@@ -1692,3 +1692,121 @@ regions:
 
 code_diag vs code: the four hook words 0x02DB420C, 0x032F011C, 0x032F0250 and 0x032F13C0, the `cl` hook 0x04BB976C,
 and 0x04BBE000-0x04BBE94C.
+
+## Step 2g v5: Furiijio's beam faces the camera; its cloud read from the 3DS code; Tiki Buzz's tread box on its node
+
+Package smashrun_step2g_v5: `code/` exe_v23 = exe_v22 + `smashrun_walker_cave.py` over its own regions (scratch
+s2gv5/build23.py, build22.py with exe_v22 as the base); `code_diag/` exe_v23 + `tools/diag_effect_cave.py --cave
+0x04BBE000` + the extended `cl` hook + the stomp lines `st` / `hit` (s2gv5/build23d.py). No data changes. User input
+behind it: the step 2g v4 diag log (uploads caf47a00-log.txt), "the icy cloud should be visible almost all the time",
+the edge-on beam, no bounce on Tiki Buzz, enemies not turning toward a target (the step 2h readings' tread bounce path).
+
+**Furiijio's beam (fixed).** The 3DS beam models (EfffsFuriijioFreezBeamBody_B / Top_B) are flat: every mesh lies in
+the model's XY plane, the beam along X after the bones' -90 degree z turn. Their bones BeamBG / BeamBG2 / BeamBody
+carry H3D billboard mode 6 (Y-axial viewpoint; flags bits 16-18, 0x60000 / 0x2860000), so the 3DS turns the planes
+about the beam toward the camera. The converted NUDs can't: no vanilla NUD mesh or VBN bone carries a billboard
+(518 vanilla effect models surveyed: mesh flag words 0 / 4 / 8 only).
+- Both games build a node override's matrix as Rz Ry Rx:
+  - 3DS lib::Matrix34::set_rotate_xyz 0x87D298, from MotionModuleImpl 0x501CBC;
+  - Wii U 0x033730A0, from the override apply 0x02C5FBC4 (0x02C60110), read instruction by instruction.
+- With the model's yaw (Ry(-90), the flip kinds' camera view), the 3DS angles (0, a lr, 90) leave the planes' Y along
+  the view: edge-on. The user's log shows exactly that: the beam body's record +0x80 holds rows (-1.338, 0, 0.677),
+  (-0.677, 0, -1.338), (0, -1.5, 0), which is this turn at a = -116.8 with the model scale 1.5.
+- Fix: FU_ROT is now (90, a lr, 90). The beam keeps its direction (X) and its planes' Z lies along the view.
+  Approximated: exact for a camera looking along -Z; the 3DS billboard follows the real eye.
+- set_rotation_order_zxy (3DS 0x7B4D04, ModelModule +0x21 = 1) is the order of the model ROOT's rotation: 0xA6DBF8
+  and its three twins build the posture rotation with set_rotate_xyz 0x87D298 or set_rotate_zxy 0x87D3B4. Furiijio's
+  posture turns about y only, where both orders agree, so there is nothing to port (step 2f's open note withdrawn).
+- Other enemy effect models with billboard bones (a converter gap, not fixed here): starman PKFireFlash2,
+  subetenoyaminoou's shouts, tikibuzz Crump, totsukotsu's, waddledoo Beam, yellowdevil's, zully Aura (modes 2 / 4 / 6).
+
+**Furiijio's cloud (read; still not seen in game).**
+- The 3DS code (enemy_fs.cro 0x6BE88-0x6DE00, every instruction) requests effects only here:
+  - charge: 0x71A0000 (0x6D1DC) / 0x71A0001 (0x6D5DC);
+  - aim: 0x71A0005 (0x6D458 / 0x6D8D0);
+  - beam: 0x71A0002 / 4 / 3 (0x6C378-0x6C3B8 and 0x6CAA0-0x6CAE0), removed by the beam exits.
+
+  Nothing is requested in start, fly or slot 55.
+- The model has one mesh (furiijio_mh, material body_mt_ref_alp), and main.bch has no material or visibility
+  animation.
+- The ptcl has three sets only: FreezBeamRoot (the cloud: BG life 25, snow 15, cool_airA 10, endless emission),
+  ShootFilling and Sign.
+
+So on the 3DS the cloud is FreezBeamRoot during the beam only (60 / 140 frames a beam). Nothing in the 3DS code
+keeps it up the rest of the time.
+
+The user's log (S4FX cl, beam frames 2 and 20) shows the cloud alive on the Wii U side:
+- **Its record** (handle 3000026, id 71A0002):
+  - the time +0x10 runs 1/60 -> 19/60;
+  - efc flags 0x110 (0x10: no end; +0x134 = 0);
+  - the matrix +0x80 is 1.5 x identity at (-2594.05, 3.58, 0): the body centre, where the beam body sits;
+  - the scale +0xB0 is (1, 1, 1).
+- **Its eft EmitterSet** (0x6CECDB98, createID 0x24) has three emitter instances (0x3F0 apart) and three controllers
+  (scale 1, mask 0xFFFF). Its draw group is 0 (the record's +0x198 = (owner >> 24) - 1, as for every enemy effect,
+  spawn 0x0334DBA0-0x0334DC04).
+
+So the cloud is made, alive, placed and scaled right; what the log did not hold is whether its emitters emit and
+draw. code_diag v5's `cl` adds those (`h` = the address for which 2-6):
+- which 3-5: each emitter instance's first 0x100 bytes (alpha +0x58, counts);
+- which 6: the set's +0x1D0..+0x2D0 (its matrices and colour / alpha / scale floats).
+
+The record layout was read from:
+- 0x0334D8D8, the spawn: +0x198 the group, +0x12C / +0x130 the eft handle, +0x20..+0x2C the model instance's,
+  +0x134 the model length (0 -> flag 0x10);
+- 0x0334E0D0, the update: +0x10 += 1/60 x the step; the record matrix goes to the set.
+
+The "+0x138 x +0x13C x +0x140 alpha" of step 2g v4 is the time step's factors, not an alpha.
+
+**Tiki Buzz's stomp.** The 3DS area 0 ({1, node 3, 12 x 3}) is on node 3, HipN. The tread box now follows that live
+node:
+- w_upd calls node_global_position 0x0200739C(acc+0x3118, 3, &v, 1), as center_pos 0x026A7104 does, for a kind with
+  CFG TNODE;
+- the box: half width 6, half height 1.5, centre offset 0. Before, it was the bind height 11.72 above the posture.
+
+The Goomba is unchanged (no TNODE). Why nothing happened in game is not established statically: the unicorn falls
+through the same code take it, before and after. code_diag v5 logs each frame a fighter is near a TREAD enemy, from
+the box centre |dx| <= 14 and -6 <= dy <= 40 (`S4FX st s=slot|state<<16 fy pv now cy cx fx`, floats as bits), and
+each stomp taken (`S4FX hit`).
+
+**The bounce height per kind (not ported).** The step 2h readings give the path:
+- the fighter's tread MSC sends LinkEvent 6 with +0x20 = 1.0;
+- the enemy answers its param 0x11 (0x02D8C5D4: acc+0x315C vt+0x44(0x11));
+- the fighter copies +0x20 / +0x24 / +0x28 into work floats at the indices its MSC passes (WorkModule vt+0x4C,
+  0x02C58BE0-0x02C58C30).
+
+Our stomp calls StatusModule(3, 0xB3, 0) directly, so this multiplier is lost. What is still missing:
+- the work-float index and StepJump's use of it (the fighters' common tread / StepJump MSC);
+- which gl word param 0x11 is. A candidate only: the Wii U gl entry's word 10 (+0x28) is 1.5 for the Goomba and 2.0
+  for Tiki Buzz and Ghos.
+
+**Enemies facing a target (not done).** The 3DS flips the flip kinds' model at lr 1 (set_flip). The Wii U's own flip
+path, through slot 38 returning 1 (fix v3's keep-flip build), needs a Wii U flip table that the converted models
+lack: the 3DS model.flp's bone pairs, whose Wii U format (the bone getter 0x0331915C's {mode, flags, bone} list) is
+not read yet. The keep-flip build looked wrong because of that missing table. Until it exists, the flip kinds keep
+yaw -90 at lr 1 and look left while walking right.
+
+**Tests** (exe_v23):
+
+| Test | Result |
+| --- | --- |
+| smashrun_walker_test.py (S/s2e/root) | 164 checks, 0 failures; new: Tiki Buzz's box on the live node 3 (taken at a node 9.72 below the bind height, none 7 beside it, node 3 of acc+0x3118 asked; the Goomba asks none) |
+| smashrun_flier_test.py | 123 checks, 0 failures; new: the beam's world turn (x 90 keeps the direction, planes face the camera; the old turn reproduces the logged matrix); Tiki Buzz CFG TNODE 3, box (6, 0, 1.5) |
+| smashrun_flier_motion_test.py | 11 checks, 0 failures |
+| smashrun_field_test.py | 12 checks, 0 failures |
+| smashrun_enemy_test.py | 0 failures |
+| effect_slots_patch_test.py exe_v23 against exe_v17 | 47 checks, all ok |
+| s3ds_effects_test.py | 52 files, 238 emitters, 0 failures |
+| s3ds_enemy_test.py furiijio | 0 failures |
+| s2gv5/test_diag23.py (code_diag, unicorn) | the extended `cl`: 105 lines a dump frame, which 3-6 as laid out |
+
+**exe_v23 vs exe_v22, word diff** (s2gv3/diff21.py; log s2gv5/diff23.log): 3589 words, all in Smash Run's regions:
+- text 0x04B7D630-0x04B7DF00 (E);
+- 0x04B84900-0x04B849FC (D: w_upd's node call);
+- 0x04B8691C-0x04B87814 (A);
+- 0x04B89020-0x04B8A000 (B);
+- 0x04BB8004, 0x04BB8190-0x04BB865C (C);
+- 0x04BB8774-0x04BBD3F0 (G).
+
+Data, relocations and file info are equal. code_diag vs code changes 834 words: the four hook words 0x02DB420C,
+0x032F011C, 0x032F0250 and 0x032F13C0, the `cl` hook 0x04BB976C, the stomp hooks 0x04BB80E4 / 0x04BB8134, and
+0x04BBE000-0x04BBECF8.
