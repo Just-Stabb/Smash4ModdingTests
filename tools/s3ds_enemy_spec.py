@@ -2038,9 +2038,15 @@ def run_kind(c, kind, args, layouts, vts):
     spec['attacks'] = attack_list(spec)
     spec['joints'] = joint_names(args.enemy_root, kind)
     for a in spec['attacks']:
+        # the enemies' node -> bone converter (3DS 0x7B8F10, Wii U 0x030833B4; docs/smash-run-port.md "Step 2e"):
+        # node 0 -> bone 0, node >= 0x1000 -> bone node - 0x1000, else jtb entry node - 1 (1-based)
         n = a.get('node')
-        if isinstance(n, int) and 0 <= n < len(spec['joints']):
-            a['bone'] = spec['joints'][n]
+        if n == 0:
+            a['bone'] = 'bone 0'
+        elif isinstance(n, int) and n >= 0x1000:
+            a['bone'] = 'bone %d' % (n - 0x1000)
+        elif isinstance(n, int) and 1 <= n <= len(spec['joints']):
+            a['bone'] = spec['joints'][n - 1]
     spec['acmd'] = acmd_for(args.enemy_root, kind, motions + [
         {'name': n.split('BodyMain')[-1]} for n in anims if 'BodyMain' in n and
         n.split('BodyMain')[-1] not in [m_.get('name') for m_ in motions]])

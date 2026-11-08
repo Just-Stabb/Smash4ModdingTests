@@ -74,8 +74,8 @@ States:
 
 | entry | state | id | part | node | power | angle | kbg | fkb | bkb | size | x | y | z | bone (jtb) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 0 | 9 | 0 | 0 | 0 | 1 | 50 | 100 | 60 | 0 | 4 | 0 | 8 | 1 | TransN |
-| 1 | 15 | 0 | 0 | 2 | 2 | 361 | 100 | 0 | 50 | 2 | 0 | 0 | 0 | HipN |
+| 0 | 9 | 0 | 0 | 0 | 1 | 50 | 100 | 60 | 0 | 4 | 0 | 8 | 1 | bone 0 |
+| 1 | 15 | 0 | 0 | 2 | 2 | 361 | 100 | 0 | 50 | 2 | 0 | 0 | 0 | RotN |
 
 ## Params
 
@@ -241,7 +241,7 @@ Per state: the attack the framework arms on entry, then each function's items in
 
 ### state 9 (enter 1ace8, update 1b680, exit None)
 
-- **attack armed on entry** (param group 2): entry 0: power 1 angle 50 kbg 100 fkb 60 bkb 0 size 4 node 0 (TransN) offset (0, 8, 1)
+- **attack armed on entry** (param group 2): entry 0: power 1 angle 50 kbg 100 fkb 60 bkb 0 size 4 node 0 (bone 0) offset (0, 8, 1)
 - enter:
   - kinetic `[[mod.KineticEnergy.f8]+0x4]+0x10 = P0[var].f1=0:0.8 1:0.8 2:0.8 3:1`
   - kinetic `[[mod.KineticEnergy.f8]+0x4]+0x8 = P0[var].f1=0:0.8 1:0.8 2:0.8 3:1`
@@ -349,7 +349,7 @@ Per state: the attack the framework arms on entry, then each function's items in
 
 ### state 15 (enter 1ac60, update 1b610, exit None)
 
-- **attack armed on entry** (param group 2): entry 1: power 2 angle 361 kbg 100 fkb 0 bkb 50 size 2 node 2 (HipN) offset (0, 0, 0)
+- **attack armed on entry** (param group 2): entry 1: power 2 angle 361 kbg 100 fkb 0 bkb 50 size 2 node 2 (RotN) offset (0, 0, 0)
 - enter:
   - motion `Behavior::change_motion_state(3, 0, 0, 0, 0)` = DamageStart
   - attack `Behavior::bullet()`

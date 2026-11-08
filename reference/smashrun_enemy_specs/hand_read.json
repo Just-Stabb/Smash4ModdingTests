@@ -614,5 +614,115 @@
   "projectiles": "none.",
   "death": "none: death_state 0 and slots 64-66 = 0; its gl entry has HP 1 and the three flags (+0x34..+0x3C) other enemies have set at 0 (no damage, inferred).",
   "meshes": "no vmt."
+ },
+ "ghos": {
+  "class": "flier (homing)",
+  "summary": "Ghos (Kid Icarus). Faces the camera and drifts after the nearest fighter in the aerial module's slip homing (two parameter sets, 96 % / 4 %, re-picked every 20-40 frames), bouncing off walls / floors / ceilings; hit: a stun of hit_return_frame() frames, then flies again; leaves after 1200 frames without hitting or being hit. Its body hurts all the time while it flies.",
+  "read": "enemy_fs.cro (update): create 0x11560, ctor 0x11598 (EnemyAerialModuleImpl at +0x168, set_motion_label without hashsets, no set_damage_motion_label), start 0x109C0, states: 1 0x1091C / 0x10E24, 2 0x10AD0 / 0x10EE4, 3 0x10DD0 / 0x10F78, 4 0x10E84 / 0x1105C, 5 remove; helpers L66BA4 (slip-homing pick), L1120C (bounce); slots 11 notify_on_damage 0x11094, 28 notify_on_remove 0x11140, 31 0x113F0, 55 0x10B9C, 69 0x113A4; slots 64-66 = 1, 67 = 4. code.bin: EnemyAerialModuleImpl::set_mode_slip_homing 0x5F5F58, update 0x5F66AC, GroundCollisionObject::get_ground_normal 0x96A538, Behavior::hit_return_frame 0x9EA9B0 (factor 0x9EB4C0, damage 0x9EAAB4), init_common_leave 0x7B23B4, finalize_common_leave 0x7B475C.",
+  "states": {
+   "1": "Fly: kinetic 26, L66BA4 (timer = random(P@0x8C 20, P@0x90 40); random_choice(96, 4) -> set_mode_slip_homing(P7 entry 0 / 1: s0 +0, s1 +0xC, s2 +8, s3 +0x14, s4 +4, s5 +0x10)), ground off, passable on, FlyHoming loop, aerial set_target(the start's nearest fighter, 0). Update: aerial update; the timer runs out -> L66BA4; L1120C; the leave timer (P@0xA0 1200) runs out -> 3.",
+   "2": "Stun (slot 69): kinetic 16, ground off, passable on, DamageStart once, frames = hit_return_frame(), mesh 1 off / 0 on, kinetic flag |= 0x80; the frames run out: flag cleared, meshes back, -> 1.",
+   "3": "Leave: set_motion_no_restart(FlyHoming), init_common_leave(P6 {100, 0.02, 30, -1, 0, 0, 3, 0, 0.85}); update_common_leave == 0 -> 5.",
+   "4": "Dead: DamageStart at rate 0, bullet(), meshes 1 off / 0 on; kinetic flag 8 -> 5.",
+   "5": "Remove (EnemyManager::remove_enemy_by_id)."
+  },
+  "danger": [
+   {
+    "states": [
+     1
+    ],
+    "source": "param P2 entry 1 (set_attack_data)",
+    "power": 3,
+    "angle": 361,
+    "kbg": 50,
+    "fkb": 0,
+    "bkb": 50,
+    "size": 8,
+    "node": 3,
+    "note": "node 3 = jtb entry 2 = HipN; on while it flies"
+   },
+   {
+    "states": [
+     4
+    ],
+    "source": "param P2 entry 0 (set_attack_data)",
+    "power": 3,
+    "angle": 361,
+    "kbg": 100,
+    "fkb": 0,
+    "bkb": 50,
+    "size": 8,
+    "node": 3,
+    "note": "the defeated body (bullet)"
+   }
+  ],
+  "contact": "yes in state 1 (fly: power 3, angle 361, kbg 50, bkb 50, size 8, node 3 HipN); the defeated body (state 4: kbg 100). No explicit attack calls; no ACMD (no hashsets, no animcmd files).",
+  "targeting": "start: the nearest fighter (kept); aerial slip homing toward it; slot 55 turns node 2 and the posture toward it (rx = -dy 30, ry = dx 30 degrees: not ported).",
+  "kinetics": "slip homing (code.bin 0x5F5F58: mode 2, energy 0 re-initialised with its current speed, params +0x10..+0x24, energy 0 on / 1 off, target point = position); bounce L1120C: on is_touch(0xFF), r = |v|^2 / 0.8^2; r < 0.1 (and r <= 1): nothing; v reflected on get_ground_normal(0xFF) (the sum of the touched lines' normals, normalised), normalised, times 0.6 min(r, 1) -> set_current_speed.",
+  "damage": "slot 11 notify_on_damage: (a weapon / held item / flagged attack per slot 31 restores the HP with init_damage) BehaviorImpl::notify_on_damage, stop_se, the leave timer = 1200. Slot 69 (called by it): a running leave finalised + set_correct(5), => 2, returns 1 (the framework's own reaction skipped). hit_return_frame = int(int(gl +0x154) x f), f = gl +0x160 + (gl +0x164 - gl +0x160) (clamp(d, gl +0x158, gl +0x15C) - gl +0x158) / (gl +0x15C - gl +0x158), d = DamageModule +0x6C; the Wii U gl file's ghos entry (index kind + 1): +0x154 30, +0x158 1, +0x15C 80, +0x160 2, +0x164 1.",
+  "death": "state 4 (bullet); leave state 3 after 1200 frames (reset by being hit).",
+  "wiiu": "Wii U: aerial ctor 0x02DB2C44, update 0x02DB28C8, set_mode_slip_homing 0x02DB28E4 (mode 2; the earlier notes called it set_mode_homing), set_current_speed 0x02DB2BC0, get_ground_normal 0x02D64ABC (via GroundModule +0x18, as is_touch 0x02C38A24), the hit_return_frame factor 0x02DB4ED4 (gl +0x158..+0x164, damage float via 0x026A81F8: DamageModule acc+0x30D4 +0x6C), gl entry [[0x102F6C00] + 0x34] + 0x228 [[0x102F6C00] + 0x1E4 + 4 (8 kind + var)]; BehaviorImpl::notify_on_damage 0x026A3564 calls slot 69 (vt+0x234).",
+  "not_ported": "slot 31 (weapons counted as fighters' own, held items other than kinds 0x12 / 0x24 and attacks with the AttackData +0x4C flag: HP restored and +0x5A2 of module acc+0x3074 cleared, play_se(15)); slot 55 / slot 5 (the body / node 2 turned toward the target); set_node_visibility (damage mesh); play_se / stop_se.",
+  "meshes": "0 damage_VIS_O_OBJ, 1 normal_VIS_O_OBJ (not switched: no Wii U path)."
+ },
+ "tikibuzz": {
+  "class": "flier (dive bomber)",
+  "summary": "Tiki Buzz (Kirby). Hovers 35 units above fighter 0 (aerial homing extend), searches below itself every 30 frames; finds a fighter: a 0.75x hold, then dives at 6 units a frame (the only hitbox) for 9 frames, brakes, or lands (quake) and takes off again; leaves after 900 frames; stepped on: drops and vanishes.",
+  "read": "enemy_fs.cro (update): create 0x78630, ctor 0x787B8 (no hashsets; damage labels DamageStart .. DownWait, Fly), start 0x778A8, initialize 0x77DC8 (energy +0x44 = P0 f18), states: 1 0x77BD8 / 0x77E10, 2 0x77C80 / 0x7806C, 3 0x78668 / 0x77A2C, 4 0x780A4 / 0x78410, 5 0x77964 / 0x77CB0, 6 0x78240 / 0x784B4, 7 0x78454 / 0x78554, 8 0x77D7C / 0x78204, 9 0x7781C / 0x77C40, 10 0x77F04 / 0x78388, 11 0x77E50 / 0x78378, 12 remove; slot 21 0x77C30 (=> 10), slots 11 / 60 (meshes only); 64-66 = 3, 67 = 2. code.bin: set_mode_homing 0x5F59C4 / homing_extend 0x5F60F0, set_mode_none 0x5F58C8, set_mode_braking 0x5F5B48, set_mode_uniform 0x5F5BD4, update 0x5F66AC (jump table 0x5F66E4: mode 5 does nothing).",
+  "states": {
+   "1": "Fall: kinetic 8, ground off, Fly loop; on the ground -> 3.",
+   "2": "Dead: DamageStart at rate 0, bullet(); kinetic flag 8 -> 12.",
+   "3": "Fly: ground off, passable on, Y = y, Fly loop, set_mode_homing_extend(f3 0.05, f4 0.11, f7 0.05, f8 0.06, f5 0.5, f6 1.1), aerial +0x54 = 1, +0x5C = 0, +0x58 = -1, set_target(fighter 0, (0, f1 35, 0)), counter 0, meshes normal. Update: aerial update; MotionModule +0x50 = f9 (1) rising / f10 (0.2) not; Y = y; cool-down > 0: -1; else every search-0 interval (30) frames of the counter search_target(0) ({2, 30, 15, 60, 0, -25}) -> 4, cool-down int(f17 152), return; counter < f2 (900): +1, else -> 9.",
+   "4": "Hold: ground off, passable on, AttackHold at f11 (0.75), set_mode_none, kinetic 11, V = fighter 0's y, play_se 0x89C0000; aerial update; end -> 5.",
+   "5": "Dive: ground off, passable on, Attack loop, set_mode_uniform((0, -f12 6)), counter 0, play_se 0x89C0001; aerial update; y <= V: passable off; on the ground => 7; counter < f13 (9): +1, else -> 6.",
+   "6": "Brake: ground off, passable on, AttackBrake at f16 (0.7), set_mode_braking(0, f15 0.04), +0x1F0 = -1; aerial update; on the ground: speed 0, set_mode_none, end -> 3; in the air: speed y >= 0 -> 3.",
+   "7": "Landed: ground on, AttackUnguard, set_mode_none, counter 0, request_quake(3); aerial update; counter < f14 (45): +1, else -> 8.",
+   "8": "Ready: ground off, FlyReady, set_mode_none; end -> 3.",
+   "9": "Leave: ground off, passable on, Fly loop, set_correct(0), set_mode_none, timer P@0x78 200; aerial update; timer out -> 12.",
+   "10": "Stomped (slot 21): ground off, passable on, Step, create_dead_item(1, 10), disable_hit, counter 0, set_mode_uniform((0, -f19 3)), meshes damage 2, effect 0x70F0000 at the position, play_se 0x89C0002; aerial update; counter < f20 (60) and not on the ground: +1, else -> 11.",
+   "11": "Gone: kinetic 26, ground on, passable on, set_visibility(0), effect 0x70F0001, play_se 0x89C0003; -> 12.",
+   "12": "Remove."
+  },
+  "danger": [
+   {
+    "states": [
+     5
+    ],
+    "source": "param P2 entry 0 (set_attack_data)",
+    "power": 2,
+    "angle": 60,
+    "kbg": 120,
+    "fkb": 50,
+    "bkb": 0,
+    "size": 4,
+    "node": 2,
+    "offset": [
+     0,
+     -1,
+     0
+    ],
+    "note": "node 2 = jtb entry 1 = RotN; the dive only"
+   },
+   {
+    "states": [
+     2
+    ],
+    "source": "param P2 entry 1 (set_attack_data)",
+    "power": 2,
+    "angle": 361,
+    "kbg": 100,
+    "fkb": 0,
+    "bkb": 50,
+    "size": 3,
+    "node": 2,
+    "note": "the defeated body"
+   }
+  ],
+  "contact": "only in the dive (state 5: power 2, angle 60, kbg 120, fkb 50, size 4, node 2, y -1) and the defeated body (state 2). No explicit attack calls; no ACMD.",
+  "targeting": "aerial homing toward fighter 0 + (0, 35, 0); search group 0 every 30 frames (a 15 x 60 box 25 below it); start faces the nearest fighter.",
+  "kinetics": "setters (code.bin): every one = the mode, energy 0 vt+0xC(0x17, speed, 0, acc) (Wii U vt+0x1C, vptr +0x1C), energy 0 on / 1 off: homing speed 0 (homing_extend = homing + mode 3), slip homing the current speed, none (-1) 0, braking (4) the current speed + params +0x18 / +0x1C, uniform (5) the given speed; the update's mode 5 does nothing (the speed set once).",
+  "death": "state 2 (bullet); stomped: 10 -> 11 -> removed (create_dead_item: kill and item drop); leave: 9 after 900 fly frames.",
+  "not_ported": "start's GroundCollisionObject +0x141 = 4 / +0x142 = 0 and set_circle_follow_node(2) (the Wii U collision object's layout differs past +0x100; not mapped); the flap rate (MotionModule +0x50); meshes (set_mesh_visibility) and set_visibility(0); play_se.",
+  "meshes": "0 Damage1_VIS_O_OBJ, 1 Damage2_VIS_O_OBJ, 2 Normal_VIS_O_OBJ."
  }
 }

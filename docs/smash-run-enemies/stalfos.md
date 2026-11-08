@@ -104,7 +104,7 @@ States:
 
 | entry | state | id | part | node | power | angle | kbg | fkb | bkb | size | x | y | z | bone (jtb) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 0 | 23 | 0 | 0 | 2 | 10 | 361 | 100 | 0 | 50 | 8 | 0 | 0 | 0 | HipN |
+| 0 | 23 | 0 | 0 | 2 | 10 | 361 | 100 | 0 | 50 | 8 | 0 | 0 | 0 | RotN |
 
 ## Params
 
@@ -634,7 +634,7 @@ Per state: the attack the framework arms on entry, then each function's items in
 
 ### state 23 (enter 50c14, update 51c4c, exit None)
 
-- **attack armed on entry** (param group 2): entry 0: power 10 angle 361 kbg 100 fkb 0 bkb 50 size 8 node 2 (HipN) offset (0, 0, 0)
+- **attack armed on entry** (param group 2): entry 0: power 10 angle 361 kbg 100 fkb 0 bkb 50 size 8 node 2 (RotN) offset (0, 0, 0)
 - enter:
   - kinetic `EnemyKineticModuleImpl::change_kinetic(23)`
   - ground `GroundModuleImpl::set_attach_ground(0)`

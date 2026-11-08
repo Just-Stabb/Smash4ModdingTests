@@ -87,6 +87,15 @@ Step 2c v2: the White Bear's landing (state 9 enter) also does request_quake(6) 
   effect 0x8000005 following node 0) for 300 frames -> remove); the death / collapse enters set DEFEATED (+0x19C)
   and the notify_on_remove hook gives the defeat path only to those (a leave is removed plainly).
 
+Step 2e (docs/smash-run-port.md, "Step 2e"; region G, code_f): the fliers (FLIERS) Ghos 0x11 and Tiki Buzz 0x0F,
+  walker-engine kinds with their own CFG VT / SIZE (0x230: the aerial module at AER 0x1B0) / tread box / handlers:
+  VTF = VT but slots 10 / 27 / 41 / 69 (the kind's FDMG / F27 / FSTART / F69, else BehaviorImpl's). Ghos: 1 fly
+  (slip homing on the nearest fighter, the wall bounce, 1200-frame leave timer), 2 stun (hit_return_frame), 3 leave,
+  4 dead, 5 remove; contact P2 entry 1 in 1. Tiki Buzz: 1 fall, 2 dead, 3 fly (homing extend on fighter 0 + 35,
+  search every 30 frames, 900-frame leave), 4 hold, 5 dive (uniform (0, -6); the only hitbox, P2 entry 0), 6 brake,
+  7 landed (quake 3), 8 ready, 9 leave, 10 stomped (slot 20 and the stomp test, box (6, 11.72, 1.5)), 11 gone, 12
+  remove. Region G is new code space past the old text region (textregion:0x2BC0000, grow:0x04BC0000).
+
 Not ported (the README lists them): the Waddle Doo's beam (states 7 / 8: an article the Wii U has no weapon kind
 for) and its leave timer (9) and random hop (6); the Churine's sleep powder (6 / 7: an effect and attack the Wii U
 has no data for); the Waddle Dee's parasol float (EnemyAerialModule embedded in the 3DS object: the parasol fall is
@@ -197,8 +206,13 @@ CAVE_D, LIMIT_D = 0x04B84900, 0x04B84A00    # fix v8: free between stage_omega_c
 # 0x04B8597C, sets to 0x04B8621C) and the old .text end before position_vars_cave.py's 0x04B78000
 CAVE_E, LIMIT_E = 0x04B7D600, 0x04B7DF00    # code, then data
 DATA_F = ((0x04B85980, 0x04B85C00), (0x04B86220, 0x04B86800), (0x04B77E20, 0x04B78000))     # data only
-REGIONS = ((CAVE, LIMIT), (CAVE_B, LIMIT_B), (CAVE_C, LIMIT_C), (CAVE_D, LIMIT_D), (CAVE_E, LIMIT_E)) + DATA_F
-GROW = LIMIT_C
+# step 2e: the fliers' code and data, in new code space after the text region's old end 0x04BB8670 (the RPL file
+# info's textRegionSize raised to TEXT_REGION, the text section grown to LIMIT_G: nothing there in exe_v15)
+CAVE_G, LIMIT_G = 0x04BB8680, 0x04BC0000
+TEXT_REGION = LIMIT_G - 0x02000000
+REGIONS = ((CAVE, LIMIT), (CAVE_B, LIMIT_B), (CAVE_C, LIMIT_C), (CAVE_D, LIMIT_D), (CAVE_E, LIMIT_E),
+           (CAVE_G, LIMIT_G)) + DATA_F
+GROW = LIMIT_G
 
 # the framework (docs/smash-run-port.md, Step 2b / Fix v5)
 OPNEW = 0x03374578
@@ -260,6 +274,23 @@ SITE_S, WORD_S = 0x02D9A618, 0x801C05EC      # lwz r0, 0x5EC(r28)
 # fix v3 (enemy-wide, for the Smash Run kinds < 0x50: 2a's four and the walkers)
 SITE_ROT, WORD_ROT = 0x02DB4B20, 0x815F0000  # initialize_after: lwz r10, 0(r31)
 SITE_DEATH, WORD_DEATH = 0x02DB40E4, 0x7C0802A6   # notify_on_remove: mflr r0
+# ---- step 2e: the fliers (the Wii U's EnemyAerialModuleImpl, as mczakoplasmawisp embeds it; 3DS names / addresses)
+AER = 0x1B0                          # the aerial module in a flier (0x74 bytes; the 3DS behaviours' +0x168)
+FL_SIZE = 0x230                      # a flier object: the walker's 0x1B0, the aerial module, 3 words
+AER_CTOR = 0x02DB2C44                # EnemyAerialModuleImpl(acc) (3DS 0x5F6BAC): +0 acc, +4 / +8 energies, mode -1
+AER_UPDATE = 0x02DB28C8              # update() -> update(1.0, 1.0, true) 0x02DB2524 (3DS 0x5F6B80 / 0x5F66AC)
+AER_SLIP_HOMING = 0x02DB28E4         # set_mode_slip_homing(f1-f6) (3DS 0x5F5F58: mode 2, params +0x10..+0x24)
+AER_SLIP_HOMING_EXT = 0x02DB2A48     # set_mode_slip_homing_extend (3DS 0x5F64FC: slip homing, then mode 3)
+AER_SET_SPEED = 0x02DB2BC0           # set_current_speed(Vector2&) (3DS 0x5F5C58): energy 0's speed x / y
+GROUND_NORMAL = 0x02D64ABC           # GroundCollisionObject::get_ground_normal(mask) -> (r3, r4) = (x, y) bits
+#                                      (3DS 0x96A538; the GroundModule's +0x18, as is_touch 0x02C38A24 reads it)
+SET_PASSABLE = 0x02C367C4            # GroundModule set_passable_check(bool) (3DS 0x4E1B84)
+SQRTF = 0x04ADEAB8                   # sqrtf (get_distance 0x02DB2C08 tail-calls it)
+HIT_FACTOR = 0x02DB4ED4              # the 3DS's 0x9EB4C0 (hit_return_frame's factor: gl +0x158..+0x164, the
+#                                      DamageModule (acc+0x30D4) float +0x6C through 0x026A81F8)
+BI_NOTIFY_DMG = 0x026A3564           # BehaviorImpl::notify_on_damage (slot 10; the 3DS's slot 11)
+GL_INDEX, GL_BASE = 0x1E4, 0x34      # gl entry = [[PARAM_MGR] + 0x34] + 0x228 * [[PARAM_MGR] + 0x1E4 + 4 * (8K + var)]
+VT_WORDS = [None]                    # BehaviorImpl's vtable words (read from the input), for code_f
 TWIN_FLIP = ((0x1008FFCC, 0x026D7C98), (0x1008F1D4, 0x026D19F4), (0x1008EC68, 0x026CF200))
 RELOC_DUMMY = 0x037EE73C
 SET_LR_SLOT = 49
@@ -289,7 +320,7 @@ SLOT = {50: 0xC + 8 * 50, 72: 0xC + 8 * 72, 73: 0xC + 8 * 73}     # reverse_lr, 
 CF = {}
 for _i, _n in enumerate(('KIND NST TAB START START01 R64 R65 R66 R67 REMOVE DEADMOT HASH EN ENN KICK SET ATK SRCH '
                          'FALLMOT LANDST LANDMOT TURNMOT TURNST WALKST HOPTHR HOPLAND HOPFLAG HOPMOT HOPLOOP ZERO TREAD AREA '
-                         'SMODE LEAVE').split()):
+                         'SMODE LEAVE VT SIZE TB0 TB1 TB2 FSTART FDMG F69 F27 LVP').split()):
     CF[_n] = 4 * _i
 CF['DMG'] = 4 * len(CF)              # 9 words
 CF['P'] = CF['DMG'] + 4 * 9          # the kind's own values P0.. (at least five words)
@@ -327,7 +358,26 @@ WHITEBEAR_BULLET = (10, 0, 0, 2, 8, 361, 100, 0, 50, 5, 0.0, 0.0, 0.0, 0, 0.0, 2
 # three floats mapped by their order: effect 0, hitlag 1.0, sdi 1.0, sound level 2, sound type 1, facing 3 (the
 # Wii U throws' default), no reaction 0, type 0)
 ABS_WORDS = (0x2716, 0, 0, 10.0, 90, 100, 0, 40, 0, 0.0, 1.0, 1.0, 2, 1, 3, 0, 0, 0)
-ATTACKS = {'kuribo_bump': KURIBO_BUMP, 'heiho_bump': HEIHO_BUMP, 'bullet': BULLET_ATK, 'heiho_bullet': HEIHO_BULLET,
+SPECS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'reference', 'smashrun_enemy_specs')
+
+
+def vl_group(kind, index):
+    """the kind's fs vl group `index` (its entries, typed as in the file: floats stay floats), from the generated
+    spec (reference/smashrun_enemy_specs/<kind>.json, read from the 3DS param files)"""
+    import json
+    with open(os.path.join(SPECS, kind + '.json')) as f:
+        members = json.load(f)['params']['members']
+    if index == 'struct':
+        return [m for m in members if m['type'] == 'struct'][0]['values'][0]
+    return [m for m in members if m.get('index') == index][0]['values']
+
+
+# step 2e: the fliers' vl P2 entries (the 3DS files' words)
+GHOS_BODY = tuple(vl_group('ghos', 2)[1])          # state 1 (fly): power 3, angle 361, kbg 50, bkb 50, size 8, node 3
+GHOS_BULLET = tuple(vl_group('ghos', 2)[0])        # state 4 (dead): power 3, angle 361, kbg 100, bkb 50, size 8
+TIKI_DIVE = tuple(vl_group('tikibuzz', 2)[0])      # state 5 (dive): power 2, angle 60, kbg 120, fkb 50, size 4, y -1
+TIKI_BULLET = tuple(vl_group('tikibuzz', 2)[1])    # state 2 (dead): power 2, angle 361, kbg 100, bkb 50, size 3
+ATTACKS = {'ghos_body': GHOS_BODY, 'ghos_bullet': GHOS_BULLET, 'tiki_dive': TIKI_DIVE, 'tiki_bullet': TIKI_BULLET, 'kuribo_bump': KURIBO_BUMP, 'heiho_bump': HEIHO_BUMP, 'bullet': BULLET_ATK, 'heiho_bullet': HEIHO_BULLET,
            'churine_bullet': CHURINE_BULLET, 'gordo_spike': GORDO_SPIKE, 'whitebear_bullet': WHITEBEAR_BULLET}
 DAMAGE_LABELS = ('DamageStart', 'DamageFly', 'DamageFall', 'DownBound', 'DownBound', 'DownLoop', 'DownBoundEnd',
                  'DownWait')
@@ -455,6 +505,43 @@ WALKERS = (
          attacks=((1, 'gordo_spike'), (2, 'gordo_spike')),
          P=()),
 )
+_GS = vl_group('ghos', 'struct')     # P@0x8C: 20, 40, 96.0, 0.6, 0.8, 1200, 30.0
+_GP7 = vl_group('ghos', 7)           # the two slip-homing sets
+_GP6 = vl_group('ghos', 6)[0]        # the leave: {100, 0.02, 30, -1, 0, 0, 3, 0, 0.85}
+_TP0 = vl_group('tikibuzz', 0)[0]    # Tiki Buzz's P0 row (variation 0)
+FLIERS = (
+    # Ghos (Kid Icarus) 0x11, BehaviorGhos (create 0x11560, table 0x10D350; docs/smash-run-port.md "Step 2e")
+    dict(name='ghos', kind=0x11, flier=True, size=FL_SIZE, areas=tuple(tuple(e) for e in vl_group('ghos', 5)),
+         motions=(('DamageStart', 1), ('FlyHoming', 1)), no_damage_labels=True,    # its ctor: no damage labels,
+         dead='DamageStart', last=None, hashset=False, kick=False,                   # no hashsets
+         energy={},                                      # initialize 0x10F74: bx lr
+         states={1: ('f_g1_en', 'f_g1_up'), 2: ('f_g2_en', 'f_g2_up'), 3: ('f_leave_en', 'o_leave_up'),
+                 4: ('g_dead_en', 'g_dead_up'), 5: 'remove'},
+         start=(1, 1), rets=(1, 1, 1, 4), remove=5, fall=(None, 0), landing=None, turn=None, turnst=0, walkst=0,
+         hop=(0.0, 0, 0), search=((0, 120, 300.0, 0.0, 0.0, 0.0, 0.0),),           # P1 (never searched)
+         attacks=((1, 'ghos_body'), (4, 'ghos_bullet')),
+         fstart='f_ghos_start', fdmg='f_ghos_dmg', f69='f_ghos_69', f27='f_ghos_rm', lvp=19,
+         P=(_GS[0], _GS[1], int(_GS[2]), _GS[3], _GS[4], _GS[5], 0.1) + tuple(_GP7[0]) + tuple(_GP7[1]) +
+           (_GP6[0], -_GP6[1], _GP6[2], _GP6[6], _GP6[8], 1.0, 0.0)),
+    # Tiki Buzz (Kirby) 0x0F, BehaviorTikibuzz (create 0x78630, table 0x10E134)
+    dict(name='tikibuzz', kind=0x0F, flier=True, size=FL_SIZE, areas=tuple(tuple(e) for e in vl_group('tikibuzz', 5)),
+         motions=(('Attack', 1), ('AttackBrake', 1), ('AttackHold', 4), ('AttackUnguard', 1), ('DamageFall', 1),
+                  ('DamageFly', 1), ('DamageStart', 1), ('DownBound', 1), ('DownBoundEnd', 1), ('DownLoop', 1),
+                  ('DownWait', 1), ('Fly', 1), ('FlyReady', 1), ('Step', 1)),
+         dead='DamageStart', last='Fly', hashset=False, kick=False,
+         energy={0x44: _TP0[18]},                       # initialize 0x77DC8: energy +0x44 = P0 f18 (0.98)
+         states={1: ('t_fall_en', 't_fall_up'), 2: ('g_dead_en', 'g_dead_up'), 3: ('t_fly_en', 't_fly_up'),
+                 4: ('t_hold_en', 't_hold_up'), 5: ('t_dive_en', 't_dive_up'), 6: ('t_brk_en', 't_brk_up'),
+                 7: ('t_land_en', 't_land_up'), 8: ('t_rdy_en', 't_rdy_up'), 9: ('t_lv_en', 't_lv_up'),
+                 10: ('t_stomp_en', 't_stomp_up'), 11: ('t_gone_en', 't_gone_up'), 12: 'remove'},
+         tread=10, tbox=(6.0, 11.72, 1.5),             # area 0 (node 3 = HipN, 12 x 3; HipN's bind height 11.72)
+         start=(3, 3), rets=(3, 3, 3, 2), remove=12, fall=(None, 0), landing=None, turn=None, turnst=0, walkst=0,
+         hop=(0.0, 0, 0), search=tuple(tuple(g) for g in vl_group('tikibuzz', 1)),
+         attacks=((5, 'tiki_dive'), (2, 'tiki_bullet')), fstart='f_tiki_start',
+         P=tuple(_TP0[:14]) + (int(_TP0[14]),) + tuple(_TP0[15:19]) + (float(_TP0[19]), _TP0[20]) +
+           (vl_group('tikibuzz', 'struct')[0], _TP0[3], _TP0[4], _TP0[7], _TP0[8], _TP0[5], _TP0[6], 0.0)),
+)
+WALKERS = WALKERS + FLIERS
 KINDS = tuple(w['kind'] for w in WALKERS)
 
 
@@ -511,8 +598,8 @@ def damage_labels(w):
     return [index(w, s) for s in DAMAGE_LABELS] + [index(w, w['last'])]
 
 
-def cfg_values(w, D):
-    """the kind's CFG words (D: data labels)"""
+def cfg_values(w, D, fn=lambda x: 0):
+    """the kind's CFG words (D: data labels, fn: code label -> address)"""
     n = w['name']
     lm = lambda s: index(w, s) if s else 0  # noqa: E731
     c = dict(KIND=w['kind'], NST=nstates(w), TAB=D['st_' + n] - 0x18, START=w['start'][0], START01=w['start'][1],
@@ -523,7 +610,11 @@ def cfg_values(w, D):
              TURNST=w['turnst'], WALKST=w['walkst'], HOPTHR=fword(w['hop'][0]), HOPLAND=w['hop'][1],
              HOPFLAG=w['hop'][2], HOPMOT=lm(w.get('hop_motion', (None, 0))[0]),
              HOPLOOP=w.get('hop_motion', (None, 0))[1], ZERO=0, TREAD=w.get('tread', 0), AREA=D['ar_' + n],
-             SMODE=w.get('smode', 0), LEAVE=w.get('leave', 0))
+             SMODE=w.get('smode', 0), LEAVE=w.get('leave', 0),
+             VT=D['vtf' if w.get('flier') else 'vt'], SIZE=w.get('size', OBJ_SIZE),
+             TB0=fword(w.get('tbox', TREAD_BOX)[0]), TB1=fword(w.get('tbox', TREAD_BOX)[1]),
+             TB2=fword(w.get('tbox', TREAD_BOX)[2]), FSTART=fn(w.get('fstart', 0)), FDMG=fn(w.get('fdmg', 0)),
+             F69=fn(w.get('f69', 0)), F27=fn(w.get('f27', 0)), LVP=P(w['lvp']) if 'lvp' in w else 0)
     words = [0] * (cfg_size(w) // 4)
     for k, v in c.items():
         words[CF[k] // 4] = v & 0xFFFFFFFF
@@ -550,6 +641,7 @@ class Data:
         b = self.blocks = []
         b.append(('consts', [fword(0.0), fword(1.0), 0x2545F491, 0], 0x10))     # 0.0, 1.0, the xorshift state
         b.append(('abs_words', [word(v) for v in ABS_WORDS], 4))
+        b.append(('fconsts', [0x43300000, 0x80000000], 8))      # the int -> double bias (f_hitret)
         vt = list(self.vt_words) + [0, 0, 0, 0]          # 74 slots + 74 / 75
         over = {12: ZIMA_CAPTURE_MOTION, 38: ZIMA_ONE if KEEP_FLIP else fn('w_noflip'), 40: fn('w_init'),
                 3: fn('w_upd'), 41: fn('w_start'), 45: fn('w_atk'), TREAD_SLOT: fn('w_tread'), 64: fn('w_r64'), 65: fn('w_r65'), 66: fn('w_r66'),
@@ -558,6 +650,11 @@ class Data:
             vt[(0xC + 8 * k) // 4] = f
             vt[(0x8 + 8 * k) // 4] = 0
         b.append(('vt', vt, 4))
+        vtf = list(vt)
+        for k in (10, 27, 41, 69):
+            vtf[(0xC + 8 * k) // 4] = fn('f_v%d' % k)
+            vtf[(0x8 + 8 * k) // 4] = 0
+        b.append(('vtf', vtf, 4))
         ktab = []
         for w in WALKERS:
             ktab += [w['kind'], g('cfg_' + w['name'])]
@@ -587,7 +684,9 @@ class Data:
             b.append(('st_' + n, st, 4))
             b.append(('ar_' + n, [word(v) for e in w['areas'] for v in e], 4))
             need = ('st_', 'en_', 'set_', 'atk_', 'sr_', 'ar_') + (('hs_',) if w['hashset'] else ())
-            b.append(('cfg_' + n, cfg_values(w, {p + n: g(p + n) for p in need}), 4))
+            dd = {p + n: g(p + n) for p in need}
+            dd.update(vt=g('vt'), vtf=g('vtf'))
+            b.append(('cfg_' + n, cfg_values(w, dd, fn), 4))
         return self
 
     def place(self, spans):
@@ -899,7 +998,7 @@ def code(D):
         b c_loop
     c_found:
         lwz r31, 4(r11)
-        li r3, 0x%X
+        lwz r3, 0x%X(r31)
         bl 0x%08X
         mr. r27, r3
         beq c_out
@@ -909,7 +1008,9 @@ def code(D):
         bl 0x%08X
         li r0, 0
         addi r11, r27, 0xE0
-        li r12, %d
+        lwz r12, 0x%X(r31)
+        addi r12, r12, -0xE4
+        srwi r12, r12, 2
         mtctr r12
     c_zero:
         stwu r0, 4(r11)
@@ -918,9 +1019,9 @@ def code(D):
         stb r0, 0x120(r27)
         li r0, -1
         stw r0, 0x15C(r27)
-    """ % (OBJ_SIZE, OPNEW, BEH_CTOR, (OBJ_SIZE - 0xE4) // 4))
-    la(A, 'r11', 'vt')
+    """ % (CF['SIZE'], OPNEW, BEH_CTOR, CF['SIZE']))
     A.asm("""
+        lwz r11, 0x%X(r31)
         stw r11, 0xE0(r27)
         lis r11, 0x%04X
         lwz r12, %d(r11)
@@ -936,7 +1037,7 @@ def code(D):
         cmpwi r4, -1
         beq c_out
         mr r3, r27
-    """ % (ha(COMMON_PMF), sx(COMMON_PMF), sx(COMMON_PMF + 4), CF['HASH'], SET_MOTION_LABEL, CF['DMG']))
+    """ % (CF['VT'], ha(COMMON_PMF), sx(COMMON_PMF), sx(COMMON_PMF + 4), CF['HASH'], SET_MOTION_LABEL, CF['DMG']))
     for i, r in enumerate(('r4', 'r5', 'r6', 'r7', 'r8', 'r9', 'r10')):
         A.asm("lwz %s, 0x%X(r31)" % (r, CF['DMG'] + 4 * i))
     A.asm("""
@@ -1801,7 +1902,7 @@ def code(D):
         lwz r0, 0x5EC(r28)
         b 0x%08X
     """ % (SITE_S + 4))
-    return A, B, code_e(D, en, st, far, lfs)
+    return A, B, code_e(D, en, st, far, lfs), code_f(D, VT_WORDS[0])
 
 
 def code_e(D, en, st, far, lfs):
@@ -2079,8 +2180,8 @@ def code_e(D, en, st, far, lfs):
         bctrl
         li r0, 0
         stw r0, 0x%(V5)X(r31)
-        li r4, 7
-        b go""" % dict(V5=V(5), V6=V(6), RMH=REMOVE_EFFECT >> 16, RML=REMOVE_EFFECT & 0xFFFF))
+        lwz r4, 0x%(RM)X(r30)
+        b go""" % dict(V5=V(5), V6=V(6), RMH=REMOVE_EFFECT >> 16, RML=REMOVE_EFFECT & 0xFFFF, RM=CF['REMOVE']))
     # the landing's absolute hit (v2; the 3DS 0x7EF04-0x7F01C: set_attack_absolute_data(P6), then for the fighter
     # entries in order the first on the ground gets hit_attack_absolute(P6 id 0, entry), once): the fighter table
     # (slots 0-3, live) as the stomp test reads it; on the ground = MSC StatusModule(1) (the situation) == 0; the
@@ -2208,27 +2309,856 @@ def code_e(D, en, st, far, lfs):
     return Ee
 
 
+def code_f(D, vtw):
+    """step 2e (region G): the fliers' framework (the vtable's dispatching slots 10 / 27 / 41 / 69, the leave) and
+    each flier's own states (3DS enemy_fs.cro addresses in the comments). Conditional branches to the shared exits
+    (region A) use .far."""
+    G = Asm(CAVE_G)
+
+    def far(t):
+        G.asm("lis r12, 0x%04X\nori r12, r12, 0x%04X\nmtctr r12\nbctrl" % (t >> 16, t & 0xFFFF))
+
+    def st(label, body):
+        G.asm("%s:\nmflr r0\nbl pro\n%s\nb epi" % (label, body))
+
+    def lfs(fr, label, off=0):
+        G.asm("lis r12, 0x%04X\nlfs %s, %d(r12)" % (ha(D[label] + off), fr, sx(D[label] + off)))
+
+    orig = lambda k: vtw[(0xC + 8 * k) // 4]  # noqa: E731
+    # ---- the vtable's dispatching slots: the kind's CFG handler (FSTART / FDMG / F27 / F69), else BehaviorImpl's
+    G.asm("""
+    f_v41:
+        lwz r12, 0x168(r3)
+        lwz r12, 0x%X(r12)
+        mtctr r12
+        bctr
+    """ % CF['FSTART'])
+    for k, f in ((10, 'FDMG'), (27, 'F27'), (69, 'F69')):
+        G.asm("""
+        f_v%d:
+            lwz r12, 0x168(r3)
+            lwz r12, 0x%X(r12)
+            cmpwi r12, 0
+            bne f_v%d_go
+            lis r12, 0x%04X
+            ori r12, r12, 0x%04X
+        f_v%d_go:
+            mtctr r12
+            bctr
+        """ % (k, CF[f], k, orig(k) >> 16, orig(k) & 0xFFFF, k))
+    # ---- shared helpers
+    # f_aer: r3 = the aerial module; f_pass1: set_passable_check(1); f_gl: r3 = the kind's gl entry (Behavior +8
+    # kind, +0xC variation; the Wii U's own lookup, e.g. 0x02DB4EF0)
+    G.asm("""
+    f_pass1:
+        lwz r3, 0(r31)
+        lwz r3, 0x30DC(r3)
+        li r4, 1
+        b 0x%08X
+    f_gl:
+        lis r12, 0x%04X
+        lwz r12, %d(r12)
+        lwz r9, 8(r31)
+        lwz r10, 0xC(r31)
+        slwi r9, r9, 3
+        add r9, r9, r10
+        slwi r9, r9, 2
+        add r9, r9, r12
+        lwz r9, 0x%X(r9)
+        mulli r9, r9, 0x228
+        lwz r3, 0x%X(r12)
+        add r3, r3, r9
+        blr
+    f_kflag:
+        lwz r12, 0(r31)
+        lwz r12, 0x3130(r12)
+        lwz r12, 8(r12)
+        lwz r12, 0(r12)
+        lwz r12, 0x14(r12)
+        blr
+    """ % (SET_PASSABLE, ha(PARAM_MGR), sx(PARAM_MGR), GL_INDEX, GL_BASE))
+    # f_hitret: r3 = hit_return_frame() (3DS 0x9EA9B0): int(float(int gl[+0x154]) * factor), factor = HIT_FACTOR
+    # (the 3DS 0x9EB4C0's Wii U copy); uses r1+8..+0x17 of the caller's frame
+    G.asm("""
+    f_hitret:
+        mflr r0
+        stw r0, 0x1C(r1)
+        bl f_gl
+        lwz r0, 0x154(r3)
+        xoris r0, r0, 0x8000
+        stw r0, 0xC(r1)
+        lis r0, 0x4330
+        stw r0, 8(r1)
+        lfd f1, 8(r1)
+    """)
+    G.asm("lis r12, 0x%04X\nlfd f0, %d(r12)" % (ha(D['fconsts']), sx(D['fconsts'])))
+    G.asm("""
+        fsub f1, f1, f0
+        frsp f1, f1
+        stfs f1, 0x10(r1)
+        mr r3, r31
+        bl 0x%08X
+        lfs f0, 0x10(r1)
+        fmuls f1, f0, f1
+        fctiwz f1, f1
+        stfd f1, 8(r1)
+        lwz r3, 0xC(r1)
+        lwz r0, 0x1C(r1)
+        mtlr r0
+        blr
+    """ % HIT_FACTOR)
+    # the common leave (3DS Behavior::init_common_leave 0x7B23B4 with the kind's InnerEnemyLeaveParam at CFG LVP:
+    # frames, the energy's +0x30 (-speed), +0x34, the leave effect 0x8000005's offset y and scale): V6 = frames,
+    # kinetic 15, ground off, set_correct(0), the effect following node 0 -> V5; update: o_leave_up (step 2c v2)
+    st('f_leave_en', """
+        lwz r28, 0x%(LVP)X(r30)
+        add r28, r28, r30
+        lwz r0, 0(r28)
+        stw r0, 0x%(V6)X(r31)
+        bl h_ebase
+        lwz r0, 4(r28)
+        stw r0, 0x30(r10)
+        lwz r0, 8(r28)
+        stw r0, 0x34(r10)
+        li r4, 15
+        bl h_kin
+        li r4, 0
+        bl h_att
+        lwz r3, 0(r31)
+        lwz r3, 0x30DC(r3)
+        li r4, 0
+        bl 0x%(SC)08X
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0x10(r1)
+        stw r0, 0x14(r1)
+        stw r0, 0x18(r1)
+        stw r0, 0x1C(r1)
+        lwz r0, 0xC(r28)
+        stw r0, 0xC(r1)
+        mr r3, r31
+        lis r4, 0x800
+        ori r4, r4, 5
+        li r5, 0
+        addi r6, r1, 8
+        addi r7, r1, 0x14
+        lfs f1, 0x10(r28)
+        lis r12, 0x%(RFH)04X
+        ori r12, r12, 0x%(RFL)04X
+        mtctr r12
+        bctrl
+        stw r3, 0x%(V5)X(r31)""" % dict(LVP=CF['LVP'], V6=V(6), V5=V(5), SC=SET_CORRECT, RFH=REQ_FOLLOW >> 16,
+                                       RFL=REQ_FOLLOW & 0xFFFF))
+    # f_unleave: finalize_common_leave (3DS 0x7B475C: the leave effect removed, the count 0) when a leave runs, then
+    # set_correct(5) (as Ghos's / Furiijio's slot 69 do after it)
+    G.asm("""
+    f_unleave:
+        lwz r0, 0x%(V6)X(r31)
+        cmpwi r0, 0
+        blelr
+        mflr r0
+        stw r0, 0x1C(r1)
+        mr r3, r31
+        lwz r4, 0x%(V5)X(r31)
+        lis r12, 0x%(RMH)04X
+        ori r12, r12, 0x%(RML)04X
+        mtctr r12
+        bctrl
+        li r0, 0
+        stw r0, 0x%(V5)X(r31)
+        stw r0, 0x%(V6)X(r31)
+        lwz r3, 0(r31)
+        lwz r3, 0x30DC(r3)
+        li r4, 5
+        lwz r0, 0x1C(r1)
+        mtlr r0
+        b 0x%(SC)08X
+    """ % dict(V5=V(5), V6=V(6), RMH=REMOVE_EFFECT >> 16, RML=REMOVE_EFFECT & 0xFFFF, SC=SET_CORRECT))
+
+    # ---- Ghos (kind 0x11; enemy_fs.cro create 0x11560, table 0x10D350). V0 the slip-homing timer (+0x1EC), V1
+    # the leave timer (+0x1E8), V2 the stun frames (+0x1E4), V3 the target (+0x1F0), V4 the follow effect (+0x1FC),
+    # V5 / V6 the common leave's effect / frames. P: 0 / 1 timer range (20, 40), 2 choice % (96), 3 bounce speed
+    # (0.6), 4 max speed (0.8), 5 leave frames (1200), 6 0.1 (a literal), 7-12 / 13-18 the two P7 slip-homing sets,
+    # 19-23 the leave param (P6: 100, -0.02, 30, 3, 0.85)
+    # start 0x109C0: the aerial module (its ctor: the 3DS ctor 0x11598's), set_rhombus, set_lr(0, 1, 1) (lr 0: faces
+    # the camera), V3 = the nearest fighter, +0x10 = posture lr, +0x14 / +0x18 = 0, V1 = 1200, -> 1, the body effect
+    # 0x7110000 following node 0 -> V4 (set_node_visibility(1, 1) / (0, 0) and play_se(0x8A60000) not ported)
+    G.asm("f_ghos_start:\nmflr r0\nbl pro\naddi r3, r31, 0x%X\nlwz r4, 0(r31)\nbl 0x%08X" % (AER, AER_CTOR))
+    far(SET_RHOMBUS)
+    lfs('f1', 'consts')
+    G.asm("""
+        mr r3, r31
+        li r4, 1
+        li r5, 1
+        lwz r12, 0xE0(r3)
+        lwz r12, 0x%(LR)X(r12)
+        mtctr r12
+        bctrl
+        bl h_near
+        stw r3, 0x%(V3)X(r31)
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lwz r0, 0x60(r12)
+        stw r0, 0x10(r31)
+        li r0, 0
+        stw r0, 0x14(r31)
+        stw r0, 0x18(r31)
+        lwz r0, 0x%(P5)X(r30)
+        stw r0, 0x%(V1)X(r31)
+        li r4, 1
+        bl h_chg
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0xC(r1)
+        stw r0, 0x10(r1)
+        stw r0, 0x14(r1)
+        stw r0, 0x18(r1)
+        stw r0, 0x1C(r1)
+        mr r3, r31
+        lis r4, 0x711
+        li r5, 0
+        addi r6, r1, 8
+        addi r7, r1, 0x14
+    """ % dict(LR=0xC + 8 * SET_LR_SLOT, V3=V(3), P5=P(5), V1=V(1)))
+    lfs('f1', 'consts', 4)
+    far(REQ_FOLLOW)
+    G.asm("stw r3, 0x%X(r31)\nb epi" % V(4))
+    # L66BA4: V0 = random(P0, P1); random_choice(96, 4) -> set_mode_slip_homing(the P7 set: s0 +0, s1 +0xC, s2 +8,
+    # s3 +0x14, s4 +4, s5 +0x10); called from a state (its frame's +0x1C keeps the return)
+    G.asm("""
+    f_gpick:
+        mflr r0
+        stw r0, 0x1C(r1)
+        lwz r3, 0x%(P0)X(r30)
+        lwz r4, 0x%(P1)X(r30)
+        bl h_rand
+        stw r3, 0x%(V0)X(r31)
+        li r3, 0
+        li r4, 99
+        bl h_rand
+        lwz r0, 0x%(P2)X(r30)
+        addi r12, r30, 0x%(P7)X
+        cmpw r3, r0
+        blt gp_set
+        addi r12, r30, 0x%(P13)X
+    gp_set:
+        lfs f1, 0(r12)
+        lfs f2, 0xC(r12)
+        lfs f3, 8(r12)
+        lfs f4, 0x14(r12)
+        lfs f5, 4(r12)
+        lfs f6, 0x10(r12)
+        addi r3, r31, 0x%(AER)X
+        lwz r0, 0x1C(r1)
+        mtlr r0
+        b 0x%(SH)08X
+    """ % dict(P0=P(0), P1=P(1), V0=V(0), P2=P(2), P7=P(7), P13=P(13), AER=AER, SH=AER_SLIP_HOMING))
+    # L1120C, the wall bounce: on any contact (is_touch(0xFF)) v = energy 0's speed, n = get_ground_normal(0xFF);
+    # r = |v|^2 / (P4 * P4); r < 0.1 (and r <= 1): nothing; else v reflected on n (v - 2 (n.v) n), normalised,
+    # times P3 * min(r, 1) -> set_current_speed
+    G.asm("""
+    f_gbounce:
+        mflr r0
+        stw r0, 0x1C(r1)
+        lwz r3, 0(r31)
+        lwz r3, 0x30DC(r3)
+        li r4, 0xFF
+        bl 0x%(TOUCH)08X
+        cmpwi r3, 0
+        beq gb_out
+        lwz r3, 0(r31)
+        lwz r3, 0x30DC(r3)
+        lwz r3, 0x18(r3)
+        li r4, 0xFF
+        bl 0x%(GN)08X
+        stw r3, 8(r1)
+        stw r4, 0xC(r1)
+        lwz r12, 0x%(E0)X(r31)
+        lfs f1, 0(r12)
+        lfs f2, 4(r12)
+        fmuls f5, f1, f1
+        fmadds f5, f2, f2, f5
+        lfs f6, 0x%(P4)X(r30)
+        fmuls f6, f6, f6
+        fdivs f5, f5, f6
+        lfs f6, 0x%(ONE)X(r30)
+        fcmpu cr0, f5, f6
+        bgt gb_clamp
+        lfs f7, 0x%(P6)X(r30)
+        fcmpu cr0, f5, f7
+        blt gb_out
+        b gb_refl
+    gb_clamp:
+        fmr f5, f6
+    gb_refl:
+        lfs f3, 8(r1)
+        lfs f4, 0xC(r1)
+        fmuls f8, f3, f1
+        fmadds f8, f4, f2, f8
+        fadds f8, f8, f8
+        fnmsubs f1, f3, f8, f1
+        fnmsubs f2, f4, f8, f2
+        lfs f0, 0x%(P3)X(r30)
+        fmuls f5, f5, f0
+        stfs f1, 8(r1)
+        stfs f2, 0xC(r1)
+        stfs f5, 0x10(r1)
+        fmuls f1, f1, f1
+        fmadds f1, f2, f2, f1
+        lfs f0, 0x%(ZERO)X(r30)
+        fcmpu cr0, f1, f0
+        beq gb_set
+        bl 0x%(SQ)08X
+        lfs f5, 0x10(r1)
+        fdivs f5, f5, f1
+        lfs f1, 8(r1)
+        lfs f2, 0xC(r1)
+        fmuls f1, f1, f5
+        fmuls f2, f2, f5
+        stfs f1, 8(r1)
+        stfs f2, 0xC(r1)
+    gb_set:
+        addi r3, r31, 0x%(AER)X
+        addi r4, r1, 8
+        bl 0x%(SS)08X
+    gb_out:
+        lwz r0, 0x1C(r1)
+        mtlr r0
+        blr
+    """ % dict(TOUCH=IS_TOUCH, GN=GROUND_NORMAL, E0=AER + 4, P4=P(4), ONE=P(24), P6=P(6), P3=P(3), ZERO=P(25),
+               SQ=SQRTF, AER=AER, SS=AER_SET_SPEED))
+    # 1 fly (enter 0x1091C, update 0x10E24): kinetic 26, f_gpick, ground off, passable on, FlyHoming (loop), the
+    # aerial target = V3 (set_target: +0x30 id, +0x40 offset 0, +0x2C 0). Update: the aerial update, V0 runs out ->
+    # f_gpick, the bounce, V1 runs out -> 3 (leave). Contact attack: P2 entry 1 (set_attack_data(1))
+    st('f_g1_en', """
+        li r4, 26
+        bl h_kin
+        bl f_gpick
+        li r4, 0
+        bl h_att
+        bl f_pass1
+        li r4, 1
+        li r5, 1
+        bl h_mot1
+        lwz r0, 0x%(V3)X(r31)
+        stw r0, 0x%(T)X(r31)
+        li r0, 0
+        stw r0, 0x%(O)X(r31)
+        stw r0, 0x%(O4)X(r31)
+        stw r0, 0x%(O8)X(r31)
+        stb r0, 0x%(F)X(r31)""" % dict(V3=V(3), T=AER + 0x30, O=AER + 0x40, O4=AER + 0x44, O8=AER + 0x48,
+                                      F=AER + 0x2C))
+    st('f_g1_up', """
+        addi r3, r31, 0x%(AER)X
+        bl 0x%(UPD)08X
+        lwz r3, 0x%(V0)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V0)X(r31)
+        cmpwi r3, 0
+        bgt g1_b
+        bl f_gpick
+    g1_b:
+        bl f_gbounce
+        lwz r3, 0x%(V1)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V1)X(r31)
+        cmpwi r3, 0
+        bgt.far epi
+        li r4, 3
+        b go""" % dict(AER=AER, UPD=AER_UPDATE, V0=V(0), V1=V(1)))
+    # 2 stun (enter 0x10AD0, update 0x10EE4): kinetic 16, ground off, passable on, DamageStart (once), V2 =
+    # hit_return_frame(), the kinetic flag 0x80 set (set_node_visibility(1, 0) / (0, 1): not ported); V2 runs out ->
+    # flag 0x80 cleared, -> 1
+    st('f_g2_en', """
+        li r4, 16
+        bl h_kin
+        li r4, 0
+        bl h_att
+        bl f_pass1
+        li r4, 0
+        li r5, 0
+        bl h_mot1
+        bl f_hitret
+        stw r3, 0x%(V2)X(r31)
+        bl f_kflag
+        lwz r0, 0(r12)
+        ori r0, r0, 0x80
+        stw r0, 0(r12)""" % dict(V2=V(2)))
+    st('f_g2_up', """
+        lwz r3, 0x%(V2)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V2)X(r31)
+        cmpwi r3, 0
+        bgt.far epi
+        bl f_kflag
+        lwz r0, 0(r12)
+        rlwinm r0, r0, 0, 25, 23
+        stw r0, 0(r12)
+        li r4, 1
+        b go""" % dict(V2=V(2)))
+    # slot 10 notify_on_damage (0x11094): BehaviorImpl's, then V1 = P5 (1200: the leave timer restarts; the
+    # reflected-weapon branch (init_damage) and stop_se not ported)
+    G.asm("f_ghos_dmg:\nmflr r0\nbl pro\nmr r3, r31")
+    far(BI_NOTIFY_DMG)
+    G.asm("lwz r0, 0x%X(r30)\nstw r0, 0x%X(r31)\nb epi" % (P(5), V(1)))
+    # slot 69 (0x113A4; the Wii U notify_on_damage calls it as the 3DS's does): a leave running -> finalised and
+    # set_correct(5); => 2 (stun); returns 1 (the framework's own reaction skipped)
+    st('f_ghos_69', "bl f_unleave\nli r4, 2\nbl h_chgi\nli r3, 1")
+    # slot 27 notify_on_remove (the 3DS's 28, 0x11140): the body effect V4 removed, then BehaviorImpl's
+    G.asm("""
+    f_ghos_rm:
+        mflr r0
+        bl pro
+        lwz r4, 0x%X(r31)
+        cmpwi r4, 0
+        beq gr_out
+        mr r3, r31
+        li r0, 0
+        stw r0, 0x%X(r31)
+    """ % (V(4), V(4)))
+    far(REMOVE_EFFECT)
+    G.asm("gr_out:\nmr r3, r31\nlmw r28, 0x20(r1)\nlwz r0, 0x34(r1)\nmtlr r0\naddi r1, r1, 0x30")
+    G.asm("lis r12, 0x%04X\nori r12, r12, 0x%04X\nmtctr r12\nbctr" % (orig(27) >> 16, orig(27) & 0xFFFF))
+    # ---- the aerial modes the Wii U has no setter for (3DS EnemyAerialModuleImpl: every setter is the mode word,
+    # energy 0's init vt+0x1C(0x17, &speed, &zero3, acc) (3DS vt+0xC), energy 0 on (+0x18 = 1), energy 1 off):
+    # f_amode(r4 mode; the speed at the caller's r1+8): set_mode_none 0x5F58C8 (-1, speed 0), set_mode_uniform
+    # 0x5F5BD4 (5, the given speed: the update does nothing in mode 5, on both), set_mode_braking 0x5F5B48 (4, the
+    # current speed; +0x18 / +0x1C the two params); set_mode_homing_extend 0x5F60F0 = set_mode_homing (the slip
+    # variant with speed 0: f_ahome zeroes energy 0's speed, then the Wii U's slip_homing_extend 0x02DB2A48)
+    G.asm("""
+    f_anone:
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0xC(r1)
+        li r4, -1
+    f_amode:
+        mflr r0
+        stw r0, 0x1C(r1)
+        stw r4, 0x%(M)X(r31)
+        li r0, 0
+        stw r0, 0x10(r1)
+        stw r0, 0x14(r1)
+        stw r0, 0x18(r1)
+        lwz r3, 0x%(E0)X(r31)
+        lwz r12, 0x1C(r3)
+        lwz r12, 0x1C(r12)
+        mtctr r12
+        li r4, 0x17
+        addi r5, r1, 8
+        addi r6, r1, 0x10
+        lwz r7, 0x%(AER)X(r31)
+        bctrl
+        li r0, 1
+        lwz r12, 0x%(E0)X(r31)
+        stb r0, 0x18(r12)
+        li r0, 0
+        lwz r12, 0x%(E1)X(r31)
+        stb r0, 0x18(r12)
+        lwz r0, 0x1C(r1)
+        mtlr r0
+        blr
+    f_ahome:
+        mflr r0
+        stw r0, 0x1C(r1)
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0xC(r1)
+        stfs f1, 0x10(r1)
+        addi r3, r31, 0x%(AER)X
+        addi r4, r1, 8
+        bl 0x%(SS)08X
+        lfs f1, 0x10(r1)
+        lfs f2, 4(r28)
+        lfs f3, 8(r28)
+        lfs f4, 0xC(r28)
+        lfs f5, 0x10(r28)
+        lfs f6, 0x14(r28)
+        addi r3, r31, 0x%(AER)X
+        lwz r0, 0x1C(r1)
+        mtlr r0
+        b 0x%(SHE)08X
+    f_aupd:
+        addi r3, r31, 0x%(AER)X
+        b 0x%(UPD)08X
+    """ % dict(M=AER + 0xC, E0=AER + 4, E1=AER + 8, AER=AER, SS=AER_SET_SPEED, SHE=AER_SLIP_HOMING_EXT,
+               UPD=AER_UPDATE))
+
+    # ---- Tikibuzz (kind 0x0F; create 0x78630, table 0x10E134). V0 the search counter (+0x1DC), V1 the search
+    # cool-down (+0x1E0), V2 the dive frames (+0x1E4), V3 the stomp frames (+0x1E8), V4 the landing frames
+    # (+0x1EC), V5 the leave frames (+0x1F4), V6 the target's y (+0x1FC), Y0 the last y (+0x1F8). P0-P20: its P0
+    # row (variation 0), P21 the leave frames (P@0x78 f0: 200)
+    def tp(i):
+        return P(i)
+    G.asm("f_tiki_start:\nmflr r0\nbl pro\naddi r3, r31, 0x%X\nlwz r4, 0(r31)\nbl 0x%08X" % (AER, AER_CTOR))
+    far(SET_RHOMBUS)
+    G.asm("""
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lwz r0, 0x60(r12)
+        stw r0, 0x10(r31)
+        li r0, 0
+        stw r0, 0x14(r31)
+        stw r0, 0x18(r31)
+        bl h_near
+        mr r4, r3
+        bl h_tchk
+        cmpwi r3, 0
+        beq ts_go
+        bl h_rev
+    ts_go:
+        li r4, 3
+        b go
+    """)
+    # 1 fall (0x77BD8 / 0x77E10): kinetic 8, ground off, Fly (loop); on the ground -> 3
+    st('t_fall_en', "li r4, 8\nbl h_kin\nli r4, 0\nbl h_att\nli r4, 11\nli r5, 1\nbl h_mot1")
+    st('t_fall_up', "bl h_gnd\ncmpwi r3, 0\nbeq.far epi\nli r4, 3\nb go")
+    # 3 fly (0x78668 / 0x77A2C): ground off, passable, Y0 = y, Fly (loop), set_mode_homing_extend(f3, f4, f7, f8,
+    # f5, f6), the swing fields (+0x54 = 1, +0x5C = 0, +0x58 = -1), the target fighter 0 at (0, f1 (35), 0), V0 = 0
+    # (the meshes' visibility: not ported). Update: the aerial update, Y0 = y (the flap rate MotionModule +0x50 =
+    # f9 / f10 rising / not: not ported); V1 > 0 counts down, else every search-0 interval (30) frames of V0
+    # search_target(0) (15 x 60 below it) -> 4, V1 = int(f17) (152); V0 < f2 (900): V0++, else -> 9 (leave)
+    st('t_fly_en', """
+        li r4, 0
+        bl h_att
+        bl f_pass1
+        bl h_sety
+        li r4, 11
+        li r5, 1
+        bl h_mot1
+        addi r28, r30, 0x%(PH)X
+        lfs f1, 0(r28)
+        bl f_ahome
+        li r0, 1
+        stb r0, 0x%(S54)X(r31)
+        li r0, 0
+        stw r0, 0x%(S5C)X(r31)
+        stw r0, 0x%(V0)X(r31)
+        stw r0, 0x%(T)X(r31)
+        stw r0, 0x%(O)X(r31)
+        stw r0, 0x%(O8)X(r31)
+        stb r0, 0x%(F)X(r31)
+        lis r0, 0xBF80
+        stw r0, 0x%(S58)X(r31)
+        lfs f1, 0x%(P1)X(r30)
+        stfs f1, 0x%(O4)X(r31)""" % dict(PH=P(22), S54=AER + 0x54, S5C=AER + 0x5C, S58=AER + 0x58, V0=V(0),
+                                         T=AER + 0x30, O=AER + 0x40, O4=AER + 0x44, O8=AER + 0x48, F=AER + 0x2C,
+                                         P1=tp(1)))
+    st('t_fly_up', """
+        bl f_aupd
+        bl h_sety
+        lwz r3, 0x%(V1)X(r31)
+        cmpwi r3, 0
+        ble tf_srch
+        addi r3, r3, -1
+        stw r3, 0x%(V1)X(r31)
+        b tf_cnt
+    tf_srch:
+        li r4, 0
+        bl h_grp
+        lwz r0, 0x%(V0)X(r31)
+        divw r12, r0, r3
+        mullw r12, r12, r3
+        cmpw r12, r0
+        bne tf_cnt
+        li r4, 0
+        bl h_srch
+        cmpwi r3, -1
+        beq tf_cnt
+        li r4, 4
+        bl h_chg
+        lfs f1, 0x%(P17)X(r30)
+        fctiwz f1, f1
+        stfd f1, 8(r1)
+        lwz r0, 0xC(r1)
+        stw r0, 0x%(V1)X(r31)
+        b epi
+    tf_cnt:
+        lwz r3, 0x%(V0)X(r31)
+        lwz r0, 0x%(P2)X(r30)
+        cmpw r0, r3
+        ble tf_leave
+        addi r3, r3, 1
+        stw r3, 0x%(V0)X(r31)
+        b epi
+    tf_leave:
+        li r4, 9
+        b go""" % dict(V0=V(0), V1=V(1), P17=tp(17), P2=tp(2)))
+    # 4 hold (0x780A4 / 0x78410): ground off, passable, AttackHold at f11 (0.75), set_mode_none, kinetic 11, V6 =
+    # fighter 0's y (get_fighter_pos(0)); the aerial update, at the motion's end -> 5
+    st('t_hold_en', """
+        li r4, 0
+        bl h_att
+        bl f_pass1
+        li r4, 2
+        li r5, 0
+        lfs f2, 0x%(P11)X(r30)
+        bl h_mot
+        bl f_anone
+        li r4, 11
+        bl h_kin
+        addi r3, r1, 8
+        mr r4, r31
+        li r5, 0
+        lis r12, 0x%(GH)04X
+        ori r12, r12, 0x%(GL)04X
+        mtctr r12
+        bctrl
+        lwz r0, 0xC(r1)
+        stw r0, 0x%(V6)X(r31)""" % dict(P11=tp(11), GH=GET_TARGET_POS >> 16, GL=GET_TARGET_POS & 0xFFFF, V6=V(6)))
+    st('t_hold_up', "bl f_aupd\nbl h_end\ncmpwi r3, 0\nbeq.far epi\nli r4, 5\nb go")
+    # 5 dive (0x77964 / 0x77CB0; the contact attack, P2 entry 0): ground off, passable, Attack (loop),
+    # set_mode_uniform((0, -f12)) (-6 a frame), V2 = 0; the aerial update; at / below V6 passable off; on the
+    # ground => 7; V2 < f13 (9): V2++, else -> 6
+    st('t_dive_en', """
+        li r4, 0
+        bl h_att
+        bl f_pass1
+        li r4, 0
+        li r5, 1
+        bl h_mot1
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0x%(V2)X(r31)
+        lfs f1, 0x%(P12)X(r30)
+        fneg f1, f1
+        stfs f1, 0xC(r1)
+        li r4, 5
+        bl f_amode""" % dict(V2=V(2), P12=tp(12)))
+    st('t_dive_up', """
+        bl f_aupd
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f1, 0x14(r12)
+        lfs f0, 0x%(V6)X(r31)
+        fcmpu cr0, f1, f0
+        bgt td_t
+        lwz r3, 0(r31)
+        lwz r3, 0x30DC(r3)
+        li r4, 0
+        bl 0x%(SP)08X
+    td_t:
+        bl h_gnd
+        cmpwi r3, 0
+        beq td_c
+        li r4, 7
+        b goi
+    td_c:
+        lwz r3, 0x%(V2)X(r31)
+        lwz r0, 0x%(P13)X(r30)
+        cmpw r0, r3
+        ble td_brk
+        addi r3, r3, 1
+        stw r3, 0x%(V2)X(r31)
+        b epi
+    td_brk:
+        li r4, 6
+        b go""" % dict(V6=V(6), SP=SET_PASSABLE, V2=V(2), P13=tp(13)))
+    # 6 brake (0x78240 / 0x784B4): ground off, passable, AttackBrake at f16 (0.7), set_mode_braking(0, f15);
+    # the aerial update; on the ground: speed 0, set_mode_none, at the motion's end -> 3; in the air: rising or
+    # still (speed y >= 0) -> 3
+    st('t_brk_en', """
+        li r4, 0
+        bl h_att
+        bl f_pass1
+        li r4, 1
+        li r5, 0
+        lfs f2, 0x%(P16)X(r30)
+        bl h_mot
+        lwz r12, 0x%(E0)X(r31)
+        lwz r0, 0(r12)
+        stw r0, 8(r1)
+        lwz r0, 4(r12)
+        stw r0, 0xC(r1)
+        li r4, 4
+        bl f_amode
+        li r0, 0
+        stw r0, 0x%(B0)X(r31)
+        lwz r0, 0x%(P15)X(r30)
+        stw r0, 0x%(B1)X(r31)""" % dict(P16=tp(16), E0=AER + 4, B0=AER + 0x18, B1=AER + 0x1C, P15=tp(15)))
+    st('t_brk_up', """
+        bl f_aupd
+        bl h_vy0
+        stfs f1, 0x18(r1)
+        bl h_gnd
+        cmpwi r3, 0
+        beq tb_air
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0xC(r1)
+        addi r3, r31, 0x%(AER)X
+        addi r4, r1, 8
+        bl 0x%(SS)08X
+        bl f_anone
+        bl h_end
+        cmpwi r3, 0
+        beq.far epi
+        b tb_go
+    tb_air:
+        lfs f1, 0x18(r1)
+        lfs f0, 0x%(Z)X(r30)
+        fcmpu cr0, f1, f0
+        blt.far epi
+    tb_go:
+        li r4, 3
+        b go""" % dict(AER=AER, SS=AER_SET_SPEED, Z=P(28)))
+    # 7 landed (0x78454 / 0x78554): ground on, AttackUnguard, set_mode_none, V4 = 0, request_quake(3); the aerial
+    # update; V4 < f14 (45): V4++, else -> 8. 8 ready (0x77D7C / 0x78204): ground off, FlyReady, set_mode_none; at
+    # its end -> 3
+    st('t_land_en', """
+        li r4, 1
+        bl h_att
+        li r4, 3
+        li r5, 0
+        bl h_mot1
+        bl f_anone
+        li r0, 0
+        stw r0, 0x%(V4)X(r31)
+        mr r3, r31
+        li r4, 3
+        lis r12, 0x%(QH)04X
+        ori r12, r12, 0x%(QL)04X
+        mtctr r12
+        bctrl""" % dict(V4=V(4), QH=REQ_QUAKE >> 16, QL=REQ_QUAKE & 0xFFFF))
+    st('t_land_up', """
+        bl f_aupd
+        lwz r3, 0x%(V4)X(r31)
+        lwz r0, 0x%(P14)X(r30)
+        cmpw r0, r3
+        ble tl_go
+        addi r3, r3, 1
+        stw r3, 0x%(V4)X(r31)
+        b epi
+    tl_go:
+        li r4, 8
+        b go""" % dict(V4=V(4), P14=tp(14)))
+    st('t_rdy_en', "li r4, 0\nbl h_att\nli r4, 12\nli r5, 0\nbl h_mot1\nbl f_anone")
+    st('t_rdy_up', "bl h_end\ncmpwi r3, 0\nbeq.far epi\nli r4, 3\nb go")
+    # 9 leave (0x7781C / 0x77C40): ground off, passable, Fly (loop), set_correct(0), set_mode_none, V5 = 200; the
+    # aerial update; V5 runs out -> 12 (removed)
+    st('t_lv_en', """
+        li r4, 0
+        bl h_att
+        bl f_pass1
+        li r4, 11
+        li r5, 1
+        bl h_mot1
+        lwz r3, 0(r31)
+        lwz r3, 0x30DC(r3)
+        li r4, 0
+        bl 0x%(SC)08X
+        bl f_anone
+        lwz r0, 0x%(P21)X(r30)
+        stw r0, 0x%(V5)X(r31)""" % dict(SC=SET_CORRECT, P21=tp(21), V5=V(5)))
+    st('t_lv_up', """
+        bl f_aupd
+        lwz r3, 0x%(V5)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V5)X(r31)
+        cmpwi r3, 0
+        bgt.far epi
+        lwz r4, 0x%(RM)X(r30)
+        b go""" % dict(V5=V(5), RM=CF['REMOVE']))
+    # 10 stomped (slot 21 -> 10; 0x77F04 / 0x78388): ground off, passable, Step, create_dead_item(1, 10) (the
+    # removal's defeat path here: DEFEATED), disable_hit (notify_on_death: hit off, attacks cleared, as the Goomba's
+    # collapse), V3 = 0, set_mode_uniform((0, -f19)) (-3), effect 0x70F0000 at the body (the meshes, play_se: not
+    # ported); the aerial update; V3 < f20 (60) and not on the ground: V3++, else -> 11
+    st('t_stomp_en', """
+        li r0, 1
+        stw r0, 0x%(DF)X(r31)
+        li r4, 0
+        bl h_att
+        bl f_pass1
+        li r4, 13
+        li r5, 0
+        bl h_mot1
+        mr r3, r31
+        lis r12, 0x%(NDH)04X
+        ori r12, r12, 0x%(NDL)04X
+        mtctr r12
+        bctrl
+        li r0, 0
+        stw r0, 0x%(V3)X(r31)
+        stw r0, 8(r1)
+        lfs f1, 0x%(P19)X(r30)
+        fneg f1, f1
+        stfs f1, 0xC(r1)
+        li r4, 5
+        bl f_amode
+        lis r4, 0x70F
+        bl t_fx""" % dict(DF=DEFEATED, NDH=NOTIFY_DEATH >> 16, NDL=NOTIFY_DEATH & 0xFFFF, V3=V(3),
+                                               P19=tp(19)))
+    st('t_stomp_up', """
+        bl f_aupd
+        lwz r3, 0x%(V3)X(r31)
+        lwz r0, 0x%(P20)X(r30)
+        cmpw r0, r3
+        ble ts_gone
+        bl h_gnd
+        cmpwi r3, 0
+        bne ts_gone
+        lwz r3, 0x%(V3)X(r31)
+        addi r3, r3, 1
+        stw r3, 0x%(V3)X(r31)
+        b epi
+    ts_gone:
+        li r4, 11
+        b go""" % dict(V3=V(3), P20=tp(20)))
+    # 11 gone (0x77E50 / 0x78378): kinetic 26, ground on, passable, effect 0x70F0001 at the body (set_visibility(0),
+    # play_se: not ported); -> 12
+    st('t_gone_en', "li r4, 26\nbl h_kin\nli r4, 1\nbl h_att\nbl f_pass1\nlis r4, 0x70F\nori r4, r4, 1\nbl t_fx")
+    st('t_gone_up', "lwz r4, 0x%X(r30)\nb go" % CF['REMOVE'])
+    # t_fx(r4 id): request_effect(id, the posture position, rotation 0, 1.0) (3DS EffectModuleImpl::req(id,
+    # posture +0x14, ZERO, 1, ...))
+    G.asm("""
+    t_fx:
+        mflr r0
+        stw r0, 0x1C(r1)
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0xC(r1)
+        stw r0, 0x10(r1)
+        lwz r5, 0(r31)
+        lwz r5, 0x311C(r5)
+        addi r5, r5, 0x10
+        addi r6, r1, 8
+        mr r3, r31
+    """)
+    lfs('f1', 'consts', 4)
+    G.asm("""
+        lis r12, 0x%04X
+        ori r12, r12, 0x%04X
+        mtctr r12
+        bctrl
+        lwz r0, 0x1C(r1)
+        mtlr r0
+        blr
+    """ % (REQ_EFFECT >> 16, REQ_EFFECT & 0xFFFF))
+    return G
+
+
 def assemble(vt_words):
     """(A, B, Data): the code in regions A, B and E (A.area / A.stomp / A.e: the units of C, D, E), the data after
     it (passes until the data's addresses settle: the code's size does not depend on them)"""
     d = Data(vt_words)
+    VT_WORDS[0] = vt_words
     D = {}
     keys = [lab for lab, _w, _a in Data(vt_words).build({}).blocks]
     for _pass in range(4):
         dd = {k: D.get(k, CAVE) for k in keys}
-        A, B, Ee = code(dd)
+        A, B, Ee, Gg = code(dd)
         C = area_code(dd)
         Dd = stomp_code()
         labels = dict(A.labels)
-        for a in (B, C, Dd, Ee):
+        for a in (B, C, Dd, Ee, Gg):
             labels.update(a.labels)
-        for a in (A, B, C, Dd, Ee):
+        for a in (A, B, C, Dd, Ee, Gg):
             a.labels.update(labels)
-        ea, eb, ec, ed, ee = A.pc, B.pc, C.pc, Dd.pc, Ee.pc
+        ea, eb, ec, ed, ee, eg = A.pc, B.pc, C.pc, Dd.pc, Ee.pc, Gg.pc
+        assert eg <= LIMIT_G, 'flier code too big (0x%X)' % eg
         assert ed <= LIMIT_D, 'stomp code too big (0x%X)' % ed
         assert ea <= LIMIT and eb <= LIMIT_B and ee <= LIMIT_E, 'walker code too big (0x%X, 0x%X, 0x%X)' % (ea, eb, ee)
         spans = [((ea + 0xF) & ~0xF, LIMIT), ((eb + 0xF) & ~0xF, LIMIT_B), ((ec + 0xF) & ~0xF, LIMIT_C),
-                 ((ed + 3) & ~3, LIMIT_D), ((ee + 0xF) & ~0xF, LIMIT_E)] + list(DATA_F)
+                 ((ed + 3) & ~3, LIMIT_D), ((ee + 0xF) & ~0xF, LIMIT_E), ((eg + 0xF) & ~0xF, LIMIT_G)] + list(DATA_F)
         d.build(labels, D)
         d.place(spans)
         if d.addr == D:
@@ -2240,6 +3170,7 @@ def assemble(vt_words):
     A.area = C
     A.stomp = Dd
     A.e = Ee
+    A.g = Gg
     return A, B, d
 
 
@@ -2269,8 +3200,7 @@ def stomp_code():
         beq u_out
         lwz r12, 0(r31)
         lwz r28, 0x311C(r12)
-        lis r27, tbox@ha
-        addi r27, r27, tbox@l
+        addi r27, r30, 0x%(TB)X
         lis r12, 0x%(FH)04X
         lwz r12, %(FL)d(r12)
         cmpwi r12, 0
@@ -2298,12 +3228,8 @@ def stomp_code():
         ori r12, r12, 0x%(BL)04X
         mtctr r12
         bctr
-    tbox:
-        .float %(HW)r
-        .float %(CY)r
-        .float %(HH)r
     """ % dict(TREAD=CF['TREAD'], R67=CF['R67'], FH=ha(FIGHTERS), FL=sx(FIGHTERS), BH=BI_UPDATE >> 16,
-               BL=BI_UPDATE & 0xFFFF, HW=TREAD_BOX[0], CY=TREAD_BOX[1], HH=TREAD_BOX[2]))
+               BL=BI_UPDATE & 0xFFFF, TB=CF['TB0']))
     return Dd
 
 
@@ -2428,7 +3354,7 @@ def patches(img):
     for lo_, hi_ in REGIONS:
         for addr in range(lo_, hi_, 4):
             out[addr] = 0
-    for a in (A, B, A.area, A.stomp, A.e):
+    for a in (A, B, A.area, A.stomp, A.e, A.g):
         for i, w in enumerate(a.words()):
             out[a.base + 4 * i] = w
     for base, words in d.chunks:
@@ -2448,7 +3374,7 @@ def patches(img):
 
 def args(img):
     out, _a, _d = patches(img)
-    res = ['grow:0x%08X' % GROW] + ['0x%08X=0x%08X' % (k, v) for k, v in sorted(out.items())]
+    res = ['textregion:0x%X' % TEXT_REGION, 'grow:0x%08X' % GROW] + ['0x%08X=0x%08X' % (k, v) for k, v in sorted(out.items())]
     if not KEEP_FLIP:
         res += ['reloc:0x%08X-0x%08X=0x%08X' % (w, w + 4, RELOC_DUMMY) for w, _fn in TWIN_FLIP]
     return res

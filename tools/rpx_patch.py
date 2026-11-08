@@ -17,6 +17,10 @@ at load time). DUMMY must be a dead word.
 game's own; END must stay below the text region's end in the RPL file info). A section that no
 longer fits in its place in the file is moved to the end of the file.
 
+`textregion:SIZE` raises the RPL file info's textRegionSize (the code memory the loader allocates
+from 0x02000000; Smash 4's is 0x2BB8670, so code space ended at 0x04BB8670) to SIZE, never lowers
+it; the file info's CRC is updated. A grow: past the old region's end needs it.
+
 Addresses are memory addresses (e.g. 0x10136C58 is in .rodata). The section
 holding each address is decompressed (RPX zlib sections), patched, recompressed
 into the same space, and its CRC in the RPX CRC table is updated, so no other
@@ -28,6 +32,7 @@ import zlib
 
 SHF_RPL_ZLIB = 0x08000000
 SHT_RPL_CRCS = 0x80000003
+SHT_RPL_FILEINFO = 0x80000004
 
 
 def load(path):
@@ -62,7 +67,11 @@ def main():
     patches = {}
     reloc_moves = []
     grows = []
+    text_region = None
     for p in sys.argv[3:]:
+        if p.startswith('textregion:'):
+            text_region = max(text_region or 0, int(p[11:], 0))
+            continue
         if p.startswith('grow:'):
             grows.append(int(p[5:], 0))
             continue
@@ -76,6 +85,19 @@ def main():
 
     by_section = {}
     cache = {}
+    info_idx = next((i for i, s in enumerate(secs) if s[1] == SHT_RPL_FILEINFO), None)
+    if text_region is not None:
+        info = section_data(d, secs[info_idx])
+        old, = struct.unpack('>I', info[4:8])
+        if text_region > old:
+            struct.pack_into('>I', info, 4, text_region)
+            by_section[info_idx] = (info, [])
+            print("text region 0x%X -> 0x%X (ends 0x%08X)" % (old, text_region, 0x02000000 + text_region))
+    if info_idx is not None and grows:
+        info = by_section[info_idx][0] if info_idx in by_section else section_data(d, secs[info_idx])
+        region_end = 0x02000000 + struct.unpack('>I', info[4:8])[0]
+        assert max(grows) <= region_end, 'grow:0x%08X past the text region (ends 0x%08X): textregion:' % (
+            max(grows), region_end)
     for end in sorted(set(grows))[-1:]:     # several grow: (one per cave script): the largest
         # the code section that ends below END grows (zero-filled) up to it; the loader maps the
         # whole text region (textRegionSize in the file info), so this stays inside allocated code

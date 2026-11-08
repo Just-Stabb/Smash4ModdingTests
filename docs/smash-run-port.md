@@ -1064,32 +1064,145 @@ fixed number of them (38 or 23 a frame for a few frames).
   modes 0-4 and 6) lacks, and homing_extend.
 - Furiijio, Propeller Heiho: not read yet (Propeller Heiho carries items: create_item_and_have / Item::fall).
 
-## Step 2e (research so far): how a node index reaches a bone; Ghos's hit stun formula
+## Step 2e: the fliers Ghos and Tiki Buzz (3DS state code); Furiijio and Propeller Heiho not yet
 
-**Node -> bone (settles Ghos's node 3 and Plasma Wisp's node 5).** The motion module turns a node index into a bone
-index through its converter at +0x20 (context +0x24), called with the model's jtb (model handle +0xC) from the node
-matrix getters (3DS MotionModuleImpl::get_world_matrix 0x501468, Wii U 0x02C64588). The default converter is the
-identity (3DS 0x518018, set by the motion module's ctor at 0x5047D8); the enemies' (3DS 0x7B8F10, next to the
-Behavior code; Wii U **0x030833B4**, the same code) is:
-`node == 0 -> bone 0; node >= 0x1000 -> bone node - 0x1000; no jtb -> bone 0; else bone = jtb entry [node - 1]`
-(u16 at [jtb + 4] + 2 * node - 2, no bound check). **Node indices are 1-based into the jtb.** So:
-- Ghos's contact hitbox node 3 -> its jtb entry 2 = HipN: inside its 3-entry table; no jtb change is needed.
-- Plasma Wisp's weapons at node 5 -> entry 4 of its 5-entry jtb [0, 1, 2, 4, 3] = bone 3 (LHandN): in range all
-  along, on the Wii U twin's own model too (12-byte jtb). Step 2c v1's sixth entry is never read (harmless); it was
-  not the laser's fix.
-- The generated specs' "bone (jtb)" column (tools/s3ds_enemy_spec.py) maps node N to entry N, one off: node N is
-  entry N - 1 (e.g. Gordo's node 3 is HipN, not Thorn1N; the White Bear's node 2 is RotN). The ports pass the node
-  to the game's create_attack_data, which converts it as above, so the walkers' hitboxes are right; only the
-  annotation is off.
+Package smashrun_step2e_v1: `code/` exe_v16 = exe_v12 (Extended Memory v3) + Smash Run through step 2e
+(scratch build16.py: `smashrun_field_cave.py`'s default set `step2e` and `smashrun_walker_cave.py`, one rpx_patch
+call) and `smashrun_step2e_data` (both kinds' models, motions, vl params, sound banks lower case and capitalised, their
+effect folders from smashrun_effects_v2). Not yet run in game. Tests on exe_v16: `tools/smashrun_flier_test.py` 36
+checks (new), smashrun_walker_test.py 156 (with an enemy root; its per-kind checks now cover the ground kinds, the
+fliers' sets / hashsets / S2 / T2 are in its generic checks), smashrun_field_test.py 12, smashrun_enemy_test.py 26,
+s3ds_enemy_test.py ghos / tikibuzz 11 each: 0 failures. The readings with code addresses are in
+`reference/smashrun_enemy_specs/hand_read.json` (ghos, tikibuzz) and so in their docs/smash-run-enemies pages.
 
-**hit_return_frame** (code.bin 0x9EA9B0, Ghos's stun length): the gl entry g of the kind / variation
-(EnemyParamAccessor +0x38 + 0x208 * [inst + 0x1E4 + 32 * kind + 4 * var]): frames = int(int(g[+0x154]) * f), f
-(0x9EB4C0) = g[+0x160] + (g[+0x164] - g[+0x160]) * (clamp(d, g[+0x158], g[+0x15C]) - g[+0x158]) / (g[+0x15C] -
-g[+0x158]) (1.0 when the range is empty), d = the DamageModule's float +0x6C (0x9EAAB4: acc+0x3054 on the 3DS).
-Not yet mapped to the Wii U (gl entry layout, the DamageModule field).
+**Node -> bone.** The motion module turns a node index into a bone index through its converter at +0x20 (context
++0x24), called with the model's jtb (model handle +0xC) by the node matrix getters (3DS MotionModuleImpl::
+get_world_matrix 0x501468, Wii U 0x02C64588). The default is the identity (3DS 0x518018, set by the motion module's
+ctor 0x5047D8); the enemies' (3DS 0x7B8F10, Wii U **0x030833B4**, the same code): `node 0 -> bone 0; node >= 0x1000 ->
+bone node - 0x1000; no jtb -> 0; else bone = jtb entry [node - 1]` (no bound check): **node indices are 1-based**.
+Ghos's node 3 is its jtb entry 2 (HipN); Plasma Wisp's weapons' node 5 is entry 4 of its 5-entry jtb (bone 3,
+LHandN): step 2c v1's sixth entry is never read. `tools/s3ds_enemy_spec.py` annotated node N as entry N; fixed
+(node 0 -> "bone 0", N -> entry N - 1, >= 0x1000 -> bone N - 0x1000) and every spec regenerated (only the bone
+names and the two new readings changed; e.g. the Goomba's bump node 4 is HeadN, its body node 2 RotN). The ports
+pass the node to the game's create_attack_data, so no hitbox moved.
 
-Still to do for the fliers: the Wii U ground normal (GroundCollisionObject get_ground_normal), the 3DS aerial
-uniform (mode 5) and homing_extend maths for Tikibuzz, Furiijio and Propeller Heiho's reading, the ports.
+**Code space: the text region raised.** Every zero span of exe_v15's text is claimed (the docs' and tools' CAVE /
+LIMIT / tables; Smash Run's own spans hold ~1.9 KB), and the fliers need ~3.3 KB of code and ~2 KB of data. The
+code memory is the RPL file info's text region (textRegionSize 0x2BB8670 from 0x02000000; Cemu allocates, maps and
+recompiles the whole region, docs/native-notes.md), so `tools/rpx_patch.py` has a new `textregion:SIZE` (raises
+the file info word +4, never lowers it, updates its CRC; a `grow:` past the region's end is refused without it)
+and the walker cave passes `textregion:0x2BC0000 grow:0x04BC0000`: region G 0x04BB8680-0x04BC0000 (32 KB, code to
+0x04BB9354, the fliers' data after it, to 0x04BBA500). Proof it was free: exe_v15's text ends 0x04BB8660, and no
+branch, lis / D-form pair, relocation or data word in exe_v15 points into 0x04BB8660-0x04BC0000 (scratch
+diff16.py; one data word 0x04BBA266 at 0x1040ED80 sits in a table of hashes: unaligned, no relocation). Assumed, not
+verified on Cemu: that a main executable's larger text region only moves later code allocations (the main RPX is
+loaded first at 0x02000000; graphic-pack code caves live below it). If exe_v16 does not boot, this is the first
+suspect. Calls from G into 0x026Axxxx / 0x0269xxxx go through ctr (beyond a `b`).
+
+**The flier framework** (`tools/smashrun_walker_cave.py`, `FLIERS` in its kind table; `code_f`, region G):
+- A flier is a walker-engine kind with its own CFG words VT (its vtable), SIZE (the object: 0x230 = the walker's
+  0x1B0 + the aerial module at AER 0x1B0, 0x74 bytes, as mczakoplasmawisp embeds it), TB0-2 (the stomp test's tread
+  box, now per kind: the Goomba keeps (7, 2.53, 4)), FSTART / FDMG / F69 / F27 (its handlers) and LVP (its leave
+  param). create (region A) reads SIZE and VT from the CFG.
+- VTF: the walkers' vtable but slot 41 (start: the kind's FSTART) and slots 10 (notify_on_damage, the 3DS's 11),
+  27 (notify_on_remove, the 3DS's 28) and 69 (the damage reaction, as on the 3DS: BehaviorImpl::notify_on_damage
+  0x026A3564 calls it at vt+0x234 and skips its own reaction on non-zero), each the kind's handler or else
+  BehaviorImpl's own.
+- The aerial module: ctor 0x02DB2C44 (called by the kind's start; the 3DS ctor's), update() 0x02DB28C8. The 3DS modes
+  (code.bin setters): 0 normal / slip normal, 1 slip normal extend, 2 homing / slip homing, 3 homing extend / slip
+  homing extend, 4 braking, 5 uniform, 6 slip homing vector extend; the update's jump table (0x5F66E4) does nothing
+  for -1 and **5** (uniform: the speed is set once by the setter). So the Wii U's 0x02DB28E4 is
+  set_mode_**slip_homing** (mode 2; the earlier notes called it homing), 0x02DB2A48 slip_homing_extend (3),
+  0x02DB2A7C slip_homing_vector_extend (6); its update 0x02DB2524 handles 0-4 and 6, and returns for 5, as the 3DS.
+  Every setter is: the mode word, energy 0's init (Wii U vptr energy +0x1C, vt+0x1C; 3DS vt+0xC)(0x17, &speed,
+  &zero3, acc), energy 0 on (+0x18 = 1), energy 1 off; homing keeps speed 0, the slip variants the current speed.
+  The cave's own setters: f_amode (none: -1 / speed 0; uniform: 5 / the given speed; braking: 4 / the current speed,
+  then +0x18 / +0x1C), f_ahome (homing_extend = energy 0's speed zeroed by set_current_speed 0x02DB2BC0, then the
+  Wii U's slip_homing_extend). set_target(id, offset) is three stores (+0x30 id, +0x40 offset, +0x2C 0).
+- get_ground_normal: Wii U **0x02D64ABC** (GroundCollisionObject, the GroundModule's +0x18, as is_touch 0x02C38A24
+  reads it; found as the call with mask 8 in change_kinetic 0x02DBE13C, the 3DS's 0x646498): returns (x, y) in r3 /
+  r4; mask 0xFF sums the touched lines' normals (line +0x48), normalised, (0, 1) if none.
+- hit_return_frame (3DS 0x9EA9B0): the Wii U has the factor (3DS 0x9EB4C0) at **0x02DB4ED4** (gl +0x158..+0x164, the
+  damage float through 0x026A81F8: DamageModule acc+0x30D4 +0x6C; its only caller 0x02DB4FB0) and the gl entry at
+  [[0x102F6C00] + 0x34] + 0x228 x [[0x102F6C00] + 0x1E4 + 4 (8 kind + var)] (the same offsets as the 3DS's +0x38 /
+  0x228 stride, e.g. 0x02DB4EF0); the cave computes int(float(gl +0x154) x factor) from the live entry (f_hitret).
+  The Wii U gl file (param/enemy/gl/enemy_param.bin, group 3, 138 words an entry, entry = kind + 1) has for ghos
+  +0x154 30, +0x158 1, +0x15C 80, +0x160 2, +0x164 1 (60 frames at low damage to 30 at 80); tikibuzz 30 / 1 / 80 /
+  2 / 1.
+- The common leave in G (f_leave_en: init_common_leave 0x7B23B4 with the kind's InnerEnemyLeaveParam, as step 2c
+  v2's Waddle Doo; o_leave_up now ends in the kind's REMOVE) and finalize_common_leave (0x7B475C: effect removed,
+  count 0) + set_correct(5) (f_unleave).
+
+**Ghos** (Kid Icarus, 0x11; enemy_fs.cro create 0x11560, table 0x10D350):
+- start 0x109C0: the aerial module, set_rhombus, set_lr(0, 1, 1) (faces the camera), the nearest fighter kept as its
+  target, leave timer 1200 (P@0xA0), -> 1, its body effect 0x7110000 following node 0.
+- 1 fly (0x1091C / 0x10E24): kinetic 26, slip homing with P7 set 0 (96 %) or 1 (4 %) re-picked every random(20, 40)
+  frames (L66BA4), ground off, passable, FlyHoming loop, aerial target = that fighter; each frame the aerial update,
+  the wall bounce (L1120C: on any contact, r = |v|^2 / 0.64; r >= 0.1: v reflected on get_ground_normal(0xFF),
+  normalised, x 0.6 min(r, 1)), the leave timer; at 0 -> 3.
+- 2 stun (0x10AD0 / 0x10EE4; slot 69 => 2): kinetic 16, DamageStart, hit_return_frame() frames with the kinetic flag
+  0x80 set, then -> 1. Slot 10 (0x11094): BehaviorImpl's notify_on_damage, then the leave timer back to 1200. Slot
+  69 (0x113A4): a running leave is finalised (set_correct(5)), => 2, returns 1.
+- 3 leave (0x10DD0: init_common_leave(P6: 100 frames, -0.02, 30, effect 0x8000005 at (0, 3, 0) x 0.85)) -> 5.
+- 4 dead (bullet), 5 remove; slots 64-66 1, 67 4; slot 27 (0x11140) removes the body effect, then BehaviorImpl's.
+- **Contact damage**: P2 entry 1 in state 1 (power 3, angle 361, kbg 50, fkb 0, bkb 50, size 8, node 3 = HipN): all
+  the time it flies; P2 entry 0 (kbg 100) on the defeated body (4). No explicit attack calls, no ACMD (no hashsets,
+  no animcmd files).
+- Not ported: slot 31 (0x113F0: weapons that count as a fighter's own (is_weapon_as_fighter), held items but kinds
+  0x12 / 0x24, and attacks with the AttackData +0x4C flag set a flag that makes notify_on_damage restore the HP
+  (init_damage) and clear +0x5A2 of the module at acc+0x3074 (Wii U +0x30F4, field not mapped), play_se(15)):
+  reflected or such weapons hurt it here); slot 55 / 5 (0x10B9C: the body and node 2 turned toward the target,
+  rx = -dy 30, ry = dx 30 degrees: MotionModule set_node_rotate and the posture rotation, not mapped);
+  set_node_visibility (the damage mesh); sounds.
+
+**Tiki Buzz** (Kirby, 0x0F; create 0x78630, table 0x10E134):
+- start 0x778A8: the aerial module, set_rhombus, faces the nearest fighter, -> 3. initialize 0x77DC8: energy +0x44 =
+  P0 f18 (0.98).
+- 3 fly (0x78668 / 0x77A2C): ground off, passable, Fly loop, set_mode_homing_extend(f3, f4, f7, f8, f5, f6) = (0.05,
+  0.11, 0.05, 0.06, 0.5, 1.1), the aerial +0x54 = 1, +0x5C = 0, +0x58 = -1, target fighter 0 at (0, 35, 0); each
+  frame: the aerial update; a 152-frame cool-down after a find; else every 30 frames (search group 0: 15 x 60, 25
+  below it) search_target -> 4; after 900 frames -> 9.
+- 4 hold (0x780A4): AttackHold at 0.75, set_mode_none, kinetic 11, remembers fighter 0's y; at the end -> 5.
+- 5 dive (0x77964 / 0x77CB0): Attack, set_mode_uniform((0, -6)); at / below that y passable off; ground => 7; 9
+  frames -> 6. **The only hitbox**: P2 entry 0 (power 2, angle 60, kbg 120, fkb 50, bkb 0, size 4, node 2 = RotN,
+  offset (0, -1, 0)).
+- 6 brake (0x78240 / 0x784B4): AttackBrake at 0.7, set_mode_braking(0, 0.04); in the air: speed y >= 0 -> 3; on the
+  ground: speed 0, set_mode_none, at the end -> 3. 7 landed (0x78454): ground on, AttackUnguard, request_quake(3), 45
+  frames -> 8 ready (FlyReady) -> 3.
+- 9 leave (0x7781C): Fly, set_correct(0), set_mode_none, 200 frames -> 12 (removed).
+- 10 stomped (slot 21 = Wii U 20 => 10, and fix v8's own stomp test with its tread box (6, 11.72, 1.5): area 0, node
+  3 = HipN, 12 x 3, HipN's bind height 11.72): Step, defeated (create_dead_item: the removal's defeat path),
+  disable_hit as notify_on_death (as the Goomba's collapse), set_mode_uniform((0, -3)), effect 0x70F0000; 60 frames
+  or the ground -> 11: kinetic 26, ground on, effect 0x70F0001 -> 12 remove.
+- 1 fall (after damage: slots 64-66 3; kinetic 8, Fly; ground -> 3), 2 dead (bullet; P2 entry 1: power 2, angle
+  361, kbg 100, bkb 50, size 3).
+- Not ported: start's GroundCollisionObject +0x141 = 4 / +0x142 = 0 and set_circle_follow_node(2) (the Wii U
+  collision object's fields past +0x100 are shifted: is_touch's +0x150 is the Wii U's +0x15C; not mapped); the
+  flap rate (MotionModule +0x50 = 1 rising / 0.2); the meshes (normal / damage 1 / damage 2) and set_visibility(0);
+  sounds.
+
+**Spawner**: `smashrun_field_cave.py` set `step2e` (default): step2c's kinds and Ghos / Tiki Buzz, three times each in
+a 17-entry turn (placement 2: they appear DY = 30 above the player, DX = 70 to the side, and fly from there), at most
+6 alive; requests step2c's fourteen + 0x11 / 0x0F: ten enemy effect banks (0x70F, 0x711, 0x712, 0x719, 0x71D,
+0x71F, 0x740, 0x757, 0x758, 0x759), exactly the category's ten slots.
+
+**exe_v16 vs exe_v15, word diff** (scratch diff16.py; data / rodata / bss equal; relocations equal): the file info's
+textRegionSize 0x2BB8670 -> 0x2BC0000; text section grown 0x04BB8660 -> 0x04BC0000; text 0x02D9A618 (S2's branch),
+0x02D9B6F8 (field hook D), 0x04B7D16C-0x04B7D4F0 (field cave code), 0x04B7D62C-0x04B7DF00 (E), 0x04B84924-0x04B849FC
+(D), 0x04B85980-0x04B85C00 and 0x04B86220-0x04B86560 (data spans, now empty), 0x04B86918-0x04B88000 (A),
+0x04B89020-0x04B8A000 (B), 0x04BB8000-0x04BB8008 and 0x04BB8174-0x04BB8660 (C), 0x04BB8680-0x04BBA500 (G): 4323
+words, all Smash Run regions.
+
+**Furiijio and Propeller Heiho (not ported; read so far from the generated specs only):**
+- Furiijio (0x1A, create 0x6DC6C, object 616): set_mode_homing (non-slip: f_ahome's way works) with its own params,
+  an ice beam (motions IceBeamShotHold / IceBeamShot, P2 entries 0 / 1 in states 4 / 7, node 3, power 4, kbg 100,
+  fkb 100, size 2; effect models EfffsFuriijioFreezBeam*: whether the beam is a weapon article or the behaviour's own
+  hitboxes is to read first), init_common_leave (P6), slot 69 0x6DC48 (as Ghos's), slots 57 / 61 / 62.
+- Propeller Heiho (0x47, create 0x9AA38, object 528): set_mode_normal with explicit update(x, y, bool) arguments
+  (mode 0 / 1 with the stick and a cosine bob, __hardfp_cosf), change_kinetic(23) / (16); it carries an item:
+  Behavior::create_item_and_have(kind, variation, position, 1), ItemManager::find_item, Item::fall / Item::warp /
+  Item::is_haved. The Wii U equivalents (item creation by kind, have / drop) are not found yet; its only P2 entry is
+  the defeated body (state 3): no contact damage while it flies.
 
 ## Plan (to refine once code.bin is in)
 

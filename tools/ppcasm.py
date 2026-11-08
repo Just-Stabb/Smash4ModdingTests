@@ -27,7 +27,7 @@ X_OPS = {"add": 266, "subf": 40, "mullw": 235, "divwu": 459, "divw": 491, "and":
          "slw": 24, "srw": 536, "lwzx": 23, "stwx": 151, "lbzx": 87, "stbx": 215, "lfsx": 535, "stfsx": 663}
 FA_OPS = {"fadds": (59, 21), "fsubs": (59, 20), "fmuls": (59, 25), "fdivs": (59, 18),
           "fmadds": (59, 29), "fmsubs": (59, 28), "fadd": (63, 21), "fsub": (63, 20),
-          "fmul": (63, 25), "fmadd": (63, 29)}
+          "fmul": (63, 25), "fmadd": (63, 29), "fnmsubs": (59, 30), "fnmadds": (59, 31)}
 FX_OPS = {"fmr": 72, "fneg": 40, "fabs": 264, "frsp": 12, "fctiwz": 15}
 COND = {"beq": (12, 2), "bne": (4, 2), "blt": (12, 0), "bge": (4, 0), "ble": (4, 1), "bgt": (12, 1), "bdnz": (16, 0)}
 FIXED = {"blr": 0x4E800020, "bctr": 0x4E800420, "bctrl": 0x4E800421, "nop": 0x60000000}
@@ -178,7 +178,7 @@ class Asm:
             d, a = reg(args[0]), reg(args[1])
             if op in ("fmuls", "fmul"):
                 return (prim << 26) | (d << 21) | (a << 16) | (reg(args[2]) << 6) | (xo << 1)
-            if op.startswith("fm") and len(args) == 4:      # fmadd(s) d, a, c, b = a*c + b
+            if op.startswith(("fm", "fnm")) and len(args) == 4:      # fmadd(s) d, a, c, b = a*c + b
                 return (prim << 26) | (d << 21) | (a << 16) | (reg(args[3]) << 11) | (reg(args[2]) << 6) | (xo << 1)
             return (prim << 26) | (d << 21) | (a << 16) | (reg(args[2]) << 11) | (xo << 1)
         if op in FX_OPS:

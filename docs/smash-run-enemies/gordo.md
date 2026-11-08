@@ -44,8 +44,8 @@ States:
 
 | entry | state | id | part | node | power | angle | kbg | fkb | bkb | size | x | y | z | bone (jtb) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 0 | 1 | 0 | 0 | 3 | 10 | 65 | 50 | 50 | 100 | 8 | 0 | 0 | 0 | Thorn1N |
-| 1 | 2 | 0 | 0 | 3 | 10 | 65 | 50 | 50 | 100 | 8 | 0 | 0 | 0 | Thorn1N |
+| 0 | 1 | 0 | 0 | 3 | 10 | 65 | 50 | 50 | 100 | 8 | 0 | 0 | 0 | HipN |
+| 1 | 2 | 0 | 0 | 3 | 10 | 65 | 50 | 50 | 100 | 8 | 0 | 0 | 0 | HipN |
 
 ## Params
 
@@ -64,7 +64,7 @@ Per state: the attack the framework arms on entry, then each function's items in
 
 ### state 1 (enter 1a180, update 1a3fc, exit None)
 
-- **attack armed on entry** (param group 2): entry 0: power 10 angle 65 kbg 50 fkb 50 bkb 100 size 8 node 3 (Thorn1N) offset (0, 0, 0)
+- **attack armed on entry** (param group 2): entry 0: power 10 angle 65 kbg 50 fkb 50 bkb 100 size 8 node 3 (HipN) offset (0, 0, 0)
 - enter:
   - kinetic `EnemyKineticModuleImpl::change_kinetic(-1)`
   - ground `GroundModuleImpl::set_attach_ground(0)`
@@ -74,7 +74,7 @@ Per state: the attack the framework arms on entry, then each function's items in
 
 ### state 2 (enter 1a0b8, update 65d1c, exit None)
 
-- **attack armed on entry** (param group 2): entry 1: power 10 angle 65 kbg 50 fkb 50 bkb 100 size 8 node 3 (Thorn1N) offset (0, 0, 0)
+- **attack armed on entry** (param group 2): entry 1: power 10 angle 65 kbg 50 fkb 50 bkb 100 size 8 node 3 (HipN) offset (0, 0, 0)
 - enter:
   - kinetic `EnemyKineticModuleImpl::change_kinetic(-1)`
   - helper `L65d20(this)`

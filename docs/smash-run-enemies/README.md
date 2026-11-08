@@ -75,7 +75,7 @@ Top-level keys (one per line group; values compact JSON):
 | `vtable_functions` | items of each overridden vtable slot |
 | `helpers` | items of each other local function reached (`L<addr>` in the items) |
 | `functions` | every analysed function: `blocks: [{addr, guard, events, term}]`; events `{a, op: call / lcall / vcall / mcall / icall / store / param, ...}`; `term` `{type: if (cond, then, else) / goto / fall / return / tailcall / switch}`: a pseudo-code listing of the function |
-| `attacks` | the P2 entries with names: `entry, state, id, part, node, power, angle, kbg, fkb, bkb, size, x, y, z, bone` (bone: `node` through model.jtb into the skeleton: inferred), `other` (the remaining words with their AttackData offsets) |
+| `attacks` | the P2 entries with names: `entry, state, id, part, node, power, angle, kbg, fkb, bkb, size, x, y, z, bone` (bone: `node` as the enemies' node -> bone converter reads it (3DS 0x7B8F10, Wii U 0x030833B4): node 0 -> bone 0, node N -> model.jtb entry N - 1 (1-based), node >= 0x1000 -> bone node - 0x1000), `other` (the remaining words with their AttackData offsets) |
 | `joints` | model.jtb joints as bone names |
 | `acmd` | per motion: `{attack / effect / sound: {main / init / exit: [[command, params...]...]}}` (3DS ACMD decoded with tools/acmd_info.json) |
 | `articles` | `article_data_set`, `entries` ([weapon kind, count?, data ptr, 0] per article index), `weapons`: per weapon class `{class, vtable, slots: {k: {name, fn, items}}}` |
@@ -550,9 +550,9 @@ script. Articles: the weapon classes the kind owns.
 | 0x0C | [mettaur](mettaur.md) | stationary+shooter | 10 | 8:2 | - | bullet | default |  |
 | 0x0D | [shotzo](shotzo.md) | stationary+shooter | 8 | 8:0 | - | shot | default |  |
 | 0x0E | [zima](zima.md) | crawler | 8 | 4:4, 6:6 | - | - | own 0x14dbc | yes |
-| 0x0F | [tikibuzz](tikibuzz.md) | flyer | 13 | 5:2, 2:2 | - | - | default |  |
+| 0x0F | [tikibuzz](tikibuzz.md) | flier (dive bomber) | 13 | 5:2, 2:2 | - | - | default | yes |
 | 0x10 | [ghost](ghost.md) | flyer+links | 9 | 0:0, 2:2 | - | - | own 0x66244 |  |
-| 0x11 | [ghos](ghos.md) | flyer | 6 | 4:3, 1:3 | - | - | default |  |
+| 0x11 | [ghos](ghos.md) | flier (homing) | 6 | 4:3, 1:3 | - | - | default | yes |
 | 0x12 | [plasmawisp](plasmawisp.md) | flyer+shooter | 11 | 2:3, 2:6, 2:9, 1:12 | - | hadoudan, laser, needle | own 0x8936c | yes |
 | 0x13 | [waddledee](waddledee.md) | walker | 9 | 7:2 | - | parasol | default | yes |
 | 0x14 | [critter](critter.md) | walker+acmd-hitboxes | 16 | 14:6 | BiteAttackHold, motion1(BiteAttack), BiteAttack, BiteAttackTurn, motion5(BiteAttackTurn), SpinAttack, motion18(SpinAttack) | - | default |  |

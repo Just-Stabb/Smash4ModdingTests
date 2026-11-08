@@ -68,7 +68,7 @@ States:
 
 | entry | state | id | part | node | power | angle | kbg | fkb | bkb | size | x | y | z | bone (jtb) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 0 | 10 | 0 | 0 | 2 | 2 | 361 | 100 | 0 | 50 | 3 | 0 | 0 | 0 | HipN |
+| 0 | 10 | 0 | 0 | 2 | 2 | 361 | 100 | 0 | 50 | 3 | 0 | 0 | 0 | RotN |
 
 ## Params
 
@@ -259,7 +259,7 @@ Per state: the attack the framework arms on entry, then each function's items in
 
 ### state 10 (enter 7d030, update 7dacc, exit None)
 
-- **attack armed on entry** (param group 2): entry 0: power 2 angle 361 kbg 100 fkb 0 bkb 50 size 3 node 2 (HipN) offset (0, 0, 0)
+- **attack armed on entry** (param group 2): entry 0: power 2 angle 361 kbg 100 fkb 0 bkb 50 size 3 node 2 (RotN) offset (0, 0, 0)
 - enter:
   - motion `Behavior::change_motion_state(2, 0, 0, 0, 0)` = Damage
   - attack `Behavior::bullet()`

@@ -17,7 +17,7 @@ From `reference/smashrun_enemy_specs/hand_read.json` (read from the listings bel
 
 When it is dangerous:
 
-- states [9]: Behavior::hit_attack_absolute with P6 (InnerEnemyAttackAbsoluteParam: state 9, id 0, part 0, power 10, angle 90, kbg 100, fkb 0, bkb 40, ...) on the first grounded fighter; power 10, angle 90, kbg 100, fkb 0, bkb 40. an absolute hit, not a hitbox: the first fighter on the ground (fighter-manager entry order), anywhere on the stage, takes it at the landing. Not ported to the Wii U yet (step 2c).
+- states [9]: Behavior::hit_attack_absolute with P6 (InnerEnemyAttackAbsoluteParam: state 9, id 0, part 0, power 10, angle 90, kbg 100, fkb 0, bkb 40, ...) on the first grounded fighter; power 10, angle 90, kbg 100, fkb 0, bkb 40. an absolute hit, not a hitbox: the first fighter on the ground (fighter-manager entry order), anywhere on the stage, takes it at the landing. Ported in step 2c v2: Wii U AttackModule MSC ops 0x2716 / 0x271D on the first live fighter whose StatusModule(1) situation is 0.
 - states [10]: param P2 entry 0 (set_attack_data); power 8, angle 361, kbg 100, fkb 0, bkb 50, size 5, node 2. defeated body flight (HipN)
 
 States:
@@ -69,7 +69,7 @@ States:
 
 | entry | state | id | part | node | power | angle | kbg | fkb | bkb | size | x | y | z | bone (jtb) |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 0 | 10 | 0 | 0 | 2 | 8 | 361 | 100 | 0 | 50 | 5 | 0 | 0 | 0 | HipN |
+| 0 | 10 | 0 | 0 | 2 | 8 | 361 | 100 | 0 | 50 | 5 | 0 | 0 | 0 | RotN |
 
 ## Params
 
@@ -236,7 +236,7 @@ Per state: the attack the framework arms on entry, then each function's items in
 
 ### state 10 (enter 7e708, update 7ea7c, exit None)
 
-- **attack armed on entry** (param group 2): entry 0: power 8 angle 361 kbg 100 fkb 0 bkb 50 size 5 node 2 (HipN) offset (0, 0, 0)
+- **attack armed on entry** (param group 2): entry 0: power 8 angle 361 kbg 100 fkb 0 bkb 50 size 5 node 2 (RotN) offset (0, 0, 0)
 - enter:
   - motion `Behavior::change_motion_state(2, 0, 0, 0, 0)` = DamageStart
   - attack `Behavior::bullet()`

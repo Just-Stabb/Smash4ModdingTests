@@ -53,6 +53,7 @@ REVERSE_LR = 0x026A7A20
 SET_LR = 0x026A780C
 FAILS = []
 VT_ADDR = [0]
+GKINDS = [w for w in W.WALKERS if not w.get('flier')]   # the walkers (step 2e's fliers: smashrun_flier_test.py)
 
 
 def check(cond, what):
@@ -131,7 +132,7 @@ class Machine:
             self.ret(0x7000 + r(4))
         elif addr == W.OPNEW:
             c.append(('new', r(3)))
-            self.uc.mem_write(OBJ, b'\xCC' * W.OBJ_SIZE)
+            self.uc.mem_write(OBJ, b'\xCC' * r(3))
             self.ret(OBJ)
         elif addr == W.BEH_CTOR:
             c.append(('ctor', r(3), r(4), r(5), r(6)))
@@ -311,7 +312,7 @@ class Machine:
 
     def walker(self, cfg, state=0, lr=-1.0, x=0.0, kind=0, var=0):
         """a walker object (as create leaves it) with the fake modules"""
-        self.uc.mem_write(OBJ, bytes(W.OBJ_SIZE))
+        self.uc.mem_write(OBJ, bytes(W.FL_SIZE))
         self.w32(OBJ, ACC)
         self.w32(OBJ + 4, state)
         self.w32(OBJ + 8, kind)
@@ -410,7 +411,7 @@ def main():
                                                             (W.SITE_DEATH, 'cave_death'))),
           'hooks: F2 / T2 / S2 / initialize_after / notify_on_remove branch to the cave')
     want = {}
-    for a in (A, B, A.area, A.stomp, A.e):
+    for a in (A, B, A.area, A.stomp, A.e, A.g):
         want.update({a.base + 4 * i: x for i, x in enumerate(a.words())})
     for base, words in d.chunks:
         want.update({base + 4 * i: x for i, x in enumerate(words)})
@@ -425,7 +426,7 @@ def main():
           'step 2a\'s factory hook still in place (0x%08X)' % E.SITE_F)
 
     # the factory
-    for w in W.WALKERS:
+    for w in GKINDS:
         k = w['kind']
         m = Machine(img)
         m.w32(MOD + 4, ACC)
@@ -479,7 +480,7 @@ def main():
     ok &= all(vt[(0x8 + 8 * k) // 4] == 0 for k in range(76))
     check(ok, 'VT: BehaviorImpl\'s 74 slots (dtor 0x%08X, update 0x%08X kept) with 12 38 40 41 45 64-67 72-75 '
           'overridden' % (slots[0], slots[3]))
-    for w in W.WALKERS:
+    for w in GKINDS:
         m = Machine(img)
         m.walker(cfg[w['kind']], state=3, kind=w['kind'])
         m.call(slots[20], {3: OBJ, 4: 0x11, 5: 0})
@@ -489,7 +490,7 @@ def main():
                     if t else []) and len(m.calls) == len(c),
               'VT %s: slot 20 (the 3DS\'s 21, stepped on) %s' % (w['name'], '=> %d (collapses)' % t if t else
                                                                   'does nothing (BehaviorImpl\'s nop, as on the 3DS)'))
-    for w in W.WALKERS:
+    for w in GKINDS:
         got = []
         for k in (64, 65, 66, 67):
             m = Machine(img)
@@ -553,7 +554,7 @@ def main():
 
     # change_state: the kind's table
     rows = {}
-    for w in W.WALKERS:
+    for w in GKINDS:
         r = {}
         for sid, s in w['states'].items():
             if s == 'remove':
@@ -574,7 +575,7 @@ def main():
                   % (w['name'], slot, W.CHG_BASE if slot == 72 else W.CHG_INT, sorted(r)))
 
     # initialize / start / set_attack_data
-    for w in W.WALKERS:
+    for w in GKINDS:
         k, c0 = w['kind'], cfg[w['kind']]
         m = Machine(img)
         m.walker(c0)
@@ -671,7 +672,7 @@ def main():
         exp = {k: (v if v else m.r32(ZT)) for k, v in exp.items()}
         check(got == exp, 'fix v7: area site 0x%08X: a walker kind gets its own table, others the slot\'s +0x70 %s'
               % (site, {hex(k): hex(v) for k, v in got.items()}))
-    for w in W.WALKERS:
+    for w in GKINDS:
         t = [img.u32(D['ar_' + w['name']] + 4 * j) for j in range(12)]
         check(t == [W.word(v) for e in w['areas'] for v in e], 'fix v7: %s area table %s (tread area %s)'
               % (w['name'], w['areas'], 'on' if w['areas'][0][0] else 'off, as on the 3DS'))
