@@ -127,7 +127,7 @@ Guy +0x78 = 0.7, +0x90 = 1.0 -- inferred from the vl files' order; the Waddle Do
 
 The framework:
 - vtable VT: a copy of BehaviorImpl's 0x1008AEBC (GHS: {delta, fn}, slot k's fn at +0xC + 8k) plus 74 / 75;
-  overrides: 12 zima's 0x026D6E18 (capture motion), 20 w_tread (stepped on, below), 38 w_noflip (0, fix v3; --keep-flip: zima's `li r3, 1`),
+  overrides: 12 zima's 0x026D6E18 (capture motion), 20 w_tread (stepped on, below), 38 w_noflip (0, fix v3; step 2g v6: 1 for FLIP_TABLE kinds; --keep-flip: zima's `li r3, 1`),
   40 initialize (the kind's 3DS kinetic energy words), 41 start (set_rhombus, +0x10 = posture lr, face the
   nearest target, the kind's first state), 45 set_attack_data (below), 64-67 the kind's states (CFG), 72 / 73
   change_state(id) / the interrupt one (the kind's state table {enter, update, exit} PMFs to 0x026A3A44 /
@@ -201,7 +201,8 @@ Fix v3 (every Smash Run kind < 0x50, 2a's twins included):
 - initialize_after 0x02DB4AC8, 0x02DB4B20 `lwz r10, 0(r31)` -> for kinds < 0x50 set_lr(posture lr, 1, 1).
 - notify_on_remove 0x02DB40E4 `mflr r0` -> for kinds < 0x50 type 0 becomes 3 (the defeat effect path 0x02DB3AB0).
 - step 2g v3: slots 49 / 50 (set_lr / reverse_lr) -> w_slr / w_rlr (the game's, then w_yaw) in the cave's vtables and
-  the twins' (TWIN_LR, relocations moved to RELOC_DUMMY): the 3DS-flip kinds (YAW_FLIP) keep yaw -90 at lr 1, their
+  the twins' (TWIN_LR, relocations moved to RELOC_DUMMY): the 3DS-flip kinds (YAW_FLIP; from step 2g v6 only YAW_HOLD,
+  the ones without a model.flp: the others flip for real, slot 38 = 1) keep yaw -90 at lr 1, their
   camera-facing lr -1 view, which the 3DS mirrors for lr 1 (lr 1 showed their backs: the "sometimes facing away" spawns).
 
 Space: 0x04B86800-0x04B88000 (kind_expand.py's old space after smashrun_enemy_cave.py), 0x04B89000-0x04B8A000
@@ -371,15 +372,22 @@ TWIN_FLIP = ((0x1008FFCC, 0x026D7C98), (0x1008F1D4, 0x026D19F4), (0x1008EC68, 0x
 # Their models face the camera at lr -1 (yaw -90) and the 3DS shows lr +1 as that view mirrored; without the mirror
 # (no Wii U flip table: fix v3) lr +1's yaw +90 showed their backs. w_yaw keeps yaw -90 for lr +1 (the mirror's front).
 YAW_FLIP = (0x01, 0x13, 0x19, 0x1F, 0x0E, 0x12, 0x1D, 0x0F, 0x1A, 0x47)
+# step 2g v6: the real flip. The converted models now carry the 3DS model.flp as the Wii U's (tools/s3ds_enemy.py
+# flp_bytes), so slot 38 returns 1 for the YAW_FLIP kinds that have one (FLIP_TABLE: the game's own set_lr 0x026A780C /
+# reverse_lr 0x026A7A20 then call MotionModule 0x02C6108C(lr == 1, 1), the 3DS's set_flip(lr == 1, 1), and the anim
+# mirror 0x036C48B0 mirrors the skeleton) and they keep lr x 90 (no yaw hold). Churine and Propeller Heiho flip on the
+# 3DS but have no model.flp in either game (nothing to mirror): they keep the step 2g v3 yaw hold (YAW_HOLD).
+FLIP_TABLE = (0x01, 0x13, 0x19, 0x0E, 0x12, 0x1D, 0x0F, 0x1A)
+YAW_HOLD = tuple(k for k in YAW_FLIP if k not in FLIP_TABLE)
 SET_LR, REVERSE_LR = 0x026A780C, 0x026A7A20
 # the twins' vtables (2a's zima / plasmawisp / darios use them): slots 49 / 50 -> w_slr / w_rlr (kinds >= 0x50 unchanged)
 TWIN_LR = tuple((w - 0x13C + 0xC + 8 * k, orig, lab) for w, _f in TWIN_FLIP
                 for k, orig, lab in ((49, SET_LR, 'w_slr'), (50, REVERSE_LR, 'w_rlr')))
 
 
-def yaw_mask():
+def yaw_mask(kinds=None):
     m = [0, 0, 0]
-    for k in YAW_FLIP:
+    for k in YAW_HOLD if kinds is None else kinds:
         m[k >> 5] |= 1 << (k & 31)
     return m
 RELOC_DUMMY = 0x037EE73C
@@ -794,7 +802,8 @@ class Data:
         b.append(('consts', [fword(0.0), fword(1.0), 0x2545F491, 0], 0x10))     # 0.0, 1.0, the xorshift state
         b.append(('abs_words', [word(v) for v in ABS_WORDS], 4))
         b.append(('fconsts', [0x43300000, 0x80000000], 8))      # the int -> double bias (f_hitret)
-        b.append(('yawk', [fword(1.0), fword(90.0), fword(-90.0)] + yaw_mask(), 4))    # step 2g v3: w_yaw
+        # step 2g v3: w_yaw (+0xC: the YAW_HOLD mask); step 2g v6: +0x18 the FLIP_TABLE mask (w_noflip / twin_flip)
+        b.append(('yawk', [fword(1.0), fword(90.0), fword(-90.0)] + yaw_mask() + yaw_mask(FLIP_TABLE), 4))
         vt = list(self.vt_words) + [0, 0, 0, 0]          # 74 slots + 74 / 75
         over = {12: ZIMA_CAPTURE_MOTION, 38: ZIMA_ONE if KEEP_FLIP else fn('w_noflip'), 40: fn('w_init'),
                 3: fn('w_upd'), 41: fn('w_start'), 45: fn('w_atk'), TREAD_SLOT: fn('w_tread'), 64: fn('w_r64'), 65: fn('w_r65'), 66: fn('w_r66'),
@@ -1990,14 +1999,25 @@ def code(D):
     # ---- fix v3 -----------------------------------------------------------------------------------------------
     B.asm("""
     w_noflip:
+        lwz r12, 8(r3)
         li r3, 0
+        cmplwi r12, 0x60
+        bgelr
+        lis r10, 0x%04X
+        addi r10, r10, %d
+        srwi r11, r12, 5
+        slwi r11, r11, 2
+        addi r11, r11, 0x18
+        lwzx r11, r10, r11
+        clrlwi r12, r12, 27
+        srw r11, r11, r12
+        clrlwi r3, r11, 31
         blr
     twin_flip:
         lwz r0, 8(r3)
-        li r3, 1
         cmplwi r0, 0x50
-        bgelr
-        li r3, 0
+        blt w_noflip
+        li r3, 1
         blr
     cave_rot:
         lwz r0, 8(r31)
@@ -2035,7 +2055,8 @@ def code(D):
     death_go:
         mflr r0
         b 0x%08X
-    """ % (0xC + 8 * SET_LR_SLOT, SITE_ROT + 4, ha(D['vt']), sx(D['vt']), DEFEATED, SITE_DEATH + 4))
+    """ % (ha(D['yawk']), sx(D['yawk']), 0xC + 8 * SET_LR_SLOT, SITE_ROT + 4, ha(D['vt']), sx(D['vt']), DEFEATED,
+           SITE_DEATH + 4))
     # ---- T2: the motion data set table (r0 = category, r31 = mgr; r9-r12 free)
     B.asm("cave_t:")
     F.sr_check(B)
@@ -3543,7 +3564,8 @@ def code_f(D, vtw):
     # fu_node: BeamN (node 3) turned to FU_ROT (set_node_rotate(3, rad, 0); a change -> the ModelModule's vt+0xC4, as
     # the Wii U's own callers do) and placed at the posture + FU_C (+ the zero offset) in global space
     # (set_node_translate(3, &v, 1, 0) + vt+0xC4: the 3DS's Behavior::set_node_global_position 0x7B5224). Step 2g v5:
-    # FU_ROT is (90, a lr, 90), the 3DS's (0, a lr, 90) turned 90 about the beam (x): the 3DS beam models' bones are
+    # FU_ROT is (90, a lr, 90), the 3DS's (0, a lr, 90) turned 90 about the beam (x; step 2g v6: x 90 x -lr, so at lr 1,
+    # now yaw +90 with the real flip, the planes' front still faces the camera): the 3DS beam models' bones are
     # Y-axial billboards (H3D billboard mode 6 in BeamBG / BeamBG2 / BeamBody's flags), which turn their planes to
     # the camera about the beam; the converted NUDs have no billboard, so the turn is in the angles (both games build
     # the node matrix as Rz Ry Rx: 3DS Matrix34::set_rotate_xyz 0x87D298, Wii U 0x033730A0). The 3DS's
@@ -3557,6 +3579,11 @@ def code_f(D, vtw):
         lfs f0, 0x%(P27)X(r30)
         lfs f1, 0x%(R)X(r31)
         fmuls f1, f1, f0
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f2, 0x60(r12)
+        fneg f2, f2
+        fmuls f1, f1, f2
         stfs f1, 8(r1)
         lfs f1, 0x%(R4)X(r31)
         fmuls f1, f1, f0

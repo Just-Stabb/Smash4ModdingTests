@@ -18,7 +18,8 @@ cross_f.rpx builds: `model/enemy/%s/%s/c%02d/`, `motion/enemy/%s/%s/`, `animcmd/
       model.sb / model.nhb (empty: no swing / helper bones) and model.xmb (a fighter body's: light set 0,
       shadow, main + normal-map draws) from reference/enemy_model_defaults (its README: without sb / nhb the
       bone-matrix getter 0x0331915C crashes; without xmb the enemies draw black).
-      The 3DS model.flp (mirror table, copied as is by the loader) is not written yet.
+      model.flp: the 3DS mirror table (flp_bytes): the same FLIP layout (major 1, minor 0: no built-in humanoid
+      table), byte-swapped to the Wii U's big-endian, the 3DS's rotation mode 5 written as 2 (below).
   motion/enemy/KIND/PART/main.pac
       the motion .bch's skeletal animations (motion/PART/main.bch or main/*.bch), one OMO each (name.omo),
       sampled every frame 0..end (H3D keys, linear / hermite / step, Euler XYZ rotations as quaternions). The
@@ -114,6 +115,39 @@ def jtb_bytes(data, nbones):
         idx = v[2:]
     assert all(i < nbones or i == 0xFFFF for i in idx), 'model.jtb: index out of the skeleton (%d bones): %s' % (nbones, idx)
     return struct.pack('>%dH' % n, *v)
+
+
+FLP_MODE_MAP = {5: 2}    # the 3DS's rotation mode 5 -> the Wii U's 2 (Z): see flp_bytes
+
+
+def flp_bytes(data, nbones):
+    """the 3DS model.flp (the model's mirror table: what MotionModuleImpl::set_flip mirrors) as the Wii U reads it.
+    Both games' files: 'FLIP', u8 major 1, u8 minor, u16 count, count 12-byte entries of six u16, a 4-byte trailer
+    (the 3DS little-endian, the Wii U big-endian). The Wii U (docs/smash-run-port.md "Step 2g v6"):
+    - the model folder loader keeps model.flp (name compare 0x03303C64); 0x0330E4C4 checks 'FLIP' and major == 1
+      (0x104CB434) and calls 0x0330C38C(model, entries, count, minor != 0). Minor 1 first adds a built-in humanoid
+      table (TransN, RotN, ThrowN, HipN, the L / R limbs by name, 0x0330C3EC-0x0330CC1C); minor 0 (every 3DS
+      enemy's) only the file's entries.
+    - each entry (0x0330CC28): u16 +8 == 0 -> list A {mode = +4, flags = +6, bone = +0}; else list B {mode = +4,
+      flags = +6, bone = +0, pair = +2} (u16 +10 unused). The lists go to the skeleton (0x036B4968) and the model
+      (+0x100).
+    - the anim mirror 0x036C48B0 (called after the anim evaluation, 0x036C6D48, when the skeleton's flip byte is set):
+      list A: flags 1 negates the translation's axis `mode`, flags 2 mirrors the rotation across that axis relative
+      to the bind rotation (q' = bind x M(bind^-1 x q)); list B swaps the pair's translations / rotations the same
+      way. Modes other than 0-2 are an error (0x90000600) and skipped.
+    The 3DS tables give HipN's rotation mode 5. Mapped to 2 here: with 2, every flip kind's skeleton through the Wii
+    U's mirror is the exact X mirror of its unflipped pose on every motion (tools/s3ds_enemy_test.py), as the 3DS
+    shows lr 1 (the lr -1 view mirrored); with 5 skipped HipN is not mirrored (5 to 10 units off). The 3DS's own
+    mirror code was not read (inferred from that geometry)."""
+    assert data[:4] == b'FLIP' and data[4] == 1, 'model.flp: not a FLIP v1 file'
+    n = struct.unpack_from('<H', data, 6)[0]
+    assert len(data) == 8 + 12 * n + 4, 'model.flp: %d bytes for %d entries' % (len(data), n)
+    out = data[:6] + struct.pack('>H', n)
+    for i in range(n):
+        bone, pair, mode, flags, is_pair, z = struct.unpack_from('<6H', data, 8 + 12 * i)
+        assert bone < nbones and (not is_pair or pair < nbones), 'model.flp: entry %d out of the skeleton' % i
+        out += struct.pack('>6H', bone, pair, FLP_MODE_MAP.get(mode, mode), flags, is_pair, z)
+    return out + data[-4:]
 
 
 def vbn_bytes(bones):
@@ -539,6 +573,9 @@ def convert(src, kind, out, tex_id, log=print):
         if os.path.exists(os.path.join(d, 'model.jtb')):
             open(os.path.join(od, 'model.jtb'), 'wb').write(
                 jtb_bytes(open(os.path.join(d, 'model.jtb'), 'rb').read(), len(model['bones'])))
+        if os.path.exists(os.path.join(d, 'model.flp')):
+            open(os.path.join(od, 'model.flp'), 'wb').write(
+                flp_bytes(open(os.path.join(d, 'model.flp'), 'rb').read(), len(model['bones'])))
         manims, vanims = bch.material_animations(), bch.visibility_animations()
         if manims or vanims:
             # the model's own (always running) material / visibility animation: model.mta, as stages' /

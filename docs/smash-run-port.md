@@ -1824,3 +1824,127 @@ stomp is unchanged (`st=3 tread=8`). The user saw Tiki Buzz's bounce as higher t
 the plain StepJump (multiplier 1.0): the per-kind multiplier (param 0x11) is step 2g v6's. 2742 `cl` lines (the
 cloud) for its analysis.
 
+
+## Step 2g v6: the real model flip (the 3DS model.flp as the Wii U's), Furiijio's beam at lr 1
+
+Package smashrun_step2g_v6: `code/` exe_v24 = exe_v23 + `smashrun_walker_cave.py` over its own regions (scratch
+s2gv6/build24.py, build23.py with exe_v23 as the base); `data/model/enemy/KIND/body/c00/model.flp`, 36 files (every
+3DS enemy model with one, tac left out). The data is new files only, next to the converted models. User input behind it:
+the flip kinds face left while walking right (step 2g v3's yaw hold). The v5b log confirms that Tiki Buzz's stomp works
+with the step 2g v5 HipN tread box (kept).
+
+**The Wii U flip table is model.flp, the 3DS's own format.**
+- **Loading.** The model folder loader keeps `model.flp` (name compare 0x03303C64; the name table 0x101927D8..., 'model.flp'
+  0x10192858). 0x0330E4C4 checks 'FLIP' (0x10192A7C) and that the major version equals 0x104CB434 (1). It then calls
+  0x0330C38C(model, file + 8, u16 count at +6, minor != 0).
+- **Minor 1 vs minor 0.** Minor 1 (the Wii U fighters' files: Squirtle's lists three extra hip entries) first adds a
+  built-in humanoid table by bone name (TransN, RotN, ThrowN, HipN, WaistN, the L / R limbs; 0x0330C3EC-0x0330CC1C,
+  names 0x10192B98-0x10192D48). Minor 0, every 3DS enemy's, uses only the file's entries.
+- **Entries.** Each entry is 12 bytes, six u16 (0x0330CC28):
+  - +8 == 0: list A {mode = +4, flags = +6, bone = +0};
+  - otherwise: list B {mode, flags, bone, pair = +2}.
+
+  Runtime entries are 12 / 16 bytes, at the skeleton's [+0xA0] +0x10 (0x036B4968) and at the model's +0x100.
+- **The 3DS file.** It has the same header and entries, in little-endian (`FLIP` 01 00, u16 count, entries, a 4-byte
+  trailer). Step 2c's reading of the fields as "bone, pair, param, mode, lr flag" was wrong. The fields are bone, pair,
+  mode, flags, is_pair.
+- **The anim mirror.** 0x036C48B0 runs after the anim evaluation (0x036C6D48) while the skeleton's flip byte is set.
+  set_flip is 0x0331910C / 0x03319134, reached from MotionModule 0x02C6108C.
+  - List A, flags 1: negates translation[mode].
+  - List A, flags 2: mirrors the rotation across that axis, relative to the bind: q = bind × M(bind⁻¹ × q). bind is
+    the VBN Euler as Rz Ry Rx (0x036C473C). M negates the other two components (0x036C4A88 / 0x036C4AC8 /
+    0x036C4B08). 0x036C4640(out, a, b) returns b × a.
+  - List B: the same, with the pair swapped.
+  - Modes above 2: error 0x90000600, and the entry is skipped. Flags bit 4 is not used here.
+- **Attached effects.** The bone getter 0x0331915C remaps a bone through list B when the model is flipped. It then
+  negates the matrix column `mode` for flags-2 entries, so effects and attachments follow the mirrored side.
+
+**The converter** (`tools/s3ds_enemy.py` flp_bytes, written by convert()) byte-swaps the file. One exception: the 3DS
+tables give HipN's rotation mode 5, which the Wii U skips. It is written as 2.
+
+Why mode 2: through a model of 0x036C48B0, mode 2 is the only value that makes each flip kind's mirrored skeleton the
+exact X mirror of its unflipped pose (every bone onto its pair's mirror) on frames of every motion. With mode 5
+skipped, HipN stays unmirrored and bones end up 5-10 units off. The 3DS's own mirror code was located but not read,
+so this is inferred from the geometry (flagged):
+- set_flip 0x50458C sets the skeleton controller's +0x530;
+- its readers are 0x84DED8, 0x84F800, 0x84FA34 and 0x8501BC.
+
+**The executable** (exe_v24):
+- **FLIP_TABLE.** These kinds now have a table: kuribo, waddledee, waddledoo, zima, plasmawisp, darios, tikibuzz,
+  furiijio.
+  - Slot 38 (w_noflip) returns 1 for them, through a kind mask at yawk +0x18.
+  - The twins' twin_flip returns 1 for kinds ≥ 0x50 and for FLIP_TABLE kinds: zima, plasmawisp and darios now, not
+    stalfos.
+  - The game's set_lr 0x026A780C / reverse_lr 0x026A7A20 then call MotionModule 0x02C6108C(lr == 1, 1), as the 3DS's
+    set_flip(lr == 1, 1).
+- **The yaw hold.** w_yaw's hold (yaw −90 at lr 1) now applies only to YAW_HOLD: churine and propellerheiho. They flip
+  on the 3DS but have no model.flp in either game, so there is nothing to mirror. Flagged: what the 3DS draws for them at
+  lr 1 is not established; its GsbDrawModel flip byte 0x7FB3B0 was not followed.
+- **Furiijio's beam.** fu_node writes BeamN's x angle as FU_ROT x × −lr. At lr 1 the body is now at yaw +90, and with
+  x = 90 the beam planes' front would face away from the camera. The direction is unchanged:
+  Ry(90 lr) Rz(90) Ry(a lr) Rx(−90 lr) eₓ = (−sin a, cos a, 0) on both sides, as the 3DS's (0, a lr, 90) gives.
+  BeamN is not in Furiijio's table.
+
+**Tests:**
+
+| Test | Result |
+| --- | --- |
+| s3ds_enemy_test.py all (80 enemies) | 792 checks, 0 failures |
+| smashrun_walker_test.py (S/s2e/root) | 165 checks, 0 failures |
+| smashrun_flier_test.py | 123 checks, 0 failures |
+| smashrun_flier_motion_test.py | 11 checks, 0 failures |
+| smashrun_field_test.py --set step2g | 12 checks, 0 failures |
+| smashrun_enemy_test.py | 26 checks, 0 failures |
+| effect_slots_patch_test.py exe_v24 | 47 checks, all ok |
+| s3ds_effects_test.py | 52 files, 238 emitters, 0 failures |
+
+Notes on the tests:
+- **s3ds_enemy_test.py, new flip checks:**
+  - Every converted model.flp parses through the Wii U parser's model (`wiiu_flp_lists`) into the 3DS entries, and
+    every pair is an L / R bone pair.
+  - For the eight ported flip kinds, every bone of the mirrored pose (`wiiu_mirror`, 0x036C48B0) lands on the X mirror
+    of its pair's position: 34-64 frames each, worst 0.015 (Tiki Buzz), most 0.0000.
+  - A negative control (the mode-5 entry kept) fails at 6.7.
+  - Not-yet-ported kinds whose skeletons are not X-symmetric are reported as `info`.
+- **smashrun_walker_test.py:** new checks for w_noflip per kind, for twin_flip with stalfos, and for w_yaw holding only
+  YAW_HOLD.
+- **smashrun_flier_motion_test.py:** the spawn / hit-turn facing through the game's own initialize_after, set_lr,
+  damage_turn and reverse_lr. For the FLIP_TABLE kinds: yaw lr × 90, and the motion flip called with lr == 1 at every
+  turn. For churine and propellerheiho: the yaw hold. For the others: no flip.
+- **effect_slots_patch_test.py:** run against exe_v12, the Extended Memory v3 base, because exe_v17 is no longer on
+  disk. Smash Run doesn't touch the effect manager.
+- **s3ds_effects_test.py:** run with the 10 local .ptcl files as the corpus.
+
+**exe_v24 vs exe_v23, word diff** (s2gv3/diff21.py, log s2gv6/diff24.log). 4175 words, every one in Smash Run's regions:
+- text:
+  - the hook sites re-targeted to the moved caves;
+  - 0x04B849E8-0x04B88000 (A, E);
+  - 0x04B89360-0x04B8A000 (B: w_noflip / twin_flip);
+  - 0x04BB8000-0x04BB8C00 (C);
+  - 0x04BB9648-0x04BBD430 (G: fu_node, everything after it moved, the data).
+- data: the twins' slot 38 words 0x1008EC68, 0x1008F1D4 and 0x1008FFCC (→ the moved twin_flip).
+- relocations: equal. File info: equal.
+
+**Not done in this step (open):**
+- **The per-kind stomp bounce.** The fighter's MSC is read (status 0xB3, Mario's script, common code).
+  - main func_1145 → func_1149: only when link 3 exists, `LinkModule(3, 3, 6, 0x11000004, 0x1000007, 0x21000010)`.
+  - The copy-back 0x02C58BE0-0x02C58C30 writes event +0x24 / +0x28 / +0x20 to work floats 0x1000007 / 0x1000008 /
+    0x1000009, +0x1C to int 0x11000004, and +0x2C..+0x2E to flags 0x21000010..12. Then work float 0x1000006 =
+    0x1000009 (the enemy's param 0x11).
+  - Pre func_1143 sets kinetic 0x33.
+
+  Still missing:
+  - The native consumer of float 0x1000006 under kinetic 0x33 (a candidate, 0x02C49A9C, multiplies a table entry by
+    float 6; unconfirmed).
+  - Whether status work floats survive the status change: our stomp has no link 3, so func_1149 writes nothing, and
+    the jump still happens.
+
+  So writing the multiplier before StatusModule(3, 0xB3, 0) is not shown to work. The gl word for param 0x11 is also
+  not settled.
+- **Ghos's exact immunity rules.** Not started: the Wii U twins of is_weapon_as_fighter / Item::is_haved are still to
+  find.
+- **Billboard effect models.** Not started.
+- **The full re-read of Tiki Buzz, Furiijio and Propeller Heiho.** Not started.
+- **The turn-toward-target audit.** Not done: check_turn_to_target / reverse_lr per state against the 3DS for every
+  ported kind. The flip itself is now driven by the game's set_lr / reverse_lr, whatever calls them.
+- **Furiijio's cloud log analysis** (uploads dc67f861-log.txt / e48d89f5-log.txt). Not done.

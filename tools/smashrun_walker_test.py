@@ -510,10 +510,22 @@ def main():
             m.wf(POSTURE + 0x64, lr * 90.0)
             m.call(fn['w_yaw'], {3: YK})
             res[(k, lr)] = (m.rf(POSTURE + 0x64), m.r32(HEAP + 0x3F420), m.r32(HEAP + 0x3F800 + 0xFC))
-    ok = all(v == ((-90.0, 0, 2) if (k in W.YAW_FLIP and lr == 1.0) else (lr * 90.0, 7, 1)) for (k, lr), v in res.items())
-    check(ok, 'step 2g v3: w_yaw: lr 1 -> yaw -90 (model +0x20 = 0, motion +0xFC 1 -> 2) for the 3DS-flip kinds %s, '
-          'lr x 90 untouched for lr -1 and the others (Shy Guy, Stalfos, White Bear, Gordo, Ghos, the twins) %s'
-          % ([hex(k) for k in W.YAW_FLIP], {('0x%X' % k, lr): v[0] for (k, lr), v in res.items() if lr == 1.0}))
+    ok = all(v == ((-90.0, 0, 2) if (k in W.YAW_HOLD and lr == 1.0) else (lr * 90.0, 7, 1)) for (k, lr), v in res.items())
+    check(ok, 'step 2g v3 / v6: w_yaw: lr 1 -> yaw -90 (model +0x20 = 0, motion +0xFC 1 -> 2) only for the flip kinds '
+          'without a model.flp %s; lr x 90 for lr -1, the flip kinds with one (now mirrored for real) and the others '
+          '(Shy Guy, Stalfos, White Bear, Gordo, Ghos, the twins) %s'
+          % ([hex(k) for k in W.YAW_HOLD], {('0x%X' % k, lr): v[0] for (k, lr), v in res.items() if lr == 1.0}))
+    # step 2g v6: slot 38 (is_flip_model) of the walker vtables: 1 for the FLIP_TABLE kinds (set_lr / reverse_lr then
+    # flip the motion: MotionModule 0x02C6108C(lr == 1, 1)), 0 for every other kind
+    got = {}
+    for k in sorted(set(W.YAW_FLIP) | {0x0B, 0x30, 0x40, 0x08, 0x11, 0x5A, 0x57, 0x23, 0x5F}):
+        m = Machine(img)
+        m.w32(OBJ + 8, k)
+        m.call(fn['w_noflip'], {3: OBJ})
+        got[k] = m.uc.reg_read(R[3])
+    check(all(v == (1 if k in W.FLIP_TABLE else 0) for k, v in got.items()),
+          'step 2g v6: slot 38 w_noflip -> 1 for the kinds with a model.flp %s, 0 for the rest %s'
+          % ([hex(k) for k in W.FLIP_TABLE], {hex(k): v for k, v in got.items()}))
     for w in GKINDS:
         m = Machine(img)
         m.walker(cfg[w['kind']], state=3, kind=w['kind'])
@@ -542,7 +554,7 @@ def main():
     res = {}
     for word, orig in W.TWIN_FLIP:
         f = img.u32(word)
-        for k in (0x12, 0x0E, 0x1D, 0x57, 0x5A, 0x58):
+        for k in (0x12, 0x0E, 0x1D, 0x30, 0x57, 0x5A, 0x58):
             m = Machine(img)
             m.w32(OBJ + 8, k)
             m.call(f, {3: OBJ})
@@ -552,10 +564,11 @@ def main():
         ok = all(res[w] == o for w, o in W.TWIN_FLIP)
     else:
         ok = all(res[w] == fn['twin_flip'] for w, _o in W.TWIN_FLIP)
-        ok &= all(res[(w, k)] == (1 if k >= 0x50 else 0) for w, _o in W.TWIN_FLIP for k in (0x12, 0x0E, 0x1D, 0x57,
-                                                                                           0x5A, 0x58))
-    check(ok, 'fix v3: the twins\' slot 38 (zima / plasmawisp / darios vtables) %s'
-          % ('kept (variant)' if W.KEEP_FLIP else '-> 0 for kinds < 0x50, 1 for the Fortress minions'))
+        ok &= all(res[(w, k)] == (1 if k >= 0x50 or k in W.FLIP_TABLE else 0) for w, _o in W.TWIN_FLIP
+                  for k in (0x12, 0x0E, 0x1D, 0x30, 0x57, 0x5A, 0x58))
+    check(ok, 'fix v3 / step 2g v6: the twins\' slot 38 (zima / plasmawisp / darios vtables) %s'
+          % ('kept (variant)' if W.KEEP_FLIP else '-> 1 for the Fortress minions and the Smash Run twins with a '
+             'model.flp (zima, plasmawisp, darios), 0 for Stalfos'))
     got = {}
     for k in (0x01, 0x12, 0x57, 0x60):
         m = Machine(img)

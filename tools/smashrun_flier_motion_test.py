@@ -267,11 +267,13 @@ def facing(img, D, kinds):
             m.wf(POSTURE + 0x60, lr)
             m.wf(POSTURE + 0x64, 1.0)                # the Enemy's posture init (0x02D89EF0)
             m.call(INIT_AFTER, {3: OBJ})
-            yaws = [(m.rf(POSTURE + 0x60), m.rf(POSTURE + 0x64))]
+            flips = lambda: [c[1] for c in m.calls if c[0] == 'flip']  # noqa: E731
+            yaws = [(m.rf(POSTURE + 0x60), m.rf(POSTURE + 0x64), flips()[-1:])]
             for _hit in range(2):
                 m.wf(HEAP + 0x3D200 + 0x6C + 0x2C, -m.rf(POSTURE + 0x60))
+                n0 = len(flips())
                 m.call(W.DAMAGE_TURN, {3: OBJ})
-                yaws.append((m.rf(POSTURE + 0x60), m.rf(POSTURE + 0x64)))
+                yaws.append((m.rf(POSTURE + 0x60), m.rf(POSTURE + 0x64), flips()[n0:][-1:]))
             out[(w['name'], lr)] = yaws
     return out
 
@@ -298,14 +300,18 @@ def main():
     fc = facing(img, D, [allk[n] for n in names])
     bad = {}
     for (n, lr), yaws in fc.items():
-        flip = allk[n]['kind'] in W.YAW_FLIP
+        k = allk[n]['kind']
         lrs = [lr, -lr, lr]
-        want = [(x, -90.0 if flip else 90.0 * x) for x in lrs]
+        # step 2g v6: the kinds with a model.flp keep lr x 90 and the motion flip (MotionModule 0x02C6108C(lr == 1))
+        # follows every turn; Churine / Propeller Heiho (no table) keep the yaw hold; the others never flip
+        want = [(x, -90.0 if (k in W.YAW_HOLD and x == 1.0) else 90.0 * x,
+                 [int(x == 1.0)] if k in W.FLIP_TABLE else []) for x in lrs]
         if yaws != want:
             bad[(n, lr)] = yaws
-    check(not bad, 'step 2g v3: spawned on either side (lr 1 / -1), then turned twice by hits from behind (the game\'s '
-          'initialize_after, set_lr, damage_turn, reverse_lr with the cave\'s slots 49 / 50): the 3DS-flip kinds keep '
-          'yaw -90 (their camera-facing view) through it all, the others lr x 90 (%s); wrong: %s'
+    check(not bad, 'step 2g v3 / v6: spawned on either side (lr 1 / -1), then turned twice by hits from behind (the '
+          'game\'s initialize_after, set_lr, damage_turn, reverse_lr with the cave\'s slots 49 / 50): yaw lr x 90 and '
+          'the motion flip set to lr == 1 at every turn for the kinds with a model.flp; yaw -90 at lr 1 for Churine '
+          '/ Propeller Heiho (no table); lr x 90 and no flip for the others (%s); wrong: %s'
           % (', '.join(names), bad))
 
     start, target = (0.0, 30.0), (70.0, 0.0)

@@ -17,6 +17,10 @@
   rotates, which gets the skinned effect shader) sample where the 3DS's coordinator transform (SPICA's) puts the
   3DS UVs; the model.mta's UV tracks the same a frame against the 3DS's animated scale / rotation / translation.
 - the ACMD: big-endian, every command known, the same scripts and parameters as the 3DS file.
+- the mirror table (model.flp, step 2g v6): the Wii U parser's lists (0x0330E4C4 / 0x0330C38C, modelled in
+  wiiu_flp_lists) hold the 3DS entries (mode 5 -> 2), every pair an L / R bone pair; and through a model of the
+  Wii U's anim mirror 0x036C48B0 (wiiu_mirror) every bone of the flipped pose lands on the X mirror of its pair's
+  unflipped position, on frames of every motion (the 3DS's lr 1 = the lr -1 view mirrored).
 
   python3 tools/s3ds_enemy_test.py SRC_ROOT [KIND | all]   (SRC_ROOT: a tools/s3ds_unpack.py extract)
 """
@@ -275,12 +279,151 @@ def acmd_tests(src, kind, out):
     check(ok, '%s: ACMD big-endian, every command known, the 3DS script counts' % kind)
 
 
+def wiiu_flp_lists(data):
+    """the Wii U's model.flp parser (0x0330E4C4: 'FLIP', major 1; 0x0330C38C with minor 0: the entries only):
+    (list A [(mode, flags, bone)], list B [(mode, flags, bone, pair)])"""
+    assert data[:4] == b'FLIP' and data[4] == 1
+    n = struct.unpack_from('>H', data, 6)[0]
+    a, b = [], []
+    for i in range(n):
+        e = struct.unpack_from('>5H', data, 8 + 12 * i)
+        if e[4] == 0:
+            a.append((e[2], e[3], e[0]))            # 0x0330CC38: {+4, +6, +0}
+        else:
+            b.append((e[2], e[3], e[0], e[1]))      # 0x0330CC68: {+4, +6, +0, +2}
+    return a, b
+
+
+def _qmul(a, b):
+    """Hamilton a x b (x, y, z, w); 0x036C4640(out, r4, r5) computes r5 x r4"""
+    ax, ay, az, aw = a
+    bx, by, bz, bw = b
+    return np.array([aw * bx + ax * bw + ay * bz - az * by, aw * by - ax * bz + ay * bw + az * bx,
+                     aw * bz + ax * by - ay * bx + az * bw, aw * bw - ax * bx - ay * by - az * bz])
+
+
+def _bind_q(rx, ry, rz):
+    """0x036C473C: the bind Euler angles (R = Rz Ry Rx) as a quaternion"""
+    sx, cx, sy, cy, sz, cz = (f(v / 2) for v in (rx, ry, rz) for f in (np.sin, np.cos))
+    return np.array([sx * cy * cz - cx * sy * sz, cx * sy * cz + sx * cy * sz, cx * cy * sz - sx * sy * cz,
+                     cx * cy * cz + sx * sy * sz])
+
+
+def _mirror_q(d, mode):
+    d = d.copy()
+    for k in range(3):
+        if k != mode:
+            d[k] = -d[k]
+    return d
+
+
+def wiiu_mirror(pose, binds, lists):
+    """the Wii U's anim mirror 0x036C48B0 on local poses [(t, q)]: list A flags 1 negates t[mode], flags 2 sets
+    q = bind x M(bind^-1 x q) (M negates the two other axes, 0x036C4A88 / 0x036C4AC8 / 0x036C4B08); list B swaps
+    the pair's (t, q) the same way (0x036C4B6C on); modes above 2 skipped (error 0x90000600)"""
+    t = [p[0].copy() for p in pose]
+    q = [p[1].copy() for p in pose]
+    conj = lambda v: np.array([-v[0], -v[1], -v[2], v[3]])  # noqa: E731
+    for mode, fl, bone in lists[0]:
+        if mode > 2:
+            continue
+        if fl & 1:
+            t[bone][mode] = -t[bone][mode]
+        if fl & 2:
+            bq = _bind_q(*binds[bone])
+            q[bone] = _qmul(bq, _mirror_q(_qmul(conj(bq), q[bone]), mode))
+            q[bone] /= np.linalg.norm(q[bone])
+    for mode, fl, a, b in lists[1]:
+        if mode > 2:
+            continue
+        if fl & 1:
+            ta, tb = t[a].copy(), t[b].copy()
+            ta[mode], tb[mode] = -ta[mode], -tb[mode]
+            t[a], t[b] = tb, ta
+        if fl & 2:
+            ba, bb = _bind_q(*binds[a]), _bind_q(*binds[b])
+            da, db = _qmul(conj(ba), q[a]), _qmul(conj(bb), q[b])
+            q[a], q[b] = _qmul(ba, _mirror_q(db, mode)), _qmul(bb, _mirror_q(da, mode))
+    return list(zip(t, q))
+
+
+def _qmat(q):
+    x, y, z, w = q / np.linalg.norm(q)
+    return np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                     [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                     [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+
+
+# the ported kinds whose behaviour flips (tools/smashrun_walker_cave.py FLIP_TABLE): their mirror must be exact
+FLIP_PORTED = ('kuribo', 'waddledee', 'waddledoo', 'zima', 'plasmawisp', 'darios', 'tikibuzz', 'furiijio')
+
+
+def flip_tests(src, kind, out, model, part='body', c='c00'):
+    sf = os.path.join(src, 'enemy', kind, 'model', part, c, 'model.flp')
+    if not os.path.exists(sf):
+        return
+    tag = '%s/%s/%s' % (kind, part, c)
+    bones = model['bones']
+    a = open(sf, 'rb').read()
+    w = open(os.path.join(out, 'model', 'enemy', kind, part, c, 'model.flp'), 'rb').read()
+    lists = wiiu_flp_lists(w)
+    n = struct.unpack_from('<H', a, 6)[0]
+    src_e = [struct.unpack_from('<6H', a, 8 + 12 * i) for i in range(n)]
+    want_a = [(se.FLP_MODE_MAP.get(m, m), f, b) for b, _p, m, f, ip, _z in src_e if not ip]
+    want_b = [(se.FLP_MODE_MAP.get(m, m), f, b, p) for b, p, m, f, ip, _z in src_e if ip]
+    names = [b['name'] for b in bones]
+    lr_ok = all(sorted((names[x][:1], names[y][:1])) == ['L', 'R'] and names[x][1:] == names[y][1:]
+                for _m, _f, x, y in want_b)
+    check(len(w) == len(a) and lists == (want_a, want_b) and lr_ok,
+          '%s: model.flp big-endian, the Wii U parser\'s lists = the 3DS entries (%d A, %d B; pairs L / R)'
+          % (tag, len(want_a), len(want_b)))
+    pair = {i: i for i in range(len(bones))}
+    for _m, _f, x, y in want_b:
+        pair[x], pair[y] = y, x
+    binds = [b['rot'] for b in bones]
+    files = se._motion_files(os.path.join(src, 'enemy', kind)).get(part, [])
+    worst, frames = 0.0, 0
+    S = np.diag([-1.0, 1.0, 1.0])
+    for fn in files:
+        for anim in sm.Bch(open(fn, 'rb').read()).skeletal_animations():
+            nf = int(round(anim['frames'])) + 1
+            loc = se.anim_locals(anim, bones, nf)
+            for f in sorted({0, nf // 3, (2 * nf) // 3, nf - 1}):
+                pose = []
+                for i in range(len(bones)):
+                    m = loc[i][f]
+                    pose.append((m[:3, 3].copy(), np.array(se._mat_quat((m[:3, :3] / np.linalg.norm(m[:3, :3], axis=0))[None])[0])))
+                world = []
+                for p in (pose, wiiu_mirror(pose, binds, lists)):
+                    wm = []
+                    for i, b in enumerate(bones):
+                        m = np.eye(4)
+                        m[:3, :3], m[:3, 3] = _qmat(p[i][1]), p[i][0]
+                        wm.append(wm[b['parent']] @ m if b['parent'] >= 0 else m)
+                    world.append(wm)
+                worst = max(worst, max(np.abs(world[1][i][:3, 3] - S @ world[0][pair[i]][:3, 3]).max()
+                                       for i in range(len(bones))))
+                frames += 1
+    size = max(np.ptp([b['pos'] for b in bones], axis=0).max(), 1.0)
+    what = '%s: the Wii U mirror of every bone = the X mirror of its pair (%d frames, worst %.4f)' % (tag, frames, worst)
+    if a[5]:
+        # minor 1 (shandera, tac: no entries): the Wii U adds its built-in humanoid table by bone name
+        print('info  %s: model.flp minor 1, the built-in table (not modelled here)' % tag)
+    elif kind in FLIP_PORTED:
+        check(frames > 0 and worst < 0.01 * max(size, 10.0), what)
+    else:
+        # not ported yet: a skeleton that is not X-symmetric (unpaired limbs, asymmetric motions) mirrors only
+        # approximately on either game; reported, checked when the kind is ported
+        print('info  ' + what)
+
+
 def enemy_tests(src, kind, out):
     se.convert(src, kind, out, 0x4E000000, log=lambda *a: None)
     models, mbns = {}, {}
     for part, c, _d in se._model_dirs(os.path.join(src, 'enemy', kind)):
         bch, mbn, model = model_tests(src, kind, out, part, c)
         uv_tests(src, kind, out, bch, mbn, model, part, c)
+        flip_tests(src, kind, out, model, part, c)
         if c == 'c00':
             models[part], mbns[part] = model, mbn
     if models:
