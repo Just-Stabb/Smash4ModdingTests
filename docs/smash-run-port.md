@@ -1444,3 +1444,67 @@ and exactly the effect-slot patch's 74 words (3797).
 - **Step 2e v1: the fliers (Ghos, Tiki Buzz) don't move: they stay where they spawn.** The unicorn tests check the
   calls, not the resulting motion: the aerial / kinetic path doesn't move them in game (steps 2f / 2g's Furiijio and
   Propeller Heiho share it: expect the same).
+
+## Step 2g v2: fliers move
+
+Package smashrun_step2g_v2: `code/` exe_v20 = exe_v19 + `smashrun_walker_cave.py` rewritten over its own regions
+(scratch s2gv2/build20.py: W.args over exe_v19, one rpx_patch call; the field cave and the effect-slot patch untouched).
+Install: replace code/cross_f.rpx only; the step 2g data stays.
+
+**Root cause (step 2e's v16): the fliers' ground collision was never switched on.** An enemy is moved by the ground
+collision manager: the GroundModule (acc+0x30DC) update, vt+0x64 = **0x02C35C9C**, returns at once while its byte
+**+0xDE** is 0, and only past that test does it add the GroundCollisionObject (+0x18) to the collision manager
+([0x102F7DB4]; 0x02D61264 add, 0x02D612FC remove), which moves it. The GroundModule ctor (0x02C3326C, 0x02C333B8) leaves
++0xDE 0; for the Smash Run kinds only **set_rhombus 0x026A65BC** sets it (the gl entry's shape: type 0 rhombus
+0x02C39A78, type 1 circle 0x02C3CFA0, then +0xDE = 1 at 0x026A6668 / 0x026A66B8; the other setter 0x02DB3290 is only
+reached from four Wii U enemies through 0x02DB5158). Step 2e's Ghos / Tiki Buzz starts called set_rhombus with r3 = the
+aerial module (the ctor's return): its +8 (energy 1's pointer) >= 0x61, so it returned without a shape and without
++0xDE. The AI and the kinetics were fine (energy 0 carried the aerial speed every frame); the enemy just never moved.
+The walkers' start (w_start) always passed `this`. Step 2f fixed the call (`mr r3, r31`, "set_rhombus fixes", then
+for the shape) for Ghos / Tiki Buzz and wrote Furiijio's / Propeller Heiho's starts the same way, so exe_v17 / exe_v19
+already move; the gl shape types: ghos 1 (circle r 8 at (0, 8)), tikibuzz 1, furiijio 0 (rhombus 12 / 18 / 0 / 9),
+propellerheiho 1 (gl group 3 word 64 +).
+
+**The aerial / kinetic path, read and run (all as assumed):** the aerial ctor 0x02DB2C44 -> 0x02DB1AC4 takes energies
+0 / 1 from the EnemyKineticModule (acc+0x30E8, ctor **0x02DBD284**, vtable 0x10122CB8: get_energy vt+0x54 0x02C4FE9C,
+change_kinetic vt+0xEC 0x02DBE00C, sums vt+0xA4 0x02DBE4F4 / vt+0xAC 0x02DBE614); energy 0 is the object at +0x124
+(ctor 0x02DBE824, vtable 0x10122F24: update vt+0x14 0x02DC0084, init vt+0x1C 0x02DC3674, type at +0x44). Every
+change_kinetic id (0x02DBD5D4's table) only inits energy 0 with a type (26 -> 0x17, 16 -> 0xD, ...) and turns energy 1
+off; type 0x17's update (0x02DC0670) keeps the speed the aerial update writes (energy +0 / +4), then the base update
+0x02C4E030 (accel 0, limit -1). The aerial target: +0x2C 0 and +0x30 >= 0 -> EnemyAiModule get_target_pos 0x02DB9CA0
+(the fighter manager's entry), +0x30 < 0 -> the enemy's own position (no movement); get_nearest_target 0x026A7008
+(0x02DB9D80) has no team filter. The Wii U's own fliers (the ctor's two users: 0x026C2DE0, object +0x2B4, and
+0x026CF438, +0x168; updates 0x026C46FC / 0x026D0B3C / 0x026D0F70) do the same: set_rhombus, change_kinetic(26),
+set_target_pos 0x02DB2BE4 (+0x34 position, +0x2C 1), set_attach_ground(0), set_passable(1), the aerial update in the
+state update.
+
+**Fix in exe_v20: Ghos's re-pick keeps its speed.** The Wii U's 0x02DB28E4 (mode 2) inits energy 0 with speed 0, i.e.
+it is set_mode_**homing**; the 3DS's slip homing 0x5F5F58 inits it with energy 0's current speed (+4 / +8 of the
+energy, then s0-s5 to +0x10-+0x24 in order, as the Wii U's f1-f6). So Ghos stopped dead at each L66BA4 re-pick (every
+20-40 frames). f_gpick now saves energy 0's speed (caller frame +0x10 / +0x14), calls 0x02DB28E4, then
+set_current_speed 0x02DB2BC0. Tiki Buzz's homing_extend and Furiijio's homing start at 0 on the 3DS too (unchanged);
+Propeller Heiho uses the cave's own set_mode_normal. Ghos stays slow by its 3DS P7 set 0 (accel 0.0035 / 0.01, max
+0.052 x / 0.15 y a frame; set 1, 4 %, max 1.5): that is the 3DS's drift.
+
+**Behavioural test** `tools/smashrun_flier_motion_test.py PATCHED.rpx` (new): the game's EnemyKineticModule (built by
+its ctor), aerial module, change_kinetic, energy init / update, speed sum and set_rhombus run as game code (Espresso
+paired-single saves nopped in Unicorn's copy of 0x02600000-0x02E00000); posture += the sum only while GroundModule
++0xDE is set. 10 checks: the module; per kind, start turns the ground collision on and the flier gets closer to its
+goal (Ghos 240 frames: 76.2 -> 57.9 units from the fighter; Tiki Buzz 120: -> 29.3; Furiijio 60: -> 23.8; Propeller
+Heiho: y 100 -> 1 (the fighter's height), then the bob); Ghos's speed carries on through its re-picks. exe_v16 (with
+the step-2e tools, git 4f09c72): 5 failures (Ghos / Tiki Buzz: +0xDE 0, (0, 30) -> (0, 30) while energy 0 had speed;
+the re-pick stop); exe_v19 (HEAD tools): 1 (the re-pick stop: (0.052, -0.15) -> (0, 0) at frames 31, 61, 87, ...);
+exe_v20: 0. Other tests on exe_v20: smashrun_flier_test.py 120, smashrun_walker_test.py 160 (enemy root),
+smashrun_field_test.py 12, smashrun_enemy_test.py 26 (root), effect_slots_patch_test.py exe_v20 against exe_v17 47:
+0 failures.
+
+**Still assumed:** that the collision manager's step is what moves an enemy (read from 0x02C35C9C's early return and
+0x02D61264, and it is the one difference between step 2e's fliers and the walkers, and the test reproduces the
+in-game symptom with it); no log build was made.
+
+**exe_v20 vs exe_v19, word diff** (scratch s2gv2/diff20.py; data / rodata / bss equal; relocations equal; the file
+info unchanged): text 0x04B7D630, 0x04B7DBCC, 0x04B7DCC4-0x04B7DD88, 0x04B7DDDC-0x04B7DE30 (E and its data),
+0x04B8691C-0x04B87FC8 (A: 31 words), 0x04B89414-0x04B89F30 (B: 34 words), 0x04BB8004, 0x04BB8188-0x04BB833C (C: 12
+words), 0x04BB8774, 0x04BB88C8, 0x04BB8950 and 0x04BB89BC-0x04BBCDF0 (G: f_gpick's 7 more words, everything after it
+moved, the fliers' data): 4086 words, all Smash Run regions (the other regions' changes are the moved data addresses).
+The text section moved to the file's end again (rpx_patch), hence 177 MB.

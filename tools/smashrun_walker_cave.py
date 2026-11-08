@@ -2645,7 +2645,10 @@ def code_f(D, vtw):
     far(REQ_FOLLOW)
     G.asm("stw r3, 0x%X(r31)\nb epi" % V(4))
     # L66BA4: V0 = random(P0, P1); random_choice(96, 4) -> set_mode_slip_homing(the P7 set: s0 +0, s1 +0xC, s2 +8,
-    # s3 +0x14, s4 +4, s5 +0x10); called from a state (its frame's +0x1C keeps the return)
+    # s3 +0x14, s4 +4, s5 +0x10); called from a state (its frame's +0x1C keeps the return, +0x10 / +0x14 the speed).
+    # Step 2g v2: the Wii U's 0x02DB28E4 is set_mode_HOMING (energy 0's init with speed 0); the 3DS's slip homing
+    # 0x5F5F58 inits it with the current speed (energy +4 / +8), so the speed is kept: saved before, set back with
+    # set_current_speed 0x02DB2BC0 after (else every re-pick, each 20-40 frames, stopped Ghos dead)
     G.asm("""
     f_gpick:
         mflr r0
@@ -2669,11 +2672,21 @@ def code_f(D, vtw):
         lfs f4, 0x14(r12)
         lfs f5, 4(r12)
         lfs f6, 0x10(r12)
+        lwz r12, 0x%(E0)X(r31)
+        lfs f0, 0(r12)
+        stfs f0, 0x10(r1)
+        lfs f0, 4(r12)
+        stfs f0, 0x14(r1)
         addi r3, r31, 0x%(AER)X
+        bl 0x%(SH)08X
+        addi r3, r31, 0x%(AER)X
+        addi r4, r1, 0x10
+        bl 0x%(SS)08X
         lwz r0, 0x1C(r1)
         mtlr r0
-        b 0x%(SH)08X
-    """ % dict(P0=P(0), P1=P(1), V0=V(0), P2=P(2), P7=P(7), P13=P(13), AER=AER, SH=AER_SLIP_HOMING))
+        blr
+    """ % dict(P0=P(0), P1=P(1), V0=V(0), P2=P(2), P7=P(7), P13=P(13), AER=AER, SH=AER_SLIP_HOMING, E0=AER + 4,
+               SS=AER_SET_SPEED))
     # L1120C, the wall bounce: on any contact (is_touch(0xFF)) v = energy 0's speed, n = get_ground_normal(0xFF);
     # r = |v|^2 / (P4 * P4); r < 0.1 (and r <= 1): nothing; else v reflected on n (v - 2 (n.v) n), normalised,
     # times P3 * min(r, 1) -> set_current_speed
