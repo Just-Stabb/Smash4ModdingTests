@@ -1948,3 +1948,6 @@ Notes on the tests:
 - **The turn-toward-target audit.** Not done: check_turn_to_target / reverse_lr per state against the 3DS for every
   ported kind. The flip itself is now driven by the game's set_lr / reverse_lr, whatever calls them.
 - **Furiijio's cloud log analysis** (uploads dc67f861-log.txt / e48d89f5-log.txt). Not done.
+
+User result of step 2g v6: the enemies' facing directions are correct now (the model.flp mirror works in game).
+
