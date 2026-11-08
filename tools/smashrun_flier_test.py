@@ -35,6 +35,8 @@ EINIT, FVT = 0x02000010, HEAP + 0x24200      # the aerial energy's init (vt+0x1C
 # step 2g (Propeller Heiho): fake items (+0 id, +4 kind, +0x24 vptr) and their vtable's three stub entries
 IMGR, ITEMS, IVT = HEAP + 0x27F00, HEAP + 0x28000, HEAP + 0x28800
 IT_STUBS = {0x02000040: 'item_remove', 0x02000044: 'item_id', 0x02000048: 'item_have'}
+# step 2g v4: a fake DamageModule (acc+0x30D4: +8 one entry, +0xC the entries, entry 0 +0 the damage) and hit records
+DMOD, DENT, HITREC, HATK, HREC = HEAP + 0x29000, HEAP + 0x29100, HEAP + 0x29400, HEAP + 0x29500, HEAP + 0x29600
 
 
 class Machine(T.Machine):
@@ -46,6 +48,9 @@ class Machine(T.Machine):
         self.w32(MODEL, MODEL + 0x40)
         self.w32(MODEL + 0x40 + W.MODEL_NODE_DIRTY, DIRTY)
         self.w32(ACC + 0x30D8, EFFM)
+        self.w32(ACC + 0x30D4, DMOD)
+        self.w32(DMOD + 8, 1)
+        self.w32(DMOD + 0xC, DENT)
         self.w32(W.PARAM_MGR, PMGR)
         self.w32(PMGR + W.GL_BASE, GLTAB)
         self.w32(PMGR + W.GL_INDEX + 4 * (8 * 0x11), 2)          # ghos, variation 0 -> gl entry 2
@@ -101,6 +106,10 @@ class Machine(T.Machine):
             self.ret()
         elif addr == W.BI_NOTIFY_DMG:
             c.append(('bi_damage', r(3)))
+            self.ret()
+        elif addr == W.INIT_DAMAGE:
+            c.append(('init_damage', r(3), round(self.fr(1), 4)))
+            self.wf(DENT, self.fr(1))
             self.ret()
         elif addr == W.GET_TARGET_POS:
             c.append(('target_pos', r(5)))
@@ -619,6 +628,29 @@ def main():
     m.call(slot(10), {3: OBJ})
     check([x[0] for x in m.calls] == ['bi_damage'] and m.r32(OBJ + W.V(1)) == 1200,
           'ghos slot 10 (notify_on_damage 0x11094): BehaviorImpl\'s, then the leave timer back to 1200')
+    # step 2g v4: the immunity (3DS slot 31 0x113F0 -> Wii U slot 31 with the hit record, then slot 10 0x11094).
+    # A fighter's direct hit (AttackData +0x4C set) leaves the damage as it was; an indirect one (a projectile's,
+    # a thrown item's: +0x4C 0) hurts and is the new damage to restore to
+    res = []
+    m = Machine(img)
+    m.flier(c0)
+    m.wf(DENT, 12.0)
+    m.w32(HITREC + 0x14, HATK)
+    m.w32(HITREC + 0x20, HREC)
+    for direct, dmg_after_hit in ((0, 20.0), (1, 31.0), (1, 45.0), (0, 27.0), (1, 40.0)):
+        m.uc.mem_write(HATK + 0x4C, bytes([direct]))
+        m.uc.mem_write(HREC + 0x1C, bytes([0 if direct else 1]))
+        m.wf(DENT, dmg_after_hit)                  # the framework has added the hit's damage
+        m.calls = []
+        m.call(fn['f_g31'], {3: OBJ, 4: HITREC})
+        imm = m.uc.mem_read(OBJ + W.GH_IMM, 1)[0]
+        m.call(slot(10), {3: OBJ})
+        res.append((direct, imm, [x[0] for x in m.calls], round(m.rf(DENT), 2), m.r32(OBJ + W.V(1))))
+    want = [(0, 0, ['bi_damage'], 20.0, 1200), (1, 1, ['init_damage'], 20.0, 1200), (1, 1, ['init_damage'], 20.0, 1200),
+            (0, 0, ['bi_damage'], 27.0, 1200), (1, 1, ['init_damage'], 27.0, 1200)]
+    vg31 = img.u32(D['vt_ghos'] + 0xC + 8 * 31)
+    check(res == want and vg31 == fn['f_g31'], 'ghos slot 31 + 10 (0x113F0 / 0x11094): a direct hit (AttackData +0x4C) is undone '
+          '(init_damage(the damage before it), no reaction); an indirect hit hurts (BehaviorImpl\'s); vt_ghos slot 31 = f_g31 %s' % res)
     out = {}
     for leaving in (0, 1):
         m = Machine(img)

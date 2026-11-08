@@ -110,6 +110,9 @@ Step 2g (docs/smash-run-port.md, "Step 2g"; region G, code_ph): Propeller Heiho 
   aerial module and GroundModule ray_check; it carries an item: the Wii U's Behavior::create_item 0x026A8D78 + the
   item's have(0x50000000) (create_item_and_have), held by Item::warp each frame (slot 59), swapped / dropped
   (Item::fall) in slot 55 and on damage (slot 10), removed with it (slot 27).
+Step 2g v4: Ghos's immunity to direct hits (the 3DS's slot 31 0x113F0 / slot 11 0x11094): vt_ghos slot 31 f_g31 (the
+  hit's AttackData byte +0x4C -> GH_IMM), slot 10 f_ghos_dmg (immune: DamageModuleImpl::init_damage(GH_DMG) 0x02C212F0,
+  no reaction; else GH_DMG = the damage and BehaviorImpl's); Ghos's object GH_SIZE (two more words).
 
 Not ported (the README lists them): the Waddle Doo's beam (states 7 / 8: an article the Wii U has no weapon kind
 for) and its leave timer (9) and random hop (6); the Churine's sleep powder (6 / 7: an effect and attack the Wii U
@@ -314,6 +317,14 @@ SQRTF = 0x04ADEAB8                   # sqrtf (get_distance 0x02DB2C08 tail-calls
 HIT_FACTOR = 0x02DB4ED4              # the 3DS's 0x9EB4C0 (hit_return_frame's factor: gl +0x158..+0x164, the
 #                                      DamageModule (acc+0x30D4) float +0x6C through 0x026A81F8)
 BI_NOTIFY_DMG = 0x026A3564           # BehaviorImpl::notify_on_damage (slot 10; the 3DS's slot 11)
+# step 2g v4: Ghos's immunity (3DS slot 31 0x113F0 / slot 11 0x11094). The Wii U's slot 31 is the 3DS's: BehaviorImpl's
+# 0x026A48EC (BI_VT +0x104) reads the hit record exactly as the 3DS's 0x3DD654 (r4 the hit: +0x14 AttackData, its
+# byte +0x4C -> this +0x160; +0x20 the attacker record, byte +0x27 -> +0x15C); the EnemyBehaviorModule (acc+0x30EC,
+# vtable 0x10122340) calls it through its +0xF4 entry 0x02DB9988 (Behavior +0xE0 vtable +0x104)
+INIT_DAMAGE = 0x02C212F0             # DamageModuleImpl::init_damage(float) (3DS 0x4D30BC: every entry (Wii U 0xE4
+#                                      bytes at [+0xC], [+8] of them; 3DS 0xE0) +0 = f, +4 / +8 / +0xC4 = 0, +0xD4 0)
+GH_IMM, GH_DMG = FL_SIZE, FL_SIZE + 4    # Ghos's 3DS +0x1F4 (immune this hit) / +0x1F8 (the damage to restore)
+GH_SIZE = FL_SIZE + 8
 # step 2f (Furiijio; docs/smash-run-port.md "Step 2f")
 CENTER_POS = 0x026A7104              # Behavior::center_pos (out, this): ModelModule node_global_position(center_node)
 SET_NODE_ROT = 0x02C64188            # MotionModule set_node_rotate(node, &rad, compose) (3DS 0x501328) -> changed
@@ -612,7 +623,7 @@ PHK = dict(c01=33, c10=34, c50=35, c5=36, c1=37, cm1=38, c0=39, c360=40, deg=41,
 PH_LIT = (_F('3DCCCCCD'), 10.0, 50.0, 5.0, 1.0, -1.0, 0.0, 360.0, DEG2RAD, _F('3B360B61'), 0.5, _F('3C23D70A'), -5.0)
 FLIERS = (
     # Ghos (Kid Icarus) 0x11, BehaviorGhos (create 0x11560, table 0x10D350; docs/smash-run-port.md "Step 2e")
-    dict(name='ghos', kind=0x11, flier=True, size=FL_SIZE, areas=tuple(tuple(e) for e in vl_group('ghos', 5)),
+    dict(name='ghos', kind=0x11, flier=True, size=GH_SIZE, areas=tuple(tuple(e) for e in vl_group('ghos', 5)),
          motions=(('DamageStart', 1), ('FlyHoming', 1)), no_damage_labels=True,    # its ctor: no damage labels,
          dead='DamageStart', last=None, hashset=False, kick=False,                   # no hashsets
          energy={},                                      # initialize 0x10F74: bx lr
@@ -622,7 +633,7 @@ FLIERS = (
          hop=(0.0, 0, 0), search=((0, 120, 300.0, 0.0, 0.0, 0.0, 0.0),),           # P1 (never searched)
          attacks=((1, 'ghos_body'), (4, 'ghos_bullet')),
          fstart='f_ghos_start', fdmg='f_ghos_dmg', f69='f_ghos_69', f27='f_ghos_rm', lvp=19,
-         vtover={55: 'f_g55'},                           # step 2g v3: the 3DS's slot 55 0x10BA0 (the turn)
+         vtover={55: 'f_g55', 31: 'f_g31'},              # step 2g v3: the 3DS's slot 55 0x10BA0 (the turn); v4: 31
          P=(_GS[0], _GS[1], int(_GS[2]), _GS[3], _GS[4], _GS[5], 0.1) + tuple(_GP7[0]) + tuple(_GP7[1]) +
            (_GP6[0], -_GP6[1], _GP6[2], _GP6[6], _GP6[8], 1.0, 0.0) + (_GS[6], DEG2RAD)),   # P26 P@0xA4 30, P27
     # Tiki Buzz (Kirby) 0x0F, BehaviorTikibuzz (create 0x78630, table 0x10E134)
@@ -2654,6 +2665,8 @@ def code_f(D, vtw):
         li r0, 0
         stw r0, 0x14(r31)
         stw r0, 0x18(r31)
+        stw r0, 0x%(GI)X(r31)
+        stw r0, 0x%(GD)X(r31)
         lwz r0, 0x%(P5)X(r30)
         stw r0, 0x%(V1)X(r31)
         li r4, 1
@@ -2670,7 +2683,7 @@ def code_f(D, vtw):
         li r5, 0
         addi r6, r1, 8
         addi r7, r1, 0x14
-    """ % dict(LR=0xC + 8 * SET_LR_SLOT, V3=V(3), P5=P(5), V1=V(1)))
+    """ % dict(LR=0xC + 8 * SET_LR_SLOT, V3=V(3), P5=P(5), V1=V(1), GI=GH_IMM, GD=GH_DMG))
     lfs('f1', 'consts', 4)
     far(REQ_FOLLOW)
     G.asm("stw r3, 0x%X(r31)\nb epi" % V(4))
@@ -3047,11 +3060,35 @@ def code_f(D, vtw):
         stw r0, 0(r12)
         li r4, 1
         b go""" % dict(V2=V(2)))
-    # slot 10 notify_on_damage (0x11094): BehaviorImpl's, then V1 = P5 (1200: the leave timer restarts; the
-    # reflected-weapon branch (init_damage) and stop_se not ported)
-    G.asm("f_ghos_dmg:\nmflr r0\nbl pro\nmr r3, r31")
+    # slot 31 (0x113F0; the Wii U calls its slot 31 with the hit record before notify_on_damage, as the 3DS): immune
+    # (GH_IMM = 1) when the hit is direct. The 3DS: category 1 (a weapon) immune when is_weapon_as_fighter(kind)
+    # (3DS weapon kinds 0x179 / 0x17A / 0x180-0x182), category 4 (an item) when held and not kind 0x12 / 0x24, any
+    # other (a fighter's own attack) when the AttackData's byte +0x4C is set. Approximated: every category by that
+    # byte (the Wii U's twins of is_weapon_as_fighter / Item::is_haved are not found; projectiles and thrown items
+    # are indirect hitboxes); not ported: the module acc+0x3074 byte +0x5A2 = 0 / 1 and play_se(15)
+    G.asm("""
+    f_g31:
+        lwz r11, 0x14(r4)
+        li r0, 0
+        cmpwi r11, 0
+        beq g31_s
+        lbz r0, 0x4C(r11)
+        cmpwi r0, 0
+        beq g31_s
+        li r0, 1
+    g31_s:
+        stb r0, 0x%X(r3)
+        blr
+    """ % GH_IMM)
+    # slot 10 notify_on_damage (0x11094): immune (GH_IMM) -> DamageModuleImpl::init_damage(GH_DMG) (the HP before
+    # the hit) and no reaction; else GH_DMG = damage(0) (entry 0's +0, as 3DS DamageModuleImpl::damage(int)
+    # 0x9512CC) and BehaviorImpl's; then V1 = P5 (1200: the leave timer restarts). stop_se not ported
+    G.asm("f_ghos_dmg:\nmflr r0\nbl pro\nlwz r3, 0(r31)\nlwz r3, 0x30D4(r3)\nlbz r0, 0x%X(r31)\ncmpwi r0, 0\n"
+          "beq gd_n\nlfs f1, 0x%X(r31)" % (GH_IMM, GH_DMG))
+    far(INIT_DAMAGE)
+    G.asm("b gd_t\ngd_n:\nlwz r3, 0xC(r3)\nlfs f0, 0(r3)\nstfs f0, 0x%X(r31)\nmr r3, r31" % GH_DMG)
     far(BI_NOTIFY_DMG)
-    G.asm("lwz r0, 0x%X(r30)\nstw r0, 0x%X(r31)\nb epi" % (P(5), V(1)))
+    G.asm("gd_t:\nlwz r0, 0x%X(r30)\nstw r0, 0x%X(r31)\nb epi" % (P(5), V(1)))
     # slot 69 (0x113A4; the Wii U notify_on_damage calls it as the 3DS's does): a leave running -> finalised and
     # set_correct(5); => 2 (stun); returns 1 (the framework's own reaction skipped)
     st('f_ghos_69', "bl f_unleave\nli r4, 2\nbl h_chgi\nli r3, 1")
@@ -5500,7 +5537,8 @@ def patches(img):
     for w, fn in TWIN_FLIP:
         out[w] = fn if KEEP_FLIP else A.addr('twin_flip')
     for w, orig, lab in TWIN_LR:
-        assert img.u32(w) in (orig, A.g.addr(lab)), hex(w)
+        # the game's word, or an earlier build's w_slr / w_rlr (anywhere in region G: later code moves them)
+        assert img.u32(w) == orig or A.g.base <= img.u32(w) < A.g.base + 0x8000, hex(w)
         out[w] = A.g.addr(lab)
     return out, (A, B), d
 

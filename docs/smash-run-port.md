@@ -1588,3 +1588,107 @@ words), 0x04BB8004, 0x04BB80A0-0x04BB8660 (C: the stomp body and data), 0x04BB87
 0x1008F22C-0x1008F238, 0x10090024-0x10090030 (the twins' slots 49 / 50); relocations: those six ADDR32 entries moved
 to 0x037EE73C; file info equal: 5263 words, all Smash Run's. code_diag vs code: the four hook words 0x02DB420C,
 0x032F011C, 0x032F0250, 0x032F13C0 and 0x04BBE000-0x04BBE6B8.
+
+## Step 2g v4: Ghos's immunity to direct hits; Furiijio's cloud (log build); the fliers re-read
+
+Package smashrun_step2g_v4: `code/` exe_v22 = exe_v21 + `smashrun_walker_cave.py` over its own regions (scratch
+s2gv4/build22.py: build21.py with exe_v21 as the base; the twins' slot 49 / 50 words now accept an earlier build's
+region-G address); `code_diag/` exe_v22 + `tools/diag_effect_cave.py --cave 0x04BBE000` + the `cl` hook
+(s2gv4/build22d.py). No data changes. User results on step 2g v3 behind it: the S4FX log
+(diag exe_v21) shows bank 0x71A in slot 0x2D (the new slots above 0x29 work in game). Every beam makes 0x71A0000 /
+0x71A0005 / 0x71A0002 / 4 / 3, each with a handle, but the cloud is not seen (3DS 212.png vs mod 214.png). Ghos is hurt by direct hits.
+
+**Ghos's immunity (ported).** The Wii U's behaviour slot 31 is the 3DS's (equal numbering from 29). BehaviorImpl's
+default **0x026A48EC** (BI vtable 0x1008AEBC +0x104) matches the 3DS default 0x3DD654 instruction for instruction:
+the hit r4 has +0x14 the AttackData (its byte +0x4C -> this +0x160) and +0x20 the attacker record (byte +0x27 ->
++0x15C), so the hit record is laid out as on the 3DS. The EnemyBehaviorModule (acc+0x30EC, vtable 0x10122340) calls
+it through entry +0xF4, 0x02DB9988 (the Behavior's +0xE0 vtable +0x104). Wii U **DamageModuleImpl::init_damage(float)
+= 0x02C212F0**: [+8] entries of 0xE4 bytes at [+0xC], each with +0 = f, +4 / +8 / +0xC4 = 0 and +0xD4 = 0 (the 3DS
+0x4D30BC: 0xE0-byte entries, byte +0xD2). damage(0) = [[DM +0xC] + 0], as the 3DS 0x9512CC. Port:
+- vt_ghos slot 31 = f_g31: GH_IMM = (AttackData +0x4C != 0).
+- slot 10 f_ghos_dmg:
+  - immune: init_damage(GH_DMG) and no BehaviorImpl reaction;
+  - otherwise: GH_DMG = damage(0), then BehaviorImpl::notify_on_damage;
+  - either way, the leave timer is set to 1200.
+- The object is GH_SIZE = FL_SIZE + 8, its two words zeroed in start.
+
+Approximated: every attacker category is judged by the +0x4C byte. The 3DS rules are:
+- weapons: is_weapon_as_fighter 0x7B4368, weapon kinds 0x179 / 0x17A / 0x180-0x182;
+- items: held (Item::is_haved 0x9E6518), except kinds 0x12 / 0x24.
+
+No Wii U twins of those two were found. Known for an exact port later: find_battle_object 0x02BF2108 ([0x102F6C30],
+&acc, id, 0), is_null 0x02BEF50C, category [obj] >> 28, kind obj +4. Not ported: the 3DS module acc+0x3074's byte
++0x5A2, play_se(15) and stop_se.
+
+**Furiijio's cloud (not settled; log build).** Checked in the order given:
+1. **Our set_scale / set_pos.** None go to the cloud's handle (+0x254 -> FU_E), on the 3DS either: set_scale goes to
+   0x71A0004 and set_pos to 0x71A0003.
+2. **Early removal.** Only the beam exits (0x6D094 / 0x6D494 -> fu_bexit) remove it.
+3. **The set.** The 3DS emitters (BG 52, snow 10 follow none, cool_airA 35 with an unconverted 0x18-byte block) were
+   converted faithfully. Byte-diffed against the charge set's emitters, the cloud's differ only in:
+   - one_time 0 / end 0x7FFFFFFF (endless);
+   - life, rate, colours, alpha and scale;
+   - camera offset -2 (the 3DS's 0x334).
+
+   tools/s3ds_effects_preview.py draws it. The efc entry (set 1, flags 0x110) is the 3DS's.
+4. **Wii U side.**
+   - req_follow 0x02C2AF98 makes the record (0x0334C5C0; manager [0x10353CA4] +0x4040 + index x 0x1C0). Its fields:
+     - +0x50: the matrix;
+     - +0x12C: the eft handle (0x04A55BF0's out);
+     - +0x138 x +0x13C x +0x140: the alpha (0x0334E138);
+     - +0x144: the flags.
+   - The efc's 0x10 / 0x20 are not tested at set-up.
+   - The eft buffer sizing 0x04A5BDCC sizes endless emitters as life / (interval + 1) x rate + rate.
+   - The follow node is passed through unchanged (0x02C27D54).
+
+So code_diag adds `S4FX cl h= off= a b c d e`:
+- When: on the beam's 2nd and 20th frames (hooked at fu_beam's first word, 0x04BB976C, beam length 9 / 90).
+- What: the cloud's record (which 0), the beam body's record (which 1) and 0x8C bytes of the cloud's eft EmitterSet
+  ([record +0x12C], which 2); 53 lines a frame.
+- Checked in Unicorn: s2gv4/test_diag.py.
+
+Also found: the beam is drawn edge-on. With the 3DS angles (0, a, 90), only two products exist: Ry Rz and Rz Ry. With
+the model's yaw, the port's puts the BeamBody planes (XY, turned -90 about z) edge-on to the camera. That is the thin
+beam in 214.png. The meaning of the 3DS's set_rotation_order_zxy is still to be read: open.
+
+**Re-read (hand_read.json `reread_v4`)**:
+- Furiijio:
+  - state 1 update 0x6C0E8, including random_range 0x7B0B2C, which is inclusive: sweep 1 in 3;
+  - the ctor's homing row (stride 0x1C) and +0x20C / +0x210 (cool-down, growth);
+  - the beam enter 0x6C258 and the growth 0x6CC84 / 0x6CE64;
+  - 3DS request_follow_effect 0x7B4AEC = the Wii U 0x026A95F8.
+- Tiki Buzz state 3 enter 0x78668: set_mode_homing_extend row +0xC / +0x10 / +0x1C / +0x20 / +0x14 / +0x18, aerial
+  +0x54 / +0x58 / +0x5C, set_target.
+- Propeller Heiho state 5 enter 0x991D4: random_range(P18, P19), P23, P24, P32.
+
+No differences from the port. Not re-read line by line this step: the other states of the three (2g v3 re-read Ghos
+fully). A dive / charge motion test was tried (the dive's uniform mode stops in the motion harness's kinetic step)
+and not kept.
+
+**Tests** (exe_v22):
+
+| Test | Result |
+| --- | --- |
+| smashrun_flier_test.py | 122 checks, 0 failures; new: Ghos slot 31 + 10 over five hits, direct ones undone to the damage before them, indirect ones hurt and become the new restore point; vt_ghos slot 31 = f_g31 |
+| smashrun_flier_motion_test.py | 11 checks, 0 failures |
+| smashrun_walker_test.py (S/s2e/root) | 163 checks, 0 failures |
+| smashrun_field_test.py | 12 checks, 0 failures |
+| smashrun_enemy_test.py | 26 checks, 0 failures |
+| effect_slots_patch_test.py exe_v22 against exe_v17 | 47 checks, 0 failures |
+| s3ds_effects_test.py | 52 files, 238 emitters, 0 failures |
+
+**exe_v22 vs exe_v21, word diff** (s2gv3/diff21.py; log s2gv4/diff22.log). 4497 words in all, every one in Smash Run's
+regions:
+- text:
+  - 0x04B7DBCC, 0x04B7DCEC-0x04B7DD40 (E);
+  - 0x04B86B4C-0x04B87FC8 (A: the moved data addresses);
+  - 0x04B89414-0x04B89D20 (B);
+  - 0x04BB8004, 0x04BB81A8-0x04BB8510 (C);
+  - 0x04BB8774;
+  - 0x04BB890C-0x04BBD398 (G: f_g31, f_ghos_dmg, everything after them moved, the data).
+- data: 0x1008ECC0-0x1008ECCC, 0x1008F22C-0x1008F238 and 0x10090024-0x10090030 (the twins' slots 49 / 50 -> the moved
+  w_slr / w_rlr).
+- relocations: equal. File info: equal.
+
+code_diag vs code: the four hook words 0x02DB420C, 0x032F011C, 0x032F0250 and 0x032F13C0, the `cl` hook 0x04BB976C,
+and 0x04BBE000-0x04BBE94C.
