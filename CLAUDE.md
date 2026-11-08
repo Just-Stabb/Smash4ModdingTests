@@ -39,3 +39,9 @@
   scripts set on the call (`LAST_EFFECT_SET_COLOR`, `EFFECT_FOLLOW_COLOR`, `..._ALPHA` etc.), including on
   effects drawn by Ultimate's own shaders (the universal path). Compare each move's colours with Ultimate's
   (fx_render, the user's clips) before sending a package.
+- **Smash Run enemy ports: read the 3DS code for every enemy.** Each enemy's behaviour comes from its own 3DS
+  code (enemy_fs.cro state enter / update / exit functions and helpers, code.bin for framework calls), not from the
+  generated spec summaries or guesses: movement and speeds, search / turn / facing, contact damage per state (P2
+  set_attack_data entries, explicit attack calls, ACMD), stomp / damage / immunity / stun, death, leave timers,
+  effects. Record each reading with code addresses in `reference/smashrun_enemy_specs/hand_read.json`, flag every
+  approximation, and test behaviour (not only call sequences) where the game code can be run.
