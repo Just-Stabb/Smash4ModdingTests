@@ -164,16 +164,45 @@ def furiijio(img, D, fn, c0, vtw, Machine, calls, run):
         tr = calls(m, 'node_trans')
         ne = calls(m, 'node_effect')
         b = -ry * math.pi / 180
-        ok = (abs(ry - a * -1.0) < 1e-3 and m.rf(OBJ + W.FU_ROT) == 0.0 and m.rf(OBJ + W.FU_ROT + 8) == 90.0 and
+        ok = (abs(ry - a * -1.0) < 1e-3 and m.rf(OBJ + W.FU_ROT) == 90.0 and m.rf(OBJ + W.FU_ROT + 8) == 90.0 and
               rot and rot[0][2] == 3 and abs(rot[0][3][1] - ry * math.pi / 180) < 1e-3 and
-              abs(rot[0][3][2] - math.pi / 2) < 1e-3 and rot[0][4] == 0 and
+              abs(rot[0][3][2] - math.pi / 2) < 1e-3 and abs(rot[0][3][0] - math.pi / 2) < 1e-3 and rot[0][4] == 0 and
               tr and tr[0][2:] == (3, (12.0, 27.0, 0.5), 1, 0) and len(calls(m, 'dirty')) == 2 and
               ne and ne[0][2:4] == (0x71A0005, 2) and abs(ne[0][4][0] - 10 * math.sin(b)) < 1e-3 and
               abs(ne[0][4][1] - 10 * math.cos(b)) < 1e-3 and ne[0][5] == (0.0, 0.0, round(-ry, 3)) and
               ne[0][6] == 1.5 and m.r32(OBJ + V(4)) == 25 and m.rf(OBJ + V(8)) == 0.0)
         check(ok, 'furiijio 3 enter (0x6D224) target (%g, %g): angle %.2f (calc_angle x lr), BeamN (node 3) turned '
-              '(0, a, 90) deg and placed at the posture + FU_C, effect 0x71A0005 on node 2 at (10 sin b, 10 cos b) '
+              '(90, a, 90) deg (step 2g v5: the billboard turn) and placed at the posture + FU_C, effect 0x71A0005 on node 2 at (10 sin b, 10 cos b) '
               'rot (0, 0, lr a) x 1.5, V4 = 25, beam length 0 %s %s' % (tx, ty, ry, rot, ne))
+    # step 2g v5: the beam's world turn. Both games build a node's matrix as Rz Ry Rx (3DS Matrix34::set_rotate_xyz
+    # 0x87D298, Wii U 0x033730A0, read off their code); the model root is the yaw (Ry(-90): the flip kinds' camera
+    # view). The 3DS beam models' planes (XY, the beam along X) are Y-axial billboards there; the port turns them to
+    # the camera with x = 90: the beam keeps its direction (X) and its planes face the camera (Z along the view), where
+    # the 3DS angles (0, a, 90) left Y along the view (edge-on). The user's step 2g v4 log (the beam body's record
+    # +0x80: rows (-1.338, 0, 0.677), (-0.677, 0, -1.338), (0, -1.5, 0), scale 1.5) is exactly the old turn at
+    # a = -116.8: the model check is checked against it too.
+    def rz_ry_rx(x, y, z):
+        cx, sx, cy, sy, cz, sz = math.cos(x), math.sin(x), math.cos(y), math.sin(y), math.cos(z), math.sin(z)
+        return [[cy * cz, sx * sy * cz - cx * sz, cx * sy * cz + sx * sz],
+                [cy * sz, sx * sy * sz + cx * cz, cx * sy * sz - sx * cz],
+                [-sy, sx * cy, cx * cy]]
+
+    def mul(p, q):
+        return [[sum(p[i][k] * q[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
+    yaw = rz_ry_rx(0.0, -math.pi / 2, 0.0)
+    wm = {}
+    for ry_ in (-116.8, -30.0, 45.0, 170.0):
+        new = mul(yaw, rz_ry_rx(math.pi / 2, math.radians(ry_), math.pi / 2))
+        old = mul(yaw, rz_ry_rx(0.0, math.radians(ry_), math.pi / 2))
+        col = lambda M, j: [round(M[i][j], 3) for i in range(3)]  # noqa: E731
+        wm[ry_] = (col(new, 0) == col(old, 0) and abs(col(new, 0)[2]) < 1e-3 and abs(abs(col(new, 2)[2]) - 1) < 1e-3
+                   and abs(abs(col(old, 1)[2]) - 1) < 1e-3)
+    log_rows = [[-1.338, 0.0, 0.677], [-0.677, 0.0, -1.338], [0.0, -1.5, 0.0]]
+    old = mul(yaw, rz_ry_rx(0.0, math.radians(-116.8), math.pi / 2))
+    fits = all(abs(1.5 * old[i][j] - log_rows[i][j]) < 0.01 for i in range(3) for j in range(3))
+    check(all(wm.values()) and fits, 'furiijio beam (step 2g v5): with the yaw, (90, a, 90) keeps (0, a, 90)\'s beam '
+          'direction and turns the planes to the camera (Z along the view; the old turn had Y along it, edge-on) for a '
+          '%s; the old turn reproduces the user\'s logged beam matrix (a -116.8, scale 1.5): %s' % (sorted(wm), fits))
     outs = []
     for _ in range(27):
         (c,) = run(m, fn['fu3_up'])

@@ -145,6 +145,13 @@ class Machine:
         elif addr == W.CHANGE_KINETIC:
             c.append(('kinetic', r(3), r(4)))
             self.ret()
+        elif addr == W.NODE_GPOS:            # step 2g v5: the tread box on a live node (posture + node_off)
+            c.append(('node_gpos', r(3), r(4), r(6)))
+            off = getattr(self, 'node_off', (0.0, 11.72))
+            self.wf(r(5), self.rf(POSTURE + 0x10) + off[0])
+            self.wf(r(5) + 4, self.rf(POSTURE + 0x14) + off[1])
+            self.wf(r(5) + 8, 0.0)
+            self.ret()
         elif addr == W.SET_ATTACH_GROUND:
             c.append(('attach', r(3), r(4)))
             self.ret()
@@ -732,10 +739,12 @@ def main():
     # ---- fix v8: the stomp detected in the walker's update (slot 3)
     FT, TBL, ENTS, FACC, FPOST = (HEAP + 0x34000 + 0x100 * i for i in range(5))
 
-    def stomp(name, frames, state=3, ex=0.0, ey=0.0, count=1, live=4):
+    def stomp(name, frames, state=3, ex=0.0, ey=0.0, count=1, live=4, node_off=None, calls_out=None):
         """frames: the fighter's (x, y) per frame; -> per frame (chgi states, msc status calls, bi_update calls)"""
         w = byname[name]
         m = Machine(img)
+        if node_off:
+            m.node_off = node_off
         m.walker(cfg[w['kind']], state=state, kind=w['kind'], x=ex)
         m.wf(POSTURE + 0x14, ey)
         m.w32(W.FIGHTERS, FT)
@@ -754,6 +763,8 @@ def main():
             m.wf(FPOST + 0x14, fy)
             m.calls = []
             m.call(fn['w_upd'], {3: OBJ, 4: INPUT})
+            if calls_out is not None:
+                calls_out.append([c[1:] for c in m.calls if c[0] == 'node_gpos'])
             out.append(([c[2] for c in m.calls if c[0] == 'chgi'], [c[1:] for c in m.calls if c[0] == 'msc_status'],
                         [c[1:] for c in m.calls if c[0] == 'bi_update']))
         return out
@@ -786,7 +797,7 @@ def main():
     # ---- step 2g v3: Tiki Buzz's stomp (its tread box (6, 11.72, 1.5): the top 13.22 above its posture) -> 10 and the
     # fighter's StepJump, as the Goomba's; the test relative to the enemy and swept (a fast fall, a rising flier)
     tb = byname['tikibuzz']['tbox']
-    top = 50.0 + tb[1] + tb[2]
+    top = 50.0 + 11.72 + tb[1] + tb[2]      # step 2g v5: the box centred on node 3 (HipN: bind height 11.72 here)
     sj = (FACC, (3, W.STEP_JUMP, 0))
     tk = {}
     tk['fall'] = stomp('tikibuzz', [(2.0, top + 7), (2.0, top + 1), (2.0, top - 1)], ey=50.0)
@@ -799,6 +810,21 @@ def main():
     none = lambda v: all(not g[0] and not g[1] for g in v)  # noqa: E731
     ok = hit(tk['fall']) and hit(tk['fast']) and hit(tk['rising']) and none(tk['beside']) and none(tk['through']) \
         and none(tk['in 10'])
+    # step 2g v5: the box follows the live node (the 3DS area 0 is on node 3): with HipN 3 lower and 4 to the side
+    # (a bob, the model's offset) a fall onto the node's top is taken and one onto the bind height's is not; the
+    # node asked is 3 of the ModelModule ([acc +0x3118]), and the Goomba (no TNODE) never asks
+    ncalls = []
+    ntop = 50.0 + 2.0 + tb[1] + tb[2]       # HipN 2 above the posture (9.72 below its bind height), 4 to the side
+    nd = stomp('tikibuzz', [(6.0, ntop + 3), (6.0, ntop - 1)], ey=50.0, node_off=(4.0, 2.0), calls_out=ncalls)
+    nb = stomp('tikibuzz', [(-3.0, ntop + 3), (-3.0, ntop - 1)], ey=50.0, node_off=(4.0, 2.0))
+    gc = []
+    stomp('kuribo', fall, calls_out=gc)
+    ok_n = [g[0] for g in nd] == [[], [10]] and nd[1][1] == [sj] and none(nb) and \
+        all(c == [(0, 3, 1)] for c in ncalls[:2]) and not any(gc)
+    check(ok_n, 'step 2g v5: Tiki Buzz\'s tread box on the live node 3 (node_global_position(3, &v, 1)): HipN 9.72 '
+          'below its bind height and 4 to the side -> a fall onto its top taken (below the bind box\'s top: none '
+          'there), none 7 beside it (3 from the posture); node calls %s; '
+          'the Goomba asks no node %s' % (ncalls[:2], gc[:1]))
     check(ok, 'step 2g v3: Tiki Buzz stomped (box top %.2f above y 50): a fall into it, a fast fall (5 a frame) past '
           'its 3-unit box, a landing while it rises 3 -> => 10 and the fighter\'s StatusModule(3, 0x%X StepJump, 0) '
           'once; none beside it (|dx| 7 > 6), through it and the sweep in one frame, nor in 10 %s'

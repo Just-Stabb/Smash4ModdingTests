@@ -414,7 +414,7 @@ SLOT = {50: 0xC + 8 * 50, 72: 0xC + 8 * 72, 73: 0xC + 8 * 73}     # reverse_lr, 
 CF = {}
 for _i, _n in enumerate(('KIND NST TAB START START01 R64 R65 R66 R67 REMOVE DEADMOT HASH EN ENN KICK SET ATK SRCH '
                          'FALLMOT LANDST LANDMOT TURNMOT TURNST WALKST HOPTHR HOPLAND HOPFLAG HOPMOT HOPLOOP ZERO TREAD AREA '
-                         'SMODE LEAVE VT SIZE TB0 TB1 TB2 FSTART FDMG F69 F27 LVP').split()):
+                         'SMODE LEAVE VT SIZE TB0 TB1 TB2 FSTART FDMG F69 F27 LVP TNODE').split()):
     CF[_n] = 4 * _i
 CF['DMG'] = 4 * len(CF)              # 9 words
 CF['P'] = CF['DMG'] + 4 * 9          # the kind's own values P0.. (at least five words)
@@ -647,7 +647,8 @@ FLIERS = (
                  4: ('t_hold_en', 't_hold_up'), 5: ('t_dive_en', 't_dive_up'), 6: ('t_brk_en', 't_brk_up'),
                  7: ('t_land_en', 't_land_up'), 8: ('t_rdy_en', 't_rdy_up'), 9: ('t_lv_en', 't_lv_up'),
                  10: ('t_stomp_en', 't_stomp_up'), 11: ('t_gone_en', 't_gone_up'), 12: 'remove'},
-         tread=10, tbox=(6.0, 11.72, 1.5),             # area 0 (node 3 = HipN, 12 x 3; HipN's bind height 11.72)
+         tread=10, tbox=(6.0, 0.0, 1.5), tnode=3,      # area 0 (node 3 = HipN, 12 x 3): step 2g v5 centred on the
+                                                       # live node (node_global_position), as the 3DS area is
          start=(3, 3), rets=(3, 3, 3, 2), remove=12, fall=(None, 0), landing=None, turn=None, turnst=0, walkst=0,
          hop=(0.0, 0, 0), search=tuple(tuple(g) for g in vl_group('tikibuzz', 1)),
          attacks=((5, 'tiki_dive'), (2, 'tiki_bullet')), fstart='f_tiki_start',
@@ -764,7 +765,8 @@ def cfg_values(w, D, fn=lambda x: 0):
              VT=D['vt_' + n] if w.get('vtover') else D['vtf' if w.get('flier') else 'vt'], SIZE=w.get('size', OBJ_SIZE),
              TB0=fword(w.get('tbox', TREAD_BOX)[0]), TB1=fword(w.get('tbox', TREAD_BOX)[1]),
              TB2=fword(w.get('tbox', TREAD_BOX)[2]), FSTART=fn(w.get('fstart', 0)), FDMG=fn(w.get('fdmg', 0)),
-             F69=fn(w.get('f69', 0)), F27=fn(w.get('f27', 0)), LVP=P(w['lvp']) if 'lvp' in w else 0)
+             F69=fn(w.get('f69', 0)), F27=fn(w.get('f27', 0)), LVP=P(w['lvp']) if 'lvp' in w else 0,
+             TNODE=w.get('tnode', 0))
     words = [0] * (cfg_size(w) // 4)
     for k, v in c.items():
         words[CF[k] // 4] = v & 0xFFFFFFFF
@@ -3540,8 +3542,13 @@ def code_f(D, vtw):
              **{'P%d' % i: fp(i) for i in range(42)})
     # fu_node: BeamN (node 3) turned to FU_ROT (set_node_rotate(3, rad, 0); a change -> the ModelModule's vt+0xC4, as
     # the Wii U's own callers do) and placed at the posture + FU_C (+ the zero offset) in global space
-    # (set_node_translate(3, &v, 1, 0) + vt+0xC4: the 3DS's Behavior::set_node_global_position 0x7B5224). The 3DS's
-    # set_rotation_order_zxy (ModelModule +0x21 = 1) before it in states 3 / 6: no Wii U equivalent found
+    # (set_node_translate(3, &v, 1, 0) + vt+0xC4: the 3DS's Behavior::set_node_global_position 0x7B5224). Step 2g v5:
+    # FU_ROT is (90, a lr, 90), the 3DS's (0, a lr, 90) turned 90 about the beam (x): the 3DS beam models' bones are
+    # Y-axial billboards (H3D billboard mode 6 in BeamBG / BeamBG2 / BeamBody's flags), which turn their planes to
+    # the camera about the beam; the converted NUDs have no billboard, so the turn is in the angles (both games build
+    # the node matrix as Rz Ry Rx: 3DS Matrix34::set_rotate_xyz 0x87D298, Wii U 0x033730A0). The 3DS's
+    # set_rotation_order_zxy (ModelModule +0x21 = 1) is the model root's order (3DS 0xA6DBF8: the posture rotation
+    # through set_rotate_zxy 0x87D3B4), the same as xyz for a yaw-only posture: nothing to port
     G.asm("""
     fu_node:
         mflr r0
@@ -4007,9 +4014,8 @@ def code_f(D, vtw):
         lfs f0, 0x60(r12)
         fmuls f1, f1, f0
         stfs f1, 0x%(R4)X(r31)
-        li r0, 0
-        stw r0, 0x%(R)X(r31)
         lwz r0, 0x%(P28)X(r30)
+        stw r0, 0x%(R)X(r31)
         stw r0, 0x%(R8)X(r31)
         b fu_aimfin""" % d)
     st('fu6_en', """
@@ -4045,9 +4051,8 @@ def code_f(D, vtw):
     fu6_c:
         stfs f2, 0x%(V7)X(r31)
         stfs f1, 0x%(R4)X(r31)
-        li r0, 0
-        stw r0, 0x%(R)X(r31)
         lwz r0, 0x%(P28)X(r30)
+        stw r0, 0x%(R)X(r31)
         stw r0, 0x%(R8)X(r31)
         b fu_aimfin""" % d)
     for k, nxt in ((3, 4), (6, 7)):
@@ -5339,9 +5344,9 @@ def stomp_code():
     Dd = Asm(CAVE_D)
     Dd.asm("""
     w_upd:
-        stwu r1, -0x50(r1)
+        stwu r1, -0x60(r1)
         mflr r0
-        stw r0, 0x54(r1)
+        stw r0, 0x64(r1)
         stmw r24, 0x20(r1)
         stw r4, 0x40(r1)
         mr r31, r3
@@ -5361,6 +5366,18 @@ def stomp_code():
         lwz r12, 0(r31)
         lwz r28, 0x311C(r12)
         addi r27, r30, 0x%(TB)X
+        lwz r4, 0x%(TN)X(r30)
+        cmpwi r4, 0
+        beq u_post
+        lwz r3, 0x3118(r12)
+        addi r5, r1, 0x50
+        li r6, 1
+        lis r12, 0x%(NGH)04X
+        ori r12, r12, 0x%(NGL)04X
+        mtctr r12
+        bctrl
+        addi r28, r1, 0x40
+    u_post:
         lis r12, 0x%(FH)04X
         lwz r12, %(FL)d(r12)
         cmpwi r12, 0
@@ -5381,15 +5398,16 @@ def stomp_code():
         mr r3, r31
         lwz r4, 0x40(r1)
         lmw r24, 0x20(r1)
-        lwz r0, 0x54(r1)
+        lwz r0, 0x64(r1)
         mtlr r0
-        addi r1, r1, 0x50
+        addi r1, r1, 0x60
         lis r12, 0x%(BH)04X
         ori r12, r12, 0x%(BL)04X
         mtctr r12
         bctr
     """ % dict(TREAD=CF['TREAD'], R67=CF['R67'], FH=ha(FIGHTERS), FL=sx(FIGHTERS), BH=BI_UPDATE >> 16,
-               BL=BI_UPDATE & 0xFFFF, TB=CF['TB0'], DF=DEFEATED))
+               BL=BI_UPDATE & 0xFFFF, TB=CF['TB0'], DF=DEFEATED, TN=CF['TNODE'], NGH=NODE_GPOS >> 16,
+               NGL=NODE_GPOS & 0xFFFF))
     return Dd
 
 

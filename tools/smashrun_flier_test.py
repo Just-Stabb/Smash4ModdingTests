@@ -415,9 +415,11 @@ def tikibuzz(img, D, fn, c0, slot, w):
     check(calls(m, 'kinetic') == [('kinetic', T.EKIN, 26)] and fx and fx[0][2] == 0x70F0001 and
           [x[2] for x in run(m, fn['t_gone_up'])[0] if x[0] == 'chg'] == [12],
           'tikibuzz 11 (0x77E50): kinetic 26, ground on, effect 0x70F0001, -> 12')
-    # the stomp detection (fix v8's, with its tread box: half width 6, centre +11.72, half height 1.5)
-    check([img.u32(c0 + W.CF['TB%d' % i]) for i in range(3)] == [W.fword(v) for v in (6.0, 11.72, 1.5)] and
-          img.u32(c0 + W.CF['TREAD']) == 10, 'tikibuzz: tread state 10, tread box (6, 11.72, 1.5) (area 0: node 3 '
+    # the stomp detection (fix v8's, with its tread box: half width 6, half height 1.5; step 2g v5: centred on the
+    # live node 3, HipN, offset 0)
+    check([img.u32(c0 + W.CF['TB%d' % i]) for i in range(3)] == [W.fword(v) for v in (6.0, 0.0, 1.5)] and
+          img.u32(c0 + W.CF['TNODE']) == 3 and
+          img.u32(c0 + W.CF['TREAD']) == 10, 'tikibuzz: tread state 10, tread box (6, node 3 + 0, 1.5) (area 0: node 3 '
           'HipN, 12 x 3)')
 
 
