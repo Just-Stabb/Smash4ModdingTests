@@ -1064,6 +1064,33 @@ fixed number of them (38 or 23 a frame for a few frames).
   modes 0-4 and 6) lacks, and homing_extend.
 - Furiijio, Propeller Heiho: not read yet (Propeller Heiho carries items: create_item_and_have / Item::fall).
 
+## Step 2e (research so far): how a node index reaches a bone; Ghos's hit stun formula
+
+**Node -> bone (settles Ghos's node 3 and Plasma Wisp's node 5).** The motion module turns a node index into a bone
+index through its converter at +0x20 (context +0x24), called with the model's jtb (model handle +0xC) from the node
+matrix getters (3DS MotionModuleImpl::get_world_matrix 0x501468, Wii U 0x02C64588). The default converter is the
+identity (3DS 0x518018, set by the motion module's ctor at 0x5047D8); the enemies' (3DS 0x7B8F10, next to the
+Behavior code; Wii U **0x030833B4**, the same code) is:
+`node == 0 -> bone 0; node >= 0x1000 -> bone node - 0x1000; no jtb -> bone 0; else bone = jtb entry [node - 1]`
+(u16 at [jtb + 4] + 2 * node - 2, no bound check). **Node indices are 1-based into the jtb.** So:
+- Ghos's contact hitbox node 3 -> its jtb entry 2 = HipN: inside its 3-entry table; no jtb change is needed.
+- Plasma Wisp's weapons at node 5 -> entry 4 of its 5-entry jtb [0, 1, 2, 4, 3] = bone 3 (LHandN): in range all
+  along, on the Wii U twin's own model too (12-byte jtb). Step 2c v1's sixth entry is never read (harmless); it was
+  not the laser's fix.
+- The generated specs' "bone (jtb)" column (tools/s3ds_enemy_spec.py) maps node N to entry N, one off: node N is
+  entry N - 1 (e.g. Gordo's node 3 is HipN, not Thorn1N; the White Bear's node 2 is RotN). The ports pass the node
+  to the game's create_attack_data, which converts it as above, so the walkers' hitboxes are right; only the
+  annotation is off.
+
+**hit_return_frame** (code.bin 0x9EA9B0, Ghos's stun length): the gl entry g of the kind / variation
+(EnemyParamAccessor +0x38 + 0x208 * [inst + 0x1E4 + 32 * kind + 4 * var]): frames = int(int(g[+0x154]) * f), f
+(0x9EB4C0) = g[+0x160] + (g[+0x164] - g[+0x160]) * (clamp(d, g[+0x158], g[+0x15C]) - g[+0x158]) / (g[+0x15C] -
+g[+0x158]) (1.0 when the range is empty), d = the DamageModule's float +0x6C (0x9EAAB4: acc+0x3054 on the 3DS).
+Not yet mapped to the Wii U (gl entry layout, the DamageModule field).
+
+Still to do for the fliers: the Wii U ground normal (GroundCollisionObject get_ground_normal), the 3DS aerial
+uniform (mode 5) and homing_extend maths for Tikibuzz, Furiijio and Propeller Heiho's reading, the ports.
+
 ## Plan (to refine once code.bin is in)
 
 1. Data (names decoded): convert Smash Run's enemies, field, final-battle stages, UI, params. Done: enemies,
