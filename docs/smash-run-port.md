@@ -1818,3 +1818,9 @@ the fighter posture through r11 after the hook's line-cap check had loaded the l
 runs, logs once and returns) and shipped as smashrun_step2g_v5b_diag.zip (code_diag only). The log's `cl` lines
 (1260) are kept for the cloud analysis.
 
+User result of the v5b log build (exe_v23 + logs; log e48d89f5): no crash. Landing on Tiki Buzz works now (`S4FX hit
+s=0 st=8 tread=A`: the step 2g v5 tread box on the live HipN was the fix) and bounces the fighter; the Goomba's
+stomp is unchanged (`st=3 tread=8`). The user saw Tiki Buzz's bounce as higher than the Goomba's; both still use
+the plain StepJump (multiplier 1.0): the per-kind multiplier (param 0x11) is step 2g v6's. 2742 `cl` lines (the
+cloud) for its analysis.
+
