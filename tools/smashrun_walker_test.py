@@ -53,7 +53,9 @@ REVERSE_LR = 0x026A7A20
 SET_LR = 0x026A780C
 FAILS = []
 VT_ADDR = [0]
-GKINDS = [w for w in W.WALKERS if not w.get('flier')]   # the walkers (step 2e's fliers: smashrun_flier_test.py)
+GKINDS = [w for w in W.WALKERS if not w.get('flier') and not w.get('step2h')]   # the walkers (step 2e's fliers:
+# smashrun_flier_test.py; step 2h's kinds: smashrun_step2h_test.py)
+WM_SETF, WM_SETI = 0x02000010, 0x02000014   # step 2h: the fighter WorkModule's set_float / set_int (vt +0x4C / +0x8C)
 
 
 def check(cond, what):
@@ -99,6 +101,7 @@ class Machine:
         w(ATKM, AVT)
         w(AVT + 0x334, ATK_MSC)
         self.situation = {}             # fighter accessor -> MSC StatusModule(1) (0 ground)
+        self.work = {}                  # step 2h: fighter WorkModule writes {(module, id): value}
         w(KIN + 8, ARRP)
         w(ARRP, ARR)
         w(ARR + 4, EN)
@@ -176,6 +179,14 @@ class Machine:
                 self.ret(self.situation.get(self.r32(ctx + 4), 2))
             else:
                 self.ret()
+        elif addr == WM_SETF:
+            c.append(('set_float', r(3), r(4), round(self.fr(1), 4)))
+            self.work[(r(3), r(4))] = round(self.fr(1), 4)
+            self.ret()
+        elif addr == WM_SETI:
+            c.append(('set_int', r(3), r(4), r(5)))
+            self.work[(r(3), r(5))] = r(4)
+            self.ret()
         elif addr == ATK_MSC:
             args = r(4)
             words = [self.r32(self.r32(args) + 4 * i) for i in range(self.r32(args + 4))]
@@ -418,7 +429,7 @@ def main():
                                                             (W.SITE_DEATH, 'cave_death'))),
           'hooks: F2 / T2 / S2 / initialize_after / notify_on_remove branch to the cave')
     want = {}
-    for a in (A, B, A.area, A.stomp, A.e, A.g):
+    for a in (A, B, A.area, A.stomp, A.e, A.g, A.h):
         want.update({a.base + 4 * i: x for i, x in enumerate(a.words())})
     for base, words in d.chunks:
         want.update({base + 4 * i: x for i, x in enumerate(words)})
@@ -750,7 +761,7 @@ def main():
               'area 0 (kind, node, size) %s' % (k, got))
 
     # ---- fix v8: the stomp detected in the walker's update (slot 3)
-    FT, TBL, ENTS, FACC, FPOST = (HEAP + 0x34000 + 0x100 * i for i in range(5))
+    FT, TBL, ENTS, FACC, FPOST, FSTAT, FWM, FWMVT = (HEAP + 0x34000 + 0x100 * i for i in range(8))
 
     def stomp(name, frames, state=3, ex=0.0, ey=0.0, count=1, live=4, node_off=None, calls_out=None):
         """frames: the fighter's (x, y) per frame; -> per frame (chgi states, msc status calls, bi_update calls)"""
@@ -767,6 +778,11 @@ def main():
         m.uc.mem_write(ENTS + 0x1E, bytes([live]))
         m.w32(ENTS + 0xC, FACC)
         m.w32(FACC + 0x18, FPOST)
+        m.w32(FACC + 0x20, FSTAT)            # step 2h: its StatusModule (+0x48 the status kind) and WorkModule
+        m.w32(FACC + 0x28, FWM)
+        m.w32(FWM, FWMVT)
+        m.w32(FWMVT + W.WM_SET_FLOAT, WM_SETF)
+        m.w32(FWMVT + W.WM_SET_INT, WM_SETI)
         out = []
         for fr in frames:
             fx, fy = fr[:2]
@@ -1392,8 +1408,8 @@ def main():
                                                                  for sfx, f in ms]
         hs = D.get('hs_' + n)
         if hs:
-            ok &= [img.u32(hs + 4 * i) for i in range(3 * len(ms))] == \
-                [zlib.crc32((sfx.lower() + x).encode()) for sfx, _f in ms for x in ('.init', '', '.exit')]
+            ok &= [img.u32(hs + 4 * i) for i in range(3 * len(ms))] == (list(w['hs3ds']) if w.get('hs3ds') else
+                [zlib.crc32((sfx.lower() + x).encode()) for sfx, _f in ms for x in ('.init', '', '.exit')])
         check(ok, 'set %s (0x%08X): %d entries, K\'s 3DS order, crc32(stem, 0xFFFFFFFF), flags%s'
               % (n, s, len(ms), '; hashsets 0x%08X' % hs if hs else '; no hashsets (none on the 3DS)'))
         if root:

@@ -114,6 +114,17 @@ Step 2g v4: Ghos's immunity to direct hits (the 3DS's slot 31 0x113F0 / slot 11 
   hit's AttackData byte +0x4C -> GH_IMM), slot 10 f_ghos_dmg (immune: DamageModuleImpl::init_damage(GH_DMG) 0x02C212F0,
   no reaction; else GH_DMG = the damage and BehaviorImpl's); Ghos's object GH_SIZE (two more words).
 
+Step 2h (docs/smash-run-port.md, "Step 2h"; region H 0x04BC0000-0x04BD0000, code_h; the text region grown again):
+  the stomp bounce: the stomp test now calls the kind's slot 20 (w_tread, or the kind's own handler) and u_bounce writes
+  the fighter's tread multiplier (status float 0x1000006 = CFG BOUNCE, else the enemy's work float 0x11 = W+0x44, the
+  value the Enemy's event 6 answers) and step count (int 0x10000006 = 0), through its WorkModule (MSC accessor +0x28,
+  vt +0x4C / +0x8C); u_pend (at w_upd's start) writes the multiplier again while the fighter's status (+0x20 -> +0x48)
+  is StepJump 0xB3 and drops it once it has left it (MSC StatusModule op 3 is a request). Kinds: Big Goomba 0x23
+  (dk_*: its ACMD hitboxes through the 3DS hashset table, the 25-HP stomp), Spiny 0x4E (tg_*: the egg and the
+  Spiny, always-on spikes, never stomped, the leave), Paratroopa / Koopa 0x03 (pt_*: the hop and the bite (aerial
+  uniform mode), the wing loss, the walking leap, the shell item 0x94). STEP2H, CFG BOUNCE, `hs3ds` (a kind's 3DS
+  hashset table), STEM_NAME (the 3DS motion files' capitalisation), `dead` as a motion index.
+
 Not ported (the README lists them): the Waddle Doo's beam (states 7 / 8: an article the Wii U has no weapon kind
 for) and its leave timer (9) and random hop (6); the Churine's sleep powder (6 / 7: an effect and attack the Wii U
 has no data for); the Waddle Dee's parasol float (EnemyAerialModule embedded in the 3DS object: the parasol fall is
@@ -234,10 +245,13 @@ DATA_F = ((0x04B85980, 0x04B85C00), (0x04B86220, 0x04B86800), (0x04B77E20, 0x04B
 # step 2e: the fliers' code and data, in new code space after the text region's old end 0x04BB8670 (the RPL file
 # info's textRegionSize raised to TEXT_REGION, the text section grown to LIMIT_G: nothing there in exe_v15)
 CAVE_G, LIMIT_G = 0x04BB8680, 0x04BC0000
-TEXT_REGION = LIMIT_G - 0x02000000
+# step 2h: region H, the text grown again by 64 KB (the file info's textRegionSize raised with it; nothing is mapped
+# there in exe_v24: the text ends at 0x04BC0000 and the data starts at 0x10000000)
+CAVE_H, LIMIT_H = 0x04BC0000, 0x04BD0000
+TEXT_REGION = LIMIT_H - 0x02000000
 REGIONS = ((CAVE, LIMIT), (CAVE_B, LIMIT_B), (CAVE_C, LIMIT_C), (CAVE_D, LIMIT_D), (CAVE_E, LIMIT_E),
-           (CAVE_G, LIMIT_G)) + DATA_F
-GROW = LIMIT_G
+           (CAVE_G, LIMIT_G), (CAVE_H, LIMIT_H)) + DATA_F
+GROW = LIMIT_H
 
 # the framework (docs/smash-run-port.md, Step 2b / Fix v5)
 OPNEW = 0x03374578
@@ -371,13 +385,13 @@ TWIN_FLIP = ((0x1008FFCC, 0x026D7C98), (0x1008F1D4, 0x026D19F4), (0x1008EC68, 0x
 # churine, zima, plasmawisp, darios, tikibuzz, furiijio, propellerheiho; not heiho, stalfos, whitebear, gordo, ghos).
 # Their models face the camera at lr -1 (yaw -90) and the 3DS shows lr +1 as that view mirrored; without the mirror
 # (no Wii U flip table: fix v3) lr +1's yaw +90 showed their backs. w_yaw keeps yaw -90 for lr +1 (the mirror's front).
-YAW_FLIP = (0x01, 0x13, 0x19, 0x1F, 0x0E, 0x12, 0x1D, 0x0F, 0x1A, 0x47)
+YAW_FLIP = (0x01, 0x13, 0x19, 0x1F, 0x0E, 0x12, 0x1D, 0x0F, 0x1A, 0x47, 0x23, 0x4E)  # step 2h: dekakuribo, togezo
 # step 2g v6: the real flip. The converted models now carry the 3DS model.flp as the Wii U's (tools/s3ds_enemy.py
 # flp_bytes), so slot 38 returns 1 for the YAW_FLIP kinds that have one (FLIP_TABLE: the game's own set_lr 0x026A780C /
 # reverse_lr 0x026A7A20 then call MotionModule 0x02C6108C(lr == 1, 1), the 3DS's set_flip(lr == 1, 1), and the anim
 # mirror 0x036C48B0 mirrors the skeleton) and they keep lr x 90 (no yaw hold). Churine and Propeller Heiho flip on the
 # 3DS but have no model.flp in either game (nothing to mirror): they keep the step 2g v3 yaw hold (YAW_HOLD).
-FLIP_TABLE = (0x01, 0x13, 0x19, 0x0E, 0x12, 0x1D, 0x0F, 0x1A)
+FLIP_TABLE = (0x01, 0x13, 0x19, 0x0E, 0x12, 0x1D, 0x0F, 0x1A, 0x23, 0x4E)   # step 2h: dekakuribo, togezo
 YAW_HOLD = tuple(k for k in YAW_FLIP if k not in FLIP_TABLE)
 SET_LR, REVERSE_LR = 0x026A780C, 0x026A7A20
 # the twins' vtables (2a's zima / plasmawisp / darios use them): slots 49 / 50 -> w_slr / w_rlr (kinds >= 0x50 unchanged)
@@ -422,7 +436,7 @@ SLOT = {50: 0xC + 8 * 50, 72: 0xC + 8 * 72, 73: 0xC + 8 * 73}     # reverse_lr, 
 CF = {}
 for _i, _n in enumerate(('KIND NST TAB START START01 R64 R65 R66 R67 REMOVE DEADMOT HASH EN ENN KICK SET ATK SRCH '
                          'FALLMOT LANDST LANDMOT TURNMOT TURNST WALKST HOPTHR HOPLAND HOPFLAG HOPMOT HOPLOOP ZERO TREAD AREA '
-                         'SMODE LEAVE VT SIZE TB0 TB1 TB2 FSTART FDMG F69 F27 LVP TNODE').split()):
+                         'SMODE LEAVE VT SIZE TB0 TB1 TB2 FSTART FDMG F69 F27 LVP TNODE BOUNCE').split()):
     CF[_n] = 4 * _i
 CF['DMG'] = 4 * len(CF)              # 9 words
 CF['P'] = CF['DMG'] + 4 * 9          # the kind's own values P0.. (at least five words)
@@ -471,6 +485,8 @@ def vl_group(kind, index):
         members = json.load(f)['params']['members']
     if index == 'struct':
         return [m for m in members if m['type'] == 'struct'][0]['values'][0]
+    if index == 'struct2':                      # step 2h: the second inline struct
+        return [m for m in members if m['type'] == 'struct'][1]['values'][0]
     return [m for m in members if m.get('index') == index][0]['values']
 
 
@@ -699,11 +715,105 @@ FLIERS = (
          P=tuple(_PP0) + PH_LIT),
 )
 WALKERS = WALKERS + FLIERS
+# step 2h (docs/smash-run-port.md "Step 2h"; region H, code_h): Big Goomba, Spiny, Paratroopa / Koopa, Pooka
+_DK0 = vl_group('dekakuribo', 0)[0]      # P0 row: f0..f19 (walk 2 / 1 / 10, rates, hops, 25 HP stomp, 28 close, 200)
+# the 3DS create's hashset table (enemy_fs.cro 0xC5D3C: {name.init, name, name.exit} per motion): the scripts are
+# named apart from the motions (AngryL's is "angry", motion 18's own Damage scripts)
+DK_HS = (0x5D3BC3AA, 0xC0C12699, 0x0F46A3D0, 0x0E83541B, 0xD354F72A, 0x5CFE3461, 0x5EB275E0, 0xF1506564, 0x0CCF159A,
+         0x8B2BBB41, 0x11C8546C, 0xD956DB3B, 0x23938046, 0x88866C6F, 0x71EEE03C, 0x7AB9FC7B, 0x592F6334, 0x28C49C01,
+         0xB1F07FB5, 0x4BB1B3DE, 0xE38D1FCF, 0x5C6C76EE, 0x96507C35, 0x0E111694, 0x98299C4E, 0xCABD7352, 0xCA54FC34,
+         0xDF4E2DE7, 0xFC437B83, 0x8D334D9D, 0x1C109455, 0x20F2E588, 0x4E6DF42F, 0x7FD00F18, 0xFB50DF0C, 0x2DAD6F62,
+         0x916B53B2, 0xEF3ACE15, 0xC31633C8, 0x34D87757, 0xD7F912B4, 0x66A5172D, 0x9E38722F, 0x5076A4C0, 0xCC451255,
+         0x6AC81B7E, 0x9A128179, 0x38B57B04, 0xDEEDAD68, 0xEC16504D, 0x8C90CD12, 0xD96E6992, 0x8D917A55, 0x8B1309E8,
+         0x9EB09115, 0xBA133075, 0xCCCDF16F)
+_TGS = vl_group('togezo', 'struct')      # PS8c: 0.4 (W+0x38), 10, 200 (walk frames), 150 (search frames)
+_TG6 = vl_group('togezo', 6)[0]          # the leave: {120, 0.1, 5, 0, 0, 0, 3, 0, 0.85}
+TG_SPIN = 30.0                           # the egg's spin, degrees a frame per unit of speed (the 3DS's common factor
+#                                          EnemyParamAccessor +0x198 +0x90 x +0xA0 is not in the dump: approximated)
+for _i, _n in enumerate(('tg_egg', 'tg_body', 'tg_eggdead', 'tg_dead')):    # togezo P2 0-3 (state 0, 0, 4, 12)
+    ATTACKS[_n] = tuple(vl_group('togezo', 2)[_i])
+# the 3DS create's hashset table (enemy_fs.cro 0xC75DC)
+PT_HS = (0x82E7C6C0, 0x81E6391E, 0xD09AA6BA, 0x2E71FFFF, 0xA51BE995, 0x7C0C9F85, 0x8B2BBB41, 0x11C8546C, 0xD956DB3B,
+         0x23938046, 0x88866C6F, 0x71EEE03C, 0x7AB9FC7B, 0x592F6334, 0x28C49C01, 0xB1F07FB5, 0x4BB1B3DE, 0xE38D1FCF,
+         0x5C6C76EE, 0x96507C35, 0x0E111694, 0x98299C4E, 0xCABD7352, 0xCA54FC34, 0xDF4E2DE7, 0xFC437B83, 0x8D334D9D,
+         0x1C109455, 0x20F2E588, 0x4E6DF42F, 0x7FD00F18, 0xFB50DF0C, 0x2DAD6F62, 0x8A5CA6C0, 0x538A83B3, 0xD821C6BA,
+         0x6FE180E4, 0xCEFF938C, 0x3D9CE09E, 0x42FA02C2, 0xE96FB2C6, 0x108762B8, 0x916B53B2, 0xEF3ACE15, 0xC31633C8,
+         0x1672FB23, 0x9E9898B1, 0x440F9B59, 0xFCEF9C58, 0x97CA47AB, 0xAE92FC22, 0xED2A8FBA, 0xA407A342, 0xBF57EFC0,
+         0x28479585, 0x60DDFE28, 0x7A3AF5FF, 0x2E7A4ABC, 0x058D08B8, 0x7C072AC6, 0x1B824B30, 0xB749DECE, 0x49FF2B4A,
+         0x7F3E1CA6, 0x20201547, 0x2D437CDC, 0xD96E6992, 0x8D917A55, 0x8B1309E8)
+for _i, _n in enumerate(('pt_bite', 'pt_leap', 'pt_shell', 'pt_bullet')):  # patapata P2 0-3 (states 6, 16, 20, 8)
+    ATTACKS[_n] = tuple(vl_group('patapata', 2)[_i])
+STEP2H = (
+    # Big Goomba (Mario) 0x23, BehaviorDekakuribo (create 0x86D84, table 0x10F374; docs/smash-run-port.md "Step 2h")
+    dict(name='dekakuribo', kind=0x23, step2h=True, areas=tuple(tuple(e) for e in vl_group('dekakuribo', 5)),
+         motions=(('AngryL', 1), ('AttackRunStart', 1), ('Collapses', 1), ('Damage', 1), ('DamageFall', 1),
+                  ('DamageFly', 1), ('DamageStart', 1), ('DownBound', 1), ('DownBoundEnd', 1), ('DownLoop', 1),
+                  ('DownWait', 1), ('Fall', 1), ('Landing', 1), ('RunBrakeL', 1), ('RunL', 5), ('RunTurnL', 1),
+                  ('Stepped', 1), ('WalkL', 5), ('Damage', 1)),
+         dead=18, last='Fall', hashset=True, hs3ds=DK_HS, kick=True,
+         energy={8: _DK0[1], 0xC: _DK0[2], 0x10: 0.0, 0x14: _DK0[5], 0x18: _DK0[3], 0x24: _DK0[7], 0x40: 1.0,
+                 0x44: _DK0[14], 0x28: _DK0[6], 0x2C: _DK0[8]},     # initialize 0x8630C
+         states={1: ('g_fall_en', 'g_fall_up'), 2: ('dk_land_en', 'g_land_up'), 3: ('dk_walk_en', 'dk_walk_up'),
+                 4: ('dk_close_en', 'dk_close_up'), 5: ('dk_angry_en', 'dk_angry_up'), 6: ('dk_rs_en', 'dk_rs_up'),
+                 7: ('dk_run_en', 'dk_run_up'), 8: ('dk_brk_en', 'k_brk_up'), 9: ('dk_rt_en', 'dk_rt_up'),
+                 10: ('dk_step_en', 'dk_step_up'), 11: ('dk_col_en', 'dk_col_up'), 12: ('g_dead_en', 'g_dead_up'),
+                 13: 'remove'},
+         tread=11, tbox=(7.0, 6.0, 1.5),            # P5[0] {on, node 0, 14 x 3, offset (0, 6)}: 11 = skip in Collapses
+         start=(1, 1), rets=(3, 1, 1, 12), remove=13, fall=('Fall', 2), landing='Landing', turn=None, turnst=0,
+         walkst=3, hop=(0.0, 0, 0), search=tuple(tuple(g) for g in vl_group('dekakuribo', 1)),
+         attacks=(),                                 # slot 45 is empty: every hitbox is the motions' ACMD
+         vtover={45: 'o_nop', 20: 'dk_tread'}, fstart='w_start',
+         P=tuple(_DK0) + (30.0, int(_DK0[19]), int(_DK0[10]), int(_DK0[13]))),   # P20 WalkL frames, P21-23 ints
+    # Spiny (Mario) 0x4E, BehaviorTogezo (create 0x37F14, table 0x1119CC): variation 0 the egg (Paipo), 1 the Spiny
+    dict(name='togezo', kind=0x4E, step2h=True, areas=tuple(tuple(e) for e in vl_group('togezo', 5)),
+         motions=(('Change', 1), ('Damage', 1), ('Fall', 1), ('Landing', 1), ('Paipo', 1), ('Turn', 1), ('Walk', 1)),
+         no_damage_labels=True, dead='Damage', last=None, hashset=False, kick=False, energy={},
+         states={1: ('tg_efall_en', 'tg_efall_up'), 2: ('tg_ebnc_en', 'tg_ebnc_up'), 3: ('tg_estun_en', 'tg_estun_up'),
+                 4: ('tg_edead_en', 'g_dead_up'), 5: ('tg_chg_en', 'tg_chg_up'), 6: ('tg_fall_en', 'g_fall_up'),
+                 7: ('g_land_en', 'g_landt_up'), 8: ('tg_walk_en', 'tg_walk_up'), 9: ('g_turn_en', 'g_turn_up'),
+                 10: ('tg_leave_en', 'o_leave_up'), 11: ('tg_stun_en', 'tg_stun_up'), 12: ('g_dead_en', 'g_dead_up'),
+                 13: 'remove'},
+         start=(1, 6), rets=(0, 0, 1, 4), remove=13, fall=('Fall', 7), landing='Landing', turn='Turn', turnst=9,
+         walkst=8, hop=(0.0, 0, 0), search=tuple(tuple(g) for g in vl_group('togezo', 1)),
+         attacks=(), vtover={40: 'tg_init', 45: 'tg_atk', 66: 'tg_66', 67: 'tg_67'}, fstart='tg_start', f69='tg_69',
+         lvp=18,                                     # TREAD 0: never stomped (its tread area is off, slot 21 BI's nop)
+         P=tuple(vl_group('togezo', 0)[0]) + tuple(vl_group('togezo', 0)[1]) +
+           (_TGS[0], _TGS[2], _TGS[3], vl_group('togezo', 'struct2')[0], TG_SPIN, DEG2RAD) +
+           (_TG6[0], -_TG6[1], _TG6[2], _TG6[6], _TG6[8])),
+    # Paratroopa / Koopa (Mario) 0x03, BehaviorPatapata (create 0x74108, table 0x110C80): variations 0 / 1 winged,
+    # 2 / 3 walking (the wing loss adds 2); a flier-sized object (its bite uses the aerial module)
+    dict(name='patapata', kind=0x03, step2h=True, flier=True, size=FL_SIZE,
+         areas=tuple(tuple(e) for e in vl_group('patapata', 5)),
+         motions=(('Bite', 1), ('BulletMode', 1), ('Damage', 1), ('DamageFall', 1), ('DamageFly', 1),
+                  ('DamageStart', 1), ('DownBound', 1), ('DownBoundEnd', 1), ('DownLoop', 1), ('DownWait', 1),
+                  ('Fall', 1), ('Fly', 1), ('JumpAttack', 1), ('JumpHold', 1), ('Landing', 1), ('LandingJumpAttack', 1),
+                  ('Fall', 1), ('NokonokoMode', 1), ('ShellMode', 1), ('ShellReturn', 1), ('TurnNokonoko', 1),
+                  ('TurnPatapata', 1), ('Walk', 1)),     # 16: an entry with no name in the 3DS set (unused)
+         dead='BulletMode', last='Fall', hashset=True, hs3ds=PT_HS, kick=False, energy={},
+         states={1: ('pt_wfall_en', 'pt_wfall_up'), 2: ('pt_hop_en', 'pt_hop_up'), 3: ('pt_turn_en', 'pt_turn_up'),
+                 5: ('pt_bw_en', 'pt_bw_up'), 6: ('pt_bite_en', 'pt_bite_up'), 7: ('pt_brec_en', 'pt_brec_up'),
+                 8: ('g_dead_en', 'g_dead_up'), 9: ('pt_wl_en', 'pt_wl_up'), 10: ('g_fall_en', 'g_fall_up'),
+                 11: ('g_land_en', 'g_land_up'), 12: ('pt_walk_en', 'pt_walk_up'), 13: ('g_turn_en', 'g_turn_up'),
+                 14: ('pt_jh_en', 'pt_jh_up'), 15: ('pt_leap_en', 'pt_leap_up'), 16: ('pt_lh_en', 'pt_lh_up'),
+                 17: ('pt_sl_en', 'pt_sl_up'), 18: ('pt_la_en', 'pt_la_up'), 19: ('pt_sh_en', 'pt_sh_up'),
+                 20: ('pt_ss_en', 'pt_sh_up'), 23: 'remove'},
+         tread=19, tbox=(2.0, 8.0, 4.0), bounce=1.0,   # P5[0] {on, node 0, 4 x 8, offset (0, 8)}; the user's 1.0
+         start=(1, 1), rets=(2, 1, 1, 20), remove=23, fall=('Fall', 11), landing='Landing', turn='TurnNokonoko',
+         turnst=13, walkst=12, hop=(0.0, 0, 0), search=tuple(tuple(g) for g in vl_group('patapata', 1)),
+         attacks=((6, 'pt_bite'), (16, 'pt_leap'), (20, 'pt_shell'), (8, 'pt_bullet')),
+         vtover={20: 'pt_tread', 64: 'pt_64', 65: 'pt_65', 66: 'pt_66', 67: 'pt_67'}, fstart='pt_start', f69='pt_69',
+         P=tuple(x for row in vl_group('patapata', 0) for x in row) + tuple(vl_group('patapata', 'struct')) +
+           tuple(vl_group('patapata', 'struct2')) + (3.0, 0x94, 10.0, 1.0, -1.0)),
+)
+WALKERS = WALKERS + STEP2H
 KINDS = tuple(w['kind'] for w in WALKERS)
 
 
+STEM_NAME = {'dekakuribo': 'DekaKuribo'}      # step 2h: the 3DS motion files' own capitalisation
+
+
 def stem(name, sfx):
-    return 'Enm%sBodyMain%s' % (name.capitalize(), sfx)
+    return 'Enm%sBodyMain%s' % (STEM_NAME.get(name, name.capitalize()), sfx)
 
 
 def motion_hash(s):
@@ -763,7 +873,7 @@ def cfg_values(w, D, fn=lambda x: 0):
     lm = lambda s: index(w, s) if s else 0  # noqa: E731
     c = dict(KIND=w['kind'], NST=nstates(w), TAB=D['st_' + n] - 0x18, START=w['start'][0], START01=w['start'][1],
              R64=w['rets'][0], R65=w['rets'][1], R66=w['rets'][2], R67=w['rets'][3], REMOVE=w['remove'],
-             DEADMOT=lm(w['dead']), HASH=D.get('hs_' + n, 0), EN=D['en_' + n], ENN=len(w['energy']),
+             DEADMOT=w['dead'] if isinstance(w['dead'], int) else lm(w['dead']), HASH=D.get('hs_' + n, 0), EN=D['en_' + n], ENN=len(w['energy']),
              KICK=1 if w['kick'] else 0, SET=D['set_' + n], ATK=D['atk_' + n], SRCH=D['sr_' + n],
              FALLMOT=lm(w['fall'][0]), LANDST=w['fall'][1], LANDMOT=lm(w['landing']), TURNMOT=lm(w['turn']),
              TURNST=w['turnst'], WALKST=w['walkst'], HOPTHR=fword(w['hop'][0]), HOPLAND=w['hop'][1],
@@ -774,7 +884,7 @@ def cfg_values(w, D, fn=lambda x: 0):
              TB0=fword(w.get('tbox', TREAD_BOX)[0]), TB1=fword(w.get('tbox', TREAD_BOX)[1]),
              TB2=fword(w.get('tbox', TREAD_BOX)[2]), FSTART=fn(w.get('fstart', 0)), FDMG=fn(w.get('fdmg', 0)),
              F69=fn(w.get('f69', 0)), F27=fn(w.get('f27', 0)), LVP=P(w['lvp']) if 'lvp' in w else 0,
-             TNODE=w.get('tnode', 0))
+             TNODE=w.get('tnode', 0), BOUNCE=fword(w.get('bounce', 0.0)))
     words = [0] * (cfg_size(w) // 4)
     for k, v in c.items():
         words[CF[k] // 4] = v & 0xFFFFFFFF
@@ -802,6 +912,7 @@ class Data:
         b.append(('consts', [fword(0.0), fword(1.0), 0x2545F491, 0], 0x10))     # 0.0, 1.0, the xorshift state
         b.append(('abs_words', [word(v) for v in ABS_WORDS], 4))
         b.append(('fconsts', [0x43300000, 0x80000000], 8))      # the int -> double bias (f_hitret)
+        b.append(('pend', [0] * 12, 4))     # step 2h: the stomp bounce, per fighter slot {accessor, multiplier, count}
         # step 2g v3: w_yaw (+0xC: the YAW_HOLD mask); step 2g v6: +0x18 the FLIP_TABLE mask (w_noflip / twin_flip)
         b.append(('yawk', [fword(1.0), fword(90.0), fword(-90.0)] + yaw_mask() + yaw_mask(FLIP_TABLE), 4))
         vt = list(self.vt_words) + [0, 0, 0, 0]          # 74 slots + 74 / 75
@@ -836,7 +947,9 @@ class Data:
             ms = w['motions']
             b.append(('set_' + n, [g('set_' + n) + 0x18, len(ms), 0, 0, 0, 0] +
                       [x for sfx, flags in ms for x in (motion_hash(stem(n, sfx)), flags)], 4))
-            if w['hashset']:
+            if w.get('hs3ds'):            # step 2h: the 3DS create's own hashset table (script names differ)
+                b.append(('hs_' + n, list(w['hs3ds']), 4))
+            elif w['hashset']:
                 b.append(('hs_' + n, [zlib.crc32((sfx.lower() + x).encode()) for sfx, _f in ms
                                       for x in ('.init', '', '.exit')], 4))
             b.append(('en_' + n, [x for off, v in sorted(w['energy'].items()) for x in (off, fword(v))], 4))
@@ -5335,19 +5448,22 @@ def assemble(vt_words):
     for _pass in range(4):
         dd = {k: D.get(k, CAVE) for k in keys}
         A, B, Ee, Gg = code(dd)
+        Hh = code_h(dd)
         C = area_code(dd)
         Dd = stomp_code()
         labels = dict(A.labels)
-        for a in (B, C, Dd, Ee, Gg):
+        for a in (B, C, Dd, Ee, Gg, Hh):
             labels.update(a.labels)
-        for a in (A, B, C, Dd, Ee, Gg):
+        for a in (A, B, C, Dd, Ee, Gg, Hh):
             a.labels.update(labels)
-        ea, eb, ec, ed, ee, eg = A.pc, B.pc, C.pc, Dd.pc, Ee.pc, Gg.pc
+        ea, eb, ec, ed, ee, eg, eh = A.pc, B.pc, C.pc, Dd.pc, Ee.pc, Gg.pc, Hh.pc
         assert eg <= LIMIT_G, 'flier code too big (0x%X)' % eg
+        assert eh <= LIMIT_H, 'step 2h code too big (0x%X)' % eh
         assert ed <= LIMIT_D, 'stomp code too big (0x%X)' % ed
         assert ea <= LIMIT and eb <= LIMIT_B and ee <= LIMIT_E, 'walker code too big (0x%X, 0x%X, 0x%X)' % (ea, eb, ee)
         spans = [((ea + 0xF) & ~0xF, LIMIT), ((eb + 0xF) & ~0xF, LIMIT_B), ((ec + 0xF) & ~0xF, LIMIT_C),
-                 ((ed + 3) & ~3, LIMIT_D), ((ee + 0xF) & ~0xF, LIMIT_E), ((eg + 0xF) & ~0xF, LIMIT_G)] + list(DATA_F)
+                 ((ed + 3) & ~3, LIMIT_D), ((ee + 0xF) & ~0xF, LIMIT_E), ((eg + 0xF) & ~0xF, LIMIT_G),
+                 ((eh + 0xF) & ~0xF, LIMIT_H)] + list(DATA_F)
         d.build(labels, D)
         d.place(spans)
         if d.addr == D:
@@ -5360,6 +5476,7 @@ def assemble(vt_words):
     A.stomp = Dd
     A.e = Ee
     A.g = Gg
+    A.h = Hh
     return A, B, d
 
 
@@ -5377,7 +5494,8 @@ def stomp_code():
         stmw r24, 0x20(r1)
         stw r4, 0x40(r1)
         mr r31, r3
-        lwz r30, 0x168(r3)
+        bl u_pend
+        lwz r30, 0x168(r31)
         lwz r29, 0x%(TREAD)X(r30)
         cmpwi r29, 0
         beq u_out
@@ -5486,9 +5604,8 @@ def stomp_body(C):
         fcmpu cr0, f6, f7
         bgt b_next
         mr r3, r31
-        mr r4, r29
         lwz r12, 0xE0(r3)
-        lwz r12, 0x%(S73)X(r12)
+        lwz r12, 0x%(S20)X(r12)
         mtctr r12
         bctrl
         li r0, 3
@@ -5508,11 +5625,1270 @@ def stomp_body(C):
         ori r12, r12, 0x%(ML)04X
         mtctr r12
         bctrl
+        bl u_bounce
         b u_out
     b_next:
         b u_next
-    """ % dict(ENT=FIGHTER_ENTRY, PREV=PREV, S73=SLOT[73], STEP=STEP_JUMP, MH=MSC_STATUS >> 16,
+    """ % dict(ENT=FIGHTER_ENTRY, PREV=PREV, S20=0xC + 8 * TREAD_SLOT, STEP=STEP_JUMP, MH=MSC_STATUS >> 16,
                ML=MSC_STATUS & 0xFFFF, SWH=struct.unpack('>I', struct.pack('>f', STOMP_SWEEP))[0] >> 16))
+
+
+GET_DAMAGE = 0x02C22ECC              # DamageModule (acc+0x30D4) get_damage(r4 index) -> f1 (entries 0xE4 apart, +0)
+SET_CUR_DAMAGE = 0x026A7E58          # Behavior::set_current_damage(f1) (3DS 0x7B3688): init_damage(f1), HP W+0 = W+4 - damage
+STEP_JUMP_SPEED = 0x02E79938         # the fighters' StepJump speed (this, &out, accessor): y = step_jump_speed_y x float
+#                                      0x1000006 (x pow(float 0x20000B5, int 0x10000006 - 1) past one step); 3DS 0x97E080
+WM_SET_FLOAT, WM_SET_INT = 0x4C, 0x8C    # WorkModule vt: set_float(f1, r4 id), set_int(r4 value, r5 id)
+STATUS_KIND = 0x48                   # StatusModule (MSC accessor +0x20) +0x48 the status kind (tools/edge_counter_cave.py)
+F_TREAD_MUL, I_STEP_COUNT = 0x01000006, 0x10000006
+DISABLE_HIT, DISABLE_TREAD = 0x026A75C0, 0x026A75FC   # Behavior::disable_hit / disable_tread (3DS 0x7B0864 / 0x7B0D50)
+CREATE_THROW = 0x026A8F10            # Behavior::create_item_and_throw(kind, var, &pos, &speed, f1, r8, r9, r10) (3DS 0x7B4488)
+PEND_N = 40                          # the pending re-write lasts this many cave-enemy updates (seen-flag bit 16)
+
+
+def code_h(D):
+    """step 2h (region H): the stomp bounce multiplier (u_bounce / u_pend) and the four kinds' states (Big Goomba
+    dk_*, ...). 3DS enemy_fs.cro addresses in the comments; docs/smash-run-port.md "Step 2h"."""
+    H = Asm(CAVE_H)
+
+    def call(t):
+        return "lis r12, 0x%04X\nori r12, r12, 0x%04X\nmtctr r12\nbctrl" % (t >> 16, t & 0xFFFF)
+
+    def st(label, body):
+        H.asm("%s:\nmflr r0\nbl pro\n%s\nb epi" % (label, body))
+
+    def en(label, kin, att, mot, loop, rate=None, extra='', pre=''):
+        r = "bl h_mot1" if rate is None else "lfs f2, 0x%X(r30)\nbl h_mot" % rate
+        st(label, "%s\nli r4, %d\nbl h_kin\nli r4, %d\nbl h_att\nli r4, %d\nli r5, %d\n%s\n%s"
+           % (pre, kin, att, mot, loop, r, extra))
+
+    d = dict(PH=ha(D['pend']), PL=sx(D['pend']), CH=ha(D['consts']), CL=sx(D['consts']), BOUNCE=CF['BOUNCE'],
+             SF=WM_SET_FLOAT, SI=WM_SET_INT, SK=STATUS_KIND, FTH=F_TREAD_MUL >> 16, FTL=F_TREAD_MUL & 0xFFFF,
+             ICH=I_STEP_COUNT >> 16, ICL=I_STEP_COUNT & 0xFFFF, N=PEND_N, STEP=STEP_JUMP, ZERO=CF['ZERO'],
+             DF=DEFEATED, **{'V%d' % i: V(i) for i in range(9)}, **{'P%d' % i: P(i) for i in range(80)})
+    a = lambda text: H.asm(text % d)  # noqa: E731
+
+    # ---- the stomp bounce (the tread link event's answer, emulated). The fighter's StepJump (status 0xB3) sends
+    # LinkEvent 6 to the stepped object only through link 3 (common MSC func_1149); the enemy answers its param 0x11
+    # (Enemy event 6, 0x02D8C5D4: WorkModule acc+0x315C vt+0x44(0x11) = work float 0x11 = W+0x44, the value each
+    # kind's 3DS initialize writes there, the Enemy ctor's default 1.0 otherwise) and the MSC copies it into status
+    # float 0x1000006 and zeroes the step count int 0x10000006; the jump's speed (0x02E79938, 3DS 0x97E080) is
+    # step_jump_speed_y x float 0x1000006. Our stomp has no link: u_bounce writes the two itself (CFG BOUNCE, else
+    # W+0x44), now and (u_pend) on each cave-enemy update while the fighter is in 0xB3, until it leaves it.
+    a("""
+    u_bounce:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        lfs f1, 0x%(BOUNCE)X(r30)
+        lis r12, 0x%(CH)04X
+        lfs f0, %(CL)d(r12)
+        fcmpu cr0, f1, f0
+        bne ubn_have
+        lwz r12, 0(r31)
+        lwz r12, 0x3130(r12)
+        lwz r12, 8(r12)
+        lwz r12, 0(r12)
+        lwz r12, 4(r12)
+        lfs f1, 0x44(r12)
+    ubn_have:
+        lis r12, 0x%(PH)04X
+        addi r12, r12, %(PL)d
+        mulli r11, r25, 12
+        add r12, r12, r11
+        stw r24, 0(r12)
+        stfs f1, 4(r12)
+        li r0, %(N)d
+        stw r0, 8(r12)
+        mr r3, r24
+        bl ub_set
+        lwz r3, 0x28(r24)
+        lwz r12, 0(r3)
+        lwz r12, 0x%(SI)X(r12)
+        mtctr r12
+        li r4, 0
+        lis r5, 0x%(ICH)04X
+        ori r5, r5, 0x%(ICL)04X
+        bctrl
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+    ub_set:
+        lwz r3, 0x28(r3)
+        lwz r12, 0(r3)
+        lwz r12, 0x%(SF)X(r12)
+        mtctr r12
+        lis r4, 0x%(FTH)04X
+        ori r4, r4, 0x%(FTL)04X
+        bctr
+    u_pend:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        li r28, 0
+    upd_loop:
+        lis r27, 0x%(PH)04X
+        addi r27, r27, %(PL)d
+        mulli r0, r28, 12
+        add r27, r27, r0
+        lwz r10, 8(r27)
+        clrlwi. r11, r10, 16
+        beq upd_next
+        addi r10, r10, -1
+        stw r10, 8(r27)
+        lwz r3, 0(r27)
+        lwz r12, 0x20(r3)
+        lwz r12, 0x%(SK)X(r12)
+        cmpwi r12, 0x%(STEP)X
+        bne upd_left
+        oris r10, r10, 1
+        stw r10, 8(r27)
+        lfs f1, 4(r27)
+        bl ub_set
+        b upd_next
+    upd_left:
+        rlwinm. r10, r10, 0, 15, 15
+        beq upd_next
+        li r0, 0
+        stw r0, 8(r27)
+    upd_next:
+        addi r28, r28, 1
+        cmplwi r28, 4
+        blt upd_loop
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+    """)
+
+    # ---- Big Goomba (dekakuribo 0x23). V0 the state frames, V1 the run frames (+0x178), V2 the run start's
+    # airborne flag (+0x181), V3 the target, V4 the close count (+0x184), V5 WalkL's loop phase (float), V6 the walk's
+    # turn flag (+0x180). P0-19 its P0 row, P20 WalkL's frames, P21-23 f19 / f10 / f13 as ints
+    quake = "mr r3, r31\nli r4, 3\n" + call(REQ_QUAKE)
+    # 2 landing (0x85E30 / 0x864E0): kinetic 0, ground on, Landing, request_quake(3) (play_se 0x2910009: not ported);
+    # at its end -> 3 (g_land_up)
+    en('dk_land_en', 0, 1, 12, 0, extra=quake)
+    # 3 walk (0x85F3C / 0x8675C)
+    en('dk_walk_en', 0xA, 1, 17, 1, rate=P(4), pre="li r0, 0\nstw r0, 0x%X(r31)\nstw r0, 0x%X(r31)\nstw r0, 0x%X(r31)"
+       % (V(0), V(5), V(6)))
+    a("""
+    dk_loop:
+        lfs f1, 0x%(V5)X(r31)
+        lfs f0, 0x%(P4)X(r30)
+        fadds f1, f1, f0
+        lfs f0, 0x%(P20)X(r30)
+        li r3, 0
+        fcmpu cr0, f1, f0
+        blt dkl_st
+        fsubs f1, f1, f0
+        li r3, 1
+    dkl_st:
+        stfs f1, 0x%(V5)X(r31)
+        blr
+    dk_dist2:
+        mflr r0
+        stwu r1, -0x20(r1)
+        stw r0, 0x24(r1)
+        mr r5, r4
+        addi r3, r1, 8
+        mr r4, r31
+    """ + call(GET_TARGET_POS) + """
+        lfs f1, 8(r1)
+        lfs f2, 0xC(r1)
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f0, 0x10(r12)
+        fsubs f1, f1, f0
+        lfs f0, 0x14(r12)
+        fsubs f2, f2, f0
+        fmuls f1, f1, f1
+        fmadds f1, f2, f2, f1
+        b h_ret20
+    """)
+    st('dk_walk_up', """
+        lwz r0, 0x%(V6)X(r31)
+        cmpwi r0, 0
+        beq dkw_srch
+        bl dk_loop
+        cmpwi r3, 0
+        bne dkw_rev
+        bl h_clear
+        b dkw_cnt
+    dkw_rev:
+        bl h_rev
+        li r4, 3
+        b goi
+    dkw_srch:
+        bl dk_loop
+        li r4, 0
+        bl h_grp
+        lwz r10, 0x%(V0)X(r31)
+        addi r0, r10, 1
+        divwu r11, r0, r3
+        mullw r11, r11, r3
+        subf. r0, r11, r0
+        bne dkw_gnd
+        li r4, 0
+        bl h_srch
+        stw r3, 0x%(V3)X(r31)
+        cmpwi r3, 0
+        blt dkw_gnd
+        mr r4, r3
+        bl h_dx
+        lfs f0, 0x%(ZERO)X(r30)
+        fcmpu cr0, f1, f0
+        bge dkw_face
+        bl h_rev
+    dkw_face:
+        lwz r4, 0x%(V3)X(r31)
+        bl dk_dist2
+        lfs f0, 0x%(P18)X(r30)
+        fmuls f0, f0, f0
+        fcmpu cr0, f1, f0
+        li r4, 4
+        ble.far go
+        li r4, 6
+        b go
+    dkw_gnd:
+        bl h_gnd
+        cmpwi r3, 0
+        bne dkw_on
+        li r4, 1
+        bl h_chg
+        b dkw_cnt
+    dkw_on:
+        lwz r0, 0xC(r31)
+        cmpwi r0, 1
+        bne dkw_wall
+        bl h_cliff
+        cmpwi r3, 0
+        bne dkw_flag
+    dkw_wall:
+        bl k_wallt
+        cmpwi r3, 0
+        beq dkw_cnt
+    dkw_flag:
+        li r0, 1
+        stw r0, 0x%(V6)X(r31)
+    dkw_cnt:
+        bl h_mv
+        lwz r3, 0x%(V0)X(r31)
+        addi r3, r3, 1
+        stw r3, 0x%(V0)X(r31)""" % d)
+    # 4 close (0x86240 / 0x86B6C): W+0x24 / +0x2C = P16 / P17 (0), kinetic 5, ground off, Fall loop, V4 = 1; on the
+    # ground: V4 < 3 -> kinetic 5 again, V4++; else -> 5
+    en('dk_close_en', 5, 0, 11, 1, pre="bl h_ebase\nlwz r0, 0x%X(r30)\nstw r0, 0x24(r10)\nlwz r0, 0x%X(r30)\n"
+       "stw r0, 0x2C(r10)\nli r0, 1\nstw r0, 0x%X(r31)" % (P(16), P(17), V(4)))
+    st('dk_close_up', """
+        bl h_vy0
+        bgt.far epi
+        bl h_gnd
+        cmpwi r3, 0
+        beq.far epi
+        lwz r3, 0x%(V4)X(r31)
+        cmpwi r3, 3
+        bge dkc_go
+        addi r3, r3, 1
+        stw r3, 0x%(V4)X(r31)
+        li r4, 5
+        bl h_kin
+        b epi
+    dkc_go:
+        li r4, 5
+        b go""" % d)
+    # 5 angry (0x858FC / 0x860A0): kinetic 0, ground on, AngryL loop (its ACMD stomps); P19 (200) frames -> 3
+    en('dk_angry_en', 0, 1, 0, 1, pre="li r0, 0\nstw r0, 0x%X(r31)" % V(0))
+    st('dk_angry_up', """
+        lwz r3, 0x%(V0)X(r31)
+        addi r3, r3, 1
+        stw r3, 0x%(V0)X(r31)
+        lwz r0, 0x%(P21)X(r30)
+        cmpw r3, r0
+        ble.far epi
+        li r4, 3
+        b go""" % d)
+    # 6 run start (0x86DBC / 0x85BDC): W+0x24 / +0x2C = P7 / P8 (3 / 3.5), W+0x20 = P6 (-0.5: a hop back) unless a
+    # ledge is behind (check_cliff_distance_lr(3 / g + 2, -lr): the cave's check_cliff with -lr), kinetic 5, ground
+    # off, AttackRunStart at P11, V2 = 1; landed: V2 = 0, ground on; P22 (30) frames and landed -> 7 (V1 = 0)
+    en('dk_rs_en', 5, 0, 1, 0, rate=P(11), pre="""
+        bl h_ebase
+        lwz r0, 0x%(P7)X(r30)
+        stw r0, 0x24(r10)
+        lwz r0, 0x%(P8)X(r30)
+        stw r0, 0x2C(r10)
+        lfs f1, 0x10(r31)
+        fneg f1, f1
+        mr r3, r31
+    """ % d + call(CHECK_CLIFF_LR) + """
+        mr r28, r3
+        bl h_ebase
+        li r0, 0
+        cmpwi r28, 0
+        bne dks_z
+        lwz r0, 0x%(P6)X(r30)
+    dks_z:
+        stw r0, 0x20(r10)
+        li r0, 1
+        stw r0, 0x%(V2)X(r31)
+        li r0, 0
+        stw r0, 0x%(V0)X(r31)""" % d)
+    st('dk_rs_up', """
+        lwz r0, 0x%(V2)X(r31)
+        cmpwi r0, 0
+        beq dkr_t
+        bl h_vy0
+        bgt dkr_t
+        bl h_gnd
+        cmpwi r3, 0
+        beq dkr_t
+        li r0, 0
+        stw r0, 0x%(V2)X(r31)
+        li r4, 1
+        bl h_att
+    dkr_t:
+        lwz r3, 0x%(V0)X(r31)
+        addi r3, r3, 1
+        stw r3, 0x%(V0)X(r31)
+        lwz r0, 0x%(P22)X(r30)
+        cmpw r3, r0
+        ble.far epi
+        lwz r0, 0x%(V2)X(r31)
+        cmpwi r0, 1
+        beq.far epi
+        li r0, 0
+        stw r0, 0x%(V1)X(r31)
+        li r4, 7
+        b go""" % d)
+    # 7 run (0x85EA4 / 0x8651C): RunL at P9, kinetic 10 (its ACMD: the 6 %% head box, the quakes); every P1[1]
+    # interval of V1 (first at 0) search: a target behind -> 9; a ledge (variation 1: clear_speed_all) or a wall -> 9;
+    # off the ground -> 1; V1 > P23 (200, the turns don't reset it) -> 8; V1++
+    en('dk_run_en', 0xA, 1, 14, 1, rate=P(9))
+    st('dk_run_up', """
+        li r4, 1
+        bl h_grp
+        lwz r0, 0x%(V1)X(r31)
+        divwu r11, r0, r3
+        mullw r11, r11, r3
+        subf. r0, r11, r0
+        bne dkn_gnd
+        li r4, 1
+        bl h_srch
+        stw r3, 0x%(V3)X(r31)
+        cmpwi r3, 0
+        blt dkn_gnd
+        mr r4, r3
+        bl h_dx
+        lfs f0, 0x%(ZERO)X(r30)
+        fcmpu cr0, f1, f0
+        bge dkn_gnd
+        li r4, 9
+        bl h_chg
+    dkn_gnd:
+        bl h_gnd
+        cmpwi r3, 0
+        bne dkn_on
+        li r4, 1
+        bl h_chg
+        b dkn_time
+    dkn_on:
+        lwz r0, 0xC(r31)
+        cmpwi r0, 1
+        bne dkn_wall
+        bl h_cliff
+        cmpwi r3, 0
+        beq dkn_wall
+        bl h_clear
+        b dkn_turn
+    dkn_wall:
+        bl k_wallt
+        cmpwi r3, 0
+        beq dkn_time
+    dkn_turn:
+        li r4, 9
+        bl h_chg
+    dkn_time:
+        lwz r3, 0x%(V1)X(r31)
+        lwz r0, 0x%(P23)X(r30)
+        cmpw r3, r0
+        ble dkn_in
+        li r4, 8
+        bl h_chg
+    dkn_in:
+        bl h_mv
+        lwz r3, 0x%(V1)X(r31)
+        addi r3, r3, 1
+        stw r3, 0x%(V1)X(r31)""" % d)
+    # 8 brake (0x85954 / 0x860F0): RunBrakeL, kinetic 2 (play_se 0x2910008: not ported); update k_brk_up (-> 3)
+    en('dk_brk_en', 2, 1, 13, 0)
+    # 9 run turn (0x86F2C / 0x85CCC): RunTurnL at P12, kinetic 2; a ledge: clear_speed_all; at its end reverse_lr => 7
+    en('dk_rt_en', 2, 1, 15, 0, rate=P(12))
+    st('dk_rt_up', """
+        bl h_cliff
+        cmpwi r3, 0
+        beq dkt_end
+        bl h_clear
+    dkt_end:
+        bl h_end
+        cmpwi r3, 0
+        beq dkt_in
+        bl h_rev
+        li r4, 7
+        bl h_chgi
+    dkt_in:
+        bl h_mv
+        li r0, 0
+        stw r0, 4(r29)""")
+    # 10 stepped (0x86C14 / 0x86CC0): kinetic 0, Stepped, ground on (play_se 0x291000C: not ported); end -> 3
+    en('dk_step_en', 0, 1, 16, 0)
+    st('dk_step_up', "bl h_end\ncmpwi r3, 0\nbeq.far epi\nli r4, 3\nb go")
+    # 11 collapses (0x859BC / 0x861A0): kinetic 0, Collapses, ground on, notify_on_death; end -> 13 (the 3DS's
+    # create_dead_item(1, 20) is the removal's defeat path: DEFEATED)
+    en('dk_col_en', 0, 1, 2, 0, extra="mr r3, r31\n" + call(NOTIFY_DEATH) + "\nli r0, 1\nstw r0, 0x%X(r31)" % DEFEATED)
+    st('dk_col_up', "bl h_end\ncmpwi r3, 0\nbeq.far epi\nli r4, 13\nb go")
+    # slot 20 (the 3DS's 21, 0x85FE0): add_damage(P15 = 25) (the damage module's damage + 25 -> set_current_damage:
+    # HP W+0 = max - damage), HP > 0 => 10 (stepped), else HP = 0 => 11 (collapses)
+    st('dk_tread', """
+        lwz r3, 0(r31)
+        lwz r3, 0x30D4(r3)
+        li r4, 0
+    """ + call(GET_DAMAGE) + """
+        lfs f0, 0x%(P15)X(r30)
+        fadds f1, f1, f0
+        mr r3, r31
+    """ % d + call(SET_CUR_DAMAGE) + """
+        bl h_ebase
+        lfs f1, 0(r10)
+        lfs f0, 0x%(ZERO)X(r30)
+        fcmpu cr0, f1, f0
+        li r4, 10
+        bgt dk_tgo
+        stfs f0, 0(r10)
+        li r4, 11
+    dk_tgo:
+        bl h_chgi""" % d)
+    # ---- Spiny (togezo 0x4E). V0 the stun frames (+0x16C), V1 the walk timer (+0x170), V2 the search timer
+    # (+0x174), V3 the egg's spin step (+0x178, degrees), V4 the spin angle (the posture rot the 3DS turns node 2 by),
+    # V5 / V6 the common leave (effect, frames: f_leave_en / o_leave_up / f_unleave). P0-5 P0[0] (egg), P6-11
+    # P0[1] (Spiny), P12 PS8c f0 (0.4), P13 / P14 PS8c f2 / f3 (200 / 150), P15 PS9c f0 (0.5), P16 the spin factor,
+    # P17 DEG2RAD, P18-22 the leave (P6)
+    tg = dict(R1=P(1), R2=P(2), R3=P(3), R5=P(5), **d)
+    # slot 40 initialize (0x370C0): its P0 row by variation: W+0x10 = +0x08 = f1, +0x20 = +0x28 = f2, +0x24 = +0x2C =
+    # f3, +0x0C = f5, +0x38 = PS8c f0
+    st('tg_init', """
+        lwz r0, 0xC(r31)
+        li r28, 0
+        cmpwi r0, 1
+        bne tgi_row
+        li r28, 24
+    tgi_row:
+        add r28, r28, r30
+        bl h_ebase
+        lwz r0, 0x%(R1)X(r28)
+        stw r0, 0x10(r10)
+        stw r0, 8(r10)
+        lwz r0, 0x%(R2)X(r28)
+        stw r0, 0x20(r10)
+        stw r0, 0x28(r10)
+        lwz r0, 0x%(R3)X(r28)
+        stw r0, 0x24(r10)
+        stw r0, 0x2C(r10)
+        lwz r0, 0x%(R5)X(r28)
+        stw r0, 0xC(r10)
+        lwz r0, 0x%(P12)X(r30)
+        stw r0, 0x38(r10)""" % tg)
+    # W+0x40 = the row's f4 (the egg's bounce 0.8, the Spiny's 1)
+    H.asm("""
+    tg_w40:
+        mflr r9
+        bl h_ebase
+        mtlr r9
+        lwz r0, 0xC(r31)
+        cmpwi r0, 1
+        lwz r0, 0x%(P4)X(r30)
+        bne tgw_st
+        lwz r0, 0x%(P10)X(r30)
+    tgw_st:
+        stw r0, 0x40(r10)
+        blr
+    """ % tg)
+    # tg_arm(r4 = an InnerEnemyAttackParam): create_attack_data, set_attack(its id, part) (Behavior::set_attack_data's
+    # arming); slot 45 set_attack_data (0x37568): the 3DS clears ids >= 1 only and arms P2 entries 2.. by state
+    # (2: the egg's dead body in 4, 3: the Spiny's in 12, as id 0); here clear_all and id 0 again: the body (P2[var
+    # == 1 ? 1 : 0], L62440) or the dead body
+    st('tg_arm', """
+        mr r28, r4
+        mr r3, r31
+    """ + call(ATK_CREATE) + """
+        lwz r4, 4(r28)
+        lwz r5, 8(r28)
+        stw r4, 0x84(r31)
+        stw r5, 0x88(r31)
+        lwz r3, 0(r31)
+        lwz r3, 0x30C8(r3)
+        addi r6, r31, 0x1C
+    """ + call(ATK_SET))
+    st('tg_atk', """
+        mr r28, r4
+        lwz r3, 0(r31)
+        lwz r3, 0x30C8(r3)
+    """ + call(ATK_CLEAR) + """
+        lis r4, 0x%(EH)04X
+        addi r4, r4, %(EL)d
+        cmpwi r28, 4
+        beq tga_go
+        lis r4, 0x%(DH)04X
+        addi r4, r4, %(DL)d
+        cmpwi r28, 12
+        beq tga_go
+        lis r4, 0x%(GH)04X
+        addi r4, r4, %(GL)d
+        lwz r0, 0xC(r31)
+        cmpwi r0, 1
+        bne tga_go
+        lis r4, 0x%(BH)04X
+        addi r4, r4, %(BL)d
+    tga_go:
+        mr r3, r31
+        bl tg_arm""" % dict(EH=ha(D['tg_eggdead']), EL=sx(D['tg_eggdead']), DH=ha(D['tg_dead']), DL=sx(D['tg_dead']),
+                            GH=ha(D['tg_egg']), GL=sx(D['tg_egg']), BH=ha(D['tg_body']), BL=sx(D['tg_body'])))
+    # slots 66 / 67: var 1 ? 6 : 1, var 1 ? 12 : 4
+    H.asm("""
+    tg_66:
+        lwz r0, 0xC(r3)
+        li r3, 1
+        cmpwi r0, 1
+        bnelr
+        li r3, 6
+        blr
+    tg_67:
+        lwz r0, 0xC(r3)
+        li r3, 4
+        cmpwi r0, 1
+        bnelr
+        li r3, 12
+        blr
+    """)
+    # start (0x36CE0): set_rhombus, stick x = the posture lr (no turn to a target), the counters, V1 / V2 = P13 /
+    # P14, the body attack (id 0), var 1 -> 6 (fall), else 1 (the egg's fall)
+    st('tg_start', """
+    """ + call(SET_RHOMBUS) + """
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lwz r0, 0x60(r12)
+        stw r0, 0x10(r31)
+        li r0, 0
+        stw r0, 0x14(r31)
+        stw r0, 0x18(r31)
+        addi r11, r31, 0x168
+        li r12, 9
+        mtctr r12
+    tgs_zero:
+        stwu r0, 4(r11)
+        bdnz tgs_zero
+        lwz r0, 0x%(P13)X(r30)
+        stw r0, 0x%(V1)X(r31)
+        lwz r0, 0x%(P14)X(r30)
+        stw r0, 0x%(V2)X(r31)
+        mr r3, r31
+        li r4, 0
+        bl tg_atk
+        li r4, 1
+        lwz r0, 0xC(r31)
+        cmpwi r0, 1
+        bne.far goi
+        li r4, 6
+        b goi""" % tg)
+    # the egg's spin (L6239C, slot 55 0x3740C): V3 = sign(-speed x) x |speed| x P16 x -lr (degrees a frame; the 3DS's
+    # common factor EnemyParamAccessor +0x198 +0x90 x +0xA0 is not in the dump: P16 stands in); tg_turn: V4 += V3,
+    # node 2 (RotN) set to (V4, 0, 0) radians (set_node_rotate, the ModelModule's vt+0xC4 on a change)
+    H.asm("""
+    tg_spin:
+        mflr r0
+        stwu r1, -0x20(r1)
+        stw r0, 0x24(r1)
+        addi r3, r1, 8
+        mr r4, r31
+    """ + call(GET_SPEED) + """
+        lfs f1, 8(r1)
+        lfs f2, 0xC(r1)
+        fmuls f3, f1, f1
+        fmadds f3, f2, f2, f3
+        fmr f4, f3
+        lis r12, 0x%(CH)04X
+        lfs f0, %(CL)d(r12)
+        fcmpu cr0, f3, f0
+        ble tgp_z
+        frsqrte f4, f3
+        fmuls f4, f4, f3
+    tgp_z:
+        lfs f0, 0x%(P16)X(r30)
+        fmuls f4, f4, f0
+        lfs f0, 0x10(r31)
+        fmuls f4, f4, f0
+        lis r12, 0x%(CH)04X
+        lfs f0, %(CL)d(r12)
+        fcmpu cr0, f1, f0
+        ble tgp_st
+        fneg f4, f4
+    tgp_st:
+        stfs f4, 0x%(V3)X(r31)
+        b h_ret20
+    tg_turn:
+        mflr r0
+        stwu r1, -0x20(r1)
+        stw r0, 0x24(r1)
+        lfs f1, 0x%(V4)X(r31)
+        lfs f0, 0x%(V3)X(r31)
+        fadds f1, f1, f0
+        stfs f1, 0x%(V4)X(r31)
+        lfs f0, 0x%(P17)X(r30)
+        fmuls f1, f1, f0
+        stfs f1, 8(r1)
+        li r0, 0
+        stw r0, 0xC(r1)
+        stw r0, 0x10(r1)
+        lwz r3, 0(r31)
+        lwz r3, 0x30F0(r3)
+        li r4, 2
+        addi r5, r1, 8
+        li r6, 0
+    """ % tg + call(SET_NODE_ROT) + """
+        cmpwi r3, 0
+        beq.far h_ret20
+        lwz r3, 0(r31)
+        lwz r3, 0x3118(r3)
+        lwz r12, 0(r3)
+        lwz r12, 0x%X(r12)
+        mtctr r12
+        bctrl
+        b h_ret20
+    """ % MODEL_NODE_DIRTY)
+    # 1 egg fall (0x36FEC / 0x37288): kinetic 8, ground off, Paipo loop, the spin, W+0x40 = f4; on the ground => 2
+    en('tg_efall_en', 8, 0, 4, 1, extra="bl tg_spin\nbl tg_w40")
+    st('tg_efall_up', "bl tg_turn\nbl h_gnd\ncmpwi r3, 0\nbeq.far epi\nli r4, 2\nb goi")
+    # 2 egg bounce (0x37090 / 0x372C8): kinetic 4 (the bounce: W+0x40 its restitution, inferred); landed (speed y
+    # <= 0, on the ground): |speed| < P15 (0.5) -> the hatch (L622F4: variation 1, initialize, the Spiny's body
+    # attack; the mesh swap: no Wii U path) -> 5; else a new spin step
+    st('tg_ebnc_en', "li r4, 4\nbl h_kin")
+    st('tg_ebnc_up', """
+        bl tg_turn
+        bl h_vy0
+        bgt.far epi
+        bl h_gnd
+        cmpwi r3, 0
+        beq.far epi
+        addi r3, r1, 8
+        mr r4, r31
+    """ + call(GET_SPEED) + """
+        lfs f1, 8(r1)
+        lfs f2, 0xC(r1)
+        fmuls f1, f1, f1
+        fmadds f1, f2, f2, f1
+        lfs f0, 0x%(P15)X(r30)
+        fmuls f0, f0, f0
+        fcmpu cr0, f1, f0
+        blt tgb_hatch
+        bl tg_spin
+        b epi
+    tgb_hatch:
+        bl tg_hatch
+        li r4, 5
+        b go
+    tg_hatch:
+        mflr r0
+        stw r0, 0x1C(r1)
+        li r0, 1
+        stw r0, 0xC(r31)
+        mr r3, r31
+        bl tg_init
+        mr r3, r31
+        li r4, 5
+        bl tg_atk
+        lwz r0, 0x1C(r1)
+        mtlr r0
+        blr""" % tg)
+    # 3 egg stun (slot 69, var 0; 0x36FA0 / 0x37260): kinetic 16, ground off, V0 = hit_return_frame(), a spin step;
+    # V0 counted down -> 1
+    st('tg_estun_en', "li r4, 16\nbl h_kin\nli r4, 0\nbl h_att\nbl f_hitret\nstw r3, 0x%X(r31)\nbl tg_spin" % V(0))
+    st('tg_estun_up', """
+        bl tg_turn
+        lwz r3, 0x%(V0)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V0)X(r31)
+        cmpwi r3, 0
+        bgt.far epi
+        li r4, 1
+        b go""" % tg)
+    # 4 egg dead (slot 67, var 0; 0x370A4 / 0x3766C): bullet(), V3 = 0 (P2 entry 2 armed by set_attack_data); W
+    # flags & 8 -> 13 (g_dead_up)
+    st('tg_edead_en', "li r0, 1\nstw r0, 0x%X(r31)\nli r0, 0\nstw r0, 0x%X(r31)\nmr r3, r31\n" % (DEFEATED, V(3)) +
+       call(BULLET))
+    # 5 hatch (Change; 0x37A0C / 0x37E20): kinetic 5, ground off, Change, W+0x40 (play_se 0x6D90000: not ported); at
+    # its end on the ground: the nearest target behind -> 9, else 8 (g_landt_up)
+    en('tg_chg_en', 5, 0, 0, 0, extra="bl tg_w40")
+    st('tg_chg_up', "bl h_gnd\ncmpwi r3, 0\nbeq.far epi\nmr r3, r31\nmr r4, r29\nbl g_landt_up")
+    # 6 fall (0x377E8 / 0x37B48): kinetic 8, ground off, Fall loop, W+0x40; on the ground => 7 (g_fall_up)
+    en('tg_fall_en', 8, 0, 2, 1, extra="bl tg_w40")
+    # 8 walk (0x37984 / 0x37C7C): kinetic 1, Walk loop; move; off the ground -> 6; a wall -> 9; V1 (200) runs out ->
+    # 10 (the leave); else while V2 (150) runs: every P1[0] interval (20) search_target(0) + check_turn_to_target -> 9
+    en('tg_walk_en', 1, 1, 6, 1)
+    st('tg_walk_up', """
+        bl h_mv
+        bl h_gnd
+        cmpwi r3, 0
+        bne tgk_on
+        li r4, 6
+        b go
+    tgk_on:
+        bl h_wall
+        cmpwi r3, 0
+        li r4, 9
+        bne.far go
+        lwz r3, 0x%(V1)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V1)X(r31)
+        cmpwi r3, 0
+        li r4, 10
+        ble.far go
+        lwz r28, 0x%(V2)X(r31)
+        addi r28, r28, -1
+        stw r28, 0x%(V2)X(r31)
+        cmpwi r28, 0
+        ble.far epi
+        li r4, 0
+        bl h_grp
+        divwu r11, r28, r3
+        mullw r11, r11, r3
+        subf. r0, r11, r28
+        bne.far epi
+        li r4, 0
+        bl h_srch
+        cmpwi r3, 0
+        blt.far epi
+        mr r4, r3
+        bl h_tchk
+        cmpwi r3, 0
+        beq.far epi
+        li r4, 9
+        b go""" % tg)
+    # 10 leave (0x378D8 / 0x37BF8): Fall at rate 0, init_common_leave(P6) (f_leave_en: CFG LVP), then o_leave_up
+    st('tg_leave_en', "li r4, 2\nli r5, 0\nbl h_mot0\nmr r3, r31\nbl f_leave_en")
+    # 11 stun (slot 69, var 1; 0x37760 / 0x37AB8): kinetic 16, ground off, Damage loop, V0 = hit_return_frame(), W
+    # flags |= 0x80; counted down: on the ground flags &= ~0x80, -> 8; in the air -> 6
+    en('tg_stun_en', 16, 0, 1, 1, extra="bl f_hitret\nstw r3, 0x%X(r31)\nbl f_kflag\nlwz r0, 0(r12)\nori r0, r0, 0x80\n"
+       "stw r0, 0(r12)" % V(0))
+    st('tg_stun_up', """
+        lwz r3, 0x%(V0)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V0)X(r31)
+        cmpwi r3, 0
+        bgt.far epi
+        bl h_gnd
+        cmpwi r3, 0
+        li r4, 6
+        beq.far go
+        bl f_kflag
+        lwz r0, 0(r12)
+        rlwinm r0, r0, 0, 25, 23
+        stw r0, 0(r12)
+        li r4, 8
+        b go""" % tg)
+    # slot 69 (0x37EAC): a running leave ends (finalize_common_leave + set_correct(5): f_unleave), var 0 => 3, var 1
+    # => 11; returns 1 (the framework's reaction is skipped)
+    st('tg_69', """
+        bl f_unleave
+        li r4, 3
+        lwz r0, 0xC(r31)
+        cmpwi r0, 1
+        bne tg69_go
+        li r4, 11
+    tg69_go:
+        bl h_chgi
+        li r3, 1""")
+    # ---- Paratroopa / Koopa (patapata 0x03). A flier-sized object (the aerial module at AER, for the bite). V0 the
+    # search counter (+0x1DC), V1 the bite / leap cool-down (+0x1E8), V2 the attack timer (+0x1E0), V3 the hop's
+    # first falling frame seen (+0x1F0), V4 the dead item still due (+0x1FC). P0-47 its P0 rows (12 words a
+    # variation), P48-50 PS78 (60 %%, 30, 1.5), P51-61 PS84, P62 P@0xB0 (3: the shell item's height), P63 the item kind
+    pt = dict(d, R1=P(1), R2=P(2), R3=P(3), R4=P(4), R5=P(5), R6=P(6), R8=P(8), R9=P(9), R10=P(10), R11=P(11),
+              TEN=P(64), ONE=P(65), MONE=P(66), AM=AER + 0xC)
+    H.asm("""
+    pt_row:
+        lwz r28, 0xC(r31)
+        mulli r28, r28, 48
+        add r28, r28, r30
+        blr
+    pt_hopw:
+        mflr r9
+        bl pt_row
+        bl h_ebase
+        mtlr r9
+        lwz r0, 0x%(R3)X(r28)
+        stw r0, 8(r10)
+        stw r0, 0x20(r10)
+        stw r0, 0x28(r10)
+        lwz r0, 0x%(R4)X(r28)
+        stw r0, 0xC(r10)
+        stw r0, 0x24(r10)
+        stw r0, 0x2C(r10)
+        blr
+    pt_hop5:
+        mflr r8
+        bl pt_hopw
+        mtlr r8
+        lwz r0, 0x%(R5)X(r28)
+        stw r0, 0x40(r10)
+        blr
+    pt_hop6:
+        mflr r8
+        bl pt_hopw
+        mtlr r8
+        lwz r0, 0x%(R6)X(r28)
+        stw r0, 0x40(r10)
+        blr
+    """ % pt)
+    # L5D968 (the walk) / L736B4 (the winged start): W+0x10 = f1, +0x08 = f2, +0x0C = 10, +0x40 = 1 (walk only),
+    # +0x44 = f8, +0x14 / +0x18 = 0, the kinetic module's vt+0xFC(0x20000004) kick
+    st('pt_walkw', """
+        bl pt_row
+        bl h_ebase
+        lwz r0, 0x%(R1)X(r28)
+        stw r0, 0x10(r10)
+        lwz r0, 0x%(R2)X(r28)
+        stw r0, 8(r10)
+        lwz r0, 0x%(TEN)X(r30)
+        stw r0, 0xC(r10)
+        lwz r0, 0x%(ONE)X(r30)
+        stw r0, 0x40(r10)
+        b ptw_44
+    pt_startw:
+        mflr r0
+        bl pro
+        bl pt_row
+        bl h_ebase
+    ptw_44:
+        lwz r0, 0x%(R8)X(r28)
+        stw r0, 0x44(r10)
+        li r0, 0
+        stw r0, 0x14(r10)
+        stw r0, 0x18(r10)
+        bl h_kick""" % pt)
+    # start (0x7234C): the aerial module, set_rhombus, lr, face the nearest target, the dead item due (V4 = 1);
+    # winged (var 0 / 1): L736B4, => 1; walking (2 / 3): L5D968, => 10
+    st('pt_start', """
+        addi r3, r31, 0x%(AER)X
+        lwz r4, 0(r31)
+    """ % dict(AER=AER) + call(AER_CTOR) + "\nmr r3, r31\n" + call(SET_RHOMBUS) + """
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lwz r0, 0x60(r12)
+        stw r0, 0x10(r31)
+        li r0, 0
+        stw r0, 0x14(r31)
+        stw r0, 0x18(r31)
+        li r0, 1
+        stw r0, 0x%(V4)X(r31)
+        bl h_near
+        mr r4, r3
+        bl h_tchk
+        cmpwi r3, 0
+        beq pts_w
+        bl h_rev
+    pts_w:
+        lwz r0, 0xC(r31)
+        cmpwi r0, 2
+        bge pts_k
+        mr r3, r31
+        bl pt_startw
+        li r4, 1
+        b goi
+    pts_k:
+        mr r3, r31
+        bl pt_walkw
+        li r4, 10
+        b goi""" % pt)
+    # 1 winged fall (0x7258C / 0x72820): L5DAB4, kinetic 8, ground off, Fly loop; on the ground => 2
+    en('pt_wfall_en', 8, 0, 11, 1, pre="bl pt_hop6\nbl f_anone")
+    st('pt_wfall_up', "bl h_gnd\ncmpwi r3, 0\nbeq.far epi\nli r4, 2\nb goi")
+    # 2 hop (0x725E8 / 0x72860): L5D7EC, kinetic 5, ground off, Fly loop, V3 = 0. Update: its first falling frame:
+    # V3 = 1, W+0x40 = f6 (L73E48; its energy 0 +0x38 / +0x3C writes: not ported); landed after that: var 1 60 %% a
+    # search of group 2 and a target behind -> 3, else -> 2 (hop again); a wall -> 3; the search (V0 and the
+    # cool-down V1 run out): V0 = group var's interval, search_target(var): found -> face it, -> 5; V0--, V1--
+    en('pt_hop_en', 5, 0, 11, 1, pre="bl pt_hop5\nli r0, 0\nstw r0, 0x%X(r31)" % V(3))
+    st('pt_hop_up', """
+        bl h_vy0
+        bge pth_g
+        lwz r0, 0x%(V3)X(r31)
+        cmpwi r0, 0
+        bne pth_g
+        li r0, 1
+        stw r0, 0x%(V3)X(r31)
+        bl pt_row
+        bl h_ebase
+        lwz r0, 0x%(R6)X(r28)
+        stw r0, 0x40(r10)
+    pth_g:
+        lwz r0, 0x%(V3)X(r31)
+        cmpwi r0, 0
+        beq pth_w
+        bl h_vy0
+        bgt pth_w
+        bl h_gnd
+        cmpwi r3, 0
+        beq pth_w
+        li r4, 2
+        lwz r0, 0xC(r31)
+        cmpwi r0, 1
+        bne.far go
+        li r3, 1
+        li r4, 100
+        bl h_rand
+        lwz r0, 0x%(P48)X(r30)
+        cmpw r3, r0
+        li r4, 2
+        bgt.far go
+        li r4, 2
+        bl h_srch
+        cmpwi r3, 0
+        li r4, 2
+        blt.far go
+        mr r4, r3
+        bl h_dx
+        lfs f0, 0x%(ZERO)X(r30)
+        fcmpu cr0, f1, f0
+        li r4, 2
+        bge.far go
+        li r4, 3
+        b go
+    pth_w:
+        bl h_wall
+        cmpwi r3, 0
+        li r4, 3
+        bne.far go
+        lwz r0, 0x%(V0)X(r31)
+        lwz r12, 0x%(V1)X(r31)
+        or r0, r0, r12
+        cmpwi r0, 0
+        bgt pth_cnt
+        lwz r4, 0xC(r31)
+        bl h_grp
+        stw r3, 0x%(V0)X(r31)
+        lwz r4, 0xC(r31)
+        bl h_srch
+        cmpwi r3, 0
+        blt pth_cnt
+        mr r4, r3
+        bl h_dx
+        lfs f0, 0x%(ZERO)X(r30)
+        fcmpu cr0, f1, f0
+        bge pth_bite
+        bl h_rev
+    pth_bite:
+        li r4, 5
+        b go
+    pth_cnt:
+        lwz r3, 0x%(V0)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V0)X(r31)
+        lwz r3, 0x%(V1)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V1)X(r31)
+        bl h_mv""" % pt)
+    # 3 turn on the ground (0x72FEC / 0x72A30): L5D7EC, kinetic 0, ground on, TurnPatapata; at its end reverse_lr
+    # => 1 (g_turn_up with WALKST... its own: => 1)
+    en('pt_turn_en', 0, 1, 21, 0, pre="bl pt_hop5")
+    st('pt_turn_up', "bl h_end\ncmpwi r3, 0\nbeq.far epi\nbl h_rev\nli r4, 1\nb goi")
+    # 5 bite wind-up (0x72F28 / 0x730F0): the aerial module's set_mode_normal(0, 0, 0, 0, 10, 10) with the current
+    # speed (0, -P0 f11) -- the Wii U's reduced module has no mode 0: its uniform mode (f_amode 5) at that speed is
+    # the same motion (no acceleration) --, ground off, Bite at P50 (1.5), V2 = P0 f9; the aerial update; V2 out -> 6
+    st('pt_bw_en', """
+        li r4, 0
+        bl h_att
+        li r4, 0
+        li r5, 0
+        lfs f2, 0x%(P50)X(r30)
+        bl h_mot
+        bl pt_row
+        lwz r0, 0x%(R9)X(r28)
+        stw r0, 0x%(V2)X(r31)
+        li r0, 0
+        stw r0, 8(r1)
+        lfs f1, 0x%(R11)X(r28)
+        fneg f1, f1
+        stfs f1, 0xC(r1)
+        li r4, 5
+        bl f_amode""" % pt)
+    H.asm("""
+    pt_tick:
+        lwz r3, 0x%(V2)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V2)X(r31)
+        blr
+    """ % pt)
+    st('pt_bw_up', "bl f_aupd\nbl pt_tick\ncmpwi r3, 0\nbgt.far epi\nli r4, 6\nb go")
+    # 6 bite (0x72714 / 0x72CEC; P2 entry 0 armed: 4 %%, angle -50): V2 = P0 f10; the aerial update; V2 out -> 7;
+    # the motion's end -> 1 with the cool-down V1 = P49 (30)
+    st('pt_bite_en', "bl pt_row\nlwz r0, 0x%(R10)X(r28)\nstw r0, 0x%(V2)X(r31)" % pt)
+    st('pt_bite_up', """
+        bl f_aupd
+        bl h_end
+        cmpwi r3, 0
+        bne ptb_end
+        bl pt_tick
+        cmpwi r3, 0
+        bgt.far epi
+        li r4, 7
+        b go
+    ptb_end:
+        lwz r0, 0x%(P49)X(r30)
+        stw r0, 0x%(V1)X(r31)
+        li r4, 1
+        b go""" % pt)
+    # 7 bite recovery (0x72A84 / 0x72ECC): the aerial update; at the motion's end -> 1, V1 = P49
+    st('pt_brec_en', "nop")
+    st('pt_brec_up', "bl f_aupd\nbl h_end\ncmpwi r3, 0\nbeq.far epi\nb ptb_end")
+    # the wing loss (L in slots 20 / 69 / 9's enter): var += 2, the effect 0x7030000 at the posture (one shot), the
+    # walk params (L5D968); the wing mesh off: no Wii U mesh switch (it stays)
+    st('pt_dewing', """
+        lwz r3, 0xC(r31)
+        cmpwi r3, 2
+        bge.far epi
+        addi r3, r3, 2
+        stw r3, 0xC(r31)
+        lis r4, 0x703
+        bl t_fx
+        mr r3, r31
+        bl pt_walkw""")
+    # 9 wing loss (0x72740 / 0x72D74): L5DAB4, kinetic 8, clear_speed_all, ground off, NokonokoMode, the wing loss;
+    # at its end -> 10
+    en('pt_wl_en', 8, 0, 17, 0, pre="bl pt_hop6\nbl f_anone", extra="bl h_clear\nmr r3, r31\nbl pt_dewing")
+    st('pt_wl_up', "bl h_end\ncmpwi r3, 0\nbeq.far epi\nli r4, 10\nb go")
+    # 12 walk (0x732A4 / 0x73898): kinetic 1, Walk loop; the search (V0 / V1 out): V0 = group var + 1's interval,
+    # search_target(var + 1): found -> face it, -> 14; a wall (or var 3 and a ledge) -> 13; off the ground -> 10;
+    # move; V0--, V1--
+    en('pt_walk_en', 1, 1, 22, 1)
+    st('pt_walk_up', """
+        lwz r0, 0x%(V0)X(r31)
+        lwz r12, 0x%(V1)X(r31)
+        or r0, r0, r12
+        cmpwi r0, 0
+        bgt ptk_g
+        lwz r4, 0xC(r31)
+        addi r4, r4, 1
+        bl h_grp
+        stw r3, 0x%(V0)X(r31)
+        lwz r4, 0xC(r31)
+        addi r4, r4, 1
+        bl h_srch
+        cmpwi r3, 0
+        blt ptk_g
+        mr r4, r3
+        bl h_dx
+        lfs f0, 0x%(ZERO)X(r30)
+        fcmpu cr0, f1, f0
+        li r4, 14
+        bge.far go
+        bl h_rev
+        li r4, 14
+        b go
+    ptk_g:
+        bl h_gnd
+        cmpwi r3, 0
+        li r4, 10
+        beq.far go
+        bl h_wall
+        cmpwi r3, 0
+        bne ptk_t
+        lwz r0, 0xC(r31)
+        cmpwi r0, 3
+        bne ptk_m
+        bl h_cliff
+        cmpwi r3, 0
+        beq ptk_m
+    ptk_t:
+        li r4, 13
+        b go
+    ptk_m:
+        bl h_mv
+        lwz r3, 0x%(V0)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V0)X(r31)
+        lwz r3, 0x%(V1)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V1)X(r31)""" % pt)
+    # 14 jump hold (0x73D4C / 0x73ED0): kinetic 0, JumpHold at P51 (1); end -> 15
+    en('pt_jh_en', 0, 1, 13, 0, rate=P(51))
+    st('pt_jh_up', "bl h_end\ncmpwi r3, 0\nbeq.far epi\nli r4, 15\nb go")
+    # 15 leap (0x73DB0 / 0x74010): set_kinetic_shoot(P53 3, P54 1, P55 0.075): W+0x20 = 3, +0x24 = 1, +0x28 = -1,
+    # +0x2C = 10, +0x1C = 0.075, the kick, kinetic 5; ground off; JumpAttack at P52 (3); V2 = P0 f9; V0 = P61 (15);
+    # move; V2 out -> 16
+    st('pt_leap_en', """
+        bl h_ebase
+        lwz r0, 0x%(P53)X(r30)
+        stw r0, 0x20(r10)
+        lwz r0, 0x%(P54)X(r30)
+        stw r0, 0x24(r10)
+        lwz r0, 0x%(MONE)X(r30)
+        stw r0, 0x28(r10)
+        lwz r0, 0x%(TEN)X(r30)
+        stw r0, 0x2C(r10)
+        lwz r0, 0x%(P55)X(r30)
+        stw r0, 0x1C(r10)
+        bl h_kick
+        li r4, 5
+        bl h_kin
+        li r4, 0
+        bl h_att
+        li r4, 12
+        li r5, 0
+        lfs f2, 0x%(P52)X(r30)
+        bl h_mot
+        bl pt_row
+        lwz r0, 0x%(R9)X(r28)
+        stw r0, 0x%(V2)X(r31)
+        lwz r0, 0x%(P61)X(r30)
+        stw r0, 0x%(V0)X(r31)""" % pt)
+    st('pt_leap_up', "bl h_mv\nbl pt_tick\ncmpwi r3, 0\nbgt.far epi\nli r4, 16\nb go")
+    # 16 the leap's hit (0x73688 / 0x73C98; P2 entry 1 armed: 2 %%): V2 = P0 f10; move; V2-- (clear_all at 0); V0--;
+    # on the ground: V0 < 0 -> V1 = P60 (20), => 18; else => 17
+    st('pt_lh_en', "bl pt_row\nlwz r0, 0x%(R10)X(r28)\nstw r0, 0x%(V2)X(r31)" % pt)
+    H.asm("""
+    pt_attick:
+        mflr r0
+        stw r0, 0x1C(r1)
+        bl pt_tick
+        cmpwi r3, 0
+        bne ptt_v0
+        lwz r3, 0(r31)
+        lwz r3, 0x30C8(r3)
+    """ + call(ATK_CLEAR) + """
+    ptt_v0:
+        lwz r3, 0x%(V0)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V0)X(r31)
+        lwz r0, 0x1C(r1)
+        mtlr r0
+        blr
+    """ % pt)
+    st('pt_lh_up', """
+        bl h_mv
+        bl pt_attick
+        bl h_gnd
+        cmpwi r3, 0
+        beq.far epi
+        lwz r3, 0x%(V0)X(r31)
+        cmpwi r3, 0
+        li r4, 17
+        bge.far goi
+        lwz r0, 0x%(P60)X(r30)
+        stw r0, 0x%(V1)X(r31)
+        li r4, 18
+        b goi""" % pt)
+    # 17 slide (0x73F0C / 0x7405C): set_kinetic_brake_ground(P56 0.04) (W+0x14, kinetic 2), ground on; on the
+    # ground: V2-- (clear_all at 0), V0-- < 0 -> V1 = P60, => 18; off it -> 10
+    st('pt_sl_en', "bl h_ebase\nlwz r0, 0x%(P56)X(r30)\nstw r0, 0x14(r10)\nli r4, 2\nbl h_kin\nli r4, 1\nbl h_att" % pt)
+    st('pt_sl_up', """
+        bl h_gnd
+        cmpwi r3, 0
+        li r4, 10
+        beq.far go
+        bl pt_attick
+        lwz r3, 0x%(V0)X(r31)
+        cmpwi r3, 0
+        bge.far epi
+        lwz r0, 0x%(P60)X(r30)
+        stw r0, 0x%(V1)X(r31)
+        li r4, 18
+        b goi""" % pt)
+    # 18 landing attack (0x7355C / 0x739E0): set_kinetic_brake_ground(P58 0.1), LandingJumpAttack at P57; move;
+    # end -> 12
+    st('pt_la_en', """
+        bl h_ebase
+        lwz r0, 0x%(P58)X(r30)
+        stw r0, 0x14(r10)
+        li r4, 2
+        bl h_kin
+        li r4, 1
+        bl h_att
+        li r4, 15
+        li r5, 0
+        lfs f2, 0x%(P57)X(r30)
+        bl h_mot""" % pt)
+    st('pt_la_up', "bl h_mv\nbl h_end\ncmpwi r3, 0\nbeq.far epi\nli r4, 12\nb go")
+    # 19 shell (stomped as a Koopa; 0x735C0 / 0x73A24) and 20 the spinning shell (killed as a Koopa; 0x73F48, P2
+    # entry 2: 17 %%): kinetic 0 (19) / 16 (20), ShellMode (at 10 in 20), disable_hit, disable_tread,
+    # set_current_damage(0); the first time the dead item (the removal's defeat path: DEFEATED; the 3DS's
+    # set_already_dead_flag); update: at the motion's end on the ground create_item_and_throw(P63 0x94, var 0 / 2 ?
+    # 1 : 0, position + (0, P62 - speed y, 0), the current speed, 0, true, -1, -1), then -> 23 (removed: the 3DS
+    # hides it, set_visibility(0), and removes it)
+    H.asm("""
+    pt_shell:
+        mflr r0
+        stw r0, 0x1C(r1)
+        mr r3, r31
+    """ + call(DISABLE_HIT) + "\nmr r3, r31\n" + call(DISABLE_TREAD) + """
+        lis r12, 0x%(CH)04X
+        lfs f1, %(CL)d(r12)
+        mr r3, r31
+    """ % pt + call(SET_CUR_DAMAGE) + """
+        lwz r0, 0x%(V4)X(r31)
+        cmpwi r0, 0
+        beq pts_d
+        li r0, 1
+        stw r0, 0x%(DF)X(r31)
+    pts_d:
+        lwz r0, 0x1C(r1)
+        mtlr r0
+        blr
+    """ % pt)
+    st('pt_sh_en', "li r4, 0\nbl h_kin\nli r4, 1\nbl h_att\nli r4, 18\nli r5, 0\nbl h_mot1\nbl pt_shell")
+    st('pt_ss_en', "li r4, 16\nbl h_kin\nli r4, 0\nbl h_att\nli r4, 18\nli r5, 1\nlfs f2, 0x%X(r30)\nbl h_mot\n"
+       "bl pt_shell" % P(64))
+    st('pt_sh_up', """
+        bl h_end
+        cmpwi r3, 0
+        beq.far epi
+        bl h_gnd
+        cmpwi r3, 0
+        beq.far epi
+        addi r3, r1, 0x14
+        mr r4, r31
+    """ + call(GET_SPEED) + """
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f1, 0x10(r12)
+        stfs f1, 8(r1)
+        lfs f1, 0x14(r12)
+        lfs f0, 0x%(P62)X(r30)
+        fadds f1, f1, f0
+        lfs f0, 0x18(r1)
+        fsubs f1, f1, f0
+        stfs f1, 0xC(r1)
+        lfs f1, 0x18(r12)
+        stfs f1, 0x10(r1)
+        mr r3, r31
+        lwz r4, 0x%(P63)X(r30)
+        lwz r5, 0xC(r31)
+        andi. r5, r5, 1
+        xori r5, r5, 1
+        addi r6, r1, 8
+        addi r7, r1, 0x14
+        lis r12, 0x%(CH)04X
+        lfs f1, %(CL)d(r12)
+        li r8, 1
+        li r9, -1
+        li r10, -1
+    """ % pt + call(CREATE_THROW) + """
+        lwz r4, 0x%(RM)X(r30)
+        b go""" % dict(RM=CF['REMOVE']))
+    # slot 20 (the 3DS's 21, 0x726BC): var 0 / 1 => 9 (the wing loss), else => 19 (the shell)
+    st('pt_tread', "lwz r0, 0xC(r31)\nli r4, 9\ncmpwi r0, 2\nblt pt_tgo\nli r4, 19\npt_tgo:\nbl h_chgi")
+    # slot 69 (0x73C00): a hit that does not kill: var 0 / 1 lose the wings (no state change); returns 0 (the
+    # framework's damage reaction runs, then slots 64-66 by the new variation)
+    st('pt_69', "bl pt_dewing\nli r3, 0")
+    # slots 64-67 by variation: winged 2 / 1 / 1 / 8, walking 12 / 10 / 10 / 20
+    for k, a_, b_ in ((64, 2, 12), (65, 1, 10), (66, 1, 10), (67, 8, 20)):
+        H.asm("pt_%d:\nlwz r0, 0xC(r3)\nli r3, %d\ncmpwi r0, 2\nbltlr\nli r3, %d\nblr" % (k, a_, b_))
+    return H
 
 
 def area_code(D):
@@ -5566,7 +6942,7 @@ def patches(img):
     for lo_, hi_ in REGIONS:
         for addr in range(lo_, hi_, 4):
             out[addr] = 0
-    for a in (A, B, A.area, A.stomp, A.e, A.g):
+    for a in (A, B, A.area, A.stomp, A.e, A.g, A.h):
         for i, w in enumerate(a.words()):
             out[a.base + 4 * i] = w
     for base, words in d.chunks:

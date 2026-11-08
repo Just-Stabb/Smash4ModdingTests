@@ -308,3 +308,15 @@ and `create_item_and_throw`.
 - Pooka: the ghost / jump choice in 3 and the ghost's flight speed were not fully re-read; the callers of slots
   56 / 60 / 70.
 - Green Shell: the fighter-side multiply and the item's tread path (above).
+
+## Resolved in step 2h (docs/smash-run-port.md, "Step 2h")
+
+- **Param 0x11** is the enemy's work float 0x11 (W+0x44), not a gl word: the event's `acc+0x315C` is a WorkModule
+  (vt+0x44 get_float) that the Enemy ctor fills (HP, +0x3C = gl+0x120, +0x40 / +0x44 = 1.0). The 3DS initialize writes
+  it: Goomba 0.8, Tiki Buzz 0.98, Big Goomba 0.9, Paratroopa 0.7.
+- **The fighter-side multiply** is confirmed: StepJump speed y = step_jump_speed_y x status float 0x1000006 (Wii U
+  0x02E79938 = 3DS 0x97E080, kinetic 1 mode 1).
+- **HP** (Wii U enemy_param.bin gl group 3, entry kind + 1, +0x14): Big Goomba 40, Spiny 30, Paratroopa 20, Pooka 10.
+- **add_damage / set_current_damage**: Wii U Behavior::set_current_damage is 0x026A7E58 (init_damage, then HP = max -
+  get_damage(0) 0x02C22ECC).
+- **Item 0x94** is in the Wii U item table; its code and files are still unverified.

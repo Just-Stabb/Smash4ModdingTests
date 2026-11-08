@@ -97,12 +97,26 @@ ENEMY_SETS = {
                 (0x47, 2), (0x1D, 2), (0x0E, 1), (0x19, 1), (0x1F, 1)),
                (0x12, 0x1D, 0x30, 0x0E, 0x57, 0x58, 0x59, 0x01, 0x0B, 0x13, 0x19, 0x1F, 0x08, 0x40, 0x11, 0x0F, 0x1A,
                 0x47)),
+    # step 2h: step2g's set and Big Goomba 0x23 (placement 1), the Spiny 0x4E as its egg (variation 0, placement 2: it
+    # drops from DY above the player, bounces and hatches) and as the walking Spiny (variation 1, placement 1), the
+    # Paratroopa 0x03 (variations 0 / 1 winged, placement 2) and the Koopa (2 / 3, placement 1), in the 32-entry turn;
+    # requests step2g's eighteen + 0x23, 0x4E, 0x03. An entry's third value is the variation (the create
+    # param's +4, the field cave's +0x24; 0 when absent)
+    'step2h': (((0x11, 2), (0x23, 1), (0x03, 2, 0), (0x1A, 2), (0x4E, 2, 0), (0x47, 2), (0x0F, 2), (0x01, 1),
+                (0x40, 1), (0x03, 1, 2), (0x11, 2), (0x4E, 1, 1), (0x12, 2), (0x1A, 2), (0x23, 1), (0x47, 2),
+                (0x03, 2, 1), (0x0F, 2), (0x0B, 1), (0x08, 2), (0x11, 2), (0x30, 1), (0x0F, 2), (0x13, 1),
+                (0x4E, 2, 0), (0x1A, 2), (0x03, 1, 3), (0x47, 2), (0x1D, 2), (0x0E, 1), (0x19, 1), (0x1F, 1)),
+               (0x12, 0x1D, 0x30, 0x0E, 0x57, 0x58, 0x59, 0x01, 0x0B, 0x13, 0x19, 0x1F, 0x08, 0x40, 0x11, 0x0F, 0x1A,
+                0x47, 0x23, 0x4E, 0x03)),
     'smashrun': (((0x12, 2), (0x1D, 2), (0x30, 1), (0x0E, 1)), (0x12, 0x1D, 0x30, 0x0E, 0x57)),
     'minions': (((0x57, 2), (0x58, 2), (0x59, 1), (0x5A, 1)), (0x57, 0x58, 0x59, 0x5A)),
 }
-ENEMIES = 'step2g'
+ENEMIES = 'step2h'
 SPAWNS, REQUESTS = ENEMY_SETS[ENEMIES]
-KINDS = tuple(k for k, _m in SPAWNS)
+KINDS = tuple(e[0] for e in SPAWNS)
+# step 2h: the alive count sums each kind's counter once (KINDS repeats the kinds spawned more than once a turn,
+# which counted them two or three times against MAX_ALIVE)
+ALIVE_KINDS = tuple(sorted(set(KINDS), key=KINDS.index))
 INTERVAL = 150                  # frames between spawns (2.5 s)
 MAX_ALIVE = 6
 DX, DY = 70.0, 30.0             # spawn offset from the player
@@ -208,7 +222,7 @@ def assemble():
     """ % ((DATA + 0x8000) >> 16, DATA & 0xFFFF if DATA & 0xFFFF < 0x8000 else (DATA & 0xFFFF) - 0x10000,
            INTERVAL))
     a.asm("li r12, 0")
-    for k in KINDS:
+    for k in ALIVE_KINDS:
         a.asm("""
         lhz r11, 0x%X(r31)
         add r12, r12, r11
@@ -250,6 +264,9 @@ def assemble():
         slwi r12, r12, 3
         add r11, r11, r12
         lwz r12, 0(r11)
+        srwi r0, r12, 16
+        stw r0, 0x24(r1)
+        clrlwi r12, r12, 16
         stw r12, 0x20(r1)
         lwz r11, 4(r11)
         stw r11, 0x40(r1)
@@ -291,8 +308,8 @@ def assemble():
         b 0x%08X
     spawn_table:
     """ % (len(SPAWNS), SPAWN, UPDATE_REST))
-    for k, mode in SPAWNS:
-        a.asm(".word 0x%X\n.word %d" % (k, mode))
+    for e in SPAWNS:
+        a.asm(".word 0x%X\n.word %d" % (e[0] | (e[2] if len(e) > 2 else 0) << 16, e[1]))
     words = a.words()
     assert CAVE + 4 * len(words) <= CODE_LIMIT, 'field cave too big'
     return a, words
@@ -321,10 +338,11 @@ def args():
 
 def configure(name):
     """switch the enemy set ('walkers' / 'smashrun' / 'minions') for assemble() / args()"""
-    global ENEMIES, SPAWNS, REQUESTS, KINDS
+    global ENEMIES, SPAWNS, REQUESTS, KINDS, ALIVE_KINDS
     ENEMIES = name
     SPAWNS, REQUESTS = ENEMY_SETS[name]
-    KINDS = tuple(k for k, _m in SPAWNS)
+    KINDS = tuple(e[0] for e in SPAWNS)
+    ALIVE_KINDS = tuple(sorted(set(KINDS), key=KINDS.index))
 
 
 def main():

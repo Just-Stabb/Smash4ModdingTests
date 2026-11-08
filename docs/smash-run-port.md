@@ -1951,3 +1951,127 @@ Notes on the tests:
 
 User result of step 2g v6: the enemies' facing directions are correct now (the model.flp mirror works in game).
 
+
+## Step 2h: Big Goomba, Spiny, Paratroopa / Koopa (3DS state code); the stomp bounce per kind; Pooka not yet
+
+Package smashrun_step2h_v1: `code/` exe_v25 = exe_v24 + `smashrun_walker_cave.py` over its own regions and the new region
+H, + `smashrun_field_cave.py` set "step2h" over its own cave (scratch s2h/build25.py); `data/` the three kinds' converted
+files (models with model.flp / jtb / sb / nhb / xmb, the NUD baselines of `s3ds_enemy_vis.py --nud` (Big Goomba's damage
+faces, the Spiny's egg mesh hidden), motions, animcmd, vl params, sound banks lower case and capitalised, the
+Paratroopa's effects). The readings are docs/smash-run-enemies/step2h-readings.md; they are merged into
+reference/smashrun_enemy_specs/hand_read.json (per kind `hp`, `stomp_bounce_multiplier`, `port_step2h`, and
+`_framework_step2h`).
+
+**The stomp bounce (fixes Tiki Buzz vs Goomba).**
+- **What the multiplier is.** The Enemy's event 6 answer (0x02D8C5D4) is `[acc+0x315C]` vt+0x44(0x11). That module is
+  a WorkModule: the Enemy ctor (0x02D89E88..0x02D89F50) writes the HP into its floats 0 / 1 (as `[[[acc+0x3130]+8]+0]+4`,
+  the W the behaviours use: Behavior::set_current_damage 0x026A7E58 writes HP = max - damage there) and +0x3C = gl+0x120,
+  +0x40 / +0x44 = 1.0. vt+0x44 is get_float, so param 0x11 is the work float 0x11 = **W+0x44**: 1.0 unless the kind's
+  initialize writes it (Goomba 0.8, Tiki Buzz 0.98, Big Goomba 0.9, Paratroopa 0.7; Ghos 1.0). The gl word 10 (+0x28)
+  candidate was wrong.
+- **Who uses it.** The fighters' StepJump speed (Wii U 0x02E79938 = 3DS 0x97E080, which 3DS
+  FighterKineticTransactor::change_kinetic_impl calls for kinetic 1 in mode int 0x11000000 = 1): y =
+  step_jump_speed_y (fighter_param 0x15F, or 0x160 for the short one) x status float 0x1000006, x pow(float 0x20000B5,
+  count - 1) when the step count int 0x10000006 is above 1. StepJump's main (func_1145) sets the mode, then func_1149
+  copies the answer into float 0x1000006 and zeroes the count, only through link 3. Its loop (func_1146) ends the status
+  into 0xB (Jump), whose kinetic change reads the float. The 0x02C49A9C candidate is the item throw.
+- **The fix.** stomp_body now calls the kind's slot 20 (the game's own tread entry: w_tread or the kind's handler) and
+  then `u_bounce`, which writes float 0x1000006 = CFG BOUNCE (else W+0x44) and int 0x10000006 = 0 through the fighter's
+  WorkModule (the MSC accessor's +0x28; set_float vt+0x4C, set_int vt+0x8C). MSC StatusModule op 3 is a request (3DS
+  0x687968 stores the kind), so the status can change after the write. A pending entry per fighter slot (`pend`) makes
+  `u_pend` (at w_upd's start, every cave enemy's update) write the float again while the fighter's status (StatusModule
+  +0x48, the MSC accessor's +0x20) is 0xB3, and drop it once the fighter has left 0xB3 (or after 40 updates).
+- **Values:** Goomba 0.8, Tiki Buzz 0.98, Big Goomba 0.9, Paratroopa / Koopa 1.0 (the user's: the Green Shell keeps
+  the 1.0 default; the 3DS value would be 0.7).
+- **Proof** (smashrun_step2h_test.py): a fall onto each kind writes its multiplier and the zeroed count with the status
+  request, again while the fighter is in 0xB3, not after; the game's own 0x02E79938, run natively in unicorn with the
+  written values, gives y = 2.4 x 0.8 / 0.9 / 0.98 / 1.0 (and the pow factor only past one step). The tread detection
+  itself is unchanged (the Goomba / Tiki Buzz stomp tests pass as before).
+
+**Big Goomba (dekakuribo 0x23; dk_*).** Walker kind with the 3DS states 1-13 (step2h-readings.md): walk (WalkL at 0.3,
+kinetic 10; the search every 60 counter frames; a fighter within 28 -> 4 (three zero-kick jumps) -> 5 AngryL for 200
+frames; farther -> 6 hop back (W+0x20 -0.5 unless a ledge is behind) -> 7 RunL for 200 run frames (the run turn 9 keeps
+the count) -> 8 brake -> 3), walls through the turn flag (clear_speed_all until WalkL loops, then reverse_lr => 3).
+- **Its hitboxes are the motions' ACMD.** Slot 45 is empty (o_nop, as the 3DS's 0x869F4). The Wii U enemy loads
+  animcmd/enemy/KIND/attack.bin (0x10123278) and change_motion_state runs the hashset's scripts. The 3DS scripts are not
+  named after the motions (AngryL's is "angry" 0xC0C12699; motion 18 is a second Damage with its own 12 % body box), so
+  the hashsets are the 3DS create's own table (`hs3ds`, enemy_fs.cro 0xC5D3C). The Wii U's own enemies use
+  Special_Hitbox in their attack.bin (mcanimal, mcgiant), so the command runs for enemies. Converted attack.bin:
+  AngryL ids 1 / 2 at nodes 6 / 5 (4 %, -30, fixed 80), RunL node 4 (6 %, 30, bkb 80), WalkL / Landing a 0 % push box,
+  the death Damage node 2 (12 %, 361).
+- **The stomp** (slot 20 dk_tread): damage + P0 f15 (25) through set_current_damage (HP 40 from the gl entry: 15 => 10
+  Stepped, then 0 => 11 Collapses, notify_on_death, -> 13). Tread box P5[0] {node 0, 14 x 3, offset (0, 6)}: (7, 6,
+  1.5). The motion stems are the 3DS files' `EnmDekaKuribo...` (STEM_NAME). FLIP_TABLE (its model.flp).
+- Not ported: the eyes (slot 3's material frame), sounds; approximated: is_looped (WalkL's 30 frames at 0.3),
+  check_cliff_distance_lr without the distance.
+
+**Spiny (togezo 0x4E; tg_*).** Variation 0 the egg, 1 the Spiny (the field spawner now passes the variation: the create
+param's +4, the field cave's +0x24; the spawn table word kind | variation << 16).
+- Start: var 0 => 1, var 1 => 6, the spikes (id 0: P2[var]) armed, the walk / search timers 200 / 150, no turn to a
+  target. Initialize by variation (slot 40 tg_init). set_attack_data (tg_atk): clear_all, then id 0 again: the egg's or
+  the Spiny's spikes, the dead bodies in 4 / 12 (the 3DS clears ids >= 1 only).
+- The egg: 1 falls (Paipo), 2 bounces (kinetic 4, W+0x40 = 0.8); a landing slower than 0.5 hatches it (var 1, its
+  initialize, the Spiny's spikes) -> 5 Change -> 8 / 9. Node 2 spins by a speed-derived step (set_node_rotate).
+- The Spiny: 8 walks (kinetic 1), every 20 frames of the search timer a search + check_turn_to_target -> 9 (turn), the
+  200-frame leave (10: Fall at rate 0 + f_leave_en with P6) -> 13. Slot 69 (tg_69): a running leave ends (f_unleave),
+  => 3 / 11 (hit_return_frame stun), returns 1. Slots 66 / 67 by variation. TREAD 0: never stomped.
+- FLIP_TABLE (its model.flp). Approximated: the spin factor (30 degrees a frame per unit of speed: the 3DS's common
+  EnemyParamAccessor +0x198 +0x90 x +0xA0 is not in the dump); no mesh swap: the egg mesh is hidden in the model, so the
+  egg is drawn as the Spiny; slot 60 (its caller unknown) and slot 13 not ported.
+
+**Paratroopa / Koopa (patapata 0x03; pt_*).** A flier-sized object (the aerial module for the bite).
+- Winged (var 0 / 1): 1 falls, 2 hops (L5D7EC; var 1's 60 % landing check of group 2), the search (group var, every
+  10, not in the cool-down) -> 5 the bite wind-up: the 3DS's set_mode_normal(0, 0, 0, 0, 10, 10) with speed (0, -0.5)
+  is a constant speed, so the Wii U module's uniform mode (f_amode 5) at that speed stands in; -> 6 the bite (P2 entry 0:
+  4 %, -50) -> 7 -> 1 with the 30-frame cool-down.
+- The wing loss (slot 20 tread, slot 69 non-lethal hit, state 9): variation + 2, effect 0x7030000 at the posture, the
+  walk params (L5D968), NokonokoMode -> 10 -> 11 -> 12. Slots 64-67 by variation (2 / 1 / 1 / 8 winged, 12 / 10 / 10 / 20
+  walking).
+- Walking (2 / 3): 12 walks, the search (group var + 1, every 30) -> 14 JumpHold -> 15 the leap (set_kinetic_shoot
+  inline: W+0x20 3, +0x24 1, +0x28 -1, +0x2C 10, +0x1C 0.075, the kick, kinetic 5) -> 16 (P2 entry 1: 2 %) -> 17 slide
+  / 18 LandingJumpAttack -> 12.
+- The shell: stomped as a Koopa => 19, killed => 20 (kinetic 16, ShellMode at 10, P2 entry 2: 17 %). Both:
+  disable_hit 0x026A75C0, disable_tread 0x026A75FC, set_current_damage(0), defeated (the dead item); at the motion's end
+  on the ground create_item_and_throw 0x026A8F10(0x94, var 0 / 2 ? 1 : 0, position + (0, 3 - speed y, 0), the speed,
+  0, true, -1, -1) -> 23.
+- Item 0x94 `patapata` is in the Wii U item table (0x104157A0: {0x94, 0xB, 0xB, 0x101, 2, 0, name}); whether the
+  executable has its behaviour and the data its files was not established (README asks the user to report a freeze).
+- Hashsets from the 3DS table (0xC75DC). Tread box P5[0] {node 0, 4 x 8, offset (0, 8)}: (2, 8, 4). CFG BOUNCE 1.0.
+- Approximated / not ported: the wing mesh stays (no Wii U mesh switch), the hop's first-falling-frame energy 0 writes,
+  slots 13 / 71, states 21 / 22 (no code enters them), sounds.
+
+**Pooka (not ported).** Its readings stand; what it needs is listed in step2h-readings.md ("Pooka", "Porting notes"):
+the HP-driven balloon (frame from (threshold - HP) / threshold, MotionModule set_frame unmapped: change_motion_state
+with a start frame would do), slot 69 / 11 / 67 hooks, the ghost (set_correct(0), disable_hit, kinetic 26 with energy
+0's speed: a flier-sized object), the lunge's bounce (the hit notification slot 6), the pop (P2 entry 1: size 30, 6 %;
+effect 0x7200001 at node 3, scale 3; quake 3). Its model needs body_normal_R hidden (no lr mesh switch) and keeps the
+goggles. Its converted model has a model.flp (FLIP_TABLE when ported).
+
+**Spawner** (`smashrun_field_cave.py` set "step2h", the default): step2g's 23 entries plus Big Goomba x2, the Spiny egg
+x2 / Spiny, the Paratroopa (var 0 / 1, placement 2) and the Koopa (var 2 / 3, placement 1): 32 entries; requests + 0x23,
+0x4E, 0x03. The 6-alive cap now sums each kind's counter once (ALIVE_KINDS: the repeated kinds counted two or three
+times before).
+
+**Space.** Region H 0x04BC0000-0x04BD0000 (the text section grown 64 KB: file info textRegion 0x2BC0000 -> 0x2BD0000,
+grow 0x04BD0000; code to 0x04BC193C, data after it and in the other regions' tails).
+
+**Tests** (exe_v25):
+
+| Test | Result |
+| --- | --- |
+| smashrun_step2h_test.py (new; S/s2e/root) | 41 checks, 0 failures |
+| smashrun_walker_test.py (S/s2e/root + the new kinds' data) | 176 checks, 0 failures |
+| smashrun_flier_test.py | 123 checks, 0 failures |
+| smashrun_flier_motion_test.py | 11 checks, 0 failures |
+| smashrun_field_test.py --set step2h | 13 checks, 0 failures |
+| smashrun_enemy_test.py (S/s2e/root) | 26 checks, 0 failures |
+| effect_slots_patch_test.py exe_v25 exe_v12 | 47 checks, all ok |
+| s3ds_effects_test.py (10 local vanilla .ptcl) | 52 files, 238 emitters, 0 failures |
+| s3ds_enemy_test.py dekakuribo / togezo / patapata / pooka | 15 / 12 / 13 / 13 checks, 0 failures |
+
+**exe_v25 vs exe_v24, word diff** (s2h/diff25.py, log s2h/diff25.log): 6147 words, every one in Smash Run's regions:
+- the hook sites 0x02D9A618 (S2) and 0x02D9B6F8 (the field cave's D) re-targeted to the moved caves;
+- 0x04B7D16C-0x04B7DF00 (the field cave and region E), 0x04B84918-0x04B84A00 (D: w_upd), 0x04B8691C-0x04B87FFC (A),
+  0x04B89020-0x04B8A000 (B), 0x04BB8000-0x04BB8660 (C), 0x04BB8770-0x04BBF00C (G and the data), 0x04BC0000-0x04BC193C
+  (H, new);
+- the text section 0x2BBFFE0 -> 0x2BCFFE0 bytes, the file info's textRegion 0x2BC0000 -> 0x2BD0000; relocations equal.

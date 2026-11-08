@@ -163,7 +163,7 @@ def main():
           'D: every frame ends in 0x02D9B1A8(mgr); r31 / stack kept')
     check([f for f, _ in spawns] == [F.INTERVAL * i - 1 for i in range(1, n + 1)], 'D: a spawn every %d frames %s'
           % (F.INTERVAL, [f for f, _ in spawns]))
-    kinds, modes, xs, ys, faces, rest_ok = [], [], [], [], [], True
+    kinds, modes, xs, ys, faces, rest_ok, vars_ = [], [], [], [], [], True, []
     for _f, (_t, mgr, p) in spawns:
         v = struct.unpack('>II f fff f B3x i fffi fi I', p[:0x3C]) if False else None
         kind, var = struct.unpack('>II', p[0:8])
@@ -171,20 +171,26 @@ def main():
         mode = struct.unpack('>i', p[0x20:0x24])[0]
         kinds.append(kind)
         modes.append(mode)
+        vars_.append(var)
         xs.append(round(x - m.player[0], 3))
         ys.append(round(y - m.player[1], 3))
         faces.append(face)
-        rest_ok &= mgr == MGR and var == 0 and one == 1.0 and z == 0.0 and p[0x1C:0x20] == bytes(4) and \
+        rest_ok &= mgr == MGR and one == 1.0 and z == 0.0 and p[0x1C:0x20] == bytes(4) and \
             p[0x24:0x3C] == bytes(0x18)
         del v
-    want_modes = [2 if k in (0x12, 0x1D, 0x57, 0x58, 0x08, 0x11, 0x0F, 0x1A, 0x47) else 1 for k in F.KINDS]  # floaters, fliers: as given
-    check(kinds == list(F.KINDS) + [F.KINDS[0]] and modes == [m for _k, m in F.SPAWNS] + [F.SPAWNS[0][1]] and
+    want_vars = [e[2] if len(e) > 2 else 0 for e in F.SPAWNS]           # step 2h: the variation (+4)
+    want_modes = [2 if k in (0x12, 0x1D, 0x57, 0x58, 0x08, 0x11, 0x0F, 0x1A, 0x47) or (k == 0x4E and v == 0) or
+                  (k == 0x03 and v < 2) else 1
+                  for k, v in zip(F.KINDS, want_vars)]  # floaters, fliers, the Spiny's egg: as given
+    check(vars_ == want_vars + [want_vars[0]], 'D: variations %s (step 2h: the Spiny egg 0, the Spiny 1; the '
+          'Paratroopa 0 / 1, the Koopa 2 / 3)' % vars_)
+    check(kinds == list(F.KINDS) + [F.KINDS[0]] and modes == [e[1] for e in F.SPAWNS] + [F.SPAWNS[0][1]] and
           modes[:-1] == want_modes,
           'D: kinds %s (then the first again), placement %s' % ([hex(k) for k in kinds], modes))
     check(xs == [F.DX if i % 2 == 0 else -F.DX for i in range(n)] and ys == [F.DY] * n and
           faces == [-1.0 if i % 2 == 0 else 1.0 for i in range(n)],
           'D: x %s from the player, y +%s, facing %s' % (xs, F.DY, faces))
-    check(rest_ok, 'D: variation 0, +8 = 1.0, z 0, the rest 0')
+    check(rest_ok, 'D: +8 = 1.0, z 0, the rest 0')
     # limits
     m2 = Machine(secs)
     m2.stage(0x94)

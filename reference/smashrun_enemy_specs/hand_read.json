@@ -870,5 +870,419 @@
   "anim_mirror": "0x036C48B0 (called at 0x036C6D60 after the anim evaluation when [skeleton +0xA0] +0xC is set; set by 0x0331910C / cleared 0x03319134): A: flags 1 negates translation[mode]; flags 2: q = bind x M(bind^-1 x q), bind from the VBN Euler (0x036C473C, Rz Ry Rx), M negates the two other components (0x036C4A88 / 4AC8 / 4B08), 0x036C4640(out, a, b) = b x a; modes > 2: error 0x90000600, skipped. B: same per pair, swapped (0x036C4B6C on). Bit 4 unused here.",
   "bone_getter": "0x0331915C: the bone remapped through list B (0x033117B4) when flipped, its global matrix (0x033179C8), then list A / B flags 2 negate column `mode` (effects / attachments).",
   "tread_link_event": "Fighter status 0xB3 (StepJump) main (Mario's MSC func_1145, common code) calls func_1149: if link 3 exists, LinkModule(3, 3, 6, 0x11000004, 0x1000007, 0x21000010): the native copy-back 0x02C58BE0-0x02C58C30 writes event +0x24 / +0x28 / +0x20 to work floats 0x1000007 / 0x1000008 / 0x1000009 (vt+0x4C), +0x1C to int 0x11000004 (vt+0x8C), +0x2C..+0x2E to flags 0x21000010..12 (vt+0x10C); then float 0x1000006 = float 0x1000009 (the enemy's param 0x11). Pre (func_1143): StatusModule(5, 2, kinetic 0x33, ...). Open: the native consumer of 0x1000006 in kinetic 0x33 (not found; 0x02C49A9C multiplies a table entry by float 6, unconfirmed), and our stomp has no link 3, so 0x1000009 / 0x1000006 are never written by func_1149."
+ },
+ "dekakuribo": {
+  "class": "walker (charger + stomper)",
+  "summary": "Big Goomba (Mario). Walks (WalkL 0.3x), every 60 frames searches a 150 x 40 box ahead; a fighter within 28 units: 3 frames standing (state 4) then the angry stomp dance (AngryL, 200 frames, foot hitboxes 4% + QUAKE each step); farther: a hop back (AttackRunStart) and a 200-frame charge (RunL 0.6x, head hitbox 6%, run turn when the target is behind). Walls / ledges (variation 1) turn it at the end of the walk loop. Stepped on: 25 HP off; survives -> Stepped (24 frames) and walks on, else Collapses (killed). It does NOT split (no articles, no create_enemy / spawn calls).",
+  "variations": "0: walks off ledges; 1: turns at ledges (check_cliff in 3 / 7 / 8 / 9 sets the turn flag or stops). P0 has one row (all variations read row 0... the reader indexes P0 by kind only: f0 = 0).",
+  "read": "create 0x86D84, ctor 0x86FA4 (size 0x188; hashsets; damage labels DamageStart..DownWait, Fall), vtable 0xD02C0, state table 0x10F374; start 0x85A84, initialize 0x8630C, states 1 0x85DDC/0x864A0, 2 0x85E30/0x864E0, 3 0x85F3C/0x8675C, 4 0x86240/0x86B6C, 5 0x858FC/0x860A0, 6 0x86DBC/0x85BDC, 7 0x85EA4/0x8651C, 8 0x85954/0x860F0, 9 0x86F2C/0x85CCC, 10 0x86C14/0x86CC0, 11 0x859BC/0x861A0, 12 0x85BAC/0x86208, 13 0xB4088 (remove); slot 3 0x869F8, 21 0x85FE0, 45 0x869F4 (empty), 47 0x86C88, 48 0x86C80 (14), 54 0x861FC, 55 0x869E4, 74 / 75 0x85D9C / 0x86D44; 64-67 = 3 / 1 / 1 / 12.",
+  "states": {
+   "1": "Fall: Fall loop, kinetic 8, attach off; is_touch(8) -> interrupt 2.",
+   "2": "Landing: Landing (once), kinetic 0, attach on, play_se 0x2910009, request_quake(3); motion end -> 3.",
+   "3": "Walk (0x85F3C / 0x8675C): +0x180 (turn flag) = 0, WalkL loop, MotionModule +0x50 = P0 f4 0.3, kinetic 10, attach on. Update: every P1[0].interval (60) frames of the state counter (+0x170 + 1, slot 55 increments it) check_target(P1[0]: type 2, range 150 x 40, offset (10, 10), 0) -> +0x17C; found: reverse_lr(1, 1) if (fighter x - x) * stick x < 0, then 3D distance <= P0 f18 (28) -> 4, else -> 6. Ground: off -> 1; turn flag set: clear_speed_all until MotionModule is_looped, then reverse_lr(1, 1) and interrupt 3 (no turn motion); flag clear: variation 1 and check_cliff -> flag; is_touch(stick x > 0 ? 4 : 2) (wall ahead) -> flag.",
+   "4": "Close target (0x86240 / 0x86B6C): W+0x24 = P0 f16 (0), W+0x2C = P0 f17 (0), kinetic 5 (a jump with zero kick: it stands), attach off, Fall loop, +0x184 = 1. Update: speed y <= 0 and on the ground: +0x184 < 3 -> change_kinetic(5), +1; else -> 5. Net: ~3 frames in the Fall pose, then 5.",
+   "5": "Angry (0x858FC / 0x860A0): kinetic 0, attach on, AngryL loop (100 frames); state frame > P0 f19 (200) -> 3. Hitboxes from AngryL's ACMD (see danger).",
+   "6": "Run start (0x86DBC / 0x85BDC): W+0x24 = P0 f7 (3), W+0x2C = P0 f8 (3.5); check_cliff_distance_lr(P0 f6 x (P0 f7 / gl+0x120 (gravity) + 2) x -2, -lr) (= 3/g + 2 behind it): a ledge behind -> W+0x20 = 0, else P0 f6 (-0.5) (hops backwards); kinetic 5, attach off, AttackRunStart at P0 f11 (0.6), +0x181 = 1. Update: speed y <= 0 and on the ground with +0x181: +0x181 = 0, attach on; state frame > P0 f10 (30) and +0x181 != 1 -> 7 with +0x178 = 0.",
+   "7": "Run (0x85EA4 / 0x8651C): RunL loop, MotionModule +0x50 = P0 f9 (0.6), kinetic 10, attach on. Update: every P1[1].interval (100) of +0x178 (first at 0) check_target(P1[1]: 200 x 100, offset (0, 10)); the target behind (lr < 0 and dx > 0, or lr > 0 and dx < 0) -> 9. On the ground: check_cliff and variation 1 -> clear_speed_all, -> 9; wall ahead -> 9; off the ground -> 1; +0x178 > P0 f13 (200) -> 8; +0x178 += 1 (not reset by the turn: the charge lasts 200 frames in all).",
+   "8": "Brake: RunBrakeL (once), kinetic 2, attach on, play_se 0x2910008. Update: variation != 1: off the ground -> 1; variation 1: check_cliff -> clear_speed_all; end -> 3.",
+   "9": "Run turn: RunTurnL at P0 f12 (0.6), kinetic 2, attach on. Update: check_cliff -> clear_speed_all; end -> reverse_lr(1, 1), interrupt 7 if +0x168 == 7 (came from the run; slot 74 / 75 store the old state in +0x168 when old == 7 or new == 3), else interrupt 3.",
+   "10": "Stepped (slot 21, HP left): kinetic 0, Stepped (24 frames), attach on, play_se 0x291000C; end -> 3.",
+   "11": "Collapses (slot 21, HP 0): kinetic 0, Collapses (34 frames), attach on, BehaviorImpl::notify_on_death (death flag, delete_hit, attacks cleared, disable_hit), play_se 0x291000B; end -> create_dead_item(1, 20, 0, 0), -> 13.",
+   "12": "Dead (slot 67): motion 18 (Damage) at rate 0, bullet(); W flags & 8 -> 13. Its hitbox is motion 18's ACMD (12%), not P2.",
+   "13": "Remove (EnemyManager::remove_enemy_by_id)."
+  },
+  "stomp": "Slot 21 (0x85FE0): DamageModule add_damage(P0 f15 = 25, 0), then HP (W+0) - 25: > 0 -> HP stored, interrupt 10 (Stepped); <= 0 -> HP = 0, interrupt 11 (Collapses). No state guard in slot 21 itself (BehaviorImpl::notify_on_death's disable_hit / the tread area keep it from repeating, inferred). Tread area (vl last group P5[0]) = {on 1, node 0 (bone 0), 14 x 3, offset (0, 6)}; area 1 {1, 0, 8, 12, 0, 4}. The fighter's bounce: no per-kind value in the behaviour; the tread event returns the enemy's param 0x11 (see patapata 'stomp_bounce').",
+  "danger": [
+   {
+    "states": [
+     5
+    ],
+    "source": "ACMD AngryL attack.bin (Set_Loop(100); WAIT 28: id 1 on 8 frames; WAIT 42: id 2 ...)",
+    "power": 4,
+    "angle": -30,
+    "kbg": 100,
+    "fkb": 80,
+    "bkb": 0,
+    "size": 5,
+    "node": 6,
+    "offset": [
+     2,
+     -3,
+     0
+    ],
+    "note": "id 1 node 6 = RFootJ frames 28-36 of each 100-frame loop, id 2 node 5 = LFootJ from frame 78 (the second stomp); angle -30 (330: down and forward), fixed 80, hitlag 2, SDI 1, trip 1.0, shield damage 2, rehit 60; QUAKE(3) and External_Graphic 0x1000026 at each stomp (frames 36 / 86)"
+   },
+   {
+    "states": [
+     7
+    ],
+    "source": "ACMD RunL attack.bin",
+    "power": 6,
+    "angle": 30,
+    "kbg": 100,
+    "fkb": 0,
+    "bkb": 80,
+    "size": 5,
+    "node": 4,
+    "offset": [
+     -5,
+     5,
+     0
+    ],
+    "note": "node 4 = HeadN, whole run; hitlag 2, shield damage 2, rehit 60, facing restriction 3; RunL effect: 0x1000026 at (0, -10, 0) then Graphic_Effect2 0x1000019 x2 every 10 frames, QUAKE(3) every 10 frames"
+   },
+   {
+    "states": [
+     3,
+     2
+    ],
+    "source": "ACMD WalkL / Landing attack.bin",
+    "power": 0,
+    "angle": 0,
+    "kbg": 60,
+    "fkb": 1,
+    "bkb": 0,
+    "size": 3,
+    "node": 4,
+    "offset": [
+     -4,
+     0,
+     0
+    ],
+    "note": "a push box: 0 damage, flinchless, no hitlag, no GFX (HeadN)"
+   },
+   {
+    "states": [
+     12
+    ],
+    "source": "ACMD motion 18 (Damage) attack.bin, played by the death state",
+    "power": 12,
+    "angle": 361,
+    "kbg": 100,
+    "fkb": 0,
+    "bkb": 50,
+    "size": 10,
+    "node": 2,
+    "offset": [
+     0,
+     0,
+     0
+    ],
+    "note": "RotN; the flying body; rehit 20"
+   }
+  ],
+  "contact": "No P2 contact: set_attack_data (slot 45) is an empty function (0x869F4) and the only P2 entry (state 0: power 6, angle 70, kbg 100, size 10, node 2 RotN, (2, 8, 0)) is never armed. Slot 47 (0x86C88) returns 0 in states 0 / 10 / 11 / 12 / 13, 1 otherwise; slot 48 returns 14 (no P2 entry has state 14: nothing armed). All its hitboxes are ACMD (above).",
+  "targeting": "start: faces get_nearest_target (check_turn_to_target + reverse_lr). Walk: P1[0] every 60 state frames, faces the found fighter; run: P1[1] every 100 run frames -> run turn if behind. No turn motion in the walk (reverse at the loop end).",
+  "kinetics": "initialize 0x8630C: W+0x08 = P0 f1 2, +0x0C = f2 1, +0x10 = 0, +0x14 = f5 0.01, +0x18 = f3 10, +0x24 = f7 3, +0x40 = 1, +0x44 = f14 0.9, +0x28 = f6 -0.5, +0x2C = f8 3.5, W-module vt+0x7C(0x20000004) (Wii U vt+0xFC). Walk / run: kinetic 10 (Kuribo's walk/run), rates 0.3 / 0.6 on MotionModule +0x50.",
+  "death": "Damage: slots 64 / 65 / 66 = 3 / 1 / 1; death 67 = 12 (bullet + ACMD 12% body). HP from its gl entry (not in the 3DS dump).",
+  "leave": "none (no init_common_leave).",
+  "effects_sounds": "play_se 0x2910009 landing, 0x2910008 brake, 0x291000C stepped, 0x291000B collapse; request_quake(3) on landing; ACMD: RunL / AngryL QUAKE(3) + effects 0x1000026 / 0x1000019 (common bank), sounds 0x2910000-0x2910009 (sound.bin). Slot 3 (0x869F8, every frame): the eyes follow fighter 0: angle of (fighter 0 - node 2 RotN position) -> MotionModule set_frame_material(clamp(angle / 2pi x 60, 1, 59), 0), set_rate_material(0, 0).",
+  "meshes": "no vmt.",
+  "facing": "slot 38 returns 1 (flip with lr).",
+  "framework_new": "add_damage (code.bin 0x4D2FE4; Wii U DamageModule acc+0x30D4: not mapped; the HP write W+0 is what the states use), MotionModuleImpl::is_looped (0x5048D0), EnemyKineticModuleImpl::get_sum_speed3f (0x96EBFC), check_cliff_distance_lr (0x9EAED4; the walker cave's CHECK_CLIFF_LR 0x026A6D88 takes the lr in f1: whether it also takes the distance is to check), set_frame_material / set_rate_material (0x7FB7FC / 0x5015AC; eyes only, optional), slot 3 hook (per-frame before the state update).",
+  "open": "Its HP (gl entry) on the Wii U; the exact meaning of slot 47 / 48; the tread area's (0, 6) offset field order (read as {on, node, w, h, x, y} as for Kuribo / Tiki Buzz).",
+  "hp": "40 (Wii U enemy_param.bin gl group 3, entry kind + 1, word 5 +0x14; the Enemy ctor copies it to HP W+0 / max W+4)",
+  "stomp_bounce_multiplier": "0.9 (its initialize writes W+0x44 = P0 f14)",
+  "port_step2h": "Ported in step 2h (tools/smashrun_walker_cave.py dk_*, region H; tests tools/smashrun_step2h_test.py). Verified: states 1-13 as read (walk search on frame 60 of the counter, close <= 28 -> 4 -> 5, else 6 -> 7 -> 8, run turn 9 back to 7, walls via the turn flag and the WalkL loop); slot 45 empty, every hitbox from the motions' ACMD: the hashsets are the 3DS create's table (enemy_fs.cro 0xC5D3C: AngryL plays the script \"angry\" 0xC0C12699, motion 18 its own Damage scripts) and the Wii U enemy loads animcmd/enemy/KIND/attack.bin (0x10123278); the stomp: damage + 25 via the Wii U set_current_damage 0x026A7E58 (HP = max - damage), 40 -> 15 Stepped, then Collapses. Approximated: is_looped (WalkL 30 / 0.3 frames), check_cliff_distance_lr without the distance, the eyes (slot 3), sounds, the damage-face meshes."
+ },
+ "togezo": {
+  "class": "walker (spiked; egg variation)",
+  "summary": "Spiny (Mario). Variation 1 walks (Walk, kinetic 1), turns at walls, turns toward fighters behind it (search every 20 frames) during its first 150 walk frames, and leaves after 200 walk frames. Variation 0 is the Spiny egg (Paipo): falls spinning, bounces, and when its bounce speed drops under 0.5 it hatches (Change) into variation 1. Its body hurts all the time (P2 entry 0 / 1, power 1). It cannot be stomped: its tread area is off (vl P5[0].on = 0), slot 21 is BehaviorImpl's nop, no enable_tread.",
+  "variations": "0: egg (Paipo mesh, rolls, hatches -> var 1 in place: L622F4 sets this+0x10 = 1); 1: walking Spiny (togezo mesh). P0 per variation: 0 {0, 0, 0, 0, 0.8, 2}, 1 {1, 0.3, 0.01, 1.75, 1, 0}.",
+  "read": "create 0x37F14, ctor 0x37F4C (size 0x17C, no damage labels), vtable 0xCD7F0, table 0x1119CC; start 0x36CE0, initialize 0x370C0, set_attack_data 0x37568, slot 5 0x3736C, 13 0x376DC, 55 0x3740C, 60 0x376A4, 63 0xB4940, 66 0xB4964, 67 0xB492C, 69 0x37EAC; helpers L622F4 (hatch), L6239C (spin rate), L62440 (body attack); states 1 0x36FEC/0x37288, 2 0x37090/0x372C8, 3 0x36FA0/0x37260, 4 0x370A4/0x3766C, 5 0x37A0C/0x37E20, 6 0x377E8/0x37B48, 7 0x37880/0x37B88, 8 0x37984/0x37C7C, 9 0x3792C/0x37C28, 10 0x378D8/0x37BF8, 11 0x37760/0x37AB8, 12 0x379DC/0x37DE8, 13 remove.",
+  "states": {
+   "1": "Egg fall: kinetic 8, attach off, Paipo loop, +0x178 = L6239C (spin step), W+0x40 = P0[var] f4 (0.8 / 1); on the ground -> interrupt 2.",
+   "2": "Egg bounce: kinetic 4 (bounce). Update: speed y <= 0 on the ground: |speed| < PS9c f0 (0.5) -> L622F4 (hatch) and -> 5; else +0x178 = L6239C (re-spin).",
+   "3": "Egg stun (slot 69, var 0): kinetic 16, attach off, +0x16C = hit_return_frame(), +0x178 = L6239C; counts down -> 1.",
+   "4": "Egg dead (slot 67 var 0): bullet(), +0x178 = 0; W flags & 8 -> 13. Armed: P2 entry 2.",
+   "5": "Hatch (Change): kinetic 5, attach off, Change (30 frames), W+0x40 = P0[var] f4, play_se 0x6D90000; at the end on the ground: nearest target behind -> 9 (turn) else -> 8.",
+   "6": "Fall (var 1): kinetic 8, attach off, Fall loop, W+0x40 = P0 f4; ground -> interrupt 7.",
+   "7": "Landing: kinetic 0, attach on, Landing; end: target behind -> 9, else 8.",
+   "8": "Walk (0x37984 / 0x37C7C): kinetic 1, attach on, Walk loop. Update: move(); off the ground -> 6; check_wall -> 9; walk timer +0x170 (start: PS8c f2 = 200) - 1 <= 0 -> 10 (leave); else search timer +0x174 (PS8c f3 = 150) - 1: while > 0, every search_interval(0) (20) frames search_target(0) (P1[0]: 100 x 60, offset (0, 10)) + check_turn_to_target -> 9. After 150 frames it no longer turns to targets.",
+   "9": "Turn: kinetic 0, attach on, Turn; end -> reverse_lr(1, 1), interrupt 8.",
+   "10": "Leave: Fall at rate 0, init_common_leave(P6 {120, 0.1, 5, 0, 0, 0, 3, 0, 0.85}); update_common_leave() == 0 -> 13.",
+   "11": "Stun (slot 69, var 1): kinetic 16, attach off, Damage loop, +0x16C = hit_return_frame(), W flags |= 0x80; count down: on the ground -> flags &= ~0x80, -> 8; in the air -> 6.",
+   "12": "Dead (slot 67 var 1): Damage at rate 0, bullet(); flags & 8 -> 13. Armed: P2 entry 3.",
+   "13": "Remove."
+  },
+  "danger": [
+   {
+    "states": "all (armed by start and the hatch, kept: set_attack_data clears only ids >= 1)",
+    "source": "L62440 (0x62440): AttackModuleImpl::clear(0, 0), create_attack_data(P2[var == 1 ? 1 : 0]), set_attack(id 0, part 0)",
+    "power": 1,
+    "angle": 361,
+    "kbg": 100,
+    "fkb": 0,
+    "bkb": 70,
+    "size": 2,
+    "node": 2,
+    "offset": [
+     0,
+     0,
+     0
+    ],
+    "note": "var 0 (egg) entry 0 angle 361; var 1 entry 1 angle 70; node 2 = RotN; shield damage 1, rehit 60, facing 1 (fields after bkb as P2)"
+   },
+   {
+    "states": [
+     4
+    ],
+    "source": "set_attack_data 0x37568: entries 2.. whose state = the new state, id 0 (replaces the body box)",
+    "power": 5,
+    "angle": 361,
+    "kbg": 100,
+    "fkb": 0,
+    "bkb": 50,
+    "size": 2,
+    "node": 2,
+    "offset": [
+     0,
+     0,
+     0
+    ],
+    "note": "entry 2: the egg's flying body"
+   },
+   {
+    "states": [
+     12
+    ],
+    "source": "set_attack_data, entry 3",
+    "power": 5,
+    "angle": 361,
+    "kbg": 100,
+    "fkb": 0,
+    "bkb": 50,
+    "size": 2,
+    "node": 2,
+    "offset": [
+     0,
+     0,
+     0
+    ],
+    "note": "the Spiny's flying body"
+   }
+  ],
+  "contact": "yes, always (id 0, power 1, size 2 at RotN): the spikes. set_attack_data (0x37568) clears ids 1 .. count-1 only (AttackModule +0x3C = count), then arms P2 entries 2.. by state.",
+  "stomp": "Cannot be stomped: tread area off (P5[0] = {0, 2, 1, 1, 0, 0}; area 1 {1, 2, 4, 4, 0, 0}), slot 21 not overridden (BehaviorImpl's nop), no enable_tread anywhere. A fighter landing on it just touches the always-on spike box.",
+  "targeting": "start: no turn to a target (stick x = posture lr). Hatch / landing: faces the nearest target (turn motion). Walk: search group 0 every 20 frames for the first 150 walk frames, turn if behind.",
+  "kinetics": "initialize 0x370C0 (per variation): W+0x10 / +0x08 = P0 f1 (0 / 0.3), +0x20 / +0x28 = f2 (0 / 0.01), +0x24 / +0x2C = f3 (0 / 1.75), +0x0C = f5 (2 / 0), +0x38 = PS8c f0 0.4. Spin (slot 55 0x3740C, var != 1): node 2 rotated about x by +0x178 per frame (MotionModule set_node_rotate(2), the posture rot): +0x178 = sign(-speed x) x |speed| x (EnemyParamAccessor+0x198 +0x90 x +0xA0) x -lr x pi/180 (L6239C). Slot 5 (update_on_skip) does the same rotate. start var 0 also copies node 2's rotation into the posture.",
+  "death": "slots 64 / 65 = 0 (no damage states), 66 = var 1 ? 6 : 1, 67 = var 1 ? 12 : 4; slot 69 (0x37EAC): a running leave -> finalize_common_leave + set_correct(5); var 0 -> interrupt 3, var 1 -> interrupt 11; returns 1 (the framework's damage reaction is skipped: no damage motions, it has no damage labels). Slot 60 (0x376A4, var 0): hatch (L622F4) + interrupt 5 (caller not identified). Slot 63 returns 0 in states 10 / 11 / 12. Slot 13 (capture motion) only for var 1.",
+  "leave": "after 200 walk frames (+0x170 counts only in the walk): state 10, init_common_leave(P6: 120 frames, 0.1, 5, effect 0x8000005 at (0, 3, 0) x 0.85 as Waddle Doo's), then remove. A hit during the leave cancels it (slot 69).",
+  "effects_sounds": "play_se 0x6D90000 (hatch); the common leave effect; no ACMD (no attack / effect scripts).",
+  "meshes": "0 togezo_mh, 1 togezo_paipo_mh: var 0 starts paipo on / togezo off, the hatch (L622F4) and var 1 togezo on / paipo off.",
+  "facing": "slot 38 returns 1.",
+  "framework_new": "AttackModuleImpl::clear(id, bool) (code.bin 0x4CE5AC; Wii U not mapped: the cave can keep clear_all + re-arm id 0), init / update / finalize_common_leave (the cave has them), hit_return_frame (the cave's f_hitret), MotionModuleImpl::node_rotate / set_node_rotate (Wii U SET_NODE_ROT 0x02C64188) and PostureModule rot (the egg's spin: visual), slot 5 update_on_skip, slot 60 (caller unknown).",
+  "open": "Who calls slot 60 (inferred: something that forces the egg to hatch); EnemyParamAccessor+0x198's +0x90 / +0xA0 (a common param, the spin factor); P0 f0 / PS8c f1 / PS9c f1 (read nowhere in these functions); kinetic 4 (bounce) parameters (W+0x40 = 0.8 restitution, inferred).",
+  "hp": "30 (Wii U enemy_param.bin gl group 3, entry kind + 1, word 5 +0x14; the Enemy ctor copies it to HP W+0 / max W+4)",
+  "stomp_bounce_multiplier": "never stomped",
+  "port_step2h": "Ported in step 2h (tg_*). Verified: per-variation initialize, start var 0 -> 1 / var 1 -> 6 with id 0 armed, set_attack_data keeps id 0 (clear_all + re-arm), the egg fall / bounce / hatch (|v| < 0.5) -> 5 -> 8, walk search every 20 frames while the 150-frame timer runs, the 200-frame leave (f_leave_en with P6), slot 69 (ends a leave, => 3 / 11, returns 1), slots 66 / 67 by variation, never stomped (TREAD 0). The spawner passes the variation (create param +4). Approximated: the spin factor (30 deg / frame per unit speed; EnemyParamAccessor +0x198 +0x90 x +0xA0 not in the dump), no mesh swap (the paipo mesh hidden in the model: the egg is drawn as the Spiny), sounds; slot 60 / 13 not ported."
+ },
+ "patapata": {
+  "class": "walker / hopper (winged) -> walker -> shell",
+  "summary": "Koopa Paratroopa / Koopa Troopa (Mario). Variations 0 / 1 are winged: hop forward (kinetic 5 hops) and dive-bite a fighter found below-ahead (Bite, HeadN hitbox 4%, angle -50); stomped or hit (not killed), they lose the wings (variation += 2, effect 0x7030000) and become walking Koopas. Variations 2 / 3 walk (kinetic 1), and leap at a fighter ahead (JumpHold -> JumpAttack, HeadN 2%). Stomped as a Koopa: ShellMode (hit off, tread off), it is defeated and its shell becomes an item (item kind 0x94 'patapata', thrown with its speed); killed as a Koopa: a spinning shell hitbox 17% (state 20) then the same shell item. Killed winged: bullet with a 2% body.",
+  "variations": "0 / 2: material frame 10, the shell item's variation 1; 1 / 3: material frame 0, the shell item's variation 0 (colour per frame not checked: red / green). 1 (winged): on each landing 60 % (random_range(1, 100) <= P@0x78 60, inclusive) searches group 2 (80 x 80, offset (-40, 20)) and turns (TurnPatapata) if the fighter is behind. 3 (walking): turns at ledges (check_cliff). 0 / 2: no ledge check. P0 rows: 0 / 1 {.., 0.6, 2.5, 1, 1, 2.5, 0.7, 15, 9, 0.5}, 2 {.., 0.2, 0.5, .., 0.7, 1, 20, 0}, 3 {.., 0.2, 0.3, ..}.",
+  "read": "create 0x74108, ctor 0x74140 (size 0x200; damage labels DamageStart..DownWait, Fall), vtable 0xCF420, table 0x110C80; start 0x7234C; slots 13 0x72DB0, 21 0x726BC, 28 0x72CE8, 34 0xB4ED4, 36 0xB4F28, 38 0xB5710 (0), 63 0xB4EF8, 64 0xB4F88, 65 0xB4F70, 66 0xB4F58, 67 0xB4EE0, 69 0x73C00, 71 0x72A88; helpers L5D7EC / L5DAB4 (hop params), L5D968 (walk params), L736B4, L73E48; states 1 0x7258C/0x72820, 2 0x725E8/0x72860, 3 0x72FEC/0x72A30, 4 0x72660/0x72A30, 5 0x72F28/0x730F0, 6 0x72714/0x72CEC, 7 0x72A84/0x72ECC, 8 0x726E4/0x72C90, 9 0x72740/0x72D74, 10 0x73130/0x73750, 11 0x73188/0x73790, 12 0x732A4/0x73898, 13 0x7324C/0x73844, 14 0x73D4C/0x73ED0, 15 0x73DB0/0x74010, 16 0x73688/0x73C98, 17 0x73F0C/0x7405C, 18 0x7355C/0x739E0, 19 0x735C0/0x73A24, 20 0x73F48/0x73A24, 21 0x73048/0x732FC, 22 0x731E0/0x737CC, 23 remove. No initialize override (slot 40 default).",
+  "states": {
+   "1": "Winged fall: L5DAB4, kinetic 8, attach off, Fly loop; ground -> 2.",
+   "2": "Hop (0x725E8 / 0x72860): L5D7EC (W+0x08 / +0x20 / +0x28 = P0 f3 0.6, +0x0C / +0x24 / +0x2C = f4 2.5, +0x40 = f5 1), kinetic 5 (the hop), attach off, Fly loop, stick x = lr, +0x1F0 = 0. Update: first falling frame -> L73E48 (W+0x40 = f6 1; energy 0 +0x38 = f3 0.6, +0x3C = f7 2.5). Landing (speed y <= 0, ground): var 1: 60 % search_target(2) + target behind -> 3, else -> 2 (hop again). check_wall -> 3. Search: when +0x1DC <= 0 and the bite cool-down +0x1E8 <= 0: +0x1DC = search_interval(var) (10), search_target(var) (group 0 / 1: 42.5 x 50, offset (5, 5)): found -> reverse_lr if behind, -> 5. +0x1DC / +0x1E8 -1, move().",
+   "3": "Turn (ground): L5D7EC, kinetic 0, attach on, TurnPatapata; end -> reverse_lr(1, 1), interrupt 1.",
+   "4": "Turn (air): L5DAB4, kinetic -1, attach off, TurnPatapata; same update (unused by the code read: no transition to 4 found).",
+   "5": "Bite wind-up: aerial set_mode_normal(0, 0, 0, 0, 10, 10), aerial set_current_speed((0, -P0 f11 0.5)), attach off, Bite at P@0x80 (PS78 f2) 1.5, +0x1E0 = P0 f9 (15 / 1); aerial update; count -> 6.",
+   "6": "Bite (P2 entry 0 armed): +0x1E0 = P0 f10 (9 / 20); aerial update; count -> 7; motion end -> 1 with the cool-down +0x1E8 = PS78 f1 30.",
+   "7": "Bite recovery (no hitbox): aerial update; end -> 1, +0x1E8 = 30.",
+   "8": "Dead winged (slot 67 var 0 / 1): BulletMode at rate 0, bullet() (P2 entry 3); flags & 8 -> 23.",
+   "9": "Wing loss (slot 21 / slot 69 / slot 13 for var 0 / 1): L5DAB4, kinetic 8, clear_speed_all, attach off, NokonokoMode, var += 2, wing mesh off, EffectModule req(0x7030000, position, ZERO, 1, 0, -1, 0, 0) (one-shot at the posture), L5D968 (walk params); end -> 10.",
+   "10": "Fall (walking): kinetic 8, attach off, Fall; ground -> interrupt 11.",
+   "11": "Landing: kinetic 0, attach on, Landing; end -> 12.",
+   "12": "Walk (0x732A4 / 0x73898): kinetic 1, attach on, Walk loop. Update: search when +0x1DC <= 0 and +0x1E8 <= 0: +0x1DC = search_interval(var) (30), search_target(var + 1) (group 3 / 4: 70 x 30, offset (10, 10)): found -> reverse_lr if behind, -> 14. Ground: check_wall (or var 3 and check_cliff) -> 13; else move(); off the ground -> 10.",
+   "13": "Turn: kinetic 0, attach on, TurnNokonoko; end -> reverse_lr, interrupt 12.",
+   "14": "Jump hold: kinetic 0, attach on, JumpHold at PS84 f0 (1); end -> 15.",
+   "15": "Jump attack: set_kinetic_shoot(PS84 f2 3, f3 1, f4 0.075) (W+0x20 = 3, +0x24 = 1, +0x28 = -1, +0x2C = 10, +0x1C = 0.075, vt+0x7C(0x20000004), kinetic 5), attach off, JumpAttack at PS84 f1 (3), +0x1E0 = P0 f9 (1), +0x1DC = PS84 f10 (15); move(); count -> 16.",
+   "16": "Jump attack active (P2 entry 1 armed): +0x1E0 = P0 f10 (20); move(); +0x1E0 -1 (clear_all when it runs out); +0x1DC -1; on the ground: +0x1DC < 0 -> +0x1E8 = PS84 f9 (20), interrupt 18; else interrupt 17.",
+   "17": "Slide: set_kinetic_brake_ground(PS84 f5 0.04) (W+0x14, kinetic 2), attach on; on the ground: +0x1E0 -1 (clear_all at 0), +0x1DC -1 < 0 -> +0x1E8 = 20, interrupt 18; off -> 10.",
+   "18": "Landing attack: set_kinetic_brake_ground(PS84 f7 0.1), attach on, LandingJumpAttack at PS84 f6 (1.5); move(); end -> 12.",
+   "19": "Shell (slot 21 var 2 / 3: stomped as a Koopa): kinetic 0, attach on, ShellMode, disable_hit, disable_tread, set_current_damage(0); first time (+0x1FC): create_dead_item(1, 0, 0, 0), EnemyManager::set_already_dead_flag(id), +0x1FC = 0. Update (0x73A24): motion end on the ground: create_item_and_throw(0x94, var 0 / 2 ? 1 : 0, position + (0, P@0xB0 (3) - speed y, 0), current speed, 0.0, true, -1, -1) -> +0x1F4; an item made -> set_visibility(0); -> 23 (removed).",
+   "20": "Shell spin (slot 67 var 2 / 3: killed as a Koopa; P2 entry 2 armed): kinetic 16, attach off, ShellMode at rate 10, disable_hit, disable_tread, set_current_damage(0), the same first-time dead item; update as 19 (the shell item at the motion end on the ground).",
+   "21": "Riding the item (not reached by any code read): passable, follows the item +0x1F4's position, 60 frames (or the item's status 3 resets it) -> remove the item, visible, -> 22.",
+   "22": "ShellReturn: passable off, attach on, ShellReturn; end: enable_hit, enable_tread, ground -> 12 / air -> 10. (Reached only from 21.)",
+   "23": "Remove."
+  },
+  "stomp": "Slot 21 (0x726BC): var 0 / 1 -> interrupt 9 (wing loss: becomes var 2 / 3, walks on, alive); var 2 / 3 -> interrupt 19 (shell: defeated, the shell item 0x94 thrown). Tread area P5[0] = {1, 0 (bone 0), 4 x 8, offset (0, 8)}; area 1 {1, 0, 8, 12, 0, 8}.",
+  "stomp_bounce": "The 3DS Paratroopa code sets no bounce: slot 21 only changes state. The fighter's bounce comes from the tread link event: the fighter's tread status (MSC) sends LinkEvent kind 6 through LinkModule (3DS LinkModuleImpl::notify_event_msc_cmd 0x4794E0, event built at code.bin 0x479834-0x479868; Wii U LinkModule MSC handler 0x02C58578, op 3 at 0x02C588C4, event 6 built at 0x02C58AE8-0x02C58B6C, sent by LinkModule vt+0x8C) with +0x20 float = 1.0 (Wii U default 0x1010980C), +0x2C/+0x2D/+0x2E bytes 0, and copies the answer back to script variables (+0x20 float, +0x24 / +0x28 floats, +0x2C..+0x2E bytes, +0x1C int; returns byte +0x18). An enemy answers in its event handler (3DS code.bin 0x757A14: module [enemy+0xDC] vt+0x20(0x11); Wii U 0x02D8C450 case 6 at 0x02D8C5D4: behaviour slot 20 (0x02DB98F4), then acc+0x315C vt+0x44(0x11) -> event +0x20, +0x2E = 1): a per-kind jump multiplier from the enemy param (id 0x11, gl entry; value per kind not read). GREEN SHELL (user's reference for Koopa-type enemies): item kind 0x46 'greenshell' (Wii U item table 0x104157A0, 0x24-byte entries, name at +0x18; 3DS 0xC2EB28 the same). A scan of the whole Wii U text (and the 3DS code.bin) finds no other writer of the tread event's +0x20 / +0x2E than the enemy handler (Wii U 0x02D8C5F8 / 0x02D8C600; 3DS 0x757A34 / 0x757A38); the only item link-event switch found (Wii U 0x0303CC40, kinds 2 / 8) has no case 6. So a fighter treading a Green Shell gets the event's default multiplier 1.0, i.e. its own footstool jump: fighter_param 0x15F step_jump_speed_y (0x160 step_mini_jump_speed_y for the short one) x 1.0, in its StepJump status (0xB3). USE FOR PARATROOPA / KOOPA: StatusModule(3, 0xB3 StepJump, 0) with multiplier 1.0 (what fix v8's stomp already does: no extra speed write). Not verified: that the fighter's tread MSC multiplies step_jump_speed_y by the event float (inferred from the 1.0 default), and the green shell's own tread path (its tread area and whether treading it goes through event 6 at all) was not traced; the Wii U fighter MSC tread status was not read.",
+  "danger": [
+   {
+    "states": [
+     6
+    ],
+    "source": "param P2 entry 0 (set_attack_data)",
+    "power": 4,
+    "angle": -50,
+    "kbg": 100,
+    "fkb": 0,
+    "bkb": 40,
+    "size": 9,
+    "node": 4,
+    "offset": [
+     7,
+     0,
+     0
+    ],
+    "note": "the bite: node 4 = HeadN; angle stored 4294967246 = -50 (down-forward); shield damage 1, rehit 60, facing 3"
+   },
+   {
+    "states": [
+     16
+    ],
+    "source": "param P2 entry 1",
+    "power": 2,
+    "angle": 361,
+    "kbg": 100,
+    "fkb": 0,
+    "bkb": 40,
+    "size": 5,
+    "node": 4,
+    "offset": [
+     3,
+     2,
+     0
+    ],
+    "note": "the Koopa's leap (HeadN); cleared by clear_all when +0x1E0 runs out (20 frames), in 16 or 17"
+   },
+   {
+    "states": [
+     20
+    ],
+    "source": "param P2 entry 2",
+    "power": 17,
+    "angle": 361,
+    "kbg": 70,
+    "fkb": 0,
+    "bkb": 50,
+    "size": 3,
+    "node": 0,
+    "offset": [
+     0,
+     3,
+     0
+    ],
+    "note": "the killed Koopa's spinning shell (bone 0) until it lands"
+   },
+   {
+    "states": [
+     8
+    ],
+    "source": "param P2 entry 3",
+    "power": 2,
+    "angle": 361,
+    "kbg": 100,
+    "fkb": 0,
+    "bkb": 50,
+    "size": 3,
+    "node": 2,
+    "offset": [
+     0,
+     0,
+     0
+    ],
+    "note": "the killed Paratroopa's body (RotN)"
+   }
+  ],
+  "contact": "only the bite (6), the leap (16) and the dead bodies (8, 20); walking / hopping never hurts. No ACMD attack scripts.",
+  "targeting": "start: faces the nearest target; winged: search group var every 10 frames (not during the bite cool-down), var 1's landing check group 2; walking: group var + 1 every 30 frames; found -> face it and attack.",
+  "kinetics": "No initialize override. Hop: L5D7EC / L5DAB4 (W+0x08, +0x20, +0x28 = P0 f3; +0x0C, +0x24, +0x2C = f4; +0x40 = f5 / f6), kinetic 5. Walk: L5D968 (W+0x10 = P0 f1, +0x08 = f2, +0x0C = 10, +0x40 = 1, +0x44 = f8 0.7, +0x14 / +0x18 = 0, vt+0x7C(0x20000004, P0 row, 0)), kinetic 1. L736B4 (start, winged): +0x44 = f8, +0x14 / +0x18 = 0, the kick. Bite: the behaviour's aerial module (EnemyAerialModuleImpl set_mode_normal, set_current_speed, update).",
+  "death": "Non-lethal hit: slot 69 (0x73C00) var 0 / 1 -> the wing loss (var += 2, mesh, effect 0x7030000, walk params; no state change), returns 0 (the framework's damage reaction runs) -> slots 64 / 65 / 66 = var 0 / 1 ? 2 / 1 / 1 : 12 / 10 / 10 (read after the var change: a winged one comes back walking). Lethal (BehaviorImpl::notify_on_damage calls slot 67 before slot 69): 67 = var 0 / 1 ? 8 : 20. Slot 71 (0x72A88): var 0 / 1 BehaviorImpl::notify_on_death; var 2 / 3 instead push a request into the module at acc+0x30A0 (inlined queue, not mapped; no notify_on_death: the shell states disable hit / tread themselves); +0x1FC = 0 (so a killed Koopa makes no create_dead_item in 20). Slot 13 (capture motion) also de-wings. Slot 28 notify_on_remove: Behavior::notify_on_remove.",
+  "leave": "none.",
+  "articles_items": "No articles. Item kind 0x94 'patapata' (the shell; 2 variations; present in both the 3DS 0xC2EB28 and the Wii U 0x104157A0 item tables) via Behavior::create_item_and_throw (3DS 0x7B4488; Wii U 0x026A8F10). Whether the Wii U has the item's code and resources (animcmd/item/patapata exists on the 3DS) was not checked. ItemManager::remove_item (code.bin 0x3C94C8) in 21 only.",
+  "effects_sounds": "EffectModule req 0x7030000 (wing loss, one-shot at the posture, bank 0x703 = kind 3); ACMD: Bite effect Graphic_Effect6 0x100008E at bone 2 frame 22, sound 0x28E0000 frame 10; JumpHold Graphic_Effect2 0x1000019; JumpAttack sound 0x28E0001 frame 11; NokonokoMode 0x28E0003; ShellMode 0x28E0004. Start: set_frame_material(var 0 / 2 ? 10 : 0, 0), set_rate_material(0, 0).",
+  "meshes": "0 patapata_wing (off for var 2 / 3 and after the wing loss).",
+  "facing": "slot 38 returns 0: no model flip (as Gordo's: the yaw alone turns it).",
+  "framework_new": "set_kinetic_shoot (code.bin 0x7B24E0: W stores + vt+0x7C + kinetic 5: inline), set_kinetic_brake_ground (0x7B51F4: W+0x14, kinetic 2: inline), is_falling (0x9EA500: get_sum_speed3f(1).y < 0), disable_hit / enable_hit (0x7B0864 / 0x42FB14: HitModule set_whole(3 / 0, 0); Wii U 0x026A75C0 / 0x026A75D4, HitModule acc+0x30E0 set_whole 0x02C42F00), disable_tread / enable_tread (Wii U 0x026A75FC / 0x026A7614), set_current_damage (0x7B3688: init_damage(f) then HP = max - damage; Wii U INIT_DAMAGE 0x02C212F0), set_already_dead_flag (0x3E5C84), create_item_and_throw (Wii U 0x026A8F10) + item kind 0x94, is_generate_shoot (0x9EAA2C), set_frame_material (0x7FB7FC), the aerial module's set_mode_normal (0x5F5A9C, not in the Wii U's reduced module: mode 0) and set_current_speed (Wii U 0x02DB2BC0), set_visibility (0x661720), set_mesh_visibility (no Wii U path, fix v5), slot 71 / 69 hooks.",
+  "open": "State 21 / 22 are not entered by any code read (an item / link path?); is_generate_shoot's true branch at start (spawned by a shooter: no first state set); the acc+0x30A0 request in slot 71; the material frame -> colour; whether the Wii U has item 0x94's code and files; the enemy param 0x11 value per kind (the bounce multiplier).",
+  "hp": "20 (Wii U enemy_param.bin gl group 3, entry kind + 1, word 5 +0x14; the Enemy ctor copies it to HP W+0 / max W+4)",
+  "stomp_bounce_multiplier": "1.0 by the user (as the Green Shell; its 3DS W+0x44 is 0.7, P0 f8)",
+  "port_step2h": "Ported in step 2h (pt_*; a flier-sized object for the aerial module). Verified: start (winged => 1, walking => 10), the hop (L5D7EC) and re-hop, var 1's 60 % landing check, the search (group var / var + 1), the bite (5 -> 6 -> 7 -> 1, cool-down 30) with the aerial module's uniform mode at (0, -P0 f11) standing in for set_mode_normal(0, 0, 0, 0, 10, 10), the wing loss (slot 20 / 69 / state 9: var += 2, effect 0x7030000, walk params), the walking leap (set_kinetic_shoot inline), the shell (19 / 20: disable_hit / disable_tread / set_current_damage(0), create_item_and_throw(0x94, ...) 0x026A8F10), slots 64-67 by variation; hashsets from the 3DS table 0xC75DC. Item 0x94 patapata is in the Wii U item table 0x104157A0 (its code / files not checked). Approximated: the wing mesh stays, the first-falling-frame energy 0 writes, slots 13 / 71, states 21 / 22."
+ },
+ "pooka": {
+  "class": "walker (inflate-to-pop)",
+  "summary": "Pooka (Dig Dug). Walks (Move, kinetic 1), turns at random(30, 90)-frame intervals toward the nearest fighter, searches every 15 frames (45 x 40, offset (25, 10)); found: backs off (Attackhold 1.5x, 40 frames) and lunges (jump, Attack, BodyN hitbox 2%) bouncing off the first thing it hits. A target it cannot reach (ground in the way) makes it go 'ghost' (goggle eyes only, no collision, no hit) and float through walls toward it. Damage below 85 % of its HP inflates it (Damageballoon: the balloon's frame follows the HP lost); left alone it deflates back (HP restored to 90 %); at 0 HP it inflates fully and pops after 15 frames: a size-30 burst (6%, angle 70, fixed 60) that hits fighters around it, then it is removed.",
+  "variations": "one P0 row (variation 0); none differ in code.",
+  "read": "create 0x23C6C, ctor 0x23CA4 (size 0x18C; damage labels Damagestart..DownWait, Move), vtable 0xCC6E0, table 0x10D9A8; start 0x21064, initialize 0x222BC; slots 7 0x23670, 11 0x22900, 13 0x232B8, 17 0x236F0, 51 0x65060, 56 0x2376C, 60 0x22A68, 64-67 = 3 / 1 / 1 / 10, 69 0x23A48, 70 0x23B14; helpers L65020 (HP = W+0), L65040 (max HP = W+4), L65084 (meshes); states 1 0x2141C/0x22368, 2 0x214D0/0x223A8, 3 0x21678/0x22494, 4 0x2160C/0x22440, 5 0x2343C/0x23678, 6 0x21DAC/0x22B40, 7 0x23214/0x23580, 8 0x2129C/0x219C4, 9 0x21550/0x22418, 10 0x21F74/0x22E90, 11 0x217F4/0x22870, 12 remove.",
+  "states": {
+   "1": "Fall: kinetic 8, attach off, passable off, reset_gravity (W+0x3C = gl+0x120, +0x40 = 1), Move at rate 0 (loop), normal meshes; ground -> 2.",
+   "2": "Landing (Landiing): kinetic 0, attach on; end: target behind -> 4, else 3.",
+   "3": "Walk (0x21678 / 0x22494): W+0x10 = P0 f1 0.04, +0x08 = f2 0.15, +0x14 = f3 0.01, kinetic 1, attach on, Move at P0 f6 (1) loop, turn timer +0x168 = random_range(f4 30, f5 90), +0x16C = f7 10, +0x170 = search_interval(0) (15). Update: move(); on the ground and no ledge: every f7 (10) frames (+0x16C): the nearest fighter within P0 f8 (200) of center_pos with GroundModule ray_check blocked -> 8 (ghost) or (a second ray / angle test) -> 9 (jump); +0x170 countdown: search_target(0) found -> 5; +0x168 countdown: face the nearest target (turn) and re-pick random(30, 90); check_wall -> 4; ledge -> 4; off the ground -> 1. (The 8 / 9 choice was taken from the generated map, not fully re-read.)",
+   "4": "Turn: kinetic 0, attach on, Turn; end -> reverse_lr(1, 1), interrupt 3.",
+   "5": "Back-off (Attackhold): W+0x10 = 0.1, +0x08 = P0 f13 0.4, +0x14 = 0, kinetic 1, attach on, Attackhold at f15 1.5, play_se 0x6B10006, +0x170 = f14 40. Update: move with the stick reversed (backs away), a ledge -> clear_speed_all + kinetic 0; count -> 6.",
+   "6": "Lunge (P2 entry 0 armed): W+0x20 = f16 2, +0x24 = f17 1, +0x28 / +0x2C = 10, +0x1C = 0, +0x3C = gl+0x120, kinetic 5, attach off, Attack at f18 0.1 (loop), play_se 0x6B10007, +0x17C = -1. Update: slot 7 (attack hit, 0x23670) stores the hit object's id in +0x17C; a hit object (or check_wall) -> bounce: away from the object's center_pos (or the wall's get_ground_normal(6)), speed |v| x P0 f19 (0.5), kinetic 5, AttackModule clear_all (the hitbox ends at the first hit / wall), +0x17C = -1; speed y <= 0 on the ground -> interrupt 7.",
+   "7": "Landing slide: kinetic 26 with energy 0's x speed kept (y 0), attach on, Landiing; |speed x| < 0.1 on the ground -> 3.",
+   "8": "Ghost: kinetic 26, energy 0 zeroed (+0x38 / +0x3C = 10), attach off, set_correct(0) (no ground collision), disable_hit, Move, meshes off but the goggles (L65084(0, 0, 0)), request_follow_effect(0x7200000, node 1, ZERO, ZERO, 1) -> +0x174, +0x16C = 0. Update: every P0 f11 (30) frames: the nearest fighter within f12 (200): flies toward it (calc_angle, energy 0 speed (cos, sin) x the param speed, +0x1C = 1); once the ray checks clear: set_correct(5), enable_hit, normal meshes, visible, remove_effect(+0x174), -> 1, +0x178 = 1.",
+   "9": "Jump over: kinetic 8, set_current_speed(computed), attach off, passable on, Move; 10 frames -> 1.",
+   "10": "Balloon (slot 67 death state, slot 69 / 60 / 70 / 17): the launch: W+0x20 / +0x24 from the hit (P0 f30 50, f27 0.2, f28 0.45 and the damage), +0x28 / +0x2C = 10, +0x1C = f31 0.025, +0x3C = f32 0.015, kinetic 5, attach off, ray_check_from_pos (20 units) limits the rise, Damageballoon at frame +0x184 rate 0, damage meshes, +0x168 = P0 f24 (15), +0x170 = dead (W flags bit 2) ? P0 f33 (0) : f25 (100), +0x188 = 1 (inflating), +0x189 = 0. Update: move(); bounces on landing (vy x -0.8). Inflating: the frame follows (threshold - HP) x 100 / threshold (% of end_frame); +0x168 -1, then +0x170 -1: at 0: dead -> interrupt 11 (pop); else +0x188 = 0, +0x189 = 1 (deflating), +0x170 = f25 100. Deflating (+0x188 = 0): frame -= P0 f26 (0.3) a frame, set_current_damage so HP climbs with it, update_weaken; frame 0 -> HP set to P0 f29 (90) % of max, reset_gravity, -> 1.",
+   "11": "Pop (P2 entry 1 armed): kinetic -1, attach off, (an inlined module request at acc+0x30AC: status 0x2711, not mapped), meshes (1, 1, 0), EffectModule req(0x7200001, node 3 (HipN), ZERO, ZERO, P0 f35 3, ...) (one-shot burst x3), play_se 0x6B10005, +0x170 = f34 1. Update: move(); count 0 -> create_dead_item(1, 0, 0, 0), request_quake(3); the sound 0x6B10005 no longer playing -> 12.",
+   "12": "Remove."
+  },
+  "danger": [
+   {
+    "states": [
+     6
+    ],
+    "source": "param P2 entry 0 (set_attack_data)",
+    "power": 2,
+    "angle": 20,
+    "kbg": 100,
+    "fkb": 0,
+    "bkb": 50,
+    "size": 5,
+    "node": 4,
+    "offset": [
+     0,
+     0,
+     0
+    ],
+    "note": "the lunge (node 4 = BodyN); cleared at the first hit or wall bounce; P2 word 13 = 8 (effect?), shield damage 1, rehit 60, facing 3"
+   },
+   {
+    "states": [
+     11
+    ],
+    "source": "param P2 entry 1",
+    "power": 6,
+    "angle": 70,
+    "kbg": 100,
+    "fkb": 60,
+    "bkb": 0,
+    "size": 30,
+    "node": 4,
+    "offset": [
+     0,
+     0,
+     0
+    ],
+    "note": "the pop burst: size 30 around BodyN, fixed knockback 60; from the pop until the sound ends"
+   }
+  ],
+  "contact": "only the lunge (6) and the pop (11). No bullet() death (death state 10 = the balloon). No ACMD attack scripts (Attack's init effect script: Graphic_Effect2 0x1000009).",
+  "stomp": "Cannot be stomped: tread area off (P5[0] = {0, 0, 12, 12, 0, 0}; area 1 {1, 0, 15, 15, 0, 6}); slot 21 not overridden; no enable_tread.",
+  "targeting": "start: faces the nearest target; threshold +0x180 = P0 f23 (85) % of max HP; a reachable-but-blocked target at start -> 8 (ghost), else 1. Walk: search group 0 (interval 15, 45 x 40, offset (25, 10)); random(30, 90) turn checks toward the nearest.",
+  "kinetics": "initialize 0x222BC: W+0x10 = P0 f1 0.04, +0x08 = f2 0.15, +0x14 = f3 0.01. See the states.",
+  "death": "Inflate / pop: slot 11 (notify_on_damage 0x22900): HP <= threshold -> stop the link / hit stop (LinkModule to_link_stop / leave_link_stop, StopModule leave_stop_internal: inlined), play_se 0x6B10004, then BehaviorImpl::notify_on_damage. Slot 69 (0x23A48): damage meshes, passable off; HP <= threshold -> interrupt 10, returns 1 (no normal reaction); else returns 0 (normal damage reaction, back to 3 / 1 / 1). Lethal: death state 67 = 10 (dead flag set): inflates, pops after 15 frames (11). Slot 56 (0x2376C, per frame after the state?): keeps the balloon frame / deflation in the damage states (mirrors 10's update). Slot 60 (0x22A68): reset_gravity; HP >= threshold: HP back to at most 90 %, frame 0, normal meshes, update_weaken; else -> 10. Slot 70 (0x23B14): when the common state (+0xE4) is 0 and HP <= threshold -> 10; otherwise damage meshes, passable off, and HP <= threshold: Damageballoon at the kept frame (+0x188 = 1) (guards from the generated map). Slot 17 (capture cut) -> 10. Slot 13 (capture motion): the gl capture motion and the balloon flags.",
+  "leave": "none.",
+  "effects_sounds": "follow effect 0x7200000 node 1 (ghost; removed when it reappears); one-shot 0x7200001 node 3 x3 (pop); request_quake(3) at the pop; play_se 0x6B10004 (inflate hit), 0x6B10005 (pop), 0x6B10006 (back-off), 0x6B10007 (lunge).",
+  "meshes": "0 body_damage, 1 body_normal_L, 2 body_normal_R, 3 eye_damage, 4 eye_normal, 5 gogle, 6 leg: L65084(damage, ?, visible) and slot 51 (sync_lr_and_direction 0x65060) pick body_normal_L / _R by lr (posture lr == -1 -> L), normal / damage sets; the ghost shows only the goggles.",
+  "facing": "slot 38 returns 1; slot 51 swaps the L / R body meshes with lr.",
+  "framework_new": "set_current_damage (code.bin 0x7B3688; Wii U INIT_DAMAGE 0x02C212F0 + HP write), update_weaken (0x7B0FE8), reset_gravity (0x7B0F64: W+0x3C = gl+0x120, +0x40 = 1: inline), MotionModule set_frame (0x504928) / end_frame (0x953F98), calc_angle (0x7B01D8), ray_check (Wii U RAY_CHECK 0x02C39F18) / ray_check_from_pos (0x7B2E34), set_current_speed (0x7B24B4), get_current_speed_all (0x9EAD88), disable_hit / enable_hit (Wii U 0x026A75C0 / 0x026A75D4), set_correct (Wii U 0x02C36458), get_ground_normal (Wii U 0x02D64ABC), SoundModule is_playing (0x4C27BC: the pop's end; a fixed timer would do), slot 7 (attack hit) / 11 / 51 / 56 / 60 / 69 / 70 / 17 hooks, set_mesh_visibility (no Wii U path).",
+  "open": "State 3's ghost / jump choice and state 8's flight speed (P0 f9 / f10 / f22?) were taken from the generated map, not fully re-read; slot 70 / 56 / 60 callers (slot numbers inferred); the inlined acc+0x30A4 / 0x30AC requests (link stop / status 0x2711); its HP (gl).",
+  "hp": "10 (Wii U enemy_param.bin gl group 3, entry kind + 1, word 5 +0x14; the Enemy ctor copies it to HP W+0 / max W+4)",
+  "stomp_bounce_multiplier": "never stomped",
+  "port_step2h": "Not ported in step 2h (readings only)."
+ },
+ "_framework_step2h": {
+  "tread_multiplier": "Param 0x11 of the Enemy event 6 answer (0x02D8C5D4: acc+0x315C vt+0x44(0x11)) is WorkModule get_float(0x11) = the enemy work float 0x11 = W+0x44: the Enemy ctor (0x02D89E88..0x02D89F50) writes HP / max HP to floats 0 / 1, +0x3C = gl+0x120, +0x40 / +0x44 = 1.0; the behaviours' initialize overwrite +0x44 (Kuribo 0.8, Tiki Buzz 0.98, Big Goomba 0.9, Paratroopa 0.7). Not gl +0x28.",
+  "stepjump_speed": "The fighters' StepJump speed (Wii U 0x02E79938 = 3DS 0x97E080, called from FighterKineticTransactor::change_kinetic_impl kinetic 1 with int 0x11000000 = 1): y = step_jump_speed_y (fighter_param 0x15F / 0x160) x status float 0x1000006, x pow(float 0x20000B5, int 0x10000006 - 1) past one step. Common MSC func_1149 sets float 0x1000006 = the answer and int 0x10000006 = 0 only through link 3.",
+  "msc_status_op3": "MSC StatusModule op 3 is a request (3DS StatusModulePartialImpl::notify_event_msc_cmd case 3 0x687968: vt+0x90(bool), +0x54 = the kind): the status changes later.",
+  "workmodule_vt": "WorkModule vt+0x44 get_float(r4 id), +0x4C set_float(f1, r4 id), +0x84 get_int(r4 id), +0x8C set_int(r4 value, r5 id); the MSC accessor +0x20 StatusModule (+0x48 the status kind), +0x28 WorkModule.",
+  "damage": "Wii U Behavior::set_current_damage 0x026A7E58 (init_damage 0x02C212F0, then W+0 = W+4 - get_damage(0) 0x02C22ECC); the Big Goomba's add_damage(25) = set_current_damage(get_damage(0) + 25).",
+  "create_param": "The enemy create param's +4 is the variation (0x02D9BD34 builds {kind, variation, ...}); the field spawner writes it (smashrun_field_cave.py set step2h).",
+  "item_0x94": "Item 0x94 patapata: Wii U item table 0x104157A0 entry {0x94, 0xB, 0xB, 0x101, 2, 0, name}; whether its code and resources exist was not established."
  }
 }
