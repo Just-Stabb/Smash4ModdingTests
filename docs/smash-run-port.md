@@ -1434,3 +1434,13 @@ and exactly the effect-slot patch's 74 words (3797).
 3. Formats: 3DS models / motions / textures to Wii U (NUD / OMO / NUT), effects, sounds.
 4. Mode: a menu entry, the character select and power setup, the 5-minute field, the final battle, results.
 5. Split screen: the Wii U renders one camera; 4 viewports is engine work (cameras, HUD per player, culling).
+
+## User results after step 2g (naming, laser, fliers)
+
+- **Naming:** the kind `plasmawisp` (0x12, its Fortress twin `mczakoplasmawisp` 0x57) is **Lethinium** in game (the
+  user's correction: earlier sections and READMEs call it "Plasma Wisp"; user-facing text uses Lethinium from now on).
+- **Lethinium's laser is visible now** (since step 2d's bank registrations; the S4FX logs' ids 0x7570002-4 were the
+  open question).
+- **Step 2e v1: the fliers (Ghos, Tiki Buzz) don't move: they stay where they spawn.** The unicorn tests check the
+  calls, not the resulting motion: the aerial / kinetic path doesn't move them in game (steps 2f / 2g's Furiijio and
+  Propeller Heiho share it: expect the same).
