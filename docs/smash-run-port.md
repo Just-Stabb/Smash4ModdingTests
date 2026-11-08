@@ -1301,7 +1301,7 @@ unchanged): text 0x02D9A618, 0x02D9B6F8, 0x04B7D16C, 0x04B7D230-0x04B7D52C (fiel
 its data), 0x04B849B4-0x04B84A00 (D), 0x04B8691C-0x04B87FC8 (A), 0x04B8940C-0x04B89FFC (B), 0x04BB8004-0x04BB8654 (C),
 0x04BB8770-0x04BBB738 (G: code to 0x04BB9DD4, data after it): 3876 words, all Smash Run regions.
 
-**Propeller Heiho (0x47, not ported).** Read so far: start 0x99010 (set_frame / set_rate_material, set_rhombus,
+**Propeller Heiho (0x47, not ported here: see Step 2g).** Read so far: start 0x99010 (set_frame / set_rate_material, set_rhombus,
 nearest + turn, play_se, the item helper 0x5A6F0: a held item (find_item 0x3CD464, its vt+0x144(0)), then
 success_by_percent and random_range(0, 28) choose an item kind, create_item_and_have(kind, variation, position, 1)
 0x7B4104); states 1 turn (0x99598: set_mode_normal(0, 0, 0.1, 0.1, 10, 10), TurnAir, at the end reverse_lr -> 4),
@@ -1322,6 +1322,107 @@ keep theirs (docs/native-notes.md, "Effect manager: bank slots"). exe_v18 vs exe
 the tool's exactly; relocations and file info equal. The step-2f advice to remove `effect/enemy/plasmawisp/` and
 `effect/enemy/darios/` is withdrawn. `tools/diag_effect_cave.py`'s `slot >= 0x29` tests assume 41 slots (a log build
 over exe_v18 would print enemy slots 41+ as "none"); update it before using it again.
+
+## Step 2g: Propeller Heiho (3DS state code) and the item it carries
+
+Package smashrun_step2g_v1: `code/` exe_v19 = exe_v18 (effect_slots_v1) + Smash Run through step 2g (scratch
+build19.py: `smashrun_field_cave.py`'s default set `step2g` and `smashrun_walker_cave.py` applied over exe_v18 in one
+rpx_patch call: both write every word of their regions, so the result is exe_v12 + the step 2g caves + the
+effect-slot patch; the text section moved to the file's end again, its old place zeroed, hence 160 MB) and
+`smashrun_step2g_data` (Propeller Heiho's model, motions, vl param, sound bank lower case and capitalised, its effect
+folder (one 32-byte .efc) from smashrun_effects_v2; no item data: the three items are the Wii U's own). Not yet run
+in game. Tests on exe_v19: `tools/smashrun_flier_test.py` 120 checks (67 before; new: `tools/
+smashrun_propellerheiho_test.py`'s 51 and the generic F2 / start checks for the new kind), smashrun_walker_test.py
+160 (with the enemy root + propellerheiho's pac), smashrun_field_test.py 12, smashrun_enemy_test.py 26 (root),
+s3ds_enemy_test.py propellerheiho 11, `tools/effect_slots_patch_test.py` exe_v19 against exe_v17 47 (all ok): 0
+failures. Readings with addresses: `hand_read.json` (propellerheiho, with a new `item` key that
+`tools/s3ds_enemy_spec.py` now prints), docs/smash-run-enemies/propellerheiho.md regenerated.
+
+**The carried item (3DS).** The item helper 0x5A6F0: a held item is removed (item vt+0x144(0)); success_by_percent(P@0x24
+10) -> kind 0x21 customizeitem, else success_by_percent(P@0x28 20) -> 0x1D goldbag, else 0x0E tabemono with variation
+random_range(0, 28) (inclusive: tabemono has 29); Behavior::create_item_and_have(kind, variation, posture, 1)
+(0x7B4104: create_item 0x7B214C = ItemCreateParam::init_normal + ItemManager::create_item, then the item's vt+0x17C
+(0x50000000, 0, -1, 0, 0): "have" with no owner, then vt+0x14C: its id) -> +0x208. The 3DS item kind table (code.bin
+0xC2EB28, 0x24-byte entries, name at +0x18) and the Wii U's (0x104157A0) list the same kinds (checked to 0x3F): 0x0E
+tabemono (29 variations on both), 0x1D goldbag, 0x21 customizeitem; no mapping needed. The hold is the behaviour's:
+slot 59 (every frame) Item::warp(HipN's global position + (0, P@0x1C -10, 0), z 0) while not dropped. Slot 55 (after
+the state update) in states 4 / 5: a swap timer (P@0x20 60) re-picks the item with the item's own effect (common
+0x100001C at (-5, 5, 0), tabemono (0, 5, 5)) and play_se(0x6D20001); between swaps a drop timer (first P@0x68 100,
+then P@0x60 180) rolls success_by_percent(P@0x64 10): Item::fall(tabemono ? 0 : 1, ZERO), none held, dropped (+0x20C),
+-> 5 (in 5: +0x1F4 = P@0x80 60). Slot 11 (notify_on_damage) drops it the same way after BehaviorImpl's, so the
+killing blow drops it (the defeat). The dtors remove a held item (vt+0x144(0)). Slot 71 only counts the propeller
+sound.
+
+**The item on the Wii U.** `Behavior::create_item` survives at **0x026A8D78** (r3 this, r4 kind, r5 variation, r6
+&pos, r7 unused, r8 bool: get_param(kind, 0x2C), init_normal **0x030519B4** (id 0x20000000 | var << 16 | kind),
+ItemManager::create_item **0x0305542C**; its only caller is the Wii U's create_item_and_throw 0x026A8F10, used by two
+Wii U enemies); create_item_and_have is gone (no caller), so the cave makes its two item calls. The Item: +0 id, +4
+kind, vtable at **+0x24** with 8-byte entries ({adjust, function}, the function at +4), the **same slot numbers as the
+3DS's** (create_item_and_throw's id call is the 3DS's vt+0x14C = slot 83 = Wii U +0x29C; slot 81 +0x28C =
+0x0302604C sets +0x3B6E, the removed flag find_item skips: the 3DS's remove; slot 95 +0x2FC = 0x03026884 is have(owner,
+...), its owner-0x50000000 path the no-owner held state). The ItemManager: [0x102F9B30]; find_item **0x030563AC**
+(the 3DS 0x3CD464's loop: +0x14 list, the removed byte +0x3B6E). Item::warp(Vector3) **0x0303207C** (warp(v, v2)
+0x030322F4; the 3DS's module calls and event 0x29). Item::fall(float, Vector3) **0x03032D78** (found through the
+3DS's callers ItemModuleImpl::drop_item / throw_item: the Wii U's ItemModule calls it from 0x02C46580 / 0x02C47668 /
+0x02C49238; the same item params 3 / 4 / 5 and sp-float 0x34). The node position: the ModelModule (acc+0x3118)
+node_global_position **0x0200739C** (node 3, as center_pos 0x026A7104 calls it). So the carry is ported, not only the
+drop. **To check in game**: that the Wii U creates these three kinds outside Classic (their resources loaded on a
+Smash Run field); a failed create leaves none held (handled).
+
+**The movement functions.**
+- set_mode_normal (3DS 0x5F5A9C) has no Wii U copy; the cave's `ph_anormal` is it with the Wii U layout: the mode word
+  (+0xC, a word on the Wii U) 0, energy 0's init(0x17, &zero2, &zero3, acc) (vt+0x1C of its vptr +0x1C), energy 0 on /
+  1 off (+0x18 bytes), energy 0 +0x38 / +0x3C and the module +0x20 / +0x24 = the max speed, +0x10..+0x1C = accel x / y,
+  brake x / y. The Wii U's update(x, y, brake) **0x02DB2524** reads exactly these in mode 0 (speed += (x, y) x accel;
+  brake 0x02DB1BA4 with +0x18 / +0x20). set_max_speed (0x5F58A0): `ph_maxspd` (+0x20 / +0x24; in mode 0 / 1 also
+  energy 0 +0x38 / +0x3C).
+- get_height_from_ground (0x7B4C68): GroundModule ray_check(from, dir, out, bool) is **0x02C39F18** on the Wii U (a
+  GroundModule vtable entry in six vtables: the 3DS 0x9535F4's two GroundCollision paths, mask 0x102000 when the bool
+  is 0); `ph_hgt` = ray from the posture by (0, -50): y - hit y, or 50.
+- is_in_view_area (0x9EA804) exists: **0x026A96BC** (CameraModule acc+0x30CC is_clip_in(1) **0x02C15EB8**, the 3DS
+  0x950DDC's sphere loop and CameraMan; step 2c had not found it).
+- success_by_percent (0x7B3BC4) exists: **0x026A8618** (the game's Randomizer 0x105759C0 < f1 x 0.01, a static
+  function; random_range(float) is 0x026A8598). random_range(int, int) (inclusive): the cave's h_rand as for the
+  other kinds.
+- damage_turn (0x7B0814) exists: **0x02DB4E84** (DamageModule +0x6C +0x2C lr against the posture lr -> reverse_lr).
+- get_lr_to_nearest_target (0x9EB178: the nearest fighter's x against the posture's -> 1 / -1, else the given lr):
+  `ph_lrcmp` with get_nearest_target + get_target_pos (approximation: the 3DS asks EnemyAiModule::get_nearest_fighter
+  from the posture).
+- The Behavior's slots 55 / 59: the Wii U's BehaviorImpl update (0x0269FE00) calls the state update, then vt+0x1C4
+  (slot 55), then vt+0x1E4 (slot 59) every frame, as the 3DS: the kind's own vtable overrides them.
+
+**Propeller Heiho** (Mario, 0x47; create 0x9AA38, table 0x111278), `FLIERS` 'propellerheiho' (object PH_SIZE 0x25C:
+the flier's 0x230 + the 3DS's +0x1DC..+0x20C; its vtable `vt_propellerheiho` = VTF but slots 55 / 59; CFG P0-32 = its
+P0 row, then the code's literals):
+- start 0x99010: the aerial module, set_rhombus, the fields (+0x208 none), +0x10 = posture lr, faced to the nearest,
+  the item picked, swap 60, drop 100, -> 4.
+- 4 height, 5 patrol, 6 brake, 1 turn, 2 fly away, 7 stun as in hand_read.json (the 3DS sequences; P13 120 frames to
+  reach the nearest's height within P14 3; the bob vy = cos(a) x P16 x (360 / P17) / 360 with a += 360 / P17 a frame
+  (int), floor / ceiling turning it; the patrol random(150, 450) frames, then the brake and (P22 100 %) the fly-away;
+  dropped -> 60 frames -> fly away; the fly-away removed out of view (is_in_view_area) or after 300 frames).
+- 3 dead (bullet; P2 entry 0), 8 remove; slots 64-66 4, 67 3; 69 => 7 (returns 1).
+- **Contact damage**: only P2 entry 0 on the defeated body (state 3: power 2, angle 361, kbg 100, fkb 0, bkb 50, size
+  2, node 2 = RotN). None while it flies, turns, patrols, brakes, flies away or is stunned. No explicit attack calls,
+  no ACMD, no articles.
+- Not ported: the tilt (slot 55's posture z rotation toward -vx / P15 x P20, the stun's 5-degree return, slot 13's
+  reset: the posture rotation is not mapped on the Wii U); set_frame_material / set_rate_material(0) at start; the
+  sounds (0x6D20000 the propeller loop, counted per kind; 0x6D20001 the swap); the swap effect is requested by the
+  Behavior at the item's hold position + the offset (the 3DS: the item's EffectModule on joint 0; whether the Wii U's
+  common effect 0x1C is the same puff is to check); the kinetic is never set outside 3 / 7 (as on the 3DS: after a
+  stun it stays 16).
+
+**Spawner**: `smashrun_field_cave.py` set `step2g` (default): step2f's and Propeller Heiho (placement 2, three times in
+the 23-entry turn), at most 6 alive, the fliers' spawn offset (DX 70, DY 30); requests step2f's seventeen + 0x47.
+
+**Code space**: region G (claimed in step 2e): the fliers' code now to 0x04BBAE5C (Propeller Heiho's 0x04BB9DD4 on),
+their data after it to 0x04BBCDD0; 0x04BBCDD0-0x04BC0000 free.
+
+**exe_v19 vs exe_v18, word diff** (scratch diff19.py; data / rodata / bss equal; relocations equal; the file info
+unchanged): text 0x02D9A618, 0x02D9B6F8 (the field hooks' targets), 0x04B7D16C, 0x04B7D23C-0x04B7D568 (field cave),
+0x04B7D630, 0x04B7DBCC, 0x04B7DCC0-0x04B7DF00 (E and its data), 0x04B8691C-0x04B877E0 (A: 11 words), 0x04B8940C-
+0x04B8A000 (B: data moved), 0x04BB8004, 0x04BB8180-0x04BB8660 (C), 0x04BB8770-0x04BB9340 (G: 5 words), 0x04BB9DD4-
+0x04BBCDD0 (G: Propeller Heiho's code, the fliers' data): 3723 words, all Smash Run regions. exe_v19 vs exe_v17: these
+and exactly the effect-slot patch's 74 words (3797).
 
 ## Plan (to refine once code.bin is in)
 

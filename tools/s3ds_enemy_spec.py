@@ -2321,7 +2321,7 @@ def md_kind(spec):
         L.append('')
         if hr.get('variations'):
             L.append('- Variations: ' + hr['variations'])
-        for key in ('targeting', 'kinetics', 'projectiles', 'death', 'meshes'):
+        for key in ('targeting', 'kinetics', 'projectiles', 'item', 'death', 'meshes'):
             if hr.get(key):
                 L.append('- %s: %s' % (key.capitalize(), hr[key]))
         L.append('')

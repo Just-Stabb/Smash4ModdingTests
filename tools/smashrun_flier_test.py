@@ -11,6 +11,9 @@ the aerial module, the ground normal, the hit stun factor, sqrtf, BehaviorImpl's
 - per kind: slots 64-67, change_state over its 3DS table, set_attack_data (the vl P2 entries in their states only,
   the entries' words = the 3DS vl's), start, each state's enter / update (the 3DS sequences of docs/smash-run-port.md
   "Step 2e"), the damage / stun / leave / death paths.
+Then tools/smashrun_furiijio_test.py (step 2f) and tools/smashrun_propellerheiho_test.py (step 2g: its items through
+stubbed Wii U item calls: create_item, the item vtable's remove / id / have, find_item, warp, fall; the ray check, the
+camera clip, success_by_percent, damage_turn, the aerial update(x, y, brake)).
 """
 import math
 import os
@@ -29,6 +32,9 @@ PMGR, GLTAB = HEAP + 0x25000, HEAP + 0x26000      # the param manager, the gl en
 ORIG27 = ORIG4 = None
 MODEL, EFFM, DIRTY = HEAP + 0x24400, HEAP + 0x24600, 0x02000020     # fake ModelModule / EffectModule, vt+0xC4 stub
 EINIT, FVT = 0x02000010, HEAP + 0x24200      # the aerial energy's init (vt+0x1C), its fake vtable
+# step 2g (Propeller Heiho): fake items (+0 id, +4 kind, +0x24 vptr) and their vtable's three stub entries
+IMGR, ITEMS, IVT = HEAP + 0x27F00, HEAP + 0x28000, HEAP + 0x28800
+IT_STUBS = {0x02000040: 'item_remove', 0x02000044: 'item_id', 0x02000048: 'item_have'}
 
 
 class Machine(T.Machine):
@@ -44,6 +50,13 @@ class Machine(T.Machine):
         self.w32(PMGR + W.GL_BASE, GLTAB)
         self.w32(PMGR + W.GL_INDEX + 4 * (8 * 0x11), 2)          # ghos, variation 0 -> gl entry 2
         self.w32(GLTAB + 2 * 0x228 + 0x154, 30)
+        # step 2g: the ItemManager, the items' vtable, the item / ground / camera / random answers
+        self.w32(W.ITEM_MGR, IMGR)
+        for a, n in IT_STUBS.items():
+            self.w32(IVT + {'item_remove': W.IT_REMOVE, 'item_id': W.IT_ID, 'item_have': W.IT_HAVE}[n], a)
+        self.items, self.removed, self.create_fail = {}, set(), False
+        self.success, self.view, self.ray_hit, self.wall = [], 1, None, 0
+        self.node3, self.vx = (0.0, 20.0, 3.0), 0.0
 
     def hook(self, u, addr, size, _):
         r = lambda n: u.reg_read(R[n])  # noqa: E731
@@ -125,6 +138,70 @@ class Machine(T.Machine):
             c.append(('follow', r(3), r(4), r(5), tuple(round(self.rf(r(6) + 4 * i), 3) for i in range(3)),
                       tuple(round(self.rf(r(7) + 4 * i), 3) for i in range(3)), round(self.fr(1), 3)))
             self.ret(self.handle)
+        elif addr == W.CREATE_ITEM:
+            c.append(('create_item', r(3), r(4), r(5), tuple(round(self.rf(r(6) + 4 * i), 3) for i in range(3)),
+                      tuple(round(self.rf(r(7) + 4 * i), 3) for i in range(3)), r(8)))
+            if self.create_fail:
+                self.ret(0)
+            else:
+                n = len(self.items)
+                it = ITEMS + 0x40 * n
+                self.w32(it, 0x1000 + n)
+                self.w32(it + 4, r(4))
+                self.w32(it + 0x24, IVT)
+                self.items[0x1000 + n] = it
+                self.ret(it)
+        elif addr in IT_STUBS:
+            name = IT_STUBS[addr]
+            c.append((name, r(3)) + ((r(4),) if name == 'item_remove' else
+                                     (r(4), r(5), r(6), r(7), r(8)) if name == 'item_have' else ()))
+            if name == 'item_remove':
+                self.removed.add(self.r32(r(3)))
+            self.ret(self.r32(r(3)) if name == 'item_id' else None)
+        elif addr == W.FIND_ITEM:
+            c.append(('find_item', r(3), r(4)))
+            it = self.items.get(r(4))
+            self.ret(it if it and r(4) not in self.removed else 0)
+        elif addr == W.ITEM_WARP:
+            c.append(('warp', r(3), tuple(round(self.rf(r(4) + 4 * i), 3) for i in range(3))))
+            self.ret()
+        elif addr == W.ITEM_FALL:
+            c.append(('fall', r(3), round(self.fr(1), 3), tuple(round(self.rf(r(4) + 4 * i), 3) for i in range(3))))
+            self.ret()
+        elif addr == W.NODE_GPOS:
+            c.append(('node_gpos', r(3), r(4), r(6)))
+            for i, v in enumerate(self.node3):
+                self.wf(r(5) + 4 * i, v)
+            self.ret()
+        elif addr == W.RAY_CHECK:
+            c.append(('ray', r(3), tuple(round(self.rf(r(4) + 4 * i), 3) for i in range(2)),
+                      tuple(round(self.rf(r(5) + 4 * i), 3) for i in range(2)), r(7)))
+            if self.ray_hit is None:
+                self.ret(0)
+            else:
+                self.wf(r(6), self.rf(r(4)))
+                self.wf(r(6) + 4, self.ray_hit)
+                self.ret(1)
+        elif addr == W.IN_VIEW:
+            c.append(('in_view', r(3)))
+            self.ret(self.view)
+        elif addr == W.SUCCESS_PCT:
+            c.append(('success', round(self.fr(1), 3)))
+            self.ret(self.success.pop(0) if self.success else 0)
+        elif addr == W.DAMAGE_TURN:
+            c.append(('damage_turn', r(3)))
+            self.ret()
+        elif addr == W.AER_UPDATE_XY:
+            c.append(('aer_update_xy', r(3), round(self.fr(1), 4), round(self.fr(2), 4), r(4)))
+            self.ret()
+        elif addr == W.CHECK_WALL:
+            c.append(('wall', r(3)))
+            self.ret(self.wall)
+        elif addr == W.GET_SPEED:
+            self.wf(r(3), self.vx)
+            self.wf(r(3) + 4, self.vy)
+            self.wf(r(3) + 8, 0.0)
+            self.ret()
         elif addr == ORIG4:
             c.append(('bi_skip', r(3)))
             self.ret()
@@ -136,7 +213,7 @@ class Machine(T.Machine):
 
     def flier(self, cfg, state=0, kind=0x11, lr=0.0):
         self.walker(cfg, state=state, kind=kind, lr=lr)
-        self.uc.mem_write(OBJ + W.FL_SIZE, bytes(W.FU_SIZE - W.FL_SIZE))
+        self.uc.mem_write(OBJ + W.FL_SIZE, bytes(max(W.FU_SIZE, W.PH_SIZE) - W.FL_SIZE))
         self.w32(OBJ + W.AER, ACC)
         self.w32(OBJ + W.AER + 4, FEN0)
         self.w32(OBJ + W.AER + 8, FEN1)
@@ -557,6 +634,8 @@ def main():
               'module)' % w['name'])
     import smashrun_furiijio_test
     smashrun_furiijio_test.furiijio(img, D, fn, cfg['furiijio'], vt_words, Machine, calls, run)
+    import smashrun_propellerheiho_test
+    smashrun_propellerheiho_test.propellerheiho(img, D, fn, cfg['propellerheiho'], vt_words, Machine, calls, run)
     print('%d failures' % len(T.FAILS))
     sys.exit(1 if T.FAILS else 0)
 

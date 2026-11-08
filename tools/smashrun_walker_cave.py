@@ -104,6 +104,13 @@ Step 2f (docs/smash-run-port.md, "Step 2f"; region G): Furiijio 0x1A, a flier wi
   degrees), 8 leave, 9 dead, 10 remove. REQ_FOLLOW corrected to 0x026A95F8 (0x026A9584 is REQ_NODE), and the fliers'
   starts call set_rhombus with the Behavior.
 
+Step 2g (docs/smash-run-port.md, "Step 2g"; region G, code_ph): Propeller Heiho 0x47 (PH_SIZE, `vtover` slots 55 /
+  59, `dmg_labels`): 4 height, 5 patrol (cosine bob), 6 brake, 1 turn, 2 fly away, 7 stun, 3 dead, 8 remove, with the
+  3DS's set_mode_normal / set_max_speed / get_height_from_ground / get_lr_to_nearest_target written over the Wii U's
+  aerial module and GroundModule ray_check; it carries an item: the Wii U's Behavior::create_item 0x026A8D78 + the
+  item's have(0x50000000) (create_item_and_have), held by Item::warp each frame (slot 59), swapped / dropped
+  (Item::fall) in slot 55 and on damage (slot 10), removed with it (slot 27).
+
 Not ported (the README lists them): the Waddle Doo's beam (states 7 / 8: an article the Wii U has no weapon kind
 for) and its leave timer (9) and random hop (6); the Churine's sleep powder (6 / 7: an effect and attack the Wii U
 has no data for); the Waddle Dee's parasol float (EnemyAerialModule embedded in the 3DS object: the parasol fall is
@@ -313,6 +320,31 @@ SINF, COSF, ACOSF = 0x04ADEB48, 0x04ADF434, 0x04ADF800      # libm (identified b
 FU = 0x230                           # Furiijio's own fields after the flier's (object FU_SIZE)
 FU_C, FU_ROT, FU_E = FU, FU + 0xC, FU + 0x18                 # center offset (3DS +0x218), node angles (+0x224), effects
 FU_SIZE = FU + 0x28
+# step 2g (Propeller Heiho; docs/smash-run-port.md "Step 2g"): the Wii U's item calls and the helpers it was missing
+CREATE_ITEM = 0x026A8D78             # Behavior::create_item(kind, var, &pos, &rot, bool) -> Item* (3DS 0x7B214C: init_normal
+#                                      0x030519B4 + ItemManager::create_item 0x0305542C); create_item_and_have 0x7B4104
+#                                      itself is gone on the Wii U (no caller): the cave does its two item calls
+ITEM_MGR = 0x102F9B30                # [ITEM_MGR] = the ItemManager (lib::Singleton<app::ItemManager>::instance_)
+FIND_ITEM = 0x030563AC               # ItemManager::find_item(id) -> Item* / 0 (3DS 0x3CD464; Item +0 id, +4 kind)
+ITEM_WARP = 0x0303207C               # Item::warp(Vector3 const&) (3DS 0x74E174)
+ITEM_FALL = 0x03032D78               # Item::fall(float, Vector3 const&) (3DS 0x74D6E4; ItemModule drop / throw call it)
+IT_VT, IT_REMOVE, IT_ID, IT_HAVE = 0x24, 0x28C, 0x29C, 0x2FC   # the Item's vtable (+0x24; entries 8 bytes) slots 81
+#                                      (remove(bool): +0x3B6E = 1), 83 (id), 95 (have(owner, ...)): the 3DS's
+#                                      vt+0x144 / +0x14C / +0x17C (the same slot numbers)
+NODE_GPOS = 0x0200739C               # ModelModule node_global_position(node, &v, bool) (acc+0x3118; 3DS 0x4A8xxx via
+#                                      acc+0x3098, as center_pos 0x026A7104 calls it)
+RAY_CHECK = 0x02C39F18               # GroundModule ray_check(V2 const& from, V2 const& dir, V2& out, bool) (3DS 0x9535F4)
+IN_VIEW = 0x026A96BC                 # Behavior::is_in_view_area() (3DS 0x9EA804: CameraModule (acc+0x30CC) is_clip_in(1)
+#                                      0x02C15EB8, the 3DS's 0x950DDC)
+SUCCESS_PCT = 0x026A8618             # Behavior::success_by_percent(f1) (3DS 0x7B3BC4: the game's Randomizer < f1 x 0.01)
+DAMAGE_TURN = 0x02DB4E84             # Behavior::damage_turn() (3DS 0x7B0814: DamageModule +0x98 lr != posture lr -> turn)
+AER_UPDATE_XY = 0x02DB2524           # EnemyAerialModuleImpl::update(f1 x, f2 y, r4 brake) (3DS 0x5F66AC)
+PH = 0x230                           # Propeller Heiho's own fields after the flier's (3DS +0x1DC..+0x20C)
+PH_D, PH_B, PH_Y, PH_F, PH_T, PH_A, PH_R, PH_S, PH_DT, PH_I, PH_X = (PH + 4 * i for i in range(11))
+PH_SIZE = PH + 0x2C
+ITEM_NONE = 0x50000000
+PH_FOOD, PH_GOLDBAG, PH_CUSTOM = 0x0E, 0x1D, 0x21  # tabemono (29 variations), goldbag, customizeitem (both games' tables)
+PH_SWAP_FX = 0x100001C               # the item swap's effect (3DS: the item's EffectModule req, common effect 0x1C)
 GL_INDEX, GL_BASE = 0x1E4, 0x34      # gl entry = [[PARAM_MGR] + 0x34] + 0x228 * [[PARAM_MGR] + 0x1E4 + 4 * (8K + var)]
 VT_WORDS = [None]                    # BehaviorImpl's vtable words (read from the input), for code_f
 TWIN_FLIP = ((0x1008FFCC, 0x026D7C98), (0x1008F1D4, 0x026D19F4), (0x1008EC68, 0x026CF200))
@@ -404,7 +436,8 @@ TIKI_BULLET = tuple(vl_group('tikibuzz', 2)[1])    # state 2 (dead): power 2, an
 FU_BEAM0 = tuple(vl_group('furiijio', 2)[0])     # state 4 (beam): power 4, angle 361, kbg 100, fkb 100, size 2, node 3
 FU_BEAM1 = tuple(vl_group('furiijio', 2)[1])     # state 7 (sweep beam): the same but +0x7C 140 (60 in entry 0)
 FU_BULLET = tuple(vl_group('furiijio', 2)[2])    # state 9 (dead): power 3, angle 361, kbg 100, bkb 50, size 3, node 2
-ATTACKS = {'fu_beam0': FU_BEAM0, 'fu_beam1': FU_BEAM1, 'fu_bullet': FU_BULLET, 'ghos_body': GHOS_BODY, 'ghos_bullet': GHOS_BULLET, 'tiki_dive': TIKI_DIVE, 'tiki_bullet': TIKI_BULLET, 'kuribo_bump': KURIBO_BUMP, 'heiho_bump': HEIHO_BUMP, 'bullet': BULLET_ATK, 'heiho_bullet': HEIHO_BULLET,
+PH_BULLET = tuple(vl_group('propellerheiho', 2)[0])  # state 3 (dead): power 2, angle 361, kbg 100, bkb 50, size 2, node 2
+ATTACKS = {'ph_bullet': PH_BULLET, 'fu_beam0': FU_BEAM0, 'fu_beam1': FU_BEAM1, 'fu_bullet': FU_BULLET, 'ghos_body': GHOS_BODY, 'ghos_bullet': GHOS_BULLET, 'tiki_dive': TIKI_DIVE, 'tiki_bullet': TIKI_BULLET, 'kuribo_bump': KURIBO_BUMP, 'heiho_bump': HEIHO_BUMP, 'bullet': BULLET_ATK, 'heiho_bullet': HEIHO_BULLET,
            'churine_bullet': CHURINE_BULLET, 'gordo_spike': GORDO_SPIKE, 'whitebear_bullet': WHITEBEAR_BULLET}
 DAMAGE_LABELS = ('DamageStart', 'DamageFly', 'DamageFall', 'DownBound', 'DownBound', 'DownLoop', 'DownBoundEnd',
                  'DownWait')
@@ -545,6 +578,11 @@ DEG2RAD = struct.unpack('>f', bytes.fromhex('3C8EFA35'))[0]   # the 3DS literal 
 FU_CALC = tuple(struct.unpack('>f', bytes.fromhex(h))[0] for h in ('3FC90FDB', '43340000', '3EA2F983', 'BEA2F983',
                                                                    'BF800000', '3727C5AC'))
 FU_PD4 = 15.0                          # P@0xD4 (the beam hitbox's base offset; the spec's float after the struct)
+_PP0 = vl_group('propellerheiho', 0)[0]    # P0 row (variation 0, 33 words: P(0)..P(32) = the 3DS P0 +0x00..+0x80)
+_F = lambda h: struct.unpack('>f', bytes.fromhex(h))[0]  # noqa: E731
+# Propeller Heiho's literals after its P0 row (the 3DS code's own constants; 0x3B360B61 = 1 / 360, 0x3C23D70A = 0.01)
+PHK = dict(c01=33, c10=34, c50=35, c5=36, c1=37, cm1=38, c0=39, c360=40, deg=41, i360=42, half=43, stop=44, cm5=45)
+PH_LIT = (_F('3DCCCCCD'), 10.0, 50.0, 5.0, 1.0, -1.0, 0.0, 360.0, DEG2RAD, _F('3B360B61'), 0.5, _F('3C23D70A'), -5.0)
 FLIERS = (
     # Ghos (Kid Icarus) 0x11, BehaviorGhos (create 0x11560, table 0x10D350; docs/smash-run-port.md "Step 2e")
     dict(name='ghos', kind=0x11, flier=True, size=FL_SIZE, areas=tuple(tuple(e) for e in vl_group('ghos', 5)),
@@ -595,6 +633,22 @@ FLIERS = (
                                _FS[9] * 10, _FS[10], _FS[11], _FS[12], _FS[13], _FS[14], _FS[15], _FS[17],
                                180.0 / (_FS[17] or 1), FU_PD4, 1.5, 0.05, DEG2RAD, 90.0, 1.0, 0.0) +
            (_FP6[0], -_FP6[1], _FP6[2], _FP6[6], _FP6[8]) + FU_CALC),
+    # Propeller Heiho (Mario) 0x47, BehaviorPropellerheiho (create 0x9AA38, table 0x111278; docs/smash-run-port.md
+    # "Step 2g"): its ctor's damage labels (Damage x 8, Vertical); slot 69 always => 7, so they are never played
+    dict(name='propellerheiho', kind=0x47, flier=True, size=PH_SIZE,
+         areas=tuple(tuple(e) for e in vl_group('propellerheiho', 5)),
+         motions=(('Damage', 1), ('Move', 1), ('TurnAir', 1), ('Vertical', 1)),
+         dmg_labels=('Damage',) * 8 + ('Vertical',),
+         dead='Damage', last='Vertical', hashset=False, kick=False,
+         energy={},                                      # no initialize override
+         states={1: ('ph1_en', 'ph1_up'), 2: ('ph2_en', 'ph2_up'), 3: ('ph3_en', 'ph3_up'), 4: ('ph4_en', 'ph4_up'),
+                 5: ('ph5_en', 'ph5_up'), 6: ('ph6_en', 'ph6_up'), 7: ('ph7_en', 'ph7_up'), 8: 'remove'},
+         start=(4, 4), rets=(4, 4, 4, 3), remove=8, fall=(None, 0), landing=None, turn=None, turnst=0, walkst=0,
+         hop=(0.0, 0, 0), search=tuple(tuple(g) for g in vl_group('propellerheiho', 1)),
+         attacks=((3, 'ph_bullet'),),
+         fstart='f_ph_start', fdmg='f_ph_dmg', f69='f_ph_69', f27='f_ph_rm',
+         vtover={55: 'f_ph_55', 59: 'f_ph_59'},
+         P=tuple(_PP0) + PH_LIT),
 )
 WALKERS = WALKERS + FLIERS
 KINDS = tuple(w['kind'] for w in WALKERS)
@@ -650,6 +704,8 @@ def damage_labels(w):
     is skipped)"""
     if w.get('no_damage_labels'):
         return [-1] * 9
+    if w.get('dmg_labels'):                     # step 2g: the 3DS create's own nine (motion names)
+        return [index(w, s) for s in w['dmg_labels']]
     return [index(w, s) for s in DAMAGE_LABELS] + [index(w, w['last'])]
 
 
@@ -3873,7 +3929,1101 @@ def code_f(D, vtw):
         bl fu_beam
         b epi
     """)
+    code_ph(G, D, far, st, orig)
     return G
+
+
+def code_ph(G, D, far, st, orig):
+    """step 2g: Propeller Heiho (kind 0x47; enemy_fs.cro create 0x9AA38, state table 0x111278; docs/smash-run-port.md
+    "Step 2g"), in region G after the other fliers. Its fields PH_* are the 3DS's +0x1DC..+0x20C: PH_D the vertical
+    direction (+0x1DC), PH_B the aerial update's brake flag (+0x1E0), PH_Y a height reference (+0x1E4, written only),
+    PH_F the fly-away frames (+0x1F0), PH_T the state timer (+0x1F4), PH_A the bob angle in degrees (int, +0x1F8),
+    PH_R turned (+0x1FC), PH_S the item swap timer (+0x200), PH_DT the drop timer (+0x204), PH_I the held item's id
+    (+0x208, 0x50000000 none), PH_X dropped (+0x20C). P0-32: its P0 row (P@0x00..0x80), then the literals PHK."""
+    d = dict(AER=AER, AM=AER + 0xC, A10=AER + 0x10, A14=AER + 0x14, A18=AER + 0x18, A1C=AER + 0x1C, A20=AER + 0x20,
+             A24=AER + 0x24, E0=AER + 4, E1=AER + 8, PD=PH_D, PB=PH_B, PY=PH_Y, PF=PH_F, PT=PH_T, PA=PH_A, PR=PH_R,
+             PS=PH_S, PDT=PH_DT, PI=PH_I, PX=PH_X, PHm4=PH - 4, DEF=DEFEATED, MGRH=ha(ITEM_MGR), MGRL=sx(ITEM_MGR),
+             FCH=ha(D['fconsts']), FCL=sx(D['fconsts']), SS=AER_SET_SPEED, UXY=AER_UPDATE_XY, SC=SET_CORRECT,
+             SP=SET_PASSABLE, BUL=BULLET, CTOR=AER_CTOR, VT=IT_VT, RM=IT_REMOVE, ID=IT_ID, HAVE=IT_HAVE,
+             FXH=PH_SWAP_FX >> 16, FXL=PH_SWAP_FX & 0xFFFF, FOOD=PH_FOOD, GOLD=PH_GOLDBAG, CUST=PH_CUSTOM,
+             **{'P%d' % i: P(i) for i in range(33)}, **{k.upper(): P(i) for k, i in PHK.items()})
+
+    def call(t):
+        return "lis r12, 0x%04X\nori r12, r12, 0x%04X\nmtctr r12\nbctrl" % (t >> 16, t & 0xFFFF)
+
+    d.update(FIND=call(FIND_ITEM), SUCC=call(SUCCESS_PCT), CREATE=call(CREATE_ITEM), FALL=call(ITEM_FALL),
+             WARP=call(ITEM_WARP), NGP=call(NODE_GPOS), RAY=call(RAY_CHECK), VIEW=call(IN_VIEW), TPOS=call(GET_TARGET_POS),
+             GSPD=call(GET_SPEED), COS=call(COSF), DTURN=call(DAMAGE_TURN), RHOMB=call(SET_RHOMBUS),
+             BIDMG=call(BI_NOTIFY_DMG), REQ=call(REQ_EFFECT))
+    a = lambda text: G.asm(text % d)  # noqa: E731
+    # ---- helpers (r31 this, r30 CFG; own frames)
+    # ph_find: r3 = ItemManager::find_item(PH_I) (0 for none / removed)
+    a("""
+    ph_find:
+        lwz r4, 0x%(PI)X(r31)
+        lis r3, 0x%(MGRH)04X
+        lwz r3, %(MGRL)d(r3)
+        lis r12, 0x%(FIH)04X
+        ori r12, r12, 0x%(FIL)04X
+        mtctr r12
+        bctr
+    """.replace('%(FIH)04X', '%04X' % (FIND_ITEM >> 16)).replace('%(FIL)04X', '%04X' % (FIND_ITEM & 0xFFFF)))
+    # ph_anormal(f1-f6): EnemyAerialModuleImpl::set_mode_normal (3DS 0x5F5A9C; no Wii U copy): mode 0, energy 0's
+    # init(0x17, &zero2, &zero3, acc), energy 0 on, energy 1 off, energy 0 +0x38 / +0x3C and the module +0x20 / +0x24
+    # = (f5, f6) (the max speed), +0x10..+0x1C = f1..f4 (the update's accel x / y, brake x / y)
+    a("""
+    ph_anormal:
+        mflr r0
+        stwu r1, -0x40(r1)
+        stw r0, 0x44(r1)
+        stfs f1, 0x20(r1)
+        stfs f2, 0x24(r1)
+        stfs f3, 0x28(r1)
+        stfs f4, 0x2C(r1)
+        stfs f5, 0x30(r1)
+        stfs f6, 0x34(r1)
+        li r0, 0
+        stw r0, 0x%(AM)X(r31)
+        stw r0, 8(r1)
+        stw r0, 0xC(r1)
+        stw r0, 0x10(r1)
+        stw r0, 0x14(r1)
+        stw r0, 0x18(r1)
+        lwz r3, 0x%(E0)X(r31)
+        lwz r12, 0x1C(r3)
+        lwz r12, 0x1C(r12)
+        mtctr r12
+        li r4, 0x17
+        addi r5, r1, 8
+        addi r6, r1, 0x10
+        lwz r7, 0x%(AER)X(r31)
+        bctrl
+        li r0, 1
+        lwz r12, 0x%(E0)X(r31)
+        stb r0, 0x18(r12)
+        li r0, 0
+        lwz r11, 0x%(E1)X(r31)
+        stb r0, 0x18(r11)
+        lfs f5, 0x30(r1)
+        lfs f6, 0x34(r1)
+        stfs f5, 0x38(r12)
+        stfs f6, 0x3C(r12)
+        stfs f5, 0x%(A20)X(r31)
+        stfs f6, 0x%(A24)X(r31)
+        lfs f1, 0x20(r1)
+        stfs f1, 0x%(A10)X(r31)
+        lfs f1, 0x24(r1)
+        stfs f1, 0x%(A14)X(r31)
+        lfs f1, 0x28(r1)
+        stfs f1, 0x%(A18)X(r31)
+        lfs f1, 0x2C(r1)
+        stfs f1, 0x%(A1C)X(r31)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+    # ph_maxspd(f1, f2): set_max_speed (3DS 0x5F58A0): the module +0x20 / +0x24; in mode 0 / 1 also energy 0's
+    ph_maxspd:
+        stfs f1, 0x%(A20)X(r31)
+        stfs f2, 0x%(A24)X(r31)
+        lwz r0, 0x%(AM)X(r31)
+        cmplwi r0, 1
+        bgt ms_out
+        lwz r12, 0x%(E0)X(r31)
+        stfs f1, 0x38(r12)
+        stfs f2, 0x3C(r12)
+    ms_out:
+        blr
+    # ph_setspd(f1, f2): set_current_speed(x, y) (3DS 0x5F5C7C -> the Vector2 setter, Wii U 0x02DB2BC0)
+    ph_setspd:
+        mflr r0
+        stwu r1, -0x20(r1)
+        stw r0, 0x24(r1)
+        stfs f1, 8(r1)
+        stfs f2, 0xC(r1)
+        addi r3, r31, 0x%(AER)X
+        addi r4, r1, 8
+        bl 0x%(SS)08X
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+    # ph_upd(f1, f2, r4): EnemyAerialModuleImpl::update(x, y, brake) (3DS 0x5F66AC = Wii U 0x02DB2524)
+    ph_upd:
+        addi r3, r31, 0x%(AER)X
+        b 0x%(UXY)08X
+    # ph_i2f(r3) -> f1, ph_f2i(f1) -> r3 (truncating, as vcvt.s32.f32)
+    ph_i2f:
+        stwu r1, -0x20(r1)
+        xoris r3, r3, 0x8000
+        stw r3, 0xC(r1)
+        lis r0, 0x4330
+        stw r0, 8(r1)
+        lfd f1, 8(r1)
+        lis r12, 0x%(FCH)04X
+        lfd f0, %(FCL)d(r12)
+        fsub f1, f1, f0
+        frsp f1, f1
+        addi r1, r1, 0x20
+        blr
+    ph_f2i:
+        stwu r1, -0x20(r1)
+        fctiwz f1, f1
+        stfd f1, 8(r1)
+        lwz r3, 0xC(r1)
+        addi r1, r1, 0x20
+        blr
+    # ph_hgt(r7 bool) -> f1: Behavior::get_height_from_ground(posture, 50, bool) (3DS 0x7B4C68: GroundModule
+    # ray_check(pos, (0 x 50, -1 x 50), out, bool); hit -> pos y - out y, else 50)
+    ph_hgt:
+        mflr r0
+        stwu r1, -0x30(r1)
+        stw r0, 0x34(r1)
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f1, 0x10(r12)
+        stfs f1, 8(r1)
+        lfs f1, 0x14(r12)
+        stfs f1, 0xC(r1)
+        stfs f1, 0x20(r1)
+        lfs f2, 0x%(C50)X(r30)
+        lfs f0, 0x%(C0)X(r30)
+        fmuls f3, f0, f2
+        stfs f3, 0x10(r1)
+        lfs f0, 0x%(CM1)X(r30)
+        fmuls f3, f0, f2
+        stfs f3, 0x14(r1)
+        lwz r3, 0(r31)
+        lwz r3, 0x30DC(r3)
+        addi r4, r1, 8
+        addi r5, r1, 0x10
+        addi r6, r1, 0x18
+        %(RAY)s
+        lfs f1, 0x%(C50)X(r30)
+        cmpwi r3, 0
+        beq hg_out
+        lfs f1, 0x20(r1)
+        lfs f0, 0x1C(r1)
+        fsubs f1, f1, f0
+    hg_out:
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+    # ph_lrcmp: f1 = get_lr_to_nearest_target(posture lr) (3DS 0x9EB178: the nearest fighter's x vs the posture's:
+    # 1 / -1, else the given lr), then cr0 = f1 ? posture lr
+    ph_lrcmp:
+        mflr r0
+        stwu r1, -0x20(r1)
+        stw r0, 0x24(r1)
+        bl h_near
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f1, 0x60(r12)
+        cmpwi r3, 0
+        blt lr_cmp
+        mr r5, r3
+        addi r3, r1, 8
+        mr r4, r31
+        %(TPOS)s
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f2, 0x10(r12)
+        lfs f3, 8(r1)
+        lfs f1, 0x%(C1)X(r30)
+        fcmpu cr0, f2, f3
+        blt lr_cmp
+        lfs f1, 0x%(CM1)X(r30)
+        bgt lr_cmp
+        lfs f1, 0x60(r12)
+    lr_cmp:
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f0, 0x60(r12)
+        fcmpu cr0, f1, f0
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+    # ph_hpos(r5 out): where the item hangs (3DS slot 59 0x9A224): node 3 (HipN)'s global position (ModelModule
+    # node_global_position(3, &v, 1)) + (0, P7 -10, 0), z = 0
+    ph_hpos:
+        mflr r0
+        stwu r1, -0x20(r1)
+        stw r0, 0x24(r1)
+        stw r5, 0x1C(r1)
+        li r0, 0
+        stw r0, 0(r5)
+        stw r0, 4(r5)
+        stw r0, 8(r5)
+        lwz r3, 0(r31)
+        lwz r3, 0x3118(r3)
+        li r4, 3
+        li r6, 1
+        %(NGP)s
+        lwz r5, 0x1C(r1)
+        lfs f0, 0x%(C0)X(r30)
+        lfs f1, 0(r5)
+        fadds f1, f1, f0
+        stfs f1, 0(r5)
+        lfs f1, 4(r5)
+        lfs f2, 0x%(P7)X(r30)
+        fadds f1, f1, f2
+        stfs f1, 4(r5)
+        stfs f0, 8(r5)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+    # ph_drop: the held item falls (3DS slots 11 / 55: Item::fall(tabemono ? 0 : 1, ZERO)); none held, dropped
+    ph_drop:
+        mflr r0
+        stwu r1, -0x20(r1)
+        stw r0, 0x24(r1)
+        bl ph_find
+        cmpwi r3, 0
+        beq dr_none
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0xC(r1)
+        stw r0, 0x10(r1)
+        lfs f1, 0x%(C0)X(r30)
+        lwz r0, 4(r3)
+        cmpwi r0, 0x%(FOOD)X
+        beq dr_go
+        lfs f1, 0x%(C1)X(r30)
+    dr_go:
+        addi r4, r1, 8
+        %(FALL)s
+    dr_none:
+        lis r0, 0x5000
+        stw r0, 0x%(PI)X(r31)
+        li r0, 1
+        stw r0, 0x%(PX)X(r31)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+    # ph_pick (3DS 0x5A6F0): a held item is removed (Item vt slot 81 remove(0)); then success_by_percent(P9 10):
+    # customizeitem 0x21, else (P10 20) goldbag 0x1D, else tabemono 0x0E variation random(0, 28); created and held:
+    # Behavior::create_item(kind, var, posture, zero, 1) and the item's have(0x50000000, 0, -1, 0, 0) (slot 95) =
+    # the 3DS's create_item_and_have 0x7B4104; PH_I = its id (slot 83), or none
+    ph_pick:
+        mflr r0
+        stwu r1, -0x30(r1)
+        stw r0, 0x34(r1)
+        stw r28, 0x28(r1)
+        lwz r0, 0x%(PI)X(r31)
+        lis r12, 0x5000
+        cmplw r0, r12
+        beq pk_new
+        bl ph_find
+        cmpwi r3, 0
+        beq pk_none
+        lwz r12, 0x%(VT)X(r3)
+        lwz r12, 0x%(RM)X(r12)
+        mtctr r12
+        li r4, 0
+        bctrl
+    pk_none:
+        lis r0, 0x5000
+        stw r0, 0x%(PI)X(r31)
+    pk_new:
+        lfs f1, 0x%(P9)X(r30)
+        %(SUCC)s
+        li r4, 0x%(CUST)X
+        li r5, 0
+        cmpwi r3, 0
+        bne pk_make
+        lfs f1, 0x%(P10)X(r30)
+        %(SUCC)s
+        li r4, 0x%(GOLD)X
+        li r5, 0
+        cmpwi r3, 0
+        bne pk_make
+        li r3, 0
+        li r4, 28
+        bl h_rand
+        andi. r5, r3, 0x1FFF
+        li r4, 0x%(FOOD)X
+    pk_make:
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0xC(r1)
+        stw r0, 0x10(r1)
+        lwz r6, 0(r31)
+        lwz r6, 0x311C(r6)
+        addi r6, r6, 0x10
+        addi r7, r1, 8
+        li r8, 1
+        mr r3, r31
+        %(CREATE)s
+        lis r0, 0x5000
+        mr r28, r3
+        cmpwi r28, 0
+        beq pk_store
+        lwz r12, 0x%(VT)X(r28)
+        lwz r12, 0x%(HAVE)X(r12)
+        mtctr r12
+        mr r3, r28
+        lis r4, 0x5000
+        li r5, 0
+        li r6, -1
+        li r7, 0
+        li r8, 0
+        bctrl
+        mr r3, r28
+        lwz r12, 0x%(VT)X(r3)
+        lwz r12, 0x%(ID)X(r12)
+        mtctr r12
+        bctrl
+        mr r0, r3
+    pk_store:
+        stw r0, 0x%(PI)X(r31)
+        lwz r28, 0x28(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+    """)
+    # ---- start 0x99010: the aerial module, set_rhombus, the fields (the ctor's: PH_I none), +0x10 = posture lr,
+    # +0x14 / +0x18 = 0, turned to the nearest fighter (check_turn_to_target -> reverse_lr(1, 1)), the item picked,
+    # PH_S = P8 60, PH_DT = P26 100, -> 4. Not ported: set_frame_material / set_rate_material(0) (the prop's material
+    # animation stopped), play_se(0x6D20000) (the propeller loop, counted per kind)
+    a("""
+    f_ph_start:
+        mflr r0
+        bl pro
+        addi r3, r31, 0x%(AER)X
+        lwz r4, 0(r31)
+        bl 0x%(CTOR)08X
+        mr r3, r31
+        %(RHOMB)s
+        li r0, 0
+        li r12, 11
+        mtctr r12
+        addi r12, r31, 0x%(PHm4)X
+    ps_z:
+        stwu r0, 4(r12)
+        bdnz ps_z
+        lis r0, 0x5000
+        stw r0, 0x%(PI)X(r31)
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lwz r0, 0x60(r12)
+        stw r0, 0x10(r31)
+        li r0, 0
+        stw r0, 0x14(r31)
+        stw r0, 0x18(r31)
+        bl h_near
+        mr r4, r3
+        bl h_tchk
+        cmpwi r3, 0
+        beq ps_t
+        bl h_rev
+    ps_t:
+        bl ph_pick
+        lwz r0, 0x%(P8)X(r30)
+        stw r0, 0x%(PS)X(r31)
+        lwz r0, 0x%(P26)X(r30)
+        stw r0, 0x%(PDT)X(r31)
+        li r4, 4
+        b go
+    """)
+    # slot 59 (0x9A224, every frame): the held item warped to ph_hpos (Item::warp)
+    a("""
+    f_ph_59:
+        mflr r0
+        bl pro
+        lwz r0, 0x%(PX)X(r31)
+        cmpwi r0, 0
+        bne.far epi
+        bl ph_find
+        mr r28, r3
+        cmpwi r28, 0
+        beq.far epi
+        addi r5, r1, 8
+        bl ph_hpos
+        mr r3, r28
+        addi r4, r1, 8
+        %(WARP)s
+        b epi
+    """)
+    # slot 55 (0x99E24, after the state's update): in states 4 / 5 with the item still held: PH_S counts down; at 0
+    # a new item (ph_pick), PH_S = P8 60, the swap effect 0x100001C at the item ((-5, 5, 0), tabemono (0, 5, 5));
+    # else PH_DT counts down; at 0 success_by_percent(P25 10) drops it (ph_drop; not in 5: -> 5, in 5: PH_T = P32
+    # 60), or PH_DT = P24 180. Not ported: the body's tilt (posture rot z toward -vx / P15 x P20 in 5, else 0, 1
+    # degree a frame; the posture rotation is not mapped) and play_se(0x6D20001) at the swap
+    a("""
+    f_ph_55:
+        mflr r0
+        bl pro
+        lwz r0, 4(r31)
+        cmpwi r0, 5
+        beq p55_a
+        cmpwi r0, 4
+        bne.far epi
+    p55_a:
+        lwz r0, 0x%(PX)X(r31)
+        cmpwi r0, 0
+        bne.far epi
+        lwz r3, 0x%(PS)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(PS)X(r31)
+        cmpwi r3, 0
+        bgt p55_drop
+        bl ph_pick
+        lwz r0, 0x%(P8)X(r30)
+        stw r0, 0x%(PS)X(r31)
+        bl ph_find
+        mr r28, r3
+        cmpwi r28, 0
+        beq.far epi
+        addi r5, r1, 8
+        bl ph_hpos
+        lfs f2, 0x%(CM5)X(r30)
+        lfs f3, 0x%(C5)X(r30)
+        lfs f4, 0x%(C0)X(r30)
+        lwz r0, 4(r28)
+        cmpwi r0, 0x%(FOOD)X
+        bne p55_o
+        fmr f2, f4
+        fmr f4, f3
+    p55_o:
+        lfs f1, 8(r1)
+        fadds f1, f1, f2
+        stfs f1, 8(r1)
+        lfs f1, 0xC(r1)
+        fadds f1, f1, f3
+        stfs f1, 0xC(r1)
+        lfs f1, 0x10(r1)
+        fadds f1, f1, f4
+        stfs f1, 0x10(r1)
+        li r0, 0
+        stw r0, 0x14(r1)
+        stw r0, 0x18(r1)
+        stw r0, 0x1C(r1)
+        mr r3, r31
+        lis r4, 0x%(FXH)04X
+        ori r4, r4, 0x%(FXL)04X
+        addi r5, r1, 8
+        addi r6, r1, 0x14
+        lfs f1, 0x%(C1)X(r30)
+        %(REQ)s
+        b epi
+    p55_drop:
+        lwz r3, 0x%(PDT)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(PDT)X(r31)
+        cmpwi r3, 0
+        bgt.far epi
+        lfs f1, 0x%(P25)X(r30)
+        %(SUCC)s
+        cmpwi r3, 0
+        beq p55_fail
+        bl ph_drop
+        lwz r0, 4(r31)
+        cmpwi r0, 5
+        beq p55_in5
+        li r4, 5
+        b go
+    p55_in5:
+        lwz r0, 0x%(P32)X(r30)
+        stw r0, 0x%(PT)X(r31)
+        b epi
+    p55_fail:
+        lwz r0, 0x%(P24)X(r30)
+        stw r0, 0x%(PDT)X(r31)
+        b epi
+    """)
+    # slot 10 notify_on_damage (the 3DS's 11, 0x9A330): BehaviorImpl's, then a held item falls (ph_drop)
+    a("""
+    f_ph_dmg:
+        mflr r0
+        bl pro
+        mr r3, r31
+        %(BIDMG)s
+        lwz r0, 0x%(PX)X(r31)
+        cmpwi r0, 0
+        bne.far epi
+        lwz r0, 0x%(PI)X(r31)
+        lis r12, 0x5000
+        cmplw r0, r12
+        beq.far epi
+        bl ph_drop
+        b epi
+    """)
+    # slot 69 (0x9AA1C): => 7 (stun), returns 1 (the framework's damage reaction skipped)
+    st('f_ph_69', "li r4, 7\nbl h_chgi\nli r3, 1")
+    # slot 27 notify_on_remove (the 3DS's dtors 0x9AC10 / 0x9AC74 remove a held item: vt slot 81 remove(0)), then
+    # BehaviorImpl's (r4 kept)
+    a("""
+    f_ph_rm:
+        mflr r0
+        bl pro
+        bl ph_find
+        cmpwi r3, 0
+        beq pr_go
+        lwz r12, 0x%(VT)X(r3)
+        lwz r12, 0x%(RM)X(r12)
+        mtctr r12
+        li r4, 0
+        bctrl
+    pr_go:
+        lis r0, 0x5000
+        stw r0, 0x%(PI)X(r31)
+        mr r3, r31
+        mr r4, r29
+        lmw r28, 0x20(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        lis r12, 0x%(O27H)04X
+        ori r12, r12, 0x%(O27L)04X
+        mtctr r12
+        bctr
+    """.replace('%(O27H)04X', '%04X' % (orig(27) >> 16)).replace('%(O27L)04X', '%04X' % (orig(27) & 0xFFFF)))
+    zero6 = "lfs f1, 0x%(C0)X(r30)\nfmr f2, f1\nfmr f3, f1\nfmr f4, f1\nlfs f5, 0x%(C10)X(r30)\nfmr f6, f5\nbl ph_anormal"
+    tpos = "mr r5, r3\naddi r3, r1, 8\nmr r4, r31\n%(TPOS)s"
+    # 1 turn (0x99598 / 0x99D64): set_mode_normal(0, 0, 0.1, 0.1, 10, 10), ground off, passable, TurnAir once; at
+    # its end reverse_lr(1, 1), PH_R = 1, => 4; else the aerial update(0, 0, 0)
+    st('ph1_en', ("""
+        lfs f1, 0x%(C0)X(r30)
+        fmr f2, f1
+        lfs f3, 0x%(C01)X(r30)
+        fmr f4, f3
+        lfs f5, 0x%(C10)X(r30)
+        fmr f6, f5
+        bl ph_anormal
+        li r4, 0
+        bl h_att
+        bl f_pass1
+        li r4, 2
+        li r5, 0
+        bl h_mot1""") % d)
+    st('ph1_up', ("""
+        bl h_end
+        cmpwi r3, 0
+        beq p1_u
+        bl h_rev
+        li r0, 1
+        stw r0, 0x%(PR)X(r31)
+        li r4, 4
+        b goi
+    p1_u:
+        lfs f1, 0x%(C0)X(r30)
+        fmr f2, f1
+        li r4, 0
+        bl ph_upd""") % d)
+    # 2 fly away (0x99440 / 0x99CC4): set_mode_normal(0, P28 0.05, 0, 0, 10, 10), set_max_speed(0, P29 4), PH_D = 1,
+    # PH_B = 0, speed (0, P27 0), ground off, passable, set_correct(0), Vertical loop at P31 2, PH_F = P30 300; each
+    # frame while PH_F > 0 and is_in_view_area: update(0, PH_D, PH_B); else => 8 (removed: a held item goes with it)
+    st('ph2_en', ("""
+        lfs f1, 0x%(C0)X(r30)
+        lfs f2, 0x%(P28)X(r30)
+        fmr f3, f1
+        fmr f4, f1
+        lfs f5, 0x%(C10)X(r30)
+        fmr f6, f5
+        bl ph_anormal
+        lfs f1, 0x%(C0)X(r30)
+        lfs f2, 0x%(P29)X(r30)
+        bl ph_maxspd
+        lfs f0, 0x%(C1)X(r30)
+        stfs f0, 0x%(PD)X(r31)
+        li r0, 0
+        stw r0, 0x%(PB)X(r31)
+        lfs f1, 0x%(C0)X(r30)
+        lfs f2, 0x%(P27)X(r30)
+        lfs f0, 0x%(C1)X(r30)
+        fmuls f2, f2, f0
+        bl ph_setspd
+        li r4, 0
+        bl h_att
+        bl f_pass1
+        lwz r3, 0(r31)
+        lwz r3, 0x30DC(r3)
+        li r4, 0
+        bl 0x%(SC)08X
+        lfs f2, 0x%(P31)X(r30)
+        li r4, 3
+        li r5, 1
+        bl h_mot
+        lwz r0, 0x%(P30)X(r30)
+        stw r0, 0x%(PF)X(r31)""") % d)
+    st('ph2_up', ("""
+        lwz r3, 0x%(PF)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(PF)X(r31)
+        cmpwi r3, 0
+        ble p2_out
+        mr r3, r31
+        %(VIEW)s
+        cmpwi r3, 0
+        beq p2_out
+        lfs f1, 0x%(C0)X(r30)
+        lfs f2, 0x%(PD)X(r30)
+        lwz r4, 0x%(PB)X(r31)
+        bl ph_upd
+        b epi
+    p2_out:
+        li r4, 8
+        b go""").replace('0x%(PD)X(r30)', '0x%(PD)X(r31)') % d)
+    # 3 dead (0x99624 / 0x9A2F8): kinetic 23, ground off, passable off, bullet() (P2 entry 0), defeated; the kinetic
+    # flag 8 -> 8
+    st('ph3_en', ("""
+        li r0, 1
+        stw r0, 0x%(DEF)X(r31)
+        li r4, 23
+        bl h_kin
+        li r4, 0
+        bl h_att
+        lwz r3, 0(r31)
+        lwz r3, 0x30DC(r3)
+        li r4, 0
+        bl 0x%(SP)08X
+        mr r3, r31
+        bl 0x%(BUL)08X""") % d)
+    st('ph3_up', "li r4, 8\nbl h_flag\nbeq.far epi\nli r4, 8\nb go")
+    # 4 height (0x9A578 / 0x9A6F8): set_mode_normal(0, 0, 0, 0, 10, 10), PH_B = 0, ground off, passable, Vertical
+    # loop, PH_T = P13 120, PH_D = the nearest fighter's side in y (-1 below / 1), |dy| < P14 3 => 5, speed (0, P12 1
+    # x PH_D). Update: going down, low = height_from_ground(1) < 5 - P7 (15); PH_T counts down; at 0, on the ground,
+    # low or a ceiling: PH_D = -1 (ceiling), 1 (ground / low), => 5 (PH_T > 0 or PH_R) or to the nearest's side (lr
+    # differs => 1 turn, else 5); else at the target's height (within P14) the same choice; else update(0, PH_D, PH_B)
+    st('ph4_en', (zero6 + """
+        li r0, 0
+        stw r0, 0x%(PB)X(r31)
+        li r4, 0
+        bl h_att
+        bl f_pass1
+        li r4, 3
+        li r5, 1
+        bl h_mot1
+        lwz r0, 0x%(P13)X(r30)
+        stw r0, 0x%(PT)X(r31)
+        lfs f0, 0x%(C0)X(r30)
+        stfs f0, 0x%(PD)X(r31)
+        bl h_near
+        cmpwi r3, 0
+        blt p4e_s
+        """ + tpos + """
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f1, 0x14(r12)
+        lfs f2, 0xC(r1)
+        lfs f0, 0x%(C1)X(r30)
+        fcmpu cr0, f1, f2
+        ble p4e_d
+        lfs f0, 0x%(CM1)X(r30)
+    p4e_d:
+        stfs f0, 0x%(PD)X(r31)
+        fsubs f3, f2, f1
+        fabs f3, f3
+        lfs f0, 0x%(P14)X(r30)
+        fcmpu cr0, f3, f0
+        bge p4e_s
+        li r4, 5
+        b go
+    p4e_s:
+        lfs f1, 0x%(C0)X(r30)
+        lfs f2, 0x%(P12)X(r30)
+        lfs f0, 0x%(PD)X(r31)
+        fmuls f2, f2, f0
+        bl ph_setspd""") % d)
+    st('ph4_up', ("""
+        li r28, 0
+        lfs f1, 0x%(PD)X(r31)
+        lfs f0, 0x%(C0)X(r30)
+        fcmpu cr0, f1, f0
+        bge p4_a0
+        li r7, 1
+        bl ph_hgt
+        lfs f0, 0x%(C5)X(r30)
+        lfs f2, 0x%(P7)X(r30)
+        fsubs f0, f0, f2
+        fcmpu cr0, f0, f1
+        ble p4_a0
+        li r28, 1
+    p4_a0:
+        lwz r3, 0x%(PT)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(PT)X(r31)
+        cmpwi r3, 0
+        ble p4_b
+        li r4, 8
+        bl h_touch
+        cmpwi r3, 0
+        bne p4_b
+        cmpwi r28, 0
+        bne p4_b
+        li r4, 1
+        bl h_touch
+        cmpwi r3, 0
+        beq p4_a
+    p4_b:
+        li r4, 1
+        bl h_touch
+        cmpwi r3, 0
+        beq p4_b1
+        lfs f0, 0x%(CM1)X(r30)
+        stfs f0, 0x%(PD)X(r31)
+    p4_b1:
+        li r4, 8
+        bl h_touch
+        or r3, r3, r28
+        cmpwi r3, 0
+        beq p4_b2
+        lfs f0, 0x%(C1)X(r30)
+        stfs f0, 0x%(PD)X(r31)
+    p4_b2:
+        lwz r0, 0x%(PT)X(r31)
+        cmpwi r0, 0
+        bgt p4_5
+    p4_d:
+        lwz r0, 0x%(PR)X(r31)
+        cmpwi r0, 0
+        bne p4_5
+        bl ph_lrcmp
+        beq p4_5
+        li r4, 1
+        b go
+    p4_5:
+        li r4, 5
+        b go
+    p4_a:
+        bl h_near
+        cmpwi r3, 0
+        blt p4_c
+        """ + tpos + """
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f1, 0x14(r12)
+        lfs f2, 0xC(r1)
+        lfs f4, 0x%(PD)X(r31)
+        lfs f0, 0x%(C0)X(r30)
+        lfs f5, 0x%(P14)X(r30)
+        fcmpu cr0, f4, f0
+        ble p4_a2
+        fsubs f3, f2, f5
+        fcmpu cr0, f1, f3
+        bgt p4_d
+    p4_a2:
+        fcmpu cr0, f4, f0
+        bge p4_c
+        fadds f3, f2, f5
+        fcmpu cr0, f1, f3
+        blt p4_d
+    p4_c:
+        lfs f1, 0x%(C0)X(r30)
+        lfs f2, 0x%(PD)X(r31)
+        lwz r4, 0x%(PB)X(r31)
+        bl ph_upd""") % d)
+    # 5 patrol (0x991D4 / 0x99848): set_mode_normal(0 x 4, 10, 10), PH_A = 0, PH_B = 1, PH_Y = y, ground off,
+    # passable, Move loop at P23 0.5, PH_T = dropped ? P32 60 : random(P18 150, P19 450), PH_DT = P24 180. Update:
+    # PH_T at 0: dropped => 2 (fly away); the nearest fighter more than P11 60 away in y => 4 (PH_R = 0); else PH_T =
+    # random(150, 450) => 6 (brake). A wall => 1. Else the bob: PH_A += 360 / P17 (int, wrapped at 360), vy =
+    # cos(PH_A) x P16 x (360 / P17) / 360; PH_D = the current vy's sign; (going down and below 15 above the ground
+    # (height_from_ground(0)), or on the ground) and vy < 0: PH_A = 270, PH_D = 1, PH_Y = y - P16 / 2; else a
+    # ceiling and vy > 0: PH_A = 90, PH_D = -1, PH_Y = y + P16 / 2; speed (P15 0.5 x move x, vy); PH_D = vy >= 0;
+    # update(move x, PH_D, 0)
+    st('ph5_en', (zero6 + """
+        li r0, 0
+        stw r0, 0x%(PA)X(r31)
+        li r0, 1
+        stw r0, 0x%(PB)X(r31)
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lwz r0, 0x14(r12)
+        stw r0, 0x%(PY)X(r31)
+        li r4, 0
+        bl h_att
+        bl f_pass1
+        lfs f2, 0x%(P23)X(r30)
+        li r4, 1
+        li r5, 1
+        bl h_mot
+        lwz r0, 0x%(PX)X(r31)
+        cmpwi r0, 0
+        lwz r3, 0x%(P32)X(r30)
+        bne p5e_t
+        lwz r3, 0x%(P18)X(r30)
+        lwz r4, 0x%(P19)X(r30)
+        bl h_rand
+    p5e_t:
+        stw r3, 0x%(PT)X(r31)
+        lwz r0, 0x%(P24)X(r30)
+        stw r0, 0x%(PDT)X(r31)""") % d)
+    st('ph5_up', ("""
+        lwz r3, 0x%(PT)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(PT)X(r31)
+        cmpwi r3, 0
+        bgt p5_go
+        lwz r0, 0x%(PX)X(r31)
+        cmpwi r0, 0
+        beq p5_n
+        li r4, 2
+        b go
+    p5_n:
+        bl h_near
+        cmpwi r3, 0
+        blt p5_r
+        """ + tpos + """
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f1, 0x14(r12)
+        lfs f2, 0xC(r1)
+        fsubs f3, f2, f1
+        fabs f3, f3
+        lfs f0, 0x%(P11)X(r30)
+        fcmpu cr0, f3, f0
+        ble p5_r
+        li r4, 4
+        bl h_chg
+        li r0, 0
+        stw r0, 0x%(PR)X(r31)
+        b epi
+    p5_r:
+        lwz r3, 0x%(P18)X(r30)
+        lwz r4, 0x%(P19)X(r30)
+        bl h_rand
+        stw r3, 0x%(PT)X(r31)
+        li r4, 6
+        b go
+    p5_go:
+        bl h_wall
+        cmpwi r3, 0
+        beq p5_w
+        li r4, 1
+        b go
+    p5_w:
+        lwz r3, 0x%(PA)X(r31)
+        bl ph_i2f
+        lfs f0, 0x%(C360)X(r30)
+        lfs f2, 0x%(P17)X(r30)
+        fdivs f2, f0, f2
+        stfs f2, 0x18(r1)
+        fadds f1, f1, f2
+        bl ph_f2i
+        stw r3, 0x%(PA)X(r31)
+        cmpwi r3, 360
+        blt p5_ang
+        bl ph_i2f
+        lfs f0, 0x%(C360)X(r30)
+        fsubs f1, f1, f0
+        bl ph_f2i
+        stw r3, 0x%(PA)X(r31)
+    p5_ang:
+        li r4, 8
+        bl h_touch
+        mr r28, r3
+        li r4, 1
+        bl h_touch
+        stw r3, 0x14(r1)
+        lwz r3, 0x%(PA)X(r31)
+        bl ph_i2f
+        lfs f0, 0x%(DEG)X(r30)
+        fmuls f1, f1, f0
+        %(COS)s
+        lfs f2, 0x%(P16)X(r30)
+        lfs f0, 0x18(r1)
+        fmuls f2, f2, f0
+        lfs f0, 0x%(I360)X(r30)
+        fmuls f2, f2, f0
+        fmuls f1, f1, f2
+        stfs f1, 0x1C(r1)
+        lwz r12, 0x%(E0)X(r31)
+        lfs f1, 4(r12)
+        lfs f0, 0x%(C0)X(r30)
+        lfs f2, 0x%(C1)X(r30)
+        fcmpu cr0, f1, f0
+        bge p5_dr
+        lfs f2, 0x%(CM1)X(r30)
+    p5_dr:
+        stfs f2, 0x%(PD)X(r31)
+        lwz r0, 0x%(PX)X(r31)
+        cmpwi r0, 0
+        bne p5_g
+        lfs f1, 0x%(PD)X(r31)
+        lfs f0, 0x%(C0)X(r30)
+        fcmpu cr0, f1, f0
+        bge p5_g
+        li r7, 0
+        bl ph_hgt
+        lfs f0, 0x%(C5)X(r30)
+        lfs f2, 0x%(P7)X(r30)
+        fsubs f0, f0, f2
+        fcmpu cr0, f0, f1
+        bgt p5_l
+    p5_g:
+        cmpwi r28, 0
+        beq p5_m
+    p5_l:
+        lfs f1, 0x1C(r1)
+        lfs f0, 0x%(C0)X(r30)
+        fcmpu cr0, f0, f1
+        ble p5_m
+        li r0, 270
+        stw r0, 0x%(PA)X(r31)
+        lfs f0, 0x%(C1)X(r30)
+        stfs f0, 0x%(PD)X(r31)
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f1, 0x14(r12)
+        lfs f2, 0x%(P16)X(r30)
+        lfs f3, 0x%(HALF)X(r30)
+        fmuls f2, f2, f3
+        fsubs f1, f1, f2
+        b p5_y
+    p5_m:
+        lwz r0, 0x14(r1)
+        cmpwi r0, 0
+        beq p5_n2
+        lfs f1, 0x1C(r1)
+        lfs f0, 0x%(C0)X(r30)
+        fcmpu cr0, f1, f0
+        ble p5_n2
+        li r0, 90
+        stw r0, 0x%(PA)X(r31)
+        lfs f0, 0x%(CM1)X(r30)
+        stfs f0, 0x%(PD)X(r31)
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f1, 0x14(r12)
+        lfs f2, 0x%(P16)X(r30)
+        lfs f3, 0x%(HALF)X(r30)
+        fmuls f2, f2, f3
+        fadds f1, f1, f2
+    p5_y:
+        stfs f1, 0x%(PY)X(r31)
+    p5_n2:
+        lfs f1, 0x%(P15)X(r30)
+        lfs f0, 0x10(r31)
+        fmuls f1, f1, f0
+        lfs f2, 0x1C(r1)
+        bl ph_setspd
+        lfs f0, 0x1C(r1)
+        lfs f1, 0x%(C0)X(r30)
+        lfs f2, 0x%(C1)X(r30)
+        fcmpu cr0, f0, f1
+        bge p5_pd
+        fmr f2, f1
+    p5_pd:
+        stfs f2, 0x%(PD)X(r31)
+        lfs f1, 0x10(r31)
+        li r4, 0
+        bl ph_upd""") % d)
+    # 6 brake (0x9934C / 0x99BD0): v = the current speed, set_mode_normal(0, 0, P21 0.05 x |vx| / max(|vy|, 0.1),
+    # P21, 10, 10), speed v, PH_B = 1, ground off, passable, Move loop. Update: |v|^2 < 0.01: success_by_percent(P22
+    # 100) => 2 (fly away); else the nearest's side differs => 1, else => 4 (PH_R = 0); moving: update(move x, PH_D,
+    # PH_B)
+    st('ph6_en', ("""
+        addi r3, r1, 8
+        mr r4, r31
+        %(GSPD)s
+        lfs f1, 8(r1)
+        fabs f1, f1
+        lfs f2, 0xC(r1)
+        fabs f2, f2
+        lfs f0, 0x%(C01)X(r30)
+        fcmpu cr0, f2, f0
+        bge p6_a
+        fmr f2, f0
+    p6_a:
+        lfs f4, 0x%(P21)X(r30)
+        fmuls f3, f4, f1
+        fdivs f3, f3, f2
+        lfs f1, 0x%(C0)X(r30)
+        fmr f2, f1
+        lfs f5, 0x%(C10)X(r30)
+        fmr f6, f5
+        bl ph_anormal
+        lfs f1, 8(r1)
+        lfs f2, 0xC(r1)
+        bl ph_setspd
+        li r0, 1
+        stw r0, 0x%(PB)X(r31)
+        li r4, 0
+        bl h_att
+        bl f_pass1
+        li r4, 1
+        li r5, 1
+        bl h_mot1""") % d)
+    st('ph6_up', ("""
+        addi r3, r1, 8
+        mr r4, r31
+        %(GSPD)s
+        lfs f1, 8(r1)
+        fmuls f0, f1, f1
+        lfs f1, 0xC(r1)
+        fmuls f1, f1, f1
+        fadds f0, f0, f1
+        lfs f1, 0x10(r1)
+        fmuls f1, f1, f1
+        fadds f0, f0, f1
+        lfs f1, 0x%(STOP)X(r30)
+        fcmpu cr0, f0, f1
+        bge p6_mv
+        lfs f1, 0x%(P22)X(r30)
+        %(SUCC)s
+        cmpwi r3, 0
+        beq p6_lr
+        li r4, 2
+        b go
+    p6_lr:
+        bl ph_lrcmp
+        beq p6_4
+        li r4, 1
+        b go
+    p6_4:
+        li r4, 4
+        bl h_chg
+        li r0, 0
+        stw r0, 0x%(PR)X(r31)
+        b epi
+    p6_mv:
+        lfs f1, 0x10(r31)
+        lfs f2, 0x%(PD)X(r31)
+        lwz r4, 0x%(PB)X(r31)
+        bl ph_upd""") % d)
+    # 7 stun (0x99148 / 0x99674): Damage once, kinetic 16, ground off, damage_turn(), PH_T = hit_return_frame(), the
+    # kinetic flag 0x80; update: on the ground clear_speed_all; PH_T below 0: flag 0x80 off, => 4; else move(ai).
+    # Not ported: the posture's z rotation back to 0 (5 degrees a frame)
+    st('ph7_en', ("""
+        li r4, 0
+        li r5, 0
+        bl h_mot1
+        li r4, 16
+        bl h_kin
+        li r4, 0
+        bl h_att
+        mr r3, r31
+        %(DTURN)s
+        bl f_hitret
+        stw r3, 0x%(PT)X(r31)
+        bl f_kflag
+        lwz r0, 0(r12)
+        ori r0, r0, 0x80
+        stw r0, 0(r12)""") % d)
+    st('ph7_up', ("""
+        bl h_gnd
+        cmpwi r3, 0
+        beq p7_a
+        bl h_clear
+    p7_a:
+        lwz r3, 0x%(PT)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(PT)X(r31)
+        cmpwi r3, 0
+        bge p7_mv
+        bl f_kflag
+        lwz r0, 0(r12)
+        rlwinm r0, r0, 0, 25, 23
+        stw r0, 0(r12)
+        li r4, 4
+        b goi
+    p7_mv:
+        bl h_mv""") % d)
 
 
 def assemble(vt_words):
