@@ -1810,3 +1810,11 @@ yaw -90 at lr 1 and look left while walking right.
 Data, relocations and file info are equal. code_diag vs code changes 834 words: the four hook words 0x02DB420C,
 0x032F011C, 0x032F0250 and 0x032F13C0, the `cl` hook 0x04BB976C, the stomp hooks 0x04BB80E4 / 0x04BB8134, and
 0x04BBE000-0x04BBECF8.
+
+User result of step 2g v5: Furiijio's beam looks fuller (the camera-facing turn works); the mist is still not
+visible; the code_diag build crashed after a stompable enemy came near (IP 0x04BBE94C): the `st` hook's body read
+the fighter posture through r11 after the hook's line-cap check had loaded the line counter into r11 (address
+0x546). Fixed in scratchpad s2gv5/build23d.py (r11 reloaded from its saved slot before the body; emulated: the hook
+runs, logs once and returns) and shipped as smashrun_step2g_v5b_diag.zip (code_diag only). The log's `cl` lines
+(1260) are kept for the cloud analysis.
+
