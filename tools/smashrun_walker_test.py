@@ -674,8 +674,9 @@ def main():
                 m.call(slots[slot], {3: OBJ, 4: sid})
                 c = [x for x in m.calls if x[0] in ('chg', 'chgi')]
                 eid = sid if sid in r else 1
-                en, up = r[eid]
-                ok &= c == [(kind, OBJ, eid, (0xFFFF, up), (0xFFFF, en), (0, 0))]
+                en, up = r[eid][:2]
+                ex = (0xFFFF, r[eid][2]) if len(r[eid]) > 2 else (0, 0)    # step 2f / 2m: a state's exit
+                ok &= c == [(kind, OBJ, eid, (0xFFFF, up), (0xFFFF, en), ex)]
             check(ok, 'change_state %s slot %d -> 0x%08X(this, id, &update, &enter, &exit): states %s, others -> 1'
                   % (w['name'], slot, W.CHG_BASE if slot == 72 else W.CHG_INT, sorted(r)))
 
@@ -750,7 +751,7 @@ def main():
     def enters(name):
         """each state's enter: (kinetic, attach, (motion index, rate, loop)) as the 3DS's"""
         out = {}
-        for sid, (en, _up) in rows[name].items():
+        for sid, (en, _up, *_ex) in rows[name].items():
             if en == W.ZIMA_REMOVE_ENTER:
                 continue
             m = Machine(img)

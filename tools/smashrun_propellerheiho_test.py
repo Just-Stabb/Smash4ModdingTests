@@ -26,10 +26,12 @@ def propellerheiho(img, D, fn, c0, vtw, Machine, calls, run):
     vk = [img.u32(D['vt_propellerheiho'] + 4 * i) for i in range((0xC + 8 * 76) // 4)]
     vtf = [img.u32(D['vtf'] + 4 * i) for i in range((0xC + 8 * 76) // 4)]
     diff = sorted(k for k in range(76) if vk[(0xC + 8 * k) // 4] != vtf[(0xC + 8 * k) // 4])
-    check(diff == [55, 59] and vk[(0xC + 8 * 55) // 4] == fn['f_ph_55'] and vk[(0xC + 8 * 59) // 4] == fn['f_ph_59'],
-          'propellerheiho: its vtable = VTF but slots 55 (after the state update) and 59 (every frame) %s' % diff)
+    check(diff == [55, 59, 71] and vk[(0xC + 8 * 55) // 4] == fn['se_ph_55'] and vk[(0xC + 8 * 59) // 4] == fn['f_ph_59']
+          and vk[(0xC + 8 * 71) // 4] == fn['se_ph_71'],
+          'propellerheiho: its vtable = VTF but slots 55 (after the state update; step 2m: f_ph_55 and the swap\'s '
+          'sound), 59 (every frame) and 71 (step 2m: the loop\'s count) %s' % diff)
     check([img.u32(c0 + W.CF[k]) for k in ('FSTART', 'FDMG', 'F69', 'F27')] ==
-          [fn['f_ph_start'], fn['f_ph_dmg'], fn['f_ph_69'], fn['f_ph_rm']],
+          [fn['se_ph_start'], fn['f_ph_dmg'], fn['f_ph_69'], fn['f_ph_rm']],
           'propellerheiho: CFG handlers start 0x99010, damage (slot 10 = 3DS 11, 0x9A330), slot 69 0x9AA1C, '
           'remove (slot 27)')
     slot = lambda k: vk[(0xC + 8 * k) // 4]  # noqa: E731

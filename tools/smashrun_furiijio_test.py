@@ -34,9 +34,10 @@ def furiijio(img, D, fn, c0, vtw, Machine, calls, run):
     vk = [img.u32(vt + 4 * i) for i in range((0xC + 8 * 76) // 4)]
     vtf = [img.u32(D['vtf'] + 4 * i) for i in range((0xC + 8 * 76) // 4)]
     diff = sorted(k for k in range(76) if vk[(0xC + 8 * k) // 4] != vtf[(0xC + 8 * k) // 4])
-    check(diff == [4, 61, 62] and vk[(0xC + 8 * 4) // 4] == fn['f_fu_skip'] and
-          vk[(0xC + 8 * 61) // 4] == vk[(0xC + 8 * 62) // 4] == fn['f_fu_kin'],
-          'furiijio: its vtable = VTF but slots 4 (update_on_skip, the 3DS\'s 5), 61, 62 %s' % diff)
+    check(diff == [4, 57, 61, 62] and vk[(0xC + 8 * 4) // 4] == fn['f_fu_skip'] and
+          vk[(0xC + 8 * 61) // 4] == vk[(0xC + 8 * 62) // 4] == fn['f_fu_kin'] and vk[(0xC + 8 * 57) // 4] == fn['se_fu_57'],
+          'furiijio: its vtable = VTF but slots 4 (update_on_skip, the 3DS\'s 5), 61, 62, 57 (step 2m: the bound '
+          'sound) %s' % diff)
     slot = lambda k: vk[(0xC + 8 * k) // 4]  # noqa: E731
     V = W.V
     P = lambda i: img.u32(c0 + W.P(i))  # noqa: E731

@@ -7833,9 +7833,9 @@ def code_2m(H, st, call, D):
         bl h_se
         stw r3, 0(r28)
     phs_c:
-        lwz r0, 4(r28)
-        addi r0, r0, 1
-        stw r0, 4(r28)""" % (ph, hi(0x6D20000)))
+        lwz r12, 4(r28)
+        addi r12, r12, 1
+        stw r12, 4(r28)""" % (ph, hi(0x6D20000)))
     a("""
     ph_dec:
         mflr r27
@@ -7843,10 +7843,10 @@ def code_2m(H, st, call, D):
         lwz r4, 0(r28)
         cmpwi r4, -1
         beq phd_o
-        lwz r0, 4(r28)
-        addi r0, r0, -1
-        stw r0, 4(r28)
-        cmpwi r0, 0
+        lwz r12, 4(r28)
+        addi r12, r12, -1
+        stw r12, 4(r28)
+        cmpwi r12, 0
         bgt phd_o
         bl h_ses
         li r0, -1

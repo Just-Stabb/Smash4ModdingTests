@@ -31,6 +31,8 @@ cross_f.rpx builds: `model/enemy/%s/%s/c%02d/`, `motion/enemy/%s/%s/`, `animcmd/
       a motion can show the damage face.
   animcmd/enemy/KIND/*.bin
       the 3DS ACMD byte-swapped to the Wii U's big-endian (checked: every command one tools/acmd.py knows).
+      Sound_Effect ids are left as they are: the ported kinds' 3DS soundlabeltable rows are registered on the Wii
+      U at their own row numbers (smashrun_sound.py, step 2m), so a 3DS id names the same tone there.
   sound/se/snd_se_enemy_KIND.nus3bank, param/enemy/fs/enemy_param_vl_KIND.bin
       copied: the 3DS bank is already the Wii U's layout (NUS3 chunks, little-endian TONE, IDSP audio) and the
       vl params the same typed big-endian format.
@@ -52,6 +54,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import acmd  # noqa: E402
+import smashrun_sound as SND  # noqa: E402
 import mta  # noqa: E402
 import nud  # noqa: E402
 import nut  # noqa: E402
@@ -639,6 +642,14 @@ def convert(src, kind, out, tex_id, log=print):
             open(os.path.join(dst, fn), 'wb').write(b)
             f = acmd.ACMDFile.load(os.path.join(dst, fn))       # every command one the Wii U knows
             summary['acmd'].append('%s %d' % (fn, len(f.scripts)))
+            # step 2m: a Sound_Effect id is (soundlabeltable row << 16) | label in both games; the ported kinds' 3DS
+            # rows are registered on the Wii U at their own numbers (smashrun_sound.SND_ROWS, snd_rows), so the ids
+            # stay as they are; any other row (none in the ported kinds' scripts) is reported
+            other = sorted({c.params[0] for cmds in f.scripts.values() for c in cmds if c.name == 'Sound_Effect' and
+                            c.params[0] >> 16 and c.params[0] >> 16 not in SND.SND_ROWS})
+            if other:
+                log('  animcmd %s: Sound_Effect ids on rows not registered on the Wii U: %s' % (
+                    fn, ', '.join('0x%X' % v for v in other)))
             log('  animcmd %s: %d scripts, %d commands' % (fn, len(f.scripts), sum(map(len, f.scripts.values()))))
     snd = os.path.join(base, 'snd_se_enemy_%s.nus3bank' % kind)
     if os.path.exists(snd):

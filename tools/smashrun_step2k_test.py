@@ -148,7 +148,7 @@ def main():
     w = byname['waddledoo']
     cf = lambda n, k: img.u32(cfgs[n] + W.CF[k])  # noqa: E731
     check(cf('waddledoo', 'SIZE') == 0x1D0 and w['states'][10] == ('do_ch_en', 'do_ch_up') and
-          w['states'][11] == ('do_bm_en', 'do_bm_up') and w['states'][1][1] == 'do_fall_up',
+          w['states'][11][:2] == ('se_waddledoo_11', 'do_bm_up') and W.SE_ORIG[('waddledoo', 11)] == 'do_bm_en' and w['states'][1][1] == 'do_fall_up',
           'waddledoo: object 0x1D0 (DO_* after the walker\'s 0x1B0), states 10 / 11 the 3DS\'s 7 / 8, 1 its own fall')
 
     def doo(state, lr=-1.0, cd=0, sc=0, found=0, ground=True):

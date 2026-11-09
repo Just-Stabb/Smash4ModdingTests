@@ -15,6 +15,8 @@ Step 2k (docs/smash-run-port.md "Step 2k") fixed: 1 (the beam: the Wii U's own w
 Step 2l (docs/smash-run-port.md "Step 2l") fixed: every walker / flier kind's own param object (the framework row: P3 hurtboxes / P4 ground boxes from the kind's vl), the Waddle Doo's hit-effect handle (it sat in V8, the landing's hop flag: a hit skipped the landing's turn), 6 (the dropped parasol: the Wii U's own weapon kind 0xAD), and Lethinium's Fortress-only forced level-2 attack; the twins compared state by state (tools/smashrun_twin_compare.py; open leads in "Not audited (left)"). Found: the Waddle Dee's own parasol shield (start 0x7BB1C: two parts at node 8) is not ported.
 
 
+Step 2m (docs/smash-run-port.md "Step 2m") fixed: 11 and 12 (every 3DS play_se / stop_se of the ported kinds at its 3DS point; the 3DS soundlabeltable rows of their banks registered in the Wii U's at a battle's start, so the 3DS ids and the converted ACMD ids name the same tones; the twins' own rows pointed at the kinds' banks on Smash Run stages), the tier-2 sound rows (26-35, 37, 39, 41, 42, 44, 47, 49, 51-54), and the Stalfos leads: 9 update, 22 enter and the attack motion variants read equal; 7 / 8 update lacked the 3DS's L5F470 (drop through a passable floor to a target below): ported. The Waddle Dee's parasol shield: read, nothing to port (the 3DS creates its reflector parts off and never turns them on). Found: the Wii U framework's own fs_common sounds (row 0x4A6) have no bank on the Wii U.
+
 1. Waddle Doo: the beam (its only attack) and its trigger are missing; the leave timer is never reset (600 frames after spawning it leaves mid-fight)
 2. Churine: the sleep powder (its only attack) and its search are missing: harmless except its death flight
 3. Plasma Wisp: runs on the Wii U sm params: laser 5 % / bkb 60 (3DS 3 / 50), cannon 10 / 160 (9 / 150), search 240 / 200 / 150 (200 / 140 / 20), level timers
@@ -25,8 +27,8 @@ Step 2l (docs/smash-run-port.md "Step 2l") fixed: every walker / flier kind's ow
 8. Waddle Doo: the random 50 % hop is missing; hop threshold 1.0 vs the 3DS 0.5
 9. Shy Guy: wall-hop landing threshold 1.0 vs the 3DS 0.5; the run timer is not reset on damage (slot 69)
 10. Goomba: the notice hop has no ledge check: it can hop backwards off a ledge
-11. Framework: no sound is played by any cave-ported kind (32 play_se / stop_se sites in their 3DS code; the twins play the Wii U twins' own)
-12. Framework: converted ACMD Sound_Effect ids are the 3DS bank ids (Shy Guy, White Bear, Big Goomba, Paratroopa): wrong or no sound on the Wii U
+11. Framework: no sound is played by any cave-ported kind (32 play_se / stop_se sites in their 3DS code; the twins play the Wii U twins' own) (fixed, step 2m)
+12. Framework: converted ACMD Sound_Effect ids are the 3DS bank ids (Shy Guy, White Bear, Big Goomba, Paratroopa): wrong or no sound on the Wii U (fixed, step 2m: right once the rows are registered)
 13. Spiny: the egg is drawn as the Spiny (no mesh swap)
 14. Paratroopa / Koopa: the wings stay after the wing loss; item 0x94 (the shell) unchecked
 15. Goomba: the dead item is dropped at removal, not on Collapses frame 1
@@ -62,35 +64,35 @@ Tier 1 (gameplay):
 
 Tier 2 (visual, sounds):
 
-26. Framework, sounds (missing): see the sound-porting plan
-27. Framework, ACMD sounds in the converted animcmd (wrong): remap the Sound_Effect ids with the bank-id table (sound plan) when converting; until then they play whatever the Wii U has at that id, or nothing (check in game)
+26. Framework, sounds (missing): see the sound-porting plan (fixed, step 2m)
+27. Framework, ACMD sounds in the converted animcmd (wrong): remap the Sound_Effect ids with the bank-id table (sound plan) when converting; until then they play whatever the Wii U has at that id, or nothing (check in game) (fixed, step 2m)
 28. Goomba, stomp -> Collapses (approximated): call the Wii U create_dead_item twin on frame 1 (find it beside create_item 0x026A8D78)
-29. Goomba, sound: notice (missing): sound plan
-30. Goomba, sound: collapse (missing): sound plan
-31. Shy Guy, sounds (missing): sound plan
+29. Goomba, sound: notice (missing): sound plan (fixed, step 2m)
+30. Goomba, sound: collapse (missing): sound plan (fixed, step 2m)
+31. Shy Guy, sounds (missing): sound plan (fixed, step 2m)
 32. Waddle Dee, parasol drop (missing): a weapon article, or an item-like prop
 33. Waddle Doo, hit effect (missing): F69
-34. Waddle Doo, sounds (missing): with the beam
-35. Churine, sounds (missing): with the powder
+34. Waddle Doo, sounds (missing): with the beam (fixed, step 2m)
+35. Churine, sounds (missing): with the powder (fixed, step 2m)
 36. White Bear, quake kind (approximated): check the Wii U camera quake table for 7
-37. White Bear, sounds (wrong): sound plan
+37. White Bear, sounds (wrong): sound plan (fixed, step 2m)
 38. Ghos, damage mesh / rotation order (missing): see the table
-39. Ghos, sounds (missing): sound plan
+39. Ghos, sounds (missing): sound plan (fixed, step 2m)
 40. Tiki Buzz, flap rate / meshes (missing): see the table
-41. Tiki Buzz, sounds (missing): sound plan
-42. Furiijio, sounds (missing): sound plan (the beam is a handle: stop it in the exit PMFs fu already has)
+41. Tiki Buzz, sounds (missing): sound plan (fixed, step 2m)
+42. Furiijio, sounds (missing): sound plan (the beam is a handle: stop it in the exit PMFs fu already has) (fixed, step 2m)
 43. Propeller Heiho, tilt (missing): see the table
-44. Propeller Heiho, sounds (missing): sound plan (loop: one per kind, stop when the last one goes)
+44. Propeller Heiho, sounds (missing): sound plan (loop: one per kind, stop when the last one goes) (fixed, step 2m)
 45. Big Goomba, eyes (missing): see the table
 46. Big Goomba, damage face meshes (missing): see the table
-47. Big Goomba, sounds (missing): sound plan
+47. Big Goomba, sounds (missing): sound plan (fixed, step 2m)
 48. Spiny, egg mesh (missing): mesh visibility per variation (the model.mta path, or the Wii U set_mesh_visibility twin)
-49. Spiny, sounds (missing): sound plan
+49. Spiny, sounds (missing): sound plan (fixed, step 2m)
 50. Paratroopa / Koopa, wing mesh (missing): mesh visibility
-51. Paratroopa / Koopa, sounds (wrong): sound plan
-52. Plasma Wisp, sounds (approximated): they play if bank 0xBE2 resolves to K's bank (snd_se_enemy_Plasmawisp, the twin's tone order): check in game
-53. Darios, sounds (approximated): check in game
-54. Stalfos, sounds (wrong): the twin never plays the 3DS's 0000 / 0001 / 0002 at those states: add them after the bank map
+51. Paratroopa / Koopa, sounds (wrong): sound plan (fixed, step 2m)
+52. Plasma Wisp, sounds (approximated): they play if bank 0xBE2 resolves to K's bank (snd_se_enemy_Plasmawisp, the twin's tone order): check in game (fixed, step 2m)
+53. Darios, sounds (approximated): check in game (fixed, step 2m)
+54. Stalfos, sounds (wrong): the twin never plays the 3DS's 0000 / 0001 / 0002 at those states: add them after the bank map (fixed, step 2m)
 
 Tier 3 (minor):
 
@@ -148,8 +150,8 @@ Tier 3 (minor):
 | speed y test energy mask | Kuribo 4 (0x325F4) get_sum_speed3f(-9) (every energy but 3) | h_vy0 = get_current_speed 0x026A678C = get_sum_speed3f(1) | approximated | call the Wii U get_sum_speed3f with -9 for the Kuribo notice |
 | slot 69 (on damage) for the walkers | Shy Guy 0x1BF70 (run timer +0x174 = 0), Waddle Doo 0x7E0E0 (leave timer = 600, hit effect 0x7190001 at center_pos), Waddle Dee 0x7C938 (parasol helpers 0x5CF90 / 0x5CF18), Churine 0x3DDE8 (powder effect removed in 7); all return 0 | VT slot 69 = BehaviorImpl's for these kinds (F69 0) | fixed in step 2j for Shy Guy (hh_69) and Waddle Doo (do_69); Waddle Dee's since step 2i (wd_69); Churine's (the powder effect) with its powder | F69 handlers: h69 V2 = 0; o69 V7 = CFG LEAVE + REQ_EFFECT0(0x7190001, center_pos, 1.0) |
 | variations | every kind has per-variation rows / behaviour (P0[var], var-gated ledge turns, Gordo 1-3 movers, Waddle Dee 2/3 parasol-less, Furiijio / Paratroopa rows) | the spawner makes variation 0 (Spiny / Paratroopa pass the create param) | missing | spawn the 3DS layout variations (field_smash placement data) once the kinds are stable |
-| sounds | every play_se / stop_se below (Behavior::play_se 0x7B59A8) | none called | missing | see the sound-porting plan |
-| ACMD sounds in the converted animcmd | Sound_Effect with 3DS ids: Shy Guy Run 0x69B0001 / RunBrake 0x69B0003, White Bear QuakeUp 0x6CC0000 / QuakeLanding 0x6CC0001, Big Goomba 0x2910000-0x2910009, Paratroopa 0x28E0000 / 0x28E0001 / 0x28E0003 / 0x28E0004 | tools/s3ds_enemy.py copies the ACMD byte-swapped; the kinds with hashsets (Kuribo, Shy Guy, Churine, White Bear, Big Goomba, Paratroopa) run them, so these ids reach the Wii U sound module unchanged | wrong | remap the Sound_Effect ids with the bank-id table (sound plan) when converting; until then they play whatever the Wii U has at that id, or nothing (check in game) |
+| sounds | every play_se / stop_se below (Behavior::play_se 0x7B59A8) | every site at the same point (docs/smash-run-port.md "Step 2m": state-enter wrappers SE_EN, the updates / exits / slots, Behavior::play_se 0x026A96EC / stop_se 0x026A970C); the 3DS rows registered in the Wii U soundlabeltable at a battle's start (snd_rows): a 3DS id plays its own tone | fixed (step 2m) |  |
+| ACMD sounds in the converted animcmd | Sound_Effect with 3DS ids: Shy Guy Run 0x69B0001 / RunBrake 0x69B0003, White Bear QuakeUp 0x6CC0000 / QuakeLanding 0x6CC0001, Big Goomba 0x2910000-0x2910009, Paratroopa 0x28E0000 / 0x28E0001 / 0x28E0003 / 0x28E0004 | the ids are soundlabeltable rows of the kinds' banks; with the rows registered (snd_rows) they name the same tones on the Wii U: no remap needed (checked by name, smashrun_step2m_test.py) | fixed (step 2m) |  |
 
 ## Goomba (kuribo 0x01; create 0x33248, table 0x110138)
 
@@ -166,8 +168,8 @@ Tier 3 (minor):
 | death flight | 9: Damage at rate 0, bullet(), P2 entry 1 (power 2, angle 361, kbg 100, bkb 50, size 3, node 2); flag 8 -> 10 | g_dead_en / g_dead_up, BULLET_ATK | ok |  |
 | stomp -> Collapses | 8 (slot 21): kinetic 0, Collapses, notify_on_death; frame f16c == 1 create_dead_item(1, 10, 0, 0) (0x32A08); end -> 10 | k_col_en / k_col_up; the item drop is the removal's defeat path (fix v3) | fixed (step 2j: kc_col_up calls create_dead_item 0x02DB3944 on frame 1; it drops nothing in the sm category, as the removal's call) | call the Wii U create_dead_item twin on frame 1 (find it beside create_item 0x026A8D78) |
 | tread box | 3DS area 0 {on, node 2, 14 x 8, 0, 0} moves with node 2 | TREAD_BOX (7, 2.53, 4) around the posture, not animated | approximated | node_global_position(2) as Tiki Buzz does (v5) |
-| sound: notice | 4 enter 0x333A4 play_se(0x28D0002) | none | missing | sound plan |
-| sound: collapse | 8 enter 0x323A4 play_se(0x28D0004) | none | missing | sound plan |
+| sound: notice | 4 enter 0x333A4 play_se(0x28D0002) | se_kuribo_4: the enter, then play_se(0x28D0002) | fixed (step 2m) |  |
+| sound: collapse | 8 enter 0x323A4 play_se(0x28D0004) | se_kuribo_8: the enter, then play_se(0x28D0004) | fixed (step 2m) |  |
 | RunL ACMD effects | External_Graphic 0x1000026, Graphic_Effect2 0x1000019 every 10 frames (common bank) | converted ACMD runs (hashsets) | ok | common effect ids not re-checked here |
 
 ## Shy Guy (heiho 0x0B; create 0x1C024, table 0x10F6CC)
@@ -186,7 +188,7 @@ Tier 3 (minor):
 | settle | 14: kinetic 21, Fall; kinetic flag 1 -> 4 | h_set_*: + a 120-frame guard (Wii U kinetic 21 unverified) | approximated | check kinetic 21 on the Wii U, drop the guard |
 | run timer on damage | slot 69 0x1BF70: +0x174 = 0 | not ported | fixed (step 2j: hh_69) | F69: V2 = 0 |
 | contact / bullet | P2 entry 0 (state 9) power 1, angle 50, kbg 100, fkb 60, size 4, offset (0, 8, 1); entry 1 (15) | HEIHO_BUMP / HEIHO_BULLET (identical) | ok |  |
-| sounds | play_se(0x69B0002): 6 enter 0x1AC50, 7 enter 0x1BA88, 7 re-hop 0x1BDD0, 11 enter 0x1B99C; ACMD Run 0x69B0001, RunBrake 0x69B0003 | none (ACMD ids unmapped) | missing | sound plan |
+| sounds | play_se(0x69B0002): 6 enter 0x1AC50, 7 enter 0x1BA88, 7 re-hop 0x1BDD0, 11 enter 0x1B99C; ACMD Run 0x69B0001, RunBrake 0x69B0003 | se_heiho_6 / se_heiho_7 (enters), se_heiho_7u (the second hop); 11 has no caller; the ACMD ids right as they are | fixed (step 2m) |  |
 
 ## Waddle Dee (waddledee 0x13; create 0x7C9D8, table 0x111B20)
 
@@ -199,6 +201,7 @@ Tier 3 (minor):
 | walk / turn / jump | 4: Walk 1.2, every 100 frames 50 % -> 6; wall: > 50 -> 5 else 6; var 1/3 ledge -> 5; off ground -> 2 (var 0/1); 6: apex -> 2 | d_walk / g_turn / d_jump, P=(1.2, 100, 50, 50) | ok |  |
 | energy | initialize: +0x10 0.2, +8 0.2, +0x20/+0x28 0.3, +0x24/+0x2C 2.5, +0x44 1, +0x18 0.0005 (var 0/1) | same | ok |  |
 | bullet | P2 entry 0 (state 7) power 2, angle 361, size 3 | BULLET_ATK (identical but the state word, unread) | ok |  |
+| the parasol's reflector (start 0x7BB1C) | a ShieldGroup of two parts (node 8: (P+0x98, 0, 0), size P+0x9C; node 7: (P+0xA0, P+0xA8, P+0xA4), size P+0xAC) added to the module acc+0x88 (vt+0x20), then set_status(0 / 1, 0, 0) (0x684930: status 0 = the part inactive); the drop 0x5CF90 the same; nothing turns it on | none | ok | nothing to port: on the 3DS it never blocks or reflects (step 2m) |
 | sounds | none in its code | - | ok |  |
 
 ## Waddle Doo (waddledoo 0x19; create 0x7E148, table 0x111C14)
@@ -214,7 +217,7 @@ Tier 3 (minor):
 | hit effect | slot 69 0x7E114: request_effect(0x7190001, center_pos, 1.0), handle +0x1A0 (old one removed) | step 2j: do_69 with the handle in V8 (+0x18C), which g_landt_up reads as the hop-landing flag (a hit skipped the landing's turn); step 2l: its own field DO_FX (+0x1C8) | fixed (step 2l) | |
 | turn search | 3: every search_interval(0) = 60 frames search_target(0) behind -> 4 | o_walk_up | ok |  |
 | leave (state 9) | init_common_leave(P6 {300, 0.02, 30, ...}): energy +0x30 / +0x34, kinetic 15, effect 0x8000005 | o_leave_* (8) | approximated | code.bin 0x7B23B4 / 0x7B40B0 read in step 2c v2 |
-| sounds | beam play_se 0x6A80000 / stop_se | none | missing | with the beam |
+| sounds | beam play_se 0x6A80000 / stop_se | se_waddledoo_11 (-> DO_SE), the motion end and the exit se_doo_11x stop it | fixed (step 2m) |  |
 
 ## Churine (churine 0x1F; create 0x3DEE0, table 0x10C550)
 
@@ -224,7 +227,7 @@ Tier 3 (minor):
 | search | walk: every search_interval(0) (3) frames search_target(0) (100 x 35, (5, 5)) -> 6 (turn first, f170 = 1); a first-frame flag f171 -> 6 once | search=() (none) | fixed (step 2k) | ch_srch: search_target(0) every 3 frames (V0), the cool-down (V1), behind -> turn first (V2), the start's first-frame attack (V3) |
 | walk / hop / turn | 3: initialize again, Walk; wall -> 4; ledge -> 5; 4: landing higher than 20 and no wall -> 2 (f178), else 5 | c_walk / c_jump / g_hop_up (HOPTHR 20) | ok |  |
 | bullet | P2 entry 0 (state 8) power 1, angle 361, size 3 | CHURINE_BULLET (identical) | ok |  |
-| sounds | play_se 0x6B00001 (powder) | none | missing | with the powder |
+| sounds | play_se 0x6B00001 (powder) | ch_pw_up: play_se(0x6B00001) with the powder effect | fixed (step 2m) |  |
 
 ## White Bear (whitebear 0x40; create 0x7F420, table 0x111E8C)
 
@@ -237,7 +240,7 @@ Tier 3 (minor):
 | states / timers | walk V1 60-120, search 60, cool-down 60, QuakeHold 1.5, jump +0x24/+0x2C 1.5, +0x3C 0.1, fall +0x2C 3 / +0x3C 1, landing < 180 -> 9, quakes 3 with 50 >> (n - 1) % | cave states 1-11 | ok |  |
 | fall speed gate | 1: is_touch only | g_fall_up waits for vy <= 0 | approximated | framework item |
 | effects | landing 0x7400000 / 0x7400001 (request_effect) | step 2c v2 | ok |  |
-| sounds | ACMD QuakeUp 0x6CC0000, QuakeLanding 0x6CC0001 (no play_se in code) | ACMD ids unmapped | wrong | sound plan |
+| sounds | ACMD QuakeUp 0x6CC0000, QuakeLanding 0x6CC0001 (no play_se in code) | ACMD ids right as they are (row 0x6CC registered) | fixed (step 2m) |  |
 
 ## Gordo (gordo 0x08; create 0x1A470, table 0x10F55C)
 
@@ -256,7 +259,7 @@ Tier 3 (minor):
 | states / homing / leave 1200 / stun / immunity | re-read in steps 2e-2g v4 (hand_read ghos) | code_f gh_*, f_g31 / f_ghos_dmg | ok |  |
 | immunity rules | slot 31 0x113F0: weapon / held item / +0x5A2 flag | AttackData +0x4C byte | approximated |  |
 | damage mesh / rotation order | set_node_visibility, set_rotation_order_xyz (slot 55) | not ported | missing |  |
-| sounds | start (slot 41) play_se(0x8A60000) -> handle +0x200 (0x10AA4); stop_se on damage when kinetic flag 2 (slot 11 0x110F4) and on remove (slot 28 0x11180); immune hit play_se(15) (slot 31 0x11454, common id 15) | none | missing | sound plan |
+| sounds | start (slot 41) play_se(0x8A60000) -> handle +0x200 (0x10AA4); stop_se on damage when kinetic flag 2 (slot 11 0x110F4) and on remove (slot 28 0x11180); immune hit play_se(15) (slot 31 0x11454, common id 15) | gh_start -> GH_SE, se_gh_dmg / se_gh_rm stop it, gh_31 plays 15 on an immune hit | fixed (step 2m) |  |
 
 ## Tiki Buzz (tikibuzz 0x0F; create 0x78630, table 0x10E134)
 
@@ -265,7 +268,7 @@ Tier 3 (minor):
 | states / dive / stomp | re-read v4 / v5 (hand_read) | code_f tk_* | ok |  |
 | collision object | start: GroundCollisionObject +0x141 = 4, +0x142 = 0, set_circle_follow_node(2) | not mapped (Wii U layout past +0x100 differs) | missing |  |
 | flap rate / meshes | MotionModule +0x50, set_mesh_visibility, set_visibility(0) | not ported | missing |  |
-| sounds | 4 hold 0x89C0000 (0x78170), 5 dive 0x89C0001 (0x77A0C), 10 stomped 0x89C0002 (0x78040), 11 gone 0x89C0003 (0x77EF0) | none | missing | sound plan |
+| sounds | 4 hold 0x89C0000 (0x78170), 5 dive 0x89C0001 (0x77A0C), 10 stomped 0x89C0002 (0x78040), 11 gone 0x89C0003 (0x77EF0) | se_tikibuzz_4 / 5 / 10 / 11 | fixed (step 2m) |  |
 
 ## Furiijio (furiijio 0x1A; create 0x6DC6C, table 0x10D168)
 
@@ -274,7 +277,7 @@ Tier 3 (minor):
 | states / beam / sweep / effects | re-read v4 / v5 / v6 | code_f fu_* | ok |  |
 | rotation order | set_rotation_order_zxy | no Wii U setter | approximated |  |
 | variations 1 / 2 | P0 rows 1 / 2 | not spawned | missing |  |
-| sounds | 2 / 5 charge 0x6A90001 (0x6D1EC / 0x6D5EC), 4 / 7 beam 0x6A90002 (0x6C3CC / 0x6CAF4) -> handle +0x260, stop_se in the exits (0x6D0E0 / 0x6D4E0); slot 57 bound 0x6A90003 (0x6DC34) | none | missing | sound plan (the beam is a handle: stop it in the exit PMFs fu already has) |
+| sounds | 2 / 5 charge 0x6A90001 (0x6D1EC / 0x6D5EC), 4 / 7 beam 0x6A90002 (0x6C3CC / 0x6CAF4) -> handle +0x260, stop_se in the exits (0x6D0E0 / 0x6D4E0); slot 57 bound 0x6A90003 (0x6DC34) | se_furiijio_2 / 5, se_furiijio_4 / 7 (-> FU_SE), se_fu_bexit stops it, se_fu_57 / se_fu_69 the bound sound | fixed (step 2m) |  |
 
 ## Propeller Heiho (propellerheiho 0x47; create 0x9AA38, table 0x111278)
 
@@ -285,7 +288,7 @@ Tier 3 (minor):
 | material | set_frame_material / set_rate_material(0) at start | not ported | missing |  |
 | swap effect | the item's EffectModule, joint 0 | Behavior request at the hold position + offset | approximated |  |
 | nearest target | EnemyAiModule::get_nearest_fighter from the posture | get_nearest_target | approximated |  |
-| sounds | start play_se(0x6D20000) the propeller loop, counted per kind (slot 41 0x990C8); swap 0x6D20001 (slot 55 0x9A070) | none | missing | sound plan (loop: one per kind, stop when the last one goes) |
+| sounds | start play_se(0x6D20000) the propeller loop, counted per kind (slot 41 0x990C8); swap 0x6D20001 (slot 55 0x9A070) | se_ph_start / se_ph_71 / se_ph2_up with ph_snd {handle, count} (reset each battle: approximated), se_ph_55 the swap | fixed (step 2m) |  |
 
 ## Big Goomba (dekakuribo 0x23; create 0x86D84, table 0x10F374)
 
@@ -295,7 +298,7 @@ Tier 3 (minor):
 | is_looped / ledge distance | WalkL loop test; check_cliff_distance_lr with the distance | WalkL 30 / 0.3 frames; check_cliff without the distance | approximated |  |
 | eyes | slot 3 0x869F8: set_frame_material(angle to fighter 0 / 2pi x 60, clamp 1..59) | not ported | missing |  |
 | damage face meshes | set_mesh_visibility | not ported | missing |  |
-| sounds | 2 landing 0x2910009 (0x85E84), 8 brake 0x2910008 (0x859AC), 10 stepped 0x291000C (0x86C70), 11 collapse 0x291000B (0x85A20); ACMD WalkL 0x2910000 / 0x2910001, RunL 0x2910002 / 0x2910003, RunTurnL 0x2910006 / 0x2910007, AngryL 0x2910009 | none (ACMD ids unmapped) | missing | sound plan |
+| sounds | 2 landing 0x2910009 (0x85E84), 8 brake 0x2910008 (0x859AC), 10 stepped 0x291000C (0x86C70), 11 collapse 0x291000B (0x85A20); ACMD WalkL 0x2910000 / 0x2910001, RunL 0x2910002 / 0x2910003, RunTurnL 0x2910006 / 0x2910007, AngryL 0x2910009 | se_dekakuribo_2 / 8 / 10 / 11; the ACMD ids right as they are | fixed (step 2m) |  |
 
 ## Spiny (togezo 0x4E; create 0x37F14, table 0x1119CC)
 
@@ -305,7 +308,7 @@ Tier 3 (minor):
 | egg mesh | var 0 draws the Paipo (egg) mesh, var 1 the Spiny | no mesh swap: the egg is drawn as the Spiny | missing | mesh visibility per variation (the model.mta path, or the Wii U set_mesh_visibility twin) |
 | spin factor | EnemyParamAccessor +0x198 +0x90 x +0xA0 | 30 deg / frame per unit speed | approximated | read the common param from the Wii U accessor |
 | slots 60 / 13 | forced hatch (caller unknown) / capture motion | not ported | missing |  |
-| sounds | 5 hatch play_se 0x6D90000 (0x37AA4) | none | missing | sound plan |
+| sounds | 5 hatch play_se 0x6D90000 (0x37AA4) | se_togezo_5 | fixed (step 2m) |  |
 
 ## Paratroopa / Koopa (patapata 0x03; create 0x74108, table 0x110C80)
 
@@ -317,7 +320,7 @@ Tier 3 (minor):
 | first falling frame | energy 0 writes | not ported | approximated |  |
 | slots 13 / 71, states 21 / 22 | - | not ported | missing |  |
 | shell item 0x94 | create_item_and_throw(0x94) | 0x026A8F10; the Wii U item's code / files unchecked | approximated | check item 0x94 in game |
-| sounds | ACMD only: Bite 0x28E0000 (frame 10), JumpAttack 0x28E0001 (11), NokonokoMode 0x28E0003, ShellMode 0x28E0004 | ACMD ids unmapped | wrong | sound plan |
+| sounds | ACMD only: Bite 0x28E0000 (frame 10), JumpAttack 0x28E0001 (11), NokonokoMode 0x28E0003, ShellMode 0x28E0004 | the ACMD ids right as they are (row 0x28E registered) | fixed (step 2m) |  |
 
 ## Zima (zima 0x0E; Wii U twin mczakozima 0x5A)
 
@@ -339,7 +342,7 @@ Tier 3 (minor):
 | large needle (P6 e1) | word 2 = 1, word 6 = 50 | word 2 = 3, word 6 = 60 | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
 | level timers (inline struct) | 28 words: 100 / 250 / 10 / 50 ... | 32 words (Wii U layout): 200 / 200 / 20 / 5 ... | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
 | AI code | 3DS states 1-10 (hand_read plasmawisp) | Wii U mczakoplasmawisp (0x026D0000..0x026D1E00) | approximated | not diffed instruction by instruction (left) |
-| sounds | 0x6A20000 needle / laser charge (4 / 6 enter 0x89E88 / 0x89DA8), 0x6A20001 needle (4 end 0x8A12C), 0x6A20002 laser (0x89FB8), 0x6A20003 cannon (0x8A23C), 0x6A20004 level up (helper 0x899E4) | the twin calls 0xBE20000-0xBE20004 (0x026D0610, 0x026D1098, 0x026D1138, 0x026D117C, 0x026D13A4, 0x026D1428, 0x026D166C: 0xBE20001 twice) | approximated | they play if bank 0xBE2 resolves to K's bank (snd_se_enemy_Plasmawisp, the twin's tone order): check in game |
+| sounds | 0x6A20000 needle / laser charge (4 / 6 enter 0x89E88 / 0x89DA8), 0x6A20001 needle (4 end 0x8A12C), 0x6A20002 laser (0x89FB8), 0x6A20003 cannon (0x8A23C), 0x6A20004 level up (helper 0x899E4) | the twin's 0xBE20000-4 at the 3DS's points; row 0xBE2 names the kind's bank (5019) on a Smash Run stage (snd_rows) | fixed (step 2m) |  |
 
 ## Darios (darios 0x1D; Wii U twin mczakodarios 0x58)
 
@@ -350,7 +353,7 @@ Tier 3 (minor):
 | beam attack P6 e1 | power 5, bkb 60, size 6, word 27 = 15 | power 6, bkb 70, size 4, 13 | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
 | inline struct | 6 words / entry | 9 words / entry | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
 | AI code | 3DS states 1-8 | Wii U mczakodarios (0x026CBA64..0x026CF4DC) | approximated | not diffed (left) |
-| sounds | charge 0x6B20000 (4 enter 0x2F484), beam 0x6B20001 (5 enter 0x2E028), stop_se handle +0x19C (helper 0x643AC) | twin: 0xBE30000 (0x026CD950), 0xBE30001 (0x026CDF14) | approximated | check in game |
+| sounds | charge 0x6B20000 (4 enter 0x2F484), beam 0x6B20001 (5 enter 0x2E028), stop_se handle +0x19C (helper 0x643AC) | the twin's 0xBE30000 / 1; row 0xBE3 names the kind's bank (5037) on a Smash Run stage | fixed (step 2m) |  |
 
 ## Stalfos (stalfos 0x30; Wii U twin mczakostalfos 0x59)
 
@@ -359,29 +362,20 @@ Tier 3 (minor):
 | group 4 word 9 | 20.0 | 11.0 | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
 | group 5 e1 word 1 | 0 | 3 | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
 | groups 6 / 7 word 6 | 3.0 | 2.4 | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
-| AI code | 3DS states 1-24 (hand_read stalfos); hitboxes ACMD (K's attack.bin runs) | Wii U mczakostalfos (0x026D2000..0x026D6000) | approximated | not diffed (left) |
-| sounds | 0x6BF0005 landing (2 / 14 / 16 enter), 0x6BF0000 (10 / 11 ground touch), 0x6BF0001 (13), 0x6BF0002 (15 enter), slot 29 0x6BF0003, slot 30 0x4A60079 (common bank) | twin: 0xBE40002, 0xBE40003 (x2), 0xBE40005 (x3) only | wrong | the twin never plays the 3DS's 0000 / 0001 / 0002 at those states: add them after the bank map |
+| AI code | 3DS states 1-24 (hand_read stalfos); hitboxes ACMD (K's attack.bin runs) | Wii U mczakostalfos (0x026D2000..0x026D6000), compared state by state (step 2l tools/smashrun_twin_compare.py; step 2m read: 9 update, 22 enter, the attack motions' variants equal; 7 / 8 update lacked L5F470) | fixed (step 2m) | sf7_up / sf8_up (kind 0x30): the game's updates with the 3DS's drop through a passable floor to a target below (its floor ray from the posture, not the touch position: approximated) |
+| sounds | 0x6BF0005 landing (2 / 14 / 16 enter), 0x6BF0000 (10 / 11 ground touch), 0x6BF0001 (13), 0x6BF0002 (15 enter), slot 29 0x6BF0003, slot 30 0x4A60079 (common bank) | the twin plays all of them (0xBE40000 / 1 through its helper 0x026D4DA0, the audit missed it); row 0xBE4 names the kind's bank (5052) on a Smash Run stage; slot 30's 0x4A60079 (fs_common, no Wii U bank) not mapped | fixed (step 2m) but slot 30 |  |
 
 ## Sound-porting plan
 
-No sound is ported yet. The Wii U API (the Fortress enemies' own path):
+Ported in step 2m (docs/smash-run-port.md "Step 2m", tools/smashrun_sound.py). A sound id is (soundlabeltable row << 16) | label in both games; the row gives the bank id (the .nus3bank's BINF id), the label the tone (Wii U 0x0311EDBC / 0x0311EF88 on [[[[0x102F7288]] + 0x29C] + 4]). The Wii U table has no row for any Smash Run bank and their 3DS row numbers are all empty in it: snd_rows registers the 3DS rows at their own numbers at a Smash Run battle's start (in the loaded table, nothing shipped), so every 3DS id, in code and in the converted ACMD, names the same tone on the Wii U (compared by name). The twins' rows 0xBE2-0xBE4 name the kinds' banks on Smash Run stages (put back elsewhere). The Wii U API:
 
 | call | 3DS | Wii U |
 |---|---|---|
-| Behavior::play_se(id, bool) -> handle | 3DS 0x7B59A8 -> SoundModuleImpl::play_se 0x4C4B84 (acc+0x3074; id, false, bool, 0, 0, type 0) | Wii U 0x026A96EC(r3 behaviour, r4 id, r5 bool) -> SoundModule (acc+0x30F4) 0x02C72214(module, id, 0, bool, 0, 0, 0); used by every Fortress enemy (e.g. 0x026CD950 mczakodarios 0xBE30000) |
+| Behavior::play_se(id, bool) -> handle | 3DS 0x7B59A8 -> SoundModuleImpl::play_se 0x4C4B84 | Wii U 0x026A96EC(r3 behaviour, r4 id, r5 bool) -> SoundModule (acc+0x30F4) 0x02C72214(module, id, 0, bool, 0, 0, 0) |
 | Behavior::stop_se(handle, int) | 3DS 0x4C3148 -> SoundModuleImpl::stop_se_handle 0x4C3158 | Wii U 0x026A970C(r3, r4 handle) -> 0x02C73750 |
-| stop by id | 3DS SoundModuleImpl::stop_se 0x4C4D9C | Wii U 0x026A9718(r3, r4 id, r5) -> 0x02C734B8 (used at 0x026D86D4 after is_playing 0x02C7450C) |
-| bank file | 3DS enemy/KIND/snd_se_enemy_KIND.nus3bank | Wii U sound/se/snd_se_enemy_%s.nus3bank (rodata +0x158D64) with the capitalised name table 0x1041A534; tools/s3ds_enemy.py already copies the banks (step 2a adds capitalised copies) |
+| bank file | 3DS enemy/KIND/snd_se_enemy_KIND.nus3bank | Wii U sound/se/snd_se_enemy_%s.nus3bank with the capitalised name table 0x1041A534 (the converted 3DS banks, BINF ids unchanged) |
 
-Ids: A sound id is (bank << 16) | tone. The 3DS banks: kuribo 0x28D, patapata 0x28E, dekakuribo 0x291, heiho 0x69B, plasmawisp 0x6A2, waddledoo 0x6A8, furiijio 0x6A9, churine 0x6B0, darios 0x6B2, stalfos 0x6BF, whitebear 0x6CC, propellerheiho 0x6D2, togezo 0x6D9, tikibuzz 0x89C, ghos 0x8A6 (common: 0x4A6, id 15). The Wii U uses its own bank numbers (Mczakoplasmawisp 0xBE2, Mczakodarios 0xBE3, Mczakostalfos 0xBE4, others 0x837 / 0x8EB / 0x8EC / 0x8EF / 0x925 / 0x2C2 in 0x026B0000-0x026E8000). The bank number is not in the nus3bank (BINF holds the name and a file id, e.g. kuribo 0x138A) nor in config.nus3conf by name; sound/config/soundlabeltable.bin ("STB", header 0xCB4 / 0xCB40 / 0x7D0 / 0x19F) holds u16 bank numbers (0x0BE3 at +0x925E).
-
-Steps:
-
-1. Decode soundlabeltable.bin (and the loader that reads snd_se_enemy_%s) to learn how a bank number maps to a file; find free numbers (or check whether the 3DS numbers 0x28D... are free on the Wii U) and register one bank per Smash Run kind.
-2. A cave helper snd(id) = bl 0x026A96EC with r4 = (WIIU_BANK[kind] << 16) | tone, r5 = 0; store the handle where the 3DS does (Waddle Doo +0x1A4 -> a V word, Furiijio +0x260 -> FU_E slot, Ghos +0x200, Darios +0x19C) and stop it with 0x026A970C where the 3DS stop_se is (exits / damage / remove).
-3. Rewrite the converted ACMD Sound_Effect arguments with the same map (tools/s3ds_enemy.py acmd_be), so the ACMD sounds land in the new banks.
-4. Twins: check in game whether 0xBE2 / 0xBE3 / 0xBE4 resolve to K's bank; if not, the twin calls need the same remap (or the twin bank names registered for K).
-5. Propeller Heiho's loop is counted per kind (one loop for all of them): a kind-wide counter word in the cave data.
+Still open: row 0x4A6 (snd_se_fs_common: the Wii U framework's own enemy sounds, e.g. 0x02DBF40C / 0x02DBF434, and Stalfos's slot 30) has no Wii U bank file.
 
 Per kind (every 3DS sound, its id and when it plays):
 
@@ -407,6 +401,6 @@ Per kind (every 3DS sound, its id and when it plays):
 
 ## Not audited (left)
 
-- The twins' AI (step 2l, tools/smashrun_twin_compare.py over every state's enter / update / exit, docs/smash-run-port.md "Step 2l"): the four Wii U state tables have the 3DS's state count (7 / 10 / 8 / 24), their exits at the same states, the same transitions, kinetics, ground flags and motions; Zima and Darios match (the remaining token differences are the 3DS's array reads and a node rotation the 3DS summary keeps in a helper). Lethinium: the Wii U adds a level-2 forced attack (+0x1E4 timer, P+0x138) and a cool-down word (P+0x134) after its level-2 attack: fixed (pw2_up, the param word). Stalfos leads still to read: 7 / 8 update (the 3DS sets ground off / passable / set_correct(0) after L5F470 inline; the Wii U path through 0x026D3008 not followed), 9 update (the attack choice: the 3DS reads PSxx 0xCC..0x120 inline, the Wii U through helpers / pointers), 22 enter (3DS P+0xE0), the attack motions' variants (+0x194 / +0x1C2), play_se (sounds).
+- The twins' AI (step 2l, tools/smashrun_twin_compare.py over every state's enter / update / exit, docs/smash-run-port.md "Step 2l"): the four Wii U state tables have the 3DS's state count (7 / 10 / 8 / 24), their exits at the same states, the same transitions, kinetics, ground flags and motions; Zima and Darios match (the remaining token differences are the 3DS's array reads and a node rotation the 3DS summary keeps in a helper). Lethinium: the Wii U adds a level-2 forced attack (+0x1E4 timer, P+0x138) and a cool-down word (P+0x134) after its level-2 attack: fixed (pw2_up, the param word). Stalfos (step 2m): 9 update, 22 enter and the attack motions' variants read equal; 7 / 8 update lacked the 3DS's L5F470 drop (ported: sf7_up / sf8_up); its sounds are the twin's own (all but slot 30's fs_common one).
 - The fliers (Ghos, Tiki Buzz, Furiijio, Propeller Heiho) and the step 2h kinds (Big Goomba, Spiny, Paratroopa) were not re-read line by line here: their own steps' readings (hand_read) are taken as the 3DS side, and their listed approximations are carried over.
 - The common effect ids in the converted ACMD (0x1000019 / 0x1000026 / 0x100008E) and the twins' effect calls.
