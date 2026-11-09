@@ -2279,3 +2279,139 @@ twins' slot 38 words, TWIN_FLIP). Relocations and the file info equal.
 **Still open:** the hit object's centre for the Pooka's bounce (BattleObjectAccessor::center_pos / is_active twins),
 White Bear's set_weak_param, Waddle Dee's parasol article, update_weaken; the big ones for the next step: Waddle Doo's
 beam, Churine's sleep powder, the four twins' params / AI, sounds.
+
+## Step 2k: Waddle Doo's beam (the Wii U's own weapon 0xAF), Churine's sleep powder, the twins' own params, the White Bear's weakness
+
+Package smashrun_step2k_v1: `code/` exe_v28 = exe_v27 + `smashrun_walker_cave.py` over its own regions (scratch
+s2k/build28.py; the field cave unchanged, set "step2j"); `data/` the twins' remapped param files
+(param/enemy/fs/enemy_param_vl_{zima,plasmawisp,darios,stalfos}.bin, replacing step 2a's 3DS-layout files) and the
+Waddle Doo / Churine effects (effects v2 + v3 files, re-shipped). Readings with addresses: hand_read.json
+`_framework_step2k`, waddledoo / churine / whitebear / zima / plasmawisp / darios / stalfos `port_step2k`.
+
+**The Wii U keeps Smash Run's weapons.** The weapon name tables (root / owner / name, 0x104189DC / 0x10418FF0 /
+0x10419604) list enemy weapons the Fortress never uses, with their native code, descriptors, singletons and module
+rows: 0x78 hammerbros hammer, 0x79 popperam gravel, 0x7A monoeye shot, 0x7B mettaur bullet, 0xAA / 0xAB starman
+pkbeam gamma / omega, 0xAC keronpa fire, **0xAD waddledee parasol**, 0xAE kihunter acidbullet, **0xAF waddledoo
+beam**, 0xB0-0xB2 plasmawisp needle / laser / hadoudan, 0xB3 shotzo shot, 0xBA kamek magicshot, 0xC3 / 0xC4 deathpod,
+0xF5-0xF7 bokkuncannon, 0xF8 peahat shot, 0xFF octorock rock, 0x139 bokkunmage magic, **0x13A churine
+sleeppowder**, 0x13B eggrobo bullet, 0x13C dafune flowermine, 0x13D totsukotsu shot, 0x140 / 0x141 shandera, 0x142
+darknut sword, 0x143 bonkers coconut, 0x144 / 0x161 pokkuri. Their numbers are the 3DS's (Waddle Doo's beam: 175).
+Kind 0xAF: descriptor 0x1041DC90 (motion info 0x101743E8, as the Fortress needle 0x145's: no model flag 0x40, flags
+0x802), singleton 0x1056A74C, specializer vtable 0x101741F0: init 0x0319FE98 = the 3DS's 0xA407C (speed [slot+0xC8]
+along the activate param's angle +0x68 from (0, 1), the attack from [slot+0xDC] (P7[0]), effect 0x7190000 following
+node 0 at [slot+0xCC]), life 0x031A026C = 0xA467C, on_take_from_pocket 0x031A02F4. It reads its params from
+`[[0x102F6C00] + 0xC4]`: the param slot of kind 0x19 in the 3DS waddledoo param object's layout.
+
+**Waddle Doo** (3DS states 7 / 8 as 10 / 11; `do_*` in `code_2k`, region H; the object grows to 0x1D0, DO_* at 0x1B0):
+- the search (walk 0x7D5D0, fall 0x7D258, jump 0x7D350; the wall hop 5 has none): DO_SC (+0x16C) + 1 >
+  search_interval(1) (20): the cool-down DO_CD (+0x180) - 1 < 0: DO_SC = 0, search_target(1) (60 x 70 at (30, 20));
+  found: walking, the leave timer V7 = 600 (0x7D62C); in the air DO_AIR (+0x19D) = 1; => 10. The walk's order:
+  wall, random hop, the beam's search, the turn search. The fall is the 3DS's (on the ground => 2, no speed test).
+- 10 (0x7DD40 / 0x7DEEC): on the ground kinetic 0, ground on; BeamShotHold at PS8c f3 (1.0); in the air the kinetic
+  stays until it lands (then 0, ground on, DO_AIR off; 11 the same); the end => 11.
+- 11 (0x7D060 / 0x7DB04): BeamShot at f4 (4.0), DO_CD = f5 (150), shots 180 / f9 = 7; each frame while shots remain:
+  DO_TK - 1 < 0: DO_TK = f8 (2), generate_article_angle(0, angle x lr, false) (Wii U 0x026A7DD8: AI energy +0x54, then
+  generate_article 0x026A7D40: ArticleModule acc+0x4C vt+0x54 / vt+0xD4), angle 30 - 25 n (DO_ANG); all shot and
+  the motion's end => 3. play_se(0x6A80000) / stop_se (0x7D0D4, 0x7DC18, exit 0x7DD18): the sound step.
+- the article set (written by the T hook, ART_SETS 0x10352794[0x19], before the field cave's requests: the resource
+  request 0x030BF400 and the accessor set-up read it): {entries, 1}, {0xAF, 5, do_beam_cb, 0} = the 3DS's
+  enemy_article_data_set_waddledoo {175, 5, 0x7DDB0}.
+- do_beam_cb (the 3DS's spawner 0x7DDB0 in the Wii U form of mczakoplasmawisp's 0x026CF644; r3 the article, r4 the
+  owner's accessor): ModelModule node_global_position(3) + (PS8c f6 9 x lr, f7 0.75), z the GroundModule's +0x88
+  (3DS +0x80); BattleObjectActivateParam (ctor 0x026CF4F0): +4 position, +0x10 lr, +0x1C 0, +0x20 the owner's id, +0x28
+  its team ([acc+0x312C]+4 vt+0x14), +0x2C life PSc4 f0 (8), +0x58 4, +0x60 0, +0x68 the angle (AI +0x54), +0x6C 0;
+  util_activate 0x02C073A8; the members +0x48 / +0x3C freed (0x033EBE74); returns 0. The Wii U's param layout (pos at
+  +4, lr +0x10) is the twin spawner's; the 3DS's is 4 bytes later for those two.
+- its param slot (the S hook): slot[0x19] = `wdp`, a static object in the 3DS layout (enemy_param_vl_waddledoo.bin
+  through the spec: P0-P6 vectors {reader, elem size, count, data, flag}, PS8c, the 0.5, PSc4 {8, 4.0, 0.5}, P7).
+  The walker kinds read slot[K] (the activation's +0x70 area table: their own since fix v7; the accessor set-up's
+  +0x5C, P4, and the other common groups): the Waddle Doo now reads its own 3DS P3 / P4 (sphere r 9 at node 3,
+  [8, 22, -10, 12, -8, 3, 0, 0, 0, 26]) instead of mczakozima's.
+
+**Churine** (3DS 6 / 7 as 8 / 9; `ch_*`; V0 +0x168, V1 +0x16C, V2 +0x170, V3 +0x171, V5 +0x17C, V6 +0x180):
+- walk (0x3D76C, after the ground / wall / ledge tests): V0 > 0: - 1; V1 > 0: - 1, still > 0: skip; V0 <= 0:
+  search_target(0) (100 x 35 at (5, 5)): found ahead => 8, behind: V2 = 1 => 5; not found: V0 = search_interval(0)
+  (3); then the first-frame flag V3 (the start 0x3D064 sets it: `ch_start` = w_start + V3 = 1) => 8 once.
+- 5 turn (0x3D660): the end: reverse_lr, V2 ? => 8 : => 3 (interrupt), V2 = 0.
+- 8 (0x3DBF0 / 0x3DD14): clear_speed_all, W+0x20 0, +0x24 P0 f9 1, +0x28 / +0x2C 10, +0x1C 0, kinetic 5, ground off,
+  Jump (once); the stick (lr, 1); speed y <= 0 on the ground => 9 (interrupt).
+- 9 (0x3D3B4 / 0x3D970): kinetic 0, clear_speed_all, ground on, SleepPowder (once), V6 = 0; V6 + 1 each frame; on the
+  ground: with the effect: EffectSystem is_exist (0x0334C78C = 3DS 0x7FA27C / 0x807BF8) 0 -> V5 = 0, => 5, V1 = P0 f13
+  210; without: from frame P0 f12 40 request_follow_effect(0x71F0000, node 1, (f7, f8, 0) = (0, 5, 0), (90 - 90 lr,
+  -90, 0), f11 1) -> V5, EffectModule set_rate_last(f10 1.4) (Wii U 0x02C2CB74 = 3DS 0x4D6B18 line for line); off the
+  ground: the effect removed, => 1. play_se(0x6B00001): the sound step. The sleep hitboxes are its ACMD (the
+  converted attack.bin `sleeppowder`, run by the motion's hashset): frame 50 id 1 (1 %, 361, kbg 7, size 8, (0, 4,
+  11)), 70 id 2 (kbg 3, size 25, (0, 4, 40)), effect 9 (sleep: the converted value is the 3DS's; the audit's "13" was
+  the CollisionPart word), removed at 125.
+- slot 69 (0x3DDE8): in 9 the effect removed, returns 0; 6 dead enter (0x3D36C): the same, then g_dead_en.
+- The Wii U's weapon 0x13A churine sleeppowder exists but the 3DS behaviour never generates it (no article call):
+  not used.
+
+**The twins' own params.** Each twin's AI reads a param object of its class: the sm accessor (vtable 0x1008BFB8,
+[mgr+0x28D0]) builds them in a block (vt+0x14 0x026B4120: 0x57 mczakoplasmawisp +0x1214 ctor 0x026B37A8, 0x58 darios
++0x13DC 0x026B3A1C, 0x59 stalfos +0x14A4 0x026B3C30, 0x5A zima +0x1684 0x026B3ED4; dtors 0x026B3980 / 0x026B3BA4 /
+0x026B3E30 / 0x026B4034, 0x026B43E0's) and parses `param/enemy/sm/enemy_param_vl_<twin>.bin` every battle (vt+0x24
+0x026B44B0: path 0x032D7220 / 0x032D9A30 / 0x032D7140, parsers 0x026B6370 / 0x026B6380 / 0x026B6390 / 0x026B63A0 ->
+the generic loader 0x033B4770 at the object's +0xAC member), setting slot[0x50+i] (step 2a's hook then copies them to
+slot[K]). The twins' AIs read their own slot hard-coded (plasmawisp 31 sites, darios 31, stalfos 44, zima 6 + 1 in
+stalfos's code), the rest by the object's kind.
+- The layouts, token by token (tools/smashrun_twin_params.py): the same groups and types but zima G0 (the 3DS's 5th
+  word, u32 90, has no Wii U field: dropped), zima G5 / darios G5 / stalfos G9 (the Wii U's 6 trailing words 0.1, 5,
+  5|6, 8|9, 2, 20: kept), plasmawisp G5 (8 Wii U words after the 3DS's 53rd: kept). The written file tokenises to the
+  twin's exact type / group sequence. 35 words take the 3DS value (`--diff`; the audit's rows).
+- `k2_twins` (from cave_s on a Smash Run stage): the previous battle's objects deleted (k2_objs, dtor(obj, 1)); for each
+  twin, path "param/enemy/fs" + "enemy_param_vl_<K>.bin"; a handle (the file found): ctor(0, empty handle) allocates
+  a new object, the twin's parser fills it; attacks (+0x30 > 0): slot[K] = it and slot[twin] = it (not zima's: the
+  walkers borrow slot[0x5A], and the 7 hard-coded zima reads, +0xC / +0x7C..+0x90, see the same values in both
+  files); else deleted, nothing changed. Not found: nothing changes (the step 2a behaviour).
+
+**The twins' AI against the 3DS states (open).** Only the params are the kinds' own now; the AI code itself (Wii U
+mczakozima 0x026D6680-0x026D7CA0, mczakoplasmawisp 0x026CF4DC-0x026D1E00, mczakodarios 0x026CBA64-0x026CF4DC,
+mczakostalfos 0x026D1E00-0x026D6680) was not compared state by state with the 3DS's (hand_read zima 1-7, plasmawisp
+1-10, darios 1-8, stalfos 1-24): the next step for them, with the sounds (the 3DS ids per state: accuracy-audit.md).
+
+**White Bear's weakness.** 3DS: the start's set_weak_param(5, P0 f19 2.0) -> DamageModuleImpl 0x4D34C4 -> the
+damage transactor ([DM+0x68], vtable 0xBDE22C) vt+0x84 0x5F6D44 (count 1, {5, 2.0} at +8); read by its vt+0x90
+0x966BE8 (through the DamageModule's 0x4D3020): the entry whose kind is the AttackData's attribute byte +0x43
+multiplies the damage. The Wii U transactor has no weak table (no twin of 0x5F6D44 / 0x5F6D6C add_weak_param_multi
+/ 0x966BE8 found; its DamageModule slot 38 0x02C23550 forwards to vt+0x124 as 0x4D3020 does, slot 50 0x02C23648 is
+another call). Ported in the bear (vtover 31, FDMG; WB_W 0x1B0, WB_D 0x1B4): slot 31 (BehaviorImpl 0x026A48EC after)
+notes a hit of attribute P15 (5); slot 10 (notify_on_damage) adds that hit's damage x (P16 2.0 - 1) through
+set_current_damage (0x026A7E58), then BehaviorImpl's 0x026A3564. APPROXIMATED: the damage (HP) is doubled, the
+knockback is the game's for the hit's own damage.
+
+**Item drops on defeat (open, read).** The Wii U create_dead_item 0x02DB3944 returns unless EnemyManager +0x5EC is 0
+(fs); past it, it fills a request (kind, variation, the gl entry's +0x18 drop group, center_pos + y, the item kind
+argument, 6 / 1 / 0 by the bool and acc+0x3120 +0x84) for 0x02DAF754 on `[0x103525B8]` (the 3DS's FieldSmash item
+manager: lot tables at +0x88 / +0xCDC), which no Wii U code ever sets (only this read): passing the gate would call
+it on 0. The 3DS's create_dead_item 0x7B1984 is the Smash Run reward: EnemyManager::add_kill_count, FieldSmashManager,
+GlobalParameter's melee params and the FsItemAutoSet lots (0x42A090..: the stat power-ups and equipment of the
+3DS's Smash Run), none of which the Wii U has. A port needs that manager (or a stand-in creating only Wii U items:
+create_item 0x026A8D78, kinds of the Wii U item table 0x104157A0 with code); not done in this step.
+
+**Tests** (exe_v28):
+
+| Test | Result |
+| --- | --- |
+| smashrun_step2k_test.py (new; S/s2e/root, the 3DS fs and Wii U sm param dirs) | 26 checks, 0 failures (the beam's search / charge / fan / spawner / article set / param object, the Wii U's beam init 0x0319FE98 run on it, Churine 3-9 / slot 69 / start / its hitboxes, k2_twins, the remapped values, the bear) |
+| smashrun_step2j_test.py | 22 checks, 0 failures |
+| smashrun_step2i_test.py (the step 2i package's data/) | 10 checks, 0 failures |
+| smashrun_step2h_test.py (S/s2e/root) | 41 checks, 0 failures |
+| smashrun_walker_test.py (S/s2e/root) | 179 checks, 0 failures (Waddle Doo / Churine enters 10 / 11 / 8 / 9; the Doo's beam cool-down held in its walk tests; S2 also writes slot[0x19]) |
+| smashrun_flier_test.py | 123 checks, 0 failures |
+| smashrun_flier_motion_test.py | 11 checks, 0 failures |
+| smashrun_field_test.py --set step2j | 13 checks, 0 failures |
+| smashrun_enemy_test.py (S/s2e/root) | 26 checks, 0 failures |
+| effect_slots_patch_test.py exe_v28 exe_v12 | 47 checks, all ok |
+
+**exe_v28 vs exe_v27, word diff** (s2k/diff28.py, log s2k/diff28.log): 6502 words, all in Smash Run's regions and
+sites: the hook words 0x02D9A46C (T2), 0x02D9A618 (S2), 0x02DB40E4, 0x02DB4B20 re-targeted; E 0x04B7D630-0x04B7DD7C;
+D 0x04B849F0-0x04B849FC; A 0x04B8691C-0x04B87D9C; B 0x04B89320-0x04B89FFC; C / G and the data 0x04BB8004-0x04BC0040;
+H 0x04BC00C0-0x04BC5770 (code to 0x04BC49FC, data after it); data section 0x1008EC68 / 0x1008F1D4 / 0x1008FFCC (the
+twins' slot 38 words, TWIN_FLIP). No weapon-kind table changed (kind 0xAF is the game's). Relocations and the file
+info equal.
+
+**Still open:** the twins' AI state by state; the dead items (above); sounds (the beam handle +0x1A4, the powder);
+in game: the beam (kind 0xAF's files: none on the 3DS, none requested by its descriptor; its effect from bank 0x719),
+the sleep attribute, the twins' files found. The walker kinds still borrow mczakozima's param object (its P3 hurtbox
+capsule and P4 for every walker but the Waddle Doo): their own 3DS objects, as `wdp`, would follow the same way.

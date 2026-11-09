@@ -10,6 +10,8 @@ Severity: **wrong** (differs from the 3DS), **missing** (3DS behaviour not porte
 
 Step 2j (docs/smash-run-port.md "Step 2j") fixed: 6 (the parasol fall; the dropped parasol is still missing), 7 (the view test; set_weak_param still missing), 8, 9, 10, 15, and Waddle Doo's leave-timer reset on damage (1, the beam still missing); Furiijio's beam billboards in its effect models' data.
 
+Step 2k (docs/smash-run-port.md "Step 2k") fixed: 1 (the beam: the Wii U's own weapon kind 0xAF, its trigger, the leave-timer reset by the beam's search), 2 (the sleep powder and its search), 3, 4, 5 (the twins read their kinds' own params: tools/smashrun_twin_params.py, k2_twins), 7 (set_weak_param, approximated: the bear doubles attribute-5 hits' damage itself). Found: every walker kind but the Waddle Doo still borrows mczakozima's param object (its P3 hurtbox capsule, P4): a new framework row. Open: the twins' AI state by state, the dead items (the Wii U has no FieldSmash item manager: read in "Step 2k"), sounds.
+
 
 1. Waddle Doo: the beam (its only attack) and its trigger are missing; the leave timer is never reset (600 frames after spawning it leaves mid-fight)
 2. Churine: the sleep powder (its only attack) and its search are missing: harmless except its death flight
@@ -138,6 +140,7 @@ Tier 3 (minor):
 |---|---|---|---|---|
 | AI kinetic energy layout ([[[[acc+0x30B0]+8]+0]+4], Wii U acc+0x3130) | 3DS 0x645FC0 (kinetic 20 setter) writes +0x10 / +0x14 / +0x70 / +0x74 / +0x78 / +0x90 / +0x94 | Wii U twin 0x026A97D0 writes the same offsets; w_init / h_en write the 3DS offsets unchanged | ok | none: this energy is NOT shifted (only the KineticModule get_energy(n) energies are: 3DS clear_speed_x 0x7B0B80 +4/+0xC vs Wii U 0x026A67F4 +0/+8, handled for the aerial module) |
 | energy kick | 3DS 0x32C4C / 0x1AB50: module [acc+0x30B0] vt+0x7C with r1 = 0x20000004 only (the spec's float args are stale registers) | h_kick / i_kick: vt+0xFC, r4 = 0x20000004 | ok |  |
+| param slot of the walker kinds | each kind its own param object (P3 hurtbox, P4 ground, ...) | every walker kind but the Waddle Doo (step 2k: its own static object `wdp`) reads mczakozima's (step 2b's donor): its P3 capsule, its P4 | approximated (found in step 2k) | a static object per kind, as `wdp` |
 | state frame counter order | common_state_func 0x3DA218: enter, slot 54 (vt+0xD8, reset), update, slot 55 (vt+0xDC, ++) | V-counters reset in the enter, incremented at the end of the update | ok |  |
 | fall: speed gate | Kuribo 1 (0x32C70), Waddle Doo 1 (0x7D21C), White Bear 1, Waddle Dee 1: is_touch(8) only; Shy Guy 1 (0x1B0A8) tests speed y <= 0 first | g_fall_up always waits for h_vy0 <= 0 | approximated | a CFG flag: skip h_vy0 for the kinds whose 3DS fall has no speed test |
 | speed y test energy mask | Kuribo 4 (0x325F4) get_sum_speed3f(-9) (every energy but 3) | h_vy0 = get_current_speed 0x026A678C = get_sum_speed3f(1) | approximated | call the Wii U get_sum_speed3f with -9 for the Kuribo notice |
@@ -199,12 +202,12 @@ Tier 3 (minor):
 
 | item | 3DS (address, value) | our port (label / value) | severity | suggested fix |
 |---|---|---|---|---|
-| the beam (its only attack) | 7 BeamShotHold (rate PS8c.f3 1) -> 8 BeamShot (rate 4): 180 / 25 = 7 shots, one every 2 frames, generate_article_angle(0, (30 - 25n) x lr) (0x7DBD4), play_se(0x6A80000) handle +0x1A4 (0x7D0D4), stop_se on the end (0x7DC18) and in exit 0x7DD18; cool-down f180 = 150 | not ported (no Wii U weapon kind) | missing | a weapon: reuse a Wii U article slot (e.g. plasmawisp's needle path 0x102FE844) with the 3DS beam params, or a cave hitbox sweep |
-| beam trigger | fall 1 / walk 3 / jumps 5, 6: every search_interval(1) = 20 frames once f180 < 0: search_target(1) (60 x 70, offset (30, 20)) -> f19d / 7; walk also f184 = 600 | not ported | missing | with the beam |
+| the beam (its only attack) | 7 BeamShotHold (rate PS8c.f3 1) -> 8 BeamShot (rate 4): 180 / 25 = 7 shots, one every 2 frames, generate_article_angle(0, (30 - 25n) x lr) (0x7DBD4), play_se(0x6A80000) handle +0x1A4 (0x7D0D4), stop_se on the end (0x7DC18) and in exit 0x7DD18; cool-down f180 = 150 | not ported (no Wii U weapon kind) | fixed (step 2k) | the Wii U's own weapon kind 0xAF (the 3DS's 175: native code, descriptor, singleton) with the 3DS's article set {0xAF, 5, the spawner 0x7DDB0 ported} and the Doo's own param object; states 10 / 11 (do_ch_*, do_bm_*) |
+| beam trigger | fall 1 / walk 3 / jumps 5, 6: every search_interval(1) = 20 frames once f180 < 0: search_target(1) (60 x 70, offset (30, 20)) -> f19d / 7; walk also f184 = 600 | not ported | fixed (step 2k) | do_bsrch in the walk / fall / jump: search_interval(1), the cool-down, search_target(1); the walk resets the leave timer |
 | random hop | 3: f170 counter, random_range(1, 100) <= PS8c.f2 50 -> 6 (Jump, kinetic 5) | not ported | fixed (step 2j: do_owr, state 9 = the 3DS 6) | a state 6 = g_hop_en without the wall test |
 | hop landing threshold | 5 update 0x7D77C: \|y - y0\| > P@0xC0 = 0.5 | HOPTHR 1.0 ("a guess") | fixed (step 2j: HOPTHR 0.5) | hop[0] = 0.5 |
 | jump -> Fall motion | 5 / 6: is_falling -> set_motion_no_restart(Fall) (0x7D6F0) | Jump motion kept | fixed (step 2j: do_fallm in 5 and 9) | switch to FALLMOT when vy < 0 |
-| leave timer | f184 = 600 at start; reset to 600 by a beam (0x7D62C) and by damage (slot 69 0x7E12C); walk counts it down -> 9 | V7 = 600, walk counts down; never reset | fixed for damage (step 2j: do_69); the beam's reset waits for the beam | reset V7 on damage (F69) and on the beam |
+| leave timer | f184 = 600 at start; reset to 600 by a beam (0x7D62C) and by damage (slot 69 0x7E12C); walk counts it down -> 9 | V7 = 600, walk counts down; never reset | fixed (step 2j damage, step 2k the beam's search) | V7 = 600 on damage and on the beam's search finding a fighter |
 | hit effect | slot 69 0x7E114: request_effect(0x7190001, center_pos, 1.0), handle +0x1A0 (old one removed) | none | fixed (step 2j: do_69) | F69 |
 | turn search | 3: every search_interval(0) = 60 frames search_target(0) behind -> 4 | o_walk_up | ok |  |
 | leave (state 9) | init_common_leave(P6 {300, 0.02, 30, ...}): energy +0x30 / +0x34, kinetic 15, effect 0x8000005 | o_leave_* (8) | approximated | code.bin 0x7B23B4 / 0x7B40B0 read in step 2c v2 |
@@ -214,8 +217,8 @@ Tier 3 (minor):
 
 | item | 3DS (address, value) | our port (label / value) | severity | suggested fix |
 |---|---|---|---|---|
-| the sleep powder (its only attack) | 6 attack hop (energy +0x24 1, +0x28/+0x2C 10, kinetic 5, Jump) -> 7 SleepPowder: ACMD hitboxes frame 50 (id 1, power 1, angle 361, kbg 7, size 8, offset (0, 4, 11), effect 13 = sleep) and 70 (id 2, kbg 3, size 25, offset (0, 4, 40)) to 125; from frame 40 follow effect 0x71F0000 (rate 1.4, scale 1); play_se(0x6B00001) on landing (0x3DB28); effect end -> 5, cool-down 210 | not ported ("no data") | missing | states 6 / 7: the ACMD hitboxes are already in the converted attack.bin (the hashsets run SleepPowder); the effect is converted (step 2d banks) |
-| search | walk: every search_interval(0) (3) frames search_target(0) (100 x 35, (5, 5)) -> 6 (turn first, f170 = 1); a first-frame flag f171 -> 6 once | search=() (none) | missing | with the powder |
+| the sleep powder (its only attack) | 6 attack hop (energy +0x24 1, +0x28/+0x2C 10, kinetic 5, Jump) -> 7 SleepPowder: ACMD hitboxes frame 50 (id 1, power 1, angle 361, kbg 7, size 8, offset (0, 4, 11), effect 13 = sleep) and 70 (id 2, kbg 3, size 25, offset (0, 4, 40)) to 125; from frame 40 follow effect 0x71F0000 (rate 1.4, scale 1); play_se(0x6B00001) on landing (0x3DB28); effect end -> 5, cool-down 210 | not ported ("no data") | fixed (step 2k) | states 8 / 9 (the 3DS 6 / 7): the hop, SleepPowder (its converted ACMD hitboxes: effect 9 = sleep, the 3DS's value; "13" above is the CollisionPart word), the follow effect 0x71F0000 and set_rate_last 1.4, the cool-down 210; slot 69 / dead enter remove it |
+| search | walk: every search_interval(0) (3) frames search_target(0) (100 x 35, (5, 5)) -> 6 (turn first, f170 = 1); a first-frame flag f171 -> 6 once | search=() (none) | fixed (step 2k) | ch_srch: search_target(0) every 3 frames (V0), the cool-down (V1), behind -> turn first (V2), the start's first-frame attack (V3) |
 | walk / hop / turn | 3: initialize again, Walk; wall -> 4; ledge -> 5; 4: landing higher than 20 and no wall -> 2 (f178), else 5 | c_walk / c_jump / g_hop_up (HOPTHR 20) | ok |  |
 | bullet | P2 entry 0 (state 8) power 1, angle 361, size 3 | CHURINE_BULLET (identical) | ok |  |
 | sounds | play_se 0x6B00001 (powder) | none | missing | with the powder |
@@ -224,7 +227,7 @@ Tier 3 (minor):
 
 | item | 3DS (address, value) | our port (label / value) | severity | suggested fix |
 |---|---|---|---|---|
-| damage weakness | start: set_weak_param(5, P0.f19 2.0) | not ported | missing (step 2j: no Wii U twin of the 3DS weak-param setter 0x5F6D44 found; DamageModule slot 43 0x02C23648 forwards to its inner object's vt+0x15C) | find the Wii U set_weak_param twin (Behavior helpers 0x026A6xxx-0x026A9xxx) and call it in the start |
+| damage weakness | start: set_weak_param(5, P0.f19 2.0) | not ported | fixed, approximated (step 2k) | no weak table on the Wii U (none of 0x5F6D44 / 0x5F6D6C / 0x966BE8 has a twin): slot 31 notes attribute-5 hits (AttackData +0x43), slot 10 doubles their damage through set_current_damage before BehaviorImpl's notify_on_damage; the knockback is the hit's own |
 | view test before the quake | 6 end: is_in_view_area() -> 7 else 3 | taken as true | fixed (step 2j: wb_hold_up, IN_VIEW) | IN_VIEW 0x026A96BC is mapped since step 2g: use it |
 | quake kind | request_quake(7) on landing | QUAKE_KIND 6 | approximated | check the Wii U camera quake table for 7 |
 | absolute hit | P6 {state 9, power 10, angle 90, kbg 100, bkb 40, 1.0, 1.0, 1.0, 2, 1, ...} on the first fighter whose module +0x24 vt+0x68 == 0 | ABS_WORDS via MSC set_abs / hit_absolute; "grounded" = MSC StatusModule(1) == 0 | approximated | confirm the field mapping (effect / hitlag / sdi / sound) in game |
@@ -317,9 +320,9 @@ Tier 3 (minor):
 
 | item | 3DS (address, value) | our port (label / value) | severity | suggested fix |
 |---|---|---|---|---|
-| contact attack | 3DS fs vl P2 entry 0: power 4, bkb 70, word 32 = 60 | Wii U sm vl: power 5, bkb 60, word 32 = 240 (the twin reads the Wii U sm vl (param slot[K] = slot[twin], step 2a S-hook), not the 3DS fs vl) | wrong | give K its own param slot: the Wii U sm layout with the 3DS values (a patched copy of the twin's vl) |
-| group 4 word 9 | 15.0 | 6.0 | wrong | same |
-| inline struct (corner timer 100-200 etc.) | 9 words / entry | 12 words / entry (Wii U layout; 3DS values 100 / 200 / 50 / 5.0 / 4.5 present) | approximated | map word by word when building the slot |
+| contact attack | 3DS fs vl P2 entry 0: power 4, bkb 70, word 32 = 60 | Wii U sm vl: power 5, bkb 60, word 32 = 240 (the twin reads the Wii U sm vl (param slot[K] = slot[twin], step 2a S-hook), not the 3DS fs vl) | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
+| group 4 word 9 | 15.0 | 6.0 | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
+| inline struct (corner timer 100-200 etc.) | 9 words / entry | 12 words / entry (Wii U layout; 3DS values 100 / 200 / 50 / 5.0 / 4.5 present) | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
 | AI code | 3DS states 1-7 (hand_read zima) | Wii U mczakozima 0x026D6680..0x026D7CA0 | approximated | not diffed instruction by instruction (left) |
 | sounds | none in the 3DS code | the twin has no Behavior::play_se either | ok |  |
 
@@ -327,11 +330,11 @@ Tier 3 (minor):
 
 | item | 3DS (address, value) | our port (label / value) | severity | suggested fix |
 |---|---|---|---|---|
-| search groups | P1 e0 range 200; e1 interval 5, 140, 20 | Wii U 240; 10, 200, 150 | wrong | own param slot |
-| laser (P7) | power 3, bkb 50 | power 5, bkb 60 | wrong | own param slot |
-| cannon / hadoudan (P8) | power 9, bkb 150 | power 10, bkb 160 | wrong | own param slot |
-| large needle (P6 e1) | word 2 = 1, word 6 = 50 | word 2 = 3, word 6 = 60 | wrong | own param slot |
-| level timers (inline struct) | 28 words: 100 / 250 / 10 / 50 ... | 32 words (Wii U layout): 200 / 200 / 20 / 5 ... | wrong | own param slot (word map) |
+| search groups | P1 e0 range 200; e1 interval 5, 140, 20 | Wii U 240; 10, 200, 150 | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
+| laser (P7) | power 3, bkb 50 | power 5, bkb 60 | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
+| cannon / hadoudan (P8) | power 9, bkb 150 | power 10, bkb 160 | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
+| large needle (P6 e1) | word 2 = 1, word 6 = 50 | word 2 = 3, word 6 = 60 | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
+| level timers (inline struct) | 28 words: 100 / 250 / 10 / 50 ... | 32 words (Wii U layout): 200 / 200 / 20 / 5 ... | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
 | AI code | 3DS states 1-10 (hand_read plasmawisp) | Wii U mczakoplasmawisp (0x026D0000..0x026D1E00) | approximated | not diffed instruction by instruction (left) |
 | sounds | 0x6A20000 needle / laser charge (4 / 6 enter 0x89E88 / 0x89DA8), 0x6A20001 needle (4 end 0x8A12C), 0x6A20002 laser (0x89FB8), 0x6A20003 cannon (0x8A23C), 0x6A20004 level up (helper 0x899E4) | the twin calls 0xBE20000-0xBE20004 (0x026D0610, 0x026D1098, 0x026D1138, 0x026D117C, 0x026D13A4, 0x026D1428, 0x026D166C: 0xBE20001 twice) | approximated | they play if bank 0xBE2 resolves to K's bank (snd_se_enemy_Plasmawisp, the twin's tone order): check in game |
 
@@ -339,10 +342,10 @@ Tier 3 (minor):
 
 | item | 3DS (address, value) | our port (label / value) | severity | suggested fix |
 |---|---|---|---|---|
-| charge time | P0.f6 = 90 frames | Wii U 150 | wrong | own param slot |
-| beam attack P6 e0 | angle 367, fkb 10, size 6, word 16 = 6.0, word 27 = 15 | angle 30, fkb 1, size 4, 10.0, 13 | wrong | own param slot |
-| beam attack P6 e1 | power 5, bkb 60, size 6, word 27 = 15 | power 6, bkb 70, size 4, 13 | wrong | own param slot |
-| inline struct | 6 words / entry | 9 words / entry | approximated | word map |
+| charge time | P0.f6 = 90 frames | Wii U 150 | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
+| beam attack P6 e0 | angle 367, fkb 10, size 6, word 16 = 6.0, word 27 = 15 | angle 30, fkb 1, size 4, 10.0, 13 | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
+| beam attack P6 e1 | power 5, bkb 60, size 6, word 27 = 15 | power 6, bkb 70, size 4, 13 | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
+| inline struct | 6 words / entry | 9 words / entry | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
 | AI code | 3DS states 1-8 | Wii U mczakodarios (0x026CBA64..0x026CF4DC) | approximated | not diffed (left) |
 | sounds | charge 0x6B20000 (4 enter 0x2F484), beam 0x6B20001 (5 enter 0x2E028), stop_se handle +0x19C (helper 0x643AC) | twin: 0xBE30000 (0x026CD950), 0xBE30001 (0x026CDF14) | approximated | check in game |
 
@@ -350,9 +353,9 @@ Tier 3 (minor):
 
 | item | 3DS (address, value) | our port (label / value) | severity | suggested fix |
 |---|---|---|---|---|
-| group 4 word 9 | 20.0 | 11.0 | wrong | own param slot |
-| group 5 e1 word 1 | 0 | 3 | wrong | own param slot |
-| groups 6 / 7 word 6 | 3.0 | 2.4 | wrong | own param slot (the model scale is K's 2.4 from gl; these may be scale-related) |
+| group 4 word 9 | 20.0 | 11.0 | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
+| group 5 e1 word 1 | 0 | 3 | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
+| groups 6 / 7 word 6 | 3.0 | 2.4 | fixed (step 2k) | the kind's own file in the twin's layout (tools/smashrun_twin_params.py: every word the 3DS's, the twin's extra words kept), parsed into its own object by k2_twins |
 | AI code | 3DS states 1-24 (hand_read stalfos); hitboxes ACMD (K's attack.bin runs) | Wii U mczakostalfos (0x026D2000..0x026D6000) | approximated | not diffed (left) |
 | sounds | 0x6BF0005 landing (2 / 14 / 16 enter), 0x6BF0000 (10 / 11 ground touch), 0x6BF0001 (13), 0x6BF0002 (15 enter), slot 29 0x6BF0003, slot 30 0x4A60079 (common bank) | twin: 0xBE40002, 0xBE40003 (x2), 0xBE40005 (x3) only | wrong | the twin never plays the 3DS's 0000 / 0001 / 0002 at those states: add them after the bank map |
 

@@ -230,6 +230,12 @@ at the start of the third (with the stomp test's body), the stomp hook's frame i
 0x04B84A00, zero and unclaimed between stage_omega_cave.py's LIMIT and boot_training_cave.py's CAVE, no branch, word
 or lis / addi pair in the executable pointing into it), data after them (largest blocks first). To fit fix v7, state tables start at row 1 (id 0 -> 1 in change_state) and
 P has five words.
+
+Step 2k (code_2k, region H; docs/smash-run-port.md "Step 2k"): the Waddle Doo's beam (3DS states 7 / 8 as 10 / 11,
+do_*: the Wii U's own weapon kind 0xAF through the 3DS's article set art_doo / spawner do_beam_cb, its own static param
+object wdp in slot 0x19), the Churine's sleep powder (3DS 6 / 7 as 8 / 9, ch_*), the twins' own params (k2_twins:
+param/enemy/fs/enemy_param_vl_<K>.bin in the twin's layout, tools/smashrun_twin_params.py), the White Bear's weakness
+(wb_31 / wb_dmg). Test: tools/smashrun_step2k_test.py.
 """
 import math
 import os
@@ -587,12 +593,14 @@ WALKERS = (
                   ('Fall', 1), ('Jump', 1), ('Landing', 1), ('Turn', 1), ('Walk', 1)),
          dead='Damage', last='Jump', hashset=False, kick=False,
          energy={8: 0.3, 0x10: 0.3, 0x20: 0.5, 0x24: 2.4, 0x28: 0.5, 0x2C: 2.4},
-         states={1: ('g_fall_en', 'g_fall_up'), 2: ('g_land_en', 'g_landt_up'), 3: ('o_walk_en', 'o_walk_up'),
+         states={1: ('g_fall_en', 'do_fall_up'), 2: ('g_land_en', 'g_landt_up'), 3: ('o_walk_en', 'o_walk_up'),
                  4: ('g_turn_en', 'g_turn_up'), 5: ('g_hop_en', 'do_hop_up'), 6: ('g_dead_en', 'g_dead_up'),
-                 7: 'remove', 8: ('o_leave_en', 'o_leave_up'), 9: ('do_jump_en', 'do_jump_up')},   # step 2j: 9 = 3DS 6
+                 7: 'remove', 8: ('o_leave_en', 'o_leave_up'), 9: ('do_jump_en', 'do_jump_up'),   # step 2j: 9 = 3DS 6
+                 10: ('do_ch_en', 'do_ch_up'), 11: ('do_bm_en', 'do_bm_up')},    # step 2k: the beam (3DS 7 / 8)
          vtover={55: 'do_55', 56: 'do_56', 57: 'do_57', 58: 'do_58', 69: 'do_69'}, fstart='w_start',  # 2i: the eyes
-         # the 3DS's 10 / 11 / 9 (dead / remove / leave; 6 hop and 7 / 8 beam not ported)
+         # the 3DS's 10 / 11 / 9 (dead / remove / leave), 6 the hop (step 2j), 7 / 8 the beam (step 2k: 10 / 11)
          start=(1, 1), rets=(3, 1, 1, 6), remove=7, leave=600,   # start: +0x184 = PS8c f0 600
+         size=0x1D0,                  # step 2k: DO_* (the beam's counters) after the walker's 0x1B0
          fall=('Fall', 2), landing='Landing', turn='Turn', turnst=4,
          walkst=3, hop=(0.5, 3, 0), hop_motion=('Jump', 0),     # step 2j: P@0xC0 0.5 (5 update 0x7D77C)
          search=((2, 60, 200.0, 200.0, 0.0, 0.0, 0.0), (2, 20, 60.0, 70.0, 30.0, 20.0, 0.0)),
@@ -600,7 +608,10 @@ WALKERS = (
          # the leave (state 9, init_common_leave(P6 {300, 0.02, 30, -1, 0, 0, 3, 0, 0.85})): frames, the
          # energy's +0x30 (-0.02) / +0x34 (30), the leave effect's offset y and scale
          # step 2i: P5-P7 PS8c +0xB4 / +0xB8 / +0xBC (the blink); step 2j: P8 / P9 PS8c f1 / f2 (60, 50: the random hop)
-         P=(300, -0.02, 30.0, 3.0, 0.85, 30, 50, 4, 60, 50)),
+         # step 2k (the beam, PS8c): P10 f3 1.0 (BeamShotHold rate), P11 f4 4.0 (BeamShot rate), P12 f5 150 (the
+         # cool-down), P13 f8 2 (frames between shots), P14 f9 25 (the fan step, as a float), P15 180 / f9 = 7 shots
+         # (0x7D0A4), P16 30.0 (the first angle, a literal at 0x7DB88)
+         P=(300, -0.02, 30.0, 3.0, 0.85, 30, 50, 4, 60, 50, 1.0, 4.0, 150, 2, 25.0, 180 // 25, 30.0)),
     dict(name='churine', areas=((0, 0, 12.0, 12.0, 0.0, 0.0), (1, 3, 5.0, 10.0, 0.0, 4.0)), kind=0x1F,
          motions=(('DamageFall', 1), ('DamageFly', 1), ('DamageStart', 1), ('DownBound', 1), ('DownBoundEnd', 1),
                   ('DownLoop', 1), ('DownWait', 1), ('Jump', 1), ('Landing', 1), ('SleepPowder', 1), ('Turn', 1),
@@ -608,13 +619,19 @@ WALKERS = (
          dead='DamageStart', last='Fall', hashset=True, kick=False,
          energy={8: 0.7, 0x10: 0.1, 0x14: 0.05, 0x20: 0.2, 0x24: 2.5, 0x28: 0.2, 0x2C: 2.5},
          states={1: ('g_fall_en', 'g_fall_up'), 2: ('g_land_en', 'g_landt_up'), 3: ('c_walk_en', 'c_walk_up'),
-                 4: ('c_jump_en', 'g_hop_up'), 5: ('g_turn_en', 'g_turn_up'), 6: ('g_dead_en', 'g_dead_up'),
-                 7: 'remove'},                # the 3DS's 8 / 9 (6 / 7 not ported: no empty rows)
+                 4: ('c_jump_en', 'g_hop_up'), 5: ('g_turn_en', 'ch_turn_up'), 6: ('ch_dead_en', 'g_dead_up'),
+                 7: 'remove', 8: ('ch_hop_en', 'ch_hop_up'), 9: ('ch_pw_en', 'ch_pw_up')},
+         # the 3DS's 8 / 9 (dead / remove) as 6 / 7; step 2k: its 6 (the attack hop) / 7 (the sleep powder) as 8 / 9
+         vtover={69: 'ch_69'}, fstart='ch_start',          # step 2k: slot 69 0x3DDE8, start 0x3CFF8 (+0x171 = 1)
          start=(1, 1), rets=(3, 1, 1, 6), remove=7, fall=('Fall', 2), landing='Landing', turn='Turn', turnst=5,
          walkst=3, hop=(20.0, 2, 1),
-         search=(),                   # 3DS {2, 3, 100, 35, 5, 5, 0}: only for the powder (not ported)
+         search=((2, 3, 100.0, 35.0, 5.0, 5.0, 0.0),),      # step 2k: P1[0], the powder's search
          attacks=((6, 'churine_bullet'),),
-         P=()),
+         # step 2k (P0 f9..f13 and the literals of 6 / 7): P0 f9 1.0 (the hop's W+0x24), P1 10.0 (W+0x28 / +0x2C,
+         # 0x3DC10), P2 f12 40 (the powder effect's frame), P3 / P4 f7 / f8 (0, 5: its offset), P5 f11 1.0 (scale),
+         # P6 f10 1.4 (its rate), P7 f13 210 (the search cool-down), P8 / P9 90 / -90 (its rotation, 0x3DA68)
+         P=tuple(vl_group('churine', 0)[0][i] for i in (9,)) + (10.0,) +
+           tuple(vl_group('churine', 0)[0][i] for i in (12, 7, 8, 11, 10, 13)) + (90.0, -90.0)),
     # ---- step 2c
     # White Bear (Ice Climber) 0x40, BehaviorWhitebear (enemy_fs.cro create 0x7F420, table 0x111E8C)
     dict(name='whitebear', areas=((0, 2, 1.0, 1.0, 0.0, 0.0), (1, 3, 12.0, 26.0, 0.0, 5.0)), kind=0x40,
@@ -635,7 +652,9 @@ WALKERS = (
          # rate f13, long-fall frames f14, repeat chance f15 (%%, halved per landing), repeat landing rate f16, quakes
          # f17, search cool-down f18; 0.1 the jump's E+0x3C (a literal)
          P=(60, 120, 1.5, 1.5, 1.0, 3.0, 1.0, 180, 50, 0.5, 3, 60, 0.1,
-            2.5, 8.0)),       # v2: the landing effects' scales (0x7400000: the 3DS's (2.5, 1.7, 1) as 2.5; 0x7400001 8)
+            2.5, 8.0,         # v2: the landing effects' scales (0x7400000: the 3DS's (2.5, 1.7, 1) as 2.5; 0x7400001 8)
+            5, vl_group('whitebear', 0)[0][19]),    # step 2k: set_weak_param(5, P0 f19 2.0) (its start 0x7E378)
+         vtover={31: 'wb_31'}, fdmg='wb_dmg', fstart='w_start', size=0x1C0),  # step 2k: WB_W / WB_D (the weakness)
     # Gordo (Kirby) 0x08, BehaviorGordo (create 0x1A470, table 0x10F55C): variation 0 (the one the spawner makes)
     dict(name='gordo', areas=((0, 0, 12.0, 12.0, 0.0, 0.0), (0, 0, 14.0, 14.0, 0.0, 0.0)), kind=0x08,
          motions=(('Togetoge', 1),), no_damage_labels=True,       # its ctor 0x1A4A8: no hashsets, no damage labels
@@ -1080,6 +1099,13 @@ class Data:
         for w in WALKERS:
             ktab += [w['kind'], g('cfg_' + w['name'])]
         b.append(('ktab', ktab + [0xFFFFFFFF], 4))
+        # step 2k: the Waddle Doo's param object and article set, the twins' file names and object pointers
+        b += wd_param_blocks(g)
+        b.append(('art_doo', [g('art_doo') + 8, 1, WD_BEAM, 5, fn('do_beam_cb'), 0], 4))
+        b.append(('k2_dir', cstr('param/enemy/fs'), 4))
+        for _t, k in TWIN_K:
+            b.append(('k2_' + k, cstr('enemy_param_vl_%s.bin' % k), 4))
+        b.append(('k2_objs', [0] * len(TWIN_K), 4))
         for name, entry in ATTACKS.items():
             b.append((name, [word(v) for v in entry], 4))
         for w in WALKERS:
@@ -2249,7 +2275,7 @@ def code(D):
     cw_cl:
         bl h_cliff
         cmpwi r3, 0
-        beq epi
+        beq.far ch_srch             # step 2k: the powder's search (3DS 0x3D76C)
         li r4, 5
         b go""")
     en(B, 'c_jump_en', 5, 0, 7, 1, pre="mr r3, r31\nbl w_init", extra="bl h_sety")
@@ -2322,6 +2348,9 @@ def code(D):
     for w in WALKERS:
         s, t = D['set_' + w['name']], MOTION_SETS + 4 * w['kind']
         B.asm("lis r11, 0x%04X\naddi r11, r11, %d\nlis r12, 0x%04X\nstw r11, %d(r12)" % (ha(s), sx(s), ha(t), sx(t)))
+    # step 2k: the Waddle Doo's article set (the beam), read by the resource request and its accessor set-up
+    s, t = D['art_doo'], ART_SETS + 4 * 0x19
+    B.asm("lis r11, 0x%04X\naddi r11, r11, %d\nlis r12, 0x%04X\nstw r11, %d(r12)" % (ha(s), sx(s), ha(t), sx(t)))
     B.asm("""
     t_done:
         cmpwi r0, 1
@@ -2340,6 +2369,9 @@ def code(D):
     """ % (ha(PARAM_MGR), sx(PARAM_MGR), SLOTS + 4 * SLOT_DONOR))
     for k in KINDS:
         B.asm("stw r11, 0x%X(r12)" % (SLOTS + 4 * k))
+    # step 2k: the Waddle Doo's own param object (the beam reads the 3DS layout), then the twins' own params
+    B.asm("lis r11, 0x%04X\naddi r11, r11, %d\nstw r11, 0x%X(r12)\nbl k2_twins"
+          % (ha(D['wdp']), sx(D['wdp']), SLOTS + 4 * WD_PARAM))
     B.asm("""
     s2_done:
         lwz r0, 0x5EC(r28)
@@ -7344,7 +7376,7 @@ def code_fix2j(H, st, call, d, D):
         stw r3, 0x%(V4)X(r31)
         lwz r0, 0x%(P8)X(r30)
         cmpw r0, r3
-        bge.far ow_look
+        bge do_bsw                  # step 2k: the beam's search (3DS 0x7D5D0), then the turn search
         li r0, 0
         stw r0, 0x%(V4)X(r31)
         li r3, 1
@@ -7352,7 +7384,7 @@ def code_fix2j(H, st, call, d, D):
         bl h_rand
         lwz r0, 0x%(P9)X(r30)
         cmpw r3, r0
-        bgt.far ow_look
+        bgt do_bsw
         li r4, 9
         b go
     do_fallm:
@@ -7377,7 +7409,8 @@ def code_fix2j(H, st, call, d, D):
     # loop); speed y <= 0 on the ground => 3 (the beam search in it: with the beam, not ported). 5's update (0x7D6BC)
     # switches to Fall the same way (0x7D6F0), then the wall hop's landing test (g_hop_up, HOPTHR 0.5: 0x7D77C)
     en('do_jump_en', 5, 0, 11, 0)
-    st('do_jump_up', "bl do_fallm\nbl h_vy0\nbgt.far epi\nbl h_gnd\ncmpwi r3, 0\nbeq.far epi\nli r4, 3\nb goi")
+    # step 2k: not landed -> the beam's search in the air (0x7D350: search_interval(1) / search_target(1), +0x19D = 1)
+    st('do_jump_up', "bl do_fallm\nbl h_vy0\nbgt do_bsa\nbl h_gnd\ncmpwi r3, 0\nbeq do_bsa\nli r4, 3\nb goi")
     st('do_hop_up', "bl do_fallm\nmr r3, r31\nmr r4, r29\nbl g_hop_up")
     # ---- Shy Guy slot 69 (0x1BF70): the run timer (+0x174: V2) = 0; returns 0
     a("""
@@ -7482,6 +7515,666 @@ def code_fix2j(H, st, call, d, D):
     # else -> 3
     st('wb_hold_up', "bl h_end\ncmpwi r3, 0\nbeq.far epi\nmr r3, r31\n" + call(IN_VIEW) +
        "\ncmpwi r3, 0\nli r4, 7\nbne.far go\nli r4, 3\nb go")
+
+
+
+# ---- step 2k (docs/smash-run-port.md "Step 2k"): Waddle Doo's beam on the Wii U's own weapon kind 0xAF, Churine's
+# sleep powder, the twins' own params, the White Bear's weakness, the dead items
+GEN_ART_ANGLE = 0x026A7DD8           # Behavior::generate_article_angle(r4 id, f1 angle, r5 bool) (3DS 0x7B4BF8: the
+#                                      angle into the AI energy +0x54, then generate_article 0x026A7D40: ArticleModule
+#                                      (acc+0x4C) vt+0x54 generate(id, 0, bool, -1), vt+0xD4 on the article made)
+UTIL_ACTIVATE = 0x02C073A8           # ArticleModule::util_activate(Article&, BattleObjectActivateParam&) (3DS 0x7DEB4's)
+ACT_PARAM = 0x026CF4F0               # BattleObjectActivateParam ctor (0xA8 bytes; mczakoplasmawisp's spawners)
+ACT_PARAM_FREE = 0x033EBE74          # the dtor of its members +0x3C / +0x48 (r4 = 2), as those spawners
+ACC_TEAM = 0x312C                    # [acc+0x312C]+4: vt+0x14 the team (3DS [acc+0x30AC]+4 vt+8)
+EFF_EXIST = 0x0334C78C               # EffectSystem::is_exist(handle) (3DS EffectModuleImpl::is_exist_effect 0x7FA27C)
+EFF_RATE_LAST = 0x02C2CB74           # EffectModule (acc+0x30D8) set_rate_last(f1) (3DS 0x4D6B18, line for line)
+ART_SETS = 0x10352794                # the enemy article sets by kind (0x02DC6D88; {entries*, count}, entries {kind, max,
+#                                      spawner, 0})
+WD_BEAM = 0xAF                       # the Wii U's weapon kind 0xAF (enemy / waddledoo / beam): descriptor 0x1041DC90,
+#                                      singleton 0x1056A74C, specializer vtable 0x101741F0 (init 0x0319FE98 = 3DS 0xA407C,
+#                                      life 0x031A026C = 3DS 0xA467C), the 3DS's own kind 175
+DO_SC, DO_CD, DO_TK, DO_IX, DO_ANG, DO_AIR = (0x1B0 + 4 * i for i in range(6))   # 3DS +0x16C / +0x180 / +0x174 /
+#                                      +0x178 / (30 - 25 n) / +0x19D (search-1 count, cool-down, shot wait, shot index,
+#                                      the next angle, charged in the air)
+WD_PARAM = 0x19                      # param slot [mgr + 0x60 + 4 * 0x19] (the beam's init reads [mgr+0xC4] +0xC8 / +0xCC
+#                                      / +0xDC: the 3DS waddledoo param object's layout, enemy_param_vl_waddledoo.bin)
+SLOT_OFF = {0x57: 0x1214, 0x58: 0x13DC, 0x59: 0x14A4, 0x5A: 0x1684}   # the sm accessor's block (vt+0x14 0x026B4120)
+TWIN_CTOR = {0x57: 0x026B37A8, 0x58: 0x026B3A1C, 0x59: 0x026B3C30, 0x5A: 0x026B3ED4}
+TWIN_DTOR = {0x57: 0x026B3980, 0x58: 0x026B3BA4, 0x59: 0x026B3E30, 0x5A: 0x026B4034}   # (obj, 0): 0x026B43E0's calls
+TWIN_PARSE = {0x57: 0x026B6370, 0x58: 0x026B6380, 0x59: 0x026B6390, 0x5A: 0x026B63A0}   # (handle&, obj): vt+0x24
+#                                      0x026B44B0's per-kind loads (0x026B4884 / 0x026B48EC / 0x026B4954 / 0x026B49BC)
+KIND_OF = {'plasmawisp': 0x12, 'darios': 0x1D, 'stalfos': 0x30, 'zima': 0x0E}
+SM_ACC_VT = 0x1008BFB8               # the sm param accessor's vtable (ctor 0x026B40B8), [mgr+0x28D0]
+RES_DIR = 0x032D7220                 # lib path object (this, char*, 1) (vt+0x24 0x026B4510)
+RES_DIR2 = 0x032D9A30                # (this, 1) (0x026B451C)
+RES_JOIN = 0x032D7140                # (dir, &out, name, 0) (0x026B49AC)
+RES_NEW = 0x032D3E3C                 # an empty handle (this) (vt+0x14's)
+RES_FREE = 0x032D4200                # (this, 2)
+TWIN_K = ((0x57, 'plasmawisp'), (0x58, 'darios'), (0x59, 'stalfos'), (0x5A, 'zima'))
+WB_W, WB_D = 0x1B0, 0x1B4           # the White Bear's weak hit noted (slot 31) / its damage before the hit
+BI_SLOT31 = 0x026A48EC               # BehaviorImpl's slot 31 (the hit record: +0x14 AttackData, its +0x4C)
+
+
+def wd_param_blocks(g):
+    """the static waddledoo param object (the 3DS layout the beam's code reads, every value from
+    enemy_param_vl_waddledoo.bin through the spec) and its arrays: [(label, words, align)]"""
+    import json
+    with open(os.path.join(SPECS, 'waddledoo.json')) as f:
+        members = json.load(f)['params']['members']
+    obj = [0] * (0xE4 // 4)
+    out = []
+    for m in members:
+        o = m['offset'] // 4
+        if m['type'] == 'array':
+            lab = 'wdp_%d' % m['index']
+            ents = m['values']
+            out.append((lab, [word(v) for e in ents for v in e], 4))
+            obj[o:o + 5] = [0, m['elem_size'], len(ents), g(lab), 0]
+        elif m['type'] == 'struct':
+            vals = m['values'][0]
+            obj[o:o + len(vals)] = [word(v) for v in vals]
+        else:
+            obj[o] = word(m['value'])
+    return [('wdp', obj, 4)] + out
+
+
+def cstr(s):
+    b = s.encode() + b'\0'
+    b += b'\0' * (-len(b) % 4)
+    return list(struct.unpack('>%dI' % (len(b) // 4), b))
+
+
+def code_2k(H, st, call, d, D):
+    """step 2k (region H): the Waddle Doo's beam (3DS states 7 / 8, the article's spawner), the Churine's sleep powder
+    (states 6 / 7, its search, slot 69), the twins' params re-read from their own files; enemy_fs.cro addresses in the
+    comments, docs/smash-run-port.md "Step 2k" """
+    p = dict(d, SC=DO_SC, CD=DO_CD, TK=DO_TK, IX=DO_IX, ANG=DO_ANG, AIR=DO_AIR, LV=CF['LEAVE'], LST=CF['LANDST'])
+    a = lambda text: H.asm(text % p)  # noqa: E731
+    # ---- Waddle Doo. The beam's search (fall 1 0x7D258, walk 3 0x7D5D0, jump 6 0x7D350; the wall hop 5 has none):
+    # +0x16C (DO_SC) + 1 > search_interval(1) (20): the cool-down +0x180 (DO_CD) - 1 < 0: DO_SC = 0, search_target(1)
+    # (60 x 70 at (30, 20)) found: walk: the leave timer +0x184 (V7) = PS8c f0 600 (0x7D62C); air: +0x19D = 1; => 7
+    # (here 10). r28: 0 walk (not found: the turn search ow_look), 1 air (not found: done)
+    a("""
+    do_bsw:
+        li r28, 0
+        b do_bsrch
+    do_bsa:
+        li r28, 1
+    do_bsrch:
+        lwz r3, 0x%(SC)X(r31)
+        addi r3, r3, 1
+        stw r3, 0x%(SC)X(r31)
+        li r4, 1
+        bl h_grp
+        lwz r0, 0x%(SC)X(r31)
+        cmpw r3, r0
+        bge dbs_no
+        lwz r3, 0x%(CD)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(CD)X(r31)
+        cmpwi r3, 0
+        bge dbs_no
+        li r0, 0
+        stw r0, 0x%(SC)X(r31)
+        li r4, 1
+        bl h_srch
+        cmpwi r3, -1
+        beq dbs_no
+        cmpwi r28, 0
+        bne dbs_air
+        lwz r0, 0x%(LV)X(r30)
+        stw r0, 0x%(V7)X(r31)
+        b dbs_go
+    dbs_air:
+        li r0, 1
+        stw r0, 0x%(AIR)X(r31)
+    dbs_go:
+        li r4, 10
+        b go
+    dbs_no:
+        cmpwi r28, 0
+        bne.far epi
+        b ow_look
+    """)
+    # 1 fall (0x7D21C): on the ground => 2 (interrupt; no speed test), else the beam's search in the air
+    st('do_fall_up', "bl h_gnd\ncmpwi r3, 0\nbeq do_bsa\nlwz r4, 0x%(LST)X(r30)\nb goi" % p)
+    # charged / firing in the air (+0x19D): landing -> kinetic 0, ground on, the flag off (0x7DEF4 / 0x7DB0C)
+    a("""
+    do_land0:
+        mflr r0
+        stw r0, 0x1C(r1)
+        lwz r0, 0x%(AIR)X(r31)
+        cmpwi r0, 0
+        beq dl0_o
+        bl h_gnd
+        cmpwi r3, 0
+        beq dl0_o
+        li r4, 0
+        bl h_kin
+        li r4, 1
+        bl h_att
+        li r0, 0
+        stw r0, 0x%(AIR)X(r31)
+    dl0_o:
+        lwz r0, 0x1C(r1)
+        mtlr r0
+        blr
+    """)
+    # 7 (here 10) the charge (0x7DD40 / 0x7DEEC): on the ground kinetic 0 and ground on; BeamShotHold at PS8c f3 (1.0);
+    # its end => 8 (here 11)
+    st('do_ch_en', """
+        lwz r0, 0x%(AIR)X(r31)
+        cmpwi r0, 0
+        bne dch_m
+        li r4, 0
+        bl h_kin
+        li r4, 1
+        bl h_att
+    dch_m:
+        li r4, 1
+        li r5, 0
+        lfs f2, 0x%(P10)X(r30)
+        bl h_mot""" % p)
+    st('do_ch_up', "bl do_land0\nbl h_end\ncmpwi r3, 0\nbeq.far epi\nli r4, 11\nb go")
+    # 8 (here 11) the beam (0x7D060 / 0x7DB04): BeamShot at PS8c f4 (4.0); 180 / f9 = 7 shots; the cool-down = f5
+    # (150); each frame while shots remain: the wait +0x174 - 1 < 0: wait = f8 (2), generate_article_angle(0, (30 - f9 n)
+    # x lr, false), n + 1 (0x7DBD4: a fan from 30 down to -120 degrees, 0 = up); all shot and the motion's end => 3.
+    # play_se(0x6A80000) / stop_se (0x7D0D4 / 0x7DC18 / exit 0x7DD18): with the sounds (not this step)
+    st('do_bm_en', """
+        li r4, 0
+        li r5, 0
+        lfs f2, 0x%(P11)X(r30)
+        bl h_mot
+        li r0, 0
+        stw r0, 0x%(TK)X(r31)
+        stw r0, 0x%(IX)X(r31)
+        lwz r0, 0x%(P16)X(r30)
+        stw r0, 0x%(ANG)X(r31)
+        lwz r0, 0x%(P12)X(r30)
+        stw r0, 0x%(CD)X(r31)""" % p)
+    st('do_bm_up', """
+        bl do_land0
+        lwz r3, 0x%(IX)X(r31)
+        lwz r0, 0x%(P15)X(r30)
+        cmpw r0, r3
+        ble dbm_end
+        lwz r3, 0x%(TK)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(TK)X(r31)
+        cmpwi r3, 0
+        bge.far epi
+        lwz r0, 0x%(P13)X(r30)
+        stw r0, 0x%(TK)X(r31)
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f0, 0x60(r12)
+        lfs f1, 0x%(ANG)X(r31)
+        fmuls f1, f1, f0
+        lfs f0, 0x%(P14)X(r30)
+        lfs f2, 0x%(ANG)X(r31)
+        fsubs f2, f2, f0
+        stfs f2, 0x%(ANG)X(r31)
+        mr r3, r31
+        li r4, 0
+        li r5, 0
+    """ % p + call(GEN_ART_ANGLE) + """
+        lwz r3, 0x%(IX)X(r31)
+        addi r3, r3, 1
+        stw r3, 0x%(IX)X(r31)
+        b epi
+    dbm_end:
+        bl h_end
+        cmpwi r3, 0
+        beq.far epi
+        li r4, 3
+        b go""" % p)
+    # the article's spawner (the 3DS article data set's 0x7DDB0; the Wii U form of mczakoplasmawisp's 0x026CF644):
+    # r3 the article, r4 the owner's accessor. The position: node 3's global position + (PS8c f6 9 x lr, f7 0.75), z =
+    # the GroundModule's +0x88 (3DS +0x80); the activate param: +4 position, +0x10 lr, +0x1C 0, +0x20 the owner's id,
+    # +0x28 its team, +0x2C the life PSc4 f0 (8), +0x58 4, +0x60 0, +0x68 the angle (the AI energy's +0x54, set by
+    # generate_article_angle); util_activate. The weapon's own init (0x0319FE98) then reads the speed PSc4 f1 (4) along
+    # the angle, the attack P7[0] (2 %%, angle 361, kbg 100, fixed 100, size 1) and the effect 0x7190000 at PSc4 f2 (0.5)
+    a("""
+    do_beam_cb:
+        stwu r1, -0x100(r1)
+        mflr r0
+        stw r0, 0x104(r1)
+        stmw r29, 0xF0(r1)
+        mr r31, r3
+        mr r30, r4
+        lis r29, 0x%(WH)04X
+        addi r29, r29, %(WL)d
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0xC(r1)
+        stw r0, 0x10(r1)
+        lwz r3, 0x3118(r30)
+        li r4, 3
+        addi r5, r1, 8
+        li r6, 1
+    """ % dict(p, WH=ha(D['wdp']), WL=sx(D['wdp'])) + call(NODE_GPOS) + """
+        lfs f0, 0xC(r1)
+        lfs f1, 0xA8(r29)
+        fadds f0, f0, f1
+        stfs f0, 0xC(r1)
+        lwz r12, 0x311C(r30)
+        lfs f2, 0x60(r12)
+        stfs f2, 0x14(r1)
+        lfs f0, 8(r1)
+        lfs f1, 0xA4(r29)
+        fmadds f0, f2, f1, f0
+        stfs f0, 8(r1)
+        lwz r12, 0x30DC(r30)
+        lfs f0, 0x88(r12)
+        stfs f0, 0x10(r1)
+        addi r3, r1, 0x18
+    """ + call(ACT_PARAM) + """
+        lfs f0, 8(r1)
+        stfs f0, 0x1C(r1)
+        lfs f0, 0xC(r1)
+        stfs f0, 0x20(r1)
+        lfs f0, 0x10(r1)
+        stfs f0, 0x24(r1)
+        lfs f0, 0x14(r1)
+        stfs f0, 0x28(r1)
+        li r0, 0
+        stw r0, 0x34(r1)
+        stb r0, 0x78(r1)
+        stb r0, 0x84(r1)
+        lwz r0, 0(r30)
+        stw r0, 0x38(r1)
+        lwz r0, 0xC4(r29)
+        stw r0, 0x44(r1)
+        li r0, 4
+        stw r0, 0x70(r1)
+        lwz r12, 0x3130(r30)
+        lwz r12, 8(r12)
+        lwz r12, 0(r12)
+        lwz r12, 4(r12)
+        lwz r0, 0x54(r12)
+        stw r0, 0x80(r1)
+        lwz r11, 0x%(TEAM)X(r30)
+        addi r3, r11, 4
+        lwz r12, 4(r11)
+        lwz r12, 0x14(r12)
+        mtctr r12
+        bctrl
+        stw r3, 0x40(r1)
+        mr r3, r31
+        addi r4, r1, 0x18
+    """ % dict(TEAM=ACC_TEAM) + call(UTIL_ACTIVATE) + """
+        addi r3, r1, 0x60
+        li r4, 2
+    """ + call(ACT_PARAM_FREE) + """
+        addi r3, r1, 0x54
+        li r4, 2
+    """ + call(ACT_PARAM_FREE) + """
+        li r3, 0
+        lmw r29, 0xF0(r1)
+        lwz r0, 0x104(r1)
+        mtlr r0
+        addi r1, r1, 0x100
+        blr
+    """)
+    # ---- Churine (V0 +0x168 the search wait, V1 +0x16C the cool-down, V2 +0x170 a target to turn to, V3 +0x171 the
+    # first frame, V5 +0x17C the powder effect, V6 +0x180 the powder's frames). The walk's search (0x3D76C, after the
+    # ground / wall / ledge tests): V0 > 0: - 1; V1 > 0: - 1, still > 0: skip; V0 <= 0: search_target(0) (100 x 35 at
+    # (5, 5)): found: behind -> V2 = 1, => 5 (turn) / => 6 (here 8); not found: V0 = search_interval(0) (3). Then (the
+    # 3DS's +0x171, set by its start 0x3D064) the first frame => 6 (here 8) once.
+    a("""
+    ch_srch:
+        lwz r3, 0x%(V0)X(r31)
+        cmpwi r3, 0
+        ble chs_cd
+        addi r3, r3, -1
+        stw r3, 0x%(V0)X(r31)
+    chs_cd:
+        lwz r3, 0x%(V1)X(r31)
+        cmpwi r3, 0
+        ble chs_w
+        addi r3, r3, -1
+        stw r3, 0x%(V1)X(r31)
+        cmpwi r3, 0
+        bgt chs_ff
+    chs_w:
+        lwz r3, 0x%(V0)X(r31)
+        cmpwi r3, 0
+        bgt chs_ff
+        li r4, 0
+        bl h_srch
+        cmpwi r3, -1
+        beq chs_nf
+        mr r4, r3
+        bl h_tchk
+        cmpwi r3, 0
+        beq chs_atk
+        li r0, 1
+        stw r0, 0x%(V2)X(r31)
+        li r4, 5
+        b go
+    chs_atk:
+        li r4, 8
+        b go
+    chs_nf:
+        li r4, 0
+        bl h_grp
+        stw r3, 0x%(V0)X(r31)
+    chs_ff:
+        lwz r0, 0x%(V3)X(r31)
+        cmpwi r0, 0
+        beq.far epi
+        li r4, 8
+        bl h_chg
+        li r0, 0
+        stw r0, 0x%(V3)X(r31)
+        b epi
+    """)
+    # start (0x3CFF8): the walker's, then +0x171 = 1
+    st('ch_start', "mr r3, r31\nmr r4, r29\nbl w_start\nli r0, 1\nstw r0, 0x%(V3)X(r31)" % p)
+    # 5 turn (0x3D660): at the end reverse_lr, => 6 (here 8) if V2 else => 3 (interrupt), V2 = 0
+    st('ch_turn_up', """
+        bl h_end
+        cmpwi r3, 0
+        beq.far epi
+        bl h_rev
+        lwz r0, 0x%(V2)X(r31)
+        li r4, 3
+        cmpwi r0, 0
+        beq cht_go
+        li r4, 8
+    cht_go:
+        li r0, 0
+        stw r0, 0x%(V2)X(r31)
+        b goi""" % p)
+    # 6 (here 8) the attack hop (0x3DBF0 / 0x3DD14): clear_speed_all, W+0x20 0, +0x24 P0 f9 (1), +0x28 / +0x2C 10, +0x1C
+    # 0, kinetic 5, ground off, Jump at 1 (once); each frame the stick (lr, 1); speed y <= 0 on the ground => 7 (here
+    # 9, interrupt)
+    st('ch_hop_en', """
+        bl h_clear
+        bl h_ebase
+        li r0, 0
+        stw r0, 0x20(r10)
+        stw r0, 0x1C(r10)
+        lwz r0, 0x%(P0)X(r30)
+        stw r0, 0x24(r10)
+        lwz r0, 0x%(P1)X(r30)
+        stw r0, 0x28(r10)
+        stw r0, 0x2C(r10)
+        li r4, 5
+        bl h_kin
+        li r4, 0
+        bl h_att
+        li r4, 7
+        li r5, 0
+        bl h_mot1""" % p)
+    st('ch_hop_up', """
+        lwz r0, 0x10(r31)
+        stw r0, 0(r29)
+        lis r12, 0x%(CH)04X
+        lfs f0, %(C1)d(r12)
+        stfs f0, 4(r29)
+        bl h_vy0
+        bgt.far epi
+        bl h_gnd
+        cmpwi r3, 0
+        beq.far epi
+        li r4, 9
+        b goi""" % dict(p, C1=sx(D['consts'] + 4)))
+    # 7 (here 9) the powder (0x3D3B4 / 0x3D970): kinetic 0, clear_speed_all, ground on, SleepPowder at 1 (once: its
+    # ACMD, the converted attack.bin, arms the sleep hitboxes at frames 50 / 70 to 125), V6 = 0. Each frame V6 + 1; on
+    # the ground: with the effect: gone (is_exist) -> V5 = 0, => 5, the cool-down V1 = P0 f13 (210); without it: from
+    # frame P0 f12 (40) request_follow_effect(0x71F0000, node 1, (f7, f8, 0) = (0, 5, 0), (90 - 90 lr, -90, 0), f11 1)
+    # -> V5, EffectModule set_rate_last(f10 1.4) (play_se(0x6B00001): with the sounds); off the ground: the effect
+    # removed, => 1
+    st('ch_pw_en', """
+        li r4, 0
+        bl h_kin
+        bl h_clear
+        li r4, 1
+        bl h_att
+        li r4, 9
+        li r5, 0
+        bl h_mot1
+        li r0, 0
+        stw r0, 0x%(V6)X(r31)""" % p)
+    st('ch_pw_up', """
+        lwz r3, 0x%(V6)X(r31)
+        addi r3, r3, 1
+        stw r3, 0x%(V6)X(r31)
+        bl h_gnd
+        cmpwi r3, 0
+        beq chp_air
+        lwz r3, 0x%(V5)X(r31)
+        cmpwi r3, 0
+        beq chp_req
+    """ % p + call(EFF_EXIST) + """
+        cmpwi r3, 0
+        bne.far epi
+        li r0, 0
+        stw r0, 0x%(V5)X(r31)
+        li r4, 5
+        bl h_chg
+        lwz r0, 0x%(P7)X(r30)
+        stw r0, 0x%(V1)X(r31)
+        b epi
+    chp_req:
+        lwz r0, 0x%(P2)X(r30)
+        lwz r3, 0x%(V6)X(r31)
+        cmpw r0, r3
+        bgt.far epi
+        lwz r0, 0x%(P3)X(r30)
+        stw r0, 8(r1)
+        lwz r0, 0x%(P4)X(r30)
+        stw r0, 0xC(r1)
+        li r0, 0
+        stw r0, 0x10(r1)
+        stw r0, 0x1C(r1)
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f0, 0x60(r12)
+        lfs f1, 0x%(P8)X(r30)
+        fmuls f0, f0, f1
+        fsubs f0, f1, f0
+        stfs f0, 0x14(r1)
+        lwz r0, 0x%(P9)X(r30)
+        stw r0, 0x18(r1)
+        mr r3, r31
+        lis r4, 0x71F
+        li r5, 1
+        addi r6, r1, 8
+        addi r7, r1, 0x14
+        lfs f1, 0x%(P5)X(r30)
+    """ % p + call(REQ_FOLLOW) + """
+        stw r3, 0x%(V5)X(r31)
+        lwz r3, 0(r31)
+        lwz r3, 0x30D8(r3)
+        lfs f1, 0x%(P6)X(r30)
+    """ % p + call(EFF_RATE_LAST) + """
+        b epi
+    chp_air:
+        bl ch_rmfx
+        li r4, 1
+        b go""")
+    a("""
+    ch_rmfx:
+        lwz r4, 0x%(V5)X(r31)
+        cmpwi r4, 0
+        beqlr
+        mflr r0
+        stw r0, 0x1C(r1)
+        mr r3, r31
+    """ % p + call(REMOVE_EFFECT) + """
+        li r0, 0
+        stw r0, 0x%(V5)X(r31)
+        lwz r0, 0x1C(r1)
+        mtlr r0
+        blr
+    """ % p)
+    # slot 69 (0x3DDE8): in 7 (here 9) the effect removed; returns 0. 8 (here 6, dead) enter 0x3D36C: the same
+    st('ch_69', "lwz r0, 4(r31)\ncmpwi r0, 9\nbne ch69_o\nbl ch_rmfx\nch69_o:\nli r3, 0")
+    st('ch_dead_en', "bl ch_rmfx\nmr r3, r31\nmr r4, r29\nbl g_dead_en")
+    # ---- White Bear: start 0x7E378 set_weak_param(5, P0 f19 2.0) -> 3DS DamageModuleImpl::set_weak_param 0x4D34C4 ->
+    # its transactor ([DM+0x68]) vt+0x84 0x5F6D44: one {kind 5, x2.0} entry; read by the transactor's vt+0x90 0x966BE8
+    # (through DamageModule 0x4D3020): a hit whose AttackData attribute byte +0x43 is the entry's kind takes its
+    # damage x the multiplier. The Wii U's transactor has neither (no twin of 0x5F6D44 / 0x5F6D6C / 0x966BE8; its
+    # DamageModule slot 38 0x02C23550 forwards to vt+0x124 like 0x4D3020): here slot 31 (the hit record, r4: +0x14
+    # the AttackData) notes a hit of attribute P15 (5, fire) in WB_W, and slot 10 (notify_on_damage, after the damage
+    # is added) adds that hit's damage once more x (P16 - 1): damage(0) - WB_D (the damage before it), through
+    # set_current_damage (HP W+0 = max - damage), then BehaviorImpl's notify_on_damage (its defeat test sees it)
+    a("""
+    wb_31:
+        lwz r12, 0x14(r4)
+        li r0, 0
+        cmpwi r12, 0
+        beq wb31_s
+        lbz r11, 0x43(r12)
+        lwz r12, 0x168(r3)
+        lwz r12, 0x%(P15)X(r12)
+        cmpw r11, r12
+        bne wb31_s
+        li r0, 1
+    wb31_s:
+        stw r0, 0x%(WBW)X(r3)
+        lis r12, 0x%(B31H)04X
+        ori r12, r12, 0x%(B31L)04X
+        mtctr r12
+        bctr
+    """ % dict(p, WBW=WB_W, B31H=BI_SLOT31 >> 16, B31L=BI_SLOT31 & 0xFFFF))
+    st('wb_dmg', """
+        lwz r0, 0x%(WBW)X(r31)
+        cmpwi r0, 0
+        beq wbd_n
+        li r0, 0
+        stw r0, 0x%(WBW)X(r31)
+        lwz r3, 0(r31)
+        lwz r3, 0x30D4(r3)
+        li r4, 0
+    """ % dict(p, WBW=WB_W) + call(GET_DAMAGE) + """
+        lfs f0, 0x%(WBD)X(r31)
+        fsubs f2, f1, f0
+        lis r12, 0x%(CH)04X
+        lfs f0, %(CL)d(r12)
+        fcmpu cr0, f2, f0
+        ble wbd_n
+        lfs f3, 0x%(P16)X(r30)
+        lfs f0, %(C1)d(r12)
+        fsubs f3, f3, f0
+        fmadds f1, f2, f3, f1
+        mr r3, r31
+    """ % dict(p, WBD=WB_D, C1=sx(D['consts'] + 4)) + call(SET_CUR_DAMAGE) + """
+    wbd_n:
+        lwz r3, 0(r31)
+        lwz r3, 0x30D4(r3)
+        li r4, 0
+    """ + call(GET_DAMAGE) + """
+        stfs f1, 0x%(WBD)X(r31)
+        mr r3, r31
+    """ % dict(WBD=WB_D) + call(BI_NOTIFY_DMG))
+    # ---- the battle load (cave_t / cave_s, on a Smash Run stage): the Waddle Doo's article set (the beam, kind 0xAF,
+    # max 5: the 3DS's enemy_article_data_set_waddledoo {175, 5, 0x7DDB0}) and its param slot (the static object)
+    # are written there; k2_twins: the twins' param objects re-read from the Smash Run kinds' own files (below)
+    code_2k_twins(H, call, p, D)
+
+
+def code_2k_twins(H, call, p, D):
+    """k2_twins (from cave_s on a Smash Run stage, after the param load and step 2a's slot[K] = slot[twin]): for each
+    twin 0x57-0x5A whose Smash Run kind's own file (param/enemy/fs/enemy_param_vl_<K>.bin: the 3DS values in the
+    twin's sm layout, tools/smashrun_twin_params.py) is found, a new object of the twin's class (its ctor with no
+    object allocates one, as the sm accessor's vt+0x14 builds them) parsed from it with the twin's own parser (the
+    call its vt+0x24 makes for the sm file); if it holds attacks (+0x30, the base layout's attack count, > 0):
+    slot[K] = it, and slot[twin] = it too (the twins' AIs read their own slot hard-coded: 31 / 31 / 44 sites) but for
+    zima, whose slot the walkers borrow (step 2b's donor: its own object stays; the 7 hard-coded zima reads, +0xC and
+    +0x7C..+0x90, read values the 3DS file and the Wii U file share). The objects of the previous Smash Run battle
+    (k2_objs) are deleted first (the twin's dtor with 1); the accessor re-sets the twins' slots from its block every
+    battle (vt+0x24), so nothing else points at them by then"""
+    a = lambda text: H.asm(text)  # noqa: E731
+    a("""
+    k2_twins:
+        stwu r1, -0x60(r1)
+        mflr r0
+        stw r0, 0x64(r1)
+        stmw r26, 0x48(r1)
+        lis r29, 0x%04X
+        addi r29, r29, %d
+    """ % (ha(D['k2_objs']), sx(D['k2_objs'])))
+    for i, (t, k) in enumerate(TWIN_K):
+        a("""
+        lwz r3, %d(r29)
+        cmpwi r3, 0
+        beq k2d_%x
+        li r4, 1
+        """ % (4 * i, t) + call(TWIN_DTOR[t]) + """
+        li r0, 0
+        stw r0, %d(r29)
+    k2d_%x:
+        """ % (4 * i, t))
+    a("""
+        lis r28, 0x%04X
+        lwz r28, %d(r28)
+        cmpwi r28, 0
+        beq k2t_o
+        addi r3, r1, 0xC
+        lis r4, 0x%04X
+        addi r4, r4, %d
+        li r5, 1
+    """ % (ha(PARAM_MGR), sx(PARAM_MGR), ha(D['k2_dir']), sx(D['k2_dir'])) + call(RES_DIR) + """
+        addi r3, r1, 0xC
+        li r4, 1
+    """ + call(RES_DIR2))
+    for i, (t, k) in enumerate(TWIN_K):
+        kind = KIND_OF[k]
+        a("""
+        addi r3, r1, 0xC
+        addi r4, r1, 8
+        lis r5, 0x%04X
+        addi r5, r5, %d
+        li r6, 0
+        """ % (ha(D['k2_' + k]), sx(D['k2_' + k])) + call(RES_JOIN) + """
+        lwz r0, 8(r1)
+        cmpwi r0, 0
+        beq k2t_%x_f
+        addi r3, r1, 0x10
+        """ % t + call(RES_NEW) + """
+        mr r4, r3
+        li r3, 0
+        """ + call(TWIN_CTOR[t]) + """
+        mr. r30, r3
+        addi r3, r1, 0x10
+        li r4, 2
+        """ + call(RES_FREE) + """
+        cmpwi r30, 0
+        beq k2t_%x_f
+        addi r3, r1, 8
+        mr r4, r30
+        """ % t + call(TWIN_PARSE[t]) + """
+        lwz r0, 0x30(r30)
+        cmpwi r0, 0
+        bgt k2t_%x_ok
+        mr r3, r30
+        li r4, 1
+        """ % t + call(TWIN_DTOR[t]) + """
+        b k2t_%x_f
+    k2t_%x_ok:
+        stw r30, %d(r29)
+        stw r30, 0x%X(r28)
+        %s
+    k2t_%x_f:
+        addi r3, r1, 8
+        li r4, 2
+        """ % (t, t, 4 * i, SLOTS + 4 * kind, '' if t == 0x5A else 'stw r30, 0x%X(r28)' % (SLOTS + 4 * t), t)
+          + call(RES_FREE))
+    a("""
+        addi r3, r1, 0xC
+        li r4, 2
+    """ + call(RES_FREE) + """
+    k2t_o:
+        lmw r26, 0x48(r1)
+        lwz r0, 0x64(r1)
+        mtlr r0
+        addi r1, r1, 0x60
+        blr
+    """)
 
 
 def code_h(D):
@@ -8740,6 +9433,7 @@ def code_h(D):
         H.asm("pt_%d:\nlwz r0, 0xC(r3)\nli r3, %d\ncmpwi r0, 2\nbltlr\nli r3, %d\nblr" % (k, a_, b_))
     code_pk(H, st, call, d, D)              # step 2j: Pooka
     code_fix2j(H, st, call, d, D)           # step 2j: the audit's fixes
+    code_2k(H, st, call, d, D)              # step 2k: the beam, the powder, the twins' params
     code_vis(H, st, call)
     return H
 

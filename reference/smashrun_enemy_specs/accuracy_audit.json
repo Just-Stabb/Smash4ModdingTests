@@ -1,5 +1,5 @@
 {
- "about": "Smash Run port accuracy audit against the 3DS code (docs/smash-run-enemies/accuracy-audit.md). HEAD d43a726.",
+ "about": "Smash Run port accuracy audit against the 3DS code (docs/smash-run-enemies/accuracy-audit.md). HEAD d43a726. Step 2k updated the rows it fixed (severity \"fixed\").",
  "severity": [
   "wrong",
   "missing",
@@ -86,6 +86,14 @@
      "severity": "wrong",
      "fix": "remap the Sound_Effect ids with the bank-id table (sound plan) when converting; until then they play whatever the Wii U has at that id, or nothing (check in game)",
      "tier": 2
+    },
+    {
+     "item": "param slot of the walker kinds",
+     "s3ds": "each kind its own param object (P3 hurtbox, P4, ...)",
+     "port": "every walker kind but the Waddle Doo (step 2k: its own static object) reads mczakozima's (step 2b's donor): its P3 capsule and P4",
+     "severity": "approximated",
+     "fix": "a static object per kind as the Doo's wdp",
+     "tier": 1
     }
    ]
   },
@@ -383,16 +391,16 @@
      "item": "the beam (its only attack)",
      "s3ds": "7 BeamShotHold (rate PS8c.f3 1) -> 8 BeamShot (rate 4): 180 / 25 = 7 shots, one every 2 frames, generate_article_angle(0, (30 - 25n) x lr) (0x7DBD4), play_se(0x6A80000) handle +0x1A4 (0x7D0D4), stop_se on the end (0x7DC18) and in exit 0x7DD18; cool-down f180 = 150",
      "port": "not ported (no Wii U weapon kind)",
-     "severity": "missing",
-     "fix": "a weapon: reuse a Wii U article slot (e.g. plasmawisp's needle path 0x102FE844) with the 3DS beam params, or a cave hitbox sweep",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): the Wii U's own weapon kind 0xAF (the 3DS's 175) with the 3DS article set / spawner and the Doo's own param object; states 10 / 11",
      "tier": 1
     },
     {
      "item": "beam trigger",
      "s3ds": "fall 1 / walk 3 / jumps 5, 6: every search_interval(1) = 20 frames once f180 < 0: search_target(1) (60 x 70, offset (30, 20)) -> f19d / 7; walk also f184 = 600",
      "port": "not ported",
-     "severity": "missing",
-     "fix": "with the beam",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): do_bsrch in walk / fall / jump (search_interval(1), the cool-down, search_target(1))",
      "tier": 1
     },
     {
@@ -423,8 +431,8 @@
      "item": "leave timer",
      "s3ds": "f184 = 600 at start; reset to 600 by a beam (0x7D62C) and by damage (slot 69 0x7E12C); walk counts it down -> 9",
      "port": "V7 = 600, walk counts down; never reset",
-     "severity": "wrong",
-     "fix": "reset V7 on damage (F69) and on the beam",
+     "severity": "fixed",
+     "fix": "fixed (step 2j damage, step 2k the beam's search: V7 = 600)",
      "tier": 1
     },
     {
@@ -468,16 +476,16 @@
      "item": "the sleep powder (its only attack)",
      "s3ds": "6 attack hop (energy +0x24 1, +0x28/+0x2C 10, kinetic 5, Jump) -> 7 SleepPowder: ACMD hitboxes frame 50 (id 1, power 1, angle 361, kbg 7, size 8, offset (0, 4, 11), effect 13 = sleep) and 70 (id 2, kbg 3, size 25, offset (0, 4, 40)) to 125; from frame 40 follow effect 0x71F0000 (rate 1.4, scale 1); play_se(0x6B00001) on landing (0x3DB28); effect end -> 5, cool-down 210",
      "port": "not ported (\"no data\")",
-     "severity": "missing",
-     "fix": "states 6 / 7: the ACMD hitboxes are already in the converted attack.bin (the hashsets run SleepPowder); the effect is converted (step 2d banks)",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): states 8 / 9 (the 3DS 6 / 7): the hop, SleepPowder (its ACMD hitboxes, effect 9 sleep), the follow effect 0x71F0000 / set_rate_last, cool-down 210",
      "tier": 1
     },
     {
      "item": "search",
      "s3ds": "walk: every search_interval(0) (3) frames search_target(0) (100 x 35, (5, 5)) -> 6 (turn first, f170 = 1); a first-frame flag f171 -> 6 once",
      "port": "search=() (none)",
-     "severity": "missing",
-     "fix": "with the powder",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): ch_srch (search_target(0) every 3 frames, the cool-down, the turn first, the first-frame attack)",
      "tier": 1
     },
     {
@@ -513,8 +521,8 @@
      "item": "damage weakness",
      "s3ds": "start: set_weak_param(5, P0.f19 2.0)",
      "port": "not ported",
-     "severity": "missing",
-     "fix": "find the Wii U set_weak_param twin (Behavior helpers 0x026A6xxx-0x026A9xxx) and call it in the start",
+     "severity": "fixed",
+     "fix": "fixed, approximated (step 2k): the Wii U has no weak table; slot 31 notes attribute-5 hits, slot 10 doubles their damage through set_current_damage (knockback the hit's own)",
      "tier": 1
     },
     {
@@ -942,24 +950,24 @@
      "item": "contact attack",
      "s3ds": "3DS fs vl P2 entry 0: power 4, bkb 70, word 32 = 60",
      "port": "Wii U sm vl: power 5, bkb 60, word 32 = 240 (the twin reads the Wii U sm vl (param slot[K] = slot[twin], step 2a S-hook), not the 3DS fs vl)",
-     "severity": "wrong",
-     "fix": "give K its own param slot: the Wii U sm layout with the 3DS values (a patched copy of the twin's vl)",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): the kind's own file in the twin's layout (tools/smashrun_twin_params.py), parsed by k2_twins",
      "tier": 1
     },
     {
      "item": "group 4 word 9",
      "s3ds": "15.0",
      "port": "6.0",
-     "severity": "wrong",
-     "fix": "same",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): the kind's own file in the twin's layout (tools/smashrun_twin_params.py), parsed by k2_twins",
      "tier": 3
     },
     {
      "item": "inline struct (corner timer 100-200 etc.)",
      "s3ds": "9 words / entry",
      "port": "12 words / entry (Wii U layout; 3DS values 100 / 200 / 50 / 5.0 / 4.5 present)",
-     "severity": "approximated",
-     "fix": "map word by word when building the slot",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): the kind's own file in the twin's layout (tools/smashrun_twin_params.py), parsed by k2_twins",
      "tier": 3
     },
     {
@@ -987,40 +995,40 @@
      "item": "search groups",
      "s3ds": "P1 e0 range 200; e1 interval 5, 140, 20",
      "port": "Wii U 240; 10, 200, 150",
-     "severity": "wrong",
-     "fix": "own param slot",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): the kind's own file in the twin's layout (tools/smashrun_twin_params.py), parsed by k2_twins",
      "tier": 1
     },
     {
      "item": "laser (P7)",
      "s3ds": "power 3, bkb 50",
      "port": "power 5, bkb 60",
-     "severity": "wrong",
-     "fix": "own param slot",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): the kind's own file in the twin's layout (tools/smashrun_twin_params.py), parsed by k2_twins",
      "tier": 1
     },
     {
      "item": "cannon / hadoudan (P8)",
      "s3ds": "power 9, bkb 150",
      "port": "power 10, bkb 160",
-     "severity": "wrong",
-     "fix": "own param slot",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): the kind's own file in the twin's layout (tools/smashrun_twin_params.py), parsed by k2_twins",
      "tier": 1
     },
     {
      "item": "large needle (P6 e1)",
      "s3ds": "word 2 = 1, word 6 = 50",
      "port": "word 2 = 3, word 6 = 60",
-     "severity": "wrong",
-     "fix": "own param slot",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): the kind's own file in the twin's layout (tools/smashrun_twin_params.py), parsed by k2_twins",
      "tier": 1
     },
     {
      "item": "level timers (inline struct)",
      "s3ds": "28 words: 100 / 250 / 10 / 50 ...",
      "port": "32 words (Wii U layout): 200 / 200 / 20 / 5 ...",
-     "severity": "wrong",
-     "fix": "own param slot (word map)",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): the kind's own file in the twin's layout (tools/smashrun_twin_params.py), parsed by k2_twins",
      "tier": 1
     },
     {
@@ -1048,32 +1056,32 @@
      "item": "charge time",
      "s3ds": "P0.f6 = 90 frames",
      "port": "Wii U 150",
-     "severity": "wrong",
-     "fix": "own param slot",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): the kind's own file in the twin's layout (tools/smashrun_twin_params.py), parsed by k2_twins",
      "tier": 1
     },
     {
      "item": "beam attack P6 e0",
      "s3ds": "angle 367, fkb 10, size 6, word 16 = 6.0, word 27 = 15",
      "port": "angle 30, fkb 1, size 4, 10.0, 13",
-     "severity": "wrong",
-     "fix": "own param slot",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): the kind's own file in the twin's layout (tools/smashrun_twin_params.py), parsed by k2_twins",
      "tier": 1
     },
     {
      "item": "beam attack P6 e1",
      "s3ds": "power 5, bkb 60, size 6, word 27 = 15",
      "port": "power 6, bkb 70, size 4, 13",
-     "severity": "wrong",
-     "fix": "own param slot",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): the kind's own file in the twin's layout (tools/smashrun_twin_params.py), parsed by k2_twins",
      "tier": 1
     },
     {
      "item": "inline struct",
      "s3ds": "6 words / entry",
      "port": "9 words / entry",
-     "severity": "approximated",
-     "fix": "word map",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): the kind's own file in the twin's layout (tools/smashrun_twin_params.py), parsed by k2_twins",
      "tier": 3
     },
     {
@@ -1101,24 +1109,24 @@
      "item": "group 4 word 9",
      "s3ds": "20.0",
      "port": "11.0",
-     "severity": "wrong",
-     "fix": "own param slot",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): the kind's own file in the twin's layout (tools/smashrun_twin_params.py), parsed by k2_twins",
      "tier": 3
     },
     {
      "item": "group 5 e1 word 1",
      "s3ds": "0",
      "port": "3",
-     "severity": "wrong",
-     "fix": "own param slot",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): the kind's own file in the twin's layout (tools/smashrun_twin_params.py), parsed by k2_twins",
      "tier": 3
     },
     {
      "item": "groups 6 / 7 word 6",
      "s3ds": "3.0",
      "port": "2.4",
-     "severity": "wrong",
-     "fix": "own param slot (the model scale is K's 2.4 from gl; these may be scale-related)",
+     "severity": "fixed",
+     "fix": "fixed (step 2k): the kind's own file in the twin's layout (tools/smashrun_twin_params.py), parsed by k2_twins",
      "tier": 3
     },
     {

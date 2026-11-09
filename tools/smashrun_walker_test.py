@@ -728,6 +728,8 @@ def main():
         m = Machine(img)
         m.walker(cfg[w['kind']], state=state, lr=lr, kind=w['kind'], var=var)
         m.w32(OBJ + W.V(7), w.get('leave', 0))       # as start leaves it (Waddle Doo's leave timer)
+        if name == 'waddledoo':                       # step 2k: the beam's cool-down held (smashrun_step2k_test.py)
+            m.w32(OBJ + W.DO_CD, 0x7FFFFFFF)
         m.target, m.target_x = 0, 300.0
         if setup:
             setup(m)
@@ -1132,7 +1134,8 @@ def main():
     got = enters('waddledoo')
     exp = {1: (8, 0, (10, 1.0, 1), ''), 2: (0, 1, (12, 1.0, 0), ''), 3: (1, 1, (14, 1.0, 1), ''),
            4: (0, 1, (13, 1.0, 0), ''), 5: (5, 0, (11, 1.0, 0), ''), 6: (None, None, (2, 0.0, 0), 'bullet'),
-           8: (15, 0, (10, 0.0, 0), ''), 9: (5, 0, (11, 1.0, 0), '')}     # step 2j: 9 the random hop (3DS 6)
+           8: (15, 0, (10, 0.0, 0), ''), 9: (5, 0, (11, 1.0, 0), ''),     # step 2j: 9 the random hop (3DS 6)
+           10: (0, 1, (1, 1.0, 0), ''), 11: (None, None, (0, 4.0, 0), '')}  # step 2k: the beam (3DS 7 / 8)
     check(got == exp, 'waddledoo enters as the 3DS\'s: %s' % got)
     wd = world('waddledoo', 3, lr=-1.0)
     m = wd.m
@@ -1157,7 +1160,8 @@ def main():
     # ---- Churine
     got = enters('churine')
     exp = {1: (8, 0, (12, 1.0, 1), ''), 2: (0, 1, (8, 1.0, 0), ''), 3: (1, 1, (11, 1.0, 1), ''),
-           4: (5, 0, (7, 1.0, 1), ''), 5: (0, 1, (10, 1.0, 0), ''), 6: (None, None, (2, 0.0, 0), 'bullet')}
+           4: (5, 0, (7, 1.0, 1), ''), 5: (0, 1, (10, 1.0, 0), ''), 6: (None, None, (2, 0.0, 0), 'bullet'),
+           8: (5, 0, (7, 1.0, 0), ''), 9: (0, 1, (9, 1.0, 0), '')}     # step 2k: the hop / the powder (3DS 6 / 7)
     check(got == exp, 'churine enters as the 3DS\'s: %s' % got)
     wd = world('churine', 3, lr=1.0)
     m = wd.m
@@ -1423,10 +1427,12 @@ def main():
                 exp[k] = before[twin]
             for k in W.KINDS:
                 exp[k] = before[W.SLOT_DONOR]
-        check(after == exp and m.uc.reg_read(R[3]) == 0x1234 and m.uc.reg_read(R[0]) == 2 and
+            exp[W.WD_PARAM] = D['wdp']            # step 2k: the Waddle Doo's own (static) param object
+        # step 2k: r3 is not live after the hook (0x02D9A62C / 0x02D9A6AC set it): k2_twins (its own test) uses it
+        check(after == exp and m.uc.reg_read(R[0]) == 2 and
               m.uc.reg_read(R[1]) == STACK and m.uc.reg_read(R[28]) == MGR,
               'S2 (stage 0x%X%s): %s' % (stage, '' if pm else ', no param manager',
-                                         'slot[K] = slot[0x5A] for the walkers (2a\'s kept), r3 = the load\'s'
+                                         'slot[K] = slot[0x5A] for the walkers (2a\'s kept), slot[0x19] the Doo\'s own, r0 / r1 / r28 kept'
                                          if stage == 0x94 and pm else 'no slot changed'))
 
     # the sets
