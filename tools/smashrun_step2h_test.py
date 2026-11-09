@@ -126,7 +126,7 @@ class M(T.Machine):
     def wfr(self, n, v):
         self.uc.reg_write(T.FR[n], struct.unpack('>Q', struct.pack('>d', v))[0])
 
-    def fighter(self, y=20.0, x=0.0, status=0x1D):
+    def fighter(self, y=20.0, x=0.0, status=0x1D, situation=W.SITU_AIR):
         self.w32(W.FIGHTERS, FT)
         self.w32(FT, TBL)
         self.w32(TBL, ENTS)
@@ -144,6 +144,7 @@ class M(T.Machine):
         self.w32(F24, F24VT)
         self.w32(F24VT + 0xF4, F24_F4)
         self.w32(FSTAT + W.STATUS_KIND, status)
+        self.w32(FSTAT + W.STATUS_SITU, situation)     # step 2r: the stomp needs the fighter in the air (2)
         self.wf(FPOST + 0x10, x)
         self.wf(FPOST + 0x14, y)
         self.params = {}

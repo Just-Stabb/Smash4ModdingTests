@@ -182,6 +182,9 @@ class Asm:
             if op.startswith(("fm", "fnm")) and len(args) == 4:      # fmadd(s) d, a, c, b = a*c + b
                 return (prim << 26) | (d << 21) | (a << 16) | (reg(args[3]) << 11) | (reg(args[2]) << 6) | (xo << 1)
             return (prim << 26) | (d << 21) | (a << 16) | (reg(args[2]) << 11) | (xo << 1)
+        if op == "fsel":                                 # fsel fD, fA, fC, fB: fD = fA >= 0 ? fC : fB
+            return (63 << 26) | (reg(args[0]) << 21) | (reg(args[1]) << 16) | (reg(args[3]) << 11) | \
+                (reg(args[2]) << 6) | (23 << 1)
         if op in FX_OPS:
             return (63 << 26) | (reg(args[0]) << 21) | (reg(args[1]) << 11) | (FX_OPS[op] << 1)
         if op == "frsqrte":

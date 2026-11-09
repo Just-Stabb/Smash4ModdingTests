@@ -207,6 +207,16 @@ scale, and the fighter's feet are its posture origin (not its ECB); no jump inpu
 Step 2g v3: the test is relative to the enemy (PREV keeps the fighter's y minus the box top, so a rising / sinking
 flier is handled) and swept (a crossing of the box top this frame counts down to the box's height + STOMP_SWEEP 4 below
 it: a fast fall stepped over Tiki Buzz's 3-unit box); a defeated enemy (+0x19C) is skipped (Tiki Buzz's 11 / 12).
+Step 2r (docs/smash-run-port.md "Step 2r"): the test is now the game's own tread (u_body in region H). The 3DS's areas
+touch by box overlap (code.bin 0x73DCFC -> 0x9E575C, rect / rect 0x9E57BC; a rect's bounds are its centre +- size x
+0.5, 0x41FE7C), and the Wii U auto-tread (0x02E67534 mode 1) needs the fighter in the air, not in StepJump and falling
+(KineticModule vt+0xA4(1) y < 0). So: the feet's fall over the frame (relative to the box) meets [bottom, top] (any
+fall speed; no need to start above the top: a fall into the box from the side counts), the fighter's x extent (its
+area 0's, clamped to FT_EXT_MAX a side; APPROXIMATED: the fighter area that pairs with the tread kind was not
+identified) meets the box's x range, situation 2, status != 0xB3, speed y < 0, and no bounce pending for it. u_pend
+applies the step jump (mode 1, the multiplier, change_kinetic(1)) once StepJump has run and the fighter is in Jump,
+whatever its kinetic kind, then watches it PEND_VER updates: the speed lost (y <= 0) while still in Jump -> applied
+once more (u_apply).
 
 Hooks (2a's three stay as they are):
 - F2, the factory 0x02DB94CC after 2a's hook: 0x02DB951C `cmplwi r12, 0x10` -> for the walker kinds
@@ -1102,6 +1112,7 @@ class Data:
         b.append(('abs_words', [word(v) for v in ABS_WORDS], 4))
         b.append(('fconsts', [0x43300000, 0x80000000], 8))      # the int -> double bias (f_hitret)
         b.append(('pend', [0] * 12, 4))     # step 2h: the stomp bounce, per fighter slot {accessor, multiplier, count}
+        b.append(('stompk', [fword(FT_EXT_MAX)], 4))     # step 2r: the fighter box's clamp
         # step 2g v3: w_yaw (+0xC: the YAW_HOLD mask); step 2g v6: +0x18 the FLIP_TABLE mask (w_noflip / twin_flip)
         b.append(('yawk', [fword(1.0), fword(90.0), fword(-90.0)] + yaw_mask() + yaw_mask(FLIP_TABLE), 4))
         vt = list(self.vt_words) + [0, 0, 0, 0]          # 74 slots + 74 / 75
@@ -5786,80 +5797,8 @@ def stomp_code():
 
 
 def stomp_body(C):
-    """the per-fighter test (in region C, after the area hooks; r25 slot, r26 the fighter table, r27 tbox, r28 the
-    enemy's posture, r29 its TREAD state, r31 this)"""
-    C.asm("""
-    u_body:
-        lwz r12, 0(r26)
-        mulli r11, r25, 0x%(ENT)X
-        add r12, r12, r11
-        lbz r11, 0x1E(r12)
-        cmplwi r11, 4
-        blt b_next
-        lwz r24, 0xC(r12)
-        lwz r11, 0x18(r24)
-        lfs f1, 0x14(r11)
-        lfs f3, 0x14(r28)
-        lfs f4, 4(r27)
-        fadds f3, f3, f4
-        lfs f5, 8(r27)
-        fadds f4, f3, f5
-        fsubs f1, f1, f4
-        slwi r10, r25, 2
-        add r10, r10, r31
-        lwz r0, 0x%(PREV)X(r10)
-        lfs f2, 0x%(PREV)X(r10)
-        stfs f1, 0x%(PREV)X(r10)
-        cmpwi r0, 0
-        beq b_next
-        fsubs f0, f1, f1
-        fcmpu cr0, f2, f0
-        blt b_next
-        fcmpu cr0, f1, f0
-        bgt b_next
-        fadds f6, f5, f5
-        lis r0, 0x%(SWH)04X
-        stw r0, 0x1C(r1)
-        lfs f7, 0x1C(r1)
-        fadds f6, f6, f7
-        fneg f6, f6
-        fcmpu cr0, f1, f6
-        blt b_next
-        lfs f6, 0x10(r11)
-        lfs f7, 0x10(r28)
-        fsubs f6, f6, f7
-        fabs f6, f6
-        lfs f7, 0(r27)
-        fcmpu cr0, f6, f7
-        bgt b_next
-        mr r3, r31
-        lwz r12, 0xE0(r3)
-        lwz r12, 0x%(S20)X(r12)
-        mtctr r12
-        bctrl
-        li r0, 3
-        stw r0, 0x10(r1)
-        stw r0, 0x4C(r1)
-        li r0, 0x%(STEP)X
-        stw r0, 0x14(r1)
-        li r0, 0
-        stw r0, 0x18(r1)
-        stw r0, 8(r1)
-        stw r24, 0xC(r1)
-        addi r0, r1, 0x10
-        stw r0, 0x48(r1)
-        addi r3, r1, 8
-        addi r4, r1, 0x48
-        lis r12, 0x%(MH)04X
-        ori r12, r12, 0x%(ML)04X
-        mtctr r12
-        bctrl
-        bl u_bounce
-        b u_out
-    b_next:
-        b u_next
-    """ % dict(ENT=FIGHTER_ENTRY, PREV=PREV, S20=0xC + 8 * TREAD_SLOT, STEP=STEP_JUMP, MH=MSC_STATUS >> 16,
-               ML=MSC_STATUS & 0xFFFF, SWH=struct.unpack('>I', struct.pack('>f', STOMP_SWEEP))[0] >> 16))
+    """step 2r: the per-fighter test moved to region H (code_h: u_body); region C keeps the area hooks only"""
+    return C
 
 
 GET_DAMAGE = 0x02C22ECC              # DamageModule (acc+0x30D4) get_damage(r4 index) -> f1 (entries 0xE4 apart, +0)
@@ -5892,6 +5831,22 @@ I_JUMP_MODE = 0x11000000             # the kinetic-1 mode (0x02E7A7D0: 1 = the s
 WM_GET_INT = 0x84                    # WorkModule vt: get_int(r4 id)
 KM_ACC = 0x34                        # the MSC accessor's KineticModule (MSC KineticModule wrapper 0x030B29D8)
 KM_CHANGE, KM_KIND = 0xEC, 0xF4      # KineticModule vt: change_kinetic(r4) / its kind (+0x11C)
+# step 2r: the stomp test as the game's own tread (docs/smash-run-port.md "Step 2r"). The 3DS areas touch by box overlap
+# (code.bin 0x73DCFC -> 0x9E575C: rect / rect at 0x9E57BC, the bounds +0x28..+0x34 of each AreaInstance; a rect's
+# bounds are its centre +- size x 0.5, 0x41FE7C with the 0.5 at 0x41FF00), so a fighter treads while a box of its own
+# overlaps the enemy's tread area; the Wii U's auto-tread (common MSC func_65's third clause -> BattleObject(0x18, 1)
+# = 0x02E67534 with mode 1) also needs the fighter in the air (func_65: situation 2), not in StepJump (0x02E67598) and
+# falling: KineticModule vt+0xA4(1) (the sum speed of energy mask 1, 0x02C508EC) y < 0 (0x02E67610..0x02E67640).
+KM_SPEED = 0xA4                      # KineticModule vt: get_sum_speed(r4 energy mask) -> (x, y) as r3 / r4 bits
+STATUS_SITU, SITU_AIR = 0x84, 2      # StatusModule +0x84 the situation (MSC StatusModule op 1: vt+0xDC 0x02E885E0)
+FT_AREA = 0x60                       # the MSC accessor's AreaModule (MSC AreaModule wrapper 0x030B30A4)
+# the fighter's own box: its AreaModule area 0 (list [am+0xC]: +4 count, +8 entries 0x2C apart, entry +4 the
+# instance; bounds min x +0x2C, max x +0x34: what the fighter's area update 0x02E6CD34 reads to build its area 1),
+# each side clamped to FT_EXT_MAX from the fighter's x (APPROXIMATED: the fighter area that pairs with the tread kind
+# 0xE was not identified); no AreaModule / area: the fighter's x alone
+FT_EXT_MAX = 5.0
+PEND_VER = 8                         # step 2r: updates the bounce is watched for after it was applied (u_pend)
+B_APPLIED, B_REDONE = 0x20000, 0x40000   # pend count word bits: the bounce applied / applied a second time
 
 
 def code_pk(H, st, call, d, D):
@@ -8990,7 +8945,10 @@ def code_h(D):
              ICH=I_STEP_COUNT >> 16, ICL=I_STEP_COUNT & 0xFFFF, N=PEND_N, STEP=STEP_JUMP, ZERO=CF['ZERO'],
              BIH=BO_ID_INVALID >> 16, ITH=I_TREAD_TARGET >> 16, ITL=I_TREAD_TARGET & 0xFFFF,
              JMP=JUMP, WGI=WM_GET_INT, KMA=KM_ACC, KMK=KM_KIND, KMC=KM_CHANGE, KJ=KINETIC_JUMP,
-             IMH=I_JUMP_MODE >> 16, DF=DEFEATED, **{'V%d' % i: V(i) for i in range(9)},
+             IMH=I_JUMP_MODE >> 16, DF=DEFEATED, KMS=KM_SPEED, BAH=B_APPLIED >> 16, BRH=B_REDONE >> 16, VER=PEND_VER,
+             SKH=ha(D['stompk']), SKL=sx(D['stompk']), FAM=FT_AREA, SITU=STATUS_SITU, AIR=SITU_AIR,
+             ENT=FIGHTER_ENTRY, PREV=PREV, S20=0xC + 8 * TREAD_SLOT, MH=MSC_STATUS >> 16, ML=MSC_STATUS & 0xFFFF,
+             **{'V%d' % i: V(i) for i in range(9)},
              **{'P%d' % i: P(i) for i in range(80)})
     a = lambda text: H.asm(text % d)  # noqa: E731
 
@@ -9082,6 +9040,8 @@ def code_h(D):
         lwz r3, 0(r27)
         lwz r12, 0x20(r3)
         lwz r12, 0x%(SK)X(r12)
+        rlwinm. r0, r10, 0, 14, 14
+        bne upd_ver
         cmpwi r12, 0x%(STEP)X
         bne upd_left
         oris r10, r10, 1
@@ -9102,32 +9062,34 @@ def code_h(D):
         bctrl
         cmpwi r3, 1
         blt upd_seen
+        bl u_apply
+        lis r0, %(BAH)d
+        ori r0, r0, %(VER)d
+        stw r0, 8(r27)
+        b upd_next
+    upd_ver:
+        cmpwi r12, 0x%(JMP)X
+        bne upd_drop
+        rlwinm. r0, r10, 0, 13, 13
+        bne upd_next
         lwz r3, 0(r27)
         lwz r3, 0x%(KMA)X(r3)
         lwz r12, 0(r3)
-        lwz r12, 0x%(KMK)X(r12)
-        mtctr r12
-        bctrl
-        cmpwi r3, %(KJ)d
-        beq upd_drop
-        lwz r3, 0(r27)
-        lwz r3, 0x28(r3)
-        lwz r12, 0(r3)
-        lwz r12, 0x%(SI)X(r12)
+        lwz r12, 0x%(KMS)X(r12)
         mtctr r12
         li r4, 1
-        lis r5, 0x%(IMH)04X
         bctrl
-        lfs f1, 4(r27)
-        lwz r3, 0(r27)
-        bl ub_set
-        lwz r3, 0(r27)
-        lwz r3, 0x%(KMA)X(r3)
-        lwz r12, 0(r3)
-        lwz r12, 0x%(KMC)X(r12)
-        mtctr r12
-        li r4, %(KJ)d
-        bctrl
+        stw r4, 0x10(r1)
+        lfs f1, 0x10(r1)
+        lis r12, 0x%(CH)04X
+        lfs f0, %(CL)d(r12)
+        fcmpu cr0, f1, f0
+        bgt upd_next
+        bl u_apply
+        lwz r10, 8(r27)
+        oris r10, r10, %(BRH)d
+        stw r10, 8(r27)
+        b upd_next
     upd_drop:
         li r0, 0
         stw r0, 8(r27)
@@ -9146,6 +9108,177 @@ def code_h(D):
         mtlr r0
         addi r1, r1, 0x20
         b u_vis                     # step 2i: the material-animation kinds' meshes
+    u_apply:
+        stwu r1, -0x10(r1)
+        mflr r0
+        stw r0, 0x14(r1)
+        lwz r3, 0(r27)
+        lwz r3, 0x28(r3)
+        lwz r12, 0(r3)
+        lwz r12, 0x%(SI)X(r12)
+        mtctr r12
+        li r4, 1
+        lis r5, 0x%(IMH)04X
+        bctrl
+        lfs f1, 4(r27)
+        lwz r3, 0(r27)
+        bl ub_set
+        lwz r3, 0(r27)
+        lwz r3, 0x%(KMA)X(r3)
+        lwz r12, 0(r3)
+        lwz r12, 0x%(KMC)X(r12)
+        mtctr r12
+        li r4, %(KJ)d
+        bctrl
+        lwz r0, 0x14(r1)
+        mtlr r0
+        addi r1, r1, 0x10
+        blr
+    """)
+
+    # ---- step 2r: the per-fighter stomp test (from w_upd's loop: r25 the fighter slot, r26 the fighter table, r27 the
+    # tread box {half width, centre, half height}, r28 the enemy's posture (or its node's position), r29 its TREAD
+    # state, r30 CFG, r31 this; w_upd's frame). The game's own tread, per frame: the fighter's box overlaps the tread
+    # area (the 3DS's area contact: rect / rect overlap, code.bin 0x9E57BC) and the fighter is in the air, not in
+    # StepJump and falling (the Wii U auto-tread 0x02E67534 mode 1). Overlap: the fighter's feet (the posture
+    # position, the Wii U fighter's base) swept over the frame's fall relative to the box ([y now, y last frame]
+    # meets [bottom, top]: a fall of any speed through the box counts, the old test's "from above the top" is gone)
+    # and its x extent (its area 0, clamped: FT_EXT_MAX) meets the box's x range. A fighter whose bounce is still
+    # pending (u_pend's entry) is not taken again.
+    a("""
+    u_body:
+        lwz r12, 0(r26)
+        mulli r11, r25, 0x%(ENT)X
+        add r12, r12, r11
+        lbz r11, 0x1E(r12)
+        cmplwi r11, 4
+        blt ub_next
+        lwz r24, 0xC(r12)
+        lwz r11, 0x18(r24)
+        lfs f1, 0x14(r11)
+        lfs f3, 0x14(r28)
+        lfs f4, 4(r27)
+        fadds f3, f3, f4
+        lfs f5, 8(r27)
+        fadds f4, f3, f5
+        fsubs f1, f1, f4
+        slwi r10, r25, 2
+        add r10, r10, r31
+        lwz r0, 0x%(PREV)X(r10)
+        lfs f2, 0x%(PREV)X(r10)
+        stfs f1, 0x%(PREV)X(r10)
+        cmpwi r0, 0
+        beq ub_next
+        fcmpu cr0, f1, f2
+        bge ub_next
+        lis r12, 0x%(CH)04X
+        lfs f0, %(CL)d(r12)
+        fcmpu cr0, f1, f0
+        bgt ub_next
+        fadds f6, f5, f5
+        fneg f6, f6
+        fcmpu cr0, f2, f6
+        blt ub_next
+        lfs f6, 0x10(r11)
+        lfs f7, 0x10(r28)
+        lfs f8, 0(r27)
+        fmr f9, f0
+        fmr f10, f0
+        lwz r9, 0x%(FAM)X(r24)
+        cmpwi r9, 0
+        beq ub_x
+        lwz r9, 0xC(r9)
+        cmpwi r9, 0
+        beq ub_x
+        lwz r0, 4(r9)
+        cmpwi r0, 1
+        blt ub_x
+        lwz r9, 8(r9)
+        cmpwi r9, 0
+        beq ub_x
+        lwz r9, 4(r9)
+        cmpwi r9, 0
+        beq ub_x
+        lis r12, 0x%(SKH)04X
+        lfs f11, %(SKL)d(r12)
+        lfs f12, 0x2C(r9)
+        fsubs f9, f6, f12
+        fsel f9, f9, f9, f0
+        fsubs f12, f9, f11
+        fsel f9, f12, f11, f9
+        lfs f12, 0x34(r9)
+        fsubs f10, f12, f6
+        fsel f10, f10, f10, f0
+        fsubs f12, f10, f11
+        fsel f10, f12, f11, f10
+    ub_x:
+        fsubs f12, f6, f9
+        fadds f11, f7, f8
+        fcmpu cr0, f12, f11
+        bgt ub_next
+        fadds f12, f6, f10
+        fsubs f11, f7, f8
+        fcmpu cr0, f12, f11
+        blt ub_next
+        lwz r9, 0x20(r24)
+        lwz r0, 0x%(SK)X(r9)
+        cmpwi r0, 0x%(STEP)X
+        beq ub_next
+        lwz r0, 0x%(SITU)X(r9)
+        cmpwi r0, %(AIR)d
+        bne ub_next
+        lis r9, 0x%(PH)04X
+        addi r9, r9, %(PL)d
+        mulli r0, r25, 12
+        add r9, r9, r0
+        lwz r0, 8(r9)
+        clrlwi. r0, r0, 16
+        beq ub_fall
+        lwz r0, 0(r9)
+        cmpw r0, r24
+        beq ub_next
+    ub_fall:
+        lwz r3, 0x%(KMA)X(r24)
+        cmpwi r3, 0
+        beq ub_take
+        lwz r12, 0(r3)
+        lwz r12, 0x%(KMS)X(r12)
+        mtctr r12
+        li r4, 1
+        bctrl
+        stw r4, 0x1C(r1)
+        lfs f1, 0x1C(r1)
+        lis r12, 0x%(CH)04X
+        lfs f0, %(CL)d(r12)
+        fcmpu cr0, f1, f0
+        bge ub_next
+    ub_take:
+        mr r3, r31
+        lwz r12, 0xE0(r3)
+        lwz r12, 0x%(S20)X(r12)
+        mtctr r12
+        bctrl
+        li r0, 3
+        stw r0, 0x10(r1)
+        stw r0, 0x4C(r1)
+        li r0, 0x%(STEP)X
+        stw r0, 0x14(r1)
+        li r0, 0
+        stw r0, 0x18(r1)
+        stw r0, 8(r1)
+        stw r24, 0xC(r1)
+        addi r0, r1, 0x10
+        stw r0, 0x48(r1)
+        addi r3, r1, 8
+        addi r4, r1, 0x48
+        lis r12, 0x%(MH)04X
+        ori r12, r12, 0x%(ML)04X
+        mtctr r12
+        bctrl
+        bl u_bounce
+        b u_out
+    ub_next:
+        b u_next
     """)
 
     # ---- Big Goomba (dekakuribo 0x23). V0 the state frames, V1 the run frames (+0x178), V2 the run start's

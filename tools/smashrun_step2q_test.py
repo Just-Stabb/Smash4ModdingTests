@@ -47,6 +47,7 @@ OBJ, INPUT, POSTURE, EN, HEAP, STACK = T.OBJ, T.INPUT, T.POSTURE, T.EN, T.HEAP, 
 FWM, FACC, FPOST, FSTAT = H.FWM, H.FACC, H.FPOST, H.FSTAT
 FKM, FKMVT = HEAP + 0x34A00, HEAP + 0x34B00          # the fighter's KineticModule (acc+0x34), its vtable
 KM_KIND_STUB, KM_CHANGE_STUB, INVALID_STUB = 0x02000040, 0x02000044, 0x02000048
+KM_SPEED_STUB = 0x0200004C          # step 2r: KineticModule vt+0xA4 get_sum_speed(mask) -> (x, y) bits in r3 / r4
 KM_CHANGE_GAME, KM_KIND_GAME = 0x02C4FA00, 0x02C510BC   # FighterKineticModule vt+0xEC / vt+0xF4 (vtable 0x1012C5C0)
 FKM_VTABLE = 0x1012C5C0
 TRANSACTOR_KEEP_32 = 0x02E7EE50      # xori r6, r30, 0x32: the transactor's keep-energies flag (kind == 0x32)
@@ -63,10 +64,15 @@ class M(H.M):
     def __init__(self, img):
         H.M.__init__(self, img)
         self.kin, self.invalid = 1, 0
+        self.fvy = -1.0                  # step 2r: the fighter's speed y (mask 1): falling
 
     def hook(self, u, addr, size, x):
         if addr == KM_KIND_STUB:
             return self.ret(self.kin)
+        if addr == KM_SPEED_STUB:
+            self.calls.append(('get_speed', u.reg_read(T.R[4])))
+            u.reg_write(T.R[4], struct.unpack('>I', struct.pack('>f', self.fvy))[0])
+            return self.ret(0)
         if addr == KM_CHANGE_STUB:
             self.calls.append(('change_kinetic', u.reg_read(T.R[3]), u.reg_read(T.R[4])))
             self.kin = u.reg_read(T.R[4])
@@ -85,6 +91,7 @@ class M(H.M):
         self.w32(FKM, FKMVT)
         self.w32(FKMVT + W.KM_KIND, KM_KIND_STUB)
         self.w32(FKMVT + W.KM_CHANGE, KM_CHANGE_STUB)
+        self.w32(FKMVT + W.KM_SPEED, KM_SPEED_STUB)
 
 
 def log_lines(path):
@@ -142,10 +149,11 @@ def main():
             m.calls = []
             m.call(fn['w_upd'], {3: OBJ, 4: INPUT})
             out.append(list(m.calls))
-        for st, cnt, kin in after:
+        for st, cnt, kin, *vy in after:
             m.w32(FSTAT + W.STATUS_KIND, st)
             m.work[(FWM, W.I_STEP_COUNT)] = cnt
             m.kin = kin
+            m.fvy = vy[0] if vy else 2.0         # step 2r: the fighter's speed y (u_pend's watch after the bounce)
             m.wf(FPOST + 0x14, top + 30.0)
             m.calls = []
             m.call(fn['w_upd'], {3: OBJ, 4: INPUT})
@@ -153,19 +161,22 @@ def main():
         pend = [m.r32(D['pend'] + 12 * i + 8) for i in range(4)]
         return m, out, pend
     # the Big Goomba from Jump: before the fighter's update (count 0) nothing; after it (count 1, kinetic 0x32): the
-    # step jump; the next update nothing (the entry ended)
+    # step jump; the next update (rising) nothing. Step 2r: the entry then stays in its applied phase (B_APPLIED,
+    # PEND_VER updates) instead of ending
+    apply = lambda mul: [('set_int', FWM, 1, W.I_JUMP_MODE), ('set_float', FWM, W.F_TREAD_MUL, mul),  # noqa: E731
+                         ('change_kinetic', FKM, 1)]
     m, got, pend = stomp_then('dekakuribo', 3, [(0xB, 0, 1), (0xB, 1, 0x32), (0xB, 1, 1)])
-    check(('msc_status', FACC, (3, W.STEP_JUMP, 0)) in got[1] and got[2] == [] and
-          got[3] == [('set_int', FWM, 1, W.I_JUMP_MODE), ('set_float', FWM, W.F_TREAD_MUL, 0.9),
-                     ('change_kinetic', FKM, 1)] and got[4] == [] and pend == [0, 0, 0, 0] and
+    check(('msc_status', FACC, (3, W.STEP_JUMP, 0)) in got[1] and got[2] == [] and got[3] == apply(0.9) and
+          got[4] == [] and pend[0] == W.B_APPLIED | (W.PEND_VER - 1) and pend[1:] == [0, 0, 0] and
           m.work[(FWM, W.I_JUMP_MODE)] == 1 and m.work[(FWM, W.F_TREAD_MUL)] == 0.9,
           'Big Goomba stomped from Jump: nothing while StepJump has not run (count 0); once it has and the fighter '
-          'is in Jump with kinetic 0x32: mode int 0x11000000 = 1, float 0x1000006 = 0.9, change_kinetic(1); the '
-          'entry ended %s' % ((got[2:], pend),))
+          'is in Jump with kinetic 0x32: mode int 0x11000000 = 1, float 0x1000006 = 0.9, change_kinetic(1); rising '
+          'after it: nothing more (step 2r: the entry watched for PEND_VER updates) %s' % ((got[2:], pend),))
+    # step 2r: from JumpAerial (the chain took kinetic 1) the step jump is applied too (whatever the kinetic kind)
     m, got, pend = stomp_then('kuribo', 3, [(0xB, 1, 1), (0xB, 1, 1)], at_stomp=0xC)
-    check(got[2] == [] and got[3] == [] and pend == [0, 0, 0, 0],
-          'Goomba stomped from JumpAerial (the chain took kinetic 1: the game\'s own step jump): no change, the entry '
-          'ended %s' % ((got[2:], pend),))
+    check(got[2] == apply(0.8) and got[3] == [] and pend[0] == W.B_APPLIED | (W.PEND_VER - 1),
+          'step 2r: Goomba stomped from JumpAerial (the chain took kinetic 1): the step jump applied all the same '
+          '(mode 1, 0.8, change_kinetic(1)), then watched %s' % ((got[2:], pend),))
     m, got, pend = stomp_then('patapata', 12, [(0xE, 1, 0x32), (0x1D, 1, 0x32)], var=2)
     check(got[2] == [] and got[3] == [],
           'the fighter in another status after the stomp (0xE, 0x1D): no kinetic change %s' % got[2:])

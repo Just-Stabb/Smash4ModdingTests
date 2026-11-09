@@ -3059,3 +3059,101 @@ relocations and the file info equal.
 
 **Still open:** the enemy sounds in game (the install's file names; the `bl` line settles it); the beam's and
 Furiijio's look against the 3DS; the Paratroopa's wings; slots 34 / 36's use; the DK hand-slap scaling against the bear.
+
+## Step 2r: the stomp area as the game's tread (box overlap, airborne, falling, swept), the Big Goomba's bounce applied whatever the kinetic (log build)
+
+Package smashrun_step2r_v1: `code/` exe_v35 = exe_v34 + `smashrun_walker_cave.py` over its own regions (scratch
+s2r/build35.py; the field cave unchanged, set "step2j"); no data changes (keep step 2q's). Separately
+smashrun_step2r_diag_v1 (`code_diag/`: exe_v35 + tools/diag_step2r_cave.py). Readings with addresses: hand_read.json
+`_framework_step2r`, and `port_step2r` of kuribo, dekakuribo, patapata, tikibuzz.
+
+User results with step 2q: enemy sounds play, the White Bear's armor works, the Koopa's death is fixed. Still wrong:
+Big Goombas and Koopas / Paratroopas have a small stomp area; Big Goombas give no height (from a full jump and from a
+double jump alike, while a Goomba bounces from a double jump). No log came with the report.
+
+**What the 3DS tests (re-derived).**
+- The area box. The tread area is a rect (shape byte 0 at AreaData +0x1C; AreaInstance set-up code.bin 0x3D90B4 jump
+  table -> 0x3D90E8): centre = the entry's offset (+0xC, x by lr when flagged), size (+0x14); unless flag 0x40, both x
+  the scale of the area's node world matrix (|first column|, 0x3D9278-0x3D92C4: 1.0 -> nothing), then 0x41FE7C makes
+  the bounds centre +- size x 0.5 (the 0.5 at 0x41FF00) plus the base (+0x38 / +0x3C: the node's world translation,
+  or the posture's position without a node). So the vl's 14 x 3 etc. are full sizes, offset and size both scaled:
+  step 2n's boxes are right (Goomba (8.4, 3.04, 4.8), Big Goomba (9.1, 7.8, 1.95), Paratroopa (3, 12, 6) as half width,
+  centre, half height; Tiki Buzz (6, 0, 1.5) on its live node). The models agree: dekakuribo's skeleton is the
+  Goomba's (TransN 0, HipN 2.53, HeadN 4.81 model units), so 7.5 x 1.3 = 9.75 is its head top.
+- The contact. Two areas touch when their boxes overlap (0x73DCFC -> 0x9E575C; rect / rect 0x9E57BC: each max against
+  the other's min), not when a point is inside one (0x944424, the point test, is another shape method). So a fighter
+  treads while a box of its own overlaps the tread area: its width counts and the order of entry does not (the port's
+  test was a point, the feet, that had to cross the box's top from above within its half width: the Koopa's 6-wide box
+  was nearly impossible to hit, and a fall into any box from the side never counted).
+- The Wii U's own tread (common MSC func_65, in the air statuses only (`global18 == 2`, the situation): its third clause
+  is the auto-tread `BattleObject(0x18, 1)` -> the fighter's BattleObject command 0x18 = 0x02E67534(acc, mode)): the
+  stored target int 0x10000008 valid, the status not StepJump (0x02E67598), not a status flag (StatusModule vt+0x174 +4
+  bit 9), and in mode 1 flag 0x20000005 on and falling: KineticModule vt+0xA4(1) (get_sum_speed of energy mask 1,
+  0x02C508EC) y < 0 (0x02E67610-0x02E67640). The writer of int 0x10000008 / flag 0x20000005 (the tread contact on the
+  fighter's side) was not found; the fighter's area update 0x02E6CD34 builds its area 1 from area 0's bounds
+  (AreaInstance +0x2C min x, +0x30 min y, +0x34 max x, +0x38 max y) widened by fighter params 0x32 / 0x33, and resets
+  the target (0x50000000) and flags 0x20000005 / 0x20000055 (0x02E6D00C-0x02E6D090). The step 2o log shows the game's
+  own tread does reach our enemies (a second tread on the Goomba / Big Goomba while the old target was still set).
+- The Wii U fighter's position is its base (PostureModule +0x10 / +0x14, the feet), the same frame as the 3DS's.
+
+**The stomp test now (u_body, region H).** Per live fighter per frame: the feet's fall over the frame, relative to
+the box (rel = feet y - box top, last frame's kept in PREV), meets the box ([rel now, rel last] against [-2 x half
+height, 0], rel now < rel last: any speed; no "from above the top"); the fighter's x extent meets the box's x range;
+StatusModule +0x84 (the situation, MSC StatusModule op 1: FighterStatusModule vt+0xDC 0x02E885E0) = 2 (air); status
+not 0xB3; its speed y (KineticModule vt+0xA4(1)) < 0; no bounce pending for it (u_pend's entry). The fighter's x
+extent is its AreaModule (acc+0x60) area 0's min x / max x (list [am+0xC]: +4 count, +8 entries 0x2C apart, entry +4
+the instance), each side clamped to FT_EXT_MAX 5 from its x; no AreaModule / area: its x alone. APPROXIMATED: which
+fighter area pairs with the tread kind 0xE is not identified (area 0 is what the fighter's own area update reads), so
+its width is the clamped area 0; the diag build logs the raw area 0.
+
+**The Big Goomba's bounce.** No log of step 2q's build came, so the cause is not pinned by a log; read again:
+- Nothing in the Big Goomba's own path differs: its slot 20 (dk_tread, 3DS 0x85FE0) only damages it and changes its
+  state (10 Stepped); u_bounce / u_pend run for every stompable kind on the same path (u_bounce is called after slot
+  20 for every stomp, the squash included); the step 2o log's Big Goomba stomps show no hit on the fighter (no freeze,
+  status B throughout), so the WalkL / Landing push box on its head (0 %, flinchless) did not take the bounce.
+- What step 2q's u_pend relied on: the kinetic kind (+0x11C) after StepJump -> Jump being 0x32 when the stomp came in
+  Jump, and the game's own chain making the step jump otherwise (kind 1: u_pend dropped the entry without applying).
+  Whether Jump's 0x32 setting reaches change_kinetic (which stores the kind) or is skipped as "unchanged" was not
+  established: if skipped, +0x11C stays Jump's 1 and step 2q's u_pend did nothing from a full jump. And the game's
+  chain from JumpAerial / Fall (kind 2 / 0x32 -> Jump takes kinetic 1) gives the step jump only if the mode int
+  0x11000000 survives Jump's pre and the status work clear; for the Goomba it evidently does (the step 2o log's rises),
+  for the user's Big Goomba stomps it evidently did not.
+- Fix (u_pend): once StepJump's main has run (int 0x10000006 >= 1) and the fighter is in Jump, the step jump is applied
+  whatever the kinetic kind (u_apply: mode int 0x11000000 = 1, float 0x1000006 = the kind's multiplier,
+  change_kinetic(1)); the entry then stays PEND_VER 8 updates in an applied phase (count word bit 17): if the fighter is
+  still in Jump and its speed y (mask 1) is <= 0, the step jump is applied once more (bit 18); another status ends it.
+- Run natively in unicorn: the FighterKineticTransactor's per-kind set-up 0x02E7A4DC for kinetic 1: mode 1 -> the step
+  jump 0x02E79938 -> 0x02E7A41C with y = 0.9 x step_jump_speed_y (2.16 for 2.4); mode 0 -> the plain jump 0x02E7A198.
+  For each status the stomp comes in (Jump 0xB with kinetic 1 -> Jump's pre takes 0x32; JumpAerial 0xC (2), Fall 0xD
+  (0x32), FallAerial 0xE (0x13) -> 1) u_pend applies the same step jump.
+- APPROXIMATED / not run: the fighter's status change routine and Jump's main with a real fighter (no RAM image); the
+  re-apply is a guard, not a 3DS behaviour.
+
+**The log build (smashrun_step2r_diag_v1; tools/diag_step2r_cave.py, test tools/diag_step2r_test.py).** Step 2q's
+lines at their exe_v35 addresses with near / hit / hs / pd replaced: `nk` / `nr` / `nb` every frame a live fighter is
+within 30 of a stompable enemy's x and 30 of its box top (kind, state, slot, status | situation << 16, kinetic kind,
+speed y mask 1 / all; fighter x / y, enemy x / y, rel now / last, half width; centre, half height, area 0 min / max x,
+the extents used, the slot's pending word); `hs` a stomp (tread target, kinetic kind, speed) arming `wy`; `pd` each
+pending entry with the kinetic kind / speed; `ap` each application (status, count word, kinetic kind and speed before,
+the step count int); `wy` the stomping fighter for 90 cave-enemy updates (status | situation, kinetic kind, y, speeds,
+the mode int, the multiplier float). The cave grows to region H's end (0x04BCC000-0x04BD0000, zero in exe_v35).
+
+**Tests** (exe_v35):
+
+| Test | Result |
+| --- | --- |
+| smashrun_step2r_test.py (new; the 3DS code.bin, the step 2p log) | 14 checks, 0 failures (the readings word by word: the 3DS rect bounds / scale / overlap, the Wii U auto-tread and situation; the four boxes from their vl P5[0]; the stomp grid: 5 kinds x 3 fighter boxes x x offsets around each edge x 5 starting heights x 6 fall speeds up to 60 a frame = 7650 falls against the model; the exclusions (ground, ledge, StepJump, not falling, rising, pending, first frame, standing in it, rising into it) and the side entry; 0x02E7A4DC natively; the bounce for Jump / JumpAerial / Fall / FallAerial x 4 kinds; the watch's re-apply, its end, its limit; the step 2p log's Big Goomba fall stomped on the same frame) |
+| diag_step2r_test.py (new; the log build against exe_v35) | 27 checks, 0 failed |
+| smashrun_step2q_test.py | 18 checks, 0 failures (step 2r: the step jump applied from JumpAerial too; the entry watched, not ended) |
+| smashrun_walker_test.py | 181 checks, 0 failures (step 2r: a fall through the Goomba / Tiki Buzz in one frame is a stomp; the fighters in the air) |
+| smashrun_step2p / 2o / 2n / 2m / 2l / 2k / 2j / 2i / 2h_test.py | 16 / 15 / 13 / 21 / 19 / 29 / 24 / 12 / 43 checks, 0 failures |
+| smashrun_flier / flier_motion / field / enemy | 125 / 13 / 13 / 26 checks, 0 failures |
+| effect_slots_patch_test.py exe_v35 exe_v12 | 47 checks, all ok |
+
+**exe_v35 vs exe_v34, word diff** (s2r/diff35.py, log s2r/t/diff35.log): 12753 words, every one in Smash Run's regions
+(region C's per-fighter test moved to region H, region H's code and data after it moved, the data words 0x102FE778 /
+0x102FE944 / 0x102FE95C that point into it); relocations and the file info equal. tools/ppcasm.py gained `fsel`.
+
+**Still open:** the fighter area that pairs with the tread kind (the diag's `nb` raw area 0 against where stomps
+land); whether the Big Goomba bounces now (`ap` / `wy`); the beam's and Furiijio's look against the 3DS; the
+Paratroopa's wings; slots 34 / 36's use; the DK hand-slap scaling against the bear.

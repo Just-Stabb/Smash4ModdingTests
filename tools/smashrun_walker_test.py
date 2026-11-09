@@ -857,6 +857,7 @@ def main():
         m.w32(ENTS + 0xC, FACC)
         m.w32(FACC + 0x18, FPOST)
         m.w32(FACC + 0x20, FSTAT)            # step 2h: its StatusModule (+0x48 the status kind) and WorkModule
+        m.w32(FSTAT + W.STATUS_SITU, W.SITU_AIR)   # step 2r: in the air (the stomp needs it, as the game's tread)
         m.w32(FACC + 0x28, FWM)
         m.w32(FWM, FWMVT)
         m.w32(FWMVT + W.WM_SET_FLOAT, WM_SETF)
@@ -886,7 +887,8 @@ def main():
     res = {}
     res['beside'] = stomp('kuribo', [(9.0, 20.0), (9.0, 5.0)])
     res['rising'] = stomp('kuribo', [(3.0, 0.0001), (3.0, 2.0), (3.0, 5.0)])
-    res['below'] = stomp('kuribo', [(3.0, 20.0), (3.0, -10.0)])     # past its bottom + the sweep (step 2g v3)
+    res['below'] = stomp('kuribo', [(3.0, -2.0), (3.0, -10.0)])     # step 2r: falling below its bottom (a fall
+    # straight through the box in one frame is a stomp since step 2r: smashrun_step2r_test.py)
     res['first'] = stomp('kuribo', [(3.0, 5.0)])
     res['in 8'] = stomp('kuribo', fall, state=8)
     res['dead'] = stomp('kuribo', fall, state=9)
@@ -898,7 +900,7 @@ def main():
     ok = all(not g[0] and not g[1] and g[2] for v in res.values() for g in v)
     hi = stomp('kuribo', [(-50.0, 40.0), (-53.0, 14.0)], ex=-50.0, ey=10.0)
     ok &= hi[1][0] == [8]
-    check(ok, 'fix v8: no stomp beside it (|dx| 9), rising through it, landing past its bottom, on the first frame '
+    check(ok, 'fix v8: no stomp beside it (|dx| 9), rising through it, falling below its bottom, on the first frame '
           '(no last y), in 8 / its death state, a fighter not live, no fighters, above it but not reaching its top, '
           'nor on the other walkers (no TREAD state); one on a Goomba at (-50, 10) %s' % hi[1][0])
 
@@ -912,12 +914,13 @@ def main():
     tk['fast'] = stomp('tikibuzz', [(2.0, top + 7), (2.0, top + 1), (2.0, top - 5)], ey=50.0)
     tk['rising'] = stomp('tikibuzz', [(2.0, top + 7, 50.0), (2.0, top + 1, 50.0), (2.0, top + 0.5, 53.0)], ey=50.0)
     tk['beside'] = stomp('tikibuzz', [(7.0, top + 7), (7.0, top + 1), (7.0, top - 1)], ey=50.0)
-    tk['through'] = stomp('tikibuzz', [(2.0, top + 7), (2.0, top + 1), (2.0, top - 10)], ey=50.0)
+    tk['through'] = stomp('tikibuzz', [(2.0, top + 7), (2.0, top + 1), (2.0, top - 10)], ey=50.0)   # step 2r: taken
+    tk['under'] = stomp('tikibuzz', [(2.0, top - 4), (2.0, top - 5), (2.0, top - 10)], ey=50.0)   # below it already
     tk['in 10'] = stomp('tikibuzz', [(2.0, top + 7), (2.0, top + 1), (2.0, top - 1)], state=10, ey=50.0)
     hit = lambda v: [g[0] for g in v] == [[], [], [10]] and v[2][1] == [sj] and not v[1][1]  # noqa: E731
     none = lambda v: all(not g[0] and not g[1] for g in v)  # noqa: E731
-    ok = hit(tk['fall']) and hit(tk['fast']) and hit(tk['rising']) and none(tk['beside']) and none(tk['through']) \
-        and none(tk['in 10'])
+    ok = hit(tk['fall']) and hit(tk['fast']) and hit(tk['rising']) and none(tk['beside']) and hit(tk['through']) \
+        and none(tk['under']) and none(tk['in 10'])
     # step 2g v5: the box follows the live node (the 3DS area 0 is on node 3): with HipN 3 lower and 4 to the side
     # (a bob, the model's offset) a fall onto the node's top is taken and one onto the bind height's is not; the
     # node asked is 3 of the ModelModule ([acc +0x3118]), and the Goomba (no TNODE) never asks
@@ -935,7 +938,8 @@ def main():
           'the Goomba asks no node %s' % (ncalls[:2], gc[:1]))
     check(ok, 'step 2g v3: Tiki Buzz stomped (box top %.2f above y 50): a fall into it, a fast fall (5 a frame) past '
           'its 3-unit box, a landing while it rises 3 -> => 10 and the fighter\'s StatusModule(3, 0x%X StepJump, 0) '
-          'once; none beside it (|dx| 7 > 6), through it and the sweep in one frame, nor in 10 %s'
+          'once; step 2r: a fall through it in one frame too; none beside it (|dx| 7 > 6), below it already, nor in '
+          '10 %s'
           % (top, W.STEP_JUMP, {k: [g[0] for g in v] for k, v in tk.items()}))
 
     # ---- Kuribo
