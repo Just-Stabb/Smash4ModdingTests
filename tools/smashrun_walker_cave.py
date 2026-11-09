@@ -358,7 +358,8 @@ BI_NOTIFY_DMG = 0x026A3564           # BehaviorImpl::notify_on_damage (slot 10; 
 INIT_DAMAGE = 0x02C212F0             # DamageModuleImpl::init_damage(float) (3DS 0x4D30BC: every entry (Wii U 0xE4
 #                                      bytes at [+0xC], [+8] of them; 3DS 0xE0) +0 = f, +4 / +8 / +0xC4 = 0, +0xD4 0)
 GH_IMM, GH_DMG = FL_SIZE, FL_SIZE + 4    # Ghos's 3DS +0x1F4 (immune this hit) / +0x1F8 (the damage to restore)
-GH_SIZE = FL_SIZE + 8
+GH_SE = FL_SIZE + 8                  # step 2m: the gas loop's sound handle (3DS +0x200)
+GH_SIZE = FL_SIZE + 0xC
 # step 2f (Furiijio; docs/smash-run-port.md "Step 2f")
 CENTER_POS = 0x026A7104              # Behavior::center_pos (out, this): ModelModule node_global_position(center_node)
 SET_NODE_ROT = 0x02C64188            # MotionModule set_node_rotate(node, &rad, compose) (3DS 0x501328) -> changed
@@ -370,7 +371,8 @@ EFF_SET_SCALE = 0x02C2C120           # EffectModule set_scale(handle, &v) (3DS 0
 SINF, COSF, ACOSF = 0x04ADEB48, 0x04ADF434, 0x04ADF800      # libm (identified by running them; acosf: calc_angle's)
 FU = 0x230                           # Furiijio's own fields after the flier's (object FU_SIZE)
 FU_C, FU_ROT, FU_E = FU, FU + 0xC, FU + 0x18                 # center offset (3DS +0x218), node angles (+0x224), effects
-FU_SIZE = FU + 0x28
+FU_SE, FU_BND = FU + 0x28, FU + 0x2C  # step 2m: the beam's sound handle (3DS +0x260), the bound sound's flag (+0x264)
+FU_SIZE = FU + 0x30
 # step 2g (Propeller Heiho; docs/smash-run-port.md "Step 2g"): the Wii U's item calls and the helpers it was missing
 CREATE_ITEM = 0x026A8D78             # Behavior::create_item(kind, var, &pos, &rot, bool) -> Item* (3DS 0x7B214C: init_normal
 #                                      0x030519B4 + ItemManager::create_item 0x0305542C); create_item_and_have 0x7B4104
@@ -1114,6 +1116,18 @@ class Data:
         for _t, k in TWIN_K:
             b.append(('k2_' + k, cstr('enemy_param_vl_%s.bin' % k), 4))
         b.append(('k2_objs', [0] * len(TWIN_K), 4))
+        # step 2m: the 3DS sound rows (smashrun_sound.SND_ROWS: {row, bank id, label count, the list}, the lists as the
+        # table's little-endian words), the twins' rows {row, the kind's bank (big-endian: stored byte-reversed), saved},
+        # the Propeller Heiho's loop {handle, count} (enemy_fs.cro 0x111270: -1, 0), Stalfos's drop constants
+        tab = []
+        for row, (_k, bank, labs) in sorted(SND.SND_ROWS.items()):
+            b.append(('snd_l_%x' % row, [struct.unpack('>I', struct.pack('<i', v))[0] for v in labs], 4))
+            tab += [row, bank, len(labs), g('snd_l_%x' % row)]
+        b.append(('snd_tab', tab + [0xFFFFFFFF], 4))
+        b.append(('snd_twin', [x for row, (krow, _n, _b) in sorted(SND.TWIN_SND.items())
+                               for x in (row, SND.SND_ROWS[krow][1], 0)] + [0xFFFFFFFF], 4))
+        b.append(('ph_snd', [0xFFFFFFFF, 0], 4))
+        b.append(('sf_consts', [fword(10.0), fword(-100.0)], 4))
         for name, entry in ATTACKS.items():
             b.append((name, [word(v) for v in entry], 4))
         for w in WALKERS:
@@ -2369,11 +2383,11 @@ def code(D):
     B.asm("cave_s:")
     F.sr_check(B)
     B.asm("""
-        bgt s2_done
+        bgt s2_nsr
         lis r12, 0x%04X
         lwz r12, %d(r12)
         cmpwi r12, 0
-        beq s2_done
+        beq s2_sr
     """ % (ha(PARAM_MGR), sx(PARAM_MGR)))
     # step 2l: every kind its own static param object in its 3DS layout (kind_param_blocks; step 2k only the Waddle
     # Doo's, the others borrowed mczakozima's slot 0x5A: its P3 hurtbox capsule and P4 ground box); then the twins'
@@ -2381,6 +2395,22 @@ def code(D):
         o = D[param_label(w['name'])]
         B.asm("lis r11, 0x%04X\naddi r11, r11, %d\nstw r11, 0x%X(r12)" % (ha(o), sx(o), SLOTS + 4 * w['kind']))
     B.asm("bl k2_twins")
+    # step 2m: the sound rows (snd_rows: r3 1 on a Smash Run stage, 0 on any other enemy battle: the twins' rows put
+    # back), the Propeller Heiho's loop count reset (the 3DS's static in enemy_fs.cro's data, {-1, 0} at its load)
+    B.asm("""
+    s2_sr:
+        lis r12, 0x%04X
+        addi r12, r12, %d
+        li r0, -1
+        stw r0, 0(r12)
+        li r0, 0
+        stw r0, 4(r12)
+        li r3, 1
+        bl snd_rows
+        b s2_done
+    s2_nsr:
+        li r3, 0
+        bl snd_rows""" % (ha(D['ph_snd']), sx(D['ph_snd'])))
     B.asm("""
     s2_done:
         lwz r0, 0x5EC(r28)
@@ -7575,6 +7605,50 @@ TWIN_K = ((0x57, 'plasmawisp'), (0x58, 'darios'), (0x59, 'stalfos'), (0x5A, 'zim
 WB_W, WB_D = 0x1B0, 0x1B4           # the White Bear's weak hit noted (slot 31) / its damage before the hit
 BI_SLOT31 = 0x026A48EC               # BehaviorImpl's slot 31 (the hit record: +0x14 AttackData, its +0x4C)
 
+# ---- step 2m (docs/smash-run-port.md "Step 2m"): sounds, Stalfos's drop through a passable floor
+import smashrun_sound as SND  # noqa: E402
+PLAY_SE = 0x026A96EC                 # Behavior::play_se(r4 id, r5 bool) -> handle (3DS 0x7B59A8 -> SoundModuleImpl::play_se
+#                                      0x4C4B84): SoundModule acc+0x30F4 0x02C72214(module, id, 0, bool, 0, 0, 0)
+STOP_SE = 0x026A970C                 # Behavior::stop_se(r4 handle, r5) (3DS 0x4C3148 stop_se_handle): 0x02C73750
+SND_MGR = 0x102F7288                 # [[[[SND_MGR]] + 0x29C] + 4] = the loaded soundlabeltable.bin (+8 byte: loaded);
+#                                      read by 0x0311EC30 (row -> {bank, count, offset}) / 0x0311EDC4 (label -> tone)
+IS_PASSABLE_GROUND = 0x02C36EFC      # GroundModule is_passable_ground() (3DS 0x96AB30: [+0x18] entry 3, flag 0x2000)
+DO_SE = 0x1CC                        # the Waddle Doo's beam sound handle (3DS +0x1A4; free word before its 0x1D0)
+ST_ROW_UP = {7: (0x102FE944, 0x026D3EB4), 8: (0x102FE95C, 0x026D41E8)}   # mczakostalfos's table (0x102FE8A8, row n
+#                                      at +0x18 (n - 1)): states 7 / 8's update words and the game's updates
+ST_HELP = {'l5f7f8': 0x026D3008, 'l5f3a4': 0x026D3818, 'l5f110': 0x026D3A68, 'l5f754': 0x026D3DA4}   # the twin's
+#                                      helpers = the 3DS's L5F7F8 / L5F3A4 / L5F110 / L5F754 (states 7 / 8)
+# every 3DS state-enter play_se of a ported kind: (kind, Wii U state) -> (id, the handle's field or None); the state's
+# enter becomes se_<kind>_<state> = the enter, then play_se (the 3DS calls it at the enter's end), handle stored
+SE_EN = {('kuribo', 4): (0x28D0002, None), ('kuribo', 8): (0x28D0004, None),
+         ('heiho', 6): (0x69B0002, None), ('heiho', 7): (0x69B0002, None),
+         ('waddledoo', 11): (0x6A80000, DO_SE),
+         ('tikibuzz', 4): (0x89C0000, None), ('tikibuzz', 5): (0x89C0001, None),
+         ('tikibuzz', 10): (0x89C0002, None), ('tikibuzz', 11): (0x89C0003, None),
+         ('furiijio', 2): (0x6A90001, None), ('furiijio', 5): (0x6A90001, None),
+         ('furiijio', 4): (0x6A90002, FU_SE), ('furiijio', 7): (0x6A90002, FU_SE),
+         ('dekakuribo', 2): (0x2910009, None), ('dekakuribo', 8): (0x2910008, None),
+         ('dekakuribo', 10): (0x291000C, None), ('dekakuribo', 11): (0x291000B, None),
+         ('togezo', 5): (0x6D90000, None),
+         ('pooka', 5): (0x6B10006, None), ('pooka', 6): (0x6B10007, None), ('pooka', 11): (0x6B10005, None)}
+SE_ORIG = {}
+_BY = {w['name']: w for w in WALKERS}
+for (_n, _s), _v in SE_EN.items():
+    _st = _BY[_n]['states'][_s]
+    SE_ORIG[(_n, _s)] = _st[0]
+    _BY[_n]['states'][_s] = ('se_%s_%d' % (_n, _s),) + tuple(_st[1:])
+_BY['heiho']['states'][7] = (_BY['heiho']['states'][7][0], 'se_heiho_7u')      # 7 update: the second hop's sound
+_BY['waddledoo']['states'][11] = _BY['waddledoo']['states'][11][:2] + ('se_doo_11x',)   # 3DS 8 exit 0x7DD18
+for _s in (4, 7):                                                                # 3DS 4 / 7 exits 0x6D094 / 0x6D494
+    _BY['furiijio']['states'][_s] = _BY['furiijio']['states'][_s][:2] + ('se_fu_bexit',)
+_BY['furiijio']['vtover'][57] = 'se_fu_57'       # 3DS slot 57 0x6DBDC (DownBoundEnd / DownWait: the bound sound)
+_BY['furiijio']['f69'] = 'se_fu_69'              # 3DS slot 69 0x6DC48 (+0x264 = 0, returns 0)
+_BY['ghos'].update(fdmg='se_gh_dmg', f27='se_gh_rm')        # 3DS slots 11 0x11094 / 28 0x11140: the gas loop stopped
+_BY['propellerheiho'].update(fstart='se_ph_start')          # 3DS slot 41 0x99010: the propeller loop, one per kind
+_BY['propellerheiho']['vtover'].update({55: 'se_ph_55', 71: 'se_ph_71'})   # 3DS slots 55 (the swap) / 71 (death)
+_BY['propellerheiho']['states'][2] = (_BY['propellerheiho']['states'][2][0], 'se_ph2_up')   # 3DS 2 update 0x99CC4
+_BY['pooka'].update(fdmg='se_pk_dmg')            # 3DS slot 11 0x22900: HP at the threshold -> play_se(0x6B10004)
+
 
 def param_members(name):
     import json
@@ -7655,6 +7729,460 @@ def code_2l_pw(H):
         mtctr r12
         bctr
     """ % (PW_UP2 >> 16, PW_UP2 & 0xFFFF))
+
+
+def code_2m(H, st, call, D):
+    """step 2m (region H; docs/smash-run-port.md "Step 2m"): every 3DS play_se / stop_se of the ported kinds at the
+    same points (smashrun_sound.SITES: enemy_fs.cro addresses), the 3DS sound rows registered in the Wii U's
+    soundlabeltable at a battle's start (snd_rows), Stalfos's drop through a passable floor (3DS L5F470 in states 7 /
+    8, missing from mczakostalfos)"""
+    a = H.asm
+    hi = lambda v: "lis r4, 0x%04X\nori r4, r4, 0x%04X" % (v >> 16, v & 0xFFFF)  # noqa: E731
+    # h_se: play_se(r4 id, false) on this (r31) -> r3 handle; h_ses: stop_se(r4 handle, 0)
+    a("h_se:\nmr r3, r31\nli r5, 0\nlis r12, 0x%04X\nori r12, r12, 0x%04X\nmtctr r12\nbctr" % (PLAY_SE >> 16,
+                                                                                         PLAY_SE & 0xFFFF))
+    a("h_ses:\nmr r3, r31\nli r5, 0\nlis r12, 0x%04X\nori r12, r12, 0x%04X\nmtctr r12\nbctr" % (STOP_SE >> 16,
+                                                                                          STOP_SE & 0xFFFF))
+    # the state enters with a sound (SE_EN): the enter, then play_se (the 3DS's last call in each), the handle kept
+    for (n, sid), (snd, field) in sorted(SE_EN.items()):
+        st('se_%s_%d' % (n, sid), "mr r3, r31\nmr r4, r29\nbl %s\n%s\nbl h_se\n%s" % (
+            SE_ORIG[(n, sid)], hi(snd), "stw r3, 0x%X(r31)" % field if field else ''))
+    # Shy Guy 7 update (0x1BD54): the second hop (V4 + 1, kinetic 5) plays 0x69B0002 (0x1BDD0)
+    st('se_heiho_7u', "lwz r28, 0x%X(r31)\nmr r3, r31\nmr r4, r29\nbl h_ntc_up\nlwz r0, 0x%X(r31)\ncmpw r0, r28\n"
+       "beq.far epi\n%s\nbl h_se" % (V(4), V(4), hi(0x69B0002)))
+    # Waddle Doo 11 (the 3DS's 8) exit 0x7DD18: the beam's sound stopped if it still plays (+0x1A4 != -1)
+    st('se_doo_11x', "lwz r4, 0x%X(r31)\ncmpwi r4, -1\nbeq.far epi\nbl h_ses\nli r0, -1\nstw r0, 0x%X(r31)"
+       % (DO_SE, DO_SE))
+    # Furiijio 4 / 7 exits (0x6D094 / 0x6D494): its effects removed (fu_bexit), the beam's sound (+0x260) stopped
+    st('se_fu_bexit', "mr r3, r31\nmr r4, r29\nbl fu_bexit\nlwz r4, 0x%X(r31)\ncmpwi r4, -1\nbeq.far epi\nbl h_ses\n"
+       "li r0, -1\nstw r0, 0x%X(r31)" % (FU_SE, FU_SE))
+    # Furiijio slot 57 (0x6DBDC): not yet (+0x264), on the ground and the motion DownBoundEnd (4) / DownWait (6):
+    # play_se(0x6A90003), +0x264 = 1; slot 69 (0x6DC48): +0x264 = 0, returns 0
+    st('se_fu_57', """
+        lbz r0, 0x%(B)X(r31)
+        cmpwi r0, 0
+        bne.far epi
+        bl h_gnd
+        cmpwi r3, 0
+        beq.far epi
+        lwz r3, 0(r31)
+        lwz r3, 0x30F0(r3)
+        lwz r0, 0x%(MK)X(r3)
+        cmpwi r0, 4
+        beq f57_s
+        cmpwi r0, 6
+        bne.far epi
+    f57_s:
+        %(ID)s
+        bl h_se
+        li r0, 1
+        stb r0, 0x%(B)X(r31)""" % dict(B=FU_BND, MK=MOT_KIND, ID=hi(0x6A90003)))
+    st('se_fu_69', "li r0, 0\nstb r0, 0x%X(r31)\nli r3, 0" % FU_BND)
+    # Ghos slot 10 (the 3DS's 11, 0x11094): after the damage handling, the kinetic flag 2 and a handle (+0x200 >= 0)
+    # -> stop_se, +0x200 = -1; slot 27 (the 3DS's 28, 0x11140): the handle stopped, then f_ghos_rm
+    st('se_gh_dmg', """
+        mr r3, r31
+        mr r4, r29
+        bl f_ghos_dmg
+        lwz r12, 0(r31)
+        lwz r12, 0x3130(r12)
+        lwz r12, 8(r12)
+        lwz r12, 0(r12)
+        lwz r12, 0x14(r12)
+        lwz r0, 0(r12)
+        andi. r0, r0, 2
+        beq.far epi
+        lwz r4, 0x%(S)X(r31)
+        cmpwi r4, 0
+        blt.far epi
+        bl h_ses
+        li r0, -1
+        stw r0, 0x%(S)X(r31)""" % dict(S=GH_SE))
+    a("""
+    se_gh_rm:
+        mflr r0
+        bl pro
+        lwz r4, 0x%(S)X(r31)
+        cmpwi r4, 0
+        blt ghr_go
+        bl h_ses
+        li r0, -1
+        stw r0, 0x%(S)X(r31)
+    ghr_go:
+        mr r3, r31
+        mr r4, r29
+        lmw r28, 0x20(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        b f_ghos_rm
+    """ % dict(S=GH_SE))
+    # Propeller Heiho: the propeller loop is one per kind (enemy_fs.cro data 0x111270 {handle -1, count 0}: ph_snd).
+    # start (0x99010): count <= 0 -> play_se(0x6D20000) -> handle; count + 1. ph_dec (state 2 update 0x99D0C, slot 71
+    # 0x99DD8): a handle (!= -1): count - 1, at 0 or below stop_se(handle), handle = -1
+    ph = "lis r28, 0x%04X\naddi r28, r28, %d" % (ha(D['ph_snd']), sx(D['ph_snd']))
+    st('se_ph_start', """
+        mr r3, r31
+        mr r4, r29
+        bl f_ph_start
+        %s
+        lwz r0, 4(r28)
+        cmpwi r0, 0
+        bgt phs_c
+        %s
+        bl h_se
+        stw r3, 0(r28)
+    phs_c:
+        lwz r0, 4(r28)
+        addi r0, r0, 1
+        stw r0, 4(r28)""" % (ph, hi(0x6D20000)))
+    a("""
+    ph_dec:
+        mflr r27
+        %s
+        lwz r4, 0(r28)
+        cmpwi r4, -1
+        beq phd_o
+        lwz r0, 4(r28)
+        addi r0, r0, -1
+        stw r0, 4(r28)
+        cmpwi r0, 0
+        bgt phd_o
+        bl h_ses
+        li r0, -1
+        stw r0, 0(r28)
+    phd_o:
+        mtlr r27
+        blr
+    """ % ph)
+    orig71 = VT_WORDS[0][(0xC + 8 * 71) // 4] if VT_WORDS[0] else 0
+    st('se_ph_71', "stw r27, 8(r1)\nmr r3, r31\nmr r4, r29\n" + call(orig71) + "\nbl ph_dec\nlwz r27, 8(r1)")
+    # state 2 update (0x99CC4): the timer +0x1F0 (PH_F) - 1 <= 0 or out of view -> the count, then -> 8 (the same test
+    # made before the game's ph2_up, which then changes the state)
+    st('se_ph2_up', """
+        stw r27, 8(r1)
+        li r28, 1
+        lwz r3, 0x%(F)X(r31)
+        addi r3, r3, -1
+        cmpwi r3, 0
+        ble ph2_c
+        mr r3, r31
+    """ % dict(F=PH_F) + call(IN_VIEW) + """
+        li r28, 0
+        cmpwi r3, 0
+        bne ph2_c
+        li r28, 1
+    ph2_c:
+        stw r28, 0xC(r1)
+        mr r3, r31
+        mr r4, r29
+        bl ph2_up
+        lwz r0, 0xC(r1)
+        cmpwi r0, 0
+        beq ph2_o
+        bl ph_dec
+    ph2_o:
+        lwz r27, 8(r1)""")
+    # slot 55 (0x99E24): the swap (states 4 / 5, the item held (PH_X 0), PH_S - 1 <= 0) plays 0x6D20001 (0x9A070:
+    # every swap, the new item found or not)
+    st('se_ph_55', """
+        li r28, 0
+        lwz r0, 4(r31)
+        cmpwi r0, 4
+        beq p55s_a
+        cmpwi r0, 5
+        bne p55s_c
+    p55s_a:
+        lwz r0, 0x%(X)X(r31)
+        cmpwi r0, 0
+        bne p55s_c
+        lwz r3, 0x%(S)X(r31)
+        addi r3, r3, -1
+        cmpwi r3, 0
+        bgt p55s_c
+        li r28, 1
+    p55s_c:
+        mr r3, r31
+        mr r4, r29
+        bl f_ph_55
+        cmpwi r28, 0
+        beq.far epi
+        %(ID)s
+        bl h_se""" % dict(X=PH_X, S=PH_S, ID=hi(0x6D20001)))
+    # Pooka slot 10 (the 3DS's 11, 0x22900): HP <= the threshold (pk_thr: max HP x P23 %%) -> play_se(0x6B10004)
+    # (the hit stop / link stop of 0x22954..0x22A34: not mapped), then BehaviorImpl::notify_on_damage
+    st('se_pk_dmg', "bl pk_thr\nfcmpu cr0, f2, f1\nbgt pkd_n\n%s\nbl h_se\npkd_n:\nmr r3, r31\nmr r4, r29\n%s"
+       % (hi(0x6B10004), call(BI_NOTIFY_DMG)))
+    # ---- snd_rows (cave_s, r3 = 1 on a Smash Run stage, 0 else): the loaded soundlabeltable ([[[[SND_MGR]] + 0x29C]
+    # + 4], little-endian, 'STB\0' version 1): each 3DS row of snd_tab {row, bank id, label count, label list} written
+    # where the row is empty (bank -1) or already that bank: {bank, count, the list's offset from the label base
+    # (+0x10 + [+0xC]), 0}. snd_twin {row, the Smash Run kind's bank, saved}: on a Smash Run stage the twins' rows
+    # 0xBE2-0xBE4 name the kinds' banks (the original id saved), on any other enemy battle the saved id is put back.
+    a("""
+    snd_rows:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r26, 0x18(r1)
+        mr r26, r3
+        lis r12, 0x%(MH)04X
+        lwz r12, %(ML)d(r12)
+        cmpwi r12, 0
+        beq snr_o
+        lwz r12, 0(r12)
+        cmpwi r12, 0
+        beq snr_o
+        lwz r12, 0x29C(r12)
+        cmpwi r12, 0
+        beq snr_o
+        lbz r0, 8(r12)
+        cmpwi r0, 0
+        beq snr_o
+        lwz r31, 4(r12)
+        cmpwi r31, 0
+        beq snr_o
+        lwz r0, 0(r31)
+        lis r11, 0x5354
+        ori r11, r11, 0x4200
+        cmpw r0, r11
+        bne snr_o
+        li r11, 8
+        lwbrx r30, r11, r31
+        li r11, 0xC
+        lwbrx r29, r11, r31
+        add r29, r29, r31
+        addi r29, r29, 0x10
+        cmpwi r26, 0
+        beq snr_tw
+        lis r28, 0x%(TH)04X
+        addi r28, r28, %(TL)d
+    snr_l:
+        lwz r3, 0(r28)
+        cmpwi r3, -1
+        beq snr_tw
+        cmplw r3, r30
+        bge snr_n
+        slwi r4, r3, 4
+        add r4, r4, r31
+        addi r4, r4, 0x10
+        lwbrx r5, r0, r4
+        lwz r6, 4(r28)
+        cmpwi r5, -1
+        beq snr_w
+        cmpw r5, r6
+        bne snr_n
+    snr_w:
+        stwbrx r6, r0, r4
+        lwz r7, 8(r28)
+        li r0, 4
+        stwbrx r7, r4, r0
+        lwz r7, 0xC(r28)
+        subf r7, r29, r7
+        li r0, 8
+        stwbrx r7, r4, r0
+        li r0, 0
+        stw r0, 0xC(r4)
+    snr_n:
+        addi r28, r28, 0x10
+        b snr_l
+    snr_tw:
+        lis r28, 0x%(WH)04X
+        addi r28, r28, %(WL)d
+    snr_t:
+        lwz r3, 0(r28)
+        cmpwi r3, -1
+        beq snr_o
+        cmplw r3, r30
+        bge snr_tn
+        slwi r4, r3, 4
+        add r4, r4, r31
+        addi r4, r4, 0x10
+        lwz r5, 8(r28)
+        cmpwi r26, 0
+        beq snr_back
+        cmpwi r5, 0
+        bne snr_set
+        lwz r5, 0(r4)
+        stw r5, 8(r28)
+    snr_set:
+        lwz r6, 4(r28)
+        stwbrx r6, r0, r4
+        b snr_tn
+    snr_back:
+        cmpwi r5, 0
+        beq snr_tn
+        stw r5, 0(r4)
+        li r0, 0
+        stw r0, 8(r28)
+    snr_tn:
+        addi r28, r28, 0xC
+        b snr_t
+    snr_o:
+        lmw r26, 0x18(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+    """ % dict(MH=ha(SND_MGR), ML=sx(SND_MGR), TH=ha(D['snd_tab']), TL=sx(D['snd_tab']), WH=ha(D['snd_twin']),
+               WL=sx(D['snd_twin'])))
+    # ---- Stalfos (kind 0x30 on mczakostalfos's AI): states 7 / 8 update (3DS 0x51D8C / 0x51FD0) as the game's
+    # (0x026D3EB4 / 0x026D41E8) with the 3DS's L5F470 where the 3DS has it; the Fortress twin (0x59) runs the game's.
+    # sf_drop = L5F470 (is_passable_ground, the nearest target's y + P+0xC8 x 10 below the posture's y,
+    # is_exist_floor_under(100): Behavior 0x7B4230 = GroundModule ray_check from the touch position - (0, 10) along
+    # (0, -100), here from the posture's position: APPROXIMATED) and, when it holds, the 3DS's set_attach_ground(0),
+    # set_passable_check(1), set_correct(0), +0x1D4 = 8 -> r3 1
+    pr = "lis r12, 0x102F\nlwz r12, 0x6C00(r12)\nlwz r12, 0x1C4(r12)"
+    gm = "lwz r3, 0(r31)\nlwz r3, 0x30DC(r3)"
+    a("""
+    sf_drop:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        %(GM)s
+    """ % dict(GM=gm) + call(IS_PASSABLE_GROUND) + """
+        clrlwi. r3, r3, 24
+        beq sfd_n
+        mr r3, r31
+    """ + call(NEAREST) + """
+        mr r5, r3
+        addi r3, r1, 8
+        mr r4, r31
+    """ + call(GET_TARGET_POS) + """
+        %(PR)s
+        lfs f0, 0xC8(r12)
+        lis r12, 0x%(CH)04X
+        lfs f2, %(CL)d(r12)
+        lfs f1, 0xC(r1)
+        fmadds f1, f0, f2, f1
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lfs f0, 0x14(r12)
+        fcmpu cr0, f0, f1
+        ble sfd_n
+        lfs f1, 0x10(r12)
+        stfs f1, 0x10(r1)
+        fsubs f0, f0, f2
+        stfs f0, 0x14(r1)
+        li r0, 0
+        stw r0, 0x18(r1)
+        lis r12, 0x%(CH)04X
+        lfs f0, %(CL4)d(r12)
+        stfs f0, 0x1C(r1)
+        %(GM)s
+        addi r4, r1, 0x10
+        addi r5, r1, 0x18
+        addi r6, r1, 0x20
+        li r7, 1
+    """ % dict(PR=pr, GM=gm, CH=ha(D['sf_consts']), CL=sx(D['sf_consts']), CL4=sx(D['sf_consts'] + 4)) + call(RAY_CHECK)
+      + """
+        clrlwi. r3, r3, 24
+        beq sfd_n
+        %(GM)s
+        li r4, 0
+    """ % dict(GM=gm) + call(SET_ATTACH_GROUND) + "\n" + gm + "\nli r4, 1\n" + call(SET_PASSABLE) + "\n" + gm +
+      "\nli r4, 0\n" + call(SET_CORRECT) + """
+        li r0, 8
+        stw r0, 0x1D4(r31)
+        li r3, 1
+        b sfd_o
+    sfd_n:
+        li r3, 0
+    sfd_o:
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+    """)
+    for sid in (7, 8):
+        word, orig = ST_ROW_UP[sid]
+        tm = 0x188 if sid == 7 else 0x180
+        a("""
+        sf%(N)d_up:
+            lwz r0, 8(r3)
+            cmpwi r0, 0x30
+            beq sf%(N)d_go
+            lis r12, 0x%(OH)04X
+            ori r12, r12, 0x%(OL)04X
+            mtctr r12
+            bctr
+        sf%(N)d_go:
+            mflr r0
+            bl pro
+            lwz r3, 0x%(TM)X(r31)
+            addi r3, r3, -1
+            stw r3, 0x%(TM)X(r31)
+            lwz r3, 0x1B4(r31)
+            addi r3, r3, -1
+            stw r3, 0x1B4(r31)
+        """ % dict(N=sid, OH=orig >> 16, OL=orig & 0xFFFF, TM=tm))
+        if sid == 8:                     # move(input, this + 0x10) (3DS 0x52004: move(AiInput*, Vector3 const&))
+            a("mr r3, r31\nmr r4, r29\naddi r5, r31, 0x10\n" + call(0x026A66DC))
+        a("""
+            bl h_gnd
+            cmpwi r3, 0
+            bne sf%(N)d_t
+            li r4, 1
+            b go
+        sf%(N)d_t:
+            lbz r0, 0x1C2(r31)
+            cmpwi r0, 0
+            beq sf%(N)d_a
+            mr r3, r31
+            li r4, 2
+        """ % dict(N=sid) + call(0x026A70FC) + """
+            stw r3, 0x1C8(r31)
+            cmpwi r3, -1
+            bne sf%(N)d_s
+            li r0, 0
+            stb r0, 0x1C2(r31)
+            b sf%(N)d_a
+        sf%(N)d_s:
+            mr r3, r31
+            li r4, 2
+        """ % dict(N=sid) + call(0x026A706C) + """
+            stw r3, 0x170(r31)
+            %(PR)s
+            lwz r0, 0xE8(r12)
+            stw r0, 0x1A0(r31)
+            li r4, 9
+            b go
+        sf%(N)d_a:
+        """ % dict(N=sid, PR=pr))
+        if sid == 7:                     # 7 only: L5F7F8(0, &out) true, out -1 -> 0x12 (0x51E50)
+            a("li r0, -1\nstw r0, 8(r1)\nmr r3, r31\nli r4, 0\naddi r5, r1, 8\n" + call(ST_HELP['l5f7f8']) +
+              "\ncmpwi r3, 0\nbeq sf7_b\nlwz r0, 8(r1)\ncmpwi r0, -1\nbne sf7_b\nli r4, 0x12\nb go\nsf7_b:")
+        a("bl sf_drop\ncmpwi r3, 0\nbeq sf%d_c\nli r4, 1\nb go\nsf%d_c:" % (sid, sid))
+        seq = ((ST_HELP['l5f3a4'], None), (ST_HELP['l5f110'], 0), (ST_HELP['l5f754'], 0)) if sid == 7 else \
+            ((ST_HELP['l5f110'], 'gt'), (ST_HELP['l5f3a4'], None), (ST_HELP['l5f754'], 1))
+        for fnc, arg in seq:
+            if arg == 'gt':             # (+0x180 > 0)
+                a("lwz r0, 0x180(r31)\nli r4, 0\ncmpwi r0, 0\nble sf8_g\nli r4, 1\nsf8_g:")
+            elif arg is not None:
+                a("li r4, %d" % arg)
+            a("mr r3, r31\n" + call(fnc) + "\ncmpwi r3, 0\nbne.far epi")
+        a("""
+            bl h_wall
+            cmpwi r3, 0
+            bne sf%(N)d_w
+            bl h_cliff
+            cmpwi r3, 0
+            beq sf%(N)d_e
+        sf%(N)d_w:
+            bl h_near
+            mr r4, r3
+            bl h_tchk
+            cmpwi r3, 0
+            bne sf%(N)d_turn
+        """ % dict(N=sid))
+        if sid == 8:                     # the input zeroed (0x521A8)
+            a("li r0, 0\nstw r0, 0(r29)\nstw r0, 4(r29)")
+        a("b sf%(N)d_e\nsf%(N)d_turn:\nli r4, 0x16\nb go\nsf%(N)d_e:" % dict(N=sid))
+        if sid == 7:
+            a("lwz r0, 0x188(r31)\ncmpwi r0, 0\nbgt.far epi\nli r4, 8\nb go")
+        else:                            # +0x180 <= 0: L5F7F8(0, &out) true, out -1 -> 0x12
+            a("lwz r0, 0x180(r31)\ncmpwi r0, 0\nbgt.far epi\nli r0, -1\nstw r0, 8(r1)\nmr r3, r31\nli r4, 0\n"
+              "addi r5, r1, 8\n" + call(ST_HELP['l5f7f8']) + "\ncmpwi r3, 0\nbeq.far epi\nlwz r0, 8(r1)\n"
+              "cmpwi r0, -1\nbne.far epi\nli r4, 0x12\nb go")
 
 
 def code_2l(H, call, D):
@@ -7740,7 +8268,7 @@ def code_2k(H, st, call, d, D):
     """step 2k (region H): the Waddle Doo's beam (3DS states 7 / 8, the article's spawner), the Churine's sleep powder
     (states 6 / 7, its search, slot 69), the twins' params re-read from their own files; enemy_fs.cro addresses in the
     comments, docs/smash-run-port.md "Step 2k" """
-    p = dict(d, SC=DO_SC, CD=DO_CD, TK=DO_TK, IX=DO_IX, ANG=DO_ANG, AIR=DO_AIR, LV=CF['LEAVE'], LST=CF['LANDST'])
+    p = dict(d, SC=DO_SC, CD=DO_CD, TK=DO_TK, IX=DO_IX, ANG=DO_ANG, AIR=DO_AIR, LV=CF['LEAVE'], LST=CF['LANDST'], SE=DO_SE)
     a = lambda text: H.asm(text % p)  # noqa: E731
     # ---- Waddle Doo. The beam's search (fall 1 0x7D258, walk 3 0x7D5D0, jump 6 0x7D350; the wall hop 5 has none):
     # +0x16C (DO_SC) + 1 > search_interval(1) (20): the cool-down +0x180 (DO_CD) - 1 < 0: DO_SC = 0, search_target(1)
@@ -7878,6 +8406,13 @@ def code_2k(H, st, call, d, D):
         bl h_end
         cmpwi r3, 0
         beq.far epi
+        lwz r4, 0x%(SE)X(r31)
+        cmpwi r4, -1
+        beq dbm_go
+        bl h_ses
+        li r0, -1
+        stw r0, 0x%(SE)X(r31)
+    dbm_go:
         li r4, 3
         b go""" % p)
     # the article's spawner (the 3DS article data set's 0x7DDB0; the Wii U form of mczakoplasmawisp's 0x026CF644):
@@ -8142,6 +8677,9 @@ def code_2k(H, st, call, d, D):
         lwz r3, 0x30D8(r3)
         lfs f1, 0x%(P6)X(r30)
     """ % p + call(EFF_RATE_LAST) + """
+        lis r4, 0x6B0
+        ori r4, r4, 1
+        bl h_se
         b epi
     chp_air:
         bl ch_rmfx
@@ -9588,6 +10126,7 @@ def code_h(D):
     code_2l(H, call, D)                     # step 2l: the Waddle Dee's parasol
     code_2l_pw(H)                           # step 2l: Lethinium's level-2 attack as the 3DS's
     code_vis(H, st, call)
+    code_2m(H, st, call, D)                  # step 2m: sounds, Stalfos's drop
     return H
 
 
@@ -9749,7 +10288,9 @@ def code_vis(H, st, call):
     # 0x109C0: normal on, damage off (0x10A7C / 0x10A94); 2 stun enter 0x10AD0: normal off, damage on (0x10B50 /
     # 0x10B68); its update 0x10EE4 when V2 runs out: normal on, damage off (0x10F3C / 0x10F54); 4 dead enter 0x10E84:
     # normal off, damage on (0x10EC0 / 0x10EDC)
-    wrap('gh_start', 'f_ghos_start', '', before=vdef + "\n" + vset(2, 3))
+    # step 2m: and the gas loop (0x10AA4: play_se(0x8A60000) -> +0x200)
+    wrap('gh_start', 'f_ghos_start', "lis r4, 0x8A6\nbl h_se\nstw r3, 0x%X(r31)" % GH_SE,
+         before=vdef + "\n" + vset(2, 3))
     wrap('gh2_en', 'f_g2_en', vset(1, 3))
     wrap('gh2_up', 'f_g2_up', "lwz r0, 0x%X(r31)\ncmpwi r0, 0\nbgt.far epi\n%s" % (V(2), vset(2, 3)))
     wrap('gh_dead_en', 'g_dead_en', vset(1, 3))
@@ -10016,6 +10557,11 @@ def code_vis(H, st, call):
         mtctr r12
         bctrl
     g31_out:
+        cmpwi r28, 1
+        bne g31_x
+        li r4, 15
+        bl h_se
+    g31_x:
         lmw r28, 0x20(r1)
         lwz r0, 0x34(r1)
         mtlr r0
@@ -10095,6 +10641,9 @@ def patches(img):
         out[w] = fn if KEEP_FLIP else A.addr('twin_flip')
     assert img.u32(PW_ROW2_UP) == PW_UP2 or A.h.base <= img.u32(PW_ROW2_UP) < LIMIT_H, hex(PW_ROW2_UP)
     out[PW_ROW2_UP] = A.h.addr('pw2_up')          # step 2l (its relocation moved to RELOC_DUMMY: args)
+    for sid, (w, orig) in ST_ROW_UP.items():        # step 2m: mczakostalfos's states 7 / 8 update words -> sfN_up
+        assert img.u32(w) == orig or A.h.base <= img.u32(w) < LIMIT_H, hex(w)
+        out[w] = A.h.addr('sf%d_up' % sid)
     for w, orig, lab in TWIN_LR:
         # the game's word, or an earlier build's w_slr / w_rlr (anywhere in region G: later code moves them)
         assert img.u32(w) == orig or A.g.base <= img.u32(w) < A.g.base + 0x8000, hex(w)
@@ -10109,6 +10658,7 @@ def args(img):
         res += ['reloc:0x%08X-0x%08X=0x%08X' % (w, w + 4, RELOC_DUMMY) for w, _fn in TWIN_FLIP]
     res += ['reloc:0x%08X-0x%08X=0x%08X' % (w, w + 4, RELOC_DUMMY) for w, _o, _l in TWIN_LR]
     res += ['reloc:0x%08X-0x%08X=0x%08X' % (PW_ROW2_UP, PW_ROW2_UP + 4, RELOC_DUMMY)]
+    res += ['reloc:0x%08X-0x%08X=0x%08X' % (w, w + 4, RELOC_DUMMY) for w, _o in ST_ROW_UP.values()]
     return res
 
 

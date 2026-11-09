@@ -83,6 +83,7 @@ class Machine:
         uc.mem_map(STACK - 0x10000, 0x20000)
         uc.mem_write(DONE, struct.pack('>IIII', 0x48000000, 0x48000000, 0x48000000, 0x48000000))  # stop addresses
         self.calls = []
+        self.sounds = []                # step 2m: play_se / stop_se
         self.ground, self.walls, self.cliff, self.motion_end = True, set(), False, False
         self.target, self.target_x = 0, 0.0
         self.found, self.vy, self.stopped = -1, 0.0, True
@@ -141,6 +142,14 @@ class Machine:
             # step 2j: Goomba's notice ledge / collapse dead item, the aerial module (Waddle Dee), the bear's view
             c.append((EXTRA_STUBS.get(addr, hex(addr)),))
             self.ret(int(self.cliff) if addr == W.CHECK_CLIFF_DIST else (1 if addr == W.IN_VIEW else None))
+            return
+        if addr == W.PLAY_SE:               # step 2m: the sounds, kept apart from the call lists
+            self.sounds.append(('play', r(3), r(4), r(5)))
+            self.ret(0x5E00 + len(self.sounds))
+            return
+        if addr == W.STOP_SE:
+            self.sounds.append(('stop', r(3), r(4), r(5)))
+            self.ret()
             return
         if addr in self.creates:
             c.append(('create', addr, r(3), r(4), r(5)))
