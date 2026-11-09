@@ -2862,3 +2862,97 @@ relocations and the file info equal.
 
 **Still open:** the Big Goomba bounce (the log build's hs / pd lines); which file the user's install holds for the
 twins (the `k2` line: loader byte 1 and +0x19C non-zero = the package's file); the Paratroopa's wings.
+
+## Step 2p: the Big Goomba's bounce (a stale tread target), Paratroopa / Spiny slot 63, the sound banks in the Wii U layout (log build for the rest)
+
+Package smashrun_step2p_v1: `code/` exe_v33 = exe_v32 + `smashrun_walker_cave.py` over its own regions (scratch
+s2p/build33.py; the field cave unchanged, set "step2j"); `data/sound/se/` the 19 ported kinds' banks in the Wii U
+layout (`tools/smashrun_sound.py convert`). Separately smashrun_step2p_diag_v1 (`code_diag/`: exe_v33 +
+tools/diag_step2p_cave.py). Readings with addresses: hand_read.json `_framework_step2p`, and `port_step2p` of
+dekakuribo, patapata, togezo, kuribo.
+
+**The Big Goomba's bounce: a stale tread target (wrong; fixed).** The step 2o log (upload 693c657a) per stomp, the
+fighter's posture y each frame after it (pd lines):
+- Big Goomba 1 (hs fst=B: the fighter in Jump): dy -1.84 (the old speed), then -0.11, -0.22, -0.32, -0.43: a
+  StepJump at speed 0, the fall from rest.
+- Big Goomba 2 (fst=B): -1.84, -0.11, then +2.98, +2.88: speed 0 for a frame, then a jump a frame later together with
+  the Big Goomba's 10 -> 12 (a second tread).
+- Goomba (fst=C): -1.84, then +2.36 at once, and its state 8 -> 8 in the next fighter update (a second tread);
+  the Paratroopa 2 -> 9 (ours) then 9 -> 19 (the shell) in the next update; the Koopa's rise 2.17.
+
+The fighters' StepJump (0xB3, the common MSC in every fighter's script): main func_1145 (count + 1, int 0x11000000 =
+1) then func_1149: `if (LinkModule(5, 3, int 0x10000008))` (op 5 = LinkModule vt+0x34: link 3 to the object of that
+id) it sends link event 6 and sets float 0x1000006 = the answer (+0x20 -> float 0x1000009). An enemy answers event 6
+(0x02D8C5D4) with its W+0x44 **and runs its slot 20 (tread)** (0x02DB98F4). The loop goes to Jump (0xB) in the same
+update (the change routine re-reads the request at 0x02E88F14); Jump's kinetic 1 with mode 1 gives y =
+step_jump_speed_y x float 0x1000006 (0x02E79938). int 0x10000008 is a long-lived fighter int (not cleared by status
+changes): the target the fighters' own tread scan last found (common func_65, BattleObject(0x18)). So our stomp's
+StepJump took whatever object that int named: the stepped enemy itself (the Goomba / Paratroopa: their W+0x44
+answers 0.8 / 0.7 = the 2.36 / 2.17 rises, and a second tread through event 6), or a stale object that does not answer
+(the Big Goomba's first stomp: 0, speed 0). Fix (u_bounce): with the multiplier / count writes, the fighter's int
+0x10000008 = 0x50000000 (no object: 0x02BF205C resolves categories 0-4 only), so func_1149's link fails, float
+0x1000006 keeps the kind's multiplier (CFG BOUNCE else W+0x44: Big Goomba 0.9) and our stomp is the only tread (the
+Paratroopa loses its wings without becoming a shell, the Big Goomba is squashed, not flattened, by one stomp).
+Approximated: func_1149 / the status change order are read from the MSC and the change routine, not run in unicorn;
+the game's own auto-tread can still tread an enemy on a later frame if the fighter is still in its tread area.
+
+**Slot 63 (missing; ported).** The 3DS Paratroopa overrides slots 34 (0xB4ED4: the byte +0x1FC), 36 (0xB4F28: 0 in
+19-22 and 8, else 1) and 63 (0xB4EF8: 0 in 8, 16, 19, 20, 21, else 1); the Spiny slot 63 (0xB4940: 0 in 10-12); the
+cave left them at BehaviorImpl's (34: 1, 36: 0, 63: 1). Slot 63 is what change_state asks on every state change
+(0x026A39E4, from 0x026A3B28 / 0x026A3ABC): 1 -> [acc+0x30C4] 0x02BFEFCC(1, 1, -1) and the jostle byte
+[acc+0x30E4]+0x3B = 1; 0 -> off: the push area per state. Ported (pt_63, tg_63). Slots 34 (read by notify_on_damage's
+dead path 0x026A36DC) and 36 (the Enemy's vt+0x23C 0x02D8BE44) are read, not ported (their use is not identified).
+
+**The Paratroopa after a hit (open; log build).** The video (upload 78ac97b7, 60 fps): pairs of walking Koopas facing
+each other cycle stand / shell / dive poses about every 3 frames. After a non-lethal hit the 3DS's slot 69 (0x73C00)
+takes the wings off (var + 2) and returns 0, so the framework's damage reaction (common states, damage labels
+DamageStart..DownWait, Fall: the 3DS ctor's) runs and returns to slot 64 / 65 / 66 = 12 / 10 / 10: the cave does the
+same (pt_69, pt_64-66), the motions are all there (lengths 17-81 frames), and the log's walking Koopa (spawned var 2)
+ran its states at the normal pace (mot lines). No offline cause found; the log build's `dm` / `kd` lines show the hit
+and the next 240 updates (state, common state +0xE4, motion, frame, position).
+
+**Sounds: the banks in the Wii U layout (wrong; converted) and the load path (log build).**
+- Both games' banks are little-endian NUS3 with Namco IDSP tones (3DS 20 kHz, Wii U 48 kHz); the game's parser
+  0x036872D8 takes either's chunks (PROP version 3 in both). The tone entries differ: over the 52 local Wii U banks
+  every tone with an output send list (2007) has entry flags (+8) with 0x1800 set and 7 sends (bus 0-6, 3-6 at -90 dB
+  in the enemy banks) and ends in 2 more words (the 26 without 0x1800 hold no send list); over the 3DS enemy banks
+  every such tone (556) has 3 sends and no 0x1800. The DTON presets 3 / 7 sends likewise.
+- `tools/smashrun_sound.py convert ENEMY_SRC TEMPLATE OUT`: each 3DS tone flags | 0x1800, sends to 7, the two words 0,
+  over the Wii U Lethinium bank's (snd_se_enemy_Mczakoplasmawisp) PROP / GRP / DTON / JUNK (the same group ids, e.g.
+  0x2A0); BINF (name, id) and PACK the 3DS's. The converted Lethinium tones equal the Wii U's own Lethinium tones word
+  for word but the data's values (offset, size, volume, priority, rate, samples, loop).
+- The play path: SoundModule 0x02C72214 -> 0x02C71B24: id -> bank id (0x0311EDBC) and tone (0x0311EF88), then
+  0x02C71898 finds a loaded bank of that id among the sound manager's lists and the module's own (+0x18, +0x24,
+  +0x30, +0x54, vt+0x344); none -> -1, silent. Whether the enemy banks are loaded there (the enemy resource request
+  0x030BF400 registers sound/se/snd_se_enemy_%s.nus3bank, type 4, the capitalised names at 0x1042A534) and how
+  snd_rows' rows resolve in game: the log build's `bk` (every bank the parser takes: result, BINF id, name), `sv`
+  (each Smash Run row's id resolved: bank id, tone, the bank handle found) and `sr` (snd_rows' end: the table, row
+  0x28D's bank) lines.
+
+**Effects (read; open).** Waddle Doo's beam: the weapon 0xAF plays effect 0x7190000 = the waddledoo bank's effect 0
+(efc flags 0x110: set 1 PtcfsWaddledooBeam, one emitter of particle type 3, purple-white lightning, 64 x 32 texture,
+scale 20, life 4, endless; and model 1 EfffsWaddledooBeam: beam1 / glow1, both H3D billboard mode 2 -> _BILLBOARDWORLD_,
+glow1 a purple radial glow). Its files are **unchanged since effects v3**: the step 2n converter writes the same
+waddledoo .ptcl byte for byte as v3's (no Doo emitter is among the 81 two-channel ones) and the effect-model converter
+changed only Furiijio's billboard set since v3. So step 2n did not make the beam a purple column; what the 3DS draws
+differently (the glow's size / blend, mode 2's maths in the Wii U 0x033168E0 / 0x033095B4, the emitter type 3) was not
+settled. Furiijio's mist: not re-read in this step.
+
+**Tests** (exe_v33):
+
+| Test | Result |
+| --- | --- |
+| smashrun_step2p_test.py (new; the step 2o log, the 3DS enemy/, the Wii U Lethinium bank, the converted banks) | 16 checks, 0 failures (each stompable kind's stomp: one tread, float 0x1000006 = its multiplier, count 0, tread target 0x50000000, StepJump; 0x02BF205C(0x50000000) = 0 natively; 0x02E79938 with 0.9 = 2.16, the step 2o path 0; the log's stomps re-read; the 19 banks; Lethinium's tones = the Wii U's; slot 63) |
+| diag_step2p_test.py (new; the log build against exe_v33) | 26 checks, 0 failures |
+| smashrun_step2h_test.py | 43 checks, 0 failures (the stomp's writes now with the tread target) |
+| smashrun_step2o / 2n / 2l / 2k / 2j / 2i_test.py | 15 / 13 / 19 / 29 / 24 / 12 checks, 0 failures |
+| smashrun_walker_test.py / flier / flier_motion / field / enemy | 181 / 125 / 13 / 13 / 26 checks, 0 failures |
+| effect_slots_patch_test.py exe_v33 exe_v12 | 47 checks, all ok |
+| smashrun_step2m_test.py | not run: it needs the 3DS sound/config/soundlabeltable.bin (from the dump's dt / ls), not in this session |
+
+**exe_v33 vs exe_v32, word diff** (s2p/diff33.py, log s2p/t/diff33.log): 9273 words, every one in Smash Run's regions
+(region H's code moved by the new words, the data words 0x102FE778 / 0x102FE944 / 0x102FE95C that point into it);
+relocations and the file info equal.
+
+**Still open:** the Paratroopa's pose cycle after a hit and the enemy sounds in game (the log build); the beam's and
+Furiijio's look against the 3DS; the Paratroopa's wings; slots 34 / 36's use.

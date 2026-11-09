@@ -845,7 +845,7 @@ STEP2H = (
                  13: 'remove'},
          start=(1, 6), rets=(0, 0, 1, 4), remove=13, fall=('Fall', 7), landing='Landing', turn='Turn', turnst=9,
          walkst=8, hop=(0.0, 0, 0), search=tuple(tuple(g) for g in vl_group('togezo', 1)),
-         attacks=(), vtover={40: 'tg_init', 45: 'tg_atk', 60: 'tg_60', 66: 'tg_66', 67: 'tg_67'}, fstart='tgv_start', f69='tg_69',
+         attacks=(), vtover={40: 'tg_init', 45: 'tg_atk', 60: 'tg_60', 66: 'tg_66', 67: 'tg_67', 63: 'tg_63'}, fstart='tgv_start', f69='tg_69',
          lvp=18,                                     # TREAD 0: never stomped (its tread area is off, slot 21 BI's nop)
          P=tuple(vl_group('togezo', 0)[0]) + tuple(vl_group('togezo', 0)[1]) +
            (_TGS[0], _TGS[2], _TGS[3], vl_group('togezo', 'struct2')[0], TG_SPIN, DEG2RAD) +
@@ -871,7 +871,7 @@ STEP2H = (
          start=(1, 1), rets=(2, 1, 1, 20), remove=23, fall=('Fall', 11), landing='Landing', turn='TurnNokonoko',
          turnst=13, walkst=12, hop=(0.0, 0, 0), search=tuple(tuple(g) for g in vl_group('patapata', 1)),
          attacks=((6, 'pt_bite'), (16, 'pt_leap'), (20, 'pt_shell'), (8, 'pt_bullet')),
-         vtover={20: 'pt_tread', 64: 'pt_64', 65: 'pt_65', 66: 'pt_66', 67: 'pt_67'}, fstart='ptv_start', f69='pt_69',
+         vtover={20: 'pt_tread', 64: 'pt_64', 65: 'pt_65', 66: 'pt_66', 67: 'pt_67', 63: 'pt_63'}, fstart='ptv_start', f69='pt_69',
          P=tuple(x for row in vl_group('patapata', 0) for x in row) + tuple(vl_group('patapata', 'struct')) +
            tuple(vl_group('patapata', 'struct2')) + (3.0, KOOPA_SHELL[0], 10.0, 1.0, -1.0)),
 )
@@ -5868,6 +5868,12 @@ STEP_JUMP_SPEED = 0x02E79938         # the fighters' StepJump speed (this, &out,
 WM_SET_FLOAT, WM_SET_INT = 0x4C, 0x8C    # WorkModule vt: set_float(f1, r4 id), set_int(r4 value, r5 id)
 STATUS_KIND = 0x48                   # StatusModule (MSC accessor +0x20) +0x48 the status kind (tools/edge_counter_cave.py)
 F_TREAD_MUL, I_STEP_COUNT = 0x01000006, 0x10000006
+# step 2p: the fighter's tread target (LA int 0x10000008: StepJump's func_1149 links 3 to it, LinkModule op 5 =
+# vt+0x34(3, id), and copies that object's link event 6 answer into float 0x1000006). A stale id there (an object
+# that does not answer event 6) zeroed the bounce; the stepped enemy's own id would run its tread slot a second
+# time (event 6 -> 0x02DB98F4 -> slot 20). u_bounce writes the invalid id (category 5: 0x02BF205C finds no object),
+# so the link fails, func_1149 is skipped and float 0x1000006 keeps u_bounce's multiplier.
+I_TREAD_TARGET, BO_ID_INVALID = 0x10000008, 0x50000000
 DISABLE_HIT, DISABLE_TREAD = 0x026A75C0, 0x026A75FC   # Behavior::disable_hit / disable_tread (3DS 0x7B0864 / 0x7B0D50)
 CREATE_THROW = 0x026A8F10            # Behavior::create_item_and_throw(kind, var, &pos, &speed, f1, r8, r9, r10) (3DS 0x7B4488)
 PEND_N = 40                          # the pending re-write lasts this many cave-enemy updates (seen-flag bit 16)
@@ -8934,6 +8940,7 @@ def code_h(D):
     d = dict(PH=ha(D['pend']), PL=sx(D['pend']), CH=ha(D['consts']), CL=sx(D['consts']), BOUNCE=CF['BOUNCE'],
              SF=WM_SET_FLOAT, SI=WM_SET_INT, SK=STATUS_KIND, FTH=F_TREAD_MUL >> 16, FTL=F_TREAD_MUL & 0xFFFF,
              ICH=I_STEP_COUNT >> 16, ICL=I_STEP_COUNT & 0xFFFF, N=PEND_N, STEP=STEP_JUMP, ZERO=CF['ZERO'],
+             BIH=BO_ID_INVALID >> 16, ITH=I_TREAD_TARGET >> 16, ITL=I_TREAD_TARGET & 0xFFFF,
              DF=DEFEATED, **{'V%d' % i: V(i) for i in range(9)}, **{'P%d' % i: P(i) for i in range(80)})
     a = lambda text: H.asm(text % d)  # noqa: E731
 
@@ -8944,6 +8951,10 @@ def code_h(D):
     # float 0x1000006 and zeroes the step count int 0x10000006; the jump's speed (0x02E79938, 3DS 0x97E080) is
     # step_jump_speed_y x float 0x1000006. Our stomp has no link: u_bounce writes the two itself (CFG BOUNCE, else
     # W+0x44), now and (u_pend) on each cave-enemy update while the fighter is in 0xB3, until it leaves it.
+    # Step 2p: and the fighter's tread target int 0x10000008 = BO_ID_INVALID, so that StepJump's func_1149 (which
+    # links to whatever object that int names and copies its event 6 answer over float 0x1000006) is skipped: the
+    # step 2o log showed a stale target zeroing the Big Goomba's bounce (hs fst=B, then the fall from rest) and the
+    # stepped enemy's own id treading it twice (Goomba 8 -> 8, Paratroopa 9 -> 19, Big Goomba 10 -> 12).
     a("""
     u_bounce:
         stwu r1, -0x20(r1)
@@ -8978,6 +8989,14 @@ def code_h(D):
         li r4, 0
         lis r5, 0x%(ICH)04X
         ori r5, r5, 0x%(ICL)04X
+        bctrl
+        lwz r3, 0x28(r24)
+        lwz r12, 0(r3)
+        lwz r12, 0x%(SI)X(r12)
+        mtctr r12
+        lis r4, 0x%(BIH)04X
+        lis r5, 0x%(ITH)04X
+        ori r5, r5, 0x%(ITL)04X
         bctrl
         lwz r0, 0x24(r1)
         mtlr r0
@@ -10174,6 +10193,12 @@ def code_h(D):
     # slots 64-67 by variation: winged 2 / 1 / 1 / 8, walking 12 / 10 / 10 / 20
     for k, a_, b_ in ((64, 2, 12), (65, 1, 10), (66, 1, 10), (67, 8, 20)):
         H.asm("pt_%d:\nlwz r0, 0xC(r3)\nli r3, %d\ncmpwi r0, 2\nbltlr\nli r3, %d\nblr" % (k, a_, b_))
+    # step 2p: slot 63 (called by change_state's 0x026A39E4 on every state change: 1 -> the push area / jostle on,
+    # 0 -> off; BehaviorImpl's default 0x026A4848 is always 1): the 3DS overrides of patapata (0xB4EF8: 0 in states 8,
+    # 16, 19, 20, 21) and togezo (0xB4940: 0 in 10, 11, 12)
+    for lab, sts in (('pt_63', (8, 16, 19, 20, 21)), ('tg_63', (10, 11, 12))):
+        H.asm("%s:\nlwz r0, 4(r3)\nli r3, 0\n%s\nli r3, 1\nblr" % (lab, '\n'.join(
+            'cmpwi r0, %d\nbeqlr' % x for x in sts)))
     code_pk(H, st, call, d, D)              # step 2j: Pooka
     code_fix2j(H, st, call, d, D)           # step 2j: the audit's fixes
     code_2k(H, st, call, d, D)              # step 2k: the beam, the powder, the twins' params

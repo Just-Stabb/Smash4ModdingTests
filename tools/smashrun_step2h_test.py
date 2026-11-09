@@ -492,11 +492,13 @@ def main():
     mul = m.rf(EN + 0x44)
     sets = [[c for c in g if c[0] in ('set_float', 'set_int')] for g in got]
     check(round(mul, 4) == 0.8 and sets[1] == [('set_float', FWM, W.F_TREAD_MUL, 0.8),
-                                               ('set_int', FWM, 0, W.I_STEP_COUNT)]
+                                               ('set_int', FWM, 0, W.I_STEP_COUNT),
+                                               ('set_int', FWM, W.BO_ID_INVALID, W.I_TREAD_TARGET)]
           and ('msc_status', FACC, (3, W.STEP_JUMP, 0)) in got[1] and sets[2] == [('set_float', FWM, W.F_TREAD_MUL, 0.8)]
           and sets[3] == [('set_float', FWM, W.F_TREAD_MUL, 0.8)] and sets[4] == [] and sets[5] == [],
           'bounce: a Goomba stomp writes the fighter\'s tread multiplier float 0x1000006 = its W+0x44 (%.2f, its 3DS '
-          'initialize\'s P0 f13) and step count int 0x10000006 = 0 with StatusModule(3, 0xB3); again on each update '
+          'initialize\'s P0 f13), step count int 0x10000006 = 0 and (step 2p) the tread target int 0x10000008 = '
+          '0x50000000 with StatusModule(3, 0xB3); again on each update '
           'while the fighter is in 0xB3; not after it has left it (0xB jump) %s' % (mul, sets))
     m, got = stomp('kuribo', 3, [(5.0, 0x1D), (-1.0, 0x1D), (2.0, 0xB), (2.0, 0xB3)], top('kuribo'))
     sets = [[c for c in g if c[0] == 'set_float'] for g in got]

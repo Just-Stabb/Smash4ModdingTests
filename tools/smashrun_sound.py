@@ -3,6 +3,8 @@
 and a check of the map against the files.
 
   python3 tools/smashrun_sound.py S3DS_STB WIIU_STB ENEMY_SRC [WIIU_SE_DIR]
+  python3 tools/smashrun_sound.py convert ENEMY_SRC WIIU_TEMPLATE_BANK OUT_DIR
+      (step 2p: the ported kinds' 3DS banks in the Wii U's bank layout -> OUT_DIR/sound/se/<BINF name>.nus3bank)
 
   S3DS_STB / WIIU_STB: sound/config/soundlabeltable.bin of the 3DS (s3ds_unpack extract) and of the Wii U;
   ENEMY_SRC: the 3DS enemy/ folder (enemy/<kind>/snd_se_enemy_<kind>.nus3bank, the banks tools/s3ds_enemy.py ships
@@ -27,6 +29,94 @@ has no Wii U bank file and no row: not mapped.
 import os
 import struct
 import sys
+
+# ---- step 2p: the 3DS bank layout vs the Wii U's (wiiu_bank). Both are little-endian NUS3 banks (PROP, BINF, GRP,
+# DTON, TONE, JUNK, PACK) with Namco IDSP (DSP-ADPCM) tone data; the game's parser 0x036872D8 takes either's chunks.
+# What differs is in the tone entries (and the DTON presets): over the 52 local Wii U banks every tone with an output
+# send list (2007) has the entry flags (word +8) 0x1800 set, 7 sends (bus 0-6; 3-6 at -90 dB in the enemy banks) and
+# two more words at its end (zeros in the game's tones); the 26 without 0x1800 hold no send list. Over the 3DS enemy
+# banks every such tone (556) has 3 sends (0-2) and no 0x1800. The DTON presets likewise (3 / 7 sends). wiiu_bank writes the 3DS tones in the Wii U
+# layout (flags | 0x1800, the send list to 7 with 3-6 at -90 dB, the two words 0) over a Wii U enemy bank's PROP /
+# GRP / DTON / JUNK (snd_se_enemy_Mczakoplasmawisp: the same group ids, e.g. 0x2A0), the 3DS BINF (name, id) and
+# PACK (IDSP as it is) kept.
+TONE_WIIU_FLAGS = 0x1800
+SEND_N = 7
+MINUS90 = 0xC2B40000
+
+
+def sections_list(d):
+    """[(name, bytes)] of a .nus3bank in TOC order"""
+    assert d[:4] == b'NUS3' and d[8:16] == b'BANKTOC '
+    count = struct.unpack('<I', d[20:24])[0]
+    q = 24 + count * 8
+    out = []
+    for i in range(count):
+        name, size = struct.unpack('<4sI', d[24 + i * 8:32 + i * 8])
+        assert d[q:q + 4] == name and struct.unpack('<I', d[q + 4:q + 8])[0] == size, name
+        out.append((name, d[q + 8:q + 8 + size]))
+        q += 8 + size
+    return out
+
+
+def bank_bytes(secs):
+    toc = b''.join(struct.pack('<4sI', n, len(b)) for n, b in secs)
+    body = b'BANKTOC ' + struct.pack('<II', 4 + len(toc), len(secs)) + toc
+    body += b''.join(n + struct.pack('<I', len(b)) + b for n, b in secs)
+    return b'NUS3' + struct.pack('<I', len(body)) + body
+
+
+def tone_entries(t):
+    n = struct.unpack('<I', t[:4])[0]
+    return [t[o:o + s] for o, s in (struct.unpack('<II', t[4 + 8 * i:12 + 8 * i]) for i in range(n))]
+
+
+def tone_table(entries):
+    base = 4 + 8 * len(entries)
+    tab, body = b'', b''
+    for e in entries:
+        tab += struct.pack('<II', base + len(body), len(e))
+        body += e
+    return struct.pack('<I', len(entries)) + tab + body
+
+
+def send_list(words, start=0):
+    """the index of a tone / preset's output send list: a count n (2-8) then n {bus i, level} pairs, i = 0..n-1"""
+    for i in range(start, len(words) - 1):
+        n = words[i]
+        if 2 <= n <= 8 and i + 1 + 2 * n <= len(words) and \
+                all(words[i + 1 + 2 * k] == k for k in range(n)):
+            return i
+    return None
+
+
+def wiiu_tone(e):
+    """a 3DS tone entry in the Wii U layout (unchanged if it already is one or holds no data)"""
+    if len(e) < 0x20:
+        return bytes(e)
+    flags = struct.unpack('<I', e[8:12])[0]
+    if flags & TONE_WIIU_FLAGS:
+        return bytes(e)
+    q = ((0x0D + e[0x0C] + 3) & ~3) + 4                 # the rest (parse_entry): its first word 8
+    head, rest = bytearray(e[:q]), e[q:]
+    w = list(struct.unpack('<%dI' % (len(rest) // 4), rest[:len(rest) // 4 * 4]))
+    i = send_list(w)
+    assert i is not None, 'no send list in %r' % bytes(e[0xD:0xD + e[0xC] - 1])
+    n = w[i]
+    sends = w[i + 1:i + 1 + 2 * n] + sum(([k, MINUS90] for k in range(n, SEND_N)), [])
+    w = w[:i] + [SEND_N] + sends + w[i + 1 + 2 * n:] + [0, 0]
+    head[8:12] = struct.pack('<I', flags | TONE_WIIU_FLAGS)
+    return bytes(head) + struct.pack('<%dI' % len(w), *w)
+
+
+def wiiu_bank(data, template):
+    """(bank bytes, notes): a 3DS enemy bank in the Wii U's layout over the template Wii U bank's PROP / GRP / DTON /
+    JUNK (see TONE_WIIU_FLAGS)"""
+    src = dict(sections_list(data))
+    tpl = dict(sections_list(template))
+    tones = [wiiu_tone(e) for e in tone_entries(src[b'TONE'])]
+    out = [(b'PROP', tpl[b'PROP']), (b'BINF', src[b'BINF']), (b'GRP ', tpl[b'GRP ']), (b'DTON', tpl[b'DTON']),
+           (b'TONE', tone_table(tones)), (b'JUNK', tpl[b'JUNK']), (b'PACK', src[b'PACK'])]
+    return bank_bytes(out), len(tones)
 
 # the 3DS soundlabeltable rows of the ported kinds' banks: row -> (kind, the bank's BINF id, label -> tone index)
 SND_ROWS = {
@@ -166,7 +256,31 @@ def wiiu_rows(wiiu, sr_stage=True):
     return rows
 
 
+def convert(src, template, out):
+    """every ported kind's bank (SND_ROWS) in the Wii U layout, under its BINF name (the capitalised file name the
+    game's enemy loader builds: sound/se/snd_se_enemy_%s.nus3bank from 0x1042A534)"""
+    tpl = open(template, 'rb').read()
+    os.makedirs(os.path.join(out, 'sound', 'se'), exist_ok=True)
+    for _row, (k, bank, _labs) in sorted(SND_ROWS.items()):
+        d = open(os.path.join(src, k, 'snd_se_enemy_%s.nus3bank' % k), 'rb').read()
+        b, n = wiiu_bank(d, tpl)
+        name = bank_names_bytes(b)[0]
+        with open(os.path.join(out, 'sound', 'se', name + '.nus3bank'), 'wb') as f:
+            f.write(b)
+        print('%-28s id %d: %d tones, %d -> %d bytes' % (name, bank, n, len(d), len(b)))
+
+
+def bank_names_bytes(d):
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix='.nus3bank', dir='/dev/shm' if os.path.isdir('/dev/shm') else None) as t:
+        t.write(d)
+        t.flush()
+        return bank_names(t.name)
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == 'convert':
+        return convert(*sys.argv[2:5])
     if len(sys.argv) < 4:
         sys.exit(__doc__)
     t3, tw, src = stb(sys.argv[1]), stb(sys.argv[2]), sys.argv[3]
