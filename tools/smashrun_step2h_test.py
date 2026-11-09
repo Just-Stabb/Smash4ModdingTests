@@ -416,9 +416,10 @@ def paratroopa(img, fn, D, cfg, byname, world, enter_calls, stomp, vslot):
     deaths = {var: call(vslot(n, 67), var).uc.reg_read(T.R[3]) for var in (0, 3)}
     wo = world(n, 20, var=3)
     c = [x for x in wo.enter(20) if x[0] in ('kinetic', 'motion')]
-    check(deaths == {0: 8, 3: 20} and ('kinetic', T.EKIN, 16) in c and ('motion', OBJ, 18, 0.0, 10.0, 1, 0.0) in c,
-          'patapata death: winged -> 8 (BulletMode, bullet), walking -> 20 the spinning shell (kinetic 16, ShellMode at '
-          '10, P2 entry 2: 17 %%) %s' % c)
+    # step 2q: ShellMode once (the 3DS's change_motion_state(0x12, 0, 10, false, 0), 0x73F80-0x73F98), not looped
+    check(deaths == {0: 8, 3: 20} and ('kinetic', T.EKIN, 16) in c and ('motion', OBJ, 18, 0.0, 10.0, 0, 0.0) in c,
+          'patapata death: winged -> 8 (BulletMode, bullet), walking -> 20 the spinning shell (kinetic 16, ShellMode '
+          'once at 10, P2 entry 2: 17 %%) %s' % c)
 
 
 def main():

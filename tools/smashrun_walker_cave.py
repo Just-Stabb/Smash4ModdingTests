@@ -682,8 +682,9 @@ WALKERS = (
          # f17, search cool-down f18; 0.1 the jump's E+0x3C (a literal)
          P=(60, 120, 1.5, 1.5, 1.0, 3.0, 1.0, 180, 50, 0.5, 3, 60, 0.1,
             2.5, 8.0,         # v2: the landing effects' scales (0x7400000: the 3DS's (2.5, 1.7, 1) as 2.5; 0x7400001 8)
-            5, vl_group('whitebear', 0)[0][19]),    # step 2k: set_weak_param(5, P0 f19 2.0) (its start 0x7E378)
-         vtover={31: 'wb_31'}, fdmg='wb_dmg', fstart='w_start', size=0x1C0),  # step 2k: WB_W / WB_D (the weakness)
+            5, vl_group('whitebear', 0)[0][19],     # step 2k: set_weak_param(5, P0 f19 2.0) (its start 0x7E378)
+            float(vl_group('whitebear', 0)[0][20])),  # step 2q: slot 68's no-reaction threshold, P0 word 20 (40, int)
+         vtover={31: 'wb_31', 68: 'wb_68'}, fdmg='wb_dmg', fstart='w_start', size=0x1C0),  # 2k: WB_W / WB_D; 2q: 68
     # Gordo (Kirby) 0x08, BehaviorGordo (create 0x1A470, table 0x10F55C): variation 0 (the one the spawner makes)
     dict(name='gordo', areas=((0, 0, 12.0, 12.0, 0.0, 0.0), (0, 0, 14.0, 14.0, 0.0, 0.0)), kind=0x08,
          motions=(('Togetoge', 1),), no_damage_labels=True,       # its ctor 0x1A4A8: no hashsets, no damage labels
@@ -5877,6 +5878,20 @@ I_TREAD_TARGET, BO_ID_INVALID = 0x10000008, 0x50000000
 DISABLE_HIT, DISABLE_TREAD = 0x026A75C0, 0x026A75FC   # Behavior::disable_hit / disable_tread (3DS 0x7B0864 / 0x7B0D50)
 CREATE_THROW = 0x026A8F10            # Behavior::create_item_and_throw(kind, var, &pos, &speed, f1, r8, r9, r10) (3DS 0x7B4488)
 PEND_N = 40                          # the pending re-write lasts this many cave-enemy updates (seen-flag bit 16)
+# step 2q: a stomp taken while the fighter is in Jump (0xB). StepJump (0xB3) ends into Jump in the same update (no link:
+# func_1146 `!LinkModule(2, 3)`), and Jump's pre (common MSC func_471: `var0 = 1; if (KineticModule(0x18) == var0)
+# var0 = 0x32`) asks the fighter's kinetic kind: the KineticModule's +0x11C (vt+0xF4 0x02C510BC), written only by
+# change_kinetic (vt+0xEC 0x02C4FA00), still Jump's own 1 (StepJump's 0x33 is only a status setting, +0x60, at that
+# point), so Jump takes kinetic 0x32 (the transactor 0x02E7EE14 keeps the energies only for 0x32) and the step-jump
+# speed (kinetic 1 with int 0x11000000 = 1 -> 0x02E79938) is never computed: 0x33's reset left speed 0, the log's fall
+# from rest (from JumpAerial 0xC, kinetic 2, the same chain takes kinetic 1: the Goomba's rise). u_pend, once StepJump's
+# main has run (the step count int 0x10000006, zeroed by u_bounce, is >= 1) and the fighter is in Jump with a kinetic
+# other than 1: the mode int 0x11000000 = 1, float 0x1000006 = the multiplier, change_kinetic(1): the step jump.
+JUMP, KINETIC_JUMP = 0xB, 1
+I_JUMP_MODE = 0x11000000             # the kinetic-1 mode (0x02E7A7D0: 1 = the step jump 0x02E79938)
+WM_GET_INT = 0x84                    # WorkModule vt: get_int(r4 id)
+KM_ACC = 0x34                        # the MSC accessor's KineticModule (MSC KineticModule wrapper 0x030B29D8)
+KM_CHANGE, KM_KIND = 0xEC, 0xF4      # KineticModule vt: change_kinetic(r4) / its kind (+0x11C)
 
 
 def code_pk(H, st, call, d, D):
@@ -7639,6 +7654,8 @@ RES_NEW = 0x032D3E3C                 # an empty handle (this) (vt+0x14's)
 RES_FREE = 0x032D4200                # (this, 2)
 TWIN_K = ((0x57, 'plasmawisp'), (0x58, 'darios'), (0x59, 'stalfos'), (0x5A, 'zima'))
 WB_W, WB_D = 0x1B0, 0x1B4           # the White Bear's weak hit noted (slot 31) / its damage before the hit
+IGNORE_DAMAGE = 0x026A8128           # Behavior::ignore_damage() const -> f1 = the gl entry's +0x124 (3DS 0x9EA614)
+INVALID_IGNORE = 0x026A816C          # Behavior::invalid_ignore_damage() const (3DS 0x9EADF4)
 BI_SLOT31 = 0x026A48EC               # BehaviorImpl's slot 31 (the hit record: +0x14 AttackData, its +0x4C)
 
 # ---- step 2m (docs/smash-run-port.md "Step 2m"): sounds, Stalfos's drop through a passable floor
@@ -8770,8 +8787,6 @@ def code_2k(H, st, call, d, D):
         lwz r0, 0x%(WBW)X(r31)
         cmpwi r0, 0
         beq wbd_n
-        li r0, 0
-        stw r0, 0x%(WBW)X(r31)
         lwz r3, 0(r31)
         lwz r3, 0x30D4(r3)
         li r4, 0
@@ -8795,7 +8810,40 @@ def code_2k(H, st, call, d, D):
     """ + call(GET_DAMAGE) + """
         stfs f1, 0x%(WBD)X(r31)
         mr r3, r31
-    """ % dict(WBD=WB_D) + call(BI_NOTIFY_DMG))
+    """ % dict(WBD=WB_D) + call(BI_NOTIFY_DMG) + """
+        li r0, 0
+        stw r0, 0x%(WBW)X(r31)
+    """ % dict(WBW=WB_W))
+    # step 2q: slot 68 (0x7F388; the game's notify_on_damage calls it with r4 = the reaction flag, f1 = the damage, as
+    # the 3DS's 0x3DA934-0x3DA948 does after its own ignore_damage test): the flag = 1, then a damage at most the
+    # threshold (P0 word 20 = 40, as a float; for a hit of its weak attribute 5, the DamageModule's +0xA4 on the 3DS
+    # (here WB_W, noted by slot 31 and cleared after notify_on_damage) the default ignore_damage(), the gl +0x124)
+    # takes no reaction unless invalid_ignore_damage(): the bear's super armor. APPROXIMATED: the 3DS's
+    # calc_donkey_handslap_damage_fs (0x7B55BC, DK's hand slap scaled by the FieldSmash common param +0x20; the Wii U
+    # has no FS param) is not applied to the damage
+    st('wb_68', """
+        stfs f1, 0x10(r1)
+        li r0, 1
+        stb r0, 0(r29)
+        lwz r0, 0x%(WBW)X(r31)
+        cmpwi r0, 0
+        beq wb68_p
+        mr r3, r31
+    """ % dict(WBW=WB_W) + call(IGNORE_DAMAGE) + """
+        b wb68_c
+    wb68_p:
+        lfs f1, 0x%(P17)X(r30)
+    wb68_c:
+        lfs f0, 0x10(r1)
+        fcmpu cr0, f0, f1
+        bgt wb68_o
+        mr r3, r31
+    """ % p + call(INVALID_IGNORE) + """
+        cmpwi r3, 0
+        bne wb68_o
+        li r0, 0
+        stb r0, 0(r29)
+    wb68_o:""")
     # ---- the battle load (cave_t / cave_s, on a Smash Run stage): the Waddle Doo's article set (the beam, kind 0xAF,
     # max 5: the 3DS's enemy_article_data_set_waddledoo {175, 5, 0x7DDB0}) and its param slot (the static object)
     # are written there; k2_twins: the twins' param objects re-read from the Smash Run kinds' own files (below)
@@ -8941,7 +8989,9 @@ def code_h(D):
              SF=WM_SET_FLOAT, SI=WM_SET_INT, SK=STATUS_KIND, FTH=F_TREAD_MUL >> 16, FTL=F_TREAD_MUL & 0xFFFF,
              ICH=I_STEP_COUNT >> 16, ICL=I_STEP_COUNT & 0xFFFF, N=PEND_N, STEP=STEP_JUMP, ZERO=CF['ZERO'],
              BIH=BO_ID_INVALID >> 16, ITH=I_TREAD_TARGET >> 16, ITL=I_TREAD_TARGET & 0xFFFF,
-             DF=DEFEATED, **{'V%d' % i: V(i) for i in range(9)}, **{'P%d' % i: P(i) for i in range(80)})
+             JMP=JUMP, WGI=WM_GET_INT, KMA=KM_ACC, KMK=KM_KIND, KMC=KM_CHANGE, KJ=KINETIC_JUMP,
+             IMH=I_JUMP_MODE >> 16, DF=DEFEATED, **{'V%d' % i: V(i) for i in range(9)},
+             **{'P%d' % i: P(i) for i in range(80)})
     a = lambda text: H.asm(text % d)  # noqa: E731
 
     # ---- the stomp bounce (the tread link event's answer, emulated). The fighter's StepJump (status 0xB3) sends
@@ -8955,6 +9005,10 @@ def code_h(D):
     # links to whatever object that int names and copies its event 6 answer over float 0x1000006) is skipped: the
     # step 2o log showed a stale target zeroing the Big Goomba's bounce (hs fst=B, then the fall from rest) and the
     # stepped enemy's own id treading it twice (Goomba 8 -> 8, Paratroopa 9 -> 19, Big Goomba 10 -> 12).
+    # Step 2q: once StepJump's main has run (count int 0x10000006 >= 1) and the fighter is in Jump (0xB) with a kinetic
+    # other than 1 (Jump's pre took 0x32: the stomp came while the fighter was in Jump, the step 2p log's fst=B), the
+    # entry ends with the step jump the game would have made: mode int 0x11000000 = 1, float 0x1000006 = the
+    # multiplier, KineticModule change_kinetic(1) (JUMP / KINETIC_JUMP above); in Jump with kinetic 1 it just ends.
     a("""
     u_bounce:
         stwu r1, -0x20(r1)
@@ -9036,6 +9090,50 @@ def code_h(D):
         bl ub_set
         b upd_next
     upd_left:
+        cmpwi r12, 0x%(JMP)X
+        bne upd_seen
+        lwz r3, 0(r27)
+        lwz r3, 0x28(r3)
+        lwz r12, 0(r3)
+        lwz r12, 0x%(WGI)X(r12)
+        mtctr r12
+        lis r4, 0x%(ICH)04X
+        ori r4, r4, 0x%(ICL)04X
+        bctrl
+        cmpwi r3, 1
+        blt upd_seen
+        lwz r3, 0(r27)
+        lwz r3, 0x%(KMA)X(r3)
+        lwz r12, 0(r3)
+        lwz r12, 0x%(KMK)X(r12)
+        mtctr r12
+        bctrl
+        cmpwi r3, %(KJ)d
+        beq upd_drop
+        lwz r3, 0(r27)
+        lwz r3, 0x28(r3)
+        lwz r12, 0(r3)
+        lwz r12, 0x%(SI)X(r12)
+        mtctr r12
+        li r4, 1
+        lis r5, 0x%(IMH)04X
+        bctrl
+        lfs f1, 4(r27)
+        lwz r3, 0(r27)
+        bl ub_set
+        lwz r3, 0(r27)
+        lwz r3, 0x%(KMA)X(r3)
+        lwz r12, 0(r3)
+        lwz r12, 0x%(KMC)X(r12)
+        mtctr r12
+        li r4, %(KJ)d
+        bctrl
+    upd_drop:
+        li r0, 0
+        stw r0, 8(r27)
+        b upd_next
+    upd_seen:
+        lwz r10, 8(r27)
         rlwinm. r10, r10, 0, 15, 15
         beq upd_next
         li r0, 0
@@ -10141,7 +10239,11 @@ def code_h(D):
         blr
     """ % pt)
     st('pt_sh_en', "li r4, 0\nbl h_kin\nli r4, 1\nbl h_att\nli r4, 18\nli r5, 0\nbl h_mot1\nbl pt_shell")
-    st('pt_ss_en', "li r4, 16\nbl h_kin\nli r4, 0\nbl h_att\nli r4, 18\nli r5, 1\nlfs f2, 0x%X(r30)\nbl h_mot\n"
+    # step 2q: ShellMode once (the 3DS change_motion_state(0x12, 0, 10, false, 0) at 0x73F80-0x73F98: r2 = 0), as in
+    # 19; looping it (steps 2h-2p) the motion never ended, so the killed Koopa never became the shell item: it stayed
+    # in 20 for good, its 16-frame ShellMode sampled every 10 frames (the log's kd: frames 0, 10, 4, 14, 8, ...: the
+    # pose flicker) and its spin hitbox armed
+    st('pt_ss_en', "li r4, 16\nbl h_kin\nli r4, 0\nbl h_att\nli r4, 18\nli r5, 0\nlfs f2, 0x%X(r30)\nbl h_mot\n"
        "bl pt_shell" % P(64))
     st('pt_sh_up', """
         bl h_end

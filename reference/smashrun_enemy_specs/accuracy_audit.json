@@ -94,6 +94,14 @@
      "severity": "approximated",
      "fix": "a static object per kind as the Doo's wdp",
      "tier": 1
+    },
+    {
+     "item": "enemy sound banks not loaded in game",
+     "s3ds": "-",
+     "port": "the Wii U's own path (pool request 0x02DAE314, loader 0x02DAE564 -> 0x033EDD24 -> 0x03673A94) runs for the 19 kinds (natively); no `bk` line = no file data; the resource lookup is case-sensitive",
+     "severity": "open",
+     "fix": "step 2q: install note (exact capitalised names) and the log build's `bl` line",
+     "tier": 2
     }
    ]
   },
@@ -580,6 +588,14 @@
      "severity": "wrong",
      "fix": "sound plan",
      "tier": 2
+    },
+    {
+     "item": "armor (no damage reaction)",
+     "s3ds": "slot 68 0x7F388 (from notify_on_damage 0x3DA934): reaction off when the damage <= P0 word 20 (40), or for its weak attribute 5 <= ignore_damage() (gl +0x124), unless invalid_ignore_damage()",
+     "port": "BehaviorImpl's slot 68 (none)",
+     "severity": "fixed",
+     "fix": "fixed (step 2q): wb_68, P17 = 40.0; approximated: DK's hand-slap scaling (calc_donkey_handslap_damage_fs) not applied",
+     "tier": 1
     }
    ]
   },
@@ -834,6 +850,14 @@
      "severity": "missing",
      "fix": "sound plan",
      "tier": 2
+    },
+    {
+     "item": "bounce when stomped from a full jump",
+     "s3ds": "the fighter's step jump (kinetic 1, mode 1) after StepJump",
+     "port": "StepJump ended into Jump in the same update; Jump's pre (func_471) saw kinetic 1 and took 0x32 (speed kept at 0)",
+     "severity": "fixed",
+     "fix": "fixed (step 2q): u_pend makes the step jump (mode int 0x11000000 = 1, the multiplier, change_kinetic(1)) once StepJump ran and the fighter is in Jump with another kinetic; every stompable kind",
+     "tier": 1
     }
    ]
   },
@@ -940,6 +964,14 @@
      "severity": "wrong",
      "fix": "sound plan",
      "tier": 2
+    },
+    {
+     "item": "killed Koopa (state 20)",
+     "s3ds": "0x73F48: ShellMode at 10, loop false (0x73F80); at its end on the ground the shell item, -> 23",
+     "port": "ShellMode looped: never ended, the Koopa flickered in 20 for good with its spin hitbox",
+     "severity": "fixed",
+     "fix": "fixed (step 2q): pt_ss_en loop 0",
+     "tier": 1
     }
    ]
   },

@@ -2956,3 +2956,106 @@ relocations and the file info equal.
 
 **Still open:** the Paratroopa's pose cycle after a hit and the enemy sounds in game (the log build); the beam's and
 Furiijio's look against the 3DS; the Paratroopa's wings; slots 34 / 36's use.
+
+## Step 2q: the enemy sound banks (the load path runs for our kinds; their files are not found), the Big Goomba's bounce (a stomp from Jump), the killed Koopa's flicker (ShellMode looped), the White Bear's armor (slot 68)
+
+Package smashrun_step2q_v1: `code/` exe_v34 = exe_v33 + `smashrun_walker_cave.py` over its own regions (scratch
+s2q/build34.py; the field cave unchanged, set "step2j"); `data/sound/se/` the 19 banks again (byte-equal to step 2p's:
+re-shipped for the install note below). Separately smashrun_step2q_diag_v1 (`code_diag/`: exe_v34 +
+tools/diag_step2q_cave.py). Readings with addresses: hand_read.json `_framework_step2q`, and `port_step2q` of
+dekakuribo, patapata, whitebear.
+
+**Sounds: the game's own load path runs for our kinds (read and run natively); the banks had no data (open: the
+install).** The user's step 2p log: `bk` lines (every bank the parser takes) only for the game's own banks, among them
+0x13E7-0x13E9 (Mczakoplasmawisp / Mczakodarios / Mczakostalfos, the twins the field cave requests) right after `sr`;
+none of the 19 Smash Run banks; every `sv` of a Smash Run id finds its bank id (0x138A..0x13DB) but no loaded bank.
+- The path. The field cave's battle-load hook requests each kind through the EnemyResourcePool (mgr+0x28),
+  0x02DAE314(pool, kind): a kind new to the pool calls the file request 0x030BF400 (types 0-4 through the path builder
+  0x030BC6BC; type 4 = `sound/se/snd_se_enemy_%s.nus3bank` (0x10158D64) with the capitalised table 0x1041A534,
+  registered by 0x030BEEE0) and enters the pool's three maps (+0 model, +0xC effect, +0x18 sound holder). At the
+  battle's start 0x02D9A5EC (after cave_s / snd_rows) calls the pool loader 0x02DAE564: per kind in kind order, the
+  models, the effect banks (0x02DAE48C, kind + 0x700) and the sound bank: 0x030BF61C(type 4) -> 0x033EDD24 -> a free
+  slot of 120 -> 0x033EDABC: data = 0x032D8B9C(handle), 0x03673A94(data, size): **no data -> 0x80000005, no parse**
+  (0x03673B3C-0x03673B50); data -> 0x036771D8 -> 0x03685DB8 -> the parser 0x036872D8 (the `bk` hook). The spawn
+  path's own pool entries load a bank only with EnemyCreateParam +0x3B set (0x02DAEF04); the field cave's kinds come
+  through 0x02DAE314 and the loader. Unloading: the holders go with the pool, as the game's own enemies'.
+- Run natively (smashrun_step2q_test.py): 0x02DAE314 over the field cave's 22 requested kinds, then 0x02DAE564:
+  every kind, the 19 ported and the three twins alike, reaches 0x033EDD24 with its own type-4 handle; 0x03673A94
+  natively: data 0 -> 0x80000005 and no parser call, data -> 0x036771D8. So the twins' banks parse and ours do not
+  only because their files had no data: the files were not found (or not loaded).
+- The resource lookup is case-sensitive: the path is walked a segment at a time (0x032D6CE4), each name hashed from
+  its raw bytes (0x032EAA40, h = h x 0x25 ^ byte; natively "snd_se_enemy_Kuribo.nus3bank" 0xF47A868E,
+  "..._kuribo..." 0x95D6B66E) and compared byte by byte (0x032EB0E4). The first packages shipped the banks lower case
+  (snd_se_enemy_kuribo.nus3bank, "Enemies"); copying a capitalised file over a lower-case one on Windows keeps the old
+  name, and Sm4shExplorer then registers the lower-case name, which the game never asks for. The most likely cause;
+  not proven: the log build's `bl` line gives, per kind at the battle's start, the file handle (0 = not found), its
+  flags and the bank made. README: delete every snd_se_enemy_<kind>.nus3bank of the 19 kinds (any case) from the
+  workspace's data/sound/se, copy the package's, check the capital letter, rebuild the patch.
+- No code change for the sounds: the 19 banks load through the game's own path once their files are found.
+
+**The Big Goomba's bounce: a stomp from Jump (wrong; fixed).** The log's one stomp: `hs k=23 s=5 fst=B tgt=50000000`
+(step 2p's tread-target fix in place), then pd fst=B for 27 updates and the fighter's y -1.84 (the old speed), -0.11,
+-0.22, -0.32, -0.43: speed 0 again. The Big Goomba is tall, so it is stomped from a full jump (status 0xB, Jump); the
+Goomba's stomps came from JumpAerial (0xC), and every step 2o / 2p stomp with fst=B fell from rest. Status 0xB is Jump,
+0xC JumpAerial (Mario's MSC registers 0xB pre func_472 / main func_492, 0xC func_474 / func_495). Jump's pre
+(func_471): `var0 = 1; if (KineticModule(0x18) == var0) var0 = 0x32` (re-entering Jump keeps the jump), init_settings
+with var0. KineticModule op 0x18 is the kind at +0x11C (vt+0xF4 0x02C510BC), written only by change_kinetic (vt+0xEC
+0x02C4FA00, after the transactor); a status's kinetic setting is only stored (StatusModule vt+0x114 0x02E885F8: +0x60;
+step 2p's reading that it changed the kinetic was wrong). Our StepJump ends into Jump in the same fighter update (no
+link 3: func_1146), and Jump's pre still reads Jump's own 1: kinetic 0x32, which the transactor (0x02E7EE14: energies
+reset unless the new kind is 0x32) leaves at the speed StepJump's 0x33 reset to 0; the step jump (kinetic 1, mode int
+0x11000000 = 1 -> 0x02E79938) is never computed. From JumpAerial (kinetic 2) the chain takes kinetic 1: the step jump.
+(A vanilla footstool usually holds StepJump through its motion, so Jump's pre comes a frame later.) No hitbox or
+reaction of the Big Goomba's is involved: the fighter stays in 0xB. Its own stomp reaction (squashed, 3DS slot 21
+0x85FE0) is right. Fix (u_pend): once StepJump's main has run (the step count int 0x10000006, zeroed by u_bounce, >= 1)
+and the fighter is in Jump with a kinetic kind other than 1: int 0x11000000 = 1, float 0x1000006 = the kind's
+multiplier, KineticModule change_kinetic(1): the game's own step jump (0x02E79938: 0.9 x step_jump_speed_y); in Jump
+with kinetic 1 (the stomp from JumpAerial) nothing; the entry ends either way. For every stompable kind.
+APPROXIMATED: the jump comes at the next cave-enemy update after the fighter's (at most a frame late).
+
+**The killed Koopa's flicker: ShellMode looped (wrong; fixed).** The log's `dm` / `kd` lines: the walking Koopa's
+last hit (HP 3) killed it: slot 67 -> 20 (the spinning shell), then all 240 `kd` updates in 0x14 with motion 0x12
+(ShellMode), its frame 10, 4, 14, 8, 2, 12, 6, 0 (rate 10 over a 16-frame motion: the stand / shell / dive poses
+every frame), y bouncing between -30 and +29 (kinetic 16). The 3DS's 20 enter 0x73F48: change_kinetic(0x10),
+set_attach_ground(0), change_motion_state(0x12, 0.0, 10.0, **false**, 0.0) (r2 = 0 at 0x73F80; the Koopa's walk
+0x732E4 passes 1), disable_hit / disable_tread / set_current_damage(0), the first-time dead item; its update is 19's
+(0x73A24: the motion's end on the ground -> the shell item, hidden, -> 23). The cave played it looped since step 2h
+(pt_ss_en `li r5, 1`): it never ended, so the killed Koopa stayed in 20 for good, flickering, with its spin hitbox (P2
+entry 2, 17 %) armed. Fix: once (loop 0). The earlier video's Koopas cycling poses were killed ones.
+
+**The White Bear's armor (missing; ported).** The 3DS bear's vtable (0xCFDE0) overrides slot 68 (0x7F388; the
+Goomba's is the empty 0x117AC), which BehaviorImpl::notify_on_damage calls after its own ignore test (code.bin
+0x3DA934-0x3DA948: vt+0x110(this, &reaction, the damage)): reaction = 1; the threshold = the hit's attribute
+([DamageModule+0xA4]) == 5 (its weakness) ? ignore_damage() (gl +0x124, 0 for the bear) : (float) P0 word 20 (40);
+damage (DK's hand slap scaled, calc_donkey_handslap_damage_fs 0x7B55BC) <= the threshold and not
+invalid_ignore_damage() -> reaction 0: hits of 40 or less don't put it in the damage states (no knockback, no
+flinch); it still takes the damage. Nothing else gives it armor: the gl file is byte-identical in both games, its start
+/ initialize set only set_weak_param and its kinetic energies; slots 64-67 3 / 1 / 1 / 10, 69 returns 0. The Wii U's
+notify_on_damage is the same (0x026A35CC-0x026A3614: vt+0x22C(this, r4 = &flag, f1 = the damage), ignore_damage
+0x026A8128, invalid_ignore_damage 0x026A816C). Ported: wb_68 (slot 68), P17 = 40.0; the weak hit from WB_W (slot
+31's note of the hit's attribute, step 2k), now cleared after notify_on_damage instead of before. APPROXIMATED: DK's
+hand slap is not scaled (the Wii U has the scaling 0x026A8014 but no FieldSmash common param); DM+0xA4 read as the
+hit's attribute.
+
+**The log build (smashrun_step2q_diag_v1; tools/diag_step2q_cave.py, test tools/diag_step2q_test.py).** Step 2p's
+lines at their exe_v34 addresses; `pd` adds the fighter's KineticModule kind (+0x11C: 1 Jump, 0x32 kept, 0x33
+StepJump); `bl` (new): per kind at a battle's start, in the pool loader after the bank is made (0x02DAE83C): the kind,
+the type-4 file's handle (0 = not found), its +0x10 flags, the bank made (0 = none).
+
+**Tests** (exe_v34):
+
+| Test | Result |
+| --- | --- |
+| smashrun_step2q_test.py (new; the step 2p log, the package's data/, the gl enemy_param.bin) | 18 checks, 0 failures (from Jump: nothing until StepJump ran, then mode 1 / 0.9 / change_kinetic(1), the entry ended; from JumpAerial and in other statuses nothing; Tiki Buzz through a seen StepJump; change_kinetic / the kind natively; 0x02E79938 natively 2.16; the killed Koopa: ShellMode once at 10, the shell thrown, removed; the bear: no reaction <= 40, a reaction above it or with invalid_ignore_damage, its weak hit against gl +0x124, notify_on_damage's call words, WB_W through notify; the sound path natively for the 22 kinds, 0x03673A94 natively, the names and the case-sensitive hash, the package's names; the log's Big Goomba stomp and killed Koopa) |
+| diag_step2q_test.py (new; the log build against exe_v34) | 27 checks, 0 failures |
+| smashrun_step2h_test.py | 43 checks, 0 failures (the killed Koopa's motion now loop 0) |
+| smashrun_step2p / 2o / 2n / 2m / 2l / 2k / 2j / 2i_test.py | 16 / 15 / 13 / 21 / 19 / 29 / 24 / 12 checks, 0 failures (2m with the 3DS soundlabeltable extracted again) |
+| smashrun_walker_test.py / flier / flier_motion / field / enemy | 181 / 125 / 13 / 13 / 26 checks, 0 failures |
+| effect_slots_patch_test.py exe_v34 exe_v12 | 47 checks, all ok |
+
+**exe_v34 vs exe_v33, word diff** (s2q/diff34.py, log s2q/t/diff34.log): 10675 words, every one in Smash Run's regions
+(region H's code moved by the new words, the data words 0x102FE778 / 0x102FE944 / 0x102FE95C that point into it);
+relocations and the file info equal.
+
+**Still open:** the enemy sounds in game (the install's file names; the `bl` line settles it); the beam's and
+Furiijio's look against the 3DS; the Paratroopa's wings; slots 34 / 36's use; the DK hand-slap scaling against the bear.
