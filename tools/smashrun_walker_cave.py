@@ -375,6 +375,11 @@ PH = 0x230                           # Propeller Heiho's own fields after the fl
 PH_D, PH_B, PH_Y, PH_F, PH_T, PH_A, PH_R, PH_S, PH_DT, PH_I, PH_X = (PH + 4 * i for i in range(11))
 PH_SIZE = PH + 0x2C
 ITEM_NONE = 0x50000000
+# step 2i: the stomped / killed Koopa's shell. The 3DS throws item 0x94 `patapata` (variation 1 for var 0 / 2, else
+# 0): the Wii U item table has the kind (0x104157A0: {0x94, 0xB, 0xB, 0x101, 2, 0}) but no code path to its
+# behaviour was found and its files (item/patapata/, a Smash Run item) are 3DS data, so the Wii U's Green Shell
+# (kind 0x46 `greenshell`, the same kickable shell) is thrown instead, variation 0 (APPROXIMATED)
+KOOPA_SHELL = (0x46, 0)
 PH_FOOD, PH_GOLDBAG, PH_CUSTOM = 0x0E, 0x1D, 0x21  # tabemono (29 variations), goldbag, customizeitem (both games' tables)
 PH_SWAP_FX = 0x100001C               # the item swap's effect (3DS: the item's EffectModule req, common effect 0x1C)
 GL_INDEX, GL_BASE = 0x1E4, 0x34      # gl entry = [[PARAM_MGR] + 0x34] + 0x228 * [[PARAM_MGR] + 0x1E4 + 4 * (8K + var)]
@@ -436,7 +441,7 @@ SLOT = {50: 0xC + 8 * 50, 72: 0xC + 8 * 72, 73: 0xC + 8 * 73}     # reverse_lr, 
 CF = {}
 for _i, _n in enumerate(('KIND NST TAB START START01 R64 R65 R66 R67 REMOVE DEADMOT HASH EN ENN KICK SET ATK SRCH '
                          'FALLMOT LANDST LANDMOT TURNMOT TURNST WALKST HOPTHR HOPLAND HOPFLAG HOPMOT HOPLOOP ZERO TREAD AREA '
-                         'SMODE LEAVE VT SIZE TB0 TB1 TB2 FSTART FDMG F69 F27 LVP TNODE BOUNCE').split()):
+                         'SMODE LEAVE VT SIZE TB0 TB1 TB2 FSTART FDMG F69 F27 LVP TNODE BOUNCE VIS MVIS').split()):
     CF[_n] = 4 * _i
 CF['DMG'] = 4 * len(CF)              # 9 words
 CF['P'] = CF['DMG'] + 4 * 9          # the kind's own values P0.. (at least five words)
@@ -553,9 +558,10 @@ WALKERS = (
                   ('Landing', 1), ('ParasolFall', 1), ('Turn', 1), ('Walk', 1)),
          dead='Damage', last='Jump', hashset=False, kick=False,
          energy={8: 0.2, 0x10: 0.2, 0x18: 0.0005, 0x20: 0.3, 0x24: 2.5, 0x28: 0.3, 0x2C: 2.5, 0x44: 1.0},
-         states={1: ('g_fall_en', 'g_fall_up'), 2: ('d_para_en', 'g_fall_up'), 3: ('g_land_en', 'g_land_up'),
-                 4: ('d_walk_en', 'd_walk_up'), 5: ('g_turn_en', 'g_turn_up'), 6: ('d_jump_en', 'd_jump_up'),
-                 7: ('g_dead_en', 'g_dead_up'), 8: 'remove'},
+         states={1: ('wd1_en', 'g_fall_up'), 2: ('wd2_en', 'g_fall_up'), 3: ('wd3_en', 'g_land_up'),
+                 4: ('wd4_en', 'd_walk_up'), 5: ('wd5_en', 'g_turn_up'), 6: ('wd6_en', 'd_jump_up'),
+                 7: ('wd7_en', 'g_dead_up'), 8: 'remove'},     # step 2i: wdN_en = the enter + 0x5D04C (wd_show)
+         vtover={51: 'wd_51', 60: 'wd_60', 69: 'wd_69', 71: 'wd_71'}, fstart='wd_start',
          start=(1, 2), rets=(4, 1, 1, 7), remove=8, fall=('Fall', 3), landing='Landing', turn='Turn', turnst=5,
          walkst=4, hop=(0.0, 0, 0),
          search=(),                   # 3DS {2, 30, 300, 100, 0, 10, 0}: never searches
@@ -570,6 +576,7 @@ WALKERS = (
          states={1: ('g_fall_en', 'g_fall_up'), 2: ('g_land_en', 'g_landt_up'), 3: ('o_walk_en', 'o_walk_up'),
                  4: ('g_turn_en', 'g_turn_up'), 5: ('g_hop_en', 'g_hop_up'), 6: ('g_dead_en', 'g_dead_up'),
                  7: 'remove', 8: ('o_leave_en', 'o_leave_up')},
+         vtover={55: 'do_55', 56: 'do_56', 57: 'do_57', 58: 'do_58'}, fstart='w_start',     # step 2i: the eyes
          # the 3DS's 10 / 11 / 9 (dead / remove / leave; 6 hop and 7 / 8 beam not ported)
          start=(1, 1), rets=(3, 1, 1, 6), remove=7, leave=600,   # start: +0x184 = PS8c f0 600
          fall=('Fall', 2), landing='Landing', turn='Turn', turnst=4,
@@ -578,7 +585,7 @@ WALKERS = (
          attacks=((6, 'bullet'),),
          # the leave (state 9, init_common_leave(P6 {300, 0.02, 30, -1, 0, 0, 3, 0, 0.85})): frames, the
          # energy's +0x30 (-0.02) / +0x34 (30), the leave effect's offset y and scale
-         P=(300, -0.02, 30.0, 3.0, 0.85)),
+         P=(300, -0.02, 30.0, 3.0, 0.85, 30, 50, 4)),   # step 2i: P5-P7 PS8c +0xB4 / +0xB8 / +0xBC (the blink)
     dict(name='churine', areas=((0, 0, 12.0, 12.0, 0.0, 0.0), (1, 3, 5.0, 10.0, 0.0, 4.0)), kind=0x1F,
          motions=(('DamageFall', 1), ('DamageFly', 1), ('DamageStart', 1), ('DownBound', 1), ('DownBoundEnd', 1),
                   ('DownLoop', 1), ('DownWait', 1), ('Jump', 1), ('Landing', 1), ('SleepPowder', 1), ('Turn', 1),
@@ -651,12 +658,12 @@ FLIERS = (
          motions=(('DamageStart', 1), ('FlyHoming', 1)), no_damage_labels=True,    # its ctor: no damage labels,
          dead='DamageStart', last=None, hashset=False, kick=False,                   # no hashsets
          energy={},                                      # initialize 0x10F74: bx lr
-         states={1: ('f_g1_en', 'f_g1_up'), 2: ('f_g2_en', 'f_g2_up'), 3: ('f_leave_en', 'o_leave_up'),
-                 4: ('g_dead_en', 'g_dead_up'), 5: 'remove'},
+         states={1: ('f_g1_en', 'f_g1_up'), 2: ('gh2_en', 'gh2_up'), 3: ('f_leave_en', 'o_leave_up'),
+                 4: ('gh_dead_en', 'g_dead_up'), 5: 'remove'},             # step 2i: gh_* = the f_* + the meshes
          start=(1, 1), rets=(1, 1, 1, 4), remove=5, fall=(None, 0), landing=None, turn=None, turnst=0, walkst=0,
          hop=(0.0, 0, 0), search=((0, 120, 300.0, 0.0, 0.0, 0.0, 0.0),),           # P1 (never searched)
          attacks=((1, 'ghos_body'), (4, 'ghos_bullet')),
-         fstart='f_ghos_start', fdmg='f_ghos_dmg', f69='f_ghos_69', f27='f_ghos_rm', lvp=19,
+         fstart='gh_start', fdmg='f_ghos_dmg', f69='f_ghos_69', f27='f_ghos_rm', lvp=19,
          vtover={55: 'f_g55', 31: 'f_g31'},              # step 2g v3: the 3DS's slot 55 0x10BA0 (the turn); v4: 31
          P=(_GS[0], _GS[1], int(_GS[2]), _GS[3], _GS[4], _GS[5], 0.1) + tuple(_GP7[0]) + tuple(_GP7[1]) +
            (_GP6[0], -_GP6[1], _GP6[2], _GP6[6], _GP6[8], 1.0, 0.0) + (_GS[6], DEG2RAD)),   # P26 P@0xA4 30, P27
@@ -667,15 +674,15 @@ FLIERS = (
                   ('DownWait', 1), ('Fly', 1), ('FlyReady', 1), ('Step', 1)),
          dead='DamageStart', last='Fly', hashset=False, kick=False,
          energy={0x44: _TP0[18]},                       # initialize 0x77DC8: energy +0x44 = P0 f18 (0.98)
-         states={1: ('t_fall_en', 't_fall_up'), 2: ('g_dead_en', 'g_dead_up'), 3: ('t_fly_en', 't_fly_up'),
+         states={1: ('t_fall_en', 't_fall_up'), 2: ('g_dead_en', 'g_dead_up'), 3: ('tk_fly_en', 't_fly_up'),
                  4: ('t_hold_en', 't_hold_up'), 5: ('t_dive_en', 't_dive_up'), 6: ('t_brk_en', 't_brk_up'),
                  7: ('t_land_en', 't_land_up'), 8: ('t_rdy_en', 't_rdy_up'), 9: ('t_lv_en', 't_lv_up'),
-                 10: ('t_stomp_en', 't_stomp_up'), 11: ('t_gone_en', 't_gone_up'), 12: 'remove'},
+                 10: ('tk_stomp_en', 't_stomp_up'), 11: ('tk_gone_en', 't_gone_up'), 12: 'remove'},
          tread=10, tbox=(6.0, 0.0, 1.5), tnode=3,      # area 0 (node 3 = HipN, 12 x 3): step 2g v5 centred on the
                                                        # live node (node_global_position), as the 3DS area is
          start=(3, 3), rets=(3, 3, 3, 2), remove=12, fall=(None, 0), landing=None, turn=None, turnst=0, walkst=0,
          hop=(0.0, 0, 0), search=tuple(tuple(g) for g in vl_group('tikibuzz', 1)),
-         attacks=((5, 'tiki_dive'), (2, 'tiki_bullet')), fstart='f_tiki_start',
+         attacks=((5, 'tiki_dive'), (2, 'tiki_bullet')), fstart='tk_start', fdmg='tk_dmg', vtover={60: 'tk_60'},
          P=tuple(_TP0[:14]) + (int(_TP0[14]),) + tuple(_TP0[15:19]) + (float(_TP0[19]), _TP0[20]) +
            (vl_group('tikibuzz', 'struct')[0], _TP0[3], _TP0[4], _TP0[7], _TP0[8], _TP0[5], _TP0[6], 0.0)),
     # Furiijio (Kid Icarus) 0x1A, BehaviorFuriijio (create 0x6DC6C, table 0x10D168; docs/smash-run-port.md "Step 2f")
@@ -775,7 +782,7 @@ STEP2H = (
                  13: 'remove'},
          start=(1, 6), rets=(0, 0, 1, 4), remove=13, fall=('Fall', 7), landing='Landing', turn='Turn', turnst=9,
          walkst=8, hop=(0.0, 0, 0), search=tuple(tuple(g) for g in vl_group('togezo', 1)),
-         attacks=(), vtover={40: 'tg_init', 45: 'tg_atk', 66: 'tg_66', 67: 'tg_67'}, fstart='tg_start', f69='tg_69',
+         attacks=(), vtover={40: 'tg_init', 45: 'tg_atk', 60: 'tg_60', 66: 'tg_66', 67: 'tg_67'}, fstart='tgv_start', f69='tg_69',
          lvp=18,                                     # TREAD 0: never stomped (its tread area is off, slot 21 BI's nop)
          P=tuple(vl_group('togezo', 0)[0]) + tuple(vl_group('togezo', 0)[1]) +
            (_TGS[0], _TGS[2], _TGS[3], vl_group('togezo', 'struct2')[0], TG_SPIN, DEG2RAD) +
@@ -801,15 +808,82 @@ STEP2H = (
          start=(1, 1), rets=(2, 1, 1, 20), remove=23, fall=('Fall', 11), landing='Landing', turn='TurnNokonoko',
          turnst=13, walkst=12, hop=(0.0, 0, 0), search=tuple(tuple(g) for g in vl_group('patapata', 1)),
          attacks=((6, 'pt_bite'), (16, 'pt_leap'), (20, 'pt_shell'), (8, 'pt_bullet')),
-         vtover={20: 'pt_tread', 64: 'pt_64', 65: 'pt_65', 66: 'pt_66', 67: 'pt_67'}, fstart='pt_start', f69='pt_69',
+         vtover={20: 'pt_tread', 64: 'pt_64', 65: 'pt_65', 66: 'pt_66', 67: 'pt_67'}, fstart='ptv_start', f69='pt_69',
          P=tuple(x for row in vl_group('patapata', 0) for x in row) + tuple(vl_group('patapata', 'struct')) +
-           tuple(vl_group('patapata', 'struct2')) + (3.0, 0x94, 10.0, 1.0, -1.0)),
+           tuple(vl_group('patapata', 'struct2')) + (3.0, KOOPA_SHELL[0], 10.0, 1.0, -1.0)),
 )
 WALKERS = WALKERS + STEP2H
 KINDS = tuple(w['kind'] for w in WALKERS)
 
 
 STEM_NAME = {'dekakuribo': 'DekaKuribo'}      # step 2h: the 3DS motion files' own capitalisation
+
+# ---- step 2i: mesh switching (docs/smash-run-port.md "Step 2i"). The 3DS behaviours switch the meshes their model's
+# normal.vmt lists through Behavior::set_mesh_visibility(vmt index, bool) (3DS 0x6618C4 -> ModelModulePartialImpl::
+# set_node_visibility 0x6618D4: ModelModule +8 != 8 -> GsbDrawModel::set_mesh_visibility(int, bool) 0x7FB018) and the
+# whole model through Behavior::set_visibility(bool) (0x661720). The Wii U's equivalents: the ModelModule (acc+0x3118)
+# holds the model handle at +4 (vt+0x6C returns it); the handle API set_mesh_visibility_by_index 0x032FF6B4(handle,
+# mesh, bool) -> 0x034232FC(model, mesh, bool, 0) writes bits 0-1 of the model's per-mesh byte ([model+0x7DC]+4,
+# 0xFE at load: "not set") and is_valid 0x032FF640 (what the lua binding "set_mesh_visibility_by_index" 0x030F2880
+# calls); ModelModule vt+0x164 = set_visibility(bool) 0x02007728 (the 3DS's 0x661720 line for line). The mesh index is
+# the NUD's mesh order (the model's mesh list, 0x0342633C's by-name search runs over the same indices).
+# VMT: each kind's normal.vmt (3DS index order); NUD_MESHES: the converted model.nud's meshes in order (a vmt name
+# can be several NUD meshes: Big Goomba's three normal_mh); VIS_DEFAULT: the H3D model's visibility bit per vmt
+# entry (the spawn state, h_vdef); MAT_VIS: the kinds whose faces the 3DS switches by material animation per motion
+# (the converted material_anime.pac's MTAs, which the Wii U does not play for enemies): u_vis applies them per frame.
+VMT = {
+    'waddledee': ('waddledee_Cparasol_mh_VIS_O_OBJ', 'waddledee_Larm_mh_VIS_O_OBJ', 'waddledee_Lparasol_mh_VIS_O_OBJ',
+                  'waddledee_Rarm_mh_VIS_O_OBJ', 'waddledee_Rparasol_mh_VIS_O_OBJ', 'waddledee_damage_mh_VIS_O_OBJ',
+                  'waddledee_normal_mh_VIS_O_OBJ'),
+    'waddledoo': ('waddledoo_eye_blink1_mh_VIS_O_OBJ', 'waddledoo_eye_blink2_mh_VIS_O_OBJ',
+                  'waddledoo_eye_normal_mh_VIS_O_OBJ', 'waddledoo_tear_mh_VIS_O_OBJ'),
+    'ghos': ('damage_VIS_O_OBJ', 'normal_VIS_O_OBJ'),
+    'tikibuzz': ('Damage1_VIS_O_OBJ', 'Damage2_VIS_O_OBJ', 'Normal_VIS_O_OBJ'),
+    'togezo': ('togezo_mh_VIS_O_OBJ', 'togezo_paipo_mh_VIS_O_OBJ'),
+    'patapata': ('patapata_wing_VIS_O_OBJ',),
+    'pooka': ('body_damage_mh_VIS_O_OBJ', 'body_normal_L_mh_VIS_O_OBJ', 'body_normal_R_mh_VIS_O_OBJ',
+              'eye_damage_mh_VIS_O_OBJ', 'eye_normal_mh_VIS_O_OBJ', 'gogle_mh_VIS_O_OBJ', 'leg_mh_VIS_O_OBJ'),
+    'kuribo': ('damage_mh', 'normal_mh'),                   # no vmt: the material animation's meshes (MAT_VIS)
+    'dekakuribo': ('damage2_mh', 'damage_mh', 'normal_mh'),
+}
+NUD_MESHES = {
+    'waddledee': VMT['waddledee'],
+    'waddledoo': ('waddledoo_eye_blink1_mh_VIS_O_OBJ', 'waddledoo_eye_blink2_mh_VIS_O_OBJ',
+                  'waddledoo_eye_normal_mh_VIS_O_OBJ', 'waddledoo_mh', 'waddledoo_tear_mh_VIS_O_OBJ'),
+    'ghos': VMT['ghos'], 'tikibuzz': VMT['tikibuzz'], 'togezo': VMT['togezo'], 'pooka': VMT['pooka'],
+    'patapata': ('body_mh', 'patapata_wing_VIS_O_OBJ'),
+    'kuribo': ('damage_mh', 'normal_mh'),
+    'dekakuribo': ('damage2_mh', 'damage_mh', 'normal_mh', 'normal_mh', 'normal_mh'),
+}
+VIS_DEFAULT = {                                             # the H3D models' visibility bits (s3ds_model.Bch)
+    'waddledee': (1, 1, 1, 1, 1, 1, 1), 'waddledoo': (0, 0, 1, 1), 'ghos': (0, 1), 'tikibuzz': (0, 0, 1),
+    'togezo': (1, 1), 'patapata': (1,), 'pooka': (0, 1, 1, 0, 1, 1, 1), 'kuribo': (0, 1), 'dekakuribo': (0, 0, 1),
+}
+MAT_VIS = {     # motion stem -> visible vmt entries (the converted material_anime.pac; other motions: default.mta)
+    'kuribo': dict(default=(0, 1), **{m: (1, 0) for m in (
+        'Collapses', 'Damage', 'DamageFall', 'DamageFly', 'DamageStart', 'DownBound', 'DownBoundEnd', 'DownLoop',
+        'DownWait')}),
+    'dekakuribo': dict(default=(0, 0, 1), **{m: (1, 0, 0) for m in ('Damage', 'DamageFly', 'DamageStart')},
+                       **{m: (0, 1, 0) for m in ('Collapses', 'DamageFall', 'DownBound', 'DownBoundEnd', 'DownLoop',
+                                                 'DownWait', 'Stepped')}),
+}
+
+
+def vis_table(name):
+    """[n, default mask, then per vmt entry its NUD mesh indices packed from the top byte (0xFF: none; 4 at most)]"""
+    out = [len(VMT[name]), sum(v << i for i, v in enumerate(VIS_DEFAULT[name]))]
+    for m in VMT[name]:
+        idx = [i for i, x in enumerate(NUD_MESHES[name]) if x == m][:4]
+        out.append(sum(((idx[k] if k < len(idx) else 0xFF) << (24 - 8 * k)) for k in range(4)))
+    return out
+
+
+def mvis_table(w):
+    """[motion count, then per motion index the visible-entry mask]"""
+    t = MAT_VIS[w['name']]
+    mask = lambda bits: sum(b << i for i, b in enumerate(bits))  # noqa: E731
+    return [len(w['motions'])] + [mask(t.get(sfx, t['default'])) for sfx, _f in w['motions']]
+
 
 
 def stem(name, sfx):
@@ -884,7 +958,8 @@ def cfg_values(w, D, fn=lambda x: 0):
              TB0=fword(w.get('tbox', TREAD_BOX)[0]), TB1=fword(w.get('tbox', TREAD_BOX)[1]),
              TB2=fword(w.get('tbox', TREAD_BOX)[2]), FSTART=fn(w.get('fstart', 0)), FDMG=fn(w.get('fdmg', 0)),
              F69=fn(w.get('f69', 0)), F27=fn(w.get('f27', 0)), LVP=P(w['lvp']) if 'lvp' in w else 0,
-             TNODE=w.get('tnode', 0), BOUNCE=fword(w.get('bounce', 0.0)))
+             TNODE=w.get('tnode', 0), BOUNCE=fword(w.get('bounce', 0.0)),
+             VIS=D.get('vis_' + n, 0), MVIS=D.get('mvis_' + n, 0))
     words = [0] * (cfg_size(w) // 4)
     for k, v in c.items():
         words[CF[k] // 4] = v & 0xFFFFFFFF
@@ -967,7 +1042,12 @@ class Data:
                        if s else [0] * 6)            # {enter, update, exit} PMFs (step 2f: an exit)
             b.append(('st_' + n, st, 4))
             b.append(('ar_' + n, [word(v) for e in w['areas'] for v in e], 4))
+            if n in VMT:                  # step 2i: the mesh switch tables (h_vis / u_vis)
+                b.append(('vis_' + n, vis_table(n), 4))
+                if n in MAT_VIS:
+                    b.append(('mvis_' + n, mvis_table(w), 4))
             need = ('st_', 'en_', 'set_', 'atk_', 'sr_', 'ar_') + (('hs_',) if w['hashset'] else ())
+            need += tuple(p for p in ('vis_', 'mvis_') if (p == 'vis_' and n in VMT) or (p == 'mvis_' and n in MAT_VIS))
             dd = {p + n: g(p + n) for p in need}
             dd.update(vt=g('vt'), vtf=g('vtf'))
             if w.get('vtover'):
@@ -1373,7 +1453,7 @@ def code(D):
         bctr
     """ % (CF['EN'], CF['ENN'], CF['KICK']))
     # ---- slot 41 start: set_rhombus, +0x10 = posture lr, face the nearest target, the first state
-    A.asm("w_start:\nmflr r0\nbl pro")
+    A.asm("w_start:\nmflr r0\nbl pro\nmr r3, r31\nbl h_vdef")      # step 2i: the model's default meshes
     far(A, SET_RHOMBUS)
     A.asm("lwz r0, 0x%X(r30)\ncmpwi r0, 0\nbeq s_lr\nbl h_smode" % CF['SMODE'])
     A.asm("""
@@ -3204,18 +3284,8 @@ def code_f(D, vtw):
     # are indirect hitboxes); not ported: the module acc+0x3074 byte +0x5A2 = 0 / 1 and play_se(15)
     G.asm("""
     f_g31:
-        lwz r11, 0x14(r4)
-        li r0, 0
-        cmpwi r11, 0
-        beq g31_s
-        lbz r0, 0x4C(r11)
-        cmpwi r0, 0
-        beq g31_s
-        li r0, 1
-    g31_s:
-        stb r0, 0x%X(r3)
-        blr
-    """ % GH_IMM)
+        b gh_31                     # step 2i: the 3DS's per-category rules (code_vis)
+    """)
     # slot 10 notify_on_damage (0x11094): immune (GH_IMM) -> DamageModuleImpl::init_damage(GH_DMG) (the HP before
     # the hit) and no reaction; else GH_DMG = damage(0) (entry 0's +0, as 3DS DamageModuleImpl::damage(int)
     # 0x9512CC) and BehaviorImpl's; then V1 = P5 (1200: the leave timer restarts). stop_se not ported
@@ -5758,7 +5828,7 @@ def code_h(D):
         lwz r0, 0x24(r1)
         mtlr r0
         addi r1, r1, 0x20
-        blr
+        b u_vis                     # step 2i: the material-animation kinds' meshes
     """)
 
     # ---- Big Goomba (dekakuribo 0x23). V0 the state frames, V1 the run frames (+0x178), V2 the run start's
@@ -6198,6 +6268,7 @@ def code_h(D):
         bne.far goi
         li r4, 6
         b goi""" % tg)
+    # (step 2i: tgv_hatch, the hatch's node 2 reset and mesh swap)
     # the egg's spin (L6239C, slot 55 0x3740C): V3 = sign(-speed x) x |speed| x P16 x -lr (degrees a frame; the 3DS's
     # common factor EnemyParamAccessor +0x198 +0x90 x +0xA0 is not in the dump: P16 stands in); tg_turn: V4 += V3,
     # node 2 (RotN) set to (V4, 0, 0) radians (set_node_rotate, the ModelModule's vt+0xC4 on a change)
@@ -6304,6 +6375,8 @@ def code_h(D):
         mr r3, r31
         li r4, 5
         bl tg_atk
+        mr r3, r31
+        bl tgv_hatch
         lwz r0, 0x1C(r1)
         mtlr r0
         blr""" % tg)
@@ -6410,7 +6483,7 @@ def code_h(D):
     # first falling frame seen (+0x1F0), V4 the dead item still due (+0x1FC). P0-47 its P0 rows (12 words a
     # variation), P48-50 PS78 (60 %%, 30, 1.5), P51-61 PS84, P62 P@0xB0 (3: the shell item's height), P63 the item kind
     pt = dict(d, R1=P(1), R2=P(2), R3=P(3), R4=P(4), R5=P(5), R6=P(6), R8=P(8), R9=P(9), R10=P(10), R11=P(11),
-              TEN=P(64), ONE=P(65), MONE=P(66), AM=AER + 0xC)
+              TEN=P(64), ONE=P(65), MONE=P(66), AM=AER + 0xC, SHV=KOOPA_SHELL[1])
     H.asm("""
     pt_row:
         lwz r28, 0xC(r31)
@@ -6647,20 +6720,23 @@ def code_h(D):
     st('pt_brec_en', "nop")
     st('pt_brec_up', "bl f_aupd\nbl h_end\ncmpwi r3, 0\nbeq.far epi\nb ptb_end")
     # the wing loss (L in slots 20 / 69 / 9's enter): var += 2, the effect 0x7030000 at the posture (one shot), the
-    # walk params (L5D968); the wing mesh off: no Wii U mesh switch (it stays)
+    # walk params (L5D968); the wing mesh off (step 2i: h_vsetr)
     st('pt_dewing', """
         lwz r3, 0xC(r31)
         cmpwi r3, 2
         bge.far epi
         addi r3, r3, 2
         stw r3, 0xC(r31)
+        li r4, 0
+        li r5, 1
+        bl h_vsetr
         lis r4, 0x703
         bl t_fx
         mr r3, r31
         bl pt_walkw""")
     # 9 wing loss (0x72740 / 0x72D74): L5DAB4, kinetic 8, clear_speed_all, ground off, NokonokoMode, the wing loss;
     # at its end -> 10
-    en('pt_wl_en', 8, 0, 17, 0, pre="bl pt_hop6\nbl f_anone", extra="bl h_clear\nmr r3, r31\nbl pt_dewing")
+    en('pt_wl_en', 8, 0, 17, 0, pre="bl pt_hop6\nbl f_anone", extra="bl h_clear\nli r4, 0\nli r5, 1\nbl h_vsetr\nmr r3, r31\nbl pt_dewing")
     st('pt_wl_up', "bl h_end\ncmpwi r3, 0\nbeq.far epi\nli r4, 10\nb go")
     # 12 walk (0x732A4 / 0x73898): kinetic 1, Walk loop; the search (V0 / V1 out): V0 = group var + 1's interval,
     # search_target(var + 1): found -> face it, -> 14; a wall (or var 3 and a ledge) -> 13; off the ground -> 10;
@@ -6867,9 +6943,7 @@ def code_h(D):
         stfs f1, 0x10(r1)
         mr r3, r31
         lwz r4, 0x%(P63)X(r30)
-        lwz r5, 0xC(r31)
-        andi. r5, r5, 1
-        xori r5, r5, 1
+        li r5, %(SHV)d
         addi r6, r1, 8
         addi r7, r1, 0x14
         lis r12, 0x%(CH)04X
@@ -6878,8 +6952,15 @@ def code_h(D):
         li r9, -1
         li r10, -1
     """ % pt + call(CREATE_THROW) + """
+        lis r0, 0x%(NONE)04X
+        cmpw r3, r0
+        beq ptsh_n
+        mr r3, r31
+        li r4, 0
+        bl h_whole
+    ptsh_n:
         lwz r4, 0x%(RM)X(r30)
-        b go""" % dict(RM=CF['REMOVE']))
+        b go""" % dict(RM=CF['REMOVE'], NONE=ITEM_NONE >> 16))
     # slot 20 (the 3DS's 21, 0x726BC): var 0 / 1 => 9 (the wing loss), else => 19 (the shell)
     st('pt_tread', "lwz r0, 0xC(r31)\nli r4, 9\ncmpwi r0, 2\nblt pt_tgo\nli r4, 19\npt_tgo:\nbl h_chgi")
     # slot 69 (0x73C00): a hit that does not kill: var 0 / 1 lose the wings (no state change); returns 0 (the
@@ -6888,7 +6969,443 @@ def code_h(D):
     # slots 64-67 by variation: winged 2 / 1 / 1 / 8, walking 12 / 10 / 10 / 20
     for k, a_, b_ in ((64, 2, 12), (65, 1, 10), (66, 1, 10), (67, 8, 20)):
         H.asm("pt_%d:\nlwz r0, 0xC(r3)\nli r3, %d\ncmpwi r0, 2\nbltlr\nli r3, %d\nblr" % (k, a_, b_))
+    code_vis(H, st, call)
     return H
+
+
+BO_MGR = 0x102F6C30                  # [BO_MGR] = the BattleObjectManager
+FIND_BO = 0x02BF2108                 # BattleObjectManager::find_battle_object(mgr, &out {object, vt}, id, bool)
+BO_IS_NULL = 0x02BEF50C              # BattleObjectAccessor::is_null(&out)
+ITEM_STATUS = 0x38E4                 # Item: [+0x38E4] +0x48 the status kind (0x0302DDC0; the 3DS [+0x3890] +0x48)
+MM_IS_VALID = 0x032FF640             # model handle is_valid (id != -1 and model != 0)
+MM_SET_MESH = 0x032FF6B4             # set_mesh_visibility_by_index(handle, mesh, bool) -> 0x034232FC(model, mesh, bool, 0)
+MM_SET_VIS = 0x164                   # ModelModule vt: set_visibility(bool) 0x02007728 (3DS Behavior::set_visibility)
+MOT_KIND = 0x38                      # MotionModule (acc+0x30F0) +0x38: the motion playing (getter 0x02C64C08)
+BLINK_N = 0x194                      # Waddle Doo's blink counter (3DS +0x194); +0x198 (half) the phase count (+0x198),
+BLINK_F = 0x19B                      # +0x19B the blinking flag (+0x19C); unused by every other kind
+WD_LR_LEFT = 0xBF800000              # posture lr -1.0 (3DS 0x5D0F0: lr + 0x40800000 == 0)
+
+
+def code_vis(H, st, call):
+    """step 2i: the mesh switch (h_vis / h_vset / h_vdef / u_vis) and every 3DS set_mesh_visibility /
+    set_node_visibility / set_visibility call of the ported kinds (docs/smash-run-port.md "Step 2i").
+
+    Interface (for the next kinds, e.g. Pooka): put the kind in VMT / NUD_MESHES / VIS_DEFAULT (its cfg word VIS then
+    points at its table), then from any code with r3 = the behaviour:
+      bl h_vis     r4 = 3DS vmt index, r5 = 0 / 1 (Behavior::set_mesh_visibility; nothing for a kind without a table,
+                   an index past the table, no model or ModelModule +8 == 8)
+      bl h_vset    r4 = mask of visible entries, r5 = mask of the entries to set (bit i = vmt index i)
+      bl h_vdef    the model's default (VIS_DEFAULT) on every entry, the blink words zeroed (call it from start)
+      bl h_whole   r4 = 0 / 1: the whole model (Behavior::set_visibility)
+    All keep r13-r31 / f14-f31; inside st() bodies r31 is the behaviour (h_visr / h_vsetr take r4 / r5 only).
+    MAT_VIS kinds need no call: u_vis (every update, from u_pend) sets the playing motion's entries."""
+    d = dict(VIS=CF['VIS'], MVIS=CF['MVIS'], MK=MOT_KIND, VSL=MM_SET_VIS, BN=BLINK_N, BN4=BLINK_N + 4, BF=BLINK_F)
+    H.asm("""
+    h_visr:
+        mr r3, r31
+    h_vis:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stmw r28, 0x10(r1)
+        lwz r12, 0x168(r3)
+        lwz r28, 0x%(VIS)X(r12)
+        cmpwi r28, 0
+        beq hv_out
+        lwz r0, 0(r28)
+        cmplw r4, r0
+        bge hv_out
+        slwi r0, r4, 2
+        add r29, r28, r0
+        lwz r29, 8(r29)
+        mr r30, r5
+        lwz r12, 0(r3)
+        lwz r31, 0x3118(r12)
+        cmpwi r31, 0
+        beq hv_out
+        lwz r0, 8(r31)
+        cmpwi r0, 8
+        beq hv_out
+        addi r3, r31, 4
+    """ % d + call(MM_IS_VALID) + """
+        cmpwi r3, 0
+        beq hv_out
+    hv_loop:
+        rlwinm r4, r29, 8, 24, 31
+        cmpwi r4, 0xFF
+        beq hv_out
+        addi r3, r31, 4
+        mr r5, r30
+    """ + call(MM_SET_MESH) + """
+        slwi r29, r29, 8
+        ori r29, r29, 0xFF
+        b hv_loop
+    hv_out:
+        lmw r28, 0x10(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+    h_vsetr:
+        mr r3, r31
+    h_vset:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stmw r28, 0x10(r1)
+        mr r31, r3
+        mr r29, r4
+        mr r28, r5
+        lwz r12, 0x168(r31)
+        lwz r12, 0x%(VIS)X(r12)
+        cmpwi r12, 0
+        beq hv_out
+        lwz r0, 0(r12)
+        li r11, 1
+        slw r11, r11, r0
+        addi r11, r11, -1
+        and r28, r28, r11
+        li r30, 0
+    hs_loop:
+        srw r0, r28, r30
+        cmpwi r0, 0
+        beq hv_out
+        andi. r0, r0, 1
+        beq hs_next
+        mr r3, r31
+        mr r4, r30
+        srw r5, r29, r30
+        andi. r5, r5, 1
+        bl h_vis
+    hs_next:
+        addi r30, r30, 1
+        b hs_loop
+    h_vdef:
+        li r0, 0
+        stw r0, 0x%(BN)X(r3)
+        stw r0, 0x%(BN4)X(r3)
+        lwz r12, 0x168(r3)
+        lwz r12, 0x%(VIS)X(r12)
+        cmpwi r12, 0
+        beqlr
+        lwz r4, 4(r12)
+        li r5, -1
+        b h_vset
+    h_whole:
+        lwz r3, 0(r3)
+        lwz r3, 0x3118(r3)
+        cmpwi r3, 0
+        beqlr
+        lwz r12, 0(r3)
+        lwz r12, 0x%(VSL)X(r12)
+        mtctr r12
+        bctr
+    u_vis:
+        lwz r12, 0x168(r31)
+        lwz r11, 0x%(MVIS)X(r12)
+        cmpwi r11, 0
+        beqlr
+        lwz r10, 0(r31)
+        lwz r10, 0x30F0(r10)
+        cmpwi r10, 0
+        beqlr
+        lwz r10, 0x%(MK)X(r10)
+        lwz r0, 0(r11)
+        cmplw r10, r0
+        bgelr
+        slwi r10, r10, 2
+        add r11, r11, r10
+        lwz r4, 4(r11)
+        mr r3, r31
+        li r5, -1
+        b h_vset
+    """ % d)
+
+    def wrap(label, target, after, before=''):
+        """a state / slot function: `before`, the ported function (r3 this, r4 its argument), then `after`"""
+        st(label, "%s\nmr r3, r31\nmr r4, r29\nbl %s\n%s" % (before, target, after))
+
+    vset = lambda m, c: "li r4, 0x%X\nli r5, 0x%X\nbl h_vsetr" % (m, c)  # noqa: E731
+    vdef = "mr r3, r31\nbl h_vdef"
+    # Ghos (vmt 0 damage, 1 normal; ModelModulePartialImpl::set_node_visibility(i, b) = the vmt switch). start
+    # 0x109C0: normal on, damage off (0x10A7C / 0x10A94); 2 stun enter 0x10AD0: normal off, damage on (0x10B50 /
+    # 0x10B68); its update 0x10EE4 when V2 runs out: normal on, damage off (0x10F3C / 0x10F54); 4 dead enter 0x10E84:
+    # normal off, damage on (0x10EC0 / 0x10EDC)
+    wrap('gh_start', 'f_ghos_start', '', before=vdef + "\n" + vset(2, 3))
+    wrap('gh2_en', 'f_g2_en', vset(1, 3))
+    wrap('gh2_up', 'f_g2_up', "lwz r0, 0x%X(r31)\ncmpwi r0, 0\nbgt.far epi\n%s" % (V(2), vset(2, 3)))
+    wrap('gh_dead_en', 'g_dead_en', vset(1, 3))
+    # Tiki Buzz (0 Damage1, 1 Damage2, 2 Normal). slot 11 (Wii U 10) 0x7818C: notify_on_damage, then Damage1 on,
+    # Damage2 / Normal off; slot 60 0x781CC: Normal only; 3 fly enter 0x78668: Normal only (0x78778..0x78798); 10
+    # stomp enter 0x77F04: Damage2 only (0x77FD8..0x77FF8); 11 gone enter 0x77E50: set_visibility(0) (0x77EA0)
+    wrap('tk_start', 'f_tiki_start', '', before=vdef)
+    wrap('tk_fly_en', 't_fly_en', vset(4, 7))
+    wrap('tk_stomp_en', 't_stomp_en', vset(2, 7))
+    wrap('tk_gone_en', 't_gone_en', "mr r3, r31\nli r4, 0\nbl h_whole")
+    st('tk_dmg', "mr r3, r31\nmr r4, r29\n" + call(BI_NOTIFY_DMG) + "\nmr r28, r3\n" + vset(1, 7) + "\nmr r3, r28")
+    st('tk_60', vset(4, 7))
+    # Spiny (0 togezo, 1 paipo, the egg). start 0x36CE0: var != 0 the Spiny (paipo off, togezo on: 0x36D54 / 0x36D64),
+    # var 0 the egg (0x36D94 / 0x36DA4); the hatch L622F4 (tgv_hatch, from tg_hatch): node 2's rotation zeroed
+    # (set_node_rotate(2, 0) 0x62354 + the model's dirty call), paipo off, togezo on (0x6237C / 0x62394); slot 60
+    # 0x376A4: an egg (var != 1) hatches => 5 (the 3DS's vt+0x124: change_state_interrupt)
+    st('tgv_start', vdef + "\nlwz r0, 0xC(r31)\nli r4, 2\ncmpwi r0, 0\nbeq tgvs_s\nli r4, 1\ntgvs_s:\nli r5, 3\n"
+       "bl h_vsetr\nmr r3, r31\nmr r4, r29\nbl tg_start")
+    st('tgv_hatch', """
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0xC(r1)
+        stw r0, 0x10(r1)
+        lwz r3, 0(r31)
+        lwz r3, 0x30F0(r3)
+        li r4, 2
+        addi r5, r1, 8
+        li r6, 0
+    """ + call(SET_NODE_ROT) + """
+        cmpwi r3, 0
+        beq tgvh_v
+        lwz r3, 0(r31)
+        lwz r3, 0x3118(r3)
+        lwz r12, 0(r3)
+        lwz r12, 0x%X(r12)
+        mtctr r12
+        bctrl
+    tgvh_v:
+    """ % MODEL_NODE_DIRTY + vset(1, 3))
+    st('tg_60', "lwz r0, 0xC(r31)\ncmpwi r0, 1\nbeq.far epi\nbl tg_hatch\nli r4, 5\nb goi")
+    # Paratroopa / Koopa (0 the wing). start 0x7234C: walking (var 2 / 3) the wing off (0x724A8); the wing loss
+    # (pt_dewing: slot 69 0x73C00's 0x73C3C, slot 20 -> 9) and 9's enter 0x72740 (0x727BC): the wing off; the shell's
+    # end 0x73A24: the thrown item made (not 0x50000000) -> set_visibility(0) (0x73BC8). Not ported: slot 13
+    # (0x72DB0, the capture motion) and state 21's set_visibility(1) (0x734C8; no code enters 21)
+    st('ptv_start', vdef + "\nlwz r0, 0xC(r31)\ncmpwi r0, 2\nblt ptvs_g\n" + vset(0, 1) +
+       "\nptvs_g:\nmr r3, r31\nmr r4, r29\nbl pt_start")
+    # Waddle Dee (0 Cparasol, 1 Larm, 2 Lparasol, 3 Rarm, 4 Rparasol, 5 damage, 6 normal). wd_show = 0x5D04C, called
+    # by start 0x7B9F0, every state's enter (1-7) and slot 51 0x5D034 (sync_lr_and_direction, then it): variation 2 /
+    # 3 both arms, no parasol, and unless the motion is 0 (Damage) the normal face; 0 / 1 by the motion (MotionModule
+    # +0x38; 3DS +0x40) and lr (L = lr -1.0): Jump 9 / Landing 10 / Walk 13 Rarm !L, Rparasol L, Larm L, Lparasol !L;
+    # Turn 12 the other way round; ParasolFall 11 the centre parasol, no arm; the normal face. Not ported: its
+    # +0x1EC (8 / 9) and the acc+0x88 module's vt+0x34 calls (the parasol's node), the parasol variations' sway
+    # (slot 55 0x7C480: node scale, not a mesh)
+    st('wd_show', """
+        lwz r12, 0(r31)
+        lwz r12, 0x30F0(r12)
+        lwz r6, 0x%(MK)X(r12)
+        lwz r0, 0xC(r31)
+        cmplwi r0, 1
+        ble wds_par
+        li r4, 0x0A
+        li r5, 0x1F
+        cmpwi r6, 0
+        beq wds_set
+        li r4, 0x4A
+        li r5, 0x7F
+        b wds_set
+    wds_par:
+        lwz r12, 0(r31)
+        lwz r12, 0x311C(r12)
+        lwz r7, 0x60(r12)
+        lis r8, 0x%(LH)04X
+        li r5, 0x7F
+        li r4, 0x41
+        cmpwi r6, 11
+        beq wds_set
+        li r9, 0x52
+        li r10, 0x4C
+        cmpw r7, r8
+        beq wds_l
+        li r9, 0x4C
+        li r10, 0x52
+    wds_l:
+        mr r4, r10
+        cmpwi r6, 12
+        beq wds_set
+        mr r4, r9
+        cmpwi r6, 9
+        beq wds_set
+        cmpwi r6, 10
+        beq wds_set
+        cmpwi r6, 13
+        bne.far epi
+    wds_set:
+        bl h_vsetr""" % dict(MK=MOT_KIND, LH=WD_LR_LEFT >> 16))
+    show = "mr r3, r31\nbl wd_show"
+    for i, lab in ((1, 'g_fall_en'), (2, 'd_para_en'), (3, 'g_land_en'), (4, 'd_walk_en'), (5, 'g_turn_en'),
+                   (6, 'd_jump_en'), (7, 'g_dead_en')):
+        wrap('wd%d_en' % i, lab, show)
+    wrap('wd_start', 'w_start', show)
+    orig51 = VT_WORDS[0][(0xC + 8 * 51) // 4] if VT_WORDS[0] else 0
+    st('wd_51', "mr r3, r31\nmr r4, r29\n" + call(orig51) + "\n" + show)
+    # the parasol drop 0x5CF90 (slots 69 / 71 / 13): var 0 / 1 -> var + 2 and initialize (vt+0xA0: slot 40); not
+    # ported: generate_article(0) (the dropped parasol), the acc+0x88 calls, W+0x3C = +0x1E0. The damage face
+    # 0x5CF18: both arms, no parasol, damage on, normal off. Slot 69 0x7C938: drop, damage face, 0; slot 71 0x7C460:
+    # drop, damage face, BehaviorImpl::notify_on_death; slot 60 0x7C5FC: normal on, damage off
+    st('wd_drop', "lwz r3, 0xC(r31)\ncmplwi r3, 1\nbgt.far epi\naddi r3, r3, 2\nstw r3, 0xC(r31)\nmr r3, r31\n"
+       "bl w_init")
+    wdmg = "mr r3, r31\nbl wd_drop\n" + vset(0x2A, 0x7F)
+    st('wd_69', wdmg + "\nli r3, 0")
+    st('wd_71', wdmg + "\nmr r3, r31\nmr r4, r29\n" + call(NOTIFY_DEATH))
+    st('wd_60', vset(0x40, 0x60))
+    # Waddle Doo (0 blink1, 1 blink2, 2 normal, 3 tear). slot 55 0x7D8A8 (every frame, after the state's update):
+    # not blinking -> the counter (+0x194) - 1; in the 3DS's state 10 (dead: ours 6) the tear and open eyes, the flag
+    # off; in 3 (walk): the counter out -> random_range(P5 30, P6 50) frames, the phase count 0, blinking; while
+    # blinking, phase = ++count / P7 (4): 0 open, 1 blink1, 2 blink2, 3 blink1, 4 open, 5 open and the flag off;
+    # other states: open eyes, the flag off. Slots 56 0x7E090 / 57 0x7DFF0: tear and open eyes; 58 0x7E040: open
+    d = dict(BN=BLINK_N, BP=BLINK_N + 4, BF=BLINK_F, P5=P(5), P6=P(6), P7=P(7))
+    st('do_55', """
+        lbz r0, 0x%(BF)X(r31)
+        cmpwi r0, 0
+        bne do55_s
+        lwz r3, 0x%(BN)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(BN)X(r31)
+    do55_s:
+        lwz r0, 4(r31)
+        li r3, 0
+        cmpwi r0, 6
+        beq do55_dead
+        cmpwi r0, 3
+        beq do55_walk
+        stb r3, 0x%(BF)X(r31)
+        b do55_open
+    do55_dead:
+        stb r3, 0x%(BF)X(r31)
+        li r4, 0xC
+        b do55_set
+    do55_walk:
+        lbz r0, 0x%(BF)X(r31)
+        cmpwi r0, 0
+        bne do55_ph
+        lwz r0, 0x%(BN)X(r31)
+        cmpwi r0, 0
+        bgt do55_open
+        lwz r3, 0x%(P5)X(r30)
+        lwz r4, 0x%(P6)X(r30)
+        bl h_rand
+        stw r3, 0x%(BN)X(r31)
+        li r0, 0
+        sth r0, 0x%(BP)X(r31)
+        li r0, 1
+        stb r0, 0x%(BF)X(r31)
+    do55_ph:
+        lhz r3, 0x%(BP)X(r31)
+        addi r3, r3, 1
+        sth r3, 0x%(BP)X(r31)
+        lwz r4, 0x%(P7)X(r30)
+        divw r3, r3, r4
+        cmplwi r3, 5
+        bgt.far epi
+        blt do55_tab
+        li r0, 0
+        stb r0, 0x%(BF)X(r31)
+        b do55_open
+    do55_tab:
+        li r4, 4
+        cmpwi r3, 0
+        beq do55_set
+        cmpwi r3, 4
+        beq do55_set
+        li r4, 1
+        cmpwi r3, 2
+        bne do55_set
+        li r4, 2
+        b do55_set
+    do55_open:
+        li r4, 4
+    do55_set:
+        li r5, 0xF
+        bl h_vsetr""" % d)
+    # Ghos's slot 31 (0x113F0; hit r4: +0x14 the AttackData, +0x20 the attacker record: +0x18 its battle object id,
+    # +0x1C its category byte, the Wii U record's ctor 0x02C0EC80 defaults them to 0x50000000 / 6 as the 3DS):
+    # category 1 (a weapon): find_battle_object 0x02BF2108([0x102F6C30], &out, id, 0), not is_null 0x02BEF50C and
+    # is_weapon_as_fighter(kind = object +4) -> immune; 4 (an item): ItemManager::find_item 0x030563AC, held
+    # (Item::is_haved(0): status ([item +0x38E4] +0x48, getter 0x0302DDC0) 2) and its kind (+4) not 0x12 curryshot /
+    # 0x24 fireflower -> immune; any other: the AttackData +0x4C byte. Immune: GH_IMM = 1, the SoundModule's (acc+0x30F4,
+    # the 3DS acc+0x3074) flag +0x5AD (the 3DS +0x5A2; setter vt+0x84 0x026AB6E8) = 0; else GH_IMM = 0, the flag 1.
+    # is_weapon_as_fighter (3DS 0x7B4368, no Wii U twin found): kinds 0x179 / 0x17A (Bayonetta's wickedweavearm /
+    # leg) and 0x180-0x182 (Corrin's dragonhand / spearhand / waterdragon), the same numbers in the Wii U's weapon
+    # table 0x10419C18. Not ported: play_se(15); is_haved's second test (the 3DS's module +0x38D8 vt+0x2C(4))
+    H.asm("""
+    gh_31:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r28, 0x20(r1)
+        mr r31, r3
+        lwz r30, 0x14(r4)
+        lwz r29, 0x20(r4)
+        li r28, 0
+        cmpwi r29, 0
+        beq g31_set
+        lbz r0, 0x1C(r29)
+        cmpwi r0, 1
+        beq g31_wpn
+        cmpwi r0, 4
+        beq g31_item
+        cmpwi r30, 0
+        beq g31_set
+        lbz r0, 0x4C(r30)
+        cmpwi r0, 0
+        beq g31_set
+        b g31_imm
+    g31_wpn:
+        lis r3, 0x%(BOH)04X
+        lwz r3, %(BOL)d(r3)
+        addi r4, r1, 8
+        lwz r5, 0x18(r29)
+        li r6, 0
+    """ % dict(BOH=ha(BO_MGR), BOL=sx(BO_MGR)) + call(FIND_BO) + """
+        addi r3, r1, 8
+    """ + call(BO_IS_NULL) + """
+        cmpwi r3, 0
+        bne g31_set
+        lwz r3, 8(r1)
+        lwz r3, 4(r3)
+        cmpwi r3, 0x179
+        beq g31_imm
+        cmpwi r3, 0x17A
+        beq g31_imm
+        addi r0, r3, -0x180
+        cmplwi r0, 2
+        bgt g31_set
+        b g31_imm
+    g31_item:
+        lis r3, 0x%(IMH)04X
+        lwz r3, %(IML)d(r3)
+        lwz r4, 0x18(r29)
+    """ % dict(IMH=ha(ITEM_MGR), IML=sx(ITEM_MGR)) + call(FIND_ITEM) + """
+        cmpwi r3, 0
+        beq g31_set
+        lwz r12, 0x%(IST)X(r3)
+        lwz r0, 0x48(r12)
+        cmpwi r0, 2
+        bne g31_set
+        lwz r0, 4(r3)
+        cmpwi r0, 0x12
+        beq g31_set
+        cmpwi r0, 0x24
+        beq g31_set
+    g31_imm:
+        li r28, 1
+    g31_set:
+        stb r28, 0x%(IMM)X(r31)
+        lwz r3, 0(r31)
+        lwz r3, 0x30F4(r3)
+        cmpwi r3, 0
+        beq g31_out
+        xori r4, r28, 1
+        lwz r12, 0(r3)
+        lwz r12, 0x84(r12)
+        mtctr r12
+        bctrl
+    g31_out:
+        lmw r28, 0x20(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+    """ % dict(IST=ITEM_STATUS, IMM=GH_IMM))
+    st('do_56', vset(0xC, 0xF))
+    st('do_57', vset(0xC, 0xF))
+    st('do_58', vset(0x4, 0xF))
 
 
 def area_code(D):

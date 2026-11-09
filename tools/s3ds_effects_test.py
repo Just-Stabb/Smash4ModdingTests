@@ -3,8 +3,10 @@
 validate: the game's loader rules), has the 3DS file's sets in order with their emitters, and every emitter's
 written fields read back (as the game reads them, tools/ptcl.py) as the 3DS values: timing, life, rate, speeds,
 direction, gravity, air resistance, volume, emitter transform, scale (base, random, ratios, sections), alpha
-(3 keys, sections as fractions), colour types / sections / scale, the colour keys (x the texture's tint),
-rotation, UV scale / scroll (V negated), blend, follow and particle type; the texture is the 3DS one's shape;
+(3 keys, sections as fractions), colour types / sections / scale, the colour mode (the 3DS combiner, the pixel
+program run on the CPU), the colour keys (the texture's tint folded in for that mode: colour 1 untinted),
+rotation, UV scale / scroll (V negated), blend, follow and particle type; the texture is the 3DS one's shape
+(no alpha: the colour's level, once);
 the .efc has the 3DS entries (models left out).
 
   python3 tools/s3ds_effects_test.py SRC_ROOT VANILLA_DIR [KIND...]
@@ -25,6 +27,36 @@ import s3ds_effects as se  # noqa: E402
 import vfxb_to_ptcl as vt  # noqa: E402
 
 FAILS = []
+_MODES = {}
+
+
+def program_mode(p, si):
+    """the colour mode (0-3) shader si's pixel program draws, run on the CPU (tools/latte_exec.py) with
+    colour 0, colour 1 and a flat texture; None when the program isn't a one-texture colour 0 / 1 one"""
+    import eft_pixel
+    import latte_exec
+    b = bytes(p.shader_binary(si))
+    key = hash(b)
+    if key not in _MODES:
+        lay = eft_pixel.layout(b)
+        mode = None
+        if lay is not None and lay.get('c1') is not None and 'uv1' not in lay:
+            c0, c1, t = np.array([0.2, 0.4, 0.6, 1.0]), np.array([0.5, 0.3, 0.1, 1.0]), 0.5
+            inp = np.zeros((1, lay['regs'], 4), np.float32)
+            inp[0, lay['c0']] = c0
+            inp[0, lay['c1']] = c1
+            inp[0, lay['uv'][0]] = (0.5, 0.5, 0, 0)
+            if lay.get('vc') is not None:
+                inp[0, lay['vc']] = 1.0
+            cb9 = np.zeros((16, 4), np.float32)
+            cb9[8] = (1, 0, 0, 0)
+            tex = np.full((4, 4, 4), t, np.float32)
+            rgb = latte_exec.PixelProgram(b).run(inp, {9: cb9}, {0: (tex, 1, 1)})[0, :3]
+            want = {0: c0[:3], 1: c0[:3] * t, 2: c1[:3] + (c0[:3] - c1[:3]) * t, 3: c0[:3] * t + c1[:3]}
+            hits = [m for m, v in want.items() if np.abs(rgb - v).max() < 2e-3]
+            mode = hits[0] if len(hits) == 1 else None
+        _MODES[key] = mode
+    return _MODES[key]
 
 
 def check(cond, what):
@@ -54,9 +86,9 @@ def emitter_checks(tag, p, w, e):
         ('emitter_scale', g(0x208, '3f')), ('emitter_rotation', g(0x214, '3f')),
         ('emitter_translation', g(0x220, '3f')), ('scale', g(0x4E4, '2f')),
         ('scale_init_ratio', g(0x4EC, '2f')), ('scale_diff21', g(0x4F4, '2f')), ('scale_diff32', g(0x4FC, '2f')),
-        ('scale_sections', g(0x4D8, '2i')), ('alpha_init', g(0x4BC, 'f')), ('alpha_diff21', g(0x4C0, 'f')),
-        ('alpha_diff32', g(0x4C4, 'f')), ('alpha_section1', g(0x4C8, 'i') / 100.0),
-        ('alpha_section2', g(0x4CC, 'i') / 100.0), ('color_section1', g(0x490, '2i')),
+        ('scale_sections', tuple(max(v, 0) for v in g(0x4D8, '2i'))), ('alpha_init', g(0x4BC, 'f')), ('alpha_diff21', g(0x4C0, 'f')),
+        ('alpha_diff32', g(0x4C4, 'f')), ('alpha_section1', max(g(0x4C8, 'i'), 0) / 100.0),
+        ('alpha_section2', max(g(0x4CC, 'i'), 0) / 100.0), ('color_section1', g(0x490, '2i')),
         ('color_section2', g(0x498, '2i')), ('color_section3', g(0x4A0, '2i')), ('color_scale', g(0x4B8, 'f')),
         ('rotation_init', g(0x508, '3f')), ('rotation_random', g(0x514, '3f')),
         ('rotation_velocity', g(0x520, '3f')), ('rotation_attenuation', g(0x538, 'f')),
@@ -73,17 +105,34 @@ def emitter_checks(tag, p, w, e):
           f(w, 'one_time') == (0 if end >= se.FOREVER else 1), '%s: end frame / one-time' % tag)
     check(struct.unpack_from('>I', w, vt.FOLLOW)[0] == g(0x190, 'I'), '%s: follow' % tag)
     check(close(struct.unpack_from('>2f', w, 0x514), (g(0x374, 'f'), -g(0x378, 'f'))), '%s: UV scroll' % tag)
-    # colour keys: the 3DS keys x the texture's tint (a common factor per channel)
+    # no negative section (the 3DS's -127, no first section: eft took the key's step backwards from it)
+    check(min(f(w, 'scale_sections')) >= 0 and f(w, 'alpha_section1') >= 0, '%s: negative section' % tag)
+    # colour mode: the 3DS combiner, and the emitter's pixel program draws it (run on the CPU)
+    comb = g(se.COMBINER, 'I')
+    mode = struct.unpack_from('>I', w, vt.COLOR_MODE)[0]
+    if comb in (0, 1, 2, 3):
+        check(mode == comb, '%s: colour mode %d != 3DS combiner %d' % (tag, mode, comb))
+        drawn = program_mode(p, f(w, 'shader_index'))
+        check(drawn in (None, mode), '%s: pixel program draws colour mode %s, not %d' % (tag, drawn, mode))
+    # colour keys: the 3DS keys with the texture's tint folded in for that mode (se.tinted_keys)
     img = e['textures'][0]
     if img is not None:
-        rgba = img.astype(np.float32) / 255.0
-        if e['formats'][0] in se.NO_ALPHA:
-            rgba[..., 3] = rgba[..., :3].max(-1)
-        _shape, tint = se.shape_texture(rgba)
+        shape, tint = se.texture_shape(img, e['formats'][0])
+        k0, k1 = se.tinted_keys(mode, [g(0x430, '3f')], [g(0x460, '3f')], tint)
         keys = np.array(f(w, 'color0_keys')).reshape(8, 4)[0, :3]
-        check(close(keys, np.array(g(0x430, '3f')) * tint, 1e-3), '%s: colour 0 key 0' % tag)
+        check(close(keys, np.array(k0[0]), 1e-3), '%s: colour 0 key 0' % tag)
+        keys1 = np.array(f(w, 'color1_keys')).reshape(8, 4)[0, :3]
+        check(close(keys1, np.array(k1[0]), 1e-3), '%s: colour 1 key 0 (untinted)' % tag)
         back = p.decode_texture(w, 0)
         check(back is not None and back.shape[0] >= 8, '%s: texture' % tag)
+        if back is not None and e['formats'][0] in se.NO_ALPHA and back.shape[:2] == shape.shape:
+            # no alpha: the shape is the colour's level, once (not level^2: Furiijio's mist, effects v3)
+            err = np.abs(back[..., 0] / 255.0 - shape).mean()
+            check(err < 0.03, '%s: shape not the texture level (mean error %.3f)' % (tag, err))
+            if e['formats'][0] == 12 and shape.max() > 0.5:
+                lv = np.asarray(img, np.float32)[..., :3].max(-1) / 255.0
+                check(np.abs(back[..., 0] / 255.0 - lv).mean() <= np.abs(back[..., 0] / 255.0 - lv * lv).mean()
+                      + 1e-3, '%s: ETC1 shape nearer level^2 than the level' % tag)
     typ = g(0x328, 'I')
     want_t = {5: 3, 6: 3, 7: 0}.get(typ, typ)
     if f(w, 'particle_type') != want_t:

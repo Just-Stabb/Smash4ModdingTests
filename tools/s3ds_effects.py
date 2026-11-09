@@ -40,6 +40,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import eft_pixel  # noqa: E402
 import ptcl  # noqa: E402
 import s3ds_model as sm  # noqa: E402
 import vfxb_to_ptcl as vt  # noqa: E402
@@ -52,6 +53,40 @@ SURFACE = {18: 13, 19: 12, 20: 6, 21: 10, 22: 11, 23: 7, 24: 8, 25: 9, 26: 5, 27
 NO_ALPHA = {12, 6, 10, 7, 1, 3}               # ETC1, HILO8, L4, L8, RGB8, RGB565: alpha from the shape
 SHAPE_SEL = vt.SHAPE_SEL
 BC4 = 0x34
+COMBINER = 0x194                              # 3DS colour combiner: the Wii U's colour modes (0x314)
+
+
+def texture_shape(img, fmt):
+    """(shape [h, w] 0..1, tint rgb) of a 3DS texture for the BC4-shape templates (shape replicated: the
+    template draws its colour from colour 0 / 1 by it and its alpha as it). A format without alpha (ETC1, L8,
+    RGB565...): the 3DS draws the colour's level as the alpha too, so the shape is that level (the colour's
+    projection on the tint), once: alpha = max(rgb) and then x the projection drew level^2 (Furiijio's mist
+    at a quarter where the 3DS has a half; the vanilla Wii U copies of the fighters' ETC1 textures hold the
+    level: 104 of 134 matched texture pairs). With alpha: alpha x the projection (xv2_to_ptcl.shape_texture)"""
+    rgba = img.astype(np.float32) / 255.0
+    if fmt not in NO_ALPHA:
+        return shape_texture(rgba)
+    rgba[..., 3] = rgba[..., :3].max(-1)                  # the weights of the tint
+    _s, tint = shape_texture(rgba)
+    return np.clip(rgba[..., :3] @ tint / float(tint @ tint), 0, 1), tint
+
+
+def tinted_keys(mode, keys0, keys1, tint):
+    """the colour 0 / 1 keys that draw the 3DS colour of combiner MODE with the texture's tint folded into
+    them (the shape carries the level only): 0 colour 0 (no texture colour); 1 colour 0 x texture; 2
+    colour 1 + (colour 0 - colour 1) x texture -> colour 0' = colour 1 + (colour 0 - colour 1) x tint,
+    colour 1 as is (exact); 3 colour 0 x texture + colour 1 -> colour 0 x tint, colour 1 as is. Colour 1
+    was x tint too up to effects v3: Furiijio's mist (colour 1 deep blue) drew a darker blue than the 3DS"""
+    t = np.asarray(tint, float)
+    if mode == 0:
+        k0 = [np.asarray(k, float) for k in keys0]
+    elif mode == 2:
+        k0 = [np.asarray(keys1[min(i, len(keys1) - 1)], float) +
+              (np.asarray(k, float) - np.asarray(keys1[min(i, len(keys1) - 1)], float)) * t
+              for i, k in enumerate(keys0)]
+    else:
+        k0 = [np.asarray(k, float) * t for k in keys0]
+    return [tuple(float(c) for c in k) for k in k0], [tuple(float(c) for c in k) for k in keys1]
 
 # (3DS offset, struct format (little endian), Wii U field name or offset, note). Offsets read off the corpus
 # (see the module doc): the matches with the shared emitters' Wii U fields given as e.g. 0.99 (share of pairs)
@@ -265,10 +300,7 @@ def convert_emitter(p, templates, e, notes):
     if img is None:
         img = np.full((16, 16, 4), 255, np.uint8)
         notes.append('no texture: white')
-    rgba = img.astype(np.float32) / 255.0
-    if e['formats'][0] in NO_ALPHA:
-        rgba[..., 3] = rgba[..., :3].max(-1)
-    shape, tint = shape_texture(rgba)
+    shape, tint = texture_shape(img, e['formats'][0])
     h, w = shape.shape
     tw, th = pow2(w, hi=256), pow2(h, hi=256)
     if (tw, th) != (w, h):
@@ -299,8 +331,12 @@ def convert_emitter(p, templates, e, notes):
                 struct.pack_into('>' + c, em, wo + size * j, x)
     p.set_field(em, 'volume_sweep_start', u32_angle(g[0x260]))
     p.set_field(em, 'volume_sweep_param', u32_angle(g[0x264]))
-    p.set_field(em, 'alpha_section1', g[0x4C8] / 100.0)
-    p.set_field(em, 'alpha_section2', g[0x4CC] / 100.0)
+    # a first section of -127 (689 3DS emitters: no first section; the paired Wii U fighter emitters have 0 there,
+    # 86 + 37 + 20 + ... of them) is 0: a negative one made eft's emission take the key's step backwards (cross_f
+    # 0x04A5D964: the start value init - diff21 / section)
+    p.set_field(em, 'alpha_section1', max(g[0x4C8], 0) / 100.0)
+    p.set_field(em, 'alpha_section2', max(g[0x4CC], 0) / 100.0)
+    p.set_field(em, 'scale_sections', [max(v, 0) for v in g[0x4D8]])
     p.set_field(em, 'scale_random', [g[0x4E0], g[0x4E0]])
     p.set_emitter_srt(em, g[0x208], g[0x214], g[0x220])
     struct.pack_into('>I', em, vt.FOLLOW, follow)
@@ -320,20 +356,36 @@ def convert_emitter(p, templates, e, notes):
     if not animated_ptn:
         struct.pack_into('>hh', em, 0x504, 0, 0)
 
-    # ---- colours: the 3 keys, x the texture's tint
-    for track, off, toff in ((0, 0x430, 0x428), (1, 0x460, 0x42C)):
-        keys = [tuple(g[off][4 * k:4 * k + 3]) for k in range(3)]
-        keys = [(*(float(c * t) for c, t in zip(k, tint)), 1.0) for k in keys]
+    # ---- colour mode: the 3DS combiner (the Wii U's colour modes, 0x314: 551 of 581 paired fighter emitters
+    # with 2 have 2, 47 of 58 with 1 have 1, 7 of 14 with 3 have 3). A template drawing another mode gets an
+    # own pixel program (tools/eft_pixel.py) of the 3DS mode: up to effects v3 every emitter drew its
+    # template's (mostly 2, colour 1 + (colour 0 - colour 1) x texture), Furiijio's mist (3: colour 0 x
+    # texture + colour 1) a deep blue, invisible on a blue sky
+    mode = struct.unpack_from('>I', em, vt.COLOR_MODE)[0]
+    want = g[COMBINER]
+    c1_rgb = [float(c) * g[0x4B8] for c in g[0x460][:3]]
+    if want in (0, 1, 2, 3) and want != mode:
+        si = eft_pixel.own_shader(p, p.field(em, 'shader_index'), want, 0, 1.0, c1_const=c1_rgb,
+                                  additive=blend == 1)
+        if si is None:
+            notes.append('colour mode %d drawn as the template\'s %d (no own program for its layout)' % (want, mode))
+        else:
+            struct.pack_into('>I', em, 0x844, si)
+            struct.pack_into('>I', em, vt.COLOR_MODE, want)
+            mode = want
+
+    # ---- colours: the 3 keys, the texture's tint folded in for the colour mode drawn (tinted_keys)
+    keys = [[tuple(g[off][4 * k:4 * k + 3]) for k in range(3)] for off in (0x430, 0x460)]
+    k0, k1 = tinted_keys(mode, keys[0], keys[1], tint)
+    for track, ks, toff in ((0, k0, 0x428), (1, k1, 0x42C)):
+        ks = [(*k, 1.0) for k in ks]
         typ_c = g[toff]
         if typ_c == 2:
-            p.set_color_keys(em, track, keys, 2)
+            p.set_color_keys(em, track, ks, 2)
         elif typ_c == 1:
-            p.set_color_keys(em, track, keys, 1)
+            p.set_color_keys(em, track, ks, 1)
         else:
-            p.set_color_keys(em, track, keys[:1], 0)
-    if g[0x194] == 2 and p.field(em, 'color1_type') is not None and \
-            struct.unpack_from('>I', em, vt.COLOR_MODE)[0] != 2 and any(g[0x460][:3]):
-        notes.append('colour 1 lost: the template has no colour-1 combiner')
+            p.set_color_keys(em, track, ks[:1], 0)
     if p.field(em, 'keyanim_size'):
         p.set_field(em, 'keyanim_size', 0)
     notes += sanitize(p, em)

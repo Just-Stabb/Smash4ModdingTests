@@ -46,6 +46,7 @@ KICK2 = 0x02000008              # vt+0xEC (step 2c: the 3DS's vt+0x74 kick of th
 ATK_MSC = 0x0200000C            # the AttackModule's MSC entry vt+0x334 (step 2c v2: the bear's absolute hit)
 AVT = HEAP + 0x22000
 DONE = 0x02000000               # return address of a run
+VIS_STUB, SOUND_SET = 0x02000060, 0x02000064   # step 2i: ModelModule vt+0x164 / SoundModule vt+0x84 stubs
 CREATES = {0x50: 0x02DD0438, 0x51: 0x02DC7414, 0x52: 0x026B7344, 0x53: 0x026C2E9C, 0x54: 0x026BE944,
            0x55: 0x026BB3E8, 0x56: 0x026C5F80, 0x57: 0x026CF4DC, 0x58: 0x026CBA64, 0x59: 0x026D1DFC,
            0x5A: 0x026D6834, 0x5B: 0x02DDB82C, 0x5E: 0x026E24EC, 0x5F: 0x026D80A0, 0x60: 0x026DB864}
@@ -87,6 +88,7 @@ class Machine:
         self.creates = dict((v, k) for k, v in CREATES.items())
         self.vt = VT_ADDR[0]
         uc.hook_add(UC_HOOK_CODE, self.hook)
+        self.meshes, self.objects = {}, {}     # step 2i: NUD mesh -> visible; battle object id -> object
         # fake modules
         w = self.w32
         w(ACC + 0x30C8, ATKM)
@@ -311,6 +313,27 @@ class Machine:
         elif addr == E.PARAM_LOAD:
             c.append(('load', r(3)))
             self.ret(0x1234)
+        # step 2i: the mesh switch (h_vis: the model handle's is_valid / set_mesh_visibility_by_index; h_whole: the
+        # ModelModule's vt+0x164, VIS_STUB in the fake ModelModules' vtables), Ghos's slot 31 lookups
+        elif addr == W.MM_IS_VALID:
+            self.ret(1)
+        elif addr == W.MM_SET_MESH:
+            c.append(('mesh', r(4), r(5)))
+            self.meshes[r(4)] = r(5)
+            self.ret(1)
+        elif addr == VIS_STUB:
+            c.append(('visible', r(4)))
+            self.ret()
+        elif addr == W.FIND_BO:
+            c.append(('find_bo', r(3), r(5)))
+            self.w32(r(4), self.objects.get(r(5), 0))
+            self.w32(r(4) + 4, 0)
+            self.ret()
+        elif addr == W.BO_IS_NULL:
+            self.ret(0 if self.r32(r(3)) else 1)
+        elif addr == SOUND_SET:
+            c.append(('sound_5ad', r(4)))
+            self.ret()
 
     def stage(self, kind):
         self.w32(F.STAGE_KIND, kind)

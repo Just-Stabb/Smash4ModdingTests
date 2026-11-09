@@ -48,6 +48,7 @@ class M(T.Machine):
         self.w32(ACC + 0x3118, MODEL)            # the ModelModule: vt+0xC4 (a node changed) stubbed
         self.w32(MODEL, MODEL + 0x10)
         self.w32(MODEL + 0x10 + W.MODEL_NODE_DIRTY, NODE_DIRTY)
+        self.w32(MODEL + 0x10 + W.MM_SET_VIS, T.VIS_STUB)     # step 2i: set_visibility(bool)
         self.wf(EN, self.maxhp)
         self.wf(EN + 4, self.maxhp)
 

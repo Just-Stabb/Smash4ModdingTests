@@ -47,6 +47,7 @@ class Machine(T.Machine):
         self.w32(ACC + 0x3118, MODEL)
         self.w32(MODEL, MODEL + 0x40)
         self.w32(MODEL + 0x40 + W.MODEL_NODE_DIRTY, DIRTY)
+        self.w32(MODEL + 0x40 + W.MM_SET_VIS, T.VIS_STUB)     # step 2i: set_visibility(bool)
         self.w32(ACC + 0x30D8, EFFM)
         self.w32(ACC + 0x30D4, DMOD)
         self.w32(DMOD + 8, 1)
