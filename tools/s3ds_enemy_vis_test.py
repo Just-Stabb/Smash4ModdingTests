@@ -93,10 +93,11 @@ def main():
             check(ok and len(diff) > 0, '%s: model.nud hides %s, the rest unchanged (%d bytes differ)'
                   % (k, [V.short(k, n) for n in hidden_all[k]], len(diff)))
             del idx_ranges
-        want = {'waddledee': {'Cparasol', 'Lparasol', 'Rparasol', 'damage'},
-                'waddledoo': {'eye_blink1', 'eye_blink2', 'tear'}, 'kuribo': {'damage'}}
-        check(all({V.short(k, n) for n in hidden_all.get(k, [])} == w for k, w in want.items()),
-              'NUDs: Waddle Dee no parasol / damage face, Waddle Doo no blink / tear, Goomba no damage face')
+        want = {'darios': {'shoot'}, 'pooka': {'body_damage', 'eye_damage'}}
+        check(all({V.short(k, n) for n in hidden_all.get(k, [])} == w for k, w in want.items()) and
+              not set(nk) & set(V.CODE_SWITCHED),
+              'NUDs: Darios no shot mesh, Pooka no damage meshes; none for the kinds the code switches (step 2i: %s)'
+              % ', '.join(V.CODE_SWITCHED))
     print('%d kinds, %d failures' % (len(kinds), len(FAILS)))
     sys.exit(1 if FAILS else 0)
 

@@ -14,7 +14,9 @@ motion/enemy/.../material_anime.pac for enemies. The baseline that works without
 default-hidden mesh's polygons with their indices zeroed (nud.hidden's way: the mesh, its materials and bones stay,
 nothing is drawn), so an enemy shows only its 3DS default meshes; the damage faces / blinks stay hidden for good.
 Kinds: every vmt kind above, plus the ones whose converted material_anime.pac carries a visibility default
-(default.mta: kuribo, dekakuribo, keronpa: their damage faces).
+(default.mta: kuribo, dekakuribo, keronpa: their damage faces), except CODE_SWITCHED: step 2i switches those kinds'
+meshes at run time (smashrun_walker_cave.py h_vis: the model handle's set_mesh_visibility_by_index 0x032FF6B4), so
+their NUDs stay the models' own (every mesh drawn; the code sets the 3DS defaults at the start).
 
 S3DS_ENEMY_ROOT: the 3DS dump's enemy folders (KIND/model/body/c00/normal.bch + normal.vmt); MOTION_ROOT holds the
 converted motion/enemy/KIND/body/main.pac (the MTAs' names and lengths); OUT_ROOT gets
@@ -50,6 +52,8 @@ import mta  # noqa: E402
 import omo  # noqa: E402
 
 WIIU_KINDS = ('crazyhand', 'masterhand', 'mcanimal', 'mcblade', 'mcgiant', 'yellowdevil')
+# step 2i: the kinds whose meshes the cave switches (smashrun_walker_cave.py VMT / MAT_VIS, ported kinds): no baseline
+CODE_SWITCHED = ('dekakuribo', 'ghos', 'kuribo', 'patapata', 'tikibuzz', 'togezo', 'waddledee', 'waddledoo')
 HIDE = ('damage', 'blink', 'tear', 'eye_close', 'wideopen')
 # alternatives a behaviour shows one of: (kind, regex of the family); the first (sorted) stays
 ALT = {
@@ -185,6 +189,9 @@ def main():
         root, conv, out_root = sys.argv[1], sys.argv[3], sys.argv[4]
         names = sys.argv[5:] or sorted(set(kinds(root)) | {'kuribo', 'dekakuribo', 'keronpa'})
         for kind in names:
+            if kind in CODE_SWITCHED:
+                print('%s: switched by code (step 2i): its own model.nud, nothing written' % kind)
+                continue
             hide = {n for n, v in pac_defaults(conv, kind).items() if not v}
             if os.path.exists(os.path.join(root, kind, 'model', 'body', 'c00', 'normal.vmt')):
                 _vmt, default, _dmg = model_states(kind, os.path.join(root, kind, 'model', 'body', 'c00'))

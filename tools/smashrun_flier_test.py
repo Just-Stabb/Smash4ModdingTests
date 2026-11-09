@@ -631,29 +631,65 @@ def main():
     m.call(slot(10), {3: OBJ})
     check([x[0] for x in m.calls] == ['bi_damage'] and m.r32(OBJ + W.V(1)) == 1200,
           'ghos slot 10 (notify_on_damage 0x11094): BehaviorImpl\'s, then the leave timer back to 1200')
-    # step 2g v4: the immunity (3DS slot 31 0x113F0 -> Wii U slot 31 with the hit record, then slot 10 0x11094).
-    # A fighter's direct hit (AttackData +0x4C set) leaves the damage as it was; an indirect one (a projectile's,
-    # a thrown item's: +0x4C 0) hurts and is the new damage to restore to
+    # step 2i: the immunity's per-category rules (3DS slot 31 0x113F0 -> Wii U slot 31 with the hit record, then
+    # slot 10 0x11094; the record: +0x18 the attacker's battle object id, +0x1C its category). A fighter's direct
+    # hit (category 0, AttackData +0x4C set) is undone; a projectile (category 1) hurts unless its weapon kind counts
+    # as the fighter (is_weapon_as_fighter: 0x179 / 0x17A / 0x180-0x182, e.g. Corrin's dragonhand 0x180) whatever
+    # its +0x4C; a thrown item (category 4, not held) hurts; a held item (status 2) is immune unless it is a
+    # curryshot (0x12) / fireflower (0x24). The SoundModule's +0x5AD (the 3DS +0x5A2) follows: 0 immune, 1 else
+    SND, SNDVT, WOBJ, IT1 = HEAP + 0x29800, HEAP + 0x29900, HEAP + 0x29C00, HEAP + 0x29D00
     res = []
     m = Machine(img)
     m.flier(c0)
-    m.wf(DENT, 12.0)
+    m.w32(ACC + 0x30F4, SND)
+    m.w32(SND, SNDVT)
+    m.w32(SNDVT + 0x84, T.SOUND_SET)
     m.w32(HITREC + 0x14, HATK)
     m.w32(HITREC + 0x20, HREC)
-    for direct, dmg_after_hit in ((0, 20.0), (1, 31.0), (1, 45.0), (0, 27.0), (1, 40.0)):
+    m.w32(IT1 + W.ITEM_STATUS, IT1 + 0x100)
+    m.items[0x40000005] = IT1
+    cases = (('fighter direct', 0, 0x00000001, 1, None, None, 31.0, 1),
+             ('fighter indirect', 0, 0x00000001, 0, None, None, 20.0, 0),
+             ('projectile', 1, 0x10000002, 1, 0x00, None, 33.0, 0),
+             ('dragonhand', 1, 0x10000003, 0, 0x180, None, 40.0, 1),
+             ('wickedweave', 1, 0x10000004, 0, 0x17A, None, 44.0, 1),
+             ('thrown item', 4, 0x40000005, 0, 0x46, 3, 27.0, 0),
+             ('held item', 4, 0x40000005, 0, 0x46, 2, 35.0, 1),
+             ('held fireflower', 4, 0x40000005, 0, 0x24, 2, 30.0, 0))
+    restore = 12.0
+    m.wf(DENT, restore)
+    m.call(fn['f_g31'], {3: OBJ, 4: HITREC})      # a first (immune) hit: the restore point is the damage before
+    m.uc.mem_write(OBJ + W.GH_DMG, struct.pack('>f', restore))
+    for name, cat, oid, direct, kind, status, dmg_after_hit, want_imm in cases:
         m.uc.mem_write(HATK + 0x4C, bytes([direct]))
-        m.uc.mem_write(HREC + 0x1C, bytes([0 if direct else 1]))
+        m.uc.mem_write(HREC + 0x1C, bytes([cat]))
+        m.w32(HREC + 0x18, oid)
+        m.objects = {}
+        if cat == 1 and kind:
+            m.objects[oid] = WOBJ
+            m.w32(WOBJ + 4, kind)
+        if cat == 4:
+            m.w32(IT1 + 4, kind)
+            m.w32(IT1 + 0x100 + 0x48, status)
         m.wf(DENT, dmg_after_hit)                  # the framework has added the hit's damage
         m.calls = []
         m.call(fn['f_g31'], {3: OBJ, 4: HITREC})
         imm = m.uc.mem_read(OBJ + W.GH_IMM, 1)[0]
+        snd = [x[1] for x in m.calls if x[0] == 'sound_5ad']
+        m.calls = []
         m.call(slot(10), {3: OBJ})
-        res.append((direct, imm, [x[0] for x in m.calls], round(m.rf(DENT), 2), m.r32(OBJ + W.V(1))))
-    want = [(0, 0, ['bi_damage'], 20.0, 1200), (1, 1, ['init_damage'], 20.0, 1200), (1, 1, ['init_damage'], 20.0, 1200),
-            (0, 0, ['bi_damage'], 27.0, 1200), (1, 1, ['init_damage'], 27.0, 1200)]
+        after = round(m.rf(DENT), 2)
+        res.append((name, imm == want_imm, snd == [1 - want_imm], [x[0] for x in m.calls] ==
+                    (['init_damage'] if want_imm else ['bi_damage']), after == (restore if want_imm else dmg_after_hit)))
+        if not want_imm:
+            restore = dmg_after_hit
     vg31 = img.u32(D['vt_ghos'] + 0xC + 8 * 31)
-    check(res == want and vg31 == fn['f_g31'], 'ghos slot 31 + 10 (0x113F0 / 0x11094): a direct hit (AttackData +0x4C) is undone '
-          '(init_damage(the damage before it), no reaction); an indirect hit hurts (BehaviorImpl\'s); vt_ghos slot 31 = f_g31 %s' % res)
+    check(all(all(r[1:]) for r in res) and vg31 == fn['f_g31'],
+          'ghos slot 31 + 10 (0x113F0 / 0x11094), step 2i the 3DS\'s rules: a fighter\'s direct hit, a weapon-as-fighter '
+          '(Corrin 0x180, Bayonetta 0x17A) and a held item are undone (init_damage(the damage before them), no '
+          'reaction, SoundModule +0x5AD = 0); a projectile (even with +0x4C set), a thrown item and a held fire flower '
+          'hurt (BehaviorImpl\'s, +0x5AD = 1) and are the new restore point; vt_ghos slot 31 = f_g31 %s'
+          % [r for r in res if not all(r[1:])])
     out = {}
     for leaving in (0, 1):
         m = Machine(img)

@@ -2075,3 +2075,105 @@ grow 0x04BD0000; code to 0x04BC193C, data after it and in the other regions' tai
   0x04B89020-0x04B8A000 (B), 0x04BB8000-0x04BB8660 (C), 0x04BB8770-0x04BBF00C (G and the data), 0x04BC0000-0x04BC193C
   (H, new);
 - the text section 0x2BBFFE0 -> 0x2BCFFE0 bytes, the file info's textRegion 0x2BC0000 -> 0x2BD0000; relocations equal.
+
+## Step 2i: mesh switching, Ghos immunity, Koopa shell
+
+Package smashrun_step2i_v1: `code/` exe_v26 = exe_v25 + `smashrun_walker_cave.py` over its own regions (scratch
+s2i/build26.py; the field cave unchanged, set "step2h"); `data/` the seven restored model.nud files. Readings with
+addresses: hand_read.json `_framework_step2i` and each kind's `port_step2i`.
+
+**The Wii U's mesh switch (root cause of the fixed meshes).** The 3DS behaviours switch the meshes their normal.vmt
+lists with Behavior::set_mesh_visibility(vmt index, bool) (0x6618C4, falling into ModelModulePartialImpl::
+set_node_visibility 0x6618D4: ModelModule +8 != 8 -> GsbDrawModel::set_mesh_visibility 0x7FB018), and the whole model
+with Behavior::set_visibility 0x661720. Nothing in the Wii U's enemy code calls a mesh switch (its Fortress enemies
+never switch meshes), and the material_anime.pac route is not played for enemies (fix v3 / v4). What the Wii U has:
+- the ModelModule (acc+0x3118; enemy vtable 0x10120B74) holds the model handle at +4; vt+0x164 = set_visibility(bool)
+  0x02007728, the 3DS function line for line;
+- the handle API the stage lua bindings use ("set_mesh_visibility_by_index" 0x030F2880, "set_mesh_visibility"
+  0x030F26B4): is_valid 0x032FF640; **set_mesh_visibility_by_index 0x032FF6B4(handle, mesh, bool)** -> 0x034232FC(model,
+  mesh, bool, 0), which sets bits 0-1 of the model's per-mesh byte ([model+0x7DC]+4, sized by the mesh count
+  [[model+0x6E4]+0x44] and filled with 0xFE at load by 0x034205FC); by name 0x032FF944 -> 0x0342633C (strcmp over the
+  same list, first match only);
+- meshes are addressed by the NUD's mesh order. The fighters' VisibilityModule (MSC 0x39, accessor +0xA8; ACMD
+  Model_Changer 0x96114CFC -> vt+0xCC op 0x2711, Visibility 0xCB59A07E -> vt+0x94) is not on enemies.
+
+**The helper (region H, `code_vis`; for Pooka and later kinds).** A kind joins by an entry in VMT (its normal.vmt names,
+3DS index order), NUD_MESHES (its model.nud meshes in order) and VIS_DEFAULT (the H3D model's visibility bit per vmt
+entry); its CFG word VIS then points at {n, default mask, per entry up to 4 NUD mesh indices}. From code with r3 = the
+behaviour (inside st() bodies, `h_visr` / `h_vsetr` take r31):
+- `h_vis` r4 = 3DS vmt index, r5 = 0 / 1: Behavior::set_mesh_visibility (skipped for no table, an index past it, no
+  ModelModule or its +8 == 8, an invalid handle; every NUD mesh of the entry);
+- `h_vset` r4 = visible mask, r5 = the entries to set (bit i = vmt index i);
+- `h_vdef` the H3D defaults on every entry (and the Waddle Doo blink words zeroed): w_start calls it, the fliers' and the
+  step 2h kinds' start wrappers too;
+- `h_whole` r4 = 0 / 1: Behavior::set_visibility (ModelModule vt+0x164);
+- MAT_VIS kinds (faces by 3DS material animation, per motion: the converted material_anime.pac's MTAs) need no call:
+  `u_vis` (the end of u_pend, every cave enemy's update) sets the entries for the motion playing (MotionModule +0x38,
+  the 3DS +0x40).
+All keep r13-r31 / f14-f31. Pooka's VMT / NUD_MESHES / VIS_DEFAULT entries are in already.
+
+**Per kind** (3DS addresses in the code comments and hand_read):
+- Goomba / Big Goomba: the faces per motion (Damage* / Down* / Collapses the damage face; Big Goomba's Damage /
+  DamageStart / DamageFly damage2, Stepped / Collapses / the rest damage); its three normal_mh meshes together.
+- Waddle Dee: 0x5D04C (`wd_show`) at the start, every state's enter and slot 51: with a parasol the one parasol by lr
+  and motion (walk / jump / landing, turn, parasol fall); without, both arms; slot 69 / 71 drop the parasol (var + 2,
+  initialize) and show the damage face (71 then notify_on_death), slot 60 the normal face.
+- Waddle Doo: slot 55 every frame: the blink (random_range(30, 50) frames, then 4-frame phases open / blink1 / blink2
+  / blink1 / open), the tear in the dead state; slots 56 / 57 tear, 58 open eyes.
+- Ghos: normal; the stun's damage face until its timer runs out; dead: damage.
+- Tiki Buzz: a hit (slot 10, after BehaviorImpl's) Damage1; slot 60 / fly Normal; the stomp Damage2; gone: the whole
+  model hidden.
+- Spiny: the egg as the egg, the Spiny as the Spiny; the hatch (L622F4) swaps them and zeroes node 2's spin; slot 60
+  hatches an egg (=> 5).
+- Paratroopa: winged; the wing loss (stomp -> 9, slot 69) and a Koopa's start wingless; the shell's model hidden once
+  the shell item is thrown.
+- Not switched: Darios's shot mesh (its twin's AI states, not ours: its NUD baseline stays), Zima / Lethinium /
+  Stalfos / Shy Guy / Churine / White Bear / Gordo / Furiijio / Propeller Heiho (no vmt, no visibility call).
+- Not ported: Waddle Dee's dropped parasol article, its +0x1EC / acc+0x88 node calls and sway; slot 13 (Waddle Dee,
+  Paratroopa); Paratroopa state 21's set_visibility(1) (no code enters 21).
+
+**NUD baselines restored.** `s3ds_enemy_vis.py --nud` skips CODE_SWITCHED (kuribo, dekakuribo, waddledee, waddledoo,
+ghos, tikibuzz, togezo, patapata); the package ships the seven converted model.nud files those kinds had hidden meshes
+in (byte-checked: each is the installed baseline with the hidden meshes' indices back; patapata hid nothing). Darios,
+Pooka and the unported kinds keep their baselines (12 NUDs).
+
+**Ghos's immunity, exact.** gh_31 (slot 31; f_g31 branches to it): the hit's attacker record +0x18 id / +0x1C category
+(the Wii U record ctor 0x02C0EC80 defaults 0x50000000 / 6, as the 3DS):
+- category 1, a weapon: find_battle_object 0x02BF2108([0x102F6C30], &out, id, 0), is_null 0x02BEF50C, kind = object
+  +4: immune when is_weapon_as_fighter (3DS 0x7B4368; no Wii U twin: 0x179 / 0x17A Bayonetta's wicked weave arm / leg,
+  0x180-0x182 Corrin's dragonhand / spearhand / waterdragon, the same numbers in the Wii U weapon table 0x10419C18);
+- category 4, an item: find_item 0x030563AC, held (status [item+0x38E4]+0x48 == 2, getter 0x0302DDC0) and kind
+  (+4) not 0x12 curryshot / 0x24 fireflower: immune;
+- otherwise the AttackData +0x4C byte.
+Immune: GH_IMM 1 and the SoundModule's (acc+0x30F4, the 3DS acc+0x3074) flag +0x5AD = 0 (the 3DS +0x5A2, mapped by its
+setter's vtable position and the init writes; a sound flag, it does not change the hit reaction); else GH_IMM 0, flag 1.
+Approximated: Item::is_haved's second test (3DS [item+0x38D8] vt+0x2C(4)) is not mapped (held = status 2); play_se(15).
+
+**Koopa shell (item 0x94).** The Wii U item table 0x104157A0 (0x138 kinds) has {0x94, 0xB, 0xB, 0x101, 2, 0,
+"patapata"}, but no code path from create_item (0x026A8D78 -> ItemManager 0x0305542C) to a 0x94 behaviour was found,
+and item/patapata/ is 3DS data (animcmd/item/patapata/*). The shell is thrown as the Wii U's Green Shell (0x46,
+variation 0; KOOPA_SHELL) instead: APPROXIMATED, so a missing item can't freeze the game.
+
+**Tests** (exe_v26):
+
+| Test | Result |
+| --- | --- |
+| smashrun_step2i_test.py (new; with DATA_ROOT the package's data/) | 9 checks (+1 with DATA_ROOT), 0 failures |
+| smashrun_step2h_test.py (S/s2e/root) | 41 checks, 0 failures (togezo's vtable / start, the shell item 0x46 and set_visibility(0)) |
+| smashrun_walker_test.py (S/s2e/root) | 176 checks, 0 failures |
+| smashrun_flier_test.py | 123 checks, 0 failures (Ghos slot 31: 8 attackers, the exact rules) |
+| smashrun_flier_motion_test.py | 11 checks, 0 failures |
+| smashrun_field_test.py --set step2h | 13 checks, 0 failures |
+| smashrun_enemy_test.py (S/s2e/root) | 26 checks, 0 failures |
+| effect_slots_patch_test.py exe_v26 exe_v12 | 47 checks, all ok |
+| s3ds_enemy_test.py kuribo / dekakuribo / togezo / patapata / waddledee / waddledoo / ghos / tikibuzz / pooka | 15 / 15 / 12 / 13 / 19 / 13 / 11 / 13 / 13, 0 failures |
+| s3ds_enemy_vis_test.py (29 kinds, --nud baselines) | 0 failures |
+
+**exe_v26 vs exe_v25, word diff** (s2i/diff26.py, log s2i/diff26.log): 8716 words, all in section 2 and all in Smash
+Run's regions: 0x04B7D630-0x04B7DF00 (E), 0x04B849F0-0x04B849FC (D: w_upd's calls to the moved code),
+0x04B8691C-0x04B87FE0 (A), 0x04B89020-0x04B89F3C (B), 0x04BB8004-0x04BBF8D0 (C, G and the data), 0x04BC0014-0x04BC22A8
+(H: code to 0x04BC22A8). No hook site changed; relocations and file info equal.
+
+**Still open:** the mesh switch is read statically (0x034232FC's byte, its 0xFE "not set" default and the draw's use of
+bits 0-1 not run): the in-game check is the first proof; Waddle Dee's parasol article / node, Item::is_haved's second
+test, the shell item 0x94 itself, Darios's shot mesh.

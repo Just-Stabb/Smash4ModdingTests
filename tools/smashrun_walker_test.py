@@ -172,6 +172,7 @@ class Machine:
             self.ret()
         elif addr == W.CHANGE_MOTION:
             c.append(('motion', r(3), r(4), round(self.fr(1), 4), round(self.fr(2), 4), r(5), round(self.fr(3), 4)))
+            self.w32(MOTION + W.MOT_KIND, r(4))      # step 2i: the MotionModule's motion playing (+0x38)
             self.ret()
         elif addr == W.MSC_STATUS:
             ctx, args = r(3), r(4)
@@ -493,7 +494,7 @@ def main():
         labels = [m.r32(o + 0xB0 + 4 * i) for i in range(9)]
         want_labels = [0xCCCCCCCC] * 9 if w.get('no_damage_labels') else W.damage_labels(w)    # none: not called
         check(calls == [('new', W.OBJ_SIZE), ('ctor', OBJ, ACC, k, 2)] and m.r32(MOD + 8) == OBJ and
-              m.r32(o + 0xE0) == D['vt'] and init == exp and m.r32(o + 0xA8) == D.get('hs_' + w['name'], 0) and
+              m.r32(o + 0xE0) == D['vt_' + w['name'] if w.get('vtover') else 'vt'] and init == exp and m.r32(o + 0xA8) == D.get('hs_' + w['name'], 0) and
               labels == want_labels and m.r32(o + 8) == k,
               'F2: %s 0x%02X -> new(0x%X), ctor(acc, K, var), module+8, vptr VT, BehaviorImpl init, CFG, '
               'hashsets 0x%X, damage labels %s' % (w['name'], k, W.OBJ_SIZE, m.r32(o + 0xA8), labels))

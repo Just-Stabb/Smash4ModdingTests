@@ -156,9 +156,11 @@ def spiny(img, fn, D, cfg, byname, world, enter_calls, stomp, vslot):
     pv = lambda i: W.P(i)  # noqa: E731
     ok = (vslot(n, 40) == fn['tg_init'] and vslot(n, 45) == fn['tg_atk'] and vslot(n, 66) == fn['tg_66'] and
           vslot(n, 67) == fn['tg_67'] and img.u32(cfg[n] + W.CF['TREAD']) == 0 and
-          img.u32(cfg[n] + W.CF['FSTART']) == fn['tg_start'] and img.u32(cfg[n] + W.CF['F69']) == fn['tg_69'])
-    check(ok, 'togezo: vtable 40 its per-variation initialize, 45 its set_attack_data, 66 / 67 by variation, start, '
-          'slot 69 its own; TREAD 0 (never stomped: its tread area is off)')
+          img.u32(cfg[n] + W.CF['FSTART']) == fn['tgv_start'] and img.u32(cfg[n] + W.CF['F69']) == fn['tg_69'] and
+          vslot(n, 60) == fn['tg_60'])
+    check(ok, 'togezo: vtable 40 its per-variation initialize, 45 its set_attack_data, 60 its own (step 2i), 66 / 67 by '
+          'variation, start (step 2i: tgv_start, the meshes, then tg_start), slot 69 its own; TREAD 0 (never stomped: '
+          'its tread area is off)')
     atk = lambda calls: [c[2] for c in calls if c[0] == 'atk_create']  # noqa: E731
     # start: var 1 -> 6 with the body (P2[1], angle 70); var 0 -> 1 with the egg's (P2[0], angle 361)
     res = {}
@@ -393,7 +395,8 @@ def paratroopa(img, fn, D, cfg, byname, world, enter_calls, stomp, vslot):
           'patapata walking: found -> 14 JumpHold -> 15 the leap (W+0x20..+0x2C %s, +0x1C 0.075) -> 16 (P2 entry 1: 2 %%)'
           ' -> landed -> 17 slide / 18 LandingJumpAttack -> 12 %s' % (leap, wo.states()))
     # stomped as a Koopa => 19 the shell: hit and tread off, damage 0, defeated; at the motion's end on the ground
-    # create_item_and_throw(0x94, var 2 -> 1, position + (0, 3 - speed y, 0), the speed, 0, true, -1, -1) -> 23
+    # create_item_and_throw(0x94, var 2 -> 1, position + (0, 3 - speed y, 0), the speed, 0, true, -1, -1) -> 23; step
+    # 2i: the Wii U's Green Shell (0x46, variation 0) stands in for 0x94, and the model is hidden once it is thrown
     m, got = stomp(n, 12, [(5.0, 0x1D), (-1.0, 0x1D)], 12.0, init=False, var=2)
     wo = world(n, 19, var=2, setup=lambda m: m.w32(OBJ + W.V(4), 1))     # the dead item due (start)
     c = [x[0] for x in wo.m.calls if x[0] in ('disable_hit', 'disable_tread', 'set_damage', 'motion')]
@@ -401,12 +404,15 @@ def paratroopa(img, fn, D, cfg, byname, world, enter_calls, stomp, vslot):
     wo.m.motion_end, wo.oneshot, wo.mframes = True, True, 9
     wo.run(2)
     thr = [x for e in wo.log for x in e[4] if x[0] == 'throw']
+    vis = [x for e in wo.log for x in e[4] if x[0] == 'visible']
     check([x[2] for x in got[1] if x[0] == 'chgi'] == [19] and c == ['motion', 'disable_hit', 'disable_tread',
                                                                        'set_damage'] and
-          wo.m.r32(OBJ + W.DEFEATED) == 1 and len(thr) == 1 and thr[0][:3] == ('throw', 0x94, 1) and
-          thr[0][3][1:] == (3.5, 0.0) and thr[0][4:] == ((0.0, -0.5), 0.0, 1, -1, -1) and wo.states() == [19, 23],
+          wo.m.r32(OBJ + W.DEFEATED) == 1 and len(thr) == 1 and thr[0][:3] == ('throw', 0x46, 0) and
+          thr[0][3][1:] == (3.5, 0.0) and thr[0][4:] == ((0.0, -0.5), 0.0, 1, -1, -1) and wo.states() == [19, 23] and
+          vis == [('visible', 0)],
           'patapata stomped as a Koopa => 19 shell: disable_hit / disable_tread / set_current_damage(0), defeated; '
-          'at its end the shell item 0x94 (variation 1) thrown from 3 above, -> 23 %s' % ((thr, c, got[1], wo.states()),))
+          'at its end the shell item thrown from 3 above (step 2i: the Green Shell 0x46, variation 0, for the 3DS\'s '
+          '0x94), the model hidden (set_visibility(0), 0x73BC8), -> 23 %s' % ((thr, c, got[1], wo.states(), vis),))
     deaths = {var: call(vslot(n, 67), var).uc.reg_read(T.R[3]) for var in (0, 3)}
     wo = world(n, 20, var=3)
     c = [x for x in wo.enter(20) if x[0] in ('kinetic', 'motion')]
