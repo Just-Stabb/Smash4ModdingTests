@@ -1588,7 +1588,10 @@ def code(D):
         bctr
     """ % (CF['EN'], CF['ENN'], CF['KICK']))
     # ---- slot 41 start: set_rhombus, +0x10 = posture lr, face the nearest target, the first state
-    A.asm("w_start:\nmflr r0\nbl pro\nmr r3, r31\nbl h_vdef")      # step 2i: the model's default meshes
+    # step 2i: the model's default meshes; step 2o: r3 = this again for set_rhombus (h_vdef used to return the last
+    # set_mesh_visibility_by_index's 1 in r3: set_rhombus(1) read address 9, the step 2i crash at a Big Goomba /
+    # Goomba / Waddle Dee / Waddle Doo spawn)
+    A.asm("w_start:\nmflr r0\nbl pro\nmr r3, r31\nbl h_vdef\nmr r3, r31")
     far(A, SET_RHOMBUS)
     A.asm("lwz r0, 0x%X(r30)\ncmpwi r0, 0\nbeq s_lr\nbl h_smode" % CF['SMODE'])
     A.asm("""
@@ -7615,6 +7618,11 @@ SLOT_OFF = {0x57: 0x1214, 0x58: 0x13DC, 0x59: 0x14A4, 0x5A: 0x1684}   # the sm a
 TWIN_CTOR = {0x57: 0x026B37A8, 0x58: 0x026B3A1C, 0x59: 0x026B3C30, 0x5A: 0x026B3ED4}
 TWIN_DTOR = {0x57: 0x026B3980, 0x58: 0x026B3BA4, 0x59: 0x026B3E30, 0x5A: 0x026B4034}   # (obj, 0): 0x026B43E0's calls
 TWIN_PARSE = {0x57: 0x026B6370, 0x58: 0x026B6380, 0x59: 0x026B6390, 0x5A: 0x026B63A0}   # (handle&, obj): vt+0x24
+# step 2o: each parser is `mr r12, r4; mr r4, r3; addi r3, r12, LOADER; b 0x033B4770`: the object's loader member;
+# the loader's byte +8 is 1 after a clean parse and 0 after a token / layout error (0x033B4770 clears it, the error
+# path 0x033B4894 leaves it; the game's own ctor + loader run in unicorn on the twins' sm files, step 2k's files and
+# step 2a's 3DS-layout files: tools/smashrun_step2o_test.py)
+TWIN_LOADER = {0x57: 0x1A4, 0x58: 0xA4, 0x59: 0x1BC, 0x5A: 0xAC}
 #                                      0x026B44B0's per-kind loads (0x026B4884 / 0x026B48EC / 0x026B4954 / 0x026B49BC)
 KIND_OF = {'plasmawisp': 0x12, 'darios': 0x1D, 'stalfos': 0x30, 'zima': 0x0E}
 SM_ACC_VT = 0x1008BFB8               # the sm param accessor's vtable (ctor 0x026B40B8), [mgr+0x28D0]
@@ -8793,12 +8801,22 @@ def code_2k_twins(H, call, p, D):
     twin 0x57-0x5A whose Smash Run kind's own file (param/enemy/fs/enemy_param_vl_<K>.bin: the 3DS values in the
     twin's sm layout, tools/smashrun_twin_params.py) is found, a new object of the twin's class (its ctor with no
     object allocates one, as the sm accessor's vt+0x14 builds them) parsed from it with the twin's own parser (the
-    call its vt+0x24 makes for the sm file); if it holds attacks (+0x30, the base layout's attack count, > 0):
-    slot[K] = it, and slot[twin] = it too (the twins' AIs read their own slot hard-coded: 31 / 31 / 44 sites) but for
-    zima, whose slot the walkers borrow (step 2b's donor: its own object stays; the 7 hard-coded zima reads, +0xC and
-    +0x7C..+0x90, read values the 3DS file and the Wii U file share). The objects of the previous Smash Run battle
-    (k2_objs) are deleted first (the twin's dtor with 1); the accessor re-sets the twins' slots from its block every
-    battle (vt+0x24), so nothing else points at them by then"""
+    call its vt+0x24 makes for the sm file); if the parse was clean (step 2o: the loader's +8 byte, TWIN_LOADER) and
+    it holds attacks (+0x30, the base layout's attack count, > 0): slot[K] = it, and slot[twin] = it too (the twins'
+    AIs read their own slot hard-coded: 31 / 31 / 44 sites) but for zima, whose slot the walkers borrow (step 2b's
+    donor: its own object stays; the 7 hard-coded zima reads, +0xC and +0x7C..+0x90, read values the 3DS file and the
+    Wii U file share).
+    Step 2o (the user's code_diag_novis crash: Lethinium's cannon shot, article 3, weapon init 0x02AE050C, read
+    [slot 0x57]+0x19C, the G8 vector's elements, as 0 and faulted at 0x02AE06B4; its G2 attacks were there, the
+    twin had fought for 7 s):
+    - a parse error no longer passes: step 2a's 3DS-layout file (the same path) parses G0-G5 and stops at G5 (the
+      3DS has 8 words fewer), leaving G6-G8 (needles / laser / cannon) empty with +0x30 = 4, and step 2k took it.
+      Every twin's 3DS-layout file fails the same way (loader +8 = 0; zima from G1, darios at its G6, stalfos
+      parses its vectors but not its tail), the shipped files parse clean (unicorn, the game's own code);
+    - an object is deleted (the twin's dtor with 1) only once its replacement is in the slots; when the file isn't
+      there or doesn't parse, the previous object (k2_objs) stays and is put back in the slots (step 2k deleted
+      first: a run that then found no file left the slots on a freed object; 0x02D9A5EC has two callers, 0x02FB6894
+      and the scene method 0x02FD94B0)."""
     a = lambda text: H.asm(text)  # noqa: E731
     a("""
     k2_twins:
@@ -8809,17 +8827,6 @@ def code_2k_twins(H, call, p, D):
         lis r29, 0x%04X
         addi r29, r29, %d
     """ % (ha(D['k2_objs']), sx(D['k2_objs'])))
-    for i, (t, k) in enumerate(TWIN_K):
-        a("""
-        lwz r3, %d(r29)
-        cmpwi r3, 0
-        beq k2d_%x
-        li r4, 1
-        """ % (4 * i, t) + call(TWIN_DTOR[t]) + """
-        li r0, 0
-        stw r0, %d(r29)
-    k2d_%x:
-        """ % (4 * i, t))
     a("""
         lis r28, 0x%04X
         lwz r28, %d(r28)
@@ -8859,21 +8866,41 @@ def code_2k_twins(H, call, p, D):
         addi r3, r1, 8
         mr r4, r30
         """ % t + call(TWIN_PARSE[t]) + """
+        lbz r0, 0x%X(r30)
+        cmpwi r0, 1
+        bne k2t_%x_bad
         lwz r0, 0x30(r30)
         cmpwi r0, 0
         bgt k2t_%x_ok
+    k2t_%x_bad:
         mr r3, r30
         li r4, 1
-        """ % t + call(TWIN_DTOR[t]) + """
+        """ % (TWIN_LOADER[t] + 8, t, t, t) + call(TWIN_DTOR[t]) + """
         b k2t_%x_f
     k2t_%x_ok:
+        lwz r27, %d(r29)
         stw r30, %d(r29)
         stw r30, 0x%X(r28)
         %s
+        cmpwi r27, 0
+        beq k2t_%x_h
+        cmpw r27, r30
+        beq k2t_%x_h
+        mr r3, r27
+        li r4, 1
+        """ % (t, t, 4 * i, 4 * i, SLOTS + 4 * kind, '' if t == 0x5A else 'stw r30, 0x%X(r28)' % (SLOTS + 4 * t), t, t)
+          + call(TWIN_DTOR[t]) + """
+        b k2t_%x_h
     k2t_%x_f:
+        lwz r27, %d(r29)
+        cmpwi r27, 0
+        beq k2t_%x_h
+        stw r27, 0x%X(r28)
+        %s
+    k2t_%x_h:
         addi r3, r1, 8
         li r4, 2
-        """ % (t, t, 4 * i, SLOTS + 4 * kind, '' if t == 0x5A else 'stw r30, 0x%X(r28)' % (SLOTS + 4 * t), t)
+        """ % (t, t, 4 * i, t, SLOTS + 4 * kind, '' if t == 0x5A else 'stw r27, 0x%X(r28)' % (SLOTS + 4 * t), t)
           + call(RES_FREE))
     a("""
         addi r3, r1, 0xC
@@ -9757,8 +9784,11 @@ def code_h(D):
     st('pt_wfall_up', "bl h_gnd\ncmpwi r3, 0\nbeq.far epi\nli r4, 2\nb goi")
     # 2 hop (0x725E8 / 0x72860): L5D7EC, kinetic 5, ground off, Fly loop, V3 = 0. Update: its first falling frame:
     # V3 = 1, W+0x40 = f6 (L73E48; its energy 0 +0x38 / +0x3C writes: not ported); landed after that: var 1 60 %% a
-    # search of group 2 and a target behind -> 3, else -> 2 (hop again); a wall -> 3; the search (V0 and the
-    # cool-down V1 run out): V0 = group var's interval, search_target(var): found -> face it, -> 5; V0--, V1--
+    # search of group 2 and a target behind -> 3 (0x72954: no more this frame), else the request -> 2 (hop again,
+    # 0x7292C) and the frame goes on (a later request this frame wins, as the 3DS's change_state); a wall -> 3; the
+    # search when V0 <= 0 AND the cool-down V1 <= 0 (0x72970-0x72980; step 2o: was V0 | V1 <= 0, which let any
+    # negative counter through: a search every frame and the 30-frame cool-down cut to V0's 11): V0 = group var's
+    # interval, search_target(var): found -> face it, -> 5; else V0--, V1-- (0x729F8), move
     en('pt_hop_en', 5, 0, 11, 1, pre="bl pt_hop5\nli r0, 0\nstw r0, 0x%X(r31)" % V(3))
     st('pt_hop_up', """
         bl h_vy0
@@ -9781,38 +9811,38 @@ def code_h(D):
         bl h_gnd
         cmpwi r3, 0
         beq pth_w
-        li r4, 2
         lwz r0, 0xC(r31)
         cmpwi r0, 1
-        bne.far go
+        bne pth_re
         li r3, 1
         li r4, 100
         bl h_rand
         lwz r0, 0x%(P48)X(r30)
         cmpw r3, r0
-        li r4, 2
-        bgt.far go
+        bgt pth_re
         li r4, 2
         bl h_srch
         cmpwi r3, 0
-        li r4, 2
-        blt.far go
+        blt pth_re
         mr r4, r3
         bl h_dx
         lfs f0, 0x%(ZERO)X(r30)
         fcmpu cr0, f1, f0
-        li r4, 2
-        bge.far go
+        bge pth_re
         li r4, 3
         b go
+    pth_re:
+        li r4, 2
+        bl h_chg
     pth_w:
         bl h_wall
         cmpwi r3, 0
         li r4, 3
         bne.far go
         lwz r0, 0x%(V0)X(r31)
-        lwz r12, 0x%(V1)X(r31)
-        or r0, r0, r12
+        cmpwi r0, 0
+        bgt pth_cnt
+        lwz r0, 0x%(V1)X(r31)
         cmpwi r0, 0
         bgt pth_cnt
         lwz r4, 0xC(r31)
@@ -9911,14 +9941,16 @@ def code_h(D):
     # at its end -> 10
     en('pt_wl_en', 8, 0, 17, 0, pre="bl pt_hop6\nbl f_anone", extra="bl h_clear\nli r4, 0\nli r5, 1\nbl h_vsetr\nmr r3, r31\nbl pt_dewing")
     st('pt_wl_up', "bl h_end\ncmpwi r3, 0\nbeq.far epi\nli r4, 10\nb go")
-    # 12 walk (0x732A4 / 0x73898): kinetic 1, Walk loop; the search (V0 / V1 out): V0 = group var + 1's interval,
-    # search_target(var + 1): found -> face it, -> 14; a wall (or var 3 and a ledge) -> 13; off the ground -> 10;
-    # move; V0--, V1--
+    # 12 walk (0x732A4 / 0x73898): kinetic 1, Walk loop; the search when V0 <= 0 AND V1 <= 0 (0x738A0-0x738B4; step
+    # 2o: was V0 | V1 <= 0): V0 = group var + 1's interval, search_target(var + 1): found -> face it, -> 14; else
+    # V0--, V1-- every frame (0x73928, before the ground check; step 2o: was only on the frames it moved), off the
+    # ground -> 10, a wall (or var 3 and a ledge) -> 13, move
     en('pt_walk_en', 1, 1, 22, 1)
     st('pt_walk_up', """
         lwz r0, 0x%(V0)X(r31)
-        lwz r12, 0x%(V1)X(r31)
-        or r0, r0, r12
+        cmpwi r0, 0
+        bgt ptk_g
+        lwz r0, 0x%(V1)X(r31)
         cmpwi r0, 0
         bgt ptk_g
         lwz r4, 0xC(r31)
@@ -9940,6 +9972,12 @@ def code_h(D):
         li r4, 14
         b go
     ptk_g:
+        lwz r3, 0x%(V0)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V0)X(r31)
+        lwz r3, 0x%(V1)X(r31)
+        addi r3, r3, -1
+        stw r3, 0x%(V1)X(r31)
         bl h_gnd
         cmpwi r3, 0
         li r4, 10
@@ -9957,13 +9995,7 @@ def code_h(D):
         li r4, 13
         b go
     ptk_m:
-        bl h_mv
-        lwz r3, 0x%(V0)X(r31)
-        addi r3, r3, -1
-        stw r3, 0x%(V0)X(r31)
-        lwz r3, 0x%(V1)X(r31)
-        addi r3, r3, -1
-        stw r3, 0x%(V1)X(r31)""" % pt)
+        bl h_mv""" % pt)
     # 14 jump hold (0x73D4C / 0x73ED0): kinetic 0, JumpHold at P51 (1); end -> 15
     en('pt_jh_en', 0, 1, 13, 0, rate=P(51))
     st('pt_jh_up', "bl h_end\ncmpwi r3, 0\nbeq.far epi\nli r4, 15\nb go")
@@ -10176,7 +10208,9 @@ def code_vis(H, st, call):
       bl h_vset    r4 = mask of visible entries, r5 = mask of the entries to set (bit i = vmt index i)
       bl h_vdef    the model's default (VIS_DEFAULT) on every entry, the blink words zeroed (call it from start)
       bl h_whole   r4 = 0 / 1: the whole model (Behavior::set_visibility)
-    All keep r13-r31 / f14-f31; inside st() bodies r31 is the behaviour (h_visr / h_vsetr take r4 / r5 only).
+    All keep r13-r31 / f14-f31, and h_vis / h_vset / h_vdef return r3 = the behaviour they were given (step 2o: they
+    returned the mesh call's 1, which w_start passed on to set_rhombus); inside st() bodies r31 is the behaviour (h_visr /
+    h_vsetr take r4 / r5 only).
     MAT_VIS kinds need no call: u_vis (every update, from u_pend) sets the playing motion's entries."""
     d = dict(VIS=CF['VIS'], MVIS=CF['MVIS'], MK=MOT_KIND, VSL=MM_SET_VIS, BN=BLINK_N, BN4=BLINK_N + 4, BF=BLINK_F)
     H.asm("""
@@ -10187,6 +10221,7 @@ def code_vis(H, st, call):
         mflr r0
         stw r0, 0x24(r1)
         stmw r28, 0x10(r1)
+        stw r3, 8(r1)
         lwz r12, 0x168(r3)
         lwz r28, 0x%(VIS)X(r12)
         cmpwi r28, 0
@@ -10220,6 +10255,7 @@ def code_vis(H, st, call):
         ori r29, r29, 0xFF
         b hv_loop
     hv_out:
+        lwz r3, 8(r1)
         lmw r28, 0x10(r1)
         lwz r0, 0x24(r1)
         mtlr r0
@@ -10232,6 +10268,7 @@ def code_vis(H, st, call):
         mflr r0
         stw r0, 0x24(r1)
         stmw r28, 0x10(r1)
+        stw r3, 8(r1)
         mr r31, r3
         mr r29, r4
         mr r28, r5

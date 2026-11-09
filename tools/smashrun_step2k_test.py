@@ -107,9 +107,14 @@ class K(J.PM):
         if addr in W.TWIN_PARSE.values():
             c.append(('parse', addr, r(4)))
             self.w32(r(4) + 0x30, 0 if getattr(self, 'empty', False) else 2)
+            # step 2o: the loader's +8 byte (1: a clean parse; 0: step 2a's 3DS-layout file, a token error)
+            t = [k for k, v in W.TWIN_PARSE.items() if v == addr][0]
+            self.uc.mem_write(r(4) + W.TWIN_LOADER[t] + 8, bytes([0 if addr in getattr(self, 'bad', ()) else 1]))
             return self.ret()
         if addr in W.TWIN_DTOR.values():
-            c.append(('dtor', addr, r(3), r(4)))
+            # step 2o: whether a param slot still points at the object being deleted
+            held = [k for k in range(0x61) if self.r32(T.PM + W.SLOTS + 4 * k) == r(3)]
+            c.append(('dtor', addr, r(3), r(4), held))
             return self.ret()
         return J.PM.hook(self, u, addr, size, x)
 
@@ -406,12 +411,13 @@ def main():
               '1 %%, effect 9 = sleep), run by its SleepPowder motion (hashset 0x%08X) %s' % (hs, hb))
 
     # ==== the twins' params
-    def k2(files, prev=None, empty=False):
+    def k2(files, prev=None, empty=False, bad=()):
         m = K(img)
-        m.files, m.empty = set(files), empty
+        m.files, m.empty, m.bad = set(files), empty, set(W.TWIN_PARSE[t] for t in bad)
         m.w32(W.PARAM_MGR, T.PM)
         m.uc.mem_write(T.PM + W.SLOTS, struct.pack('>97I', *[0x50000000 + i for i in range(0x61)]))
         if prev:
+            m.objs = [0] * 4                     # the new objects at other addresses than the previous run's
             for i, o in enumerate(prev):
                 m.w32(D['k2_objs'] + 4 * i, o)
         else:
@@ -431,18 +437,39 @@ def main():
           [c[1] for c in m.calls if c[0] == 'join'] == ['enemy_param_vl_%s.bin' % k for _t, k in W.TWIN_K],
           'k2_twins: each kind\'s file (param/enemy/fs) parsed into a new object of its twin\'s class (ctor(0), the '
           'twin\'s parser): slot[K] = it, slot[twin] too but for zima (the walkers\' donor)')
+    # step 2o: a later run (the next battle, or a second run of the param load) with only zima's file: zima's new
+    # object replaces the old one, which is deleted once no slot holds it; the other three find no file: their
+    # objects stay (not deleted) and are put back in the slots (step 2k deleted them all first and left the slots
+    # on freed objects when the file was missing)
     m2, sl2, objs2 = k2(['enemy_param_vl_zima.bin'], prev=objs)
-    dt = [(c[1], c[2], c[3]) for c in m2.calls if c[0] == 'dtor']
+    dt = [(c[1], c[2], c[3], c[4]) for c in m2.calls if c[0] == 'dtor']
     exp2 = [0x50000000 + i for i in range(0x61)]
-    exp2[0x0E] = objs2[3]
+    for i, (t, k) in enumerate(W.TWIN_K):
+        exp2[W.KIND_OF[k]] = objs2[i]
+        if t != 0x5A:
+            exp2[t] = objs2[i]
     m3, sl3, objs3 = k2([])
     m4, sl4, objs4 = k2(['enemy_param_vl_darios.bin'], empty=True)
     dt4 = [c for c in m4.calls if c[0] == 'dtor']
-    check(dt == [(W.TWIN_DTOR[t], objs[i], 1) for i, (t, _k) in enumerate(W.TWIN_K)] and sl2 == exp2 and
-          objs2[:3] == [0, 0, 0] and sl3 == [0x50000000 + i for i in range(0x61)] and objs3 == [0] * 4 and
-          sl4 == sl3 and objs4 == [0] * 4 and len(dt4) == 1 and dt4[0][3] == 1,
-          'k2_twins: the previous battle\'s objects deleted first (dtor(obj, 1)); a missing file leaves the slots as '
-          'they are; an object that parsed no attacks is deleted and not used')
+    check(dt == [(W.TWIN_DTOR[0x5A], objs[3], 1, [])] and sl2 == exp2 and objs2[:3] == objs[:3] and
+          objs2[3] not in objs and sl3 == [0x50000000 + i for i in range(0x61)] and objs3 == [0] * 4 and
+          sl4 == sl3 and objs4 == [0] * 4 and len(dt4) == 1 and dt4[0][3] == 1 and dt4[0][4] == [],
+          'k2_twins: an old object is deleted (dtor(obj, 1)) only once its replacement is in the slots (no slot holds '
+          'it then); a missing file keeps the old object, in the slots; with none, the slots stay as they are; an '
+          'object that parsed no attacks is deleted and not used %s' % ((dt, objs2, dt4),))
+    # step 2o: a parse error (the loader's +8 byte 0: step 2a's 3DS-layout file at the same path parses G0-G5 and
+    # leaves Lethinium's G6-G8 needles / laser / cannon empty with its attacks there) is deleted and not used, the
+    # previous object kept; with no previous object the slots keep the accessor's
+    m5, sl5, objs5 = k2(['enemy_param_vl_plasmawisp.bin'], bad=(0x57,))
+    m6, sl6, objs6 = k2(['enemy_param_vl_%s.bin' % k for _t, k in W.TWIN_K], prev=objs, bad=(0x57,))
+    dt5 = [(c[2], c[4]) for c in m5.calls if c[0] == 'dtor']
+    dt6 = [(c[2], c[4]) for c in m6.calls if c[0] == 'dtor']
+    new6 = [c[3] for c in m6.calls if c[0] == 'ctor']
+    check(sl5 == sl3 and objs5 == [0] * 4 and len(dt5) == 1 and dt5[0][1] == [] and
+          objs6[0] == objs[0] and sl6[0x57] == objs[0] and sl6[0x12] == objs[0] and objs6[1:] == new6[1:] and
+          sorted(o for o, _h in dt6) == sorted([new6[0]] + objs[1:]) and all(h == [] for _o, h in dt6),
+          'k2_twins: a parse error (the loader +8 byte 0) is deleted, never put in a slot; the previous object (or '
+          'the accessor\'s) stays %s' % ((dt5, objs6, dt6),))
     if len(sys.argv) > 4:
         import fighter_param_vl as V
         import smashrun_twin_params as TP

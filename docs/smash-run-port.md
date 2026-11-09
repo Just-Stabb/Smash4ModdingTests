@@ -2762,3 +2762,103 @@ kuribo's in region E, 0x04BBDEF8 dekakuribo's, 0x04BBE9B0 patapata's); relocatio
 
 **Still open:** the step 2i crash's cause (the log build's lines); the Paratroopa's wings (its `mot` lines); in game:
 the stomps on Big Goomba and Paratroopa, Furiijio's mist and the other 26 banks' two-channel emitters.
+
+## Step 2o: the two crashes (set_rhombus(1) at a spawn; the twins' 3DS-layout params), the Paratroopa's / Koopa's attack cadence, the Big Goomba bounce (log build)
+
+Package smashrun_step2o_v1: `code/` exe_v32 = exe_v31 + `smashrun_walker_cave.py` over its own regions (scratch
+s2o/build32.py; the field cave unchanged, set "step2j"); `data/` the twins' four param files re-shipped
+(param/enemy/fs/enemy_param_vl_{zima,plasmawisp,darios,stalfos}.bin, tools/smashrun_twin_params.py's output, byte-equal
+to steps 2k / 2l's: step 2a's 3DS-layout files at the same paths crash, below). Separately smashrun_step2o_diag_v1
+(`code_diag/`: exe_v32 + tools/diag_step2o_cave.py; sha1 in its README). Readings with addresses: hand_read.json `_framework_step2o`,
+patapata / dekakuribo / plasmawisp `port_step2o`.
+
+**Crash 1: every Big Goomba / Goomba / Waddle Dee / Waddle Doo spawn (the step 2i crash).** The user's code_diag log
+ends with a Big Goomba's spawn (`sp a=23`) and its five mesh switches (`vis m=0..4`, the model's 5 meshes, 0 / 1
+hidden, 2-4 shown), then nothing: no `st` line, though the spawn's first state request comes in the same call; the
+code_diag_novis build (h_vis returning at once) ran past it. Cause: step 2i put `bl h_vdef` at the top of w_start
+(the kinds' slot 41, 0x04B86D14 now) and the next call, set_rhombus 0x026A65BC, takes `this` in r3, which h_vdef
+left as the last set_mesh_visibility_by_index's return value, 1 (0x0342333C `li r3, 1`). set_rhombus then reads
+`lwz r9, 8(r3)` = address 9 and writes through [1]+0x30DC: a fault in Cemu or a write into low memory. It hits every
+kind whose start is w_start and that has a mesh table (kuribo, dekakuribo, waddledoo, waddledee through wd_start):
+Ghos / Tiki Buzz / the Spiny / the Paratroopa / the Pooka set r3 again before their own start (so the log's earlier
+Ghos spawn survived), and with --novis h_vis never changed r3. The unicorn machine of every earlier test has no
+ModelModule (acc+0x3118 = 0), so h_vis returned before r3 changed and set_rhombus's r3 was never checked.
+Fix: h_vis / h_vset (and so h_vdef) keep r3 = the behaviour they were given (saved at 8(r1), back at hv_out
+0x04BC4394), and w_start sets `mr r3, r31` after h_vdef. The rb lines toggling B / C on the fighters' models are their
+own mesh changes (expressions), not a loop.
+
+**Crash 2: Lethinium's cannon shot (the code_diag_novis crash).** Cemu's crash report: an access violation at
+0x02AE06B4 (`lwz r10, 0x10(r30)`, r30 = 0) in the stack generate_article_angle(3) 0x026A7DD8 (from the twin's state
+code 0x026D1658: article 3 = plasmawisp_hadoudan, level 2) -> 0x02C03F2C -> 0x02C030BC -> the spawner 0x026CFB08
+(util_activate 0x02C073A8) -> 0x02C0747C -> 0x02B61BB4 -> the weapon's init 0x02AE050C, which reads the owner's
+param object [mgr+0x1BC] (slot 0x57) and loads r30 = [obj+0x19C]: the G8 vector's element pointer (the object's
+vectors {handler, element size, count +8, data +0xC, flag}: G0-G5 at +0x00..+0x64, G6 +0x148, G7 +0x168, G8 +0x190;
+member list 0x026B60B0). The Pooka spawned a minute earlier and is not in the stack. Run in unicorn (the game's own
+ctor 0x026B37A8 and generic loader 0x033B4770; tools/smashrun_step2o_test.py): the Wii U sm file and the package's
+remapped file (steps 2k / 2l) parse to a full object; step 2a's converted 3DS-layout file, shipped at the same path
+param/enemy/fs/enemy_param_vl_plasmawisp.bin, stops at G5 (8 words fewer) with the loader's error path
+(0x033B4894), leaving G6-G8 (needles, laser, cannon) empty and +0x19C = 0 — but G2 (attacks, +0x30 = 4) parsed, so
+k2_twins (step 2k: "+0x30 > 0") installed it. That is exactly this crash, and the needles / laser would read empty
+vectors the same way. The same holds for the other twins' 3DS-layout files (darios: its G6 empty; zima: from G1;
+stalfos: vectors full, the tail not). Fix (k2_twins, 0x04BC3C18): an object is used only when the loader's +8 byte
+is 1 (TWIN_LOADER: the parser thunks' `addi r3, r12, LOADER`: 0x1A4 / 0xA4 / 0x1BC / 0xAC; 1 after a clean parse, 0
+after the error path) and +0x30 > 0; a refused object is deleted and the slots keep what they had (the previous
+object, else the accessor's Wii U one); and an old object is deleted only after its replacement is in the slots (step
+2k deleted every previous object first: a run that then failed left the slots on freed memory; 0x02D9A5EC has two
+callers, 0x02FB6894 and the scene method 0x02FD94B0). In game the user's install must hold the step 2k / 2l file
+(README); the log build's `k2` line reports what was parsed.
+
+**The Paratroopa's attack cadence (wrong: "rapidly uses its attack").** 3DS hop update 0x72860: the search when
++0x1DC <= 0 AND +0x1E8 <= 0 (0x72970-0x72980: `cmp; ldrle; cmple; bgt`), +0x1DC = search_interval(var) (10), found ->
+face it, -> 5; else both -1 (0x729F8) and move; the cool-down +0x1E8 = PS78 +0x7C (30) when the Bite motion ends
+(state 6 0x72D40-0x72D54, state 7 0x72EF4-0x72F08), counted down only in the hop state. The cave tested `V0 | V1 <=
+0`: once either counter was negative (both run down without a floor) the OR was negative, so it searched every frame
+and cut the cool-down to V0's 11 frames. Fix (pt_hop_up 0x04BC109C): the two tests apart; the landing as the 3DS
+(0x7292C: the request -> 2 and the frame goes on to the wall test, the search and the counters; the var-1 turn still
+returns, 0x72954). Measured in unicorn with the motions' real lengths (Bite 66 frames at 1.5): with a target always in
+the box, 31 hop frames between bites (exe_v31: 12), a search every 10 hop frames without one (exe_v31: every frame).
+**The Koopa** (0x73898) had the same OR, and its counters ran only on the frames it moved (the 3DS: every walk frame,
+0x73928, before the ground test): the leap came 1 walk frame after the landing attack (cool-down 20 ignored); now 21
+(pt_walk_up 0x04BC140C).
+
+**The Big Goomba's bounce (open; log build).** The stomp path is the same code for every stompable kind (u_body:
+slot 20, the fighter's StatusModule(3, 0xB3), u_bounce: float 0x1000006 = W+0x44 = 0.9, the count 0; u_pend writes
+it again while the fighter is in 0xB3) and the unicorn run gives the Big Goomba's its 0.9 (smashrun_step2h_test.py);
+the 3DS slot 21 0x85FE0 is add_damage(P0 f15) and the HP test only (no bounce call of its own); the fighter's bounce
+there is the tread link's answer (W+0x44). What differs in game: the Big Goomba is the only stompable kind that is
+alive after the stomp with hitboxes the stomp does not clear (Goomba / Tiki Buzz die, notify_on_death clears; the
+Paratroopa's P2 attacks are re-armed per state by slot 45; the Koopa's shell disables hit): its slot 45 is empty (as
+the 3DS 0x869F4) and its hitboxes are the motions' ACMD: WalkL / Landing a 0 % push box on HeadN (flinchless, fixed 1),
+RunL a 6 % head box (states 3 and 7 are where the code_diag_novis log's `near` lines found the fighters). A hit
+reaction in the stomp frame would replace the StepJump request. Not proven: the log build's `hs` (the fighter's
+status at the stomp) and `pd` lines (its status every update while the bounce is pending) will show whether the
+fighter enters 0xB3 and what replaces it.
+
+**Pooka (read for the second crash).** Not in the crash's stack. Its start (pk_start) sets r3 = this after h_vdef
+(checked with a live model); its mesh / whole-model calls go through h_vset / h_whole, now returning r3; no other
+fault-capable call was found (the pop's effect / quake / dead item calls are the game's own, tested in step 2j).
+
+**The log build (smashrun_step2o_diag_v1; tools/diag_step2o_cave.py, test tools/diag_step2o_test.py).** Step 2n's
+lines at their exe_v32 addresses (the sites from the assembled cave's labels, each checked against its word: st
+w_chg2 0x04B86E20, vis in hv_loop, whole 0x04BC4450, near / hit in u_body 0x04BB808C), plus `k2` (each k2_twins run:
+the count, Lethinium's object, slots 0x57 / 0x12, slot 0x57's loader byte and +0x19C, the other three objects as
+bits), `hs` (a stomp: kind, state, the fighter's status, y) and `pd` (each pending bounce entry each cave-enemy
+update: slot, status, count, multiplier, y). Space 0x04BCC000-0x04BCE000 (H's code ends at 0x04BC59B0).
+
+**Tests** (exe_v32):
+
+| Test | Result |
+| --- | --- |
+| smashrun_step2o_test.py (new; SM_DIR, the 3DS fs dir, S/s2e/root) | 15 checks, 0 failures (every kind's start with a live model passes this to set_rhombus; h_vis / h_vset / h_vdef return r3; the Paratroopa 31 hop frames between bites, a search every 10; the Koopa 21 walk frames; the four twins' files through the game's own ctor + loader: the sm and the package's clean, the 3DS layout an error, Lethinium's with +0x30 = 4 and +0x19C = 0). On exe_v31: 5 failures (set_rhombus(0x1) for kuribo / waddledee / waddledoo / dekakuribo, r3 = 1 after h_vis, 12 frames, searches every frame, the Koopa's 1 frame) |
+| diag_step2o_test.py (new; the log build against exe_v32) | 21 checks, 0 failures |
+| smashrun_step2k_test.py | 29 checks, 0 failures (k2_twins: an old object deleted only once no slot holds it; a missing file keeps it in the slots; a parse error deleted, never in a slot) |
+| smashrun_step2n / 2m / 2l / 2j / 2i / 2h_test.py | 13 / 21 / 19 / 24 / 12 / 43 checks, 0 failures |
+| smashrun_walker_test.py / flier / flier_motion / field / enemy | 181 / 125 / 13 / 13 / 26 checks, 0 failures |
+| effect_slots_patch_test.py exe_v32 exe_v12 | 47 checks, all ok |
+
+**exe_v32 vs exe_v31, word diff** (s2o/diff32.py, log s2o/t/diff32.log): 9852 words, every one in Smash Run's regions
+(A / B / C / E / G / H and the data words 0x102FE778, 0x102FE944 / 0x102FE95C that point into the moved H code);
+relocations and the file info equal.
+
+**Still open:** the Big Goomba bounce (the log build's hs / pd lines); which file the user's install holds for the
+twins (the `k2` line: loader byte 1 and +0x19C non-zero = the package's file); the Paratroopa's wings.
