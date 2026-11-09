@@ -199,9 +199,10 @@ def material_mta(anim, materials, statics, folder, frames):
 # names' pairing; the game's per-type maths not read). The bone keeps its hash (the OMO's key): only the name changes.
 BILLBOARD_TAGS = {2: '_BILLBOARDWORLD_', 3: '_BILLBOARDWORLD_', 4: '_BILLBOARD_', 5: '_BILLBOARDV_',
                   6: '_BILLBOARDYAXIS_', 7: '_BILLBOARDYAXISV_'}
-# folders whose billboard the port does in code instead (Furiijio's beam: smashrun_walker_cave turns its node to
-# the camera, step 2g v5); tagged, both would turn it
-BILLBOARD_IN_CODE = {'EfffsFuriijioFreezBeamBody_B', 'EfffsFuriijioFreezBeamTop_B'}
+# folders whose billboard the port does in code instead: none since step 2j (Furiijio's beam had its node turned to
+# the camera in smashrun_walker_cave.py from step 2g v5 to 2i; its bones now carry the H3D billboard as the Wii U's
+# _BILLBOARDYAXIS_ tag and the node keeps the 3DS's angles)
+BILLBOARD_IN_CODE = set()
 
 
 def billboard_name(name, flags):

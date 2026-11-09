@@ -2177,3 +2177,105 @@ Run's regions: 0x04B7D630-0x04B7DF00 (E), 0x04B849F0-0x04B849FC (D: w_upd's call
 **Still open:** the mesh switch is read statically (0x034232FC's byte, its 0xFE "not set" default and the draw's use of
 bits 0-1 not run): the in-game check is the first proof; Waddle Dee's parasol article / node, Item::is_haved's second
 test, the shell item 0x94 itself, Darios's shot mesh.
+
+## Step 2j: Pooka (3DS state code); the audit's small fixes; Furiijio's beam billboards in its data
+
+Package smashrun_step2j_v1: `code/` exe_v27 = exe_v26 + `smashrun_walker_cave.py` over its own regions (the Pooka,
+the fixes) + `smashrun_field_cave.py` set "step2j" over its own cave (scratch s2j/build27.py); `data/` the Pooka's
+converted files (model with model.flp and every mesh drawn, motion, animcmd, vl params, sound banks lower case and
+capitalised, its effects: the .ptcl / .efc and the EfffsPookaGogle / EfffsPookaBlowout models) and Furiijio's two
+reconverted beam effect models. Readings with addresses: hand_read.json pooka `port_step2j` (the open points of
+step2h-readings.md re-read), each fixed kind's `port_step2j`, `_framework_step2j`.
+
+**Pooka (pooka 0x20; pk_*, `code_pk`, region H).** A flier-sized object (PK_SIZE 0x240: the aerial module's energy 0
+pointer for the ghost, the slide and the drop; PK +0 deflating, +4 shown, +8 hit). States 1-12 and slots 6 / 12 / 16
+/ 51 / 56 / 60 / 69 / 70 from the 3DS (vtable 0xCC6E0, table 0x10D9A8):
+- 3 walk (0x21678 / 0x22494): Move at P0 f6, a turn check toward the nearest fighter every random(30, 90) frames
+  (-> 4 Turn, reverse_lr at its end), the search every 15 (45 x 40 at (25, 10)) -> 5; a ledge or a wall -> 4.
+- **The ghost / drop choice (re-read, 0x22528-0x22730):** every P0 f7 (10) frames, or at once on check_wall: the
+  nearest fighter T within 200 of the centre C, ray_check(C, T - C, every collision) blocked at H1 short of T and within
+  P0 f9 (15) of C; ray_check(C, T - C, the passable floors left out) blocked no farther -> 8 ghost; otherwise T within
+  30 degrees of straight below (the atan2 range (-120, -60), 0x226E0) -> 9 drop (passable on, speed (0, -1), 10 frames).
+- 5 back-off (Attackhold at 1.5, the stick reversed, 40 frames) -> 6 lunge (W+0x20 2, +0x24 1, kinetic 5, Attack at
+  0.1; P2 entry 0: 2 %, angle 20, kbg 100, bkb 50, size 5, BodyN). The first hit (slot 6 = the 3DS's slot 7, the
+  behaviour module's forwarder 0x02DB9720) or a wall (get_ground_normal(6)): the speed reflected, its angle clamped
+  to 50-90 / 90-130 by P0 f20 / f21, x 0.5 (P0 f19), kinetic 5, AttackModule clear_all (the hitbox ends) -> landing
+  => 7 slide (energy 0's x eased by 0.1) -> 3.
+- **8 ghost (flight re-read, 0x219C4):** kinetic 26, set_correct(0), disable_hit, every mesh off and the model hidden
+  (L65084(0, 0, 0) ends in set_visibility(0): the reading's "goggles shown" was the follow effect 0x7200000, the
+  EfffsPookaGogle model, on node 1); every 30 frames: still inside (ray from it to the fighter blocked within 25, or
+  the ray back blocked within the distance + 20) -> energy 0's speed 0.5 toward the fighter (calc_angle's rotation
+  of (0, 0.5)); clear: set_correct(5), enable_hit, the meshes, the effect removed, -> 1, a search at once.
+- **Inflate / deflate:** slot 69 (0x23A48): HP <= 85 % of max -> 10, returns 1 (no reaction). 10 (0x21F74 / 0x22E90):
+  the launch (x = the damage's speed x (DamageModule +0x6C +0xC), halved; y between 0.45 and 0.2 by HP), Damageballoon
+  at rate 0; for 15 frames the frame moves 1/15 of the way to (V6 - HP) / V6 of end_frame (MotionModule set_frame
+  0x02C5E494 / end_frame 0x02C5E68C, frame +0x3C: the 3DS 0x504928 / 0x953F98 / +0x44); held 100 frames (or popped if
+  dead); deflating 0.3 a frame with set_current_damage (HP climbs back to the threshold); frame 0: HP 90 %,
+  reset_gravity, -> 1. Slots 56 / 60 / 70 / 12 / 16 keep it in the framework's damage states (their Wii U callers:
+  slot 56 every frame of the common damage states (0x026A05E8.., before 59), 60 when they end (0x026A03AC..), 70
+  from notify_on_damage 0x026A3564 when no reaction runs, 69 before the reaction).
+- **Pop (0x217F4 / 0x22870):** dead (flags 2) -> 15 balloon frames => 11: kinetic -1, the model hidden, effect
+  0x7200001 at node 3 x3, P2 entry 1 (6 %, angle 70, kbg 100, fixed 60, size 30); its first frame create_dead_item(1, 0)
+  (Wii U 0x02DB3944) and request_quake(3); removed after 28 frames (APPROXIMATED: SoundModule is_playing(0x6B10005), the
+  Explosion tone is 9307 samples at 20000 Hz). DEFEATED set (the removal's defeat path, as the other kinds).
+- Meshes (L65084, `pk_mesh` over `h_vset` / `h_whole`): body_normal_L / _R by lr, the damage / normal eye sets; the
+  start sets the H3D defaults (`h_vdef`). Never stomped (tread area off, TREAD 0). FLIP_TABLE (its model.flp).
+- Approximated / not ported: the bounce direction off a hit object (the nearest fighter's position stands in for the
+  hit object's center_pos), the pop's timer, sounds, update_weaken, the balloon launch's ray_check_from_pos lift, the
+  status 0x2711 request, slot 11's link / hit-stop calls.
+- `create_dead_item` 0x02DB3944 (the 3DS 0x7B1984's twin: the same EnemyManager +0x5EC test first) returns at once
+  unless the manager's category is 0 (fs): on the Smash Run stages (sm, field cave B) no enemy drops a dead item,
+  at the removal or anywhere.
+
+**The audit's fixes** (accuracy-audit.md rows marked fixed; each from its 3DS address):
+- Waddle Doo: slot 69 `do_69` (0x7E0E0: the hit effect 0x7190001 at center_pos, the old one removed, the 600-frame
+  leave timer reset at 0x7E12C; returns 0); the walk's random hop (0x7D568: every 61 walk frames random(1, 100) <= 50)
+  -> state 9 = the 3DS's 6 (0x7CE10 / 0x7D2CC: Jump, Fall when falling); the Fall switch in 5 too (0x7D6F0); the hop
+  landing threshold 0.5 (0x7D77C). The leave timer's reset by the beam (0x7D62C) waits for the beam.
+- Shy Guy: slot 69 `hh_69` (0x1BF70: the run timer = 0); the wall hop's landing threshold 0.5 (0x1B5B8).
+- Waddle Dee: the parasol fall (0x7C6BC / 0x7C8E0) in the aerial module (a flier-sized object; the start builds it):
+  the module's uniform mode at (current x, -P0 f5 0.2) stands in for set_mode_normal(0, 0, 0.0005, 0, 10, 10), then
+  update(stick x, -1, true) each frame (APPROXIMATED: no mode 0, the 0.0005 stick acceleration left out). Its slot 69
+  (step 2i) drops the parasol (var + 2); the parasol article itself is still not ported.
+- Goomba: the notice hop's ledge check (0x33314) with the Wii U check_cliff_distance_lr 0x026A6CF4 (f1 distance, f2
+  lr; 0x026A6D88 is its speed caller); the collapse's create_dead_item(1, 10) on its frame 1 (0x32A08).
+- White Bear: the quake hold's end tests IN_VIEW (0x026A96BC = 3DS 0x9EA804): in view -> 7, else -> 3.
+  set_weak_param(5, 2.0) is still missing: 3DS DamageModuleImpl::set_weak_param 0x4D34C4 -> [DM+0x68] vt+0x84 =
+  0x5F6D44 (one {kind, multiplier} entry, count 1); the Wii U DamageModule's slot 43 (0x02C23648) forwards to its inner
+  object's vt+0x15C with the accessor, and no twin of 0x5F6D44 was found.
+- Furiijio's beam: `tools/s3ds_effect_models.py` BILLBOARD_IN_CODE is empty, so EfffsFuriijioFreezBeamBody_B / Top_B's
+  bones are tagged _BILLBOARDYAXIS_ (H3D mode 6) and the game turns their planes to the camera; BeamN keeps the 3DS's
+  (0, a lr, 90) (fu3_en / fu6_en; fu_node's x x -lr gone): the step 2g v5 / v6 turn is removed, the placement and
+  length unchanged.
+
+**Spawner** (`smashrun_field_cave.py` set "step2j", the default): step2h's 32 entries plus the Pooka twice (placement
+1): 34 entries; requests + 0x20 (its effect bank 0x720). Code to 0x04B7D5DC (CODE_LIMIT 0x04B7D600).
+
+**Tests** (exe_v27):
+
+| Test | Result |
+| --- | --- |
+| smashrun_step2j_test.py (new) | 22 checks, 0 failures (13 Pooka, 9 fixes) |
+| smashrun_step2i_test.py (DATA_ROOT the step 2i package's data/) | 10 checks, 0 failures (the VIS tables: 9 kinds with Pooka) |
+| smashrun_step2h_test.py (S/s2e/root) | 41 checks, 0 failures |
+| smashrun_walker_test.py (S/s2e/root: Pooka's motion / animcmd in it) | 179 checks, 0 failures (F2 new(SIZE): Waddle Dee 0x230; Waddle Doo 9) |
+| smashrun_flier_test.py | 123 checks, 0 failures (Furiijio's BeamN (0, a, 90); region G's last word may hold data) |
+| smashrun_flier_motion_test.py | 11 checks, 0 failures |
+| smashrun_field_test.py --set step2j | 13 checks, 0 failures |
+| smashrun_enemy_test.py (S/s2e/root) | 26 checks, 0 failures |
+| effect_slots_patch_test.py exe_v27 exe_v12 | 47 checks, all ok |
+| s3ds_enemy_test.py pooka | 13 checks, 0 failures |
+| s3ds_effect_models_test.py (every kind, a fresh conversion) | 99 models, 230 textures, 0 failures |
+| s3ds_effects_test.py (VANILLA_DIR the fighter ptcl) | 52 files, 238 emitters, 0 failures |
+
+**exe_v27 vs exe_v26, word diff** (s2j/diff27.py, log s2j/diff27.log): 8929 words, all in Smash Run's regions and
+sites: the hook words 0x02D9A46C (T2), 0x02D9A618 (S2), 0x02D9B6F8 (D), 0x02DB40E4 (notify_on_remove), 0x02DB4B20
+(initialize_after) re-targeted to the moved code; the field cave 0x04B7D16C-0x04B7D5DC; E 0x04B7D630-0x04B7DD7C; D
+0x04B849F0-0x04B849FC; A 0x04B8691C-0x04B87D9C; B 0x04B89250-0x04B8A000; C 0x04BB8004-0x04BB83A0; G and the
+data 0x04BB8774-0x04BC0000 (a run ends at 0x04BC0040, into H); H 0x04BC00C0-0x04BC4168 (code to 0x04BC3D6C, data
+after it); data section 0x1008EC68 / 0x1008F1D4 / 0x1008FFCC (the
+twins' slot 38 words, TWIN_FLIP). Relocations and the file info equal.
+
+**Still open:** the hit object's centre for the Pooka's bounce (BattleObjectAccessor::center_pos / is_active twins),
+White Bear's set_weak_param, Waddle Dee's parasol article, update_weaken; the big ones for the next step: Waddle Doo's
+beam, Churine's sleep powder, the four twins' params / AI, sounds.

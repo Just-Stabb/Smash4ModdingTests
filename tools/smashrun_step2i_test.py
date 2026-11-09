@@ -90,9 +90,9 @@ def main():
         res[n] = (t[0] == len(W.VMT[n]) and img.u32(cfg[n] + W.CF['VIS']) == a and
                   all([W.NUD_MESHES[n][i] for i in ix] == [e] * len(ix) and ix for ix, e in zip(idx, W.VMT[n])) and
                   t[1] == sum(v << i for i, v in enumerate(W.VIS_DEFAULT[n])))
-    check(all(res.values()) and len(res) == 8 and
+    check(all(res.values()) and len(res) == 9 and
           [b for b in struct.pack('>I', img.u32(D['vis_dekakuribo'] + 8 + 8))] == [2, 3, 4, 0xFF],
-          'tables: CFG VIS -> {n, H3D default mask, per vmt entry its NUD meshes} for the 8 ported kinds (Pooka\'s '
+          'tables: CFG VIS -> {n, H3D default mask, per vmt entry its NUD meshes} for the 9 ported kinds (step 2j: Pooka\'s too; Pooka\'s '
           'table is built once it is a walker; Big Goomba\'s normal_mh = NUD meshes 2 / 3 / 4) %s' % res)
     if root:
         res = {}

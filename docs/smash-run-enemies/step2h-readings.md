@@ -307,6 +307,10 @@ and `create_item_and_throw`.
   has item 0x94's code and files; the colour per material frame.
 - Pooka: the ghost / jump choice in 3 and the ghost's flight speed were not fully re-read; the callers of slots
   56 / 60 / 70.
+  Resolved in step 2j (hand_read.json pooka `port_step2j`): the choice (two ray_checks, the passable floors in or
+  out, and a 30-degree "below" test for the drop), the flight (0.5 a frame toward the fighter, every 30 frames), the
+  slot callers (56 every frame of the common damage states, 60 when they end, 70 from notify_on_damage without a
+  reaction). Correction: the ghost hides the whole model; the goggles are the follow effect 0x7200000.
 - Green Shell: the fighter-side multiply and the item's tread path (above).
 
 ## Resolved in step 2h (docs/smash-run-port.md, "Step 2h")

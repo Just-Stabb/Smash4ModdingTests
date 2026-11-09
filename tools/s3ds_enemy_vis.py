@@ -53,7 +53,8 @@ import omo  # noqa: E402
 
 WIIU_KINDS = ('crazyhand', 'masterhand', 'mcanimal', 'mcblade', 'mcgiant', 'yellowdevil')
 # step 2i: the kinds whose meshes the cave switches (smashrun_walker_cave.py VMT / MAT_VIS, ported kinds): no baseline
-CODE_SWITCHED = ('dekakuribo', 'ghos', 'kuribo', 'patapata', 'tikibuzz', 'togezo', 'waddledee', 'waddledoo')
+CODE_SWITCHED = ('dekakuribo', 'ghos', 'kuribo', 'patapata', 'pooka', 'tikibuzz', 'togezo', 'waddledee',
+                 'waddledoo')      # step 2j: pooka
 HIDE = ('damage', 'blink', 'tear', 'eye_close', 'wideopen')
 # alternatives a behaviour shows one of: (kind, regex of the family); the first (sorted) stays
 ALT = {

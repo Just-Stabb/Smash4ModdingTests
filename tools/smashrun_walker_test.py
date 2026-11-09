@@ -54,6 +54,7 @@ REVERSE_LR = 0x026A7A20
 SET_LR = 0x026A780C
 FAILS = []
 VT_ADDR = [0]
+EXTRA_STUBS = {}                # step 2j: cave labels run as stubs (the aerial helpers), filled by main
 GKINDS = [w for w in W.WALKERS if not w.get('flier') and not w.get('step2h')]   # the walkers (step 2e's fliers:
 # smashrun_flier_test.py; step 2h's kinds: smashrun_step2h_test.py)
 WM_SETF, WM_SETI = 0x02000010, 0x02000014   # step 2h: the fighter WorkModule's set_float / set_int (vt +0x4C / +0x8C)
@@ -108,6 +109,9 @@ class Machine:
         w(ARRP, ARR)
         w(ARR + 4, EN)
         w(ARR + 0x14, FLAGS)
+        w(W.PARAM_MGR, HEAP + 0x25000)          # step 2j: the gl entries (every kind -> entry 0; gravity 0.25)
+        w(HEAP + 0x25000 + W.GL_BASE, HEAP + 0x26000)
+        self.wf(HEAP + 0x26000 + 0x120, 0.25)
 
     def w32(self, a, v):
         self.uc.mem_write(a, struct.pack('>I', v & 0xFFFFFFFF))
@@ -132,6 +136,12 @@ class Machine:
     def hook(self, u, addr, size, _):
         r = lambda n: u.reg_read(R[n])  # noqa: E731
         c = self.calls
+        if addr in EXTRA_STUBS or addr in (W.CHECK_CLIFF_DIST, W.CREATE_DEAD_ITEM, W.AER_CTOR, W.AER_UPDATE_XY,
+                                           W.IN_VIEW):
+            # step 2j: Goomba's notice ledge / collapse dead item, the aerial module (Waddle Dee), the bear's view
+            c.append((EXTRA_STUBS.get(addr, hex(addr)),))
+            self.ret(int(self.cliff) if addr == W.CHECK_CLIFF_DIST else (1 if addr == W.IN_VIEW else None))
+            return
         if addr in self.creates:
             c.append(('create', addr, r(3), r(4), r(5)))
             self.ret(0x7000 + r(4))
@@ -445,6 +455,7 @@ def main():
     VT_ADDR[0] = D['vt']
     cfg = {w['kind']: D['cfg_' + w['name']] for w in W.WALKERS}
     fn = dict(A.labels)
+    EXTRA_STUBS.update({fn[k]: k for k in ("f_amode", "f_aupd", "f_anone")})     # step 2j: the aerial helpers
     byname = {w['name']: w for w in W.WALKERS}
 
     # hooks and space
@@ -493,11 +504,11 @@ def main():
         calls = [c for c in m.calls if c[0] in ('new', 'ctor', 'create')]
         labels = [m.r32(o + 0xB0 + 4 * i) for i in range(9)]
         want_labels = [0xCCCCCCCC] * 9 if w.get('no_damage_labels') else W.damage_labels(w)    # none: not called
-        check(calls == [('new', W.OBJ_SIZE), ('ctor', OBJ, ACC, k, 2)] and m.r32(MOD + 8) == OBJ and
+        check(calls == [('new', w.get('size', W.OBJ_SIZE)), ('ctor', OBJ, ACC, k, 2)] and m.r32(MOD + 8) == OBJ and
               m.r32(o + 0xE0) == D['vt_' + w['name'] if w.get('vtover') else 'vt'] and init == exp and m.r32(o + 0xA8) == D.get('hs_' + w['name'], 0) and
               labels == want_labels and m.r32(o + 8) == k,
               'F2: %s 0x%02X -> new(0x%X), ctor(acc, K, var), module+8, vptr VT, BehaviorImpl init, CFG, '
-              'hashsets 0x%X, damage labels %s' % (w['name'], k, W.OBJ_SIZE, m.r32(o + 0xA8), labels))
+              'hashsets 0x%X, damage labels %s' % (w['name'], k, w.get('size', W.OBJ_SIZE), m.r32(o + 0xA8), labels))
     res = {}
     for k in [0x30, 0x0E, 0x12, 0x1D, 0x57, 0x5A, 0x50, 0x60, 0x00, 0x02, 0x2F, 0x4F, 0x61]:
         m = Machine(img)
@@ -1076,10 +1087,11 @@ def main():
 
     # ---- Waddle Dee
     got = enters('waddledee')
-    exp = {1: (8, 0, (8, 1.0, 1), ''), 2: (8, 0, (11, 1.0, 1), ''), 3: (0, 1, (10, 1.0, 0), ''),
+    exp = {1: (8, 0, (8, 1.0, 1), ''), 2: (None, 0, (11, 1.0, 1), ''), 3: (0, 1, (10, 1.0, 0), ''),
            4: (1, 1, (13, 1.2, 1), ''), 5: (0, 1, (12, 1.0, 0), ''), 6: (5, 0, (9, 1.0, 0), ''),
            7: (None, None, (0, 0.0, 0), 'bullet')}
-    check(got == exp, 'waddledee enters as the 3DS\'s (the parasol fall: kinetic 8 with ParasolFall): %s' % got)
+    check(got == exp, 'waddledee enters as the 3DS\'s (step 2j: the parasol fall in the aerial module, no kinetic '
+          'change, ParasolFall): %s' % got)
     wd = world('waddledee', 4, lr=-1.0)
     m = wd.m
     wd.run(300)
@@ -1120,11 +1132,12 @@ def main():
     got = enters('waddledoo')
     exp = {1: (8, 0, (10, 1.0, 1), ''), 2: (0, 1, (12, 1.0, 0), ''), 3: (1, 1, (14, 1.0, 1), ''),
            4: (0, 1, (13, 1.0, 0), ''), 5: (5, 0, (11, 1.0, 0), ''), 6: (None, None, (2, 0.0, 0), 'bullet'),
-           8: (15, 0, (10, 0.0, 0), '')}
+           8: (15, 0, (10, 0.0, 0), ''), 9: (5, 0, (11, 1.0, 0), '')}     # step 2j: 9 the random hop (3DS 6)
     check(got == exp, 'waddledoo enters as the 3DS\'s: %s' % got)
     wd = world('waddledoo', 3, lr=-1.0)
     m = wd.m
     m.found, m.target_x = 0, 50.0
+    m.w32(OBJ + W.V(4), 0xFFFFFC18)       # step 2j: the random hop's counter held back (tested in smashrun_step2j_test)
     wd.run(70)
     st = wd.states()
     srch = [c for e in wd.log for c in e[4] if c[0] == 'search'][:1]

@@ -7,7 +7,9 @@ Prints rpx_patch.py args (after the standard build's and tools/smashrun_menu.py'
 
 On a battle whose stage kind (`*(0x1047277C)`) is one of the Smash Run slots (0x82-0x95, stage_slot_cave.py)
 the game's own enemy system runs as in Classic's Master Fortress. The enemies (ENEMY_SETS):
-- "step2g" (the default): "step2f" plus Propeller Heiho 0x47 (placement 2, three times in the 23-entry turn;
+- "step2j" (the default): "step2h" plus the Pooka 0x20 (placement 1, twice in the 34-entry turn; docs/smash-run-
+  port.md, "Step 2j"); requests step2h's twenty-one + 0x20.
+- "step2g": "step2f" plus Propeller Heiho 0x47 (placement 2, three times in the 23-entry turn;
   docs/smash-run-port.md, "Step 2g"); requests step2f's seventeen + 0x47.
 - "step2f": "step2e" plus Furiijio 0x1A (placement 2, three times in the 20-entry turn; docs/smash-run-
   port.md, "Step 2f"); requests step2e's sixteen + 0x1A.
@@ -108,10 +110,19 @@ ENEMY_SETS = {
                 (0x4E, 2, 0), (0x1A, 2), (0x03, 1, 3), (0x47, 2), (0x1D, 2), (0x0E, 1), (0x19, 1), (0x1F, 1)),
                (0x12, 0x1D, 0x30, 0x0E, 0x57, 0x58, 0x59, 0x01, 0x0B, 0x13, 0x19, 0x1F, 0x08, 0x40, 0x11, 0x0F, 0x1A,
                 0x47, 0x23, 0x4E, 0x03)),
+    # step 2j: step2h's set and the Pooka 0x20 (placement 1: it walks), twice in the 34-entry turn; requests step2h's
+    # twenty-one + 0x20 (its effect bank 0x720: the ghost's goggles, the pop's burst)
+    'step2j': (((0x11, 2), (0x23, 1), (0x03, 2, 0), (0x1A, 2), (0x20, 1), (0x4E, 2, 0), (0x47, 2), (0x0F, 2),
+                (0x01, 1), (0x40, 1), (0x03, 1, 2), (0x11, 2), (0x4E, 1, 1), (0x12, 2), (0x1A, 2), (0x23, 1),
+                (0x47, 2), (0x03, 2, 1), (0x0F, 2), (0x0B, 1), (0x20, 1), (0x08, 2), (0x11, 2), (0x30, 1), (0x0F, 2),
+                (0x13, 1), (0x4E, 2, 0), (0x1A, 2), (0x03, 1, 3), (0x47, 2), (0x1D, 2), (0x0E, 1), (0x19, 1),
+                (0x1F, 1)),
+               (0x12, 0x1D, 0x30, 0x0E, 0x57, 0x58, 0x59, 0x01, 0x0B, 0x13, 0x19, 0x1F, 0x08, 0x40, 0x11, 0x0F, 0x1A,
+                0x47, 0x23, 0x4E, 0x03, 0x20)),
     'smashrun': (((0x12, 2), (0x1D, 2), (0x30, 1), (0x0E, 1)), (0x12, 0x1D, 0x30, 0x0E, 0x57)),
     'minions': (((0x57, 2), (0x58, 2), (0x59, 1), (0x5A, 1)), (0x57, 0x58, 0x59, 0x5A)),
 }
-ENEMIES = 'step2h'
+ENEMIES = 'step2j'
 SPAWNS, REQUESTS = ENEMY_SETS[ENEMIES]
 KINDS = tuple(e[0] for e in SPAWNS)
 # step 2h: the alive count sums each kind's counter once (KINDS repeats the kinds spawned more than once a turn,

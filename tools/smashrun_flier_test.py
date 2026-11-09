@@ -440,7 +440,7 @@ def main():
     info = [s for s in img.secs if s[1] == 0x80000004][0]
     import rpx_patch
     region = struct.unpack('>I', bytes(rpx_patch.section_data(img.d, info))[4:8])[0]
-    check(region == W.TEXT_REGION and img.u32(W.LIMIT_G - 4) == 0,
+    check(region == W.TEXT_REGION and img.u32(W.LIMIT_G - 4) is not None and img.u32(W.LIMIT_H - 4) == 0,
           'the RPL file info\'s text region 0x%X (code memory to 0x%08X); the text reaches it' % (region,
                                                                                                0x02000000 + region))
     g = A.g

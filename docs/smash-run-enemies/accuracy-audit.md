@@ -8,6 +8,9 @@ Severity: **wrong** (differs from the 3DS), **missing** (3DS behaviour not porte
 
 ## Prioritised fix list: the top 15 by player impact
 
+Step 2j (docs/smash-run-port.md "Step 2j") fixed: 6 (the parasol fall; the dropped parasol is still missing), 7 (the view test; set_weak_param still missing), 8, 9, 10, 15, and Waddle Doo's leave-timer reset on damage (1, the beam still missing); Furiijio's beam billboards in its effect models' data.
+
+
 1. Waddle Doo: the beam (its only attack) and its trigger are missing; the leave timer is never reset (600 frames after spawning it leaves mid-fight)
 2. Churine: the sleep powder (its only attack) and its search are missing: harmless except its death flight
 3. Plasma Wisp: runs on the Wii U sm params: laser 5 % / bkb 60 (3DS 3 / 50), cannon 10 / 160 (9 / 150), search 240 / 200 / 150 (200 / 140 / 20), level timers
@@ -138,7 +141,7 @@ Tier 3 (minor):
 | state frame counter order | common_state_func 0x3DA218: enter, slot 54 (vt+0xD8, reset), update, slot 55 (vt+0xDC, ++) | V-counters reset in the enter, incremented at the end of the update | ok |  |
 | fall: speed gate | Kuribo 1 (0x32C70), Waddle Doo 1 (0x7D21C), White Bear 1, Waddle Dee 1: is_touch(8) only; Shy Guy 1 (0x1B0A8) tests speed y <= 0 first | g_fall_up always waits for h_vy0 <= 0 | approximated | a CFG flag: skip h_vy0 for the kinds whose 3DS fall has no speed test |
 | speed y test energy mask | Kuribo 4 (0x325F4) get_sum_speed3f(-9) (every energy but 3) | h_vy0 = get_current_speed 0x026A678C = get_sum_speed3f(1) | approximated | call the Wii U get_sum_speed3f with -9 for the Kuribo notice |
-| slot 69 (on damage) for the walkers | Shy Guy 0x1BF70 (run timer +0x174 = 0), Waddle Doo 0x7E0E0 (leave timer = 600, hit effect 0x7190001 at center_pos), Waddle Dee 0x7C938 (parasol helpers 0x5CF90 / 0x5CF18), Churine 0x3DDE8 (powder effect removed in 7); all return 0 | VT slot 69 = BehaviorImpl's for these kinds (F69 0) | missing | F69 handlers: h69 V2 = 0; o69 V7 = CFG LEAVE + REQ_EFFECT0(0x7190001, center_pos, 1.0) |
+| slot 69 (on damage) for the walkers | Shy Guy 0x1BF70 (run timer +0x174 = 0), Waddle Doo 0x7E0E0 (leave timer = 600, hit effect 0x7190001 at center_pos), Waddle Dee 0x7C938 (parasol helpers 0x5CF90 / 0x5CF18), Churine 0x3DDE8 (powder effect removed in 7); all return 0 | VT slot 69 = BehaviorImpl's for these kinds (F69 0) | fixed in step 2j for Shy Guy (hh_69) and Waddle Doo (do_69); Waddle Dee's since step 2i (wd_69); Churine's (the powder effect) with its powder | F69 handlers: h69 V2 = 0; o69 V7 = CFG LEAVE + REQ_EFFECT0(0x7190001, center_pos, 1.0) |
 | variations | every kind has per-variation rows / behaviour (P0[var], var-gated ledge turns, Gordo 1-3 movers, Waddle Dee 2/3 parasol-less, Furiijio / Paratroopa rows) | the spawner makes variation 0 (Spiny / Paratroopa pass the create param) | missing | spawn the 3DS layout variations (field_smash placement data) once the kinds are stable |
 | sounds | every play_se / stop_se below (Behavior::play_se 0x7B59A8) | none called | missing | see the sound-porting plan |
 | ACMD sounds in the converted animcmd | Sound_Effect with 3DS ids: Shy Guy Run 0x69B0001 / RunBrake 0x69B0003, White Bear QuakeUp 0x6CC0000 / QuakeLanding 0x6CC0001, Big Goomba 0x2910000-0x2910009, Paratroopa 0x28E0000 / 0x28E0001 / 0x28E0003 / 0x28E0004 | tools/s3ds_enemy.py copies the ACMD byte-swapped; the kinds with hashsets (Kuribo, Shy Guy, Churine, White Bear, Big Goomba, Paratroopa) run them, so these ids reach the Wii U sound module unchanged | wrong | remap the Sound_Effect ids with the bank-id table (sound plan) when converting; until then they play whatever the Wii U has at that id, or nothing (check in game) |
@@ -150,13 +153,13 @@ Tier 3 (minor):
 | states / transitions 1-10 | 0x32760..0xB4088 (spec states 1-10) | g_fall / g_land / k_walk / k_ntc / k_run / k_brk / k_rt / k_col / g_dead / remove | ok |  |
 | walk search | 3: (f16c % 100) == 0, check_target(2, (10, 10), (100, 40)), behind -> reverse_lr, interrupt 4 (0x32F40) | k_walk_up: V0 % 100, h_srch group 0, h_dx, goi 4 | ok |  |
 | walk wall / ledge re-entry | 3: reverse_lr + change_state_interrupt(3) (re-enter now) | h_rev + h_chg 3 (deferred) | approximated | h_chgi |
-| notice hop x speed | 4 enter 0x33314: check_cliff_distance_lr(f7 x (f8 / gl+0x120 + 2) x -2, -lr): a ledge behind -> E+0x20 = 0, else -0.4 | k_ntc_en: E+0x20 = -0.4 always | approximated | CHECK_CLIFF_LR 0x026A6D88 with that distance and -lr; 0 on a hit |
+| notice hop x speed | 4 enter 0x33314: check_cliff_distance_lr(f7 x (f8 / gl+0x120 + 2) x -2, -lr): a ledge behind -> E+0x20 = 0, else -0.4 | k_ntc_en: E+0x20 = -0.4 always | fixed (step 2j: kc_ntc_en, Wii U check_cliff_distance_lr 0x026A6CF4) | CHECK_CLIFF_LR 0x026A6D88 with that distance and -lr; 0 on a hit |
 | notice timers | 4: airborne until speed y <= 0 and ground; then f16c > 30 -> 5, f170 = 0 | V2 / V0 > P3 30, V1 = 0 | ok |  |
 | run | 5: rate 1.0, kinetic 10; search every 60 run frames (150 x 60, offset (0, 10)); behind -> 7; var 1 ledge clear + 7; wall -> 7; > 110 -> 6 | k_run_up | ok |  |
 | brake / run turn | 6 RunBrakeL kinetic 2; 7 RunTurnL, end reverse_lr, interrupt 5 (f168 == 5) else 3 | k_brk / k_rt: always => 5 | ok | 7 is only entered from 5 |
 | contact attack | P2 entry 0 in 5: power 1, angle 100, kbg 100, fkb 80, bkb 0, size 3, node 4, offset (-1, 0, 0) | KURIBO_BUMP (identical, checked against the vl) | ok |  |
 | death flight | 9: Damage at rate 0, bullet(), P2 entry 1 (power 2, angle 361, kbg 100, bkb 50, size 3, node 2); flag 8 -> 10 | g_dead_en / g_dead_up, BULLET_ATK | ok |  |
-| stomp -> Collapses | 8 (slot 21): kinetic 0, Collapses, notify_on_death; frame f16c == 1 create_dead_item(1, 10, 0, 0) (0x32A08); end -> 10 | k_col_en / k_col_up; the item drop is the removal's defeat path (fix v3) | approximated | call the Wii U create_dead_item twin on frame 1 (find it beside create_item 0x026A8D78) |
+| stomp -> Collapses | 8 (slot 21): kinetic 0, Collapses, notify_on_death; frame f16c == 1 create_dead_item(1, 10, 0, 0) (0x32A08); end -> 10 | k_col_en / k_col_up; the item drop is the removal's defeat path (fix v3) | fixed (step 2j: kc_col_up calls create_dead_item 0x02DB3944 on frame 1; it drops nothing in the sm category, as the removal's call) | call the Wii U create_dead_item twin on frame 1 (find it beside create_item 0x026A8D78) |
 | tread box | 3DS area 0 {on, node 2, 14 x 8, 0, 0} moves with node 2 | TREAD_BOX (7, 2.53, 4) around the posture, not animated | approximated | node_global_position(2) as Tiki Buzz does (v5) |
 | sound: notice | 4 enter 0x333A4 play_se(0x28D0002) | none | missing | sound plan |
 | sound: collapse | 8 enter 0x323A4 play_se(0x28D0004) | none | missing | sound plan |
@@ -168,7 +171,7 @@ Tier 3 (minor):
 |---|---|---|---|---|
 | states 1-10, 12-16 | 0x1A898.. | g_* / h_* (table numbered as the 3DS) | ok |  |
 | state 11 (run wall hop: Run, kinetic 5, sound, landing -> 2 / 10) | 0x1B92C / 0x1BBCC | not in the table (no caller found in the spec) | missing | port it with 6's code if a caller turns up (variations 1 / 2) |
-| hop landing threshold | 6 update 0x1B5B8: \|y - y0\| > P@0x90 = 0.5 and ray_check == 0 -> 2, else -> 5 | HOPTHR 1.0 (hop=(1.0, 2, 0); the docstring's "inferred" 1.0) | wrong | hop[0] = 0.5 |
+| hop landing threshold | 6 update 0x1B5B8: \|y - y0\| > P@0x90 = 0.5 and ray_check == 0 -> 2, else -> 5 | HOPTHR 1.0 (hop=(1.0, 2, 0); the docstring's "inferred" 1.0) | fixed (step 2j: HOPTHR 0.5) | hop[0] = 0.5 |
 | hop wall test | ray_check(lr, 5, 1) 0x1B5B8 | check_wall 0x026A68E4 | approximated | RAY_CHECK 0x02C39F18 is mapped (step 2g): use it |
 | wait | 3: Wait twice, then random_range(1, 100) <= 50 reverse_lr, -> 4; the search runs that frame too (it can override with 7) | h_wait_up: -> 4 skips the search | approximated | fall through to hh_look after the -> 4 |
 | walk | 4: walk row (0.3 / 0.3 / 0 / 0.5 / 2.5), kinetic 1; random_range(60, 120); wall -> 6; var 1/2 ledge -> 5; search every 30 (120 x 40, (10, 10)) -> 7 | h_walk_* | ok |  |
@@ -176,7 +179,7 @@ Tier 3 (minor):
 | hold / run | 8: f170 = P0[var].f4 (var 0: 0); 9: f174 = 80 only if <= 0, run row (0.8, 0.0075), kinetic 3; wall: var 1/2 check_wall_jump_or_turn -> 6 else 10 (0x1B70C); off ground f174 = 0 | h_hold / h_run | ok | var 0 only |
 | brake | 12: RunBrake, kinetic 2; check_cliff -> clear_speed_x (0x1BB50); end and stopped -> 14 | h_brk_up: h_clear (clear_speed_all) | approximated | clear_speed_x 0x026A67F4 |
 | settle | 14: kinetic 21, Fall; kinetic flag 1 -> 4 | h_set_*: + a 120-frame guard (Wii U kinetic 21 unverified) | approximated | check kinetic 21 on the Wii U, drop the guard |
-| run timer on damage | slot 69 0x1BF70: +0x174 = 0 | not ported | missing | F69: V2 = 0 |
+| run timer on damage | slot 69 0x1BF70: +0x174 = 0 | not ported | fixed (step 2j: hh_69) | F69: V2 = 0 |
 | contact / bullet | P2 entry 0 (state 9) power 1, angle 50, kbg 100, fkb 60, size 4, offset (0, 8, 1); entry 1 (15) | HEIHO_BUMP / HEIHO_BULLET (identical) | ok |  |
 | sounds | play_se(0x69B0002): 6 enter 0x1AC50, 7 enter 0x1BA88, 7 re-hop 0x1BDD0, 11 enter 0x1B99C; ACMD Run 0x69B0001, RunBrake 0x69B0003 | none (ACMD ids unmapped) | missing | sound plan |
 
@@ -184,7 +187,7 @@ Tier 3 (minor):
 
 | item | 3DS (address, value) | our port (label / value) | severity | suggested fix |
 |---|---|---|---|---|
-| parasol fall (state 2; variation 0 = the spawned one) | EnemyAerialModule set_mode_normal(accel P0.f6 0.0005, max 10, 10), speed (x kept, -0.2), ParasolFall loop, aerial update with the stick each frame | d_para_en: a normal fall (kinetic 8) with the ParasolFall motion | wrong | the flier aerial module (AER, as Paratroopa's pt_*): set_mode_normal / uniform (0, -0.2) and its update |
+| parasol fall (state 2; variation 0 = the spawned one) | EnemyAerialModule set_mode_normal(accel P0.f6 0.0005, max 10, 10), speed (x kept, -0.2), ParasolFall loop, aerial update with the stick each frame | d_para_en: a normal fall (kinetic 8) with the ParasolFall motion | fixed (step 2j: wd_para_en / wd_para_up in the aerial module; its uniform mode stands in for mode 0, the 0.0005 stick acceleration left out) | the flier aerial module (AER, as Paratroopa's pt_*): set_mode_normal / uniform (0, -0.2) and its update |
 | parasol drop | slots 13 / 69 / 71 -> L5CF90 generate_article(0) (the parasol weapon) for var 0 / 1 | not ported (no weapon kind) | missing | a weapon article, or an item-like prop |
 | stomp | slot 21 0x7BF04: parasol variations write P@0x8C into the parasol timer | w_tread TREAD 0 (nothing) | missing | port with the parasol |
 | walk / turn / jump | 4: Walk 1.2, every 100 frames 50 % -> 6; wall: > 50 -> 5 else 6; var 1/3 ledge -> 5; off ground -> 2 (var 0/1); 6: apex -> 2 | d_walk / g_turn / d_jump, P=(1.2, 100, 50, 50) | ok |  |
@@ -198,11 +201,11 @@ Tier 3 (minor):
 |---|---|---|---|---|
 | the beam (its only attack) | 7 BeamShotHold (rate PS8c.f3 1) -> 8 BeamShot (rate 4): 180 / 25 = 7 shots, one every 2 frames, generate_article_angle(0, (30 - 25n) x lr) (0x7DBD4), play_se(0x6A80000) handle +0x1A4 (0x7D0D4), stop_se on the end (0x7DC18) and in exit 0x7DD18; cool-down f180 = 150 | not ported (no Wii U weapon kind) | missing | a weapon: reuse a Wii U article slot (e.g. plasmawisp's needle path 0x102FE844) with the 3DS beam params, or a cave hitbox sweep |
 | beam trigger | fall 1 / walk 3 / jumps 5, 6: every search_interval(1) = 20 frames once f180 < 0: search_target(1) (60 x 70, offset (30, 20)) -> f19d / 7; walk also f184 = 600 | not ported | missing | with the beam |
-| random hop | 3: f170 counter, random_range(1, 100) <= PS8c.f2 50 -> 6 (Jump, kinetic 5) | not ported | missing | a state 6 = g_hop_en without the wall test |
-| hop landing threshold | 5 update 0x7D77C: \|y - y0\| > P@0xC0 = 0.5 | HOPTHR 1.0 ("a guess") | wrong | hop[0] = 0.5 |
-| jump -> Fall motion | 5 / 6: is_falling -> set_motion_no_restart(Fall) (0x7D6F0) | Jump motion kept | missing | switch to FALLMOT when vy < 0 |
-| leave timer | f184 = 600 at start; reset to 600 by a beam (0x7D62C) and by damage (slot 69 0x7E12C); walk counts it down -> 9 | V7 = 600, walk counts down; never reset | wrong | reset V7 on damage (F69) and on the beam |
-| hit effect | slot 69 0x7E114: request_effect(0x7190001, center_pos, 1.0), handle +0x1A0 (old one removed) | none | missing | F69 |
+| random hop | 3: f170 counter, random_range(1, 100) <= PS8c.f2 50 -> 6 (Jump, kinetic 5) | not ported | fixed (step 2j: do_owr, state 9 = the 3DS 6) | a state 6 = g_hop_en without the wall test |
+| hop landing threshold | 5 update 0x7D77C: \|y - y0\| > P@0xC0 = 0.5 | HOPTHR 1.0 ("a guess") | fixed (step 2j: HOPTHR 0.5) | hop[0] = 0.5 |
+| jump -> Fall motion | 5 / 6: is_falling -> set_motion_no_restart(Fall) (0x7D6F0) | Jump motion kept | fixed (step 2j: do_fallm in 5 and 9) | switch to FALLMOT when vy < 0 |
+| leave timer | f184 = 600 at start; reset to 600 by a beam (0x7D62C) and by damage (slot 69 0x7E12C); walk counts it down -> 9 | V7 = 600, walk counts down; never reset | fixed for damage (step 2j: do_69); the beam's reset waits for the beam | reset V7 on damage (F69) and on the beam |
+| hit effect | slot 69 0x7E114: request_effect(0x7190001, center_pos, 1.0), handle +0x1A0 (old one removed) | none | fixed (step 2j: do_69) | F69 |
 | turn search | 3: every search_interval(0) = 60 frames search_target(0) behind -> 4 | o_walk_up | ok |  |
 | leave (state 9) | init_common_leave(P6 {300, 0.02, 30, ...}): energy +0x30 / +0x34, kinetic 15, effect 0x8000005 | o_leave_* (8) | approximated | code.bin 0x7B23B4 / 0x7B40B0 read in step 2c v2 |
 | sounds | beam play_se 0x6A80000 / stop_se | none | missing | with the beam |
@@ -221,8 +224,8 @@ Tier 3 (minor):
 
 | item | 3DS (address, value) | our port (label / value) | severity | suggested fix |
 |---|---|---|---|---|
-| damage weakness | start: set_weak_param(5, P0.f19 2.0) | not ported | missing | find the Wii U set_weak_param twin (Behavior helpers 0x026A6xxx-0x026A9xxx) and call it in the start |
-| view test before the quake | 6 end: is_in_view_area() -> 7 else 3 | taken as true | approximated | IN_VIEW 0x026A96BC is mapped since step 2g: use it |
+| damage weakness | start: set_weak_param(5, P0.f19 2.0) | not ported | missing (step 2j: no Wii U twin of the 3DS weak-param setter 0x5F6D44 found; DamageModule slot 43 0x02C23648 forwards to its inner object's vt+0x15C) | find the Wii U set_weak_param twin (Behavior helpers 0x026A6xxx-0x026A9xxx) and call it in the start |
+| view test before the quake | 6 end: is_in_view_area() -> 7 else 3 | taken as true | fixed (step 2j: wb_hold_up, IN_VIEW) | IN_VIEW 0x026A96BC is mapped since step 2g: use it |
 | quake kind | request_quake(7) on landing | QUAKE_KIND 6 | approximated | check the Wii U camera quake table for 7 |
 | absolute hit | P6 {state 9, power 10, angle 90, kbg 100, bkb 40, 1.0, 1.0, 1.0, 2, 1, ...} on the first fighter whose module +0x24 vt+0x68 == 0 | ABS_WORDS via MSC set_abs / hit_absolute; "grounded" = MSC StatusModule(1) == 0 | approximated | confirm the field mapping (effect / hitlag / sdi / sound) in game |
 | states / timers | walk V1 60-120, search 60, cool-down 60, QuakeHold 1.5, jump +0x24/+0x2C 1.5, +0x3C 0.1, fall +0x2C 3 / +0x3C 1, landing < 180 -> 9, quakes 3 with 50 >> (n - 1) % | cave states 1-11 | ok |  |
