@@ -288,6 +288,7 @@ int sn_fx() { return 0; } // fx edge_sword_flash2
 int sn_fx_h;            // the newest flash's handle (0: none)
 int sn_fx_t;            // frames to the next flash
 float sn_last;          // the drawn length last frame
+int sn_shld;            // test 148: 1 once it hit a shield, 2 once its hit records were cleared for the way back
 
 // fair's flash at the blade's end (edge_sword_flash2, its frame 13) carried out with the point while the sword grows:
 // a new one every FX_EVERY frames at the point's end, the newest moved with it (EffectModule 0x3 / 0x17, as Shadow
@@ -337,6 +338,7 @@ void func_46()
     sn_slot = sn_find_owner();
     sn_life = SN_LIFE;
     sn_index = 0;
+    sn_shld = 0;
     sn_still();
     if (sn_over() == 0)
     {
@@ -346,14 +348,38 @@ void func_46()
     callFunc3(func_47);
 }
 
+// test 148, the user: "Make the tip of snakesword not disappear when being shielded, if it is shielded, make it unable to
+// hit the same character as it hit previously until the snakesword is being pulled back to where it came from". A shield
+// hit no longer removes it (tools/extra_kinds.json snaketip "on_hit_bits" 0x17: the shield result asks for its status
+// 0, which it is in) and leaves the shielding fighter in its hit record, so it isn't hit again; it was shielded if this
+// frame's hit kinds hold the shield's (AttackModule 0x2726 with mask 0x4: 1 << 2, docs/native-notes.md). Once the
+// sword goes back (the drawn length, his VAR_30, shorter than last frame: only the retract shortens it), motion 1
+// (`snaketipclear`, tools/edge_specials_build.py) clears its records and sets its hitbox again, so from then on it can
+// hit that fighter. Not shielded: no change (a fighter it caught stays out of its record and isn't hit twice)
+void sn_shield_check(float before)
+{
+    if (sn_shld == 0 && AttackModule(0x2726, 0x4))
+    {
+        sn_shld = 0x1;
+    }
+    if (sn_shld == 0x1 && sn_last < before - 0.5f)
+    {
+        sn_shld = 0x2;
+        func_24(0x1, 0, 1.0f);
+    }
+}
+
 void func_47()
 {
+    float before;
     if (sn_over())
     {
         return 0x1;
     }
     sn_still();
+    before = sn_last;
     sn_frame();
+    sn_shield_check(before);
     if (AttackModule(0x2726))
     {
         AttackModule(0x2724);

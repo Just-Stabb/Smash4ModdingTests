@@ -105,6 +105,10 @@ Translator additions for the specials (`tools/ultimate_acmd.py`): `for _ in a..b
   for 74 / 28 / 47 frames (`param_fire`), then burst (BurstS / M / L) for 10 / 24 / 50 frames; a
   wall or floor bursts it early, a hit too (`"on_hit": 1`). Its scripts are Ultimate's edge_fire
   ones; the bursts' effects outlive it (Terminate 0).
+- **Shields (test 148, the user: "make Flare and its variants not instantly disappear on shield, they should play out
+  their hitboxes"):** a shield is a hit too (`extra_kinds.json` `"on_hit_bits": "0x17"`: Din's Fire's own hit method
+  removed the weapon on the shield result 0x4, the flight and a burst touching a shield alike): the flight bursts on a
+  shield and the burst plays out its frames and hitboxes, shields included (needs exe_v36 or later).
 
 ## Up special
 
@@ -316,6 +320,15 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
   - **Autolink (Octaslash let go only since test 134):** each frame of Octaslash's rush, the last fighter hit (still in hitstun, within 30) is pulled 60%
     of the way to 10 along his rush direction, 3 higher (LASTHIT_OFFSET_X / _Y; `edge_hi_link`), so the multi-hits
     carry them along.
+  - **Shadow Flare's shot as a line (test 148):** while it flies its path is a trail too, one that draws nothing
+    (block 15 numbered from 15 x 1024 + 765: the articles' `tr_hidden`) and doesn't stay (-2), laid by his per-frame
+    hook along the place the shot writes in his VAR_27 (`edge_s_line_tick`; "Side special" below): it closes shapes
+    with the lines on screen as any trail does.
+  - **Held Octaslash hittable (test 148, the user: "Please remove the invulnerability from held Octaslash"):** the held
+    slashes are Clang 0 (`OCTA_HELD_CLANG`). Nothing set intangibility or invincibility (no HitModule / intangibility
+    commands, vl intangible frames 0 - 0); their Clang 1 cancelled any attack or projectile within 9% of their 0.14%
+    that met them (out every other frame all round him), so he couldn't be reached. Blade Dash and a let-go Octaslash
+    keep Ultimate's.
   - **Blade Dash (tap):** its aim stays the full circle; landing lag 22
     (Ultimate 27); the air end ends in a normal Fall (Octaslash: SpecialFall as before), at frame 15 (test 120, the user: 8
     frames earlier than test 116's 23, which was "right before the point where Sephiroth would begin falling in the
@@ -492,6 +505,20 @@ From Ultimate's status code (lua2cpp_edge, `spec_side_special` research: START 0
   (from his own slot's position, the slot found by his kind 0x42: test 72 took his position from the creation
   callback's point, assumed his head, and in game that point is ~9 lower, so the shot flew along the floor). Scripts: Ultimate's Fly (4 hitboxes, the
   beam), Hit (beam left, beam_hit), End (beam left). A wall / the floor or its life's end: End, gone.
+- **Reach (test 148, the user: "make it so Sephiroth's fully charged side special reaches Donkey Kong and have its
+  length scale with charging", a screenshot of them at the two edges of Smashville's main platform, ~139.3 wide):** the
+  shot flies 38.5 + 89.5 r (38.5 uncharged as before, 128 at full charge: 138 from him with its place 10 in front, its
+  hitbox's front 2 further) over 7 + 9 r frames (5.5 - 8 a frame); Ultimate's speed 5.5 x (1 + 0.5 r) for 7 frames
+  (38.5 - 57.75) is replaced (`fl_travel`, flare1.c fl_fly_main).
+- **As a line (test 148, the user: "make side special act as a line that can finish a shape", "side special should not
+  create a new visible line, but act as one while it is active"):** each frame it flies the shot writes its place into
+  his VAR_27 (shared 3, `fl_line`), -1 when it stops; his per-frame hook (`edge.c edge_s_line_tick`) lays an up special
+  trail along it (block 15 from 15 x 1024 + 765, the pen VAR_12, its flag TIMER_14): its `trail` articles hold its points
+  but draw no line (`tools/edge_trail_msc.py` tr_hidden), and its crossings with the lines on screen close shapes
+  ("Up special": closed shapes, the shape's fill / hitbox, every line cleared, the line ended with its shape). Ended
+  (-2: nothing stays) when the shot stops or its place stops coming for 4 frames (TIMER_15). Made only in SHOT, after
+  the shot is made, with no trail laid and no shape's steps running; one a shot. A shield still removes the shot itself
+  (`port_check` W12 INFO; not asked).
 - **The orbs**: Ultimate's hit makes a flaredummy on the fighter hit (one per fighter), which keeps ceil(n) flare2
   orbs circling it. Smash 4's MSC has no way for a weapon to make or reach other weapons, so the shot itself turns
   into the dummy and plays the orbs: on its hit (status 1) it finds the fighter hit (in hitstop, nearest: the slot

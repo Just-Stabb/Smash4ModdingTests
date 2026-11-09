@@ -64,15 +64,15 @@
         "0x24D": {"flags": "0x0", "motion": "specialairlwhit: as 0x249"}
       },
       "weapons": {
-        "fire": {"kind": "0x18C", "base": "dein", "max": 3, "on_hit": 1},
+        "fire": {"kind": "0x18C", "base": "dein", "max": 3, "on_hit": 1, "on_hit_bits": "0x17"},
         "flare1": {"kind": "0x18D", "base": "dein", "max": 4, "on_hit": 1},
         "flare2": {"kind": "0x18E", "base": "dein", "max": 3},
         "flash": {"kind": "0x18F", "base": "dein", "max": 1, "on_hit": 0, "on_hit_bits": "0x17", "motions": 12},
         "snake": {"kind": "0x199", "base": "dein", "max": 12, "flags_set": "0x40"},
-        "snaketip": {"kind": "0x19A", "base": "dein", "max": 1, "on_hit": 0, "flags_set": "0x40"},
+        "snaketip": {"kind": "0x19A", "base": "dein", "max": 1, "on_hit": 0, "on_hit_bits": "0x17", "flags_set": "0x40"},
         "phantom": "0x19B",
         "trail": {"kind": "0x19C", "base": "dein", "max": 24, "flags_set": "0x40"},
-        "fill": {"kind": "0x19D", "base": "dein", "max": 3, "on_hit": 0, "flags_set": "0x40", "motions": 8}
+        "fill": {"kind": "0x19D", "base": "dein", "max": 3, "on_hit": 0, "on_hit_bits": "0x17", "flags_set": "0x40", "motions": 8}
       }
     },
     {

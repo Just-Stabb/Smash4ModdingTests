@@ -1196,10 +1196,24 @@ void tr_test(float x, float y, int num)
     }
 }
 
-// 1 if point k is counted here (a stretch's first point is the one before's last, counted there; a trail's first, here)
+// 1 if point k is counted here (a stretch's first point is the one before's last, counted there; a trail's first, here:
+// numbered block x 1024, or block x 1024 + 765 for Shadow Flare's shot's, test 148)
 int tr_counts(int k)
 {
-    if (k > 0 || tr_base - (tr_base / 0x400) * 0x400 == 0)
+    int i;
+    i = tr_base - (tr_base / 0x400) * 0x400;
+    if (k > 0 || i == 0 || i == 765)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// 1 for a stretch of Shadow Flare's shot's trail (numbered from block x 1024 + 765, test 148): its line isn't
+// drawn ("side special should not create a new visible line, but act as one while it is active"), its fill is
+int tr_hidden()
+{
+    if (tr_base - (tr_base / 0x400) * 0x400 >= 765)
     {
         return 0x1;
     }
@@ -1467,7 +1481,7 @@ void tr_pose()
             j = tr_n - 1;
         }
         tr_joint(19 + 2 * k, tr_get_x(j), tr_get_y(j));
-        if (k < tr_n - 1 && tr_has(tr_gone, k) == 0)
+        if (k < tr_n - 1 && tr_has(tr_gone, k) == 0 && tr_hidden() == 0)
         {
             j = k + 1;
         }

@@ -1774,6 +1774,7 @@ void func_82()
     edge_lw_ph_tick();                 // Sephiroth: Zelda's Phantom charging from down special (tests 103 / 104)
     edge_hi_air_tick();                // Sephiroth: up special once per air time (test 113)
     edge_tr_tick();                    // ... its trail's shapes (test 126)
+    edge_s_line_tick();                // Shadow Flare's shot as a line while it flies (test 148)
     edge_hi_keep_in();                 // ... Octaslash's victims kept in the blast zones (test 127)
     if (!global3)
     {
@@ -38244,6 +38245,24 @@ float edge_tr_sum3() { return -1003.5f; }
 float edge_tr_commit() { return -1004.5f; }
 float edge_tr_cancel() { return -1005.5f; }      // a shape not made (test 128: near the blast zones)
 float edge_tr_scale() { return 1.3f; }           // the shape's fill and hitbox x this (test 127: 1.2; 1.3 test 132)
+// test 148: Shadow Flare's shot as a line while it flies (edge_s_line_tick)
+int   edge_tr_shot_var() { return 0x0f00032e; }  // TIMER_14: 9999 while the shot's line (or its shape's steps) runs
+int   edge_tr_fresh_var() { return 0x0f00032f; } // TIMER_15: frames its place may go unrefreshed before it's over
+int   edge_tr_place_var() { return 0x0f00031b; } // VAR_27 (shared 3): the shot's place, flare1 writes it (-1: stopped)
+int   edge_tr_pen_var() { return 0x0f00030c; }   // VAR_12 (Octaslash's loop frames, free then): the place last read,
+                                                 // the line's pen; -1 once its line is over (one line a shot)
+int   edge_tr_shot_from() { return 0x2fd; }      // its points' numbers: block 15 x 1024 + 765 (51 x 15) on, so the
+                                                 // articles know it and draw no line (trail.c tr_hidden)
+
+// 1 while the shot's line (or its shape's steps) runs
+int edge_tr_shot()
+{
+    if (WorkModuleF(0, edge_tr_shot_var()) > 0.0f)
+    {
+        return 0x1;
+    }
+    return 0;
+}
 
 float edge_tr_pack(float x, float y)
 {
@@ -38299,23 +38318,30 @@ void edge_tr_point(float p, int n)
 // staying: test 127, "only make Blade Dash lines persist after use"), its point 0
 int edge_tr_cur_block()
 {
-    if (edge_hi_charged)
+    if (edge_hi_charged || edge_tr_shot())
     {
-        return 0xf;
+        return 0xf;                        // held Octaslash's, or Shadow Flare's shot's (test 148): neither stays
     }
     return edge_tr_block;
 }
 
-void edge_tr_begin()
+// the trail's first number: block x 1024 (the shot's: + 765, test 148)
+int edge_tr_start_num()
+{
+    int b;
+    b = edge_tr_cur_block();
+    if (edge_tr_shot())
+    {
+        return b * 0x400 + edge_tr_shot_from();
+    }
+    return b * 0x400;
+}
+
+// the trail's state set up for a new one (edge_tr_begin, edge_tr_shot_begin)
+void edge_tr_reset()
 {
     int i;
-    int b;
-    float h;
-    float p;
-    if (edge_hi_charged == 0)
-    {
-        edge_tr_block = edge_tr_block - (edge_tr_block / 0xe) * 0xe + 1;
-    }
+    int n;
     WorkModule(0, 0.0f, edge_tr_cross_var());
     i = 0x300;
     while (i <= 0x30b)
@@ -38323,23 +38349,49 @@ void edge_tr_begin()
         WorkModule(0, 0.0f, 0x0f000000 + i);   // VAR_0 - VAR_11
         i = i + 1;
     }
-    WorkModule(0, (float)(edge_tr_cur_block() * 0x400), edge_tr_floor_var());
+    n = edge_tr_start_num();
+    WorkModule(0, (float)n, edge_tr_floor_var());
     WorkModule(0, 0.0f, 0x0f000328);
     WorkModule(0, 0.0f, 0x0f000329);
     WorkModule(0, 5.0f, 0x0f00032a);
     WorkModule(0, 0.0f, 0x0f00032b);
     WorkModule(0, 0.0f, 0x0f00032c);
-    WorkModule(0, 0.0f, 0x0f00032d);               // the blast-zone keep-in back (test 138)
     // point 0 up a frame before point 1 can follow it (VAR_10, 2 frames, his per-frame hook counting it down): test 131,
     // point 1 could be written the frame point 0 was (the rush's main and loop), the old lines' articles never saw point
     // 0, so tested no first piece, and a line started where another ended never met it (the user's clip: "this shape
     // should be able to form a triangle")
     WorkModule(0, 2.0f, edge_tr_s3_var());
     WorkModule(0, edge_tr_pack4(PostureModuleF(0x1), PostureModuleF(0x2)), edge_tr_s4_var());
+}
+
+void edge_tr_begin()
+{
+    int b;
+    int n;
+    float h;
+    float p;
+    WorkModule(0, 0.0f, edge_tr_shot_var());      // a shot's line still running (its steps) is over (test 148)
+    if (edge_hi_charged == 0)
+    {
+        edge_tr_block = edge_tr_block - (edge_tr_block / 0xe) * 0xe + 1;
+    }
+    edge_tr_reset();
+    WorkModule(0, 0.0f, 0x0f00032d);               // the blast-zone keep-in back (test 138)
     h = edge_tr_h();                       // locals first (test 135: no nested script calls as arguments)
     p = edge_tr_pack(PostureModuleF(0x1), PostureModuleF(0x2) + h);
     b = edge_tr_cur_block();
-    edge_tr_point(p, b * 0x400);
+    n = b * 0x400;
+    edge_tr_point(p, n);
+}
+
+// Shadow Flare's shot's line starts at its place p (test 148: edge_s_line_tick)
+void edge_tr_shot_begin(float p)
+{
+    int n;
+    WorkModule(0, 9999.0f, edge_tr_shot_var());
+    edge_tr_reset();
+    n = edge_tr_start_num();
+    edge_tr_point(p, n);
 }
 
 // sin by its series (no sin in MSC; trail.c tr_sin the same), x folded into -pi/2 .. pi/2
@@ -38667,6 +38719,10 @@ void edge_tr_steps()
 // the trail's end: -1 (it stays: Blade Dash), -2 (held Octaslash's: its articles go)
 float edge_tr_end_code()
 {
+    if (edge_tr_shot())
+    {
+        return -2.0f;                      // Shadow Flare's shot's line doesn't stay (test 148)
+    }
     // (test 130: after a shape that ended it, VAR_20 3, -1 too: its lines are gone already, and its glow's articles
     // then go once it's over as Blade Dash's do, not through the -2 path; the user: Octaslash's shape "effect still
     // doesn't appear")
@@ -38748,6 +38804,7 @@ void edge_tr_find_next()
     int x;
     int y;
     int z;
+    int n;
     x = (int)WorkModuleF(0, edge_tr_om_var()) / 0x400;
     y = (int)WorkModuleF(0, edge_tr_floor_var()) / 0x400;
     i = (int)WorkModuleF(0, edge_tr_qn_var()) + 1;
@@ -38768,7 +38825,8 @@ void edge_tr_find_next()
     WorkModule(0, 0.0f, edge_tr_cross_var());
     WorkModule(0, WorkModuleF(0, edge_tr_sp_var()), edge_tr_new_var());
     WorkModule(0, WorkModuleF(0, edge_tr_sn_var()), edge_tr_num_var());
-    WorkModule(0, (float)(edge_tr_cur_block() * 0x400), edge_tr_floor_var());
+    n = edge_tr_start_num();
+    WorkModule(0, (float)n, edge_tr_floor_var());
     WorkModule(0, 0.0f, edge_tr_q_var());
 }
 
@@ -39000,8 +39058,17 @@ void edge_tr_step(int last)
         }
     }
     v = WorkModuleF(0, edge_tr_new_var());
-    x = PostureModuleF(0x1);
-    y = PostureModuleF(0x2) + edge_tr_h();
+    if (edge_tr_shot())
+    {
+        c = WorkModuleF(0, edge_tr_pen_var());     // the pen: Shadow Flare's shot's place (test 148)
+        x = edge_tr_x(c);
+        y = edge_tr_y(c);
+    }
+    else
+    {
+        x = PostureModuleF(0x1);
+        y = PostureModuleF(0x2) + edge_tr_h();
+    }
     dx = x - edge_tr_x(v);
     dy = y - edge_tr_y(v);
     d = dx * dx + dy * dy;
@@ -39016,6 +39083,58 @@ void edge_tr_step(int last)
         // he landed was lost, the end written over it in the same frame)
         WorkModule(0, -6.0f, edge_tr_q_var());
         WorkModule(0, edge_tr_end_code(), edge_tr_sn_var());
+    }
+}
+
+// test 148, the user: "make side special act as a line that can finish a shape", then "side special should not create a
+// new visible line, but act as one while it is active". Shadow Flare's shot (weapons/flare1.c) writes its place into his
+// VAR_27 (shared 3, packed as edge_tr_pack) every frame it flies, -1 once it stops (it hit / its end). From his
+// per-frame hook (after edge_tr_tick) a trail is laid along it as one is along him in up special: block 15 (a trail that
+// doesn't stay, as held Octaslash's: they can't overlap, the shot is over long before SHOT's cancel frame), its numbers
+// from 15 x 1024 + 765 (edge_tr_shot_from) so its articles draw no line (trail.c tr_hidden: "should not create a new
+// visible line"), the pen its place (VAR_12, edge_tr_step); its crossings with the lines on screen close shapes as any
+// trail's do (fill, hitbox, every line cleared; the trail ends with its shape). Over when the shot stops, or its place
+// hasn't come for 4 frames (TIMER_15: removed by the game, a shield); ended with -2, its articles go once a fill is over:
+// nothing of it stays. Only started in SHOT (0x158), when no trail is laid and no shape's steps run (else that shot
+// makes no line); one line a shot (VAR_12 -1 from SHOT's start and after its line, 0 from edge_s_generate)
+void edge_s_line_tick()
+{
+    float v;
+    float q;
+    v = WorkModuleF(0, edge_tr_place_var());
+    q = WorkModuleF(0, edge_tr_q_var());
+    if (edge_tr_shot() == 0)
+    {
+        if (v > 0.0f && global4 == 0x158 && edge_s_fired && WorkModuleF(0, edge_tr_pen_var()) == 0.0f && q >= 0.0f
+            && WorkModuleF(0, edge_tr_num_var()) < 1024.0f && edge_sn_out() == 0)
+        {
+            WorkModule(0, v, edge_tr_pen_var());
+            WorkModule(0, 0.0f, edge_tr_place_var());
+            WorkModule(0, 4.0f, edge_tr_fresh_var());
+            edge_tr_shot_begin(v);
+        }
+        return;
+    }
+    WorkModule(0, 9999.0f, edge_tr_shot_var());
+    if (v > 0.0f && WorkModuleF(0, edge_tr_fresh_var()) > 0.0f)
+    {
+        WorkModule(0, v, edge_tr_pen_var());
+        WorkModule(0, 0.0f, edge_tr_place_var());
+        WorkModule(0, 4.0f, edge_tr_fresh_var());
+        edge_tr_step(0);
+    }
+    else if (v < 0.0f || WorkModuleF(0, edge_tr_fresh_var()) <= 0.0f)
+    {
+        // stopped: the line ends at its last place (edge_tr_step 1; again each frame until it's over: it waits for a
+        // shape's steps)
+        WorkModule(0, 0.0f, edge_tr_place_var());
+        WorkModule(0, 0.0f, edge_tr_fresh_var());
+        edge_tr_step(0x1);
+    }
+    if (WorkModuleF(0, edge_tr_q_var()) >= 0.0f && WorkModuleF(0, edge_tr_num_var()) < 1024.0f)
+    {
+        WorkModule(0, 0.0f, edge_tr_shot_var());   // its line and steps over
+        WorkModule(0, -1.0f, edge_tr_pen_var());
     }
 }
 
@@ -41063,6 +41182,8 @@ void edge_s_generate()
     }
     slot = WorkModule(0x6, 0x10000049);
     WorkModule(0x7, v, 0x10000049);
+    WorkModule(0, 0.0f, edge_tr_place_var());     // its line (test 148, edge_s_line_tick): no place yet, a line to make
+    WorkModule(0, 0.0f, edge_tr_pen_var());
     ArticleModule(0x2710, 0x6);
     WorkModule(0x7, slot, 0x10000049);
     edge_s_fired = 0x1;
@@ -41106,6 +41227,7 @@ void edge_s_shot_loop()
 void edge_s_shot_main()
 {
     edge_s_fired = 0;
+    WorkModule(0, -1.0f, edge_tr_pen_var());      // no shot line till its shot is made (test 148, edge_s_generate)
     MotionModule(0x1, edge_s_motion(0x221, 0x22d), 0, 1.0f);
     global20 = 0;
     func_78(edge_s_shot_loop);

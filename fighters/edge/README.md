@@ -2334,3 +2334,79 @@ fire, flares, flash, 12 snakes, point and 16 trails set up, then his 17th trail 
 - **exe_diag_v4** (`$S/exe_diag_v4.zip`, exe_v11 + v3b's crumbs): every allocation assert of the animation / model /
   render code (258, 0x0330xxxx - 0x0347xxxx and 0x036Axxxx - 0x036Dxxxx) logs `S4DIAG trap k=0 a=<its address>` before
   stopping as before, so a remaining hang names the allocation (and its heap). `diag_crumbs_test.py`: 0 failed.
+
+## Test 148 (`$S/sephiroth_test148.zip`, not in build/: disk): Shadow Flare's reach and line, held Octaslash hittable, Flare / the snake sword's tip on shields
+
+User (screenshot: Sephiroth at the left edge of Smashville's main platform, Donkey Kong at the right): "make it so
+Sephiroth's fully charged side special reaches Donkey Kong and have its length scale with charging, also make side
+special act as a line that can finish a shape" (then: "side special should not create a new visible line, but act as
+one while it is active"), "Please remove the invulnerability from held Octaslash", "make Flare and its variants not
+instantly disappear on shield, they should play out their hitboxes", "Make the tip of snakesword not disappear when
+being shielded, if it is shielded, make it unable to hit the same character as it hit previously until the snakesword
+is being pulled back to where it came from".
+- **Shadow Flare's reach** (`weapons/flare1.c` fl_fly_main): Smashville's main platform is about 139.3 wide (no stage
+  file here: the community's measurement of Smash 4's Smashville, 139.31; ~140 elsewhere), so edge to edge is ~138
+  between two fighters standing on its edges. The shot flies 38.5 + 89.5 r (r = hold / 27): 38.5 uncharged (5.5 a frame
+  for 7 frames, as before), 128 fully charged, for 7 + 9 r frames (16 full), 5.5 - 8 a frame. With its place 10 in
+  front of him and its hitbox's front 2 ahead of that, a full charge reaches 140 from him (120 + 12 = 132 if the last
+  frame's move doesn't count: still inside Donkey Kong at the far edge). Ultimate's (5.5 - 8.25 a frame, always 7
+  frames: 38.5 - 57.75) is the user's change now.
+- **Shadow Flare as a line** (`edge.c` edge_s_line_tick, `weapons/flare1.c` fl_line, `tools/edge_trail_msc.py`
+  tr_hidden): while the shot flies it writes its place into his VAR_27 (shared 3, packed as edge_tr_pack) every frame,
+  -1 once it stops (a hit, its end); his per-frame hook lays a trail along it (the pen its place, VAR_12) exactly as up
+  special's along him: block 15, numbered from 15 x 1024 + 765, so its `trail` articles draw no line (every piece on its
+  start) but hold its points for the crossing tests, the shape's sums and the fill. Its crossings with the lines on
+  screen (Blade Dash's kept lines, a held Octaslash's) close shapes as any line's do: a U or a corner crossed twice, two
+  lines that meet (a triangle) or three (four sides); the fill, the hitbox, every line cleared, and the shot's line ends
+  with its shape. It ends -2 (its articles go once a fill is over): nothing stays, as the user asked. Over when the shot
+  stops or its place hasn't come for 4 frames (TIMER_15: the game removed it, e.g. a shield). Only started in SHOT
+  (0x158) after the shot is made, with no line being laid and no shape's steps running (else that shot makes no line);
+  one line a shot. TIMER_14 is its flag (the block number, the end code and the pen follow it).
+- **Held Octaslash's invulnerability** (`edge_specials_build.py` OCTA_HELD_CLANG): nothing sets intangibility or
+  invincibility in it: his up special's MSC has no HitModule call (Zelda's Farore's Wind's `HitModule(0x2710, 2)` /
+  `VisibilityModule` were replaced with the rest of her 0x159), its scripts no Body_Collision / Set_Bone_Intangibility /
+  armor, the vl's intangible frames for 0x231 / 0x237 / 0x239 are 0 - 0 (since test 73), and Zelda's specializer
+  slots compare no up special status. What kept him from being hit: the held slashes (test 134), out every other frame
+  all round him (to 27 from his middle) with Clang 1: an attack or a projectile meeting them within 9% of their 0.14%
+  clanked and was cancelled while he went on. They're Clang 0 now (they meet no other hitbox: attacks and projectiles
+  reach him; he's hit as in any move); the rest of them (0.14%, FKB 100 at 40 degrees, no hitlag) and Blade Dash / a
+  let-go Octaslash (Ultimate's 2.3%) unchanged. If he still can't be hit, the push-away itself is what stops them
+  (36 frames of hitstun each slash, the user's test 134 design).
+- **Flare on shields** (`tools/extra_kinds.json` fire `"on_hit_bits": "0x17"`, `weapon_expand.py`): the weapon's
+  hit method took only results 0x13; a shield (0x4) went to Din's Fire's own method, which removes the weapon at once:
+  the flight vanished on a shield, and so did a burst touching one. Now a shield is a hit: the flight bursts there
+  (status 1, as on a fighter) and the burst plays out its frames (10 / 24 / 50) and hitboxes, shields included.
+- **The snake sword's tip on shields** (extra_kinds snaketip `"on_hit_bits": "0x17"`; `edge_snake_articles_msc.py`
+  sn_shield_check; `edge_specials_build.py` SNAKE_TIP_CLEAR): a shield no longer removes it (on_hit 0: it stays in its
+  status). Its hit record keeps the shielding fighter (a hit on a shield is recorded), so it can't hit them again;
+  when the sword starts back (his VAR_30, the drawn length, shorter than last frame) and it was shielded
+  (`AttackModule(0x2726, 0x4)`: a shield among this frame's hits), it plays its motion 1, `snaketipclear`, whose frame 0
+  clears its records (`Hit_Log_Clear(-1)`) and sets the catch and its trail again: from the retract on it can hit them.
+  Not shielded: unchanged (no second hit on a fighter it caught).
+- **The shape's hitbox on shields** (extra_kinds fill `"on_hit_bits": "0x17"`): the same bug the new check found: a
+  shape whose hitbox met a shield lost it (the article removed) for everyone else; now it lasts its frames 4 - 50.
+- New check `port_check` W12 weapon-shield (and a guide catalogue row): an article with its own hit method and no
+  shield bit: WARN if it stays in its status on a hit ("on_hit" 0), INFO if it changes status. On test 147's
+  `extra_kinds.json` it flags fill and snaketip (WARN), fire and flare1 (INFO); now only flare1 (INFO: Shadow Flare's
+  shot on a shield is still removed, not asked).
+- **Executable:** exe_v36 = exe_v35 (Smash Run step 2r, `smashrun_step2r_v1`) + 3 words (`weapon_expand.py`: the hit
+  methods' masks for fire `0x04BB5104`, snaketip `0x04BB7024`, fill `0x04BB72A8`, `andi. r0, r5, 0x13` -> `0x17`); the
+  rest of `weapon_expand.py`'s 7972 words already the same in exe_v35. `weapon_expand_test.py` (unicorn): 0 failed (307
+  checks; the three hit methods with the shield bit). sha1 `547909505de1a13ba07f190abc00cba67651d139`.
+- **Tested:** `tools/edge_trail_sim.py`'s new cases (both update orders): the shot across a U of three Blade Dashes
+  makes its shape (middle (-0.7, 32.7), half axes 39.6 / 20.5; the next up special's line gives (0, 32.4)), across a V
+  of two the triangle (middle (0.1, 64.5)), every line gone after, none of the shot's articles left; crossing one line
+  once makes nothing, the line stays, the shot's articles go. `msc_stack_check`: 0 problems in edge / flare1 / snaketip /
+  trail. The body game.bin differs from the installed one only in held Octaslash's 96 hitboxes' Clang. Not tested in
+  game.
+- Approximated / unconfirmed: Smashville's width (not read from its stage file); that a shield hit enters the tip's
+  hit record (Smash 4's rule; if not, it may hit the shield again at once) and that the trail (Sword_Glow, Terminate 1)
+  looks the same after the motion change (set again; if the first one outlives the motion, two overlap); that a
+  clank was the invulnerability (nothing else found).
+- port_check over the chain (tests 70-115, 117-147, UI / sound v1, fighters_fix_multi_v1, smashrun_step2r_v1's exe_v35)
+  + this: 42 errors, 57 warnings, 4 notes, the same findings as without it (the errors the chain's: l00-l07 M1 / M3 /
+  M4, F1, E5, E7, S4, A3 (Squirtle's extras) and T1 / T2, as fighters_texid_fix_v1 isn't in the scratchpad any more).
+- Package (install over Smash Run step 2r and fighters_fix_multi_v1): `code/cross_f.rpx` (exe_v36),
+  `script/animcmd/body/game.bin`, `script/animcmd/weapon/snaketip/` (game / effect / sound.bin, motion.mtable),
+  `script/msc/edge.mscsb`, `flare1/flare1.mscsb`, `snaketip/snaketip.mscsb`, `trail/trail.mscsb`.
+

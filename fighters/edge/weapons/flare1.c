@@ -593,6 +593,7 @@ int fl_clr0;           // hit records to clear (Part 0 / 1) when the orbit scrip
 int fl_clr1;
 int fl_beam;          // the beam's effect handle while the shot flies (fl_fly_main lays it, the loop moves it)
 float fl_y0;          // the shot's height (Ultimate's spawn), held while it flies (test 81: on the ground it sat on the floor)
+float fl_travel;      // test 148: how far it flies (38.5 uncharged, as before, to 128 fully charged)
 int fl_fx0;
 int fl_fx1;
 int fl_fx2;
@@ -721,6 +722,51 @@ int fl_owner_slot(int air, float lr)
     return best;
 }
 
+// test 148, the user: "make side special act as a line that can finish a shape" ("side special should not create a new
+// visible line, but act as one while it is active"): while it flies, its place goes to Sephiroth's VAR_27 (his shared
+// 3: 0x0F000340 + 8 x slot + 3) every frame, packed as edge.c edge_tr_pack ((x + 512) x 2 whole x 2048 + (y + 512) x 2
+// whole); -1 once it stops (a hit, its end). His per-frame hook lays a line that draws nothing along it
+// (edge.c edge_s_line_tick), so its path can close a shape with the lines on screen while it flies
+float fl_pack(float x, float y)
+{
+    int ix;
+    int iy;
+    ix = (int)((x + 512.0f) * 2.0f + 0.5f);
+    iy = (int)((y + 512.0f) * 2.0f + 0.5f);
+    if (ix < 0)
+    {
+        ix = 0;
+    }
+    if (ix > 0x7ff)
+    {
+        ix = 0x7ff;
+    }
+    if (iy < 0)
+    {
+        iy = 0;
+    }
+    if (iy > 0x7ff)
+    {
+        iy = 0x7ff;
+    }
+    return (float)(ix * 0x800 + iy);
+}
+
+void fl_line(float v)
+{
+    if (fl_owner >= 0)
+    {
+        WorkModule(0, v, 0x0f000340 + 0x8 * fl_owner + 0x3);
+    }
+}
+
+void fl_line_here()
+{
+    float v;
+    v = fl_pack(PostureModuleF(0x1), fl_y0);
+    fl_line(v);
+}
+
 // ---- 0 FLY (260a0 / 26000 / 26c00): straight along his facing at speed_x 5.5 x lerp(1, speed_mul 1.5, r) for
 // life 7 frames, power x lerp(1, power_mul 3, r) (0x33eccf0); a wall / the floor ends it (Ultimate's End: the beam
 // left to fade). Placed at Ultimate's spawn: his position + (lr x offset_x 10, offset_y 10) (air: offset_x_air 10,
@@ -742,6 +788,7 @@ void fl_fly_loop()
     }
     fl_move(fl_speed * PostureModuleF(0), 0);
     PostureModule(0x2714, PostureModuleF(0x1), fl_y0, PostureModuleF(0x3));
+    fl_line_here();
     if (fl_beam != 0)                          // Ultimate's beam follows the shot (EFFECT_FOLLOW on top) until Hit / End
     {                                          // leave it (EFFECT_DETACH_KIND)
         EffectModule(0x17, fl_beam, PostureModuleF(0x1), PostureModuleF(0x2), PostureModuleF(0x3));
@@ -780,8 +827,15 @@ void fl_fly_main()
     {
         fl_n = 1.0f;
     }
-    fl_speed = 5.5f * (1.0f + 0.5f * fl_r);
-    fl_life = 0x7;
+    // test 148, the user: "make it so Sephiroth's fully charged side special reaches Donkey Kong and have its length
+    // scale with charging" (his screenshot: Sephiroth at the left edge of Smashville's main platform, Donkey Kong at the
+    // right; the platform is about 139.3 wide). Uncharged as before (5.5 a frame for 7 frames: 38.5); the distance grows
+    // with r = hold / 27 to 128 fully charged (its place 10 in front of him + 128 = 138, its hitbox's front 2 more: the
+    // far edge from the near one), its life to 16 frames (7 + 9 r), so its speed stays 5.5 - 8 a frame (Ultimate's 5.5
+    // x lerp(1, 1.5, r) = 5.5 - 8.25 for its fixed 7 frames: 38.5 - 57.75, the user's change)
+    fl_travel = 38.5f + 89.5f * fl_r;
+    fl_life = 0x7 + (int)(9.0f * fl_r + 0.5f);
+    fl_speed = fl_travel / (float)fl_life;
     fl_fx0 = fl_fx1 = fl_fx2 = fl_fx3 = fl_fx4 = 0;
     lr = PostureModuleF(0);
     fl_owner = fl_owner_slot(air, lr);
@@ -821,6 +875,7 @@ void fl_fly_main()
     func_24(0, 0, 1.0f);                       // fly
     AttackModule(0x2728, 1.0f + 2.0f * fl_r);
     fl_move(fl_speed * lr, 0);
+    fl_line_here();                            // its line from its first place (test 148)
     callFunc3(fl_fly_loop);
 }
 
@@ -832,6 +887,10 @@ void fl_end_loop()
 
 void fl_end_main()
 {
+    if (fl_phase == 0)
+    {
+        fl_line(-1.0f);                        // its line over (test 148)
+    }
     fl_phase = 0x1;
     fl_move(0, 0);
     AttackModule(0x2719);
@@ -919,6 +978,7 @@ void fl_hit_main()
 {
     if (fl_phase == 0)
     {
+        fl_line(-1.0f);                        // its line over (test 148)
         fl_phase = 0x1;
         fl_slot = 0xffffffff;
         fl_tries = 0;

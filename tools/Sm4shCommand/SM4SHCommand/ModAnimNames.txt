@@ -117,6 +117,9 @@ FlareNone7
 // its point, 0x19A, article 10; copies of Zelda's light arrow, motion.mtable its one motion): Move (the run's
 // script empty; the point's its 5% catch and the sword trail; tools/edge_specials_build.py snake_article_scripts)
 Move
+// snaketip's motion 1 (Sephiroth test 148): after a shield hit, played as the sword starts back: its hit records
+// cleared (Hit_Log_Clear), the catch and the trail set again
+SnakeTipClear
 // the up special trail's articles (trail: a stretch of the line and its shapes' fill, weapon kind 0x19C, his article 11,
 // its one motion Move as the snake's; fill: a closed shape's hitbox, 0x19D, article 12; tools/edge_specials_build.py
 // fill_scripts): FillHit (the hitbox), FillNone / FillNone2 - FillNone7 (hitboxes off)

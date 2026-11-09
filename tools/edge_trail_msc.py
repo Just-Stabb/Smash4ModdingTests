@@ -31,7 +31,10 @@ Sephiroth (edge.c edge_tr_*) talks to the articles through his shared variables 
     it.
   An article keeps testing and answering after its trail is over (old lines make shapes too), but takes no points. A
   crossing with another trail's piece is kept as a junction (its piece, the other's number: JUNCTIONS at most).
-  -2 ends a trail that doesn't stay (held Octaslash's, test 127): its articles go once their fill is over. A new Blade
+  Shadow Flare's shot (test 148: "side special should not create a new visible line, but act as one while it is active")
+  lays a trail of block 15 numbered from 15 x 1024 + SHOT_FROM (edge.c edge_s_line_tick): its articles draw no line
+  (tr_hidden: every piece on its start), but test, mark, sum and fill as any.
+  -2 ends a trail that doesn't stay (held Octaslash's, test 127; the shot's): its articles go once their fill is over. A new Blade
   Dash trail (block 1 - 14; Octaslash's is 15) puts out the trails KEEP or more before it (the user: "delete the oldest
   line if a new line has been made after the 6th line").
 Its trail's points are taken while their number follows its last and are within its stretch. Removed after LIFE
@@ -52,6 +55,7 @@ FILL_SCALE = 1.3    # the fill drawn this much bigger than the shape (test 127, 
                     # since test 132: "rather than full and larger than the lines that it is made of")
 JUNCTIONS = 4
 KEEP = 6
+SHOT_FROM = 765     # Shadow Flare's shot's trail: its numbers from block 15 x 1024 + this (51 x 15: a stretch starts there)
 EXT = 3.0           # the pieces tested taken this much longer at both ends (lines meeting end to end cross: test 131)
 C_BONE, W_BONE, A_BONE = 2, 3, 3 + POINTS                     # bones: TopN, HaveN, C, W0 - W15, A0 / B0 ... A14 / B14
 
@@ -375,10 +379,24 @@ void tr_test(float x, float y, int num)
     }
 }
 
-// 1 if point k is counted here (a stretch's first point is the one before's last, counted there; a trail's first, here)
+// 1 if point k is counted here (a stretch's first point is the one before's last, counted there; a trail's first, here:
+// numbered block x 1024, or block x 1024 + SHOT_FROM_N for Shadow Flare's shot's, test 148)
 int tr_counts(int k)
 {
-    if (k > 0 || tr_base - (tr_base / 0x400) * 0x400 == 0)
+    int i;
+    i = tr_base - (tr_base / 0x400) * 0x400;
+    if (k > 0 || i == 0 || i == SHOT_FROM_N)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// 1 for a stretch of Shadow Flare's shot's trail (numbered from block x 1024 + SHOT_FROM_N, test 148): its line isn't
+// drawn ("side special should not create a new visible line, but act as one while it is active"), its fill is
+int tr_hidden()
+{
+    if (tr_base - (tr_base / 0x400) * 0x400 >= SHOT_FROM_N)
     {
         return 0x1;
     }
@@ -646,7 +664,7 @@ void tr_pose()
             j = tr_n - 1;
         }
         tr_joint(A_BONE_N + 2 * k, tr_get_x(j), tr_get_y(j));
-        if (k < tr_n - 1 && tr_has(tr_gone, k) == 0)
+        if (k < tr_n - 1 && tr_has(tr_gone, k) == 0 && tr_hidden() == 0)
         {
             j = k + 1;
         }
@@ -759,7 +777,7 @@ void func_47()
 '''
     reps = {'POINTS_N': POINTS, 'LIFE_N': LIFE, 'DELAY_N': FILL_DELAY, 'GROW_N': FILL_GROW, 'HOLD_N': FILL_HOLD,
             'END_N': FILL_END, 'A_BONE_N': A_BONE, 'C_BONE_N': C_BONE, 'W_BONE_N': W_BONE,
-            'COMMIT_V': '%.1ff' % COMMIT, 'CANCEL_V': '%.1ff' % CANCEL, 'JUNC_N': JUNCTIONS, 'EXT_N': '%.1ff' % EXT, 'KEEP_N': KEEP, 'SCALE_V': '%.2ff' % FILL_SCALE, 'SUM1_V': '%.1ff' % SUM1, 'SUM2_V': '%.1ff' % SUM2, 'SUM3_V': '%.1ff' % SUM3}
+            'SHOT_FROM_N': SHOT_FROM, 'COMMIT_V': '%.1ff' % COMMIT, 'CANCEL_V': '%.1ff' % CANCEL, 'JUNC_N': JUNCTIONS, 'EXT_N': '%.1ff' % EXT, 'KEEP_N': KEEP, 'SCALE_V': '%.2ff' % FILL_SCALE, 'SUM1_V': '%.1ff' % SUM1, 'SUM2_V': '%.1ff' % SUM2, 'SUM3_V': '%.1ff' % SUM3}
     for k, v in sorted(reps.items(), key=lambda kv: -len(kv[0])):
         body = body.replace(k, str(v))
     body = (body.replace('GETX', ifchain('        return tr_x#;'))

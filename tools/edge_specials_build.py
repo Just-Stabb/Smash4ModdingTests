@@ -152,6 +152,7 @@ SNAKE_SWORD = 0x18         # joint 24, LHaveN (the sword in his hand)
 SNAKE_ARTICLES = ('snake', 'snaketip')
 TRAIL_HALF = 1.5            # the point's trail: half its width
 SNAKE_MOTION = 0xEF3E3778  # the light arrow's one motion (their base kind's), the articles' motion 0
+SNAKE_TIP_CLEAR = 'snaketipclear'   # the point's motion 1 (test 148): its hit records cleared (weapons/snaketip.c)
 
 
 # --sound: his sound / expression scripts from Ultimate's (tools/ultimate_sound.py's sound_ids.json, the banks built
@@ -256,6 +257,7 @@ def phantom_hand_flash(path):
 # (SpecialHi2 changed to again at frame 4 by the MSC, so the script runs past frames 0 - 3 at once)
 OCTA_VAR = 0x0F000314
 OCTA_HELD_ANGLE, OCTA_HELD_FKB = 40, 100   # held Octaslash's slashes (test 134)
+OCTA_HELD_CLANG = 0                       # ... no clank (test 148: they cancelled attacks / projectiles)
 
 
 def octaslash_loop_scripts(game, effect):
@@ -281,11 +283,18 @@ def octaslash_loop_scripts(game, effect):
             # chained"): FKB 100, KBG 100 -> ((1 + 100 / 2) x 1.4 + 18) = 89 knockback at weight 100 (2.7 a frame, 36
             # frames of hitstun); facing restriction 0, by position (Ultimate's LR_CHECK_POS: away from him either side).
             # Let go (0), Ultimate's 2.3 and its hitlag
+            # Test 148, the user: "Please remove the invulnerability from held Octaslash". Nothing sets intangibility or
+            # invincibility on him in it (no HitModule / Body_Collision / Set_Bone_Intangibility in its statuses or
+            # scripts, his vl motion frames 0x231 / 0x237 / 0x239 0 - 0, no native status check): what kept him from
+            # being hit were these held slashes, out every other frame round him with Clang 1: an attack (or a
+            # projectile) meeting them within 9% of their 0.14% was cancelled (a clank) and he went on. Now Clang 0
+            # (OCTA_HELD_CLANG): they meet no other hitbox, so attacks and projectiles go through to him. Let go (0)
+            # and Blade Dash: Ultimate's, unchanged
             loop = []
             for c in body:
                 if c.name.endswith('Hitbox'):
                     held = _set(c, Damage=0.14, Hitlag=0.0, Angle=OCTA_HELD_ANGLE, KBG=100, FKB=OCTA_HELD_FKB, BKB=0,
-                                FacingRestrict=0)
+                                FacingRestrict=0, Clang=OCTA_HELD_CLANG)
                     loop += _when(0, [c], OCTA_VAR) + _when(1, [held], OCTA_VAR) + _when(2, [held], OCTA_VAR)
                 else:
                     loop.append(c)
@@ -423,9 +432,24 @@ def snake_article_scripts(fighter, hit_template, glow_template):
         os.makedirs(d, exist_ok=True)
         game = [tip, acmd.Command(acmd.END)] if name == 'snaketip' else stop
         effect = [trail, acmd.Command(acmd.END)] if name == 'snaketip' else stop
-        for fn, sc in (('game', game), ('effect', effect), ('sound', stop)):
-            acmd.ACMDFile({SNAKE_MOTION: sc}).save(os.path.join(d, fn + '.bin'))
-        open(os.path.join(d, 'motion.mtable'), 'wb').write(SNAKE_MOTION.to_bytes(4, 'big'))
+        motions = [SNAKE_MOTION]
+        scripts = {'game': {SNAKE_MOTION: game}, 'effect': {SNAKE_MOTION: effect}, 'sound': {SNAKE_MOTION: stop}}
+        if name == 'snaketip':
+            # test 148, the user: "Make the tip of snakesword not disappear when being shielded, if it is shielded, make
+            # it unable to hit the same character as it hit previously until the snakesword is being pulled back to
+            # where it came from": a shield hit no longer removes it (extra_kinds.json "on_hit_bits" 0x17) and its hit
+            # record keeps the shielding fighter from being hit again; once the sword starts back, if it was shielded,
+            # snaketip.c plays motion 1, whose frame 0 clears the records (Hit_Log_Clear: a dein copy has no animation,
+            # its scripts only ever run frame 0) and sets the same hitbox again; its effect script sets the trail again
+            # (motion 0's Sword_Glow has Terminate 1, taken as ending with its motion)
+            clear = U.cmd('Hit_Log_Clear', -1)
+            motions.append(acmd.crc(SNAKE_TIP_CLEAR))
+            scripts['game'][motions[1]] = [clear, tip, acmd.Command(acmd.END)]
+            scripts['effect'][motions[1]] = effect
+            scripts['sound'][motions[1]] = stop
+        for fn in ('game', 'effect', 'sound'):
+            acmd.ACMDFile(scripts[fn]).save(os.path.join(d, fn + '.bin'))
+        open(os.path.join(d, 'motion.mtable'), 'wb').write(b''.join(m.to_bytes(4, 'big') for m in motions))
     return 'held forward air articles: %s, and trail (scripts)' % ', '.join(SNAKE_ARTICLES)
 
 

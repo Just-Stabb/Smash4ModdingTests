@@ -199,6 +199,15 @@ article finds its owner (the nearest Sephiroth), then every frame:
 - **A model on a dein copy.** That flag 0x40 alone loads and draws it (both its readers are generic code).
 - **The trail on a weapon.** That the sword trail (`Sword_Glow`) draws from a weapon's script.
 
+- **Test 148, shields** (the user: "Make the tip of snakesword not disappear when being shielded, if it is shielded,
+  make it unable to hit the same character as it hit previously until the snakesword is being pulled back to where it
+  came from"): the point's hit method takes the shield result too (`extra_kinds.json` snaketip `"on_hit_bits": "0x17"`;
+  Din's Fire's method removed it), so a shield leaves it in its status. A hit on a shield is in its hit record, so the
+  shielding fighter isn't hit again; as the sword starts back (VAR_30 shorter than last frame) a point that was shielded
+  (`AttackModule(0x2726, 0x4)`) plays its motion 1, `snaketipclear` (frame 0: `Hit_Log_Clear(-1)`, the catch and the
+  trail again: a dein copy has no animation, its scripts only run frame 0), so from then on it can hit them
+  (`sn_shield_check`, `tools/edge_snake_articles_msc.py`). Unconfirmed in game: that the shield hit is recorded, and
+  the trail across the motion change.
 - **Test 119:** "attack held" is SELF_ATTACK or attack's raw input bit (MSC button 14, `ControlModule(0x2712, 0xe)`):
   with the A+B smash setting on, B pressed during the hold made the game clear attack's bit (smash latch), ending it.
 

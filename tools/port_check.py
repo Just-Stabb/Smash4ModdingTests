@@ -1043,6 +1043,28 @@ def check_weapon_rehit(inst, name, rec, rep):
                     'the base\'s hit method removes it at its first hit ("on_hit": its own status, e.g. 0 to stay)' % art)
 
 
+def check_weapon_shield(rec, rep):
+    """W12: a brand-new article with its own hit method ("on_hit") whose "on_hit_bits" lack the shield result (0x4): a
+    shield the attack meets goes to the base's method, which removes the weapon at once (Sephiroth test 148, the user:
+    Flare and its variants "instantly disappear on shield" instead of playing out their hitboxes, the snake sword's tip
+    "disappear[s] when being shielded"; Supamario fix 89's Kamehameha before it). WARN for one that stays in its status
+    on a hit ("on_hit": 0: it is meant to outlive its hits); INFO for one that changes status on a hit (a shield skips
+    that status: an explosion, its orbs), unless its record says "shield_removes": true (meant). 0x17 keeps it"""
+    import weapon_expand
+    for art, w in sorted(rec.get('weapons', {}).items()):
+        if not isinstance(w, dict) or 'on_hit' not in w or w.get('shield_removes'):
+            continue
+        bits = int(str(w.get('on_hit_bits', weapon_expand.HIT_BITS)), 0)
+        if bits & 0x4:
+            continue
+        if int(w['on_hit']) == 0:
+            rep.add('WARN', 'W12 weapon-shield', '%s: "on_hit" 0 (it stays through its hits) but no shield bit in '
+                    '"on_hit_bits" (0x%X): a shield removes it at once ("on_hit_bits": "0x17")' % (art, bits))
+        else:
+            rep.add('INFO', 'W12 weapon-shield', '%s: a shield removes it without its status %d ("on_hit_bits": "0x17" '
+                    'for it, "shield_removes": true if meant)' % (art, int(w['on_hit'])))
+
+
 # hitbox ids / Parts (hit-record groups) a base weapon's AttackModule has: its kind's set-up method fills the module
 # parameters (accessor init 0x02BCBD84 -> per-kind object, vt +0xC; +0xDC ids, +0xEC parts). The module never checks
 # a hitbox's id or Part against them: past the end it writes over other memory and crashes on the hit.
@@ -1916,6 +1938,7 @@ def main():
     check_weapons(a.name, rec, rep)
     check_weapon_statuses(a.name, rep)
     check_weapon_rehit(inst, a.name, rec, rep)
+    check_weapon_shield(rec, rep)
     check_weapon_parts(inst, a.name, rec, rep)
     check_weapon_motion(inst, a.name, rec, rep)
     check_weapon_facing(a.name, rep)

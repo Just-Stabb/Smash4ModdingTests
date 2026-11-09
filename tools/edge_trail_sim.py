@@ -4,13 +4,16 @@ tools/edge_trail_msc.py, weapons/fill.c from tools/edge_fill_msc.py): his points
 shared 4 - 6 and the trail articles' tests and answers, line for line, run with the articles updated after and before
 him. Cases: a held Octaslash circle (a loop); a U from one up special closed by a straight line from the next (old
 lines); a tilted ellipse (another shape); a triangle of three Blade Dashes and a four-sided shape of four (junctions:
-test 127); a Blade Dash's last point (the landing) taken. Prints each shape (middle, long axis' angle, half axes, the pieces gone).
+test 127); a Blade Dash's last point (the landing) taken; Shadow Flare's shot as a line (test 148: block 15 numbered
+from 765, no line drawn, ended with -2): a U and a V of Blade Dashes closed by it, one crossing only, its articles gone
+after. Prints each shape (middle, long axis' angle, half axes, the pieces gone).
 
   python3 tools/edge_trail_sim.py
 """
 import math
 
 SEG, PER, PTS = 4.0, 15, 16
+SHOT_FROM = 765     # Shadow Flare's shot's trail numbers: block 15 x 1024 + this on (test 148)
 SUM1, SUM2, SUM3, COMMIT, CANCEL = -1001.5, -1002.5, -1003.5, -1004.5, -1005.5
 
 
@@ -88,7 +91,10 @@ class World:
             s.dead = False
 
         def counts(s, k):
-            return k > 0 or s.base % 1024 == 0
+            return k > 0 or s.base % 1024 in (0, SHOT_FROM)
+
+        def hidden(s):          # trail.c tr_hidden: the shot's stretches draw no line
+            return s.base % 1024 >= SHOT_FROM
 
         def test(s, p, num):
             sh = s.w.sh
@@ -207,18 +213,22 @@ class World:
             self.arts.append(World.Art(self))
 
     def cur(self):
-        return 15 if self.charged else self.block
+        return 15 if self.charged or self.shot else self.block
 
-    def begin(self, x, y, charged=False):
+    def start(self):
+        return self.cur() * 1024 + (SHOT_FROM if self.shot else 0)
+
+    def begin(self, x, y, charged=False, shot=False):
         self.charged = charged
-        if not charged:
+        self.shot = shot        # edge.c edge_tr_shot_begin (test 148)
+        if not charged and not shot:
             self.block = self.block % 14 + 1
         self.sh[4] = 0.0
         for i in range(12):
             self.V[i] = 0.0
-        self.V[1] = float(self.cur() * 1024)
+        self.V[1] = float(self.start())
         self.V[10] = 2.0        # point 0 seen a frame before point 1 (test 131: the old lines tested no first piece)
-        self.point(pack(x, y), self.cur() * 1024)
+        self.point(pack(x, y), self.start())
 
     def steps(self):
         sh, V = self.sh, self.V
@@ -344,7 +354,7 @@ class World:
         V[6], V[7] = V[1], V[11]
         sh[4] = 0.0
         sh[5], sh[6] = V[3], V[4]
-        V[1] = float(self.cur() * 1024)
+        V[1] = float(self.start())
         V[0] = 0
 
     @staticmethod
@@ -395,7 +405,7 @@ class World:
             self.find_next()
 
     def end_code(self):
-        return -2.0 if self.charged else -1.0
+        return -2.0 if self.charged or self.shot else -1.0
 
     def step(self, x, y, last=False):
         sh, V = self.sh, self.V
@@ -448,6 +458,8 @@ class World:
             self.V[10] -= 1
         if -5 <= self.V[0] <= -1 or -8 <= self.V[0] <= -7 or -13 <= self.V[0] <= -11:
             self.steps()
+        if self.shot and self.V[0] >= 0 and self.sh[6] < 1024:
+            self.shot = False   # edge.c edge_s_line_tick: the shot's line and its steps over (TIMER_14 0)
 
     def frame(self, x, y, last, order):
         if order == 'articles first':
@@ -473,10 +485,24 @@ class World:
                     a.tick()
 
 
-def run_path(w, path, order, charged=False):
-    w.begin(*path[0], charged=charged)
+def run_path(w, path, order, charged=False, shot=False):
+    w.begin(*path[0], charged=charged, shot=shot)
     for i, (x, y) in enumerate(path[1:]):
         w.frame(x, y, i == len(path) - 2, order)
+
+
+def shot_case(order, lines, shot):
+    """Blade Dash lines, then Shadow Flare's shot (8 a frame) as a line: (shapes, shot articles alive, shot articles
+    drawing a line, old pieces left)"""
+    w = World()
+    for a, b in lines:
+        run_path(w, line(a, b), order)
+        w.idle(5, order)
+    run_path(w, line(shot[0], shot[1], speed=8.0), order, shot=True)
+    w.idle(30, order)
+    sa = [a for a in w.arts if a.base // 1024 == 15 and a.base % 1024 >= SHOT_FROM]
+    old = sum(1 for a in w.arts if a not in sa and not a.dead for k in range(len(a.pts) - 1) if k not in a.gone)
+    return (w.shapes, sum(1 for a in sa if not a.dead), sum(1 for a in sa if not a.hidden()), old)
 
 
 def circle():
@@ -556,3 +582,13 @@ if __name__ == '__main__':
         w.idle(5, order)
         last = [a for a in w.arts][-1]
         print('a Blade Dash to (40, 20): its last point taken', last.pts[-1])
+        # test 148: Shadow Flare's shot (8 a frame, the line its path) closing shapes; (shapes, its articles left,
+        # its articles drawing a line, old pieces left)
+        u = [((-30, 60), (-30, 20)), ((-30, 20), (30, 20)), ((30, 20), (30, 60))]
+        print('shot across a U of three Blade Dashes (x -30 - 30, y 20 - 60) at y 45:',
+              shot_case(order, u, ((-60, 45), (68, 45))))
+        print('shot across a V of two Blade Dashes ((0, 50) up to (+-40, 90)) at y 70:',
+              shot_case(order, [((0, 50), (-40, 90)), ((0, 50), (40, 90))], ((-70, 70), (68, 70))))
+        print('shot crossing one Blade Dash once (no shape, the line stays):',
+              shot_case(order, [((0, 20), (0, 80))], ((-60, 50), (68, 50))))
+        print('shot alone:', shot_case(order, [], ((-60, 50), (68, 50))))
