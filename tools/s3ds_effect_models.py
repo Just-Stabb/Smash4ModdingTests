@@ -188,6 +188,29 @@ def material_mta(anim, materials, statics, folder, frames):
     return out, skipped
 
 
+# H3D billboard modes (a bone's flags, bits 16-19; SPICA's H3DBillboardMode: 0 off, 2 World, 3 WorldViewpoint,
+# 4 Screen, 5 ScreenViewpoint, 6 YAxial, 7 YAxialViewpoint; the enemies' effect models have 2, 4, 5, 6, 7) -> the
+# Wii U's billboard bones, which the game finds by NAME: cross_f 0x03327FEC scans a model's VBN bone names
+# (records of 0x4C, the name at +0x1C of the loaded file) for '_BILLBOARDYAXISV_' (its type 4), '_BILLBOARDV_' (3),
+# '_BILLBOARDYAXIS_' (2), '_BILLBOARD_' (1), '_BILLBOARDWORLD_' (5), from the model's skeleton set-up 0x0341F440
+# (list at +0x7D0, count +0x7D4), applied each update by 0x034235CC (-> 0x033168E0 / 0x033095B4). Vanilla effect
+# models use them (Falco's reflector, Pit's guardian shield, Shulk's Monado swords: 'bgplane_BILLBOARDYAXIS__O_OBJ_
+# O_HIR'; over the local vanilla VBNs YAXIS 130, plain 77, V 30, YAXISV 5). 'V' read as the viewpoint variants (the
+# names' pairing; the game's per-type maths not read). The bone keeps its hash (the OMO's key): only the name changes.
+BILLBOARD_TAGS = {2: '_BILLBOARDWORLD_', 3: '_BILLBOARDWORLD_', 4: '_BILLBOARD_', 5: '_BILLBOARDV_',
+                  6: '_BILLBOARDYAXIS_', 7: '_BILLBOARDYAXISV_'}
+# folders whose billboard the port does in code instead (Furiijio's beam: smashrun_walker_cave turns its node to
+# the camera, step 2g v5); tagged, both would turn it
+BILLBOARD_IN_CODE = {'EfffsFuriijioFreezBeamBody_B', 'EfffsFuriijioFreezBeamTop_B'}
+
+
+def billboard_name(name, flags):
+    """the VBN name of a 3DS bone: its billboard mode (flags bits 16-19) as the Wii U's name tag, kept within
+    the VBN's 63 characters"""
+    tag = BILLBOARD_TAGS.get((flags >> 16) & 0xF)
+    return name if tag is None else name[:63 - len(tag)] + tag
+
+
 def convert_model(mdir, folder, out_dir, tex_id, log=print):
     bch = sm.Bch(open(os.path.join(mdir, 'normal.bch'), 'rb').read())
     model = bch.models()[0]
@@ -195,9 +218,14 @@ def convert_model(mdir, folder, out_dir, tex_id, log=print):
     notes = []
     # skeleton: the 3DS bones, under a TopN root unless theirs is one
     top = 0 if bones and bones[0]['name'] == 'TopN' else 1
+    tag = folder not in BILLBOARD_IN_CODE
     vb = ([('TopN', -1, se.bone_hash('TopN'))] if top else []) + \
-        [(b['name'], b['parent'] + top if b['parent'] >= 0 else (0 if top else -1), se.bone_hash(b['name']))
+        [(billboard_name(b['name'], b['flags']) if tag else b['name'],
+          b['parent'] + top if b['parent'] >= 0 else (0 if top else -1), se.bone_hash(b['name']))
          for b in bones]
+    for b in bones:
+        if tag and BILLBOARD_TAGS.get((b['flags'] >> 16) & 0xF):
+            notes.append('billboard bone %s (H3D mode %d)' % (b['name'], (b['flags'] >> 16) & 0xF))
     assert len({h for _n, _p, h in vb}) == len(vb), 'bone hash collision'
     # materials: each one's combiner baked into its texture (the same results shared)
     textures = {k: v for k, v in bch.textures().items() if not k.endswith('#format')}

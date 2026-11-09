@@ -22,10 +22,12 @@ simple one, listed).
 Each emitter is converted onto a vanilla template emitter (vfxb_to_ptcl.Templates: by particle type, blend,
 follow type, flipbook, UV animation and rotation needs), then the 3DS fields written over it; the texture
 (PICA200: ETC1 / ETC1A4 / L / LA / RGB(A)... decoded by tools/s3ds_model.py) folded into the templates' BC4
-shape + a tint (xv2_to_ptcl.shape_texture: the alpha-weighted mean colour into the colour tracks); ETC1 and
-the other formats without alpha take their alpha from the shape (as the 3DS draws them, and Smash 4's BC4
-textures). Not converted: key animations (emitter curves), primitives (mesh particles: skipped), the
-complex blocks, colour 1 where the template's combiner has none. The effect models (effect/model/NAME/*.bch)
+shape + a tint (texture_shape: the alpha-weighted mean colour, folded into the colour tracks for the colour
+mode drawn, tinted_keys); ETC1 and the other formats without alpha: the shape is the colour's level (alpha
+and colour alike, as the 3DS draws them and Smash 4's BC4 textures). The 3DS colour combiner (0x194) is the
+Wii U's colour mode: a template drawing another gets an own pixel program (tools/eft_pixel.py). Not
+converted: key animations (emitter curves), primitives (mesh particles: drawn as billboards), the complex
+blocks. The effect models (effect/model/NAME/*.bch)
 are converted by tools/s3ds_effect_models.py into effect/enemy/KIND/model/NAME/; the .efc keeps the
 references to the ones converted.
 """

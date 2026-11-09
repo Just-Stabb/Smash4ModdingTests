@@ -110,7 +110,20 @@ def model_checks(tag, mdir, d, all_ids):
                 check(err < 8, '%s: texture != the baked combiner (BC1 / BC3) (mean error %.1f)' % (mt, err))
     # skeleton and animation
     vb = omo.vbn_read(os.path.join(d, 'model.vbn'))
-    check([n for n, _p, _h in vb] == (['TopN'] if top else []) + [b['name'] for b in bones], '%s: vbn bones' % tag)
+    folder = os.path.basename(os.path.normpath(d))
+    want = [b['name'] if folder in em.BILLBOARD_IN_CODE else em.billboard_name(b['name'], b['flags']) for b in bones]
+    check([n for n, _p, _h in vb] == (['TopN'] if top else []) + want, '%s: vbn bones' % tag)
+    # billboards: every H3D billboard bone (flags bits 16-19) carries the game's name tag for its mode (the game finds
+    # them by name, cross_f 0x03327FEC), none other does, the hash stays the 3DS name's (the OMO's key), names fit
+    for (n, _p, h), b in zip(vb[top:], bones):
+        mode = (b['flags'] >> 16) & 0xF
+        tags = [t for t in ('_BILLBOARDYAXISV_', '_BILLBOARDV_', '_BILLBOARDYAXIS_', '_BILLBOARD_', '_BILLBOARDWORLD_')
+                if t in n]
+        if folder in em.BILLBOARD_IN_CODE or not mode:
+            check(not tags, '%s: bone %s tagged %s without a billboard' % (tag, n, tags))
+        else:
+            check(tags == [em.BILLBOARD_TAGS[mode]], '%s: bone %s (H3D billboard %d) tags %s' % (tag, n, mode, tags))
+        check(h == se.bone_hash(b['name']) and len(n) <= 63, '%s: bone %s hash / length' % (tag, n))
     od = open(os.path.join(d, 'model.omo'), 'rb').read()
     o = omo.Omo(od)
     check(o.encode() == od, '%s: omo re-encodes' % tag)
@@ -127,7 +140,8 @@ def model_checks(tag, mdir, d, all_ids):
         for i, b in enumerate(bones):
             lm = locs[i][min(fr, len(locs[i]) - 1)]
             ref.append(lm if b['parent'] < 0 else ref[b['parent']] @ lm)
-            worst = max(worst, np.abs(np.array(w[b['name']]) - ref[-1]).max() / max(1.0, np.abs(ref[-1]).max()))
+            wn = vb[i + top][0]                             # (its VBN name: a billboard's carries the tag)
+            worst = max(worst, np.abs(np.array(w[wn]) - ref[-1]).max() / max(1.0, np.abs(ref[-1]).max()))
     check(worst < 1e-3, '%s: omo world matrices off by %.4g' % (tag, worst))
     # material / visibility animation
     md = open(os.path.join(d, 'model.mta'), 'rb').read()
