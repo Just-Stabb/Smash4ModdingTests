@@ -293,6 +293,7 @@ def main():
               'Lethinium\'s param file: the Wii U-only word at object +0x134 (G5 word 59, the twin\'s 90: the search '
               'cool-down its level-2 attack sets, 0x026D0EA0) = the 3DS\'s search_interval(1) %s (G1 word 8), which the '
               '3DS leaves in +0x1E0 there; the other Wii U-only words kept' % g[5][1][59].value)
+    T.overrun_check()
     print('%d failures' % len(T.FAILS))
     sys.exit(1 if T.FAILS else 0)
 

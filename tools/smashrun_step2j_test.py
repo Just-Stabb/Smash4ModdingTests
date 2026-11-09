@@ -331,6 +331,7 @@ def main():
         print('back', s5, en5, sticks[:3], back, en6)
         print('en8', [c for c in en8 if c[0] in ('kinetic', 'set_correct', 'disable_hit', 'follow', 'visible')],
               [c for c in out8 if c[0] in ('set_correct', 'enable_hit', 'remove_effect', 'visible')])
+    T.overrun_check()
     T.FAILS and sys.exit('%d FAILED' % len(T.FAILS))
     print('all checks passed')
 

@@ -230,3 +230,21 @@ that each turns as the 3DS does.
   texture has no alpha. This is intended (the 3DS's), but check in game.
 - **Delivery name.** The package is `smashrun_effects_v3.zip`: `smashrun_effects_v1.zip` and `_v2.zip` are older
   user-facing packages (Nov 6) and were left untouched.
+
+## Step 2n: the MATC blocks (the mist still faint after v3)
+
+The "primitive table" suspected above (3DS header +0x40 / +0x44, 0x6C50 / 0x948 for furiijio) is not primitives: it is
+a table of 0x18C-byte **MATC** blocks, one PICA200 fragment set-up per emitter ('MATC', two words, a command list:
+TEV stages 0xC0-0xFC, buffer 0xE0, blending 0x100-0x103, alpha test 0x104, depth 0x107, texture unit 0 0x80-0x8E).
+The emitter's +0x158 is its block's offset. The real primitives are at header words 11 / 12 (furiijio: three unit
+quads), indexed by +0x14C.
+
+TEV stage 0 takes the colour from the texture's rgb and the alpha from ONE channel: furiijio's cool_airA and
+sign_center the texture's alpha, BG / snow / tubu / flare its red. The converter drew both from one BC4 shape (alpha x
+the colour's level), so an RGBA texture's colour came out x its alpha: cool_air (a cyan texture, alpha 0.33) drew a
+deep blue (0.26, 0.47, 1.0) where the 3DS draws (0.35, 0.71, 1.0), against the blue sky. tools/s3ds_effects.py now
+reads the block (`matc_regs`, `matc_alpha_channel`) and, where the level or the MATC's alpha channel differs from
+the one shape, writes two channels (BC5, comp_sel R R R G: R the level, G the alpha channel) under an own pixel
+program (alpha mode 0: colour 0 alpha x t.a). 81 of the 238 emitters (36 banks) change; the rest are byte-equal to
+v3 but for texture offsets. Package: smashrun_step2n_v1 (data/: 30 banks; data_wiiu_overlap/: 6). Details:
+docs/smash-run-port.md "Step 2n".

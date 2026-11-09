@@ -354,6 +354,7 @@ def main():
                  if math.hypot(*log[i][3:5]) < 0.5 * math.hypot(*log[i - 1][3:5])]
         check(rp and not drops, 'ghos: the speed carries on through each slip-homing re-pick (frames %s; speed '
               'drops %s)' % (rp, drops[:3]))
+    T.overrun_check()
     print('%d failure(s)' % len(T.FAILS))
     sys.exit(1 if T.FAILS else 0)
 

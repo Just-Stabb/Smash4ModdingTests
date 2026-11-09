@@ -6,7 +6,10 @@ direction, gravity, air resistance, volume, emitter transform, scale (base, rand
 (3 keys, sections as fractions), colour types / sections / scale, the colour mode (the 3DS combiner, the pixel
 program run on the CPU), the colour keys (the texture's tint folded in for that mode: colour 1 untinted),
 rotation, UV scale / scroll (V negated), blend, follow and particle type; the texture is the 3DS one's shape
-(no alpha: the colour's level, once);
+(no alpha: the colour's level, once); step 2n: every emitter's MATC block (its own TEV set-up, +0x158) is found,
+Furiijio's alpha channels read off its command lists, and where the colour level / the MATC's alpha
+channel differ from the one shape the texture holds both (BC5: R the level, G the alpha) and the pixel program
+takes the alpha from G (run on the CPU);
 the .efc has the 3DS entries (models left out).
 
   python3 tools/s3ds_effects_test.py SRC_ROOT VANILLA_DIR [KIND...]
@@ -57,6 +60,29 @@ def program_mode(p, si):
             mode = hits[0] if len(hits) == 1 else None
         _MODES[key] = mode
     return _MODES[key]
+
+
+def program_alpha(p, si):
+    """step 2n: the alpha shader si's pixel program draws from colour 0 alpha 1 and a texel rgb 0.5 / alpha 0.25
+    (0.25: the texture's alpha, the BC5 two-channel textures' G), run on the CPU; None for a two-texture layout"""
+    import eft_pixel
+    import latte_exec
+    b = bytes(p.shader_binary(si))
+    lay = eft_pixel.layout(b)
+    if lay is None or 'uv1' in lay:
+        return None
+    inp = np.zeros((1, lay['regs'], 4), np.float32)
+    inp[0, lay['c0']] = (1.0, 1.0, 1.0, 1.0)
+    if lay.get('c1') is not None:
+        inp[0, lay['c1']] = (0.0, 0.0, 0.0, 1.0)
+    inp[0, lay['uv'][0]] = (0.5, 0.5, 0, 0)
+    if lay.get('vc') is not None:
+        inp[0, lay['vc']] = 1.0
+    cb9 = np.zeros((16, 4), np.float32)
+    cb9[8] = (1, 0, 0, 0)
+    tex = np.zeros((4, 4, 4), np.float32)
+    tex[...] = (0.5, 0.5, 0.5, 0.25)
+    return float(latte_exec.PixelProgram(b).run(inp, {9: cb9}, {0: (tex, 1, 1)})[0, 3])
 
 
 def check(cond, what):
@@ -125,7 +151,25 @@ def emitter_checks(tag, p, w, e):
         check(close(keys1, np.array(k1[0]), 1e-3), '%s: colour 1 key 0 (untinted)' % tag)
         back = p.decode_texture(w, 0)
         check(back is not None and back.shape[0] >= 8, '%s: texture' % tag)
-        if back is not None and e['formats'][0] in se.NO_ALPHA and back.shape[:2] == shape.shape:
+        chan = se.matc_alpha_channel(e.get('matc'))
+        two = struct.unpack_from('>I', w, ptcl.TEXRES + 0x14)[0] == se.TWO_SEL and \
+            p.texres(w, 0)['native_format'] == ptcl.GX2_EFT[se.BC5]
+        if chan is not None and back is not None and back.shape[:2] == shape.shape:
+            # step 2n: the emitter's own TEV stage 0 (its MATC block): the colour the texture's rgb (level, alpha
+            # not folded in), the alpha its channel chan; two channels where they differ from the one shape
+            level, alpha, _t = se.texture_channels(img, e['formats'][0], chan)
+            differs = np.abs(level - shape).mean() > 0.02 or np.abs(alpha - shape).mean() > 0.02
+            if differs and check(two, '%s: two-channel texture (colour level / alpha %s): not written' % (tag, chan)):
+                el = np.abs(back[..., 0] / 255.0 - level).mean()
+                ea = np.abs(back[..., 3] / 255.0 - alpha).mean()
+                check(el < 0.03 and ea < 0.03, '%s: two channels: colour level error %.3f, alpha (%s) error %.3f'
+                      % (tag, el, chan, ea))
+                pa = program_alpha(p, f(w, 'shader_index'))
+                check(pa is not None and abs(pa - 0.25) < 2e-3, '%s: the pixel program\'s alpha is not colour 0 '
+                      'alpha x the texture\'s alpha (G): %s' % (tag, pa))
+            elif not differs:
+                check(not two, '%s: two channels where one shape is exact' % tag)
+        if back is not None and e['formats'][0] in se.NO_ALPHA and back.shape[:2] == shape.shape and not two:
             # no alpha: the shape is the colour's level, once (not level^2: Furiijio's mist, effects v3)
             err = np.abs(back[..., 0] / 255.0 - shape).mean()
             check(err < 0.03, '%s: shape not the texture level (mean error %.3f)' % (tag, err))
@@ -152,7 +196,19 @@ def main():
         f = os.path.join(src, 'enemy', k, 'effect', '%s.03030000.ptcl' % k)
         if not os.path.exists(f):
             continue
-        s3 = se.read_spbd(open(f, 'rb').read())
+        raw = open(f, 'rb').read()
+        s3 = se.read_spbd(raw)
+        if struct.unpack_from('<I', raw, 0x44)[0]:
+            # step 2n: every emitter's +0x158 lands on a MATC block of the table (header words 16 / 17)
+            lost = [e['name'] for s in s3['sets'] for e in s['emitters'] if e.get('matc') is None]
+            check(not lost, '%s: emitters without their MATC block: %s' % (k, lost))
+        if k == 'furiijio':
+            got = {(s['name'], e['name']): se.matc_alpha_channel(e['matc']) for s in s3['sets'] for e in s['emitters']}
+            want = {('PtcfsFuriijioFreezBeamRoot', 'BG'): 'r', ('PtcfsFuriijioFreezBeamRoot', 'snow'): 'r',
+                    ('PtcfsFuriijioFreezBeamRoot', 'cool_airA'): 'a', ('PtcfsFuriijioShootFilling', 'tubu'): 'r',
+                    ('PtcfsFuriijioSign', 'flare'): 'r', ('PtcfsFuriijioSign', 'sign_center'): 'a'}
+            check(all(got.get(x) == v for x, v in want.items()), 'furiijio: the MATC alpha channels (TEV stage 0) '
+                  'read: %s' % got)
         out, efc_b, _made = se.convert_file(f, f.replace('.ptcl', '.efc'), templates, base, log=lambda *a: None)
         p = ptcl.Ptcl(out)
         n_files += 1

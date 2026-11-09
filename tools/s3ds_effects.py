@@ -25,9 +25,11 @@ follow type, flipbook, UV animation and rotation needs), then the 3DS fields wri
 shape + a tint (texture_shape: the alpha-weighted mean colour, folded into the colour tracks for the colour
 mode drawn, tinted_keys); ETC1 and the other formats without alpha: the shape is the colour's level (alpha
 and colour alike, as the 3DS draws them and Smash 4's BC4 textures). The 3DS colour combiner (0x194) is the
-Wii U's colour mode: a template drawing another gets an own pixel program (tools/eft_pixel.py). Not
-converted: key animations (emitter curves), primitives (mesh particles: drawn as billboards), the complex
-blocks. The effect models (effect/model/NAME/*.bch)
+Wii U's colour mode: a template drawing another gets an own pixel program (tools/eft_pixel.py). Step 2n: each
+emitter's own PICA200 TEV set-up (its MATC block, matc_regs) says which texture channel the alpha comes from;
+where the colour and that alpha differ from the one shape, the texture is two channels (BC5: R the colour's level,
+G the alpha) under an own pixel program. Not converted: key animations (emitter curves), primitives (3DS mesh
+particles: drawn as billboards; Furiijio's are unit quads), the complex blocks. The effect models (effect/model/NAME/*.bch)
 are converted by tools/s3ds_effect_models.py into effect/enemy/KIND/model/NAME/; the .efc keeps the
 references to the ones converted.
 """
@@ -55,7 +57,51 @@ SURFACE = {18: 13, 19: 12, 20: 6, 21: 10, 22: 11, 23: 7, 24: 8, 25: 9, 26: 5, 27
 NO_ALPHA = {12, 6, 10, 7, 1, 3}               # ETC1, HILO8, L4, L8, RGB8, RGB565: alpha from the shape
 SHAPE_SEL = vt.SHAPE_SEL
 BC4 = 0x34
+BC5, TWO_SEL = 0x35, 0x00000001               # step 2n: two channels, rgb <- R (the colour), a <- G (the alpha)
 COMBINER = 0x194                              # 3DS colour combiner: the Wii U's colour modes (0x314)
+# step 2n: every 3DS emitter's own PICA200 fragment set-up. Header words 16 / 17 (+0x40 / +0x44) are the MATC table
+# (offset, size: furiijio 0x6C50, 0x948), 0x18C-byte blocks 'MATC', 2 words, then a PICA command list (TEV stages
+# 0xC0.. 0xFC, 0xE0 buffer, 0x100-0x107 blending / alpha test / depth, 0x80-0x8E texture 0); the emitter's +0x158 is
+# its block's offset (furiijio: BG 0, snow 0x18C, cool_airA 0x318, tubu 0x4A4, flare 0x630, sign_center 0x7BC; the
+# texture size in each block's 0x82 is its emitter's). TEV stage 0 takes the colour from texture 0's rgb and the
+# alpha from ONE channel of it, per emitter (furiijio: cool_airA and sign_center its alpha, BG / snow / tubu / flare
+# its red); stage 1 multiplies the vertex (particle) colour and alpha in, stage 2+ add / blend colour 1 (the
+# combiner 0x194). (The table was read as mesh primitives up to effects v3: those are at header words 11 / 12, three
+# unit quads for furiijio.)
+MATC_PTR = 0x158
+TEV_SRC = {0: 'prim', 1: 'frag', 2: 'frag2', 3: 'tex0', 4: 'tex1', 5: 'tex2', 6: 'tex3', 0xD: 'buf', 0xE: 'const',
+           0xF: 'prev'}
+TEV_ALPHA_OP = {0: 'a', 1: '1-a', 2: 'r', 3: '1-r', 4: 'g', 5: '1-g', 6: 'b', 7: '1-b'}
+
+
+def matc_regs(blk, off):
+    """{PICA register: value} of the MATC block at OFF of the table BLK (None: no block there). Commands are
+    {param, header (register, mask, extra count << 20, consecutive << 31)} + the extra params, padded to 8 bytes"""
+    if off < 0 or off + 12 > len(blk) or blk[off:off + 4] != b'MATC':
+        return None
+    p, regs = off + 12, {}
+    while p + 8 <= len(blk) and blk[p:p + 4] != b'MATC':
+        param, hdr = struct.unpack_from('<2I', blk, p)
+        reg, extra, cons = hdr & 0xFFFF, (hdr >> 20) & 0xFF, hdr >> 31
+        if reg > 0x2FF or p + 8 + 4 * extra > len(blk):
+            break
+        vals = [param] + list(struct.unpack_from('<%dI' % extra, blk, p + 8))
+        for i, v in enumerate(vals):
+            regs[reg + (i if cons else 0)] = v
+        p += 8 + 4 * extra + (4 if extra % 2 else 0)
+    return regs
+
+
+def matc_alpha_channel(regs):
+    """the texture channel TEV stage 0 takes the alpha from ('a', 'r', 'g', 'b'), or None when stage 0's alpha
+    isn't texture 0 straight (another source, an inverted operand, a stage 0 that doesn't pass A on)"""
+    if not regs or 0xC0 not in regs:
+        return None
+    src, opr, cmb = regs.get(0xC0, 0), regs.get(0xC1, 0), regs.get(0xC2, 0)
+    if TEV_SRC.get((src >> 16) & 0xF) != 'tex0' or (cmb >> 16) & 0xF != 0:     # alpha: A = tex0 (replace)
+        return None
+    op = TEV_ALPHA_OP.get((opr >> 12) & 0x7)
+    return op if op in ('a', 'r', 'g', 'b') else None
 
 
 def texture_shape(img, fmt):
@@ -71,6 +117,22 @@ def texture_shape(img, fmt):
     rgba[..., 3] = rgba[..., :3].max(-1)                  # the weights of the tint
     _s, tint = shape_texture(rgba)
     return np.clip(rgba[..., :3] @ tint / float(tint @ tint), 0, 1), tint
+
+
+def texture_channels(img, fmt, chan):
+    """step 2n: (colour level [h, w], alpha [h, w], tint rgb) of a 3DS texture drawn as its MATC's TEV stage 0 does:
+    the colour its rgb (the level along the tint, alpha NOT folded in) and the alpha its channel CHAN ('a': the
+    alpha, 0 or 1 for a format without one as PICA200 reads it: 1; 'r' / 'g' / 'b': that colour channel). The
+    tint is texture_shape's (alpha-weighted mean colour), so tinted_keys folds it the same way"""
+    rgba = img.astype(np.float32) / 255.0
+    _s, tint = texture_shape(img, fmt)
+    t = np.asarray(tint, np.float32)
+    level = np.clip(rgba[..., :3] @ t / max(float(t @ t), 1e-6), 0, 1)
+    if chan == 'a':
+        alpha = np.ones(rgba.shape[:2], np.float32) if fmt in NO_ALPHA else rgba[..., 3]
+    else:
+        alpha = rgba[..., 'rgb'.index(chan)]
+    return level, alpha, tint
 
 
 def tinted_keys(mode, keys0, keys1, tint):
@@ -199,6 +261,7 @@ def read_spbd(data):
     assert d[:4] == b'SPBD', d[:4]
     h = struct.unpack_from('<20I', d, 0)
     names, tex_pos = h[4], h[5]
+    matc = d[h[16]:h[16] + h[17]] if h[17] and h[16] + h[17] <= len(d) else b''
 
     def nm(o):
         return d[names + o:d.index(b'\0', names + o)].decode('latin1')
@@ -228,7 +291,8 @@ def read_spbd(data):
                 texs.append(sm.decode_texture(raw, w_, h_, f))
                 fmts.append(f)
             es.append(dict(name=nm(struct.unpack_from('<I', em, 0x38)[0]), data=em, textures=texs, formats=fmts,
-                           wrap=em[TEX_SLOTS3[0] + 0x10], complex=struct.unpack_from('<I', em, 0)[0] == 1))
+                           wrap=em[TEX_SLOTS3[0] + 0x10], complex=struct.unpack_from('<I', em, 0)[0] == 1,
+                           matc=matc_regs(matc, struct.unpack_from('<I', em, MATC_PTR)[0]) if matc else None))
         out.append(dict(name=sname, emitters=es))
     return dict(sets=out)
 
@@ -291,7 +355,7 @@ def convert_emitter(p, templates, e, notes):
     elif any(abs(x) > 1e-6 for x in g[0x508] + g[0x514]):
         rot = vt.ROT_ANIMATED
     if g[0x14C] >= 0:
-        notes.append('primitive (mesh particle): drawn as a billboard')
+        notes.append('primitive (a 3DS mesh particle, a unit quad for Furiijio\'s): drawn as a billboard')
     if e['complex']:
         notes.append('complex blocks (fields / child / stripe) not converted')
     em, _turns, _swapped = templates.get(typ, blend, False, uv_mode, follow, ptn, rot, notes)
@@ -305,10 +369,29 @@ def convert_emitter(p, templates, e, notes):
     shape, tint = texture_shape(img, e['formats'][0])
     h, w = shape.shape
     tw, th = pow2(w, hi=256), pow2(h, hi=256)
-    if (tw, th) != (w, h):
-        shape = resize(shape[..., None].astype(np.float32), tw, th)[..., 0]
-    r8 = (np.clip(shape, 0, 1) * 255 + 0.5).astype(np.uint8)
-    p.set_texture(em, 0, np.stack([r8, r8, r8, r8], 2), BC4, comp_sel=SHAPE_SEL)
+    # step 2n: the emitter's own TEV stage 0 (its MATC block): the colour from the texture's rgb, the alpha from one
+    # channel. Where those differ from the one shape (alpha x level, or the level), two channels: BC5, rgb <- R the
+    # colour's level, a <- G the alpha channel, drawn by an own pixel program (alpha mode 0: colour 0 alpha x t.a).
+    # Up to effects v3 the colour was x the alpha too (Furiijio's cool_air: alpha 0.33 x a bright cyan texture drew
+    # a deep blue, as the sky)
+    chan = matc_alpha_channel(e.get('matc'))
+    two = None
+    if chan is not None:
+        level, alpha, _t = texture_channels(img, e['formats'][0], chan)
+        if np.abs(level - shape).mean() > 0.02 or np.abs(alpha - shape).mean() > 0.02:
+            two = (level, alpha)
+
+    def shape_tex(s):
+        if (tw, th) != (w, h):
+            s = resize(s[..., None].astype(np.float32), tw, th)[..., 0]
+        return (np.clip(s, 0, 1) * 255 + 0.5).astype(np.uint8)
+    if two is not None:
+        lv8, al8 = shape_tex(two[0]), shape_tex(two[1])
+        p.set_texture(em, 0, np.stack([lv8, al8, np.zeros_like(lv8), np.full_like(lv8, 255)], 2), BC5,
+                      comp_sel=TWO_SEL)
+    else:
+        r8 = shape_tex(shape)
+        p.set_texture(em, 0, np.stack([r8, r8, r8, r8], 2), BC4, comp_sel=SHAPE_SEL)
     wu, wv = e['wrap'] & 0xF, e['wrap'] >> 4
     samp = struct.unpack_from('>I', em, ptcl.TEXRES + 0x0C)[0] & 0x00FFFFFF
     struct.pack_into('>I', em, ptcl.TEXRES + 0x0C, samp | (min(wu, 2) << 24) | (min(wv, 2) << 28))
@@ -366,15 +449,21 @@ def convert_emitter(p, templates, e, notes):
     mode = struct.unpack_from('>I', em, vt.COLOR_MODE)[0]
     want = g[COMBINER]
     c1_rgb = [float(c) * g[0x4B8] for c in g[0x460][:3]]
-    if want in (0, 1, 2, 3) and want != mode:
-        si = eft_pixel.own_shader(p, p.field(em, 'shader_index'), want, 0, 1.0, c1_const=c1_rgb,
+    if (want in (0, 1, 2, 3) and want != mode) or two is not None:
+        target = want if want in (0, 1, 2, 3) else mode
+        si = eft_pixel.own_shader(p, p.field(em, 'shader_index'), target, 0, 1.0, c1_const=c1_rgb,
                                   additive=blend == 1)
         if si is None:
             notes.append('colour mode %d drawn as the template\'s %d (no own program for its layout)' % (want, mode))
+            if two is not None:             # the template's program reads one channel: the one shape again
+                notes.append('texture alpha / colour in one shape (no own program for its layout)')
+                r8 = shape_tex(shape)
+                p.set_texture(em, 0, np.stack([r8, r8, r8, r8], 2), BC4, comp_sel=SHAPE_SEL)
+                two = None
         else:
             struct.pack_into('>I', em, 0x844, si)
-            struct.pack_into('>I', em, vt.COLOR_MODE, want)
-            mode = want
+            struct.pack_into('>I', em, vt.COLOR_MODE, target)
+            mode = target
 
     # ---- colours: the 3 keys, the texture's tint folded in for the colour mode drawn (tinted_keys)
     keys = [[tuple(g[off][4 * k:4 * k + 3]) for k in range(3)] for off in (0x430, 0x460)]

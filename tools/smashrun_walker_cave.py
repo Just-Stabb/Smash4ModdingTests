@@ -461,6 +461,19 @@ BI_UPDATE = 0x026A4880               # BehaviorImpl::update (slot 3): the state'
 # the Goomba's tread area (its 3DS area 0: node 2, 14 x 8, offset 0): half width, centre above the posture
 # (node 2 HipN 2.53 in its bind pose), half height
 TREAD_BOX = (7.0, 2.53, 4.0)
+# step 2n: the tread box in the model's scale. The 3DS area (AreaInstance set-up, code.bin 0x3D9278-0x3D92C4) takes the
+# scale of its node's world matrix (|first column|, sqrt(m00^2 + m10^2 + m20^2); no node: the posture's +0x10) and,
+# when it is not 1.0, multiplies the area's offset and size by it; the node matrix carries the model scale the enemy's
+# activation sets (set_scale(gl entry +0x1C), docs/smash-run-port.md "Step 2a"). The boxes above are the vl's model
+# units, so each is scaled here by its kind's +0x1C (Wii U param/enemy/gl/enemy_param.bin group 3, entry kind + 1,
+# word 7: kuribo 1.2, tikibuzz 1.0, dekakuribo 1.3, patapata 1.5). A TNODE box's live node position is already scaled
+TREAD_SCALE = {'kuribo': 1.2, 'tikibuzz': 1.0, 'dekakuribo': 1.3, 'patapata': 1.5}
+
+
+def tread_box(w):
+    """the kind's tread box (half width, centre above the posture / node, half height) in the model's scale"""
+    s = TREAD_SCALE.get(w['name'], 1.0)
+    return tuple(v * s for v in w.get('tbox', TREAD_BOX))
 # step 2g v3: the stomp test is relative to the enemy (PREV keeps the fighter's y minus the box top) and swept: a
 # crossing of the box top this frame counts down to the box's height + STOMP_SWEEP below it (a fast fall, 3.4 a
 # frame at most, plus a rising flier, did step over Tiki Buzz's 3-unit box); dying / defeated enemies (+0x19C) skip
@@ -1055,8 +1068,8 @@ def cfg_values(w, D, fn=lambda x: 0):
              HOPLOOP=w.get('hop_motion', (None, 0))[1], ZERO=0, TREAD=w.get('tread', 0), AREA=D['ar_' + n],
              SMODE=w.get('smode', 0), LEAVE=w.get('leave', 0),
              VT=D['vt_' + n] if w.get('vtover') else D['vtf' if w.get('flier') else 'vt'], SIZE=w.get('size', OBJ_SIZE),
-             TB0=fword(w.get('tbox', TREAD_BOX)[0]), TB1=fword(w.get('tbox', TREAD_BOX)[1]),
-             TB2=fword(w.get('tbox', TREAD_BOX)[2]), FSTART=fn(w.get('fstart', 0)), FDMG=fn(w.get('fdmg', 0)),
+             TB0=fword(tread_box(w)[0]), TB1=fword(tread_box(w)[1]),
+             TB2=fword(tread_box(w)[2]), FSTART=fn(w.get('fstart', 0)), FDMG=fn(w.get('fdmg', 0)),
              F69=fn(w.get('f69', 0)), F27=fn(w.get('f27', 0)), LVP=P(w['lvp']) if 'lvp' in w else 0,
              TNODE=w.get('tnode', 0), BOUNCE=fword(w.get('bounce', 0.0)),
              VIS=D.get('vis_' + n, 0), MVIS=D.get('mvis_' + n, 0))

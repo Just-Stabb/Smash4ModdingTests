@@ -355,7 +355,7 @@ def paratroopa(img, fn, D, cfg, byname, world, enter_calls, stomp, vslot):
           'module uniform at (0, -0.5): set_mode_normal without acceleration) -> 15 frames -> 6 bite -> its end -> 1 '
           'with the 30-frame cool-down %s %s' % (hop, wo.states(), (am, cool, rehop)))
     # the stomp on a winged one: => 9 (the wing loss: var 2, effect 0x7030000, NokonokoMode) -> 10; bounce 1.0
-    m, got = stomp(n, 2, [(5.0, 0x1D), (-1.0, 0x1D)], 12.0, init=False)
+    m, got = stomp(n, 2, [(5.0, 0x1D), (-1.0, 0x1D)], sum(W.tread_box(byname[n])[1:]), init=False)
     sf = [c for c in got[1] if c[0] in ('chgi', 'set_float')]
     wo = world(n, 9, var=0)
     c = [x for x in wo.m.calls if x[0] in ('effect', 'motion', 'kinetic', 'clear_speed')]
@@ -397,7 +397,7 @@ def paratroopa(img, fn, D, cfg, byname, world, enter_calls, stomp, vslot):
     # stomped as a Koopa => 19 the shell: hit and tread off, damage 0, defeated; at the motion's end on the ground
     # create_item_and_throw(0x94, var 2 -> 1, position + (0, 3 - speed y, 0), the speed, 0, true, -1, -1) -> 23; step
     # 2i: the Wii U's Green Shell (0x46, variation 0) stands in for 0x94, and the model is hidden once it is thrown
-    m, got = stomp(n, 12, [(5.0, 0x1D), (-1.0, 0x1D)], 12.0, init=False, var=2)
+    m, got = stomp(n, 12, [(5.0, 0x1D), (-1.0, 0x1D)], sum(W.tread_box(byname[n])[1:]), init=False, var=2)
     wo = world(n, 19, var=2, setup=lambda m: m.w32(OBJ + W.V(4), 1))     # the dead item due (start)
     c = [x[0] for x in wo.m.calls if x[0] in ('disable_hit', 'disable_tread', 'set_damage', 'motion')]
     wo.m.vy = -0.5
@@ -484,7 +484,7 @@ def main():
         return m, out
 
     def top(name):
-        tb = byname[name].get('tbox', W.TREAD_BOX)
+        tb = W.tread_box(byname[name])         # step 2n: in the model's scale
         return tb[1] + tb[2]
 
     fall = [(5.0, 0x1D), (-1.0, 0x1D), (-1.0, 0xB3), (3.0, 0xB3), (6.0, 0xB), (8.0, 0xB)]
@@ -666,6 +666,7 @@ def main():
 
     spiny(img, fn, D, cfg, byname, world, enter_calls, stomp, vslot)
     paratroopa(img, fn, D, cfg, byname, world, enter_calls, stomp, vslot)
+    T.overrun_check()
     print('%d failures' % len(T.FAILS))
     sys.exit(1 if T.FAILS else 0)
 

@@ -743,6 +743,7 @@ def main():
     smashrun_furiijio_test.furiijio(img, D, fn, cfg['furiijio'], vt_words, Machine, calls, run)
     import smashrun_propellerheiho_test
     smashrun_propellerheiho_test.propellerheiho(img, D, fn, cfg['propellerheiho'], vt_words, Machine, calls, run)
+    T.overrun_check()
     print('%d failures' % len(T.FAILS))
     sys.exit(1 if T.FAILS else 0)
 

@@ -488,6 +488,7 @@ def main():
           wb['P'][15:17] == (5, 2.0),
           'white bear: an attribute-5 hit (AttackData +0x43) takes its damage x2 (10 -> 15 becomes 20 through '
           'set_current_damage, before BehaviorImpl\'s notify_on_damage); other hits as they are %s' % res)
+    T.overrun_check()
     print('%d failures' % len(T.FAILS))
     sys.exit(1 if T.FAILS else 0)
 

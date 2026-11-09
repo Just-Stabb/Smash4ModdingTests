@@ -299,6 +299,7 @@ def main():
           'Waddle Doo: walking, a blink starts once the counter runs out, phase = frame / 4: open, blink1, blink2, '
           'blink1, open, then the next wait random_range(30, 50) (%d); dead (the 3DS\'s 10, ours 6): the tear and '
           'open eyes; other states open eyes; slots 56 / 57 the tear, 58 none %s' % (wait, (first, dead, other, s56)))
+    T.overrun_check()
     print('%d failures' % len(T.FAILS))
     sys.exit(1 if T.FAILS else 0)
 

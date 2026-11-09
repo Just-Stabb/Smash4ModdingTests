@@ -451,6 +451,7 @@ def main():
           'ground, the target below by more than P+0xC8 x 10, a floor under: ray from (x, y - 10) along (0, -100)): '
           'set_attach_ground(0), set_passable_check(1), set_correct(0), +0x1D4 = 8, -> 1; kind 0x59 the game\'s %s'
           % (len(scen), bad[:2]))
+    T.overrun_check()
     print('%d failures' % len(T.FAILS))
     sys.exit(1 if T.FAILS else 0)
 

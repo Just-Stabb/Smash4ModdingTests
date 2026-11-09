@@ -2651,3 +2651,114 @@ info is equal.
 **Still open:** the fs_common sounds (row 0x4A6: no Wii U bank; the framework's defeat / reflect sounds and Stalfos's
 slot 30); the Pooka pop's real is_playing wait; the dead items (step 2k); in game: every sound above, the loops'
 stops, the Stalfos drop.
+
+## Step 2n: the step 2i crash report (the GX2R lines are not it), the scaled tread boxes, Furiijio's mist (the MATC blocks)
+
+Package smashrun_step2n_v1: `code/` exe_v31 = exe_v30 + `smashrun_walker_cave.py` over its own regions (scratch
+s2n/build31.py; the field cave unchanged, set "step2j"); `data/` the 30 effect banks the converter fix changes
+(effect/enemy/KIND/KIND.010d0000.ptcl: effects v3's 27 changed ones, and killer / killercannon / shotzo, last shipped in
+effects v2) and `data_wiiu_overlap/` the 6 overlapping kinds' (dogars, kamek, magnumkiller, metroid, ohganemochi,
+tac; optional, as in effects v2 / v3).
+Separately smashrun_step2n_diag_v1 (`code_diag/`, `code_diag_novis/`): the log build below. Readings with addresses:
+hand_read.json `_framework_step2n`, and `port_step2n` of kuribo, dekakuribo, patapata, furiijio.
+
+**The step 2i crash: what the log holds.** The user's log of smashrun_step2i_v1 (upload ed53ffc2) ends in 256 lines
+`GX2RSetAttributeBuffer(): Offset exceeds buffer size`, 32 a frame for 8 frames. That burst is in **every** Smash Run
+battle's log since step 2g, at the battle's load and before any spawn, in battles that then ran for 30-80 s: uploads
+891b8bbc, caf47a00, dc67f861, e48d89f5 (256 lines each, interleaved with the diag builds' `S4FX reg` lines, which the
+battle load prints), de4066d2 (another battle: 38 a frame, 8 frames). So it is the game's own (an 8-frame model draw
+at battle start; Cemu logs it and goes on), not the crash. Its only caller is the NU renderer's draw 0x036F3CE0
+(0x036F3DA8: GX2RSetAttributeBuffer(the vertex buffer object's GX2RBuffer at +0xC, stream, stride, offset), from
+NU::DeviceWiiU's draws 0x036F3E30 / 0x036F3EDC). Nothing after it reached the log: no Cemu crashlog either (dc67f861,
+the 2g v5 log build's PPC fault, shows Cemu writes "Crashlog for Cemu 2.6" with the PPC state when the game faults),
+so the crash was a freeze, a GPU-side failure or a fault whose lines Cemu never flushed. The cause is not in the
+log; the log build below is the next step.
+
+**What was ruled out offline (step 2i's code and data).**
+- The mesh switch is the game's own, bounded path. set_mesh_visibility_by_index 0x032FF6B4 = `lwz r3, 8(r3)` ->
+  0x034232DC: mesh < [[model+0x6E4]+0x44] and [model+0x7DC] != 0, then bits 0-1 of byte [[model+0x7DC]+4][mesh]; the
+  array is allocated with that same count and filled with 0xFE (0x03420AF0-0x03420B64), so no index can write past
+  it. The model's update (0x03424068: [model+0x848] vt+0x74 = 0x03424E88, every update) takes each mesh's
+  visibility (bits 0-1, 2 = "unset": bit 2), and on a change asks the command list [model+0x7EC] vt+0x1C / vt+0x24
+  (the visible list +0x7F0, its count) to rebuild. The engine drives the same entry for fighters' models (mesh swaps
+  0x034557D4 / 0x034557E8, visibility tracks 0x03428DE8) and the enemies' own Behavior::set_mesh_visibility
+  0x026A8D50 -> ModelModule 0x02007784 -> 0x03426140 (through a vmt-like table at [model+0x734], which our models
+  don't have) -> 0x034232FC: no path specific to the cave.
+- The seven restored model.nud files: every polygon's indices are below its vertex count, every index / vertex /
+  vertex-add range inside its section; each differs from step 2h's only in the hidden meshes' index bytes and is the
+  converter's full output, the same files the user ran in steps 1-2b (smashrun_enemies_v1b) without a crash.
+- The Koopa shell (Green Shell 0x46): ItemManager create 0x0305542C returns null when the item's resource isn't loaded
+  (0x030554C8: 0x03053578(kind, variation), r29 = 0 from Behavior::create_item 0x026A8D78), so no item is made
+  without its files. set_node_rotate (the Spiny's hatch) checks the node against the count (0x02C641C0).
+  Ghos's slot 31 matches the 3DS's 0x113F0 (which also skips BehaviorImpl's +0x15C / +0x160 writes).
+- Heap overruns and freezes in the cave: two new permanent checks in the shared unicorn machine
+  (smashrun_walker_test.py): every guest write into an object's region is checked against its SIZE (CFG SIZE, what
+  operator new got), and every run must return within its instruction cap. Over every scenario of the 13 test files
+  (the walkers, fliers, steps 2h-2n, all the step 2j-2m code included), on exe_v30 and exe_v31: no write past an object,
+  no run that doesn't return.
+- Timing: in the step 2i spawn set ("step2h"), Ghos is the first spawn (150 frames), then Big Goomba (300), the
+  Paratroopa (450), Furiijio (600).
+
+**The log build (smashrun_step2n_diag_v1; tools/diag_step2n_cave.py, test tools/diag_step2n_test.py).** exe_v31 plus
+OSReport lines (`S4N ...`, each tag with its own cap) from: the spawner's heartbeat every 60 frames (hb; it stops if
+the game freezes), each spawn (sp: kind, variation), each cave enemy's state change request (st: kind, variation,
+state, new state, change_state / interrupt, this), each mesh switch that changes a mesh (vis: mesh, kind, old / new
+bits, the model, its mesh count; 0xEE: an index past the count), h_whole (whole), the game's mesh-list rebuild
+(rb: model, visible count, command list), the Paratroopa's motion every 30 updates (mot: state, motion, frame, rate),
+a fighter near a Big Goomba / Paratroopa in the stomp test and each stomp (near / hit). `code_diag_novis` is the same
+with h_vis / h_whole returning at once (every mesh of the step 2i models drawn): the A/B for the mesh switch. Space
+0x04BCC000-0x04BCE000 (region H's zero tail); each stub saves r0, r2-r12, LR, CTR, XER, CR, f0-f13 and replays the
+word it replaced; the test runs every hook on both executables in unicorn: registers as the original leaves them,
+the line's values, each cap.
+
+**The tread boxes in the model's scale (Big Goomba / Paratroopa not stompable).** The 3DS area code (AreaInstance
+set-up, code.bin 0x3D9278-0x3D92C4) takes the scale of the area's node world matrix (|first column|, or the
+posture's +0x10 without a node) and, when it isn't 1.0, multiplies the area's offset and size by it; the node matrix
+carries the model scale the activation sets (the gl entry's +0x1C). The cave's boxes were the vl's model units:
+Wii U gl (param/enemy/gl/enemy_param.bin group 3, entry kind + 1, +0x1C): Goomba 1.2, Tiki Buzz 1.0, Big Goomba
+1.3, Paratroopa 1.5. Now `TREAD_SCALE` / `tread_box()` scale them: Goomba (8.4, 3.04, 4.8), Big Goomba (9.1, 7.8,
+1.95) (top 9.75, was 7.5, half width 9.1, was 7), Paratroopa (3.0, 12.0, 6.0) (top 18, was 12; half width 3, was 2),
+Tiki Buzz unchanged (its live node is already scaled). The 3DS's hit test is a point in the box (0x944424: the
+point's x / y against +0x28..+0x34), as the cave's. The Paratroopa's ±2 was the narrowest box of all. Whether this
+is all of it is for the user to see (the log build's near / hit lines show every fall near them otherwise).
+
+**The Paratroopa's wings.** Not found statically: the wing mesh is weighted to LWingN / RWingN (bones 8 / 13: 22482
+of its 22950 weight), the VBN bone hashes are the names' CRC32, the jtb lists all 14 bones, the Fly motion (the hop
+and the fall's, index 11, change_motion_state(0xB, 0, 1, loop) as the 3DS's 0x72634) turns both wing bones about 116
+degrees over its first 10 frames (OMO type 5, the layout checked track by track), the bite turns them too. The log
+build's `mot` lines will say which motion and frame the game plays while it hops.
+
+**Furiijio's mist: the 3DS emitters' own fragment set-up (tools/s3ds_effects.py).** SPBD header words 16 / 17
+(+0x40 / +0x44; furiijio 0x6C50, 0x948) are a table of 0x18C-byte **MATC** blocks: 'MATC', two words, then a PICA200
+command list (TEV stages 0xC0-0xFC, the combiner buffer 0xE0, blending 0x100-0x103, alpha test 0x104, depth 0x107,
+texture unit 0 0x80-0x8E). Each emitter's +0x158 is its block's offset (furiijio BG 0, snow 0x18C, cool_airA 0x318,
+tubu 0x4A4, flare 0x630, sign_center 0x7BC; each block's 0x82 is its emitter's texture size). Effects v3 read the
+table as mesh primitives (those are header words 11 / 12: three unit quads for furiijio, +0x14C). TEV stage 0 takes
+the colour from texture 0's rgb and the **alpha from one channel**: cool_airA and sign_center the texture's alpha, BG
+/ snow / tubu / flare its red; stage 1 multiplies the particle colour and alpha in; stage 2 on adds colour 1 (mode 3,
+cool_air) or blends to it (BG / snow: c1 + (1 - c1) x c0 x t). The converter drew every emitter from ONE shape (alpha
+x the colour's level) for both: for an RGBA texture the colour came out x its alpha, so cool_air (a cyan texture,
+alpha 0.33) drew colour 0 x tint x 0.29 + colour 1 = a deep blue (0.26, 0.47, 1.0) where the 3DS draws (0.35, 0.71,
+1.0), against a blue sky. Fix: `matc_regs` / `matc_alpha_channel` read the block; where the colour's level or the
+MATC's alpha channel differs from the one shape (mean > 0.02) the texture is two channels (BC5, comp_sel R R R G: R
+the colour's level, alpha not folded in; G the 3DS alpha channel) under an own pixel program (eft_pixel.own_shader,
+alpha mode 0: colour 0 alpha x t.a). cool_air now draws its 3DS colour and alpha (contrast against the sky 0.106,
+the 3DS's 0.108, effects v3's 0.085). 81 of the 238 emitters (36 banks) get the two channels (the RGBA smoke / leaves /
+stones / flashes / glows); every other emitter is byte-equal to effects v3 but for its texture's offset.
+
+**Tests** (exe_v31):
+
+| Test | Result |
+| --- | --- |
+| smashrun_step2n_test.py (new; the Wii U gl enemy_param.bin) | 13 checks, 0 failures (the boxes = the vl areas x the gl scales; falls at dx 8.5 / 9.5 Big Goomba, 2.8 / 3.2 Paratroopa (winged -> 9, Koopa -> 19), 8.0 / 8.6 Goomba; the guards) |
+| diag_step2n_test.py (new; the two log builds against exe_v31) | 19 checks, 0 failures |
+| smashrun_step2m / 2l / 2k / 2j / 2i / 2h_test.py | 21 / 19 / 28 / 24 / 12 / 43 checks, 0 failures (the guards in each; step 2h's Paratroopa stomps use the scaled top) |
+| smashrun_walker_test.py / flier / flier_motion / field / enemy | 181 / 125 / 13 / 13 / 26 checks, 0 failures |
+| effect_slots_patch_test.py exe_v31 exe_v12 | 47 checks, all ok |
+| s3ds_effects_test.py (S/van, 117 vanilla ptcl) | 52 files, 238 emitters, 0 failures (new: every emitter's MATC block found, Furiijio's alpha channels, the two-channel textures and the program's alpha from G) |
+
+**exe_v31 vs exe_v30, word diff** (s2n/diff31.py): 9 words, the three stompable kinds' CFG TB0-TB2 (0x04B7DD50
+kuribo's in region E, 0x04BBDEF8 dekakuribo's, 0x04BBE9B0 patapata's); relocations and the file info equal.
+
+**Still open:** the step 2i crash's cause (the log build's lines); the Paratroopa's wings (its `mot` lines); in game:
+the stomps on Big Goomba and Paratroopa, Furiijio's mist and the other 26 banks' two-channel emitters.

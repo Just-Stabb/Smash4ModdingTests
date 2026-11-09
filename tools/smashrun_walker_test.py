@@ -20,13 +20,16 @@ Runs the cave's code and the game's around it, the framework's calls stubbed (mo
 - each kind's behaviour in a small world (ground / walls / ledges / the target's search / the speed's y / the
   motion's end stubbed, x moved by the AI stick): the 3DS state sequences of README (Fix v5);
 - T2 / S2, the sets and hashsets.
+Step 2n: the machine guards every test file's runs: a guest write past the object's own SIZE (CFG SIZE, what operator
+new got) and a run that hits its instruction cap without returning are failures (overrun_check(), called by each
+test file at its end): a heap overrun or a freeze in game.
 """
 import os
 import struct
 import sys
 import zlib
 
-from unicorn import Uc, UC_ARCH_PPC, UC_MODE_PPC32, UC_MODE_BIG_ENDIAN, UC_HOOK_CODE
+from unicorn import Uc, UC_ARCH_PPC, UC_MODE_PPC32, UC_MODE_BIG_ENDIAN, UC_HOOK_CODE, UC_HOOK_MEM_WRITE
 from unicorn.ppc_const import UC_PPC_REG_LR, UC_PPC_REG_PC, UC_PPC_REG_MSR
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -53,11 +56,23 @@ CREATES = {0x50: 0x02DD0438, 0x51: 0x02DC7414, 0x52: 0x026B7344, 0x53: 0x026C2E9
 REVERSE_LR = 0x026A7A20
 SET_LR = 0x026A780C
 FAILS = []
+RUNAWAYS = []                   # step 2n: (start, pc) runs that hit the instruction cap without returning
+OVERRUNS = []                   # step 2n: (kind, offset, size, pc) writes past an object's SIZE
 VT_ADDR = [0]
 EXTRA_STUBS = {}                # step 2j: cave labels run as stubs (the aerial helpers), filled by main
 GKINDS = [w for w in W.WALKERS if not w.get('flier') and not w.get('step2h')]   # the walkers (step 2e's fliers:
 # smashrun_flier_test.py; step 2h's kinds: smashrun_step2h_test.py)
 WM_SETF, WM_SETI = 0x02000010, 0x02000014   # step 2h: the fighter WorkModule's set_float / set_int (vt +0x4C / +0x8C)
+
+
+def overrun_check():
+    """step 2n: every write the cave made into an object stayed inside the object's SIZE (operator new's)"""
+    stuck = sorted(set(RUNAWAYS))
+    check(not stuck, 'every run returns within 50000 instructions (start, pc): %s'
+          % ', '.join('(0x%08X, 0x%08X)' % o for o in stuck[:12]))
+    seen = sorted(set(OVERRUNS))
+    check(not seen, 'no write past an object\'s SIZE (kind, offset, size, pc): %s'
+          % ', '.join('(0x%X, +0x%X, %d, 0x%08X)' % o for o in seen[:12]))
 
 
 def check(cond, what):
@@ -90,6 +105,9 @@ class Machine:
         self.creates = dict((v, k) for k, v in CREATES.items())
         self.vt = VT_ADDR[0]
         uc.hook_add(UC_HOOK_CODE, self.hook)
+        # step 2n: the object's own size (CFG SIZE, operator new's) guarded: a write past it is a heap overrun in game
+        self.obj_size, self.overruns = None, []
+        uc.hook_add(UC_HOOK_MEM_WRITE, self.guard, begin=OBJ, end=ACC - 1)
         self.meshes, self.objects = {}, {}     # step 2i: NUD mesh -> visible; battle object id -> object
         # fake modules
         w = self.w32
@@ -125,6 +143,12 @@ class Machine:
 
     def rf(self, a):
         return struct.unpack('>f', self.uc.mem_read(a, 4))[0]
+
+    def guard(self, u, _access, addr, size, value, _):
+        if self.obj_size is not None and addr + size > OBJ + self.obj_size:
+            pcv = u.reg_read(UC_PPC_REG_PC)
+            self.overruns.append((addr - OBJ, size, pcv))
+            OVERRUNS.append((self.obj_kind, addr - OBJ, size, pcv))
 
     def ret(self, r3=None):
         if r3 is not None:
@@ -369,6 +393,8 @@ class Machine:
         self.uc.reg_write(R[1], STACK)
         self.uc.reg_write(UC_PPC_REG_MSR, self.uc.reg_read(UC_PPC_REG_MSR) | 0x2000)
         self.uc.emu_start(start, stop, count=50000)
+        if self.uc.reg_read(UC_PPC_REG_PC) != stop:      # step 2n: a run that never returns (a loop) is a freeze in game
+            RUNAWAYS.append((start, self.uc.reg_read(UC_PPC_REG_PC)))
 
     def call(self, fn, regs, fregs=None):
         self.uc.reg_write(UC_PPC_REG_LR, DONE)
@@ -376,6 +402,7 @@ class Machine:
 
     def walker(self, cfg, state=0, lr=-1.0, x=0.0, kind=0, var=0):
         """a walker object (as create leaves it) with the fake modules"""
+        self.obj_size = None
         self.uc.mem_write(OBJ, bytes(W.FL_SIZE))
         self.w32(OBJ, ACC)
         self.w32(OBJ + 4, state)
@@ -383,6 +410,7 @@ class Machine:
         self.w32(OBJ + 0xC, var)
         self.w32(OBJ + 0x168, cfg)
         self.w32(OBJ + 0xE0, self.vt)
+        self.obj_size, self.obj_kind = self.r32(cfg + W.CF['SIZE']), kind
         self.wf(OBJ + 0x10, lr)
         self.wf(POSTURE + 0x10, x)
         self.wf(POSTURE + 0x14, 0.0)
@@ -853,7 +881,8 @@ def main():
         all(g[2] == [(OBJ, INPUT)] for g in got) and not got[3][1]
     check(ok, 'fix v8: a fighter falling onto a walking Goomba (feet from above its tread box top %.2f to inside it, '
           '|dx| 3 <= %g) -> => collapses 8 and the fighter\'s StatusModule(3, 0x%X StepJump, 0); BehaviorImpl\'s '
-          'update every frame %s' % (W.TREAD_BOX[1] + W.TREAD_BOX[2], W.TREAD_BOX[0], W.STEP_JUMP, got))
+          'update every frame %s' % (W.tread_box(byname['kuribo'])[1] + W.tread_box(byname['kuribo'])[2],
+                                     W.tread_box(byname['kuribo'])[0], W.STEP_JUMP, got))
     res = {}
     res['beside'] = stomp('kuribo', [(9.0, 20.0), (9.0, 5.0)])
     res['rising'] = stomp('kuribo', [(3.0, 0.0001), (3.0, 2.0), (3.0, 5.0)])
@@ -1481,6 +1510,7 @@ def main():
                     scr = [struct.unpack('>I', dd[0x10 + 8 * i:0x14 + 8 * i])[0] for i in range(cnt)]
                     out = [hex(h) for h in scr if h not in hashes]
                     check(not out, 'set %s: %s.bin\'s %d scripts are in its hashsets %s' % (n, f, cnt, out))
+    overrun_check()
     print('%d failures' % len(FAILS))
     sys.exit(1 if FAILS else 0)
 
