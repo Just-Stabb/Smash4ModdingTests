@@ -27,15 +27,20 @@ import fighter_param_vl as V  # noqa: E402
 
 TWINS = (('zima', 'mczakozima'), ('plasmawisp', 'mczakoplasmawisp'), ('darios', 'mczakodarios'),
          ('stalfos', 'mczakostalfos'))
-# per kind, per group: the Wii U group's tokens as a list of ('3', i) = the 3DS group's token i, ('U', j) = the
+# per kind, per group: the Wii U group's tokens as a list of ('3', i) = the 3DS group's token i, ('3g', (g, i)) = the
+# 3DS group g's token i, ('U', j) = the
 # Wii U's token j (no 3DS counterpart); groups not listed map 1:1
 EDITS = {
     'zima': {0: [('3', 0), ('3', 1), ('3', 2), ('3', 3)],
              5: [('3', i) for i in range(19)] + [('U', j) for j in range(19, 25)]},
     'darios': {5: [('3', i) for i in range(12)] + [('U', j) for j in range(12, 18)]},
     'stalfos': {9: [('3', i) for i in range(3)] + [('U', j) for j in range(3, 9)]},
-    'plasmawisp': {5: [('3', i) for i in range(53)] + [('U', j) for j in range(53, 61)] +
-                   [('3', i) for i in range(53, 56)]},
+    # step 2l: Wii U word 59 (object +0x134, 90) is the twin's search cool-down after its level-2 attack (the Wii U
+    # sets +0x1E0 = it with change_state(8) at 0x026D0EA0; the 3DS 0x89134 leaves +0x1E0 = search_interval(1), set
+    # just before at 0x8904C): it takes the 3DS's search_interval(1) (P1 entry 1's interval, G1 word 8), so the
+    # Wii U's store writes the 3DS's value (docs/smash-run-port.md "Step 2l")
+    'plasmawisp': {5: [('3', i) for i in range(53)] + [('U', j) for j in range(53, 59)] + [('3g', (1, 8))] +
+                   [('U', 60)] + [('3', i) for i in range(53, 56)]},
 }
 
 
@@ -66,7 +71,7 @@ def remap(kind, fs_data, sm_data):
         if nu is not None:
             out += b'\x20' + struct.pack('>I', nu)
         for j, (src, i) in enumerate(plan):
-            tok = t3[i] if src == '3' else tu[i]
+            tok = t3[i] if src == '3' else tu[i] if src == 'U' else g3[i[0]][1][i[1]]
             assert tok.t == tu[j].t, (kind, gi, j, tok.t, tu[j].t)
             if tok.raw != tu[j].raw:
                 changed.append((gi, j, tu[j].text(), tok.text()))

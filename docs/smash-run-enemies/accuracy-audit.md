@@ -12,6 +12,8 @@ Step 2j (docs/smash-run-port.md "Step 2j") fixed: 6 (the parasol fall; the dropp
 
 Step 2k (docs/smash-run-port.md "Step 2k") fixed: 1 (the beam: the Wii U's own weapon kind 0xAF, its trigger, the leave-timer reset by the beam's search), 2 (the sleep powder and its search), 3, 4, 5 (the twins read their kinds' own params: tools/smashrun_twin_params.py, k2_twins), 7 (set_weak_param, approximated: the bear doubles attribute-5 hits' damage itself). Found: every walker kind but the Waddle Doo still borrows mczakozima's param object (its P3 hurtbox capsule, P4): a new framework row. Open: the twins' AI state by state, the dead items (the Wii U has no FieldSmash item manager: read in "Step 2k"), sounds.
 
+Step 2l (docs/smash-run-port.md "Step 2l") fixed: every walker / flier kind's own param object (the framework row: P3 hurtboxes / P4 ground boxes from the kind's vl), the Waddle Doo's hit-effect handle (it sat in V8, the landing's hop flag: a hit skipped the landing's turn), 6 (the dropped parasol: the Wii U's own weapon kind 0xAD), and Lethinium's Fortress-only forced level-2 attack; the twins compared state by state (tools/smashrun_twin_compare.py; open leads in "Not audited (left)"). Found: the Waddle Dee's own parasol shield (start 0x7BB1C: two parts at node 8) is not ported.
+
 
 1. Waddle Doo: the beam (its only attack) and its trigger are missing; the leave timer is never reset (600 frames after spawning it leaves mid-fight)
 2. Churine: the sleep powder (its only attack) and its search are missing: harmless except its death flight
@@ -140,7 +142,7 @@ Tier 3 (minor):
 |---|---|---|---|---|
 | AI kinetic energy layout ([[[[acc+0x30B0]+8]+0]+4], Wii U acc+0x3130) | 3DS 0x645FC0 (kinetic 20 setter) writes +0x10 / +0x14 / +0x70 / +0x74 / +0x78 / +0x90 / +0x94 | Wii U twin 0x026A97D0 writes the same offsets; w_init / h_en write the 3DS offsets unchanged | ok | none: this energy is NOT shifted (only the KineticModule get_energy(n) energies are: 3DS clear_speed_x 0x7B0B80 +4/+0xC vs Wii U 0x026A67F4 +0/+8, handled for the aerial module) |
 | energy kick | 3DS 0x32C4C / 0x1AB50: module [acc+0x30B0] vt+0x7C with r1 = 0x20000004 only (the spec's float args are stale registers) | h_kick / i_kick: vt+0xFC, r4 = 0x20000004 | ok |  |
-| param slot of the walker kinds | each kind its own param object (P3 hurtbox, P4 ground, ...) | every walker kind but the Waddle Doo (step 2k: its own static object `wdp`) reads mczakozima's (step 2b's donor): its P3 capsule, its P4 | approximated (found in step 2k) | a static object per kind, as `wdp` |
+| param slot of the walker kinds | each kind its own param object (P3 hurtbox, P4 ground, ...) | step 2l: every walker / flier kind its own static object in its 3DS layout (kind_param_blocks, S2); the framework reads P3 at 0x02D896F4 (+0x44 / +0x48), P4 at 0x02DA2BA0 (+0x5C) | fixed (step 2l) | |
 | state frame counter order | common_state_func 0x3DA218: enter, slot 54 (vt+0xD8, reset), update, slot 55 (vt+0xDC, ++) | V-counters reset in the enter, incremented at the end of the update | ok |  |
 | fall: speed gate | Kuribo 1 (0x32C70), Waddle Doo 1 (0x7D21C), White Bear 1, Waddle Dee 1: is_touch(8) only; Shy Guy 1 (0x1B0A8) tests speed y <= 0 first | g_fall_up always waits for h_vy0 <= 0 | approximated | a CFG flag: skip h_vy0 for the kinds whose 3DS fall has no speed test |
 | speed y test energy mask | Kuribo 4 (0x325F4) get_sum_speed3f(-9) (every energy but 3) | h_vy0 = get_current_speed 0x026A678C = get_sum_speed3f(1) | approximated | call the Wii U get_sum_speed3f with -9 for the Kuribo notice |
@@ -191,7 +193,8 @@ Tier 3 (minor):
 | item | 3DS (address, value) | our port (label / value) | severity | suggested fix |
 |---|---|---|---|---|
 | parasol fall (state 2; variation 0 = the spawned one) | EnemyAerialModule set_mode_normal(accel P0.f6 0.0005, max 10, 10), speed (x kept, -0.2), ParasolFall loop, aerial update with the stick each frame | d_para_en: a normal fall (kinetic 8) with the ParasolFall motion | fixed (step 2j: wd_para_en / wd_para_up in the aerial module; its uniform mode stands in for mode 0, the 0.0005 stick acceleration left out) | the flier aerial module (AER, as Paratroopa's pt_*): set_mode_normal / uniform (0, -0.2) and its update |
-| parasol drop | slots 13 / 69 / 71 -> L5CF90 generate_article(0) (the parasol weapon) for var 0 / 1 | not ported (no weapon kind) | missing | a weapon article, or an item-like prop |
+| parasol drop | slots 13 / 69 / 71 -> L5CF90 generate_article(0) (the parasol weapon, kind 173, set 0x111C08 {173, 1, 0x7C778}) for var 0 / 1 | step 2l: wd_drop generate_article(0, false) -> the Wii U's weapon kind 0xAD (art_dee, spawner wd_para_cb = 0x7C778, its own init 0x0319F3FC = 0xADF64 on the Dee's param object); slot 13 not ported | fixed (step 2l) | |
+| parasol shield | start 0x7BB1C (var 0 / 1): a ShieldModule group of 2 parts at node 8 (PS88 +0x98 ..), switched off by the drop (acc+0x88 vt+0x34 (0 / 1, 0, 0), 0x5CFC0) | not ported (the Wii U Dee has no shield: the drop's two set_status calls left out with it) | missing | Behavior::set_shield_data / the Wii U ShieldModule (acc+0x84) |
 | stomp | slot 21 0x7BF04: parasol variations write P@0x8C into the parasol timer | w_tread TREAD 0 (nothing) | missing | port with the parasol |
 | walk / turn / jump | 4: Walk 1.2, every 100 frames 50 % -> 6; wall: > 50 -> 5 else 6; var 1/3 ledge -> 5; off ground -> 2 (var 0/1); 6: apex -> 2 | d_walk / g_turn / d_jump, P=(1.2, 100, 50, 50) | ok |  |
 | energy | initialize: +0x10 0.2, +8 0.2, +0x20/+0x28 0.3, +0x24/+0x2C 2.5, +0x44 1, +0x18 0.0005 (var 0/1) | same | ok |  |
@@ -208,7 +211,7 @@ Tier 3 (minor):
 | hop landing threshold | 5 update 0x7D77C: \|y - y0\| > P@0xC0 = 0.5 | HOPTHR 1.0 ("a guess") | fixed (step 2j: HOPTHR 0.5) | hop[0] = 0.5 |
 | jump -> Fall motion | 5 / 6: is_falling -> set_motion_no_restart(Fall) (0x7D6F0) | Jump motion kept | fixed (step 2j: do_fallm in 5 and 9) | switch to FALLMOT when vy < 0 |
 | leave timer | f184 = 600 at start; reset to 600 by a beam (0x7D62C) and by damage (slot 69 0x7E12C); walk counts it down -> 9 | V7 = 600, walk counts down; never reset | fixed (step 2j damage, step 2k the beam's search) | V7 = 600 on damage and on the beam's search finding a fighter |
-| hit effect | slot 69 0x7E114: request_effect(0x7190001, center_pos, 1.0), handle +0x1A0 (old one removed) | none | fixed (step 2j: do_69) | F69 |
+| hit effect | slot 69 0x7E114: request_effect(0x7190001, center_pos, 1.0), handle +0x1A0 (old one removed) | step 2j: do_69 with the handle in V8 (+0x18C), which g_landt_up reads as the hop-landing flag (a hit skipped the landing's turn); step 2l: its own field DO_FX (+0x1C8) | fixed (step 2l) | |
 | turn search | 3: every search_interval(0) = 60 frames search_target(0) behind -> 4 | o_walk_up | ok |  |
 | leave (state 9) | init_common_leave(P6 {300, 0.02, 30, ...}): energy +0x30 / +0x34, kinetic 15, effect 0x8000005 | o_leave_* (8) | approximated | code.bin 0x7B23B4 / 0x7B40B0 read in step 2c v2 |
 | sounds | beam play_se 0x6A80000 / stop_se | none | missing | with the beam |
@@ -404,6 +407,6 @@ Per kind (every 3DS sound, its id and when it plays):
 
 ## Not audited (left)
 
-- The twins' AI code (Wii U mczakozima / mczakoplasmawisp / mczakodarios / mczakostalfos) was not diffed instruction by instruction against the 3DS states: only their params and their sound calls. A real port (or a state-by-state diff) is the next step for them; the param slot fix above is the cheap part.
+- The twins' AI (step 2l, tools/smashrun_twin_compare.py over every state's enter / update / exit, docs/smash-run-port.md "Step 2l"): the four Wii U state tables have the 3DS's state count (7 / 10 / 8 / 24), their exits at the same states, the same transitions, kinetics, ground flags and motions; Zima and Darios match (the remaining token differences are the 3DS's array reads and a node rotation the 3DS summary keeps in a helper). Lethinium: the Wii U adds a level-2 forced attack (+0x1E4 timer, P+0x138) and a cool-down word (P+0x134) after its level-2 attack: fixed (pw2_up, the param word). Stalfos leads still to read: 7 / 8 update (the 3DS sets ground off / passable / set_correct(0) after L5F470 inline; the Wii U path through 0x026D3008 not followed), 9 update (the attack choice: the 3DS reads PSxx 0xCC..0x120 inline, the Wii U through helpers / pointers), 22 enter (3DS P+0xE0), the attack motions' variants (+0x194 / +0x1C2), play_se (sounds).
 - The fliers (Ghos, Tiki Buzz, Furiijio, Propeller Heiho) and the step 2h kinds (Big Goomba, Spiny, Paratroopa) were not re-read line by line here: their own steps' readings (hand_read) are taken as the 3DS side, and their listed approximations are carried over.
 - The common effect ids in the converted ACMD (0x1000019 / 0x1000026 / 0x100008E) and the twins' effect calls.

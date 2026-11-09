@@ -365,14 +365,14 @@ def fixes(img, fn, D, byname):
                       tuple(x if isinstance(x, int) else fn[x] for x in s_)) for sid, s_ in w['states'].items()}
         return T.World(m, w, rows, state, cfgs[n])
 
-    # Waddle Doo slot 69 (0x7E0E0): the old hit effect removed, effect 0x7190001 at center_pos x1 -> V8, the leave
-    # timer back to 600 (0x7E12C), returns 0
+    # Waddle Doo slot 69 (0x7E0E0): the old hit effect removed, effect 0x7190001 at center_pos x1 -> its handle (3DS
+    # +0x1A0: DO_FX since step 2l, V8 before), the leave timer back to 600 (0x7E12C), returns 0
     m = PM(img)
     m.walker(cfgs['waddledoo'], state=3, kind=0x19)
-    m.w32(OBJ + W.V(8), 0x1111)
+    m.w32(OBJ + W.DO_FX, 0x1111)
     m.w32(OBJ + W.V(7), 12)
     m.call(vslot('waddledoo', 69), {3: OBJ})
-    got = ([c for c in m.calls if c[0] in ('remove_effect', 'effect0')], m.r32(OBJ + W.V(8)), m.r32(OBJ + W.V(7)),
+    got = ([c for c in m.calls if c[0] in ('remove_effect', 'effect0')], m.r32(OBJ + W.DO_FX), m.r32(OBJ + W.V(7)),
            m.uc.reg_read(T.R[3]))
     check(got == ([('remove_effect', OBJ, 0x1111), ('effect0', OBJ, 0x7190001, (0.0, 0.0, 0.0), 1.0)], 0x5556, 600, 0),
           'waddledoo slot 69 (0x7E0E0): the old hit effect removed, effect 0x7190001 at center_pos x1, the leave timer '

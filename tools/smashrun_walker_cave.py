@@ -236,6 +236,11 @@ do_*: the Wii U's own weapon kind 0xAF through the 3DS's article set art_doo / s
 object wdp in slot 0x19), the Churine's sleep powder (3DS 6 / 7 as 8 / 9, ch_*), the twins' own params (k2_twins:
 param/enemy/fs/enemy_param_vl_<K>.bin in the twin's layout, tools/smashrun_twin_params.py), the White Bear's weakness
 (wb_31 / wb_dmg). Test: tools/smashrun_step2k_test.py.
+
+Step 2l (docs/smash-run-port.md "Step 2l"): every walker / flier kind its own static param object in its 3DS layout
+(kind_param_blocks; S2 slot[K]); the Waddle Doo's hit effect in DO_FX (not V8, the landing's hop flag); the Waddle Dee's
+parasol (art_dee / wd_para_cb / wd_drop: the Wii U's own weapon kind 0xAD); Lethinium's state 2 update through pw2_up
+(no Fortress-only forced level-2 attack). Test: tools/smashrun_step2l_test.py.
 """
 import math
 import os
@@ -1100,8 +1105,11 @@ class Data:
             ktab += [w['kind'], g('cfg_' + w['name'])]
         b.append(('ktab', ktab + [0xFFFFFFFF], 4))
         # step 2k: the Waddle Doo's param object and article set, the twins' file names and object pointers
-        b += wd_param_blocks(g)
+        for w in WALKERS:            # step 2l: every kind its own param object (step 2k: the Waddle Doo's)
+            b += kind_param_blocks(w['name'], g)
         b.append(('art_doo', [g('art_doo') + 8, 1, WD_BEAM, 5, fn('do_beam_cb'), 0], 4))
+        # step 2l: the Waddle Dee's (enemy_article_data_set_waddledee 0x111C08: {173, 1, 0x7C778})
+        b.append(('art_dee', [g('art_dee') + 8, 1, WD_PARASOL, 1, fn('wd_para_cb'), 0], 4))
         b.append(('k2_dir', cstr('param/enemy/fs'), 4))
         for _t, k in TWIN_K:
             b.append(('k2_' + k, cstr('enemy_param_vl_%s.bin' % k), 4))
@@ -2349,8 +2357,9 @@ def code(D):
         s, t = D['set_' + w['name']], MOTION_SETS + 4 * w['kind']
         B.asm("lis r11, 0x%04X\naddi r11, r11, %d\nlis r12, 0x%04X\nstw r11, %d(r12)" % (ha(s), sx(s), ha(t), sx(t)))
     # step 2k: the Waddle Doo's article set (the beam), read by the resource request and its accessor set-up
-    s, t = D['art_doo'], ART_SETS + 4 * 0x19
-    B.asm("lis r11, 0x%04X\naddi r11, r11, %d\nlis r12, 0x%04X\nstw r11, %d(r12)" % (ha(s), sx(s), ha(t), sx(t)))
+    for lab, k in (('art_doo', 0x19), ('art_dee', 0x13)):      # step 2l: the Waddle Dee's (the parasol)
+        s, t = D[lab], ART_SETS + 4 * k
+        B.asm("lis r11, 0x%04X\naddi r11, r11, %d\nlis r12, 0x%04X\nstw r11, %d(r12)" % (ha(s), sx(s), ha(t), sx(t)))
     B.asm("""
     t_done:
         cmpwi r0, 1
@@ -2365,13 +2374,13 @@ def code(D):
         lwz r12, %d(r12)
         cmpwi r12, 0
         beq s2_done
-        lwz r11, 0x%X(r12)
-    """ % (ha(PARAM_MGR), sx(PARAM_MGR), SLOTS + 4 * SLOT_DONOR))
-    for k in KINDS:
-        B.asm("stw r11, 0x%X(r12)" % (SLOTS + 4 * k))
-    # step 2k: the Waddle Doo's own param object (the beam reads the 3DS layout), then the twins' own params
-    B.asm("lis r11, 0x%04X\naddi r11, r11, %d\nstw r11, 0x%X(r12)\nbl k2_twins"
-          % (ha(D['wdp']), sx(D['wdp']), SLOTS + 4 * WD_PARAM))
+    """ % (ha(PARAM_MGR), sx(PARAM_MGR)))
+    # step 2l: every kind its own static param object in its 3DS layout (kind_param_blocks; step 2k only the Waddle
+    # Doo's, the others borrowed mczakozima's slot 0x5A: its P3 hurtbox capsule and P4 ground box); then the twins'
+    for w in WALKERS:
+        o = D[param_label(w['name'])]
+        B.asm("lis r11, 0x%04X\naddi r11, r11, %d\nstw r11, 0x%X(r12)" % (ha(o), sx(o), SLOTS + 4 * w['kind']))
+    B.asm("bl k2_twins")
     B.asm("""
     s2_done:
         lwz r0, 0x5EC(r28)
@@ -7342,12 +7351,13 @@ def code_fix2j(H, st, call, d, D):
     """step 2j: the accuracy audit's small fixes (docs/smash-run-enemies/accuracy-audit.md, each from its 3DS
     address; docs/smash-run-port.md "Step 2j")"""
     en = lambda label, kin, att, mot, loop, extra='': st(label, "li r4, %d\nbl h_kin\nli r4, %d\nbl h_att\nli r4, %d\nli r5, %d\nbl h_mot1\n%s" % (kin, att, mot, loop, extra))  # noqa: E731,E501
-    p = dict(d, CF_LEAVE=CF['LEAVE'], MK=MOT_KIND, AERO=AER, DFT=DEFEATED)
+    p = dict(d, CF_LEAVE=CF['LEAVE'], MK=MOT_KIND, AERO=AER, DFT=DEFEATED, FX=DO_FX)
     a = lambda text: H.asm(text % p)  # noqa: E731
-    # ---- Waddle Doo. Slot 69 (0x7E0E0): the old hit effect (+0x1A0: V8) removed, request_effect(0x7190001,
-    # center_pos, 1.0) -> V8, the leave timer (+0x184: V7) back to PS8c f0 (CFG LEAVE, 600) (0x7E12C); returns 0
+    # ---- Waddle Doo. Slot 69 (0x7E0E0): the old hit effect (+0x1A0: DO_FX, step 2l; V8 before) removed,
+    # request_effect(0x7190001, center_pos, 1.0) -> DO_FX, the leave timer (+0x184: V7) back to PS8c f0 (CFG LEAVE,
+    # 600) (0x7E12C); returns 0
     st('do_69', """
-        lwz r4, 0x%(V8)X(r31)
+        lwz r4, 0x%(FX)X(r31)
         cmpwi r4, 0
         beq d69_e
         mr r3, r31
@@ -7363,7 +7373,7 @@ def code_fix2j(H, st, call, d, D):
         lis r12, 0x%(CH)04X
         lfs f1, %(CL1)d(r12)
     """ % dict(p, CL1=sx(D['consts'] + 4)) + call(REQ_EFFECT0) + """
-        stw r3, 0x%(V8)X(r31)
+        stw r3, 0x%(FX)X(r31)
         lwz r0, 0x%(CF_LEAVE)X(r30)
         stw r0, 0x%(V7)X(r31)
         li r3, 0""" % p)
@@ -7537,6 +7547,16 @@ WD_BEAM = 0xAF                       # the Wii U's weapon kind 0xAF (enemy / wad
 DO_SC, DO_CD, DO_TK, DO_IX, DO_ANG, DO_AIR = (0x1B0 + 4 * i for i in range(6))   # 3DS +0x16C / +0x180 / +0x174 /
 #                                      +0x178 / (30 - 25 n) / +0x19D (search-1 count, cool-down, shot wait, shot index,
 #                                      the next angle, charged in the air)
+DO_FX = 0x1B0 + 4 * 6                # step 2l: the hit effect's handle (3DS +0x1A0; step 2j kept it in V8, which the
+#                                      landing's turn test g_landt_up reads as the hop-landing flag: a hit skipped it)
+WD_PARASOL = 0xAD                    # step 2l: the Wii U's weapon kind 0xAD (enemy / waddledee / parasol): descriptor
+#                                      0x1041DC60 (param getter 0x0319FC90: [slot 0x13]+0xEC), flags 0x842 (0x40: a
+#                                      model), specializer vtable 0x10173F50 (slots 2 / 5 / 6 / 7 / 14 / 20 = the 3DS's
+#                                      0xADE04 / 0xAE0D0 / 0xADF64 / 0xADED0 / 0xAE2D0 / 0xAE73C), the 3DS's own kind 173
+PW_ROW2_UP = 0x102FE778              # step 2l: mczakoplasmawisp's state table (0x102FE754, rows {0xFFFF, enter, 0xFFFF,
+#                                      update, 0xFFFF | 0, exit}) row 2's update word (the hover / search 0x026D09A4)
+PW_UP2 = 0x026D09A4
+GEN_ART = 0x026A7D40                 # Behavior::generate_article(r4 id, r5 bool) (3DS 0x7B1BBC)
 WD_PARAM = 0x19                      # param slot [mgr + 0x60 + 4 * 0x19] (the beam's init reads [mgr+0xC4] +0xC8 / +0xCC
 #                                      / +0xDC: the 3DS waddledoo param object's layout, enemy_param_vl_waddledoo.bin)
 SLOT_OFF = {0x57: 0x1214, 0x58: 0x13DC, 0x59: 0x14A4, 0x5A: 0x1684}   # the sm accessor's block (vt+0x14 0x026B4120)
@@ -7556,18 +7576,37 @@ WB_W, WB_D = 0x1B0, 0x1B4           # the White Bear's weak hit noted (slot 31) 
 BI_SLOT31 = 0x026A48EC               # BehaviorImpl's slot 31 (the hit record: +0x14 AttackData, its +0x4C)
 
 
-def wd_param_blocks(g):
-    """the static waddledoo param object (the 3DS layout the beam's code reads, every value from
-    enemy_param_vl_waddledoo.bin through the spec) and its arrays: [(label, words, align)]"""
+def param_members(name):
     import json
-    with open(os.path.join(SPECS, 'waddledoo.json')) as f:
-        members = json.load(f)['params']['members']
-    obj = [0] * (0xE4 // 4)
+    with open(os.path.join(SPECS, name + '.json')) as f:
+        return json.load(f)['params']['members']
+
+
+def param_size(members):
+    """the object's size: past its last member (a vector {reader, elem size, count, data, flag} is 0x14 bytes)"""
+    return max(m['offset'] + (0x14 if m['type'] == 'array' else 4 * len(m['values'][0]) if m['type'] == 'struct'
+                              else 4) for m in members)
+
+
+def param_label(name):
+    return 'wdp' if name == 'waddledoo' else 'prm_' + name
+
+
+def kind_param_blocks(name, g):
+    """step 2l (step 2k's wd_param_blocks for every kind): the kind's static param object in its own 3DS layout
+    (enemy_param_vl_<name>.bin through the spec: P0.. vectors {0, elem size, count, data, 0}, the structs and words
+    at their 3DS offsets) and its arrays: [(label, words, align)]. The framework reads P3 (the hurtboxes, 0x02D896F4:
+    +0x44 count (at most 15), +0x48 data, 0x30 an entry) and P4 (the ground box, the accessor set-up 0x02DA2BA0:
+    +0x5C) from it, the weapons their kind's own params (0xAF the Doo's beam +0xC4.., 0xAD the Dee's parasol +0x88 /
+    +0xB0.. / +0xEC)"""
+    members = param_members(name)
+    lab0 = param_label(name)
+    obj = [0] * (param_size(members) // 4)
     out = []
     for m in members:
         o = m['offset'] // 4
         if m['type'] == 'array':
-            lab = 'wdp_%d' % m['index']
+            lab = '%s_%d' % (lab0, m['index'])
             ents = m['values']
             out.append((lab, [word(v) for e in ents for v in e], 4))
             obj[o:o + 5] = [0, m['elem_size'], len(ents), g(lab), 0]
@@ -7576,13 +7615,125 @@ def wd_param_blocks(g):
             obj[o:o + len(vals)] = [word(v) for v in vals]
         else:
             obj[o] = word(m['value'])
-    return [('wdp', obj, 4)] + out
+    return [(lab0, obj, 4)] + out
+
+
+def wd_param_blocks(g):
+    """the static waddledoo param object (step 2k; kind_param_blocks since step 2l)"""
+    return kind_param_blocks('waddledoo', g)
 
 
 def cstr(s):
     b = s.encode() + b'\0'
     b += b'\0' * (-len(b) % 4)
     return list(struct.unpack('>%dI' % (len(b) // 4), b))
+
+
+def code_2l_pw(H):
+    """step 2l: Lethinium (plasmawisp, kind 0x12) on its twin's AI: mczakoplasmawisp's state 2 update (0x026D09A4)
+    has a Fortress-only branch: at level 2 (+0x1EC; the 3DS +0x1E8) it counts +0x1E4 (set to P+0x138 120 by the
+    level-up 0x026D04B0) down and, at 0, forces the level-2 attack (change_state(8), 0x026D0BE8..0x026D0C1C) with no
+    search, no chance and no distance test. The 3DS's update (0x88E68: 0x88FD0..0x89224) has no such branch: at level
+    2 it only skips the level counter and goes on to the attack timer +0x1E0, the search and the chance / distance
+    test, as the Wii U's 0x026D0C48 path does. pw2_up (the row's update for both kinds): for kind 0x12 at level >= 2,
+    +0x1E4 = 0x7FFFFFFF (its - 1 stays > 0, so 0x026D0BF4 takes the 0x026D0C48 path: the 3DS's), then the game's
+    update. The twin (0x57) is unchanged."""
+    H.asm("""
+    pw2_up:
+        lwz r0, 8(r3)
+        cmpwi r0, 0x12
+        bne pw2_go
+        lwz r0, 0x1EC(r3)
+        cmpwi r0, 2
+        blt pw2_go
+        lis r0, 0x7FFF
+        ori r0, r0, 0xFFFF
+        stw r0, 0x1E4(r3)
+    pw2_go:
+        lis r12, 0x%04X
+        ori r12, r12, 0x%04X
+        mtctr r12
+        bctr
+    """ % (PW_UP2 >> 16, PW_UP2 & 0xFFFF))
+
+
+def code_2l(H, call, D):
+    """step 2l: the Waddle Dee's parasol spawner (enemy_fs.cro 0x7C778, the article set 0x111C08 {173, 1, it}; the
+    Wii U form of do_beam_cb): r3 the article, r4 the owner's accessor. node_global_position(9, &pos, true) (0x7C7B8),
+    z = the GroundModule's +0x88 (3DS +0x80); the activate param (3DS offsets in brackets): +4 [+8] the position, +0x10
+    [+0x14] the posture lr, +0x1C 0, +0x20 the owner's id, +0x28 its team, +0x2C the life [waddledee param +0xB0] (PSb0
+    f0 120), +0x58 4, +0x60 0, +0x68 -lr (0x7C838: the weapon's init 0x0319F3FC = 3DS 0xADF64 multiplies PSb0 f1 1.0 by
+    it: the parasol drifts backwards); util_activate; the members freed; returns 0"""
+    H.asm("""
+    wd_para_cb:
+        stwu r1, -0x100(r1)
+        mflr r0
+        stw r0, 0x104(r1)
+        stmw r29, 0xF0(r1)
+        mr r31, r3
+        mr r30, r4
+        lis r29, 0x%(PH)04X
+        addi r29, r29, %(PL)d
+        li r0, 0
+        stw r0, 8(r1)
+        stw r0, 0xC(r1)
+        stw r0, 0x10(r1)
+        lwz r3, 0x3118(r30)
+        li r4, 9
+        addi r5, r1, 8
+        li r6, 1
+    """ % dict(PH=ha(D['prm_waddledee']), PL=sx(D['prm_waddledee'])) + call(NODE_GPOS) + """
+        lwz r12, 0x30DC(r30)
+        lfs f0, 0x88(r12)
+        stfs f0, 0x10(r1)
+        lwz r12, 0x311C(r30)
+        lfs f2, 0x60(r12)
+        stfs f2, 0x14(r1)
+        addi r3, r1, 0x18
+    """ + call(ACT_PARAM) + """
+        lfs f0, 8(r1)
+        stfs f0, 0x1C(r1)
+        lfs f0, 0xC(r1)
+        stfs f0, 0x20(r1)
+        lfs f0, 0x10(r1)
+        stfs f0, 0x24(r1)
+        lfs f0, 0x14(r1)
+        stfs f0, 0x28(r1)
+        fneg f0, f0
+        stfs f0, 0x80(r1)
+        li r0, 0
+        stw r0, 0x34(r1)
+        stb r0, 0x78(r1)
+        stb r0, 0x84(r1)
+        lwz r0, 0(r30)
+        stw r0, 0x38(r1)
+        lwz r0, 0xB0(r29)
+        stw r0, 0x44(r1)
+        li r0, 4
+        stw r0, 0x70(r1)
+        lwz r11, 0x%(TEAM)X(r30)
+        addi r3, r11, 4
+        lwz r12, 4(r11)
+        lwz r12, 0x14(r12)
+        mtctr r12
+        bctrl
+        stw r3, 0x40(r1)
+        mr r3, r31
+        addi r4, r1, 0x18
+    """ % dict(TEAM=ACC_TEAM) + call(UTIL_ACTIVATE) + """
+        addi r3, r1, 0x60
+        li r4, 2
+    """ + call(ACT_PARAM_FREE) + """
+        addi r3, r1, 0x54
+        li r4, 2
+    """ + call(ACT_PARAM_FREE) + """
+        li r3, 0
+        lmw r29, 0xF0(r1)
+        lwz r0, 0x104(r1)
+        mtlr r0
+        addi r1, r1, 0x100
+        blr
+    """)
 
 
 def code_2k(H, st, call, d, D):
@@ -9434,6 +9585,8 @@ def code_h(D):
     code_pk(H, st, call, d, D)              # step 2j: Pooka
     code_fix2j(H, st, call, d, D)           # step 2j: the audit's fixes
     code_2k(H, st, call, d, D)              # step 2k: the beam, the powder, the twins' params
+    code_2l(H, call, D)                     # step 2l: the Waddle Dee's parasol
+    code_2l_pw(H)                           # step 2l: Lethinium's level-2 attack as the 3DS's
     code_vis(H, st, call)
     return H
 
@@ -9703,8 +9856,9 @@ def code_vis(H, st, call):
     # ported: generate_article(0) (the dropped parasol), the acc+0x88 calls, W+0x3C = +0x1E0. The damage face
     # 0x5CF18: both arms, no parasol, damage on, normal off. Slot 69 0x7C938: drop, damage face, 0; slot 71 0x7C460:
     # drop, damage face, BehaviorImpl::notify_on_death; slot 60 0x7C5FC: normal on, damage off
+    # step 2l: generate_article(0, false) (0x5CFBC): the parasol, the Wii U's weapon kind 0xAD (art_dee, wd_para_cb)
     st('wd_drop', "lwz r3, 0xC(r31)\ncmplwi r3, 1\nbgt.far epi\naddi r3, r3, 2\nstw r3, 0xC(r31)\nmr r3, r31\n"
-       "bl w_init")
+       "li r4, 0\nli r5, 0\n" + call(GEN_ART) + "\nmr r3, r31\nbl w_init")
     wdmg = "mr r3, r31\nbl wd_drop\n" + vset(0x2A, 0x7F)
     st('wd_69', wdmg + "\nli r3, 0")
     st('wd_71', wdmg + "\nmr r3, r31\nmr r4, r29\n" + call(NOTIFY_DEATH))
@@ -9939,6 +10093,8 @@ def patches(img):
         out[site] = branch(site, A.addr('area_%d' % i))
     for w, fn in TWIN_FLIP:
         out[w] = fn if KEEP_FLIP else A.addr('twin_flip')
+    assert img.u32(PW_ROW2_UP) == PW_UP2 or A.h.base <= img.u32(PW_ROW2_UP) < LIMIT_H, hex(PW_ROW2_UP)
+    out[PW_ROW2_UP] = A.h.addr('pw2_up')          # step 2l (its relocation moved to RELOC_DUMMY: args)
     for w, orig, lab in TWIN_LR:
         # the game's word, or an earlier build's w_slr / w_rlr (anywhere in region G: later code moves them)
         assert img.u32(w) == orig or A.g.base <= img.u32(w) < A.g.base + 0x8000, hex(w)
@@ -9952,6 +10108,7 @@ def args(img):
     if not KEEP_FLIP:
         res += ['reloc:0x%08X-0x%08X=0x%08X' % (w, w + 4, RELOC_DUMMY) for w, _fn in TWIN_FLIP]
     res += ['reloc:0x%08X-0x%08X=0x%08X' % (w, w + 4, RELOC_DUMMY) for w, _o, _l in TWIN_LR]
+    res += ['reloc:0x%08X-0x%08X=0x%08X' % (PW_ROW2_UP, PW_ROW2_UP + 4, RELOC_DUMMY)]
     return res
 
 

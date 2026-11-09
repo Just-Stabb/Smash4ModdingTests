@@ -2415,3 +2415,99 @@ info equal.
 in game: the beam (kind 0xAF's files: none on the 3DS, none requested by its descriptor; its effect from bank 0x719),
 the sleep attribute, the twins' files found. The walker kinds still borrow mczakozima's param object (its P3 hurtbox
 capsule and P4 for every walker but the Waddle Doo): their own 3DS objects, as `wdp`, would follow the same way.
+
+## Step 2l: every kind's own param object, Waddle Dee's parasol (weapon 0xAD), the Doo's hit effect, the twins against their 3DS states
+
+Package smashrun_step2l_v1: `code/` exe_v29 = exe_v28 + `smashrun_walker_cave.py` over its own regions (scratch
+s2l/build29.py: the tool applied to exe_v28 rebuilds exe_v28 byte for byte, so v29 is v28 plus this step's changes);
+`data/` the Waddle Dee's parasol model (model/enemy/waddledee/parasol/c00: nud / nut / vbn / jtb / sb / nhb / xmb, from
+tools/s3ds_enemy.py; step 1's package had only nud / nut / vbn, and a model without jtb / sb / nhb / xmb crashes or
+draws black, "Enemies") and Lethinium's param file (param/enemy/fs/enemy_param_vl_plasmawisp.bin, one word changed,
+below). Readings with addresses: hand_read.json `_framework_step2l`, waddledoo / waddledee / plasmawisp / stalfos / zima /
+darios `port_step2l`.
+
+**Waddle Doo's hit effect (a bug).** Slot 69 (3DS 0x7E0E0) keeps the hit effect's handle at +0x1A0; step 2j's do_69
+kept it in V8 (+0x18C), which the landing g_landt_up reads as the hop-landing flag (non-zero: no turn search), so after
+a hit the next landing never turned to a target behind it. Now its own field DO_FX (+0x1C8, after DO_*; the object is
+0x1D0); V8 is the hop flag only.
+
+**Every kind's own param object.** Step 2k gave the Waddle Doo a static param object in its 3DS layout (`wdp`, slot
+0x19); every other walker / flier kind still read mczakozima's (slot 0x5A, step 2b's donor), its P3 hurtbox capsule
+and P4 ground box included. kind_param_blocks builds each kind's object from the spec of its
+enemy_param_vl_<kind>.bin (P0.. vectors {0, elem size, count, data, 0} at 0x14 a vector, the structs and words at their
+3DS offsets) and S2 sets slot[K] = it for all 15 kinds (slot 0x5A untouched). What the framework reads from it (the
+Wii U, by `[[0x102F6C00] + 0x60 + 4 kind]`): the hurtboxes P3 (0x02D896F4: +0x44 count, at most 15, +0x48 data, 0x30 an
+entry: x1 y1 z1 x2 y2 z2, radius, node), the ground box P4 (the accessor set-up 0x02DA2BA0: +0x5C), P5 (the activation
++0x70, the walkers' own area table since fix v7), P1 (search_interval / search_target(type) 0x026A706C / 0x026A70B8:
++0x20; the walkers call search_target with their own CFG values), P2 (slot 45 0x02DB58B8: overridden by w_atk); P0
+(0x02DC0780) only for kinds 0 and 0x22. Hurtboxes now (radius, node -> bone: node n is model.jtb's u16 word n, word 0 being the count, 0 none; the converter
+keeps the .bch's bone order; the 0-based reading would put every body on a foot): Goomba 8 HeadN, Shy Guy 7 HipN, Waddle
+Dee / Doo 9 HipN, Churine 7 HeadN, White Bear 11 HipN, Gordo 8 HipN, Ghos 10 RotN, Tiki Buzz 7 HipN, Furiijio 14 HipN,
+Propeller Heiho 7 node 0 (the root), Big Goomba 6 HipN, Spiny 11 RotN, Paratroopa 9 HipN, Pooka 18 BodyN (was mczakozima's for all but the Doo).
+
+**Waddle Dee's parasol.** The 3DS drop 0x5CF90 (slots 69 / 71, and 13, not ported): var 0 / 1 -> + 2,
+generate_article(0, false), ShieldModule set_status of its parasol shield's two parts off, initialize, W+0x3C restored.
+The article set enemy_article_data_set_waddledee 0x111C08 is {173, max 1, spawner 0x7C778}: kind 173 = 0xAD, which the
+Wii U keeps with its code (descriptor 0x1041DC60: param getter 0x0319FC90 = `[slot 0x13] + 0xEC`, flags 0x842 (0x40: a
+model); specializer vtable 0x10173F50, its slots 2 / 5 / 6 / 7 / 14 / 20 the 3DS's 0xADE04 / 0xAE0D0 / 0xADF64 / 0xADED0 /
+0xAE2D0 / 0xAE73C; slot 6, the init, line for line). It reads the Dee's param object in the 3DS layout: +0x88, the
+struct at +0xB0 (life 120, speed 1.0, 0.01, 0.02, 2.0, scale 1.0, 1.8, 8, 6, 5), P6 (+0xD8, its attack), +0xEC.
+- art_dee {0xAD, 1, wd_para_cb, 0} in ART_SETS[0x13] (the T hook, with the Doo's), so the battle load requests it;
+- wd_para_cb = 0x7C778: node_global_position(9 = LRParasolN, &pos, true), z the GroundModule's +0x88 (3DS +0x80); the activate param
+  (Wii U offsets) +4 the position, +0x10 the posture lr, +0x1C 0, +0x20 the owner's id, +0x28 its team, +0x2C the life
+  P+0xB0 (120), +0x58 4, +0x60 0, +0x68 -lr (the init multiplies the speed P+0xB4 by it: the parasol drifts backwards);
+  util_activate;
+- wd_drop: generate_article(0, false) (Wii U 0x026A7D40 = 3DS Behavior::generate_article 0x7B1BBC) after var + 2.
+Not ported: the Dee's own parasol shield (its start 0x7BB1C: a ShieldModule group of two parts at node 8 from PS88, for
+var 0 / 1) and so the drop's two set_status calls (Wii U ShieldModule acc+0x84 vt+0x6C, unused by the walker Dee); W+0x3C
+(+0x1E0, not saved by our start); slot 13. The parasol has no motion on the 3DS either (its descriptor's motion list is
+the 3DS's).
+
+**The twins against their 3DS states.** tools/smashrun_twin_compare.py lines each twin's Wii U state table (.data,
+rows {0xFFFF, enter, 0xFFFF, update, 0xFFFF | 0, exit}: mczakozima 0x102FEB04, mczakoplasmawisp 0x102FE754, mczakodarios
+0x102FE678, mczakostalfos 0x102FE8A8) up with the kind's 3DS table and reduces each enter / update / exit to the same
+tokens (state changes, kinetic, ground / passable flags, motions by name, param words, the Behavior helpers), printing
+what only one side has. The four tables have the 3DS's state counts (7 / 10 / 8 / 24), exits at the same states (Lethinium
+2, Stalfos 10 / 11 / 22), and per state the same transitions, kinetics, ground flags and motions:
+- Zima, Darios: equal (the listed differences are reads of P0 / P1 elements, which the 3DS spec names by element, and
+  Zima's node rotation, kept by the 3DS in a helper). Timers, attack choice and effects are their params (step 2k).
+- Lethinium: one Fortress-only addition, read: the state 2 update (0x026D09A4) at level 2 (+0x1EC; 3DS +0x1E8) counts
+  +0x1E4 (P+0x138 120, set by the level-up 0x026D04B0) down and at 0 forces its level-2 attack (change_state(8),
+  +0x1E0 = P+0x134) with no search, chance or distance test (0x026D0BE8..0x026D0C1C). The 3DS (0x88FD0..0x89224) has no
+  such branch: at level 2 it only stops the level counter and goes on with the attack timer +0x1E0, the search and
+  the level's chance / distance (PS78 f8..f10 / f5..f7 -> 4 / 6 / 8), as the Wii U's 0x026D0C48 path. Fixed: pw2_up
+  (row 2's update word 0x102FE778 -> it; relocation moved to RELOC_DUMMY) keeps +0x1E4 at 0x7FFFFFFF for kind 0x12 at
+  level >= 2 (the twin, 0x57, untouched); and the Wii U's normal level-2 attack sets +0x1E0 = P+0x134 (0x026D0EA0) where
+  the 3DS leaves search_interval(1): the param file's +0x134 (G5 word 59, a Wii U-only word, the twin's 90) is now that
+  interval (5; tools/smashrun_twin_params.py). The level-up itself (0x898D8 = 0x026D04B0) is the same: the counter
+  random_range(P+0x84, +0x88 | +0xD4, +0xD8), the follow effects 0x7120005 / 0x7120003 (the Wii U's from the twin's bank
+  0x757: step 2d), play_se, set_check_catch.
+- Stalfos: 5 update read line for line (equal); 3 (the move timer in the Wii U's helper 0x026D2E9C) equal. Leads not
+  read yet: 7 / 8 update (the 3DS's ground off / passable on / set_correct(0) after L5F470; the Wii U through
+  0x026D3008), 9 update (the attack choice, PSxx +0xCC..+0x120 inline on the 3DS), 22 enter (P+0xE0), the attack
+  motions' variants (+0x194 / +0x1C2).
+A full port onto our engine is not needed for any of them: the state machines are the 3DS's (the same tables), the
+differences are Fortress additions a wrapper or a param word neutralises; Stalfos (24 states, the attack choice) is
+the one to finish reading.
+
+**Tests** (exe_v29):
+
+| Test | Result |
+| --- | --- |
+| smashrun_step2l_test.py (new; the 3DS fs params, enemy/ sources, the Wii U sm params) | 17 checks, 0 failures (the Doo's hit then landing turns, DO_FX; S2 gives all 15 kinds their own objects; P3 / P4 / P5 = the vl groups, the structs at their offsets, every hurtbox node a bone through model.jtb; the parasol's article set, the drop (var 0 / 1 once, slots 69 / 71), the spawner's activate param, the Wii U's own parasol init 0x0319F3FC run on the Dee's object; pw2_up for kinds 0x12 / 0x57 and levels; the remapped +0x134 word) |
+| smashrun_step2k_test.py | 26 checks, 0 failures |
+| smashrun_step2j_test.py | 22 checks, 0 failures (the Doo's slot 69 now writes DO_FX) |
+| smashrun_step2i_test.py (the step 2i package's data/) | 10 checks, 0 failures |
+| smashrun_step2h_test.py | 41 checks, 0 failures |
+| smashrun_walker_test.py | 179 checks, 0 failures (S2: every kind its own object) |
+| smashrun_flier_test.py / smashrun_flier_motion_test.py | 123 / 11 checks, 0 failures |
+| smashrun_field_test.py --set step2j / smashrun_enemy_test.py | 13 / 26 checks, 0 failures |
+| effect_slots_patch_test.py exe_v29 exe_v12 | 47 checks, all ok |
+
+**exe_v29 vs exe_v28, word diff** (s2l/diff29.py, log s2l/diff29.log): 7801 words, all Smash Run: the S2 hook word
+0x02D9A618 (re-targeted), E 0x04B7D62C-0x04B7DF00, D 0x04B849F0-0x04B849FC, A 0x04B86918-0x04B88000, B
+0x04B89378-0x04B8A000, C 0x04BB8004-0x04BB83D8, G 0x04BB8770-0x04BC0040, H 0x04BC00C0-0x04BC8654 (code to 0x04BC4B94),
+the data word 0x102FE778 (pw2_up); one relocation moved (0x102FE778 -> RELOC_DUMMY 0x037EE73C). The file info is equal.
+
+**Still open:** in game: the parasol (its model path, the flag-0x40 motion set-up without a motion file), the
+hurtboxes; the Dee's parasol shield; Stalfos's leads above; sounds (the next step); the dead items (step 2k).

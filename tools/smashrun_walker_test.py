@@ -223,6 +223,9 @@ class Machine:
         elif addr == W.REMOVE_EFFECT:
             c.append(('remove_effect', r(3), r(4)))
             self.ret()
+        elif addr == W.GEN_ART:                 # step 2l: Behavior::generate_article(id, bool) (the Dee's parasol)
+            c.append(('gen_art', r(3), r(4), r(5)))
+            self.ret()
         elif addr == W.BI_UPDATE:
             c.append(('bi_update', r(3), r(4)))
             self.ret()
@@ -1425,14 +1428,13 @@ def main():
         if stage == 0x94 and pm:
             for _n, k, twin, _c in E.PAIRS:
                 exp[k] = before[twin]
-            for k in W.KINDS:
-                exp[k] = before[W.SLOT_DONOR]
-            exp[W.WD_PARAM] = D['wdp']            # step 2k: the Waddle Doo's own (static) param object
+            for w in W.WALKERS:                # step 2l: every kind its own static param object (2k: the Doo's)
+                exp[w['kind']] = D[W.param_label(w['name'])]
         # step 2k: r3 is not live after the hook (0x02D9A62C / 0x02D9A6AC set it): k2_twins (its own test) uses it
         check(after == exp and m.uc.reg_read(R[0]) == 2 and
               m.uc.reg_read(R[1]) == STACK and m.uc.reg_read(R[28]) == MGR,
               'S2 (stage 0x%X%s): %s' % (stage, '' if pm else ', no param manager',
-                                         'slot[K] = slot[0x5A] for the walkers (2a\'s kept), slot[0x19] the Doo\'s own, r0 / r1 / r28 kept'
+                                         'slot[K] = the kind\'s own param object for the walkers (2a\'s kept), r0 / r1 / r28 kept'
                                          if stage == 0x94 and pm else 'no slot changed'))
 
     # the sets
