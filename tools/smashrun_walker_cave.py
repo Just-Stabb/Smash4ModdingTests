@@ -132,6 +132,15 @@ Step 2j (docs/smash-run-port.md "Step 2j"; region H, code_pk / code_fix2j): Pook
   hop threshold, Waddle Dee's parasol fall in the aerial module, Goomba's notice ledge check and frame-1 dead item,
   White Bear's view test; Furiijio's beam angles back to the 3DS's (its effect models billboard themselves).
 
+Step 2m (docs/smash-run-port.md "Step 2m"; region H, code_2m): sounds. Every 3DS play_se / stop_se of the ported
+  kinds at its 3DS point (SE_EN: state-enter wrappers se_<kind>_<state>; the updates / exits / slots: se_heiho_7u,
+  ch_pw_up, do_bm_up / se_doo_11x, gh_start / se_gh_dmg / se_gh_rm / gh_31, se_fu_bexit / se_fu_57 / se_fu_69,
+  se_ph_start / se_ph_71 / se_ph2_up / se_ph_55 (ph_snd: one loop per kind), se_pk_dmg); snd_rows (cave_s) registers
+  the 3DS soundlabeltable rows of the kinds' banks at their own numbers in the Wii U's loaded table (and points the
+  twins' rows at the kinds' banks on Smash Run stages), so the 3DS ids play as they are (tools/smashrun_sound.py).
+  Stalfos: sf7_up / sf8_up on mczakostalfos's state 7 / 8 update words: the 3DS's drop through a passable floor
+  (L5F470) for kind 0x30.
+
 Not ported (the README lists them): the Waddle Doo's beam (states 7 / 8: an article the Wii U has no weapon kind
 for) and its leave timer (9) and random hop (6); the Churine's sleep powder (6 / 7: an effect and attack the Wii U
 has no data for); the Waddle Dee's parasol float (EnemyAerialModule embedded in the 3DS object: the parasol fall is
@@ -7607,8 +7616,8 @@ BI_SLOT31 = 0x026A48EC               # BehaviorImpl's slot 31 (the hit record: +
 
 # ---- step 2m (docs/smash-run-port.md "Step 2m"): sounds, Stalfos's drop through a passable floor
 import smashrun_sound as SND  # noqa: E402
-PLAY_SE = 0x026A96EC                 # Behavior::play_se(r4 id, r5 bool) -> handle (3DS 0x7B59A8 -> SoundModuleImpl::play_se
-#                                      0x4C4B84): SoundModule acc+0x30F4 0x02C72214(module, id, 0, bool, 0, 0, 0)
+PLAY_SE = 0x026A96EC                 # Behavior::play_se(r4 id, r5 bool) -> handle (3DS 0x7B59A8 -> SoundModuleImpl::
+#                                      play_se 0x4C4B84): SoundModule acc+0x30F4 0x02C72214(module, id, 0, bool, 0, 0, 0)
 STOP_SE = 0x026A970C                 # Behavior::stop_se(r4 handle, r5) (3DS 0x4C3148 stop_se_handle): 0x02C73750
 SND_MGR = 0x102F7288                 # [[[[SND_MGR]] + 0x29C] + 4] = the loaded soundlabeltable.bin (+8 byte: loaded);
 #                                      read by 0x0311EC30 (row -> {bank, count, offset}) / 0x0311EDC4 (label -> tone)

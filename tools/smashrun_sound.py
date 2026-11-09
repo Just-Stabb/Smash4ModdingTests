@@ -195,7 +195,6 @@ def main():
         for trow, (krow, tname, tbank) in sorted(TWIN_SND.items()):
             name, bid, tones = bank_names(os.path.join(sedir, 'snd_se_enemy_%s.nus3bank' % tname))
             wb, wl = labels(tw, trow)
-            kb, kl = SND_ROWS[krow][1], SND_ROWS[krow][2]
             for lab, ti in enumerate(wl):
                 twin = tones[ti].replace('Mczako', '').lower() if ti >= 0 else None
                 ours = tone_of((trow << 16) | lab, rowsw, banks)

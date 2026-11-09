@@ -2511,3 +2511,143 @@ the data word 0x102FE778 (pw2_up); one relocation moved (0x102FE778 -> RELOC_DUM
 
 **Still open:** in game: the parasol (its model path, the flag-0x40 motion set-up without a motion file), the
 hurtboxes; the Dee's parasol shield; Stalfos's leads above; sounds (the next step); the dead items (step 2k).
+
+## Step 2m: enemy sounds (the 3DS rows in the Wii U's sound table), Stalfos's last twin states, the Waddle Dee's parasol shield
+
+Package smashrun_step2m_v1: `code/` exe_v30 = exe_v29 + `smashrun_walker_cave.py` over its own regions (scratch
+s2m/build30.py; the field cave unchanged, set "step2j"); `data/` the 19 ported kinds' sound banks under the names the
+game loads (sound/se/snd_se_enemy_<Kind>.nus3bank: the 3DS banks unchanged, as earlier packages installed them;
+re-shipped so every bank the sounds use is there). No data file changes: the converted animcmd is right as it is
+(below). Readings with addresses: hand_read.json `_framework_step2m`, and `port_step2m` of kuribo, heiho, waddledoo,
+churine, ghos, tikibuzz, furiijio, propellerheiho, dekakuribo, togezo, pooka, patapata, whitebear, plasmawisp, darios,
+zima, stalfos, waddledee. tools/smashrun_sound.py holds the map (SND_ROWS, TWIN_SND) and every 3DS call site (SITES)
+and checks them against the files.
+
+**Sound ids (both games).** A sound id is (soundlabeltable row << 16) | label. sound/config/soundlabeltable.bin ('STB\0'
+version 1, little-endian: row count, rows size, 16-byte rows {bank id, label count, offset, 0}, then the label lists:
+label -> tone index, -1 none) gives the row's bank id (the BINF id inside the .nus3bank) and the label's tone in it. Wii
+U: 0x0311EC30 (row -> its entry, bounded by the count), 0x0311EDBC (id -> bank id), 0x0311EF88 (id -> tone index), on
+the table [[[[0x102F7288]] + 0x29C] + 4] (+8 byte: loaded; 0x0311ECE8 checks 'STB' and version 1); SoundModule's play
+path (0x02C71B90 / 0x02C731A4) calls them, then the loaded bank of that id; no reverse lookup (bank -> row).
+
+**How the 3DS ids map to the Wii U (by name).** The 3DS table's rows for the ported kinds' banks: kuribo 0x28D (bank
+5002), patapata 0x28E (5004), dekakuribo 0x291 (5039), gordo 0x698 (5009), heiho 0x69B (5012), zima 0x69E (5015),
+plasmawisp 0x6A2 (5019), waddledee 0x6A3 (5020), waddledoo 0x6A8 (5026), furiijio 0x6A9 (5027), churine 0x6B0 (5034),
+pooka 0x6B1 (5035), darios 0x6B2 (5037), stalfos 0x6BF (5052), whitebear 0x6CC (5068), propellerheiho 0x6D2 (5076),
+togezo 0x6D9 (5083), tikibuzz 0x89C (5016), ghos 0x8A6 (5018) (the converted banks are the 3DS files: their BINF ids are
+these). The Wii U table (vanilla, and the user's latest, Sephiroth's UI-sound package's) has **no row for any of these
+bank ids, and all 19 row numbers are empty (-1)** in it: no Wii U id reached a Smash Run bank, every Smash Run sound was
+silent. Registering the 3DS rows at their own numbers makes the mapped Wii U id of each 3DS id the 3DS id itself; the
+check is by name (tools/smashrun_sound.py): every id's tone through the 3DS table = its tone through the registered
+row, a tone of that kind's bank (e.g. 0x28D0002 = snd_se_enemy_Kuribo_CRY, 0x6A80000 = Waddledoo_Beam, 0x89C0003 =
+Tikibuzz_Break). The converted ACMD Sound_Effect ids (heiho Run 0x69B0001 / RunBrake 0x69B0003, whitebear 0x6CC0000 /
+0x6CC0001, dekakuribo 0x2910000-0x2910009, patapata 0x28E0000 / 1 / 3 / 4: 18 commands) are rows of the same table:
+**right on the Wii U as they are** once the rows exist (no remap; tools/s3ds_enemy.py now reports any Sound_Effect on
+an unregistered row: none). The common id 15 (row 0 = snd_se_joucyu, bank 2000, in both games) is
+snd_se_common_Hit_Muteki in both. The twins' AI plays its own rows 0xBE2 / 0xBE3 / 0xBE4 (Mczakoplasmawisp 5095 /
+Mczakodarios 5096 / Mczakostalfos 5097, never loaded on a Smash Run stage); their label lists name the same tones in
+the same order as the kinds' banks (Mczakostarfos_Attack = Starfos_Attack, ..., Mczakoplasmawisp_Charge =
+Plasmawisp_Charge). Row 0x4A6 (the 3DS's snd_se_fs_common, bank 5000): the Wii U has its path in the bank-set table
+(0x1041D0A0: mask 0x20, index 0x15) but no file and no row; the Wii U enemy framework still plays it (0x02DB3894,
+0x02DBF40C 0x4A60017, 0x02DBF434 0x4A6001A, 0x02DC2610, 0x02DC3600) and so does Stalfos's slot 30 (0x4A60079
+enemy_reflect): silent, not mapped (open).
+
+**snd_rows** (region H 0x04BC526C, from cave_s 0x04B8955C: r3 1 on a Smash Run stage (s2_sr), 0 on any other enemy
+battle (s2_nsr)): the loaded table found and checked ('STB', version 1, loaded); each of the 19 rows of snd_tab {row,
+bank, count, its label list in the cave} written little-endian (stwbrx) where the row is empty or already that bank:
+{bank, count, the list's offset from the table's label base (+0x10 + [+0xC], a 32-bit wrap to the cave), 0}; a row
+another bank uses is left alone (the user's own table wins). snd_twin {row, the kind's bank, saved}: on a Smash Run
+stage rows 0xBE2-0xBE4 get the kinds' banks 5019 / 5037 / 5052 (the original id saved), on any other enemy battle the
+saved id is put back (the Fortress keeps its banks). Nothing is written to the file on disk and no data file is shipped:
+another mod's soundlabeltable.bin cannot conflict. Also in cave_s: the Propeller Heiho's loop counter reset.
+
+**Every 3DS play_se / stop_se at the same point** (Behavior::play_se 0x026A96EC (r4 id, r5 false) = 3DS 0x7B59A8;
+stop_se 0x026A970C (r4 handle, r5 0) = 3DS 0x4C3148; h_se / h_ses 0x04BC4BD4 / 0x04BC4BEC):
+- state enters (SE_EN: se_<kind>_<state> = the enter, then play_se, the 3DS's last call in each): Goomba 4 (0x333A4
+  0x28D0002) / 8 (0x323A4 0x28D0004); Shy Guy 6 (0x1AC50) / 7 (0x1BA88) 0x69B0002; Waddle Doo 11 (3DS 8, 0x7D0D4
+  0x6A80000 -> DO_SE 0x1CC = 3DS +0x1A4); Tiki Buzz 4 / 5 / 10 / 11 (0x78170 / 0x77A0C / 0x78040 / 0x77EF0,
+  0x89C0000-3); Furiijio 2 / 5 (0x6D1EC / 0x6D5EC 0x6A90001), 4 / 7 (0x6C3CC / 0x6CAF4 0x6A90002 -> FU_SE = FU + 0x28 =
+  3DS +0x260); Big Goomba 2 / 8 / 10 / 11 (0x85E84 0x2910009, 0x859AC 0x2910008, 0x86C70 0x291000C, 0x85A20
+  0x291000B); Spiny 5 (0x37AA4 0x6D90000); Pooka 5 / 6 / 11 (0x23540 0x6B10006, 0x21F50 0x6B10007, 0x21980 0x6B10005).
+- Shy Guy 7 update se_heiho_7u: the second hop (V4 + 1) plays 0x69B0002 (0x1BDD0); 11 (0x1B99C) has no caller.
+- Churine 9 (3DS 7) update: play_se(0x6B00001) right after the powder effect and set_rate_last (0x3DB28).
+- Waddle Doo 11: all shot and the motion's end: DO_SE != -1 -> stop_se, -1 (0x7DC18), then -> 3; exit se_doo_11x
+  (0x7DD18) the same.
+- Ghos: start play_se(0x8A60000) -> GH_SE (FL_SIZE + 8, 3DS +0x200; object FL_SIZE + 0xC); slot 10 se_gh_dmg (3DS 11
+  0x110F4: after the damage handling, the AI energy's flag 2 and GH_SE >= 0 -> stop_se, -1); slot 27 se_gh_rm (3DS 28
+  0x11180: stop, then f_ghos_rm); slot 31 gh_31: every immune hit -> play_se(15) (0x11454).
+- Furiijio: 4 / 7 exits se_fu_bexit (0x6D0E0 / 0x6D4E0: FU_SE != -1 -> stop_se, -1, after fu_bexit); slot 57 se_fu_57
+  (0x6DBDC: FU_BND (FU + 0x2C = 3DS +0x264) 0, on the ground, motion kind (MotionModule +0x38 = 3DS +0x40) 4
+  DownBoundEnd or 6 DownWait -> play_se(0x6A90003), FU_BND = 1); F69 se_fu_69 (0x6DC48: FU_BND = 0, returns 0). Object
+  FU + 0x30.
+- Propeller Heiho: the propeller loop is one per kind (enemy_fs.cro data 0x111270 {handle -1, count 0} -> ph_snd): FSTART
+  se_ph_start (0x990C8: count <= 0 -> play_se(0x6D20000) -> handle; count + 1); ph_dec (handle != -1: count - 1, at 0
+  or below stop_se, -1) from slot 71 se_ph_71 (0x99DD8, after BehaviorImpl::notify_on_death 0x0269FD6C) and state 2's
+  update se_ph2_up (0x99D0C: the timer or the view test that sends it to 8, tested before ph2_up); slot 55 se_ph_55
+  (0x9A070: every item swap, the new item found or not -> 0x6D20001). ph_snd reset at each Smash Run battle's start
+  (APPROXIMATED: the 3DS value lives in the module's data from its load).
+- Pooka FDMG se_pk_dmg (3DS slot 11 0x22900): HP <= the threshold (pk_thr) -> play_se(0x6B10004) (0x22A44; the hit /
+  link stop before it, 0x22954..0x22A34, not mapped), then BehaviorImpl::notify_on_damage. The pop's end still waits
+  PK_POP frames (the 3DS's is_playing(0x6B10005): APPROXIMATED as before).
+- Lethinium / Darios / Stalfos (twin AI): their sounds are the twins' (Lethinium 0xBE20000-4 at 0x026D0600..0x026D165C,
+  Darios 0xBE30000 / 1 at 0x026CD940 / 0x026CDF00, Stalfos 0xBE40000-5 at nine sites, Attack / JumpAttack through its
+  helper 0x026D4DA0(this, i, id, frame) = the 3DS's inline +0x1F4[i] / P+0x19C[i] test: the audit's "the twin never
+  plays 0000 / 0001 / 0002" missed it); with the twins' rows on the kinds' banks they play the Smash Run sounds. Stalfos
+  slot 30 (0x4A60079, fs_common) is the only one not heard.
+
+**Stalfos's remaining twin states** (step 2l's leads, read on both sides):
+- 9 update (0x519EC / 0x026D44E4): equal (P+0x128..+0x138 -> 13 with +0x1EC; else |dx| < P+0xCC x 10 or a ledge within
+  P+0x120 x 10 -> 10 with +0x194 = random_range(P+0xF4, +0xF8) / (+0xFC, +0x100) and +0x19C = P+0xEC / +0xF0 by
+  +0x1C2; else 13 with +0x19C = P+0x108 / +0x10C, +0x1CC = clamp(|dx| / 80, 0, 1) (3DS x 0.0125), +0x1DC / +0x1E0 =
+  P+0x110 / +0x114 x it, +0x1E4 / +0x1E8 = P+0x118 / +0x11C). The compare tool's leads were reads through the twin's
+  slot pointer, which its linear scan does not follow.
+- 22 enter (0x50E20 / 0x026D5F94): equal (P+0xE0 read from [[0x102F6C00]+0x1C4], the kind's object since step 2k).
+- the attack motions' variants: equal (10: +0x1C2 ? (+0x194 == 1 ? 9 : 5) : (+0x194 == 1 ? 7 : 0); 11: 6 / 10, 0 / 1;
+  13: 0x1D / 0x1F; 14: 0x1E / 0x20; 12: MOT(+0x198)); the twin's 0x026D47E0 / 0x026D4808 = the 3DS's inline stores.
+- 7 / 8 update (0x51D8C / 0x51FD0 vs 0x026D3EB4 / 0x026D41E8): the same calls in the same order (the twin's 0x026D3008 /
+  0x026D3818 / 0x026D3A68 / 0x026D3DA4 = L5F7F8 / L5F3A4 / L5F110 / L5F754) except the 3DS's **L5F470**, missing from
+  the twin: is_passable_ground (3DS 0x96AB30; Wii U GroundModule 0x02C36EFC: [+0x18] entry 3, flag 0x2000, through
+  0x02D64D20), the nearest target's y + P+0xC8 x 10 below the posture's y, and is_exist_floor_under(100) (3DS 0x7B4230:
+  GroundModule ray_check from touch_pos(8) - (0, 10) along (0, -100), true) -> set_attach_ground(0),
+  set_passable_check(1), set_correct(0), +0x1D4 = 8, -> 1: the Stalfos drops through a passable floor toward a target
+  below it. Ported: sf7_up / sf8_up (0x04BC5540 / 0x04BC5710) on the twin table's words 0x102FE944 / 0x102FE95C
+  (relocations moved to RELOC_DUMMY): kind 0x30 runs the 3DS order with the twin's helpers and sf_drop (0x04BC53E4);
+  kind 0x59 (the Fortress twin) jumps to the game's update. APPROXIMATED: the ray starts at the posture's position (x,
+  y - 10) (no Wii U get_touch_pos found; on the ground they coincide in x, the posture is at the feet).
+
+**Waddle Dee's parasol shield (read: nothing to port).** The start 0x7BB1C builds a ShieldGroup resource (two
+ShieldParts, ctor 0xAC34, 0x20 each: node 8 with both ends (P+0x98, 0, 0) and size P+0x9C; node 7 with ends (P+0xA0,
+P+0xA8, P+0xA4) and size P+0xAC; shape byte 2; the group {parts, 2, 0, 0, 999, 0, flag}) and adds it to the module at
+acc+0x88 (vt+0x20 0x684E84; its vtables (0xBD6C50..) are ShieldModulePartialImpl's: vt+0x34 = set_status 0x684930,
+the ReflectorDataSet add 0x3D4018: a reflector), then sets both parts' status to 0 (vt+0x34 (0 / 1, 0, 0), 0x7BC34 /
+0x7BC54): 0x684930 -> 0x3D3DE8 stores the status byte at the part's +0x20 and counts a part active only for a non-zero
+status. The drop 0x5CF90 sets them 0 again. No other Waddle Dee code, no ACMD (it has no animcmd) and no
+Behavior::set_shield_state (0x7B2124, the acc+0x84 module) turns a part on: on the 3DS the parasol's reflector exists
+but is never active, so it blocks / reflects nothing. A Wii U port would add a group and switch it off: no behaviour.
+
+**Tests** (exe_v30):
+
+| Test | Result |
+| --- | --- |
+| smashrun_step2m_test.py (new; the 3DS / Wii U soundlabeltable, the 3DS enemy/ banks and animcmd, the Wii U sound/se, the Sephiroth package's table) | 20 checks, 0 failures (the 19 rows from the files and empty in both Wii U tables; every 3DS play_se id and ACMD id names the 3DS's tone; the twins' ids by name; id 15; snd_rows run on the real table, then the game's 0x0311EDBC / 0x0311EF88 give every id its kind's bank and tone; a used row left alone; the twins' rows back off Smash Run; every hooked state / slot's play_se / stop_se with the 3DS id and handle; Stalfos 7 / 8 = the game's calls in 13 cases plus the drop) |
+| smashrun_step2l_test.py | 17 checks, 0 failures |
+| smashrun_step2k_test.py | 26 checks, 0 failures (the Doo's state 11 is se_waddledoo_11 around do_bm_en) |
+| smashrun_step2j_test.py / smashrun_step2i_test.py / smashrun_step2h_test.py | 22 / 10 / 41 checks, 0 failures |
+| smashrun_walker_test.py | 179 checks, 0 failures (change_state rows with their exits) |
+| smashrun_flier_test.py / smashrun_flier_motion_test.py | 123 / 11 checks, 0 failures (Furiijio's slot 57, the Propeller Heiho's slots 55 / 71 and start wrappers) |
+| smashrun_field_test.py --set step2j / smashrun_enemy_test.py | 13 / 26 checks, 0 failures |
+| effect_slots_patch_test.py exe_v30 exe_v12 | 47 checks, all ok |
+
+The shared test machine (smashrun_walker_test.py) stubs play_se / stop_se (kept in `sounds`, apart from the call lists).
+tools/ppcasm.py gained lwbrx / stwbrx; tools/rpx_patch.py rewrites a grown section in place when it is the file's last
+(it was moved after itself, leaving a 17 MB dead copy: exe_v30 is 331,772,014 bytes).
+
+**exe_v30 vs exe_v29, word diff** (s2m/diff30.py, log s2m/diff30.log): 9215 words, all Smash Run: E 0x04B7D62C-0x04B7DF00,
+D 0x04B849EC-0x04B84A00, A 0x04B86918-0x04B877E8, B 0x04B89324-0x04B8A000 (cave_s), C / G and the data 0x04BB8004-0x04BC0040,
+H 0x04BC00BC-0x04BC968C (code to 0x04BC5918, data after it), the data words 0x102FE778 (pw2_up, moved), 0x102FE944 /
+0x102FE95C (sf7_up / sf8_up); two relocations moved (0x102FE944 / 0x102FE95C -> RELOC_DUMMY 0x037EE73C). The file
+info is equal.
+
+**Still open:** the fs_common sounds (row 0x4A6: no Wii U bank; the framework's defeat / reflect sounds and Stalfos's
+slot 30); the Pooka pop's real is_playing wait; the dead items (step 2k); in game: every sound above, the loops'
+stops, the Stalfos drop.

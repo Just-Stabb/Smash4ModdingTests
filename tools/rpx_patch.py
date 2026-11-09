@@ -156,6 +156,14 @@ def main():
                 if len(comp) <= room:
                     new = comp
                     break
+            if new is None and not nxt and off + size >= len(d) - 63:
+                # the file's last section: rewritten in place, the file cut to its new end (moving it would
+                # leave its old copy behind as dead bytes)
+                new = struct.pack('>I', len(data)) + zlib.compress(bytes(data), 9)
+                del d[off:]
+                d += new
+                room = len(new)
+                print("section %d rewritten at the file's end (%s)" % (idx, hex(off)))
             if new is None:
                 # doesn't fit any more (a grown section): move it to the end of the file
                 new = struct.pack('>I', len(data)) + zlib.compress(bytes(data), 9)
