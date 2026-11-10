@@ -21,7 +21,8 @@ for _g, _names in (
         ('Hitboxes & hits', ['Extra_Special_Hitbox', 'Extra_Extended_Special_Hitbox', 'Hit_Check', 'Hit_Get',
                              'Hit_Reset', 'Hit_Log_Clear']),
         ('Fighter state', ['Status_Get', 'Status_Set', 'Hitstun_Get', 'Hitstun_Set', 'Hitstop_Set', 'Damage_Get',
-                           'Damage_Set', 'Body_State_Set', 'Armor_Set', 'Item_State_Set', 'Stage_Collision_Set']),
+                           'Damage_Set', 'Body_State_Set', 'Armor_Set', 'Item_State_Set', 'Stage_Collision_Set',
+                           'Leave_Ground_Cancel']),
         ('Inputs', ['Input_Compare', 'Input_Get', 'Input_Set']),
         ('Position & rotation', ['Position_Get', 'Position_Set', 'Rotation_Get', 'Rotation_Set', 'Joint_Position_Get']),
         ('Animation', ['Motion_Get', 'Motion_Set', 'Animation_Rate_Set']),
@@ -98,7 +99,7 @@ GROUP_HELP = {
         '- Hitboxes & hits: hitboxes with hitstun / hitstop / DI extras, checking what an attack connected with, '
         'clearing the "has hit" flag and the hit records.',
         '- Fighter state: read or change any fighter\'s status, hitstun, hitstop, damage, intangibility, armor, '
-        'item states and stage collision.',
+        'item states and stage collision; let a grounded move go on in the air (Leave_Ground_Cancel).',
         '- Inputs: read, test or force a fighter\'s buttons and sticks.',
         '- Position & rotation: read or move a fighter / article, rotate it, read a joint\'s position.',
         '- Animation: which animation plays, its frame and rate; play another one; the fighter\'s overall speed.',
@@ -134,7 +135,8 @@ GROUP_HELP = {
         'states and stage collision, on any target (self, the nearest opponent, the last fighter hit, a player slot, '
         'the last attacker). Each is the matching position variable\'s own code (docs/position-variables.md) with '
         'parameters instead of a variable ID. They act on fighters: on an article (Target 0 in a projectile\'s '
-        'script) they do nothing.',
+        'script) they do nothing. Leave_Ground_Cancel decides whether this fighter\'s grounded move ends when it '
+        'leaves the ground.',
     ],
     NEW_GROUP + ' / Inputs': [
         'A fighter\'s controller: test an input (Input_Compare, then True / Else), copy it into a variable '
@@ -451,6 +453,46 @@ HELP = {
         '',
         NOT_VIEWER,
         NEEDS,
+    ],
+    'Leave_Ground_Cancel': [
+        '## How it works',
+        'Decides whether this grounded move is cut short when the fighter leaves the ground (walks or slides off an '
+        'edge, or is moved up off it). Normally (on) the move ends there and the fighter goes to Fall. Off, the move '
+        'goes on in the air: its animation, hitboxes, effects and the rest of its scripts, with air physics.',
+        '- Enabled 1: on, the normal game (the move ends in Fall when the fighter leaves the ground).',
+        '- Enabled 0: off: the move goes on in the air, and a move that stops at edges can slide off them.',
+        '- Enabled 2: off, but the move still stops at edges: it leaves the ground only by moving up.',
+        '',
+        '## Edges',
+        'Most Smash 4 ground moves stop at edges (ground correction 2, "cliff stop": every dash attack), so they never '
+        'leave the ground sideways. With Enabled=0 such a move slides off edges (as a walk does) while it\'s on the '
+        'ground, so a dash attack runs off the stage; Enabled=2 keeps the stop. A move that already slides off is left '
+        'as it is.',
+        '',
+        '## In the air, and after',
+        '- The frame it is in the air, the fighter gets the air kinetics and stage collision the game\'s own ground / '
+        'air moves switch to (kinetic 0 FALL: gravity, air drift and air friction, with the speed it carried). The '
+        'animation keeps playing (the status doesn\'t change).',
+        '- The move ends in Fall at its interrupt frame (its cancel window opening: the vl file\'s cancel frame or '
+        'ENABLE_CANCEL) or at the end of its animation, whichever comes first; in Fall it can act again.',
+        '- Landing during it: the move goes on, grounded (no landing, no landing lag), until it ends as it normally '
+        'would (with Enabled=0 still sliding off the next edge).',
+        '',
+        '## Gotchas',
+        '- It resets to on by itself at every status change (the next move, Fall, a hit, ...), so it never carries into '
+        'another move; it stays through a motion change inside one status (a smash attack\'s charge and swing).',
+        '- Turning it back on in the air (Enabled=1) ends the move in Fall on the next frame.',
+        '- Fighters only (Kirby\'s copies too); in an article\'s script it does nothing.',
+        '- No ledge grab during the move (the move isn\'t Fall).',
+        '- Only the leave-ground Fall is held back: a move that ends through its own MSC (a smash charge\'s hold, a '
+        'rapid jab\'s loop, a motion change from MSC) won\'t end in the air until its interrupt frame, its '
+        'animation\'s end, or the ground. Use it on moves that end by their animation (dash attacks, tilts, jabs, '
+        'smash swings), or turn it back on at a frame in the script.',
+        '- Not tested in game yet (emulator only, tools/leave_ground_test.py): the momentum carried into the air.',
+        '',
+        NOT_VIEWER,
+        'Needs exe_v39 or later (the patched cross_f.rpx, tools/acmd_ext_cave.py). Without it a script that uses this '
+        'command won\'t load properly: ship the executable with any script that uses it.',
     ],
     'Input_Compare': [
         '## How it works',
@@ -1109,6 +1151,33 @@ EXAMPLES = {
         '    }',
         '    Stage_Collision_Set(Target=2, Mode=5)',
         '}',
+    ],
+    'Leave_Ground_Cancel': [
+        '// Example 1: Diddy Kong\'s dash attack (AttackDash, game script) keeps cartwheeling off the stage',
+        'Leave_Ground_Cancel(Enabled=0)',
+        'FRAME(Frames=9)',
+        'Hitbox(ID=1, Part=0, Bone=0, Damage=2, Angle=0x28, KBG=0x64, FKB=0x37, BKB=0, Size=3.5, X=0, Y=7, Z=8.5, '
+        'Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=1, SFXType=1, '
+        'Ground/Air=0x80000003, Direct/Indirect=1, Type=6)',
+        'WAIT(Frames=1)',
+        'Remove_All_Hitboxes()',
+        'FRAME(Frames=18)',
+        'Hitbox(ID=0, Part=0, Bone=0, Damage=2, Angle=0x16E, KBG=0x64, FKB=0x3E, BKB=0, Size=3.5, X=0, Y=7, Z=8.5, '
+        'Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=1, SFXType=1, Ground/Air=3, '
+        'Direct/Indirect=1, Type=6)',
+        'WAIT(Frames=1)',
+        'Remove_All_Hitboxes()',
+        'FRAME(Frames=24)',
+        'Hitbox(ID=0, Part=0, Bone=0, Damage=3, Angle=0x4E, KBG=0x5A, FKB=0, BKB=0x50, Size=4.5, X=0, Y=6, Z=8.5, '
+        'Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, '
+        'Direct/Indirect=1, Type=6)',
+        'WAIT(Frames=1)',
+        'Remove_All_Hitboxes()',
+        '',
+        '// Example 2: goes on in the air only if lifted (it still stops at edges); normal again from frame 20',
+        'Leave_Ground_Cancel(Enabled=2)',
+        'FRAME(Frames=20)',
+        'Leave_Ground_Cancel(Enabled=1)',
     ],
     'Input_Compare': [
         '// Example 1: on frame 12, a stronger hitbox if special is still held',

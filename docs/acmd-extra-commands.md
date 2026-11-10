@@ -4,13 +4,13 @@ These are new commands for game, effect, sound and expression scripts. They need
 `cross_f.rpx` (`tools/acmd_ext_cave.py`, part of the standard build). Without it, a script that uses
 them won't load properly, so ship the executable with any script that uses them.
 
-Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7) lists all of them in one
+Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8) lists all of them in one
 group, **New Commands**, at the top of the list (vanilla commands stay in their own groups), in subgroups:
 
 | Subgroup | Commands |
 |---|---|
 | Hitboxes & hits | Extra_Special_Hitbox, Extra_Extended_Special_Hitbox, Hit_Check, Hit_Get, Hit_Reset, Hit_Log_Clear |
-| Fighter state | Status_Get / _Set, Hitstun_Get / _Set, Hitstop_Set, Damage_Get / _Set, Body_State_Set, Armor_Set, Item_State_Set, Stage_Collision_Set |
+| Fighter state | Status_Get / _Set, Hitstun_Get / _Set, Hitstop_Set, Damage_Get / _Set, Body_State_Set, Armor_Set, Item_State_Set, Stage_Collision_Set, Leave_Ground_Cancel |
 | Inputs | Input_Compare, Input_Get, Input_Set |
 | Position & rotation | Position_Get / _Set, Rotation_Get / _Set, Joint_Position_Get |
 | Animation | Motion_Get / _Set, Animation_Rate_Set |

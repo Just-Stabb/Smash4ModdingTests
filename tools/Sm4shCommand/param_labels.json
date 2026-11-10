@@ -3168,6 +3168,69 @@
    "confidence": "medium"
   }
  },
+ "224CF650": {
+  "_command": "Leave_Ground_Cancel",
+  "_new": true,
+  "_name": "Leave_Ground_Cancel",
+  "_size": 2,
+  "_desc": "Whether this grounded move is cut into Fall when the fighter leaves the ground (walks / slides off an edge, or moves up). Off: the move (animation, hitboxes, scripts) goes on in the air with air physics (gravity, air drift) until its interrupt frame or its end, then Fall; landing during it, it goes on grounded. Back on by itself at the next status (move). Fighters only. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0
+  ],
+  "0": {
+   "name": "Enabled",
+   "desc": "1 on (normal: the move ends in Fall when it leaves the ground); 0 off: the move goes on in the air, and a move that stops at edges (every dash attack) can slide off them; 2 off, but the move still stops at edges (it leaves the ground only by moving up).",
+   "confidence": "high"
+  },
+  "_example": [
+   "// Example 1: Diddy Kong's dash attack (AttackDash, game script) keeps cartwheeling off the stage",
+   "Leave_Ground_Cancel(Enabled=0)",
+   "FRAME(Frames=9)",
+   "Hitbox(ID=1, Part=0, Bone=0, Damage=2, Angle=0x28, KBG=0x64, FKB=0x37, BKB=0, Size=3.5, X=0, Y=7, Z=8.5, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=1, SFXType=1, Ground/Air=0x80000003, Direct/Indirect=1, Type=6)",
+   "WAIT(Frames=1)",
+   "Remove_All_Hitboxes()",
+   "FRAME(Frames=18)",
+   "Hitbox(ID=0, Part=0, Bone=0, Damage=2, Angle=0x16E, KBG=0x64, FKB=0x3E, BKB=0, Size=3.5, X=0, Y=7, Z=8.5, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=1, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=6)",
+   "WAIT(Frames=1)",
+   "Remove_All_Hitboxes()",
+   "FRAME(Frames=24)",
+   "Hitbox(ID=0, Part=0, Bone=0, Damage=3, Angle=0x4E, KBG=0x5A, FKB=0, BKB=0x50, Size=4.5, X=0, Y=6, Z=8.5, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=6)",
+   "WAIT(Frames=1)",
+   "Remove_All_Hitboxes()",
+   "",
+   "// Example 2: goes on in the air only if lifted (it still stops at edges); normal again from frame 20",
+   "Leave_Ground_Cancel(Enabled=2)",
+   "FRAME(Frames=20)",
+   "Leave_Ground_Cancel(Enabled=1)"
+  ],
+  "_group": "Fighter state",
+  "_help": [
+   "## How it works",
+   "Decides whether this grounded move is cut short when the fighter leaves the ground (walks or slides off an edge, or is moved up off it). Normally (on) the move ends there and the fighter goes to Fall. Off, the move goes on in the air: its animation, hitboxes, effects and the rest of its scripts, with air physics.",
+   "- Enabled 1: on, the normal game (the move ends in Fall when the fighter leaves the ground).",
+   "- Enabled 0: off: the move goes on in the air, and a move that stops at edges can slide off them.",
+   "- Enabled 2: off, but the move still stops at edges: it leaves the ground only by moving up.",
+   "",
+   "## Edges",
+   "Most Smash 4 ground moves stop at edges (ground correction 2, \"cliff stop\": every dash attack), so they never leave the ground sideways. With Enabled=0 such a move slides off edges (as a walk does) while it's on the ground, so a dash attack runs off the stage; Enabled=2 keeps the stop. A move that already slides off is left as it is.",
+   "",
+   "## In the air, and after",
+   "- The frame it is in the air, the fighter gets the air kinetics and stage collision the game's own ground / air moves switch to (kinetic 0 FALL: gravity, air drift and air friction, with the speed it carried). The animation keeps playing (the status doesn't change).",
+   "- The move ends in Fall at its interrupt frame (its cancel window opening: the vl file's cancel frame or ENABLE_CANCEL) or at the end of its animation, whichever comes first; in Fall it can act again.",
+   "- Landing during it: the move goes on, grounded (no landing, no landing lag), until it ends as it normally would (with Enabled=0 still sliding off the next edge).",
+   "",
+   "## Gotchas",
+   "- It resets to on by itself at every status change (the next move, Fall, a hit, ...), so it never carries into another move; it stays through a motion change inside one status (a smash attack's charge and swing).",
+   "- Turning it back on in the air (Enabled=1) ends the move in Fall on the next frame.",
+   "- Fighters only (Kirby's copies too); in an article's script it does nothing.",
+   "- No ledge grab during the move (the move isn't Fall).",
+   "- Only the leave-ground Fall is held back: a move that ends through its own MSC (a smash charge's hold, a rapid jab's loop, a motion change from MSC) won't end in the air until its interrupt frame, its animation's end, or the ground. Use it on moves that end by their animation (dash attacks, tilts, jabs, smash swings), or turn it back on at a frame in the script.",
+   "- Not tested in game yet (emulator only, tools/leave_ground_test.py): the momentum carried into the air.",
+   "",
+   "The Hitbox Viewer doesn't simulate this command (it only acts in game).",
+   "Needs exe_v39 or later (the patched cross_f.rpx, tools/acmd_ext_cave.py). Without it a script that uses this command won't load properly: ship the executable with any script that uses it."
+  ]
+ },
  "227B36A1": {
   "_command": "FT_ATTACK_ABS_CAMERA_QUAKE",
   "0": {

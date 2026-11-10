@@ -162,7 +162,8 @@ namespace SALT.Moveset.AnimCMD
             {0xBE1E63B3,6},
             {0xBF7A21C8,3},
             {0xE33213D8,4},
-            {0xFC5AB6DC,3}
+            {0xFC5AB6DC,3},
+            {0x224CF650,2}
         };
         #endregion
         #region Names
@@ -785,6 +786,7 @@ namespace SALT.Moveset.AnimCMD
             {0xBF7A21C8,"Stage_Collision_Set"},
             {0xE33213D8,"Armor_Set"},
             {0xFC5AB6DC,"Target_Slot_Get"},
+            {0x224CF650,"Leave_Ground_Cancel"},
         };
         #endregion
         #region Params
@@ -1409,6 +1411,7 @@ namespace SALT.Moveset.AnimCMD
             {0xBF7A21C8,"0,0"},
             {0xE33213D8,"0,0,1"},
             {0xFC5AB6DC,"0,3"},
+            {0x224CF650,"0"},
         };
         #endregion
         #region syntax
@@ -2031,6 +2034,7 @@ namespace SALT.Moveset.AnimCMD
             {0xBF7A21C8,"Target,Mode"},
             {0xE33213D8,"Target,Type,Threshold"},
             {0xFC5AB6DC,"Target,Variable"},
+            {0x224CF650,"Enabled"},
         };
         #endregion
 
@@ -2655,6 +2659,7 @@ namespace SALT.Moveset.AnimCMD
             {0xBF7A21C8,"Sets how a fighter collides with the stage (GroundModule(0x2710, mode)). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0xE33213D8,"Gives a fighter armor (DamageModule(0xB, type, threshold)). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0xFC5AB6DC,"Stores which player slot (1-8) a target is: the nearest opponent, the last fighter hit, the last attacker, ... New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0x224CF650,"Whether this grounded move is cut into Fall when the fighter leaves the ground (walks / slides off an edge, or moves up). Off: the move (animation, hitboxes, scripts) goes on in the air with air physics (gravity, air drift) until its interrupt frame or its end, then Fall; landing during it, it goes on grounded. Back on by itself at the next status (move). Fighters only. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
         };
         #endregion
         /// <summary>
