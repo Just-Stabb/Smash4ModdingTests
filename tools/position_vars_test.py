@@ -178,18 +178,25 @@ mo1: lwz r7, 4(r5)
  blr""",                                       # GroundModule(op, value): op, value, argument count
     0x030B29D8: """lwz r12, 4(r3)
  lwz r5, 0(r4)
+ lwz r9, 0xB1C(r12)
+ slwi r10, r9, 5
+ add r10, r10, r12
  lwz r6, 0(r5)
- stw r6, 0xB00(r12)
- lwz r7, 4(r5)
- stw r7, 0xB04(r12)
- lwz r7, 8(r5)
- stw r7, 0xB08(r12)
- lwz r7, 0xC(r5)
- stw r7, 0xB0C(r12)
- lwz r7, 4(r4)
- stw r7, 0xB10(r12)
+ stw r6, 0xB20(r10)
+ lwz r6, 4(r5)
+ stw r6, 0xB24(r10)
+ lwz r6, 8(r5)
+ stw r6, 0xB28(r10)
+ lwz r6, 0xC(r5)
+ stw r6, 0xB2C(r10)
+ lwz r6, 0x10(r5)
+ stw r6, 0xB30(r10)
+ lwz r6, 4(r4)
+ stw r6, 0xB34(r10)
+ addi r9, r9, 1
+ stw r9, 0xB1C(r12)
  li r3, 0
- blr""",                                       # KineticModule(op, energy, x, y): logged at +0xB00 (count +0xB10)
+ blr""",                                       # KineticModule(op, ...): calls counted at +0xB1C, each logged (first 5 words, count) at +0xB20 + 0x20 n
     0x030B306C: """lwz r12, 4(r3)
  lwz r5, 0(r4)
  lwz r6, 0(r5)
@@ -422,16 +429,21 @@ check('  self untouched', ri(mu, 0, 0xAF0), 0)
 call(mu, FSET2, w0, hid(5, 6), 5.0)
 check('stage collision back (air, 5) on slot 3', (ri(mu, 2, 0xAF0), ri(mu, 2, 0xAF4)), (0x2710, 5))
 check('q6 reads 0', call(mu, FGET2, w0, hid(5, 6)), 0)
-# q7 (write only, Sephiroth test 153): shield push. Under 1000: KineticModule(0x11, 4, value, 0) on the target (its guard
-# damage pushback energy's speed); 1000 and up: WorkModule int 0x11000009 (its shield stun frames left) = value - 1000
+# q7 (write only, Sephiroth tests 153 / 154): shield push. Under 1000: its energy 4 made again with that speed, as the guard
+# damage status's init makes it: KineticModule(0xe, 4, 0xb, value, 0, 0, 0, 0) then (0xb, 4) on the target (test 153's
+# (0x11, 4, value, 0) didn't move it in game); 1000 and up: WorkModule int 0x11000009 (shield stun frames left) = value - 1000
+def kcall(slot, n):
+    o = 0xB20 + 0x20 * n
+    w = [ri(mu, slot, o + 4 * k) for k in range(6)]
+    return (w[0], w[1], w[2], struct.unpack('>f', struct.pack('>i', w[3]))[0], w[4], w[5])
 call(mu, FSET2, w0, hid(1, 7), -2.5)
-check('q7 push speed: KineticModule(0x11, 4, -2.5, 0) on the opponent, 4 words',
-      (ri(mu, 2, 0xB00), ri(mu, 2, 0xB04), struct.unpack('>f', struct.pack('>i', ri(mu, 2, 0xB08)))[0], ri(mu, 2, 0xB0C),
-       ri(mu, 2, 0xB10)), (0x11, 4, -2.5, 0, 4))
-check('  self untouched', ri(mu, 0, 0xB00), 0)
+check('q7 push: 2 KineticModule calls on the opponent', ri(mu, 2, 0xB1C), 2)
+check('  KineticModule(0xe, 4, 0xb, -2.5, 0, ...), 8 words', kcall(2, 0), (0xE, 4, 0xB, -2.5, 0, 8))
+check('  then KineticModule(0xb, 4) (enabled), 2 words', kcall(2, 1)[:2] + kcall(2, 1)[5:], (0xB, 4, 2))
+check('  self untouched', ri(mu, 0, 0xB1C), 0)
 call(mu, FSET2, w0, hid(5, 7), 1003.0)
 check('q7 shield stun: WorkModule int 0x11000009 = 3 on slot 3', ri(mu, 2, 0x800 + 4 * 9), 3)
-check('  its speed not set again', struct.unpack('>f', struct.pack('>i', ri(mu, 2, 0xB08)))[0], -2.5)
+check('  no more KineticModule calls', ri(mu, 2, 0xB1C), 2)
 check('q7 reads 0', call(mu, FGET2, w0, hid(5, 7)), 0)
 def jid(target, n): return 0x0F000290 + 4 * target + n
 for k, v in enumerate((3.5, 12.25, -1.0)):
