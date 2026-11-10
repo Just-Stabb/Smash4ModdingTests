@@ -4,6 +4,8 @@
   Shooter, Strike, Juggernaut, Normal, Technical or Barrage) if they haven't given one, and add it to
   `docs/character-traits.md` and `kirby_copy_trait()` in `fighters/kirby/kirby.c` (rebuild
   `kirby.mscsb`). Kirby's copy of that character gets the trait's changes.
+- **Roll-off: Hero's (`brave`) implementation is the main universal version.** Its momentum mechanics
+  are the reference for every fighter; the roll-off stats (speed, air multiplier) stay as given below.
 - **Roll-off** (`docs/universal-mechanics.md`), **reverse tilts** and **up / down tilt, down smash
   and shield out of run** (tilts / down smash, not shield, also out of the initial dash and of
   turns out of a dash or a run) are wanted on every character;
