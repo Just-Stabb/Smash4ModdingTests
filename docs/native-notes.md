@@ -1505,6 +1505,55 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
   `KineticModule(0xD, …)`. The only native code is SDI (`0x02E5AF10`, `0x02E5B340`), which uses the
   hitbox's SDI.
 
+## Leave_Ground_Cancel (grounded moves into the air)
+
+`tools/acmd_ext_cave.py` (`lgc_code`), user docs `docs/acmd-extra-commands.md`, test `tools/leave_ground_test.py`.
+First in exe_v39.
+
+- **How a grounded move ends when it leaves the ground (vanilla):** nothing in the executable changes the status.
+  The executable only changes the situation (StatusModule `+0x84`, 0 ground / 1 cliff / 2 air; `+0x88` the last
+  one) when the fighter leaves the ground: with a ground correction that lets it (GroundModule correct kind 1), or
+  by moving up. The fighter's MSC per-frame main (`func_11` in the decompiled fighters) reads it every frame,
+  `global18 = StatusModule(0x1)` (base StatusModule MSC handler `0x0200D6D8` op 1 -> vt `+0xDC` = `0x02E885E0`,
+  `lwz r3, 0x84(r3)`), then runs the status loop (`global16`), which for every grounded move does
+  `if (global18 == 0x2) { func_16(0xE, 0); return; }` (AttackDash `func_273`, the same in every fighter) after the
+  cancel-window check (`CancelModule(0x2713) == 1 && func_39()`: its transitions all check `global18 != 0` first,
+  so none fires in the air). `func_16` -> `global11` (`func_79`) -> `StatusModule(0x3, 0xE, 0)`: op 3
+  (`0x0200D8FC`) calls vt `+0x12C` (`0x02E88618`, byte `+0x96` = arg != 0) and stores the request at `+0x54`.
+  The change itself is vt `+0x16C` = `0x02E88B28` (`+0x4C` = the new kind at `0x02E88B40`, the old status's end
+  scripts, `+0x48` = the new kind at `0x02E88D00`, the new one's scripts), reached from the pending request.
+  - Ground correction: `StatusModule(0x5, situation, kinetic, correct, ...)` (op 5, vt `+0x13C` = `0x02E89154`,
+    "init settings") stores the correction at `+0x78` (vt `+0xF4` = `0x0200D6CC`) and the kinetic kind at `+0x60`
+    (vt `+0x114`). Every dash attack's is `(0, 0xF, 0x2, ...)`: ground, MOTION, cliff stop (common MSC, Diddy's
+    `func_245` = Captain Falcon's), so it never leaves the ground sideways. Fall's is `(2, 0x13, 0x5, ...)`.
+  - The game's own ground / air switch for moves that go on in both (`func_101` / `func_102` in every fighter's
+    MSC): `KineticModule(0, 6); func_20(0); GroundModule(0x2710, 1)` / `KineticModule(0, 0); func_20(2);
+    GroundModule(0x2710, 5)`.
+- **CancelModule:** accessor `+0x94` (MSC sys `0x23`, wrapper `0x030B2F58`, vt `+0x4C`). The fighters'
+  (vtable `0x1012B0C4`, handler `0x02E6FCFC`): `0x2713` returns byte `+0x10` (the cancel window is open), `0x2710`
+  opens it (`0x02E6FBF8`, ACMD `ENABLE_CANCEL`), `0x2711` shuts it (`0x02E6FAC8`: `+0x10` = 0, `+0xC` = -1).
+- **MSC module wrappers:** the syscall table is at `0x104187A0` (`sys_N` = word N): Status `0x18` -> `0x030B2B98`,
+  Ground `0x1A` -> `0x030B2C78` (accessor `+0x2C`, vt `+0x4BC`), Cancel `0x23` -> `0x030B2F58`, Motion `0x12` ->
+  `0x030B2A48` (accessor `+0x44`, vt `+0x2D4`; handler `0x02C6164C`), Kinetic `0x10` -> `0x030B29D8`.
+- **The patch (exe_v39):** a 16-entry table at `0x04B93A00` (`+0` the fighter's StatusModule, `+4` state: 1 off,
+  2 in the air through it, 4 edges kept; `+8` the kinetic type it had; then a round-robin word), code from
+  `0x04B93B10` (both in acmd_ext_cave.py's space between the debug counters and `OBJS`).
+  - The command (`h_lgc`, index 617, CRC `0x224CF650`, 2 words): fighters only (StatusModule vtable
+    `0x1012D42C`); sets the state; on the ground, an edge-stopping move (`+0x78` 2 / 3) gets `GroundModule(0x2710,
+    1)` while off (Enabled 0) and its own back otherwise.
+  - `0x0200D868` (op 1, `lwz r10, 0(r31)`) -> trampoline `0x037EE598` -> `hk_lgc_sit`: off and the situation 2 with
+    a grounded status (`+0x78` 1-3): the kinetic type (KineticModule `+0x11C`) kept, `KineticModule(0, 0)`,
+    `GroundModule(0x2710, 5)`; marked in the air and situation 0 again: that kinetic type and the move's correction
+    back. Returns to `0x0200D86C` by ctr (the cave is out of `b` range).
+  - `0x0200D91C` (op 3, `lwz r11, 0(r31)`; r29 = the words) -> trampoline `0x037EE59C` -> `hk_lgc_req`: a request
+    for Fall (`0xE`) in the air while off and marked in the air, with `MotionModule(0x2712)` (motion ended) and
+    `CancelModule(0x2713)` both 0, is dropped: `0x10(r1)` = r30 and on at `0x0200D948` (no vt `+0x12C`, no `+0x54`).
+    Anything else goes on at `0x0200D920`.
+  - `0x02E88B40` (`stw r28, 0x4C(r30)` in the status change) -> `hk_lgc_chg`: the store, then the fighter's entry
+    cleared (LR is free there: `0x02E88B28` saved it).
+  - The trampolines are the last two words of copy_custom_cave.py's Havok-cave space (its `SPAWN_LIMIT` now
+    `0x037EE598`; zero in exe_v38).
+
 ## Sword trails (trail textures by id)
 
 - `Sword_Glow` / `Sword_Glow2` / `Sword_Trace` take trail texture ids (Ike 4 / 143, Marth 9 / 144,

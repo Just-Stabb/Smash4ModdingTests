@@ -227,6 +227,27 @@ WORK_W = 0x030B2B28              # WorkModule: (6, id) an int
 LAST_ATTACKER = 0x10000065       # a fighter's int: the player slot (fighter table entry, from 0) that hit it last
 ACC_VAR = 0x0F0002BC             # position_vars_cave.py: + target (0-10) = that target's module accessor's bits
 
+# Leave_Ground_Cancel (docs/acmd-extra-commands.md, docs/native-notes.md "Leave_Ground_Cancel"). A grounded move
+# goes to Fall when it leaves the ground because its own MSC loop asks for it: the per-frame MSC main reads the
+# situation (global18 = StatusModule(1): base handler 0x0200D6D8 op 1, StatusModule +0x84; 2 = air) and the status
+# loop does `if (global18 == 2) { func_16(0xE, 0); return; }` (Fall request: StatusModule(3, 0xE, 0), op 3 at
+# 0x0200D8FC stores it at StatusModule +0x54; the change itself is 0x02E88B28, StatusModule vt +0x16C).
+LGC = 0x04B93A00                 # LGC_N entries of 0x10 (zero at load, free after DBG): +0 the fighter's StatusModule
+LGC_N = 16                       # (0 = free), +4 state bits (1 off, 2 in the air through it, 4 still stops at edges),
+                                 # +8 its kinetic type when it went into the air; then the round-robin word
+LGC_CODE = 0x04B93B10            # its code (after the table and its round-robin word), up to OBJS (zero at load)
+LGC_SIT = 0x0200D868             # op 1 (situation read), r31 = StatusModule: lwz r10, 0(r31)
+LGC_REQ = 0x0200D91C             # op 3 (status request), r31 = StatusModule, r29 = words (+4 kind): lwz r11, 0(r31)
+LGC_CHG = 0x02E88B40             # status change (0x02E88B28, r30 = StatusModule, r28 new kind): stw r28, 0x4C(r30)
+LGC_ORIG = {LGC_SIT: 0x815F0000, LGC_REQ: 0x817F0000, LGC_CHG: 0x939E004C}
+LGC_TRAMP = {LGC_SIT: 0x037EE598, LGC_REQ: 0x037EE59C}   # the first two are out of the cave's branch range: `b`
+                                 # trampolines at the end of copy_custom_cave.py's Havok-cave space (its
+                                 # SPAWN_LIMIT lowered to 0x037EE598; zero in exe_v38); the cave jumps back by ctr
+FIGHTER_STATUS_VT = 0x1012D42C   # fighters' StatusModule vtable (vt +0x144 = their MSC handler 0x02E882AC)
+CANCEL_W = 0x030B2F58            # CancelModule (accessor +0x94, vt +0x4C): (0x2713) the cancel window is open
+GROUND_W = 0x030B2C78            # GroundModule (accessor +0x2C, vt +0x4BC): (0x2710, kind) its ground correction
+FALL_KIND = 0xE                  # Fall
+
 _T = ('Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 '
       'player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter\'s own script.')
 _V = 'Float variable that gets the value (e.g. VAR_0 0x0F000300; any float variable).'
@@ -337,6 +358,15 @@ NEW_CMDS = [
     ('Animation_Rate_Set', 'h_arset', [('Rate', 1, 'Multiplier on every animation and the ACMD timed to it (1 = '
                                                    'normal) until set back to 1.')],
      'Speeds up / slows down everything this fighter does (MotionModule +0xF4, the Mii rate).'),
+    ('Leave_Ground_Cancel', 'h_lgc', [('Enabled', 0, '1 on (normal: the move ends in Fall when it leaves the ground); '
+                                                    '0 off: the move goes on in the air, and a move that stops at '
+                                                    'edges (every dash attack) can slide off them; 2 off, but the '
+                                                    'move still stops at edges (it leaves the ground only by moving '
+                                                    'up).')],
+     'Whether this grounded move is cut into Fall when the fighter leaves the ground (walks / slides off an edge, or '
+     'moves up). Off: the move (animation, hitboxes, scripts) goes on in the air with air physics (gravity, air '
+     'drift) until its interrupt frame or its end, then Fall; landing during it, it goes on grounded. Back on by '
+     'itself at the next status (move). Fighters only.'),
 ]
 SM4SHCOMMAND_DESC.update({n: d + ' New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).'
                           for n, _l, _p, d in NEW_CMDS})
@@ -829,6 +859,288 @@ nc_args:
 """)
 
 
+def lgc_code(b):
+    """Leave_Ground_Cancel: the command, its table and the three StatusModule hooks (in CODE2, after the new
+    commands; nc_msc / nc_args / nc_out are theirs)"""
+    def msc2(wrapper, w0, src):
+        """nc_msc(r29, wrapper, 2) with nc_args = {w0, src} (src: a register)"""
+        return """
+        lis r12, nc_args@ha
+        addi r12, r12, nc_args@l
+        li r0, 0x%X
+        stw r0, 0(r12)
+        stw %s, 4(r12)
+        mr r3, r29
+        lis r4, 0x%X
+        ori r4, r4, 0x%X
+        li r5, 2
+        bl nc_msc""" % (w0, src, wrapper >> 16, wrapper & 0xFFFF)
+
+    def msc1(wrapper, w0):
+        return """
+        lis r12, nc_args@ha
+        li r0, 0x%X
+        stw r0, nc_args@l(r12)
+        mr r3, r29
+        lis r4, 0x%X
+        ori r4, r4, 0x%X
+        li r5, 1
+        bl nc_msc""" % (w0, wrapper >> 16, wrapper & 0xFFFF)
+    b.asm("""
+# --- Leave_Ground_Cancel(Enabled): 1 on, 0 off (edges don't stop the move), 2 off (edges still stop it) ---------
+h_lgc:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r26, 0x28(r1)
+        mr r31, r5
+        mr r29, r3
+        li r28, 8
+        lbz r0, 8(r6)
+        cmpwi r0, 0
+        beq nc_out
+        lwz r26, 0(r7)                  # Enabled""" + chk_t('r29', 'r0', 'nc_out') + """
+        lwz r27, 0x20(r29)              # StatusModule""" + chk_t('r27', 'r0', 'nc_out') + """
+        lwz r0, 0(r27)
+        lis r12, 0x%(vth)X
+        ori r12, r12, 0x%(vtl)X
+        cmplw r0, r12
+        bne nc_out                      # fighters only
+        mr r3, r27
+        xori r4, r26, 1                 # an entry is made unless Enabled is 1
+        bl lgc_find
+        mr. r30, r3
+        beq nc_out
+        lwz r0, 4(r30)
+        rlwinm r0, r0, 0, 30, 30        # keep "in the air through it"
+        cmpwi r26, 1
+        beq lgc_lg_st
+        ori r0, r0, 1
+        cmpwi r26, 2
+        bne lgc_lg_st
+        ori r0, r0, 4
+lgc_lg_st:
+        stw r0, 4(r30)
+        andi. r12, r0, 2                # in the air: the landing sets the ground correction
+        bne nc_out
+        lwz r12, 0x84(r27)
+        cmpwi r12, 0
+        bne nc_out
+        mr r4, r0
+        mr r3, r27
+        bl lgc_gc
+        cmpwi r4, 0                     # the status's own isn't an edge-stopping one: leave it
+        beq nc_out
+        mr r26, r3""" % dict(vth=FIGHTER_STATUS_VT >> 16, vtl=FIGHTER_STATUS_VT & 0xFFFF) + msc2(GROUND_W, 0x2710, 'r26') + """
+        b nc_out
+
+# --- lgc_gc(r3 StatusModule, r4 state) -> r3 the ground correction the move gets: its status's own (+0x78), or 1
+#     (slides off edges) for an edge-stopping one (2 / 3) while off with edges not kept; r4 = 1 if its own stops at
+#     edges. Leaf: r0 r3 r4 ---------------------------------------------------------------------------------------
+lgc_gc:
+        andi. r0, r4, 5
+        lwz r3, 0x78(r3)
+        addi r4, r3, -2
+        cmplwi r4, 1
+        li r4, 0
+        bgtlr
+        li r4, 1
+        cmpwi r0, 1
+        bnelr
+        li r3, 1
+        blr
+
+# --- lgc_find(r3 StatusModule, r4 make) -> r3 its entry or 0 (make: a free one, else the next in turn); leaf: r0 r3
+#     r10 r11 r12 -----------------------------------------------------------------------------------------------
+lgc_find:
+        lis r12, lgc_tab@ha
+        addi r12, r12, lgc_tab@l
+        li r11, %(n)d
+        li r10, 0
+lgc_lf_loop:
+        lwz r0, 0(r12)
+        cmplw r0, r3
+        beq lgc_lf_hit
+        cmpwi r0, 0
+        bne lgc_lf_next
+        cmpwi r10, 0
+        bne lgc_lf_next
+        mr r10, r12
+lgc_lf_next:
+        addi r12, r12, 0x10
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne lgc_lf_loop
+        cmpwi r4, 0
+        beq lgc_lf_none
+        cmpwi r10, 0
+        bne lgc_lf_take
+        lis r11, lgc_tab@ha
+        addi r11, r11, lgc_tab@l
+        lwz r12, %(rr)d(r11)            # all taken: the next in turn
+        addi r0, r12, 0x10
+        andi. r0, r0, %(mask)d
+        stw r0, %(rr)d(r11)
+        add r10, r11, r12
+lgc_lf_take:
+        stw r3, 0(r10)
+        li r0, 0
+        stw r0, 4(r10)
+        stw r0, 8(r10)
+        mr r12, r10
+lgc_lf_hit:
+        mr r3, r12
+        blr
+lgc_lf_none:
+        li r3, 0
+        blr
+
+# --- hook: the MSC situation read (StatusModule(1), every frame from the fighter's MSC main, before its status
+#     loop). Off and in the air (a grounded move: its correction 1-3): air kinetics (KineticModule(0, 0)) and air
+#     ground correction (GroundModule(0x2710, 5)), as the game's own air switch does (func_102 in every fighter's
+#     MSC), the kinetic type kept; back on the ground through it: that kinetic type and the move's correction. ----
+hk_lgc_sit:
+        mr r3, r31
+        bl lgc_sit
+        lwz r10, 0(r31)
+        lis r12, 0x%(sit_bh)X
+        ori r12, r12, 0x%(sit_bl)X
+        mtctr r12
+        bctr
+lgc_sit:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stmw r29, 0x14(r1)
+        mr r31, r3
+        li r4, 0
+        bl lgc_find
+        mr. r30, r3
+        beq lgc_ls_ret
+        lwz r29, 4(r31)                 # accessor""" % dict(n=LGC_N, rr=LGC_N * 0x10, mask=LGC_N * 0x10 - 1,
+                                                          sit_bh=(LGC_SIT + 4) >> 16, sit_bl=(LGC_SIT + 4) & 0xFFFF) + chk_t('r29', 'r0', 'lgc_ls_ret') + """
+        lwz r0, 4(r30)
+        lwz r12, 0x84(r31)              # situation
+        andi. r11, r0, 3
+        cmpwi r11, 1                    # off, still on the ground
+        bne lgc_ls_land
+        cmpwi r12, 2
+        bne lgc_ls_ret
+        lwz r11, 0x78(r31)
+        addi r11, r11, -1
+        cmplwi r11, 2
+        bgt lgc_ls_ret                      # not a grounded move
+        ori r0, r0, 2
+        stw r0, 4(r30)
+        lwz r11, 0x34(r29)              # KineticModule: its type (+0x11C) back on landing
+        lwz r11, 0x11C(r11)
+        stw r11, 8(r30)
+        li r4, 0
+        li r5, 5
+        b lgc_ls_set
+lgc_ls_land:
+        andi. r11, r0, 2
+        beq lgc_ls_ret
+        cmpwi r12, 0
+        bne lgc_ls_ret
+        rlwinm r0, r0, 0, 31, 29        # landed: "in the air" off
+        stw r0, 4(r30)
+        mr r4, r0
+        mr r3, r31
+        bl lgc_gc
+        mr r5, r3
+        lwz r4, 8(r30)
+lgc_ls_set:
+        stw r5, 8(r1)""" + msc2(KINETIC_W, 0, 'r4') + """
+        lwz r30, 8(r1)""" + msc2(GROUND_W, 0x2710, 'r30') + """
+lgc_ls_ret:
+        lmw r29, 0x14(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+# --- hook: a status request (StatusModule(3, kind, ...)). Fall asked for while off and in the air through it is
+#     dropped (the move goes on) until the move's cancel window opens (CancelModule(0x2713)) or its motion ends
+#     (MotionModule(0x2712)): then the Fall goes through, as the status's own loop asks for it. -----------------
+hk_lgc_req:
+        mr r3, r31
+        mr r4, r29
+        bl lgc_req
+        cmpwi r3, 0
+        bne lgc_lq_drop
+        lwz r11, 0(r31)
+        lis r12, 0x%(req_bh)X
+        ori r12, r12, 0x%(req_bl)X
+        mtctr r12
+        bctr
+lgc_lq_drop:
+        stw r30, 0x10(r1)               # (the request's result word, as the original path)
+        lis r12, 0x%(skip_h)X
+        ori r12, r12, 0x%(skip_l)X
+        mtctr r12
+        bctr
+lgc_req:
+        lwz r0, 4(r4)
+        cmpwi r0, %(fall)d
+        bne lgc_lq_no
+        lwz r0, 0x84(r3)
+        cmpwi r0, 2
+        bne lgc_lq_no
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stmw r29, 0x14(r1)
+        mr r31, r3
+        li r4, 0
+        bl lgc_find
+        cmpwi r3, 0
+        beq lgc_lq_0
+        lwz r0, 4(r3)
+        andi. r0, r0, 3
+        cmpwi r0, 3
+        bne lgc_lq_0
+        lwz r29, 4(r31)""" % dict(req_bh=(LGC_REQ + 4) >> 16, req_bl=(LGC_REQ + 4) & 0xFFFF, skip_h=0x0200D948 >> 16,
+                             skip_l=0x0200D948 & 0xFFFF, fall=FALL_KIND) + chk_t(
+        'r29', 'r0', 'lgc_lq_0') + msc1(MOTION_W, 0x2712) + """
+        cmpwi r3, 0
+        bne lgc_lq_0
+        lwz r0, 0x94(r29)
+        cmpwi r0, 0
+        beq lgc_lq_1""" + msc1(CANCEL_W, 0x2713) + """
+        cmpwi r3, 0
+        bne lgc_lq_0
+lgc_lq_1:
+        li r3, 1
+        b lgc_lq_ret
+lgc_lq_0:
+        li r3, 0
+lgc_lq_ret:
+        lmw r29, 0x14(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+lgc_lq_no:
+        li r3, 0
+        blr
+
+# --- hook: every status change (0x02E88B28): the fighter's entry goes (the next move starts on) --------------
+hk_lgc_chg:
+        stw r28, 0x4C(r30)
+        mr r3, r30
+        li r4, 0
+        bl lgc_find
+        cmpwi r3, 0
+        beq lgc_lc_back
+        li r0, 0
+        stw r0, 0(r3)
+        stw r0, 4(r3)
+lgc_lc_back:
+        b 0x%(chg_back)08X
+""" % dict(chg_back=LGC_CHG + 4))
+
+
 def ha(v):
     return ((v + 0x8000) >> 16) & 0xFFFF
 
@@ -1083,6 +1395,10 @@ next_entry:
     input_code(a)
     b2 = Asm(CODE2)                     # the new commands (their labels resolve with the main part's, below)
     newcmd_code(b2)
+    b3 = Asm(LGC_CODE)                  # Leave_Ground_Cancel (its own space: CODE2 is full)
+    lgc_code(b3)
+    assert not set(b3.labels) & (set(a.labels) | set(b2.labels)), set(b3.labels) & (set(a.labels) | set(b2.labels))
+    a.labels.update(b3.labels)
     b2.asm('cmd_crcs:\n' + ''.join('        .word 0x%08X\n' % crc(c[0]) for c in COMMANDS))
     b2.asm('cmd_sizes:\n' + ''.join('        .word %d\n' % c[1] for c in COMMANDS))
     a.labels.update(b2.labels)
@@ -1103,14 +1419,20 @@ scratch:                                # scale_int: a double, then 2^52 + 2^31
     a.labels['acc_cache'] = ACC_CACHE
     a.labels['threads'] = THREADS
     a.labels['dbg'] = DBG
+    a.labels['lgc_tab'] = LGC
+    assert DBG + 0x100 <= LGC and LGC + LGC_N * 0x10 + 4 <= OBJS
     assert TABLE + ENTRIES * ENTRY + 8 * DI_SLOTS <= DBG and DBG + 0x100 <= OBJS
     assert a.addr('scratch') % 8 == 0, hex(a.addr('scratch'))
     b2.labels.update(a.labels)
+    b3.labels.update(a.labels)
     words = a.words()
     assert CAVE + 4 * len(words) <= TABLE, hex(CAVE + 4 * len(words))
     words2 = b2.words()
     assert THREADS + THREAD_N * THREAD_SIZE <= CODE2 and CODE2 + 4 * len(words2) <= GROW, hex(CODE2 + 4 * len(words2))
     a.part2 = (CODE2, words2)
+    words3 = b3.words()
+    assert LGC + LGC_N * 0x10 + 4 <= LGC_CODE and LGC_CODE + 4 * len(words3) <= OBJS, hex(LGC_CODE + 4 * len(words3))
+    a.part3 = (LGC_CODE, words3)
     assert ACC_CACHE + 64 * 8 <= THREADS and THREADS + THREAD_N * THREAD_SIZE <= GROW <= LIMIT
     hooks = {LOOKUP: b(LOOKUP, a.addr('lookup')), SIZE1: b(SIZE1, a.addr('size1')),
              SIZE2: b(SIZE2, a.addr('size2')), FETCH: b(FETCH, a.addr('fetch')),
@@ -1118,6 +1440,10 @@ scratch:                                # scale_int: a double, then 2^52 + 2^31
              HIT_AMUL: b(HIT_AMUL, a.addr('hk_amul')), HIT_AFIX: b(HIT_AFIX, a.addr('hk_afix')),
              DI_STAT: b(DI_STAT, a.addr('di_check')),   # was bnelr: di_check tests cr0
              SLOT_SET: b(SLOT_SET, a.addr('slot_set')),
+             LGC_SIT: b(LGC_SIT, LGC_TRAMP[LGC_SIT]), LGC_REQ: b(LGC_REQ, LGC_TRAMP[LGC_REQ]),
+             LGC_TRAMP[LGC_SIT]: b(LGC_TRAMP[LGC_SIT], a.addr('hk_lgc_sit')),
+             LGC_TRAMP[LGC_REQ]: b(LGC_TRAMP[LGC_REQ], a.addr('hk_lgc_req')),
+             LGC_CHG: b(LGC_CHG, a.addr('hk_lgc_chg')),
              FRAME_HOOK: b(FRAME_HOOK, a.addr('hk_frame')), WM_RESET: b(WM_RESET, a.addr('hk_wmreset')),
              VAR_ENTRY: b(VAR_ENTRY, a.addr('user_gate'))}
     for k, h in enumerate(STEP_HOOKS):
@@ -2809,6 +3135,7 @@ def main():
     out = ['grow:0x%08X' % LIMIT]
     out += ['0x%08X=0x%08X' % (CAVE + 4 * i, w) for i, w in enumerate(words)]
     out += ['0x%08X=0x%08X' % (a.part2[0] + 4 * i, w) for i, w in enumerate(a.part2[1])]
+    out += ['0x%08X=0x%08X' % (a.part3[0] + 4 * i, w) for i, w in enumerate(a.part3[1])]
     out += ['0x%08X=0x%08X' % kv for kv in sorted(hooks.items())]
     print(' '.join(out))
     sys.stderr.write('acmd ext: %d words, %s\n' % (len(words), ', '.join(

@@ -24,6 +24,24 @@ import zlib
 END = 0x5766F889
 _INFO = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "acmd_info.json")))["commands"]
 INFO = {int(k, 16): v for k, v in _INFO.items()}
+
+
+def _new_commands():
+    """the executable's new commands (tools/acmd_ext_cave.py NEW_CMDS) that acmd_info.json doesn't list yet
+    (e.g. Leave_Ground_Cancel, before Sm4shCommand's tables are regenerated)"""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import acmd_ext_cave as ext
+    except Exception:
+        return
+    for name, _label, params, _desc in ext.NEW_CMDS:
+        ident = zlib.crc32(name.encode()) & 0xFFFFFFFF
+        if ident not in INFO:
+            INFO[ident] = {"size": 1 + len(params), "name": name, "format": [t for _n, t, _d in params],
+                           "syntax": [n for n, _t, _d in params]}
+
+
+_new_commands()
 BY_NAME = {v["name"].lower(): k for k, v in INFO.items()}
 
 

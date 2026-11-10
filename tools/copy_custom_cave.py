@@ -91,7 +91,8 @@ SPAWNERS = [
 GROWN = 0x04B9E000             # grown code space (trail_table_cave.py's LIMIT)
 GROWN_LIMIT = 0x04BA0000       # kind_expand.py from here
 NEAR = 0x02B00000              # hooks below this use the Havok cave
-SPAWN_LIMIT = 0x037EE5A0       # copy_held_cave.py from here
+SPAWN_LIMIT = 0x037EE598       # acmd_ext_cave.py's Leave_Ground_Cancel trampolines from here, copy_held_cave.py from
+                               # 0x037EE5A0
 
 
 def D(op, rd, ra, imm): return (op << 26) | (rd << 21) | (ra << 16) | (imm & 0xFFFF)

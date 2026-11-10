@@ -36,6 +36,7 @@ them too.
 | `Motion_Get` / `Motion_Set`, `Animation_Rate_Set` | the animation playing, its frame and rate |
 | `Last_Hit_Get`, `Target_Slot_Get` | the last fighter hit / the last attacker, any target's player slot |
 | `Status_*`, `Hitstun_*`, `Hitstop_Set`, `Damage_*`, `Body_State_Set`, `Armor_Set`, `Item_State_Set`, `Stage_Collision_Set`, `Joint_Position_Get` | the variable-based features (docs/position-variables.md) as commands with parameters |
+| `Leave_Ground_Cancel` | whether a grounded move is cut into Fall when the fighter leaves the ground (exe_v39; not in Sm4shCommand's list yet) |
 
 ## Extra_Special_Hitbox / Extra_Extended_Special_Hitbox
 
@@ -416,6 +417,68 @@ Hitstop_Set(Target=2, Frames=8, Shake=1)
 Body_State_Set(Target=0, State=0, Frames=0xA)              // intangible for 10 frames
 ```
 
+## Leave_Ground_Cancel
+
+`Leave_Ground_Cancel(Enabled)` (exe_v39 and later) decides whether this grounded move is cut short when the
+fighter leaves the ground: walks or slides off an edge, or is moved up off it. Normally (on) the move ends there
+and the fighter goes to Fall. Off, the move goes on in the air: its animation, hitboxes, effects and the rest of
+its scripts, with air physics.
+
+| Enabled | Meaning |
+|---|---|
+| 1 | on: the normal game (the move ends in Fall when the fighter leaves the ground) |
+| 0 | off: the move goes on in the air, and a move that stops at edges can slide off them |
+| 2 | off, but the move still stops at edges: it leaves the ground only by moving up |
+
+- **Edges:** in Smash 4 most ground moves stop at edges (their ground correction is 2, "cliff stop": every dash
+  attack, from the common `StatusModule(0x5, 0, 0xF, 0x2, ...)`), so they never leave the ground sideways. With
+  `Enabled=0` such a move gets correction 1 (slides off, as a walk does) while it's on the ground, so a dash
+  attack runs off the stage. `Enabled=2` keeps the stop. A move that already slides off (correction 1) is left as
+  it is.
+- **In the air:** the frame the fighter is in the air, it gets the air kinetics and stage collision the game's own
+  ground / air moves switch to (`KineticModule(0, 0)` + `GroundModule(0x2710, 5)`, `func_102` in every fighter's
+  MSC; kinetic 0 = FALL: gravity, air drift and air friction, the speed it had carried on). The animation keeps
+  playing (the status doesn't change).
+- **Ending:** the move ends in Fall at its interrupt frame (its cancel window opening: `CancelModule(0x2713)`, the
+  move's cancel frame from the vl file, or `ENABLE_CANCEL`) or at the end of its animation, whichever comes first;
+  in Fall it can act again (aerials, jump, specials).
+- **Landing during it:** the move goes on, grounded (no landing, no landing lag), back on the kinetic type it had
+  and its own ground correction (correction 1 for an edge-stopping move while the command is still off, so it can
+  run off the next edge too), until it ends as it normally would.
+- **Reset:** back on by itself at the next status change (the next move, Fall, a hit, ...), so it never carries
+  into another move. Turning it back on in the air (`Enabled=1`) ends the move in Fall on the next frame. It stays
+  through a motion change inside one status (e.g. a smash attack's charge and swing, when they are one status).
+- **Fighters only** (Kirby's copies too). In an article's script it does nothing.
+- **Only the leave-ground Fall is held back.** A move's own MSC loop asks for Fall every frame it's in the air
+  (`if (global18 == 2) { func_16(0xE, 0); return; }`) and returns there, so the rest of that loop doesn't run in
+  the air: a move that ends through its own MSC (a smash charge's hold, a rapid jab's loop, a move that changes its
+  motion from MSC) won't end in the air until it reaches its interrupt frame, its animation's end, or the ground.
+  Use it on moves that end by their animation (dash attacks, tilts, jabs, smashes' swings, ...), or turn it back
+  on at a frame in the script.
+- **Ledges:** no ledge grab during the move (the move isn't Fall).
+- **Not tested in game yet**, only in the emulator (`tools/leave_ground_test.py`): the momentum the move carries
+  into the air, and which kinetic type feels right, are to be checked in game.
+
+Example: Diddy Kong's dash attack (`attackdash`, game script) keeps cartwheeling off the stage.
+
+```
+Leave_Ground_Cancel(Enabled=0)
+FRAME(Frames=9)
+Hitbox(ID=1, Part=0, Bone=0, Damage=2, Angle=0x28, KBG=0x64, FKB=0x37, BKB=0, Size=3.5, X=0, Y=7, Z=8.5, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=1, SFXType=1, Ground/Air=0x80000003, Direct/Indirect=1, Type=6)
+WAIT(Frames=1)
+Remove_All_Hitboxes()
+FRAME(Frames=18)
+Hitbox(ID=0, Part=0, Bone=0, Damage=2, Angle=0x16E, KBG=0x64, FKB=0x3E, BKB=0, Size=3.5, X=0, Y=7, Z=8.5, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=1, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=6)
+WAIT(Frames=1)
+Remove_All_Hitboxes()
+FRAME(Frames=24)
+Hitbox(ID=0, Part=0, Bone=0, Damage=3, Angle=0x4E, KBG=0x5A, FKB=0, BKB=0x50, Size=4.5, X=0, Y=6, Z=8.5, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=6)
+WAIT(Frames=1)
+Remove_All_Hitboxes()
+```
+
+`tools/acmd.py` reads and writes it (`Command(acmd.BY_NAME['leave_ground_cancel'], [0])`).
+
 ## Debug counters
 
 Words at `0x04B93900` (Cemu: Debug > Memory, go to the address), all 0 at boot, counting up across
@@ -528,4 +591,7 @@ to do that.
 - **The new commands' targets:** `position_vars_cave.py`'s variable `0x0F0002BC + target` (read only) gives the
   target's module accessor; the commands then run the module's MSC op through its wrapper with that accessor, as
   the position variables do (`nc_msc`). Their code is the cave's second part (`0x04B98900`).
+- **Leave_Ground_Cancel:** a 16-entry table keyed by the fighter's StatusModule (`0x04B93A00`, its code from
+  `0x04B93B10`) and three hooks on the game's StatusModule: the MSC situation read, the MSC status request and the
+  status change. Details: `docs/native-notes.md`, "Leave_Ground_Cancel".
 - Addresses: `docs/native-notes.md`, "New ACMD commands".
