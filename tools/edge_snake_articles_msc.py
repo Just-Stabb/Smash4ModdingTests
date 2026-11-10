@@ -31,6 +31,7 @@ HI3_STATUS = 0x29                      # his status in up tilt (AttackHi3)
 RUNS = 12
 FX_EVERY = 6                           # frames between the point's flashes while the sword grows
 TIP_LEN = 3.48                         # the point's length (tools/edge_snake_articles.py)
+SN_GUARD_R = 22.0                      # test 150: a guarding fighter's middle this near the point: it was shielded
 
 COMMON = r'''
 // ---- Sephiroth's held forward air (tools/edge_snake_articles_msc.py)
@@ -351,16 +352,50 @@ void func_46()
 // test 148, the user: "Make the tip of snakesword not disappear when being shielded, if it is shielded, make it unable to
 // hit the same character as it hit previously until the snakesword is being pulled back to where it came from". A shield
 // hit no longer removes it (tools/extra_kinds.json snaketip "on_hit_bits" 0x17: the shield result asks for its status
-// 0, which it is in) and leaves the shielding fighter in its hit record, so it isn't hit again; it was shielded if this
-// frame's hit kinds hold the shield's (AttackModule 0x2726 with mask 0x4: 1 << 2, docs/native-notes.md). Once the
-// sword goes back (the drawn length, his VAR_30, shorter than last frame: only the retract shortens it), motion 1
-// (`snaketipclear`, tools/edge_specials_build.py) clears its records and sets its hitbox again, so from then on it can
-// hit that fighter. Not shielded: no change (a fighter it caught stays out of its record and isn't hit twice)
+// 0, which it is in) and leaves the shielding fighter in its hit record, so it isn't hit again. Once the sword goes back
+// (the drawn length, his VAR_30, shorter than last frame: only the retract shortens it), motion 1 (`snaketipclear`,
+// tools/edge_specials_build.py) clears its records and sets its hitbox again on Part 1 (a dein copy's other hit record:
+// new, whatever the clear did), so from then on it can hit that fighter.
+// Test 150 (the user: "the snake tip doesn't reactivate when Sephiroth releases the button/on its way back to the
+// hilt"): test 148 took "shielded" only from this frame's hit kinds (AttackModule 0x2726 with mask 0x4), which may never
+// report a shield hit on a weapon; now also a fighter guarding (status 0x1B - 0x1E, docs/position-variables.md) whose
+// middle is within SN_GUARD_R of the point, any frame the sword grows, counts; and the way back's hitbox is on Part 1, a
+// record of its own. A fighter it caught can be hit once more on the way back only then (a shield in the move)
+int sn_guard_near()
+{
+    int s;
+    float st;
+    float dx;
+    float dy;
+    s = 0;
+    while (s < 0x8)
+    {
+        if (s != sn_slot && WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
+        {
+            st = WorkModuleF(0, 0x0f0000a0 + 0x8 * (s + 0x3) + 0x2);
+            if (st >= 27.0f && st <= 30.0f)
+            {
+                dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - PostureModuleF(0x1);
+                dy = WorkModuleF(0, 0x0f000021 + 0x4 * s) + 8.0f - PostureModuleF(0x2);
+                if (dx * dx + dy * dy < SN_GUARD_Rf * SN_GUARD_Rf)
+                {
+                    return 0x1;
+                }
+            }
+        }
+        s += 1;
+    }
+    return 0;
+}
+
 void sn_shield_check(float before)
 {
-    if (sn_shld == 0 && AttackModule(0x2726, 0x4))
+    if (sn_shld == 0 && sn_last >= before - 0.5f)
     {
-        sn_shld = 0x1;
+        if (AttackModule(0x2726, 0x4) || sn_guard_near())
+        {
+            sn_shld = 0x1;
+        }
     }
     if (sn_shld == 0x1 && sn_last < before - 0.5f)
     {
@@ -415,7 +450,7 @@ def generate(base_c, own):
     code = code.replace('HI3_Hf', '%.2ff' % HI3_H).replace('HI3_Vf', '%.2ff' % HI3_V)
     code = code.replace('HI3_STATUSf', '%.1ff' % HI3_STATUS)
     code = code.replace('SN_LIFE', '900').replace('RUNS', str(RUNS)).replace('FX_EVERY', str(FX_EVERY))
-    code = code.replace('TIP_LENf', '%.2ff' % TIP_LEN)
+    code = code.replace('TIP_LENf', '%.2ff' % TIP_LEN).replace('SN_GUARD_Rf', '%.1ff' % SN_GUARD_R)
     return text.rstrip('\n') + '\n' + code
 
 

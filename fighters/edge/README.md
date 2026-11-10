@@ -2445,3 +2445,67 @@ User: "Make the snake sword's tip unclankable", "Uncharged side special should r
 - Package (install over test 148): `script/animcmd/weapon/fill/game.bin`, `script/animcmd/weapon/snaketip/game.bin`,
   `script/msc/edge.mscsb`, `script/msc/flare1/flare1.mscsb`. No executable (test 148's exe_v36 stays).
 
+## Test 150 (`$S/sephiroth_test150.zip`, not in build/: disk): held Octaslash hittable (again), Shadow Flare faster, the tip again on the way back, the shape's boost, up air / forward smash 2x sword
+
+User (screenshots: Sephiroth high above Smashville's main platform with Donkey Kong on it; his up air's arc): "Held
+Octaslash still has invulnerablity/intangibility, please make side special move a bit faster, the snake tip doesn't
+reactivate when Sephiroth releases the button/on its way back to the hilt. Please make uncharged side special reach a bit
+further", "when Sephiroth completes a shape and held Octaslash ends (not just when held Octaslash is released),
+Sephiroth gets a single vertical height speed boost that puts him about as high as he is in the attached screenshot, and
+full air drift into special fall", "double the size and reach of Sephiroth's sword during up air and adjust the hitboxes
+to match. Only begin making the sword larger 2 frames before the sword effect spawn", "Please do the same to forward
+smash".
+- **Held Octaslash's invulnerability, looked for again:** no intangibility, invincibility or armor beyond test 149's 3%
+  is set for it anywhere I can read: his MSC for 0x154 / 0x159 / 0x15A (no HitModule, VisibilityModule or ShieldModule
+  call; the status data `StatusModule(0x2713, 0, 1, 0, 0, 0, 0x422, 0, 0x100, 0)` is Zelda's own warp's but for
+  `0x10040000`: knockdown 0, footstool, grab immunity off), its scripts (no Body_Collision / Set_Bone_Intangibility /
+  Set_Armor; only up tilt's head and three unrelated common motions have any), the vl (motions 0x231 - 0x23F: intangible
+  0 - 0, the same file as test 73's), Zelda's native code (her specializer vtable `0x10147F34` and its callees two deep
+  compare no up-special status or motion number; the counter cave acts only in 0x155), the hurtboxes (vl group 5, Zelda's
+  7 on HipN / BustN / HeadN / arms / knees: in d02specialhi2 they stay on his body, ~8 - 14 up), and the per-frame hooks
+  (the blast-zone keep-in moves others only). What does stop a melee fighter (the user's Donkey Kong has no projectile):
+  the held slashes (test 134's design) are out every other frame all round him, ~27 from his middle, each a fixed 89
+  knockback (36 frames of hitstun) re-hitting every 2 frames, so anyone walking in is pushed away before their attack
+  reaches him, and he keeps up with them (2.4 a frame against their 2.7, slowing). A projectile should hit him; please
+  test with one (Mario's fireball, Link's arrow).
+  - Changed anyway (`edge.c` edge_hi_hittable): every frame of the held rush his body state goes back to normal: whole
+    body `HitModule(0x2710, 0)`, timed intangible `HitModule(2, 0)` and invincible `HitModule(1, 0, 0)` frames 0, so
+    whatever might set it, it can't hold. The 3% armor stays.
+  - If he still can't be hit by a projectile, something native is at work and I need a Cemu debugger break or clip. If
+    he can, the push-away is the cause and the choice is the user's: e.g. a hit once per pass, less hitstun, or less
+    reach.
+- **Shadow Flare** (`weapons/flare1.c`): uncharged reach 40% of the full (56 of 140: a flight of 44; test 149: 1/3,
+  46.7), full unchanged (128, 140 from him); ~25% faster: 6 + 7 r frames (6 - 13; were 6 - 16), 7.33 - 9.85 a frame
+  (were 5.78 - 8). The hitbox (12 long) still covers each frame's move; the line (test 148) takes a point each frame.
+- **The tip on the way back** (`edge_snake_articles_msc.py` sn_shield_check / sn_guard_near, `edge_specials_build.py`):
+  test 148 switched to `snaketipclear` only if `AttackModule(0x2726, 0x4)` (a shield among this frame's hit kinds)
+  reported the shield, which on a weapon may never happen: then nothing cleared its record and it never hit them again.
+  Now "shielded" is also a fighter guarding (status 0x1B - 0x1E) whose middle is within 22 of the point while the sword
+  grows, and the way back's hitbox (motion 1, after `Hit_Log_Clear(-1)`) is on Part 1, a hit record of its own, so it
+  can hit the shielding fighter whatever the clear did. Its hitbox is out all the way back as before (Clang 0, test
+  149).
+- **The shape's boost** (`edge.c` edge_hi_to_end, edge_hi_end_air_main, edge_hi_end_loop): when a shape ends held
+  Octaslash (VAR_20 3), the end is always the air end (lifted off if on the ground), its y speed sqrt(2 g h), g his
+  gravity (0x3000018, 0.108), h 48 (the screenshot: him ~48 above the main platform, from its 139.3 width = ~615 px and
+  Donkey Kong's height): about 3.2 a frame, a rise of ~48 from where the move ended; his own gravity, the fall cap back
+  once he falls, full air drift (control x 1) from its first frame (the plain air end: x 0.5 from frame 18), no landing
+  in its first 3 frames, then SpecialFall with its air speed x 1. Once a shape (VAR_20 is 3 for that end only). The
+  finisher (angle 366 into the shape) as before.
+- **Up air / forward smash, the sword 2x** (`edge.c` edge_sw_tick / edge_sw_scale, `edge_specials_build.py`
+  sword2x_scripts): the blade's joint (EdgeBladeL, 1003, at LHaveN's origin; the snake sword hides it the same way)
+  scaled by his motion and frame: up air (0x6B) 1.33 / 1.67 at 15 / 16, 2 from 17 (its Sword_Glow, Ultimate's
+  AFTER_IMAGE4_ON) to 28, back over 29 - 31; forward smash (0x5F) from 21, 2 from 23 (its trail) to 30, back over 31 -
+  33; 1 in every other motion (set every frame unless the held forward air / up tilt has hidden it). In the 2x frames:
+  the hitboxes on LHaveN offsets and size x 2 (up air X 0.5 / 7 / 14 / 21 -> 1 / 14 / 28 / 42, size 4 -> 8, Z 3 -> 6;
+  forward smash X 0 / 7 / 15 / 21.5 -> 0 / 14 / 30 / 43, size 8, Y / Z -1 / 4 -> -2 / 8), forward smash's ID 5 on his
+  root (the sword's far part) Z 16.5 -> 26.5 (twice as far beyond ID 1 by his hand) and size 5.5 -> 11, ID 1 as it was;
+  the trail's points x 2 (X2 30.2 -> 60.5), the sword lights on LHaveN (edge_sword_light*, External_Graphic) x 2. The
+  scale is uniform about LHaveN's origin, so the blade is twice as wide too and starts a little further from the hilt.
+- **Tested:** builds, `msc_stack_check` 0 problems (edge / flare1 / snaketip); the built scripts differ from test 149's
+  only in AttackAirHi / AttackS4 (game and effect: the numbers above) and the tip's motion 1 (Part 1).
+  `tools/edge_armor_test.py` still 0 failed. Not tested in game (no game runtime here): the boost height, the 2x sword's
+  look, the tip.
+- port_check over the chain + tests 148 / 149 + this: 42 errors, 57 warnings, 4 notes, the same as without it.
+- Package (install over test 149): `script/animcmd/body/game.bin`, `effect.bin`, `script/animcmd/weapon/snaketip/
+  game.bin`, `script/msc/edge.mscsb`, `flare1/flare1.mscsb`, `snaketip/snaketip.mscsb`.
+

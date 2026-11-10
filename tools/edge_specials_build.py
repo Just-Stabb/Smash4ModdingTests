@@ -136,6 +136,7 @@ def body_scripts(a, fighter, param):
         log += snake_article_scripts(fighter, hit, glow) + '\n'
         log += fill_scripts(fighter, hit) + '\n'
     log += octaslash_loop_scripts(game, effect)
+    log += sword2x_scripts(game, effect)
     game.save(os.path.join(out, 'game.bin'))
     effect.save(os.path.join(out, 'effect.bin'))
     if a.sound:
@@ -328,6 +329,70 @@ def octaslash_loop_scripts(game, effect):
             'angle %d FKB %d by position; the finisher 366 after a shape, no hitlag while held\n' % (n, OCTA_HELD_ANGLE, OCTA_HELD_FKB))
 
 
+# test 150, the user: "double the size and reach of Sephiroth's sword during up air and adjust the hitboxes to match. Only
+# begin making the sword larger 2 frames before the sword effect spawn. Please do the same to forward smash". edge.c
+# edge_sw_tick scales the blade's joint (EdgeBladeL, 1003, at LHaveN's origin: tools/snake_sword.py) by SWORD2X_SCALE from
+# 2 frames before the move's Sword_Glow (grow, scale, shrink back after the trail's gone: SWORD2X below, motion frames);
+# here, in the frames the blade is 2x (from the trail's frame to the shrink): the hitboxes on LHaveN (joint 24, 0x18)
+# have their offsets and size x 2 (scaled about LHaveN's origin, as the blade is), the trail's points (Sword_Glow, on
+# LHaveN) x 2, and the sword's lights on LHaveN (edge_sword_light*: External_Graphic) x 2 in size and offset. Forward
+# smash's hitbox ID 5 (on his root, at the sword's far part, 10 beyond the hand's ID 1 along Z) goes twice as far from
+# ID 1 (Z 6.5 + 2 x (Z - 6.5)) at twice its size; ID 1 (by his hand) as it was
+SWORD2X_SCALE = 2.0
+SWORD2X_JOINT = 0x18
+SWORD2X = {'AttackAirHi': (15.0, 29.0), 'AttackS4': (21.0, 31.0)}   # (grow from, shrink from): edge.c edge_sw_scale
+
+
+def sword2x_scripts(game, effect):
+    k = SWORD2X_SCALE
+    hb = ('Hitbox', 'Special_Hitbox', 'Extended_Hitbox', 'Extended_Special_Hitbox')
+    log = []
+    for name, (grow, shrink) in SWORD2X.items():
+        crc = acmd.crc(name)
+        full = grow + 2.0                          # the trail's frame: the blade at 2x from here to `shrink`
+        n_hit = n_fx = 0
+        out = []
+        for f, body in _frames(game.scripts[crc]):
+            if full <= f < shrink:
+                nb = []
+                for c in body:
+                    if c.name in hb:
+                        syn = acmd.INFO[c.ident]['syntax']
+                        g = lambda key: c.params[syn.index(key)]   # noqa: E731
+                        if g('Bone') == SWORD2X_JOINT:
+                            kw = dict(Size=g('Size') * k, X=g('X') * k, Y=g('Y') * k, Z=g('Z') * k)
+                            if 'X2' in syn:
+                                kw.update(X2=g('X2') * k, Y2=g('Y2') * k, Z2=g('Z2') * k)
+                            c = _set(c, **kw)
+                            n_hit += 1
+                        elif name == 'AttackS4' and g('ID') == 5:
+                            c = _set(c, Size=g('Size') * k, Z=6.5 + k * (g('Z') - 6.5))
+                            n_hit += 1
+                    nb.append(c)
+                body = nb
+            out.append((f, body))
+        game.scripts[crc] = _join(out)
+        eout = []
+        for f, body in _frames([c for c in effect.scripts[crc] if c.ident != acmd.END]):
+            if full <= f < shrink:
+                nb = []
+                for c in body:
+                    syn = acmd.INFO[c.ident]['syntax']
+                    if c.name == 'Sword_Glow':
+                        c = _set(c, **{key: c.params[syn.index(key)] * k for key in ('X1', 'Y1', 'Z1', 'X2', 'Y2', 'Z2')})
+                        n_fx += 1
+                    elif c.name == 'External_Graphic' and c.params[syn.index('Bone')] == SWORD2X_JOINT:
+                        c = _set(c, **{key: c.params[syn.index(key)] * k for key in ('X', 'Y', 'Z', 'Size')})
+                        n_fx += 1
+                    nb.append(c)
+                body = nb
+            eout.append((f, body))
+        effect.scripts[crc] = _join(eout) + [acmd.Command(acmd.END)]
+        assert n_hit and n_fx, (name, n_hit, n_fx)
+        log.append('%s %d hitboxes / %d sword effects x %g (frames %g - %g)' % (name, n_hit, n_fx, k, full, shrink - 1))
+    return 'sword 2x: %s\n' % '; '.join(log)
+
+
 def _frames(cmds):
     """[(frame, [commands after that FRAME up to the next])], the commands before any FRAME at frame 0"""
     out, cur, f = [], [], 0.0
@@ -446,7 +511,10 @@ def snake_article_scripts(fighter, hit_template, glow_template):
             # (motion 0's Sword_Glow has Terminate 1, taken as ending with its motion)
             clear = U.cmd('Hit_Log_Clear', -1)
             motions.append(acmd.crc(SNAKE_TIP_CLEAR))
-            scripts['game'][motions[1]] = [clear, tip, acmd.Command(acmd.END)]
+            # test 150 (the user: "the snake tip doesn't reactivate ... on its way back to the hilt"): its hitbox on Part 1,
+            # a hit record of its own (a dein copy has Parts 0 - 1), so the way back can hit the shielding fighter even if
+            # the clear leaves a shield's record
+            scripts['game'][motions[1]] = [clear, _set(tip, Part=1), acmd.Command(acmd.END)]
             scripts['effect'][motions[1]] = effect
             scripts['sound'][motions[1]] = stop
         for fn in ('game', 'effect', 'sound'):

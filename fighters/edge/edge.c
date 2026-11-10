@@ -1775,6 +1775,7 @@ void func_82()
     edge_hi_air_tick();                // Sephiroth: up special once per air time (test 113)
     edge_tr_tick();                    // ... its trail's shapes (test 126)
     edge_s_line_tick();                // Shadow Flare's shot as a line while it flies (test 148)
+    edge_sw_tick();                    // up air / forward smash: the blade at 2x (test 150)
     edge_hi_keep_in();                 // ... Octaslash's victims kept in the blast zones (test 127)
     if (!global3)
     {
@@ -39138,6 +39139,63 @@ void edge_s_line_tick()
     }
 }
 
+// test 150, the user: "double the size and reach of Sephiroth's sword during up air and adjust the hitboxes to match.
+// Only begin making the sword larger 2 frames before the sword effect spawn. Please do the same to forward smash". The
+// blade's joint (EdgeBladeL, 1003: at LHaveN's origin, the blade's mesh on it, the hilt on LHaveN; the snake sword hides
+// it the same way, edge_sn_blade_hide) scaled by his motion and its frame (his own hit / status variables q 3 / 4,
+// 0x0F0000A3 / A4): up air (0x6B) from frame 15 (its Sword_Glow at 17), forward smash (0x5F) from 21 (its trail at 23),
+// 1.33 / 1.67 / 2 over the two frames before the trail and its frame, 2 until the trail is gone (29 / 31: up air's ends
+// at 23 + 5, forward smash's at 28 + 2), back to 1 over 3 frames; 1 in every other motion (so a move cut short leaves
+// it normal), set every frame unless the held forward air / up tilt has it hidden (edge_sn_hid). The scripts' hitboxes,
+// trail and sword lights match from the trail's frame (tools/edge_specials_build.py sword2x_scripts: SWORD2X)
+float edge_sw_scale(int m, float f)
+{
+    float a;
+    float b;
+    if (m == 0x6b)
+    {
+        a = 15.0f;
+        b = 29.0f;
+    }
+    else if (m == 0x5f)
+    {
+        a = 21.0f;
+        b = 31.0f;
+    }
+    else
+    {
+        return 1.0f;
+    }
+    if (f < a || f >= b + 3.0f)
+    {
+        return 1.0f;
+    }
+    if (f < a + 2.0f)
+    {
+        return 1.0f + (f - a + 1.0f) / 3.0f;
+    }
+    if (f < b)
+    {
+        return 2.0f;
+    }
+    return 2.0f - (f - b + 1.0f) / 3.0f;
+}
+
+void edge_sw_tick()
+{
+    int m;
+    float f;
+    float k;
+    if (edge_sn_hid)
+    {
+        return;
+    }
+    m = (int)WorkModuleF(0, 0x0f0000a3);
+    f = WorkModuleF(0, 0x0f0000a4);
+    k = edge_sw_scale(m, f);
+    ModelModule(0, 0x3eb, k, k, k);
+}
+
 // the rush's y: the stop energy's plus the gravity energy's (test 106: in the air the rush's y is on the gravity
 // energy, edge_hi_rush_set)
 float edge_hi_vy()
@@ -39629,9 +39687,38 @@ void edge_hi_rush_main()
     func_78(edge_hi_rush_loop);
 }
 
+// test 150, the user: "make it so when Sephiroth completes a shape and held Octaslash ends (not just when held Octaslash
+// is released), Sephiroth gets a single vertical height speed boost that puts him about as high as he is in the attached
+// screenshot, and full air drift into special fall" (the screenshot: Smashville, him about 48 above the main platform,
+// measured against its 139.3 width and Donkey Kong's height). The forced end after a shape (VAR_20 3, set once a shape
+// is made in held Octaslash: edge_tr_steps) is always the air end now (lifted off the ground), its y speed
+// sqrt(2 g h) with his own gravity g (0x3000018) and h = edge_hi_boost_h(): a rise of about 48 from where the shape
+// ended the move; his own gravity (not the end's 0.12), the fall capped again from the top (the rise's cap lifted to
+// 20), full air drift (control max x 1, not the end's 0.5 from frame 18) from its first frame, into SpecialFall with
+// its air speed x 1 (edge_hi_landing_frame). Once a shape: VAR_20 is 3 only for that end
+float edge_hi_boost_h() { return 48.0f; }
+
+int edge_hi_shape_end()
+{
+    if (edge_hi_charged && WorkModuleF(0, edge_hi_pass_var()) == 3.0f)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
 // the END status, ground (edge_hi_end_air 0) or air
 void edge_hi_to_end(int air)
 {
+    if (edge_hi_shape_end())
+    {
+        air = 0x1;                         // test 150: the shape's boost, from the ground too
+        if (global18 != 0x2)
+        {
+            func_20(0x2);
+            GroundModule(0x2710, 0x5);
+        }
+    }
     edge_hi_end_air = air;
     func_16(0x15a, 0);
 }
@@ -39909,6 +39996,20 @@ void edge_hi_end_air_main()
     KineticModule(0x11, 0x2, 0.0f, 0.0f);
     KineticModule(0xc, 0x2);
     edge_hi_control = 0;
+    if (edge_hi_shape_end())
+    {
+        // test 150: the shape's boost (edge_hi_to_end), full drift from now
+        mul = WorkModuleF(0, 0x3000018);
+        vy = MathF(0, 2.0f * mul * edge_hi_boost_h());
+        KineticModule(0x11, 0x1, vy);
+        KineticModule(0xf, 0x1, -mul);
+        KineticModule(0x14, 0x1, 20.0f);
+        KineticModule(0xb, 0x1);
+        edge_hi_control = 0x1;
+        KineticModule(0xe, 0x2, 0, 0.0f, 0.0f, 0, 0, 0);
+        KineticModule(0x6, 0x2, 1.0f);
+        KineticModule(0xb, 0x2);
+    }
     edge_hi_cliff_mode(0x4);               // pre: cliff 1728 (ON_DROP_BOTH_SIDES, inferred)
     if (edge_hi_charged)
     {
@@ -39973,6 +40074,18 @@ void edge_hi_end_loop()
     if (func_56())
     {
         return;
+    }
+    if (edge_hi_shape_end())
+    {
+        if (edge_hi_vy() <= 0.0f)
+        {
+            KineticModule(0x14, 0x1, WorkModuleF(0, 0x3000019));   // the shape's boost over: his fall cap again
+        }
+        if (f < 3.0f)
+        {
+            edge_hi_pitch();               // lifting off: no landing yet (test 150)
+            return;
+        }
     }
     if (global18 == 0)
     {
@@ -40078,6 +40191,18 @@ void edge_hi_armor(int on)
     }
 }
 
+// test 150, the user: "Held Octaslash still has invulnerablity/intangibility" (after test 148's no-clank slashes). Nothing
+// found that sets it (README test 150), so the held rush now puts his body state back to normal every frame it's held,
+// whatever set it: the whole body's status state normal (HitModule(0x2710, 0), as Scintilla's slash ends its WHOLE_HIT
+// XLU) and the timed intangible / invincible frames 0 (HitModule(2, 0) / HitModule(1, 0, 0): position_vars_cave's
+// INTANGIBLE / INVINCIBLE writes use these)
+void edge_hi_hittable()
+{
+    HitModule(0x2710, 0);
+    HitModule(0x2, 0);
+    HitModule(0x1, 0, 0);
+}
+
 // exec (out of hitlag): 03650 the start's button check (Octaslash = special held until DECIDED_RUSH, the
 // start scripts' frame 18), 038b0 / 03930 the rush counter (+ the ExeFS speed hook)
 void edge_hi_exec()
@@ -40097,6 +40222,7 @@ void edge_hi_exec()
         {
             edge_hi_steer();               // test 113
             edge_hi_armor(0x1);            // test 149: 3% armor while held
+            edge_hi_hittable();            // test 150: whole body hittable while held
         }
         else if (edge_hi_charged)
         {

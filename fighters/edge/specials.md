@@ -334,6 +334,14 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     held (`edge_hi_held`, from his exec) the status armor slot is damage-based, 3.0 (`DamageModule(0xb, 3, 3.0f)`,
     `edge_hi_armor`): a hit of 3% or less (3.0 included) doesn't make him flinch, he takes its damage; off (mode 0) once
     the button is let go and as the rush ends any way (`edge_hi_rush_end`). Not in the start (0x154) or the end.
+  - **Held Octaslash hittable, again (test 150):** every held frame his body state is put back to normal
+    (`edge_hi_hittable`: `HitModule(0x2710, 0)`, timed intangible / invincible frames 0); nothing found that sets it
+    (README test 150: the push-away is what stops melee fighters).
+  - **The shape's boost (test 150, the user: "when Sephiroth completes a shape and held Octaslash ends ... a single
+    vertical height speed boost that puts him about as high as he is in the attached screenshot, and full air drift into
+    special fall"):** the forced end after a shape (VAR_20 3) is the air end (lifted off the ground), y speed
+    sqrt(2 g 48) with his gravity (~3.2: a rise of ~48), his own gravity, full drift from its start, then SpecialFall
+    (air speed x 1); `edge_hi_to_end`, `edge_hi_end_air_main`.
   - **Blade Dash (tap):** its aim stays the full circle; landing lag 22
     (Ultimate 27); the air end ends in a normal Fall (Octaslash: SpecialFall as before), at frame 15 (test 120, the user: 8
     frames earlier than test 116's 23, which was "right before the point where Sephiroth would begin falling in the
@@ -510,6 +518,8 @@ From Ultimate's status code (lua2cpp_edge, `spec_side_special` research: START 0
   (from his own slot's position, the slot found by his kind 0x42: test 72 took his position from the creation
   callback's point, assumed his head, and in game that point is ~9 lower, so the shot flew along the floor). Scripts: Ultimate's Fly (4 hitboxes, the
   beam), Hit (beam left, beam_hit), End (beam left). A wall / the floor or its life's end: End, gone.
+- **Speed and uncharged reach (test 150, the user: "make side special move a bit faster", "make uncharged side special
+  reach a bit further"):** 44 + 84 r over 6 + 7 r frames (reach 56 - 140 from him, 40% uncharged; 7.33 - 9.85 a frame).
 - **Uncharged reach (test 149, the user: "Uncharged side special should reach 1/3 of its maximum distance"):** reach
   from him 140 / 3 = 46.67 uncharged (a flight of 34.67), 140 fully charged as test 148, linear in r: the flight is
   34.67 + 93.33 r over 6 + 10 r frames (5.78 - 8 a frame).
