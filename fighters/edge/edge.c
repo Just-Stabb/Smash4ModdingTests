@@ -1796,6 +1796,7 @@ void func_82()
         global29 = ControlModule(0xa, 0x2);
         global45 = ControlModule(0xa, 0x3);
     }
+    rolloff_hold_update(); // roll-off: the air speed cap off while the stick holds the way he moves (universal mechanics)
 }
 
 float func_83()
@@ -8531,22 +8532,22 @@ void func_380()
 
 void func_381()
 {
-    if (global6 == 0xe) // roll-off: slid off an edge -> Fall without the air speed cap (universal mechanics)
+    if (global6 == 0xe || StatusModule(0x1) == 0x2) // roll-off (Hero's): slid off an edge, into Fall or an attack buffered off the edge -> no air speed cap (universal mechanics)
     {
         WorkModule(0x13, 0x1, 0x20000044);
-        global63 = 1; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
-        global64 = 1; // roll-off: Fall's end puts the cap back
+        global63 = 1; // roll-off: the speed carried off x rolloff_air_speed_mult(), once (rolloff_fall_speed)
+        global64 = 1; // roll-off: the cap stays off while the stick holds the way he moves (rolloff_hold_update; 1: that way not known yet)
     }
     func_383();
 }
 
 void func_382()
 {
-    if (global6 == 0xe) // roll-off: slid off an edge -> Fall without the air speed cap (universal mechanics)
+    if (global6 == 0xe || StatusModule(0x1) == 0x2) // roll-off (Hero's): slid off an edge, into Fall or an attack buffered off the edge -> no air speed cap (universal mechanics)
     {
         WorkModule(0x13, 0x1, 0x20000044);
-        global63 = 1; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
-        global64 = 1; // roll-off: Fall's end puts the cap back
+        global63 = 1; // roll-off: the speed carried off x rolloff_air_speed_mult(), once (rolloff_fall_speed)
+        global64 = 1; // roll-off: the cap stays off while the stick holds the way he moves (rolloff_hold_update; 1: that way not known yet)
     }
     func_383();
 }
@@ -11044,11 +11045,7 @@ void func_534()
 
 void func_535()
 {
-    if (global64) // roll-off: Fall over, the air speed cap is back (universal mechanics)
-    {
-        global64 = 0;
-        WorkModule(0x14, 0x20000044);
-    }
+    // roll-off (Hero's): Fall's end no longer puts the air speed cap back (rolloff_hold_update) (universal mechanics)
     
 }
 
@@ -42736,3 +42733,68 @@ void edge_sn_end()
 }
 
 // ==== SNAKE FAIR END ====
+
+// ===================================================================
+// Roll-off momentum (Hero's, the universal version: fighters/brave/brave.c, his fixes 61 / 62 / 85;
+// tools/universal_mechanics.py). The speed carried off a ledge isn't held to the air speed cap (flag
+// 0x20000044 off) for as long as the stick holds the way he moves on screen (raw stick X, position
+// variable 0x0F000260, times that way, past rolloff_hold_x()), whatever he does in the air (Fall, an
+// aerial, a special, an air dodge, a jump); on a frame attack or special is pressed the stick doesn't
+// count (a stick click's neutral move zeroes it for that frame). Landing or a ledge (situation not
+// air) or a hit (Damage 0x45 - DamageFall 0x4C) puts the cap back too. The speed itself is the
+// ACMD's, set once, x rolloff_air_speed_mult() once (Fall's main, or here when he slid straight into
+// an air action: global63 still set outside Fall and the rolls), then air friction slows it.
+// Sephiroth only: no new globals (his MSC already uses globals up to 0x86, the most seen working:
+// port_check C5), so the way he moves is kept in global64 (1 off / not known yet, 2 right, 3 left)
+// and taken from his speed's sign (kinetic energy 3's X, the carried speed) instead of Hero's X
+// against the last frame's: the same way, read without a stored position.
+// ===================================================================
+float rolloff_hold_x() { return 0.3f; } // the stick past this, on screen, the way he moves keeps the cap off
+
+void rolloff_hold_update()
+{
+    float v;
+    float d;
+    if (global64)
+    {
+        if (global64 == 0x1)
+        {
+            v = KineticModuleF(0xa, 0x3);
+            if (v > 0.01f)
+            {
+                global64 = 0x2;
+            }
+            else if (v < -0.01f)
+            {
+                global64 = 0x3;
+            }
+        }
+        d = 0;
+        if (global64 == 0x2)
+        {
+            d = 1.0f;
+        }
+        else if (global64 == 0x3)
+        {
+            d = -1.0f;
+        }
+        if (StatusModule(0x1) != 0x2 || global4 >= 0x45 && global4 <= 0x4c
+            || d != 0 && WorkModuleF(0, 0x0f000260) * d < rolloff_hold_x()
+               && ControlModule(0x2710, 0) == 0 && ControlModule(0x2710, 0x1) == 0)
+        {
+            global64 = 0;
+            WorkModule(0x14, 0x20000044);
+        }
+    }
+    if (global63 != 0 && global4 != 0xe && global4 != 0x20 && global4 != 0x21)
+    {
+        if (StatusModule(0x1) == 0x2)
+        {
+            rolloff_fall_speed(); // slid straight into an air action: the multiplier now, once
+        }
+        else
+        {
+            global63 = 0;
+        }
+    }
+}

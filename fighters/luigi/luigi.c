@@ -1836,6 +1836,7 @@ void func_82()
         global29 = ControlModule(0xa, 0x2);
         global45 = ControlModule(0xa, 0x3);
     }
+    rolloff_hold_update(); // roll-off (Hero's): the air speed cap off while the stick holds the way he moves
 }
 
 float func_83()
@@ -8583,24 +8584,24 @@ void func_380()
 
 void func_381()
 {
-    if (global6 == 0xe) // roll-off: slid off an edge -> Fall without the air speed cap
+    if (global6 == 0xe || StatusModule(0x1) == 0x2) // roll-off (Hero's): slid off an edge, into Fall or an attack buffered off the edge -> no air speed cap
     {
         WorkModule(0x13, 0x1, 0x20000044);
-        global63 = 1; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
-        global68 = 1; // roll-off: the momentum carries into the next air action (rolloff_momentum_update)
-        global69 = -1.0f; // carried speed: measured next frame (momentum_decay_only)
+        global63 = 1; // roll-off: the speed carried off x rolloff_air_speed_mult(), once (rolloff_fall_speed)
+        rolloff_cap = 1; // roll-off: the cap stays off while the stick holds the way he moves (rolloff_hold_update)
+        rolloff_dir = 0; // roll-off: the way he moves, once he's off (rolloff_hold_update)
     }
     func_383();
 }
 
 void func_382()
 {
-    if (global6 == 0xe) // roll-off: slid off an edge -> Fall without the air speed cap
+    if (global6 == 0xe || StatusModule(0x1) == 0x2) // roll-off (Hero's): slid off an edge, into Fall or an attack buffered off the edge -> no air speed cap
     {
         WorkModule(0x13, 0x1, 0x20000044);
-        global63 = 1; // roll-off: Fall's main scales the carried speed (rolloff_fall_speed)
-        global68 = 1; // roll-off: the momentum carries into the next air action (rolloff_momentum_update)
-        global69 = -1.0f; // carried speed: measured next frame (momentum_decay_only)
+        global63 = 1; // roll-off: the speed carried off x rolloff_air_speed_mult(), once (rolloff_fall_speed)
+        rolloff_cap = 1; // roll-off: the cap stays off while the stick holds the way he moves (rolloff_hold_update)
+        rolloff_dir = 0; // roll-off: the way he moves, once he's off (rolloff_hold_update)
     }
     func_383();
 }
@@ -10513,7 +10514,10 @@ void func_502()
     if (global64) // (Melee air dodge) Fall after the dodge: its air speed flag off, normal kinetics
     {
         global64 = 0;
-        WorkModule(0x2711, 0x20000044);
+        if (!rolloff_cap) // (a roll-off's stays off: Hero's, rolloff_hold_update)
+        {
+            WorkModule(0x2711, 0x20000044);
+        }
         KineticModule(0, 0);
     }
     func_40();
@@ -11169,9 +11173,9 @@ void func_534()
 
 void func_535()
 {
-    if (!global68) // (a roll-off keeps it until Luigi is grounded: rolloff_momentum_update)
-    {
-        WorkModule(0x2711, 0x20000044); // roll-off / air dodge: Fall over, the air speed cap is back
+    if (!global68 && !rolloff_cap) // (the jump's momentum keeps it until Luigi is grounded: rolloff_momentum_update;
+    {                              // a roll-off's: Hero's, rolloff_hold_update)
+        WorkModule(0x2711, 0x20000044); // air dodge: Fall over, the air speed cap is back
     }
 }
 
@@ -38094,13 +38098,13 @@ void func_2347()
 // shield is held (ControlModule(0x2712, 3)), ground correction 0x2 (stops at edges); from the
 // speed frame on, 0x1 (can slide off). Sliding off goes to Fall (func_374), which keeps the roll's
 // speed: the roll end (func_381 / func_382) sets flag 0x20000044 (no max air speed) when the next
-// status is Fall, and Fall's end (func_535) clears it. rolloff_fall_speed() can scale the carried
+// status is Fall or he's in the air, and rolloff_hold_update puts it back. rolloff_fall_speed() can scale the carried
 // speed once. Lock: global62 counts the frames in a row shield has been held this roll; at
 // rolloff_lock_frames() (10) the roll can't slide off for the rest of it. global63: slid off.
-// Momentum (user): after sliding off, the speed carries into the next action too (aerial, special,
-// air dodge, double jump): global68 keeps flag 0x20000044 (no air speed cap) on, past Fall's end,
-// until Luigi is on the ground or a ledge (rolloff_momentum_update, main loop func_74); air
-// friction still slows it as usual.
+// Momentum: Hero's (the universal version, rolloff_hold_update): after sliding off (into Fall or an
+// attack buffered off the edge) the cap stays off through any air action while the stick holds the
+// way he moves; landing, a ledge or a hit puts it back. (global68 is the jump's momentum now only:
+// rolloff_momentum_update, main loop func_74.)
 // ===================================================================
 float rolloff_start_frame() { return 5.0f; } // = the ACMD's speed frame
 int   rolloff_lock_frames()  { return 10; }   // shield held this many frames in a row: no roll-off for the rest of the roll
@@ -38507,3 +38511,64 @@ int wavedash_escape_blocked()
 
 // roll-off (added after the rest, so the other functions keep their numbers)
 float rolloff_clear_frames() { return 3.0f; } // the carried speed is cleared on the roll's frames before this
+
+// ===================================================================
+// Roll-off momentum (Hero's, the universal version: fighters/brave/brave.c, his fixes 61 / 62 / 85).
+// The speed carried off a ledge isn't held to the air speed cap (flag 0x20000044 off) for as long as
+// the stick holds the way he moves on screen (raw stick X, position variable 0x0F000260, times
+// rolloff_dir, past rolloff_hold_x()), whatever he does in the air (Fall, an aerial, a special, an air
+// dodge, a jump); on a frame attack or special is pressed the stick doesn't count (a stick click's
+// neutral move zeroes it for that frame). Landing or a ledge (situation not air) or a hit (Damage
+// 0x45 - DamageFall 0x4C) puts the cap back too. rolloff_dir: the way he moves (1 right, -1 left), from
+// his X (position variable 0x0F000000) against the last frame's (rolloff_last_x) once he's off (a roll can
+// turn him round, so not his facing). rolloff_cap: the cap is off from a roll-off. The speed itself is
+// the ACMD's, set once, x rolloff_air_speed_mult() once (Fall's main, or here when he slid straight
+// into an air action: global63 still set outside Fall and the rolls), then air friction slows it.
+// ===================================================================
+int   rolloff_cap;      // the roll-off took the air speed cap off (the roll end; rolloff_hold_update puts it back)
+float rolloff_dir;      // the way he moves on screen once he's off: 1 right, -1 left, 0 not known yet
+float rolloff_last_x;   // his X the frame before
+float rolloff_hold_x() { return 0.3f; } // the stick past this, on screen, the way he moves keeps the cap off
+
+void rolloff_hold_update()
+{
+    float x;
+    x = WorkModuleF(0, 0x0f000000);
+    if (rolloff_cap)
+    {
+        if (rolloff_dir == 0)
+        {
+            if (x > rolloff_last_x + 0.01f)
+            {
+                rolloff_dir = 1.0f;
+            }
+            else if (x < rolloff_last_x - 0.01f)
+            {
+                rolloff_dir = -1.0f;
+            }
+        }
+        if (StatusModule(0x1) != 0x2 || global4 >= 0x45 && global4 <= 0x4c
+            || rolloff_dir != 0 && WorkModuleF(0, 0x0f000260) * rolloff_dir < rolloff_hold_x()
+               && ControlModule(0x2710, 0) == 0 && ControlModule(0x2710, 0x1) == 0)
+        {
+            rolloff_cap = 0;
+            rolloff_dir = 0;
+            if (!global68) // the jump's momentum keeps it off until grounded
+            {
+                WorkModule(0x14, 0x20000044);
+            }
+        }
+    }
+    rolloff_last_x = x;
+    if (global63 != 0 && global4 != 0xe && global4 != 0x20 && global4 != 0x21)
+    {
+        if (StatusModule(0x1) == 0x2)
+        {
+            rolloff_fall_speed(); // slid straight into an air action: the multiplier now, once
+        }
+        else
+        {
+            global63 = 0;
+        }
+    }
+}
