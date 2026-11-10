@@ -419,8 +419,10 @@ def snake_article_scripts(fighter, hit_template, glow_template):
     empty; the point's game script its 5% catch (on its root, the middle of the point: tools/edge_snake_articles.py,
     the point 3.48 long along +Z), its effect script his sword trail's textures (0x104 / 0x105) across the point (its
     local Y), swept along its path"""
+    # test 149, the user: "Make the snake sword's tip unclankable": Clang 0 (it meets no other hitbox, so nothing
+    # cancels it or is cancelled by it), Rebound 0 (motion 0's and the re-issued one in `snaketipclear` alike)
     tip = _set(hit_template, ID=0, Part=0, Bone=0, Damage=5.0, Angle=361, KBG=0, FKB=0, BKB=20, Size=4.5,
-               X=0.0, Y=0.0, Z=1.74, X2=0.0, Y2=0.0, Z2=1.74, Hitlag=1.0, SFXLevel=0)
+               X=0.0, Y=0.0, Z=1.74, X2=0.0, Y2=0.0, Z2=1.74, Hitlag=1.0, SFXLevel=0, Clang=0, Rebound=0)
     # the trail's two points across the point along its local Y only: the article is turned (-angle, 90, 0), so its Y
     # is across the blade in the screen plane whichever way it runs, its X is depth (test 83's X and Y both: a wide
     # diagonal ribbon, partly facing the camera)
@@ -484,8 +486,10 @@ def fill_scripts(fighter, hit_template):
                           ShieldDamage=0,
                           # test 139, the user: "make shapes always win clank scenarios": no clank (Clang 0: it doesn't
                           # meet other hitboxes, so nothing cancels it), no rebound; it was already neither reflectable
-                          # nor absorbable
-                          Clang=0, Rebound=0, Reflectable=0, Absorbable=0) for k in range(5)]
+                          # nor absorbable. Test 149, the user: "please make shapes unshieldable": Shieldable 0 (the
+                          # hitbox's filter flag 0x04, 0x02C0E77C: it doesn't hit shields, it goes through them to the
+                          # fighter)
+                          Clang=0, Rebound=0, Reflectable=0, Absorbable=0, Shieldable=0) for k in range(5)]
             inner += _when(si + 1, boxes, FILL_VAR_SIZE)
         hit += _when(di + 1, inner, FILL_VAR_DAMAGE)
     for i, name in enumerate(FILL_MOTIONS):

@@ -474,7 +474,10 @@ to the normal build.
   - or, with `r4 == 0`: byte `+0x24` is set, or word `+0` == 1 (flag; vtable `+0x10C` on /
     `+0x114` off; also `0x02C24DA4` directly from the fighter update `0x02E25710`),
   - or either slot (`+4`, `+0x14`; checked by `0x02C24BF4`) matches: mode 1 always, mode 2 when
-    knockback < threshold, mode 3 when damage < threshold.
+    knockback <= threshold, mode 3 when damage <= threshold (`fcmpu`, the GT bit taken out: a value equal to the
+    threshold is armored). The MSC command 0xB (case `0x02C2391C`) puts its value in the knockback threshold (f1,
+    slot `+4`) for mode 2 and in the damage threshold (f2, slot `+8`) for mode 3; mode 0 clears the slot. Unicorn:
+    `tools/edge_armor_test.py` (Sephiroth test 149: held Octaslash's `DamageModule(0xb, 3, 3.0f)`).
 - DamageModule vtable base `0x10105B7C`. `+0x1E4` = MSC `DamageModule` handler (`0x02C2366C`,
   jump table for commands 0–0x13), `+0x1EC` = MSC float handler (`0x02C23C38`). MSC command 0xB
   only ever writes slot 0. Slot 1 is set natively (Bowser / Giga Bowser `0x02F07270` /

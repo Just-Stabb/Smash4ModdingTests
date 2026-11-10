@@ -39741,6 +39741,10 @@ void edge_hi_rush_loop()
 // 0a6c0 / 0ae80
 void edge_hi_rush_end()
 {
+    if (edge_hi_charged)
+    {
+        edge_hi_armor(0);                  // held Octaslash's armor off (test 149)
+    }
     if (global6 != 0x15a || edge_hi_end_air == 0 && edge_hi_charged)
     {
         edge_tr_step(0x1);                 // the trail ends but into the air end (it goes on while he rises; Blade
@@ -40054,6 +40058,26 @@ void edge_hi_end()
     }
 }
 
+// test 149, the user: "Give held Octaslash 3% armor": while the special button holds Octaslash's rush (edge_hi_held), hits
+// of 3% or less don't make him flinch (he takes their damage): the status armor slot (DamageModule(0xb, 3, d): the MSC
+// handler 0x02C2366C puts mode 3's value in the damage threshold, and the no-reaction check 0x02C24C88 takes a hit
+// whose damage is not over it: 3.0 itself is armored; tools/edge_armor_test.py), set every frame of the held rush
+// (edge_hi_exec) and cleared (mode 0, as Ryu's armored specials clear it) once it's let go and as the rush ends any
+// way (edge_hi_rush_end: the end, a hit that does make him flinch, a grab). Blade Dash has none
+float edge_hi_armor_d() { return 3.0f; }
+
+void edge_hi_armor(int on)
+{
+    if (on)
+    {
+        DamageModule(0xb, 0x3, edge_hi_armor_d());
+    }
+    else
+    {
+        DamageModule(0xb, 0, 0);
+    }
+}
+
 // exec (out of hitlag): 03650 the start's button check (Octaslash = special held until DECIDED_RUSH, the
 // start scripts' frame 18), 038b0 / 03930 the rush counter (+ the ExeFS speed hook)
 void edge_hi_exec()
@@ -40072,6 +40096,11 @@ void edge_hi_exec()
         if (edge_hi_held())
         {
             edge_hi_steer();               // test 113
+            edge_hi_armor(0x1);            // test 149: 3% armor while held
+        }
+        else if (edge_hi_charged)
+        {
+            edge_hi_armor(0);
         }
         if (edge_hi_charged && (float)edge_hi_count > 15.0f)
         {

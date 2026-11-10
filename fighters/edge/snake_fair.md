@@ -208,6 +208,9 @@ article finds its owner (the nearest Sephiroth), then every frame:
   trail again: a dein copy has no animation, its scripts only run frame 0), so from then on it can hit them
   (`sn_shield_check`, `tools/edge_snake_articles_msc.py`). Unconfirmed in game: that the shield hit is recorded, and
   the trail across the motion change.
+- **Test 149, no clank** (the user: "Make the snake sword's tip unclankable"): the point's catch hitbox (motion 0 and
+  `snaketipclear`'s) is Clang 0, Rebound 0: it meets no other hitbox. The runs (`snake`) have no hitboxes (their
+  scripts are empty); the end hit is his own (the body's, on joint 24, once the sword is back): unchanged.
 - **Test 119:** "attack held" is SELF_ATTACK or attack's raw input bit (MSC button 14, `ControlModule(0x2712, 0xe)`):
   with the A+B smash setting on, B pressed during the hold made the game clear attack's bit (smash latch), ending it.
 

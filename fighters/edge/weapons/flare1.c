@@ -593,7 +593,7 @@ int fl_clr0;           // hit records to clear (Part 0 / 1) when the orbit scrip
 int fl_clr1;
 int fl_beam;          // the beam's effect handle while the shot flies (fl_fly_main lays it, the loop moves it)
 float fl_y0;          // the shot's height (Ultimate's spawn), held while it flies (test 81: on the ground it sat on the floor)
-float fl_travel;      // test 148: how far it flies (38.5 uncharged, as before, to 128 fully charged)
+float fl_travel;      // how far it flies: 34.67 uncharged (test 149: 1/3 of the full reach) to 128 fully charged (test 148)
 int fl_fx0;
 int fl_fx1;
 int fl_fx2;
@@ -833,8 +833,11 @@ void fl_fly_main()
     // with r = hold / 27 to 128 fully charged (its place 10 in front of him + 128 = 138, its hitbox's front 2 more: the
     // far edge from the near one), its life to 16 frames (7 + 9 r), so its speed stays 5.5 - 8 a frame (Ultimate's 5.5
     // x lerp(1, 1.5, r) = 5.5 - 8.25 for its fixed 7 frames: 38.5 - 57.75, the user's change)
-    fl_travel = 38.5f + 89.5f * fl_r;
-    fl_life = 0x7 + (int)(9.0f * fl_r + 0.5f);
+    // Test 149, the user: "Uncharged side special should reach 1/3 of its maximum distance": its reach from him (its
+    // place 10 in front + its flight + its hitbox's front 2) is 140 / 3 = 46.67 uncharged (a flight of 34.67; test 148:
+    // 38.5, Ultimate's), still 140 fully charged (128), linear in r between; 6 + 10 r frames (6 - 16), 5.78 - 8 a frame
+    fl_travel = 34.6667f + 93.3333f * fl_r;
+    fl_life = 0x6 + (int)(10.0f * fl_r + 0.5f);
     fl_speed = fl_travel / (float)fl_life;
     fl_fx0 = fl_fx1 = fl_fx2 = fl_fx3 = fl_fx4 = 0;
     lr = PostureModuleF(0);

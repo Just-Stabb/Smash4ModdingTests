@@ -2410,3 +2410,38 @@ is being pulled back to where it came from".
   `script/animcmd/body/game.bin`, `script/animcmd/weapon/snaketip/` (game / effect / sound.bin, motion.mtable),
   `script/msc/edge.mscsb`, `flare1/flare1.mscsb`, `snaketip/snaketip.mscsb`, `trail/trail.mscsb`.
 
+## Test 149 (`$S/sephiroth_test149.zip`, not in build/: disk): the tip unclankable, uncharged Shadow Flare 1/3, held Octaslash's 3% armor, shapes unshieldable
+
+User: "Make the snake sword's tip unclankable", "Uncharged side special should reach 1/3 of its maximum distance",
+"Give held Octaslash 3% armor", "please make shapes unshieldable".
+- **The tip** (`edge_specials_build.py` snake_article_scripts): its catch hitbox (motion 0 and test 148's
+  `snaketipclear`) is Clang 0, Rebound 0 (was 1 / 1): it meets no other hitbox, so it neither clanks nor rebounds. The
+  runs (`snake`, the blade's pieces) have no hitboxes: their scripts are empty (they only draw). The end hit (11%,
+  frames 21 - 24 of up tilt) is his own body's, on joint 24 once the sword is back at the hilt, not the tip's:
+  unchanged (one line if it should be too).
+- **Uncharged Shadow Flare** (`weapons/flare1.c`): full charge reaches 140 from him (test 148: its place 10 in front, a
+  flight of 128, its hitbox's front 2); uncharged now 140 / 3 = 46.67 (a flight of 34.67; test 148 and Ultimate: 38.5,
+  a reach of 50.5), linear in r = hold / 27 between: the flight 34.67 + 93.33 r over 6 + 10 r frames (6 uncharged, 11
+  at half, 16 full), 5.78 - 8 a frame (Ultimate's 5.5 - 8.25).
+- **Held Octaslash's armor** (`edge.c` edge_hi_armor): every frame of the rush while the special button holds it
+  (`edge_hi_held`, his exec out of hitlag) the status armor slot is damage-based with threshold 3.0, `DamageModule(0xb,
+  3, 3.0f)`: a hit of 3% or less doesn't make him flinch (no knockback, he stays in the move) and he takes its damage;
+  cleared (`DamageModule(0xb, 0, 0)`, as Ryu's armored specials clear theirs) once it's let go and when the rush ends
+  any way (`edge_hi_rush_end`: its end, a hit over 3%, a grab). Not in the start (0x154), the end (0x15A) or Blade Dash.
+  Read from the game code: the MSC handler's case 0xB (`0x02C2391C`) puts mode 3's value in the damage threshold (f2),
+  and the no-reaction check `0x02C24C88` / `0x02C24BF4` armors a hit whose damage isn't over it (3.0 included).
+- **Shapes unshieldable** (`edge_specials_build.py` fill_scripts): the shape's 125 hitboxes are Shieldable 0 (the
+  hitbox filter flag 0x04, `0x02C0E77C`, param_labels "0 = unblockable, goes through shield"): a shielding fighter is
+  hit as if not shielding. Still Clang 0, Rebound 0, not reflectable or absorbable.
+- **Tested:** `tools/edge_armor_test.py` (new, unicorn, the base game's code): the MSC command sets slot 0 mode 3,
+  threshold 3.0; 0.14 / 2.3 / 2.99 / 3.0% hits get no reaction at knockback 200, 3.01 / 3.5 / 12% react; mode 0 clears
+  it; mode 2 (the game's own knockback armor) as before: 0 failed. `msc_stack_check`: 0 problems in edge / flare1. The
+  built files differ from test 148's only in edge.mscsb, flare1.mscsb, the tip's game.bin (2 hitboxes' Clang /
+  Rebound) and the fill's game.bin (125 hitboxes' Shieldable). Not tested in game.
+- Unconfirmed: that the damage the check gets is the hit's after staleness (a fresh 3.5% hit staled under 3 would be
+  armored); an unblockable hitbox against a shield bubble in game.
+- port_check over the chain (as test 148's) + test 148 + this: 42 errors, 57 warnings, 4 notes, the same findings as
+  without it.
+- Package (install over test 148): `script/animcmd/weapon/fill/game.bin`, `script/animcmd/weapon/snaketip/game.bin`,
+  `script/msc/edge.mscsb`, `script/msc/flare1/flare1.mscsb`. No executable (test 148's exe_v36 stays).
+

@@ -278,7 +278,8 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     from its frame 4 to 50, when the glow's gone (test 127, the user: "make the hitbox ... happen on frame 4, and linger
     until the effect fades"; tests 125 / 126: frames 20 - 23; one hit log: a fighter is hit once), size by b (up to 5 / 8
     / 12 / 17 / more: 6, 9.5, 14, 19.5, 26), damage / BKB / KBG by sqrt(a b) (up to 25 / 40 / 60 / 95 / more: 3 / 7 /
-    12 / 18 / 25%, BKB 60, KBG 100 for every size since test 142 (the user: "return the bkb and kbg values to what they
+    12 / 18 / 25%, BKB 60, KBG 100 for every size since test 142; unshieldable since test 149, the user: "please make
+    shapes unshieldable": Shieldable 0, it goes through shields to the fighter (the user: "return the bkb and kbg values to what they
     were before and make damage affected the most", their choice of one value, the old top tier's; BKB 40 - 60, KBG 60 -
     100 by tier in tests 125 - 141); test 141, the user: "make shapes minimum damage lower and maximum damage
     higher with the same amount of knockback growth", a stage-wide shape (sqrt(a b) ~ 55 - 60) and a larger one (~ 85)
@@ -329,6 +330,10 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     commands, vl intangible frames 0 - 0); their Clang 1 cancelled any attack or projectile within 9% of their 0.14%
     that met them (out every other frame all round him), so he couldn't be reached. Blade Dash and a let-go Octaslash
     keep Ultimate's.
+  - **Held Octaslash's armor (test 149, the user: "Give held Octaslash 3% armor"):** every frame of the rush while
+    held (`edge_hi_held`, from his exec) the status armor slot is damage-based, 3.0 (`DamageModule(0xb, 3, 3.0f)`,
+    `edge_hi_armor`): a hit of 3% or less (3.0 included) doesn't make him flinch, he takes its damage; off (mode 0) once
+    the button is let go and as the rush ends any way (`edge_hi_rush_end`). Not in the start (0x154) or the end.
   - **Blade Dash (tap):** its aim stays the full circle; landing lag 22
     (Ultimate 27); the air end ends in a normal Fall (Octaslash: SpecialFall as before), at frame 15 (test 120, the user: 8
     frames earlier than test 116's 23, which was "right before the point where Sephiroth would begin falling in the
@@ -505,6 +510,9 @@ From Ultimate's status code (lua2cpp_edge, `spec_side_special` research: START 0
   (from his own slot's position, the slot found by his kind 0x42: test 72 took his position from the creation
   callback's point, assumed his head, and in game that point is ~9 lower, so the shot flew along the floor). Scripts: Ultimate's Fly (4 hitboxes, the
   beam), Hit (beam left, beam_hit), End (beam left). A wall / the floor or its life's end: End, gone.
+- **Uncharged reach (test 149, the user: "Uncharged side special should reach 1/3 of its maximum distance"):** reach
+  from him 140 / 3 = 46.67 uncharged (a flight of 34.67), 140 fully charged as test 148, linear in r: the flight is
+  34.67 + 93.33 r over 6 + 10 r frames (5.78 - 8 a frame).
 - **Reach (test 148, the user: "make it so Sephiroth's fully charged side special reaches Donkey Kong and have its
   length scale with charging", a screenshot of them at the two edges of Smashville's main platform, ~139.3 wide):** the
   shot flies 38.5 + 89.5 r (38.5 uncharged as before, 128 at full charge: 138 from him with its place 10 in front, its
