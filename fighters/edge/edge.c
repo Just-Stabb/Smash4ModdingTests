@@ -1777,6 +1777,7 @@ void func_82()
     edge_s_line_tick();                // Shadow Flare's shot as a line while it flies (test 148)
     edge_sw_tick();                    // up air / forward smash: the blade at 2x (test 150)
     edge_hi3_pull();                   // up tilt's first hit lifts grounded fighters up the sword (test 151)
+    edge_s4_push();                    // forward smash on a shield: the shielder slides back (test 153)
     edge_hi_keep_in();                 // ... Octaslash's victims kept in the blast zones (test 127)
     if (!global3)
     {
@@ -39346,6 +39347,162 @@ void edge_hi3_pull()
         bit = bit * 0x2;
     }
     WorkModule(0, (float)mask, 0x0f00030e);
+}
+
+// test 153, the user: "Make Sephiroth's forward smash push opponents back when they shield it, from where Sephiroth is to
+// where Donkey Kong is" (the screenshot: Smashville, him at the main platform's left edge, Donkey Kong ~300 px in of its
+// ~622 px = 139.3: ~66 from him), "The push back should not teleport them, it should apply some speed to them and look
+// smooth", "the opponent should be in shieldstun for the duration of the pushback". From his per-frame hook: in forward
+// smash (motion 0x5F) frames 26 - 29 (its hits at 26 - 27, with hitlag) a fighter (not him) in shield stun (guard damage,
+// status 0x1E) in front of him within 80 is marked (VAR_19 below; the end point his x + 66 x his facing then); each
+// frame after, each marked one gets its pushback speed set, through the position
+// variables' q 7 (tools/position_vars_cave.py: its energy 4's speed, the guard damage status's own pushback energy, so
+// the game moves it and its ground correction stops it at a ledge as a normal pushback), of 0.15 x the distance left,
+// 3 a frame at most and 0.8 at least, its shield stun held at 3 frames (q 7 1003) and its inputs off (q 0x15) so it can't
+// act out of it; done when within 0.5 of the end point, when it stops moving (a ledge: the marked ones' x summed, VAR_22,
+// unchanged a frame out of hitstop), after 45 frames or when it leaves the guard statuses: its inputs back on,
+// its last 3 frames of stun run out. Already past the end point: only the normal pushback
+float edge_s4_push_d() { return 66.0f; }
+
+// its state: VAR_19 = 1000 + the marked slots (a bit each) + 512 if the push goes left (snake sword's "hit" flag, 0 / 1
+// in its moves: 1000 + tells this one's), VAR_12 the end point's x, VAR_15 frames since, VAR_22 the marked ones' x summed
+void edge_s4_push()
+{
+    int m;
+    int s;
+    int bit;
+    int mask;
+    int code;
+    int stop;
+    float f;
+    float x;
+    float st;
+    float rem;
+    float v;
+    float sum;
+    float dir;
+    float hs;
+    m = (int)WorkModuleF(0, 0x0f0000a3);
+    f = WorkModuleF(0, 0x0f0000a4);
+    if (m == 0x5f && f < 26.0f)
+    {
+        WorkModule(0, 0.0f, 0x0f000313);
+        return;
+    }
+    code = (int)WorkModuleF(0, 0x0f000313);
+    if (code < 1000 && (m != 0x5f || f >= 30.0f))
+    {
+        return;                            // no push going (and VAR_19 not this one's)
+    }
+    mask = 0;
+    dir = PostureModuleF(0);
+    if (code >= 1000)
+    {
+        mask = code - 1000;
+        dir = 1.0f;
+        if (mask >= 0x200)
+        {
+            mask = mask - 0x200;
+            dir = -1.0f;
+        }
+    }
+    if (m == 0x5f && f < 30.0f)
+    {
+        s = 0;
+        bit = 0x1;
+        while (s < 0x8)
+        {
+            x = WorkModuleF(0, 0x0f000020 + 0x4 * s) - PostureModuleF(0x1);
+            if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0.0f && (x != 0.0f || WorkModuleF(0, 0x0f000021 + 0x4 * s)
+                != PostureModuleF(0x2)) && (mask / bit) - (mask / bit / 0x2) * 0x2 == 0
+                && WorkModuleF(0, 0x0f0000a0 + 0x8 * (s + 0x3) + 0x2) == 30.0f && x * PostureModuleF(0) > 0.0f
+                && x * PostureModuleF(0) < 80.0f)
+            {
+                if (mask == 0)
+                {
+                    dir = PostureModuleF(0);
+                    WorkModule(0, PostureModuleF(0x1) + edge_s4_push_d() * dir, 0x0f00030c);
+                    WorkModule(0, 0.0f, 0x0f00030f);
+                    WorkModule(0, -99999.0f, 0x0f000316);
+                }
+                mask = mask + bit;
+            }
+            s = s + 1;
+            bit = bit * 0x2;
+        }
+    }
+    if (mask == 0)
+    {
+        return;
+    }
+    WorkModule(0, WorkModuleF(0, 0x0f00030f) + 1.0f, 0x0f00030f);
+    sum = 0.0f;
+    hs = 0.0f;
+    s = 0;
+    bit = 0x1;
+    while (s < 0x8)
+    {
+        if ((mask / bit) - (mask / bit / 0x2) * 0x2 == 0x1)
+        {
+            sum = sum + WorkModuleF(0, 0x0f000020 + 0x4 * s);
+            hs = hs + WorkModuleF(0, 0x0f00005b + 0x8 * s);
+        }
+        s = s + 1;
+        bit = bit * 0x2;
+    }
+    stop = 0;
+    if (WorkModuleF(0, 0x0f00030f) > 45.0f)
+    {
+        stop = 0x1;
+    }
+    if (hs == 0.0f && WorkModuleF(0, 0x0f00030f) > 2.0f && func_13(sum - WorkModuleF(0, 0x0f000316)) < 0.05f)
+    {
+        stop = 0x1;                        // it stopped (a ledge)
+    }
+    WorkModule(0, sum, 0x0f000316);
+    s = 0;
+    bit = 0x1;
+    while (s < 0x8)
+    {
+        if ((mask / bit) - (mask / bit / 0x2) * 0x2 == 0x1)
+        {
+            x = WorkModuleF(0, 0x0f000020 + 0x4 * s);
+            st = WorkModuleF(0, 0x0f0000a0 + 0x8 * (s + 0x3) + 0x2);
+            rem = (WorkModuleF(0, 0x0f00030c) - x) * dir;
+            if (stop || rem <= 0.5f || WorkModuleF(0, 0x0f000023 + 0x4 * s) == 0.0f || st < 27.0f || st > 30.0f)
+            {
+                WorkModule(0, 0.0f, 0x0f000100 + 0x20 * (s + 0x3) + 0x15);   // its inputs back
+                mask = mask - bit;
+            }
+            else
+            {
+                v = rem * 0.15f;
+                if (v > 3.0f)
+                {
+                    v = 3.0f;
+                }
+                if (v < 0.8f)
+                {
+                    v = 0.8f;
+                }
+                WorkModule(0, v * dir, 0x0f0000a0 + 0x8 * (s + 0x3) + 0x7);       // its pushback speed
+                WorkModule(0, 1003.0f, 0x0f0000a0 + 0x8 * (s + 0x3) + 0x7);       // shield stun held at 3
+                WorkModule(0, 1.0f, 0x0f000100 + 0x20 * (s + 0x3) + 0x15);        // inputs off
+            }
+        }
+        s = s + 1;
+        bit = bit * 0x2;
+    }
+    if (mask == 0)
+    {
+        WorkModule(0, 0.0f, 0x0f000313);
+        return;
+    }
+    if (dir < 0.0f)
+    {
+        mask = mask + 0x200;
+    }
+    WorkModule(0, (float)(1000 + mask), 0x0f000313);
 }
 
 // the rush's y: the stop energy's plus the gravity energy's (test 106: in the air the rush's y is on the gravity

@@ -2564,3 +2564,42 @@ buffering from flare".
 - port_check over the chain + tests 148 - 151 + this: 42 errors, 57 warnings, 4 notes, the chain's.
 - Package (install over test 151): `script/msc/edge.mscsb`.
 
+## Roll-off: Hero's momentum (`$S/fighters_rolloff_hero_v1.zip`, with every fighter)
+
+User: Hero's roll-off is the universal version. `edge.c` got it through `tools/universal_mechanics.py --upgrade`
+(docs/universal-mechanics.md "Roll-off" 5 - 6): the roll ends (`func_381` / `func_382`) also take a slide straight into
+an attack buffered off the edge, Fall's end (`func_535`) no longer puts the air speed cap back, `func_82` calls
+`rolloff_hold_update()` (new, at the end of the file): the cap stays off while the stick holds the way he moves, back on
+letting go, landing, a ledge or a hit. His MSC already uses globals up to 0x86, so it adds none: the way he moves is in
+`global64` (1 / 2 right / 3 left) from his carried speed's sign. Speed / multiplier unchanged (2.2 / 1.0). Built on test
+152's edge.c: only `func_82`, `func_381`, `func_382`, `func_535` differ (+2 functions); globals 0x86.
+
+## Test 153 (`$S/sephiroth_test153.zip`, not in build/: disk): forward smash pushes a shield back, smoothly, the shielder in shield stun
+
+User (screenshot: Smashville, him at the main platform's left edge, Donkey Kong ~300 px in of its ~622 px): "Make
+Sephiroth's forward smash push opponents back when they shield it, from where Sephiroth is to where Donkey Kong is", "The
+push back should not teleport them, it should apply some speed to them and look smooth", "the opponent should be in
+shieldstun for the duration of the pushback".
+- **Distance:** 298 px of 622 px for the 139.3-wide platform: ~66 units (`edge_s4_push_d`). The shielder slides until
+  it is 66 from where he stood at the hit (along his facing); one already past it gets only the normal pushback.
+- **How** (`edge.c` edge_s4_push, his per-frame hook): in forward smash's frames 26 - 29 (its hits at 26 - 27) a fighter in
+  shield stun (guard damage, status 0x1E) in front of him within 80 is marked; then every frame its pushback speed is
+  set to 0.15 x the distance left, 3 a frame at most, 0.8 at least (from point-blank, 15 out: 3 a frame for ~10 frames,
+  slowing, ~25 frames in all; from 45: ~15), through its own guard damage pushback energy (energy 4), so the game moves
+  it and stops it at a ledge as a normal pushback does (its ground correction: can't slide off); its shield stun held at
+  3 frames left and its inputs off (no out-of-shield jump / roll / shield drop) while it slides; done within 0.5 of the
+  point, when it stops moving (a ledge: no movement for a frame out of hitstop), after 45 frames or if it leaves the
+  guard statuses: its inputs back on, its last 3 frames of stun run out. State in VAR_19 (1000 + the slots marked +
+  512 left: the snake sword's 0 / 1 "hit" flag otherwise), VAR_12 the end x, VAR_15 the frames, VAR_22 the x sum.
+- **Executable (exe_v37 = exe_v36 + `tools/position_vars_cave.py` again, then `acmd_ext_cave.py`):** a new write for
+  another fighter, hit / status quantity q 7 (`0x0F0000A0 + 8 x target + 7`, docs/position-variables.md): 1000 + n sets
+  its shield stun frames left (WorkModule int `0x11000009`, GuardDamage's count), under 1000 its energy 4 speed
+  (`KineticModule(0x11, 4, value, 0)`, the MSC syscall table's KineticModule wrapper `0x030B29D8`). The cave re-packs
+  (1241 words differ; every other word of both tools the same as exe_v36). Unicorn: `position_vars_test.py` (the new q 7
+  checks), `acmd_ext_test.py` and `weapon_expand_test.py` on exe_v37: 0 failed.
+- **Built isolated:** the package's `edge.mscsb` is test 152's `edge.c` + this change only (the concurrent universal
+  roll-off work in edge.c isn't in it; test 152's source rebuilds test 152's file byte for byte).
+- Not tested in game (whether energy 4's set speed carries the shielder as expected; the ledge stop).
+- port_check over the chain + tests 148 - 152 + this: 42 errors, 57 warnings, 4 notes, the same as without it.
+- Package (install over test 152): `code/cross_f.rpx` (exe_v37), `script/msc/edge.mscsb`.
+

@@ -47,7 +47,8 @@ PostureModuleF(1)/(2)); writes go through the fighter's own set_pos, like MSC's 
                             docs/position-variables.md)
   0x0F0000A0 + 8*target + q   hit / status / motion (q 0 attack has connected (write: back to 0,
               AttackModule(0x2724)), 1 connected this frame, 2 status (write: change status), 3 motion (write: play it), 4 motion frame,
-              5 fighter kind, 6 write: stage collision (GroundModule(0x2710, value): 0 none, 5 air));
+              5 fighter kind, 6 write: stage collision (GroundModule(0x2710, value): 0 none, 5 air), 7 write: shield
+              push (>= 1000: shield stun frames left = value - 1000; else its energy 4 speed x = value));
               targets as for the combat variables (0x0F0000A0-0x0F0000F7)
   0x0F000098  self animation rate multiplier      set it (MotionModule +0xF4, the Mii rate:
               (1.0 normally)                      multiplies every animation, ACMD timing too)
@@ -462,6 +463,8 @@ MSC_STOP = 0x030B5160      # 0x30 StopModule
 MSC_SHAKE = 0x030B5C50     # 0x48 ShakeModule
 MSC_STATUS = 0x030B2B98    # 0x18 StatusModule
 MSC_GROUND = 0x030B2C78    # 0x1A GroundModule
+MSC_KINETIC = 0x030B29D8   # 0x10 KineticModule (the MSC syscall table 0x104187A0 + 4 x id)
+SHIELD_STUN = 0x11000009   # the guard damage status's (0x1E) frames left of shield stun (its loop leaves at 0)
 MSC_MOTION = 0x030B2A48    # 0x12 MotionModule
 MSC_MOTION_F = 0x030B2A80  # 0x13 MotionModuleF
 MSC_ATTACK = 0x030B50F0    # 0x2E AttackModule
@@ -1185,8 +1188,10 @@ ext_motion_set:
 %(SET_MOTION)s
         b ext_zero
 ext_q_frame:                            # q4: the motion's frame (read only); q5: fighter kind; q6: stage
-        cmpwi r22, 0xD                  # collision (write only); q7: 0
+        cmpwi r22, 0xD                  # collision (write only); q7: shield push (write only)
         beq ext_q_kind
+        cmpwi r22, 0xF
+        beq ext_q_push
         cmpwi r22, 0xE
         beq ext_q_ground
         cmpwi r22, 0xC
@@ -1205,6 +1210,23 @@ ext_q_ground:                           # q6 (write only): GroundModule(0x2710, 
         bl ext_value_int
         mr r22, r3
 %(SET_GROUND)s
+        b ext_zero
+ext_q_push:                             # q7 (write only, Sephiroth test 153): value >= 1000: its shield stun
+        cmpwi r29, 0                    # frames left = value - 1000 (WorkModule int 0x11000009, the guard damage
+        beq ext_zero                    # status's count); else its energy 4's speed = (value, 0) (KineticModule
+        lfs f1, 0x10(r1)                # (0x11, 4, value, 0): the guard damage status's pushback energy)
+        lis r0, 0x447A                  # 1000.0f
+        stw r0, 0x8(r1)
+        lfs f0, 0x8(r1)
+        fcmpu cr0, f1, f0
+        blt ext_push_speed
+        bl ext_value_int
+        addi r22, r3, -1000
+%(SET_STUN)s
+        b ext_zero
+ext_push_speed:
+        lwz r22, 0x10(r1)               # the value's float bits
+%(SET_PUSH)s
         b ext_zero
 ext_q_kind:                             # q5 (read only): its fighter kind, the fighter table entry's +4 (what
         cmpwi r29, 0                    # 0x02BEF604 reads), -1 if it isn't in the table
@@ -1945,6 +1967,8 @@ inp_state:                              # per slot: held, tapped, inputs off, st
         STATUS=msc(MSC_STATUS, 0),
         SET_STATUS=msc(MSC_STATUS, 3, "r22", 0),
         SET_GROUND=msc(MSC_GROUND, 0x2710, "r22"),
+        SET_STUN=msc(MSC_WORK, 7, "r22", SHIELD_STUN),
+        SET_PUSH=msc(MSC_KINETIC, 0x11, 4, "r22", 0),
         MOTION=msc(MSC_MOTION, 7),
         SET_MOTION=msc(MSC_MOTION, 1, "r22", 0, 0x3F800000),
         FRAME=msc(MSC_MOTION_F, 1),

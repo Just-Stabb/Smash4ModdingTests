@@ -176,6 +176,20 @@ mo1: lwz r7, 4(r5)
  stw r7, 0xAF8(r12)
  li r3, 0
  blr""",                                       # GroundModule(op, value): op, value, argument count
+    0x030B29D8: """lwz r12, 4(r3)
+ lwz r5, 0(r4)
+ lwz r6, 0(r5)
+ stw r6, 0xB00(r12)
+ lwz r7, 4(r5)
+ stw r7, 0xB04(r12)
+ lwz r7, 8(r5)
+ stw r7, 0xB08(r12)
+ lwz r7, 0xC(r5)
+ stw r7, 0xB0C(r12)
+ lwz r7, 4(r4)
+ stw r7, 0xB10(r12)
+ li r3, 0
+ blr""",                                       # KineticModule(op, energy, x, y): logged at +0xB00 (count +0xB10)
     0x030B306C: """lwz r12, 4(r3)
  lwz r5, 0(r4)
  lwz r6, 0(r5)
@@ -408,6 +422,17 @@ check('  self untouched', ri(mu, 0, 0xAF0), 0)
 call(mu, FSET2, w0, hid(5, 6), 5.0)
 check('stage collision back (air, 5) on slot 3', (ri(mu, 2, 0xAF0), ri(mu, 2, 0xAF4)), (0x2710, 5))
 check('q6 reads 0', call(mu, FGET2, w0, hid(5, 6)), 0)
+# q7 (write only, Sephiroth test 153): shield push. Under 1000: KineticModule(0x11, 4, value, 0) on the target (its guard
+# damage pushback energy's speed); 1000 and up: WorkModule int 0x11000009 (its shield stun frames left) = value - 1000
+call(mu, FSET2, w0, hid(1, 7), -2.5)
+check('q7 push speed: KineticModule(0x11, 4, -2.5, 0) on the opponent, 4 words',
+      (ri(mu, 2, 0xB00), ri(mu, 2, 0xB04), struct.unpack('>f', struct.pack('>i', ri(mu, 2, 0xB08)))[0], ri(mu, 2, 0xB0C),
+       ri(mu, 2, 0xB10)), (0x11, 4, -2.5, 0, 4))
+check('  self untouched', ri(mu, 0, 0xB00), 0)
+call(mu, FSET2, w0, hid(5, 7), 1003.0)
+check('q7 shield stun: WorkModule int 0x11000009 = 3 on slot 3', ri(mu, 2, 0x800 + 4 * 9), 3)
+check('  its speed not set again', struct.unpack('>f', struct.pack('>i', ri(mu, 2, 0xB08)))[0], -2.5)
+check('q7 reads 0', call(mu, FGET2, w0, hid(5, 7)), 0)
 def jid(target, n): return 0x0F000290 + 4 * target + n
 for k, v in enumerate((3.5, 12.25, -1.0)):
     wf(mu, 2, 0xA80 + 4 * k, v)
