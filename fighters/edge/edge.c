@@ -37810,8 +37810,23 @@ void edge_n_change(int state)
 // 6 frames after the fire is made (edge_n_fired counts the frames from 1 at the generate, the roll from 6), on the ground the
 // roll inputs (test 143's: func_48's global24 0x2000000 forward / 0x4000000 back) go into EscapeF / EscapeB. In the air
 // nothing (as the charge's roll cancel: no air dodge)
+// Test 152, the user: the roll "bufferable": a roll input from the release on (Flare / Megaflare: SpecialN1 / N2;
+// Gigaflare: from its fire, the charge's own roll window being over by then) is kept, the newest one, and the roll comes
+// out on the first frame the cancel is open (6 frames after the fire), on the ground. The buffer is edge_n_released
+// (the charge's "special let go" flag, read only while charging before frame 100): 0x10 forward, 0x20 back (0 / 1 none)
 int edge_n_roll_after()
 {
+    if (edge_n_state == 0x1 || edge_n_fired)
+    {
+        if ((global24 & 0x2000000) != 0)
+        {
+            edge_n_released = 0x10;
+        }
+        else if ((global24 & 0x4000000) != 0)
+        {
+            edge_n_released = 0x20;
+        }
+    }
     if (edge_n_fired == 0)
     {
         return 0;
@@ -37821,12 +37836,12 @@ int edge_n_roll_after()
         edge_n_fired += 1;
         return 0;
     }
-    if (global18 == 0 && (global24 & 0x2000000) != 0)
+    if (global18 == 0 && edge_n_released == 0x10)
     {
         func_16(0x20, 0x1);
         return 0x1;
     }
-    if (global18 == 0 && (global24 & 0x4000000) != 0)
+    if (global18 == 0 && edge_n_released == 0x20)
     {
         func_16(0x21, 0x1);
         return 0x1;
