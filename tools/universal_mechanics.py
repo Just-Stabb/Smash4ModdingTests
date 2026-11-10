@@ -4,6 +4,20 @@ reverse tilts, tilts / down smash / shield out of run (and out of the dash and t
 roll-off (the MSC side; the rolls' ACMD speed is tools/rolloff_acmd.py).
 
   python3 tools/universal_mechanics.py IN.c OUT.c [--air-mult 1.0] [--name Fighter] [--ground-uncapped]
+  python3 tools/universal_mechanics.py --upgrade IN.c OUT.c   (a fighter patched before Hero's roll-off)
+
+Roll-off momentum is Hero's (fighters/brave/brave.c, his fixes 61-85; CLAUDE.md: Hero's roll-off is
+the universal version): sliding off an edge (into Fall, or an attack buffered off the edge) takes the
+air speed cap off (flag 0x20000044) and it stays off, through Fall and any air action after it, for as
+long as the stick holds the way the fighter moves (raw stick X on screen x that way past 0.3; a frame
+attack or special is pressed doesn't count as letting go); landing, a ledge or a hit puts it back
+(rolloff_hold_update, every frame from the fighter's per-frame hook, global14's function). Fall's
+end doesn't put it back. The speed is set once (the ACMD, at the roll's speed frame) and scaled
+once by rolloff_air_speed_mult(); after that it changes the way the game changes it.
+
+--upgrade: a fighter's MSC (decompiled or source) patched by an earlier version of this tool (the
+cap back at Fall's end): its roll ends, Fall's end and per-frame hook get Hero's momentum, and
+rolloff_hold_x / rolloff_hold_update are added at the end (its speeds and multiplier unchanged).
 
 --ground-uncapped (fighters the user picks): the roll's speed isn't held to the ground speed limit.
 Every roll frame, KineticModule(0x15, 3, -1, -1): no speed limit on energy 3 (the stick-driven
@@ -16,9 +30,7 @@ Works on any fighter's common status scripts: the functions are found through th
 mains' func_78(loop). A part a fighter already has (its own reverse tilts, an earlier patch) is
 left alone. Prints what it changed; exits 1 if an anchor isn't found (nothing is written then).
 
-The code is the same as Captain Falcon's / Kirby's / Luigi's / Sonic's (done by hand), with one
-difference: Fall's end only puts the air speed cap back (flag 0x20000044) when a roll-off took it
-off, so a fighter's own moves that use the flag aren't touched.
+The code is the same as Hero's (and Captain Falcon's / Kirby's / Luigi's / Sonic's, done by hand).
 """
 import argparse
 import re
@@ -135,7 +147,8 @@ def patch(src, air_mult=1.0, name='the fighter', ground_uncapped=False):
     if any('rolloff_update()' in l for l in f.lines) or any('run_attack_update()' in l for l in f.lines):
         raise Fail('already has roll-off / run attacks (hand-patched fighter)')
     for g, t in (('global48', 'float'), ('global32', 'float'), ('global38', 'int'), ('global24', 'int'),
-                 ('global47', 'int'), ('global18', 'int'), ('global5', 'int'), ('global6', 'int')):
+                 ('global47', 'int'), ('global18', 'int'), ('global5', 'int'), ('global6', 'int'),
+                 ('global4', 'int')):
         if not any(l == '%s %s;' % (t, g) for l in f.lines):
             raise Fail('common global %s is not a %s here' % (g, t))
     change = None                                  # the "change status" helper: func_16 in the fighters seen so far
@@ -149,7 +162,9 @@ def patch(src, air_mult=1.0, name='the fighter', ground_uncapped=False):
 
     n, last = f.globals_next()
     g_hold, g_slid, g_cap = 'global%d' % n, 'global%d' % (n + 1), 'global%d' % (n + 2)
-    f.lines[last + 1:last + 1] = ['int %s;' % g for g in (g_hold, g_slid, g_cap)]
+    g_dir, g_last = 'global%d' % (n + 3), 'global%d' % (n + 4)
+    f.lines[last + 1:last + 1] = ['int %s;' % g for g in (g_hold, g_slid, g_cap)] + \
+        ['float %s;' % g for g in (g_dir, g_last)]
 
     # --- reverse tilts: the up / down tilt pre scripts, after their StatusModule calls
     for st in ('attackhi3', 'attacklw3'):
@@ -231,28 +246,14 @@ def patch(src, air_mult=1.0, name='the fighter', ground_uncapped=False):
             end = common                          # the fighter's own end calls the common one last (Palutena)
         if end not in done:
             done.add(end)
-            f.insert(top(end), ['if (global6 == 0xe) // roll-off: slid off an edge -> Fall without the air speed cap %s' % TAG,
-                                '{',
-                                '    WorkModule(0x13, 0x1, 0x20000044);',
-                                '    %s = 1; // roll-off: Fall\'s main scales the carried speed (rolloff_fall_speed)' % g_slid,
-                                '    %s = 1; // roll-off: Fall\'s end puts the cap back' % g_cap,
-                                '}'])
+            f.insert(top(end), [l % dict(slid=g_slid, cap=g_cap, dir=g_dir, tag=TAG) for l in ROLL_END])
             f.log.append('roll-off: roll end %s (%s)' % (end, st))
     fall_main = f.table(1, STATUS['fall'])
     fall_main = f.holder(fall_main, r'func_78\(') or fall_main
     at = f.find_in(fall_main, r'func_78\(', first=False)
     f.insert(at, ['rolloff_fall_speed(); // roll-off: speed carried off the ledge x rolloff_air_speed_mult() %s' % TAG])
-    fall_end = f.table(2, STATUS['fall'])
-    i, _ = f.func_span(fall_end)
-    k = i + 2
-    while re.match(r'^    (int|float) var\d+;$', f.lines[k]):
-        k += 1
-    f.insert(k, ['if (%s) // roll-off: Fall over, the air speed cap is back %s' % (g_cap, TAG),
-                 '{',
-                 '    %s = 0;' % g_cap,
-                 '    WorkModule(0x14, 0x20000044);',
-                 '}'])
-    f.log.append('roll-off: Fall main %s, end %s' % (fall_main, fall_end))
+    f.log.append('roll-off: Fall main %s (Fall\'s end left alone: Hero\'s)' % fall_main)
+    add_hold_call(f)
 
     # --- the added functions (at the end, so the original functions keep their numbers)
     uncap = ''
@@ -261,24 +262,112 @@ def patch(src, air_mult=1.0, name='the fighter', ground_uncapped=False):
 ''' % name)
     helpers = HELPERS % dict(name=name, hold=g_hold, slid=g_slid, cap=g_cap, mult='%rf' % float(air_mult),
                              change=change, uncap=uncap)
+    hold = HOLD_HELPERS % dict(slid=g_slid, cap=g_cap, dir=g_dir, last=g_last, fall_speed='rolloff_fall_speed')
     while f.lines and f.lines[-1] == '':
         f.lines.pop()
-    f.lines += [''] + helpers.split('\n')
+    f.lines += [''] + helpers.split('\n') + [''] + hold.split('\n')
     return f
+
+
+def add_hold_call(f):
+    """rolloff_hold_update() at the end of the per-frame hook (global14's function: func_82 in every fighter
+    seen; Hero's brave_frame calls func_82 then it)"""
+    hooks = sorted({m.group(1) for m in (re.match(r'^\s*global14 = (func_\d+);', l) for l in f.lines) if m})
+    if len(hooks) != 1:
+        raise Fail('per-frame hook (global14 = func_N): %s' % (hooks or 'none'))
+    hook = hooks[0]
+    if f.has(hook, r'\breturn\b'):
+        raise Fail('%s (the per-frame hook) returns early' % hook)
+    _, j = f.func_span(hook)
+    f.insert(j, ['rolloff_hold_update(); // roll-off: the air speed cap off while the stick holds the way he moves %s' % TAG])
+    f.log.append('roll-off: per-frame hook %s (rolloff_hold_update)' % hook)
+
+
+def upgrade(src):
+    """Hero's roll-off momentum for a fighter patched by the earlier version (decompiled or source): the roll
+    ends also take a slide into an air action, Fall's end no longer puts the cap back, the per-frame hook runs
+    rolloff_hold_update"""
+    f = Fighter(src)
+    text = '\n'.join(f.lines)
+    if 'rolloff_hold_update' in text:
+        raise Fail('already has Hero\'s roll-off momentum')
+    for g, t in (('global4', 'int'), ('global6', 'int')):
+        if not any(l == '%s %s;' % (t, g) for l in f.lines):
+            raise Fail('common global %s is not a %s here' % (g, t))
+    # the roll ends: if (global6 == 0xe) { flag on; slid = 1; cap = 1; }
+    ends = []
+    for k in range(len(f.lines) - 5):
+        if re.match(r'^    if \(global6 == 0xe\)( //.*)?$', f.lines[k]) and f.lines[k + 1] == '    {' and \
+                re.match(r'^        WorkModule\(0x13, 0x1, 0x20000044\);', f.lines[k + 2]):
+            m1 = re.match(r'^        (global\d+) = (?:0x)?1(?:\.0f)?;', f.lines[k + 3])
+            m2 = re.match(r'^        (global\d+) = (?:0x)?1(?:\.0f)?;', f.lines[k + 4])
+            if m1 and m2 and f.lines[k + 5] == '    }':
+                ends.append((k, m1.group(1), m2.group(1)))
+    if not ends or len({(s, c) for _, s, c in ends}) != 1:
+        raise Fail('roll ends (if (global6 == 0xe) {flag; slid = 1; cap = 1;}): %d found' % len(ends))
+    slid, cap = ends[0][1], ends[0][2]
+    # Fall's end: if (cap) { cap = 0; flag off; }
+    falls = [k for k in range(len(f.lines) - 4)
+             if re.match(r'^    if \(%s\)( //.*)?$' % cap, f.lines[k]) and f.lines[k + 1] == '    {' and
+             re.match(r'^        %s = 0;' % cap, f.lines[k + 2]) and
+             re.match(r'^        WorkModule\(0x14, 0x20000044\);', f.lines[k + 3]) and f.lines[k + 4] == '    }']
+    if len(falls) != 1:
+        raise Fail('Fall\'s end (if (%s) {%s = 0; flag off;}): %d found' % (cap, cap, len(falls)))
+    # rolloff_fall_speed: by name, or the function that reads slid back (if (slid != 0) { slid = 0; ...})
+    names = [m.group(1) for m in (re.match(r'^void (\w+)\(\)$', l) for l in f.lines) if m]
+    if 'rolloff_fall_speed' in names:
+        fall_speed = 'rolloff_fall_speed'
+    else:
+        cands = [n for n in names if f.has(n, r'^\s*%s = 0;' % slid) and f.has(n, r'KineticModule\(0x11, 0x3,')]
+        if len(cands) != 1:
+            raise Fail('rolloff_fall_speed (reads %s back): %s' % (slid, cands))
+        fall_speed = cands[0]
+    n, last = f.globals_next()
+    g_dir, g_last = 'global%d' % n, 'global%d' % (n + 1)
+    # edits, last line first so the indices hold
+    edits = [(k, 'end') for k, _, _ in ends] + [(falls[0], 'fall')]
+    for k, what in sorted(edits, reverse=True):
+        if what == 'fall':
+            del f.lines[k:k + 5]
+            f.lines.insert(k, '    // roll-off (Hero\'s): Fall\'s end no longer puts the air speed cap back (rolloff_hold_update) %s' % TAG)
+        else:
+            f.lines[k + 5:k + 6] = ['        %s = 0; // roll-off: the way he moves, once he\'s off (rolloff_hold_update)' % g_dir, '    }']
+            f.lines[k] = '    if (global6 == 0xe || StatusModule(0x1) == 0x2) // roll-off (Hero\'s): slid off an edge, into Fall ' \
+                         'or an attack buffered off the edge -> no air speed cap %s' % TAG
+    f.log.append('roll-off: roll ends at lines %s, Fall\'s end at line %d (slid %s, cap %s, fall speed %s)' % (
+        ', '.join(str(k + 1) for k, _, _ in ends), falls[0] + 1, slid, cap, fall_speed))
+    f.lines[last + 1:last + 1] = ['float %s;' % g for g in (g_dir, g_last)]
+    add_hold_call(f)
+    while f.lines and f.lines[-1] == '':
+        f.lines.pop()
+    f.lines += [''] + (HOLD_HELPERS % dict(slid=slid, cap=cap, dir=g_dir, last=g_last, fall_speed=fall_speed)).split('\n')
+    return f
+
+
+ROLL_END = ['if (global6 == 0xe || StatusModule(0x1) == 0x2) // roll-off: slid off an edge (into Fall, or an attack '
+            'buffered off the edge) -> no air speed cap %(tag)s',
+            '{',
+            '    WorkModule(0x13, 0x1, 0x20000044);',
+            '    %(slid)s = 1; // roll-off: the speed carried off x rolloff_air_speed_mult(), once (rolloff_fall_speed)',
+            '    %(cap)s = 1; // roll-off: the cap stays off while the stick holds the way he moves (rolloff_hold_update)',
+            '    %(dir)s = 0; // roll-off: that way, from his movement once he\'s off (rolloff_hold_update)',
+            '}']
 
 
 HELPERS = '''// ===================================================================
 // Universal mechanics (docs/universal-mechanics.md), added by tools/universal_mechanics.py; the same
-// code as Captain Falcon's / Kirby's / Luigi's / Sonic's.
+// code as Hero's (fighters/brave/brave.c, the universal roll-off) and Captain Falcon's / Kirby's /
+// Luigi's / Sonic's.
 // Roll-off: the rolls' ACMD gives them their speed (EscapeF +S / EscapeB -S added at frame
 // rolloff_start_frame(), 0 at frame 27); kinetic 0x6 so the animation doesn't move %(name)s.
 // Every roll frame: before the speed frame, or while shield is held (ControlModule(0x2712, 3)),
 // ground correction 0x2 (stops at edges); from the speed frame on, 0x1 (can slide off). Sliding off
-// goes to Fall, which keeps the roll's speed: the roll end sets flag 0x20000044 (no max air speed)
-// when the next status is Fall, and Fall's end clears it. rolloff_fall_speed() scales the carried
-// speed once. Lock: %(hold)s counts the frames in a row shield has been held this roll; at
-// rolloff_lock_frames() (10) the roll can't slide off for the rest of it. %(slid)s: slid off.
-// %(cap)s: the roll-off took the air speed cap off (Fall's end puts it back).
+// (into Fall, or an attack buffered off the edge) keeps the roll's speed: the roll end sets flag
+// 0x20000044 (no max air speed), and it stays off until the stick stops holding the way he moves,
+// he lands / grabs a ledge or he's hit (rolloff_hold_update, every frame). rolloff_fall_speed()
+// scales the carried speed once. Lock: %(hold)s counts the frames in a row shield has been held this
+// roll; at rolloff_lock_frames() (10) the roll can't slide off for the rest of it. %(slid)s: slid off.
+// %(cap)s: the roll-off took the air speed cap off (rolloff_hold_update puts it back).
 // ===================================================================
 float rolloff_start_frame() { return 5.0f; } // = the ACMD's speed frame
 float rolloff_clear_frames() { return 3.0f; } // the carried speed is cleared on the roll's frames before this
@@ -381,11 +470,71 @@ int dash_turn_attack_update()
 }
 '''
 
-ADDED_FUNCS = 10         # rolloff_start_frame ... dash_turn_attack_update (msc_fingerprint.py --added)
+# Hero's roll-off momentum (fighters/brave/brave.c rolloff_hold_update, his fixes 61, 62, 85), with the fighter's
+# globals; and the air multiplier for a slide straight into an air action (no Fall to apply it)
+HOLD_HELPERS = '''// ===================================================================
+// Roll-off momentum (Hero's, the universal version: fighters/brave/brave.c, his fixes 61 / 62 / 85).
+// The speed carried off a ledge isn't held to the air speed cap (flag 0x20000044 off) for as long as
+// the stick holds the way he moves on screen (raw stick X, position variable 0x0F000260, times
+// %(dir)s, past rolloff_hold_x()), whatever he does in the air (Fall, an aerial, a special, an air
+// dodge, a jump); on a frame attack or special is pressed the stick doesn't count (a stick click's
+// neutral move zeroes it for that frame). Landing or a ledge (situation not air) or a hit (Damage
+// 0x45 - DamageFall 0x4C) puts the cap back too. %(dir)s: the way he moves (1 right, -1 left), from
+// his X (position variable 0x0F000000) against the last frame's (%(last)s) once he's off (a roll can
+// turn him round, so not his facing). %(cap)s: the cap is off from a roll-off. The speed itself is
+// the ACMD's, set once, x rolloff_air_speed_mult() once (Fall's main, or here when he slid straight
+// into an air action: %(slid)s still set outside Fall and the rolls), then air friction slows it.
+// ===================================================================
+float rolloff_hold_x() { return 0.3f; } // the stick past this, on screen, the way he moves keeps the cap off
+
+void rolloff_hold_update()
+{
+    float x;
+    x = WorkModuleF(0, 0x0f000000);
+    if (%(cap)s)
+    {
+        if (%(dir)s == 0)
+        {
+            if (x > %(last)s + 0.01f)
+            {
+                %(dir)s = 1.0f;
+            }
+            else if (x < %(last)s - 0.01f)
+            {
+                %(dir)s = -1.0f;
+            }
+        }
+        if (StatusModule(0x1) != 0x2 || global4 >= 0x45 && global4 <= 0x4c
+            || %(dir)s != 0 && WorkModuleF(0, 0x0f000260) * %(dir)s < rolloff_hold_x()
+               && ControlModule(0x2710, 0) == 0 && ControlModule(0x2710, 0x1) == 0)
+        {
+            %(cap)s = 0;
+            %(dir)s = 0;
+            WorkModule(0x14, 0x20000044);
+        }
+    }
+    %(last)s = x;
+    if (%(slid)s != 0 && global4 != 0xe && global4 != 0x20 && global4 != 0x21)
+    {
+        if (StatusModule(0x1) == 0x2)
+        {
+            %(fall_speed)s(); // slid straight into an air action: the multiplier now, once
+        }
+        else
+        {
+            %(slid)s = 0;
+        }
+    }
+}
+'''
+
+ADDED_FUNCS = 12         # rolloff_start_frame ... dash_turn_attack_update, rolloff_hold_x, rolloff_hold_update
+UPGRADE_ADDED_FUNCS = 2  # --upgrade: rolloff_hold_x, rolloff_hold_update (msc_fingerprint.py --added)
 
 
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument('--upgrade', action='store_true', help='Hero\'s roll-off momentum for a fighter patched earlier')
     ap.add_argument('src')
     ap.add_argument('dst')
     ap.add_argument('--air-mult', type=float, default=1.0)
@@ -393,7 +542,10 @@ def main():
     ap.add_argument('--ground-uncapped', action='store_true')
     a = ap.parse_args()
     try:
-        f = patch(open(a.src).read(), a.air_mult, a.name, a.ground_uncapped)
+        if a.upgrade:
+            f = upgrade(open(a.src).read())
+        else:
+            f = patch(open(a.src).read(), a.air_mult, a.name, a.ground_uncapped)
     except Fail as e:
         print('FAILED: %s' % e)
         sys.exit(1)
