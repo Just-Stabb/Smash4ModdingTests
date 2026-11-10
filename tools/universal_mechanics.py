@@ -162,9 +162,8 @@ def patch(src, air_mult=1.0, name='the fighter', ground_uncapped=False):
 
     n, last = f.globals_next()
     g_hold, g_slid, g_cap = 'global%d' % n, 'global%d' % (n + 1), 'global%d' % (n + 2)
-    g_dir, g_last = 'global%d' % (n + 3), 'global%d' % (n + 4)
-    f.lines[last + 1:last + 1] = ['int %s;' % g for g in (g_hold, g_slid, g_cap)] + \
-        ['float %s;' % g for g in (g_dir, g_last)]
+    g_dir = 'rolloff_dir'                           # declared with rolloff_hold_update (HOLD_HELPERS)
+    f.lines[last + 1:last + 1] = ['int %s;' % g for g in (g_hold, g_slid, g_cap)]
 
     # --- reverse tilts: the up / down tilt pre scripts, after their StatusModule calls
     for st in ('attackhi3', 'attacklw3'):
@@ -262,7 +261,7 @@ def patch(src, air_mult=1.0, name='the fighter', ground_uncapped=False):
 ''' % name)
     helpers = HELPERS % dict(name=name, hold=g_hold, slid=g_slid, cap=g_cap, mult='%rf' % float(air_mult),
                              change=change, uncap=uncap)
-    hold = HOLD_HELPERS % dict(slid=g_slid, cap=g_cap, dir=g_dir, last=g_last, fall_speed='rolloff_fall_speed')
+    hold = HOLD_HELPERS % dict(slid=g_slid, cap=g_cap, fall_speed='rolloff_fall_speed')
     while f.lines and f.lines[-1] == '':
         f.lines.pop()
     f.lines += [''] + helpers.split('\n') + [''] + hold.split('\n')
@@ -322,8 +321,8 @@ def upgrade(src):
         if len(cands) != 1:
             raise Fail('rolloff_fall_speed (reads %s back): %s' % (slid, cands))
         fall_speed = cands[0]
-    n, last = f.globals_next()
-    g_dir, g_last = 'global%d' % n, 'global%d' % (n + 1)
+    g_dir = 'rolloff_dir'                           # declared with rolloff_hold_update (HOLD_HELPERS), after every
+    # other global, so none of them moves (a source's named globals keep their indices)
     # edits, last line first so the indices hold
     edits = [(k, 'end') for k, _, _ in ends] + [(falls[0], 'fall')]
     for k, what in sorted(edits, reverse=True):
@@ -331,16 +330,22 @@ def upgrade(src):
             del f.lines[k:k + 5]
             f.lines.insert(k, '    // roll-off (Hero\'s): Fall\'s end no longer puts the air speed cap back (rolloff_hold_update) %s' % TAG)
         else:
+            f.lines[k + 3] = '        %s = 1; // roll-off: the speed carried off x rolloff_air_speed_mult(), once (rolloff_fall_speed)' % slid
+            f.lines[k + 4] = '        %s = 1; // roll-off: the cap stays off while the stick holds the way he moves (rolloff_hold_update)' % cap
             f.lines[k + 5:k + 6] = ['        %s = 0; // roll-off: the way he moves, once he\'s off (rolloff_hold_update)' % g_dir, '    }']
             f.lines[k] = '    if (global6 == 0xe || StatusModule(0x1) == 0x2) // roll-off (Hero\'s): slid off an edge, into Fall ' \
                          'or an attack buffered off the edge -> no air speed cap %s' % TAG
     f.log.append('roll-off: roll ends at lines %s, Fall\'s end at line %d (slid %s, cap %s, fall speed %s)' % (
         ', '.join(str(k + 1) for k, _, _ in ends), falls[0] + 1, slid, cap, fall_speed))
-    f.lines[last + 1:last + 1] = ['float %s;' % g for g in (g_dir, g_last)]
+    for k, l in enumerate(f.lines):         # the old helpers' comments (sources patched by the earlier version)
+        if l.startswith('//'):
+            f.lines[k] = l.replace("when the next status is Fall, and Fall's end clears it.",
+                                 "when it slides off (into Fall or an air action); rolloff_hold_update puts it back.").replace(
+                "(Fall's end puts it back)", "(rolloff_hold_update puts it back)")
     add_hold_call(f)
     while f.lines and f.lines[-1] == '':
         f.lines.pop()
-    f.lines += [''] + (HOLD_HELPERS % dict(slid=slid, cap=cap, dir=g_dir, last=g_last, fall_speed=fall_speed)).split('\n')
+    f.lines += [''] + (HOLD_HELPERS % dict(slid=slid, cap=cap, fall_speed=fall_speed)).split('\n')
     return f
 
 
@@ -476,15 +481,17 @@ HOLD_HELPERS = '''// ===========================================================
 // Roll-off momentum (Hero's, the universal version: fighters/brave/brave.c, his fixes 61 / 62 / 85).
 // The speed carried off a ledge isn't held to the air speed cap (flag 0x20000044 off) for as long as
 // the stick holds the way he moves on screen (raw stick X, position variable 0x0F000260, times
-// %(dir)s, past rolloff_hold_x()), whatever he does in the air (Fall, an aerial, a special, an air
+// rolloff_dir, past rolloff_hold_x()), whatever he does in the air (Fall, an aerial, a special, an air
 // dodge, a jump); on a frame attack or special is pressed the stick doesn't count (a stick click's
 // neutral move zeroes it for that frame). Landing or a ledge (situation not air) or a hit (Damage
-// 0x45 - DamageFall 0x4C) puts the cap back too. %(dir)s: the way he moves (1 right, -1 left), from
-// his X (position variable 0x0F000000) against the last frame's (%(last)s) once he's off (a roll can
+// 0x45 - DamageFall 0x4C) puts the cap back too. rolloff_dir: the way he moves (1 right, -1 left), from
+// his X (position variable 0x0F000000) against the last frame's (rolloff_last_x) once he's off (a roll can
 // turn him round, so not his facing). %(cap)s: the cap is off from a roll-off. The speed itself is
 // the ACMD's, set once, x rolloff_air_speed_mult() once (Fall's main, or here when he slid straight
 // into an air action: %(slid)s still set outside Fall and the rolls), then air friction slows it.
 // ===================================================================
+float rolloff_dir;      // the way he moves on screen once he's off: 1 right, -1 left, 0 not known yet
+float rolloff_last_x;   // his X the frame before
 float rolloff_hold_x() { return 0.3f; } // the stick past this, on screen, the way he moves keeps the cap off
 
 void rolloff_hold_update()
@@ -493,27 +500,27 @@ void rolloff_hold_update()
     x = WorkModuleF(0, 0x0f000000);
     if (%(cap)s)
     {
-        if (%(dir)s == 0)
+        if (rolloff_dir == 0)
         {
-            if (x > %(last)s + 0.01f)
+            if (x > rolloff_last_x + 0.01f)
             {
-                %(dir)s = 1.0f;
+                rolloff_dir = 1.0f;
             }
-            else if (x < %(last)s - 0.01f)
+            else if (x < rolloff_last_x - 0.01f)
             {
-                %(dir)s = -1.0f;
+                rolloff_dir = -1.0f;
             }
         }
         if (StatusModule(0x1) != 0x2 || global4 >= 0x45 && global4 <= 0x4c
-            || %(dir)s != 0 && WorkModuleF(0, 0x0f000260) * %(dir)s < rolloff_hold_x()
+            || rolloff_dir != 0 && WorkModuleF(0, 0x0f000260) * rolloff_dir < rolloff_hold_x()
                && ControlModule(0x2710, 0) == 0 && ControlModule(0x2710, 0x1) == 0)
         {
             %(cap)s = 0;
-            %(dir)s = 0;
+            rolloff_dir = 0;
             WorkModule(0x14, 0x20000044);
         }
     }
-    %(last)s = x;
+    rolloff_last_x = x;
     if (%(slid)s != 0 && global4 != 0xe && global4 != 0x20 && global4 != 0x21)
     {
         if (StatusModule(0x1) == 0x2)
