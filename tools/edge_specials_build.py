@@ -330,27 +330,67 @@ def octaslash_loop_scripts(game, effect):
 
 
 # test 150, the user: "double the size and reach of Sephiroth's sword during up air and adjust the hitboxes to match. Only
-# begin making the sword larger 2 frames before the sword effect spawn. Please do the same to forward smash". edge.c
-# edge_sw_tick scales the blade's joint (EdgeBladeL, 1003, at LHaveN's origin: tools/snake_sword.py) by SWORD2X_SCALE from
-# 2 frames before the move's Sword_Glow (grow, scale, shrink back after the trail's gone: SWORD2X below, motion frames);
-# here, in the frames the blade is 2x (from the trail's frame to the shrink): the hitboxes on LHaveN (joint 24, 0x18)
-# have their offsets and size x 2 (scaled about LHaveN's origin, as the blade is), the trail's points (Sword_Glow, on
-# LHaveN) x 2, and the sword's lights on LHaveN (edge_sword_light*: External_Graphic) x 2 in size and offset. Forward
-# smash's hitbox ID 5 (on his root, at the sword's far part, 10 beyond the hand's ID 1 along Z) goes twice as far from
-# ID 1 (Z 6.5 + 2 x (Z - 6.5)) at twice its size; ID 1 (by his hand) as it was
-SWORD2X_SCALE = 2.0
-SWORD2X_JOINT = 0x18
-SWORD2X = {'AttackAirHi': (15.0, 29.0), 'AttackS4': (21.0, 31.0)}   # (grow from, shrink from): edge.c edge_sw_scale
+# begin making the sword larger 2 frames before the sword effect spawn. Please do the same to forward smash"; test 151:
+# "reduce [up air's] by 50%" (2 -> 1.5), forward smash's "increase by 25%" (2 -> 2.5). edge.c edge_sw_tick scales the
+# blade's joint (EdgeBladeL, 1003, at LHaveN's origin: tools/snake_sword.py) by the move's factor from 2 frames before its
+# Sword_Glow (grow, scale, shrink back after the trail's gone: SWORD_FRAMES below, motion frames). The factors are edge.c's
+# `edge_sw_k_uair()` / `edge_sw_k_fsmash()`, read from there (sword_factors: one place to change each). Here, in the frames
+# the blade is at the factor (from the trail's frame to the shrink): the hitboxes on LHaveN (joint 24, 0x18) have their
+# offsets and size x k (scaled about LHaveN's origin, as the blade is), the trail's points (Sword_Glow, on LHaveN) x k, and
+# the sword's lights on LHaveN (edge_sword_light*: External_Graphic) x k in size and offset. Forward smash's hitbox ID 5
+# (a capsule on his root along the sword's far part, Z 16.5 - 21.5, 10 - 15 beyond the hand's ID 1 at Z 6.5) goes k
+# times as far from ID 1 (Z / Z2 6.5 + k x (Z - 6.5); test 150 moved Z only) at k times its size; ID 1 (by his hand,
+# the hilt) where it was
+SWORD_JOINT = 0x18
+SWORD_FRAMES = {'AttackAirHi': (15.0, 29.0), 'AttackS4': (21.0, 31.0)}   # (grow from, shrink from): edge.c edge_sw_scale
+SWORD_K_FN = {'AttackAirHi': 'edge_sw_k_uair', 'AttackS4': 'edge_sw_k_fsmash'}
+# test 151, the user: forward smash's sword hitboxes "the same as its 13% hitbox" with "slightly higher base knockback":
+# every one (IDs 0 - 5: the sword's on LHaveN, ID 1 at the hilt by his hand, ID 5 along the far part) takes ID 0's
+# (13.5%, angle 361, KBG 81, hitlag 0.7, cut, sound level M ...) with BKB 54 + FSMASH_BKB_ADD; ID, Part, bone, size and
+# place stay (the k-x sword's)
+FSMASH_BKB_ADD = 5
+HIT_COPY = ('Damage', 'Angle', 'KBG', 'FKB', 'BKB', 'Effect', 'Trip', 'Hitlag', 'SDI', 'Clang', 'Rebound', 'ShieldDamage',
+            'SFXLevel', 'SFXType', 'Ground/Air', 'Direct/Indirect', 'Type', 'HitBits', 'Unk41', 'CollisionPart', 'NoScale',
+            'Shieldable', 'Reflectable', 'Absorbable', 'Rehit', 'IgnoreInvuln', 'HitAllStates', 'FacingRestrict',
+            'NoGrabRelease', 'TeamDamage', 'DisableHitlag', 'NoGFX', 'Flinchless')
+
+
+def sword_factors():
+    """{move: factor} from edge.c's edge_sw_k_* (the MSC that scales the blade)"""
+    src = open(os.path.join(EDGE, 'edge.c')).read()
+    out = {}
+    for name, fn in SWORD_K_FN.items():
+        m = re.search(r'float %s\(\) \{ return ([0-9.]+)f; \}' % fn, src)
+        assert m, fn
+        out[name] = float(m.group(1))
+    return out
+
+
+def fsmash_same_hitboxes(body):
+    """forward smash's hitboxes all ID 0's (the 13.5% one) with BKB + FSMASH_BKB_ADD (test 151)"""
+    hb = ('Hitbox', 'Special_Hitbox', 'Extended_Hitbox', 'Extended_Special_Hitbox')
+    hits = [c for c in body if c.name in hb]
+    tpl = next(c for c in hits if c.params[0] == 0)
+    tsyn = acmd.INFO[tpl.ident]['syntax']
+    out = []
+    for c in body:
+        if c.name in hb:
+            syn = acmd.INFO[c.ident]['syntax']
+            kw = {key: tpl.params[tsyn.index(key)] for key in HIT_COPY if key in syn and key in tsyn}
+            kw['BKB'] = tpl.params[tsyn.index('BKB')] + FSMASH_BKB_ADD
+            c = _set(c, **kw)
+        out.append(c)
+    return out, len(hits)
 
 
 def sword2x_scripts(game, effect):
-    k = SWORD2X_SCALE
     hb = ('Hitbox', 'Special_Hitbox', 'Extended_Hitbox', 'Extended_Special_Hitbox')
     log = []
-    for name, (grow, shrink) in SWORD2X.items():
+    for name, k in sword_factors().items():
+        grow, shrink = SWORD_FRAMES[name]
         crc = acmd.crc(name)
-        full = grow + 2.0                          # the trail's frame: the blade at 2x from here to `shrink`
-        n_hit = n_fx = 0
+        full = grow + 2.0                          # the trail's frame: the blade at k from here to `shrink`
+        n_hit = n_fx = n_same = 0
         out = []
         for f, body in _frames(game.scripts[crc]):
             if full <= f < shrink:
@@ -359,17 +399,23 @@ def sword2x_scripts(game, effect):
                     if c.name in hb:
                         syn = acmd.INFO[c.ident]['syntax']
                         g = lambda key: c.params[syn.index(key)]   # noqa: E731
-                        if g('Bone') == SWORD2X_JOINT:
+                        if g('Bone') == SWORD_JOINT:
                             kw = dict(Size=g('Size') * k, X=g('X') * k, Y=g('Y') * k, Z=g('Z') * k)
                             if 'X2' in syn:
                                 kw.update(X2=g('X2') * k, Y2=g('Y2') * k, Z2=g('Z2') * k)
                             c = _set(c, **kw)
                             n_hit += 1
                         elif name == 'AttackS4' and g('ID') == 5:
-                            c = _set(c, Size=g('Size') * k, Z=6.5 + k * (g('Z') - 6.5))
+                            kw = dict(Size=g('Size') * k, Z=6.5 + k * (g('Z') - 6.5))
+                            if 'Z2' in syn:
+                                kw['Z2'] = 6.5 + k * (g('Z2') - 6.5)
+                            c = _set(c, **kw)
                             n_hit += 1
                     nb.append(c)
                 body = nb
+                if name == 'AttackS4' and any(c.name in hb for c in body):
+                    body, n = fsmash_same_hitboxes(body)
+                    n_same += n
             out.append((f, body))
         game.scripts[crc] = _join(out)
         eout = []
@@ -381,16 +427,18 @@ def sword2x_scripts(game, effect):
                     if c.name == 'Sword_Glow':
                         c = _set(c, **{key: c.params[syn.index(key)] * k for key in ('X1', 'Y1', 'Z1', 'X2', 'Y2', 'Z2')})
                         n_fx += 1
-                    elif c.name == 'External_Graphic' and c.params[syn.index('Bone')] == SWORD2X_JOINT:
+                    elif c.name == 'External_Graphic' and c.params[syn.index('Bone')] == SWORD_JOINT:
                         c = _set(c, **{key: c.params[syn.index(key)] * k for key in ('X', 'Y', 'Z', 'Size')})
                         n_fx += 1
                     nb.append(c)
                 body = nb
             eout.append((f, body))
         effect.scripts[crc] = _join(eout) + [acmd.Command(acmd.END)]
-        assert n_hit and n_fx, (name, n_hit, n_fx)
-        log.append('%s %d hitboxes / %d sword effects x %g (frames %g - %g)' % (name, n_hit, n_fx, k, full, shrink - 1))
-    return 'sword 2x: %s\n' % '; '.join(log)
+        assert n_hit and n_fx and (name != 'AttackS4' or n_same), (name, n_hit, n_fx, n_same)
+        log.append('%s %d hitboxes / %d sword effects x %g (frames %g - %g)%s' % (
+            name, n_hit, n_fx, k, full, shrink - 1, ', %d hitboxes as ID 0 with BKB +%d' % (n_same, FSMASH_BKB_ADD)
+            if n_same else ''))
+    return 'sword scale: %s\n' % '; '.join(log)
 
 
 def _frames(cmds):

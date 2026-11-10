@@ -594,7 +594,7 @@ void func_48()
 }
 
 // ---- Sephiroth's up special trail (tools/edge_trail_msc.py; tests 124 / 126): one stretch of the purple line his
-// path leaves during either up special's attack, up to 16 points; still, removed after 360 frames
+// path leaves during either up special's attack, up to 16 points; still, removed after 640 frames
 int tr_slot;            // his player slot (0 - 7), -1: not found
 int tr_life;            // frames left
 int tr_base;            // its first point's number
@@ -1538,7 +1538,7 @@ void func_46()
 {
     int k;
     tr_slot = tr_find_owner();
-    tr_life = 360;
+    tr_life = 640;
     tr_n = 0;
     tr_over_t = 0;
     tr_mark = 0;

@@ -43,6 +43,14 @@ The user's numbers:
 
 ## Held up tilt (test 98)
 
+**Its first hit, tapped (test 151, the user: "fix its initial hitbox on the ground - it's supposed to pick opponents up
+into the hilt part of the hitbox"):** Ultimate's frame-17 hits (1%, grounded targets only) carry the fighter to (2, 45) /
+(0, 46) from his top over 5 / 6 frames (angle 368, set_vec_target_pos); the port's angle 366 pulled it to the hitbox's
+own centre, 8.5 up, so it stayed on the floor. His per-frame hook now carries every fighter it hit (in hitstop / hitstun
+near the hits by frame 18) up to his place + (2, 37) (feet: its middle near 45) by frame 22, a 1 / (23 - f) part a frame
+out of his hitlag, its stage collision the air's (`edge.c` edge_hi3_pull, VAR_14 the marks). Not while the sword is
+held (VAR_23 0 only).
+
 User, test 97: "please make held Up tilt work the same way that held forward air does", "for up tilt, make the
 default direction up". Everything above applies, with up tilt's own numbers (`edge_sn_move` 1):
 - **Hooks:** up tilt's status (0x29) main `func_278` (`edge_sn_init_hi3`: the hold check starts if attack is held),

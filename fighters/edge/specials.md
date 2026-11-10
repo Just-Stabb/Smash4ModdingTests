@@ -105,6 +105,14 @@ Translator additions for the specials (`tools/ultimate_acmd.py`): `for _ in a..b
   for 74 / 28 / 47 frames (`param_fire`), then burst (BurstS / M / L) for 10 / 24 / 50 frames; a
   wall or floor bursts it early, a hit too (`"on_hit": 1`). Its scripts are Ultimate's edge_fire
   ones; the bursts' effects outlive it (Terminate 0).
+- **Angles (test 151, the user: "angleable by holding up / down before it releases"):** the stick as the fire is made
+  (Flare / Megaflare their frame 13, Gigaflare the charge's 120): y >= 0.5 sends it 45 degrees up, y <= -0.5 45 down,
+  else straight (`edge_n_dir`, through the custom slot as level + 4 x direction; `fire.c` fire_move splits its speed
+  0.707 / 0.707 and turns its look, PostureModule 0x2717 (-45 / 45, 0, 0), its facing set). A floor met going down
+  bursts it as before.
+- **Roll cancel after the fire (test 151, the user: "6 frames after Flare or a variant is released, Sephiroth's animation
+  can be cancelled into a roll"):** on the ground, from 6 frames after the fire is made, test 143's roll inputs go into
+  EscapeF / EscapeB (`edge_n_roll_after`); in the air nothing (no air dodge, as the charge's cancel).
 - **Shields (test 148, the user: "make Flare and its variants not instantly disappear on shield, they should play out
   their hitboxes"):** a shield is a hit too (`extra_kinds.json` `"on_hit_bits": "0x17"`: Din's Fire's own hit method
   removed the weapon on the shield result 0x4, the flight and a burst touching a shield alike): the flight bursts on a
@@ -239,7 +247,8 @@ by function: the spec `edgenro/spec_up_special.md`; addresses below are `f_7203e
     `tools/edge_trail_msc.py`), still at its first point, moving its model's joints every frame relative to it
     (`ModelModule(0x7, 0x7D0 + bone, 0, dy, dx x lr)`, lr its facing as made: test 127 fixes a line drawn the wrong way
     when the move was turned after its start; setting the facing to +1 didn't turn its model); removed after
-    360 frames ("persists for 6 seconds"), or once its pieces are all gone and its fill is over. Model
+    640 frames (test 151, the user: "Blade Dash's lines last 640 frames"; 360 before: "persists for 6 seconds"; the
+    other trails go before that anyway), or once its pieces are all gone and its fill is over. Model
     (`tools/edge_snake_articles.py build_trail`, 49 bones): the line, piece k two ribbons 1.2 wide in the screen plane
     (width along world up and along world X) between its own joints A_k / B_k, so a piece can go alone (both on its
     start); the fill, wedges from a middle joint C to joints W_k / W_k+1 at the pieces' points. The light arrow's glow

@@ -2509,3 +2509,42 @@ smash".
 - Package (install over test 149): `script/animcmd/body/game.bin`, `effect.bin`, `script/animcmd/weapon/snaketip/
   game.bin`, `script/msc/edge.mscsb`, `flare1/flare1.mscsb`, `snaketip/snaketip.mscsb`.
 
+## Test 151 (`$S/sephiroth_test151.zip`, not in build/: disk): up air 1.5x / forward smash 2.5x sword, forward smash's hits all its 13.5%, up tilt's lift, angled Flare, roll after Flare, Blade Dash lines 640 frames
+
+User: up air's sword "reduce ... by 50%", forward smash's "increase by 25%" and "make all of the sword hitboxes the same
+as its 13% hitbox, but with slightly higher base knockback", "Up tilt: fix its initial hitbox on the ground - it's
+supposed to pick opponents up into the hilt part of the hitbox", Flare and its variants "angleable by holding up / down
+before it releases", "6 frames after Flare or a variant is released, Sephiroth's animation can be cancelled into a roll",
+"Blade Dash's lines last 640 frames".
+- **Sword sizes** (`edge.c` edge_sw_k_uair / edge_sw_k_fsmash: one constant a move, which `edge_specials_build.py`
+  sword_factors also reads for the scripts): up air 1.5 (was 2), forward smash 2.5 (was 2), same frames (grown in thirds
+  over the two frames before the trail, back over three after it). Everything on LHaveN x k as before: up air's hitboxes
+  X 0.75 / 10.5 / 21 / 31.5, size 6, Z 4.5; forward smash's X 0 / 17.5 / 37.5 / 53.75, size 10, Y / Z -2.5 / 10; the
+  trails (up air's far edge 45.3, forward smash's 76.1) and the sword lights x k.
+- **Forward smash's hitboxes** (`fsmash_same_hitboxes`): all six (IDs 0, 2, 3, 4 on the sword; 1, a sphere at his hand,
+  the hilt: 0 / 8.5 / 6.5 on his root, size 5.8; 5, a capsule on his root along the far part of the sword) are now ID 0's
+  13.5% (angle 361, KBG 81, hitlag 0.7, cut, sound level M, ...) with BKB 59 (ID 0's 54 + 5; the 20% / 15% ones had BKB
+  57); their places and sizes the 2.5x sword's. ID 5 now follows the sword at both ends: Z 16.5 / Z2 21.5 -> 31.5 / 44
+  (6.5 + 2.5 x (Z - 6.5)), size 13.75 (test 150 moved only its Z). ID 1 stays where it is (his hand).
+- **Up tilt's lift** (`edge.c` edge_hi3_pull): Ultimate's frame-17 hits (1%, grounded targets only: Ground/Air 1 in the
+  port, as it was) use angle 368 with set_vec_target_pos (2, 45) / (0, 46) from his top over 5 / 6 frames: the fighter is
+  carried up the sword for frame 20's hits (21 - 48 up it, the 14% at its top). Smash 4 has no 368 and no target point;
+  the port's 366 pulls to the hitbox's own centre, 8.5 up by his feet, so the fighter stayed on the floor under the
+  sword. Now his per-frame hook marks every fighter (not him) in hitstop or hitstun within 15 of 7 in front of him (-10 -
+  20 up) by frame 18 and moves each a 1 / (23 - f) part of the way to his place + (2, 37) each frame out of his hitlag
+  until frame 22, its stage collision the air's. Not while the snake sword is held (VAR_23).
+- **Angled Flare** (`edge.c` edge_n_dir / edge_n_generate, `weapons/fire.c`): the stick as the fire is made (Flare /
+  Megaflare at their frame 13, Gigaflare at the charge's 120): up (y >= 0.5) 45 degrees up, down (<= -0.5) 45 down, else
+  straight; sent as level + 4 x direction through the custom slot; the fire splits its speed (0.707 x / 0.707 y, its
+  growth and life as before) and turns its look (PostureModule 0x2717 (-45 / +45, 0, 0), its facing set: port_check W6).
+- **Roll after the fire** (`edge_n_roll_after`): on the ground, from 6 frames after the fire is made, test 143's roll
+  inputs go into EscapeF / EscapeB. In the air nothing (no air dodge, as the charge's roll cancel).
+- **Blade Dash's lines** (`tools/edge_trail_msc.py` LIFE): 640 frames (was 360). The 6-line limit stays.
+- **Tested:** builds, `msc_stack_check` 0 problems (edge / fire / trail); the scripts differ from test 150's only in
+  AttackAirHi / AttackS4 (the numbers above). Not tested in game: the lift (whether the game lets a hit fighter be
+  placed in the air from the floor, the 37), the angled Flare's look, the roll timing.
+- port_check over the chain + tests 148 - 150 + this: 42 errors, 57 warnings, 4 notes, the chain's; the W6 this change
+  first gave (the fire turned without setting its facing) fixed.
+- Package (install over test 150): `script/animcmd/body/game.bin`, `effect.bin`, `script/msc/edge.mscsb`,
+  `fire/fire.mscsb`, `trail/trail.mscsb`.
+

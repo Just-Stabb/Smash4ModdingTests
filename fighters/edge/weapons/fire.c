@@ -557,6 +557,7 @@ int func_40(int arg0)
 // the burst (Ultimate's burst scripts end it by a notify at frame 6 / 20 / 45).
 // Weapons are pooled: the state is reset when status 0 is entered.
 int fire_level;
+int fire_dir;           // test 151: 0 straight, 1 up 45 degrees, 2 down 45 (his custom slot's value / 4)
 int fire_frame;
 int fire_life;
 int fire_phase;
@@ -575,9 +576,21 @@ void fire_status(int status)
     StatusModule(0x3, status, 0);
 }
 
+// along its direction (test 151, the user: "angleable by holding up / down before it releases": 45 degrees up / down)
 void fire_move(float speed)
 {
-    KineticModule(0x11, 0, speed * PostureModuleF(0), 0);
+    if (fire_dir == 0x1)
+    {
+        KineticModule(0x11, 0, speed * 0.7071068f * PostureModuleF(0), speed * 0.7071068f);
+    }
+    else if (fire_dir == 0x2)
+    {
+        KineticModule(0x11, 0, speed * 0.7071068f * PostureModuleF(0), -speed * 0.7071068f);
+    }
+    else
+    {
+        KineticModule(0x11, 0, speed * PostureModuleF(0), 0);
+    }
     KineticModule(0xf, 0, 0, 0);
     KineticModule(0x15, 0, -1.0f, -1.0f);
 }
@@ -666,9 +679,31 @@ void fire_fly_main()
         return;
     }
     fire_level = WorkModule(0x6, 0x10000005);
+    fire_dir = fire_level / 0x4;               // level + 4 x direction (edge.c edge_n_generate, test 151)
+    fire_level = fire_level - fire_dir * 0x4;
     if (fire_level < 0 || fire_level > 0x2)
     {
         fire_level = 0;
+    }
+    if (fire_dir < 0 || fire_dir > 0x2)
+    {
+        fire_dir = 0;
+    }
+    // its look turned along it (the pitch about its side axis, its facing turning it his way: the snake articles'
+    // PostureModule 0x2717 (-pitch, 0, 0), up = +pitch), its facing set as it is (a weapon that turns itself without
+    // setting it leaves the fighters it hits facing the camera: port_check W6)
+    PostureModule(0, PostureModuleF(0));
+    if (fire_dir == 0x1)
+    {
+        PostureModule(0x2717, -45.0f, 0, 0);
+    }
+    else if (fire_dir == 0x2)
+    {
+        PostureModule(0x2717, 45.0f, 0, 0);
+    }
+    else
+    {
+        PostureModule(0x2717, 0, 0, 0);
     }
     fire_frame = 0;
     fire_speed = 0.01f;
@@ -706,6 +741,7 @@ void fire_burst_loop()
 
 void fire_burst_main()
 {
+    fire_dir = 0;                              // the burst stays where it is (fire_move(0))
     if (fire_phase == 0)
     {
         fire_phase = 0x1;

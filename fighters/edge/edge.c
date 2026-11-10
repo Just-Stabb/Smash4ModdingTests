@@ -1776,6 +1776,7 @@ void func_82()
     edge_tr_tick();                    // ... its trail's shapes (test 126)
     edge_s_line_tick();                // Shadow Flare's shot as a line while it flies (test 148)
     edge_sw_tick();                    // up air / forward smash: the blade at 2x (test 150)
+    edge_hi3_pull();                   // up tilt's first hit lifts grounded fighters up the sword (test 151)
     edge_hi_keep_in();                 // ... Octaslash's victims kept in the blast zones (test 127)
     if (!global3)
     {
@@ -37749,11 +37750,31 @@ void edge_n_air()
     }
 }
 
+// test 151, the user: "Neutral special (Flare / Megaflare / Gigaflare): angleable by holding up / down before it
+// releases": the stick as it's made (Flare / Megaflare at their frame 13, Gigaflare at the charge's 120): up (y >= 0.5)
+// 45 degrees up, down (y <= -0.5) 45 down, else straight; to the fire article with its level as level + 4 x direction
+// (1 up, 2 down; weapons/fire.c fire_fly_main)
+int edge_n_dir()
+{
+    if (global32 >= 0.5f)
+    {
+        return 0x1;
+    }
+    if (global32 <= -0.5f)
+    {
+        return 0x2;
+    }
+    return 0;
+}
+
 void edge_n_generate()
 {
     int slot;
+    int v;
     slot = WorkModule(0x6, 0x10000049);
-    WorkModule(0x7, edge_n_level, 0x10000049);
+    v = edge_n_dir();
+    v = edge_n_level + 0x4 * v;
+    WorkModule(0x7, v, 0x10000049);
     ArticleModule(0x2710, 0x5);
     WorkModule(0x7, slot, 0x10000049);
     edge_n_fired = 0x1;
@@ -37785,6 +37806,34 @@ void edge_n_change(int state)
     global20 = 0;
 }
 
+// test 151, the user: "6 frames after Flare or a variant is released, Sephiroth's animation can be cancelled into a roll":
+// 6 frames after the fire is made (edge_n_fired counts the frames from 1 at the generate, the roll from 6), on the ground the
+// roll inputs (test 143's: func_48's global24 0x2000000 forward / 0x4000000 back) go into EscapeF / EscapeB. In the air
+// nothing (as the charge's roll cancel: no air dodge)
+int edge_n_roll_after()
+{
+    if (edge_n_fired == 0)
+    {
+        return 0;
+    }
+    if (edge_n_fired < 0x6)
+    {
+        edge_n_fired += 1;
+        return 0;
+    }
+    if (global18 == 0 && (global24 & 0x2000000) != 0)
+    {
+        func_16(0x20, 0x1);
+        return 0x1;
+    }
+    if (global18 == 0 && (global24 & 0x4000000) != 0)
+    {
+        func_16(0x21, 0x1);
+        return 0x1;
+    }
+    return 0;
+}
+
 void edge_n_loop()
 {
     float f;
@@ -37792,6 +37841,10 @@ void edge_n_loop()
     {
         edge_n_kinetic();
         MotionModule(0x3, edge_n_motion(edge_n_ground_motion()));
+    }
+    if (edge_n_roll_after())
+    {
+        return;
     }
     f = MotionModuleF(0x1);
     if (edge_n_state == 0)
@@ -39144,23 +39197,31 @@ void edge_s_line_tick()
 // blade's joint (EdgeBladeL, 1003: at LHaveN's origin, the blade's mesh on it, the hilt on LHaveN; the snake sword hides
 // it the same way, edge_sn_blade_hide) scaled by his motion and its frame (his own hit / status variables q 3 / 4,
 // 0x0F0000A3 / A4): up air (0x6B) from frame 15 (its Sword_Glow at 17), forward smash (0x5F) from 21 (its trail at 23),
-// 1.33 / 1.67 / 2 over the two frames before the trail and its frame, 2 until the trail is gone (29 / 31: up air's ends
+// grown in thirds over the two frames before the trail and its frame to the factor k (2 in test 150), k until the trail is gone (29 / 31: up air's ends
 // at 23 + 5, forward smash's at 28 + 2), back to 1 over 3 frames; 1 in every other motion (so a move cut short leaves
 // it normal), set every frame unless the held forward air / up tilt has it hidden (edge_sn_hid). The scripts' hitboxes,
-// trail and sword lights match from the trail's frame (tools/edge_specials_build.py sword2x_scripts: SWORD2X)
+// trail and sword lights match from the trail's frame (tools/edge_specials_build.py sword2x_scripts: SWORD_FRAMES).
+// Test 151, the user: up air's "reduce ... by 50%", forward smash's "increase by 25%": each move's factor is one constant
+// here, which the build also reads for the scripts (edge_specials_build.py sword_factors): change it here only
+float edge_sw_k_uair() { return 1.5f; }      // up air's sword (test 150: 2)
+float edge_sw_k_fsmash() { return 2.5f; }    // forward smash's sword (test 150: 2)
+
 float edge_sw_scale(int m, float f)
 {
     float a;
     float b;
+    float k;
     if (m == 0x6b)
     {
         a = 15.0f;
         b = 29.0f;
+        k = edge_sw_k_uair();
     }
     else if (m == 0x5f)
     {
         a = 21.0f;
         b = 31.0f;
+        k = edge_sw_k_fsmash();
     }
     else
     {
@@ -39172,13 +39233,13 @@ float edge_sw_scale(int m, float f)
     }
     if (f < a + 2.0f)
     {
-        return 1.0f + (f - a + 1.0f) / 3.0f;
+        return 1.0f + (k - 1.0f) * (f - a + 1.0f) / 3.0f;
     }
     if (f < b)
     {
-        return 2.0f;
+        return k;
     }
-    return 2.0f - (f - b + 1.0f) / 3.0f;
+    return k - (k - 1.0f) * (f - b + 1.0f) / 3.0f;
 }
 
 void edge_sw_tick()
@@ -39194,6 +39255,76 @@ void edge_sw_tick()
     f = WorkModuleF(0, 0x0f0000a4);
     k = edge_sw_scale(m, f);
     ModelModule(0, 0x3eb, k, k, k);
+}
+
+// test 151, the user: "Up tilt: fix its initial hitbox on the ground - it's supposed to pick opponents up into the hilt part
+// of the hitbox". Ultimate's game_attackhi3 frame 17: two 1% hits on grounded targets only (COLLISION_SITUATION_MASK_G,
+// here Ground/Air 1: as it was), angle 368 with set_vec_target_pos to (2, 45) / (0, 46) from his top over 5 / 6 frames:
+// the hit fighter is carried up to the sword, where frame 20's hits (21 - 48 up it) land. Smash 4 has no 368 and no
+// target point: the port's 366 pulls toward the hitbox's own centre, 8.5 up by his feet, so the fighter stayed on the
+// floor under the sword. Now his per-frame hook carries them: in up tilt (0x29, not the held snake sword: VAR_23 0) from
+// motion frame 17 every fighter (not him) in hitstop or hitstun near the hits (within 15 of 7 in front, -10 - 20 up) by
+// frame 18 is marked (VAR_14, a bit a player slot: Octaslash's, free here), and each marked one is moved (its place,
+// 0x0F000020 + 4 x slot) a 1 / (23 - f) part of the way to his place + (2 forward, 37 up) each frame out of his hitlag
+// until frame 22 (feet at 37: its middle at about 45, Ultimate's point), its stage collision the air's (q 6 = 5) so the
+// floor doesn't hold it
+void edge_hi3_pull()
+{
+    float f;
+    float x;
+    float y;
+    float tx;
+    float ty;
+    float k;
+    float lr;
+    int s;
+    int bit;
+    int mask;
+    if (global4 != 0x29 || WorkModuleF(0, 0x0f000317) != 0.0f)
+    {
+        return;
+    }
+    f = MotionModuleF(0x1);
+    if (f < 17.0f)
+    {
+        WorkModule(0, 0.0f, 0x0f00030e);
+        return;
+    }
+    if (f >= 23.0f)
+    {
+        return;
+    }
+    mask = (int)WorkModuleF(0, 0x0f00030e);
+    lr = PostureModuleF(0);
+    tx = PostureModuleF(0x1) + 2.0f * lr;
+    ty = PostureModuleF(0x2) + 37.0f;
+    k = 1.0f / (23.0f - f);
+    s = 0;
+    bit = 0x1;
+    while (s < 0x8)
+    {
+        x = WorkModuleF(0, 0x0f000020 + 0x4 * s);
+        y = WorkModuleF(0, 0x0f000021 + 0x4 * s);
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0.0f && (x != PostureModuleF(0x1) || y != PostureModuleF(0x2)))
+        {
+            if (f < 19.0f && (mask / bit) - (mask / bit / 0x2) * 0x2 == 0
+                && (WorkModuleF(0, 0x0f00005b + 0x8 * s) > 0.0f || WorkModuleF(0, 0x0f000058 + 0x8 * s) > 0.0f)
+                && func_13(x - PostureModuleF(0x1) - 7.0f * lr) < 15.0f && y - PostureModuleF(0x2) > -10.0f
+                && y - PostureModuleF(0x2) < 20.0f)
+            {
+                mask = mask + bit;
+            }
+            if ((mask / bit) - (mask / bit / 0x2) * 0x2 == 0x1 && WorkModuleF(0, 0x0f000043) == 0.0f)
+            {
+                WorkModule(0, x + (tx - x) * k, 0x0f000020 + 0x4 * s);
+                WorkModule(0, y + (ty - y) * k, 0x0f000021 + 0x4 * s);
+                WorkModule(0, 5.0f, 0x0f0000a0 + 0x8 * (s + 0x3) + 0x6);
+            }
+        }
+        s = s + 1;
+        bit = bit * 0x2;
+    }
+    WorkModule(0, (float)mask, 0x0f00030e);
 }
 
 // the rush's y: the stop energy's plus the gravity energy's (test 106: in the air the rush's y is on the gravity
