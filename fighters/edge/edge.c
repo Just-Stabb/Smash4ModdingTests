@@ -37812,7 +37812,8 @@ void edge_n_change(int state)
 // nothing (as the charge's roll cancel: no air dodge)
 // Test 152, the user: the roll "bufferable": a roll input from the release on (Flare / Megaflare: SpecialN1 / N2;
 // Gigaflare: from its fire, the charge's own roll window being over by then) is kept, the newest one, and the roll comes
-// out on the first frame the cancel is open (6 frames after the fire), on the ground. The buffer is edge_n_released
+// out on the first frame the cancel is open (6 frames after the fire), on the ground; held counts too (shield held,
+// ControlModule(0x2712, 3), and the stick 0.5 or more forward / back: global48 x his facing). The buffer is edge_n_released
 // (the charge's "special let go" flag, read only while charging before frame 100): 0x10 forward, 0x20 back (0 / 1 none)
 int edge_n_roll_after()
 {
@@ -37825,6 +37826,14 @@ int edge_n_roll_after()
         else if ((global24 & 0x4000000) != 0)
         {
             edge_n_released = 0x20;
+        }
+        else if (ControlModule(0x2712, 0x3) && global48 * PostureModuleF(0) >= 0.5f)
+        {
+            edge_n_released = 0x10;        // held: shield + forward (the user: "allow the roll input to be held")
+        }
+        else if (ControlModule(0x2712, 0x3) && global48 * PostureModuleF(0) <= -0.5f)
+        {
+            edge_n_released = 0x20;        // held: shield + back
         }
     }
     if (edge_n_fired == 0)

@@ -2548,3 +2548,19 @@ before it releases", "6 frames after Flare or a variant is released, Sephiroth's
 - Package (install over test 150): `script/animcmd/body/game.bin`, `effect.bin`, `script/msc/edge.mscsb`,
   `fire/fire.mscsb`, `trail/trail.mscsb`.
 
+## Test 152 (`$S/sephiroth_test152.zip`, not in build/: disk): the roll after Flare buffered, pressed or held
+
+User: make the roll cancel after Flare (test 151) bufferable, then "please also allow the roll input to be held for
+buffering from flare".
+- `edge.c` edge_n_roll_after: from the release on (Flare / Megaflare: their SpecialN1 / N2; Gigaflare: from its fire),
+  every frame the newest roll input is kept: a roll press (test 143's: func_48's global24 0x2000000 forward / 0x4000000
+  back) or a held one (shield held, `ControlModule(0x2712, 3)`, with the stick 0.5 or more forward / back: global48 x
+  his facing); on the first frame the cancel is open (6 frames after the fire), on the ground, that roll comes out
+  (EscapeF / EscapeB). No expiry inside the window (at most 13 + 6 frames from the release). The buffer reuses
+  `edge_n_released` (the charge's "special let go" flag, only read while charging before frame 100; 0x10 forward, 0x20
+  back), no new global. In the air nothing, as before. The charge's own roll cancel (test 143, frames 20 - 99 of the
+  charge) is separate code and unchanged (it acts the frame the input comes).
+- Not tested in game. `msc_stack_check` 0 problems; only edge.mscsb differs from test 151's.
+- port_check over the chain + tests 148 - 151 + this: 42 errors, 57 warnings, 4 notes, the chain's.
+- Package (install over test 151): `script/msc/edge.mscsb`.
+

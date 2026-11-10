@@ -113,6 +113,8 @@ Translator additions for the specials (`tools/ultimate_acmd.py`): `for _ in a..b
 - **Roll cancel after the fire (test 151, the user: "6 frames after Flare or a variant is released, Sephiroth's animation
   can be cancelled into a roll"):** on the ground, from 6 frames after the fire is made, test 143's roll inputs go into
   EscapeF / EscapeB (`edge_n_roll_after`); in the air nothing (no air dodge, as the charge's cancel).
+  Buffered since test 152: a roll input pressed or held (shield + stick 0.5 forward / back) from the release on comes
+  out on the window's first frame.
 - **Shields (test 148, the user: "make Flare and its variants not instantly disappear on shield, they should play out
   their hitboxes"):** a shield is a hit too (`extra_kinds.json` `"on_hit_bits": "0x17"`: Din's Fire's own hit method
   removed the weapon on the shield result 0x4, the flight and a burst touching a shield alike): the flight bursts on a
