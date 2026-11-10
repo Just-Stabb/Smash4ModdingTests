@@ -3,6 +3,8 @@
 
   python3 tools/supamario_kame_build.py PKG_DIR SUPAMARIO_V4 SUPAMARIO_V5 OUT_DIR [--rpx IN.rpx]
                                         [--taunts [--diag | --diag2]]
+  python3 tools/supamario_kame_build.py --msc-only OUT.mscsb   (only supamario.mscsb, no package needed:
+                                        supamario_kame_values.SUPAMARIO_FX)
 
 PKG_DIR: the extracted .vfxpackage. SUPAMARIO_V4 / _V5: the fighter/supamario folders of the v4 and
 v5 packages (v4's ptcl is the base; v5 has the .efc entry 0x16, the scripts and the fireball's
@@ -494,8 +496,38 @@ def fl(v):
     return '%sf' % repr(float(v))
 
 
+def supamario_values(fx):
+    """the KAME_* values for fighters/supamario/supamario.c; fx: the effect ones (KAME_FX_CRG / CRGON / TSUBU,
+    KAME_N_START_FX / OFF), from the package build or supamario_kame_values.SUPAMARIO_FX"""
+    return {
+        'KAME_N_HOLD_FRAME': fl(N_HOLD_FRAME), 'KAME_N_FIRE_FRAME': fl(N_FIRE_FRAME), 'KAME_N_LV2': str(N_LV2),
+        'KAME_N_LV3': str(N_LV3), 'KAME_N_FULL': str(N_FULL), 'KAME_ARTICLE': str(ARTICLE),
+        'KAME_N_REFX': str(N_REFX), 'KAME_HAND': '0x%X' % HAND,
+        'KAME_N_POSE_FRAME': fl(N_POSE_FRAME), 'KAME_SND_START': '0x%X' % SND_START,
+        'KAME_SND_CHARGE': '0x%X' % SND_CHARGE, 'KAME_SND_FIRE': '0x%X' % SND_FIRE,
+        # the pose: the level's flight (test 20: held through the dissolve too, it stayed long after a
+        # hit; Supamario can't see the beam end: ArticleModule 0x2717 is 0 for it, test 16)
+        **{'KAME_N_POSE_%d' % (i + 1): str(KAME_LIFE[i]) for i in range(3)},
+        'KAME_N_FALL_ACCEL': fl(N_FALL_ACCEL), 'KAME_N_FALL_MAX': fl(N_FALL_MAX),
+        **{'KAME_N_CRG_%d' % (i + 1): fl(N_CRG[i][0]) for i in range(3)},
+        **{'KAME_N_CRGON_%d' % (i + 1): fl(N_CRG[i][1]) for i in range(3)}, **fx}
+
+
+def msc_only(out_path):
+    """--msc-only OUT.mscsb: supamario.mscsb from fighters/supamario/supamario.c without the XV2 package (the
+    effect ids and start effects read back from the shipped file: supamario_kame_values.SUPAMARIO_FX)"""
+    import tempfile
+    import supamario_kame_values
+    with tempfile.TemporaryDirectory(dir=os.path.dirname(os.path.abspath(out_path))) as tmp:
+        compile_msc(substitute(os.path.join(HERE, '..', 'fighters/supamario/supamario.c'),
+                               supamario_values(supamario_kame_values.SUPAMARIO_FX)), out_path, tmp)
+
+
 def main():
     argv = sys.argv[1:]
+    if argv[:1] == ['--msc-only'] and len(argv) == 2:
+        msc_only(argv[1])
+        return
     rpx_in = None
     if '--rpx' in argv:
         rpx_in = argv[argv.index('--rpx') + 1]
@@ -581,22 +613,12 @@ def main():
     for fn, f in sp.items():
         f.save(os.path.join(body, fn + '.bin'))
     heads = head_parts(xv2vfx.load_package(pkg))
-    compile_msc(substitute(os.path.join(HERE, '..', 'fighters/supamario/supamario.c'), {
-        'KAME_N_HOLD_FRAME': fl(N_HOLD_FRAME), 'KAME_N_FIRE_FRAME': fl(N_FIRE_FRAME), 'KAME_N_LV2': str(N_LV2),
-        'KAME_N_LV3': str(N_LV3), 'KAME_N_FULL': str(N_FULL), 'KAME_ARTICLE': str(ARTICLE),
-        'KAME_N_REFX': str(N_REFX), 'KAME_HAND': '0x%X' % HAND,
-        'KAME_N_POSE_FRAME': fl(N_POSE_FRAME), 'KAME_SND_START': '0x%X' % SND_START,
-        'KAME_SND_CHARGE': '0x%X' % SND_CHARGE, 'KAME_SND_FIRE': '0x%X' % SND_FIRE,
+    compile_msc(substitute(os.path.join(HERE, '..', 'fighters/supamario/supamario.c'), supamario_values({
         'KAME_N_START_FX': msc_effects(heads, ids, False, START_POS).replace('LV', 'kame_n_level()'),
         'KAME_N_START_OFF': '\n'.join('    EffectModule(0x2723, %s, 0x1, 0x1);' % eid(n) for n in
                                        dict.fromkeys(p[0] for h in heads for p in h if not p[3])),
-        # the pose: the level's flight (test 20: held through the dissolve too, it stayed long after a
-        # hit; Supamario can't see the beam end: ArticleModule 0x2717 is 0 for it, test 16)
-        **{'KAME_N_POSE_%d' % (i + 1): str(KAME_LIFE[i]) for i in range(3)},
-        'KAME_N_FALL_ACCEL': fl(N_FALL_ACCEL), 'KAME_N_FALL_MAX': fl(N_FALL_MAX),
-        **{'KAME_N_CRG_%d' % (i + 1): fl(N_CRG[i][0]) for i in range(3)},
-        **{'KAME_N_CRGON_%d' % (i + 1): fl(N_CRG[i][1]) for i in range(3)}, 'KAME_FX_CRGON': eid('PtcSupamarioKmhCrgON'),
-        'KAME_FX_CRG': eid('PtcSupamarioKmhCrg'), 'KAME_FX_TSUBU': eid('PtcSupamarioKmhtsubu')}),
+        'KAME_FX_CRGON': eid('PtcSupamarioKmhCrgON'), 'KAME_FX_CRG': eid('PtcSupamarioKmhCrg'),
+        'KAME_FX_TSUBU': eid('PtcSupamarioKmhtsubu')})),
         os.path.join(sup, 'script/msc/supamario.mscsb'), tmp)
 
     # the projectile

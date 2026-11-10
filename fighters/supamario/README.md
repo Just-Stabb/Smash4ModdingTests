@@ -1,8 +1,9 @@
 # Supamario MSC
 
 `supamario.c`: Supamario's decompiled MSC (first commit: the v5 package's `supamario.mscsb` as
-decompiled; a copy of Mario's with the universal mechanics). Built by
-`tools/supamario_kame_build.py`, which replaces the `KAME_*` names.
+decompiled; a copy of Mario's, without the universal mechanics until `supamario_universal_v1` below). Built by
+`tools/supamario_kame_build.py`, which replaces the `KAME_*` names (`--msc-only OUT.mscsb`: only this file, without
+the XV2 package, the effect values from `tools/supamario_kame_values.py` `SUPAMARIO_FX`).
 
 ## Neutral special: Kamehameha (status 0x152)
 
@@ -131,3 +132,25 @@ Mario's copy hat and motions (Kirby's fireball throw, which the Kamehameha plays
 takes Supamario as Mario (`fighters/kirby/specials.md`, "Supamario copy"). Changed: `code/cross_f.rpx` only (fix
 90's plus 18 words). With the throw playing, the charge effects (Supamario's own, on Kirby's hand) show as his.
 
+## Universal mechanics v1 (`supamario_universal_v1.zip`)
+
+Install over fix 91. User: give Supamario all the universal changes (CLAUDE.md, `docs/universal-mechanics.md`).
+He had none: the v5 MSC was a plain copy of Mario's (no reverse tilts, no tilts / down smash out of run, dash or
+turns, no roll-off), and his body `game.bin`'s EscapeF had no speed (the animation's movement; no EscapeB script).
+
+- **MSC:** `tools/universal_mechanics.py` on `supamario.c` (its patch mode, as every patched fighter: the reverse
+  tilts in `func_247` / `func_248`; the run commands in `func_716`; `run_attack_update` / `dash_turn_attack_update`
+  in the Dash, Run, RunBrake, Turn, TurnDash, TurnRun and TurnRunBrake loops; roll-off in the roll pre / loop /
+  end scripts `func_362` / `363`, `370` / `372`, `381` / `382`, Fall's main `func_501`, and Hero's momentum,
+  `rolloff_hold_update`, from the per-frame hook `func_82`), roll-off speed 2.2 / air multiplier 1.0 (Mario's in
+  `universal_mechanics_all`: the defaults). Its three new globals are named here (`rolloff_shield`,
+  `rolloff_slid`, `rolloff_cap`) and declared after the Kamehameha's, so those keep their numbers (62-66).
+- **Checks:** the unchanged source, compiled with `SUPAMARIO_FX`, does what fix 85-91's `supamario.mscsb` does in
+  every function (`msc_fingerprint`: 0 differ); the patched one differs only in those 18 functions, by additions
+  (and the rolls' kinetic type `0xf` -> `0x6`), `--added 12`; the Kamehameha's functions are the same.
+  `msc_stack_check`: 0 problems. `rolloff_hold_test.py`: as Hero's.
+- **ACMD:** fighters_latest's body `game.bin` (test 24's, the last shipped) through `tools/rolloff_acmd.py --plain
+  --add EscapeF EscapeB` (2.2): EscapeF +2.2 / EscapeB -2.2 at frame 5, cleared first, 0 at 27 (EscapeB created);
+  both the same as Mario's in `universal_mechanics_all`; every other script unchanged.
+- Kirby's Supamario copy: nothing to change (a copy only changes Kirby's neutral special; his roll-off is his own).
+- Changed: `script/msc/supamario.mscsb`, `script/animcmd/body/game.bin`. Not tested in game.

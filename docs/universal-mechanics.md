@@ -2,8 +2,8 @@
 
 These are the user's own mechanic changes. Every fighter should eventually get them.
 
-**Every fighter has them now** (user's `fighter-modded-scripts-only.zip`, 65 folders, Supamario left
-out for now): Captain Falcon, Kirby, Luigi and Sonic by hand (below); everyone else, the
+**Every fighter has them now** (user's `fighter-modded-scripts-only.zip`, 65 folders; Supamario
+later, `supamario_universal_v1`: `fighters/supamario/README.md`): Captain Falcon, Kirby, Luigi and Sonic by hand (below); everyone else, the
 non-playable forms included (Giga Bowser, Wario-Man, Giga Mac, Mega Lucario, the Fighting Mii Team),
 with the tools:
 
@@ -215,7 +215,7 @@ aerial fix keeps the direction). The user made Hero's the universal version.
 
 ### Hero's momentum for every fighter (`$S/fighters_rolloff_hero_v1.zip`)
 
-Every fighter with roll-off (69 MSC files; Supamario has none yet) runs Hero's momentum:
+Every fighter with roll-off (69 MSC files; Supamario since `supamario_universal_v1`) runs Hero's momentum:
 
 - **Patched fighters** (`universal_mechanics_all`'s 56, plus Corrin, Meta Knight, Samus and Roy from
   their no-ground-cap builds and Ganondorf from `ganon_upb_v6`; Incineroar / Steve use Bowser's /
@@ -236,6 +236,10 @@ Every fighter with roll-off (69 MSC files; Supamario has none yet) runs Hero's m
   momentum is on, the roll-off's release doesn't put the cap back. Sonic's `rolloff_momentum_update`
   (until grounded) is gone.
 - **Hero** stays as he is (the reference; his Acceleratle ×2 roll is his own).
+- **Supamario** (`fighters/supamario/supamario.c`, `supamario_universal_v1`): had none of the universal
+  mechanics; `universal_mechanics.py` (patch mode) on his source, 2.2 / 1.0 (Mario's), and the rolls'
+  ACMD (`rolloff_acmd.py --plain --add EscapeF EscapeB`). Built with `supamario_kame_build.py --msc-only`.
+  `rolloff_hold_test.py`: as Hero's.
 
 `tools/rolloff_hold_test.py FILE.mscsb|DIR` runs the compiled MSC through the roll-off's frames in a
 small MSC interpreter (the modules stubbed) and compares each fighter's flag trace with Hero's
@@ -243,6 +247,6 @@ small MSC interpreter (the modules stubbed) and compares each fighter's flag tra
 moving left, a weak stick, a roll ending on the ground; and the carried speed × the fighter's
 multiplier (Fall's main or the hook). 69 of 69 as Hero's. Not tested in game.
 
-Done: every fighter but Supamario: default 2.2 / 1.0, Captain Falcon 2.4 / 1.0, Kirby 2.1 / 1.0
+Done: every fighter (Supamario too, `supamario_universal_v1`): default 2.2 / 1.0, Captain Falcon 2.4 / 1.0, Kirby 2.1 / 1.0
 (Overdrive 2.8 / 1.05), Luigi 1.6 / 1.1, Sonic 2.76 / 1.0, Pikachu 8 / 0.2, Hero 2.2 / 1.0 (Acceleratle
 ×2), with Hero's momentum.

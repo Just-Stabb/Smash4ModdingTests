@@ -1779,6 +1779,7 @@ void func_82()
         global29 = ControlModule(0xa, 0x2);
         global45 = ControlModule(0xa, 0x3);
     }
+    rolloff_hold_update(); // roll-off: the air speed cap off while the stick holds the way he moves (universal mechanics)
 }
 
 float func_83()
@@ -6280,6 +6281,10 @@ int func_247()
     }
     StatusModule(0x5, 0, 0xf, 0x2, 0, 0x1, 0, 0, 0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, var0, 0, 0x2, 0x40);
+    if (global48 < -0.12f && PostureModuleF(0) == 1.0f || global48 > 0.12f && PostureModuleF(0) == -1.0f)
+    {
+        PostureModule(0x2710); // reverse facing direction (universal: reverse tilts) (universal mechanics)
+    }
     return 0;
 }
 
@@ -6287,6 +6292,10 @@ int func_248()
 {
     StatusModule(0x5, 0, 0xf, 0x9, 0, 0x1, 0, 0, 0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x10a2, 0, 0x2, 0x40);
+    if (global48 < -0.12f && PostureModuleF(0) == 1.0f || global48 > 0.12f && PostureModuleF(0) == -1.0f)
+    {
+        PostureModule(0x2710); // reverse facing direction (universal: reverse tilts) (universal mechanics)
+    }
     return 0;
 }
 
@@ -8061,7 +8070,8 @@ int func_362()
     {
         return 0x1;
     }
-    StatusModule(0x5, 0, 0xf, 0x2, 0, 0, 0, 0, 0, 0);
+    StatusModule(0x5, 0, 0x6, 0x2, 0, 0, 0, 0, 0, 0); // roll-off: kinetic 0x6 (ACMD sets the speed) (universal mechanics)
+    rolloff_shield = 0; // roll-off: new roll, shield-hold count starts over
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x80000, 0, 0x400001);
     return 0;
 }
@@ -8072,7 +8082,8 @@ int func_363()
     {
         return 0x1;
     }
-    StatusModule(0x5, 0, 0xf, 0x2, 0, 0, 0, 0x10, 0, 0);
+    StatusModule(0x5, 0, 0x6, 0x2, 0, 0, 0, 0x10, 0, 0); // roll-off: kinetic 0x6 (ACMD sets the speed) (universal mechanics)
+    rolloff_shield = 0; // roll-off: new roll, shield-hold count starts over
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0x80000, 0, 0x400001);
     return 0;
 }
@@ -8168,6 +8179,7 @@ void func_369()
 
 void func_370()
 {
+    rolloff_update(); // roll-off: edge sliding from the speed frame, not while shield is held (universal mechanics)
     if (func_374())
     {
         return;
@@ -8199,6 +8211,7 @@ void func_371()
 
 void func_372()
 {
+    rolloff_update(); // roll-off: edge sliding from the speed frame, not while shield is held (universal mechanics)
     if (func_374())
     {
         return;
@@ -8468,11 +8481,25 @@ void func_380()
 
 void func_381()
 {
+    if (global6 == 0xe || StatusModule(0x1) == 0x2) // roll-off: slid off an edge (into Fall, or an attack buffered off the edge) -> no air speed cap (universal mechanics)
+    {
+        WorkModule(0x13, 0x1, 0x20000044);
+        rolloff_slid = 1; // roll-off: the speed carried off x rolloff_air_speed_mult(), once (rolloff_fall_speed)
+        rolloff_cap = 1; // roll-off: the cap stays off while the stick holds the way he moves (rolloff_hold_update)
+        rolloff_dir = 0; // roll-off: that way, from his movement once he's off (rolloff_hold_update)
+    }
     func_383();
 }
 
 void func_382()
 {
+    if (global6 == 0xe || StatusModule(0x1) == 0x2) // roll-off: slid off an edge (into Fall, or an attack buffered off the edge) -> no air speed cap (universal mechanics)
+    {
+        WorkModule(0x13, 0x1, 0x20000044);
+        rolloff_slid = 1; // roll-off: the speed carried off x rolloff_air_speed_mult(), once (rolloff_fall_speed)
+        rolloff_cap = 1; // roll-off: the cap stays off while the stick holds the way he moves (rolloff_hold_update)
+        rolloff_dir = 0; // roll-off: that way, from his movement once he's off (rolloff_hold_update)
+    }
     func_383();
 }
 
@@ -10305,6 +10332,7 @@ void func_500()
 void func_501()
 {
     func_502();
+    rolloff_fall_speed(); // roll-off: speed carried off the ledge x rolloff_air_speed_mult() (universal mechanics)
     func_78(func_503);
 }
 
@@ -14067,6 +14095,10 @@ void func_715()
         func_16(0xe, 0);
         return;
     }
+    if (run_attack_update()) // tilts / down smash out of the dash (universal mechanics)
+    {
+        return 0x1;
+    }
     if (CancelModule(0x2713) == 0x1 && func_39() != 0)
     {
         return;
@@ -14255,6 +14287,9 @@ void func_716()
     WorkModule(0x16, 0x1e00007f);
     WorkModule(0x16, 0x1e00005c);
     WorkModule(0x16, 0x1e000054);
+    WorkModule(0x16, 0x1e000056); // up tilt out of run (universal mechanics)
+    WorkModule(0x16, 0x1e000057); // down tilt out of run (universal mechanics)
+    WorkModule(0x16, 0x1e00005f); // down smash out of run (universal mechanics)
     WorkModule(0x16, 0x1e000030);
     if (WorkModule(0x10, 0x2000000a))
     {
@@ -14278,6 +14313,10 @@ void func_717()
     {
         func_16(0xe, 0);
         return;
+    }
+    if (run_attack_update()) // tilts / down smash out of run (universal mechanics)
+    {
+        return 0x1;
     }
     if (func_43())
     {
@@ -14473,6 +14512,10 @@ void func_722()
     {
         return;
     }
+    if (run_attack_update()) // tilts / down smash out of run (RunBrake) (universal mechanics)
+    {
+        return;
+    }
     if (func_43())
     {
         return;
@@ -14572,6 +14615,10 @@ void func_724()
     {
         return 0x1;
     }
+    if (dash_turn_attack_update()) // tilts / down smash turning out of a dash (universal mechanics)
+    {
+        return 0x1;
+    }
     if (func_704())
     {
         return 0x1;
@@ -14604,6 +14651,10 @@ void func_726()
 {
     float var0;
     if (func_71(global61))
+    {
+        return 0x1;
+    }
+    if (dash_turn_attack_update()) // tilts / down smash turning out of a dash (universal mechanics)
     {
         return 0x1;
     }
@@ -14717,6 +14768,10 @@ void func_730()
         return 0x1;
     }
     if (func_60())
+    {
+        return 0x1;
+    }
+    if (global18 == 0 && run_attack_update()) // tilts / down smash turning from a run (universal mechanics)
     {
         return 0x1;
     }
@@ -14938,6 +14993,10 @@ void func_732()
         return 0x1;
     }
     if (CancelModule(0x2713) == 0x1 && func_39() != 0)
+    {
+        return 0x1;
+    }
+    if (global18 == 0 && run_attack_update()) // tilts / down smash turning from a run (TurnRunBrake) (universal mechanics)
     {
         return 0x1;
     }
@@ -37442,5 +37501,181 @@ void kame_n_air()
     if (kame_n_state != 0)
     {
         KineticModule(0xc, 0x2);
+    }
+}
+
+// ===================================================================
+// Universal mechanics (docs/universal-mechanics.md), added by tools/universal_mechanics.py; the same
+// code as Hero's (fighters/brave/brave.c, the universal roll-off) and Captain Falcon's / Kirby's /
+// Luigi's / Sonic's.
+// Roll-off: the rolls' ACMD gives them their speed (EscapeF +S / EscapeB -S added at frame
+// rolloff_start_frame(), 0 at frame 27); kinetic 0x6 so the animation doesn't move Supamario.
+// Every roll frame: before the speed frame, or while shield is held (ControlModule(0x2712, 3)),
+// ground correction 0x2 (stops at edges); from the speed frame on, 0x1 (can slide off). Sliding off
+// (into Fall, or an attack buffered off the edge) keeps the roll's speed: the roll end sets flag
+// 0x20000044 (no max air speed), and it stays off until the stick stops holding the way he moves,
+// he lands / grabs a ledge or he's hit (rolloff_hold_update, every frame). rolloff_fall_speed()
+// scales the carried speed once. Lock: rolloff_shield counts the frames in a row shield has been held this
+// roll; at rolloff_lock_frames() (10) the roll can't slide off for the rest of it. rolloff_slid: slid off.
+// rolloff_cap: the roll-off took the air speed cap off (rolloff_hold_update puts it back).
+// ===================================================================
+int rolloff_shield; // the frames in a row shield has been held this roll (declared here, after the Kamehameha's
+int rolloff_slid;   // globals, so theirs keep their numbers)
+int rolloff_cap;
+float rolloff_start_frame() { return 5.0f; } // = the ACMD's speed frame
+float rolloff_clear_frames() { return 3.0f; } // the carried speed is cleared on the roll's frames before this
+int   rolloff_lock_frames()  { return 10; }   // shield held this many frames in a row: no roll-off for the rest of the roll
+float rolloff_air_speed_mult() { return 1.0f; } // speed carried off a ledge x this (1.0 = unchanged)
+
+void rolloff_fall_speed()
+{
+    float x;
+    float y;
+    if (rolloff_slid != 0)
+    {
+        rolloff_slid = 0;
+        if (rolloff_air_speed_mult() != 1.0f)
+        {
+            x = KineticModuleF(0xa, 0x3);
+            y = KineticModuleF(0xb, 0x3);
+            KineticModule(0x11, 0x3, x * rolloff_air_speed_mult(), y);
+        }
+    }
+}
+
+void rolloff_update()
+{
+    if (MotionModuleF(0x1) < 1.0f)
+    {
+        rolloff_shield = 0; // new roll
+    }
+    if (MotionModuleF(0x1) < rolloff_clear_frames()) // no speed carried into the roll (it comes in when the roll
+    {                                                // starts; the ACMD's clear didn't reach it), well before the
+        KineticModule(0x11, 0x3, 0, 0);              // ACMD adds the roll's speed (user)
+        KineticModule(0x11, 0x2, 0, KineticModuleF(0xb, 0x2)); // and a dash's slide, energy 2 (user: a back roll
+    }                                                          // out of a dash went almost nowhere)
+    if (rolloff_shield < rolloff_lock_frames())
+    {
+        if (ControlModule(0x2712, 0x3))
+        {
+            rolloff_shield++;
+        }
+        else
+        {
+            rolloff_shield = 0;
+        }
+    }
+    if (MotionModuleF(0x1) >= rolloff_start_frame() && !ControlModule(0x2712, 0x3) && rolloff_shield < rolloff_lock_frames())
+    {
+        GroundModule(0x2710, 0x1);
+    }
+    else
+    {
+        GroundModule(0x2710, 0x2);
+    }
+}
+
+// ===================================================================
+// Tilts / down smash out of run, the dash and the turns (universal mechanic): when attack is
+// pressed, stick Y <= -run_tilt_y() (0.5): down smash if flicked down in the last run_smash_flick()
+// (4) frames or the down smash command is set, else down tilt; stick Y >= run_tilt_y(): up tilt.
+// Shield out of run is the game's own (Run main turns the Shield group on).
+// ===================================================================
+float run_tilt_y()      { return 0.5f; }
+int   run_smash_flick() { return 4; }
+
+int run_attack_update()
+{
+    if (!(global38 & 0x1)) // attack pressed this frame
+    {
+        return 0;
+    }
+    if (global24 & 0x20) // up smash: the loops' own check
+    {
+        return 0;
+    }
+    if (global24 & 0x40 || global32 <= -run_tilt_y() && global47 < run_smash_flick())
+    {
+        func_16(0x2e, 0x1); // AttackLw4Start
+        return 0x1;
+    }
+    if (global32 <= -run_tilt_y())
+    {
+        func_16(0x2a, 0x1); // AttackLw3
+        return 0x1;
+    }
+    if (global32 >= run_tilt_y())
+    {
+        func_16(0x29, 0x1); // AttackHi3
+        return 0x1;
+    }
+    return 0;
+}
+
+// Turn (0x6) / TurnDash (0x7) loops: tilts / down smash when the turn came out of a Dash (0x3).
+int dash_turn_attack_update()
+{
+    if (global5 != 0x3 || global18 != 0)
+    {
+        return 0;
+    }
+    return run_attack_update();
+}
+
+
+// ===================================================================
+// Roll-off momentum (Hero's, the universal version: fighters/brave/brave.c, his fixes 61 / 62 / 85).
+// The speed carried off a ledge isn't held to the air speed cap (flag 0x20000044 off) for as long as
+// the stick holds the way he moves on screen (raw stick X, position variable 0x0F000260, times
+// rolloff_dir, past rolloff_hold_x()), whatever he does in the air (Fall, an aerial, a special, an air
+// dodge, a jump); on a frame attack or special is pressed the stick doesn't count (a stick click's
+// neutral move zeroes it for that frame). Landing or a ledge (situation not air) or a hit (Damage
+// 0x45 - DamageFall 0x4C) puts the cap back too. rolloff_dir: the way he moves (1 right, -1 left), from
+// his X (position variable 0x0F000000) against the last frame's (rolloff_last_x) once he's off (a roll can
+// turn him round, so not his facing). rolloff_cap: the cap is off from a roll-off. The speed itself is
+// the ACMD's, set once, x rolloff_air_speed_mult() once (Fall's main, or here when he slid straight
+// into an air action: rolloff_slid still set outside Fall and the rolls), then air friction slows it.
+// ===================================================================
+float rolloff_dir;      // the way he moves on screen once he's off: 1 right, -1 left, 0 not known yet
+float rolloff_last_x;   // his X the frame before
+float rolloff_hold_x() { return 0.3f; } // the stick past this, on screen, the way he moves keeps the cap off
+
+void rolloff_hold_update()
+{
+    float x;
+    x = WorkModuleF(0, 0x0f000000);
+    if (rolloff_cap)
+    {
+        if (rolloff_dir == 0)
+        {
+            if (x > rolloff_last_x + 0.01f)
+            {
+                rolloff_dir = 1.0f;
+            }
+            else if (x < rolloff_last_x - 0.01f)
+            {
+                rolloff_dir = -1.0f;
+            }
+        }
+        if (StatusModule(0x1) != 0x2 || global4 >= 0x45 && global4 <= 0x4c
+            || rolloff_dir != 0 && WorkModuleF(0, 0x0f000260) * rolloff_dir < rolloff_hold_x()
+               && ControlModule(0x2710, 0) == 0 && ControlModule(0x2710, 0x1) == 0)
+        {
+            rolloff_cap = 0;
+            rolloff_dir = 0;
+            WorkModule(0x14, 0x20000044);
+        }
+    }
+    rolloff_last_x = x;
+    if (rolloff_slid != 0 && global4 != 0xe && global4 != 0x20 && global4 != 0x21)
+    {
+        if (StatusModule(0x1) == 0x2)
+        {
+            rolloff_fall_speed(); // slid straight into an air action: the multiplier now, once
+        }
+        else
+        {
+            rolloff_slid = 0;
+        }
     }
 }
