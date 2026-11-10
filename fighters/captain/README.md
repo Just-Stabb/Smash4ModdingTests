@@ -27,7 +27,8 @@ older upload with my roll-off shield check). Its own changes include:
 - **Roll-off:** see `docs/universal-mechanics.md`: roll pre `func_362`/`363`, `rolloff_update()`
   in the roll loops `func_370`/`372` (edge sliding + stored speed, globals 62/63), roll ends
   `func_381`/`382` (air speed cap flag), Fall main `func_501` → `rolloff_fall_start()`, Fall end
-  `func_535` clears the flag. ACMD: `tools/rolloff_acmd.py <upload>/body/game.bin
+  `func_535` clears the flag (now: Hero's roll-off momentum (`fighters_rolloff_hero_v1`, docs/universal-mechanics.md "Roll-off" 6) in `captain_latest.c`: the cap stays off while the stick holds
+  the way he moves, `rolloff_hold_update()` from `func_82`; Fall's end leaves it). ACMD: `tools/rolloff_acmd.py <upload>/body/game.bin
   build/captain/game.bin --plain --add 2.4 EscapeF EscapeB`.
 - **Falcon Punch:** landing while holding goes on with the punch (frame 46) instead of staying
   frozen.

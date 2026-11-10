@@ -336,13 +336,14 @@ def main():
         k, v = m.split('=')
         mults[k] = float(v)
     hero = a.hero
-    tmp = None
     if not hero:
-        tmp = tempfile.mkdtemp()
-        hero = os.path.join(tmp, 'brave.mscsb')
-        subprocess.run([sys.executable, os.path.join(HERE, 'msclang/msclang.py'), '-x', os.path.join(HERE, 'mscinfo.xml'),
-                        os.path.join(ROOT, 'fighters/brave/brave.c'), '-o', hero], check=True, capture_output=True)
-    ref, _ = scenarios(hero)
+        with tempfile.TemporaryDirectory() as tmp:
+            hero = os.path.join(tmp, 'brave.mscsb')
+            subprocess.run([sys.executable, os.path.join(HERE, 'msclang/msclang.py'), '-x', os.path.join(HERE, 'mscinfo.xml'),
+                            os.path.join(ROOT, 'fighters/brave/brave.c'), '-o', hero], check=True, capture_output=True)
+            ref, _ = scenarios(hero)
+    else:
+        ref, _ = scenarios(hero)
     if a.v:
         for k, v in ref.items():
             print('Hero %-28s %s' % (k, ''.join(map(str, v))))

@@ -24,9 +24,11 @@ Same code as Luigi's (the common function numbers match):
   TurnRunBrake loops `func_730` / `func_732`.
 - **Roll-off:** speed **2.76** (user), air multiplier **1.0** (default). Roll pre
   `func_362` / `func_363` (kinetic 0x6), `rolloff_update()` in `func_370` / `func_372`, roll ends
-  `func_381` / `func_382`, Fall main `func_501`, Fall end `func_535`. **Momentum into the next
-  action** (user): after a slide-off, `global64` keeps `0x20000044` (no air speed cap) on past
-  Fall's end until Sonic is on the ground / a ledge (`rolloff_momentum_update()`, main loop
-  `func_74`). Globals: `global62` shield-hold count, `global63` slid off, `global64` momentum.
+  `func_381` / `func_382`, Fall main `func_501`, Fall end `func_535`. **Momentum: Hero's roll-off momentum (`fighters_rolloff_hero_v1`, docs/universal-mechanics.md "Roll-off" 6)**
+  (user: Hero's is the universal version): a slide-off (into Fall or an attack buffered off the edge)
+  keeps `0x20000044` (no air speed cap) off through any air action while the stick holds the way he
+  moves; letting go, landing, a ledge or a hit puts it back (`rolloff_hold_update()`, from `func_82`).
+  Was: until grounded (`rolloff_momentum_update()`, removed). Globals: `global62` shield-hold count,
+  `global63` slid off, `global64` the cap off from a roll-off, `rolloff_dir` / `rolloff_last_x`.
   ACMD: `tools/rolloff_acmd.py --plain --add 2.76` (EscapeF loses its `Set_Edge_Slide(5)`; EscapeB is
   created).

@@ -158,6 +158,7 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | `PostureModuleF(0x7)` (scale) taken as the facing | Hero fix 68 | [C2] |
 | a speed set in world X without the facing: right-side bias | Squirtle's Withdraw | [C4] |
 | no universal mechanics in the MSC | | [C3] |
+| the old roll-off momentum (cap back at Fall's end), not Hero's | user: Hero's is the universal version | `universal_mechanics.py --upgrade` [C3] |
 | trait / README missing | | [K1, K2] |
 | turned effects on bones flip for one facing | Sephiroth t49, Squirtle's dash attack | `--variants` in the plan [E1] |
 | Smash 4 common effects standing in for Ultimate's | Squirtle (all), Hero's up air (fix 63-70) | plan converts `sys_*` from ef_common.eff [E3] |

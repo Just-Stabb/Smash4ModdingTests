@@ -9,6 +9,9 @@ cd "$(dirname "$0")"
 if git -C msclang apply --check ../msclang_nested_call.patch 2>/dev/null; then
     git -C msclang apply ../msclang_nested_call.patch
 fi
+# mscdec fix: its table of globals holding function addresses has 64 entries, so a file with more globals
+# (one the universal mechanics already patched) failed to decompile (IndexError in disasmlib)
+sed -i 's/gvIsOffset = \[False for i in range(64)\]/gvIsOffset = [False for i in range(256)]/' mscdec/disasmlib.py
 python3 -c "import pycparser" 2>/dev/null || python3 -m pip install pycparser
 echo "Decompile: python3 tools/mscdec/mscdec.py file.mscsb -o file.c"
 echo "Compile:   python3 tools/msclang/msclang.py file.c -o file.mscsb"

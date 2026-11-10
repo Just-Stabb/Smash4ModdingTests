@@ -7,14 +7,19 @@ out for now): Captain Falcon, Kirby, Luigi and Sonic by hand (below); everyone e
 non-playable forms included (Giga Bowser, Wario-Man, Giga Mac, Mega Lucario, the Fighting Mii Team),
 with the tools:
 
-1. MSC: decompile (`tools/mscdec`; strings with raw line breaks need escaping), then
+1. MSC: decompile (`tools/mscdec` with `-x tools/mscinfo.xml`; strings with raw line breaks need
+   escaping; its `gvIsOffset` table had 64 entries, so a file already patched (65+ globals) failed:
+   `tools/setup_toolchain.sh` widens it), then
    `python3 tools/universal_mechanics.py IN.c OUT.c [--air-mult M]`, then msclang. The patcher finds
    every function through the status table (`sv_set_mem(0x1, kind, status, func_N)`; a fighter's own
    script that calls the common one, like Palutena's EscapeF pre or Yoshi's roll main, is followed),
    skips parts a fighter already has (Corrin's, Meta Knight's, Dr. Mario's and Mewtwo's own reverse
-   tilts), adds three globals and the helper functions at the end. Fall's end only puts the air speed
-   cap back when a roll-off took it off (the hand-done fighters clear it on every Fall end).
-2. Check: `python3 tools/msc_fingerprint.py ORIGINAL.mscsb REBUILT.mscsb --added 9` compares what each
+   tilts), adds three globals and the helper functions at the end. Roll-off momentum is Hero's
+   ("Roll-off momentum" below): the per-frame hook (global14's function, `func_82`) calls
+   `rolloff_hold_update()`, and Fall's end is left alone. `--upgrade IN.c OUT.c` gives a fighter
+   patched by the earlier version (decompiled, or a source such as `fighters/pzenigame/pzenigame.c`)
+   Hero's momentum, its speeds and multiplier unchanged.
+2. Check: `python3 tools/msc_fingerprint.py ORIGINAL.mscsb REBUILT.mscsb --added 12` compares what each
    function does (calls, constants, variables; not the bytes, which msclang lays out differently).
    An unedited round trip was the same in every function for every fighter (a few layout-only
    differences: an extra `else` jump, `-0.1` folded); after the patch exactly the patched functions
@@ -132,7 +137,10 @@ Done: Kirby, Captain Falcon, Luigi, Sonic.
 ## Roll-off
 
 Both rolls keep their speed off a ledge instead of stopping at it ("roll-off"). The user's
-design, implemented on top of the user's first version from Captain Falcon's `captain.mscsb`:
+design, implemented on top of the user's first version from Captain Falcon's `captain.mscsb`.
+**Hero's (`brave`) implementation is the universal version** (user, CLAUDE.md): its momentum
+mechanics (4 - 6 below) are every fighter's; each fighter keeps its own roll-off speed and air
+multiplier.
 
 1. **The roll's animation doesn't move the fighter; ACMD gives it its speed.** Roll pre (EscapeF
    `0x20` = common `func_362`, EscapeB `0x21` = `func_363`): `StatusModule(0x5, 0, 0x6, 0x2, …)`,
@@ -154,7 +162,8 @@ design, implemented on top of the user's first version from Captain Falcon's `ca
    (an int global: Kirby `global72`, Captain Falcon `global62`) is reset in the roll pre scripts
    and goes back to 0 whenever shield is released before reaching 10.
 4. **The speed at the edge carries over on its own.** Sliding off sends the roll to Fall
-   (`func_374`), and the fighter keeps the roll's current speed into the fall with no extra code.
+   (`func_374`), or straight into an attack buffered off the edge, and the fighter keeps the roll's
+   current speed with no extra code. The speed is set once (the ACMD), never per frame.
    (v3 also stored the speed every roll frame and gave it again in Fall's main; that doubled the
    speed on top of the carried momentum, with no air cap, and could fling fighters to the blast
    zone, so it was removed.)
@@ -164,10 +173,31 @@ design, implemented on top of the user's first version from Captain Falcon's `ca
    kinetic energy 3's X speed (`KineticModuleF(0xa, 0x3)`, the speed the air speed cap applies to)
    × the multiplier, Y kept (`KineticModule(0x11, 0x3, x, y)`, the same way the game scales it, e.g.
    Kirby's `func_1072`). Only once, so the fall then slows it as usual (v3 set the speed every
-   frame, which is what flung fighters).
-5. **No air speed cap while falling from it.** The roll end (key 2: `func_381` / `func_382`) sets
-   flag `0x20000044` (lifts the max horizontal air speed) when the next status (`global6`) is
-   Fall (`0xE`); Fall's end (key 2, `func_535`) clears it.
+   frame, which is what flung fighters). A slide straight into a buffered attack has no Fall: the
+   per-frame hook applies the multiplier once instead, the frame after (the slide-off mark still set
+   outside Fall and the rolls, in the air; on the ground the mark is dropped, so no later Fall scales
+   an unrelated fall).
+5. **No air speed cap from it.** The roll end (key 2: `func_381` / `func_382`) sets flag
+   `0x20000044` (lifts the max horizontal air speed) when the next status (`global6`) is Fall
+   (`0xE`) **or he's already in the air** (`StatusModule(0x1) == 2`: an attack buffered off the
+   edge, Hero fix 62), and marks the cap as taken off by the roll-off. Fall's end (`func_535`) no
+   longer touches it.
+6. **Roll-off momentum (Hero's, fixes 61 / 62 / 85): the cap stays off while the stick holds the way
+   he moves.** Every frame, from the per-frame hook (global14's function: `func_82`; Hero's
+   `brave_frame` calls `func_82` then it), `rolloff_hold_update()`:
+   - **The way he moves** (`rolloff_dir`, 1 right / −1 left) is taken once he's off, from his X
+     (position variable `0x0F000000`) against the last frame's (`rolloff_last_x`, more than 0.01
+     apart): not his facing, which a roll's turn can flip (fix 62).
+   - **The cap comes back** (`WorkModule(0x14, 0x20000044)`, the mark cleared) when he's not in the
+     air (landed, grabbed a ledge), when he's hit (status Damage `0x45` - DamageFall `0x4C`), or when
+     the stick stops holding that way: the raw stick X on screen (`0x0F000260`) × the way under
+     `rolloff_hold_x()` (0.3), let go or turned. On a frame attack or special is pressed
+     (`ControlModule(0x2710, 0 / 1)`) the stick doesn't count: a stick click's attack / special zeroes
+     the stick for that frame (fix 85); the next frame it does.
+   - Until then the cap stays off through Fall and any air action after it (an aerial, a special, an
+     air dodge, a double jump), and air friction slows the speed as usual.
+   The position / stick variables are the executable's (`tools/position_vars_cave.py`, in the
+   standard `cross_f.rpx`).
 
 History: v1 (mine) used an ACMD shield flag; v2 set the speed every frame (constant speed). The
 user's first version cleared the air speed flag at the start of Fall and only checked shield in
@@ -177,10 +207,42 @@ the roll's end; its `0x208000e0` / `0x1000004` save / restore is gone.
 number uses it). **Default air speed multiplier: 1.0** (`rolloff_air_speed_mult()`). The user confirmed the current version (v3 minus the Fall speed boost) is
 right as-is.
 
-**Test (Hero only, fix 61, user):** the cap stays off until the stick stops holding the roll's way
-(screen X × the roll's way under 0.3), into any air action, and comes back on landing, a ledge or a hit,
-instead of at Fall's end (`rolloff_hold_update`, `fighters/brave/brave.c`); a frame attack or special is pressed
-doesn't put it back (a stick click's neutral move zeroes the stick for that frame: fix 85). If it plays right it can go
-into `tools/universal_mechanics.py` for everyone.
+History of the momentum: Captain Falcon / Kirby put the cap back at every Fall end; the patched
+fighters at Fall's end after a roll-off; Luigi and Sonic kept it off until grounded (Luigi's with
+"carried speed only goes down"); Hero tested the stick-held version (fixes 61, 62, 84, 85; his
+roll-off aerial direction picks of fixes 62 - 69 were removed in fix 76: the executable's buffered
+aerial fix keeps the direction). The user made Hero's the universal version.
 
-Done: Captain Falcon (2.4, air ×1.0), Kirby (2.1, air ×1.0), Luigi (1.6, air ×1.1, momentum kept into the next air action until grounded: `fighters/luigi/README.md`), Sonic (2.76, air ×1.0, same momentum: `fighters/sonic/README.md`).
+### Hero's momentum for every fighter (`$S/fighters_rolloff_hero_v1.zip`)
+
+Every fighter with roll-off (69 MSC files; Supamario has none yet) runs Hero's momentum:
+
+- **Patched fighters** (`universal_mechanics_all`'s 56, plus Corrin, Meta Knight, Samus and Roy from
+  their no-ground-cap builds and Ganondorf from `ganon_upb_v6`; Incineroar / Steve use Bowser's /
+  Pit's file): the latest shipped MSC decompiled, `universal_mechanics.py --upgrade`, compiled. Each
+  decompile compiled back to the same functions first (`msc_fingerprint`: 0 differ), and after the
+  upgrade only the roll ends, Fall's end and `func_82` differ (`--added 2`). Bayonetta's roll ends are
+  her own (`func_2260` / `func_2261`).
+- **Squirtle** (`fighters/pzenigame/pzenigame.c`): `--upgrade` on the source.
+- **Sephiroth** (`fighters/edge/edge.c`): the same, except that his MSC already uses globals up to
+  `0x86` (port_check C5: the most seen working), so his `rolloff_hold_update` adds none: the way he
+  moves is kept in `global64` (1 off / not known yet, 2 right, 3 left) and read from the sign of his
+  carried speed (kinetic energy 3's X) instead of his X against the last frame's.
+- **Captain Falcon, Kirby, Luigi, Sonic** (hand-written): the same roll ends, hook and helper
+  (`rolloff_cap`, `rolloff_dir`, `rolloff_last_x`). Their Fall end only puts the cap back when no
+  roll-off holds it (Kirby / Luigi still clear it there for their air dodge's Fall). Luigi's jump
+  momentum (`global68`, until grounded, speed only going down) and Kirby's Luigi / Sonic copy's jump
+  momentum (`global93`) are unchanged: their roll-off part is now Hero's, and while the jump's
+  momentum is on, the roll-off's release doesn't put the cap back. Sonic's `rolloff_momentum_update`
+  (until grounded) is gone.
+- **Hero** stays as he is (the reference; his Acceleratle ×2 roll is his own).
+
+`tools/rolloff_hold_test.py FILE.mscsb|DIR` runs the compiled MSC through the roll-off's frames in a
+small MSC interpreter (the modules stubbed) and compares each fighter's flag trace with Hero's
+`brave.mscsb`: a slide into Fall then an aerial, a buffered aerial, landing, a hit, a stick click,
+moving left, a weak stick, a roll ending on the ground; and the carried speed × the fighter's
+multiplier (Fall's main or the hook). 69 of 69 as Hero's. Not tested in game.
+
+Done: every fighter but Supamario: default 2.2 / 1.0, Captain Falcon 2.4 / 1.0, Kirby 2.1 / 1.0
+(Overdrive 2.8 / 1.05), Luigi 1.6 / 1.1, Sonic 2.76 / 1.0, Pikachu 8 / 0.2, Hero 2.2 / 1.0 (Acceleratle
+×2), with Hero's momentum.

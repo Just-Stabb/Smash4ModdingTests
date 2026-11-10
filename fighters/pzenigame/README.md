@@ -4,7 +4,7 @@ A port of Ultimate's Squirtle (the user's `pokemon-trainer-SSBU` zip, folder `pz
 model/body c00-c07, the `water` / `waterfall` article models, motion/body/c00, `vl.prc`,
 `expression_vl.prc`, AI). New fighter kind `0x46`, character id 64, UI name `Squirtle` (subtitle
 "Tiny Turtle Pokémon"), base Mario. Trait: **Shooter** (`docs/character-traits.md`,
-`kirby_copy_trait()`). Roll-off: the default 2.2 / 1.0 (Mario's universal-mechanics scripts).
+`kirby_copy_trait()`). Roll-off: the default 2.2 / 1.0 (Mario's universal-mechanics scripts), with Hero's roll-off momentum (`fighters_rolloff_hero_v1`, docs/universal-mechanics.md "Roll-off" 6) (`--upgrade`).
 Down special (the user's call): Pokémon Change stays as an animation with no swap.
 
 ## v1 (`build/squirtle_v1.zip`)

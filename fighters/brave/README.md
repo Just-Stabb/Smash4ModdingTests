@@ -3,7 +3,8 @@
 A port of Ultimate's Hero (the user's `brave.zip`: model/body c00-c07, motions, params, AI, the
 articles). New fighter kind `0x45`, character id 63, UI name `Hero` (subtitle "The Luminary"),
 base Robin. Trait: **Shooter** (no preference given; docs/character-traits.md,
-`kirby_copy_trait()`). Roll-off: the default 2.2 / 1.0 (Robin's universal-mechanics scripts).
+`kirby_copy_trait()`). Roll-off: the default 2.2 / 1.0 (Robin's universal-mechanics scripts). His roll-off momentum
+(fixes 61 / 62 / 85, `rolloff_hold_update`) is the universal version: every fighter has it since `fighters_rolloff_hero_v1`.
 
 ## v1 (`build/steve_hero_v1.zip`, with Steve)
 

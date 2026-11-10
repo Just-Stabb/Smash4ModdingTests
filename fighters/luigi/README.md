@@ -24,10 +24,12 @@ Same code as Captain Falcon's (the common function numbers match):
 - **Carried speed only goes down** (user): while the jump / roll-off momentum is on,
   `momentum_decay_only()` keeps kinetic energy 3's X speed (the one the stick drives) from going above
   both the max air speed and the carried amount (`global69`), which follows the speed down.
-- **Roll-off:** speed **1.6**, air multiplier **1.1** (user). **Momentum into the next action** (user): after a
-  slide-off, `global68` keeps `0x20000044` (no air speed cap) on past Fall's end until Luigi is on
-  the ground / a ledge (`rolloff_momentum_update()`, main loop `func_74`), so an aerial, special,
-  air dodge or double jump keeps the speed; air friction still slows it. Roll pre `func_362` / `func_363`
+- **Roll-off:** speed **1.6**, air multiplier **1.1** (user). **Momentum: Hero's roll-off momentum (`fighters_rolloff_hero_v1`, docs/universal-mechanics.md "Roll-off" 6)** (user: Hero's
+  is the universal version): a slide-off (into Fall or an attack buffered off the edge) keeps
+  `0x20000044` (no air speed cap) off through any air action while the stick holds the way he moves;
+  letting go, landing, a ledge or a hit puts it back (`rolloff_hold_update()`, from `func_82`;
+  `rolloff_cap`). Was: until grounded with the carried speed only going down (`global68`), which is
+  now the jump's momentum only; while it's on, the roll-off's release doesn't put the cap back. Roll pre `func_362` / `func_363`
   (kinetic 0x6), `rolloff_update()` in `func_370` / `func_372`, roll ends `func_381` / `func_382`,
   Fall main `func_501` (`rolloff_fall_speed()`), Fall end `func_535` (clears `0x20000044`).
   Globals: `global62` shield-hold count, `global63` slid off. ACMD: `tools/rolloff_acmd.py --plain --add 1.6`.

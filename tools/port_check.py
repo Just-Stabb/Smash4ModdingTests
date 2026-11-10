@@ -793,6 +793,10 @@ def check_msc(inst, name, rep):
         if 'rolloff' not in text.lower():
             rep.add('ERROR', 'C3 universal', '%s has no universal mechanics (tools/universal_mechanics.py: reverse tilts, '
                     'roll-off, tilts out of run)' % os.path.relpath(main_c, ROOT))
+        elif 'rolloff_hold_update' not in text:
+            rep.add('ERROR', 'C3 universal', '%s has the old roll-off momentum (the air speed cap back at Fall\'s end): '
+                    'Hero\'s is the universal version (tools/universal_mechanics.py --upgrade, docs/universal-mechanics.md '
+                    '"Roll-off" 6)' % os.path.relpath(main_c, ROOT))
 
 
 def check_repo(name, kind, rep):

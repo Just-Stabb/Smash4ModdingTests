@@ -955,8 +955,11 @@ writes `0x4B490000 + profile` to int `0x1000008E` for the executable's stat scal
 
 ## Added: Luigi / Sonic copies: momentum and Luigi's wavedash
 
+- **Roll-off momentum (Kirby and every copy):** Hero's roll-off momentum (`fighters_rolloff_hero_v1`, docs/universal-mechanics.md "Roll-off" 6): the cap stays off while the stick holds the
+  way he moves (`rolloff_hold_update()` from `func_82`, `rolloff_cap`); the Sonic / Luigi copy's
+  roll-off no longer sets `global93` (was: until grounded).
 - **Momentum conservation (Sonic or Luigi copy, `kirby_momentum_copy()`):** a jump (Jump pre
-  `func_472`) and a roll-off (roll ends `func_381` / `func_382`) take the air speed cap off (flag
+  `func_472`) (and, before `fighters_rolloff_hero_v1`, a roll-off) take the air speed cap off (flag
   `0x20000044`) until Kirby is on the ground / a ledge (`global93`, `kirby_momentum_update()` in the
   main loop `func_74`; Fall's end `func_535` no longer puts the cap back then). Air friction still
   slows him. With **Luigi's** copy the carried speed only goes down (`momentum_decay_only()`,
