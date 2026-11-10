@@ -1416,6 +1416,12 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
     at `+0x20` / `+0x24`.
   - A weapon's own movement is energy 0 and gravity is energy 2.
   - Set_Kinetic_Handler sends op 0 `{0, ID}` through vt `+0x114`, so it works on any object.
+  - MSC handler (vt `+0x114`, Sephiroth test 154, `tools/kinetic_push_test.py`): fighters' `0x02E79100`
+    (fighter_kinetic_module_impl.cpp) takes ops 0xF / 0x11 / 0x15 / 0x19 and passes the rest to
+    kinetic_module_impl's `0x02C510C4` (a jump table of ops 0 - 0x18). Op 0x11 (an energy's speed) knows energies 0 -
+    3 only (vt `+0x54` get energy, then `+0` / `+4`); any other goes to its assert (`0x032C4E20`, line 0xA9) and sets
+    nothing. Op 0xE (8 words: energy, type, x, y, 3 more) gets that energy and calls its reset (`[energy + 0x1C]` vt
+    `+0x1C`) for any energy: energy 4 (the guard damage pushback, type 0xB: func_460) is set only this way.
     Set_Kinetic_Handler_Aerial is fighter-only.
 - **Reflection:** the weapon's reflect module (accessor `+0x7C`, vtable `0x1010B00C`) records a hit
   on a reflector (`0x02C6C7DC` / `0x02C6CA00`).

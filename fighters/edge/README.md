@@ -2605,3 +2605,25 @@ shieldstun for the duration of the pushback".
   same as without it.
 - Package (install over test 152): `code/cross_f.rpx` (exe_v37), `script/msc/edge.mscsb`.
 
+## Test 154 (`$S/sephiroth_test154.zip`, executable only): forward smash's shield push really moves them
+
+User (test 153): "The extra shieldstun seems to have worked, but the pushback doesn't seem any further than usual."
+- **Cause (the executable):** test 153's push wrote `KineticModule(0x11, 4, x, 0)` on the shielder (position variable q 7).
+  The fighter KineticModule's MSC handler (`0x02E79100`, fighter_kinetic_module_impl.cpp) sets an energy's speed with op
+  0x11 for energies 0 - 3 only; energy 4 (the guard damage pushback) goes to its assert (line 0xA9) and nothing is
+  set, so the shielder kept the normal pushback. The stun write (WorkModule int `0x11000009`) worked. The game itself
+  sets energy 4 only with op 0xE, once, in the guard damage status's init (func_460: `KineticModule(0xe, 4, 0xb, x, 0,
+  0, 0, 0)`, `(0xb, 4)`).
+- **Fix (exe_v38 = exe_v37 + `position_vars_cave.py` again, then `acmd_ext_cave.py`):** q 7's speed write now makes
+  energy 4 again the status's way: `KineticModule(0xe, 4, 0xb, x, 0, 0, 0, 0)` then `(0xb, 4)`, every frame of the slide
+  (`edge_s4_push` unchanged: 0.15 x the distance left, 0.8 - 3 a frame, to 66 from him; the stun held; inputs off). It
+  moves as the game's own pushback does (its energy, its ground correction: stopped at a ledge).
+- **Tested (unicorn):** `tools/kinetic_push_test.py` (new) runs the game's handler with a fake kinetic module: op 0x11 on
+  energy 3 sets its speed; on energy 4 it gets no energy and hits the assert (test 153's write: nothing set); op 0xE on
+  energy 4 gets it and resets it with type 0xB and the speed (test 154's). `position_vars_test.py` (q 7: the two
+  KineticModule calls, the stun), `acmd_ext_test.py`, `weapon_expand_test.py` on exe_v38: 0 failed. The energy's own
+  per-frame movement isn't run (the game's, the one the normal pushback uses). Not tested in game.
+- port_check over the chain + tests 148 - 152 + fighters_rolloff_hero_v1 + 153 + this: 42 errors, 57 warnings, 4
+  notes, the same as without it.
+- Package (install over test 153): `code/cross_f.rpx` (exe_v38, sha1 9bfbd137...). edge.mscsb is test 153's.
+
