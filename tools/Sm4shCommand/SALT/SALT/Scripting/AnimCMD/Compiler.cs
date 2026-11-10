@@ -168,8 +168,13 @@ namespace SALT.Moveset.AnimCMD
                 {
                     switch (specs[i])
                     {
-                        case 0: // 0x1A, 26, or a float stored as its bits (1.5f)
-                            cmd.Parameters.Add(ACMDCommand.ParseInt(p));
+                        case 0: // 0x1A, 26, or a float stored as its bits (1.5f); or a variable's alias (VAR_0, SELF_HIT):
+                                // int parameters that hold a variable ID (SUB_FLOAT_2's, Float_Var_Compare_Var's, ...)
+                            uint aliased;
+                            if (FighterVariable.TryParseAlias(p, out aliased))
+                                cmd.Parameters.Add((int)aliased);
+                            else
+                                cmd.Parameters.Add(ACMDCommand.ParseInt(p));
                             break;
                         case 1: // 1.5, 1.5f, or its bits in hex (0x3FC00000, as an int parameter shows it)
                             cmd.Parameters.Add(ParseFloat(p));

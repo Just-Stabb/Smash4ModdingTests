@@ -1381,34 +1381,34 @@ namespace SALT.Moveset.AnimCMD
             {0x113030DB,"0,1,1,1,0,0,0"},
             {0x1B492AD1,"0"},
             {0x4C0DBE48,"0,0,0"},
-            {0x43D5B75B,"0,0,0"},
+            {0x43D5B75B,"0,0,3"},
             {0x58FABCF7,"0,0,1"},
             {0xD41CE3F4,"0,0,0,1"},
             {0xFE66276F,"NONE"},
             {0x3B130D3B,"0"},
             {0x0F4F6EF4,"0,0,0"},
             {0x1AA4CD3E,"0,0"},
-            {0x1EC5B53B,"0,0"},
-            {0x29F1BB70,"0,0,0"},
+            {0x1EC5B53B,"0,3"},
+            {0x29F1BB70,"0,0,3"},
             {0x32DEB0DC,"0,1,1,1,0"},
-            {0x4BD9E69A,"0,0,0"},
+            {0x4BD9E69A,"0,0,3"},
             {0x4F6B304E,"0,0"},
             {0x50F6ED36,"0,0,1,1"},
-            {0x54443BE2,"0,0"},
-            {0x6078528B,"0,0,0"},
-            {0x69FD6D46,"0,0,0"},
+            {0x54443BE2,"0,3"},
+            {0x6078528B,"0,0,3"},
+            {0x69FD6D46,"0,0,3"},
             {0x6C574576,"1"},
             {0x72D266EA,"0,0"},
             {0x83D8148C,"0,0,0"},
             {0x87E19722,"0,1,1,1"},
             {0x92753431,"0,0,0"},
-            {0x9CCE9C8E,"0,0,0"},
+            {0x9CCE9C8E,"0,0,3"},
             {0xAFB9CA75,"0,1"},
-            {0xB496C1D9,"0,0"},
-            {0xBE1E63B3,"0,0,0,0,0"},
+            {0xB496C1D9,"0,3"},
+            {0xBE1E63B3,"0,0,3,3,3"},
             {0xBF7A21C8,"0,0"},
             {0xE33213D8,"0,0,1"},
-            {0xFC5AB6DC,"0,0"},
+            {0xFC5AB6DC,"0,3"},
         };
         #endregion
         #region syntax
@@ -2673,10 +2673,35 @@ namespace SALT.Moveset.AnimCMD
         /// </summary>
         public static Dictionary<uint, List<string>> CMD_EXAMPLE = new Dictionary<uint, List<string>>();
 
+        /// <summary>
+        /// Optional in-depth help of each command ("Help:" lines in Events.cfg), shown in the command list after the
+        /// parameters (not in the editor's tooltips, which show the description). "" is an empty line, "## text" a
+        /// heading.
+        /// </summary>
+        public static Dictionary<uint, List<string>> CMD_HELP = new Dictionary<uint, List<string>>();
+
+        /// <summary>
+        /// Optional help of a command group ("Group: NAME" blocks in Events.cfg), shown when the group is picked in
+        /// the command list. A group "A / B" is B inside A.
+        /// </summary>
+        public static Dictionary<string, List<string>> GROUP_HELP = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+
         public static List<string> GetExample(uint crc)
         {
             List<string> lines;
             return CMD_EXAMPLE.TryGetValue(crc, out lines) ? lines : new List<string>();
+        }
+
+        public static List<string> GetHelp(uint crc)
+        {
+            List<string> lines;
+            return CMD_HELP.TryGetValue(crc, out lines) ? lines : new List<string>();
+        }
+
+        public static List<string> GetGroupHelp(string group)
+        {
+            List<string> lines;
+            return group != null && GROUP_HELP.TryGetValue(group, out lines) ? lines : new List<string>();
         }
 
         public static string GetCategory(uint crc)
@@ -2772,6 +2797,8 @@ namespace SALT.Moveset.AnimCMD
         ///   "Category: group" (optional, the command list's group)
         ///   "Param: Name = description" lines (optional, one per parameter)
         ///   "Example: line" lines (optional, a usage example; the indentation after "Example: " is kept)
+        ///   "Help: line" lines (optional, the command list's in-depth help; "Help:" alone is an empty line)
+        /// A block whose first line is "Group: NAME" holds "Help:" lines for that group instead.
         /// Lines starting with // are comments. Returns the number of definitions read;
         /// problems are added to <paramref name="errors"/> and that block is skipped.
         /// </summary>
@@ -2814,6 +2841,21 @@ namespace SALT.Moveset.AnimCMD
                 var block = blocks[b];
                 try
                 {
+                    if (block[0].StartsWith("Group:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var group = block[0].Substring(6).Trim();
+                        if (group.Length == 0)
+                            throw new FormatException("a group block starts with \"Group: NAME\"");
+                        var lines = new List<string>();
+                        for (int i = 1; i < block.Count; i++)
+                        {
+                            if (!block[i].StartsWith("Help:", StringComparison.OrdinalIgnoreCase))
+                                throw new FormatException("a group block holds only \"Help:\" lines");
+                            lines.Add(block[i].Substring(5).Trim());
+                        }
+                        GROUP_HELP[group] = lines;
+                        continue;
+                    }
                     if (block.Count < 4)
                         throw new FormatException("needs at least 4 lines (identifier, name, parameter types, parameter names)");
 
@@ -2835,6 +2877,7 @@ namespace SALT.Moveset.AnimCMD
                     string desc = null, category = null;
                     var paramDesc = new Dictionary<string, string>();
                     var example = new List<string>();
+                    var help = new List<string>();
                     for (int i = 4; i < block.Count; i++)
                     {
                         var line = block[i];
@@ -2853,6 +2896,8 @@ namespace SALT.Moveset.AnimCMD
                             var text = line.Substring(8);
                             example.Add((text.StartsWith(" ") ? text.Substring(1) : text).TrimEnd());
                         }
+                        else if (line.StartsWith("Help:", StringComparison.OrdinalIgnoreCase))
+                            help.Add(line.Substring(5).Trim());
                         else if (desc == null)
                             desc = line == "NONE" ? string.Empty : line;
                         else
@@ -2866,6 +2911,10 @@ namespace SALT.Moveset.AnimCMD
                         CMD_EXAMPLE[crc] = example;
                     else
                         CMD_EXAMPLE.Remove(crc);
+                    if (help.Count > 0)
+                        CMD_HELP[crc] = help;
+                    else
+                        CMD_HELP.Remove(crc);
                     count++;
                 }
                 catch (Exception e)
@@ -2899,6 +2948,9 @@ namespace SALT.Moveset.AnimCMD
             sb.AppendLine("//   Param: Name = description   (optional, one line per parameter, also shown in tooltips)");
             sb.AppendLine("//   Example: line   (optional, one per line of a usage example, shown in the command list;");
             sb.AppendLine("//            indentation after \"Example: \" is kept, \"//\" lines are the example's comments)");
+            sb.AppendLine("//   Help: line   (optional, one per line of help shown in the command list only, after the parameters;");
+            sb.AppendLine("//         \"Help:\" alone is an empty line, \"Help: ## text\" a heading)");
+            sb.AppendLine("// A block starting \"Group: NAME\" holds the Help: lines shown when that group is picked in the list.");
             sb.AppendLine("// Lines starting with // are comments. Tools > Command Definitions edits this file.");
             foreach (var pair in CMD_NAMES.OrderBy(x => x.Value, StringComparer.OrdinalIgnoreCase))
             {
@@ -2932,6 +2984,15 @@ namespace SALT.Moveset.AnimCMD
                         sb.AppendLine($"Param: {p.Key} = {p.Value}");
                 foreach (var line in GetExample(crc))
                     sb.AppendLine("Example: " + line);
+                foreach (var line in GetHelp(crc))
+                    sb.AppendLine(("Help: " + line).TrimEnd());
+            }
+            foreach (var group in GROUP_HELP)
+            {
+                sb.AppendLine();
+                sb.AppendLine("Group: " + group.Key);
+                foreach (var line in group.Value)
+                    sb.AppendLine(("Help: " + line).TrimEnd());
             }
             File.WriteAllText(path, sb.ToString());
         }

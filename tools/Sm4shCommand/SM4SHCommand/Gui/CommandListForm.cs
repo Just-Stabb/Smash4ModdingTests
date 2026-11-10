@@ -8,22 +8,30 @@ using SALT.Moveset.AnimCMD;
 namespace Sm4shCommand
 {
     /// <summary>
-    /// View > Commands: every ACMD command, grouped by what it does (its "Category:" in Events.cfg),
-    /// with its description, parameters (type and meaning), a template line and a usage example (its
-    /// "Example:" lines). A search box filters by name, identifier, description or parameter. Insert (or
-    /// double-click) puts the template in the open script at the caret, Insert Example the example;
-    /// Copy / Copy Example put them on the clipboard.
+    /// View > Commands: every ACMD command, grouped by what it does (its "Category:" in Events.cfg; "A / B" is
+    /// group B inside group A, e.g. "New Commands / Inputs"), with its description, parameters (type and
+    /// meaning), its help ("Help:" lines), a template line and a usage example (its "Example:" lines). Picking a
+    /// group shows its help ("Group:" blocks). A search box filters by name, identifier, description, help or
+    /// parameter. Insert (or double-click) puts the template in the open script at the caret, Insert Example the
+    /// example; Copy / Copy Example put them on the clipboard.
     /// </summary>
     public class CommandListForm : Form
     {
-        // groups in this order; any other group after them, alphabetically, and Other last
+        // groups in this order; any other group after them, alphabetically, and Other last. The commands this
+        // mod adds are all in "New Commands" (first), in the subgroups below (tools/acmd_ext_help.py SUBGROUPS).
+        const string NewGroup = "New Commands";
         static readonly string[] GroupOrder =
         {
-            "Script flow & timing", "Variables & compares", "Hitboxes", "Grabs & throws", "Hurtboxes & body",
+            NewGroup, "Script flow & timing", "Variables & compares", "Hitboxes", "Grabs & throws", "Hurtboxes & body",
             "Search boxes, areas & shields", "Effects", "Trails & sword glow", "Lights, flashes & overlays",
             "Sound", "Camera, quake & rumble", "Slowdown", "Movement & physics", "Animation, model & visibility",
             "Articles (projectiles)", "Items", "Item scripts (IT_)", "Traces & targeting", "Fighter-specific",
         };
+        static readonly string[] SubgroupOrder =
+        {
+            "Hitboxes & hits", "Fighter state", "Inputs", "Position & rotation", "Animation", "Targets & tracking", "Threads",
+        };
+        const string GroupSeparator = " / ";
         static readonly string[] TypeNames = { "int", "float", "decimal", "variable" };
 
         readonly Func<ITS_EDITOR> activeEditor;
@@ -89,7 +97,13 @@ namespace Sm4shCommand
                     e.Handled = true;
                 }
             };
-            tree.AfterSelect += (o, e) => ShowCommand(e.Node.Tag as uint?);
+            tree.AfterSelect += (o, e) =>
+            {
+                if (e.Node.Tag is string)
+                    ShowGroup((string)e.Node.Tag);
+                else
+                    ShowCommand(e.Node.Tag as uint?);
+            };
             tree.NodeMouseDoubleClick += (o, e) => { if (e.Node.Tag is uint) Insert(); };
             tree.KeyDown += (o, e) => { if (e.KeyCode == Keys.Enter && tree.SelectedNode?.Tag is uint) { Insert(); e.Handled = true; } };
             btnInsert.Click += (o, e) => Insert();
@@ -112,6 +126,20 @@ namespace Sm4shCommand
             return i >= 0 ? i : group == "Other" ? int.MaxValue : GroupOrder.Length;
         }
 
+        static int SubgroupRank(string group)
+        {
+            int i = Array.IndexOf(SubgroupOrder, group);
+            return i >= 0 ? i : SubgroupOrder.Length;
+        }
+
+        /// <summary>"A / B" -> ("A", "B"); "A" -> ("A", null).</summary>
+        static void SplitGroup(string category, out string group, out string sub)
+        {
+            int i = category.IndexOf(GroupSeparator, StringComparison.Ordinal);
+            group = i < 0 ? category : category.Substring(0, i).Trim();
+            sub = i < 0 ? null : category.Substring(i + GroupSeparator.Length).Trim();
+        }
+
         static string[] Syntax(uint crc)
         {
             string s;
@@ -131,7 +159,7 @@ namespace Sm4shCommand
             if (words.Length == 0)
                 return true;
             var text = string.Join(" ", new[] { ACMD_INFO.CMD_NAMES[crc], crc.ToString("X8"), ACMD_INFO.GetDescription(crc),
-                ACMD_INFO.GetCategory(crc) }.Concat(Syntax(crc)));
+                ACMD_INFO.GetCategory(crc) }.Concat(Syntax(crc)).Concat(ACMD_INFO.GetHelp(crc)));
             Dictionary<string, string> pd;
             if (ACMD_INFO.PARAM_DESC.TryGetValue(crc, out pd))
                 text += " " + string.Join(" ", pd.Values);
@@ -142,29 +170,53 @@ namespace Sm4shCommand
         {
             var words = search.Text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(w => w.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? w.Substring(2) : w).ToArray();
+            // top-level group -> subgroup (null: directly in the group) -> commands
             var groups = ACMD_INFO.CMD_NAMES.Keys.Where(c => Matches(c, words))
-                .GroupBy(ACMD_INFO.GetCategory)
+                .Select(c => { string g, sub; SplitGroup(ACMD_INFO.GetCategory(c), out g, out sub); return new { c, g, sub }; })
+                .GroupBy(x => x.g, StringComparer.OrdinalIgnoreCase)
                 .OrderBy(g => GroupRank(g.Key)).ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase);
             uint? keep = current;
+            string keepGroup = tree.SelectedNode?.Tag as string;
             TreeNode select = null;
             int total = 0;
             tree.BeginUpdate();
             tree.Nodes.Clear();
             foreach (var g in groups)
             {
-                var cmds = g.OrderBy(c => ACMD_INFO.CMD_NAMES[c].StartsWith("unk_") ? 1 : 0)
-                    .ThenBy(c => ACMD_INFO.CMD_NAMES[c], StringComparer.OrdinalIgnoreCase).ToList();
-                var node = new TreeNode($"{g.Key} ({cmds.Count})");
-                foreach (var c in cmds)
+                int count = g.Count();
+                var node = new TreeNode($"{g.Key} ({count})") { Tag = g.Key };
+                if (g.Key == NewGroup)
+                    node.ToolTipText = "Every command this mod adds (they need the patched cross_f.rpx). Click for an overview.";
+                if (keepGroup == g.Key && !keep.HasValue)
+                    select = node;
+                // commands directly in the group first, then the subgroups
+                foreach (var sg in g.GroupBy(x => x.sub ?? "", StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(x => x.Key.Length == 0 ? -1 : SubgroupRank(x.Key)).ThenBy(x => x.Key, StringComparer.OrdinalIgnoreCase))
                 {
-                    var n = new TreeNode(ACMD_INFO.CMD_NAMES[c]) { Tag = c, ToolTipText = FirstSentence(ACMD_INFO.GetDescription(c)) };
-                    if (ACMD_INFO.CMD_NAMES[c].StartsWith("unk_"))
-                        n.ForeColor = Color.Gray;
-                    node.Nodes.Add(n);
-                    if (keep == c)
-                        select = n;
+                    var cmds = sg.Select(x => x.c).OrderBy(c => ACMD_INFO.CMD_NAMES[c].StartsWith("unk_") ? 1 : 0)
+                        .ThenBy(c => ACMD_INFO.CMD_NAMES[c], StringComparer.OrdinalIgnoreCase).ToList();
+                    var parent = node;
+                    if (sg.Key.Length > 0)
+                    {
+                        string full = g.Key + GroupSeparator + sg.Key;
+                        parent = new TreeNode($"{sg.Key} ({cmds.Count})") { Tag = full };
+                        node.Nodes.Add(parent);
+                        if (keepGroup == full && !keep.HasValue)
+                            select = parent;
+                        if (words.Length > 0)
+                            parent.Expand();
+                    }
+                    foreach (var c in cmds)
+                    {
+                        var n = new TreeNode(ACMD_INFO.CMD_NAMES[c]) { Tag = c, ToolTipText = FirstSentence(ACMD_INFO.GetDescription(c)) };
+                        if (ACMD_INFO.CMD_NAMES[c].StartsWith("unk_"))
+                            n.ForeColor = Color.Gray;
+                        parent.Nodes.Add(n);
+                        if (keep == c)
+                            select = n;
+                    }
                 }
-                total += cmds.Count;
+                total += count;
                 tree.Nodes.Add(node);
                 if (words.Length > 0)
                     node.Expand();
@@ -240,8 +292,10 @@ namespace Sm4shCommand
                     "description or parameters (e.g. \"knockback\", \"sound\", \"B738EABD\"). Gray commands " +
                     "(unk_) have no known name.\n\nInsert (or double-click, or Enter) adds the command to the " +
                     "open script below the caret, with every parameter set to 0. Most commands also have an example: " +
-                    "a real use from the game's scripts (or, for the new commands, a hand-written one), which " +
-                    "Insert Example adds to the script.", body, Color.DimGray);
+                    "a real use from the game's scripts (or, for the new commands, hand-written ones), which " +
+                    "Insert Example adds to the script.\n\nThe commands this mod adds are all under \"New Commands\" " +
+                    "(first in the list): click it for an overview (targets, variables, what they need), and each " +
+                    "command for its full help and examples.", body, Color.DimGray);
                 UpdateButtons();
                 return;
             }
@@ -265,15 +319,69 @@ namespace Sm4shCommand
             }
             if (format.Length > 0)
                 add("\n", body, SystemColors.WindowText);
+            var help = ACMD_INFO.GetHelp(c);
+            if (help.Count > 0)
+            {
+                AddHelp(add, help, true);
+                add("\n", body, SystemColors.WindowText);
+            }
             add("Template\n", bold, SystemColors.WindowText);
             add(Template(c) + "\n", mono, Color.DarkBlue);
             var example = ACMD_INFO.GetExample(c);
             if (example.Count > 0)
             {
-                add("\nExample\n", bold, SystemColors.WindowText);
+                add(example.Any(l => l.Length == 0) ? "\nExamples\n" : "\nExample\n", bold, SystemColors.WindowText);
                 foreach (var line in example)
                     add(line + "\n", mono, line.TrimStart().StartsWith("//") ? Color.SeaGreen : Color.DarkBlue);
             }
+            info.SelectionStart = 0;
+            info.ScrollToCaret();
+            UpdateButtons();
+        }
+
+        /// <summary>Help lines: "## text" a heading, "" an empty line, "- text" a list line, else a paragraph.</summary>
+        static void AddHelp(Action<string, Font, Color> add, List<string> lines, bool withHeading)
+        {
+            if (withHeading && (lines.Count == 0 || !lines[0].StartsWith("##")))
+                add("How to use it\n", bold, SystemColors.WindowText);
+            foreach (var line in lines)
+            {
+                if (line.StartsWith("##"))
+                    add(line.Substring(2).Trim() + "\n", bold, SystemColors.WindowText);
+                else if (line.StartsWith("- "))
+                    add("    \u2022 " + line.Substring(2) + "\n", body, SystemColors.WindowText);
+                else
+                    add(line + "\n", body, SystemColors.WindowText);
+            }
+        }
+
+        /// <summary>A group picked in the list: its name, its help (Events.cfg "Group:" blocks) and what it holds.</summary>
+        void ShowGroup(string group)
+        {
+            current = null;
+            info.Clear();
+            Action<string, Font, Color> add = (t, f, color) =>
+            {
+                info.SelectionStart = info.TextLength;
+                info.SelectionFont = f;
+                info.SelectionColor = color;
+                info.AppendText(t);
+            };
+            string top, sub;
+            SplitGroup(group, out top, out sub);
+            add((sub ?? top) + "\n", title, SystemColors.WindowText);
+            int count = ACMD_INFO.CMD_NAMES.Keys.Count(c =>
+            {
+                var cat = ACMD_INFO.GetCategory(c);
+                return string.Equals(cat, group, StringComparison.OrdinalIgnoreCase) ||
+                    cat.StartsWith(group + GroupSeparator, StringComparison.OrdinalIgnoreCase);
+            });
+            add(sub != null ? $"{top}  \u00b7  {count} commands\n\n" : $"{count} commands\n\n", body, Color.DimGray);
+            var help = ACMD_INFO.GetGroupHelp(group);
+            if (help.Count > 0)
+                AddHelp(add, help, false);
+            else
+                add("Pick a command in this group on the left.", body, Color.DimGray);
             info.SelectionStart = 0;
             info.ScrollToCaret();
             UpdateButtons();

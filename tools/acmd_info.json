@@ -10193,7 +10193,7 @@
 "format": [
 0,
 0,
-0
+3
 ],
 "syntax": [
 "Target",
@@ -10278,7 +10278,7 @@
 "name": "Last_Hit_Get",
 "format": [
 0,
-0
+3
 ],
 "syntax": [
 "Which",
@@ -10291,7 +10291,7 @@
 "format": [
 0,
 0,
-0
+3
 ],
 "syntax": [
 "Target",
@@ -10323,7 +10323,7 @@
 "format": [
 0,
 0,
-0
+3
 ],
 "syntax": [
 "Target",
@@ -10364,7 +10364,7 @@
 "name": "Status_Get",
 "format": [
 0,
-0
+3
 ],
 "syntax": [
 "Target",
@@ -10377,7 +10377,7 @@
 "format": [
 0,
 0,
-0
+3
 ],
 "syntax": [
 "Target",
@@ -10391,7 +10391,7 @@
 "format": [
 0,
 0,
-0
+3
 ],
 "syntax": [
 "Target",
@@ -10471,7 +10471,7 @@
 "format": [
 0,
 0,
-0
+3
 ],
 "syntax": [
 "Target",
@@ -10496,7 +10496,7 @@
 "name": "Damage_Get",
 "format": [
 0,
-0
+3
 ],
 "syntax": [
 "Target",
@@ -10509,9 +10509,9 @@
 "format": [
 0,
 0,
-0,
-0,
-0
+3,
+3,
+3
 ],
 "syntax": [
 "Target",
@@ -10552,7 +10552,7 @@
 "name": "Target_Slot_Get",
 "format": [
 0,
-0
+3
 ],
 "syntax": [
 "Target",

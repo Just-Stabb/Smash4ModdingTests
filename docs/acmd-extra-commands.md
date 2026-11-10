@@ -4,12 +4,25 @@ These are new commands for game, effect, sound and expression scripts. They need
 `cross_f.rpx` (`tools/acmd_ext_cave.py`, part of the standard build). Without it, a script that uses
 them won't load properly, so ship the executable with any script that uses them.
 
-Sm4shCommand knows them, with tooltips for every parameter. View > Commands lists the Extra hitboxes,
-Hit_Reset / Hit_Log_Clear and Hit_Check / Hit_Get under Hitboxes, the Input commands under Variables & compares,
-Track_Target, Last_Hit_Get and Target_Slot_Get under Traces & targeting, Rotation_ / Position_ under Movement &
-physics, Motion_, Animation_Rate_Set and Joint_Position_Get under Animation, and the fighter-state commands
-(Status_, Hitstun_, Hitstop_Set, Damage_, Body_State_Set, Armor_Set, Item_State_Set, Stage_Collision_Set) under
-Hurtboxes & body. `tools/acmd.py` reads and writes them too.
+Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7) lists all of them in one
+group, **New Commands**, at the top of the list (vanilla commands stay in their own groups), in subgroups:
+
+| Subgroup | Commands |
+|---|---|
+| Hitboxes & hits | Extra_Special_Hitbox, Extra_Extended_Special_Hitbox, Hit_Check, Hit_Get, Hit_Reset, Hit_Log_Clear |
+| Fighter state | Status_Get / _Set, Hitstun_Get / _Set, Hitstop_Set, Damage_Get / _Set, Body_State_Set, Armor_Set, Item_State_Set, Stage_Collision_Set |
+| Inputs | Input_Compare, Input_Get, Input_Set |
+| Position & rotation | Position_Get / _Set, Rotation_Get / _Set, Joint_Position_Get |
+| Animation | Motion_Get / _Set, Animation_Rate_Set |
+| Targets & tracking | Track_Target, Last_Hit_Get, Target_Slot_Get |
+| Threads | Thread_Start, Thread_Stop |
+
+Each command there has in-depth help after its parameters (how it works, the values, gotchas) and several complete
+examples (Insert Example / Copy Example), and clicking New Commands shows an overview (targets, compare methods,
+variables). That text is written in `tools/acmd_ext_help.py` (a new command gets its group, help and examples
+there; `python3 tools/acmd_ext_cave.py --labels tools/Sm4shCommand/param_labels.json`, then
+`python3 tools/Sm4shCommand/apply_param_labels.py`, which regenerates Events.cfg). `tools/acmd.py` reads and writes
+them too.
 
 | Command | Does |
 |---|---|

@@ -195,7 +195,7 @@ INPUT_CMP_PARAMS = [
 INPUT_GET_PARAMS = [
     ('Target', 0, _TARGET),
     ('Input', 0, _INPUT),
-    ('Variable', 0, 'Float variable that gets the value (this object\'s own, e.g. VAR_0 0x0F000300; any float variable).'),
+    ('Variable', 3, 'Float variable that gets the value (this object\'s own, e.g. VAR_0 0x0F000300; any float variable).'),
 ]
 INPUT_SET_PARAMS = [
     ('Target', 0, _TARGET),
@@ -2759,136 +2759,15 @@ def b(at, to):
     return 0x48000000 | (off & 0x3FFFFFC)
 
 
-# Usage examples for the command list (View > Commands; Events.cfg "Example:" lines). Each compiles in
-# Sm4shCommand as written; "//" lines are comments (not inserted with Insert Example).
-_HITBOX_HEAD = ('ID=0, Part=0, Bone=0, Damage=12, Angle=0x169, KBG=0x64, FKB=0, BKB=0x28, Size=5, X=0, Y=8, Z=6, '
-                'Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, '
-                'Ground/Air=3, Direct/Indirect=1, Type=1, HitBits=0x3F, Unk41=0, CollisionPart=0xF, NoScale=0, '
-                'Shieldable=1, Reflectable=0, Absorbable=0, Rehit=0, IgnoreInvuln=0, HitAllStates=0, FacingRestrict=3, '
-                'NoGrabRelease=0, TeamDamage=0, DisableHitlag=0, NoGFX=0, Flinchless=0, ')
-_EXTRAS = 'HitstunMul=0.5, HitstopMul=0, HitstopFrames=0x14, SelfHitstopMul=0, SelfHitstopFrames=0, DIMul=0.001'
-EXAMPLES = {
-    'Extra_Special_Hitbox': [
-        '// a 12% hit: half the hitstun, the opponent frozen 20 frames, (almost) no DI',
-        'FRAME(Frames=5)',
-        'Extra_Special_Hitbox(' + _HITBOX_HEAD + 'Shape=0, ' + _EXTRAS + ')',
-        'WAIT(Frames=3)',
-        'Remove_All_Hitboxes()'],
-    'Extra_Extended_Special_Hitbox': [
-        '// the same hit as a capsule from (0, 8, 6) to (0, 8, 14)',
-        'FRAME(Frames=5)',
-        'Extra_Extended_Special_Hitbox(' + _HITBOX_HEAD + 'X2=0, Y2=8, Z2=14, ' + _EXTRAS + ')',
-        'WAIT(Frames=3)',
-        'Remove_All_Hitboxes()'],
-    'Track_Target': [
-        '// in a projectile\'s script: home in on the nearest opponent for 60 frames at speed 1.8,',
-        '// turning at most 4 degrees a frame, at any distance',
-        'Track_Target(Frames=0x3C, Speed=1.8, TurnRate=4, Range=0, Mode=0, TargetOwner=0, TargetTeammates=0)',
-        '// stop tracking early (keeps flying straight)',
-        'FRAME(Frames=0x28)',
-        'Track_Target(Frames=0, Speed=0, TurnRate=0, Range=0, Mode=0, TargetOwner=0, TargetTeammates=0)'],
-    'Thread_Start': [
-        '// a lingering explosion 30 frames after the move starts, whatever the fighter is doing by then',
-        '// (Offset is worked out from the braces when the script compiles)',
-        'Thread_Start(Offset=0, ID=1, Flags=0){',
-        '    FRAME(Frames=0x1E)',
-        '    Graphic_Effect(Graphic=0x1000009, Bone=0, X=0, Y=8, Z=0, XRot=0, YRot=0, ZRot=0, Size=1.5, RandomX=0, '
-        'RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=0)',
-        '    Hitbox(ID=3, Part=0, Bone=0, Damage=8, Angle=0x169, KBG=0x50, FKB=0, BKB=0x32, Size=9, X=0, Y=8, Z=0, '
-        'Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, '
-        'Direct/Indirect=1, Type=1)',
-        '    WAIT(Frames=3)',
-        '    Remove_Hitbox(ID=3)',
-        '}'],
-    'Input_Compare': [
-        '// on frame 12: if special is held, a stronger hitbox',
-        'FRAME(Frames=0xC)',
-        'Input_Compare(Target=0, Input=1, Method=0, Value=1)',
-        'True(Offset=0){',
-        '    Hitbox(ID=0, Part=0, Bone=0, Damage=14, Angle=0x169, KBG=0x64, FKB=0, BKB=0x32, Size=6, X=0, Y=8, Z=8, '
-        'Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, '
-        'Direct/Indirect=1, Type=1)',
-        '}',
-        '// the stick held forward past halfway (Method 5: >)',
-        'Input_Compare(Target=0, Input=0x10, Method=5, Value=0.5)'],
-    'Input_Get': [
-        '// stick Y into VAR_0 (0x0F000300), then test it later with Float_Var_Compare',
-        'Input_Get(Target=0, Input=0x11, Variable=0x0F000300)'],
-    'Input_Set': [
-        '// make the fighter just hit jump (one frame) and ignore its controller for 30 frames',
-        'Input_Set(Target=2, Input=0x15, Value=1)',
-        'Input_Set(Target=2, Input=2, Value=2)',
-        'WAIT(Frames=0x1E)',
-        'Input_Set(Target=2, Input=0x15, Value=0)'],
-    'Hit_Reset': [
-        '// first hit, then check the second hitbox on its own',
-        'FRAME(Frames=0x14)',
-        'Hit_Reset()',
-        'Hitbox(ID=0, Part=0, Bone=0, Damage=6, Angle=0x169, KBG=0x64, FKB=0, BKB=0x28, Size=5, X=0, Y=8, Z=8, '
-        'Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=1, SFXType=1, Ground/Air=3, '
-        'Direct/Indirect=1, Type=1)',
-        'WAIT(Frames=3)',
-        'Float_Var_Compare(Variable=0x0F0000A0, Method=0, Value=1)'],
-    'Hit_Log_Clear': [
-        '// a second wave of the same hitboxes (Part 0) that can hit fighters the first one hit',
-        'FRAME(Frames=0x14)',
-        'Hit_Log_Clear(Part=0)'],
-    'Thread_Stop': [
-        '// stop thread 1 (started by Thread_Start(ID=1)) if it\'s still running',
-        'Thread_Stop(ID=1)',
-        '// or stop every thread this object started',
-        'Thread_Stop(ID=-1)'],
-}
-
-EXAMPLES.update({
-    'Hit_Check': [
-        '// a cancel on hit or on shield (MSC\'s AttackModule(0x2727, 6)), from frame 20',
-        'FRAME(Frames=0x14)',
-        'Hit_Check(Target=0, When=0, Kinds=6)',
-        'True(Offset=0){',
-        '    Input_Set(Target=0, Input=2, Value=2)',
-        '}',
-        '// only when this frame\'s hit was on a shield',
-        'Hit_Check(Target=0, When=1, Kinds=4)'],
-    'Hit_Get': [
-        '// VAR_0 = what the move has connected with (2 hurtbox, 4 shield, 6 both, 0 nothing)',
-        'Hit_Get(Target=0, When=0, Variable=VAR_0)',
-        'Float_Var_Compare(Variable=VAR_0, Method=0, Value=4)'],
-    'Rotation_Get': ['// VAR_0 = this article\'s rotation about Z (degrees)', 'Rotation_Get(Target=0, Axis=2, Variable=VAR_0)'],
-    'Rotation_Set': ['// tilt this projectile 45 degrees (about Z)', 'Rotation_Set(Target=0, X=0, Y=0, Z=45)',
-                     '// the last fighter hit: upright again', 'Rotation_Set(Target=2, X=0, Y=0, Z=0)'],
-    'Position_Get': ['// VAR_0 / VAR_1 = the nearest opponent\'s X / Y',
-                     'Position_Get(Target=1, Axis=0, Variable=VAR_0)', 'Position_Get(Target=1, Axis=1, Variable=VAR_1)'],
-    'Position_Set': ['// move this fighter 10 forward and 5 up', 'Position_Set(Target=0, X=10, Y=5, Z=0, Mode=1)',
-                     '// put player 2 at (0, 30, 0)', 'Position_Set(Target=4, X=0, Y=30, Z=0, Mode=0)'],
-    'Motion_Get': ['// VAR_0 = the animation frame the last fighter hit is on', 'Motion_Get(Target=2, What=1, Variable=VAR_0)'],
-    'Motion_Set': ['// play motion 0x5F from frame 10 at half speed', 'Motion_Set(Target=0, Motion=0x5F, Frame=10, Rate=0.5)',
-                   '// keep the current animation, jump to frame 20', 'Motion_Set(Target=0, Motion=-1, Frame=20, Rate=0)'],
-    'Last_Hit_Get': ['// VAR_0 = the player slot (1-8) this fighter last hit; VAR_1 = the one that last hit it',
-                     'Last_Hit_Get(Which=0, Variable=VAR_0)', 'Last_Hit_Get(Which=1, Variable=VAR_1)'],
-    'Target_Slot_Get': ['// VAR_0 = the nearest opponent\'s player slot (1-8)', 'Target_Slot_Get(Target=1, Variable=VAR_0)'],
-    'Status_Get': ['// VAR_0 = the last fighter hit\'s status', 'Status_Get(Target=2, Variable=VAR_0)'],
-    'Status_Set': ['// the last fighter hit: shield break (0x59)', 'Status_Set(Target=2, Status=0x59)'],
-    'Hitstun_Get': ['// VAR_0 = the hitstun frames the last fighter hit has left', 'Hitstun_Get(Target=2, What=0, Variable=VAR_0)'],
-    'Hitstun_Set': ['// end the last fighter hit\'s hitstun now', 'Hitstun_Set(Target=2, Frames=0)'],
-    'Hitstop_Set': ['// the last fighter hit: 8 frames of hitstop, shaking', 'Hitstop_Set(Target=2, Frames=8, Shake=1)'],
-    'Damage_Get': ['// VAR_0 = this fighter\'s damage %', 'Damage_Get(Target=0, Variable=VAR_0)'],
-    'Damage_Set': ['// the last fighter that hit this one: 0%', 'Damage_Set(Target=11, Percent=0)'],
-    'Body_State_Set': ['// intangible for 10 frames', 'Body_State_Set(Target=0, State=0, Frames=0xA)'],
-    'Armor_Set': ['// armor against knockback below 60, then none', 'Armor_Set(Target=0, Type=2, Threshold=60)',
-                  'WAIT(Frames=0xA)', 'Armor_Set(Target=0, Type=0, Threshold=0)'],
-    'Item_State_Set': ['// the last fighter hit turns metal (the Metal Box\'s)', 'Item_State_Set(Target=2, Code=1)'],
-    'Stage_Collision_Set': ['// the last fighter hit passes through the stage this frame', 'Stage_Collision_Set(Target=2, Mode=0)'],
-    'Joint_Position_Get': ['// VAR_0-2 = player 1\'s joint 11 (WaistN for most fighters)',
-                           'Joint_Position_Get(Target=3, Joint=0xB, VariableX=VAR_0, VariableY=VAR_1, VariableZ=VAR_2)'],
-    'Animation_Rate_Set': ['// everything 1.2x faster, then back', 'Animation_Rate_Set(Rate=1.2)', 'WAIT(Frames=0x3C)',
-                           'Animation_Rate_Set(Rate=1)'],
-})
+# Sm4shCommand's help for these commands (View > Commands: group, help text and usage examples, each example
+# compiling in Sm4shCommand as written) is in acmd_ext_help.py; labels() copies it into param_labels.json.
+from acmd_ext_help import EXAMPLES, GROUP, HELP  # noqa: E402
 
 
 def labels(path):
     """add / update the new commands in tools/Sm4shCommand/param_labels.json (apply_param_labels.py then
-    puts them in Sm4shCommand's table, tools/acmd_info.json and Events.cfg)"""
+    puts them in Sm4shCommand's table, tools/acmd_info.json and Events.cfg; their group, help and examples come
+    from acmd_ext_help.py)"""
     import json
     d = json.load(open(path))
     info = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'acmd_info.json')))['commands']
@@ -2896,14 +2775,15 @@ def labels(path):
         own = {'Track_Target': TRACK_PARAMS, 'Thread_Start': THREAD_PARAMS, 'Thread_Stop': THREAD_STOP_PARAMS,
                'Input_Compare': INPUT_CMP_PARAMS, 'Input_Get': INPUT_GET_PARAMS, 'Input_Set': INPUT_SET_PARAMS,
                'Hit_Reset': [], 'Hit_Log_Clear': HIT_LOG_CLEAR_PARAMS}
-        own.update({n: [(pn, 0 if ty == 3 else ty, d) for pn, ty, d in p] for n, p in NEW_PARAMS.items()})
+        own.update(NEW_PARAMS)           # Variable parameters are type 3: Sm4shCommand shows them as VAR_0, ...
         if name in own:
             e = {'_command': name, '_new': True, '_name': name, '_size': size, '_desc': SM4SHCOMMAND_DESC[name],
                  '_format': [t for _n, t, _d in own[name]]}
             assert len(own[name]) == size - 1
             for k, (pname, _t, desc) in enumerate(own[name]):
                 e[str(k)] = {'name': pname, 'desc': desc, 'confidence': 'high'}
-            e['_example'] = EXAMPLES[name]
+            e['_example'] = EXAMPLES.get(name, [])
+            e['_group'], e['_help'] = GROUP.get(name), HELP.get(name, [])     # (no entry yet: "New Commands" itself)
             d['%08X' % crc(name)] = e
             continue
         base = '%08X' % BASE_CRC[name]
@@ -2915,7 +2795,8 @@ def labels(path):
         for k, (pname, _t, desc) in enumerate(EXTRA_PARAMS):
             e[str(len(bi['syntax']) + k)] = {'name': pname, 'desc': desc, 'confidence': 'high'}
         assert len(e['_format']) == size - 1
-        e['_example'] = EXAMPLES[name]
+        e['_example'] = EXAMPLES.get(name, [])
+        e['_group'], e['_help'] = GROUP.get(name), HELP.get(name, [])
         d['%08X' % crc(name)] = e
     json.dump(dict(sorted(d.items())), open(path, 'w'), indent=1)
 

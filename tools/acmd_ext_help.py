@@ -91,7 +91,8 @@ GROUP_HELP = {
         'Vanilla commands stay in their usual groups; everything new is here.',
         '',
         '## Requirement',
-        NEEDS,
+        'They need the patched cross_f.rpx (tools/acmd_ext_cave.py, part of the standard build). Without it a script '
+        'that uses any of them won\'t load properly: ship the executable with any script that uses them.',
         '',
         '## Groups',
         '- Hitboxes & hits: hitboxes with hitstun / hitstop / DI extras, checking what an attack connected with, '
@@ -332,8 +333,8 @@ HELP = {
         '- It only matters while the target is in a hit status (Damage, DamageFly, ...).',
         '- To change the hitstun a move gives instead (before or after the hit), use LASTHIT_HITSTUN_MUL '
         '(SET_FLOAT to 0x0F000052) or an Extra hitbox\'s HitstunMul.',
-        '- The hit sets the hitstun when it lands (after the hitlag the target\'s status counts it down), so set it '
-        'after the hit: a WAIT past the hitlag, or a thread.',
+        '- The hit sets the target\'s hitstun itself, so set it after the hit has landed: a WAIT past the hitlag, or a '
+        'thread.',
         '',
         NOT_VIEWER,
         NEEDS,
@@ -368,7 +369,7 @@ HELP = {
     ] + TARGETS + [
         '',
         '## Gotchas',
-        '- It sets the %, it doesn\'t deal damage: no hit, no knockback, no stale-move or rage effects beyond the new %.',
+        '- It sets the %, it doesn\'t deal a hit: no knockback, no hitstun, no hitlag.',
         '- Percent is a fixed number. To add or take away an amount, use the damage variable with SUB_FLOAT_2 '
         '(a read, the change, a write): SELF_DAMAGE (0x0F000117), OPP_DAMAGE, LASTHIT_DAMAGE, SLOTn_DAMAGE. '
         'SUB_FLOAT_2 subtracts, so put a negative step in the source variable to add damage.',
@@ -398,14 +399,14 @@ HELP = {
         'Gives the target armor (DamageModule(0xB, type, threshold)), set before Type is applied so the type reads '
         'it. It holds until set again: Armor_Set(Type=0) ends it.',
         '- Type 0: none.',
-        '- Type 1: super armor (no flinching from any hit; Threshold unused).',
+        '- Type 1: super armor (no flinching from any hit).',
         '- Type 2: knockback-based: hits whose knockback is below Threshold don\'t make it flinch.',
         '- Type 3: damage-based: hits dealing less than Threshold % don\'t make it flinch.',
         '',
     ] + TARGETS + [
         '',
         '## Gotchas',
-        '- Always end it: armor set by a script stays after the move unless the fighter\'s status clears it.',
+        '- End it yourself (Type 0) where the move\'s armor should end, rather than relying on the move ending.',
         '- The fighter still takes the damage %, only the flinch is skipped.',
         '',
         NOT_VIEWER,
@@ -426,7 +427,7 @@ HELP = {
         '',
         '## Gotchas',
         '- The mushrooms refuse while the fighter can\'t grow / shrink (its flags 0x20000025, 0x20000037, 0x2000001B).',
-        '- Metal stays until code 2 (or the item\'s own end); the others run out on the item\'s timer.',
+        '- Code 2 ends metal; the other states last the item\'s own duration.',
         '- Used by Hero\'s Kaclang (metal), Metal Slash (metal on the last fighter hit), Hocus Pocus and critical hits '
         '(8 / 9).',
         '',
@@ -474,7 +475,7 @@ HELP = {
         '## Gotchas',
         '- The test runs where it is in the script: FRAME(Frames=12) then Input_Compare tests on frame 12 only. To '
         'catch a press any time in a window, test each frame (a Set_Loop of WAIT(Frames=1)) or use a held input.',
-        '- Stick values are after the game\'s dead zone; "tilted forward" is > 0.2 or so, "smashed" is near 1.',
+        '- Stick values are the game\'s own, after its dead zone (-1 to 1).',
         '- An unknown Target or Input compares 0; an unknown Method is false.',
         '- The fighter\'s own buttons (Target 0, inputs 0-15) are read with the game\'s ControlModule, as fighter MSC '
         'reads them; the rest through the input variables (docs/position-variables.md, "Inputs and state").',
@@ -590,8 +591,7 @@ HELP = {
         '## Gotchas',
         '- A fighter\'s status may set its own rotation every frame (rolls, damage flips): set it every frame (a loop '
         'or a thread) to keep it, and back to 0 when done.',
-        '- It turns the model (and what is attached to its bones: hitboxes on bones follow), not the movement '
-        'direction: Track_Target or the projectile\'s MSC steers.',
+        '- It turns the model, not the movement direction: Track_Target or the projectile\'s MSC steers.',
         '',
         NOT_VIEWER,
         NEEDS,
@@ -634,8 +634,8 @@ HELP = {
         '',
         '## Gotchas',
         '- Only the animation changes: the status keeps running, with its own code, and may play its own motion '
-        'again. A new motion on yourself also starts that motion\'s game script, so a move\'s script that plays '
-        'another motion hands over to that script.',
+        'again. The scripts follow the motion (as when MSC changes it), so playing another motion on this fighter '
+        'normally hands over to that motion\'s scripts.',
         '- Motion numbers are per fighter: what is 0x5F for one fighter is another animation for the next.',
         '- Rate here is the motion\'s own (like Set_Frame_Speed); Animation_Rate_Set multiplies on top.',
         '',

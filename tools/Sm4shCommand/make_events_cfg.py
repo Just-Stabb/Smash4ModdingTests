@@ -11,12 +11,15 @@ Definitions saves).
 import json
 import os
 import re
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "SALT", "SALT", "Scripting", "AnimCMD", "CMD_INFO.cs")
 DST = os.path.join(HERE, "SM4SHCommand", "Events.cfg")
 LABELS = os.path.join(HERE, "param_labels.json")   # the parameter research (apply_param_labels.py)
 EXAMPLES = os.path.join(HERE, "vanilla_examples.json")   # a real use of each vanilla command (make_examples.py)
+sys.path.insert(0, os.path.join(HERE, ".."))
+from acmd_ext_help import GROUP_HELP, NEW_GROUP  # noqa: E402  (the new commands' group texts)
 
 
 def one_line(t):
@@ -39,28 +42,27 @@ def param_lines(entry, names):
 # group whose pattern matches its name, else its real name (from _desc_extra), else, for the unk_
 # commands, its research note (_note: the module its handler calls).
 CATEGORIES = [
-    ("Script flow & timing", r"^Thread_|^(FRAME|FRAME_\w+|WAIT|WAIT_LOOP\w*|LOOP|Loop_Rest|Set_Loop|IF|ELIF|ELSE|Else|ENDIF|SWITCH|CASE|DEFAULT|"
+    ("Script flow & timing", r"^(FRAME|FRAME_\w+|WAIT|WAIT_LOOP\w*|LOOP|Loop_Rest|Set_Loop|IF|ELIF|ELSE|Else|ENDIF|SWITCH|CASE|DEFAULT|"
      r"ENDSWITCH|Goto|CALL|JUMP|Script_End|END|EXECUTE|NOP|True|False|Is_Bool|Is_Not_Bool|IS_RANDOM|"
      r"Set_Frame_Duration|Set_Frame_Speed|POOL)$"),
     ("Variables & compares", r"^(SET_INT|ADD_INT|INC_INT|SET_FLOAT|ADD_FLOAT|SUB_FLOAT\w*|ON_FLAG|OFF_FLAG|IS_FLAG)$|"
-     r"^(?i:int|float)_\w*(?i:compare)|_VAR_COMPARE|COMPARE_VAR|^Input_"),
+     r"^(?i:int|float)_\w*(?i:compare)|_VAR_COMPARE|COMPARE_VAR"),
     ("Item scripts (IT_)", r"^IT_"),
-    ("Hitboxes", r"Hitbox|^Hit_(Reset|Check|Get)$|^ATTACK_(?!SE(_\d)?$)|^ATK_|^HIT_STOP_MUL$|^SET_ATTACK_HIT_STOP$|^INFLICTION_OFF$|^Set_Weight_"),
+    ("Hitboxes", r"Hitbox|^ATTACK_(?!SE(_\d)?$)|^ATK_|^HIT_STOP_MUL$|^SET_ATTACK_HIT_STOP$|^INFLICTION_OFF$|^Set_Weight_"),
     ("Grabs & throws", r"Grab_Collision|Throw_(Specifier|Applier)|^FT_CATCH|^CTH_"),
     ("Search boxes, areas & shields", r"^Search_Collision$|^SCH_|^SEARCH_|^SET_SEARCH|AREA|Wind_Effect|^REFLECTOR$|^SHIELD_|^Shield_"),
-    ("Hurtboxes & body", r"^Body_Collision$|Intangibility|Bone_Collision|^Set_Armor$|^COL_PRI$|"
-     r"^(Status|Hitstun|Hitstop|Damage|Body_State|Armor|Item_State|Stage_Collision)_"),
+    ("Hurtboxes & body", r"^Body_Collision$|Intangibility|Bone_Collision|^Set_Armor$|^COL_PRI$"),
     ("Trails & sword glow", r"AFTER_IMAGE|Sword_(Glow|Trace)"),
     ("Lights, flashes & overlays", r"FLASH|Flash|LIGHT|Overlay|Screen_Tint|GOLD_EYE|_CHARGE"),
     ("Effects", r"EFFECT|Graphic|PARTICLE|^EM_"),
     ("Sound", r"(^|_)SE(_|$)|Sound|SOUND|Voice|VOICE|PITCH|VOLUME|BGM|SEQUENCE|^PLAY_|^IS_PLAYING|INHIVIT"),
     ("Camera, quake & rumble", r"CAM|Camera|QUAKE|Rumble|RUMBLE|SCROLL"),
     ("Slowdown", r"Time_Manipulation"),
-    ("Traces & targeting", r"TRACE|TEAM_OWNER|^SET_CURSOR$|^Track_|^Last_Hit_Get$|^Target_Slot_Get$"),
-    ("Animation, model & visibility", r"^Motion_(Get|Set)$|^Animation_Rate_Set$|^Joint_Position_Get$|^MOT_|Model|Morph|^VIS_|Visibility|SHADOW|MATERIAL|^MII_|^STRANS"),
+    ("Traces & targeting", r"TRACE|TEAM_OWNER|^SET_CURSOR$"),
+    ("Animation, model & visibility", r"^MOT_|Model|Morph|^VIS_|Visibility|SHADOW|MATERIAL|^MII_|^STRANS"),
     ("Articles (projectiles)", r"ARTICLE|Article"),
     ("Items", r"(?i:item)|^Fire_Weapon$|BULLET"),
-    ("Movement & physics", r"^(Rotation|Position)_(Get|Set)$|Momentum|Movements|SPEED|ENERGY|Kinetic|KINETIC|^SET_AIR$|Direction|^TURN_|ROT$|^STICK_LR|"
+    ("Movement & physics", r"Momentum|Movements|SPEED|ENERGY|Kinetic|KINETIC|^SET_AIR$|Direction|^TURN_|ROT$|^STICK_LR|"
      r"^SET_LR$|Ledgegrab|Edge_Slide|GROUND|BOX2D|PASSABLE|RHOMBUS|SLOPE|Slope|POS|^FT_MOTION_ANGLE$"),
 ]
 NOTE_CATEGORIES = [                          # for unk_ commands: words in the research note
@@ -77,6 +79,8 @@ NOTE_CATEGORIES = [                          # for unk_ commands: words in the r
 
 
 def category(name, entry):
+    if entry.get("_new"):                    # every command this mod adds (tools/acmd_ext_cave.py): one group
+        return NEW_GROUP + (" / " + entry["_group"] if entry.get("_group") else "")
     for text in (None if name.startswith("unk_") else name,
                  re.sub(r"^\(Real name: (\S+).*", r"\1", entry.get("_desc_extra", "")) or None):
         if text:
@@ -118,6 +122,9 @@ def main():
         "//   Param: Name = description   (optional, one line per parameter, also shown in tooltips)",
         "//   Example: line   (optional, one per line of a usage example, shown in the command list;",
         "//            indentation after \"Example: \" is kept, \"//\" lines are the example's comments)",
+        "//   Help: line   (optional, one per line of help shown in the command list only, after the parameters;",
+        "//         \"Help:\" alone is an empty line, \"Help: ## text\" a heading)",
+        "// A block starting \"Group: NAME\" holds the Help: lines shown when that group is picked in the list.",
         "// Lines starting with // are comments. Tools > Command Definitions edits this file.",
     ]
     for crc, name in sorted(names.items(), key=lambda kv: kv[1].upper()):
@@ -145,6 +152,9 @@ def main():
         out += ["", "%08X" % crc, name, f, s, d, "Category: " + category(name, entry)]
         out += param_lines(entry, [] if s == "NONE" else s.split(","))
         out += ["Example: " + line for line in entry.get("_example") or vanilla.get(crc, [])]
+        out += [("Help: " + line).rstrip() for line in entry.get("_help", [])]
+    for group, lines in GROUP_HELP.items():
+        out += ["", "Group: " + group] + [("Help: " + line).rstrip() for line in lines]
     open(DST, "w", newline="\r\n").write("\n".join(out) + "\n")
     print("%d commands -> %s" % (len(names), DST))
 
