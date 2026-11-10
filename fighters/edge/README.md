@@ -2597,9 +2597,11 @@ shieldstun for the duration of the pushback".
   (`KineticModule(0x11, 4, value, 0)`, the MSC syscall table's KineticModule wrapper `0x030B29D8`). The cave re-packs
   (1241 words differ; every other word of both tools the same as exe_v36). Unicorn: `position_vars_test.py` (the new q 7
   checks), `acmd_ext_test.py` and `weapon_expand_test.py` on exe_v37: 0 failed.
-- **Built isolated:** the package's `edge.mscsb` is test 152's `edge.c` + this change only (the concurrent universal
-  roll-off work in edge.c isn't in it; test 152's source rebuilds test 152's file byte for byte).
+- **Includes the roll-off change:** the package's `edge.mscsb` is built from `edge.c` with both this change and the
+  universal roll-off (Hero's momentum, fighters_rolloff_hero_v1), so installing it after that package keeps both;
+  `tools/rolloff_hold_test.py` on it: as Hero's; `msc_stack_check` 0 problems, globals within port_check C5.
 - Not tested in game (whether energy 4's set speed carries the shielder as expected; the ledge stop).
-- port_check over the chain + tests 148 - 152 + this: 42 errors, 57 warnings, 4 notes, the same as without it.
+- port_check over the chain + tests 148 - 152 + fighters_rolloff_hero_v1 + this: 42 errors, 57 warnings, 4 notes, the
+  same as without it.
 - Package (install over test 152): `code/cross_f.rpx` (exe_v37), `script/msc/edge.mscsb`.
 
