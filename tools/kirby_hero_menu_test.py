@@ -11,6 +11,7 @@
   spawner); reserve entries 10-14 name 0x196, 0x197, 0x195, 0x194, 0x193.
 """
 import os
+import re
 import struct
 import sys
 
@@ -22,6 +23,39 @@ from unicorn import Uc, UC_ARCH_PPC, UC_MODE_32, UC_MODE_BIG_ENDIAN  # noqa: E40
 from unicorn.ppc_const import UC_PPC_REG_0, UC_PPC_REG_LR, UC_PPC_REG_CR  # noqa: E402
 
 check = T.check
+
+
+def live_after(img, at, limit=400):
+    """registers read before written along the code from `at` (straight line, following unconditional branches and
+    both ways of conditional ones, up to `limit` instructions; calls end a path: r3-r12 are then dead)"""
+    import capstone
+    md = capstone.Cs(capstone.CS_ARCH_PPC, capstone.CS_MODE_32 | capstone.CS_MODE_BIG_ENDIAN)
+    live, seen, todo = set(), set(), [(at, frozenset())]
+    while todo and len(seen) < limit:
+        a, written = todo.pop()
+        while (a, written) not in seen and len(seen) < limit:
+            seen.add((a, written))
+            ins = next(md.disasm(img.read(a, 4), a))
+            regs = [int(x) for x in re.findall(r'\br(\d+)\b', ins.op_str)]
+            m = ins.mnemonic
+            if m.startswith(('st', 'cmp', 'mt', 'tw')) or m.startswith('b'):
+                rd, wr = set(regs), set()
+            elif regs:
+                rd, wr = set(regs[1:]), {regs[0]}
+            else:
+                rd, wr = set(), set()
+            live |= rd - written
+            written = written | wr
+            m = ins.mnemonic
+            if m in ('blr', 'bctr', 'bctrl') or m == 'bl':
+                break
+            if m == 'b':
+                a = int(ins.op_str.split()[-1], 0)
+                continue
+            if m.startswith('b') and not m.endswith('lr') and not m.endswith('ctr'):
+                todo.append((int(ins.op_str.split()[-1], 0), written))
+            a += 4
+    return live
 
 
 def main():
@@ -68,6 +102,18 @@ def main():
         if r11 != (0x12345678 - (C.SHIFT if k == C.KIRBY else 0)):
             bad.append('ints %x' % k)
     check('kind stub: equal for Hero and Kirby only; int array 0x48 lower for Kirby only', bad, [])
+    # crash fix v2: a stub may change only the registers the panel cave doesn't read before writing them after the
+    # hook (exe_v45b's kind stub clobbered r12, the fighter object the cave reads next: `lwz r12, 0xC(r12)`)
+    for hook, name, own in ((C.HOOK_KIND, 'kind_stub', set()), (C.HOOK_INTS, 'ints_stub', {11})):
+        live = live_after(new, hook + 4)
+        for r in range(32):
+            mu.reg_write(UC_PPC_REG_0 + r, 0x7F000100 - 0xC if r == 11 else 0x1000 + r)
+        mu.reg_write(UC_PPC_REG_LR, 0x7F00FFF0)
+        mu.emu_start(lab[name], 0x7F00FFF0, count=50)
+        changed = {r for r in range(32) if r not in (1,) and mu.reg_read(UC_PPC_REG_0 + r) != (
+            0x7F000100 - 0xC if r == 11 else 0x1000 + r)} - own
+        check('%s: changes no register the panel cave reads after 0x%08X (live: %s)' % (name, hook, sorted(live)),
+              sorted(changed & live), [])
     check('Kirby\'s ints land on the cave\'s gauge / window / rows reads',
           [0x10000000 | (i * 4 + C.SHIFT) // 4 for i in (0x8A, 0x8C, 0x8D)], [0x1000009C, 0x1000009E, 0x1000009F])
     recs, n = new.w(hdr), new.w(hdr + 4)

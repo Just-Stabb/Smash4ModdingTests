@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tests tools/kirby_hero_sword_cave.py's patch (exe_v46): runs its code in unicorn from the patched RPX.
 
-  python3 tools/kirby_hero_sword_test.py PATCHED.rpx ORIGINAL.rpx      (exe_v46, exe_v45b)
+  python3 tools/kirby_hero_sword_test.py PATCHED.rpx ORIGINAL.rpx      (exe_v46, exe_v45c)
 
 - the original has what the patch expects: the held-item read 0x030C487C `lwzx r7, r24, r21` with r24 the held-item
   table (decoded from the loader's own lis / addi, as the hat read's check), the kind compare 0x02EFE664, the held

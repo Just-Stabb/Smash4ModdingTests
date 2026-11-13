@@ -138,9 +138,35 @@ def R_names(src):
     return funcs, glob
 
 
+def slot_table(src):
+    """kirby.c's Hero-copy state kept in New_Var slots (crash fix v2): {name: (type, id)}"""
+    return {n: (t, int(i, 16)) for n, t, i in re.findall(r'^//\s+(khm_\w+)\s+(int|float)\s+0x([0-9A-Fa-f]{8})\s*$',
+                                                         open(src).read(), re.M)}
+
+
+def kget(r, name):
+    """a khm_* value: its New_Var slot (WorkModule int / float), or its global in an older build"""
+    if name in r.slots:
+        t, i = r.slots[name]
+        return r.game.fvars.get(i, 0.0) if t == 'float' else r.game.ints.get(i, 0)
+    return r.vm.g.get(r.gi[name], 0)
+
+
+def kset(r, name, v):
+    if name in r.slots:
+        t, i = r.slots[name]
+        if t == 'float':
+            r.game.fvars[i] = v
+        else:
+            r.game.ints[i] = v
+    else:
+        r.vm.g[r.gi[name]] = v
+
+
 class Run:
     def __init__(self, path, src, marker, situation=0):
         self.vm = R.VM(path)
+        self.slots = slot_table(src)
         funcs, glob = R_names(src)
         self.fn = {n: self.vm.func(i) for i, n in enumerate(funcs)}
         self.gi = {n: i for i, n in enumerate(glob)}
@@ -191,8 +217,8 @@ def cast(r, spell, frames, f=None):
     r.vm.call(r.fn['khm_update'])
     r.vm.g[r.gi['global4']] = 0x175
     r.vm.call(r.fn['khm_update'])
-    r.vm.g[r.gi['khm_spells']] = spell
-    r.vm.g[r.gi['khm_cursor']] = 0
+    kset(r, 'khm_spells', spell)
+    kset(r, 'khm_cursor', 0)
     g.press = {0}
     r.vm.call(r.fn['khm_update'])
     g.press = set()
@@ -223,7 +249,7 @@ def v3_tests(path, src):
     check('Kaclang: metal off (SELF_ITEM 2) after 300', g.fvars.get(0x0F000099), 2.0)
     r.setf('ncp_mp', 100.0)
     cast(r, 0xd, 12)
-    check('Bounce: 720 frames of reflector', r.vm.g.get(r.gi['khm_reflect_t']) > 700, True)
+    check('Bounce: 720 frames of reflector', kget(r, 'khm_reflect_t') > 700, True)
     r.setf('ncp_mp', 100.0)
     g.speeds = []
     cast(r, 0x10, 31)
@@ -234,7 +260,7 @@ def v3_tests(path, src):
           (g.fvars.get(0x0F000000), g.fvars.get(0x0F000001), g.speeds[-1]), (50.0, 120.0, -7.0))
     r.vm.g[r.gi['global18']] = 0
     r.vm.call(r.fn['khm_update'])
-    check('Zoom: done on landing', r.vm.g.get(r.gi['khm_sub']), 0x7f)
+    check('Zoom: done on landing', kget(r, 'khm_sub'), 0x7f)
     r.setf('ncp_mp', 100.0)
     cast(r, 0xf, 3)
     check('Hocus Pocus (the draw\'s first outcome): giant (SELF_ITEM 3), 4 MP', (g.fvars.get(0x0F000099), r.gf('ncp_mp')),
@@ -256,8 +282,8 @@ def v3_tests(path, src):
     r.vm.call(r.fn['khm_update'])
     r.vm.g[r.gi['global4']] = 0x175
     r.vm.call(r.fn['khm_update'])
-    r.vm.g[r.gi['khm_spells']] = 0x17
-    r.vm.g[r.gi['khm_cursor']] = 0
+    kset(r, 'khm_spells', 0x17)
+    kset(r, 'khm_cursor', 0)
     g.press = {0}
     r.vm.call(r.fn['khm_update'])
     g.press = set()
@@ -267,9 +293,9 @@ def v3_tests(path, src):
         g.fvars[0x0F000020] = g.fvars[0x0F000000]    # his own slot's variables follow him
         g.fvars[0x0F000021] = g.fvars[0x0F000001]
         xs.append(round(g.fvars[0x0F000000], 3))
-    check('Zoom 2 U: target the nearest (slot 1)', r.vm.g.get(r.gi['khm_z2_target']), 1)
+    check('Zoom 2 U: target the nearest (slot 1)', kget(r, 'khm_z2_target'), 1)
     check('Zoom 2 U: still before 29, then 9 a frame at the target until within 15 (stops at x 35.x)',
-          (xs[29], xs[31] - xs[30] > 8.0, r.vm.g.get(r.gi['khm_sub'])), (10.0, True, 0x7f))
+          (xs[29], xs[31] - xs[30] > 8.0, kget(r, 'khm_sub')), (10.0, True, 0x7f))
     check('Zoom 2 U: within 15 of the target\'s feet + 6 at the end', abs(50.0 - xs[-1]) <= 15.0 + 1e-3, True)
     check('Zoom 2 U: intangible while flying', g.fvars.get(0x0F00011B), 2.0)
 
@@ -282,10 +308,10 @@ def menu_tests(path, src):
     g.fvars[0x0F000117] = 30.0                  # his damage (Heal)
     r.vm.g[r.gi['global4']] = 0x175
     r.vm.call(r.fn['khm_update'])
-    check('menu: opens when the stone starts', r.vm.g.get(r.gi['khm_state']), 1)
+    check('menu: opens when the stone starts', kget(r, 'khm_state'), 1)
     check('menu: blocks the stone\'s special while open', r.vm.call(r.fn['khm_blocking']), 1)
-    r.vm.g[r.gi['khm_spells']] = 0x1 + 0x2 * 0x20 + 0xc * 0x400   # rows: Heal, Sizz, Oomph
-    r.vm.g[r.gi['khm_rows']] = r.vm.g[r.gi['khm_spells']]
+    kset(r, 'khm_spells', 0x1 + 0x2 * 0x20 + 0xc * 0x400)   # rows: Heal, Sizz, Oomph
+    kset(r, 'khm_rows', kget(r, 'khm_spells'))
     r.vm.call(r.fn['khm_update'])
     check('panel: the gauge int (0x8A) 0x4D50 + MP 100 + after-cost 93 (Heal at the cursor)', hex(g.ints.get(0x1000008A, 0)),
           hex(0x4D500000 + 100 * 0x100 + 93))
@@ -295,16 +321,16 @@ def menu_tests(path, src):
     r.vm.g[r.gi['global32']] = R.f2i(-1.0)    # stick down: the cursor to row 1 (Sizz)
     r.vm.call(r.fn['khm_update'])
     r.vm.g[r.gi['global32']] = 0
-    check('menu: stick down moves the cursor', r.vm.g.get(r.gi['khm_cursor']), 1)
+    check('menu: stick down moves the cursor', kget(r, 'khm_cursor'), 1)
     r.vm.g[r.gi['global32']] = R.f2i(-1.0)    # the stick came back (the first move waits for it), now down
     r.vm.call(r.fn['khm_update'])
     r.vm.g[r.gi['global32']] = R.f2i(0.0)
     r.vm.call(r.fn['khm_update'])
-    r.vm.g[r.gi['khm_cursor']] = 1
+    kset(r, 'khm_cursor', 1)
     g.press = {0}                               # attack casts
     r.vm.call(r.fn['khm_update'])
     g.press = set()
-    check('menu: attack casts Sizz (8 MP)', (r.vm.g.get(r.gi['khm_state']), r.vm.g.get(r.gi['khm_spell']), r.gf('ncp_mp')),
+    check('menu: attack casts Sizz (8 MP)', (kget(r, 'khm_state'), kget(r, 'khm_spell'), r.gf('ncp_mp')),
           (2, 2, 92.0))
     for _ in range(8):
         r.vm.call(r.fn['khm_update'])
@@ -313,15 +339,15 @@ def menu_tests(path, src):
     check('Sizz: the custom slots put back', (g.ints[0x10000048], g.ints[0x1000009F]), (7, 11))
     for _ in range(80):
         r.vm.call(r.fn['khm_update'])
-    check('menu: shut after the cast (panel window 0)', (r.vm.g.get(r.gi['khm_state']), g.ints.get(0x1000008C)), (0, 0))
+    check('menu: shut after the cast (panel window 0)', (kget(r, 'khm_state'), g.ints.get(0x1000008C)), (0, 0))
     # Heal and Oomph
     for row, want in ((0, 'heal'), (2, 'oomph')):
         r.vm.g[r.gi['global4']] = 0
         r.vm.call(r.fn['khm_update'])
         r.vm.g[r.gi['global4']] = 0x175
         r.vm.call(r.fn['khm_update'])
-        r.vm.g[r.gi['khm_spells']] = 0x1 + 0x2 * 0x20 + 0xc * 0x400
-        r.vm.g[r.gi['khm_cursor']] = row
+        kset(r, 'khm_spells', 0x1 + 0x2 * 0x20 + 0xc * 0x400)
+        kset(r, 'khm_cursor', row)
         g.press = {0}
         r.vm.call(r.fn['khm_update'])
         g.press = set()
@@ -331,19 +357,19 @@ def menu_tests(path, src):
             check('Heal: 11% off his damage at frame 6, 7 MP', (g.fvars.get(0x0F000117), r.gf('ncp_mp')), (19.0, 85.0))
         else:
             check('Oomph: 720 frames, the marker bits 0x80 + 0x20 (not in a special)',
-                  (r.vm.g.get(r.gi['khm_attack_t']) > 700, r.vm.call(r.fn['khm_buff_bits'])), (True, 0xA0))
+                  (kget(r, 'khm_attack_t') > 700, r.vm.call(r.fn['khm_buff_bits'])), (True, 0xA0))
     # too little MP: greyed, the misfire, no MP spent
     r.setf('ncp_mp', 5.0)
     r.vm.g[r.gi['global4']] = 0
     r.vm.call(r.fn['khm_update'])
     r.vm.g[r.gi['global4']] = 0x175
     r.vm.call(r.fn['khm_update'])
-    r.vm.g[r.gi['khm_spells']] = 0x3
-    r.vm.g[r.gi['khm_cursor']] = 0
+    kset(r, 'khm_spells', 0x3)
+    kset(r, 'khm_cursor', 0)
     g.press = {0}
     r.vm.call(r.fn['khm_update'])
     g.press = set()
-    check('Sizzle with 5 MP: greyed, nothing cast, MP kept', (r.vm.g.get(r.gi['khm_spell']), r.gf('ncp_mp')), (0, 5.0))
+    check('Sizzle with 5 MP: greyed, nothing cast, MP kept', (kget(r, 'khm_spell'), r.gf('ncp_mp')), (0, 5.0))
     # shield shuts it; the stone ending shuts it
     r.vm.g[r.gi['global4']] = 0
     r.vm.call(r.fn['khm_update'])
@@ -352,13 +378,13 @@ def menu_tests(path, src):
     g.press = {3}
     r.vm.call(r.fn['khm_update'])
     g.press = set()
-    check('shield shuts the menu', r.vm.g.get(r.gi['khm_state']), 0)
+    check('shield shuts the menu', kget(r, 'khm_state'), 0)
     v3_tests(path, src)
     rr = Run(path, src, 3)
     rr.update()
     rr.vm.g[rr.gi['global4']] = 0x175
     rr.vm.call(rr.fn['khm_update'])
-    check('Sephiroth copy: no menu, no gauge', (rr.vm.g.get(rr.gi['khm_state'], 0), rr.game.ints.get(0x1000008A)), (0, 0))
+    check('Sephiroth copy: no menu, no gauge', (kget(rr, 'khm_state'), rr.game.ints.get(0x1000008A)), (0, 0))
 
 
 def v6_tests(path, src):
@@ -372,7 +398,7 @@ def v6_tests(path, src):
             r = Run(path, src, 2, situation=situation)
             g = r.game
             r.update()
-            g.tag = lambda r=r: r.vm.g.get(r.gi['khm_frame'], 0) if r.vm.g.get(r.gi['khm_state'], 0) == 2 else None
+            g.tag = lambda r=r: kget(r, 'khm_frame') if kget(r, 'khm_state') == 2 else None
             mp0 = r.gf('ncp_mp')
             shown = []
 
@@ -408,7 +434,7 @@ def v6_tests(path, src):
     blocked = []
 
     def hit_at(r):
-        f = r.vm.g.get(r.gi['khm_frame'], 0)
+        f = kget(r, 'khm_frame')
         r.game.hit_now = f == a + 1
         blocked.append((f, r.vm.call(r.fn['khm_blocking'])))
     cast(r, 0x14, a + 3, hit_at)
@@ -429,7 +455,7 @@ def v6_tests(path, src):
         if metal:
             g.fvars[0x0F000278] = metal
         a, b = ev[0x13]['hitbox']
-        cast(r, 0x13, a + 4, lambda r: setattr(r.game, 'hit_now', r.vm.g.get(r.gi['khm_frame'], 0) == a + 1))
+        cast(r, 0x13, a + 4, lambda r: setattr(r.game, 'hit_now', kget(r, 'khm_frame') == a + 1))
         got = (g.fvars.get(0x0F000278) if not metal else 1.0, g.fvars.get(0x0F00015F))
         check('Metal Slash: target metal %s, status 0x%X -> (metal, KO) %s' % (bool(metal), status, want),
               got if status != 28 else (g.fvars.get(0x0F000278), g.fvars.get(0x0F00015F)), want)
@@ -440,7 +466,7 @@ def v6_tests(path, src):
     cast(r, 0x11, 8, lambda r: bits.append(r.vm.call(r.fn['khm_sw_crit_bit'])))
     check('Flame Slash crit rolled: the x2 bit 0x10 while its hitboxes are made', set(bits), {0x10})
     # Oomph doesn't boost a sword spell
-    r.vm.g[r.gi['khm_attack_t']] = 100
+    kset(r, 'khm_attack_t', 100)
     check('Oomph: no 0x20 during the sword spell (Hero\'s specials)', r.vm.call(r.fn['khm_buff_bits']) & 0x20, 0)
     # the stone ends mid-cast: everything stopped
     r = Run(path, src, 2)
@@ -528,7 +554,8 @@ def main():
     check('Sephiroth: Gigaflare made by the charge at 120 (level 2)', [(a[0], a[1], a[4]) for a in r.game.articles],
           [(7, 120.0, 2)])
     menu_tests(path, src)
-    v6_tests(path, src)
+    if 'khm_sword' in names(src)[0]:
+        v6_tests(path, src)
     # the plain Robin copy
     r = Run(path, src, 0)
     check('Robin copy (no marker): newcopy_marker 0', r.vm.call(r.fn['newcopy_marker']), 0)

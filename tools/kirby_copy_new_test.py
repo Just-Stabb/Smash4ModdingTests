@@ -166,9 +166,15 @@ def main():
         check('name read %s: Hero / Sephiroth slots %s, others the table\'s' % (
             tag, '/'.join(C.NAMES[k][idx] for k in sorted(C.NAMES))), bad, [])
     recs, n = new.w(C.ROBIN_HDR), new.w(C.ROBIN_HDR + 4)
-    check('Robin copy header -> the cave list, 8 records', (recs, n), (lab['robin_list'], 8))
-    check('Robin copy records', [tuple(new.w(recs + 16 * i + 4 * j) for j in range(4)) for i in range(n)],
-          list(C.ROBIN_RECORDS) + list(C.NEW_RECORDS))
+    import kirby_hero_menu_cave as M          # exe_v45 on: the menu cave's list (these 8 records, then Hero's spells)
+    if (recs, n) == (M.build()[0].labels['robin_list2'], len(M.records())):
+        check('Robin copy header -> kirby_hero_menu_cave.py\'s list (13 records, these 8 first)',
+              [tuple(new.w(recs + 16 * i + 4 * j) for j in range(4)) for i in range(8)],
+              list(C.ROBIN_RECORDS) + list(C.NEW_RECORDS))
+    else:
+        check('Robin copy header -> the cave list, 8 records', (recs, n), (lab['robin_list'], 8))
+        check('Robin copy records', [tuple(new.w(recs + 16 * i + 4 * j) for j in range(4)) for i in range(n)],
+              list(C.ROBIN_RECORDS) + list(C.NEW_RECORDS))
     for i, k in C.RESERVE:
         e = C.KIRBY_RESERVE + 0x10 * i
         check('reserve entry %d names 0x%X' % (i, k), [new.w(e + 4 * j) for j in range(4)], [k, 0, 0, 0])

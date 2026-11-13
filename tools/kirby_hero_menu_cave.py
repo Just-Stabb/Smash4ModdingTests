@@ -22,6 +22,9 @@ fighters/kirby/specials.md "Hero copy: Stone = Command Selection".
    Robin's thunder with its spawner 0x02F643A4 (extra_kinds.json brave "weapons"), Hero's max counts. Kirby's
    reserve article entries 10-14 name them (their files load with Kirby's).
 Space: 0x04BAF700-0x04BAFA00 (after kirby_copy_new_cave.py's 0x04BAF400-0x04BAF700).
+Crash fix v2 (exe_v45c): the kind stub kept the kind through r12, which the panel cave still needed (its fighter
+object): every panel's menu check then read 0x04BB000C and gave up (no window or gauge for Hero or Kirby). It uses
+r11 now; kirby_hero_menu_test.py checks that each stub leaves every register the cave reads after it.
 """
 import os
 import sys
@@ -51,7 +54,10 @@ def records():
 
 def build():
     src = ['panel_kind:', '.word 0', 'robin_list2:'] + ['.word 0x%08X' % w for r in records() for w in r]
-    src += ['kind_stub:', 'lis r12, panel_kind@ha', 'stw r0, panel_kind@l(r12)',
+    # crash fix v2: r11, not r12 (the panel cave reads its fighter object from r12 right after the hook:
+    # `lwz r12, 0xC(r12)`; exe_v45 / v45b clobbered it, so every panel's menu check failed); r11 is dead there (written
+    # at 0x04B85110 before any read, and on the skip path 0x04B85190)
+    src += ['kind_stub:', 'lis r11, panel_kind@ha', 'stw r0, panel_kind@l(r11)',
             'cmpwi r0, %d' % BRAVE, 'beq ks_out', 'cmpwi r0, %d' % KIRBY, 'ks_out:', 'blr']
     src += ['ints_stub:', 'lwz r11, 0xC(r11)', 'lis r12, panel_kind@ha', 'lwz r12, panel_kind@l(r12)',
             'cmpwi r12, %d' % KIRBY, 'bne is_out', 'addi r11, r11, -%d' % SHIFT, 'is_out:', 'blr']

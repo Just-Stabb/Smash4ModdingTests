@@ -72873,7 +72873,7 @@ int kirby_copy_trait(int kind)
 // Stat profile for the executable's stat scaling (tools/kirby_stat_cave.py PROFILES).
 int kirby_trait_profile(int trait)
 {
-    if (khm_speed_t > 0)
+    if (WorkModule(0x6, 0x0f0003ad) > 0)
     {
         return 3; // the Hero copy's Acceleratle: Hero's profile 3 (x2 speeds; end of the file)
     }
@@ -75140,40 +75140,52 @@ void newcopy_n_end()
 // The panel: Kirby's ints 0x1000008A (gauge), 0x1000008C (window), 0x1000008D (rows), drawn by the panel cave for
 // kind 8 (exe_v45: tools/kirby_hero_menu_cave.py), the values as brave_panel_update's.
 // ===================================================================
-int   khm_state;      // 0 shut, 1 open, 2 a spell being cast
-int   khm_frame;      // frames open / cast
-int   khm_cursor;
-int   khm_spells;     // the four rows, 5 bits each
-int   khm_spell;
-int   khm_released;
-int   khm_stick;
-int   khm_repeat;
-int   khm_done;
-int   khm_burst;
-int   khm_ate;        // this frame's special was taken by the menu
-int   khm_last;       // last frame's status
-int   khm_menu;       // panel: 0 shut, 1 open, 2 a cast row, 3 closing
-int   khm_anim;
-int   khm_t;
-int   khm_rows;
-int   khm_grey;
-int   khm_cost_view;
-int   khm_speed_t;    // Acceleratle frames left
-int   khm_attack_t;   // Oomph frames left
-int   khm_accel_t;    // Acceleration frames left
-int   khm_psyche;     // Psyche Up held
-int   khm_reflect_t;  // v3: Bounce frames left
-int   khm_sub;        // v3: Kaclang / Zoom: the part of the spell
-int   khm_t2;         // v3: frames in that part
-int   khm_metal_on;   // v3: Kaclang's Metal Box state on
-int   khm_invisible_t; // v3: Hocus Pocus invisible frames left
-int   khm_poison_t;   // v3: Hocus Pocus poison frames left
-float khm_dmg_seen;   // v3: the others' damage last frame (MP from damage dealt)
-int   khm_sw_n;       // v6: the sword spell being cast (0x11-0x14), 0 none
-int   khm_sw_f;       // its frame
-int   khm_sw_crit;    // a critical hit: Hatchet Man always, the others 1 in 8 (brave_crit_update)
-int   khm_sw_shown;   // the crit's show played
-int   khm_sw_cam;     // the crit's camera: frames left
+
+// The Hero copy's state (khm_*) is kept in Kirby's New_Var slots (exe_v40: tools/acmd_ext_cave.py, 64 per object,
+// read 0 until set, cleared when the fighter is set up again; MSC: WorkModule(0x6, ID) / WorkModule(0x7, v, ID) as
+// ints, WorkModuleF(0, ID) / WorkModule(0, v, ID) as floats), not in MSC globals: the game's MSC holds 128 globals a
+// file (crash fix v2: the script context 0x0337B230 allocates 0x43C bytes, globals at +4 for 0x80 words; a global
+// index of 128 or more writes over the context's own fields: +0x204 (a 7-word sub-object), +0x220 (the file's +0x14),
+// ...). v2-v5 had 138-149 globals: the likely cause of exe_v45b's Kirby match-load hang (no crash report in the user's
+// log). The slots, from the top
+// down (Kirby's own scripts declare none; Sm4shCommand's New_Var takes the lowest free ones first):
+//   khm_state        int   0x0F0003BF
+//   khm_frame        int   0x0F0003BE
+//   khm_cursor       int   0x0F0003BD
+//   khm_spells       int   0x0F0003BC
+//   khm_spell        int   0x0F0003BB
+//   khm_released     int   0x0F0003BA
+//   khm_stick        int   0x0F0003B9
+//   khm_repeat       int   0x0F0003B8
+//   khm_done         int   0x0F0003B7
+//   khm_burst        int   0x0F0003B6
+//   khm_ate          int   0x0F0003B5
+//   khm_last         int   0x0F0003B4
+//   khm_menu         int   0x0F0003B3
+//   khm_anim         int   0x0F0003B2
+//   khm_t            int   0x0F0003B1
+//   khm_rows         int   0x0F0003B0
+//   khm_grey         int   0x0F0003AF
+//   khm_cost_view    int   0x0F0003AE
+//   khm_speed_t      int   0x0F0003AD
+//   khm_attack_t     int   0x0F0003AC
+//   khm_accel_t      int   0x0F0003AB
+//   khm_psyche       int   0x0F0003AA
+//   khm_reflect_t    int   0x0F0003A9
+//   khm_sub          int   0x0F0003A8
+//   khm_t2           int   0x0F0003A7
+//   khm_metal_on     int   0x0F0003A6
+//   khm_invisible_t  int   0x0F0003A5
+//   khm_poison_t     int   0x0F0003A4
+//   khm_dmg_seen     float 0x0F0003A3
+//   khm_sw_n         int   0x0F0003A2
+//   khm_sw_f         int   0x0F0003A1
+//   khm_sw_crit      int   0x0F0003A0
+//   khm_sw_shown     int   0x0F00039F
+//   khm_sw_cam       int   0x0F00039E
+//   khm_z2_target    int   0x0F00039D
+//   khm_z2_vx        float 0x0F00039C
+//   khm_z2_vy        float 0x0F00039B
 
 int khm_bit(int s)
 {
@@ -75250,7 +75262,7 @@ int khm_row(int k)
 {
     int v;
     int i;
-    v = khm_spells;
+    v = WorkModule(0x6, 0x0f0003bc);
     i = 0;
     while (i < k)
     {
@@ -75291,7 +75303,7 @@ void khm_draw()
     int mul;
     int pass;
     int drawn;
-    khm_spells = 0;
+    WorkModule(0x7, 0, 0x0f0003bc);
     taken = 0;
     mul = 0x1;
     k = 0;
@@ -75328,13 +75340,13 @@ void khm_draw()
         if (pick != 0)
         {
             taken = taken + khm_bit(pick);
-            khm_spells = khm_spells + pick * mul;
+            WorkModule(0x7, WorkModule(0x6, 0x0f0003bc) + pick * mul, 0x0f0003bc);
         }
         mul = mul * 0x20;
         k += 1;
     }
-    drawn = khm_spells;
-    khm_spells = 0;
+    drawn = WorkModule(0x6, 0x0f0003bc);
+    WorkModule(0x7, 0, 0x0f0003bc);
     mul = 0x1;
     pass = 0;
     while (pass < 0x2)
@@ -75345,7 +75357,7 @@ void khm_draw()
             n = (drawn / khm_bit(0x5 * k)) % 0x20;
             if (n != 0 && khm_can_pay(n) == 1 - pass)
             {
-                khm_spells = khm_spells + n * mul;
+                WorkModule(0x7, WorkModule(0x6, 0x0f0003bc) + n * mul, 0x0f0003bc);
                 mul = mul * 0x20;
             }
             k += 1;
@@ -75367,34 +75379,34 @@ void khm_move()
     {
         dir = 0x1;
     }
-    if (khm_stick == 0x2)
+    if (WorkModule(0x6, 0x0f0003b9) == 0x2)
     {
         if (dir == 0)
         {
-            khm_stick = 0;
+            WorkModule(0x7, 0, 0x0f0003b9);
         }
         return;
     }
     if (dir == 0)
     {
-        khm_stick = 0;
+        WorkModule(0x7, 0, 0x0f0003b9);
         return;
     }
-    if (dir == khm_stick)
+    if (dir == WorkModule(0x6, 0x0f0003b9))
     {
-        khm_repeat += 1;
-        if (khm_repeat < 0xc)
+        WorkModule(0x7, WorkModule(0x6, 0x0f0003b8) + 1, 0x0f0003b8);
+        if (WorkModule(0x6, 0x0f0003b8) < 0xc)
         {
             return;
         }
     }
-    khm_stick = dir;
-    khm_repeat = 0;
+    WorkModule(0x7, dir, 0x0f0003b9);
+    WorkModule(0x7, 0, 0x0f0003b8);
     i = 0;
     while (i < 0x4)
     {
-        khm_cursor = (khm_cursor + dir + 0x4) % 0x4;
-        if (khm_row(khm_cursor) != 0)
+        WorkModule(0x7, (WorkModule(0x6, 0x0f0003bd) + dir + 0x4) % 0x4, 0x0f0003bd);
+        if (khm_row(WorkModule(0x6, 0x0f0003bd)) != 0)
         {
             return;
         }
@@ -75404,17 +75416,17 @@ void khm_move()
 
 int khm_once(int bit)
 {
-    if ((khm_done / bit) % 0x2 == 0x1)
+    if ((WorkModule(0x6, 0x0f0003b7) / bit) % 0x2 == 0x1)
     {
         return 0;
     }
-    khm_done = khm_done + bit;
+    WorkModule(0x7, WorkModule(0x6, 0x0f0003b7) + bit, 0x0f0003b7);
     return 0x1;
 }
 
 int khm_blocking()
 {
-    return khm_state == 0x1 || khm_ate || khm_sw_n && khm_sw_f < khm_sw_cancel(khm_sw_n);   // v6: a sword spell
+    return WorkModule(0x6, 0x0f0003bf) == 0x1 || WorkModule(0x6, 0x0f0003b5) || WorkModule(0x6, 0x0f0003a2) && WorkModule(0x6, 0x0f0003a1) < khm_sw_cancel(WorkModule(0x6, 0x0f0003a2));   // v6: a sword spell
 }
 
 // an article (copy article id) with its custom number (as ncp_hero_generate)
@@ -75461,10 +75473,10 @@ int khm_self_slot()
 
 int khm_burst_motion()
 {
-    if (khm_burst > 0x50) { return 0; }
-    if (khm_burst > 0x3c) { return 0x6; }
-    if (khm_burst > 0x28) { return 0x5; }
-    if (khm_burst > 0x14) { return 0x4; }
+    if (WorkModule(0x6, 0x0f0003b6) > 0x50) { return 0; }
+    if (WorkModule(0x6, 0x0f0003b6) > 0x3c) { return 0x6; }
+    if (WorkModule(0x6, 0x0f0003b6) > 0x28) { return 0x5; }
+    if (WorkModule(0x6, 0x0f0003b6) > 0x14) { return 0x4; }
     return 0x3;
 }
 
@@ -75479,10 +75491,10 @@ void khm_glow(int id, int on)
 
 void khm_close()
 {
-    if (khm_menu == 0x1 || khm_menu == 0x2)
+    if (WorkModule(0x6, 0x0f0003b3) == 0x1 || WorkModule(0x6, 0x0f0003b3) == 0x2)
     {
-        khm_menu = 0x3;
-        khm_anim = 0x4;
+        WorkModule(0x7, 0x3, 0x0f0003b3);
+        WorkModule(0x7, 0x4, 0x0f0003b2);
     }
 }
 
@@ -75491,7 +75503,7 @@ void khm_cast(int f)
 {
     int n;
     float d;
-    n = khm_spell;
+    n = WorkModule(0x6, 0x0f0003bb);
     if (n == 0x1 && f >= 6 && khm_once(0x1))
     {
         d = WorkModuleF(0, 0x0f000117) - 11.0f;
@@ -75525,22 +75537,22 @@ void khm_cast(int f)
     }
     else if (n == 0xb && f >= 11 && khm_once(0x1))
     {
-        khm_speed_t = 0x258;
+        WorkModule(0x7, 0x258, 0x0f0003ad);
         khm_glow(0x345007b, 0x1);
     }
     else if (n == 0xc && f >= 11 && khm_once(0x1))
     {
-        khm_attack_t = 0x2d0;
+        WorkModule(0x7, 0x2d0, 0x0f0003ac);
         khm_glow(0x345007a, 0x1);
     }
     else if (n == 0x15 && f >= 6 && khm_once(0x1))
     {
-        khm_psyche = 0x1;
+        WorkModule(0x7, 0x1, 0x0f0003aa);
         khm_glow(0x345004e, 0x1);
     }
     else if (n == 0x16 && f >= 11 && khm_once(0x1))
     {
-        khm_accel_t = 0x258;
+        WorkModule(0x7, 0x258, 0x0f0003ab);
     }
     else if (n == 0x9)
     {
@@ -75552,7 +75564,7 @@ void khm_cast(int f)
     }
     else if (n == 0xd && f >= 11 && khm_once(0x1))
     {
-        khm_reflect_t = 0x2d0;
+        WorkModule(0x7, 0x2d0, 0x0f0003a9);
         khm_glow(0x3450066, 0x1);
     }
     else if (n == 0xf && f >= 1 && khm_once(0x1))
@@ -75567,7 +75579,7 @@ void khm_cast(int f)
     {
         khm_zoom2u(f);
     }
-    else if (khm_sword_spell(n) && khm_sub == 0)
+    else if (khm_sword_spell(n) && WorkModule(0x6, 0x0f0003a8) == 0)
     {
         khm_sword(f);       // v6
     }
@@ -75578,19 +75590,19 @@ int khm_buff_bits()
 {
     int m;
     m = 0;
-    if (khm_accel_t > 0)
+    if (WorkModule(0x6, 0x0f0003ab) > 0)
     {
         m = m + 0x1000;
     }
-    if (khm_attack_t > 0)
+    if (WorkModule(0x6, 0x0f0003ac) > 0)
     {
         m = m + 0x80;
-        if ((global4 < 0x152 || global4 > 0x155) && khm_sw_n == 0)
+        if ((global4 < 0x152 || global4 > 0x155) && WorkModule(0x6, 0x0f0003a2) == 0)
         {
             m = m + 0x20;
         }
     }
-    if (khm_psyche && (global4 < 0x152 || global4 > 0x155) && khm_sw_n == 0)
+    if (WorkModule(0x6, 0x0f0003aa) && (global4 < 0x152 || global4 > 0x155) && WorkModule(0x6, 0x0f0003a2) == 0)
     {
         m = m + 0x40;
     }
@@ -75599,41 +75611,41 @@ int khm_buff_bits()
 
 void khm_buffs()
 {
-    if (khm_speed_t > 0)
+    if (WorkModule(0x6, 0x0f0003ad) > 0)
     {
-        khm_speed_t -= 1;
-        if (khm_speed_t == 0)
+        WorkModule(0x7, WorkModule(0x6, 0x0f0003ad) - (1), 0x0f0003ad);
+        if (WorkModule(0x6, 0x0f0003ad) == 0)
         {
             khm_glow(0x345007b, 0);
         }
     }
-    if (khm_attack_t > 0)
+    if (WorkModule(0x6, 0x0f0003ac) > 0)
     {
-        khm_attack_t -= 1;
-        if (khm_attack_t == 0)
+        WorkModule(0x7, WorkModule(0x6, 0x0f0003ac) - (1), 0x0f0003ac);
+        if (WorkModule(0x6, 0x0f0003ac) == 0)
         {
             khm_glow(0x345007a, 0);
         }
     }
-    if (khm_accel_t > 0)
+    if (WorkModule(0x6, 0x0f0003ab) > 0)
     {
-        khm_accel_t -= 1;
+        WorkModule(0x7, WorkModule(0x6, 0x0f0003ab) - (1), 0x0f0003ab);
     }
     khm_v3_timers();
     khm_sw_timers();        // v6
-    if (khm_psyche && (global4 < 0x152 || global4 > 0x155) && khm_sw_n == 0
+    if (WorkModule(0x6, 0x0f0003aa) && (global4 < 0x152 || global4 > 0x155) && WorkModule(0x6, 0x0f0003a2) == 0
         && (WorkModuleF(0, 0x0f0000a1) >= 0.5f && (global4 < 0x35 || global4 > 0x3e)
             || global5 == 0x3e && global4 != 0x3e))
     {
-        khm_psyche = 0;
+        WorkModule(0x7, 0, 0x0f0003aa);
         khm_glow(0x345004e, 0);
     }
     if (global4 == 0xb1 || newcopy_hero() == 0)
     {
-        khm_speed_t = 0;
-        khm_attack_t = 0;
-        khm_accel_t = 0;
-        khm_psyche = 0;
+        WorkModule(0x7, 0, 0x0f0003ad);
+        WorkModule(0x7, 0, 0x0f0003ac);
+        WorkModule(0x7, 0, 0x0f0003ab);
+        WorkModule(0x7, 0, 0x0f0003aa);
     }
 }
 
@@ -75648,74 +75660,74 @@ void khm_panel()
         WorkModule(0x7, 0, 0x1000008a);
         WorkModule(0x7, 0, 0x1000008c);
         WorkModule(0x7, 0, 0x1000008d);
-        khm_menu = 0;
+        WorkModule(0x7, 0, 0x0f0003b3);
         return;
     }
     g = (int)ncp_mp;
     b = g;
-    if (khm_cost_view > 0 && khm_cost_view <= g)
+    if (WorkModule(0x6, 0x0f0003ae) > 0 && WorkModule(0x6, 0x0f0003ae) <= g)
     {
-        b = g - khm_cost_view;
+        b = g - WorkModule(0x6, 0x0f0003ae);
     }
-    khm_cost_view = 0;
+    WorkModule(0x7, 0, 0x0f0003ae);
     WorkModule(0x7, 0x4d500000 + g * 0x100 + b, 0x1000008a);
-    if (khm_menu == 0)
+    if (WorkModule(0x6, 0x0f0003b3) == 0)
     {
         WorkModule(0x7, 0, 0x1000008c);
         WorkModule(0x7, 0, 0x1000008d);
         return;
     }
-    if (khm_anim < 0x7)
+    if (WorkModule(0x6, 0x0f0003b2) < 0x7)
     {
-        khm_anim += 1;
+        WorkModule(0x7, WorkModule(0x6, 0x0f0003b2) + 1, 0x0f0003b2);
     }
-    khm_t += 1;
-    if (khm_menu == 0x3 && khm_anim > 0x4)
+    WorkModule(0x7, WorkModule(0x6, 0x0f0003b1) + 1, 0x0f0003b1);
+    if (WorkModule(0x6, 0x0f0003b3) == 0x3 && WorkModule(0x6, 0x0f0003b2) > 0x4)
     {
-        khm_menu = 0;
+        WorkModule(0x7, 0, 0x0f0003b3);
         WorkModule(0x7, 0, 0x1000008c);
         WorkModule(0x7, 0, 0x1000008d);
         return;
     }
-    a = 0x48450004 + khm_cursor + (khm_anim - 0x1) * 0x100 + (khm_t / 0x2 % 0x10) * 0x800;
-    if (khm_menu == 0x3)
+    a = 0x48450004 + WorkModule(0x6, 0x0f0003bd) + (WorkModule(0x6, 0x0f0003b2) - 0x1) * 0x100 + (WorkModule(0x6, 0x0f0003b1) / 0x2 % 0x10) * 0x800;
+    if (WorkModule(0x6, 0x0f0003b3) == 0x3)
     {
         a = a + 0x8;
     }
-    if (khm_menu == 0x2)
+    if (WorkModule(0x6, 0x0f0003b3) == 0x2)
     {
         a = a + 0x20;
     }
-    if (khm_menu == 0x1 && khm_t >= 0x168 && khm_t / 0x4 % 0x2 == 0x1)
+    if (WorkModule(0x6, 0x0f0003b3) == 0x1 && WorkModule(0x6, 0x0f0003b1) >= 0x168 && WorkModule(0x6, 0x0f0003b1) / 0x4 % 0x2 == 0x1)
     {
         a = a + 0x10;
     }
     WorkModule(0x7, a, 0x1000008c);
-    WorkModule(0x7, 0x48000000 + khm_rows + khm_grey * 0x100000, 0x1000008d);
+    WorkModule(0x7, 0x48000000 + WorkModule(0x6, 0x0f0003b0) + WorkModule(0x6, 0x0f0003af) * 0x100000, 0x1000008d);
 }
 
 void khm_open()
 {
-    khm_state = 0x1;
-    khm_frame = 0;
-    khm_cursor = 0;
-    khm_spell = 0;
-    khm_released = 0;
-    khm_stick = 0x2;
-    khm_repeat = 0;
-    khm_done = 0;
+    WorkModule(0x7, 0x1, 0x0f0003bf);
+    WorkModule(0x7, 0, 0x0f0003be);
+    WorkModule(0x7, 0, 0x0f0003bd);
+    WorkModule(0x7, 0, 0x0f0003bb);
+    WorkModule(0x7, 0, 0x0f0003ba);
+    WorkModule(0x7, 0x2, 0x0f0003b9);
+    WorkModule(0x7, 0, 0x0f0003b8);
+    WorkModule(0x7, 0, 0x0f0003b7);
     khm_draw();
-    khm_menu = 0x1;
-    khm_anim = 0;
-    khm_t = 0;
-    khm_rows = khm_spells;
-    khm_grey = khm_grey_bits();
+    WorkModule(0x7, 0x1, 0x0f0003b3);
+    WorkModule(0x7, 0, 0x0f0003b2);
+    WorkModule(0x7, 0, 0x0f0003b1);
+    WorkModule(0x7, WorkModule(0x6, 0x0f0003bc), 0x0f0003b0);
+    WorkModule(0x7, khm_grey_bits(), 0x0f0003af);
     SoundModule(0x2710, 0x76400dd);     // se_brave_special_l18: the window opens
 }
 
 void khm_shut()
 {
-    khm_state = 0;
+    WorkModule(0x7, 0, 0x0f0003bf);
     khm_close();
 }
 
@@ -75723,14 +75735,14 @@ void khm_shut()
 void khm_update()
 {
     int n;
-    khm_ate = 0;
+    WorkModule(0x7, 0, 0x0f0003b5);
     khm_buffs();
-    if (newcopy_hero() && global4 == 0x175 && khm_last != 0x175 && khm_state != 0x1)
+    if (newcopy_hero() && global4 == 0x175 && WorkModule(0x6, 0x0f0003b4) != 0x175 && WorkModule(0x6, 0x0f0003bf) != 0x1)
     {
         khm_open();
     }
-    khm_last = global4;
-    if (khm_state == 0x1)
+    WorkModule(0x7, global4, 0x0f0003b4);
+    if (WorkModule(0x6, 0x0f0003bf) == 0x1)
     {
         if (global4 != 0x175 || newcopy_hero() == 0)
         {
@@ -75738,76 +75750,76 @@ void khm_update()
         }
         else
         {
-            khm_frame += 1;
+            WorkModule(0x7, WorkModule(0x6, 0x0f0003be) + 1, 0x0f0003be);
             ncp_mp_timer = 0;   // no MP back while it's open
             if (ControlModule(0x2712, 0x1) == 0)
             {
-                khm_released = 0x1;
+                WorkModule(0x7, 0x1, 0x0f0003ba);
             }
             khm_move();
-            n = khm_row(khm_cursor);
-            khm_grey = khm_grey_bits();
-            khm_cost_view = khm_cost(n);
-            if (khm_frame == 0x168)
+            n = khm_row(WorkModule(0x6, 0x0f0003bd));
+            WorkModule(0x7, khm_grey_bits(), 0x0f0003af);
+            WorkModule(0x7, khm_cost(n), 0x0f0003ae);
+            if (WorkModule(0x6, 0x0f0003be) == 0x168)
             {
                 SoundModule(0x2710, 0x76400c1);     // 2 s left
             }
-            if (ControlModule(0x2710, 0x3) || ControlModule(0x2710, 0x2) || khm_frame >= 0x1e0)
+            if (ControlModule(0x2710, 0x3) || ControlModule(0x2710, 0x2) || WorkModule(0x6, 0x0f0003be) >= 0x1e0)
             {
-                khm_ate = ControlModule(0x2710, 0x1);
+                WorkModule(0x7, ControlModule(0x2710, 0x1), 0x0f0003b5);
                 khm_shut();
             }
-            else if (n != 0 && (ControlModule(0x2710, 0) || khm_released && ControlModule(0x2710, 0x1)))
+            else if (n != 0 && (ControlModule(0x2710, 0) || WorkModule(0x6, 0x0f0003ba) && ControlModule(0x2710, 0x1)))
             {
-                khm_ate = 0x1;
+                WorkModule(0x7, 0x1, 0x0f0003b5);
                 SoundModule(0x2710, 0x76400c0);     // a spell chosen
-                khm_menu = 0x2;
-                khm_rows = n * khm_bit(0x5 * khm_cursor);
-                khm_grey = (khm_grey / khm_bit(khm_cursor)) % 0x2 * khm_bit(khm_cursor);
-                khm_anim = 0x5;
-                khm_t = 0;
+                WorkModule(0x7, 0x2, 0x0f0003b3);
+                WorkModule(0x7, n * khm_bit(0x5 * WorkModule(0x6, 0x0f0003bd)), 0x0f0003b0);
+                WorkModule(0x7, (WorkModule(0x6, 0x0f0003af) / khm_bit(WorkModule(0x6, 0x0f0003bd))) % 0x2 * khm_bit(WorkModule(0x6, 0x0f0003bd)), 0x0f0003af);
+                WorkModule(0x7, 0x5, 0x0f0003b2);
+                WorkModule(0x7, 0, 0x0f0003b1);
                 if (khm_can_pay(n))
                 {
-                    khm_burst = (int)(ncp_mp + 0.999f);
+                    WorkModule(0x7, (int)(ncp_mp + 0.999f), 0x0f0003b6);
                     ncp_mp = ncp_mp - (float)khm_cost(n);
                     if (n == 0x8)
                     {
                         ncp_mp = 0;
                     }
-                    khm_spell = n;
+                    WorkModule(0x7, n, 0x0f0003bb);
                 }
                 else
                 {
-                    khm_spell = 0;      // greyed: the misfire puff
+                    WorkModule(0x7, 0, 0x0f0003bb);      // greyed: the misfire puff
                     EffectModule(0x2717, 0x1000006, 0x2, 0, 0, 0, 0, 0, 0, 1.0f, 0);
                 }
-                khm_state = 0x2;
-                khm_frame = 0;
-                khm_done = 0;
-                khm_sub = 0x7f;
-                if (khm_spell == 0x9 || khm_spell == 0xa || khm_spell == 0x10 || khm_spell == 0x17
-                    || khm_sword_spell(khm_spell))
+                WorkModule(0x7, 0x2, 0x0f0003bf);
+                WorkModule(0x7, 0, 0x0f0003be);
+                WorkModule(0x7, 0, 0x0f0003b7);
+                WorkModule(0x7, 0x7f, 0x0f0003a8);
+                if (WorkModule(0x6, 0x0f0003bb) == 0x9 || WorkModule(0x6, 0x0f0003bb) == 0xa || WorkModule(0x6, 0x0f0003bb) == 0x10 || WorkModule(0x6, 0x0f0003bb) == 0x17
+                    || khm_sword_spell(WorkModule(0x6, 0x0f0003bb)))
                 {
-                    khm_sub = 0;
+                    WorkModule(0x7, 0, 0x0f0003a8);
                 }
             }
             else if (ControlModule(0x2710, 0x1))
             {
-                khm_ate = 0x1;      // special before it was let go: kept from the stone
+                WorkModule(0x7, 0x1, 0x0f0003b5);      // special before it was let go: kept from the stone
             }
         }
     }
-    else if (khm_state == 0x2)
+    else if (WorkModule(0x6, 0x0f0003bf) == 0x2)
     {
-        khm_cast(khm_frame);
-        khm_frame += 1;
-        if (khm_frame >= 0x46)
+        khm_cast(WorkModule(0x6, 0x0f0003be));
+        WorkModule(0x7, WorkModule(0x6, 0x0f0003be) + 1, 0x0f0003be);
+        if (WorkModule(0x6, 0x0f0003be) >= 0x46)
         {
             khm_close();
         }
-        if (khm_frame >= 0x50 && khm_sub == 0x7f)
+        if (WorkModule(0x6, 0x0f0003be) >= 0x50 && WorkModule(0x6, 0x0f0003a8) == 0x7f)
         {
-            khm_state = 0;      // a spell with parts (Kaclang, Zoom, Kamikazee) says when it's done
+            WorkModule(0x7, 0, 0x0f0003bf);      // a spell with parts (Kaclang, Zoom, Kamikazee) says when it's done
         }
     }
     khm_panel();
@@ -75824,15 +75836,15 @@ int khm_stone()
 
 void khm_metal(int on)
 {
-    if (on && khm_metal_on == 0)
+    if (on && WorkModule(0x6, 0x0f0003a6) == 0)
     {
         WorkModule(0, 1.0f, 0x0f000099);    // the Metal Box's own metal (SELF_ITEM 1), as brave_metal
     }
-    else if (on == 0 && khm_metal_on)
+    else if (on == 0 && WorkModule(0x6, 0x0f0003a6))
     {
         WorkModule(0, 2.0f, 0x0f000099);    // its end (SELF_ITEM 2)
     }
-    khm_metal_on = on;
+    WorkModule(0x7, on, 0x0f0003a6);
 }
 
 // Kamikazee: the crash article's blast (level 1 + 8 x his slot) at 20, KO'd at the motion's end (50: Ultimate's
@@ -75846,7 +75858,7 @@ void khm_kamikazee(int f)
     if (f >= 49 && khm_once(0x2))
     {
         WorkModule(0x2710, 0x20000043);
-        khm_sub = 0x7f;
+        WorkModule(0x7, 0x7f, 0x0f0003a8);
     }
 }
 
@@ -75855,22 +75867,22 @@ void khm_kamikazee(int f)
 // when he leaves the stone (as Hero's at his status's end)
 void khm_kaclang(int f)
 {
-    if (khm_sub == 0)
+    if (WorkModule(0x6, 0x0f0003a8) == 0)
     {
         if (f >= 20)
         {
-            khm_sub = 0x1;
-            khm_t2 = 0;
+            WorkModule(0x7, 0x1, 0x0f0003a8);
+            WorkModule(0x7, 0, 0x0f0003a7);
         }
         return;
     }
-    if (khm_sub == 0x1)
+    if (WorkModule(0x6, 0x0f0003a8) == 0x1)
     {
-        khm_t2 += 1;
-        if (khm_stone() == 0 || khm_t2 >= 0x12c)
+        WorkModule(0x7, WorkModule(0x6, 0x0f0003a7) + 1, 0x0f0003a7);
+        if (khm_stone() == 0 || WorkModule(0x6, 0x0f0003a7) >= 0x12c)
         {
             khm_metal(0);
-            khm_sub = 0x7f;
+            WorkModule(0x7, 0x7f, 0x0f0003a8);
             return;
         }
         WorkModule(0, 2.0f, 0x0f00011c);
@@ -75939,43 +75951,43 @@ void khm_zoom_place()
 // stone's own fall and landing do the rest
 void khm_zoom(int f)
 {
-    if (khm_sub == 0)
+    if (WorkModule(0x6, 0x0f0003a8) == 0)
     {
         if (f >= 29)
         {
-            khm_sub = 0x1;
-            khm_t2 = 0;
+            WorkModule(0x7, 0x1, 0x0f0003a8);
+            WorkModule(0x7, 0, 0x0f0003a7);
             func_20(0x2);
             GroundModule(0x2710, 0x5);
             khm_fly(9.0f);
         }
         return;
     }
-    if (khm_sub == 0x1 || khm_sub == 0x2)
+    if (WorkModule(0x6, 0x0f0003a8) == 0x1 || WorkModule(0x6, 0x0f0003a8) == 0x2)
     {
         WorkModule(0, 2.0f, 0x0f00011b);
     }
-    if (khm_sub == 0x1)
+    if (WorkModule(0x6, 0x0f0003a8) == 0x1)
     {
-        khm_t2 += 1;
+        WorkModule(0x7, WorkModule(0x6, 0x0f0003a7) + 1, 0x0f0003a7);
         khm_fly(9.0f);
-        if (khm_t2 >= 0x28)
+        if (WorkModule(0x6, 0x0f0003a7) >= 0x28)
         {
-            khm_sub = 0x2;
-            khm_t2 = 0;
+            WorkModule(0x7, 0x2, 0x0f0003a8);
+            WorkModule(0x7, 0, 0x0f0003a7);
             khm_zoom_place();
             khm_fly(-7.0f);
         }
         return;
     }
-    if (khm_sub == 0x2)
+    if (WorkModule(0x6, 0x0f0003a8) == 0x2)
     {
-        khm_t2 += 1;
-        if (global18 == 0 || khm_t2 > 0x96)
+        WorkModule(0x7, WorkModule(0x6, 0x0f0003a7) + 1, 0x0f0003a7);
+        if (global18 == 0 || WorkModule(0x6, 0x0f0003a7) > 0x96)
         {
             KineticModule(0xf, 0x1, -0.089f);
             KineticModule(0x14, 0x1, 1.5f);
-            khm_sub = 0x7f;
+            WorkModule(0x7, 0x7f, 0x0f0003a8);
             return;
         }
         khm_fly(-7.0f);
@@ -76022,22 +76034,22 @@ void khm_hocus_pocus()
         o = o - 0x9;                            // another spell, cast for Hocus Pocus's 4 MP
         if (o == 0x8)
         {
-            khm_burst = (int)(ncp_mp + 0.999f) + 0x4;
+            WorkModule(0x7, (int)(ncp_mp + 0.999f) + 0x4, 0x0f0003b6);
             ncp_mp = 0;
         }
-        khm_spell = o;
-        khm_frame = 0;
-        khm_done = 0;
-        khm_sub = 0x7f;
+        WorkModule(0x7, o, 0x0f0003bb);
+        WorkModule(0x7, 0, 0x0f0003be);
+        WorkModule(0x7, 0, 0x0f0003b7);
+        WorkModule(0x7, 0x7f, 0x0f0003a8);
         if (o == 0x9 || o == 0xa || o == 0x10 || o == 0x17 || khm_sword_spell(o))
         {
-            khm_sub = 0;
+            WorkModule(0x7, 0, 0x0f0003a8);
         }
         return;
     }
     if (o == 0x2) { ncp_mp = 100.0f; SoundModule(0x2710, 0x76400ea); }
     else if (o == 0x4) { ncp_mp = 0; SoundModule(0x2710, 0x4d); }
-    else if (o == 0x5) { khm_poison_t = 0x1f4; SoundModule(0x2710, 0x4b); }
+    else if (o == 0x5) { WorkModule(0x7, 0x1f4, 0x0f0003a4); SoundModule(0x2710, 0x4b); }
     else if (o == 0x0) { WorkModule(0, 3.0f, 0x0f000099); }    // giant (Super Mushroom)
     else if (o == 0x1) { WorkModule(0, 5.0f, 0x0f000099); }    // Starman
     else if (o == 0x3) { WorkModule(0, 7.0f, 0x0f000099); SoundModule(0x2710, 0x76400eb); }   // timer
@@ -76046,7 +76058,7 @@ void khm_hocus_pocus()
     else if (o == 0x9)
     {
         VisibilityModule(0x2710, 0);
-        khm_invisible_t = 0x258;
+        WorkModule(0x7, 0x258, 0x0f0003a5);
         SoundModule(0x2710, 0x76400e9);
     }
     else if (o == 0x6)
@@ -76065,23 +76077,23 @@ void khm_v3_timers()
     float d;
     if (global4 == 0xb1 || newcopy_hero() == 0)
     {
-        if (khm_reflect_t > 0)
+        if (WorkModule(0x6, 0x0f0003a9) > 0)
         {
             ShieldModule(0, 0x3, 0, 0, 0x3);
         }
-        khm_reflect_t = 0;
-        khm_poison_t = 0;
-        if (khm_invisible_t > 0)
+        WorkModule(0x7, 0, 0x0f0003a9);
+        WorkModule(0x7, 0, 0x0f0003a4);
+        if (WorkModule(0x6, 0x0f0003a5) > 0)
         {
             VisibilityModule(0x2710, 0x1);
         }
-        khm_invisible_t = 0;
+        WorkModule(0x7, 0, 0x0f0003a5);
         khm_metal(0);
     }
-    if (khm_reflect_t > 0)
+    if (WorkModule(0x6, 0x0f0003a9) > 0)
     {
-        khm_reflect_t -= 1;
-        if (khm_reflect_t == 0)
+        WorkModule(0x7, WorkModule(0x6, 0x0f0003a9) - (1), 0x0f0003a9);
+        if (WorkModule(0x6, 0x0f0003a9) == 0)
         {
             ShieldModule(0, 0x3, 0, 0, 0x3);
             khm_glow(0x3450066, 0);
@@ -76092,23 +76104,23 @@ void khm_v3_timers()
             ShieldModule(0, 0x3, 0, 0x1, 0x3);
         }
     }
-    if (khm_invisible_t > 0)
+    if (WorkModule(0x6, 0x0f0003a5) > 0)
     {
-        khm_invisible_t -= 1;
-        if (khm_invisible_t == 0)
+        WorkModule(0x7, WorkModule(0x6, 0x0f0003a5) - (1), 0x0f0003a5);
+        if (WorkModule(0x6, 0x0f0003a5) == 0)
         {
             VisibilityModule(0x2710, 0x1);
         }
     }
-    if (khm_poison_t > 0)
+    if (WorkModule(0x6, 0x0f0003a4) > 0)
     {
-        khm_poison_t -= 1;
-        if (khm_poison_t % 0x14 == 0)
+        WorkModule(0x7, WorkModule(0x6, 0x0f0003a4) - (1), 0x0f0003a4);
+        if (WorkModule(0x6, 0x0f0003a4) % 0x14 == 0)
         {
             WorkModule(0x2, 1.1f, 0x0f000117);
         }
     }
-    if (khm_metal_on && (khm_state != 0x2 || khm_spell != 0xa))
+    if (WorkModule(0x6, 0x0f0003a6) && (WorkModule(0x6, 0x0f0003bf) != 0x2 || WorkModule(0x6, 0x0f0003bb) != 0xa))
     {
         khm_metal(0);
     }
@@ -76123,16 +76135,16 @@ void khm_v3_timers()
         }
         s += 1;
     }
-    if (newcopy_hero() && d > khm_dmg_seen && WorkModuleF(0, 0x0f0000a0) >= 0.5f
+    if (newcopy_hero() && d > WorkModuleF(0, 0x0f0003a3) && WorkModuleF(0, 0x0f0000a0) >= 0.5f
         && (global4 < 0x152 || global4 > 0x155) && (global4 < 0x17c || global4 > 0x250))
     {
-        ncp_mp = ncp_mp + 0.8f * (d - khm_dmg_seen);
+        ncp_mp = ncp_mp + 0.8f * (d - WorkModuleF(0, 0x0f0003a3));
         if (ncp_mp > 100.0f)
         {
             ncp_mp = 100.0f;
         }
     }
-    khm_dmg_seen = d;
+    WorkModule(0, d, 0x0f0003a3);
 }
 
 // ---- v4: Zoom 2 U (brave.c brave_zoom2u, the mod's own spell: Zoom on its side after the nearest opponent). Hero's:
@@ -76143,7 +76155,6 @@ void khm_v3_timers()
 // (its status sets them), so the flight moves it straight through his position variables (0x0F000000 / 1), 9 a frame
 // (less on the last step), gravity held at 0 meanwhile (khm_fly(0)); the end gives the stone the clamped speed in
 // the gravity energy. Hero's after-flight homing (15 frames of tracking into an aerial) has no place on the stone.
-int khm_z2_target;
 
 int khm_z2_nearest()
 {
@@ -76221,7 +76232,7 @@ int khm_z2_step()
     float d;
     float k;
     int t;
-    t = khm_z2_target;
+    t = WorkModule(0x6, 0x0f00039d);
     x = WorkModuleF(0, 0x0f000000);
     y = WorkModuleF(0, 0x0f000001);
     if (t < 0 || t >= 0x8 || WorkModuleF(0, 0x0f000023 + 0x4 * t) == 0)
@@ -76248,8 +76259,8 @@ int khm_z2_step()
     }
     WorkModule(0, x + dx / d * k, 0x0f000000);
     WorkModule(0, y + dy / d * k, 0x0f000001);
-    khm_z2_vx = dx / d * 9.0f;
-    khm_z2_vy = dy / d * 9.0f;
+    WorkModule(0, dx / d * 9.0f, 0x0f00039c);
+    WorkModule(0, dy / d * 9.0f, 0x0f00039b);
     if (d - k <= 15.0f)
     {
         return 0x1;
@@ -76257,29 +76268,27 @@ int khm_z2_step()
     return 0;
 }
 
-float khm_z2_vx;
-float khm_z2_vy;
 
 void khm_z2_end()
 {
     KineticModule(0xf, 0x1, -0.089f);
     KineticModule(0x14, 0x1, 1.5f);
-    KineticModule(0x11, 0x1, khm_clampf(khm_z2_vy, WorkModuleF(0, 0x3000019)));
-    khm_sub = 0x7f;
+    KineticModule(0x11, 0x1, khm_clampf(WorkModuleF(0, 0x0f00039b), WorkModuleF(0, 0x3000019)));
+    WorkModule(0x7, 0x7f, 0x0f0003a8);
 }
 
 void khm_zoom2u(int f)
 {
-    if (khm_sub == 0)
+    if (WorkModule(0x6, 0x0f0003a8) == 0)
     {
         if (khm_once(0x1))
         {
-            khm_z2_target = khm_z2_nearest();
+            WorkModule(0x7, khm_z2_nearest(), 0x0f00039d);
         }
         if (f >= 29)
         {
-            khm_sub = 0x1;
-            khm_t2 = 0;
+            WorkModule(0x7, 0x1, 0x0f0003a8);
+            WorkModule(0x7, 0, 0x0f0003a7);
             if (global18 != 0x2)
             {
                 WorkModule(0x2, 6.0f, 0x0f000005);  // off the ground first (as Hero's)
@@ -76289,22 +76298,22 @@ void khm_zoom2u(int f)
         }
         return;
     }
-    if (khm_sub != 0x1)
+    if (WorkModule(0x6, 0x0f0003a8) != 0x1)
     {
         return;
     }
     WorkModule(0, 2.0f, 0x0f00011b);    // intangible
-    khm_t2 += 1;
+    WorkModule(0x7, WorkModule(0x6, 0x0f0003a7) + 1, 0x0f0003a7);
     GroundModule(0x2715);               // through platforms
     khm_fly(0);
-    if (global18 == 0 && khm_t2 > 0x2)
+    if (global18 == 0 && WorkModule(0x6, 0x0f0003a7) > 0x2)
     {
-        khm_z2_vx = 0;
-        khm_z2_vy = 0;
+        WorkModule(0, 0, 0x0f00039c);
+        WorkModule(0, 0, 0x0f00039b);
         khm_z2_end();                   // met the ground
         return;
     }
-    if (khm_z2_step() || khm_t2 >= 0x28)
+    if (khm_z2_step() || WorkModule(0x6, 0x0f0003a7) >= 0x28)
     {
         khm_z2_end();
     }
@@ -76629,7 +76638,7 @@ int khm_sw_window(int n, int f)
 // sound and the sword gone
 void khm_sw_stop()
 {
-    if (khm_sw_n)
+    if (WorkModule(0x6, 0x0f0003a2))
     {
         khm_sw_remove();
         EffectModule(0x2723, 0x3450078, 0, 0x1);
@@ -76637,7 +76646,7 @@ void khm_sw_stop()
         EffectModule(0x2723, 0x3450072, 0, 0x1);
         SoundModule(0x2714, 0x76400e2);
     }
-    khm_sw_n = 0;
+    WorkModule(0x7, 0, 0x0f0003a2);
     WorkModule(0x7, 0, 0x1000008b);
 }
 
@@ -76646,13 +76655,13 @@ void khm_sw_stop()
 void khm_sw_hit(int n)
 {
     float st;
-    if (khm_sw_crit && khm_sw_shown == 0)
+    if (WorkModule(0x6, 0x0f0003a0) && WorkModule(0x6, 0x0f00039f) == 0)
     {
-        khm_sw_shown = 0x1;
+        WorkModule(0x7, 0x1, 0x0f00039f);
         SoundModule(0x2710, 0x7640112);     // se_brave_criticalhit
         SlowModule(0, 0x4, 0x28);
         WorkModule(0, 8.0f, 0x0f000099);    // the camera in (position variables' ITEM code 8)
-        khm_sw_cam = 0x28;
+        WorkModule(0x7, 0x28, 0x0f00039e);
     }
     if (n == 0x13)
     {
@@ -76675,18 +76684,18 @@ void khm_sw_hit(int n)
 void khm_sword(int f)
 {
     int n;
-    n = khm_spell;
+    n = WorkModule(0x6, 0x0f0003bb);
     if (khm_once(0x4))
     {
-        khm_sw_n = n;
-        khm_sw_shown = 0;
-        khm_sw_crit = n == 0x14 || randi(0, 0x8) == 0;
+        WorkModule(0x7, n, 0x0f0003a2);
+        WorkModule(0x7, 0, 0x0f00039f);
+        WorkModule(0x7, n == 0x14 || randi(0, 0x8) == 0, 0x0f0003a0);
     }
-    khm_sw_f = f;
+    WorkModule(0x7, f, 0x0f0003a1);
     if (khm_stone() == 0 || newcopy_hero() == 0)
     {
         khm_sw_stop();
-        khm_sub = 0x7f;
+        WorkModule(0x7, 0x7f, 0x0f0003a8);
         return;
     }
     WorkModule(0x7, 0x1, 0x1000008b);       // the sword shown (exe_v46)
@@ -76699,14 +76708,14 @@ void khm_sword(int f)
     if (f >= khm_sw_end(n))
     {
         khm_sw_stop();
-        khm_sub = 0x7f;
+        WorkModule(0x7, 0x7f, 0x0f0003a8);
     }
 }
 
 // the crit bit (x2 damage, hero_buff_cave.py) while a rolled Flame / Kacrackle / Metal Slash's hitboxes are made
 int khm_sw_crit_bit()
 {
-    if (khm_sw_n >= 0x11 && khm_sw_n <= 0x13 && khm_sw_crit && khm_sw_f <= khm_sw_cancel(khm_sw_n))
+    if (WorkModule(0x6, 0x0f0003a2) >= 0x11 && WorkModule(0x6, 0x0f0003a2) <= 0x13 && WorkModule(0x6, 0x0f0003a0) && WorkModule(0x6, 0x0f0003a1) <= khm_sw_cancel(WorkModule(0x6, 0x0f0003a2)))
     {
         return 0x10;
     }
@@ -76716,20 +76725,20 @@ int khm_sw_crit_bit()
 // every frame (khm_buffs): the crit's camera back after 40 frames; the sword hidden when nothing is cast
 void khm_sw_timers()
 {
-    if (khm_sw_cam > 0)
+    if (WorkModule(0x6, 0x0f00039e) > 0)
     {
-        khm_sw_cam -= 1;
-        if (khm_sw_cam == 0 || global4 == 0xb1)
+        WorkModule(0x7, WorkModule(0x6, 0x0f00039e) - (1), 0x0f00039e);
+        if (WorkModule(0x6, 0x0f00039e) == 0 || global4 == 0xb1)
         {
-            khm_sw_cam = 0;
+            WorkModule(0x7, 0, 0x0f00039e);
             WorkModule(0, 9.0f, 0x0f000099);
         }
     }
-    if (khm_sw_n && (global4 == 0xb1 || newcopy_hero() == 0 || khm_state != 0x2))
+    if (WorkModule(0x6, 0x0f0003a2) && (global4 == 0xb1 || newcopy_hero() == 0 || WorkModule(0x6, 0x0f0003bf) != 0x2))
     {
         khm_sw_stop();
     }
-    if (khm_sw_n == 0)
+    if (WorkModule(0x6, 0x0f0003a2) == 0)
     {
         WorkModule(0x7, 0, 0x1000008b);
     }

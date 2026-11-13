@@ -12,6 +12,7 @@ Stack effects (p = the command's push bit): pushes +p; binary operations -2 + p;
 setVar and the compound assignments -1 + p (a = b = 0); i++ / f++ 0; printf(n) -n; sys(n) -n + p; try(label) 0 and
 callFunc(n) -(n + 1), then + p of its try once the call returns; callFunc2 / 3 (n) -(n + 1);
 if / ifNot -1; jumps / else 0; intToFloat / floatToInt 0.
+Also: no global variable index past the game's 128 a file (MAX_GLOBALS, below).
 """
 import os
 import re
@@ -124,7 +125,32 @@ def main():
             bad += 1
             print('%s (0x%X): %s' % (names[k] if names else 'script %d' % k, s.bounds[0], '; '.join(probs[:3])))
     print('%d of %d scripts with stack problems' % (bad, len(scripts)))
+    top = max_global(m)
+    if top >= MAX_GLOBALS:
+        print('ERROR: global variable %d used: the game keeps %d (indices 0-%d) a file; higher ones write over the '
+              'script context (Kirby crash fix v2)' % (top, MAX_GLOBALS, MAX_GLOBALS - 1))
+        bad += 1
+    else:
+        print('globals: %d of %d' % (top + 1, MAX_GLOBALS))
     sys.exit(1 if bad else 0)
+
+
+# the game's MSC script context (0x0337B230: 0x43C bytes) holds the file's globals at +4, 0x80 words (cleared by
+# 0x0337B2C0 / 0x0337B260: li r4, 0x80); pushVar / setVar index them unchecked (0x0337BA38: [ctx] + 4 + 4 x index),
+# so global 128 on writes the context's own fields (+0x204 a 7-word sub-object, +0x220 the file's +0x14, ...).
+# Kirby v2-v5 used up to 149 (the likely cause of the Kirby match-load hang, crash fix v2); Hero / Sephiroth use 135
+# (128-134: the 7-word sub-object, no harm seen in game).
+MAX_GLOBALS = 0x80
+VAR_OPS = {0x0B, 0x14, 0x15, 0x3F, 0x40} | set(range(0x1C, 0x25)) | set(range(0x41, 0x46))
+
+
+def max_global(m):
+    top = -1
+    for sc in m.scripts:
+        for c in sc:
+            if c.command in VAR_OPS and len(c.parameters) == 2 and c.parameters[0] == 1:
+                top = max(top, c.parameters[1])
+    return top
 
 
 if __name__ == '__main__':

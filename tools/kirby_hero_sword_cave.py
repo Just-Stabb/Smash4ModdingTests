@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Kirby's Hero copy, v6: Hero's sword as the copy's held model, shown on the stone while a sword spell is cast.
-Prints rpx_patch.py arguments for exe_v46 = exe_v45b + this:
+Prints rpx_patch.py arguments for exe_v46 = exe_v45c (crash fix v2) + this:
 
-  python3 tools/rpx_patch.py EXE_V45B.rpx EXE_V46.rpx $(python3 tools/kirby_hero_sword_cave.py)
-  python3 tools/kirby_hero_sword_test.py EXE_V46.rpx EXE_V45B.rpx
+  python3 tools/rpx_patch.py EXE_V45C.rpx EXE_V46.rpx $(python3 tools/kirby_hero_sword_cave.py)
+  python3 tools/kirby_hero_sword_test.py EXE_V46.rpx EXE_V45C.rpx
 
-fighters/kirby/specials.md "v6". Traced (exe_v45b):
+fighters/kirby/specials.md "v6". Traced (exe_v45b, the same in v45c):
 - Kirby's copy held model (marthsword, ikesword, ...) is his article 26, "simple" (weapon kind 0x11, spawner
   0x02EFC3D0, the same generic spawner as the hat, article 25 / kind 0xC). The copy model function 0x02EFE138 (called
   by copy_grant at 0x02EFD0A0 with the granted kind; with -1 at a copy's loss from 0x02EF5DE4 / 0x02EF6074) generates
