@@ -403,6 +403,15 @@ Generator: `tools/starcopy_cave.py` (prints `ADDR=VALUE` words for
   word (`0x037EE73C`/`+2`), which is never executed. `starcopy_cave.py` emits
   it. Several earlier theories (`bl +4`, data relocation, Cemu register
   mix-up, `message+0xC`) were probably this same problem at different spots.
+- **The same in reverse: a hook on a relocated word** (Kirby copy crash fix v3). A hook `bl` replacing an
+  instruction that carries a relocation is rewritten by the loader too: `0x030C470C` `lwz r7, -0x5930(r8)` has an
+  `ADDR16_LO` (addend `0x41A6D0`), so the `bl` put there got its low half set to `0xA6D0` and became
+  `b 0x04BAEDDC` (zeros, no link): every Kirby match with a non-Kirby fighter hung while loading (exe_v44-v46). A
+  static image or unicorn run of the patched RPX never sees it (the relocations are applied by the loader).
+  `lis` / `addi` / `lwz` / `stw` with a `@ha` / `@l` of a data address, and calls to other modules, carry one;
+  register forms (`lwzx`, `mr`, `cmpw`) don't. `rpx_patch.py` now refuses a patched word that a relocation would
+  rewrite to something else: hook the next instruction (its use) or move the relocation with `reloc:` onto the
+  cave's replayed copy.
 - **BattleObject return values**: the syscall (`0x030B2E48`) builds a message
   on its stack (`+4` kind 6, `+8` args, `+0xC` result = 0) and returns
   `message+0xC` to the MSC, not `r3`. Storing a value there from the star

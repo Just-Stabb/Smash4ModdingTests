@@ -22,10 +22,14 @@ no held model and no copy set-up, with Kirby's int 0x100000A0 telling the MSC wh
    top bits; copy_grant's r5 is the copied fighter's entry). weapon_expand.py's stubs map the kind for the loader
    (0x030C46A8 r28), its other user (0x030C5254 r16) and the release (0x030C5BD0 r23); they're re-pointed at stubs
    that also map 0x45 / 0x42 to 0x2C, and the loader's stub keeps the real kind in RES_KIND. Two name reads in the
-   loader then take the new names for that slot only: the motion folder (0x030C470C `lwz r7, -0x5930(r8)`, table
-   0x1041A6D0 + "body": "brave" / "edge" -> motion/bravebody, edgebody) and the hat (0x030C4830 `lwzx r7, r23, r21`,
-   table 0x1041A7B8: "bravecap" / "edgecap" -> model/bravecap/cNN, edgecap/cNN). A Robin in the same match loads
-   refletcap / refletbody in its own slot as before.
+   loader then take the new names for that slot only: the motion folder (table 0x1041A6D0 + "body": "brave" / "edge"
+   -> motion/bravebody, edgebody; hooked on the read's use, 0x030C4710 `lbz r10, 0(r7)`, which the stub replays after
+   swapping r7) and the hat (0x030C4830 `lwzx r7, r23, r21`, table 0x1041A7B8: "bravecap" / "edgecap" ->
+   model/bravecap/cNN, edgecap/cNN). A Robin in the same match loads refletcap / refletbody in its own slot as before.
+   **Crash fix v3:** the motion-folder read itself (0x030C470C `lwz r7, -0x5930(r8)`) carries an R_PPC_ADDR16_LO
+   relocation (.rela.text, addend 0x41A6D0): the loader rewrote the low half of the bl put there to 0xA6D0, turning it
+   into `b 0x04BAEDDC` (zeros, no link) for every non-Kirby fighter's hat entry: Kirby's match never loaded (exe_v44's
+   IP 0 crash and exe_v45b / v45c's silent hang). A hooked word must carry no relocation (rpx_patch.py now refuses it).
 3. Articles: Robin's copy record list (header 0x101356E4) copied here with two more records, the copy's articles 6
    and 7: Hero's fireball (weapon 0x190, max 3, the thunder's spawner 0x02F643A4: its level from the custom N slot,
    copy_custom_cave.py's thunder cave reads Kirby's 0x1000009F) and Sephiroth's Flare fire (0x18C, max 3, Din's
@@ -49,12 +53,13 @@ from ppcasm import Asm  # noqa: E402
 CAVE = 0x04BAF400              # crash fix v1: in kind_expand.py's code space (free after extended_memory.py's
 LIMIT = 0x04BAF620             # 0x04BAF000-0x04BAF100); exe_v44 grew the text region to 0x04BD6000 for it and Cemu
                                # crashed calling into it (PPCRecompiler_getJumpTableBase, IP 0: the user's log).
-                               # 0x04BAF620-0x04BAF700: kirby_hero_sword_cave.py (exe_v46; this code ends at 0x04BAF618)
+                               # 0x04BAF620-0x04BAF700: kirby_hero_sword_cave.py (exe_v46; this code ends at 0x04BAF610)
 
 HOOK_GRANT = 0x02EFCDA4         # copy_grant: mr r28, r6
 HOOK_STORE = 0x02EFCEE0         # copy_grant: stw r28, 0x290(r7) (int 0x100000A4)
 RES_HOOKS = ((0x030C46A8, 28, True), (0x030C5254, 16, False), (0x030C5BD0, 23, False))   # bl old stub
-HOOK_BODY = 0x030C470C          # lwz r7, -0x5930(r8): table 0x1041A6D0 (owner name -> motion/<name>body)
+HOOK_BODY = 0x030C4710          # lbz r10, 0(r7): the first use of r7 = [0x1041A6D0 + 4 kind] (motion/<name>body). Not
+                                # the read 0x030C470C itself: its ADDR16_LO relocation rewrote the bl (crash fix v3)
 HOOK_HAT = 0x030C4830           # lwzx r7, r23, r21: table 0x1041A7B8 (hat; r23 = 0x1041A7B8 from 0x030C46E8). exe_v44
                                 # hooked 0x030C487C (r24 = 0x1041A8A0: the held-item table, type 0x11) by mistake
 
@@ -100,12 +105,18 @@ def source(old_records):
             src += ['cmplwi r%d, 0x%X' % (reg, k), 'bne r%X_%d' % (hook, i), 'li r%d, 0x%X' % (reg, to),
                     'r%X_%d:' % (hook, i)]
         src += ['blr']
-    for tag, orig in (('body', 'lwz r7, -0x5930(r8)'), ('hat', 'lwzx r7, r23, r21')):
-        src += ['name_%s:' % tag, 'lis r12, res_kind@ha', 'lwz r12, res_kind@l(r12)']
-        for k in sorted(NAMES):
-            src += ['cmplwi r12, 0x%X' % k, 'bne n%s_%x' % (tag, k), 'lis r7, s_%s_%x@ha' % (tag, k),
-                    'addi r7, r7, s_%s_%x@l' % (tag, k), 'blr', 'n%s_%x:' % (tag, k)]
-        src += [orig, 'blr']
+    # the motion folder: at its use (r7 already read by the loader), r7 swapped, then the hooked lbz replayed
+    src += ['name_body:', 'lis r12, res_kind@ha', 'lwz r12, res_kind@l(r12)']
+    for k in sorted(NAMES):
+        src += ['cmplwi r12, 0x%X' % k, 'bne nbody_%x' % k, 'lis r7, s_body_%x@ha' % k,
+                'addi r7, r7, s_body_%x@l' % k, 'nbody_%x:' % k]
+    src += ['lbz r10, 0(r7)', 'blr']
+    # the hat: in place of the read (no relocation on 0x030C4830's lwzx)
+    src += ['name_hat:', 'lis r12, res_kind@ha', 'lwz r12, res_kind@l(r12)']
+    for k in sorted(NAMES):
+        src += ['cmplwi r12, 0x%X' % k, 'bne nhat_%x' % k, 'lis r7, s_hat_%x@ha' % k,
+                'addi r7, r7, s_hat_%x@l' % k, 'blr', 'nhat_%x:' % k]
+    src += ['lwzx r7, r23, r21', 'blr']
     return '\n'.join(src)
 
 

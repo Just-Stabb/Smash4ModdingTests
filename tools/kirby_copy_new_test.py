@@ -10,6 +10,8 @@
 - the three resource stubs map every kind the same way (the loader's keeps the real kind);
 - the two name reads: Hero's / Sephiroth's slot "brave" / "edge" (motion folder) and "bravecap" / "edgecap" (hat),
   every other kind the table's own name (run with the RPX's tables);
+- crash fix v3: no patched word carries a relocation the loader would rewrite (exe_v44-v46 hooked 0x030C470C, whose
+  ADDR16_LO relocation turned the bl into `b 0x04BAEDDC`: every Kirby match with another fighter hung or crashed);
 - the hooks are bl to the stubs; Robin's copy header points at 8 records (the 6 old + fireball 0x190 / fire 0x18C);
   reserve entries 15-18 name 0x18C, 0x190, 0xB6, 0xB4.
 """
@@ -37,6 +39,7 @@ def check(what, got, want):
 class Img:
     def __init__(self, path):
         d, _o, _e, secs = rpx_patch.load(path)
+        self.d, self.secs = d, secs
         self.segs = [(s[3], bytes(rpx_patch.section_data(d, s))) for s in secs if s[1] == 1 and s[3] and s[5]]
 
     def read(self, a, n):
@@ -54,6 +57,30 @@ class Img:
             s += self.read(a, 1)
             a += 1
         return s.decode()
+
+
+def reloc_clashes(new, old):
+    """Every relocation of the patched RPX whose word differs from the original's and which would write something
+    else there at load time (rpx_patch.py refuses these since crash fix v3)."""
+    bad = []
+    for rsec in new.secs:
+        if rsec[1] != 4:
+            continue
+        rdata = rpx_patch.section_data(new.d, rsec)
+        sym = rpx_patch.section_data(new.d, new.secs[rsec[6]])
+        for o in range(0, len(rdata), 12):
+            off, info, add = struct.unpack('>IIi', rdata[o:o + 12])
+            try:
+                w = new.w(off & ~3)
+                if w == old.w(off & ~3):
+                    continue
+            except KeyError:
+                continue
+            sval, = struct.unpack('>I', sym[(info >> 8) * 16 + 4:(info >> 8) * 16 + 8])
+            f = rpx_patch.reloc_field(info & 0xFF, off, (sval + add) & 0xFFFFFFFF, w)
+            if sval >= 0xC0000000 or f is None or f[0] != f[1]:
+                bad.append('0x%08X (type %d)' % (off, info & 0xFF))
+    return bad
 
 
 def bl_target(at, w):
@@ -97,7 +124,8 @@ def main():
     check('original copy_grant 0x%08X stw r28, 0x290(r7)' % C.HOOK_STORE, old.w(C.HOOK_STORE), 0x93870290)
     for hook, _reg, _k in C.RES_HOOKS:
         check('original 0x%08X is a bl (weapon_expand.py\'s stub)' % hook, (old.w(hook) >> 26, old.w(hook) & 3), (18, 1))
-    check('original 0x%08X lwz r7, -0x5930(r8)' % C.HOOK_BODY, old.w(C.HOOK_BODY), 0x80E8A6D0)
+    check('original 0x030C470C lwz r7, -0x5930(r8) (the motion-folder read)', old.w(0x030C470C), 0x80E8A6D0)
+    check('original 0x%08X lbz r10, 0(r7) (its use, hooked)' % C.HOOK_BODY, old.w(C.HOOK_BODY), 0x89470000)
     check('original 0x%08X lwzx r7, r23, r21' % C.HOOK_HAT, old.w(C.HOOK_HAT), 0x7CF7A82E)
     # crash fix v1: the read hooked as the hat's must read the register the loader fills with the hat table
     # (0x1041A7B8: lis 0x1042 + addi -0x5848 at 0x030C46E8), not the held-item table's (exe_v44 hooked r24's)
@@ -125,6 +153,10 @@ def main():
     # the patched
     a, _res = C.args()
     lab = a.labels
+    # crash fix v3: the loader applies .rela at load time; a patched word it relocates is rewritten (exe_v44-v46's
+    # bl at 0x030C470C, the read's ADDR16_LO: low half -> 0xA6D0, `b 0x04BAEDDC` into zeros)
+    check('no word the build changed is rewritten by a relocation', reloc_clashes(new, old), [])
+    check('0x030C470C (the relocated read) left as it was', new.w(0x030C470C), old.w(0x030C470C))
     for hook, name in [(C.HOOK_GRANT, 'grant_map'), (C.HOOK_STORE, 'grant_store'), (C.HOOK_BODY, 'name_body'),
                        (C.HOOK_HAT, 'name_hat')] + [(h, 'res_%X' % h) for h, _r, _k in C.RES_HOOKS]:
         w = new.w(hook)
@@ -157,12 +189,16 @@ def main():
             if mk >= 0x3A or mk == 8:
                 continue            # the loader returns before reading for these
             mu.mem_write(lab['res_kind'], struct.pack('>I', k))
-            regs = {8: 0x10420000 + 4 * mk, 21: 4 * mk, 23: table, 24: 0x1041A8A0, 7: 0}
+            # the body hook runs after the loader's own read (r7 = the table's entry), the hat's in place of it
+            regs = {8: 0x10420000 + 4 * mk, 21: 4 * mk, 23: table, 24: 0x1041A8A0,
+                    7: new.w(table + 4 * mk) if tag == 'body' else 0, 10: 0x55}
             call(mu, lab['name_%s' % tag], regs)
             got = mem_cstr(mu, mu.reg_read(UC_PPC_REG_0 + 7))
             want = C.NAMES[k][idx] if k in C.NAMES else new.cstr(new.w(table + 4 * mk))
             if got != want:
                 bad.append((hex(k), got, want))
+            if tag == 'body' and mu.reg_read(UC_PPC_REG_0 + 10) != ord(want[:1] or '\0'):
+                bad.append((hex(k), 'r10 (the replayed lbz)', mu.reg_read(UC_PPC_REG_0 + 10)))
         check('name read %s: Hero / Sephiroth slots %s, others the table\'s' % (
             tag, '/'.join(C.NAMES[k][idx] for k in sorted(C.NAMES))), bad, [])
     recs, n = new.w(C.ROBIN_HDR), new.w(C.ROBIN_HDR + 4)

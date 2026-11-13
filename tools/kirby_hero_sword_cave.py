@@ -26,7 +26,7 @@ The patch:
 3. STONE: copy_held_cave.py --stone: its hide path comes here: in the stone statuses (0x155 / 0x175 / 0x176) with
    Kirby's int 0x1000008B == 1 (kirby.c khm_sw_*: a sword spell being cast) it takes the show path (0x02B026B4), else
    the hook's own `lwz r3, 0xA8(r30)` and back to 0x02B02734 (both through ctr: 0x02Bxxxxx is out of `b` reach).
-Space: 0x04BAF620-0x04BAF700, the end of kirby_copy_new_cave.py's space (its code ends at 0x04BAF618), in the code
+Space: 0x04BAF620-0x04BAF700, the end of kirby_copy_new_cave.py's space (its code ends at 0x04BAF610 since crash fix v3), in the code
 region the standard build already runs (kind_expand.py's; never the grown text region: crash fix v1).
 """
 import os

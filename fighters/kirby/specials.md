@@ -1543,3 +1543,39 @@ python3 tools/msclang/msclang.py -x tools/mscinfo.xml fighters/kirby/kirby.c -o 
 python3 tools/msc_stack_check.py kirby.mscsb fighters/kirby/kirby.c; python3 tools/rolloff_hold_test.py kirby.mscsb
 python3 tools/kirby_newcopy_test.py kirby.mscsb
 ```
+
+### Crash fix v3 (`kirby_bisect_v3`): exe_v45d / exe_v46b, the motion-folder hook's relocation
+
+User (bisect v2, Kirby's old MSC from link_samus_v2): exe_v43 + only the copy-resource loader's hooks
+(`kirby_copy_new_cave.py`) hangs on loading any Kirby match. The other pieces load fine (reserve entries, Robin copy
+list, panel stub, copy_grant).
+
+**Cause:** the motion-folder hook `0x030C470C` (`lwz r7, -0x5930(r8)`) sits on a word that carries an
+**`R_PPC_ADDR16_LO` relocation** (`.rela.text`, offset `0x030C470E`, symbol `.data` `0x10000000` + `0x41A6D0`). The
+loader applies relocations when the game starts, so it wrote `0xA6D0` into the low half of the `bl` put there:
+`0x49AEAE9D` (`bl 0x04BAF5A8`) became `0x49AEA6D0`, i.e. **`b 0x04BAEDDC`**. That is a plain branch with no link,
+into zeroed code space. It is reached for the hat entry (type 0xC) of every match entry whose kind is below 0x3A
+and not Kirby, so the hang happens in any Kirby match against another fighter. A Kirby ditto never gets there.
+It was in every build since exe_v44: v1's exe_v44 became `b 0x04BCEDDC` (also zeros). The registers in v1's crash
+log (r8 = 0x10420010, set by the `addis` just before `0x030C470C`; r23-r26 = the loader's tables) put that crash at
+this hook too. So crash fix v1's "cave outside the code region" was not what crashed.
+- Evidence: across bisect v2's exes, `1_loader_hooks` is the only one with a patched word that a relocation still
+  targets. In the whole of v6's exe_v46, `0x030C470E` is the only relocation that disagrees with its word (apart
+  from rpx_patch's `reloc:` dummies and three vanilla entry-point words).
+- Ruled out for the others: `0x030C46A8` / `0x030C5254` / `0x030C5BD0` replace weapon_expand's own `bl` (no
+  relocation). `0x030C4830` is `lwzx` (none). It is also a `beq` target, which is harmless. The stubs touch only
+  r12 / cr0 / LR, all dead at those points. Without a Hero or Sephiroth in the match they compute exactly what the
+  originals did. The panel stub (which loads fine) stores to and runs from the same page (0x04BAF7xx).
+
+**Fix:** the motion-folder hook moves to the read's use, `0x030C4710` `lbz r10, 0(r7)` (no relocation). The stub
+swaps r7 for "brave" / "edge" when res_kind is 0x45 / 0x42, then replays the `lbz`. `0x030C470C` is left as it
+was. The hat hook is unchanged, and the code now ends at 0x04BAF610 (kirby_hero_sword_cave.py still starts at
+0x04BAF620).
+- `tools/rpx_patch.py` now refuses a patch to a word that a relocation (after `reloc:` moves) would rewrite to
+  something else (ADDR32 / ADDR16_LO / HI / HA / REL24 / REL14 modelled; any other type, or an import, is refused).
+- `tools/kirby_copy_new_test.py`: every relocation whose word the build changed must write what is there; the
+  original's `0x030C470C` stays; the body stub is run with r7 already read and checks the replayed r10.
+  exe_v45c fails these, and exe_v45d / exe_v46b pass (with kirby_hero_menu_test / kirby_hero_sword_test).
+- exe_v45d = exe_v45c with the cave regenerated, the five hooks re-pointed and `0x030C470C` restored. exe_v46b is
+  v6's exe_v46 with the same words. The bisect package has exe_v43 + each old hook alone (2 = the relocated one,
+  expected to hang), + all five fixed, and the two full exes.

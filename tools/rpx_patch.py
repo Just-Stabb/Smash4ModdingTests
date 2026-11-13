@@ -13,6 +13,11 @@ Relocations: an argument `reloc:LO-HI=DUMMY` moves every relocation whose target
 there (e.g. a code cave in a dead function: its relocations would otherwise patch the new code
 at load time). DUMMY must be a dead word.
 
+A patched word that a relocation still targets (after the reloc: moves) with a value other than the
+patch's is refused: the loader applies the relocations at load time and would rewrite it (crash fix v3:
+a hook `bl` on an `lwz rD, lo(rA)` had its low half rewritten and branched into zeros). Hook a word
+with no relocation, or move it with reloc: (e.g. onto the cave's replayed copy of the instruction).
+
 `grow:END` extends the code section below END with zeros up to END (room for new code after the
 game's own; END must stay below the text region's end in the RPL file info). A section that no
 longer fits in its place in the file is moved to the end of the file.
@@ -139,6 +144,11 @@ def main():
                       % (moved, idx, hex(lo), hex(hi), hex(dummy)))
                 by_section.setdefault(idx, (data, []))
 
+    clashes = reloc_clashes(d, secs, by_section)
+    if clashes:
+        sys.exit("patched words the loader still relocates (it would rewrite them at load time; hook another word "
+                 "or move the relocation with reloc:):\n  " + "\n  ".join(clashes))
+
     for idx, (data, items) in by_section.items():
         sec = secs[idx]
         for addr, value in items:
@@ -203,6 +213,60 @@ def main():
             crc, = struct.unpack('>I', d2[crc_off + i * 4:crc_off + i * 4 + 4])
             assert crc == zlib.crc32(bytes(section_data(d2, s))) & 0xFFFFFFFF, "CRC mismatch in section %d" % i
     print("wrote %s (verified)" % dst)
+
+
+RELOC_NAMES = {1: 'ADDR32', 4: 'ADDR16_LO', 5: 'ADDR16_HI', 6: 'ADDR16_HA', 10: 'REL24', 11: 'REL14'}
+
+
+def reloc_field(typ, off, val, word):
+    """(the bits of `word` relocation `typ` at byte `off` writes, the value it writes there), or None (not modelled)."""
+    if typ == 1:
+        return word, val
+    if typ in (4, 5, 6):        # the halfword at off (the low half of the word for an instruction's immediate)
+        half = word & 0xFFFF if off & 2 else word >> 16
+        return half, {4: val & 0xFFFF, 5: val >> 16, 6: ((val + 0x8000) >> 16) & 0xFFFF}[typ]
+    if typ == 10:
+        return word & 0x03FFFFFC, (val - (off & ~3)) & 0x03FFFFFC
+    if typ == 11:
+        return word & 0xFFFC, (val - (off & ~3)) & 0xFFFC
+    return None
+
+
+def reloc_clashes(d, secs, by_section):
+    """Patched words (value changed) that a relocation still targets with a value other than the patch's: the loader
+    applies .rela at load time and would rewrite them (crash fix v3: a bl put on a `lwz r7, lo(r8)` got its low half
+    rewritten to the relocation's 0xA6D0 and jumped into zeros). Uses the relocations as moved by reloc: arguments."""
+    out = []
+    for ridx, rsec in enumerate(secs):
+        if rsec[1] != 4 or rsec[7] not in by_section or not by_section[rsec[7]][1]:
+            continue
+        tidx = rsec[7]
+        tdata = by_section[tidx][0]
+        base = secs[tidx][3]
+        changed = {}
+        for addr, value in by_section[tidx][1]:
+            o = addr - base
+            old = struct.unpack('>I', tdata[o:o + 4])[0] if o + 4 <= len(tdata) else 0
+            if old != value:
+                changed[addr & ~3] = value
+        if not changed:
+            continue
+        rdata = by_section[ridx][0] if ridx in by_section else section_data(d, rsec)
+        sym = section_data(d, secs[rsec[6]])
+        for o in range(0, len(rdata), 12):
+            off, info, add = struct.unpack('>IIi', rdata[o:o + 12])
+            w = changed.get(off & ~3)
+            if w is None:
+                continue
+            typ, si = info & 0xFF, info >> 8
+            sval, = struct.unpack('>I', sym[si * 16 + 4:si * 16 + 8])
+            f = reloc_field(typ, off, (sval + add) & 0xFFFFFFFF, w)
+            if sval >= 0xC0000000 or f is None or f[0] != f[1]:
+                out.append('0x%08X = 0x%08X: relocation %s at 0x%08X (symbol 0x%08X + 0x%X) writes %s' % (
+                    off & ~3, w, RELOC_NAMES.get(typ, 'type %d' % typ), off, sval, add & 0xFFFFFFFF,
+                    'the import\'s address' if sval >= 0xC0000000 else '?' if f is None else '0x%X over 0x%X' % (
+                        f[1], f[0])))
+    return out
 
 
 def locate(d, secs, addr, cache=None):
