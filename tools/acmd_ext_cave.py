@@ -35,7 +35,8 @@ The hit-time hooks that use them are in this file too (HIT_* below), see docs/ac
 
 The other commands (NEW_CMDS, ...) and the per-object variables / timers are described where they are defined;
 New_Var (exe_v40: NV_* / nv_code) grows the text region (textregion: / grow: in the output) and redirects the
-WorkModule vtables' int ops (their relocations moved with reloc:).
+WorkModule vtables' int ops (their relocations moved with reloc:). Gravity_Set (exe_v42: GS_* / gs_code) sits after
+New_Var's code in that region and hooks the fighters' gravity energy update and damage reaction decision.
 """
 import os
 import struct
@@ -290,6 +291,32 @@ for _vt, _fns in zip(WM_VTABLES, [
         WM_INT_ORIG[_vt + _off] = _f
 RELOC_DUMMY = 0x037EE73C         # a dead word for the vtable words' relocations (as position_vars_cave.py)
 
+# Gravity_Set (docs/acmd-extra-commands.md "Gravity_Set", docs/native-notes.md "Gravity_Set"; first in exe_v42). A
+# fighter's gravity is its KineticModule's energy 1 (the fighters' KineticModule, vtable 0x1012C5C0, ctor 0x02E78B58:
+# energy 1 at +0x334, class ctor 0x02E814B0, vtable 0x1012C8F8 at the energy's +0x1C): +4 vertical speed, +0x24 the
+# acceleration (negative: -gravity), +0x28 the max fall speed, +0x2C the brake (V acceleration) back to it, +0x30 an
+# absolute limit, +0x34 a multiplier (1), +0x38 the limit mode. Its reset (vt +0x1C, 0x02E818A8: every kinetic type
+# change / KineticModule(0xE, 1, ...)) sets them again from the fighter's params (type 0: -0x03000018 gravity,
+# 0x03000019 max fall, 0x0300001A, 0x03000023). Its update (vt +0x14, 0x02E8159C, from the KineticModule update
+# 0x02C50058 every frame it's enabled: r3 energy, r4 the module accessor) reads +0x24 / +0x28 there. The command keeps
+# its values in GS (per fighter); the update's entry swaps them into the energy and its exit puts the energy's own
+# back, so the energy never holds them outside its update: nothing to restore, a reset in between is the game's.
+GS_UPD = 0x02E8159C              # gravity energy update entry: stwu r1, -0x48(r1) (r3 energy, r4 accessor)
+GS_UPD_END = 0x02E81860          # its single exit (every path): mr r3, r29 (r28 energy, r29 accessor), then
+                                 # bl 0x0275FF54; r0 r11 r12 free
+GS_HIT = 0x02E76BB4              # the fighters' damage reaction decision (owner vt +0x14C, from DamageModule vt +0x94
+                                 # 0x02C22EF0 after its armor check, on every hit: r4 accessor, r5 the hit, r6 armor);
+                                 # returns 0 = the hit takes effect (damage status), else no reaction: mflr r0
+GS_ORIG = {GS_UPD: 0x9421FFB8, GS_UPD_END: 0x7FA3EB78, GS_HIT: 0x7C0802A6}
+GRAV_VT = 0x1012C8F8             # the fighters' gravity energy class (its +0x1C)
+FIGHTER_KINETIC_VT = 0x1012C5C0  # the fighters' KineticModule
+GS_CODE = 0x04BD3600             # code (after New_Var's, in the grown text region), up to GS
+GS = 0x04BD3E00                  # GS_N entries of 0x20 (zero at load), up to NV_LIMIT: +0 the accessor (0 = free),
+GS_N = 16                        # +4 its StatusModule (the status change hook's key), +8 Accel, +0xC MaxFall (floats,
+                                 # < 0 = the fighter's own), +0x10 Mode
+GS_VARS = (0x337, 0x338)         # user_entry IDs 0x0F000337 GRAVITY / 0x0F000338 MAX_FALL (read only)
+FAST_FALL_FLAG = 0x21000001      # the fighter's fast-fall flag (MSC WorkModule(0x2711, flag): off)
+
 _T = ('Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 '
       'player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter\'s own script.')
 _V = 'Float variable that gets the value (e.g. VAR_0 0x0F000300; any float variable).'
@@ -424,6 +451,19 @@ NEW_CMDS = [
      'Declares a named variable (Type int or float, a starting value) that every variable parameter takes by name: '
      'SET_FLOAT / SET_INT / ADD_INT / INC_INT, Float_Var_Compare / Int_Var_Compare, Hit_Get(Variable=...), ... 64 '
      'slots per object (fighter or article), beyond VAR_0-VAR_31.'),
+    ('Gravity_Set', 'h_gs', [
+        ('Accel', 1, 'Gravity: how much the vertical speed drops each frame (the fighter_param "Gravity", e.g. Diddy '
+                     'Kong 0.105). 0: no gravity (the vertical speed stays as it is). Below 0 (-1): the fighter\'s own. '
+                     'Mode 1: a multiplier of its own (0.5 = half).'),
+        ('MaxFall', 1, 'Max fall speed (the fighter_param "Maximum Fall Speed", Diddy 1.75). Falling faster, the '
+                       'fighter slows to it gradually as after a fast fall (Mode 2: at once). Below 0 (-1): the '
+                       'fighter\'s own. Mode 1: a multiplier of its own.'),
+        ('Mode', 0, 'Bits, add them: 1 Accel and MaxFall are multipliers of the fighter\'s own; 2 a fall faster than '
+                    'MaxFall is cut to it at once; 4 no fast fall while it holds. 0: plain values. Accel and MaxFall '
+                    'both below 0 with Mode 0 (or 1): turns Gravity_Set off.')],
+     'Sets this fighter\'s gravity and max fall speed for the rest of the move (aerials, specials, a grounded move '
+     'that went on in the air with Leave_Ground_Cancel, ...). Back to the fighter\'s own by itself at the next status '
+     '(move), when a hit takes effect, on a ledge grab and on a KO. Fighters only.'),
 ]
 SM4SHCOMMAND_DESC.update({n: d + ' New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).'
                           for n, _l, _p, d in NEW_CMDS})
@@ -1195,8 +1235,8 @@ hk_lgc_chg:
         stw r0, 0(r3)
         stw r0, 4(r3)
 lgc_lc_back:
-        b 0x%(chg_back)08X
-""" % dict(chg_back=LGC_CHG + 4))
+        b gs_chg                        # Gravity_Set's entry too (exe_v42; it goes on to 0x02E88B44)
+""")
 
 
 def nv_code(b):
@@ -1221,7 +1261,7 @@ def nv_code(b):
 ue_nv:
         addi r28, r30, -%(base)d
         cmplwi r28, %(n)d
-        bge.far ue_zero                 # 0x337-0x33F, 0x3C0-0x3FF
+        bge.far gs_var                  # 0x337-0x33F, 0x3C0-0x3FF (gs_var: GRAVITY / MAX_FALL, else 0; exe_v42)
         mr r3, r31
         mr r4, r29                      # writing creates the object's entry
         bl obj_find
@@ -1426,6 +1466,363 @@ nvi_%(name)s_o:                         # not ours: the class's own code (the ba
         mtctr r12
         bctr
 """ % dict(name=name, k=k, hi=base >> 16, lo=base & 0xFFFF))
+
+
+CLIFF_KINDS = [(0x72, 0x7A), (0xF3, 0xF4)]   # CliffCatchMove - CliffJumpQuick2, AirCatchHit / AirCatchHang (a tether)
+
+
+def gs_code(b):
+    """Gravity_Set: the command, its table lookups, the gravity energy update's entry / exit hooks, the damage reaction
+    hook, the status change clear (from hk_lgc_chg) and the GRAVITY / MAX_FALL variables (from ue_nv), in GS_CODE"""
+    D = dict(n=GS_N, mask=GS_N * 0x20 - 1, upd_back=GS_UPD + 4, end_back=GS_UPD_END + 4, hit_back=GS_HIT + 4,
+             chg_back=LGC_CHG + 4, svh=FIGHTER_STATUS_VT >> 16, svl=FIGHTER_STATUS_VT & 0xFFFF,
+             kvh=FIGHTER_KINETIC_VT >> 16, kvl=FIGHTER_KINETIC_VT & 0xFFFF, gvh=GRAV_VT >> 16, gvl=GRAV_VT & 0xFFFF,
+             wh=WORK_W >> 16, wl=WORK_W & 0xFFFF, ffh=FAST_FALL_FLAG >> 16, ffl=FAST_FALL_FLAG & 0xFFFF,
+             g0=GS_VARS[0], g1=GS_VARS[1])
+    cliff = ''.join("""
+        addi r12, r10, -0x%X
+        cmplwi r12, %d
+        ble gg_clear""" % (lo_k, hi_k - lo_k) for lo_k, hi_k in CLIFF_KINDS)     # (not r0: addi rD, r0, n is li)
+    b.asm("""
+# --- Gravity_Set(Accel, MaxFall, Mode): Accel / MaxFall < 0 keep the fighter's own; Mode 1 multipliers of its own,
+#     2 a fall faster than MaxFall is cut to it at once, 4 no fast fall. Accel and MaxFall < 0 with Mode 0 / 1: off
+h_gs:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r27, 0x1C(r1)
+        mr r31, r5                      # script state
+        mr r30, r7                      # parameters
+        mr r29, r3                      # accessor
+        lbz r0, 8(r6)
+        cmpwi r0, 0
+        beq gs_step""" % D + chk_t('r29', 'r0', 'gs_step') + """
+        lwz r28, 0x20(r29)              # StatusModule""" + chk_t('r28', 'r0', 'gs_step') + """
+        lwz r0, 0(r28)
+        lis r12, 0x%(svh)X
+        ori r12, r12, 0x%(svl)X
+        cmplw r0, r12
+        bne gs_step                     # fighters only
+        lis r12, gs_zero@ha
+        lfs f0, gs_zero@l(r12)
+        lfs f1, 0(r30)                  # Accel
+        lfs f2, 4(r30)                  # MaxFall
+        li r4, 1
+        fcmpu cr0, f1, f0
+        bge gs_on
+        fcmpu cr0, f2, f0
+        bge gs_on
+        lwz r0, 8(r30)
+        andi. r0, r0, 6
+        bne gs_on
+        li r4, 0                        # off: only an existing entry, cleared
+gs_on:
+        mr r3, r29
+        li r5, 0
+        bl gs_find
+        cmpwi r3, 0
+        beq gs_step
+        li r0, 0
+        cmpwi r4, 0
+        bne gs_set
+        stw r0, 0(r3)
+        stw r0, 4(r3)
+        b gs_step
+gs_set:
+        stw r29, 0(r3)
+        stw r28, 4(r3)
+        stfs f1, 8(r3)
+        stfs f2, 0xC(r3)
+        lwz r0, 8(r30)                  # Mode
+        stw r0, 0x10(r3)
+gs_step:
+        lwz r3, 8(r31)
+        cmpwi r3, -1
+        bne gs_hret
+        lwz r11, 4(r31)
+        addi r11, r11, 16
+        stw r11, 4(r31)
+        li r3, 2
+gs_hret:
+        lmw r27, 0x1C(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+
+# --- gs_find(r3 key, r4 make, r5 the key's offset: 0 accessor, 4 StatusModule) -> r3 its entry or 0 (make: a free
+#     one, else the next in turn; the caller fills it). Leaf: r0 r3 r10 r11 r12 ----------------------------------
+gs_find:
+        lis r12, gs_tab@ha
+        addi r12, r12, gs_tab@l
+        li r11, %(n)d
+        li r10, 0
+gf_loop:
+        lwz r0, 0(r12)
+        cmpwi r0, 0
+        beq gf_free
+        lwzx r0, r12, r5
+        cmplw r0, r3
+        beq gf_hit
+        b gf_next
+gf_free:
+        cmpwi r10, 0
+        bne gf_next
+        mr r10, r12
+gf_next:
+        addi r12, r12, 0x20
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne gf_loop
+        cmpwi r4, 0
+        beq gf_none
+        cmpwi r10, 0
+        bne gf_take
+        lis r11, gs_rr@ha
+        lwz r10, gs_rr@l(r11)           # all taken: the next in turn
+        addi r0, r10, 0x20
+        andi. r0, r0, %(mask)d
+        stw r0, gs_rr@l(r11)
+        lis r12, gs_tab@ha
+        addi r12, r12, gs_tab@l
+        add r10, r12, r10
+gf_take:
+        mr r3, r10
+        blr
+gf_hit:
+        mr r3, r12
+        blr
+gf_none:
+        li r3, 0
+        blr
+
+# --- gs_get(r3 accessor) -> r3 its live entry or 0. On a ledge (situation 1, or a cliff status / tether hang as the
+#     current or the pending status) the entry is cleared first: a ledge grab ends it whatever path it took. r0 r3-r5
+#     r10-r12 ---------------------------------------------------------------------------------------------------
+gs_get:
+        stwu r1, -0x10(r1)
+        mflr r0
+        stw r0, 0x14(r1)
+        li r4, 0
+        li r5, 0
+        bl gs_find
+        cmpwi r3, 0
+        beq gg_ret
+        lwz r11, 4(r3)""" % D + chk_t('r11', 'r0', 'gg_ret') + """
+        lwz r0, 0x84(r11)               # situation: 1 ledge
+        cmpwi r0, 1
+        beq gg_clear
+        lwz r10, 0x48(r11)              # the status""" + cliff + """
+        lwz r10, 0x4C(r11)              # the status being changed to""" + cliff + """
+        b gg_ret
+gg_clear:
+        li r0, 0
+        stw r0, 0(r3)
+        stw r0, 4(r3)
+        li r3, 0
+gg_ret:
+        lwz r0, 0x14(r1)
+        mtlr r0
+        addi r1, r1, 0x10
+        blr
+
+# --- gs_eff(r3 entry, f1 the energy's acceleration, f2 its max fall) -> f1, f2 the ones to use. Leaf: r0 r12 f0 f3
+gs_eff:
+        lis r12, gs_zero@ha
+        lfs f0, gs_zero@l(r12)
+        lwz r0, 0x10(r3)
+        andi. r0, r0, 1                 # cr0: multipliers
+        lfs f3, 8(r3)                   # Accel
+        fcmpu cr1, f3, f0
+        blt cr1, ge_max
+        bne ge_amul
+        fneg f1, f3                     # the energy's is negative (downward)
+        b ge_max
+ge_amul:
+        fmuls f1, f1, f3
+ge_max:
+        lfs f3, 0xC(r3)                 # MaxFall
+        fcmpu cr1, f3, f0
+        blt cr1, ge_ret
+        bne ge_mmul
+        fmr f2, f3
+        blr
+ge_mmul:
+        fmuls f2, f2, f3
+ge_ret:
+        blr
+
+# --- hook: the gravity energy update's entry (r3 energy, r4 accessor). With a live entry: the energy's own
+#     acceleration / max fall kept (gs_cur), the Gravity_Set ones put in for this update; Mode 2 cuts the fall
+#     speed, Mode 4 turns the fast-fall flag off. ------------------------------------------------------------------
+gs_upd:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stw r3, 0x10(r1)
+        stw r4, 0x14(r1)
+        stw r31, 0x18(r1)
+        mr r31, r3
+        mr r3, r4
+        bl gs_get
+        cmpwi r3, 0
+        beq gu_go
+        lfs f1, 0x24(r31)
+        lfs f2, 0x28(r31)
+        lis r12, gs_cur@ha
+        addi r12, r12, gs_cur@l
+        stw r31, 0(r12)
+        stfs f1, 4(r12)
+        stfs f2, 8(r12)
+        bl gs_eff
+        stfs f1, 0x24(r31)
+        stfs f2, 0x28(r31)
+        lwz r0, 0x10(r3)
+        andi. r0, r0, 2
+        beq gu_ff
+        fneg f3, f2
+        lfs f0, 4(r31)                  # vertical speed
+        fcmpu cr0, f0, f3
+        bge gu_ff
+        stfs f3, 4(r31)
+gu_ff:
+        lwz r0, 0x10(r3)
+        andi. r0, r0, 4
+        beq gu_go
+        lis r12, nc_args@ha
+        addi r12, r12, nc_args@l
+        li r0, 0x2711                   # WorkModule(0x2711, fast-fall flag): off
+        stw r0, 0(r12)
+        lis r0, 0x%(ffh)X
+        ori r0, r0, 0x%(ffl)X
+        stw r0, 4(r12)
+        lwz r3, 0x14(r1)
+        lis r4, 0x%(wh)X
+        ori r4, r4, 0x%(wl)X
+        li r5, 2
+        bl nc_msc
+gu_go:
+        lwz r3, 0x10(r1)
+        lwz r4, 0x14(r1)
+        lwz r31, 0x18(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        stwu r1, -0x48(r1)              # the replaced instruction
+        b 0x%(upd_back)08X
+
+# --- hook: the update's exit (r28 energy): the energy's own acceleration / max fall back -------------------------
+gs_end:
+        lis r12, gs_cur@ha
+        addi r12, r12, gs_cur@l
+        lwz r11, 0(r12)
+        cmplw r11, r28
+        bne gs_end_b
+        li r0, 0
+        stw r0, 0(r12)
+        lwz r0, 4(r12)
+        stw r0, 0x24(r28)
+        lwz r0, 8(r12)
+        stw r0, 0x28(r28)
+gs_end_b:
+        mr r3, r29
+        b 0x%(end_back)08X
+
+# --- hook: the damage reaction decision (r4 accessor): run it; a hit that takes effect (0) ends the fighter's
+#     Gravity_Set at once (a hit with no reaction, armor or too weak, leaves it) -------------------------------------
+gs_hit:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r4, 0x10(r1)
+        bl gs_hit_orig
+        stw r3, 0x14(r1)
+        cmpwi r3, 0
+        bne gh_ret
+        lwz r3, 0x10(r1)
+        li r4, 0
+        li r5, 0
+        bl gs_find
+        cmpwi r3, 0
+        beq gh_ret
+        li r0, 0
+        stw r0, 0(r3)
+        stw r0, 4(r3)
+gh_ret:
+        lwz r3, 0x14(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+gs_hit_orig:
+        mflr r0                         # the replaced instruction (LR: back into gs_hit)
+        b 0x%(hit_back)08X
+
+# --- from hk_lgc_chg (every status change, r30 StatusModule; LR free): the fighter's entry goes -------------------
+gs_chg:
+        mr r3, r30
+        li r4, 0
+        li r5, 4
+        bl gs_find
+        cmpwi r3, 0
+        beq gs_chg_b
+        li r0, 0
+        stw r0, 0(r3)
+        stw r0, 4(r3)
+gs_chg_b:
+        b 0x%(chg_back)08X
+
+# --- from ue_nv (user_entry: r31 WorkModule, r30 index, r29 write; r27 r28 free): 0x337 GRAVITY / 0x338 MAX_FALL,
+#     the gravity in effect (what the next update uses, Gravity_Set's included); read only; other objects read 0 --
+gs_var:
+        cmplwi r30, 0x%(g0)X
+        blt gv_zero
+        cmplwi r30, 0x%(g1)X
+        bgt gv_zero
+        cmpwi r29, 0
+        bne gv_out
+        mr r3, r31
+        bl acc_of""" % D + chk_t('r3', 'r0', 'gv_zero') + """
+        mr r28, r3
+        lwz r27, 0x34(r3)               # KineticModule""" + chk_t('r27', 'r0', 'gv_zero') + """
+        lwz r0, 0(r27)
+        lis r12, 0x%(kvh)X
+        ori r12, r12, 0x%(kvl)X
+        cmplw r0, r12
+        bne gv_zero                     # fighters only
+        addi r27, r27, 0x334            # energy 1
+        lwz r0, 0x1C(r27)
+        lis r12, 0x%(gvh)X
+        ori r12, r12, 0x%(gvl)X
+        cmplw r0, r12
+        bne gv_zero
+        mr r3, r28
+        bl gs_get
+        lfs f1, 0x24(r27)
+        lfs f2, 0x28(r27)
+        cmpwi r3, 0
+        beq gv_pick
+        bl gs_eff
+gv_pick:
+        cmplwi r30, 0x%(g0)X
+        bne gv_max
+        fneg f1, f1
+        b ue_out
+gv_max:
+        fmr f1, f2
+gv_out:
+        b ue_out
+gv_zero:
+        b ue_zero
+gs_cur:                                 # the energy being updated with Gravity_Set's values, then its own two
+        .word 0
+        .word 0
+        .word 0
+gs_rr:
+        .word 0
+gs_zero:
+        .float 0.0
+""" % D)
 
 
 def ha(v):
@@ -1690,6 +2087,10 @@ next_entry:
     nv_code(b4)
     assert not set(b4.labels) & (set(a.labels) | set(b2.labels)), set(b4.labels) & (set(a.labels) | set(b2.labels))
     a.labels.update(b4.labels)
+    b5 = Asm(GS_CODE)                   # Gravity_Set (exe_v42: the grown text region, after New_Var's code)
+    gs_code(b5)
+    assert not set(b5.labels) & (set(a.labels) | set(b2.labels)), set(b5.labels) & (set(a.labels) | set(b2.labels))
+    a.labels.update(b5.labels)
     b2.asm('cmd_crcs:\n' + ''.join('        .word 0x%08X\n' % crc(c[0]) for c in COMMANDS))
     b2.asm('cmd_sizes:\n' + ''.join('        .word %d\n' % c[1] for c in COMMANDS))
     a.labels.update(b2.labels)
@@ -1719,6 +2120,9 @@ ue_nv_far:                              # user_entry's New_Var IDs (exe_v40): ue
     b2.labels.update(a.labels)
     b3.labels.update(a.labels)
     b4.labels.update(a.labels)
+    b5.labels.update(a.labels)
+    a.labels['gs_tab'] = GS
+    b5.labels['gs_tab'] = GS
     words = a.words()
     assert CAVE + 4 * len(words) <= TABLE, hex(CAVE + 4 * len(words))
     words2 = b2.words()
@@ -1731,6 +2135,10 @@ ue_nv_far:                              # user_entry's New_Var IDs (exe_v40): ue
     assert OBJS + OBJ_N * OBJ_SIZE + NV_OFF <= NV_CODE and NV_CODE + 4 * len(words4) <= NV_LIMIT, hex(NV_CODE + 4 * len(words4))
     assert NV_INT + 8 <= OBJ_SIZE and NV_DECL + 8 <= NV_INT and OBJ_SIZE == 4 * NV_N
     a.part4 = (NV_CODE, words4)
+    words5 = b5.words()
+    assert NV_CODE + 4 * len(words4) <= GS_CODE and GS_CODE + 4 * len(words5) <= GS, hex(GS_CODE + 4 * len(words5))
+    assert GS + GS_N * 0x20 <= NV_LIMIT
+    a.part5 = (GS_CODE, words5)
     assert ACC_CACHE + 64 * 8 <= THREADS and THREADS + THREAD_N * THREAD_SIZE <= GROW <= LIMIT
     hooks = {LOOKUP: b(LOOKUP, a.addr('lookup')), SIZE1: b(SIZE1, a.addr('size1')),
              SIZE2: b(SIZE2, a.addr('size2')), FETCH: b(FETCH, a.addr('fetch')),
@@ -1743,7 +2151,9 @@ ue_nv_far:                              # user_entry's New_Var IDs (exe_v40): ue
              LGC_TRAMP[LGC_REQ]: b(LGC_TRAMP[LGC_REQ], a.addr('hk_lgc_req')),
              LGC_CHG: b(LGC_CHG, a.addr('hk_lgc_chg')),
              FRAME_HOOK: b(FRAME_HOOK, a.addr('hk_frame')), WM_RESET: b(WM_RESET, a.addr('hk_wmreset')),
-             VAR_ENTRY: b(VAR_ENTRY, a.addr('user_gate'))}
+             VAR_ENTRY: b(VAR_ENTRY, a.addr('user_gate')),
+             GS_UPD: b(GS_UPD, a.addr('gs_upd')), GS_UPD_END: b(GS_UPD_END, a.addr('gs_end')),
+             GS_HIT: b(GS_HIT, a.addr('gs_hit'))}
     for k, h in enumerate(STEP_HOOKS):
         hooks[h] = b(h, a.addr('hk_step%d' % k))
     for vt in WM_VTABLES:               # New_Var: the WorkModule int ops (absolute addresses: no branch range)
@@ -3439,6 +3849,7 @@ def main():
     out += ['0x%08X=0x%08X' % (a.part2[0] + 4 * i, w) for i, w in enumerate(a.part2[1])]
     out += ['0x%08X=0x%08X' % (a.part3[0] + 4 * i, w) for i, w in enumerate(a.part3[1])]
     out += ['0x%08X=0x%08X' % (a.part4[0] + 4 * i, w) for i, w in enumerate(a.part4[1])]
+    out += ['0x%08X=0x%08X' % (a.part5[0] + 4 * i, w) for i, w in enumerate(a.part5[1])]
     out += ['0x%08X=0x%08X' % kv for kv in sorted(hooks.items())]
     # the vtable words have ADDR32 relocations to the classes' own functions: moved to a dead word, or the loader
     # would write those back over ours

@@ -1407,15 +1407,16 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
     fighter's WorkModule (accessor `+0x28`) in place of the caller's, at `+0x60 + 4 × (24 + k)`. Every
     pointer is range-checked (word aligned, `0x10000000`–`0x8FFFFFFF`); a failed check, an index past
     the count or a not-live entry reads 0 and writes nothing. A write creates the fighter's entry
-    (as its own write would), a read never does. `0x337`–`0x33F` and `0x3C0`–`0x3FF` read 0; `0x380`–`0x3BF` are
-    New_Var's (below, exe_v40).
+    (as its own write would), a read never does. `0x339`–`0x33F` and `0x3C0`–`0x3FF` read 0; `0x380`–`0x3BF` are
+    New_Var's (below, exe_v40); `0x337` / `0x338` are Gravity_Set's GRAVITY / MAX_FALL (below, exe_v42).
 - **KineticModule:** accessor `+0x34`.
   - Fields: kinetic type at `+0x11C`, energies at `+0x18` (0x10 each).
   - Methods: set the type with vt `+0xEC`, get an energy with vt `+0x54(id)`, get the speed sum with
     vt `+0xA4(mask)` (x in r3, y in r4).
   - An energy holds its speed at `+0` / `+4`, its enabled byte at `+0x18`, and acceleration / limit
     at `+0x20` / `+0x24`.
-  - A weapon's own movement is energy 0 and gravity is energy 2.
+  - A weapon's own movement is energy 0 and gravity is energy 2. A fighter's gravity is energy 1, its own class
+    with another layout (below, "Gravity_Set").
   - Set_Kinetic_Handler sends op 0 `{0, ID}` through vt `+0x114`, so it works on any object.
   - MSC handler (vt `+0x114`, Sephiroth test 154, `tools/kinetic_push_test.py`): fighters' `0x02E79100`
     (fighter_kinetic_module_impl.cpp) takes ops 0xF / 0x11 / 0x15 / 0x19 and passes the rest to
@@ -1598,6 +1599,68 @@ First in exe_v39; working from exe_v41 (below).
   ASCII in 6 words): sets the int bit to Type == 1, then, with Scope 1 or the declared bit clear, sets the declared
   bit and stores Initial (truncated for an int). Not executed: only steps. A non-New_Var ID or a bad accessor /
   WorkModule: nothing.
+
+## Gravity_Set (a fighter's gravity, exe_v42)
+
+`tools/acmd_ext_cave.py` (`gs_code`), user docs `docs/acmd-extra-commands.md` "Gravity_Set", test
+`tools/gravity_set_test.py` (the game's own constructor, reset and update in unicorn).
+
+- **The fighters' KineticModule** (vtable `0x1012C5C0`, constructor `0x02E78B58`, 0x540 bytes, accessor `+0x34`):
+  energies built in place and registered by `0x02C4FE4C(module, energy, index, ...)`: 0 at `+0x2C0` (`0x02E81F6C`),
+  **1 = gravity at `+0x334`** (`0x02E814B0`, 0x3C bytes), 2 at `+0x370`, 3 at `+0x3D8`, 4 at `+0x430`. The table at
+  module `+0x18` (0x10 a slot: `+0` the energy, `+8` its mask), count `+0xC`. Module `+4` = the accessor.
+- **The update** `0x02C50058(module, mask)` calls, for every energy with `+0x18` (enabled) set and `+0x19` clear,
+  `[[energy + 0x1C] + 0x14](energy, module +4 = accessor)`. Energy vtables are 8-byte entries (`+0x14` update, `+0x1C`
+  reset, `+0x24` speed clear).
+- **The gravity energy** (vtable `0x1012C8F8`): `+4` the vertical speed, `+0x24` the acceleration (negative: -gravity),
+  `+0x28` the max fall speed, `+0x2C` the brake back to it, `+0x30` an absolute limit, `+0x34` a multiplier (1.0),
+  `+0x38` the limit mode (-1 none, 0 down, 1 up, 2 both), `+0x20` the reset type. The constructor sets `+0x24` 0, the
+  rest -1, `+0x34` 1.
+- **Its reset** (vt `+0x1C`, `0x02E818A8(energy, type, speed vector, -, accessor)`: what every kinetic type change and
+  MSC `KineticModule(0xE, 1, ...)` run): speed from the vector, `+0x34` from the fighter data (`[0x102F7024]` lookup
+  `0x02E4E55C`, `+0x518`), then by type (a jump table of 9): type 0 `+0x24` = -param `0x03000018` (Gravity), `+0x28` =
+  `0x03000019` (Maximum Fall Speed), `+0x2C` = `0x0300001A` (V acceleration), `+0x30` = `0x03000023`, mode 0; type 1 the
+  same with mode 1 and `+0x24` unnegated; types 2-8 other params (`0x0300009B`, `0x0300009C`, `0x02000192`, ... ×
+  `0x030000A0`, work float `0x0100000A`). So a kinetic type change puts the fighter's own values back.
+- **Its update** (vt `+0x14`, `0x02E8159C(energy, accessor)`): f29 / the rate = `[[0x102F6C48] + 4]` /
+  `[[0x102F6C48] + 0]`.
+  - Fast-fall flag `0x21000001` on: speed = -(work float `0x24` if > 0, else param `0x0300001B` Fastfall Speed) ×
+    rate × `+0x34`. Nothing else.
+  - Else a = `+0x24` × `+0x34` × rate. With flag `0x21000000` and `0x02E6910C(accessor)`: only `v += a` when v and a
+    have opposite signs. Normally, if (v + a) × a > 0 (moving further the way gravity pulls), a = `0x02C54890(v, a,
+    +0x28 × f29 × +0x34, +0x2C)`: past -max (falling faster than the max fall speed) the step becomes +brake, and
+    the result is clamped at -max (so a fighter falling faster than its max fall slows by `+0x2C` a frame, and one
+    accelerating stops exactly at -max); max < 0 or brake <= 0: a as it is. Then `v += a`.
+  - Then the limit `+0x30` by mode `+0x38` (mode 0: down only, flag `0x21000007` uses work float `0x02000312`).
+  - Exit at `0x02E81860` (every path), then `0x0275FF54(accessor, energy)`.
+  - MSC: fighter op 0xF (`0x02E79100`) on energy 1 writes `+0x24`, 0x15 `+0x28`, base op 0x14 (`0x02C52254`) `+0x30`
+    (energy 1 takes one value; the others two, at `+0x20 / +0x24`, `+0x28 / +0x2C`, `+0x38 / +0x3C`).
+- **The patch:** a 16-entry table at `0x04BD3E00` (0x20 each: `+0` the accessor, `+4` its StatusModule, `+8` Accel,
+  `+0xC` MaxFall, `+0x10` Mode), code from `0x04BD3600` (after New_Var's, in the grown region; up to the table).
+  - The command (`h_gs`, index 619, CRC `0x8F468450`, 4 words): fighters only (StatusModule vtable `0x1012D42C`); an
+    entry for the accessor (a free one, else round robin) with the values; Accel and MaxFall < 0 and Mode & 6 == 0:
+    the entry cleared.
+  - `0x02E8159C` (`stwu r1, -0x48(r1)`) -> `gs_upd`: the accessor's live entry (`gs_get`, below): `+0x24` / `+0x28`
+    kept in `gs_cur` with the energy, Gravity_Set's put in (`gs_eff`: Accel -> -Accel, or × the energy's own with
+    Mode 1; MaxFall as given or × its own; < 0 the energy's own); Mode 2: v < -max -> v = -max; Mode 4:
+    `WorkModule(0x2711, 0x21000001)` through the MSC wrapper. Then the replaced `stwu` and back to `0x02E815A0`.
+  - `0x02E81860` (`mr r3, r29`) -> `gs_end`: if `gs_cur` is this energy (r28), its own `+0x24` / `+0x28` back. So
+    the energy never holds Gravity_Set's values outside its update: a reset or an MSC change in between is the
+    game's, and ending Gravity_Set needs no restore (the entry is just cleared).
+  - `0x02E76BB4` (`mflr r0`; the fighters' DamageModule owner vt `+0x14C`, called from DamageModule vt `+0x94`
+    `0x02C22EF0` after its armor check `0x02C24C88`, r4 the accessor, r5 the hit, r6 armored) -> `gs_hit`: runs the
+    function (`mflr r0; b 0x02E76BB8` with LR back into the wrapper); a result of 0 (the hit takes effect: the
+    hit code at `0x02C24F08` goes on with the reaction) clears the entry at once, in the hit itself. Non-zero (no
+    reaction: armor with no override, knockback <= work float `0x2A`) keeps it.
+  - `hk_lgc_chg` (every status change, `0x02E88B40`) now ends with `b gs_chg` (was `b 0x02E88B44`): the entry whose
+    StatusModule is r30 is cleared, then back to `0x02E88B44`.
+  - `gs_get` (every lookup by the update and the variables) clears the entry first when the fighter is on a ledge:
+    StatusModule `+0x84` (situation) 1, or `+0x48` (status; vt `+0x8C`) or `+0x4C` (being changed to) a cliff status
+    `0x72`–`0x7A` or `0xF3` / `0xF4` (tether), so a ledge grab ends it whatever path set it.
+  - GRAVITY / MAX_FALL (`0x0F000337` / `338`): `ue_nv`'s out-of-range branch (`bge.far ue_zero`) now goes to `gs_var`,
+    which for these two reads (writes ignored) -`+0x24` / `+0x28` of the fighter's gravity energy (KineticModule
+    vtable `0x1012C5C0`, energy `+0x334` of class `0x1012C8F8`) through `gs_eff` when an entry is live; anything else
+    goes on to `ue_zero`.
 
 ## Sword trails (trail textures by id)
 

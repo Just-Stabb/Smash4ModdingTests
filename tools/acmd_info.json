@@ -10596,6 +10596,20 @@
 "Text5",
 "Text6"
 ]
+},
+"8F468450": {
+"size": 4,
+"name": "Gravity_Set",
+"format": [
+1,
+1,
+0
+],
+"syntax": [
+"Accel",
+"MaxFall",
+"Mode"
+]
 }
 }
 }

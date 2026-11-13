@@ -1,4 +1,4 @@
-// New_Var in SALT / Sm4shCommand v1.4.9 (Mono): compile / decompile round trips, names surviving a saved file,
+// New_Var in SALT / Sm4shCommand v1.4.9 - v1.4.10 (Mono): compile / decompile round trips, names surviving a saved file,
 // errors, and every new command's examples. Run: mono NvTest.exe Events.cfg Aliases BODY_DIR TMP_DIR
 using System;
 using System.Collections.Generic;
@@ -85,10 +85,10 @@ class NvTest
         var errors = new List<string>();
         int n = ACMD_INFO.OverrideInfo(args[0], errors);
         Check("Events.cfg loads with no errors", string.Join("; ", errors), "");
-        Check("commands", ACMD_INFO.CMD_NAMES.Count, 619);
+        Check("commands", ACMD_INFO.CMD_NAMES.Count, 620);
         Check("New_Var known: size 11, group", ACMD_INFO.CMD_SIZES[FighterVariable.NewVarIdent] + " " +
               ACMD_INFO.GetCategory(FighterVariable.NewVarIdent), "11 New Commands / Variables");
-        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 35);
+        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 36);
         Check("group help blocks", ACMD_INFO.GROUP_HELP.Count, 9);
         LoadAliases(args[1]);
         Check("aliases loaded", FighterVariable.AliasCount > 500, true);

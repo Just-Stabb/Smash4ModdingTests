@@ -249,6 +249,8 @@ def _position_lines():
     for i, (nm, d) in enumerate((("Team", "the object's team (-1 = none)"), ("Hurt team", "the team whose attacks can't hit it (-1 = none); Track_Target skips a fighter whose hurt team is the tracker's attack team"),
                                  ("Attack team", "the team its attacks can't hit (-1 = none; a projectile's is its owner's, or the reflector's after a reflect)"))):
         out.append((0x0F000334 + i, nm, "Read only: %s. Needs tools/acmd_ext_cave.py." % d))
+    out.append((0x0F000337, "Gravity", "Read only: this fighter's gravity in effect (how much its vertical speed drops each frame, as the fighter_param Gravity): Gravity_Set's while it holds, else its own (its gravity energy's). Other objects read 0. Needs exe_v42 (tools/acmd_ext_cave.py)."))
+    out.append((0x0F000338, "Max fall speed", "Read only: this fighter's max fall speed in effect: Gravity_Set's while it holds, else its own (its gravity energy's). Other objects read 0. Needs exe_v42 (tools/acmd_ext_cave.py)."))
     for slot in range(8):
         for k in range(8):
             out.append((0x0F000340 + 8 * slot + k, "Slot %d shared %d" % (slot + 1, k),
@@ -327,7 +329,9 @@ def alias_lines():
     out += [("TIMER_%d" % i, 0x0F000320 + i, "counts down each frame to 0 (per object)" if i == 0 else "") for i in range(16)]
     out += [("KINETIC_TYPE", 0x0F000330, "read / set the kinetic type"), ("TRACK_FRAMES", 0x0F000331, "Track_Target frames left; 0 stops"),
             ("SPEED_X", 0x0F000332, "current speed (read only)"), ("SPEED_Y", 0x0F000333, ""),
-            ("TEAM", 0x0F000334, "team ids (read only)"), ("HURT_TEAM", 0x0F000335, ""), ("ATTACK_TEAM", 0x0F000336, "")]
+            ("TEAM", 0x0F000334, "team ids (read only)"), ("HURT_TEAM", 0x0F000335, ""), ("ATTACK_TEAM", 0x0F000336, ""),
+            ("GRAVITY", 0x0F000337, "the fighter's gravity in effect, Gravity_Set's included (read only)"),
+            ("MAX_FALL", 0x0F000338, "the fighter's max fall speed in effect, Gravity_Set's included (read only)")]
     out += [("SLOT%d_SHARED_%d" % (slot + 1, k), 0x0F000340 + 8 * slot + k,
              "VAR_24-VAR_31 of the fighter in that player slot (any object may use them)" if slot == k == 0 else "")
             for slot in range(8) for k in range(8)]

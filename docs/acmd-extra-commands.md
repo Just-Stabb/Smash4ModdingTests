@@ -4,13 +4,13 @@ These are new commands for game, effect, sound and expression scripts. They need
 `cross_f.rpx` (`tools/acmd_ext_cave.py`, part of the standard build). Without it, a script that uses
 them won't load properly, so ship the executable with any script that uses them.
 
-Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9) lists all of them in one
+Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10) lists all of them in one
 group, **New Commands**, at the top of the list (vanilla commands stay in their own groups), in subgroups:
 
 | Subgroup | Commands |
 |---|---|
 | Hitboxes & hits | Extra_Special_Hitbox, Extra_Extended_Special_Hitbox, Hit_Check, Hit_Get, Hit_Reset, Hit_Log_Clear |
-| Fighter state | Status_Get / _Set, Hitstun_Get / _Set, Hitstop_Set, Damage_Get / _Set, Body_State_Set, Armor_Set, Item_State_Set, Stage_Collision_Set, Leave_Ground_Cancel |
+| Fighter state | Status_Get / _Set, Hitstun_Get / _Set, Hitstop_Set, Damage_Get / _Set, Body_State_Set, Armor_Set, Item_State_Set, Stage_Collision_Set, Leave_Ground_Cancel, Gravity_Set |
 | Inputs | Input_Compare, Input_Get, Input_Set |
 | Position & rotation | Position_Get / _Set, Rotation_Get / _Set, Joint_Position_Get |
 | Animation | Motion_Get / _Set, Animation_Rate_Set |
@@ -38,6 +38,7 @@ them too.
 | `Last_Hit_Get`, `Target_Slot_Get` | the last fighter hit / the last attacker, any target's player slot |
 | `Status_*`, `Hitstun_*`, `Hitstop_Set`, `Damage_*`, `Body_State_Set`, `Armor_Set`, `Item_State_Set`, `Stage_Collision_Set`, `Joint_Position_Get` | the variable-based features (docs/position-variables.md) as commands with parameters |
 | `Leave_Ground_Cancel` | whether a grounded move is cut into Fall when the fighter leaves the ground (exe_v41; exe_v39 / v40's didn't work: below) |
+| `Gravity_Set` | a fighter's gravity and max fall speed for the rest of the move (exe_v42, Sm4shCommand v1.4.10) |
 | `New_Var` | declares a variable with your own name (int or float, a starting value, per object or per move): 64 more per object, usable in every variable parameter (exe_v40, Sm4shCommand v1.4.9) |
 
 ## Extra_Special_Hitbox / Extra_Extended_Special_Hitbox
@@ -485,6 +486,72 @@ Remove_All_Hitboxes()
 
 `tools/acmd.py` reads and writes it (`Command(acmd.BY_NAME['leave_ground_cancel'], [0])`).
 
+## Gravity_Set
+
+`Gravity_Set(Accel, MaxFall, Mode)` (exe_v42 and later, Sm4shCommand v1.4.10) sets this fighter's gravity and max fall
+speed for the rest of the move: an aerial, a special, a grounded move that went on in the air with
+`Leave_Ground_Cancel(Enabled=0)`, ... The game's own gravity code still does the falling, with these two numbers.
+
+| Parameter | Type | Meaning |
+|---|---|---|
+| Accel | float | Gravity: how much the vertical speed drops each frame, on the scale of the fighter_param "Gravity" (`0x03000018`; Diddy Kong 0.105). 0: no gravity (the vertical speed stays as it is: a rise keeps rising). Below 0 (-1): the fighter's own. |
+| MaxFall | float | Max fall speed, on the scale of "Maximum Fall Speed" (`0x03000019`; Diddy 1.75). Falling faster than it, the fighter slows to it gradually, by its "V acceleration" (`0x0300001A`, Diddy 0.016) a frame, as after a fast fall (Mode 2: at once). 0: it stops falling. Below 0 (-1): the fighter's own. |
+| Mode | int | Bits: 1 Accel and MaxFall are multipliers of the fighter's own (0.5 = half; -1 still keeps its own); 2 a fall faster than MaxFall is cut to it at once (every frame); 4 no fast fall while it holds (the fast-fall flag `0x21000001` is turned off every frame). |
+
+- **Off:** `Accel` and `MaxFall` both below 0 with Mode 0 or 1 turns it off at that frame.
+- **When it ends by itself** (the fighter's own values from the next frame, so it never leaks):
+  - at the next status change (the next move, Fall, landing, a jump, a grab / throw, a KO, a respawn, ...);
+  - the moment a hit takes effect (the fighter will flinch or be launched), in the hit itself, before the damage
+    status starts. A hit with no reaction (armor, or knockback under the fighter's threshold) leaves it: the move
+    goes on (user's choice: armor keeps it);
+  - on a ledge grab, whichever path it takes: the fighter's situation on the ledge, a cliff status (`0x72`–`0x7A`,
+    CliffCatchMove … CliffJumpQuick2) or a tether hang (`0xF3` / `0xF4`) as the current or the pending status, even
+    before the status change happens. (A Leave_Ground_Cancel move can't grab ledges anyway; aerials and specials
+    can.)
+  - It stays through a motion change inside one status.
+- **Wins over the move's own gravity:** every frame the gravity energy is computed with these values, whatever the
+  move's MSC set (`KineticModule(0xF / 0x14 / 0x15, 1, ...)`) and whatever kinetic type change reset the energy in
+  between. The energy itself keeps the fighter's own values outside its update, so nothing has to be restored.
+- **Only while the fighter falls with gravity:** a move whose own kinetics turn gravity off (moved by its
+  animation, a move's own hover) has no gravity to change.
+- **Fast fall:** without Mode 4, a fast fall (down during an aerial) still falls at the fighter's own fast-fall
+  speed.
+- **Reading it:** `GRAVITY` (`0x0F000337`) and `MAX_FALL` (`0x0F000338`) give the values in effect (positive numbers,
+  as the params), e.g. for `Float_Var_Compare`. Read only.
+- **Fighters only** (Kirby's copies too). In an article's script it does nothing (an article's gravity is another
+  energy class, not done).
+- **Not tested in game yet**, only in the emulator with the game's own gravity code (`tools/gravity_set_test.py`):
+  the curve frame by frame, the restore, a reset in between, the hit / armor / ledge / status-change ends.
+
+Example: Diddy Kong's dash attack runs off the stage and floats down (gravity 0.02 instead of 0.105, falling at most
+0.6 instead of 1.75). The rest of the script is the vanilla one (Leave_Ground_Cancel's example above).
+
+```
+Leave_Ground_Cancel(Enabled=0)
+Gravity_Set(Accel=0.02, MaxFall=0.6, Mode=0)
+FRAME(Frames=9)
+...
+```
+
+A floaty aerial (half the fighter's own gravity and max fall from frame 6, its own again at 30):
+
+```
+FRAME(Frames=6)
+Gravity_Set(Accel=0.5, MaxFall=0.5, Mode=1)
+FRAME(Frames=30)
+Gravity_Set(Accel=-1, MaxFall=-1, Mode=0)
+```
+
+A hover (a rise slows to a stop, the fall stops at once, no fast fall), then a heavy drop:
+
+```
+Gravity_Set(Accel=0.03, MaxFall=0, Mode=6)
+FRAME(Frames=40)
+Gravity_Set(Accel=0.2, MaxFall=3, Mode=0)
+```
+
+How it works: docs/native-notes.md "Gravity_Set".
+
 ## New_Var
 
 `New_Var(Name=charge, Type=int, Initial=0, Scope=move)` (exe_v40 and later, Sm4shCommand v1.4.9) declares a variable
@@ -615,6 +682,7 @@ nothing in this game: its handler is empty. Add by `SUB_FLOAT_2` of a variable h
 | `0x0F000331` | `TRACK_FRAMES` | `Track_Target` frames left (-1 = until stopped) | set them; 0 stops tracking |
 | `0x0F000332` / `333` | `SPEED_X` / `SPEED_Y` | the current speed (all the object's kinetic energies) | — |
 | `0x0F000334` / `335` / `336` | `TEAM` / `HURT_TEAM` / `ATTACK_TEAM` | the object's team ids (-1 = none) | — |
+| `0x0F000337` / `338` | `GRAVITY` / `MAX_FALL` | a fighter's gravity and max fall speed in effect (`Gravity_Set`'s, else its own: the gravity energy's; exe_v42); other objects read 0 | — |
 | `0x0F000340`–`37F` | `SLOT1_SHARED_0`–`SLOT8_SHARED_7` | `VAR_24`–`VAR_31` of the fighter in that player slot (below) | set it |
 | `0x0F000380`–`3BF` | your `New_Var` names (slots 0–63; exe_v40) | the value (int or float commands) | set it (an int one keeps whole numbers) |
 
@@ -695,4 +763,8 @@ to do that.
 - **Leave_Ground_Cancel:** a 16-entry table keyed by the fighter's StatusModule (`0x04B93A00`, its code from
   `0x04B93B10`) and three hooks on the game's StatusModule: the MSC situation read, the MSC status request and the
   status change. Details: `docs/native-notes.md`, "Leave_Ground_Cancel".
+- **Gravity_Set:** a 16-entry table keyed by the fighter's module accessor (`0x04BD3E00`, its code from
+  `0x04BD3600`, in New_Var's grown region) and three hooks: the gravity energy's update (entry: its values swapped
+  in; exit: the energy's own put back), the damage reaction decision (a hit that takes effect ends it) and, through
+  Leave_Ground_Cancel's status change hook, the status change. Details: `docs/native-notes.md`, "Gravity_Set".
 - Addresses: `docs/native-notes.md`, "New ACMD commands".

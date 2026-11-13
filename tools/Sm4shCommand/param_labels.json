@@ -12924,6 +12924,96 @@
    1
   ]
  },
+ "8F468450": {
+  "_command": "Gravity_Set",
+  "_new": true,
+  "_name": "Gravity_Set",
+  "_size": 4,
+  "_desc": "Sets this fighter's gravity and max fall speed for the rest of the move (aerials, specials, a grounded move that went on in the air with Leave_Ground_Cancel, ...). Back to the fighter's own by itself at the next status (move), when a hit takes effect, on a ledge grab and on a KO. Fighters only. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   1,
+   1,
+   0
+  ],
+  "0": {
+   "name": "Accel",
+   "desc": "Gravity: how much the vertical speed drops each frame (the fighter_param \"Gravity\", e.g. Diddy Kong 0.105). 0: no gravity (the vertical speed stays as it is). Below 0 (-1): the fighter's own. Mode 1: a multiplier of its own (0.5 = half).",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "MaxFall",
+   "desc": "Max fall speed (the fighter_param \"Maximum Fall Speed\", Diddy 1.75). Falling faster, the fighter slows to it gradually as after a fast fall (Mode 2: at once). Below 0 (-1): the fighter's own. Mode 1: a multiplier of its own.",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Mode",
+   "desc": "Bits, add them: 1 Accel and MaxFall are multipliers of the fighter's own; 2 a fall faster than MaxFall is cut to it at once; 4 no fast fall while it holds. 0: plain values. Accel and MaxFall both below 0 with Mode 0 (or 1): turns Gravity_Set off.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// Example 1: Diddy Kong's dash attack (AttackDash, game script) cartwheels off the stage and floats down",
+   "// (gravity 0.02 instead of 0.105, falling at most 0.6 instead of 1.75)",
+   "Leave_Ground_Cancel(Enabled=0)",
+   "Gravity_Set(Accel=0.02, MaxFall=0.6, Mode=0)",
+   "FRAME(Frames=9)",
+   "Hitbox(ID=1, Part=0, Bone=0, Damage=2, Angle=0x28, KBG=0x64, FKB=0x37, BKB=0, Size=3.5, X=0, Y=7, Z=8.5, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=1, SFXType=1, Ground/Air=0x80000003, Direct/Indirect=1, Type=6)",
+   "WAIT(Frames=1)",
+   "Remove_All_Hitboxes()",
+   "FRAME(Frames=18)",
+   "Hitbox(ID=0, Part=0, Bone=0, Damage=2, Angle=0x16E, KBG=0x64, FKB=0x3E, BKB=0, Size=3.5, X=0, Y=7, Z=8.5, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=1, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=6)",
+   "WAIT(Frames=1)",
+   "Remove_All_Hitboxes()",
+   "FRAME(Frames=24)",
+   "Hitbox(ID=0, Part=0, Bone=0, Damage=3, Angle=0x4E, KBG=0x5A, FKB=0, BKB=0x50, Size=4.5, X=0, Y=6, Z=8.5, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=6)",
+   "WAIT(Frames=1)",
+   "Remove_All_Hitboxes()",
+   "",
+   "// Example 2: a floaty aerial: half the fighter's own gravity and max fall from frame 6, its own again at 30",
+   "FRAME(Frames=6)",
+   "Gravity_Set(Accel=0.5, MaxFall=0.5, Mode=1)",
+   "FRAME(Frames=30)",
+   "Gravity_Set(Accel=-1, MaxFall=-1, Mode=0)",
+   "",
+   "// Example 3: a hover special: a rise slows to a stop and the fall stops at once (no fast fall), then from",
+   "// frame 40 a heavy drop (gravity 0.2, max fall 3)",
+   "Gravity_Set(Accel=0.03, MaxFall=0, Mode=6)",
+   "FRAME(Frames=40)",
+   "Gravity_Set(Accel=0.2, MaxFall=3, Mode=0)",
+   "",
+   "// Example 4: only if the fighter isn't already floaty (its gravity in effect under 0.05: leave it)",
+   "Float_Var_Compare(Variable=GRAVITY, Method=3, Value=0.05)",
+   "True(Offset=0){",
+   "    Gravity_Set(Accel=0.03, MaxFall=1, Mode=0)",
+   "}"
+  ],
+  "_group": "Fighter state",
+  "_help": [
+   "## How it works",
+   "Sets this fighter's gravity (how much its vertical speed drops each frame) and max fall speed for the rest of the move. It works in any move where the fighter falls with gravity: aerials, specials, a grounded move that went on in the air with Leave_Ground_Cancel(Enabled=0), ... The game's own gravity code does the rest (the same curve, with these two numbers).",
+   "- Accel: the gravity, on the scale of the fighter_param \"Gravity\" (Diddy Kong 0.105, Jigglypuff 0.053). 0: no gravity: the vertical speed stays as it is (a rise keeps rising: use a small Accel with MaxFall 0 to hover). Below 0 (write -1): the fighter's own.",
+   "- MaxFall: the max fall speed, on the scale of \"Maximum Fall Speed\" (Diddy 1.75). Falling faster than it (a fall already going when the command runs), the fighter slows to it gradually, by its \"V acceleration\" (Diddy 0.016) a frame, as the game does after a fast fall; Mode 2 cuts it at once. 0: it stops falling. Below 0 (-1): the fighter's own.",
+   "- Mode (bits, add them): 1 Accel and MaxFall are multipliers of the fighter's own (0.5 = half; -1 still means its own); 2 a fall faster than MaxFall is cut to it at once (every frame it holds); 4 no fast fall while it holds (the fast-fall flag is turned off every frame, so pressing down does nothing).",
+   "- Off: Accel and MaxFall both -1 with Mode 0 (or 1) turns it off at that frame.",
+   "",
+   "## When it ends",
+   "Back to the fighter's own values by itself, so it never carries over:",
+   "- at the next status change (the next move, Fall, landing, a jump, a grab or throw, a KO, ...);",
+   "- the moment a hit takes effect (the fighter will flinch or fly), before its damage status even starts; a hit with no reaction (armor, or too weak to make it flinch) leaves it, since the move goes on;",
+   "- on a ledge grab, whichever way it happens (the ledge situation, a cliff status, a tether hang), even if the status change hasn't happened yet.",
+   "It stays through a motion change inside one status (an aerial's landing motion is a new status, so it ends there).",
+   "",
+   "## Gotchas",
+   "- Only while the fighter falls with gravity. A move whose own kinetics turn gravity off (a special that moves by its animation, a hover the move itself does) isn't changed: there is no gravity to set.",
+   "- It wins over the move's own gravity changes from MSC (KineticModule 0xF / 0x14 / 0x15 on energy 1) and over the kinetic type changing mid-move: every frame the fighter's gravity is computed with these values.",
+   "- Without Mode 4 a fast fall (down during an aerial) still falls at the fighter's own fast-fall speed.",
+   "- GRAVITY (0x0F000337) and MAX_FALL (0x0F000338) read the values in effect (Gravity_Set's, or the fighter's own), e.g. to test them with Float_Var_Compare. Read only.",
+   "- Fighters only (Kirby's copies too); in an article's script it does nothing.",
+   "- Not tested in game yet (emulator only, tools/gravity_set_test.py, with the game's own gravity code).",
+   "",
+   "The Hitbox Viewer doesn't simulate this command (it only acts in game).",
+   "Needs exe_v42 or later (the patched cross_f.rpx, tools/acmd_ext_cave.py). Without it a script that uses this command won't load properly: ship the executable with any script that uses it."
+  ]
+ },
  "8FE9E295": {
   "_command": "EFFECT_WORK",
   "0": {
