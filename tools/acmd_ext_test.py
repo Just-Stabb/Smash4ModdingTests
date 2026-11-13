@@ -231,7 +231,7 @@ def shared_tests(pm, me_wm, own_wm, foe_wm, ents):
         fcall(pm, FSET, me_wm, S(1, 3), 99.0)
         check('shared: fighter table 0x%X -> 0, no write' % bad, (r, objs() == before), (0.0, True))
     w32(pm, C.FIGHTERS, tab)
-    for ident in (0x337, 0x33F, 0x380, 0x3FF):
+    for ident in (0x337, 0x33F, 0x3C0, 0x3FF):           # (0x380-0x3BF: New_Var's, tools/new_var_test.py)
         fcall(pm, FSET, me_wm, 0x0F000000 + ident, 5.0)
         check('ID 0x0F000%03X: reads 0, a write changes nothing' % ident,
               (fcall(pm, FGET, me_wm, 0x0F000000 + ident), objs() == before), (0.0, True))

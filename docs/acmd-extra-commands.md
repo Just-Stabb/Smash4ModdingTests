@@ -4,7 +4,7 @@ These are new commands for game, effect, sound and expression scripts. They need
 `cross_f.rpx` (`tools/acmd_ext_cave.py`, part of the standard build). Without it, a script that uses
 them won't load properly, so ship the executable with any script that uses them.
 
-Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8) lists all of them in one
+Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9) lists all of them in one
 group, **New Commands**, at the top of the list (vanilla commands stay in their own groups), in subgroups:
 
 | Subgroup | Commands |
@@ -16,6 +16,7 @@ group, **New Commands**, at the top of the list (vanilla commands stay in their 
 | Animation | Motion_Get / _Set, Animation_Rate_Set |
 | Targets & tracking | Track_Target, Last_Hit_Get, Target_Slot_Get |
 | Threads | Thread_Start, Thread_Stop |
+| Variables | New_Var |
 
 Each command there has in-depth help after its parameters (how it works, the values, gotchas) and several complete
 examples (Insert Example / Copy Example), and clicking New Commands shows an overview (targets, compare methods,
@@ -36,7 +37,8 @@ them too.
 | `Motion_Get` / `Motion_Set`, `Animation_Rate_Set` | the animation playing, its frame and rate |
 | `Last_Hit_Get`, `Target_Slot_Get` | the last fighter hit / the last attacker, any target's player slot |
 | `Status_*`, `Hitstun_*`, `Hitstop_Set`, `Damage_*`, `Body_State_Set`, `Armor_Set`, `Item_State_Set`, `Stage_Collision_Set`, `Joint_Position_Get` | the variable-based features (docs/position-variables.md) as commands with parameters |
-| `Leave_Ground_Cancel` | whether a grounded move is cut into Fall when the fighter leaves the ground (exe_v39; not in Sm4shCommand's list yet) |
+| `Leave_Ground_Cancel` | whether a grounded move is cut into Fall when the fighter leaves the ground (exe_v39) |
+| `New_Var` | declares a variable with your own name (int or float, a starting value, per object or per move): 64 more per object, usable in every variable parameter (exe_v40, Sm4shCommand v1.4.9) |
 
 ## Extra_Special_Hitbox / Extra_Extended_Special_Hitbox
 
@@ -479,6 +481,96 @@ Remove_All_Hitboxes()
 
 `tools/acmd.py` reads and writes it (`Command(acmd.BY_NAME['leave_ground_cancel'], [0])`).
 
+## New_Var
+
+`New_Var(Name=charge, Type=int, Initial=0, Scope=move)` (exe_v40 and later, Sm4shCommand v1.4.9) declares a variable
+with a name of your own. The name then works in every variable parameter of every open script, like `VAR_0`:
+`SET_FLOAT`, `SET_INT`, `ADD_INT`, `INC_INT`, `SUB_FLOAT_2`, `Float_Var_Compare`, `Int_Var_Compare`,
+`INT_VAR_COMPARE_VAR`, and the new commands' `Variable=` (`Hit_Get`, `Position_Get`, `Input_Get`, ...).
+
+| Parameter | Values |
+|---|---|
+| `Name` | letters, digits and `_`, not starting with a digit, up to 24 characters; case doesn't matter. Not an alias (`VAR_0`, `SELF_HIT`, ...) or a command's name. |
+| `Type` | `float` (default, or 0) or `int` (or 1). An int variable keeps whole numbers: a float written to it is cut toward 0 (2.7 → 2, −2.7 → −2). |
+| `Initial` | the starting value (default 0). |
+| `Scope` | `object` (default, or 0): `Initial` is set the first time a New_Var for it runs for this object; later New_Vars leave it alone, and the value stays (between moves) until the object is set up again (a fighter's KO, a projectile's next shot), as `VAR_n`'s. `move` (or 1): `Initial` is set every time this New_Var runs, so at the top of a move's script it starts fresh at every use of the move. |
+| `Slot` | optional, 0–63: the variable is `0x0F000380 + Slot`. Left out (or `auto`): the slot the name already has in the open scripts, else the lowest free one. Sm4shCommand writes it back (`Slot=0`) when it shows the script again. |
+
+- **Storage:** each object (fighter or article) has 64 of them, apart from its `VAR_0`–`VAR_31` / `TIMER_0`–`TIMER_15`
+  (which work as before) and from every other object's. They live with the object's `VAR_n` (the same 48-object
+  table), read 0 until set, and are cleared with them.
+- **Int and float both work.** The value is kept as a float: the int commands and ops (`SET_INT`, `ADD_INT`,
+  `INC_INT`, `Int_Var_Compare`, MSC's `WorkModule` int ops) read it cut to a whole number and write a whole number,
+  the float ones read and write the float. (`VAR_n` stays float-only.) Whole numbers are exact up to 16,777,216.
+- **MSC:** `WorkModuleF(0, 0x0F000380 + slot)` reads one, `WorkModule(6, 0x0F000380 + slot)` as an int;
+  `WorkModule(0 / 7, value, ID)` write it. Give the variable a fixed `Slot` for this.
+- **IDs:** `0x0F000380`–`0x0F0003BF`. `0x0F0003C0`–`0x0F0003FF` still read 0.
+
+### Names in Sm4shCommand
+
+The command keeps the name in itself (6 words of ASCII after its four parameters), so the name comes back when
+the file is opened again: Sm4shCommand reads every `New_Var` in the opened file / fighter / project and shows the
+name wherever that variable is used, in every script (`INC_INT(Variable=charge)`). Opening another fighter
+forgets them.
+
+- A name is known once a script declaring it compiles, or a file with its `New_Var` is opened. Within a script
+  the name works above its `New_Var` too. Another script may use the name without declaring it, once the
+  declaring one has compiled (saved) or was in the opened file; or declare it there too (with `Scope=object` a
+  second `New_Var` doesn't reset it).
+- An unknown name is a compile error ("unknown variable ... needs New_Var(Name=...)").
+- View > Commands, `New_Var`: its parameters, help and examples, and the names declared in the open scripts.
+  Hovering a name in a script shows its slot, type and scope.
+- With View > Show Variable Aliases off, the uses show as `0x0F000380` + slot (which compiles too); `New_Var`
+  itself always shows its name.
+- `tools/acmd.py` shows them too (`python3 tools/acmd.py vars game.bin`; `acmd.new_var(name, slot, type,
+  initial, scope)` makes one).
+
+Example: a charge counter, fresh at every use of the move.
+
+```
+New_Var(Name=charge, Type=int, Initial=0, Scope=move)
+FRAME(Frames=5)
+Set_Loop(Iterations=30){
+    Input_Compare(Target=0, Input=1, Method=0, Value=1)
+    True(Offset=0){
+        INC_INT(Variable=charge)
+    }
+    WAIT(Frames=1)
+    Goto(Offset=0)
+}
+Int_Var_Compare(Variable=charge, Method=3, Value=20)
+True(Offset=0){
+    // held 20 frames or more: the strong hitbox
+    Hitbox(ID=0, Part=0, Bone=0, Damage=18, Angle=361, KBG=100, FKB=0, BKB=60, Size=7, X=0, Y=8, Z=9, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1)
+}
+Else(Offset=0){
+    Hitbox(ID=0, Part=0, Bone=0, Damage=10, Angle=361, KBG=100, FKB=0, BKB=40, Size=5, X=0, Y=8, Z=8, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1)
+}
+WAIT(Frames=3)
+Remove_All_Hitboxes()
+```
+
+Example: every third use of the move is stronger (`Scope=object`: the count is kept between uses, until a KO).
+
+```
+New_Var(Name=uses, Type=int, Initial=0, Scope=object)
+INC_INT(Variable=uses)
+FRAME(Frames=10)
+Int_Var_Compare(Variable=uses, Method=3, Value=3)
+True(Offset=0){
+    Hitbox(ID=0, Part=0, Bone=0, Damage=16, Angle=361, KBG=100, FKB=0, BKB=60, Size=6, X=0, Y=8, Z=8, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1)
+    SET_INT(Value=0, Variable=uses)
+}
+Else(Offset=0){
+    Hitbox(ID=0, Part=0, Bone=0, Damage=8, Angle=361, KBG=100, FKB=0, BKB=40, Size=5, X=0, Y=8, Z=8, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1)
+}
+WAIT(Frames=3)
+Remove_All_Hitboxes()
+```
+
+More examples (float variables with the target commands, a counter shared by two scripts, a fixed slot for MSC)
+are in Sm4shCommand's View > Commands.
+
 ## Debug counters
 
 Words at `0x04B93900` (Cemu: Debug > Memory, go to the address), all 0 at boot, counting up across
@@ -504,7 +596,7 @@ These are ordinary float variables in the same `0x0F000xxx` range as the positio
 the other float variable commands, or with MSC's `WorkModuleF` / `WorkModule`. (`ADD_FLOAT` does
 nothing in this game: its handler is empty. Add by `SUB_FLOAT_2` of a variable holding a negative value.)
 
-- **Floats only.** `SET_INT` and the int compares don't work on them.
+- **Floats only.** `SET_INT` and the int compares don't work on them (New_Var's variables, below, do).
 - **Each object has its own,** fighters and projectiles alike, up to 48 objects using them at
   once.
 - **Lifetime:** the values stay until the object is set up again: a fighter's KO, or a projectile
@@ -520,6 +612,7 @@ nothing in this game: its handler is empty. Add by `SUB_FLOAT_2` of a variable h
 | `0x0F000332` / `333` | `SPEED_X` / `SPEED_Y` | the current speed (all the object's kinetic energies) | — |
 | `0x0F000334` / `335` / `336` | `TEAM` / `HURT_TEAM` / `ATTACK_TEAM` | the object's team ids (-1 = none) | — |
 | `0x0F000340`–`37F` | `SLOT1_SHARED_0`–`SLOT8_SHARED_7` | `VAR_24`–`VAR_31` of the fighter in that player slot (below) | set it |
+| `0x0F000380`–`3BF` | your `New_Var` names (slots 0–63; exe_v40) | the value (int or float commands) | set it (an int one keeps whole numbers) |
 
 ### Shared variables (another fighter's)
 
@@ -591,6 +684,10 @@ to do that.
 - **The new commands' targets:** `position_vars_cave.py`'s variable `0x0F0002BC + target` (read only) gives the
   target's module accessor; the commands then run the module's MSC op through its wrapper with that accessor, as
   the position variables do (`nc_msc`). Their code is the cave's second part (`0x04B98900`).
+- **New_Var:** the slots' values are a second 48 × 0x100-byte table beside the variables' (`0x04BD0000`, in 16 KB
+  the executable's code region was grown by, with its code at `0x04BD3000`); the object's entry keeps which slots
+  were declared and which are int. The WorkModule's int functions are redirected in the six WorkModule vtables for
+  these IDs. Details: `docs/native-notes.md`, "New_Var".
 - **Leave_Ground_Cancel:** a 16-entry table keyed by the fighter's StatusModule (`0x04B93A00`, its code from
   `0x04B93B10`) and three hooks on the game's StatusModule: the MSC situation read, the MSC status request and the
   status change. Details: `docs/native-notes.md`, "Leave_Ground_Cancel".

@@ -103,15 +103,121 @@ namespace SALT.Moveset
             return rawToAlias.TryGetValue(raw, out name);
         }
 
+        /// <summary>An alias (VAR_0, SELF_HIT, ..) or a New_Var name declared in the open scripts.</summary>
         public static bool TryParseAlias(string name, out uint raw)
         {
             raw = 0;
-            return name != null && aliasToRaw.TryGetValue(name.Trim(), out raw);
+            if (name == null)
+                return false;
+            return aliasToRaw.TryGetValue(name.Trim(), out raw) || TryParseNewVar(name, out raw);
+        }
+
+        /// <summary>A name from the Aliases folder only (not a New_Var name).</summary>
+        public static bool IsFileAlias(string name)
+        {
+            return name != null && aliasToRaw.ContainsKey(name.Trim());
+        }
+
+        // ------------------------------------------------------------ New_Var names
+        // New_Var(Name=charge, ...) (a new command, tools/acmd_ext_cave.py) declares a variable: slot k is the ID
+        // 0x0F000380 + k (k < 64), and the command keeps the name, so it is known again whenever a file with it is
+        // opened (ACMDFile registers every New_Var it reads) or a script with it compiles. Names are shown like
+        // aliases (when ShowAliases is on) and compile in every variable parameter; case doesn't matter.
+
+        /// <summary>New_Var's identifier (CRC32 of "New_Var").</summary>
+        public const uint NewVarIdent = 0xA321746C;
+        public const uint NewVarBase = 0x0F000380;
+        public const int NewVarSlots = 64;
+        public const int NewVarNameMax = 24;
+
+        public class NewVarInfo
+        {
+            public string Name;
+            public uint Raw;
+            public int Type;     // 0 float, 1 int
+            public int Scope;    // 0 object, 1 move
+            public float Initial;
+            public int Slot { get { return (int)(Raw - NewVarBase); } }
+            public string TypeName { get { return Type == 1 ? "int" : "float"; } }
+            public string ScopeName { get { return Scope == 1 ? "move" : "object"; } }
+        }
+
+        static readonly Dictionary<string, NewVarInfo> newVarByName = new Dictionary<string, NewVarInfo>(StringComparer.OrdinalIgnoreCase);
+        static readonly Dictionary<uint, NewVarInfo> newVarByRaw = new Dictionary<uint, NewVarInfo>();
+
+        /// <summary>Forgets every New_Var name (a new file / fighter / project is opened).</summary>
+        public static void ClearNewVars()
+        {
+            newVarByName.Clear();
+            newVarByRaw.Clear();
+        }
+
+        /// <summary>The New_Var names known, by slot.</summary>
+        public static List<NewVarInfo> NewVars
+        {
+            get { return newVarByRaw.Values.OrderBy(v => v.Raw).ToList(); }
+        }
+
+        public static bool IsNewVarSlot(uint raw)
+        {
+            return raw >= NewVarBase && raw < NewVarBase + NewVarSlots;
+        }
+
+        /// <summary>
+        /// Remembers a New_Var: name -> ID (and the ID's name, the last one given wins). False (nothing changed) if
+        /// the name isn't a valid one, is an alias from the Aliases folder, or the ID isn't a New_Var slot.
+        /// </summary>
+        public static bool DeclareNewVar(string name, uint raw, int type, int scope, float initial)
+        {
+            if (!IsAliasName(name) || name.Length > NewVarNameMax || aliasToRaw.ContainsKey(name) || !IsNewVarSlot(raw))
+                return false;
+            NewVarInfo old;
+            if (newVarByName.TryGetValue(name, out old) && old.Raw != raw && newVarByRaw.ContainsKey(old.Raw) &&
+                string.Equals(newVarByRaw[old.Raw].Name, name, StringComparison.OrdinalIgnoreCase))
+                newVarByRaw.Remove(old.Raw);
+            var info = new NewVarInfo { Name = name, Raw = raw, Type = type, Scope = scope, Initial = initial };
+            newVarByName[name] = info;
+            newVarByRaw[raw] = info;
+            return true;
+        }
+
+        public static bool TryGetNewVar(uint raw, out NewVarInfo info)
+        {
+            return newVarByRaw.TryGetValue(raw, out info);
+        }
+
+        public static bool TryGetNewVar(string name, out NewVarInfo info)
+        {
+            info = null;
+            return name != null && newVarByName.TryGetValue(name.Trim(), out info);
+        }
+
+        public static bool TryParseNewVar(string name, out uint raw)
+        {
+            NewVarInfo info;
+            raw = 0;
+            if (!TryGetNewVar(name, out info))
+                return false;
+            raw = info.Raw;
+            return true;
+        }
+
+        /// <summary>The slot a new name gets: the lowest one no known name uses, or -1 when all 64 are taken.</summary>
+        public static int FreeNewVarSlot()
+        {
+            var used = new HashSet<uint>(newVarByName.Values.Select(v => v.Raw));
+            for (int k = 0; k < NewVarSlots; k++)
+                if (!used.Contains(NewVarBase + (uint)k))
+                    return k;
+            return -1;
         }
 
         public override string ToString()
         {
             string alias;
+            NewVarInfo nv;
+            if (ShowAliases && newVarByRaw.TryGetValue(Raw, out nv))
+                return nv.Name;
             if (ShowAliases && rawToAlias.TryGetValue(Raw, out alias))
                 return alias;
             if (ShowDescriptiveNames)
@@ -129,7 +235,7 @@ namespace SALT.Moveset
             if (text.StartsWith("var ", StringComparison.InvariantCultureIgnoreCase)) // FITX style
                 text = text.Substring(4).Trim();
             uint aliased;
-            if (aliasToRaw.TryGetValue(text, out aliased))
+            if (aliasToRaw.TryGetValue(text, out aliased) || TryParseNewVar(text, out aliased))
             {
                 Raw = aliased;
             }
@@ -139,7 +245,8 @@ namespace SALT.Moveset
             }
             else if (text.IndexOf('-') < 0 || text.IndexOf('[') < 0)
             {
-                throw new FormatException($"unknown variable or alias \"{text}\"");
+                throw new FormatException($"unknown variable or alias \"{text}\"" +
+                    (IsAliasName(text) ? $" (a new variable needs New_Var(Name={text}) in one of the fighter's scripts)" : ""));
             }
             else
             {

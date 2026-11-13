@@ -258,6 +258,8 @@ namespace SALT.Moveset.AnimCMD
                 }
 
                 _list.Add(c);
+                if (ident == FighterVariable.NewVarIdent)
+                    ACMDCommand.RegisterNewVar(c);     // its name shows and compiles in every script
                 if (ident == ACMDCompiler.ThreadStart && c.Parameters.Count > 0)
                 {
                     int end = (int)(addr - start) + 4 * Convert.ToInt32(c.Parameters[0]);

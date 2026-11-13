@@ -390,6 +390,8 @@ namespace Sm4shCommand
                 for (int i = open + 1; i < col && i < line.Length; i++)
                     if (line[i] == ',')
                         index++;
+                if (crc == SALT.Moveset.FighterVariable.NewVarIdent && index >= 4)
+                    index = int.MaxValue;   // New_Var's Slot (shown, not stored as such) and nothing after it
                 if (index < spot.Syntax.Length)
                 {
                     spot.ParamIndex = index;

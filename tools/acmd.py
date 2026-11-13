@@ -11,9 +11,12 @@ Usage:
   python3 tools/acmd.py dump game.bin 0xCRC                ...or by CRC
   python3 tools/acmd.py find game.bin CMDNAME              list scripts using a command (e.g. Search_Collision)
   python3 tools/acmd.py names game.bin NAMES.txt           which names in a list (one per line) have a script
+  python3 tools/acmd.py vars game.bin [effect.bin ...]     the New_Var variables declared (name, slot, type, scope)
 
 As a module: f = ACMDFile.load(path); s = f.script("specialairsstart"); edit s (a list of
 Command), then f.save(path). Command(ident, params) with params as int/float.
+new_var("charge", slot=0, type=1, initial=0, scope=0) makes a New_Var command (tools/acmd_ext_cave.py, exe_v40);
+dump shows the variables New_Var declares in the file by name.
 """
 import json
 import os
@@ -43,6 +46,29 @@ def _new_commands():
 
 _new_commands()
 BY_NAME = {v["name"].lower(): k for k, v in INFO.items()}
+NEW_VAR = zlib.crc32(b"New_Var") & 0xFFFFFFFF
+NEW_VAR_BASE, NEW_VAR_SLOTS, NEW_VAR_NAME_WORDS = 0x0F000380, 64, 6
+VAR_NAMES = {}                  # variable ID -> New_Var name, shown by Command.__str__ (ACMDFile.load fills it)
+
+
+def new_var(name, slot, type=0, initial=0.0, scope=0):
+    """New_Var(Name, Type 0 float / 1 int, Initial, Scope 0 object / 1 move) in slot 0-63 (ID 0x0F000380 + slot)"""
+    raw = name.encode("ascii")
+    assert raw and len(raw) <= 4 * NEW_VAR_NAME_WORDS and 0 <= slot < NEW_VAR_SLOTS, (name, slot)
+    raw = raw.ljust(4 * NEW_VAR_NAME_WORDS, b"\0")
+    words = list(struct.unpack(">%dI" % NEW_VAR_NAME_WORDS, raw))
+    return Command(NEW_VAR, [NEW_VAR_BASE + slot, type, float(initial), scope] + words)
+
+
+def new_var_name(c):
+    """the name a New_Var command carries, or None"""
+    if c.ident != NEW_VAR or len(c.params) != 4 + NEW_VAR_NAME_WORDS:
+        return None
+    raw = b"".join(struct.pack(">I", int(w) & 0xFFFFFFFF) for w in c.params[4:]).split(b"\0")[0]
+    try:
+        return raw.decode("ascii") or None
+    except UnicodeDecodeError:
+        return None
 
 
 def crc(name):
@@ -76,6 +102,13 @@ class Command:
         return out
 
     def __str__(self):
+        name = new_var_name(self)
+        if name:
+            ident = self.params[0]
+            slot = ident - NEW_VAR_BASE if NEW_VAR_BASE <= ident < NEW_VAR_BASE + NEW_VAR_SLOTS else "0x%X" % ident
+            return "New_Var(Name=%s, Type=%s, Initial=%g, Scope=%s, Slot=%s)" % (
+                name, {0: "float", 1: "int"}.get(self.params[1], self.params[1]), self.params[2],
+                {0: "object", 1: "move"}.get(self.params[3], self.params[3]), slot)
         syn = self.info["syntax"]
         parts = []
         for i, p in enumerate(self.params):
@@ -83,7 +116,7 @@ class Command:
             if k == 1:
                 v = ("%g" % p) if abs(p) < 1e6 else repr(p)
             elif k == 3:
-                v = "var 0x%X" % p
+                v = VAR_NAMES.get(p, "var 0x%X" % p)
             else:
                 v = "0x%X" % p if p > 9 else str(p)
             parts.append("%s=%s" % (syn[i], v) if i < len(syn) else v)
@@ -129,7 +162,13 @@ class ACMDFile:
                 cmds.append(c)
                 a += INFO[ident]["size"] * 4
             scripts[h] = cmds
-        return cls(scripts, d[4:8])
+        f = cls(scripts, d[4:8])
+        VAR_NAMES.update({c.params[0]: n for c, n in f.new_vars()})
+        return f
+
+    def new_vars(self):
+        """[(New_Var command, its name)] in the file, by script"""
+        return [(c, new_var_name(c)) for k in sorted(self.scripts) for c in self.scripts[k] if new_var_name(c)]
 
     def script(self, name_or_crc):
         h = name_or_crc if isinstance(name_or_crc, int) else crc(name_or_crc)
@@ -172,6 +211,14 @@ def main():
         sys.exit(__doc__)
     cmd, path = sys.argv[1], sys.argv[2]
     f = ACMDFile.load(path)
+    if cmd == "vars":
+        seen = {}
+        for p in sys.argv[2:]:
+            for c, n in ACMDFile.load(p).new_vars():
+                seen.setdefault((n, c.params[0]), str(c))
+        for (_n, _i), text in sorted(seen.items(), key=lambda kv: kv[0][1]):
+            print(text)
+        return
     if cmd == "dump":
         for n in sys.argv[3:]:
             key = int(n, 16) if n.lower().startswith("0x") else crc(n)

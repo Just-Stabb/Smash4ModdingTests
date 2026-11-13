@@ -32,6 +32,10 @@ EXTRA = HitstunMul, HitstopMul, HitstopFrames, SelfHitstopMul, SelfHitstopFrames
 <= 0 mean 1 (unchanged; a negative HitstunMul adds that many hitstun frames instead), frames 0 mean
 "computed" (> 0 replaces the hitstop).
 The hit-time hooks that use them are in this file too (HIT_* below), see docs/acmd-extra-commands.md.
+
+The other commands (NEW_CMDS, ...) and the per-object variables / timers are described where they are defined;
+New_Var (exe_v40: NV_* / nv_code) grows the text region (textregion: / grow: in the output) and redirects the
+WorkModule vtables' int ops (their relocations moved with reloc:).
 """
 import os
 import struct
@@ -78,7 +82,8 @@ OBJ_N = 48
 OBJ_SIZE = 0x100                 # +0 WorkModule, +4 accessor (last seen), +8 tracking frames left (int, < 0 = until
                                  # stopped), +0xC speed, +0x10 cos(turn) (< -1.5: turn at once), +0x14 sin(turn),
                                  # +0x18 range squared (0 = any), +0x1C mode, +0x20 timers[16], +0x60 vars[32],
-                                 # +0xE0 no-gravity tracking: the vertical speed last set, +0xE4 1 = +0xE0 is set
+                                 # +0xE0 no-gravity tracking: the vertical speed last set, +0xE4 1 = +0xE0 is set,
+                                 # +0xE8 / +0xF0 New_Var's masks (NV_DECL / NV_INT); its values: NV_POOL
 ACC_CACHE = 0x04B97000           # 64 x {WorkModule, accessor}, filled by the per-frame hook for every object
 THREADS = 0x04B98000             # THREAD_N slots of THREAD_SIZE: +0 accessor (0 = free), +4 script table (the
 THREAD_N = 32                    # handler's r4), +8 ID, +0xC flags (0x80000000 = stop after this frame),
@@ -248,6 +253,39 @@ CANCEL_W = 0x030B2F58            # CancelModule (accessor +0x94, vt +0x4C): (0x2
 GROUND_W = 0x030B2C78            # GroundModule (accessor +0x2C, vt +0x4BC): (0x2710, kind) its ground correction
 FALL_KIND = 0xE                  # Fall
 
+# New_Var (docs/acmd-extra-commands.md "New_Var"; first in exe_v40): named variables beyond VAR_n, IDs
+# 0x0F000380 + slot (slot < NV_N), per object like VAR_n. user_entry sends 0x380-0x3BF to ue_nv (float reads / writes);
+# the WorkModule int ops (vtable entries WM_INT_OPS of every class, WM_VTABLES) go to nvi_* for these IDs, so SET_INT,
+# ADD_INT, INC_INT, Int_Var_Compare and MSC's WorkModule int ops work on them too. Storage: always the float value.
+NV_BASE = USER_BASE + 0x80       # 0x380: slot k is ID 0x0F000380 + k (any top nibble: 0x1F000380 is the same, as
+NV_N = 64                        # the WorkModule's own code ignores it)
+NV_POOL = 0x04BD0000             # OBJ_N blocks of NV_N floats, OBJ_SIZE apart like OBJS: the block of the entry at
+NV_OFF = NV_POOL - OBJS          # e is e + NV_OFF (zero at load; cleared with the entry when obj_find takes it)
+NV_CODE = NV_POOL + OBJ_N * OBJ_SIZE     # 0x04BD3000: nv_code
+NV_LIMIT = 0x04BD4000            # the text region grown to here (file info textRegionSize 0x2BD0000 -> 0x2BD4000)
+NV_DECL = 0xE8                   # entry words (free before): +0xE8 / +0xEC slots declared (New_Var has initialised
+NV_INT = 0xF0                    # them; bits 0-31 / 32-63), +0xF0 / +0xF4 slots of Type int (float writes truncated)
+NV_SIZE = 11                     # New_Var's words: header, Name (the ID), Type, Initial, Scope, the name (6 words)
+NV_NAME_WORDS = 6                # the name's ASCII, 4 characters a word, zero-padded (24 at most): Sm4shCommand's
+WM_VTABLES = [0x10003224, 0x100F93CC, 0x1012132C, 0x1013A1C0, 0x1013AFFC, 0x10153184]   # WorkModule classes
+# WorkModule int ops (vt offset, name, base class copy; every class's copy is the same code, so other IDs go on in the
+# base's, as position_vars_cave.py's float hooks do): get(id), set(v, id), inc(id), dec(id), add / sub / mul / div(v,
+# id), cdown(id, v) (> v: -1, returns new == v)
+WM_INT_OPS = [(0x84, 'get', 0x0200F7F0), (0x8C, 'set', 0x0200F810), (0xA4, 'inc', 0x0200F8F8),
+              (0xAC, 'dec', 0x0200F920), (0xB4, 'add', 0x0200F948), (0xBC, 'sub', 0x0200F970),
+              (0xC4, 'mul', 0x0200F998), (0xCC, 'div', 0x0200F9C0), (0xD4, 'cdown', 0x0200F9F4)]
+WM_INT_ORIG = {}                 # vtable word -> the class's own function there (exe_v39)
+for _vt, _fns in zip(WM_VTABLES, [
+        [0x0200F7F0, 0x0200F810, 0x0200F8F8, 0x0200F920, 0x0200F948, 0x0200F970, 0x0200F998, 0x0200F9C0, 0x0200F9F4],
+        [0x02BCDA68, 0x02BCDA88, 0x02BCDB70, 0x02BCDB98, 0x02BCDBC0, 0x02BCDBE8, 0x02BCDC10, 0x02BCDC38, 0x02BCDC6C],
+        [0x02DA61E8, 0x02DA6208, 0x02DA62F0, 0x02DA6318, 0x02DA6340, 0x02DA6368, 0x02DA6390, 0x02DA63B8, 0x02DA63EC],
+        [0x02F1DDAC, 0x02F1DDCC, 0x02F1DEB4, 0x02F1DEDC, 0x02F1DF04, 0x02F1DF2C, 0x02F1DF54, 0x02F1DF7C, 0x02F1DFB0],
+        [0x02F1DDAC, 0x02F1DDCC, 0x02F1DEB4, 0x02F1DEDC, 0x02F1DF04, 0x02F1DF2C, 0x02F1DF54, 0x02F1DF7C, 0x02F1DFB0],
+        [0x03060A48, 0x03060A68, 0x03060B50, 0x03060B78, 0x03060BA0, 0x03060BC8, 0x03060BF0, 0x03060C18, 0x03060C4C]]):
+    for (_off, _n, _b), _f in zip(WM_INT_OPS, _fns):
+        WM_INT_ORIG[_vt + _off] = _f
+RELOC_DUMMY = 0x037EE73C         # a dead word for the vtable words' relocations (as position_vars_cave.py)
+
 _T = ('Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 '
       'player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter\'s own script.')
 _V = 'Float variable that gets the value (e.g. VAR_0 0x0F000300; any float variable).'
@@ -367,6 +405,21 @@ NEW_CMDS = [
      'moves up). Off: the move (animation, hitboxes, scripts) goes on in the air with air physics (gravity, air '
      'drift) until its interrupt frame or its end, then Fall; landing during it, it goes on grounded. Back on by '
      'itself at the next status (move). Fighters only.'),
+    ('New_Var', 'h_newvar', [
+        ('Name', 3, 'The new variable: its name (letters, digits, _; up to 24 characters). Sm4shCommand gives it a '
+                    'free slot (ID 0x0F000380 + slot) and stores the name in the command.'),
+        ('Type', 0, 'float (0, the default) or int (1): an int variable keeps whole numbers (a float written to it is '
+                    'cut to one: 2.7 -> 2).'),
+        ('Initial', 1, 'Its starting value (0 by default).'),
+        ('Scope', 0, 'object (0, the default): set to Initial the first time New_Var runs for this object, then it '
+                     'keeps its value (as VAR_n) until the object is set up again (a fighter\'s KO, a projectile\'s '
+                     'next shot). move (1): set to Initial every time this New_Var runs (at the top of a move\'s '
+                     'script: fresh for every use of the move).')]
+     + [('Text%d' % (i + 1), 0, 'The name\'s characters %d-%d (ASCII; Sm4shCommand fills these from Name and doesn\'t '
+                                'show them).' % (4 * i + 1, 4 * i + 4)) for i in range(NV_NAME_WORDS)],
+     'Declares a named variable (Type int or float, a starting value) that every variable parameter takes by name: '
+     'SET_FLOAT / SET_INT / ADD_INT / INC_INT, Float_Var_Compare / Int_Var_Compare, Hit_Get(Variable=...), ... 64 '
+     'slots per object (fighter or article), beyond VAR_0-VAR_31.'),
 ]
 SM4SHCOMMAND_DESC.update({n: d + ' New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).'
                           for n, _l, _p, d in NEW_CMDS})
@@ -1141,6 +1194,235 @@ lgc_lc_back:
 """ % dict(chg_back=LGC_CHG + 4))
 
 
+def nv_code(b):
+    """New_Var: the command, its slots' float path (ue_nv, from user_entry), the entry clear (nv_take, from obj_find)
+    and the WorkModule int ops (nvi_*, from the vtables), in NV_CODE"""
+    D = dict(base=NV_BASE, n=NV_N, offha=ha(NV_OFF), offlo=lo(NV_OFF), decl=NV_DECL, int=NV_INT, last=OBJ_SIZE - 4,
+             step=4 * NV_SIZE)
+
+    def ours(rid, other):
+        """branch to other unless rid is a New_Var ID (category F, index 0x380 + k, k < 64; any top nibble); r11 r12"""
+        return """
+        rlwinm r12, %(r)s, 0, 4, 21
+        lis r11, 0x0F00
+        cmplw r12, r11
+        bne %(o)s
+        rlwinm r12, %(r)s, 0, 22, 31
+        addi r12, r12, -%(base)d
+        cmplwi r12, %(n)d
+        bge %(o)s""" % dict(D, r=rid, o=other)
+    b.asm("""
+# --- user_entry's IDs 0x380-0x3BF (r31 WorkModule, r30 index, r29 write, 0x18(r1) value; r27 r28 free) ---------
+ue_nv:
+        addi r28, r30, -%(base)d
+        cmplwi r28, %(n)d
+        bge.far ue_zero                 # 0x337-0x33F, 0x3C0-0x3FF
+        mr r3, r31
+        mr r4, r29                      # writing creates the object's entry
+        bl obj_find
+        cmpwi r3, 0
+        beq.far ue_zero
+        slwi r12, r28, 2
+        add r12, r12, r3
+        addis r12, r12, %(offha)d
+        addi r27, r12, %(offlo)d        # the slot (the entry's block + 4k)
+        cmpwi r29, 0
+        bne ue_nv_w
+        lfs f1, 0(r27)
+        b ue_out
+ue_nv_w:
+        lfs f1, 0x18(r1)
+        srwi r11, r28, 5
+        slwi r11, r11, 2
+        add r11, r11, r3
+        lwz r11, %(int)d(r11)           # int-typed?
+        rlwinm r0, r28, 0, 27, 31
+        srw r11, r11, r0
+        andi. r11, r11, 1
+        beq ue_nv_st
+        bl f2i                          # a whole number (toward 0)
+        bl i2f
+ue_nv_st:
+        stfs f1, 0(r27)
+        b ue_out
+
+# --- obj_find taking an entry (r12): clear its New_Var block too; leaf, r0 = 0 after (the replaced li r0, 0) -------
+nv_take:
+        addis r10, r12, %(offha)d
+        addi r10, r10, %(offlo)d
+        li r0, 0
+        li r11, %(last)d
+nv_tk_loop:
+        stwx r0, r10, r11
+        addi r11, r11, -4
+        cmpwi r11, 0
+        bge nv_tk_loop
+        b of_take2
+
+# --- New_Var(Name (the ID), Type, Initial, Scope, name x6) -------------------------------------------------------
+# Type 1: int (float writes truncated; any other: float). Scope 1: set Initial every run; any other: only while the
+# slot isn't declared for this object yet (the first run after the object's set-up).
+h_newvar:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r27, 0x1C(r1)
+        mr r31, r5                      # script state
+        mr r30, r7                      # parameters
+        lbz r0, 8(r6)
+        cmpwi r0, 0
+        beq nv_step""" % D + chk_t('r3', 'r0', 'nv_step') + """
+        lwz r29, 0x28(r3)               # WorkModule""" + chk_t('r29', 'r0', 'nv_step') + """
+        lwz r28, 0(r30)""" + ours('r28', 'nv_step') + """
+        mr r28, r12                     # slot
+        mr r3, r29
+        li r4, 1
+        bl obj_find
+        mr. r27, r3
+        beq nv_step
+        srwi r10, r28, 5
+        slwi r10, r10, 2
+        add r10, r10, r27               # the entry + the slot's mask word
+        rlwinm r0, r28, 0, 27, 31
+        li r9, 1
+        slw r9, r9, r0                  # the slot's bit
+        lwz r11, %(int)d(r10)
+        andc r11, r11, r9
+        lwz r0, 4(r30)                  # Type
+        cmpwi r0, 1
+        bne nv_type
+        or r11, r11, r9
+nv_type:
+        stw r11, %(int)d(r10)
+        lwz r11, %(decl)d(r10)
+        lwz r0, 0xC(r30)                # Scope 1 (move): every time
+        cmpwi r0, 1
+        beq nv_init
+        and. r0, r11, r9
+        bne nv_step                     # object: declared already
+nv_init:
+        or r11, r11, r9
+        stw r11, %(decl)d(r10)
+        lfs f1, 8(r30)                  # Initial
+        lwz r0, 4(r30)
+        cmpwi r0, 1
+        bne nv_store
+        bl f2i
+        bl i2f
+nv_store:
+        slwi r12, r28, 2
+        add r12, r12, r27
+        addis r12, r12, %(offha)d
+        stfs f1, %(offlo)d(r12)
+nv_step:
+        lwz r3, 8(r31)
+        cmpwi r3, -1
+        bne nv_ret
+        lwz r11, 4(r31)
+        addi r11, r11, %(step)d
+        stw r11, 4(r31)
+        li r3, 2
+nv_ret:
+        lmw r27, 0x1C(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+
+# --- nvi_op(r3 WorkModule, r4 ID, r5 operand, r6 op) -> r3: a WorkModule int op on a New_Var slot, through the
+#     float path (user_entry): the value read, changed and written back as a float -------------------------------
+nvi_op:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r27, 0x1C(r1)
+        mr r31, r3
+        mr r30, r4
+        mr r29, r5
+        mr r28, r6
+        li r27, 0                       # the result (get: the value; cdown: reached)
+        mr r3, r29
+        cmpwi r28, 1                    # set: no read
+        beq nvi_write
+        mr r3, r31
+        mr r4, r30
+        li r5, 0
+        bl user_entry
+        bl f2i
+        cmpwi r28, 0                    # get
+        bne nvi_1
+        mr r27, r3
+        b nvi_out
+nvi_1:
+        cmpwi r28, 2                    # inc
+        bne nvi_2
+        addi r3, r3, 1
+        b nvi_write
+nvi_2:
+        cmpwi r28, 3                    # dec
+        bne nvi_3
+        addi r3, r3, -1
+        b nvi_write
+nvi_3:
+        cmpwi r28, 4                    # add
+        bne nvi_4
+        add r3, r3, r29
+        b nvi_write
+nvi_4:
+        cmpwi r28, 5                    # sub
+        bne nvi_5
+        subf r3, r29, r3
+        b nvi_write
+nvi_5:
+        cmpwi r28, 6                    # mul
+        bne nvi_6
+        mullw r3, r3, r29
+        b nvi_write
+nvi_6:
+        cmpwi r28, 7                    # div (by 0: nothing)
+        bne nvi_7
+        cmpwi r29, 0
+        beq nvi_out
+        divw r3, r3, r29
+        b nvi_write
+nvi_7:
+        cmpw r3, r29                    # cdown: above the operand: -1, and the result is whether it got there
+        ble nvi_out
+        addi r3, r3, -1
+        cmpw r3, r29
+        bne nvi_write
+        li r27, 1
+nvi_write:
+        bl i2f
+        mr r3, r31
+        mr r4, r30
+        li r5, 1
+        bl user_entry
+nvi_out:
+        mr r3, r27
+        lmw r27, 0x1C(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+""" % D)
+    for k, (_off, name, base) in enumerate(WM_INT_OPS):
+        id_in_r5 = name in ('set', 'add', 'sub', 'mul', 'div')
+        b.asm("""
+nvi_%(name)s:""" % dict(name=name) + ours('r5' if id_in_r5 else 'r4', 'nvi_%s_o' % name) + ("""
+        mr r0, r4
+        mr r4, r5
+        mr r5, r0""" if id_in_r5 else "") + """
+        li r6, %(k)d
+        b nvi_op
+nvi_%(name)s_o:                         # not ours: the class's own code (the base copy: the same)
+        lis r12, 0x%(hi)X
+        ori r12, r12, 0x%(lo)X
+        mtctr r12
+        bctr
+""" % dict(name=name, k=k, hi=base >> 16, lo=base & 0xFFFF))
+
+
 def ha(v):
     return ((v + 0x8000) >> 16) & 0xFFFF
 
@@ -1399,6 +1681,10 @@ next_entry:
     lgc_code(b3)
     assert not set(b3.labels) & (set(a.labels) | set(b2.labels)), set(b3.labels) & (set(a.labels) | set(b2.labels))
     a.labels.update(b3.labels)
+    b4 = Asm(NV_CODE)                   # New_Var (the grown text region, after its slots' pool)
+    nv_code(b4)
+    assert not set(b4.labels) & (set(a.labels) | set(b2.labels)), set(b4.labels) & (set(a.labels) | set(b2.labels))
+    a.labels.update(b4.labels)
     b2.asm('cmd_crcs:\n' + ''.join('        .word 0x%08X\n' % crc(c[0]) for c in COMMANDS))
     b2.asm('cmd_sizes:\n' + ''.join('        .word %d\n' % c[1] for c in COMMANDS))
     a.labels.update(b2.labels)
@@ -1410,6 +1696,8 @@ scratch:                                # scale_int: a double, then 2^52 + 2^31
         .word 0
         .word 0x43300000
         .word 0x80000000
+ue_nv_far:                              # user_entry's New_Var IDs (exe_v40): ue_nv is out of bge's reach
+        b ue_nv
 """)
     b2.asm('cmd_handlers:\n' + ''.join('        .word 0x%08X\n' % a.addr(c[2]) for c in COMMANDS))
     a.labels.update(b2.labels)
@@ -1425,6 +1713,7 @@ scratch:                                # scale_int: a double, then 2^52 + 2^31
     assert a.addr('scratch') % 8 == 0, hex(a.addr('scratch'))
     b2.labels.update(a.labels)
     b3.labels.update(a.labels)
+    b4.labels.update(a.labels)
     words = a.words()
     assert CAVE + 4 * len(words) <= TABLE, hex(CAVE + 4 * len(words))
     words2 = b2.words()
@@ -1433,6 +1722,10 @@ scratch:                                # scale_int: a double, then 2^52 + 2^31
     words3 = b3.words()
     assert LGC + LGC_N * 0x10 + 4 <= LGC_CODE and LGC_CODE + 4 * len(words3) <= OBJS, hex(LGC_CODE + 4 * len(words3))
     a.part3 = (LGC_CODE, words3)
+    words4 = b4.words()
+    assert OBJS + OBJ_N * OBJ_SIZE + NV_OFF <= NV_CODE and NV_CODE + 4 * len(words4) <= NV_LIMIT, hex(NV_CODE + 4 * len(words4))
+    assert NV_INT + 8 <= OBJ_SIZE and NV_DECL + 8 <= NV_INT and OBJ_SIZE == 4 * NV_N
+    a.part4 = (NV_CODE, words4)
     assert ACC_CACHE + 64 * 8 <= THREADS and THREADS + THREAD_N * THREAD_SIZE <= GROW <= LIMIT
     hooks = {LOOKUP: b(LOOKUP, a.addr('lookup')), SIZE1: b(SIZE1, a.addr('size1')),
              SIZE2: b(SIZE2, a.addr('size2')), FETCH: b(FETCH, a.addr('fetch')),
@@ -1448,6 +1741,9 @@ scratch:                                # scale_int: a double, then 2^52 + 2^31
              VAR_ENTRY: b(VAR_ENTRY, a.addr('user_gate'))}
     for k, h in enumerate(STEP_HOOKS):
         hooks[h] = b(h, a.addr('hk_step%d' % k))
+    for vt in WM_VTABLES:               # New_Var: the WorkModule int ops (absolute addresses: no branch range)
+        for off, name, _base in WM_INT_OPS:
+            hooks[vt + off] = a.addr('nvi_' + name)
     return a, words, hooks
 
 
@@ -1522,7 +1818,8 @@ of_wrap:
         addi r12, r12, objs@l
         add r12, r12, r11
 of_take:
-        li r0, 0
+        b nv_take                       # (was li r0, 0: nv_take clears the entry's New_Var block, then r0 = 0)
+of_take2:
         li r11, %(last)d
 of_zero:
         stwx r0, r12, r11
@@ -1649,7 +1946,7 @@ ug_back:
 # 0x332 / 0x333 speed X / Y (read only, all energies); 0x334-0x336 team ids (read only);
 # 0x340 + 8*s + k (s, k < 8): variable 24 + k of fighter table entry s (player slot s + 1), the same
 # storage as that fighter's own 0x318 + k; any object may use them; an empty / not live entry reads 0
-# and a write there does nothing. Any other: reads 0.
+# and a write there does nothing. 0x380 + k (k < 64): New_Var slot k (ue_nv, nv_code). Any other: reads 0.
 user_entry:
         stwu r1, -0x40(r1)
         mflr r0
@@ -1756,7 +2053,7 @@ ue_sp_y:
 ue_shared:                              # 0x340 + 8*s + k: fighter table entry s's variable 24 + k
         addi r28, r30, -%(u40)d
         cmplwi r28, 0x40                # (0x337-0x33F: negative, so unsigned huge)
-        bge ue_zero
+        bge ue_nv_far                   # 0x380-0x3BF: New_Var's (nv_code); the rest reads 0 there
         srwi r27, r28, 3                # s
         rlwinm r28, r28, 2, 27, 29      # 4 * k
         addi r28, r28, 0xC0             # vars[24 + k] in the entry (+0x60 + 4 * (24 + k), as ue_var)
@@ -3132,11 +3429,15 @@ def main():
         labels(sys.argv[sys.argv.index('--labels') + 1])
         return
     a, words, hooks = build()
-    out = ['grow:0x%08X' % LIMIT]
+    out = ['grow:0x%08X' % LIMIT, 'textregion:0x%X' % (NV_LIMIT - 0x02000000), 'grow:0x%08X' % NV_LIMIT]
     out += ['0x%08X=0x%08X' % (CAVE + 4 * i, w) for i, w in enumerate(words)]
     out += ['0x%08X=0x%08X' % (a.part2[0] + 4 * i, w) for i, w in enumerate(a.part2[1])]
     out += ['0x%08X=0x%08X' % (a.part3[0] + 4 * i, w) for i, w in enumerate(a.part3[1])]
+    out += ['0x%08X=0x%08X' % (a.part4[0] + 4 * i, w) for i, w in enumerate(a.part4[1])]
     out += ['0x%08X=0x%08X' % kv for kv in sorted(hooks.items())]
+    # the vtable words have ADDR32 relocations to the classes' own functions: moved to a dead word, or the loader
+    # would write those back over ours
+    out += ['reloc:0x%08X-0x%08X=0x%08X' % (w, w + 4, RELOC_DUMMY) for w in sorted(WM_INT_ORIG)]
     print(' '.join(out))
     sys.stderr.write('acmd ext: %d words, %s\n' % (len(words), ', '.join(
         '%s 0x%08X index %d' % (c[0], crc(c[0]), NEW_BASE + i) for i, c in enumerate(COMMANDS))))

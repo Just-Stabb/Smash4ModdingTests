@@ -26,6 +26,7 @@ namespace Sm4shCommand
         {
             Projects.Clear();
             Runtime.Instance.FileTree.Nodes.Clear();
+            FighterVariable.ClearNewVars();     // New_Var names come from the project's files
             var p = new Project(filepath);
             Projects.Add(p.ProjName, p);
             Runtime.Instance.FileTree.Nodes.Add(p);

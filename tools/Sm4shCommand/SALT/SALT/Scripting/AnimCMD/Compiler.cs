@@ -156,6 +156,11 @@ namespace SALT.Moveset.AnimCMD
                     throw new ACMDCompileException(line, $"unknown command \"{name}\" (add it in Tools > Command Definitions)");
             }
 
+            // New_Var(Name=..., Type=..., Initial=..., Scope=..., Slot=...): its own form (the raw form, all 10
+            // parameters, compiles as any command)
+            if (crc == FighterVariable.NewVarIdent && parameters.Length != ACMDCommand.NewVarParams)
+                return CompileNewVar(line, inner);
+
             ACMDCommand cmd = new ACMDCommand(crc);
             var specs = cmd.ParamSpecifiers;
             if (parameters.Length != specs.Length)
@@ -187,6 +192,10 @@ namespace SALT.Moveset.AnimCMD
                             break;
                     }
                 }
+                catch (FormatException e) when (specs[i] == 3 && FighterVariable.IsAliasName(p.Trim()))
+                {
+                    throw new ACMDCompileException(line, e.Message);   // unknown variable name: say so
+                }
                 catch (Exception e) when (!(e is ACMDCompileException))
                 {
                     string kind = specs[i] == 0 ? "a whole number (e.g. 5 or 0x1A) or a float stored in an int (e.g. 1.5f)" :
@@ -199,6 +208,104 @@ namespace SALT.Moveset.AnimCMD
 
             return cmd;
         }
+        /// <summary>
+        /// New_Var(Name=charge, Type=int, Initial=0, Scope=object, Slot=0): every parameter but Name may be left out
+        /// (Type float, Initial 0, Scope object, Slot: the slot this name already has, else the lowest free one), named
+        /// ones in any order, unnamed ones in that order. Declares the name (it then compiles in every variable
+        /// parameter, in every open script).
+        /// </summary>
+        static ACMDCommand CompileNewVar(string line, string inner)
+        {
+            var inv = CultureInfo.InvariantCulture;
+            string[] keys = { "Name", "Type", "Initial", "Scope", "Slot" };
+            var vals = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var parts = inner.Trim().Length == 0 ? new string[0] : inner.Split(',');
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string part = parts[i].Trim();
+                int eq = part.IndexOf('=');
+                string key = eq >= 0 ? part.Substring(0, eq).Trim() : (i < keys.Length ? keys[i] : null);
+                string val = eq >= 0 ? part.Substring(eq + 1).Trim() : part;
+                key = keys.FirstOrDefault(k => k.Equals(key, StringComparison.OrdinalIgnoreCase));
+                if (key == null)
+                    throw new ACMDCompileException(line, "New_Var takes Name, Type, Initial, Scope and Slot (e.g. New_Var(Name=charge, Type=int, Initial=0, Scope=object))");
+                if (vals.ContainsKey(key))
+                    throw new ACMDCompileException(line, $"New_Var: {key} is given twice");
+                vals[key] = val;
+            }
+            string name;
+            if (!vals.TryGetValue("Name", out name) || name.Length == 0)
+                throw new ACMDCompileException(line, "New_Var needs a Name (e.g. New_Var(Name=charge))");
+            if (!FighterVariable.IsAliasName(name))
+                throw new ACMDCompileException(line, $"New_Var: \"{name}\" isn't a name (letters, digits and _, not starting with a digit)");
+            if (name.Length > FighterVariable.NewVarNameMax)
+                throw new ACMDCompileException(line, $"New_Var: \"{name}\" is longer than {FighterVariable.NewVarNameMax} characters");
+            if (FighterVariable.IsFileAlias(name))
+                throw new ACMDCompileException(line, $"New_Var: {name} is already a variable name (Aliases folder): pick another");
+            uint cmdIdent;
+            if (ACMD_INFO.TryGetIdent(name, out cmdIdent))
+                throw new ACMDCompileException(line, $"New_Var: {name} is a command's name: pick another");
+
+            Func<string, string, string, int> word = (key, zero, one) =>
+            {
+                string v;
+                if (!vals.TryGetValue(key, out v) || v.Length == 0)
+                    return 0;
+                if (v.Equals(zero, StringComparison.OrdinalIgnoreCase))
+                    return 0;
+                if (v.Equals(one, StringComparison.OrdinalIgnoreCase))
+                    return 1;
+                try { return ACMDCommand.ParseInt(v); }
+                catch (Exception) { throw new ACMDCompileException(line, $"New_Var: {key} is {zero} or {one}, not \"{v}\""); }
+            };
+            int type = word("Type", "float", "int");
+            int scope = word("Scope", "object", "move");
+            float initial = 0;
+            string sv;
+            if (vals.TryGetValue("Initial", out sv) && sv.Length > 0)
+            {
+                try { initial = ParseFloat(sv); }
+                catch (Exception) { throw new ACMDCompileException(line, $"New_Var: Initial must be a number, not \"{sv}\""); }
+            }
+
+            uint raw;
+            if (vals.TryGetValue("Slot", out sv) && sv.Length > 0 && !sv.Equals("auto", StringComparison.OrdinalIgnoreCase))
+            {
+                int slot;
+                try { slot = ACMDCommand.ParseInt(sv); }
+                catch (Exception) { throw new ACMDCompileException(line, $"New_Var: Slot must be 0-{FighterVariable.NewVarSlots - 1} (or auto), not \"{sv}\""); }
+                if (slot >= 0 && slot < FighterVariable.NewVarSlots)
+                    raw = FighterVariable.NewVarBase + (uint)slot;
+                else if (FighterVariable.IsNewVarSlot((uint)slot))
+                    raw = (uint)slot;
+                else
+                    throw new ACMDCompileException(line, $"New_Var: Slot must be 0-{FighterVariable.NewVarSlots - 1} (or auto), not \"{sv}\"");
+            }
+            else
+            {
+                FighterVariable.NewVarInfo known;
+                if (FighterVariable.TryGetNewVar(name, out known))
+                    raw = known.Raw;
+                else
+                {
+                    int free = FighterVariable.FreeNewVarSlot();
+                    if (free < 0)
+                        throw new ACMDCompileException(line, $"New_Var: all {FighterVariable.NewVarSlots} slots have names already (give Slot= to share one)");
+                    raw = FighterVariable.NewVarBase + (uint)free;
+                }
+            }
+            FighterVariable.DeclareNewVar(name, raw, type, scope, initial);
+
+            var cmd = new ACMDCommand(FighterVariable.NewVarIdent);
+            cmd.Parameters.Add(new FighterVariable(raw));
+            cmd.Parameters.Add(type);
+            cmd.Parameters.Add(initial);
+            cmd.Parameters.Add(scope);
+            foreach (int w in ACMDCommand.NewVarNameWordsOf(name))
+                cmd.Parameters.Add(w);
+            return cmd;
+        }
+
         /// <summary>A float parameter: 1.5, 1.5f, or the float's bits in hex (0x3FC00000; up to 0xFFFF: that number).</summary>
         public static float ParseFloat(string p)
         {
@@ -273,6 +380,13 @@ namespace SALT.Moveset.AnimCMD
         private static ACMDCommand[] CompileCommandsUnchecked(string[] lines)
         {
             var tmpList = StripComments(lines);
+            // New_Var lines first: their names compile anywhere in the script, also above the declaration
+            foreach (var l in tmpList)
+            {
+                int open = l.IndexOf('(');
+                if (open > 0 && l.Substring(0, open).Trim().Equals("New_Var", StringComparison.OrdinalIgnoreCase))
+                    CompileSingleCommand(l);
+            }
             Commands.Clear();
             for (int i = 0; i < tmpList.Count; i++)
             {

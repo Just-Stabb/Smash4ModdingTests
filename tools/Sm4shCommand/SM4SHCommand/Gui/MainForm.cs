@@ -1199,6 +1199,7 @@ namespace Sm4shCommand
             MotionTable = null;
             IDEMode = IDE_MODE.NONE;
             _nodeCache = null;
+            FighterVariable.ClearNewVars();     // New_Var names come from the files opened next
 
         }
 

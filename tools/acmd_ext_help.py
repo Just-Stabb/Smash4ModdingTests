@@ -15,7 +15,7 @@ NEW_GROUP = 'New Commands'
 
 # subgroup of each new command (the command list shows them under "New Commands", in SUBGROUPS' order)
 SUBGROUPS = ['Hitboxes & hits', 'Fighter state', 'Inputs', 'Position & rotation', 'Animation', 'Targets & tracking',
-             'Threads']
+             'Threads', 'Variables']
 GROUP = {}
 for _g, _names in (
         ('Hitboxes & hits', ['Extra_Special_Hitbox', 'Extra_Extended_Special_Hitbox', 'Hit_Check', 'Hit_Get',
@@ -27,7 +27,8 @@ for _g, _names in (
         ('Position & rotation', ['Position_Get', 'Position_Set', 'Rotation_Get', 'Rotation_Set', 'Joint_Position_Get']),
         ('Animation', ['Motion_Get', 'Motion_Set', 'Animation_Rate_Set']),
         ('Targets & tracking', ['Track_Target', 'Last_Hit_Get', 'Target_Slot_Get']),
-        ('Threads', ['Thread_Start', 'Thread_Stop'])):
+        ('Threads', ['Thread_Start', 'Thread_Stop']),
+        ('Variables', ['New_Var'])):
     for _n in _names:
         GROUP[_n] = _g
 
@@ -105,6 +106,8 @@ GROUP_HELP = {
         '- Animation: which animation plays, its frame and rate; play another one; the fighter\'s overall speed.',
         '- Targets & tracking: homing (Track_Target), who was hit last / hit this one last, player slots.',
         '- Threads: a block that keeps running on its own after the animation ends or changes.',
+        '- Variables: New_Var declares your own named variables (int or float, a starting value), usable in every '
+        'variable parameter.',
         '',
     ] + TARGETS + [
         '',
@@ -119,6 +122,8 @@ GROUP_HELP = {
         'object moves, not in hitlag, and stop at 0), KINETIC_TYPE (0x0F000330), TRACK_FRAMES (0x0F000331), SPEED_X / '
         'SPEED_Y (read only). SLOT1_SHARED_0-SLOT8_SHARED_7 are VAR_24-VAR_31 of the fighter in that player slot, '
         'so another object can leave values there for it.',
+        'More, with your own names: New_Var(Name=charge, Type=int, Initial=0) gives up to 64 more per object (Variables '
+        'group), and those work with SET_INT / ADD_INT / INC_INT / Int_Var_Compare too.',
         '',
         '## More',
         'ACMD-new-commands.md next to Sm4shCommand.exe (the repository\'s docs/acmd-extra-commands.md) has the '
@@ -157,6 +162,13 @@ GROUP_HELP = {
     NEW_GROUP + ' / Threads': [
         'Thread_Start(ID, Flags){ ... } runs its block on its own, frame by frame, while the script goes on; it '
         'keeps going after the animation ends or changes. Thread_Stop(ID) ends it.',
+    ],
+    NEW_GROUP + ' / Variables': [
+        'New_Var(Name=..., Type=int / float, Initial=..., Scope=object / move) declares a variable with your own name. '
+        'The name then works in every variable parameter of every open script: SET_FLOAT / SET_INT / ADD_INT / INC_INT, '
+        'Float_Var_Compare / Int_Var_Compare, SUB_FLOAT_2, the new commands\' Variable=... (Hit_Get, Position_Get, '
+        'Input_Get, ...). 64 per object (fighter or article), besides VAR_0-VAR_31 and TIMER_0-TIMER_15, which work '
+        'as before.',
     ],
 }
 
@@ -493,6 +505,60 @@ HELP = {
         NOT_VIEWER,
         'Needs exe_v39 or later (the patched cross_f.rpx, tools/acmd_ext_cave.py). Without it a script that uses this '
         'command won\'t load properly: ship the executable with any script that uses it.',
+    ],
+    'New_Var': [
+        '## How it works',
+        'Declares a variable with your own name. Sm4shCommand gives the name a slot (0-63, the variable ID '
+        '0x0F000380 + slot) and keeps the name in the command itself, so the script shows the name again when it is '
+        'opened later. From then on the name works wherever a variable goes, in every script of the open fighter '
+        '(game, effect, sound, expression): SET_FLOAT(Value=0, Variable=charge), INC_INT(Variable=charge), '
+        'Int_Var_Compare(Variable=charge, Method=3, Value=30), Hit_Get(Target=0, When=0, Variable=charge), ...',
+        'When it runs in game, it sets the variable to Initial (see Scope) and gives it its Type.',
+        '',
+        '## Parameters',
+        '- Name: letters, digits and _, not starting with a digit, up to 24 characters; case doesn\'t matter (charge '
+        '= Charge). Not a name the Aliases folder already has (VAR_0, SELF_HIT, ...) or a command\'s.',
+        '- Type: float (the default) or int (also 0 / 1). Both are numbers the int and the float commands take: '
+        'SET_INT, ADD_INT, INC_INT, Int_Var_Compare, INT_VAR_COMPARE_VAR read and write an int variable as a whole '
+        'number; SET_FLOAT, SUB_FLOAT_2, Float_Var_Compare and the new commands\' Variable=... as a float. An int '
+        'variable keeps whole numbers: a float written to it is cut toward 0 (2.7 -> 2, -2.7 -> -2). A float one '
+        'read by an int command is cut the same way (the variable keeps its fraction).',
+        '- Initial: the starting value (0 if left out).',
+        '- Scope: object (the default, also 0): Initial is set the first time a New_Var for it runs for this object; '
+        'after that New_Var leaves it alone, and the value stays (between moves, like VAR_n) until the object is set up '
+        'again: a fighter\'s KO, a projectile\'s next shot. move (also 1): Initial is set every time this New_Var runs: '
+        'at the top of a move\'s script it starts fresh at every use of the move.',
+        '- Slot: optional, 0-63. Left out (or auto), the name keeps the slot it already has in the open scripts, else '
+        'gets the lowest free one. Sm4shCommand shows it when the script is shown again (Slot=0, ...). Give it to '
+        'fix the ID, e.g. for MSC.',
+        '',
+        '## Where they live',
+        '- Each object has its own 64: a fighter\'s scripts and its articles\' (projectiles\') scripts each see their '
+        'own, as with VAR_n. The same name in a fighter and in its projectile is two variables.',
+        '- Before any New_Var or write, a variable reads 0. Writing it (SET_FLOAT, ...) before New_Var ran works: the '
+        'first New_Var (Scope object) then still sets Initial.',
+        '- They are apart from VAR_0-VAR_31 / TIMER_0-TIMER_15 (which work as before) and from every other object\'s.',
+        '- MSC: WorkModuleF(0, 0x0F000380 + slot) reads one (WorkModule(6, ...) as an int), WorkModule(0, value, ID) / '
+        'WorkModule(7, value, ID) write it.',
+        '',
+        '## Names in Sm4shCommand',
+        '- A name is known once a script declaring it compiles, or a file with its New_Var is opened. Declare it in '
+        'the script that sets it first; other scripts may use the name without declaring it again (or declare it too: '
+        'with Scope object, a second New_Var doesn\'t reset it).',
+        '- Names are per opened fighter / file / project: opening another forgets the old ones.',
+        '- A name used nowhere in a New_Var gives "unknown variable" when compiling. Without its name a variable shows '
+        'as 0x0F000380 + slot, which compiles too.',
+        '- View > Commands lists the names known (pick New_Var), and hovering a name in a script shows its slot.',
+        '',
+        '## Gotchas',
+        '- Up to 48 objects at once have variables (as VAR_n): past that the oldest one\'s are reset.',
+        '- Floats hold whole numbers exactly up to 16,777,216.',
+        '- Not for parameters that take a number, not a variable (FRAME(Frames=charge) doesn\'t work).',
+        '',
+        NOT_VIEWER,
+        'Needs exe_v40 or later (the patched cross_f.rpx, tools/acmd_ext_cave.py). Without it a script that uses this '
+        'command won\'t load properly, and SET_INT / INC_INT on 0x0F000380+ write out of bounds: ship the executable '
+        'with any script that uses it.',
     ],
     'Input_Compare': [
         '## How it works',
@@ -1178,6 +1244,75 @@ EXAMPLES = {
         'Leave_Ground_Cancel(Enabled=2)',
         'FRAME(Frames=20)',
         'Leave_Ground_Cancel(Enabled=1)',
+    ],
+    'New_Var': [
+        '// Example 1: a charge counter (Scope=move: 0 at every use of the move). Counts the frames special is held',
+        '// from frame 5 to 34, then a stronger hitbox if it was held for 20 of them',
+        'New_Var(Name=charge, Type=int, Initial=0, Scope=move)',
+        'FRAME(Frames=5)',
+        'Set_Loop(Iterations=30){',
+        '    Input_Compare(Target=0, Input=1, Method=0, Value=1)',
+        '    True(Offset=0){',
+        '        INC_INT(Variable=charge)',
+        '    }',
+        '    WAIT(Frames=1)',
+        '    Goto(Offset=0)',
+        '}',
+        'Int_Var_Compare(Variable=charge, Method=3, Value=20)',
+        'True(Offset=0){',
+        '    ' + _hitbox('Hitbox', Damage=18, BKB=60, Size=7, Z=9),
+        '}',
+        'Else(Offset=0){',
+        '    ' + _hitbox('Hitbox', Damage=10, Size=5, Z=8),
+        '}',
+        'WAIT(Frames=3)',
+        'Remove_All_Hitboxes()',
+        '',
+        '// Example 2: every third use of this move is stronger (Scope=object: the count is kept between uses,',
+        '// until the fighter is KO\'d)',
+        'New_Var(Name=uses, Type=int, Initial=0, Scope=object)',
+        'INC_INT(Variable=uses)',
+        'FRAME(Frames=10)',
+        'Int_Var_Compare(Variable=uses, Method=3, Value=3)',
+        'True(Offset=0){',
+        '    ' + _hitbox('Hitbox', Damage=16, BKB=60, Size=6, Z=8),
+        '    SET_INT(Value=0, Variable=uses)',
+        '}',
+        'Else(Offset=0){',
+        '    ' + _hitbox('Hitbox', Damage=8, Size=5, Z=8),
+        '}',
+        'WAIT(Frames=3)',
+        'Remove_All_Hitboxes()',
+        '',
+        '// Example 3: float variables with the target commands: how far the move has risen since it started',
+        'New_Var(Name=start_y, Initial=0, Scope=move)',
+        'New_Var(Name=now_y, Initial=0, Scope=move)',
+        'Position_Get(Target=0, Axis=1, Variable=start_y)',
+        'FRAME(Frames=20)',
+        'Position_Get(Target=0, Axis=1, Variable=now_y)',
+        '// now_y - start_y (SUB_FLOAT_2: Variable -= SourceVariable)',
+        'SUB_FLOAT_2(Variable=now_y, SourceVariable=start_y)',
+        'Float_Var_Compare(Variable=now_y, Method=5, Value=15)',
+        'True(Offset=0){',
+        '    // risen more than 15 units: a meteor hitbox',
+        '    ' + _hitbox('Hitbox', Damage=12, Angle=270, BKB=30, Size=6, Y=2, Z=4),
+        '}',
+        '',
+        '// Example 4: a hit counter kept on the fighter for the stock (game script of any move that should count),',
+        '// read in another script, e.g. the up special\'s, which declares it too (the same name: the same slot)',
+        'New_Var(Name=hits_landed, Type=int, Initial=0)',
+        'FRAME(Frames=12)',
+        _hitbox('Hitbox', Damage=6, Size=5, Z=8),
+        'WAIT(Frames=3)',
+        'Remove_All_Hitboxes()',
+        'Hit_Check(Target=0, When=0, Kinds=2)',
+        'True(Offset=0){',
+        '    INC_INT(Variable=hits_landed)',
+        '}',
+        '',
+        '// Example 5: the same variable with a fixed slot (so MSC can use WorkModuleF(0, 0x0F000385)), as a float',
+        'New_Var(Name=power, Type=float, Initial=1, Scope=object, Slot=5)',
+        'SET_FLOAT(Value=1.5, Variable=power)',
     ],
     'Input_Compare': [
         '// Example 1: on frame 12, a stronger hitbox if special is still held',

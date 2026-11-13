@@ -1407,7 +1407,8 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
     fighter's WorkModule (accessor `+0x28`) in place of the caller's, at `+0x60 + 4 × (24 + k)`. Every
     pointer is range-checked (word aligned, `0x10000000`–`0x8FFFFFFF`); a failed check, an index past
     the count or a not-live entry reads 0 and writes nothing. A write creates the fighter's entry
-    (as its own write would), a read never does. `0x337`–`0x33F` and `0x380`–`0x3FF` read 0.
+    (as its own write would), a read never does. `0x337`–`0x33F` and `0x3C0`–`0x3FF` read 0; `0x380`–`0x3BF` are
+    New_Var's (below, exe_v40).
 - **KineticModule:** accessor `+0x34`.
   - Fields: kinetic type at `+0x11C`, energies at `+0x18` (0x10 each).
   - Methods: set the type with vt `+0xEC`, get an energy with vt `+0x54(id)`, get the speed sum with
@@ -1553,6 +1554,39 @@ First in exe_v39.
     cleared (LR is free there: `0x02E88B28` saved it).
   - The trampolines are the last two words of copy_custom_cave.py's Havok-cave space (its `SPAWN_LIMIT` now
     `0x037EE598`; zero in exe_v38).
+
+## New_Var (named variables, exe_v40)
+
+`tools/acmd_ext_cave.py` (`nv_code`), user docs `docs/acmd-extra-commands.md` "New_Var", test `tools/new_var_test.py`
+(and the Mono test of Sm4shCommand v1.4.9's compiler). First in exe_v40 (= exe_v39 + this).
+
+- **IDs** `0x0F000380 + k` (k < 64, any top nibble: the WorkModule ignores it). The float path is the user variables'
+  (`var_entry` → `user_gate` → `user_entry`): `ue_shared`'s out-of-range branch now goes to `ue_nv` (through
+  `ue_nv_far`, a `b` after the main part's `scratch`: `bge` can't reach the new region).
+- **Storage:** `0x04BD0000` + 48 × 0x100: one block of 64 floats per `OBJS` entry, at the entry's address +
+  `0x3C000` (`NV_OFF`). The entry's free words hold the masks: `+0xE8` / `+0xEC` declared (slots 0–31 / 32–63),
+  `+0xF0` / `+0xF4` int-typed (a float write is truncated toward 0). `obj_find`'s take (`of_take`, was `li r0, 0`)
+  branches to `nv_take`, which clears the entry's block, so a reused entry (a reset object, or the round robin
+  past 48 objects) starts at 0; the set-up hook only forgets the entry, as before.
+- **Space:** the text region was grown 16 KB: file info textRegionSize `0x2BD0000` → `0x2BD4000`, section 2 to
+  `0x04BD4000` (`textregion:` / `grow:` in the cave's output). Pool `0x04BD0000`–`0x04BD3000`, code from `0x04BD3000`
+  (323 words). Anything grown later goes past `0x04BD4000`.
+- **Int ops:** the WorkModule's int functions read / write the category tables directly (`[wm + 8][cat] + 0xC`,
+  index = the ID's low 24 bits, no bounds check), so a category-F int at index 0x380 would land past the table. The
+  six WorkModule vtables (`0x10003224`, `0x100F93CC`, `0x1012132C`, `0x1013A1C0` / `0x1013AFFC` fighters,
+  `0x10153184`) get `nvi_*` at `+0x84` get, `+0x8C` set, `+0xA4` inc, `+0xAC` dec, `+0xB4` add, `+0xBC` sub, `+0xC4` mul,
+  `+0xCC` div (by 0: nothing, as the game's), `+0xD4` count-down (`(id, v)`: > v → −1, returns new == v); `+0x9C`
+  (random) calls set through the vtable. A New_Var ID goes to `nvi_op` (read with `user_entry`, the op, written
+  back as a float); any other ID jumps (ctr) to the base class's copy, the same code in every class (`0x0200F7F0`
+  ...; set's first word is position_vars' `seti_hook` branch in every copy). The vtable words' ADDR32 relocations are
+  moved to the dead word `0x037EE73C` (or the loader would write the old functions back). ACMD `SET_INT`
+  (`0x02BD9D18`), `ADD_INT` (`0x02BD9D98`, get + set), `INC_INT` (`0x02BD6E60`, vt `+0xA4`), `Int_Var_Compare`
+  (`0x02BE62C8`, get + `0x02BEE028`, the int compare table `0x1035181C`: 0 ==, 1 !=, 2 <=, 3 >=, 4 <, 5 >) and
+  `INT_VAR_COMPARE_VAR` (`0x02BE636C`), and MSC's WorkModule handler (`0x0200E898`) all call these through the vtable.
+- **The command** (`h_newvar`, index 618, CRC `0xA321746C`, 11 words: ID, Type, Initial (float), Scope, the name's
+  ASCII in 6 words): sets the int bit to Type == 1, then, with Scope 1 or the declared bit clear, sets the declared
+  bit and stores Initial (truncated for an int). Not executed: only steps. A non-New_Var ID or a bad accessor /
+  WorkModule: nothing.
 
 ## Sword trails (trail textures by id)
 

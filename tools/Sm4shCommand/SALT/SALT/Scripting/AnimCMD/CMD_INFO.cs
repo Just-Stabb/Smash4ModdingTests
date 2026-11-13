@@ -163,7 +163,8 @@ namespace SALT.Moveset.AnimCMD
             {0xBF7A21C8,3},
             {0xE33213D8,4},
             {0xFC5AB6DC,3},
-            {0x224CF650,2}
+            {0x224CF650,2},
+            {0xA321746C,11}
         };
         #endregion
         #region Names
@@ -787,6 +788,7 @@ namespace SALT.Moveset.AnimCMD
             {0xE33213D8,"Armor_Set"},
             {0xFC5AB6DC,"Target_Slot_Get"},
             {0x224CF650,"Leave_Ground_Cancel"},
+            {0xA321746C,"New_Var"},
         };
         #endregion
         #region Params
@@ -1412,6 +1414,7 @@ namespace SALT.Moveset.AnimCMD
             {0xE33213D8,"0,0,1"},
             {0xFC5AB6DC,"0,3"},
             {0x224CF650,"0"},
+            {0xA321746C,"3,0,1,0,0,0,0,0,0,0"},
         };
         #endregion
         #region syntax
@@ -2035,6 +2038,7 @@ namespace SALT.Moveset.AnimCMD
             {0xE33213D8,"Target,Type,Threshold"},
             {0xFC5AB6DC,"Target,Variable"},
             {0x224CF650,"Enabled"},
+            {0xA321746C,"Name,Type,Initial,Scope,Text1,Text2,Text3,Text4,Text5,Text6"},
         };
         #endregion
 
@@ -2660,6 +2664,7 @@ namespace SALT.Moveset.AnimCMD
             {0xE33213D8,"Gives a fighter armor (DamageModule(0xB, type, threshold)). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0xFC5AB6DC,"Stores which player slot (1-8) a target is: the nearest opponent, the last fighter hit, the last attacker, ... New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x224CF650,"Whether this grounded move is cut into Fall when the fighter leaves the ground (walks / slides off an edge, or moves up). Off: the move (animation, hitboxes, scripts) goes on in the air with air physics (gravity, air drift) until its interrupt frame or its end, then Fall; landing during it, it goes on grounded. Back on by itself at the next status (move). Fighters only. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0xA321746C,"Declares a named variable (Type int or float, a starting value) that every variable parameter takes by name: SET_FLOAT / SET_INT / ADD_INT / INC_INT, Float_Var_Compare / Int_Var_Compare, Hit_Get(Variable=...), ... 64 slots per object (fighter or article), beyond VAR_0-VAR_31. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
         };
         #endregion
         /// <summary>

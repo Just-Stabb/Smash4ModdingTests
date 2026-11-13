@@ -254,6 +254,8 @@ def _position_lines():
             out.append((0x0F000340 + 8 * slot + k, "Slot %d shared %d" % (slot + 1, k),
                         "Read / write: VAR_%d (0x0F%06X) of the fighter in player slot %d (fighter table entry %d): the same float that fighter's own VAR_%d reads and writes. Any object can use it (a projectile too, e.g. to keep state on the fighter it hit).\\nEmpty / not live slot: reads 0, a write does nothing. Needs tools/acmd_ext_cave.py."
                         % (24 + k, 0x318 + k, slot + 1, slot, 24 + k)))
+    for k in range(64):
+        out.append((0x0F000380 + k, "New_Var slot %d" % k, "A variable New_Var declares (a name of your own: New_Var(Name=charge, ...) in a script; Sm4shCommand shows the name where it knows it). Read / write: this object's own (fighter or projectile), as an int (SET_INT, INC_INT, Int_Var_Compare, ...) or a float (SET_FLOAT, Float_Var_Compare, ...); kept until the object is reset (KO / a projectile's next use). Starts at 0, then New_Var's Initial. Needs exe_v40 (tools/acmd_ext_cave.py)."))
     for t, (tn, td) in enumerate(zip(targets, tdesc)):
         for q, (qn, qd) in enumerate(STATE_QUANTITIES):
             out.append((0x0F0000A0 + 8 * t + q, "%s %s" % (tn, qn.lower().replace("_", " ")), "Target: %s.\\n%s" % (td, qd)))

@@ -10568,6 +10568,34 @@
 "syntax": [
 "Enabled"
 ]
+},
+"A321746C": {
+"size": 11,
+"name": "New_Var",
+"format": [
+3,
+0,
+1,
+0,
+0,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"Name",
+"Type",
+"Initial",
+"Scope",
+"Text1",
+"Text2",
+"Text3",
+"Text4",
+"Text5",
+"Text6"
+]
 }
 }
 }

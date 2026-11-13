@@ -160,9 +160,18 @@ namespace Sm4shCommand.Classes
             if (!TryParseValue(token, out value) && !SALT.Moveset.FighterVariable.TryParseAlias(token, out value))
                 return "";
             var found = Find(value, command, param, type, index);
-            if (found.Count == 0)
-                return "";
             var sb = new StringBuilder();
+            SALT.Moveset.FighterVariable.NewVarInfo nv;
+            if (SALT.Moveset.FighterVariable.TryGetNewVar(value, out nv))
+                sb.Append("\n\n").Append(token).Append(": New_Var ").Append(nv.Name).Append(" (").Append(nv.TypeName)
+                  .Append(", scope ").Append(nv.ScopeName).Append(", initial ")
+                  .Append(nv.Initial.ToString("R", CultureInfo.InvariantCulture)).Append("): slot ").Append(nv.Slot)
+                  .Append(", variable 0x").Append(value.ToString("X8"))
+                  .Append("\nThis object's own (each fighter / article has its 64). MSC: WorkModuleF(0, 0x")
+                  .Append(value.ToString("X8")).Append(nv.Type == 1 ? ") / WorkModule(6, 0x" + value.ToString("X8") + ")" : ")")
+                  .Append(".");
+            if (found.Count == 0)
+                return sb.ToString();
             foreach (var e in found.Take(3))
             {
                 sb.Append("\n\n").Append(token).Append(": ").Append(e.Name);

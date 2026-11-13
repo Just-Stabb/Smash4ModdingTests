@@ -30,6 +30,7 @@ namespace Sm4shCommand
         static readonly string[] SubgroupOrder =
         {
             "Hitboxes & hits", "Fighter state", "Inputs", "Position & rotation", "Animation", "Targets & tracking", "Threads",
+            "Variables",
         };
         const string GroupSeparator = " / ";
         static readonly string[] TypeNames = { "int", "float", "decimal", "variable" };
@@ -255,9 +256,15 @@ namespace Sm4shCommand
             return text.Length > 200 ? text.Substring(0, 200) + "…" : text;
         }
 
+        const string NewVarSlotHelp = "Optional. 0-63: the variable's slot (ID 0x0F000380 + slot). Left out (or auto): the slot " +
+            "this name already has in the open scripts, else the lowest free one. Sm4shCommand writes it back when the " +
+            "script is shown again. Give it to share a slot between names, or to fix the ID MSC uses.";
+
         /// <summary>The command with every parameter named and 0 (what Insert / Copy give).</summary>
         static string Template(uint crc)
         {
+            if (crc == SALT.Moveset.FighterVariable.NewVarIdent)
+                return "New_Var(Name=my_var, Type=float, Initial=0, Scope=object)";
             var syntax = Syntax(crc);
             var format = Format(crc);
             var parts = new List<string>();
@@ -308,13 +315,19 @@ namespace Sm4shCommand
 
             var syntax = Syntax(c);
             var format = Format(c);
+            bool newVar = c == SALT.Moveset.FighterVariable.NewVarIdent && format.Length > 4;
+            if (newVar)     // as written in scripts: the name's characters aren't typed, Slot is optional
+            {
+                syntax = syntax.Take(4).Concat(new[] { "Slot" }).ToArray();
+                format = format.Take(4).Concat(new[] { 0 }).ToArray();
+            }
             add(format.Length == 0 ? "No parameters.\n\n" : $"Parameters ({format.Length})\n", bold, SystemColors.WindowText);
             for (int i = 0; i < format.Length; i++)
             {
                 string name = i < syntax.Length ? syntax[i] : "Unknown";
                 add($"{i + 1}. {name}", bold, SystemColors.WindowText);
                 add($"  ({(format[i] >= 0 && format[i] < TypeNames.Length ? TypeNames[format[i]] : "?")})", body, Color.DimGray);
-                var pd = ACMD_INFO.GetParamDescription(c, name);
+                var pd = newVar && name == "Slot" ? NewVarSlotHelp : ACMD_INFO.GetParamDescription(c, name);
                 add(string.IsNullOrEmpty(pd) ? "\n" : "\n    " + pd + "\n", body, SystemColors.WindowText);
             }
             if (format.Length > 0)
@@ -323,6 +336,17 @@ namespace Sm4shCommand
             if (help.Count > 0)
             {
                 AddHelp(add, help, true);
+                add("\n", body, SystemColors.WindowText);
+            }
+            if (newVar)
+            {
+                var vars = SALT.Moveset.FighterVariable.NewVars;
+                add("Declared in the open scripts\n", bold, SystemColors.WindowText);
+                if (vars.Count == 0)
+                    add("None yet (open a fighter or file, or compile a script with New_Var).\n", body, Color.DimGray);
+                foreach (var v in vars)
+                    add($"    {v.Name}  \u2014  slot {v.Slot} (0x{v.Raw:X8}), {v.TypeName}, scope {v.ScopeName}, initial " +
+                        v.Initial.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + "\n", mono, Color.DarkBlue);
                 add("\n", body, SystemColors.WindowText);
             }
             add("Template\n", bold, SystemColors.WindowText);
