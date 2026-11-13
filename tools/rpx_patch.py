@@ -26,9 +26,12 @@ holding each address is decompressed (RPX zlib sections), patched, recompressed
 into the same space, and its CRC in the RPX CRC table is updated, so no other
 section moves. The input file is never modified.
 """
+import os
 import struct
 import sys
 import zlib
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 SHF_RPL_ZLIB = 0x08000000
 SHT_RPL_CRCS = 0x80000003
@@ -180,6 +183,13 @@ def main():
             d[off:off + size] = data
         struct.pack_into('>I', d, crc_off + idx * 4, zlib.crc32(bytes(data)) & 0xFFFFFFFF)
 
+    # pack the sections again (a moved section leaves its old space behind: without this the file grew by
+    # the code section's size on every build, ~22 MB -> 331 MB; tools/rpx_compact.py)
+    import rpx_compact
+    before = len(d)
+    d = bytearray(rpx_compact.compact(bytes(d))[0])
+    if len(d) != before:
+        print("compacted %d -> %d bytes" % (before, len(d)))
     open(dst, 'wb').write(d)
 
     # verify
