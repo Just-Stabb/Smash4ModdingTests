@@ -20,7 +20,9 @@
   command accepts) goes under "New Commands" in Sm4shCommand's Command tab with a thorough explanation
   (what it does, every parameter and its values, what it sets or returns, gotchas) and complete, realistic
   examples: add its GROUP / HELP / EXAMPLES in `tools/acmd_ext_help.py`, regenerate Events.cfg, rebuild
-  Sm4shCommand, and check every example compiles and round-trips.
+  Sm4shCommand, and check every example compiles and round-trips. **When an existing command is changed**
+  (new parameter values, flags, variables it accepts, behaviour), its description / help says what changed
+  and gains an example showing the change.
 - **CPU AI:** for editing fighters' CPU AI, use the vendored `tools/Sm4shAIEditor/` (BenHall-7; disassembles /
   assembles the ATKD, script and AIPD AI files; see its README and `VENDORED.md`).
 - **Script names:** every script or motion slot a mod adds (game / effect / sound / expression, any
