@@ -222,6 +222,32 @@ def v3_tests(path, src):
     g.fvars[0x0F0000A0] = 1.0                  # his attack has hit
     r.vm.call(r.fn['khm_update'])
     check('MP from damage dealt: 0.8 x 10', r.gf('ncp_mp'), 58.0)
+    # v4: Zoom 2 U (the target: slot 1 at (50, 0); he is at (10, 0) in the air)
+    r = Run(path, src, 2, situation=2)
+    g = r.game
+    r.update()
+    g.fvars.update({0x0F000000: 10.0, 0x0F000001: 0.0, 0x0F000020: 10.0, 0x0F000021: 0.0, 0x0F000023: 1.0,
+                    0x0F000024: 50.0, 0x0F000025: 0.0, 0x0F000027: 1.0, 0x03000019: 2.0})
+    r.vm.g[r.gi['global4']] = 0
+    r.vm.call(r.fn['khm_update'])
+    r.vm.g[r.gi['global4']] = 0x175
+    r.vm.call(r.fn['khm_update'])
+    r.vm.g[r.gi['khm_spells']] = 0x17
+    r.vm.g[r.gi['khm_cursor']] = 0
+    g.press = {0}
+    r.vm.call(r.fn['khm_update'])
+    g.press = set()
+    xs = []
+    for _ in range(36):
+        r.vm.call(r.fn['khm_update'])
+        g.fvars[0x0F000020] = g.fvars[0x0F000000]    # his own slot's variables follow him
+        g.fvars[0x0F000021] = g.fvars[0x0F000001]
+        xs.append(round(g.fvars[0x0F000000], 3))
+    check('Zoom 2 U: target the nearest (slot 1)', r.vm.g.get(r.gi['khm_z2_target']), 1)
+    check('Zoom 2 U: still before 29, then 9 a frame at the target until within 15 (stops at x 35.x)',
+          (xs[29], xs[31] - xs[30] > 8.0, r.vm.g.get(r.gi['khm_sub'])), (10.0, True, 0x7f))
+    check('Zoom 2 U: within 15 of the target\'s feet + 6 at the end', abs(50.0 - xs[-1]) <= 15.0 + 1e-3, True)
+    check('Zoom 2 U: intangible while flying', g.fvars.get(0x0F00011B), 2.0)
 
 
 def menu_tests(path, src):

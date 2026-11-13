@@ -1387,3 +1387,25 @@ SpecialLw16's start = spell9start 30), all while Kirby stays the stone (its moti
   stone statuses only while a sword spell is cast (`copy_held_cave.py` shows held models by status / motion: a Kirby int
   condition added), and (2) their hitboxes: Hero's SpecialLw17-20 game scripts (his built `game.bin`, translated from
   the smashline dumps the repo doesn't have) moved onto Kirby's bones.
+
+### v4 (`kirby_hero_sephiroth_copy_v4`): Zoom 2 U
+
+`kirby.c` "v4" (`khm_zoom2u`, `khm_z2_*`), brave.c's `brave_zoom2u` / `brave_z2_*`: the target is the nearest other
+fighter at the cast; launched at frame 29 (it starts as Zoom: Hero's slot 0x23A = Ultimate's spell9start, 30 frames),
+lifted 6 off the ground first; then 9 a frame at the target's feet + 6, re-aimed every frame, intangible, through
+platforms (GroundModule 0x2715), turned to face the target; over within 15 of it, after 40 frames, or on meeting the
+ground; then the vertical speed clamped to the air maximum (0x3000019) and the stone falls. The stone's status keeps
+its own kinetics, so the flight moves Kirby through his position variables (as Zoom's placement does) with gravity held
+at 0, instead of Hero's kinetic type 0xA / energy 3. Not ported: Hero's after-flight homing (up to 15 frames of tracking
+into an aerial: the stone has no aerials). Drawn with Zoom's weight and cost (8 MP); not in Hocus Pocus (it isn't
+Ultimate's).
+
+**Sword spells, what was found for the held sword (not built):** the copy item-model table `0x1041A8A0` (marthsword ...)
+is read only by the copy-resource loader (`0x030C46F4` `addi r25`, the read `0x030C48C8` `lwzx r7, r25, r21`, type
+0x164), so the sword would load for a Hero player's slot the same way as the hat (a third name read swapped in
+`kirby_copy_new_cave.py`, "bravesword"); whether Kirby's copy then creates the held-model object for the Robin copy
+(whose row is empty) is not traced (the object is `[fighter+0x28]+0xA8`, shown / hidden by `0x02B02534`'s status list,
+`copy_held_cave.py`). Still to do: trace that creation, convert Hero's sword mesh (Ultimate `brave/model/body/cNN`,
+skinned to `sword1` / `haver`) as a held model (HaveN -> SwordN, as `marthsword`), show it in the stone statuses only
+while a sword spell is cast (a Kirby int read in `copy_held_cave.py`'s hook), then the hitboxes from Hero's built
+`game.bin` (SpecialLw17-20) on Kirby's bones.

@@ -75146,6 +75146,7 @@ int khm_cost(int n)
     if (n == 0xd) { return 0xe; }
     if (n == 0xf) { return 0x4; }
     if (n == 0x10) { return 0x8; }
+    if (n == 0x17) { return 0x8; }    // v4: Zoom 2 U (Zoom's)
     return 0;
 }
 
@@ -75164,6 +75165,7 @@ int khm_weight(int n)
     if (n == 0xd) { return 0x10; }
     if (n == 0xf) { return 0x3; }
     if (n == 0x10) { return 0xf; }
+    if (n == 0x17) { return 0xf; }    // v4: Zoom 2 U
     return 0;
 }
 
@@ -75491,6 +75493,10 @@ void khm_cast(int f)
     {
         khm_zoom(f);
     }
+    else if (n == 0x17)
+    {
+        khm_zoom2u(f);
+    }
 }
 
 // the buffs' marker bits (brave_buff_update's: 3 Acceleratle is the profile, kirby_trait_profile)
@@ -75704,7 +75710,7 @@ void khm_update()
                 khm_frame = 0;
                 khm_done = 0;
                 khm_sub = 0x7f;
-                if (khm_spell == 0x9 || khm_spell == 0xa || khm_spell == 0x10)
+                if (khm_spell == 0x9 || khm_spell == 0xa || khm_spell == 0x10 || khm_spell == 0x17)
                 {
                     khm_sub = 0;
                 }
@@ -75912,7 +75918,7 @@ int khm_hp_weight(int o)
     o = o - 0x9;
     if (o == 0x1 || o == 0xa) { return 0x98; }  // Heal, Kaclang 152
     if (o == 0x9) { return 0x5b; }              // Kamikazee 91
-    if (o == 0xf || o >= 0x11 && o <= 0x14) { return 0; }
+    if (o == 0xf || o >= 0x11 && o <= 0x14 || o == 0x17) { return 0; }   // Zoom 2 U: the user's, not Ultimate's
     return 0xf4;
 }
 
@@ -75947,7 +75953,7 @@ void khm_hocus_pocus()
         khm_frame = 0;
         khm_done = 0;
         khm_sub = 0x7f;
-        if (o == 0x9 || o == 0xa || o == 0x10)
+        if (o == 0x9 || o == 0xa || o == 0x10 || o == 0x17)
         {
             khm_sub = 0;
         }
@@ -76051,4 +76057,179 @@ void khm_v3_timers()
         }
     }
     khm_dmg_seen = d;
+}
+
+// ---- v4: Zoom 2 U (brave.c brave_zoom2u, the mod's own spell: Zoom on its side after the nearest opponent). Hero's:
+// the target picked at the cast (the nearest other fighter), launched at Zoom's frame (29: it starts as Zoom), lifted
+// 6 off the ground first, then 9 a frame at the target's feet + 6, intangible, re-aimed every frame, through
+// platforms; over within 15 of it (fix 85), after 40 frames, or on meeting the ground; then the speed clamped to the
+// air maximums (brave_z2_clamp: x to 0x3000016, y to 0x3000019) and a fall. On Kirby the stone keeps its kinetics
+// (its status sets them), so the flight moves it straight through his position variables (0x0F000000 / 1), 9 a frame
+// (less on the last step), gravity held at 0 meanwhile (khm_fly(0)); the end gives the stone the clamped speed in
+// the gravity energy. Hero's after-flight homing (15 frames of tracking into an aerial) has no place on the stone.
+int khm_z2_target;
+
+int khm_z2_nearest()
+{
+    int s;
+    int me;
+    int best;
+    float d;
+    float bd;
+    float dx;
+    float dy;
+    me = khm_self_slot();
+    best = -1;
+    bd = 0;
+    s = 0;
+    while (s < 0x8)
+    {
+        if (s != me && WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
+        {
+            dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - WorkModuleF(0, 0x0f000000);
+            dy = WorkModuleF(0, 0x0f000021 + 0x4 * s) - WorkModuleF(0, 0x0f000001);
+            d = dx * dx + dy * dy;
+            if (best < 0 || d < bd)
+            {
+                best = s;
+                bd = d;
+            }
+        }
+        s += 1;
+    }
+    return best;
+}
+
+float khm_sqrt(float v)
+{
+    float r;
+    int i;
+    if (v <= 0)
+    {
+        return 0;
+    }
+    r = v;
+    if (r < 1.0f)
+    {
+        r = 1.0f;
+    }
+    i = 0;
+    while (i < 20)
+    {
+        r = 0.5f * (r + v / r);
+        i += 1;
+    }
+    return r;
+}
+
+float khm_clampf(float v, float m)
+{
+    if (v > m)
+    {
+        return m;
+    }
+    if (v < -m)
+    {
+        return -m;
+    }
+    return v;
+}
+
+// one step at the target: 1 = within 15 (over)
+int khm_z2_step()
+{
+    float x;
+    float y;
+    float dx;
+    float dy;
+    float d;
+    float k;
+    int t;
+    t = khm_z2_target;
+    x = WorkModuleF(0, 0x0f000000);
+    y = WorkModuleF(0, 0x0f000001);
+    if (t < 0 || t >= 0x8 || WorkModuleF(0, 0x0f000023 + 0x4 * t) == 0)
+    {
+        WorkModule(0, x + 9.0f * PostureModuleF(0), 0x0f000000);    // no target: straight ahead
+        return 0;
+    }
+    dx = WorkModuleF(0, 0x0f000020 + 0x4 * t) - x;
+    dy = WorkModuleF(0, 0x0f000021 + 0x4 * t) + 6.0f - y;
+    d = khm_sqrt(dx * dx + dy * dy);
+    if (d < 0.01f)
+    {
+        return 0x1;
+    }
+    if (dx * PostureModuleF(0) < 0)
+    {
+        PostureModule(0, -PostureModuleF(0));   // turned to the target, as brave_z2_fly
+        PostureModule(0x2);
+    }
+    k = 9.0f;
+    if (d < k)
+    {
+        k = d;
+    }
+    WorkModule(0, x + dx / d * k, 0x0f000000);
+    WorkModule(0, y + dy / d * k, 0x0f000001);
+    khm_z2_vx = dx / d * 9.0f;
+    khm_z2_vy = dy / d * 9.0f;
+    if (d - k <= 15.0f)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+float khm_z2_vx;
+float khm_z2_vy;
+
+void khm_z2_end()
+{
+    KineticModule(0xf, 0x1, -0.089f);
+    KineticModule(0x14, 0x1, 1.5f);
+    KineticModule(0x11, 0x1, khm_clampf(khm_z2_vy, WorkModuleF(0, 0x3000019)));
+    khm_sub = 0x7f;
+}
+
+void khm_zoom2u(int f)
+{
+    if (khm_sub == 0)
+    {
+        if (khm_once(0x1))
+        {
+            khm_z2_target = khm_z2_nearest();
+        }
+        if (f >= 29)
+        {
+            khm_sub = 0x1;
+            khm_t2 = 0;
+            if (global18 != 0x2)
+            {
+                WorkModule(0x2, 6.0f, 0x0f000005);  // off the ground first (as Hero's)
+            }
+            func_20(0x2);
+            GroundModule(0x2710, 0x5);
+        }
+        return;
+    }
+    if (khm_sub != 0x1)
+    {
+        return;
+    }
+    WorkModule(0, 2.0f, 0x0f00011b);    // intangible
+    khm_t2 += 1;
+    GroundModule(0x2715);               // through platforms
+    khm_fly(0);
+    if (global18 == 0 && khm_t2 > 0x2)
+    {
+        khm_z2_vx = 0;
+        khm_z2_vy = 0;
+        khm_z2_end();                   // met the ground
+        return;
+    }
+    if (khm_z2_step() || khm_t2 >= 0x28)
+    {
+        khm_z2_end();
+    }
 }
