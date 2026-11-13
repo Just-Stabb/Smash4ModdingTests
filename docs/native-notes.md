@@ -416,7 +416,12 @@ Generator: `tools/starcopy_cave.py` (prints `ADDR=VALUE` words for
   instances of every record in the copy's list. A weapon_expand.py weapon's param getter reads its new owner's vl slot
   (`mgr + 0x25B0 + 4 x kind`), which is empty while that fighter isn't in the match. So a copy list holding another
   fighter's weapon (Mario's: the Kamehameha; Robin's: Hero's / Sephiroth's) crashed on gaining the copy
-  (`lwz 0x160(0)`). `tools/kirby_copy_pool_cave.py` gives such a record 0 instances while its owner's vl is empty.
+  (`lwz 0x160(0)`). `tools/kirby_copy_pool_cave.py` gives such a record 0 instances while its owner's vl is not loaded.
+- **FighterParamManager vl pointers are never cleared** (crash fix v5). The constructor clears the reference counts
+  (`mgr + 0x2730 + 4k` with kind_expand.py) but not the vl arrays, so a fighter that was never loaded has heap garbage
+  in its slot (`0x9F16CDAC` in the user's log), not 0. "Is it loaded" is the reference count. A new kind's vl load
+  loads its base's too, so code that runs as another kind (Kirby's copies granted as Robin's) needs that kind's vl:
+  the Sephiroth copy (base Zelda, granted Robin) now loads Robin's with Sephiroth's (`kirby_copy_pool_cave.py`).
 - **BattleObject return values**: the syscall (`0x030B2E48`) builds a message
   on its stack (`+4` kind 6, `+8` args, `+0xC` result = 0) and returns
   `message+0xC` to the MSC, not `r3`. Storing a value there from the star

@@ -1615,3 +1615,59 @@ kirby_hero_sword_test.
 python3 tools/rpx_patch.py EXE_V45D.rpx EXE_V45E.rpx $(python3 tools/kirby_copy_pool_cave.py)
 python3 tools/kirby_copy_pool_test.py EXE_V45E.rpx EXE_V45D.rpx
 ```
+
+### Crash fix v5 (`kirby_crashfix_v5`): exe_v45f / exe_v46d, the granted kind's params
+
+User (exe_v45e): copying Sephiroth crashes (Kirby vs Sephiroth). Cemu: PPC IP `0x031DD364` `lwz r7, 0x1B0(r8)`,
+r8 = 0x9F16CDAC, r17 = 0xB6, the same stack as v4 (copy_grant -> pool builder -> weapon create -> +0x18 getter).
+
+**Cause.** Robin's own thunder (0xB6, vanilla, max 5) is in the Robin copy's pool. Its getter `0x031DD350` reads
+Robin's `[mgr + 0x11CC]` (0x111C + 4 × 0x2C), and no Robin is in the match.
+- The vl pointers are never cleared. The manager's constructor clears the reference counts (mgr + 0x2730 + 4k, all
+  0x60 kinds, kind_expand.py's array), not the vl arrays, so an unloaded fighter's slot holds heap garbage. v4
+  looked at the slot and didn't cover vanilla kinds.
+- Why only Sephiroth: a new kind's vl load case loads its base's vl first (kind_expand.py `copy_load_case`).
+  Hero's base is Robin, so Robin's params are always there with Hero. Sephiroth's base is Zelda, so they aren't.
+- Pooling is not the only thing that needs them. Copy kind 0x2C runs the Robin copy's native code, including the
+  special-param loader `0x02F1B8B0` (reads `[mgr + 0x111C + 4 × copy]`).
+
+**Fix** (`tools/kirby_copy_pool_cave.py BASE.rpx`, now reading the base executable; 0x04BAFA00-0x04BAFC2C,
+139 words):
+1. **Sephiroth's vl load also loads Robin's.** The rule covers any kind in kirby_copy_new_cave.py MAP whose base
+   isn't its granted kind; today that is only 0x42.
+   - Its load case's first word (`0x04BA875C` `mr r3, r29`) becomes a `bl` to a stub. The stub saves LR and calls
+     `0x02EA6BC4(mgr, 0x2C)`, then replays the `mr`.
+   - Its unload case's final `b 0x02EA6AF4` (`0x04BA881C`) becomes a branch to a stub that releases 0x2C after
+     Zelda.
+   - Both are refcounted like the base load.
+2. **The pool stub now covers every weapon kind.** If the weapon's owner has vl reference count 0, it gets 0
+   instances. Owners come from:
+   - the fighter slot the weapon's +0x18 / +0x24 getters read (208 vanilla kinds; e.g. 0x13, owned by "kirby",
+     reads Rosalina's);
+   - else the owner name (0x10418FF0) as a fighter name;
+   - else the new kinds from extra_kinds.json (360 owners in all).
+
+`tools/kirby_copy_pool_test.py` runs the patched executable's own code in unicorn, all sections mapped:
+- the pool stub for every kind;
+- Sephiroth's load / unload chain (with VL_LOAD / VL_UNLOAD recorded): 0x2C then 0x10, and 0x10 then 0x2C;
+- Kirby vs Mario / Supamario / Robin / Hero / Sephiroth, with the loaded sets from those chains and Mario's /
+  Robin's copy lists. Every pooled record's real getters run (found with the real descriptor getter 0x0320D934),
+  with the unloaded fighters' slots set to 0x9F16CDAC, and none faults.
+- Pooled records per match:
+
+  | Match | Pooled records |
+  |---|---|
+  | Kirby vs Mario | 0 |
+  | Kirby vs Supamario | 0, 5 |
+  | Kirby vs Robin | 0, 2 |
+  | Kirby vs Hero | 0, 2, 6, 8-12 |
+  | Kirby vs Sephiroth | 0, 2, 7 |
+
+- Negative control on exe_v45e (v4's stub, Sephiroth only): 0xB6 is pooled, and its getter faults at 0x031DD364
+  with r8 = 0x9F16CDAC, as in the user's log.
+
+exe_v45f = exe_v45d + this cave, and exe_v46d = exe_v46b + this cave. It replaces v4's cave, whose words it rewrites.
+```
+python3 tools/rpx_patch.py EXE_V45D.rpx EXE_V45F.rpx $(python3 tools/kirby_copy_pool_cave.py EXE_V45D.rpx)
+python3 tools/kirby_copy_pool_test.py EXE_V45F.rpx EXE_V45D.rpx
+```
