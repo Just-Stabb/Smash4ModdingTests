@@ -1286,6 +1286,10 @@ python3 tools/msc_stack_check.py kirby.mscsb fighters/kirby/kirby.c; python3 too
 
 ## Planned (next stage): Hero copy + Stone = Command Selection
 
+User decision (2026-11-13): **sword spells (Metal Slash and the other sword spells) show Hero's sword on the
+stone while they are cast** (the sword model attached to the stone at Hero's hand offset for the spell's frames,
+hitboxes on it as on Hero), rather than hitting at the sword's position with nothing shown.
+
 User (via the coordinator): with Hero's copy, Kirby's Stone (down special) opens Hero's Command Selection menu with all
 of Hero's spells, Kirby's stone animation unchanged, the spells' hitboxes / articles / effects / sounds / status effects
 as Hero's, at Hero's offsets. Plan (not built yet):
