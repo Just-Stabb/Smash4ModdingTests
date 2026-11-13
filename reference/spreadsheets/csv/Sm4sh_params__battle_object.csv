@@ -1,0 +1,96 @@
+Group,Name,Value,Description,Comment
+0.0,0.0,118.0,Control stick and C-stick sensitivity scale,"Control stick coordinates are integers from [-128,127] (the game further limits this value to ±127)
+This param controls value needed for ""sensitivity"" equal to 1."
+,1.0,0.2,Control stick and C-stick deadzone sensitivity,"To be outside of the deadzone, sensitivity must be > than this"
+,2.0,10.0,Weight based knockback formula,"for WBKB moves, calculated as v = 10, bd = WBKB in following formula"
+,3.0,0.1,Knockback formula,"Knockback(in Training Mode)
+=(((((v * 0.1) + (v * bd * 0.05)) * (200 / (w + 100)) * 1.4) + 18) * KBG * 0.01) + BKB
+
+v= victim percent(after hitting), bd=base damage, w=target's weight"
+,4.0,0.05
+,5.0,1.4
+,6.0,18.0
+,7.0,0.01
+,8.0,2500.0,Maximum knockback
+,9.0,0.3,Staling factor in knockback formula,Staleness used with bd in KB formula = 1 + 0.3 * (Staleness - 1)
+,10.0,999.0,Maximum %
+,11.0,0.4,Scaling for hitstun frames ,Hitstun frames = INT(Knockback * 0.4) - 1
+,12.0,12.0,Hitstun frames threshold to trigger Damage2 animations
+,13.0,21.0,Hitstun frames threshold to trigger Damage3 animations
+,14.0,32.0,Hitstun frames threshold to trigger DamageFly animations
+,15.0,0xE6,"Meteor smash start hitbox angle (degrees), 230",Meteor angle range determines whether meteors can be teched while the target is standing
+,16.0,0x136,"Meteor smash end hitbox angle (degrees), 310"
+,17.0,0.79,Launch angle with 361 angle moves on aerial opponents (radians),Equal to 45.263... degrees
+,18.0,40.0,Maximum launch angle with 361 angle moves on grounded opponents (degrees),"With Sakurai Angle moves, launch angle is ~40 when opponent get DAMAGEFLY animation."
+,19.0,60.0,Lower KB threshold for 361 angle moves,"If KB < 60, Angle = 0
+If KB ≥ 60, Angle = (KB - 60)/(88 - 60) * 40 + 1, and ≤ 40"
+,20.0,88.0,Higher KB threshold for 361 angle moves
+,21.0,0.03,Launch speed multiplier,Launch speed = KB * 0.03
+,22.0,8.3,Maximum grounded initial launch speed,Equal to ~276.67 KB
+,23.0,0.5,Launch speed multiplier with 365 angle moves,Launch speed = Attacker's momentum * 0.5
+,24.0,0.2,Multiplier for distance between 366 angle hitbox position and aerial opponent TransN bone position,Launch speed = Attacker's momentum + (Hitbox position - Opponent's TransN position) * 0.2
+,25.0,0.3,Same as above but used when opponents get launched from grounded to aerial?
+,26.0,3.0,Launch speed cap for 366 angle moves (applied on frame 6)
+,27.0,-1.0,Additional vertical launch speed cap applied if it's lower than this value
+,28.0,80.0,Launch angle with 366 angle moves on grounded opponents (degrees)
+,29.0,0.1745329,Minimum launch angle below ground to be able to bounce off while grounded (radians),Equal to 10 degrees
+,30.0,0.8,Grounded bounce vertical launch speed multiplier
+,31.0,1.22173,Minimum hitbox angle to use DamageFlyTop KB animation (radians),Equal to 70 degrees
+,32.0,1.919862,Maximum hitbox angle to use DamageFlyTop KB animation (radians),Equal to 110 degrees
+,33.0,0x64,Minimum % to use the DamageFlyRoll KB animation
+,34.0,0.3,Chance of DamageFlyRoll KB animation when 100+ %
+,35.0,30.0,Maximum hitlag frames
+,36.0,0.3846154,Hitlag scaling,"Hitlag frames = INT((Damage * 0.3846154 + 5) * HitlagMult. * CrouchingMult. * ElectricMult.)
+                    = INT((Damage / 2.6 + 5) * HitlagMult. * CrouchingMult. * ElectricMult.)"
+,37.0,5.0,Base hitlag frames
+,38.0,0x8,Odds of 2nd type of getting-hit GFX (Brawl only?),"It is easier to tell the difference between the two GFX in Brawl, but I can't notice the difference in Smash 4 yet"
+,39.0,0.75,Multiplier to hitlag for character shaking frames,Shaking frames = INT(Hitlag Frames * 0.75 + 4)
+,40.0,4.0,Base character shaking frames
+,41.0,2.0,Added V launch speed on moves with Reverse Effect,"Read on ""DamageTurn"", Hitbox Effect 0x7 (Cape)"
+,42.0,2.25,Added H launch speed on moves with Reverse Effect,"Read on ""DamageTurn"", Hitbox Effect 0x7 (Cape)"
+,43.0,7.0,Minimum KB to lock character in DownDamage,Less KB causes regular damage animation (as long as it flinches)
+,44.0,15.0,Minimum KB for longer DownDamage lock animation
+,45.0,35.0,Maximum hitbox angle to lock (degrees),Moves cannot lock if Angle ≥ 35 (only matters on very slanted surfaces)
+,46.0,1.5,Hitlag multiplier for Electric element moves,Hitlag frames = INT((Damage * 0.3846154 + 5) * 1.5) - 1
+,47.0,76.0,Maximum paralyzing frames
+,48.0,0.025,Hitlag multiplier for paralyzers,"Paralyzing frames
+= INT((((Damage * 0.3846154 + 14) * HitlagMult.) * CrouchingMult. * 0.025) * KB)"
+,49.0,14.0,Base hitlag frames for paralyzers
+,50.0,55.0,Minimum knockback to incur random tripping (on moves with bonus trip chance = 0),Base trip chance is determined by fighter_param_common Names 140 and 141
+,51.0,11.0,Minimum damage per hit from outside sources while grabbed to cause grab break,Since this is larger than total damage (Name52) it has no effect in-game
+,52.0,10.0,Total damage while grabbed from outside sources to cause a grab break
+,53.0,50.0,Hitstun frames threshold for weak camera shake,Requires tumble animation? (only matters if modding these to lower than tumble threshold)
+,54.0,70.0,Hitstun frames threshold for strong camera shake
+,55.0,9.0,% required to beat another move when they clank
+,56.0,1.0,Rebound duration multiplier,"Rebound duration formula:
+INT(Rebound animation FAF / (fighter_param Name103) * (1 * Damage + 3))"
+,57.0,3.0,Base rebound duration (frames)
+,58.0,0.007,Rebound pushback multiplier,"Rebound pushback formula:
+0.5 + 0.007 * (1 * Damage + 3)"
+,59.0,0.5,Base rebound pushback
+,60.0,0x7,Maximum number of times a projectile can be reflected
+,61.0,0.04,Additional damage GFX size (this * damage)
+,62.0,0.3,Base damage GFX size
+,63.0,0.3,Minimum damage GFX size
+,64.0,1.5,Maximum damage GFX size
+,65.0,0.8
+,66.0,1.2
+,67.0,80.0
+,68.0,160.0
+,69.0,0x3
+,70.0,0x1
+,71.0,1.8,Mashing time reduction multiplier for button inputs
+,72.0,0.8
+,73.0,0.8
+,74.0,0.6
+,75.0,0.6
+,76.0,0.6
+1.0,0.0,34.6,"Rotation angles
+when flipped by hitboxes with Reverse Effect or backward f-smash (degrees)"
+,0.0,76.4
+,0.0,113.4
+,0.0,137.3
+,0.0,152.8
+,0.0,164.0
+,0.0,173.7
+,0.0,180.0

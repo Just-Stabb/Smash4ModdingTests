@@ -1,0 +1,11 @@
+,Victim's launch direction,What is used for,Comment
+0x0,Same direction to attacker is,,No flag is regarded as 0x0.
+0x1,Opposite direction to attacker is facing,Some projectiles,No difference with 0x3 (?)
+0x2,Same direction to victim is facing,"WFT's D tilt, ToonLink's SpecialN_C2"
+0x3,Opposite direction to attacker is facing
+0x4,Same direction to attacker is facing,Bairs and back throws
+0x5,Centre of hitbox,"Aether's rising hitbox, Metal Face"
+0x6,Same direction to attacker is facing,BackSlash,Shield pushback direction is opposite to usual. There is special launch animation for this.
+0x7,Left,Crazy Hand(0x66620F6A)
+0x8,Right,Crazy Hand(0x17A04D35)
+0x9,Front,Unused

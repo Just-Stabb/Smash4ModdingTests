@@ -1,0 +1,69 @@
+,SFX Name,What is used for
+0x0,Nothing
+0x1,Punch
+0x2,Kick
+0x3,Slash
+0x4,Coin 1,Initial hitbox of Mario/Luigi Up-B
+0x5,Smash,"Rest, Luigi's D-taunt and Homerun Bat etc."
+0x6,Paper,"Greninja's U-tilt, Pound etc."
+0x7,Shock
+0x8,Burn
+0x9,Splash
+0xa,Unused
+0xb,Explosion
+0xc,Unused
+0xd,Thud,Used for Snake in Brawl
+0xe,Slam,Ike's F-smash etc.
+0xf,Thwomp
+0x10,Magic
+0x11,Shell,Unused in Smash 4.
+0x12,Slap,Peach's jab etc.
+0x13,Pun,Peach's F-smash
+0x14,Club,Peach's F-smash
+0x15,Racket,Peach's F-smash
+0x16,Aura
+0x17,Unused
+0x18,Unused
+0x19,Unused
+0x1a,Unused
+0x1b,Bat,Ness' F-smash
+0x1c,Ice
+0x1d,Fireball
+0x1e,Coin 2,Final hitbox of Mario's Up-B
+0x1f,Cape
+0x20,Blaster,Fox
+0x21,,Luigi's dash attack
+0x22,,Luigi's F-smash
+0x23,Pump,F.L.U.D.D
+0x24,Bell
+0x25,Unused
+0x26,Flamethrower,Charizard
+0x27,Unused
+0x28,Unused
+0x29,Sheet,Dr. Mario's Side-B
+0x2a,Capsule,Dr. Mario's Neutral-B
+0x2b,Unused
+0x2c,Hydrant Water
+0x2d,Shot,Mii Gunner's F-air etc.
+0x2e,,Robin's Final Smash
+0x2f,,Robin's Final Smash
+0x30,,Robin's Final Smash
+0x31,,Duck Hunt's Final Smash
+0x32,,Shulk's Final Smash
+0x33,,Shulk's Final Smash
+0x34,Blaster,Falco
+0x35,,"Ryu, Hadoken etc."
+0x36,,Ryu's hitboxes
+0x37,Stick,Lucas' F-smash
+0x38,,Ryu's Final Smash
+0x39,,Ryu's Final Smash
+0x3a,,Ryu's Final Smash
+0x3b,,Cloud hitboxes
+0x3c,,Cloud's F-smash 1st hitbox
+0x3d,,Cloud's F-smash 2nd hitbox
+0x3e,,Cloud's F-smash 3rd hitbox
+0x3f,,Cloud's Final Smash
+0x40,,Cloud's Final Smash
+0x41,,Cloud's Final Smash
+0x42,,Bullet Arts
+0x43,,Bayo's Neutral-B

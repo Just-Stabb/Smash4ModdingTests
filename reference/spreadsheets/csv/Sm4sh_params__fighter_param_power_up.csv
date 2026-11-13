@@ -1,0 +1,127 @@
+Group,,Variable,Name0,Name1,Name2,Name3,Name4,Description
+1.0,"Smash Run
+Smash Tour
+
+""Speed""",0x030000d0,1.0,1.0,0.0,1.0,0.0,0x030000d0
+,,0x03000001,0.75,1.8,0.0,0.4,0.0,Walk acceleration A
+,,0x03000002,0.75,1.4,0.0,0.4,0.0,Walk acceleration B
+,,0x03000003,0.75,1.4,0.0,0.4,0.0,Walk maximum speed
+,,0x03000007,0.75,3.4,0.0,0.4,0.0,Ground friction
+,,0x03000008,0.75,1.4,0.0,0.4,0.0,Dash initial speed
+,,0x03000009,0.75,2.6,0.0,0.4,0.0,Run maximum additional acceleration
+,,0x0300000a,0.75,2.6,0.0,0.4,0.0,Base run acceleration
+,,0x0300000b,0.75,2.6,0.0,0.4,0.0,Run maximum speed
+,,0x03000012,0.75,3.2,0.0,0.4,0.0,Hop heights
+,,0x03000015,0.75,3.2,0.0,0.4,0.0,Base air acceleration
+,,0x03000016,0.75,2.5,0.0,0.4,0.0,Air horizontal maximum speed
+,,0x03000017,0.75,1.8,0.0,0.4,0.0,Air friction
+,,0x03000039,0.75,2.7,0.0,0.4,0.0,Walk acceleration A with holding heavy items
+,,0x0300003a,0.75,2.7,0.0,0.4,0.0,Walk acceleration B with holding heavy items
+,,0x0300003b,0.75,2.0,0.0,0.4,0.0,Walk maximum speed with holding heavy items
+,,0x0300003e,0.75,2.7,0.0,0.4,0.0,Walk acceleration A with holding projectile weapons
+,,0x0300003f,0.75,2.7,0.0,0.4,0.0,Walk acceleration B with holding projectile weapons
+,,0x03000040,0.75,2.0,0.0,0.4,0.0,Walk maximum speed with holding projectile weapons
+,,0x03000041,0.75,2.3,0.0,0.4,0.0,Forward dash initial speed with holding projectile weapons
+,,0x03000042,0.75,2.0,0.0,0.4,0.0,Backward dash initial speed with holding projectile weapons
+,,0x0300004e,0.75,1.7,0.0,0.4,0.0,Speed related
+,,0x03000045,0.75,3.0,0.0,0.4,0.0,Jump related
+,,0x03000043,0.75,2.0,0.0,0.4,0.0,Ledge jump horizontal speed
+
+2.0,"Smash Run
+Smash Tour
+
+""Jump""",0x030000d1,1.0,1.0,0.0,1.0,0.0,0x030000d1
+,,0x0300000d,0.85,2.2,0.0,0.4,0.0,Added horizontal airspeed from ground/footstool jump
+,,0x0300000e,0.85,2.2,0.0,0.4,0.0,Ground to air horizontal speed multiplier
+,,0x0300000f,0.85,2.2,0.0,0.4,0.0,Jump horizontal maximum initial speed
+,,0x03000010,0.85,2.2,0.0,0.4,0.0,Air jump horizontal maximum initial speed
+,,0x03000158,0.85,2.0,0.0,0.4,0.0,Jump related
+,,0x03000159,0.85,1.3,0.0,0.4,0.0,Hop related
+,,0x0300015a,0.85,1.5,0.0,0.4,0.0,Air jump related
+,,0x0300015c,0.9,2.2,0.0,0.4,0.0,Jump related
+,,0x0300015d,0.9,1.8,0.0,0.4,0.0,Jump related
+,,0x03000018,1.0,1.0,0.0,0.4,0.0,Gravity
+,,0x03000019,1.0,1.9,0.0,0.4,0.0,Maximum fall speed
+,,0x0300001a,1.0,1.3,0.0,0.4,0.0,Aerial vertical accelration
+,,0x0300001b,0.85,2.1,0.0,0.4,0.0,Fast fall speed
+,,0x0300015f,0.85,2.0,0.0,0.4,0.0,Footstool jump related
+,,0x03000160,0.85,1.7,0.0,0.4,0.0,Footstool hop related
+,,0x03000045,0.85,2.4,0.0,0.4,0.0,Jump related
+,,0x03000047,0.85,2.2,0.0,0.4,0.0,Wall jump vertical speed
+,,0x0300015b,1.0,1.8,0.0,0.4,0.0,Jump related
+
+3.0,？,0x030000d2,1.0,1.0,0.0,1.0,0.0,0x030000d2
+,,0x03000012,0.9,3.2,0.0,0.5,0.0,Hop heights
+,,0x03000013,0.9,3.2,0.0,0.5,0.0,Air jump heights
+,,0x03000014,0.9,3.2,0.0,0.5,0.0,Air maximum additional acceleration
+,,0x03000015,1.0,3.2,0.0,0.5,0.0,Base air acceleration
+,,0x03000016,1.0,3.2,0.0,0.5,0.0,Air horizontal maximum speed
+,,0x03000017,1.0,3.2,0.0,0.5,0.0,Air friction
+,,0x03000018,0.9,3.2,0.0,0.5,0.0,Gravity
+,,0x03000019,1.0,1.5,0.0,0.5,0.0,Maximum fall speed
+
+4.0,"Smash Run
+Smash Tour
+
+""Attack""",0x030000d3,1.0,1.0,0.0,1.0,0.0,0x030000d3
+,,0x030000e2,1.0,3.5,0.0,0.5,0.0,Damage dealt multiplier
+,,0x030000e3,1.0,3.5,0.0,0.5,0.0,Damage dealt multiplier
+,,0x030000e4,1.0,3.5,0.0,0.5,0.0,Damage dealt multiplier
+,,0x030000e5,1.0,3.5,0.0,0.5,0.0,Damage dealt multiplier
+,,0x030000e6,1.0,1.5,0.0,0.5,0.0,Damage dealt multiplier
+
+5.0,"Smash Run
+Smash Tour
+
+""Arms""",0x030000d8,1.0,1.0,0.0,1.0,0.0,0x030000d8
+,,0x0300003c,1.0,1.7,0.0,0.5,0.0,Item toss speed multiplier
+,,0x0300003d,0.8,3.0,0.0,0.5,0.0,Item toss damage multiplier
+,,0x030000ea,1.0,2.5,0.0,0.5,0.0,Healing multiplier (for items)
+,,0x030000ec,0.8,2.7,0.0,0.5,0.0,Battering items damage dealt multiplier
+,,0x030000ed,0.8,3.3,0.0,0.5,0.0,Item damage dealt multiplier
+,,0x030000ee,1.0,2.0,0.0,0.5,0.0
+,,0x030000ef,1.0,2.0,0.0,1.0,0.0
+,,0x030000f0,1.0,5.0,0.0,0.2,0.0
+,,0x030000f1,1.0,4.0,0.0,0.5,0.0,Grab duration multiplier
+,,0x030000f2,1.0,3.5,0.0,0.5,0.0
+,,0x030000f3,2.0,3.5,0.0,0.7,0.0,Damage dealt multiplier
+,,0x030000f4,1.0,4.0,0.0,0.5,0.0,Damage dealt multiplier
+
+6.0,"Smash Run(?)
+
+""Defence""",0x030000d9,1.0,1.0,0.0,1.0,0.0,0x030000d9
+,,0x030000f5,1.25,0.13,0.0,2.0,0.0,Damage taken multiplier
+,,0x030000f6,1.0,2.5,0.0,0.5,0.0,Frames between shield degerneration while shield is on
+,,0x030000f7,1.0,4.0,0.0,0.5,0.0,Shield regeneration multiplier
+,,0x030000f8,1.0,0.5,0.0,1.0,0.0,Base shield stun multiplier
+,,0x030000f9,1.0,2.0,0.0,1.0,0.0,Power shield window multiplier
+,,0x03000002,1.0,0.9,0.0,1.0,0.0,Walk acceleration B
+,,0x03000008,1.0,0.9,0.0,1.0,0.0,Dash initial speed
+,,0x0300000a,1.0,0.9,0.0,1.0,0.0,Base run acceleration
+,,0x0300000e,1.0,0.9,0.0,1.0,0.0,Ground to air horizontal speed multiplier
+,,0x03000015,1.0,0.9,0.0,1.0,0.0,Base air acceleration
+,,0x03000158,1.0,0.9,0.0,1.0,0.0,Jump related
+,,0x03000159,1.0,0.9,0.0,1.0,0.0,Hop related
+
+7.0,？,-,0.7,1.0,,,,Added in 1.0.4
+,,-,0.7,1.0,,,,Added in 1.0.4
+,,-,1.0,1.0,,,,Added in 1.0.4
+,,-,1.0,1.0,,,,Added in 1.0.4
+,,-,1.0,1.0,,,,Added in 1.0.4
+,,-,1.0,1.0,,,,Added in 1.0.4
+
+8.0,"Smash Tour(?)
+
+""Defence""",0x030000d9,1.0,1.0,0.0,1.0,0.0,0x030000d9
+,,0x030000f5,1.25,0.35,0.0,2.0,0.0,Damage taken multiplier
+,,0x030000f6,1.0,2.5,0.0,0.5,0.0,Frames between shield degerneration while shield is on
+,,0x030000f7,1.0,4.0,0.0,0.5,0.0,Shield regeneration multiplier
+,,0x030000f8,1.0,0.5,0.0,1.0,0.0,Base shield stun multiplier
+,,0x030000f9,1.0,2.0,0.0,1.0,0.0,Power shield window multiplier
+,,0x03000002,1.0,0.9,0.0,1.0,0.0,Walk acceleration B
+,,0x03000008,1.0,0.9,0.0,1.0,0.0,Dash initial speed
+,,0x0300000a,1.0,0.9,0.0,1.0,0.0,Base run acceleration
+,,0x0300000e,1.0,0.9,0.0,1.0,0.0,Ground to air horizontal speed multiplier
+,,0x03000015,1.0,0.9,0.0,1.0,0.0,Base air acceleration
+,,0x03000158,1.0,0.9,0.0,1.0,0.0,Jump related
+,,0x03000159,1.0,0.9,0.0,1.0,0.0,Hop related

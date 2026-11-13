@@ -1,0 +1,16 @@
+The values stored in each file are organized using 4 bytes per param. Each param is placed back-to-back with no padding.
+
+
+
+"For example, these are Banana's params. The first row contains four floats, and the second row contains 2 floats followed by an integer."
+The param files only contain floats and ints.
+"Since there isn't a way to distinguish the float value 0 and the integer value 0, params equal to ""00000000"" are left as ""unknown."""
+"These should be tested individually, or confirmed based on patterns"
+
+"To mod the files, you can simply open them with a basic hex editor. To load the mods, make sure that your regional folder contains at least 1 other mod (a param mod?)."
+"For param with NameX, the offset in each file can be found by converting (4 * X) to Hexadecimal."
+
+"Some values which would normally be coded as integers (such as lifetime) are coded as floats, so they can be set to decimals, negative numbers, or even infinity."
+
+Percentage of params labeled:
+5.773672055

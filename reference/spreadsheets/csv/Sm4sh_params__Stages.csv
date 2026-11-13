@@ -1,0 +1,61 @@
+Source : http://opensa.dantarion.com/wiki/Stages_(Smash_4)
+Stage Name,File Name,Stage ID,Omega Stage ID,Cosmetic ID
+Battlefield,BattleField_f,0.0,47.0,1.0
+Final Destination,End_f,1.0,1.0,2.0
+Mario Galaxy,Galaxy,2.0,48.0,3.0
+Mushroom Kingdom U,MarioU,3.0,49.0,4.0
+Mario Circuit,MarioKart,4.0,50.0,5.0
+Kalos Pokémon League,Kalos,5.0,51.0,21.0
+Skyloft,Skyward,6.0,52.0,11.0
+Jungle Hijinxs,DKReturns,7.0,53.0,9.0
+Pyrosphere,Metroid,8.0,54.0,13.0
+Woolly World,YoshiU,9.0,55.0,15.0
+The Great Cave Offensive,Cave,10.0,56.0,17.0
+Town and City,Village2,11.0,57.0,29.0
+Orbital Gate Assault,Assault,12.0,58.0,19.0
+Coliseum,Colloseum_f,13.0,59.0,25.0
+Garden of Hope,PikminU,14.0,60.0,24.0
+Palutena's Temple,Angeland,15.0,61.0,31.0
+Gamer,Gamer,16.0,62.0,27.0
+Duck Hunt,DuckHunt,17.0,63.0,39.0
+Wrecking Crew,Wrecking,18.0,64.0,40.0
+Gaur Plain,XenoBlade,19.0,65.0,37.0
+Boxing Ring,Punchout,20.0,66.0,36.0
+Boxing Ring,Punchout2,21.0,67.0,36.0
+Wuhu Island,Wufu,22.0,68.0,33.0
+Miiverse,Miiverse,23.0,69.0,46.0
+Wii Fit Studio,WiiFit,24.0,70.0,35.0
+Pilotwings,Pilotwings,25.0,71.0,34.0
+Windy Hill Zone,Windyhill,25.0,72.0,45.0
+Pac-Land,Pacland,27.0,73.0,44.0
+Wily Castle,Wily,28.0,74.0,43.0
+Flat Zone X,Gw3,29.0,75.0,42.0
+Delfino Plaza,XDolpic,30.0,76.0,7.0
+Mario Circuit (Brawl),XKart,31.0,77.0,8.0
+Pokémon Stadium 2,XStadium,32.0,78.0,22.0
+Bridge of Eldin,XOldin,33.0,79.0,12.0
+Kongo Jungle 64,64Jungle,34.0,80.0,10.0
+Norfair,XNorfair,35.0,81.0,14.0
+Yoshi's Island,DxYorster,36.0,82.0,16.0
+Halberd,XHalberd,37.0,83.0,18.0
+Smashville,XVillage,38.0,84.0,30.0
+Lylat Cruise,XStarfox,39.0,85.0,20.0
+Castle Siege,XEmblem,40.0,86.0,26.0
+Skyworld,XPalutena,41.0,87.0,32.0
+Port Town Aero Dive,XFzero,42.0,88.0,23.0
+Onett,DxOnett,43.0,89.0,28.0
+75m,XDonkey,44.0,90.0,41.0
+Temple,DxShrine,45.0,91.0,38.0
+Luigi's Mansion,XMansion,46.0,92.0,6.0
+Big Battlefield,BattleFieldL_f,108.0,47.0,47.0
+Suzaku Castle,StreetFighter_f,110.0,111.0,49.0
+Dream Land(64),Pupupuland64_f,112.0,113.0,48.0
+Peach's Castle(64),PeachCastle64_f,114.0,115.0,50.0
+Hyrule Castle(64),Hyrule64_f,116.0,117.0,51.0
+Super Mario Maker,MarioMaker_f,118.0,119.0,52.0
+Pirate Ship,XPirates_f,120.0,121.0,53.0
+Midgar,Midgar_f,124.0,125.0,54.0
+Umbra Clock Tower,Umbra_f,126.0,127.0,55.0
+(3D Land),3DLand
+-,Default
+(Mushroomy Kingdom),XMarioPast

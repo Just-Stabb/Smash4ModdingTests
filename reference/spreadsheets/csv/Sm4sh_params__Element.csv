@@ -1,0 +1,85 @@
+,Label,Description,Moves (No customs)
+0x0,Normal
+0x1,Detect,Detect hurtbox and transit to next action (?),"Raptor Boost (Captain Falcon)
+Electroshock Arm (Dark Pit)
+Upperdash Arm (Pit)
+Fire Hydrant (Pac-man)"
+0x2,Slash
+0x3,Electric,"Causes x1.5 hitlag
+Gives +1 hitstun (except reeling animation)
+Puts opponents to unique damage animation
+Untechable with grounded meteor (due to hitlag multiplier)
+Deals no damage to yellow Pikmin
+Some glitches regarding to wall/floor/ceiling bounching etc."
+0x4,Freezing,"Puts opponents to ""freezing"" state when deals more than 52.5 KB
+Freeze time = INT(12 * Damage)","PK Freeze (Lucas)
+Judge 8 (Mr. Game and Watch)"
+0x5,Flame,"Thaws out frozen character
+Deals no damage to red Pikmin
+Type effectiveness(Brawl)
+Deals more damage(?) to Polar Bear"
+0x6,Coin,,"Super Jump Punch (Luigi)
+Super Jump Punch (Mario)"
+0x7,Reverse,"Puts opponents to ""reversed"" state for 25 frames
+Opponents gets Super Armer for 8 frames
+No hitlag, no knockback
+Boosts horizontal momentum to grounded/airborne opponents
+Boosts upward momentum to airborne opponents","Cape (Mario)
+Super Sheet (Dr. Mario)"
+0x8,Slip,"Puts gruonded opponents to ""tripping"" state
+Moves deals 0 damage causes soft trip
+You won't suffer another trips for 60 frames after the trip","Wario Waft (Wario)
+Banana (Item)"
+0x9,Sleep,"Puts grounded opponents to ""sleep"" state
+Sleep time = INT((10 + (10 * 6) + (25 * KB) + (1 * Opponent's % after hit)))",Sing (Jigglypuff)
+0xa,Unused
+0xb,Bury,"Puts grounded opponents to ""buried"" state
+Doesn't count towards jab lock limit
+Bury time = INT((10 + (15 * 3) + (1.5 * KB) + (0.5 * Opponent's % after hit)))","Headbutt (Donkey Kong)
+Super Dedede Jump (King Dedede)
+Down Smash (Villager)
+Jab 3 (Wii Fit Trainer)
+Flip Kick (Zero Suit Samus)"
+0xc,Stun,"Puts opponents to ""stun"" state
+Does no KB/hitlag for certain frames after ""stun"" and ""disable"" state
+Stun time = INT((76 + (15 * 3) + (1 * KB)))"
+0xd,Unused
+0xe,Flower,"Puts opponents to ""flower"" state",Rest (Jigglypuff)
+0xf,Unused
+0x10,Death,Instantly KO fighters,Orne (3DS Smash Run)
+0x11,Grass,Type effectiveness(Brawl),"Unused in Smash 4
+(This was used for Ivysaur's moves in Brawl)"
+0x12,Water,"Deals no damage to blue Pikmin
+Type effectiveness(Brawl)"
+0x13,Darkness
+0x14,Paralyze,"Puts opponents to ""paralyzing"" state
+No hitlag
+Ignores opponent's weight, set it to 100 instead
+Paralyze time = INT(((((Damage * 0.3846154 + 14) * HitlagMult.) * CrouchingMult. * 0.025) * KB))","Dragon Fang Shot (Corrin)
+Paralyzer (Zero Suit Samus)
+Down Smash (Zero Suit Samus)"
+0x15,Aura
+0x16,Plunge,"Puts grounded opponents to ""buried"" state
+Does no effect if opponents is on the platform",Pitfall (Item)
+0x17,Down,Puts opponents to lying down on their back,"Unused in Smash 4
+(This was used for Snake's d-throw in Brawl)"
+0x18,Adhension,,Crash Bomb (Megaman)
+0x19,Stab,"Cosmetic Slash variant, no known effects"
+0x1a,Magic,,"Zelda (all except uair), Parasol (Peach)"
+0x1b,Flinchless1,"No hitlag, no knockback",Up-throw (Fox)
+0x1c,Flinchless2,"No hitlag, no knockback",Down-throw (Fox)
+0x1d,Solar,,Sun Salutation (Wii Fit Trainer)
+0x1e,Crumple,"Puts opponents to lying down on their front
+Doesn't occur on uncharged Focus Attack despite element being present on the hitbox",Focus Attack (Ryu)
+0x1f,Disable,"Puts opponents to ""disable"" state
+Does no KB/hitlag for certain frames after ""stun"" and ""disable"" state
+Disable time = INT(((1 * KB) + (1.1 * Opponent's % after hit)))","Disable (Mewtwo)
+Final Smash (Mewtwo)"
+0x20,Pin,"Puts opponents to ""pinned"" state",Dragon Lunge (Corrin)
+0x21,Death2,Instantly KO fighters if their current damage goes over 100%,"Unused, Final Smash (Bayonetta) is using 0x0"
+0x22,Unused
+0x23,Unknown,Unknown but has its own hit splash GFX,Unused
+0x24,Bullet Arts,,"Bullet Climax (Bayonetta)
+Bullet Art Extension (Bayonetta)"
+0x25,Unknown,No hit splash GFX,"Trick Shot (Duck Hunt)
+Final Smash (Dark Pit, Sheik, Zelda)"

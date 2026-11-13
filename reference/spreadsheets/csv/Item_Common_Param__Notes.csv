@@ -1,0 +1,5 @@
+The order of item names is roughly the same as the order of Item IDs.
+"However, the exact order is occasionally not the same, meaning cases will have to be checked independently."
+
+"To convert from a location on this list to index in the file, do:"
+(row number - 4)*70 + Param index

@@ -1,0 +1,355 @@
+Name,Variable ID,Description,Comment
+0.0,0x13000000,Character ID
+1.0,0x03000001,Walk acceleration A
+2.0,0x03000002,Walk acceleration B
+3.0,0x03000003,Walk maximum speed
+4.0,0x03000004,Multiplier for max walk speed to use WalkSlow animation?
+5.0,0x03000005,Multiplier for max walk speed to use WalkMiddle animation?
+6.0,0x03000006,Multiplier for max walk speed to use WalkFast animation?
+7.0,0x03000007,Ground friction
+8.0,0x03000008,Dash initial speed
+9.0,0x03000009,Run maximum additional acceleration
+10.0,0x0300000a,Base run acceleration
+11.0,0x0300000b,Run maximum speed
+12.0,0x1300000c,Jump startup frames
+13.0,0x0300000d,Added horizontal airspeed from ground/footstool jump
+14.0,0x0300000e,Ground to air horizontal speed multiplier
+15.0,0x0300000f,Jump horizontal maximum initial speed
+16.0,0x03000010,Air jump horizontal maximum initial speed
+17.0,0x03000011,Jump heights
+18.0,0x03000012,Hop heights
+19.0,0x03000013,Air jump heights
+20.0,0x03000014,Air maximum additional acceleration
+21.0,0x03000015,Base air acceleration
+22.0,0x03000016,Air horizontal maximum speed
+23.0,0x03000017,Air friction
+24.0,0x03000018,Gravity
+25.0,0x03000019,Maximum fall speed
+26.0,0x0300001a,Aerial vertical accelration
+27.0,0x0300001b,Fast fall speed
+28.0,0x0300001c,Nair landing lag
+29.0,0x0300001d,Fair landing lag
+30.0,0x0300001e,Bair landing lag
+31.0,0x0300001f,Uair landing lag
+32.0,0x03000020,Dair landing lag
+33.0,0x03000021,Weight
+34.0,0x13000022,Number of jumps
+35.0,0x03000023,Ground horizontal speed cap??
+36.0,0x03000024,Air horizontal speed cap
+37.0,0x13000025,Glide time (Unused)
+38.0,0x03000026,Added speed multiplier for speed of moving platforms
+39.0,0x03000027,Base landing lag (aka soft landing lag)
+40.0,0x03000028,Additional langing lag from hard landing
+41.0,0x13000029,Falling frames to use hard landing lag
+42.0,0x1300002a,Airdodge autocancel frame
+43.0,0x0300002b,Turnaround acceleration multiplier
+44.0,0x0300002c,Character model size multiplier
+45.0,0x0300002d,Base shield size
+46.0,0x0300002e,Shield break heights
+47.0,0x1300002f
+48.0,0x03000030,Tumble hitbox size (Unused?)
+49.0,0x03000031,GFX size (Type1)
+50.0,0x03000032,GFX size (Type2)
+51.0,0x03000033
+52.0,0x03000034
+53.0,0x03000035
+54.0,0x03000036,Footstool jump speed multiplier
+55.0,0x03000037,Footstool hop speed multiplier
+56.0,0x13000038,Airborne footstool endlag
+57.0,0x03000039,Walk acceleration A with holding heavy items
+58.0,0x0300003a,Walk acceleration B with holding heavy items
+59.0,0x0300003b,Walk maximum speed with holding heavy items
+60.0,0x0300003c,Item toss speed multiplier
+61.0,0x0300003d,Item toss damage multiplier
+62.0,0x0300003e,Walk acceleration A with holding projectile weapons
+63.0,0x0300003f,Walk acceleration B with holding projectile weapons
+64.0,0x03000040,Walk maximum speed with holding projectile weapons
+65.0,0x03000041,Forward dash initial speed with holding projectile weapons
+66.0,0x03000042,Backward dash initial speed with holding projectile weapons
+67.0,0x03000043,Ledge jump horizontal speed
+68.0,0x03000044,Ledge jump heights
+69.0,0x03000045,Jump related
+70.0,0x03000046,Wall jump horizontal speed
+71.0,0x03000047,Wall jump vertical speed
+72.0,0x03000048,Ground maximum speed with holding shield
+73.0,0x13000049,"script_865, hitstun related"
+74.0,0x0300004a
+75.0,0x0300004b
+76.0,0x1300004c,Odds of secondary KO scream (1 in this)
+77.0,0x1300004d,RunBrake related
+78.0,0x0300004e,Speed related
+79.0,0x0300004f,"script_756, called at start of Turn animation"
+80.0,0x13000050,Frames during TurnRun to reverse facing direction
+81.0,0x03000051,Frame where the attack button stops being read for Jab2
+82.0,0x03000052,Frame where the attack button stops being read for Jab3
+83.0,0x03000053,Frame where the attack button stops being read for Ftilt2
+84.0,0x03000054,Frame where the attack button stops being read for Ftilt3
+85.0,0x03000055,Frame where the attack button stops being read for F-smash2
+86.0,0x13000056,Related to rapid jab,Higher = More A presses required to initiate rapid jab.
+87.0,0x03000057,Related to Name88
+88.0,0x13000058,Maximum numbers of hitbox connects not to receive pushback
+89.0,0x03000059
+90.0,0x1300005a
+91.0,0x1300005b,F-smash charge frames
+92.0,0x1300005c,U-smash charge frames
+93.0,0x1300005d,D-smash charge frames
+94.0,0x0300005e
+95.0,0x1300005f
+96.0,0x03000060
+97.0,0x03000061
+98.0,0x03000062,Respawn platform size multiplier
+99.0,0x03000063
+100.0,0x03000064
+101.0,0x03000065
+102.0,0x03000066
+103.0,0x13000067
+104.0,0x13000068,Skin type
+105.0,0x13000069
+106.0,0x1300006a,GFX type 1 Bone ID
+107.0,0x0300006b,GFX type 1 X offset
+108.0,0x0300006c,GFX type 1 Y offset
+109.0,0x1300006d,GFX type 2 Bone ID
+110.0,0x0300006e,GFX type 2 X offset
+111.0,0x0300006f,GFX type 2 Y offset
+112.0,0x03000070,Added in 1.1.3
+113.0,0x03000071,Tag heights
+114.0,0x03000072
+115.0,0x03000073,Minimum horizontal speed for wall jump
+116.0,0x13000074,Bitfield of weight-based throw
+117.0,0x03000075
+118.0,0x03000076,Camera size front
+119.0,0x03000077,Camera size Back
+120.0,0x03000078,Camera size top
+121.0,0x03000079,Camera size bottom
+122.0,0x0300007a,Equals to Name114
+123.0,0x0300007b,Zoom camera size front
+124.0,0x0300007c,Zoom camera size Back
+125.0,0x0300007d,Zoom camera size top
+126.0,0x0300007e,Zoom camera size bottom
+127.0,0x1300007f,Bone
+128.0,0x03000080
+129.0,0x03000081
+130.0,0x03000082
+131.0,0x03000083
+132.0,0x13000084,Bone
+133.0,0x03000085
+134.0,0x03000086
+135.0,0x03000087
+136.0,0x03000088,Magnifying glass shrink ratio
+137.0,0x03000089,Added in 1.0.4
+138.0,0x0300008a
+139.0,0x0300008b
+140.0,0x0300008c
+141.0,0x0300008d
+142.0,0x0300008e
+143.0,0x0300008f,Grounded item grab-box X offset
+144.0,0x03000090,Grounded item grab-box Y offset
+145.0,0x03000091,Grounded item grab-box width
+146.0,0x03000092,Grounded item grab-box height
+147.0,0x03000093,Aerial item grab-box X offset
+148.0,0x03000094,Aerial item grab-box Y offset
+149.0,0x03000095,Aerial item grab-box width
+150.0,0x03000096,Aerial item grab-box height
+151.0,0x03000097
+152.0,0x03000098
+153.0,0x03000099
+154.0,0x0300009a,script_2161
+155.0,0x0300009b,Swim vertical acceleration
+156.0,0x0300009c,Swim vertical max speed
+157.0,0x0300009d,Swim horizontal acceleration
+158.0,0x0300009e,Swim horizontal max speed
+159.0,0x0300009f,Swim horizontal friction
+160.0,0x030000a0,Drown gravity multiplier
+161.0,0x130000a1
+162.0,0x030000a2,Ladder climbing speed
+163.0,0x030000a3,Ladder descending speed
+164.0,0x130000a4,Bone (NeckN/LHand?)
+165.0,0x130000a5,Bone (LHaveN/RHand?)
+166.0,0x030000a6
+167.0,0x030000a7
+168.0,0x030000a8
+169.0,0x130000a9
+170.0,0x130000aa,Metal Box stepping SFX pitch
+171.0,0x030000ab
+172.0,0x130000ac
+173.0,0x030000ad,Added in 1.0.6
+174.0,0x130000ae,Added in 1.0.6
+175.0,0x130000af,Added in 1.0.6
+176.0,0x130000b0,Added in 1.0.6
+177.0,0x130000b1,Added in 1.0.6
+178.0,0x130000b2,Added in 1.0.6
+179.0,0x130000b3,Added in 1.0.6
+180.0,0x130000b4
+181.0,0x130000b5,Buried animation type
+182.0,0x130000b6
+183.0,0x030000b7
+184.0,0x030000b8
+185.0,0x030000b9
+186.0,0x030000ba
+187.0,0x030000bb
+188.0,0x030000bc,Star size multiplier from Inhales
+189.0,0x130000bd,Amount of damage from Inhales
+190.0,0x030000be,Egg size multiplier from Egg Lay
+191.0,0x030000bf
+192.0,0x030000c0,Equals to Name190 * 5.244
+193.0,0x030000c1
+194.0,0x030000c2
+195.0,0x030000c3,Equals to Name192 * 1.16667
+196.0,0x030000c4
+197.0,0x030000c5,Equals to Name192
+198.0,0x130000c6
+199.0,0x030000c7
+200.0,0x030000c8
+201.0,0x030000c9
+202.0,0x030000ca
+203.0,0x130000cb,Instance KO GFX Bone ID
+204.0,0x030000cc,Instance KO GFX size multiplier?
+205.0,0x130000cd,Instance KO GFX X offset
+206.0,0x130000ce,Instance KO GFX Y offset
+207.0,0x130000cf,Instance KO GFX Z offset
+208.0,0x030000d0,Used for fighter_param_power_up
+209.0,0x030000d1,Used for fighter_param_power_up
+210.0,0x030000d2,Used for fighter_param_power_up
+211.0,0x030000d3,Used for fighter_param_power_up
+212.0,0x030000d4
+213.0,0x030000d5
+214.0,0x030000d6
+215.0,0x030000d7
+216.0,0x030000d8,Item related
+217.0,0x030000d9,Used for fighter_param_power_up
+218.0,0x030000da,Damage dealt multiplier
+219.0,0x030000db,Damage dealt multiplier
+220.0,0x030000dc,Damage dealt multiplier
+221.0,0x030000dd,Damage dealt multiplier
+222.0,0x030000de,Damage dealt multiplier
+223.0,0x030000df,Damage dealt multiplier
+224.0,0x030000e0,Smash charge damage multiplier
+225.0,0x030000e1,Smash charge speed multiplier
+226.0,0x030000e2,Damage dealt multiplier
+227.0,0x030000e3,Damage dealt multiplier
+228.0,0x030000e4,Damage dealt multiplier
+229.0,0x030000e5,Damage dealt multiplier
+230.0,0x030000e6,Damage dealt multiplier
+231.0,0x030000e7,Damage dealt multiplier (EnMeteorUp)
+232.0,0x030000e8,Damage dealt multiplier (EnStrongUpperAttack)
+233.0,0x030000e9
+234.0,0x030000ea,Healing multiplier (for items)
+235.0,0x030000eb,Healing multiplier (for foods)
+236.0,0x030000ec,Battering items damage dealt multiplier
+237.0,0x030000ed,Item damage dealt multiplier
+238.0,0x030000ee
+239.0,0x030000ef
+240.0,0x030000f0
+241.0,0x030000f1,Grab duration multiplier
+242.0,0x030000f2
+243.0,0x030000f3,Damage dealt multiplier
+244.0,0x030000f4,Damage dealt multiplier
+245.0,0x030000f5,Damage taken multiplier
+246.0,0x030000f6,Frames between shield degerneration while shield is on
+247.0,0x030000f7,Shield regeneration multiplier
+248.0,0x030000f8,Base shield stun multiplier
+249.0,0x030000f9,Power shield window multiplier
+250.0,0x030000fa,Dodge intangible duration multiplier
+251.0,0x030000fb,Ledge grab range multiplier
+252.0,0x030000fc,Ledge hang duration multiplier
+253.0,0x030000fd,Respawn invincible duration multiplier
+254.0,0x030000fe,Status duration multiplier
+255.0,0x030000ff,Final Smash drop probability multiplier
+256.0,0x03000100,Home-Run Bat smash swing speed multiplier
+257.0,0x03000101,Firing items ammo multiplier
+258.0,0x03000102,"Item, damage dealt multiplier"
+259.0,0x03000103,Speed Crasher equipment hitbox X offset
+260.0,0x03000104,Speed Crasher equipment hitbox Y offset
+261.0,0x03000105,Speed Crasher equipment hitbox Z offset
+262.0,0x13000106,Jab type
+263.0,0x13000107,Number of jab
+264.0,0x13000108,Number of rapid jab
+265.0,0x13000109,Number of Ftilt
+266.0,0x1300010a,Number of F-smash
+267.0,0x1300010b,Number of D-smash
+268.0,0x1300010c,Jump type
+269.0,0x1300010d,Has glide
+270.0,0x0300010e,WalkSlow animation frame threshold1 to use WalkFallL
+271.0,0x0300010f,WalkSlow animation frame threshold2 to use WalkFallL
+272.0,0x03000110,WalkMiddle animation frame threshold1 to use WalkFallL
+273.0,0x03000111,WalkMiddle animation frame threshold2 to use WalkFallL
+274.0,0x03000112,WalkFast animation frame threshold1 to use WalkFallL
+275.0,0x03000113,WalkFast animation frame threshold2 to use WalkFallL
+276.0,0x03000114,Run animation frame threshold1 to use RunFallL / RunBrakeL
+277.0,0x03000115,Run animation frame threshold2 to use RunFallL / RunBrakeL
+278.0,0x03000116,Run animation frame threshold3 to use RunFallL / RunBrakeL
+279.0,0x03000117,Run animation frame threshold4 to use RunFallL / RunBrakeL
+280.0,0x03000118,HeavyWait animation frame lower threshold
+281.0,0x03000119,HeavyWalk animation start frame
+282.0,0x0300011a,HeavyWait animation frame higher threshold
+283.0,0x1300011b,Has crawl
+284.0,0x1300011c,Has dash attack > crouch?
+285.0,0x1300011d,Has wall jump
+286.0,0x1300011e,Has wall cling
+287.0,0x1300011f,Has tether
+288.0,0x13000120,Thrown type
+289.0,0x13000121,Always facing screen or not
+290.0,0x13000122
+291.0,0x13000123,Grabbed type
+292.0,0x13000124
+293.0,0x13000125
+294.0,0x13000126,Grabbed related
+295.0,0x03000127
+296.0,0x13000128,Bone
+297.0,0x13000129
+298.0,0x1300012a
+299.0,0x0300012b
+300.0,0x0300012c,Screen KO related
+301.0,0x0300012d,Added in 1.0.6
+302.0,0x0300012e,KO related
+303.0,0x0300012f,KO related
+304.0,0x03000130,KO related
+305.0,0x03000131,KO related
+306.0,0x03000132,KO related
+307.0,0x03000133
+308.0,0x03000134
+309.0,0x03000135
+310.0,0x03000136
+311.0,0x03000137
+312.0,0x13000138,Bone (HipN)
+313.0,0x13000139,Bone (HeadN)
+314.0,0x1300013a
+315.0,0x0300013b
+316.0,0x0300013c
+317.0,0x0300013d
+318.0,0x0300013e
+319.0,0x0300013f
+320.0,0x03000140
+321.0,0x03000141
+322.0,0x03000142
+323.0,0x03000143
+324.0,0x03000144
+325.0,0x03000145
+326.0,0x03000146
+327.0,0x03000147
+328.0,0x13000148,Costume color for Find Mii stage (Costume ID=0x0)
+329.0,0x13000149,Costume color for Find Mii stage (Costume ID=0x1)
+330.0,0x1300014a,Costume color for Find Mii stage (Costume ID=0x2)
+331.0,0x1300014b,Costume color for Find Mii stage (Costume ID=0x3)
+332.0,0x1300014c,Costume color for Find Mii stage (Costume ID=0x4)
+333.0,0x1300014d,Costume color for Find Mii stage (Costume ID=0x5)
+334.0,0x1300014e,Costume color for Find Mii stage (Costume ID=0x6)
+335.0,0x1300014f,Costume color for Find Mii stage (Costume ID=0x7)
+336.0,0x13000150,Costume color for Find Mii stage (Costume ID=0x8)
+337.0,0x13000151,Costume color for Find Mii stage (Costume ID=0x9)
+338.0,0x13000152,Costume color for Find Mii stage (Costume ID=0xa)
+339.0,0x13000153,Costume color for Find Mii stage (Costume ID=0xb)
+340.0,0x13000154,Costume color for Find Mii stage (Costume ID=0xc)
+341.0,0x13000155,Costume color for Find Mii stage (Costume ID=0xd)
+342.0,0x13000156,Costume color for Find Mii stage (Costume ID=0xe)
+343.0,0x13000157,Costume color for Find Mii stage (Costume ID=0xf)
+344.0,0x03000158,Jump related
+345.0,0x03000159,Hop related
+346.0,0x0300015a,Air jump related
+347.0,0x0300015b,Jump related
+348.0,0x0300015c,Jump related
+349.0,0x0300015d,Jump related
+350.0,0x0300015e,Jump related
+351.0,0x0300015f,Footstool jump related
+352.0,0x03000160,Footstool hop related
+353.0,0x03000161

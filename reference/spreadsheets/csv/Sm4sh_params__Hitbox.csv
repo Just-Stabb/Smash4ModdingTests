@@ -1,0 +1,54 @@
+,INT/FLOAT,Label,Description,Comment
+0.0,I,ID
+1.0,I,Part
+2.0,I,Bone
+3.0,F,Damage
+4.0,I,Angle
+5.0,I,KBG
+6.0,I,WKB
+7.0,I,BKB
+8.0,F,Hitbox Size
+9.0,F,Offset X
+10.0,F,Offset Y
+11.0,F,Offset Z
+12.0,I,Element,-> Element
+13.0,F,Tripping Rate,,Can be negative value (Paralyzer has -1)
+14.0,F,Hitlag
+15.0,F,SDI Multiplier
+16.0,I,Clang,"0x0 = No, 0x1 = Yes"
+17.0,I,Rebound,"0x0 = No, 0x1 = Yes"
+18.0,I,Shield Damage
+19.0,I,SFX Level,"0x0 = Small, 0x1 = Medium, 0x2 = Large, 0x3 = Huge","0x3 is only used for certain SFX types. Otherwise, you won't get a sound effect at all."
+20.0,I,SFX Type,-> SFX Type
+21.0,I,Ground/Air,"0x0 = Unknown, 0x1 = Grounded Only
+0x2 = Aerial Only, 0x3 = Grounded/Aerial","If 0x80000000 is set to this flag, the hitbox won't hit against downed opponent.
+e.g., 0x80000001 deals damage only for grounded opponent isn't laying down."
+22.0,I,Direct/Indirect,"0x0 = Indirect, 0x1 = Direct"
+23.0,I,Type,-> Type,"Carryover from Brawl for modifying stats in SE. No water type exists in Smash 4.
+Probably no meaning in Smash 4."
+24.0,I,Hit Bits,-> Hit Bits,Controls what kind of targets the hitbox will be able to hit.
+25.0,I,Unknown flag,,"0x0 = usual
+0x1 for the from-the-front hitboxes of Back Slash and ROB's SpecialS_C3."
+26.0,I,Unknown bit,"Another Hit Bits?
+If set to 0x1, can't hit to character/enemy/floor/ceiling
+but can hit to items/baloons","0xf(0b1111) = usual
+0xc(0b1100) for banana hitbox
+0x9(0b0101) for Master Hand"
+27.0,I,Unknown flag,,Only Dr. Wright's building hitbox has 0x1.
+28.0,I,Blockability,"0x0 = No, 0x1 = Yes"
+29.0,I,Reflectability,"0x0 = No, 0x1 = Yes"
+30.0,I,Absorbability,"0x0 = No, 0x1 = Yes"
+31.0,I,Rehit Rate,,Determines how many frames need to play before the hitbox can hit again.
+32.0,I,No Invincible,"0x0 = No, 0x1 = Yes","WFT's Dtilt, Master Hand(0x10BB7180)
+(Marth/Lucina's Final Smash had had 0x1 until 1.1.3)"
+33.0,I,No Intangible,"0x0 = No, 0x1 = Yes","Doesn't apply to invinciblility. Jigg's Final Smash, Master Hand(0x10BB7180)
+(WFT's Nair had had 0x1 until 1.0.0, Marth/Lucina's Final Smash until 1.1.3)"
+34.0,I,Facing Restriction,-> Facing Restriction
+35.0,I,Grippy?
+36.0,I,Friendly Fire,"0x0 = No, 0x1 = Yes",Only Hydrant's water hitboxes and Crushbomb's detect hitbox has 0x1 in Smash 4.
+37.0,I,No Hitlag,"0x0 = No, 0x1 = Yes",A lot of wind/water hitboxes are set to 0x1.
+38.0,I,No GFX,"0x0 = No, 0x1 = Yes",A lot of wind/water hitboxes are set to 0x1.
+39.0,I,Flinchless,"0x0 = No, 0x1 = Yes, 0x1 makes un-counter-triggerable",A lot of wind/water hitboxes are set to 0x1.
+40.0,F,Stretchy X offset
+41.0,F,Stretchy Y offset
+42.0,F,Stretchy Z offset

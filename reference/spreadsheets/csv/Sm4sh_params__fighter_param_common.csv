@@ -1,0 +1,884 @@
+Name,Variable ID,Value,Description,Comment
+0.0,0x02000000,11.0,The frame in which the input buffer clears,Buffer window = 10 F
+1.0,0x02000001,0.18,Walk sensitivity
+2.0,0x02000002,0.5,Walk accel multiplier ((1 - 0x1000006 / StickX) * this),"Once StickX get written, can't get highter value until next WalkTurn or leaving the ground"
+3.0,0x02000003,2.0
+4.0,0x02000004,5.0,Walk animation max frame speed multiplier
+5.0,0x02000005,0.1,,script_778
+6.0,0x02000006,-0.25,Turn sensitivity
+7.0,0x02000007,0.83,Dash / Fsmash sensitivity
+8.0,0x12000008,0x2,Dash / Fsmash input window
+9.0,0x12000009,0x5,Dash > Item toss/drop input window
+10.0,0x1200000a,0x5
+11.0,0x1200000b,0x6,Dash > Turn input window
+12.0,0x1200000c,0xF,Dash > Forward Dash minimum window (this + 1)
+13.0,0x0200000d,0.67,Dash exit speed multiplier,"related to perfect pivot, jump cancelling item toss and etc"
+14.0,0x0200000e,0.625,Run sensitivity
+15.0,0x0200000f,0.4,Run accel multiplier ((1 - 0x1000006 / StickX) * this),"Once StickX get written, can't get highter value until next TurnRun or leaving the ground"
+16.0,0x02000010,1.0,Dash > RunBrake friction multiplier
+17.0,0x02000011,0.25,Max run speed multiplier to occur Dash > RunBrake?,"If current speed is lower than max run speed * this, doesnt go to RunBrake"
+18.0,0x12000012,0x5,RunBrake > Dash attack winput window?,script_721
+19.0,0x02000013,0.05
+20.0,0x02000014,-0.375,Run > TurnRunBrake / Pivot grab sensitivity
+21.0,0x02000015,2.0,TurnRun acceleration multiplier on the ledge,Added in 1.0.4
+22.0,0x02000016,10.0,"Turn > Ftilt, Fsmash, Side B and Item toss input window"
+23.0,0x12000017,0x5,Starting frame of TurnRun > 'side attack' window,"TurnRun cancels into: SpecialS, Swing4Start, Swing3, LightThrow, ItemFire, AttackS4Start, AttackS3
+Window is defined by 5 ≤ Frame ≤ 5 + 8"
+24.0,0x12000018,0x8,Length of TurnRun > 'side attack' window
+25.0,0x02000019,5.0,Run animation max frame speed multiplier
+26.0,0x0200001a,-0.66,Crouch / Tether drop sensitivity
+27.0,0x0200001b,0.3,Crawling forward sensitivity
+28.0,0x0200001c,0.65,Crawling forward max rate sensitivity
+29.0,0x0200001d,-0.3,Crawling backward sensitivity
+30.0,0x0200001e,-0.65,Crawling backward max rate sensitivity
+31.0,0x0200001f,0.6625,Tap jump sensitivity
+32.0,0x12000020,0x4,Tap jump input window,This also is applied while running
+33.0,0x02000021,0.125,Jumping forward/backward sensitivity
+34.0,0x02000022,0.3,Shorthop with tap jump sensitivity
+35.0,0x02000023,0.5625,Tap jump sensitivity while running
+36.0,0x02000024,0.3,V speed multiplier (used on Bullet Bill exit and aerial footstools?)
+37.0,0x02000025,0.03
+38.0,0x02000026,1.0
+39.0,0x12000027,0x3,Frames where running off of cliff allows Jumpsquat,Note: There is MSC bug where it checks smash attack bit instead of the jump button
+40.0,0x02000028,0.1,have to do with FallF and FallB animations
+41.0,0x02000029,0.1,Animation blend speed for Fall to FallF/FallB animations,example: set to 0 and you always stay in Fall animation. Set to 1 and you instantly turn to FallF or FallB animation when holding sideways
+42.0,0x0200002a,0.05,Minimum animation blend amount for Fall to FallF/FallB,"example: if set closer to 1 there is a bigger ""gap"" between Fall and FalF/FallB blending, above 1 makes it impossible to show FallF/FallB. Similar to sensitivity, or deadzones"
+43.0,0x0200002b,-0.7,Spotdodge sensitivity
+44.0,0x1200002c,0x4,Spotdodge input window
+45.0,0x0200002d,0.7,Roll sensitivity
+46.0,0x1200002e,0x4,Roll input window
+47.0,0x0200002f,0.9
+48.0,0x02000030,0.55,Initial speed of pushback from connecting multiple hits (with jabs),"Decel = 1.1 * Ground friction, as like shield pushback, can't be negative"
+49.0,0x02000031,0.25,Ftilt sensitivity,"also MK, Kirby, Charizard F/B throw sensitivity"
+50.0,0x02000032,0.28,Up angled Ftilt vertical sensitivity (radians),Equal to 16.04... degrees
+51.0,0x02000033,-0.28,Down angled Ftilt vertical sensitivity (radians),Equal to -16.04... degrees
+52.0,0x02000034,0.25,Utilt sensitivity
+53.0,0x02000035,-0.25,Dtilt sensitivity
+54.0,0x02000036,0.55,Initial speed of pushback from connecting multiple hits (with Dtilt),"Decel = 1.1 * Ground friction, as like shield pushback, can't be negative"
+55.0,0x12000037,0x3C,Related to input window of above,seen in code relating to fighter_params 89 and 90
+56.0,0x02000038,0.28,Up angled Fsmash vertical sensitivity (radians),Equal to 16.04... degrees
+57.0,0x02000039,-0.28,Down angled Fsmash vertical sensitivity (radians),Equal to -16.04... degrees
+58.0,0x0200003a,0.66,Usmash sensitivity
+59.0,0x1200003b,0x4,Usmash input window
+60.0,0x0200003c,-0.66,Dsmash sensitivity
+61.0,0x1200003d,0x4,Dsmash input window
+62.0,0x0200003e,1.4,Full charge smash attack damage multiplier,"doesn't apply for Megaman's f-smash, base dmg = 11.5, max dmg = 19.5"
+63.0,0x0200003f,1.2,Interrupted charge smash attack knockback multiplier
+64.0,0x02000040,0.25,Bair/Fair sensitivity
+65.0,0x02000041,0.25,Uair/Dair sensitivity
+66.0,0x02000042,0.25
+67.0,0x02000043,0.9,,Added in 1.0.4
+68.0,0x02000044,4.0,,Added in 1.0.4
+69.0,0x02000045,0.56
+70.0,0x02000046,-0.66,Fastfall sensitivity
+71.0,0x12000047,0x4,Fastfall input window
+72.0,0x02000048,0.85,"X sensitivity(557), Y sensitivity to JumpSquat while RunBrake? (Tap Jump) (732)","script_557, 732"
+73.0,0x12000049,0x5,Input window for above,script_557
+74.0,0x0200004a,60.0,Minimum Glide frames before GlideLanding can occur (Unused)
+75.0,0x0200004b,1.0,Minimum Glide speed on landing for GlideLanding to occur (Unused)
+76.0,0x0200004c,0.67,Hitlag multiplier while crouching
+77.0,0x0200004d,0.85,KB multiplier while crouching
+78.0,0x0200004e,0.7,Input distance threshold for Smash DI (SDI)
+79.0,0x1200004f,0x4,SDI input window (frames)
+80.0,0x02000050,2.0,Smash DI distance
+81.0,0x02000051,0.65,Automatic SDI distance multiplier
+82.0,0x02000052,0.66,Shield SDI distance multiplier
+83.0,0x12000053,0x8,Frames after taking damage before player collision takes effect again
+84.0,0x02000054,80.0,Lower camera zoom-out threshold for hitlag shaking
+85.0,0x02000055,200.0,Upper camera zoom-out threshold for hitlag shaking
+86.0,0x02000056,0.5,Minimum hitlag shaking distance (camera zoom-out < 80),Note: Midair shaking is vertical while grounded shaking is horizontal
+87.0,0x02000057,1.8,Maximum hitlag shaking distance (camera zoom-out > 200)
+88.0,0x02000058,5.0,Required launch speed for DownBound,script_791
+89.0,0x02000059,0.5
+90.0,0x1200005a,0x1E,Caped reversed control frames (true = this minus 5)
+91.0,0x0200005b,220.0,Autostand time when lying on the ground (frames)
+92.0,0x0200005c,0.2,Trip stand sensitivity
+93.0,0x0200005d,0.2,Trip roll sensitivity (forward/backward)
+94.0,0x0200005e,60.0
+95.0,0x0200005f,0.6625,,Sensitivity?
+96.0,0x12000060,0x3
+97.0,0x02000061,0.0,B-reverse and Turnaround B sensitivity
+98.0,0x02000062,0.6,Side B sensitivity
+99.0,0x02000063,0.55,Up B/Down B sensitivity
+100.0,0x12000064,0x4,B-reverse input window
+101.0,0x12000065,0xA,Turnaround B input window
+102.0,0x02000066,-0.6875,Platform drop sensitivity
+103.0,0x12000067,0x6,Platform drop input window
+104.0,0x02000068,-0.5,Platform drop V speed
+105.0,0x02000069,1.0,"related to platform drop, (this + 0x11000004) used to set frames until drop starts",script_623
+106.0,0x0200006a,1.0
+107.0,0x0200006b,0.051
+108.0,0x0200006c,-0.66,Ledge no-snap vertical sensitivity
+109.0,0x1200006d,0x2,Maximum ledgesnap duration (frames)
+110.0,0x0200006e,100.0,CliffQuick/Slow % damage threshold in Brawl
+111.0,0x1200006f,0x168,"Maximum ledge hang duration (frames), 360",There is another animation-based 19 or 20 frames ledge hang duration
+112.0,0x12000070,0xF0,"Unknown, 240"
+113.0,0x02000071,0.25,Ledge release/getup sensitivity
+114.0,0x02000072,0.8726646,Ledge getup analog range (radians),Equal to 50 degrees
+115.0,0x12000073,0x36,Minimum regrabbing duration (frames),"After ledge release, you cannot grab the ledge in 54 frames"
+116.0,0x02000074,0.0,Unknown
+117.0,0x02000075,0.6,Reverse ledge grab range multiplier
+118.0,0x12000076,0x3C,Maximum gained ledge intangibility from being airborne (frames),"CliffWait intangibility frames are given by:
+INT((Airborne frames / 300) * 60 + (44 - (current% / 120) * 44))
+where
+0 ≤ (Airborne frames / 300) * 60 ≤ 60
+0 ≤ 44 - (current% / 120) * 44 ≤ 44
+4 ≤ Ledge intangibility"
+119.0,0x12000077,0x12C,Maximum airborne time for gaining additional ledge intangibility (frames)
+120.0,0x12000078,0x2C,Maximum gained ledge intangibility from having low% (frames)
+121.0,0x12000079,0x78,% threshold for gaining no additional ledge intangibility
+122.0,0x1200007a,0x4,Minimum ledge intangibility (frames)
+123.0,0x0200007b,0.9,H speed from ledge trump
+124.0,0x0200007c,20.0,Frames to reach top of ledge trump,Ledge trump initial V speed = 20 * gravity
+125.0,0x1200007d,0x1C,Ledge trump length (frames)
+126.0,0x0200007e,25.0
+127.0,0x1200007f,0x10,Minimum time between spring jumps (frames),Called at end of spring jump ascent action
+128.0,0x12000080,0x1E,Tech disabled duration (frames),"If you double tap your shield button, you cant tech in 30F from first input."
+129.0,0x12000081,0x8,Tech input window
+130.0,0x02000082,0.2,Tech roll sensitivity
+131.0,0x02000083,0.1,Floor tech H speed multiplier
+132.0,0x12000084,0x5,Wall tech > Wall jump input window
+133.0,0x12000085,0xE,Wall tech/Wall tech jump intangibility frames
+134.0,0x02000086,400.0,Base time on shield break (frames)
+135.0,0x02000087,90.0,Minimum time on shield break (frames),No way to prove this one. It was bugged in Brawl and bugged in this game too
+136.0,0x02000088,1.0,Reduction per frame on shield break
+137.0,0x02000089,3.0,Reduction per input on shield break
+138.0,0x0200008a,0.5,Input distance threshold for shield break mashing
+139.0,0x0200008b,10.0,Unknown
+140.0,0x0200008c,0.12,First value for calculating the trip chance for 0/180 deg moves,"True trip chance is given by averaging these two values;
+(0.12 + 0.02) / 2 = 0.07"
+141.0,0x0200008d,0.02,Second value for calculating the trip chance for 0/180 deg moves
+142.0,0x1200008e,0x3C,Minimum time between trips (frames),Slip effect ignores this
+143.0,0x1200008f,0xF0,Trip autostand timer (frames)
+144.0,0x12000090,0x96,"Maximum % to receive the damage from magnifying-glass, 150"
+145.0,0x12000091,0x3C,Frames to receive the damage from magnifying-glass
+146.0,0x02000092,1.0,% received from magnifying-glass
+147.0,0x02000093,2.0,Minimum launch speed to display player cursor (after Name148 frames)
+148.0,0x12000094,0x4,Number of frames launched before displaying player cursor
+149.0,0x12000095,0x50,Frames before player cursor appears when starting waiting actions,"CliffWait, SquatWait, Wait, WalkBrake"
+150.0,0x02000096,80.0,Camera distance(?) to force player cursor display
+151.0,0x12000097,0x2,Smashball drop probability multiplier ,Smashball drop probablity = 2 * (INT (Damage taken) / 100)
+152.0,0x12000098,0x1E,30.0
+153.0,0x12000099,0x3C,60.0
+154.0,0x1200009a,0x78,120.0
+155.0,0x1200009b,0x5,,"related to Name156, Name157, and fighter_param_equipment_ability variables 0x1900009b and 0x1900009e"
+156.0,0x1200009c,0x2
+157.0,0x0200009d,10.0
+158.0,0x0200009e,2.0
+159.0,0x0200009f,25.0
+160.0,0x120000a0,0x6
+161.0,0x020000a1,2.0,Platform drop animation length (FAF after platform drop),There is 3 frames window to cancel so true FAF is 5 frames
+162.0,0x020000a2,0.045,Player collision speed
+163.0,0x020000a3,1.15,Rage effect,"Rage effect
+=1 + (% - 35) * (1.15 - 1) / (150 - 35)
+(35 ≤ % ≤ 150)"
+164.0,0x020000a4,150.0
+165.0,0x020000a5,35.0
+166.0,0x020000a6,2.0,HeavyGet animation speed multiplier (this * sys_40(0x0))
+167.0,0x020000a7,1.33,HeavyThrow animation speed multiplier
+168.0,0x020000a8,2.0,V speed (Fall animation related),script_581
+169.0,0x020000a9,0.8
+170.0,0x020000aa,0.7
+171.0,0x020000ab,0.66
+172.0,0x020000ac,0.5,Animation speed multiplier (Fall animation related),script_637
+173.0,0x120000ad,0x14,"JumpAerial, Glide related?",script_496
+174.0,0x120000ae,0x82,"Wall jump timer (frames), 130"
+175.0,0x020000af,0.8,Wall jump sensitivity
+176.0,0x120000b0,0x3,,input window?
+177.0,0x120000b1,0x5,Wall jump startup frames
+178.0,0x020000b2,0.96,Wall jump decay multiplier
+179.0,0x120000b3,0x4,Wall jump air mobility delay
+180.0,0x020000b4,0.9,Wall jump initial H speed multiplier,"Multiplies to fighter_param 70, before max airspeed checked"
+181.0,0x020000b5,0.75,Footstool speed multiplier for each additional footstool
+182.0,0x020000b6,0.5,Required V initial speed for footstool
+183.0,0x120000b7,0x8,Minimum time between footstools (frames)
+184.0,0x020000b8,30.0,Maximum stage wall tilt for wall cling (degrees)
+185.0,0x020000b9,-20.0,Minimum stage wall tilt for wall cling (degrees)
+186.0,0x120000ba,0xB4,Wallcling timer (frames),"Wall cling time = INT(180 * 0.5 ^ (WallClingCount - 1))
+only uses 0.5 multiplier if WallClingCount > 0 (when you wallcling for 2nd time)"
+187.0,0x020000bb,0.5,Consecutive Wallcling time multiplier
+188.0,0x020000bc,0.5
+189.0,0x120000bd,0x3C,Time between wallclings (frames)
+190.0,0x020000be,0.35,Aerial attack landing lag animation duration multiplier
+191.0,0x120000bf,0x14,Airdodge landing lag (frames)
+192.0,0x020000c0,0.66,Airdodge landing lag frame speed multiplier
+193.0,0x120000c1,0x8,Tether landing lag (frames)
+194.0,0x020000c2,50.0,Shield HP
+195.0,0x020000c3,0.15,Minimum shield size 
+196.0,0x120000c4,0xB,Minimum shield hold time (frames),You cannot drop shield until frame 12.
+197.0,0x020000c5,8.0,Unknown
+198.0,0x020000c6,16.0,Unknown
+199.0,0x020000c7,0.13,Shield degeneration per frame
+200.0,0x020000c8,0.08,Shield regeneration per frame
+201.0,0x020000c9,25.0,Shield reset HP when broken,"When broken, shield strength resets to this value"
+202.0,0x020000ca,1.19,Shield damage multiplier,Prepatch formula: (1 - 0.3) * (Damage * 1.6)
+203.0,0x020000cb,0.0,Base shield damage,Added per hit after shield damage multipliers
+204.0,0x020000cc,0.58,Shield stun constant,"Shield stun formula: INT (Damage * 0.58 + 4)
+True shield stun frames = INT (Damage * 0.58 * Mult. + 4) - 2 "
+205.0,0x020000cd,4.0
+206.0,0x020000ce,0.5,Shield stun multiplier for projectiles,= INT (Damage * 0.58 * 0.5 + 4) - 2 
+207.0,0x020000cf,0.8,Grab immunity frames multiplier,INT((Shield stun + Shield drop lag) * 0.8) = Grab immunity frames
+208.0,0x020000d0,0.09,Shield pushback multiplier,Shield pushback = Shield stun formula * 0.09 * Mult.
+209.0,0x020000d1,1.3,Maximum shield pushback
+210.0,0x020000d2,80.0,Unknown
+211.0,0x020000d3,1.05,Shield health multiplier for calculating shield size,The formula for shield size = Shield Size * (0.15 + (Shield Health / 50) * 1.05 * (1 - 0.15))
+,,0.3,Shield damage resistance ratio (for actual shield HP),Removed in 1.1.1
+,,0.7,Shield damage resistance ratio (for shieldstun),Removed in 1.1.1
+212.0,0x020000d4,0.5,Shield tilt speed
+213.0,0x120000d5,0x4,Frame the power shield disappear,Power shield window: 1-3F
+214.0,0x120000d6,0x5,Window to drop shield after powershield to get interrupts?,Shield Exploder related?
+215.0,0x020000d7,0.66,Shield stun multiplier for power shield,= INT (Damage * 0.58 * 0.66 + 4) - 2
+216.0,0x020000d8,0.15,Pushback multiplier for power shield,Shield pushback = Shield stun formula * 0.09  * 0.15
+217.0,0x020000d9,0.04,Additional attacker shield pushback per % damage,Attacker shield pushback = 0.04 * Damage + 0.025
+218.0,0x020000da,0.025,Base attacker shield pushback
+219.0,0x020000db,0.05,Attacker shield pushback deceleration in air
+220.0,0x020000dc,1.1,Friction multiplier on attacker shield pushback ,gets multiplied with character's normal friction (Decel = 1.1 * Friction)
+221.0,0x020000dd,1.3,Franklin Badge reflected damage multiplier
+222.0,0x020000de,1.3,Franklin Badge reflected speed multiplier
+223.0,0x120000df,0x8,Shield drop lag (frames)
+224.0,0x120000e0,0x3,Dash attack > Dash grab/Pivot grab input window,Also applies to Roll > Grab window after Dash
+225.0,0x020000e1,1.0
+226.0,0x120000e2,0x3,"TurnRunBrake > Pivot grab, backward roll input window"
+227.0,0x020000e3,1.0,Grab time reduced per frame
+228.0,0x020000e4,8.0,Grab time reduced per directional input
+229.0,0x020000e5,10.0,Related to H speed after dash grab hitbox connected
+230.0,0x020000e6,2.0
+231.0,0x020000e7,2.0,Added Y offset difference to determine grab break,read when grabbed
+232.0,0x120000e8,0x10,Grabbed
+233.0,0x120000e9,0x1E,Grab jump break
+234.0,0x020000ea,6.0,CAPTURE_CUT_DIST_X
+235.0,0x020000eb,6.0,CAPTURE_CUT_DIST_Y
+236.0,0x120000ec,0x5A,Base grab time (frames),Grab time = INT (Opponent's % * 1.7 + 90)
+237.0,0x020000ed,1.7,Multiplier for grab hold time added from total damage
+238.0,0x020000ee,-3.0
+239.0,0x020000ef,1.0
+240.0,0x020000f0,1.9,H speed on normal grab break
+241.0,0x020000f1,1.2,H speed on jump grab break
+242.0,0x020000f2,27.0,Frames to reach top of jump grab break,Initial V speed = 27 * gravity
+243.0,0x120000f3,0x12,How many frames of invincibility you have after a throw
+244.0,0x020000f4,0.01,Weight factor of weight dependent throw speed formula,"Weight dependent throw speed is determined by using:
+New_Animation_Length = Normal_Animation_Length + 26 * (Weight * 0.01 - 1)
+Throw frames scale between frame 1 and new animation length."
+245.0,0x120000f5,0x1A,Additional animation frames scaling factor of weight dependent throw formula
+246.0,0x020000f6,2.0,Result of weight times above cannot exceed this
+247.0,0x020000f7,0.5,Result of weight times above cannot be lower than this
+248.0,0x120000f8,0x46,Grab immunity frames
+249.0,0x120000f9,0x3,Animation blending frames to DamageFly animations (except for DamageFlyRoll)
+250.0,0x020000fa,0.75,Frame speed multiplier for Damagefly animations (except for DamageFlyRoll),Determines fastfall window out of tumble; (Hitstun - Name71 + 1) to INT(Hitstun / Name250)
+251.0,0x020000fb,1.1,,Added in 1.0.4
+252.0,0x020000fc,0.0,,Added in 1.0.4
+253.0,0x120000fd,0x2A30,Frames after touching the ground until KO ownership is lost,10800 frames = 3 min
+254.0,0x120000fe,0x2D,Frames until attacks out of hitstun
+255.0,0x020000ff,2.0,Maximum launch speed needed to be able to attack out of hitstun
+256.0,0x12000100,0x28,Frames until airdodge out of hitstun
+257.0,0x02000101,2.5,Maximum launch speed needed to be able to airdodge out of hitstun
+258.0,0x02000102,0.2
+259.0,0x12000103,0x5,Frame duration of dragging opponents with 366/367 degree moves,"Dragging speed/angle is determined in frame 1 with 366 degree moves, whereas is caluculated in every frames based on the current attacker's momentum and TransN position with 367 degree moves."
+260.0,0x12000104,0x4
+261.0,0x12000105,0x4
+262.0,0x02000106,2.0,Minimum launch speed for smoke trail GFX
+263.0,0x02000107,4.0,Minimum launch speed for colored trail GFX
+264.0,0x12000108,0x2,trail GFX related,"common_876, tico_127"
+265.0,0x02000109,10.0,trail GFX related,"common_876, tico_127"
+266.0,0x0200010a,160.0,Minimum knockback for the screen to flash white
+267.0,0x0200010b,1.0,Minimum horizontal launch speed for stage collide
+268.0,0x0200010c,0.0,Intangibility frames after wall bounce
+269.0,0x0200010d,0.85,Launch speed multiplier on wall/ceiling bounce
+270.0,0x0200010e,70.0
+271.0,0x0200010f,0.2
+272.0,0x02000110,3.0,Wallbounce
+273.0,0x12000111,0xF,Stage collide
+274.0,0x02000112,0.8,Hitstun multiplier when bouncing off a wall
+275.0,0x02000113,0.8,Downwards launch speed required to bounce off the floor (air-to-ground)
+276.0,0x02000114,0.9,Launch speed multiplier when bouncing off the floor (air-to-ground)
+277.0,0x02000115,0.15,Multplier for freeze frames on wall bounce,Freeze frames on wall bounce = Hitstun frames * 0.15
+278.0,0x12000116,0x14,Maximum freeze frames on wall bounce
+279.0,0x02000117,20.0
+280.0,0x02000118,0.075,Used in vertical launch speed boost formula,Vertical launch speed boost = 5 * (Gravity - 0.075)
+281.0,0x02000119,5.0
+282.0,0x0200011a,0.17,Maximum changed angle from trajectory DI (radians),Equal to 9.740283... degrees
+283.0,0x0200011b,1.095,Maximum launch speed multiplier for LSI
+284.0,0x0200011c,0.92,Minimum launch speed multiplier for LSI
+285.0,0x1200011d,0x3,Frames after hitlag before you can hit the floor in tumble
+286.0,0x0200011e,2.0,"Minimum downward launch speed to move through clouds (skyworld, other stages?)"
+287.0,0x0200011f,0.5,Hitstun frames multiplier when through clouds,script_888 (DamageFly?)
+288.0,0x02000120,30.0,Frames to transition into DamageFall from DamageFly
+289.0,0x02000121,1.0,Global grounded hitstun friction multiplier
+290.0,0x02000122,0.051,Launch speed decay per frame
+291.0,0x02000123,2.0,Launch speed difference required to trigger knockback armor,requires 2 different attackers
+292.0,0x02000124,0.8,Multiplier for KB velocity stack/overwrite threshold
+293.0,0x02000125,0.9
+294.0,0x02000126,0.2,Maximum launch speed to execute momentum related events
+295.0,0x02000127,0.8,Tumble wiggle sensitivity (Brawl)
+296.0,0x12000128,0x1,Speed conservation when landing in hitstun
+297.0,0x12000129,0x28,"Related to controller rumble when KOd, frames?"
+298.0,0x1200012a,0x12,Related to controller rumble when KOd
+299.0,0x1200012b,0x3C,Frames before respawn (after being KO'd)
+300.0,0x0200012c,0.2,Maximum distance from the corner blastline to use diagonal blast GFX,"when Y position is in top blastzone, compares X to (left + (right - left) * 0.2) and (right - (right - left) * 0.2)"
+301.0,0x0200012d,1.2,Diagonal blast graphic scaling
+302.0,0x0200012e,2.4,Minimum initial launch speed to die off top boundary,Equal to 80 KB
+303.0,0x0200012f,4.7,Maximum initial launch speed for a Star KO to occur,Equal to 156.67 KB
+304.0,0x12000130,0x1,Frame speed multiplier for star KO duration,Higher = Faster
+305.0,0x12000131,0x82,Frame duration of Star KO
+306.0,0x12000132,0x2D,Initial distance from the stage,lower = closer
+307.0,0x02000133,-350.0,Distance Star KO'd fighter flies into the background
+308.0,0x02000134,0.6,Affects how far fighter flies downward ,lower = more
+309.0,0x02000135,-10.0,Angle
+310.0,0x12000136,0x10
+311.0,0x12000137,0x1,Screen KO
+312.0,0x12000138,0x28,Frames until fighter hits the screen during Screen KO,lower number = takes less time to fly towards the screen
+313.0,0x12000139,0x4
+314.0,0x1200013a,0x1E
+315.0,0x1200013b,0x28,Frames before respawn after Screen KO
+316.0,0x0200013c,0.0
+317.0,0x0200013d,120.0,Initial height above the screen (Screen KO)
+318.0,0x0200013e,-230.0
+319.0,0x0200013f,0.0
+320.0,0x02000140,-15.0
+321.0,0x02000141,-50.0
+322.0,0x02000142,1.0,Y pos.
+323.0,0x02000143,0.2
+324.0,0x02000144,1.7,"related to fighter_param Name26, max fall speed while Screen KO?"
+325.0,0x02000145,-1.0,Z pos.
+326.0,0x02000146,-10.0,Angle
+327.0,0x12000147,0x3C,Frames in between respawning and taking control,lower number = respawn platform descends faster
+328.0,0x12000148,0xF0,Maximum frames allowed to stay in respawn platform
+329.0,0x12000149,0x78,Frames of invincibility granted out of respawn platform
+330.0,0x1200014a,0x2D,Read on exiting respawn platform
+331.0,0x0200014b,90.0,Minimum KB required for medium knockback SFX
+332.0,0x0200014c,180.0,Minimum KB required for high knockback SFX
+333.0,0x0200014d,15.0,Minimum launch distance required for low knockback SFX
+334.0,0x0200014e,15.0,Minimum launch distance required for medium knockback SFX
+335.0,0x0200014f,15.0,Minimum launch distance required for high knockback SFX
+336.0,0x02000150,3.8,Launch speed upper threshold for full damage of tumble hitbox,Only used when being launched from Luigi Final Smash (and launched from cannon maybe?)
+337.0,0x02000151,2.3,Launch speed lower threshold for tumble hitbox
+338.0,0x02000152,0.3
+339.0,0x02000153,1.2
+340.0,0x12000154,0x3,DownDamage lock limit
+341.0,0x02000155,3.5,Minimum launch speed to use far knockback voice SFX
+342.0,0x02000156,3.0,,Added in 1.0.4
+343.0,0x02000157,10.0,Base sleep time,"Sleep time =
+(10 +  30 * sys_8(0x0) + (10 * (3 - sys_25(0xb))) + (25 * KB) + (1 * Opponent's % after hit))
+
+sys_8(0x0) : Unknown, usually 1?
+sys_25(0xb): Unknown, usually 0.
+
+After that, the result of this is multiplied by sys_8(0x1). "
+344.0,0x02000158,10.0,Base sleep time (this * 3 frames added)
+345.0,0x02000159,30.0,This * sys_8(0x0) is added to base sleep time
+346.0,0x0200015a,25.0,Multiplier for sleep time scaling off knockback
+347.0,0x0200015b,1.0,Multiplier for sleep time scaling off percent
+348.0,0x0200015c,1.0,Sleep time reduced per frame
+349.0,0x0200015d,8.0,Sleep time reduced per input
+350.0,0x0200015e,3.0,This is multiplied to result of sleep time if hitbox element is 0xa (unused)
+351.0,0x0200015f,76.0,Base stun time,"Stun time = (76 + 50 * sys_8(0x0) + (15 * (3 - sys_25(0xb)) + (1 * KB))
+
+sys_8(0x0) : Unknown, usually 0.
+sys_25(0xb): Unknown, usually 0."
+352.0,0x02000160,15.0,Base stun time (this * 3 frames added)
+353.0,0x02000161,50.0,This * sys_8(0x0) is added to base stun time
+354.0,0x02000162,1.0,Multiplier for stun time scaling off knockback
+355.0,0x02000163,0.0,Multiplier for stun time scaling off total percent
+356.0,0x02000164,1.0,Stun time reduced per frame
+357.0,0x02000165,5.0,Stun time reduced per input
+358.0,0x02000166,0.0,Base disable time,"Added in 1.0.6
+
+Disable time = ((1 * KB) + (1.1 * Opponent's % after hit))"
+359.0,0x02000167,0.0,Base disable time (this * 3 frames added)
+360.0,0x02000168,0.0
+361.0,0x02000169,1.0,Multiplier for disabled time scaling off knockback
+362.0,0x0200016a,1.1,Multiplier for disabled time scaling off total percent
+363.0,0x0200016b,1.0,Disable time reduced per frame
+364.0,0x0200016c,6.0,Disable time reduced per input
+365.0,0x1200016d,0x46
+366.0,0x1200016e,0x3,((Bone=0x3 Y pos) - (Bone=0x0 Y pos)) / (This - 1) is used to set 0x01000006,"Bury time =
+(10 + 30 * sys_8(0x0) + (15 * (3 - sys_21(0x1b)) + (1.5 * KB) + (0.5 * Opponent's % after hit))
+
+sys_8(0x0): Unknown, usually equals to 0.
+sys_21(0x1b): Unknown, usually equals to 0."
+367.0,0x0200016f,10.0,Base bury time
+368.0,0x02000170,15.0,Base bury time (this * 3 frames added)
+369.0,0x02000171,30.0,This * sys_8(0x0) is added to base bury time
+370.0,0x02000172,1.5,Multiplier for bury time scaling off knockback
+371.0,0x02000173,0.5,Multiplier for bury time scaling off total percent
+372.0,0x02000174,1.0,Bury time reduced per frames
+373.0,0x02000175,8.0,Bury time reduced per input
+374.0,0x02000176,1.2,Vertical speed out of bury escape
+375.0,0x02000177,12.0,Frame you can interrupt bury escape jump
+376.0,0x12000178,0x8
+377.0,0x02000179,70.0,Knockback resistence while buried,Getting hit with an attack with KB > 70 to remove the state and launch the character
+378.0,0x0200017a,0.7,Frozen terminal velocity?
+379.0,0x0200017b,0.7,Frozen terminal velocity?
+380.0,0x0200017c,100.0,,"referenced in ""ftStatusUniqProcessIce.execFixPos"", unsure when read"
+381.0,0x0200017d,0.8,,"referenced in ""ftStatusUniqProcessIce.execFixPos"", unsure when read"
+382.0,0x0200017e,0.5,Frozen damage multiplier
+383.0,0x0200017f,0.25,Frozen knockback multiplier
+384.0,0x02000180,0.03,Frozen gravity multiplier?
+385.0,0x02000181,-25.0,Min freeze rotation per frame,rotation per frame = -25 + randf * (-4 - (-25))
+386.0,0x02000182,-4.0,Max freeze rotation per frame
+387.0,0x02000183,12.0,Multiplier for freeze time scaling off damage,"Freeze time = (12 * Damage),  KB ≧ 52.5 is needed (requires Damage3 animation?)"
+388.0,0x02000184,1.0,Freeze time reduced per frame
+389.0,0x02000185,4.0,Freeze time reduced per input
+390.0,0x02000186,2.0
+391.0,0x02000187,8.5
+392.0,0x12000188,0x10,Read when exiting frozen state (number of frames on exit?)
+393.0,0x12000189,0x1E
+394.0,0x0200018a,0.6,Ladder grab sensitivity (Up/Down)
+395.0,0x0200018b,7.0,Ladder grab lag (frames)
+396.0,0x0200018c,0.8
+397.0,0x1200018d,0x8,Number of frames held away from ladder before leaving
+398.0,0x0200018e,0.7,Ladder-leaving sensitivity
+399.0,0x0200018f,0.081
+400.0,0x02000190,0.4,Air to water H speed multiplier?
+401.0,0x12000191,0x8,How many frames of falling from JumpStart in water?
+402.0,0x02000192,0.04
+403.0,0x02000193,0.91
+404.0,0x12000194,0x4,Touch the water > Jump cancel input window?
+405.0,0x12000195,0x14,Frame count between ripples in water when swimming
+406.0,0x12000196,0xF0,Max swim duration(frames)?
+407.0,0x02000197,2.5,Swimming scaling multiplier for how many less frames you can swim for (your % * 2.5)
+408.0,0x02000198,0.6
+409.0,0x12000199,0x96,Min frame to occur SwimDrownOut?
+410.0,0x1200019a,0xA,Read when going from swim to frail?
+411.0,0x0200019b,20.0,Related to cannon,MSC script_1805
+412.0,0x0200019c,3.0
+413.0,0x1200019d,0x28,,Added in 1.0.4
+414.0,0x0200019e,70.0,,Added in 1.0.4
+415.0,0x0200019f,100.0,Read when going from swim to frail?
+416.0,0x020001a0,200.0
+417.0,0x020001a1,1.0,,Added in 1.0.4
+418.0,0x120001a2,0x14,Stamina match effective damage
+419.0,0x120001a3,0x46,Stamina match effective damage when dead
+420.0,0x120001a4,0x2
+421.0,0x120001a5,0x96,150.0
+422.0,0x020001a6,120.0,Wario Chomp base time,Chomp duration = (120 + (0.5 * Opponent's % after hit))
+423.0,0x020001a7,0.5,Multiplier for Chomp time added (your % * 0.5)
+424.0,0x020001a8,10.0,Frames reduced per input
+425.0,0x020001a9,2.0,Related to Wario Chomp
+426.0,0x020001aa,5.0,Related to Wario Chomp
+427.0,0x020001ab,0.5,Related to Wario Chomp
+428.0,0x120001ac,0x4
+429.0,0x020001ad,5.4,H location victim falls towards when entering Kirby's mouth
+430.0,0x020001ae,6.8,V location victim falls towards when entering Kirby's mouth
+431.0,0x020001af,0.9,H velocity while falling into Kirby's mouth
+432.0,0x020001b0,1.2,V velocity while falling into Kirby's mouth
+433.0,0x020001b1,1.0,Affects time it takes to enter Kirby's mouth?
+434.0,0x020001b2,10.0,Inhale time reduced per input
+435.0,0x020001b3,1.0,Inhale time reduced per frame
+436.0,0x020001b4,250.0,Base inhale time
+437.0,0x020001b5,12.0,Used on Kirby spit/swallow
+438.0,0x020001b6,1.0,Used on Kirby spit/swallow
+439.0,0x020001b7,30.0,Time spent in a star on spit (frames)
+440.0,0x020001b8,10.0,Time spent in a star on copy (frames)
+441.0,0x020001b9,4.0,Time after Kirby spit star exit before they can act (frames)
+442.0,0x020001ba,0.73,H speed of star exit
+443.0,0x020001bb,2.3,V speed of star exit
+444.0,0x020001bc,0.0
+445.0,0x020001bd,10.0
+446.0,0x020001be,30.0
+447.0,0x020001bf,30.0
+448.0,0x020001c0,100.0,DK Cargo grab base time,Cargo grab duration = (100 + (5 * Opponent's % after hit))
+449.0,0x020001c1,5.0,DK Cargo time increase per %
+450.0,0x020001c2,7.0,DK Cargo grab time reduction per directional input
+451.0,0x020001c3,13.0,DK Cargo grab time reduction per button input
+452.0,0x020001c4,5.4,H location victim falls towards when entering Dedede's mouth
+453.0,0x020001c5,8.4,V location victim falls towards when entering Dedede's mouth
+454.0,0x020001c6,2.7,H velocity while falling into Dedede's mouth
+455.0,0x020001c7,3.6,V velocity while falling into Dedede's mouth
+456.0,0x020001c8,1.0,Affects time it takes to enter Dedede's mouth,Higher = Faster
+457.0,0x020001c9,12.0,Dedede inhale time reduced per input
+458.0,0x020001ca,0.0,Dedede inhale time reduced per frame
+459.0,0x020001cb,250.0,Dedede Swallow Base Time
+460.0,0x020001cc,12.0,Time in star reduced per input
+461.0,0x020001cd,1.0,Time in star reduced per frame
+462.0,0x020001ce,30.0,Time spent in star
+463.0,0x020001cf,4.0,Time after Dedede spit star exit before they can act (frames)
+464.0,0x020001d0,0.73,H speed of star exit
+465.0,0x020001d1,2.3,V speed of star exit
+466.0,0x020001d2,-5.0,H location on Dedede inhale escape
+467.0,0x020001d3,10.0,V location on Dedede inhale escape
+468.0,0x020001d4,2.8,Used on Dedede inhale escape
+469.0,0x020001d5,1.308997,Used on Dedede inhale escape (radians),Equal to 75 degrees
+470.0,0x020001d6,4.0,Used on Dedede inhale escape
+471.0,0x020001d7,70.0,Diddy Side B Base Hold Time,Hold duration = (70 + (1.3 * Opponent's % after hit))
+472.0,0x020001d8,1.3,Multiplier for Diddy hold time added (your % * 1.3)
+473.0,0x020001d9,24.0
+474.0,0x020001da,0.4,Related to aerial hold time
+475.0,0x020001db,6.0,Diddy hold time reduced per input
+476.0,0x020001dc,0.8,Aerial hold time divisor? Reduction per frame?
+477.0,0x020001dd,155.0,Robin Nosferatu base hold time
+478.0,0x020001de,120.0,Used for frames reduced per input multiplier,"Frames reduced per input = 5 * (120 - Initial %) / 120, or 0 if initial % > 120"
+479.0,0x020001df,5.0,Base frames reduced per input,"the amount reduced per frame (equals 1) is written in MSC, not a param"
+480.0,0x020001e0,1.0
+481.0,0x020001e1,2.0
+482.0,0x020001e2,6.0,"script_2234, DownBackU animation, checks if Animation frame ≥ this",Added in 1.0.6
+483.0,0x020001e3,5.0,script_2234,Added in 1.0.6
+484.0,0x020001e4,38.0,Duration of crumple animation for Focus Attack stage 2,Added in 1.0.6
+485.0,0x020001e5,65.0,Duration of crumple animation for Focus Attack stage 3,Added in 1.0.6
+486.0,0x020001e6,38.0,,Added in 1.0.6
+487.0,0x020001e7,60.0,,Added in 1.0.6
+488.0,0x120001e8,0x118,Base pinned duration (frames),"Added in 1.1.4
+Pinned duration = (280 + (1.5 * Opponent's % after hit))"
+489.0,0x020001e9,1.5,Multiplier for pinned time added (your % * 1.5)
+490.0,0x020001ea,1.0,Time reduced per frame
+491.0,0x020001eb,30.0,Time reduced per input
+492.0,0x020001ec,0.002,Frame speed multiplier for damage animation when pinned,Added in 1.1.4
+493.0,0x120001ed,0x6,HeavyItem smash throw input window
+494.0,0x120001ee,0x7,Item smash throw input window
+495.0,0x120001ef,0x5,Dash attack item catch window
+496.0,0x120001f0,0x5,Aerial attacks item catch window
+497.0,0x120001f1,0x5,Air dodge item catch window
+498.0,0x120001f2,0x8
+499.0,0x120001f3,0x46,Regular item drop chance constant,Drop chance = (CEIL (Damage taken) / 70)
+500.0,0x120001f4,0x2
+501.0,0x120001f5,0x5,Air dodge/Roll > Item throw/drop window
+502.0,0x020001f6,0.3
+503.0,0x020001f7,0.625
+504.0,0x120001f8,0x10
+505.0,0x020001f9,0.5
+506.0,0x120001fa,0x6
+507.0,0x020001fb,0.6
+508.0,0x020001fc,0.325,Heavy item walk sensitivity
+509.0,0x020001fd,-0.25,Heavy item pivot sensitivity
+510.0,0x120001fe,0x64,100.0
+511.0,0x120001ff,0x5,Super Scope minimum shooting time (frames)
+512.0,0x12000200,0x5,ItemFire
+513.0,0x12000201,0x6,ItemFire
+514.0,0x12000202,0x14,Endlag frames for grabbing an item during the dashing skid-to-a-halt animation
+515.0,0x12000203,0x2,Itemlegsdash
+516.0,0x12000204,0x23
+517.0,0x12000205,0xA
+518.0,0x02000206,120.0
+519.0,0x02000207,2.0
+520.0,0x02000208,0.87,"this * heavy weapon max walk speed, multiplier for deterioration accel?"
+521.0,0x02000209,1.0
+522.0,0x1200020a,0x2
+523.0,0x0200020b,0.9,Multiplier for using LightWalkGet item grab animations,"If current ground velocity ≥ (Walk Maximum Velocity * 0.9), then use LightWalkGet item animation"
+524.0,0x1200020c,0x1,Dragoon drop probability multiplier,Drop probability = 1 * INT(Damage taken) / 100
+525.0,0x1200020d,0xF,"In Brawl, this is multiplied by 0 before being added to Damage dealt, so possibly useless"
+526.0,0x0200020e,30.0,Max Dragoon drop angle difference from vertical,Actual angle difference from vertical is random from 0 to this
+527.0,0x0200020f,4.0,Dragoon drop initial speed
+528.0,0x12000210,0x78,120.0
+529.0,0x12000211,0x1E
+530.0,0x12000212,0x1,?
+531.0,0x12000213,0x14,Frames between flower damage ticks (frames)
+532.0,0x02000214,1.0,Flower time reduced per frame
+533.0,0x02000215,16.0,Flower time reduced per input
+534.0,0x02000216,3000.0,Maximum flower time
+535.0,0x02000217,40.0,Multiplier for flower time scaling off hitbox damage,Flower time = INT(40 * Damage)
+536.0,0x02000218,0.7,Something to do with flower size
+537.0,0x02000219,3.5,Used on flower effect
+538.0,0x0200021a,0.04,Something to do with flower size
+539.0,0x0200021b,2.0
+540.0,0x1200021c,0x2D0,"Curry effect duration, 720"
+541.0,0x0200021d,2.0,Curry run animation speed multiplier
+542.0,0x1200021e,0x9,Frames between Curry flames
+543.0,0x0200021f,25.0
+544.0,0x02000220,3.0
+545.0,0x02000221,-27.0
+546.0,0x02000222,54.0
+547.0,0x12000223,0x1C2,"Frames, 450"
+548.0,0x12000224,0x6,Hammer
+549.0,0x12000225,0xA,,"script_894, related to Ganondorf side-b drop"
+550.0,0x12000226,0x320,800.0
+551.0,0x12000227,0x78
+552.0,0x12000228,0x4C
+553.0,0x12000229,0x78,Golden Hammer
+554.0,0x1200022a,0xF,How many frames of time is added when you press A with a Golden Hammer
+555.0,0x1200022b,0x32,Golden Hammer
+556.0,0x1200022c,0x258,600.0
+557.0,0x1200022d,0x78,120.0
+558.0,0x0200022e,1.05
+559.0,0x0200022f,2.0,Super Mushroom size multiplier for the Giant Special Smash,Giant Special Smash size mult. = 1.8
+560.0,0x02000230,1.7,Super Mushroom size multiplier,Also used during the Tiny Special Smash
+561.0,0x02000231,0.5,Poison Mushroom size multipler for the Giant Special Smash
+562.0,0x02000232,0.5,Poison Mushroom size multiplier for standard/Tiny Special Smash,Also used during the Giant Special Smash
+563.0,0x02000233,0.84,Super Mushroom voice pitch multiplier
+564.0,0x02000234,1.25,Poison Mushroom voice pitch multiplier
+565.0,0x12000235,0x1E0,"Super Mushroom/Poison Mushroom duration (frames), 480"
+566.0,0x02000236,100.0,Read after finishing size change animation
+567.0,0x12000237,0xB4,"Frames, 180"
+568.0,0x02000238,3.0,Lightning size multiplier for the Giant Special Smash (backfire)
+569.0,0x02000239,2.4,Lightning size multiplier (backfire),Also used during the Tiny Special Smash
+570.0,0x0200023a,0.5,Lightning size multiplier for the Giant Special Smash (shrink)
+571.0,0x0200023b,0.5,Lightning size multiplier for standard/Tiny Special Smash (shrink),Also used during the Giant Special Smash
+572.0,0x0200023c,0.7,Lightning voice pitch multiplier (grow)
+573.0,0x0200023d,1.25,Lightning voice pitch multiplier (shrink)
+574.0,0x1200023e,0x258,"Lightning duration (frames), 600"
+,,80.0,,Removed in 1.0.6
+575.0,0x1200023f,0x30C,780.0
+576.0,0x02000240,50.0,Metal Box HP (you lose the metal effect if you take 50%)
+577.0,0x02000241,30.0,KB resistance while metal
+578.0,0x02000242,0.3,Minimum amount of healing a Team Healer applies
+579.0,0x02000243,0.75,Heal to hurt ratio
+580.0,0x02000244,0.7,Maximum amount of healing a Team Healer applies?
+581.0,0x12000245,0x4,Strength of Timer's slowdown effect
+582.0,0x12000246,0x258,"Timer?, 600"
+,,120.0,,Removed in 1.0.6
+583.0,0x12000247,0x3C
+584.0,0x02000248,3.0
+585.0,0x02000249,0.1
+586.0,0x0200024a,1.5
+587.0,0x0200024b,0.5
+588.0,0x0200024c,0.5
+589.0,0x0200024d,4.0
+590.0,0x0200024e,3.5
+591.0,0x0200024f,0.0
+592.0,0x12000250,0xF,Frame you can interrupt Ganondorf side-b drop
+593.0,0x02000251,3.2,Downward speed from Ganondorf side-b drop
+594.0,0x02000252,1.145,Size multiplier for tallest Miis,"Affects hitbox/hurtboxes, doesn't affect the head"
+595.0,0x02000253,0.855,Size multiplier for shortest Miis,"Affects hitbox/hurtboxes, doesn't affect the head"
+596.0,0x02000254,0.825,Unknown
+597.0,0x02000255,1.3,Unknown
+598.0,0x02000256,0.78,Bone thickness multiplier for skinnest Miis,Doesn't affect hitbox/hurtboxes nor the head
+599.0,0x02000257,1.24,Bone thickness multiplier for fattest Miis,Doesn't affect hitbox/hurtboxes nor the head
+600.0,0x02000258,0.74,Unknown
+601.0,0x02000259,1.13,Unknown
+602.0,0x0200025a,3.5
+603.0,0x0200025b,0.0
+604.0,0x0200025c,4294966296.0,-1000.0
+605.0,0x1200025d,0x3E8,1000.0
+606.0,0x0200025e,0.03
+607.0,0x0200025f,0.055
+608.0,0x02000260,0.25
+609.0,0x02000261,0.5
+610.0,0x02000262,0.65
+611.0,0x02000263,1.0
+612.0,0x02000264,1.5
+613.0,0x02000265,0.5
+614.0,0x02000266,0.009
+615.0,0x02000267,1.0
+616.0,0x02000268,1.0
+617.0,0x02000269,1.0
+618.0,0x0200026a,1.5
+619.0,0x0200026b,1.5
+620.0,0x0200026c,2.0
+621.0,0x0200026d,1.2
+622.0,0x0200026e,1.4
+623.0,0x0200026f,1.25
+624.0,0x02000270,1.5
+625.0,0x02000271,2.0
+626.0,0x02000272,3.0
+627.0,0x02000273,1.0
+628.0,0x02000274,2.0
+629.0,0x02000275,1.5
+630.0,0x02000276,1.5
+631.0,0x02000277,0.025
+632.0,0x02000278,2.0
+633.0,0x02000279,2.0
+634.0,0x0200027a,1.5
+635.0,0x0200027b,1.0
+636.0,0x0200027c,3.0
+637.0,0x0200027d,3.0
+638.0,0x0200027e,1.0
+639.0,0x0200027f,1.5
+640.0,0x02000280,3.0
+641.0,0x02000281,10.0
+642.0,0x02000282,0.6
+643.0,0x02000283,1.0
+644.0,0x12000284,0x384,900.0
+645.0,0x02000285,2.0
+646.0,0x12000286,0x258,600.0
+647.0,0x02000287,500.0
+648.0,0x02000288,1.25
+649.0,0x02000289,17.0,Ground H speed cap
+650.0,0x0200028a,100.0,Aerial H speed cap
+651.0,0x0200028b,10.0,Aerial positive V speed cap
+652.0,0x0200028c,100.0,Aerial negative V speed cap
+653.0,0x0200028d,1000.0
+654.0,0x0200028e,-0.5,Super Mashroom/Poison Mashroom multipliers (654 to 685?),Size mult. = 1.7 or 0.5
+655.0,0x0200028f,0.8,Damage dealt multiplier,"Mult. = 1 + (1.7 - 1) * 0.8 = 1.56, 1 + (0.5 - 1) * 0.8 = 0.6"
+656.0,0x02000290,1.0,,"Mult. = 1.7, 0.5"
+657.0,0x02000291,0.8,Dash initial,"Mult. = 1.56, 0.6"
+658.0,0x02000292,0.8,,"Mult. = 1.56, 0.6"
+659.0,0x02000293,0.8,,"Mult. = 1.56, 0.6"
+660.0,0x02000294,0.65,,"Mult. = 1.455, 0.675"
+661.0,0x02000295,0.5,,"Mult. = 1.35, 0.75"
+662.0,0x02000296,0.5,,"Mult. = 1.35, 0.75"
+663.0,0x02000297,0.6,,"Mult. = 1.42, 0.7"
+664.0,0x02000298,0.6,,"Mult. = 1.42, 0.7"
+665.0,0x02000299,0.8,Base air accel?,"Mult. = 1.56, 0.6"
+666.0,0x0200029a,0.8,Max air added accel?,"Mult. = 1.56, 0.6"
+667.0,0x0200029b,0.8,Max air speed?,"Mult. = 1.56, 0.6"
+668.0,0x0200029c,0.6,,"Mult. = 1.42, 0.7"
+669.0,0x0200029d,0.6,,"Mult. = 1.42, 0.7"
+670.0,0x0200029e,0.6,,"Mult. = 1.42, 0.7"
+671.0,0x0200029f,0.65,,"Mult. = 1.455, 0.675"
+672.0,0x020002a0,0.55,,"Mult. = 1.385, 0.725"
+673.0,0x020002a1,0.7,,"Mult. = 1.49, 0.65"
+674.0,0x020002a2,0.0,,"Mult. = 1, 1"
+675.0,0x020002a3,0.8,,"Mult. = 1.56, 0.6"
+676.0,0x020002a4,0.8,,"Mult. = 1.56, 0.6"
+677.0,0x020002a5,1.0,,"Mult. = 1.7, 0.5"
+678.0,0x020002a6,1.0,,"Mult. = 1.7, 0.5"
+679.0,0x020002a7,0.7,,"Mult. = 1.49, 0.65"
+680.0,0x020002a8,0.7,,"Mult. = 1.49, 0.65"
+681.0,0x020002a9,0.7,,"Mult. = 1.49, 0.65"
+682.0,0x020002aa,0.7,,"Mult. = 1.49, 0.65"
+683.0,0x020002ab,0.7,,"Mult. = 1.49, 0.65"
+684.0,0x020002ac,1.0,,"Mult. = 1.7, 0.5"
+685.0,0x020002ad,1.0,,"Mult. = 1.7, 0.5"
+686.0,0x020002ae,-0.5,Lighting multipliers (686 to 717?),Size mult. = 2.4 or 0.5
+687.0,0x020002af,0.6,Damage dealt multiplier,"Mult. = 1 + (2.4 - 1) * 0.6 = 1.84, 1 + (0.5 - 1) * 0.6 = 0.7"
+688.0,0x020002b0,1.0,,"Mult. = 2.4, 0.5"
+689.0,0x020002b1,0.6,Dash initial,"Mult. = 1.84, 0.7"
+690.0,0x020002b2,0.6,,"Mult. = 1.84, 0.7"
+691.0,0x020002b3,0.6,,"Mult. = 1.84, 0.7"
+692.0,0x020002b4,0.7,,"Mult. = 1.98, 0.65"
+693.0,0x020002b5,0.5,Gravity,"Mult. = 1.7, 0.75"
+694.0,0x020002b6,0.5,,"Mult. = 1.7, 0.75"
+695.0,0x020002b7,0.6,,"Mult. = 1.84, 0.7"
+696.0,0x020002b8,0.6,,"Mult. = 1.84, 0.7"
+697.0,0x020002b9,0.8,Base air accel?,"Mult. = 2.12, 0.6"
+698.0,0x020002ba,0.8,Max air added accel?,"Mult. = 2.12, 0.6"
+699.0,0x020002bb,0.8,Max air speed?,"Mult. = 2.12, 0.6"
+700.0,0x020002bc,0.6,,"Mult. = 1.84, 0.7"
+701.0,0x020002bd,0.6,,"Mult. = 1.84, 0.7"
+702.0,0x020002be,0.6,,"Mult. = 1.84, 0.7"
+703.0,0x020002bf,0.65,,"Mult. = 1.91, 0.675"
+704.0,0x020002c0,0.55,,"Mult. = 1.77, 0.725"
+705.0,0x020002c1,0.7,,"Mult. = 1.98, 0.65"
+706.0,0x020002c2,0.0,,"Mult. = 1, 1"
+707.0,0x020002c3,0.8,,"Mult. = 2.12, 0.6"
+708.0,0x020002c4,0.8,,"Mult. = 2.12, 0.6"
+709.0,0x020002c5,1.0,,"Mult. = 2.4, 0.5"
+710.0,0x020002c6,1.0,,"Mult. = 2.4, 0.5"
+711.0,0x020002c7,0.7,,"Mult. = 1.98, 0.65"
+712.0,0x020002c8,0.7,,"Mult. = 1.98, 0.65"
+713.0,0x020002c9,0.7,,"Mult. = 1.98, 0.65"
+714.0,0x020002ca,0.7,,"Mult. = 1.98, 0.65"
+715.0,0x020002cb,0.7,,"Mult. = 1.98, 0.65"
+716.0,0x020002cc,1.0,,"Mult. = 2.4, 0.5"
+717.0,0x020002cd,1.0,,"Mult. = 2.4, 0.5"
+718.0,0x020002ce,2.0,Bunny hood walk max speed multiplier
+719.0,0x020002cf,2.0,Bunny hood dash initial speed multiplier
+720.0,0x020002d0,2.0,Bunny hood run add accel multiplier
+721.0,0x020002d1,2.0,Bunny hood base run accel multiplier
+722.0,0x020002d2,2.0,Bunny hood max run speed multiplier
+723.0,0x020002d3,2.0,?
+724.0,0x020002d4,2.0,Bunny hood jump/airjump initial V speed multiplier
+725.0,0x020002d5,2.0,Bunny hood hop initial V speed multiplier
+726.0,0x020002d6,2.0,Bunny hood max ground-to-air H speed
+727.0,0x020002d7,1.5,Bunny hood gravity multiplier
+728.0,0x020002d8,1.5,Bunny hood fall speed multiplier
+729.0,0x020002d9,1.5,Bunny hood fast fall speed multiplier
+730.0,0x020002da,2.0,?
+731.0,0x020002db,2.0,Bunny hood ledge jump initial V speed multiplier
+732.0,0x020002dc,2.0,?
+733.0,0x020002dd,2.0,Bunny hood wall jump initial V speed multiplier
+734.0,0x020002de,0.7,Metal Box run max speed multiplier
+735.0,0x020002df,1.35,Metal Box jump initial V speed multiplier
+736.0,0x020002e0,1.35,Metal Box hop initial V speed multiplier
+737.0,0x020002e1,1.7,Metal Box gravity multiplier
+738.0,0x020002e2,1.7,Metal Box max fall speed multiplier
+739.0,0x020002e3,1.7,Metal Box fast fall speed multiplier
+740.0,0x020002e4,4.5,Metal Box weight multiplier
+741.0,0x020002e5,1.2,?
+742.0,0x020002e6,1.2
+743.0,0x120002e7,0x5A,Base amount (frames)
+744.0,0x020002e8,1.7,Multiplier to percent added to amount,script_1850 action 0xce
+745.0,0x020002e9,0.0,Amount reduction per frame
+746.0,0x020002ea,8.0,Amount reduction per input
+747.0,0x120002eb,0x118,Base amount (frames),"Added in 1.0.4, script_1856 action 0xcf"
+748.0,0x020002ec,1.5,Multiplier to percent added to amount,Added in 1.0.4
+749.0,0x020002ed,0.0,Amount reduction per frame,Added in 1.0.4
+750.0,0x020002ee,5.0,Amount reduction per input,Added in 1.0.4
+751.0,0x120002ef,0x5,,"script_1575 action ""ItemFire"""
+752.0,0x120002f0,0xA,,script_1575
+753.0,0x120002f1,0x14,,script_1574
+754.0,0x120002f2,0xA,,"code address 0x027ef714, related to 0x11000002 and 0x2100000d"
+755.0,0x020002f3,1.8
+756.0,0x020002f4,2.0
+757.0,0x020002f5,1.0
+758.0,0x020002f6,0.13
+759.0,0x020002f7,1.25
+760.0,0x020002f8,0.002
+761.0,0x020002f9,1.2
+762.0,0x020002fa,0.025
+763.0,0x020002fb,1.3,Rocket Belt max air speed,Friction = 0.015
+764.0,0x020002fc,0.05,Rocket Belt gravity,Added max added accel = 0.015
+765.0,0x020002fd,1.5
+766.0,0x020002fe,0.8
+767.0,0x020002ff,200.0
+768.0,0x02000300,1.0
+769.0,0x02000301,1.25
+770.0,0x02000302,0.25,Added H speed,"script_1317, start of action 0x10c"
+771.0,0x02000303,1.3,Added V speed,script_1317
+772.0,0x12000304,0x1
+773.0,0x12000305,0x4
+774.0,0x02000306,-1.0,Maximum added H speed on Bullet Bill exit,Bullet Bill exit Initial H speed = -1*cos(angle) + (Prev H speed * (fighter_param Name14))
+775.0,0x02000307,2.0,Added initial V speed on Bullet Bill exit,Bullet Bill exit Initial V speed = 2 + (Prev V speed * (fighter_param_common Name36))
+776.0,0x02000308,0.0,Beetle Clatter reduced per frame
+777.0,0x02000309,8.0,Beetle Clatter reduced per input
+778.0,0x1200030a,0x64,Beetle base Clatter,"Clatter = Name778 + (Name779 * %)
+(Clatter is measurement for mashing)"
+779.0,0x0200030b,3.4,Multiplier to percent added to Beetle Clatter
+780.0,0x0200030c,1.0
+781.0,0x0200030d,2.0
+782.0,0x1200030e,0x78,Daybreak item firing time (frames)
+783.0,0x0200030f,2.0
+784.0,0x02000310,45.0,script_223,This * sys_8(0x2) * sys_4C(0x0) is added to camera X rotation
+785.0,0x12000311,0x1F,FuraFuraStart intangibility frames,FuraFuraStart(U/D) are shield-break stand up animations
+786.0,0x02000312,0.05,Super Leaf fall speed
+787.0,0x02000313,1.0,Galaga hold duration reduced per frame
+788.0,0x02000314,8.0,Galaga hold duration reduced per input
+789.0,0x12000315,0x96,Base Galaga hold duration (frames),Duration = Name789 + (Name790 * %)
+790.0,0x02000316,9.5,Multiplier to percent added to Galaga hold duration
+791.0,0x02000317,1.0
+792.0,0x02000318,2.0
+793.0,0x02000319,50.0
+794.0,0x1200031a,0x2
+795.0,0x0200031b,0.5
+796.0,0x1200031c,0x1
+797.0,0x1200031d,0x28
+798.0,0x0200031e,45.0
+799.0,0x0200031f,0.0
+800.0,0x02000320,135.0
+801.0,0x02000321,-400.0
+802.0,0x02000322,0.0
+803.0,0x02000323,-15.0
+804.0,0x02000324,-50.0
+805.0,0x02000325,20.0
+806.0,0x02000326,35.0
+807.0,0x12000327,0xC8,200.0
+808.0,0x02000328,5.0
+809.0,0x02000329,1.0
+810.0,0x0200032a,0.25
+811.0,0x1200032b,0x78,120.0
+812.0,0x1200032c,0x78,120.0
+813.0,0x0200032d,70.0
+814.0,0x0200032e,2.0
+815.0,0x1200032f,0x1,Daybreak drop probability multiplier,Drop probability = 1 * INT(damage taken) / 100
+816.0,0x12000330,0xF
+817.0,0x02000331,30.0,Max Daybreak drop angle difference from vertical (degrees)
+818.0,0x02000332,4.0,Daybreak drop initial speed
+819.0,0x02000333,2.0,Sidestepper Smash Tour item roll frame speed multiplier,Added in 1.0.4
+820.0,0x02000334,600.0,,Added in 1.0.4
+821.0,0x02000335,13.78,,Added in 1.0.4
+822.0,0x02000336,1.5,,Added in 1.0.4
+823.0,0x02000337,3.5,,Added in 1.0.4
+824.0,0x02000338,0.0,"Mecha-Fiora in Smash Tour, bottom %",Added in 1.0.4
+825.0,0x02000339,70.0,"Mecha-Fiora in Smash Tour, base %",Added in 1.0.4
+826.0,0x0200033a,150.0,"Mecha-Fiora in Smash Tour, ceiling %",Added in 1.0.4
+827.0,0x0200033b,5.0,,Added in 1.0.4
+828.0,0x0200033c,3.0,,Added in 1.0.4
+829.0,0x1200033d,0x1E,% chance for applying Name830,Added in 1.0.4
+830.0,0x0200033e,5.0,Black Knight Smash Tour item smash attack knockback multiplier,Added in 1.0.4
+831.0,0x0200033f,3.5,,Added in 1.0.4
+832.0,0x02000340,3.0,,Added in 1.0.4
+833.0,0x12000341,0x708,Smash Tour Poison Mushroom duration (frames)?,Added in 1.0.4
+834.0,0x12000342,0x708,Smash Tour,Added in 1.0.4
+835.0,0x12000343,0x708,Smash Tour,Added in 1.0.4
+836.0,0x12000344,0x708,Smash Tour,Added in 1.0.4
+837.0,0x12000345,0x708,Smash Tour,Added in 1.0.4
+838.0,0x12000346,0x708,Smash Tour,Added in 1.0.4
+839.0,0x12000347,0x708,Smash Tour,Added in 1.0.4
+840.0,0x12000348,0x708,Smash Tour,Added in 1.0.4
+841.0,0x02000349,0.46,,Added in 1.0.8
+842.0,0x0200034a,0.087,Finishing Touch set gravity value,Added in 1.1.0
+843.0,0x0200034b,1.5,Finishing Touch set fall speed value,Added in 1.1.0
+844.0,0x1200034c,0xA,Something related to Set_Weight (and Set_Weight_Finishing_Touch?) event,Added in 1.1.0
+845.0,0x0200034d,0.8,Multiplier to Hitbox's hitlag multiplier (if > 1) when hitting shield,"Added in 1.1.0, After multiplication, resulting hitlag multiplier cannot be < 1"
+846.0,0x0200034e,0.25,,Added in 1.1.1
+847.0,0x0200034f,0.5,Absorbing moves damage multiplier for teammate hitboxes,Added in 1.1.3
+848.0,0x12000350,0xA,Number of consecutive hits during shieldstun to cancel with dodges,Added in 1.1.3

@@ -1,0 +1,27 @@
+,Type,Example
+0x0,Typeless
+0x1,Head
+0x2,Body
+0x3,Butt,Yoshi D-air
+0x4,Hand
+0x5,Elbow,"Falco/Fox F-throw, (Toon)Link D-throw, Sheik pummel"
+0x6,Foot
+0x7,Knee,"Falcon Jab3, Ganon U-tilt, Ike/Sword Mii D-throw, ZSS Dash attack"
+0x8,Throwing
+0x9,Weapon
+0xa,Sword
+0xb,Hammer,"Jr's pummel, Hammer(Item), Bonkers(Enemy)"
+0xc,Explosive
+0xd,Spin,Sheik's Grenade(Explosion windbox)
+0xe,Bite,"Charizard/Yoshi pummle, Corrin, Wario"
+0xf,Magic,"Palutena pummel, DownAttackD/U"
+0x10,PK(Psychic),Fenelin's flame hitbox
+0x11,Bow,Olimars SpecialHi_C2
+0x12,Unused,Unused
+0x13,Stick(?),Only used for Ness/Lucas' F-smash
+0x14,Umbrella,Only used for Peach's Up-B
+0x15,Pikmin
+0x16,Water,Unused in Smash 4
+0x17,Whip,"ZSS U-smash, Nair, SideB"
+0x18,Tail,"Fox Uair, Pikachu Usmash"
+0x19,Energy,"Samus Uthrow, Zair, Robin's thunder sword(Item)"

@@ -1,0 +1,585 @@
+Entry,ID,Equipment Name,Variable ID,Value 1,Value 2,Value 3,Description
+Entry0,0x55,Pity Final Smasher,0x19000000,50.0,60.0,70.0,Chance (percent)
+,0x30,Vampire,-,50.0,65.0,80.0,Heals multiplier (percent)
+,,,-,20.0,20.0,20.0
+,,,-,2.0,2.0,2.0
+,0x23,Desperate Attacker,-,100.0,100.0,100.0,Percent threshold
+,,,-,20.0,20.0,20.0,Percent threshold for Stamina Smash
+,,,-,1200.0,1200.0,1200.0,Duration (frames)
+,0x24,Desperate Defender,-,100.0,100.0,100.0,Percent threshold
+,,,-,20.0,20.0,20.0,Percent threshold for Stamina Smash
+,,,-,1200.0,1200.0,1200.0,Duration (frames)
+,0x25,Desperate Speedster,-,100.0,100.0,100.0,Percent threshold
+,,,-,20.0,20.0,20.0,Percent threshold for Stamina Smash
+,,,-,1200.0,1200.0,1200.0,Duration (frames)
+,0x26,Desperate Specialist,-,100.0,100.0,100.0,Percent threshold
+,,,-,20.0,20.0,20.0,Percent threshold for Stamina Smash
+,,,-,1200.0,1200.0,1200.0,Duration (frames)
+,0x27,Desperate Immortal,-,100.0,100.0,100.0,Percent threshold
+,,,-,20.0,20.0,20.0,Percent threshold for Stamina Smash
+,,,-,420.0,480.0,540.0,Invincible frames
+,0x2b,Trade-off Attacker,-,30.0,40.0,50.0,Initial damage
+,0x2c,Trade-off Defender,-,30.0,50.0,70.0,Initial damage
+,0x2d,Trade-off Speedster,-,30.0,40.0,50.0,Initial damage
+,0x2e,All-round Trade-off,-,60.0,75.0,90.0,Initial damage
+,0x5a,Sudden Death Gambler,-,50.0,75.0,95.0,Chance (percent)
+,,,-,100.0,100.0,100.0,Initial damage
+,0x4c,Crouch Healer,0x1900004b,90.0,90.0,90.0,Required frames to be healed
+,,,0x900004e,2.5,3.5,5.0,Healing percent
+,0x4d,Caloric Attacker,-,900.0,900.0,900.0,Duration (frames)
+,0x4e,Caloric Speedster,-,900.0,900.0,900.0,Duration (frames)
+,0x4f,Caloric Defender,-,900.0,900.0,900.0,Duration (frames)
+,0x50,Caloric Powerhouse,-,900.0,900.0,900.0,Duration (frames)
+,0x37,Shield Exploder,-,15.0,20.0,25.0,Dealing damage
+,0x52,Caloric Immortal,-,300.0,330.0,360.0,Invincible frames
+,0x53,Auto-Healer,-,180.0,180.0,180.0,Required frames to be healed
+,,,-,2.0,3.0,4.0,Healing percent
+,0x37,Shield Exploder,0x9000069,15.0,20.0,25.0,Hitbox damage
+,,,0x1900006c,1.0,1.0,1.0
+,,,0x900006f,1.1,1.15,1.2,Hitbox size multiplier (this * fighter_param Name45)
+,0x38,Shield Healer,-,0.3,0.4,0.5,Healing percent multiplier
+,,,-,1.15,1.15,1.15,Shield degeneration multiplier
+,0x39,Shield Reflector,-,0.3,0.4,0.5,Hitbox damage multiplier
+,,,-,1.1,1.1,1.1,Shield degeneration multiplier
+,0x58,Final Smash Healer,-,120.0,120.0,120.0,Required frames to be healed
+,,,-,6.0,9.0,12.0,Healing percent
+,0x31,No-Flinch Smasher,0x9000084,1.35,1.2,1.1,Damage taken multiplier
+,,,0x9000087,200.0,210.0,220.0,Armor Knockback threshold
+,0x34,First Striker,-,600.0,720.0,840.0,Invincible frames
+,0x32,Critical Hitter,-,20.0,26.0,33.0,Critical chance (percent)
+,,,-,3.0,3.0,3.0,Damage dealt multiplier
+,0x33,Insult to Injury,-,1.4,1.55,1.7,Damage dealt multiplier
+,0x59,Double Final Smasher,-,20.0,30.0,40.0,Minimum chance (percent)
+,,,-,75.0,85.0,95.0,Maximum chance (percent)
+,,,-,30.0,50.0,70.0
+,,,-,30.0,50.0,70.0
+,0x2f,Moon Launcher,-,60.0,60.0,60.0,Launch angle lower threshold (degrees)
+,,,-,120.0,120.0,120.0,Launch angle upper threshold (degrees)
+,0x36,Speed Crasher,0x90000a8,0.5,2.0,3.0,Minimum hitbox damage
+,,,0x90000ab,7.0,12.0,18.0,Maximum hitbox damage
+,,,0x190000ae,60.0,60.0,60.0,KB angle (degrees)
+,,Countdown,-,1.6,1.75,1.9,Launch speed multiplier
+,,,-,0.91,0.89,0.85
+,,,-,1.0,1.0,1.0
+
+Entry2,0x0,Sprinter,0x03000008,1.3,1.45,1.6,Dash initial speed
+,,,0x03000009,1.3,1.45,1.6,Run maximum additional acceleration
+,,,0x0300000a,1.3,1.45,1.6,Base run acceleration
+,,,0x0300000b,1.3,1.45,1.6,Run maximum speed
+,0x1,Stroller,0x03000008,0.8,0.7,0.6,Dash initial speed
+,,,0x03000009,0.8,0.7,0.6,Run maximum additional acceleration
+,,,0x0300000a,0.8,0.7,0.6,Base run acceleration
+,,,0x0300000b,0.8,0.7,0.6,Run maximum speed
+,0x2,Glider,0x03000014,1.25,1.3,1.35,Air maximum additional acceleration
+,,,0x03000015,1.25,1.3,1.35,Base air acceleration
+,,,0x03000016,1.25,1.3,1.35,Air horizontal maximum speed
+,,,0x03000017,1.25,1.3,1.35,Air friction
+,0x3,Antiglide,0x03000014,0.8,0.73,0.65,Air maximum additional acceleration
+,,,0x03000015,0.8,0.73,0.65,Base air acceleration
+,,,0x03000016,0.8,0.73,0.65,Air horizontal maximum speed
+,,,0x03000017,0.8,0.73,0.65,Air friction
+,0x4,Leaper,0x03000158,1.2,1.27,1.34,Jump related
+,,,0x03000159,1.2,1.27,1.34,Hop related
+,,,0x0300015f,1.2,1.27,1.34,Footstool jump related
+,,,0x03000160,1.2,1.27,1.34,Footstool hop related
+,,,0x0300015a,1.2,1.27,1.34,Air jump related
+,,,0x0300015c,1.2,1.27,1.34,Jump related
+,,,0x03000045,1.2,1.27,1.34,Jump related
+,,,0x03000047,1.2,1.27,1.34,Wall jump vertical speed
+,,,0x0300015b,1.2,1.27,1.34,Jump related
+,,,0x0300015d,1.11,1.14,1.18,Jump related
+,0x5,Antileap,0x03000158,0.8,0.72,0.65,Jump related
+,,,0x03000159,0.8,0.72,0.65,Hop related
+,,,0x0300015f,0.8,0.72,0.65,Footstool jump related
+,,,0x03000160,0.8,0.72,0.65,Footstool hop related
+,,,0x0300015a,0.8,0.72,0.65,Air jump related
+,,,0x0300015c,0.8,0.72,0.65,Jump related
+,,,0x03000045,0.8,0.72,0.65,Jump related
+,,,0x03000047,0.8,0.72,0.65,Wall jump vertical speed
+,,,0x0300015b,0.8,0.72,0.65,Jump related
+,,,0x0300015d,0.85,0.78,0.72,Jump related
+,0x6,Spead Skater,0x03000001,1.5,1.65,1.8,Walk acceleration A
+,,,0x03000002,1.5,1.65,1.8,Walk acceleration B
+,,,0x03000003,1.5,1.65,1.8,Walk maximum speed
+,,,0x03000008,1.5,1.65,1.8,Dash initial speed
+,,,0x03000009,1.5,1.65,1.8,Run maximum additional acceleration
+,,,0x0300000a,1.5,1.65,1.8,Base run acceleration
+,,,0x0300000b,1.5,1.65,1.8,Run maximum speed
+,,,0x03000007,0.6,0.5,0.4,Ground friction
+,0x7,Hi-Jump,0x03000158,1.3,1.36,1.42,Jump related
+,,,0x03000159,1.3,1.36,1.42,Hop related
+,,,0x0300015f,1.3,1.36,1.42,Footstool jump related
+,,,0x03000160,1.3,1.36,1.42,Footstool hop related
+,0x8,Lo-Jump,0x03000158,0.7,0.64,0.58,Jump related
+,,,0x03000159,0.7,0.64,0.58,Hop related
+,,,0x0300015f,0.7,0.64,0.58,Footstool jump related
+,,,0x03000160,0.7,0.64,0.58,Footstool hop related
+,0x9,Double-Jump Boost,0x0300015a,1.3,1.36,1.42,Air jump related
+,,,0x0300015c,1.3,1.36,1.42,Jump related
+,,,0x03000046,1.3,1.36,1.42,Wall jump horizontal speed
+,,,0x03000047,1.3,1.36,1.42,Wall jump vertical speed
+,,,0x0300015b,1.3,1.36,1.42,Jump related
+,,,0x0300015d,1.17,1.2,1.23,Jump related
+,0xa,Double-Jump Drag,0x0300015a,0.7,0.64,0.58,Air jump related
+,,,0x0300015c,0.7,0.64,0.58,Jump related
+,,,0x03000046,0.7,0.64,0.58,Wall jump horizontal speed
+,,,0x03000047,0.7,0.64,0.58,Wall jump vertical speed
+,,,0x0300015b,0.7,0.64,0.58,Jump related
+,,,0x0300015d,0.8,0.75,0.7,Jump related
+,0xb,Thistle Jump,0x03000018,0.95,0.925,0.9,Gravity
+,,,0x03000019,0.6,0.5,0.4,Maximum fall speed
+,,,0x0300001a,5.0,10.0,20.0,Aerial vertical accelration
+,,,0x0300001b,0.7,0.65,0.6,Fast fall speed
+,0xc,Anchor Jump,0x03000018,1.4,1.55,1.7,Gravity
+,,,0x03000019,1.4,1.55,1.7,Maximum fall speed
+,,,0x0300001a,0.5,0.2,0.1,Aerial vertical accelration
+,,,0x0300001b,1.1,1.1,1.1,Fast fall speed
+,0xd,Speed Walker,0x03000001,1.3,1.4,1.5,Walk acceleration A
+,,,0x03000002,1.3,1.4,1.5,Walk acceleration B
+,,,0x03000003,1.3,1.4,1.5,Walk maximum speed
+,0xe,Meanderer,0x03000001,0.8,0.7,0.6,Walk acceleration A
+,,,0x03000002,0.8,0.7,0.6,Walk acceleration B
+,,,0x03000003,0.8,0.7,0.6,Walk maximum speed
+,0xf,Lingering Edge,0x030000fc,2.0,3.0,4.0,Ledge hang duration multiplier
+,0x10,Hasty Edge,0x030000fc,0.5,0.33,0.2,Ledge hang duration multiplier
+,0x11,Gluey Edge,0x030000fb,1.3,1.5,1.7,Ledge grab range multiplier
+,0x12,Tough Edge,0x030000fb,0.75,0.6,0.45,Ledge grab range multiplier
+,0x13,Hard Breaker,0x03000001,1.0,1.0,1.0,Walk acceleration A
+,,,0x03000002,1.0,1.0,1.0,Walk acceleration B
+,,,0x03000003,1.0,1.0,1.0,Walk maximum speed
+,,,0x03000008,1.0,1.0,1.0,Dash initial speed
+,,,0x03000009,1.0,1.0,1.0,Run maximum additional acceleration
+,,,0x0300000a,1.0,1.0,1.0,Base run acceleration
+,,,0x0300000b,1.0,1.0,1.0,Run maximum speed
+,,,0x03000007,1.5,2.0,3.0,Ground friction
+,0x14,Perfect-Shield Helper,0x030000f9,2.34,3.0,3.67,Power shield window multiplier
+,0x15,Imperfect Shield,0x030000f9,0.0,0.0,0.0,Power shield window multiplier
+,0x16,Shield Regenerator,0x030000f7,1.5,2.0,2.5,Shield regeneration multiplier
+,0x17,Shield Degenerator,0x030000f7,0.5,0.33,0.25,Shield regeneration multiplier
+,0x18,Air Defender,0x030000f5,0.75,0.68,0.6,Damage taken multiplier
+,0x19,Air Piñata,0x030000f5,1.2,1.3,1.4,Damage taken multiplier
+,0x1a,Nimble Dodger,0x030000fa,1.1,1.2,1.3,Dodge intangible duration multiplier
+,0x1b,Dodgy Dodger,0x030000fa,0.75,0.63,0.5,Dodge intangible duration multiplier
+,0x1c,Smooth Lander,0x0300001c,0.7,0.6,0.5,Nair landing lag
+,,,0x0300001d,0.7,0.6,0.5,Fair landing lag
+,,,0x0300001e,0.7,0.6,0.5,Bair landing lag
+,,,0x0300001f,0.7,0.6,0.5,Uair landing lag
+,,,0x03000020,0.7,0.6,0.5,Dair landing lag
+,,,0x03000028,0.7,0.6,0.5,Additional langing lag from hard landing
+,,,0x03000027,1.0,1.0,1.0,Base landing lag (aka soft landing lag)
+,0x1d,Crash Lander,0x0300001c,1.3,1.5,1.7,Nair landing lag
+,,,0x0300001d,1.3,1.5,1.7,Fair landing lag
+,,,0x0300001e,1.3,1.5,1.7,Bair landing lag
+,,,0x0300001f,1.3,1.5,1.7,Uair landing lag
+,,,0x03000020,1.3,1.5,1.7,Dair landing lag
+,,,0x03000028,2.0,2.5,3.0,Additional langing lag from hard landing
+,,,0x03000027,2.0,3.0,4.0,Base landing lag (aka soft landing lag)
+,0x1e,Quick Smasher,0x030000e1,2.0,2.5,3.0,Smash charge speed multiplier
+,0x1f,Hyper Smasher,0x030000e1,0.65,0.5,0.4,Smash charge speed multiplier
+,,,0x030000e0,1.3,1.4,1.5,Smash charge damage multiplier
+,0x20,Air Attacker,0x030000dd,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x030000e2,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x030000e3,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x030000e4,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x030000e5,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x030000e6,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x0300003d,1.15,1.25,1.35,Item toss damage multiplier
+,,,0x030000ec,1.15,1.25,1.35,Battering items damage dealt multiplier
+,,,0x030000ed,1.15,1.25,1.35,Item damage dealt multiplier
+,0x21,Air Pushover,0x030000dd,0.7,0.6,0.5,Damage dealt multiplier
+,,,0x030000e2,0.7,0.6,0.5,Damage dealt multiplier
+,,,0x030000e3,0.7,0.6,0.5,Damage dealt multiplier
+,,,0x030000e4,0.7,0.6,0.5,Damage dealt multiplier
+,,,0x030000e5,0.7,0.6,0.5,Damage dealt multiplier
+,,,0x030000e6,0.7,0.6,0.5,Damage dealt multiplier
+,,,0x0300003d,0.7,0.6,0.5,Item toss damage multiplier
+,,,0x030000ec,0.7,0.6,0.5,Battering items damage dealt multiplier
+,,,0x030000ed,0.7,0.6,0.5,Item damage dealt multiplier
+,0x22,Meteor Master,0x030000e7,1.5,1.6,1.7,Damage dealt multiplier (EnMeteorUp)
+,0x23,Desperate Attacker,0x030000da,1.7,1.9,2.1,Damage dealt multiplier
+,,,0x030000db,1.7,1.9,2.1,Damage dealt multiplier
+,,,0x030000dc,1.7,1.9,2.1,Damage dealt multiplier
+,,,0x030000dd,1.7,1.9,2.1,Damage dealt multiplier
+,,,0x030000de,1.7,1.9,2.1,Damage dealt multiplier
+,,,0x030000df,1.7,1.9,2.1,Damage dealt multiplier
+,,,0x030000e0,1.7,1.9,2.1,Smash charge damage multiplier
+,,,0x030000e2,1.7,1.9,2.1,Damage dealt multiplier
+,,,0x030000e3,1.7,1.9,2.1,Damage dealt multiplier
+,,,0x030000e4,1.7,1.9,2.1,Damage dealt multiplier
+,,,0x030000e5,1.7,1.9,2.1,Damage dealt multiplier
+,,,0x030000e6,1.7,1.9,2.1,Damage dealt multiplier
+,,,0x030000f4,1.7,1.9,2.1,Damage dealt multiplier
+,,,0x0300003d,1.7,1.9,2.1,Item toss damage multiplier
+,,,0x030000ec,1.7,1.9,2.1,Battering items damage dealt multiplier
+,,,0x030000ed,1.7,1.9,2.1,Item damage dealt multiplier
+,0x24,Desperate Defender,0x030000f5,0.33,0.2,0.1,Damage taken multiplier
+,0x25,Desperate Speedster,0x03000001,1.55,1.68,1.8,Walk acceleration A
+,,,0x03000002,1.55,1.68,1.8,Walk acceleration B
+,,,0x03000003,1.55,1.68,1.8,Walk maximum speed
+,,,0x03000008,1.55,1.68,1.8,Dash initial speed
+,,,0x03000009,1.55,1.68,1.8,Run maximum additional acceleration
+,,,0x0300000a,1.55,1.68,1.8,Base run acceleration
+,,,0x0300000b,1.55,1.68,1.8,Run maximum speed
+,,,0x03000014,1.35,1.43,1.53,Air maximum additional acceleration
+,,,0x03000015,1.35,1.43,1.53,Base air acceleration
+,,,0x03000016,1.35,1.43,1.53,Air horizontal maximum speed
+,,,0x03000017,1.35,1.43,1.53,Air friction
+,,,0x03000158,1.28,1.34,1.4,Jump related
+,,,0x03000159,1.28,1.34,1.4,Hop related
+,,,0x0300015f,1.28,1.34,1.4,Footstool jump related
+,,,0x03000160,1.28,1.34,1.4,Footstool hop related
+,,,0x0300015a,1.28,1.34,1.4,Air jump related
+,,,0x0300015c,1.28,1.34,1.4,Jump related
+,,,0x03000045,1.28,1.34,1.4,Jump related
+,,,0x03000047,1.28,1.34,1.4,Wall jump vertical speed
+,,,0x0300015b,1.28,1.34,1.4,Jump related
+,,,0x0300015d,1.15,1.19,1.23,Jump related
+,0x26,Desperate Specialist,0x030000da,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000db,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000dc,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000dd,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000de,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000df,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000e0,1.5,1.65,1.8,Smash charge damage multiplier
+,,,0x030000e2,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000e3,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000e4,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000e5,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000e6,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000f4,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x0300003d,1.5,1.65,1.8,Item toss damage multiplier
+,,,0x030000ec,1.5,1.65,1.8,Battering items damage dealt multiplier
+,,,0x030000ed,1.5,1.65,1.8,Item damage dealt multiplier
+,,,0x030000f5,0.5,0.33,0.25,Damage taken multiplier
+,,,0x03000001,1.4,1.5,1.6,Walk acceleration A
+,,,0x03000002,1.4,1.5,1.6,Walk acceleration B
+,,,0x03000003,1.4,1.5,1.6,Walk maximum speed
+,,,0x03000008,1.4,1.5,1.6,Dash initial speed
+,,,0x03000009,1.4,1.5,1.6,Run maximum additional acceleration
+,,,0x0300000a,1.4,1.5,1.6,Base run acceleration
+,,,0x0300000b,1.4,1.5,1.6,Run maximum speed
+,,,0x03000014,1.25,1.3,1.35,Air maximum additional acceleration
+,,,0x03000015,1.25,1.3,1.35,Base air acceleration
+,,,0x03000016,1.25,1.3,1.35,Air horizontal maximum speed
+,,,0x03000017,1.25,1.3,1.35,Air friction
+,,,0x03000158,1.2,1.27,1.34,Jump related
+,,,0x03000159,1.2,1.27,1.34,Hop related
+,,,0x0300015f,1.2,1.27,1.34,Footstool jump related
+,,,0x03000160,1.2,1.27,1.34,Footstool hop related
+,,,0x0300015a,1.2,1.27,1.34,Air jump related
+,,,0x0300015c,1.2,1.27,1.34,Jump related
+,,,0x03000045,1.2,1.27,1.34,Jump related
+,,,0x03000047,1.2,1.27,1.34,Wall jump vertical speed
+,,,0x0300015b,1.2,1.27,1.34,Jump related
+,,,0x0300015d,1.11,1.14,1.18,Jump related
+,0x27,Desperate Immortal,,1.0,0.0,0.0
+,0x28,Unharmed Attacker,0x030000da,1.5,1.75,2.0,Damage dealt multiplier
+,,,0x030000db,1.5,1.75,2.0,Damage dealt multiplier
+,,,0x030000dc,1.5,1.75,2.0,Damage dealt multiplier
+,,,0x030000dd,1.5,1.75,2.0,Damage dealt multiplier
+,,,0x030000de,1.5,1.75,2.0,Damage dealt multiplier
+,,,0x030000df,1.5,1.75,2.0,Damage dealt multiplier
+,,,0x030000e0,1.5,1.75,2.0,Smash charge damage multiplier
+,,,0x030000e2,1.5,1.75,2.0,Damage dealt multiplier
+,,,0x030000e3,1.5,1.75,2.0,Damage dealt multiplier
+,,,0x030000e4,1.5,1.75,2.0,Damage dealt multiplier
+,,,0x030000e5,1.5,1.75,2.0,Damage dealt multiplier
+,,,0x030000e6,1.5,1.75,2.0,Damage dealt multiplier
+,,,0x030000f4,1.5,1.75,2.0,Damage dealt multiplier
+,,,0x0300003d,1.5,1.75,2.0,Item toss damage multiplier
+,,,0x030000ec,1.5,1.75,2.0,Battering items damage dealt multiplier
+,,,0x030000ed,1.5,1.75,2.0,Item damage dealt multiplier
+,0x29,Unharmed Speedster,0x03000001,1.32,1.43,1.55,Walk acceleration A
+,,,0x03000002,1.32,1.43,1.55,Walk acceleration B
+,,,0x03000003,1.32,1.43,1.55,Walk maximum speed
+,,,0x03000008,1.32,1.43,1.55,Dash initial speed
+,,,0x03000009,1.32,1.43,1.55,Run maximum additional acceleration
+,,,0x0300000a,1.32,1.43,1.55,Base run acceleration
+,,,0x0300000b,1.32,1.43,1.55,Run maximum speed
+,,,0x03000014,1.3,1.37,1.42,Air maximum additional acceleration
+,,,0x03000015,1.3,1.37,1.42,Base air acceleration
+,,,0x03000016,1.3,1.37,1.42,Air horizontal maximum speed
+,,,0x03000017,1.3,1.37,1.42,Air friction
+,,,0x03000158,1.2,1.27,1.34,Jump related
+,,,0x03000159,1.2,1.27,1.34,Hop related
+,,,0x0300015f,1.2,1.27,1.34,Footstool jump related
+,,,0x03000160,1.2,1.27,1.34,Footstool hop related
+,,,0x0300015a,1.2,1.27,1.34,Air jump related
+,,,0x0300015c,1.2,1.27,1.34,Jump related
+,,,0x03000045,1.2,1.27,1.34,Jump related
+,,,0x03000047,1.2,1.27,1.34,Wall jump vertical speed
+,,,0x0300015b,1.2,1.27,1.34,Jump related
+,,,0x0300015d,1.11,1.14,1.18,Jump related
+,0x2a,Unharmed Speed Demon,0x030000da,1.4,1.55,1.7,Damage dealt multiplier
+,,,0x030000db,1.4,1.55,1.7,Damage dealt multiplier
+,,,0x030000dc,1.4,1.55,1.7,Damage dealt multiplier
+,,,0x030000dd,1.4,1.55,1.7,Damage dealt multiplier
+,,,0x030000de,1.4,1.55,1.7,Damage dealt multiplier
+,,,0x030000df,1.4,1.55,1.7,Damage dealt multiplier
+,,,0x030000e0,1.4,1.55,1.7,Smash charge damage multiplier
+,,,0x030000e2,1.4,1.55,1.7,Damage dealt multiplier
+,,,0x030000e3,1.4,1.55,1.7,Damage dealt multiplier
+,,,0x030000e4,1.4,1.55,1.7,Damage dealt multiplier
+,,,0x030000e5,1.4,1.55,1.7,Damage dealt multiplier
+,,,0x030000e6,1.4,1.55,1.7,Damage dealt multiplier
+,,,0x030000f4,1.4,1.55,1.7,Damage dealt multiplier
+,,,0x0300003d,1.4,1.55,1.7,Item toss damage multiplier
+,,,0x030000ec,1.4,1.55,1.7,Battering items damage dealt multiplier
+,,,0x030000ed,1.4,1.55,1.7,Item damage dealt multiplier
+,,,0x03000001,1.26,1.34,1.43,Walk acceleration A
+,,,0x03000002,1.26,1.34,1.43,Walk acceleration B
+,,,0x03000003,1.26,1.34,1.43,Walk maximum speed
+,,,0x03000008,1.26,1.34,1.43,Dash initial speed
+,,,0x03000009,1.26,1.34,1.43,Run maximum additional acceleration
+,,,0x0300000a,1.26,1.34,1.43,Base run acceleration
+,,,0x0300000b,1.26,1.34,1.43,Run maximum speed
+,,,0x03000014,1.2,1.25,1.3,Air maximum additional acceleration
+,,,0x03000015,1.2,1.25,1.3,Base air acceleration
+,,,0x03000016,1.2,1.25,1.3,Air horizontal maximum speed
+,,,0x03000017,1.2,1.25,1.3,Air friction
+,,,0x03000158,1.18,1.24,1.3,Jump related
+,,,0x03000159,1.18,1.24,1.3,Hop related
+,,,0x0300015f,1.18,1.24,1.3,Footstool jump related
+,,,0x03000160,1.18,1.24,1.3,Footstool hop related
+,,,0x0300015a,1.18,1.24,1.3,Air jump related
+,,,0x0300015c,1.18,1.24,1.3,Jump related
+,,,0x03000045,1.18,1.24,1.3,Jump related
+,,,0x03000047,1.18,1.24,1.3,Wall jump vertical speed
+,,,0x0300015b,1.18,1.24,1.3,Jump related
+,,,0x0300015d,1.1,1.13,1.16,Jump related
+,0x2b,Trade-off Attacker,0x030000da,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x030000db,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x030000dc,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x030000dd,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x030000de,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x030000df,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x030000e0,1.15,1.25,1.35,Smash charge damage multiplier
+,,,0x030000e2,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x030000e3,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x030000e4,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x030000e5,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x030000e6,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x030000f4,1.15,1.25,1.35,Damage dealt multiplier
+,,,0x0300003d,1.15,1.25,1.35,Item toss damage multiplier
+,,,0x030000ec,1.15,1.25,1.35,Battering items damage dealt multiplier
+,,,0x030000ed,1.15,1.25,1.35,Item damage dealt multiplier
+,0x2c,Trade-off Defender,0x030000f5,0.8,0.7,0.6,Damage taken multiplier
+,0x2d,Trade-off Speedster,0x03000001,1.3,1.4,1.5,Walk acceleration A
+,,,0x03000002,1.3,1.4,1.5,Walk acceleration B
+,,,0x03000003,1.3,1.4,1.5,Walk maximum speed
+,,,0x03000008,1.3,1.4,1.5,Dash initial speed
+,,,0x03000009,1.3,1.4,1.5,Run maximum additional acceleration
+,,,0x0300000a,1.3,1.4,1.5,Base run acceleration
+,,,0x0300000b,1.3,1.4,1.5,Run maximum speed
+,,,0x03000014,1.2,1.24,1.28,Air maximum additional acceleration
+,,,0x03000015,1.2,1.24,1.28,Base air acceleration
+,,,0x03000016,1.2,1.24,1.28,Air horizontal maximum speed
+,,,0x03000017,1.2,1.24,1.28,Air friction
+,,,0x03000158,1.18,1.22,1.26,Jump related
+,,,0x03000159,1.18,1.22,1.26,Hop related
+,,,0x0300015f,1.18,1.22,1.26,Footstool jump related
+,,,0x03000160,1.18,1.22,1.26,Footstool hop related
+,,,0x0300015a,1.18,1.22,1.26,Air jump related
+,,,0x0300015c,1.18,1.22,1.26,Jump related
+,,,0x03000045,1.18,1.22,1.26,Jump related
+,,,0x03000047,1.18,1.22,1.26,Wall jump vertical speed
+,,,0x0300015b,1.18,1.22,1.26,Jump related
+,,,0x0300015d,1.1,1.12,1.14,Jump related
+,0x2e,All-Around Trade-off,0x030000da,1.1,1.2,1.3,Damage dealt multiplier
+,,,0x030000db,1.1,1.2,1.3,Damage dealt multiplier
+,,,0x030000dc,1.1,1.2,1.3,Damage dealt multiplier
+,,,0x030000dd,1.1,1.2,1.3,Damage dealt multiplier
+,,,0x030000de,1.1,1.2,1.3,Damage dealt multiplier
+,,,0x030000df,1.1,1.2,1.3,Damage dealt multiplier
+,,,0x030000e0,1.1,1.2,1.3,Smash charge damage multiplier
+,,,0x030000e2,1.1,1.2,1.3,Damage dealt multiplier
+,,,0x030000e3,1.1,1.2,1.3,Damage dealt multiplier
+,,,0x030000e4,1.1,1.2,1.3,Damage dealt multiplier
+,,,0x030000e5,1.1,1.2,1.3,Damage dealt multiplier
+,,,0x030000e6,1.1,1.2,1.3,Damage dealt multiplier
+,,,0x030000f4,1.1,1.2,1.3,Damage dealt multiplier
+,,,0x0300003d,1.1,1.2,1.3,Item toss damage multiplier
+,,,0x030000ec,1.1,1.2,1.3,Battering items damage dealt multiplier
+,,,0x030000ed,1.1,1.2,1.3,Item damage dealt multiplier
+,,,0x030000f5,0.8,0.7,0.6,Damage taken multiplier
+,,,0x03000001,1.28,1.36,1.44,Walk acceleration A
+,,,0x03000002,1.28,1.36,1.44,Walk acceleration B
+,,,0x03000003,1.28,1.36,1.44,Walk maximum speed
+,,,0x03000008,1.28,1.36,1.44,Dash initial speed
+,,,0x03000009,1.28,1.36,1.44,Run maximum additional acceleration
+,,,0x0300000a,1.28,1.36,1.44,Base run acceleration
+,,,0x0300000b,1.28,1.36,1.44,Run maximum speed
+,,,0x03000014,1.18,1.21,1.24,Air maximum additional acceleration
+,,,0x03000015,1.18,1.21,1.24,Base air acceleration
+,,,0x03000016,1.18,1.21,1.24,Air horizontal maximum speed
+,,,0x03000017,1.18,1.21,1.24,Air friction
+,,,0x03000158,1.15,1.21,1.26,Jump related
+,,,0x03000159,1.15,1.21,1.26,Hop related
+,,,0x0300015f,1.15,1.21,1.26,Footstool jump related
+,,,0x03000160,1.15,1.21,1.26,Footstool hop related
+,,,0x0300015a,1.15,1.21,1.26,Air jump related
+,,,0x0300015c,1.15,1.21,1.26,Jump related
+,,,0x03000045,1.15,1.21,1.26,Jump related
+,,,0x03000047,1.15,1.21,1.26,Wall jump vertical speed
+,,,0x0300015b,1.15,1.21,1.26,Jump related
+,,,0x0300015d,1.08,1.11,1.13,Jump related
+,0x2f,Moon Launcher,0x030000e8,1.3,1.4,1.5,Damage dealt multiplier (EnStrongUpperAttack)
+,0x30,Vampire,0x13000000,1.0,0.0,0.0
+,0x31,No-Flinch Smasher,0x13000000,1.0,0.0,0.0
+,0x32,Critical Hitter,0x13000000,1.0,0.0,0.0
+,0x33,Insult to Injury,0x13000000,1.0,0.0,0.0
+,0x34,First Striker,0x13000000,1.0,0.0,0.0
+,0x35,Countdown,0x13000000,1.0,0.0,0.0
+,0x36,Speed Crasher,0x13000000,1.0,0.0,0.0
+,0x37,Shield Exploder,0x13000000,1.0,0.0,0.0
+,0x38,Shield Healer,0x030000f7,0.7,0.7,0.7,Shield regeneration multiplier
+,0x39,Shield Reflector,0x030000f7,0.8,0.8,0.8,Shield regeneration multiplier
+,0x3a,Escape Artist,0x030000fe,0.5,0.33,0.25,Status duration multiplier
+,0x3b,Item Hurler,0x0300003d,1.5,1.65,1.8,Item toss damage multiplier
+,,,0x03000102,1.5,1.65,1.8,"Item, damage dealt multiplier"
+,0x3c,Item Lobber,0x0300003d,0.7,0.5,0.3,Item toss damage multiplier
+,,,0x03000102,0.7,0.5,0.3,"Item, damage dealt multiplier"
+,0x3d,Item Hitter,0x030000ec,1.5,1.65,1.8,Battering items damage dealt multiplier
+,0x3e,Item Pitcher,0x0300003d,1.0,1.0,1.0,Item toss damage multiplier
+,,,0x0300003c,1.28,1.5,1.72,Item toss speed multiplier
+,,,0x03000102,1.0,1.0,1.0,"Item, damage dealt multiplier"
+,0x3f,Item Shooter,0x030000ed,1.5,1.65,1.8,Item damage dealt multiplier
+,,,0x03000101,1.5,1.8,2.0,Firing items ammo multiplier
+,0x40,Quick Batter,0x03000100,0.7,0.6,0.5,Home-Run Bat smash swing speed multiplier
+,0x41,Star Rod,0x13000000,1.0,0.0,0.0
+,0x42,Lip's Stick,0x13000000,1.0,0.0,0.0
+,0x43,Super Scope,0x13000000,1.0,0.0,0.0
+,0x44,Ray Gun,0x13000000,1.0,0.0,0.0
+,0x45,Fire Flower,0x13000000,1.0,0.0,0.0
+,0x46,Beam Sword,0x13000000,1.0,0.0,0.0
+,0x47,Home-Run Bat,0x13000000,1.0,0.0,0.0
+,0x48,Bob-omb,0x13000000,1.0,0.0,0.0
+,0x49,Mr. Saturn,0x13000000,1.0,0.0,0.0
+,0x4a,Food Lover,0x030000eb,1.5,1.75,2.0,Healing multiplier (for foods)
+,0x4b,Picky Eater,0x030000eb,0.7,0.5,0.3,Healing multiplier (for foods)
+,0x4c,Crouch Healer,0x13000000,1.0,0.0,0.0
+,0x4d,Caloric Attacker,0x030000da,1.4,1.5,1.6,Damage dealt multiplier
+,,,0x030000db,1.4,1.5,1.6,Damage dealt multiplier
+,,,0x030000dc,1.4,1.5,1.6,Damage dealt multiplier
+,,,0x030000dd,1.4,1.5,1.6,Damage dealt multiplier
+,,,0x030000de,1.4,1.5,1.6,Damage dealt multiplier
+,,,0x030000df,1.4,1.5,1.6,Damage dealt multiplier
+,,,0x030000e0,1.4,1.5,1.6,Smash charge damage multiplier
+,,,0x030000e2,1.4,1.5,1.6,Damage dealt multiplier
+,,,0x030000e3,1.4,1.5,1.6,Damage dealt multiplier
+,,,0x030000e4,1.4,1.5,1.6,Damage dealt multiplier
+,,,0x030000e5,1.4,1.5,1.6,Damage dealt multiplier
+,,,0x030000e6,1.4,1.5,1.6,Damage dealt multiplier
+,,,0x030000f4,1.4,1.5,1.6,Damage dealt multiplier
+,,,0x0300003d,1.4,1.5,1.6,Item toss damage multiplier
+,,,0x030000ec,1.4,1.5,1.6,Battering items damage dealt multiplier
+,,,0x030000ed,1.4,1.5,1.6,Item damage dealt multiplier
+,0x4e,Caloric Speedster,0x03000001,1.36,1.47,1.58,Walk acceleration A
+,,,0x03000002,1.36,1.47,1.58,Walk acceleration B
+,,,0x03000003,1.36,1.47,1.58,Walk maximum speed
+,,,0x03000008,1.36,1.47,1.58,Dash initial speed
+,,,0x03000009,1.36,1.47,1.58,Run maximum additional acceleration
+,,,0x0300000a,1.36,1.47,1.58,Base run acceleration
+,,,0x0300000b,1.36,1.47,1.58,Run maximum speed
+,,,0x03000014,1.3,1.37,1.42,Air maximum additional acceleration
+,,,0x03000015,1.3,1.37,1.42,Base air acceleration
+,,,0x03000016,1.3,1.37,1.42,Air horizontal maximum speed
+,,,0x03000017,1.3,1.37,1.42,Air friction
+,,,0x03000158,1.21,1.26,1.32,Jump related
+,,,0x03000159,1.21,1.26,1.32,Hop related
+,,,0x0300015f,1.21,1.26,1.32,Footstool jump related
+,,,0x03000160,1.21,1.26,1.32,Footstool hop related
+,,,0x0300015a,1.21,1.26,1.32,Air jump related
+,,,0x0300015c,1.21,1.26,1.32,Jump related
+,,,0x03000045,1.21,1.26,1.32,Jump related
+,,,0x03000047,1.21,1.26,1.32,Wall jump vertical speed
+,,,0x0300015b,1.21,1.26,1.32,Jump related
+,,,0x0300015d,1.11,1.14,1.17,Jump related
+,0x4f,Caloric Defender,0x030000f5,0.5,0.4,0.3,Damage taken multiplier
+,0x50,Caloric Powerhouse,0x030000da,1.3,1.4,1.5,Damage dealt multiplier
+,,,0x030000db,1.3,1.4,1.5,Damage dealt multiplier
+,,,0x030000dc,1.3,1.4,1.5,Damage dealt multiplier
+,,,0x030000dd,1.3,1.4,1.5,Damage dealt multiplier
+,,,0x030000de,1.3,1.4,1.5,Damage dealt multiplier
+,,,0x030000df,1.3,1.4,1.5,Damage dealt multiplier
+,,,0x030000e0,1.3,1.4,1.5,Smash charge damage multiplier
+,,,0x030000e2,1.3,1.4,1.5,Damage dealt multiplier
+,,,0x030000e3,1.3,1.4,1.5,Damage dealt multiplier
+,,,0x030000e4,1.3,1.4,1.5,Damage dealt multiplier
+,,,0x030000e5,1.3,1.4,1.5,Damage dealt multiplier
+,,,0x030000e6,1.3,1.4,1.5,Damage dealt multiplier
+,,,0x030000f4,1.3,1.4,1.5,Damage dealt multiplier
+,,,0x0300003d,1.3,1.4,1.5,Item toss damage multiplier
+,,,0x030000ec,1.3,1.4,1.5,Battering items damage dealt multiplier
+,,,0x030000ed,1.3,1.4,1.5,Item damage dealt multiplier
+,,,0x030000f5,0.65,0.52,0.4,Damage taken multiplier
+,,,0x03000001,1.3,1.4,1.5,Walk acceleration A
+,,,0x03000002,1.3,1.4,1.5,Walk acceleration B
+,,,0x03000003,1.3,1.4,1.5,Walk maximum speed
+,,,0x03000008,1.3,1.4,1.5,Dash initial speed
+,,,0x03000009,1.3,1.4,1.5,Run maximum additional acceleration
+,,,0x0300000a,1.3,1.4,1.5,Base run acceleration
+,,,0x0300000b,1.3,1.4,1.5,Run maximum speed
+,,,0x03000014,1.2,1.25,1.3,Air maximum additional acceleration
+,,,0x03000015,1.2,1.25,1.3,Base air acceleration
+,,,0x03000016,1.2,1.25,1.3,Air horizontal maximum speed
+,,,0x03000017,1.2,1.25,1.3,Air friction
+,,,0x03000158,1.15,1.2,1.25,Jump related
+,,,0x03000159,1.15,1.2,1.25,Hop related
+,,,0x0300015f,1.15,1.2,1.25,Footstool jump related
+,,,0x03000160,1.15,1.2,1.25,Footstool hop related
+,,,0x0300015a,1.15,1.2,1.25,Air jump related
+,,,0x0300015c,1.15,1.2,1.25,Jump related
+,,,0x03000045,1.15,1.2,1.25,Jump related
+,,,0x03000047,1.15,1.2,1.25,Wall jump vertical speed
+,,,0x0300015b,1.15,1.2,1.25,Jump related
+,,,0x0300015d,1.09,1.11,1.13,Jump related
+,0x51,KO Healer,0x13000000,1.0,0.0,0.0
+,0x52,Caloric Immortal,0x13000000,1.0,0.0,0.0
+,0x53,Auto-Healer,0x13000000,1.0,0.0,0.0
+,0x54,Smash Ball Attractor,0x13000000,1.0,0.0,0.0
+,0x55,Pity Final Smasher,0x13000000,1.0,0.0,0.0
+,0x56,Smash Ball Clinger,0x030000ff,0.5,0.3,0.1,Final Smash drop probability multiplier
+,0x57,Super Final Smasher,0x030000da,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000db,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000dc,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000dd,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000de,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000df,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000e0,1.5,1.65,1.8,Smash charge damage multiplier
+,,,0x030000e2,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000e3,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000e4,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000e5,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000e6,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000f4,1.5,1.65,1.8,Damage dealt multiplier
+,,,0x030000f5,0.5,0.33,0.25,Damage taken multiplier
+,,,0x03000008,1.3,1.45,1.6,Dash initial speed
+,,,0x03000009,1.3,1.45,1.6,Run maximum additional acceleration
+,,,0x0300000a,1.3,1.45,1.6,Base run acceleration
+,,,0x0300000b,1.3,1.45,1.6,Run maximum speed
+,,,0x03000014,1.25,1.3,1.35,Air maximum additional acceleration
+,,,0x03000015,1.25,1.3,1.35,Base air acceleration
+,,,0x03000016,1.25,1.3,1.35,Air horizontal maximum speed
+,,,0x03000017,1.25,1.3,1.35,Air friction
+,,,0x03000158,1.2,1.27,1.34,Jump related
+,,,0x03000159,1.2,1.27,1.34,Hop related
+,,,0x0300015f,1.2,1.27,1.34,Footstool jump related
+,,,0x03000160,1.2,1.27,1.34,Footstool hop related
+,,,0x0300015a,1.2,1.27,1.34,Air jump related
+,,,0x0300015c,1.2,1.27,1.34,Jump related
+,,,0x03000045,1.2,1.27,1.34,Jump related
+,,,0x03000047,1.2,1.27,1.34,Wall jump vertical speed
+,,,0x0300015b,1.2,1.27,1.34,Jump related
+,,,0x03000001,1.3,1.45,1.6,Walk acceleration A
+,,,0x03000002,1.3,1.45,1.6,Walk acceleration B
+,,,0x03000003,1.3,1.45,1.6,Walk maximum speed
+,,,0x0300003d,1.5,1.65,1.8,Item toss damage multiplier
+,,,0x030000ec,1.5,1.65,1.8,Battering items damage dealt multiplier
+,,,0x030000ed,1.5,1.65,1.8,Item damage dealt multiplier
+,,,0x0300015d,1.26,1.33,1.4,Jump related
+,0x58,Final Smash Healer,0x13000000,1.0,0.0,0.0
+,0x59,Double Final Smasher,0x13000000,1.0,0.0,0.0
+,0x5a,Sudden Death Gambler,0x13000000,1.0,0.0,0.0
+,0x5b,Safe Respawner,0x030000fd,3.0,4.0,5.0,Respawn invincible duration multiplier
+,0x5c,Risky Respawner,0x030000fd,0.0,0.0,0.0,Respawn invincible duration multiplier

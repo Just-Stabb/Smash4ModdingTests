@@ -12,6 +12,10 @@
   default roll-off speed 2.2 and air speed multiplier 1.0 (`rolloff_air_speed_mult()`) unless the
   user gives them.
 - Fighter stat (`fighter_param`) names and indices: `reference/fighter_param_attributes.csv`.
+- **Community parameter spreadsheets:** `reference/spreadsheets/` (`Sm4sh_params.xlsx`: every param file,
+  the ACMD events list, hitbox field values, item / enemy ids, stages; `animcmd_item_params.xlsx`;
+  `Item_Common_Param.xlsx`; CSV per sheet in `csv/`). Check them before guessing a parameter or an
+  ACMD command's arguments (e.g. vanilla `Change_Hitbox_Size` resizes a live hitbox).
 - **Script names:** every script or motion slot a mod adds (game / effect / sound / expression, any
   fighter) gets its name in `tools/Sm4shCommand/SM4SHCommand/ModAnimNames.txt` (under the fighter's
   heading), so Sm4shCommand labels it; rebuild Sm4shCommand when it changes. A script that plays

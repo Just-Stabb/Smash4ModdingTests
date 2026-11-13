@@ -1,0 +1,258 @@
+Date(JST),Page Name,Editor,Name,Value,Description,Comment
+2018-07-05 00:00:00,battle_object,Ruben,24.0,0.2,Multiplier for distance between 366 angle hitbox position and aerial opponent TransN bone position,Launch speed = Attacker's momentum + (Hitbox position - Opponent's TransN position) * 0.2
+,,,26.0,3.0,Launch speed cap for 366 moves (applied on frame 6)
+,,,27.0,-1.0,Additional vertical launch speed cap applied if it's lower than this value
+,fighter_param,Ben Hall,156.0,1.0,Swim V max speed
+,fighter_param_common,Ben Hall,48.0,0.55,Initial speed of pushback from connecting multiple hits,"Decel = 1.1 * Ground friction, as like shield pushback"
+,,,84.0,80.0,Lower camera zoom-out threshold for hitlag shaking
+,,,85.0,200.0,Upper camera zoom-out threshold for hitlag shaking
+,,,86.0,0.5,Minimum hitlag shaking distance (camera zoom-out < 80),Note: Midair shaking is vertical while grounded shaking is horizontal
+,,,147.0,1.8,Maximum hitlag shaking distance (camera zoom-out > 200)
+,,,148.0,0x4,Number of frames launched before displaying player cursor
+,,,149.0,0x50,Frames before player cursor appears when starting waiting actions,"CliffWait, SquatWait, Wait, WalkBrake"
+,,,150.0,80.0,Camera distance(?) to force player cursor display
+,,Meshima,249.0,0x3,Animation blending frames to DamageFly animations (except for DamageFlyRoll)
+,,Ben Hall,340.0,0x3,DownDamage lock limit
+,,Stinny,726.0,2.0,Bunny hood max ground-to-air H speed
+2018-05-23 00:00:00,battle_object,Ben Hall,29.0,0.1745329,Minimum launch angle below ground to be able to bounce off while grounded (radians)
+,,,38.0,0x8,Odds of 2nd type of getting-hit GFX (Brawl only?),"It is easier to tell the difference between the two GFX in Brawl, but I can't notice the difference in Smash 4 yet"
+,,,39.0,0.75,Multiplier to hitlag for character shaking frames,Shaking frames = INT(Hitlag Frames * 0.75 + 4)
+,,,40.0,4.0,Base character shaking frames
+,,,41.0,2.0,V launch speed multiplier on moves with Reverse Effect,"Read on ""DamageTurn"", Hitbox Effect 0x7 (Cape)"
+,,,42.0,2.25,H launch speed multiplier on moves with Reverse Effect,"Read on ""DamageTurn"", Hitbox Effect 0x7 (Cape)"
+,,,43.0,7.0,Minimum KB to lock character in DownDamage,Less KB causes regular damage animation (as long as it flinches)
+,,,44.0,15.0,Minimum KB for longer DownDamage lock animation
+,,,45.0,35.0,Maximum hitbox angle to lock (degrees),Moves cannot lock if Angle ≥ 35 (only matters on very slanted surfaces)
+,,,51.0,11.0,Minimum damage per hit from outside sources while grabbed to cause grab break,Since this is larger than total damage (Name52) it has no effect in-game
+,,Meshima,56.0,1.0,Rebound duration multiplier,"Rebound duration formula:
+INT(Rebound animation FAF / (fighter_param Name103) * (1 * Damage + 3))"
+,,,57.0,3.0,Base rebound duration (frames)
+,,Ben Hall,60.0,0x7,Maximum number of times a projectile can be reflected
+,,Meshima,61.0,0.04,Additional damage GFX size (this * damage)
+,,,62.0,0.3,Base damage GFX size
+,,,63.0,0.3,Minimum damage GFX size
+,,DRAFIX,71.0,1.8,Time reduction multiplier for button inputs
+,,Ben Hall,-,-,Rotation angles when flipped by hitboxes with Reverse Effect or backward f-smash (degrees)
+,fighter_param,Ben Hall,76.0,-,Odds of secondary KO scream
+,,,80.0,0x1,Frames during TurnRun to reverse facing direction
+,fighter_param_common,Meshima,4.0,5.0,Walk animation max frame speed multiplier
+,,,21.0,2.0,TurnRun acceleration multiplier on the ledge,Added in 1.0.4
+,,Ben Hall,23.0,0x5,Starting frame of TurnRun > 'side attack' window
+,,,24.0,0x8,Length of TurnRun > 'side attack' window
+,,Meshima,25.0,5.0,Run animation max frame speed multiplier
+,,Ben Hall,28.0,0.65,Sensitivity for max crawl forward rate
+,,,30.0,-0.65,Sensitivity for max crawl backward rate
+,,,41.0,0.1,Animation blend speed for Fall to FallF/FallB animations,example: set to 0 and you always stay in Fall animation. Set to 1 and you instantly turn to FallF or FallB animation when holding sideways
+,,,42.0,0.05,Minimum animation blend amount for Fall to FallF/FallB,"example: if set closer to 1 there is a bigger ""gap"" between Fall and FalF/FallB blending, above 1 makes it impossible to show FallF/FallB. Similar to sensitivity, or deadzones"
+,,,97.0,0.0,B-reverse and Turnaround B sensitivity
+,,Meshima,166.0,2.0,HeavyGet animation speed multiplier (this * sys_40(0x0))
+,,,167.0,1.33,HeavyThrow animation speed multiplier
+,,Ben Hall,180.0,0.9,Wall jump initial H speed multiplier
+,,Meshima,183.0,0x8,Minimum time between footstools (frames)
+,,Ben Hall,187.0,0.5,Consecutive Wallcling time multiplier
+,,Meshima,189.0,0x3C,Time between wallclings (frames)
+,,Ben Hall,219.0,0.05,Attacker shield pushback deceleration in air
+,,,286.0,2.0,"Minimum downward launch speed to move through clouds (skyworld, other stages?)"
+,,,287.0,0.5,Hitstun frames multiplier when through clouds
+,,DRAFIX,294.0,0.2,Maximum launch speed to execute momentum related events
+,,Ruben,847.0,0.5,Absorbing moves damage multiplier for teammate hitboxes
+,,,848.0,0xA,Number of consecutive hits during shieldstun to cancel with dodges
+2018-02-20 00:00:00,fighter_param,Meshima,26.0,-,V acceleration
+,,Ben Hall,48.0,-,Tumble hitbox size
+,,Meshima,49.0,-,GFX size (Type1)
+,,,50.0,-,GFX size (Type2)
+,,Ben Hall,115.0,-,Minimum H speed for wall jump
+,,Meshima,136.0,-,Magnifying glass shrink ratio?
+,,Ben Hall,143.0,-,Grounded item grab-box X offset
+,,,144.0,-,Grounded item grab-box Y offset
+,,,145.0,-,Grounded item grab-box width
+,,,146.0,-,Grounded item grab-box height
+,,,147.0,-,Aerial item grab-box X offset
+,,,148.0,-,Aerial item grab-box Y offset
+,,,149.0,-,Aerial item grab-box width
+,,,150.0,-,Aerial item grab-box height
+,,Meshima,155.0,0.08,Swim V acceleration
+,,,157.0,0.05,Swim H accleration
+,,,158.0,0.6,Swim H max speed
+,,,159.0,0.01,Swim H friction
+,,,160.0,0.3,Drown gravity multiplier
+,,,162.0,1.4,Ladder climbing speed
+,,,163.0,1.8,Ladder descending speed
+,fighter_param_common,Ben Hall,36.0,0.3,V speed multiplier (used on Bullet Bill exit and aerial footstools?)
+,,,79.0,0x4,SDI input window (frames)
+,,,124.0,20.0,Used for V speed from ledge trump,Ledge trump initial V speed = 20 * gravity
+,,,125.0,0x1C,Ledge trump length (frames)
+,,,184.0,30.0,Maximum stage wall tilt for wall cling (degrees)
+,,,185.0,-20.0,Minimum stage wall tilt for wall cling (degrees)
+,,Meshima,234.0,6.0,Distance for forced grab break?,"When set to 0, Link > Samus will break while Samus > Link wont
+Link can grab Cloud only when they are not close before grab"
+,,,235.0,6.0,Same as above?
+,,,277.0,0.15,Multplier for freeze frames on wall bounce,Freeze frames on wall bounce = Hitstun frames * 0.15
+,,Ben Hall,336.0,3.8,Launch speed upper threshold for full damage of tumble hitbox (Brawl)
+,,,337.0,2.3,Launch speed lower threshold for tumble hitbox (Brawl)
+,,,397.0,0x8,Number of frames held away from ladder before leaving
+,,,398.0,0.7,Ladder-leaving sensitivity
+,,Stinny,411.0,20.0,Related to cannon,MSC script_1805
+,,Timothy Pitcher,559.0,2.0,Super Mushroom size multipler for the Giant Special Smash
+,,,561.0,0.5,Poison Mushroom size multipler for the Giant Special Smash
+,,,568.0,3.0,Lightning size multiplier for the Giant Special Smash (backfire)
+,,,570.0,0.5,Lightning size multiplier for the Giant Special Smash (shrink)
+,,Ben Hall,592.0,0xF,Frame you can interrupt Ganondorf side-b drop
+,,,593.0,3.2,Downward speed from Ganondorf side-b drop
+,,Meshima,763.0,1.3,Rocekt Belt max air speed,Friction = 0.015
+,,,764.0,0.05,Rocket Belt gravity,Added max added accel = 0.015
+,,Ben Hall,774.0,-1.0,Maximum added H speed on Bullet Bill exit,Bullet Bill exit Initial H speed = -1 * cos(angle) + (Prev H speed * (fighter_param Name14))
+,,,775.0,2.0,Added initial V speed on Bullet Bill exit,Bullet Bill exit Initial V speed = 2 + (Prev V speed * (fighter_param_common Name36))
+,,,776.0,0.0,"Beetle ""amount"" reduced per frame"
+,,,777.0,8.0,"Beetle held ""amount"" reduced per input"
+,,,778.0,0x64,"Beetle base held ""amount""",Amount = Name778 + (Name779 * %)
+,,,779.0,3.4,"Multiplier to percent added to Beetle ""amount"""
+,,,782.0,0x78,Daybreak item firing time (frames)
+,,,785.0,0x1F,FuraFuraStart intangibility frames,FuraFuraStart(U/D) are shield-break stand up animations
+,,Meshima,786.0,0.05,Super Leaf fall speed
+,,Ben Hall,787.0,1.0,Galaga hold duration reduced per frame
+,,,788.0,8.0,Galaga hold duration reduced per input
+,,,789.0,0x96,Base Galaga hold duration (frames),Duration = Name789 + (Name790 * %)
+,,,790.0,9.5,Multiplier to percent added to Galaga hold duration
+2018-02-02 00:00:00,battle_object,Meshima,9.0,0.3,Staling factor in knockback formula,Staleness used with bd in KB formula = 1 + 0.3*(Staleness - 1)
+,,,25.0,0.3,Another launch speed multiplier when attacker has downward speed?
+,,Ruben,26.0,3.0,Frames after launch to apply the launch speed cap
+,,Meshima,27.0,-1.0,Launch speed cap
+,fighter_param,Ben Hall,Column JJ,0x1,# of D-Smash
+,,,Column IJ,1.0,Grab duration multiplier
+,fighter_param_common,Ben Hall,12.0,0xF,Dash > Forward Dash minimum window (this + 1)
+,,,118.0,0x3C,Maximum gained ledge intangibility from being airborne (frames),"CliffWait intangibility frames
+ = INT((Airborne frames / 300) * 60 + (44 - (current% / 120) * 44))
+where
+0 ≤ (Airborne frames / 300) * 60 ≤ 60
+0 ≤ 44 - (current% / 120) * 44 ≤ 44
+4 ≤ Ledge intangibility"
+,,,119.0,0x12C,Maximum airborne time for gaining additional ledge intangibility (frames)
+,,,120.0,0x2C,Maximum gained ledge intangibility from having low% (frames)
+,,,121.0,0x78,% threshold for gaining no additional ledge intangibility
+,,,122.0,0x4,Minimum ledge intangibility (frames)
+,,mariomaniac444,124.0,20.0,Something to do with vertical speed from ledge trump
+,,Meshima,144.0,0x96,"Maximum % to receive the damage from magnifying-glass, 150"
+,,,145.0,0x3C,Frames to receive the damage from magnifying-glass
+,,,161.0,2.0,Platform drop animation length (FAF after platfrom drop),There is 3 frames window to cancel so true FAF is 5 frames
+,,,182.0,0.5,Required V initial speed for footstool
+,,Ben Hall,212.0,0.5,Shield tilt speed
+,,Meshima,496.0,0x5,Aerial attacks item catch window
+,,Stinny,523.0,0.9,Multiplier for using different item grab animations,"If current ground velocity ≥ (Walk Maximum Velocity * 0.9), then use LightWalkGet item animation"
+,,Meshima,531.0,0x14,Frames between flower damage ticks (frames)
+,,,532.0,1.0,Flower time reduced per frame
+,,,533.0,16.0,Flower time reduced per input
+,,,534.0,3000.0,Base flower time,Flower time = INT(3000 + 40 * Damage)
+,,,535.0,40.0,Multiplier for flower time added scaling off hitbox damage
+,,,540.0,0x2D0,"Curry effect duration, 720"
+,,,541.0,2.0,Curry run animation speed multiplier
+,,,542.0,0x9,Frames between Curry flames
+,,,649.0,17.0,Ground H speed cap
+,,,650.0,100.0,Aerial H speed cap
+,,,651.0,10.0,Aerial positive V speed cap
+,,,652.0,100.0,Aerial negative V speed cap
+2018-01-09 00:00:00,fighter_param,Stinny,207.0,0.8,Grab immunity frames multiplier,INT((Shield stun + Shield drop lag) * 0.8) = Grab immunity frames
+,,Ben Hall,718.0,2.0,Bunny hood dash/walk max speed multiplier?
+,,,719.0,2.0,Bunny hood dash initial speed multiplier?
+,,,727.0,1.5,Bunny hood gravity multiplier
+,,,815.0,0x1,Daybreak drop probability multiplier,Drop probability = 1 * INT(damage taken) / 100
+,,,817.0,30.0,Max Daybreak drop angle difference from vertical (degrees)
+,,,818.0,4.0,Daybreak drop initial speed
+2018-01-07 00:00:00,fighter_param,DRAFIX,Column BH,-,Walk maximum additional acceleration with heavy items
+,,,Column BI,-,Base walk acceleration with heavy items
+,,,Column BJ,-,Walk maximum velocity with heavy items
+,fighter_param_common,Ben Hall,151.0,0x2,Smashball drop probability multiplier ,Smasllball drop probablity = 2 * (INT (Damage taken) / 100)
+,,,211.0,1.05,Shield health multiplier for calculating shield size,The formula for shield size = Shield Size * (0.15 + (Shield Health / 50) * 1.05 * (1 - 0.15))
+,,,477.0,155.0,Robin Nosferatu base hold time,"the amount reduced per frame (equals 1) is written in MSC, not a param"
+,,,478.0,120.0,Used for frames reduced per input multiplier,"Frames reduced per input = 5 * (120 - Initial %) / 120, or 0 if initial % > 120"
+,,,479.0,5.0,Base frames reduced per input
+,,,488.0,0x118,Base pinned duration (frames)
+,,,499.0,0x46,Regular item drop chance constant,Drop chance = CEIL (Damage taken) / 70
+,,,501.0,0x5,Air dodge/Roll > Item throw/drop window
+,,,524.0,0x1,Dragoon drop probability multiplier
+,,,525.0,0xF,"In Brawl, this is multiplied by 0 before being added to Damage dealt, so possibly useless"
+,,,526.0,30.0,Max Dragoon drop angle difference from vertical
+,,,527.0,4.0,Dragoon drop initial speed
+,,DRAFIX,649.0,17.0,Capped run speed
+,,Ben Hall,845.0,0.8,Multiplier to Hitbox's hitlag multiplier (if > 1) when hitting shield
+2017-11-23 00:00:00,fighter_param,Ben Hall,Column BE,1.3,Footstool jump speed multiplier
+,,,Column BF,0.7,Footstool hop speed multiplier
+,fighter_param_common,,181.0,0.75,Footstool speed decay multiplier
+2017-11-14 00:00:00,battle_object,Ben Hall,0.0,118.0,Control stick and C-stick sensitivity scale,"Control stick coordinates are integers from [-128,127].
+This param controls value needed for ""sensitivity"" equal to 1."
+,,,1.0,0.2,Control stick and C-stick deadzone sensitivity,"To be outside of the deadzone, sensitivity must be > than this"
+,,,50.0,55.0,Minimum knockback for applying base trip chance when hit
+,,,53.0,50.0,Hitstun frames threshold for weak camera shake,Requires tumble animation? (only matters when modding)
+,,,54.0,70.0,Hitstun frames threshold for strong camera shake
+,fighter_param_common,Ben Hall,50.0,0.28,Up angled Ftilt vertical sensitivity (radians),Equal to 16.04... degrees
+,,,51.0,-0.28,Down angled Ftilt vertical sensitivity (radians),Equal to -16.04... degrees
+,,,56.0,0.28,Up angled Fsmash vertical sensitivity (radians),Equal to 16.04... degrees
+,,,57.0,-0.28,Down angled Fsmash vertical sensitivity (radians),Equal to -16.04... degrees
+,,Stinny,133.0,0xE,Wall tech invincibility frames
+,,,497.0,0x5,Air dodge item catch window
+,,,501.0,0x5,Air dodge > Item throw/drop window
+2017-09-14 00:00:00,fighter_param,Meshima,Column BL,-,Item Toss Damager Multiplier,Toss speed * this is added to base damage
+,fighter_param_common,Meshima,343.0,10.0,Base sleep time
+,,,344.0,10.0,Base sleep time (this * 5 frames added)
+,,,346.0,25.0,Multiplier for sleep time scaling off knockback
+,,,347.0,1.0,Multiplier for sleep time scaling off percent
+,,,348.0,1.0,Sleep time reduced per frame
+,,,349.0,8.0,Sleep time reduced per input
+,,,484.0,38.0,Duration of crumple animation for Focus Attack stage 2,Added in 1.0.6
+,,,485.0,65.0,Duration of crumple animation for Focus Attack stage 3,Added in 1.0.6
+2017-09-12 00:00:00,fighter_param_common,Ruben,370.0,1.5,Multiplier for burried time added (KB * 0.5)
+,,,371.0,0.5,Multiplier for burried time added (your % * 0.5)
+,,,377.0,70.0,Knockback resistence while buried
+2017-09-10 00:00:00,fighter_param_common,DRAFIX,292.0,0.8,Multiplier for KB velocity stack/overwrite threshold
+2017-09-05 00:00:00,fighter_param,Ben Hall,Column D,-,Walk Maximum Additional Acceleration (renamed)
+,,,Column E,-,Base Walk Acceleration (renamed)
+,,,Column AT,-,Turnaround Acceleration Multiplier
+,Hit Bits,Meshima,-,-,(Newly added)
+,Throw_Specifier,Meshima,-,-,(Newly added)
+,Element,Meshima,-,-,(Revised)
+2017-09-04 00:00:00,fighter_param,Ben Hall,Column AR,-,Fastfall Window for Soft Landing Lag
+,Hitbox labels,Meshima,-,-,(Revised)
+2017-08-31 00:00:00,Hitbox labels,Meshima,-,-,(Revised)
+,SFX Type,Meshima,-,-,(Newly added)
+,Type,Meshima,-,-,(Newly added)
+,Facing Restriction,Meshima,-,-,(Newly added)
+2017-08-26 00:00:00,battle_object,Ben Hall,58.0,0.007,Rebound pushback multiplier
+,,,59.0,0.5,Additional rebound pushback (after previous multiplier)
+,fighter_param_common,Ben Hall,208.0,0.09,Shield pushback multiplier
+2017-08-25 00:00:00,fighter_param_common,Stinny,192.0,0.66,Airdodge landing lag frame speed multiplier
+,,Ben Hall,217.0,0.04,Attacker pushback scaling factor with damage
+,,,218.0,0.025,Base attacker pushback
+,,,220.0,1.1,Friction on attacker shield pushback 
+,,Stinny,492.0,0.002,Frame speed multiplier for damage animation when pinned
+2017-07-06 00:00:00,fighter_param_common,Sluigi 123,104.0,-0.5,Platform drop V momentum 
+,,Daniel Shepsis,514.0,20.0,Endlag frames for grabbing an item during the dashing skid-to-a-halt animation
+2017-05-25 00:00:00,fighter_param_common,Stinny,162.0,0.045,Player collision speed
+,,,291.0,2.0,Launch speed difference required to trigger knockback armor,requires 2 different attackers
+,,,300.0,0.2,Maximum distance from the corner blastline to use diagonal blast GFX
+,,,315.0,40.0,Frames before respawn after Screen KO
+2017-05-10 00:00:00,fighter_param_common,Stinny,40.0,0.1,have to do with FallF and FallB animations
+,,,41.0,0.1,have to do with FallF and FallB animations
+,,,42.0,0.05,have to do with FallF and FallB animations
+,,,83.0,8.0,Frames after taking damage before player collision takes effect again
+,,,250.0,0.75,Frame speed multiplier for hitstun animations
+,,,285.0,3.0,Frames after hitlag before you can hit the floor in tumble
+,,,288.0,30.0,Frames to transition into DamageFall from DamageFly
+,,,289.0,1.0,Global grounded hitstun friction multiplier
+,,,301.0,1.2,Diagonal blast graphic scaling
+2017-04-25 00:00:00,battle_object,Stinny,64.0,1.5,Maximum damage GFX size
+,fighter_param_common,Stinny,16.0,1.0,Global ground friction multiplier
+,,,131.0,0.1,Floor tech H momentum conservation
+,,,274.0,0.8,Hitstun multiplier when bouncing off a wall
+,,,275.0,0.8,Downwards launch speed required to bounce off the floor (air-to-ground)
+,,,276.0,0.9,Launch speed multiplier when bouncing off the floor (air-to-ground)
+,,,301.0,1.2,Distance from the corner blast line to trigger diagonal blast graphic?
+,,,594.0,1.145,Size multiplier for big Mii fighters
+,,,595.0,0.855,Size multiplier for small Mii fighters
+,,,596.0,0.825,Bone size multiplier for big Mii fighters,"doesn't affect the head, bone thickness multiplier"
+,,,597.0,1.3,Affects knockback for small Mii fighters,"Setting to 1000 causes opponents to receive no knockback until ~700%, at which point knockback starts to scale normally as if they were at 0%."
+,,,600.0,0.74,Bone size multiplier for small Mii fighters,"doesn't affect the head, bone thickness multiplier"
+2017-04-09 00:00:00,battle_object,Stinny,28.0,80.0,Launch angle with 366 angle moves on grounded opponents (degrees)
+,fighter_param_common,Stinny,86.0,0.5,Hitlag horizontal shaking distance (grounded only)
+,,,87.0,1.8,Hitlag vertical shaking distance (grounded only)
+,,,190.0,0.35,Aerial attack landing lag duration multiplier
+,,,191.0,20.0,Airdodge landing lag (frames)
