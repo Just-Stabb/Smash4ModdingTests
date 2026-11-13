@@ -1509,7 +1509,7 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
 ## Leave_Ground_Cancel (grounded moves into the air)
 
 `tools/acmd_ext_cave.py` (`lgc_code`), user docs `docs/acmd-extra-commands.md`, test `tools/leave_ground_test.py`.
-First in exe_v39.
+First in exe_v39; working from exe_v41 (below).
 
 - **How a grounded move ends when it leaves the ground (vanilla):** nothing in the executable changes the status.
   The executable only changes the situation (StatusModule `+0x84`, 0 ground / 1 cliff / 2 air; `+0x88` the last
@@ -1536,9 +1536,20 @@ First in exe_v39.
 - **MSC module wrappers:** the syscall table is at `0x104187A0` (`sys_N` = word N): Status `0x18` -> `0x030B2B98`,
   Ground `0x1A` -> `0x030B2C78` (accessor `+0x2C`, vt `+0x4BC`), Cancel `0x23` -> `0x030B2F58`, Motion `0x12` ->
   `0x030B2A48` (accessor `+0x44`, vt `+0x2D4`; handler `0x02C6164C`), Kinetic `0x10` -> `0x030B29D8`.
-- **The patch (exe_v39):** a 16-entry table at `0x04B93A00` (`+0` the fighter's StatusModule, `+4` state: 1 off,
-  2 in the air through it, 4 edges kept; `+8` the kinetic type it had; then a round-robin word), code from
-  `0x04B93B10` (both in acmd_ext_cave.py's space between the debug counters and `OBJS`).
+- **The patch (exe_v39, fixed in exe_v41):** a 16-entry table at `0x04B93A00` (`+0` the fighter's StatusModule,
+  `+4` state: 1 off, 2 in the air through it, 4 edges kept; `+8` the kinetic type it had; `+0xC` its module accessor,
+  stored by the command; then a round-robin word), code from `0x04B93B10` (both in acmd_ext_cave.py's space between
+  the debug counters and `OBJS`).
+  - **StatusModule `+4` is not the module accessor** (unlike CancelModule / MotionModule `+4`): the base constructor
+    `0x0200D588` makes an embedded list there (`0x0200D5C4`: `+4` = 8, a count; `+0x14` vtable `0x10002854`); the
+    fighters' constructor `0x02E881A8` stores its fighter at `+0x9C` and no accessor. exe_v39 / v40's hooks read the
+    accessor at `+4`, got 8, failed their pointer check and did nothing: the fighter was never marked in the air, the
+    move's Fall request went through, and with `Enabled=0`'s correction 1 the move slid off the edge straight into
+    Fall (user: "forces into edge slide ... rather than continuing the move"). exe_v41 takes the accessor from the
+    entry (`+0xC`). `tools/leave_ground_test.py` now builds its StatusModules with `0x02E881A8` (the old code fails
+    it the way the game did). Nothing requests MissFoot (`0x7D`) there: vanilla MSC asks for it only in the guard
+    (`0x1B`-`0x1D`, GuardDamage), Damage (`0x45`) and SlipDown (`0x84`) loops (`GroundModule(0x2727)`), and no native
+    fighter code does.
   - The command (`h_lgc`, index 617, CRC `0x224CF650`, 2 words): fighters only (StatusModule vtable
     `0x1012D42C`); sets the state; on the ground, an edge-stopping move (`+0x78` 2 / 3) gets `GroundModule(0x2710,
     1)` while off (Enabled 0) and its own back otherwise.

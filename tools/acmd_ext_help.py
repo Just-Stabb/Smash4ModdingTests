@@ -503,8 +503,9 @@ HELP = {
         '- Not tested in game yet (emulator only, tools/leave_ground_test.py): the momentum carried into the air.',
         '',
         NOT_VIEWER,
-        'Needs exe_v39 or later (the patched cross_f.rpx, tools/acmd_ext_cave.py). Without it a script that uses this '
-        'command won\'t load properly: ship the executable with any script that uses it.',
+        'Needs exe_v41 or later (the patched cross_f.rpx, tools/acmd_ext_cave.py; in exe_v39 / v40 the move still '
+        'ended in Fall once it had slid off the edge). Without it a script that uses this command won\'t load '
+        'properly: ship the executable with any script that uses it.',
     ],
     'New_Var': [
         '## How it works',

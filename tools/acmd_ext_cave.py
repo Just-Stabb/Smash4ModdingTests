@@ -239,7 +239,11 @@ ACC_VAR = 0x0F0002BC             # position_vars_cave.py: + target (0-10) = that
 # 0x0200D8FC stores it at StatusModule +0x54; the change itself is 0x02E88B28, StatusModule vt +0x16C).
 LGC = 0x04B93A00                 # LGC_N entries of 0x10 (zero at load, free after DBG): +0 the fighter's StatusModule
 LGC_N = 16                       # (0 = free), +4 state bits (1 off, 2 in the air through it, 4 still stops at edges),
-                                 # +8 its kinetic type when it went into the air; then the round-robin word
+                                 # +8 its kinetic type when it went into the air, +0xC its module accessor (the
+                                 # command's: StatusModule +4 is NOT the accessor, it's an embedded list whose first
+                                 # word is 8, base ctor 0x0200D588; exe_v39's hooks read it there, so their pointer
+                                 # check always failed and the Fall went through: fixed in exe_v41); then the
+                                 # round-robin word
 LGC_CODE = 0x04B93B10            # its code (after the table and its round-robin word), up to OBJS (zero at load)
 LGC_SIT = 0x0200D868             # op 1 (situation read), r31 = StatusModule: lwz r10, 0(r31)
 LGC_REQ = 0x0200D91C             # op 3 (status request), r31 = StatusModule, r29 = words (+4 kind): lwz r11, 0(r31)
@@ -974,6 +978,7 @@ h_lgc:
         ori r0, r0, 4
 lgc_lg_st:
         stw r0, 4(r30)
+        stw r29, 0xC(r30)               # the accessor, for the hooks
         andi. r12, r0, 2                # in the air: the landing sets the ground correction
         bne nc_out
         lwz r12, 0x84(r27)
@@ -1070,7 +1075,7 @@ lgc_sit:
         bl lgc_find
         mr. r30, r3
         beq lgc_ls_ret
-        lwz r29, 4(r31)                 # accessor""" % dict(n=LGC_N, rr=LGC_N * 0x10, mask=LGC_N * 0x10 - 1,
+        lwz r29, 0xC(r30)               # accessor (the command's)""" % dict(n=LGC_N, rr=LGC_N * 0x10, mask=LGC_N * 0x10 - 1,
                                                           sit_bh=(LGC_SIT + 4) >> 16, sit_bl=(LGC_SIT + 4) & 0xFFFF) + chk_t('r29', 'r0', 'lgc_ls_ret') + """
         lwz r0, 4(r30)
         lwz r12, 0x84(r31)              # situation
@@ -1153,7 +1158,7 @@ lgc_req:
         andi. r0, r0, 3
         cmpwi r0, 3
         bne lgc_lq_0
-        lwz r29, 4(r31)""" % dict(req_bh=(LGC_REQ + 4) >> 16, req_bl=(LGC_REQ + 4) & 0xFFFF, skip_h=0x0200D948 >> 16,
+        lwz r29, 0xC(r3)                # accessor (the command's)""" % dict(req_bh=(LGC_REQ + 4) >> 16, req_bl=(LGC_REQ + 4) & 0xFFFF, skip_h=0x0200D948 >> 16,
                              skip_l=0x0200D948 & 0xFFFF, fall=FALL_KIND) + chk_t(
         'r29', 'r0', 'lgc_lq_0') + msc1(MOTION_W, 0x2712) + """
         cmpwi r3, 0

@@ -3,8 +3,10 @@
 
   python3 tools/leave_ground_test.py PATCHED.rpx BASE.rpx
 
-BASE is the executable it was built on (exe_v38): the hook words held there what LGC_ORIG says, the trampolines and
-the table / code space were zero. On PATCHED:
+BASE is the executable it was built on: before Leave_Ground_Cancel (exe_v38: the hook words held what LGC_ORIG says,
+the trampolines and the table / code space were zero), or an earlier build of it (exe_v39 / v40: the hooks branch to
+the trampolines / the code). The fake fighters' StatusModules are made by the game's own constructor (0x02E881A8), so
+its +4 is what the game has there (not the accessor: exe_v39 read the accessor there, the edge-slide bug). On PATCHED:
 - the CRC lookup (0x02BEE154) gives Leave_Ground_Cancel its index, the handler table its handler;
 - the command (h_lgc, as the interpreter calls it): Enabled 0 / 2 / 1 set / change / clear the fighter's entry, and
   on the ground give an edge-stopping move (ground correction 2) correction 1 / back its own through GroundModule
@@ -43,6 +45,7 @@ STUB = MEM                       # stub module handler
 LOG = MEM + 0x9000               # +0 count, then {module, op, arg} records
 ARGS = MEM + 0xA000              # MSC args: {words, count} at +0, words at +0x10
 ST, CTX, PRM = MEM + 0xB000, MEM + 0xB100, MEM + 0xB200
+SM_CTOR = 0x02E881A8             # the fighters' StatusModule constructor (r3 this, r4 the fighter)
 
 
 def check(what, got, want):
@@ -82,8 +85,10 @@ class Fighter:
             w32(mu, base + k, m)
         for m in (self.kin, self.gnd, self.mot):
             w32(mu, m, vt)
+        # the StatusModule made by the game's own constructor (0x02E881A8: base 0x0200D588, +0x9C = its fighter, the
+        # fighter vtable): its +4 is an embedded list (first word 8), not the accessor (exe_v39's hooks read it as one)
+        run(mu, SM_CTOR, RET, {UC_PPC_REG_3: self.sm, UC_PPC_REG_4: base + 0xF00})
         w32(mu, self.sm, sm_vt)
-        w32(mu, self.sm + 4, base)
         w32(mu, self.can, 0x1012B0C4)    # fighter CancelModule vtable (vt +0x4C = 0x02E6FCFC)
         w32(mu, self.can + 4, base)
         self.set(sit=0, correct=2, kinetic=0xF, ended=0, cancel=0)
@@ -119,12 +124,29 @@ def main():
     a, words, hooks = C.build()
     om, pm = machine(base), machine(patched)
 
-    # ---- words
+    # ---- words (BASE: the executable before Leave_Ground_Cancel, or an earlier build of it: exe_v39 / v40)
+    def b_to(mu, at):
+        w = r32(mu, at)
+        if w >> 26 != 18 or w & 3:
+            return None
+        off = w & 0x3FFFFFC
+        return at + (off - 0x4000000 if off & 0x2000000 else off)
+    earlier = r32(om, C.LGC_CHG) != C.LGC_ORIG[C.LGC_CHG]
     for at, w in C.LGC_ORIG.items():
-        check('base: original word at 0x%08X' % at, r32(om, at), w)
+        if not earlier:
+            check('base: original word at 0x%08X' % at, r32(om, at), w)
+        else:
+            want = C.LGC_TRAMP.get(at)
+            got = b_to(om, at)
+            check('base (an earlier Leave_Ground_Cancel build): 0x%08X branches to its %s' % (
+                at, 'trampoline' if want else 'code'), got == want if want else C.LGC_CODE <= (got or 0) < C.OBJS, True)
     for at in C.LGC_TRAMP.values():
-        check('base: trampoline 0x%08X was zero' % at, r32(om, at), 0)
-    check('base: table and code space zero', any(r32(om, x) for x in range(C.LGC, C.OBJS, 4)), False)
+        if not earlier:
+            check('base: trampoline 0x%08X was zero' % at, r32(om, at), 0)
+        else:
+            check('base: trampoline 0x%08X goes to the code' % at, C.LGC_CODE <= (b_to(om, at) or 0) < C.OBJS, True)
+    if not earlier:
+        check('base: table and code space zero', any(r32(om, x) for x in range(C.LGC, C.OBJS, 4)), False)
     check('code in place', [r32(pm, a.part3[0] + 4 * i) for i in range(len(a.part3[1]))], a.part3[1])
     for at in list(C.LGC_ORIG) + list(C.LGC_TRAMP.values()):
         check('hook word at 0x%08X' % at, r32(pm, at), hooks[at])
@@ -189,6 +211,8 @@ def main():
         return pm.reg_read(UC_PPC_REG_3), log(pm)
 
     G, K = f.gnd, f.kin
+    check('the game-built StatusModule: +4 holds 8 (an embedded list), +0x9C its fighter, not the accessor',
+          (r32(pm, f.sm + 4), r32(pm, f.sm + 0x9C)), (8, f.acc + 0xF00))
     # ---- the command
     check('Enabled 0 on the ground, edge-stopping move (2): returns 2, steps 2 words, GroundModule(0x2710, 1)',
           cmd(f, 0), (2, 8, [(G, 0x2710, 1)]))

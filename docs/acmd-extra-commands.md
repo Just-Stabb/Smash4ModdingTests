@@ -37,7 +37,7 @@ them too.
 | `Motion_Get` / `Motion_Set`, `Animation_Rate_Set` | the animation playing, its frame and rate |
 | `Last_Hit_Get`, `Target_Slot_Get` | the last fighter hit / the last attacker, any target's player slot |
 | `Status_*`, `Hitstun_*`, `Hitstop_Set`, `Damage_*`, `Body_State_Set`, `Armor_Set`, `Item_State_Set`, `Stage_Collision_Set`, `Joint_Position_Get` | the variable-based features (docs/position-variables.md) as commands with parameters |
-| `Leave_Ground_Cancel` | whether a grounded move is cut into Fall when the fighter leaves the ground (exe_v39) |
+| `Leave_Ground_Cancel` | whether a grounded move is cut into Fall when the fighter leaves the ground (exe_v41; exe_v39 / v40's didn't work: below) |
 | `New_Var` | declares a variable with your own name (int or float, a starting value, per object or per move): 64 more per object, usable in every variable parameter (exe_v40, Sm4shCommand v1.4.9) |
 
 ## Extra_Special_Hitbox / Extra_Extended_Special_Hitbox
@@ -421,7 +421,7 @@ Body_State_Set(Target=0, State=0, Frames=0xA)              // intangible for 10 
 
 ## Leave_Ground_Cancel
 
-`Leave_Ground_Cancel(Enabled)` (exe_v39 and later) decides whether this grounded move is cut short when the
+`Leave_Ground_Cancel(Enabled)` (exe_v41 and later) decides whether this grounded move is cut short when the
 fighter leaves the ground: walks or slides off an edge, or is moved up off it. Normally (on) the move ends there
 and the fighter goes to Fall. Off, the move goes on in the air: its animation, hitboxes, effects and the rest of
 its scripts, with air physics.
@@ -458,6 +458,10 @@ its scripts, with air physics.
   Use it on moves that end by their animation (dash attacks, tilts, jabs, smashes' swings, ...), or turn it back
   on at a frame in the script.
 - **Ledges:** no ledge grab during the move (the move isn't Fall).
+- **Fixed in exe_v41** (user: "forces into edge slide if the move slides off of an edge, rather than continuing the
+  move"): exe_v39 / v40 read the fighter's module accessor from the wrong place (StatusModule `+4`, which isn't it),
+  so the in-air part never ran: `Enabled=0` made the move slide off the edge, and the move then ended in Fall as
+  usual. exe_v41 keeps the accessor from the command itself. (docs/native-notes.md, "Leave_Ground_Cancel".)
 - **Not tested in game yet**, only in the emulator (`tools/leave_ground_test.py`): the momentum the move carries
   into the air, and which kinetic type feels right, are to be checked in game.
 
