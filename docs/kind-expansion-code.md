@@ -153,6 +153,13 @@ neutral B in Kirby's MSC, his new weapon added to Mario's copy article list (`we
 `fighters/kirby/specials.md`, "Supamario copy". Granting `0x41` itself also needs the ~22 switches on the
 copy kind and the special-param loader `0x02F1B8B0` (reads the old vl array by `copy*4`).
 
+Hero (0x45) and Sephiroth (0x42), exe_v44 (`tools/kirby_copy_new_cave.py`): granted as the Robin copy (0x2C) in
+copy_grant itself (the marker int 0x100000A0: 1 Supamario, 2 Hero, 3 Sephiroth; Supamario's 0x41 -> 3 moved there
+too), and their own hats / motion packs: the copy resources load **per player slot** of the copied fighter (helper
+0x030C4694 from 0x030C4D30, ids 0x20C + slot), so the loader's two name reads (motion folder 0x030C470C, hat
+0x030C487C) take `brave` / `bravecap`, `edge` / `edgecap` for a slot of those kinds. fighters/kirby/specials.md
+"Hero / Sephiroth copies".
+
 ### 1.8 IDs that encode the kind
 
 - **ACMD effect IDs** `0x3KKnnnn` (kind KK's own effects) and `0x4KKnnnn` (Final Smash): an 8-bit kind

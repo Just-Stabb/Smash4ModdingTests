@@ -1,0 +1,230 @@
+#!/usr/bin/env python3
+"""Behaviour test of Kirby's Hero / Sephiroth copy neutral specials (fighters/kirby/kirby.c "Hero / Sephiroth copies"):
+runs the compiled MSC in tools/rolloff_hold_test.py's interpreter with the modules stubbed, frame by frame, and checks
+what the move does (motions, the article made and the ints it reads, statuses, MP).
+
+  python3 tools/kirby_newcopy_test.py KIRBY.mscsb [fighters/kirby/kirby.c]
+
+The game's side, stubbed: WorkModule ints / flags (the copy kind 0x2C, the marker 0x100000A0, the custom slots),
+MotionModule (change / swap / frame), ControlModule (pressed / held), StatusModule (situation, status changes),
+ArticleModule (the generate, with the slots' values at that moment), EffectModule (ids), the rest 0.
+Scenarios: Hero Frizzle (charge 20 frames, press: MP 100 -> 84, slot 0x44A, the fireball (article 6) at frame 11 with
+level 1 in 0x10000048 / 0x1000009F, both put back, wait at the end); Hero with 10 MP charging to Kafrizz (stored at 81:
+the cancel slot 0x447), then the stored charge casts at once the level he pays for (Frizz, 6 MP); Hero with 3 MP (the
+misfire, 0x447); Sephiroth Megaflare (released at 40: slot 0x44A, the fire (article 7) at 13 with 0x10000049 =
+1 + 4 x up = 5) and Gigaflare (held: fired by the charge at 120, level 2), in the air (slots + 7); the Robin copy
+without the marker still goes to Robin's code.
+"""
+import os
+import re
+import struct
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import rolloff_hold_test as R  # noqa: E402
+
+FAIL = []
+
+
+def check(what, got, want):
+    ok = got == want
+    print('%s %s%s' % ('ok  ' if ok else 'FAIL', what, '' if ok else ': got %r, want %r' % (got, want)))
+    if not ok:
+        FAIL.append(what)
+
+
+class Game:
+    def __init__(self, marker):
+        self.ints = {0x100000A4: 0x2C, 0x100000A0: marker, 0x10000048: 7, 0x10000049: 9, 0x1000009F: 11}
+        self.flags = {0x2000009A}
+        self.motion, self.frame, self.situation = None, 0.0, 0
+        self.press, self.held = set(), set()
+        self.stick_y = 0.0
+        self.motions, self.articles, self.statuses, self.effects = [], [], [], []
+
+    def sys(self, sid, a):
+        f = R.i2f
+        if sid == 0x16:                                         # WorkModule
+            if a[0] == 0x6:
+                return self.ints.get(a[1], 0)
+            if a[0] == 0x7:
+                self.ints[a[2]] = a[1]
+                return 0
+            if a[0] == 0x10:
+                return int(a[1] in self.flags)
+            return 0
+        if sid == 0x12:                                         # MotionModule
+            if a and a[0] == 0x1:
+                self.motion, self.frame = a[1], R.i2f(a[2])
+                self.motions.append(a[1])
+            elif a and a[0] == 0x3:
+                self.motion = a[1]
+                self.motions.append(('swap', a[1]))
+            return 0
+        if sid == 0x13 and a == [1]:                            # MotionModuleF(1): frame
+            return R.f2i(self.frame)
+        if sid == 0x18:
+            if a == [1]:
+                return self.situation
+            if a and a[0] in (0x2710, 0x2711):
+                self.statuses.append(a[1])
+            return 0
+        if sid == 0xE and len(a) == 2:
+            if a[0] == 0x2710:
+                return int(a[1] in self.press)
+            if a[0] == 0x2712:
+                return int(a[1] in self.held)
+            return 0
+        if sid == 0xF and a == [1]:
+            return R.f2i(self.stick_y)
+        if sid == 0x20 and a and a[0] == 0x2710:                # ArticleModule generate
+            self.articles.append((a[1], self.frame, self.ints.get(0x10000048), self.ints.get(0x1000009F),
+                                  self.ints.get(0x10000049)))
+            return 0
+        if sid == 0x1C and a and a[0] in (0x2717, 0x2710):
+            self.effects.append(a[1])
+            return 0
+        del f
+        return 0
+
+
+def names(src):
+    return R_names(src)
+
+
+def R_names(src):
+    s = open(src).read()
+    s = re.sub(r'/\*.*?\*/', '', s, flags=re.S)
+    s = re.sub(r'//[^\n]*', '', s)
+    funcs = re.findall(r'^(?:int|void|float)\s+(\w+)\s*\([^;{)]*\)\s*\{', s, re.M)
+    glob = re.findall(r'^(?:int|float)\s+(\w+)\s*;', s, re.M)
+    return funcs, glob
+
+
+class Run:
+    def __init__(self, path, src, marker, situation=0):
+        self.vm = R.VM(path)
+        funcs, glob = R_names(src)
+        self.fn = {n: self.vm.func(i) for i, n in enumerate(funcs)}
+        self.gi = {n: i for i, n in enumerate(glob)}
+        self.game = Game(marker)
+        self.game.situation = situation
+        self.vm.game = self.game
+        self.vm.g[self.gi['global18']] = situation
+        self.vm.g[self.gi['global19']] = situation
+        f16, call = self.fn['func_16'], self.vm.call
+
+        def spy(script, args=()):               # func_16 (status change through global11): recorded
+            if script is f16:
+                self.game.statuses.append(args[0])
+                return None
+            return call(script, args)
+        self.vm.call = spy
+
+    def gf(self, name):
+        return R.i2f(self.vm.g.get(self.gi[name], 0))
+
+    def setf(self, name, v):
+        self.vm.g[self.gi[name]] = R.f2i(v)
+
+    def update(self):
+        self.vm.call(self.fn['newcopy_update'])
+
+    def start(self, held=()):
+        self.game.motions, self.game.articles, self.game.statuses = [], [], []
+        self.game.held = set(held)                  # the main runs the loop once at once (func_78)
+        self.vm.g[self.gi['global4']] = 0x222
+        self.vm.call(self.fn['newcopy_n_main'])
+
+    def step(self, press=(), held=(), stick_y=0.0):
+        g = self.game
+        g.press, g.held, g.stick_y = set(press), set(held), stick_y
+        self.vm.g[self.gi['global32']] = R.f2i(stick_y)
+        n = len(g.motions)
+        self.vm.call(self.fn['ncp_loop'])
+        if len(g.motions) == n or isinstance(g.motions[-1], tuple):
+            g.frame += 1.0
+        return g
+
+
+def main():
+    path = sys.argv[1]
+    src = sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, '..', 'fighters', 'kirby', 'kirby.c')
+    # Hero: Frizzle
+    r = Run(path, src, 2)
+    r.update()
+    check('Hero copy: MP full when the copy is new', r.gf('ncp_mp'), 100.0)
+    r.start(held=[1])
+    check('Hero: the start slot 0x446', r.game.motions[:1], [0x446])
+    for _ in range(8):
+        r.step()
+    check('Hero: the hold slot 0x44B after the start', r.game.motions[-1], 0x44B)
+    for _ in range(20):
+        r.step()
+    r.step(press=[1])
+    check('Hero: Frizzle (20 frames held): slot 0x44A', r.game.motions[-1], 0x44A)
+    check('Hero: Frizzle costs 16', r.gf('ncp_mp'), 84.0)
+    for _ in range(12):
+        r.step()
+    check('Hero: the fireball (article 6) at frame 11, level 1 in 0x10000048 / 0x1000009F',
+          [(a[0], a[1], a[2], a[3]) for a in r.game.articles], [(6, 11.0, 1, 1)])
+    check('Hero: the slots put back', (r.game.ints[0x10000048], r.game.ints[0x1000009F]), (7, 11))
+    for _ in range(60):
+        r.step()
+    check('Hero: wait (status 0) at the end', r.game.statuses[-1:], [0])
+    # Hero: 10 MP, charge to Kafrizz (stored), then the stored charge casts what he pays for
+    r = Run(path, src, 2)
+    r.update()
+    r.setf('ncp_mp', 10.0)
+    r.start()
+    for _ in range(8 + 82):
+        r.step()
+    check('Hero: Kafrizz charge stored at 81 (the cancel slot 0x447)', (r.game.motions[-1], r.vm.g.get(r.gi['ncp_stored'])),
+          (0x447, 81))
+    r.vm.g[r.gi['global4']] = 0
+    r.start()
+    for _ in range(9):
+        r.step()
+    check('Hero: the stored charge casts Frizz (all 10 MP pay for)', (r.game.motions[-1], r.gf('ncp_mp')), (0x448, 4.0))
+    # Hero: 3 MP: the misfire
+    r = Run(path, src, 2)
+    r.update()
+    r.setf('ncp_mp', 3.0)
+    r.start()
+    for _ in range(10):
+        r.step()
+    r.step(press=[1])
+    check('Hero: too little MP: the misfire (slot 0x447), no fireball', (r.game.motions[-1], r.game.articles), (0x447, []))
+    # Sephiroth: Megaflare, up
+    r = Run(path, src, 3)
+    r.update()
+    r.start(held=[1])
+    check('Sephiroth: the charge slot 0x446', r.game.motions[:1], [0x446])
+    for _ in range(40):
+        r.step(held=[1])
+    r.step(stick_y=1.0)
+    check('Sephiroth: released at 40: Megaflare slot 0x44A', r.game.motions[-1], 0x44A)
+    for _ in range(14):
+        r.step(stick_y=1.0)
+    check('Sephiroth: the fire (article 7) at 13, 0x10000049 = level 1 + 4 x up', [(a[0], a[1], a[4]) for a in r.game.articles],
+          [(7, 13.0, 5)])
+    check('Sephiroth: 0x10000049 put back', r.game.ints[0x10000049], 9)
+    # Sephiroth: Gigaflare in the air
+    r = Run(path, src, 3, situation=2)
+    r.update()
+    r.start(held=[1])
+    check('Sephiroth air: the charge slot 0x44D', r.game.motions[:1], [0x44D])
+    for _ in range(122):
+        r.step(held=[1])
+    check('Sephiroth: Gigaflare made by the charge at 120 (level 2)', [(a[0], a[1], a[4]) for a in r.game.articles],
+          [(7, 120.0, 2)])
+    # the plain Robin copy
+    r = Run(path, src, 0)
+    check('Robin copy (no marker): newcopy_marker 0', r.vm.call(r.fn['newcopy_marker']), 0)
+    print('%d failures' % len(FAIL))
+    sys.exit(1 if FAIL else 0)
+
+
+if __name__ == '__main__':
+    main()

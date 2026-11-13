@@ -1183,3 +1183,131 @@ As Samus's (`fighters/samus/README.md`): the hold's exit (`func_2720`, status `0
 the starts' exits (`func_2722` `0x1F0`, `func_2725` `0x1F4`) keep a stored charge on a hit and only remove the
 shot article. Before, a hit cleared it. Mii Gunner's Charge Blast copy (`func_2577`) is unchanged.
 Package `link_samus_v1`.
+
+## Added: Hero / Sephiroth copies (hats, motions, Frizz / Flare) — `kirby_hero_sephiroth_copy_v1`
+
+User: "Please give Kirby his hats for Hero and Sephiroth and add their copy abilities." Traits: Hero Shooter,
+Sephiroth Technical (already in `kirby_copy_trait`; `kirby_trait_update` now asks it with the copied fighter's own kind,
+`newcopy_real_kind()`).
+
+### Ultimate data used (the user's `kirby-ssbu-partial.zip`, `lua2cpp_decomp.zip`)
+
+- `kirby/model/copy_brave_cap/c00-c07` (3 meshes: `kirby_brave_001`, `met_brave11_001/002`; **no skeleton**: it sits on
+  Kirby's `Headdress` joint, (0, 9.752, 0), unrotated; the 8 colours have the same textures) and
+  `kirby/model/copy_edge_cap/c00-c07` (3 meshes skinned to `Body` / `Puff` / `S_HairB1`, an alpha-sorted hair layer, and a
+  `model.nuanmb` for the hair). `kirby/motion/copy_edge_cap/c00` (the hair's own d00specialn* motions, `motion_list.bin`,
+  swing prc) is **not used** (the hat is rigid here).
+- `kirby/motion/bravebody/c00` (12 `braved00special(air)n{start,hold,1,2,3,cancel}`) and `edgebody/c00` (8:
+  start, 1, 2, cancel, ground / air). No motion_list in those folders: Kirby's `motion/body/c00/motion_list.bin` lists
+  them with **no game scripts** (only expression / sound / effect: the copies' logic is status code) and the cancel
+  frames (vl byte 2): Hero start 12, N1 44, N2 52, N3 68, cancel 6; Sephiroth start 172, N1 56, N2 70, cancel 8.
+- `kirby/param/vl.prc`: no Hero / Sephiroth params of Kirby's own: the copies read the copied fighter's
+  `param_special_n` (lua2cpp_kirby's Hero copy status reads `param_special_n` `sp_special_n1/2/3` and calls
+  **`FighterSpecializer_Brave::add_sp` on Kirby**: Kirby's Hero copy has its own MP, paid from it as Hero's).
+- Kirby's copy effect scripts, read from the recomp dump with `tools/recomp_acmd.py` (new):
+  `reference/kirby_copy_ultimate_acmd.txt`. Hero: hold = `brave_chant` on top (0, 5, 0) turned (0, -60, 0) +
+  `brave_fire1_hold` / `brave_fire2_hold` on `arml` (2, 0, 0); N1 / N2 `brave_fire1_flame` on `arml` (2, 0, 0) to
+  12 / 11; N3 the flame on `throw`, `brave_fire3_appearance` on `throw` at 3, the flame on `handl` (1, 2, 0) 24-42.
+  Sephiroth: start = `edge_fire1_hold` on `havel`; 31 `edge_fire2_hold` + `_flash`; 68 `edge_fire2_hold_aura` on both
+  arms, `head` (3, 0, 0) and both toes; 100 `edge_fire3_hold_flash`; 102 the aura again + `edge_fire3_trigger`; 118
+  `_aura_end`; N1 / N2 `edge_fire1_trigger` / `edge_fire2_trigger` on `havel`. Floats loaded from the NRO's
+  .rodata aren't in the dump (`?f`): the head aura's size (taken as 1.0). No sound scripts were found in those
+  ranges (the copies' sounds: not done yet).
+- Not in the zip: Kirby's Ultimate effect / sound folders (none needed: the effects are Hero's and Sephiroth's own,
+  in their banks).
+
+### Design
+
+**Granted as Robin's copy.** Kirby's copy tables have rows for kinds 0-0x39 only (copy_grant refuses more), so both
+are granted as Kirby's **Robin copy (0x2C)**, the copy with the most neutral-special motion slots (14), no held model
+and no copy set-up; the int **`0x100000A0`** says which (2 Hero, 3 Sephiroth; 1 Supamario, 0 other). exe_v44
+(`tools/kirby_copy_new_cave.py`, tested by `tools/kirby_copy_new_test.py`) does it in copy_grant itself (swallow and
+the star copy both), so `supa_copy_pending()` is empty now (the executable maps Supamario too).
+
+**Hats and motions per copied player.** The copy resources load per player slot of the copied fighter (traced:
+`0x030C4D30` runs the helper `0x030C4694` for each match entry, resource ids `0x20C + slot`, Kirby's costume in the
+top bits = the hat's `cNN`), so a Hero player's slot loads `model/bravecap/cNN` and `motion/bravebody` in place of
+`refletcap` / `refletbody` (two name reads swapped for kinds 0x45 / 0x42 only), and a Robin in the same match keeps
+his. The hats: `tools/kirby_copy_hats.py` (one bone, TopN, in Kirby's head frame: the placement worked out from
+Ultimate's and Smash 4's Robin hats, which agree to ~0.7: docstring; texture ids 0x40C5F000 / 0x40C2F000 + 0x80 x
+costume). The motions: `tools/kirby_copy_motions.py` (Ultimate's tracks as they are: Kirby's two skeletons have the
+same bind pose, checked bone by bone; a frame checked against Ultimate's FK to 0.04), stored under the Robin copy
+slots' animation names (a slot finds its animation by the CRC32 of the name):
+
+| Robin slot (ground / air) | Hero | Sephiroth |
+|---|---|---|
+| 0x446 / 0x44D SpecialNStart | SpecialNStart | SpecialNStart (the charge, Gigaflare) |
+| 0x447 / 0x44E SpecialNHold (loops) | SpecialNCancel (and the misfire) | - |
+| 0x448 / 0x44F SpecialNShoot | SpecialN1 | SpecialN1 |
+| 0x44A / 0x451 SpecialNTronStart | SpecialN2 | SpecialN2 |
+| 0x44B / 0x452 SpecialNTronHold (loops) | SpecialNHold | - |
+| 0x44C / 0x453 SpecialNTronEnd | SpecialN3 | SpecialNCancel |
+
+`kirbypt1` / `kirbypt2` (the face) are the Robin copy's own packs (Robin's timing: approximated).
+
+**Articles.** Robin's copy record list gets Hero's fireball (0x190, max 3, the thunder's spawner) and Sephiroth's fire
+(0x18C, max 3, Din's Fire's spawner) as copy articles 6 / 7, and Kirby's reserve article entries 15-18 name the Robin
+copy's book / thunder and these two (so their files load and the copy's weapon pools can be made in a match without
+Robin, as Supamario's fix 90).
+
+**MSC** (`kirby.c`, "Hero / Sephiroth copies", hooked into the Robin copy's 0x222 pre / main / end): the moves as this
+mod's Hero and Sephiroth do them (`brave_n_*`, `edge_n_*`: the mod's changes kept: Hero's second-press fire, the
+stored charge, Kafrizz stored at 81, the misfire with too little MP; Sephiroth's up / down 45-degree Flare, the roll
+out of the charge, the buffered roll 6 frames after the fire, Flare playing out on shields (the article's own
+`on_hit_bits`)). Motions through MotionModule with Kirby's own effect / sound scripts for the slots rebound to an
+empty one (copy_fx_cave's set 0x10); no Robin game script; IASA by Ultimate's frames (func_39 / func_41).
+**MP:** Kirby's own (Ultimate's add_sp on Kirby): full (100) when he gets the Hero copy, 1 back a second while he
+isn't charging, Frizz / Frizzle / Kafrizz 6 / 16 / 36. (Ultimate's starting amount and refills for Kirby weren't read
+from its ExeFS: full on copying is assumed.) **No gauge is drawn on Kirby yet** (the damage-panel cave draws Hero's
+from Hero's ints 0x1000009C-9F, which Kirby uses for the star copy): part of the Stone / Command Selection stage.
+
+### Approximations / not done
+
+- Hats rigid (Sephiroth's hair doesn't swing; Ultimate's `copy_edge_cap` motions unused).
+- Copy sounds (none read: Ultimate's sound scripts for the copies weren't found in the dump's ranges) and the
+  `?f` floats; Hero's hold-level flashes `0x16500259b5` / `0x16cba715da` (not in Hero's bank) left out.
+- Swallowing a Kirby who has the Hero / Sephiroth copy gives Robin's copy (the swallow code passes that Kirby's
+  copy kind, 0x2C, without the marker).
+- Din's Fire's spawner places the fire for Zelda; on Kirby where it appears is unchecked.
+- Effect rotations as brave.c's (radians); bone effects not turned (Kirby's bones match Ultimate's).
+
+### Build
+
+```
+python3 tools/kirby_copy_hats.py ULT/kirby/model S4/fighter/kirby/model OUT/fighter/kirby/model [--check]
+python3 tools/kirby_copy_motions.py ULT/kirby S4/fighter/kirby OUT/fighter/kirby/motion [--check]
+python3 tools/rpx_patch.py EXE_V43.rpx EXE_V44.rpx $(python3 tools/kirby_copy_new_cave.py)
+python3 tools/kirby_copy_new_test.py EXE_V44.rpx EXE_V43.rpx
+python3 tools/msclang/msclang.py -x tools/mscinfo.xml fighters/kirby/kirby.c -o kirby.mscsb
+python3 tools/msc_stack_check.py kirby.mscsb fighters/kirby/kirby.c; python3 tools/rolloff_hold_test.py kirby.mscsb
+```
+(S4 = Smash 4's `fighter/kirby` with `model/refletcap`, `model/mariocap`, `model/body/c00/model.vbn`,
+`motion/refletbody`: the user's `kirby - Copy.zip`.)
+
+## Planned (next stage): Hero copy + Stone = Command Selection
+
+User (via the coordinator): with Hero's copy, Kirby's Stone (down special) opens Hero's Command Selection menu with all
+of Hero's spells, Kirby's stone animation unchanged, the spells' hitboxes / articles / effects / sounds / status effects
+as Hero's, at Hero's offsets. Plan (not built yet):
+- **Menu and MP gauge on Kirby:** `tools/trait_badge_cave.py`'s panel draws Hero's window / gauge from Hero's ints
+  `0x1000009C` (gauge), `0x1000009E` (window), `0x1000009F` (rows) for kind 0x45. Kirby's own ints there are taken
+  (0x9C debug hop, 0x9D / 0x9E star copy count / pending kind, 0x9F the copy's custom slot), so the cave reads Kirby's
+  three from free Kirby ints (0x93-0x9A, cleared by copy_grant: rewritten every frame) when kind 8 and 0x100000A0 is 2.
+- **The menu logic** (`brave.c` "Hero's MP", `brave_lw_*`: the 4 random spells, costs, the cursor, the 8-second limit)
+  copied into kirby.c on Kirby's Stone statuses (down special `0x155` / `0x175` / `0x176`): opening the stone
+  (status 0x155 start) opens the menu; choosing casts the spell from the stone pose; Kirby's motion stays the stone's.
+- **Spells:** the article spells (Sizz / Sizzle, Bang / Kaboom, Whack / Thwack, Snooze, Magic Burst / Kamikazee's
+  crash, Zoom 2 U's homing) need Hero's weapon kinds 0x193-0x197 (+ the placed / crash articles) in the Robin copy's
+  list (as fireball / fire: 8 more records, more reserve entries: 2 are left, so the reserve list or a per-copy
+  file-load hook must grow), their spawners, and each weapon's MSC reading its owner's Hero-only work (checked per
+  article). Offsets: Hero's are on his bones (`haver`, `top`, ...); Kirby's same-named bones (bind identical to
+  Ultimate's) take them, from the stone's pose (no animation of their own). Buffs (Oomph, Psyche Up, Acceleratle,
+  Bounce, Kaclang, Hocus Pocus) run through the same executable caves Hero uses (kirby_stat_cave profile 3 needs
+  Kirby's marker 0x1000008E free of the trait bits; strike_cave's bit; brave_reflect_cave's reflector group 3 is set
+  up only in Robin's set-up: Kirby's own reflector set-up exists, group to be checked); Zoom moves Kirby (status code);
+  Kaclang's metal is the Metal Box item function (any fighter); Metal Slash / Hatchet Man / Kacrackle Slash are sword
+  slashes: on the stone they'd be hitboxes at Hero's sword offsets without a sword (to be agreed with the user).
+- **Needed from the user for it:** Hero's current package (`fighter/brave` script/msc/brave.mscsb + weapons' msc, his
+  body / weapon ACMD folders and `motion.mtable`s) — or confirmation that `fighters/brave/*.c` in the repo is current —
+  and Kirby's current body ACMD (`fighter/kirby/script/animcmd/body`: the Drive's copy is from Oct 23, before Supamario
+  fix 90).

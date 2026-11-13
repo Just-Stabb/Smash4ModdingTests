@@ -1765,6 +1765,7 @@ WorkModule(0x0, WorkModule(0x6, 0x208000C2), 0x02000340); //Common Param Name 83
     fthrow_lock_update();   // forward throw: no air grab until a real landing (added)
     sideb_reflect_off();    // air side B reflector off if the swing ended early (added, before crouchjump_update)
     crouchjump_update();    // jump out of a crouch: higher, keeps momentum, trail effect (added)
+    newcopy_update();       // Hero / Sephiroth copies: Kirby's MP (end of the file)
     kirby_trait_update();   // copy ability trait: stat boosts / moveset changes (added), see the end of the file
     upb_air_update();       // up B available again on the ground / when hit (added)
     upb_cancel_carry();     // up B -> neutral special cancel: keeps the (capped) rise (added)
@@ -63938,6 +63939,10 @@ int func_3771()
     printf("------------thunder kind(%d)", WorkModule(0x6, 0x10000085));
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x1190, 0x1000, 0x80, 0x1000);
+    if (newcopy_marker() != 0) // Hero / Sephiroth copy (end of the file): no Thoron redirect
+    {
+        return 0;
+    }
     if (WorkModule(0x6, 0x10000085) == 0x3)
     {
         StatusModule(0x2711, 0x225);
@@ -63950,6 +63955,11 @@ int func_3771()
 void func_3772()
 {
     printf("status_SpecialN");
+    if (newcopy_marker() != 0) // Hero's Frizz / Sephiroth's Flare (end of the file)
+    {
+        newcopy_n_main();
+        return;
+    }
     WorkModule(0x7, 0, 0x10000090);
     WorkModule(0x7, 0x21f, 0x11000002);
     WorkModule(0x7, 0x23b, 0x11000003);
@@ -63977,7 +63987,7 @@ void func_3773()
 // [Copy: Robin 0x222] end
 void func_3774()
 {
-    
+    newcopy_n_end(); // Hero / Sephiroth copy: the charge's effects off (end of the file)
 }
 
 // [Copy: Robin 0x223] pre  "status_pre_SpecialNHold"
@@ -72938,7 +72948,7 @@ void kirby_trait_update()
     trait = trait_none();
     if (WorkModule(0x10, 0x2000009a))
     {
-        trait = kirby_copy_trait(WorkModule(0x6, 0x100000a4));
+        trait = kirby_copy_trait(newcopy_real_kind()); // Hero / Sephiroth: their own (granted as Robin's)
     }
     global76 = trait;
     overdrive_update();
@@ -73989,17 +73999,12 @@ int supa_copy_motion(int motion)
 
 // a pending star copy (0x1000009E = kind + 1): Supamario's becomes Mario's and sets the marker; any
 // other clears it
+// Since the Hero / Sephiroth copies (exe_v44, tools/kirby_copy_new_cave.py) copy_grant itself maps 0x41 -> 3 and
+// writes the marker 0x100000A0 (1 Supamario, 2 Hero, 3 Sephiroth, 0 any other copy), for swallowing too: nothing to
+// do here any more (the pending 0x42 = Supamario + 1 goes to the grant as it is)
 void supa_copy_pending()
 {
-    if (WorkModule(0x6, 0x1000009e) == 0x42)
-    {
-        WorkModule(0x7, 0x4, 0x1000009e);
-        WorkModule(0x7, 0x1, 0x100000a0);
-    }
-    else
-    {
-        WorkModule(0x7, 0, 0x100000a0);
-    }
+    
 }
 
 void skame_init()
@@ -74300,5 +74305,748 @@ void rolloff_hold_update()
         {
             global73 = 0;
         }
+    }
+}
+
+// ===================================================================
+// Hero / Sephiroth copies (added; user: "Please give Kirby his hats for Hero and Sephiroth and add their copy
+// abilities"). fighters/kirby/specials.md "Hero / Sephiroth copies".
+// Both new kinds are granted as Kirby's Robin copy (kind 0x2C): the executable (exe_v44,
+// tools/kirby_copy_new_cave.py) maps them in copy_grant and writes the marker int 0x100000A0 (2 Hero, 3 Sephiroth;
+// 1 Supamario, 0 any other copy), loads the copied player's own hat (model/bravecap, edgecap: tools/kirby_copy_hats.py)
+// and motion pack (motion/bravebody, edgebody: Ultimate's Kirby copy animations under the Robin copy slots' names,
+// tools/kirby_copy_motions.py) in place of Robin's, and adds Hero's fireball (weapon 0x190) and Sephiroth's fire
+// (0x18C) to the Robin copy's articles (ids 6 and 7). The Robin copy's neutral special status 0x222 (func_3771-3774)
+// runs these instead while the marker is set:
+//   Hero (Kirby's Ultimate copy: Hero's SpecialN, Frizz / Frizzle / Kafrizz with Hero's param_special_n and
+//   MP costs 6 / 16 / 36, Kirby's own MP: lua2cpp_kirby calls FighterSpecializer_Brave::add_sp on Kirby with
+//   sp_special_n1-3): as this mod's Hero (brave.c brave_n_*): start 8 frames, hold (a 101-frame loop) while special is
+//   held; Frizzle from 18 frames, Kafrizz from 81 (then the charge is stored); special pressed again fires the
+//   strongest level held that his MP pays for (none: the misfire); shield stores the charge (SpecialNCancel).
+//   Fire frames 10 / 11 / 16, actionable at Ultimate's Kirby motion_list cancel frames 44 / 52 / 68, cancel 6.
+//   Sephiroth (Flare / Megaflare / Gigaflare, edge.c edge_n_*): one charge motion, M from 32, L from 100, Gigaflare
+//   fired by the charge at 120; released from 20 -> SpecialN1 / N2 firing at 13; shield cancels (20-99); the mod's
+//   own changes kept: up / down 45 degrees (the stick as it fires), the roll out of the charge (ground, 20-99) and
+//   the buffered roll 6 frames after the fire. Cancel frames 172 / 56 / 70 / 8 (Kirby's motion_list).
+// Motions: the Robin copy slots (ground / air + 7), straight through MotionModule; Kirby's own effect / sound scripts
+// for those slots (Robin's charge effect and sounds) are rebound to slot 0x446's (none) with set 0x10
+// (tools/copy_fx_cave.py), and no Robin game script is bound. The effects are Ultimate's Kirby copy effect scripts
+// (lua2cpp_kirby, read with tools/recomp_acmd.py: reference/kirby_copy_ultimate_acmd.txt), on Kirby's bones
+// (Ultimate's arml / havel / handl / throw / head / toel / toer = LArmJ 0xF / LHaveN 0x18 / LHandN 0x10 / ThrowN
+// 0x19 / HeadN 0x16 / LToeN 0x6 / RToeN 0xA; the two skeletons' binds are the same), ids from
+// fighters/brave/brave_effects.json and fighters/edge/edge_effects.json (their banks load with Hero / Sephiroth).
+// ===================================================================
+int   ncp_state;     // 0 start / charge, 1 hold (Hero), 2 fire, 3 cancel, 4 misfire (Hero)
+int   ncp_level;     // 0 / 1 / 2
+int   ncp_fired;     // Sephiroth: frames since the fire (from 1), Hero: 1 once fired
+int   ncp_released;  // Hero: special pressed again; Sephiroth: released (1) or a buffered roll (0x10 / 0x20)
+int   ncp_hold;      // Hero: frames charged
+int   ncp_stored;    // Hero: a stored charge (shield cancel / Kafrizz), for the next one
+int   ncp_fx_level;  // Hero: the hold / fire effects' step shown (-1 none); Sephiroth: the charge effects' step
+float ncp_mp;        // Hero copy: Kirby's own MP (0-100)
+int   ncp_mp_timer;  // frames to the next MP point back
+int   ncp_last;      // last frame's marker (a new Hero copy fills the MP)
+
+int newcopy_marker()
+{
+    if (!WorkModule(0x10, 0x2000009a) || WorkModule(0x6, 0x100000a4) != 0x2c)
+    {
+        return 0;
+    }
+    if (WorkModule(0x6, 0x100000a0) == 0x2)
+    {
+        return 0x2;
+    }
+    if (WorkModule(0x6, 0x100000a0) == 0x3)
+    {
+        return 0x3;
+    }
+    return 0;
+}
+
+// the copied fighter's own kind (Supamario / Hero / Sephiroth are granted as Mario / Robin)
+int newcopy_real_kind()
+{
+    int m;
+    m = WorkModule(0x6, 0x100000a0);
+    if (m == 0x1 && WorkModule(0x6, 0x100000a4) == 0x3)
+    {
+        return 0x41;
+    }
+    if (m == 0x2 && WorkModule(0x6, 0x100000a4) == 0x2c)
+    {
+        return 0x45;
+    }
+    if (m == 0x3 && WorkModule(0x6, 0x100000a4) == 0x2c)
+    {
+        return 0x42;
+    }
+    return WorkModule(0x6, 0x100000a4);
+}
+
+int newcopy_hero() { return newcopy_marker() == 0x2; }
+
+// main loop (func_74): a new Hero copy starts with full MP; 1 MP back a second (Hero's sp_recover_frame 60) while
+// he isn't charging
+void newcopy_update()
+{
+    int m;
+    m = newcopy_marker();
+    if (m == 0x2 && ncp_last != 0x2)
+    {
+        ncp_mp = 100.0f;
+        ncp_mp_timer = 0;
+        ncp_stored = 0;
+    }
+    ncp_last = m;
+    if (m == 0x2 && global4 != 0x222)
+    {
+        ncp_mp_timer += 0x1;
+        if (ncp_mp_timer >= 60)
+        {
+            ncp_mp_timer = 0;
+            if (ncp_mp < 100.0f)
+            {
+                ncp_mp = ncp_mp + 1.0f;
+            }
+        }
+    }
+    if (global4 >= 0x45 && global4 <= 0x4c || global4 == 0xb1)
+    {
+        ncp_stored = 0; // a stored charge is lost when hit or KO'd (as Hero's)
+    }
+}
+
+int ncp_cost(int level)
+{
+    if (level == 0x2) { return 36; }
+    if (level == 0x1) { return 16; }
+    return 6;
+}
+
+int ncp_can_pay(int level)
+{
+    float c;
+    c = (float)ncp_cost(level);
+    return c <= ncp_mp;
+}
+
+// motions: the Robin copy slots (ground; air + 7)
+int ncp_ground_motion()
+{
+    if (newcopy_hero())
+    {
+        if (ncp_state == 0x1) { return 0x44b; }               // SpecialNHold (TronHold slot, looping)
+        if (ncp_state == 0x2)
+        {
+            if (ncp_level == 0x2) { return 0x44c; }           // SpecialN3 (TronEnd slot)
+            if (ncp_level == 0x1) { return 0x44a; }           // SpecialN2 (TronStart slot)
+            return 0x448;                                     // SpecialN1 (Shoot slot)
+        }
+        if (ncp_state >= 0x3) { return 0x447; }               // SpecialNCancel (Hold slot); the misfire too
+        return 0x446;                                         // SpecialNStart
+    }
+    if (ncp_state == 0x2)
+    {
+        if (ncp_level == 0x1) { return 0x44a; }               // SpecialN2 (Megaflare)
+        return 0x448;                                         // SpecialN1 (Flare)
+    }
+    if (ncp_state == 0x3) { return 0x44c; }                   // SpecialNCancel
+    return 0x446;                                             // SpecialNStart (the charge; Gigaflare)
+}
+
+int ncp_motion()
+{
+    int m;
+    m = ncp_ground_motion();
+    if (global18 == 0x2)
+    {
+        m = m + 0x7;
+    }
+    return m;
+}
+
+// Ultimate's Kirby motion_list cancel frames (vl byte 2)
+float ncp_cancel_frame()
+{
+    if (newcopy_hero())
+    {
+        if (ncp_state == 0x2)
+        {
+            if (ncp_level == 0x2) { return 68.0f; }
+            if (ncp_level == 0x1) { return 52.0f; }
+            return 44.0f;
+        }
+        if (ncp_state >= 0x3) { return 6.0f; }
+        return 999.0f;
+    }
+    if (ncp_state == 0x2)
+    {
+        if (ncp_level == 0x1) { return 70.0f; }
+        return 56.0f;
+    }
+    if (ncp_state == 0x3) { return 8.0f; }
+    return 172.0f;
+}
+
+// the animation's end (the looping slots never end by themselves)
+float ncp_end_frame()
+{
+    if (newcopy_hero())
+    {
+        if (ncp_state == 0x1) { return 101.0f; }
+        if (ncp_state == 0x2)
+        {
+            if (ncp_level == 0x2) { return 74.0f; }
+            if (ncp_level == 0x1) { return 65.0f; }
+            return 60.0f;
+        }
+        if (ncp_state >= 0x3) { return 29.0f; }
+        return 8.0f;
+    }
+    if (ncp_state == 0x2)
+    {
+        if (ncp_level == 0x1) { return 95.0f; }
+        return 94.0f;
+    }
+    if (ncp_state == 0x3) { return 30.0f; }
+    return 224.0f;
+}
+
+void ncp_silence()
+{
+    MotionAnimcmdModule(0, 0x10, 0x446, 0x8); // Kirby's slot 0x446: no effect / sound script (copy_fx_cave.py)
+}
+
+void ncp_kinetic()
+{
+    if (global18 == 0x2)
+    {
+        GroundModule(0x2710, 0x5);
+        KineticModule(0, 0x64);
+    }
+    else
+    {
+        GroundModule(0x2710, 0x9);
+        KineticModule(0, 0x6);
+    }
+}
+
+void ncp_fx(int id, int bone, float x, float y, float z, float size)
+{
+    EffectModule(0x2717, id, bone, x, y, z, 0, 0, 0, size, 0);
+}
+
+void ncp_off(int id)
+{
+    EffectModule(0x2723, id, 0, 0x1);
+}
+
+void ncp_charge_off()
+{
+    if (newcopy_hero())
+    {
+        ncp_off(0x345002A); // brave_chant
+        ncp_off(0x345002D); // brave_fire1_hold
+        ncp_off(0x345002F); // brave_fire2_hold
+        ncp_fx_level = -1;
+        return;
+    }
+    ncp_off(0x3420055); // edge_fire1_hold
+    ncp_off(0x3420056); // edge_fire2_hold
+    ncp_off(0x3420057); // edge_fire2_hold_aura
+    ncp_off(0x3420059); // edge_fire2_hold_flash
+    ncp_off(0x342005A); // edge_fire3_hold_flash
+}
+
+void ncp_change(int state)
+{
+    int m;
+    ncp_charge_off();
+    ncp_state = state;
+    m = ncp_motion();
+    MotionModule(0x1, m, 0, 1.0f);
+    global20 = 0;
+    ncp_silence();
+}
+
+// --- Hero: Frizz / Frizzle / Kafrizz
+int ncp_hold_level()
+{
+    int level;
+    level = 0;
+    if (ncp_hold >= 81)
+    {
+        level = 0x2;
+    }
+    else if (ncp_hold >= 18)
+    {
+        level = 0x1;
+    }
+    while (level > 0 && ncp_can_pay(level) == 0)
+    {
+        level -= 1;
+    }
+    return level;
+}
+
+// effect_bravespecialnhold (Kirby): brave_chant on top (0, 5, 0) turned (0, -60, 0), the hand flame on arml
+// (2, 0, 0): fire1_hold, fire2_hold from Frizzle
+void ncp_hero_hold_fx()
+{
+    int lv;
+    lv = 0;
+    if (ncp_hold >= 18)
+    {
+        lv = 0x1;
+    }
+    if (lv == ncp_fx_level)
+    {
+        return;
+    }
+    if (ncp_fx_level < 0)
+    {
+        EffectModule(0x2717, 0x345002A, 0, 0, 5.0f, 0, 0, -1.0472f, 0, 1.0f, 0); // brave_chant
+    }
+    ncp_off(0x345002D);
+    ncp_off(0x345002F);
+    if (lv == 0x1)
+    {
+        ncp_fx(0x345002F, 0xf, 2.0f, 0, 0, 1.0f); // brave_fire2_hold
+    }
+    else
+    {
+        ncp_fx(0x345002D, 0xf, 2.0f, 0, 0, 1.0f); // brave_fire1_hold
+    }
+    ncp_fx_level = lv;
+}
+
+// effect_bravespecialn1 / n2 / n3 (Kirby): N1 / N2 the flame on arml (2, 0, 0) to frame 12 / 11; N3 the flame on
+// throw, brave_fire3_appearance on throw at 3 (off 8 / detached 16), the flame on handl (1, 2, 0) 24-42
+void ncp_hero_fire_fx(float f)
+{
+    if (ncp_level < 0x2)
+    {
+        if (ncp_fx_level == -1)
+        {
+            ncp_fx(0x345002C, 0xf, 2.0f, 0, 0, 1.0f); // brave_fire1_flame
+            ncp_fx_level = 0x10;
+        }
+        if (ncp_fx_level == 0x10 && f >= 12.0f - (float)ncp_level)
+        {
+            ncp_off(0x345002C);
+            ncp_fx_level = 0x11;
+        }
+        return;
+    }
+    if (ncp_fx_level == -1)
+    {
+        ncp_fx(0x345002C, 0x19, 0, 0, 0, 1.0f);
+        ncp_fx_level = 0x10;
+    }
+    if (ncp_fx_level == 0x10 && f >= 3.0f)
+    {
+        ncp_fx(0x3450030, 0x19, 0, 0, 0, 1.0f); // brave_fire3_appearance
+        ncp_fx_level = 0x11;
+    }
+    if (ncp_fx_level == 0x11 && f >= 8.0f)
+    {
+        ncp_off(0x345002C);
+        ncp_fx_level = 0x12;
+    }
+    if (ncp_fx_level == 0x12 && f >= 24.0f)
+    {
+        ncp_fx(0x345002C, 0x10, 1.0f, 2.0f, 0, 1.0f);
+        ncp_fx_level = 0x13;
+    }
+    if (ncp_fx_level == 0x13 && f >= 42.0f)
+    {
+        ncp_off(0x345002C);
+        ncp_fx_level = 0x14;
+    }
+}
+
+// the fireball (copy article 6, weapon 0x190) with its level through the custom N slot: the thunder spawner reads
+// Kirby's 0x1000009F with a copy (copy_custom_cave.py), set with 0x10000048 while it's made (as skame_generate)
+void ncp_hero_generate()
+{
+    int slot;
+    int copyslot;
+    slot = WorkModule(0x6, 0x10000048);
+    copyslot = WorkModule(0x6, 0x1000009f);
+    WorkModule(0x7, ncp_level, 0x10000048);
+    WorkModule(0x7, ncp_level, 0x1000009f);
+    ArticleModule(0x2710, 0x6);
+    WorkModule(0x7, slot, 0x10000048);
+    WorkModule(0x7, copyslot, 0x1000009f);
+    ncp_fired = 0x1;
+}
+
+int ncp_hero_fire_frame()
+{
+    if (ncp_level == 0x2) { return 16; }
+    if (ncp_level == 0x1) { return 11; }
+    return 10;
+}
+
+void ncp_hero_loop(float f)
+{
+    if (ncp_state == 0)
+    {
+        if (f >= 8.0f - 1.0f)
+        {
+            ncp_change(0x1);
+            ncp_hero_hold_fx();
+        }
+        return;
+    }
+    if (ncp_state == 0x1)
+    {
+        ncp_hold += 0x1;
+        ncp_hero_hold_fx();
+        if (ControlModule(0x2710, 0x1))
+        {
+            ncp_released = 0x1;          // special pressed again fires (Ultimate's, as Hero's)
+        }
+        if (ControlModule(0x2710, 0x3))
+        {
+            ncp_stored = ncp_hold;       // shield: the charge kept for the next one
+            ncp_change(0x3);
+        }
+        else if (ncp_released)
+        {
+            ncp_level = ncp_hold_level();
+            if (ncp_can_pay(ncp_level))
+            {
+                ncp_mp = ncp_mp - (float)ncp_cost(ncp_level);
+                ncp_change(0x2);
+            }
+            else
+            {
+                ncp_change(0x4);         // no MP: the misfire (sys_misfire = the attack smoke)
+                EffectModule(0x2717, 0x1000006, 0xf, 2.0f, 0, 0, 0, 0, 0, 1.0f, 0);
+            }
+        }
+        else if (ncp_hold >= 81)
+        {
+            // full (Kafrizz): the flash, then stored and stopped (as Hero's SpecialNHoldMax)
+            EffectModule(0x2717, 0x345002B, 0, 0, 9.0f, 0, 0, -1.0472f, 0, 1.0f, 0); // brave_chant_finish
+            ncp_stored = ncp_hold;
+            ncp_change(0x3);
+        }
+        else if (f >= ncp_end_frame() - 1.0f)
+        {
+            ncp_change(0x1);             // the hold loops
+            ncp_fx_level = -1;
+            ncp_hero_hold_fx();
+        }
+        return;
+    }
+    if (ncp_state == 0x2)
+    {
+        ncp_hero_fire_fx(f);
+        if (ncp_fired == 0 && f >= (float)ncp_hero_fire_frame())
+        {
+            ncp_hero_generate();
+        }
+    }
+}
+
+void ncp_hero_air()
+{
+    if (global18 != 0x2)
+    {
+        return;
+    }
+    if (ncp_state < 0x2 || ncp_state == 0x2 && ncp_level == 0)
+    {
+        KineticModule(0xf, 0x1, -0.0712f); // the fall slowed x0.8 while charging and through Frizz (Hero's)
+        KineticModule(0x14, 0x1, 1.2f);
+    }
+}
+
+// --- Sephiroth: Flare / Megaflare / Gigaflare
+int ncp_dir()
+{
+    if (global32 >= 0.5f)
+    {
+        return 0x1;
+    }
+    if (global32 <= -0.5f)
+    {
+        return 0x2;
+    }
+    return 0;
+}
+
+// the fire (copy article 7, weapon 0x18C): Din's Fire's spawner copies the owner's 0x10000049 into its
+// 0x10000005: level + 4 x direction (edge.c edge_n_generate)
+void ncp_seph_generate()
+{
+    int slot;
+    int v;
+    slot = WorkModule(0x6, 0x10000049);
+    v = ncp_dir();
+    v = ncp_level + 0x4 * v;
+    WorkModule(0x7, v, 0x10000049);
+    ArticleModule(0x2710, 0x7);
+    WorkModule(0x7, slot, 0x10000049);
+    ncp_fired = 0x1;
+}
+
+// effect_edgespecialnstart (Kirby): edge_fire1_hold on havel; 31: fire2_hold + fire2_hold_flash; 68: the aura on
+// both arms, the head (3, 0, 0) and both toes; 100: fire3_hold_flash; 102: the aura again and fire3_trigger;
+// 118: the aura's end. N1 / N2: edge_fire1_trigger / edge_fire2_trigger on havel at 0.
+void ncp_seph_aura(int id)
+{
+    ncp_fx(id, 0xf, 0, 0, 0, 1.0f);
+    ncp_fx(id, 0x13, 0, 0, 0, 1.0f);
+    ncp_fx(id, 0x16, 3.0f, 0, 0, 1.0f);
+    ncp_fx(id, 0x6, 0, 0, 0, 1.0f);
+    ncp_fx(id, 0xa, 0, 0, 0, 1.0f);
+}
+
+void ncp_seph_charge_fx(float f)
+{
+    if (ncp_fx_level < 0)
+    {
+        ncp_fx(0x3420055, 0x18, 0, 0, 0, 1.0f); // edge_fire1_hold
+        ncp_fx_level = 0;
+    }
+    if (ncp_fx_level == 0 && f >= 31.0f)
+    {
+        ncp_off(0x3420055);
+        ncp_fx(0x3420056, 0x18, 0, 0, 0, 1.0f); // edge_fire2_hold
+        ncp_fx(0x3420059, 0x18, 0, 0, 0, 1.0f); // edge_fire2_hold_flash
+        ncp_fx_level = 0x1;
+    }
+    if (ncp_fx_level == 0x1 && f >= 68.0f)
+    {
+        ncp_seph_aura(0x3420057);               // edge_fire2_hold_aura
+        ncp_fx_level = 0x2;
+    }
+    if (ncp_fx_level == 0x2 && f >= 100.0f)
+    {
+        ncp_off(0x3420056);
+        ncp_fx(0x342005A, 0x18, 0, 0, 0, 1.0f); // edge_fire3_hold_flash
+        ncp_fx_level = 0x3;
+    }
+    if (ncp_fx_level == 0x3 && f >= 102.0f)
+    {
+        ncp_seph_aura(0x3420057);
+        ncp_fx(0x342005D, 0x18, 0, 0, 0, 1.0f); // edge_fire3_trigger
+        ncp_fx_level = 0x4;
+    }
+    if (ncp_fx_level == 0x4 && f >= 118.0f)
+    {
+        ncp_off(0x3420057);
+        ncp_seph_aura(0x3420058);               // edge_fire2_hold_aura_end
+        ncp_fx_level = 0x5;
+    }
+}
+
+// edge.c edge_n_roll_after: the roll 6 frames after the fire, buffered from the release (ground)
+int ncp_seph_roll_after()
+{
+    if (ncp_state == 0x2 || ncp_fired)
+    {
+        if ((global24 & 0x2000000) != 0)
+        {
+            ncp_released = 0x10;
+        }
+        else if ((global24 & 0x4000000) != 0)
+        {
+            ncp_released = 0x20;
+        }
+        else if (ControlModule(0x2712, 0x3) && global48 * PostureModuleF(0) >= 0.5f)
+        {
+            ncp_released = 0x10;
+        }
+        else if (ControlModule(0x2712, 0x3) && global48 * PostureModuleF(0) <= -0.5f)
+        {
+            ncp_released = 0x20;
+        }
+    }
+    if (ncp_fired == 0)
+    {
+        return 0;
+    }
+    if (ncp_fired < 0x6)
+    {
+        ncp_fired += 1;
+        return 0;
+    }
+    if (global18 == 0 && ncp_released == 0x10)
+    {
+        ncp_charge_off();
+        func_16(0x20, 0x1);
+        return 0x1;
+    }
+    if (global18 == 0 && ncp_released == 0x20)
+    {
+        ncp_charge_off();
+        func_16(0x21, 0x1);
+        return 0x1;
+    }
+    return 0;
+}
+
+int ncp_seph_loop(float f)
+{
+    if (ncp_seph_roll_after())
+    {
+        return 0x1;
+    }
+    if (ncp_state == 0)
+    {
+        ncp_seph_charge_fx(f);
+        if (f >= 100.0f)
+        {
+            ncp_level = 0x2;
+        }
+        else if (f >= 32.0f)
+        {
+            ncp_level = 0x1;
+        }
+        if (ControlModule(0x2712, 0x1) == 0)
+        {
+            ncp_released = 0x1;
+        }
+        if (f >= 20.0f && f < 100.0f && global18 == 0 && (global24 & 0x2000000) != 0)
+        {
+            ncp_charge_off();
+            func_16(0x20, 0x1);
+            return 0x1;
+        }
+        if (f >= 20.0f && f < 100.0f && global18 == 0 && (global24 & 0x4000000) != 0)
+        {
+            ncp_charge_off();
+            func_16(0x21, 0x1);
+            return 0x1;
+        }
+        if (f >= 20.0f && f < 100.0f && ControlModule(0x2710, 0x3))
+        {
+            ncp_change(0x3);
+        }
+        else if (f >= 20.0f && f < 100.0f && ncp_released)
+        {
+            ncp_change(0x2);
+            if (ncp_level == 0x1)
+            {
+                ncp_fx(0x342005C, 0x18, 0, 0, 0, 1.0f); // edge_fire2_trigger
+            }
+            else
+            {
+                ncp_fx(0x342005B, 0x18, 0, 0, 0, 1.0f); // edge_fire1_trigger
+            }
+        }
+        else if (f >= 120.0f && ncp_fired == 0)
+        {
+            ncp_seph_generate();
+        }
+    }
+    else if (ncp_state == 0x2)
+    {
+        if (f >= 13.0f && ncp_fired == 0)
+        {
+            ncp_seph_generate();
+        }
+    }
+    return 0;
+}
+
+void ncp_seph_air(float f)
+{
+    if (global18 != 0x2)
+    {
+        return;
+    }
+    if (ncp_state == 0 && f < 140.0f || ncp_state == 0x2 && f < 33.0f)
+    {
+        KineticModule(0xf, 0x1, -0.0756f); // Sephiroth's slowed fall (start_accel_y_mul_air 0.7, max 0.55)
+        KineticModule(0x14, 0x1, 1.012f);
+    }
+}
+
+void ncp_loop()
+{
+    float f;
+    int m;
+    if (StatusModule(0x6) == 0x1 || global19 == 0 && global18 == 0x2 || global19 != 0 && global18 == 0)
+    {
+        ncp_kinetic();
+        m = ncp_motion();
+        MotionModule(0x3, m);
+        ncp_silence();
+    }
+    f = MotionModuleF(0x1);
+    if (newcopy_hero())
+    {
+        ncp_hero_loop(f);
+        ncp_hero_air();
+    }
+    else
+    {
+        if (ncp_seph_loop(f))
+        {
+            return;
+        }
+        ncp_seph_air(f);
+    }
+    // actionable from Ultimate's cancel frame; done at the animation's end
+    if (f >= ncp_cancel_frame() && (func_39() != 0 || func_41() != 0))
+    {
+        ncp_charge_off();
+        return;
+    }
+    if (ncp_state != 0x1 && f >= ncp_end_frame() - 1.0f)
+    {
+        ncp_charge_off();
+        if (global18 == 0)
+        {
+            func_16(0, 0);
+        }
+        else
+        {
+            func_16(0xe, 0);
+        }
+    }
+}
+
+void newcopy_n_main()
+{
+    int m;
+    ncp_state = 0;
+    ncp_level = 0;
+    ncp_fired = 0;
+    ncp_released = 0;
+    ncp_fx_level = -1;
+    ncp_hold = 0;
+    if (newcopy_hero())
+    {
+        ncp_hold = ncp_stored;       // a stored charge goes on from where it was
+        ncp_stored = 0;
+        if (ncp_hold >= 81)
+        {
+            ncp_released = 0x1;      // a stored Kafrizz is cast at once
+        }
+    }
+    ncp_kinetic();
+    if (global18 == 0x2)
+    {
+        KineticModule(0x11, 0x1, 0);
+    }
+    m = ncp_motion();
+    MotionModule(0x1, m, 0, 1.0f);
+    global20 = 0;
+    ncp_silence();
+    func_78(ncp_loop);
+}
+
+void newcopy_n_end()
+{
+    if (newcopy_marker() != 0)
+    {
+        ncp_charge_off();
     }
 }

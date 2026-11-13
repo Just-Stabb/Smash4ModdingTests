@@ -26,6 +26,10 @@ RobotSpecialAirN
 RobotSpecialN -> robotbody/FitKirbyRobotBodyMainD00SpecialN.omo
 RobotSpecialAirN -> robotbody/FitKirbyRobotBodyMainD00SpecialAirN.omo
 
+// Hero / Sephiroth copies (granted as the Robin copy): no new scripts or slots. With them the Robin copy slots
+// 0x446-0x453 (RefletSpecialN*) play Ultimate's Kirby copy animations from motion/bravebody / edgebody (same file
+// names as refletbody's: tools/kirby_copy_motions.py), the moves are MSC (fighters/kirby/specials.md)
+
 // ---- Supamario
 // Kamehameha projectile (weapon kamehameha, article 5; motion.mtable): fly1 / 2 / 3 = charge levels
 // 1 / 2 / 3 (multi-hits, head effects), finish1 / 2 / 3 = their launchers: tools/supamario_kame_build.py
