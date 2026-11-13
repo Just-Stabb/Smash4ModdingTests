@@ -1193,7 +1193,8 @@ Sephiroth Technical (already in `kirby_copy_trait`; `kirby_trait_update` now ask
 ### Ultimate data used (the user's `kirby-ssbu-partial.zip`, `lua2cpp_decomp.zip`)
 
 - `kirby/model/copy_brave_cap/c00-c07` (3 meshes: `kirby_brave_001`, `met_brave11_001/002`; **no skeleton**: it sits on
-  Kirby's `Headdress` joint, (0, 9.752, 0), unrotated; the 8 colours have the same textures) and
+  Kirby's `Headdress` joint, (0, 9.752, 0), unrotated (wrong: its vertices are offsets from Body's place, 5.17:
+  "Visual fix v1"); the 8 colours have the same textures) and
   `kirby/model/copy_edge_cap/c00-c07` (3 meshes skinned to `Body` / `Puff` / `S_HairB1`, an alpha-sorted hair layer, and a
   `model.nuanmb` for the hair). `kirby/motion/copy_edge_cap/c00` (the hair's own d00specialn* motions, `motion_list.bin`,
   swing prc) is **not used** (the hat is rigid here).
@@ -1230,8 +1231,10 @@ top bits = the hat's `cNN`), so a Hero player's slot loads `model/bravecap/cNN` 
 `refletcap` / `refletbody` (two name reads swapped for kinds 0x45 / 0x42 only), and a Robin in the same match keeps
 his. The hats: `tools/kirby_copy_hats.py` (one bone, TopN, in Kirby's head frame: the placement worked out from
 Ultimate's and Smash 4's Robin hats, which agree to ~0.7: docstring; texture ids 0x40C5F000 / 0x40C2F000 + 0x80 x
-costume). The motions: `tools/kirby_copy_motions.py` (Ultimate's tracks as they are: Kirby's two skeletons have the
-same bind pose, checked bone by bone; a frame checked against Ultimate's FK to 0.04), stored under the Robin copy
+costume; the hat bone is BodyBN at 5.17, not HeadN: "Visual fix v1"). The motions: `tools/kirby_copy_motions.py`
+(since "Visual fix v1" re-parented through Ultimate's FK, with Ultimate's own face packs; stage 1 copied
+Ultimate's tracks as they are, which put the legs 2.392 low: the bind poses agree but the parents don't), stored under
+the Robin copy
 slots' animation names (a slot finds its animation by the CRC32 of the name):
 
 | Robin slot (ground / air) | Hero | Sephiroth |
@@ -1243,7 +1246,8 @@ slots' animation names (a slot finds its animation by the CRC32 of the name):
 | 0x44B / 0x452 SpecialNTronHold (loops) | SpecialNHold | - |
 | 0x44C / 0x453 SpecialNTronEnd | SpecialN3 | SpecialNCancel |
 
-`kirbypt1` / `kirbypt2` (the face) are the Robin copy's own packs (Robin's timing: approximated).
+`kirbypt1` / `kirbypt2` (the body sphere and the face) were the Robin copy's own packs (Robin's timing); since "Visual
+fix v1" they are Ultimate's Body / mouth tracks.
 
 **Articles.** Robin's copy record list gets Hero's fireball (0x190, max 3, the thunder's spawner) and Sephiroth's fire
 (0x18C, max 3, Din's Fire's spawner) as copy articles 6 / 7, and Kirby's reserve article entries 15-18 name the Robin
@@ -1670,4 +1674,75 @@ exe_v45f = exe_v45d + this cave, and exe_v46d = exe_v46b + this cave. It replace
 ```
 python3 tools/rpx_patch.py EXE_V45D.rpx EXE_V45F.rpx $(python3 tools/kirby_copy_pool_cave.py EXE_V45D.rpx)
 python3 tools/kirby_copy_pool_test.py EXE_V45F.rpx EXE_V45D.rpx
+```
+
+### Visual fix v1 (`kirby_copy_visuals_v1`): hat placement, the copy motions' legs and body
+
+User (with crash fix v5, Kirby copying Sephiroth in game; clip 2026-11-13): "Sephiroth's hair/hat seem positioned
+slightly wrong and the animations stretch Kirby oddly." Only Kirby's copy hats and copy motions change; no exe or MSC
+change.
+
+**Inputs.** Ultimate: the user's `kirby-ssbu-partial.zip`. Smash 4: `kirby - Copy.zip` (Drive), plus the user's
+`kirby_smash4_model.zip` / `kirby_smash4_motion.zip`, which are the same vanilla files plus the installed copies.
+Kirby's vl: `param-smash4-vanilla.zip`. Clip frames: ffmpeg. Checks: forward kinematics of both skeletons, and
+renders of Kirby's Smash 4 meshes posed by each pack (a numpy rasterizer, not in the repo).
+
+**Scale (the user's hint): no difference.** Both Kirby skeletons have the same bind pose, world position and turn,
+to 0.0000 on all 42 shared bones. The body meshes' vertex boxes are equal to 0.01. Ultimate's copy tracks carry no
+compensate-scale flag, so children inherit scale as in Smash 4. Vanilla motions both games share (A01Turn,
+A01WalkFast) have the same scale values bone for bone (e.g. Waist 0.78-1.08). So translations need no ratio, and
+Ultimate's own squash (Bust 0.73 in Gigaflare's charge, Body 0.83-1.19 in Hero's moves) is kept as it is.
+
+**Motions: what stretched Kirby.** `tools/kirby_copy_motions.py --check` now runs every frame of the built packs
+against Ultimate's FK. Stage 1 was 2.39 off on every frame; now the largest error is 0.04, from 16-bit rounding at
+the toes.
+- **Different parents.** Ultimate hangs both legs on LegC (Hip + 2.392 along Hip's X, i.e. up) and both clavicles on
+  ClavicleC (Bust + 0.05). Smash 4 has LLegJ / RLegJ straight on HipN and L/RShoulderN on BustN. Stage 1 copied the
+  local tracks as they were, so the legs, knees, feet and toes were 2.392 too low on every frame. The feet were in
+  the floor, which is why they don't show in the clip's Flare / Megaflare frames.
+  - The new converter gives each Smash 4 bone the transform from its Smash 4 parent's counterpart to its own
+    counterpart in Ultimate's posed skeleton (`s4_locals`). LegC / ClavicleC never scale, so the decomposition is
+    exact (shear asserted < 1e-3).
+- **Body and mouth from the wrong pack.** In Smash 4 the whole body mesh, the eyes and the face meshes are bound to
+  BodyBN. Vanilla main.pac motions never animate BodyBN or the mouth bones: kirbypt1 plays BodyBN, and kirbypt2 plays
+  MouthN, the lips, MouthShitaN/Nb, CheekN and HukumiN. Every vanilla part entry has its main motion's frame count.
+  - Stage 1 shipped the Robin copy's part packs. That put Robin's body lean on BodyBN (up to ~37 degrees, timed for
+    Robin's 8-76 frame motions) under Ultimate's motions, and Body / Mouth1 / Cheek / Puff in main.pac too.
+  - Now Ultimate's Body goes to kirbypt1, and Mouth1, MouthLa1-Le / Ra1-Re, MouthD1/D2, Cheek and Puff go to kirbypt2
+    (`FACE_BONES`, mapped by name and bind: identical). Both have the main motion's frame count. main.pac has the
+    other 26 bones, as vanilla.
+  - The Robin part entries for slots a copy doesn't play (Sephiroth's two holds) stay, so the part packs keep stage
+    1's entry set.
+- HeadN keeps Ultimate's Head track. Ultimate's Head yaws freely (up to 179 degrees in Gigaflare's charge, 153 in
+  its run), but nothing is skinned to it on Kirby and the hats aren't on it (below).
+
+**Hats: the anchor.** Smash 4's copy hats sit on **BodyBN** (y 5.17 in the bind pose; NeckN is at the same place),
+not on HeadN (6.37) as stage 1 assumed. A hat's one bone (TopN) has the head-frame turn as its bind, so its vertices
+are Y-up offsets from the anchor. The evidence:
+- Kirby's joint table 1 starts with BodyBN (joint ID 1000). His vl group 9 attach points are four on ID 1000 and two
+  on HipN, where Marth's are BustN, HeadN x3 and HipN x2.
+- Vanilla hats sit on the head only from 5.17. Peach's crown has its nearest vertex 0.10 inside the body sphere at
+  5.17 and 0.92 above it at 6.37. Koopa's cap and Fox's ears behave the same way. Mario's and Luigi's caps, which
+  just touch at 6.37, sink 0.2-0.6 at 5.17, as a cap does. `kirby_copy_hats.py --check` prints the table.
+- The clip: the hair sat 1.2 low (bare pink head top behind the fringe, side locks down to the floor). It also kept
+  to the body and face while the installed motions yawed HeadN by ~100 degrees.
+
+So:
+- **edgecap:** Ultimate's model-space vertices (skinned to Body at 5.17) minus (0, 5.17, 0). That is 1.2 higher
+  than stage 1.
+- **bravecap:** Ultimate's vertices as they are (offset 0). copy_brave_cap has no skeleton, and its coordinates are
+  already offsets from that point: its circlet hugs the body sphere at 5.17 (nearest +0.05, median +0.23, none
+  inside; the best fit scanning heights is 5.1-5.2), with the gem in front and the sword and shield on the back.
+  Stage 1 put it on Headdress (9.752, + 3.382), which in game left the circlet ~1.5-2.9 above the head and the sword
+  and shield 3.4 high: now 3.382 lower.
+
+Renders of Ultimate's pose against both builds: the package's `preview/compare.png`. The new build matches
+Ultimate's; stage 1 shows the sunk feet, the leaning body and the low hair the clip shows.
+
+Still approximated: the hats are rigid (copy_edge_cap's S_HairB1 swing and its Puff weights; Ultimate's
+`kirby/motion/copy_edge_cap` hair motions unused).
+
+```
+python3 tools/kirby_copy_hats.py ULT/kirby/model S4/fighter/kirby/model OUT/fighter/kirby/model --check
+python3 tools/kirby_copy_motions.py ULT/kirby S4/fighter/kirby OUT/fighter/kirby/motion --check
 ```
