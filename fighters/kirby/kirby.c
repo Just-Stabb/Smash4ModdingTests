@@ -75103,6 +75103,13 @@ int   khm_speed_t;    // Acceleratle frames left
 int   khm_attack_t;   // Oomph frames left
 int   khm_accel_t;    // Acceleration frames left
 int   khm_psyche;     // Psyche Up held
+int   khm_reflect_t;  // v3: Bounce frames left
+int   khm_sub;        // v3: Kaclang / Zoom: the part of the spell
+int   khm_t2;         // v3: frames in that part
+int   khm_metal_on;   // v3: Kaclang's Metal Box state on
+int   khm_invisible_t; // v3: Hocus Pocus invisible frames left
+int   khm_poison_t;   // v3: Hocus Pocus poison frames left
+float khm_dmg_seen;   // v3: the others' damage last frame (MP from damage dealt)
 
 int khm_bit(int s)
 {
@@ -75134,6 +75141,11 @@ int khm_cost(int n)
     if (n == 0xe) { return 0x10; }
     if (n == 0x15) { return 0xe; }
     if (n == 0x16) { return 0x14; }
+    if (n == 0x9) { return 0x1; }     // v3: Kamikazee, Kaclang, Bounce, Hocus Pocus, Zoom
+    if (n == 0xa) { return 0x6; }
+    if (n == 0xd) { return 0xe; }
+    if (n == 0xf) { return 0x4; }
+    if (n == 0x10) { return 0x8; }
     return 0;
 }
 
@@ -75148,6 +75160,10 @@ int khm_weight(int n)
     if (n == 0x8) { return 0x5; }
     if (n == 0xe) { return 0x11; }
     if (n == 0x16) { return 0x10; }
+    if (n == 0x9 || n == 0xa) { return 0x5; }   // v3
+    if (n == 0xd) { return 0x10; }
+    if (n == 0xf) { return 0x3; }
+    if (n == 0x10) { return 0xf; }
     return 0;
 }
 
@@ -75454,6 +75470,27 @@ void khm_cast(int f)
     {
         khm_accel_t = 0x258;
     }
+    else if (n == 0x9)
+    {
+        khm_kamikazee(f);
+    }
+    else if (n == 0xa)
+    {
+        khm_kaclang(f);
+    }
+    else if (n == 0xd && f >= 11 && khm_once(0x1))
+    {
+        khm_reflect_t = 0x2d0;
+        khm_glow(0x3450066, 0x1);
+    }
+    else if (n == 0xf && f >= 1 && khm_once(0x1))
+    {
+        khm_hocus_pocus();
+    }
+    else if (n == 0x10)
+    {
+        khm_zoom(f);
+    }
 }
 
 // the buffs' marker bits (brave_buff_update's: 3 Acceleratle is the profile, kirby_trait_profile)
@@ -75502,6 +75539,7 @@ void khm_buffs()
     {
         khm_accel_t -= 1;
     }
+    khm_v3_timers();
     if (khm_psyche && (global4 < 0x152 || global4 > 0x155)
         && (WorkModuleF(0, 0x0f0000a1) >= 0.5f && (global4 < 0x35 || global4 > 0x3e)
             || global5 == 0x3e && global4 != 0x3e))
@@ -75665,6 +75703,11 @@ void khm_update()
                 khm_state = 0x2;
                 khm_frame = 0;
                 khm_done = 0;
+                khm_sub = 0x7f;
+                if (khm_spell == 0x9 || khm_spell == 0xa || khm_spell == 0x10)
+                {
+                    khm_sub = 0;
+                }
             }
             else if (ControlModule(0x2710, 0x1))
             {
@@ -75680,10 +75723,332 @@ void khm_update()
         {
             khm_close();
         }
-        if (khm_frame >= 0x50)
+        if (khm_frame >= 0x50 && khm_sub == 0x7f)
         {
-            khm_state = 0;
+            khm_state = 0;      // a spell with parts (Kaclang, Zoom, Kamikazee) says when it's done
         }
     }
     khm_panel();
+}
+
+// ---- v3 (kirby_hero_sephiroth_copy_v3): Kamikazee, Kaclang, Bounce, Hocus Pocus, Zoom, Hero's MP from damage dealt.
+// Frames from Ultimate's Hero motions (brave.zip motion/body/c00: SpecialLw9 = spell7, 50 frames; SpecialLw10Start
+// 21; SpecialLw16 start = spell9start, 30), behaviour from brave.c (brave_kaclang / brave_reflect / brave_hocus_pocus /
+// brave_zoom / brave_frame), all of it while Kirby stays the stone (its motion untouched).
+int khm_stone()
+{
+    return global4 == 0x155 || global4 == 0x175 || global4 == 0x176;
+}
+
+void khm_metal(int on)
+{
+    if (on && khm_metal_on == 0)
+    {
+        WorkModule(0, 1.0f, 0x0f000099);    // the Metal Box's own metal (SELF_ITEM 1), as brave_metal
+    }
+    else if (on == 0 && khm_metal_on)
+    {
+        WorkModule(0, 2.0f, 0x0f000099);    // its end (SELF_ITEM 2)
+    }
+    khm_metal_on = on;
+}
+
+// Kamikazee: the crash article's blast (level 1 + 8 x his slot) at 20, KO'd at the motion's end (50: Ultimate's
+// SpecialLw9 = spell7) with the instance flag "causes KO" 0x20000043 (any fighter: Whack's own KO uses it)
+void khm_kamikazee(int f)
+{
+    if (f >= 20 && khm_once(0x1))
+    {
+        khm_generate(0xc, 0x1 + 0x8 * khm_self_slot());
+    }
+    if (f >= 49 && khm_once(0x2))
+    {
+        WorkModule(0x2710, 0x20000043);
+        khm_sub = 0x7f;
+    }
+}
+
+// Kaclang: from 20 (SpecialLw10Start's 21 frames) invincible (position variable 0x0F00011C, renewed each frame) and
+// metal for 300 frames (steel_frame), falling fast in the air (accel 0.2, max 3); then the metal off. Over early
+// when he leaves the stone (as Hero's at his status's end)
+void khm_kaclang(int f)
+{
+    if (khm_sub == 0)
+    {
+        if (f >= 20)
+        {
+            khm_sub = 0x1;
+            khm_t2 = 0;
+        }
+        return;
+    }
+    if (khm_sub == 0x1)
+    {
+        khm_t2 += 1;
+        if (khm_stone() == 0 || khm_t2 >= 0x12c)
+        {
+            khm_metal(0);
+            khm_sub = 0x7f;
+            return;
+        }
+        WorkModule(0, 2.0f, 0x0f00011c);
+        khm_metal(0x1);
+        if (global18 == 0x2)
+        {
+            KineticModule(0xf, 0x1, -0.2f);
+            KineticModule(0x14, 0x1, 3.0f);
+        }
+    }
+}
+
+void khm_fly(float v)
+{
+    KineticModule(0xf, 0x1, 0);
+    KineticModule(0x14, 0x1, 10.0f);
+    KineticModule(0x11, 0x1, v);
+}
+
+// brave_zoom_place: above a random fighter on the ground (not him), 120 up; none: (0, 180)
+void khm_zoom_place()
+{
+    int s;
+    int me;
+    int count;
+    int pick;
+    float x;
+    float y;
+    me = khm_self_slot();
+    count = 0;
+    s = 0;
+    while (s < 0x8)
+    {
+        if (s != me && WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0 && WorkModuleF(0, 0x0f000176 + 0x20 * s) < 0.5f)
+        {
+            count += 1;
+        }
+        s += 1;
+    }
+    x = 0;
+    y = 60.0f;
+    if (count > 0)
+    {
+        pick = randi(0, count);
+        s = 0;
+        while (s < 0x8)
+        {
+            if (s != me && WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0 && WorkModuleF(0, 0x0f000176 + 0x20 * s) < 0.5f)
+            {
+                if (pick == 0)
+                {
+                    x = WorkModuleF(0, 0x0f000020 + 0x4 * s);
+                    y = WorkModuleF(0, 0x0f000021 + 0x4 * s);
+                }
+                pick -= 1;
+            }
+            s += 1;
+        }
+    }
+    WorkModule(0, x, 0x0f000000);
+    WorkModule(0, y + 120.0f, 0x0f000001);
+}
+
+// Zoom: the stone goes up off the screen (9 a frame for 40 frames, intangible: 0x0F00011B renewed each frame), is put
+// 120 above a fighter on the ground and comes down at 7 a frame, intangible, until it lands (150 frames at most). The
+// stone's own fall and landing do the rest
+void khm_zoom(int f)
+{
+    if (khm_sub == 0)
+    {
+        if (f >= 29)
+        {
+            khm_sub = 0x1;
+            khm_t2 = 0;
+            func_20(0x2);
+            GroundModule(0x2710, 0x5);
+            khm_fly(9.0f);
+        }
+        return;
+    }
+    if (khm_sub == 0x1 || khm_sub == 0x2)
+    {
+        WorkModule(0, 2.0f, 0x0f00011b);
+    }
+    if (khm_sub == 0x1)
+    {
+        khm_t2 += 1;
+        khm_fly(9.0f);
+        if (khm_t2 >= 0x28)
+        {
+            khm_sub = 0x2;
+            khm_t2 = 0;
+            khm_zoom_place();
+            khm_fly(-7.0f);
+        }
+        return;
+    }
+    if (khm_sub == 0x2)
+    {
+        khm_t2 += 1;
+        if (global18 == 0 || khm_t2 > 0x96)
+        {
+            KineticModule(0xf, 0x1, -0.089f);
+            KineticModule(0x14, 0x1, 1.5f);
+            khm_sub = 0x7f;
+            return;
+        }
+        khm_fly(-7.0f);
+    }
+}
+
+// Hocus Pocus: Ultimate's outcomes and odds (brave_hp_weight); the spells Kirby can't cast here (the sword spells,
+// Zoom 2 U: not in this version) and Hocus Pocus itself weigh 0
+int khm_hp_weight(int o)
+{
+    if (o == 0) { return 0x1e8; }               // giant 488
+    if (o == 0x1) { return 0x7a; }              // Starman 122
+    if (o == 0x2) { return 0x18c; }             // full MP 396
+    if (o == 0x7) { return 0x225; }             // small 549
+    if (o <= 0x9) { return 0x262; }             // timer, no MP, poison, sleep, flower, invisible: 610
+    o = o - 0x9;
+    if (o == 0x1 || o == 0xa) { return 0x98; }  // Heal, Kaclang 152
+    if (o == 0x9) { return 0x5b; }              // Kamikazee 91
+    if (o == 0xf || o >= 0x11 && o <= 0x14) { return 0; }
+    return 0xf4;
+}
+
+void khm_hocus_pocus()
+{
+    int o;
+    int r;
+    int total;
+    total = 0;
+    o = 0;
+    while (o <= 0x1e)
+    {
+        total = total + khm_hp_weight(o);
+        o += 1;
+    }
+    r = randi(0, total);
+    o = 0;
+    while (o < 0x1e && r >= khm_hp_weight(o))
+    {
+        r = r - khm_hp_weight(o);
+        o += 1;
+    }
+    if (o >= 0xa)
+    {
+        o = o - 0x9;                            // another spell, cast for Hocus Pocus's 4 MP
+        if (o == 0x8)
+        {
+            khm_burst = (int)(ncp_mp + 0.999f) + 0x4;
+            ncp_mp = 0;
+        }
+        khm_spell = o;
+        khm_frame = 0;
+        khm_done = 0;
+        khm_sub = 0x7f;
+        if (o == 0x9 || o == 0xa || o == 0x10)
+        {
+            khm_sub = 0;
+        }
+        return;
+    }
+    if (o == 0x2) { ncp_mp = 100.0f; SoundModule(0x2710, 0x76400ea); }
+    else if (o == 0x4) { ncp_mp = 0; SoundModule(0x2710, 0x4d); }
+    else if (o == 0x5) { khm_poison_t = 0x1f4; SoundModule(0x2710, 0x4b); }
+    else if (o == 0x0) { WorkModule(0, 3.0f, 0x0f000099); }    // giant (Super Mushroom)
+    else if (o == 0x1) { WorkModule(0, 5.0f, 0x0f000099); }    // Starman
+    else if (o == 0x3) { WorkModule(0, 7.0f, 0x0f000099); SoundModule(0x2710, 0x76400eb); }   // timer
+    else if (o == 0x7) { WorkModule(0, 4.0f, 0x0f000099); }    // small (Poison Mushroom)
+    else if (o == 0x8) { WorkModule(0, 6.0f, 0x0f000099); }    // Lip's Stick flower
+    else if (o == 0x9)
+    {
+        VisibilityModule(0x2710, 0);
+        khm_invisible_t = 0x258;
+        SoundModule(0x2710, 0x76400e9);
+    }
+    else if (o == 0x6)
+    {
+        func_16(0x5f, 0);   // sleep (FuraSleepStart: the stone ends; Hero's lands first in the air)
+    }
+}
+
+// every frame: Bounce's reflector (Kirby's reflector group 3, the shape as Hero's: brave_reflect_shape), the
+// invisible and poison timers, the metal off, and Hero's MP from damage dealt (0.8 x the other fighters' damage
+// added while his attack has hit, his specials' hits not counted: brave_frame)
+void khm_v3_timers()
+{
+    int s;
+    int me;
+    float d;
+    if (global4 == 0xb1 || newcopy_hero() == 0)
+    {
+        if (khm_reflect_t > 0)
+        {
+            ShieldModule(0, 0x3, 0, 0, 0x3);
+        }
+        khm_reflect_t = 0;
+        khm_poison_t = 0;
+        if (khm_invisible_t > 0)
+        {
+            VisibilityModule(0x2710, 0x1);
+        }
+        khm_invisible_t = 0;
+        khm_metal(0);
+    }
+    if (khm_reflect_t > 0)
+    {
+        khm_reflect_t -= 1;
+        if (khm_reflect_t == 0)
+        {
+            ShieldModule(0, 0x3, 0, 0, 0x3);
+            khm_glow(0x3450066, 0);
+        }
+        else
+        {
+            ShieldModule(0x2717, 0x3, 0, 0, 12.0f, 0, 4.0f, 0, 0, 15.0f, 0, 1.5f, 1.2f, 999.0f, 0, 1.2f, 0x3);
+            ShieldModule(0, 0x3, 0, 0x1, 0x3);
+        }
+    }
+    if (khm_invisible_t > 0)
+    {
+        khm_invisible_t -= 1;
+        if (khm_invisible_t == 0)
+        {
+            VisibilityModule(0x2710, 0x1);
+        }
+    }
+    if (khm_poison_t > 0)
+    {
+        khm_poison_t -= 1;
+        if (khm_poison_t % 0x14 == 0)
+        {
+            WorkModule(0x2, 1.1f, 0x0f000117);
+        }
+    }
+    if (khm_metal_on && (khm_state != 0x2 || khm_spell != 0xa))
+    {
+        khm_metal(0);
+    }
+    me = khm_self_slot();
+    d = 0;
+    s = 0;
+    while (s < 0x8)
+    {
+        if (s != me && WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
+        {
+            d = d + WorkModuleF(0, 0x0f000177 + 0x20 * s);
+        }
+        s += 1;
+    }
+    if (newcopy_hero() && d > khm_dmg_seen && WorkModuleF(0, 0x0f0000a0) >= 0.5f
+        && (global4 < 0x152 || global4 > 0x155) && (global4 < 0x17c || global4 > 0x250))
+    {
+        ncp_mp = ncp_mp + 0.8f * (d - khm_dmg_seen);
+        if (ncp_mp > 100.0f)
+        {
+            ncp_mp = 100.0f;
+        }
+    }
+    khm_dmg_seen = d;
 }

@@ -43,6 +43,7 @@ class Game:
         self.stick_y = 0.0
         self.motions, self.articles, self.statuses, self.effects = [], [], [], []
         self.fvars = {}
+        self.speeds = []
 
     def sys(self, sid, a):
         f = R.i2f
@@ -59,6 +60,8 @@ class Game:
                 return 0
             if a[0] == 0x10:
                 return int(a[1] in self.flags)
+            if a[0] == 0x2710:
+                self.flags.add(a[1])
             return 0
         if sid == 0x12:                                         # MotionModule
             if a and a[0] == 0x1:
@@ -87,6 +90,9 @@ class Game:
         if sid == 0x20 and a and a[0] == 0x2710:                # ArticleModule generate
             self.articles.append((a[1], self.frame, self.ints.get(0x10000048), self.ints.get(0x1000009F),
                                   self.ints.get(0x10000049)))
+            return 0
+        if sid == 0x10 and len(a) == 3 and a[0] == 0x11 and a[1] == 1:   # KineticModule(0x11, 1, v): speed
+            self.speeds.append(R.i2f(a[2]))
             return 0
         if sid == 0x1C and a and a[0] in (0x2717, 0x2710):
             self.effects.append(a[1])
@@ -152,6 +158,70 @@ class Run:
         if len(g.motions) == n or isinstance(g.motions[-1], tuple):
             g.frame += 1.0
         return g
+
+
+def cast(r, spell, frames, f=None):
+    """open the menu on the stone, cast `spell` from row 0, run `frames` frames (f(r) after each)"""
+    g = r.game
+    r.vm.g[r.gi['global4']] = 0
+    r.vm.call(r.fn['khm_update'])
+    r.vm.g[r.gi['global4']] = 0x175
+    r.vm.call(r.fn['khm_update'])
+    r.vm.g[r.gi['khm_spells']] = spell
+    r.vm.g[r.gi['khm_cursor']] = 0
+    g.press = {0}
+    r.vm.call(r.fn['khm_update'])
+    g.press = set()
+    for _ in range(frames):
+        r.vm.call(r.fn['khm_update'])
+        if f:
+            f(r)
+
+
+def v3_tests(path, src):
+    """v3: Kamikazee, Kaclang, Bounce, Hocus Pocus, Zoom, MP from damage dealt"""
+    r = Run(path, src, 2)
+    g = r.game
+    r.update()
+    g.fvars.update({0x0F000000: 10.0, 0x0F000001: 0.0, 0x0F000020: 10.0, 0x0F000021: 0.0, 0x0F000023: 1.0,
+                    0x0F000024: 50.0, 0x0F000025: 0.0, 0x0F000027: 1.0})    # he is slot 0, a fighter in slot 1
+    cast(r, 0x9, 21)
+    check('Kamikazee: the crash (article 12) at 20, level 1 + 8 x his slot 0', [(x[0], x[2]) for x in g.articles], [(12, 1)])
+    check('Kamikazee: no KO before 49', 0x20000043 in g.flags, False)
+    for _ in range(30):
+        r.vm.call(r.fn['khm_update'])
+    check('Kamikazee: KO flag 0x20000043 at 49', 0x20000043 in g.flags, True)
+    r.setf('ncp_mp', 100.0)
+    cast(r, 0xa, 25)
+    check('Kaclang: metal (SELF_ITEM 1) and invincible from 20', (g.fvars.get(0x0F000099), g.fvars.get(0x0F00011C)), (1.0, 2.0))
+    for _ in range(300):
+        r.vm.call(r.fn['khm_update'])
+    check('Kaclang: metal off (SELF_ITEM 2) after 300', g.fvars.get(0x0F000099), 2.0)
+    r.setf('ncp_mp', 100.0)
+    cast(r, 0xd, 12)
+    check('Bounce: 720 frames of reflector', r.vm.g.get(r.gi['khm_reflect_t']) > 700, True)
+    r.setf('ncp_mp', 100.0)
+    g.speeds = []
+    cast(r, 0x10, 31)
+    check('Zoom: up at 9 from frame 29', g.speeds[:1], [9.0])
+    for _ in range(40):
+        r.vm.call(r.fn['khm_update'])
+    check('Zoom: then put 120 above the fighter on the ground (slot 1) and down at 7',
+          (g.fvars.get(0x0F000000), g.fvars.get(0x0F000001), g.speeds[-1]), (50.0, 120.0, -7.0))
+    r.vm.g[r.gi['global18']] = 0
+    r.vm.call(r.fn['khm_update'])
+    check('Zoom: done on landing', r.vm.g.get(r.gi['khm_sub']), 0x7f)
+    r.setf('ncp_mp', 100.0)
+    cast(r, 0xf, 3)
+    check('Hocus Pocus (the draw\'s first outcome): giant (SELF_ITEM 3), 4 MP', (g.fvars.get(0x0F000099), r.gf('ncp_mp')),
+          (3.0, 96.0))
+    r.setf('ncp_mp', 50.0)
+    r.vm.g[r.gi['global4']] = 0x2
+    r.vm.call(r.fn['khm_update'])
+    g.fvars[0x0F000197] = 10.0                 # slot 1's damage + 10 (0x0F000177 + 0x20)
+    g.fvars[0x0F0000A0] = 1.0                  # his attack has hit
+    r.vm.call(r.fn['khm_update'])
+    check('MP from damage dealt: 0.8 x 10', r.gf('ncp_mp'), 58.0)
 
 
 def menu_tests(path, src):
@@ -233,6 +303,7 @@ def menu_tests(path, src):
     r.vm.call(r.fn['khm_update'])
     g.press = set()
     check('shield shuts the menu', r.vm.g.get(r.gi['khm_state']), 0)
+    v3_tests(path, src)
     rr = Run(path, src, 3)
     rr.update()
     rr.vm.g[rr.gi['global4']] = 0x175

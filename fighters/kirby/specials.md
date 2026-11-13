@@ -1359,3 +1359,31 @@ at 2, `se_brave_special_n04` at 97; N1 `n02` at 8, N2 `n03` at 11, N3 `n07` at 1
 Megaflare `n03_01` at 2. Not played yet: their Smash 4 ids are positions in Hero's / Sephiroth's built sound banks
 (`tools/ultimate_sound.py`, from the label lists), which aren't in the repo; and `vc_kirby_copy_*` is Kirby's
 Ultimate voice, not in any Smash 4 bank.
+
+### v3 (`kirby_hero_sephiroth_copy_v3`): Kamikazee, Kaclang, Bounce, Hocus Pocus, Zoom, MP from damage dealt
+
+`kirby.c` "v3" (`khm_kamikazee` / `khm_kaclang` / `khm_zoom` / `khm_hocus_pocus` / `khm_v3_timers`), Hero's code
+(`brave.c`) with Ultimate's frames (brave.zip `motion/body/c00`: SpecialLw9 = spell7 50 frames, SpecialLw10Start 21,
+SpecialLw16's start = spell9start 30), all while Kirby stays the stone (its motion untouched):
+- **Kamikazee:** the crash article's blast (level 1 + 8 x his slot) at 20; KO'd at 49 (the motion's end) with the
+  instance flag "causes KO" 0x20000043 (a common flag: Whack's KO uses it on any fighter).
+- **Kaclang:** from 20, invincible (0x0F00011C renewed each frame) and the Metal Box's metal (SELF_ITEM 1) for 300
+  frames, falling fast in the air (Hero's accel 0.2 / max 3); then the metal off (SELF_ITEM 2). Over early if he leaves
+  the stone (as Hero's at his status's end). The stone keeps its own armour as well.
+- **Bounce:** 720 frames of Kirby's reflector group 3 with Hero's shape (ShieldModule 0x2717: 15 across, 12 up, x1.5
+  damage, x1.2 speed), renewed every frame (Kirby's own set-up gives group 3 a shape; Hero's needed a cave for it), the
+  barrier glow on his hip.
+- **Hocus Pocus:** Ultimate's outcomes and odds (brave_hp_weight): giant, Starman, full MP, timer, no MP, poison,
+  sleep (the game's sleep status: ends the stone), small, flower, invisible (600 frames), or another spell cast from the
+  stone; the sword spells and Zoom 2 U weigh 0 (not on Kirby yet).
+- **Zoom:** from 29 the stone goes up at 9 a frame for 40 frames, intangible, is put 120 above a random fighter on
+  the ground and comes down at 7 a frame (intangible) until it lands (150 frames at most); the stone's own landing
+  follows.
+- **MP from damage dealt:** 0.8 x the damage the other fighters took while his attack has hit (position variables'
+  DAMAGE, his HIT), not from his specials (statuses 0x152-0x155, copy specials 0x17C-0x250), at most 100.
+- **Still not on Kirby:** Zoom 2 U and the four sword spells (Flame Slash, Kacrackle Slash, Metal Slash, Hatchet Man).
+  The sword spells need (1) Hero's sword as a Kirby held model (Hero's sword mesh from Ultimate's model, converted as
+  the hats, loaded for a Hero player's slot through the copy item-model table's name read, as the hat), shown during the
+  stone statuses only while a sword spell is cast (`copy_held_cave.py` shows held models by status / motion: a Kirby int
+  condition added), and (2) their hitboxes: Hero's SpecialLw17-20 game scripts (his built `game.bin`, translated from
+  the smashline dumps the repo doesn't have) moved onto Kirby's bones.
