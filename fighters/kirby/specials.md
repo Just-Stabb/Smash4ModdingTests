@@ -1438,6 +1438,29 @@ at 17. Kirby's copy voices (`vc_kirby_copy_brave_01` ...) have no equivalent in 
 Sephiroth's copy sounds need `snd_se_Edge.nus3bank` (his tone names): the soundlabeltable only maps labels to tone
 indices.
 
+### Crash fix v2 (`kirby_copy_crashfix_v2`): exe_v45c, Kirby's MSC globals
+
+User: exe_v45b (crash fix v1) boots, but loading a match with Kirby (against anyone) fails; the Cemu log has no crash
+report (it ends at boot): a hang or a silent exit.
+- **The likely cause: Kirby's MSC had more globals than the game keeps.** The MSC script context (allocated at
+  `0x0337B230`, 0x43C bytes) holds a file's globals at +4 for 0x80 words (cleared with `li r4, 0x80`, `0x0337B26C` /
+  `0x0337B320`); pushVar / setVar index them unchecked (`0x0337BA38`), so global 128 on writes over the context's own
+  fields (+0x204 a 7-word sub-object, +0x220 the file's +0x14, +0x224 ...). Kirby had 106 globals in link_samus_v2,
+  116 in copy v1; the Hero menu's 37 `khm_*` took v2-v5 to 138-149, and none of them had run in game (v1's exe crashed
+  first). Hero / Sephiroth have 135 (their 128-134 land in the 7-word sub-object; no trouble seen).
+  Fix: the `khm_*` state lives in Kirby's **New_Var slots** `0x0F00039B`-`0x0F0003BF` (the top of the 64, exe_v40;
+  MSC `WorkModule(0x6 / 0x7)` as ints, `WorkModuleF(0)` / `WorkModule(0)` as floats; the table is in kirby.c above
+  `khm_bit`): Kirby is at 117 globals. `tools/msc_stack_check.py` now fails on a global index >= 128.
+- **exe_v45c:** exe_v45b's panel stub (`kirby_hero_menu_cave.py` kind_stub) kept the kind through r12, the fighter
+  object the panel cave reads right after the hook (`lwz r12, 0xC(r12)`): every Hero / Kirby menu check read
+  0x04BB000C (5) and gave up (no window or gauge; no crash). It uses r11 now (dead there);
+  `kirby_hero_menu_test.py` checks each stub against the registers the cave reads after it (v45b fails, v45c passes).
+- Ruled out (unicorn / static): 0x04BAF400-0x04BAFA00 is referenced by no code, data word, relocation or lis pair;
+  Kirby's article-file collector (`0x030C37AC`, a 48-entry buffer, no bound) gathers 34 kinds as before (the new
+  reserve kinds have no sub-articles); the loader stubs keep the registers the loader uses; the Robin header's
+  relocation is moved.
+- The package: exe_v45c and v5's kirby.mscsb with the slots.
+
 ### v6 (`kirby_hero_sephiroth_copy_v6`): the sword spells, Hero's sword on the stone (exe_v46)
 
 User decision: during a sword spell Hero's sword is shown on the stone (attached at Hero's hand offset), its hitboxes on
@@ -1457,7 +1480,7 @@ simple2r / simple2l), the name from the held-item table `0x1041A8A0` (read at `0
 `0x02B02534` is that article's own update (r27 = its owner Kirby's module accessor, r30 = the article's;
 `copy_held_cave.py`).
 
-**2. exe_v46** = exe_v45b + `tools/kirby_hero_sword_cave.py` (tested by `tools/kirby_hero_sword_test.py`, unicorn), in
+**2. exe_v46** = exe_v45c + `tools/kirby_hero_sword_cave.py` (tested by `tools/kirby_hero_sword_test.py`, unicorn), in
 0x04BAF620-0x04BAF6F8 (the end of `kirby_copy_new_cave.py`'s space, whose LIMIT is now 0x04BAF620; the standard
 code region, nothing grown, checked):
 - the third name swap: `0x030C487C` (`lwzx r7, r24, r21`, r24 = the held-item table: the test decodes it from the
@@ -1497,10 +1520,9 @@ below the hats' 0x40C5F000). Every Kirby costume gets Eleven's (c00) sword (the 
   don't); special can't end the stone before the cancel frame (khm_blocking); the stone ending or the copy lost stops
   the cast (hitboxes, effects, Hatchet Man's charge sound, the sword).
 
-Tests: `kirby_hero_sword_test.py exe_v46 exe_v45b` (the originals at the hooks, the item name for kinds 0-0x50, the
+Tests: `kirby_hero_sword_test.py exe_v46 exe_v45c` (the originals at the hooks, the item name for kinds 0-0x50, the
 generate stub for every grant / kind pair, the held model's visibility through the whole chain from 0x02B02730 with
-stub modules), `kirby_copy_new_test.py` / `kirby_hero_menu_test.py` on exe_v46 (their pre-existing Robin-list
-"failures" against exe_v43 are the menu cave's newer list), `kirby_newcopy_test.py` v6 (each spell ground / air: every
+stub modules), `kirby_copy_new_test.py` / `kirby_hero_menu_test.py` on exe_v46, `kirby_newcopy_test.py` v6 (each spell ground / air: every
 hitbox / effect / sound call at its frame equals the generator's events from the reference; removals; the sword int;
 MP; weights; Hocus Pocus; Hatchet Man's show and camera; Metal Slash metal / KO / shield; the crit bit; Oomph; the stone
 ending mid-cast), `msc_stack_check.py`, `rolloff_hold_test.py`.
@@ -1513,8 +1535,8 @@ stage 2's spells).
 
 Build:
 ```
-python3 tools/rpx_patch.py EXE_V45B.rpx EXE_V46.rpx $(python3 tools/kirby_hero_sword_cave.py)
-python3 tools/kirby_hero_sword_test.py EXE_V46.rpx EXE_V45B.rpx
+python3 tools/rpx_patch.py EXE_V45C.rpx EXE_V46.rpx $(python3 tools/kirby_hero_sword_cave.py)
+python3 tools/kirby_hero_sword_test.py EXE_V46.rpx EXE_V45C.rpx
 python3 tools/kirby_copy_sword.py BRAVE_ZIP/brave/model/body V1/fighter/kirby/model/bravecap/c00 OUT/fighter/kirby/model
 python3 tools/kirby_hero_sword_msc.py > /tmp/sw.c     # the GENERATED block in kirby.c (paste between its markers)
 python3 tools/msclang/msclang.py -x tools/mscinfo.xml fighters/kirby/kirby.c -o kirby.mscsb
