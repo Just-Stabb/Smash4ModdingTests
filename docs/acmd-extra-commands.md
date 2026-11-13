@@ -123,8 +123,9 @@ a number. Fields written as numbers work as before; a command with no variable d
   - `|FOLLOW`: the field is read again every frame while the hitbox is out (a stick-aimed hitbox that follows the
     stick, damage that grows with a charge). It runs every frame the object moves, after its script, so not in
     hitlag. It ends when another hitbox is made with the same ID (Extra or plain), when the object is reset (KO, a
-    projectile's next use), or after 16 more FOLLOW hitboxes (the oldest goes). Damage and Size keep the ratio the
-    game's code gave the first value (Strike Kirby's ×1.15, ...).
+    projectile's next use), or after 16 more FOLLOW hitboxes (the oldest goes). Damage and Size change through the
+    same calls `Change_Hitbox_Damage` / `Change_Hitbox_Size` make, so the hitbox really resizes; they keep the ratio
+    the game's code gave the first value (Strike Kirby's ×1.15, ...).
   - `|WORLD` (Angle): the value is a screen angle (above).
   - `|NEG`: minus the value (`Angle=ROT_X|NEG`).
 - **Needs exe_v43.** An older executable reads the ID as a number (a hitbox of size ~0 with an angle in the
@@ -178,9 +179,10 @@ Extras column.
 How it works (`tools/acmd_ext_cave.py` `hv_code`; docs/native-notes.md "Hitbox variables"): the two commands'
 handler table entries point at `hv_extra`, which reads each variable field, writes the value into the command's own
 parameter word, calls the unchanged Extra handler (the game's hitbox handler, then the extras), and puts the words
-back. A FOLLOW hitbox gets an entry in a 16-entry table keyed by its AttackModule slot; the per-frame hook writes the
-slot's data again (`+0x18` Damage, `+0x1C` Size, `+0x20` Angle, `+0x24` KBG, `+0x28` FKB, `+0x2C` BKB) and the
-extras record's check words. Tested in `tools/hitbox_var_test.py` (unicorn) and
+back. A FOLLOW hitbox gets an entry in a 16-entry table keyed by its AttackModule slot; the per-frame hook sets
+Damage and Size through the same AttackModule calls the vanilla `Change_Hitbox_Damage` / `Change_Hitbox_Size` make
+(so a size change resizes the hitbox as that command does), and writes Angle / KBG / FKB / BKB into the slot's data
+(`+0x20`-`+0x2C`) with the extras record's check words. Tested in `tools/hitbox_var_test.py` (unicorn) and
 `tools/Sm4shCommand/hitbox_var_test.cs` (the compiler).
 
 ## Track_Target

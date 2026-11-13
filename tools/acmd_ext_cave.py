@@ -341,9 +341,10 @@ FAST_FALL_FLAG = 0x21000001      # the fighter's fast-fall flag (MSC WorkModule(
 # FOLLOW: an entry of HV_TAB (16 x 0x48) keyed by the hitbox's slot: +0 accessor (0 = free), +4 AttackModule, +8 the
 # slot, +0xC the slot's tag (TAG | the extras entry: a later hitbox in the slot changes it), +0x10 the fields that
 # follow (bits 0-5), +0x14 + 4k field k's word, +0x2C + 4k its coefficient (Damage / Size: slot value / the value
-# written, ints: slot value - the value written: whatever the game's own path did to them, as Strike's x1.15). Every
-# frame the object moves (FRAME_HOOK, before acmd's hk_frame) the fields are read again and the slot's data written
-# (+0x18 Damage, +0x1C Size, +0x20 Angle, +0x24 KBG, +0x28 FKB, +0x2C BKB), with the extras entry's check words.
+# written, ints: slot value - the value written: whatever the game's own path did to them, as Strike's x1.15), +0x44
+# the ID. Every frame the object moves (FRAME_HOOK, before acmd's hk_frame) the fields are read again: Damage / Size
+# through AttackModule's own calls that Change_Hitbox_Damage / Change_Hitbox_Size make (AM_SET_DAMAGE / AM_SET_SIZE),
+# Angle / KBG / FKB / BKB into the slot's +0x20 / 24 / 28 / 2C, with the extras entry's check words.
 HV_CODE = 0x04B97200             # free (after ACC_CACHE, up to THREADS: zero in exe_v42)
 HV_TAB = 0x04B97B00              # HV_N entries of HV_ENTRY (zero at load)
 HV_N = 16
@@ -357,6 +358,10 @@ HV_VAR_LO, HV_VAR_HI = 0x01000000, 0x20000000
 HV_VARS = 0x3C0                  # user_entry IDs 0x0F0003C0-0x0F0003C8 (read only), from gs_var's gv_zero:
 HV_VAR_NAMES = ['STICK_ANGLE', 'STICK_ANGLE_RAW', 'STICK_LEN', 'CSTICK_ANGLE', 'CSTICK_ANGLE_RAW', 'CSTICK_LEN',
                 'ROT_X', 'ROT_Y', 'ROT_Z']
+AM_SET_DAMAGE = 0xB4             # AttackModuleImpl vt +0xB4 (0x02C090D0: id, f1 damage, r5 0): slot +0x18 (what the
+                                 # Change_Hitbox_Damage handler 0x02BDAEE0 calls)
+AM_SET_SIZE = 0xCC               # vt +0xCC (0x02C09128: id, f1 size): slot +0x1C (the Change_Hitbox_Size handler
+                                 # 0x02BDAF64's call; the collision reads the slot's size every frame)
 HV_PARAM_DESC = [' ' + d + ' Or a variable (exe_v43): its value when the command runs; |FOLLOW: every frame; |NEG: minus '
                  'it (Extra hitboxes help: "Variables in ...").' for d in (
                      'Damage=VAR_0, Damage=charge (a New_Var): below 0 is 0.',
@@ -1880,7 +1885,7 @@ def hv_code(b):
     D = dict(n=HV_N, es=HV_ENTRY, tag=TAG, tag_off=TAG_OFF, entries=ENTRIES, entry=ENTRY, f0=4 * HV_FIELD0,
              pfh=POSTURE_FW >> 16, pfl=POSTURE_FW & 0xFFFF, v0=HV_VARS, v8=HV_VARS + len(HV_VAR_NAMES) - 1,
              vr=HV_VARS + 6, sp0=HV_SPECIAL[0], spn=HV_SPECIAL[1] - HV_SPECIAL[0],
-             frame_back=FRAME_HOOK + 4)
+             frame_back=FRAME_HOOK + 4, vdmg=AM_SET_DAMAGE, vsize=AM_SET_SIZE)
     fl = lambda reg, fail: chk_t(reg, 'r0', fail)     # noqa: E731
     posture = """
         lis r12, nc_args@ha
@@ -2037,6 +2042,8 @@ hv_take:
         stw r28, 8(r12)
         stw r23, 0xC(r12)
         stw r30, 0x10(r12)
+        lwz r0, 0(r27)
+        stw r0, 0x44(r12)               # the ID (for the AttackModule calls)
         li r23, 0
 hv_coef:
         srw r0, r30, r23
@@ -2252,16 +2259,22 @@ hvf_field:
         stwx r3, r27, r24               # the extras entry's check word (+4 / 8 / C / 10)
         b hvf_fnext
 hvf_dmg:
-        li r10, 0x18
+        li r10, %(vdmg)d                 # AttackModule vt +0xB4 (id, damage, 0): Change_Hitbox_Damage's call
         b hvf_mul
 hvf_size:
-        li r10, 0x1C
+        li r10, %(vsize)d                 # vt +0xCC (id, size): Change_Hitbox_Size's call
 hvf_mul:
         stw r3, 8(r1)
         lfs f1, 8(r1)
         lfsx f2, r12, r24
         fmuls f1, f1, f2
-        stfsx f1, r28, r10
+        lwz r3, 0x50(r31)
+        lwz r12, 0(r3)
+        lwzx r12, r12, r10
+        mtctr r12
+        lwz r4, 0x44(r30)               # the hitbox ID
+        li r5, 0
+        bctrl
 hvf_fnext:
         addi r26, r26, 1
         cmpwi r26, 6

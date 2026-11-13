@@ -238,7 +238,8 @@ _EXTRA_RULES = [
     'own.',
     '- FOLLOW lasts until another hitbox is made with the same ID (Extra or plain), the object is reset (KO / a '
     'projectile\'s next use), or 16 FOLLOW hitboxes later (the oldest goes). It doesn\'t update during hitlag (the '
-    'object is frozen). Damage keeps whatever the game did to the first value (Strike Kirby\'s x1.15, ...).',
+    'object is frozen). Damage and Size change through the same calls as Change_Hitbox_Damage / Change_Hitbox_Size, so '
+    'the hitbox really resizes; Damage keeps whatever the game did to the first value (Strike Kirby\'s x1.15, ...).',
     '- The Hitbox Viewer draws a variable with the script\'s last SET_FLOAT of it, else a stand-in (Damage 10, '
     'Angle 0, KBG 100, FKB 0, BKB 40, Size 4), and lists it in the Extras column.',
     '- Needs exe_v43 or later: an older executable reads the variable\'s ID as a number (a hitbox of size 0 and '

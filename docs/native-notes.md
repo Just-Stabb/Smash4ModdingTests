@@ -1673,7 +1673,7 @@ tests `tools/hitbox_var_test.py` (unicorn: `--synthetic` the cave with stubs; `P
   2.4e-38-1e-19); bits 20-23 are flags (`0x00100000` FOLLOW, `0x00200000` WORLD, `0x00400000` NEG), the rest is the ID
   (`rlwinm r4, w, 0, 12, 7`). Type nibble 1 (ints): WorkModule vt `+0x84` (get_int, New_Var's `nvi_get` for
   `0x1F00038x`) and `i2f`; the rest vt `+0x44` (get_float: the mod's `0x0F000xxx` through position_vars' hooks).
-- **Space:** code `0x04B97200`-`0x04B979EC`, FOLLOW table `0x04B97B00` (16 × 0x48), in the free space after
+- **Space:** code `0x04B97200`-`0x04B97A0C`, FOLLOW table `0x04B97B00` (16 × 0x48), in the free space after
   `ACC_CACHE` (`0x04B97000` + 64 × 8) and before `THREADS` (`0x04B98000`): grown .text, zero in exe_v42.
 - **Words changed outside it (5):** the handler table entries of the two commands (`cmd_handlers`, `0x04B99C98` /
   `0x04B99C9C`: `h_extra` / `h_extra_ext` -> `hv_extra` / `hv_extra_ext`), `FRAME_HOOK` `0x02C5F430` (`b hk_frame` ->
@@ -1692,14 +1692,16 @@ tests `tools/hitbox_var_test.py` (unicorn: `--synthetic` the cave with stubs; `P
   `[AM + 0x3C]`), `+0xC` the slot's tag halfword (`TAG | n`, just set by `ext_record`; the entry is only made when
   the extras entry n's `+0` is this slot), `+0x10` the FOLLOW fields (bits 0-5), `+0x14 + 4k` field k's word,
   `+0x2C + 4k` its coefficient: Damage / Size slot value (`+0x18` / `+0x1C`) / the value written (1 if 0), ints slot
-  value (`+0x20 + 4 (k - 1)`) - the value written. So whatever the game's path does to a value (Strike's damage
+  value (`+0x20 + 4 (k - 1)`) - the value written; `+0x44` the hitbox ID. So whatever the game's path does to a value (Strike's damage
   × 1.15 at set_attack) carries over.
 - **`hv_fhook`** (`FRAME_HOOK`: every object, every frame it moves, after its ACMD; r31 MotionModule, `+4` the
   accessor): `hv_frame(accessor)`, then `b hk_frame` (the timers / tracking, which ends with the replaced `li r0, 1`).
   `hv_frame`: for each of its entries, the hitbox must still be the one recorded (`[acc + 0x50]` the AttackModule,
   the slot's tag, extras entry n's slot), else the entry is freed; the FOLLOW fields are read and converted again
-  and written: `+0x18` Damage × ratio, `+0x1C` Size × ratio, `+0x20 / 24 / 28 / 2C` Angle / KBG / FKB / BKB +
-  offset, and the ints into the extras entry's check words (`+4`-`+0x10`, what `ext_find` compares), so the extras
+  and written: Damage × ratio and Size × ratio through AttackModule vt `+0xB4` (`0x02C090D0(id, f1, 0)`: slot
+  `+0x18`) and vt `+0xCC` (`0x02C09128(id, f1)`: slot `+0x1C`), the calls the vanilla Change_Hitbox_Damage
+  (`0x02BDAEE0`, index 36) and Change_Hitbox_Size (`0x02BDAF64`, index 42) handlers make (both only store the float:
+  the collision reads the slot's size every frame); `+0x20 / 24 / 28 / 2C` Angle / KBG / FKB / BKB + offset, and the ints into the extras entry's check words (`+4`-`+0x10`, what `ext_find` compares), so the extras
   still apply. Not run in hitlag (the hook isn't). A later plain hitbox in the slot: `slot_set` clears the tag; a
   later Extra one: a new tag; either way the next frame frees the entry without writing.
 - **`hv_wmreset`** (`WM_RESET`, r31 the accessor; r0 r10 ctr free): frees the object's entries, then `b hk_wmreset`.
@@ -1709,9 +1711,13 @@ tests `tools/hitbox_var_test.py` (unicorn: `--synthetic` the cave with stubs; `P
   (`hv_atan2`: octant reduction, atan z = z (a1 + a3 z² + ... + a9 z⁸), Abramowitz & Stegun 4.4.49, within 1e-5 rad;
   (0, 0) -> 0), q 2 √(x² + y²) (`fsqrt`). `0x3C6`-`0x3C8`: PostureModuleF(4-6) (`nc_msc`, the accessor from
   `acc_of`). Others (and `0x337` / `0x338` for a non-fighter) -> `ue_zero` as before.
-- **Not checked in game yet:** that a FOLLOW Size change resizes the hitbox's collision (if AttackModule caches the
-  shape's size at set_attack, only the data's damage / angle / knockback follow); the rotation axis / sign that matches
-  a given move.
+- **The game's hitbox handler** (`0x02BDBB20`, Special_Hitbox) reads every parameter from `r7` (Damage `+0xC` -> data
+  `+0x18`, Size `+0x20` -> `+0x1C`, Angle / KBG / FKB / BKB `+0x10`-`+0x1C` -> `+0x20`-`+0x2C`), gets the battle object
+  (`0x0347B1B8(accessor)`, its vt `+0x1CC` sees the data) and calls set_attack (`0x02C086A8`: the Part's hit record
+  `0x02C108C4`, the 0x68-byte copy, vt `+0x5C` `0x02C08848`, then `0x02C0E77C`). `hitbox_var_test.py PATCHED BASE`
+  runs it with the AttackModule and its Parts made by their own constructors (`0x02C077F4`, `0x02C10478`), the hit
+  record pool and the battle object stubbed.
+- **Not checked in game yet:** the rotation axis / sign that matches a given move.
 
 ## Sword trails (trail textures by id)
 

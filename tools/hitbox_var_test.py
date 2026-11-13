@@ -52,6 +52,8 @@ ACC, WM, AM, SLOTS, STATE, FLAG, SCRIPT, WMVT, MM = (OBJ + o for o in (0, 0x400,
 ACC2, WM2, AM2, SLOTS2 = (OBJ + o for o in (0x3000, 0x3400, 0x3800, 0x4000))
 STUB_GETF, STUB_GETI, STUB_SETF, STUB_ZERO = 0x7F0F0000, 0x7F0F0010, 0x7F0F0020, 0x7F0F0030
 FAKEMOD, FAKEVT = 0x7F0F8000, 0x7F0F9000
+STUB_AMDMG, STUB_AMSIZE, AMVT = 0x7F0F0040, 0x7F0F0050, 0x7F0FA000
+CHANGE_SIZE, CHANGE_DAMAGE = 0x02BDAF64, 0x02BDAEE0   # the game's Change_Hitbox_Size / Change_Hitbox_Damage handlers
 AM_CTOR = 0x02C077F4             # AttackModuleImpl's constructor (this, accessor)
 GROUP_CTOR = 0x02C10478          # a Part's (hit group's, 0x174 bytes) constructor (this)
 HIT_GROUP = 0x02C108C4           # set_attack's hit record set-up for the slot (from the game's record pool): a stub
@@ -228,6 +230,8 @@ def setup(mu, w, synthetic):
                 w32(mu, am + vec + 4, base)                               # them), each made by the parts' own
                 for k in range(20):                                       # constructor
                     run(mu, GROUP_CTOR, RET, {UC_PPC_REG_3: base + 0x174 * k})
+        else:                                   # synthetic: the two calls FOLLOW makes, as the game's (0x02C090D0 /
+            w32(mu, am, AMVT)                   # 0x02C09128: the slot's +0x18 / +0x1C)
         w32(mu, am + 4, acc)
         w32(mu, am + 0x3C, 10)
         w32(mu, am + 0x40, slots)
@@ -246,13 +250,25 @@ def setup(mu, w, synthetic):
         stub(mu, STUB_ZERO, w.zero)
         def hit_group(mu, *_):              # the slot's record in its Part (the game takes it from a pool its set-up
             g, ident = mu.reg_read(UC_PPC_REG_3), mu.reg_read(UC_PPC_REG_5)      # makes): a zeroed one of ours
-            rec = RECS + 0x100 * ((g - OBJ) // 0x174 % 16) + 0x10 * 0 + 0x1000 * (ident % 10)
+            rec = RECS + 0x100 * ((g - OBJ) // 0x174 % 16) + 0x1000 * (ident % 10)
             mu.mem_write(rec, b'\0' * 0x80)
             w32(mu, g + 0x18 + 4 * ident, rec)
             w.ret(r3=0)
         stub(mu, HIT_GROUP, hit_group)
         stub(mu, OBJ_OF, lambda mu, *_: w.ret(r3=FAKEMOD))   # the battle object of the accessor (its vt +0x1CC,
                                                             # called with the data before set_attack: a stub)
+    if synthetic:
+        def am_set(off):
+            def h(mu, *_):
+                am, ident = mu.reg_read(UC_PPC_REG_3), mu.reg_read(UC_PPC_REG_4)
+                mu.mem_write(r32(mu, am + 0x40) + 0x84 * ident + off, struct.pack('>f', d2f(mu.reg_read(UC_PPC_REG_FPR1))))
+                w.calls.append(('am', off))
+                w.ret()
+            return h
+        stub(mu, STUB_AMDMG, am_set(0x18))
+        stub(mu, STUB_AMSIZE, am_set(0x1C))
+        w32(mu, AMVT + C.AM_SET_DAMAGE, STUB_AMDMG)
+        w32(mu, AMVT + C.AM_SET_SIZE, STUB_AMSIZE)
     w32(mu, WMVT + 0x44, STUB_GETF)
     w32(mu, WMVT + 0x84, STUB_GETI)
     w32(mu, WMVT + 0x4C, STUB_SETF)
@@ -514,6 +530,30 @@ def tests(mu, a, w, ref=None):
     check('FOLLOW: next frame: Damage 20 (x the ratio), Angle 90 (stick up), Size 5; KBG (no FOLLOW) kept',
           slot_vals(mu), (round(20.0 * w.strike, 4), 90, 71, 0, 30, 5.0))
     check('FOLLOW: the extras still found (check words updated)', ext_find(mu, a, slot_of(mu)) != 0, True)
+    # Size / Damage go through AttackModule's own calls, the ones Change_Hitbox_Size / _Damage make: the same slot
+    # as those handlers give (rpx: the game's handlers run on the slot as it was before the frame)
+    hitbox(mu, a, E, dict(Damage=VAR(0) | FOLLOW, Size=VAR(5) | FOLLOW, Angle=33))
+    before = bytes(mu.mem_read(slot_of(mu), 0x84))
+    setv(mu, a, w, {VAR(0): 14.5, VAR(5): 7.25})
+    w.calls[:] = []
+    frame(mu, a)
+    after = bytes(mu.mem_read(slot_of(mu), 0x84))
+    check('FOLLOW Damage / Size: AttackModule vt +0xB4 / +0xCC (Change_Hitbox_Damage / _Size\'s calls)',
+          slot_vals(mu)[0::5], (round(14.5 * w.strike, 4), 7.25))
+    if not w.synthetic:
+        mu.mem_write(slot_of(mu), before)
+        for handler, v in ((CHANGE_DAMAGE, 14.5 * w.strike), (CHANGE_SIZE, 7.25)):
+            mu.mem_write(0x7F0F1000, struct.pack('>If', SID, v))
+            w32(mu, STATE + 8, -1)
+            mu.mem_write(FLAG + 8, b'\1')
+            run(mu, handler, RET, {UC_PPC_REG_3: ACC, UC_PPC_REG_4: 0, UC_PPC_REG_5: STATE, UC_PPC_REG_6: FLAG,
+                                   UC_PPC_REG_7: 0x7F0F1000})
+        check('FOLLOW Damage / Size: the slot (0x84 bytes) = the game\'s Change_Hitbox_Damage + Change_Hitbox_Size on it',
+              after, bytes(mu.mem_read(slot_of(mu), 0x84)))
+        mu.mem_write(slot_of(mu), after)
+    setv(mu, a, w, {0x0F000110: 0.0, 0x0F000111: 1.0, VAR(0): 20.0, VAR(5): 5.0})
+    hitbox(mu, a, E, dict(Damage=VAR(0) | FOLLOW, Angle=NAMES['STICK_ANGLE'] | FOLLOW, Size=VAR(5) | FOLLOW,
+                          KBG=VAR(2)))
     setv(mu, a, w, {0x0F000110: -1.0, 0x0F000111: 0.0})
     frame(mu, a, ACC2)
     check('FOLLOW: another object\'s frame: untouched', slot_vals(mu)[1], 90)
