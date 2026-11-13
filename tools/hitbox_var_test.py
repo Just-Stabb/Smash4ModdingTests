@@ -52,6 +52,12 @@ ACC, WM, AM, SLOTS, STATE, FLAG, SCRIPT, WMVT, MM = (OBJ + o for o in (0, 0x400,
 ACC2, WM2, AM2, SLOTS2 = (OBJ + o for o in (0x3000, 0x3400, 0x3800, 0x4000))
 STUB_GETF, STUB_GETI, STUB_SETF, STUB_ZERO = 0x7F0F0000, 0x7F0F0010, 0x7F0F0020, 0x7F0F0030
 FAKEMOD, FAKEVT = 0x7F0F8000, 0x7F0F9000
+AM_CTOR = 0x02C077F4             # AttackModuleImpl's constructor (this, accessor)
+GROUP_CTOR = 0x02C10478          # a Part's (hit group's, 0x174 bytes) constructor (this)
+HIT_GROUP = 0x02C108C4           # set_attack's hit record set-up for the slot (from the game's record pool): a stub
+GROUPS, GROUPS2 = OBJ + 0x6000, OBJ + 0xA000
+RECS = 0x7E200000                # hit records (rpx mode)
+OBJ_OF = 0x0347B1B8              # the hitbox handlers' battle object lookup (accessor +0: its object ID)
 SID = 3
 VAR = lambda k: 0x0F000300 + k   # noqa: E731
 FOLLOW, WORLD, NEG = (C.HV_FLAGS[k] for k in ('FOLLOW', 'WORLD', 'NEG'))
@@ -198,7 +204,12 @@ def synthetic_machine(a, words, hooks):
 def rpx_machine(path):
     from stage_slot_test import machine
     mu = machine(path)
+    taken = [(lo, hi) for lo, hi, _p in mu.mem_regions()]
+    for page in range(0x10000000, 0x11000000, 0x1000):        # .bss (machine() maps the file's sections only)
+        if not any(lo <= page <= hi for lo, hi in taken):
+            mu.mem_map(page, 0x1000)
     mu.mem_map(OBJ, 0x10000)
+    mu.mem_map(RECS, 0x10000)
     mu.mem_map(0x7F010000, 0x000F0000)
     return mu
 
@@ -206,15 +217,20 @@ def rpx_machine(path):
 def setup(mu, w, synthetic):
     """the fake fighter (ACC) and a second object (ACC2); stubs"""
     mu.mem_write(OBJ, b'\0' * 0x10000)
-    for acc, wm, am, slots in ((ACC, WM, AM, SLOTS), (ACC2, WM2, AM2, SLOTS2)):
+    for acc, wm, am, slots, groups in ((ACC, WM, AM, SLOTS, GROUPS), (ACC2, WM2, AM2, SLOTS2, GROUPS2)):
         w32(mu, acc + 0x28, wm)
         w32(mu, acc + 0x50, am)
         w32(mu, wm, WMVT)
+        if not synthetic:                       # the game's AttackModuleImpl, made by its own constructor
+            run(mu, AM_CTOR, RET, {UC_PPC_REG_3: am, UC_PPC_REG_4: acc})
+            for vec, base in ((0x10, groups), (0x34, groups + 0x2000)):   # its two part arrays ({count, 20 parts
+                w32(mu, am + vec, 20)                                     # of 0x174}: the game's set-up allocates
+                w32(mu, am + vec + 4, base)                               # them), each made by the parts' own
+                for k in range(20):                                       # constructor
+                    run(mu, GROUP_CTOR, RET, {UC_PPC_REG_3: base + 0x174 * k})
         w32(mu, am + 4, acc)
         w32(mu, am + 0x3C, 10)
         w32(mu, am + 0x40, slots)
-        if not synthetic:
-            w32(mu, am, 0x10103524)                 # the game's AttackModuleImpl
     if not synthetic:                           # the fighter's other modules: every vtable entry returns 0
         w32(mu, FAKEVT - 4, 0)
         for i in range(0x200):
@@ -225,8 +241,18 @@ def setup(mu, w, synthetic):
             for off in range(0, 0x200, 4):
                 if off not in (0x28, 0x50):
                     w32(mu, acc + off, FAKEMOD)
+            w32(mu, acc, 0xF0000000)            # its object ID: no manager has it (the game's lookups find none)
         w32(mu, FAKEMOD, FAKEVT)
         stub(mu, STUB_ZERO, w.zero)
+        def hit_group(mu, *_):              # the slot's record in its Part (the game takes it from a pool its set-up
+            g, ident = mu.reg_read(UC_PPC_REG_3), mu.reg_read(UC_PPC_REG_5)      # makes): a zeroed one of ours
+            rec = RECS + 0x100 * ((g - OBJ) // 0x174 % 16) + 0x10 * 0 + 0x1000 * (ident % 10)
+            mu.mem_write(rec, b'\0' * 0x80)
+            w32(mu, g + 0x18 + 4 * ident, rec)
+            w.ret(r3=0)
+        stub(mu, HIT_GROUP, hit_group)
+        stub(mu, OBJ_OF, lambda mu, *_: w.ret(r3=FAKEMOD))   # the battle object of the accessor (its vt +0x1CC,
+                                                            # called with the data before set_attack: a stub)
     w32(mu, WMVT + 0x44, STUB_GETF)
     w32(mu, WMVT + 0x84, STUB_GETI)
     w32(mu, WMVT + 0x4C, STUB_SETF)
