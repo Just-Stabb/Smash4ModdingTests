@@ -171,6 +171,17 @@ namespace SALT.Moveset.AnimCMD
                 string p = parameters[i];
                 try
                 {
+                    uint hv;
+                    if (ACMDCommand.IsHitboxVarField(crc, i) && (specs[i] == 0 || specs[i] == 1) &&
+                        ACMDCommand.TryParseHitboxVar(p, out hv))
+                    {
+                        // a variable in an Extra hitbox's Damage ... Size: the word as it is (a float holds its bits)
+                        if (specs[i] == 0)
+                            cmd.Parameters.Add(unchecked((int)hv));
+                        else
+                            cmd.Parameters.Add(BitConverter.ToSingle(BitConverter.GetBytes(hv), 0));
+                        continue;
+                    }
                     switch (specs[i])
                     {
                         case 0: // 0x1A, 26, or a float stored as its bits (1.5f); or a variable's alias (VAR_0, SELF_HIT):
@@ -196,8 +207,15 @@ namespace SALT.Moveset.AnimCMD
                 {
                     throw new ACMDCompileException(line, e.Message);   // unknown variable name: say so
                 }
+                catch (FormatException e) when (ACMDCommand.IsHitboxVarField(crc, i) && p.Contains("|"))
+                {
+                    string pname = i < cmd.ParamSyntax.Length ? cmd.ParamSyntax[i] : $"#{i + 1}";
+                    throw new ACMDCompileException(line, $"{cmd.Name} parameter {pname}: {e.Message}");
+                }
                 catch (Exception e) when (!(e is ACMDCompileException))
                 {
+                    if (ACMDCommand.IsHitboxVarField(crc, i) && FighterVariable.IsAliasName(p.Trim()))
+                        throw new ACMDCompileException(line, $"{cmd.Name} parameter {(i < cmd.ParamSyntax.Length ? cmd.ParamSyntax[i] : "")}: unknown variable \"{p.Trim()}\" (a name from the Aliases folder, a New_Var, or an ID such as 0x0F000300)");
                     string kind = specs[i] == 0 ? "a whole number (e.g. 5 or 0x1A) or a float stored in an int (e.g. 1.5f)" :
                                   specs[i] == 3 ? "a variable (e.g. 0x2100000D)" :
                                   specs[i] == 1 ? "a number (e.g. 1.5 or 250.0)" : "a number";

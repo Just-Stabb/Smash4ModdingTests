@@ -227,7 +227,7 @@ def main():
     call(pm, 0x02F1DD20, me_wm, NV(10), f1=0.5)
     check('add_float 1 / sub_float 0.5', fget(me_wm, NV(10)), 24.5)
     before = objs()
-    for ident in (0x3C0, 0x3FF, 0x337, 0x33F):
+    for ident in (0x3C9, 0x3FF, 0x337, 0x33F):         # (0x3C0-0x3C8: exe_v43's, hitbox_var_test.py)
         fset(me_wm, 0x0F000000 + ident, 5.0)
         check('ID 0x0F000%03X still reads 0, a write changes nothing' % ident,
               (fget(me_wm, 0x0F000000 + ident), objs() == before), (0.0, True))

@@ -36,7 +36,11 @@ The hit-time hooks that use them are in this file too (HIT_* below), see docs/ac
 The other commands (NEW_CMDS, ...) and the per-object variables / timers are described where they are defined;
 New_Var (exe_v40: NV_* / nv_code) grows the text region (textregion: / grow: in the output) and redirects the
 WorkModule vtables' int ops (their relocations moved with reloc:). Gravity_Set (exe_v42: GS_* / gs_code) sits after
-New_Var's code in that region and hooks the fighters' gravity energy update and damage reaction decision.
+New_Var's code in that region and hooks the fighters' gravity energy update and damage reaction decision. The hitbox
+variables (exe_v43: HV_* / hv_code, in the free space after ACC_CACHE): the Extra hitbox commands' Damage / Angle /
+KBG / FKB / BKB / Size take a variable (handler table -> hv_extra, which wraps h_extra), FOLLOW re-reads them every frame
+(FRAME_HOOK -> hv_fhook before hk_frame, WM_RESET -> hv_wmreset before hk_wmreset), and user_entry's 0x3C0-0x3C8 (from
+gs_var's gv_zero) are the stick angles / lengths and the rotation.
 """
 import os
 import struct
@@ -131,10 +135,13 @@ EXTRA_PARAMS = [
 ]
 SM4SHCOMMAND_DESC = {
     'Extra_Special_Hitbox': 'Special_Hitbox with 6 more parameters at the end: hitstun multiplier, hitstop / self hitstop multiplier '
-                            'and frames, DI multiplier. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).',
+                            'and frames, DI multiplier. Damage, Angle, KBG, FKB, BKB and Size can be variables (exe_v43: '
+                            'Angle=STICK_ANGLE, Damage=VAR_0, |FOLLOW, |WORLD, |NEG). New command: needs the patched cross_f.rpx '
+                            '(docs/acmd-extra-commands.md).',
     'Extra_Extended_Special_Hitbox': 'Extended_Special_Hitbox (capsule: X2/Y2/Z2) with 6 more parameters at the end: hitstun multiplier, '
-                                     'hitstop / self hitstop multiplier and frames, DI multiplier. New command: needs the patched '
-                                     'cross_f.rpx (docs/acmd-extra-commands.md).',
+                                     'hitstop / self hitstop multiplier and frames, DI multiplier. Damage, Angle, KBG, FKB, BKB and '
+                                     'Size can be variables (exe_v43: Angle=STICK_ANGLE, Damage=VAR_0, |FOLLOW, |WORLD, |NEG). New '
+                                     'command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).',
 }
 SM4SHCOMMAND_DESC['Track_Target'] = (
     'Makes this object (a fighter, or a projectile in its own script) home in on the nearest other fighter for Frames frames: '
@@ -169,6 +176,8 @@ HIT_LOG_CLEAR_PARAMS = [
 ]
 BASE_CRC = {'Extra_Special_Hitbox': 0x14FCC7E4, 'Extra_Extended_Special_Hitbox': 0x7075DC5A}
 
+HANDLER = {'h_extra': 'hv_extra', 'h_extra_ext': 'hv_extra_ext'}   # cmd_handlers: the Extra hitbox commands go
+                                 # through hv_extra (exe_v43: variables in their fields), which calls h_extra
 COMMANDS = [                     # name, size (words, header included), handler label, base handler
     ('Extra_Special_Hitbox', 42 + N_EXTRA, 'h_extra', SPECIAL_HITBOX),
     ('Extra_Extended_Special_Hitbox', 44 + N_EXTRA, 'h_extra_ext', EXT_SPECIAL_HITBOX),
@@ -316,6 +325,46 @@ GS_N = 16                        # +4 its StatusModule (the status change hook's
                                  # < 0 = the fighter's own), +0x10 Mode
 GS_VARS = (0x337, 0x338)         # user_entry IDs 0x0F000337 GRAVITY / 0x0F000338 MAX_FALL (read only)
 FAST_FALL_FLAG = 0x21000001      # the fighter's fast-fall flag (MSC WorkModule(0x2711, flag): off)
+
+# Hitbox variables (docs/acmd-extra-commands.md "Variables in Extra hitboxes"; first in exe_v43). The Extra hitbox
+# commands' Damage, Angle, KBG, FKB, BKB and Size (parameters 3-8, both commands) take a variable: a word in
+# 0x01000000-0x1FFFFFFF (no hitbox has such a number: as an int it's 16 million or more, as a float 2.4e-38 to 1e-19)
+# is the variable ID, bits 20-23 (0x00F00000, never part of a variable ID the game or the mod uses) its flags:
+#   0x00100000 FOLLOW (re-read every frame while the hitbox is out), 0x00200000 WORLD (Angle: the value is a screen
+#   angle, 0 = right: mirrored to 180 - a when the object faces left), 0x00400000 NEG (minus the value).
+# The ID without the flags is read from the object's WorkModule (int IDs 0x1xxxxxxx as an int, the rest as a float)
+# when the command runs, converted (Angle: rounded, 361-368 kept, else wrapped into 0-359; KBG / FKB / BKB rounded,
+# >= 0; Damage / Size >= 0) and written into the command's own parameter word for the original handler (h_extra:
+# the game's hitbox handler then builds the hitbox from it through AttackModule as from a number), then the word is
+# put back. The command's handler table entry points at hv_extra / hv_extra_ext, which wrap h_extra / h_extra_ext
+# unchanged (a command without variables: the same call, nothing else).
+# FOLLOW: an entry of HV_TAB (16 x 0x48) keyed by the hitbox's slot: +0 accessor (0 = free), +4 AttackModule, +8 the
+# slot, +0xC the slot's tag (TAG | the extras entry: a later hitbox in the slot changes it), +0x10 the fields that
+# follow (bits 0-5), +0x14 + 4k field k's word, +0x2C + 4k its coefficient (Damage / Size: slot value / the value
+# written, ints: slot value - the value written: whatever the game's own path did to them, as Strike's x1.15). Every
+# frame the object moves (FRAME_HOOK, before acmd's hk_frame) the fields are read again and the slot's data written
+# (+0x18 Damage, +0x1C Size, +0x20 Angle, +0x24 KBG, +0x28 FKB, +0x2C BKB), with the extras entry's check words.
+HV_CODE = 0x04B97200             # free (after ACC_CACHE, up to THREADS: zero in exe_v42)
+HV_TAB = 0x04B97B00              # HV_N entries of HV_ENTRY (zero at load)
+HV_N = 16
+HV_ENTRY = 0x48
+HV_LIMIT = THREADS
+HV_FIELD0 = 3                    # parameter index of Damage (Angle, KBG, FKB, BKB, Size after it)
+HV_FIELDS = ('Damage', 'Angle', 'KBG', 'FKB', 'BKB', 'Size')
+HV_FLAGS = {'FOLLOW': 0x00100000, 'WORLD': 0x00200000, 'NEG': 0x00400000}
+HV_FLAG_MASK = 0x00F00000
+HV_VAR_LO, HV_VAR_HI = 0x01000000, 0x20000000
+HV_VARS = 0x3C0                  # user_entry IDs 0x0F0003C0-0x0F0003C8 (read only), from gs_var's gv_zero:
+HV_VAR_NAMES = ['STICK_ANGLE', 'STICK_ANGLE_RAW', 'STICK_LEN', 'CSTICK_ANGLE', 'CSTICK_ANGLE_RAW', 'CSTICK_LEN',
+                'ROT_X', 'ROT_Y', 'ROT_Z']
+HV_PARAM_DESC = [' ' + d + ' Or a variable (exe_v43): its value when the command runs; |FOLLOW: every frame; |NEG: minus '
+                 'it (Extra hitboxes help: "Variables in ...").' for d in (
+                     'Damage=VAR_0, Damage=charge (a New_Var): below 0 is 0.',
+                     'Angle=STICK_ANGLE (the stick, along the facing), Angle=VAR_1: rounded, wrapped into 0-359 (361-368 '
+                     'kept); |WORLD: a screen angle (0 right), mirrored when facing left.',
+                     'KBG=VAR_0: rounded, below 0 is 0.', 'FKB=VAR_0: rounded, below 0 is 0.',
+                     'BKB=VAR_0: rounded, below 0 is 0.', 'Size=VAR_0: below 0 is 0.')]
+HV_SPECIAL = (361, 368)          # angles kept as they are (361 Sakurai, 362-368 the game's other special angles)
 
 _T = ('Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 '
       'player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter\'s own script.')
@@ -1813,7 +1862,7 @@ gv_max:
 gv_out:
         b ue_out
 gv_zero:
-        b ue_zero
+        b hv_var                        # (exe_v43: the hitbox variables 0x3C0-0x3C8; any other ID still reads 0)
 gs_cur:                                 # the energy being updated with Gravity_Set's values, then its own two
         .word 0
         .word 0
@@ -1823,6 +1872,585 @@ gs_rr:
 gs_zero:
         .float 0.0
 """ % D)
+
+
+def hv_code(b):
+    """Hitbox variables (HV_* above): the Extra hitbox commands' wrappers, the conversion, the FOLLOW table (record,
+    per-frame update, object reset) and the variables 0x0F0003C0-3C8 (stick angles / lengths, rotation), in HV_CODE"""
+    D = dict(n=HV_N, es=HV_ENTRY, tag=TAG, tag_off=TAG_OFF, entries=ENTRIES, entry=ENTRY, f0=4 * HV_FIELD0,
+             pfh=POSTURE_FW >> 16, pfl=POSTURE_FW & 0xFFFF, v0=HV_VARS, v8=HV_VARS + len(HV_VAR_NAMES) - 1,
+             vr=HV_VARS + 6, sp0=HV_SPECIAL[0], spn=HV_SPECIAL[1] - HV_SPECIAL[0],
+             frame_back=FRAME_HOOK + 4)
+    fl = lambda reg, fail: chk_t(reg, 'r0', fail)     # noqa: E731
+    posture = """
+        lis r12, nc_args@ha
+        addi r12, r12, nc_args@l
+        stw %s, 0(r12)
+        lis r4, 0x%%(pfh)X
+        ori r4, r4, 0x%%(pfl)X
+        li r5, 1
+        bl nc_msc                       # PostureModuleF(op): r3 the float's bits"""
+    b.asm(("""
+# --- the Extra hitbox commands' handlers (cmd_handlers): h_extra / h_extra_ext with variables in their fields ------
+# frame 0xA0: 0x10 + 4k the field words as written, 0x28 + 4k the values put in their place, r22-r31 at 0x78
+hv_extra:
+        lis r12, h_extra@ha
+        addi r12, r12, h_extra@l
+        b hv_go
+hv_extra_ext:
+        lis r12, h_extra_ext@ha
+        addi r12, r12, h_extra_ext@l
+hv_go:
+        stwu r1, -0xA0(r1)
+        mflr r0
+        stw r0, 0xA4(r1)
+        stmw r22, 0x78(r1)
+        mr r31, r3                      # accessor
+        mr r30, r4
+        mr r29, r5                      # script state
+        mr r28, r6
+        mr r27, r7                      # parameters
+        mr r26, r12                     # the handler (h_extra / h_extra_ext)
+        li r25, 0                       # fields replaced (bit k: field k)
+        lbz r0, 8(r28)                  # skipped (not executed): as before
+        cmpwi r0, 0
+        beq hv_call
+        li r24, 0
+hv_scan:
+        slwi r23, r24, 2
+        addi r22, r23, %(f0)d            # the field's parameter (Damage = parameter 3)
+        lwzx r4, r27, r22
+        addi r11, r1, 0x10
+        stwx r4, r11, r23
+        rlwinm r0, r4, 8, 24, 31        # a variable: 0x01000000 <= word < 0x20000000
+        cmplwi r0, 1
+        blt hv_snext
+        cmplwi r0, 0x20
+        bge hv_snext
+        mr r3, r31
+        mr r5, r24
+        bl hv_value
+        stwx r3, r27, r22               # the value, in the command's own word for the game's handler
+        addi r11, r1, 0x28
+        stwx r3, r11, r23
+        li r0, 1
+        slw r0, r0, r24
+        or r25, r25, r0
+hv_snext:
+        addi r24, r24, 1
+        cmpwi r24, 6
+        blt hv_scan
+hv_call:
+        mtctr r26
+        mr r3, r31
+        mr r4, r30
+        mr r5, r29
+        mr r6, r28
+        mr r7, r27
+        bctrl                           # h_extra: the game's hitbox handler, the extras, the step
+        mr r24, r3
+        cmpwi r25, 0
+        beq hv_ret
+        li r23, 0                       # the words put back
+        li r30, 0                       # the fields that FOLLOW
+hv_back:
+        srw r0, r25, r23
+        andi. r0, r0, 1
+        beq hv_bnext
+        slwi r22, r23, 2
+        addi r11, r1, 0x10
+        lwzx r0, r11, r22
+        addi r11, r27, %(f0)d
+        stwx r0, r11, r22
+        rlwinm. r0, r0, 0, 11, 11       # 0x00100000 FOLLOW
+        beq hv_bnext
+        li r0, 1
+        slw r0, r0, r23
+        or r30, r30, r0
+hv_bnext:
+        addi r23, r23, 1
+        cmpwi r23, 6
+        blt hv_back
+        lwz r29, 0x50(r31)              # AttackModule""" + fl('r29', 'hv_ret') + """
+        lwz r4, 0(r27)                  # ID
+        lwz r0, 0x3C(r29)
+        cmplw r4, r0
+        bge hv_ret
+        lwz r28, 0x40(r29)""" + fl('r28', 'hv_ret') + """
+        mulli r4, r4, 0x84
+        add r28, r28, r4                # the slot
+        lis r12, hv_tab@ha              # a FOLLOW of this slot's earlier hitbox ends
+        addi r12, r12, hv_tab@l
+        li r11, %(n)d
+hv_drop:
+        lwz r0, 8(r12)
+        cmplw r0, r28
+        bne hv_dnext
+        li r0, 0
+        stw r0, 0(r12)
+hv_dnext:
+        addi r12, r12, %(es)d
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne hv_drop
+        cmpwi r30, 0
+        beq hv_ret
+        lhz r23, %(tag_off)d(r28)       # tagged by ext_record (h_extra) just now
+        rlwinm r0, r23, 0, 16, 23
+        cmplwi r0, %(tag)d
+        bne hv_ret
+        rlwinm r0, r23, 0, 24, 31
+        cmplwi r0, %(entries)d
+        bge hv_ret
+        mulli r0, r0, %(entry)d
+        lis r12, table@ha
+        addi r12, r12, table@l
+        lwzx r0, r12, r0
+        cmplw r0, r28
+        bne hv_ret
+        lis r12, hv_tab@ha              # a free entry, else the next in turn
+        addi r12, r12, hv_tab@l
+        li r11, %(n)d
+hv_free:
+        lwz r0, 0(r12)
+        cmpwi r0, 0
+        beq hv_take
+        addi r12, r12, %(es)d
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne hv_free
+        lis r11, hv_rr@ha
+        lwz r10, hv_rr@l(r11)
+        addi r0, r10, 1
+        cmplwi r0, %(n)d
+        blt hv_wrap
+        li r0, 0
+hv_wrap:
+        stw r0, hv_rr@l(r11)
+        mulli r10, r10, %(es)d
+        lis r12, hv_tab@ha
+        addi r12, r12, hv_tab@l
+        add r12, r12, r10
+hv_take:
+        stw r31, 0(r12)
+        stw r29, 4(r12)
+        stw r28, 8(r12)
+        stw r23, 0xC(r12)
+        stw r30, 0x10(r12)
+        li r23, 0
+hv_coef:
+        srw r0, r30, r23
+        andi. r0, r0, 1
+        beq hv_cnext
+        slwi r22, r23, 2
+        addi r11, r1, 0x10
+        lwzx r0, r11, r22
+        addi r11, r12, 0x14
+        stwx r0, r11, r22               # the field's word (variable and flags)
+        addi r11, r1, 0x28
+        lwzx r3, r11, r22               # the value written
+        cmpwi r23, 0
+        beq hv_cdmg
+        cmpwi r23, 5
+        beq hv_csize
+        addi r11, r28, 0x1C             # ints: the slot's word (+0x20 + 4 (k - 1)) - the value
+        lwzx r0, r11, r22
+        subf r0, r3, r0
+        b hv_cset
+hv_cdmg:
+        lfs f1, 0x18(r28)
+        b hv_cdiv
+hv_csize:
+        lfs f1, 0x1C(r28)
+hv_cdiv:
+        stw r3, 8(r1)
+        lfs f2, 8(r1)
+        lis r11, hv_k@ha
+        lfs f0, hv_k@l(r11)             # 0.0
+        fcmpu cr0, f2, f0
+        bne hv_cratio
+        lfs f1, hv_one@l(r11)           # (0 written: x1)
+        b hv_cst
+hv_cratio:
+        fdivs f1, f1, f2
+hv_cst:
+        stfs f1, 8(r1)
+        lwz r0, 8(r1)
+hv_cset:
+        addi r11, r12, 0x2C
+        stwx r0, r11, r22
+hv_cnext:
+        addi r23, r23, 1
+        cmpwi r23, 6
+        blt hv_coef
+hv_ret:
+        mr r3, r24
+        lmw r22, 0x78(r1)
+        lwz r0, 0xA4(r1)
+        mtlr r0
+        addi r1, r1, 0xA0
+        blr
+
+# --- hv_value(r3 accessor, r4 the field's word, r5 field 0-5) -> r3 the word for the field (float bits / int) ------
+hv_value:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r29, 0x24(r1)
+        mr r31, r3
+        mr r30, r4
+        mr r29, r5
+        rlwinm r4, r30, 0, 12, 7        # the ID: the flags (bits 20-23) off
+        lwz r3, 0x28(r31)               # WorkModule""" + fl('r3', 'hvl_zero') + """
+        lwz r12, 0(r3)
+        rlwinm r0, r4, 4, 28, 31
+        cmpwi r0, 1
+        beq hvl_int
+        lwz r12, 0x44(r12)              # get_float (the mod's 0x0F000xxx through position_vars' hooks)
+        mtctr r12
+        bctrl
+        b hvl_have
+hvl_int:
+        lwz r12, 0x84(r12)              # get_int (New_Var's int IDs 0x1F00038x included)
+        mtctr r12
+        bctrl
+        bl i2f
+hvl_have:
+        rlwinm. r0, r30, 0, 9, 9        # 0x00400000 NEG
+        beq hvl_pos
+        fneg f1, f1
+hvl_pos:
+        cmpwi r29, 1
+        beq hvl_angle
+        cmpwi r29, 0
+        beq hvl_float
+        cmpwi r29, 5
+        beq hvl_float
+        bl hv_round                     # KBG / FKB / BKB: rounded, >= 0
+        cmpwi r3, 0
+        bge hvl_ret
+        li r3, 0
+        b hvl_ret
+hvl_float:                              # Damage / Size: >= 0 (NaN: 0)
+        lis r12, hv_k@ha
+        lfs f0, hv_k@l(r12)
+        fcmpu cr0, f1, f0
+        bge hvl_fok
+        fmr f1, f0
+hvl_fok:
+        stfs f1, 8(r1)
+        lwz r3, 8(r1)
+        b hvl_ret
+hvl_angle:
+        rlwinm. r0, r30, 0, 10, 10      # 0x00200000 WORLD: facing left -> 180 - a
+        beq hvl_round
+        stfs f1, 0x18(r1)
+        mr r3, r31
+        li r0, 0                        # PostureModuleF(0): the facing""" + posture % 'r0' + """
+        stw r3, 8(r1)
+        lfs f2, 8(r1)
+        lfs f1, 0x18(r1)
+        lis r12, hv_k@ha
+        lfs f0, hv_k@l(r12)
+        fcmpu cr0, f2, f0
+        bge hvl_round
+        lfs f0, hv_180@l(r12)
+        fsubs f1, f0, f1
+hvl_round:
+        bl hv_round
+        addi r0, r3, -%(sp0)d            # 361-368: the special angles, as they are
+        cmplwi r0, %(spn)d
+        ble hvl_ret
+        li r0, 360
+        divw r12, r3, r0
+        mullw r12, r12, r0
+        subf r3, r12, r3
+        cmpwi r3, 0
+        bge hvl_ret
+        addi r3, r3, 360
+        b hvl_ret
+hvl_zero:
+        li r3, 0
+hvl_ret:
+        lmw r29, 0x24(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+
+# --- hv_round(f1) -> r3: to the nearest whole number (halves away from 0); f0 f1 f2 r12 ---------------------------
+hv_round:
+        lis r12, hv_k@ha
+        lfs f0, hv_k@l(r12)
+        lfs f2, hv_half@l(r12)
+        fcmpu cr0, f1, f0
+        bge hr_pos
+        fneg f2, f2
+hr_pos:
+        fadds f1, f1, f2
+        b f2i
+
+# --- FRAME_HOOK (every object, every frame it moves, after its ACMD; r31 MotionModule): the FOLLOW fields, then
+#     the timers / tracking (hk_frame, which runs the replaced li r0, 1). Volatile registers are free there. -------
+hv_fhook:
+        lwz r3, 4(r31)                  # accessor
+        bl hv_frame
+        b hk_frame
+
+# --- hv_frame(r3 accessor): its FOLLOW entries: still its hitbox? then the fields again -----------------------------
+hv_frame:""" + fl('r3', 'hf_none') + """
+        stwu r1, -0x50(r1)
+        mflr r0
+        stw r0, 0x54(r1)
+        stmw r24, 0x30(r1)
+        mr r31, r3
+        lis r30, hv_tab@ha
+        addi r30, r30, hv_tab@l
+        li r29, %(n)d
+hvf_loop:
+        lwz r0, 0(r30)
+        cmplw r0, r31
+        bne hvf_next
+        lwz r3, 0x50(r31)
+        lwz r0, 4(r30)
+        cmplw r3, r0
+        bne hvf_drop
+        lwz r28, 8(r30)                 # the slot: the same hitbox (tag) and extras entry?
+        lhz r3, %(tag_off)d(r28)
+        lwz r0, 0xC(r30)
+        cmplw r3, r0
+        bne hvf_drop
+        rlwinm r3, r3, 0, 24, 31
+        mulli r3, r3, %(entry)d
+        lis r27, table@ha
+        addi r27, r27, table@l
+        add r27, r27, r3
+        lwz r0, 0(r27)
+        cmplw r0, r28
+        bne hvf_drop
+        li r26, 0
+hvf_field:
+        lwz r25, 0x10(r30)
+        srw r0, r25, r26
+        andi. r0, r0, 1
+        beq hvf_fnext
+        slwi r24, r26, 2
+        mr r3, r31
+        addi r4, r30, 0x14
+        lwzx r4, r4, r24
+        mr r5, r26
+        bl hv_value
+        addi r12, r30, 0x2C             # its coefficient
+        cmpwi r26, 0
+        beq hvf_dmg
+        cmpwi r26, 5
+        beq hvf_size
+        lwzx r0, r12, r24
+        add r3, r3, r0
+        addi r11, r28, 0x1C
+        stwx r3, r11, r24               # slot +0x20 / 24 / 28 / 2C
+        stwx r3, r27, r24               # the extras entry's check word (+4 / 8 / C / 10)
+        b hvf_fnext
+hvf_dmg:
+        li r10, 0x18
+        b hvf_mul
+hvf_size:
+        li r10, 0x1C
+hvf_mul:
+        stw r3, 8(r1)
+        lfs f1, 8(r1)
+        lfsx f2, r12, r24
+        fmuls f1, f1, f2
+        stfsx f1, r28, r10
+hvf_fnext:
+        addi r26, r26, 1
+        cmpwi r26, 6
+        blt hvf_field
+        b hvf_next
+hvf_drop:
+        li r0, 0
+        stw r0, 0(r30)
+hvf_next:
+        addi r30, r30, %(es)d
+        addi r29, r29, -1
+        cmpwi r29, 0
+        bne hvf_loop
+        lmw r24, 0x30(r1)
+        lwz r0, 0x54(r1)
+        mtlr r0
+        addi r1, r1, 0x50
+hf_none:
+        blr
+
+# --- WM_RESET (object set up / reused; r31 accessor; r0 r10 ctr free): its FOLLOW entries go; then hk_wmreset -------
+hv_wmreset:
+        lis r10, hv_tab@ha
+        addi r10, r10, hv_tab@l
+        li r0, %(n)d
+        mtctr r0
+hvw_loop:
+        lwz r0, 0(r10)
+        cmplw r0, r31
+        bne hvw_next
+        li r0, 0
+        stw r0, 0(r10)
+hvw_next:
+        addi r10, r10, %(es)d
+        bdnz hvw_loop
+        b hk_wmreset
+
+# --- user_entry's 0x3C0-0x3C8 (from gs_var's gv_zero; r31 WorkModule, r30 index, r29 write; r27 r28 free), read only:
+#     0x3C0 + 3c + q: c 0 stick / 1 C-stick; q 0 angle along the facing (0 forward, 90 up: a hitbox angle), 1 angle
+#     on screen (0 right), 2 length. 0x3C6-0x3C8: the rotation X / Y / Z (PostureModuleF(4-6), degrees). Others: 0
+hv_var:
+        cmplwi r30, %(v0)d
+        blt hvv_zero
+        cmplwi r30, %(v8)d
+        bgt hvv_zero
+        cmpwi r29, 0
+        bne hvv_out
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        cmplwi r30, %(vr)d
+        blt hvv_stick
+        mr r3, r31
+        bl acc_of""" + fl('r3', 'hvv_pzero') + """
+        addi r28, r30, -%(vr)d
+        addi r28, r28, 4""" + posture % 'r28' + """
+        stw r3, 8(r1)
+        lfs f1, 8(r1)
+        b hvv_done
+hvv_stick:
+        addi r28, r30, -%(v0)d
+        li r27, 0                       # c
+        cmplwi r28, 3
+        blt hvv_c
+        li r27, 1
+        addi r28, r28, -3               # q
+hvv_c:
+        slwi r0, r27, 1
+        lis r4, 0x0F00
+        ori r4, r4, 0x110               # STICK_X (along the facing) / CSTICK_X
+        add r4, r4, r0
+        cmplwi r28, 1
+        bne hvv_x
+        lis r4, 0x0F00
+        ori r4, r4, 0x260               # STICK_X_RAW / CSTICK_X_RAW (on screen)
+        add r4, r4, r27
+hvv_x:
+        mr r3, r31
+        lwz r12, 0(r3)
+        lwz r12, 0x44(r12)
+        mtctr r12
+        bctrl
+        stfs f1, 0x10(r1)               # x
+        slwi r0, r27, 1
+        lis r4, 0x0F00
+        ori r4, r4, 0x111               # STICK_Y / CSTICK_Y
+        add r4, r4, r0
+        mr r3, r31
+        lwz r12, 0(r3)
+        lwz r12, 0x44(r12)
+        mtctr r12
+        bctrl                           # f1 = y
+        lfs f2, 0x10(r1)
+        cmplwi r28, 2
+        beq hvv_len
+        bl hv_atan2
+        b hvv_done
+hvv_len:
+        fmuls f1, f1, f1
+        fmadds f1, f2, f2, f1
+        bl fsqrt
+hvv_done:
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+hvv_out:
+        b ue_out
+hvv_pzero:
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+hvv_zero:
+        b ue_zero
+
+# --- hv_atan2(f1 y, f2 x) -> f1 degrees, 0 to 360 (0: +x, 90: +y; 0 for (0, 0)); f0 f3-f8, cr0 cr1, r12 ---------
+hv_atan2:
+        lis r12, hv_k@ha
+        addi r12, r12, hv_k@l
+        lfs f0, 0(r12)
+        fabs f3, f2
+        fabs f4, f1
+        fcmpu cr0, f3, f0
+        bne hat_go
+        fcmpu cr0, f4, f0
+        bne hat_go
+        fmr f1, f0
+        blr
+hat_go:
+        fcmpu cr1, f4, f3
+        ble cr1, hat_low
+        fdivs f5, f3, f4                # |y| > |x|: z = |x| / |y|, angle 90 - atan z
+        b hat_poly
+hat_low:
+        fdivs f5, f4, f3                # z = |y| / |x|, angle atan z
+hat_poly:
+        fmuls f6, f5, f5
+        lfs f7, 4(r12)
+        lfs f8, 8(r12)
+        fmadds f7, f7, f6, f8
+        lfs f8, 12(r12)
+        fmadds f7, f7, f6, f8
+        lfs f8, 16(r12)
+        fmadds f7, f7, f6, f8
+        lfs f8, 20(r12)
+        fmadds f7, f7, f6, f8
+        fmuls f7, f7, f5                # atan z (radians, z in 0-1: within 1e-5)
+        lfs f8, 24(r12)
+        fmuls f7, f7, f8                # degrees
+        ble cr1, hat_q
+        lfs f8, 28(r12)
+        fsubs f7, f8, f7
+hat_q:
+        fcmpu cr0, f2, f0
+        bge hat_y
+        lfs f8, 32(r12)
+        fsubs f7, f8, f7                # x < 0: 180 - a
+hat_y:
+        fcmpu cr0, f1, f0
+        bge hat_out
+        lfs f8, 36(r12)
+        fsubs f7, f8, f7                # y < 0: 360 - a
+        fcmpu cr0, f7, f8
+        blt hat_out
+        fsubs f7, f7, f8
+hat_out:
+        fmr f1, f7
+        blr
+hv_k:
+        .float 0.0
+        .float 0.0208351                # atan z = z (a1 + a3 z^2 + ... + a9 z^8) (Abramowitz & Stegun 4.4.49)
+        .float -0.0851330
+        .float 0.1801410
+        .float -0.3302995
+        .float 0.9998660
+        .float 57.29577951
+hv_90:
+        .float 90.0
+hv_180:
+        .float 180.0
+        .float 360.0
+hv_half:
+        .float 0.5
+hv_one:
+        .float 1.0
+hv_rr:
+        .word 0
+""") % D)
+    assert b.labels['hv_90'] - b.labels['hv_k'] == 28 and b.labels['hv_180'] - b.labels['hv_k'] == 32
+
 
 
 def ha(v):
@@ -2091,6 +2719,10 @@ next_entry:
     gs_code(b5)
     assert not set(b5.labels) & (set(a.labels) | set(b2.labels)), set(b5.labels) & (set(a.labels) | set(b2.labels))
     a.labels.update(b5.labels)
+    b6 = Asm(HV_CODE)                   # hitbox variables (exe_v43: free space after ACC_CACHE)
+    hv_code(b6)
+    assert not set(b6.labels) & (set(a.labels) | set(b2.labels)), set(b6.labels) & (set(a.labels) | set(b2.labels))
+    a.labels.update(b6.labels)
     b2.asm('cmd_crcs:\n' + ''.join('        .word 0x%08X\n' % crc(c[0]) for c in COMMANDS))
     b2.asm('cmd_sizes:\n' + ''.join('        .word %d\n' % c[1] for c in COMMANDS))
     a.labels.update(b2.labels)
@@ -2105,7 +2737,7 @@ scratch:                                # scale_int: a double, then 2^52 + 2^31
 ue_nv_far:                              # user_entry's New_Var IDs (exe_v40): ue_nv is out of bge's reach
         b ue_nv
 """)
-    b2.asm('cmd_handlers:\n' + ''.join('        .word 0x%08X\n' % a.addr(c[2]) for c in COMMANDS))
+    b2.asm('cmd_handlers:\n' + ''.join('        .word 0x%08X\n' % a.addr(HANDLER.get(c[2], c[2])) for c in COMMANDS))
     a.labels.update(b2.labels)
     a.labels['table'] = TABLE
     a.labels['di_tab'] = TABLE + ENTRIES * ENTRY
@@ -2121,6 +2753,9 @@ ue_nv_far:                              # user_entry's New_Var IDs (exe_v40): ue
     b3.labels.update(a.labels)
     b4.labels.update(a.labels)
     b5.labels.update(a.labels)
+    b6.labels.update(a.labels)
+    b6.labels['hv_tab'] = HV_TAB
+    a.labels['hv_tab'] = HV_TAB
     a.labels['gs_tab'] = GS
     b5.labels['gs_tab'] = GS
     words = a.words()
@@ -2139,6 +2774,10 @@ ue_nv_far:                              # user_entry's New_Var IDs (exe_v40): ue
     assert NV_CODE + 4 * len(words4) <= GS_CODE and GS_CODE + 4 * len(words5) <= GS, hex(GS_CODE + 4 * len(words5))
     assert GS + GS_N * 0x20 <= NV_LIMIT
     a.part5 = (GS_CODE, words5)
+    words6 = b6.words()
+    assert ACC_CACHE + 64 * 8 <= HV_CODE and HV_CODE + 4 * len(words6) <= HV_TAB, hex(HV_CODE + 4 * len(words6))
+    assert HV_TAB + HV_N * HV_ENTRY <= HV_LIMIT
+    a.part6 = (HV_CODE, words6)
     assert ACC_CACHE + 64 * 8 <= THREADS and THREADS + THREAD_N * THREAD_SIZE <= GROW <= LIMIT
     hooks = {LOOKUP: b(LOOKUP, a.addr('lookup')), SIZE1: b(SIZE1, a.addr('size1')),
              SIZE2: b(SIZE2, a.addr('size2')), FETCH: b(FETCH, a.addr('fetch')),
@@ -2150,7 +2789,7 @@ ue_nv_far:                              # user_entry's New_Var IDs (exe_v40): ue
              LGC_TRAMP[LGC_SIT]: b(LGC_TRAMP[LGC_SIT], a.addr('hk_lgc_sit')),
              LGC_TRAMP[LGC_REQ]: b(LGC_TRAMP[LGC_REQ], a.addr('hk_lgc_req')),
              LGC_CHG: b(LGC_CHG, a.addr('hk_lgc_chg')),
-             FRAME_HOOK: b(FRAME_HOOK, a.addr('hk_frame')), WM_RESET: b(WM_RESET, a.addr('hk_wmreset')),
+             FRAME_HOOK: b(FRAME_HOOK, a.addr('hv_fhook')), WM_RESET: b(WM_RESET, a.addr('hv_wmreset')),
              VAR_ENTRY: b(VAR_ENTRY, a.addr('user_gate')),
              GS_UPD: b(GS_UPD, a.addr('gs_upd')), GS_UPD_END: b(GS_UPD_END, a.addr('gs_end')),
              GS_HIT: b(GS_HIT, a.addr('gs_hit'))}
@@ -3830,6 +4469,8 @@ def labels(path):
              '_format': bi['format'] + [t for _n, t, _d in EXTRA_PARAMS]}
         for k, pname in enumerate(bi['syntax']):
             e[str(k)] = dict(bl.get(str(k), {}), name=pname)
+            if HV_FIELD0 <= k < HV_FIELD0 + len(HV_FIELDS):     # exe_v43: a variable
+                e[str(k)]['desc'] = e[str(k)].get('desc', '').rstrip() + HV_PARAM_DESC[k - HV_FIELD0]
         for k, (pname, _t, desc) in enumerate(EXTRA_PARAMS):
             e[str(len(bi['syntax']) + k)] = {'name': pname, 'desc': desc, 'confidence': 'high'}
         assert len(e['_format']) == size - 1
@@ -3850,6 +4491,7 @@ def main():
     out += ['0x%08X=0x%08X' % (a.part3[0] + 4 * i, w) for i, w in enumerate(a.part3[1])]
     out += ['0x%08X=0x%08X' % (a.part4[0] + 4 * i, w) for i, w in enumerate(a.part4[1])]
     out += ['0x%08X=0x%08X' % (a.part5[0] + 4 * i, w) for i, w in enumerate(a.part5[1])]
+    out += ['0x%08X=0x%08X' % (a.part6[0] + 4 * i, w) for i, w in enumerate(a.part6[1])]
     out += ['0x%08X=0x%08X' % kv for kv in sorted(hooks.items())]
     # the vtable words have ADDR32 relocations to the classes' own functions: moved to a dead word, or the loader
     # would write those back over ours

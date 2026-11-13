@@ -231,7 +231,7 @@ def shared_tests(pm, me_wm, own_wm, foe_wm, ents):
         fcall(pm, FSET, me_wm, S(1, 3), 99.0)
         check('shared: fighter table 0x%X -> 0, no write' % bad, (r, objs() == before), (0.0, True))
     w32(pm, C.FIGHTERS, tab)
-    for ident in (0x337, 0x33F, 0x3C0, 0x3FF):           # (0x380-0x3BF: New_Var's, tools/new_var_test.py)
+    for ident in (0x337, 0x33F, 0x3C9, 0x3FF):           # (0x380-0x3BF: New_Var's; 0x3C0-0x3C8: hitbox_var_test.py)
         fcall(pm, FSET, me_wm, 0x0F000000 + ident, 5.0)
         check('ID 0x0F000%03X: reads 0, a write changes nothing' % ident,
               (fcall(pm, FGET, me_wm, 0x0F000000 + ident), objs() == before), (0.0, True))
@@ -1013,7 +1013,7 @@ def main():
     bad = [i for _, i in pairs if fetch(pm, i)[0] != r32(om, HANDLERS + 4 * i)]
     check('vanilla handlers unchanged', bad, [])
     check('r12 kept', fetch(pm, 50)[1], 0x55)
-    check('new handlers', [fetch(pm, i)[0] for _, i in new], [a.addr(c[2]) for c in C.COMMANDS])
+    check('new handlers', [fetch(pm, i)[0] for _, i in new], [a.addr(C.HANDLER.get(c[2], c[2])) for c in C.COMMANDS])
 
     # handlers, base handler stubbed (steps over its own size when state +8 == -1, returns 2)
     acc, am, slots, state, flag, params = 0x10370000, 0x10371000, 0x10372000, 0x10373000, 0x10374000, 0x10375000

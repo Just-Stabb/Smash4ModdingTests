@@ -4,7 +4,7 @@ These are new commands for game, effect, sound and expression scripts. They need
 `cross_f.rpx` (`tools/acmd_ext_cave.py`, part of the standard build). Without it, a script that uses
 them won't load properly, so ship the executable with any script that uses them.
 
-Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10) lists all of them in one
+Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11) lists all of them in one
 group, **New Commands**, at the top of the list (vanilla commands stay in their own groups), in subgroups:
 
 | Subgroup | Commands |
@@ -27,7 +27,7 @@ them too.
 
 | Command | Does |
 |---|---|
-| `Extra_Special_Hitbox` / `Extra_Extended_Special_Hitbox` | hitboxes with hitstun / hitstop / DI extras |
+| `Extra_Special_Hitbox` / `Extra_Extended_Special_Hitbox` | hitboxes with hitstun / hitstop / DI extras; Damage / Angle / KBG / FKB / BKB / Size from variables (exe_v43, Sm4shCommand v1.4.11: below) |
 | `Track_Target` | homing on the nearest fighter |
 | `Thread_Start` / `Thread_Stop` | a block that runs on its own |
 | `Input_Compare` / `Input_Get` / `Input_Set` | a fighter's buttons and sticks |
@@ -95,6 +95,93 @@ Extra_Special_Hitbox(ID=0, Part=0, Bone=0, Damage=12.0, Angle=361, KBG=100, FKB=
   tag (`0x02C0874C`, in AttackModule's set-hitbox), so it never keeps an earlier Extra hitbox's extras when its
   angle and knockback match. Extra hitboxes with IDs 8 and 9 (fighters have 10) get their extras too (only 0-7
   did).
+
+### Variables in Extra hitboxes (exe_v43, Sm4shCommand v1.4.11)
+
+The Extra hitboxes' **Damage, Angle, KBG, FKB, BKB and Size** (both commands) can each be a variable instead of a
+number: `Damage=VAR_0`, `Angle=STICK_ANGLE`, `Size=charge` (a `New_Var`), or an ID (`0x0F000300`). The variable is
+read when the command runs and the hitbox is made from its value through the game's own hitbox code, exactly as from
+a number. Fields written as numbers work as before; a command with no variable does what it did in exe_v42.
+
+- **Which variables:** any variable ID from `0x01000000` to `0x1FFFFFFF`: `VAR_0`–`VAR_31`, `New_Var` names (int or
+  float), the mod's other variables (`STICK_ANGLE`, `ROT_X`, `POS_...`, `SELF_DAMAGE`, ...), the game's own floats
+  (`0x0xxxxxxx`: work floats, fighter_param) and ints (`0x1xxxxxxx`, read as ints). Not flags (`0x2xxxxxxx`).
+- **Encoding (why it doesn't break old scripts):** the variable's ID goes in the parameter word as it is (a float
+  parameter holds the ID's bits). No real hitbox has such a word: as an int it is 16 million or more, as a float
+  2.4·10⁻³⁸ to 10⁻¹⁹. Bits 20–23 (`0x00F00000`, never part of an ID the game or the mod uses) hold the flags. So
+  the command, its size and every other parameter are unchanged, and an old script reads exactly as before.
+- **The value:**
+  - Damage, Size: as they are; below 0 is 0.
+  - KBG, FKB, BKB: rounded to a whole number (halves away from 0); below 0 is 0.
+  - Angle: rounded, then wrapped into 0–359 (−30 → 330, 725 → 5, 360 → 0, −0.5 → 359), except 361–368, kept as
+    they are (361 = the Sakurai angle).
+- **Facing:** a hitbox's angle is along the fighter's facing, as for every hitbox (0 forward, 90 up, 180 backward,
+  270 down); the game mirrors it for a fighter facing left. Variables measured along the facing (`STICK_ANGLE`) go in
+  as they are. An angle measured on screen (0 right, 90 up, 180 left, e.g. `STICK_ANGLE_RAW`) needs `|WORLD`: facing
+  left it becomes 180 − value (screen 135°, up-left, is 45° forward-up for a fighter facing left).
+- **Flags** (after the variable, with `|`, any case and order):
+  - `|FOLLOW`: the field is read again every frame while the hitbox is out (a stick-aimed hitbox that follows the
+    stick, damage that grows with a charge). It runs every frame the object moves, after its script, so not in
+    hitlag. It ends when another hitbox is made with the same ID (Extra or plain), when the object is reset (KO, a
+    projectile's next use), or after 16 more FOLLOW hitboxes (the oldest goes). Damage and Size keep the ratio the
+    game's code gave the first value (Strike Kirby's ×1.15, ...).
+  - `|WORLD` (Angle): the value is a screen angle (above).
+  - `|NEG`: minus the value (`Angle=ROT_X|NEG`).
+- **Needs exe_v43.** An older executable reads the ID as a number (a hitbox of size ~0 with an angle in the
+  millions).
+
+Variables for it (read only, this object's own; exe_v43):
+
+| ID | Name | Read |
+|---|---|---|
+| `0x0F0003C0` | `STICK_ANGLE` | the control stick's angle in degrees, 0–360, along the facing (0 forward, 90 up, 180 back, 270 down): a hitbox angle as it is. 0 in neutral |
+| `0x0F0003C1` | `STICK_ANGLE_RAW` | the same on screen (0 right, 90 up), whichever way the fighter faces (`|WORLD` in a hitbox) |
+| `0x0F0003C2` | `STICK_LEN` | how far the stick is pushed: √(x² + y²), 0 (neutral) to 1 (a little over on diagonals) |
+| `0x0F0003C3`–`3C5` | `CSTICK_ANGLE`, `CSTICK_ANGLE_RAW`, `CSTICK_LEN` | the C-stick's |
+| `0x0F0003C6`–`3C8` | `ROT_X`, `ROT_Y`, `ROT_Z` | the object's rotation about X / Y / Z in degrees (`PostureModuleF(4–6)`, what `Rotation_Get` stores; a fighter's forward tilt is X) |
+
+They come from the input variables (`STICK_X` / `STICK_Y` along the facing, `STICK_X_RAW` on screen;
+docs/position-variables.md), forced sticks (`Input_Set`) included; an object without a controller reads 0.
+
+Example 1, a hit launched the way the control stick points (on frame 8):
+
+```
+FRAME(Frames=8)
+Extra_Special_Hitbox(ID=0, Part=0, Bone=0, Damage=10, Angle=STICK_ANGLE, KBG=80, FKB=0, BKB=50, Size=6, X=0, Y=8, Z=8, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1, HitBits=0x3F, Unk41=0, CollisionPart=0xF, NoScale=0, Shieldable=1, Reflectable=0, Absorbable=0, Rehit=0, IgnoreInvuln=0, HitAllStates=0, FacingRestrict=3, NoGrabRelease=0, TeamDamage=0, DisableHitlag=0, NoGFX=0, Flinchless=0, Shape=0, HitstunMul=0, HitstopMul=0, HitstopFrames=0, SelfHitstopMul=0, SelfHitstopFrames=0, DIMul=0)
+WAIT(Frames=4)
+Remove_All_Hitboxes()
+```
+
+`Angle=STICK_ANGLE|FOLLOW` makes it follow the stick every frame while it is out; `Angle=STICK_ANGLE_RAW|WORLD` is
+the same angle from the on-screen one.
+
+Example 2, the fighter's current rotation, stored, as the hitbox's angle:
+
+```
+FRAME(Frames=6)
+Rotation_Get(Target=0, Axis=0, Variable=VAR_1)
+Extra_Special_Hitbox(ID=0, Part=0, Bone=0, Damage=9, Angle=VAR_1, KBG=90, FKB=0, BKB=40, Size=5, X=0, Y=8, Z=7, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1, HitBits=0x3F, Unk41=0, CollisionPart=0xF, NoScale=0, Shieldable=1, Reflectable=0, Absorbable=0, Rehit=0, IgnoreInvuln=0, HitAllStates=0, FacingRestrict=3, NoGrabRelease=0, TeamDamage=0, DisableHitlag=0, NoGFX=0, Flinchless=0, Shape=0, HitstunMul=0, HitstopMul=0, HitstopFrames=0, SelfHitstopMul=0, SelfHitstopFrames=0, DIMul=0)
+WAIT(Frames=3)
+Remove_All_Hitboxes()
+```
+
+`Rotation_Get` stores degrees; Axis 0 (about X) is a fighter's forward tilt, the way `Rotation_Set`'s X turns it.
+`Angle=ROT_X` does the same without the variable (and `|FOLLOW` follows it); `Angle=ROT_X|NEG` takes minus it, so a
+fighter tilted 30° forward (nose down) launches 30° downward (330). Which axis and sign match a given move's
+rotation depends on how its MSC / ACMD rotates the model: check in game.
+
+More examples (FOLLOW with a neutral-stick fallback, a hitbox growing with a charge, an Extended capsule aimed with
+the C-stick) are in Sm4shCommand's View > Commands. The Hitbox Viewer draws a variable with the script's last
+`SET_FLOAT` of it, else a stand-in (Damage 10, Angle 0, KBG 100, FKB 0, BKB 40, Size 4), and lists it in the
+Extras column.
+
+How it works (`tools/acmd_ext_cave.py` `hv_code`; docs/native-notes.md "Hitbox variables"): the two commands'
+handler table entries point at `hv_extra`, which reads each variable field, writes the value into the command's own
+parameter word, calls the unchanged Extra handler (the game's hitbox handler, then the extras), and puts the words
+back. A FOLLOW hitbox gets an entry in a 16-entry table keyed by its AttackModule slot; the per-frame hook writes the
+slot's data again (`+0x18` Damage, `+0x1C` Size, `+0x20` Angle, `+0x24` KBG, `+0x28` FKB, `+0x2C` BKB) and the
+extras record's check words. Tested in `tools/hitbox_var_test.py` (unicorn) and
+`tools/Sm4shCommand/hitbox_var_test.cs` (the compiler).
 
 ## Track_Target
 
@@ -575,7 +662,7 @@ with a name of your own. The name then works in every variable parameter of ever
   the float ones read and write the float. (`VAR_n` stays float-only.) Whole numbers are exact up to 16,777,216.
 - **MSC:** `WorkModuleF(0, 0x0F000380 + slot)` reads one, `WorkModule(6, 0x0F000380 + slot)` as an int;
   `WorkModule(0 / 7, value, ID)` write it. Give the variable a fixed `Slot` for this.
-- **IDs:** `0x0F000380`–`0x0F0003BF`. `0x0F0003C0`–`0x0F0003FF` still read 0.
+- **IDs:** `0x0F000380`–`0x0F0003BF`. `0x0F0003C0`–`0x0F0003C8` are the stick angles and rotation (exe_v43, "Variables in Extra hitboxes"); `0x0F0003C9`–`0x0F0003FF` still read 0.
 
 ### Names in Sm4shCommand
 
@@ -683,6 +770,8 @@ nothing in this game: its handler is empty. Add by `SUB_FLOAT_2` of a variable h
 | `0x0F000332` / `333` | `SPEED_X` / `SPEED_Y` | the current speed (all the object's kinetic energies) | — |
 | `0x0F000334` / `335` / `336` | `TEAM` / `HURT_TEAM` / `ATTACK_TEAM` | the object's team ids (-1 = none) | — |
 | `0x0F000337` / `338` | `GRAVITY` / `MAX_FALL` | a fighter's gravity and max fall speed in effect (`Gravity_Set`'s, else its own: the gravity energy's; exe_v42); other objects read 0 | — |
+| `0x0F0003C0`–`3C5` | `STICK_ANGLE`, `STICK_ANGLE_RAW`, `STICK_LEN`, `CSTICK_ANGLE`, `CSTICK_ANGLE_RAW`, `CSTICK_LEN` | the sticks' angle in degrees (along the facing / on screen) and how far they're pushed (exe_v43; "Variables in Extra hitboxes" above) | — |
+| `0x0F0003C6`–`3C8` | `ROT_X`, `ROT_Y`, `ROT_Z` | the object's rotation in degrees (as `Rotation_Get`; exe_v43) | — |
 | `0x0F000340`–`37F` | `SLOT1_SHARED_0`–`SLOT8_SHARED_7` | `VAR_24`–`VAR_31` of the fighter in that player slot (below) | set it |
 | `0x0F000380`–`3BF` | your `New_Var` names (slots 0–63; exe_v40) | the value (int or float commands) | set it (an int one keeps whole numbers) |
 

@@ -251,6 +251,13 @@ def _position_lines():
         out.append((0x0F000334 + i, nm, "Read only: %s. Needs tools/acmd_ext_cave.py." % d))
     out.append((0x0F000337, "Gravity", "Read only: this fighter's gravity in effect (how much its vertical speed drops each frame, as the fighter_param Gravity): Gravity_Set's while it holds, else its own (its gravity energy's). Other objects read 0. Needs exe_v42 (tools/acmd_ext_cave.py)."))
     out.append((0x0F000338, "Max fall speed", "Read only: this fighter's max fall speed in effect: Gravity_Set's while it holds, else its own (its gravity energy's). Other objects read 0. Needs exe_v42 (tools/acmd_ext_cave.py)."))
+    hv = "Needs exe_v43 (tools/acmd_ext_cave.py)."
+    for c, stick, base in ((0, "control stick", "STICK_X / STICK_Y"), (1, "C-stick", "CSTICK_X / CSTICK_Y")):
+        out.append((0x0F0003C0 + 3 * c, "%s angle" % stick.capitalize(), "Read only: this fighter's %s angle in degrees, 0 to 360, along its facing: 0 forward, 90 up, 180 back, 270 down (from %s; 0 with the stick in neutral: check the length). A hitbox angle as it is: Angle=%sSTICK_ANGLE in an Extra hitbox. Objects without a controller read 0. %s" % (stick, base, "C" if c else "", hv)))
+        out.append((0x0F0003C1 + 3 * c, "%s angle on screen" % stick.capitalize(), "Read only: the %s angle in degrees, 0 to 360, on screen: 0 right, 90 up, 180 left, whichever way the fighter faces. For an Extra hitbox's Angle use it with |WORLD (or use the facing one). %s" % (stick, hv)))
+        out.append((0x0F0003C2 + 3 * c, "%s length" % stick.capitalize(), "Read only: how far the %s is pushed, 0 (neutral) to 1 (sqrt(x^2 + y^2) of %s; a little over 1 on diagonals). %s" % (stick, base, hv)))
+    for k, axis in enumerate("XYZ"):
+        out.append((0x0F0003C6 + k, "Rotation %s" % axis, "Read only: this object's rotation about %s in degrees (PostureModuleF(%d): what Rotation_Get Axis %d stores, Rotation_Set / MSC PostureModule(4, ...) set; a fighter's forward tilt is X). Live: works with |FOLLOW in an Extra hitbox. %s" % (axis, 4 + k, k, hv)))
     for slot in range(8):
         for k in range(8):
             out.append((0x0F000340 + 8 * slot + k, "Slot %d shared %d" % (slot + 1, k),
@@ -331,7 +338,14 @@ def alias_lines():
             ("SPEED_X", 0x0F000332, "current speed (read only)"), ("SPEED_Y", 0x0F000333, ""),
             ("TEAM", 0x0F000334, "team ids (read only)"), ("HURT_TEAM", 0x0F000335, ""), ("ATTACK_TEAM", 0x0F000336, ""),
             ("GRAVITY", 0x0F000337, "the fighter's gravity in effect, Gravity_Set's included (read only)"),
-            ("MAX_FALL", 0x0F000338, "the fighter's max fall speed in effect, Gravity_Set's included (read only)")]
+            ("MAX_FALL", 0x0F000338, "the fighter's max fall speed in effect, Gravity_Set's included (read only)"),
+            ("STICK_ANGLE", 0x0F0003C0, "stick angle along the facing, degrees (0 fwd, 90 up): a hitbox angle (read only)"),
+            ("STICK_ANGLE_RAW", 0x0F0003C1, "stick angle on screen, degrees (0 right, 90 up)"),
+            ("STICK_LEN", 0x0F0003C2, "how far the stick is pushed, 0-1"),
+            ("CSTICK_ANGLE", 0x0F0003C3, "the same for the C-stick"), ("CSTICK_ANGLE_RAW", 0x0F0003C4, ""),
+            ("CSTICK_LEN", 0x0F0003C5, ""),
+            ("ROT_X", 0x0F0003C6, "this object's rotation, degrees (PostureModuleF(4-6), as Rotation_Get; read only)"),
+            ("ROT_Y", 0x0F0003C7, ""), ("ROT_Z", 0x0F0003C8, "")]
     out += [("SLOT%d_SHARED_%d" % (slot + 1, k), 0x0F000340 + 8 * slot + k,
              "VAR_24-VAR_31 of the fighter in that player slot (any object may use them)" if slot == k == 0 else "")
             for slot in range(8) for k in range(8)]

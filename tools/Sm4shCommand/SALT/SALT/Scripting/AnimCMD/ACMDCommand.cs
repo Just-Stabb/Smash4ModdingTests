@@ -131,6 +131,119 @@ namespace SALT.Moveset.AnimCMD
                 return int.Parse(p, System.Globalization.NumberStyles.Integer, inv);
             return (int)uint.Parse(p, System.Globalization.NumberStyles.Integer, inv);
         }
+        // ------------------------------------------------- variables in the Extra hitbox commands (exe_v43)
+        // Extra_Special_Hitbox / Extra_Extended_Special_Hitbox's Damage, Angle, KBG, FKB, BKB and Size (parameters
+        // 3-8) take a variable: the word is the variable's ID (0x01000000-0x1FFFFFFF: no number a hitbox uses is
+        // there), with flags in bits 20-23 (tools/acmd_ext_cave.py HV_*). Text: a variable's name or ID, then
+        // |FOLLOW (read again every frame), |WORLD (Angle: a screen angle, mirrored when facing left), |NEG (minus
+        // it), e.g. Angle=STICK_ANGLE|FOLLOW, Damage=VAR_0, Size=charge (a New_Var). The word goes in the parameter
+        // as it is (a float parameter holds its bits).
+
+        public const uint ExtraHitboxIdent = 0x974EA5BE, ExtraExtHitboxIdent = 0x5C8A67C9;
+        public const int HitboxVarFirst = 3, HitboxVarCount = 6;
+        public const uint HitboxVarFlagMask = 0x00F00000;
+        public static readonly string[] HitboxVarFlags = { "FOLLOW", "WORLD", "NEG" };   // 0x00100000 << i
+        public static readonly string[] HitboxVarFields = { "Damage", "Angle", "KBG", "FKB", "BKB", "Size" };
+
+        /// <summary>Parameter index of a command that takes a variable (the Extra hitboxes' Damage ... Size).</summary>
+        public static bool IsHitboxVarField(uint ident, int index)
+        {
+            return (ident == ExtraHitboxIdent || ident == ExtraExtHitboxIdent) &&
+                   index >= HitboxVarFirst && index < HitboxVarFirst + HitboxVarCount;
+        }
+
+        /// <summary>A word such a parameter reads as a variable (with its flags).</summary>
+        public static bool IsHitboxVarWord(uint word)
+        {
+            return word >= 0x01000000 && word < 0x20000000;
+        }
+
+        /// <summary>The word in a parameter (an int's value, a float's bits).</summary>
+        public static uint ParamWord(object p)
+        {
+            if (p is float) return BitConverter.ToUInt32(BitConverter.GetBytes((float)p), 0);
+            if (p is bfloat) return BitConverter.ToUInt32(BitConverter.GetBytes((float)(bfloat)p), 0);
+            if (p is FighterVariable) return ((FighterVariable)p).Raw;
+            try { return unchecked((uint)Convert.ToInt64(p)); } catch { return 0; }
+        }
+
+        /// <summary>"VAR_0|FOLLOW" (a name, or the ID in hex, then its flags), or null for a number / unknown flag bits.</summary>
+        public static string FormatHitboxVar(uint word)
+        {
+            if (!IsHitboxVarWord(word))
+                return null;
+            uint id = word & ~HitboxVarFlagMask, flags = word & HitboxVarFlagMask;
+            string name;
+            if (!IsHitboxVarWord(id) || !TryVariableName(id, out name))
+                name = "0x" + id.ToString("X8");
+            var sb = new System.Text.StringBuilder(name);
+            for (int i = 0; i < HitboxVarFlags.Length; i++)
+                if ((flags & (0x00100000u << i)) != 0)
+                {
+                    sb.Append('|').Append(HitboxVarFlags[i]);
+                    flags &= ~(0x00100000u << i);
+                }
+            return flags == 0 ? sb.ToString() : "0x" + word.ToString("X8");
+        }
+
+        /// <summary>
+        /// A variable in such a parameter: NAME or 0xID, then |FLAG.. (FOLLOW, WORLD, NEG; any case). False for
+        /// anything else (a number: parsed as before). Throws FormatException for a bad flag or a name / ID that
+        /// isn't a variable.
+        /// </summary>
+        public static bool TryParseHitboxVar(string text, out uint word)
+        {
+            word = 0;
+            if (text == null)
+                return false;
+            var parts = text.Split('|');
+            string first = parts[0].Trim();
+            uint raw;
+            bool named = FighterVariable.TryParseAlias(first, out raw);
+            if (!named)
+            {
+                if (parts.Length == 1)
+                    return false;           // a number (or nonsense: the usual error)
+                if (!first.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ||
+                    !uint.TryParse(first.Substring(2), System.Globalization.NumberStyles.HexNumber,
+                                   System.Globalization.CultureInfo.InvariantCulture, out raw))
+                    throw new FormatException($"\"{first}\" isn't a variable (a name such as VAR_0, STICK_ANGLE or a New_Var, or an ID such as 0x0F000300)");
+            }
+            if (!IsHitboxVarWord(raw) || (raw & HitboxVarFlagMask) != 0)
+                throw new FormatException($"{first} (0x{raw:X8}) can't be used here: a hitbox variable is an ID from 0x01000000 to 0x1FFFFFFF without bits 0x00F00000 (0x0F000300 VAR_0 ..., a New_Var, a game int / float)");
+            for (int i = 1; i < parts.Length; i++)
+            {
+                string f = parts[i].Trim();
+                int k = Array.FindIndex(HitboxVarFlags, x => x.Equals(f, StringComparison.OrdinalIgnoreCase));
+                if (k < 0)
+                    throw new FormatException($"unknown flag \"{f}\" (FOLLOW, WORLD or NEG)");
+                raw |= 0x00100000u << k;
+            }
+            word = raw;
+            return true;
+        }
+
+        /// <summary>
+        /// The value a field gets from its variable's value v, as the executable works it out (hv_value): NEG first;
+        /// Angle: WORLD with facing &lt; 0 makes it 180 - v, rounded (halves away from 0), 361-368 kept, else wrapped
+        /// into 0-359; KBG / FKB / BKB rounded, at least 0; Damage / Size at least 0.
+        /// </summary>
+        public static float HitboxVarValue(int field, uint word, float v, float facing = 1)
+        {
+            if ((word & 0x00400000) != 0) v = -v;
+            if (field == 0 || field == 5)
+                return v >= 0 ? v : 0;      // (NaN: 0)
+            if (field == 1 && (word & 0x00200000) != 0 && facing < 0) v = 180 - v;
+            double r = v >= 0 ? Math.Floor(v + 0.5) : -Math.Floor(-v + 0.5);
+            int n = double.IsNaN(r) || r > int.MaxValue || r < int.MinValue ? int.MinValue : (int)r;
+            if (field != 1)
+                return n > 0 ? n : 0;
+            if (n >= 361 && n <= 368)
+                return n;
+            n %= 360;
+            return n < 0 ? n + 360 : n;
+        }
+
         public override string ToString()
         {
             var inv = System.Globalization.CultureInfo.InvariantCulture;
@@ -146,7 +259,10 @@ namespace SALT.Moveset.AnimCMD
             {
                 string value;
                 object p = this.Parameters[i];
-                if (p is int | p is bint)
+                string hv = IsHitboxVarField(this.Ident, i) ? FormatHitboxVar(ParamWord(p)) : null;
+                if (hv != null)
+                    value = hv;     // a variable in an Extra hitbox's Damage ... Size
+                else if (p is int | p is bint)
                 {
                     string pname = i < syntax.Length ? syntax[i].Trim() : "";
                     value = FormatInt(Convert.ToInt32(p), pname);

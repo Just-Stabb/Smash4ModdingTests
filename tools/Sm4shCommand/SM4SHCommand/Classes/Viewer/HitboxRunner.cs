@@ -18,6 +18,9 @@ namespace Sm4shCommand.Viewer
         public bool HasExtras;
         public float HitstunMul, HitstopMul, SelfHitstopMul, DIMul;
         public int HitstopFrames, SelfHitstopFrames;
+        // fields that take a variable (exe_v43): "Angle=STICK_ANGLE|FOLLOW = 0" (the value used here: the script's
+        // last SET_FLOAT of it, else a stand-in)
+        public string VarsText = "";
 
         public HitboxData Clone() { return (HitboxData)MemberwiseClone(); }
 
@@ -44,6 +47,7 @@ namespace Sm4shCommand.Viewer
                 if (SelfHitstopFrames > 0) o.Add("self hitstop " + SelfHitstopFrames + "f");
                 else if (SelfHitstopMultiplier != 1) o.Add("self hitstop x" + SelfHitstopMultiplier.ToString("0.###", ic));
                 if (DIMultiplier != 1) o.Add("DI x" + DIMultiplier.ToString("0.###", ic));
+                if (VarsText.Length > 0) o.Add(VarsText);
                 return string.Join(", ", o.ToArray());
             }
         }
@@ -95,6 +99,9 @@ namespace Sm4shCommand.Viewer
         double currentFrame, animFrame, frameSpeed, syncFrames, rate;
         int gameFrame;
         List<VarWrite> writes = new List<VarWrite>();
+        Dictionary<uint, float> varValues = new Dictionary<uint, float>();   // SET_FLOATs so far (threads share them)
+        // what a variable in an Extra hitbox is drawn with when the script doesn't SET_FLOAT it first
+        static readonly float[] VarStandIn = { 10, 0, 100, 0, 40, 4 };
         double Speed { get { return frameSpeed * rate; } }   // the move's frame speed x the animation rate variable
         bool incrementFrame;
         SortedDictionary<int, HitboxData> hitboxes = new SortedDictionary<int, HitboxData>();
@@ -121,6 +128,7 @@ namespace Sm4shCommand.Viewer
             th.isThread = true;
             th.root = r;
             th.hitboxes = r.hitboxes;
+            th.varValues = r.varValues;
             th.script = block;
             th.frameSpeed = 1; th.rate = 1; th.syncFrames = -1;
             r.threads.Add(new ScriptThread { Id = id, StartFrame = r.gameFrame, Runner = th });
@@ -170,7 +178,7 @@ namespace Sm4shCommand.Viewer
         public List<FrameState> Run(IList<ICommand> commands, int frames)
         {
             script = commands;
-            subscripts.Clear(); states.Clear(); hitboxes.Clear(); threads.Clear();
+            subscripts.Clear(); states.Clear(); hitboxes.Clear(); threads.Clear(); varValues.Clear();
             index = 0; loopStart = 0; loopIterations = 0; skipWords = 0;
             currentFrame = 0; animFrame = 0; frameSpeed = 1; syncFrames = -1; rate = 1;
             incrementFrame = true;
@@ -239,6 +247,38 @@ namespace Sm4shCommand.Viewer
                     return;
                 index++;
             }
+        }
+
+        /// <summary>An Extra hitbox's fields that hold a variable: the value it would give (the script's last SET_FLOAT
+        /// of it, else a stand-in), converted as the game does, facing right (ACMDCommand.HitboxVarValue).</summary>
+        void HitboxVars(ACMDCommand cmd, IList<object> p, HitboxData h)
+        {
+            var ic = System.Globalization.CultureInfo.InvariantCulture;
+            var o = new List<string>();
+            for (int k = 0; k < ACMDCommand.HitboxVarCount; k++)
+            {
+                int i = ACMDCommand.HitboxVarFirst + k;
+                if (i >= p.Count) break;
+                uint w = ACMDCommand.ParamWord(p[i]);
+                if (!ACMDCommand.IsHitboxVarWord(w)) continue;
+                uint id = w & ~ACMDCommand.HitboxVarFlagMask;
+                float v;
+                bool known = varValues.TryGetValue(id & 0x0FFFFFFF, out v);
+                if (!known) v = VarStandIn[k];
+                float x = ACMDCommand.HitboxVarValue(k, w, v);
+                switch (k)
+                {
+                    case 0: h.Damage = x; break;
+                    case 1: h.Angle = (int)x; break;
+                    case 2: h.KBG = (int)x; break;
+                    case 3: h.WBKB = (int)x; break;
+                    case 4: h.BKB = (int)x; break;
+                    case 5: h.Size = x; break;
+                }
+                o.Add(string.Format(ic, "{0}={1} {2} {3}", ACMDCommand.HitboxVarFields[k], ACMDCommand.FormatHitboxVar(w),
+                    known ? "=" : "drawn as", x.ToString("0.###", ic)));
+            }
+            h.VarsText = string.Join(", ", o.ToArray());
         }
 
         static int I(object o)
@@ -360,6 +400,8 @@ namespace Sm4shCommand.Viewer
                                 h.SelfHitstopMul = F(p[d]); h.SelfHitstopFrames = (int)F(p[f]); h.DIMul = F(p[g]);
                             }
                         }
+                        if (extra)
+                            HitboxVars(cmd, p, h);
                         hitboxes[h.Id] = h;
                         break;
                     }
@@ -435,6 +477,7 @@ namespace Sm4shCommand.Viewer
                         uint v = (uint)I(p[1]);
                         float val = F(p[0]);
                         writes.Add(new VarWrite { GameFrame = gameFrame, Variable = v, Value = val });
+                        varValues[v & 0x0FFFFFFF] = val;
                         if (v == ANIM_RATE && UseFrameSpeed && val > 0) rate = val;
                     }
                     break;

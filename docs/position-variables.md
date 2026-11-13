@@ -157,6 +157,13 @@ Raw stick X, on screen whichever way the fighter faces (positive = right): `0x0F
 (Y has no facing, so `STICK_Y` / `CSTICK_Y` are already raw). Writing one forces the stick like
 `STICK_X` (the value is turned into "forward" with the fighter's facing at the time).
 
+Stick angles (exe_v43, self only, read only; `tools/acmd_ext_cave.py`, docs/acmd-extra-commands.md "Variables in
+Extra hitboxes"): `STICK_ANGLE` (`0x0F0003C0`) is the control stick's angle in degrees, 0–360, along the facing
+(atan2(`SELF_STICK_Y`, `SELF_STICK_X`): 0 forward, 90 up, 180 back, 270 down; 0 in neutral), so it is a hitbox angle
+as it is; `STICK_ANGLE_RAW` (`0x0F0003C1`) the same on screen (0 right); `STICK_LEN` (`0x0F0003C2`) how far it is
+pushed; `CSTICK_ANGLE` / `CSTICK_ANGLE_RAW` / `CSTICK_LEN` (`0x0F0003C3`–`3C5`) the C-stick's. `ROT_X` / `ROT_Y` /
+`ROT_Z` (`0x0F0003C6`–`3C8`) are the object's rotation in degrees (`PostureModuleF(4–6)`).
+
 **Forced inputs** go in where the game reads the controller, so they act exactly like pressing the
 button or tilting the stick: a forced press is "pressed this frame" on its first frame, a stick
 forced from neutral to 1.0 counts as a smash input, and so on. They work on CPUs too. They last

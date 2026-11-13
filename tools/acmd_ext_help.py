@@ -122,7 +122,9 @@ GROUP_HELP = {
         'Also per object: TIMER_0-TIMER_15 (0x0F000320-0x0F00032F: set frames, they count down by 1 every frame the '
         'object moves, not in hitlag, and stop at 0), KINETIC_TYPE (0x0F000330), TRACK_FRAMES (0x0F000331), SPEED_X / '
         'SPEED_Y (read only), GRAVITY / MAX_FALL (0x0F000337 / 338: a fighter\'s gravity and max fall speed in effect, '
-        'Gravity_Set\'s included; read only). SLOT1_SHARED_0-SLOT8_SHARED_7 are VAR_24-VAR_31 of the fighter in that player slot, '
+        'Gravity_Set\'s included; read only), STICK_ANGLE / STICK_ANGLE_RAW / STICK_LEN and the C-stick\'s '
+        '(0x0F0003C0-3C5: the stick\'s angle along the facing / on screen, in degrees, and how far it is pushed), '
+        'ROT_X / ROT_Y / ROT_Z (0x0F0003C6-3C8: the rotation in degrees; read only; exe_v43). SLOT1_SHARED_0-SLOT8_SHARED_7 are VAR_24-VAR_31 of the fighter in that player slot, '
         'so another object can leave values there for it.',
         'More, with your own names: New_Var(Name=charge, Type=int, Initial=0) gives up to 64 more per object (Variables '
         'group), and those work with SET_INT / ADD_INT / INC_INT / Int_Var_Compare too.',
@@ -133,7 +135,8 @@ GROUP_HELP = {
     ],
     NEW_GROUP + ' / Hitboxes & hits': [
         'Extra_Special_Hitbox / Extra_Extended_Special_Hitbox make the vanilla Special hitboxes with six extras '
-        '(hitstun / hitstop / DI). Hit_Check / Hit_Get tell what an attack connected with (a hurtbox, a shield, ...). '
+        '(hitstun / hitstop / DI); their Damage, Angle, KBG, FKB, BKB and Size can be variables (exe_v43: '
+        'Angle=STICK_ANGLE, Damage=VAR_0, |FOLLOW to follow them every frame). Hit_Check / Hit_Get tell what an attack connected with (a hurtbox, a shield, ...). '
         'Hit_Reset clears the "has hit" flag (SELF_HIT); Hit_Log_Clear the record of who a hitbox Part has hit, so '
         'the same hitboxes can hit again.',
     ],
@@ -208,6 +211,38 @@ _EXTRA_RULES = [
     '- Works in articles\' (projectiles\') scripts too.',
     '- Hitbox Viewer: drawn like the plain command, with the six extras in the list\'s Extras column; the '
     'knockback / hitstun calculator uses them.',
+    '',
+    '## Variables in Damage, Angle, KBG, FKB, BKB and Size (exe_v43 and later)',
+    'Any of these six can be a variable instead of a number: Damage=VAR_0, Angle=STICK_ANGLE, Size=charge (a New_Var), '
+    'or an ID (0x0F000300). The variable is read when the command runs, and the hitbox is made from its value exactly '
+    'as from a number (the game\'s own hitbox code). Fields left as numbers work as before, and a command with no '
+    'variable is the same as in older executables.',
+    '- Which variables: VAR_0-VAR_31, New_Var names (int or float), the mod\'s other variables (STICK_ANGLE, ROT_X, '
+    'POS_..., SELF_DAMAGE, ...), and the game\'s own floats / ints (0x1000xxxx ints are read as ints). Not flags '
+    '(0x2xxxxxxx).',
+    '- How the value is used: Damage and Size as they are (below 0: 0). KBG, FKB and BKB rounded to a whole number '
+    '(halves away from 0; below 0: 0). Angle rounded, then any value works: -30 is 330, 725 is 5, 360 is 0; 361-368 '
+    'stay as they are (361 = the Sakurai angle).',
+    '- The angle is along the facing, as every hitbox angle is (0 forward, 90 up, 180 backward, 270 down): the game '
+    'mirrors it for a fighter facing left. STICK_ANGLE / CSTICK_ANGLE are measured that way, so Angle=STICK_ANGLE '
+    'launches the way the stick points whichever way the fighter faces.',
+    '- Flags after the variable, with |: |FOLLOW: the field is read again every frame while the hitbox is out (a '
+    'stick-aimed hitbox that follows the stick, damage that grows with a charge); |WORLD (Angle): the value is an '
+    'angle on screen (0 right, 90 up, 180 left), turned into the hitbox\'s angle for the facing (facing left: '
+    '180 - value), e.g. Angle=STICK_ANGLE_RAW|WORLD; |NEG: minus the value (Angle=ROT_X|NEG). Several: '
+    'Angle=STICK_ANGLE|FOLLOW.',
+    '- Variables for it: STICK_ANGLE (0x0F0003C0: the control stick\'s angle along the facing, 0-360; 0 in '
+    'neutral), STICK_ANGLE_RAW (0x0F0003C1, on screen: 0 right), STICK_LEN (0x0F0003C2: how far it is pushed, 0-1), '
+    'the same for the C-stick (CSTICK_ANGLE, CSTICK_ANGLE_RAW, CSTICK_LEN: 0x0F0003C3-3C5), ROT_X / ROT_Y / ROT_Z '
+    '(0x0F0003C6-3C8: this object\'s rotation in degrees, what Rotation_Get stores). All read only, this object\'s '
+    'own.',
+    '- FOLLOW lasts until another hitbox is made with the same ID (Extra or plain), the object is reset (KO / a '
+    'projectile\'s next use), or 16 FOLLOW hitboxes later (the oldest goes). It doesn\'t update during hitlag (the '
+    'object is frozen). Damage keeps whatever the game did to the first value (Strike Kirby\'s x1.15, ...).',
+    '- The Hitbox Viewer draws a variable with the script\'s last SET_FLOAT of it, else a stand-in (Damage 10, '
+    'Angle 0, KBG 100, FKB 0, BKB 40, Size 4), and lists it in the Extras column.',
+    '- Needs exe_v43 or later: an older executable reads the variable\'s ID as a number (a hitbox of size 0 and '
+    'an angle in the millions).',
 ]
 HELP = {
     'Extra_Special_Hitbox': [
@@ -733,6 +768,9 @@ HELP = {
         'Stores the target\'s model rotation about one axis, in degrees (PostureModuleF(4 / 5 / 6)):',
         '- Axis 0: about X. Axis 1: about Y. Axis 2: about Z.',
         'The rotation that Rotation_Set sets (and MSC\'s PostureModule(4, ...)); not the facing (Position_Get Axis 3).',
+        'For a hitbox angle: store it, then give the variable as an Extra hitbox\'s Angle (Angle=VAR_1; exe_v43). '
+        'ROT_X / ROT_Y / ROT_Z (0x0F0003C6-3C8) read the same rotation directly, as a live variable '
+        '(Angle=ROT_X|FOLLOW follows it every frame).',
         '',
     ] + TARGETS + [''] + VARS + ['', NOT_VIEWER, NEEDS],
     'Rotation_Set': [
@@ -966,6 +1004,57 @@ EXAMPLES = {
         '}',
         'WAIT(Frames=3)',
         'Remove_All_Hitboxes()',
+        '',
+        '// Example 4 (exe_v43): a hit launched the way the control stick points on frame 8. STICK_ANGLE is the',
+        '// stick\'s angle along the fighter\'s facing (0 forward, 90 up, 180 back, 270 down), so it works facing',
+        '// either way. (With the stick in neutral it reads 0: forward.)',
+        'FRAME(Frames=8)',
+        _hitbox('Extra_Special_Hitbox', Damage=10, Angle='STICK_ANGLE', KBG=80, BKB=50, Size=6, Z=8),
+        'WAIT(Frames=4)',
+        'Remove_All_Hitboxes()',
+        '',
+        '// Example 5 (exe_v43): the same, but the angle follows the stick every frame while the hitbox is out',
+        '// (|FOLLOW), and a neutral stick sends straight up instead (STICK_LEN: how far the stick is pushed)',
+        'FRAME(Frames=8)',
+        'Float_Var_Compare(Variable=STICK_LEN, Method=5, Value=0.3)',
+        'True(Offset=0){',
+        '    ' + _hitbox('Extra_Special_Hitbox', Damage=10, Angle='STICK_ANGLE|FOLLOW', KBG=80, BKB=50, Size=6, Z=8),
+        '}',
+        'Else(Offset=0){',
+        '    ' + _hitbox('Extra_Special_Hitbox', Damage=10, Angle=90, KBG=80, BKB=50, Size=6, Z=8),
+        '}',
+        'WAIT(Frames=10)',
+        'Remove_All_Hitboxes()',
+        '',
+        '// Example 6 (exe_v43): launch along the fighter\'s current rotation. Rotation_Get stores it in VAR_1',
+        '// (degrees; Axis 0 = about X: a fighter\'s forward tilt, as Rotation_Set\'s X), and the hitbox takes',
+        '// VAR_1 as its angle. (Angle=ROT_X does the same without the variable; Angle=ROT_X|NEG takes minus it:',
+        '// tilted 30 degrees forward, nose down, launches 30 degrees down, 330.)',
+        'FRAME(Frames=6)',
+        'Rotation_Get(Target=0, Axis=0, Variable=VAR_1)',
+        _hitbox('Extra_Special_Hitbox', Damage=9, Angle='VAR_1', KBG=90, BKB=40, Size=5, Z=7),
+        'WAIT(Frames=3)',
+        'Remove_All_Hitboxes()',
+        '',
+        '// Example 7 (exe_v43): a hitbox that grows while special is held: damage 4% to 14% and size 3 to 7 over',
+        '// 20 frames (New_Vars charge / reach; SUB_FLOAT_2 of a negative step adds). |FOLLOW reads them again every',
+        '// frame while the hitbox is out',
+        'New_Var(Name=charge, Type=float, Initial=4, Scope=move)',
+        'New_Var(Name=reach, Type=float, Initial=3, Scope=move)',
+        'SET_FLOAT(Value=-0.5, Variable=VAR_2)',
+        'SET_FLOAT(Value=-0.2, Variable=VAR_3)',
+        'FRAME(Frames=5)',
+        _hitbox('Extra_Special_Hitbox', Damage='charge|FOLLOW', Angle=45, KBG=90, BKB=50, Size='reach|FOLLOW', Z=8),
+        'Set_Loop(Iterations=20){',
+        '    Input_Compare(Target=0, Input=1, Method=0, Value=1)',
+        '    True(Offset=0){',
+        '        SUB_FLOAT_2(Variable=charge, SourceVariable=VAR_2)',
+        '        SUB_FLOAT_2(Variable=reach, SourceVariable=VAR_3)',
+        '    }',
+        '    WAIT(Frames=1)',
+        '    Goto(Offset=0)',
+        '}',
+        'Remove_All_Hitboxes()',
     ],
     'Extra_Extended_Special_Hitbox': [
         '// Example 1: a sword swing as a capsule from (0, 8, 6) to (0, 8, 14): half the hitstun, a 20-frame freeze',
@@ -984,6 +1073,15 @@ EXAMPLES = {
                 X=0, Y=0, Z=20, X2=0, Y2=0, Z2=26, SFXLevel=2, HitstunMul=1.5,
                 SelfHitstopFrames=14),
         'WAIT(Frames=4)',
+        'Remove_All_Hitboxes()',
+        '',
+        '// Example 3 (exe_v43): a long sweep that launches the way the C-stick points on screen, followed every',
+        '// frame (CSTICK_ANGLE_RAW is 0 = right, 90 = up whichever way the fighter faces; |WORLD turns it into the',
+        '// hitbox\'s angle for the facing: the same as CSTICK_ANGLE)',
+        'FRAME(Frames=10)',
+        _hitbox('Extra_Extended_Special_Hitbox', Damage=11, Angle='CSTICK_ANGLE_RAW|WORLD|FOLLOW', KBG=85, BKB=45,
+                Size=4, Z=4, Z2=18),
+        'WAIT(Frames=6)',
         'Remove_All_Hitboxes()',
     ],
     'Hit_Check': [

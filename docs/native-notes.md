@@ -1662,6 +1662,57 @@ First in exe_v39; working from exe_v41 (below).
     vtable `0x1012C5C0`, energy `+0x334` of class `0x1012C8F8`) through `gs_eff` when an entry is live; anything else
     goes on to `ue_zero`.
 
+## Hitbox variables (Extra hitboxes' fields from variables, exe_v43)
+
+`tools/acmd_ext_cave.py` (`hv_code`, `HV_*`), user docs `docs/acmd-extra-commands.md` "Variables in Extra hitboxes",
+tests `tools/hitbox_var_test.py` (unicorn: `--synthetic` the cave with stubs; `PATCHED BASE` the executables) and
+`tools/Sm4shCommand/hitbox_var_test.cs` (the compiler). First in exe_v43 (= exe_v42 + this).
+
+- **Encoding:** Extra_Special_Hitbox / Extra_Extended_Special_Hitbox parameters 3-8 (Damage f, Angle i, KBG i, FKB i,
+  BKB i, Size f): a word in `0x01000000`-`0x1FFFFFFF` is a variable (no real value is there: ints 16M+, floats
+  2.4e-38-1e-19); bits 20-23 are flags (`0x00100000` FOLLOW, `0x00200000` WORLD, `0x00400000` NEG), the rest is the ID
+  (`rlwinm r4, w, 0, 12, 7`). Type nibble 1 (ints): WorkModule vt `+0x84` (get_int, New_Var's `nvi_get` for
+  `0x1F00038x`) and `i2f`; the rest vt `+0x44` (get_float: the mod's `0x0F000xxx` through position_vars' hooks).
+- **Space:** code `0x04B97200`-`0x04B979EC`, FOLLOW table `0x04B97B00` (16 × 0x48), in the free space after
+  `ACC_CACHE` (`0x04B97000` + 64 × 8) and before `THREADS` (`0x04B98000`): grown .text, zero in exe_v42.
+- **Words changed outside it (5):** the handler table entries of the two commands (`cmd_handlers`, `0x04B99C98` /
+  `0x04B99C9C`: `h_extra` / `h_extra_ext` -> `hv_extra` / `hv_extra_ext`), `FRAME_HOOK` `0x02C5F430` (`b hk_frame` ->
+  `b hv_fhook`), `WM_RESET` `0x02BF5864` (`b hk_wmreset` -> `b hv_wmreset`), and `gs_var`'s `gv_zero` `0x04BD3AC8`
+  (`b ue_zero` -> `b hv_var`).
+- **`hv_extra`** (the handler, `(r3 accessor, r4, r5 state, r6 exec, r7 params)`): when executed (`[r6 + 8]` byte),
+  each variable field's value is converted (`hv_value`: NEG; Damage / Size >= 0; KBG / FKB / BKB rounded (halves
+  away from 0, `fctiwz` of v ± 0.5) and >= 0; Angle: WORLD with PostureModuleF(0) < 0 -> 180 - v, rounded, 361-368
+  kept, else `divw` mod 360 into 0-359) and written into the script's own parameter word; then `h_extra` (unchanged:
+  the game's handler `0x02BDBB20` / `0x02BDD46C` reads the words, builds the data and calls set_attack; then
+  `ext_record` tags the slot) runs with the same registers, and the words are put back. In place rather than a copy,
+  so whatever the game's handler reads (r7 or the state) sees the values. Skipped (not executed): nothing read or
+  written. No variable field: just the `h_extra` call.
+- **FOLLOW:** after the call, any earlier entry for the same slot is dropped; with a FOLLOW field, an entry (free,
+  else round robin `hv_rr`): `+0` accessor, `+4` AttackModule, `+8` the slot (`[AM + 0x40] + ID × 0x84`, ID <
+  `[AM + 0x3C]`), `+0xC` the slot's tag halfword (`TAG | n`, just set by `ext_record`; the entry is only made when
+  the extras entry n's `+0` is this slot), `+0x10` the FOLLOW fields (bits 0-5), `+0x14 + 4k` field k's word,
+  `+0x2C + 4k` its coefficient: Damage / Size slot value (`+0x18` / `+0x1C`) / the value written (1 if 0), ints slot
+  value (`+0x20 + 4 (k - 1)`) - the value written. So whatever the game's path does to a value (Strike's damage
+  × 1.15 at set_attack) carries over.
+- **`hv_fhook`** (`FRAME_HOOK`: every object, every frame it moves, after its ACMD; r31 MotionModule, `+4` the
+  accessor): `hv_frame(accessor)`, then `b hk_frame` (the timers / tracking, which ends with the replaced `li r0, 1`).
+  `hv_frame`: for each of its entries, the hitbox must still be the one recorded (`[acc + 0x50]` the AttackModule,
+  the slot's tag, extras entry n's slot), else the entry is freed; the FOLLOW fields are read and converted again
+  and written: `+0x18` Damage × ratio, `+0x1C` Size × ratio, `+0x20 / 24 / 28 / 2C` Angle / KBG / FKB / BKB +
+  offset, and the ints into the extras entry's check words (`+4`-`+0x10`, what `ext_find` compares), so the extras
+  still apply. Not run in hitlag (the hook isn't). A later plain hitbox in the slot: `slot_set` clears the tag; a
+  later Extra one: a new tag; either way the next frame frees the entry without writing.
+- **`hv_wmreset`** (`WM_RESET`, r31 the accessor; r0 r10 ctr free): frees the object's entries, then `b hk_wmreset`.
+- **Variables `0x0F0003C0`-`3C8`** (`hv_var`, from `gv_zero`: user_entry's frame, r31 WorkModule, r30 index, r29
+  write; writes ignored): `0x3C0 + 3c + q` (c 0 stick / 1 C-stick): x = get_float(`0x0F000110 + 2c`, along the
+  facing) or (q 1) `0x0F000260 + c` (on screen), y = get_float(`0x0F000111 + 2c`); q 0 / 1 atan2 in degrees 0-360
+  (`hv_atan2`: octant reduction, atan z = z (a1 + a3 z² + ... + a9 z⁸), Abramowitz & Stegun 4.4.49, within 1e-5 rad;
+  (0, 0) -> 0), q 2 √(x² + y²) (`fsqrt`). `0x3C6`-`0x3C8`: PostureModuleF(4-6) (`nc_msc`, the accessor from
+  `acc_of`). Others (and `0x337` / `0x338` for a non-fighter) -> `ue_zero` as before.
+- **Not checked in game yet:** that a FOLLOW Size change resizes the hitbox's collision (if AttackModule caches the
+  shape's size at set_attack, only the data's damage / angle / knockback follow); the rotation axis / sign that matches
+  a given move.
+
 ## Sword trails (trail textures by id)
 
 - `Sword_Glow` / `Sword_Glow2` / `Sword_Trace` take trail texture ids (Ike 4 / 143, Marth 9 / 144,
