@@ -197,8 +197,8 @@ class Asm:
             return (18 << 26) | (off & 0x3FFFFFC) | (op == "bl")
         if op in COND or op.rstrip("lr") in COND and op.endswith("lr"):
             crf = 0
-            if len(args) == 2:
-                crf = reg(args.pop(0))
+            if len(args) == 2 or (len(args) == 1 and op.endswith("lr") and op not in COND):
+                crf = reg(args.pop(0))      # `beq cr7, X` / `beqlr cr7` (the lr form used to drop it: cr0's)
             if op.endswith("lr") and op not in COND:
                 bo, bi = COND[op[:-2]]
                 return (19 << 26) | (bo << 21) | ((crf * 4 + bi) << 16) | (16 << 1)

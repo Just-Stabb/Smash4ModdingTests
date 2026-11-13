@@ -1579,3 +1579,39 @@ was. The hat hook is unchanged, and the code now ends at 0x04BAF610 (kirby_hero_
 - exe_v45d = exe_v45c with the cave regenerated, the five hooks re-pointed and `0x030C470C` restored. exe_v46b is
   v6's exe_v46 with the same words. The bisect package has exe_v43 + each old hook alone (2 = the relocated one,
   expected to hang), + all five fixed, and the two full exes.
+
+### Crash fix v4 (`kirby_crashfix_v4`): exe_v45e / exe_v46c, copy pools with weapons whose owner is absent
+
+User (bisect v3): exe_v43 + the hat hook (test 3), and exe_v43 + all five fixed loader hooks (test 6), load but
+crash when Kirby gains a copy (Kirby vs Mario). Test 6's Cemu log: PPC IP `0x04BB3350` `lwz r11, 0x160(r8)`,
+r8 = 0, r12 = FighterParamManager. Stack: copy_grant `0x02EFCEB0` -> the copy's pool builder `0x02EFDB88`
+(`0x02EFDCA4`) -> weapon create `0x02BF42E8` -> ... -> the module set-up's +0x18 param getter call (`0x02BCB9F4`).
+
+**Cause (not the loader hooks):** `0x04BB3340` is weapon_expand.py's copy of the Kamehameha's (weapon 0x18B) param
+getter. It reads Supamario's vl slot `[mgr + 0x26B4]` (0x25B0 + 4 x 0x41), which is set only while Supamario is in
+the match. The manager's constructor loops clear the relocated arrays for the whole capacity, so the empty slot is
+deterministic. Mario's copy list (fix 90) has the Kamehameha with max 1, so the pool builder makes an instance, and
+Kirby vs Mario crashes as soon as Kirby gains Mario's copy. exe_v43 should do the same (the package's check 1). The
+same goes for the Robin copy list (Hero's 0x190 / 0x193-0x197 and Sephiroth's 0x18C): copying Robin, Hero without a
+Sephiroth, or Sephiroth without a Hero. A vanilla copy pool only holds the copied fighter's own weapons, and that
+fighter is always in the match. Bisect v3's test 1 reportedly gained a copy without crashing: not explained by the
+code (the hat stub without hook 1 just replays the `lwzx`), so the copy gained there was probably not Mario's.
+
+**Fix** (`tools/kirby_copy_pool_cave.py`, tested by `tools/kirby_copy_pool_test.py`, 0x04BAFA00-0x04BAFA78):
+- The pool builder reads a record's instance count at `0x02EFDC74` (`lwz r19, 4(r11)`, no relocation). That read
+  now goes through a stub. For a new weapon kind (0x185 on) whose owner fighter's vl slot is empty (the slot its
+  getter reads; owners from extra_kinds.json), the count becomes 0. That is the path a vanilla max-0 record takes:
+  no instances and not registered.
+- Such a weapon is never generated, because its copy path needs the owner in the match.
+- The stub uses r11 / r12 (dead there) and cr7, and keeps cr0 (the `rlwinm.` before the hook is tested after it).
+- `tools/ppcasm.py`: `bltlr cr7` (a conditional blr with only a cr field) silently used cr0. It now takes the
+  field. No other tool used that form.
+
+exe_v45e = exe_v45d + this cave, and exe_v46c = exe_v46b + this cave. The package also has exe_v43 + only this
+cave, to confirm the cause.
+Tests: kirby_copy_pool_test (v45e, v46c, v43 + cave), kirby_copy_new_test, kirby_hero_menu_test,
+kirby_hero_sword_test.
+```
+python3 tools/rpx_patch.py EXE_V45D.rpx EXE_V45E.rpx $(python3 tools/kirby_copy_pool_cave.py)
+python3 tools/kirby_copy_pool_test.py EXE_V45E.rpx EXE_V45D.rpx
+```
