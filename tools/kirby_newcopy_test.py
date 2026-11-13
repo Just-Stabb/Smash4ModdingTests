@@ -45,6 +45,9 @@ class Game:
         self.fvars = {}
         self.speeds = []
         self.sounds = []
+        self.calls, self.removed, self.slow = [], [], []       # v6
+        self.hit_now = False
+        self.tag = lambda: None
 
     def sys(self, sid, a):
         f = R.i2f
@@ -97,9 +100,26 @@ class Game:
             return 0
         if sid == 0x1E and a and a[0] in (0x2710, 0x2714):           # SoundModule play / stop
             self.sounds.append((a[0], a[1]))
+            self.calls.append((self.tag(), 'sound' if a[0] == 0x2710 else 'stop', list(a[1:])))
             return 0
         if sid == 0x1C and a and a[0] in (0x2717, 0x2710):
             self.effects.append(a[1])
+            if a[0] == 0x2710:
+                self.calls.append((self.tag(), 'effect', list(a[1:])))
+            return 0
+        if sid == 0x1C and a and a[0] in (0x2712, 0x2723):             # v6: EffectModule follow / kill
+            self.calls.append((self.tag(), 'follow' if a[0] == 0x2712 else 'kill', list(a[1:])))
+            return 0
+        if sid == 0x2E and a and a[0] == 0x272C:                     # v6: AttackModule hitbox (Extended_Special_Hitbox)
+            self.calls.append((self.tag(), 'hitbox', list(a[1:])))
+            return 0
+        if sid == 0x2E and a and a[0] == 0x2718:                     # AttackModule remove one
+            self.removed.append(a[1])
+            return 0
+        if sid == 0x2E and a and a[0] == 0x2726:                     # AttackModule hit this frame (kinds)
+            return int(self.hit_now and (len(a) < 2 or a[1] & 2 != 0))
+        if sid == 0x49:                                               # SlowModule
+            self.slow.append(list(a))
             return 0
         del f
         return 0
@@ -341,6 +361,98 @@ def menu_tests(path, src):
     check('Sephiroth copy: no menu, no gauge', (rr.vm.g.get(rr.gi['khm_state'], 0), rr.game.ints.get(0x1000008A)), (0, 0))
 
 
+def v6_tests(path, src):
+    """v6: the sword spells (17 Flame Slash, 18 Kacrackle Slash, 19 Metal Slash, 20 Hatchet Man): Hero's script
+    commands at their frames (tools/kirby_hero_sword_msc.py's events), the held sword's int, the functions"""
+    import kirby_hero_sword_msc as SW
+    ev = SW.events(SW.parse())
+    names = {0x11: 'Flame Slash', 0x12: 'Kacrackle Slash', 0x13: 'Metal Slash', 0x14: 'Hatchet Man'}
+    for n in (0x11, 0x12, 0x13, 0x14):
+        for sit, situation in (('ground', 0), ('air', 2)):
+            r = Run(path, src, 2, situation=situation)
+            g = r.game
+            r.update()
+            g.tag = lambda r=r: r.vm.g.get(r.gi['khm_frame'], 0) if r.vm.g.get(r.gi['khm_state'], 0) == 2 else None
+            mp0 = r.gf('ncp_mp')
+            shown = []
+
+            def each(r):
+                shown.append(r.game.ints.get(0x1000008B, 0))
+            cast(r, n, ev[n]['end'] + 5, each)
+            end = ev[n]['end']
+
+            def norm(lst, bits):
+                return [(f, k, [round(R.i2f(x) if bits else float(x), 4) if SW.is_float(k, i) else x
+                                for i, x in enumerate(v)]) for f, k, v in lst]
+            want = norm([(f, k, v) for f, k, v in ev[n][sit] if k != 'remove'], False)
+            got = norm([(f, k, v) for f, k, v in g.calls if f is not None and f < end], True)
+            check('%s (%s): Hero\'s %d hitbox / effect / sound commands at their frames, Kirby\'s bones'
+                  % (names[n], sit, len(want)), got, want)
+            rm = [f for f, k, _v in ev[n][sit] if k == 'remove']
+            check('%s (%s): hitboxes 5-9 removed at %s, and at the end' % (names[n], sit, rm),
+                  g.removed, [5, 6, 7, 8, 9] * (len(rm) + 1))
+            check('%s (%s): the sword int 0x1000008B 1 from the cast to the end (%d), then 0' % (names[n], sit, end),
+                  (set(shown[:end]), set(shown[end + 1:])), ({1}, {0}))
+            check('%s: its MP (brave_cost)' % names[n], mp0 - r.gf('ncp_mp'), {0x11: 12, 0x12: 11, 0x13: 6, 0x14: 15}[n])
+    # the menu's weights, Hocus Pocus's
+    r = Run(path, src, 2)
+    check('weights (brave_lw_weight): 0x12 / 0x12 / 0x7 / 0x12',
+          [r.vm.call(r.fn['khm_weight'], (n,)) for n in (0x11, 0x12, 0x13, 0x14)], [0x12, 0x12, 0x7, 0x12])
+    check('Hocus Pocus: the sword spells 244 each (Ultimate\'s), Zoom 2 U still 0',
+          [r.vm.call(r.fn['khm_hp_weight'], (o + 9,)) for o in (0x11, 0x12, 0x13, 0x14, 0x17)], [244] * 4 + [0])
+    # Hatchet Man: always critical, the show on the hit; special doesn't end the stone before the cancel frame
+    r = Run(path, src, 2)
+    g = r.game
+    r.update()
+    a, b = ev[0x14]['hitbox']
+    blocked = []
+
+    def hit_at(r):
+        f = r.vm.g.get(r.gi['khm_frame'], 0)
+        r.game.hit_now = f == a + 1
+        blocked.append((f, r.vm.call(r.fn['khm_blocking'])))
+    cast(r, 0x14, a + 3, hit_at)
+    check('Hatchet Man: the crit show on the hit (SlowModule(0, 4, 40), camera in, se_brave_criticalhit)',
+          (g.slow, g.fvars.get(0x0F000099), (0x2710, 0x7640112) in g.sounds), ([[0, 4, 40]], 8.0, True))
+    for _ in range(45):
+        r.vm.call(r.fn['khm_update'])
+    check('Hatchet Man: the camera back after 40 frames', g.fvars.get(0x0F000099), 9.0)
+    check('Hatchet Man: special held off before the cancel frame (%d)' % ev[0x14]['cancel'],
+          all(b for f, b in blocked if f < ev[0x14]['cancel']), True)
+    check('Hatchet Man: no x2 crit bit (its damage is Ultimate\'s crit already)', r.vm.call(r.fn['khm_sw_crit_bit']), 0)
+    # Metal Slash: metal on the fighter hit; KO on one already metal; nothing on a shield
+    for metal, status, want in ((0.0, 0x48, (1.0, None)), (1.0, 0x48, (1.0, 1.0)), (0.0, 28, (None, None))):
+        r = Run(path, src, 2)
+        g = r.game
+        r.update()
+        g.fvars[0x0F0000B2] = float(status)
+        if metal:
+            g.fvars[0x0F000278] = metal
+        a, b = ev[0x13]['hitbox']
+        cast(r, 0x13, a + 4, lambda r: setattr(r.game, 'hit_now', r.vm.g.get(r.gi['khm_frame'], 0) == a + 1))
+        got = (g.fvars.get(0x0F000278) if not metal else 1.0, g.fvars.get(0x0F00015F))
+        check('Metal Slash: target metal %s, status 0x%X -> (metal, KO) %s' % (bool(metal), status, want),
+              got if status != 28 else (g.fvars.get(0x0F000278), g.fvars.get(0x0F00015F)), want)
+    # Flame Slash: the 1-in-8 crit (the VM's randi gives 0: rolled) -> the marker's x2 bit during the cast
+    r = Run(path, src, 2)
+    r.update()
+    bits = []
+    cast(r, 0x11, 8, lambda r: bits.append(r.vm.call(r.fn['khm_sw_crit_bit'])))
+    check('Flame Slash crit rolled: the x2 bit 0x10 while its hitboxes are made', set(bits), {0x10})
+    # Oomph doesn't boost a sword spell
+    r.vm.g[r.gi['khm_attack_t']] = 100
+    check('Oomph: no 0x20 during the sword spell (Hero\'s specials)', r.vm.call(r.fn['khm_buff_bits']) & 0x20, 0)
+    # the stone ends mid-cast: everything stopped
+    r = Run(path, src, 2)
+    g = r.game
+    r.update()
+    cast(r, 0x14, 38)
+    r.vm.g[r.gi['global4']] = 0x2
+    r.vm.call(r.fn['khm_update'])
+    check('stone ended mid-cast: hitboxes removed, the long sound stopped, the sword hidden',
+          (g.removed[-5:], (0x2714, 0x76400E2) in g.sounds, g.ints.get(0x1000008B)), ([5, 6, 7, 8, 9], True, 0))
+
+
 def main():
     path = sys.argv[1]
     src = sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, '..', 'fighters', 'kirby', 'kirby.c')
@@ -416,6 +528,7 @@ def main():
     check('Sephiroth: Gigaflare made by the charge at 120 (level 2)', [(a[0], a[1], a[4]) for a in r.game.articles],
           [(7, 120.0, 2)])
     menu_tests(path, src)
+    v6_tests(path, src)
     # the plain Robin copy
     r = Run(path, src, 0)
     check('Robin copy (no marker): newcopy_marker 0', r.vm.call(r.fn['newcopy_marker']), 0)

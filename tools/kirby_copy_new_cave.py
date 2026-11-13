@@ -47,8 +47,9 @@ sys.path.insert(0, HERE)
 from ppcasm import Asm  # noqa: E402
 
 CAVE = 0x04BAF400              # crash fix v1: in kind_expand.py's code space (free after extended_memory.py's
-LIMIT = 0x04BAF700             # 0x04BAF000-0x04BAF100); exe_v44 grew the text region to 0x04BD6000 for it and Cemu
-                               # crashed calling into it (PPCRecompiler_getJumpTableBase, IP 0: the user's log)
+LIMIT = 0x04BAF620             # 0x04BAF000-0x04BAF100); exe_v44 grew the text region to 0x04BD6000 for it and Cemu
+                               # crashed calling into it (PPCRecompiler_getJumpTableBase, IP 0: the user's log).
+                               # 0x04BAF620-0x04BAF700: kirby_hero_sword_cave.py (exe_v46; this code ends at 0x04BAF618)
 
 HOOK_GRANT = 0x02EFCDA4         # copy_grant: mr r28, r6
 HOOK_STORE = 0x02EFCEE0         # copy_grant: stw r28, 0x290(r7) (int 0x100000A4)

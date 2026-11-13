@@ -1438,20 +1438,86 @@ at 17. Kirby's copy voices (`vc_kirby_copy_brave_01` ...) have no equivalent in 
 Sephiroth's copy sounds need `snd_se_Edge.nus3bank` (his tone names): the soundlabeltable only maps labels to tone
 indices.
 
-### v6 (sword spells): plan, not built
+### v6 (`kirby_hero_sephiroth_copy_v6`): the sword spells, Hero's sword on the stone (exe_v46)
 
-Hero's built sword-spell scripts (ground / air game, effect, sound for slots 0x27A-0x27D / 0x286-0x289) are saved in
-`reference/brave_sword_spells_acmd.txt` (from the user's "Hero current" package). Steps left, in order:
-1. Trace who creates Kirby's held-model object (`[fighter+0x28]+0xA8`) for a copy (start from copy_grant /
-   `0x02EFDDFC` and the item resource, type 0x11, id `0x20C + slot` with Kirby's costume bits) and whether it does so for
-   the Robin copy (its item row 0x1041A8A0[0x2C] is empty).
-2. Item-table swap at `0x030C487C` (`lwzx r7, r24, r21`, r24 = 0x1041A8A0) for a Hero slot -> "bravesword" (a third
-   name stub in `kirby_copy_new_cave.py`'s cave, inside 0x04BAF400-0x04BAF700).
-3. Convert Hero's sword (Ultimate `brave/model/body/cNN`, the sword meshes on `sword1` / `haver`) as a held model like
-   `marthsword` (HaveN -> SwordN), texture ids in Hero's block.
-4. `copy_held_cave.py`: show it in the stone statuses (0x155 / 0x175 / 0x176) only while a Kirby int says a sword spell
-   is being cast (the MSC sets it during spells 17-20).
-5. Port the four scripts' hitboxes / effects / sounds to Kirby: MSC AttackModule / EffectModule / SoundModule calls at
-   the scripts' frames, Hero's bone indices mapped to Kirby's (Hero's vbn names -> Kirby's), and their functions
-   (Metal Slash's metal KO via brave_metal_slash's variables, Kacrackle's freeze, Flame Slash's fire, Hatchet Man's
-   crit / shield break); then weights 0x12 / 0x12 / 0x7 / 0x12 and Hocus Pocus's 244.
+User decision: during a sword spell Hero's sword is shown on the stone (attached at Hero's hand offset), its hitboxes on
+it as on Hero. Flame Slash (17), Kacrackle Slash (18), Metal Slash (19) and Hatchet Man (20) are in the menu now, with
+Hero's weights (0x12 / 0x12 / 0x7 / 0x12), costs (12 / 11 / 6 / 15 MP) and Hocus Pocus weight (244 each).
+
+**1. Who makes the held model (traced in exe_v45b).** Kirby's copy held model (marthsword, ikesword, ...) is his
+**article 26, "simple"** (weapon kind 0x11; its spawner 0x02EFC3D0 is the hat's (article 25, kind 0xC) generic one).
+The copy model function `0x02EFE138` (copy_grant calls it at `0x02EFD0A0` with the granted kind; a copy's loss calls
+it with -1 from `0x02EF5DE4` / `0x02EF6074`) generates it (ArticleModule generate `0x02C03EA0`, r4 = 0x1A, at
+`0x02EFE748`) only for the kinds with a held model, from the compare chain at `0x02EFE664` (1, 0x12, 0x13, 0x17,
+0x1D, 0x22, 0x25, 0x27, 0x2B, 0x2E, 0x2F, 0x36, 0x37; Bayonetta 0x38 gets articles 0x20 / 0x21), and removes it
+(`0x02C05594`) on a -1. **So the Robin copy (the Hero copy's granted kind 0x2C) never had one**: fixed in the exe (2).
+Its model is the copied player's slot resource of **type 0x11**: the copy-resource loader `0x030C4694` runs per match
+entry for the types 0xC, 0x11, 0x164, 0x165 (`0x030C4D88` ...: Kirby's article weapon kinds hat, simple,
+simple2r / simple2l), the name from the held-item table `0x1041A8A0` (read at `0x030C487C`). The per-frame show / hide
+`0x02B02534` is that article's own update (r27 = its owner Kirby's module accessor, r30 = the article's;
+`copy_held_cave.py`).
+
+**2. exe_v46** = exe_v45b + `tools/kirby_hero_sword_cave.py` (tested by `tools/kirby_hero_sword_test.py`, unicorn), in
+0x04BAF620-0x04BAF6F8 (the end of `kirby_copy_new_cave.py`'s space, whose LIMIT is now 0x04BAF620; the standard
+code region, nothing grown, checked):
+- the third name swap: `0x030C487C` (`lwzx r7, r24, r21`, r24 = the held-item table: the test decodes it from the
+  loader's own `addi`s) -> "bravesword" for a Hero player's slot (kirby_copy_new_cave's res_kind 0x45), every other
+  kind the table's own name -> `model/bravesword/cNN` (Kirby's costume);
+- the held article for the Hero copy: `0x02EFE664` (`cmplwi r27, 0x22`) -> a stub that, for kind 0x2C granted for a
+  Hero (grant_kind 0x45), returns into the generate at `0x02EFE748` (the Robin path's own code follows it), else does
+  the compare;
+- `copy_held_cave.py --stone`: its hide path goes on to a check: in the stone statuses 0x155 / 0x175 / 0x176 with
+  Kirby's int **0x1000008B** == 1 the show path, else the hook's own instruction and back (both through ctr).
+
+**3. The sword model** (`tools/kirby_copy_sword.py`, from Ultimate's brave.zip `model/body/c00`): the mesh
+`brave_sword_VIS_O_OBJShape` (material met_brave11_001, single-bound to Sword1, blade along +X) in Kirby's LHaveN
+frame as Hero holds it in HaveR (Sword1 -> HaveR from the nusktb: x' = 0.2023 - y, y' = x: the blade along +Y, as
+Marth's on Kirby), one bone `HaveN` (unrotated), Hero's size; the template hat (v1's `bravecap/c00`) gives the
+material, metal material / texture and the one-bone side files. Texture ids 0x40C5E000 + 0x80 x NN (Hero's block,
+below the hats' 0x40C5F000). Every Kirby costume gets Eleven's (c00) sword (the folder is picked by Kirby's costume).
+
+**4. MSC** (`kirby.c` "v6": `khm_sword`, `khm_sw_*`). The cast plays Hero's scripts as MSC calls at their frames:
+`khm_sw_game` / `khm_sw_fx` / `khm_sw_end` / `khm_sw_cancel` / `khm_sw_window` are generated by
+`tools/kirby_hero_sword_msc.py` from `reference/brave_sword_spells_acmd.txt`:
+- timing: Hero's Set_Frame_Duration (FT_MOTION_RATE) applied (Flame / Kacrackle Slash 0.5 on 1-7, 0.8 / 0.7 on 12-40):
+  their hitboxes at cast frames 6-8, Metal Slash 11, Hatchet Man 37; the motions' ends (sword shown until) 53 / 50 /
+  61 / 107 and cancel frames 39 / 36 / 40 / 88 (Ultimate's motion_list: skill3 61 frames, cancel 47; skill1 61, 40;
+  skill2 107, 88);
+- hitboxes: AttackModule op 0x272C (Extended_Special_Hitbox's own path) with Hero's values, the capsule's end 0.01
+  along Y from the centre (a sphere), IDs + 5 and Part 1 beside the stone's own; Hero's RHaveN (0x19) offsets on
+  Kirby's LHaveN (0x18) as above, his RArmJ (0x16) on Kirby's LArmJ (0x10), bone 0 as is; removed by ID;
+- effects: EFFECT_FOLLOW -> EffectModule 0x2712 (on the sword: turned 90 about Z), EFFECT / LANDING_EFFECT -> 0x2710,
+  Terminate_Graphic_Effect -> 0x2723; sounds: Hero's ids (0x76400C2 ..., v5's bank mapping), the common swings;
+- functions: Flame Slash's fire / Kacrackle Slash's freeze are their hitboxes' effects (5 / 4); Metal Slash (a
+  hurtbox hit in its hitbox frames, AttackModule 0x2726 kinds 2): the fighter hit turns metal (ITEM 0x0F000278), one
+  already metal is KO'd (0x0F00015F), nothing on a shield (as brave_metal_slash); Hatchet Man is always critical, the
+  others 1 in 8 (rolled at the cast): the show on the hit (SlowModule(0, 4, 40), ITEM 8 then 9 after 40 frames, Hero's
+  se_brave_criticalhit 0x7640112) and for 17-19 the marker's x2 bit 0x10 (hero_buff_cave.py) while cast; Hatchet
+  Man's shield damage 10 as Hero's script. Oomph / Psyche Up don't boost (or spend on) a sword spell (Hero's specials
+  don't); special can't end the stone before the cancel frame (khm_blocking); the stone ending or the copy lost stops
+  the cast (hitboxes, effects, Hatchet Man's charge sound, the sword).
+
+Tests: `kirby_hero_sword_test.py exe_v46 exe_v45b` (the originals at the hooks, the item name for kinds 0-0x50, the
+generate stub for every grant / kind pair, the held model's visibility through the whole chain from 0x02B02730 with
+stub modules), `kirby_copy_new_test.py` / `kirby_hero_menu_test.py` on exe_v46 (their pre-existing Robin-list
+"failures" against exe_v43 are the menu cave's newer list), `kirby_newcopy_test.py` v6 (each spell ground / air: every
+hitbox / effect / sound call at its frame equals the generator's events from the reference; removals; the sword int;
+MP; weights; Hocus Pocus; Hatchet Man's show and camera; Metal Slash metal / KO / shield; the crit bit; Oomph; the stone
+ending mid-cast), `msc_stack_check.py`, `rolloff_hold_test.py`.
+
+**Approximations / to check in game:** where LHaveN is in the stone pose (the sword sits there; the stone's animation
+isn't changed) and its edge's side; whether LHaveN's frame is as Ultimate's HaveL; the effects' 90-degree turn;
+Sword_Glow trails left out (the stone doesn't swing it); Metal Slash's Extra hitbox extras (6 frames more hitstun:
+no MSC op); LANDING_EFFECT played as a plain EFFECT; the casts' frames counted from the frame after the choice (as
+stage 2's spells).
+
+Build:
+```
+python3 tools/rpx_patch.py EXE_V45B.rpx EXE_V46.rpx $(python3 tools/kirby_hero_sword_cave.py)
+python3 tools/kirby_hero_sword_test.py EXE_V46.rpx EXE_V45B.rpx
+python3 tools/kirby_copy_sword.py BRAVE_ZIP/brave/model/body V1/fighter/kirby/model/bravecap/c00 OUT/fighter/kirby/model
+python3 tools/kirby_hero_sword_msc.py > /tmp/sw.c     # the GENERATED block in kirby.c (paste between its markers)
+python3 tools/msclang/msclang.py -x tools/mscinfo.xml fighters/kirby/kirby.c -o kirby.mscsb
+python3 tools/msc_stack_check.py kirby.mscsb fighters/kirby/kirby.c; python3 tools/rolloff_hold_test.py kirby.mscsb
+python3 tools/kirby_newcopy_test.py kirby.mscsb
+```

@@ -254,6 +254,21 @@ cases). It confirms `0x271A` = set damage and `0x271E` = add damage.
 `+0xC8` (hit since start; `0x2724` clears it). There's no command that
 returns the hit target.
 
+A hitbox can be made from MSC with op `0x272C` (ACMD Extended_Special_Hitbox's own path: `0x02C0D210`, parser
+`0x02C0AA64`): `AttackModule(0x272c, 40 FP params, X2, Y2, Z2)`, the args as raw words (ints, floats as float bits:
+Damage, Size, X/Y/Z, Trip, Hitlag, SDI and X2/Y2/Z2 floats), 44 words with the op (the count is checked: 42 + 2).
+Kirby's Hero copy's sword spells use it (fighters/kirby/specials.md "v6"; not checked in game yet).
+
+### Kirby's copy held model (article 26)
+
+The held model of a copy (marthsword, ikesword, ...) is Kirby's article 26 "simple" (weapon kind 0x11), made by the
+copy model function `0x02EFE138` (generate at `0x02EFE748`) only for the kinds with one (the compare chain from
+`0x02EFE664`), removed on a copy's loss (its -1 call); its model is the copied player's slot resource of type 0x11
+(the copy-resource loader `0x030C4694` loads types 0xC / 0x11 / 0x164 / 0x165 = Kirby's article weapon kinds hat /
+simple / simple2r / simple2l per match entry), named from `0x1041A8A0` (read at `0x030C487C`); `0x02B02534` is that
+article's per-frame update (r27 the owner's module accessor), showing it by the owner's status
+(`tools/copy_held_cave.py`, `tools/kirby_hero_sword_cave.py`).
+
 ### Collision records (the hit target)
 
 `0x02C09C0C` (sets `+0xC4`/`+0xC8`) walks the attack module's **per-hitbox

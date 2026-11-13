@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Kirby's copy held model (Marth's sword, ...) shown in more motions. Prints rpx_patch.py args.
 
-  python3 tools/copy_held_cave.py [MOTION ...]      (default: 0x380 0x382 0x384)
+  python3 tools/copy_held_cave.py [MOTION ...] [--stone ADDR]     (default: 0x380 0x382 0x384)
 
 Kirby's per-frame copy update (0x02B02534) shows or hides the copy's held model (the RPX's
 held-model table 0x1041A8A0: marthsword, ikesword, gamewatchpan, ...; object [fighter+0x28]+0xA8,
@@ -15,6 +15,11 @@ Kirby's motion kind ([accessor+0x44] MotionModule, vtable +0x94) is one of MOTIO
 copy's slots 0x380 / 0x382 / 0x384, which only the Marth copy sword aerials play now (Shield
 Breaker plays 0x37F / 0x37E / 0x383 there, fighters/kirby/specials.md); the sword's size and place
 come from those animations' LHaveN track.
+
+With --stone ADDR (Kirby's Hero copy, exe_v46: tools/kirby_hero_sword_cave.py) the hide path goes on to ADDR instead
+(`b`, in reach: 0x04BAFxxx) with the same registers, which shows the model in the stone statuses while a sword spell
+is cast and else does the hook's own instruction and goes back (fighters/kirby/specials.md "v6"). Without it the
+cave is the standard build's, unchanged.
 
 Space: 0x037EE5A0-0x037EE5F0, the end of copy_custom_cave.py's free CAVE_C space (Havok cave; its
 code ends at 0x037EE428, copy_fx_cave.py's trampoline is at 0x037EE5F0). The grown code space
@@ -33,7 +38,7 @@ SHOW = 0x02B026B4
 MOTIONS = [0x380, 0x382, 0x384]
 
 
-def build(motions):
+def build(motions, stone=None):
     a = Asm(CAVE)
     src = """
 held:                                   # r27 module accessor, r30 [fighter+0x28]
@@ -45,12 +50,19 @@ held:                                   # r27 module accessor, r30 [fighter+0x28
 """
     for m in motions:
         src += "        cmplwi r3, 0x%X\n        beq show\n" % m
-    src += """
+    if stone is None:
+        src += """
         lwz r3, 0xA8(r30)               # the hook's own instruction
         b 0x%08X
+""" % (HOOK + 4)
+    else:
+        src += """
+        b 0x%08X                        # the stone check (kirby_hero_sword_cave.py), then the hook's own instruction
+""" % stone
+    src += """
 show:
         b 0x%08X
-""" % (HOOK + 4, SHOW)
+""" % SHOW
     a.asm(src)
     words = a.words()
     assert CAVE + 4 * len(words) <= LIMIT, 'copy held cave too big'
@@ -60,8 +72,14 @@ show:
 
 
 def main():
-    motions = [int(x, 0) for x in sys.argv[1:]] or MOTIONS
-    words, hook = build(motions)
+    args = sys.argv[1:]
+    stone = None
+    if '--stone' in args:
+        i = args.index('--stone')
+        stone = int(args[i + 1], 0)
+        del args[i:i + 2]
+    motions = [int(x, 0) for x in args] or MOTIONS
+    words, hook = build(motions, stone)
     out = ['0x%08X=0x%08X' % (CAVE + 4 * i, w) for i, w in enumerate(words)]
     out.append('0x%08X=0x%08X' % (HOOK, hook))
     print(' '.join(out))
