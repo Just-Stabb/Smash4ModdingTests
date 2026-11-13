@@ -152,6 +152,22 @@ namespace SALT.Moveset
             newVarByRaw.Clear();
         }
 
+        /// <summary>A copy of the names known (RestoreNewVars puts it back: a preview compile leaves none behind).</summary>
+        public static List<NewVarInfo> SaveNewVars()
+        {
+            return newVarByName.Values.ToList();
+        }
+
+        public static void RestoreNewVars(List<NewVarInfo> saved)
+        {
+            ClearNewVars();
+            foreach (var v in saved)
+            {
+                newVarByName[v.Name] = v;
+                newVarByRaw[v.Raw] = v;
+            }
+        }
+
         /// <summary>The New_Var names known, by slot.</summary>
         public static List<NewVarInfo> NewVars
         {

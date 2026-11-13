@@ -113,12 +113,12 @@ A block with a problem is skipped and reported in the log at startup.
 - v1.4.9 (Mono, `new_var_test.cs`): Events.cfg loads with no errors (619 commands, 9 group help blocks, 35 commands with
   help); New_Var's bytes, text and round trip; defaults, positional and numeric forms, a name used above its
   declaration and in another script, explicit / auto slots, all 64 slots, the errors (unknown name, an alias's or a
-  command's name, too long, bad type / slot); aliases off (hex, compiles back); names coming back from a saved file
+  command's name, too long, bad type / slot); aliases off (hex, compiles back); a preview compile (the Hitbox Viewer following the editor) leaves no half-typed names behind; names coming back from a saved file
   in a new session; Kirby's game / sound / expression scripts (1,651) still decompile and compile to the same bytes
   (effect.bin: the same 5 else-if chains as before); every new command's examples compile and round-trip. Under
   Xvfb (`new_var_gui_test.cs`, also referencing SM4SHCommand.exe and System.Windows.Forms / System.Drawing; `xvfb-run
   mono GuiTest.exe Events.cfg`): View > Commands' New_Var page (5 parameters, the declared names, the template) and
-  the hover on a name. 129 + 9 checks, 0 failures. Build and run: `dotnet .../csc.dll -out:NvTest.exe -r:SALT.dll -r:/usr/lib/mono/4.5/mscorlib.dll
+  the hover on a name. 130 + 9 checks, 0 failures. Build and run: `dotnet .../csc.dll -out:NvTest.exe -r:SALT.dll -r:/usr/lib/mono/4.5/mscorlib.dll
   -r:/usr/lib/mono/4.5/System.dll -r:/usr/lib/mono/4.5/System.Core.dll -nostdlib new_var_test.cs`, then
   `mono NvTest.exe Events.cfg Aliases FIGHTER/script/animcmd/body TMP_DIR` next to the built SALT.dll.
 - v1.4.8 (Mono): Events.cfg loads with no errors (618 commands, 8 group help blocks, 34 commands with help); every

@@ -315,6 +315,8 @@ namespace Sm4shCommand.GUI
             if (currentCrc != scriptCrc) return getScript(currentCrc);
             if (editor != null)
             {
+                // a preview compile while typing: New_Var names typed half-way (c, ch, cha, ...) mustn't take slots
+                var names = SALT.Moveset.FighterVariable.SaveNewVars();
                 try
                 {
                     var lines = ACMDCompiler.StripComments(editor.Lines.ToArray());
@@ -323,6 +325,10 @@ namespace Sm4shCommand.GUI
                 catch (Exception ex)
                 {
                     error = ex.Message.Split('\n')[0];
+                }
+                finally
+                {
+                    SALT.Moveset.FighterVariable.RestoreNewVars(names);
                 }
             }
             return getScript(scriptCrc);

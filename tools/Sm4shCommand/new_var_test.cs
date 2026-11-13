@@ -155,6 +155,14 @@ class NvTest
         Check("a 65th: an error", Error("New_Var(Name=v64)"), "New_Var: all 64 slots have names already (give Slot= to share one)");
         Check("a 65th sharing a slot", Error("New_Var(Name=v64, Slot=3)"), null);
 
+        // ---- a preview compile (the Hitbox Viewer following the editor) leaves no half-typed names behind
+        FighterVariable.ClearNewVars();
+        Compile("New_Var(Name=kept)");
+        var before = FighterVariable.SaveNewVars();
+        Compile("New_Var(Name=c)\nNew_Var(Name=ch)");
+        FighterVariable.RestoreNewVars(before);
+        Check("preview: only the names from before", string.Join(",", FighterVariable.NewVars.Select(v => v.Name + "=" + v.Slot)), "kept=0");
+
         // ---- aliases off: hex, which compiles back
         FighterVariable.ClearNewVars();
         s = Compile("New_Var(Name=charge, Type=int)\nINC_INT(Variable=charge)");
