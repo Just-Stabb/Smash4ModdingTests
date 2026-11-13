@@ -21,6 +21,8 @@
   (what it does, every parameter and its values, what it sets or returns, gotchas) and complete, realistic
   examples: add its GROUP / HELP / EXAMPLES in `tools/acmd_ext_help.py`, regenerate Events.cfg, rebuild
   Sm4shCommand, and check every example compiles and round-trips.
+- **CPU AI:** for editing fighters' CPU AI, use the vendored `tools/Sm4shAIEditor/` (BenHall-7; disassembles /
+  assembles the ATKD, script and AIPD AI files; see its README and `VENDORED.md`).
 - **Script names:** every script or motion slot a mod adds (game / effect / sound / expression, any
   fighter) gets its name in `tools/Sm4shCommand/SM4SHCommand/ModAnimNames.txt` (under the fighter's
   heading), so Sm4shCommand labels it; rebuild Sm4shCommand when it changes. A script that plays
