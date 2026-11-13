@@ -1766,6 +1766,7 @@ WorkModule(0x0, WorkModule(0x6, 0x208000C2), 0x02000340); //Common Param Name 83
     sideb_reflect_off();    // air side B reflector off if the swing ended early (added, before crouchjump_update)
     crouchjump_update();    // jump out of a crouch: higher, keeps momentum, trail effect (added)
     newcopy_update();       // Hero / Sephiroth copies: Kirby's MP (end of the file)
+    khm_update();           // Hero copy: Stone = Command Selection, the spells, the buffs, the panel (end of the file)
     kirby_trait_update();   // copy ability trait: stat boosts / moveset changes (added), see the end of the file
     upb_air_update();       // up B available again on the ground / when hit (added)
     upb_cancel_carry();     // up B -> neutral special cancel: keeps the (capped) rise (added)
@@ -38990,7 +38991,8 @@ void func_2322()
 void func_2323()
 {
     func_2324();
-    if (ControlModule(0x2710, 0x1) && WorkModule(0x6, 0x11000003) >= WorkModule(0x6, 0x18000001))
+    if (ControlModule(0x2710, 0x1) && WorkModule(0x6, 0x11000003) >= WorkModule(0x6, 0x18000001)
+        && khm_blocking() == 0) // the Hero copy's Command Selection takes special while it's open (end of the file)
     {
         func_16(0x176, 0);
         return 0x1;
@@ -72871,6 +72873,10 @@ int kirby_copy_trait(int kind)
 // Stat profile for the executable's stat scaling (tools/kirby_stat_cave.py PROFILES).
 int kirby_trait_profile(int trait)
 {
+    if (khm_speed_t > 0)
+    {
+        return 3; // the Hero copy's Acceleratle: Hero's profile 3 (x2 speeds; end of the file)
+    }
     if (global83)
     {
         return 2; // Overdrive: Rush x1.2 (tools/kirby_stat_cave.py)
@@ -72954,7 +72960,7 @@ void kirby_trait_update()
     overdrive_update();
     strike_crit_update(trait);
     // bits 8-11: the trait number, for the damage panel's trait badge (tools/trait_badge_cave.py)
-    WorkModule(0x7, 0x4b490000 + trait * 0x100 + kirby_trait_profile(trait) + kirby_trait_flags(trait), 0x1000008e);
+    WorkModule(0x7, 0x4b490000 + trait * 0x100 + kirby_trait_profile(trait) + kirby_trait_flags(trait) + khm_buff_bits(), 0x1000008e);
 }
 
 // ===================================================================
@@ -75049,4 +75055,635 @@ void newcopy_n_end()
     {
         ncp_charge_off();
     }
+}
+
+// ===================================================================
+// Hero copy, stage 2: Stone (down special) = Hero's Command Selection (added; the user: "When Kirby has Hero's copy
+// ability, make it so when Kirby is in the stone, he gets Hero's menu (Command Selection) and all of the same
+// spells ... use the attacks at the same offsets as Hero does while in the stone and not change the animation").
+// fighters/kirby/specials.md "Hero copy: Stone = Command Selection". As Hero's (fighters/brave/brave.c brave_lw_*,
+// "Hero's MP"): when the stone's hold starts (status 0x175) four spells are drawn with Ultimate's weights (lot_prob),
+// the ones his MP doesn't pay for greyed and put last; the stick (up / down past 0.5, again every 12 frames held)
+// moves the cursor, attack or special (once let go) casts, shield / jump / 480 frames shut it (blinking from 360).
+// While it's open special doesn't end the stone (func_2323) and his MP doesn't come back. The stone's own motion,
+// fall and armour are left as they are; the spell plays out from the stone (its frames counted here, the main loop):
+//   1 Heal (11%), 2 / 3 Sizz / Sizzle (copy article 8, Hero's flash), 4 / 5 Bang / Kaboom (9, explosion),
+//   6 / 7 Whack / Thwack (10, deathball), 8 Magic Burst (12, crash: all his MP, its strength in fifths), 14 Snooze
+//   (11, sleep), and the buffs through the same marker bits as Hero's (0x1000008E: tools/kirby_stat_cave.py profile
+//   3, tools/hero_buff_cave.py 0x20 / 0x40 / 0x80 / 0x1000): 11 Acceleratle (600 frames x2 speeds), 12 Oomph (720
+//   frames), 21 Psyche Up (until his next hit lands), 22 Acceleration (600 frames, bit 0x1000).
+//   Not in this version (weight 0, never drawn): 9 Kamikazee, 10 Kaclang, 13 Bounce, 15 Hocus Pocus, 16 Zoom,
+//   17-20 the sword spells (the user: Hero's sword shown on the stone, its hitboxes as Hero's), 23 Zoom 2 U.
+// Costs, weights, frames: Hero's (brave_cost, brave_lw_weight, brave_lw_cast). The articles come from Kirby's hand
+// (Robin's thunder spawner, as Hero's), told their level through the custom N slot as Hero's (0x10000048, and
+// 0x1000009F on Kirby with a copy: copy_custom_cave.py); Hero's shot.c finds the owner as the nearest Hero or
+// Kirby (fighters/brave/weapons/shot.c). Sounds: Hero's (his bank loads with him). Glows on his hip (HipN 2).
+// The panel: Kirby's ints 0x1000008A (gauge), 0x1000008C (window), 0x1000008D (rows), drawn by the panel cave for
+// kind 8 (exe_v45: tools/kirby_hero_menu_cave.py), the values as brave_panel_update's.
+// ===================================================================
+int   khm_state;      // 0 shut, 1 open, 2 a spell being cast
+int   khm_frame;      // frames open / cast
+int   khm_cursor;
+int   khm_spells;     // the four rows, 5 bits each
+int   khm_spell;
+int   khm_released;
+int   khm_stick;
+int   khm_repeat;
+int   khm_done;
+int   khm_burst;
+int   khm_ate;        // this frame's special was taken by the menu
+int   khm_last;       // last frame's status
+int   khm_menu;       // panel: 0 shut, 1 open, 2 a cast row, 3 closing
+int   khm_anim;
+int   khm_t;
+int   khm_rows;
+int   khm_grey;
+int   khm_cost_view;
+int   khm_speed_t;    // Acceleratle frames left
+int   khm_attack_t;   // Oomph frames left
+int   khm_accel_t;    // Acceleration frames left
+int   khm_psyche;     // Psyche Up held
+
+int khm_bit(int s)
+{
+    int b;
+    int i;
+    b = 0x1;
+    i = 0;
+    while (i < s)
+    {
+        b = b * 0x2;
+        i += 1;
+    }
+    return b;
+}
+
+// Hero's costs (brave_cost)
+int khm_cost(int n)
+{
+    if (n == 0x1) { return 0x7; }
+    if (n == 0x2) { return 0x8; }
+    if (n == 0x3) { return 0x14; }
+    if (n == 0x4) { return 0x9; }
+    if (n == 0x5) { return 0x25; }
+    if (n == 0x6) { return 0xa; }
+    if (n == 0x7) { return 0x1e; }
+    if (n == 0x8) { return 0x1; }     // Magic Burst: all of it (at least 1)
+    if (n == 0xb) { return 0xd; }
+    if (n == 0xc) { return 0x10; }
+    if (n == 0xe) { return 0x10; }
+    if (n == 0x15) { return 0xe; }
+    if (n == 0x16) { return 0x14; }
+    return 0;
+}
+
+// Hero's draw weights (brave_lw_weight); 0: not in this version
+int khm_weight(int n)
+{
+    if (n == 0x1) { return 0x7; }
+    if (n == 0x2 || n == 0x4 || n == 0xb || n == 0xc || n == 0x15) { return 0x10; }
+    if (n == 0x3 || n == 0x5) { return 0x14; }
+    if (n == 0x6) { return 0xc; }
+    if (n == 0x7) { return 0x8; }
+    if (n == 0x8) { return 0x5; }
+    if (n == 0xe) { return 0x11; }
+    if (n == 0x16) { return 0x10; }
+    return 0;
+}
+
+int khm_can_pay(int n)
+{
+    float c;
+    c = (float)khm_cost(n);
+    return c <= ncp_mp;
+}
+
+int khm_row(int k)
+{
+    int v;
+    int i;
+    v = khm_spells;
+    i = 0;
+    while (i < k)
+    {
+        v = v / 0x20;
+        i += 1;
+    }
+    return v % 0x20;
+}
+
+int khm_grey_bits()
+{
+    int k;
+    int n;
+    int g;
+    g = 0;
+    k = 0;
+    while (k < 0x4)
+    {
+        n = khm_row(k);
+        if (n != 0 && khm_can_pay(n) == 0)
+        {
+            g = g + khm_bit(k);
+        }
+        k += 1;
+    }
+    return g;
+}
+
+// four spells drawn by weight without repeats, then the ones he pays for first (brave_lw_draw)
+void khm_draw()
+{
+    int k;
+    int n;
+    int total;
+    int r;
+    int taken;
+    int pick;
+    int mul;
+    int pass;
+    int drawn;
+    khm_spells = 0;
+    taken = 0;
+    mul = 0x1;
+    k = 0;
+    while (k < 0x4)
+    {
+        total = 0;
+        n = 0x1;
+        while (n <= 0x17)
+        {
+            if ((taken / khm_bit(n)) % 0x2 == 0)
+            {
+                total = total + khm_weight(n);
+            }
+            n += 1;
+        }
+        pick = 0;
+        if (total > 0)
+        {
+            r = randi(0, total);
+            n = 0x1;
+            while (n <= 0x17 && pick == 0)
+            {
+                if ((taken / khm_bit(n)) % 0x2 == 0)
+                {
+                    r = r - khm_weight(n);
+                    if (r < 0)
+                    {
+                        pick = n;
+                    }
+                }
+                n += 1;
+            }
+        }
+        if (pick != 0)
+        {
+            taken = taken + khm_bit(pick);
+            khm_spells = khm_spells + pick * mul;
+        }
+        mul = mul * 0x20;
+        k += 1;
+    }
+    drawn = khm_spells;
+    khm_spells = 0;
+    mul = 0x1;
+    pass = 0;
+    while (pass < 0x2)
+    {
+        k = 0;
+        while (k < 0x4)
+        {
+            n = (drawn / khm_bit(0x5 * k)) % 0x20;
+            if (n != 0 && khm_can_pay(n) == 1 - pass)
+            {
+                khm_spells = khm_spells + n * mul;
+                mul = mul * 0x20;
+            }
+            k += 1;
+        }
+        pass += 1;
+    }
+}
+
+void khm_move()
+{
+    int dir;
+    int i;
+    dir = 0;
+    if (global32 > 0.5f)
+    {
+        dir = -1;
+    }
+    else if (global32 < -0.5f)
+    {
+        dir = 0x1;
+    }
+    if (khm_stick == 0x2)
+    {
+        if (dir == 0)
+        {
+            khm_stick = 0;
+        }
+        return;
+    }
+    if (dir == 0)
+    {
+        khm_stick = 0;
+        return;
+    }
+    if (dir == khm_stick)
+    {
+        khm_repeat += 1;
+        if (khm_repeat < 0xc)
+        {
+            return;
+        }
+    }
+    khm_stick = dir;
+    khm_repeat = 0;
+    i = 0;
+    while (i < 0x4)
+    {
+        khm_cursor = (khm_cursor + dir + 0x4) % 0x4;
+        if (khm_row(khm_cursor) != 0)
+        {
+            return;
+        }
+        i += 1;
+    }
+}
+
+int khm_once(int bit)
+{
+    if ((khm_done / bit) % 0x2 == 0x1)
+    {
+        return 0;
+    }
+    khm_done = khm_done + bit;
+    return 0x1;
+}
+
+int khm_blocking()
+{
+    return khm_state == 0x1 || khm_ate;
+}
+
+// an article (copy article id) with its custom number (as ncp_hero_generate)
+void khm_generate(int article, int custom)
+{
+    int slot;
+    int copyslot;
+    slot = WorkModule(0x6, 0x10000048);
+    copyslot = WorkModule(0x6, 0x1000009f);
+    WorkModule(0x7, custom, 0x10000048);
+    WorkModule(0x7, custom, 0x1000009f);
+    ArticleModule(0x2710, article);
+    WorkModule(0x7, slot, 0x10000048);
+    WorkModule(0x7, copyslot, 0x1000009f);
+}
+
+// Kirby's player slot (Hero's brave_self_slot / brave_slot_of: the slot whose position variables are at his
+// position; 8 none, as brave_lw_slot)
+int khm_self_slot()
+{
+    float x;
+    float y;
+    int s;
+    float dx;
+    float dy;
+    x = WorkModuleF(0, 0x0f000000);
+    y = WorkModuleF(0, 0x0f000001);
+    s = 0;
+    while (s < 0x8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
+        {
+            dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - x;
+            dy = WorkModuleF(0, 0x0f000021 + 0x4 * s) - y;
+            if (dx < 1.0f && dx > -1.0f && dy < 1.0f && dy > -1.0f)
+            {
+                return s;
+            }
+        }
+        s += 1;
+    }
+    return 0x8;
+}
+
+int khm_burst_motion()
+{
+    if (khm_burst > 0x50) { return 0; }
+    if (khm_burst > 0x3c) { return 0x6; }
+    if (khm_burst > 0x28) { return 0x5; }
+    if (khm_burst > 0x14) { return 0x4; }
+    return 0x3;
+}
+
+void khm_glow(int id, int on)
+{
+    EffectModule(0x2723, id, 0, 0x1);
+    if (on)
+    {
+        EffectModule(0x2717, id, 0x2, 0, 0, 0, 0, 0, 0, 0.95f, 0);
+    }
+}
+
+void khm_close()
+{
+    if (khm_menu == 0x1 || khm_menu == 0x2)
+    {
+        khm_menu = 0x3;
+        khm_anim = 0x4;
+    }
+}
+
+// the spell, frame f of its cast (brave_lw_cast's frames)
+void khm_cast(int f)
+{
+    int n;
+    float d;
+    n = khm_spell;
+    if (n == 0x1 && f >= 6 && khm_once(0x1))
+    {
+        d = WorkModuleF(0, 0x0f000117) - 11.0f;
+        if (d < 0)
+        {
+            d = 0;
+        }
+        WorkModule(0, d, 0x0f000117);
+        EffectModule(0x2717, 0x1000035, 0x2, 0, 0, 0, 0, 0, 0, 1.0f, 0);
+        SoundModule(0x2710, 0x76400d4);
+    }
+    else if ((n == 0x2 || n == 0x3) && f >= 6 && khm_once(0x1))
+    {
+        khm_generate(0x8, n - 0x2);
+    }
+    else if ((n == 0x4 || n == 0x5) && f >= 6 && khm_once(0x1))
+    {
+        khm_generate(0x9, n - 0x4);
+    }
+    else if ((n == 0x6 || n == 0x7) && f >= 6 && khm_once(0x1))
+    {
+        khm_generate(0xa, n - 0x6);
+    }
+    else if (n == 0x8 && f >= 20 && khm_once(0x1))
+    {
+        khm_generate(0xc, khm_burst_motion() + 0x8 * khm_self_slot());
+    }
+    else if (n == 0xe && f >= 6 && khm_once(0x1))
+    {
+        khm_generate(0xb, 0);
+    }
+    else if (n == 0xb && f >= 11 && khm_once(0x1))
+    {
+        khm_speed_t = 0x258;
+        khm_glow(0x345007b, 0x1);
+    }
+    else if (n == 0xc && f >= 11 && khm_once(0x1))
+    {
+        khm_attack_t = 0x2d0;
+        khm_glow(0x345007a, 0x1);
+    }
+    else if (n == 0x15 && f >= 6 && khm_once(0x1))
+    {
+        khm_psyche = 0x1;
+        khm_glow(0x345004e, 0x1);
+    }
+    else if (n == 0x16 && f >= 11 && khm_once(0x1))
+    {
+        khm_accel_t = 0x258;
+    }
+}
+
+// the buffs' marker bits (brave_buff_update's: 3 Acceleratle is the profile, kirby_trait_profile)
+int khm_buff_bits()
+{
+    int m;
+    m = 0;
+    if (khm_accel_t > 0)
+    {
+        m = m + 0x1000;
+    }
+    if (khm_attack_t > 0)
+    {
+        m = m + 0x80;
+        if (global4 < 0x152 || global4 > 0x155)
+        {
+            m = m + 0x20;
+        }
+    }
+    if (khm_psyche && (global4 < 0x152 || global4 > 0x155))
+    {
+        m = m + 0x40;
+    }
+    return m;
+}
+
+void khm_buffs()
+{
+    if (khm_speed_t > 0)
+    {
+        khm_speed_t -= 1;
+        if (khm_speed_t == 0)
+        {
+            khm_glow(0x345007b, 0);
+        }
+    }
+    if (khm_attack_t > 0)
+    {
+        khm_attack_t -= 1;
+        if (khm_attack_t == 0)
+        {
+            khm_glow(0x345007a, 0);
+        }
+    }
+    if (khm_accel_t > 0)
+    {
+        khm_accel_t -= 1;
+    }
+    if (khm_psyche && (global4 < 0x152 || global4 > 0x155)
+        && (WorkModuleF(0, 0x0f0000a1) >= 0.5f && (global4 < 0x35 || global4 > 0x3e)
+            || global5 == 0x3e && global4 != 0x3e))
+    {
+        khm_psyche = 0;
+        khm_glow(0x345004e, 0);
+    }
+    if (global4 == 0xb1 || newcopy_hero() == 0)
+    {
+        khm_speed_t = 0;
+        khm_attack_t = 0;
+        khm_accel_t = 0;
+        khm_psyche = 0;
+    }
+}
+
+// the panel's ints (brave_panel_update's values, Kirby's ints: tools/kirby_hero_menu_cave.py)
+void khm_panel()
+{
+    int a;
+    int g;
+    int b;
+    if (newcopy_hero() == 0)
+    {
+        WorkModule(0x7, 0, 0x1000008a);
+        WorkModule(0x7, 0, 0x1000008c);
+        WorkModule(0x7, 0, 0x1000008d);
+        khm_menu = 0;
+        return;
+    }
+    g = (int)ncp_mp;
+    b = g;
+    if (khm_cost_view > 0 && khm_cost_view <= g)
+    {
+        b = g - khm_cost_view;
+    }
+    khm_cost_view = 0;
+    WorkModule(0x7, 0x4d500000 + g * 0x100 + b, 0x1000008a);
+    if (khm_menu == 0)
+    {
+        WorkModule(0x7, 0, 0x1000008c);
+        WorkModule(0x7, 0, 0x1000008d);
+        return;
+    }
+    if (khm_anim < 0x7)
+    {
+        khm_anim += 1;
+    }
+    khm_t += 1;
+    if (khm_menu == 0x3 && khm_anim > 0x4)
+    {
+        khm_menu = 0;
+        WorkModule(0x7, 0, 0x1000008c);
+        WorkModule(0x7, 0, 0x1000008d);
+        return;
+    }
+    a = 0x48450004 + khm_cursor + (khm_anim - 0x1) * 0x100 + (khm_t / 0x2 % 0x10) * 0x800;
+    if (khm_menu == 0x3)
+    {
+        a = a + 0x8;
+    }
+    if (khm_menu == 0x2)
+    {
+        a = a + 0x20;
+    }
+    if (khm_menu == 0x1 && khm_t >= 0x168 && khm_t / 0x4 % 0x2 == 0x1)
+    {
+        a = a + 0x10;
+    }
+    WorkModule(0x7, a, 0x1000008c);
+    WorkModule(0x7, 0x48000000 + khm_rows + khm_grey * 0x100000, 0x1000008d);
+}
+
+void khm_open()
+{
+    khm_state = 0x1;
+    khm_frame = 0;
+    khm_cursor = 0;
+    khm_spell = 0;
+    khm_released = 0;
+    khm_stick = 0x2;
+    khm_repeat = 0;
+    khm_done = 0;
+    khm_draw();
+    khm_menu = 0x1;
+    khm_anim = 0;
+    khm_t = 0;
+    khm_rows = khm_spells;
+    khm_grey = khm_grey_bits();
+    SoundModule(0x2710, 0x76400dd);     // se_brave_special_l18: the window opens
+}
+
+void khm_shut()
+{
+    khm_state = 0;
+    khm_close();
+}
+
+// every frame (main loop, after newcopy_update)
+void khm_update()
+{
+    int n;
+    khm_ate = 0;
+    khm_buffs();
+    if (newcopy_hero() && global4 == 0x175 && khm_last != 0x175 && khm_state != 0x1)
+    {
+        khm_open();
+    }
+    khm_last = global4;
+    if (khm_state == 0x1)
+    {
+        if (global4 != 0x175 || newcopy_hero() == 0)
+        {
+            khm_shut();     // the stone ended or he lost the copy
+        }
+        else
+        {
+            khm_frame += 1;
+            ncp_mp_timer = 0;   // no MP back while it's open
+            if (ControlModule(0x2712, 0x1) == 0)
+            {
+                khm_released = 0x1;
+            }
+            khm_move();
+            n = khm_row(khm_cursor);
+            khm_grey = khm_grey_bits();
+            khm_cost_view = khm_cost(n);
+            if (khm_frame == 0x168)
+            {
+                SoundModule(0x2710, 0x76400c1);     // 2 s left
+            }
+            if (ControlModule(0x2710, 0x3) || ControlModule(0x2710, 0x2) || khm_frame >= 0x1e0)
+            {
+                khm_ate = ControlModule(0x2710, 0x1);
+                khm_shut();
+            }
+            else if (n != 0 && (ControlModule(0x2710, 0) || khm_released && ControlModule(0x2710, 0x1)))
+            {
+                khm_ate = 0x1;
+                SoundModule(0x2710, 0x76400c0);     // a spell chosen
+                khm_menu = 0x2;
+                khm_rows = n * khm_bit(0x5 * khm_cursor);
+                khm_grey = (khm_grey / khm_bit(khm_cursor)) % 0x2 * khm_bit(khm_cursor);
+                khm_anim = 0x5;
+                khm_t = 0;
+                if (khm_can_pay(n))
+                {
+                    khm_burst = (int)(ncp_mp + 0.999f);
+                    ncp_mp = ncp_mp - (float)khm_cost(n);
+                    if (n == 0x8)
+                    {
+                        ncp_mp = 0;
+                    }
+                    khm_spell = n;
+                }
+                else
+                {
+                    khm_spell = 0;      // greyed: the misfire puff
+                    EffectModule(0x2717, 0x1000006, 0x2, 0, 0, 0, 0, 0, 0, 1.0f, 0);
+                }
+                khm_state = 0x2;
+                khm_frame = 0;
+                khm_done = 0;
+            }
+            else if (ControlModule(0x2710, 0x1))
+            {
+                khm_ate = 0x1;      // special before it was let go: kept from the stone
+            }
+        }
+    }
+    else if (khm_state == 0x2)
+    {
+        khm_cast(khm_frame);
+        khm_frame += 1;
+        if (khm_frame >= 0x46)
+        {
+            khm_close();
+        }
+        if (khm_frame >= 0x50)
+        {
+            khm_state = 0;
+        }
+    }
+    khm_panel();
 }

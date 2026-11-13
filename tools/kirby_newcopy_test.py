@@ -42,10 +42,16 @@ class Game:
         self.press, self.held = set(), set()
         self.stick_y = 0.0
         self.motions, self.articles, self.statuses, self.effects = [], [], [], []
+        self.fvars = {}
 
     def sys(self, sid, a):
         f = R.i2f
+        if sid == 0x17 and len(a) == 2 and a[0] == 0:          # WorkModuleF(0, var): position variables
+            return R.f2i(self.fvars.get(a[1], 0.0))
         if sid == 0x16:                                         # WorkModule
+            if a[0] == 0 and len(a) == 3:                       # WorkModule(0, value, var): set a float variable
+                self.fvars[a[2]] = R.i2f(a[1])
+                return 0
             if a[0] == 0x6:
                 return self.ints.get(a[1], 0)
             if a[0] == 0x7:
@@ -148,6 +154,92 @@ class Run:
         return g
 
 
+def menu_tests(path, src):
+    """stage 2: Stone (status 0x175) = Hero's Command Selection (kirby.c khm_*)"""
+    r = Run(path, src, 2)
+    g = r.game
+    r.update()
+    g.fvars[0x0F000117] = 30.0                  # his damage (Heal)
+    r.vm.g[r.gi['global4']] = 0x175
+    r.vm.call(r.fn['khm_update'])
+    check('menu: opens when the stone starts', r.vm.g.get(r.gi['khm_state']), 1)
+    check('menu: blocks the stone\'s special while open', r.vm.call(r.fn['khm_blocking']), 1)
+    r.vm.g[r.gi['khm_spells']] = 0x1 + 0x2 * 0x20 + 0xc * 0x400   # rows: Heal, Sizz, Oomph
+    r.vm.g[r.gi['khm_rows']] = r.vm.g[r.gi['khm_spells']]
+    r.vm.call(r.fn['khm_update'])
+    check('panel: the gauge int (0x8A) 0x4D50 + MP 100 + after-cost 93 (Heal at the cursor)', hex(g.ints.get(0x1000008A, 0)),
+          hex(0x4D500000 + 100 * 0x100 + 93))
+    check('panel: the window int (0x8C) shown, Hero\'s magic', (g.ints.get(0x1000008C, 0) >> 16, g.ints.get(0x1000008C, 0) & 4),
+          (0x4845, 4))
+    check('panel: the rows int (0x8D)', g.ints.get(0x1000008D, 0) & 0xFFFFF, 0x1 + 0x2 * 0x20 + 0xc * 0x400)
+    r.vm.g[r.gi['global32']] = R.f2i(-1.0)    # stick down: the cursor to row 1 (Sizz)
+    r.vm.call(r.fn['khm_update'])
+    r.vm.g[r.gi['global32']] = 0
+    check('menu: stick down moves the cursor', r.vm.g.get(r.gi['khm_cursor']), 1)
+    r.vm.g[r.gi['global32']] = R.f2i(-1.0)    # the stick came back (the first move waits for it), now down
+    r.vm.call(r.fn['khm_update'])
+    r.vm.g[r.gi['global32']] = R.f2i(0.0)
+    r.vm.call(r.fn['khm_update'])
+    r.vm.g[r.gi['khm_cursor']] = 1
+    g.press = {0}                               # attack casts
+    r.vm.call(r.fn['khm_update'])
+    g.press = set()
+    check('menu: attack casts Sizz (8 MP)', (r.vm.g.get(r.gi['khm_state']), r.vm.g.get(r.gi['khm_spell']), r.gf('ncp_mp')),
+          (2, 2, 92.0))
+    for _ in range(8):
+        r.vm.call(r.fn['khm_update'])
+    check('Sizz: copy article 8, level 0 in the custom slots at frame 6',
+          [(x[0], x[2], x[3]) for x in g.articles], [(8, 0, 0)])
+    check('Sizz: the custom slots put back', (g.ints[0x10000048], g.ints[0x1000009F]), (7, 11))
+    for _ in range(80):
+        r.vm.call(r.fn['khm_update'])
+    check('menu: shut after the cast (panel window 0)', (r.vm.g.get(r.gi['khm_state']), g.ints.get(0x1000008C)), (0, 0))
+    # Heal and Oomph
+    for row, want in ((0, 'heal'), (2, 'oomph')):
+        r.vm.g[r.gi['global4']] = 0
+        r.vm.call(r.fn['khm_update'])
+        r.vm.g[r.gi['global4']] = 0x175
+        r.vm.call(r.fn['khm_update'])
+        r.vm.g[r.gi['khm_spells']] = 0x1 + 0x2 * 0x20 + 0xc * 0x400
+        r.vm.g[r.gi['khm_cursor']] = row
+        g.press = {0}
+        r.vm.call(r.fn['khm_update'])
+        g.press = set()
+        for _ in range(14):
+            r.vm.call(r.fn['khm_update'])
+        if want == 'heal':
+            check('Heal: 11% off his damage at frame 6, 7 MP', (g.fvars.get(0x0F000117), r.gf('ncp_mp')), (19.0, 85.0))
+        else:
+            check('Oomph: 720 frames, the marker bits 0x80 + 0x20 (not in a special)',
+                  (r.vm.g.get(r.gi['khm_attack_t']) > 700, r.vm.call(r.fn['khm_buff_bits'])), (True, 0xA0))
+    # too little MP: greyed, the misfire, no MP spent
+    r.setf('ncp_mp', 5.0)
+    r.vm.g[r.gi['global4']] = 0
+    r.vm.call(r.fn['khm_update'])
+    r.vm.g[r.gi['global4']] = 0x175
+    r.vm.call(r.fn['khm_update'])
+    r.vm.g[r.gi['khm_spells']] = 0x3
+    r.vm.g[r.gi['khm_cursor']] = 0
+    g.press = {0}
+    r.vm.call(r.fn['khm_update'])
+    g.press = set()
+    check('Sizzle with 5 MP: greyed, nothing cast, MP kept', (r.vm.g.get(r.gi['khm_spell']), r.gf('ncp_mp')), (0, 5.0))
+    # shield shuts it; the stone ending shuts it
+    r.vm.g[r.gi['global4']] = 0
+    r.vm.call(r.fn['khm_update'])
+    r.vm.g[r.gi['global4']] = 0x175
+    r.vm.call(r.fn['khm_update'])
+    g.press = {3}
+    r.vm.call(r.fn['khm_update'])
+    g.press = set()
+    check('shield shuts the menu', r.vm.g.get(r.gi['khm_state']), 0)
+    rr = Run(path, src, 3)
+    rr.update()
+    rr.vm.g[rr.gi['global4']] = 0x175
+    rr.vm.call(rr.fn['khm_update'])
+    check('Sephiroth copy: no menu, no gauge', (rr.vm.g.get(rr.gi['khm_state'], 0), rr.game.ints.get(0x1000008A)), (0, 0))
+
+
 def main():
     path = sys.argv[1]
     src = sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, '..', 'fighters', 'kirby', 'kirby.c')
@@ -219,6 +311,7 @@ def main():
         r.step(held=[1])
     check('Sephiroth: Gigaflare made by the charge at 120 (level 2)', [(a[0], a[1], a[4]) for a in r.game.articles],
           [(7, 120.0, 2)])
+    menu_tests(path, src)
     # the plain Robin copy
     r = Run(path, src, 0)
     check('Robin copy (no marker): newcopy_marker 0', r.vm.call(r.fn['newcopy_marker']), 0)

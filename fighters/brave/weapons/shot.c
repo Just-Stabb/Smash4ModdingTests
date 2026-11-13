@@ -94,7 +94,7 @@ void sh_loop()
 // to the article, which his spawner makes at his hand. The custom number holds the level only (0 / 1): it also picks
 // the article's native param block (4 entries, custom 0-3: tools/weapon_expand.py CUSTOM_CLAMP), and level + 4 x slot
 // read past it for P2 and later, whose Whack / Thwack never appeared (multi-instance bugs v1)
-// the live fighter nearest to the article (its kind 0x45 only when kind is 1); 8 none
+// the live fighter nearest to the article (its kind 0x45 or Kirby's 8 only when kind is 1); 8 none
 int sh_nearest(int kind)
 {
     int s;
@@ -110,7 +110,10 @@ int sh_nearest(int kind)
     {
         if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
         {
-            if (kind == 0 || (int)WorkModuleF(0, 0x0f0000bd + 0x8 * s) == 0x45)
+            // a Hero, or a Kirby (his Hero copy casts these from the stone: fighters/kirby/specials.md "Hero copy:
+            // Stone = Command Selection"); the nearest of them to the article, which is made at the caster's hand
+            if (kind == 0 || (int)WorkModuleF(0, 0x0f0000bd + 0x8 * s) == 0x45
+                || (int)WorkModuleF(0, 0x0f0000bd + 0x8 * s) == 0x8)
             {
                 dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - PostureModuleF(0x1);
                 dy = WorkModuleF(0, 0x0f000021 + 0x4 * s) - PostureModuleF(0x2);

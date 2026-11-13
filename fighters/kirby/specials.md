@@ -1315,3 +1315,47 @@ as Hero's, at Hero's offsets. Plan (not built yet):
   body / weapon ACMD folders and `motion.mtable`s) — or confirmation that `fighters/brave/*.c` in the repo is current —
   and Kirby's current body ACMD (`fighter/kirby/script/animcmd/body`: the Drive's copy is from Oct 23, before Supamario
   fix 90).
+
+## Added: Hero copy, Stone = Command Selection (stage 2, `kirby_hero_sephiroth_copy_v2`)
+
+With the Hero copy, Kirby's stone (down special: the hold, status 0x175) opens Hero's Command Selection
+(`kirby.c` "Hero copy, stage 2", `khm_*`, a port of `brave.c` `brave_lw_*` / `brave_panel_update`): four spells drawn
+with Ultimate's weights, unaffordable ones greyed and put last, the stick moves the cursor (12-frame repeat), attack or
+special (once let go) casts, shield / jump / 480 frames shut it (the 2-seconds-left sound at 360). While it's open the
+stone's own "special ends it" check (`func_2323`) is held off and his MP doesn't come back. The stone's motion, fall,
+armour and timer are untouched: the spell plays out from the stone, its frames counted by `khm_update` (main loop).
+**The menu and gauge on his damage panel:** exe_v45 (`tools/kirby_hero_menu_cave.py`, tested by
+`tools/kirby_hero_menu_test.py`): the panel cave draws for kind 8 too, from Kirby's ints `0x1000008A` (gauge),
+`0x1000008C` (window), `0x1000008D` (rows) (Hero's values, shifted: his own 0x9C-0x9F are the star copy's); the gauge
+shows whenever he has the Hero copy.
+
+| spell | on Kirby (v2) |
+|---|---|
+| Heal (7 MP) | 11% off his damage at frame 6, Hero's sound, the heal effect on his hip |
+| Sizz / Sizzle | Hero's flash article (copy article 8) at frame 6, level 0 / 1 |
+| Bang / Kaboom | Hero's explosion (article 9) |
+| Whack / Thwack | Hero's deathball (article 10) |
+| Snooze | Hero's sleep (article 11) |
+| Magic Burst | all his MP; Hero's crash (article 12) at frame 20, its strength in fifths of the MP spent, on his slot (no hover: the stone falls) |
+| Acceleratle / Oomph / Psyche Up / Acceleration | Hero's marker bits on Kirby's marker 0x1000008E: profile 3 (x2 speeds, 600 frames), 0x80 + 0x20 (720), 0x40 (to his next hit), 0x1000 (600; no Overdrive glow); the glows on his hip |
+| Kamikazee, Kaclang, Bounce, Hocus Pocus, Zoom, Zoom 2 U, Flame / Kacrackle / Metal Slash, Hatchet Man | **not yet** (weight 0: never drawn) |
+
+The articles come out of his hand as the Hero copy's fireball (Robin's thunder spawner); `fighters/brave/weapons/shot.c`
+(Hero's flash / explosion / deathball / sleep) now takes the nearest Hero **or Kirby** as the caster (it searched for
+kind 0x45 only, so a Kirby's Whack would have counted the opposing Hero as its owner: his damage for the KO chance,
+and immune). Rebuilt with `brave_build.compile_msc` (thunder_base.c + shot.c + the article).
+
+Not yet / approximated: the 12 spells above (Zoom moves the fighter through Hero's own statuses; Kaclang / Bounce /
+Hocus Pocus use Hero-side state (Robin's reflector group, his metal and item hooks) to check on Kirby; the sword spells
+need Hero's sword as a Kirby held model (the item-model table row for the Hero copy, as the hat) shown in the stone
+statuses (`copy_held_cave.py` shows held models by status) and their hitboxes from Hero's scripts on Kirby's bones);
+Hero's MP from damage dealt (0.8x) isn't on Kirby; the cast's own effects (Hero's spell motions' effect scripts) aren't
+played (the articles' and buffs' are).
+
+**Copy sounds found** (stage 1 follow-up): Kirby's Ultimate copy sound scripts are in the recomp dump
+(`reference/kirby_copy_ultimate_acmd.txt`, end): Hero hold `se_brave_special_n01` (status loop) + `vc_kirby_copy_brave_01`
+at 2, `se_brave_special_n04` at 97; N1 `n02` at 8, N2 `n03` at 11, N3 `n07` at 1 / `n05` at 17; Sephiroth charge
+`se_edge_special_n01` (loop) at 1, `vc_kirby_copy_edge_01` at 2, `se_edge_special_n04_01` at 119; Flare `n02_01` at 2,
+Megaflare `n03_01` at 2. Not played yet: their Smash 4 ids are positions in Hero's / Sephiroth's built sound banks
+(`tools/ultimate_sound.py`, from the label lists), which aren't in the repo; and `vc_kirby_copy_*` is Kirby's
+Ultimate voice, not in any Smash 4 bank.
