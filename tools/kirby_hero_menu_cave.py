@@ -21,7 +21,7 @@ fighters/kirby/specials.md "Hero copy: Stone = Command Selection".
    10 deathball (Whack / Thwack, 0x195), 11 sleep (Snooze, 0x197), 12 crash (Magic Burst, 0x196); all copies of
    Robin's thunder with its spawner 0x02F643A4 (extra_kinds.json brave "weapons"), Hero's max counts. Kirby's
    reserve article entries 10-14 name them (their files load with Kirby's).
-Space: after kirby_copy_new_cave.py's code (its cave ends at 0x04BD4218), below its LIMIT.
+Space: 0x04BAF700-0x04BAFA00 (after kirby_copy_new_cave.py's 0x04BAF400-0x04BAF700).
 """
 import os
 import sys
@@ -31,8 +31,8 @@ sys.path.insert(0, HERE)
 from ppcasm import Asm  # noqa: E402
 import kirby_copy_new_cave as V44  # noqa: E402
 
-CAVE = 0x04BD4400
-LIMIT = V44.LIMIT
+CAVE = 0x04BAF700              # crash fix v1: after kirby_copy_new_cave.py's, in kind_expand.py's code space
+LIMIT = 0x04BAFA00
 HOOK_KIND = 0x04B850C0          # cmpwi r0, 0x45 (then bne rows)
 HOOK_INTS = 0x04B85138          # lwz r11, 0xC(r11) (the WorkModule's int array)
 KIRBY = 8

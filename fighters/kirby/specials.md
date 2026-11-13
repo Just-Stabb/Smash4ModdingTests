@@ -1409,3 +1409,31 @@ is read only by the copy-resource loader (`0x030C46F4` `addi r25`, the read `0x0
 skinned to `sword1` / `haver`) as a held model (HaveN -> SwordN, as `marthsword`), show it in the stone statuses only
 while a sword spell is cast (a Kirby int read in `copy_held_cave.py`'s hook), then the hitboxes from Hero's built
 `game.bin` (SpecialLw17-20) on Kirby's bones.
+
+### Crash fix v1 (`kirby_copy_crashfix_v1`): exe_v44b / exe_v45b
+
+User: v1 crashed while loading (Cemu: IP 0 / LR 0 inside `PPCRecompiler_getJumpTableBase`; r23-r26 = the copy-resource
+loader's four tables, r8 = 0x10420010, i.e. in the loader `0x030C4694` for a copied player's slot). Two faults in
+`tools/kirby_copy_new_cave.py`, both fixed:
+1. **The cave was outside the code Cemu runs:** exe_v44 put its code at 0x04BD4000-0x04BD6000, growing the text region
+   past acmd_ext_cave.py's end (0x04BD4000) for it; the first call into it (the loader's hooks) jumped nowhere. Both
+   caves now sit in free code inside kind_expand.py's region: 0x04BAF400-0x04BAF700 (kirby_copy_new_cave.py) and
+   0x04BAF700-0x04BAFA00 (kirby_hero_menu_cave.py); no grow / textregion.
+2. **The hat swap hooked the wrong read:** `0x030C487C` reads the held-item table (r24 = 0x1041A8A0, resource type 0x11:
+   marthsword ...), so a Hero / Sephiroth player's slot loaded `bravecap` / `edgecap` as Kirby's held item (and Robin's
+   hood as the hat). The hat is read at `0x030C4830` (`lwzx r7, r23, r21`, r23 = 0x1041A7B8 from `0x030C46E8`).
+Tests that would have caught them (`tools/kirby_copy_new_test.py`, `kirby_hero_menu_test.py`): the hooked read's base
+register must be the one the loader fills with the hat table (decoded from the loader's own `addi`s), and every cave
+must lie in the code region the standard build already executes (below 0x04BD4000). exe_v44 fails both.
+
+### v5 (`kirby_hero_sephiroth_copy_v5`): the Hero copy's sounds
+
+`kirby.c` `ncp_hero_sounds`: Kirby's Ultimate Hero-copy sound scripts with Hero's Smash 4 ids, resolved from the
+user's `sound/config/soundlabeltable.bin` (snd_se_Brave = bank 2051 = row 1892) and Hero's `snd_se_Brave.nus3bank`
+(tone `snd_se_Brave_special_N01` = tone 225 = label 0xAA -> 0x76400AA; checked: `special_L01` comes out 0x76400C0, the
+id brave.c uses, and Hero's own SpecialN sound scripts play the same ids at the same frames): the hold's charge n01
+(0x76400AA) from its frame 2, stopped at the fire / cancel / status end; n04 (0x76400AF) when the charge is full; Frizz
+n02 (0x76400AB) at 8, Frizzle n03 (0x76400AD) at 11, Kafrizz n07 (0x76400B3) at 1 (stopping n04) and n05 (0x76400B0)
+at 17. Kirby's copy voices (`vc_kirby_copy_brave_01` ...) have no equivalent in his Smash 4 banks: left out.
+Sephiroth's copy sounds need `snd_se_Edge.nus3bank` (his tone names): the soundlabeltable only maps labels to tone
+indices.

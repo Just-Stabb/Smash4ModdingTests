@@ -63,8 +63,8 @@ def bl_target(at, w):
 
 def emu(img):
     mu = Uc(UC_ARCH_PPC, UC_MODE_32 | UC_MODE_BIG_ENDIAN)
-    mu.mem_map(C.CAVE, C.LIMIT - C.CAVE)
-    mu.mem_write(C.CAVE, img.read(C.CAVE, C.LIMIT - C.CAVE))
+    mu.mem_map(C.CAVE & ~0xFFF, 0x2000)
+    mu.mem_write(C.CAVE & ~0xFFF, img.read(C.CAVE & ~0xFFF, 0x2000))
     mu.mem_map(0x10400000, 0x40000)          # the name tables' page (0x1041A6D0 / 0x1041A7B8) and their strings
     mu.mem_write(0x10400000, img.read(0x10400000, 0x40000))
     mu.mem_map(0x10140000, 0x20000)
@@ -98,7 +98,20 @@ def main():
     for hook, _reg, _k in C.RES_HOOKS:
         check('original 0x%08X is a bl (weapon_expand.py\'s stub)' % hook, (old.w(hook) >> 26, old.w(hook) & 3), (18, 1))
     check('original 0x%08X lwz r7, -0x5930(r8)' % C.HOOK_BODY, old.w(C.HOOK_BODY), 0x80E8A6D0)
-    check('original 0x%08X lwzx r7, r24, r21' % C.HOOK_HAT, old.w(C.HOOK_HAT), 0x7CF8A82E)
+    check('original 0x%08X lwzx r7, r23, r21' % C.HOOK_HAT, old.w(C.HOOK_HAT), 0x7CF7A82E)
+    # crash fix v1: the read hooked as the hat's must read the register the loader fills with the hat table
+    # (0x1041A7B8: lis 0x1042 + addi -0x5848 at 0x030C46E8), not the held-item table's (exe_v44 hooked r24's)
+    w = old.w(C.HOOK_HAT)
+    base = (w >> 16) & 31
+    adds = {}
+    for a in range(0x030C46DC, 0x030C4700, 4):
+        x = old.w(a)
+        if x >> 26 == 14:                                   # addi rD, rA, simm
+            adds[(x >> 21) & 31] = 0x10420000 + (((x & 0xFFFF) ^ 0x8000) - 0x8000)
+    check('the hat hook reads the hat table (0x1041A7B8) through r%d' % base, adds.get(base), 0x1041A7B8)
+    # crash fix v1: every cave word inside the text region the standard build already runs code in (below
+    # acmd_ext_cave.py's end, 0x04BD4000; exe_v44 grew past it and Cemu crashed calling there)
+    check('cave inside the proven code region', C.CAVE >= 0x04B00000 and C.LIMIT <= 0x04BD4000, True)
     check('Kirby copy table [0x2C] is Robin\'s header', old.w(C.COPY_TABLE + 4 * C.ROBIN), C.ROBIN_HDR)
     recs, n = old.w(C.ROBIN_HDR), old.w(C.ROBIN_HDR + 4)
     check('original Robin copy records', (recs, [tuple(old.w(recs + 16 * i + 4 * j) for j in range(4)) for i in range(n)]),
@@ -107,7 +120,7 @@ def main():
         e = C.KIRBY_RESERVE + 0x10 * i
         check('original reserve entry %d free' % i, [old.w(e + 4 * j) for j in range(4)], [0x10, 0, 0, 0])
     for a in range(C.CAVE, C.LIMIT, 4):
-        if old.w(a) if a < 0x04BD4000 else 0:
+        if old.w(a):
             check('cave 0x%08X free in the original' % a, old.w(a), 0)
     # the patched
     a, _res = C.args()
@@ -137,14 +150,14 @@ def main():
             if keep and struct.unpack('>I', bytes(mu.mem_read(lab['res_kind'], 4)))[0] != k:
                 bad.append('kept %x' % k)
         check('resource stub 0x%08X r%d: kinds 0-0x50 mapped%s' % (hook, reg, ', real kind kept' if keep else ''), bad, [])
-    for tag, table, idx in (('body', 0x1041A6D0, 0), ('hat', 0x1041A7B8, 1)):
+    for tag, table, idx in (('body', 0x1041A6D0, 0), ('hat', 0x1041A7B8, 1)):   # the hat read: r23 = the table
         bad = []
         for k in range(0x51):
             mk = mapping.get(k, k)
             if mk >= 0x3A or mk == 8:
                 continue            # the loader returns before reading for these
             mu.mem_write(lab['res_kind'], struct.pack('>I', k))
-            regs = {8: 0x10420000 + 4 * mk, 21: 4 * mk, 24: table, 7: 0}
+            regs = {8: 0x10420000 + 4 * mk, 21: 4 * mk, 23: table, 24: 0x1041A8A0, 7: 0}
             call(mu, lab['name_%s' % tag], regs)
             got = mem_cstr(mu, mu.reg_read(UC_PPC_REG_0 + 7))
             want = C.NAMES[k][idx] if k in C.NAMES else new.cstr(new.w(table + 4 * mk))

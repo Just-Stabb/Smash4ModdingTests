@@ -37,6 +37,7 @@ def main():
     for i, _k in C.RESERVE:
         e = C.V44.KIRBY_RESERVE + 0x10 * i
         check('original reserve entry %d free' % i, [old.w(e + 4 * j) for j in range(4)], [0x10, 0, 0, 0])
+    check('cave inside the proven code region (crash fix v1)', C.CAVE >= 0x04B00000 and C.LIMIT <= 0x04BD4000, True)
     for a in range(C.CAVE, C.CAVE + 0x200, 4):
         if old.w(a):
             check('cave 0x%08X free in the original' % a, old.w(a), 0)

@@ -23,7 +23,7 @@ no held model and no copy set-up, with Kirby's int 0x100000A0 telling the MSC wh
    (0x030C46A8 r28), its other user (0x030C5254 r16) and the release (0x030C5BD0 r23); they're re-pointed at stubs
    that also map 0x45 / 0x42 to 0x2C, and the loader's stub keeps the real kind in RES_KIND. Two name reads in the
    loader then take the new names for that slot only: the motion folder (0x030C470C `lwz r7, -0x5930(r8)`, table
-   0x1041A6D0 + "body": "brave" / "edge" -> motion/bravebody, edgebody) and the hat (0x030C487C `lwzx r7, r24, r21`,
+   0x1041A6D0 + "body": "brave" / "edge" -> motion/bravebody, edgebody) and the hat (0x030C4830 `lwzx r7, r23, r21`,
    table 0x1041A7B8: "bravecap" / "edgecap" -> model/bravecap/cNN, edgecap/cNN). A Robin in the same match loads
    refletcap / refletbody in its own slot as before.
 3. Articles: Robin's copy record list (header 0x101356E4) copied here with two more records, the copy's articles 6
@@ -33,7 +33,10 @@ no held model and no copy set-up, with Kirby's int 0x100000A0 telling the MSC wh
    the list (0x02EFDB88), so the weapons' files must be loaded: Kirby's reserve article entries 15-18 name the Robin
    copy's book 0xB4 and thunder 0xB6 (with instances, never loaded in a match without Robin) and 0x190 / 0x18C
    (count 0: their files load with Kirby's; Supamario's fix 90 did the same for its kamehameha).
-Code space: the text region grown from 0x04BD4000 (acmd_ext_cave.py's end) to LIMIT.
+Code space: 0x04BAF400-0x04BAF700, free code in kind_expand.py's region (crash fix v1: exe_v44 grew the text region
+past acmd_ext_cave.py's 0x04BD4000 for it, and Cemu crashed the first time a hook called into it: IP 0, in
+PPCRecompiler_getJumpTableBase, the user's log). The hat read is 0x030C4830 (r23 = the hat table); exe_v44 swapped
+0x030C487C, the held-item table's read (type 0x11), loading the hat as the Hero player's held item.
 """
 import os
 import struct
@@ -43,15 +46,16 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from ppcasm import Asm  # noqa: E402
 
-CAVE = 0x04BD4000
-LIMIT = 0x04BD6000
-TEXT_REGION = 0x2BD6000         # textRegionSize: code memory from 0x02000000 to LIMIT
+CAVE = 0x04BAF400              # crash fix v1: in kind_expand.py's code space (free after extended_memory.py's
+LIMIT = 0x04BAF700             # 0x04BAF000-0x04BAF100); exe_v44 grew the text region to 0x04BD6000 for it and Cemu
+                               # crashed calling into it (PPCRecompiler_getJumpTableBase, IP 0: the user's log)
 
 HOOK_GRANT = 0x02EFCDA4         # copy_grant: mr r28, r6
 HOOK_STORE = 0x02EFCEE0         # copy_grant: stw r28, 0x290(r7) (int 0x100000A4)
 RES_HOOKS = ((0x030C46A8, 28, True), (0x030C5254, 16, False), (0x030C5BD0, 23, False))   # bl old stub
 HOOK_BODY = 0x030C470C          # lwz r7, -0x5930(r8): table 0x1041A6D0 (owner name -> motion/<name>body)
-HOOK_HAT = 0x030C487C           # lwzx r7, r24, r21: table 0x1041A7B8 (hat)
+HOOK_HAT = 0x030C4830           # lwzx r7, r23, r21: table 0x1041A7B8 (hat; r23 = 0x1041A7B8 from 0x030C46E8). exe_v44
+                                # hooked 0x030C487C (r24 = 0x1041A8A0: the held-item table, type 0x11) by mistake
 
 ROBIN = 0x2C
 MAP = ((0x41, 3, 1), (0x45, ROBIN, 2), (0x42, ROBIN, 3))      # copied kind -> granted kind, marker
@@ -95,7 +99,7 @@ def source(old_records):
             src += ['cmplwi r%d, 0x%X' % (reg, k), 'bne r%X_%d' % (hook, i), 'li r%d, 0x%X' % (reg, to),
                     'r%X_%d:' % (hook, i)]
         src += ['blr']
-    for tag, orig in (('body', 'lwz r7, -0x5930(r8)'), ('hat', 'lwzx r7, r24, r21')):
+    for tag, orig in (('body', 'lwz r7, -0x5930(r8)'), ('hat', 'lwzx r7, r23, r21')):
         src += ['name_%s:' % tag, 'lis r12, res_kind@ha', 'lwz r12, res_kind@l(r12)']
         for k in sorted(NAMES):
             src += ['cmplwi r12, 0x%X' % k, 'bne n%s_%x' % (tag, k), 'lis r7, s_%s_%x@ha' % (tag, k),
@@ -137,8 +141,7 @@ def args():
     lst = a.labels['robin_list']
     out[ROBIN_HDR] = lst
     out[ROBIN_HDR + 4] = len(ROBIN_RECORDS) + len(NEW_RECORDS)
-    res = ['grow:0x%08X' % LIMIT, 'textregion:0x%X' % TEXT_REGION]
-    res += ['0x%08X=0x%08X' % (k, v) for k, v in sorted(out.items())]
+    res = ['0x%08X=0x%08X' % (k, v) for k, v in sorted(out.items())]
     res += ['reloc:0x%08X-0x%08X=0x%08X' % (ROBIN_HDR, ROBIN_HDR + 4, ROBIN_RECS_OLD + 12)]
     return a, res
 
