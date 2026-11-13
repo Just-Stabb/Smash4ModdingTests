@@ -44,6 +44,7 @@ class Game:
         self.motions, self.articles, self.statuses, self.effects = [], [], [], []
         self.fvars = {}
         self.speeds = []
+        self.sounds = []
 
     def sys(self, sid, a):
         f = R.i2f
@@ -93,6 +94,9 @@ class Game:
             return 0
         if sid == 0x10 and len(a) == 3 and a[0] == 0x11 and a[1] == 1:   # KineticModule(0x11, 1, v): speed
             self.speeds.append(R.i2f(a[2]))
+            return 0
+        if sid == 0x1E and a and a[0] in (0x2710, 0x2714):           # SoundModule play / stop
+            self.sounds.append((a[0], a[1]))
             return 0
         if sid == 0x1C and a and a[0] in (0x2717, 0x2710):
             self.effects.append(a[1])
@@ -359,6 +363,9 @@ def main():
     check('Hero: the fireball (article 6) at frame 11, level 1 in 0x10000048 / 0x1000009F',
           [(a[0], a[1], a[2], a[3]) for a in r.game.articles], [(6, 11.0, 1, 1)])
     check('Hero: the slots put back', (r.game.ints[0x10000048], r.game.ints[0x1000009F]), (7, 11))
+    check('Hero sounds: the charge n01 (0x76400AA), stopped at the fire, Frizzle\'s n03 (0x76400AD) at 11',
+          [x for x in r.game.sounds if x[1] in (0x76400AA, 0x76400AD)],
+          [(0x2710, 0x76400AA), (0x2714, 0x76400AA), (0x2710, 0x76400AD)])
     for _ in range(60):
         r.step()
     check('Hero: wait (status 0) at the end', r.game.statuses[-1:], [0])

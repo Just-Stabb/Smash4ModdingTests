@@ -74352,6 +74352,7 @@ int   ncp_fx_level;  // Hero: the hold / fire effects' step shown (-1 none); Sep
 float ncp_mp;        // Hero copy: Kirby's own MP (0-100)
 int   ncp_mp_timer;  // frames to the next MP point back
 int   ncp_last;      // last frame's marker (a new Hero copy fills the MP)
+int   ncp_snd;       // v5: the Hero copy's sounds played (bits)
 
 int newcopy_marker()
 {
@@ -74695,8 +74696,61 @@ int ncp_hero_fire_frame()
     return 10;
 }
 
+// v5: Kirby's Ultimate Hero-copy sound scripts (reference/kirby_copy_ultimate_acmd.txt, end), ids from Hero's bank
+// (snd_se_Brave, soundlabeltable row 1892: se_brave_special_n01 0x76400AA ... n07 0x76400B3; the same as Hero's own
+// SpecialN sound scripts): the hold's charge n01 from its frame 2 (stopped by the fire / cancel / the status's end),
+// n04 when it's full (Kafrizz: the mod's 81 frames; Ultimate's script plays it at the hold's 97), N1 n02 at 8, N2 n03
+// at 11, N3 n07 at 1 and n05 at 17 (stopping n04). Kirby's copy voices (vc_kirby_copy_brave_01 ...) aren't in his
+// Smash 4 banks: left out.
+void ncp_hero_sounds(float f)
+{
+    if (ncp_state == 0x1 && (ncp_snd & 0x1) == 0 && f >= 2.0f)
+    {
+        SoundModule(0x2710, 0x76400aa);
+        ncp_snd = ncp_snd | 0x1;
+    }
+    if (ncp_state == 0x1 && (ncp_snd & 0x2) == 0 && ncp_hold >= 81)
+    {
+        SoundModule(0x2710, 0x76400af);
+        ncp_snd = ncp_snd | 0x2;
+    }
+    if (ncp_state >= 0x2 && (ncp_snd & 0x4) == 0)
+    {
+        SoundModule(0x2714, 0x76400aa);
+        ncp_snd = ncp_snd | 0x4;
+    }
+    if (ncp_state == 0x2 && (ncp_snd & 0x8) == 0)
+    {
+        if (ncp_level == 0 && f >= 8.0f)
+        {
+            SoundModule(0x2710, 0x76400ab);
+            ncp_snd = ncp_snd | 0x8;
+        }
+        else if (ncp_level == 0x1 && f >= 11.0f)
+        {
+            SoundModule(0x2710, 0x76400ad);
+            ncp_snd = ncp_snd | 0x8;
+        }
+        else if (ncp_level == 0x2)
+        {
+            if ((ncp_snd & 0x10) == 0 && f >= 1.0f)
+            {
+                SoundModule(0x2710, 0x76400b3);
+                SoundModule(0x2714, 0x76400af);
+                ncp_snd = ncp_snd | 0x10;
+            }
+            if (f >= 17.0f)
+            {
+                SoundModule(0x2710, 0x76400b0);
+                ncp_snd = ncp_snd | 0x8;
+            }
+        }
+    }
+}
+
 void ncp_hero_loop(float f)
 {
+    ncp_hero_sounds(f);
     if (ncp_state == 0)
     {
         if (f >= 8.0f - 1.0f)
@@ -75028,6 +75082,7 @@ void newcopy_n_main()
     ncp_released = 0;
     ncp_fx_level = -1;
     ncp_hold = 0;
+    ncp_snd = 0;
     if (newcopy_hero())
     {
         ncp_hold = ncp_stored;       // a stored charge goes on from where it was
@@ -75054,6 +75109,10 @@ void newcopy_n_end()
     if (newcopy_marker() != 0)
     {
         ncp_charge_off();
+    }
+    if (newcopy_marker() == 0x2)
+    {
+        SoundModule(0x2714, 0x76400aa); // the hold's charge sound (PLAY_STATUS: ends with the status)
     }
 }
 
