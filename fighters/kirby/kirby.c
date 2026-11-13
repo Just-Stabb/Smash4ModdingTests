@@ -45802,8 +45802,9 @@ void func_2720()
     {
         
     }
-    else if (var0 == 0x1f2 || var0 == 0x1b || var0 == 0x1f || var0 == 0x20 || var0 == 0x21)
+    else if (var0 == 0x1f2 || var0 == 0x1b || var0 == 0x1f || var0 == 0x20 || var0 == 0x21 || var0 >= 0x45 && var0 <= 0x4c)
     {
+        // (user, as Samus's) hit while charging (Damage 0x45 - DamageFall 0x4c): the charge is kept, as on a shield
         ArticleModule(0x2712, 0);
         if (WorkModule(0x6, 0x10000084) >= func_2717())
         {
@@ -45839,7 +45840,12 @@ void func_2722()
     int var0;
     int var1;
     var0 = global6;
-    if (var0 != 0x1f4 && var0 != 0x1f3 && var0 != 0x1f1)
+    if (var0 >= 0x45 && var0 <= 0x4c)
+    {
+        // (user, as Samus's) hit in the start: the stored charge (and a full charge's glow) is kept; the shot goes
+        ArticleModule(0x2712, 0);
+    }
+    else if (var0 != 0x1f4 && var0 != 0x1f3 && var0 != 0x1f1)
     {
         WorkModule(0x7, 0, 0x10000084);
         ArticleModule(0x2712, 0);
@@ -45882,7 +45888,12 @@ void func_2725()
     int var0;
     int var1;
     var0 = global6;
-    if (var0 != 0x1f0 && var0 != 0x1f5)
+    if (var0 >= 0x45 && var0 <= 0x4c)
+    {
+        // (user, as Samus's) hit in the start: the stored charge (and a full charge's glow) is kept; the shot goes
+        ArticleModule(0x2712, 0);
+    }
+    else if (var0 != 0x1f0 && var0 != 0x1f5)
     {
         WorkModule(0x7, 0, 0x10000084);
         ArticleModule(0x2712, 0);

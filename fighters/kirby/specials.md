@@ -1175,3 +1175,11 @@ has 0x3A rows, so Supamario (`0x41`) is copied as Mario:
   copy hat or motions, so the copy's motion `0x331` played nothing. `weapon_expand.py` `kirby_copy` now also maps
   the copied fighter's kind (`0x41`) to the copy's (`3`) in all three (their `mr rK, r4` -> `bl` a stub;
   `weapon_expand_test.py` runs the stubs on every kind). Supamario's body model is Mario's, so Mario's hat is his.
+
+## Changed: Samus copy's Charge Shot keeps its charge on a hit
+
+As Samus's (`fighters/samus/README.md`): the hold's exit (`func_2720`, status `0x1F1`) keeps the charge
+(`0x10000084`) when the next status is a damage status (`0x45`-`0x4C`), the same way as a shield / dodge out;
+the starts' exits (`func_2722` `0x1F0`, `func_2725` `0x1F4`) keep a stored charge on a hit and only remove the
+shot article. Before, a hit cleared it. Mii Gunner's Charge Blast copy (`func_2577`) is unchanged.
+Package `link_samus_v1`.
