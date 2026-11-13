@@ -1437,3 +1437,21 @@ n02 (0x76400AB) at 8, Frizzle n03 (0x76400AD) at 11, Kafrizz n07 (0x76400B3) at 
 at 17. Kirby's copy voices (`vc_kirby_copy_brave_01` ...) have no equivalent in his Smash 4 banks: left out.
 Sephiroth's copy sounds need `snd_se_Edge.nus3bank` (his tone names): the soundlabeltable only maps labels to tone
 indices.
+
+### v6 (sword spells): plan, not built
+
+Hero's built sword-spell scripts (ground / air game, effect, sound for slots 0x27A-0x27D / 0x286-0x289) are saved in
+`reference/brave_sword_spells_acmd.txt` (from the user's "Hero current" package). Steps left, in order:
+1. Trace who creates Kirby's held-model object (`[fighter+0x28]+0xA8`) for a copy (start from copy_grant /
+   `0x02EFDDFC` and the item resource, type 0x11, id `0x20C + slot` with Kirby's costume bits) and whether it does so for
+   the Robin copy (its item row 0x1041A8A0[0x2C] is empty).
+2. Item-table swap at `0x030C487C` (`lwzx r7, r24, r21`, r24 = 0x1041A8A0) for a Hero slot -> "bravesword" (a third
+   name stub in `kirby_copy_new_cave.py`'s cave, inside 0x04BAF400-0x04BAF700).
+3. Convert Hero's sword (Ultimate `brave/model/body/cNN`, the sword meshes on `sword1` / `haver`) as a held model like
+   `marthsword` (HaveN -> SwordN), texture ids in Hero's block.
+4. `copy_held_cave.py`: show it in the stone statuses (0x155 / 0x175 / 0x176) only while a Kirby int says a sword spell
+   is being cast (the MSC sets it during spells 17-20).
+5. Port the four scripts' hitboxes / effects / sounds to Kirby: MSC AttackModule / EffectModule / SoundModule calls at
+   the scripts' frames, Hero's bone indices mapped to Kirby's (Hero's vbn names -> Kirby's), and their functions
+   (Metal Slash's metal KO via brave_metal_slash's variables, Kacrackle's freeze, Flame Slash's fire, Hatchet Man's
+   crit / shield break); then weights 0x12 / 0x12 / 0x7 / 0x12 and Hocus Pocus's 244.
