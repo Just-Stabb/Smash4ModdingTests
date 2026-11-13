@@ -16,6 +16,7 @@ Traits: **Rush**, **Shooter**, **Strike**, **Juggernaut**, **Normal**, **Technic
 | Bowser | `0x0F` | Strike |
 | Marth | `0x12` | Strike |
 | Donkey Kong | `0x04` | Strike |
+| Link | `0x05` | Strike |
 | Luigi | `0x0B` | Technical |
 | Supamario (new kind, Mario copy) | `0x41` | Normal |
 | Sephiroth (`edge`, new kind, Ultimate port on Zelda's base) | `0x42` | Technical |

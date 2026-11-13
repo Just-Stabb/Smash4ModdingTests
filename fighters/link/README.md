@@ -1,6 +1,6 @@
 # Link (link)
 
-Trait: not set yet (ask the user: CLAUDE.md "Character traits"). Link's fighter MSC (`link.mscsb`) is the
+Trait: **Strike** (`docs/character-traits.md`; Kirby's Link copy gets it). Link's fighter MSC (`link.mscsb`) is the
 universal-mechanics one in `fighters_rolloff_hero_v1` and isn't changed here (not in this folder).
 
 ## Arrow (Hero's Bow): `weapons/bowarrow.c`

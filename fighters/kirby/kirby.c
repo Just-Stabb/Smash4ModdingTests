@@ -72842,6 +72842,7 @@ int kirby_copy_trait(int kind)
     if (kind == 0xf)  { return trait_strike(); } // Bowser
     if (kind == 0x12) { return trait_strike(); } // Marth
     if (kind == 0x4)  { return trait_strike(); } // Donkey Kong
+    if (kind == 0x5)  { return trait_strike(); } // Link
     if (kind == 0xb)  { return trait_technical(); } // Luigi
     if (kind == 0x41) { return trait_normal(); }    // Supamario (new kind, docs/kind-expansion.md)
     if (kind == 0x42) { return trait_technical(); } // Sephiroth (edge, new kind, Zelda base)
