@@ -2291,3 +2291,107 @@ python3 tools/kirby_hero_sword_swing_test.py EXE_V46I.rpx EXE_V46H.rpx OUT/motio
     KIRBY/model/body/c00/model.vbn ULT/brave
 python3 tools/kirby_newcopy_test.py MSC_OUT/kirby_B.mscsb
 ```
+
+### Hero copy fix v7 (`kirby_hero_copy_fix_v7`): the swing where the game draws it, the stone kept, Hero's trails
+
+User (fix v6, clip `MedalTVCemuWiiUEmulator20261114124342677`): "The sword swings now, but it's too low and doesn't
+rotate correctly. Also now when the stone ends during sword moves, Kirby is visible in the animation rather than Kirby
+staying in the stone state until it finishes. After fixing that, please begin on the sword trails." No executable
+change: exe_v46i stays (the motion table words are the same).
+
+**How the game draws the swing: measured on the clip (`tools/kirby_hero_sword_clip.py`).**
+- The clip shows the first five frames of a Flame Slash from the 100t stone, side on. The pommel and the blade's end
+  were read on 2x crops in stone units: 24 px a unit, the stone 11.6 wide and 8.1 tall.
+- Fix v6's animation drawn the way fix v6 assumed misses all five frames: the pommel 6.5-9.6 too high, the blade
+  117-173 degrees off.
+- Two engine rules make the same animation match: pommel within 0.3-0.9, blade within 4-19 degrees (yellow over the
+  clip's sword in `preview/clip_v6_vs_model.png`).
+  - **TransN's translation is not drawn** (`TRANS_DRAWN = False`). It is the root's motion: SpecialLw1 ends with
+    TransN at (0, 9, 0), the 9 the sword was low by.
+  - **A held item is drawn turned -90 about the joint's Z** (`ITEM_TO_HAVE`): item point v at joint @ K @ v, so the
+    item's +Y (bravesword's blade) lies along LHaveN's +X.
+    - A free fit of the blade's axis in LHaveN's frame over the five frames gives (0.99, -0.14, 0.03), error 0.004.
+      The +Y fix v6 assumed scores 8.6.
+    - The vanilla Marth copy agrees. marthsword's blade is +Z under its HaveN bind (90, 0, -90), and with K it comes
+      out along LHaveN's +Y. That is forward at Shield Breaker's thrust (`FitKirbyMarthBodyMainD00SpecialNEnd` frame
+      15, LHaveN's +Y = (-0.03, -0.01, 0.96)).
+  - One frame offset: the sword's first visible frame shows cast frame 1.
+- So `tools/kirby_hero_sword_anim.py` now solves LHaveN as D @ inv(K) through the stone pose without the root's
+  translation, where D is the wanted item frame (Hero's Sword1 @ inv(S2H), as fix v6).
+  - S2H also turns by +90 about Z, so LHaveN's frame is now exactly Hero's Sword1 frame, 0.2023 apart along -Y.
+  - In `tools/kirby_hero_sword_msc.py`, Hero's Sword1 offsets (x, y, z) become (x, y - 0.2023, z) on LHaveN; fix v6
+    used (0.2023 - y, x, z). His sword effects keep their rotations (fix v6 added 90 about Z).
+  - The arm hitbox offsets are recomputed in the new frame.
+  - The slot names, the RPX table words and the animation names are unchanged.
+
+**The stone ending mid-spell (cause found, certain):**
+- `khm_blocking` held special off only to the spell's cancel frame, and the hold loop's ground timer not at all. Either
+  took him to SpecialLwEnd 0x176, whose main shows him again (`VisibilityModule(0x2710, 1)`) and sets the revert
+  motion.
+- `khm_stone()` counts 0x176 as the stone, so the cast went on there, and `khm_sw_motion` put him back in the swing
+  motion, visible.
+- Now:
+  - `khm_sw_busy()` (a sword spell cast, 0x0F0003A2) holds off both ends to the spell's end (special in
+    `khm_blocking`, the timer in `func_2323`). The stone then ends normally.
+  - `khm_sword` stops the spell in any status but the hold 0x175 (`khm_sw_stop`, no motion forced).
+  - `khm_sw_motion` sets the motion's frame only when it has drifted half a frame from the cast's, since a set jumps
+    the slot's new trail script.
+
+**Trails (`tools/kirby_hero_sword_acmd.py`):**
+- The swing slots 0x304-0x307 get motion.mtable names `BraveSword17`-`20`.
+- Their effect scripts hold Hero's built Sword_Glow / Terminate_Sword_Glow (`reference/brave_sword_spells_acmd.txt`,
+  Ultimate's AFTER_IMAGE4_ON / OFF as his port converted them):
+  - Hero's textures (trail ids 264-269) and shader 3, so they draw exactly as Hero's own trails. Hero is in the match
+    whenever Kirby has his copy.
+  - Bones: 0x19 -> LHaveN 0x18, offsets as above.
+  - Frames: Hero's motion frames -> cast frames (the swing motion's frames).
+
+  | Spell | Trail on | Trail off | Textures | Blur |
+  |---|---|---|---|---|
+  | Flame Slash | 3 | 8 (fade 4) | 0x10A / 0x109 | 7 |
+  | Kacrackle Slash | 4 | 8 (6) | 0x108 / 0x109 | 8 |
+  | Metal Slash | 9 | 16 (2) | 0x10D / 0x109 | 6 |
+  | Hatchet Man | 34 | 42 (3) | 0x10A / 0x109 | 6 |
+
+- Built on the Drive's Kirby animcmd (`fighter-modded-scripts-only`: effect.bin sha1 3cdf26b9, motion.mtable 0c2aa945).
+  Every other script is unchanged.
+- `ModAnimNames.txt` updated, Sm4shCommand rebuilt.
+
+**Tests:**
+- `kirby_hero_sword_clip.py V6_MAIN V7_MAIN KIRBY_VBN [--frames CLIP_FRAMES --out DIR --ult ULT_BRAVE]` (new):
+  - fix v6 as assumed misses the clip;
+  - fix v6 under the two rules matches it;
+  - the fitted axis is +X;
+  - renders: the clip overlay, and per spell Hero's blade from the Ultimate files vs fix v6 and fix v7 as drawn
+    (`hero_v6_v7_17-20.png`: green on white).
+- `kirby_hero_sword_swing_test.py ... EFFECT.bin MTABLE`:
+  - every animation drawn as the game does = Hero's blade frame (within 0.005);
+  - sword and arm hitboxes on Hero's points;
+  - the four trail scripts: names, frames, textures / shader, both trail points on Hero's blade.
+  - fix v6's animation now fails it.
+- `kirby_newcopy_test.py` (fix v6/v7):
+  - the swing motion changed once, with no frame sets while it plays in step and one after a 4-frame drift;
+  - the landing guard;
+  - for each spell, special and the ground timer held off through the spell and taken the frame after;
+  - 0x176 or a hit mid-spell stops it with no motion forced;
+  - fix v6's MSC fails all of these, the user's report reproduced: special at the cancel frame, the timer at cast 1,
+    the swing forced in 0x176.
+- Also run: `msc_stack_check.py` (globals 118), `rolloff_hold_test.py`.
+
+**Not checked in game / approximated:**
+- The roll of the item turn: rotating about the blade axis, only the blade's line was measurable. -90 about Z is the
+  plain choice and matches Marth's sword.
+- The trail's look on Kirby is Hero's (his textures and shader), not compared with an Ultimate clip of Kirby.
+- That gameplay joint positions (hitboxes) leave out TransN's translation as the drawn pose does.
+```
+python3 tools/kirby_hero_sword_anim.py ULT/brave KIRBY OUT --rpx EXE_V46I.rpx --preview PREVIEW
+cp OUT/path.json reference/kirby_hero_sword_path.json
+python3 tools/kirby_hero_sword_msc.py > /tmp/sw.c       # the GENERATED block in kirby.c
+sh tools/kirby_hero_copy_build.sh MSC_OUT
+python3 tools/kirby_hero_sword_acmd.py KIRBY/script/animcmd/body ACMD_OUT
+python3 tools/kirby_hero_sword_clip.py V6_OUT/motion/body/main.pac OUT/motion/body/main.pac KIRBY/model/body/c00/model.vbn \
+    --frames CLIP_FRAMES --out PREVIEW --ult ULT/brave
+python3 tools/kirby_hero_sword_swing_test.py EXE_V46I.rpx EXE_V46H.rpx OUT/motion/body/main.pac KIRBY/motion/body/main.pac \
+    KIRBY/model/body/c00/model.vbn ULT/brave ACMD_OUT/effect.bin ACMD_OUT/motion.mtable
+python3 tools/kirby_newcopy_test.py MSC_OUT/kirby_B.mscsb
+```

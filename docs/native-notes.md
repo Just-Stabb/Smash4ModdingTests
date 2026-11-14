@@ -274,7 +274,10 @@ when its LinkModule has attribute 7 on a link (set_attribute vt +0x3BC = `0x02C5
 module mask +0x84), the parent's is_visible (LinkModule vt +0xDC = `0x02C560C8`). The update sets link 3's attribute 7
 every frame except in the Sonic copy's spin motions 0x318-0x31A, where Kirby is hidden and the sphere shows; so a held
 model can't show while Kirby is invisible (e.g. the stone) unless that attribute is cleared (Kirby's Hero copy fix v5,
-fighters/kirby/specials.md).
+fighters/kirby/specials.md). How it is drawn (measured on a game clip, Hero copy fix v7): the item's
+model is placed at joint @ K with K a -90 degree turn about the joint's Z (the item's +Y along the joint's +X;
+marthsword's blade comes out along LHaveN's +Y), and a fighter's drawn pose leaves out the root TransN's translation
+(the root's motion: Kirby's stone pose holds TransN at (0, 9, 0)).
 
 ### Collision records (the hit target)
 

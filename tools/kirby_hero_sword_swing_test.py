@@ -158,7 +158,7 @@ def main():
         import acmd
         import struct
         import kirby_hero_sword_acmd as T
-        eff = acmd.ACMDFile.load(sys.argv[7])
+        effects = acmd.ACMDFile.load(sys.argv[7])
         mt = open(sys.argv[8], 'rb').read()
         table = struct.unpack('>%dI' % (len(mt) // 4), mt)
         for n in sorted(A.SLOT):
@@ -166,7 +166,7 @@ def main():
             tr, frames = KM.tracks(os.path.join(ult, 'motion/body/c00/%s.nuanmb' % A.SPELLS[n]))
             w = KM.ult_world(skel, tr, frames)
             at = SW.timing(ref[(n, 'ground', 'game')])
-            sc = acmd.ACMDFile.load(sys.argv[7]).script(T.name(n)) or []
+            sc = effects.script(T.name(n)) or []
             t, glows, ends_ = 0.0, [], []
             for c in sc:
                 if c.name == 'FRAME':
