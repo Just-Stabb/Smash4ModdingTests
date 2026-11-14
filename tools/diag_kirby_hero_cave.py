@@ -2,7 +2,7 @@
 """TEMPORARY diagnostic executable for Kirby's Hero copy (fighters/kirby/specials.md "Hero copy fix v4" / "fix v5"):
 OSReport lines (Cemu's log, `S4KH <tag> ...`, hex words, floats as their bits) from every step of the held sword's
 chain and from the Hero spells' articles, so the user's log settles what the static reading and the unicorn runs can't.
-Not for the normal chain build. Goes on the B executable (fix v5: exe_v46h) and prints rpx_patch.py arguments:
+Not for the normal chain build. Goes on the B executable (fix v5: exe_v46h; fix v6: exe_v46i) and prints rpx_patch.py arguments:
 
   python3 tools/rpx_patch.py exe_v46h.rpx exe_v46h_diag.rpx $(python3 tools/diag_kirby_hero_cave.py --rpx exe_v46h.rpx)
   python3 tools/diag_kirby_hero_test.py exe_v46h_diag.rpx exe_v46h.rpx
@@ -27,7 +27,8 @@ Lines (each tag with its own cap, CAPS), in the order the chain runs:
   vis    (fix v5) the end of the held article's update (0x02B02884) for the Hero copy's article, every frame while the
          sword int is 1 or the article's own flag is set, and the frame after: the int, own flag, Kirby's flag, the
          attribute mask, and drawn = the article's is_visible (vt +0xA4: own flag AND, with the attribute, Kirby's):
-         1 on every frame of a sword spell when the fix works.
+         1 on every frame of a sword spell when the fix works; mot = Kirby's motion kind (fix v6: 304-307 while a
+         sword spell swings the sword, 2ED / 2F1 the stone's hold).
   spawn  Robin's thunder spawner's generate (0x02F6465C) for a Kirby (8) or a Hero (0x45): owner kind, custom
          number, the new weapon's position x / y / z (the hand joint's), the owner's own z and x.
   hit    the hit methods of the weapons 0x190 (Frizz), 0x193 flash, 0x194 explosion, 0x195 deathball, 0x196 crash,
@@ -60,7 +61,7 @@ HIT_METHODS = {0x190: 0x04BB5898, 0x193: 0x04BB6030, 0x194: 0x04BB62B8, 0x195: 0
 NAMES = {'cpy': ('kind', 'prev', 'grant', 'f'), 'gen': ('kind', 'h'),
          'res': ('type', 'kind', 'cost_ent', 'found', 'n0', 'n1', 'n2'), 'stn': ('st', 'kind', 'acc', 'art'),
          'swd': ('v', 'own', 'kirby', 'attr'), 'lnk': ('kind', 'joint', 'lr'),
-         'vis': ('v', 'own', 'kirby', 'attr', 'drawn'),
+         'vis': ('v', 'own', 'kirby', 'attr', 'drawn', 'mot'),
          'spawn': ('kind', 'custom', 'x', 'y', 'z', 'oz', 'ox'), 'hit': ('kind', 'bits', 'x', 'y', 'z', 'w')}
 CAPS = {'cpy': 60, 'gen': 60, 'res': 120, 'stn': 200, 'swd': 800, 'lnk': 60, 'vis': 800, 'spawn': 300, 'hit': 400}
 LINK_CALL = 0x02B61FB8          # the link to the owner's joint (r5); the held article's init calls it
@@ -200,12 +201,21 @@ def hooks():
         stw r10, vislast@l(r12)
         or. r11, r11, r10
         beq skip
+        lwz r3, 0x44(r27)               # fix v6: Kirby's motion kind (0x304-0x307 in a sword spell)
+        lwz r12, 0(r3)
+        lwz r12, 0x94(r12)
+        mtctr r12
+        bctrl
+        lis r12, vism@ha
+        stw r3, vism@l(r12)
         lwz r3, 0xA8(r30)               # drawn: the article's is_visible (vt +0xA4)
         lwz r12, 0(r3)
         lwz r12, 0xA4(r12)
         mtctr r12
         bctrl
         mr r8, r3
+        lis r12, vism@ha
+        lwz r9, vism@l(r12)
         lis r12, visv@ha
         lwz r4, visv@l(r12)
         lwz r12, 0xA8(r30)
@@ -329,7 +339,7 @@ def build(orig):
         else:
             a.asm('%s\nb 0x%X' % (B.word(w), at + 4))
         out[at] = i
-    a.asm('\n'.join('cap_%s:\n.word 0' % t for t in tags) + '\nstncnt:\n.word 0\nswdlast:\n.word 0\nvislast:\n.word 0\nvisv:\n.word 0')
+    a.asm('\n'.join('cap_%s:\n.word 0' % t for t in tags) + '\nstncnt:\n.word 0\nswdlast:\n.word 0\nvislast:\n.word 0\nvisv:\n.word 0\nvism:\n.word 0')
     pos = a.pc
     data = bytearray()
     for t in tags:

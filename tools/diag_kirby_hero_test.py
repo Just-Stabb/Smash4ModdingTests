@@ -112,11 +112,14 @@ def main():
     vst, vwk, vav = F + 0x1600, F + 0x1700, F + 0x1800
     fst, fwk, fav = F + 0x1900, F + 0x1910, F + 0x1920
     box = {'st': 0x175, 'v': 1, 'drawn': 1}
+    fmo, vmo, kmo = F + 0x1930, F + 0x1A00, F + 0x1B00
     for e in (E0, E1):
+        e.stub(fmo, lambda e: 0x304)
         e.stub(fst, lambda e: box['st'])
         e.stub(fwk, lambda e: box['v'] if e.r(4) == D.SWORD_INT else 0x55)
         e.stub(fav, lambda e: box['drawn'])
-    mods = {KA + 0x20: kst, KA + 0x28: kwk, KA + 0xA8: kvi, AA + 0x68: aln, AA + 0xA8: avi,
+    mods = {KA + 0x20: kst, KA + 0x28: kwk, KA + 0xA8: kvi, AA + 0x68: aln, AA + 0xA8: avi, KA + 0x44: kmo,
+            kmo: vmo, vmo + 0x94: fmo,
             kst: vst, kwk: vwk, avi: vav, vst + 0x8C: fst, vwk + 0x84: fwk, vav + 0xA4: fav,
             kvi + 8: 0x00010000, avi + 8: 0x01010000, aln + 0x84: 0x80}
     # lnk: the link call's entry, LR in the held article's init, r31 the kind, r5 the joint
@@ -157,12 +160,12 @@ def main():
         m = dict(mods)
         m[avi + 8] = (own << 24) | 0x010000
         diff, calls = case(at['vis'], {31: kind, 27: KA, 30: AA}, m)
-        got.append((hex(kind), v, own, diff, [(c[0],) + nv(c, 5) for c in calls]))
-    check('vis: registers kept (lmw replayed); a line (int, own, Kirby, attribute mask, drawn) for the Hero copy\'s '
+        got.append((hex(kind), v, own, diff, [(c[0],) + nv(c, 6) for c in calls]))
+    check('vis: registers kept (lmw replayed); a line (int, own, Kirby, attribute mask, drawn, Kirby\'s motion) for the Hero copy\'s '
           'article while the int is 1 or its own flag set, and the frame after; none for another kind',
-          got, [('0x2c', 0, 0, {}, []), ('0x2c', 1, 1, {}, [(fmts['vis'], 1, 1, 0, 0x80, 1)]), ('0x12', 1, 1, {}, []),
-                ('0x2c', 0, 0, {}, [(fmts['vis'], 0, 0, 0, 0x80, 0)]), ('0x2c', 0, 0, {}, []),
-                ('0x2c', 0, 1, {}, [(fmts['vis'], 0, 1, 0, 0x80, 0)])])
+          got, [('0x2c', 0, 0, {}, []), ('0x2c', 1, 1, {}, [(fmts['vis'], 1, 1, 0, 0x80, 1, 0x304)]),
+                ('0x12', 1, 1, {}, []), ('0x2c', 0, 0, {}, [(fmts['vis'], 0, 0, 0, 0x80, 0, 0x304)]),
+                ('0x2c', 0, 0, {}, []), ('0x2c', 0, 1, {}, [(fmts['vis'], 0, 1, 0, 0x80, 0, 0x304)])])
     # spawn: r27 the owner fighter (+0x726C -> +0x18 kind; +0x72E4 posture +0x10 x / +0x18 z), r1 + 0x50 the struct
     info, post = F + 0x500, F + 0x600
     for kind, want in ((8, True), (0x45, True), (0x2C, False)):

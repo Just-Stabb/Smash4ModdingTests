@@ -62,6 +62,7 @@ class Game:
         self.nv = {}                                           # category-F user variables / New_Var slots (floats)
         self.stick_x, self.lr = 0.0, 0.0                       # fix v4: ControlModuleF(0), PostureModuleF(0)
         self.posture = []                                      # fix v4: PostureModule calls
+        self.frame_sets = []                                   # fix v6: (cast frame, motion, frame) of MotionModule 0x2713
 
     # fix v2: the copy article's spawner as the executable runs it (traced: tools/kirby_robin_book_cave.py). Robin's
     # thunder spawner 0x02F643A4 (the Robin copy's records 2, 6 and 8-12) first calls Robin's tome code 0x02F613B8
@@ -138,6 +139,11 @@ class Game:
             elif a and a[0] == 0x3:
                 self.motion = a[1]
                 self.motions.append(('swap', a[1]))
+            elif a == [0x7]:                                    # fix v6: the current motion kind
+                return self.motion if self.motion is not None else 0
+            elif a and a[0] == 0x2713:                          # fix v6: the motion's frame set
+                self.frame = R.i2f(a[1])
+                self.frame_sets.append((self.tag(), self.motion, self.frame))
             return 0
         if sid == 0x13 and a == [1]:                            # MotionModuleF(1): frame
             return R.f2i(self.frame)
@@ -552,6 +558,58 @@ def v6_tests(path, src):
           (g.removed[-5:], (0x2714, 0x76400E2) in g.sounds, g.ints.get(0x1000008B)), ([5, 6, 7, 8, 9], True, 0))
 
 
+def fix_v6_tests(path, src):
+    """Hero copy fix v6: during a sword spell Kirby plays the spell's motion (0x304-0x307, tools/kirby_hero_sword_anim.py)
+    with its frame set to the cast's every frame, from the first cast frame to the spell's end; nothing after (he stays
+    in it); a landing's hold motion (0x2ED / 0x2F1) keeps its first 3 frames; the arm hitbox on LHaveN (0x18)"""
+    import kirby_hero_sword_msc as SW
+    import kirby_hero_sword_anim as A
+    ev = SW.events(SW.parse())
+    names_ = {0x11: 'Flame Slash', 0x12: 'Kacrackle Slash', 0x13: 'Metal Slash', 0x14: 'Hatchet Man'}
+    for n in (0x11, 0x12, 0x13, 0x14):
+        for situation, hold in ((0, 0x2ED), (2, 0x2F1)):
+            r = Run(path, src, 2, situation=situation)
+            g = r.game
+            r.update()
+            g.motion, g.frame = hold, 20.0
+            g.tag = lambda r=r: kget(r, 'khm_frame') if kget(r, 'khm_state') == 2 else None
+            end = ev[n]['end']
+            cast(r, n, end + 10)
+            slot = A.SLOT[n]
+            changes = [m for m in g.motions if m == slot]
+            sets = [(f, m, fr) for f, m, fr in g.frame_sets]
+            check('fix v6: %s (%s): motion 0x%X once, its frame = the cast frame on every frame 0-%d, none after'
+                  % (names_[n], 'air' if situation else 'ground', slot, end),
+                  (len(changes), sets), (1, [(f, slot, float(f)) for f in range(end + 1)]))
+    # a landing mid-cast: the hold motion's first 3 frames left alone, then back to the spell's motion at the cast frame
+    r = Run(path, src, 2, situation=2)
+    g = r.game
+    r.update()
+    g.motion, g.frame = 0x2F1, 30.0
+    g.tag = lambda r=r: kget(r, 'khm_frame') if kget(r, 'khm_state') == 2 else None
+    cast(r, 0x14, 20)
+    g.motion, g.frame = 0x2ED, 0.0                    # func_2262 on the landing
+    n0 = len(g.frame_sets)
+    log = []
+    for fr in (0.0, 1.0, 2.0, 3.0):
+        g.frame = fr
+        r.vm.call(r.fn['khm_update'])
+        log.append((g.motion, len(g.frame_sets) - n0))
+    check('fix v6: landing mid-cast: 0x2ED kept at its frames 0-2 (its landing hitbox), Hatchet Man\'s motion again at 3',
+          log, [(0x2ED, 0), (0x2ED, 0), (0x2ED, 0), (A.SLOT[0x14], 1)])
+    check('fix v6: ... at the cast frame', g.frame_sets[-1][1:], (A.SLOT[0x14], float(g.frame_sets[-1][0])))
+    # the arm hitbox (Hero's bone 0x16) on LHaveN at the path's offset, every spell
+    _scale, arms = SW.load_path()
+    bad = []
+    for n in (0x11, 0x12, 0x13, 0x14):
+        for sit in ('ground', 'air'):
+            for f, k, v in ev[n][sit]:
+                if k == 'hitbox' and v[0] == 2 + SW.ID_SHIFT:
+                    if v[2] != SW.K_SWORD or [round(x, 4) for x in v[9:12]] != arms[n][f]:
+                        bad.append((hex(n), sit, f, v[2], v[9:12]))
+    check('fix v6: the arm hitbox (ID 7) on LHaveN 0x18 at ArmR\'s offset in HaveR\'s frame at its frame', bad, [])
+
+
 def fix_v1_tests(path, src):
     """Hero copy fix v1: the marker-less Robin copy's guess; the A build's sword spells"""
     def marker(m, kinds):
@@ -902,6 +960,8 @@ def main():
     menu_tests(path, src)
     if 'khm_sword' in names(src)[0]:
         v6_tests(path, src)
+    if 'khm_sw_motion' in names(src)[0] and not re.search(r'^int khm_sword_on\(\) \{ return 0; \}', open(src).read(), re.M):
+        fix_v6_tests(path, src)
     # the plain Robin copy
     r = Run(path, src, 0)
     check('Robin copy (no marker): newcopy_marker 0', r.vm.call(r.fn['newcopy_marker']), 0)

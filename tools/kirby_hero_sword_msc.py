@@ -21,7 +21,10 @@ fighters/kirby/specials.md "v6". What it does with Hero's scripts:
 - Bones: Hero's script bones are his joint ids (model.jtb table 0: 0x16 RArmJ, 0x19 RHaveN = Ultimate's Sword1);
   the sword is on Kirby's LHaveN (0x18, the held model's bone: tools/kirby_copy_sword.py), so a Sword1-frame offset
   (x, y, z) is (0.2023 - y, x, z) there, and an effect on it is turned 90 about Z (its X along the blade, as Hero's);
-  0x16 -> Kirby's LArmJ (0x10, the same arm); 0 -> 0.
+  0 -> 0. Fix v6 (the swing, tools/kirby_hero_sword_anim.py): LHaveN now moves along Hero's HaveR path, so 0x16
+  (Hero's forearm) -> LHaveN too, at ArmR's origin in HaveR's frame at that frame (PATH "arm", the stone has no arm;
+  before: Kirby's LArmJ 0x10, still in the stone pose); and with a path scale other than 1 (PATH "scale", the sword
+  model rescaled the same) the sword offsets and the sword effects' sizes are scaled by it.
 - Effects: External_Graphic (EFFECT_FOLLOW) -> EffectModule 0x2712 (bone-following, as Robin's MSC uses it);
   Graphic_Effect2 / 3 (EFFECT / LANDING_EFFECT) -> 0x2710; Terminate_Graphic_Effect -> 0x2723 (id, kill, kill
   light). Sword_Glow / Terminate_Sword_Glow (the trail) are left out: the stone doesn't swing the sword, so the trail
@@ -36,6 +39,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REF = os.path.join(HERE, '..', 'reference', 'brave_sword_spells_acmd.txt')
+PATH = os.path.join(HERE, '..', 'reference', 'kirby_hero_sword_path.json')     # fix v6 (kirby_hero_sword_anim.py)
 SPELLS = {'Flame Slash': 0x11, 'Kacrackle Slash': 0x12, 'Metal Slash': 0x13, 'Hatchet Man': 0x14}
 # Ultimate's motion_list (brave.zip): motion length (frames), cancel frame
 MOTION = {0x11: (61, 47), 0x12: (61, 47), 0x13: (61, 40), 0x14: (107, 88)}
@@ -100,8 +104,19 @@ def timing(game):
     return at
 
 
+def load_path(path=PATH):
+    """(scale, {spell: [arm offset a cast frame]}) from kirby_hero_sword_anim.py's path.json; (1, None) without it"""
+    if not path or not os.path.exists(path):
+        return 1.0, None
+    p = json.load(open(path))
+    return p['scale'], {int(k, 16): v['arm'] for k, v in p['spells'].items()}
+
+
+SCALE, ARMS = load_path()
+
+
 def sword_point(x, y, z):
-    return (round(SWORD1_TO_HAVE - y, 4), x, z)
+    return tuple(round(v * SCALE, 4) for v in (SWORD1_TO_HAVE - y, x, z))
 
 
 def fl(v):
@@ -126,6 +141,9 @@ def events(ref):
                         x, y, z = a['X'], a['Y'], a['Z']
                         if bone == SWORD_BONE:
                             kb, (x, y, z) = K_SWORD, sword_point(x, y, z)
+                        elif bone == ARM_BONE and ARMS is not None:      # fix v6: the forearm at the grip
+                            assert (x, y, z) == (0, 0, 0), (n, name, x, y, z)
+                            kb, (x, y, z) = K_SWORD, tuple(ARMS[n][min(f, len(ARMS[n]) - 1)])
                         elif bone == ARM_BONE:
                             kb = K_ARM
                         else:
@@ -143,15 +161,17 @@ def events(ref):
                         bone = a['Bone']
                         pos = (a['X'], a['Y'], a['Z'])
                         rot = [a['XRot'], a['YRot'], a['ZRot']]
+                        size = a['Size']
                         if bone == SWORD_BONE:
                             bone, pos = K_SWORD, sword_point(*pos)
                             rot[2] += EFFECT_ROT_Z
+                            size = round(size * SCALE, 4)
                         else:
                             assert bone == 0, bone
                         if name == 'External_Graphic':
-                            ev.append((f, 'follow', [a['Graphic'], bone] + list(pos) + rot + [a['Size'], a['Terminate']]))
+                            ev.append((f, 'follow', [a['Graphic'], bone] + list(pos) + rot + [size, a['Terminate']]))
                         else:
-                            ev.append((f, 'effect', [a['Graphic'], bone] + list(pos) + rot + [a['Size']]
+                            ev.append((f, 'effect', [a['Graphic'], bone] + list(pos) + rot + [size]
                                        + [a[k] for k in ('RandomX', 'RandomY', 'RandomZ', 'RandomXRot', 'RandomYRot',
                                                          'RandomZRot', 'Terminate')]))
                     elif name == 'Terminate_Graphic_Effect':

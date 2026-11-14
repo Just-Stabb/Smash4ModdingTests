@@ -29,6 +29,19 @@ RobotSpecialAirN -> robotbody/FitKirbyRobotBodyMainD00SpecialAirN.omo
 // Hero / Sephiroth copies (granted as the Robin copy): no new scripts or slots. With them the Robin copy slots
 // 0x446-0x453 (RefletSpecialN*) play Ultimate's Kirby copy animations from motion/bravebody / edgebody (same file
 // names as refletbody's: tools/kirby_copy_motions.py), the moves are MSC (fighters/kirby/specials.md)
+// Hero copy fix v6: the Stone's sword spells swing Hero's sword. Kirby's empty motion slots 0x304-0x307 (no
+// motion.mtable name: no scripts run) play these animations from his own motion/body pack (exe_v46i's motion table),
+// LHaveN along Hero's sword in Flame Slash / Kacrackle Slash / Metal Slash / Hatchet Man (Ultimate's skill3 / skill3 /
+// skill1 / skill2), the held bravesword on it: tools/kirby_hero_sword_anim.py. The labels below name the slots; a
+// script given one of these names (motion.mtable) would show in the Hitbox Viewer with the swing and the sword.
+BraveSword17
+BraveSword18
+BraveSword19
+BraveSword20
+BraveSword17 -> body/FitKirbyBodyMainD03SpecialLwBraveSword17.omo + bravesword@LHaveN
+BraveSword18 -> body/FitKirbyBodyMainD03SpecialLwBraveSword18.omo + bravesword@LHaveN
+BraveSword19 -> body/FitKirbyBodyMainD03SpecialLwBraveSword19.omo + bravesword@LHaveN
+BraveSword20 -> body/FitKirbyBodyMainD03SpecialLwBraveSword20.omo + bravesword@LHaveN
 
 // ---- Supamario
 // Kamehameha projectile (weapon kamehameha, article 5; motion.mtable): fly1 / 2 / 3 = charge levels

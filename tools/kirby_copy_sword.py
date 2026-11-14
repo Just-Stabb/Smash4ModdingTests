@@ -5,6 +5,8 @@ fighters/kirby/specials.md "v6".
 
   python3 tools/kirby_copy_sword.py ULT_BRAVE_BODY_DIR TEMPLATE_DIR OUT_MODEL_DIR [--costume NN]
   python3 tools/kirby_copy_sword.py --fix-skeletons MODEL_DIR     (fix v3: an existing bravesword tree's vbn / jtb)
+  python3 tools/kirby_copy_sword.py --rescale MODEL_DIR SCALE     (fix v6: an existing Hero-size bravesword tree's
+                                                                    model.nud / metal.nud at SCALE: Kirby's size)
 
 ULT_BRAVE_BODY_DIR: Ultimate's brave/model/body (cNN with model.numshb / numdlb / numatb / nusktb and the textures:
 the user's brave.zip). TEMPLATE_DIR: a one-bone Kirby copy model folder (the Hero copy hat, fighter/kirby/model/
@@ -162,9 +164,53 @@ def build(ult, template, out, costume=0, log=print):
     return m
 
 
+# Kirby's Hero copy fix v6: the sword at Kirby's size. The swing (tools/kirby_hero_sword_anim.py) moves LHaveN along
+# Hero's path scaled by the stone's top over Hero's (0.415); a Hero-size blade (14.2 long) on that path spent most of
+# Flame / Kacrackle Slash under the floor. The model's positions (and the NUD's bounding spheres) are scaled in place;
+# LHaveN keeps scale 1, so the scripts' sword hitboxes are placed along the scaled blade by their offsets
+# (kirby_hero_sword_msc.py) rather than by a bone scale the hitboxes might not take.
+HERO_BLADE_TOP = 12.06          # the blade's end along +Y at Hero's size (kirby_copy_sword.py's output)
+
+
+def rescale(root, scale, log=print):
+    """scale every bravesword/cNN/{model,metal}.nud's vertex positions and bounding spheres in place; refuses a tree
+    whose blade isn't Hero-size (scaling twice)"""
+    import nud
+    dt = np.dtype([('pos', '>f4', (3,)), ('nrm', '>f2', (4,)), ('bit', '>f2', (4,)), ('tan', '>f2', (4,)),
+                   ('bi', 'u1', (4,)), ('bw', 'u1', (4,))])
+    done = 0
+    for c in sorted(os.listdir(root)):
+        for fn in ('model.nud', 'metal.nud'):
+            p = os.path.join(root, c, fn)
+            if not os.path.exists(p):
+                continue
+            d = bytearray(open(p, 'rb').read())
+            for o in (0x20,):
+                d[o:o + 16] = struct.pack('>4f', *(v * scale for v in struct.unpack('>4f', bytes(d[o:o + 16]))))
+            meshes = nud.read(p)
+            top = 0.0
+            for i, m in enumerate(meshes):
+                o = 0x30 + 0x30 * i
+                f = list(struct.unpack('>8f', bytes(d[o:o + 32])))
+                d[o:o + 28] = struct.pack('>7f', *(v * scale for v in f[:7]))
+                for pg in m.polygons:
+                    assert pg.vert_size >> 4 == 4, 'not a rigged polygon: %s' % p
+                    a = np.frombuffer(bytes(d), dt, pg.nv, pg.vaoff).copy()
+                    top = max(top, float(a['pos'][:, 1].max()))
+                    a['pos'] *= scale
+                    d[pg.vaoff:pg.vaoff + a.nbytes] = a.tobytes()
+            assert abs(top - HERO_BLADE_TOP) < 0.05, '%s: blade top %.3f, not Hero-size (already scaled?)' % (p, top)
+            open(p, 'wb').write(bytes(d))
+            done += 1
+    log('bravesword: %d NUDs scaled by %.4f' % (done, scale))
+    return done
+
+
 def main():
     if len(sys.argv) == 3 and sys.argv[1] == '--fix-skeletons':
         sys.exit(0 if fix_skeletons(sys.argv[2]) else 1)
+    if len(sys.argv) == 4 and sys.argv[1] == '--rescale':
+        sys.exit(0 if rescale(sys.argv[2], float(sys.argv[3])) else 1)
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('ult')
     ap.add_argument('template')
