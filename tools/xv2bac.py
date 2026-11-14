@@ -22,15 +22,16 @@ Fields decoded (offsets in the item):
   0 Animation: +8 u16 EAN type (0 common CMN.ean, 5 character, 10 / 11 face base / forehead, 0xFFFE the skill's
     own EAN), +A u16 EAN index, +C u16 flags, +E u16 ?, +10 u16 start frame, +12 u16 end frame, +14 u16 loop start
     (0xFFFF none), +16 u16, +18 f32 speed, +1C f32 blend weight, +20 f32 blend step.
-  1 Hitbox: +8 u16 BDM entry, +A u16 flags, +C u16 damage, +E u16 damage when guarded, +10 u16 stamina-broken BDM,
+  1 Hitbox: +8 u16 BDM entry (the God Fist's #160 is in CMN.bdm, not GOK_PLAYER.bdm), +A u16 flags, +C u16 damage, +E u16 damage when guarded, +10 u16 stamina-broken BDM,
     +12 u16 ?, +14 u16, +16 u16, +18 f32 x 3 position, +24 f32 size, +28 f32 x 6 min / max (box hitboxes).
   2 Movement: +8 u16 flags, +A u16, +C f32 x 3 direction (per frame; +Z forward), +18 f32 x 3 drag.
   3 Invulnerability: +8 u16 type. 4 TimeScale: +8 f32 scale. 5 Tracking: +8 f32 strength, +C u16 flags.
   7 BcmCallback: +8 u16 flags (the window in which the BCM may chain another move).
-  8 Effect: +8 u16 EEPK type (1 common CMN.eepk, 2 character, 3 / 5 skill effects with +C = the skill id,
-    0 ?), +A u16, +C u16 skill id (0xFFFF none), +E u16, +10 u16 effect id, +12 u16 bone, +14 f32 x 3 position,
+  8 Effect: +8 u16 EEPK type (1 common: BTL_CMN.eepk, 2 character, 3 / 5 skill effects with +C = the skill id,
+    0 common too), +A u16, +C u16 skill id (0xFFFF none), +E u16, +10 u16 effect id, +12 u16 bone, +14 f32 x 3 position,
     +20 f32 x 3 rotation, +2C u16 flags (1 = off).
-  11 Sound: +8 u16 ACB type (0 common SE, 3 skill SE, 10 / 11 skill voice ...), +A u16, +C u16 cue id, +E u16 flags.
+  11 Sound: +8 u16 ACB type (LazyBone's names: 0 common SE, 2 character SE, 3 character voice, 10 skill SE, 11 skill
+    voice), +A u16, +C u16 cue id, +E u16 flags.
   15 Functions: +8 u16 function, +A u16, +C f32 x 5 parameters.
   16 ScreenEffect: +8 u16 BPE id, +A u16 bone, +C u16, +E u16.
   17 ThrowHandler: +8 u16 flags, +A u16, +C u16 user bone, +E u16 victim bone, +10 u16 the victim's next BAC entry
@@ -50,8 +51,11 @@ TYPES = {0: 'Animation', 1: 'Hitbox', 2: 'Movement', 3: 'Invulnerability', 4: 'T
          16: 'ScreenEffect', 17: 'ThrowHandler', 18: 'PhysicsObject', 19: 'Aura', 20: 'HomingMovement',
          21: 'EyeMovement'}
 EAN_TYPES = {0: 'CMN', 5: 'character', 10: 'face base', 11: 'face forehead', 0xFFFE: 'skill'}
-EEPK_TYPES = {0: 'common?', 1: 'CMN', 2: 'character', 3: 'skill (type 3)', 5: 'skill (type 5)'}
-ACB_TYPES = {0: 'common SE', 3: 'skill SE', 10: 'skill voice A', 11: 'skill voice B'}
+# EEPK type 1: vfx/cmn/BTL_CMN.eepk (the God Fist's 120 / 160 / 220 / 230 are hit sparks / hit smoke there; 180
+# isn't in it); 0: common too (its 11, BTL_CMN's focus lines); 3 / 5 with a skill id: the skill's own .eepk
+EEPK_TYPES = {0: 'common (0)', 1: 'CMN', 2: 'character', 3: 'skill (type 3)', 5: 'skill (type 5)'}
+# LazyBone152's names (not checked against the sound files: the God Fist's cues aren't in CAR_BTL_GOK_SE.acb)
+ACB_TYPES = {0: 'common SE', 2: 'character SE', 3: 'character voice', 10: 'skill SE', 11: 'skill voice'}
 
 
 def _u16s(b, o, n):

@@ -135,11 +135,11 @@ def floor_fix(frames, smash):
     for f in range(len(frames)):
         y = world_y(frames, smash, None, f)
         snap = STAND_FOOT - min(y['LFootJ'], y['RFootJ'])
-        lift = max(0.0, max(FLOOR[n] - y[n] for n in FLOOR))
+        least = max(FLOOR[n] - y[n] for n in FLOOR)          # the lowest offset keeping every joint over FLOOR
         w = 1.0
         if FLIP[0] - 4 < f < FLIP[1] + 4:
             w = max(0.0, min(1.0, (FLIP[0] - f) / 4.0, (f - FLIP[1]) / 4.0))
-        offs.append(max(w * snap + (1 - w) * lift, lift))
+        offs.append(max(w * snap + (1 - w) * max(0.0, least), least))
     for f, fr in enumerate(frames):
         p, q, sc = fr['RotN']
         fr['RotN'] = ((p[0], p[1] + offs[f], p[2]), q, sc)

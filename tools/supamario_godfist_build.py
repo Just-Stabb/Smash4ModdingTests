@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 """Supamario's Super God Fist (dash attack; Dragon Ball Xenoverse 2's 030_GOD_CSA "Super God Fist"): the package.
 
-  python3 tools/supamario_godfist_build.py SUPAMARIO_DIR OUT_DIR [--png SHEET.png]
+  python3 tools/supamario_godfist_build.py SUPAMARIO_DIR OUT_DIR --ean 030_GOD_CSA.ean [--cmn-vfx VFX_CMN_DIR]
+                                           [--png SHEET.png]
 
 SUPAMARIO_DIR: his installed fighter/supamario folder (the user's supamario.zip: supamario_universal_v1 + the
-ported sound ids; its motion/body and script/animcmd/body are the base). Writes OUT_DIR/fighter/supamario/:
+ported sound ids; its motion/body, script/animcmd/body and effect/supamario are the base). --ean: the skill's
+animations (XV2's 030_GOD_CSA.ean, the default body). --cmn-vfx: XV2's vfx/cmn (BTL_CMN.eepk and its files): the
+common effects the BAC plays, converted into his bank. Writes OUT_DIR/fighter/supamario/:
   motion/body/{main,lhand,rhand,mariopt1}.pac   AttackDash replaced (tools/supamario_godfist_anim.py)
   script/animcmd/body/{game,effect,sound,expression}.bin   the attackdash scripts replaced (below)
   script/msc/supamario.mscsb   fighters/supamario/supamario.c (gf_init / gf_update in the AttackDash status)
+  effect/supamario/supamario.010d0000.{ptcl,efc}   with --cmn-vfx: + PtcSupamarioGfBtl_MHit / _MHitSmk / _PHitSmk
+
+v3 (fighters/supamario/README.md "Super God Fist v3"): XV2's own animation; the frame numbers below are v2's (v3:
+the punch 14-17, the check 18, the God Fist part from 46, the hold 46-95 (#0 0-40 at x0.8), the launch at 96 with an
+8-frame freeze, acting from 141; the constants hold them).
 
 The move (fighters/supamario/README.md "Super God Fist" has the XV2 skill read, frame by frame; v2: the victim's
 motion from XV2's own CMN.ean animations, reference/xv2/godfist_victim_cmn.json):
@@ -50,14 +58,15 @@ V_SLOT, V_ST, V_SIT, V_PHASE, V_CNT, V_ONE, V_LOCK, V_ROT = (0x0F000380 + GF_SLO
 VARS = [('gf', GF_VAR, 1), ('gf_slot', V_SLOT, 0), ('gf_st', V_ST, 0), ('gf_sit', V_SIT, 0),
         ('gf_phase', V_PHASE, 0), ('gf_cnt', V_CNT, 0), ('gf_one', V_ONE, 0), ('gf_lock', V_LOCK, 0),
         ('gf_rot', V_ROT, 0)]
-PUNCH, PUNCH_END = anim.GF_PUNCH, 11    # the dash punch's hitbox frames 7-10, the hit check at 11
-JUMP_TO, STRIKE = anim.GF_JUMP_TO, anim.GF_STRIKE
-WHIFF_END = float(anim.GF_WHIFF_END)     # the whiff's end (MSC)
-IASA = float(anim.GF_IASA)              # the God Fist's cancel frame (MSC): the victim's flight is over
-HOLD_X = 11.0                           # the victim held this far in front of him (his fist is 6 ahead)
+PUNCH, PUNCH_END = anim.GF_PUNCH, anim.GF_PUNCH_END   # the hitbox 14-17 (the BAC's), the hit check at 18
+JUMP_TO, STRIKE = anim.GF_JUMP_TO, anim.GF_STRIKE      # 46, 96 (#0 frame 40: the launch)
+WHIFF_END = float(anim.GF_WHIFF_END)     # the whiff's end (MSC): 44
+HOLD_X = 11.5                           # the victim held this far in front of him (his fist 7.3-7.5 ahead, + 4)
 PUNCH_DMG, STRIKE_DMG = 4.0, 11.0
-PUNCH_FREEZE = 9                        # the punch's hitstop, both: CMN.bdm #160's stun 9 / 9 (if it is that BDM)
-STRIKE_FREEZE = 24                      # hitstop frames, both
+PUNCH_FREEZE = 9                        # the punch's hitstop, both: CMN.bdm #160's stun 9 / 9 (the BDM the hitbox
+                                        # names: #160 isn't in GOK_PLAYER.bdm)
+STRIKE_FREEZE = 8                       # the launch's hitstop, both (the slow hold is the animation's: #0 0-40 x0.8)
+INVINCIBLE = 75                         # Supamario invincible from the catch (XV2: 0-40 of #0 at x0.8, +the launch)
 # the victim's motion: XV2's own (CMN.ean #179 held / launched, then #96 the tumbling slide; tools/
 # supamario_godfist_xv2.py -> reference/xv2/godfist_victim_cmn.json): its travel, its pelvis height and its tilt
 # toward the travel, frame by frame
@@ -74,6 +83,8 @@ GF_THICK = 1.5                          # half its thickness (lying, its middle 
 GF_LAND_WAIT = 20                       # frames it may take to reach the ground after the flight
 GF_DOWN = 50                            # the downed frames with the controller off (v1 60: the slide is longer)
 GF_THREAD = 0x47                        # the thread's ID
+IASA = float(STRIKE + 1 + GF_FLIGHT)    # the God Fist's cancel frame (MSC): the victim's flight is over (141)
+ROOT_Z = [0.0] * anim.FRAMES             # his TransN z by motion frame (build() sets it from the animation)
 DOWN_HELD = (0x4D, 0x53)                # DownBound .. DownWait (0x53): still down; 0x57 DownDamage
 DOWN_DAMAGE, DOWN_WAIT, DOWN_WAIT2, DOWN_STAND = 0x57, 0x50, 0x51, 0x54
 # position variables (docs/position-variables.md), target 2 = the last fighter hit
@@ -83,7 +94,14 @@ FX_DASH, FX_DASH_CLOUD, FX_FLASH, FX_GLOW, FX_CHARGE = 0x100008C, 0x1000009, 0x1
 FX_FIRE, FX_RINGS, FX_BIG_CLOUD = 0x341000E, 0x100003A, 0x1000020
 SND_DASH, SND_HEAVY, SND_FIRE, SND_BURST, SND_START = 0xCB10071, 0x5E0007, 0xCB10027, 0x0CB1008D, 0x0CB1008E
 VOICE = 0x80000007
-LHAND = 0x10                            # bone LHandN (his left fist)
+FIST = 0x14                             # bone RHandN: XV2's God Fist is a right (b_R_Arm2 holds the victim)
+# XV2's common effects the BAC plays (EEPK type 1 = vfx/cmn/BTL_CMN.eepk): converted into his bank by effects()
+# ({name: ACMD id}; empty: Smash's own stand-ins). The skill's own (030_GOD_CSA.eepk: skill effects 0, 1, 2, 11)
+# and CMN 180 (not in BTL_CMN.eepk) are still missing.
+CMN_EFFECTS = {'MHit': ('Btl_MHit.emp', 220), 'MHitSmk': ('Btl_MHitSmk.emp', 120),
+               'PHitSmk': ('Btl_PHitSmk.emp', 160)}
+CMN_FX = {}
+CMN_SIZE = 5.04 / 8.5                   # xv2_to_ptcl makes 8.5 units a metre; his body is 5.04 a metre
 
 
 def msc_values():
@@ -203,6 +221,20 @@ def hold_lean(k, n):
     return _at(xv2_curves()['179'], 40.0 * k / max(1, n - 1))[2]
 
 
+def flight_offset(k):
+    """flight_frame(k) as written at flight frame k: less the way he has moved since the launch (his TransN:
+    #0's travel through the flip; thread frame k is his motion frame STRIKE + 1 + k)"""
+    x, y, a = flight_frame(k)
+    f = min(STRIKE + 1 + k, len(ROOT_Z) - 1)
+    return x - (ROOT_Z[f] - ROOT_Z[STRIKE + 1]), y, a
+
+
+# the victim's slide: XV2's CMN effects on it (BAC entry 3: CMN 160 at #96 20 and 42, CMN 120 at 62), at the
+# flight frames those #96 frames fall on
+SLIDE_FX = [(GF_LAUNCH + int(round(u * GF_SLIDE / 77.0)), n) for u, n in ((20, 'PHitSmk'), (42, 'PHitSmk'),
+                                                                        (62, 'MHitSmk'))]
+
+
 def flight_frame(k):
     """the victim's feet offset (in front of him, up) and Rotation_Set X at flight frame k (1 .. GF_FLIGHT)"""
     s0, _h0, p0 = xv2_victim(0)
@@ -216,8 +248,8 @@ def flight_frame(k):
 def game_script():
     s = [acmd.new_var(n, v - 0x0F000380, 0, 0.0, scope) for n, v, scope in VARS]
     s += [setf(1, V_ONE), cmd('frame', float(PUNCH))]
-    s += [hitbox('extra_special_hitbox', ID=0, Bone=LHAND, Damage=PUNCH_DMG, Angle=0, KBG=0, FKB=0, BKB=20,
-                 Size=4.0, X=1.5, SFXLevel=1, SFXType=1, Type=4, HitstopFrames=PUNCH_FREEZE,
+    s += [hitbox('extra_special_hitbox', ID=0, Bone=FIST, Damage=PUNCH_DMG, Angle=0, KBG=0, FKB=0, BKB=20,
+                 Size=4.5, X=0.0, SFXLevel=1, SFXType=1, Type=4, HitstopFrames=PUNCH_FREEZE,
                  SelfHitstopFrames=PUNCH_FREEZE),
           hitbox('extra_special_hitbox', ID=1, Bone=0, Damage=PUNCH_DMG, Angle=0, KBG=0, FKB=0, BKB=20, Size=4.0,
                  Y=6.5, Z=4.0, SFXLevel=1, SFXType=1, Type=4, HitstopFrames=PUNCH_FREEZE,
@@ -225,7 +257,7 @@ def game_script():
     s += [cmd('frame', float(PUNCH_END)), cmd('remove_all_hitboxes')]
     # the catch: a fighter's body hit (not a shield)
     caught = [setf(1, GF_VAR), cmd('target_slot_get', 2, V_SLOT),
-              cmd('body_state_set', 0, 1, 45),                         # invincible (XV2: 0-40 of the follow-up)
+              cmd('body_state_set', 0, 1, INVINCIBLE),                 # invincible (XV2: 0-40 of the follow-up)
               cmd('hitstun_set', 2, 20), setf(HOLD_X, LH_OFFX), setf(0, LH_OFFY)]
     # a victim still locked down by an earlier God Fist gets its controller back first
     caught = per_lock_release() + [setf(0, V_PHASE)] + caught
@@ -241,8 +273,8 @@ def game_script():
             hold.append(cmd('hit_reset'))
         s += if_(GF_VAR, 0, 1, hold)
     # 50: the God Fist
-    strike = [hitbox('extra_special_hitbox', ID=0, Bone=LHAND, Damage=STRIKE_DMG, Angle=0, KBG=0, FKB=0, BKB=25,
-                     Size=5.5, X=2.0, Hitlag=1.0, SDI=0.0, SFXLevel=2, SFXType=1, Type=4, IgnoreInvuln=0,
+    strike = [hitbox('extra_special_hitbox', ID=0, Bone=FIST, Damage=STRIKE_DMG, Angle=0, KBG=0, FKB=0, BKB=25,
+                     Size=6.0, X=0.0, Hitlag=1.0, SDI=0.0, SFXLevel=2, SFXType=1, Type=4, IgnoreInvuln=0,
                      HitstopFrames=STRIKE_FREEZE, SelfHitstopFrames=STRIKE_FREEZE, DIMul=0.001),
               hitbox('extra_special_hitbox', ID=1, Bone=0, Damage=STRIKE_DMG, Angle=0, KBG=0, FKB=0, BKB=25,
                      Size=6.0, Y=6.5, Z=HOLD_X, Hitlag=1.0, SDI=0.0, SFXLevel=2, SFXType=1, Type=4,
@@ -267,13 +299,18 @@ def flight_thread():
     """the thread: flight (target 2: still the move's last hit), then the landing and the downed state (the
     victim's slot: the move may be over)"""
     b = per_slot(lambda t: [cmd('input_set', t, 21, 1.0)]) + per_slot_lock()    # controller off from the launch
+    fx = dict(SLIDE_FX)
     for k in range(1, GF_FLIGHT + 1):
-        x, y, a = flight_frame(k)
+        x, y, a = flight_offset(k)
         b += [setf(x, LH_OFFX), setf(y, LH_OFFY), setf(0, LH_GROUND), cmd('hitstop_set', 2, 2, 0),
-              cmd('hitstun_set', 2, 40), cmd('rotation_set', 2, float(a), 0.0, 0.0), cmd('wait', 1.0)]
+              cmd('hitstun_set', 2, 40), cmd('rotation_set', 2, float(a), 0.0, 0.0)]
+        if k in fx and fx[k] in CMN_FX:
+            # at the victim (its feet's offset from him, on the ground): bone 0, Z forward
+            b.append(gfx('graphic_effect', CMN_FX[fx[k]], 0, 0.0, 0.0, float(x), CMN_SIZE))
+        b.append(cmd('wait', 1.0))
     # the end: lying on its back (kept turned until DownWait has taken over), 0.5 higher, stage collision back
     # (air): it drops onto the ground
-    x, y, a = flight_frame(GF_FLIGHT)
+    x, y, a = flight_offset(GF_FLIGHT)
     b += [setf(x, LH_OFFX), setf(y + 0.5, LH_OFFY), setf(5, LH_GROUND), cmd('hitstun_set', 2, 40),
           setf(1, V_PHASE), setf(GF_LAND_WAIT, V_CNT), setf(0, V_ROT)]
     lie = per_slot(lambda t: [cmd('rotation_set', t, float(a), 0.0, 0.0)])
@@ -320,27 +357,39 @@ def out_of_down(then):
 
 
 def effect_script():
+    """XV2's BAC timings: entry 0 (the dash punch, 1:1 to its frame 18) CMN 220 at 10; entry 1 (the follow-up, #0:
+    0-40 x0.8 = 46-96, then 1:1) CMN 120 at #0 60 = 116. The skill's own effects (gold, 030_GOD_CSA.eepk) are
+    missing: Smash's stand in (the glow on the fist while it's held, the fire burst / rings at the launch)"""
+    hit = CMN_FX.get('MHit')
     s = [cmd('frame', 1.0), gfx('graphic_effect', FX_DASH, 0, 0.0, 0.0, 0.0, 1.0),
-         cmd('frame', 5.0), gfx('graphic_effect', FX_DASH_CLOUD, 0, 0.0, 0.0, 0.0, 0.7),
-         cmd('frame', float(PUNCH)), gfx('graphic_effect', FX_FLASH, LHAND, 2.0, 0.0, 0.0, 0.6)]
+         cmd('frame', 10.0)]
+    s += [gfx('graphic_effect', hit, 0, 0.0, 5.0, 0.0, 0.8 * CMN_SIZE)] if hit else []
+    s += [cmd('frame', 12.0), gfx('graphic_effect', FX_DASH_CLOUD, 0, 0.0, 0.0, 0.0, 0.7)]
+    if not hit:
+        s += [cmd('frame', float(PUNCH)), gfx('graphic_effect', FX_FLASH, FIST, 2.0, 0.0, 0.0, 0.6)]
     s += [cmd('frame', float(JUMP_TO))] + if_(GF_VAR, 1, 0, [
-        gfx('external_graphic', FX_GLOW, LHAND, 1.0, 0.0, 0.0, 1.2)])
-    s += [cmd('frame', float(JUMP_TO + 5))] + if_(GF_VAR, 1, 0, [gfx('graphic_effect', FX_CHARGE, LHAND, 2.0, 0.0, 0.0,
-                                                                        1.3)])
+        gfx('external_graphic', FX_GLOW, FIST, 1.0, 0.0, 0.0, 1.2)])
+    s += [cmd('frame', float(STRIKE - 8))] + if_(GF_VAR, 1, 0, [gfx('graphic_effect', FX_CHARGE, FIST, 2.0, 0.0,
+                                                                     0.0, 1.3)])
     s += [cmd('frame', float(STRIKE))] + if_(GF_VAR, 1, 0, [
         cmd('terminate_graphic_effect', FX_GLOW, 1, 1),
-        gfx('graphic_effect', FX_FIRE, 0, 0.0, 7.0, HOLD_X, 1.6),
-        gfx('graphic_effect', FX_RINGS, 0, 0.0, 7.0, HOLD_X, 1.5),
-        gfx('graphic_effect', FX_FLASH, 0, 0.0, 7.0, HOLD_X, 2.0)])
+        gfx('graphic_effect', FX_FIRE, 0, 0.0, 5.0, HOLD_X, 1.6),
+        gfx('graphic_effect', FX_RINGS, 0, 0.0, 5.0, HOLD_X, 1.5),
+        gfx('graphic_effect', FX_FLASH, 0, 0.0, 5.0, HOLD_X, 2.0)])
     s += [cmd('frame', float(STRIKE + 1))] + if_(GF_VAR, 1, 0, [
         gfx('graphic_effect', FX_BIG_CLOUD, 0, 0.0, 0.0, 0.0, 1.0)])
-    s += [cmd('frame', float(JUMP_TO + 41))] + if_(GF_VAR, 1, 0, [gfx('graphic_effect', FX_DASH_CLOUD, 0, 0.0, 0.0,
-                                                                            0.0, 0.6)])     # the flip's landing
+    smoke = CMN_FX.get('MHitSmk')
+    land = [gfx('graphic_effect', smoke, 0, 0.0, 0.0, 0.0, CMN_SIZE)] if smoke else [
+        gfx('graphic_effect', FX_DASH_CLOUD, 0, 0.0, 0.0, 0.0, 0.6)]
+    s += [cmd('frame', float(STRIKE + 20))] + if_(GF_VAR, 1, 0, land)       # #0 60: the flip's landing
     return s
 
 
 def sound_script():
-    s = [cmd('frame', 5.0), cmd('sound_effect', SND_DASH), cmd('low_voice_clip', VOICE)]
+    """stand-ins (the skill's own sounds aren't among the files: BAC entry 0 plays the skill's SE / voice cue 0 at
+    0, entry 1 cue 81 (ACB type 3) at 0, the victim's entries common SE cue 53 / 74 at 0, entry 9 type 3 cue 35;
+    CAR_BTL_GOK_SE.acb holds Goku's throw sounds, cues 0-5, none of these)"""
+    s = [cmd('frame', 1.0), cmd('low_voice_clip', VOICE), cmd('frame', 10.0), cmd('sound_effect', SND_DASH)]
     s += [cmd('frame', float(JUMP_TO))] + if_(GF_VAR, 1, 0, [cmd('sound_effect', SND_START)])
     s += [cmd('frame', float(STRIKE))] + if_(GF_VAR, 1, 0, [
         cmd('sound_effect', SND_HEAVY), cmd('sound_effect', SND_FIRE), cmd('sound_effect', SND_BURST)])
@@ -349,7 +398,7 @@ def sound_script():
 
 def expression_script():
     s = [cmd('slope_full2', 1, 4, 1), cmd('frame', float(PUNCH)), cmd('rumble', 0x10, 0)]
-    s += [cmd('frame', 30.0), cmd('slope_full', 6, 6)]          # the whiff's (vanilla: 38 of 54); the jump runs it
+    s += [cmd('frame', 34.0), cmd('slope_full', 6, 6)]          # the whiff's (vanilla: 38 of 54); the jump runs it
     s += [cmd('frame', float(STRIKE))] + if_(GF_VAR, 1, 0, [cmd('rumble', 0x12, 0), cmd('quake', 4)])
     return s
 
@@ -376,15 +425,55 @@ def msc(out_path):
         kb.compile_msc(src, out_path, tmp)
 
 
-def build(sm_dir, out_dir, png=None):
+def effects(sm_dir, cmn_dir, fdir):
+    """XV2's common effects (CMN_EFFECTS, from vfx/cmn's BTL_CMN.eepk) into his bank: new ptcl sets
+    PtcSupamarioGf* (tools/xv2_to_ptcl.py, 64-pixel textures) and .efc entries; CMN_FX = their ACMD ids"""
+    import efc
+    import ptcl
+    import xv2_to_ptcl
+    src = os.path.join(sm_dir, 'effect', 'supamario')
+    dst = os.path.join(fdir, 'effect', 'supamario')
+    os.makedirs(dst, exist_ok=True)
+    base = 'supamario.010d0000'
+    p = ptcl.Ptcl(open(os.path.join(src, base + '.ptcl'), 'rb').read())
+    with tempfile.TemporaryDirectory() as pkg:
+        # a package of BTL_CMN.eepk alone (vfx/cmn holds five .eepk): links to everything else
+        for fn in os.listdir(cmn_dir):
+            if not fn.lower().endswith('.eepk') or fn == 'BTL_CMN.eepk':
+                os.symlink(os.path.abspath(os.path.join(cmn_dir, fn)), os.path.join(pkg, fn))
+        old = xv2_to_ptcl.TEX_MAX
+        xv2_to_ptcl.TEX_MAX = 64
+        try:
+            made, _log = xv2_to_ptcl.convert_package(p, pkg, 'PtcSupamarioGf', emps=[v[0] for v in CMN_EFFECTS.values()],
+                                                     strict=False)
+        finally:
+            xv2_to_ptcl.TEX_MAX = old
+    out = p.build()
+    assert ptcl.Ptcl(out).validate() == []
+    open(os.path.join(dst, base + '.ptcl'), 'wb').write(out)
+    e = efc.Efc(open(os.path.join(src, base + '.efc'), 'rb').read())
+    by_emp = {}
+    for si, name, _chunk in made:
+        by_emp.setdefault(name.replace('PtcSupamarioGf', '') + '.emp', e.add(si + 1))
+    open(os.path.join(dst, base + '.efc'), 'wb').write(e.build())
+    CMN_FX.clear()
+    for k, (emp, _xid) in CMN_EFFECTS.items():
+        CMN_FX[k] = 0x03410000 | by_emp[emp]
+    return made
+
+
+def build(sm_dir, out_dir, ean_path, cmn_dir=None, png=None):
     fdir = os.path.join(out_dir, 'fighter', 'supamario')
     mo = os.path.join(fdir, 'motion', 'body')
-    out, bones = anim.build(os.path.join(sm_dir, 'motion', 'body'), os.path.join(sm_dir, 'model', 'body', 'c00',
-                                                                                  'model.vbn'), mo)
+    out, bones, _info = anim.build(os.path.join(sm_dir, 'motion', 'body'),
+                                   os.path.join(sm_dir, 'model', 'body', 'c00', 'model.vbn'), ean_path, mo)
+    trans = [h for n, _p, h in bones if n == 'TransN'][0]
+    ROOT_Z[:] = [out['main'].sample(trans, f)[0][2] for f in range(out['main'].frames)]
     if png:
         import supamario_godfist_render
-        supamario_godfist_render.sheet(out['main'], bones, png, [0, 3, 5, 7, 10, 22, 30, 38, 40, 44, 47, 50, 60,
-                                                                 70, 74, 78, 82, 86, 91, 99])
+        supamario_godfist_render.sheet(out['main'], bones, png, anim.SHEET)
+    if cmn_dir:
+        effects(sm_dir, cmn_dir, fdir)
     scripts(os.path.join(sm_dir, 'script', 'animcmd', 'body'), os.path.join(fdir, 'script', 'animcmd', 'body'))
     os.makedirs(os.path.join(fdir, 'script', 'msc'), exist_ok=True)
     msc(os.path.join(fdir, 'script', 'msc', 'supamario.mscsb'))
@@ -393,14 +482,15 @@ def build(sm_dir, out_dir, png=None):
 
 def main():
     a = sys.argv[1:]
-    png = None
-    if '--png' in a:
-        i = a.index('--png')
-        png = a[i + 1]
-        del a[i:i + 2]
-    if len(a) != 2:
+    opts = {}
+    for k in ('--png', '--ean', '--cmn-vfx'):
+        if k in a:
+            i = a.index(k)
+            opts[k] = a[i + 1]
+            del a[i:i + 2]
+    if len(a) != 2 or '--ean' not in opts:
         sys.exit(__doc__)
-    print(build(a[0], a[1], png))
+    print(build(a[0], a[1], opts['--ean'], opts.get('--cmn-vfx'), opts.get('--png')))
 
 
 if __name__ == '__main__':

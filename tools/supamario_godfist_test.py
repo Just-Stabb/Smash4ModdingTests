@@ -9,7 +9,7 @@ MSC: whiff (ends at GF_WHIFF_END in Wait; in Run when the run flag 0x1300011c is
 reaches GF_JUMP_TO in one frame, then 1; no cancel before GF_IASA even with the vl cancel frame open; Wait at the
 motion's end).
 ACMD (the victim: a fighter in player slot 2 that gets up the first frame its controller lets it, from DownWait):
-the hold (11 in front, frames 40-49, XV2's lean back), the strike, the flight (XV2's curves: the offsets / spin
+the hold (HOLD_X in front, JUMP_TO .. STRIKE - 1, XV2's lean back), the strike, the flight (XV2's curves: the offsets / spin
 each frame, the controller off), lying until DownWait takes over,
 landing -> DownWait, held down GF_DOWN frames, then the controller back; a weak hit while down -> it stands up after
 the down damage; a launching hit -> released at once; a victim that never lands (off the stage) -> released; a
@@ -95,7 +95,7 @@ def msc_tests(path):
         vm.game.run_flag = run_flag
         vm.call(init)
         ended = None
-        for f in range(0, 40):
+        for f in range(0, int(B.WHIFF_END) + 6):
             vm.game.frame = float(f)
             vm.call(loop)
             if vm.game.status is not None:
@@ -103,7 +103,7 @@ def msc_tests(path):
                 break
         check('MSC whiff (run flag %d): ends at frame %d in status 0x%X' % (run_flag, B.WHIFF_END, want), ended,
               (int(B.WHIFF_END), want))
-    # hit: gf set at frame 11 (the game script), the vl cancel window open from frame 39
+    # hit: gf set at the hit check (the game script, PUNCH_END), the vl cancel window open from frame 39
     vm = msc_vm(path)
     g = vm.game
     vm.call(init)
@@ -115,15 +115,16 @@ def msc_tests(path):
         g.frame = f
         g.cancel_open = f >= 39
         g.motion_end = f >= last
-        if f >= 11:
+        if f >= B.PUNCH_END:
             g.gf = 1.0
         g.rate = None
         vm.call(loop)
         trace.append((f, g.rate))
         f = f + (g.rate if g.rate is not None else (trace and [r for _f, r in trace if r is not None][-1:] or [1.0])[0])
     rates = [(fr, r) for fr, r in trace if r is not None]
-    check('MSC hit: the jump (frame 11, rate %d), then rate 1 at frame %d' % (B.JUMP_TO - 11, B.JUMP_TO), rates,
-          [(11.0, float(B.JUMP_TO - 11)), (float(B.JUMP_TO), 1.0)])
+    h = float(B.PUNCH_END)
+    check('MSC hit: the jump (frame %d, rate %d), then rate 1 at frame %d' % (h, B.JUMP_TO - h, B.JUMP_TO), rates,
+          [(h, float(B.JUMP_TO - h)), (float(B.JUMP_TO), 1.0)])
     check('MSC hit: no status change before the motion end (cancel window ignored)', (trace[-1][0], g.status),
           (last, 0))
     # the God Fist's cancel frame: acting (func_39) only from GF_IASA (a stub: every frame it is asked, it acts)
@@ -140,10 +141,9 @@ def msc_tests(path):
             return 0
         return orig(script, args)
     vm.call = call
-    for fr in range(11, int(last)):
-        g.frame, g.gf = float(fr) if fr >= 12 else 11.0, 1.0
-        if fr == 12:
-            g.frame = float(B.JUMP_TO)
+    for fr in range(B.PUNCH_END, int(last)):
+        g.gf = 1.0
+        g.frame = float(fr) if fr == B.PUNCH_END else float(B.JUMP_TO + fr - B.PUNCH_END - 1)
         vm.call(loop)
     check('MSC hit: no acting before GF_IASA (%d)' % B.IASA, min(asked) if asked else None, B.IASA)
 
@@ -321,7 +321,7 @@ def run_move(script, victim, hit=True, strike_hits=True, frames=400, second=None
             freeze -= 1
         elif not main.done:
             a.step(main, frame)
-            if hit and B.PUNCH <= frame <= 10:
+            if hit and B.PUNCH <= frame < B.PUNCH_END:
                 a.self_hit = True
             if strike_hits and frame == B.STRIKE and a.vars.get(B.GF_VAR) == 1.0 and not struck:
                 struck = True
@@ -363,17 +363,18 @@ def acmd_tests(game_bin):
     v = Victim()
     a, rec = run_move(script, v)
     held = [r for r in rec if B.JUMP_TO <= r[1] < B.STRIKE]
-    check('hold: the victim 11 in front on the ground while held', {(r[2], r[3]) for r in held}, {(B.HOLD_X, 0.0)})
+    check('hold: the victim %g in front on the ground while held' % B.HOLD_X, {(r[2], r[3]) for r in held}, {(B.HOLD_X, 0.0)})
     n_hold = B.STRIKE - B.JUMP_TO
     tr = v.trace
     want_hold = [(B.HOLD_X, 0.0, -B.hold_lean(k, n_hold)) for k in range(n_hold)]
     check('hold: XV2\'s lean back (#179 0-40: %.0f -> %.0f degrees)' % (-want_hold[0][2], -want_hold[-1][2]),
           all(abs(a[2] - b[2]) < 1e-3 and a[:2] == b[:2] for a, b in zip(tr[:n_hold], want_hold)), True)
     flight = tr[n_hold:n_hold + B.GF_FLIGHT]
-    want = [B.flight_frame(k) for k in range(1, B.GF_FLIGHT + 1)]
+    want = [B.flight_offset(k) for k in range(1, B.GF_FLIGHT + 1)]
     ok = len(flight) == len(want) and all(abs(x - wx) < 1e-3 and abs(y - wy) < 1e-3 and abs(r_ - wa) < 1e-2
                                           for (x, y, r_, _st), (wx, wy, wa) in zip(flight, want))
-    check('flight: %d frames of offsets / spin as flight_frame (XV2 #179 / #96)' % B.GF_FLIGHT, ok, True)
+    check('flight: %d frames of offsets / spin as flight_offset (XV2 #179 / #96, less his own travel)' % B.GF_FLIGHT,
+          ok, True)
     check('flight: ends %g in front (feet), lying (%g degrees)' % (want[-1][0], want[-1][2]),
           (round(flight[-1][0], 3), flight[-1][2]), (round(want[-1][0], 3), want[-1][2]))
     turned = abs(want[-1][2] - (-B.hold_lean(n_hold - 1, n_hold)))
@@ -443,7 +444,7 @@ def acmd_tests(game_bin):
             return v
         return None
     a2.target = target
-    for fr in range(0, 13):
+    for fr in range(0, B.PUNCH_END + 1):
         a2.step(main, float(fr))
     check('second God Fist: the first victim gets its controller back', v.input_off, 0.0)
 
@@ -453,6 +454,12 @@ def main():
     if len(a) != 1:
         sys.exit(__doc__)
     d = a[0]
+    # his TransN by motion frame (the flight offsets take his travel off): from the built AttackDash
+    import omo
+    e = dict(omo.pac_read(os.path.join(d, 'motion', 'body', 'main.pac')))
+    o = omo.Omo(e['FitMarioBodyMainC00AttackDash.omo'])
+    trans = o.nodes[0][1]                       # TransN: the first node (vbn order)
+    B.ROOT_Z[:] = [o.sample(trans, f)[0][2] for f in range(o.frames)]
     msc_tests(os.path.join(d, 'script', 'msc', 'supamario.mscsb'))
     acmd_tests(os.path.join(d, 'script', 'animcmd', 'body', 'game.bin'))
     print('%d problem(s)' % len(PROBLEMS))

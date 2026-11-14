@@ -340,3 +340,73 @@ Damage stays 4% + 11%.
 lying-until-DownWait and the rotation back to 0). `msc_stack_check` 0; `msc_fingerprint` vs the user's: `func_272` /
 `func_273` + 2 (the MSC code is v1's; only `GF_IASA` 89 -> 95). Every other script / animation byte for byte the
 user's. `xv2ean.py --selftest`.
+
+## Super God Fist v3 (`supamario_god_fist_v3.zip`): XV2's own animation, CMN effects, the BDM
+
+Install over v2 (no exe change; either exe). Not tested in game. New files from the user: the skill's
+`030_GOD_CSA.ean` (+ `_F` female, `_MAM` heavy male), `030_GOD_CSA.bas` (only 24 bytes of zero padding more than
+the first one: a newer BAS layout), `030_GOD_CSA_PLAYER.bcm` (byte for byte the first one), XV2's `vfx/cmn`,
+`GOK_PLAYER.bdm / .bac / .bcm` (Goku's character files) and `CAR_BTL_GOK_SE.acb`.
+
+### The animation (`tools/supamario_godfist_anim.py`, now from 030_GOD_CSA.ean)
+- The EAN: #0 GOD_SPA_CSA_C (112 frames: the follow-up), #1 GOD_SPA_CSA_MISS_C (71: the dash punch, which goes on
+  past the target), #2 / #3 their `_S` variants (the other BCM variant). #0 frame 0 is #1 frame 15's pose. The three
+  bodies share the skeleton; `_F` differs from the default by up to 0.3 m (posture), `_MAM` up to 1 m (wide arms,
+  low stance): the default (C) is used.
+- XV2 is left-handed, characters face -Z: `xv2ean.Ean(smash_axes=True)` mirrors z -> -z (facing +Z, the right hand
+  still the right; the skill punches with the RIGHT fist: BAC entry 1 holds the victim on b_R_Arm2). Retargeted bone
+  by bone (world-space turns from the T-pose rests, fingers too: `XV2_TO_MARIO`), 5.04 units a metre (Mario's hip
+  to foot / XV2's pelvis to foot).
+- Timeline (BAC timings, 60 frames a second both): **0-18 = #1 0-18** (the hitbox 14-17, the BAC's: the fist is
+  7.3-7.5 in front of him, 5 up, from 14), the whiff #1 18-70 twice as fast, **ending at 44**; the hit check at 18
+  jumps to **46 = #0 frame 0**; **46-96 = #0 0-40 at x0.8** (the BAC's TimeScale: 50 frames, the fist held in);
+  **96 = #0 40, the launch** (the God Fist hit); 96-167 = #0 40-111 (the flip away 40-60, the stance by 111).
+- Root: #1's dash x the body scale to the contact (18.6), x0.3 after (a whiff slides 28 in all, vanilla Mario's 28);
+  #0's own 2.5 m x0.5 (6 units, mostly in the flip). RotN: the pelvis' height changes, then the lower foot put on
+  the floor on every frame (XV2 fights in the air: its dash leaps and its hold hangs) except over the flip (#0
+  40-62, ramped over 4 frames: only lifted where the head (3), hands (1), knees (1.5) or feet would go under the
+  floor). Checked: feet at the floor (1.56, the foot joint standing) everywhere but the flip; head / hands / knees
+  never below 1.5.
+- Previews: `supamario_godfist_render.py` sheets, and the clip beside ours (`preview/v3_vs_clip.png`): the clip's
+  hold looks ~6 frames shorter than the BAC's 50 (its launch ~44 frames after the contact); the BAC's kept.
+
+### Gameplay timings (v3)
+| | v2 | v3 |
+|---|---|---|
+| punch hitbox / check | 7-10 / 11 | 14-17 / 18 (BAC: 14-17) |
+| whiff ends | 38 | 44 |
+| God Fist part from | 40 | 46 |
+| hold | 10 frames + 24 freeze | 50 frames (the animation's x0.8) + 8 freeze |
+| launch | 50 | 96 (#0 40) |
+| hold distance | 11 | 11.5 (his fist 7.3-7.5 ahead + 4) |
+| acting | 95 | 141 (the flight's end) |
+| invincible from the catch | 45 | 75 |
+The punch is on RHandN now (bone 0x14). The flight is v2's (XV2 #179 / #96 curves) less his own travel during it
+(`flight_offset`: he moves 5 forward in the flip; the victim is placed relative to him).
+
+### Effects (vfx/cmn)
+The BAC's EEPK type 1 is **BTL_CMN.eepk**: its 220 = Btl_MHit (hit sparks), 120 = Btl_MHitSmk, 160 = Btl_PHitSmk
+(hit smoke), 230 = Btl_RHit; 0 / 11 = Btl_FocusLineW (camera focus lines). Converted (`xv2_to_ptcl`, 64-pixel
+textures, sets `PtcSupamarioGfBtl_MHit / _MHitSmk / _PHitSmk`, efc entries 0x2C-0x2E: ids 0x0341002C-E, +94 KB in
+the 2.9 MB ptcl) and played at the BAC's frames: 220 at the dash's frame 10 (entry 0, replacing v2's orange
+flash), 120 at #0 60 (the flip's landing, 116, replacing v2's dust), and on the victim's slide (entry 3: 160 at #96
+20 / 42, 120 at 62: flight frames 25 / 32 / 39, at its position, from the game script's thread). Size x0.59 (the
+converter's 8.5 units a metre against his 5.04). `xv2vfx.load_package(strict=False)` now skips the 15 vfx/cmn EMPs
+its reader can't name (a Sphere emitter's parameter 3), instead of failing.
+**Still missing**: the skill's own effects (030_GOD_CSA.eepk: skill effects 0 at 2, 1 at 10, 2 at #0 17 / #1 40,
+11 on the victim at 12: the gold God Fist ones) and CMN 180 (#1 41: not in BTL_CMN.eepk) and the focus lines (not
+converted: a camera effect). The gold stand-ins (glow, fire burst, rings) stay.
+
+### The BDM
+`GOK_PLAYER.bdm` has entries 0-16 and 142: **no #160**. #160 is CMN.bdm's (v2: stun 9 / 9, pushback 0.25 / 0.7,
+the "damage" field 100 in every entry: a ratio). So the BAC hitbox's +0x12 = 1 doesn't name the character's BDM;
+CMN.bdm it is. The punch keeps its 9-frame freeze; the damage (in neither file: the skill's power) stays 4% + 11%.
+`GOK_PLAYER.bac / .bcm`: Goku's own moveset (913 BAC entries); the skill doesn't use them.
+
+### Sounds
+`CAR_BTL_GOK_SE.acb` holds 6 cues, all in memory (an AWB inside: no separate .awb needed): 0 nage_DashBasa,
+1 nage_CatchDashi, 2 nage_Hit_Blow, 3 nage_GOK_Jump, 4 nage_GOK_CatchBashi, 5 nage_GOK_GiantSwing (Goku's throws).
+It is Goku's **character SE** (ACB type 2: GOK_PLAYER.bac's type-2 sounds use exactly cues 0-5). The God Fist's BAC
+plays none of them: skill SE / voice cue 0 (types 10 / 11: the skill's own .acb), **character voice** cues 81 / 35
+(type 3: the attacker's battle voice bank), common SE cues 53 / 74 (type 0: XV2's common battle SE). Not added
+(not this move's sounds); the stand-ins stay.
