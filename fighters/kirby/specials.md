@@ -2192,3 +2192,102 @@ python3 tools/kirby_hero_sword_test.py EXE_V46H.rpx EXE_V45H.rpx EXE_V46F.rpx
 python3 tools/rpx_patch.py EXE_V46H.rpx EXE_V46H_DIAG.rpx $(python3 tools/diag_kirby_hero_cave.py --rpx EXE_V46H.rpx)
 python3 tools/diag_kirby_hero_test.py EXE_V46H_DIAG.rpx EXE_V46H.rpx
 ```
+
+### Hero copy fix v6 (`kirby_hero_copy_fix_v6`): exe_v46i (B), Hero's sword swung on the stone
+
+User (fix v5 B): "The sword appears now, but doesn't animate." The held sword hangs on Kirby's LHaveN (fix v5), and
+Kirby, invisible in the stone, holds a pose: his hold motions 0x2ED / 0x2F1 have no animation (Kirby's motion table:
+hash 0).
+
+**How the sword is moved (chosen and why).** Three ways were looked at:
+- The article's own motion: Kirby's "simple" article loads `motion/<name>` (its set-up `0x02B01ED8`: model
+  `0x030C5EE0`, motion pack `0x030C6054`, MotionModule vt +0x44), and the stone show path only sets its frame from
+  Kirby's (`0x02BF0594` -> vt +0x2F4). Nothing found picks its motion: the simple article has no `motion.mtable`
+  (no `animcmd/weapon/simple`), no ACMD of Kirby's changes article 0x1A's motion, and cloudsword's
+  `FitKirbyCloudSwordMainD00SpecialN` is played by code not traced. Its hitboxes would also have stayed on LHaveN.
+- Joint overrides (MSC ModelModule 1 / 7 on LHaveN): no motion change, but LHaveN's world still depends on the hidden
+  pose of the arm above it, and the per-frame data (four spells, up to 108 frames) would be hundreds of calls.
+- **Chosen: Kirby's own LHaveN moved by a Kirby motion played during the spell.** This is the same mechanism the Marth
+  copy's sword aerials use (LHaveN tracks in Kirby animations moved `marthsword`, confirmed in game). The animation
+  fixes the whole hidden skeleton, LHaveN included, and the bone-0x18 hitboxes and effects follow the blade with no
+  extra work.
+
+**Data (Ultimate's files, `tools/kirby_hero_sword_anim.py`):**
+- Spells -> animations, from the motion_list: special_lw17 / 18 `d03speciallwskill3`, 19 `skill1`, 20 `skill2` (21
+  Psyche Up is `skill4`, no sword). Cancel frames 47 / 47 / 40 / 88.
+- The blade's frame on Hero is Sword1 @ inv(S2H): the model is given in HaveR's frame as Sword1 sits in it in the bind
+  pose (`kirby_copy_sword.sword_to_have`: (0.2023 - y, x, z)). Sword1 has its own tracks in these spells, up to ~50
+  degrees off its bind relation to HaveR. A first build driven by HaveR put the sword hitboxes 4-6 off Hero's (the
+  swing test caught it).
+- Clock: cast frame g shows Hero's motion frame mf(g), with the reference scripts' Set_Frame_Duration rates (the same
+  clock as the hitboxes, `kirby_hero_sword_msc.timing`). Animation index mf - 1 (ACMD frames are 1-based),
+  interpolated (position lerp, rotation nlerp). One key per cast frame, 0 to `khm_sw_end` (54 / 51 / 62 / 108 frames).
+- Placement: Hero's model space = Kirby's (Y up, +Z facing). The path's scale about the feet is 1 by default: Hero's
+  own arc, the sword at Hero's size, as v6's decision (Hero's sword "attached at Hero's hand offset", its hitboxes as on
+  Hero; the bone-0 hitboxes are Hero's positions too). `--scale kirby` (the stone's top 8.02 / Hero's 19.34 = 0.415,
+  with `kirby_copy_sword.py --rescale` for the model) was rendered for comparison: that sword is inside the 8-tall
+  stone for most of each spell. A Hero-size blade on the scaled path went under the floor. Previews in the package.
+- The animation: every bone of Kirby's main pack at `FitKirbyBodyMainD03SpecialLw1`'s last frame (the stone pose; the
+  part bones are not in the main pack), constant; LHaveN per frame = inv(LHandN's stone-pose world) @ the wanted
+  model-space matrix (no shear). Encoded and re-posed within 0.005.
+- Arm hitbox (Hero's bone 0x16, his forearm ArmR, ID 2 in each spell): the stone has no arm, so it goes on LHaveN at
+  ArmR's origin in the blade frame at its frame (`reference/kirby_hero_sword_path.json` "arm"). Before, it was on
+  Kirby's still LArmJ.
+
+**Files:**
+- Kirby's `motion/body/main.pac`: his own pack (vanilla, byte for byte) plus `FitKirbyBodyMainD03SpecialLwBraveSword17`
+  - `20`.
+- exe_v46i = exe_v46h + Kirby's motion table (`0x103850A4`, 8 bytes a motion) slots 0x304-0x307 = the four animations'
+  hashes (`zlib.crc32(name, 0xFFFFFFFF)`, as `kirby_marth_sword.py`) and SpecialLw's flags (0x4). These slots were
+  empty: hash and flags 0, `motion.mtable` hash 0, so a change to them runs no ACMD. Marth's aerials use 0x301-0x303.
+  The change motion `0x02C5D7xx` reads the entry's flags halfword (+6).
+- `kirby.c` (B): `khm_sw_motion(n, f)`, called from `khm_sword` every cast frame:
+  - Kirby's motion becomes `khm_sw_slot(n)` = 0x304 + n - 0x11 (`MotionModule(0x1, slot, f, 1.0)`) if it isn't already;
+  - its frame is set to the cast frame (`MotionModule(0x2713, f)`).
+  - Two exceptions:
+    - Right after a landing (motion 0x2ED / 0x2F1 at frames 0-2, set by the hold loop's `func_2262`), it waits: the
+      hold motion's own script (the landing hitbox) runs.
+    - After the spell he stays in the slot. A change back to the hold motion would rerun its script (the hitbox).
+  - The generated block (`tools/kirby_hero_sword_msc.py`, now reading `reference/kirby_hero_sword_path.json`): the arm
+    hitbox on LHaveN at its offset. With a path scale other than 1, the sword offsets and the sword effects' sizes are
+    scaled.
+  - Globals 118.
+- Diagnostic: `diag_kirby_hero_cave.py`'s vis line also gives Kirby's motion kind (`mot=304`-`307` while swinging).
+- `ModAnimNames.txt`: `BraveSword17`-`20` with `-> body/FitKirbyBodyMainD03SpecialLwBraveSword1N.omo +
+  bravesword@LHaveN` lines (Sm4shCommand rebuilt).
+
+**Tests:**
+- `tools/kirby_hero_sword_swing_test.py exe_v46i exe_v46h MAIN.pac KIRBY_MAIN.pac KIRBY_VBN ULT_BRAVE` (new):
+  - the table words (empty in exe_v46h, no other word changed);
+  - the pack (Kirby's entries byte for byte, plus the four);
+  - each animation decoded and posed against Hero's blade frame recomputed from the Ultimate files and the scripts
+    (within 0.05 on every frame), all other bones constant;
+  - every sword hitbox the MSC makes, at its frame, at Hero's own hitbox point on his blade and inside the blade's
+    reach; every arm hitbox at ArmR;
+  - natively (`kirby_hero_sword_vis_test.World`): the held sword's update with Kirby in 0x304-0x307 draws it while
+    the int is 1 and hides it after.
+- `kirby_newcopy_test.py` fix v6 (the MSC in its interpreter):
+  - each spell, ground and air: the motion changed once, its frame = the cast frame on every frame 0-end, none after;
+  - a landing mid-cast: 0x2ED kept on its frames 0-2, then the spell's motion at the cast frame;
+  - the arm hitbox on 0x18 at the path's offset;
+  - all earlier checks pass.
+- Also run: `kirby_hero_sword_vis_test.py`, `kirby_hero_sword_test.py`, `diag_kirby_hero_test.py` on exe_v46i(_diag);
+  `msc_stack_check.py`, `rolloff_hold_test.py`.
+
+**Not checked in game / approximated:**
+- Whether Kirby's hidden TransN offset (SpecialLw1 ends with TransN at (0, 9, 0)) is drawn. The path is solved through
+  it, as the game poses the bones. If the game drops it, everything is 9 lower.
+- The ground animations serve air casts too.
+- Sword_Glow trails are still left out. They would need ACMD scripts for the slots, so a `motion.mtable` name.
+- The spells' bone-0 hitboxes and effects stay where v6 put them (Hero's positions).
+```
+python3 tools/kirby_hero_sword_anim.py ULT/brave KIRBY OUT --rpx EXE_V46H.rpx --preview PREVIEW   # OUT: main.pac, rpx_args, path.json
+cp OUT/path.json reference/kirby_hero_sword_path.json
+python3 tools/kirby_hero_sword_msc.py > /tmp/sw.c       # the GENERATED block in kirby.c
+sh tools/kirby_hero_copy_build.sh MSC_OUT               # kirby_B.mscsb
+python3 tools/rpx_patch.py EXE_V46H.rpx EXE_V46I.rpx $(cat OUT/rpx_args.txt)
+python3 tools/rpx_patch.py EXE_V46I.rpx EXE_V46I_DIAG.rpx $(python3 tools/diag_kirby_hero_cave.py --rpx EXE_V46I.rpx)
+python3 tools/kirby_hero_sword_swing_test.py EXE_V46I.rpx EXE_V46H.rpx OUT/motion/body/main.pac KIRBY/motion/body/main.pac \
+    KIRBY/model/body/c00/model.vbn ULT/brave
+python3 tools/kirby_newcopy_test.py MSC_OUT/kirby_B.mscsb
+```
