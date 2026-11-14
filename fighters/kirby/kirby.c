@@ -77096,7 +77096,8 @@ void khm_sword(int f)
                                                         // is (user: "only visible ... when the trail begins and
                                                         // disappear when it ends"; khm_sw_shown, generated)
     khm_sw_motion(n, f);                    // fix v6: the sword swung (LHaveN moved as Hero's hand)
-    khm_sw_game(n, f);
+    khm_sw_game(n, f);                      // fix v10: its hitboxes on bone 0 at the blade's drawn place, every
+                                            // frame, depth on his plane (fix v8's on LHaveN in 3D missed)
     khm_sw_fx(n, f);
     if (khm_sw_window(n, f) && AttackModule(0x2726, 0x2))
     {

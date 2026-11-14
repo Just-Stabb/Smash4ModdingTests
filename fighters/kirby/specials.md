@@ -2530,3 +2530,68 @@ keeps his 15); it replaces fix v8's gap of 1. MSC only: exe_v46i and fix v8's ot
   - The model doesn't apply the launch's 6 lift (WorkModule op 2), so the flights there start at the cast position.
 - `preview/zoom2u_v9.png`: the paths and stops.
 - **Not checked in game:** the target's centre is a fixed + 6, not each fighter's own height.
+
+### Hero copy fix v10 (`kirby_hero_copy_fix_v10`): the sword spells' hitboxes hit again
+
+User (fix v8 / v9, exe_v46i): "Kirby's Stone menu (sword attack) hitboxes are bad now, they seem to not be able to hit
+opponents at all." No executable change: MSC and the swing animations only.
+
+**Cause (worked out with `tools/kirby_hero_sword_hitboxes.py`).** That tool takes each version's own events and the
+swing's LHaveN matrices (path.json), puts every hitbox in the world, and checks it against the core of a medium
+fighter's hurtboxes standing next to the stone. The core is a box: depth -1.5..1.5, height 1..11, 7.8..13.8 in front.
+I ran it under two readings of the game: A, gameplay joints as drawn; B, with the 9 of TransN that the fix v6-v9 swing
+animations kept.
+
+- **Depth.** Fix v8 moved the hitboxes onto the blade, on LHaveN in 3D, and dropped Flame / Kacrackle Slash's bone-0
+  bursts (IDs 3-4). Those bursts sat on Kirby's plane and were what reached in fix v7. The blade itself swings into
+  the screen in the follow-through, as Hero's does: Flame / Kacrackle Slash up to 14.8 deep, Metal Slash 8.
+- **Results, fix v8:**
+  - Flame / Kacrackle Slash reach nothing under A or B; on their only on-plane frame (6) the blade is high and far
+    forward.
+  - Metal Slash reaches only under A.
+  - Hatchet Man reaches under both (its blade stays within 2.4 of the plane).
+- **Results, fix v7:** every spell reaches under A. Under B, Metal Slash misses, while Flame / Kacrackle still reach
+  through the bursts.
+- **TransN.** In Kirby's skeleton bone 0 is TransN, and the swing animations kept SpecialLw1's (0, 9, 0). The drawing
+  leaves that out (fix v7, measured). Whether the game's hitbox joints also leave it out was never measured; under
+  reading B everything on LHaveN or bone 0 was 9 higher.
+- I couldn't run AttackModule's own world-position code. This is the geometry of both readings, not a game
+  measurement.
+
+**Fix:**
+- `kirby_hero_sword_anim.py` holds TransN at 0 in the four swing animations. The drawing is unchanged (it left TransN
+  out anyway), and joints no longer depend on how the game treats it.
+- `kirby_hero_sword_msc.py` `flatten`: each sword hitbox (fix v8's points on the blade: Hero's X along it, the arm one
+  at the base) is now a bone-0 hitbox.
+  - It is remade every cast frame from its set to Remove_All_Hitboxes, at the blade's drawn place that frame
+    (LHaveN's matrix x the point).
+  - Its depth is on Kirby's plane.
+  - It is a capsule back to the last frame's point (the sweep).
+  - IDs, Part, sizes, damage and the rest are Hero's, as fix v8.
+- Seen from the camera the hitboxes follow the blade. They don't depend on the joint's frame, nor on TransN.
+  Bone-0 hitboxes in this same Stone context are what hit in fix v7.
+- **Reach now:** every spell reaches, under both readings. Margins: Flame / Kacrackle 4.5, Metal 3.8, Hatchet 3.8.
+- Hitbox frames:
+
+  | Spell | Hitboxes (cast frames) |
+  |---|---|
+  | Flame / Kacrackle Slash | 6-8 |
+  | Metal Slash | 11-12 |
+  | Hatchet Man | 37-40 |
+
+**Tests:**
+- `kirby_hero_sword_hitboxes.py --v7 V7_MSC_PY --v8 V8_MSC_PY --test` (rewritten):
+  - prints the reach table, with each version's depth;
+  - fails unless fix v10 reaches in every spell, ground and air, every hitbox on the plane and on the drawn blade as
+    seen from the side;
+  - fix v8's would fail.
+- `kirby_hero_sword_hitboxes.py --out DIR` renders `hitboxes_17-20.png`: side and top views per frame. Grey = fix v7,
+  orange = fix v8, red = fix v10, green = the opponent's box. Fix v8 hides under fix v10 in the side view.
+- `kirby_newcopy_test.py`: the MSC's hitboxes equal those worked out on their own from Hero's script and path.json,
+  for every frame and ID.
+- `kirby_hero_sword_swing_test.py`: every hitbox on bone 0 at Hero's blade point (Y / Z) with depth 0, on the drawn
+  blade's line; TransN at 0 in the animations.
+- Also: `msc_stack_check` (globals 118), `rolloff_hold_test`, `kirby_hero_sword_fx_vis_test`, the A build.
+
+**Not measured in game:** hurtbox sizes and depth (the box is an estimate), and which reading the game uses. Fix v10
+doesn't depend on the readings.
