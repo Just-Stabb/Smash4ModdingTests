@@ -1046,3 +1046,64 @@ At the move's start (gf_init), if an opponent in hitstun is within 40 units, usi
 - what speed his kinetics carry in the air after the burst;
 - that set_pos-based tracking doesn't pass through walls;
 - that the pinned speed left at 92 is negligible (air friction runs while he is held).
+
+## Super God Fist v13 (`supamario_god_fist_v13.zip`): tracking on the burst's first frames within 20, an off-stage God Fist plays to its end
+
+v13 installs over v12 and still uses exe B (`exe_v46i`). The user's requests:
+- "make the tracking only happen in the first few frames";
+- "make it so the animation finishes in the air instead of cutting to fall when hitting an opponent";
+- "reduce the homing range to 20 units".
+
+### Tracking: the first 3 burst frames, within 20 units
+- **When:** only motion frames 9-11, the burst's first three (`TRACK_END` 12), not 9-14. At the 2x startup, the one of
+  them it plays is frame 10, which covers motion frames 10 to 12.
+- **Who:** an opponent within 20 units (`TRACK_RANGE`; from his position to its, in front, within 60 degrees, in
+  hitstun).
+- **Speed:** the x1.5 cap, the 60-degree limit and the off-edge rule are as in v12.
+- **How much extra:** k now spreads, over the tracking frames left, the extra way the burst needs to reach the
+  opponent at the contact (frame 15). That is the opponent's distance, plus its speed away from him (measured from the
+  frame before) over the burst's frames left, less the catch's 11.5 and the burst's own way left.
+  - **At most:** 3 x 0.5 x 4.53 = **6.8 units** more (v12: 13.6). At the 2x startup it is one frame: 0.5 x 9.07 =
+    **4.5**.
+  - **A still opponent within 20** is already in reach: the burst covers 27 and the catch is 11.5 further. So the
+    horizontal boost only comes in for an opponent flying away from him, at about 3.2+ a frame. Aiming up (and down
+    past an edge) still applies.
+- **The 2x startup** keeps its own 40-unit range (`COMBO_RANGE`; the user hasn't changed it). An opponent within 20 at
+  the start is within 40 too, so a tracked combo usually gets the 2x startup and its one tracking frame.
+- **The edge check** (GroundModule 0x2726) is now asked on every grounded frame from the move's start, not only on
+  tracking frames. So the 2x startup's single tracking frame knows it even when he's already off the ground by then.
+
+### An off-stage God Fist plays to its end
+- **Hit path in the air** (the v12 off-stage catch): the move no longer goes to Fall at GF_IASA (92). It plays the
+  animation to its end (the flip, the stance) held in place: the MSC pin runs until the motion ends, and the game
+  script's Gravity_Set stays. Then Fall, with his gravity back (the status change).
+- **Acting from 92:** he can still act from 92 in the air. gf_update calls func_41 (the air interrupts: aerials,
+  specials, air dodge, jumps). Their transition terms (STRANS ON, WorkModule 0x17) are turned on at 92, since a ground
+  status has them off:
+  - 0x1e000061 attack air, 0x1e00008a item shoot air;
+  - 0x1e000062-65 specials, 0x1e000094 final;
+  - 0x1e00003d air dodge;
+  - 0x1e00003e / 3f / 43 / 44 / 45 jumps.
+  
+  Acting changes the status, which ends the pin and the Gravity_Set.
+- **Leave_Ground_Cancel:** turned back on at the hand-off only on the ground (Input_Get SITUATION != 2), so nothing
+  asks for Fall early in the air. The v10 MSC air Fall at GF_IASA is gone.
+- **Grounded hits** are unchanged (act from 92 via func_39, Wait at the end).
+
+### Tests
+`--all-models`: 0 problems.
+
+New or updated checks:
+- tracking: none behind, above / below 60 degrees, not in hitstun, facing away, or out of range (25, flying away);
+- tracking: a still opponent within 20 gets no extra way;
+- tracking: an opponent flying away 6 a frame gets extras on frames 9-11 only, 0.5x each, 6.8 in all;
+- tracking: one flying away 4.2 a frame gets part of it;
+- tracking up at 50 / 59 degrees: off the ground on frame 10 (2x) and never steeper than 60;
+- tracking down: never over the stage, and down past an edge;
+- the 2x startup's single tracking frame;
+- off-stage catch: held to the animation's end, then Fall; the air terms are turned on at 92; acting at 100 ends it
+  there; a ground catch is unchanged;
+- Leave_Ground_Cancel is not turned on at an off-stage hand-off;
+- the v10 air test now expects Fall at the animation's end.
+
+`msc_stack_check`: 0 of 2325.
