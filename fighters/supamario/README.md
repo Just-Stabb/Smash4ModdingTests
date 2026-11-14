@@ -1107,3 +1107,66 @@ New or updated checks:
 - the v10 air test now expects Fall at the animation's end.
 
 `msc_stack_check`: 0 of 2325.
+
+## Super God Fist v14 (`supamario_god_fist_v14.zip`): actionable in the air at 92, tracking range 35
+
+v14 is installed over v13 and still uses exe B (`exe_v46i`). User requests:
+- "make Supamario actionable at the same time in the air as on the ground after hitting an opponent";
+- "increase the tracking range to 35 units".
+
+### Acting in the air at 92
+**Why v13 didn't work.** v13 turned the air actions' transition terms on (WorkModule 0x17) and called func_41 from the
+AttackDash status, and in game he still couldn't act at 92 in the air. The game reads a term only while its transition
+group is on, and AttackDash, a ground status, has the air groups off. The game's own air statuses turn them on with
+`func_40` (WorkModule 0x19 on these groups, from `reference/msc-note-sheet/STransGroup_ID.csv`):
+
+| Group | Actions |
+|---|---|
+| 0x1f000008 | landing |
+| 0x0a | air specials |
+| 0x0b | light throw |
+| 0x0c | air catch |
+| 0x0d | air dodge |
+| 0x0e | aerials |
+| 0x0f | footstool |
+| 0x10 | wall jump |
+| 0x11 | air jump |
+
+For example, `func_175` calls `func_40` and then `func_41` from its loop.
+
+**What v14 does (`gf_air_act`).** From GF_IASA (92) in the air:
+1. It calls `func_40` and turns the terms on, once.
+2. It then calls `func_41`, the game's air interrupts with all their own rules.
+3. If `func_41` doesn't act, it does the same actions straight from the frame's commands (`global24`), in `func_41`'s
+   order, keeping its special-move hooks (`func_72`):
+   - up / down / side / neutral special (0x154 / 0x155 / 0x153 / 0x152);
+   - air dodge (0x22);
+   - aerial (0x34; AttackAir picks the direction from the stick);
+   - jump (0xC for Mario's kind, or 0xD), with the button, or with tap jump if it's on, and only with a jump left.
+
+Acting ends the hold (the status change stops the pin and Gravity_Set). With nothing pressed, the animation plays to its
+end in the air, then Fall (v13). Grounded hits are unchanged: `func_39` from 92.
+
+### Tracking range 35
+`TRACK_RANGE` is 35 (v13 20). The 2x combo startup keeps its own 40.
+- **A still opponent:** within 35, it is still in reach. At 35 the burst (27) plus the catch (11.5) just covers it,
+  so it gets no extra way.
+- **An opponent moving away:** it gets the extra way (up to 6.8, 4.5 at the 2x startup) once it flies away faster than
+  about (38.7 - its distance) / 6 a frame: about 0.6 a frame at 35, 3.1 at 20.
+- **Overlap with the 2x startup:** an opponent within 35 at the start is within 40 too, so a tracked combo usually
+  gets the 2x startup and its one tracking frame. The opponents tracked over all three frames are those that come
+  into range after the start.
+
+### Tests
+`--all-models`: 0 problems. New checks:
+- in the air, with an aerial, air dodge, each special or a jump pressed from 89, he acts on 92 exactly, into that
+  status, held until then;
+- a jump with no jump left plays out, then Fall;
+- the air groups are turned on at 92;
+- nothing pressed: held to the end, then Fall;
+- on the ground: unchanged (`func_39` from 92, no air groups);
+- the tracking range: out of range beyond 35 on the tracking frames.
+
+Not confirmed in game:
+- that `func_40`'s groups make `func_41` act from AttackDash (the direct fallback acts if they don't);
+- that the command flags are there on the frame (`global24`, the game's buffer).
