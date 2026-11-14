@@ -1746,3 +1746,63 @@ Still approximated: the hats are rigid (copy_edge_cap's S_HairB1 swing and its P
 python3 tools/kirby_copy_hats.py ULT/kirby/model S4/fighter/kirby/model OUT/fighter/kirby/model --check
 python3 tools/kirby_copy_motions.py ULT/kirby S4/fighter/kirby OUT/fighter/kirby/motion --check
 ```
+
+### Visual fix v2 (`kirby_copy_visuals_v2`): Sephiroth's hair swings
+
+User: "make Sephiroth's hair swing like in Ultimate." Only `model/edgecap/c00-c07` changes. No exe or MSC change.
+
+**What Smash 4 supports.**
+- **Swing bones on hats: yes, with no code.** 22 of Kirby's vanilla copy models have them. Examples: `marthcap`
+  (3 hair bones), `linkcap` (the cap's tail, a chain of 3), `ikecap` (the bandana, 2 x 3), `szerosuithair` (the
+  ponytail, 5); also `palutenacap`, `zeldacap`, `pikachucap`, `soniccap` and others. How they are built:
+  - A swing bone is a `model.vbn` bone of type 3, named `SWG_<name>__swing` and parented on the root.
+  - The hat's vertices are skinned to it.
+  - The hat's `model.sb` (` BWS` 5.1, little-endian, a u32 count, 140-byte entries as Smash Forge's `SB.SBEntry`)
+    gives each swing bone, by hash:
+    - physics words (800, 5, 3, 100, 0, 1 for Marth's / Zero Suit Samus's hair);
+    - rx / ry / rz limits in degrees (rz is the swing about the bone's Z, + away from the head on these hair bones);
+    - 8 collision bone hashes (0xCD94A505 = none);
+    - the bone's length at word 30 (Ike's 1.515 / 2.157 are his chain's bone-to-bone distances).
+  - The swing bones' axes are Ultimate's convention: X along the strand, Z across.
+- **Hat animations: not for this copy.** Kirby's copy resource tables are the body motions `0x1041A6D0`, the hats
+  `0x1041A7B8` and three held-item tables (`0x1041A8A0` and two more with only Bayonetta's guns). None of them is a
+  hat-motion table.
+  - `motion/yoshicap` (the Yoshi copy's N1 / N2) and `motion/ultraswordhat` (the Final Smash) exist, but are
+    presumably loaded and played by their own code; not traced.
+  - So keyframed hair for the Robin-slot copies would need an exe stage: load `motion/edgecap` and play its entry for
+    Kirby's motion on the hat.
+
+**Ultimate's hair.** `copy_edge_cap` swings one bone, `S_HairB1`:
+- It sits at Body + (2.1, -4.2, 0) local, i.e. the back of the head, pointing down to `S_HairB2_null` 5 below.
+- It moves 1343 back-hair vertices, the strand below y ~6.9, blended into Body.
+- `swing.prc` `hairb`: z -20..50, y -20..20, gravity 1, inertial mass 5, goal strength 10, air resistance 100,
+  friction 0.5, no collision.
+- `swingblend.prc` swing is on (blend 1) by default and off (0) in the 8 neutral-special motions. There,
+  `motion/copy_edge_cap/d00special*.nuanmb` key `S_HairB1` up to ~83 degrees off its bind (hair flips).
+- The front locks, the arcs and the Puff weights don't swing.
+
+**Done** (`tools/kirby_copy_hats.py`, edgecap only):
+- **Skeleton:** `model.vbn` = refletcap's `TopN` + `SWG_HairB1N__swing`.
+  - Type 3, parent `TopN`, at `S_HairB1`'s bind in the hat frame (local (2.1, -4.2, 0), axes kept), hash
+    crc32(name).
+  - The header counts types (1, 0, 0, 1).
+- **Skinning:** each vertex's `S_HairB1` weight goes to bone 1 and the rest to `TopN`, in `model.nud` and
+  `metal.nud`. Positions are v1's exactly. The nud bone range is 0-1.
+- **Physics:** `model.sb` takes one entry from Zero Suit Samus's `SWG_Pony01N__swing` (read from
+  `szerosuithair/c00` at build time).
+  - It is a strand hanging from the back of the head, with the same bone axes; its physics words are Marth's hair's.
+  - With Ultimate's limits: ry (-20, 20), rz (-20, 50).
+  - Length 5.0 (`SWING`).
+- `--check` (with OUT) asserts the c00-c07 layout as the vanilla swing hats': the types, the parent, the sb hash and
+  header, the nud bone range.
+
+**Offline test.** In the package's `preview/`:
+- **Skinning:** `swing_range.png` renders the bone at each limit; the strand bends smoothly with no tearing.
+- **Motion:** `sim_dash.png` / `.gif` (a dash and stop) and `sim_charge.png` (Gigaflare's charge). They are a damped
+  pendulum within the sb limits, an illustration only. The game's swing solver couldn't be run offline, so how much
+  it swings is checked in game.
+
+**Approximated / not done:**
+- The physics words are Zero Suit Samus's, not a conversion of Ultimate's swing params (whose units don't map).
+- Ultimate's keyframed hair in the neutral special: physics runs there instead.
+- No collision with the body; the limits keep the hair off it, as in Ultimate.

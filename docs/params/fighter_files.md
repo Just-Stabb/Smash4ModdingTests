@@ -122,7 +122,7 @@ in Marth's slot needs its own file or can keep the base fighter's.
 | `model.mta` | MTA4 | material animation (eyes etc.) | `mta.py` | own |
 | `material_anime_eye/_eyelid/_face(_lang).pac` | KCAP of `.mta` | face, eyelid, eye animations per motion (`FitMarthBodyMainJ02Win1.mta`, mouth shapes `FitMarthBodyMainVoiceS0`) | `omo.py` pac reader | own |
 | `metal.nud` | NDP3 | the model used while Metal (Metal Box) | `nud.py` | own (or a copy of model.nud) |
-| `model.sb` | ` BWS` | swing bones (cape, hair physics), by bone hash | none | own if the skeleton has swing bones |
+| `model.sb` | ` BWS` | swing bones (cape, hair physics), by bone hash: u16 5, u16 1, u32 count, 140-byte entries (Smash Forge SB.SBEntry: hash, physics words, rx / ry / rz limits in degrees, 8 collision bone hashes (0xCD94A505 none), length at word 30); the bones are type 3 `SWG_..__swing` in model.vbn | `kirby_copy_hats.py` (sb_read / sb_write, Kirby's Sephiroth hair) | own if the skeleton has swing bones |
 | `model.nhb` | ` BHN` | helper bones (twist / shoulder correctives, `HLP_*`) | none | own if it has `HLP_*` bones |
 | `model.ik` | `CRIK` | IK chains (Marth: two leg chains, bones 3-6 and 7-10) | none | own (or copy if the leg bone indices match) |
 | `model.flp` | `FLIP` | 12 bytes (`FLIP 01 01 00 00 'up' 00 00`), mirroring setting | none | copy |
