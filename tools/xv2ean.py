@@ -46,6 +46,9 @@ XV2_TO_MARIO = {
     'b_L_Leg1': 'LLegJ', 'b_L_Leg2': 'LKneeJ', 'b_L_Foot': 'LFootJ', 'b_L_Toe': 'LToeN',
     'b_R_Leg1': 'RLegJ', 'b_R_Leg2': 'RKneeJ', 'b_R_Foot': 'RFootJ', 'b_R_Toe': 'RToeN',
 }
+# the fingers (XV2 h_*_Index1-3 ... -> Smash's *Index1N-3N; Smash's thumb chain is Thumb1N-3N, the others 1N-3N)
+XV2_TO_MARIO.update({'h_%s_%s%d' % (s, f, k): '%s%s%dN' % (s, f, k) for s in 'LR'
+                     for f in ('Thumb', 'Index', 'Middle', 'Ring', 'Pinky') for k in (1, 2, 3)})
 ROOT_XV2, ROOT_SMASH = 'b_C_Base', 'TransN'
 
 
@@ -87,8 +90,19 @@ class Animation:
         self.name, self.frames, self.nodes = name, frames, nodes     # nodes: {bone index: {kind: Component}}
 
 
+def mirror_z_pos(p):
+    return (p[0], p[1], -p[2]) + tuple(p[3:])
+
+
+def mirror_z_quat(q):
+    """a rotation seen through the z -> -z mirror (M R M: the axis (-x, -y, z), the same angle)"""
+    return (-q[0], -q[1], q[2], q[3])
+
+
 class Ean:
-    def __init__(self, data):
+    def __init__(self, data, smash_axes=False):
+        """smash_axes: XV2's left-handed space (a character faces -Z, its right hand at -X in the rest pose) mirrored
+        z -> -z into Smash 4's (faces +Z, right hand at -X): every rest and keyed position / rotation"""
         d = data
         assert d[:4] == b'#EAN', d[:4]
         count, = struct.unpack_from('<H', d, 0x12)
@@ -100,6 +114,16 @@ class Ean:
             no, = struct.unpack_from('<I', d, ntab + 4 * i) if ntab else (0,)
             name = _cstr(d, no) if no else ''
             self.animations.append(self._anim(d, ao, name) if ao else None)
+        if smash_axes:
+            for b in self.bones:
+                b.pos, b.rot = mirror_z_pos(b.pos), mirror_z_quat(b.rot)
+            for an in self.animations:
+                for comps in (an.nodes.values() if an else ()):
+                    for kind, c in comps.items():
+                        if kind == 0:
+                            c.values = [mirror_z_pos(v) for v in c.values]
+                        elif kind == 1:
+                            c.values = [mirror_z_quat(v) for v in c.values]
 
     @staticmethod
     def _esk(d, o):
@@ -272,11 +296,11 @@ def world_rots(locals_, parents):
 
 
 # ---------------------------------------------------------------- retarget
-def retarget(ean, anim, smash, bone_map=None, root_scale=None):
+def retarget(ean, anim, smash, bone_map=None, root_scale=None, at=None):
     """per frame {smash bone name: (pos, quat, scale)}: each mapped bone turned by its XV2 bone's world-space turn
     from the ESK rest (D = W_xv2(t) W_xv2_rest^-1; W_smash(t) = D W_smash_rest), its local rotation from its parent's;
     other bones at their rest; TransN moved by b_C_Base's movement x root_scale (default: the pelvis heights'
-    ratio). smash: vbn_rest()."""
+    ratio). smash: vbn_rest(). at: the (fractional) source frames to sample (default every frame)."""
     bone_map = bone_map or XV2_TO_MARIO
     xi = {b.name: i for i, b in enumerate(ean.bones)}
     xpar = [b.parent for b in ean.bones]
@@ -305,7 +329,7 @@ def retarget(ean, anim, smash, bone_map=None, root_scale=None):
     frames = []
     root = xi.get(ROOT_XV2)
     root0 = ean.local(anim, root, 0)[0] if root is not None else (0.0, 0.0, 0.0)
-    for f in range(anim.frames):
+    for f in (range(anim.frames) if at is None else at):
         xl = [ean.local(anim, i, f) for i in range(len(ean.bones))]
         xw = world_rots([l[1] for l in xl], xpar)
         sw = list(srest)

@@ -1,28 +1,32 @@
 #!/usr/bin/env python3
-"""Supamario's Super God Fist (dash attack): a new AttackDash animation (body main / lhand / rhand / mariopt1).
+"""Supamario's Super God Fist (dash attack): the AttackDash animation (body main / lhand / rhand / mariopt1),
+retargeted from Xenoverse 2's own skill animations (030_GOD_CSA.ean) since v3.
 
-  python3 tools/supamario_godfist_anim.py BODY_MOTION_DIR MODEL_VBN OUT_DIR [--png SHEET.png]
+  python3 tools/supamario_godfist_anim.py BODY_MOTION_DIR MODEL_VBN GOD_CSA.ean OUT_DIR [--png SHEET.png]
 
-BODY_MOTION_DIR: his motion/body/ (main.pac, lhand.pac, rhand.pac, mariopt1.pac: Mario's animations, under
-Mario's names; the RPX's motion table finds them by name). Writes OUT_DIR/{main,lhand,rhand,mariopt1}.pac with
-FitMarioBody*C00AttackDash.omo replaced (every other entry byte for byte the input's).
+BODY_MOTION_DIR: his motion/body/ (main / lhand / rhand / mariopt1 .pac, Mario's names: the RPX's motion table
+finds them by name). Writes OUT_DIR/{main,lhand,rhand,mariopt1}.pac with FitMarioBody*C00AttackDash.omo replaced
+(every other entry byte for byte the input's).
 
-Xenoverse 2's own animations for the skill (030_GOD_CSA's EAN, CMN.ean #96 / #179) were not in the files given, so
-this is posed from Mario's own animations, following the user's clip and the BAC timeline (fighters/supamario/
-README.md "Super God Fist"): every pose is a frame of one of his animations, played or cross-faded:
+The skill's EAN (the default body, `030_GOD_CSA.ean`; `_F` female and `_MAM` heavy male bodies hold the same moves
+posed for those builds: C is the one for Mario) has four animations: #1 GOD_SPA_CSA_MISS_C (71 frames: the dash
+punch, played by BAC entry 0; it goes on past the target when nothing is hit), #0 GOD_SPA_CSA_C (112: the follow-up,
+BAC entry 1 on connect: the fist held in 0-40 at x0.8, a flip away 40-60, back to a stance by 111), #3 / #2 the
+same for the other BCM variant. #0 frame 0 is #1 frame 15's pose: the follow-up starts at the contact.
 
-  frames 0-38   the dash punch (both paths): a run lean (Run 5 / 10), the wind-up and the straight left (his forward
-                smash's thrust, AttackS4S 12 -> 16), out at frame 7 (the hitbox 7-10), held to 22, back to Wait1 by
-                38; the whiff ends there (MSC: GF_WHIFF_END, vanilla Mario's dash attack acts from 39)
-  frames 40-99  the God Fist (the MSC jumps here from the hit at frame 11, GF_JUMP_TO = 40; below +40): the punch
-                held (+0 - +2), pulled back (the charge, +7), thrust again (+10: the God Fist hit), the follow-through
-                held while the victim is launched, then a back flip in place (JumpB 2-36, +30 - +46: XV2's attacker
-                spins away after the launch) landing into Wait1 (+59); he acts from +55 (GF_IASA: the victim's
-                flight is over; v1: +49).
-  TransN: the dash, 0 -> 16 by frame 7, 20 by 10, then still (the victim's flight is placed relative to him).
-  RotN: up to +14 over the flip (+28 - +50) (a hop: the flip is in the animation only, he stays grounded).
-  Hands: fists (Attack11's hands at frame 3), Wait1's at the whiff's end and the move's.
+XV2 is left-handed with characters facing -Z: read through `xv2ean.Ean(smash_axes=True)` (mirrored z -> -z: facing
++Z, the right hand still the right), retargeted bone by bone (`xv2ean.retarget`, its world-space turns, the fingers
+too) onto Mario's skeleton. The timeline (frames at 60 a second, XV2's too):
 
+  0-44     the dash punch, #1 0-18 at XV2's speed (the hitbox 14-17 as the BAC's, the fist out at 14-15), then
+           #1 18-70 twice as fast: the whiff ends at 44 (MSC: GF_WHIFF_END)
+  46-166   the God Fist (the MSC jumps here from the hit check at 18, GF_JUMP_TO = 46): #0 0-40 at x0.8 (the BAC's
+           TimeScale: 50 frames, the fist held in the victim), the God Fist hit at #0 40 (GF_STRIKE = 96), then
+           #0 40-111 at its speed (the flip away 40-60, the stance by 111)
+  TransN   #1's dash (b_C_Base) x the body scale up to the contact, x0.3 after (a whiff slides 28 in all, as vanilla
+           Mario's dash attack); #0's travel (2.5 m forward, mostly in the flip) x0.5
+  RotN     the pelvis' height changes (XV2 crouches, leaps and flips), feet on the floor in the stance (#1 frame
+           0); lifted wherever the head, hands or feet would go into the floor (XV2's flip is in the air)
 Every motion keeps the vanilla AttackDash's node order (vbn order, which the game reads the gameplay joints by).
 """
 import math
@@ -33,156 +37,136 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.append(HERE)
 import omo  # noqa: E402
+import xv2ean as X  # noqa: E402
 
-GF_PUNCH = 7          # the dash punch's hitbox frames 7-10
-GF_WHIFF_END = 38     # the whiff ends here (MSC), as vanilla Mario's dash attack (54 frames, acting from 39)
-GF_JUMP_TO = 40       # the God Fist part starts here (the MSC jumps to it from the hit)
-G = GF_JUMP_TO
-GF_STRIKE = G + 10    # the God Fist hit
-GF_IASA = G + 55      # he acts from here: the victim's flight (the strike's freeze, then 44 frames) is over
-FRAMES = G + 60
-# (out frame, motion, source frame): between two keys of the same motion the source plays (linearly), between
-# different motions the poses cross-fade (smoothstep)
-KEYS = [
-    (0, 'A02Run', 5), (3, 'A02Run', 10),
-    (5, 'C03AttackS4S', 12), (7, 'C03AttackS4S', 16), (10, 'C03AttackS4S', 16), (16, 'C03AttackS4S', 20),
-    (22, 'C03AttackS4S', 20), (GF_WHIFF_END, 'A00Wait1', 0),
-    (G, 'C03AttackS4S', 16), (G + 2, 'C03AttackS4S', 16), (G + 7, 'C03AttackS4S', 12), (G + 9, 'C03AttackS4S', 14),
-    (G + 10, 'C03AttackS4S', 16), (G + 17, 'C03AttackS4S', 20), (G + 26, 'C03AttackS4S', 20),
-    (G + 30, 'A03JumpB', 2), (G + 46, 'A03JumpB', 36),
-    (G + 51, 'A05LandingLight', 4), (G + 59, 'A00Wait1', 0),
-]
-HAND_KEYS = [(0, 'C00Attack11', 3), (GF_WHIFF_END - 6, 'C00Attack11', 3), (GF_WHIFF_END, 'A00Wait1', 0),
-             (G, 'C00Attack11', 3), (G + 49, 'C00Attack11', 3), (G + 59, 'A00Wait1', 0)]
-
-
-def root_z(f):
-    if f <= GF_PUNCH:
-        t = f / GF_PUNCH
-        return 16.0 * (1 - (1 - t) ** 2)
-    if f <= 10:
-        return 16.0 + 4.0 * (f - GF_PUNCH) / (10 - GF_PUNCH)
-    return 20.0
+PUNCH_ANIM, GODFIST_ANIM = 1, 0       # 030_GOD_CSA.ean (#3 / #2: the other BCM variant's)
+SCALE = 5.04                          # metres -> units: Mario's hip-to-foot 3.93 / XV2's pelvis-to-foot 0.78
+CONTACT = 15                          # #1's frame where #0 begins (the same pose)
+GF_PUNCH = 14                         # the hitbox 14-17 (BAC entry 0)
+GF_PUNCH_END = 18                     # the hit check
+WHIFF_FAST_FROM, WHIFF_RATE = 18, 2.0
+GF_WHIFF_END = int(WHIFF_FAST_FROM + (70 - WHIFF_FAST_FROM) / WHIFF_RATE)      # 44
+GF_JUMP_TO = GF_WHIFF_END + 2         # 46
+SLOW, HOLD_SRC = 0.8, 40              # BAC entry 1: TimeScale 0.8 for #0 0-40
+GF_HOLD = int(round(HOLD_SRC / SLOW))                                         # 50
+GF_STRIKE = GF_JUMP_TO + GF_HOLD      # 96: #0 frame 40
+GODFIST_END_SRC = 111
+FRAMES = GF_STRIKE + (GODFIST_END_SRC - HOLD_SRC) + 1                          # 168
+WHIFF_ROOT = 0.3                      # the dash past the contact (whiff)
+GODFIST_ROOT = 0.5                    # #0's own travel
+# the lowest the joints may go (units above the floor; Mario's foot joint is 1.56 up when standing)
+FLOOR = {'HeadN': 3.0, 'LHandN': 1.0, 'RHandN': 1.0, 'LFootJ': 1.3, 'RFootJ': 1.3, 'LToeN': 0.4, 'RToeN': 0.4,
+         'LKneeJ': 1.5, 'RKneeJ': 1.5}
+STAND_FOOT = 1.56
 
 
-def rot_y(f):
-    """the hop over the back flip (53-75), on top of RotN's own height"""
-    if G + 28 <= f <= G + 50:
-        return 14.0 * math.sin(math.pi * (f - G - 28) / 22.0)
-    return 0.0
+def source(f):
+    """(animation, source frame) at output frame f"""
+    if f < GF_JUMP_TO:
+        if f <= WHIFF_FAST_FROM:
+            return PUNCH_ANIM, float(f)
+        return PUNCH_ANIM, min(70.0, WHIFF_FAST_FROM + (min(f, GF_WHIFF_END) - WHIFF_FAST_FROM) * WHIFF_RATE)
+    u = f - GF_JUMP_TO
+    if u <= GF_HOLD:
+        return GODFIST_ANIM, u * SLOW
+    return GODFIST_ANIM, min(float(GODFIST_END_SRC), HOLD_SRC + (u - GF_HOLD))
 
 
-def slerp(a, b, t):
-    d = sum(x * y for x, y in zip(a, b))
-    if d < 0:
-        b = tuple(-x for x in b)
-        d = -d
-    if d > 0.9995:
-        q = tuple(x + (y - x) * t for x, y in zip(a, b))
-    else:
-        th = math.acos(min(1.0, d))
-        s = math.sin(th)
-        wa, wb = math.sin((1 - t) * th) / s, math.sin(t * th) / s
-        q = tuple(wa * x + wb * y for x, y in zip(a, b))
-    n = math.sqrt(sum(x * x for x in q))
-    return tuple(x / n for x in q)
+def _pelvis_and_base(ean, anim, f):
+    bi = {b.name: i for i, b in enumerate(ean.bones)}
+    return ean.local(anim, bi['b_C_Pelvis'], f)[0], ean.local(anim, bi['b_C_Base'], f)[0]
 
 
-def lerp(a, b, t):
-    return tuple(x + (y - x) * t for x, y in zip(a, b))
+def root_z(ean, f):
+    a, sf = source(f)
+    punch = ean.animations[PUNCH_ANIM]
+    b0 = _pelvis_and_base(ean, punch, 0)[1][2]
+    bc = _pelvis_and_base(ean, punch, CONTACT)[1][2]
+    if a == PUNCH_ANIM:
+        b = _pelvis_and_base(ean, punch, sf)[1][2]
+        if sf <= CONTACT:
+            return (b - b0) * SCALE
+        return (bc - b0) * SCALE + (b - bc) * SCALE * WHIFF_ROOT
+    gf = ean.animations[GODFIST_ANIM]
+    g0 = _pelvis_and_base(ean, gf, 0)[1][2]
+    return (bc - b0) * SCALE + (_pelvis_and_base(ean, gf, sf)[1][2] - g0) * SCALE * GODFIST_ROOT
 
 
-def blend(a, b, t):
-    return lerp(a[0], b[0], t), slerp(a[1], b[1], t), lerp(a[2], b[2], t)
+def body_frames(ean, smash):
+    """[{bone: (pos, quat, scale)}] for every output frame (TransN / RotN set)"""
+    out = []
+    for f in range(FRAMES):
+        a, sf = source(f)
+        fr = X.retarget(ean, ean.animations[a], smash, at=[sf], root_scale=SCALE)[0]
+        out.append(fr)
+    punch = ean.animations[PUNCH_ANIM]
+    pel_ref = _pelvis_and_base(ean, punch, 0)[0][1]
+    rot_rest = fr['RotN'][0]
+    for f, fr in enumerate(out):
+        a, sf = source(f)
+        pel = _pelvis_and_base(ean, ean.animations[a], sf)[0][1]
+        fr['TransN'] = ((0.0, 0.0, root_z(ean, f)), fr['TransN'][1], fr['TransN'][2])
+        fr['RotN'] = ((rot_rest[0], rot_rest[1] + (pel - pel_ref) * SCALE, rot_rest[2]), fr['RotN'][1], fr['RotN'][2])
+    return out
 
 
-class Source:
-    def __init__(self, entries, prefix):
-        self.e = entries
-        self.prefix = prefix
-        self.cache = {}
-
-    def anim(self, motion):
-        if motion not in self.cache:
-            self.cache[motion] = omo.Omo(self.e[self.prefix + motion + '.omo'])
-        return self.cache[motion]
-
-    def pose(self, motion, fr, h, rest):
-        """bone h's local (pos, quat, scale) at a (fractional) frame of motion; rest when the motion lacks it"""
-        o = self.anim(motion)
-        fr = max(0.0, min(o.frames - 1.0, fr))
-        a = o.sample(h, int(math.floor(fr)))
-        if a is None:
-            return rest
-        b = o.sample(h, min(o.frames - 1, int(math.floor(fr)) + 1))
-        return blend(a, b, fr - math.floor(fr))
+def world_y(frames, smash, bones_vbn, f):
+    """{bone: world y} of frame f (TransN's own height left out)"""
+    import omo as _o
+    par = {b[0]: b[1] for b in smash}
+    names = [b[0] for b in smash]
+    w = {}
+    for i, n in enumerate(names):
+        p, q, s = frames[f][n]
+        local = _o.trs(p, q, s)
+        w[n] = _o.mul(w[names[par[n]]], local) if par[n] >= 0 else local
+    return {n: w[n][1][3] for n in FLOOR}
 
 
-def at(keys, f):
-    """(motion, source frame) pair(s) and the weight at output frame f"""
-    for (f0, m0, s0), (f1, m1, s1) in zip(keys, keys[1:]):
-        if f0 <= f <= f1:
-            t = (f - f0) / float(f1 - f0) if f1 > f0 else 0.0
-            if m0 == m1:
-                return [(m0, s0 + (s1 - s0) * t)], 0.0
-            return [(m0, s0), (m1, s1)], t * t * (3 - 2 * t)
-    f0, m0, s0 = keys[-1]
-    return [(m0, s0)], 0.0
+def floor_fix(frames, smash):
+    """RotN lowered so the feet stand on the floor in the stance (#1 frame 0), and lifted wherever a joint would go
+    under FLOOR (smoothed: the most needed within +-3 frames, averaged over +-3)"""
+    y0 = world_y(frames, smash, None, 0)
+    c = STAND_FOOT - min(y0['LFootJ'], y0['RFootJ'])
+    need = []
+    for f in range(len(frames)):
+        y = world_y(frames, smash, None, f)
+        need.append(max(0.0, max(FLOOR[n] - (y[n] + c) for n in FLOOR)))
+    peak = [max(need[max(0, f - 3):f + 4]) for f in range(len(need))]
+    lift = [sum(peak[max(0, f - 3):f + 4]) / len(peak[max(0, f - 3):f + 4]) for f in range(len(peak))]
+    lift = [max(a, b) for a, b in zip(lift, need)]
+    for f, fr in enumerate(frames):
+        p, q, s = fr['RotN']
+        fr['RotN'] = ((p[0], p[1] + c + lift[f], p[2]), q, s)
+    return c, lift
 
 
-def build_motion(src, base_data, keys, frames, extra=None):
-    """the motion: base_data's nodes (order, hashes) resampled from the keys; extra(h, f, pose) adjusts a pose"""
-    o = omo.Omo(base_data)
-    o.frames = frames
-    for n in o.nodes:
-        n[3] = [b''] * frames
-    for n in list(o.nodes):
-        h = n[1]
-        rest = ((0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 1.0), (1.0, 1.0, 1.0))
-        pos, rot, scl = [], [], []
-        for f in range(frames):
-            pairs, t = at(keys, f)
-            p = src.pose(pairs[0][0], pairs[0][1], h, rest)
-            if len(pairs) > 1:
-                p = blend(p, src.pose(pairs[1][0], pairs[1][1], h, rest), t)
-            if extra:
-                p = extra(h, f, p)
-            pos.append(p[0])
-            rot.append(p[1])
-            scl.append(p[2])
-        tr = omo.tracks(o, h)
-        omo.set_node(o, h, pos if 'pos' in tr else None, rot if 'rot' in tr else None,
-                     scl if 'scl' in tr else None)
-    return o
-
-
-def build(motion_dir, vbn_path, out_dir):
-    bones = omo.vbn_read(vbn_path)
-    names = {n: h for n, _p, h in bones}
+def build(motion_dir, vbn_path, ean_path, out_dir):
+    ean = X.Ean(open(ean_path, 'rb').read(), smash_axes=True)
+    smash = X.vbn_rest(vbn_path)
+    frames = body_frames(ean, smash)
+    c, lift = floor_fix(frames, smash)
     os.makedirs(out_dir, exist_ok=True)
     out = {}
-    for part, prefix, keys in (('main', 'FitMarioBodyMain', KEYS), ('mariopt1', 'FitMarioBodyMariopt1', KEYS),
-                               ('lhand', 'FitMarioBodyLhand', HAND_KEYS), ('rhand', 'FitMarioBodyRhand', HAND_KEYS)):
+    for part, prefix in (('main', 'FitMarioBodyMain'), ('mariopt1', 'FitMarioBodyMariopt1'),
+                         ('lhand', 'FitMarioBodyLhand'), ('rhand', 'FitMarioBodyRhand')):
         entries = omo.pac_read(os.path.join(motion_dir, part + '.pac'))
         e = dict(entries)
-        name = [n for n in e if n.endswith('AttackDash.omo')][0]
-        src = Source(e, prefix)
-
-        def extra(h, f, p, part=part):
-            if part != 'main':
-                return p
-            if h == names['TransN']:
-                return (p[0][0], p[0][1], root_z(f)), p[1], p[2]
-            if h == names['RotN']:
-                return (p[0][0], p[0][1] + rot_y(f), p[0][2]), p[1], p[2]
-            return p
-        o = build_motion(src, e[name], keys, FRAMES, extra)
-        # node order unchanged (vbn order), every node still there
+        name = [n for n in e if n.startswith(prefix) and n.endswith('AttackDash.omo')][0]
+        o = X.to_omo(frames, e[name], smash)
         assert [n[1] for n in o.nodes] == [n[1] for n in omo.Omo(e[name]).nodes]
-        new = [(n, o.encode() if n == name else d) for n, d in entries]
-        omo.pac_write(os.path.join(out_dir, part + '.pac'), new)
+        omo.pac_write(os.path.join(out_dir, part + '.pac'), [(n, o.encode() if n == name else d) for n, d in entries])
         out[part] = o
-    return out, bones
+    return out, omo.vbn_read(vbn_path), {'stance_drop': c, 'lift': lift}
+
+
+def joint_offset(o, bones, joint, f):
+    """a joint's (in front of TransN, up) at frame f"""
+    w = omo.world(o, bones, f)
+    return w[joint][2][3] - w['TransN'][2][3], w[joint][1][3]
+
+
+SHEET = [0, 6, 9, 12, 14, 15, 18, 30, 44, 46, 66, 86, 96, 100, 104, 108, 112, 120, 140, 167]
 
 
 def main():
@@ -192,14 +176,14 @@ def main():
         i = a.index('--png')
         png = a[i + 1]
         del a[i:i + 2]
-    if len(a) != 3:
+    if len(a) != 4:
         sys.exit(__doc__)
-    out, bones = build(*a)
-    print('AttackDash: %d frames, %d nodes' % (out['main'].frames, len(out['main'].nodes)))
+    out, bones, info = build(*a)
+    print('AttackDash: %d frames, %d nodes; stance drop %.2f, most lift %.2f' % (
+        out['main'].frames, len(out['main'].nodes), info['stance_drop'], max(info['lift'])))
     if png:
         import supamario_godfist_render
-        supamario_godfist_render.sheet(out['main'], bones, png,
-                                       [0, 3, 5, 7, 10, 22, 30, 38, 40, 44, 47, 50, 60, 70, 74, 78, 82, 86, 91, 99])
+        supamario_godfist_render.sheet(out['main'], bones, png, SHEET)
 
 
 if __name__ == '__main__':
