@@ -1632,3 +1632,14 @@ player (run natively for kinds 0x45 / 0x42 / 0x41 / Robin / Zelda, players 0-3).
 - Changed: `fighter/brave/sound/snd_se_Brave_c0[1235-7].nus3bank`, `snd_vc_Brave_c0[1235-7].nus3bank`,
   `code/cross_f.rpx`.
 
+## Ported sound ids v1 (`$S/ported_sound_ids_v1.zip`): his own sound bank ids
+
+nus3 loads one bank an id (docs/native-notes.md "Fighter sound banks: one bank an id"); a port keeping its base's bank
+ids silenced the later player with the base (or another port on those ids) in the match. Every bank of a new kind
+now has its own id (`tools/sound_bank_ids.own_id`, `reference/port_sound_ids.json`), its rows keep the base's ids
+and the executable (`tools/sound_alias_cave.py` v2) gives his banks those ids as aliases; nothing else changes
+(soundlabeltable, scripts, MSC, sequences: the same).
+- **Banks:** all 17 of his (se 46128, vc 46129, cheer 46130, Final Smash se_common 46131 / _c01 46153, se _cNN
+  46136 + NN, vc _cNN 46144 + NN), from fix 71's (the Drive package) with only the id changed; v1's costume ids
+  (40409 ... / 44473 ...) superseded. Aliases (Robin's): se 2051, vc 6059, cheer 6131, se_common 2052.
+- Check: Hero vs Robin (both heard, either player first), Hero vs Hero, Final Smash next to Robin's.

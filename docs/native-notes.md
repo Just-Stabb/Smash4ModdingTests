@@ -1880,13 +1880,25 @@ natively (exe_v45h / exe_v46g; tools/sound_alias_cave_test.py, scratchpad emulat
   Capitalised name (`0x02A64C68(MTB, name, 0 se / 1 vc / 2 cheer)`) into +0x5C0 / +0x5C4 / +0x5C8 (0xFFFF when there
   is no record). The MTB names its 13 records from the executable's table at `0x10340CA4` (Littlemac, Reflet, Cloud,
   Bayonetta, Wiifit, KoopaJr, KoopaJr_ouen, Pikmin_ouen, Kamui), so a new kind never has one.
-- **Fix** (new kinds' sound fix v1): `tools/sound_bank_ids.py` gives costume banks their own ids (se 40000 +
-  (id - 2000) x 8 + NN, vc 44000 + (id - 6000) x 8 + NN; only the BINF id word changes), `tools/sound_alias_cave.py`
-  sets +0x5C0 / +0x5C4 to the main ids for the kinds in its ALIASES (hook: `0x03121FA8`'s first word, only for its
-  call from the set-up, LR `0x027620B8`; the vc and cheer registrations after it read the new +0x5C4). The main
-  banks keep their ids (the results screen, the CSS and other row-id lookups untouched), so a port with its base,
-  or two ports on one base's ids, still silence the later one (port_check A6 WARN with --vanilla); giving the main
-  banks ids of their own too needs the same alias and the results screen's sound lookup checked first.
+- **Fix v1** (new kinds' sound fix v1): costume banks of their own ids, +0x5C0 / +0x5C4 set for Hero / Sephiroth
+  (hook `0x03121FA8`, its call from the set-up, LR `0x027620B8`).
+- **Fix v2** (ported sound ids v1): EVERY bank of a new kind its own id (`tools/sound_bank_ids.own_id`: 46000 +
+  (kind - 0x41) x 32 + slot: se 0, vc 1, cheer 2, se_common 3, se_cNN 8 + NN, vc_cNN 16 + NN, se_common_cNN 24 + NN),
+  so a port never collides with its base or another port; the soundlabeltable rows keep the base's ids (no script,
+  MSC, sequence, csb or executable sound id moves: Robin's specializer, which Hero runs, plays Robin's row ids
+  natively) and `tools/sound_alias_cave.py` v2 gives the kind's banks the old ids as aliases, per kind from
+  `reference/port_sound_ids.json`: hook SETUP `0x03127990` (the sound manager's +0x2A4 getter) for its call at
+  `0x02761E44` (LR `0x02761E48`, right after the MTB lookups, before the handles): +0x5C0 se, +0x5C4 vc, +0x5C8 cheer
+  (the audience gets it with the cheer handle +0x90 at `0x02761FBC`); hook FS `0x03121FA8` for its call at
+  `0x02761598` (LR `0x0276159C`, the Final Smash's se_common handle +0x84, set up when the Smash Ball's banks load at
+  `0x02761500`): +0x580 and the voice player slot's alias. The finder takes +0x84 for +0x580 (`0x02C71A90`), the
+  se / vc handles for +0x5C0 / +0x5C4. Other users of a fighter's banks, read: Kirby's copy banks (+0x5DC, 7 slots,
+  `0x02761B00` from `0x02EFDE88`) are only the copied player's Kirby-copy voice bank (kind * 0x11 + 0xF, never
+  registered for kinds past 0x39), never his se / vc; the Final Smash holder `[[0x102F9028] + 0x34]` (kind * 9 + n:
+  `0x030C1BBC` Fin effect / se_common / the costume-mapped vc through `0x030C1B34`); stage / common objects match
+  only their own handles and the common banks (`0x03125C78`). Not read: the results screen (its fighters come from
+  the per-player loaders too, mode 1 at `0x030C2E04` skipping only sequences / voice animation / Kirby-copy voice,
+  so presumably the same SoundModule set-up) and the Vault sound test (`0x02A7912C`, by character id).
 - Diagnostic: `tools/diag_sound_cave.py` (OSReport `S4SND setup / bankfail / gated / nobank / filtered / ok` per
   player: the handles' ids, nus3's error, every refused sound).
 

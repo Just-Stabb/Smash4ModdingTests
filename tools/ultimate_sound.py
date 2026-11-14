@@ -32,12 +32,15 @@ scripts' ids move to the new rows, same labels: tools/brave_build.py --sound).
   variant: Zelda's MissFoot02 -> Sephiroth's only missfoot01); a use Ultimate has no voice for (Zelda's Passive,
   HeavyGet) is made silent rather than left the base's voice on the port.
 - Costumes: Ultimate's se_ / vc_<ult>_cNN (Hero: Erdrick, Solo and Eight's voices and swords) as
-  snd_se_ / snd_vc_<Name>_cNN, same tone order, a BINF id of its own (tools/sound_bank_ids.costume_id: nus3
-  refuses a second bank of an id already loaded, so a second player of the fighter in another costume was
-  silent; tools/sound_alias_cave.py's ALIASES then needs his kind's main ids); the game loads _cNN by the
+  snd_se_ / snd_vc_<Name>_cNN, same tone order; the game loads _cNN by the
   costume number (a kind past 0x39 takes it as is, so c05 - c07 are written too) and falls back to the main
   file (none written when Ultimate's is the main one's, e.g. c04). The crowd's cheer: the base's ouen bank's
   chant given vc_<ult>_cheer.
+- Own bank ids: every bank of the kind (main, costumes, cheer, the Final Smash's se_common) gets the kind's own
+  BINF id (tools/sound_bank_ids.own_id; nus3 loads one bank an id, so a port on its base's ids silenced the
+  later player with the base, another port on those ids, or itself in another costume in the match); the
+  rows keep the base's ids and tools/sound_alias_cave.py (the kind's record in reference/port_sound_ids.json,
+  written here) gives them to the banks as aliases.
 - Ultimate's random containers (a TONE with no data, +4 = 0x7F, its name at +8, e.g.
   se_brave_step_left_ll for _ll01 - _ll03):
   Smash 4's banks have none, the name maps to the first variant.
@@ -331,8 +334,7 @@ def main():
         open(os.path.join(out_fighter, 'sound', os.path.basename(base_path)), 'wb').write(blob)
         # the costumes' own banks (Ultimate's _cNN: Hero's other heroes' voices and sword sounds): same tone
         # order, loaded for costume NN by file name (a kind past 0x39 takes its costume number as is: _c05 for
-        # costume 5); an id of their own (nus3 refuses a second bank of a loaded id: the second player was
-        # silent), matched to the main bank's rows by the alias sound_alias_cave.py sets for the kind
+        # costume 5); written with the main id here, given their own at the end (own ids, below)
         written = []
         raw_main = open(ult_path + '.nus3audio', 'rb').read()
         for nn in range(1, 8):
@@ -342,7 +344,6 @@ def main():
             cname = 'snd_%s_%s_c%02d' % (kind, a.name, nn)
             cblob, cfirst, _sw = costume_bank(ms.ultimate(cpath + '.nus3audio'), cname)
             assert cfirst == first
-            cblob = sbi.with_id(cblob, sbi.costume_id(bank_id, nn))
             open(os.path.join(out_fighter, 'sound', cname + '.nus3bank'), 'wb').write(cblob)
             written.append('c%02d' % nn)
         k = len(old_tones)
@@ -423,6 +424,23 @@ def main():
         os.path.basename(sq_path), sid, len(seqs), len(out_seqs) - len(seqs),
         unnamed,
         ', '.join(unknown) or '-'))
+
+    # own BINF ids for every bank of the kind (main, costumes, cheer, Final Smash: tools/sound_bank_ids.py): nus3
+    # loads one bank an id, so a port keeping its base's ids silenced the later player with the base (or another
+    # port on them) in the match. The rows keep the base's ids (the scripts', MSC's, sequences' and the
+    # executable's own sound ids stay valid); sound_alias_cave.py gives the kind those ids as its banks' aliases
+    # (reference/port_sound_ids.json). With --new-ids the banks already have ids (and rows) of their own.
+    if not a.new_ids and any(r['name'] == folder for r in json.load(open(sbi.KINDS))['kinds']):
+        dst = os.path.join(out_fighter, 'sound')
+        done = {os.path.basename(p) for p in glob.glob(os.path.join(dst, '*.nus3bank'))}
+        files = [(os.path.join(dst, f), f) for f in sorted(done)]
+        files += [(p, os.path.basename(p)) for p in sorted(glob.glob(os.path.join(snd, '*.nus3bank')))
+                  if os.path.basename(p) not in done]
+        js = sbi.load_json(sbi.IDS)
+        rec, rep = sbi.renumber(files, folder, dst, js)
+        sbi.save_json(sbi.IDS, js)
+        report.append('own bank ids (%s; aliases %s, sound_alias_cave.py):\n%s' % (
+            sbi.IDS, rec['alias'], '\n'.join(rep)))
 
     os.makedirs(os.path.join(a.out, 'sound', 'config'), exist_ok=True)
     open(os.path.join(a.out, 'sound', 'config', 'soundlabeltable.bin'), 'wb').write(table.data())

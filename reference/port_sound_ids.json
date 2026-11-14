@@ -1,0 +1,111 @@
+{
+ "_comment": "tools/sound_bank_ids.py: per new kind its banks' own BINF ids and the ids their soundlabeltable rows use (alias: sound_alias_cave.py)",
+ "fighters": {
+  "supamario": {
+   "kind": "0x41",
+   "cap": "Supamario",
+   "base": "mario",
+   "alias": {
+    "vc": 6001,
+    "ouen": 6086,
+    "se": 2144
+   },
+   "banks": {
+    "snd_vc_Supamario": 46001,
+    "snd_vc_Supamario_ouen": 46002
+   },
+   "_note": "se 2144 was already its own (tools/fighter_own_bank.py); vc / cheer = vanilla Mario's banks under his names"
+  },
+  "edge": {
+   "kind": "0x42",
+   "cap": "Edge",
+   "base": "zelda",
+   "alias": {
+    "se": 2018,
+    "vc": 6014,
+    "ouen": 6110
+   },
+   "banks": {
+    "snd_se_Edge": 46032
+   },
+   "_note": "vc / cheer aliases from the build records (fighters/edge/README.md UI and sounds v1: vc_edge in snd_vc_Edge 6014, the cheer in Zelda's ouen bank 6110); those banks and se _c06 / _c07 not renumbered yet (files not at hand)"
+  },
+  "gaogaen": {
+   "kind": "0x43",
+   "cap": "Gaogaen",
+   "base": "koopa",
+   "alias": {
+    "se": 2016,
+    "se_common": 2017,
+    "vc": 6013,
+    "ouen": 6091
+   },
+   "banks": {
+    "snd_se_Gaogaen": 46064,
+    "snd_se_Gaogaen_common": 46067,
+    "snd_vc_Gaogaen": 46065,
+    "snd_vc_Gaogaen_ouen": 46066
+   },
+   "_note": "Bowser's vanilla banks under his names (tools/add_fighter.py; no sound port yet)"
+  },
+  "pickel": {
+   "kind": "0x44",
+   "cap": "Pickel",
+   "base": "pit",
+   "alias": {
+    "se": 2027,
+    "vc": 6022,
+    "ouen": 6101
+   },
+   "banks": {
+    "snd_se_Pickel": 46096,
+    "snd_vc_Pickel": 46097,
+    "snd_vc_Pickel_ouen": 46098
+   },
+   "_note": "Pit's vanilla banks under his names (tools/add_fighter.py; no sound port yet)"
+  },
+  "brave": {
+   "kind": "0x45",
+   "cap": "Brave",
+   "base": "reflet",
+   "alias": {
+    "se": 2051,
+    "se_common": 2052,
+    "vc": 6059,
+    "ouen": 6131
+   },
+   "banks": {
+    "snd_se_Brave": 46128,
+    "snd_se_Brave_c01": 46137,
+    "snd_se_Brave_c02": 46138,
+    "snd_se_Brave_c03": 46139,
+    "snd_se_Brave_c05": 46141,
+    "snd_se_Brave_c06": 46142,
+    "snd_se_Brave_c07": 46143,
+    "snd_se_Brave_common": 46131,
+    "snd_se_Brave_common_c01": 46153,
+    "snd_vc_Brave": 46129,
+    "snd_vc_Brave_c01": 46145,
+    "snd_vc_Brave_c02": 46146,
+    "snd_vc_Brave_c03": 46147,
+    "snd_vc_Brave_c05": 46149,
+    "snd_vc_Brave_c06": 46150,
+    "snd_vc_Brave_c07": 46151,
+    "snd_vc_Brave_ouen": 46130
+   },
+   "_note": "Hero fix 71's banks (Robin's ids), the Drive package brave_smash4_current"
+  },
+  "pzenigame": {
+   "kind": "0x46",
+   "cap": "Pzenigame",
+   "base": "mario",
+   "alias": {
+    "se": 2004,
+    "vc": 6001,
+    "ouen": 6086
+   },
+   "banks": {},
+   "_note": "Mario's ids (ultimate_sound.py, base rows grown); his banks not renumbered yet (files not at hand)"
+  }
+ }
+}

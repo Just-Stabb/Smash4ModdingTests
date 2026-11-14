@@ -843,3 +843,15 @@ by id. His textures now have their own block, 0x40C60000 + 0x400 per costume (`t
 `reference/port_bases.json` `_texture_ids`): body c00-c07 and l00-l07 (the low models are copies: the same ids). His water article keeps Mario's fireball ids (the same picture). Only the ids changed (pixels and every other byte the same:
 `tools/fighter_texture_ids_test.py --package`); built with `fighter_texture_ids.py fix-package` over the installed
 packages; `port_check` T1 / T2.
+
+## Ported sound ids v1 (`$S/ported_sound_ids_v1.zip`): his own sound bank ids
+
+nus3 loads one bank an id (docs/native-notes.md "Fighter sound banks: one bank an id"); a port keeping its base's bank
+ids silenced the later player with the base (or another port on those ids) in the match. Every bank of a new kind
+now has its own id (`tools/sound_bank_ids.own_id`, `reference/port_sound_ids.json`), its rows keep the base's ids
+and the executable (`tools/sound_alias_cave.py` v2) gives his banks those ids as aliases; nothing else changes
+(soundlabeltable, scripts, MSC, sequences: the same).
+- **Banks: not yet** (his built banks weren't at hand): `python3 tools/sound_bank_ids.py renumber
+  <install>/fighter/pzenigame/sound --name pzenigame --out OUT` (se 46160, vc 46161, cheer 46162). The executable
+  already has his aliases (Mario's 2004 / 6001 / 6086). Until then, with Mario or Supamario in the match his later
+  player's voice (and with Mario his SE) is refused. Rebuilt sound steps (ultimate_sound.py) give him the ids.

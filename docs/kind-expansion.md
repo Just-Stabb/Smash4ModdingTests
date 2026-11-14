@@ -323,7 +323,8 @@ is matched against the banks of the fighter playing it (each fighter's 7 bank sl
 the match's; Hero's banks keep Robin's ids and grow her rows. **Corrected (new kinds' sound fix v1,
 docs/native-notes.md "Fighter sound banks: one bank an id"):** nus3 loads only one bank an id, so with the
 base (or another port on its ids) in the match the later player's banks are refused and he is silent; costume
-banks need ids of their own (`tools/sound_bank_ids.py` + `tools/sound_alias_cave.py`).
+every bank of a new kind gets an id of its own while its rows keep the base's ids, aliased by the executable
+(`tools/sound_bank_ids.py` + `tools/sound_alias_cave.py` v2, ported sound ids v1).
 
 Only the game can confirm: the bank with id 2144 loading and playing (Supamario's moves' sounds), the
 three new sounds from ACMD (`Sound_Effect` 0x0CB1008B...), the fireball bounce, Mario and Supamario

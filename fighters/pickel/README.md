@@ -115,3 +115,13 @@ by id. His textures now have their own block, 0x40C40000 + 0x400 per costume (`t
 `reference/port_bases.json` `_texture_ids`): body c00-c07 and l00-l07 (the low models are older than fix 12's costumes, so they have ids of their own, + 0x2000). Only the ids changed (pixels and every other byte the same:
 `tools/fighter_texture_ids_test.py --package`); built with `fighter_texture_ids.py fix-package` over the installed
 packages; `port_check` T1 / T2.
+
+## Ported sound ids v1 (`$S/ported_sound_ids_v1.zip`): his own sound bank ids
+
+nus3 loads one bank an id (docs/native-notes.md "Fighter sound banks: one bank an id"); a port keeping its base's bank
+ids silenced the later player with the base (or another port on those ids) in the match. Every bank of a new kind
+now has its own id (`tools/sound_bank_ids.own_id`, `reference/port_sound_ids.json`), its rows keep the base's ids
+and the executable (`tools/sound_alias_cave.py` v2) gives his banks those ids as aliases; nothing else changes
+(soundlabeltable, scripts, MSC, sequences: the same).
+- **Banks:** Pit's vanilla banks under his names (unchanged copies: tools/add_fighter.py) with his ids: se 46096,
+  vc 46097, cheer 46098; aliases Pit's 2027 / 6022 / 6101. Check: Steve vs Pit.

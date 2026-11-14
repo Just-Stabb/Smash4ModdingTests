@@ -2637,3 +2637,15 @@ sound effects. The executable in the package (`tools/sound_alias_cave.py`) alrea
 With Zelda in the match his main banks (her ids 2018 / 6014) are refused for the later player (open, as Hero /
 Robin).
 
+## Ported sound ids v1 (`$S/ported_sound_ids_v1.zip`): his own sound bank ids
+
+nus3 loads one bank an id (docs/native-notes.md "Fighter sound banks: one bank an id"); a port keeping its base's bank
+ids silenced the later player with the base (or another port on those ids) in the match. Every bank of a new kind
+now has its own id (`tools/sound_bank_ids.own_id`, `reference/port_sound_ids.json`), its rows keep the base's ids
+and the executable (`tools/sound_alias_cave.py` v2) gives his banks those ids as aliases; nothing else changes
+(soundlabeltable, scripts, MSC, sequences: the same).
+- **Banks:** `snd_se_Edge` 46032 (from the snd_se_Edge.nus3bank uploaded Nov 13). Not yet (files not at hand):
+  `snd_vc_Edge` (6014), `snd_vc_Edge_ouen` (Zelda's 6110), `snd_se_Edge_c06` / `_c07` (2018): `python3
+  tools/sound_bank_ids.py renumber <install>/fighter/edge/sound --name edge --out OUT`. The executable already has his
+  aliases (se 2018, vc 6014, cheer 6110), so the renumbered se plays now; his voice / cheer next to Zelda stay
+  refused for the later player until those banks are renumbered.

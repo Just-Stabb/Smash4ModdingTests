@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
-"""Runs tools/sound_alias_cave.py natively (unicorn) on the patched executable, against the unpatched one, and the
-game's own nus3 bank loader on real banks.
+"""Runs tools/sound_alias_cave.py (v2) natively (unicorn) on the patched executable, against the one it was built on,
+and the game's own nus3 bank loader on real banks.
 
-  python3 tools/sound_alias_cave_test.py PATCHED.rpx ORIGINAL.rpx [--banks MAIN.nus3bank OLD_C01 NEW_C01 OTHER]
+  python3 tools/sound_alias_cave_test.py PATCHED.rpx ORIGINAL.rpx [--pairs BASE.nus3bank PORT_OLD PORT_NEW ...]
 
-- the words: the hook a `b` to the cave, the cave as built, it was zero, no other word changed;
-- the SoundModule set-up's tail run natively from 0x027620A0 through both bank registrations (0x03121FA8 called at
-  0x027620B4 and 0x027620CC; the voice player 0x03121E94 stubbed to record what it gets): for Hero 0x45 / Sephiroth
-  0x42 the aliases +0x5C0 / +0x5C4 become ALIASES' ids and the player gets them as the slots' aliases; for a vanilla
-  kind (Robin 0x2C, Mario 0x01) and a new kind without an entry (0x41) everything as unpatched; registers as the
-  unpatched run leaves them;
-- the bank finder 0x02C71898, natively, with the module's handles holding costume banks of their own ids (the
-  costume ids of tools/sound_bank_ids.py): a sound of the main se id / vc id is found in the se / vc handle once the
-  set-up ran on the patched executable (unpatched: not found), a sound of another id not;
-- with --banks: nus3's own load (0x03673A94, natively, each bank in its own buffer, the lib's bank lists set up as
-  its init does): MAIN then OLD_C01 (the same BINF id) -> 0x80000021 (refused: the second player's bank), MAIN then
-  NEW_C01 (its own id) -> 0, OTHER twice -> 0x80000021 (a vanilla bank loaded twice: the same rule).
+- the words: both hooks `b`s to their entries, the cave as built, no other word changed (ORIGINAL may carry v1);
+- the SoundModule set-up natively, for every new kind of reference/port_sound_ids.json and two vanilla kinds:
+  0x02761E40 -> 0x02761E4C (the call the SETUP hook acts on, right after the MTB lookups): +0x5C0 / +0x5C4 / +0x5C8 =
+  the kind's old se / vc / cheer ids (0xFFFF before, as the MTB leaves a new kind; vanilla kinds and the unpatched
+  executable unchanged); then 0x027620A0 -> 0x027620D0: the voice player gets them as its se / vc slots' aliases;
+  the Final Smash bank 0x02761580 -> 0x0276159C: +0x580 and the slot's alias = the old se_common id;
+- the bank finder 0x02C71898 with every handle holding a bank of the kind's OWN id (sound_bank_ids.own_id): a sound
+  of the old se / vc / se_common id is found in the se / vc / Final Smash handle (unpatched: none), another id not;
+- with --pairs (triples): nus3's own load (0x03673A94, natively; each bank in its own buffer), in one session as in a
+  match: BASE then PORT_OLD (the port as it was: the base's id) -> the second refused (0x80000021); BASE then
+  PORT_NEW -> both load; and every BASE and PORT_NEW of the run loaded together -> all load.
 """
 import os
 import sys
@@ -29,9 +28,11 @@ import kind_expand_test as KT  # noqa: E402
 from unicorn.ppc_const import UC_PPC_REG_1, UC_PPC_REG_LR, UC_PPC_REG_MSR  # noqa: E402
 
 MOD = KT.STRUCTS + 0x10000      # a fighter SoundModule (0x600 bytes)
+MGR = KT.STRUCTS + 0x18000      # the sound manager object the set-up's getters read
 FINDER = 0x02C71898             # (module, bank id) -> the handle (module + offset) holding it
 BANK_ID = 0x033EC060
 COMMON = 0x03127708
+SND_MGR = 0x102F7288            # [..] -> [..] the sound manager
 
 
 def emu(path):
@@ -43,6 +44,8 @@ def emu(path):
     E.stub(BANK_ID, lambda E: E.ids.get(E.r(3), 0xFFFFFFFF))
     E.stub(COMMON, lambda E: KT.STRUCTS + 0x7F00)
     E.stub(0x033EBB6C, lambda E: 1 if E.r(3) in E.ids else 0)
+    E.setw(SND_MGR, MGR)
+    E.setw(MGR, MGR + 0x100)
     return E
 
 
@@ -56,18 +59,34 @@ def module(E, kind, entry=1):
         E.setw(MOD + o, 0xFFFF)
 
 
-def setup_tail(E, kind):
-    """0x027620A0 -> 0x027620D0: the common... se and vc registrations of the set-up"""
-    module(E, kind)
-    del E.regs[:]
+def run(E, start, until, regs=None):
     for n in range(32):
         E.mu.reg_write(REGS[n], 0x1000 + n)
     E.mu.reg_write(REGS[30], MOD)
+    E.mu.reg_write(REGS[28], 0x102F0000)    # the set-up's lis r28, 0x102F (0x02761E40: lwz r3, 0x7288(r28))
+    for n, v in (regs or {}).items():
+        E.mu.reg_write(REGS[n], v)
     E.mu.reg_write(UC_PPC_REG_1, KT.STACK + 0xF0000)
     E.mu.reg_write(UC_PPC_REG_LR, 0x0BADC0DE)
-    E.mu.emu_start(0x027620A0, 0x027620D0, count=100000)
-    keep = {n: E.mu.reg_read(REGS[n]) for n in range(13, 32)}
-    return E.w(MOD + 0x5C0), E.w(MOD + 0x5C4), list(E.regs), keep
+    E.mu.emu_start(start, until, count=100000)
+    return {n: E.mu.reg_read(REGS[n]) for n in range(13, 32)}
+
+
+def setup(E, kind):
+    """the SETUP hook's call, then the registrations; (aliases, registrations, r13-r31)"""
+    module(E, kind)
+    del E.regs[:]
+    keep = run(E, 0x02761E40, 0x02761E4C)
+    al = tuple(E.w(MOD + o) for o in (C.SE_ALIAS, C.VC_ALIAS, C.OUEN_ALIAS))
+    run(E, 0x027620A0, 0x027620D0)
+    return al, [(o, a) for o, a, _6, _7 in E.regs], keep
+
+
+def final_smash(E, kind):
+    module(E, kind)
+    del E.regs[:]
+    keep = run(E, 0x02761580, 0x0276159C, {3: 0xFFFF})
+    return E.w(MOD + C.COMMON_ALIAS), [(o, a) for o, a, _6, _7 in E.regs], keep
 
 
 def nus3(path, banks):
@@ -124,19 +143,21 @@ def nus3(path, banks):
 
 def main():
     argv = sys.argv[1:]
-    banks = None
-    if '--banks' in argv:
-        i = argv.index('--banks')
-        banks = argv[i + 1:i + 5]
-        del argv[i:i + 5]
+    pairs = []
+    if '--pairs' in argv:
+        i = argv.index('--pairs')
+        pairs = argv[i + 1:]
+        del argv[i:]
     patched, original = argv[0], argv[1]
     P, O = K.Image(patched), K.Image(original)
-    words, hooks = C.build()
+    words, hooks, labels = C.build()
+    aliases = C.load_aliases()
     print('# words')
-    check('the hook is a b to the cave', [(hex(a), P.w(a)) for a in hooks], [(hex(C.HOOK), C.branch(C.HOOK, C.CAVE))])
+    check('the hooks are b to their entries', sorted((hex(a), P.w(a)) for a in hooks),
+          sorted([(hex(C.FS_HOOK), C.branch(C.FS_HOOK, labels['fs'])),
+                  (hex(C.SETUP_HOOK), C.branch(C.SETUP_HOOK, labels['setup']))]))
     check('the cave holds the built words', [hex(C.CAVE + 4 * i) for i, w in enumerate(words)
                                              if P.w(C.CAVE + 4 * i) != w], [])
-    check('the cave was zero', [hex(x) for x in range(C.CAVE, C.CAVE + 4 * len(words), 4) if O.w(x)], [])
     import diag_sound_cave as DG
     diag = {st[1] for st in DG.STEPS}               # diag_sound_cave.py's hooks, when it is applied as well
     diff = []
@@ -149,53 +170,74 @@ def main():
                 diff.append(hex(a))
     check('no other word changed', diff[:5], [])
 
-    print('# the set-up\'s registrations, natively (0x027620A0 -> 0x027620D0)')
+    print('# the set-up natively: aliases, the voice player\'s slots, the Final Smash bank')
     Ep, Eo = emu(patched), emu(original)
-    for kind, name in ((0x45, 'Hero'), (0x42, 'Sephiroth'), (0x41, 'Supamario (no entry)'), (0x2C, 'Robin'),
-                       (0x01, 'Mario')):
-        se, vc, regs, keep = setup_tail(Ep, kind)
-        se0, vc0, regs0, keep0 = setup_tail(Eo, kind)
-        if kind in C.ALIASES:
-            a_se, a_vc = C.ALIASES[kind]
-            check('%s: +0x5C0 / +0x5C4 = %d / %d (unpatched 0xFFFF)' % (name, a_se, a_vc), (se, vc, se0, vc0),
-                  (a_se, a_vc, 0xFFFF, 0xFFFF))
-            check('  the voice player gets them as the se / vc slots\' aliases',
-                  [(o, al) for o, al, _6, _7 in regs], [(0x18, a_se), (0x24, a_vc)])
+    kinds = sorted(aliases) + [0x2C, 0x01]
+    for kind in kinds:
+        al, regs, keep = setup(Ep, kind)
+        al0, regs0, keep0 = setup(Eo, kind)
+        fs, fregs, fkeep = final_smash(Ep, kind)
+        fs0, fregs0, fkeep0 = final_smash(Eo, kind)
+        if kind in aliases:
+            se, vc, ou, com = aliases[kind]
+            want = tuple(x or 0xFFFF for x in (se, vc, ou))
+            check('kind 0x%02X: +0x5C0 / +0x5C4 / +0x5C8 = %s (the executable it was built on: %s)' % (
+                kind, want, al0), al, want)
+            check('  the voice player\'s se / vc slots get them', regs, [(0x18, want[0]), (0x24, want[1])])
+            check('  Final Smash: +0x580 and the slot alias = %d' % (com or 0xFFFF), (fs, fregs),
+                  (com or 0xFFFF, [(0x84, com or 0xFFFF)]))
         else:
-            check('%s: as unpatched' % name, (se, vc, regs), (se0, vc0, regs0))
-        check('  r13-r31 as unpatched', keep, keep0)
+            check('kind 0x%02X (vanilla): as the executable it was built on' % kind, (al, regs, fs, fregs),
+                  (al0, regs0, fs0, fregs0))
+        check('  r13-r31 as unpatched', (keep, fkeep), (keep0, fkeep0))
 
-    print('# the bank finder 0x02C71898 with costume banks of their own ids')
-    for kind in sorted(C.ALIASES):
-        a_se, a_vc = C.ALIASES[kind]
-        c_se, c_vc = B.costume_id(a_se, 1), B.costume_id(a_vc, 1)
+    print('# the bank finder 0x02C71898: banks of the kind\'s own ids, sounds of the old ids')
+    v1 = O.w(C.FS_HOOK) == C.branch(C.FS_HOOK, C.CAVE)
+    for kind in sorted(aliases):
+        se, vc, ou, com = aliases[kind]
         res = {}
         for tag, E in (('patched', Ep), ('unpatched', Eo)):
-            setup_tail(E, kind)
+            setup(E, kind)
+            final_smash_mem = E.w(MOD + C.COMMON_ALIAS)
+            if tag == 'patched':
+                run(E, 0x02761580, 0x0276159C, {3: 0xFFFF})
             E.ids.clear()
-            E.ids.update({MOD + 0x18: c_se, MOD + 0x24: c_vc})
-            res[tag] = [E.call(FINDER, MOD, b) - MOD for b in (a_se, a_vc, 1234)]
-        check('kind 0x%02X, costume banks %d / %d: sounds of %d / %d -> se / vc handle; another id none' % (
-            kind, c_se, c_vc, a_se, a_vc), res['patched'][:2] + [res['patched'][2] in (0x18, 0x24)],
-            [0x18, 0x24, False])
-        check('  unpatched: neither found (the costume player was silent)', [o in (0x18, 0x24) for o in res['unpatched'][:2]],
-              [False, False])
+            E.ids.update({MOD + 0x18: B.own_id(kind, 'se'), MOD + 0x24: B.own_id(kind, 'vc'),
+                          MOD + 0x84: B.own_id(kind, 'se_common')})
+            res[tag] = [E.call(FINDER, MOD, b) - MOD if b else None for b in (se, vc, com, 1234)]
+            del final_smash_mem
+        want = [0x18 if se else None, 0x24 if vc else None, 0x84 if com else None]
+        got = res['patched'][:3]
+        check('kind 0x%02X: old se %d / vc %d / se_common %s -> +0x18 / +0x24 / +0x84; another id none' % (
+            kind, se, vc, com or '-'), got + [res['patched'][3] in (0x18, 0x24, 0x84)], want + [False])
+        if v1 and kind in (0x42, 0x45):             # v1 (new kinds' sound fix v1) aliased these two's se / vc
+            continue
+        check('  unpatched: none found', [o in (0x18, 0x24, 0x84) for o in res['unpatched'][:3] if o is not None],
+              [False] * len([b for b in (se, vc, com) if b]))
 
-    if banks:
+    if pairs:
         print('# nus3\'s bank load (0x03673A94), natively')
-        main_, old, new, other = [(os.path.basename(p), open(p, 'rb').read()) for p in banks]
-        check('the costume bank built from the old one: only its id differs', (B.binf(new[1])[1],
-              B.with_id(old[1], B.binf(new[1])[1]) == new[1], B.binf(old[1])[1] == B.binf(main_[1])[1]),
-              (B.binf(new[1])[1], True, True))
-        r = nus3(original, [main_, old])
-        check('%s then %s (same id %d): the second refused' % (main_[0], old[0], B.binf(old[1])[1]),
-              [x[1] for x in r], [0, 0x80000021])
-        r = nus3(original, [main_, new])
-        check('%s then the renumbered %s (id %d): both load' % (main_[0], new[0], B.binf(new[1])[1]),
-              [x[1] for x in r], [0, 0])
-        r = nus3(original, [other, other])
-        check('%s twice: the second refused (the same rule for vanilla banks)' % other[0], [x[1] for x in r],
-              [0, 0x80000021])
+        trip = [pairs[i:i + 3] for i in range(0, len(pairs), 3)]
+        allb = []
+        for base, old, new in trip:
+            b, o, n = [(os.path.basename(p), open(p, 'rb').read()) for p in (base, old, new)]
+            check('%s: the renumbered bank differs from the old one only in its id (%d -> %d)' % (
+                n[0], B.binf(o[1])[1], B.binf(n[1])[1]), B.with_id(o[1], B.binf(n[1])[1]) == n[1], True)
+            r = nus3(original, [b, o])
+            check('%s (id %d) then the old %s (id %d): the later refused' % (
+                b[0], B.binf(b[1])[1], o[0], B.binf(o[1])[1]), [x[1] for x in r],
+                [0, 0x80000021] if B.binf(b[1])[1] == B.binf(o[1])[1] else [0, 0])
+            r = nus3(original, [b, n])
+            check('%s then the new %s (id %d): both load' % (b[0], n[0], B.binf(n[1])[1]), [x[1] for x in r], [0, 0])
+            allb += [b, n]
+        seen, uniq = set(), []
+        for x in allb:
+            if x[0] not in seen:
+                seen.add(x[0])
+                uniq.append(x)
+        r = nus3(original, uniq)
+        check('all %d bases and ports in one session: every bank loads' % len(uniq),
+              [x for x in r if x[1] != 0], [])
     print('FAILED %d' % KT.fails if KT.fails else 'all passed')
     sys.exit(1 if KT.fails else 0)
 

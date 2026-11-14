@@ -154,3 +154,14 @@ turns, no roll-off), and his body `game.bin`'s EscapeF had no speed (the animati
   both the same as Mario's in `universal_mechanics_all`; every other script unchanged.
 - Kirby's Supamario copy: nothing to change (a copy only changes Kirby's neutral special; his roll-off is his own).
 - Changed: `script/msc/supamario.mscsb`, `script/animcmd/body/game.bin`. Not tested in game.
+
+## Ported sound ids v1 (`$S/ported_sound_ids_v1.zip`): his own sound bank ids
+
+nus3 loads one bank an id (docs/native-notes.md "Fighter sound banks: one bank an id"); a port keeping its base's bank
+ids silenced the later player with the base (or another port on those ids) in the match. Every bank of a new kind
+now has its own id (`tools/sound_bank_ids.own_id`, `reference/port_sound_ids.json`), its rows keep the base's ids
+and the executable (`tools/sound_alias_cave.py` v2) gives his banks those ids as aliases; nothing else changes
+(soundlabeltable, scripts, MSC, sequences: the same).
+- **Banks:** `snd_vc_Supamario` 46001 / `_ouen` 46002 (vanilla Mario's, which his are: tools/fighter_own_bank.py
+  left them on Mario's ids 6001 / 6086); `snd_se_Supamario` keeps 2144 (already his own; alias 2144). Aliases: vc
+  6001, cheer 6086. Check: Supamario vs Mario vs Squirtle.

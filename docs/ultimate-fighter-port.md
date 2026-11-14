@@ -320,15 +320,16 @@ entries with the volume in dB at +12 of the data block; a random container has +
 
 - **Banks** (`ultimate_sound.py`): the slot's renamed base banks keep their BINF ids and rows; the rows
   grow by the Ultimate tones. A sound id's bank is matched against the banks **the playing fighter**
-  loaded (`0x0312093C`: row -> bank id; `0x03120978`: a fighter's 7 bank slots, own id or alias). But nus3
-  loads **one bank an id** (a second bank of a loaded id is refused, 0x80000021: that player is silent; docs/
-  native-notes.md "Fighter sound banks: one bank an id"), so the base and a port keeping its ids silence the later
-  player (port_check A6 WARN). Costume banks `_cNN` are loaded by file name
+  loaded (`0x0312093C`: row -> bank id; `0x03120978`: a fighter's 7 bank slots, own id or alias). nus3 loads
+  **one bank an id** (a second bank of a loaded id is refused, 0x80000021: that player is silent; docs/
+  native-notes.md "Fighter sound banks: one bank an id"), so **every bank of a port gets its own id**
+  (`sound_bank_ids.own_id`, written by ultimate_sound.py) while the rows keep the base's ids, and the executable's
+  `tools/sound_alias_cave.py` (v2) gives the kind those ids as its banks' aliases (`reference/port_sound_ids.json`,
+  which ultimate_sound.py updates: rebuild the cave after a sound step; port_check A6). Costume banks `_cNN` are loaded by file name
   for that costume (`0x030C0C34`; Robin / Wii Fit / Cloud / Corrin take costume & 1, Olimar / Bayonetta
   >= 4, Little Mac >= 8, every other kind, the new ones included, the costume number as is) and fall
-  back to the main file; they must have the main bank's tone order and **an id of their own**
-  (`tools/sound_bank_ids.costume_id`, written by ultimate_sound.py) with the kind's main ids in
-  `tools/sound_alias_cave.py` ALIASES, the alias vanilla takes from
+  back to the main file; they must have the main bank's tone order and an id of their own (as above), the
+  alias vanilla takes from
   `sound/config/fightermodelbanktable.mtb` (`MTB\0`, entries name[16] (the 13 named by the executable's table
   at `0x10340CA4`, never a new kind), base id, type (1 se, 2 vc, 3 vc_ouen, 4 se_common), alt ids). Hero fix 71's
   costume banks kept the main id: a second Hero in another costume was silent (port_check A6 ERROR).

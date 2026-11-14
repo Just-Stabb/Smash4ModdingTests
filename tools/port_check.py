@@ -1625,65 +1625,70 @@ def check_sound_ids(inst, name, rep):
 
 
 def check_sound_bank_ids(inst, name, kind, vanilla, rep):
-    """A6: nus3 refuses to load a bank whose BINF id is already loaded (0x036774A4 -> 0x80000021, docs/native-notes.md
-    "Fighter sound banks: one bank an id"): the fighter's handle stays empty and every sound and voice of that player
-    is silent. A costume bank (_cNN) with the main bank's id silenced a second player of the fighter in another
-    costume (Hero fix 71's banks: the second Hero). ERROR: two of his banks share an id; costume banks of their own
-    ids (tools/sound_bank_ids.py) without tools/sound_alias_cave.py's alias for his kind in the install's executable
-    (their sounds, played by the main bank's rows, would find no bank). WARN: a main bank keeping the base's id
-    (the base and the port in one match: the one loaded second is silent)"""
+    """A6: nus3 loads one bank an id (0x036774A4 -> 0x80000021, docs/native-notes.md "Fighter sound banks: one bank an
+    id"): a later bank of an id already loaded is refused, its player's handle stays empty and all his sounds and
+    voices are silent. A port's banks keeping its base's ids (Hero fix 71: Robin's 2051 / 6059) broke the later player
+    with the base, another port on those ids, or a second him in another costume, in the match. ERROR: a bank of his
+    with a vanilla fighter's id (its base's), two of his banks sharing an id; banks of their own ids without
+    tools/sound_alias_cave.py's hooks / his aliases (reference/port_sound_ids.json) in the install's executable
+    (the rows keep the base's ids: his sounds would find no bank). WARN: an id that isn't tools/sound_bank_ids.own_id
+    (unique, but outside the scheme)"""
     import fighter_own_bank as fb
     import sound_alias_cave as SA
-    ids, mains = {}, {}
-    for b in inst.glob(r'fighter/%s/sound/snd_(se|vc)_[A-Za-z0-9]+(_c\d\d)?\.nus3bank' % name):
+    import sound_bank_ids as SB
+    try:
+        _k, cap, _b = SB.kind_record(name)
+    except SystemExit:
+        return
+    ids, mine, vanilla_ids, odd = {}, [], [], []
+    for b in inst.glob(r'fighter/%s/sound/snd_(se|vc)_.*\.nus3bank' % name):
+        f = b.split('/')[-1]
+        c = SB.classify(f, cap)
+        if c is None:
+            continue
         try:
             _n, bid = fb.binf(inst.get(b))
         except Exception:                     # noqa: BLE001
             continue
-        ids.setdefault(bid, []).append(b.split('/')[-1])
-        m = re.search(r'/snd_(se|vc)_[A-Za-z0-9]+\.nus3bank$', b)
-        if m:
-            mains[m.group(1)] = bid
+        ids.setdefault(bid, []).append(f)
+        if bid in SB.VANILLA_FIGHTER_IDS:
+            vanilla_ids.append('%s %d' % (f, bid))
+        else:
+            mine.append(f)
+            if bid != SB.own_id(kind, *c):
+                odd.append('%s %d' % (f, bid))
+    if vanilla_ids:
+        rep.add('ERROR', 'A6 bank-ids', 'banks keeping a vanilla fighter\'s id (his base\'s: with that fighter, or '
+                'another port on that id, in the match the later player is silent): %s; give them their own '
+                '(tools/sound_bank_ids.py renumber, or rebuild with ultimate_sound.py) and rebuild the executable\'s '
+                'tools/sound_alias_cave.py' % ', '.join(vanilla_ids[:6]))
     dup = ['%d: %s' % (i, ', '.join(sorted(f))) for i, f in sorted(ids.items()) if len(f) > 1]
     if dup:
-        rep.add('ERROR', 'A6 bank-ids', 'banks sharing a BINF id (nus3 loads only the first: a second player of his in '
-                'another costume is silent); give the costume banks their own (tools/sound_bank_ids.py) and add his '
-                'kind to tools/sound_alias_cave.py ALIASES: %s' % '; '.join(dup))
-    own = [f for i, fs in ids.items() for f in fs if re.search(r'_c\d\d\.nus3bank$', f) and i not in mains.values()]
-    if own and 'code/cross_f.rpx' in inst.files:
+        rep.add('ERROR', 'A6 bank-ids', 'banks sharing a BINF id (nus3 loads only the first: a second player of his '
+                'in another costume is silent): %s' % '; '.join(dup))
+    if odd:
+        rep.add('WARN', 'A6 bank-ids', 'ids of their own but not sound_bank_ids.own_id\'s: %s' % ', '.join(odd[:6]))
+    if mine and 'code/cross_f.rpx' in inst.files:
         import tempfile
         import kind_expand as K
+        want = SA.load_aliases().get(kind)
         with tempfile.NamedTemporaryFile(suffix='.rpx') as f:
             f.write(inst.get('code/cross_f.rpx'))
             f.flush()
             img = K.Image(f.name)
-            words, hooks = SA.build({})
-            table = SA.CAVE + 4 * (len(words) - 2 * (SA.LAST_KIND - SA.FIRST_KIND + 1))
+            _w, hooks, _l = SA.build({})
             try:
-                hooked = img.w(SA.HOOK) == hooks[SA.HOOK]
-                got = (img.w(table + 8 * (kind - SA.FIRST_KIND)), img.w(table + 8 * (kind - SA.FIRST_KIND) + 4))
+                hooked = all(img.w(a) == w for a, w in hooks.items())
+                got = SA.table_of(img, kind)
             except Exception:                 # noqa: BLE001
                 hooked, got = False, None
-        want = (mains.get('se', 0), mains.get('vc', 0))
-        if not hooked or got != want:
-            rep.add('ERROR', 'A6 bank-ids', 'costume banks of their own ids (%s) but the executable %s: their sounds '
-                    'find no bank; build it with tools/sound_alias_cave.py (ALIASES[0x%X] = %d, %d)' % (
-                        ', '.join(sorted(own)[:4]), 'has no sound_alias_cave.py hook' if not hooked else
-                        'gives kind 0x%X the aliases %s' % (kind, got), kind, want[0], want[1]))
-    if vanilla:
-        for k, bid in sorted(mains.items()):
-            hit = []
-            for p in glob.glob(os.path.join(vanilla, 'fighter', '*', 'sound', 'snd_%s_*.nus3bank' % k)):
-                if os.path.basename(os.path.dirname(os.path.dirname(p))) == name:
-                    continue
-                try:
-                    if fb.binf(open(p, 'rb').read())[1] == bid:
-                        hit.append(os.path.basename(p))
-                except Exception:             # noqa: BLE001
-                    continue
-            if hit:
-                rep.add('WARN', 'A6 bank-ids', 'his snd_%s bank keeps id %d of %s: with that fighter in the match, '
-                        'the one loaded second (the later player) is silent' % (k, bid, ', '.join(hit[:3])))
+        if want is None or not hooked or got != want:
+            rep.add('ERROR', 'A6 bank-ids', 'banks of their own ids (%s) but %s: his sounds (rows of the base\'s ids) '
+                    'find no bank; build it with tools/sound_alias_cave.py (v2)' % (
+                        ', '.join(sorted(mine)[:3]), 'no aliases for kind 0x%X in reference/port_sound_ids.json'
+                        % kind if want is None else 'the executable has no sound_alias_cave.py v2 hooks'
+                        if not hooked else 'the executable gives kind 0x%X the aliases %s, not %s' % (
+                            kind, got, want)))
 
 
 def check_universal(p, rep):
