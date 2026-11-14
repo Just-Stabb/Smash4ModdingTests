@@ -37694,6 +37694,9 @@ void rolloff_hold_update()
 // the motion to GF_JUMP_TO in one frame (the rate that reaches it, so every script command on the way runs: the
 // Kamehameha's kame_play_to), and no cancel until GF_IASA. A whiff (GF_VAR still 0) ends at GF_WHIFF_END as the
 // vanilla end does (Run if 0x1300011c, else Wait).
+// `//GFD ` lines: the diag build's (tools/supamario_godfist_build.py --diag uncomments them): OSReport lines through
+// the diag executable (writes to 0x0F0003F0 + k, tools/diag_godfist_cave.py): 9 the jump asked (the frame), 10 the
+// rate back to 1, 11 the God Fist path leaving the status (the frame).
 // ===================================================================
 int gf_jump;            // 0 the jump not asked for yet, 1 on its way to GF_JUMP_TO, 2 done
 
@@ -37734,6 +37737,7 @@ int gf_update()
         if (fr < GF_JUMP_TO - 0.5f)
         {
             MotionModule(0x4, GF_JUMP_TO - fr);
+            //GFD WorkModule(0, fr, 0x0F0003F9);
             return 0x1;
         }
     }
@@ -37741,18 +37745,22 @@ int gf_update()
     {
         MotionModule(0x4, 1.0f);
         gf_jump = 0x2;
+        //GFD WorkModule(0, fr, 0x0F0003FA);
     }
     if (global18 == 0x2)
     {
+        //GFD WorkModule(0, fr, 0x0F0003FB);
         func_16(0xe, 0);
         return 0x1;
     }
     if (fr >= GF_IASA && func_39() != 0)
     {
+        //GFD WorkModule(0, fr, 0x0F0003FB);
         return 0x1;
     }
     if (MotionModule(0x2712) == 0x1)
     {
+        //GFD WorkModule(0, fr, 0x0F0003FB);
         func_16(0, 0);
     }
     return 0x1;

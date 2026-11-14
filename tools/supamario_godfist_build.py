@@ -55,9 +55,16 @@ import supamario_godfist_anim as anim  # noqa: E402
 GF_SLOT_BASE = 0x30                     # New_Var slots 0x30-0x38 (0x0F0003B0-8)
 GF_VAR = 0x0F000380 + GF_SLOT_BASE      # gf: 0 dash punch / whiff, 1 caught, 2 struck (the MSC reads it)
 V_SLOT, V_ST, V_SIT, V_PHASE, V_CNT, V_ONE, V_LOCK, V_ROT = (0x0F000380 + GF_SLOT_BASE + k for k in range(1, 9))
+# v4: gf_spin 1 while the victim in gf_slot may be turned (Rotation_Set; every release zeroes it), gf_wd 1 while
+# the hold watchdog (thread GF_WATCH) is on duty, gf_tmp / gf_tmp2 scratch (the watchdog's reads, the diag logs)
+V_SPIN, V_WD, V_TMP, V_TMP2 = (0x0F000380 + GF_SLOT_BASE + k for k in range(9, 13))
 VARS = [('gf', GF_VAR, 1), ('gf_slot', V_SLOT, 0), ('gf_st', V_ST, 0), ('gf_sit', V_SIT, 0),
         ('gf_phase', V_PHASE, 0), ('gf_cnt', V_CNT, 0), ('gf_one', V_ONE, 0), ('gf_lock', V_LOCK, 0),
-        ('gf_rot', V_ROT, 0)]
+        ('gf_rot', V_ROT, 0), ('gf_spin', V_SPIN, 0), ('gf_wd', V_WD, 0), ('gf_tmp', V_TMP, 0),
+        ('gf_tmp2', V_TMP2, 0)]
+# gf values: 0 the dash punch / whiff, 1 caught (held), 2 struck (the flight thread has the victim), 3 the strike
+# missed (the victim let go at STRIKE + 1)
+GF_MISSED = 3
 PUNCH, PUNCH_END = anim.GF_PUNCH, anim.GF_PUNCH_END   # the hitbox 14-17 (the BAC's), the hit check at 18
 JUMP_TO, STRIKE = anim.GF_JUMP_TO, anim.GF_STRIKE      # 46, 96 (#0 frame 40: the launch)
 WHIFF_END = float(anim.GF_WHIFF_END)     # the whiff's end (MSC): 44
@@ -82,7 +89,20 @@ GF_PIVOT = 5.0                          # the body's middle above its feet (the 
 GF_THICK = 1.5                          # half its thickness (lying, its middle at least this high)
 GF_LAND_WAIT = 20                       # frames it may take to reach the ground after the flight
 GF_DOWN = 50                            # the downed frames with the controller off (v1 60: the slide is longer)
-GF_THREAD = 0x47                        # the thread's ID
+GF_THREAD = 0x47                        # the flight thread's ID
+GF_WATCH = 0x46                         # the hold watchdog thread's ID (v4)
+GF_WATCH_FRAMES = 160                   # its lifetime: the catch (18) to well past the strike (97 + the freeze)
+STATUS_ATTACK_DASH = 0x27               # Supamario's AttackDash status (func_272 / func_273)
+STRIKE_PART = 1                         # v4: the strike's hitboxes on Part 1, a hit record of their own (v3 had
+                                        # Part 0, the punch's: its record already held the victim, so the strike
+                                        # could never connect: no launch, the lean left on the victim)
+# diagnostics (the diag build, --diag): a write to 0x0F0003F0 + k is an OSReport line with the diag executable
+# (tools/diag_godfist_cave.py: `S4GF k=.. v=.. n=..`); the normal executables ignore these writes (0x3C9-0x3FF
+# read 0, writes do nothing: acmd_ext_cave.py hv_var), so the diag scripts are harmless without it
+DIAG = False
+DIAG_BASE = 0x0F0003F0
+D_CATCH_KINDS, D_SLOT, D_HOLD_FRAME, D_HOLD_ROT, D_STRIKE_KINDS, D_FLIGHT, D_WD_RELEASE, D_ROT_AFTER, \
+    D_MISSED, D_MSC_JUMP, D_MSC_RATE1, D_MSC_EXIT, D_PHASE, D_WD_STATUS = range(14)
 IASA = float(STRIKE + 1 + GF_FLIGHT)    # the God Fist's cancel frame (MSC): the victim's flight is over (141)
 ROOT_Z = [0.0] * anim.FRAMES             # his TransN z by motion frame (build() sets it from the animation)
 DOWN_HELD = (0x4D, 0x53)                # DownBound .. DownWait (0x53): still down; 0x57 DownDamage
@@ -245,6 +265,54 @@ def flight_frame(k):
     return place(cx, h * GF_HSCALE, phi)
 
 
+def dlog(k, var=None, value=None):
+    """diag build only: OSReport line k with a variable's value (or a constant)"""
+    if not DIAG:
+        return []
+    if var is None:
+        return [setf(value, DIAG_BASE + k)]
+    # DIAG = 0 - (0 - var): SUB_FLOAT_2 is a read and a write for these IDs; a diag ID reads 0
+    return [setf(0, V_TMP2), cmd('sub_float_2', V_TMP2, var), cmd('sub_float_2', DIAG_BASE + k, V_TMP2)]
+
+
+def dlog_get(k, get):
+    """diag: run `get` (a command filling V_TMP) and log V_TMP"""
+    return [get] + dlog(k, V_TMP) if DIAG else []
+
+
+def unspin():
+    """the victim (gf_slot) upright, its stage collision back (air: it drops to the floor), gf_spin 0"""
+    out = per_slot(lambda t: [cmd('rotation_set', t, 0.0, 0.0, 0.0)])
+    if DIAG:
+        out += per_slot(lambda t: dlog_get(D_ROT_AFTER, cmd('rotation_get', t, 0, V_TMP)))
+    return out + [setf(0, V_SPIN)]
+
+
+def hold_release(reason):
+    """the hold ends without the launch (Supamario's move interrupted / replaced, the strike missed, time):
+    the victim upright, its stage collision back, the watchdog off"""
+    return (dlog(D_WD_RELEASE, value=reason) + unspin()
+            + per_slot(lambda t: [cmd('stage_collision_set', t, 5)]) + [setf(0, V_WD)])
+
+
+def watchdog():
+    """GF_WATCH (Flags 1: it runs in hitlag too), from the catch: every frame, while gf_wd is 1 (until the flight
+    thread has the victim, or a release): his status (Status_Get(0)) not AttackDash any more (hit, grabbed, KO'd:
+    the game script that holds the victim is gone) or gf back to 0 (a new dash attack) -> let go; gf 2 (struck:
+    the flight thread's) or GF_MISSED (the main script let go) -> off duty; gf still 1 past the strike's frame (his
+    motion frame, Motion_Get) -> let go. At the end (GF_WATCH_FRAMES) still on duty and not struck -> let go.
+    A thread survives status changes (acmd_ext_cave.py: threads are dropped only at the object's set-up)."""
+    body = [cmd('status_get', 0, V_TMP)]
+    body += if_(V_TMP, 1, STATUS_ATTACK_DASH, dlog(D_WD_STATUS, V_TMP) + hold_release(1))
+    body += if_(V_WD, 0, 1, if_(GF_VAR, 0, 0, hold_release(2)))
+    body += if_(V_WD, 0, 1, if_(GF_VAR, 0, 2, [setf(0, V_WD)]))
+    body += if_(V_WD, 0, 1, if_(GF_VAR, 0, GF_MISSED, [setf(0, V_WD)]))
+    body += if_(V_WD, 0, 1, [cmd('motion_get', 0, 1, V_TMP)] + if_(V_TMP, 5, STRIKE + 2.5, hold_release(3)))
+    b = loop(GF_WATCH_FRAMES, if_(V_WD, 0, 1, body) + [cmd('wait', 1.0)])
+    b += if_(V_WD, 0, 1, if_(GF_VAR, 1, 2, hold_release(4)))
+    return b
+
+
 def game_script():
     s = [acmd.new_var(n, v - 0x0F000380, 0, 0.0, scope) for n, v, scope in VARS]
     s += [setf(1, V_ONE), cmd('frame', float(PUNCH))]
@@ -255,35 +323,44 @@ def game_script():
                  Y=6.5, Z=4.0, SFXLevel=1, SFXType=1, Type=4, HitstopFrames=PUNCH_FREEZE,
                  SelfHitstopFrames=PUNCH_FREEZE)]
     s += [cmd('frame', float(PUNCH_END)), cmd('remove_all_hitboxes')]
+    s += dlog_get(D_CATCH_KINDS, cmd('hit_get', 0, 0, V_TMP))
     # the catch: a fighter's body hit (not a shield)
     caught = [setf(1, GF_VAR), cmd('target_slot_get', 2, V_SLOT),
               cmd('body_state_set', 0, 1, INVINCIBLE),                 # invincible (XV2: 0-40 of the follow-up)
               cmd('hitstun_set', 2, 20), setf(HOLD_X, LH_OFFX), setf(0, LH_OFFY)]
-    # a victim still locked down by an earlier God Fist gets its controller back first
-    caught = per_lock_release() + [setf(0, V_PHASE)] + caught
+    caught += dlog(D_SLOT, V_SLOT)
+    caught += [setf(1, V_SPIN), setf(1, V_WD)] + thread(GF_WATCH, 1, watchdog())
+    # an earlier God Fist's victim (still flying / down): its flight thread stopped, upright, controller back
+    earlier = [cmd('thread_stop', GF_THREAD)] + if_(V_SPIN, 0, 1, unspin())
+    caught = earlier + per_lock_release() + [setf(0, V_PHASE)] + caught
     s += [cmd('hit_check', 0, 0, 2), cmd('true', 2 + size(caught))] + caught
-    # the hold, 40-49 (only reached when caught: the MSC jumps here; guarded anyway)
+    # the hold, 46-95 (only reached when caught: the MSC jumps here; guarded anyway)
     for f in range(JUMP_TO, STRIKE):
         s.append(cmd('frame', float(f)))
         # XV2's lean (#179 0-40, back 29 -> 57 degrees), about its feet, frozen in place (hitstop) as it's held
         hold = [setf(HOLD_X, LH_OFFX), setf(0, LH_OFFY), setf(0, LH_GROUND), cmd('hitstun_set', 2, 20),
                 cmd('hitstop_set', 2, 2, 0),
                 cmd('rotation_set', 2, -hold_lean(f - JUMP_TO, STRIKE - JUMP_TO), 0.0, 0.0)]
+        if f in (JUMP_TO, STRIKE - 1):
+            hold += dlog_get(D_HOLD_FRAME, cmd('motion_get', 0, 1, V_TMP))
+            hold += dlog_get(D_HOLD_ROT, cmd('rotation_get', 2, 0, V_TMP))
         if f == STRIKE - 1:
-            hold.append(cmd('hit_reset'))
+            hold += [cmd('hit_reset'), cmd('hit_log_clear', STRIKE_PART)]
         s += if_(GF_VAR, 0, 1, hold)
-    # 50: the God Fist
-    strike = [hitbox('extra_special_hitbox', ID=0, Bone=FIST, Damage=STRIKE_DMG, Angle=0, KBG=0, FKB=0, BKB=25,
-                     Size=6.0, X=0.0, Hitlag=1.0, SDI=0.0, SFXLevel=2, SFXType=1, Type=4, IgnoreInvuln=0,
-                     HitstopFrames=STRIKE_FREEZE, SelfHitstopFrames=STRIKE_FREEZE, DIMul=0.001),
-              hitbox('extra_special_hitbox', ID=1, Bone=0, Damage=STRIKE_DMG, Angle=0, KBG=0, FKB=0, BKB=25,
-                     Size=6.0, Y=6.5, Z=HOLD_X, Hitlag=1.0, SDI=0.0, SFXLevel=2, SFXType=1, Type=4,
+    # 96: the God Fist (Part STRIKE_PART: a hit record of its own; the punch's Part 0 record holds the victim)
+    strike = [hitbox('extra_special_hitbox', ID=0, Part=STRIKE_PART, Bone=FIST, Damage=STRIKE_DMG, Angle=0, KBG=0,
+                     FKB=0, BKB=25, Size=6.0, X=0.0, Hitlag=1.0, SDI=0.0, SFXLevel=2, SFXType=1, Type=4,
+                     IgnoreInvuln=0, HitstopFrames=STRIKE_FREEZE, SelfHitstopFrames=STRIKE_FREEZE, DIMul=0.001),
+              hitbox('extra_special_hitbox', ID=1, Part=STRIKE_PART, Bone=0, Damage=STRIKE_DMG, Angle=0, KBG=0,
+                     FKB=0, BKB=25, Size=6.0, Y=6.5, Z=HOLD_X, Hitlag=1.0, SDI=0.0, SFXLevel=2, SFXType=1, Type=4,
                      HitstopFrames=STRIKE_FREEZE, SelfHitstopFrames=STRIKE_FREEZE, DIMul=0.001)]
     s += [cmd('frame', float(STRIKE))] + if_(GF_VAR, 0, 1, strike)
-    # 51 (after the freeze: the script waits through his hitstop): struck -> the flight thread
+    # 97 (after the freeze: the script waits through his hitstop): struck -> the flight thread; else let go
     launched = [setf(2, GF_VAR), cmd('remove_all_hitboxes')] + thread(GF_THREAD, 1, flight_thread())
     s += [cmd('frame', float(STRIKE + 1)), cmd('remove_all_hitboxes')]
+    s += if_(GF_VAR, 0, 1, dlog_get(D_STRIKE_KINDS, cmd('hit_get', 0, 0, V_TMP)))
     s += if_(GF_VAR, 0, 1, [cmd('hit_check', 0, 0, 2), cmd('true', 2 + size(launched))] + launched)
+    s += if_(GF_VAR, 0, 1, dlog(D_MISSED, value=1) + hold_release(5) + [setf(GF_MISSED, GF_VAR)])
     return s
 
 
@@ -299,6 +376,7 @@ def flight_thread():
     """the thread: flight (target 2: still the move's last hit), then the landing and the downed state (the
     victim's slot: the move may be over)"""
     b = per_slot(lambda t: [cmd('input_set', t, 21, 1.0)]) + per_slot_lock()    # controller off from the launch
+    b += dlog(D_FLIGHT, V_SLOT)
     fx = dict(SLIDE_FX)
     for k in range(1, GF_FLIGHT + 1):
         x, y, a = flight_offset(k)
@@ -316,9 +394,11 @@ def flight_thread():
     lie = per_slot(lambda t: [cmd('rotation_set', t, float(a), 0.0, 0.0)])
     upright = per_slot(lambda t: [cmd('rotation_set', t, 0.0, 0.0, 0.0)])
     # landing wait (phase 1): on the ground -> DownWait, controller off (phase 2, GF_DOWN frames)
-    release = per_lock_release() + if_(V_ROT, 0, 0, upright) + [setf(1, V_ROT), setf(0, V_PHASE)]
+    # v4: every release zeroes the rotation (unspin), whatever was done before (v3: only if gf_rot said it wasn't)
+    release = dlog(D_PHASE, V_PHASE) + per_lock_release() + unspin() + [setf(1, V_ROT), setf(0, V_PHASE)]
     land = [setf(2, V_SIT)] + per_slot(lambda t: [cmd('input_get', t, 22, V_SIT)])
-    to_down = per_slot(lambda t: [cmd('status_set', t, DOWN_WAIT)]) + [setf(2, V_PHASE), setf(GF_DOWN, V_CNT)]
+    to_down = (per_slot(lambda t: [cmd('status_set', t, DOWN_WAIT)]) + [setf(2, V_PHASE), setf(GF_DOWN, V_CNT)]
+               + dlog(D_PHASE, value=2))
     phase1 = lie + land + if_(V_SIT, 0, 0, to_down)
     # still phase 1 (in the air): count down, then give up and give the controller back (it fell off the stage)
     phase1 += if_(V_PHASE, 0, 1, [cmd('sub_float_2', V_CNT, V_ONE)] + if_(V_CNT, 2, 0, release))
@@ -337,8 +417,9 @@ def flight_thread():
     # (later phases first: a phase entered this frame starts on the next)
     body = if_(V_PHASE, 0, 3, read + phase3) + if_(V_PHASE, 0, 2, read + phase2) + if_(V_PHASE, 0, 1, phase1)
     b += loop(GF_LAND_WAIT + GF_DOWN + 60, body + [cmd('wait', 1.0)])
-    # the thread's end: never leave a controller off
+    # the thread's end: never leave a controller off, nor the victim turned
     b += if_(V_PHASE, 1, 0, release)
+    b += if_(V_SPIN, 0, 1, unspin())
     return b
 
 
@@ -419,6 +500,8 @@ def msc(out_path):
     import supamario_kame_values
     vals = kb.supamario_values(supamario_kame_values.SUPAMARIO_FX)      # GF_* included (msc_values)
     src = kb.substitute(os.path.join(HERE, '..', 'fighters/supamario/supamario.c'), vals)
+    if DIAG:
+        src = src.replace('//GFD ', '')
     code = '\n'.join(line.split('//')[0] for line in src.split('\n'))
     assert 'GF_' not in code.replace('gf_', ''), [w for w in code.split() if 'GF_' in w][:5]
     with tempfile.TemporaryDirectory(dir=os.path.dirname(os.path.abspath(out_path))) as tmp:
@@ -483,6 +566,10 @@ def build(sm_dir, out_dir, ean_path, cmn_dir=None, png=None):
 def main():
     a = sys.argv[1:]
     opts = {}
+    global DIAG
+    if '--diag' in a:
+        a.remove('--diag')
+        DIAG = True
     for k in ('--png', '--ean', '--cmn-vfx'):
         if k in a:
             i = a.index(k)
