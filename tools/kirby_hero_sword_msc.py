@@ -49,6 +49,15 @@ disappear when it ends"):
   khm_sw_stop at the spell's end (Hero's: with his motion).
 - khm_sw_shown(n, f): the sword drawn from the trail's start (Sword_Glow) to its end (Terminate_Sword_Glow), cast
   frames.
+
+Fix v10 (user: "hitboxes are bad now, they seem to not be able to hit opponents at all"): the hitboxes (fix v8's
+points on the blade) are bone-0 hitboxes now (flatten): remade every cast frame of their life at the blade's drawn
+place that frame (path.json's LHaveN matrices x the offset), their depth on Kirby's plane (X 0), a capsule back to
+the last frame's point. Fix v8's followed LHaveN in 3D: in Flame / Kacrackle Slash's follow-through the blade swings
+7-15 into the screen (and Metal Slash's 5-8), out of reach of a fighter's hurtboxes on the plane
+(tools/kirby_hero_sword_hitboxes.py), and fix v8 had dropped the bone-0 bursts that hit in fix v7. Bone 0 is TransN,
+whose translation the swing animations keep at 0 since fix v10 (kirby_hero_sword_anim.py), so the place no longer
+depends on how the game treats TransN's or LHaveN's frame.
 """
 import json
 import os
@@ -136,6 +145,53 @@ def load_path(path=PATH):
 SCALE, ARMS = load_path()
 
 
+def load_worlds(path=PATH):
+    """fix v10: {spell: [LHaveN's drawn model-space matrix a cast frame]} (path.json lhaven_world); None without it"""
+    if not path or not os.path.exists(path):
+        return None
+    import numpy as np
+    p = json.load(open(path))
+    return {int(k, 16): [np.array(m) for m in v['lhaven_world']] for k, v in p['spells'].items()}
+
+
+WORLDS = load_worlds()
+FLAT_X = 0.0            # fix v10: the hitboxes' depth (bone 0's X): Kirby's plane
+
+
+def flatten(ev, worlds):
+    """fix v10: the sword hitboxes (LHaveN offsets) as bone-0 (TransN) hitboxes at the blade's drawn place, frame by
+    frame: each live hitbox remade every cast frame from its set to its removal at that frame's point (LHaveN's drawn
+    matrix x the offset), its depth (X) on Kirby's plane, a capsule from the last frame's point (the sweep)"""
+    import numpy as np
+    out, live, prev = [], {}, {}
+    last = max(f for f, k, _v in ev if k in ('hitbox', 'remove'))
+    by = {}
+    for f, k, v in ev:
+        by.setdefault(f, []).append((k, v))
+    for f in range(0, last + 1):
+        for k, v in by.get(f, []):
+            if k == 'hitbox':
+                live[v[0]] = v
+                prev.pop(v[0], None)
+            elif k == 'remove':
+                live, prev = {}, {}
+                out.append((f, 'remove', []))
+        for i in sorted(live):
+            v = list(live[i])
+            W = worlds[min(f, len(worlds) - 1)]
+            p = W @ np.array([v[9], v[10], v[11], 1.0])
+            pt = [FLAT_X, round(float(p[1]), 4), round(float(p[2]), 4)]
+            a = prev.get(i, [pt[0], round(pt[1] + 0.01, 4), pt[2]])
+            v[2] = 0
+            v[9:12] = pt
+            v[40:43] = a
+            out.append((f, 'hitbox', v))
+            prev[i] = pt
+    out += [(f, k, v) for f, k, v in ev if k not in ('hitbox', 'remove')]
+    out.sort(key=lambda x: x[0])
+    return out
+
+
 def sword_point(x, y, z):
     """Hero's Sword1-frame offset on Kirby's LHaveN. Fix v7: the game draws the held item turned -90 about the
     joint's Z (kirby_hero_sword_anim.ITEM_TO_HAVE, measured on the user's clip), and LHaveN is solved so the item is
@@ -209,6 +265,8 @@ def events(ref):
                     else:
                         raise SystemExit('unhandled %s' % name)
             ev.sort(key=lambda x: x[0])         # stable: game, effect, sound at the same frame
+            if WORLDS is not None:
+                ev = flatten(ev, WORLDS[n])     # fix v10
             e[sit] = ev
         hb = [f for f, k, _v in e['ground'] if k in ('hitbox', 'remove')]
         e['hitbox'] = (min(hb), max(hb))

@@ -210,9 +210,11 @@ def build(ult, kirby, ref_path=SWM.REF, scale_mode='hero'):
         o = omo.Omo(src.encode())
         o.frames = len(mfs)
         o.nodes = []
-        for name, _par, h, _b in sk:
+        for name, par, h, _b in sk:
             if h in pose:
                 p, q, s = pose[h]
+                if par is None:     # fix v10: the root (TransN) at 0, not SpecialLw1's (0, 9, 0): the game doesn't
+                    p = (0.0, 0.0, 0.0)     # draw it (fix v7), and the hitboxes' bone 0 / joints can't depend on it
                 omo.set_node(o, h, [p] * o.frames, [q] * o.frames, [s] * o.frames)
         omo.set_node(o, have_h, P, Q, S)
         anims[n] = o

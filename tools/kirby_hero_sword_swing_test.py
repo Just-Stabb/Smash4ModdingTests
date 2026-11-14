@@ -15,9 +15,10 @@ sword hitboxes against Hero's blade, and the held sword's update run natively wi
   = the sword model's frame on Hero (Sword1 @ inv(S2H), kirby_copy_sword.sword_to_have) at Ultimate frame mf(g) - 1 (the scripts' FT_MOTION_RATE clock; recomputed here from the
   Ultimate files and the reference scripts, independently of tools/kirby_hero_sword_anim.py's own numbers), the
   position scaled by the path's scale.
-- The hitboxes the MSC makes (tools/kirby_hero_sword_msc.py's events, as kirby.c's generated block): every sword
-  hitbox (bone 0x18) at its frame sits where Hero's sits on his blade (Hero's Sword1 at that frame x the script's
-  offset, the path's scale) and inside the blade's reach; every arm hitbox where Hero's ArmR is.
+- The hitboxes the MSC makes (tools/kirby_hero_sword_msc.py's events, as kirby.c's generated block): fix v10, every
+  one on bone 0 (TransN, held at the origin) every cast frame from its set to Remove_All_Hitboxes, at Hero's blade
+  point that frame as seen from the side (his Sword1 x (X, Y, 0); the arm one at the blade's base, Sword1 X 1.5),
+  depth 0 (Kirby's plane), on the drawn blade's line. (Fix v6-v8: on LHaveN in 3D.)
 - Fix v7, with EFFECT.bin / MTABLE (tools/kirby_hero_sword_acmd.py's output): each slot named BraveSword17-20 in the
   motion.mtable, its effect script's Sword_Glow / Terminate_Sword_Glow at Hero's frames (cast frames), his textures /
   shader, and both trail points on Hero's blade at that frame.
@@ -110,8 +111,10 @@ def main():
                 continue
             vals = {tuple(np.round(np.concatenate([np.array(x, float).ravel() for x in o.sample(node[1], g)]), 3))
                     for g in range(o.frames)}
-            want_v = tuple(np.round(np.concatenate([np.array(x, float).ravel()
-                                                    for x in src.sample(node[1], src.frames - 1)]), 3))
+            smp = [np.array(x, float).ravel() for x in src.sample(node[1], src.frames - 1)]
+            if node[1] == sk[0][2]:
+                smp[0] = np.zeros(3)                # fix v10: the root (TransN) at 0
+            want_v = tuple(np.round(np.concatenate(smp), 3))
             consts.append(vals == {want_v})
         worst = 0.0
         hb_bad, arm_bad = [], []
@@ -123,40 +126,55 @@ def main():
             H[:3, 3] *= scale
             worst = max(worst, float(np.abs(got_m - H)[:3].max()))
             lhw.append(A.fk_lhaven(o, sk, g))                   # the joint (hitboxes are joint-local)
+        # fix v10: every hitbox on bone 0 (TransN, at the origin in these animations) at Hero's blade point that frame
+        # (his Sword1 at Ultimate frame mf(f) - 1 x (X, Y, 0); the arm one at the blade's base), seen from the side:
+        # its depth (X) 0; every cast frame from its set to Remove_All_Hitboxes; on the drawn blade's line (Y / Z)
+        at = SW.timing(ref[(n, 'ground', 'game')])
         for sit in ('ground', 'air'):
+            got = {}
             for f, k, v in ev[n][sit]:
-                if k != 'hitbox' or v[2] != SW.K_SWORD:
-                    continue
+                if k == 'hitbox':
+                    got.setdefault(f, {})[v[0] - SW.ID_SHIFT] = v
+            live, want = {}, {}
+            cmds = {}
+            for mf_, nm, a in ref[(n, sit, 'game')]:
+                cmds.setdefault(at(mf_), []).append((nm, a))
+            for f in range(max(cmds) + 1):
+                for nm, a in cmds.get(f, []):
+                    if nm.endswith('Special_Hitbox') and a['Bone'] in (SW.SWORD_BONE, SW.ARM_BONE):
+                        live[a['ID']] = a
+                    elif nm == 'Remove_All_Hitboxes':
+                        live = {}
+                if live:
+                    want[f] = dict(live)
+            if sorted(got) != sorted(want) or any(sorted(got[f]) != sorted(want[f]) for f in want):
+                hb_bad.append((sit, 'frames / ids', sorted(got), sorted(want)))
+                continue
+            for f, ids in want.items():
                 idx = min(max(mfs[f] - 1.0, 0.0), frames - 1.0)
-                ours = lhw[f] @ np.array([v[9], v[10], v[11], 1.0])
-                hid = v[0] - SW.ID_SHIFT
-                hero_cmd = [a for mf_, nm, a in ref[(n, sit, 'game')] if nm.endswith('Special_Hitbox') and
-                            a['ID'] == hid and SW.timing(ref[(n, 'ground', 'game')])(mf_) == f][0]
                 S1 = np.array(mat_at(w['Sword1'], idx))
-                local = np.linalg.inv(A.ITEM_TO_HAVE) @ np.linalg.inv(lhw[f]) @ ours      # in the item's frame
-                on_axis = (abs(local[0] - SW.SWORD1_TO_HAVE * scale) < 0.05 and abs(local[2]) < 0.05   # Sword1's X axis
-                           and A.BLADE[0] * scale <= local[1] <= A.BLADE[1] * scale)
-                if hero_cmd['Bone'] == SW.SWORD_BONE:
-                    # fix v8: on Hero's blade's axis at his X (his Z -2.5 / -2 / -1.5 put them off the drawn blade)
-                    hero = S1 @ np.array([hero_cmd['X'], hero_cmd['Y'], 0.0, 1.0])
-                    hero = hero * scale                                       # Hero's point, the path's scale
-                    hero[3] = 1.0
-                    if np.abs(ours - hero)[:3].max() > 0.05 or not on_axis:
-                        hb_bad.append((sit, f, hid, np.round(ours[:3], 2).tolist(), np.round(hero[:3], 2).tolist()))
-                else:                                       # fix v8: the arm (bone 0x16): the blade's base
-                    hero = (S1 @ np.array([SW.HILT_X, 0.0, 0.0, 1.0]))[:3] * scale
-                    if np.abs(ours[:3] - hero).max() > 0.05 or not on_axis:
-                        arm_bad.append((sit, f, np.round(ours[:3], 2).tolist(), np.round(hero, 2).tolist()))
+                D = lhw[f] @ A.ITEM_TO_HAVE                     # the drawn item
+                ga = D @ np.array([SW.SWORD1_TO_HAVE * scale, A.BLADE[0] * scale, 0, 1.0])
+                gb = D @ np.array([SW.SWORD1_TO_HAVE * scale, A.BLADE[1] * scale, 0, 1.0])
+                for hid, a in ids.items():
+                    v = got[f][hid]
+                    pt = (a['X'], a['Y'], 0.0) if a['Bone'] == SW.SWORD_BONE else (SW.HILT_X, 0.0, 0.0)
+                    hero = S1 @ np.array(list(pt) + [1.0]) * scale
+                    ours = np.array(v[9:12], float)
+                    q, r_ = ga[1:3], gb[1:3]
+                    t = np.clip(np.dot(ours[1:] - q, r_ - q) / np.dot(r_ - q, r_ - q), 0, 1)
+                    side = np.linalg.norm(ours[1:] - (q + t * (r_ - q)))
+                    if v[2] != 0 or abs(ours[0]) > 1e-4 or np.abs(ours[1:] - hero[1:3]).max() > 0.05 or side > 0.05:
+                        (hb_bad if a['Bone'] == SW.SWORD_BONE else arm_bad).append(
+                            (sit, f, hid, v[2], np.round(ours, 2).tolist(), np.round(hero[:3], 2).tolist()))
         check('%s: %d frames (cast 0-%d); every other bone constant at SpecialLw1\'s last frame (%d of %d)'
               % (names[n], end + 1, end, sum(consts), len(consts)), (o.frames, all(consts)), (end + 1, True))
         check('%s: LHaveN = Hero\'s sword frame (%s, FT_MOTION_RATE clock, scale %.3f) on every frame, within 0.05 (%.4f)'
               % (names[n], A.SPELLS[n], scale, worst), worst < 0.05, True)
-        check('%s: fix v8: every sword hitbox on the drawn blade\'s axis, at Hero\'s X along his blade' % names[n],
-              hb_bad, [])
-        check('%s: fix v8: the arm hitbox on the blade\'s base (Sword1 X %.1f)' % (names[n], SW.HILT_X), arm_bad, [])
-        bone0 = [x for x in ev[n].get('dropped', [])]
-        check('%s: fix v8: Hero\'s bone-0 hitboxes left out (%d)' % (names[n], len(bone0)),
-              [x for sit in ('ground', 'air') for _f, k, x in ev[n][sit] if k == 'hitbox' and x[2] == 0], [])
+        check('%s: fix v10: every sword hitbox on bone 0 at Hero\'s blade point (Y / Z) every frame of its life, depth 0, '
+              'on the drawn blade as seen from the side' % names[n], hb_bad, [])
+        check('%s: fix v10: the arm hitbox the same at the blade\'s base (Sword1 X %.1f)' % (names[n], SW.HILT_X),
+              arm_bad, [])
     # fix v7: the trail scripts (tools/kirby_hero_sword_acmd.py), when the built effect.bin / motion.mtable are given
     if len(sys.argv) > 8:
         import acmd

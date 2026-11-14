@@ -758,6 +758,33 @@ def fix_v9_zoom2u(path, src):
               (all(aimed), round(sx - tx, 3), round(sy + STONE_C - (ty + TARGET_C), 3)), (True, 0.0, 0.0))
 
 
+def v10_expected_hitboxes(SW, n, sit):
+    """fix v10, worked out here from Hero's script and path.json on their own: {cast frame: {(id, bone 0, 0, y, z)}}
+    (each of Hero's sword / arm hitboxes from its frame to Remove_All_Hitboxes, at LHaveN's drawn matrix that frame x
+    its point on the blade: Sword1 (X, Y - 0.2023, 0), the arm (1.5, -0.2023, 0); his bone-0 ones left out)"""
+    import json
+    import numpy as np
+    ref = SW.parse()
+    at = SW.timing(ref[(n, 'ground', 'game')])
+    worlds = [np.array(m) for m in json.load(open(SW.PATH))['spells']['0x%x' % n]['lhaven_world']]
+    live, out = {}, {}
+    cmds = {}
+    for mf, nm, a in ref[(n, sit, 'game')]:
+        cmds.setdefault(at(mf), []).append((nm, a))
+    last = max(cmds)
+    for f in range(last + 1):
+        for nm, a in cmds.get(f, []):
+            if nm.endswith('Special_Hitbox') and a['Bone'] in (0x19, 0x16):
+                pt = (a['X'], a['Y'] - 0.2023, 0.0) if a['Bone'] == 0x19 else (1.5, -0.2023, 0.0)
+                live[a['ID'] + 5] = pt
+            elif nm == 'Remove_All_Hitboxes':
+                live = {}
+        for i, pt in live.items():
+            p = worlds[f] @ np.array(list(pt) + [1.0])
+            out.setdefault(f, set()).add((i, 0, 0.0, round(float(p[1]), 2), round(float(p[2]), 2)))
+    return out
+
+
 def fix_v8_tests(path, src):
     """Hero copy fix v8: the sword spells' hitboxes on the blade, their blade effects out of the MSC (the swing slots'
     effect scripts), Zoom's hitbox refreshed up and down, Zoom 2 U stopping 1 from the target, the copy traits"""
@@ -772,18 +799,20 @@ def fix_v8_tests(path, src):
             r.update()
             g.tag = lambda r=r: kget(r, 'khm_frame') if kget(r, 'khm_state') == 2 else None
             cast(r, n, ev[n]['end'] + 3)
+            want_hb = v10_expected_hitboxes(SW, n, sit)
+            got_hb = {}
             for f, k, v in g.calls:
                 if k == 'hitbox':
                     ids.add(v[0])
                     x, y, z = (R.i2f(w) for w in v[9:12])
-                    if v[2] != SW.K_SWORD or abs(y + 0.2023) > 1e-4 or abs(z) > 1e-4 or not -0.01 <= x <= 12.1:
-                        bad.append((hex(n), sit, f, v[0], v[2], round(x, 3), round(y, 4), round(z, 4)))
-                    if v[0] == 2 + SW.ID_SHIFT and abs(x - SW.HILT_X) > 1e-4:
-                        bad.append(('arm not at the blade\'s base', hex(n), sit, f, x))
+                    got_hb.setdefault(f, set()).add((v[0], v[2], round(x, 2), round(y, 2), round(z, 2)))
                 elif k == 'follow':
                     follows.append((hex(n), sit, f))
                 elif k == 'effect' and v[0] >> 16 == 0x345:
                     hero_bank.append((hex(n), sit, f, hex(v[0]), v[-1]))
+            if got_hb != want_hb:
+                bad.append((hex(n), sit, sorted(set(got_hb) ^ set(want_hb)),
+                            [f for f in want_hb if got_hb.get(f) != want_hb[f]][:3]))
             stop_kills = [v[0] for _f, k, v in g.calls if k == 'kill']
             vis = [(f, tuple(v)) for f, k, v in g.calls if k == 'effvis']
             per_frame = {}
@@ -796,9 +825,9 @@ def fix_v8_tests(path, src):
                 effvis_bad.append((hex(n), sit, spell_frames[:3], spell_frames[-1:], vis[-2:]))
             if any(e[3] == '0x3450049' for e in hero_bank if e[0] == hex(n) and e[1] == sit) and 0x3450049 not in stop_kills:
                 bad.append(('Hatchet Man\'s ground burst not ended by khm_sw_stop', sit))
-    check('fix v8: every sword spell hitbox on LHaveN on the blade\'s axis (Hero\'s Sword1 X along it, Y -0.2023, Z 0, '
-          'X within the blade 0-12.1), the arm one (ID 7) at the blade\'s base X %.1f; no bone-0 hitbox' % SW.HILT_X,
-          bad, [])
+    check('fix v10: every sword spell hitbox on bone 0 (TransN) at the blade\'s drawn place every cast frame from its '
+          'set to its removal (Hero\'s Sword1 X along the blade, the arm one at the base X %.1f; path.json\'s LHaveN '
+          'matrices), its depth on Kirby\'s plane (X 0)' % SW.HILT_X, bad, [])
     check('fix v8: the hitbox IDs made: 5-7 (Hero\'s 0-2; his bone-0 3-4 left out)', sorted(ids), [5, 6, 7])
     check('fix v8: every frame of a sword spell EffectModule(0x26, 0) then (0x1C, 1) (his effects shown though he is '
           'hidden: tools/kirby_hero_sword_fx_vis_test.py), and (0x26, 1) at its end', effvis_bad, [])
