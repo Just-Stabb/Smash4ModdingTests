@@ -77,6 +77,7 @@ def fresh(script=0x5C00, tables=(0x7AB1E0, 0x7AB1E1, 0x7AB1E2, 0x7AB1E3), no_syn
         mu.mem_write(addr, stub(addr, 2, t))
         mu.mem_write(MGR + 0x100 + 4 * i, struct.pack(">I", addr))
     mu.mem_write(BIND, stub(BIND, 3, 0))
+    mu.mem_write(C.AGENT_CLEAR, stub(C.AGENT_CLEAR, 5, 0))
     mu.mem_write(FSYNC, stub(FSYNC, 4, 0))
     mu.mem_write(THIS + 0x1C, struct.pack(">I", 0x47C))                 # pending motion (late update)
     mu.mem_write(THIS + 0x20, struct.pack(">ff", 5.0, 1.0))             # frame, rate
@@ -125,5 +126,24 @@ check("kind -1: own kind (+0x18)", (dbg(mu, 3), struct.unpack(">I", mu.mem_read(
 mu = fresh(script=0)
 pc, log = call(mu, C.BIND_ALL, 0x999, 0xF)
 check("no script: nothing changed", (pc, struct.unpack(">I", mu.mem_read(THIS + 0x1C, 4))[0], mu.mem_read(THIS + 0x2E, 1)[0]), (RET, 0x47C, 0))
+# SILENCE (0x11): the four agents cleared with the game's clear, the late bind cancelled, nothing looked up
+mu = fresh()
+mu.mem_write(THIS + 0x28, struct.pack(">I", 0xF))
+mu.mem_write(THIS + 0x2E, bytes([1]))
+regs = {r: 0x1000 + r for r in range(14, 32)}
+for r, v in regs.items():
+    mu.reg_write(getattr(sys.modules["unicorn.ppc_const"], "UC_PPC_REG_%d" % r), v)
+pc, log = call(mu, C.SILENCE, 0x44B, 8)
+check("silence: returns to the caller", pc, RET)
+check("  clears agents 0-3 (this + 0x50 + 0x38 k), nothing else called", [l[:2] for l in log],
+      [(5, THIS + 0x50 + 0x38 * k) for k in range(4)])
+check("  late bind cancelled: +0x1C -2, +0x28 -1, +0x2E 0",
+      (struct.unpack(">i", mu.mem_read(THIS + 0x1C, 4))[0], struct.unpack(">i", mu.mem_read(THIS + 0x28, 4))[0],
+       mu.mem_read(THIS + 0x2E, 1)[0]), (-2, -1, 0))
+check("  frame / flags untouched", (struct.unpack(">ff", mu.mem_read(THIS + 0x20, 8)), tuple(mu.mem_read(THIS + 0x2C, 2))),
+      ((5.0, 1.0), (0, 0)))
+check("  callee-saved r14-r31 kept", [r for r in range(14, 32) if mu.reg_read(getattr(sys.modules["unicorn.ppc_const"],
+      "UC_PPC_REG_%d" % r)) != 0x1000 + r], [])
+check("  the set kinds untouched", struct.unpack(">IIII", mu.mem_read(THIS + 8, 16)), (0, 0, 0, 0))
 print("FAILS", fails)
 sys.exit(1 if fails else 0)

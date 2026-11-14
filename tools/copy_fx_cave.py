@@ -29,6 +29,15 @@ then binds sets 2-3 to that kind's scripts and syncs them with the frame / "cont
 / +0x1C, so it lasts for this motion only. copy_custom_motion() calls it for a custom slot only,
 after the motion change.
 
+Set SILENCE (0x11, also never used by the game; Kirby's Hero / Sephiroth copies, kirby_hero_copy_fix_v1): no
+script at all for the motion just set: the four agents (sets 0-3: game, expression, sound, effect) are cleared
+with the game's own agent clear 0x02BEE9B8 (what the bind 0x027606C0 does for a motion with no scripts: hash 0),
+and the late update's pending bind is cancelled ([this+0x1C] = -2, [this+0x28] = -1, [this+0x2E] = 0), so the
+motion's own scripts never run. The copies call it after every motion change and every frame of their status (a
+motion change binds sets 0-1 at once; Kirby's Robin copy slots carry Robin's expression scripts (rumble, QUAKE
+screen shake) and sound / effect scripts (0x447: Robin's sound 0x7640028 and an endless spark effect; 0x44A: sound
+0x8B50003)). Set 0x10 rebound only sets 2-3, to another slot's (0x446's) scripts, and left sets 0-1 running.
+
 History: v1 bound sets 1-2 at once (set 1 is expression; the late update rebound 2-3 to Kirby's).
 v2 bound 2-3 at once, synced them and set +0x1C = -2: it worked, but it ran before the MSC's
 frame set, so when the motion restarted mid-move (landing: the copy helpers' ground / air swap
@@ -46,7 +55,11 @@ LIMIT = 0x04B79000
 TRAMP = 0x037EE5F0          # -0x037EE600 (transform_grab_cave.py starts there)
 HOOK = 0x02760CE4           # MotionAnimcmdModule vtable +0x6C: mflr r0
 BIND_ALL = 0x10
+SILENCE = 0x11
 SCRIPT_OF = 0x02E42518
+AGENT_CLEAR = 0x02BEE9B8    # (agent): its script and state cleared (0x027606C0's path for a motion with no scripts)
+AGENTS = 0x50               # agent k (script set k: 0 game, 1 expression, 2 sound, 3 effect) at this + 0x50 + 0x38 k
+AGENT_SIZE = 0x38
 
 SOURCE = """
 copy_fx:                                # r3 this, r4 set, r5 motion, r6 kind (-1 = own)
@@ -57,6 +70,8 @@ copy_fx:                                # r3 this, r4 set, r5 motion, r6 kind (-
         stw r12, 0(r11)
         cmpwi r4, %(BIND_ALL)d
         beq fx_all
+        cmpwi r4, %(SILENCE)d
+        beq fx_none
         mflr r0                         # +0x6C's own instruction
         lis r12, %(BACK_HI)s            # back (too far for b; r12 is free at a function's start)
         addi r12, r12, %(BACK_LO)s
@@ -99,6 +114,34 @@ fx_done:
         mtlr r0
         addi r1, r1, 0x30
         blr
+fx_none:                                # SILENCE: the four agents cleared, no late bind (r3 this)
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r31, 0x1C(r1)
+        stw r30, 0x18(r1)
+        mr r31, r3
+        li r30, 0
+fx_n_loop:
+        mulli r3, r30, %(AGENT_SIZE)d
+        addi r3, r3, %(AGENTS)d
+        add r3, r3, r31
+        bl %(AGENT_CLEAR)s
+        addi r30, r30, 1
+        cmpwi r30, 4
+        blt fx_n_loop
+        li r0, -2
+        stw r0, 0x1C(r31)               # no pending late bind (the late update skips -2)
+        li r0, -1
+        stw r0, 0x28(r31)               # no override kind
+        li r0, 0
+        stb r0, 0x2E(r31)
+        lwz r30, 0x18(r1)
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
 dbg:                                    # debug words (docs/native-notes.md): +0x6C calls, bind-all
         .word 0                         # calls, last motion, last kind, last script
         .word 0
@@ -111,7 +154,9 @@ dbg:                                    # debug words (docs/native-notes.md): +0
 def assemble():
     a = Asm(CAVE)
     back = HOOK + 4
-    a.asm(SOURCE % dict(BIND_ALL=BIND_ALL, BACK_HI=hex(ha(back)), BACK_LO=hex(lo(back)), SCRIPT_OF="0x%08X" % SCRIPT_OF))
+    a.asm(SOURCE % dict(BIND_ALL=BIND_ALL, SILENCE=SILENCE, BACK_HI=hex(ha(back)), BACK_LO=hex(lo(back)),
+                        SCRIPT_OF="0x%08X" % SCRIPT_OF, AGENT_CLEAR="0x%08X" % AGENT_CLEAR, AGENTS=AGENTS,
+                        AGENT_SIZE=AGENT_SIZE))
     words = a.words()
     assert CAVE + 4 * len(words) <= LIMIT, "copy fx cave too big: %d words" % len(words)
     return a, words
