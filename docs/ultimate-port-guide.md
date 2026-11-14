@@ -164,6 +164,7 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | Smash 4 common effects standing in for Ultimate's | Squirtle (all), Hero's up air (fix 63-70) | plan converts `sys_*` from ef_common.eff [E3] |
 | washed out / dark / purple effects | Hero fixes 21-52 | converter (own pixel programs, linear -> display, no HDR purple) |
 | base native code playing its effects on copied articles | Hero (Robin's Thunder orb) | `reference/port_bases.json` traps; per base cave (thunder_orb_cave.py) |
+| a Kirby copy played on another copy's motion slots runs that copy's expression / sound / effect scripts (rumble, QUAKE, sparks, its sounds) | Kirby's Hero / Sephiroth copies (Robin's slots), fix v1 | copy_fx_cave.py SILENCE (all four sets) every frame; `kirby_newcopy_test.py` |
 | the base's landing hit left on a move Ultimate has no script for | Squirtle's down air | translator `EMPTY_IF_ABSENT` [S7] |
 | the base's scripts the port keeps (ledge quick options, sleep) with Smash 4's common effects | Squirtle | translator `common_to_own` [E3] |
 | variants inserted before the common effects: their ids moved under the translated scripts | Squirtle v6 build | `--variants-last` |

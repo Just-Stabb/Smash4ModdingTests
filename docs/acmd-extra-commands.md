@@ -663,7 +663,9 @@ with a name of your own. The name then works in every variable parameter of ever
   `INC_INT`, `Int_Var_Compare`, MSC's `WorkModule` int ops) read it cut to a whole number and write a whole number,
   the float ones read and write the float. (`VAR_n` stays float-only.) Whole numbers are exact up to 16,777,216.
 - **MSC:** `WorkModuleF(0, 0x0F000380 + slot)` reads one, `WorkModule(6, 0x0F000380 + slot)` as an int;
-  `WorkModule(0 / 7, value, ID)` write it. Give the variable a fixed `Slot` for this.
+  `WorkModule(0 / 7, value, ID)` write it. Give the variable a fixed `Slot` for this. MSC needs no `New_Var`: an
+  undeclared slot reads 0 until written and keeps what is written (Kirby's Hero copy keeps its state in slots
+  0x39B-0x3BF this way); `New_Var` only sets the starting value and the int type.
 - **IDs:** `0x0F000380`–`0x0F0003BF`. `0x0F0003C0`–`0x0F0003C8` are the stick angles and rotation (exe_v43, "Variables in Extra hitboxes"); `0x0F0003C9`–`0x0F0003FF` still read 0.
 
 ### Names in Sm4shCommand

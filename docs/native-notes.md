@@ -1260,6 +1260,14 @@ stores the kind. So the copy helpers' `(0, 0, motion, kind)` ran the copied figh
 the custom's, with `copy_custom_motion()`), but the experimental `(0, 1, custom, kind)` did nothing
 to effects / sounds (user: still Kirby's).
 
+**Set `0x11` (SILENCE, exe_v45g / exe_v46e, Kirby's Hero copy fix v1):** `copy_fx_cave.py` clears the four agents
+(`this + 0x50 + 0x38 k`, k = 0 game, 1 expression, 2 sound, 3 effect) with the game's agent clear `0x02BEE9B8` (what
+`0x027606C0` does for a motion whose mtable hash is 0) and cancels the late bind (`+0x1C` = -2: the late update
+`0x02760E48` skips it; `+0x28` = -1, `+0x2E` = 0), so the motion just set runs no script. An agent bound to a hash its
+set's table doesn't hold is cleared too (`0x02BEE404` leaves `+4` = 0), which is why set `0x10` with Kirby's slot
+`0x446` (no scripts) silenced sound / effect only: sets 0-1 are bound by the motion change itself. Tested with the
+game's code: `tools/kirby_hero_copy_fix_test.py`.
+
 `tools/copy_fx_cave.py` (cave `0x04B78E80`, trampoline `0x037EE5F0`, hook = `+0x6C`'s first
 instruction) adds set `0x10`: bind sets 1 and 2 (effect, sound) to `kind`'s scripts for `motion`,
 exactly as above, and store the kind for them. `copy_custom_motion()` calls it for customs only
@@ -1270,7 +1278,7 @@ bone ID Kirby doesn't have may sit somewhere else.
 **First test: still Kirby's effects / sounds.** (Notes from then: the motion change `0x027608B0`
 (vtable `+0x4C`) binds only sets 0–1, and the frame set (MSC op 1, `0x02760EB0`) syncs only sets
 0–1; agents `+0x130` on are a second group, `0x027605C0`.) The cave now has debug words at `dbg`
-(`0x04B78F90`, tested in `tools/copy_fx_test.py`): `+0x00` every `+0x6C` call, `+0x04` bind-all
+(`0x04B78F90`; `0x04B78FA8` since exe_v45g / v46e, tested in `tools/copy_fx_test.py`): `+0x00` every `+0x6C` call, `+0x04` bind-all
 calls, `+0x08` last motion, `+0x0C` last kind, `+0x10` the motion's script (0 = the kind has none),
 `+0x14` / `+0x18` the set 1 / set 2 tables (0 = none). Breakpoint for the bind-all path:
 `0x04B78EB0`.
@@ -1633,6 +1641,11 @@ First in exe_v39; working from exe_v41 (below).
   ASCII in 6 words): sets the int bit to Type == 1, then, with Scope 1 or the declared bit clear, sets the declared
   bit and stores Initial (truncated for an int). Not executed: only steps. A non-New_Var ID or a bad accessor /
   WorkModule: nothing.
+- **The declared / int masks gate only the command:** `ue_nv` (every read and write of a slot, float or through
+  `nvi_*`) never tests the declared bit; the int bit only truncates float writes. So a slot no New_Var declared
+  works from MSC as from ACMD: reads 0 until written, keeps what is written (checked with the game's own MSC
+  WorkModule handler `0x0200E898` ops 7 / 6 / 0 and get_float on Kirby's 37 `khm_*` slots:
+  `tools/kirby_hero_copy_fix_test.py`, Kirby's Hero copy fix v1).
 
 ## Gravity_Set (a fighter's gravity, exe_v42)
 

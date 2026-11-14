@@ -74334,9 +74334,10 @@ void rolloff_hold_update()
 //   fired by the charge at 120; released from 20 -> SpecialN1 / N2 firing at 13; shield cancels (20-99); the mod's
 //   own changes kept: up / down 45 degrees (the stick as it fires), the roll out of the charge (ground, 20-99) and
 //   the buffered roll 6 frames after the fire. Cancel frames 172 / 56 / 70 / 8 (Kirby's motion_list).
-// Motions: the Robin copy slots (ground / air + 7), straight through MotionModule; Kirby's own effect / sound scripts
-// for those slots (Robin's charge effect and sounds) are rebound to slot 0x446's (none) with set 0x10
-// (tools/copy_fx_cave.py), and no Robin game script is bound. The effects are Ultimate's Kirby copy effect scripts
+// Motions: the Robin copy slots (ground / air + 7), straight through MotionModule; none of Kirby's own scripts for
+// those slots (Robin's copy: expression rumble / QUAKE, sound 0x7640028 / 0x8B50003, a spark effect) runs: every
+// script set is cleared after each motion change and every frame (copy_fx_cave.py SILENCE, Hero copy fix v1; before
+// it, set 0x10 rebound only sound / effect to slot 0x446's and the expression scripts ran). The effects are Ultimate's Kirby copy effect scripts
 // (lua2cpp_kirby, read with tools/recomp_acmd.py: reference/kirby_copy_ultimate_acmd.txt), on Kirby's bones
 // (Ultimate's arml / havel / handl / throw / head / toel / toer = LArmJ 0xF / LHaveN 0x18 / LHandN 0x10 / ThrowN
 // 0x19 / HeadN 0x16 / LToeN 0x6 / RToeN 0xA; the two skeletons' binds are the same), ids from
@@ -74353,6 +74354,7 @@ float ncp_mp;        // Hero copy: Kirby's own MP (0-100)
 int   ncp_mp_timer;  // frames to the next MP point back
 int   ncp_last;      // last frame's marker (a new Hero copy fills the MP)
 int   ncp_snd;       // v5: the Hero copy's sounds played (bits)
+int   ncp_guess;     // fix v1: the copy the match's fighters say a marker-less Robin copy is (2 Hero, 3 Sephiroth, 0)
 
 int newcopy_marker()
 {
@@ -74368,6 +74370,40 @@ int newcopy_marker()
     {
         return 0x3;
     }
+    if (WorkModule(0x6, 0x100000a0) == 0)
+    {
+        return ncp_guess;   // fix v1: no marker (see newcopy_guess)
+    }
+    return 0;
+}
+
+// fix v1: a Robin copy without the marker (copy_grant writes it; a Kirby who had the Hero / Sephiroth copy swallowed
+// by another Kirby passes on only the Robin copy, and the in-game report had a Hero copy act as Robin's) in a match
+// with no Robin is the Hero copy when a Hero is in the match and no Sephiroth, Sephiroth's when he is and no Hero.
+// The fighters' kinds from the position variables (player slots 1-8: 0x0F0000A0 + 8 x (3 + s) + 5, -1 none).
+// Once a frame (newcopy_update).
+int newcopy_guess()
+{
+    int s;
+    int k;
+    int robin;
+    int hero;
+    int seph;
+    robin = 0;
+    hero = 0;
+    seph = 0;
+    s = 0;
+    while (s < 0x8)
+    {
+        k = (int)WorkModuleF(0, 0x0f0000bd + 0x8 * s);
+        if (k == 0x2c) { robin = 0x1; }
+        if (k == 0x45) { hero = 0x1; }
+        if (k == 0x42) { seph = 0x1; }
+        s += 1;
+    }
+    if (robin) { return 0; }
+    if (hero && seph == 0) { return 0x2; }
+    if (seph && hero == 0) { return 0x3; }
     return 0;
 }
 
@@ -74376,6 +74412,10 @@ int newcopy_real_kind()
 {
     int m;
     m = WorkModule(0x6, 0x100000a0);
+    if (m == 0 && WorkModule(0x6, 0x100000a4) == 0x2c)
+    {
+        m = ncp_guess;      // fix v1
+    }
     if (m == 0x1 && WorkModule(0x6, 0x100000a4) == 0x3)
     {
         return 0x41;
@@ -74398,6 +74438,11 @@ int newcopy_hero() { return newcopy_marker() == 0x2; }
 void newcopy_update()
 {
     int m;
+    ncp_guess = 0;
+    if (WorkModule(0x6, 0x100000a4) == 0x2c && WorkModule(0x6, 0x100000a0) == 0)
+    {
+        ncp_guess = newcopy_guess();
+    }
     m = newcopy_marker();
     if (m == 0x2 && ncp_last != 0x2)
     {
@@ -74520,9 +74565,14 @@ float ncp_end_frame()
     return 224.0f;
 }
 
+// Hero copy fix v1: no script at all for the Robin copy slot just set: game, expression, sound and effect
+// (copy_fx_cave.py SILENCE, exe_v45g / exe_v46e). Before, set 0x10 rebound only sound / effect, to slot 0x446's
+// (empty in Kirby's files), and left Robin's expression scripts running (0x447 / 0x44B rumble loops, 0x44B's QUAKE
+// screen shake, 0x448 / 0x44C rumble); with the copies' MSC run every frame, as a motion change binds the game /
+// expression sets at once.
 void ncp_silence()
 {
-    MotionAnimcmdModule(0, 0x10, 0x446, 0x8); // Kirby's slot 0x446: no effect / sound script (copy_fx_cave.py)
+    MotionAnimcmdModule(0, 0x11, 0, 0x8);
 }
 
 void ncp_kinetic()
@@ -74702,11 +74752,27 @@ int ncp_hero_fire_frame()
 // n04 when it's full (Kafrizz: the mod's 81 frames; Ultimate's script plays it at the hold's 97), N1 n02 at 8, N2 n03
 // at 11, N3 n07 at 1 and n05 at 17 (stopping n04). Kirby's copy voices (vc_kirby_copy_brave_01 ...) aren't in his
 // Smash 4 banks: left out.
+// Hero copy fix v1: Kirby's Ultimate copy voices (vc_kirby_copy_brave_01-04 / vc_kirby_copy_edge_01-04) and
+// Sephiroth's charge / Flare sounds, added to Kirby's own banks by tools/kirby_copy_sound.py (the package's
+// snd_vc_Kirby / snd_se_Kirby and soundlabeltable: Kirby's voice row 63 and se row 10 grown; his own ids unchanged)
+// the fire voice's frame (Kirby's Ultimate copy sound scripts: with n02 at 8, n03 at 11, n05 at 17)
+int ncp_hero_voice_frame()
+{
+    if (ncp_level == 0x2) { return 17; }
+    if (ncp_level == 0x1) { return 11; }
+    return 8;
+}
+
+int ncp_vc_brave(int n) { return 0x3f002e + n; }     // vc_kirby_copy_brave_0n: 0x3F002F-0x3F0032
+int ncp_vc_edge(int n) { return 0x3f0032 + n; }      // vc_kirby_copy_edge_0n: 0x3F0033-0x3F0036
+int ncp_se_edge(int n) { return 0xa00d4 + n; }       // 1 special_n01, 2 n02_01, 3 n03_01, 4 n04_01: 0xA00D5-0xA00D8
+
 void ncp_hero_sounds(float f)
 {
     if (ncp_state == 0x1 && (ncp_snd & 0x1) == 0 && f >= 2.0f)
     {
         SoundModule(0x2710, 0x76400aa);
+        SoundModule(0x2710, ncp_vc_brave(1));   // fix v1: vc_kirby_copy_brave_01 (PLAY_STATUS at the hold's 2)
         ncp_snd = ncp_snd | 0x1;
     }
     if (ncp_state == 0x1 && (ncp_snd & 0x2) == 0 && ncp_hold >= 81)
@@ -74717,7 +74783,13 @@ void ncp_hero_sounds(float f)
     if (ncp_state >= 0x2 && (ncp_snd & 0x4) == 0)
     {
         SoundModule(0x2714, 0x76400aa);
+        SoundModule(0x2714, ncp_vc_brave(1));   // the hold's voice ends with it (Ultimate: its status's)
         ncp_snd = ncp_snd | 0x4;
+    }
+    if (ncp_state == 0x2 && (ncp_snd & 0x20) == 0 && f >= (float)ncp_hero_voice_frame())
+    {
+        SoundModule(0x2710, ncp_vc_brave(0x2 + ncp_level));  // fix v1: _02 Frizz at 8, _03 Frizzle 11, _04 Kafrizz 17
+        ncp_snd = ncp_snd | 0x20;
     }
     if (ncp_state == 0x2 && (ncp_snd & 0x8) == 0)
     {
@@ -74951,6 +75023,53 @@ int ncp_seph_roll_after()
     return 0;
 }
 
+// fix v1: Kirby's Ultimate Sephiroth-copy sound script (reference/kirby_copy_ultimate_acmd.txt): the charge
+// se_edge_special_n01 at 1 (PLAY_STATUS: stopped by the fire, the cancel or the status's end) and
+// vc_kirby_copy_edge_01 at 2, Gigaflare's n04_01 and vc_kirby_copy_edge_04 at 119; Flare n02_01 at 2 and _02 at 12,
+// Megaflare n03_01 at 2 and _03 at 12 (frames of the fire's motion)
+void ncp_seph_sounds(float f)
+{
+    if (ncp_state == 0)
+    {
+        if ((ncp_snd & 0x100) == 0 && f >= 1.0f)
+        {
+            SoundModule(0x2710, ncp_se_edge(1));
+            ncp_snd = ncp_snd | 0x100;
+        }
+        if ((ncp_snd & 0x200) == 0 && f >= 2.0f)
+        {
+            SoundModule(0x2710, ncp_vc_edge(1));
+            ncp_snd = ncp_snd | 0x200;
+        }
+        if ((ncp_snd & 0x400) == 0 && f >= 119.0f)
+        {
+            SoundModule(0x2710, ncp_vc_edge(4));
+            SoundModule(0x2710, ncp_se_edge(4));
+            ncp_snd = ncp_snd | 0x400;
+        }
+        return;
+    }
+    if ((ncp_snd & 0x800) == 0)
+    {
+        SoundModule(0x2714, ncp_se_edge(1));
+        ncp_snd = ncp_snd | 0x800;
+    }
+    if (ncp_state != 0x2)
+    {
+        return;
+    }
+    if ((ncp_snd & 0x1000) == 0 && f >= 2.0f)
+    {
+        SoundModule(0x2710, ncp_se_edge(0x2 + ncp_level));
+        ncp_snd = ncp_snd | 0x1000;
+    }
+    if ((ncp_snd & 0x2000) == 0 && f >= 12.0f)
+    {
+        SoundModule(0x2710, ncp_vc_edge(0x2 + ncp_level));
+        ncp_snd = ncp_snd | 0x2000;
+    }
+}
+
 int ncp_seph_loop(float f)
 {
     if (ncp_seph_roll_after())
@@ -75037,8 +75156,8 @@ void ncp_loop()
         ncp_kinetic();
         m = ncp_motion();
         MotionModule(0x3, m);
-        ncp_silence();
     }
+    ncp_silence();      // every frame (fix v1)
     f = MotionModuleF(0x1);
     if (newcopy_hero())
     {
@@ -75047,6 +75166,7 @@ void ncp_loop()
     }
     else
     {
+        ncp_seph_sounds(f);     // fix v1
         if (ncp_seph_loop(f))
         {
             return;
@@ -75113,6 +75233,11 @@ void newcopy_n_end()
     if (newcopy_marker() == 0x2)
     {
         SoundModule(0x2714, 0x76400aa); // the hold's charge sound (PLAY_STATUS: ends with the status)
+        SoundModule(0x2714, ncp_vc_brave(1));
+    }
+    if (newcopy_marker() == 0x3)
+    {
+        SoundModule(0x2714, ncp_se_edge(1)); // fix v1: Sephiroth's charge sound (PLAY_STATUS)
     }
 }
 
@@ -75230,9 +75355,17 @@ int khm_cost(int n)
     return 0;
 }
 
+// fix v1: 1 with the sword spells (v6: exe_v46*'s held sword, the bravesword models); the A package (exe_v45g, no
+// sword) is built with 0 (tools/kirby_hero_copy_build.sh): the four sword spells never drawn, as before v6
+int khm_sword_on() { return 0x1; }
+
 // Hero's draw weights (brave_lw_weight); 0: not in this version
 int khm_weight(int n)
 {
+    if (n >= 0x11 && n <= 0x14 && khm_sword_on() == 0)
+    {
+        return 0;
+    }
     if (n == 0x1) { return 0x7; }
     if (n == 0x2 || n == 0x4 || n == 0xb || n == 0xc || n == 0x15) { return 0x10; }
     if (n == 0x3 || n == 0x5) { return 0x14; }
@@ -75998,6 +76131,10 @@ void khm_zoom(int f)
 // Zoom 2 U: not in this version) and Hocus Pocus itself weigh 0
 int khm_hp_weight(int o)
 {
+    if (o >= 0x9 + 0x11 && o <= 0x9 + 0x14 && khm_sword_on() == 0)
+    {
+        return 0;           // fix v1: no sword spells in the A build
+    }
     if (o == 0) { return 0x1e8; }               // giant 488
     if (o == 0x1) { return 0x7a; }              // Starman 122
     if (o == 0x2) { return 0x18c; }             // full MP 396

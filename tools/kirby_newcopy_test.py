@@ -14,6 +14,16 @@ the cancel slot 0x447), then the stored charge casts at once the level he pays f
 misfire, 0x447); Sephiroth Megaflare (released at 40: slot 0x44A, the fire (article 7) at 13 with 0x10000049 =
 1 + 4 x up = 5) and Gigaflare (held: fired by the charge at 120, level 2), in the air (slots + 7); the Robin copy
 without the marker still goes to Robin's code.
+
+Hero copy fix v1: the WorkModule model is the game's (tools/acmd_ext_cave.py nv_code, run in unicorn by
+tools/kirby_hero_copy_fix_test.py and tools/new_var_test.py): category-F ids 0x300-0x3BF (VAR_n, timers, New_Var
+slots 0x380 + k) are one float per id and object, read 0 until written, kept whether or not a New_Var declared them;
+an int op reads the float cut toward 0 and writes the int as a float; 0x3C0-0x3FF read 0 and drop writes (any top
+nibble). Before, the stub kept ints and floats in two maps, so an int write read back as a float stayed 0 and a
+0x3C0+ write was kept. Also: the silence (MotionAnimcmdModule(0, 0x11, 0, 8), copy_fx_cave.py SILENCE) after every
+motion change and every frame of the copy statuses; Kirby's copy voices and Sephiroth's sounds (tools/
+kirby_copy_sound.py ids); the marker-less Robin copy's guess from the match's fighters; the A build (no sword
+spells).
 """
 import os
 import re
@@ -48,18 +58,50 @@ class Game:
         self.calls, self.removed, self.slow = [], [], []       # v6
         self.hit_now = False
         self.tag = lambda: None
+        self.animcmd = []                                      # fix v1: MotionAnimcmdModule(0, set, motion, kind)
+        self.nv = {}                                           # category-F user variables / New_Var slots (floats)
+
+    @staticmethod
+    def user(ident):
+        """the cave's user-variable index for a category-F id 0x300-0x3FF (any top nibble), else None"""
+        if (ident >> 24) & 0xF == 0xF and 0x300 <= ident & 0xFFFFFF < 0x400:
+            return ident & 0xFFFFFF
+        return None
+
+    def nv_get(self, ident):
+        i = self.user(ident)
+        return self.nv.get(i, 0.0) if i < 0x3C0 else 0.0
+
+    def nv_set(self, ident, v):
+        i = self.user(ident)
+        if i < 0x3C0:
+            self.nv[i] = float(v)
 
     def sys(self, sid, a):
         f = R.i2f
         if sid == 0x17 and len(a) == 2 and a[0] == 0:          # WorkModuleF(0, var): position variables
+            if self.user(a[1]) is not None:
+                return R.f2i(self.nv_get(a[1]))
             return R.f2i(self.fvars.get(a[1], 0.0))
+        if sid == 0x4B and a and a[0] == 0 and len(a) == 4:    # fix v1: MotionAnimcmdModule(0, set, motion, kind)
+            self.animcmd.append((len(self.motions), a[1], a[2], a[3]))
+            return 0
         if sid == 0x16:                                         # WorkModule
             if a[0] == 0 and len(a) == 3:                       # WorkModule(0, value, var): set a float variable
+                if self.user(a[2]) is not None:
+                    self.nv_set(a[2], R.i2f(a[1]))
+                    return 0
                 self.fvars[a[2]] = R.i2f(a[1])
                 return 0
             if a[0] == 0x6:
+                if self.user(a[1]) is not None:                 # the cave: the float cut toward 0
+                    return int(self.nv_get(a[1])) & 0xFFFFFFFF
                 return self.ints.get(a[1], 0)
             if a[0] == 0x7:
+                if self.user(a[2]) is not None:
+                    v = a[1] - (1 << 32) if a[1] & 0x80000000 else a[1]
+                    self.nv_set(a[2], v)
+                    return 0
                 self.ints[a[2]] = a[1]
                 return 0
             if a[0] == 0x10:
@@ -145,20 +187,19 @@ def slot_table(src):
 
 
 def kget(r, name):
-    """a khm_* value: its New_Var slot (WorkModule int / float), or its global in an older build"""
+    """a khm_* value: its New_Var slot (the cave's float, read as the MSC's op reads it), or its global in an older
+    build"""
     if name in r.slots:
         t, i = r.slots[name]
-        return r.game.fvars.get(i, 0.0) if t == 'float' else r.game.ints.get(i, 0)
+        v = r.game.nv_get(i)
+        return v if t == 'float' else int(v) & 0xFFFFFFFF
     return r.vm.g.get(r.gi[name], 0)
 
 
 def kset(r, name, v):
     if name in r.slots:
         t, i = r.slots[name]
-        if t == 'float':
-            r.game.fvars[i] = v
-        else:
-            r.game.ints[i] = v
+        r.game.nv_set(i, v if t == 'float' else (v - (1 << 32) if v & 0x80000000 else v))
     else:
         r.vm.g[r.gi[name]] = v
 
@@ -422,10 +463,11 @@ def v6_tests(path, src):
             check('%s: its MP (brave_cost)' % names[n], mp0 - r.gf('ncp_mp'), {0x11: 12, 0x12: 11, 0x13: 6, 0x14: 15}[n])
     # the menu's weights, Hocus Pocus's
     r = Run(path, src, 2)
-    check('weights (brave_lw_weight): 0x12 / 0x12 / 0x7 / 0x12',
-          [r.vm.call(r.fn['khm_weight'], (n,)) for n in (0x11, 0x12, 0x13, 0x14)], [0x12, 0x12, 0x7, 0x12])
-    check('Hocus Pocus: the sword spells 244 each (Ultimate\'s), Zoom 2 U still 0',
-          [r.vm.call(r.fn['khm_hp_weight'], (o + 9,)) for o in (0x11, 0x12, 0x13, 0x14, 0x17)], [244] * 4 + [0])
+    if not re.search(r'^int khm_sword_on\(\) \{ return 0; \}', open(src).read(), re.M):   # the B build (fix v1)
+        check('weights (brave_lw_weight): 0x12 / 0x12 / 0x7 / 0x12',
+              [r.vm.call(r.fn['khm_weight'], (n,)) for n in (0x11, 0x12, 0x13, 0x14)], [0x12, 0x12, 0x7, 0x12])
+        check('Hocus Pocus: the sword spells 244 each (Ultimate\'s), Zoom 2 U still 0',
+              [r.vm.call(r.fn['khm_hp_weight'], (o + 9,)) for o in (0x11, 0x12, 0x13, 0x14, 0x17)], [244] * 4 + [0])
     # Hatchet Man: always critical, the show on the hit; special doesn't end the stone before the cancel frame
     r = Run(path, src, 2)
     g = r.game
@@ -479,6 +521,31 @@ def v6_tests(path, src):
           (g.removed[-5:], (0x2714, 0x76400E2) in g.sounds, g.ints.get(0x1000008B)), ([5, 6, 7, 8, 9], True, 0))
 
 
+def fix_v1_tests(path, src):
+    """Hero copy fix v1: the marker-less Robin copy's guess; the A build's sword spells"""
+    def marker(m, kinds):
+        r = Run(path, src, m)
+        for s_, k in enumerate(kinds):
+            r.game.fvars[0x0F0000BD + 8 * s_] = float(k)
+        for s_ in range(len(kinds), 8):
+            r.game.fvars[0x0F0000BD + 8 * s_] = -1.0
+        r.update()
+        return r.vm.call(r.fn['newcopy_marker']), r.vm.call(r.fn['newcopy_real_kind'])
+    check('guess: no marker, Kirby vs Hero: the Hero copy (and its kind 0x45)', marker(0, [8, 0x45]), (2, 0x45))
+    check('guess: no marker, Kirby vs Sephiroth: Sephiroth\'s', marker(0, [8, 0x42]), (3, 0x42))
+    check('guess: no marker with a Robin in the match: Robin\'s', marker(0, [8, 0x45, 0x2C]), (0, 0x2C))
+    check('guess: no marker with both Hero and Sephiroth: Robin\'s', marker(0, [8, 0x45, 0x42]), (0, 0x2C))
+    check('guess: the marker wins (Sephiroth\'s marker, a Hero in the match)', marker(3, [8, 0x45]), (3, 0x42))
+    check('guess: Supamario\'s marker 1 isn\'t touched', marker(1, [8, 0x45])[0], 0)
+    sword = 0 if re.search(r'^int khm_sword_on\(\) \{ return 0; \}', open(src).read(), re.M) else 1
+    r = Run(path, src, 2)
+    got = [r.vm.call(r.fn['khm_weight'], [n]) for n in (0x11, 0x12, 0x13, 0x14)] + \
+        [r.vm.call(r.fn['khm_hp_weight'], [0x9 + n]) for n in (0x11, 0x12, 0x13, 0x14)]
+    check('sword spells %s (khm_sword_on %d: the %s build)' % ('drawn' if sword else 'never drawn', sword,
+                                                              'B' if sword else 'A'),
+          got, [0x12, 0x12, 0x7, 0x12, 0xf4, 0xf4, 0xf4, 0xf4] if sword else [0] * 8)
+
+
 def main():
     path = sys.argv[1]
     src = sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, '..', 'fighters', 'kirby', 'kirby.c')
@@ -504,8 +571,17 @@ def main():
     check('Hero sounds: the charge n01 (0x76400AA), stopped at the fire, Frizzle\'s n03 (0x76400AD) at 11',
           [x for x in r.game.sounds if x[1] in (0x76400AA, 0x76400AD)],
           [(0x2710, 0x76400AA), (0x2714, 0x76400AA), (0x2710, 0x76400AD)])
+    check('fix v1: Hero voices: vc_kirby_copy_brave_01 (0x3F002F) at the hold, stopped at the fire, _03 (0x3F0031) '
+          'with Frizzle', [x for x in r.game.sounds if x[1] >> 16 == 0x3F], [(0x2710, 0x3F002F), (0x2714, 0x3F002F),
+                                                                           (0x2710, 0x3F0031)])
+    check('fix v1: every animcmd call is the silence (set 0x11, kind 8): none of Robin\'s scripts',
+          sorted(set(x[1:] for x in r.game.animcmd)), [(0x11, 0, 8)])
+    check('fix v1: silenced after every motion change (the change\'s own frame)',
+          all(any(c[0] >= k + 1 for c in r.game.animcmd) for k in range(len(r.game.motions))), True)
+    n0 = len(r.game.animcmd)
     for _ in range(60):
         r.step()
+    check('fix v1: silenced every frame of the status', len(r.game.animcmd) - n0 >= 60, True)
     check('Hero: wait (status 0) at the end', r.game.statuses[-1:], [0])
     # Hero: 10 MP, charge to Kafrizz (stored), then the stored charge casts what he pays for
     r = Run(path, src, 2)
@@ -544,6 +620,11 @@ def main():
     check('Sephiroth: the fire (article 7) at 13, 0x10000049 = level 1 + 4 x up', [(a[0], a[1], a[4]) for a in r.game.articles],
           [(7, 13.0, 5)])
     check('Sephiroth: 0x10000049 put back', r.game.ints[0x10000049], 9)
+    check('fix v1: Sephiroth sounds: the charge n01 (0xA00D5) at 1 and vc_kirby_copy_edge_01 (0x3F0033) at 2, n01 '
+          'stopped at the fire, Megaflare n03_01 (0xA00D7) at 2 and edge_03 (0x3F0035) at 12',
+          [x for x in r.game.sounds if x[1] >> 16 in (0xA, 0x3F)],
+          [(0x2710, 0xA00D5), (0x2710, 0x3F0033), (0x2714, 0xA00D5), (0x2710, 0xA00D7), (0x2710, 0x3F0035)])
+    check('fix v1: Sephiroth silenced too', sorted(set(x[1:] for x in r.game.animcmd)), [(0x11, 0, 8)])
     # Sephiroth: Gigaflare in the air
     r = Run(path, src, 3, situation=2)
     r.update()
@@ -553,6 +634,12 @@ def main():
         r.step(held=[1])
     check('Sephiroth: Gigaflare made by the charge at 120 (level 2)', [(a[0], a[1], a[4]) for a in r.game.articles],
           [(7, 120.0, 2)])
+    check('fix v1: Gigaflare: n04_01 (0xA00D8) and vc_kirby_copy_edge_04 (0x3F0036) at 119',
+          [x for x in r.game.sounds if x[1] in (0xA00D8, 0x3F0036)], [(0x2710, 0x3F0036), (0x2710, 0xA00D8)])
+    r.vm.g[r.gi['global4']] = 0
+    r.vm.call(r.fn['newcopy_n_end'])
+    check('fix v1: the status\'s end stops the charge sound', r.game.sounds[-1:], [(0x2714, 0xA00D5)])
+    fix_v1_tests(path, src)
     menu_tests(path, src)
     if 'khm_sword' in names(src)[0]:
         v6_tests(path, src)

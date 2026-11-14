@@ -1806,3 +1806,78 @@ User: "make Sephiroth's hair swing like in Ultimate." Only `model/edgecap/c00-c0
 - The physics words are Zero Suit Samus's, not a conversion of Ultimate's swing params (whose units don't map).
 - Ultimate's keyframed hair in the neutral special: physics runs there instead.
 - No collision with the body; the limits keep the hair off it, as in Ultimate.
+
+### Hero copy fix v1 (`kirby_hero_copy_fix_v1`): exe_v45g / exe_v46e, the copy slots' scripts, copy voices / sounds
+
+User (crash fix v5 A: exe_v45f + crash fix v2's MSC), Kirby's Hero copy: (1) most of Robin's sounds and effects play,
+and Robin's neutral-special expression script too; (2) only Frizz comes out, the other charge levels lock Kirby out
+of the move; (3) no MP gauge; (4) the Stone doesn't open Command Selection. Sephiroth's copy: no Kirby voice, no
+Sephiroth sounds (none were played: not converted yet).
+
+**Not the cause: New_Var slots without a declaration.** The hypothesis was that the cave keeps values only for slots a
+New_Var declared, so the `khm_*` state (crash fix v2) was lost. `nv_code`'s `ue_nv` (every slot read / write, also
+through the WorkModule int ops `nvi_*`) never tests the declared mask; only `h_newvar` uses it (to set Initial once).
+Run with the game's own code (`tools/kirby_hero_copy_fix_test.py`, exe_v45f too): the MSC WorkModule handler
+`0x0200E898` ops 7 / 6 / 0 and get_float on all 37 slots `0x0F00039B`-`0x0F0003BF`, no New_Var: unset slots read 0,
+every write reads back, ints and floats, another object's slots apart (`new_var_test.py` passes on exe_v45f / v45g
+too). The interpreter test's stub was not the real model though (ints and floats in two maps): it now mirrors the
+cave (one float per category-F id 0x300-0x3BF, int ops cut toward 0, 0x3C0+ read 0 and drop writes).
+
+**Cause found: the copy slots' scripts were only half silenced.** Kirby's scripts for the Robin copy slots (his
+vanilla files, the Drive's `fighter-modded-scripts-only.zip`, hashes from `motion.mtable` = crc32 of
+`refletspecialn*`): no game scripts; expression: 0x447 (Hold) `Rumble_Loop(0x22)`, 0x448 (Shoot) / 0x44C (TronEnd)
+`Rumble(0xD)`, 0x44B (TronHold, the Hero copy's hold) `QUAKE(5)` (a screen shake) + `Rumble_Loop(2)`; sound: 0x447
+`0x7640028` at 1 (Robin's bank id 2051, Hero's bank in Kirby vs Hero), 0x44A (TronStart, Frizzle / Megaflare)
+`0x8B50003` at 15; effect: 0x447 an endless `0x1000019` spark loop. `ncp_silence` (set 0x10) rebound only the sound /
+effect sets, to slot 0x446's (none), on motion changes; a motion change binds the game / expression sets itself, so
+the expression scripts always ran. Fix: `copy_fx_cave.py` set **0x11 SILENCE** clears all four agents (game,
+expression, sound, effect) with the game's clear `0x02BEE9B8` and cancels the late bind (`+0x1C` = -2); the copies'
+MSC calls it after every motion change and every frame of the status (`MotionAnimcmdModule(0, 0x11, 0, 8)`).
+
+**Symptoms 2-4 and Robin's sounds: the MSC taking the Robin copy's path.** All four match `newcopy_marker()` = 0 for the
+Hero copy (the copy kind 0x2C without marker 2 in int `0x100000A0`): Robin's own neutral special runs (Thunder /
+Elthunder / Arcthunder with the tome, which runs out: "locks Kirby out"; Robin's sounds and effects), `khm_panel`
+writes no gauge, `khm_update` opens no menu. The Hero copy's own path does all four right in the interpreter, and the
+Sephiroth copy's path ran in game (the visual fix clip shows its MSC-played charge effects), so the marker worked for
+Sephiroth. Statically copy_grant's map / marker for 0x45 is right (kirby_copy_new_test runs the stubs; the swallow
+path `0x02796680` passes the swallowed fighter's kind `0x02BEF604`; the star copy passes kind + 1 - 1; nothing else
+writes int 0xA0: scanned). Not found why Hero's marker would be lost; one known way: a Kirby who has the Hero copy
+swallowed by another Kirby passes only the Robin copy (stage 1 limitation). **Guard:** a Robin copy with no marker in
+a match with no Robin is the Hero copy when a Hero is in the match and no Sephiroth, Sephiroth's when he is and no
+Hero (`newcopy_guess`, the position variables' slot kinds `0x0F0000BD + 8 s`, once a frame into `ncp_guess`; also
+`newcopy_real_kind` for the trait). The README's check 2b (a Robin in the match turns the guard off) tells whether
+the marker itself arrives.
+
+**Voices and Sephiroth's sounds** (`tools/kirby_copy_sound.py`, new): into **Kirby's own banks** (a sound id is matched
+against the playing fighter's banks; Sephiroth's id 2018 needn't be among Kirby's while he has the Robin copy):
+- `snd_vc_Kirby` (id 6006, row 63, 47 -> 55 labels): Ultimate's `vc_kirby_copy_brave_01-04` / `vc_kirby_copy_edge_01-04`
+  (the user's `kirby_fighter_voice_ssbu`, IDSP and TONE volumes as they are) = `0x3F002F`-`0x3F0032` / `0x3F0033`-
+  `0x3F0036`. The recomp dump's unnamed hashes in Kirby's copy sound scripts are these names (hash40: length + crc32):
+  Hero hold _01 at 2 (PLAY_STATUS: stopped at the fire / cancel / end), Frizz _02 at 8, Frizzle _03 at 11, Kafrizz
+  _04 at 17 (the non-Japanese side of an is_flag pick: the other is `vc_kirby_copy_brave_rnd_special_n0x_jp`);
+  Sephiroth charge _01 at 2, Gigaflare _04 at 119, Flare _02 at 12, Megaflare _03 at 12.
+- `snd_se_Kirby` (id 2009, row 10, 213 -> 217 labels): Sephiroth's `se_edge_special_n01` (charge, at 1, stopped at the
+  fire / cancel / end), `n02_01` (Flare, 2), `n03_01` (Megaflare, 2), `n04_01` (Gigaflare, 119), from his Smash 4 bank
+  (the user's `snd_se_Edge`) = `0xA00D5`-`0xA00D8`. Unresolved in the dump: `0xd6a6d0d29` (13 characters, played at
+  the Hero fires' 10-17): left out.
+- Base banks: the user's `kirby_smash4_sound` (= the vanilla ones in `fighter-smash4-vanilla.zip`, same sha1); the
+  soundlabeltable: the user's upload (rows 10 and 63 changed only, `--check`). `voiceanim_Kirby.vat` (46 labels)
+  isn't grown: Kirby's own label 46 is already past it (no mouth animation for those).
+
+**A / B builds:** `tools/kirby_hero_copy_build.sh OUT`: B = kirby.c as it is (exe_v46e + v6's sword models); A = the
+same with `khm_sword_on()` 0 (exe_v45g has no held sword: the four sword spells are never drawn, as before v6).
+Globals 118 of 128.
+
+Tests: `kirby_hero_copy_fix_test.py exe_v45g exe_v45f` / `exe_v46e exe_v46d` (the cave alone differs; SILENCE through
+the real chain; the slots from MSC; exe_v45f fails the SILENCE checks), `copy_fx_test.py` (SILENCE with stubs),
+`kirby_newcopy_test.py` A and B (the cave's WorkModule model; silence every frame and after every change; voices
+and Sephiroth's sounds at their frames; the guess; the A build's sword spells; v1-v6's checks; the old B MSC fails
+9), `msc_stack_check.py`, `rolloff_hold_test.py`, `new_var_test.py`, `kirby_copy_new_test.py`, `kirby_hero_menu_test.py`
+(its base must be exe_v44: with exe_v43 the "original Robin list" check fails for exe_v45f as for v45g),
+`kirby_hero_sword_test.py` (v46e), `kirby_copy_pool_test.py` (v45g / v46e).
+```
+python3 tools/rpx_patch.py EXE_V45F.rpx EXE_V45G.rpx $(python3 tools/copy_fx_cave.py)
+python3 tools/rpx_patch.py EXE_V46D.rpx EXE_V46E.rpx $(python3 tools/copy_fx_cave.py)
+python3 tools/kirby_copy_sound.py ULT_VOICE KIRBY_SOUND SND_SE_EDGE SOUNDLABELTABLE OUT [--check]
+sh tools/kirby_hero_copy_build.sh OUT
+```
