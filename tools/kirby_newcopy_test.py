@@ -755,17 +755,17 @@ def fix_v8_tests(path, src):
     parts = {}
     for f, v in hbs:
         parts.setdefault(v[1], []).append(f)
-    check('fix v8: Zoom: the stone\'s hitbox (motion 0x2F1\'s ID 0: 18%%, 6.5 at (0, 2, 0)) remade every frame of '
-          'the flight: Part 2 on the way up (cast frames 29-68), Part 3 on the way down (69 to the landing)',
+    check('fix v8: Zoom: the stone\'s hitbox (motion 0x2F1\'s ID 0: 18%, 6.5 at (0, 2, 0)) remade every frame of '
+          'the flight: Part 2 on the way up (cast frames 29-68), Part 3 on the way down (69 to the frame before the landing: 88 here)',
           ({p: (min(fs), max(fs), len(fs)) for p, fs in parts.items()}, vals_bad),
-          ({2: (29, 68, 40), 3: (69, 89, 21)}, []))
+          ({2: (29, 68, 40), 3: (69, 88, 20)}, []))
     check('fix v8: Zoom: a hit record for each leg (Parts 2 / 3: the game keeps one per Part for the status), so a '
           'fighter hit on the way up can be hit again on the way down, each leg once', sorted(parts), [2, 3])
     # Zoom 2 U: 1 from the target, every approach
     cases = [('right, facing right', 1.0, (50.0, 0.0)), ('left, facing right (turns)', 1.0, (-40.0, 0.0)),
              ('left, facing left', -1.0, (-40.0, 0.0)), ('above', 1.0, (12.0, 70.0)), ('below', 1.0, (8.0, -60.0)),
              ('on a platform up and ahead', 1.0, (45.0, 30.0)), ('below and behind', -1.0, (40.0, -35.0)),
-             ('already within 1', 1.0, (24.0, 0.0))]
+             ('already within 1', 1.0, (22.0, 0.0))]
     for what, lr, (tx, ty) in cases:
         r = Run(path, src, 2, situation=2)
         g = r.game
