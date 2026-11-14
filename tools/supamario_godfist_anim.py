@@ -20,9 +20,10 @@ too) onto Mario's skeleton. The timeline (frames at 60 a second, XV2's too):
 
   0-44     the dash punch, #1 0-18 at XV2's speed (the hitbox 14-17 as the BAC's, the fist out at 14-15), then
            #1 18-70 twice as fast: the whiff ends at 44 (MSC: GF_WHIFF_END)
-  46-166   the God Fist (the MSC jumps here from the hit check at 18, GF_JUMP_TO = 46): #0 0-40 at x0.8 (the BAC's
-           TimeScale: 50 frames, the fist held in the victim), the God Fist hit at #0 40 (GF_STRIKE = 96), then
-           #0 40-111 at its speed (the flip away 40-60, the stance by 111)
+  46-137   the God Fist (the MSC jumps here from the hit check at 18, GF_JUMP_TO = 46): #0 0-40 in GF_HOLD = 20
+           frames (x2; v3-v8: the BAC's TimeScale x0.8, 50 frames), the fist held in the victim, the God Fist hit at
+           #0 40 (GF_STRIKE = 66; 96 in v3-v8), then #0 40-111 at its speed (the flip away 40-62, its feet down at
+           GF_FLIP_LAND = 92, the stance by 111)
   TransN   #1's dash (b_C_Base) x the body scale up to the contact, x0.3 after (a whiff slides 28 in all, as vanilla
            Mario's dash attack); #0's travel (2.5 m forward, mostly in the flip) x0.5; all x TRAVEL (v9: 1.6)
   RotN     the pelvis' height changes (XV2 crouches, leaps and flips), then the lower foot put on the floor on
@@ -30,7 +31,6 @@ too) onto Mario's skeleton. The timeline (frames at 60 a second, XV2's too):
            lifted only where the head, hands, knees or feet would go into the floor)
 Every motion keeps the vanilla AttackDash's node order (vbn order, which the game reads the gameplay joints by).
 """
-import math
 import os
 import sys
 
@@ -48,11 +48,16 @@ GF_PUNCH_END = 18                     # the hit check
 WHIFF_FAST_FROM, WHIFF_RATE = 18, 2.0
 GF_WHIFF_END = int(WHIFF_FAST_FROM + (70 - WHIFF_FAST_FROM) / WHIFF_RATE)      # 44
 GF_JUMP_TO = GF_WHIFF_END + 2         # 46
-SLOW, HOLD_SRC = 0.8, 40              # BAC entry 1: TimeScale 0.8 for #0 0-40
-GF_HOLD = int(round(HOLD_SRC / SLOW))                                         # 50
-GF_STRIKE = GF_JUMP_TO + GF_HOLD      # 96: #0 frame 40
+HOLD_SRC = 40                         # BAC entry 1: TimeScale 0.8 for #0 0-40 (50 frames in v3-v8)
+# v9 (user: "the hold on the fist should be reduced"): the XV2 reference clip's punch connects at its frame ~19 and the
+# victim flies at ~61: 42 frames contact to launch. Ours adds the punch's freeze (9), its last 4 frames to the check,
+# the jump's frame and the strike's freeze (8): 22, so the hold is 20 frames (#0 0-40 at x2; v8 50 at x0.8)
+GF_HOLD = 20
+SLOW = HOLD_SRC / float(GF_HOLD)      # #0 frames a frame in the hold (2.0)
+GF_STRIKE = GF_JUMP_TO + GF_HOLD      # 66: #0 frame 40
 GODFIST_END_SRC = 111
-FRAMES = GF_STRIKE + (GODFIST_END_SRC - HOLD_SRC) + 1                          # 168
+FRAMES = GF_STRIKE + (GODFIST_END_SRC - HOLD_SRC) + 1                          # 138
+GF_FLIP_LAND = GF_STRIKE + 22 + 4     # his feet back on the floor: the flip (#0 40-62) + floor_fix's 4-frame ramp
 WHIFF_ROOT = 0.3                      # the dash past the contact (whiff)
 GODFIST_ROOT = 0.5                    # #0's own travel
 TRAVEL = 1.6                          # v9 (user: "move Supamario about 1.6x further"): all of his travel (TransN) x this,

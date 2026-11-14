@@ -19,7 +19,8 @@ common effects the BAC plays, converted into his bank. Writes OUT_DIR/fighter/su
 
 v3 (fighters/supamario/README.md "Super God Fist v3"): XV2's own animation; the frame numbers below are v2's (v3:
 the punch 14-17, the check 18, the God Fist part from 46, the hold 46-95 (#0 0-40 at x0.8), the launch at 96 with an
-8-frame freeze, acting from 141; the constants hold them).
+8-frame freeze, acting from 141; the constants hold them. v9: the hold 46-65 (#0 0-40 at x2), the launch at 66,
+acting from 92, the flip's landing).
 
 v4 (README "Super God Fist v4"): the launch at STRIKE + 1 without Hit_Check (v3's never saw the strike in game:
 no flight, the hold's lean left on the victim), a watchdog thread (GF_WATCH) and every release turning the victim
@@ -73,7 +74,7 @@ VARS = [('gf', GF_VAR, 1), ('gf_slot', V_SLOT, 0), ('gf_st', V_ST, 0), ('gf_sit'
         ('gf_tmp2', V_TMP2, 0)]
 # gf values: 0 the dash punch / whiff, 1 caught (held), 2 struck (the flight thread has the victim)
 PUNCH, PUNCH_END = anim.GF_PUNCH, anim.GF_PUNCH_END   # the hitbox 14-17 (the BAC's), the hit check at 18
-JUMP_TO, STRIKE = anim.GF_JUMP_TO, anim.GF_STRIKE      # 46, 96 (#0 frame 40: the launch)
+JUMP_TO, STRIKE = anim.GF_JUMP_TO, anim.GF_STRIKE      # 46, 66 (#0 frame 40: the launch; 96 in v3-v8)
 WHIFF_END = float(anim.GF_WHIFF_END)     # the whiff's end (MSC): 44
 HOLD_X = 11.5                           # the victim held this far in front of him (his fist 7.3-7.5 ahead, + 4)
 PUNCH_DMG, STRIKE_DMG = 4.0, 11.0          # 15 in all (v7: no hit at the end; v6's 1% end hit gone)
@@ -82,7 +83,8 @@ PUNCH_FREEZE = 9                        # the punch's hitstop, both: CMN.bdm #16
 STRIKE_FREEZE = 8                       # the launch's hitstop, both (the slow hold is the animation's: #0 0-40 x0.8);
                                         # v7: the victim's 2 more, so it's still frozen when the flight's first
                                         # frame freezes it again (unfrozen in the air, its ground Damage status falls)
-INVINCIBLE = 75                         # Supamario invincible from the catch (XV2: 0-40 of #0 at x0.8, +the launch)
+INVINCIBLE = 75 - (50 - anim.GF_HOLD)   # Supamario invincible from the catch (XV2: 0-40 of #0, +the launch): 45 with
+                                        # v9's 20-frame hold (v3-v8 75 with 50)
 # the victim's motion: XV2's own (CMN.ean #179 held / launched, then #96 the tumbling slide; tools/
 # supamario_godfist_xv2.py -> reference/xv2/godfist_victim_cmn.json): its travel, its pelvis height and its tilt
 # toward the travel, frame by frame
@@ -124,13 +126,13 @@ D_CATCH_KINDS, D_SLOT, D_HOLD_FRAME, D_HOLD_ROT, D_STRIKE_KINDS, D_FLIGHT, D_WD_
 # forcing the down once it lands): no hit at all. The flight freezes it (hitstop 2 / hitstun each frame) to flight
 # frame DOWNFALL_K (frozen through the flight's last frame), where it's asked into DamageFall (0x4C, the game's
 # tumble: its main func_815 enables the down term 0x1e00000d), so its ground Damage status never runs in the air
-# (v6's Fall); at HANDOFF (141) it's DROP_Y above the ground, its stage
+# (v6's Fall); at HANDOFF it's DROP_Y above the ground, its stage
 # collision back (air), upright (DamageFall's own tumble animation), carrying the flight's end speed (SLIDE_SPEED
 # along his facing: its knockback energy, the PUSH variable, decaying the game's way and stopped at a ledge), and
 # DamageFall's loop (func_816) knocks it down when it touches the ground (DownBound 0x4D -> DownWait 0x50, the
 # game's own motions: the path every untechnically landed tumble takes). No tech: the tech (passive 0x64 / 0x65 in
 # func_816) needs a shield press within the window, and its controller is off (Input_Set 21) from the launch.
-# The MSC (gf_tick) waits for the down (phase 4), then holds it GF_DOWN frames (phase 2). He acts from IASA (143)
+# The MSC (gf_tick) waits for the down (phase 4), then holds it GF_DOWN frames (phase 2). He acts from IASA
 # v8 (user, v7's clip: "make the opponent's movements look more natural between spinning and landing", "landing
 # does not slide far enough"). The clip: at the flight's end (flight frame 44, the victim lying, its tilt -810) it
 # popped upright at once (Rotation 0 with DamageFall's tumble pose), hung ~30 frames in the air 1 above the ground
@@ -144,16 +146,16 @@ D_CATCH_KINDS, D_SLOT, D_HOLD_FRAME, D_HOLD_ROT, D_STRIKE_KINDS, D_FLIGHT, D_WD_
 # a ledge), from SLIDE_V0 down by SLIDE_DECAY a frame: SLIDE_DIST in all, XV2 #96's 9.44 m at the flight's 3
 # units a metre
 # v9 (user: "make it actionable after the flip Supamario does"): he acts from FLIP_END, the frame his flip lands
-# (the built motion: his feet back on the floor at 122, after the flip's lift #0 40-62 and its 4-frame ramp; the
-# build checks it). The victim's flight is in his game script, so it must be handed off before he can act: the
+# (the built motion: his feet back on the floor at GF_STRIKE + 22 + 4 = 92, after the flip's lift #0 40-62 and its
+# 4-frame ramp; the build checks it). The victim's flight is in his game script, so it must be handed off before he can act: the
 # ease now starts at flight frame EASE_FROM (inside #179's launch: its last frames only drift back) and the hand-off
 # is the frame before FLIP_END
-FLIP_END = 122
+FLIP_END = anim.GF_FLIP_LAND           # 92 (v9's 20-frame hold; 122 with v8's 50)
 EASE_FROM = 14
-FLY_N = FLIP_END - STRIKE - 2           # 24: flight frames k 1 .. FLY_N (motion frames 97 .. 120)
+FLY_N = FLIP_END - STRIKE - 2           # 24: flight frames k 1 .. FLY_N (motion frames 67 .. 90)
 EASE_N = FLY_N - EASE_FROM              # 10
 DOWNFALL_K = FLY_N - 2
-HANDOFF = STRIKE + FLY_N + 1            # 121
+HANDOFF = STRIKE + FLY_N + 1            # 91
 DROP_Y = 0.3                            # the feet's height at the last flight frame (it lands at once)
 DAMAGE_FALL = 0x4C
 EASE_SPEED = 1.0                        # its travel a frame while easing down (units)
@@ -165,7 +167,7 @@ SLIDE_V0 = SLIDE_DIST * (1 - SLIDE_DECAY)       # the geometric series' first te
 LH_PUSH = 0x0F0000B7                    # target 2's PUSH (docs/position-variables.md: < 1000 = its energy 4's speed,
                                         # world X)
 SELF_FACING = 0x0F000003
-IASA = float(FLIP_END)                  # 122: the flip landed (v8: 136, XV2's BCM callback window from #0 80)
+IASA = float(FLIP_END)                  # 92: the flip landed (v8: 136, XV2's BCM callback window from #0 80)
 ROOT_Z = [0.0] * anim.FRAMES             # his TransN z by motion frame (build() sets it from the animation)
 DOWN_HELD = (0x4D, 0x53)                # DownBound .. DownWait (0x53): still down; 0x57 DownDamage
 DOWN_DAMAGE, DOWN_WAIT, DOWN_WAIT2, DOWN_STAND = 0x57, 0x50, 0x51, 0x54
@@ -472,7 +474,7 @@ def game_script():
         if f == STRIKE - 1:
             hold += [cmd('hit_reset'), cmd('hit_log_clear', STRIKE_PART)]
         s += if_(GF_VAR, 0, 1, hold)
-    # 96: the God Fist (Part STRIKE_PART: a hit record of its own; the punch's Part 0 record holds the victim)
+    # STRIKE (66): the God Fist (Part STRIKE_PART: a hit record of its own; the punch's Part 0 record holds the victim)
     strike = [hitbox('extra_special_hitbox', ID=0, Part=STRIKE_PART, Bone=FIST, Damage=STRIKE_DMG, Angle=0, KBG=0,
                      FKB=0, BKB=25, Size=6.0, X=0.0, Hitlag=1.0, SDI=0.0, SFXLevel=2, SFXType=1, Type=4,
                      IgnoreInvuln=0, HitstopFrames=STRIKE_FREEZE + 2, SelfHitstopFrames=STRIKE_FREEZE, DIMul=0.001),
@@ -480,7 +482,7 @@ def game_script():
                      FKB=0, BKB=25, Size=6.0, Y=6.5, Z=HOLD_X, Hitlag=1.0, SDI=0.0, SFXLevel=2, SFXType=1, Type=4,
                      HitstopFrames=STRIKE_FREEZE + 2, SelfHitstopFrames=STRIKE_FREEZE, DIMul=0.001)]
     s += [cmd('frame', float(STRIKE))] + if_(GF_VAR, 0, 1, strike)
-    # 97 (after the freeze: the script waits through his hitstop): struck -> the flight thread; else let go
+    # STRIKE + 1 (after the freeze: the script waits through his hitstop): struck -> the flight thread; else let go
     # v4: the launch no longer waits on Hit_Check: v3's `Hit_Check(0, 0, 2)` here, one frame after the strike (its
     # freeze in between), never saw the strike in game (the user's clip: 11% dealt, then no flight, the hold's lean
     # left on the victim): the hit's kinds reach AttackModule +0xC8 later than this frame's script. The hold is a
@@ -576,12 +578,16 @@ def effect_script():
         wf = PUNCH_END + (40 - PUNCH_END) // 2
         whiff = [cmd('terminate_graphic_effect', sk['Model'], 1, 1), at_fist('Bas', wf, 0.6), at_fist('Drop', wf, 1.0)]
         s += [cmd('frame', float(wf))] + if_(GF_VAR, 0, 0, whiff)
-        hz, hy = victim_head(61)
-        s += [cmd('frame', 61.0)] + if_(GF_VAR, 1, 0, [gfx('graphic_effect', sk['HitPt'], 0, 0.0, hy, hz,
-                                                           0.4 * SKILL_SCALE)])
-        # effect 1's model plays 37 frames (its obj.ema): off ~37 real frames after its start
-        s += [cmd('frame', 64.0)] + if_(GF_VAR, 1, 0, [cmd('terminate_graphic_effect', sk['Model'], 1, 1)])
-        s += [cmd('frame', 67.0)] + if_(GF_VAR, 1, 0, [at_fist('Bas', 67, 0.6), at_fist('Drop', 67, 1.0)])
+        # the victim's entry 2 (from the catch, in step with the hold) frame 12: JUMP_TO + 12 / SLOW; effect 1's model
+        # plays 37 frames (its obj.ema): off ~37 real frames after its start (64); entry 1's effect 2 at #0 17
+        hf = JUMP_TO + int(round(12 / anim.SLOW))
+        bf = JUMP_TO + int(round(17 / anim.SLOW))
+        hz, hy = victim_head(hf)
+        timed = [(hf, [gfx('graphic_effect', sk['HitPt'], 0, 0.0, hy, hz, 0.4 * SKILL_SCALE)]),
+                 (64, [cmd('terminate_graphic_effect', sk['Model'], 1, 1)]),
+                 (bf, [at_fist('Bas', bf, 0.6), at_fist('Drop', bf, 1.0)])]
+        for f, body in sorted(timed, key=lambda t: t[0]):
+            s += [cmd('frame', float(f))] + if_(GF_VAR, 1, 0, body)
     else:
         s += [cmd('frame', float(JUMP_TO))] + if_(GF_VAR, 1, 0, [
             gfx('external_graphic', FX_GLOW, FIST, 1.0, 0.0, 0.0, 1.2)])
@@ -611,13 +617,13 @@ def victim_head(f, height=10.0):
 def sound_script():
     """his own sounds at the dash (the skill's own SE bank, cue 0 at entry 0's 0, isn't among the files; the
     voices are left out: the user); v5: XV2's CMN SE (SE_IDS): Hit_LL on the catch (BAC entry 2, the victim's, at 0:
-    the God Fist part's first frame), Down when the victim's slide starts (flight frame GF_LAUNCH + 1 = #96 frame
-    1: motion STRIKE + GF_LAUNCH + 1). Without them (no --cmn-se) v4's stand-ins"""
+    the God Fist part's first frame), Down when the victim lands (HANDOFF + 1: the knockdown, the start of XV2's #96
+    slide). Without them (no --cmn-se) v4's stand-ins"""
     s = [cmd('frame', 1.0), cmd('low_voice_clip', VOICE), cmd('frame', 10.0), cmd('sound_effect', SND_DASH)]
     if SE_IDS:
         s += [cmd('frame', float(JUMP_TO))] + if_(GF_VAR, 1, 0, [cmd('sound_effect', SE_IDS['gf_hit_ll'])])
         s += [cmd('frame', float(STRIKE))] + if_(GF_VAR, 1, 0, [cmd('sound_effect', SND_HEAVY)])
-        s += [cmd('frame', float(STRIKE + GF_LAUNCH + 1))] + if_(GF_VAR, 1, 0, [cmd('sound_effect',
+        s += [cmd('frame', float(HANDOFF + 1))] + if_(GF_VAR, 1, 0, [cmd('sound_effect',
                                                                                    SE_IDS['gf_down'])])
         return s
     s += [cmd('frame', float(JUMP_TO))] + if_(GF_VAR, 1, 0, [cmd('sound_effect', SND_START)])
@@ -806,7 +812,7 @@ def build(sm_dir, out_dir, ean_path, cmn_dir=None, png=None, skill_dir=None, cmn
     feet = [h for n_, _p, h in bones if n_ in ('LFootJ', 'RFootJ')]
     assert len(feet) == 2
     land = next(f for f in range(STRIKE + 5, out['main'].frames)
-                if max(omo_world_y(out['main'], bones, n_, f) for n_ in ('LFootJ', 'RFootJ')) < 1.7)
+                if max(omo_world_y(out['main'], bones, n_, f) for n_ in ('LFootJ', 'RFootJ')) < 2.2)   # landing stance: L 2.06, R 1.56
     assert land == FLIP_END, ('the flip lands at %d, FLIP_END %d' % (land, FLIP_END))
     FIST_AT.clear()
     for f in range(out['main'].frames):
