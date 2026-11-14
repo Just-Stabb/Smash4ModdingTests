@@ -20,6 +20,14 @@ Hero's own. Converted:
   motion's frames (khm_sw_motion starts it at the cast's first frame and keeps it there);
 - the ground scripts (the air ones have the same trail).
 The other effects stay MSC calls (khm_sw_fx) and the slots get no game / sound / expression scripts.
+
+Fix v8 (fighters/kirby/specials.md "Hero copy fix v8"; user: the moves' own effects "don't appear"): the effect
+scripts also hold Hero's sword-following effects (his External_Graphic on his sword: Flame Slash's fire blade
+0x3450078, Kacrackle Slash's ice 0x3450076, Hatchet Man's dark blade 0x3450072, Hero's own turned variants
+brave_*_sword@0,0,-90 of fighters/brave/brave_effects.json) and their Terminate_Graphic_Effect, from
+kirby_hero_sword_msc.sword_effect_events: on LHaveN with the v7 offsets, rotations and sizes Hero's, no colour or
+alpha set on the call (Hero's scripts set none: the emitters' own colours, his .ptcl's), Terminate 0, and only while
+the sword is drawn (the trail's window). They were MSC calls (khm_sw_fx, EffectModule 0x2712) through fix v7.
 """
 import os
 import struct
@@ -56,6 +64,12 @@ def trail_events(n, ref):
     return out
 
 
+def fx_events(n, ref):
+    """fix v8: the trail and the sword-following effects, by cast frame (stable: the trail first)"""
+    ev = trail_events(n, ref) + SW.sword_effect_events(ref, n)
+    return sorted(ev, key=lambda e: e[0])
+
+
 def command(nm, a):
     ident = acmd.BY_NAME[nm.lower()]
     info = acmd.INFO[ident]
@@ -85,7 +99,7 @@ def build(src, out):
         assert table[A.SLOT[n]] in (0, h), 'motion 0x%X is named already (0x%08X)' % (A.SLOT[n], table[A.SLOT[n]])
         assert h not in eff.scripts or table[A.SLOT[n]] == h, '%s: a script of that name exists' % name(n)
         table[A.SLOT[n]] = h
-        ev = trail_events(n, ref)
+        ev = fx_events(n, ref)
         eff.scripts[h] = script(ev)
         made[n] = ev
     os.makedirs(out, exist_ok=True)

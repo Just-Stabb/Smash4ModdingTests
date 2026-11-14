@@ -495,8 +495,14 @@ def v6_tests(path, src):
             rm = [f for f, k, _v in ev[n][sit] if k == 'remove']
             check('%s (%s): hitboxes 5-9 removed at %s, and at the end' % (names[n], sit, rm),
                   g.removed, [5, 6, 7, 8, 9] * (len(rm) + 1))
-            check('%s (%s): the sword int 0x1000008B 1 from the cast to the end (%d), then 0' % (names[n], sit, end),
-                  (set(shown[:end]), set(shown[end + 1:])), ({1}, {0}))
+            if 'khm_sw_shown' in r.fn:      # fix v8: only while Hero's trail is
+                on, off = ev[n]['shown']
+                check('%s (%s): fix v8: the sword int 0x1000008B 1 from the trail\'s start (%d) to the frame before its '
+                      'end (%d), else 0' % (names[n], sit, on, off),
+                      shown[:end + 5], [int(on <= i < off) for i in range(end + 5)])
+            else:
+                check('%s (%s): the sword int 0x1000008B 1 from the cast to the end (%d), then 0' % (names[n], sit, end),
+                      (set(shown[:end]), set(shown[end + 1:])), ({1}, {0}))
             check('%s: its MP (brave_cost)' % names[n], mp0 - r.gf('ncp_mp'), {0x11: 12, 0x12: 11, 0x13: 6, 0x14: 15}[n])
     # the menu's weights, Hocus Pocus's
     r = Run(path, src, 2)
@@ -651,6 +657,8 @@ def fix_v6_tests(path, src):
         check('fix v7: status 0x%X (%s) mid-spell: the spell stopped (sword int 0, hitboxes removed), Kirby\'s motion left '
               'alone (no swing motion over it)' % (st, what),
               (g.ints.get(0x1000008B), g.removed[-5:], g.motions[nm:], g.motion), (0, [5, 6, 7, 8, 9], [], g.motion))
+    if 'khm_sw_shown' in r.fn:
+        return                          # fix v8: the arm hitbox is on the blade (fix_v8_tests)
     # the arm hitbox (Hero's bone 0x16) on LHaveN at the path's offset, every spell
     _scale, arms = SW.load_path()
     bad = []
@@ -661,6 +669,140 @@ def fix_v6_tests(path, src):
                     if v[2] != SW.K_SWORD or [round(x, 4) for x in v[9:12]] != arms[n][f]:
                         bad.append((hex(n), sit, f, v[2], v[9:12]))
     check('fix v6: the arm hitbox (ID 7) on LHaveN 0x18 at ArmR\'s offset in HaveR\'s frame at its frame', bad, [])
+
+
+# the falling stone's hitbox: Kirby's game.bin, motion 0x2F1 (SpecialAirLw hold, hash 0x132FAC0E: the Drive's
+# fighter-modded-scripts-only copy), ID 0 bone 0, as tools/kirby_hero_sword_msc.py's FP order
+STONE_AIR_HITBOX = dict(ID=0, Bone=0, Damage=18.0, Angle=0x46, KBG=0x46, FKB=0, BKB=0x41, Size=6.5, X=0.0, Y=2.0, Z=0.0,
+                        Effect=0, Trip=0.0, Hitlag=0.7, SDI=1.0, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2,
+                        SFXType=2, **{'Ground/Air': 3, 'Direct/Indirect': 1}, Type=2, HitBits=0x3F, Unk41=0,
+                        CollisionPart=0xF, NoScale=0, Shieldable=1, Reflectable=0, Absorbable=0, Rehit=0,
+                        IgnoreInvuln=0, HitAllStates=0, FacingRestrict=0, NoGrabRelease=0, TeamDamage=0,
+                        DisableHitlag=0, NoGFX=0, Flinchless=0)
+
+
+def z2_gap(sx, sy, tx, ty):
+    """fix v8: the gap along the approach between the stone over (sx, sy) and a target standing at (tx, ty), computed
+    here on its own: the stone's box (every stone form's extents: X +-7.6, Y -1.35 .. 13.17) and the target's (X +-4,
+    Y 0 .. 12) touch when the centres are within the summed half-extents; the gap is how much further the stone's
+    centre can move toward the target's before that. Returns (gap, the boxes overlap)"""
+    cs = (sx, sy + (13.17 - 1.35) / 2)
+    ct = (tx, ty + 6.0)
+    hx, hy = 7.6 + 4.0, (13.17 + 1.35) / 2 + 6.0
+    dx, dy = ct[0] - cs[0], ct[1] - cs[1]
+    d = (dx * dx + dy * dy) ** 0.5
+    ux, uy = abs(dx) / d, abs(dy) / d
+    e = min(hx / ux if ux > 1e-4 else 1e9, hy / uy if uy > 1e-4 else 1e9)
+    return d - e, abs(dx) < hx - 1e-6 and abs(dy) < hy - 1e-6
+
+
+def fix_v8_tests(path, src):
+    """Hero copy fix v8: the sword spells' hitboxes on the blade, their blade effects out of the MSC (the swing slots'
+    effect scripts), Zoom's hitbox refreshed up and down, Zoom 2 U stopping 1 from the target, the copy traits"""
+    import kirby_hero_sword_msc as SW
+    ev = SW.events(SW.parse())
+    names = {0x11: 'Flame Slash', 0x12: 'Kacrackle Slash', 0x13: 'Metal Slash', 0x14: 'Hatchet Man'}
+    # the hitboxes the MSC makes, run frame by frame
+    bad, follows, ids, hero_bank = [], [], set(), []
+    for n in (0x11, 0x12, 0x13, 0x14):
+        for sit, situation in (('ground', 0), ('air', 2)):
+            r = Run(path, src, 2, situation=situation)
+            g = r.game
+            r.update()
+            g.tag = lambda r=r: kget(r, 'khm_frame') if kget(r, 'khm_state') == 2 else None
+            cast(r, n, ev[n]['end'] + 3)
+            for f, k, v in g.calls:
+                if k == 'hitbox':
+                    ids.add(v[0])
+                    x, y, z = (R.i2f(w) for w in v[9:12])
+                    if v[2] != SW.K_SWORD or abs(y + 0.2023) > 1e-4 or abs(z) > 1e-4 or not -0.01 <= x <= 12.1:
+                        bad.append((hex(n), sit, f, v[0], v[2], round(x, 3), round(y, 4), round(z, 4)))
+                    if v[0] == 2 + SW.ID_SHIFT and abs(x - SW.HILT_X) > 1e-4:
+                        bad.append(('arm not at the blade\'s base', hex(n), sit, f, x))
+                elif k == 'follow':
+                    follows.append((hex(n), sit, f))
+                elif k == 'effect' and v[0] >> 16 == 0x345:
+                    hero_bank.append((hex(n), sit, f, hex(v[0]), v[-1]))
+            stop_kills = [v[0] for _f, k, v in g.calls if k == 'kill']
+            if any(e[3] == '0x3450049' for e in hero_bank if e[0] == hex(n) and e[1] == sit) and 0x3450049 not in stop_kills:
+                bad.append(('Hatchet Man\'s ground burst not ended by khm_sw_stop', sit))
+    check('fix v8: every sword spell hitbox on LHaveN on the blade\'s axis (Hero\'s Sword1 X along it, Y -0.2023, Z 0, '
+          'X within the blade 0-12.1), the arm one (ID 7) at the blade\'s base X %.1f; no bone-0 hitbox' % SW.HILT_X,
+          bad, [])
+    check('fix v8: the hitbox IDs made: 5-7 (Hero\'s 0-2; his bone-0 3-4 left out)', sorted(ids), [5, 6, 7])
+    check('fix v8: no sword-following effect (EffectModule 0x2712) from the MSC: the swing slots\' effect scripts '
+          'make them', follows, [])
+    check('fix v8: Hero\'s-bank one-shot effects from the MSC (Hatchet Man\'s ground burst, ground only) with '
+          'Terminate 0, ended by khm_sw_stop', hero_bank, [('0x14', 'ground', 38, '0x3450049', 0)])
+    # Zoom: the stone's hitbox, Part 2 on the way up, Part 3 on the way down
+    r = Run(path, src, 2)
+    g = r.game
+    r.update()
+    g.fvars.update({0x0F000000: 10.0, 0x0F000001: 0.0, 0x0F000020: 10.0, 0x0F000021: 0.0, 0x0F000023: 1.0,
+                    0x0F000024: 50.0, 0x0F000025: 0.0, 0x0F000027: 1.0})
+    g.tag = lambda: kget(r, 'khm_frame') if kget(r, 'khm_state') == 2 else None
+    cast(r, 0x10, 29 + 40 + 20)
+    r.vm.g[r.gi['global18']] = 0                # lands
+    r.vm.call(r.fn['khm_update'])
+    hbs = [(f, v) for f, k, v in g.calls if k == 'hitbox']
+    want = [STONE_AIR_HITBOX[k] for k in SW.FP[:40] if k != 'Part'] + [0.0, 2.01, 0.0]
+    vals_bad = []
+    for f, v in hbs:
+        vals = [round(R.i2f(x), 4) if SW.is_float('hitbox', i) else x for i, x in enumerate(v)]
+        vals = vals[:1] + vals[2:]
+        if vals != [round(x, 4) if isinstance(x, float) else x for x in want]:
+            vals_bad.append((f, vals))
+    parts = {}
+    for f, v in hbs:
+        parts.setdefault(v[1], []).append(f)
+    check('fix v8: Zoom: the stone\'s hitbox (motion 0x2F1\'s ID 0: 18%%, 6.5 at (0, 2, 0)) remade every frame of '
+          'the flight: Part 2 on the way up (cast frames 29-68), Part 3 on the way down (69 to the landing)',
+          ({p: (min(fs), max(fs), len(fs)) for p, fs in parts.items()}, vals_bad),
+          ({2: (29, 68, 40), 3: (69, 89, 21)}, []))
+    check('fix v8: Zoom: a hit record for each leg (Parts 2 / 3: the game keeps one per Part for the status), so a '
+          'fighter hit on the way up can be hit again on the way down, each leg once', sorted(parts), [2, 3])
+    # Zoom 2 U: 1 from the target, every approach
+    cases = [('right, facing right', 1.0, (50.0, 0.0)), ('left, facing right (turns)', 1.0, (-40.0, 0.0)),
+             ('left, facing left', -1.0, (-40.0, 0.0)), ('above', 1.0, (12.0, 70.0)), ('below', 1.0, (8.0, -60.0)),
+             ('on a platform up and ahead', 1.0, (45.0, 30.0)), ('below and behind', -1.0, (40.0, -35.0)),
+             ('already within 1', 1.0, (24.0, 0.0))]
+    for what, lr, (tx, ty) in cases:
+        r = Run(path, src, 2, situation=2)
+        g = r.game
+        g.lr = lr
+        r.update()
+        g.fvars.update({0x0F000000: 10.0, 0x0F000001: 0.0, 0x0F000020: 10.0, 0x0F000021: 0.0, 0x0F000023: 1.0,
+                        0x0F000024: tx, 0x0F000025: ty, 0x0F000027: 1.0, 0x03000019: 2.0})
+        r.vm.g[r.gi['global4']] = 0
+        r.vm.call(r.fn['khm_update'])
+        r.vm.g[r.gi['global4']] = 0x175
+        r.vm.call(r.fn['khm_update'])
+        kset(r, 'khm_spells', 0x17)
+        kset(r, 'khm_cursor', 0)
+        g.press = {0}
+        r.vm.call(r.fn['khm_update'])
+        g.press = set()
+        path_ = []
+        g0 = z2_gap(10.0, 0.0, tx, ty)[0]
+        for _ in range(29 + 45):
+            r.vm.call(r.fn['khm_update'])
+            g.fvars[0x0F000020] = g.fvars[0x0F000000]
+            g.fvars[0x0F000021] = g.fvars[0x0F000001]
+            path_.append((g.fvars[0x0F000000], g.fvars[0x0F000001]))
+        x, y = path_[-1]
+        gap, overlap = z2_gap(x, y, tx, ty)
+        gaps = [z2_gap(px, py, tx, ty)[0] for px, py in path_]
+        dec = all(b <= a + 1e-3 for a, b in zip(gaps, gaps[1:]))
+        want_gap = round(min(g0, 1.0), 2) if g0 < 1.0 else 1.0
+        check('fix v8: Zoom 2 U, target %s: over (khm_sub 0x7F) with the gap along the approach %.2f (the stone %s), '
+              'never inside, never past (the gap only shrinks)' % (what, want_gap, 'not moved' if g0 <= 1.0 else
+                                                                  'stopped 1 away'),
+              (kget(r, 'khm_sub'), round(gap, 2), overlap, dec, len(path_)), (0x7f, want_gap, False, True, 29 + 45))
+    # the copy traits (user, 2026-11-14): Hero Technical, Sephiroth Shooter
+    r = Run(path, src, 2)
+    check('copy traits: Hero (0x45) Technical, Sephiroth (0x42) Shooter (kirby_copy_trait)',
+          [r.vm.call(r.fn['kirby_copy_trait'], (k,)) for k in (0x45, 0x42)],
+          [r.vm.call(r.fn['trait_technical']), r.vm.call(r.fn['trait_shooter'])])
 
 
 def fix_v1_tests(path, src):
@@ -1015,6 +1157,8 @@ def main():
         v6_tests(path, src)
     if 'khm_sw_motion' in names(src)[0] and not re.search(r'^int khm_sword_on\(\) \{ return 0; \}', open(src).read(), re.M):
         fix_v6_tests(path, src)
+    if 'khm_sw_shown' in names(src)[0]:
+        fix_v8_tests(path, src)
     # the plain Robin copy
     r = Run(path, src, 0)
     check('Robin copy (no marker): newcopy_marker 0', r.vm.call(r.fn['newcopy_marker']), 0)

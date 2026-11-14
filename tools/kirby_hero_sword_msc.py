@@ -212,8 +212,48 @@ def events(ref):
             e[sit] = ev
         hb = [f for f, k, _v in e['ground'] if k in ('hitbox', 'remove')]
         e['hitbox'] = (min(hb), max(hb))
+        e['shown'] = trail_window(ref, n)
         out[n] = e
     return out
+
+
+def sword_effect_events(ref, n):
+    """fix v8: spell n's sword-following effects for the swing slot's effect script: [(cast frame, ACMD name,
+    {param: value})], Hero's External_Graphic on his sword bone and their Terminate_Graphic_Effect (the ground script;
+    the air one has the same), on Kirby's LHaveN with sword_point's offset, Terminate 0 (each ends at its
+    Terminate_Graphic_Effect, khm_sw_stop if the spell stops); within the sword's drawn window (trail_window: made
+    at Hero's frame or the window's start, ended at Hero's frame or the window's end: Hatchet Man's dark blade 6-77 ->
+    34-42), as the sword is hidden outside it"""
+    at = timing(ref[(n, 'ground', 'game')])
+
+    def pick(sit):
+        out = []
+        for mf, name, a in ref[(n, sit, 'effect')]:
+            if name == 'External_Graphic':
+                assert a['Bone'] == SWORD_BONE, (n, a)
+                b = dict(a)
+                b['Bone'] = K_SWORD
+                b['X'], b['Y'], b['Z'] = sword_point(a['X'], a['Y'], a['Z'])
+                b['Size'] = round(a['Size'] * SCALE, 4)
+                b['Terminate'] = 0
+                out.append((at(mf), name, b))
+            elif name == 'Terminate_Graphic_Effect' and a['Graphic'] >> 16 == HERO_BANK:
+                out.append((at(mf), name, dict(a)))
+        return out
+    g = pick('ground')
+    assert g == pick('air'), n
+    on, off = trail_window(ref, n)            # fix v8: the blade's effects only while the sword is drawn
+    return [(max(f, on) if nm == 'External_Graphic' else min(f, off), nm, a) for f, nm, a in g]
+
+
+def trail_window(ref, n):
+    """fix v8: (the cast frame Hero's trail starts, the one it ends): the sword is drawn from the first to the frame
+    before the second (khm_sw_shown)"""
+    at = timing(ref[(n, 'ground', 'game')])
+    on = [at(mf) for mf, name, _a in ref[(n, 'ground', 'effect')] if name == 'Sword_Glow']
+    off = [at(mf) for mf, name, _a in ref[(n, 'ground', 'effect')] if name == 'Terminate_Sword_Glow']
+    assert len(on) == len(off) == 1, (n, on, off)
+    return on[0], off[0]
 
 
 def is_float(kind, i):
@@ -289,6 +329,15 @@ def c_source(ev):
         out.append('    return 0;')
         out.append('}')
         out.append('')
+    out.append('// fix v8: the sword drawn only while Hero\'s trail is (Sword_Glow to Terminate_Sword_Glow)')
+    out.append('int khm_sw_shown(int n, int f)')
+    out.append('{')
+    for n in sorted(ev):
+        a, b = ev[n]['shown']
+        out.append('    if (n == 0x%x) { return f >= %d && f < %d; }' % (n, a, b))
+    out.append('    return 0;')
+    out.append('}')
+    out.append('')
     out.append('int khm_sw_window(int n, int f)')
     out.append('{')
     for n in sorted(ev):
