@@ -38,6 +38,26 @@ player's slot: ITEM2 0x030C49D8 `lwzx r7, r11, r24` (the c00 fallback path when 
 root) -> the same name stub (r11 / r12 = r28 << 2 = r21 there, which the stub indexes with).
 Space: 0x04BAF620-0x04BAF700, the end of kirby_copy_new_cave.py's space (its code ends at 0x04BAF610 since crash fix v3), in the code
 region the standard build already runs (kind_expand.py's; never the grown text region: crash fix v1).
+Fix v5 (Hero copy fix v5; the user, with fix v4: the sword still never appears). Two more things kept it from showing,
+both in the held article's own native code (fighters/kirby/specials.md "Hero copy fix v5"):
+- VIS: the article follows Kirby's visibility. Its VisibilityModule's is_visible (vt +0xA4 = 0x02C77004) is its own
+  flag AND, when its LinkModule link 3 has attribute 7, the parent's is_visible (LinkModule vt +0xDC = 0x02C560C8). The
+  update 0x02B02534 sets that attribute again every frame (0x02B02824 .. 0x02B02860) for every Kirby motion but the
+  Sonic copy's spin ones (0x318-0x31A: SonicSpecialNSpin / Homing / HomingStart, where Kirby is hidden and the sphere
+  shows; it clears it there, 0x02B02794). Kirby is invisible for the whole stone (his native stone code 0x02EED1FC:
+  VisibilityModule whole 0 at 0x02EED290; the MSC's SpecialLwEnd main shows him again), so the stone show path's own
+  flag (v6) was ANDed with Kirby's 0 every frame. The stone show path now goes to STONE_SHOW: the show path's own
+  preamble (0x02BF0594 the owner's motion frame, the item's MotionModule vt +0x2F4), then the Sonic branch 0x02B02794
+  with r7 = [r30+0x68] (the LinkModule), r10 = its vtable + 0x3C0, which clears link 3's attribute 7 and shows the
+  item. The hide path is unchanged: its motion check sets the attribute again (0x02B02824).
+- JOINT: the article's init 0x02B02078 picks the joint and the link's constraint flags by the copy kind (its int
+  0x10000007, Kirby's 0x100000A4): the Robin kind 0x2C (dead in vanilla: 0x2C never had a held article) goes to
+  0x02B02248, joint 0x19 (Kirby's RHaveN: model.jtb table 0 entry 0x18) and flags 8. The sword model and the sword
+  spells' hitboxes are on joint 0x18 (LHaveN), as Marth's sword. 0x02B02184 `beq 0x02B02248` -> `beq 0x02B022EC` (the
+  Marth / Lucina / Roy path: joint 0x18, flags 0x108). Only the Hero copy reaches it (GEN: the held article is made
+  for kind 0x2C only when granted for a Hero).
+Space for STONE_SHOW: CAVE2 0x04BAF200-0x04BAF300 (free: kirby_robin_book_cave.py's space ends at 0x04BAF200,
+kirby_copy_new_cave.py's starts at 0x04BAF400).
 """
 import os
 import sys
@@ -64,9 +84,18 @@ STONE = (0x155, 0x175, 0x176)
 BRAVE = 0x45
 ROBIN = 0x2C
 ITEM_NAME = 'bravesword'
+# fix v5
+CAVE2 = 0x04BAF200
+LIMIT2 = 0x04BAF300
+HOOK_JOINT = 0x02B02184         # the held article's init: beq 0x02B02248 (kind 0x2C: joint 0x19, link flags 8)
+JOINT_ORIGINAL = 0x418200C4
+MARTH_LINK = 0x02B022EC         # lwz r4, 0x20(r30); li r6, 0; mr r3, r29; li r5, 0x18; bl 0x02B61FB8; flags r28 (0x108)
+SHOW_SYNC = 0x02BF0594          # the show path's first call (0x02B026B8): the owner's motion frame (r3 = the handle)
+SONIC_SHOW = 0x02B02794         # the show path's Sonic-spin branch: link 3 attribute 7 cleared, the item shown
+ORIGINAL[HOOK_JOINT] = JOINT_ORIGINAL
 
 
-def source(lab44):
+def source(lab44, stone_show):
     gk, rk = lab44['grant_kind'], lab44['res_kind']
     src = ['s_item:'] + V44.words_of(ITEM_NAME)
     # 1. the held-item name
@@ -85,20 +114,41 @@ def source(lab44):
     src += ['b hs_hide', 'hs_chk:', 'lwz r3, 0x28(r27)', 'lwz r12, 0(r3)', 'lwz r12, 0x84(r12)',
             'lis r4, 0x%04X' % (SWORD_INT >> 16), 'ori r4, r4, 0x%04X' % (SWORD_INT & 0xFFFF), 'mtctr r12', 'bctrl',
             'cmpwi r3, 1', 'bne hs_hide',
-            'lis r12, 0x%04X' % (HELD.SHOW >> 16), 'ori r12, r12, 0x%04X' % (HELD.SHOW & 0xFFFF), 'mtctr r12', 'bctr',
+            'b 0x%08X' % stone_show,       # fix v5 (v6-v4: the show path 0x02B026B4, whose motion check set link 3's
             'hs_hide:', 'lwz r3, 0xA8(r30)',
             'lis r12, 0x%04X' % (HELD_BACK >> 16), 'ori r12, r12, 0x%04X' % (HELD_BACK & 0xFFFF), 'mtctr r12', 'bctr']
     return '\n'.join(src)
 
 
+def source2():
+    """fix v5: the stone's show path. In 0x02B02534's frame (reached by branches: its LR is saved there), r27 Kirby's
+    module accessor, r30 the item's, r31 its copy kind, r1 + 0x68 the owner's handle"""
+    return '\n'.join([
+        'stone_show:',
+        'addi r3, r1, 0x68',                                    # as 0x02B026B4: the owner's motion frame (f1) ...
+        'lis r12, 0x%04X' % (SHOW_SYNC >> 16), 'ori r12, r12, 0x%04X' % (SHOW_SYNC & 0xFFFF), 'mtctr r12', 'bctrl',
+        'lwz r3, 0x44(r30)', 'lwz r6, 0(r3)', 'lwz r7, 0x2F4(r6)', 'mtctr r7', 'bctrl',    # ... set on the item
+        'lwz r7, 0x68(r30)', 'lwz r10, 0(r7)', 'addi r10, r10, 0x3C0',                     # the LinkModule (0x02B02718)
+        'lis r12, 0x%04X' % (SONIC_SHOW >> 16), 'ori r12, r12, 0x%04X' % (SONIC_SHOW & 0xFFFF), 'mtctr r12', 'bctr',
+    ])
+
+
 def build():
     a44, _res = V44.args()
+    a2 = Asm(CAVE2)
+    a2.asm(source2())
+    words2 = a2.words()
+    assert CAVE2 + 4 * len(words2) <= LIMIT2, 'kirby hero sword cave 2 too big: %d words' % len(words2)
     a = Asm(CAVE)
-    a.asm(source(a44.labels))
+    a.asm(source(a44.labels, a2.labels['stone_show']))
     words = a.words()
     assert CAVE + 4 * len(words) <= LIMIT, 'kirby hero sword cave too big: %d words' % len(words)
     assert a44.pc <= CAVE, 'kirby_copy_new_cave.py reaches 0x%08X' % a44.pc
+    a.labels.update(a2.labels)
     out = {CAVE + 4 * i: w for i, w in enumerate(words)}
+    out.update({x: 0 for x in range(a.pc, LIMIT, 4)})                  # fix v5: v6's longer show branch's tail
+    out.update({CAVE2 + 4 * i: w for i, w in enumerate(words2)})
+    out[HOOK_JOINT] = bc_to(HOOK_JOINT, MARTH_LINK)                   # fix v5
     out[HOOK_ITEM] = V44.bl(HOOK_ITEM, a.labels['name_item'])
     out[HOOK_GEN] = V44.bl(HOOK_GEN, a.labels['gen_stub'])
     out[HOOK_GEN2] = V44.bl(HOOK_GEN2, a.labels['gen_stub'])          # fix v4
@@ -109,6 +159,13 @@ def build():
         out[HELD.CAVE + 4 * i] = w
     out[HELD.HOOK] = hook
     return a, out
+
+
+def bc_to(at, target):
+    """the `beq` at `at` (bc 12, 2) re-aimed at target"""
+    off = target - at
+    assert -0x8000 <= off < 0x8000 and not off & 3
+    return 0x41820000 | (off & 0xFFFC)
 
 
 def main():
