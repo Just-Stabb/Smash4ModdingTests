@@ -182,6 +182,7 @@ class Victim:
         self.fall = 0
         self.hittable = lambda motion_frame: True     # its hurtbox there (False: intangible / out of reach)
         self.hitstun = 0
+        self.bound = 0
         self.hits_taken = []          # (game frame, part)
 
     def frame(self, n):
@@ -205,12 +206,18 @@ class Victim:
             self.hitstun -= 1
             if self.hitstun <= 0:
                 self.status = WAIT_STATUS     # its hitstun over (the game: Wait, Fall...): the rotation stays
-        if self.status in (0x50, 0x51) and self.ground == 5 and self.situation != 0 and self.never_lands:
-            self.status = FALL            # DownWait in the air: its status falls
+        if self.status in (0x50, 0x51) and self.situation != 0:
+            self.status = FALL            # DownWait in the air: its loop (func_963) goes to Fall
+        if self.status == 0x4D:
+            self.bound -= 1
+            if self.bound <= 0:
+                self.status = 0x50        # DownBound's motion over: DownWait
         if self.ground == 5 and self.situation != 0 and not self.never_lands:
             self.fall += 1
-            if self.fall >= 2:
+            if self.fall >= 3:
                 self.situation = 0
+                if self.status == 0x4C:   # DamageFall touching the ground (func_816): DownBound
+                    self.status, self.bound = 0x4D, 12
         elif self.ground == 0:
             self.situation, self.fall = 2, 0
 
@@ -577,30 +584,35 @@ def acmd_tests(game_bin):
           all(abs(a_[2] - b_[2]) < 1e-3 and a_[:2] == b_[:2] for a_, b_ in zip(tr[:n_hold], want_hold)), True)
     flight = tr[n_hold:n_hold + B.GF_FLIGHT]
     want = [B.flight_offset(k) for k in range(1, B.GF_FLIGHT + 1)]
-    want = [(x, y, a_ if k + 1 < B.UPRIGHT_K else 0.0) for k, (x, y, a_) in enumerate(want)]
     ok = len(flight) == len(want) and all(abs(x - wx) < 1e-3 and abs(y - wy) < 1e-3 and abs(r_ - wa) < 1e-2
                                           for (x, y, r_, _st), (wx, wy, wa) in zip(flight, want))
-    check('flight: %d frames of offsets / spin as flight_offset (XV2 #179 / #96, less his own travel), upright '
-          'from flight frame %d' % (B.GF_FLIGHT, B.UPRIGHT_K), ok, True)
-    full = B.flight_offset(B.UPRIGHT_K - 1)[2]
-    turned = abs(full - (-B.hold_lean(n_hold - 1, n_hold)))
-    check('flight: turns %.0f degrees backward before the down (XV2 935 x 0.8)' % turned, 650 < turned < 800, True)
-    up0 = next((r for r in flight if r[2] == 0.0), None)
-    check('upright only once DownWait has taken over (its own lying animation)', up0 is not None and up0[3] == 0x50,
-          True)
+    check('flight: %d frames of offsets / spin as flight_offset (XV2 #179 / #96, less his own travel)' % B.GF_FLIGHT,
+          ok, True)
+    turned = abs(want[-1][2] - (-B.hold_lean(n_hold - 1, n_hold)))
+    check('flight: turns %.0f degrees backward (XV2 935 x 0.8)' % turned, 700 < turned < 800, True)
+    drop = tr[n_hold + B.GF_FLIGHT:n_hold + B.GF_FLIGHT + 1]
+    check('the drop: %g above the ground, upright (DamageFall\'s own tumble), asked into DamageFall (0x4C)'
+          % B.DROP_Y, (drop[:1] and (drop[0][1], drop[0][2]), ('status', B.DAMAGE_FALL) in v.log),
+          ((B.DROP_Y, 0.0), True))
+    seq = []
+    for r in rec:
+        if r[5] in (0x4C, 0x4D, 0x50) and (not seq or seq[-1] != r[5]):
+            seq.append(r[5])
+    check('the game\'s own knockdown: DamageFall -> DownBound -> DownWait (no DownWait asked in the air)',
+          (seq[:3], ('status', 0x50) in v.log), ([0x4C, 0x4D, 0x50], False))
     check('rotation back to 0 at the end', v.rot[0], 0.0)
     lock_on = next((r[0] for r in rec if r[6] == 1.0), None)
     launch = next((r[0] for r in rec if r[8] == 2.0), next(r[0] for r in rec if r[1] > B.STRIKE))
     check('controller off from the launch', lock_on is not None and lock_on <= launch + 1, True)
-    down = [r for r in rec if r[5] == 0x50]
-    check('lands, DownWait (0x50)', bool(down), True)
+    down = [r for r in rec if r[5] in (0x4D, 0x50)]
+    check('lands, knocked down (DownBound 0x4D, DownWait 0x50)', bool(down), True)
     # (no landing: v3's build; the later scenarios still run, at the frames a landing would have had)
     first_down = down[0][0] if down else launch + B.GF_FLIGHT + 3
     up = next((r[0] for r in rec if r[5] == 0x54), None)
-    check('held down %d frames, then gets up (DownStand)' % B.GF_DOWN, up is not None and
+    check('held down %d frames from the knockdown, then gets up (DownStand)' % B.GF_DOWN, up is not None and
           B.GF_DOWN - 2 <= up - first_down <= B.GF_DOWN + 2, True)
-    check('no getup before the end (status stays 0x50)', up is not None and
-          all(r[5] == 0x50 for r in rec if first_down <= r[0] < up), True)
+    check('no getup before the end (status stays DownBound / DownWait)', up is not None and
+          all(r[5] in (0x4D, 0x50) for r in rec if first_down <= r[0] < up), True)
     check('controller back at the end', (v.input_off, a.vars.get(B.V_LOCK)), (0.0, 0.0))
     check('no thread left running at the end', sorted(a.threads), [])
     # a weak hit while down (20 frames in): DownDamage, then it stands
@@ -624,12 +636,12 @@ def acmd_tests(game_bin):
     check('launching hit while down: controller back at once, upright', rel is not None and rel <= land + 17
           and v.rot[0] == 0.0, True)
     check('launching hit: never stood up by the move', ('status', 0x54) in v.log, False)
-    # never lands (off the stage): DownWait in the air -> it falls (out of the down statuses): controller back
+    # never lands (off the stage): still tumbling when the MSC's wait for the down runs out: controller back
     v = Victim()
     v.never_lands = True
     a, rec = run_move(script, v)
-    check('never lands: falls, controller back, upright', (v.status == FALL, v.input_off, v.rot[0]),
-          (True, 0.0, 0.0))
+    check('never lands (no down within %d frames of the drop): controller back, upright' % B.GF_FALL_WAIT,
+          (v.input_off, v.rot[0], v.status in range(0x4D, 0x54)), (0.0, 0.0, False))
     # the dash punch on a shield / no catch: strike never happens
     v = Victim()
     a, rec = run_move(script, v, hit=False, frames=120)
@@ -697,11 +709,12 @@ def acmd_tests(game_bin):
 
 
 def facing_tests(body_dir):
-    """every effect of the move looks the same mirrored when he faces the other way: the game turns his bones
-    (TopN, bone 0: Z forward along his facing, Y up, X across, i.e. depth) with his facing, so an effect is
-    placed alike both ways only if its offset / rotation stays in the screen plane: on bone 0 no X (depth) offset
-    and no turn but about Y; on the fist (RHandN: at the punch its +X points forward, Z across) only an offset along
-    +X and a turn about Y (the model's front onto +X)"""
+    """every effect of the move looks the same, mirrored left-right, when he faces the other way. Only bone 0 (TopN:
+    Z forward along his facing, Y up, X across = depth, in both facings: Mario's own forward smash fire is Bone 0,
+    Y 7, Z 15) has axes that are the same on screen both ways: an effect there may sit at a height and a distance
+    ahead (no X: depth) and turn only about Y by 0 / 180. A body bone's own axes are not (v5: on RHandN, whose +Y
+    points down at the punch, turned Y -90, the model came out upside down with one facing: the user's v5 clip),
+    so an effect on any other bone gets no offset and no turn (it sits on the bone, camera-facing particles)."""
     bad = []
     for part in ('effect', 'game'):
         for c in acmd.ACMDFile.load(os.path.join(body_dir, part + '.bin')).script('attackdash'):
@@ -709,15 +722,14 @@ def facing_tests(body_dir):
                 continue
             d = dict(zip(acmd.INFO[c.ident]['syntax'], c.params))
             if d['Bone'] == 0:
-                ok = d['X'] == 0 and d['XRot'] == 0 and d['ZRot'] == 0
-            elif d['Bone'] == B.FIST:
-                ok = d['Y'] == 0 and d['Z'] == 0 and d['XRot'] == 0 and d['ZRot'] == 0
+                ok = d['X'] == 0 and d['XRot'] == 0 and d['ZRot'] == 0 and abs(d['YRot']) in (0, 180)
             else:
-                ok = False
+                ok = all(d[k] == 0 for k in ('X', 'Y', 'Z', 'XRot', 'YRot', 'ZRot'))
             if not ok:
-                bad.append((part, hex(d['Graphic']), d['Bone'], d['X'], d['Y'], d['Z']))
-    check('effects: placed alike facing left and right (bone 0: no depth offset; fist: along the forearm only)',
-          bad, [])
+                bad.append((part, hex(d['Graphic']), d['Bone'], (d['X'], d['Y'], d['Z']), (d['XRot'], d['YRot'],
+                                                                                            d['ZRot'])))
+    check('effects: placed and turned alike facing left and right (bone 0: height / ahead, Y 0 / 180 only; other '
+          'bones: no offset, no turn)', bad, [])
 
 
 def diag_tests(game_bin):

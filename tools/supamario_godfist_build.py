@@ -112,12 +112,21 @@ D_CATCH_KINDS, D_SLOT, D_HOLD_FRAME, D_HOLD_ROT, D_STRIKE_KINDS, D_FLIGHT, D_WD_
 # 8: the watchdog thread's every frame (does a thread run in game at all?); MSC (supamario.c, //GFD lines): 9 / 10 /
 # 11 the jump / rate 1 / status left, 12 gf_tick's phase 3 or a release (99), 13 the status that released it
 # v5: the flight in the game script (v4's thread never reached the victim in game): flight frame k (1 .. GF_FLIGHT) at
-# motion frame STRIKE + k (97 .. 140: his motion runs 1:1 after the strike's freeze); DownWait asked at k DOWN_K
-# (no hitstop / hitstun from then: the status change mustn't wait), upright from UPRIGHT_K (DownWait's own lying
-# animation has it lying); at STRIKE + GF_FLIGHT + 1 (141) the drop (stage collision back) and the hand-off to the
-# MSC (gf_tick: phase 2, the downed count); he acts from IASA (143), after the script's last frame
-DOWN_K, UPRIGHT_K = GF_FLIGHT - 2, GF_FLIGHT - 1
+# motion frame STRIKE + k (97 .. 140: his motion runs 1:1 after the strike's freeze). v6 (user, v5 in game: "never
+# actually forced to lay down, they never go into tumble"): v5's Status_Set DownWait at flight frame 42 came while
+# the victim was in the air (stage collision 0 while flown), and DownWait's loop (func_963: `global18 == 2` ->
+# Fall) left it at once: it fell, landed on its feet and the MSC let it go. Now the flight ends in the game's own
+# knockdown: no hitstop / hitstun from flight frame NOHOLD_K, at HANDOFF (141) dropped DROP_Y above the ground with
+# its stage collision back (air) and put in DamageFall (0x4C, tumble: its main enables the down term 0x1e00000d,
+# its loop func_816 goes to DownBound 0x4D when it touches the ground with that term on), upright (DamageFall's
+# own tumble animation); DownBound (func_921 / 922) plays the game's knockdown and ends in DownWait (0x50, face up /
+# down picked by the game). The MSC (gf_tick) waits for the down (phase 4), then holds it GF_DOWN frames
+# (phase 2). He acts from IASA (143)
+NOHOLD_K = GF_FLIGHT - 2
 HANDOFF = STRIKE + GF_FLIGHT + 1
+DROP_Y = 3.0                            # the drop height (units above the ground) at the hand-off
+DAMAGE_FALL = 0x4C
+GF_FALL_WAIT = 40                       # frames the MSC waits for the down after the drop
 IASA = float(HANDOFF + 2)               # the God Fist's cancel frame (MSC): 143
 ROOT_Z = [0.0] * anim.FRAMES             # his TransN z by motion frame (build() sets it from the animation)
 DOWN_HELD = (0x4D, 0x53)                # DownBound .. DownWait (0x53): still down; 0x57 DownDamage
@@ -171,7 +180,17 @@ SKILL_FX = {}                           # {'Crg': id, ..., 'Model': id} (effects
 # the model's front (its -Z, XV2's) turned onto the hand's +X: Y -90
 SKILL_GAIN, SKILL_ALPHA = 2.0, 1.5
 FIST_TIP = 1.2
-MODEL_ROT = (0.0, -90.0, 0.0)
+# v6 (user, v5 in game: "too close to Supamario, should be further from the tip of his fist", "mirrored vertically
+# depending on facing", "too small by comparison"): on bone 0 (TopN: Z forward, Y up in both facings, as Mario's own
+# forward smash fire, Bone 0 Z 15 Y 7), placed where his fist is (FIST_AT, from the built animation) plus AHEAD
+# along his facing, turned only about Y (0 / 180): a hand bone's local axes (RHandN's +Y points down at the punch)
+# turned the model upside down with one facing. Sizes x SKILL_SCALE: XV2's skill sizes are in metres of Goku (his
+# head bone 1.55 m up), Supamario's head bone is 9.67 units up: 6.24 units a metre, x1.24 on the 5.04 the effects
+# were converted at; x1.5 with the bloom halo XV2 adds around them (the user: "too small")
+SKILL_SCALE = 1.5
+MODEL_AHEAD = 5.0                       # the model's origin this far past his fist tip (its front 1.6 x size beyond)
+PTCL_AHEAD = {'Crg': 1.2, 'Circle': 2.0, 'Bas': 1.5, 'Drop': 1.5}
+MODEL_ROT = (0.0, 180.0, 0.0)           # its front (XV2's -Z) along his facing
 FIST_AT = {}                            # motion frame -> his right fist (in front of him, up) (build() fills it)
 
 
@@ -184,7 +203,8 @@ def msc_values():
             'GF_DOWN_DAMAGE': '%sf' % float(DOWN_DAMAGE), 'GF_DOWN_WAIT2': '%sf' % float(DOWN_WAIT2),
             'GF_DOWN_WAIT': '%sf' % float(DOWN_WAIT), 'GF_DOWN_STAND': '%sf' % float(DOWN_STAND),
             'GF_DOWN_LO': '%sf' % float(lo), 'GF_DOWN_HI': '%sf' % float(hi),
-            'GF_DOWN_HELD_FROM': '%sf' % float(GF_DOWN - 3)}
+            'GF_DOWN_HELD_FROM': '%sf' % float(GF_DOWN - 3), 'GF_DOWN_FRAMES': '%sf' % float(GF_DOWN),
+            'GF_DAMAGE_LO': '%sf' % float(0x45), 'GF_DAMAGE_HI': '%sf' % float(DAMAGE_FALL)}
 
 
 # ---------------------------------------------------------------- ACMD building
@@ -433,25 +453,25 @@ def game_script():
         if k > 1:
             s.append(cmd('frame', float(STRIKE + k)))
         f = [setf(x, LH_OFFX), setf(y, LH_OFFY), setf(0, LH_GROUND)]
-        if k < DOWN_K:
+        if k < NOHOLD_K:
             f += [cmd('hitstop_set', 2, 2, 0), cmd('hitstun_set', 2, 40)]
-        f.append(cmd('rotation_set', 2, float(a) if k < UPRIGHT_K else 0.0, 0.0, 0.0))
-        if k == DOWN_K:
-            f.append(cmd('status_set', 2, DOWN_WAIT))
+        f.append(cmd('rotation_set', 2, float(a), 0.0, 0.0))
         if k in fx and fx[k] in CMN_FX:
             # at the victim (its feet's offset from him, on the ground): bone 0, Z forward
             f.append(gfx('graphic_effect', CMN_FX[fx[k]], 0, 0.0, 0.0, float(x), CMN_SIZE))
-        if k in (1, GF_FLIGHT // 2, UPRIGHT_K):
+        if k in (1, GF_FLIGHT // 2, GF_FLIGHT):
             f += dlog_get(D_HOLD_ROT, cmd('rotation_get', 2, 0, V_TMP))
             f += dlog_get(D_SLOT, cmd('target_slot_get', 2, V_TMP))          # target 2 still found
         if k in (2, 3, 4):
             f += dlog_get(D_STRIKE_KINDS, cmd('hit_get', 0, 0, V_TMP))       # when the strike's kinds show
         s += if_(GF_VAR, 0, 2, f)
-    # the drop: stage collision back (air), upright, gf_phase 2 (the MSC's downed count)
-    x, y, _a = flight_offset(GF_FLIGHT)
+    # the drop: DROP_Y above the ground, stage collision back (air), tumbling (DamageFall), upright; gf_phase 4 (the
+    # MSC waits for the game's knockdown, then holds it down)
+    x, _y, _a = flight_offset(GF_FLIGHT)
     s += [cmd('frame', float(HANDOFF))] + if_(GF_VAR, 0, 2, [
-        setf(x, LH_OFFX), setf(y + 0.5, LH_OFFY), setf(5, LH_GROUND), cmd('rotation_set', 2, 0.0, 0.0, 0.0),
-        setf(0, V_SPIN), setf(GF_DOWN, V_CNT), setf(2, V_PHASE)] + dlog(D_PHASE, value=2))
+        setf(x, LH_OFFX), setf(DROP_Y, LH_OFFY), setf(5, LH_GROUND), cmd('status_set', 2, DAMAGE_FALL),
+        cmd('rotation_set', 2, 0.0, 0.0, 0.0), setf(0, V_SPIN), setf(GF_FALL_WAIT, V_CNT), setf(4, V_PHASE)]
+        + dlog(D_PHASE, value=4))
     return s
 
 
@@ -480,31 +500,35 @@ def effect_script():
     x0.8 too) effect 11 at 12 (61), at its head"""
     hit = CMN_FX.get('MHit')
     sk = SKILL_FX
+
+    def at_fist(key, frame, size, at=None):
+        # following him (bone 0), where his fist is at frame `at` (its spawn frame), AHEAD past it
+        fz, fy = FIST_AT.get(frame if at is None else at, (7.3, 5.0))
+        ahead = MODEL_AHEAD if key == 'Model' else PTCL_AHEAD[key]
+        return gfx('external_graphic', sk[key], 0, 0.0, fy, fz + FIST_TIP + ahead, size * SKILL_SCALE,
+                   rot=MODEL_ROT if key == 'Model' else (0.0, 0.0, 0.0))
     s = [cmd('frame', 1.0), gfx('graphic_effect', FX_DASH, 0, 0.0, 0.0, 0.0, 1.0)]
     if sk:
-        s += [cmd('frame', 2.0), gfx('external_graphic', sk['Crg'], FIST, FIST_TIP - 0.5, 0.0, 0.0, 0.6)]
+        s += [cmd('frame', 2.0), at_fist('Crg', 2, 0.6)]
     s += [cmd('frame', 10.0)]
     s += [gfx('graphic_effect', hit, 0, 0.0, 5.0, 0.0, 0.8 * CMN_SIZE)] if hit else []
     if sk:
-        # the model (its cone along its -Z, XV2's front) on the fist, its front along the forearm
-        s += [gfx('external_graphic', sk['Model'], FIST, FIST_TIP, 0.0, 0.0, 1.5, rot=MODEL_ROT),
-              gfx('external_graphic', sk['Circle'], FIST, FIST_TIP, 0.0, 0.0, 0.6)]
+        # the model (its cone along its -Z, XV2's front) where the fist strikes (frame PUNCH), the rings
+        s += [at_fist('Model', 10, 1.5, at=PUNCH), at_fist('Circle', 10, 0.6, at=PUNCH)]
     s += [cmd('frame', 12.0), gfx('graphic_effect', FX_DASH_CLOUD, 0, 0.0, 0.0, 0.0, 0.7)]
     if not hit and not sk:
         s += [cmd('frame', float(PUNCH)), gfx('graphic_effect', FX_FLASH, FIST, 2.0, 0.0, 0.0, 0.6)]
     if sk:
         # the whiff: entry 0's frame 40 (our 18 + 22 / 2): effect 1 off, effect 2 (the fist's burst)
-        whiff = [cmd('terminate_graphic_effect', sk['Model'], 1, 1),
-                 gfx('external_graphic', sk['Bas'], FIST, FIST_TIP, 0.0, 0.0, 0.6),
-                 gfx('external_graphic', sk['Drop'], FIST, FIST_TIP, 0.0, 0.0, 1.0)]
-        s += [cmd('frame', float(PUNCH_END + (40 - PUNCH_END) // 2))] + if_(GF_VAR, 0, 0, whiff)
+        wf = PUNCH_END + (40 - PUNCH_END) // 2
+        whiff = [cmd('terminate_graphic_effect', sk['Model'], 1, 1), at_fist('Bas', wf, 0.6), at_fist('Drop', wf, 1.0)]
+        s += [cmd('frame', float(wf))] + if_(GF_VAR, 0, 0, whiff)
         hz, hy = victim_head(61)
-        s += [cmd('frame', 61.0)] + if_(GF_VAR, 1, 0, [gfx('graphic_effect', sk['HitPt'], 0, 0.0, hy, hz, 0.4)])
+        s += [cmd('frame', 61.0)] + if_(GF_VAR, 1, 0, [gfx('graphic_effect', sk['HitPt'], 0, 0.0, hy, hz,
+                                                           0.4 * SKILL_SCALE)])
         # effect 1's model plays 37 frames (its obj.ema): off ~37 real frames after its start
         s += [cmd('frame', 64.0)] + if_(GF_VAR, 1, 0, [cmd('terminate_graphic_effect', sk['Model'], 1, 1)])
-        s += [cmd('frame', 67.0)] + if_(GF_VAR, 1, 0, [
-            gfx('external_graphic', sk['Bas'], FIST, FIST_TIP, 0.0, 0.0, 0.6),
-            gfx('external_graphic', sk['Drop'], FIST, FIST_TIP, 0.0, 0.0, 1.0)])
+        s += [cmd('frame', 67.0)] + if_(GF_VAR, 1, 0, [at_fist('Bas', 67, 0.6), at_fist('Drop', 67, 1.0)])
     else:
         s += [cmd('frame', float(JUMP_TO))] + if_(GF_VAR, 1, 0, [
             gfx('external_graphic', FX_GLOW, FIST, 1.0, 0.0, 0.0, 1.2)])
