@@ -37909,6 +37909,85 @@ void gf_track(float fr)
     gf_ey = vy;
 }
 
+// v14: his air actions from a ground status (AttackDash). v13 turned the air actions' transition terms on (WorkModule
+// 0x17) and called func_41, and in game he still couldn't act: a term is only read while its transition GROUP is on,
+// and a ground status has the air groups off. The game's own air statuses turn them on with func_40 (WorkModule 0x19:
+// 0x1f000008 landing, 0x0a air specials, 0x0b light throw, 0x0c air catch, 0x0d air dodge, 0x0e aerials, 0x0f
+// footstool, 0x10 wall jump, 0x11 air jump: reference/msc-note-sheet/STransGroup_ID.csv; e.g. func_175 turns them on
+// and calls func_41 from its loop). So: func_40 and the terms once, then func_41 (the game's air interrupts, every
+// rule of theirs). Should func_41 still not act, the same actions straight from the commands (global24, the frame's
+// ControlModule(0xa, 0)), in func_41's order and with its own checks: specials (func_72 hooks: 0x4000 hi, 0x8000 lw,
+// 0x2000 side, 0x1000 neutral), air dodge (0x400000), aerial (0x1: AttackAir picks the direction from the stick),
+// jump (0x200000 button / 0x100000 tap with tap jump on, a jump left)
+int gf_air_act()
+{
+    if (gf_terms == 0)
+    {
+        gf_terms = 0x1;
+        func_40();
+        WorkModule(0x17, 0x1e000061);
+        WorkModule(0x17, 0x1e00008a);
+        WorkModule(0x17, 0x1e000062);
+        WorkModule(0x17, 0x1e000063);
+        WorkModule(0x17, 0x1e000064);
+        WorkModule(0x17, 0x1e000065);
+        WorkModule(0x17, 0x1e000094);
+        WorkModule(0x17, 0x1e00003d);
+        WorkModule(0x17, 0x1e00003e);
+        WorkModule(0x17, 0x1e00003f);
+        WorkModule(0x17, 0x1e000043);
+        WorkModule(0x17, 0x1e000044);
+        WorkModule(0x17, 0x1e000045);
+    }
+    if (func_41() != 0)
+    {
+        return 0x1;
+    }
+    if (global24 & 0x4000 && func_72(global26))
+    {
+        func_16(0x154, 0x1);
+        return 0x1;
+    }
+    if (global24 & 0x8000 && func_72(global27))
+    {
+        func_16(0x155, 0x1);
+        return 0x1;
+    }
+    if (global24 & 0x2000 && func_72(global25))
+    {
+        func_16(0x153, 0x1);
+        return 0x1;
+    }
+    if (global24 & 0x1000 && func_72(global28))
+    {
+        func_16(0x152, 0x1);
+        return 0x1;
+    }
+    if (global24 & 0x400000)
+    {
+        func_16(0x22, 0x1);
+        return 0x1;
+    }
+    if (global24 & 0x1)
+    {
+        func_16(0x34, 0x1);
+        return 0x1;
+    }
+    if ((global24 & 0x200000 || global24 & 0x100000 && ControlModule(0x271c)) && WorkModule(0x6, 0x10000001) < WorkModule(0x6, 0x10000002))
+    {
+        if (WorkModule(0x6, 0x1300010c) == 0x1)
+        {
+            func_16(0xc, 0x1);
+        }
+        else
+        {
+            func_16(0xd, 0x1);
+        }
+        return 0x1;
+    }
+    return 0;
+}
+
 void gf_init()
 {
     gf_jump = 0;
@@ -37996,35 +38075,15 @@ int gf_update()
     }
     // v10: Leave_Ground_Cancel (the game script: 0 from the start, 2 from the catch, 1 at the hand-off on the
     // ground): caught in the air (he ran off a ledge before the punch), the God Fist goes on in the air. v13: in the
-    // air it plays to its end (held in place) and ends in Fall there; from GF_IASA he can act in the air (func_41:
-    // aerials, specials, air dodge, jumps; their transition terms turned on, a ground status has them off), which
-    // ends the hold (the status changes: the pin stops, Gravity_Set ends)
+    // air it plays to its end (held in place) and ends in Fall there. v14 (user: "make Supamario actionable at the same
+    // time in the air as on the ground"): from GF_IASA he acts in the air (gf_air_act), which ends the hold (the status
+    // changes: the pin stops, Gravity_Set ends)
     if (global18 == 0x2)
     {
-        if (fr >= GF_IASA)
+        if (fr >= GF_IASA && gf_air_act() != 0)
         {
-            if (gf_terms == 0)
-            {
-                gf_terms = 0x1;
-                WorkModule(0x17, 0x1e000061);
-                WorkModule(0x17, 0x1e00008a);
-                WorkModule(0x17, 0x1e000062);
-                WorkModule(0x17, 0x1e000063);
-                WorkModule(0x17, 0x1e000064);
-                WorkModule(0x17, 0x1e000065);
-                WorkModule(0x17, 0x1e000094);
-                WorkModule(0x17, 0x1e00003d);
-                WorkModule(0x17, 0x1e00003e);
-                WorkModule(0x17, 0x1e00003f);
-                WorkModule(0x17, 0x1e000043);
-                WorkModule(0x17, 0x1e000044);
-                WorkModule(0x17, 0x1e000045);
-            }
-            if (func_41() != 0)
-            {
-                //GFD WorkModule(0, fr, 0x0F0003FB);
-                return 0x1;
-            }
+            //GFD WorkModule(0, fr, 0x0F0003FB);
+            return 0x1;
         }
         if (MotionModule(0x2712) == 0x1)
         {

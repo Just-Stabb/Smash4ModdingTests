@@ -72,6 +72,8 @@ class MscGame:
         self.edge_x = None             # his ground's edge in front (GroundModule(0x2726, d): 1 when x + d is past it)
         self.ottotto = []              # the distances it was asked with
         self.terms_on = []             # (frame, term) WorkModule(0x17, term): transition terms turned on
+        self.groups_on = []            # (frame, group) WorkModule(0x19, group): transition groups turned on (v14)
+        self.jumps = (1, 2)            # jumps used / max (ints 0x10000001 / 0x10000002)
 
     def fvar(self, v):
         if v == B.GF_VAR:
@@ -112,6 +114,10 @@ class MscGame:
                     self.y += v
             if a[0] == 0x17 and len(a) == 2:
                 self.terms_on.append((self.frame, a[1]))
+            if a[0] == 0x19 and len(a) == 2:
+                self.groups_on.append((self.frame, a[1]))
+            if a[0] == 0x6 and len(a) == 2 and a[1] in (0x10000001, 0x10000002, 0x1300010c):
+                return {0x10000001: self.jumps[0], 0x10000002: self.jumps[1], 0x1300010c: 1}[a[1]]
             if a[0] == 0 and len(a) == 3 and a[2] == 0x0F000116 and R.i2f(a[1]) == 2.0:
                 self.sit_set.append(self.frame)
             if a[0] == 0x6 and a[-1] == 0x1300011c:
@@ -310,7 +316,7 @@ def msc_v12_tests(path):
                                   ('not in hitstun', {2: [15.0, 0.0, 0.0, 0x0]}, 1.0, None),
                                   ('hitstun over, still in a damage status', {2: [15.0, 0.0, 0.0, hit]}, 1.0, None),
                                   ('in front but he faces away', {2: [15.0, 0.0, 30.0, hit]}, -1.0, None),
-                                  ('out of range (25, flying away)', {2: [25.0, 6.0, 30.0, hit]}, 1.0, {2: 5.0})):
+                                  ('out of range (more than 35 on the tracking frames)', {2: [48.0, 6.0, 30.0, hit]}, 1.0, None)):
         _vm, g, out = startup_sim(path, slots, face, slot_v=sv)
         check('tracking: none with an opponent %s (no extra move)' % name, (g.moves, g.sit_set), ([], []))
     # within range, standing still, level: the burst reaches it anyway (k 1): no extra way (the startup at 2x: it is
@@ -379,59 +385,66 @@ def msc_v12_tests(path):
         if fast:
             check('startup %s: rate 2 to the punch, 1 from it' % name,
                   [r for f, _x, _y, r in out[:punch + 2]], [2.0] * punch + [1.0, 1.0])
-    # an off-stage catch: held where he is to the animation's end (v13), then Fall; acting from GF_IASA ends it
+    # an off-stage catch: held where he is to the animation's end (v13), then Fall; v14: acting from GF_IASA, as on
+    # the ground, in the air (func_40's groups, then func_41, then the actions from the commands)
     last = float(B.anim.FRAMES - 1)
-    for case in ('air', 'air, acts at 100', 'ground'):
+
+    def air_hit(case, cmd=0, at=None, jumps=(1, 2)):
         vm = msc_vm(path)
         g = vm.game
         g.x, g.y = 100.0, 50.0
+        g.jumps = jumps
         init, loop = vm.func(272), vm.func(273)
-        f41 = vm.func(41)
+        f39 = vm.func(39)
         orig = vm.call
-        acted = []
+        asked39 = []
 
-        def call(script, args=(), orig=orig, g=g, acted=acted, f41=f41, case=case):
-            if script is f41:
-                if case == 'air, acts at 100' and g.frame >= 100:
-                    acted.append(g.frame)
-                    return 1
+        def call(script, args=(), orig=orig, g=g):
+            if script is f39:
+                asked39.append(g.frame)
                 return 0
             return orig(script, args)
         vm.call = call
         vm.call(init)
         fr = 0.0
-        while fr <= last and g.status is None and not acted:
+        while fr <= last and g.status is None:
             g.frame = fr
             g.air = case != 'ground' and fr >= B.PUNCH
             vm.g[18] = 2 if g.air else 0
+            vm.g[24] = cmd if at is not None and fr >= at else 0
             g.cancel_open = fr >= 39
             g.motion_end = fr >= last
             g.lgc = 2 if fr >= B.PUNCH_END else 0          # the game script's Leave_Ground_Cancel (in the air)
             if fr >= B.PUNCH_END:
                 g.gf = 1.0
             vm.call(loop)
+            ended = fr
             g.y -= 0.5 if g.air else 0.0            # his fall, unless held
             fr = float(B.JUMP_TO) if fr == B.PUNCH_END else fr + 1.0
         held = [(f, var, v) for f, var, v in g.moves if var in (0x0F000000, 0x0F000001)]
-        frames = sorted({f for f, _v, _x in held}) or [None]
-        air_terms = {0x1e000061, 0x1e00008a, 0x1e000062, 0x1e000063, 0x1e000064, 0x1e000065, 0x1e000094, 0x1e00003d,
-                     0x1e00003e, 0x1e00003f, 0x1e000043, 0x1e000044, 0x1e000045}
-        on = [(f, t) for f, t in g.terms_on if t in air_terms]
-        terms = sorted({t for _f, t in on})
-        if case == 'air':
-            check('an off-stage catch: held at the catch\'s place every frame from the catch to the animation\'s end'
-                  ' (v13: not cut at GF_IASA), then Fall', (frames[0], frames[-1], {(var, v) for _f, var, v in held},
-                                                           g.status),
-                  (float(B.PUNCH_END), last - 1, {(0x0F000000, 100.0), (0x0F000001, 50.0 - 0.5 * (B.PUNCH_END - B.PUNCH))},
-                   0xE))
-            check('an off-stage catch: the air actions\' transition terms turned on at GF_IASA (aerials, specials, air'
-                  ' dodge, jumps)', (min(f for f, _t in on), len(terms)), (float(B.IASA), 13))
-        elif case == 'air, acts at 100':
-            check('an off-stage catch, acting at 100 (after GF_IASA): the move ends there (no Fall asked), held to it',
-                  (acted, g.status, frames[-1]), ([100.0], None, 100.0))
-        else:
-            check('a catch on the ground: not held (no position writes), no air terms, Wait at the end',
-                  (held, terms, g.status), ([], [], 0x0))
+        return g, ended, held, asked39
+
+    g, ended, held, _a = air_hit('air')
+    frames = sorted({f for f, _v, _x in held})
+    check('an off-stage catch, nothing pressed: held at the catch\'s place every frame to the animation\'s end, then'
+          ' Fall', (frames[0], frames[-1], {(var, v) for _f, var, v in held}, (ended, g.status)),
+          (float(B.PUNCH_END), last - 1, {(0x0F000000, 100.0), (0x0F000001, 50.0 - 0.5 * (B.PUNCH_END - B.PUNCH))},
+           (last, 0xE)))
+    check('an off-stage catch: the air transition groups turned on at GF_IASA (func_40: 0x1f000008, 0a - 11)',
+          sorted({gr for f, gr in g.groups_on if f == B.IASA}),
+          [0x1f000008] + list(range(0x1f00000a, 0x1f000012)))
+    for name, cmd, want in (('an aerial', 0x1, 0x34), ('air dodge', 0x400000, 0x22), ('up special', 0x4000, 0x154),
+                            ('down special', 0x8000, 0x155), ('side special', 0x2000, 0x153),
+                            ('neutral special', 0x1000, 0x152), ('a jump (button)', 0x200000, 0xC)):
+        g, ended, held, _a = air_hit('air', cmd, at=B.IASA - 3)
+        check('an off-stage catch, %s pressed from %d: acts on GF_IASA (%d), as on the ground (status 0x%X), held to'
+              ' it' % (name, B.IASA - 3, B.IASA, want), (ended, g.status, max(f for f, _v, _x in held)),
+              (float(B.IASA), want, float(B.IASA)))
+    g, ended, held, _a = air_hit('air', 0x200000, at=B.IASA, jumps=(2, 2))
+    check('an off-stage catch, jump with no jump left: no jump, plays out, then Fall', (ended, g.status), (last, 0xE))
+    g, ended, held, asked = air_hit('ground', 0x1, at=B.IASA)
+    check('a catch on the ground: not held, no air groups, acting through func_39 from GF_IASA (unchanged)',
+          (held, g.groups_on, min(asked)), ([], [], float(B.IASA)))
 
 
 # ---------------------------------------------------------------- ACMD
