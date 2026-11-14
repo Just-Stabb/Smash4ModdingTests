@@ -216,7 +216,13 @@ SND_DASH, SND_HEAVY, SND_FIRE, SND_BURST, SND_START = 0xCB10071, 0x5E0007, 0xCB1
 # nothing): loud from its first frame through ~100 frames (the dash, the punch and the hold), then fading. The BAC
 # item's sound flags are 0 (not stopped with the entry): XV2 lets it play out, and so does this. It covers the dash,
 # so Mario's own dash sound (SND_DASH at 10) is left out when it's there
-CMN_SE = {'gf_hit_ll': ('Hit_LL', 0.0), 'gf_down': ('Down', 0.0), 'gf_start': ('CAR_BTL_S030_CSA_Dash', 0.0)}
+# v12 (user: "make Super God Fist's startup sound less loud and end much sooner"): -6 dB (the tone's volume) and the
+# waveform cut at START_SE_END frames (the punch / catch: 14 - 18) with a START_SE_FADE-frame linear fade-out
+# (trimmed in the bank, not stopped from the script: Smash 4's ACMD has no stop for one sound, and a cut tone ends
+# the same whatever happens to the move)
+START_SE_END, START_SE_FADE = 20, 6
+CMN_SE = {'gf_hit_ll': ('Hit_LL', 0.0), 'gf_down': ('Down', 0.0),
+          'gf_start': ('CAR_BTL_S030_CSA_Dash', -6.0, START_SE_END, START_SE_FADE)}
 SE_IDS = {}                              # label -> sound id (sound_bank() fills it)
 SE_BANK_ID, SE_ROW = 2144, 3249
 VOICE = 0x80000007
@@ -687,6 +693,19 @@ def sound_script():
     return s
 
 
+def se_pcm(pcm, rate, entry):
+    """a CMN_SE entry's PCM: (wav, volume dB) as loaded, (wav, volume dB, end, fade) cut at `end` frames (60 a
+    second) with a linear fade-out over the last `fade` frames"""
+    if len(entry) < 4:
+        return pcm
+    import numpy as np
+    n = min(len(pcm), int(round(entry[2] * rate / 60.0)))
+    k = int(round(entry[3] * rate / 60.0))
+    x = pcm[:n].astype(np.float64)
+    x[n - k:] *= np.linspace(1.0, 0.0, k)
+    return np.round(x).clip(-32768, 32767).astype(np.int16)
+
+
 def sound_bank(sm_dir, table_path, wav_dir, out_dir):
     """CMN_SE into his snd_se_Supamario (the one in sm_dir/sound) as new one-shot tones (IDSP, 48 kHz mono, -0.5
     dBFS peak: tools/fighter_own_bank.py's), labels appended to his row in the soundlabeltable at table_path
@@ -707,8 +726,8 @@ def sound_bank(sm_dir, table_path, wav_dir, out_dir):
     have = kc.tone_names(data)
     exe = mm.dspenc()
     try:
-        new = [(label, fb.idsp_oneshot(exe, fb.load_audio(os.path.join(wav_dir, wav + '.wav'))), vol)
-               for label, (wav, vol) in CMN_SE.items() if prefix + label not in have]
+        new = [(label, fb.idsp_oneshot(exe, se_pcm(fb.load_audio(os.path.join(wav_dir, e[0] + '.wav')), fb.RATE, e)),
+                e[1]) for label, e in CMN_SE.items() if prefix + label not in have]
     finally:
         os.remove(exe)
     if new:
