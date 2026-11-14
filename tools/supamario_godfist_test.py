@@ -84,6 +84,10 @@ class MscGame:
         i = v - 0x0F0000A2
         if 0 <= i < 88 and i % 8 == 0 and i // 8 - 2 in self.slots:
             return self.slots[i // 8 - 2][3]
+        i = v - 0x0F000156                     # a slot's SITUATION (0x0F000100 + 0x20 x (slot + 2) + 0x16)
+        if 0 <= i < 0x120 and i % 0x20 == 0 and i // 0x20 in self.slots:
+            sl = self.slots[i // 0x20]
+            return float(sl[4]) if len(sl) > 4 else 0.0
         return 0.0
 
     def sys(self, sid, a):
@@ -248,11 +252,11 @@ def msc_tests(path):
           (-6.0, 48000 * B.START_SE_END // 60, 10000, 0, 10000))
 
 
-def startup_sim(path, slots, face=1.0, frames=24):
+def startup_sim(path, slots, face=1.0, frames=24, ledge_at=None):
     """the dash punch's startup, game frame by game frame: the MSC's init and loop, then the game moves him: on the
     ground his TransN's way (B.ROOT_Z) at the motion's rate, in the air (a SITUATION 2 write) gravity only (FALL: no
-    TransN), 0.1 a frame more each frame. slots {slot: [x, y, hitstun, status]} (he is at 0, 0). -> (vm, game, per
-    game frame (motion frame, x, y, rate))"""
+    TransN), 0.1 a frame more each frame. slots {slot: [x, y, hitstun, status(, situation: 0 ground)]} (he is at
+    0, 0); ledge_at: the game frame he runs off a ledge. -> (vm, game, per game frame (motion frame, x, y, rate))"""
     vm = msc_vm(path)
     g = vm.game
     g.face = face
@@ -260,7 +264,9 @@ def startup_sim(path, slots, face=1.0, frames=24):
     init, loop = vm.func(272), vm.func(273)
     vm.call(init)
     fr, vy, out = 0.0, 0.0, []
-    for _ in range(frames):
+    for gf in range(frames):
+        if ledge_at is not None and gf >= ledge_at:
+            g.air = True
         g.frame = fr
         vm.g[18] = 2 if g.air else 0
         vm.call(loop)
@@ -318,6 +324,28 @@ def msc_v12_tests(path):
     _vm, g, out = startup_sim(path, {4: [80.0, -40.0, 30.0, hit]})
     check('tracking down on the ground: no move down (not into the floor), still on the ground',
           (min(y for _f, _x, y, _r in out), g.sit_set), (0.0, []))
+    # grounded, the opponent at ground level: never aimed lower than his own path
+    _vm, g, out = startup_sim(path, {4: [80.0, -3.0, 30.0, hit, 0]})
+    check('tracking, grounded vs an opponent on the ground a little below (a slope): no move down, no dip',
+          ([v for _f, var, v in g.moves if var == 0x0F000005 and v < -1e-6], min(y for _f, _x, y, _r in out)),
+          ([], 0.0))
+    _vm, g, out = startup_sim(path, {4: [80.0, -20.0, 30.0, hit, 0]}, ledge_at=11)
+    check('tracking, grounded at the start, off a ledge mid-burst, the opponent on the ground 20 below: no down',
+          [v for _f, var, v in g.moves if var == 0x0F000005 and abs(v) > 1e-6], [])
+    _vm, g, out = startup_sim(path, {4: [80.0, -20.0, 30.0, hit, 2]}, ledge_at=11)
+    check('tracking, off a ledge mid-burst, the opponent in the air 20 below: aimed down (at most %g a frame)'
+          % B.TRACK_DOWN, bool([v for _f, var, v in g.moves if var == 0x0F000005 and v < -1e-6]), True)
+    _vm, g, out = startup_sim(path, {4: [80.0, -4.0, 30.0, hit, 2]}, ledge_at=11)
+    check('tracking, off a ledge mid-burst, the opponent in the air within %g of his height: no down'
+          % B.LEVEL_DY, [v for _f, var, v in g.moves if var == 0x0F000005 and abs(v) > 1e-6], [])
+    # grounded vs an opponent in the air above, near 60 degrees: up
+    _vm, g, out = startup_sim(path, {4: [40.0, 66.0, 30.0, hit, 2]})
+    ups = [(f, v) for f, var, v in g.moves if var == 0x0F000005 and v > 1e-6]
+    fw = {f: v for f, var, v in g.moves if var == 0x0F000004}
+    check('tracking, grounded vs an opponent in the air 59 degrees up: he rises from the burst\'s first frame,'
+          ' never steeper than 60 degrees', (g.sit_set[:1], bool(ups), ups[0][1] <= 3 ** 0.5 *
+                                             (B.BURST_SPEED + fw.get(ups[0][0], 0.0)) + 1e-3),
+          ([float(B.BURST[0])], True, True))
     # the nearest of two
     _vm, g, out = startup_sim(path, {2: [150.0, 0.0, 30.0, hit], 5: [45.0, 0.0, 30.0, hit]})
     _vm, g1, out1 = startup_sim(path, {5: [45.0, 0.0, 30.0, hit]})

@@ -37704,6 +37704,7 @@ int gf_jump;            // 0 the jump not asked for yet, 1 on its way to GF_JUMP
 // of the dash's burst (gf_track), and an off-stage catch held in place (gf_air: gf_px / gf_py) to GF_IASA
 int gf_fast;
 int gf_air;
+int gf_ground0;         // on the ground when the move started
 float gf_px;
 float gf_py;
 float gf_lx;            // his X / Y the frame before (gf_track)
@@ -37776,6 +37777,7 @@ void gf_track(float fr)
     float k;
     float vx;
     float vy;
+    int level;
     x = WorkModuleF(0, 0x0f000000);
     y = WorkModuleF(0, 0x0f000001);
     face = WorkModuleF(0, 0x0f000003);
@@ -37812,6 +37814,18 @@ void gf_track(float fr)
         k = GF_TRACK_MAX;
     }
     vy = k * d * dy / dx;
+    // v12 (user: "if Supamario is grounded and the opponent is at ground level, don't allow him to track lower than
+    // default"): started on the ground and the opponent on the ground (its SITUATION 0) or within GF_LEVEL_DY of his
+    // height: never aimed down, on the ground or after leaving it (his own path, no dip)
+    level = 0;
+    if (gf_ground0 == 0x1 && (WorkModuleF(0, 0x0f000156 + 0x20 * t) == 0.0f || dy * dy <= GF_LEVEL_DY * GF_LEVEL_DY))
+    {
+        level = 0x1;
+    }
+    if (level == 0x1 && vy < 0.0f)
+    {
+        vy = 0.0f;
+    }
     if (global18 == 0)
     {
         vx = (k - 1.0f) * d;
@@ -37831,7 +37845,14 @@ void gf_track(float fr)
             vy = -GF_TRACK_DOWN;
         }
         vx = k * d - mx;
-        vy = vy - my;
+        if (level == 0x1 && vy <= 0.0f)
+        {
+            vy = 0.0f;
+        }
+        else
+        {
+            vy = vy - my;
+        }
     }
     WorkModule(0, vx, 0x0f000004);
     WorkModule(0, vy, 0x0f000005);
@@ -37848,6 +37869,11 @@ void gf_init()
     gf_ey = 0.0f;
     gf_lx = WorkModuleF(0, 0x0f000000);
     gf_ly = WorkModuleF(0, 0x0f000001);
+    gf_ground0 = 0;
+    if (global18 == 0)
+    {
+        gf_ground0 = 0x1;
+    }
     gf_fast = 0;
     if (gf_pick(GF_COMBO_D2) != 0)
     {

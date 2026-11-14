@@ -96,6 +96,7 @@ BURST_SPEED = 4.5336                    # his TransN's way a frame over BURST (b
                                         # a constant, since the MSC is also built without the motion: kame_build)
 TRACK_MAX = 1.5
 TRACK_DOWN = 3.0
+LEVEL_DY = 5.0                          # "at ground level": the opponent on the ground, or within this of his height
 COMBO_RANGE = 40.0
 OFFSTAGE_GRAVITY = (-1.0, 0.0, 2)      # Gravity_Set: his own gravity (a rise slows), max fall 0, a fall cut at once
 SITUATION_VAR = 22                      # Input_Get's SITUATION (0 ground, 1 ledge, 2 air)
@@ -318,7 +319,7 @@ def msc_values():
             'GF_SLIDE_MIN': '%sf' % SLIDE_MIN, 'GF_PUNCH': '%sf' % float(PUNCH),
             'GF_BURST_FROM': '%sf' % float(BURST[0]), 'GF_BURST_END': '%sf' % float(BURST[1]),
             'GF_BURST_SPEED': '%sf' % BURST_SPEED, 'GF_TRACK_MAX': '%sf' % TRACK_MAX,
-            'GF_TRACK_DOWN': '%sf' % TRACK_DOWN, 'GF_HOLD_X': '%sf' % HOLD_X, 'GF_COMBO_D2': '%sf' % (COMBO_RANGE ** 2)}
+            'GF_TRACK_DOWN': '%sf' % TRACK_DOWN, 'GF_LEVEL_DY': '%sf' % LEVEL_DY, 'GF_HOLD_X': '%sf' % HOLD_X, 'GF_COMBO_D2': '%sf' % (COMBO_RANGE ** 2)}
 
 
 def burst_speed():
