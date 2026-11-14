@@ -37705,6 +37705,7 @@ int gf_jump;            // 0 the jump not asked for yet, 1 on its way to GF_JUMP
 int gf_fast;
 int gf_air;
 int gf_ground0;         // on the ground when the move started
+int gf_offedge;         // the tracked opponent is past the edge of his ground (GroundModule(0x2726, its distance))
 float gf_px;
 float gf_py;
 float gf_lx;            // his X / Y the frame before (gf_track)
@@ -37814,11 +37815,23 @@ void gf_track(float fr)
         k = GF_TRACK_MAX;
     }
     vy = k * d * dy / dx;
-    // v12 (user: "if Supamario is grounded and the opponent is at ground level, don't allow him to track lower than
-    // default"): started on the ground and the opponent on the ground (its SITUATION 0) or within GF_LEVEL_DY of his
-    // height: never aimed down, on the ground or after leaving it (his own path, no dip)
+    // v12 (user: "don't track opponents in hitstun lower than default. If they're off an edge then it can happen"):
+    // started on the ground, an opponent lower than him is tracked down only when it is past the edge of his ground:
+    // GroundModule(0x2726, distance), the game's own teeter check (Wait / Walk: is_ottotto(0.86), 1 when his ground
+    // doesn't go on that far in front of him), asked with the opponent's distance while he is on the ground (kept
+    // once he is off it). Over the stage: never aimed down (his own path, no dip); past the edge: he runs off it
+    // (Leave_Ground_Cancel is off) and the air path aims down, at most 60 degrees, GF_TRACK_DOWN a frame
+    if (global18 == 0)
+    {
+        gf_offedge = 0;
+        if (GroundModule(0x2726, dx) == 0x1)
+        {
+            gf_offedge = 0x1;
+        }
+        //GFD WorkModule(0, gf_offedge * 1000.0f + dx, 0x0F0003FE);
+    }
     level = 0;
-    if (gf_ground0 == 0x1 && (WorkModuleF(0, 0x0f000156 + 0x20 * t) == 0.0f || dy * dy <= GF_LEVEL_DY * GF_LEVEL_DY))
+    if (gf_ground0 == 0x1 && gf_offedge == 0)
     {
         level = 0x1;
     }
@@ -37870,6 +37883,7 @@ void gf_init()
     gf_lx = WorkModuleF(0, 0x0f000000);
     gf_ly = WorkModuleF(0, 0x0f000001);
     gf_ground0 = 0;
+    gf_offedge = 0;
     if (global18 == 0)
     {
         gf_ground0 = 0x1;

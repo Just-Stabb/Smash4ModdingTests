@@ -69,6 +69,8 @@ class MscGame:
         self.slots = {}
         self.moves = []                # (frame, variable, value) position writes
         self.sit_set = []              # frames SITUATION 2 was written
+        self.edge_x = None             # his ground's edge in front (GroundModule(0x2726, d): 1 when x + d is past it)
+        self.ottotto = []              # the distances it was asked with
 
     def fvar(self, v):
         if v == B.GF_VAR:
@@ -112,6 +114,10 @@ class MscGame:
             if a[0] == 0x6 and a[-1] == 0x1300011c:
                 return self.run_flag
             return 0
+        if sid == 0x1A and len(a) == 2 and a[0] == 0x2726:
+            d = R.i2f(a[1])
+            self.ottotto.append(d)
+            return int(self.edge_x is not None and (self.x + d * self.face) * self.face > self.edge_x)
         if sid == 0x13 and a == [0x1]:
             return R.f2i(self.frame)
         if sid == 0x12 and len(a) == 2 and a[0] == 0x4:
@@ -252,20 +258,22 @@ def msc_tests(path):
           (-6.0, 48000 * B.START_SE_END // 60, 10000, 0, 10000))
 
 
-def startup_sim(path, slots, face=1.0, frames=24, ledge_at=None):
+def startup_sim(path, slots, face=1.0, frames=24, ledge_at=None, edge_x=None):
     """the dash punch's startup, game frame by game frame: the MSC's init and loop, then the game moves him: on the
     ground his TransN's way (B.ROOT_Z) at the motion's rate, in the air (a SITUATION 2 write) gravity only (FALL: no
     TransN), 0.1 a frame more each frame. slots {slot: [x, y, hitstun, status(, situation: 0 ground)]} (he is at
-    0, 0); ledge_at: the game frame he runs off a ledge. -> (vm, game, per game frame (motion frame, x, y, rate))"""
+    0, 0); ledge_at: the game frame he runs off a ledge; edge_x: his ground's edge in front of him (he runs off it,
+    GroundModule(0x2726, d) is 1 past it). -> (vm, game, per game frame (motion frame, x, y, rate))"""
     vm = msc_vm(path)
     g = vm.game
     g.face = face
     g.slots = {k: list(v) for k, v in slots.items()}
+    g.edge_x = edge_x
     init, loop = vm.func(272), vm.func(273)
     vm.call(init)
     fr, vy, out = 0.0, 0.0, []
     for gf in range(frames):
-        if ledge_at is not None and gf >= ledge_at:
+        if ledge_at is not None and gf >= ledge_at or edge_x is not None and g.x * face > edge_x:
             g.air = True
         g.frame = fr
         vm.g[18] = 2 if g.air else 0
@@ -324,20 +332,23 @@ def msc_v12_tests(path):
     _vm, g, out = startup_sim(path, {4: [80.0, -40.0, 30.0, hit]})
     check('tracking down on the ground: no move down (not into the floor), still on the ground',
           (min(y for _f, _x, y, _r in out), g.sit_set), (0.0, []))
-    # grounded, the opponent at ground level: never aimed lower than his own path
-    _vm, g, out = startup_sim(path, {4: [80.0, -3.0, 30.0, hit, 0]})
-    check('tracking, grounded vs an opponent on the ground a little below (a slope): no move down, no dip',
-          ([v for _f, var, v in g.moves if var == 0x0F000005 and v < -1e-6], min(y for _f, _x, y, _r in out)),
-          ([], 0.0))
-    _vm, g, out = startup_sim(path, {4: [80.0, -20.0, 30.0, hit, 0]}, ledge_at=11)
-    check('tracking, grounded at the start, off a ledge mid-burst, the opponent on the ground 20 below: no down',
-          [v for _f, var, v in g.moves if var == 0x0F000005 and abs(v) > 1e-6], [])
-    _vm, g, out = startup_sim(path, {4: [80.0, -20.0, 30.0, hit, 2]}, ledge_at=11)
-    check('tracking, off a ledge mid-burst, the opponent in the air 20 below: aimed down (at most %g a frame)'
-          % B.TRACK_DOWN, bool([v for _f, var, v in g.moves if var == 0x0F000005 and v < -1e-6]), True)
-    _vm, g, out = startup_sim(path, {4: [80.0, -4.0, 30.0, hit, 2]}, ledge_at=11)
-    check('tracking, off a ledge mid-burst, the opponent in the air within %g of his height: no down'
-          % B.LEVEL_DY, [v for _f, var, v in g.moves if var == 0x0F000005 and abs(v) > 1e-6], [])
+    # grounded, an opponent lower than him: over the stage never aimed down; past the edge of his ground, down
+    for name, slot, edge, ledge in (('a little below on the stage (a slope)', [80.0, -3.0, 30.0, hit, 0], None, None),
+                                    ('20 below, over the stage, he off a ledge mid-burst', [80.0, -20.0, 30.0, hit, 2],
+                                     None, 11),
+                                    ('20 below in the air, over the stage (edge at 100)', [80.0, -20.0, 30.0, hit, 2],
+                                     100.0, None)):
+        _vm, g, out = startup_sim(path, {4: slot}, edge_x=edge, ledge_at=ledge)
+        check('tracking, grounded vs an opponent %s: never aimed down (no dip)' % name,
+              [v for _f, var, v in g.moves if var == 0x0F000005 and v < -1e-6], [])
+    _vm, g, out = startup_sim(path, {4: [70.0, -25.0, 30.0, hit, 2]}, edge_x=30.0)
+    downs = [(f, v) for f, var, v in g.moves if var == 0x0F000005 and v < -1e-6]
+    fw = {f: v for f, var, v in g.moves if var == 0x0F000004}
+    check('tracking, grounded vs an opponent below past the edge (edge 30, it at 70, 25 down): he runs off the edge,'
+          ' then aims down (at most %g a frame, never steeper than 60 degrees)' % B.TRACK_DOWN,
+          (g.air, bool(downs), all(-v <= B.TRACK_DOWN + 1e-6 for _f, v in downs)), (True, True, True))
+    check('tracking past the edge: the edge check (GroundModule 0x2726) asked with the opponent\'s distance',
+          bool(g.ottotto) and all(dist > 0 for dist in g.ottotto), True)
     # grounded vs an opponent in the air above, near 60 degrees: up
     _vm, g, out = startup_sim(path, {4: [40.0, 66.0, 30.0, hit, 2]})
     ups = [(f, v) for f, var, v in g.moves if var == 0x0F000005 and v > 1e-6]

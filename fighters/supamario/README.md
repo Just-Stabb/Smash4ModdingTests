@@ -1000,6 +1000,18 @@ v12 is installed over v11 and still uses exe B (`exe_v46i`). The user asked:
   Down, it never moves him, so he can't go into the floor.
 - **In the air:** his kinetics move him. The MSC makes up the difference to the aimed path, measured from the frame
   before, and moves him down at most 3 a frame.
+- **Opponents lower than him** (the user: "don't track opponents in hitstun lower than default. If they're off an
+  edge then it can happen"). This applies when he starts the move on the ground:
+  - **Over the stage:** an opponent below him is never tracked down, on the ground or after he leaves it (his own
+    path, no dip).
+  - **Past the edge of his ground:** downward tracking is allowed. He runs off the edge (Leave_Ground_Cancel is off),
+    then the air path aims down, at most 60 degrees and 3 a frame. An off-stage catch is then held as above.
+  - **How "past the edge" is decided:** `GroundModule(0x2726, distance)`, asked every grounded burst frame with the
+    opponent's distance in front (kept once he is in the air). This is the game's own teeter check: Wait / Walk call it
+    with 0.86 and go into Ottotto when it is 1, i.e. his ground doesn't go on that far in front of him.
+  - **Not confirmed:** that it answers the same at long distances is known only from its vanilla use. The diag build
+    logs it (k 14: 1000 x past the edge + the distance).
+  - **Upward tracking** is unchanged.
 - **No target:** exactly v11.
 
 ### A faster startup on a combo
@@ -1016,6 +1028,9 @@ At the move's start (gf_init), if an opponent in hitstun is within 40 units, usi
   - extras only on the burst's frames, capped at 1.5x;
   - an opponent just out of reach is reached;
   - up leaves the ground, and down on the ground does nothing;
+  - grounded vs an opponent below over the stage (a slope, 20 below with him off a ledge mid-burst, 20 below inside
+    the edge): never down;
+  - grounded vs an opponent below past the edge: he runs off it and aims down (at most 3 a frame);
   - of two opponents, the nearest is tracked;
   - with the startup at 2x, tracking on the burst frames it plays.
 - **Startup:** at 2x within 40 (the punch on game frame 7); normal at 45, behind him, or not in hitstun.

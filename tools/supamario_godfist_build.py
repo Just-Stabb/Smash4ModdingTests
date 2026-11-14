@@ -96,7 +96,6 @@ BURST_SPEED = 4.5336                    # his TransN's way a frame over BURST (b
                                         # a constant, since the MSC is also built without the motion: kame_build)
 TRACK_MAX = 1.5
 TRACK_DOWN = 3.0
-LEVEL_DY = 5.0                          # "at ground level": the opponent on the ground, or within this of his height
 COMBO_RANGE = 40.0
 OFFSTAGE_GRAVITY = (-1.0, 0.0, 2)      # Gravity_Set: his own gravity (a rise slows), max fall 0, a fall cut at once
 SITUATION_VAR = 22                      # Input_Get's SITUATION (0 ground, 1 ledge, 2 air)
@@ -143,6 +142,8 @@ DIAG = False
 DIAG_BASE = 0x0F0003F0
 D_CATCH_KINDS, D_SLOT, D_HOLD_FRAME, D_HOLD_ROT, D_STRIKE_KINDS, D_FLIGHT, D_WD_RELEASE, D_ROT_AFTER, \
     D_WD_ALIVE, D_MSC_JUMP, D_MSC_RATE1, D_MSC_EXIT, D_PHASE, D_WD_STATUS = range(14)
+# 14 (v12, MSC gf_track): the edge check while tracking on the ground: 1000 x (opponent past his ground's edge) + its
+# distance
 # 8: the watchdog thread's every frame (does a thread run in game at all?); MSC (supamario.c, //GFD lines): 9 / 10 /
 # 11 the jump / rate 1 / status left, 12 gf_tick's phase 3 or a release (99), 13 the status that released it
 # v5: the flight in the game script (v4's thread never reached the victim in game): flight frame k (1 .. GF_FLIGHT) at
@@ -319,7 +320,7 @@ def msc_values():
             'GF_SLIDE_MIN': '%sf' % SLIDE_MIN, 'GF_PUNCH': '%sf' % float(PUNCH),
             'GF_BURST_FROM': '%sf' % float(BURST[0]), 'GF_BURST_END': '%sf' % float(BURST[1]),
             'GF_BURST_SPEED': '%sf' % BURST_SPEED, 'GF_TRACK_MAX': '%sf' % TRACK_MAX,
-            'GF_TRACK_DOWN': '%sf' % TRACK_DOWN, 'GF_LEVEL_DY': '%sf' % LEVEL_DY, 'GF_HOLD_X': '%sf' % HOLD_X, 'GF_COMBO_D2': '%sf' % (COMBO_RANGE ** 2)}
+            'GF_TRACK_DOWN': '%sf' % TRACK_DOWN, 'GF_HOLD_X': '%sf' % HOLD_X, 'GF_COMBO_D2': '%sf' % (COMBO_RANGE ** 2)}
 
 
 def burst_speed():
