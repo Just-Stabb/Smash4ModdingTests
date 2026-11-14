@@ -531,8 +531,9 @@ def v6_tests(path, src):
     for _ in range(45):
         r.vm.call(r.fn['khm_update'])
     check('Hatchet Man: the camera back after 40 frames', g.fvars.get(0x0F000099), 9.0)
-    check('Hatchet Man: special held off before the cancel frame (%d)' % ev[0x14]['cancel'],
-          all(b for f, b in blocked if f < ev[0x14]['cancel']), True)
+    last_hm = max(f for f, k, _v in ev[0x14]['ground'] if k == 'hitbox')
+    check('Hatchet Man: special held off to its last hitbox frame (%d; fix v11, was the cancel frame %d)'
+          % (last_hm, ev[0x14]['cancel']), all(b for f, b in blocked if f - 1 <= last_hm), True)
     check('Hatchet Man: no x2 crit bit (its damage is Ultimate\'s crit already)', r.vm.call(r.fn['khm_sw_crit_bit']), 0)
     # Metal Slash: metal on the fighter hit; KO on one already metal; nothing on a shield
     for metal, status, want in ((0.0, 0x48, (1.0, None)), (1.0, 0x48, (1.0, 1.0)), (0.0, 28, (None, None))):
@@ -571,8 +572,9 @@ def fix_v6_tests(path, src):
     """Hero copy fix v6 / v7: during a sword spell Kirby plays the spell's motion (0x304-0x307,
     tools/kirby_hero_sword_anim.py) from the first cast frame (its frame 0); fix v7: its frame set again only when it
     drifts from the cast's (setting it jumps the slot's trail script); nothing after the end (he stays in it); a
-    landing's hold motion (0x2ED / 0x2F1) keeps its first 3 frames; the arm hitbox on LHaveN (0x18). Fix v7: the
-    stone can't end during the spell (special, the ground timer), and a status other than the hold stops it"""
+    landing's hold motion (0x2ED / 0x2F1) keeps its first 3 frames; the arm hitbox on LHaveN (0x18). Fix v7: a
+    status other than the hold stops it. Fix v11: special ends the stone only from the frame after the last hitbox;
+    the ground timer whenever it runs out, the spell cut cleanly there"""
     import kirby_hero_sword_msc as SW
     import kirby_hero_sword_anim as A
     ev = SW.events(SW.parse())
@@ -620,31 +622,65 @@ def fix_v6_tests(path, src):
         log.append((g.motion, g.frame == float(f) if g.motion != 0x2ED else None))
     check('fix v6: landing mid-cast: 0x2ED kept at its frames 0-2 (its landing hitbox), Hatchet Man\'s motion again at '
           '3, at the cast frame', log, [(0x2ED, None), (0x2ED, None), (0x2ED, None), (A.SLOT[0x14], True)])
-    # fix v7: every way the stone could end during a sword spell
+    # fix v11 (replaces fix v7's "held to the spell's end"): special only from the frame after the last hitbox (never
+    # forced); the ground timer ends the stone whenever it runs out, the spell cut there; nothing -> plays out
+    last_hb = {n: max(f for sit in ('ground', 'air') for f, k, _v in ev[n][sit] if k == 'hitbox') for n in ev}
     for n in (0x11, 0x12, 0x13, 0x14):
-        end = ev[n]['end']
-        for how in ('special', 'timer'):
+        end, last = ev[n]['end'], last_hb[n]
+        hb_frames = sorted(set(f for f, k, _v in ev[n]['ground'] if k == 'hitbox'))
+        timer_at = (2, hb_frames[0], last + 3)              # the timer running out before / during / after the hitboxes
+        for how in ['special', 'nothing'] + ['timer %d' % t for t in timer_at]:
             r = Run(path, src, 2)
             g = r.game
             r.update()
             g.motion, g.frame = 0x2ED, 20.0
-            g.ints[0x18000000] = 10000 if how == 'special' else 1
+            g.ints[0x18000000] = 10000 if not how.startswith('timer') else 1000
             g.ints[0x11000002] = 0
-            ends = []
+            g.tag = lambda r=r: kget(r, 'khm_frame') if kget(r, 'khm_state') == 2 else None
+            ends, mark = [], {}
 
             def each(r, how=how):
-                f = kget(r, 'khm_frame')
+                c = kget(r, 'khm_frame') - 1            # the cast frame this update ran
+                if ends:                                # the stone's end (0x176) from the next frame: its main sets
+                    if 'calls' not in mark:             # the stone's end motion (func_2262)
+                        mark.update(calls=len(r.game.calls), motions=len(r.game.motions))
+                    r.vm.g[r.gi['global4']] = 0x176
+                    r.game.motion = 0x2E9
+                    advance(r)
+                    return
                 r.vm.g[r.gi['global4']] = 0x175
                 r.game.press = {1} if how == 'special' else set()
-                r.game.ints[0x11000002] = 50
+                if how.startswith('timer') and c >= int(how.split()[1]):
+                    r.game.ints[0x11000002] = 1000      # its time is up from this cast frame on
                 n_st = len(r.game.statuses)
                 r.vm.call(r.fn['func_2323'])
                 if len(r.game.statuses) > n_st and 0x176 in r.game.statuses[n_st:]:
-                    ends.append(f)
+                    ends.append(c)
                 advance(r)
             cast(r, n, end + 4, each)
-            check('fix v7: %s: the stone\'s %s end held off through the spell (cast 0-%d), taken right after it'
-                  % (names_[n], 'special' if how == 'special' else 'ground timer', end), ends[:1], [end + 1])
+            if how == 'special':
+                check('fix v11: %s: special held every frame: ignored to the last hitbox frame (%d), the stone ends on '
+                      'the next (allowed, the press its own)' % (names_[n], last), ends[:1], [last + 1])
+            elif how == 'nothing':
+                check('fix v11: %s: nothing pressed, time left: the stone stays through the spell (to %d) and after; '
+                      'the spell played out (every hitbox frame, then over)' % (names_[n], end),
+                      (ends, sorted(set(f for f, k, _v in g.calls if k == 'hitbox')), int(g.nv_get(0x0F0003A2))),
+                      ([], hb_frames, 0))
+            else:
+                t = int(how.split()[1])
+                check('fix v11: %s: the ground timer running out at cast frame %d (%s the hitboxes %d-%d): the stone '
+                      'ends right then' % (names_[n], t, 'before' if t < hb_frames[0] else 'during' if t <= last
+                                           else 'after', hb_frames[0], last), ends[:1], [t])
+                # then the stone's end (0x176): the spell cut there, cleanly, Kirby not put in the swing
+                calls0, nm = mark['calls'], mark['motions']
+                after = g.calls[calls0:]
+                check('fix v11: %s: cut at %d: in 0x176 the spell stopped at once (sword int 0, hitboxes 5-9 removed, '
+                      'blade effects ended, his effects follow his model again), no hitbox / effect made after, his '
+                      'motion the stone\'s end (no swing motion)' % (names_[n], t),
+                      (g.ints.get(0x1000008B), g.removed[-5:], [tuple(v) for _f, k, v in after if k == 'effvis'][-1:],
+                       sorted(set(v[0] for _f, k, v in after if k == 'kill' and v[0] >> 16 == 0x345)) != [],
+                       [k for _f, k, _v in after if k in ('hitbox', 'effect', 'follow')], g.motions[nm:], g.motion),
+                      (0, [5, 6, 7, 8, 9], [(0x26, 1)], True, [], [], 0x2E9))
     for st, what in ((0x176, 'SpecialLwEnd'), (0x48, 'a hit (damage)')):
         r = Run(path, src, 2)
         g = r.game

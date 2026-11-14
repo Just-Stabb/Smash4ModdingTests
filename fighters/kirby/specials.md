@@ -2595,3 +2595,36 @@ animations kept.
 
 **Not measured in game:** hurtbox sizes and depth (the box is an estimate), and which reading the game uses. Fix v10
 doesn't depend on the readings.
+
+### Hero copy fix v11 (`kirby_hero_copy_fix_v11`): leaving the stone after a sword spell's hitboxes
+
+User (fix v10): "make it so Kirby can leave the stone the moment the hitboxes finish for the sword attacks". Then:
+"I don't want it to be forced", and "If the timer runs out mid-spell, the stone should end the spell there". MSC only.
+
+- **Special** (the player's own way out, `khm_blocking`) is held off only while a spell's hitboxes can still be out.
+  `khm_sw_hitting()` checks the cast frame against `khm_sw_last(n)`, which is generated from the hitbox frames:
+
+  | Spell | Last hitbox frame | Special ends the stone from |
+  |---|---|---|
+  | Flame / Kacrackle Slash | 8 | 9 |
+  | Metal Slash | 12 | 13 |
+  | Hatchet Man | 40 | 41 |
+
+  Before that a press is ignored. It is only allowed, never forced: with no press the spell plays out as in fix v10.
+- **The ground timer** no longer waits for the spell (fix v7's `khm_sw_busy()` in `func_2323` removed). When it runs out
+  during a sword spell, at any point, the stone ends right then.
+- **Either way** the stone goes to its normal end, SpecialLwEnd 0x176.
+  - Its main sets the stone's end motion (`func_2262`) and shows Kirby.
+  - `khm_sword` sees a status other than the hold and calls `khm_sw_stop`. That removes hitboxes 5-9, sets the sword
+    int to 0, ends the blade effects and Hatchet Man's burst, stops the long sound and gives back
+    `EffectModule(0x26, 1)`.
+  - Kirby's motion is left alone, so he is never put back in the swing (fix v7's bug).
+  - The trail (Sword_Glow in the swing slot's effect script) ends with the motion change, as any interrupted sword
+    swing's does. That isn't modelled here.
+- **Tests** (`kirby_newcopy_test.py`, replacing fix v7's held-to-the-end checks), each spell:
+  - special held every frame: ignored to the last hitbox frame, the stone ends on the next;
+  - nothing pressed with time left: no end, every hitbox frame made, the spell over;
+  - the timer running out before, during and after the hitbox frames: the stone ends that frame;
+  - then in 0x176: sword int 0, hitboxes 5-9 removed, blade effects ended, (0x26, 1), no hitbox or effect made after,
+    and no motion change (the stone's end motion kept).
+  - Fix v10's MSC fails all 28 special and timer checks.

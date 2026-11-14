@@ -39001,9 +39001,9 @@ void func_2323()
         func_16(0x176, 0);
         return 0x1;
     }
-    if (WorkModule(0x6, 0x11000002) >= WorkModule(0x6, 0x18000000) && khm_zooming() == 0 // fix v4: not in a Zoom
-        && khm_sw_busy() == 0) // fix v7: nor in a sword spell (it ends after the spell)
-    {
+    if (WorkModule(0x6, 0x11000002) >= WorkModule(0x6, 0x18000000) && khm_zooming() == 0) // fix v4: not in a Zoom;
+    {   // fix v11 (user: "If the timer runs out mid-spell, the stone should end the spell there"): a sword spell no
+        // longer holds the timer off (fix v7 did): the stone ends, and khm_sword stops the spell in 0x176 (khm_sw_stop)
         func_16(0x176, 0);
         return 0x1;
     }
@@ -75568,8 +75568,9 @@ int khm_once(int bit)
 
 int khm_blocking()
 {
-    return WorkModule(0x6, 0x0f0003bf) == 0x1 || WorkModule(0x6, 0x0f0003b5) || khm_sw_hitting()   // fix v11: a sword spell
-        || khm_zooming();       // fix v4: Zoom / Zoom 2 U                                              // to its last hitbox
+    return WorkModule(0x6, 0x0f0003bf) == 0x1 || WorkModule(0x6, 0x0f0003b5)
+        || khm_sw_hitting()     // fix v11: a sword spell, to its last hitbox frame (fix v7: to its end)
+        || khm_zooming();       // fix v4: Zoom / Zoom 2 U
 }
 
 // fix v7 (user: "when the stone ends during sword moves, Kirby is visible in the animation rather than staying in the
@@ -75577,7 +75578,9 @@ int khm_blocking()
 // it). The stone's own ends wait for it: special (khm_blocking, was only to the cancel frame) and the ground timer
 // in the hold loop func_2323; the spell then ends and the stone ends normally. Before, special after the cancel frame
 // or the timer took him to SpecialLwEnd 0x176 (shown again: VisibilityModule(0x2710, 1)), where the cast went on
-// (0x176 counted as the stone) and khm_sw_motion put him back in the sword motion, visible
+// (0x176 counted as the stone) and khm_sw_motion put him back in the sword motion, visible. Fix v11: neither end
+// waits for the whole spell any more (khm_sw_hitting; the timer, func_2323); khm_sw_stop still stops it in 0x176 and
+// leaves his motion to the stone's end
 int khm_sw_busy()
 {
     return WorkModule(0x6, 0x0f0003a2) != 0;
@@ -75587,8 +75590,9 @@ int khm_sw_busy()
 // want it to be forced"): special (the player's own way out, khm_blocking) is held off only while the spell's
 // hitboxes can still be out: to its last hitbox frame (khm_sw_last, generated; 0x0F0003A1 = the cast frame khm_sword
 // last ran). From the next frame a special press takes him to the stone's normal end (0x176: khm_sword then stops the
-// spell, khm_sw_stop, and leaves his motion alone, fix v7). Nothing ends it by itself: the ground timer still waits
-// for the spell's end (khm_sw_busy in func_2323), so with no press the spell plays out as before
+// spell, khm_sw_stop, and leaves his motion alone: 0x176's main sets the stone's end motion, fix v7). The press is
+// only allowed, never forced. The ground timer ("If the timer runs out mid-spell, the stone should end the spell
+// there") ends the stone whenever it runs out, the spell cut there the same way (func_2323)
 int khm_sw_hitting()
 {
     return WorkModule(0x6, 0x0f0003a2) != 0 && WorkModule(0x6, 0x0f0003a1) <= khm_sw_last(WorkModule(0x6, 0x0f0003a2));
