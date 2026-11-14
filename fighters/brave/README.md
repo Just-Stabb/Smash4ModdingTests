@@ -1569,3 +1569,8 @@ passes (fighters/kirby/specials.md "Hero copy fix v2": a Kirby-cast Whack with a
 Hero as the caster). Hero's own `brave_generate` still passes the level alone (0 / 1), which keeps the search (the Hero
 or Kirby nearest to the article): his spells behave as before (`tools/brave_shot_owner_test.py`). The native param
 getters keep the custom within their 4 entries (`CUSTOM_CLAMP`).
+
+Kirby's fix v3: the projectiles drew invisible with those custom numbers (past 3), so Kirby sends the level alone again
+and the articles find him themselves: `shot.c` / `placed.c` (crash) take a Kirby in his stone (statuses 0x155 / 0x175 /
+0x176) within 30 of the article as the caster, before Hero's search. Hero's own casts are unchanged
+(`tools/brave_shot_owner_test.py`); rebuilt: flash, explosion, deathball, sleep, crash, spark, tornado.

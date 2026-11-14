@@ -1949,3 +1949,62 @@ python3 tools/brave_shot_owner_test.py OUT/shot   # + flash / explosion / deathb
 read unless `book_fix` and the marker is 2 / 3; record 7 reads 0x49): with the old executable modelled, Frizzle's
 fireball gets custom 0 and the marker is lost (the in-game report); with fix v2, Frizz / Frizzle / the stored Kafrizz
 0 / 1 / 2, the marker kept, the Stone's projectiles level + 4 x (slot + 1) (fix v1's MSC fails those).
+
+### Hero copy fix v3 (`kirby_hero_copy_fix_v3`): visible spells, Acceleration, the sword, the Stone's menu and drop
+
+User (fix v2): Frizzle / Kafrizz work. Every Command Selection projectile (Sizz, Bang, Whack, Snooze, Magic Burst ...)
+is invisible except its burst; Acceleration does nothing and shows no glow; the B build's sword still isn't shown
+(the `bravesword` folders installed). New: in the air, with the menu shut, down special drops him as a normal Stone;
+a cancelled menu opens again at once.
+
+**Invisible projectiles: fix v2's custom numbers past 3.** Between fix v1 (projectiles drawn: the user saw Whack for
+Thwack) and fix v2 only the custom number changed for them (fix v2's exe change ran for Frizz too, which draws): fix v2
+sent level + 4 x (slot + 1) (4-13) to articles 8-11 and Magic Burst's level + 8 x slot reached the crash. That is
+port_check W10 ("past 3 it reads the base weapon's per-custom data past its 4 entries"), the bug catalogue's P2
+Whack / Thwack that never appeared: the getter clamp (checked in exe_v45h) is not the only per-custom read (the other
+one not found). Fix: `khm_generate` sends the level alone again (0 / 1) and Magic Burst 0 (61-100 MP spent: full) or
+3 (1-60 MP: the x0.2 tier; 40 / 60 / 80 aren't below 4), Kamikazee 1. The caster is found in the article:
+`shot.c` `sh_stone_kirby` / `placed.c` `pl_stone_kirby` (crash only): a Kirby (kind 8) in his stone (statuses
+0x155 / 0x175 / 0x176, position variables) within 30 of the article, nearest first, before Hero's search (the nearest
+Hero or Kirby, which took an opponent Hero nearer to the article). Hero's own casts are unchanged (no stone Kirby near
+his hand; his crash keeps its slot in the number). Rebuilt Hero files: flash, explosion, deathball, sleep (shot.c),
+crash, spark, tornado (placed.c).
+
+**Acceleration: Hero's is Kirby's Overdrive.** brave.c's `brave_accel_on` (fix 79) sets the animation rate 1.2
+(`0x0F000098`) and the common blue glow `0x10000C7` on four joints, made again every frame, besides the marker bit
+0x1000; Kirby's v2 port set only the bit. `khm_accel` now does both for its 600 frames (Kirby's Overdrive joints
+HeadN / LArmJ / RArmJ / LLegJ, `overdrive_gfx_on`), and puts the rate back at its end, a KO or the copy's loss.
+Acceleratle / Oomph / Psyche Up already had their glows and bits (interpreter: the marker 0x...303 / 0xA0 / 0x40).
+
+**The sword: a wrong bone hash in the converted model.** A model.vbn bone's third word is the game's hash of its name,
+not crc32: Smash 4's held swords' root `HaveN` is 0x2D6C2084 and `SwordN` 0x7B4475A3 (marthsword, ikesword); Kirby's
+body `RHaveN` 0x47F11BB8 is ikesword's root's; the copy hats kept their template's `TopN` 0x4A2AE7BC and show.
+`tools/kirby_copy_sword.py` (v6) wrote crc32("HaveN") = 0xF4A99364 and one bone. The engine finds joints by name (an
+item's `HaveN`: `0x0302C320` -> `0x030832C8`, ModelModule vt `+0x1CC` with the string), which no bone of ours
+matched. Now the vanilla held swords' layout: HaveN (0x2D6C2084, the root, unrotated: the vertices are already in
+LHaveN's frame) and its child SwordN (0x7B4475A3), model.jtb `00 02 00 00 00 01`; `--fix-skeletons MODEL_DIR` rewrites
+an existing `bravesword` tree (fix v3's B package: the 8 folders' model.vbn / model.jtb). Not checked in game before
+this package (no emulator here).
+
+**The Stone (user):**
+- The menu cancelled (shield / jump) opens again at once with the same four spells (`khm_reopen`: the window from
+  its start, the opening sound, the 8 seconds from 0, the cursor on the first row). The 8 seconds running out still
+  shuts it (Hero's limit), as before.
+- Down special (B + down: command bit 0x8000) in the AIR with the menu shut (no menu open, no spell being cast,
+  `khm_sub` idle: after a spell or the 8 seconds) drops him as a normal Stone: the stone article removed and the down
+  special started over (status 0x155: Kirby's own transformation, its fast fall and the falling hitbox, then the
+  stone's hold), with no menu for the rest of that stone (`khm_plain`, New_Var slot `0x0F00039A`, cleared when he
+  leaves the stone statuses). `khm_stone_drop`, called first in the stone's hold loop `func_2323`. On the ground, or
+  with the menu open (special casts there; a held-down special in the menu casts too) or during a cast, nothing new.
+
+Tests: `kirby_newcopy_test.py` (fix v3: the spells' custom = the level, Magic Burst 0 / 3 from any slot, Kamikazee 1,
+Acceleration's rate 1.2 / glow every frame / bit / its end, the menu reopened by shield and jump with the same spells,
+the 8 seconds still shut it, the drop and its six non-cases), `brave_shot_owner_test.py` (the stone Kirby as caster
+for every shot article, an opponent Hero nearer to it; Hero's own: a stone Kirby 40 away or a Kirby not in the stone
+not taken; placed.c: crash on the stone Kirby, Hero's crash / Zap's spark by the number), `msc_stack_check.py`
+(globals 118), `rolloff_hold_test.py`, `port_check brave` (0 errors; W10 / C4 as before: Hero's own brave.c).
+No executable change: A stays exe_v45h, B exe_v46f.
+```
+python3 tools/kirby_copy_sword.py --fix-skeletons OUT/fighter/kirby/model      # v6's bravesword tree
+sh tools/kirby_hero_copy_build.sh OUT; python3 tools/brave_shot_owner_test.py OUT/shot
+```

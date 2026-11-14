@@ -4,6 +4,7 @@ model.nut, model.vbn and the one-bone model's side files), shown on the stone wh
 fighters/kirby/specials.md "v6".
 
   python3 tools/kirby_copy_sword.py ULT_BRAVE_BODY_DIR TEMPLATE_DIR OUT_MODEL_DIR [--costume NN]
+  python3 tools/kirby_copy_sword.py --fix-skeletons MODEL_DIR     (fix v3: an existing bravesword tree's vbn / jtb)
 
 ULT_BRAVE_BODY_DIR: Ultimate's brave/model/body (cNN with model.numshb / numdlb / numatb / nusktb and the textures:
 the user's brave.zip). TEMPLATE_DIR: a one-bone Kirby copy model folder (the Hero copy hat, fighter/kirby/model/
@@ -61,12 +62,40 @@ def sword_to_have(skel_path):
     return np.linalg.inv(local('HaveR')) @ local('Sword1')
 
 
-def vbn_one_bone(name):
-    """little-endian model.vbn (' NBV' 2.1, as the copy hats'): one bone at the origin, unrotated, scale 1"""
-    out = struct.pack('<4sHHI4I', b' NBV', 2, 1, 1, 1, 0, 0, 0)
-    out += name.encode().ljust(64, b'\0') + struct.pack('<IiI', 0, 0x0FFFFFFF, zlib.crc32(name.encode()) & 0xFFFFFFFF)
-    out += struct.pack('<9f', 0, 0, 0, 0, 0, 0, 1, 1, 1)
+# Kirby's Hero copy fix v3: the game's own bone hashes. A model.vbn bone's third word is the game's hash of its name
+# (not crc32: Smash 4's held models give HaveN 0x2D6C2084 and SwordN 0x7B4475A3 in marthsword / ikesword's vbn, Kirby's
+# body RHaveN 0x47F11BB8 = ikesword's root; the hats keep their template's TopN 0x4A2AE7BC). v6 wrote crc32("HaveN") =
+# 0xF4A99364, a hash no game lookup of "HaveN" finds, and the sword never showed on the stone (fix v2's report). Now
+# the vanilla held swords' layout: HaveN (root, the game's hash) and its child SwordN, the mesh on HaveN (bone 0),
+# model.jtb listing both (marthsword's 00 02 00 00 00 01).
+HELD_BONES = (('HaveN', 0x2D6C2084), ('SwordN', 0x7B4475A3))
+HELD_JTB = bytes.fromhex('000200000001')
+
+
+def vbn_held():
+    """little-endian model.vbn (' NBV' 2.1, as Kirby's copy models'): HaveN at the origin, unrotated, scale 1 (the
+    vertices are in LHaveN's frame), SwordN its child at the same place; the game's hashes"""
+    out = struct.pack('<4sHHI4I', b' NBV', 2, 1, len(HELD_BONES), len(HELD_BONES), 0, 0, 0)
+    for i, (name, h) in enumerate(HELD_BONES):
+        out += name.encode().ljust(64, b'\0') + struct.pack('<IiI', 0, 0x0FFFFFFF if i == 0 else 0, h)
+    for _ in HELD_BONES:
+        out += struct.pack('<9f', 0, 0, 0, 0, 0, 0, 1, 1, 1)
     return out
+
+
+def fix_skeletons(root, log=print):
+    """rewrite an existing bravesword/cNN tree's model.vbn / model.jtb (v6's output) with the game's hashes"""
+    n = 0
+    for c in range(8):
+        dst = os.path.join(root, 'bravesword', 'c%02d' % c)
+        if not os.path.isdir(dst):
+            continue
+        open(os.path.join(dst, 'model.vbn'), 'wb').write(vbn_held())
+        open(os.path.join(dst, 'model.jtb'), 'wb').write(HELD_JTB)
+        n += 1
+    log('bravesword: %d folders\' skeletons rewritten (HaveN 0x%08X, SwordN 0x%08X)' % (n, HELD_BONES[0][1],
+                                                                                     HELD_BONES[1][1]))
+    return n
 
 
 def sword_meshes(src, m, tex, tmpl):
@@ -109,7 +138,8 @@ def build(ult, template, out, costume=0, log=print):
         os.makedirs(dst, exist_ok=True)
         for f in SIDE_FILES:
             shutil.copy(os.path.join(template, f), os.path.join(dst, f))
-        open(os.path.join(dst, 'model.vbn'), 'wb').write(vbn_one_bone('HaveN'))
+        open(os.path.join(dst, 'model.vbn'), 'wb').write(vbn_held())
+        open(os.path.join(dst, 'model.jtb'), 'wb').write(HELD_JTB)
         tex = uf.Textures(src, TEX_BASE + 0x80 * c)
         meshes = sword_meshes(src, m, tex, tmpl)
         open(os.path.join(dst, 'model.nud'), 'wb').write(nud.write(meshes, top_bone=0))
@@ -133,6 +163,8 @@ def build(ult, template, out, costume=0, log=print):
 
 
 def main():
+    if len(sys.argv) == 3 and sys.argv[1] == '--fix-skeletons':
+        sys.exit(0 if fix_skeletons(sys.argv[2]) else 1)
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('ult')
     ap.add_argument('template')

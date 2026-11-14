@@ -297,7 +297,7 @@ def v3_tests(path, src):
     g.fvars.update({0x0F000000: 10.0, 0x0F000001: 0.0, 0x0F000020: 10.0, 0x0F000021: 0.0, 0x0F000023: 1.0,
                     0x0F000024: 50.0, 0x0F000025: 0.0, 0x0F000027: 1.0})    # he is slot 0, a fighter in slot 1
     cast(r, 0x9, 21)
-    check('Kamikazee: the crash (article 12) at 20, level 1 + 8 x his slot 0', [(x[0], x[2]) for x in g.articles], [(12, 1)])
+    check('Kamikazee: the crash (article 12) at 20, level 1 (fix v3: no slot; placed.c finds Kirby)', [(x[0], x[2]) for x in g.articles], [(12, 1)])
     check('Kamikazee: no KO before 49', 0x20000043 in g.flags, False)
     for _ in range(30):
         r.vm.call(r.fn['khm_update'])
@@ -431,7 +431,7 @@ def menu_tests(path, src):
     r.vm.call(r.fn['khm_update'])
     g.press = set()
     check('Sizzle with 5 MP: greyed, nothing cast, MP kept', (kget(r, 'khm_spell'), r.gf('ncp_mp')), (0, 5.0))
-    # shield shuts it; the stone ending shuts it
+    # shield no longer shuts it (fix v3: it opens again at once; fix_v3_tests)
     r.vm.g[r.gi['global4']] = 0
     r.vm.call(r.fn['khm_update'])
     r.vm.g[r.gi['global4']] = 0x175
@@ -439,7 +439,7 @@ def menu_tests(path, src):
     g.press = {3}
     r.vm.call(r.fn['khm_update'])
     g.press = set()
-    check('shield shuts the menu', kget(r, 'khm_state'), 0)
+    check('fix v3: shield doesn\'t shut the menu (it opens again at once)', kget(r, 'khm_state'), 1)
     v3_tests(path, src)
     rr = Run(path, src, 3)
     rr.update()
@@ -599,7 +599,7 @@ def fix_v2_tests(path, src):
     for _ in range(30):
         r.step()
     check('fix v2: the stored Kafrizz: custom number 2', [a[5] for a in r.game.articles], [2])
-    # the Stone's projectiles: level + 4 x (his slot + 1); Sizz / Whack / Thwack / Snooze; Magic Burst's own coding
+    # fix v3: the Stone's projectiles carry the level alone again (fix v2's level + 4 x (slot + 1) drew them invisible)
     for spell, art, level in ((0x2, 8, 0), (0x3, 8, 1), (0x4, 9, 0), (0x5, 9, 1), (0x6, 10, 0), (0x7, 10, 1),
                               (0xe, 11, 0)):
         for slot in (0, 2):
@@ -613,10 +613,95 @@ def fix_v2_tests(path, src):
             r.update()
             cast(r, spell, 10)
             c = [a[5] for a in g.articles if a[0] == art]
-            check('fix v2: spell 0x%X from slot %d: article %d, custom %r = level %d + 4 x (slot + 1); param block %d'
-                  % (spell, slot, art, c, level, level), (c, [x & 3 for x in c], [x // 4 - 1 for x in c]),
-                  ([level + 4 * (slot + 1)], [level], [slot]))
+            check('fix v3: spell 0x%X from slot %d: article %d, custom %r = the level %d (0-3: port_check W10)'
+                  % (spell, slot, art, c, level), c, [level])
     check('fix v2: Sephiroth\'s fire (Din\'s spawner) as before', Game.THUNDER_RECORDS.count(7), 0)
+
+
+def fix_v3_tests(path, src):
+    """Hero copy fix v3: Acceleration as Hero's (x1.2 animations, the blue glow every frame); the menu cancelled
+    opens again; down special in the air with the menu shut drops him as Kirby's own Stone"""
+    r = Run(path, src, 2)
+    g = r.game
+    r.update()
+    cast(r, 0x16, 15)
+    check('Acceleration: the animation rate 1.2 (0x0F000098)', g.fvars.get(0x0F000098), 1.2000000476837158)
+    n = len([e for e in g.effects if e == 0x10000C7])
+    r.vm.g[r.gi['global4']] = 0
+    r.vm.call(r.fn['khm_update'])
+    check('Acceleration: the blue glow 0x10000C7 made again every frame on 4 joints',
+          len([e for e in g.effects if e == 0x10000C7]) - n, 4)
+    check('Acceleration: the stat bit 0x1000 in the marker', (r.vm.call(r.fn['khm_buff_bits']) & 0x1000) != 0, True)
+    for _ in range(600):
+        r.vm.call(r.fn['khm_update'])
+    check('Acceleration over after 600: the rate back to 1.0, the glow off', (g.fvars.get(0x0F000098),
+          kget(r, 'khm_accel_t') if 'khm_accel_t' in r.slots else 0), (1.0, 0))
+    # the menu: shield / jump reopen it
+    r = Run(path, src, 2)
+    g = r.game
+    r.update()
+    r.vm.g[r.gi['global4']] = 0
+    r.vm.call(r.fn['khm_update'])
+    r.vm.g[r.gi['global4']] = 0x175
+    r.vm.call(r.fn['khm_update'])
+    spells = kget(r, 'khm_spells')
+    for _ in range(30):
+        r.vm.call(r.fn['khm_update'])
+    for btn, name in ((3, 'shield'), (2, 'jump')):
+        g.press = {btn}
+        g.sounds = []
+        r.vm.call(r.fn['khm_update'])
+        g.press = set()
+        r.vm.call(r.fn['khm_update'])
+        check('the menu cancelled with %s: still open (state 1), the same spells, its time from 0, the open sound'
+              % name, (kget(r, 'khm_state'), kget(r, 'khm_spells'), kget(r, 'khm_frame') <= 2,
+                       (0x2710, 0x76400DD) in g.sounds), (1, spells, True, True))
+    for _ in range(0x1e0):
+        r.vm.call(r.fn['khm_update'])
+    check('its 8 seconds up: shut', kget(r, 'khm_state'), 0)
+
+    # Magic Burst / Kamikazee: custom 0-3 (placed.c finds Kirby)
+    for mp, want in ((100.0, 0), (70.0, 0), (50.0, 3), (10.0, 3)):
+        for slot in (0, 2):
+            r = Run(path, src, 2)
+            g = r.game
+            for s_ in range(8):
+                g.fvars[0x0F000020 + 4 * s_] = 30.0 if s_ == slot else -50.0 - 10 * s_
+                g.fvars[0x0F000023 + 4 * s_] = 1.0 if s_ in (slot, 1) else 0.0
+            g.fvars.update({0x0F000000: 30.0, 0x0F000001: 0.0})
+            r.update()
+            r.setf('ncp_mp', mp)
+            cast(r, 0x8, 25)
+            check('Magic Burst with %d MP from slot %d: custom %d (0 full / 3 the x0.2 tier)' % (mp, slot, want),
+                  [a[5] for a in g.articles if a[0] == 12], [want])
+
+    def stone(air, state, press=True, down=True, sub=0x7f):
+        r = Run(path, src, 2, situation=2 if air else 0)
+        r.update()
+        r.vm.g[r.gi['global4']] = 0x175
+        kset(r, 'khm_state', state)
+        kset(r, 'khm_sub', sub)
+        r.game.press = {1} if press else set()
+        r.vm.g[r.gi['global24']] = 0x8000 if down else 0x1000
+        r.game.statuses = []
+        got = r.vm.call(r.fn['khm_stone_drop'])
+        return r, got
+    r, got = stone(True, 0)
+    check('down special in the air, the menu shut: down special starts over (0x155), '
+          'khm_plain set', (got, r.game.statuses, kget(r, 'khm_plain')), (1, [0x155], 1))
+    r.vm.g[r.gi['global4']] = 0x155
+    r.vm.call(r.fn['khm_update'])
+    r.vm.g[r.gi['global4']] = 0x175
+    r.vm.call(r.fn['khm_update'])
+    check('...and its hold opens no menu (Kirby\'s own Stone)', kget(r, 'khm_state'), 0)
+    r.vm.g[r.gi['global4']] = 0
+    r.vm.call(r.fn['khm_update'])
+    check('...until the stone ends (khm_plain cleared)', kget(r, 'khm_plain'), 0)
+    for args, name in (((False, 0), 'on the ground'), ((True, 1), 'the menu open'), ((True, 2), 'a spell cast'),
+                       ((True, 0, False), 'no special press'), ((True, 0, True, False), 'neutral special'),
+                       ((True, 0, True, True, 1), 'Zoom still going')):
+        r, got = stone(*args)
+        check('no drop: %s' % name, (got, r.game.statuses), (0, []))
 
 
 def main():
@@ -714,6 +799,7 @@ def main():
     check('fix v1: the status\'s end stops the charge sound', r.game.sounds[-1:], [(0x2714, 0xA00D5)])
     fix_v1_tests(path, src)
     fix_v2_tests(path, src)
+    fix_v3_tests(path, src)
     menu_tests(path, src)
     if 'khm_sword' in names(src)[0]:
         v6_tests(path, src)

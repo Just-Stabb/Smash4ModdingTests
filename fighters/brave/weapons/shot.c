@@ -5,8 +5,8 @@
 // ---- Command Selection's projectiles (copies of Robin's thunder, fighters/brave/README.md): Sizz / Sizzle
 // (flash, article 9), Bang / Kaboom (explosion, 10), Whack / Thwack (deathball, 11), Snooze (sleep, 13).
 // The owner's custom N slot (int 0x10000048, which the game copies into this weapon's 0x10000005) = level
-// (0 / 1), or level + 4 x (the caster's player slot + 1) (Kirby's Hero copy, fix v2; the native param getter keeps
-// custom & 3). Status 0 flies straight ahead at sh_speed for sh_life frames playing motion
+// (0 / 1); the caster is found here (sh_find_owner). (level + 4 x (the caster's player slot + 1) is still read, but a
+// custom number past 3 draws the projectile invisible: Kirby's fix v2, port_check W10.) Status 0 flies straight ahead at sh_speed for sh_life frames playing motion
 // `level` (Ultimate's scripts: its hitboxes and effects), then sh_end(); status 1 (a hit: extra_kinds.json
 // "on_hit": 1) runs sh_hit(), whose sh_burst(motion, frames) stops it there, plays that motion for those
 // frames and removes it, or which goes on flying. Weapons are pooled: status 0 resets everything.
@@ -131,9 +131,49 @@ int sh_nearest(int kind)
     return best;
 }
 
+// Kirby's Hero copy (fix v3): a Kirby in his stone (statuses 0x155 / 0x175 / 0x176: the Stone casts these), within 30
+// of the article (made at his hand), nearest first; 8 none. Before the Hero-or-Kirby search, which can take an
+// opponent Hero nearer to the article for the caster (Whack then aims away from him and never rolls on him).
+int sh_stone_kirby()
+{
+    int s;
+    int best;
+    float st;
+    float d;
+    float bd;
+    float dx;
+    float dy;
+    best = 0x8;
+    bd = 900.0f;
+    s = 0;
+    while (s < 0x8)
+    {
+        st = WorkModuleF(0, 0x0f0000ba + 0x8 * s);
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0 && (int)WorkModuleF(0, 0x0f0000bd + 0x8 * s) == 0x8
+            && (st == 341.0f || st == 373.0f || st == 374.0f))
+        {
+            dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - PostureModuleF(0x1);
+            dy = WorkModuleF(0, 0x0f000021 + 0x4 * s) - PostureModuleF(0x2);
+            d = dx * dx + dy * dy;
+            if (d < bd)
+            {
+                best = s;
+                bd = d;
+            }
+        }
+        s += 1;
+    }
+    return best;
+}
+
 int sh_find_owner()
 {
     int s;
+    s = sh_stone_kirby();
+    if (s != 0x8)
+    {
+        return s;
+    }
     s = sh_nearest(0x1);
     if (s == 0x8)
     {
@@ -160,12 +200,12 @@ void sh_main()
     sh_level = c - sh_owner * 0x4;
     if (sh_owner == 0)
     {
-        sh_owner = sh_find_owner();    // the level alone in the custom number (Hero's own: brave.c brave_generate)
+        sh_owner = sh_find_owner();    // the level alone in the custom number (Hero's own and Kirby's Hero copy's)
     }
     else
     {
-        sh_owner = sh_owner - 0x1;     // Kirby's Hero copy (kirby.c khm_generate, fix v2): level + 4 x (his slot + 1),
-    }                                  // the caster itself (a nearest-Hero-or-Kirby search can pick an opponent)
+        sh_owner = sh_owner - 0x1;     // level + 4 x (the caster's slot + 1): nobody sends it since fix v3 (Kirby's
+    }                                  // fix v2 did: a custom number past 3 left the projectile invisible)
     if (sh_level > 0x1)
     {
         sh_level = 0x1;

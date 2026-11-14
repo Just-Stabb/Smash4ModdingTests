@@ -79,6 +79,42 @@ void pl_main()
     StatusModule(0x3, 0x1, 0);
 }
 
+// Kirby's Hero copy (fix v3): the crash (Magic Burst / Kamikazee) cast from Kirby's stone carries its level alone
+// (0-3: a custom number past 3 draws a copy of Robin's thunder invisible, port_check W10), so the caster is found here:
+// a Kirby in his stone (statuses 0x155 / 0x175 / 0x176) within 30 of the article (made at his hand), nearest first;
+// 8 none. Hero's own crash keeps his slot in the number (level + 8 x slot), Zap's spark its target's.
+int pl_stone_kirby()
+{
+    int s;
+    int best;
+    float st;
+    float d;
+    float bd;
+    float dx;
+    float dy;
+    best = 0x8;
+    bd = 900.0f;
+    s = 0;
+    while (s < 0x8)
+    {
+        st = WorkModuleF(0, 0x0f0000ba + 0x8 * s);
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0 && (int)WorkModuleF(0, 0x0f0000bd + 0x8 * s) == 0x8
+            && (st == 341.0f || st == 373.0f || st == 374.0f))
+        {
+            dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - PostureModuleF(0x1);
+            dy = WorkModuleF(0, 0x0f000021 + 0x4 * s) - PostureModuleF(0x2);
+            d = dx * dx + dy * dy;
+            if (d < bd)
+            {
+                best = s;
+                bd = d;
+            }
+        }
+        s += 1;
+    }
+    return best;
+}
+
 // status 1: the article's set-up and life (once), then on as before
 void pl_hit_main()
 {
@@ -96,6 +132,10 @@ void pl_hit_main()
     }
     pl_slot = c / pl_levels;
     pl_level = c - pl_slot * pl_levels;
+    if (pl_levels == 0x8 && c < 0x4 && pl_stone_kirby() != 0x8)
+    {
+        pl_slot = pl_stone_kirby();     // crash from Kirby's stone (fix v3: his custom number keeps 0-3)
+    }
     pl_life = placed_life(pl_level);
     pl_frame = 0;
     pl_total = 0;

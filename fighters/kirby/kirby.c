@@ -38991,6 +38991,10 @@ void func_2322()
 void func_2323()
 {
     func_2324();
+    if (khm_stone_drop()) // the Hero copy: down special in the air, the menu shut: Kirby's own Stone (end of the file)
+    {
+        return 0x1;
+    }
     if (ControlModule(0x2710, 0x1) && WorkModule(0x6, 0x11000003) >= WorkModule(0x6, 0x18000001)
         && khm_blocking() == 0) // the Hero copy's Command Selection takes special while it's open (end of the file)
     {
@@ -75314,6 +75318,7 @@ void newcopy_n_end()
 //   khm_z2_target    int   0x0F00039D
 //   khm_z2_vx        float 0x0F00039C
 //   khm_z2_vy        float 0x0F00039B
+//   khm_plain        int   0x0F00039A
 
 int khm_bit(int s)
 {
@@ -75565,19 +75570,16 @@ int khm_blocking()
     return WorkModule(0x6, 0x0f0003bf) == 0x1 || WorkModule(0x6, 0x0f0003b5) || WorkModule(0x6, 0x0f0003a2) && WorkModule(0x6, 0x0f0003a1) < khm_sw_cancel(WorkModule(0x6, 0x0f0003a2));   // v6: a sword spell
 }
 
-// an article (copy article id) with its custom number (as ncp_hero_generate). Fix v2: the custom number reaches the
-// article now (exe_v45h / v46f, tools/kirby_robin_book_cave.py: Robin's tome code no longer zeroes 0x1000009F first),
-// and Command Selection's projectiles (articles 8-11: shot.c's flash / explosion / deathball / sleep) carry their
-// caster: level + 4 x (Kirby's player slot + 1) (shot.c; the native param block takes custom & 3 = the level), so
-// Whack / Thwack leave Kirby out and roll with his damage instead of a "nearest Hero or Kirby" search's pick
+// an article (copy article id) with its custom number (as ncp_hero_generate). The custom number reaches the article
+// since fix v2 (exe_v45h / v46f, tools/kirby_robin_book_cave.py: Robin's tome code no longer zeroes 0x1000009F
+// first). Fix v3: Command Selection's projectiles get the level alone again (0 / 1): fix v2 coded the caster in it
+// (level + 4 x (slot + 1)) and every one of them flew invisible (only their bursts drawn; Frizz, custom 0-2, fine):
+// a thunder copy's custom number past 3 reaches the base's per-custom data past its 4 entries (port_check W10, Hero's
+// P2 Whack in multi-instance bugs v1). shot.c finds Kirby as the caster itself (a Kirby in the stone near it).
 void khm_generate(int article, int custom)
 {
     int slot;
     int copyslot;
-    if (article >= 0x8 && article <= 0xb && khm_self_slot() < 0x8)
-    {
-        custom = custom + 0x4 * (khm_self_slot() + 0x1);
-    }
     slot = WorkModule(0x6, 0x10000048);
     copyslot = WorkModule(0x6, 0x1000009f);
     WorkModule(0x7, custom, 0x10000048);
@@ -75613,6 +75615,18 @@ int khm_self_slot()
         s += 1;
     }
     return 0x8;
+}
+
+// fix v3: Magic Burst's custom number kept 0-3 (port_check W10: past 3 the projectiles drew invisible, fix v2) and
+// without Kirby's slot (placed.c finds him in his stone): of the crash's MP tiers only 0 (100 MP, full) and 3 (20 MP,
+// x0.2) are below 4, so 61-100 MP spent casts the full one, 1-60 the x0.2 one (Hero's own keeps 0 / 3-6 + 8 x slot)
+int khm_burst_custom()
+{
+    if (khm_burst_motion() == 0 || khm_burst_motion() == 0x6)
+    {
+        return 0;
+    }
+    return 0x3;
 }
 
 int khm_burst_motion()
@@ -75673,7 +75687,7 @@ void khm_cast(int f)
     }
     else if (n == 0x8 && f >= 20 && khm_once(0x1))
     {
-        khm_generate(0xc, khm_burst_motion() + 0x8 * khm_self_slot());
+        khm_generate(0xc, khm_burst_custom());     // fix v3: 0-3 (placed.c finds Kirby: his stone)
     }
     else if (n == 0xe && f >= 6 && khm_once(0x1))
     {
@@ -75774,6 +75788,14 @@ void khm_buffs()
     if (WorkModule(0x6, 0x0f0003ab) > 0)
     {
         WorkModule(0x7, WorkModule(0x6, 0x0f0003ab) - (1), 0x0f0003ab);
+        if (WorkModule(0x6, 0x0f0003ab) == 0)
+        {
+            khm_accel(0);
+        }
+        else
+        {
+            khm_accel(0x1);
+        }
     }
     khm_v3_timers();
     khm_sw_timers();        // v6
@@ -75786,10 +75808,36 @@ void khm_buffs()
     }
     if (global4 == 0xb1 || newcopy_hero() == 0)
     {
+        if (WorkModule(0x6, 0x0f0003ab) > 0)
+        {
+            khm_accel(0);
+        }
         WorkModule(0x7, 0, 0x0f0003ad);
         WorkModule(0x7, 0, 0x0f0003ac);
         WorkModule(0x7, 0, 0x0f0003ab);
         WorkModule(0x7, 0, 0x0f0003aa);
+    }
+}
+
+// fix v3: Acceleration as Hero's (brave.c brave_accel_on / off, fix 79): Kirby's Overdrive on him for its 600
+// frames: every animation x1.2 (the rate variable 0x0F000098) and the common blue glow 0x10000C7 on the head, both
+// arms and the left leg (Overdrive's own joints: HeadN 0x16, LArmJ 0xF, RArmJ 0x13, LLegJ 0x3), removed and made again
+// every frame; the stats x1.2 through the marker's bit 0x1000 (khm_buff_bits) as before. Fix v2 had the bit only
+// (no glow, no animation rate: the user's "Acceleration doesn't work").
+void khm_accel(int on)
+{
+    EffectModule(0x2723, overdrive_gfx(), 0x1, 0x1);
+    if (on)
+    {
+        WorkModule(0, 1.2f, 0x0f000098);
+        overdrive_gfx_on(0x16);
+        overdrive_gfx_on(0xf);
+        overdrive_gfx_on(0x13);
+        overdrive_gfx_on(0x3);
+    }
+    else
+    {
+        WorkModule(0, 1.0f, 0x0f000098);
     }
 }
 
@@ -75875,13 +75923,62 @@ void khm_shut()
     khm_close();
 }
 
+// fix v3: the menu cancelled with shield / jump opens again at once, the same four spells: its window shown again
+// from the start (the open animation, the opening sound), the 8 seconds from 0, the cursor on the first row, special
+// to be let go again before it casts
+void khm_reopen()
+{
+    WorkModule(0x7, 0, 0x0f0003be);
+    WorkModule(0x7, 0, 0x0f0003bd);
+    WorkModule(0x7, 0, 0x0f0003ba);
+    WorkModule(0x7, 0x2, 0x0f0003b9);
+    WorkModule(0x7, 0, 0x0f0003b8);
+    WorkModule(0x7, 0x1, 0x0f0003b3);
+    WorkModule(0x7, 0, 0x0f0003b2);
+    WorkModule(0x7, 0, 0x0f0003b1);
+    WorkModule(0x7, WorkModule(0x6, 0x0f0003bc), 0x0f0003b0);
+    WorkModule(0x7, khm_grey_bits(), 0x0f0003af);
+    SoundModule(0x2710, 0x76400dd);     // se_brave_special_l18: the window opens
+}
+
+// fix v3 (user): in the stone in the air, with the menu shut (a spell cast and over, or its 8 seconds up), down
+// special (B + down: command bit 0x8000) drops him as a normal Stone: the down special starts over (status 0x155: the
+// transformation, its fast fall and the falling hitbox, then the stone's hold), the stone article made again; the
+// menu stays shut for the rest of that stone (khm_plain), so it is Kirby's own Stone from there. On the ground, or
+// with the menu open (special casts there) or a spell still being cast, nothing changes. From the stone's hold loop
+// (func_2323), before its own "special ends it". Returns 1 when it changed the status.
+int khm_stone_drop()
+{
+    if (newcopy_hero() == 0 || global18 != 0x2 || WorkModule(0x6, 0x0f0003bf) != 0 || WorkModule(0x6, 0x0f00039a))
+    {
+        return 0;
+    }
+    if (WorkModule(0x6, 0x0f0003a8) != 0x7f && WorkModule(0x6, 0x0f0003a8) != 0)
+    {
+        return 0;           // a spell with parts (Zoom, Kaclang, Kamikazee ...) still going
+    }
+    if ((global24 & 0x8000) == 0 || ControlModule(0x2710, 0x1) == 0)
+    {
+        return 0;
+    }
+    WorkModule(0x7, 0x1, 0x0f00039a);
+    ArticleModule(0x2712, 0x18);    // the stone made again by the down special's start
+    func_16(0x155, 0);
+    return 0x1;
+}
+
 // every frame (main loop, after newcopy_update)
 void khm_update()
 {
     int n;
     WorkModule(0x7, 0, 0x0f0003b5);
     khm_buffs();
-    if (newcopy_hero() && global4 == 0x175 && WorkModule(0x6, 0x0f0003b4) != 0x175 && WorkModule(0x6, 0x0f0003bf) != 0x1)
+    if (khm_stone() == 0)
+    {
+        WorkModule(0x7, 0, 0x0f00039a);     // fix v3: khm_plain, a stone dropped as Kirby's own, over
+    }
+    if (newcopy_hero() && global4 == 0x175 && WorkModule(0x6, 0x0f0003b4) != 0x175 && WorkModule(0x6, 0x0f0003bf) != 0x1
+        && WorkModule(0x6, 0x0f00039a) == 0)
     {
         khm_open();
     }
@@ -75908,10 +76005,14 @@ void khm_update()
             {
                 SoundModule(0x2710, 0x76400c1);     // 2 s left
             }
-            if (ControlModule(0x2710, 0x3) || ControlModule(0x2710, 0x2) || WorkModule(0x6, 0x0f0003be) >= 0x1e0)
+            if (ControlModule(0x2710, 0x3) || ControlModule(0x2710, 0x2))
+            {
+                khm_reopen();       // fix v3 (user): shield / jump don't shut the menu: it opens again at once
+            }
+            else if (WorkModule(0x6, 0x0f0003be) >= 0x1e0)
             {
                 WorkModule(0x7, ControlModule(0x2710, 0x1), 0x0f0003b5);
-                khm_shut();
+                khm_shut();         // the 8 seconds are up (Hero's limit): shut, a plain stone
             }
             else if (n != 0 && (ControlModule(0x2710, 0) || WorkModule(0x6, 0x0f0003ba) && ControlModule(0x2710, 0x1)))
             {
@@ -75997,7 +76098,7 @@ void khm_kamikazee(int f)
 {
     if (f >= 20 && khm_once(0x1))
     {
-        khm_generate(0xc, 0x1 + 0x8 * khm_self_slot());
+        khm_generate(0xc, 0x1);     // Kamikazee's blast; fix v3: the level alone (placed.c finds Kirby)
     }
     if (f >= 49 && khm_once(0x2))
     {
