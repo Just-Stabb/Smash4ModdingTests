@@ -76,7 +76,7 @@ PUNCH, PUNCH_END = anim.GF_PUNCH, anim.GF_PUNCH_END   # the hitbox 14-17 (the BA
 JUMP_TO, STRIKE = anim.GF_JUMP_TO, anim.GF_STRIKE      # 46, 96 (#0 frame 40: the launch)
 WHIFF_END = float(anim.GF_WHIFF_END)     # the whiff's end (MSC): 44
 HOLD_X = 11.5                           # the victim held this far in front of him (his fist 7.3-7.5 ahead, + 4)
-PUNCH_DMG, STRIKE_DMG = 4.0, 11.0
+PUNCH_DMG, STRIKE_DMG = 4.0, 10.0          # v6: + DROP_DMG (1) at the end: 15 in all, as v1-v5
 PUNCH_FREEZE = 9                        # the punch's hitstop, both: CMN.bdm #160's stun 9 / 9 (the BDM the hitbox
                                         # names: #160 isn't in GOK_PLAYER.bdm)
 STRIKE_FREEZE = 8                       # the launch's hitstop, both (the slow hold is the animation's: #0 0-40 x0.8)
@@ -115,18 +115,20 @@ D_CATCH_KINDS, D_SLOT, D_HOLD_FRAME, D_HOLD_ROT, D_STRIKE_KINDS, D_FLIGHT, D_WD_
 # motion frame STRIKE + k (97 .. 140: his motion runs 1:1 after the strike's freeze). v6 (user, v5 in game: "never
 # actually forced to lay down, they never go into tumble"): v5's Status_Set DownWait at flight frame 42 came while
 # the victim was in the air (stage collision 0 while flown), and DownWait's loop (func_963: `global18 == 2` ->
-# Fall) left it at once: it fell, landed on its feet and the MSC let it go. Now the flight ends in the game's own
-# knockdown: no hitstop / hitstun from flight frame NOHOLD_K, at HANDOFF (141) dropped DROP_Y above the ground with
-# its stage collision back (air) and put in DamageFall (0x4C, tumble: its main enables the down term 0x1e00000d,
-# its loop func_816 goes to DownBound 0x4D when it touches the ground with that term on), upright (DamageFall's
-# own tumble animation); DownBound (func_921 / 922) plays the game's knockdown and ends in DownWait (0x50, face up /
-# down picked by the game). The MSC (gf_tick) waits for the down (phase 4), then holds it GF_DOWN frames
-# (phase 2). He acts from IASA (143)
+# Fall) left it at once: it fell, landed on its feet and the MSC let it go. Asking for the down statuses directly
+# isn't safe either: DownBound / DownSpot (func_921 -> func_960) play the motion in int 0x11000010, which no MSC
+# sets (the native damage code does). So the flight ends in a real launch, and the game does the rest its own way:
+# no hitstop / hitstun from flight frame NOHOLD_K; at HANDOFF (141) the victim DROP_Y above the ground, its stage
+# collision back (air), and a hitbox on it (Part DROP_PART: a hit record of its own; angle DROP_ANGLE, set
+# knockback DROP_FKB / DROP_BKB: ~90 units for weight 100, 86 for Donkey Kong's 127, over Smash 4's tumble
+# threshold of 80) puts it in DamageFly (tumble); it lands within a few frames and the game knocks it down
+# (missed tech: DownBound -> DownWait, face up / down its own pick). The MSC (gf_tick) waits for the down (phase 4),
+# then holds it GF_DOWN frames (phase 2). He acts from IASA (143)
 NOHOLD_K = GF_FLIGHT - 2
 HANDOFF = STRIKE + GF_FLIGHT + 1
-DROP_Y = 3.0                            # the drop height (units above the ground) at the hand-off
-DAMAGE_FALL = 0x4C
-GF_FALL_WAIT = 40                       # frames the MSC waits for the down after the drop
+DROP_Y = 3.0                            # the victim's height above the ground at the launch
+DROP_PART, DROP_ANGLE, DROP_FKB, DROP_BKB, DROP_DMG = 2, 20, 60, 30, 1.0
+GF_FALL_WAIT = 60                       # frames the MSC waits for the down after the launch
 IASA = float(HANDOFF + 2)               # the God Fist's cancel frame (MSC): 143
 ROOT_Z = [0.0] * anim.FRAMES             # his TransN z by motion frame (build() sets it from the animation)
 DOWN_HELD = (0x4D, 0x53)                # DownBound .. DownWait (0x53): still down; 0x57 DownDamage
@@ -204,7 +206,7 @@ def msc_values():
             'GF_DOWN_WAIT': '%sf' % float(DOWN_WAIT), 'GF_DOWN_STAND': '%sf' % float(DOWN_STAND),
             'GF_DOWN_LO': '%sf' % float(lo), 'GF_DOWN_HI': '%sf' % float(hi),
             'GF_DOWN_HELD_FROM': '%sf' % float(GF_DOWN - 3), 'GF_DOWN_FRAMES': '%sf' % float(GF_DOWN),
-            'GF_DAMAGE_LO': '%sf' % float(0x45), 'GF_DAMAGE_HI': '%sf' % float(DAMAGE_FALL)}
+            'GF_DAMAGE_LO': '%sf' % float(0x45), 'GF_DAMAGE_HI': '%sf' % float(0x4C)}
 
 
 # ---------------------------------------------------------------- ACMD building
@@ -465,13 +467,17 @@ def game_script():
         if k in (2, 3, 4):
             f += dlog_get(D_STRIKE_KINDS, cmd('hit_get', 0, 0, V_TMP))       # when the strike's kinds show
         s += if_(GF_VAR, 0, 2, f)
-    # the drop: DROP_Y above the ground, stage collision back (air), tumbling (DamageFall), upright; gf_phase 4 (the
-    # MSC waits for the game's knockdown, then holds it down)
+    # the end: DROP_Y above the ground, stage collision back (air), upright, and the launching hit (tumble: the game
+    # lands it into its own knockdown); gf_phase 4 (the MSC waits for the down, then holds it down)
     x, _y, _a = flight_offset(GF_FLIGHT)
+    drop = hitbox('extra_special_hitbox', ID=0, Part=DROP_PART, Bone=0, Damage=DROP_DMG, Angle=DROP_ANGLE, KBG=100,
+                  FKB=DROP_FKB, BKB=DROP_BKB, Size=7.0, Y=DROP_Y + 4.0, Z=x, Hitlag=0.1, SDI=0.0, SFXLevel=0,
+                  SFXType=1, Type=4, HitstopFrames=1, SelfHitstopFrames=1, DIMul=0.001)
     s += [cmd('frame', float(HANDOFF))] + if_(GF_VAR, 0, 2, [
-        setf(x, LH_OFFX), setf(DROP_Y, LH_OFFY), setf(5, LH_GROUND), cmd('status_set', 2, DAMAGE_FALL),
-        cmd('rotation_set', 2, 0.0, 0.0, 0.0), setf(0, V_SPIN), setf(GF_FALL_WAIT, V_CNT), setf(4, V_PHASE)]
+        setf(x, LH_OFFX), setf(DROP_Y, LH_OFFY), setf(5, LH_GROUND), cmd('rotation_set', 2, 0.0, 0.0, 0.0),
+        cmd('hit_log_clear', DROP_PART), drop, setf(0, V_SPIN), setf(GF_FALL_WAIT, V_CNT), setf(4, V_PHASE)]
         + dlog(D_PHASE, value=4))
+    s += [cmd('frame', float(HANDOFF + 1)), cmd('remove_all_hitboxes')]
     return s
 
 

@@ -37773,7 +37773,7 @@ int gf_update()
 // flight is in the game script now (frames 97-141, his motion still running) and the rest, after he can act,
 // here, through the position / input variables (docs/position-variables.md), which MSC reaches as ACMD does.
 // GF_V_PHASE (the game script's New_Var gf_phase): 1 flying (the game script places it; if his move is cut short
-// the controller comes back here), 4 (v6) dropped tumbling, waiting for the game's knockdown, 2 downed (DownWait, controller off GF_DOWN frames: a hit that launches it
+// the controller comes back here), 4 (v6) launched tumbling, waiting for the game's knockdown, 2 downed (DownWait, controller off GF_DOWN frames: a hit that launches it
 // (out of the down statuses) or the time -> controller back; DownDamage -> 3), 3 a hit that didn't launch it:
 // once the down damage is over (DownWait) it stands up (DownStand), controller back. GF_V_SLOT: its player slot
 // (target 2 + slot). (MSC can't reach another fighter's rotation: the game script turns it upright before the
@@ -37818,9 +37818,9 @@ void gf_tick()
     WorkModule(0, cnt, GF_V_CNT);
     if (ph > 3.5f)
     {
-        // v6: dropped tumbling (DamageFall) at the flight's end: the game's own knockdown (DownBound -> DownWait)
-        // starts the held-down count; still tumbling (or its damage statuses, the frame the drop is asked):
-        // wait; anything else (a tech, landing on its feet) or no down in time: controller back
+        // v6: launched (a real tumbling hit, DamageFly) at the flight's end: the game's own knockdown (DownBound ->
+        // DownWait) starts the held-down count; still in its damage / tumble statuses (0x45-0x4C): wait; anything
+        // else (a tech, landing on its feet) or no down in time: controller back
         if (st >= GF_DOWN_LO && st <= GF_DOWN_HI)
         {
             WorkModule(0, 2.0f, GF_V_PHASE);

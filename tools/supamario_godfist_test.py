@@ -161,7 +161,7 @@ def msc_tests(path):
 VAR_IDS = {v for _n, v, _s in B.VARS}
 WAIT_STATUS = 0x0
 FALL = 0x1A                    # (any status out of the down ones)
-DAMAGE_STATUSES = (0x45, 0x47)
+DAMAGE_STATUSES = (0x45, 0x47, 0x4C)
 
 
 class Victim:
@@ -204,8 +204,8 @@ class Victim:
             self.status = 0x54            # gets up the first frame it can
         elif self.status in DAMAGE_STATUSES:
             self.hitstun -= 1
-            if self.hitstun <= 0:
-                self.status = WAIT_STATUS     # its hitstun over (the game: Wait, Fall...): the rotation stays
+            if self.hitstun <= 0:             # its hitstun over (the game: Wait, Fall...): the rotation stays
+                self.status = 0x4C if self.status == 0x47 and self.situation != 0 else WAIT_STATUS
         if self.status in (0x50, 0x51) and self.situation != 0:
             self.status = FALL            # DownWait in the air: its loop (func_963) goes to Fall
         if self.status == 0x4D:
@@ -216,13 +216,16 @@ class Victim:
             self.fall += 1
             if self.fall >= 3:
                 self.situation = 0
-                if self.status == 0x4C:   # DamageFall touching the ground (func_816): DownBound
+                if self.status in (0x47, 0x4C):   # tumbling onto the ground, no tech: DownBound
                     self.status, self.bound = 0x4D, 12
         elif self.ground == 0:
             self.situation, self.fall = 2, 0
 
     def hit(self, g, part, hitstun):
         self.hits_taken.append((g, part))
+        if part == B.DROP_PART:                 # the end's launch: over the tumble threshold
+            self.status, self.hitstun = 0x47, 36
+            return
         if self.status not in DAMAGE_STATUSES:
             self.status = 0x45
         self.hitstun = max(self.hitstun, hitstun)
@@ -569,8 +572,8 @@ def acmd_tests(game_bin):
     check('the punch connects (Part 0) and catches: gf 1, the victim\'s slot kept',
           (v.hits_taken[:1] and v.hits_taken[0][1], max(r[8] for r in rec) >= 1, a.vars.get(B.V_SLOT)),
           (0, True, float(v.slot)))
-    check('the strike (frame %d) connects (the victim takes it: the v3 clip\'s 4%% + 11%%)' % B.STRIKE,
-          len(v.hits_taken), 2)
+    check('the strike (frame %d) connects (the victim takes it: the v3 clip\'s 4%% + 11%%), then the end\'s launch'
+          % B.STRIKE, [p for _g, p in v.hits_taken], [0, B.STRIKE_PART, B.DROP_PART])
     check('launched: gf 2 after the strike', any(r[8] == 2.0 for r in rec), True)
     moved = [r for r in rec if r[8] == 2.0 and r[2] is not None and r[2] > B.HOLD_X + 5]
     check('the victim flies (moved away from the hold: the v4 clip\'s bug: it never moved)', bool(moved), True)
@@ -591,15 +594,16 @@ def acmd_tests(game_bin):
     turned = abs(want[-1][2] - (-B.hold_lean(n_hold - 1, n_hold)))
     check('flight: turns %.0f degrees backward (XV2 935 x 0.8)' % turned, 700 < turned < 800, True)
     drop = tr[n_hold + B.GF_FLIGHT:n_hold + B.GF_FLIGHT + 1]
-    check('the drop: %g above the ground, upright (DamageFall\'s own tumble), asked into DamageFall (0x4C)'
-          % B.DROP_Y, (drop[:1] and (drop[0][1], drop[0][2]), ('status', B.DAMAGE_FALL) in v.log),
-          ((B.DROP_Y, 0.0), True))
+    check('the end: %g above the ground, upright, and a real launch (Part %d: its own record) puts it in tumble'
+          % (B.DROP_Y, B.DROP_PART), (drop[:1] and (drop[0][1], drop[0][2]), [p for _g, p in v.hits_taken][-1:]),
+          ((B.DROP_Y, 0.0), [B.DROP_PART]))
     seq = []
     for r in rec:
-        if r[5] in (0x4C, 0x4D, 0x50) and (not seq or seq[-1] != r[5]):
+        if r[5] in (0x47, 0x4D, 0x50) and (not seq or seq[-1] != r[5]):
             seq.append(r[5])
-    check('the game\'s own knockdown: DamageFall -> DownBound -> DownWait (no DownWait asked in the air)',
-          (seq[:3], ('status', 0x50) in v.log), ([0x4C, 0x4D, 0x50], False))
+    check('the game\'s own knockdown: DamageFly -> DownBound -> DownWait (no down status asked by the move)',
+          (seq[:3], [x for x in v.log if x[0] == 'status' and x[1] in (0x4C, 0x4D, 0x50)]),
+          ([0x47, 0x4D, 0x50], []))
     check('rotation back to 0 at the end', v.rot[0], 0.0)
     lock_on = next((r[0] for r in rec if r[6] == 1.0), None)
     launch = next((r[0] for r in rec if r[8] == 2.0), next(r[0] for r in rec if r[1] > B.STRIKE))
@@ -678,7 +682,7 @@ def acmd_tests(game_bin):
           (v.rot[0], v.ground, v.input_off), (0.0, 5, 0.0))
     # the strike doesn't connect (the victim intangible at it): the hold is a throw, launched all the same
     v = Victim()
-    v.hittable = lambda f: f < B.STRIKE
+    v.hittable = lambda f: f != B.STRIKE
     a, rec = run_move(script, v)
     check('strike not connecting: still launched, downed, upright at the end, controller back',
           (any(r[8] == 2.0 for r in rec), any(r[5] == 0x50 for r in rec), v.rot[0], v.input_off),
@@ -746,9 +750,9 @@ def diag_tests(game_bin):
            [val for k, val in a.diag if k == B.D_HOLD_FRAME], [val for k, val in a.diag if k == B.D_STRIKE_KINDS][-1],
            [val for k, val in a.diag if k == B.D_FLIGHT][0]),
           ([2.0], float(v.slot), [float(B.JUMP_TO), float(B.STRIKE - 1)], 2.0, float(v.slot)))
-    check('diag: target 2\'s rotation read in the flight (spun, spun, upright) and its slot',
+    check('diag: target 2\'s rotation read in the flight (spun at flight frames 1 / 22 / 44) and its slot',
           ([val != 0.0 for k, val in a.diag if k == B.D_HOLD_ROT][-3:],
-           [val for k, val in a.diag if k == B.D_SLOT][-3:]), ([True, True, False], [float(v.slot)] * 3))
+           [val for k, val in a.diag if k == B.D_SLOT][-3:]), ([True, True, True], [float(v.slot)] * 3))
     check('diag: no hold release in a clean run', B.D_WD_RELEASE in ks, False)
 
 

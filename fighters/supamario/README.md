@@ -617,3 +617,54 @@ Kamehameha fire / burst stand-ins at the strike gone (XV2 plays nothing there), 
 combinations of the open game rules: kinds deferred or not, Part records blocking or not, threads running or not); on v4's build 19 failures (its clip). `msc_stack_check`: 0; `msc_fingerprint`
 v4 vs v5 (`--added 2`: gf_release, gf_tick): `func_82` (the call) and `func_2320` (GF_IASA 143) differ.
 `diag_godfist_test.py` on exe B: 0 failed. The bank: the old 90 tones unchanged, 2 added; the table: only row 3249.
+
+## Super God Fist v6 (`supamario_god_fist_v6.zip`): a real knockdown, the effects on bone 0, bigger
+
+Install over v5, exe B (no exe change). User, v5 in game (clips `MedalTVCemuWiiUEmulator20261114115719714` hit,
+`...115708933` whiff): "The release works. The opponent doesn't actually go get forced to lay down since they never
+go into tumble. The effect is too close to Supamario when it should be further from the tip of his fist. The effect
+seems mirrored vertically depending on facing direction. Also the effect is too small by comparison to Supamario."
+
+### The knockdown
+The v5 hit clip: Donkey Kong flies and spins away, lands on his feet, stands, and (the CPU) jumps ~1.4 s after the
+strike. v5 asked for DownWait (0x50) at flight frame 42, with the victim still in the air (its stage collision is
+off while it's flown): DownWait's own loop (`func_963`, the common status every fighter's MSC carries) starts with
+`if (global18 == 0x2) func_16(0xe)`: in the air -> Fall. So it fell, landed on its feet, and gf_tick, seeing it out
+of the down statuses, gave the controller back. Asking for the down statuses directly isn't safe either: DownBound
+(0x4D) and DownSpot (0x4E) share their main (`func_921` -> `func_960`), which plays the motion in int `0x11000010`,
+and no MSC sets that int (the native damage code does). The way the game itself knocks a fighter down: a tumbling
+fighter (DamageFly 0x47 / DamageFall 0x4C, whose loop `func_816` goes to DownBound when it touches the ground with
+the down term `0x1e00000d` on; DownBound's loop `func_922` / `func_961` then ends in DownWait) that doesn't tech.
+
+v6 ends the flight with a real launch: at frame 141 the victim 3 above the ground, its stage collision back (air),
+upright, and a hitbox on it (Part 2, a hit record of its own; 1%, the strike now 10%: 15 in all as before; angle 20,
+set knockback WBKB 60 / BKB 30 / KBG 100: ~90 knockback units for weight 100, 86 for Donkey Kong's 127, over Smash
+4's tumble threshold of 80; no SDI, DI x0.001) puts it in DamageFly; it lands within a few frames and the game knocks
+it down its own way (DownBound, then DownWait, face up / down its own pick). gf_tick waits for the down (gf_phase 4:
+damage / tumble statuses 0x45-0x4C keep it waiting, up to 60 frames; anything else, a tech or landing on its feet,
+releases), then holds it down 50 frames (phase 2) as before; a non-launching hit still stands it up.
+- The controller is off from the launch (Input_Set 21), so a player can't tech; a CPU's AI may not go through the
+  controller (unconfirmed): a CPU tech is released at once (the clip's CPU jumped only after v5's release).
+
+### Effects
+- **Facing**: v5 put them on RHandN with an offset along its local +X and the model turned Y -90 about that bone. At
+  the punch RHandN's +Y points down (-0.96 world up), so the model was upside down relative to his body, and a body
+  bone's frame doesn't come out the same on screen for both facings (the user: "mirrored vertically depending on
+  facing"). v6 puts every skill effect on bone 0 (TopN: Z forward along his facing, Y up in both facings, the axes
+  Mario's own forward smash fire uses, `Bone 0, Y 7, Z 15`) where his fist is (from the built animation) and turns
+  only about Y (0 / 180: the model's front, XV2's -Z, onto his facing). They follow him (External_Graphic), not the
+  hand. The test's facing check is stricter: bone 0 effects may only sit at a height / ahead and turn about Y by 0 /
+  180; any other bone gets no offset and no turn. v5 fails it (7 effects).
+- **Further out**: the model's origin 5 past the fist tip (its front 1.6 x size beyond that, its swirl and wind
+  trailing back over the fist), the rings 2, the charge / burst 1.2 / 1.5 past the tip (v5: 1.2 along the hand,
+  inside the cone).
+- **Bigger**: x1.5 on every skill effect's size: XV2's sizes are in metres of Goku (head bone 1.55 m up), Supamario's
+  head bone is 9.67 units up, 6.24 units a metre (x1.24 on the 5.04 they were converted at, his hip-to-foot scale),
+  with XV2's bloom halo (none in Smash 4) on top.
+
+### Tests
+`supamario_godfist_test.py --all-models`: 0 problems (normal and diag builds). The model of the game: a DownWait
+asked in the air falls (func_963), a tumbling fighter landing goes DownBound -> DownWait, the end's hit launches
+(Part 2). On v5's build: 12 failures (no knockdown: the clip; the effects' facing). `msc_stack_check` 0;
+`msc_fingerprint` v5 vs v6: only `func_2322` (gf_tick, phase 4). Unchanged from v5: the motion, sound / expression
+scripts, ptcl / efc / model, sound bank, soundlabeltable.
