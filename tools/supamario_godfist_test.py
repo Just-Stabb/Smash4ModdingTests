@@ -71,6 +71,7 @@ class MscGame:
         self.sit_set = []              # frames SITUATION 2 was written
         self.edge_x = None             # his ground's edge in front (GroundModule(0x2726, d): 1 when x + d is past it)
         self.ottotto = []              # the distances it was asked with
+        self.landed = []               # game frames he landed on (startup_sim)
         self.terms_on = []             # (frame, term) WorkModule(0x17, term): transition terms turned on
         self.groups_on = []            # (frame, group) WorkModule(0x19, group): transition groups turned on (v14)
         self.jumps = (1, 2)            # jumps used / max (ints 0x10000001 / 0x10000002)
@@ -267,7 +268,7 @@ def msc_tests(path):
           (-6.0, 48000 * B.START_SE_END // 60, 10000, 0, 10000))
 
 
-def startup_sim(path, slots, face=1.0, frames=24, ledge_at=None, edge_x=None, slot_v=None):
+def startup_sim(path, slots=None, face=1.0, frames=24, ledge_at=None, edge_x=None, slot_v=None):
     """the dash punch's startup, game frame by game frame: the MSC's init and loop, then the game moves him: on the
     ground his TransN's way (B.ROOT_Z) at the motion's rate, in the air (a SITUATION 2 write) gravity only (FALL: no
     TransN), 0.1 a frame more each frame. slots {slot: [x, y, hitstun, status(, situation: 0 ground)]} (he is at
@@ -277,7 +278,7 @@ def startup_sim(path, slots, face=1.0, frames=24, ledge_at=None, edge_x=None, sl
     vm = msc_vm(path)
     g = vm.game
     g.face = face
-    g.slots = {k: list(v) for k, v in slots.items()}
+    g.slots = {k: list(v) for k, v in (slots or {}).items()}
     g.edge_x = edge_x
     init, loop = vm.func(272), vm.func(273)
     vm.call(init)
@@ -289,22 +290,41 @@ def startup_sim(path, slots, face=1.0, frames=24, ledge_at=None, edge_x=None, sl
         vm.g[18] = 2 if g.air else 0
         vm.call(loop)
         out.append((fr, g.x, g.y, g.rate))
-        if g.sit_set and not g.air:
+        if g.sit_set and g.sit_set[-1] == fr and not g.air:     # SITUATION 2 written this frame: off the ground
             g.air = True
         nf = min(fr + g.rate, float(B.WHIFF_END))
-        if not g.air:
-            g.x += (B.ROOT_Z[int(nf)] - B.ROOT_Z[int(fr)]) * face
-        else:
+        if g.air:                                       # v16: no TransN: the MSC moves him, on the ground too
             vy -= 0.1
             g.y += vy
+            off = ledge_at is not None and gf >= ledge_at or edge_x is not None and g.x * face > edge_x
+            if g.y <= 0.0 and not off:                  # lands
+                g.y, vy, g.air = 0.0, 0.0, False
+                g.landed.append(gf)
         for sl, v in (slot_v or {}).items():
             g.slots[sl][0] += v
         fr = nf
     return vm, g, out
 
 
+def extras(g, out):
+    """v16: [(motion frame, the forward write less his travel there)] (gf_travel writes his travel, gf_root's change
+    since the frame before, plus the tracking's extra), the frames with an extra only"""
+    prev = {}
+    last = None
+    for f, _x, _y, _r in out:
+        prev.setdefault(f, last)
+        last = f
+    res = []
+    for f, var, v in g.moves:
+        if var == 0x0F000004:
+            e = v - (B.root_at(f) - B.root_at(prev[f] if prev.get(f) is not None else f))
+            if abs(e) > 1e-3:
+                res.append((f, e))
+    return res
+
+
 def msc_v12_tests(path):
-    """v12 - v15: tracking (the burst's first frames) and the 2x startup (one range: 50 since v15), the off-stage catch"""
+    """v12 - v16: tracking (the burst's first frames) and the 2x startup (one range: 50 since v15), the off-stage catch"""
     hit = 0x45
     _vm, g0, base = startup_sim(path, {})
     tr = (float(B.BURST[0]), float(B.TRACK_END))
@@ -318,21 +338,22 @@ def msc_v12_tests(path):
                                   ('in front but he faces away', {2: [15.0, 0.0, 30.0, hit]}, -1.0, None),
                                   ('out of range (more than 50 on the tracking frames)', {2: [61.0, 6.0, 30.0, hit]}, 1.0, None)):
         _vm, g, out = startup_sim(path, slots, face, slot_v=sv)
-        check('tracking: none with an opponent %s (no extra move)' % name, (g.moves, g.sit_set), ([], []))
+        check('tracking: none with an opponent %s (no extra move: his travel only)' % name,
+              (extras(g, out), [m for m in g.moves if m[1] != 0x0F000004], g.sit_set), ([], [], []))
     # within range, standing still, level: the burst reaches it anyway (k 1): no extra way (the startup at 2x)
     _vm, g, out = startup_sim(path, {3: [15.0, 0.0, 30.0, hit]})
     check('tracking, within range and still (15): no extra way (k 1), level',
-          (max(abs(v) for _f, _var, v in g.moves), g.sit_set), (0.0, []))
+          (extras(g, out), max(abs(v) for _f, var, v in g.moves if var == 0x0F000005), g.sit_set), ([], 0.0, []))
     # v15: a still opponent at 45 (beyond the burst + catch, ~37.5): the dash stretched toward it, capped (the 2x
     # startup: its one tracking frame, motion 10 -> 12: 0.5 x 2 x BURST_SPEED)
     _vm, g, out = startup_sim(path, {3: [45.0, 0.0, 30.0, hit]})
-    extra = [(f, v) for f, var, v in g.moves if var == 0x0F000004 and abs(v) > 1e-6]
+    extra = extras(g, out)
     check('tracking, a still opponent at 45 (2x startup): the burst stretched on frame 10, capped (%.2f more)'
           % B.BURST_SPEED, ([f for f, _v in extra], [round(v, 3) for _f, v in extra], g.sit_set),
           ([10.0], [round(B.BURST_SPEED, 3)], []))
     # within range, flying away fast: k capped, only on the burst's first 3 frames, %.1f at most
     _vm, g, out = startup_sim(path, {3: [-40.0, 0.0, 30.0, hit]}, slot_v={3: 6.0})
-    extra = [(f, v) for f, var, v in g.moves if var == 0x0F000004 and abs(v) > 1e-6]
+    extra = extras(g, out)
     check('tracking, an opponent flying away (6 a frame): extras only on the burst\'s first frames %d-%d, 0.5x its'
           ' speed each (%.1f more in all, the most)' % (tr[0], tr[1] - 1, most),
           ([f for f, _v in extra], all(abs(v - 0.5 * B.BURST_SPEED) < 1e-3 for _f, v in extra),
@@ -361,9 +382,10 @@ def msc_v12_tests(path):
         _vm, g, out = startup_sim(path, {4: slot}, edge_x=edge, ledge_at=ledge)
         check('tracking, grounded vs an opponent %s: never aimed down (no dip)' % name,
               [v for _f, var, v in g.moves if var == 0x0F000005 and v < -1e-6], [])
-    _vm, g, out = startup_sim(path, {4: [16.0, -8.0, 30.0, hit, 2]}, edge_x=2.0)
+    # (1x: it comes into range after the start; he runs off the edge, at 2, on frame 10, so frame 11 aims down)
+    _vm, g, out = startup_sim(path, {4: [60.0, -8.0, 30.0, hit, 2]}, edge_x=2.0, slot_v={4: -1.5})
     downs = [(f, v) for f, var, v in g.moves if var == 0x0F000005 and v < -1e-6]
-    check('tracking, grounded vs an opponent below past the edge (edge 2, it at 16, 8 down): he runs off the edge,'
+    check('tracking, grounded vs an opponent below past the edge (edge 2, it 8 down): he runs off the edge,'
           ' then aims down on the first frames (at most %g a frame)' % B.TRACK_DOWN,
           (g.air, bool(downs), all(-v <= B.TRACK_DOWN + 1e-6 and tr[0] <= f < tr[1] for f, v in downs)),
           (True, True, True))
@@ -373,6 +395,24 @@ def msc_v12_tests(path):
     _vm, g, out = startup_sim(path, {2: [18.0, 15.0, 30.0, hit], 5: [12.0, 6.0, 30.0, hit]})
     _vm, g1, out1 = startup_sim(path, {5: [12.0, 6.0, 30.0, hit]})
     check('tracking: the nearest opponent in hitstun of two', out, out1)
+    # v16: his travel the same on the ground and in the air (off an edge, lifted by the tracking), no jump on landing
+    norm = max(abs(B.root_at(f + 1) - B.root_at(f)) for f in range(B.JUMP_TO - 1))
+    for name, kw, rate in (('a whiff running off an edge (frame 11)', dict(slots={}, ledge_at=11), 1),
+                           ('a whiff off an edge at 2 (the burst)', dict(slots={}, edge_x=2.0), 1),
+                           ('2x, tracked up (clip 1: an opponent in the air ahead and up), landing mid-move',
+                            dict(slots={4: [40.0, 20.0, 30.0, hit, 2]}), 2),
+                           ('1x, tracked up (it comes into range), landing mid-move',
+                            dict(slots={4: [60.0, 20.0, 30.0, hit, 2]}, slot_v={4: -2.0}), 1)):
+        _vm, g, out = startup_sim(path, frames=50, **kw)
+        dxs = [b[1] - a[1] for a, b in zip(out, out[1:])]
+        trav = [v for f, var, v in g.moves if var == 0x0F000004]
+        check('travel, %s: every frame\'s way his travel (+ the tracking\'s capped extra), the same in the air'
+              ' (%s), no jump of more than a frame\'s way (%.2f x %d + %.2f) on landing (%s)'
+              % (name, 'airborne' if g.air or g.landed or g.sit_set else 'on the ground', norm, rate,
+                 0.5 * rate * B.BURST_SPEED, g.landed or 'none'),
+              (max(abs(v) for v in dxs) <= norm * rate + 0.5 * rate * B.BURST_SPEED + 1e-3,
+               abs(out[-1][1] - B.root_at(out[-1][0]) - sum(e for _f, e in extras(g, out))) < 1e-3, bool(trav)),
+              (True, True, True))
     # the startup at 2x with tracking up: the one first-burst frame it plays (10)
     _vm, g, out = startup_sim(path, {2: [14.0, 10.0, 20.0, hit]})
     ups = [f for f, var, v in g.moves if var == 0x0F000005 and v > 1e-6]
@@ -395,10 +435,11 @@ def msc_v12_tests(path):
     # the ground, in the air (func_40's groups, then func_41, then the actions from the commands)
     last = float(B.anim.FRAMES - 1)
 
-    def air_hit(case, cmd=0, at=None, jumps=(1, 2)):
+    def air_hit(case, cmd=0, at=None, jumps=(1, 2), land_at=None, edge_x=None):
         vm = msc_vm(path)
         g = vm.game
         g.x, g.y = 100.0, 50.0
+        g.edge_x = edge_x
         g.jumps = jumps
         init, loop = vm.func(272), vm.func(273)
         f39 = vm.func(39)
@@ -415,7 +456,7 @@ def msc_v12_tests(path):
         fr = 0.0
         while fr <= last and g.status is None:
             g.frame = fr
-            g.air = case != 'ground' and fr >= B.PUNCH
+            g.air = case != 'ground' and fr >= B.PUNCH and not (land_at is not None and fr >= land_at)
             vm.g[18] = 2 if g.air else 0
             vm.g[24] = cmd if at is not None and fr >= at else 0
             g.cancel_open = fr >= 39
@@ -432,10 +473,15 @@ def msc_v12_tests(path):
 
     g, ended, held, _a = air_hit('air')
     frames = sorted({f for f, _v, _x in held})
-    check('an off-stage catch, nothing pressed: held at the catch\'s place every frame to the animation\'s end, then'
-          ' Fall', (frames[0], frames[-1], {(var, v) for _f, var, v in held}, (ended, g.status)),
-          (float(B.PUNCH_END), last - 1, {(0x0F000000, 100.0), (0x0F000001, 50.0 - 0.5 * (B.PUNCH_END - B.PUNCH))},
-           (last, 0xE)))
+    after = [(f, v) for f, var, v in g.moves if var == 0x0F000004 and f >= B.IASA]
+    check('an off-stage catch, nothing pressed: held at the catch\'s place to GF_IASA - 1 only (v16), then falling'
+          ' with his own gravity (no more position holds) with his travel on, Fall at the animation\'s end',
+          (frames[0], frames[-1], len({(var, v) for _f, var, v in held}), bool(after), (ended, g.status)),
+          (float(B.PUNCH_END), float(B.IASA - 1), 2, True, (last, 0xE)))
+    g, ended, held, _a = air_hit('air', land_at=B.IASA + 8)
+    check('an off-stage catch, falling from GF_IASA, landing on %d: a normal landing (LandingHeavy 0x16 when the'
+          ' game\'s func_55 doesn\'t take it), not held after %d' % (B.IASA + 8, B.IASA - 1),
+          (ended, g.status, max(f for f, _v, _x in held)), (float(B.IASA + 8), 0x16, float(B.IASA - 1)))
     check('an off-stage catch: the air transition groups turned on at GF_IASA (func_40: 0x1f000008, 0a - 11)',
           sorted({gr for f, gr in g.groups_on if f == B.IASA}),
           [0x1f000008] + list(range(0x1f00000a, 0x1f000012)))
@@ -445,9 +491,17 @@ def msc_v12_tests(path):
         g, ended, held, _a = air_hit('air', cmd, at=B.IASA - 3)
         check('an off-stage catch, %s pressed from %d: acts on GF_IASA (%d), as on the ground (status 0x%X), held to'
               ' it' % (name, B.IASA - 3, B.IASA, want), (ended, g.status, max(f for f, _v, _x in held)),
-              (float(B.IASA), want, float(B.IASA)))
+              (float(B.IASA), want, float(B.IASA - 1)))
     g, ended, held, _a = air_hit('air', 0x200000, at=B.IASA, jumps=(2, 2))
     check('an off-stage catch, jump with no jump left: no jump, plays out, then Fall', (ended, g.status), (last, 0xE))
+    # v16: the God Fist on the ground stops at the edge of his ground (the travel's teeter check, the dash attack's
+    # cliff stop); with no edge, his whole travel
+    g, ended, held, asked = air_hit('ground')
+    full = g.x
+    edge = 100.0 + B.root_at(B.PUNCH_END) + 3.0
+    g, ended, held, asked = air_hit('ground', edge_x=edge)
+    check('the God Fist on the ground near an edge (%.1f): his travel stops at it (%.1f; without it %.1f)'
+          % (edge, g.x, full), (g.x <= edge + 1e-3, full > edge), (True, True))
     g, ended, held, asked = air_hit('ground', 0x1, at=B.IASA)
     check('a catch on the ground: not held, no air groups, acting through func_39 from GF_IASA (unchanged)',
           (held, g.groups_on, min(asked)), ([], [], float(B.IASA)))
@@ -932,8 +986,9 @@ def acmd_tests(game_bin):
     a2 = Acmd(script, v)
     a2.my_situation = 2
     run_move(script, v, acm=a2)
-    check('an off-stage catch (in the air): Gravity_Set(own gravity, max fall 0, a fall cut at once) at the catch',
-          a2.gravity_log, [(float(B.PUNCH_END), (-1.0, 0.0, 2))])
+    check('an off-stage catch (in the air): Gravity_Set(own gravity, max fall 0, a fall cut at once) at the catch,'
+          ' off at GF_IASA (v16: his own gravity and fall)',
+          a2.gravity_log, [(float(B.PUNCH_END), (-1.0, 0.0, 2)), (float(B.IASA), (-1.0, -1.0, 0))])
     # in the air at the hand-off (caught off a ledge): the MSC ends the move in Fall at GF_IASA, after the hand-off
     g_iasa = [r[0] for r in rec if r[1] >= B.IASA + 1][0]       # the frame his motion is at GF_IASA (rec: after it)
     v = Victim()
@@ -1222,7 +1277,10 @@ def main():
     e = dict(omo.pac_read(os.path.join(d, 'motion', 'body', 'main.pac')))
     o = omo.Omo(e['FitMarioBodyMainC00AttackDash.omo'])
     trans = o.nodes[0][1]                       # TransN: the first node (vbn order)
-    B.ROOT_Z[:] = [o.sample(trans, f)[0][2] for f in range(o.frames)]
+    # v16: his travel is the MSC's (ROOT_TABLE), not the motion's (TransN 0 on every frame)
+    B.ROOT_Z[:] = list(B.ROOT_TABLE)
+    check('the motion: TransN still on every frame (his travel is the MSC\'s: v16)',
+          max(abs(o.sample(trans, f)[0][2]) for f in range(o.frames)), 0.0)
     bones = omo.vbn_read(vbn)
     B.FOOT_UP[:] = [min(B.omo_world_y(o, bones, n, f) for n in ('LFootJ', 'RFootJ')) - B.anim.STAND_FOOT
                     for f in range(o.frames)]

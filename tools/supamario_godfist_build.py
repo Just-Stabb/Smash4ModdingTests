@@ -104,6 +104,7 @@ TRACK_END = 12
 # (the MSC's GF_TRACK_D2: gf_pick's rules, in hitstun, in front, within 60 degrees); v14 35 / 40, v13 20 / 40
 HOMING_RANGE = 50.0
 TRACK_RANGE = COMBO_RANGE = HOMING_RANGE
+GRAVITY_OWN = (-1.0, -1.0, 0)          # v16: Gravity_Set off (his own gravity and max fall again)
 OFFSTAGE_GRAVITY = (-1.0, 0.0, 2)      # Gravity_Set: his own gravity (a rise slows), max fall 0, a fall cut at once
 SITUATION_VAR = 22                      # Input_Get's SITUATION (0 ground, 1 ledge, 2 air)
 PUNCH_SITUATION = NO_DOWN | 3
@@ -206,7 +207,68 @@ LH_PUSH = 0x0F0000B7                    # target 2's PUSH (docs/position-variabl
                                         # world X)
 SELF_FACING = 0x0F000003
 IASA = float(FLIP_END)                  # 92: the flip landed (v8: 136, XV2's BCM callback window from #0 80)
-ROOT_Z = [0.0] * anim.FRAMES             # his TransN z by motion frame (build() sets it from the animation)
+ROOT_Z = [0.0] * anim.FRAMES             # his travel by motion frame (build() sets it: anim.root_z, = ROOT_TABLE)
+# v16: his travel (anim.root_z) by motion frame, a constant (the MSC's gf_root is made from it, and the MSC is also
+# built without the motion: kame_build); build() checks it against the animation's. Not in the motion any more
+# (anim.ROOT_IN_MOTION): the MSC moves him by it every frame (gf_travel), on the ground and in the air alike
+ROOT_TABLE = [0.0, -0.0485, -0.1754, -0.3482, -0.5271, -0.6822, -0.8071, -0.9466, -1.0896, -1.155, 3.0319, 7.8898, 12.6856,
+              17.4471, 22.05, 26.0466, 26.9975, 27.8161, 28.4858, 29.5525, 30.4373, 31.074, 31.3882, 31.8843,
+              33.3065, 34.2244, 34.8197, 35.3489, 35.8285, 36.2915, 36.7215, 37.1184, 37.3665, 37.5319, 37.6807,
+              37.7799, 37.8461, 37.8957, 37.9122, 37.9784, 38.1603, 38.3918, 38.6233, 38.8052, 38.8714, 38.8714,
+              26.0466, 26.362, 26.4417, 26.5397, 26.6344, 26.6969, 26.7516, 26.8045, 26.8566, 26.9077, 26.9578,
+              27.0075, 27.0569, 27.106, 27.156, 27.2059, 27.2567, 27.308, 27.3605, 27.4135, 27.4678, 28.1637,
+              28.8717, 29.5556, 30.1706, 30.6667, 31.1112, 31.4626, 31.7761, 32.0414, 32.2895, 32.4996, 32.6512,
+              32.7511, 32.8166, 32.8752, 32.9648, 33.1026, 33.2886, 33.5022, 33.7365, 33.9708, 34.1844, 34.3635,
+              34.4876, 34.5703, 34.6392, 34.7012, 34.7494, 34.7908, 34.8252, 34.8528, 34.8803, 34.8941, 34.9079,
+              34.9148, 34.9217, 34.9217, 34.9217, 34.9217, 34.9286, 34.9286, 34.9286, 34.9286, 34.9286, 34.9286,
+              34.9286, 34.9286, 34.9286, 34.9217, 34.9148, 34.901, 34.8803, 34.8597, 34.8252, 34.7908, 34.7632,
+              34.7356, 34.7081, 34.6874, 34.6667, 34.6461, 34.6323, 34.6185, 34.6047, 34.5909, 34.584, 34.5772,
+              34.5703, 34.5634, 34.5634, 34.5634]
+ROOT_TOL = 0.01                         # gf_root's pieces: within this of ROOT_TABLE at every frame
+
+
+def root_pieces():
+    """ROOT_TABLE as straight pieces [(from, to, value at from, slope)] (none across the God Fist's start: the whiff
+    0 .. JUMP_TO - 1, the God Fist JUMP_TO ..), each within ROOT_TOL of every frame it covers"""
+    out = []
+    for lo, hi in ((0, JUMP_TO - 1), (JUMP_TO, len(ROOT_TABLE) - 1)):
+        a = lo
+        while a < hi:
+            b = a + 1
+            while b < hi:
+                c = b + 1
+                sl = (ROOT_TABLE[c] - ROOT_TABLE[a]) / float(c - a)
+                if any(abs(ROOT_TABLE[a] + sl * (k - a) - ROOT_TABLE[k]) > ROOT_TOL for k in range(a, c + 1)):
+                    break
+                b = c
+            out.append((a, b, ROOT_TABLE[a], (ROOT_TABLE[b] - ROOT_TABLE[a]) / float(b - a)))
+            a = b
+    return out
+
+
+def root_at(f):
+    """gf_root(f) as the MSC works it out (motion frame f, fractions too)"""
+    for a, b, v, sl in root_pieces():
+        if f < b or b == len(ROOT_TABLE) - 1 or b == JUMP_TO - 1 and f < JUMP_TO:
+            return v + (min(f, b) - a) * sl
+    return ROOT_TABLE[-1]
+
+
+def root_code():
+    """gf_root's body (GF_ROOT_CODE in supamario.c)"""
+    out = []
+    pieces = root_pieces()
+    for i, (a, b, v, sl) in enumerate(pieces):
+        last = i == len(pieces) - 1 or b == JUMP_TO - 1
+        cond = 'f < %sf' % float(JUMP_TO) if b == JUMP_TO - 1 else 'f < %sf' % float(b)
+        body = 'return %rf + (f - %sf) * %rf;' % (round(v, 4), float(a), round(sl, 6))
+        if last and b == len(ROOT_TABLE) - 1:
+            out.append('if (f > %sf) { f = %sf; } %s' % (float(b), float(b), body))
+        elif b == JUMP_TO - 1:
+            out.append('if (%s) { if (f > %sf) { f = %sf; } %s }' % (cond, float(b), float(b), body))
+        else:
+            out.append('if (%s) { %s }' % (cond, body))
+    return ' '.join(out)
 # v10: his lower foot's height over the floor by motion frame (build() sets it): 0 on the ground frames, XV2's
 # height (~3.4) from the punch's rise through the hold and the strike (anim.raise_weight); the held victim, the
 # strike's hitbox on it and the launch go up with him, so the fist stays where it was on the victim
@@ -328,7 +390,7 @@ def msc_values():
             'GF_BURST_FROM': '%sf' % float(BURST[0]), 'GF_BURST_END': '%sf' % float(BURST[1]),
             'GF_BURST_SPEED': '%sf' % BURST_SPEED, 'GF_TRACK_MAX': '%sf' % TRACK_MAX,
             'GF_TRACK_DOWN': '%sf' % TRACK_DOWN, 'GF_TRACK_END': '%sf' % float(TRACK_END),
-            'GF_TRACK_D2': '%sf' % (TRACK_RANGE ** 2), 'GF_HOLD_X': '%sf' % HOLD_X}
+            'GF_TRACK_D2': '%sf' % (TRACK_RANGE ** 2), 'GF_ROOT_CODE': root_code(), 'GF_HOLD_X': '%sf' % HOLD_X}
 
 
 def burst_speed():
@@ -609,6 +671,12 @@ def game_script():
     s += if_(V_TMP2, 1, 2, [cmd('leave_ground_cancel', LGC_ON)]) + if_(GF_VAR, 0, 2, [
         setf(x, LH_OFFX), setf(0.0, LH_OFFY), setf(5, LH_GROUND), cmd('rotation_set', 2, 0.0, 0.0, 0.0),
         setf(0, V_SPIN), setf(GF_FALL_WAIT, V_CNT), setf(4, V_PHASE)] + dlog(D_PHASE, value=4))
+    # v16 (user: "transition into his normal gravity and falling after being actionable", "specifically after hitting
+    # Super God Fist in the air"): an air catch's Gravity_Set off at GF_IASA (both below 0, Mode 0: his own again); the
+    # MSC stops holding him there
+    assert IASA == HANDOFF + 1
+    s += [cmd('frame', float(IASA))] + if_(GF_VAR, 1, 0, [cmd('input_get', 0, SITUATION_VAR, V_TMP2)] + if_(
+        V_TMP2, 0, 2, [cmd('gravity_set', *GRAVITY_OWN)]))
     # XV2's CMN effects on the slide (BAC entry 3: CMN 160 at #96 20 / 42, CMN 120 at 62), at the slide's planned
     # place (SLIDE_DECAY's series from the hand-off; the game may stop it short at a ledge)
     for u, name in ((20, 'PHitSmk'), (42, 'PHitSmk'), (62, 'MHitSmk')):
@@ -913,7 +981,10 @@ def build(sm_dir, out_dir, ean_path, cmn_dir=None, png=None, skill_dir=None, cmn
     out, bones, _info = anim.build(os.path.join(sm_dir, 'motion', 'body'),
                                    os.path.join(sm_dir, 'model', 'body', 'c00', 'model.vbn'), ean_path, mo)
     trans = [h for n, _p, h in bones if n == 'TransN'][0]
-    ROOT_Z[:] = [out['main'].sample(trans, f)[0][2] for f in range(out['main'].frames)]
+    ROOT_Z[:] = _info['root_z']
+    assert max(abs(a - b) for a, b in zip(ROOT_Z, ROOT_TABLE)) < 1e-3, 'ROOT_TABLE is out of date'
+    assert all(abs(out['main'].sample(trans, f)[0][2]) < 1e-6 for f in range(out['main'].frames)), 'TransN moves'
+    assert max(abs(root_at(f) - ROOT_TABLE[f]) for f in range(len(ROOT_TABLE))) <= ROOT_TOL + 1e-6
     assert abs(burst_speed() - BURST_SPEED) < 1e-3, ('BURST_SPEED is %.4f now' % burst_speed())
     FOOT_UP[:] = [min(omo_world_y(out['main'], bones, n_, f) for n_ in ('LFootJ', 'RFootJ')) - anim.STAND_FOOT
                   for f in range(out['main'].frames)]

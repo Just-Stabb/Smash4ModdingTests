@@ -1200,3 +1200,68 @@ catch's 11.5.
 - **Out of range:** beyond 50 on the tracking frames.
 - **A still opponent at 45:** stretched on frame 10 by 4.53 (the cap).
 - **The 2x startup:** within 50 (48: 2x), and not at 52.
+
+## Super God Fist v16 (`supamario_god_fist_v16.zip`): his travel from the MSC (same in the air), the edge miss, falling from 92 after an air hit
+
+v16 goes over v15 and still uses exe B (`exe_v46i`). The user, with v15 clips (`aa89bf6c`, `3fdb9f20`):
+- "When done near an edge, the speed isn't the same as on the ground when going into the air and for some reason this
+  isn't hitting the opponent (first clip)."
+- "Sometimes when landing from doing the quick, tracking Super God Fist, Supamario will teleport forward."
+- "Please make Supamario transition into his normal gravity and falling after being actionable from hitting Super God
+  Fist", specifically after hitting it in the air.
+
+### The cause (clip 1, frames 94-110)
+DK was in the air in hitstun, ahead of Supamario and above him, near the edge. Supamario dashed with the 2x startup.
+The tracking's one 2x frame (motion 10) aimed up and set SITUATION 2, so he left the ground. From then on
+Leave_Ground_Cancel's FALL kinetics ran instead of MOTION, and the game no longer applied the motion's TransN. The
+burst's remaining way (about 14 units, motion 10-15) was lost: in the clip he hardly moves from frame 96 to 106, and
+the punch fell short of DK.
+
+The same happens when the dash runs off an edge: in the air the TransN stops ("the speed isn't the same").
+
+On landing, MOTION kinetics come back, and the game catches up with the TransN that went by in the air in one frame
+("teleport forward"). The game's own catch-up can't be run offline. It is the likely cause, and with no TransN it
+can't happen.
+
+### The fix: his travel is the MSC's
+- **The motion:** `anim.ROOT_IN_MOTION = False` sets TransN to 0 on every frame (the build checks this).
+- **The MSC:** every frame, `gf_travel` moves him forward by `gf_root`'s change since the frame before (forward
+  writes through `0x0F000004`), on the ground and in the air alike. Its change follows the motion's rate, hitstop and
+  the jump to the God Fist; at the jump there's no way, where v3-v15's TransN stepped him back about 2.4.
+  - `gf_root` is the build's `ROOT_TABLE` (`anim.root_z`, a constant checked against the animation) as 75 straight
+    pieces within 0.01 of every frame, generated into the MSC (`GF_ROOT_CODE`).
+- **Tracking:** its extra rides on the same write (`gf_tvx`), so only the extra is the tracking's. The air branch
+  takes `(k - 1)` of the way, as on the ground.
+- **On the ground on the God Fist** (Leave_Ground_Cancel 2): the travel stops at the edge of his ground (the teeter
+  check `GroundModule(0x2726, way)`), as the dash attack's cliff stop did.
+- **The whiff:** runs off the edge as before (Leave_Ground_Cancel 0) and keeps its per-frame way in the air.
+
+### Falling from 92 after an air hit
+For a catch made in the air:
+- **The hold:** the MSC holds him only to GF_IASA - 1 (91). At 92 the game script turns its Gravity_Set off (`(-1,
+  -1, 0)`: his own gravity and max fall).
+- **After 92:** he falls with his own gravity while the animation plays on, and his travel goes on. He can act from
+  92 (v14's `gf_air_act`).
+- **No action:** Fall at the animation's end.
+- **Landing first:** a normal landing (the game's `func_55` with the landing group on, else LandingHeavy `0x16`).
+- **Ground hits and whiffs:** unchanged.
+
+### Tests
+`--all-models`: 0 problems. New or updated checks:
+- the motion's TransN is 0 on every frame;
+- travel the same on the ground and in the air:
+  - a whiff off a ledge at frame 11, or off an edge at 2;
+  - 2x tracked up (clip 1's case), landing mid-move;
+  - 1x tracked up, landing mid-move;
+  - in each, every frame's move is his travel plus the tracking's capped extra, never more than a frame's way, landing
+    included;
+- the God Fist on the ground stops at an edge;
+- tracking's extras measured over the travel;
+- the off-edge down aim on a 1x run;
+- an air hit: held to 91, then falling with the travel on and Fall at the end; landing at 100 is a normal landing;
+  every action at 92;
+- Gravity_Set on at the catch and off at 92.
+
+**Not confirmed in game:**
+- that set_pos-based travel on the ground follows slopes as the TransN did;
+- the game's landing catch-up mechanism itself.

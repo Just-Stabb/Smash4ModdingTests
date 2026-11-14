@@ -65,6 +65,13 @@ TRAVEL = 1.4                          # v9 (user: "move Supamario about 1.6x fur
                                       # v10 1.4 (user: "a bit less far than it does now, but still farther than before")
                                       # the timing kept. AttackDash's ground correction is 2 (cliff stop, func_245's
                                       # StatusModule(5, 0, 0xF, 2, ...)): he still stops at a ledge as the vanilla one
+# v16 (user, v15's clip: "When done near an edge, the speed isn't the same as on the ground when going into the air",
+# "Sometimes when landing from doing the quick, tracking Super God Fist, Supamario will teleport forward"): his
+# travel is no longer in the motion. On the ground the game moved him by TransN (MOTION kinetics); in the air
+# (Leave_Ground_Cancel's FALL kinetics) it didn't, so off an edge (or lifted by the tracking) the dash stalled, and
+# on landing the motion's TransN came back as one jump. TransN is 0 on every frame now; the MSC moves him by the same
+# way a frame (root_z: the build's ROOT_TABLE, gf_root) on the ground and in the air alike
+ROOT_IN_MOTION = False
 # the lowest the joints may go (units above the floor; Mario's foot joint is 1.56 up when standing)
 FLOOR = {'HeadN': 3.0, 'LHandN': 1.0, 'RHandN': 1.0, 'LFootJ': 1.3, 'RFootJ': 1.3, 'LToeN': 0.4, 'RToeN': 0.4,
          'LKneeJ': 1.5, 'RKneeJ': 1.5}
@@ -116,7 +123,7 @@ def body_frames(ean, smash):
     for f, fr in enumerate(out):
         a, sf = source(f)
         pel = _pelvis_and_base(ean, ean.animations[a], sf)[0][1]
-        fr['TransN'] = ((0.0, 0.0, root_z(ean, f)), fr['TransN'][1], fr['TransN'][2])
+        fr['TransN'] = ((0.0, 0.0, root_z(ean, f) if ROOT_IN_MOTION else 0.0), fr['TransN'][1], fr['TransN'][2])
         fr['RotN'] = ((rot_rest[0], rot_rest[1] + (pel - pel_ref) * SCALE, rot_rest[2]), fr['RotN'][1], fr['RotN'][2])
     return out
 
@@ -188,7 +195,7 @@ def build(motion_dir, vbn_path, ean_path, out_dir):
         assert [n[1] for n in o.nodes] == [n[1] for n in omo.Omo(e[name]).nodes]
         omo.pac_write(os.path.join(out_dir, part + '.pac'), [(n, o.encode() if n == name else d) for n, d in entries])
         out[part] = o
-    return out, omo.vbn_read(vbn_path), {'rotn_offsets': offs}
+    return out, omo.vbn_read(vbn_path), {'rotn_offsets': offs, 'root_z': [root_z(ean, f) for f in range(FRAMES)]}
 
 
 def joint_offset(o, bones, joint, f):

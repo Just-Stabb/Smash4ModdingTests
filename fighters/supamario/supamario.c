@@ -37700,6 +37700,9 @@ void rolloff_hold_update()
 // rate back to 1, 11 the God Fist path leaving the status (the frame).
 // ===================================================================
 int gf_jump;            // 0 the jump not asked for yet, 1 on its way to GF_JUMP_TO, 2 done
+float gf_rl;            // v16: gf_root at the frame his travel was last applied (gf_travel)
+int gf_rinit;
+float gf_tvx;           // v16: gf_track's extra way forward this frame (gf_travel moves him by it too)
 // v12: the startup at 2x when an opponent in hitstun is close (gf_fast 1 until the punch, then 2), XV2's tracking
 // of the dash's burst (gf_track), and an off-stage catch held in place (gf_air: gf_px / gf_py) to GF_IASA
 int gf_fast;
@@ -37789,6 +37792,7 @@ void gf_track(float fr)
     float va;
     float need;
     float nt;
+    gf_tvx = 0.0f;
     x = WorkModuleF(0, 0x0f000000);
     y = WorkModuleF(0, 0x0f000001);
     face = WorkModuleF(0, 0x0f000003);
@@ -37893,7 +37897,7 @@ void gf_track(float fr)
         {
             vy = -GF_TRACK_DOWN;
         }
-        vx = k * d - mx;
+        vx = (k - 1.0f) * d;          // v16: the travel itself is gf_travel's in the air too
         if (level == 0x1 && vy <= 0.0f)
         {
             vy = 0.0f;
@@ -37903,9 +37907,9 @@ void gf_track(float fr)
             vy = vy - my;
         }
     }
-    WorkModule(0, vx, 0x0f000004);
+    gf_tvx = vx;                       // v16: moved by gf_travel with the frame's travel
     WorkModule(0, vy, 0x0f000005);
-    gf_ex = vx;
+    gf_ex = 0.0f;
     gf_ey = vy;
 }
 
@@ -37988,9 +37992,51 @@ int gf_air_act()
     return 0;
 }
 
+// v16: his travel at motion frame f (the build's ROOT_TABLE, anim.root_z: the dash, the whiff to GF_JUMP_TO, the God
+// Fist from it), in straight pieces within 0.01 of every frame (supamario_godfist_build.root_code)
+float gf_root(float f)
+{
+    GF_ROOT_CODE
+    return 0.0f;
+}
+
+// v16 (user: "When done near an edge, the speed isn't the same as on the ground when going into the air", "when
+// landing from doing the quick, tracking Super God Fist, Supamario will teleport forward"): his travel is no longer
+// the motion's TransN (the game applies it only on the ground: in the air, off an edge or lifted by the tracking, the
+// dash stalled, and on landing the TransN skipped came back at once); every frame the MSC moves him forward by
+// gf_root's change since the frame before (the motion's rate, hitstop and the jump to the God Fist included) plus
+// gf_track's extra (gf_tvx), on the ground and in the air alike. edges 1 (the God Fist on the ground: Leave_Ground_Cancel
+// 2, the edges kept): not past the edge of his ground (GroundModule(0x2726, way): the teeter check), as the vanilla
+// dash attack's cliff stop
+void gf_travel(float fr, int edges)
+{
+    float r;
+    float dv;
+    r = gf_root(fr);
+    if (gf_rinit == 0)
+    {
+        gf_rinit = 0x1;
+        gf_rl = r;
+    }
+    dv = r - gf_rl + gf_tvx;
+    gf_rl = r;
+    gf_tvx = 0.0f;
+    if (dv == 0.0f)
+    {
+        return;
+    }
+    if (edges == 0x1 && global18 == 0 && dv > 0.0f && GroundModule(0x2726, dv) == 0x1)
+    {
+        return;
+    }
+    WorkModule(0, dv, 0x0f000004);
+}
+
 void gf_init()
 {
     gf_jump = 0;
+    gf_rinit = 0;
+    gf_tvx = 0.0f;
     WorkModule(0, 0.0f, GF_VAR);
     gf_air = 0;
     gf_ex = 0.0f;
@@ -38025,6 +38071,7 @@ int gf_update()
     if (WorkModuleF(0, GF_VAR) < 0.5f)
     {
         gf_track(fr);
+        gf_travel(fr, 0);
         if (fr >= GF_WHIFF_END)
         {
             if (global18 == 0x2)
@@ -38052,13 +38099,22 @@ int gf_update()
         gf_px = WorkModuleF(0, 0x0f000000);
         gf_py = WorkModuleF(0, 0x0f000001);
     }
-    if (gf_air == 0x1 && MotionModule(0x2712) == 0)
+    // v16 (user: "make Supamario transition into his normal gravity and falling after being actionable from hitting
+    // Super God Fist", "specifically after hitting Super God Fist in the air"): held to GF_IASA only (the game script
+    // ends its Gravity_Set there); from it he falls with his own gravity while the animation plays on, his travel on
+    if (gf_air == 0x1 && fr < GF_IASA)
     {
         WorkModule(0, gf_px, 0x0f000000);
         WorkModule(0, gf_py, 0x0f000001);
+        gf_rl = gf_root(fr);
+    }
+    else
+    {
+        gf_travel(fr, global18 == 0);
     }
     if (gf_jump == 0)
     {
+        gf_rl = gf_root(GF_JUMP_TO);   // v16: no way at the jump to the God Fist (the whiff's way isn't his)
         gf_jump = 0x1;
         if (fr < GF_JUMP_TO - 0.5f)
         {
@@ -38089,6 +38145,21 @@ int gf_update()
         {
             //GFD WorkModule(0, fr, 0x0F0003FB);
             func_16(0xe, 0);
+        }
+        return 0x1;
+    }
+    // v16: an air God Fist falling from GF_IASA lands: a normal landing (func_55, the game's own: its landing group
+    // and terms on through func_40), else LandingHeavy
+    if (gf_air == 0x1 && fr >= GF_IASA)
+    {
+        if (gf_terms == 0)
+        {
+            gf_terms = 0x1;
+            func_40();
+        }
+        if (func_55() == 0)
+        {
+            func_16(0x16, 0);
         }
         return 0x1;
     }
