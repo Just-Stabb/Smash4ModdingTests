@@ -32,6 +32,23 @@ fighters/kirby/specials.md "v6". What it does with Hero's scripts:
   would draw nothing.
 - Sounds: Sound_Effect -> SoundModule 0x2710, Stop_Sound_Effect -> 0x2714 (Hero's ids: his bank, as v5).
 - Ground / air: the air scripts where they differ (Kacrackle Slash and Hatchet Man have no landing dust in the air).
+
+Fix v8 (fighters/kirby/specials.md "Hero copy fix v8"; user: "make the hitboxes for the sword attack match the sword",
+"the additional effects from the moves ... don't appear", "make the sword only visible ... when the trail begins and
+disappear when it ends"):
+- Hitboxes on the blade: every sword hitbox on the blade's own axis (Hero's Sword1 X along the blade, Y as Hero's, Z
+  0: Hero's Z -2.5 / -2 / -1.5 put them 1.5-2.5 off the drawn blade, beyond its flat's +-1.8), the arm hitbox (bone
+  0x16) on the blade's base (Sword1 X = HILT_X, where the blade and the trail start) instead of Hero's forearm, and the
+  bone-0 hitboxes (Flame / Kacrackle Slash's IDs 3-4, the flame / ice burst ahead of the blade: 8.5 / 10.5 wide, up
+  to 16 off the blade) left out (DROPPED_BONE0). Sizes, damage and the rest Hero's.
+- Effects: the sword-following ones (External_Graphic on bone 0x19: the fire / ice / dark blade) and their
+  Terminate_Graphic_Effect are no longer MSC calls: tools/kirby_hero_sword_acmd.py puts them in the swing slots' effect
+  scripts with the trail (sword_effect_events), Terminate 0 (ended by their own Terminate_Graphic_Effect at Hero's
+  frame, and by khm_sw_stop if the spell stops). The bone-0 ones (landing dust, Metal Slash's flash, Hatchet Man's
+  ground burst) stay here, ground / air as Hero's; Hero's bank ones (0x345....) with Terminate 0 and ended by
+  khm_sw_stop at the spell's end (Hero's: with his motion).
+- khm_sw_shown(n, f): the sword drawn from the trail's start (Sword_Glow) to its end (Terminate_Sword_Glow), cast
+  frames.
 """
 import json
 import os
@@ -49,6 +66,9 @@ K_SWORD, K_ARM = 0x18, 0x10
 SWORD1_TO_HAVE = 0.2023        # Sword1's origin in HaveR's frame (x), tools/kirby_copy_sword.py
 ID_SHIFT, PART = 5, 1
 EFFECT_ROT_Z = 0.0             # fix v7: LHaveN's frame is Sword1's (was 90: the item frame taken as LHaveN's)
+HILT_X = 1.5                   # fix v8: the blade's base along Sword1's X (Hero's trail starts there; the model's
+                               # blade runs X 1.5-12.1, the grip below it)
+HERO_BANK = 0x345
 # Special_Hitbox's 41 FP parameters, then Extra's six
 FP = ['ID', 'Part', 'Bone', 'Damage', 'Angle', 'KBG', 'FKB', 'BKB', 'Size', 'X', 'Y', 'Z', 'Effect', 'Trip', 'Hitlag',
       'SDI', 'Clang', 'Rebound', 'ShieldDamage', 'SFXLevel', 'SFXType', 'Ground/Air', 'Direct/Indirect', 'Type',
@@ -144,16 +164,15 @@ def events(ref):
                         vals = [a[k] for k in FP[:40]]
                         bone = a['Bone']
                         x, y, z = a['X'], a['Y'], a['Z']
-                        if bone == SWORD_BONE:
-                            kb, (x, y, z) = K_SWORD, sword_point(x, y, z)
-                        elif bone == ARM_BONE and ARMS is not None:      # fix v6: the forearm at the grip
+                        if bone == SWORD_BONE:              # fix v8: on the blade's axis (Z 0)
+                            kb, (x, y, z) = K_SWORD, sword_point(x, y, 0.0)
+                        elif bone == ARM_BONE:                # fix v8: the blade's base (v6-v7: the forearm)
                             assert (x, y, z) == (0, 0, 0), (n, name, x, y, z)
-                            kb, (x, y, z) = K_SWORD, tuple(ARMS[n][min(f, len(ARMS[n]) - 1)])
-                        elif bone == ARM_BONE:
-                            kb = K_ARM
-                        else:
+                            kb, (x, y, z) = K_SWORD, sword_point(HILT_X, 0.0, 0.0)
+                        else:                                 # fix v8: bone 0 (the burst ahead of the blade): out
                             assert bone == 0, bone
-                            kb = 0
+                            e.setdefault('dropped', []).append((sit, f, a['ID']))
+                            continue
                         vals[0] += ID_SHIFT
                         vals[1] = PART
                         vals[2] = kb
@@ -162,7 +181,10 @@ def events(ref):
                         ev.append((f, 'hitbox', vals))
                     elif name == 'Remove_All_Hitboxes':
                         ev.append((f, 'remove', []))
-                    elif name in ('External_Graphic', 'Graphic_Effect2', 'Graphic_Effect3'):
+                    elif name == 'External_Graphic' or (name == 'Terminate_Graphic_Effect'
+                                                        and a['Graphic'] >> 16 == HERO_BANK):
+                        continue                                # fix v8: the swing slots' effect scripts
+                    elif name in ('Graphic_Effect2', 'Graphic_Effect3'):
                         bone = a['Bone']
                         pos = (a['X'], a['Y'], a['Z'])
                         rot = [a['XRot'], a['YRot'], a['ZRot']]
@@ -172,12 +194,10 @@ def events(ref):
                             size = round(size * SCALE, 4)
                         else:
                             assert bone == 0, bone
-                        if name == 'External_Graphic':
-                            ev.append((f, 'follow', [a['Graphic'], bone] + list(pos) + rot + [size, a['Terminate']]))
-                        else:
-                            ev.append((f, 'effect', [a['Graphic'], bone] + list(pos) + rot + [size]
-                                       + [a[k] for k in ('RandomX', 'RandomY', 'RandomZ', 'RandomXRot', 'RandomYRot',
-                                                         'RandomZRot', 'Terminate')]))
+                        term = 0 if a['Graphic'] >> 16 == HERO_BANK else a['Terminate']   # fix v8: khm_sw_stop
+                        ev.append((f, 'effect', [a['Graphic'], bone] + list(pos) + rot + [size]
+                                   + [a[k] for k in ('RandomX', 'RandomY', 'RandomZ', 'RandomXRot', 'RandomYRot',
+                                                     'RandomZRot')] + [term]))
                     elif name == 'Terminate_Graphic_Effect':
                         ev.append((f, 'kill', [a['Graphic'], a['KillParticles'], a['KillImmediately']]))
                     elif name == 'Sound_Effect':

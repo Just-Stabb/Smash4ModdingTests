@@ -3,7 +3,8 @@
 rolloff_hold_test's MSC interpreter) and its game script (the attackdash script of the built game.bin, run in a
 small ACMD interpreter with a simulated victim), frame by frame, in the scenarios below.
 
-  python3 tools/supamario_godfist_test.py PKG_FIGHTER_DIR [--all-models]   (OUT_DIR/fighter/supamario of the build)
+  python3 tools/supamario_godfist_test.py PKG_FIGHTER_DIR --vbn MODEL_VBN [--all-models]
+      (OUT_DIR/fighter/supamario of the build; MODEL_VBN: his model/body/c00/model.vbn, for his height by frame)
 
 v4: the interpreter models hitboxes, Part hit records, Hit_Reset / Hit_Log_Clear, his hitstop and a status change
 (the script and hitboxes gone, the threads on); Acmd.DEFER (the kinds of a hit reach Hit_Check only after the next
@@ -60,6 +61,9 @@ class MscGame:
         self.cancel_open = False
         self.run_flag = 0
         self.motion_end = False
+        self.air = False               # v10: his situation in the air (vm.g[18] 2, set with it)
+        self.lgc = 1                   # Leave_Ground_Cancel's Enabled (the game script's)
+        self.dropped = []              # Fall requests the cave dropped (frame)
 
     def sys(self, sid, a):
         if sid == 0x17 and len(a) == 2 and a[0] == 0:
@@ -80,6 +84,11 @@ class MscGame:
         if sid == 0x23 and a == [0x2713]:
             return int(self.cancel_open)
         if sid == 0x18 and len(a) >= 2 and a[0] == 0x3:
+            # acmd_ext_cave's hk_lgc_req (docs/native-notes.md "Leave_Ground_Cancel"): a Fall request in the air while
+            # off, the motion not ended and the cancel window shut, is dropped
+            if a[1] == 0xE and self.air and self.lgc != 1 and not self.motion_end and not self.cancel_open:
+                self.dropped.append(self.frame)
+                return 0
             self.status = a[1]
             return 0
         return 0
@@ -155,6 +164,46 @@ def msc_tests(path):
         g.frame = float(fr) if fr == B.PUNCH_END else float(B.JUMP_TO + fr - B.PUNCH_END - 1)
         vm.call(loop)
     check('MSC hit: no acting before GF_IASA (%d)' % B.IASA, min(asked) if asked else None, B.IASA)
+    # v10: Leave_Ground_Cancel (the game script: 0 from the start, 2 from the catch, 1 at WHIFF_END - 1 / HANDOFF)
+    for vl in (39, None):
+        vm = msc_vm(path)
+        g = vm.game
+        vm.call(init)
+        ended = None
+        for f in range(0, int(B.WHIFF_END) + 6):
+            g.frame = float(f)
+            g.air = f >= 8                     # ran off a ledge at 8
+            vm.g[18] = 2 if g.air else 0
+            g.lgc = 1 if f >= B.WHIFF_END - 1 else 0
+            g.cancel_open = vl is not None and f >= vl
+            vm.call(loop)
+            if g.status is not None:
+                ended = (f, g.status)
+                break
+        want = (vl if vl is not None else int(B.WHIFF_END) - 1, 0xE)    # Leave_Ground_Cancel on at WHIFF_END - 1
+        check('MSC whiff off a ledge (frame 8; the vl cancel window %s): the punch goes on in the air, Fall at %d'
+              % (vl, want[0]), (ended, min(g.dropped) if g.dropped else None), (want, 8))
+    for air_from in (B.JUMP_TO + 4, B.STRIKE + 5, B.PUNCH_END - 4):
+        vm = msc_vm(path)
+        g = vm.game
+        vm.call(init)
+        fr, ended = 0.0, None
+        while fr <= last and g.status is None:
+            g.frame = fr
+            g.air = fr >= air_from
+            vm.g[18] = 2 if g.air else 0
+            g.cancel_open = fr >= 39
+            g.motion_end = fr >= last
+            if fr >= B.PUNCH_END:
+                g.gf = 1.0
+            g.lgc = 1 if fr >= B.HANDOFF else (2 if fr >= B.PUNCH_END else 0)
+            g.rate = None
+            vm.call(loop)
+            if g.status is not None:
+                ended = (fr, g.status)
+            fr = float(B.JUMP_TO) if fr == B.PUNCH_END else fr + 1.0
+        check('MSC hit, in the air from %d (the vl cancel window open from 39): the God Fist goes on to the hand-off'
+              ' (%d), Fall at GF_IASA' % (air_from, B.HANDOFF), ended, (float(B.IASA), 0xE))
 
 
 # ---------------------------------------------------------------- ACMD
@@ -296,6 +345,7 @@ class Acmd:
         self.motion_frame = 0.0
         self.g = 0
         self.diag = []             # (k, value) written to the diag IDs
+        self.lgc_log = []          # (motion frame, Leave_Ground_Cancel's Enabled)
 
     def target(self, t, thread=False):
         if t == 2 and thread and not self.T2_THREAD:
@@ -407,6 +457,8 @@ class Acmd:
                 if d['Part'] in self.stale and not self.BLOCK:
                     self.stale.discard(d['Part'])
                     self.records.pop(d['Part'], None)
+            elif n == 'Leave_Ground_Cancel':
+                self.lgc_log.append((self.motion_frame, p[0]))
             elif n == 'Remove_All_Hitboxes':
                 self.active.clear()
                 self.stale = set(self.records)
@@ -597,6 +649,19 @@ def acmd_tests(game_bin):
     v = Victim()
     a, rec = run_move(script, v, hit=False, frames=60)
     check('ACMD whiff: gf stays 0, nothing done to anyone', (a.vars.get(B.GF_VAR), v.log, a.threads), (0.0, [], {}))
+    check('Leave_Ground_Cancel on a whiff: off from the start (as Diddy Kong\'s), on again at WHIFF_END - 1',
+          a.lgc_log, [(0.0, 0), (B.WHIFF_END - 1, 1)])
+    v = Victim()
+    a, rec = run_move(script, v)
+    check('Leave_Ground_Cancel on a God Fist: off from the start, edges kept from the catch, on at the hand-off',
+          a.lgc_log, [(0.0, 0), (float(B.PUNCH_END), 2), (float(B.HANDOFF), 1)])
+    # in the air at the hand-off (caught off a ledge): the MSC ends the move in Fall at GF_IASA, after the hand-off
+    g_iasa = [r[0] for r in rec if r[1] >= B.IASA + 1][0]       # the frame his motion is at GF_IASA (rec: after it)
+    v = Victim()
+    a, rec = run_move(script, v, interrupt=(g_iasa, 0xE))
+    check('Fall at GF_IASA (in the air): the victim handed off before it, downed, then upright with its controller'
+          ' back, gf_phase 0', (any(r[5] == 0x50 for r in rec), v.rot[0], v.input_off, a.vars.get(B.V_PHASE)),
+          (True, 0.0, 0.0, 0.0))
     # the full God Fist, nothing else happening
     v = Victim()
     a, rec = run_move(script, v)
@@ -610,13 +675,18 @@ def acmd_tests(game_bin):
     moved = [r for r in rec if r[8] == 2.0 and r[2] is not None and r[2] > B.HOLD_X + 5]
     check('the victim flies (moved away from the hold: the v4 clip\'s bug: it never moved)', bool(moved), True)
     held = [r for r in rec if B.JUMP_TO <= r[1] < B.STRIKE and r[8] == 1.0]
-    check('hold: the victim %g in front on the ground while held' % B.HOLD_X, {(r[2], r[3]) for r in held},
-          {(B.HOLD_X, 0.0)})
+    check('hold: the victim %g in front, at his height (v10: raised with him, FOOT_UP) while held' % B.HOLD_X,
+          all(r[2] == B.HOLD_X and min(abs(r[3] - B.FOOT_UP[f]) for f in range(B.JUMP_TO, B.STRIKE)) < 1e-3
+              for r in held) and bool(held), True)
+    check('hold: his height (and the victim\'s) one level through the punch, the hold and the strike (~3.4)',
+          max(abs(B.FOOT_UP[f] - B.FOOT_UP[B.STRIKE]) for f in [B.PUNCH_END] + list(range(B.JUMP_TO, B.STRIKE + 1)))
+          < 0.2 and B.FOOT_UP[B.STRIKE] > 3.0, True)
     n_hold = B.STRIKE - B.JUMP_TO
     tr = v.trace
-    want_hold = [(B.HOLD_X, 0.0, -B.hold_lean(k, n_hold)) for k in range(n_hold)]
+    want_hold = [(B.HOLD_X, B.FOOT_UP[B.JUMP_TO + k], -B.hold_lean(k, n_hold)) for k in range(n_hold)]
     check('hold: XV2\'s lean back (#179 0-40: %.0f -> %.0f degrees)' % (-want_hold[0][2], -want_hold[-1][2]),
-          all(abs(a_[2] - b_[2]) < 1e-3 and a_[:2] == b_[:2] for a_, b_ in zip(tr[:n_hold], want_hold)), True)
+          all(abs(a_[2] - b_[2]) < 1e-3 and a_[0] == b_[0] and abs(a_[1] - b_[1]) < 1e-3
+              for a_, b_ in zip(tr[:n_hold], want_hold)), True)
     flight = tr[n_hold:n_hold + B.FLY_N]
     want = [B.flight_v8(k) for k in range(1, B.FLY_N + 1)]
     ok = len(flight) == len(want) and all(abs(x - wx) < 1e-3 and abs(y - wy) < 1e-3 and abs(r_ - wa) < 1e-2
@@ -847,8 +917,14 @@ def diag_tests(game_bin):
 
 
 def main():
-    a = [x for x in sys.argv[1:] if not x.startswith('--')]
-    if len(a) != 1:
+    argv = sys.argv[1:]
+    vbn = None
+    if '--vbn' in argv:
+        i = argv.index('--vbn')
+        vbn = argv[i + 1]
+        del argv[i:i + 2]
+    a = [x for x in argv if not x.startswith('--')]
+    if len(a) != 1 or vbn is None:
         sys.exit(__doc__)
     d = a[0]
     # his TransN by motion frame (the flight offsets take his travel off): from the built AttackDash
@@ -857,6 +933,9 @@ def main():
     o = omo.Omo(e['FitMarioBodyMainC00AttackDash.omo'])
     trans = o.nodes[0][1]                       # TransN: the first node (vbn order)
     B.ROOT_Z[:] = [o.sample(trans, f)[0][2] for f in range(o.frames)]
+    bones = omo.vbn_read(vbn)
+    B.FOOT_UP[:] = [min(B.omo_world_y(o, bones, n, f) for n in ('LFootJ', 'RFootJ')) - B.anim.STAND_FOOT
+                    for f in range(o.frames)]
     msc_tests(os.path.join(d, 'script', 'msc', 'supamario.mscsb'))
     vm = R.VM(os.path.join(d, 'script', 'msc', 'supamario.mscsb'))
     if '--no-msc-tick' not in sys.argv and len(vm.m.scripts) > 2321:      # v5's gf_tick (the last function)

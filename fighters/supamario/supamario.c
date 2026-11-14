@@ -37748,7 +37748,10 @@ int gf_update()
         gf_jump = 0x2;
         //GFD WorkModule(0, fr, 0x0F0003FA);
     }
-    if (global18 == 0x2)
+    // v10: Leave_Ground_Cancel (the game script: 0 from the start, 2 from the catch, 1 at the hand-off): caught in
+    // the air (he ran off a ledge before the punch), the God Fist goes on in the air to the hand-off; Fall from
+    // GF_IASA, as the ground path acts from there
+    if (global18 == 0x2 && fr >= GF_IASA)
     {
         //GFD WorkModule(0, fr, 0x0F0003FB);
         func_16(0xe, 0);

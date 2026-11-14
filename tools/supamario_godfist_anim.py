@@ -25,10 +25,11 @@ too) onto Mario's skeleton. The timeline (frames at 60 a second, XV2's too):
            #0 40 (GF_STRIKE = 66; 96 in v3-v8), then #0 40-111 at its speed (the flip away 40-62, its feet down at
            GF_FLIP_LAND = 92, the stance by 111)
   TransN   #1's dash (b_C_Base) x the body scale up to the contact, x0.3 after (a whiff slides 28 in all, as vanilla
-           Mario's dash attack); #0's travel (2.5 m forward, mostly in the flip) x0.5; all x TRAVEL (v9: 1.6)
+           Mario's dash attack); #0's travel (2.5 m forward, mostly in the flip) x0.5; all x TRAVEL (v9: 1.6, v10: 1.4)
   RotN     the pelvis' height changes (XV2 crouches, leaps and flips), then the lower foot put on the floor on
-           every frame (XV2 fights in the air: its dash leaps and its hold hangs), except over the flip (#0 40-62:
-           lifted only where the head, hands, knees or feet would go into the floor)
+           the ground frames (XV2's dash leaps); from the punch's rise (#1 10-14) through the hold, the strike and
+           the flip (#0 40-62) XV2's own height (v10; v3-v9 only over the flip), lifted only where the head, hands,
+           knees or feet would go into the floor; a whiff comes back down with #1 18-28
 Every motion keeps the vanilla AttackDash's node order (vbn order, which the game reads the gameplay joints by).
 """
 import os
@@ -60,7 +61,8 @@ FRAMES = GF_STRIKE + (GODFIST_END_SRC - HOLD_SRC) + 1                          #
 GF_FLIP_LAND = GF_STRIKE + 22 + 4     # his feet back on the floor: the flip (#0 40-62) + floor_fix's 4-frame ramp
 WHIFF_ROOT = 0.3                      # the dash past the contact (whiff)
 GODFIST_ROOT = 0.5                    # #0's own travel
-TRAVEL = 1.6                          # v9 (user: "move Supamario about 1.6x further"): all of his travel (TransN) x this,
+TRAVEL = 1.4                          # v9 (user: "move Supamario about 1.6x further"): all of his travel (TransN) x this,
+                                      # v10 1.4 (user: "a bit less far than it does now, but still farther than before")
                                       # the timing kept. AttackDash's ground correction is 2 (cliff stop, func_245's
                                       # StatusModule(5, 0, 0xF, 2, ...)): he still stops at a ledge as the vanilla one
 # the lowest the joints may go (units above the floor; Mario's foot joint is 1.56 up when standing)
@@ -132,21 +134,37 @@ def world_y(frames, smash, bones_vbn, f):
     return {n: w[n][1][3] for n in FLOOR}
 
 
-FLIP = (GF_STRIKE, GF_STRIKE + 22)    # #0 40-62: XV2's flip (in the air there): only lifted, not put down
+FLIP = (GF_STRIKE, GF_STRIKE + 22)    # #0 40-62: XV2's flip (in the air there)
+# v10 (user, v9's clip: "make Supamario's distance from the ground consistent", then "The initial hit of Super God
+# Fist doesn't make Supamario move high enough. That is the problem"): v3-v9 put his lower foot on the floor on every
+# frame but the flip's, so he stood on the floor through the punch and the hold and only went up to XV2's height
+# (the hold's hang, ~3.4 over the floor) 3 frames before the strike, where the flip's ramp began. XV2 rises with
+# the punch (#1 10-14: its feet 1.3 -> 3.3 over its stance) and stays up through the hold, the strike and the flip.
+# So he is raised (XV2's own height, as v9's flip) from the punch's rise (RISE) to the flip's end, eased in over
+# the rise; a whiff comes back down with #1's own descent (DROP); the flip lands over 4 frames as before.
+RISE = (10, 14)                       # #1 10-14: XV2's rise into the punch (eased from on the floor to its height)
+DROP = (18, 23)                       # the whiff's way back down (#1 18-28 at x2)
+
+
+def raise_weight(f):
+    """0: his lower foot put on the floor, 1: XV2's own height (only lifted where a joint would go under FLOOR)"""
+    if RISE[0] <= f <= DROP[1] and f < GF_JUMP_TO:
+        return max(0.0, min(1.0, (f - RISE[0]) / float(RISE[1] - RISE[0]), (DROP[1] - f) / float(DROP[1] - DROP[0])))
+    if GF_JUMP_TO <= f < FLIP[1] + 4:
+        return max(0.0, min(1.0, (FLIP[1] + 4 - f) / 4.0))
+    return 0.0
 
 
 def floor_fix(frames, smash):
-    """RotN moved so the lower foot stands on the floor (STAND_FOOT) on every frame (XV2 fights in the air: its dash
-    leaps, its hold hangs; on Smash's ground he stays on it), except over the flip (FLIP, ramped in / out over 4
-    frames) where it is only lifted wherever a joint would go under FLOOR; returns the offsets"""
+    """RotN moved so the lower foot stands on the floor (STAND_FOOT) on the ground frames (XV2 fights in the air: its
+    dash leaps; on Smash's ground he stays on it); from the punch's rise to the flip's landing (raise_weight) XV2's
+    own height, only lifted wherever a joint would go under FLOOR; returns the offsets"""
     offs = []
     for f in range(len(frames)):
         y = world_y(frames, smash, None, f)
         snap = STAND_FOOT - min(y['LFootJ'], y['RFootJ'])
         least = max(FLOOR[n] - y[n] for n in FLOOR)          # the lowest offset keeping every joint over FLOOR
-        w = 1.0
-        if FLIP[0] - 4 < f < FLIP[1] + 4:
-            w = max(0.0, min(1.0, (FLIP[0] - f) / 4.0, (f - FLIP[1]) / 4.0))
+        w = 1.0 - raise_weight(f)
         offs.append(max(w * snap + (1 - w) * max(0.0, least), least))
     for f, fr in enumerate(frames):
         p, q, sc = fr['RotN']
