@@ -14,12 +14,13 @@ README.md "Super God Fist"): every pose is a frame of one of his animations, pla
   frames 0-38   the dash punch (both paths): a run lean (Run 5 / 10), the wind-up and the straight left (his forward
                 smash's thrust, AttackS4S 12 -> 16), out at frame 7 (the hitbox 7-10), held to 22, back to Wait1 by
                 38; the whiff ends there (MSC: GF_WHIFF_END, vanilla Mario's dash attack acts from 39)
-  frames 40-93  the God Fist (the MSC jumps here from the hit at frame 11, GF_JUMP_TO = 40; below +40): the punch
+  frames 40-99  the God Fist (the MSC jumps here from the hit at frame 11, GF_JUMP_TO = 40; below +40): the punch
                 held (+0 - +2), pulled back (the charge, +7), thrust again (+10: the God Fist hit), the follow-through
-                held while the victim flies, then a back flip in place (JumpB 2-36, +24 - +40: XV2's attacker spins
-                away after the launch) landing into Wait1 (+53).
+                held while the victim is launched, then a back flip in place (JumpB 2-36, +30 - +46: XV2's attacker
+                spins away after the launch) landing into Wait1 (+59); he acts from +55 (GF_IASA: the victim's
+                flight is over; v1: +49).
   TransN: the dash, 0 -> 16 by frame 7, 20 by 10, then still (the victim's flight is placed relative to him).
-  RotN: up to +14 over the flip (+22 - +44) (a hop: the flip is in the animation only, he stays grounded).
+  RotN: up to +14 over the flip (+28 - +50) (a hop: the flip is in the animation only, he stays grounded).
   Hands: fists (Attack11's hands at frame 3), Wait1's at the whiff's end and the move's.
 
 Every motion keeps the vanilla AttackDash's node order (vbn order, which the game reads the gameplay joints by).
@@ -38,7 +39,8 @@ GF_WHIFF_END = 38     # the whiff ends here (MSC), as vanilla Mario's dash attac
 GF_JUMP_TO = 40       # the God Fist part starts here (the MSC jumps to it from the hit)
 G = GF_JUMP_TO
 GF_STRIKE = G + 10    # the God Fist hit
-FRAMES = G + 54
+GF_IASA = G + 55      # he acts from here: the victim's flight (the strike's freeze, then 44 frames) is over
+FRAMES = G + 60
 # (out frame, motion, source frame): between two keys of the same motion the source plays (linearly), between
 # different motions the poses cross-fade (smoothstep)
 KEYS = [
@@ -46,12 +48,12 @@ KEYS = [
     (5, 'C03AttackS4S', 12), (7, 'C03AttackS4S', 16), (10, 'C03AttackS4S', 16), (16, 'C03AttackS4S', 20),
     (22, 'C03AttackS4S', 20), (GF_WHIFF_END, 'A00Wait1', 0),
     (G, 'C03AttackS4S', 16), (G + 2, 'C03AttackS4S', 16), (G + 7, 'C03AttackS4S', 12), (G + 9, 'C03AttackS4S', 14),
-    (G + 10, 'C03AttackS4S', 16), (G + 17, 'C03AttackS4S', 20), (G + 20, 'C03AttackS4S', 20),
-    (G + 24, 'A03JumpB', 2), (G + 40, 'A03JumpB', 36),
-    (G + 45, 'A05LandingLight', 4), (G + 53, 'A00Wait1', 0),
+    (G + 10, 'C03AttackS4S', 16), (G + 17, 'C03AttackS4S', 20), (G + 26, 'C03AttackS4S', 20),
+    (G + 30, 'A03JumpB', 2), (G + 46, 'A03JumpB', 36),
+    (G + 51, 'A05LandingLight', 4), (G + 59, 'A00Wait1', 0),
 ]
 HAND_KEYS = [(0, 'C00Attack11', 3), (GF_WHIFF_END - 6, 'C00Attack11', 3), (GF_WHIFF_END, 'A00Wait1', 0),
-             (G, 'C00Attack11', 3), (G + 43, 'C00Attack11', 3), (G + 53, 'A00Wait1', 0)]
+             (G, 'C00Attack11', 3), (G + 49, 'C00Attack11', 3), (G + 59, 'A00Wait1', 0)]
 
 
 def root_z(f):
@@ -65,8 +67,8 @@ def root_z(f):
 
 def rot_y(f):
     """the hop over the back flip (53-75), on top of RotN's own height"""
-    if G + 22 <= f <= G + 44:
-        return 14.0 * math.sin(math.pi * (f - G - 22) / 22.0)
+    if G + 28 <= f <= G + 50:
+        return 14.0 * math.sin(math.pi * (f - G - 28) / 22.0)
     return 0.0
 
 
@@ -197,7 +199,7 @@ def main():
     if png:
         import supamario_godfist_render
         supamario_godfist_render.sheet(out['main'], bones, png,
-                                       [0, 3, 5, 7, 10, 22, 30, 38, 40, 44, 47, 50, 57, 64, 68, 72, 76, 80, 85, 93])
+                                       [0, 3, 5, 7, 10, 22, 30, 38, 40, 44, 47, 50, 60, 70, 74, 78, 82, 86, 91, 99])
 
 
 if __name__ == '__main__':

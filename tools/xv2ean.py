@@ -8,11 +8,10 @@ onto a Smash 4 skeleton (model.vbn) as OMO motions.
         order is kept, e.g. its AttackDash), XV2_TO_MARIO's bone map
   python3 -I tools/xv2ean.py --selftest                           a written EAN read back, the retarget's checks
 
-STATUS: written for the Super God Fist (fighters/supamario/README.md) without an EAN file to read: the skill's
-030_GOD_CSA.ean and CMN.ean were not among the files given. The layout below is LazyBone152's XV2-Tools
-(Xv2CoreLib EAN/EAN_File.cs, ESK/ESK_File.cs) as remembered, not yet checked against a real file: the self-test
-only proves this reader and its own writer agree. Check `dump` on a real EAN first (bone names b_C_Base,
-b_C_Pelvis, ... and a sensible frame count are the sign the offsets are right).
+STATUS: the layout below (LazyBone152's XV2-Tools, Xv2CoreLib EAN/EAN_File.cs, ESK/ESK_File.cs) reads XV2's real
+CMN.ean (the user's chara/CMN, God Fist v2): 130 bones (GOK_BAS_BONE, b_C_Base, b_C_Pelvis, ...), 253 animations
+with their names (#96 CMN_DMG_SUBERI_AOMUKE, #179 GOK_SPA_CSG_D, ...), and retargeted onto Mario's skeleton they
+pose as people do (supamario_godfist_render sheets). The self-test proves reader / writer / retarget agree.
 
 Little-endian.
 EAN: +0 "#EAN", +4 u16 0xFFFE, +6 u16 header size, +8 u32 version, +0x10 u8 camera flag, +0x11 u8, +0x12 u16

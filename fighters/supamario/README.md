@@ -277,3 +277,66 @@ follow-up).
   reads a flag the earlier status sets); the flight ignores walls (it passes through the stage while flying, lands
   on whatever is under its end point, or falls if nothing is). The CPU's attack data (ATKD) still has the vanilla
   dash attack's frames.
+
+## Super God Fist v2 (`supamario_god_fist_v2.zip`): XV2's CMN files
+
+Install over v1 (no exe change; either exe). The user sent XV2's `chara/CMN` folder (CMN.ean, CMN.bdm, CMN.bac,
+CMN_M*.bac, the lobby / mission .ean / .bac; **no .eepk, no .acb / .awb, no ESK of its own**: CMN.ean carries its
+skeleton). Not tested in game.
+
+### What the BAC's animations really are
+The BAC's animation items carry the EAN type (`xv2bac.py`): **0xFFFE = the skill's own EAN** (030_GOD_CSA.ean),
+0 = CMN.ean, 10 / 11 = face, 9 = (entry 9's extra, unknown).
+- **The attacker** (entry 0 dash punch: skill #1; entry 1 the God Fist: skill #0; the other variant's #3 / #2): all
+  in the **skill's own EAN, still missing**. CMN.ean has no attacker animation for it (searched every .ean in the
+  folder for CSG / GOD). The attacker stays posed from Mario's animations (v1's, timing adjusted below).
+- **The victim**: CMN.ean **#179 GOK_SPA_CSG_D** (59 frames; the God Fist's own victim animation, from Goku's "CSG":
+  held 0-40 doubled over and leaning back, then launched in a fast backward tumble 40-58), **#96
+  CMN_DMG_SUBERI_AOMUKE** (78 frames: a tumbling slide along the ground ending on its back, face up), and the other
+  variant's #180 (the _S of #179) and #71 CMN_DMG_BLOW_F.
+
+`tools/xv2ean.py` reads CMN.ean as it is (its layout is now checked: names, frame counts, natural poses retargeted
+onto Mario: previews in the package).
+
+### The victim's motion, from #179 and #96 (`tools/supamario_godfist_xv2.py` -> `reference/xv2/godfist_victim_cmn.json`)
+Per frame, from the pelvis: the travel away from the attacker (#179 -Z plus entry 2's BAC Movement 0.3 a frame
+40-58; #96 +Z, played with the victim turned away as its travel goes on), the pelvis height, and the body's tilt
+toward the travel (unwrapped). XV2: launched leaning back 57 degrees, **20.0 m** in 95 frames (10.6 m in the 18 launch
+frames, 9.7 m sliding), **935 degrees** of backward tumble (1.4 turns in the launch at ~27 a frame, ~1.2 more sliding,
+then flat on its back), a hop of only 0.4 m: it stays low and ends on the ground (the "downed" the user asked for).
+
+v2's scripted motion follows it (`supamario_godfist_build.py` `xv2_victim` / `flight_frame`):
+- **hold** (40-49): leaning back 29 -> 57 degrees (#179 0-40), frozen in place.
+- **launch** (18 frames, #179 40-58 at XV2's speed) then **slide** (26 frames: #96's 77 at ~3x): 44 frames (v1: 30);
+  travel scaled to 60 units (3 a metre: it ends 71 in front of him, its feet at 66); the pelvis height x 5 as its
+  middle (kept off the floor); the tilt scaled 0.8 to end lying on its back (810 = 2.25 turns, face up as Smash's
+  DownWaitU; XV2 ends 993 = on its back with its head toward the attacker, which the pure tilt can't give face up).
+  #96 starts 1.1 m lower and 75 degrees back from #179's end: the height eased in over its first 6 frames, the tilt
+  offset by the 75 (so the tumble never turns back).
+- it lands lying, kept turned until DownWait takes over (then upright: the down animation lies it down).
+- **timing**: Supamario's God Fist part is 6 frames longer (motion 100 frames, acting from 95, v1 89): the flight is
+  over before he can move (the victim is placed relative to him, as the move's last hit: if he could run or attack
+  during it, it would follow him or another fighter). Downed 50 frames (v1 60): ~52 frames for him to reach it.
+- `tools/supamario_godfist_flight_render.py`: the victim's path as panels (a standing figure placed and turned).
+
+### CMN.bdm
+199 entries of 10 x 0x80 bytes (`+0` u32 id). **#160** exists: type 10, "damage" 100 (every CMN entry has 100: a
+ratio, not the damage: the skill's damage isn't in these files), **stun 9 / 9** (u16 +0x30 / +0x32: the attacker's /
+victim's hitstop), pushback 0.25 / 0.7 (f32 +0x28 / +0x2C), 0.1 / 0.04 (+0x40 / +0x44). The BAC hitbox's u16 +0x12 is
+1 in the God Fist (0 in most CMN.bac hitboxes): probably the BDM file (common / character / skill), so #160 may be
+the character's or the skill's BDM, not CMN's. Used: the punch's freeze 9 / 9 (`Extra_Special_Hitbox` HitstopFrames).
+Damage stays 4% + 11%.
+
+### Still missing
+- **The attacker's animations**: `030_GOD_CSA.ean` (skill EAN #0-#3). With it: `python3 -I tools/xv2ean.py omo
+  030_GOD_CSA.ean 1 model.vbn AttackDash.omo OUT.omo` (then fitted into the AttackDash timeline).
+- **Effects**: `030_GOD_CSA.eepk` (+ EMP / ETR / EMB / EMO) for the skill's effects 0, 1, 2, 11 and CMN.eepk (CMN
+  effects 120, 160, 180, 220, 230) — none in CMN/.
+- **Sounds**: the skill's ACB / AWB (cue 81, voice cue 0) and CMN SE (cues 35, 53, 74) — none in CMN/.
+- **Damage**: the skill's / character's BDM with #160 (or the CUS skill power).
+
+### Tests
+`supamario_godfist_test.py`: 28 checks (v1's, the flight now against `flight_frame`'s XV2 curves, the hold's lean, the
+lying-until-DownWait and the rotation back to 0). `msc_stack_check` 0; `msc_fingerprint` vs the user's: `func_272` /
+`func_273` + 2 (the MSC code is v1's; only `GF_IASA` 89 -> 95). Every other script / animation byte for byte the
+user's. `xv2ean.py --selftest`.

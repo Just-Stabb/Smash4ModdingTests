@@ -9,7 +9,8 @@ MSC: whiff (ends at GF_WHIFF_END in Wait; in Run when the run flag 0x1300011c is
 reaches GF_JUMP_TO in one frame, then 1; no cancel before GF_IASA even with the vl cancel frame open; Wait at the
 motion's end).
 ACMD (the victim: a fighter in player slot 2 that gets up the first frame its controller lets it, from DownWait):
-the hold (11 in front, frames 40-49), the strike, the flight (the offsets / spin each frame, the controller off),
+the hold (11 in front, frames 40-49, XV2's lean back), the strike, the flight (XV2's curves: the offsets / spin
+each frame, the controller off), lying until DownWait takes over,
 landing -> DownWait, held down GF_DOWN frames, then the controller back; a weak hit while down -> it stands up after
 the down damage; a launching hit -> released at once; a victim that never lands (off the stage) -> released; a
 second God Fist on another fighter while the first is still down -> the first released. Every scenario ends with
@@ -162,6 +163,7 @@ class Victim:
         self.offy = None
         self.ground = None
         self.rot = (0.0, 0.0, 0.0)
+        self.trace = []               # (offset x, offset y, rotation X, status) at every Rotation_Set
         self.log = []
         self.hit_at = {}              # frame -> 'weak' / 'launch'
         self.never_lands = False
@@ -292,6 +294,7 @@ class Acmd:
                     self.vars[p[2]] = float(tv.situation if tv and p[1] == 22 else 0)
                 elif n == 'Rotation_Set' and tv:
                     tv.rot = tuple(p[1:4])
+                    tv.trace.append((tv.offx, tv.offy, p[1], tv.status))
                 elif n in ('Hitstun_Set', 'Hitstop_Set') and tv:
                     tv.log.append((n, p[1]))
 
@@ -361,17 +364,27 @@ def acmd_tests(game_bin):
     a, rec = run_move(script, v)
     held = [r for r in rec if B.JUMP_TO <= r[1] < B.STRIKE]
     check('hold: the victim 11 in front on the ground while held', {(r[2], r[3]) for r in held}, {(B.HOLD_X, 0.0)})
-    flight = [(r[2], r[3], r[4]) for r in rec if r[4] != 0.0]
-    want = [B.flight_frame(k) for k in range(1, B.GF_FLIGHT)]
-    check('flight: %d frames of offsets / spin as flight_frame' % (B.GF_FLIGHT - 1), len(flight), len(want))
-    ok = all(abs(x - wx) < 1e-3 and abs(y - wy) < 1e-3 and abs(r_ - wa) < 1e-2
-             for (x, y, r_), (wx, wy, wa) in zip(flight, want))
-    check('flight: values', ok, True)
-    check('flight: ends %g in front, upright' % (B.HOLD_X + B.GF_DIST), (round(rec[-1][2], 3), rec[-1][4]),
-          (round(B.flight_frame(B.GF_FLIGHT)[0], 3), 0.0))
+    n_hold = B.STRIKE - B.JUMP_TO
+    tr = v.trace
+    want_hold = [(B.HOLD_X, 0.0, -B.hold_lean(k, n_hold)) for k in range(n_hold)]
+    check('hold: XV2\'s lean back (#179 0-40: %.0f -> %.0f degrees)' % (-want_hold[0][2], -want_hold[-1][2]),
+          all(abs(a[2] - b[2]) < 1e-3 and a[:2] == b[:2] for a, b in zip(tr[:n_hold], want_hold)), True)
+    flight = tr[n_hold:n_hold + B.GF_FLIGHT]
+    want = [B.flight_frame(k) for k in range(1, B.GF_FLIGHT + 1)]
+    ok = len(flight) == len(want) and all(abs(x - wx) < 1e-3 and abs(y - wy) < 1e-3 and abs(r_ - wa) < 1e-2
+                                          for (x, y, r_, _st), (wx, wy, wa) in zip(flight, want))
+    check('flight: %d frames of offsets / spin as flight_frame (XV2 #179 / #96)' % B.GF_FLIGHT, ok, True)
+    check('flight: ends %g in front (feet), lying (%g degrees)' % (want[-1][0], want[-1][2]),
+          (round(flight[-1][0], 3), flight[-1][2]), (round(want[-1][0], 3), want[-1][2]))
+    turned = abs(want[-1][2] - (-B.hold_lean(n_hold - 1, n_hold)))
+    check('flight: turns %.0f degrees backward (XV2 935 x 0.8)' % turned, 700 < turned < 800, True)
+    after = tr[n_hold + B.GF_FLIGHT:]
+    check('kept lying until DownWait, then upright', [r[2] for r in after if r[3] != 0x50][:1] == [want[-1][2]]
+          and next((r for r in after if r[2] == 0.0), (0, 0, 0, None))[3] == 0x50, True)
+    check('rotation back to 0 at the end', v.rot[0], 0.0)
     lock_on = next(r[0] for r in rec if r[6] == 1.0)
-    launch = next(r[0] for r in rec if r[4] != 0.0)
-    check('controller off from the launch', lock_on <= launch, True)
+    launch = next(r[0] for r in rec if r[1] > B.STRIKE)
+    check('controller off from the launch (the thread\'s first frame)', lock_on <= launch + 1, True)
     down = [r for r in rec if r[5] == 0x50]
     check('lands, DownWait (0x50)', bool(down), True)
     first_down = down[0][0]
@@ -410,7 +423,7 @@ def acmd_tests(game_bin):
     # the dash punch on a shield / no catch: strike never happens
     v = Victim()
     a, rec = run_move(script, v, hit=False, frames=120)
-    check('no catch: no flight', any(r[4] for r in rec), False)
+    check('no catch: no hold / flight (no rotation)', v.trace, [])
     # a second God Fist (on another fighter, slot 3) while the first victim is still held down: released at the catch
     v = Victim()
     a, rec = run_move(script, v, frames=land + 10)

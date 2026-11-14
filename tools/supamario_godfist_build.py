@@ -9,24 +9,29 @@ ported sound ids; its motion/body and script/animcmd/body are the base). Writes 
   script/animcmd/body/{game,effect,sound,expression}.bin   the attackdash scripts replaced (below)
   script/msc/supamario.mscsb   fighters/supamario/supamario.c (gf_init / gf_update in the AttackDash status)
 
-The move (fighters/supamario/README.md "Super God Fist" has the XV2 skill read, frame by frame):
-- frames 7-10: the dash punch (4%). Frame 11: if it hit a fighter's body (Hit_Check kinds 2) the God Fist starts:
-  `gf` = 1 (New_Var slot 0x30, the MSC reads it), the victim's player slot kept (`gf_slot`), Supamario invincible
-  (XV2: invulnerable 0-40 of the follow-up); the MSC jumps the motion to frame 40 (the God Fist part). Else the
-  whiff ends at frame 38 (vanilla Mario's dash attack acts from 39).
-- 40-50: the victim held 11 in front of him on the ground (the position variables each frame), in hitstun, no
-  stage collision (an aerial victim is pulled down to him).
+The move (fighters/supamario/README.md "Super God Fist" has the XV2 skill read, frame by frame; v2: the victim's
+motion from XV2's own CMN.ean animations, reference/xv2/godfist_victim_cmn.json):
+- frames 7-10: the dash punch (4%, a 9-frame freeze on both: CMN.bdm #160's stun 9 / 9). Frame 11: if it hit a
+  fighter's body (Hit_Check kinds 2) the God Fist starts: `gf` = 1 (New_Var slot 0x30, the MSC reads it), the
+  victim's player slot kept (`gf_slot`), Supamario invincible (XV2: invulnerable 0-40 of the follow-up); the MSC
+  jumps the motion to frame 40 (the God Fist part). Else the whiff ends at frame 38 (vanilla Mario's dash attack
+  acts from 39).
+- 40-49: the victim held 11 in front of him on the ground (the position variables each frame), in hitstun, frozen,
+  no stage collision (an aerial victim is pulled down to him), leaning back 29 -> 57 degrees (XV2 #179 0-40).
 - 50: the God Fist (11%, a 24-frame freeze on both: XV2 holds the fist in the victim through its 0.8x slow-down);
   low knockback: the launch is scripted.
-- the flight (a thread, from the end of the freeze): GF_FLIGHT frames, the victim moved GF_DIST along his facing
-  (ease-out) on an arc GF_HEIGHT high, spun GF_SPIN degrees backward (two somersaults), frozen in hitstop (so its
-  own status can't move or turn it), whatever its percent or weight; its controller is ignored from the launch.
-  Then it drops the last unit and, once on the ground, goes to DownWait (status 0x50) for GF_DOWN frames with
-  the controller still ignored: it can't get up.
+- the flight (a thread, from the end of the freeze): GF_FLIGHT (44) frames: XV2's launch (#179 40-58, 18 frames: the
+  fast backward tumble) then its tumbling slide along the ground (#96, 77 frames in 26), its travel scaled to GF_DIST
+  (60), its pelvis height x GF_HSCALE as the body's middle, its tilt (XV2: 935 degrees) scaled to end lying on its
+  back (GF_PHI_END 810); frozen in hitstop (so its own status can't move or turn it), whatever its percent or
+  weight; its controller is ignored from the launch. Supamario acts only when it's over (GF_IASA: he doesn't move
+  meanwhile, and the victim is placed relative to him, as the move's last hit). It drops onto the ground lying, and
+  goes to DownWait (status 0x50), upright again there, for GF_DOWN (50) frames with the controller still ignored.
 - downed: a hit that launches it (its status leaves the down statuses) gives the controller back; a hit that
   doesn't (DownDamage 0x57) makes it stand up (DownStand 0x54) once the down damage is over; else the controller
   comes back after GF_DOWN frames (it can then get up, roll or attack as from any down).
 """
+import json
 import math
 import os
 import sys
@@ -39,25 +44,35 @@ import acmd  # noqa: E402
 import supamario_godfist_anim as anim  # noqa: E402
 
 # ---------------------------------------------------------------- numbers
-GF_SLOT_BASE = 0x30                     # New_Var slots 0x30-0x36 (0x0F0003B0-6)
+GF_SLOT_BASE = 0x30                     # New_Var slots 0x30-0x38 (0x0F0003B0-8)
 GF_VAR = 0x0F000380 + GF_SLOT_BASE      # gf: 0 dash punch / whiff, 1 caught, 2 struck (the MSC reads it)
-V_SLOT, V_ST, V_SIT, V_PHASE, V_CNT, V_ONE, V_LOCK = (0x0F000380 + GF_SLOT_BASE + k for k in range(1, 8))
+V_SLOT, V_ST, V_SIT, V_PHASE, V_CNT, V_ONE, V_LOCK, V_ROT = (0x0F000380 + GF_SLOT_BASE + k for k in range(1, 9))
 VARS = [('gf', GF_VAR, 1), ('gf_slot', V_SLOT, 0), ('gf_st', V_ST, 0), ('gf_sit', V_SIT, 0),
-        ('gf_phase', V_PHASE, 0), ('gf_cnt', V_CNT, 0), ('gf_one', V_ONE, 0), ('gf_lock', V_LOCK, 0)]
+        ('gf_phase', V_PHASE, 0), ('gf_cnt', V_CNT, 0), ('gf_one', V_ONE, 0), ('gf_lock', V_LOCK, 0),
+        ('gf_rot', V_ROT, 0)]
 PUNCH, PUNCH_END = anim.GF_PUNCH, 11    # the dash punch's hitbox frames 7-10, the hit check at 11
 JUMP_TO, STRIKE = anim.GF_JUMP_TO, anim.GF_STRIKE
 WHIFF_END = float(anim.GF_WHIFF_END)     # the whiff's end (MSC)
-IASA = float(anim.GF_JUMP_TO + 49)      # the God Fist's cancel frame (MSC): +49, 4 before its end
+IASA = float(anim.GF_IASA)              # the God Fist's cancel frame (MSC): the victim's flight is over
 HOLD_X = 11.0                           # the victim held this far in front of him (his fist is 6 ahead)
 PUNCH_DMG, STRIKE_DMG = 4.0, 11.0
+PUNCH_FREEZE = 9                        # the punch's hitstop, both: CMN.bdm #160's stun 9 / 9 (if it is that BDM)
 STRIKE_FREEZE = 24                      # hitstop frames, both
-GF_FLIGHT = 30                          # the flight's frames
-GF_DIST = 55.0                          # how far it goes (from HOLD_X: it lands 66 in front of him)
-GF_HEIGHT = 14.0                        # the arc's height
-GF_SPIN = -720.0                        # its rotation over the flight (degrees about its side axis: backward)
+# the victim's motion: XV2's own (CMN.ean #179 held / launched, then #96 the tumbling slide; tools/
+# supamario_godfist_xv2.py -> reference/xv2/godfist_victim_cmn.json): its travel, its pelvis height and its tilt
+# toward the travel, frame by frame
+XV2_CURVES = os.path.join(HERE, '..', 'reference', 'xv2', 'godfist_victim_cmn.json')
+GF_LAUNCH = 18                          # #179 40-58 at XV2's speed (launched: the fast tumble)
+GF_SLIDE = 26                           # #96's 77 frames (the slide on the ground) ~3x faster
+GF_FLIGHT = GF_LAUNCH + GF_SLIDE        # 44
+GF_DIST = 60.0                          # XV2's 20.0 m from the launch -> 60 units (3 a metre): lands 71 in front
+GF_HSCALE = 5.0                         # the pelvis' height (metres, ~1 standing) -> the body's middle (units)
+GF_PHI_END = 810.0                      # its last tilt: XV2 turns 935 degrees to lie on its back (57 -> 993);
+                                        # 810 (57 -> 810, x0.8) leaves it on its back facing up as Smash's DownWaitU
 GF_PIVOT = 5.0                          # the body's middle above its feet (the spin is kept around it)
+GF_THICK = 1.5                          # half its thickness (lying, its middle at least this high)
 GF_LAND_WAIT = 20                       # frames it may take to reach the ground after the flight
-GF_DOWN = 60                            # the downed frames with the controller off
+GF_DOWN = 50                            # the downed frames with the controller off (v1 60: the slide is longer)
 GF_THREAD = 0x47                        # the thread's ID
 DOWN_HELD = (0x4D, 0x53)                # DownBound .. DownWait (0x53): still down; 0x57 DownDamage
 DOWN_DAMAGE, DOWN_WAIT, DOWN_WAIT2, DOWN_STAND = 0x57, 0x50, 0x51, 0x54
@@ -133,28 +148,80 @@ def gfx(name, graphic, bone, x, y, z, size_=1.0, rot=(0.0, 0.0, 0.0), terminate=
     return cmd(name, graphic, bone, x, y, z, rot[0], rot[1], rot[2], size_, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, terminate)
 
 
+_CURVES = None
+
+
+def xv2_curves():
+    """{'179': [(s, h, phi) by frame], '96': [...]} from XV2_CURVES"""
+    global _CURVES
+    if _CURVES is None:
+        d = json.load(open(XV2_CURVES))
+        out = {}
+        for a, f, sv, h, ph in d['rows']:
+            out.setdefault(a, []).append((sv, h, ph))
+        _CURVES = out
+    return _CURVES
+
+
+def _at(rows, f):
+    f = max(0.0, min(len(rows) - 1.0, f))
+    i = int(math.floor(f))
+    j = min(len(rows) - 1, i + 1)
+    t = f - i
+    return tuple(a + (b - a) * t for a, b in zip(rows[i], rows[j]))
+
+
+def xv2_victim(k):
+    """XV2's (travel m, pelvis height m, tilt degrees) at flight frame k (0 = the launch, #179 frame 40): #179 40-58
+    at its speed, then #96 77 frames in GF_SLIDE. The two animations don't meet: #96 starts 1.1 m lower (eased in
+    over its first 6 frames) and 75 degrees back (all of #96 turned on by that, so the tumble never turns back)"""
+    c = xv2_curves()
+    held, slide = c['179'], c['96']
+    if k <= GF_LAUNCH:
+        return _at(held, 40 + k)
+    u = (k - GF_LAUNCH) * (len(slide) - 1) / float(GF_SLIDE)
+    sv, h, ph = _at(slide, u)
+    end, start = held[-1], slide[0]
+    w = max(0.0, 1.0 - u / 6.0)
+    return sv, h + (end[1] - start[1]) * w, ph + (end[2] - start[2])
+
+
+def place(cx, cy, phi):
+    """feet offset (in front of him, up) and the Rotation_Set X (degrees) for its middle at (cx, cy) tilted phi
+    toward the travel (away from him: it faces him, so that is backward, X = -phi): the feet go where the middle
+    stays put (the spin assumed about the feet), and no part of the body (the middle +- GF_PIVOT along its up axis,
+    +- GF_THICK across it) below the ground"""
+    r = math.radians(phi)
+    low = cy - GF_PIVOT * abs(math.cos(r)) - GF_THICK * abs(math.sin(r))
+    if low < 0:
+        cy -= low
+    return cx - GF_PIVOT * math.sin(r), cy - GF_PIVOT * math.cos(r), -phi
+
+
+def hold_lean(k, n):
+    """its tilt at hold frame k of n (XV2: #179 0-40, leaning back 29 -> 57 degrees as the fist goes in)"""
+    return _at(xv2_curves()['179'], 40.0 * k / max(1, n - 1))[2]
+
+
 def flight_frame(k):
-    """the victim's offset (in front of him, up) and rotation at flight frame k (1 .. GF_FLIGHT)"""
-    t = k / float(GF_FLIGHT)
-    ease = 1 - (1 - t) ** 2
-    a = GF_SPIN * ease
-    r = math.radians(a)
-    # its middle on the arc; it faces him (its forward = his back), so a backward turn (a < 0) swings its middle
-    # away from him: the feet put where the middle stays on the arc
-    cx = HOLD_X + GF_DIST * ease
-    cy = 4 * GF_HEIGHT * t * (1 - t) + GF_PIVOT
-    x = cx + GF_PIVOT * math.sin(r)
-    y = cy - GF_PIVOT * math.cos(r)
-    return x, y, a
+    """the victim's feet offset (in front of him, up) and Rotation_Set X at flight frame k (1 .. GF_FLIGHT)"""
+    s0, _h0, p0 = xv2_victim(0)
+    s_end, _h, p_end = xv2_victim(GF_FLIGHT)
+    sv, h, ph = xv2_victim(k)
+    cx = HOLD_X + (sv - s0) * GF_DIST / (s_end - s0)
+    phi = p0 + (ph - p0) * (GF_PHI_END - p0) / (p_end - p0)
+    return place(cx, h * GF_HSCALE, phi)
 
 
 def game_script():
     s = [acmd.new_var(n, v - 0x0F000380, 0, 0.0, scope) for n, v, scope in VARS]
     s += [setf(1, V_ONE), cmd('frame', float(PUNCH))]
-    s += [hitbox('hitbox', ID=0, Bone=LHAND, Damage=PUNCH_DMG, Angle=0, KBG=0, FKB=0, BKB=20, Size=4.0, X=1.5,
-                 SFXLevel=1, SFXType=1, Type=4, **{'Direct/Indirect': 1}),
-          hitbox('hitbox', ID=1, Bone=0, Damage=PUNCH_DMG, Angle=0, KBG=0, FKB=0, BKB=20, Size=4.0, Y=6.5, Z=4.0,
-                 SFXLevel=1, SFXType=1, Type=4)]
+    s += [hitbox('extra_special_hitbox', ID=0, Bone=LHAND, Damage=PUNCH_DMG, Angle=0, KBG=0, FKB=0, BKB=20,
+                 Size=4.0, X=1.5, SFXLevel=1, SFXType=1, Type=4, HitstopFrames=PUNCH_FREEZE,
+                 SelfHitstopFrames=PUNCH_FREEZE),
+          hitbox('extra_special_hitbox', ID=1, Bone=0, Damage=PUNCH_DMG, Angle=0, KBG=0, FKB=0, BKB=20, Size=4.0,
+                 Y=6.5, Z=4.0, SFXLevel=1, SFXType=1, Type=4, HitstopFrames=PUNCH_FREEZE,
+                 SelfHitstopFrames=PUNCH_FREEZE)]
     s += [cmd('frame', float(PUNCH_END)), cmd('remove_all_hitboxes')]
     # the catch: a fighter's body hit (not a shield)
     caught = [setf(1, GF_VAR), cmd('target_slot_get', 2, V_SLOT),
@@ -166,7 +233,10 @@ def game_script():
     # the hold, 40-49 (only reached when caught: the MSC jumps here; guarded anyway)
     for f in range(JUMP_TO, STRIKE):
         s.append(cmd('frame', float(f)))
-        hold = [setf(HOLD_X, LH_OFFX), setf(0, LH_OFFY), setf(0, LH_GROUND), cmd('hitstun_set', 2, 20)]
+        # XV2's lean (#179 0-40, back 29 -> 57 degrees), about its feet, frozen in place (hitstop) as it's held
+        hold = [setf(HOLD_X, LH_OFFX), setf(0, LH_OFFY), setf(0, LH_GROUND), cmd('hitstun_set', 2, 20),
+                cmd('hitstop_set', 2, 2, 0),
+                cmd('rotation_set', 2, -hold_lean(f - JUMP_TO, STRIKE - JUMP_TO), 0.0, 0.0)]
         if f == STRIKE - 1:
             hold.append(cmd('hit_reset'))
         s += if_(GF_VAR, 0, 1, hold)
@@ -200,22 +270,26 @@ def flight_thread():
     for k in range(1, GF_FLIGHT + 1):
         x, y, a = flight_frame(k)
         b += [setf(x, LH_OFFX), setf(y, LH_OFFY), setf(0, LH_GROUND), cmd('hitstop_set', 2, 2, 0),
-              cmd('hitstun_set', 2, 40), cmd('rotation_set', 2, 0.0, 0.0, 0.0) if k == GF_FLIGHT else
-              cmd('rotation_set', 2, float(a), 0.0, 0.0), cmd('wait', 1.0)]
-    # the end: upright, 1 above the ground, stage collision back (air), falls the last unit
-    x, _y, _a = flight_frame(GF_FLIGHT)
-    b += [setf(x, LH_OFFX), setf(1.0, LH_OFFY), setf(5, LH_GROUND), cmd('hitstun_set', 2, 40),
-          setf(1, V_PHASE), setf(GF_LAND_WAIT, V_CNT)]
+              cmd('hitstun_set', 2, 40), cmd('rotation_set', 2, float(a), 0.0, 0.0), cmd('wait', 1.0)]
+    # the end: lying on its back (kept turned until DownWait has taken over), 0.5 higher, stage collision back
+    # (air): it drops onto the ground
+    x, y, a = flight_frame(GF_FLIGHT)
+    b += [setf(x, LH_OFFX), setf(y + 0.5, LH_OFFY), setf(5, LH_GROUND), cmd('hitstun_set', 2, 40),
+          setf(1, V_PHASE), setf(GF_LAND_WAIT, V_CNT), setf(0, V_ROT)]
+    lie = per_slot(lambda t: [cmd('rotation_set', t, float(a), 0.0, 0.0)])
+    upright = per_slot(lambda t: [cmd('rotation_set', t, 0.0, 0.0, 0.0)])
     # landing wait (phase 1): on the ground -> DownWait, controller off (phase 2, GF_DOWN frames)
-    release = per_lock_release() + [setf(0, V_PHASE)]
+    release = per_lock_release() + if_(V_ROT, 0, 0, upright) + [setf(1, V_ROT), setf(0, V_PHASE)]
     land = [setf(2, V_SIT)] + per_slot(lambda t: [cmd('input_get', t, 22, V_SIT)])
     to_down = per_slot(lambda t: [cmd('status_set', t, DOWN_WAIT)]) + [setf(2, V_PHASE), setf(GF_DOWN, V_CNT)]
-    phase1 = land + if_(V_SIT, 0, 0, to_down)
+    phase1 = lie + land + if_(V_SIT, 0, 0, to_down)
     # still phase 1 (in the air): count down, then give up and give the controller back (it fell off the stage)
     phase1 += if_(V_PHASE, 0, 1, [cmd('sub_float_2', V_CNT, V_ONE)] + if_(V_CNT, 2, 0, release))
     read = per_slot(lambda t: [cmd('status_get', t, V_ST)])
     # phase 2 (down, controller off): DownDamage -> 3; out of the down statuses -> release; time -> release
-    phase2 = if_(V_ST, 0, DOWN_DAMAGE, [setf(3, V_PHASE)])
+    # its first frame in DownWait (asked for the frame before): upright again, the down animation lies it down
+    phase2 = if_(V_ROT, 0, 0, if_(V_CNT, 3, GF_DOWN - 0.5, upright + [setf(1, V_ROT)]))
+    phase2 += if_(V_ST, 0, DOWN_DAMAGE, [setf(3, V_PHASE)])
     # (not in its first frames: the DownWait asked for takes effect on its next frame)
     phase2 += if_(V_PHASE, 0, 2, if_(V_CNT, 4, GF_DOWN - 3, out_of_down(release)))
     phase2 += if_(V_PHASE, 0, 2, [cmd('sub_float_2', V_CNT, V_ONE)] + if_(V_CNT, 2, 0, release))
@@ -223,7 +297,8 @@ def flight_thread():
     stand = per_slot(lambda t: [cmd('status_set', t, DOWN_STAND)]) + release
     phase3 = if_(V_ST, 0, DOWN_WAIT, stand) + if_(V_PHASE, 0, 3, if_(V_ST, 0, DOWN_WAIT2, stand))
     phase3 += if_(V_PHASE, 0, 3, if_(V_ST, 1, DOWN_DAMAGE, out_of_down(release)))
-    body = if_(V_PHASE, 0, 1, phase1) + if_(V_PHASE, 0, 2, read + phase2) + if_(V_PHASE, 0, 3, read + phase3)
+    # (later phases first: a phase entered this frame starts on the next)
+    body = if_(V_PHASE, 0, 3, read + phase3) + if_(V_PHASE, 0, 2, read + phase2) + if_(V_PHASE, 0, 1, phase1)
     b += loop(GF_LAND_WAIT + GF_DOWN + 60, body + [cmd('wait', 1.0)])
     # the thread's end: never leave a controller off
     b += if_(V_PHASE, 1, 0, release)
@@ -308,8 +383,8 @@ def build(sm_dir, out_dir, png=None):
                                                                                   'model.vbn'), mo)
     if png:
         import supamario_godfist_render
-        supamario_godfist_render.sheet(out['main'], bones, png, [0, 3, 5, 7, 10, 22, 30, 38, 40, 44, 47, 50, 57,
-                                                                 64, 68, 72, 76, 80, 85, 93])
+        supamario_godfist_render.sheet(out['main'], bones, png, [0, 3, 5, 7, 10, 22, 30, 38, 40, 44, 47, 50, 60,
+                                                                 70, 74, 78, 82, 86, 91, 99])
     scripts(os.path.join(sm_dir, 'script', 'animcmd', 'body'), os.path.join(fdir, 'script', 'animcmd', 'body'))
     os.makedirs(os.path.join(fdir, 'script', 'msc'), exist_ok=True)
     msc(os.path.join(fdir, 'script', 'msc', 'supamario.mscsb'))
