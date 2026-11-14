@@ -1003,12 +1003,20 @@ def load_package(d, strict=True):
                 pkg['emb_textures'][fn] = [(n, dds_info(b)) for n, b in Emb(_read(p))]
             else:
                 for n, b in Emb(_read(p)):
-                    if n.lower().endswith('.emp'):
-                        pkg['emp'][n] = read_emp(b, strict)
-                    elif n.lower().endswith('.etr'):
-                        pkg['etr'][n] = read_etr(b, strict)
-                    else:
-                        raise FormatError('%s: unexpected entry %s' % (fn, n))
+                    try:
+                        if n.lower().endswith('.emp'):
+                            pkg['emp'][n] = read_emp(b, strict)
+                        elif n.lower().endswith('.etr'):
+                            pkg['etr'][n] = read_etr(b, strict)
+                        elif strict:
+                            raise FormatError('%s: unexpected entry %s' % (fn, n))
+                    except FormatError as ex:
+                        # not strict (a big shared folder such as vfx/cmn): an entry this reader can't name
+                        # is listed and left out, so the rest of the package still loads
+                        if strict:
+                            raise
+                        pkg.setdefault('unreadable', []).append('%s: %s' % (n, ex))
+                        continue
         for a in c['Assets']:
             for fn in a['Files']:
                 if not fn:

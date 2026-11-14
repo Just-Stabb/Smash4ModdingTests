@@ -25,8 +25,9 @@ too) onto Mario's skeleton. The timeline (frames at 60 a second, XV2's too):
            #0 40-111 at its speed (the flip away 40-60, the stance by 111)
   TransN   #1's dash (b_C_Base) x the body scale up to the contact, x0.3 after (a whiff slides 28 in all, as vanilla
            Mario's dash attack); #0's travel (2.5 m forward, mostly in the flip) x0.5
-  RotN     the pelvis' height changes (XV2 crouches, leaps and flips), feet on the floor in the stance (#1 frame
-           0); lifted wherever the head, hands or feet would go into the floor (XV2's flip is in the air)
+  RotN     the pelvis' height changes (XV2 crouches, leaps and flips), then the lower foot put on the floor on
+           every frame (XV2 fights in the air: its dash leaps and its hold hangs), except over the flip (#0 40-62:
+           lifted only where the head, hands, knees or feet would go into the floor)
 Every motion keeps the vanilla AttackDash's node order (vbn order, which the game reads the gameplay joints by).
 """
 import math
@@ -123,29 +124,33 @@ def world_y(frames, smash, bones_vbn, f):
     return {n: w[n][1][3] for n in FLOOR}
 
 
+FLIP = (GF_STRIKE, GF_STRIKE + 22)    # #0 40-62: XV2's flip (in the air there): only lifted, not put down
+
+
 def floor_fix(frames, smash):
-    """RotN lowered so the feet stand on the floor in the stance (#1 frame 0), and lifted wherever a joint would go
-    under FLOOR (smoothed: the most needed within +-3 frames, averaged over +-3)"""
-    y0 = world_y(frames, smash, None, 0)
-    c = STAND_FOOT - min(y0['LFootJ'], y0['RFootJ'])
-    need = []
+    """RotN moved so the lower foot stands on the floor (STAND_FOOT) on every frame (XV2 fights in the air: its dash
+    leaps, its hold hangs; on Smash's ground he stays on it), except over the flip (FLIP, ramped in / out over 4
+    frames) where it is only lifted wherever a joint would go under FLOOR; returns the offsets"""
+    offs = []
     for f in range(len(frames)):
         y = world_y(frames, smash, None, f)
-        need.append(max(0.0, max(FLOOR[n] - (y[n] + c) for n in FLOOR)))
-    peak = [max(need[max(0, f - 3):f + 4]) for f in range(len(need))]
-    lift = [sum(peak[max(0, f - 3):f + 4]) / len(peak[max(0, f - 3):f + 4]) for f in range(len(peak))]
-    lift = [max(a, b) for a, b in zip(lift, need)]
+        snap = STAND_FOOT - min(y['LFootJ'], y['RFootJ'])
+        lift = max(0.0, max(FLOOR[n] - y[n] for n in FLOOR))
+        w = 1.0
+        if FLIP[0] - 4 < f < FLIP[1] + 4:
+            w = max(0.0, min(1.0, (FLIP[0] - f) / 4.0, (f - FLIP[1]) / 4.0))
+        offs.append(max(w * snap + (1 - w) * lift, lift))
     for f, fr in enumerate(frames):
-        p, q, s = fr['RotN']
-        fr['RotN'] = ((p[0], p[1] + c + lift[f], p[2]), q, s)
-    return c, lift
+        p, q, sc = fr['RotN']
+        fr['RotN'] = ((p[0], p[1] + offs[f], p[2]), q, sc)
+    return offs
 
 
 def build(motion_dir, vbn_path, ean_path, out_dir):
     ean = X.Ean(open(ean_path, 'rb').read(), smash_axes=True)
     smash = X.vbn_rest(vbn_path)
     frames = body_frames(ean, smash)
-    c, lift = floor_fix(frames, smash)
+    offs = floor_fix(frames, smash)
     os.makedirs(out_dir, exist_ok=True)
     out = {}
     for part, prefix in (('main', 'FitMarioBodyMain'), ('mariopt1', 'FitMarioBodyMariopt1'),
@@ -157,7 +162,7 @@ def build(motion_dir, vbn_path, ean_path, out_dir):
         assert [n[1] for n in o.nodes] == [n[1] for n in omo.Omo(e[name]).nodes]
         omo.pac_write(os.path.join(out_dir, part + '.pac'), [(n, o.encode() if n == name else d) for n, d in entries])
         out[part] = o
-    return out, omo.vbn_read(vbn_path), {'stance_drop': c, 'lift': lift}
+    return out, omo.vbn_read(vbn_path), {'rotn_offsets': offs}
 
 
 def joint_offset(o, bones, joint, f):
@@ -179,8 +184,8 @@ def main():
     if len(a) != 4:
         sys.exit(__doc__)
     out, bones, info = build(*a)
-    print('AttackDash: %d frames, %d nodes; stance drop %.2f, most lift %.2f' % (
-        out['main'].frames, len(out['main'].nodes), info['stance_drop'], max(info['lift'])))
+    print('AttackDash: %d frames, %d nodes; RotN moved %.2f .. %.2f' % (
+        out['main'].frames, len(out['main'].nodes), min(info['rotn_offsets']), max(info['rotn_offsets'])))
     if png:
         import supamario_godfist_render
         supamario_godfist_render.sheet(out['main'], bones, png, SHEET)

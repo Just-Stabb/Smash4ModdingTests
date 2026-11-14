@@ -53,6 +53,7 @@ import xv2vfx  # noqa: E402
 
 UNIT = 8.5
 FOREVER = 0x7FFFFFFF
+TEX_MAX = 256                      # the largest texture side made (small, short sparks / smoke: 64 keeps a bank small)
 MAX_EMITTERS = 16                  # the most any vanilla set has
 # (particle type, blend class) -> (set, emitter) in Mario's / Supamario's ptcl: simple emitters,
 # one BC4 texture, no flipbook, both colour tracks key-animated (the normal one: colour 0 only)
@@ -325,7 +326,7 @@ def convert_emission(p, pkg, images, chain, unit, name, spawn_times):
         else:
             sx = sy = curve(node, 'ScaleBase', tex['ScaleBase'])
     h, w = shape.shape
-    tw, th = pow2(w, hi=256), pow2(h, hi=256)
+    tw, th = pow2(w, hi=TEX_MAX), pow2(h, hi=TEX_MAX)
     if (tw, th) != (w, h):
         shape = resize(shape[..., None].astype(np.float32), tw, th)[..., 0]
     r8 = (np.clip(shape, 0, 1) * 255 + 0.5).astype(np.uint8)
@@ -551,10 +552,11 @@ def convert_emp(p, pkg, images, emp_name, prefix, unit, log):
     return sets
 
 
-def convert_package(p, pkg_dir, prefix='PtcSupamarioKmh', unit=UNIT, emps=None):
+def convert_package(p, pkg_dir, prefix='PtcSupamarioKmh', unit=UNIT, emps=None, strict=True):
     """add the package's EMPs to the Ptcl p as new sets: ([(set index, name, [(bytes, emitter name,
-    notes)])], skipped-node log lines)"""
-    pkg = xv2vfx.load_package(pkg_dir)
+    notes)])], skipped-node log lines). strict=False: a big shared folder (XV2's vfx/cmn) loads with the
+    entries the reader can't name left out (xv2vfx.load_package)"""
+    pkg = xv2vfx.load_package(pkg_dir, strict)
     images = emb_images(pkg)
     log, made = [], []
     for emp_name in (emps or sorted(pkg['emp'])):
