@@ -741,3 +741,43 @@ victim frozen by a hit's own hitstop and by Hitstop_Set, a ground Damage status 
 log's Fall), DamageFall landing -> DownBound -> DownWait, the PUSH sign by his facing (a left-facing run). On v6's
 build: 13 failures (the log's Fall at the hand-off, the end hit, no down, the emitters). `msc_fingerprint` v6 vs v7:
 0 differ. `diag_godfist_test.py` on `exe_v46i`: 0 failed.
+
+## Super God Fist v8 (`supamario_god_fist_v8.zip`): spin into the down, XV2's slide, the aura XV2's way round
+
+Install over v7, exe B (`exe_v46i`, no change). User, v7 (clip `MedalTVCemuWiiUEmulator20261114125824287`,
+screenshots): "The effect is slightly too large now, and is inverted. The facing direction problem is fixed. Can you
+make the opponent's movements look more natural between spinning and landing? Also landing does not slide far
+enough."
+
+### Spin to landing (the clip, frame by frame)
+At the flight's end (flight frame 44, the victim lying, its tilt -810) it popped upright at once (the hand-off's
+Rotation 0 under DamageFall's curled tumble), then hung ~30 frames 1 above the ground (the PUSH, written while it was
+in the air, made its energy 4 a ground push: no fall), then landed hard (the game's down-bound effects), bounced and
+lay down. v8:
+- **The flight is XV2's launch (#179 40-58: the spin, 18 frames) and 10 frames easing down**: the spin running on from
+  the launch's own turn rate (a cubic, ~24 to ~40 degrees a frame) to the next whole backward turn (-720: the same
+  pose as upright, so no pop when it's set to 0), its height eased (cosine) to the ground, its travel going on at 1
+  a frame. DamageFall is asked 2 frames before the end (it's frozen to the end), and at the hand-off (frame 125) it's
+  on the ground with its stage collision back: it lands at once, the game knocks it down. No PUSH in the air.
+- **The slide is XV2's #96 face-up slide, after the knockdown**: from its first down frame gf_tick drives its speed
+  along his facing every frame through the PUSH variable (its energy 4: the game moves it, its ground correction stops
+  it at a ledge), 2.27 a frame decaying x0.92 a frame to a stop: **28.3 units** in all = #96's 9.44 m at the flight's 3
+  units a metre (v7: the flight's last 0.6 a frame once, left to the game's decay). The flight plus the slide end
+  about where v7's flight did plus ~10 (XV2's whole #179 + #96 travel).
+- XV2's CMN slide smoke (160 at #96 20) at the slide's planned place.
+- He acts from 136 (XV2's BCM callback window from #0 80; v7 143): the victim is on its own from 125.
+
+### The aura
+- **Inverted**: v7 turned the model to stream forward past the fist (its trail, +Z in the model, along his facing);
+  XV2's apex leads and its swirl / wind trail back over the punching arm. v8 turns it back (Y 180: still facing-safe)
+  with its origin 6 past the fist tip, so the bright cone (its apex 4.2 beyond that) sits on the fist and forearm and
+  the wind trails back toward the shoulder, not over his body (v6's complaint).
+- **Size** x1.75 (v7 2, v6 1.5).
+
+### Tests
+`supamario_godfist_test.py --all-models`: 0 problems (normal and diag): new checks: the spin never turns back or
+jumps and ends at -720, the height eases to the ground, the hand-off on the ground upright with no PUSH in the air,
+the slide's PUSH series 28.3 units decaying to 0 along his facing (and the other way facing left). On v7's build: 5
+failures. `msc_fingerprint` v7 vs v8: `func_2320` (GF_IASA) and `func_2322` (gf_tick: the slide).
+Approximated: whether the game moves a downed fighter by its energy 4 every frame as it does a shielding one (the
+PUSH's test 154); the slide's real length if a ledge stops it.

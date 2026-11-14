@@ -185,6 +185,7 @@ class Victim:
         self.bound = 0
         self.stop = 0                 # hitstop frames left (frozen: its status doesn't run)
         self.push = None              # the PUSH (energy 4 speed) written
+        self.push_log = []            # (game frame, its status, value)
         self.hits_taken = []          # (game frame, part)
 
     def frame(self, n):
@@ -285,6 +286,7 @@ class Acmd:
         self.in_thread = False
         self.my_status = B.STATUS_ATTACK_DASH
         self.motion_frame = 0.0
+        self.g = 0
         self.diag = []             # (k, value) written to the diag IDs
 
     def target(self, t, thread=False):
@@ -454,6 +456,7 @@ class Acmd:
         elif tq and tq[1] == 8 + 7:
             if tv:
                 tv.push = val
+                tv.push_log.append((self.g, tv.status, val))
         elif tq:
             pass
         elif B.DIAG_BASE <= var < B.DIAG_BASE + 16:
@@ -521,6 +524,7 @@ def run_move(script, victim, hit=True, frames=400, second=None, interrupt=None, 
     rec = []
     frame, freeze, jumped = 0.0, 0, False
     for g in range(frames):
+        a.g = g
         if interrupt and g == interrupt[0]:
             main.done = True
             a.active.clear()
@@ -598,19 +602,26 @@ def acmd_tests(game_bin):
     want_hold = [(B.HOLD_X, 0.0, -B.hold_lean(k, n_hold)) for k in range(n_hold)]
     check('hold: XV2\'s lean back (#179 0-40: %.0f -> %.0f degrees)' % (-want_hold[0][2], -want_hold[-1][2]),
           all(abs(a_[2] - b_[2]) < 1e-3 and a_[:2] == b_[:2] for a_, b_ in zip(tr[:n_hold], want_hold)), True)
-    flight = tr[n_hold:n_hold + B.GF_FLIGHT]
-    want = [B.flight_offset(k) for k in range(1, B.GF_FLIGHT + 1)]
+    flight = tr[n_hold:n_hold + B.FLY_N]
+    want = [B.flight_v8(k) for k in range(1, B.FLY_N + 1)]
     ok = len(flight) == len(want) and all(abs(x - wx) < 1e-3 and abs(y - wy) < 1e-3 and abs(r_ - wa) < 1e-2
                                           for (x, y, r_, _st), (wx, wy, wa) in zip(flight, want))
-    check('flight: %d frames of offsets / spin as flight_offset (XV2 #179 / #96, less his own travel)' % B.GF_FLIGHT,
-          ok, True)
-    turned = abs(want[-1][2] - (-B.hold_lean(n_hold - 1, n_hold)))
-    check('flight: turns %.0f degrees backward (XV2 935 x 0.8)' % turned, 700 < turned < 800, True)
-    drop = tr[n_hold + B.GF_FLIGHT:n_hold + B.GF_FLIGHT + 1]
-    check('the hand-off: %g above the ground, upright, carrying %g a frame along his facing (PUSH), no hit'
-          % (B.DROP_Y, B.SLIDE_SPEED), (drop[:1] and (drop[0][1], drop[0][2]), v.push is not None and
-                                        round(v.push, 3), len(v.hits_taken)),
-          ((B.DROP_Y, 0.0), round(B.SLIDE_SPEED, 3), 2))
+    check('flight: %d frames (XV2 #179\'s launch, then %d easing down) of offsets / spin as flight_v8'
+          % (B.FLY_N, B.EASE_N), ok, True)
+    rates = [want[k + 1][2] - want[k][2] for k in range(len(want) - 1)]
+    check('flight: the spin never turns back or jumps (each frame 0 to -60 degrees), ends a whole turn round (-720)',
+          (all(-60 < r <= 0 for r in rates[B.GF_LAUNCH - 2:]), want[-1][2]), (True, -720.0))
+    check('flight: eased down to the ground (%g) with no jump in height (< 1.5 a frame)' % B.DROP_Y,
+          (round(want[-1][1], 3), max(abs(want[k + 1][1] - want[k][1]) for k in range(B.GF_LAUNCH - 1, len(want) - 1))
+           < 1.5), (B.DROP_Y, True))
+    drop = tr[n_hold + B.FLY_N:n_hold + B.FLY_N + 1]
+    check('the hand-off: on the ground, upright (a whole turn from -720: no pop), no hit, no PUSH in the air',
+          (drop[:1] and (drop[0][1], drop[0][2]), len(v.hits_taken), v.push_log[:1] and v.push_log[0][1]),
+          ((0.0, 0.0), 2, 0x4D))
+    slide = [val for _st, s_, val in [(x[1], x[1], x[2]) for x in v.push_log]]
+    check('the knockdown\'s slide: %.1f units in all along his facing (XV2 #96\'s 9.44 m), decaying, then 0'
+          % B.SLIDE_DIST, (abs(sum(slide) - B.SLIDE_DIST) < 1.0, all(b <= a for a, b in zip(slide, slide[1:])),
+                           slide[-1:] == [0.0]), (True, True, True))
     seq = []
     for r in rec:
         if r[5] in (0x4C, 0x4D, 0x50, FALL) and (not seq or seq[-1] != r[5]):
@@ -621,10 +632,10 @@ def acmd_tests(game_bin):
     check('rotation back to 0 at the end', v.rot[0], 0.0)
     Acmd.FACING = -1.0
     vl = Victim()
-    run_move(script, vl, frames=B.HANDOFF + 20)
+    run_move(script, vl, frames=B.HANDOFF + 60)
     Acmd.FACING = 1.0
-    check('facing left: the slide\'s speed the other way (PUSH is world X)', vl.push is not None and
-          round(vl.push, 3), round(-B.SLIDE_SPEED, 3))
+    check('facing left: the slide the other way (PUSH is world X)',
+          vl.push_log[:1] and round(vl.push_log[0][2], 3), round(-B.SLIDE_V0, 3))
     lock_on = next((r[0] for r in rec if r[6] == 1.0), None)
     launch = next((r[0] for r in rec if r[8] == 2.0), next(r[0] for r in rec if r[1] > B.STRIKE))
     check('controller off from the launch', lock_on is not None and lock_on <= launch + 1, True)

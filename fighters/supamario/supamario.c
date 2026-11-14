@@ -37793,6 +37793,7 @@ void gf_tick()
     int t;
     float st;
     float cnt;
+    float slide;
     ph = WorkModuleF(0, GF_V_PHASE);
     if (ph < 0.5f)
     {
@@ -37825,6 +37826,7 @@ void gf_tick()
         {
             WorkModule(0, 2.0f, GF_V_PHASE);
             WorkModule(0, GF_DOWN_FRAMES, GF_V_CNT);
+            WorkModule(0, GF_SLIDE_V0, GF_V_SLIDE);
             //GFD WorkModule(0, st, 0x0F0003FC);
             return;
         }
@@ -37837,6 +37839,18 @@ void gf_tick()
     }
     if (ph < 2.5f)
     {
+        // v8: the knockdown's slide (XV2 #96's face-up slide): its speed along his facing every frame through the
+        // PUSH variable (its energy 4: the game moves it and stops it at a ledge), x GF_SLIDE_DECAY a frame
+        slide = WorkModuleF(0, GF_V_SLIDE);
+        if (slide > 0.0f)
+        {
+            if (slide < GF_SLIDE_MIN)
+            {
+                slide = 0.0f;
+            }
+            WorkModule(0, slide * WorkModuleF(0, 0x0F000003), 0x0F0000A7 + 8 * t);
+            WorkModule(0, slide * GF_SLIDE_DECAY, GF_V_SLIDE);
+        }
         if (st == GF_DOWN_DAMAGE)
         {
             WorkModule(0, 3.0f, GF_V_PHASE);

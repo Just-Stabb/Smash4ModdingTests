@@ -131,17 +131,34 @@ D_CATCH_KINDS, D_SLOT, D_HOLD_FRAME, D_HOLD_ROT, D_STRIKE_KINDS, D_FLIGHT, D_WD_
 # game's own motions: the path every untechnically landed tumble takes). No tech: the tech (passive 0x64 / 0x65 in
 # func_816) needs a shield press within the window, and its controller is off (Input_Set 21) from the launch.
 # The MSC (gf_tick) waits for the down (phase 4), then holds it GF_DOWN frames (phase 2). He acts from IASA (143)
-DOWNFALL_K = GF_FLIGHT - 2
-HANDOFF = STRIKE + GF_FLIGHT + 1
-DROP_Y = 1.0                            # the victim's feet above the ground at the hand-off
+# v8 (user, v7's clip: "make the opponent's movements look more natural between spinning and landing", "landing
+# does not slide far enough"). The clip: at the flight's end (flight frame 44, the victim lying, its tilt -810) it
+# popped upright at once (Rotation 0 with DamageFall's tumble pose), hung ~30 frames in the air 1 above the ground
+# (the PUSH re-made its energy 4 as a ground push: no fall), then landed. So the flight is now XV2's launch (#179
+# 40-58, the spin: flight frames 1-GF_LAUNCH) and EASE_N frames easing down to the ground, the spin running on
+# (a cubic from the launch's own turn rate) to the next whole backward turn (FLY_END_ANGLE: the same pose as
+# upright, no pop), its height eased to the ground (DROP_Y), its travel going on at EASE_SPEED; DamageFall asked
+# EASE_N - 2 frames into it (frozen to the end); at the hand-off (HANDOFF) it's on the ground: it lands at once,
+# no PUSH in the air. Then XV2's #96 face-up slide as the knockdown's slide: the MSC (gf_tick) drives its speed
+# along his facing frame by frame through the PUSH variable (the game moves it, its ground correction stops it at
+# a ledge), from SLIDE_V0 down by SLIDE_DECAY a frame: SLIDE_DIST in all, XV2 #96's 9.44 m at the flight's 3
+# units a metre
+FLY_N = GF_LAUNCH + 10                  # flight frames: the launch, then 10 easing down (k 1 .. FLY_N)
+EASE_N = FLY_N - GF_LAUNCH
+DOWNFALL_K = FLY_N - 2
+HANDOFF = STRIKE + FLY_N + 1            # 125
+DROP_Y = 0.3                            # the feet's height at the last flight frame (it lands at once)
 DAMAGE_FALL = 0x4C
-SLIDE_SPEED = 0.6                       # units a frame along his facing: the flight's end speed (XV2 #96's slide
-                                        # ends slowing from ~0.5-0.7 a frame at frames 40-43 of the flight)
+EASE_SPEED = 1.0                        # its travel a frame while easing down (units)
 GF_FALL_WAIT = 30                       # frames the MSC waits for the down after the hand-off
+SLIDE_DIST = 9.44 * GF_DIST / 20.0      # XV2 #96's travel (9.44 m) at the flight's scale (60 units for 20 m): 28.3
+SLIDE_DECAY = 0.92                      # its speed x this a frame
+SLIDE_MIN = 0.05                        # stops below this
+SLIDE_V0 = SLIDE_DIST * (1 - SLIDE_DECAY)       # the geometric series' first term: 2.27 a frame
 LH_PUSH = 0x0F0000B7                    # target 2's PUSH (docs/position-variables.md: < 1000 = its energy 4's speed,
                                         # world X)
 SELF_FACING = 0x0F000003
-IASA = float(HANDOFF + 2)               # the God Fist's cancel frame (MSC): 143
+IASA = float(max(HANDOFF + 2, STRIKE + 40))   # 136: XV2's BCM callback window from #0 80 (= our 96 + 40)
 ROOT_Z = [0.0] * anim.FRAMES             # his TransN z by motion frame (build() sets it from the animation)
 DOWN_HELD = (0x4D, 0x53)                # DownBound .. DownWait (0x53): still down; 0x57 DownDamage
 DOWN_DAMAGE, DOWN_WAIT, DOWN_WAIT2, DOWN_STAND = 0x57, 0x50, 0x51, 0x54
@@ -211,10 +228,15 @@ FIST_TIP = 1.2
 #   ~1.75 m character), Supamario's is ~12 units tall;
 # - more vibrant: alpha x SKILL_ALPHA 2 (capped at 1: v5-v6 x1.5), the model's colour gain x2.5 / x2 / x1.5 (R / G /
 #   B: brighter, keeping its orange)
-SKILL_SCALE = 2.0
-MODEL_AHEAD = 0.0                       # the model's origin at his fist tip (its apex 1.6 x size behind it)
+SKILL_SCALE = 1.75
+# v8 (user, v7's screenshots: "slightly too large now, and is inverted"): x1.75 (between v6's 1.5 and v7's 2: XV2's
+# aura spans ~0.9 of the character's height, 1.5 m-scale on ~1.75 m; v7's came out over his height); the model
+# turned back to XV2's way (its front, its apex, leading along his facing, its swirl and wind trailing back over the
+# fist and forearm, as XV2's follows the punching hand) but its origin MODEL_AHEAD past the fist tip, so the bright
+# cone sits on the fist and forearm, not on his body (v6's complaint)
+MODEL_AHEAD = 6.0
 PTCL_AHEAD = {'Crg': 1.0, 'Circle': 1.5, 'Bas': 1.5, 'Drop': 1.5}
-MODEL_ROT = (0.0, 0.0, 0.0)             # unturned: its trail (+Z) along his facing
+MODEL_ROT = (0.0, 180.0, 0.0)           # its front (XV2's -Z, the apex) along his facing, the trail back
 FIST_AT = {}                            # motion frame -> his right fist (in front of him, up) (build() fills it)
 
 
@@ -228,7 +250,9 @@ def msc_values():
             'GF_DOWN_WAIT': '%sf' % float(DOWN_WAIT), 'GF_DOWN_STAND': '%sf' % float(DOWN_STAND),
             'GF_DOWN_LO': '%sf' % float(lo), 'GF_DOWN_HI': '%sf' % float(hi),
             'GF_DOWN_HELD_FROM': '%sf' % float(GF_DOWN - 3), 'GF_DOWN_FRAMES': '%sf' % float(GF_DOWN),
-            'GF_DAMAGE_LO': '%sf' % float(0x45), 'GF_DAMAGE_HI': '%sf' % float(0x4C)}
+            'GF_DAMAGE_LO': '%sf' % float(0x45), 'GF_DAMAGE_HI': '%sf' % float(0x4C),
+            'GF_V_SLIDE': '0x%X' % V_SIT, 'GF_SLIDE_V0': '%sf' % SLIDE_V0, 'GF_SLIDE_DECAY': '%sf' % SLIDE_DECAY,
+            'GF_SLIDE_MIN': '%sf' % SLIDE_MIN}
 
 
 # ---------------------------------------------------------------- ACMD building
@@ -350,6 +374,22 @@ def flight_offset(k):
     return x - (ROOT_Z[f] - ROOT_Z[STRIKE + 1]), y, a
 
 
+def flight_v8(k):
+    """v8's flight frame k (1 .. FLY_N): XV2's launch (flight_offset, k <= GF_LAUNCH), then EASE_N frames down to
+    the ground: the spin on to the next whole backward turn (a cubic from the launch's turn rate to rest), the
+    height eased (cosine) to DROP_Y, the travel at EASE_SPEED. -> (x in front of him, y, Rotation X)"""
+    if k <= GF_LAUNCH:
+        return flight_offset(k)
+    x0, y0, a0 = flight_offset(GF_LAUNCH)
+    rate = a0 - flight_offset(GF_LAUNCH - 1)[2]
+    a1 = 360.0 * math.floor(a0 / 360.0)                 # the next whole backward turn: -720
+    t = (k - GF_LAUNCH) / float(EASE_N)
+    h00, h10, h01 = 2 * t ** 3 - 3 * t ** 2 + 1, t ** 3 - 2 * t ** 2 + t, -2 * t ** 3 + 3 * t ** 2
+    a = h00 * a0 + h10 * rate * EASE_N + h01 * a1
+    y = DROP_Y + (y0 - DROP_Y) * 0.5 * (1 + math.cos(math.pi * t))
+    return x0 + EASE_SPEED * (k - GF_LAUNCH), y, a
+
+
 # the victim's slide: XV2's CMN effects on it (BAC entry 3: CMN 160 at #96 20 and 42, CMN 120 at 62), at the
 # flight frames those #96 frames fall on
 SLIDE_FX = [(GF_LAUNCH + int(round(u * GF_SLIDE / 77.0)), n) for u, n in ((20, 'PHitSmk'), (42, 'PHitSmk'),
@@ -445,9 +485,8 @@ def game_script():
                 + [setf(1, V_PHASE)] + dlog(D_FLIGHT, V_SLOT))
     s += [cmd('frame', float(STRIKE + 1)), cmd('remove_all_hitboxes')]
     s += if_(GF_VAR, 0, 1, dlog_get(D_STRIKE_KINDS, cmd('hit_get', 0, 0, V_TMP)) + launched)
-    fx = dict(SLIDE_FX)
-    for k in range(1, GF_FLIGHT + 1):
-        x, y, a = flight_offset(k)
+    for k in range(1, FLY_N + 1):
+        x, y, a = flight_v8(k)
         if k > 1:
             s.append(cmd('frame', float(STRIKE + k)))
         f = [setf(x, LH_OFFX), setf(y, LH_OFFY), setf(0, LH_GROUND)]
@@ -456,22 +495,28 @@ def game_script():
         f.append(cmd('rotation_set', 2, float(a), 0.0, 0.0))
         if k == DOWNFALL_K:
             f.append(cmd('status_set', 2, DAMAGE_FALL))
-        if k in fx and fx[k] in CMN_FX:
-            # at the victim (its feet's offset from him, on the ground): bone 0, Z forward
-            f.append(gfx('graphic_effect', CMN_FX[fx[k]], 0, 0.0, 0.0, float(x), CMN_SIZE))
-        if k in (1, GF_FLIGHT // 2, GF_FLIGHT):
+        if k in (1, GF_LAUNCH, FLY_N):
             f += dlog_get(D_HOLD_ROT, cmd('rotation_get', 2, 0, V_TMP))
             f += dlog_get(D_SLOT, cmd('target_slot_get', 2, V_TMP))          # target 2 still found
         if k in (2, 3, 4):
             f += dlog_get(D_STRIKE_KINDS, cmd('hit_get', 0, 0, V_TMP))       # when the strike's kinds show
         s += if_(GF_VAR, 0, 2, f)
-    # the hand-off: DROP_Y above the ground, stage collision back (air), upright, tumbling (DamageFall, asked at
-    # DOWNFALL_K) with the flight's end speed along his facing; gf_phase 4 (the MSC waits for the game's down)
-    x, _y, _a = flight_offset(GF_FLIGHT)
+    # the hand-off: on the ground (stage collision back), upright (its rotation a whole turn round: the same pose),
+    # tumbling (DamageFall, asked at DOWNFALL_K): it lands at once, the game knocks it down; gf_phase 4 (the MSC
+    # waits for the down, then slides it: SLIDE_*)
+    x, _y, _a = flight_v8(FLY_N)
     s += [cmd('frame', float(HANDOFF))] + if_(GF_VAR, 0, 2, [
-        setf(x, LH_OFFX), setf(DROP_Y, LH_OFFY), setf(5, LH_GROUND), cmd('rotation_set', 2, 0.0, 0.0, 0.0)]
-        + if_(SELF_FACING, 5, 0, [setf(SLIDE_SPEED, LH_PUSH)]) + if_(SELF_FACING, 4, 0, [setf(-SLIDE_SPEED, LH_PUSH)])
-        + [setf(0, V_SPIN), setf(GF_FALL_WAIT, V_CNT), setf(4, V_PHASE)] + dlog(D_PHASE, value=4))
+        setf(x, LH_OFFX), setf(0.0, LH_OFFY), setf(5, LH_GROUND), cmd('rotation_set', 2, 0.0, 0.0, 0.0),
+        setf(0, V_SPIN), setf(GF_FALL_WAIT, V_CNT), setf(4, V_PHASE)] + dlog(D_PHASE, value=4))
+    # XV2's CMN effects on the slide (BAC entry 3: CMN 160 at #96 20 / 42, CMN 120 at 62), at the slide's planned
+    # place (SLIDE_DECAY's series from the hand-off; the game may stop it short at a ledge)
+    for u, name in ((20, 'PHitSmk'), (42, 'PHitSmk'), (62, 'MHitSmk')):
+        n = int(round(u * GF_SLIDE / 77.0))
+        f = HANDOFF + 2 + n
+        if name in CMN_FX and f < anim.FRAMES:
+            dx = SLIDE_V0 * (1 - SLIDE_DECAY ** n) / (1 - SLIDE_DECAY)
+            s += [cmd('frame', float(f))] + if_(GF_VAR, 0, 2, [
+                gfx('graphic_effect', CMN_FX[name], 0, 0.0, 0.0, float(x + dx), CMN_SIZE)])
     return s
 
 
