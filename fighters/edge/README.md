@@ -2627,3 +2627,13 @@ User (test 153): "The extra shieldstun seems to have worked, but the pushback do
   notes, the same as without it.
 - Package (install over test 153): `code/cross_f.rpx` (exe_v38, sha1 9bfbd137...). edge.mscsb is test 153's.
 
+## New kinds' sound fix v1 (`$S/new_kinds_sound_fix_v1.zip`, with Hero's)
+
+nus3 loads one bank an id (docs/native-notes.md "Fighter sound banks: one bank an id"); his `snd_se_Edge_c06` /
+`_c07` keep the main id 2018, so a Sephiroth in costume 6 / 7 next to another Sephiroth (or the reverse) has no
+sound effects. The executable in the package (`tools/sound_alias_cave.py`) already gives kind 0x42 the aliases
+2018 / 6014; his two banks still need ids of their own: `python3 tools/sound_bank_ids.py <install>/fighter/edge/sound
+--out OUT` (`_c06` 40150, `_c07` 40151) — not in this package (the banks weren't at hand).
+With Zelda in the match his main banks (her ids 2018 / 6014) are refused for the later player (open, as Hero /
+Robin).
+

@@ -23,7 +23,6 @@ from kind_expand_test import Emu, REGS, check  # noqa: E402
 import kind_expand_test as KT  # noqa: E402
 from unicorn.ppc_const import (UC_PPC_REG_1, UC_PPC_REG_CR, UC_PPC_REG_CTR, UC_PPC_REG_LR, UC_PPC_REG_MSR,  # noqa: E402
                                UC_PPC_REG_PC, UC_PPC_REG_XER)  # noqa: F401
-from unicorn import UC_HOOK_CODE  # noqa: E402
 
 FREGS = [getattr(__import__('unicorn.ppc_const', fromlist=['x']), 'UC_PPC_REG_FPR%d' % i) for i in range(32)]
 MOD = KT.STRUCTS + 0x10000      # a SoundModule

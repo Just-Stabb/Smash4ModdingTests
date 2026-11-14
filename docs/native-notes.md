@@ -1847,6 +1847,49 @@ by its name `0x4f%06x` (`0x032F5640`), so shader 3 is a new record (after 2, ids
   sound script from its start, so a move that keeps its status across it plays its sounds from the
   MSC (Supamario's Kamehameha, test 26).
 
+## Fighter sound banks: one bank an id (new kinds' sound fix v1)
+
+User: "players other than player 1 don't get sound effects or voice lines" with Hero (maybe Sephiroth). Read and run
+natively (exe_v45h / exe_v46g; tools/sound_alias_cave_test.py, scratchpad emulations):
+- **Per player, the same code for every kind.** Each player has a resource loader (`[[0x102F9028] + 0x58 + 4 entry]`,
+  getter `0x030C3368`); its sound request `0x030C0C34` registers snd_se (id kind * 0x11 + 6), snd_vc (+ 7), the
+  cheer (+ 9), the sequences (+ 0xA / 0xB), voiceanim (+ 0xC) in that loader's refcounted id -> file map
+  (`0x030BEEE0`; ids, not an array, so kinds past 0x40 are fine), with the costume's `_cNN` se / vc when it exists
+  (a kind past 0x39: the costume number as is). Run for Hero 0x45, Sephiroth 0x42, Supamario 0x41, Robin, Zelda:
+  the same ids and paths (new kinds only lack the Kirby-copy voice bank, + 0xF, bound `0x030C0FF8`).
+- The fighter SoundModule (vtable `0x10093C64`; +8 kind, +0xC player) set-up (vt +0x2CC = `0x02761C50`) takes the
+  files from its own player's loader (`0x030BF0FC`) and makes a bank handle of each with the sound manager
+  (`0x033EDD24` -> `0x033EDC58`: a bank already made from the same file is shared (`0x033EDA1C`, by the resource);
+  else a free slot of 120 -> `0x033EDABC` -> nus3 `0x03673A94`): +0x18 se, +0x24 vc, +0x30 cheer, then registers
+  them with its voice player (`0x03121FA8`, 7 slots, an alias each). A sound (row << 16 | label) is played only from
+  the playing fighter's handles: `0x02C71B24` -> finder `0x02C71898`: the row's bank id (`0x0311EDBC`) = a handle's
+  BINF id (`0x033EC060`), or the se / vc alias +0x5C0 / +0x5C4 (vt +0x344 = `0x02762B74`). Run for kinds 0x45 / 0x42
+  / 0x2C in players 0-3: identical.
+- **The cause: nus3 loads one bank an id.** nus3's load (`0x036771D8` -> parse `0x03685DB8` -> `0x0367CF98`) looks the
+  bank's BINF id up in its bank list (`0x036774A4`, list 0xE) and refuses a second bank of an id already loaded
+  (error `0x80000021`); `0x033EDABC` then returns 0 and the fighter's handle stays empty: every sound and voice of
+  that player is silent, the first one's plays. Natively: snd_se_Brave then snd_se_Brave_c01 (both 2051) ->
+  0, 0x80000021; the same file twice (vanilla snd_se_Kirby) -> 0, 0x80000021; snd_se_Brave then c01 with its own id
+  -> 0, 0. Players load in order, so it is always the later player. Hero's costume banks (fix 71: `_c01`-`_c03`,
+  `_c05`-`_c07`, se and vc) all kept the main ids 2051 / 6059: a Hero ditto (the second Hero takes costume 1) or
+  any second Hero in another costume was silent; Sephiroth's se `_c06` / `_c07` keep 2018 (his SE only). The same
+  rule bites a port and its base (Hero 2051 / 6059 = Robin's, Sephiroth 2018 / 6014 = Zelda's, Supamario's vc 6001
+  = Mario's) and two ports on one base's ids (Squirtle's banks are Mario's: with Supamario, the later one's voices).
+- How vanilla does costume banks: their own ids (Bowser Jr.'s Koopalings, Robin's se_common 2052 / 2053), and
+  `fightermodelbanktable.mtb` gives the fighter the base id they stand for: the set-up reads it by the fighter's
+  Capitalised name (`0x02A64C68(MTB, name, 0 se / 1 vc / 2 cheer)`) into +0x5C0 / +0x5C4 / +0x5C8 (0xFFFF when there
+  is no record). The MTB names its 13 records from the executable's table at `0x10340CA4` (Littlemac, Reflet, Cloud,
+  Bayonetta, Wiifit, KoopaJr, KoopaJr_ouen, Pikmin_ouen, Kamui), so a new kind never has one.
+- **Fix** (new kinds' sound fix v1): `tools/sound_bank_ids.py` gives costume banks their own ids (se 40000 +
+  (id - 2000) x 8 + NN, vc 44000 + (id - 6000) x 8 + NN; only the BINF id word changes), `tools/sound_alias_cave.py`
+  sets +0x5C0 / +0x5C4 to the main ids for the kinds in its ALIASES (hook: `0x03121FA8`'s first word, only for its
+  call from the set-up, LR `0x027620B8`; the vc and cheer registrations after it read the new +0x5C4). The main
+  banks keep their ids (the results screen, the CSS and other row-id lookups untouched), so a port with its base,
+  or two ports on one base's ids, still silence the later one (port_check A6 WARN with --vanilla); giving the main
+  banks ids of their own too needs the same alias and the results screen's sound lookup checked first.
+- Diagnostic: `tools/diag_sound_cave.py` (OSReport `S4SND setup / bankfail / gated / nobank / filtered / ok` per
+  player: the handles' ids, nus3's error, every refused sound).
+
 ## EffectModule requests (effect placement)
 
 - Class vtables `0x10105FE8` / `0x101228F8` (+ `0x101545A0`, another layout); MSC handler (vt

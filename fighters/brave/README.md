@@ -1190,7 +1190,7 @@ From Ultimate's own audio (the user's `sound-full-ssbu.zip`: `se_brave*`, `vc_br
 --expressions` (docs/ultimate-fighter-port.md "Sounds, voice and expressions"):
 - **Banks:** `snd_se_Brave` (Robin's 163 tones + his 167, 6 loops: the spells' charges) and `snd_vc_Brave`
   (Robin's + his 71) keep Robin's ids (2051 / 6059) and rows (1892 / 1904, grown to 275 / 117 labels):
-  banks are matched per fighter, so Robin and Hero in one match keep their own. The voices the game
+  banks are matched per fighter (but see "New kinds' sound fix v1": nus3 loads one bank an id, so with Robin in the match the later player is silent). The voices the game
   plays itself (damage, jump, teeter, ledge, KO, appeals, results) are his on Robin's labels.
 - **Costumes:** `snd_vc_Brave_c01` / `_c02` / `_c03` = Erdrick / Solo / Eight's voices, `_c05` - `_c07` the
   same again (a new kind loads `_cNN` by the costume number); `snd_se_Brave_c01` - `_c07` their own
@@ -1605,4 +1605,30 @@ User: "Magic Burst as Hero on a slot other than player 1 doesn't spawn anything.
   (W10 gone; it is an ERROR now).
 - Changed: `script/msc/brave.mscsb`, `script/msc/{crash,spark,tornado}/*.mscsb` (placed.c), and (Kirby's fix v4,
   `weapons/shot.c`: a projectile cast from Kirby's stone put on his plane) `script/msc/{flash,explosion,deathball,sleep}`.
+
+## New kinds' sound fix v1 (`$S/new_kinds_sound_fix_v1.zip`): a second Hero had no sounds or voice
+
+User: "players other than player 1 don't get sound effects or voice lines" (Hero, maybe Sephiroth). Cause (read and
+run natively, docs/native-notes.md "Fighter sound banks: one bank an id"): nus3 refuses to load a bank whose BINF id
+is already loaded (0x036774A4 -> 0x80000021); the player's bank handle stays empty and all his sounds and voices are
+silent. Fix 71's costume banks (`snd_se_Brave_c01`-`_c03`, `_c05`-`_c07` and the same `snd_vc_Brave_cNN`) all kept
+the main ids 2051 / 6059, so a second Hero in another costume (a ditto: the second takes costume 1) never got his
+banks; the first Hero (main banks) played. The per-player loading and lookup code is the same for every kind and
+player (run natively for kinds 0x45 / 0x42 / 0x41 / Robin / Zelda, players 0-3).
+- **Banks:** the 12 costume banks with ids of their own (`tools/sound_bank_ids.py`: se 40409-40415, vc
+  44473-44479, `_cNN` = 40408 / 44472 + NN); only the BINF id word changed. The main banks keep 2051 / 6059.
+- **Executable:** `tools/sound_alias_cave.py` (cave 0x04BAE000; hook 0x03121FA8 for its call from the SoundModule
+  set-up): kinds in ALIASES (Hero 0x45: 2051 / 6059, Sephiroth 0x42: 2018 / 6014) get the se / vc alias vanilla
+  takes from fightermodelbanktable.mtb, so the costume banks play the main bank's rows. Built on exe_v45h (A) and
+  exe_v46g (B).
+- **Tests:** `tools/sound_alias_cave_test.py` (words; the set-up's registrations run natively: aliases set for
+  0x45 / 0x42 only, Robin / Mario / 0x41 as unpatched; the bank finder 0x02C71898 finds the costume banks by the
+  main ids, unpatched not; nus3's own load: main + old c01 -> refused, main + new c01 -> both load, a vanilla bank
+  twice -> refused) on both executables; `sound_bank_ids.py --check`; port_check A6 (new) over the old banks
+  (ERROR), the new banks on the plain exe (ERROR: no alias) and on the fixed exe (clean).
+- **Still open:** with Robin in the match, Hero's main banks (Robin's ids) and the later player is silent (the same
+  for Sephiroth and Zelda); fixing it means main banks of their own ids too, after checking the results screen's
+  voice lookup. Diagnostic `tools/diag_sound_cave.py` (in the package as `diag/`) logs each player's banks.
+- Changed: `fighter/brave/sound/snd_se_Brave_c0[1235-7].nus3bank`, `snd_vc_Brave_c0[1235-7].nus3bank`,
+  `code/cross_f.rpx`.
 

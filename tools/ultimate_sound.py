@@ -32,9 +32,11 @@ scripts' ids move to the new rows, same labels: tools/brave_build.py --sound).
   variant: Zelda's MissFoot02 -> Sephiroth's only missfoot01); a use Ultimate has no voice for (Zelda's Passive,
   HeavyGet) is made silent rather than left the base's voice on the port.
 - Costumes: Ultimate's se_ / vc_<ult>_cNN (Hero: Erdrick, Solo and Eight's voices and swords) as
-  snd_se_ / snd_vc_<Name>_cNN, same tone order and bank id; the game loads _cNN by the costume number
-  (a kind past 0x39 takes it as is, so c05 - c07 are written too) and falls back to the main file
-  (none written when Ultimate's is the main one's, e.g. c04). The crowd's cheer: the base's ouen bank's
+  snd_se_ / snd_vc_<Name>_cNN, same tone order, a BINF id of its own (tools/sound_bank_ids.costume_id: nus3
+  refuses a second bank of an id already loaded, so a second player of the fighter in another costume was
+  silent; tools/sound_alias_cave.py's ALIASES then needs his kind's main ids); the game loads _cNN by the
+  costume number (a kind past 0x39 takes it as is, so c05 - c07 are written too) and falls back to the main
+  file (none written when Ultimate's is the main one's, e.g. c04). The crowd's cheer: the base's ouen bank's
   chant given vc_<ult>_cheer.
 - Ultimate's random containers (a TONE with no data, +4 = 0x7F, its name at +8, e.g.
   se_brave_step_left_ll for _ll01 - _ll03):
@@ -60,6 +62,7 @@ sys.path.insert(0, HERE)
 import fighter_own_bank as fb  # noqa: E402
 import minecraft_music as mm  # noqa: E402
 import minecraft_sound as ms  # noqa: E402
+import sound_bank_ids as sbi  # noqa: E402
 
 NONE40 = (8, 0xEB86B427)                # hash40("none")? a silent pick: length 8, crc as Ultimate stores it
 
@@ -250,7 +253,8 @@ def main():
     ap.add_argument('--ult-name', required=True)
     ap.add_argument('--dump', required=True)
     ap.add_argument('--new-ids', action='store_true', help='own BINF ids and soundlabeltable rows (default: the '
-                    "base's, its rows grown: banks are matched per fighter, so the base and this fighter don't mix)")
+                    "base's, its rows grown: banks are matched per fighter, but nus3 loads one bank an id, so with the base in "
+                    "the match the later player is silent)")
     for k in ('se-id', 'se-row', 'vc-id', 'vc-row'):
         ap.add_argument('--' + k, type=lambda s: int(s, 0))
     a = ap.parse_args()
@@ -326,8 +330,9 @@ def main():
             table.set_row(row, labels)
         open(os.path.join(out_fighter, 'sound', os.path.basename(base_path)), 'wb').write(blob)
         # the costumes' own banks (Ultimate's _cNN: Hero's other heroes' voices and sword sounds): same tone
-        # order and bank id, loaded for costume NN by file name (a kind past 0x39 takes its costume number
-        # as is: _c05 for costume 5) and matched by the id, as the main bank (docs/ultimate-fighter-port.md)
+        # order, loaded for costume NN by file name (a kind past 0x39 takes its costume number as is: _c05 for
+        # costume 5); an id of their own (nus3 refuses a second bank of a loaded id: the second player was
+        # silent), matched to the main bank's rows by the alias sound_alias_cave.py sets for the kind
         written = []
         raw_main = open(ult_path + '.nus3audio', 'rb').read()
         for nn in range(1, 8):
@@ -337,6 +342,7 @@ def main():
             cname = 'snd_%s_%s_c%02d' % (kind, a.name, nn)
             cblob, cfirst, _sw = costume_bank(ms.ultimate(cpath + '.nus3audio'), cname)
             assert cfirst == first
+            cblob = sbi.with_id(cblob, sbi.costume_id(bank_id, nn))
             open(os.path.join(out_fighter, 'sound', cname + '.nus3bank'), 'wb').write(cblob)
             written.append('c%02d' % nn)
         k = len(old_tones)

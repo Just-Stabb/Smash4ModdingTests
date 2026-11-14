@@ -1624,6 +1624,68 @@ def check_sound_ids(inst, name, rep):
                     len(bad), ', '.join(bad[:12]) + (' ...' if len(bad) > 12 else '')))
 
 
+def check_sound_bank_ids(inst, name, kind, vanilla, rep):
+    """A6: nus3 refuses to load a bank whose BINF id is already loaded (0x036774A4 -> 0x80000021, docs/native-notes.md
+    "Fighter sound banks: one bank an id"): the fighter's handle stays empty and every sound and voice of that player
+    is silent. A costume bank (_cNN) with the main bank's id silenced a second player of the fighter in another
+    costume (Hero fix 71's banks: the second Hero). ERROR: two of his banks share an id; costume banks of their own
+    ids (tools/sound_bank_ids.py) without tools/sound_alias_cave.py's alias for his kind in the install's executable
+    (their sounds, played by the main bank's rows, would find no bank). WARN: a main bank keeping the base's id
+    (the base and the port in one match: the one loaded second is silent)"""
+    import fighter_own_bank as fb
+    import sound_alias_cave as SA
+    ids, mains = {}, {}
+    for b in inst.glob(r'fighter/%s/sound/snd_(se|vc)_[A-Za-z0-9]+(_c\d\d)?\.nus3bank' % name):
+        try:
+            _n, bid = fb.binf(inst.get(b))
+        except Exception:                     # noqa: BLE001
+            continue
+        ids.setdefault(bid, []).append(b.split('/')[-1])
+        m = re.search(r'/snd_(se|vc)_[A-Za-z0-9]+\.nus3bank$', b)
+        if m:
+            mains[m.group(1)] = bid
+    dup = ['%d: %s' % (i, ', '.join(sorted(f))) for i, f in sorted(ids.items()) if len(f) > 1]
+    if dup:
+        rep.add('ERROR', 'A6 bank-ids', 'banks sharing a BINF id (nus3 loads only the first: a second player of his in '
+                'another costume is silent); give the costume banks their own (tools/sound_bank_ids.py) and add his '
+                'kind to tools/sound_alias_cave.py ALIASES: %s' % '; '.join(dup))
+    own = [f for i, fs in ids.items() for f in fs if re.search(r'_c\d\d\.nus3bank$', f) and i not in mains.values()]
+    if own and 'code/cross_f.rpx' in inst.files:
+        import tempfile
+        import kind_expand as K
+        with tempfile.NamedTemporaryFile(suffix='.rpx') as f:
+            f.write(inst.get('code/cross_f.rpx'))
+            f.flush()
+            img = K.Image(f.name)
+            words, hooks = SA.build({})
+            table = SA.CAVE + 4 * (len(words) - 2 * (SA.LAST_KIND - SA.FIRST_KIND + 1))
+            try:
+                hooked = img.w(SA.HOOK) == hooks[SA.HOOK]
+                got = (img.w(table + 8 * (kind - SA.FIRST_KIND)), img.w(table + 8 * (kind - SA.FIRST_KIND) + 4))
+            except Exception:                 # noqa: BLE001
+                hooked, got = False, None
+        want = (mains.get('se', 0), mains.get('vc', 0))
+        if not hooked or got != want:
+            rep.add('ERROR', 'A6 bank-ids', 'costume banks of their own ids (%s) but the executable %s: their sounds '
+                    'find no bank; build it with tools/sound_alias_cave.py (ALIASES[0x%X] = %d, %d)' % (
+                        ', '.join(sorted(own)[:4]), 'has no sound_alias_cave.py hook' if not hooked else
+                        'gives kind 0x%X the aliases %s' % (kind, got), kind, want[0], want[1]))
+    if vanilla:
+        for k, bid in sorted(mains.items()):
+            hit = []
+            for p in glob.glob(os.path.join(vanilla, 'fighter', '*', 'sound', 'snd_%s_*.nus3bank' % k)):
+                if os.path.basename(os.path.dirname(os.path.dirname(p))) == name:
+                    continue
+                try:
+                    if fb.binf(open(p, 'rb').read())[1] == bid:
+                        hit.append(os.path.basename(p))
+                except Exception:             # noqa: BLE001
+                    continue
+            if hit:
+                rep.add('WARN', 'A6 bank-ids', 'his snd_%s bank keeps id %d of %s: with that fighter in the match, '
+                        'the one loaded second (the later player) is silent' % (k, bid, ', '.join(hit[:3])))
+
+
 def check_universal(p, rep):
     """E6: the universal shader path's shaders (tools/ult_shader.py: Ultimate's programs lowered; their vertex
     program reads no emitterStaticUniformBlock, every vanilla one does): a slot the pixel program samples must
@@ -1966,6 +2028,7 @@ def main():
     check_assets(inst, a.name, base, rep)
     check_sound_tables(inst, a.name, kind, rep)
     check_sound_ids(inst, a.name, rep)
+    check_sound_bank_ids(inst, a.name, kind, vanilla, rep)
     check_effects(inst, a.name, rep)
     check_effect_heap(inst, a.name, rep)
     check_cave_hooks(inst, rep)
