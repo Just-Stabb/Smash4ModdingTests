@@ -64,13 +64,47 @@ class MscGame:
         self.air = False               # v10: his situation in the air (vm.g[18] 2, set with it)
         self.lgc = 1                   # Leave_Ground_Cancel's Enabled (the game script's)
         self.dropped = []              # Fall requests the cave dropped (frame)
+        # v12: positions (docs/position-variables.md): his, and player slots' {slot: [x, y, hitstun, status]}
+        self.x, self.y, self.face = 0.0, 0.0, 1.0
+        self.slots = {}
+        self.moves = []                # (frame, variable, value) position writes
+        self.sit_set = []              # frames SITUATION 2 was written
+
+    def fvar(self, v):
+        if v == B.GF_VAR:
+            return self.gf
+        if v in (0x0F000000, 0x0F000001, 0x0F000003):
+            return (self.x, self.y, None, self.face)[v - 0x0F000000]
+        i = v - 0x0F000020
+        if 0 <= i < 32 and i % 4 < 2 and i // 4 + 1 in self.slots:
+            return self.slots[i // 4 + 1][i % 4]
+        i = v - 0x0F000058
+        if 0 <= i < 64 and i % 8 == 0 and i // 8 + 1 in self.slots:
+            return self.slots[i // 8 + 1][2]
+        i = v - 0x0F0000A2
+        if 0 <= i < 88 and i % 8 == 0 and i // 8 - 2 in self.slots:
+            return self.slots[i // 8 - 2][3]
+        return 0.0
 
     def sys(self, sid, a):
         if sid == 0x17 and len(a) == 2 and a[0] == 0:
-            return R.f2i(self.gf if a[1] == B.GF_VAR else 0.0)
+            return R.f2i(self.fvar(a[1]))
         if sid == 0x16:
             if a[0] == 0 and len(a) == 3 and a[2] == B.GF_VAR:
                 self.gf = R.i2f(a[1])
+            if a[0] == 0 and len(a) == 3 and a[2] in (0x0F000000, 0x0F000001, 0x0F000004, 0x0F000005):
+                v = R.i2f(a[1])
+                self.moves.append((self.frame, a[2], v))
+                if a[2] == 0x0F000000:
+                    self.x = v
+                elif a[2] == 0x0F000001:
+                    self.y = v
+                elif a[2] == 0x0F000004:
+                    self.x += v * self.face
+                else:
+                    self.y += v
+            if a[0] == 0 and len(a) == 3 and a[2] == 0x0F000116 and R.i2f(a[1]) == 2.0:
+                self.sit_set.append(self.frame)
             if a[0] == 0x6 and a[-1] == 0x1300011c:
                 return self.run_flag
             return 0
@@ -204,6 +238,135 @@ def msc_tests(path):
             fr = float(B.JUMP_TO) if fr == B.PUNCH_END else fr + 1.0
         check('MSC hit, in the air from %d (the vl cancel window open from 39): the God Fist goes on to the hand-off'
               ' (%d), Fall at GF_IASA' % (air_from, B.HANDOFF), ended, (float(B.IASA), 0xE))
+    msc_v12_tests(path)
+    # v12: the startup sound -6 dB, cut at START_SE_END frames with a fade
+    import numpy as np
+    e = B.CMN_SE['gf_start']
+    pcm = B.se_pcm(np.full(48000 * 3, 10000, np.int16), 48000, e)
+    check('the startup sound: -6 dB, %d frames, fading to 0 over its last %d' % (B.START_SE_END, B.START_SE_FADE),
+          (e[1], len(pcm), int(pcm[0]), int(pcm[-1]), int(pcm[len(pcm) - 48000 * B.START_SE_FADE // 60 - 1])),
+          (-6.0, 48000 * B.START_SE_END // 60, 10000, 0, 10000))
+
+
+def startup_sim(path, slots, face=1.0, frames=24):
+    """the dash punch's startup, game frame by game frame: the MSC's init and loop, then the game moves him: on the
+    ground his TransN's way (B.ROOT_Z) at the motion's rate, in the air (a SITUATION 2 write) gravity only (FALL: no
+    TransN), 0.1 a frame more each frame. slots {slot: [x, y, hitstun, status]} (he is at 0, 0). -> (vm, game, per
+    game frame (motion frame, x, y, rate))"""
+    vm = msc_vm(path)
+    g = vm.game
+    g.face = face
+    g.slots = {k: list(v) for k, v in slots.items()}
+    init, loop = vm.func(272), vm.func(273)
+    vm.call(init)
+    fr, vy, out = 0.0, 0.0, []
+    for _ in range(frames):
+        g.frame = fr
+        vm.g[18] = 2 if g.air else 0
+        vm.call(loop)
+        out.append((fr, g.x, g.y, g.rate))
+        if g.sit_set and not g.air:
+            g.air = True
+        nf = min(fr + g.rate, float(B.WHIFF_END))
+        if not g.air:
+            g.x += (B.ROOT_Z[int(nf)] - B.ROOT_Z[int(fr)]) * face
+        else:
+            vy -= 0.1
+            g.y += vy
+        fr = nf
+    return vm, g, out
+
+
+def msc_v12_tests(path):
+    hit = 0x45
+    burst = B.ROOT_Z[B.BURST[1]] - B.ROOT_Z[B.BURST[0]]
+    _vm, g0, base = startup_sim(path, {})
+    # no tracking: behind him, more than 60 degrees up, not in hitstun, facing away from it
+    for name, slots, face in (('behind him', {2: [-60.0, 0.0, 30.0, hit]}, 1.0),
+                              ('above 60 degrees', {2: [30.0, 60.0, 30.0, hit]}, 1.0),
+                              ('below 60 degrees', {2: [30.0, -60.0, 30.0, hit]}, 1.0),
+                              ('not in hitstun', {2: [60.0, 0.0, 0.0, 0x0]}, 1.0),
+                              ('hitstun over, still in a damage status', {2: [60.0, 0.0, 0.0, hit]}, 1.0),
+                              ('in front but he faces away', {2: [60.0, 0.0, 30.0, hit]}, -1.0)):
+        _vm, g, out = startup_sim(path, slots, face)
+        want = [(f, x * face, y, r) for f, x, y, r in base]
+        check('tracking: none with an opponent %s (no extra move, the startup as v11)' % name,
+              (g.moves, g.sit_set, out), ([], [], want))
+    # in front, far (k capped at 1.5), level
+    _vm, g, out = startup_sim(path, {3: [120.0, 0.0, 30.0, hit]})
+    extra = [(f, v) for f, var, v in g.moves if var == 0x0F000004]
+    check('tracking, far in front (k capped): extras only on the burst\'s frames %d-%d, 0.5x its speed each'
+          % (B.BURST[0], B.BURST[1] - 1), ([f for f, _v in extra], all(abs(v - 0.5 * B.BURST_SPEED) < 1e-3
+                                                                      for _f, v in extra)),
+          ([float(f) for f in range(B.BURST[0], B.BURST[1])], True))
+    travel = burst + out[B.BURST[1]][1] - base[B.BURST[1]][1]
+    check('tracking: the burst covers at most 1.5x its way (%.1f -> %.1f)' % (burst, travel),
+          abs(travel - 1.5 * burst) < 0.05, True)
+    check('tracking: level (no vertical move, still on the ground)',
+          ([v for _f, var, v in g.moves if var == 0x0F000005 and abs(v) > 1e-6], g.sit_set), ([], []))
+    # in front, a little further than the burst reaches: 1 < k < 1.5
+    _vm, g, out = startup_sim(path, {3: [50.0, 0.0, 30.0, hit]})
+    travel = burst + out[B.BURST[1]][1] - base[B.BURST[1]][1]
+    check('tracking, just out of reach: the burst a little longer (%.1f, within %.1f - %.1f), ending in reach'
+          % (travel, burst, 1.5 * burst), burst < travel < 1.5 * burst and abs(out[B.BURST[1]][1] + B.HOLD_X - 50.0)
+          < 3.0, True)
+    # in front and up (30 degrees): he rises toward it, leaving the ground
+    _vm, g, out = startup_sim(path, {4: [80.0, 40.0, 30.0, hit]})
+    check('tracking up (27 degrees): he leaves the ground (SITUATION 2) on the burst\'s first frame and rises',
+          (g.sit_set[:1], out[B.BURST[1]][2] > 5.0), ([float(B.BURST[0])], True))
+    # down while on the ground: not into the floor
+    _vm, g, out = startup_sim(path, {4: [80.0, -40.0, 30.0, hit]})
+    check('tracking down on the ground: no move down (not into the floor), still on the ground',
+          (min(y for _f, _x, y, _r in out), g.sit_set), (0.0, []))
+    # the nearest of two
+    _vm, g, out = startup_sim(path, {2: [150.0, 0.0, 30.0, hit], 5: [45.0, 0.0, 30.0, hit]})
+    _vm, g1, out1 = startup_sim(path, {5: [45.0, 0.0, 30.0, hit]})
+    check('tracking: the nearest opponent in hitstun of two', out, out1)
+    # the startup at 2x with tracking up: the burst's motion frames at rate 2 (10, 12, 14)
+    _vm, g, out = startup_sim(path, {2: [34.0, 16.0, 20.0, hit]})
+    ups = [f for f, var, v in g.moves if var == 0x0F000005 and v > 1e-6]
+    check('startup at 2x with an opponent in front and up: tracked on the burst\'s frames it plays (10, 12, 14)'
+          ' and he rises', (g.sit_set[:1], ups[:1], out[10][2] > 3.0), ([10.0], [10.0], True))
+    # the startup at 2x: an opponent in hitstun within 40 (in front, within 60 degrees)
+    for name, slots, fast in (('within 40', {2: [30.0, 0.0, 20.0, hit]}, True),
+                              ('at 45', {2: [45.0, 0.0, 20.0, hit]}, False),
+                              ('within 40 but behind', {2: [-30.0, 0.0, 20.0, hit]}, False),
+                              ('within 40, not in hitstun', {2: [30.0, 0.0, 0.0, 0x0]}, False)):
+        _vm, g, out = startup_sim(path, slots)
+        punch = next(i for i, (f, _x, _y, _r) in enumerate(out) if f >= B.PUNCH)
+        check('startup %s: the punch (motion frame %d) on game frame %d' % (name, B.PUNCH, B.PUNCH // 2 if fast
+                                                                           else B.PUNCH), punch,
+              B.PUNCH // 2 if fast else B.PUNCH)
+        if fast:
+            check('startup %s: rate 2 to the punch, 1 from it' % name,
+                  [r for f, _x, _y, r in out[:punch + 2]], [2.0] * punch + [1.0, 1.0])
+    # an off-stage catch: held where he is from the catch to GF_IASA, then let go
+    for air in (True, False):
+        vm = msc_vm(path)
+        g = vm.game
+        g.x, g.y = 100.0, 50.0
+        init, loop = vm.func(272), vm.func(273)
+        vm.call(init)
+        fr = 0.0
+        while fr <= B.IASA + 3:
+            g.frame = fr
+            g.air = air and fr >= B.PUNCH
+            vm.g[18] = 2 if g.air else 0
+            g.cancel_open = fr >= 39
+            if fr >= B.PUNCH_END:
+                g.gf = 1.0
+            vm.call(loop)
+            g.y -= 0.5 if g.air else 0.0            # his fall, unless held
+            fr = float(B.JUMP_TO) if fr == B.PUNCH_END else fr + 1.0
+        held = [(f, var, v) for f, var, v in g.moves if var in (0x0F000000, 0x0F000001)]
+        frames = sorted({f for f, _v, _x in held})
+        if air:
+            check('an off-stage catch: held at the catch\'s place every frame from the catch to GF_IASA, then not',
+                  (frames[0], frames[-1], len(frames), {(var, v) for _f, var, v in held}),
+                  (float(B.PUNCH_END), float(B.IASA - 1), 1 + (B.IASA - B.JUMP_TO),
+                   {(0x0F000000, 100.0), (0x0F000001, 50.0 - 0.5 * (B.PUNCH_END - B.PUNCH))}))
+        else:
+            check('a catch on the ground: not held (no position writes)', held, [])
 
 
 # ---------------------------------------------------------------- ACMD
@@ -348,6 +511,8 @@ class Acmd:
         self.g = 0
         self.diag = []             # (k, value) written to the diag IDs
         self.lgc_log = []          # (motion frame, Leave_Ground_Cancel's Enabled)
+        self.my_situation = 0      # v12: his own SITUATION (Input_Get 0, 22)
+        self.gravity_log = []      # (motion frame, Gravity_Set's parameters)
 
     def target(self, t, thread=False):
         if t == 2 and thread and not self.T2_THREAD:
@@ -466,6 +631,10 @@ class Acmd:
                 if d['Part'] in self.stale and not self.BLOCK:
                     self.stale.discard(d['Part'])
                     self.records.pop(d['Part'], None)
+            elif n == 'Input_Get' and p[0] == 0 and p[1] == B.SITUATION_VAR:
+                self.vars[p[2]] = float(self.my_situation)
+            elif n == 'Gravity_Set':
+                self.gravity_log.append((self.motion_frame, tuple(p)))
             elif n == 'Leave_Ground_Cancel':
                 self.lgc_log.append((self.motion_frame, p[0]))
             elif n == 'Remove_All_Hitboxes':
@@ -668,6 +837,13 @@ def acmd_tests(game_bin):
     a, rec = run_move(script, v)
     check('Leave_Ground_Cancel on a God Fist: off from the start, edges kept from the catch, on at the hand-off',
           a.lgc_log, [(0.0, 0), (float(B.PUNCH_END), 2), (float(B.HANDOFF), 1)])
+    check('a catch on the ground: no Gravity_Set', a.gravity_log, [])
+    v = Victim()
+    a2 = Acmd(script, v)
+    a2.my_situation = 2
+    run_move(script, v, acm=a2)
+    check('an off-stage catch (in the air): Gravity_Set(own gravity, max fall 0, a fall cut at once) at the catch',
+          a2.gravity_log, [(float(B.PUNCH_END), (-1.0, 0.0, 2))])
     # in the air at the hand-off (caught off a ledge): the MSC ends the move in Fall at GF_IASA, after the hand-off
     g_iasa = [r[0] for r in rec if r[1] >= B.IASA + 1][0]       # the frame his motion is at GF_IASA (rec: after it)
     v = Victim()

@@ -37700,19 +37700,174 @@ void rolloff_hold_update()
 // rate back to 1, 11 the God Fist path leaving the status (the frame).
 // ===================================================================
 int gf_jump;            // 0 the jump not asked for yet, 1 on its way to GF_JUMP_TO, 2 done
+// v12: the startup at 2x when an opponent in hitstun is close (gf_fast 1 until the punch, then 2), XV2's tracking
+// of the dash's burst (gf_track), and an off-stage catch held in place (gf_air: gf_px / gf_py) to GF_IASA
+int gf_fast;
+int gf_air;
+float gf_px;
+float gf_py;
+float gf_lx;            // his X / Y the frame before (gf_track)
+float gf_ly;
+float gf_ex;            // what gf_track moved him the frame before (forward, up)
+float gf_ey;
+
+// the opponent the God Fist tracks: the nearest fighter in hitstun (hitstun left > 0 and a damage status,
+// GF_DAMAGE_LO .. GF_DAMAGE_HI) in front of him (along his facing) and within 60 degrees of level (dy^2 <= 3 dx^2),
+// and, with maxd2 > 0, within sqrt(maxd2); player slots 1-8 through the position / hitstun / status variables
+// (docs/position-variables.md); he himself is never in front of himself. 0: none
+int gf_pick(float maxd2)
+{
+    int s;
+    int best;
+    float bd;
+    float sx;
+    float sy;
+    float face;
+    float dx;
+    float dy;
+    float d2;
+    float st;
+    sx = WorkModuleF(0, 0x0f000000);
+    sy = WorkModuleF(0, 0x0f000001);
+    face = WorkModuleF(0, 0x0f000003);
+    best = 0;
+    bd = 0.0f;
+    s = 1;
+    while (s <= 8)
+    {
+        if (WorkModuleF(0, 0x0f000058 + 8 * (s - 1)) > 0.0f)
+        {
+            st = WorkModuleF(0, 0x0f0000a2 + 8 * (s + 2));
+            dx = (WorkModuleF(0, 0x0f000020 + 4 * (s - 1)) - sx) * face;
+            dy = WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) - sy;
+            d2 = dx * dx + dy * dy;
+            if (st >= GF_DAMAGE_LO && st <= GF_DAMAGE_HI && dx > 0.0f && dy * dy <= 3.0f * dx * dx)
+            {
+                if ((maxd2 <= 0.0f || d2 <= maxd2) && (best == 0 || d2 < bd))
+                {
+                    best = s;
+                    bd = d2;
+                }
+            }
+        }
+        s = s + 1;
+    }
+    return best;
+}
+
+// XV2's tracking, the dash's burst only (motion frames GF_BURST_FROM .. GF_BURST_END: its TransN covers
+// GF_BURST_SPEED a frame there): toward gf_pick(0)'s opponent, his travel aimed at it (it is within 60 degrees: the
+// pick), its horizontal part x k = (the way to go less the catch's GF_HOLD_X) / the burst's way left, between 1 and
+// GF_TRACK_MAX. On the ground the animation moves him (the extra is (k - 1) of it; up only: he doesn't go into the
+// floor, and up he leaves the ground: situation 2, Leave_Ground_Cancel is off); in the air his kinetics do (what
+// they moved him the frame before, less this, is made up), down at most GF_TRACK_DOWN a frame
+void gf_track(float fr)
+{
+    int t;
+    float x;
+    float y;
+    float face;
+    float rate;
+    float mx;
+    float my;
+    float d;
+    float dx;
+    float dy;
+    float k;
+    float vx;
+    float vy;
+    x = WorkModuleF(0, 0x0f000000);
+    y = WorkModuleF(0, 0x0f000001);
+    face = WorkModuleF(0, 0x0f000003);
+    mx = (x - gf_lx) * face - gf_ex;
+    my = y - gf_ly - gf_ey;
+    gf_lx = x;
+    gf_ly = y;
+    gf_ex = 0.0f;
+    gf_ey = 0.0f;
+    if (fr < GF_BURST_FROM - 0.01f || fr >= GF_BURST_END - 0.01f)
+    {
+        return;
+    }
+    t = gf_pick(0.0f);
+    if (t == 0)
+    {
+        return;
+    }
+    dx = (WorkModuleF(0, 0x0f000020 + 4 * (t - 1)) - x) * face;
+    dy = WorkModuleF(0, 0x0f000021 + 4 * (t - 1)) - y;
+    rate = 1.0f;
+    if (gf_fast == 1)
+    {
+        rate = 2.0f;
+    }
+    d = GF_BURST_SPEED * rate;
+    k = (dx - GF_HOLD_X) / (GF_BURST_SPEED * (GF_BURST_END - fr));
+    if (k < 1.0f)
+    {
+        k = 1.0f;
+    }
+    if (k > GF_TRACK_MAX)
+    {
+        k = GF_TRACK_MAX;
+    }
+    vy = k * d * dy / dx;
+    if (global18 == 0)
+    {
+        vx = (k - 1.0f) * d;
+        if (vy < 0.0f)
+        {
+            vy = 0.0f;
+        }
+        if (vy > 0.0f)
+        {
+            WorkModule(0, 2.0f, 0x0f000116);
+        }
+    }
+    else
+    {
+        if (vy < -GF_TRACK_DOWN)
+        {
+            vy = -GF_TRACK_DOWN;
+        }
+        vx = k * d - mx;
+        vy = vy - my;
+    }
+    WorkModule(0, vx, 0x0f000004);
+    WorkModule(0, vy, 0x0f000005);
+    gf_ex = vx;
+    gf_ey = vy;
+}
 
 void gf_init()
 {
     gf_jump = 0;
     WorkModule(0, 0.0f, GF_VAR);
+    gf_air = 0;
+    gf_ex = 0.0f;
+    gf_ey = 0.0f;
+    gf_lx = WorkModuleF(0, 0x0f000000);
+    gf_ly = WorkModuleF(0, 0x0f000001);
+    gf_fast = 0;
+    if (gf_pick(GF_COMBO_D2) != 0)
+    {
+        gf_fast = 0x1;
+        MotionModule(0x4, 2.0f);
+    }
 }
 
 int gf_update()
 {
     float fr;
     fr = MotionModuleF(0x1);
+    if (gf_fast == 0x1 && fr >= GF_PUNCH - 0.01f)
+    {
+        gf_fast = 0x2;
+        MotionModule(0x4, 1.0f);
+    }
     if (WorkModuleF(0, GF_VAR) < 0.5f)
     {
+        gf_track(fr);
         if (fr >= GF_WHIFF_END)
         {
             if (global18 == 0x2)
@@ -37731,6 +37886,18 @@ int gf_update()
             return 0x1;
         }
         return 0;
+    }
+    // v12: caught in the air (off stage): held where he is to GF_IASA (gravity off: the game script's Gravity_Set)
+    if (gf_jump == 0 && global18 == 0x2)
+    {
+        gf_air = 0x1;
+        gf_px = WorkModuleF(0, 0x0f000000);
+        gf_py = WorkModuleF(0, 0x0f000001);
+    }
+    if (gf_air == 0x1 && fr < GF_IASA)
+    {
+        WorkModule(0, gf_px, 0x0f000000);
+        WorkModule(0, gf_py, 0x0f000001);
     }
     if (gf_jump == 0)
     {

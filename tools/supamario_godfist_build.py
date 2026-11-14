@@ -87,6 +87,18 @@ PUNCH_DMG, STRIKE_DMG = 4.0, 11.0          # 15 in all (v7: no hit at the end; v
 # 0x57 DownDamage, 0x5B DownFuraFura) isn't caught (a whiff)
 NO_DOWN = 0x80000000
 LGC_ON, LGC_OFF, LGC_EDGES = 1, 0, 2         # Leave_Ground_Cancel's Enabled
+# v12 (user): XV2's tracking of the dash's burst (gf_track in the MSC: the burst is #1 9-15, his TransN's ~4.5 a
+# frame there), at most TRACK_MAX x its horizontal speed, in front within 60 degrees, down at most TRACK_DOWN a frame
+# in the air; the startup at 2x with an opponent in hitstun within COMBO_RANGE (the punch at game frame 7, not 14);
+# an off-stage catch held in place to GF_IASA (the MSC pins him, OFFSTAGE_GRAVITY stops his fall)
+BURST = (9, 15)
+BURST_SPEED = 4.5336                    # his TransN's way a frame over BURST (build() checks it against the motion:
+                                        # a constant, since the MSC is also built without the motion: kame_build)
+TRACK_MAX = 1.5
+TRACK_DOWN = 3.0
+COMBO_RANGE = 40.0
+OFFSTAGE_GRAVITY = (-1.0, 0.0, 2)      # Gravity_Set: his own gravity (a rise slows), max fall 0, a fall cut at once
+SITUATION_VAR = 22                      # Input_Get's SITUATION (0 ground, 1 ledge, 2 air)
 PUNCH_SITUATION = NO_DOWN | 3
 LASTHIT_STATUS = 0x0F0000B2
 # v10: the last fighter hit's body state (docs/position-variables.md "Inputs and state" +0x1B INTANGIBLE: 0 normal,
@@ -303,7 +315,15 @@ def msc_values():
             'GF_DOWN_HELD_FROM': '%sf' % float(GF_DOWN - 3), 'GF_DOWN_FRAMES': '%sf' % float(GF_DOWN),
             'GF_DAMAGE_LO': '%sf' % float(0x45), 'GF_DAMAGE_HI': '%sf' % float(0x4C),
             'GF_V_SLIDE': '0x%X' % V_SIT, 'GF_SLIDE_V0': '%sf' % SLIDE_V0, 'GF_SLIDE_DECAY': '%sf' % SLIDE_DECAY,
-            'GF_SLIDE_MIN': '%sf' % SLIDE_MIN}
+            'GF_SLIDE_MIN': '%sf' % SLIDE_MIN, 'GF_PUNCH': '%sf' % float(PUNCH),
+            'GF_BURST_FROM': '%sf' % float(BURST[0]), 'GF_BURST_END': '%sf' % float(BURST[1]),
+            'GF_BURST_SPEED': '%sf' % BURST_SPEED, 'GF_TRACK_MAX': '%sf' % TRACK_MAX,
+            'GF_TRACK_DOWN': '%sf' % TRACK_DOWN, 'GF_HOLD_X': '%sf' % HOLD_X, 'GF_COMBO_D2': '%sf' % (COMBO_RANGE ** 2)}
+
+
+def burst_speed():
+    """his TransN's way a frame over the dash's burst (BURST), from the built animation"""
+    return round((ROOT_Z[BURST[1]] - ROOT_Z[BURST[0]]) / float(BURST[1] - BURST[0]), 4)
 
 
 # ---------------------------------------------------------------- ACMD building
@@ -505,6 +525,9 @@ def game_script():
               cmd('hitstun_set', 2, 20), setf(HOLD_X, LH_OFFX), setf(FOOT_UP[PUNCH_END], LH_OFFY)]
     caught += dlog(D_SLOT, V_SLOT)
     caught += [setf(1, V_SPIN), cmd('leave_ground_cancel', LGC_EDGES)]
+    # v12: caught in the air (off stage): no fall to GF_IASA (the MSC holds him in place; Gravity_Set ends by itself
+    # at the next status change, a hit, a ledge grab or a KO)
+    caught += [cmd('input_get', 0, SITUATION_VAR, V_TMP2)] + if_(V_TMP2, 0, 2, [cmd('gravity_set', *OFFSTAGE_GRAVITY)])
     # an earlier God Fist's victim (still flying / down): its flight thread stopped, upright, controller back
     earlier = if_(V_SPIN, 0, 1, unspin())
     caught = earlier + per_lock_release() + [setf(0, V_PHASE)] + caught
@@ -879,6 +902,7 @@ def build(sm_dir, out_dir, ean_path, cmn_dir=None, png=None, skill_dir=None, cmn
                                    os.path.join(sm_dir, 'model', 'body', 'c00', 'model.vbn'), ean_path, mo)
     trans = [h for n, _p, h in bones if n == 'TransN'][0]
     ROOT_Z[:] = [out['main'].sample(trans, f)[0][2] for f in range(out['main'].frames)]
+    assert abs(burst_speed() - BURST_SPEED) < 1e-3, ('BURST_SPEED is %.4f now' % burst_speed())
     FOOT_UP[:] = [min(omo_world_y(out['main'], bones, n_, f) for n_ in ('LFootJ', 'RFootJ')) - anim.STAND_FOOT
                   for f in range(out['main'].frames)]
     # v10 (user: "make Supamario's distance from the ground consistent"): on the floor on the ground frames, XV2's

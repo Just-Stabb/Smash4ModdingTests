@@ -950,3 +950,84 @@ Changes:
   effects (without `--cmn-se`).
 
 The package holds only `sound.bin` and `snd_se_Supamario.nus3bank`. The diag files are unchanged from v10.
+
+## Super God Fist v12 (`supamario_god_fist_v12.zip`): a shorter, quieter startup sound, an off-stage catch held in place, XV2's tracking, a faster startup on a combo
+
+v12 is installed over v11 and still uses exe B (`exe_v46i`). The user asked:
+- "make Super God Fist's startup sound less loud and end much sooner";
+- "if it hits an opponent off stage then it halts Supamario's momentum and stops him from falling until the animation
+  is finished";
+- partial tracking of an opponent in hitstun, the initial burst only: not behind him, at most 60 degrees up or down,
+  horizontally at most 1.5x faster;
+- "when the move is done with an opponent in hitstun who is in range (40 units), the startup of Super God Fist should
+  be cut in half".
+
+### Startup sound
+- **Quieter:** 6 dB down (the tone's volume, -6.0).
+- **Shorter:** the waveform is cut at 20 frames, with a linear fade over its last 6 frames (frames 14-20), so it ends
+  with the punch rather than at ~130. This is `se_pcm` in the build, and it applies to the label's tone in the bank.
+- **Why trimmed rather than stopped:** I did it in the waveform, not with a stop from the sound script. Smash 4's ACMD
+  has no command to stop one sound, and a trimmed tone ends the same way whatever happens to the move.
+- **What changes:** same label and sound id (0x0CB10091); the soundlabeltable is unchanged.
+
+### An off-stage catch held in place
+- **When it applies:** a catch made in the air (situation 2 on the catch's frame, e.g. after running off a ledge or
+  tracking up).
+- **The MSC pins him:** gf_update stores his X / Y and writes them back every frame up to GF_IASA (92).
+- **The game script stops his fall:** at the catch, if Input_Get's SITUATION is 2, it sets
+  `Gravity_Set(-1, 0, 2)`. That keeps his own gravity, so a rise slows; sets max fall to 0; and cuts a fall at once.
+- **Afterwards:** the hold, the strike, the flight and the flip play in place, and the victim's offsets are relative
+  to him. At 92 the move ends in Fall (v10's air path) and he falls normally.
+- **Restoring gravity:** Gravity_Set ends by itself on the status change. It also ends on a hit, a ledge grab or a KO,
+  and the pin stops with the status. The launched victim goes into DamageFall with its stage collision back and falls
+  as before (gf_tick lets it go if it doesn't land within 30 frames).
+
+### Tracking (XV2's), the burst only
+- **The target:** the nearest fighter, over player slots 1-8, that is:
+  - in hitstun (hitstun left > 0 and a damage status 0x45-0x4C);
+  - in front of him (along his facing);
+  - within 60 degrees of level (dy^2 <= 3 dx^2).
+  
+  It is read through the slot position / hitstun / status variables and picked again every frame. He is never in
+  front of himself, so he is never the target.
+- **When:** only over the dash's burst, motion frames 9-15, where his TransN covers 4.53 a frame (`BURST_SPEED`,
+  checked against the motion). Before and after the burst, no tracking.
+- **How far:** his travel is aimed at the target. Its horizontal part is scaled by k = (the distance to it less the
+  catch's 11.5) / (the burst's way left), kept between 1 and 1.5. So the burst covers at most 1.5x its way (27.2 ->
+  40.8 units).
+- **On the ground:** the animation moves him, and the MSC adds (k - 1) of it forward through `0x0F000004`. Up, it
+  moves him up through `0x0F000005` and sets SITUATION 2, so with Leave_Ground_Cancel off the move goes on in the air.
+  Down, it never moves him, so he can't go into the floor.
+- **In the air:** his kinetics move him. The MSC makes up the difference to the aimed path, measured from the frame
+  before, and moves him down at most 3 a frame.
+- **No target:** exactly v11.
+
+### A faster startup on a combo
+At the move's start (gf_init), if an opponent in hitstun is within 40 units, using gf_pick's rules (in front, within
+60 degrees), the motion plays at 2x up to the punch (motion frame 14) and at 1x from then on.
+- **The punch:** comes out on game frame 7 (normal: 14). The hit check / catch is at game frame 11 (normal: 18).
+- **The rest:** everything is tied to motion frames, so it shifts with the punch.
+- **Tracking:** still works, on the burst frames the motion plays at 2x (10, 12, 14), with twice the speed a frame.
+
+### Tests
+`supamario_godfist_test.py --vbn MODEL_VBN --all-models`: 0 problems on the normal and diag builds. New checks:
+- **Tracking:**
+  - none with the opponent behind him, above or below 60 degrees, not in hitstun, or with him facing away;
+  - extras only on the burst's frames, capped at 1.5x;
+  - an opponent just out of reach is reached;
+  - up leaves the ground, and down on the ground does nothing;
+  - of two opponents, the nearest is tracked;
+  - with the startup at 2x, tracking on the burst frames it plays.
+- **Startup:** at 2x within 40 (the punch on game frame 7); normal at 45, behind him, or not in hitstun.
+- **Off-stage catch:** held at the catch's place to GF_IASA, then not; a ground catch isn't held. Gravity_Set only
+  for an air catch.
+- **Startup sound:** the cut / fade / volume.
+
+`msc_stack_check`: 0 of 2325 (gf_pick and gf_track added).
+
+**Approximated, to check in game:**
+- that writing SITUATION 2 and moving him up lifts him off the ground mid-dash, rather than the ground snapping him
+  back;
+- what speed his kinetics carry in the air after the burst;
+- that set_pos-based tracking doesn't pass through walls;
+- that the pinned speed left at 92 is negligible (air friction runs while he is held).
