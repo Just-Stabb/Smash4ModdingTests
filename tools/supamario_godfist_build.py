@@ -96,6 +96,11 @@ BURST_SPEED = 4.5336                    # his TransN's way a frame over BURST (b
                                         # a constant, since the MSC is also built without the motion: kame_build)
 TRACK_MAX = 1.5
 TRACK_DOWN = 3.0
+# v13 (user: "make the tracking only happen in the first few frames", "reduce the homing range to 20 units"): the
+# burst's first 3 frames (motion 9-11), an opponent within TRACK_RANGE; at most 3 x 0.5 x BURST_SPEED = 6.8 units more
+# (at the 2x startup one frame, motion 10 -> 12: 0.5 x 2 x BURST_SPEED = 4.5); COMBO_RANGE (the 2x startup) stays 40
+TRACK_END = 12
+TRACK_RANGE = 20.0
 COMBO_RANGE = 40.0
 OFFSTAGE_GRAVITY = (-1.0, 0.0, 2)      # Gravity_Set: his own gravity (a rise slows), max fall 0, a fall cut at once
 SITUATION_VAR = 22                      # Input_Get's SITUATION (0 ground, 1 ledge, 2 air)
@@ -320,7 +325,8 @@ def msc_values():
             'GF_SLIDE_MIN': '%sf' % SLIDE_MIN, 'GF_PUNCH': '%sf' % float(PUNCH),
             'GF_BURST_FROM': '%sf' % float(BURST[0]), 'GF_BURST_END': '%sf' % float(BURST[1]),
             'GF_BURST_SPEED': '%sf' % BURST_SPEED, 'GF_TRACK_MAX': '%sf' % TRACK_MAX,
-            'GF_TRACK_DOWN': '%sf' % TRACK_DOWN, 'GF_HOLD_X': '%sf' % HOLD_X, 'GF_COMBO_D2': '%sf' % (COMBO_RANGE ** 2)}
+            'GF_TRACK_DOWN': '%sf' % TRACK_DOWN, 'GF_TRACK_END': '%sf' % float(TRACK_END),
+            'GF_TRACK_D2': '%sf' % (TRACK_RANGE ** 2), 'GF_HOLD_X': '%sf' % HOLD_X, 'GF_COMBO_D2': '%sf' % (COMBO_RANGE ** 2)}
 
 
 def burst_speed():
@@ -596,7 +602,9 @@ def game_script():
     # tumbling (DamageFall, asked at DOWNFALL_K): it lands at once, the game knocks it down; gf_phase 4 (the MSC
     # waits for the down, then slides it: SLIDE_*)
     x, _y, _a = flight_v8(FLY_N)
-    s += [cmd('frame', float(HANDOFF)), cmd('leave_ground_cancel', LGC_ON)] + if_(GF_VAR, 0, 2, [
+    # v13: Leave_Ground_Cancel on again at the hand-off on the ground only (in the air the move plays to its end)
+    s += [cmd('frame', float(HANDOFF)), cmd('input_get', 0, SITUATION_VAR, V_TMP2)]
+    s += if_(V_TMP2, 1, 2, [cmd('leave_ground_cancel', LGC_ON)]) + if_(GF_VAR, 0, 2, [
         setf(x, LH_OFFX), setf(0.0, LH_OFFY), setf(5, LH_GROUND), cmd('rotation_set', 2, 0.0, 0.0, 0.0),
         setf(0, V_SPIN), setf(GF_FALL_WAIT, V_CNT), setf(4, V_PHASE)] + dlog(D_PHASE, value=4))
     # XV2's CMN effects on the slide (BAC entry 3: CMN 160 at #96 20 / 42, CMN 120 at 62), at the slide's planned

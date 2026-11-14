@@ -71,6 +71,7 @@ class MscGame:
         self.sit_set = []              # frames SITUATION 2 was written
         self.edge_x = None             # his ground's edge in front (GroundModule(0x2726, d): 1 when x + d is past it)
         self.ottotto = []              # the distances it was asked with
+        self.terms_on = []             # (frame, term) WorkModule(0x17, term): transition terms turned on
 
     def fvar(self, v):
         if v == B.GF_VAR:
@@ -109,6 +110,8 @@ class MscGame:
                     self.x += v * self.face
                 else:
                     self.y += v
+            if a[0] == 0x17 and len(a) == 2:
+                self.terms_on.append((self.frame, a[1]))
             if a[0] == 0 and len(a) == 3 and a[2] == 0x0F000116 and R.i2f(a[1]) == 2.0:
                 self.sit_set.append(self.frame)
             if a[0] == 0x6 and a[-1] == 0x1300011c:
@@ -240,14 +243,14 @@ def msc_tests(path):
             g.motion_end = fr >= last
             if fr >= B.PUNCH_END:
                 g.gf = 1.0
-            g.lgc = 1 if fr >= B.HANDOFF else (2 if fr >= B.PUNCH_END else 0)
+            g.lgc = 2 if fr >= B.PUNCH_END else 0          # v13: not on again at the hand-off in the air
             g.rate = None
             vm.call(loop)
             if g.status is not None:
                 ended = (fr, g.status)
             fr = float(B.JUMP_TO) if fr == B.PUNCH_END else fr + 1.0
-        check('MSC hit, in the air from %d (the vl cancel window open from 39): the God Fist goes on to the hand-off'
-              ' (%d), Fall at GF_IASA' % (air_from, B.HANDOFF), ended, (float(B.IASA), 0xE))
+        check('MSC hit, in the air from %d (the vl cancel window open from 39): the God Fist plays to its end in the'
+              ' air (v13: no Fall at GF_IASA), Fall at the animation\'s end' % air_from, ended, (last, 0xE))
     msc_v12_tests(path)
     # v12: the startup sound -6 dB, cut at START_SE_END frames with a fade
     import numpy as np
@@ -258,12 +261,13 @@ def msc_tests(path):
           (-6.0, 48000 * B.START_SE_END // 60, 10000, 0, 10000))
 
 
-def startup_sim(path, slots, face=1.0, frames=24, ledge_at=None, edge_x=None):
+def startup_sim(path, slots, face=1.0, frames=24, ledge_at=None, edge_x=None, slot_v=None):
     """the dash punch's startup, game frame by game frame: the MSC's init and loop, then the game moves him: on the
     ground his TransN's way (B.ROOT_Z) at the motion's rate, in the air (a SITUATION 2 write) gravity only (FALL: no
     TransN), 0.1 a frame more each frame. slots {slot: [x, y, hitstun, status(, situation: 0 ground)]} (he is at
     0, 0); ledge_at: the game frame he runs off a ledge; edge_x: his ground's edge in front of him (he runs off it,
-    GroundModule(0x2726, d) is 1 past it). -> (vm, game, per game frame (motion frame, x, y, rate))"""
+    GroundModule(0x2726, d) is 1 past it); slot_v {slot: its X speed a game frame}. -> (vm, game, per game frame
+    (motion frame, x, y, rate))"""
     vm = msc_vm(path)
     g = vm.game
     g.face = face
@@ -287,86 +291,82 @@ def startup_sim(path, slots, face=1.0, frames=24, ledge_at=None, edge_x=None):
         else:
             vy -= 0.1
             g.y += vy
+        for sl, v in (slot_v or {}).items():
+            g.slots[sl][0] += v
         fr = nf
     return vm, g, out
 
 
 def msc_v12_tests(path):
+    """v12 / v13: tracking (the burst's first frames, within 20), the 2x startup (within 40), the off-stage catch"""
     hit = 0x45
-    burst = B.ROOT_Z[B.BURST[1]] - B.ROOT_Z[B.BURST[0]]
     _vm, g0, base = startup_sim(path, {})
-    # no tracking: behind him, more than 60 degrees up, not in hitstun, facing away from it
-    for name, slots, face in (('behind him', {2: [-60.0, 0.0, 30.0, hit]}, 1.0),
-                              ('above 60 degrees', {2: [30.0, 60.0, 30.0, hit]}, 1.0),
-                              ('below 60 degrees', {2: [30.0, -60.0, 30.0, hit]}, 1.0),
-                              ('not in hitstun', {2: [60.0, 0.0, 0.0, 0x0]}, 1.0),
-                              ('hitstun over, still in a damage status', {2: [60.0, 0.0, 0.0, hit]}, 1.0),
-                              ('in front but he faces away', {2: [60.0, 0.0, 30.0, hit]}, -1.0)):
-        _vm, g, out = startup_sim(path, slots, face)
-        want = [(f, x * face, y, r) for f, x, y, r in base]
-        check('tracking: none with an opponent %s (no extra move, the startup as v11)' % name,
-              (g.moves, g.sit_set, out), ([], [], want))
-    # in front, far (k capped at 1.5), level
-    _vm, g, out = startup_sim(path, {3: [120.0, 0.0, 30.0, hit]})
-    extra = [(f, v) for f, var, v in g.moves if var == 0x0F000004]
-    check('tracking, far in front (k capped): extras only on the burst\'s frames %d-%d, 0.5x its speed each'
-          % (B.BURST[0], B.BURST[1] - 1), ([f for f, _v in extra], all(abs(v - 0.5 * B.BURST_SPEED) < 1e-3
-                                                                      for _f, v in extra)),
-          ([float(f) for f in range(B.BURST[0], B.BURST[1])], True))
-    travel = burst + out[B.BURST[1]][1] - base[B.BURST[1]][1]
-    check('tracking: the burst covers at most 1.5x its way (%.1f -> %.1f)' % (burst, travel),
-          abs(travel - 1.5 * burst) < 0.05, True)
-    check('tracking: level (no vertical move, still on the ground)',
-          ([v for _f, var, v in g.moves if var == 0x0F000005 and abs(v) > 1e-6], g.sit_set), ([], []))
-    # in front, a little further than the burst reaches: 1 < k < 1.5
-    _vm, g, out = startup_sim(path, {3: [50.0, 0.0, 30.0, hit]})
-    travel = burst + out[B.BURST[1]][1] - base[B.BURST[1]][1]
-    check('tracking, just out of reach: the burst a little longer (%.1f, within %.1f - %.1f), ending in reach'
-          % (travel, burst, 1.5 * burst), burst < travel < 1.5 * burst and abs(out[B.BURST[1]][1] + B.HOLD_X - 50.0)
-          < 3.0, True)
-    # in front and up (30 degrees): he rises toward it, leaving the ground
-    _vm, g, out = startup_sim(path, {4: [80.0, 40.0, 30.0, hit]})
-    check('tracking up (27 degrees): he leaves the ground (SITUATION 2) on the burst\'s first frame and rises',
-          (g.sit_set[:1], out[B.BURST[1]][2] > 5.0), ([float(B.BURST[0])], True))
-    # down while on the ground: not into the floor
-    _vm, g, out = startup_sim(path, {4: [80.0, -40.0, 30.0, hit]})
-    check('tracking down on the ground: no move down (not into the floor), still on the ground',
-          (min(y for _f, _x, y, _r in out), g.sit_set), (0.0, []))
-    # grounded, an opponent lower than him: over the stage never aimed down; past the edge of his ground, down
-    for name, slot, edge, ledge in (('a little below on the stage (a slope)', [80.0, -3.0, 30.0, hit, 0], None, None),
-                                    ('20 below, over the stage, he off a ledge mid-burst', [80.0, -20.0, 30.0, hit, 2],
-                                     None, 11),
-                                    ('20 below in the air, over the stage (edge at 100)', [80.0, -20.0, 30.0, hit, 2],
-                                     100.0, None)):
+    tr = (float(B.BURST[0]), float(B.TRACK_END))
+    most = (B.TRACK_END - B.BURST[0]) * (B.TRACK_MAX - 1) * B.BURST_SPEED
+    # no target: behind him, more than 60 degrees up / down, not in hitstun, facing away, out of range (20)
+    for name, slots, face, sv in (('behind him', {2: [-15.0, 0.0, 30.0, hit]}, 1.0, None),
+                                  ('above 60 degrees', {2: [6.0, 16.0, 30.0, hit]}, 1.0, None),
+                                  ('below 60 degrees', {2: [6.0, -16.0, 30.0, hit]}, 1.0, None),
+                                  ('not in hitstun', {2: [15.0, 0.0, 0.0, 0x0]}, 1.0, None),
+                                  ('hitstun over, still in a damage status', {2: [15.0, 0.0, 0.0, hit]}, 1.0, None),
+                                  ('in front but he faces away', {2: [15.0, 0.0, 30.0, hit]}, -1.0, None),
+                                  ('out of range (25, flying away)', {2: [25.0, 6.0, 30.0, hit]}, 1.0, {2: 5.0})):
+        _vm, g, out = startup_sim(path, slots, face, slot_v=sv)
+        check('tracking: none with an opponent %s (no extra move)' % name, (g.moves, g.sit_set), ([], []))
+    # within range, standing still, level: the burst reaches it anyway (k 1): no extra way (the startup at 2x: it is
+    # within 40 too)
+    _vm, g, out = startup_sim(path, {3: [15.0, 0.0, 30.0, hit]})
+    check('tracking, within range and still: no extra way (k 1), level',
+          (max(abs(v) for _f, _var, v in g.moves), g.sit_set), (0.0, []))
+    # within range, flying away fast: k capped, only on the burst's first 3 frames, %.1f at most
+    _vm, g, out = startup_sim(path, {3: [-40.0, 0.0, 30.0, hit]}, slot_v={3: 6.0})
+    extra = [(f, v) for f, var, v in g.moves if var == 0x0F000004 and abs(v) > 1e-6]
+    check('tracking, an opponent flying away (6 a frame): extras only on the burst\'s first frames %d-%d, 0.5x its'
+          ' speed each (%.1f more in all, the most)' % (tr[0], tr[1] - 1, most),
+          ([f for f, _v in extra], all(abs(v - 0.5 * B.BURST_SPEED) < 1e-3 for _f, v in extra),
+           abs(out[-1][1] - base[-1][1] - most) < 1e-3), ([float(f) for f in range(*map(int, tr))], True, True))
+    # within range, flying away a little slower: part of it
+    _vm, g, out = startup_sim(path, {3: [-24.0, 0.0, 30.0, hit]}, slot_v={3: 4.2})
+    more = out[-1][1] - base[-1][1]
+    check('tracking, an opponent flying away (4.2 a frame): a little more way (0 < %.2f < %.1f)' % (more, most),
+          0.0 < more < most - 0.1, True)
+    # up: he leaves the ground on the burst's first frame and rises, never steeper than 60 degrees
+    # (within 20 at the start, it is within 40 too: the startup at 2x, its one tracking frame 10)
+    for name, slot in (('50 degrees up', [10.0, 12.0, 30.0, hit, 2]), ('59 degrees up', [12.5, 16.0, 30.0, hit, 2])):
+        _vm, g, out = startup_sim(path, {4: slot})
+        ups = [(f, v) for f, var, v in g.moves if var == 0x0F000005 and v > 1e-6]
+        fw = {f: v for f, var, v in g.moves if var == 0x0F000004}
+        check('tracking %s: he leaves the ground on frame 10 (2x) and rises, on the first frames only, never steeper'
+              ' than 60 degrees' % name, (g.sit_set[:1], bool(ups), all(tr[0] <= f < tr[1] for f, _v in ups),
+                                         all(v <= 3 ** 0.5 * (2 * B.BURST_SPEED + fw.get(f, 0.0)) + 1e-3
+                                             for f, v in ups)), ([10.0], True, True, True))
+    # down: over the stage never; past the edge (he runs off it inside the first frames) down
+    for name, slot, edge, ledge in (('a little below on the stage (a slope)', [14.0, -3.0, 30.0, hit, 0], None, None),
+                                    ('8 below, over the stage, he off a ledge mid-burst', [16.0, -8.0, 30.0, hit, 2],
+                                     None, 10),
+                                    ('8 below in the air, over the stage (edge at 40)', [16.0, -8.0, 30.0, hit, 2],
+                                     40.0, None)):
         _vm, g, out = startup_sim(path, {4: slot}, edge_x=edge, ledge_at=ledge)
         check('tracking, grounded vs an opponent %s: never aimed down (no dip)' % name,
               [v for _f, var, v in g.moves if var == 0x0F000005 and v < -1e-6], [])
-    _vm, g, out = startup_sim(path, {4: [70.0, -25.0, 30.0, hit, 2]}, edge_x=30.0)
+    _vm, g, out = startup_sim(path, {4: [16.0, -8.0, 30.0, hit, 2]}, edge_x=2.0)
     downs = [(f, v) for f, var, v in g.moves if var == 0x0F000005 and v < -1e-6]
-    fw = {f: v for f, var, v in g.moves if var == 0x0F000004}
-    check('tracking, grounded vs an opponent below past the edge (edge 30, it at 70, 25 down): he runs off the edge,'
-          ' then aims down (at most %g a frame, never steeper than 60 degrees)' % B.TRACK_DOWN,
-          (g.air, bool(downs), all(-v <= B.TRACK_DOWN + 1e-6 for _f, v in downs)), (True, True, True))
+    check('tracking, grounded vs an opponent below past the edge (edge 2, it at 16, 8 down): he runs off the edge,'
+          ' then aims down on the first frames (at most %g a frame)' % B.TRACK_DOWN,
+          (g.air, bool(downs), all(-v <= B.TRACK_DOWN + 1e-6 and tr[0] <= f < tr[1] for f, v in downs)),
+          (True, True, True))
     check('tracking past the edge: the edge check (GroundModule 0x2726) asked with the opponent\'s distance',
           bool(g.ottotto) and all(dist > 0 for dist in g.ottotto), True)
-    # grounded vs an opponent in the air above, near 60 degrees: up
-    _vm, g, out = startup_sim(path, {4: [40.0, 66.0, 30.0, hit, 2]})
-    ups = [(f, v) for f, var, v in g.moves if var == 0x0F000005 and v > 1e-6]
-    fw = {f: v for f, var, v in g.moves if var == 0x0F000004}
-    check('tracking, grounded vs an opponent in the air 59 degrees up: he rises from the burst\'s first frame,'
-          ' never steeper than 60 degrees', (g.sit_set[:1], bool(ups), ups[0][1] <= 3 ** 0.5 *
-                                             (B.BURST_SPEED + fw.get(ups[0][0], 0.0)) + 1e-3),
-          ([float(B.BURST[0])], True, True))
     # the nearest of two
-    _vm, g, out = startup_sim(path, {2: [150.0, 0.0, 30.0, hit], 5: [45.0, 0.0, 30.0, hit]})
-    _vm, g1, out1 = startup_sim(path, {5: [45.0, 0.0, 30.0, hit]})
+    _vm, g, out = startup_sim(path, {2: [18.0, 15.0, 30.0, hit], 5: [12.0, 6.0, 30.0, hit]})
+    _vm, g1, out1 = startup_sim(path, {5: [12.0, 6.0, 30.0, hit]})
     check('tracking: the nearest opponent in hitstun of two', out, out1)
-    # the startup at 2x with tracking up: the burst's motion frames at rate 2 (10, 12, 14)
-    _vm, g, out = startup_sim(path, {2: [34.0, 16.0, 20.0, hit]})
+    # the startup at 2x with tracking up: the one first-burst frame it plays (10)
+    _vm, g, out = startup_sim(path, {2: [14.0, 10.0, 20.0, hit]})
     ups = [f for f, var, v in g.moves if var == 0x0F000005 and v > 1e-6]
-    check('startup at 2x with an opponent in front and up: tracked on the burst\'s frames it plays (10, 12, 14)'
-          ' and he rises', (g.sit_set[:1], ups[:1], out[10][2] > 3.0), ([10.0], [10.0], True))
-    # the startup at 2x: an opponent in hitstun within 40 (in front, within 60 degrees)
+    check('startup at 2x with an opponent in front and up: tracked on the one first-burst frame it plays (10) and he'
+          ' rises', (g.sit_set[:1], ups, out[6][2] > 1.0), ([10.0], [10.0], True))
+    # the startup at 2x: an opponent in hitstun within 40 (in front, within 60 degrees: its own range, not 20)
     for name, slots, fast in (('within 40', {2: [30.0, 0.0, 20.0, hit]}, True),
                               ('at 45', {2: [45.0, 0.0, 20.0, hit]}, False),
                               ('within 40 but behind', {2: [-30.0, 0.0, 20.0, hit]}, False),
@@ -379,33 +379,59 @@ def msc_v12_tests(path):
         if fast:
             check('startup %s: rate 2 to the punch, 1 from it' % name,
                   [r for f, _x, _y, r in out[:punch + 2]], [2.0] * punch + [1.0, 1.0])
-    # an off-stage catch: held where he is from the catch to GF_IASA, then let go
-    for air in (True, False):
+    # an off-stage catch: held where he is to the animation's end (v13), then Fall; acting from GF_IASA ends it
+    last = float(B.anim.FRAMES - 1)
+    for case in ('air', 'air, acts at 100', 'ground'):
         vm = msc_vm(path)
         g = vm.game
         g.x, g.y = 100.0, 50.0
         init, loop = vm.func(272), vm.func(273)
+        f41 = vm.func(41)
+        orig = vm.call
+        acted = []
+
+        def call(script, args=(), orig=orig, g=g, acted=acted, f41=f41, case=case):
+            if script is f41:
+                if case == 'air, acts at 100' and g.frame >= 100:
+                    acted.append(g.frame)
+                    return 1
+                return 0
+            return orig(script, args)
+        vm.call = call
         vm.call(init)
         fr = 0.0
-        while fr <= B.IASA + 3:
+        while fr <= last and g.status is None and not acted:
             g.frame = fr
-            g.air = air and fr >= B.PUNCH
+            g.air = case != 'ground' and fr >= B.PUNCH
             vm.g[18] = 2 if g.air else 0
             g.cancel_open = fr >= 39
+            g.motion_end = fr >= last
+            g.lgc = 2 if fr >= B.PUNCH_END else 0          # the game script's Leave_Ground_Cancel (in the air)
             if fr >= B.PUNCH_END:
                 g.gf = 1.0
             vm.call(loop)
             g.y -= 0.5 if g.air else 0.0            # his fall, unless held
             fr = float(B.JUMP_TO) if fr == B.PUNCH_END else fr + 1.0
         held = [(f, var, v) for f, var, v in g.moves if var in (0x0F000000, 0x0F000001)]
-        frames = sorted({f for f, _v, _x in held})
-        if air:
-            check('an off-stage catch: held at the catch\'s place every frame from the catch to GF_IASA, then not',
-                  (frames[0], frames[-1], len(frames), {(var, v) for _f, var, v in held}),
-                  (float(B.PUNCH_END), float(B.IASA - 1), 1 + (B.IASA - B.JUMP_TO),
-                   {(0x0F000000, 100.0), (0x0F000001, 50.0 - 0.5 * (B.PUNCH_END - B.PUNCH))}))
+        frames = sorted({f for f, _v, _x in held}) or [None]
+        air_terms = {0x1e000061, 0x1e00008a, 0x1e000062, 0x1e000063, 0x1e000064, 0x1e000065, 0x1e000094, 0x1e00003d,
+                     0x1e00003e, 0x1e00003f, 0x1e000043, 0x1e000044, 0x1e000045}
+        on = [(f, t) for f, t in g.terms_on if t in air_terms]
+        terms = sorted({t for _f, t in on})
+        if case == 'air':
+            check('an off-stage catch: held at the catch\'s place every frame from the catch to the animation\'s end'
+                  ' (v13: not cut at GF_IASA), then Fall', (frames[0], frames[-1], {(var, v) for _f, var, v in held},
+                                                           g.status),
+                  (float(B.PUNCH_END), last - 1, {(0x0F000000, 100.0), (0x0F000001, 50.0 - 0.5 * (B.PUNCH_END - B.PUNCH))},
+                   0xE))
+            check('an off-stage catch: the air actions\' transition terms turned on at GF_IASA (aerials, specials, air'
+                  ' dodge, jumps)', (min(f for f, _t in on), len(terms)), (float(B.IASA), 13))
+        elif case == 'air, acts at 100':
+            check('an off-stage catch, acting at 100 (after GF_IASA): the move ends there (no Fall asked), held to it',
+                  (acted, g.status, frames[-1]), ([100.0], None, 100.0))
         else:
-            check('a catch on the ground: not held (no position writes)', held, [])
+            check('a catch on the ground: not held (no position writes), no air terms, Wait at the end',
+                  (held, terms, g.status), ([], [], 0x0))
 
 
 # ---------------------------------------------------------------- ACMD
@@ -876,6 +902,12 @@ def acmd_tests(game_bin):
     a, rec = run_move(script, v)
     check('Leave_Ground_Cancel on a God Fist: off from the start, edges kept from the catch, on at the hand-off',
           a.lgc_log, [(0.0, 0), (float(B.PUNCH_END), 2), (float(B.HANDOFF), 1)])
+    va = Victim()
+    aa = Acmd(script, va)
+    aa.my_situation = 2
+    run_move(script, va, acm=aa)
+    check('Leave_Ground_Cancel on an off-stage God Fist: not on again at the hand-off (v13: plays to its end)',
+          aa.lgc_log, [(0.0, 0), (float(B.PUNCH_END), 2)])
     check('a catch on the ground: no Gravity_Set', a.gravity_log, [])
     v = Victim()
     a2 = Acmd(script, v)
@@ -887,7 +919,7 @@ def acmd_tests(game_bin):
     g_iasa = [r[0] for r in rec if r[1] >= B.IASA + 1][0]       # the frame his motion is at GF_IASA (rec: after it)
     v = Victim()
     a, rec = run_move(script, v, interrupt=(g_iasa, 0xE))
-    check('Fall at GF_IASA (in the air): the victim handed off before it, downed, then upright with its controller'
+    check('acting at GF_IASA: the victim handed off before it, downed, then upright with its controller'
           ' back, gf_phase 0', (any(r[5] == 0x50 for r in rec), v.rot[0], v.input_off, a.vars.get(B.V_PHASE)),
           (True, 0.0, 0.0, 0.0))
     # the full God Fist, nothing else happening

@@ -37705,6 +37705,9 @@ int gf_jump;            // 0 the jump not asked for yet, 1 on its way to GF_JUMP
 int gf_fast;
 int gf_air;
 int gf_ground0;         // on the ground when the move started
+int gf_terms;           // v13: the air actions' transition terms turned on (an air catch, from GF_IASA)
+int gf_ts;              // v13: the slot gf_track saw last frame (0 none) and its X then
+float gf_tsx;
 int gf_offedge;         // the tracked opponent is past the edge of his ground (GroundModule(0x2726, its distance))
 float gf_px;
 float gf_py;
@@ -37757,12 +37760,15 @@ int gf_pick(float maxd2)
     return best;
 }
 
-// XV2's tracking, the dash's burst only (motion frames GF_BURST_FROM .. GF_BURST_END: its TransN covers
-// GF_BURST_SPEED a frame there): toward gf_pick(0)'s opponent, his travel aimed at it (it is within 60 degrees: the
-// pick), its horizontal part x k = (the way to go less the catch's GF_HOLD_X) / the burst's way left, between 1 and
-// GF_TRACK_MAX. On the ground the animation moves him (the extra is (k - 1) of it; up only: he doesn't go into the
-// floor, and up he leaves the ground: situation 2, Leave_Ground_Cancel is off); in the air his kinetics do (what
-// they moved him the frame before, less this, is made up), down at most GF_TRACK_DOWN a frame
+// XV2's tracking, the dash's burst only: v13 (user: "make the tracking only happen in the first few frames",
+// "reduce the homing range to 20 units") its first frames, motion frames GF_BURST_FROM .. GF_TRACK_END (9-11; at the
+// 2x startup the one of them it plays, 10), toward gf_pick(GF_TRACK_D2)'s opponent (within 20 units, in front,
+// within 60 degrees), his travel aimed at it, its horizontal part x k between 1 and GF_TRACK_MAX: the extra way the
+// burst needs to reach it at the contact (its distance, plus its speed away from him, measured from the frame before,
+// over the burst's frames left, less the catch's GF_HOLD_X and the burst's own way left: GF_BURST_SPEED a frame to
+// GF_BURST_END) spread over the tracking frames left. On the ground the animation moves him (the extra is (k - 1) of
+// it; up only: he doesn't go into the floor, and up he leaves the ground: situation 2, Leave_Ground_Cancel is off); in
+// the air his kinetics do (what they moved him the frame before, less this, is made up), down at most GF_TRACK_DOWN
 void gf_track(float fr)
 {
     int t;
@@ -37779,6 +37785,10 @@ void gf_track(float fr)
     float vx;
     float vy;
     int level;
+    float tx;
+    float va;
+    float need;
+    float nt;
     x = WorkModuleF(0, 0x0f000000);
     y = WorkModuleF(0, 0x0f000001);
     face = WorkModuleF(0, 0x0f000003);
@@ -37788,39 +37798,40 @@ void gf_track(float fr)
     gf_ly = y;
     gf_ex = 0.0f;
     gf_ey = 0.0f;
-    if (fr < GF_BURST_FROM - 0.01f || fr >= GF_BURST_END - 0.01f)
+    rate = 1.0f;
+    if (gf_fast == 1)
     {
-        return;
+        rate = 2.0f;
     }
-    t = gf_pick(0.0f);
+    t = 0;
+    if (fr < GF_TRACK_END - 0.01f)
+    {
+        t = gf_pick(GF_TRACK_D2);
+    }
+    va = 0.0f;
+    if (t != 0)
+    {
+        tx = WorkModuleF(0, 0x0f000020 + 4 * (t - 1));
+        if (t == gf_ts)
+        {
+            va = (tx - gf_tsx) * face;
+        }
+        gf_tsx = tx;
+    }
+    gf_ts = t;
     if (t == 0)
     {
         return;
     }
     dx = (WorkModuleF(0, 0x0f000020 + 4 * (t - 1)) - x) * face;
     dy = WorkModuleF(0, 0x0f000021 + 4 * (t - 1)) - y;
-    rate = 1.0f;
-    if (gf_fast == 1)
-    {
-        rate = 2.0f;
-    }
-    d = GF_BURST_SPEED * rate;
-    k = (dx - GF_HOLD_X) / (GF_BURST_SPEED * (GF_BURST_END - fr));
-    if (k < 1.0f)
-    {
-        k = 1.0f;
-    }
-    if (k > GF_TRACK_MAX)
-    {
-        k = GF_TRACK_MAX;
-    }
-    vy = k * d * dy / dx;
     // v12 (user: "don't track opponents in hitstun lower than default. If they're off an edge then it can happen"):
     // started on the ground, an opponent lower than him is tracked down only when it is past the edge of his ground:
     // GroundModule(0x2726, distance), the game's own teeter check (Wait / Walk: is_ottotto(0.86), 1 when his ground
-    // doesn't go on that far in front of him), asked with the opponent's distance while he is on the ground (kept
-    // once he is off it). Over the stage: never aimed down (his own path, no dip); past the edge: he runs off it
-    // (Leave_Ground_Cancel is off) and the air path aims down, at most 60 degrees, GF_TRACK_DOWN a frame
+    // doesn't go on that far in front of him), asked with the opponent's distance on every frame he is on the ground
+    // with it in range (v13: from the move's start, so the 2x startup's one tracking frame knows it; kept once he is
+    // off). Over the stage: never aimed down (his own path, no dip); past the edge: he runs off it (Leave_Ground_Cancel
+    // is off) and the air path aims down, at most 60 degrees, GF_TRACK_DOWN a frame
     if (global18 == 0)
     {
         gf_offedge = 0;
@@ -37830,6 +37841,31 @@ void gf_track(float fr)
         }
         //GFD WorkModule(0, gf_offedge * 1000.0f + dx, 0x0F0003FE);
     }
+    if (fr < GF_BURST_FROM - 0.01f)
+    {
+        return;
+    }
+    d = GF_BURST_SPEED * rate;
+    if (va < 0.0f)
+    {
+        va = 0.0f;
+    }
+    need = dx + va * (GF_BURST_END - fr) / rate - GF_HOLD_X - GF_BURST_SPEED * (GF_BURST_END - fr);
+    nt = (GF_TRACK_END - fr) / rate;
+    if (nt < 1.0f)
+    {
+        nt = 1.0f;
+    }
+    k = 1.0f + need / (nt * d);
+    if (k < 1.0f)
+    {
+        k = 1.0f;
+    }
+    if (k > GF_TRACK_MAX)
+    {
+        k = GF_TRACK_MAX;
+    }
+    vy = k * d * dy / dx;
     level = 0;
     if (gf_ground0 == 0x1 && gf_offedge == 0)
     {
@@ -37884,6 +37920,8 @@ void gf_init()
     gf_ly = WorkModuleF(0, 0x0f000001);
     gf_ground0 = 0;
     gf_offedge = 0;
+    gf_terms = 0;
+    gf_ts = 0;
     if (global18 == 0)
     {
         gf_ground0 = 0x1;
@@ -37927,14 +37965,15 @@ int gf_update()
         }
         return 0;
     }
-    // v12: caught in the air (off stage): held where he is to GF_IASA (gravity off: the game script's Gravity_Set)
+    // v12: caught in the air (off stage): held where he is (gravity off: the game script's Gravity_Set); v13 (user:
+    // "make it so the animation finishes in the air instead of cutting to fall"): to the animation's end, not GF_IASA
     if (gf_jump == 0 && global18 == 0x2)
     {
         gf_air = 0x1;
         gf_px = WorkModuleF(0, 0x0f000000);
         gf_py = WorkModuleF(0, 0x0f000001);
     }
-    if (gf_air == 0x1 && fr < GF_IASA)
+    if (gf_air == 0x1 && MotionModule(0x2712) == 0)
     {
         WorkModule(0, gf_px, 0x0f000000);
         WorkModule(0, gf_py, 0x0f000001);
@@ -37955,13 +37994,43 @@ int gf_update()
         gf_jump = 0x2;
         //GFD WorkModule(0, fr, 0x0F0003FA);
     }
-    // v10: Leave_Ground_Cancel (the game script: 0 from the start, 2 from the catch, 1 at the hand-off): caught in
-    // the air (he ran off a ledge before the punch), the God Fist goes on in the air to the hand-off; Fall from
-    // GF_IASA, as the ground path acts from there
-    if (global18 == 0x2 && fr >= GF_IASA)
+    // v10: Leave_Ground_Cancel (the game script: 0 from the start, 2 from the catch, 1 at the hand-off on the
+    // ground): caught in the air (he ran off a ledge before the punch), the God Fist goes on in the air. v13: in the
+    // air it plays to its end (held in place) and ends in Fall there; from GF_IASA he can act in the air (func_41:
+    // aerials, specials, air dodge, jumps; their transition terms turned on, a ground status has them off), which
+    // ends the hold (the status changes: the pin stops, Gravity_Set ends)
+    if (global18 == 0x2)
     {
-        //GFD WorkModule(0, fr, 0x0F0003FB);
-        func_16(0xe, 0);
+        if (fr >= GF_IASA)
+        {
+            if (gf_terms == 0)
+            {
+                gf_terms = 0x1;
+                WorkModule(0x17, 0x1e000061);
+                WorkModule(0x17, 0x1e00008a);
+                WorkModule(0x17, 0x1e000062);
+                WorkModule(0x17, 0x1e000063);
+                WorkModule(0x17, 0x1e000064);
+                WorkModule(0x17, 0x1e000065);
+                WorkModule(0x17, 0x1e000094);
+                WorkModule(0x17, 0x1e00003d);
+                WorkModule(0x17, 0x1e00003e);
+                WorkModule(0x17, 0x1e00003f);
+                WorkModule(0x17, 0x1e000043);
+                WorkModule(0x17, 0x1e000044);
+                WorkModule(0x17, 0x1e000045);
+            }
+            if (func_41() != 0)
+            {
+                //GFD WorkModule(0, fr, 0x0F0003FB);
+                return 0x1;
+            }
+        }
+        if (MotionModule(0x2712) == 0x1)
+        {
+            //GFD WorkModule(0, fr, 0x0F0003FB);
+            func_16(0xe, 0);
+        }
         return 0x1;
     }
     if (fr >= GF_IASA && func_39() != 0)
