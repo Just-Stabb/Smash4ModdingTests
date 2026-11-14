@@ -75568,8 +75568,8 @@ int khm_once(int bit)
 
 int khm_blocking()
 {
-    return WorkModule(0x6, 0x0f0003bf) == 0x1 || WorkModule(0x6, 0x0f0003b5) || khm_sw_busy()   // fix v7: a sword spell, to its end
-        || khm_zooming();       // fix v4: Zoom / Zoom 2 U
+    return WorkModule(0x6, 0x0f0003bf) == 0x1 || WorkModule(0x6, 0x0f0003b5) || khm_sw_hitting()   // fix v11: a sword spell
+        || khm_zooming();       // fix v4: Zoom / Zoom 2 U                                              // to its last hitbox
 }
 
 // fix v7 (user: "when the stone ends during sword moves, Kirby is visible in the animation rather than staying in the
@@ -75581,6 +75581,17 @@ int khm_blocking()
 int khm_sw_busy()
 {
     return WorkModule(0x6, 0x0f0003a2) != 0;
+}
+
+// fix v11 (user: "make it so Kirby can leave the stone the moment the hitboxes finish for the sword attacks", "I don't
+// want it to be forced"): special (the player's own way out, khm_blocking) is held off only while the spell's
+// hitboxes can still be out: to its last hitbox frame (khm_sw_last, generated; 0x0F0003A1 = the cast frame khm_sword
+// last ran). From the next frame a special press takes him to the stone's normal end (0x176: khm_sword then stops the
+// spell, khm_sw_stop, and leaves his motion alone, fix v7). Nothing ends it by itself: the ground timer still waits
+// for the spell's end (khm_sw_busy in func_2323), so with no press the spell plays out as before
+int khm_sw_hitting()
+{
+    return WorkModule(0x6, 0x0f0003a2) != 0 && WorkModule(0x6, 0x0f0003a1) <= khm_sw_last(WorkModule(0x6, 0x0f0003a2));
 }
 
 // fix v4 (user: "using Zoom offstage, Kirby can get KO'd twice ... make Kirby unable to leave the stone during the
@@ -76969,6 +76980,16 @@ int khm_sw_shown(int n, int f)
     if (n == 0x12) { return f >= 4 && f < 8; }
     if (n == 0x13) { return f >= 9 && f < 16; }
     if (n == 0x14) { return f >= 34 && f < 42; }
+    return 0;
+}
+
+// fix v11: the last cast frame with a hitbox out (special may end the stone from the next one)
+int khm_sw_last(int n)
+{
+    if (n == 0x11) { return 8; }
+    if (n == 0x12) { return 8; }
+    if (n == 0x13) { return 12; }
+    if (n == 0x14) { return 40; }
     return 0;
 }
 

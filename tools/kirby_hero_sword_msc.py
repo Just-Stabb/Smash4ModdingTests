@@ -271,6 +271,8 @@ def events(ref):
         hb = [f for f, k, _v in e['ground'] if k in ('hitbox', 'remove')]
         e['hitbox'] = (min(hb), max(hb))
         e['shown'] = trail_window(ref, n)
+        lh = [f for sit in ('ground', 'air') for f, k, _v in e[sit] if k == 'hitbox']
+        e['last_hitbox'] = max(lh)          # fix v11 (flatten: a hitbox event every frame it is out)
         out[n] = e
     return out
 
@@ -393,6 +395,14 @@ def c_source(ev):
     for n in sorted(ev):
         a, b = ev[n]['shown']
         out.append('    if (n == 0x%x) { return f >= %d && f < %d; }' % (n, a, b))
+    out.append('    return 0;')
+    out.append('}')
+    out.append('')
+    out.append('// fix v11: the last cast frame with a hitbox out (special may end the stone from the next one)')
+    out.append('int khm_sw_last(int n)')
+    out.append('{')
+    for n in sorted(ev):
+        out.append('    if (n == 0x%x) { return %d; }' % (n, ev[n]['last_hitbox']))
     out.append('    return 0;')
     out.append('}')
     out.append('')
