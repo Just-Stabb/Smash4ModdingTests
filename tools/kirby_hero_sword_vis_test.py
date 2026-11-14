@@ -30,7 +30,6 @@ Scenarios (each from a fresh article and link, attribute 7 off as made):
   (exe_v46g: joint 0x19 RHaveN, flags 8); Marth 0x12, Lucina 0x25, Ike 0x1D, Sonic 0x22, Shulk 0x2F as before.
 """
 import os
-import struct
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))

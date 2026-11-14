@@ -267,7 +267,14 @@ copy model function `0x02EFE138` (generate at `0x02EFE748`) only for the kinds w
 (the copy-resource loader `0x030C4694` loads types 0xC / 0x11 / 0x164 / 0x165 = Kirby's article weapon kinds hat /
 simple / simple2r / simple2l per match entry), named from `0x1041A8A0` (read at `0x030C487C`); `0x02B02534` is that
 article's per-frame update (r27 the owner's module accessor), showing it by the owner's status
-(`tools/copy_held_cave.py`, `tools/kirby_hero_sword_cave.py`).
+(`tools/copy_held_cave.py`, `tools/kirby_hero_sword_cave.py`). Its init `0x02B02078` links it to a Kirby joint by the copy kind (0x18
+LHaveN for the swords, 0x19 RHaveN by default, 1000 for Sonic's sphere) with LinkModule constraint flags (vt +0x314). Its
+drawing also follows Kirby's: the weapon VisibilityModule's is_visible (vt +0xA4 = `0x02C77004`) is its own flag (+8) AND,
+when its LinkModule has attribute 7 on a link (set_attribute vt +0x3BC = `0x02C5847C`, link `[+0xC] + 0x38 n` +0x30;
+module mask +0x84), the parent's is_visible (LinkModule vt +0xDC = `0x02C560C8`). The update sets link 3's attribute 7
+every frame except in the Sonic copy's spin motions 0x318-0x31A, where Kirby is hidden and the sphere shows; so a held
+model can't show while Kirby is invisible (e.g. the stone) unless that attribute is cleared (Kirby's Hero copy fix v5,
+fighters/kirby/specials.md).
 
 ### Collision records (the hit target)
 

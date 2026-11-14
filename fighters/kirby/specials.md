@@ -2098,3 +2098,97 @@ python3 tools/diag_kirby_hero_test.py EXE_V46G_DIAG.rpx EXE_V46G.rpx
 sh tools/kirby_hero_copy_build.sh OUT; python3 tools/kirby_newcopy_test.py OUT/kirby_B.mscsb
 python3 tools/brave_mark_test.py HERO_OUT; python3 tools/brave_shot_owner_test.py HERO_OUT    # brave + 7 articles
 ```
+
+### Hero copy fix v5 (`kirby_hero_copy_fix_v5`): exe_v46h (B), the held sword drawn on the stone
+
+User (fix v4 B, in game): "the sword still doesn't appear for Kirby's Stone Menu copy". Re-traced from the start, with
+the held article's own code run in unicorn (fix v4's test ran single functions with stubbed calls).
+
+**The chain, checked again:**
+- Made: the copy model function's hat-success path reaches the GEN stub (fix v4, `0x02EFE284`); article 0x1A is the
+  only generate of Kirby's "simple" article (`0x02EFE750` is the only `li r4, 0x1A` before `bl 0x02C03EA0`).
+- Model: the loader (`0x030C4694`, called for types 0xC / 0x11 / 0x164 / 0x165 for every match entry from
+  `0x030C4D28`) builds `fighter/kirby/model/` + name + `/c0` + costume (format `%s%s%s%d`, `0x10159A24`), falls back to
+  `c00` (`0x030C49D8`), loads it as resource `type x 0x29 + entry` (costume in the top bits), and the motion folder
+  `fighter/kirby/motion/` + name (`0x030C4BE8`). Vanilla held items (marthsword, ikesword, ...) have no motion folder
+  (only cloudsword does): none is needed. The installed tree (v6 + fix v3) has all eight folders, each with the nine
+  files of vanilla `marthsword/c00` (`model.xmb` / `nhb` / `sb` / `jtb` byte-identical to it), the NUT ids the NUDs
+  use (0x40C5E000 + 0x80 NN, + 1, + 2; 0x10080000 / 0x10102000 shared), fix v3's two bones, the mesh rigged to bone 0
+  as the working copy hats are; `kirby_copy_sword.py --fix-skeletons` on v6's tree reproduces it byte for byte.
+- Init (`0x02B02078`, the article's vtable entry at `0x100E0984`): reads Kirby's copy kind (`0x100000A4`) into the
+  article's int `0x10000007`, then links it to a Kirby joint (`0x02B61FB8`) and sets the LinkModule constraint flags
+  (vt +0x314 = `0x02C5B164`, +0xAC) by kind: < 0x12 joint 0x19; 0x12 / 0x13 / 0x25 / 0x27 / 0x36 / 0x37 joint 0x18
+  (`0x02B022EC`); 0x22 joint 1000 (BodyBN); 0x2E / 0x2F joint 0x1A; the rest 0x19; flags 0x108 except 0x37 (0x103),
+  0x2E (8) and **0x2C (Robin's case, `0x02B02248`): joint 0x19, flags 8**. Kirby's jtb table 0 (joint n = entry n - 1): 0x18 LHaveN,
+  0x19 RHaveN. So the Hero copy's sword hung on RHaveN; the model and the spells' hitboxes (`khm_sw_*`, bone 0x18) are
+  built for LHaveN.
+- Update (`0x02B02534`, vtable entry `0x100E09CC`): copy_held_cave's hook, the sword cave's stone check, then the
+  show path (`0x02B026B4`) sets the article's own visibility; then by Kirby's motion kind it sets link 3's attribute 7
+  (`0x02B02824`-`0x02B02860`) for every motion but 0x318-0x31A (`SonicSpecialNSpin` / `Homing` / `HomingStart`, crc32
+  of the names), where it clears it (`0x02B02794`).
+- **Attribute 7 = draw only while the parent is visible.** The weapon VisibilityModule (vtable `0x1010C55C`; fighters
+  `0x1010C724`) is_visible, vt +0xA4 = `0x02C77004`: its own flag (+8) AND the LinkModule's vt +0xDC (`0x02C560C8`):
+  when the module's mask (+0x84) has bit 7, the parent link's owner's VisibilityModule is_visible. set_attribute
+  `0x02C5847C` (link `[+0xC] + 0x38 n`, +0x30 bits), is_attribute `0x02C5852C`. The Sonic exception is the game's own
+  case of a held model (the sphere) shown while Kirby is hidden.
+- **Kirby is invisible for the whole stone**: his MSC's `func_2337(1)` (stone article shown, `VisibilityModule(0x2710,
+  0)`: handler `0x02C77060` -> vt +0x94, +8 = 0) in the transform's blink (`func_2336`, 0x155) and at the hold's init
+  (`func_2339`, 0x175); only SpecialLwEnd's main shows him again.
+
+**Cause (certain: read, and reproduced by running the game's code):** every frame of a sword spell, v6's stone path
+set the sword's own flag, and the same update then set attribute 7 again (the stone's motions aren't Sonic's), so the
+game's is_visible was `1 AND Kirby (0)`: never drawn, in v6, fix v3 and fix v4 alike. Second, smaller: the RHaveN
+link (wrong hand for the model and the hitboxes).
+
+**Fix** (`tools/kirby_hero_sword_cave.py`, exe_v46h = ported_sound_ids_v1's B exe (exe_v46g + sound_alias_cave.py v2) +
+these words; only the cave's words differ from it, checked word by word):
+- STONE_SHOW (CAVE2 `0x04BAF200`-`0x04BAF244`, free between kirby_robin_book_cave.py's and kirby_copy_new_cave.py's
+  spaces): the stone check's show case now does the show path's preamble (`0x02BF0594(r1 + 0x68)`, the item
+  MotionModule vt +0x2F4, as `0x02B026B4`-`0x02B026CC`) and goes to the Sonic branch `0x02B02794` with r7 = `[r30 +
+  0x68]`, r10 = its vtable + 0x3C0 (as `0x02B02718`-`0x02B02724`): link 3's attribute 7 cleared, the item shown. The
+  hide path is the game's: its motion check sets the attribute back (`0x02B02824`), so after the spell the sword
+  follows Kirby again.
+- The stone check now first requires the article's copy kind (r31, its int `0x10000007`) to be 0x2C: Kirby's int
+  `0x1000008B` is a copy int whose native users store other things (`0x02F02208` writes an object id there), and with
+  the parent visibility bypassed a stray 1 would otherwise show another copy's held model on the stone.
+- JOINT: `0x02B02184` `beq 0x02B02248` -> `beq 0x02B022EC`: kind 0x2C takes Marth's path (joint 0x18, flags 0x108).
+  0x2C's case is otherwise dead (no vanilla held article for 0x2C; GEN makes one only when granted for a Hero).
+- v6's cave shrank by the old show branch; its tail words are zeroed. No word with a relocation (rpx_patch.py).
+
+**Tests:**
+- `tools/kirby_hero_sword_vis_test.py exe_v46h exe_v46g` (new; the exes run in unicorn with every section mapped):
+  the real update `0x02B02534` frame by frame through the hooks and caves, with the game's own VisibilityModule /
+  LinkModule code and a link 3 from the article to Kirby; Kirby's status / motion / work modules, the object lookup
+  `0x02BF2108` and the link call stubbed; opcode-4 (paired-single) saves nopped in the emulated copy. The stone with a
+  40-frame sword spell, before / after it, the stone's end, Wait: drawn (is_visible `0x02C77004`) on exactly the spell's
+  frames, attribute 7 back on after. exe_v46g: never drawn, and on a spell frame own flag 1 / attribute 1 (the in-game
+  report reproduced). Both: Marth's sword in 0x380 / 0x382 / 0x384 and Shield Breaker 0x1C1, hidden in Wait; Sonic's
+  sphere in 0x318-0x31A with Kirby hidden, hidden in 0x316; Marth's held model never on the stone. The real init
+  `0x02B02078`: kind 0x2C on joint 0x18 / flags 0x108 (exe_v46g 0x19 / 8); 0x12 / 0x25 / 0x1D / 0x22 / 0x2F as before.
+- `tools/kirby_hero_sword_test.py exe_v46h exe_v45h exe_v46f`: as fix v4, the stone check per kind (0x2C to
+  stone_show, 0x12 never), stone_show's words and the original show path / Sonic branch it relies on, the JOINT word,
+  CAVE2 free in both bases.
+- `tools/diag_kirby_hero_test.py exe_v46h_diag exe_v46h`; `kirby_copy_new_test.py` (base exe_v43),
+  `kirby_hero_menu_test.py` (exe_v44), `kirby_copy_pool_test.py` (exe_v45d) on exe_v46h; `sound_alias_cave_test.py`
+  (only its "no other word changed" check differs, by these words).
+
+**Diagnostic executable** (`tools/diag_kirby_hero_cave.py`, now on exe_v46h, space `0x04BAA000`-`0x04BAE000`: fix
+v4's `0x04BAC000`-`0x04BAF000` overlaps sound_alias_cave.py's `0x04BAE000` in the B chain since ported_sound_ids_v1).
+Lines in chain order: `cpy`, `res` (model path found), `gen` (handle), `lnk` (new: the init's joint), `stn` (now at
+the stone check's entry: status and the article's kind), `swd` (the sword int every frame it is 1 and the frame after,
+with the article's own flag, Kirby's, the attribute mask), `vis` (new: the update's end for kind 0x2C, every spell
+frame and the frame after: int, own, Kirby, mask, drawn = is_visible), `spawn`, `hit`. The two hooks in `0x02Bxxxxx`
+are out of branch reach of the cave and go through trampolines at `0x037EE578`-`0x037EE588` (the Havok cave's zero
+tail; diagnostic only).
+
+**Not checked in game / approximated:** where LHaveN is in the stone (the hold motions 0x2ED / 0x2F1 have no
+animation; fix v4 took SpecialLw1 / SpecialAirLw1's last frame as the held pose: LHaveN at about (-2.8, 11.2, 3.6),
+the blade from (-2.7, 11.8, 5.6) to (-3.7, 8.1, -8.1), above most stone models' 8-unit top); what the link flags'
+0x100 bit does (Marth's value is kept); the README asks for a clip.
+```
+python3 tools/rpx_patch.py B_EXE_V46G_IDS.rpx EXE_V46H.rpx $(python3 tools/kirby_hero_sword_cave.py)   # ported_sound_ids_v1 B
+python3 tools/kirby_hero_sword_vis_test.py EXE_V46H.rpx EXE_V46G.rpx
+python3 tools/kirby_hero_sword_test.py EXE_V46H.rpx EXE_V45H.rpx EXE_V46F.rpx
+python3 tools/rpx_patch.py EXE_V46H.rpx EXE_V46H_DIAG.rpx $(python3 tools/diag_kirby_hero_cave.py --rpx EXE_V46H.rpx)
+python3 tools/diag_kirby_hero_test.py EXE_V46H_DIAG.rpx EXE_V46H.rpx
+```
