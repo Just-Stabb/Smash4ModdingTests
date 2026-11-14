@@ -410,3 +410,117 @@ It is Goku's **character SE** (ACB type 2: GOK_PLAYER.bac's type-2 sounds use ex
 plays none of them: skill SE / voice cue 0 (types 10 / 11: the skill's own .acb), **character voice** cues 81 / 35
 (type 3: the attacker's battle voice bank), common SE cues 53 / 74 (type 0: XV2's common battle SE). Not added
 (not this move's sounds); the stand-ins stay.
+
+## Super God Fist v4 (`supamario_god_fist_v4.zip`): the launch and the rotation fixed, the skill's effects
+
+Install over v3 (no exe change; either exe). User, v3 in game (clip `MedalTVCemuWiiUEmulator20261114045029851`):
+"the opponent isn't launched by dash attack after the initial hit", "their rotation is permanently stuck".
+
+### What the clip shows
+The punch (4%), the catch, the motion jump and the hold all work: the opponent (Marth) is put in front of him
+and leans back. The strike connects: the training display goes Damage 11, Combo 2, Total 15 (4% + 11%). Then
+nothing moves the opponent: it stays where it was held, leaning back ~57 degrees (the hold's last
+`Rotation_Set`, XV2 #179's lean), recovers into its idle pose still tilted, and stays tilted. Supamario plays his
+flip and recovers as normal.
+
+### Causes
+1. **The flight thread never started.** v3 started it at frame 97 (the first frame after the strike's 8-frame
+   freeze) only if `Hit_Check(0, 0, 2)` reported the hit. The clip shows the strike dealt its 11%, so that check
+   was false although the hit happened. Most likely timing: the kinds a hit adds to AttackModule `+0xC8` come from
+   the attack's per-frame record pass (`0x02C09C0C`: it ORs `1 << kind` of the new records into `+0xC4` /
+   `+0xC8`), and on the first frame after the attacker's freeze the script runs before that pass has handled the
+   strike's record (the punch's check is 4 frames after its hit, so it always worked). The diag build logs the
+   kinds at 97-100 (k 4) to confirm; the fix doesn't depend on it. With no thread, nothing moved the victim, turned
+   it, put it down or turned it back.
+2. **Nothing else zeroes the rotation.** `Rotation_Set` is `PostureModule(4, ...)`; no status change resets it (the
+   clip: the victim back in its idle pose, still tilted). v3 zeroed it only inside the flight thread (on the
+   down's first frame and some releases), so any way the hold ended without the flight (this one; Supamario hit or
+   grabbed mid-hold; a new dash attack; a second God Fist on another fighter while the first lay down) left the
+   last lean on the victim, and the hold's stage collision 0 too (it could fall through the stage).
+3. (Not the cause, checked:) threads survive status changes and the motion jump (acmd_ext_cave.py: only the
+   object's set-up, `WM_RESET 0x02BF5864`, drops them; the jump only changes the motion rate); `Thread_Start`
+   with Flags 1 runs during the attacker's hitlag. My first guess, the strike blocked by the punch's Part 0 hit
+   record (rehit 0: `0x02C10BC8` never frees such a record), is ruled out by the clip's 11%; the strike is on
+   Part 1 now anyway (a record of its own, `Hit_Log_Clear(1)` before it), which costs nothing.
+
+### Fixes (tools/supamario_godfist_build.py)
+- **The launch no longer depends on Hit_Check:** at frame 97, still holding (`gf` 1), it always launches (`gf` 2,
+  the flight thread). The hold is a throw: XV2's ThrowHandler doesn't wait on the hit either. The flight is v3's
+  (target 2, as the hold, which works in game).
+- **A watchdog thread** (`GF_WATCH` 0x46, Flags 1) from the catch: every frame it reads his status
+  (`Status_Get(0)`) and `gf`: his status no longer AttackDash (hit, grabbed, KO'd: the script that holds the
+  victim is gone), `gf` back to 0 (a new dash attack), still 1 past frame 98, or its 160 frames over -> it lets go:
+  `Rotation_Set` 0 and `Stage_Collision_Set` 5 on the victim's slot (`gf_slot`, targets 3-10: not target 2).
+  `gf` 2 (the flight thread has it) -> off duty. A thread is the only place: the MSC can't reach another fighter's
+  PostureModule (no rotation variable for other targets), and a thread outlives his status.
+- **Every release turns the victim upright** (`unspin`: by slot, `gf_spin` 0): the flight thread's releases
+  (time, a launching hit while down, the downed stand-up, never landing) and its end, unconditionally (v3 skipped
+  it when `gf_rot` said it had been done).
+- **A second God Fist** stops the first one's flight thread (`Thread_Stop(0x47)`) and turns the first victim
+  upright before it takes the new one.
+- MSC: unchanged (the compiled `supamario.mscsb` is byte for byte v3's: only comments were added).
+
+### Diagnostic variant (`diag/` in the package)
+If anything still misbehaves, the diag build writes log lines: `S4GF k=<k> v=<value> c=<value x 100> n=<serial>`
+in Cemu's log.txt (Debug > Logging > "Coreinit Logging"). Its game script and MSC write diag variables
+`0x0F0003F0 + k`; the diag executables (`tools/diag_godfist_cave.py` over exe A v45h / B v46g: acmd_ext_cave's
+`hvv_zero` at `0x04B97920` aimed at a stub at `0x04BAC000` that OSReports writes of `0x3F0-0x3FF`, then goes on as
+before; the normal exes ignore these writes). k: 0 the kinds hit at the catch check (2 = a hurtbox), 1 the victim's
+slot, 2 his motion frame at the hold's first / last frame (46 / 95: the jump landed), 3 target 2's rotation X at
+the hold's first / last frame and at flight frames 1 / 22 (the thread reaches it), 4 the kinds since the Hit_Reset
+at 97-100 (when the strike shows), 5 the flight thread started (the slot), 6 a hold release (1 his status changed,
+2 a new dash attack, 3 still holding after 98, 4 time), 7 the victim's rotation X read back after each reset (0),
+9 / 10 / 11 MSC: the jump asked / the rate back to 1 / the status left (the frame), 12 the flight's phase (2
+downed; at a release, the phase it was in), 13 his status when the watchdog let go. `tools/diag_godfist_test.py`
+(unicorn): through the real fighter `set_float` (`0x02F1DC04`) a diag write makes one OSReport call with the line's
+values and keeps every register; reads, `0x0F0003D0`, a New_Var slot: no call. Both exes.
+
+### The skill's effects (Goku's skill folder `002_GOK_CSG`)
+The user's `002_GOK_CSG.eepk` (Goku's own God Fist, "the same effects") has exactly the effect ids the God Fist's
+BAC plays as skill effects (EEPK type 5 / 3, skill 30): 0, 1, 2, 11.
+
+| EEPK effect | parts (bone, scale) | BAC | Supamario |
+|---|---|---|---|
+| 0 | `Csg_Crg.emp` (b_R_Hand, 0.6, -0.1 along it) | entry 0 at 2 | frame 2, on RHandN (follows) |
+| 1 | `Csg_Bas.emo` model + `.emm/.emb/.mat.ema/.obj.ema` (b_R_Hand, 1.5), `Csg_Circle.emp` (0.6), `Csg_WindS.etr` | entry 0 at 10, off at 40 | frame 10: the model following him where the fist strikes (7.3 ahead, 5.2 up; turned 180 about Y: XV2's front is -Z), the circle on RHandN; off at 29 on a whiff (#1 40), at 64 on a hit (its 37 frames) |
+| 2 | `Csg_Bas.emp` (0.6), `Csg_drop_ptcl.emp` (1.0) (b_R_Hand) | entry 1 at #0 17; entry 0 at 40 | 67 (46 + 17 / 0.8) on a hit; 29 on a whiff |
+| 11 | `Csg_HitPt.emp` (the victim's b_C_Head, 0.4) | entry 2 (the victim) at 12 | 61 (46 + 12 / 0.8), at its head (bone 0: HOLD_X + 10 sin(lean), 10 cos(lean)) |
+
+- Particles: `xv2_to_ptcl` at his 5.04 units a metre (the ACMD size is the EEPK scale), 128-pixel textures: sets
+  `PtcSupamarioGfCsg_Crg / _Bas / _Circle / _drop_ptcl / _HitPt` (efc 0x2F-0x33, ids 0x0341002F-33); the ptcl
+  +99 KB (3.09 MB). Skipped by the converter (no Smash 4 equivalent): the 4 `ConeExtrude` stripes (Crg's two
+  `stripe_4ptcl`, Circle's two `stripe_ring00`).
+- The model: `xv2_to_nud` (`--plain 1 --scale 5.04 --tex-base 0x15141B00`): `effect/supamario/model/EffSupamarioGfCsgBas`
+  (efc 0x34, id 0x03410034; the red-orange spiral cone BasC + two wind swirls, 37 frames of obj / mat EMA; preview
+  in the package). Textures 0x15141B00-01 (after the Kamehameha's 0x15141A00-AB2).
+- Not converted: `Csg_WindS.etr` (three thin swirling streaks; Smash 4 has no trace emitter and
+  `xv2_trace_to_nud` makes straight beams). CMN 180 and the focus lines as before.
+- `tools/xv2vfx.py`: an EMP's 8 header bytes at +0x18 may hold junk (Csg_Crg / Bas / Circle: XV2-Tools never reads
+  them): noted instead of an error.
+- Replaced: v1-v3's stand-ins (the orange glow on the fist while held, the charge flash, the fire burst / rings /
+  flash at the launch). XV2 plays nothing at the launch on the attacker; the Smash hit effect and the big dust
+  cloud at 97 stay.
+- Approximated: the model doesn't follow the hand (it follows him at the strike point; XV2's follows b_R_Hand,
+  whose axes aren't RHandN's); the victim's head is placed for a Mario-sized fighter; the Circle's ring emitters
+  are turned with RHandN's axes.
+
+### Sounds
+`sound.zip` (the user's) holds only voices: `VOX/Battle/Chara/CAR_BTL_GOK_VOX.awb` (no .acb: no cue table) and 16
+skill voice banks `VOX/Battle/Skill/CAR_BTL_S000_KMH_GOD_VOX.acb` ... `U801_SKMV` (Kamehameha, Kaioken, ... ; no
+S030 / CSA one). The user decided: no Goku voice. None of the God Fist's sound effects is there (the skill SE bank,
+cue 0; the common battle SE bank `CAR_BTL_CMN*`, cues 53 / 74), nor in `002_GOK_CSG/` (no .acb). The sound script
+is v3's (his own stand-ins).
+
+### Tests
+- `supamario_godfist_test.py` now models the game's open rules (`Acmd.DEFER` the hit's kinds reaching Hit_Check
+  after the next frame's script; `BLOCK` a Part record for the whole status; hitboxes, Part records, Hit_Reset,
+  Hit_Log_Clear, his hitstop, a status change: the script and hitboxes gone, the threads on). On v3's build it
+  reproduces the clip: the strike connects (2 hits), no launch, the victim left at -57.2 degrees (23 failures).
+  v4: 0 problems, under every combination (`--all-models`); new cases: interrupted mid-hold (upright within 2
+  frames, stage collision back), a new dash attack mid-hold, the strike not connecting (still launched), his
+  status changing mid-flight, a second God Fist while the first victim lies / is held down (stopped, upright),
+  rotation 0 at the end of every case. The diag build: the same, plus its log lines.
+- `diag_godfist_test.py` (unicorn, exes A and B): 0 failed. `msc_stack_check`: 0 problems (both MSCs);
+  `msc_fingerprint` v3 vs v4: 0 differ (byte for byte), vs the diag: `func_2320` (gf_update).
+- Other scripts / animations: byte for byte v3's (sound, expression, motion unchanged; game / effect: only
+  attackdash).

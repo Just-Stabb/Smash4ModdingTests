@@ -675,13 +675,15 @@ def read_emp(data, strict=True):
     r.zero(10, 2, 'header')
     roots, ntex = r.i16(12), r.i16(14)
     node_off, tex_off = r.i32(16), r.i32(20)
-    r.zero(24, 8, 'header padding')
-    vn = out['VersionName']
+    pad = r.raw(24, 8)                  # zero in most files; some tools leave junk there (002_GOK_CSG's
+    vn = out['VersionName']             # Csg_Crg / Bas / Circle): XV2-Tools never reads these 8 bytes
     out['Textures'] = [_read_sampler(r, tex_off, i, vn) for i in range(ntex)]
     ctx = {'samplers': out['Textures'], 'samplers_off': tex_off, 'version': vn, 'visited': set(), 'notes': []}
     out['ParticleNodes'] = _emp_nodes(r, node_off, ctx) if roots > 0 else []
     if len(out['ParticleNodes']) != roots:
         r.err('root node count %d, chain has %d' % (roots, len(out['ParticleNodes'])))
+    if any(pad):
+        ctx['notes'].append('header padding (+0x18) not zero: %s (unused)' % pad.hex())
     out['_notes'] = ctx['notes']
     out['_coverage'] = r.coverage(strict)
     return out

@@ -3,7 +3,14 @@
 rolloff_hold_test's MSC interpreter) and its game script (the attackdash script of the built game.bin, run in a
 small ACMD interpreter with a simulated victim), frame by frame, in the scenarios below.
 
-  python3 tools/supamario_godfist_test.py PKG_FIGHTER_DIR      (OUT_DIR/fighter/supamario of the build)
+  python3 tools/supamario_godfist_test.py PKG_FIGHTER_DIR [--all-models]   (OUT_DIR/fighter/supamario of the build)
+
+v4: the interpreter models hitboxes, Part hit records, Hit_Reset / Hit_Log_Clear, his hitstop and a status change
+(the script and hitboxes gone, the threads on); Acmd.DEFER (the kinds of a hit reach Hit_Check only after the next
+unfrozen frame's script: v3's clip) and Acmd.BLOCK (a Part record for the whole status) are the game's open rules,
+--all-models runs every combination. On v3's build it reproduces the in-game report (the strike connects, no
+launch, the hold's lean left on the victim); v4 adds the hold's interruptions, the strike not connecting, a status
+change mid-flight, a second God Fist while the first victim lies / is held down, rotation 0 at every end.
 
 MSC: whiff (ends at GF_WHIFF_END in Wait; in Run when the run flag 0x1300011c is set), hit (the motion rate that
 reaches GF_JUMP_TO in one frame, then 1; no cancel before GF_IASA even with the vl cancel frame open; Wait at the
@@ -32,9 +39,11 @@ import supamario_godfist_build as B  # noqa: E402
 import rolloff_hold_test as R  # noqa: E402
 
 PROBLEMS = []
+PREFIX = ['']
 
 
 def check(name, got, want):
+    name = PREFIX[0] + name
     ok = got == want
     print('%s %s%s' % ('ok  ' if ok else 'FAIL', name, '' if ok else ': got %r, want %r' % (got, want)))
     if not ok:
@@ -227,6 +236,15 @@ class Acmd:
     start (cleared by Hit_Reset) or this frame (AttackModule +0xC8 / +0xC4, new records only: 0x02C09C0C); threads
     outlive status changes (dropped only at the object's set-up)"""
 
+    # the game's rules the in-game tests left open (every combination is run on v4):
+    # DEFER: a hit's kinds reach Hit_Check / Hit_Get only after the attacker's next unfrozen frame's script (the
+    #   v3 clip: the strike dealt its 11%, yet the Hit_Check one frame after its freeze didn't see it)
+    # BLOCK: a Part's hit record keeps a fighter it hit from being hit again by that Part for the whole status
+    #   (docs/native-notes.md; not what the v3 clip shows: the strike on the punch's Part 0 connected); not BLOCK:
+    #   the record holds while the Part's hitboxes are out, a new hitbox after Remove_All_Hitboxes starts a new one
+    # T2_THREAD: target 2 (the last fighter hit) found from a thread
+    DEFER, BLOCK, T2_THREAD = True, False, True
+
     def __init__(self, cmds, victim, slot2=True):
         self.cmds = cmds
         self.word = []
@@ -243,12 +261,31 @@ class Acmd:
         self.records = {}          # Part -> set of victim slots
         self.bits_start = 0
         self.bits_frame = 0
+        self.pending_bits = 0
+        self.stale = set()         # Parts whose hitboxes were all removed (not BLOCK: their next hitbox, a new record)
+        self.in_thread = False
         self.my_status = B.STATUS_ATTACK_DASH
         self.motion_frame = 0.0
         self.diag = []             # (k, value) written to the diag IDs
 
-    def target(self, t):
+    def target(self, t, thread=False):
+        if t == 2 and thread and not self.T2_THREAD:
+            return None
         return self.v if t == 2 or (t >= 3 and t - 2 == self.v.slot) else None
+
+    def slot_var(self, var):
+        """(target, quantity) of a combat / hit variable (0x0F000040-0x0F0000F7), else None"""
+        i = var - 0x0F000000
+        if 0x40 <= i < 0x98:
+            return (i - 0x40) // 8, (i - 0x40) % 8
+        if 0xA0 <= i < 0xF8:
+            return (i - 0xA0) // 8, 8 + (i - 0xA0) % 8
+        return None
+
+    def apply_bits(self):
+        self.bits_frame = self.pending_bits
+        self.bits_start |= self.pending_bits
+        self.pending_bits = 0
 
     def jump(self, r, k, off):
         off = int(off)
@@ -257,21 +294,23 @@ class Acmd:
 
     def collide(self, g):
         """the frame's collision: each live hitbox against the victim, once per Part record; -> self hitstop"""
-        self.bits_frame = 0
         freeze = 0
         for hid, (part, stop) in sorted(self.active.items()):
             rec = self.records.setdefault(part, set())
             if self.v.slot in rec or not self.v.hittable(self.motion_frame):
                 continue
             rec.add(self.v.slot)
-            self.bits_frame |= 2
+            self.pending_bits |= 2
             self.v.hit(g, part, 20)
             freeze = max(freeze, stop)
-        self.bits_start |= self.bits_frame
+            break                           # one hit of an attack a frame
+        if not self.DEFER:
+            self.apply_bits()
         return freeze
 
     def step(self, r, frame):
         """run r until it waits; frame: the motion frame (main) or None (thread)"""
+        self.in_thread = frame is None
         while not r.done:
             if r.wait_until is not None:
                 now = r.t if frame is None else frame
@@ -331,17 +370,21 @@ class Acmd:
             elif n in ('Hitbox', 'Extra_Special_Hitbox'):
                 d = dict(zip(acmd.INFO[c.ident]['syntax'], p))
                 self.active[d['ID']] = (d['Part'], d.get('SelfHitstopFrames', 0))
+                if d['Part'] in self.stale and not self.BLOCK:
+                    self.stale.discard(d['Part'])
+                    self.records.pop(d['Part'], None)
             elif n == 'Remove_All_Hitboxes':
                 self.active.clear()
+                self.stale = set(self.records)
             elif n == 'Target_Slot_Get':
-                tv = self.target(p[0])
+                tv = self.target(p[0], frame is None)
                 self.vars[p[1]] = float(tv.slot if tv else 0)
             elif n == 'Status_Get' and p[0] == 0:
                 self.vars[p[1]] = float(self.my_status)
             elif n == 'Motion_Get' and p[0] == 0:
                 self.vars[p[2]] = float(self.motion_frame if p[1] == 1 else 0)
             else:
-                tv = self.target(p[0]) if p else None
+                tv = self.target(p[0], frame is None) if p else None
                 if n == 'Status_Set' and tv:
                     tv.pending = p[1]
                     tv.log.append(('status', p[1]))
@@ -371,12 +414,19 @@ class Acmd:
         return self.vars.get(var, 0.0)
 
     def setvar(self, var, val):
-        if var == B.LH_OFFX:
-            self.v.offx = val
-        elif var == B.LH_OFFY:
-            self.v.offy = val
-        elif var == B.LH_GROUND:
-            self.v.ground = val
+        tq = self.slot_var(var)
+        tv = self.target(tq[0], self.in_thread) if tq else None
+        if tq and tq[1] == 5:
+            if tv:
+                tv.offx = val
+        elif tq and tq[1] == 6:
+            if tv:
+                tv.offy = val
+        elif tq and tq[1] == 8 + 6:
+            if tv:
+                tv.ground = val
+        elif tq:
+            pass
         elif B.DIAG_BASE <= var < B.DIAG_BASE + 16:
             self.diag.append((var - B.DIAG_BASE, val))
         else:
@@ -403,7 +453,10 @@ def run_move(script, victim, hit=True, frames=400, second=None, interrupt=None, 
         # main script (frozen while in hitstop)
         if freeze > 0:
             freeze -= 1
-        elif not main.done:
+        elif main.done:
+            if a.DEFER:
+                a.apply_bits()
+        else:
             a.motion_frame = frame
             a.step(main, frame)
             # the MSC's jump (gf_update): from the frame after gf is set, one frame to GF_JUMP_TO
@@ -420,6 +473,8 @@ def run_move(script, victim, hit=True, frames=400, second=None, interrupt=None, 
                     main.done = True
                     a.active.clear()
                     a.my_status = WAIT_STATUS
+            if a.DEFER:
+                a.apply_bits()              # the attack's update after the script: the kinds hit reach +0xC8
         for tid, r in a.new_threads:
             a.threads[tid] = r
         a.new_threads = []
@@ -430,8 +485,7 @@ def run_move(script, victim, hit=True, frames=400, second=None, interrupt=None, 
                 del a.threads[tid]
         stop = a.collide(g)
         if stop:
-            freeze = stop
-            frame -= 1.0 if not main.done else 0.0      # the frame it hit on is held (the script resumes after)
+            freeze = stop                   # the script resumes with the next frame's commands after the freeze
         victim.frame(g)
         rec.append((g, frame, victim.offx, victim.offy, victim.rot[0], victim.status, victim.input_off,
                     victim.situation, a.vars.get(B.GF_VAR, 0.0), victim.ground))
@@ -454,8 +508,8 @@ def acmd_tests(game_bin):
     check('the punch connects (Part 0) and catches: gf 1, the victim\'s slot kept',
           (v.hits_taken[:1] and v.hits_taken[0][1], max(r[8] for r in rec) >= 1, a.vars.get(B.V_SLOT)),
           (0, True, float(v.slot)))
-    check('the strike (frame %d) connects: a hit record of its own (Part %d), not the punch\'s'
-          % (B.STRIKE, B.STRIKE_PART), [p for _g, p in v.hits_taken], [0, B.STRIKE_PART])
+    check('the strike (frame %d) connects (the victim takes it: the v3 clip\'s 4%% + 11%%)' % B.STRIKE,
+          len(v.hits_taken), 2)
     check('launched: gf 2 after the strike (the flight thread started)', any(r[8] == 2.0 for r in rec), True)
     held = [r for r in rec if B.JUMP_TO <= r[1] < B.STRIKE and r[8] == 1.0]
     check('hold: the victim %g in front on the ground while held' % B.HOLD_X, {(r[2], r[3]) for r in held},
@@ -481,7 +535,7 @@ def acmd_tests(game_bin):
           and next((r for r in after if r[2] == 0.0), (0, 0, 0, None))[3] == 0x50, True)
     check('rotation back to 0 at the end', v.rot[0], 0.0)
     lock_on = next((r[0] for r in rec if r[6] == 1.0), None)
-    launch = next(r[0] for r in rec if r[1] > B.STRIKE)
+    launch = next((r[0] for r in rec if r[8] == 2.0), next(r[0] for r in rec if r[1] > B.STRIKE))
     check('controller off from the launch (the thread\'s first frame)', lock_on is not None and
           lock_on <= launch + 1, True)
     down = [r for r in rec if r[5] == 0x50]
@@ -546,13 +600,13 @@ def acmd_tests(game_bin):
     a, rec = run_move(script, v, frames=hold_g + 60, interrupt=(hold_g, 0x48))
     fixed = next((r[0] for r in rec if r[0] >= hold_g and r[4] == 0.0), None)
     check('interrupted mid-hold: upright within 2 frames', fixed is not None and fixed - hold_g <= 2, True)
-    # the strike misses (the victim out of reach / intangible at the strike): let go at once
+    # the strike doesn't connect (the victim intangible at it): the hold is a throw, launched all the same
     v = Victim()
     v.hittable = lambda f: f < B.STRIKE
-    a, rec = run_move(script, v, frames=200)
-    miss = next((r for r in rec if r[1] >= B.STRIKE + 1 and r[8] != 1.0), None)
-    check('strike missed: let go at once (gf %d), upright, stage collision back' % B.GF_MISSED,
-          (miss and miss[8], v.rot[0], v.ground, sorted(a.threads)), (float(B.GF_MISSED), 0.0, 5, []))
+    a, rec = run_move(script, v)
+    check('strike not connecting: still launched, downed, upright at the end, controller back',
+          (any(r[8] == 2.0 for r in rec), any(r[5] == 0x50 for r in rec), v.rot[0], v.input_off),
+          (True, True, 0.0, 0.0))
     # his status changes during the flight (the threads go on): the flight and the down still end upright
     launch_g = next((r[0] for r in run_move(script, Victim())[1] if r[8] == 2.0), launch)
     v = Victim()
@@ -598,15 +652,16 @@ def diag_tests(game_bin):
     check('diag: catch kinds 2 (a hurtbox), slot %d, hold frames %d / %d, strike kinds 2, flight from slot %d'
           % (v.slot, B.JUMP_TO, B.STRIKE - 1, v.slot),
           ([val for k, val in a.diag if k == B.D_CATCH_KINDS], got.get(B.D_SLOT),
-           [val for k, val in a.diag if k == B.D_HOLD_FRAME], got.get(B.D_STRIKE_KINDS), got.get(B.D_FLIGHT)),
+           [val for k, val in a.diag if k == B.D_HOLD_FRAME], [val for k, val in a.diag if k == B.D_STRIKE_KINDS][-1],
+           got.get(B.D_FLIGHT)),
           ([2.0], float(v.slot), [float(B.JUMP_TO), float(B.STRIKE - 1)], 2.0, float(v.slot)))
     check('diag: rotation read back 0 after the last release', [val for k, val in a.diag if k == B.D_ROT_AFTER][-1:],
           [0.0])
-    check('diag: no hold release / miss in a clean run', (B.D_WD_RELEASE in ks, B.D_MISSED in ks), (False, False))
+    check('diag: no hold release in a clean run', B.D_WD_RELEASE in ks, False)
 
 
 def main():
-    a = sys.argv[1:]
+    a = [x for x in sys.argv[1:] if not x.startswith('--')]
     if len(a) != 1:
         sys.exit(__doc__)
     d = a[0]
@@ -619,6 +674,18 @@ def main():
     msc_tests(os.path.join(d, 'script', 'msc', 'supamario.mscsb'))
     game = os.path.join(d, 'script', 'animcmd', 'body', 'game.bin')
     acmd_tests(game)
+    # the game's open rules every way round (Acmd: DEFER / BLOCK / T2_THREAD)
+    if '--all-models' in sys.argv:
+        for defer in (True, False):
+            for block in (False, True):
+                for t2 in (True,):          # (target 2 from a thread: as from the script, the same lookup)
+                    if (defer, block, t2) == (True, False, True):
+                        continue
+                    Acmd.DEFER, Acmd.BLOCK, Acmd.T2_THREAD = defer, block, t2
+                    PREFIX[0] = '[defer %d, part block %d, target 2 in threads %d] ' % (defer, block, t2)
+                    acmd_tests(game)
+        Acmd.DEFER, Acmd.BLOCK, Acmd.T2_THREAD = True, False, True
+        PREFIX[0] = ''
     if any(acmd.new_var_name(c) == 'gf_wd' for c in acmd.ACMDFile.load(game).script('attackdash')) and any(
             c.name == 'SUB_FLOAT_2' and len(c.params) > 0 and B.DIAG_BASE <= c.params[0] < B.DIAG_BASE + 16
             for c in acmd.ACMDFile.load(game).script('attackdash')):
