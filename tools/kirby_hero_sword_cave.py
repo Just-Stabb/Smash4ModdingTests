@@ -111,14 +111,17 @@ def source(lab44, stone_show):
             'lis r12, 0x%04X' % (GEN_ARTICLE >> 16), 'ori r12, r12, 0x%04X' % (GEN_ARTICLE & 0xFFFF), 'mtlr r12', 'blr',
             'gs_cmp:', 'cmplwi r27, 0x22', 'blr']
     # 3. the stone statuses (r27 = Kirby's module accessor, r30 = the held article's)
-    src += ['held_stone:', 'cmplwi r31, 0x%X' % ROBIN, 'bne hs_hide',     # fix v5: the Hero copy's article only (r31 its
-            'lwz r3, 0x20(r27)',                                     #   copy kind, int 0x10000007) 'lwz r12, 0(r3)', 'lwz r12, 0x8C(r12)', 'mtctr r12', 'bctrl']
+    # fix v5: the Hero copy's article only (r31 = its copy kind, int 0x10000007)
+    src += ['held_stone:', 'cmplwi r31, 0x%X' % ROBIN, 'bne hs_hide',
+            'lwz r3, 0x20(r27)', 'lwz r12, 0(r3)', 'lwz r12, 0x8C(r12)', 'mtctr r12', 'bctrl']
     for i, st in enumerate(STONE):
         src += ['cmplwi r3, 0x%X' % st, 'beq hs_chk']
     src += ['b hs_hide', 'hs_chk:', 'lwz r3, 0x28(r27)', 'lwz r12, 0(r3)', 'lwz r12, 0x84(r12)',
             'lis r4, 0x%04X' % (SWORD_INT >> 16), 'ori r4, r4, 0x%04X' % (SWORD_INT & 0xFFFF), 'mtctr r12', 'bctrl',
             'cmpwi r3, 1', 'bne hs_hide',
-            'b 0x%08X' % stone_show,       # fix v5 (v6-v4: the show path 0x02B026B4, whose motion check set link 3's
+            # fix v5 (v6-v4 went to the show path 0x02B026B4, whose motion check set link 3's attribute 7 again: the
+            # item then hidden with Kirby)
+            'b 0x%08X' % stone_show,
             'hs_hide:', 'lwz r3, 0xA8(r30)',
             'lis r12, 0x%04X' % (HELD_BACK >> 16), 'ori r12, r12, 0x%04X' % (HELD_BACK & 0xFFFF), 'mtctr r12', 'bctr']
     return '\n'.join(src)
