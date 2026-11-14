@@ -20,7 +20,8 @@ fighters/kirby/specials.md "v6". What it does with Hero's scripts:
   Extra_Special_Hitbox's extras (Metal Slash: HitstunMul -6, 6 frames more hitstun) have no MSC op: left out.
 - Bones: Hero's script bones are his joint ids (model.jtb table 0: 0x16 RArmJ, 0x19 RHaveN = Ultimate's Sword1);
   the sword is on Kirby's LHaveN (0x18, the held model's bone: tools/kirby_copy_sword.py), so a Sword1-frame offset
-  (x, y, z) is (0.2023 - y, x, z) there, and an effect on it is turned 90 about Z (its X along the blade, as Hero's);
+  (x, y, z) is (x, y - 0.2023, z) there (fix v7; v6: (0.2023 - y, x, z) and effects turned 90 about Z, the item frame
+  taken as LHaveN's), an effect on it keeps Hero's rotation;
   0 -> 0. Fix v6 (the swing, tools/kirby_hero_sword_anim.py): LHaveN now moves along Hero's HaveR path, so 0x16
   (Hero's forearm) -> LHaveN too, at ArmR's origin in HaveR's frame at that frame (PATH "arm", the stone has no arm;
   before: Kirby's LArmJ 0x10, still in the stone pose); and with a path scale other than 1 (PATH "scale", the sword
@@ -47,7 +48,7 @@ SWORD_BONE, ARM_BONE = 0x19, 0x16
 K_SWORD, K_ARM = 0x18, 0x10
 SWORD1_TO_HAVE = 0.2023        # Sword1's origin in HaveR's frame (x), tools/kirby_copy_sword.py
 ID_SHIFT, PART = 5, 1
-EFFECT_ROT_Z = 90.0
+EFFECT_ROT_Z = 0.0             # fix v7: LHaveN's frame is Sword1's (was 90: the item frame taken as LHaveN's)
 # Special_Hitbox's 41 FP parameters, then Extra's six
 FP = ['ID', 'Part', 'Bone', 'Damage', 'Angle', 'KBG', 'FKB', 'BKB', 'Size', 'X', 'Y', 'Z', 'Effect', 'Trip', 'Hitlag',
       'SDI', 'Clang', 'Rebound', 'ShieldDamage', 'SFXLevel', 'SFXType', 'Ground/Air', 'Direct/Indirect', 'Type',
@@ -116,7 +117,11 @@ SCALE, ARMS = load_path()
 
 
 def sword_point(x, y, z):
-    return tuple(round(v * SCALE, 4) for v in (SWORD1_TO_HAVE - y, x, z))
+    """Hero's Sword1-frame offset on Kirby's LHaveN. Fix v7: the game draws the held item turned -90 about the
+    joint's Z (kirby_hero_sword_anim.ITEM_TO_HAVE, measured on the user's clip), and LHaveN is solved so the item is
+    where Hero's is: LHaveN's frame is then Sword1's, SWORD1_TO_HAVE apart along -Y (fix v6 and before took the item
+    frame as LHaveN's: (0.2023 - y, x, z))"""
+    return tuple(round(v * SCALE, 4) for v in (x, y - SWORD1_TO_HAVE, z))
 
 
 def fl(v):
@@ -163,8 +168,7 @@ def events(ref):
                         rot = [a['XRot'], a['YRot'], a['ZRot']]
                         size = a['Size']
                         if bone == SWORD_BONE:
-                            bone, pos = K_SWORD, sword_point(*pos)
-                            rot[2] += EFFECT_ROT_Z
+                            bone, pos = K_SWORD, sword_point(*pos)     # fix v7: Sword1's frame: its rotation as is
                             size = round(size * SCALE, 4)
                         else:
                             assert bone == 0, bone

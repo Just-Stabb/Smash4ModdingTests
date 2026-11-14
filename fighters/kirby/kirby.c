@@ -39001,7 +39001,8 @@ void func_2323()
         func_16(0x176, 0);
         return 0x1;
     }
-    if (WorkModule(0x6, 0x11000002) >= WorkModule(0x6, 0x18000000) && khm_zooming() == 0) // fix v4: not in a Zoom
+    if (WorkModule(0x6, 0x11000002) >= WorkModule(0x6, 0x18000000) && khm_zooming() == 0 // fix v4: not in a Zoom
+        && khm_sw_busy() == 0) // fix v7: nor in a sword spell (it ends after the spell)
     {
         func_16(0x176, 0);
         return 0x1;
@@ -75567,8 +75568,19 @@ int khm_once(int bit)
 
 int khm_blocking()
 {
-    return WorkModule(0x6, 0x0f0003bf) == 0x1 || WorkModule(0x6, 0x0f0003b5) || WorkModule(0x6, 0x0f0003a2) && WorkModule(0x6, 0x0f0003a1) < khm_sw_cancel(WorkModule(0x6, 0x0f0003a2))   // v6: a sword spell
+    return WorkModule(0x6, 0x0f0003bf) == 0x1 || WorkModule(0x6, 0x0f0003b5) || khm_sw_busy()   // fix v7: a sword spell, to its end
         || khm_zooming();       // fix v4: Zoom / Zoom 2 U
+}
+
+// fix v7 (user: "when the stone ends during sword moves, Kirby is visible in the animation rather than staying in the
+// stone state until it finishes"): a sword spell being cast (from the choice to its motion's end, khm_sw_stop clears
+// it). The stone's own ends wait for it: special (khm_blocking, was only to the cancel frame) and the ground timer
+// in the hold loop func_2323; the spell then ends and the stone ends normally. Before, special after the cancel frame
+// or the timer took him to SpecialLwEnd 0x176 (shown again: VisibilityModule(0x2710, 1)), where the cast went on
+// (0x176 counted as the stone) and khm_sw_motion put him back in the sword motion, visible
+int khm_sw_busy()
+{
+    return WorkModule(0x6, 0x0f0003a2) != 0;
 }
 
 // fix v4 (user: "using Zoom offstage, Kirby can get KO'd twice ... make Kirby unable to leave the stone during the
@@ -77021,8 +77033,14 @@ void khm_sw_motion(int n, int f)
             return;
         }
         MotionModule(0x1, khm_sw_slot(n), (float)f, 1.0f);
+        return;
     }
-    MotionModule(0x2713, (float)f);
+    // fix v7: the frame set only when it has drifted (a slow-down): setting it jumps the slot's script (the trail,
+    // fix v7's effect scripts), which must run once
+    if (MotionModuleF(0x1) < (float)f - 0.5f || MotionModuleF(0x1) > (float)f + 0.5f)
+    {
+        MotionModule(0x2713, (float)f);
+    }
 }
 
 // frame f of a sword spell's cast (khm_cast)
@@ -77037,7 +77055,7 @@ void khm_sword(int f)
         WorkModule(0x7, n == 0x14 || randi(0, 0x8) == 0, 0x0f0003a0);
     }
     WorkModule(0x7, f, 0x0f0003a1);
-    if (khm_stone() == 0 || newcopy_hero() == 0)
+    if (global4 != 0x175 || newcopy_hero() == 0)     // fix v7: only in the stone's hold (0x176, its end, shows him)
     {
         khm_sw_stop();
         WorkModule(0x7, 0x7f, 0x0f0003a8);

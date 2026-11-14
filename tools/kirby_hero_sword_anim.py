@@ -61,6 +61,20 @@ MAIN_TABLE = 0x103850A4                                     # Kirby's motion tab
 HAVE, ARM = 'HaveR', 'ArmR'
 GRIP = 'grip'                                               # Sword1 @ inv(S2H) (hero_paths)
 KIRBY_HAVE, KIRBY_HAND = 'LHaveN', 'LHandN'
+# fix v7: how the game draws them, measured on the user's fix v6 clip (Flame Slash, five frames; tools/
+# kirby_hero_sword_swing_test.py --clip reproduces it from the fix v6 animation):
+# - TRANS_DRAWN False: Kirby's TransN translation (SpecialLw1 ends with TransN at (0, 9, 0)) is not part of the drawn
+#   pose (the root's motion): the fix v6 sword was 9 too low; the pommel matches the clip within ~0.6 without it.
+# - ITEM_TO_HAVE (K): the held item's model sits on the joint turned -90 about the joint's Z: an item point v is drawn
+#   at joint @ K @ v, so the item's +Y (bravesword's blade) lies along the joint's +X. Fitted on the clip: the blade
+#   along LHaveN's (0.99, -0.14, 0.03) (error 0.004 over five frames; +Y as assumed: 8.6). The vanilla Marth copy
+#   agrees: marthsword's blade (+Z under its HaveN bind (90, 0, -90)) comes out along LHaveN's +Y with K, which is
+#   forward at Shield Breaker's thrust (FitKirbyMarthBodyMainD00SpecialNEnd frame 15).
+# So LHaveN is solved as D @ inv(K) (D = the item frame wanted), which makes LHaveN's frame Hero's Sword1 frame
+# exactly (S2H turns by +90 about Z too), 0.2023 apart along -Y: Hero's Sword1 offsets (x, y, z) are (x, y - 0.2023, z)
+# on LHaveN and his sword effects keep their rotations (kirby_hero_sword_msc.py).
+TRANS_DRAWN = False
+ITEM_TO_HAVE = np.array([[0.0, 1.0, 0.0, 0.0], [-1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
 BLADE = (-2.12, 12.06)                                      # Hero's sword model along LHaveN's +Y (kirby_copy_sword.py);
                                                             # fix v6 scales it by SCALE too (kirby_copy_sword.py --rescale)
 
@@ -146,6 +160,9 @@ def kirby_pose(kirby):
     w = {}
     for name, par, h, bind in sk:
         loc = KM.trs(np.array(pose[h][0]), np.array(pose[h][1]), np.array(pose[h][2])) if h in pose else bind
+        if par is None and not TRANS_DRAWN:
+            loc = np.array(loc)
+            loc[:3, 3] = 0.0                                   # fix v7: the root's translation isn't drawn
         w[name] = w[sk[par][0]] @ loc if par is not None else loc
     return sk, src, pose, w
 
@@ -169,7 +186,7 @@ def build(ult, kirby, ref_path=SWM.REF, scale_mode='hero'):
             cache[skill] = hero_paths(ult, skill)
         w, frames = cache[skill]
         mfs = motion_frames(n, ref)
-        P, Q, S, worlds, arms, idxs = [], [], [], [], [], []
+        P, Q, S, worlds, items, arms, idxs = [], [], [], [], [], [], []
         worst = 0.0
         for mf in mfs:
             idx = min(max(mf - 1.0, 0.0), frames - 1.0)
@@ -177,14 +194,16 @@ def build(ult, kirby, ref_path=SWM.REF, scale_mode='hero'):
             A = at_index(w[ARM], idx)
             D = np.array(H)
             D[:3, 3] = H[:3, 3] * scale                        # about Hero's feet = the stone's base
-            loc = inv_parent @ D
+            WL = D @ np.linalg.inv(ITEM_TO_HAVE)                # fix v7: the joint that draws the item at D
+            loc = inv_parent @ WL
             p, q, s, shear = KM.decompose(loc[None])
             worst = max(worst, shear)
             P.append(tuple(p[0]))
             Q.append(tuple(q[0]))
             S.append(tuple(s[0]))
-            worlds.append([[round(float(x), 4) for x in row] for row in D])
-            arm = (np.linalg.inv(H) @ A)[:3, 3] * scale         # ArmR's origin in the grip frame, the path's scale
+            worlds.append([[round(float(x), 4) for x in row] for row in WL])
+            items.append([[round(float(x), 4) for x in row] for row in D])
+            arm = (np.linalg.inv(WL) @ np.append(A[:3, 3] * scale, 1.0))[:3]   # ArmR's origin on LHaveN
             arms.append([round(float(x), 4) for x in arm])
             idxs.append(round(idx, 4))
         assert worst < 1e-3, 'LHaveN local has shear %.4f' % worst
@@ -198,17 +217,21 @@ def build(ult, kirby, ref_path=SWM.REF, scale_mode='hero'):
         omo.set_node(o, have_h, P, Q, S)
         anims[n] = o
         path['spells']['0x%x' % n] = {'slot': '0x%x' % SLOT[n], 'anim': NAME % (n - 0x11 + 17), 'skill': skill,
-                                      'motion_index': idxs, 'lhaven_world': worlds, 'arm': arms}
+                                      'motion_index': idxs, 'lhaven_world': worlds, 'item_world': items, 'arm': arms}
     return anims, path, sk
 
 
-def fk_lhaven(o, sk, frame):
-    """LHaveN's model-space matrix in animation o at a frame (bind for the bones it lacks)"""
+def fk_lhaven(o, sk, frame, trans_drawn=TRANS_DRAWN):
+    """LHaveN's model-space matrix in animation o at a frame (bind for the bones it lacks; the root's translation as
+    the game draws it: TRANS_DRAWN)"""
     have = {n[1] for n in o.nodes}
     w = {}
     for name, par, h, bind in sk:
         smp = o.sample(h, frame) if h in have else None
         loc = KM.trs(np.array(smp[0]), np.array(smp[1]), np.array(smp[2])) if smp else bind
+        if par is None and not trans_drawn:
+            loc = np.array(loc)
+            loc[:3, 3] = 0.0
         w[name] = w[sk[par][0]] @ loc if par is not None else loc
     return w[KIRBY_HAVE]
 
@@ -229,7 +252,7 @@ def preview(path, out_dir):
             return (W / 2 + z * k, H - 60 - y * k)
         d.line([px(-25, 0), px(25, 0)], fill=(120, 120, 120))
         d.rectangle([px(-6, 8), px(6, 0)], outline=(110, 90, 70), width=2)       # the stone (side view)
-        frames = sp['lhaven_world']
+        frames = sp['item_world']
         for g, m in enumerate(frames):
             m = np.array(m)
             a = m @ np.array([0, BLADE[0] * path['scale'], 0, 1.0])       # the model scaled too (--rescale)
@@ -267,6 +290,11 @@ def main():
         o2 = omo.Omo(o.encode())
         for g, m in enumerate(path['spells']['0x%x' % n]['lhaven_world']):
             worst = max(worst, float(np.abs(fk_lhaven(o2, sk, g) - np.array(m))[:3].max()))
+    # fix v7: drawn as the game does (TRANS_DRAWN, ITEM_TO_HAVE), the item is where Hero's sword is
+    for n, o in anims.items():
+        o2 = omo.Omo(o.encode())
+        for g, m in enumerate(path['spells']['0x%x' % n]['item_world']):
+            worst = max(worst, float(np.abs(fk_lhaven(o2, sk, g) @ ITEM_TO_HAVE - np.array(m))[:3].max()))
     assert worst < 0.05, 'the encoded LHaveN is %.3f off' % worst
     mdir = os.path.join(a.out, 'motion/body')
     os.makedirs(mdir, exist_ok=True)
