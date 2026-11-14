@@ -37762,7 +37762,7 @@ int gf_pick(float maxd2)
 
 // XV2's tracking, the dash's burst only: v13 (user: "make the tracking only happen in the first few frames",
 // "reduce the homing range to 20 units") its first frames, motion frames GF_BURST_FROM .. GF_TRACK_END (9-11; at the
-// 2x startup the one of them it plays, 10), toward gf_pick(GF_TRACK_D2)'s opponent (within 20 units, in front,
+// 2x startup the one of them it plays, 10), toward gf_pick(GF_TRACK_D2)'s opponent (within 50 units since v15, in front,
 // within 60 degrees), his travel aimed at it, its horizontal part x k between 1 and GF_TRACK_MAX: the extra way the
 // burst needs to reach it at the contact (its distance, plus its speed away from him, measured from the frame before,
 // over the burst's frames left, less the catch's GF_HOLD_X and the burst's own way left: GF_BURST_SPEED a frame to
@@ -38006,7 +38006,7 @@ void gf_init()
         gf_ground0 = 0x1;
     }
     gf_fast = 0;
-    if (gf_pick(GF_COMBO_D2) != 0)
+    if (gf_pick(GF_TRACK_D2) != 0)          // v15: the tracking's range and rules (one constant)
     {
         gf_fast = 0x1;
         MotionModule(0x4, 2.0f);

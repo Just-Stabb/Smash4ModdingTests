@@ -304,7 +304,7 @@ def startup_sim(path, slots, face=1.0, frames=24, ledge_at=None, edge_x=None, sl
 
 
 def msc_v12_tests(path):
-    """v12 / v13: tracking (the burst's first frames, within 20), the 2x startup (within 40), the off-stage catch"""
+    """v12 - v15: tracking (the burst's first frames) and the 2x startup (one range: 50 since v15), the off-stage catch"""
     hit = 0x45
     _vm, g0, base = startup_sim(path, {})
     tr = (float(B.BURST[0]), float(B.TRACK_END))
@@ -316,14 +316,20 @@ def msc_v12_tests(path):
                                   ('not in hitstun', {2: [15.0, 0.0, 0.0, 0x0]}, 1.0, None),
                                   ('hitstun over, still in a damage status', {2: [15.0, 0.0, 0.0, hit]}, 1.0, None),
                                   ('in front but he faces away', {2: [15.0, 0.0, 30.0, hit]}, -1.0, None),
-                                  ('out of range (more than 35 on the tracking frames)', {2: [48.0, 6.0, 30.0, hit]}, 1.0, None)):
+                                  ('out of range (more than 50 on the tracking frames)', {2: [61.0, 6.0, 30.0, hit]}, 1.0, None)):
         _vm, g, out = startup_sim(path, slots, face, slot_v=sv)
         check('tracking: none with an opponent %s (no extra move)' % name, (g.moves, g.sit_set), ([], []))
-    # within range, standing still, level: the burst reaches it anyway (k 1): no extra way (the startup at 2x: it is
-    # within 40 too)
+    # within range, standing still, level: the burst reaches it anyway (k 1): no extra way (the startup at 2x)
     _vm, g, out = startup_sim(path, {3: [15.0, 0.0, 30.0, hit]})
-    check('tracking, within range and still: no extra way (k 1), level',
+    check('tracking, within range and still (15): no extra way (k 1), level',
           (max(abs(v) for _f, _var, v in g.moves), g.sit_set), (0.0, []))
+    # v15: a still opponent at 45 (beyond the burst + catch, ~37.5): the dash stretched toward it, capped (the 2x
+    # startup: its one tracking frame, motion 10 -> 12: 0.5 x 2 x BURST_SPEED)
+    _vm, g, out = startup_sim(path, {3: [45.0, 0.0, 30.0, hit]})
+    extra = [(f, v) for f, var, v in g.moves if var == 0x0F000004 and abs(v) > 1e-6]
+    check('tracking, a still opponent at 45 (2x startup): the burst stretched on frame 10, capped (%.2f more)'
+          % B.BURST_SPEED, ([f for f, _v in extra], [round(v, 3) for _f, v in extra], g.sit_set),
+          ([10.0], [round(B.BURST_SPEED, 3)], []))
     # within range, flying away fast: k capped, only on the burst's first 3 frames, %.1f at most
     _vm, g, out = startup_sim(path, {3: [-40.0, 0.0, 30.0, hit]}, slot_v={3: 6.0})
     extra = [(f, v) for f, var, v in g.moves if var == 0x0F000004 and abs(v) > 1e-6]
@@ -337,7 +343,7 @@ def msc_v12_tests(path):
     check('tracking, an opponent flying away (4.2 a frame): a little more way (0 < %.2f < %.1f)' % (more, most),
           0.0 < more < most - 0.1, True)
     # up: he leaves the ground on the burst's first frame and rises, never steeper than 60 degrees
-    # (within 20 at the start, it is within 40 too: the startup at 2x, its one tracking frame 10)
+    # (within range at the start: the startup at 2x, its one tracking frame 10)
     for name, slot in (('50 degrees up', [10.0, 12.0, 30.0, hit, 2]), ('59 degrees up', [12.5, 16.0, 30.0, hit, 2])):
         _vm, g, out = startup_sim(path, {4: slot})
         ups = [(f, v) for f, var, v in g.moves if var == 0x0F000005 and v > 1e-6]
@@ -372,11 +378,11 @@ def msc_v12_tests(path):
     ups = [f for f, var, v in g.moves if var == 0x0F000005 and v > 1e-6]
     check('startup at 2x with an opponent in front and up: tracked on the one first-burst frame it plays (10) and he'
           ' rises', (g.sit_set[:1], ups, out[6][2] > 1.0), ([10.0], [10.0], True))
-    # the startup at 2x: an opponent in hitstun within 40 (in front, within 60 degrees: its own range, not 20)
-    for name, slots, fast in (('within 40', {2: [30.0, 0.0, 20.0, hit]}, True),
-                              ('at 45', {2: [45.0, 0.0, 20.0, hit]}, False),
-                              ('within 40 but behind', {2: [-30.0, 0.0, 20.0, hit]}, False),
-                              ('within 40, not in hitstun', {2: [30.0, 0.0, 0.0, 0x0]}, False)):
+    # the startup at 2x: an opponent in hitstun within 50 (in front, within 60 degrees: the tracking's range, v15)
+    for name, slots, fast in (('within 50', {2: [48.0, 0.0, 20.0, hit]}, True),
+                              ('at 52', {2: [52.0, 0.0, 20.0, hit]}, False),
+                              ('within 50 but behind', {2: [-30.0, 0.0, 20.0, hit]}, False),
+                              ('within 50, not in hitstun', {2: [30.0, 0.0, 0.0, 0x0]}, False)):
         _vm, g, out = startup_sim(path, slots)
         punch = next(i for i, (f, _x, _y, _r) in enumerate(out) if f >= B.PUNCH)
         check('startup %s: the punch (motion frame %d) on game frame %d' % (name, B.PUNCH, B.PUNCH // 2 if fast

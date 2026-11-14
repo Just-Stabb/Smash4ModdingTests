@@ -1170,3 +1170,33 @@ end in the air, then Fall (v13). Grounded hits are unchanged: `func_39` from 92.
 Not confirmed in game:
 - that `func_40`'s groups make `func_41` act from AttackDash (the direct fallback acts if they don't);
 - that the command flags are there on the frame (`global24`, the game's buffer).
+
+## Super God Fist v15 (`supamario_god_fist_v15.zip`): one range of 50 for the tracking and the 2x startup
+
+v15 goes over v14 and still uses exe B (`exe_v46i`). The user asked: "make the tracking and double startup range the
+same and increase them to 50".
+
+### One constant for both
+`HOMING_RANGE` = 50 is used for both the tracking and the 2x startup. Before, the tracking range was 35 (v14) and the
+startup's 40.
+- `TRACK_RANGE` and `COMBO_RANGE` are now both `HOMING_RANGE`.
+- The MSC's 2x check in `gf_init` now uses the tracking's own `gf_pick(GF_TRACK_D2)`, so the two can't drift apart.
+  `GF_COMBO_D2` is gone. Both use the same rules: in hitstun, in front, within 60 degrees.
+
+### What 50 means
+Without tracking, he catches an opponent about 37.5 from where he started: his way at the contact (26.0) plus the
+catch's 11.5.
+- **Still opponents beyond that (about 38-50):** the burst is now stretched toward them too, capped at 1.5x. A still
+  opponent within 50 at the start always gets the 2x startup, so it has one tracking frame (motion 10 -> 12). That is
+  +4.5 at most, a reach of about 42.
+- **Opponents that come into range after the start:** the startup stays 1x and they get the three frames, +6.8 at
+  most, a reach of about 44.3.
+- **Fleeing opponents:** they get the extra way sooner (their speed away from him counts, as in v13).
+- **Between about 44 and 50:** a still opponent is tracked (and aimed at) but not reached. The punch's own reach past
+  the catch point isn't counted here.
+
+### Tests
+`--all-models`: 0 problems.
+- **Out of range:** beyond 50 on the tracking frames.
+- **A still opponent at 45:** stretched on frame 10 by 4.53 (the cap).
+- **The 2x startup:** within 50 (48: 2x), and not at 52.

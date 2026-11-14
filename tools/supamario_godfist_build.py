@@ -98,10 +98,12 @@ TRACK_MAX = 1.5
 TRACK_DOWN = 3.0
 # v13 (user: "make the tracking only happen in the first few frames", "reduce the homing range to 20 units"): the
 # burst's first 3 frames (motion 9-11), an opponent within TRACK_RANGE; at most 3 x 0.5 x BURST_SPEED = 6.8 units more
-# (at the 2x startup one frame, motion 10 -> 12: 0.5 x 2 x BURST_SPEED = 4.5); COMBO_RANGE (the 2x startup) stays 40
+# (at the 2x startup one frame, motion 10 -> 12: 0.5 x 2 x BURST_SPEED = 4.5)
 TRACK_END = 12
-TRACK_RANGE = 35.0                      # v14 (user: "increase the tracking range to 35 units"; v13 20)
-COMBO_RANGE = 40.0
+# v15 (user: "make the tracking and double startup range the same and increase them to 50"): one range for both
+# (the MSC's GF_TRACK_D2: gf_pick's rules, in hitstun, in front, within 60 degrees); v14 35 / 40, v13 20 / 40
+HOMING_RANGE = 50.0
+TRACK_RANGE = COMBO_RANGE = HOMING_RANGE
 OFFSTAGE_GRAVITY = (-1.0, 0.0, 2)      # Gravity_Set: his own gravity (a rise slows), max fall 0, a fall cut at once
 SITUATION_VAR = 22                      # Input_Get's SITUATION (0 ground, 1 ledge, 2 air)
 PUNCH_SITUATION = NO_DOWN | 3
@@ -326,7 +328,7 @@ def msc_values():
             'GF_BURST_FROM': '%sf' % float(BURST[0]), 'GF_BURST_END': '%sf' % float(BURST[1]),
             'GF_BURST_SPEED': '%sf' % BURST_SPEED, 'GF_TRACK_MAX': '%sf' % TRACK_MAX,
             'GF_TRACK_DOWN': '%sf' % TRACK_DOWN, 'GF_TRACK_END': '%sf' % float(TRACK_END),
-            'GF_TRACK_D2': '%sf' % (TRACK_RANGE ** 2), 'GF_HOLD_X': '%sf' % HOLD_X, 'GF_COMBO_D2': '%sf' % (COMBO_RANGE ** 2)}
+            'GF_TRACK_D2': '%sf' % (TRACK_RANGE ** 2), 'GF_HOLD_X': '%sf' % HOLD_X}
 
 
 def burst_speed():
