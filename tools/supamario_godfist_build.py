@@ -143,10 +143,17 @@ D_CATCH_KINDS, D_SLOT, D_HOLD_FRAME, D_HOLD_ROT, D_STRIKE_KINDS, D_FLIGHT, D_WD_
 # along his facing frame by frame through the PUSH variable (the game moves it, its ground correction stops it at
 # a ledge), from SLIDE_V0 down by SLIDE_DECAY a frame: SLIDE_DIST in all, XV2 #96's 9.44 m at the flight's 3
 # units a metre
-FLY_N = GF_LAUNCH + 10                  # flight frames: the launch, then 10 easing down (k 1 .. FLY_N)
-EASE_N = FLY_N - GF_LAUNCH
+# v9 (user: "make it actionable after the flip Supamario does"): he acts from FLIP_END, the frame his flip lands
+# (the built motion: his feet back on the floor at 122, after the flip's lift #0 40-62 and its 4-frame ramp; the
+# build checks it). The victim's flight is in his game script, so it must be handed off before he can act: the
+# ease now starts at flight frame EASE_FROM (inside #179's launch: its last frames only drift back) and the hand-off
+# is the frame before FLIP_END
+FLIP_END = 122
+EASE_FROM = 14
+FLY_N = FLIP_END - STRIKE - 2           # 24: flight frames k 1 .. FLY_N (motion frames 97 .. 120)
+EASE_N = FLY_N - EASE_FROM              # 10
 DOWNFALL_K = FLY_N - 2
-HANDOFF = STRIKE + FLY_N + 1            # 125
+HANDOFF = STRIKE + FLY_N + 1            # 121
 DROP_Y = 0.3                            # the feet's height at the last flight frame (it lands at once)
 DAMAGE_FALL = 0x4C
 EASE_SPEED = 1.0                        # its travel a frame while easing down (units)
@@ -158,7 +165,7 @@ SLIDE_V0 = SLIDE_DIST * (1 - SLIDE_DECAY)       # the geometric series' first te
 LH_PUSH = 0x0F0000B7                    # target 2's PUSH (docs/position-variables.md: < 1000 = its energy 4's speed,
                                         # world X)
 SELF_FACING = 0x0F000003
-IASA = float(max(HANDOFF + 2, STRIKE + 40))   # 136: XV2's BCM callback window from #0 80 (= our 96 + 40)
+IASA = float(FLIP_END)                  # 122: the flip landed (v8: 136, XV2's BCM callback window from #0 80)
 ROOT_Z = [0.0] * anim.FRAMES             # his TransN z by motion frame (build() sets it from the animation)
 DOWN_HELD = (0x4D, 0x53)                # DownBound .. DownWait (0x53): still down; 0x57 DownDamage
 DOWN_DAMAGE, DOWN_WAIT, DOWN_WAIT2, DOWN_STAND = 0x57, 0x50, 0x51, 0x54
@@ -375,19 +382,19 @@ def flight_offset(k):
 
 
 def flight_v8(k):
-    """v8's flight frame k (1 .. FLY_N): XV2's launch (flight_offset, k <= GF_LAUNCH), then EASE_N frames down to
+    """v8's flight frame k (1 .. FLY_N): XV2's launch (flight_offset, k <= EASE_FROM), then EASE_N frames down to
     the ground: the spin on to the next whole backward turn (a cubic from the launch's turn rate to rest), the
     height eased (cosine) to DROP_Y, the travel at EASE_SPEED. -> (x in front of him, y, Rotation X)"""
-    if k <= GF_LAUNCH:
+    if k <= EASE_FROM:
         return flight_offset(k)
-    x0, y0, a0 = flight_offset(GF_LAUNCH)
-    rate = a0 - flight_offset(GF_LAUNCH - 1)[2]
-    a1 = 360.0 * math.floor(a0 / 360.0)                 # the next whole backward turn: -720
-    t = (k - GF_LAUNCH) / float(EASE_N)
+    x0, y0, a0 = flight_offset(EASE_FROM)
+    rate = a0 - flight_offset(EASE_FROM - 1)[2]
+    a1 = 360.0 * (math.floor(a0 / 360.0) - (1 if a0 - 360.0 * math.floor(a0 / 360.0) < 180 else 0))
+    t = (k - EASE_FROM) / float(EASE_N)
     h00, h10, h01 = 2 * t ** 3 - 3 * t ** 2 + 1, t ** 3 - 2 * t ** 2 + t, -2 * t ** 3 + 3 * t ** 2
     a = h00 * a0 + h10 * rate * EASE_N + h01 * a1
     y = DROP_Y + (y0 - DROP_Y) * 0.5 * (1 + math.cos(math.pi * t))
-    return x0 + EASE_SPEED * (k - GF_LAUNCH), y, a
+    return x0 + EASE_SPEED * (k - EASE_FROM), y, a
 
 
 # the victim's slide: XV2's CMN effects on it (BAC entry 3: CMN 160 at #96 20 and 42, CMN 120 at 62), at the
@@ -515,6 +522,7 @@ def game_script():
         f = HANDOFF + 2 + n
         if name in CMN_FX and f < anim.FRAMES:
             dx = SLIDE_V0 * (1 - SLIDE_DECAY ** n) / (1 - SLIDE_DECAY)
+            dx -= ROOT_Z[min(f, len(ROOT_Z) - 1)] - ROOT_Z[HANDOFF]      # less his own travel since the hand-off
             s += [cmd('frame', float(f))] + if_(GF_VAR, 0, 2, [
                 gfx('graphic_effect', CMN_FX[name], 0, 0.0, 0.0, float(x + dx), CMN_SIZE)])
     return s
@@ -779,6 +787,11 @@ def skill_effects(skill_dir, p, e, dst):
     return made
 
 
+def omo_world_y(o, bones, name, f):
+    import omo
+    return omo.world(o, bones, f)[name][1][3]
+
+
 def build(sm_dir, out_dir, ean_path, cmn_dir=None, png=None, skill_dir=None, cmn_se=None, table=None):
     fdir = os.path.join(out_dir, 'fighter', 'supamario')
     mo = os.path.join(fdir, 'motion', 'body')
@@ -790,6 +803,11 @@ def build(sm_dir, out_dir, ean_path, cmn_dir=None, png=None, skill_dir=None, cmn
         import supamario_godfist_render
         supamario_godfist_render.sheet(out['main'], bones, png, anim.SHEET)
     fist = 'RHandN'                     # bone FIST (0x14)
+    feet = [h for n_, _p, h in bones if n_ in ('LFootJ', 'RFootJ')]
+    assert len(feet) == 2
+    land = next(f for f in range(STRIKE + 5, out['main'].frames)
+                if max(omo_world_y(out['main'], bones, n_, f) for n_ in ('LFootJ', 'RFootJ')) < 1.7)
+    assert land == FLIP_END, ('the flip lands at %d, FLIP_END %d' % (land, FLIP_END))
     FIST_AT.clear()
     for f in range(out['main'].frames):
         FIST_AT[f] = anim.joint_offset(out['main'], bones, fist, f)

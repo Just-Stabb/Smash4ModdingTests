@@ -2,14 +2,15 @@
 """Tests Kirby's Hero copy fix v6 (the sword swung on the stone): the executable's motion table, the animations, the
 sword hitboxes against Hero's blade, and the held sword's update run natively with Kirby in the new motions.
 
-  python3 tools/kirby_hero_sword_swing_test.py NEW.rpx OLD.rpx MAIN.pac KIRBY_MAIN.pac KIRBY_VBN ULT_BRAVE
+  python3 tools/kirby_hero_sword_swing_test.py NEW.rpx OLD.rpx MAIN.pac KIRBY_MAIN.pac KIRBY_VBN ULT_BRAVE [EFFECT.bin MTABLE]
       (exe_v46i, exe_v46h, the built motion/body/main.pac, Kirby's own main.pac and body/c00/model.vbn, Ultimate's
        fighter/brave: motion/body/c00/d03speciallwskill1-3.nuanmb and model/body/c00/model.nusktb)
 
 - The executable: Kirby's motion table (0x103850A4, 8 bytes a motion) gives slots 0x304-0x307 the animations'
   hashes and SpecialLw's flags; they were empty (0) in OLD; no other word differs from OLD.
 - The pack: the four animations under their names (the table's hashes), every other entry byte for byte Kirby's own.
-- Each animation, decoded and posed (Kirby's skeleton, bind for the bones it lacks): khm_sw_end + 1 frames (one a
+- Each animation, decoded and posed as the game draws it (Kirby's skeleton, bind for the bones it lacks, the root's
+  translation left out, the held item turned by kirby_hero_sword_anim.ITEM_TO_HAVE: fix v7, tools/kirby_hero_sword_clip.py): khm_sw_end + 1 frames (one a
   cast frame); every bone but LHaveN constant at SpecialLw1's last frame; LHaveN's model-space matrix at cast frame g
   = the sword model's frame on Hero (Sword1 @ inv(S2H), kirby_copy_sword.sword_to_have) at Ultimate frame mf(g) - 1 (the scripts' FT_MOTION_RATE clock; recomputed here from the
   Ultimate files and the reference scripts, independently of tools/kirby_hero_sword_anim.py's own numbers), the
@@ -17,6 +18,9 @@ sword hitboxes against Hero's blade, and the held sword's update run natively wi
 - The hitboxes the MSC makes (tools/kirby_hero_sword_msc.py's events, as kirby.c's generated block): every sword
   hitbox (bone 0x18) at its frame sits where Hero's sits on his blade (Hero's Sword1 at that frame x the script's
   offset, the path's scale) and inside the blade's reach; every arm hitbox where Hero's ArmR is.
+- Fix v7, with EFFECT.bin / MTABLE (tools/kirby_hero_sword_acmd.py's output): each slot named BraveSword17-20 in the
+  motion.mtable, its effect script's Sword_Glow / Terminate_Sword_Glow at Hero's frames (cast frames), his textures /
+  shader, and both trail points on Hero's blade at that frame.
 - Native (kirby_hero_sword_vis_test.World on NEW): with Kirby in each spell's motion in the stone, the update draws
   the sword while the sword int is 1 and hides it after (the motion kinds aren't the Marth / Sonic ones).
 """
@@ -86,6 +90,7 @@ def main():
     ev = SW.events(ref)
     skel = KM.ult_skeleton(os.path.join(ult, 'model/body/c00/model.nusktb'))
     have_h = next(h for n, _p, h, _b in sk if n == A.KIRBY_HAVE)
+    mfs_all = {}
     for n in sorted(A.SLOT):
         o = omo.Omo(pac[names[n] + '.omo'])
         end = ev[n]['end']
@@ -98,6 +103,7 @@ def main():
         for g in range(end + 1):
             mfs.append(mf)
             mf += 1.0 / ([d for f, d in rates if f <= mf + 1e-6] or [1.0])[-1]
+        mfs_all[n] = mfs
         consts = []
         for node in o.nodes:
             if node[1] == have_h:
@@ -111,12 +117,12 @@ def main():
         hb_bad, arm_bad = [], []
         lhw = []
         for g in range(o.frames):
-            got_m = A.fk_lhaven(o, sk, g)
+            got_m = A.fk_lhaven(o, sk, g) @ A.ITEM_TO_HAVE      # fix v7: the item as the game draws it
             idx = min(max(mfs[g] - 1.0, 0.0), frames - 1.0)
             H = np.array(mat_at(w['grip'], idx))
             H[:3, 3] *= scale
             worst = max(worst, float(np.abs(got_m - H)[:3].max()))
-            lhw.append(got_m)
+            lhw.append(A.fk_lhaven(o, sk, g))                   # the joint (hitboxes are joint-local)
         for sit in ('ground', 'air'):
             for f, k, v in ev[n][sit]:
                 if k != 'hitbox' or v[2] != SW.K_SWORD:
@@ -131,7 +137,7 @@ def main():
                     hero = S1 @ np.array([hero_cmd['X'], hero_cmd['Y'], hero_cmd['Z'], 1.0])
                     hero = hero * scale                                       # Hero's point, the path's scale
                     hero[3] = 1.0
-                    local = np.linalg.inv(lhw[f]) @ ours
+                    local = np.linalg.inv(A.ITEM_TO_HAVE) @ np.linalg.inv(lhw[f]) @ ours      # in the item's frame
                     inside = (A.BLADE[0] * scale - v[8] <= local[1] <= A.BLADE[1] * scale + v[8]
                               and np.hypot(local[0], local[2]) <= 3.0 * scale + v[8])
                     if np.abs(ours - hero)[:3].max() > 0.05 or not inside:
@@ -147,6 +153,50 @@ def main():
               % (names[n], A.SPELLS[n], scale, worst), worst < 0.05, True)
         check('%s: every sword hitbox where Hero\'s is on his blade, inside the blade\'s reach' % names[n], hb_bad, [])
         check('%s: the arm hitbox where Hero\'s forearm (ArmR) is' % names[n], arm_bad, [])
+    # fix v7: the trail scripts (tools/kirby_hero_sword_acmd.py), when the built effect.bin / motion.mtable are given
+    if len(sys.argv) > 8:
+        import acmd
+        import struct
+        import kirby_hero_sword_acmd as T
+        eff = acmd.ACMDFile.load(sys.argv[7])
+        mt = open(sys.argv[8], 'rb').read()
+        table = struct.unpack('>%dI' % (len(mt) // 4), mt)
+        for n in sorted(A.SLOT):
+            o = omo.Omo(pac[names[n] + '.omo'])
+            tr, frames = KM.tracks(os.path.join(ult, 'motion/body/c00/%s.nuanmb' % A.SPELLS[n]))
+            w = KM.ult_world(skel, tr, frames)
+            at = SW.timing(ref[(n, 'ground', 'game')])
+            sc = acmd.ACMDFile.load(sys.argv[7]).script(T.name(n)) or []
+            t, glows, ends_ = 0.0, [], []
+            for c in sc:
+                if c.name == 'FRAME':
+                    t = float(c.params[0])
+                elif c.name == 'Sword_Glow':
+                    glows.append((t, dict(zip(acmd.INFO[c.ident]['syntax'], c.params))))
+                elif c.name == 'Terminate_Sword_Glow':
+                    ends_.append((t, c.params[0]))
+            hero = [(at(mf), a) for mf, nm, a in ref[(n, 'ground', 'effect')] if nm == 'Sword_Glow']
+            hero_end = [(at(mf), a['FadeTime']) for mf, nm, a in ref[(n, 'ground', 'effect')] if nm == 'Terminate_Sword_Glow']
+            bad = []
+            for (f, a), (hf, ha) in zip(glows, hero):
+                idx = min(max(mfs_all[n][int(f)] - 1.0, 0.0), frames - 1.0)
+                J = A.fk_lhaven(o, sk, int(f))
+                S1 = np.array(mat_at(w['Sword1'], idx))
+                for k1, k2 in (('X1', 'Y1'), ('X2', 'Y2')):
+                    ours = J @ np.array([a[k1], a[k2], a[k1.replace('X', 'Z')], 1.0])
+                    hp = S1 @ np.array([ha[k1], ha[k2], ha[k1.replace('X', 'Z')], 1.0]) * scale
+                    hp[3] = 1.0
+                    if np.abs(ours - hp)[:3].max() > 0.05:
+                        bad.append((k1, np.round(ours[:3], 2).tolist(), np.round(hp[:3], 2).tolist()))
+                if (f, a['Texture1'], a['Texture2'], a['Shader'], a['Bone1']) != (hf, ha['Texture1'], ha['Texture2'],
+                                                                                  ha['Shader'], SW.K_SWORD):
+                    bad.append(('params', f, hf))
+            check('%s: motion.mtable 0x%X = %s; its effect script\'s trail (Hero\'s textures 0x%X / 0x%X, shader %d) from '
+                  'cast frame %s to %s, both ends on Hero\'s blade at that frame'
+                  % (T.name(n), A.SLOT[n], T.name(n), hero[0][1]['Texture1'], hero[0][1]['Texture2'],
+                     hero[0][1]['Shader'], [x[0] for x in glows], ends_),
+                  (table[A.SLOT[n]] == acmd.crc(T.name(n)), len(glows) == len(hero), ends_ == hero_end, bad),
+                  (True, True, True, []))
     # native: the held sword's update with Kirby in the spells' motions
     import kirby_hero_sword_vis_test as V
     wd = V.World(new_rpx)

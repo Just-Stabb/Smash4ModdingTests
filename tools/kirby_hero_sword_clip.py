@@ -84,6 +84,8 @@ def main():
     ap.add_argument('vbn')
     ap.add_argument('--frames')
     ap.add_argument('--out')
+    ap.add_argument('--ult', help='Ultimate fighter/brave: also draw, per spell, Hero\'s own blade (the Ultimate files) '
+                    'against fix v6\'s and fix v7\'s as the game draws them, every 4th cast frame')
     a = ap.parse_args()
     sk = KM.s4_skeleton(a.vbn)
     o6 = omo.Omo(dict(omo.pac_read(a.v6_pac))[A.NAME % 17 + '.omo'])
@@ -139,8 +141,50 @@ def main():
             sheet.paste(t, ((i % 2) * 800, (i // 2) * 480))
         sheet.save(os.path.join(a.out, 'clip_v6_vs_model.png'))
         print(os.path.join(a.out, 'clip_v6_vs_model.png'))
+    if a.ult and a.out:
+        compare(a, sk)
     print('%d failures' % len(FAIL))
     sys.exit(1 if FAIL else 0)
+
+
+def compare(a, sk):
+    """side views (forward right, up), per spell: white Hero's blade from Ultimate's files (his Sword1, the scripts'
+    FT_MOTION_RATE clock), yellow fix v6's and green fix v7's as the game draws them; every 4th cast frame"""
+    from PIL import Image, ImageDraw
+    import kirby_hero_sword_msc as SW
+    ref = SW.parse()
+    p6, p7 = dict(omo.pac_read(a.v6_pac)), dict(omo.pac_read(a.v7_pac))
+    skel = KM.ult_skeleton(os.path.join(a.ult, 'model/body/c00/model.nusktb'))
+    for n in sorted(A.SLOT):
+        o6, o7 = omo.Omo(p6[A.NAME % (n - 0x11 + 17) + '.omo']), omo.Omo(p7[A.NAME % (n - 0x11 + 17) + '.omo'])
+        w, frames = A.hero_paths(a.ult, A.SPELLS[n])
+        mfs = A.motion_frames(n, ref)
+        gs = list(range(0, len(mfs), 4))
+        cols = 7
+        rows = (len(gs) + cols - 1) // cols
+        T = 200
+        img = Image.new('RGB', (cols * T, rows * T + 24), (24, 24, 32))
+        d = ImageDraw.Draw(img)
+        d.text((6, 4), '%s: white Hero (Ultimate), yellow fix v6 as drawn, green fix v7 as drawn; box = the stone'
+               % A.NAME % (n - 0x11 + 17), fill=(255, 255, 255))
+        for i, g in enumerate(gs):
+            ox, oy = (i % cols) * T, 24 + (i // cols) * T
+            k = 6.0
+
+            def px(z, y):
+                return (ox + T / 2 + z * k, oy + T - 20 - y * k)
+            d.rectangle([px(-6, 8), px(6, 0)], outline=(110, 90, 70))
+            d.line([px(-16, 0), px(16, 0)], fill=(90, 90, 90))
+            idx = min(max(mfs[g] - 1.0, 0.0), frames - 1.0)
+            hero = A.at_index(w[A.GRIP], idx)
+            for col, m, width in (((255, 255, 255), hero, 5), ((255, 220, 0), drawn(o6, sk, g, False, A.ITEM_TO_HAVE), 2),
+                                  ((60, 255, 90), drawn(o7, sk, g, False, A.ITEM_TO_HAVE), 2)):
+                pp, tt = ends(np.array(m))
+                d.line([px(*pp), px(*tt)], fill=col, width=width)
+            d.text((ox + 4, oy + 2), 'cast %d' % g, fill=(200, 200, 200))
+        f = os.path.join(a.out, 'hero_v6_v7_%d.png' % (n - 0x11 + 17))
+        img.save(f)
+        print(f)
 
 
 if __name__ == '__main__':

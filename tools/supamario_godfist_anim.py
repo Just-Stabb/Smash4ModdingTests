@@ -24,7 +24,7 @@ too) onto Mario's skeleton. The timeline (frames at 60 a second, XV2's too):
            TimeScale: 50 frames, the fist held in the victim), the God Fist hit at #0 40 (GF_STRIKE = 96), then
            #0 40-111 at its speed (the flip away 40-60, the stance by 111)
   TransN   #1's dash (b_C_Base) x the body scale up to the contact, x0.3 after (a whiff slides 28 in all, as vanilla
-           Mario's dash attack); #0's travel (2.5 m forward, mostly in the flip) x0.5
+           Mario's dash attack); #0's travel (2.5 m forward, mostly in the flip) x0.5; all x TRAVEL (v9: 1.6)
   RotN     the pelvis' height changes (XV2 crouches, leaps and flips), then the lower foot put on the floor on
            every frame (XV2 fights in the air: its dash leaps and its hold hangs), except over the flip (#0 40-62:
            lifted only where the head, hands, knees or feet would go into the floor)
@@ -55,6 +55,9 @@ GODFIST_END_SRC = 111
 FRAMES = GF_STRIKE + (GODFIST_END_SRC - HOLD_SRC) + 1                          # 168
 WHIFF_ROOT = 0.3                      # the dash past the contact (whiff)
 GODFIST_ROOT = 0.5                    # #0's own travel
+TRAVEL = 1.6                          # v9 (user: "move Supamario about 1.6x further"): all of his travel (TransN) x this,
+                                      # the timing kept. AttackDash's ground correction is 2 (cliff stop, func_245's
+                                      # StatusModule(5, 0, 0xF, 2, ...)): he still stops at a ledge as the vanilla one
 # the lowest the joints may go (units above the floor; Mario's foot joint is 1.56 up when standing)
 FLOOR = {'HeadN': 3.0, 'LHandN': 1.0, 'RHandN': 1.0, 'LFootJ': 1.3, 'RFootJ': 1.3, 'LToeN': 0.4, 'RToeN': 0.4,
          'LKneeJ': 1.5, 'RKneeJ': 1.5}
@@ -86,11 +89,11 @@ def root_z(ean, f):
     if a == PUNCH_ANIM:
         b = _pelvis_and_base(ean, punch, sf)[1][2]
         if sf <= CONTACT:
-            return (b - b0) * SCALE
-        return (bc - b0) * SCALE + (b - bc) * SCALE * WHIFF_ROOT
+            return (b - b0) * SCALE * TRAVEL
+        return ((bc - b0) * SCALE + (b - bc) * SCALE * WHIFF_ROOT) * TRAVEL
     gf = ean.animations[GODFIST_ANIM]
     g0 = _pelvis_and_base(ean, gf, 0)[1][2]
-    return (bc - b0) * SCALE + (_pelvis_and_base(ean, gf, sf)[1][2] - g0) * SCALE * GODFIST_ROOT
+    return ((bc - b0) * SCALE + (_pelvis_and_base(ean, gf, sf)[1][2] - g0) * SCALE * GODFIST_ROOT) * TRAVEL
 
 
 def body_frames(ean, smash):
