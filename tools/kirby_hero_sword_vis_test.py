@@ -38,6 +38,7 @@ sys.path.insert(0, HERE)
 from kind_expand_test import Emu, REGS, STACK, RET  # noqa: E402
 from unicorn.ppc_const import UC_PPC_REG_MSR, UC_PPC_REG_1, UC_PPC_REG_LR  # noqa: E402
 import kirby_hero_sword_cave as C  # noqa: E402
+from kirby_copy_new_test import Img  # noqa: E402
 
 UPDATE, INIT = 0x02B02534, 0x02B02078
 LINK_CALL = 0x02B61FB8
@@ -234,10 +235,11 @@ def run(path, expect_fixed):
     if w.frame(status=0x20B, motion=0x316, sword=0, kind=0x22, kirby_vis=0)[0] != 0:
         bad.append('sonic start shown with Kirby hidden')
     w.reset()
-    if w.frame(status=0x175, motion=0x2ED, sword=1, kind=0x12, kirby_vis=0)[0] != (1 if expect_fixed else 0):
-        bad.append('stone check for another kind changed')
+    if w.frame(status=0x175, motion=0x2ED, sword=1, kind=0x12, kirby_vis=0)[0] != 0:
+        bad.append('another copy\'s held model shown on the stone')
     check('%s: unchanged: the Marth sword in its aerials / Shield Breaker and hidden in Wait; the Sonic sphere in the '
-          'spin motions with Kirby hidden, hidden in its start' % name, bad, [])
+          'spin motions with Kirby hidden, hidden in its start; another copy\'s held model (Marth\'s) never shown on the '
+          'stone, int 0x1000008B 1 or not' % name, bad, [])
     # the init's joint and link flags
     got = {hex(k): w.init(k) for k in (0x2C, 0x12, 0x25, 0x1D, 0x22, 0x2F)}
     want = {'0x2c': (0x18, 0x108) if expect_fixed else (0x19, 8), '0x12': (0x18, 0x108), '0x25': (0x18, 0x108),
@@ -251,9 +253,9 @@ def main():
     new = sys.argv[1]
     old = sys.argv[2] if len(sys.argv) > 2 else None
     _a, out = C.build()
-    w = World(new)
-    check('%s: every fix v5 word in place' % os.path.basename(new),
-          [hex(k) for k, v in sorted(out.items()) if w.e.w(k) != v and not (C.PS_FREE(k))], [])
+    img = Img(new)
+    check('%s: every word of kirby_hero_sword_cave.py (fix v5 included) in place' % os.path.basename(new),
+          [hex(k) for k, v in sorted(out.items()) if img.w(k) != v], [])
     run(new, True)
     if old:
         run(old, False)

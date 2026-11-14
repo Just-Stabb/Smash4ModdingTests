@@ -49,7 +49,10 @@ both in the held article's own native code (fighters/kirby/specials.md "Hero cop
   flag (v6) was ANDed with Kirby's 0 every frame. The stone show path now goes to STONE_SHOW: the show path's own
   preamble (0x02BF0594 the owner's motion frame, the item's MotionModule vt +0x2F4), then the Sonic branch 0x02B02794
   with r7 = [r30+0x68] (the LinkModule), r10 = its vtable + 0x3C0, which clears link 3's attribute 7 and shows the
-  item. The hide path is unchanged: its motion check sets the attribute again (0x02B02824).
+  item. The hide path is unchanged: its motion check sets the attribute again (0x02B02824). The stone check now also
+  requires the article's copy kind (r31, its int 0x10000007) to be 0x2C: Kirby's int 0x1000008B is a copy int whose
+  native users (e.g. 0x02F02208) store other things there, and with the parent's visibility out of the way a 1 there
+  would have shown another copy's held model on the stone.
 - JOINT: the article's init 0x02B02078 picks the joint and the link's constraint flags by the copy kind (its int
   0x10000007, Kirby's 0x100000A4): the Robin kind 0x2C (dead in vanilla: 0x2C never had a held article) goes to
   0x02B02248, joint 0x19 (Kirby's RHaveN: model.jtb table 0 entry 0x18) and flags 8. The sword model and the sword
@@ -108,7 +111,8 @@ def source(lab44, stone_show):
             'lis r12, 0x%04X' % (GEN_ARTICLE >> 16), 'ori r12, r12, 0x%04X' % (GEN_ARTICLE & 0xFFFF), 'mtlr r12', 'blr',
             'gs_cmp:', 'cmplwi r27, 0x22', 'blr']
     # 3. the stone statuses (r27 = Kirby's module accessor, r30 = the held article's)
-    src += ['held_stone:', 'lwz r3, 0x20(r27)', 'lwz r12, 0(r3)', 'lwz r12, 0x8C(r12)', 'mtctr r12', 'bctrl']
+    src += ['held_stone:', 'cmplwi r31, 0x%X' % ROBIN, 'bne hs_hide',     # fix v5: the Hero copy's article only (r31 its
+            'lwz r3, 0x20(r27)',                                     #   copy kind, int 0x10000007) 'lwz r12, 0(r3)', 'lwz r12, 0x8C(r12)', 'mtctr r12', 'bctrl']
     for i, st in enumerate(STONE):
         src += ['cmplwi r3, 0x%X' % st, 'beq hs_chk']
     src += ['b hs_hide', 'hs_chk:', 'lwz r3, 0x28(r27)', 'lwz r12, 0(r3)', 'lwz r12, 0x84(r12)',
