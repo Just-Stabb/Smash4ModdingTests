@@ -254,8 +254,15 @@ SKILL_SCALE = 1.75
 # turned back to XV2's way (its front, its apex, leading along his facing, its swirl and wind trailing back over the
 # fist and forearm, as XV2's follows the punching hand) but its origin MODEL_AHEAD past the fist tip, so the bright
 # cone sits on the fist and forearm, not on his body (v6's complaint)
-MODEL_AHEAD = 6.0
-PTCL_AHEAD = {'Crg': 1.0, 'Circle': 1.5, 'Bas': 1.5, 'Drop': 1.5}
+# v9 (user, v8's screenshot: "move the effect back very slightly so that the orb overlaps Supamario's fist"): the
+# orb is the model's BasC mesh (its bright core at the cone's front, model z -0.75 .. -1, 1.6 - 4.5 units across over
+# its 37 frames; the Wind meshes are the faint swirl). The screenshot (facing left, his glove ~1.6 units wide) has
+# its centre ~1.8 units (a glove width, a little foreshortened) ahead of the glove's centre: the model goes back
+# MODEL_BACK (6 -> 3.5 past the fist tip), and the rings spawned with it (Csg_Circle) with it, so they stay round
+# the orb (1.5 -> -1.0: on the fist). The charge (Crg, before the punch) and the burst (Bas / Drop) stay as v8's
+MODEL_BACK = 2.5
+MODEL_AHEAD = 6.0 - MODEL_BACK
+PTCL_AHEAD = {'Crg': 1.0, 'Circle': 1.5 - MODEL_BACK, 'Bas': 1.5, 'Drop': 1.5}
 MODEL_ROT = (0.0, 180.0, 0.0)           # its front (XV2's -Z, the apex) along his facing, the trail back
 FIST_AT = {}                            # motion frame -> his right fist (in front of him, up) (build() fills it)
 

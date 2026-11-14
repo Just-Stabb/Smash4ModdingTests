@@ -1132,6 +1132,14 @@ bit (32 - SH): `0x0320E670` is 0x10, `0x0320E698` 0x40 (a model), `0x0320E6AC` 0
 - `Extended_Special_Hitbox` (`0x02BDD46C`) goes through AttackModule's MSC handler (op `0x272C`,
   like `0x272B`): that case calls vtable `+0x39C` (`0x02C0D210`), which builds the data and calls
   set_attack too. So every hitbox kind reaches set_attack.
+- **Ground/Air bit 31: misses fighters lying down** (Supamario's God Fist v9). The hitbox's Ground/Air
+  (situation) parameter keeps its low byte at attack data `+0x40`; bit 31 (`0x80000000`) sets the byte
+  `+0x56` to 1: the ACMD Hitbox handler (`0x02BDB214`, its parameter 21) and the MSC builder every
+  `0x272B` / `0x272C` hitbox goes through (`0x02C0A96C` from `0x02C0AA64`, at `0x02C0AA04`: MSC argument 22,
+  the parameter + 1). The collision set-up (`0x02C0E77C`, at `0x02C0E7CC`) then gives the hitbox the target
+  class mask 1 instead of 3 (the class 2 bit off) in its packed collision word. Vanilla: Diddy Kong's dash
+  attack's multi-hits (`0x80000003`); the community sheet's Hitbox tab: "the hitbox won't hit against downed
+  opponent". Which statuses count as lying (the hurt side's class 2) is not traced here.
 - **Hitstop:** `0x02C26724(f1 damage, f2 0.3846154, f3 5, f4 multiplier, f5 30)` =
   floor(min((damage × 0.3846154 + 5) × multiplier, 30)). `0x02C2678C(r3, r4 hitbox data, f1
   damage, f2 multiplier, r5 side, r6 use the hitbox's multiplier)` multiplies by the data's `+0x34`

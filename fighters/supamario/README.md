@@ -782,11 +782,13 @@ failures. `msc_fingerprint` v7 vs v8: `func_2320` (GF_IASA) and `func_2322` (gf_
 Approximated: whether the game moves a downed fighter by its energy 4 every frame as it does a shielding one (the
 PUSH's test 154); the slide's real length if a ledge stops it.
 
-## Super God Fist v9 (`supamario_god_fist_v9.zip`): 1.6x travel, a shorter hold, acting after the flip
+## Super God Fist v9 (`supamario_god_fist_v9.zip`): 1.6x travel, a shorter hold, acting after the flip, no hitting downed fighters, the orb on the fist
 
 Install over v8, exe B (`exe_v46i`, no change). User: "please make Super God Fist move Supamario about 1.6x
 further", "and make it actionable after the flip Supamario does", then (replacing a spin speed-up asked in
-between, which is not in v9) "not the spinning part, the hold on the fist should be reduced".
+between, which is not in v9) "not the spinning part, the hold on the fist should be reduced"; then "make it so
+Super God Fist can't hit an opponent who is knocked down" and "move the effect back very slightly so that the orb
+overlaps Supamario's fist".
 
 ### Travel x1.6
 All of his own travel (TransN, `TRAVEL` in `supamario_godfist_anim.py`) is x1.6: the whiff now ends 44.4 forward
@@ -814,8 +816,33 @@ last frames only drift back) then the same 10-frame ease to the next whole backw
 MSC acts from GF_IASA as before (`func_39` in the AttackDash loop; the knockdown, slide and getup are gf_tick's from
 the hand-off on, whatever he does).
 
+### No hitting a fighter lying down
+User: "make it so Super God Fist can't hit an opponent who is knocked down". The punch's two hitboxes have
+Ground/Air `0x80000003` (v8: 3): bit 31 is Smash 4's own "misses a fighter lying down" flag (vanilla Diddy Kong's
+dash attack uses it; the community sheet's Hitbox tab documents it). Checked in the exe (`docs/native-notes.md`,
+"Ground/Air bit 31"): both the ACMD Hitbox handler and the MSC builder that Extra_Special_Hitbox goes through turn
+bit 31 into the attack data's `+0x56` byte, and the collision set-up then drops the lying class from the hitbox's
+target mask. So a fighter lying down (DownBound / DownWait / DownDamage ..., and a God Fist victim the MSC holds down)
+takes no damage and isn't caught: the move is a whiff. As a backup, the catch (frame 18) also checks the fighter it
+hit (LASTHIT_STATUS): a down status (0x4D DownBound .. 0x57 DownDamage, 0x5B DownFuraFura) means no catch. The strike
+keeps Ground/Air 3 (it only ever hits the caught fighter). Not traced: which statuses the game counts as lying
+(the hurt side); getups are invincible for most of their frames anyway.
+
+### The aura back on the fist
+User, a v8 screenshot: "please move the effect back very slightly so that the orb overlaps Supamario's fist". The
+orb is the model's BasC mesh. Its bright core is at the front of the cone (model z -0.75 to -1), and it is 1.6 to
+4.5 units across over its 37 frames; the Wind meshes are the faint swirl. In the screenshot (facing left) its centre
+is about a glove's width (~1.8 units) ahead of the glove's centre. The model goes back 2.5 units (its origin 3.5 past
+the fist tip, v8 6), and so do the rings spawned with it (Csg_Circle: 1.5 -> -1.0, so they stay round the orb, on
+the fist). Size (x1.75), the Y 180 turn and the facing-safe emitters are as v8's. The charge (Crg, before the punch)
+and the burst (Bas / Drop) stay where they were. Approximated: the 1.8 units are read off one screenshot, and the
+camera's angle foreshortens it. The effect follows bone 0 at the fist's spawn-frame place, not the hand, so the
+overlap changes a little as the fist moves.
+
 ### Tests
-`supamario_godfist_test.py --all-models`: 0 problems (normal and diag). `msc_stack_check`: 0 of 2323.
-`msc_fingerprint` v8 vs v9: only `func_2320` (GF_IASA 136 -> 92). Effects (ptcl) and the sound bank are byte for
-byte v8's. Approximated: the 42-frame contact-to-launch read from the clip by eye (+-2 frames); the hold's lean
-(XV2 #179 0-40) is played twice as fast with the hold.
+`supamario_godfist_test.py --all-models`: 0 problems (normal and diag). New checks: the punch's Ground/Air; a fighter
+lying in DownWait / DownBound / DownStand / DownDamage isn't hit or caught (a whiff); the same with the game ignoring
+the flag: hit, but not caught (the status backup); a God Fist on its own downed victim misses. `msc_stack_check`:
+0 of 2323. `msc_fingerprint` v8 vs v9: only `func_2320` (GF_IASA 136 -> 92). The sound bank is byte for byte v8's.
+Approximated: the 42 frames from contact to launch are read off the clip by eye (+-2 frames); the hold's lean
+(XV2 #179 0-40) plays twice as fast to match the shorter hold.
