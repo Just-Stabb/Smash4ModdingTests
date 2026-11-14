@@ -1187,7 +1187,7 @@ Package `link_samus_v1`.
 ## Added: Hero / Sephiroth copies (hats, motions, Frizz / Flare) — `kirby_hero_sephiroth_copy_v1`
 
 User: "Please give Kirby his hats for Hero and Sephiroth and add their copy abilities." Traits: Hero Shooter,
-Sephiroth Technical (already in `kirby_copy_trait`; `kirby_trait_update` now asks it with the copied fighter's own kind,
+Sephiroth Technical at first; swapped later at the user's request (Sephiroth Shooter, Hero Technical; docs/character-traits.md) (already in `kirby_copy_trait`; `kirby_trait_update` now asks it with the copied fighter's own kind,
 `newcopy_real_kind()`).
 
 ### Ultimate data used (the user's `kirby-ssbu-partial.zip`, `lua2cpp_decomp.zip`)
