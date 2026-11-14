@@ -160,6 +160,7 @@ def msc_tests(path):
 # ---------------------------------------------------------------- ACMD
 VAR_IDS = {v for _n, v, _s in B.VARS}
 WAIT_STATUS = 0x0
+FALL = 0x1A                    # (any status out of the down ones)
 DAMAGE_STATUSES = (0x45, 0x47)
 
 
@@ -204,6 +205,8 @@ class Victim:
             self.hitstun -= 1
             if self.hitstun <= 0:
                 self.status = WAIT_STATUS     # its hitstun over (the game: Wait, Fall...): the rotation stays
+        if self.status in (0x50, 0x51) and self.ground == 5 and self.situation != 0 and self.never_lands:
+            self.status = FALL            # DownWait in the air: its status falls
         if self.ground == 5 and self.situation != 0 and not self.never_lands:
             self.fall += 1
             if self.fall >= 2:
@@ -243,7 +246,9 @@ class Acmd:
     #   (docs/native-notes.md; not what the v3 clip shows: the strike on the punch's Part 0 connected); not BLOCK:
     #   the record holds while the Part's hitboxes are out, a new hitbox after Remove_All_Hitboxes starts a new one
     # T2_THREAD: target 2 (the last fighter hit) found from a thread
-    DEFER, BLOCK, T2_THREAD = True, False, True
+    # THREADS: a Thread_Start'ed block runs (v4's clip: nothing its flight thread did reached the victim; the
+    #   unicorn tests run the cave's threads on a weapon, never in game: False is the in-game observation)
+    DEFER, BLOCK, T2_THREAD, THREADS = True, False, True, False
 
     def __init__(self, cmds, victim, slot2=True):
         self.cmds = cmds
@@ -348,7 +353,8 @@ class Acmd:
                 else:
                     r.loops.pop()
             elif n == 'Thread_Start':
-                self.new_threads.append((p[1], Runner(self.cmds, r.k, True)))
+                if self.THREADS:
+                    self.new_threads.append((p[1], Runner(self.cmds, r.k, True)))
                 self.jump(r, k, p[0])
             elif n == 'Thread_Stop':
                 self.threads.pop(p[0], None)
@@ -433,6 +439,51 @@ class Acmd:
             self.vars[var] = val
 
 
+class MscTick:
+    """the compiled gf_tick (the MSC's per-frame hook calls it every frame, every status), run on the game
+    script's New_Vars (a.vars) and the victim / his status through the variables it reads and writes"""
+    PATH = None
+
+    def __init__(self, a):
+        self.a = a
+        self.vm = R.VM(self.PATH)
+        self.vm.game = self
+        self.fn = self.vm.func(len(self.vm.m.scripts) - 1)     # gf_tick: the last function
+
+    def var(self, i):
+        a, v = self.a, self.a.v
+        if i == 0x0F0000A2:
+            return float(a.my_status)
+        tq = a.slot_var(i)
+        if tq and tq[0] - 2 == v.slot and tq[1] == 8 + 2:
+            return float(v.status)
+        return a.getvar(i)
+
+    def sys(self, sid, args):
+        a, v = self.a, self.a.v
+        if sid == 0x17 and len(args) == 2 and args[0] == 0:
+            return R.f2i(self.var(args[1]))
+        if sid == 0x16 and len(args) == 2 and args[0] == 6:
+            return int(self.var(args[1]))
+        if sid == 0x16 and len(args) == 3 and args[0] == 0:
+            val, i = R.i2f(args[1]), args[2]
+            tq = a.slot_var(i)
+            if tq and tq[0] - 2 == v.slot and tq[1] == 8 + 2:
+                v.pending = int(val)
+                v.log.append(('status', int(val)))
+            elif 0x0F000100 <= i < 0x0F000260 and (i - 0x0F000100) % 0x20 == 21:
+                if (i - 0x0F000100) // 0x20 - 2 == v.slot:
+                    v.input_off = val
+                    v.log.append(('input_off', val))
+            else:
+                a.setvar(i, val)
+            return 0
+        return 0
+
+    def tick(self):
+        self.vm.call(self.fn)
+
+
 def run_move(script, victim, hit=True, frames=400, second=None, interrupt=None, acm=None):
     """the move from frame 0, frame by frame as the game: the main script at his motion frame (frozen in his
     hitstop), the MSC's jump to JUMP_TO the frame after gf is 1, the threads (Flags 1: in hitlag too), then the
@@ -440,6 +491,7 @@ def run_move(script, victim, hit=True, frames=400, second=None, interrupt=None, 
     hit by the punch (False: a whiff); interrupt: (game frame, his new status) his status changes there (hit /
     grabbed / ...): the main script and hitboxes gone, the threads go on. -> (Acmd, per-frame records)"""
     a = acm or Acmd(script, victim)
+    msc = MscTick(a) if MscTick.PATH else None
     if not hit:
         victim.hittable = lambda f: False
     main = Runner(script, 0, False)
@@ -483,6 +535,8 @@ def run_move(script, victim, hit=True, frames=400, second=None, interrupt=None, 
             r.t += 1
             if r.done and a.threads.get(tid) is r:
                 del a.threads[tid]
+        if msc:
+            msc.tick()
         stop = a.collide(g)
         if stop:
             freeze = stop                   # the script resumes with the next frame's commands after the freeze
@@ -510,7 +564,9 @@ def acmd_tests(game_bin):
           (0, True, float(v.slot)))
     check('the strike (frame %d) connects (the victim takes it: the v3 clip\'s 4%% + 11%%)' % B.STRIKE,
           len(v.hits_taken), 2)
-    check('launched: gf 2 after the strike (the flight thread started)', any(r[8] == 2.0 for r in rec), True)
+    check('launched: gf 2 after the strike', any(r[8] == 2.0 for r in rec), True)
+    moved = [r for r in rec if r[8] == 2.0 and r[2] is not None and r[2] > B.HOLD_X + 5]
+    check('the victim flies (moved away from the hold: the v4 clip\'s bug: it never moved)', bool(moved), True)
     held = [r for r in rec if B.JUMP_TO <= r[1] < B.STRIKE and r[8] == 1.0]
     check('hold: the victim %g in front on the ground while held' % B.HOLD_X, {(r[2], r[3]) for r in held},
           {(B.HOLD_X, 0.0)})
@@ -521,23 +577,21 @@ def acmd_tests(game_bin):
           all(abs(a_[2] - b_[2]) < 1e-3 and a_[:2] == b_[:2] for a_, b_ in zip(tr[:n_hold], want_hold)), True)
     flight = tr[n_hold:n_hold + B.GF_FLIGHT]
     want = [B.flight_offset(k) for k in range(1, B.GF_FLIGHT + 1)]
+    want = [(x, y, a_ if k + 1 < B.UPRIGHT_K else 0.0) for k, (x, y, a_) in enumerate(want)]
     ok = len(flight) == len(want) and all(abs(x - wx) < 1e-3 and abs(y - wy) < 1e-3 and abs(r_ - wa) < 1e-2
                                           for (x, y, r_, _st), (wx, wy, wa) in zip(flight, want))
-    check('flight: %d frames of offsets / spin as flight_offset (XV2 #179 / #96, less his own travel)' % B.GF_FLIGHT,
-          ok, True)
-    if flight:
-        check('flight: ends %g in front (feet), lying (%g degrees)' % (want[-1][0], want[-1][2]),
-              (round(flight[-1][0], 3), flight[-1][2]), (round(want[-1][0], 3), want[-1][2]))
-    turned = abs(want[-1][2] - (-B.hold_lean(n_hold - 1, n_hold)))
-    check('flight: turns %.0f degrees backward (XV2 935 x 0.8)' % turned, 700 < turned < 800, True)
-    after = tr[n_hold + B.GF_FLIGHT:]
-    check('kept lying until DownWait, then upright', [r[2] for r in after if r[3] != 0x50][:1] == [want[-1][2]]
-          and next((r for r in after if r[2] == 0.0), (0, 0, 0, None))[3] == 0x50, True)
+    check('flight: %d frames of offsets / spin as flight_offset (XV2 #179 / #96, less his own travel), upright '
+          'from flight frame %d' % (B.GF_FLIGHT, B.UPRIGHT_K), ok, True)
+    full = B.flight_offset(B.UPRIGHT_K - 1)[2]
+    turned = abs(full - (-B.hold_lean(n_hold - 1, n_hold)))
+    check('flight: turns %.0f degrees backward before the down (XV2 935 x 0.8)' % turned, 650 < turned < 800, True)
+    up0 = next((r for r in flight if r[2] == 0.0), None)
+    check('upright only once DownWait has taken over (its own lying animation)', up0 is not None and up0[3] == 0x50,
+          True)
     check('rotation back to 0 at the end', v.rot[0], 0.0)
     lock_on = next((r[0] for r in rec if r[6] == 1.0), None)
     launch = next((r[0] for r in rec if r[8] == 2.0), next(r[0] for r in rec if r[1] > B.STRIKE))
-    check('controller off from the launch (the thread\'s first frame)', lock_on is not None and
-          lock_on <= launch + 1, True)
+    check('controller off from the launch', lock_on is not None and lock_on <= launch + 1, True)
     down = [r for r in rec if r[5] == 0x50]
     check('lands, DownWait (0x50)', bool(down), True)
     # (no landing: v3's build; the later scenarios still run, at the frames a landing would have had)
@@ -570,36 +624,46 @@ def acmd_tests(game_bin):
     check('launching hit while down: controller back at once, upright', rel is not None and rel <= land + 17
           and v.rot[0] == 0.0, True)
     check('launching hit: never stood up by the move', ('status', 0x54) in v.log, False)
-    # never lands (off the stage)
+    # never lands (off the stage): DownWait in the air -> it falls (out of the down statuses): controller back
     v = Victim()
     v.never_lands = True
     a, rec = run_move(script, v)
-    check('never lands: no DownWait, controller back, upright', (('status', 0x50) in v.log, v.input_off, v.rot[0]),
-          (False, 0.0, 0.0))
+    check('never lands: falls, controller back, upright', (v.status == FALL, v.input_off, v.rot[0]),
+          (True, 0.0, 0.0))
     # the dash punch on a shield / no catch: strike never happens
     v = Victim()
     a, rec = run_move(script, v, hit=False, frames=120)
     check('no catch: no hold / flight (no rotation)', v.trace, [])
-    # v4: every way the hold can end without the launch leaves the victim upright, its stage collision back
+    # the hold / flight cut short (his status changes: hit, grabbed). With threads (the watchdog): upright within 2
+    # frames; without (v4's clip: no thread reached the victim): upright at his next dash attack's first frame,
+    # controller back at once (the MSC's gf_tick)
     hold_g = next(r[0] for r in run_move(script, Victim())[1] if r[1] == B.JUMP_TO + 20)
-    for what, st in (('hit / grabbed mid-hold (his status changes)', 0x48), ('a new dash attack mid-hold', None)):
+    launch_g = next((r[0] for r in run_move(script, Victim())[1] if r[8] == 2.0), launch)
+    for what, at in (('mid-hold', hold_g), ('mid-flight', launch_g + 10)):
         v = Victim()
-        if st is None:
-            a = Acmd(script, v)
-            a0, rec = run_move(script, v, frames=hold_g + 1, acm=a)
-            # his next dash attack from frame 0 (its New_Var resets gf), on nobody: the old victim let go
-            v.hittable = lambda f: False
-            a.active.clear()
-            a.records, a.bits_start = {}, 0         # a new status: a new attack
-            a, rec = run_move(script, v, frames=40, acm=a)
+        a, rec = run_move(script, v, frames=at + 60, interrupt=(at, 0x48))
+        fixed = next((r[0] for r in rec if r[0] >= at and r[4] == 0.0), None)
+        if Acmd.THREADS:
+            check('cut short %s (threads run): upright within 2 frames, stage collision back, controller on' % what,
+                  (fixed is not None and fixed - at <= 2, v.ground, v.input_off), (True, 5, 0.0))
         else:
-            a, rec = run_move(script, v, frames=hold_g + 60, interrupt=(hold_g, st))
-        check('%s: the victim upright (rotation 0), stage collision back (5), controller on' % what,
-              (v.rot[0], v.ground, v.input_off), (0.0, 5, 0.0))
+            check('cut short %s (no threads): controller on (MSC)' % what, v.input_off, 0.0)
+            # his next dash attack (on nobody): frame 0 turns the earlier victim upright
+            a.active.clear()
+            a.records, a.bits_start, a.my_status = {}, 0, B.STATUS_ATTACK_DASH
+            v.hittable = lambda f: False
+            a, rec = run_move(script, v, frames=3, acm=a)
+            check('cut short %s (no threads): upright, stage collision back at his next dash attack' % what,
+                  (v.rot[0], v.ground), (0.0, 5))
     v = Victim()
-    a, rec = run_move(script, v, frames=hold_g + 60, interrupt=(hold_g, 0x48))
-    fixed = next((r[0] for r in rec if r[0] >= hold_g and r[4] == 0.0), None)
-    check('interrupted mid-hold: upright within 2 frames', fixed is not None and fixed - hold_g <= 2, True)
+    a = Acmd(script, v)
+    a0, rec = run_move(script, v, frames=hold_g + 1, acm=a)
+    v.hittable = lambda f: False
+    a.active.clear()
+    a.records, a.bits_start = {}, 0         # a new status: a new attack
+    a, rec = run_move(script, v, frames=40, acm=a)
+    check('a new dash attack mid-hold: the old victim upright, stage collision back, controller on',
+          (v.rot[0], v.ground, v.input_off), (0.0, 5, 0.0))
     # the strike doesn't connect (the victim intangible at it): the hold is a throw, launched all the same
     v = Victim()
     v.hittable = lambda f: f < B.STRIKE
@@ -607,38 +671,53 @@ def acmd_tests(game_bin):
     check('strike not connecting: still launched, downed, upright at the end, controller back',
           (any(r[8] == 2.0 for r in rec), any(r[5] == 0x50 for r in rec), v.rot[0], v.input_off),
           (True, True, 0.0, 0.0))
-    # his status changes during the flight (the threads go on): the flight and the down still end upright
-    launch_g = next((r[0] for r in run_move(script, Victim())[1] if r[8] == 2.0), launch)
+    # a second God Fist (on another fighter, slot 3) while the first victim is still held down
     v = Victim()
-    a, rec = run_move(script, v, interrupt=(launch_g + 10, 0x48))
-    check('his status changes mid-flight: the victim still lands, downed, then upright, controller back',
-          (any(r[5] == 0x50 for r in rec), v.rot[0], v.input_off), (True, 0.0, 0.0))
-    # a second God Fist (on another fighter, slot 3) while the first victim is still lying / held down
-    for at, what in ((land - 3, 'lying (just landed)'), (land + 10, 'held down')):
-        v = Victim()
-        a, rec = run_move(script, v, frames=at)
-        check('first victim %s locked before the second move' % what, v.input_off, 1.0)
-        check('first victim %s: turned before the second move' % what, v.rot[0] != 0.0, what.startswith('lying'))
-        v2 = Victim(slot=3)
-        a2 = Acmd(script, v2)
-        a2.vars = dict(a.vars)
-        a2.threads = dict(a.threads)
-        a2.records = {}
+    a, rec = run_move(script, v, frames=land + 10)
+    check('first victim held down (controller off) before the second move', v.input_off, 1.0)
+    v2 = Victim(slot=3)
+    a2 = Acmd(script, v2)
+    a2.vars = dict(a.vars)
+    a2.records = {}
 
-        def target(t, a2=a2, v=v, v2=v2):
-            if t == 2 or t == 5:
-                return v2
-            if t == 4:
-                return v
-            return None
-        a2.target = target
-        main = Runner(script, 0, False)
-        a2.bits_start = 2
-        for fr in range(0, B.PUNCH_END + 1):
-            a2.motion_frame = float(fr)
-            a2.step(main, float(fr))
-        check('second God Fist (%s): the first victim upright, controller back, its flight thread stopped' % what,
-              (v.input_off, v.rot[0], B.GF_THREAD in a2.threads), (0.0, 0.0, False))
+    def target(t, thread=False, v=v, v2=v2):
+        if t == 2 or t == 5:
+            return v2
+        if t == 4:
+            return v
+        return None
+    a2.target = target
+    main = Runner(script, 0, False)
+    a2.bits_start = 2
+    for fr in range(0, B.PUNCH_END + 1):
+        a2.motion_frame = float(fr)
+        a2.step(main, float(fr))
+    check('second God Fist: the first victim\'s controller back, the MSC lets it go (gf_phase 0), upright',
+          (v.input_off, a2.vars.get(B.V_PHASE), v.rot[0]), (0.0, 0.0, 0.0))
+
+
+def facing_tests(body_dir):
+    """every effect of the move looks the same mirrored when he faces the other way: the game turns his bones
+    (TopN, bone 0: Z forward along his facing, Y up, X across, i.e. depth) with his facing, so an effect is
+    placed alike both ways only if its offset / rotation stays in the screen plane: on bone 0 no X (depth) offset
+    and no turn but about Y; on the fist (RHandN: at the punch its +X points forward, Z across) only an offset along
+    +X and a turn about Y (the model's front onto +X)"""
+    bad = []
+    for part in ('effect', 'game'):
+        for c in acmd.ACMDFile.load(os.path.join(body_dir, part + '.bin')).script('attackdash'):
+            if c.name not in ('Graphic_Effect', 'External_Graphic'):
+                continue
+            d = dict(zip(acmd.INFO[c.ident]['syntax'], c.params))
+            if d['Bone'] == 0:
+                ok = d['X'] == 0 and d['XRot'] == 0 and d['ZRot'] == 0
+            elif d['Bone'] == B.FIST:
+                ok = d['Y'] == 0 and d['Z'] == 0 and d['XRot'] == 0 and d['ZRot'] == 0
+            else:
+                ok = False
+            if not ok:
+                bad.append((part, hex(d['Graphic']), d['Bone'], d['X'], d['Y'], d['Z']))
+    check('effects: placed alike facing left and right (bone 0: no depth offset; fist: along the forearm only)',
+          bad, [])
 
 
 def diag_tests(game_bin):
@@ -648,15 +727,16 @@ def diag_tests(game_bin):
     v = Victim()
     a, rec = run_move(script, v)
     ks = [k for k, _v in a.diag]
-    got = dict((k, val) for k, val in a.diag)
+    got = dict((k, val) for k, val in reversed(a.diag))          # the first of each
     check('diag: catch kinds 2 (a hurtbox), slot %d, hold frames %d / %d, strike kinds 2, flight from slot %d'
           % (v.slot, B.JUMP_TO, B.STRIKE - 1, v.slot),
           ([val for k, val in a.diag if k == B.D_CATCH_KINDS], got.get(B.D_SLOT),
            [val for k, val in a.diag if k == B.D_HOLD_FRAME], [val for k, val in a.diag if k == B.D_STRIKE_KINDS][-1],
-           got.get(B.D_FLIGHT)),
+           [val for k, val in a.diag if k == B.D_FLIGHT][0]),
           ([2.0], float(v.slot), [float(B.JUMP_TO), float(B.STRIKE - 1)], 2.0, float(v.slot)))
-    check('diag: rotation read back 0 after the last release', [val for k, val in a.diag if k == B.D_ROT_AFTER][-1:],
-          [0.0])
+    check('diag: target 2\'s rotation read in the flight (spun, spun, upright) and its slot',
+          ([val != 0.0 for k, val in a.diag if k == B.D_HOLD_ROT][-3:],
+           [val for k, val in a.diag if k == B.D_SLOT][-3:]), ([True, True, False], [float(v.slot)] * 3))
     check('diag: no hold release in a clean run', B.D_WD_RELEASE in ks, False)
 
 
@@ -672,19 +752,23 @@ def main():
     trans = o.nodes[0][1]                       # TransN: the first node (vbn order)
     B.ROOT_Z[:] = [o.sample(trans, f)[0][2] for f in range(o.frames)]
     msc_tests(os.path.join(d, 'script', 'msc', 'supamario.mscsb'))
+    vm = R.VM(os.path.join(d, 'script', 'msc', 'supamario.mscsb'))
+    if '--no-msc-tick' not in sys.argv and len(vm.m.scripts) > 2321:      # v5's gf_tick (the last function)
+        MscTick.PATH = os.path.join(d, 'script', 'msc', 'supamario.mscsb')
     game = os.path.join(d, 'script', 'animcmd', 'body', 'game.bin')
+    facing_tests(os.path.join(d, 'script', 'animcmd', 'body'))
     acmd_tests(game)
     # the game's open rules every way round (Acmd: DEFER / BLOCK / T2_THREAD)
     if '--all-models' in sys.argv:
         for defer in (True, False):
             for block in (False, True):
-                for t2 in (True,):          # (target 2 from a thread: as from the script, the same lookup)
-                    if (defer, block, t2) == (True, False, True):
+                for th in (False, True):
+                    if (defer, block, th) == (True, False, False):
                         continue
-                    Acmd.DEFER, Acmd.BLOCK, Acmd.T2_THREAD = defer, block, t2
-                    PREFIX[0] = '[defer %d, part block %d, target 2 in threads %d] ' % (defer, block, t2)
+                    Acmd.DEFER, Acmd.BLOCK, Acmd.THREADS = defer, block, th
+                    PREFIX[0] = '[defer %d, part block %d, threads %d] ' % (defer, block, th)
                     acmd_tests(game)
-        Acmd.DEFER, Acmd.BLOCK, Acmd.T2_THREAD = True, False, True
+        Acmd.DEFER, Acmd.BLOCK, Acmd.THREADS = True, False, False
         PREFIX[0] = ''
     if any(acmd.new_var_name(c) == 'gf_wd' for c in acmd.ACMDFile.load(game).script('attackdash')) and any(
             c.name == 'SUB_FLOAT_2' and len(c.params) > 0 and B.DIAG_BASE <= c.params[0] < B.DIAG_BASE + 16

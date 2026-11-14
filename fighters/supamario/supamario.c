@@ -1780,6 +1780,7 @@ void func_82()
         global45 = ControlModule(0xa, 0x3);
     }
     rolloff_hold_update(); // roll-off: the air speed cap off while the stick holds the way he moves (universal mechanics)
+    gf_tick(); // Super God Fist: the downed victim (fighters/supamario/README.md "Super God Fist v5")
 }
 
 float func_83()
@@ -37764,4 +37765,91 @@ int gf_update()
         func_16(0, 0);
     }
     return 0x1;
+}
+
+// ===================================================================
+// Super God Fist v5: the downed victim, from the per-frame hook (func_82, every frame in every status). v4's
+// launch ran in an ACMD thread, and in game nothing a thread did reached the victim (the user's v4 clip): the
+// flight is in the game script now (frames 97-141, his motion still running) and the rest, after he can act,
+// here, through the position / input variables (docs/position-variables.md), which MSC reaches as ACMD does.
+// GF_V_PHASE (the game script's New_Var gf_phase): 1 flying (the game script places it; if his move is cut short
+// the controller comes back here), 2 downed (DownWait, controller off GF_DOWN frames: a hit that launches it
+// (out of the down statuses) or the time -> controller back; DownDamage -> 3), 3 a hit that didn't launch it:
+// once the down damage is over (DownWait) it stands up (DownStand), controller back. GF_V_SLOT: its player slot
+// (target 2 + slot). (MSC can't reach another fighter's rotation: the game script turns it upright before the
+// hand-off.)
+// ===================================================================
+void gf_release(int t)
+{
+    WorkModule(0, 0.0f, 0x0F000115 + 0x20 * t);
+    WorkModule(0, 0.0f, GF_V_PHASE);
+    WorkModule(0, 0.0f, GF_V_LOCK);
+    //GFD WorkModule(0, 99.0f, 0x0F0003FC);
+}
+
+void gf_tick()
+{
+    float ph;
+    int t;
+    float st;
+    float cnt;
+    ph = WorkModuleF(0, GF_V_PHASE);
+    if (ph < 0.5f)
+    {
+        return;
+    }
+    t = WorkModule(0x6, GF_V_SLOT) + 2;
+    if (t < 3 || t > 10)
+    {
+        WorkModule(0, 0.0f, GF_V_PHASE);
+        return;
+    }
+    if (ph < 1.5f)
+    {
+        if (WorkModuleF(0, 0x0F0000A2) != GF_STATUS)
+        {
+            //GFD WorkModule(0, WorkModuleF(0, 0x0F0000A2), 0x0F0003FD);
+            gf_release(t);
+        }
+        return;
+    }
+    st = WorkModuleF(0, 0x0F0000A2 + 8 * t);
+    cnt = WorkModuleF(0, GF_V_CNT) - 1.0f;
+    WorkModule(0, cnt, GF_V_CNT);
+    if (ph < 2.5f)
+    {
+        if (st == GF_DOWN_DAMAGE)
+        {
+            WorkModule(0, 3.0f, GF_V_PHASE);
+            //GFD WorkModule(0, 3.0f, 0x0F0003FC);
+            return;
+        }
+        if (cnt < GF_DOWN_HELD_FROM && (st < GF_DOWN_LO || st > GF_DOWN_HI))
+        {
+            //GFD WorkModule(0, st, 0x0F0003FD);
+            gf_release(t);
+            return;
+        }
+        if (cnt <= 0.0f)
+        {
+            gf_release(t);
+        }
+        return;
+    }
+    if (st == GF_DOWN_WAIT || st == GF_DOWN_WAIT2)
+    {
+        WorkModule(0, GF_DOWN_STAND, 0x0F0000A2 + 8 * t);
+        gf_release(t);
+        return;
+    }
+    if (st != GF_DOWN_DAMAGE && (st < GF_DOWN_LO || st > GF_DOWN_HI))
+    {
+        //GFD WorkModule(0, st, 0x0F0003FD);
+        gf_release(t);
+        return;
+    }
+    if (cnt < -120.0f)
+    {
+        gf_release(t);
+    }
 }

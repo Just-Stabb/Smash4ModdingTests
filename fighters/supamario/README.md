@@ -524,3 +524,96 @@ is v3's (his own stand-ins).
   `msc_fingerprint` v3 vs v4: 0 differ (byte for byte), vs the diag: `func_2320` (gf_update).
 - Other scripts / animations: byte for byte v3's (sound, expression, motion unchanged; game / effect: only
   attackdash).
+
+## Super God Fist v5 (`supamario_god_fist_v5.zip`): the flight without threads, effects on the fist, XV2's CMN sounds
+
+Install over v4, **exe B** (`B_exe_v46g`; the user uses B only: no A files are built any more). User, v4 in game
+(clips `MedalTVCemuWiiUEmulator20261114112625883` hit, `...112819636` whiff, `...112939121` facing): "the effect
+seems faint", "move it closer to the tip of the fist", "the release still isn't working", "some effects only
+appear facing left". Then XV2's `CAR_BTL_CMN.acb` / `.awb`.
+
+### The release: what the v4 clip shows, and the cause
+Donkey Kong takes the punch (4%) and the strike (15%); after the strike he stays where he was held, leaning back
+~57 degrees (the hold's last `Rotation_Set`), and goes back to his idle tilted (it reads as sitting) for the rest of
+the clip (110 frames): no movement, no spin, no down, never upright. Exactly v3's picture, although v4 started the
+flight thread without any condition and had a watchdog thread. So nothing either thread did reached him, while
+everything the game script itself did (the hold's placement and lean, through the same target 2 and commands)
+worked. The threads (`acmd_ext_cave.py`'s Thread_Start / thread_run) were only ever run in unicorn on a weapon's step
+entry (`acmd_ext_test.py`), never confirmed in game; the fighters' step entry the cave hooks (`0x02E408B8`) is only
+called from `0x02E40B90` when the global at `[0x102F6C04]` allows it (byte `+8` 0, or mode `+0` 2), otherwise
+`0x02E40B24` runs instead, so a fighter's threads may well never run. Not proven which; v5 doesn't depend on it:
+- **The flight is in the game script** (frames 97-140 = flight frames 1-44, his motion running 1:1 after the
+  strike's freeze), through target 2 as the hold. DownWait is asked at flight frame 42 (no hitstop / hitstun from
+  then, so the status change isn't held up), the victim upright from 43 (DownWait's own animation lies it down: a
+  rotation is only ever zeroed by a script), at 141 the drop (stage collision back) and the hand-off. He acts
+  from 143 (v4 141).
+- **The downed part is in the MSC**: `gf_tick()` (supamario.c), called by the per-frame hook `func_82` (as
+  `rolloff_hold_update`, every frame in every status), through the position / input variables (MSC reaches them
+  as ACMD does): gf_phase 1 (flying; his status no longer AttackDash -> controller back), 2 (DownWait, controller
+  off 50 frames; DownDamage -> 3; out of the down statuses -> controller back), 3 (a hit that didn't launch it:
+  back in DownWait -> DownStand, controller back).
+- If the hold or flight is cut short (he's hit or grabbed: the script is gone), the controller comes back from the
+  MSC at once; the rotation (MSC can't turn another fighter) is zeroed by the watchdog thread if threads run, and
+  in any case at his next dash attack's first frame (gf_spin). A second God Fist turns the earlier victim upright and
+  gives its controller back at the catch.
+- The test's model of the game was wrong: it ran Thread_Start blocks. `supamario_godfist_test.py` now has
+  `Acmd.THREADS` (False by default: the v4 clip) and runs the compiled `gf_tick` every frame (`MscTick`); on v4's
+  build it reproduces the clip (no movement, -57.2 degrees left, 19 failures); v5 passes with and without threads,
+  every `--all-models` combination.
+
+### Diagnostic variant (`diag/`, exe B only)
+`S4GF` lines as v4's (`tools/diag_godfist_cave.py` on exe B), now covering the whole chain: k 0 the catch's kinds,
+1 the victim's slot (at the catch, then target 2's slot at flight frames 1 / 22 / 43: still found), 2 his motion
+frame at the hold's first / last frame, 3 target 2's rotation X at the hold's first / last frame and at flight
+frames 1 / 22 / 43 (spun, spun, 0), 4 the kinds at 97-100 (when the strike's hit shows), 5 the launch (slot),
+6 a release by the watchdog (reason), 7 the rotation read back after a reset, **8 every frame the watchdog thread
+runs (does a thread run in game at all?)**, 9 / 10 / 11 MSC jump / rate 1 / status left, 12 the hand-off (2) and
+gf_tick's phase 3 / release (99), 13 the status that made gf_tick let go.
+
+### Effects
+- **On the fist** (user): effects 0, 1 (the model and Csg_Circle) and 2 follow RHandN (External_Graphic on bone
+  0x14, XV2's follow b_R_Hand) 1.2 along its +X (at the punch +X points forward, the fingers 0.74 along it; the
+  charge 0.7); the model turned Y -90 (its front, XV2's -Z, onto the hand's +X). v4 put the model on bone 0 where the
+  fist strikes and the particles at the hand's origin.
+- **Brighter** (user: "faint"): XV2 draws these with glare (the EMMs' GlareCol 1.5-2.0, bloom Smash 4 doesn't have):
+  every converted skill emitter's `color_scale` x2 and `alpha_init` x1.5 (capped at 1), the model's colour gain x2
+  (`--tint`). The emitters' colours themselves are XV2's (orange / gold: Csg_Crg's 1.0, 0.8, 0.2 ring, 1.0, 0.5,
+  0.37 haze, ...).
+- **Facing**: new test check (`facing_tests`): every effect of the move placed alike facing left and right (bone 0:
+  no X (depth) offset, turns only about Y; the fist: offsets only along its +X). v4 passes it too (Mario's own
+  forward smash fire is `Bone 0, Y 7, Z 15`: Z forward), so the placement can't make an effect show one way only.
+  In the facing clip the teal clouds that pass near him are the stage's background (they fly across before he
+  moves and far from him); to compare the two facings, a plain stage. Not added to port_check (not shown to be a
+  general trap).
+- Whiff clip: the dash, punch and slide play as the frame table says (the whiff ends 44 frames in); the effects
+  were barely visible there (the faintness above).
+
+### Sounds (XV2's `CAR_BTL_CMN.acb` / `.awb`)
+`tools/xv2acb.py` (new: CRI @UTF tables, cue -> sequence -> track -> noteOn -> synth -> waveform, AFS2) lists /
+extracts the cues; `tools/xv2acb_decode.mjs` decodes the HCA with hca.js (`npm i --ignore-scripts hca.js`; the CMN
+HCAs carry `ciph` type 0: no key). 234 cues, 183 waveforms (181 in the ACB's own AWB, 2 streamed), all decoded
+but the placeholder the 44 empty cues share (`m143`). Which cues the move plays:
+- **053 Hit_LL**: BAC entry 2 (the victim, on the catch) `common SE cue 53` at 0. Ours at frame 46 (the God Fist
+  part's first frame) on the hit path. 1.92 s.
+- **106 Down**: not in the God Fist's BAC; CMN.bac entry 78 (the generic reaction playing CMN.ean #96
+  CMN_DMG_SUBERI_AOMUKE, the slide our victim's entry 3 plays) plays it at its frame 1 (entries 76-80, 750-753 too,
+  for the other knockdown slides). Ours when the slide starts: frame 115 (flight frame 19 = #96 frame 1). Inferred.
+- Not CMN: entry 0's skill SE cue 0 (the skill's own SE bank: not in the files), the voices (entry 0 skill voice
+  cue 0, entry 1 character voice cue 81: left out, the user). CMN.bdm #160 (the punch) has no hit sound (its cue
+  field +0x0E is -1; +0x0C the ACB type 0, +0x10 the hit effect); #0 (the victim's body box) neither.
+- `74 kidan_hit01` (entry 6) is the other BCM variant's (not this one).
+- The XV2 clip's audio, cross-correlated with all 182 decoded waveforms: nothing above 0.23 (the clip's mix of
+  music / voices hides them), so it neither confirms nor adds a cue.
+
+Added to `snd_se_Supamario` (BINF 2144, unchanged) as one-shot tones 90 / 91 (`snd_se_Supamario_gf_hit_ll`,
+`_gf_down`: IDSP 48 kHz mono, -0.5 dBFS peak, volume 0 dB: RMS over the first 0.5 s -11.9 / -12.5 dB, in the
+Kamehameha tones' -10.6 to -15), labels 143 / 144 of soundlabeltable row 3249: sound ids **`0x0CB1008F`** Hit_LL,
+**`0x0CB10090`** Down. The table: the user's latest (`kirby_hero_copy_fix_v1` B), only row 3249 grown. The sound
+script: Hit_LL at 46 in place of the Kamehameha start stand-in, the heavy hit at the strike kept (Smash's), the
+Kamehameha fire / burst stand-ins at the strike gone (XV2 plays nothing there), Down at 115.
+
+### Tests
+`supamario_godfist_test.py OUT/fighter/supamario --all-models`: 0 problems (normal and diag builds; all 8
+combinations of the open game rules: kinds deferred or not, Part records blocking or not, threads running or not); on v4's build 19 failures (its clip). `msc_stack_check`: 0; `msc_fingerprint`
+v4 vs v5 (`--added 2`: gf_release, gf_tick): `func_82` (the call) and `func_2320` (GF_IASA 143) differ.
+`diag_godfist_test.py` on exe B: 0 failed. The bank: the old 90 tones unchanged, 2 added; the table: only row 3249.
