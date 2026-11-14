@@ -2,7 +2,7 @@
 
 `supamario.c`: Supamario's decompiled MSC (first commit: the v5 package's `supamario.mscsb` as
 decompiled; a copy of Mario's, without the universal mechanics until `supamario_universal_v1` below). Built by
-`tools/supamario_kame_build.py`, which replaces the `KAME_*` names (`--msc-only OUT.mscsb`: only this file, without
+`tools/supamario_kame_build.py`, which replaces the `KAME_*` names and the Super God Fist's `GF_*` (`--msc-only OUT.mscsb`: only this file, without
 the XV2 package, the effect values from `tools/supamario_kame_values.py` `SUPAMARIO_FX`).
 
 ## Neutral special: Kamehameha (status 0x152)
@@ -165,3 +165,115 @@ and the executable (`tools/sound_alias_cave.py` v2) gives his banks those ids as
 - **Banks:** `snd_vc_Supamario` 46001 / `_ouen` 46002 (vanilla Mario's, which his are: tools/fighter_own_bank.py
   left them on Mario's ids 6001 / 6086); `snd_se_Supamario` keeps 2144 (already his own; alias 2144). Aliases: vc
   6001, cheer 6086. Check: Supamario vs Mario vs Squirtle.
+
+## Super God Fist (dash attack, `supamario_god_fist_v1.zip`)
+
+User: put Xenoverse 2's Super God Fist (Super Attack `030_GOD_CSA`) on his dash attack: a hitgrab (a hit catches the
+opponent and the move goes on into the God Fist), the opponent spun around and launched a set distance (not by
+percent), kept on the ground in a downed state it can't act out of until its stun ends; a hit on it then that
+doesn't launch it stands it up. Install over `supamario_universal_v1` + `ported_sound_ids_v1` (either exe: no exe
+change). Not tested in game.
+
+### The XV2 skill (`tools/xv2bac.py`: BAC / BCM / BAS reader)
+
+The files given (`030_GOD_CSA.zip`) were only the **BAC, BAS and BCM**: no EAN (the animations), BDM (damage /
+reactions), EEPK / EMP / EMB (effects) or ACB / AWB (sounds). So the timing below is the skill's own; the damage,
+the animations, the effects and the sounds aren't (see "Approximated"). `python3 -I tools/xv2bac.py 030_GOD_CSA.bac
+030_GOD_CSA_PLAYER.bcm 030_GOD_CSA.bas` prints it all. XV2 runs at 60 frames a second, as Smash 4.
+
+- **BCM:** four variants (activator conditions `0xC01` / `0xC02` / `0xC20` / `0xC40`): BAC entry 0 (on connect: the user
+  plays entry 1, the victim entry 2), entry 5 / 10 / 11 (user 6, victim 7). Entry 4 is empty.
+- **Entry 0 (the dash punch, 70 frames):** the skill EAN's animation #1; tracking (homing) on the target 0-10; the
+  character's aura effects off at 0; skill effects 0 at 2 and 1 at 10 (with common effect 220); **hitbox 14-17**
+  (BDM #160, two boxes: flags 8 = the connect one, and one dealing 9 guard damage / 90 stamina); skill effect 2 at
+  40 (1 off), common effect 180 at 41; the skill voice at 0.
+- **Entry 1 (the user on connect, 111 frames):** skill animation #0; **invulnerable 0-40, time x0.8 0-40** (the slow
+  hold of the fist in the victim: 50 real frames); **ThrowHandler 0-40** (flags `0x2001`: the victim held at the
+  user's bone 22 by its bone 17, no victim animation); skill SE cue 81 at 0; skill effect 2 at 17; common effect
+  120 at 60; a BCM callback window 80-111 (the next move may chain from 80).
+- **Entry 2 (the victim on connect, 58 frames):** common CMN.ean #179 (a held / struck pose), invulnerable and x0.8
+  0-40 (in step with the user), ThrowHandler `0x200` to entry 3 at its end; screen effect BPE 45 at 2; effects at 3
+  and 12 (skill 11); **pushed back 0.3 a frame 40-58** (Movement -Z: launched at 40); functions 2 (90) at 0-4 and
+  0x50 (90, 5, 1) at 47 (unknown).
+- **Entry 3 (the victim, launched, 77 frames):** CMN.ean #96 (the long tumble), a size-2 body hitbox 0-79 (it hits
+  others on the way), falling (-0.11 a frame) 57-77, common effects 160 at 20 / 42 and 120 at 62. Entries 7 -> 8 ->
+  9 are the other variant's victim chain (8: CMN #71 19 frames moving +0.25, then 9: CMN #96).
+- **The clip** (`ffmpeg` frames): the punch connects ~frame 19 (0.32 s), the close-up holds the fist in the victim
+  with a gold burst until ~frame 61, then the victim streaks off out of shot and is seen far away tumbling (legs over
+  head, about two turns in ~0.3 s), then hanging in XV2's yellow-ring stun for the rest of the clip; the attacker
+  spins in the air (a flip) meanwhile. "2 hits": the punch and the God Fist.
+
+### The move
+
+| Frames | What |
+|---|---|
+| 0-6 | dash in: TransN 0 -> 16 (the animation moves him) |
+| 7-10 | **the dash punch**: 4%, angle 0, 20 set knockback (a flinch), a fist box on LHandN + one at his chest height |
+| 11 | caught if it hit a fighter's body (`Hit_Check` kinds 2: not a shield): `gf` = 1, the victim's slot kept, Supamario invincible 45 frames (XV2: 0-40), the victim put 11 in front of him |
+| 11 -> 40 | the MSC jumps the motion there in one frame (`gf_update`: the rate that reaches it, every script command on the way still run, as the Kamehameha's `kame_play_to`) |
+| whiff | the punch's follow-through and back to Wait1, ends at 38 (vanilla Mario's dash attack acts from 39) |
+| 40-49 | the hold: the victim 11 in front of him on the ground, 20 frames of hitstun every frame, no stage collision (an aerial victim is pulled down to him); the fist pulled back (the charge, a glow on it) |
+| 50 | **the God Fist**: 11%, both frozen 24 frames (XV2's slowed hold), angle 0 / 25 set knockback (the launch is scripted), no DI / SDI; fire burst + rings + flash (stand-ins) |
+| 51 + 30 | **the flight** (a thread, from the end of the freeze): the victim moved 55 along his facing (ease-out: it lands 66 in front of him) on an arc 14 high, turned -720 degrees about its side axis (two backward somersaults, ease-out, around its middle 5 above its feet), frozen in hitstop each frame (its own status can't move or turn it) and its controller ignored. Whatever its percent or weight |
+| after | it drops the last unit; once on the ground: DownWait (0x50), held down 60 frames with the controller off (the auto get-up is 220) |
+| downed | a hit that launches it (its status leaves DownBound - DownWait / DownDamage): controller back at once. A hit that doesn't (DownDamage 0x57): when the down damage is over it stands up (DownStand 0x54), controller back. Else after the 60 frames the controller comes back (it gets up, rolls or attacks from the down as usual). If it never lands (off the stage): controller back after 20 frames |
+| 60-80 | Supamario's follow-through, then a back flip in place (XV2's attacker spins away), landing into Wait1 at 93; acting from 89 |
+
+Totals: 15% (the BDM isn't there to say XV2's split). Supamario's own frames: whiff 38, hit 89 (+ the two hit
+freezes). After the strike's freeze the victim flies 30 frames, lands in ~2 and is held down 60: ~92 frames, while
+Supamario can act 38 frames after the freeze (frame 89): ~54 frames to reach it 66 away and hit it (XV2's stun
+follow-up).
+
+### How (files)
+
+- `tools/supamario_godfist_anim.py`: the AttackDash animation (94 frames: 0-38 the punch / whiff, 40-93 the God
+  Fist), posed from Mario's own animations (Run, his forward smash's thrust, JumpB's back flip, LandingLight, Wait1:
+  played or cross-faded between keys), TransN for the dash, RotN for the flip's hop; fists (Attack11's hands);
+  main / lhand / rhand / mariopt1, node order kept (vbn order). `tools/supamario_godfist_render.py`: stick-figure
+  renders (side and front) for checking.
+- `tools/supamario_godfist_build.py SUPAMARIO_DIR OUT_DIR`: the package (motion, the four attackdash scripts,
+  `supamario.mscsb`). The game script's variables are `New_Var`s in slots 0x30-0x37 (`gf`, `gf_slot`, `gf_st`,
+  `gf_sit`, `gf_phase`, `gf_cnt`, `gf_one`, `gf_lock`); the victim is target 2 (the last fighter hit) while the move
+  lasts, then its player slot (targets 3-10, `gf_slot`), so a downed victim is still found after the move; `gf_lock`
+  remembers whose controller is off (a second God Fist gives the first victim its controller back first).
+- `supamario.c`: `gf_init` (AttackDash's init `func_272`) and `gf_update` (its loop `func_273`, first): the whiff's
+  end, the jump, no cancel before `GF_IASA`. `GF_*` from `supamario_godfist_build.msc_values()` (also in
+  `supamario_kame_build.py --msc-only`). One new global (`gf_jump`): 73 of 128.
+- `tools/xv2ean.py`: an EAN reader + retargeting onto a Smash 4 skeleton (XV2_TO_MARIO bone map, world-space turns
+  from the rest poses; Mario's vbn rest Euler order checked: X, Y, Z) and OMO writing, for when the skill's EAN is
+  sent; **not checked against a real EAN** (none given): its self-test only proves reader / writer / retarget agree.
+
+### Tests (offline)
+
+- `tools/supamario_godfist_test.py OUT/fighter/supamario`: the compiled MSC in `rolloff_hold_test`'s interpreter
+  (whiff ends at 38 in Wait / Run; the jump's rates 29 then 1; no acting before 89 even with the vl cancel window
+  open) and the game script in a small ACMD interpreter with a simulated victim (the hold, the flight's offsets and
+  spin every frame, controller off from the launch, DownWait, held 60 frames, a weak hit -> stands, a launching hit ->
+  released, never lands -> released, a second God Fist releases the first victim): 25 checks.
+- `msc_stack_check`: 0 problems; `msc_fingerprint` against the user's `supamario.mscsb`: only `func_272` /
+  `func_273` differ, +2 functions. Every other ACMD script and every other animation byte for byte the user's.
+- Both exes of `ported_sound_ids_v1` (A v45h, B v46g) have every command used (Thread_Start, Hit_Check, Status_* /
+  Input_* / Hitstun_Set / Hitstop_Set / Rotation_Set / Target_Slot_Get / Body_State_Set, Extra_Special_Hitbox,
+  New_Var, Hit_Reset).
+- Animation: `supamario_godfist_render.py` sheets (no point of the head / hands / feet below the floor).
+
+### Approximated / not done
+
+- **Animation:** XV2's own (the skill EAN's #0 / #1, CMN #96 / #179) weren't in the files: posed from Mario's
+  animations after the clip. Send `030_GOD_CSA.ean` (and the character's / CMN.ean if the skill uses them) and
+  `tools/xv2ean.py omo` retargets them.
+- **Effects:** no EEPK / EMP / EMB in the files: Smash 4's own stand in (the dash smoke, an orange flash at the fist,
+  an orange glow while it's held, his forward smash's fire burst `0x341000E`, rings `0x100003A`, a big dash cloud).
+  Send the skill's `.eepk` and its EMP / ETR / EMB / EMO and they go through `xv2_to_ptcl` / `xv2_to_nud` as the
+  Kamehameha's did.
+- **Sounds:** no ACB / AWB: his own (the dash attack swish and voice; the Kamehameha's start / burst from his bank
+  2144, his forward smash's fire sound, the common heavy hit). The skill's ACB / AWB can be built into his bank with
+  the next free ids then.
+- **Damage:** the BDM wasn't there: 4% + 11% chosen (a dash attack with a guaranteed follow-up).
+- **In game, unproven:** the motion jump (rate 29 for one frame) running the script's commands on the way; a
+  rotation (`Rotation_Set`) staying on a fighter frozen in hitstop, and the spin's pivot (its feet assumed, kept
+  around its middle; if it turns about its middle it wobbles 5 units); the victim facing him when hit (the spin's
+  direction); CPUs obeying "controller ignored"; `Status_Set` DownWait from a damage status (its DownWaitU / D pick
+  reads a flag the earlier status sets); the flight ignores walls (it passes through the stage while flying, lands
+  on whatever is under its end point, or falls if nothing is). The CPU's attack data (ATKD) still has the vanilla
+  dash attack's frames.

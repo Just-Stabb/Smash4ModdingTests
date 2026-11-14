@@ -510,7 +510,14 @@ def supamario_values(fx):
         **{'KAME_N_POSE_%d' % (i + 1): str(KAME_LIFE[i]) for i in range(3)},
         'KAME_N_FALL_ACCEL': fl(N_FALL_ACCEL), 'KAME_N_FALL_MAX': fl(N_FALL_MAX),
         **{'KAME_N_CRG_%d' % (i + 1): fl(N_CRG[i][0]) for i in range(3)},
-        **{'KAME_N_CRGON_%d' % (i + 1): fl(N_CRG[i][1]) for i in range(3)}, **fx}
+        **{'KAME_N_CRGON_%d' % (i + 1): fl(N_CRG[i][1]) for i in range(3)}, **fx,
+        # the Super God Fist's (dash attack, tools/supamario_godfist_build.py)
+        **godfist_values()}
+
+
+def godfist_values():
+    import supamario_godfist_build
+    return supamario_godfist_build.msc_values()
 
 
 def msc_only(out_path):

@@ -48,7 +48,9 @@ the move (animations, ACMD hitboxes, MSC charge logic).
 ## The Xenoverse 2 Kamehameha port (`000_GOK_KMH.vfxpackage`)
 
 Readers: `tools/xv2vfx.py` (EEPK / EMP / ETR / EMM, docs/xv2-vfx-format.md), `tools/xv2emb.py`,
-`tools/xv2model.py`. Converters:
+`tools/xv2model.py`; for skills' timing and animations `tools/xv2bac.py` (BAC / BCM / BAS: the Super God Fist,
+fighters/supamario/README.md) and `tools/xv2ean.py` (EAN + retargeting onto a Smash 4 skeleton; not yet checked on
+a real EAN). Converters:
 
 - **Particles**: `tools/xv2_to_ptcl.py PKG BASE.ptcl OUT.ptcl` (the mapping is in its docstring).
   One emitter set per EMP (`PtcSupamarioKmh<Name>`, split at 16 emitters, the most any vanilla set

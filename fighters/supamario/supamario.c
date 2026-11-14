@@ -6723,12 +6723,17 @@ void func_272()
         func_271();
     }
     global16 = func_271;
+    gf_init();
     func_78(func_273);
 }
 
 void func_273()
 {
     int var0;
+    if (gf_update())
+    {
+        return;
+    }
     if (CancelModule(0x2713) == 0x1 && func_39() != 0)
     {
         return;
@@ -37678,4 +37683,77 @@ void rolloff_hold_update()
             rolloff_slid = 0;
         }
     }
+}
+
+
+// ===================================================================
+// Super God Fist (the dash attack, status 0x27: func_272 init, func_273 loop; fighters/supamario/README.md
+// "Super God Fist"). The AttackDash animation (tools/supamario_godfist_anim.py) holds both paths: the dash punch
+// 0-30, the God Fist 31-84. The game script (tools/supamario_godfist_build.py) writes GF_VAR (its New_Var `gf`,
+// slot 0x30) to 1 when the punch (frames 7-10) hit a fighter's body (Hit_Check kinds 2, frame 11): then this jumps
+// the motion to GF_JUMP_TO in one frame (the rate that reaches it, so every script command on the way runs: the
+// Kamehameha's kame_play_to), and no cancel until GF_IASA. A whiff (GF_VAR still 0) ends at GF_WHIFF_END as the
+// vanilla end does (Run if 0x1300011c, else Wait).
+// ===================================================================
+int gf_jump;            // 0 the jump not asked for yet, 1 on its way to GF_JUMP_TO, 2 done
+
+void gf_init()
+{
+    gf_jump = 0;
+    WorkModule(0, 0.0f, GF_VAR);
+}
+
+int gf_update()
+{
+    float fr;
+    fr = MotionModuleF(0x1);
+    if (WorkModuleF(0, GF_VAR) < 0.5f)
+    {
+        if (fr >= GF_WHIFF_END)
+        {
+            if (global18 == 0x2)
+            {
+                func_16(0xe, 0);
+                return 0x1;
+            }
+            if (WorkModule(0x6, 0x1300011c) == 0x1)
+            {
+                func_16(0x12, 0);
+            }
+            else
+            {
+                func_16(0, 0);
+            }
+            return 0x1;
+        }
+        return 0;
+    }
+    if (gf_jump == 0)
+    {
+        gf_jump = 0x1;
+        if (fr < GF_JUMP_TO - 0.5f)
+        {
+            MotionModule(0x4, GF_JUMP_TO - fr);
+            return 0x1;
+        }
+    }
+    if (gf_jump == 0x1 && fr >= GF_JUMP_TO - 0.01f)
+    {
+        MotionModule(0x4, 1.0f);
+        gf_jump = 0x2;
+    }
+    if (global18 == 0x2)
+    {
+        func_16(0xe, 0);
+        return 0x1;
+    }
+    if (fr >= GF_IASA && func_39() != 0)
+    {
+        return 0x1;
+    }
+    if (MotionModule(0x2712) == 0x1)
+    {
+        func_16(0, 0);
+    }
+    return 0x1;
 }
