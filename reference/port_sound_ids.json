@@ -26,7 +26,11 @@
     "ouen": 6110
    },
    "banks": {
-    "snd_se_Edge": 46032
+    "snd_se_Edge": 46032,
+    "snd_se_Edge_c06": 46046,
+    "snd_se_Edge_c07": 46047,
+    "snd_vc_Edge": 46033,
+    "snd_vc_Edge_ouen": 46034
    },
    "_note": "vc / cheer aliases from the build records (fighters/edge/README.md UI and sounds v1: vc_edge in snd_vc_Edge 6014, the cheer in Zelda's ouen bank 6110); those banks and se _c06 / _c07 not renumbered yet (files not at hand)"
   },
@@ -104,7 +108,11 @@
     "vc": 6001,
     "ouen": 6086
    },
-   "banks": {},
+   "banks": {
+    "snd_se_Pzenigame": 46160,
+    "snd_vc_Pzenigame": 46161,
+    "snd_vc_Pzenigame_ouen": 46162
+   },
    "_note": "Mario's ids (ultimate_sound.py, base rows grown); his banks not renumbered yet (files not at hand)"
   }
  }
