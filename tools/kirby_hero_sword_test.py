@@ -24,6 +24,10 @@
   (0x030C49D8 the c00 fallback, 0x030C4BE8 the motion folder) give "bravesword" too.
 
   python3 tools/kirby_hero_sword_test.py PATCHED.rpx ORIGINAL.rpx [OLD_PATCHED.rpx]   (exe_v46g, exe_v45h, exe_v46f)
+- fix v5: the stone check only for the Hero copy's article (r31 0x2C) and to the new stone_show (CAVE2), whose words
+  and the original show path / Sonic branch it relies on are checked here; the init's 0x2C case on the Marth path. The
+  run of the whole chain with the game's own Visibility / Link modules is tools/kirby_hero_sword_vis_test.py.
+  (exe_v46h = exe_v46g + sound_alias_cave.py v2 (ported_sound_ids_v1) + this: the ORIGINAL argument stays exe_v45h.)
 """
 import os
 import struct
@@ -152,9 +156,12 @@ def main():
     check('original copy_held_cave hide path (lwz r3, 0xA8(r30); b 0x02B02734)',
           (old.w(HELD.CAVE + 0x2C), bl_target(HELD.CAVE + 0x30, old.w(HELD.CAVE + 0x30) | 1)), (0x807E00A8, 0x02B02734))
     check('original 0x02B02730 b copy_held_cave', bl_target(HELD.HOOK, old.w(HELD.HOOK) | 1), HELD.CAVE)
-    for a in range(C.CAVE, C.LIMIT, 4):
+    for a in list(range(C.CAVE, C.LIMIT, 4)) + list(range(C.CAVE2, C.LIMIT2, 4)):      # fix v5: CAVE2 too
         if old.w(a):
             check('cave 0x%08X free in the original' % a, old.w(a), 0)
+    if prev:
+        check('fix v5: CAVE2 (0x%08X-0x%08X) free in %s' % (C.CAVE2, C.LIMIT2, os.path.basename(sys.argv[3])),
+              [hex(a) for a in range(C.CAVE2, C.LIMIT2, 4) if prev.w(a)], [])
     a44, _r = V44.args()
     check('kirby_copy_new_cave.py\'s cave in the original (grant_kind / res_kind words, its code before 0x%08X)' % C.CAVE,
           (old.w(a44.labels['res_kind']), a44.pc <= C.CAVE,
@@ -237,19 +244,41 @@ def main():
           bad, [])
     # 3. visibility
     bad = []
-    stop = {HELD.SHOW, C.HELD_BACK}
-    for status in (0x155, 0x175, 0x176, 0x154, 0x177, 0x222, 0):
-        for motion in (0x380, 0x382, 0x384, 0x381, 0x10):
-            for sword in (0, 1, 2):
-                acc, held = fake_modules(mu, status, motion, sword)
-                end = run(mu, HELD.HOOK, {27: acc, 30: held, 1: 0x7F008000}, stop)
-                show = motion in HELD.MOTIONS or (status in C.STONE and sword == 1)
-                want = HELD.SHOW if show else C.HELD_BACK
-                ok = end == want and (show or mu.reg_read(UC_PPC_REG_0 + 3) == 0x7E00A800)
-                if not ok:
-                    bad.append((hex(status), hex(motion), sword, hex(end)))
-    check('held model: shown in the Marth sword motions, and in the stone statuses with 0x1000008B == 1; else hidden '
-          '(r3 = the +0xA8 module)', bad, [])
+    stone_show = lab['stone_show']
+    stop = {HELD.SHOW, C.HELD_BACK, stone_show}
+    for kind in (0x2C, 0x12):
+        for status in (0x155, 0x175, 0x176, 0x154, 0x177, 0x222, 0):
+            for motion in (0x380, 0x382, 0x384, 0x381, 0x10):
+                for sword in (0, 1, 2):
+                    acc, held = fake_modules(mu, status, motion, sword)
+                    end = run(mu, HELD.HOOK, {27: acc, 30: held, 31: kind, 1: 0x7F008000}, stop)
+                    stone = kind == C.ROBIN and status in C.STONE and sword == 1
+                    want = HELD.SHOW if motion in HELD.MOTIONS else stone_show if stone else C.HELD_BACK
+                    ok = end == want and (want != C.HELD_BACK or mu.reg_read(UC_PPC_REG_0 + 3) == 0x7E00A800)
+                    if not ok:
+                        bad.append((hex(kind), hex(status), hex(motion), sword, hex(end)))
+    check('held model: shown in the Marth sword motions; the Hero copy\'s (kind 0x2C) to the fix v5 stone show path in '
+          'the stone statuses with 0x1000008B == 1, never another kind\'s; else hidden (r3 = the +0xA8 module)', bad, [])
+    # fix v5: the stone show path's words (its run, with the game's own modules: kirby_hero_sword_vis_test.py)
+    img = new
+    sw = [img.w(stone_show + 4 * i) for i in range(18)]
+    check('fix v5: stone_show calls the show path\'s 0x02BF0594 (r3 = r1 + 0x68) and the item MotionModule vt +0x2F4, '
+          'then goes to the Sonic branch 0x02B02794 with r7 = [r30 + 0x68], r10 = [r7] + 0x3C0',
+          (sw[0], (sw[1] & 0xFFFF) << 16 | (sw[2] & 0xFFFF), sw[5:10], sw[10:13], (sw[13] & 0xFFFF) << 16 | (sw[14] & 0xFFFF),
+           sw[15:17]),
+          (0x38610068, C.SHOW_SYNC, [0x807E0044, 0x80C30000, 0x80E602F4, 0x7CE903A6, 0x4E800421],
+           [0x80FE0068, 0x81470000, 0x394A03C0], C.SONIC_SHOW, [0x7D8903A6, 0x4E800420]))
+    check('fix v5: the original show path\'s preamble and the Sonic branch are where stone_show expects them',
+          (bl_target(0x02B026B8, old.w(0x02B026B8)), [hex(old.w(0x02B026BC + 4 * i)) for i in range(5)],
+           [hex(old.w(0x02B02718 + 4 * i)) for i in (0, 1, 3)], [hex(old.w(C.SONIC_SHOW + 4 * i)) for i in range(6)]),
+          (C.SHOW_SYNC, ['0x807e0044', '0x80c30000', '0x80e602f4', '0x7ce903a6', '0x4e800421'],
+           ['0x80fe0068', '0x81470000', '0x394a03c0'],
+           ['0x816a0004', '0x7d6903a6', '0x38a00007', '0x38800003', '0x7ce33b78', '0x4e800421']))
+    check('fix v5: the init\'s kind 0x2C case re-aimed at the Marth path (0x02B02184 beq 0x02B022EC: li r5, 0x18; '
+          'flags r28 = 0x108); original beq 0x02B02248 (joint 0x19, flags 8)',
+          (hex(old.w(C.HOOK_JOINT)), hex(new.w(C.HOOK_JOINT)), hex(old.w(C.HOOK_JOINT - 8)),
+           hex(old.w(C.MARTH_LINK + 0xC)), hex(old.w(0x02B02248 + 0x20))),
+          ('0x418200c4', '0x41820168', '0x281f002c', '0x38a00018', '0x38800008'))
     print('%d failures' % len(FAIL))
     sys.exit(1 if FAIL else 0)
 

@@ -1,34 +1,42 @@
 #!/usr/bin/env python3
-"""TEMPORARY diagnostic executable for Kirby's Hero copy fix v4 (fighters/kirby/specials.md "Hero copy fix v4"):
-OSReport lines (Cemu's log, `S4KH <tag> ...`, hex words, floats as their bits) from the held sword's chain and from
-the Hero spells' articles, so the user's log settles what the static reading can't. Not for the normal chain build.
-Goes on the B executable (exe_v46g: the sword fix) and prints rpx_patch.py arguments:
+"""TEMPORARY diagnostic executable for Kirby's Hero copy (fighters/kirby/specials.md "Hero copy fix v4" / "fix v5"):
+OSReport lines (Cemu's log, `S4KH <tag> ...`, hex words, floats as their bits) from every step of the held sword's
+chain and from the Hero spells' articles, so the user's log settles what the static reading and the unicorn runs can't.
+Not for the normal chain build. Goes on the B executable (fix v5: exe_v46h) and prints rpx_patch.py arguments:
 
-  python3 tools/rpx_patch.py exe_v46g.rpx exe_v46g_diag.rpx $(python3 tools/diag_kirby_hero_cave.py --rpx exe_v46g.rpx)
-  python3 tools/diag_kirby_hero_test.py exe_v46g_diag.rpx exe_v46g.rpx
+  python3 tools/rpx_patch.py exe_v46h.rpx exe_v46h_diag.rpx $(python3 tools/diag_kirby_hero_cave.py --rpx exe_v46h.rpx)
+  python3 tools/diag_kirby_hero_test.py exe_v46h_diag.rpx exe_v46h.rpx
 
-Lines (each tag with its own cap, CAPS):
+Lines (each tag with its own cap, CAPS), in the order the chain runs:
   cpy    the copy model function 0x02EFE138 (copy_grant / the copy's loss): new kind, the kind before, the grant
          kind kirby_copy_new_cave.py kept (0x45 for a Hero), the fighter (r26).
-  gen    the held article's generate (article 0x1A, 0x02EFE760): the kind, the article handle (0: not made).
   res    the copy-resource loader's model path test (0x030C4978), types 0xC (hat) / 0x11 (held model): type, kind,
          costume << 8 | match entry, found (non-zero: model/<name>/cNN exists), the path's name (3 words at its 21st
          character: "brav" "eswo" "rd/c" for model/bravesword/cNN).
-  stn    the held article's update in Kirby's stone statuses (0x155 / 0x175 / 0x176), one line every STN_EVERY calls:
-         the status, the owner's accessor, the article's; no line: the article's update never runs in the stone.
-  swd    the stone check reading Kirby's int 0x1000008B (kirby_hero_sword_cave.py hs_chk), when it is 1 (a sword
-         spell being cast: the show path follows): 1, the article visible before it (its +0xA8 module, vt +0xA4: 0
-         hidden, the show path then shows it), the owner's accessor, the article's. (The show path itself,
-         0x02B026B4, is out of a branch's reach from the cave.)
+  gen    the held article's generate (article 0x1A, 0x02EFE760): the kind, the article handle (0: not made).
+  lnk    (fix v5) the held article's init linking it to Kirby (0x02B61FB8 called from the init 0x02B02078): the copy
+         kind, the joint (0x18 LHaveN: the sword's; 0x19 RHaveN was fix v4's), the caller.
+  stn    the held article's update reaching the stone check (kirby_hero_sword_cave.py held_stone) while Kirby is in a
+         stone status (0x155 / 0x175 / 0x176), one line every STN_EVERY: the status, the article's copy kind (fix v5:
+         anything but 2C takes the hide path), the owner's accessor, the article's. No line: the update never gets
+         there (no article, or Kirby not in the stone).
+  swd    the stone check's sword int (Kirby's 0x1000008B, hs_v), every call while it is 1 and the first call after:
+         the int (1: the stone show path follows, else the hide path), the article's own visibility before (its
+         VisibilityModule +8), Kirby's own (his +8: 0 in the stone), the article's LinkModule attribute mask (+0x84:
+         bit 0x80 = it follows Kirby's visibility).
+  vis    (fix v5) the end of the held article's update (0x02B02884) for the Hero copy's article, every frame while the
+         sword int is 1 or the article's own flag is set, and the frame after: the int, own flag, Kirby's flag, the
+         attribute mask, and drawn = the article's is_visible (vt +0xA4: own flag AND, with the attribute, Kirby's):
+         1 on every frame of a sword spell when the fix works.
   spawn  Robin's thunder spawner's generate (0x02F6465C) for a Kirby (8) or a Hero (0x45): owner kind, custom
-         number, the new weapon's position x / y / z (the hand joint's), the owner's own z and x. The stone's casts
-         should show z off the owner's (the fix puts the projectile on his plane after this line).
+         number, the new weapon's position x / y / z (the hand joint's), the owner's own z and x.
   hit    the hit methods of the weapons 0x190 (Frizz), 0x193 flash, 0x194 explosion, 0x195 deathball, 0x196 crash,
          0x197 sleep (weapon_expand.py's on_hit methods): kind, result bits (1 / 2 / 0x10 a hit, 4 a shield), the
-         weapon's x / y / z: whether it touched anyone, and where.
+         weapon's x / y / z.
 Each stub (diag_stomp_cave.py's: r0, r2-r12, LR, CTR, XER, CR, f0-f13 saved; the replaced word replayed) reads the
-hooked function's own r1 as r1 + FRAME. Space: 0x04BAC000-0x04BAF000 (zero in exe_v46g: kind_expand.py's free tail
-before extended_memory.py's 0x04BAF000), in the code region the standard build runs.
+hooked function's own r1 as r1 + FRAME. Space: 0x04BAA000-0x04BAE000 (zero in exe_v46h: kind_expand.py's free tail;
+fix v4's 0x04BAC000-0x04BAF000 now holds sound_alias_cave.py's 0x04BAE000 in the B chain since ported_sound_ids_v1),
+in the code region the standard build runs.
 """
 import argparse
 import os
@@ -42,7 +50,7 @@ import diag_stomp_cave as B  # noqa: E402
 import kirby_hero_sword_cave as SW  # noqa: E402
 import kirby_copy_new_cave as V44  # noqa: E402
 
-CAVE, LIMIT = 0x04BAC000, 0x04BAF000
+CAVE, LIMIT = 0x04BAA000, 0x04BAE000
 FRAME = B.FRAME
 STN_EVERY = 60
 SW_LABELS = SW.build()[0].labels
@@ -50,10 +58,23 @@ GRANT = V44.args()[0].labels['grant_kind']
 HIT_METHODS = {0x190: 0x04BB5898, 0x193: 0x04BB6030, 0x194: 0x04BB62B8, 0x195: 0x04BB6540, 0x196: 0x04BB67C8,
                0x197: 0x04BB6A50}
 NAMES = {'cpy': ('kind', 'prev', 'grant', 'f'), 'gen': ('kind', 'h'),
-         'res': ('type', 'kind', 'cost_ent', 'found', 'n0', 'n1', 'n2'), 'stn': ('st', 'acc', 'art'),
-         'swd': ('v', 'was', 'acc', 'art'),
+         'res': ('type', 'kind', 'cost_ent', 'found', 'n0', 'n1', 'n2'), 'stn': ('st', 'kind', 'acc', 'art'),
+         'swd': ('v', 'own', 'kirby', 'attr'), 'lnk': ('kind', 'joint', 'lr'),
+         'vis': ('v', 'own', 'kirby', 'attr', 'drawn'),
          'spawn': ('kind', 'custom', 'x', 'y', 'z', 'oz', 'ox'), 'hit': ('kind', 'bits', 'x', 'y', 'z', 'w')}
-CAPS = {'cpy': 60, 'gen': 60, 'res': 120, 'stn': 200, 'swd': 600, 'spawn': 300, 'hit': 400}
+CAPS = {'cpy': 60, 'gen': 60, 'res': 120, 'stn': 200, 'swd': 800, 'lnk': 60, 'vis': 800, 'spawn': 300, 'hit': 400}
+LINK_CALL = 0x02B61FB8          # the link to the owner's joint (r5); the held article's init calls it
+INIT_LO, INIT_HI = 0x02B02078, 0x02B023B0
+UPDATE_END = 0x02B02884         # lmw r26, 0x70(r1): the update's return for every copy kind but 0x13 / 0x2F
+SWORD_INT = SW.SWORD_INT
+# fix v5: lnk / vis hook 0x02Bxxxxx, out of a branch's reach (32 MB) of the cave: each goes through two words here, the
+# zero tail of the Havok cave (0x037EE4DC-0x037EE598 zero in exe_v46h; copy_custom_cave.py's spawn space ends at its
+# SPAWN_LIMIT 0x037EE598 but never grew this far: a diagnostic-only use)
+TRAMP, TRAMP_LIMIT = 0x037EE578, 0x037EE598
+
+
+def far(at):
+    return not -0x1F00000 < at - CAVE < 0x1F00000
 
 
 def orig_r1(dst):
@@ -90,8 +111,26 @@ def hooks():
         lwz r9, 0x60(r11)
         lwz r10, 0x64(r11)
     """ % orig_r1('r11')),
-        ('stn', SW_LABELS['held_stone'] + 0x14, 0x28030155, """           # cmplwi r3, 0x155 (r3 the status)
+        ('lnk', LINK_CALL, 0x9421FFE0, """           # stwu r1, -0x20(r1) (the link call's entry: r31 the init's copy kind)
+        lwz r12, %d(r1)
+        lis r11, 0x%04X
+        ori r11, r11, 0x%04X
+        cmplw r12, r11
+        blt skip
+        lis r11, 0x%04X
+        ori r11, r11, 0x%04X
+        cmplw r12, r11
+        bge skip
+        mr r4, r31
         %s
+        mr r6, r12
+    """ % (B.LR_S, INIT_LO >> 16, INIT_LO & 0xFFFF, INIT_HI >> 16, INIT_HI & 0xFFFF, B.ld('r5', 5))),
+        ('stn', SW_LABELS['held_stone'], 0x281F002C, """           # cmplwi r31, 0x2C (the held article's copy kind)
+        lwz r3, 0x20(r27)               # Kirby's status
+        lwz r12, 0(r3)
+        lwz r12, 0x8C(r12)
+        mtctr r12
+        bctrl
         cmplwi r3, 0x155
         beq s_in
         cmplwi r3, 0x175
@@ -110,23 +149,72 @@ def hooks():
         cmpwi r9, 1
         bne skip
         mr r4, r3
-        mr r5, r27
-        mr r6, r30
-    """ % (B.ld('r3', 3), STN_EVERY)),
-        ('swd', SW_LABELS['hs_chk'] + 0x1C, 0x2C030001, """           # cmpwi r3, 1 (r3 = Kirby's int 0x1000008B)
+        mr r5, r31
+        mr r6, r27
+        mr r7, r30
+    """ % STN_EVERY),
+        ('swd', SW_LABELS['hs_v'], 0x2C030001, """           # cmpwi r3, 1 (r3 = Kirby's int 0x1000008B)
         %s
+        lis r12, swdlast@ha
+        lwz r11, swdlast@l(r12)
+        li r10, 0
         cmpwi r3, 1
+        bne w_n
+        li r10, 1
+    w_n:
+        stw r10, swdlast@l(r12)
+        or. r11, r11, r10
+        beq skip
+        mr r4, r3
+        lwz r12, 0xA8(r30)              # the article's VisibilityModule: own flag
+        lbz r5, 8(r12)
+        lwz r12, 0xA8(r27)              # Kirby's
+        lbz r6, 8(r12)
+        lwz r12, 0x68(r30)              # the article's LinkModule: attribute mask
+        lwz r7, 0x84(r12)
+    """ % B.ld('r3', 3)),
+        ('vis', UPDATE_END, 0xBB410070, """           # lmw r26, 0x70(r1) (r27 Kirby's accessor, r30 the article's, r31 its kind)
+        cmplwi r31, 0x%X
         bne skip
-        lwz r3, 0xA8(r30)               # the article's visibility (+0xA8, vt +0xA4: visible?) before the show path
+        lwz r3, 0x28(r27)               # Kirby's sword int
+        lwz r12, 0(r3)
+        lwz r12, 0x84(r12)
+        lis r4, 0x%04X
+        ori r4, r4, 0x%04X
+        mtctr r12
+        bctrl
+        lis r12, visv@ha
+        stw r3, visv@l(r12)
+        lwz r12, 0xA8(r30)
+        lbz r5, 8(r12)
+        lis r12, vislast@ha
+        lwz r11, vislast@l(r12)
+        li r10, 0
+        cmpwi r3, 1
+        beq v_on
+        cmpwi r5, 0
+        beq v_off
+    v_on:
+        li r10, 1
+    v_off:
+        stw r10, vislast@l(r12)
+        or. r11, r11, r10
+        beq skip
+        lwz r3, 0xA8(r30)               # drawn: the article's is_visible (vt +0xA4)
         lwz r12, 0(r3)
         lwz r12, 0xA4(r12)
         mtctr r12
         bctrl
-        mr r5, r3
-        li r4, 1
-        mr r6, r27
-        mr r7, r30
-    """ % B.ld('r3', 3)),
+        mr r8, r3
+        lis r12, visv@ha
+        lwz r4, visv@l(r12)
+        lwz r12, 0xA8(r30)
+        lbz r5, 8(r12)
+        lwz r12, 0xA8(r27)
+        lbz r6, 8(r12)
+        lwz r12, 0x68(r30)
+        lwz r7, 0x84(r12)
+    """ % (SW.ROBIN, SWORD_INT >> 16, SWORD_INT & 0xFFFF)),
         ('spawn', 0x02F6465C, 0x7F83E378, """           # mr r3, r28 (r27 the owner fighter; the init struct at r1 + 0x50)
         lwz r12, 0x726C(r27)
         lwz r4, 0x18(r12)
@@ -205,12 +293,13 @@ def build(orig):
     rest += ['lwz r0, %d(r1)' % B.SLOT(0), 'addi r1, r1, 0x%X' % FRAME]
     tags = sorted(set(t for t, _a, _w, _b in hk))
     out = {}
+    tramps = []
     for i, (tag, at, w0, body) in enumerate(hk):
         w = orig(at)
         assert w == w0, '%s: 0x%08X is 0x%08X, expected 0x%08X' % (tag, at, w, w0)
         assert w >> 26 not in (16, 18, 19), 'a branch at 0x%08X' % at
         b = body
-        for lab in ('skip', 'r_ok', 's_in', 'p_ok', 'h_no'):
+        for lab in ('skip', 'r_ok', 's_in', 'p_ok', 'h_no', 'w_n', 'v_on', 'v_off'):
             b = b.replace(lab, '%s%d' % (lab, i))
         cap = 'cap_%s' % tag
         a.asm('hook%d:' % i)
@@ -233,9 +322,14 @@ def build(orig):
     skip%(i)d:
         """ % dict(cap=cap, tag=tag, i=i))
         a.asm('\n'.join(rest))
-        a.asm('%s\nb 0x%X' % (B.word(w), at + 4))
+        if far(at):                     # fix v5: through a pair of trampolines (TRAMP) in branch reach of both
+            t = TRAMP + 8 * len(tramps)
+            tramps.append((at, i, t))
+            a.asm('%s\nb 0x%X' % (B.word(w), t + 4))
+        else:
+            a.asm('%s\nb 0x%X' % (B.word(w), at + 4))
         out[at] = i
-    a.asm('\n'.join('cap_%s:\n.word 0' % t for t in tags) + '\nstncnt:\n.word 0')
+    a.asm('\n'.join('cap_%s:\n.word 0' % t for t in tags) + '\nstncnt:\n.word 0\nswdlast:\n.word 0\nvislast:\n.word 0\nvisv:\n.word 0')
     pos = a.pc
     data = bytearray()
     for t in tags:
@@ -246,14 +340,19 @@ def build(orig):
     code = a.words()
     words = code + list(struct.unpack('>%dI' % (len(data) // 4), bytes(data)))
     assert CAVE + 4 * len(words) <= LIMIT, 'cave full: %d words' % len(words)
-    hkw = {at: B.branch(at, a.labels['hook%d' % i]) for at, i in out.items()}
+    hkw = {at: B.branch(at, a.labels['hook%d' % i]) for at, i in out.items() if not far(at)}
+    for at, i, t in tramps:             # the hook -> t -> the stub ... -> t + 4 -> the word after the hook
+        hkw[at] = B.branch(at, t)
+        hkw[t] = B.branch(t, a.labels['hook%d' % i])
+        hkw[t + 4] = B.branch(t + 4, at + 4)
+    assert TRAMP + 8 * len(tramps) <= TRAMP_LIMIT
     return words, dict(a.labels), hkw
 
 
 def args(rpx):
     import kind_expand as K
     img = K.Image(rpx)
-    used = [x for x in range(CAVE, LIMIT, 4) if img.w(x)]
+    used = [x for x in list(range(CAVE, LIMIT, 4)) + list(range(TRAMP, TRAMP_LIMIT, 4)) if img.w(x)]
     assert not used, 'the diagnostic cave space is in use in %s (0x%08X)' % (rpx, used[0])
     vw = [img.w(B.OSREPORT_VENEER + 4 * i) for i in range(len(B.VENEER_WORDS))]
     assert all(w == x for w, x in zip(vw, B.VENEER_WORDS) if x is not None) and vw[2] >> 16 == 0x3FE0 and \
@@ -266,7 +365,7 @@ def args(rpx):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
-    ap.add_argument('--rpx', required=True, help='the executable it goes on (exe_v46g): hook words checked')
+    ap.add_argument('--rpx', required=True, help='the executable it goes on (exe_v46h): hook words checked')
     a = ap.parse_args()
     print(' '.join(args(a.rpx)))
 

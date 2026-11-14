@@ -44,9 +44,10 @@ both in the held article's own native code (fighters/kirby/specials.md "Hero cop
   flag AND, when its LinkModule link 3 has attribute 7, the parent's is_visible (LinkModule vt +0xDC = 0x02C560C8). The
   update 0x02B02534 sets that attribute again every frame (0x02B02824 .. 0x02B02860) for every Kirby motion but the
   Sonic copy's spin ones (0x318-0x31A: SonicSpecialNSpin / Homing / HomingStart, where Kirby is hidden and the sphere
-  shows; it clears it there, 0x02B02794). Kirby is invisible for the whole stone (his native stone code 0x02EED1FC:
-  VisibilityModule whole 0 at 0x02EED290; the MSC's SpecialLwEnd main shows him again), so the stone show path's own
-  flag (v6) was ANDed with Kirby's 0 every frame. The stone show path now goes to STONE_SHOW: the show path's own
+  shows; it clears it there, 0x02B02794). Kirby is invisible for the whole stone: his MSC's func_2337(1) (the stone
+  article shown, VisibilityModule(0x2710, 0): handler 0x02C77060 -> vt +0x94, his module's +8 = 0) runs in the
+  transform's blink (func_2336, status 0x155) and at the stone hold's init (func_2339, status 0x175); nothing shows him
+  until SpecialLwEnd's main (VisibilityModule(0x2710, 1)). So the stone show path's own flag (v6) was ANDed with Kirby's 0 every frame. The stone show path now goes to STONE_SHOW: the show path's own
   preamble (0x02BF0594 the owner's motion frame, the item's MotionModule vt +0x2F4), then the Sonic branch 0x02B02794
   with r7 = [r30+0x68] (the LinkModule), r10 = its vtable + 0x3C0, which clears link 3's attribute 7 and shows the
   item. The hide path is unchanged: its motion check sets the attribute again (0x02B02824). The stone check now also
@@ -118,7 +119,7 @@ def source(lab44, stone_show):
         src += ['cmplwi r3, 0x%X' % st, 'beq hs_chk']
     src += ['b hs_hide', 'hs_chk:', 'lwz r3, 0x28(r27)', 'lwz r12, 0(r3)', 'lwz r12, 0x84(r12)',
             'lis r4, 0x%04X' % (SWORD_INT >> 16), 'ori r4, r4, 0x%04X' % (SWORD_INT & 0xFFFF), 'mtctr r12', 'bctrl',
-            'cmpwi r3, 1', 'bne hs_hide',
+            'hs_v:', 'cmpwi r3, 1', 'bne hs_hide',     # hs_v: diag_kirby_hero_cave.py's swd line (r3 the int)
             # fix v5 (v6-v4 went to the show path 0x02B026B4, whose motion check set link 3's attribute 7 again: the
             # item then hidden with Kirby)
             'b 0x%08X' % stone_show,

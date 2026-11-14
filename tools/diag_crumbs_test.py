@@ -127,6 +127,8 @@ def setup(e, regs, mem):
     for r, v in regs.items():
         if r == 'ctr':
             e.mu.reg_write(UC_PPC_REG_CTR, v)
+        elif r == 'lr':
+            e.mu.reg_write(UC_PPC_REG_LR, v)
         else:
             e.mu.reg_write(REGS[r], v)
 

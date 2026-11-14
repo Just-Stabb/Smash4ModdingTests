@@ -4,7 +4,8 @@ executable and on the one it was built on, from the hook to the word after it: e
 as the original leaves them, OSReport (stubbed at its loader-relocated import address, clobbering what a C function
 may) called with the line's format and values only when its filter passes, the per-tag caps.
 
-  python3 tools/diag_kirby_hero_test.py DIAG.rpx BASE.rpx      (exe_v46g_diag, exe_v46g)
+  python3 tools/diag_kirby_hero_test.py DIAG.rpx BASE.rpx      (exe_v46h_diag, exe_v46h; fix v5: the lnk / vis lines,
+  stn / swd as rewritten, the hooks out of reach through TRAMP)
 """
 import os
 import struct
@@ -22,9 +23,15 @@ from unicorn import UC_HOOK_CODE  # noqa: E402
 def run(e, at, stop):
     """from a prelude that sets XER's carry through r12, then the hook (as diag_stomp_test.py)"""
     pre = e.pre
-    e.pre += 20
-    e.mu.mem_write(pre, struct.pack('>5I', 0x3980FFFF, 0x318C0001, 0x3D805A5A, 0x618C000C,
-                                    (18 << 26) | ((at - (pre + 16)) & 0x3FFFFFC)))
+    e.pre += 32
+    if -0x1F00000 < at - pre < 0x1F00000:
+        e.mu.mem_write(pre, struct.pack('>5I', 0x3980FFFF, 0x318C0001, 0x3D805A5A, 0x618C000C,
+                                        (18 << 26) | ((at - (pre + 16)) & 0x3FFFFFC)))
+    else:                               # fix v5: a hook out of a branch's reach: through ctr (the same in both runs)
+        e.mu.mem_write(pre, struct.pack('>8I', 0x3980FFFF, 0x318C0001, 0x3D805A5A, 0x618C000C,
+                                        0x3C000000 | (at >> 16), 0x60000000 | (at & 0xFFFF), 0x7C0903A6, 0x3C005A5A)
+                       + struct.pack('>I', 0x4E800420))
+        e.pre += 4
     h = e.mu.hook_add(UC_HOOK_CODE, lambda mu, a, size, ud: mu.emu_stop(), None, stop, stop)
     try:
         e.mu.emu_start(pre, stop, count=6000)
@@ -98,29 +105,64 @@ def main():
         exp = [(fmts['res'], typ, 0x2C, 0x301, 0x77, 0x62726176, 0x6573776F, 0x72642F63)] if want else []
         check('res type 0x%X: registers kept (r0 = the found word, replayed), %s' % (typ, 'a line' if want else 'no line'),
               (diff, [(c[0],) + nv(c, 7) for c in calls]), ({}, exp))
-    # stn: r3 status, every STN_EVERY-th call in the stone
+    # fake modules: Kirby's accessor KA (+0x20 status, +0x28 work, +0xA8 visibility), the article's AA (+0x68 link,
+    # +0xA8 visibility with vt +0xA4)
+    KA, AA = F + 0x1000, F + 0x1200
+    kst, kwk, kvi, avi, aln = F + 0x1400, F + 0x1440, F + 0x1480, F + 0x14C0, F + 0x1500
+    vst, vwk, vav = F + 0x1600, F + 0x1700, F + 0x1800
+    fst, fwk, fav = F + 0x1900, F + 0x1910, F + 0x1920
+    box = {'st': 0x175, 'v': 1, 'drawn': 1}
+    for e in (E0, E1):
+        e.stub(fst, lambda e: box['st'])
+        e.stub(fwk, lambda e: box['v'] if e.r(4) == D.SWORD_INT else 0x55)
+        e.stub(fav, lambda e: box['drawn'])
+    mods = {KA + 0x20: kst, KA + 0x28: kwk, KA + 0xA8: kvi, AA + 0x68: aln, AA + 0xA8: avi,
+            kst: vst, kwk: vwk, avi: vav, vst + 0x8C: fst, vwk + 0x84: fwk, vav + 0xA4: fav,
+            kvi + 8: 0x00010000, avi + 8: 0x01010000, aln + 0x84: 0x80}
+    # lnk: the link call's entry, LR in the held article's init, r31 the kind, r5 the joint
+    for lr, want in ((0x02B022FC + 4, True), (0x02B02254 + 4, True), (0x02B10000, False), (0x02B02000, False)):
+        diff, calls = case(at['lnk'], {31: 0x2C, 5: 0x18, 'lr': lr}, {})
+        exp = [(fmts['lnk'], 0x2C, 0x18, lr)] if want else []
+        check('lnk from 0x%08X: registers kept (stwu replayed), %s' % (lr, 'a line (kind, joint, caller)' if want else
+                                                                     'no line (not the held article\'s init)'),
+              (diff, [(c[0],) + nv(c, 3) for c in calls]), ({}, exp))
+    # stn: at held_stone (r31 the kind), Kirby's status read, every STN_EVERY-th call in the stone
     seen = []
+    box['st'] = 0x175
     for k in range(D.STN_EVERY + 2):
-        diff, calls = case(at['stn'], {3: 0x175, 27: 0x111, 30: 0x222}, {})
+        diff, calls = case(at['stn'], {31: 0x2C, 27: KA, 30: AA}, mods)
         if diff:
             check('stn call %d: registers kept' % k, diff, {})
             break
-        seen += [(k, (c[0],) + nv(c, 3)) for c in calls]
-    check('stn: in the stone, a line on the 1st and the %dth+1 calls (status, accessor, article)' % D.STN_EVERY, seen,
-          [(0, (fmts['stn'], 0x175, 0x111, 0x222)), (D.STN_EVERY, (fmts['stn'], 0x175, 0x111, 0x222))])
-    diff, calls = case(at['stn'], {3: 0x16, 27: 0x111, 30: 0x222}, {})
-    check('stn: not in the stone: no line', (diff, calls), ({}, []))
-    # swd: r3 the int; the article's +0xA8 module, vt +0xA4 -> visible
-    mod, vt, fn = F + 0x100, F + 0x200, F + 0x300
-    art = F + 0x400
-    for e in (E0, E1):
-        e.stub(fn, lambda e: 0)
-    mem = {art + 0xA8: mod, mod: vt, vt + 0xA4: fn}
-    for v, want in ((1, True), (0, False), (2, False)):
-        diff, calls = case(at['swd'], {3: v, 27: 0x111, 30: art}, mem)
-        exp = [(fmts['swd'], 1, 0, 0x111, art)] if want else []
-        check('swd int %d: registers kept (cr0 as cmpwi r3, 1), %s' % (v, 'a line (visible before 0)' if want else 'no line'),
-              (diff, [(c[0],) + nv(c, 4) for c in calls]), ({}, exp))
+        seen += [(k, (c[0],) + nv(c, 4)) for c in calls]
+    check('stn: in the stone, a line on the 1st and the %dth+1 calls (status, kind, accessor, article)' % D.STN_EVERY,
+          seen, [(0, (fmts['stn'], 0x175, 0x2C, KA, AA)), (D.STN_EVERY, (fmts['stn'], 0x175, 0x2C, KA, AA))])
+    box['st'] = 0x16
+    diff, calls = case(at['stn'], {31: 0x2C, 27: KA, 30: AA}, mods)
+    check('stn: not in the stone: no line, registers kept (cr0 as cmplwi r31, 0x2C)', (diff, calls), ({}, []))
+    # swd: r3 the int: a line while 1 and the call after
+    got = []
+    for v in (0, 1, 1, 0, 0, 2):
+        diff, calls = case(at['swd'], {3: v, 27: KA, 30: AA}, mods)
+        got.append((v, diff, [(c[0],) + nv(c, 4) for c in calls]))
+    line = lambda v: [(fmts['swd'], v, 1, 0, 0x80)]       # noqa: E731
+    check('swd: registers kept (cr0 as cmpwi r3, 1); a line (int, own, Kirby, attribute mask) while the int is 1 and '
+          'the call after', got, [(0, {}, []), (1, {}, line(1)), (1, {}, line(1)), (0, {}, line(0)), (0, {}, []),
+                                  (2, {}, [])])
+    # vis: the update's end, the Hero copy's article (r31 0x2C): while the int is 1 or its own flag is set, and after
+    got = []
+    for kind, v, own, drawn in ((0x2C, 0, 0, 0), (0x2C, 1, 1, 1), (0x12, 1, 1, 1), (0x2C, 0, 0, 0), (0x2C, 0, 0, 0),
+                                (0x2C, 0, 1, 0)):
+        box['v'], box['drawn'] = v, drawn
+        m = dict(mods)
+        m[avi + 8] = (own << 24) | 0x010000
+        diff, calls = case(at['vis'], {31: kind, 27: KA, 30: AA}, m)
+        got.append((hex(kind), v, own, diff, [(c[0],) + nv(c, 5) for c in calls]))
+    check('vis: registers kept (lmw replayed); a line (int, own, Kirby, attribute mask, drawn) for the Hero copy\'s '
+          'article while the int is 1 or its own flag set, and the frame after; none for another kind',
+          got, [('0x2c', 0, 0, {}, []), ('0x2c', 1, 1, {}, [(fmts['vis'], 1, 1, 0, 0x80, 1)]), ('0x12', 1, 1, {}, []),
+                ('0x2c', 0, 0, {}, [(fmts['vis'], 0, 0, 0, 0x80, 0)]), ('0x2c', 0, 0, {}, []),
+                ('0x2c', 0, 1, {}, [(fmts['vis'], 0, 1, 0, 0x80, 0)])])
     # spawn: r27 the owner fighter (+0x726C -> +0x18 kind; +0x72E4 posture +0x10 x / +0x18 z), r1 + 0x50 the struct
     info, post = F + 0x500, F + 0x600
     for kind, want in ((8, True), (0x45, True), (0x2C, False)):
