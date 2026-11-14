@@ -78,6 +78,17 @@ JUMP_TO, STRIKE = anim.GF_JUMP_TO, anim.GF_STRIKE      # 46, 66 (#0 frame 40: th
 WHIFF_END = float(anim.GF_WHIFF_END)     # the whiff's end (MSC): 44
 HOLD_X = 11.5                           # the victim held this far in front of him (his fist 7.3-7.5 ahead, + 4)
 PUNCH_DMG, STRIKE_DMG = 4.0, 11.0          # 15 in all (v7: no hit at the end; v6's 1% end hit gone)
+# v9 (user: "make it so Super God Fist can't hit an opponent who is knocked down"): the punch's Ground/Air has bit 31
+# set, Smash 4's own "misses a fighter lying down" flag (vanilla Diddy Kong's dash attack: 0x80000003; the community
+# sheet's Hitbox tab, Ground/Air). The game code: the ACMD Hitbox handler (0x02BDB214) and the MSC hitbox builder
+# Extended_Special_Hitbox goes through (0x02C0AA04) both turn bit 31 into the attack data's +0x56 byte, and the
+# collision set-up (0x02C0E7CC) makes the hitbox's target class mask 1 (standing) instead of 3 (standing + lying)
+# when it's set. Belt and braces: at the catch, a fighter hit in a down status (LASTHIT_STATUS 0x4D DownBound ..
+# 0x57 DownDamage, 0x5B DownFuraFura) isn't caught (a whiff)
+NO_DOWN = 0x80000000
+PUNCH_SITUATION = NO_DOWN | 3
+LASTHIT_STATUS = 0x0F0000B2
+DOWN_LO, DOWN_HI, DOWN_FURAFURA = 0x4D, 0x57, 0x5B
 PUNCH_FREEZE = 9                        # the punch's hitstop, both: CMN.bdm #160's stun 9 / 9 (the BDM the hitbox
                                         # names: #160 isn't in GOK_PLAYER.bdm)
 STRIKE_FREEZE = 8                       # the launch's hitstop, both (the slow hold is the animation's: #0 0-40 x0.8);
@@ -445,10 +456,10 @@ def game_script():
     s += [cmd('frame', float(PUNCH))]
     s += [hitbox('extra_special_hitbox', ID=0, Bone=FIST, Damage=PUNCH_DMG, Angle=0, KBG=0, FKB=0, BKB=20,
                  Size=4.5, X=0.0, SFXLevel=1, SFXType=1, Type=4, HitstopFrames=PUNCH_FREEZE,
-                 SelfHitstopFrames=PUNCH_FREEZE),
+                 SelfHitstopFrames=PUNCH_FREEZE, **{'Ground/Air': PUNCH_SITUATION}),
           hitbox('extra_special_hitbox', ID=1, Bone=0, Damage=PUNCH_DMG, Angle=0, KBG=0, FKB=0, BKB=20, Size=4.0,
                  Y=6.5, Z=4.0, SFXLevel=1, SFXType=1, Type=4, HitstopFrames=PUNCH_FREEZE,
-                 SelfHitstopFrames=PUNCH_FREEZE)]
+                 SelfHitstopFrames=PUNCH_FREEZE, **{'Ground/Air': PUNCH_SITUATION})]
     s += [cmd('frame', float(PUNCH_END)), cmd('remove_all_hitboxes')]
     s += dlog_get(D_CATCH_KINDS, cmd('hit_get', 0, 0, V_TMP))
     # the catch: a fighter's body hit (not a shield)
@@ -460,6 +471,10 @@ def game_script():
     # an earlier God Fist's victim (still flying / down): its flight thread stopped, upright, controller back
     earlier = if_(V_SPIN, 0, 1, unspin())
     caught = earlier + per_lock_release() + [setf(0, V_PHASE)] + caught
+    # not a fighter lying down (V_TMP 1: catch it)
+    s += [setf(1, V_TMP)] + if_(LASTHIT_STATUS, 3, DOWN_LO, if_(LASTHIT_STATUS, 2, DOWN_HI, [setf(0, V_TMP)]))
+    s += if_(LASTHIT_STATUS, 0, DOWN_FURAFURA, [setf(0, V_TMP)])
+    caught = if_(V_TMP, 0, 1, caught)
     s += [cmd('hit_check', 0, 0, 2), cmd('true', 2 + size(caught))] + caught
     # the hold, 46-95 (only reached when caught: the MSC jumps here; guarded anyway)
     for f in range(JUMP_TO, STRIKE):

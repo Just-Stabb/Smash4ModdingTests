@@ -229,9 +229,14 @@ class Victim:
         elif self.ground == 0:
             self.situation, self.fall = 2, 0
 
+    def lying(self):
+        return B.DOWN_LO <= self.status <= B.DOWN_HI or self.status == B.DOWN_FURAFURA
+
     def hit(self, g, part, hitstun):
         self.hits_taken.append((g, part))
-        if self.status not in DAMAGE_STATUSES:
+        if self.lying():
+            self.status, self.dmg = 0x57, 10      # hit while down: DownDamage
+        elif self.status not in DAMAGE_STATUSES:
             self.status = 0x45
         self.hitstun = max(self.hitstun, hitstun)
 
@@ -264,6 +269,9 @@ class Acmd:
     # THREADS: a Thread_Start'ed block runs (v4's clip: nothing its flight thread did reached the victim; the
     #   unicorn tests run the cave's threads on a weapon, never in game: False is the in-game observation)
     DEFER, BLOCK, T2_THREAD, THREADS = True, False, True, False
+    # NO_DOWN: a hitbox with Ground/Air bit 31 misses a fighter lying down (0x02C0E7CC: its target class mask 1, not
+    #   3); False: the game ignored it (the catch's own status guard is all that's left)
+    NO_DOWN = True
 
     def __init__(self, cmds, victim, slot2=True):
         self.cmds = cmds
@@ -316,9 +324,11 @@ class Acmd:
     def collide(self, g):
         """the frame's collision: each live hitbox against the victim, once per Part record; -> self hitstop"""
         freeze = 0
-        for hid, (part, stop, vstop) in sorted(self.active.items()):
+        for hid, (part, stop, vstop, sit) in sorted(self.active.items()):
             rec = self.records.setdefault(part, set())
             if self.v.slot in rec or not self.v.hittable(self.motion_frame):
+                continue
+            if self.NO_DOWN and sit & B.NO_DOWN and self.v.lying():
                 continue
             rec.add(self.v.slot)
             self.pending_bits |= 2
@@ -392,7 +402,8 @@ class Acmd:
                     self.records.pop(p[0], None)
             elif n in ('Hitbox', 'Extra_Special_Hitbox'):
                 d = dict(zip(acmd.INFO[c.ident]['syntax'], p))
-                self.active[d['ID']] = (d['Part'], d.get('SelfHitstopFrames', 0), d.get('HitstopFrames', 0))
+                self.active[d['ID']] = (d['Part'], d.get('SelfHitstopFrames', 0), d.get('HitstopFrames', 0),
+                                        d['Ground/Air'])
                 if d['Part'] in self.stale and not self.BLOCK:
                     self.stale.discard(d['Part'])
                     self.records.pop(d['Part'], None)
@@ -439,6 +450,10 @@ class Acmd:
             return 0.0                      # the diag IDs read 0
         if var == B.SELF_FACING:
             return self.FACING
+        tq = self.slot_var(var)
+        if tq and tq[1] == 8 + 2:               # a target's status
+            tv = self.target(tq[0], self.in_thread)
+            return float(tv.status) if tv else 0.0
         return self.vars.get(var, 0.0)
 
     def setvar(self, var, val):
@@ -736,6 +751,34 @@ def acmd_tests(game_bin):
         a2.step(main, float(fr))
     check('second God Fist: the first victim\'s controller back, the MSC lets it go (gf_phase 0), upright',
           (v.input_off, a2.vars.get(B.V_PHASE), v.rot[0]), (0.0, 0.0, 0.0))
+    # v9: a fighter lying down is neither hit nor caught
+    punch = [c for c in script if c.name in ('Hitbox', 'Extra_Special_Hitbox')
+             and dict(zip(acmd.INFO[c.ident]['syntax'], c.params))['Part'] == 0]
+    check('the punch\'s hitboxes miss a fighter lying down (Ground/Air bit 31, as vanilla Diddy\'s 0x80000003)',
+          sorted(set(dict(zip(acmd.INFO[c.ident]['syntax'], c.params))['Ground/Air'] for c in punch)),
+          [B.PUNCH_SITUATION])
+    for st, name in ((0x50, 'DownWait'), (0x4D, 'DownBound'), (0x54, 'DownStand'), (0x57, 'DownDamage')):
+        for no_down in (True, False):
+            Acmd.NO_DOWN = no_down
+            v = Victim()
+            v.status, v.input_off, v.dmg = st, 1.0, 99      # held down (as the MSC holds one)
+            v.frame = lambda n: None                         # it stays as it is
+            a, rec = run_move(script, v, frames=60)
+            got = (a.vars.get(B.GF_VAR, 0.0), any(r[1] >= B.JUMP_TO for r in rec), v.rot, v.offx)
+            if no_down:
+                check('lying (%s): not hit, no catch: a whiff' % name, (len(v.hits_taken),) + got,
+                      (0, 0.0, False, (0.0, 0.0, 0.0), None))
+            else:
+                check('lying (%s), the flag ignored by the game: hit, but not caught (the status guard)' % name,
+                      (len(v.hits_taken) > 0,) + got, (True, 0.0, False, (0.0, 0.0, 0.0), None))
+    Acmd.NO_DOWN = True
+    # the victim of a God Fist, held down by the MSC, under a second God Fist: missed, still held, then gets up
+    v = Victim()
+    a, rec = run_move(script, v, frames=land + 10)
+    hits = len(v.hits_taken)
+    a2, rec2 = run_move(script, v, frames=120, acm=Acmd(script, v))
+    check('a God Fist on its own downed victim: missed (no hit), no catch',
+          (len(v.hits_taken) - hits, a2.vars.get(B.GF_VAR, 0.0)), (0, 0.0))
 
 
 def facing_tests(body_dir):
