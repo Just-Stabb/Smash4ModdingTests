@@ -1203,6 +1203,18 @@ instance ints `0x10000098`-`0x1000009C` by 1 each frame while they're positive (
 timers). Anything Hero (built on Robin's kind) keeps there loses 1 a frame: the crit flag (`0x9A`) read
 0 by the hit when written 1 (fix 62: written 1000, compared `!= 0`). The MP gauge int `0x9C` loses one too.
 
+### Robin's tome code (ints 0x9F-0xA1 on Robin, Hero and Kirby's Robin copy)
+
+`0x02F613B8(F, book)` (F: WorkModule at `+0x726C`; ten callers, among them Robin's thunder spawner `0x02F643A4` at
+`0x02F645BC`, with book 0, before the spawner reads the custom number at `0x02F64650`): book -1 sets VisibilityModule
+(`F+0x72B0`) group 1 to 1; any other book sets it to 0, calls the `F+0x727C` module's op 7 (`0x02C5C99C`) with the book
+as a float, and stores the book into the owner's instance ints `0x9F`, `0xA0`, `0xA1` (`0x02F61458`-`0x02F61460`) and
+`0x90`, clearing a flag (`[[cat0]+0x14]+0xC` bit 31). Robin's per-frame code (`0x02F62D88`) and set-up (`0x02F60270`)
+write the same three ints. On Kirby they are his copy custom slot `0x9F` (copy_custom_cave.py) and the copy marker
+`0xA0` (kirby_copy_new_cave.py): every Hero-copy projectile zeroed both before the custom was read (Kirby's Hero copy
+fix v2; `tools/kirby_robin_book_cave.py` skips the function for a Kirby whose marker is 2 / 3). Anything stored in a
+Robin-kind fighter's 0x9F-0xA1 / 0x90 is overwritten by his tome code.
+
 ### The Metal Box flag
 
 Work flag `0x20000012` ("Has Metal Box Item", note sheet) is read every frame by fighter code:

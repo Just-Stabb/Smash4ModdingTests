@@ -5,7 +5,8 @@
 // ---- Command Selection's projectiles (copies of Robin's thunder, fighters/brave/README.md): Sizz / Sizzle
 // (flash, article 9), Bang / Kaboom (explosion, 10), Whack / Thwack (deathball, 11), Snooze (sleep, 13).
 // The owner's custom N slot (int 0x10000048, which the game copies into this weapon's 0x10000005) = level
-// (0 / 1) + 4 x his player slot. Status 0 flies straight ahead at sh_speed for sh_life frames playing motion
+// (0 / 1), or level + 4 x (the caster's player slot + 1) (Kirby's Hero copy, fix v2; the native param getter keeps
+// custom & 3). Status 0 flies straight ahead at sh_speed for sh_life frames playing motion
 // `level` (Ultimate's scripts: its hitboxes and effects), then sh_end(); status 1 (a hit: extra_kinds.json
 // "on_hit": 1) runs sh_hit(), whose sh_burst(motion, frames) stops it there, plays that motion for those
 // frames and removes it, or which goes on flying. Weapons are pooled: status 0 resets everything.
@@ -159,8 +160,12 @@ void sh_main()
     sh_level = c - sh_owner * 0x4;
     if (sh_owner == 0)
     {
-        sh_owner = sh_find_owner();    // the level alone in the custom number (Whack / Thwack since multi-instance v1)
+        sh_owner = sh_find_owner();    // the level alone in the custom number (Hero's own: brave.c brave_generate)
     }
+    else
+    {
+        sh_owner = sh_owner - 0x1;     // Kirby's Hero copy (kirby.c khm_generate, fix v2): level + 4 x (his slot + 1),
+    }                                  // the caster itself (a nearest-Hero-or-Kirby search can pick an opponent)
     if (sh_level > 0x1)
     {
         sh_level = 0x1;

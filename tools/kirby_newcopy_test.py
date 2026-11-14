@@ -61,6 +61,26 @@ class Game:
         self.animcmd = []                                      # fix v1: MotionAnimcmdModule(0, set, motion, kind)
         self.nv = {}                                           # category-F user variables / New_Var slots (floats)
 
+    # fix v2: the copy article's spawner as the executable runs it (traced: tools/kirby_robin_book_cave.py). Robin's
+    # thunder spawner 0x02F643A4 (the Robin copy's records 2, 6 and 8-12) first calls Robin's tome code 0x02F613B8
+    # (owner, 0), which stores 0 into the owner's ints 0x9F / 0xA0 / 0xA1 / 0x90, then reads the custom number: Kirby
+    # with a copy his 0x1000009F (copy_custom_cave.py). exe_v45h / v46f (book_fix) skip the tome code for a Kirby whose
+    # marker 0x100000A0 is 2 / 3. Din's Fire's spawner (record 7, Sephiroth's fire) reads 0x10000049, no tome code.
+    THUNDER_RECORDS = (2, 6, 8, 9, 10, 11, 12)
+    book_fix = True
+
+    def spawn(self, article):
+        """the custom number the spawner gives the new weapon (its 0x10000005, a signed byte)"""
+        if article == 7:
+            return self.ints.get(0x10000049, 0)
+        if article not in self.THUNDER_RECORDS:
+            return None
+        if not (self.book_fix and self.ints.get(0x100000A0) in (2, 3)):
+            for i in (0x1000009F, 0x100000A0, 0x100000A1, 0x10000090):
+                self.ints[i] = 0
+        c = self.ints.get(0x1000009F if self.ints.get(0x100000A4, -1) < 0x3A else 0x10000048, 0)
+        return ((c & 0xFF) ^ 0x80) - 0x80
+
     @staticmethod
     def user(ident):
         """the cave's user-variable index for a category-F id 0x300-0x3FF (any top nibble), else None"""
@@ -135,7 +155,7 @@ class Game:
             return R.f2i(self.stick_y)
         if sid == 0x20 and a and a[0] == 0x2710:                # ArticleModule generate
             self.articles.append((a[1], self.frame, self.ints.get(0x10000048), self.ints.get(0x1000009F),
-                                  self.ints.get(0x10000049)))
+                                  self.ints.get(0x10000049), self.spawn(a[1])))
             return 0
         if sid == 0x10 and len(a) == 3 and a[0] == 0x11 and a[1] == 1:   # KineticModule(0x11, 1, v): speed
             self.speeds.append(R.i2f(a[2]))
@@ -546,6 +566,59 @@ def fix_v1_tests(path, src):
           got, [0x12, 0x12, 0x7, 0x12, 0xf4, 0xf4, 0xf4, 0xf4] if sword else [0] * 8)
 
 
+def fix_v2_tests(path, src):
+    """Hero copy fix v2: the level reaches the article (the spawner's custom number), the marker survives a fire, the
+    Stone's projectiles carry their caster"""
+    def frizz(book_fix, hold):
+        r = Run(path, src, 2)
+        r.game.book_fix = book_fix
+        r.update()
+        r.start()
+        for _ in range(8 + hold):
+            r.step()
+        r.step(press=[1])
+        for _ in range(20):
+            r.step()
+        return r
+    r = frizz(False, 20)
+    check('fix v2, the old executable modelled (Robin\'s tome code before the read): Frizzle\'s fireball gets custom 0 '
+          '(Frizz: the user\'s report) and the marker 0xA0 is lost',
+          ([a[5] for a in r.game.articles], r.game.ints.get(0x100000A0)), ([0], 0))
+    for hold, level, name in ((5, 0, 'Frizz'), (20, 1, 'Frizzle'), (60, 1, 'Frizzle (60)')):
+        r = frizz(True, hold)
+        check('fix v2 (exe_v45h / v46f): %s: the fireball\'s custom number %d, the marker kept (2)' % (name, level),
+              ([a[5] for a in r.game.articles], r.game.ints.get(0x100000A0)), ([level], 2))
+    # Kafrizz: charged to 81 (stored), then cast at once by the next special
+    r = Run(path, src, 2)
+    r.update()
+    r.start()
+    for _ in range(8 + 82):
+        r.step()
+    r.vm.g[r.gi['global4']] = 0
+    r.start()
+    for _ in range(30):
+        r.step()
+    check('fix v2: the stored Kafrizz: custom number 2', [a[5] for a in r.game.articles], [2])
+    # the Stone's projectiles: level + 4 x (his slot + 1); Sizz / Whack / Thwack / Snooze; Magic Burst's own coding
+    for spell, art, level in ((0x2, 8, 0), (0x3, 8, 1), (0x4, 9, 0), (0x5, 9, 1), (0x6, 10, 0), (0x7, 10, 1),
+                              (0xe, 11, 0)):
+        for slot in (0, 2):
+            r = Run(path, src, 2)
+            g = r.game
+            g.fvars.update({0x0F000000: 30.0, 0x0F000001: 5.0})
+            for s_ in range(8):
+                g.fvars[0x0F000020 + 4 * s_] = 30.0 if s_ == slot else -50.0 - 10 * s_
+                g.fvars[0x0F000021 + 4 * s_] = 5.0 if s_ == slot else 0.0
+                g.fvars[0x0F000023 + 4 * s_] = 1.0 if s_ in (slot, 1) else 0.0
+            r.update()
+            cast(r, spell, 10)
+            c = [a[5] for a in g.articles if a[0] == art]
+            check('fix v2: spell 0x%X from slot %d: article %d, custom %r = level %d + 4 x (slot + 1); param block %d'
+                  % (spell, slot, art, c, level, level), (c, [x & 3 for x in c], [x // 4 - 1 for x in c]),
+                  ([level + 4 * (slot + 1)], [level], [slot]))
+    check('fix v2: Sephiroth\'s fire (Din\'s spawner) as before', Game.THUNDER_RECORDS.count(7), 0)
+
+
 def main():
     path = sys.argv[1]
     src = sys.argv[2] if len(sys.argv) > 2 else os.path.join(HERE, '..', 'fighters', 'kirby', 'kirby.c')
@@ -640,6 +713,7 @@ def main():
     r.vm.call(r.fn['newcopy_n_end'])
     check('fix v1: the status\'s end stops the charge sound', r.game.sounds[-1:], [(0x2714, 0xA00D5)])
     fix_v1_tests(path, src)
+    fix_v2_tests(path, src)
     menu_tests(path, src)
     if 'khm_sword' in names(src)[0]:
         v6_tests(path, src)

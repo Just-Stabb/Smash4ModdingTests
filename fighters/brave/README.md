@@ -1560,3 +1560,12 @@ User: "Only a P1 Hero can spawn Whack or Thwack, P2 and later don't spawn the ar
   package + the rebuilt executable: 8 errors (9 before: X4 gone), 27 warnings (E10 lists his fireball / flash /
   sleep / deathball glows: they follow the article, removed with it as far as the game shows; W10 the slot customs).
 - Package: `script/msc/brave.mscsb`, `script/msc/deathball/deathball.mscsb`.
+
+## Shot articles' caster (with Kirby's Hero copy fix v2, `kirby_hero_copy_fix_v2`)
+
+`weapons/shot.c` (flash, explosion, deathball, sleep: rebuilt `script/msc/<name>/<name>.mscsb`, shipped in Kirby's
+fix v2 package): the custom number may now be level + 4 x (the caster's player slot + 1), which Kirby's Hero copy
+passes (fighters/kirby/specials.md "Hero copy fix v2": a Kirby-cast Whack with an opponent Hero nearer to it took that
+Hero as the caster). Hero's own `brave_generate` still passes the level alone (0 / 1), which keeps the search (the Hero
+or Kirby nearest to the article): his spells behave as before (`tools/brave_shot_owner_test.py`). The native param
+getters keep the custom within their 4 entries (`CUSTOM_CLAMP`).

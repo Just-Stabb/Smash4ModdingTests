@@ -1881,3 +1881,71 @@ python3 tools/rpx_patch.py EXE_V46D.rpx EXE_V46E.rpx $(python3 tools/copy_fx_cav
 python3 tools/kirby_copy_sound.py ULT_VOICE KIRBY_SOUND SND_SE_EDGE SOUNDLABELTABLE OUT [--check]
 sh tools/kirby_hero_copy_build.sh OUT
 ```
+
+### Hero copy fix v2 (`kirby_hero_copy_fix_v2`): exe_v45h / exe_v46f, the spell's level and the marker
+
+User (fix v1 A / B), Kirby's Hero copy: (1) the charge holds (the hold pose, shield-store works) but the projectile is
+always Frizz; (2) Thwack spawns Whack; (3) the Stone's Whack can't hit an enemy Hero, and Sizz / Bang don't hit
+enemies either (Frizz does); (4) the buff spells don't work; (5) the B build's sword isn't shown in the sword spells
+(with v6's `bravesword` folders installed); Sephiroth's copy doesn't store a Flare charge (correct: Sephiroth doesn't).
+
+**Cause of (1) / (2), found: Robin's native "hold this tome" code zeroes Kirby's ints.** Every Hero-copy projectile
+(the fireball, article 6, and the Stone's spells, articles 8-12) is made by Robin's thunder spawner `0x02F643A4` (the
+records' spawner). The spawner first calls `0x02F613B8(owner, 0)` (at `0x02F645BC`: Robin takes the Thunder tome:
+VisibilityModule group 1, the module at `F+0x727C` op 7, ints `0x9F` / `0xA0` / `0xA1` / `0x90` = the book, a flag
+cleared: `stw r29, 0x27C / 0x280 / 0x284` at `0x02F61458`-`0x02F61460`), and only then reads the custom number at
+`0x02F64650`, where copy_custom_cave.py's hook gives Kirby with a copy his `0x1000009F`. On Kirby those offsets are
+this mod's copy custom slot (`0x9F`) and the Hero / Sephiroth marker (`0xA0`): the level the MSC had just written was
+zeroed before it was read (always level 0), and the marker was lost at the first Frizz. That is also crash fix v5's
+"only Frizz, the other levels lock Kirby out" (the Robin copy's path from the second cast on) and fix v1's "why would
+Hero's marker be lost" (Sephiroth's fire uses Din's Fire's spawner: no tome call, his marker and levels survived);
+fix v1's guess only papered over it in a match without a Robin. The interpreter tests never saw it: their ArticleModule
+stub read the slots as the MSC left them.
+
+**Fix:** `tools/kirby_robin_book_cave.py` (exe_v45h = exe_v45g + it, exe_v46f = exe_v46e + it): `0x02F613B8`'s first
+word (`mflr r0`, no relocation) -> a stub that returns at once for a Kirby (fighter kind at `[[F+0x726C]+0x18]` = 8)
+whose marker `0x100000A0` is 2 or 3 (no tome on those copies); anything else (Robin, Hero himself, Sephiroth, Kirby's
+real Robin copy, Supamario's marker 1) replays `mflr r0` and runs the game's code. 15 words at `0x04BAF100`-`0x04BAF13C`
+(free code in kind_expand.py's region, before kirby_copy_new_cave.py's `0x04BAF400`: the standard code region).
+`tools/kirby_robin_book_test.py` (unicorn): the spawner's order and the stores (the evidence), the base's
+`0x02F613B8` on a Kirby with the Hero copy zeroes `0x9F` / `0xA0` / `0xA1` / `0x90` (the bug), the patched one leaves a
+Hero / Sephiroth copy's ints alone and still runs the game's code (both module calls, the stores) for everyone else;
+only the cave and the hook differ from the base.
+
+**(3) Whack's caster:** shot.c found the caster as "the Hero or Kirby nearest to the article", so a Kirby-cast Whack
+with an enemy Hero nearer to it took that Hero as the caster (left out of its targets and rolls, his damage in the KO
+chance). Now the custom number carries it (it reaches the article with the fix above): `khm_generate` passes level
++ 4 x (Kirby's player slot + 1) for articles 8-11 (flash / explosion / deathball / sleep), shot.c reads the caster from
+it (a number below 4, Hero's own `brave_generate`, still searches). The native param getters keep the custom within
+their 4 entries (`custom & 3` = the level: weapon_expand.py `CUSTOM_CLAMP`, checked in exe_v45h's getters for
+0x190 / 0x193-0x197). Hero files rebuilt: `fighter/brave/script/msc/{flash,explosion,deathball,sleep}`
+(`tools/brave_shot_owner_test.py`: Kirby's coding in any slot, Hero's own search unchanged, Whack's first target the
+opponent; the old coding with the opponent Hero nearer picked him as the caster).
+
+**Not found (statically) / open:** Sizz / Bang not hitting from the Stone while Frizz hits: the records 8-12 are the
+same as 6 (spawner, pool counts, Kirby's reserve entries name them), the articles' MSC has no owner logic besides
+Whack's, and nothing in the spawner depends on the cast's status; the casts happen from the stone status (Frizz from
+the neutral special). The buffs: the MSC sets the marker bits / profile 3 (interpreter: Acceleratle 0x4B490303, Oomph
+0x...A0, Psyche Up 0x...40, Acceleration 0x...1300, their glows played) and exe_v45h runs the stat cave's profile 3 /
+Acceleration words (checked against `kirby_stat_cave.py --table --accel`) and the buff caves for any fighter's marker;
+not reproduced. The sword (B): the name stub (`0x030C487C`), the held-article generate (`0x02EFE664` -> `0x02EFE748`,
+article 0x1A for grant kind 0x45), the stone show path (int `0x1000008B`, statuses 0x155 / 0x175 / 0x176) and the
+`bravesword/c0N` folders (path `fighter/kirby/model/` + name + `/c0` + costume) check out statically; the old
+executable's tome call also hid Kirby's VisibilityModule group 1 and cleared int `0xA1` (the stone's own start-motion
+int) at every spell, which exe_v45h / v46f no longer do on the Hero copy: re-test all three with fix v2 before going
+further (the user's observations then decide: e.g. whether the spells appear at all, whether they pass through the
+enemy).
+
+Build:
+```
+python3 tools/rpx_patch.py EXE_V45G.rpx EXE_V45H.rpx $(python3 tools/kirby_robin_book_cave.py)
+python3 tools/rpx_patch.py EXE_V46E.rpx EXE_V46F.rpx $(python3 tools/kirby_robin_book_cave.py)
+python3 tools/kirby_robin_book_test.py EXE_V45H.rpx EXE_V45G.rpx; python3 tools/kirby_robin_book_test.py EXE_V46F.rpx EXE_V46E.rpx
+sh tools/kirby_hero_copy_build.sh OUT        # kirby_A / kirby_B.mscsb (globals 118 of 128)
+python3 tools/kirby_newcopy_test.py OUT/kirby_B.mscsb; python3 tools/kirby_newcopy_test.py OUT/kirby_A.mscsb OUT/kirby_A.c
+python3 tools/brave_shot_owner_test.py OUT/shot   # + flash / explosion / deathball / sleep.mscsb (brave_build.compile_msc)
+```
+`kirby_newcopy_test.py` models the spawner now (`Game.spawn`: records 2 / 6 / 8-12 run the tome code before the
+read unless `book_fix` and the marker is 2 / 3; record 7 reads 0x49): with the old executable modelled, Frizzle's
+fireball gets custom 0 and the marker is lost (the in-game report); with fix v2, Frizz / Frizzle / the stored Kafrizz
+0 / 1 / 2, the marker kept, the Stone's projectiles level + 4 x (slot + 1) (fix v1's MSC fails those).

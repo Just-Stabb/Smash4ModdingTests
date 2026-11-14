@@ -74378,7 +74378,8 @@ int newcopy_marker()
 }
 
 // fix v1: a Robin copy without the marker (copy_grant writes it; a Kirby who had the Hero / Sephiroth copy swallowed
-// by another Kirby passes on only the Robin copy, and the in-game report had a Hero copy act as Robin's) in a match
+// by another Kirby passes on only the Robin copy, and the in-game report had a Hero copy act as Robin's: fix v2 found
+// why, Robin's tome code zeroing 0x100000A0 at every fireball, now skipped by exe_v45h / v46f) in a match
 // with no Robin is the Hero copy when a Hero is in the match and no Sephiroth, Sephiroth's when he is and no Hero.
 // The fighters' kinds from the position variables (player slots 1-8: 0x0F0000A0 + 8 x (3 + s) + 5, -1 none).
 // Once a frame (newcopy_update).
@@ -74724,7 +74725,9 @@ void ncp_hero_fire_fx(float f)
 }
 
 // the fireball (copy article 6, weapon 0x190) with its level through the custom N slot: the thunder spawner reads
-// Kirby's 0x1000009F with a copy (copy_custom_cave.py), set with 0x10000048 while it's made (as skame_generate)
+// Kirby's 0x1000009F with a copy (copy_custom_cave.py), set with 0x10000048 while it's made (as skame_generate).
+// Fix v2: the spawner's own call of Robin's tome code (0x02F613B8) zeroed 0x9F before that read (always Frizz) and
+// the marker 0xA0; exe_v45h / v46f (tools/kirby_robin_book_cave.py) skip it for the Hero / Sephiroth copy
 void ncp_hero_generate()
 {
     int slot;
@@ -75562,11 +75565,19 @@ int khm_blocking()
     return WorkModule(0x6, 0x0f0003bf) == 0x1 || WorkModule(0x6, 0x0f0003b5) || WorkModule(0x6, 0x0f0003a2) && WorkModule(0x6, 0x0f0003a1) < khm_sw_cancel(WorkModule(0x6, 0x0f0003a2));   // v6: a sword spell
 }
 
-// an article (copy article id) with its custom number (as ncp_hero_generate)
+// an article (copy article id) with its custom number (as ncp_hero_generate). Fix v2: the custom number reaches the
+// article now (exe_v45h / v46f, tools/kirby_robin_book_cave.py: Robin's tome code no longer zeroes 0x1000009F first),
+// and Command Selection's projectiles (articles 8-11: shot.c's flash / explosion / deathball / sleep) carry their
+// caster: level + 4 x (Kirby's player slot + 1) (shot.c; the native param block takes custom & 3 = the level), so
+// Whack / Thwack leave Kirby out and roll with his damage instead of a "nearest Hero or Kirby" search's pick
 void khm_generate(int article, int custom)
 {
     int slot;
     int copyslot;
+    if (article >= 0x8 && article <= 0xb && khm_self_slot() < 0x8)
+    {
+        custom = custom + 0x4 * (khm_self_slot() + 0x1);
+    }
     slot = WorkModule(0x6, 0x10000048);
     copyslot = WorkModule(0x6, 0x1000009f);
     WorkModule(0x7, custom, 0x10000048);
