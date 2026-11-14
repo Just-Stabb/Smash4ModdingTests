@@ -209,11 +209,14 @@ SND_DASH, SND_HEAVY, SND_FIRE, SND_BURST, SND_START = 0xCB10071, 0x5E0007, 0xCB1
 # Down: CMN.bac entry 78, the generic reaction playing the slide our victim's entry 3 plays (CMN.ean #96
 # CMN_DMG_SUBERI_AOMUKE), plays it at its frame 1 (the God Fist's own entry 3 doesn't: inferred, see README)
 # v10 (user: "it's still missing its startup sound effects"): the startup's only sound in the BAC is entry 0's (the
-# dash punch) skill SE cue 0 at frame 0 (with skill voice cue 0, a voice: left out). Skill SE (ACB type 10) is the
-# skill's own bank, CAR_BTL_S030_GOD... SE (the CUS entry names it), not among the uploads: CAR_BTL_GOK_SE (Goku's
-# character SE: six throw cues, BRD_BTL_nage_*) and CAR_BTL_CMN (common) hold no God Fist cue. The stand-in: CMN cue
-# 138 CAR_BTL_CMN_BurstDash_Atk (XV2's burst-dash strike: 1.0 s, its peak 10 frames in, the punch's frames 10-14)
-CMN_SE = {'gf_hit_ll': ('Hit_LL', 0.0), 'gf_down': ('Down', 0.0), 'gf_start': ('CAR_BTL_CMN_BurstDash_Atk', 0.0)}
+# dash punch) skill SE cue 0 at frame 0 (with skill voice cue 0, a voice: left out). v10 stood in CMN cue 138
+# CAR_BTL_CMN_BurstDash_Atk. v11: the skill's own SE bank (the user's CAR_BTL_S030_CSA_SE.acb, its waveform in the
+# ACB's in-memory AFS2): one cue, 0 CAR_BTL_S030_CSA_Dash = the BAC's skill SE cue 0 (ACB type 10, cue id 0). A
+# 2.15 s one-shot (the cue's Length 2153 ms; its HCA has no loop chunk, so the waveform table's LoopFlag 1 loops
+# nothing): loud from its first frame through ~100 frames (the dash, the punch and the hold), then fading. The BAC
+# item's sound flags are 0 (not stopped with the entry): XV2 lets it play out, and so does this. It covers the dash,
+# so Mario's own dash sound (SND_DASH at 10) is left out when it's there
+CMN_SE = {'gf_hit_ll': ('Hit_LL', 0.0), 'gf_down': ('Down', 0.0), 'gf_start': ('CAR_BTL_S030_CSA_Dash', 0.0)}
 SE_IDS = {}                              # label -> sound id (sound_bank() fills it)
 SE_BANK_ID, SE_ROW = 2144, 3249
 VOICE = 0x80000007
@@ -667,9 +670,11 @@ def sound_script():
     voices are left out: the user); v5: XV2's CMN SE (SE_IDS): Hit_LL on the catch (BAC entry 2, the victim's, at 0:
     the God Fist part's first frame), Down when the victim lands (HANDOFF + 1: the knockdown, the start of XV2's #96
     slide). Without them (no --cmn-se) v4's stand-ins"""
-    s = [cmd('frame', 1.0), cmd('low_voice_clip', VOICE)]
-    s += [cmd('sound_effect', SE_IDS['gf_start'])] if SE_IDS else []        # v10: the startup (BAC entry 0 at 0)
-    s += [cmd('frame', 10.0), cmd('sound_effect', SND_DASH)]
+    # v11: the skill's own startup SE at the BAC's frame 0 (entry 0 runs 1:1 to its frame 18), in place of Mario's
+    # dash sound at 10 (v10: CMN's BurstDash_Atk stand-in at 1, with it)
+    s = [cmd('sound_effect', SE_IDS['gf_start'])] if SE_IDS else []
+    s += [cmd('frame', 1.0), cmd('low_voice_clip', VOICE)]
+    s += [] if SE_IDS else [cmd('frame', 10.0), cmd('sound_effect', SND_DASH)]
     if SE_IDS:
         s += [cmd('frame', float(JUMP_TO))] + if_(GF_VAR, 1, 0, [cmd('sound_effect', SE_IDS['gf_hit_ll'])])
         s += [cmd('frame', float(STRIKE))] + if_(GF_VAR, 1, 0, [cmd('sound_effect', SND_HEAVY)])

@@ -926,3 +926,27 @@ bank and the soundlabeltable change: row 3249 gains one label.
 - invincible / intangible / shielding at the punch (no damage, no catch).
 
 `msc_stack_check`: 0 of 2323. `msc_fingerprint` v9 vs v10: only `func_2320` (the air check).
+
+## Super God Fist v11 (`supamario_god_fist_v11.zip`): the skill's own startup sound
+
+v11 is installed over v10 and still uses exe B (`exe_v46i`).
+
+The user uploaded the skill's own SE bank, `CAR_BTL_S030_CSA_SE.acb`. It has no separate .awb: the waveform is in the
+ACB's in-memory AFS2, which `tools/xv2acb.py` already reads. The bank holds one cue, 0 `CAR_BTL_S030_CSA_Dash`. That
+is the God Fist BAC's entry 0 sound: skill SE (ACB type 10), cue id 0, at frame 0.
+
+The cue is a 2.15 s one-shot:
+- Its cue Length is 2153 ms.
+- Its HCA has no loop chunk, so the waveform table's LoopFlag 1 has nothing to loop.
+- It is loud from its first frame for about 100 frames (the dash, the punch and the hold), then fades out.
+
+The BAC's sound item has flags 0, so XV2 doesn't stop it when the entry ends, and here it also plays out.
+
+Changes:
+- It replaces v10's stand-in (CMN `CAR_BTL_CMN_BurstDash_Atk`) under the same label `gf_start`, in the same bank slot
+  (sound id 0x0CB10091, peak -0.5 dBFS as the others). The soundlabeltable is unchanged from v10.
+- It plays at frame 0, the BAC's frame (the dash punch runs 1:1 with XV2 there).
+- It covers the dash, so Mario's own dash sound at frame 10 is dropped. It is kept only when the build has no XV2 sound
+  effects (without `--cmn-se`).
+
+The package holds only `sound.bin` and `snd_se_Supamario.nus3bank`. The diag files are unchanged from v10.
