@@ -559,13 +559,18 @@ def v6_tests(path, src):
 
 
 def fix_v6_tests(path, src):
-    """Hero copy fix v6: during a sword spell Kirby plays the spell's motion (0x304-0x307, tools/kirby_hero_sword_anim.py)
-    with its frame set to the cast's every frame, from the first cast frame to the spell's end; nothing after (he stays
-    in it); a landing's hold motion (0x2ED / 0x2F1) keeps its first 3 frames; the arm hitbox on LHaveN (0x18)"""
+    """Hero copy fix v6 / v7: during a sword spell Kirby plays the spell's motion (0x304-0x307,
+    tools/kirby_hero_sword_anim.py) from the first cast frame (its frame 0); fix v7: its frame set again only when it
+    drifts from the cast's (setting it jumps the slot's trail script); nothing after the end (he stays in it); a
+    landing's hold motion (0x2ED / 0x2F1) keeps its first 3 frames; the arm hitbox on LHaveN (0x18). Fix v7: the
+    stone can't end during the spell (special, the ground timer), and a status other than the hold stops it"""
     import kirby_hero_sword_msc as SW
     import kirby_hero_sword_anim as A
     ev = SW.events(SW.parse())
     names_ = {0x11: 'Flame Slash', 0x12: 'Kacrackle Slash', 0x13: 'Metal Slash', 0x14: 'Hatchet Man'}
+
+    def advance(r):                                     # the motion plays: a frame per update
+        r.game.frame += 1.0
     for n in (0x11, 0x12, 0x13, 0x14):
         for situation, hold in ((0, 0x2ED), (2, 0x2F1)):
             r = Run(path, src, 2, situation=situation)
@@ -574,30 +579,78 @@ def fix_v6_tests(path, src):
             g.motion, g.frame = hold, 20.0
             g.tag = lambda r=r: kget(r, 'khm_frame') if kget(r, 'khm_state') == 2 else None
             end = ev[n]['end']
-            cast(r, n, end + 10)
+            n0 = len(g.motions)
+            cast(r, n, end + 10, advance)
             slot = A.SLOT[n]
-            changes = [m for m in g.motions if m == slot]
-            sets = [(f, m, fr) for f, m, fr in g.frame_sets]
-            check('fix v6: %s (%s): motion 0x%X once, its frame = the cast frame on every frame 0-%d, none after'
-                  % (names_[n], 'air' if situation else 'ground', slot, end),
-                  (len(changes), sets), (1, [(f, slot, float(f)) for f in range(end + 1)]))
-    # a landing mid-cast: the hold motion's first 3 frames left alone, then back to the spell's motion at the cast frame
+            check('fix v6/v7: %s (%s): motion 0x%X once at the cast\'s first frame, no frame set while it plays in step'
+                  % (names_[n], 'air' if situation else 'ground', slot), (g.motions[n0:], g.frame_sets), ([slot], []))
+    # drift (a slow-down): the frame set to the cast's once
+    r = Run(path, src, 2)
+    g = r.game
+    r.update()
+    g.motion, g.frame = 0x2ED, 20.0
+    g.tag = lambda r=r: kget(r, 'khm_frame') if kget(r, 'khm_state') == 2 else None
+    cast(r, 0x14, 10, advance)
+    g.frame -= 4.0
+    r.vm.call(r.fn['khm_update'])
+    check('fix v7: the motion 4 frames behind the cast: its frame set to the cast\'s once',
+          [x[1:] for x in g.frame_sets], [(A.SLOT[0x14], float(g.frame_sets[-1][0]) if g.frame_sets else -1.0)])
+    # a landing mid-cast: the hold motion's first 3 frames left alone, then the spell's motion again at the cast frame
     r = Run(path, src, 2, situation=2)
     g = r.game
     r.update()
     g.motion, g.frame = 0x2F1, 30.0
     g.tag = lambda r=r: kget(r, 'khm_frame') if kget(r, 'khm_state') == 2 else None
-    cast(r, 0x14, 20)
+    cast(r, 0x14, 20, advance)
     g.motion, g.frame = 0x2ED, 0.0                    # func_2262 on the landing
-    n0 = len(g.frame_sets)
     log = []
     for fr in (0.0, 1.0, 2.0, 3.0):
         g.frame = fr
+        f = kget(r, 'khm_frame')
         r.vm.call(r.fn['khm_update'])
-        log.append((g.motion, len(g.frame_sets) - n0))
-    check('fix v6: landing mid-cast: 0x2ED kept at its frames 0-2 (its landing hitbox), Hatchet Man\'s motion again at 3',
-          log, [(0x2ED, 0), (0x2ED, 0), (0x2ED, 0), (A.SLOT[0x14], 1)])
-    check('fix v6: ... at the cast frame', g.frame_sets[-1][1:], (A.SLOT[0x14], float(g.frame_sets[-1][0])))
+        log.append((g.motion, g.frame == float(f) if g.motion != 0x2ED else None))
+    check('fix v6: landing mid-cast: 0x2ED kept at its frames 0-2 (its landing hitbox), Hatchet Man\'s motion again at '
+          '3, at the cast frame', log, [(0x2ED, None), (0x2ED, None), (0x2ED, None), (A.SLOT[0x14], True)])
+    # fix v7: every way the stone could end during a sword spell
+    for n in (0x11, 0x12, 0x13, 0x14):
+        end = ev[n]['end']
+        for how in ('special', 'timer'):
+            r = Run(path, src, 2)
+            g = r.game
+            r.update()
+            g.motion, g.frame = 0x2ED, 20.0
+            g.ints[0x18000000] = 10000 if how == 'special' else 1
+            g.ints[0x11000002] = 0
+            ends = []
+
+            def each(r, how=how):
+                f = kget(r, 'khm_frame')
+                r.vm.g[r.gi['global4']] = 0x175
+                r.game.press = {1} if how == 'special' else set()
+                r.game.ints[0x11000002] = 50
+                n_st = len(r.game.statuses)
+                r.vm.call(r.fn['func_2323'])
+                if len(r.game.statuses) > n_st and 0x176 in r.game.statuses[n_st:]:
+                    ends.append(f)
+                advance(r)
+            cast(r, n, end + 4, each)
+            check('fix v7: %s: the stone\'s %s end held off through the spell (cast 0-%d), taken right after it'
+                  % (names_[n], 'special' if how == 'special' else 'ground timer', end), ends[:1], [end + 1])
+    for st, what in ((0x176, 'SpecialLwEnd'), (0x48, 'a hit (damage)')):
+        r = Run(path, src, 2)
+        g = r.game
+        r.update()
+        g.motion, g.frame = 0x2ED, 20.0
+        cast(r, 0x14, 20, advance)
+        r.vm.g[r.gi['global4']] = st
+        g.motion = 0x2E9 if st == 0x176 else 0x48
+        nm = len(g.motions)
+        for _ in range(5):
+            r.vm.call(r.fn['khm_update'])
+            advance(r)
+        check('fix v7: status 0x%X (%s) mid-spell: the spell stopped (sword int 0, hitboxes removed), Kirby\'s motion left '
+              'alone (no swing motion over it)' % (st, what),
+              (g.ints.get(0x1000008B), g.removed[-5:], g.motions[nm:], g.motion), (0, [5, 6, 7, 8, 9], [], g.motion))
     # the arm hitbox (Hero's bone 0x16) on LHaveN at the path's offset, every spell
     _scale, arms = SW.load_path()
     bad = []
