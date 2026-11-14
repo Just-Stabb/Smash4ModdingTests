@@ -781,3 +781,41 @@ the slide's PUSH series 28.3 units decaying to 0 along his facing (and the other
 failures. `msc_fingerprint` v7 vs v8: `func_2320` (GF_IASA) and `func_2322` (gf_tick: the slide).
 Approximated: whether the game moves a downed fighter by its energy 4 every frame as it does a shielding one (the
 PUSH's test 154); the slide's real length if a ledge stops it.
+
+## Super God Fist v9 (`supamario_god_fist_v9.zip`): 1.6x travel, a shorter hold, acting after the flip
+
+Install over v8, exe B (`exe_v46i`, no change). User: "please make Super God Fist move Supamario about 1.6x
+further", "and make it actionable after the flip Supamario does", then (replacing a spin speed-up asked in
+between, which is not in v9) "not the spinning part, the hold on the fist should be reduced".
+
+### Travel x1.6
+All of his own travel (TransN, `TRAVEL` in `supamario_godfist_anim.py`) is x1.6: the whiff now ends 44.4 forward
+(v8 27.8), the God Fist 39.5 (v8 24.7), the catch at 29.8 (v8 18.6). The punch's hitboxes are on his bones, so they
+go with it; the hold keeps the victim 11.5 in front of the fist; the victim's flight is written relative to him less
+his own travel (`ROOT_Z`), so its world path, the hand-off and the slide (and the slide smoke) are where they were.
+Ledges: AttackDash's ground correction stops him at a ledge as it does vanilla dash attacks (not tried in game with
+the longer travel).
+
+### The hold: 20 frames (v8 50)
+The XV2 reference clip: the punch connects at its frame ~19 and the victim flies at ~61, 42 frames contact to launch.
+Ours adds the punch's freeze (9), the punch's last 4 frames to the hit check, the jump's frame and the strike's freeze
+(8): 22 frames, so the hold is **20 frames** (XV2 #0 0-40 at x2; v3-v8 50 at the BAC's x0.8: contact to launch now
+42 frames, v8 72). Everything after it is 30 frames earlier: the strike at 66 (v8 96), the flight 67-90, the hand-off
+at 91, the knockdown sound at 92, the move 138 frames (v8 168). The hold's two effects in step with the victim's
+reaction (its hit spark at #0 12, the aura's burst at #0 17) are placed at JUMP_TO + those / 2. The spin is as v8's.
+Invincibility runs to 45 (75 less the 30).
+
+### Acting after the flip: frame 92
+His flip (#0 40-62) lifts him off the floor from the strike; floor_fix eases the feet back down over 4 frames, so in
+the built motion both feet are back on the floor (left 2.06 / right 1.56, the landing stance) at 66 + 22 + 4 = **92**:
+GF_IASA 92 (v8 136), and the build asserts the feet first touch down at that frame. The victim's flight is in his
+game script, so it is handed off the frame before (91): the flight is XV2 #179's launch for 14 frames (v8 18: its
+last frames only drift back) then the same 10-frame ease to the next whole backward turn (-720) on the ground. The
+MSC acts from GF_IASA as before (`func_39` in the AttackDash loop; the knockdown, slide and getup are gf_tick's from
+the hand-off on, whatever he does).
+
+### Tests
+`supamario_godfist_test.py --all-models`: 0 problems (normal and diag). `msc_stack_check`: 0 of 2323.
+`msc_fingerprint` v8 vs v9: only `func_2320` (GF_IASA 136 -> 92). Effects (ptcl) and the sound bank are byte for
+byte v8's. Approximated: the 42-frame contact-to-launch read from the clip by eye (+-2 frames); the hold's lean
+(XV2 #179 0-40) is played twice as fast with the hold.
