@@ -668,3 +668,76 @@ asked in the air falls (func_963), a tumbling fighter landing goes DownBound -> 
 (Part 2). On v5's build: 12 failures (no knockdown: the clip; the effects' facing). `msc_stack_check` 0;
 `msc_fingerprint` v5 vs v6: only `func_2322` (gf_tick, phase 4). Unchanged from v5: the motion, sound / expression
 scripts, ptcl / efc / model, sound bank, soundlabeltable.
+
+## Super God Fist v7 (`supamario_god_fist_v7.zip`): the down without a hit, facing-safe emitters, bigger and brighter
+
+Install over v6, exe B (the user's current one, `exe_v46i`; no exe change). User, v6 in game (a diag `log.txt`, two
+screenshots): "still too small, not far enough down Supamario's arm, vertical effects are mirrored based on facing
+direction and not vibrant enough. The move didn't hit correctly unless I used the diagnostic build. ... it shouldn't
+allow them to tech during the hitstun of the move and shouldn't knock them back much further than where they were
+when they spun. The additional hit shouldn't do damage but force them into their laying down state once they land
+... if they are still in hitstun"; then "make them carry a small amount of momentum into their knocked down state so
+it gives the impression of sliding slightly".
+
+### The diag log (5 God Fists)
+Every run the same chain: `k=0 v=2` (the catch: a hurtbox), `k=1 v=2` (slot 2), `k=9 v=17` (the MSC's jump asked at
+17), `k=2 46` / `k=3 -29` (the hold's first frame and lean), `k=10 46` (rate 1), `k=2 94` / `k=3 -57` (the hold's
+end), `k=4 v=2` (the strike's kinds at 97: seen; v4's "not yet seen" guess is ruled out), `k=5` (the launch),
+`k=3 -64 / -415 / -810` with `k=1 2` (the flight spinning the victim through target 2, found all along), then at
+the hand-off `k=12 v=4` and at once `k=13 v=14`, `k=12 v=99`: gf_tick let it go because the victim was already in
+**Fall** (0xE): once the flight stopped freezing it (v6: no hitstop from flight frame 42), its ground Damage status
+ran in the air and fell. The 1% end hit then launched a free fighter: that is the "knocked much further". In the
+4th run (`k=11 v=146`, `k=13 v=76`) he acted at frame 146 and the victim, launched, was still tumbling (DamageFall
+0x4C) after gf_tick's 60 frames: released by time. **No `k=8` line in any run**: the watchdog thread never ran
+once, a fighter's ACMD threads don't run in game (v4's finding confirmed); v7 drops the watchdog (each God Fist
+left a never-running thread registered: 32 slots in all).
+
+### "Didn't hit correctly unless the diagnostic build"
+Not found in the files: the normal and diag game scripts differ only by the log commands (SET_FLOAT / SUB_FLOAT_2
+to 0x3F0-0x3FF, Hit_Get / Rotation_Get / Target_Slot_Get / Motion_Get reads, the watchdog's log line), the MSC only
+by its `//GFD` writes. The executables: v6's diag was `exe_v46g` (+ ids) + the diag stub; the user's normal one is
+`exe_v46h` / `exe_v46i`. `exe_v46g_ids` -> `exe_v46h` changes 48 code words, all Kirby's (the copy-held article's
+`0x02B02184`, the sword cave `0x04BAF200-0x04BAF244`, zero before, and its `0x04BAF680-0x04BAF6F8` rewritten);
+`exe_v46h` -> `exe_v46i` 8 data words (`0x103868C4-0x103868E4`, zero before, Kirby's motion table). None is in or
+near acmd_ext_cave (`0x04B90000`-`0x04B9xxxx`, threads `0x04B98000`), position_vars_cave (`0x04B78000`-`0x04B7C000`)
+or the diag stub (`0x04BAC000`, zero in all three). So nothing in the exes or the scripts makes the normal build
+behave differently; what the user saw is most likely v6's Fall / free launch above, which varies with timing. The
+v7 diag executable is built on `exe_v46i` (the user's), so diag and normal now differ only by the stub.
+
+### The down (v7)
+- No hit at the end (v6's 1% launch gone): the strike is 11% again, 15% in all.
+- The flight keeps the victim frozen (hitstop 2 each frame, hitstun 40) through flight frame 42, where it's asked
+  into **DamageFall** (0x4C, the game's tumble: its main `func_815` turns the down term `0x1e00000d` on), so its
+  ground Damage status never runs in the air. The strike freezes the victim 2 frames longer than Supamario (10 / 8)
+  so it's still frozen when the flight's first frame freezes it again.
+- At 141 it's 1 above the ground, stage collision back (air), upright (DamageFall's own animation), carrying 0.6
+  a frame along his facing (the flight's end speed: XV2 #96's slide ends slowing from 0.5-0.7 a frame) through
+  its PUSH variable (its energy 4 speed: the game decays it and stops it at a ledge). DamageFall's loop
+  `func_816` knocks it down when it touches the ground (DownBound 0x4D -> DownWait 0x50, the path every
+  un-teched tumble landing takes: the game's own down motion), with that momentum as a short slide.
+- No tech: the tech (passive 0x64 / 0x65 in `func_816`) needs a shield press in its window, and the victim's
+  controller is off (Input_Set 21) from the launch to the end of the down. (A CPU's AI going around the controller
+  is still unconfirmed.)
+- gf_tick: waits for the down (phase 4: the damage / tumble statuses 0x45-0x4C, 30 frames), then holds it 50 frames
+  (unchanged from v6: the MSC is byte for byte v6's).
+
+### Effects (v7)
+- **Mirrored vertically**: the screenshots show it's the Csg_Circle line / ray emitters (eft directional lines
+  along their velocity): they shoot up with him facing left, down into the floor facing right. XV2's emitters there
+  are turned X +-90 and emit along their Y; every converted skill emitter is now at the effect's origin, unturned,
+  with any spread / emitter speed a full sphere (dispersion 180: the lines radiate from the fist every way), so it
+  looks the same whatever the game does to an effect's axes with his facing. The test checks every
+  `PtcSupamarioGfCsg_*` emitter for it.
+- **Down the arm, past the fist**: the model unturned (its swirl and wind, +Z in the model, stream forward past the
+  fist), its origin at his fist tip: it spans from about his elbow (apex 4.8 behind the tip at size 3) to ~19 past
+  the fist. v6 had it turned 180 with the trail back over his arm and body (the screenshot: at his shoulder).
+- **Bigger**: x2 (v6 1.5): XV2's aura spans ~0.9 of the character's height (1.5 m on ~1.75 m), Supamario is ~12 tall.
+- **More vibrant**: alpha x2 (capped at 1; v6 1.5), the model's colour gain x2.5 / x2 / x1.5 (R / G / B, keeping its
+  orange; v6 x2 flat).
+
+### Tests
+`supamario_godfist_test.py --all-models`: 0 problems (normal and diag). The model of the game now also: the
+victim frozen by a hit's own hitstop and by Hitstop_Set, a ground Damage status unfrozen in the air falls (the v6
+log's Fall), DamageFall landing -> DownBound -> DownWait, the PUSH sign by his facing (a left-facing run). On v6's
+build: 13 failures (the log's Fall at the hand-off, the end hit, no down, the emitters). `msc_fingerprint` v6 vs v7:
+0 differ. `diag_godfist_test.py` on `exe_v46i`: 0 failed.
