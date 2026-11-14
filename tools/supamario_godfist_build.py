@@ -76,10 +76,12 @@ PUNCH, PUNCH_END = anim.GF_PUNCH, anim.GF_PUNCH_END   # the hitbox 14-17 (the BA
 JUMP_TO, STRIKE = anim.GF_JUMP_TO, anim.GF_STRIKE      # 46, 96 (#0 frame 40: the launch)
 WHIFF_END = float(anim.GF_WHIFF_END)     # the whiff's end (MSC): 44
 HOLD_X = 11.5                           # the victim held this far in front of him (his fist 7.3-7.5 ahead, + 4)
-PUNCH_DMG, STRIKE_DMG = 4.0, 10.0          # v6: + DROP_DMG (1) at the end: 15 in all, as v1-v5
+PUNCH_DMG, STRIKE_DMG = 4.0, 11.0          # 15 in all (v7: no hit at the end; v6's 1% end hit gone)
 PUNCH_FREEZE = 9                        # the punch's hitstop, both: CMN.bdm #160's stun 9 / 9 (the BDM the hitbox
                                         # names: #160 isn't in GOK_PLAYER.bdm)
-STRIKE_FREEZE = 8                       # the launch's hitstop, both (the slow hold is the animation's: #0 0-40 x0.8)
+STRIKE_FREEZE = 8                       # the launch's hitstop, both (the slow hold is the animation's: #0 0-40 x0.8);
+                                        # v7: the victim's 2 more, so it's still frozen when the flight's first
+                                        # frame freezes it again (unfrozen in the air, its ground Damage status falls)
 INVINCIBLE = 75                         # Supamario invincible from the catch (XV2: 0-40 of #0 at x0.8, +the launch)
 # the victim's motion: XV2's own (CMN.ean #179 held / launched, then #96 the tumbling slide; tools/
 # supamario_godfist_xv2.py -> reference/xv2/godfist_victim_cmn.json): its travel, its pelvis height and its tilt
@@ -115,20 +117,30 @@ D_CATCH_KINDS, D_SLOT, D_HOLD_FRAME, D_HOLD_ROT, D_STRIKE_KINDS, D_FLIGHT, D_WD_
 # motion frame STRIKE + k (97 .. 140: his motion runs 1:1 after the strike's freeze). v6 (user, v5 in game: "never
 # actually forced to lay down, they never go into tumble"): v5's Status_Set DownWait at flight frame 42 came while
 # the victim was in the air (stage collision 0 while flown), and DownWait's loop (func_963: `global18 == 2` ->
-# Fall) left it at once: it fell, landed on its feet and the MSC let it go. Asking for the down statuses directly
-# isn't safe either: DownBound / DownSpot (func_921 -> func_960) play the motion in int 0x11000010, which no MSC
-# sets (the native damage code does). So the flight ends in a real launch, and the game does the rest its own way:
-# no hitstop / hitstun from flight frame NOHOLD_K; at HANDOFF (141) the victim DROP_Y above the ground, its stage
-# collision back (air), and a hitbox on it (Part DROP_PART: a hit record of its own; angle DROP_ANGLE, set
-# knockback DROP_FKB / DROP_BKB: ~90 units for weight 100, 86 for Donkey Kong's 127, over Smash 4's tumble
-# threshold of 80) puts it in DamageFly (tumble); it lands within a few frames and the game knocks it down
-# (missed tech: DownBound -> DownWait, face up / down its own pick). The MSC (gf_tick) waits for the down (phase 4),
-# then holds it GF_DOWN frames (phase 2). He acts from IASA (143)
-NOHOLD_K = GF_FLIGHT - 2
+# Fall) left it at once. v6 launched it at the end with a 1% tumbling hit; the user's diag log (v6): at the hand-off
+# the victim was already in Fall (0xE: once the flight stopped freezing it, its ground Damage status, in the air,
+# fell), the MSC let it go, and the hit then launched a free fighter (once 60 frames tumbling without landing).
+# v7 (user: no tech in the move's hitstun, not knocked much further than where it spun, the end "hit" 0% and only
+# forcing the down once it lands): no hit at all. The flight freezes it (hitstop 2 / hitstun each frame) to flight
+# frame DOWNFALL_K (frozen through the flight's last frame), where it's asked into DamageFall (0x4C, the game's
+# tumble: its main func_815 enables the down term 0x1e00000d), so its ground Damage status never runs in the air
+# (v6's Fall); at HANDOFF (141) it's DROP_Y above the ground, its stage
+# collision back (air), upright (DamageFall's own tumble animation), carrying the flight's end speed (SLIDE_SPEED
+# along his facing: its knockback energy, the PUSH variable, decaying the game's way and stopped at a ledge), and
+# DamageFall's loop (func_816) knocks it down when it touches the ground (DownBound 0x4D -> DownWait 0x50, the
+# game's own motions: the path every untechnically landed tumble takes). No tech: the tech (passive 0x64 / 0x65 in
+# func_816) needs a shield press within the window, and its controller is off (Input_Set 21) from the launch.
+# The MSC (gf_tick) waits for the down (phase 4), then holds it GF_DOWN frames (phase 2). He acts from IASA (143)
+DOWNFALL_K = GF_FLIGHT - 2
 HANDOFF = STRIKE + GF_FLIGHT + 1
-DROP_Y = 3.0                            # the victim's height above the ground at the launch
-DROP_PART, DROP_ANGLE, DROP_FKB, DROP_BKB, DROP_DMG = 2, 20, 60, 30, 1.0
-GF_FALL_WAIT = 60                       # frames the MSC waits for the down after the launch
+DROP_Y = 1.0                            # the victim's feet above the ground at the hand-off
+DAMAGE_FALL = 0x4C
+SLIDE_SPEED = 0.6                       # units a frame along his facing: the flight's end speed (XV2 #96's slide
+                                        # ends slowing from ~0.5-0.7 a frame at frames 40-43 of the flight)
+GF_FALL_WAIT = 30                       # frames the MSC waits for the down after the hand-off
+LH_PUSH = 0x0F0000B7                    # target 2's PUSH (docs/position-variables.md: < 1000 = its energy 4's speed,
+                                        # world X)
+SELF_FACING = 0x0F000003
 IASA = float(HANDOFF + 2)               # the God Fist's cancel frame (MSC): 143
 ROOT_Z = [0.0] * anim.FRAMES             # his TransN z by motion frame (build() sets it from the animation)
 DOWN_HELD = (0x4D, 0x53)                # DownBound .. DownWait (0x53): still down; 0x57 DownDamage
@@ -180,19 +192,29 @@ SKILL_FX = {}                           # {'Crg': id, ..., 'Model': id} (effects
 # FIST_TIP along its local +X (the forearm's way: at the punch +X points forward, the fingers 0.74 along it; the
 # knuckles ~1.2), following the hand (External_Graphic) as XV2's follow b_R_Hand (PositionUpdate / RotateUpdate);
 # the model's front (its -Z, XV2's) turned onto the hand's +X: Y -90
-SKILL_GAIN, SKILL_ALPHA = 2.0, 1.5
+SKILL_GAIN, SKILL_ALPHA = 2.0, 2.0
+MODEL_TINT = (2.5, 2.0, 1.5)
 FIST_TIP = 1.2
-# v6 (user, v5 in game: "too close to Supamario, should be further from the tip of his fist", "mirrored vertically
-# depending on facing", "too small by comparison"): on bone 0 (TopN: Z forward, Y up in both facings, as Mario's own
-# forward smash fire, Bone 0 Z 15 Y 7), placed where his fist is (FIST_AT, from the built animation) plus AHEAD
-# along his facing, turned only about Y (0 / 180): a hand bone's local axes (RHandN's +Y points down at the punch)
-# turned the model upside down with one facing. Sizes x SKILL_SCALE: XV2's skill sizes are in metres of Goku (his
-# head bone 1.55 m up), Supamario's head bone is 9.67 units up: 6.24 units a metre, x1.24 on the 5.04 the effects
-# were converted at; x1.5 with the bloom halo XV2 adds around them (the user: "too small")
-SKILL_SCALE = 1.5
-MODEL_AHEAD = 5.0                       # the model's origin this far past his fist tip (its front 1.6 x size beyond)
-PTCL_AHEAD = {'Crg': 1.2, 'Circle': 2.0, 'Bas': 1.5, 'Drop': 1.5}
-MODEL_ROT = (0.0, 180.0, 0.0)           # its front (XV2's -Z) along his facing
+# v6 (user, v5 in game: "too close to Supamario", "mirrored vertically depending on facing", "too small"): on bone 0
+# (TopN: Z forward, Y up in both facings, as Mario's own forward smash fire, Bone 0 Z 15 Y 7), where his fist is
+# (FIST_AT, from the built animation), turned only about Y. v7 (user, v6's screenshots: "still too small, not far
+# enough down Supamario's arm, vertical effects are mirrored based on facing direction and not vibrant enough"):
+# - the model with no turn at all, its origin at his fist tip: its swirl and wind (+Z in the model, XV2's trail)
+#   now stream forward past the fist instead of back over his arm and body (v6's screenshot: the aura at his
+#   shoulder);
+# - the "vertical" effects are the Csg_Circle line / ray emitters (eft directional lines along their velocity:
+#   XV2's emitters there are turned X +-90 and emit along their Y): in the screenshots they shoot up with him facing
+#   left and down into the floor facing right. skill_effects() (facing_safe) puts every converted skill emitter at
+#   the effect's origin, unturned, and makes any directional / line / moving emitter's spread a full sphere
+#   (dispersion 180: lines radiating from the fist every way, the same whatever the game does with his facing);
+# - sizes x SKILL_SCALE 2.0 (v6 1.5): XV2's aura spans ~0.9 of the user's height in the reference clip (1.5 m on a
+#   ~1.75 m character), Supamario's is ~12 units tall;
+# - more vibrant: alpha x SKILL_ALPHA 2 (capped at 1: v5-v6 x1.5), the model's colour gain x2.5 / x2 / x1.5 (R / G /
+#   B: brighter, keeping its orange)
+SKILL_SCALE = 2.0
+MODEL_AHEAD = 0.0                       # the model's origin at his fist tip (its apex 1.6 x size behind it)
+PTCL_AHEAD = {'Crg': 1.0, 'Circle': 1.5, 'Bas': 1.5, 'Drop': 1.5}
+MODEL_ROT = (0.0, 0.0, 0.0)             # unturned: its trail (+Z) along his facing
 FIST_AT = {}                            # motion frame -> his right fist (in front of him, up) (build() fills it)
 
 
@@ -367,32 +389,6 @@ def unspin():
     return out + [setf(0, V_SPIN)]
 
 
-def hold_release(reason):
-    """the hold ends without the launch (Supamario's move interrupted / replaced, the strike missed, time):
-    the victim upright, its stage collision back, the watchdog off"""
-    return (dlog(D_WD_RELEASE, value=reason) + unspin()
-            + per_slot(lambda t: [cmd('stage_collision_set', t, 5)]) + [setf(0, V_WD)])
-
-
-def watchdog():
-    """GF_WATCH (Flags 1: it runs in hitlag too), from the catch: every frame, while gf_wd is 1 (until the flight
-    thread has the victim, or a release): his status (Status_Get(0)) not AttackDash any more (hit, grabbed, KO'd:
-    the game script that holds or flies the victim is gone) or gf back to 0 (a new dash attack) -> let go;
-    gf_phase 2 (handed to the MSC at the flight's end) -> off duty; gf still 1 past the strike's frame (his
-    motion frame, Motion_Get) -> let go. At the end (GF_WATCH_FRAMES) still on duty and not struck -> let go.
-    A thread survives status changes (acmd_ext_cave.py: threads are dropped only at the object's set-up)."""
-    body = [cmd('status_get', 0, V_TMP)]
-    body += if_(V_TMP, 1, STATUS_ATTACK_DASH, dlog(D_WD_STATUS, V_TMP) + hold_release(1))
-    body += if_(V_WD, 0, 1, if_(GF_VAR, 0, 0, hold_release(2)))
-    body += if_(V_WD, 0, 1, if_(V_PHASE, 0, 2, [setf(0, V_WD)]))       # handed off to the MSC (v5)
-    body += dlog(D_WD_ALIVE, value=1) if DIAG else []
-    body += if_(V_WD, 0, 1, if_(GF_VAR, 0, 1, [cmd('motion_get', 0, 1, V_TMP)]
-                                + if_(V_TMP, 5, STRIKE + 2.5, hold_release(3))))
-    b = loop(GF_WATCH_FRAMES, if_(V_WD, 0, 1, body) + [cmd('wait', 1.0)])
-    b += if_(V_WD, 0, 1, hold_release(4))
-    return b
-
-
 def game_script():
     s = [acmd.new_var(n, v - 0x0F000380, 0, 0.0, scope) for n, v, scope in VARS]
     # an earlier God Fist's victim left turned (its hold cut short, the watchdog thread not running): upright now
@@ -411,7 +407,7 @@ def game_script():
               cmd('body_state_set', 0, 1, INVINCIBLE),                 # invincible (XV2: 0-40 of the follow-up)
               cmd('hitstun_set', 2, 20), setf(HOLD_X, LH_OFFX), setf(0, LH_OFFY)]
     caught += dlog(D_SLOT, V_SLOT)
-    caught += [setf(1, V_SPIN), setf(1, V_WD)] + thread(GF_WATCH, 1, watchdog())
+    caught += [setf(1, V_SPIN)]
     # an earlier God Fist's victim (still flying / down): its flight thread stopped, upright, controller back
     earlier = if_(V_SPIN, 0, 1, unspin())
     caught = earlier + per_lock_release() + [setf(0, V_PHASE)] + caught
@@ -432,10 +428,10 @@ def game_script():
     # 96: the God Fist (Part STRIKE_PART: a hit record of its own; the punch's Part 0 record holds the victim)
     strike = [hitbox('extra_special_hitbox', ID=0, Part=STRIKE_PART, Bone=FIST, Damage=STRIKE_DMG, Angle=0, KBG=0,
                      FKB=0, BKB=25, Size=6.0, X=0.0, Hitlag=1.0, SDI=0.0, SFXLevel=2, SFXType=1, Type=4,
-                     IgnoreInvuln=0, HitstopFrames=STRIKE_FREEZE, SelfHitstopFrames=STRIKE_FREEZE, DIMul=0.001),
+                     IgnoreInvuln=0, HitstopFrames=STRIKE_FREEZE + 2, SelfHitstopFrames=STRIKE_FREEZE, DIMul=0.001),
               hitbox('extra_special_hitbox', ID=1, Part=STRIKE_PART, Bone=0, Damage=STRIKE_DMG, Angle=0, KBG=0,
                      FKB=0, BKB=25, Size=6.0, Y=6.5, Z=HOLD_X, Hitlag=1.0, SDI=0.0, SFXLevel=2, SFXType=1, Type=4,
-                     HitstopFrames=STRIKE_FREEZE, SelfHitstopFrames=STRIKE_FREEZE, DIMul=0.001)]
+                     HitstopFrames=STRIKE_FREEZE + 2, SelfHitstopFrames=STRIKE_FREEZE, DIMul=0.001)]
     s += [cmd('frame', float(STRIKE))] + if_(GF_VAR, 0, 1, strike)
     # 97 (after the freeze: the script waits through his hitstop): struck -> the flight thread; else let go
     # v4: the launch no longer waits on Hit_Check: v3's `Hit_Check(0, 0, 2)` here, one frame after the strike (its
@@ -455,9 +451,11 @@ def game_script():
         if k > 1:
             s.append(cmd('frame', float(STRIKE + k)))
         f = [setf(x, LH_OFFX), setf(y, LH_OFFY), setf(0, LH_GROUND)]
-        if k < NOHOLD_K:
+        if k <= DOWNFALL_K:
             f += [cmd('hitstop_set', 2, 2, 0), cmd('hitstun_set', 2, 40)]
         f.append(cmd('rotation_set', 2, float(a), 0.0, 0.0))
+        if k == DOWNFALL_K:
+            f.append(cmd('status_set', 2, DAMAGE_FALL))
         if k in fx and fx[k] in CMN_FX:
             # at the victim (its feet's offset from him, on the ground): bone 0, Z forward
             f.append(gfx('graphic_effect', CMN_FX[fx[k]], 0, 0.0, 0.0, float(x), CMN_SIZE))
@@ -467,17 +465,13 @@ def game_script():
         if k in (2, 3, 4):
             f += dlog_get(D_STRIKE_KINDS, cmd('hit_get', 0, 0, V_TMP))       # when the strike's kinds show
         s += if_(GF_VAR, 0, 2, f)
-    # the end: DROP_Y above the ground, stage collision back (air), upright, and the launching hit (tumble: the game
-    # lands it into its own knockdown); gf_phase 4 (the MSC waits for the down, then holds it down)
+    # the hand-off: DROP_Y above the ground, stage collision back (air), upright, tumbling (DamageFall, asked at
+    # DOWNFALL_K) with the flight's end speed along his facing; gf_phase 4 (the MSC waits for the game's down)
     x, _y, _a = flight_offset(GF_FLIGHT)
-    drop = hitbox('extra_special_hitbox', ID=0, Part=DROP_PART, Bone=0, Damage=DROP_DMG, Angle=DROP_ANGLE, KBG=100,
-                  FKB=DROP_FKB, BKB=DROP_BKB, Size=7.0, Y=DROP_Y + 4.0, Z=x, Hitlag=0.1, SDI=0.0, SFXLevel=0,
-                  SFXType=1, Type=4, HitstopFrames=1, SelfHitstopFrames=1, DIMul=0.001)
     s += [cmd('frame', float(HANDOFF))] + if_(GF_VAR, 0, 2, [
-        setf(x, LH_OFFX), setf(DROP_Y, LH_OFFY), setf(5, LH_GROUND), cmd('rotation_set', 2, 0.0, 0.0, 0.0),
-        cmd('hit_log_clear', DROP_PART), drop, setf(0, V_SPIN), setf(GF_FALL_WAIT, V_CNT), setf(4, V_PHASE)]
-        + dlog(D_PHASE, value=4))
-    s += [cmd('frame', float(HANDOFF + 1)), cmd('remove_all_hitboxes')]
+        setf(x, LH_OFFX), setf(DROP_Y, LH_OFFY), setf(5, LH_GROUND), cmd('rotation_set', 2, 0.0, 0.0, 0.0)]
+        + if_(SELF_FACING, 5, 0, [setf(SLIDE_SPEED, LH_PUSH)]) + if_(SELF_FACING, 4, 0, [setf(-SLIDE_SPEED, LH_PUSH)])
+        + [setf(0, V_SPIN), setf(GF_FALL_WAIT, V_CNT), setf(4, V_PHASE)] + dlog(D_PHASE, value=4))
     return s
 
 
@@ -694,6 +688,16 @@ def effects(sm_dir, cmn_dir, fdir, skill_dir=None):
     return made
 
 
+def facing_safe(p, d):
+    """an emitter that looks the same with either facing, whatever the game does to an effect's axes with his
+    facing (a mirror across, or the up / down flip the v6 screenshots show on the line emitters): its own transform
+    at the effect's origin, unturned, and any spread or emitter speed a full sphere (dispersion 180)"""
+    p.set_emitter_srt(d, tuple(p.field(d, 'emitter_scale')), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0))
+    if p.field(d, 'particle_type') in (1, 3) or p.field(d, 'dispersion_angle') > 0 or \
+            p.field(d, 'emitter_velocity') or p.field(d, 'figure_velocity'):
+        p.set_field(d, 'dispersion_angle', 180.0)
+
+
 def skill_effects(skill_dir, p, e, dst):
     """the skill's effects (SKILL_EMPS, SKILL_MODEL) from skill_dir (002_GOK_CSG) into the Ptcl p / Efc e, the
     model folder into dst/model; SKILL_FX = their ACMD ids"""
@@ -715,6 +719,7 @@ def skill_effects(skill_dir, p, e, dst):
                 continue
             p.set_field(d, 'color_scale', p.field(d, 'color_scale') * SKILL_GAIN)
             p.set_field(d, 'alpha_init', min(1.0, p.field(d, 'alpha_init') * SKILL_ALPHA))
+            facing_safe(p, d)
     SKILL_FX.clear()
     for k, emp in SKILL_EMPS.items():
         SKILL_FX[k] = 0x03410000 | by_emp[emp]
@@ -722,7 +727,7 @@ def skill_effects(skill_dir, p, e, dst):
     subprocess.run([sys.executable, '-I', os.path.join(HERE, 'xv2_to_nud.py'), skill_dir, SKILL_MODEL,
                     os.path.join(dst, 'model'), '--prefix', SKILL_MODEL_PREFIX, '--tex-base', hex(SKILL_TEX_BASE),
                     '--plain', '1', '--scale', str(SKILL_UNIT),
-                    '--tint', ';'.join('%s=%g,%g,%g' % (m, SKILL_GAIN, SKILL_GAIN, SKILL_GAIN)
+                    '--tint', ';'.join('%s=%g,%g,%g' % ((m,) + MODEL_TINT)
                                        for m in ('BasC', 'Wind01', 'Wind02'))], check=True, capture_output=True)
     assert os.path.exists(os.path.join(dst, 'model', folder, 'model.nud')), folder
     SKILL_FX['Model'] = 0x03410000 | e.add(0, folder)

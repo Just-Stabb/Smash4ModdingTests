@@ -183,9 +183,14 @@ class Victim:
         self.hittable = lambda motion_frame: True     # its hurtbox there (False: intangible / out of reach)
         self.hitstun = 0
         self.bound = 0
+        self.stop = 0                 # hitstop frames left (frozen: its status doesn't run)
+        self.push = None              # the PUSH (energy 4 speed) written
         self.hits_taken = []          # (game frame, part)
 
     def frame(self, n):
+        frozen = self.stop > 0
+        if frozen:
+            self.stop -= 1
         if self.pending is not None:
             self.status, self.pending = self.pending, None
             if self.status == 0x57:
@@ -202,6 +207,8 @@ class Victim:
                 self.status = 0x51
         elif self.status in (0x50, 0x51) and not self.input_off:
             self.status = 0x54            # gets up the first frame it can
+        elif self.status == 0x45 and self.situation != 0 and not frozen:
+            self.status = FALL                # a ground Damage status in the air, not frozen: Fall (v6's log)
         elif self.status in DAMAGE_STATUSES:
             self.hitstun -= 1
             if self.hitstun <= 0:             # its hitstun over (the game: Wait, Fall...): the rotation stays
@@ -223,9 +230,6 @@ class Victim:
 
     def hit(self, g, part, hitstun):
         self.hits_taken.append((g, part))
-        if part == B.DROP_PART:                 # the end's launch: over the tumble threshold
-            self.status, self.hitstun = 0x47, 36
-            return
         if self.status not in DAMAGE_STATUSES:
             self.status = 0x45
         self.hitstun = max(self.hitstun, hitstun)
@@ -310,13 +314,14 @@ class Acmd:
     def collide(self, g):
         """the frame's collision: each live hitbox against the victim, once per Part record; -> self hitstop"""
         freeze = 0
-        for hid, (part, stop) in sorted(self.active.items()):
+        for hid, (part, stop, vstop) in sorted(self.active.items()):
             rec = self.records.setdefault(part, set())
             if self.v.slot in rec or not self.v.hittable(self.motion_frame):
                 continue
             rec.add(self.v.slot)
             self.pending_bits |= 2
             self.v.hit(g, part, 20)
+            self.v.stop = max(self.v.stop, vstop)      # the hit's freeze on the victim too
             freeze = max(freeze, stop)
             break                           # one hit of an attack a frame
         if not self.DEFER:
@@ -343,7 +348,7 @@ class Acmd:
             elif n == 'WAIT':
                 r.wait_until = (r.t if frame is None else frame) + p[0]
             elif n == 'Float_Var_Compare':
-                a, b = self.vars.get(p[0], 0.0), p[2]
+                a, b = self.getvar(p[0]), p[2]
                 r.cond = {0: a == b, 1: a != b, 2: a <= b, 3: a >= b, 4: a < b, 5: a > b}[p[1]]
             elif n == 'Hit_Check':
                 bits = self.bits_start if p[1] == 0 else self.bits_frame
@@ -385,7 +390,7 @@ class Acmd:
                     self.records.pop(p[0], None)
             elif n in ('Hitbox', 'Extra_Special_Hitbox'):
                 d = dict(zip(acmd.INFO[c.ident]['syntax'], p))
-                self.active[d['ID']] = (d['Part'], d.get('SelfHitstopFrames', 0))
+                self.active[d['ID']] = (d['Part'], d.get('SelfHitstopFrames', 0), d.get('HitstopFrames', 0))
                 if d['Part'] in self.stale and not self.BLOCK:
                     self.stale.discard(d['Part'])
                     self.records.pop(d['Part'], None)
@@ -422,11 +427,16 @@ class Acmd:
                     tv.hitstun = p[1]
                     tv.log.append((n, p[1]))
                 elif n == 'Hitstop_Set' and tv:
+                    tv.stop = max(tv.stop, int(p[1]))
                     tv.log.append((n, p[1]))
+
+    FACING = 1.0
 
     def getvar(self, var):
         if B.DIAG_BASE <= var < B.DIAG_BASE + 16:
             return 0.0                      # the diag IDs read 0
+        if var == B.SELF_FACING:
+            return self.FACING
         return self.vars.get(var, 0.0)
 
     def setvar(self, var, val):
@@ -441,6 +451,9 @@ class Acmd:
         elif tq and tq[1] == 8 + 6:
             if tv:
                 tv.ground = val
+        elif tq and tq[1] == 8 + 7:
+            if tv:
+                tv.push = val
         elif tq:
             pass
         elif B.DIAG_BASE <= var < B.DIAG_BASE + 16:
@@ -572,8 +585,8 @@ def acmd_tests(game_bin):
     check('the punch connects (Part 0) and catches: gf 1, the victim\'s slot kept',
           (v.hits_taken[:1] and v.hits_taken[0][1], max(r[8] for r in rec) >= 1, a.vars.get(B.V_SLOT)),
           (0, True, float(v.slot)))
-    check('the strike (frame %d) connects (the victim takes it: the v3 clip\'s 4%% + 11%%), then the end\'s launch'
-          % B.STRIKE, [p for _g, p in v.hits_taken], [0, B.STRIKE_PART, B.DROP_PART])
+    check('the strike (frame %d) connects (the victim takes it: the v3 clip\'s 4%% + 11%%), and no other hit'
+          % B.STRIKE, [p for _g, p in v.hits_taken], [0, B.STRIKE_PART])
     check('launched: gf 2 after the strike', any(r[8] == 2.0 for r in rec), True)
     moved = [r for r in rec if r[8] == 2.0 and r[2] is not None and r[2] > B.HOLD_X + 5]
     check('the victim flies (moved away from the hold: the v4 clip\'s bug: it never moved)', bool(moved), True)
@@ -594,17 +607,24 @@ def acmd_tests(game_bin):
     turned = abs(want[-1][2] - (-B.hold_lean(n_hold - 1, n_hold)))
     check('flight: turns %.0f degrees backward (XV2 935 x 0.8)' % turned, 700 < turned < 800, True)
     drop = tr[n_hold + B.GF_FLIGHT:n_hold + B.GF_FLIGHT + 1]
-    check('the end: %g above the ground, upright, and a real launch (Part %d: its own record) puts it in tumble'
-          % (B.DROP_Y, B.DROP_PART), (drop[:1] and (drop[0][1], drop[0][2]), [p for _g, p in v.hits_taken][-1:]),
-          ((B.DROP_Y, 0.0), [B.DROP_PART]))
+    check('the hand-off: %g above the ground, upright, carrying %g a frame along his facing (PUSH), no hit'
+          % (B.DROP_Y, B.SLIDE_SPEED), (drop[:1] and (drop[0][1], drop[0][2]), v.push is not None and
+                                        round(v.push, 3), len(v.hits_taken)),
+          ((B.DROP_Y, 0.0), round(B.SLIDE_SPEED, 3), 2))
     seq = []
     for r in rec:
-        if r[5] in (0x47, 0x4D, 0x50) and (not seq or seq[-1] != r[5]):
+        if r[5] in (0x4C, 0x4D, 0x50, FALL) and (not seq or seq[-1] != r[5]):
             seq.append(r[5])
-    check('the game\'s own knockdown: DamageFly -> DownBound -> DownWait (no down status asked by the move)',
+    check('the game\'s own knockdown: DamageFall (asked while frozen, never Fall) -> DownBound -> DownWait',
           (seq[:3], [x for x in v.log if x[0] == 'status' and x[1] in (0x4C, 0x4D, 0x50)]),
-          ([0x47, 0x4D, 0x50], []))
+          ([0x4C, 0x4D, 0x50], [('status', 0x4C)]))
     check('rotation back to 0 at the end', v.rot[0], 0.0)
+    Acmd.FACING = -1.0
+    vl = Victim()
+    run_move(script, vl, frames=B.HANDOFF + 20)
+    Acmd.FACING = 1.0
+    check('facing left: the slide\'s speed the other way (PUSH is world X)', vl.push is not None and
+          round(vl.push, 3), round(-B.SLIDE_SPEED, 3))
     lock_on = next((r[0] for r in rec if r[6] == 1.0), None)
     launch = next((r[0] for r in rec if r[8] == 2.0), next(r[0] for r in rec if r[1] > B.STRIKE))
     check('controller off from the launch', lock_on is not None and lock_on <= launch + 1, True)
@@ -650,26 +670,21 @@ def acmd_tests(game_bin):
     v = Victim()
     a, rec = run_move(script, v, hit=False, frames=120)
     check('no catch: no hold / flight (no rotation)', v.trace, [])
-    # the hold / flight cut short (his status changes: hit, grabbed). With threads (the watchdog): upright within 2
-    # frames; without (v4's clip: no thread reached the victim): upright at his next dash attack's first frame,
-    # controller back at once (the MSC's gf_tick)
+    # the hold / flight cut short (his status changes: hit, grabbed): controller back at once (the MSC's gf_tick),
+    # upright at his next dash attack's first frame (v7: no watchdog thread: the v6 diag log never showed one run)
     hold_g = next(r[0] for r in run_move(script, Victim())[1] if r[1] == B.JUMP_TO + 20)
     launch_g = next((r[0] for r in run_move(script, Victim())[1] if r[8] == 2.0), launch)
     for what, at in (('mid-hold', hold_g), ('mid-flight', launch_g + 10)):
         v = Victim()
         a, rec = run_move(script, v, frames=at + 60, interrupt=(at, 0x48))
-        fixed = next((r[0] for r in rec if r[0] >= at and r[4] == 0.0), None)
-        if Acmd.THREADS:
-            check('cut short %s (threads run): upright within 2 frames, stage collision back, controller on' % what,
-                  (fixed is not None and fixed - at <= 2, v.ground, v.input_off), (True, 5, 0.0))
-        else:
-            check('cut short %s (no threads): controller on (MSC)' % what, v.input_off, 0.0)
+        if True:
+            check('cut short %s: controller on (MSC)' % what, v.input_off, 0.0)
             # his next dash attack (on nobody): frame 0 turns the earlier victim upright
             a.active.clear()
             a.records, a.bits_start, a.my_status = {}, 0, B.STATUS_ATTACK_DASH
             v.hittable = lambda f: False
             a, rec = run_move(script, v, frames=3, acm=a)
-            check('cut short %s (no threads): upright, stage collision back at his next dash attack' % what,
+            check('cut short %s: upright, stage collision back at his next dash attack' % what,
                   (v.rot[0], v.ground), (0.0, 5))
     v = Victim()
     a = Acmd(script, v)
@@ -734,6 +749,27 @@ def facing_tests(body_dir):
                                                                                             d['ZRot'])))
     check('effects: placed and turned alike facing left and right (bone 0: height / ahead, Y 0 / 180 only; other '
           'bones: no offset, no turn)', bad, [])
+    # v7: the skill's particle emitters themselves (v6's screenshots: Csg_Circle's lines shot up with him facing left,
+    # down facing right): every one at the effect's origin, unturned, any spread / speed a full sphere
+    import ptcl
+    path = os.path.join(body_dir, '..', '..', '..', 'effect', 'supamario', 'supamario.010d0000.ptcl')
+    if os.path.exists(path):
+        p = ptcl.Ptcl(open(path, 'rb').read())
+        bad = []
+        for si in range(len(p.sets)):
+            if not p.set_name(si).startswith('PtcSupamarioGfCsg'):
+                continue
+            for e in p.sets[si]['emitters']:
+                d = e['data']
+                if d is None:
+                    continue
+                moving = (p.field(d, 'particle_type') in (1, 3) or p.field(d, 'emitter_velocity')
+                          or p.field(d, 'figure_velocity'))
+                if any(p.field(d, 'emitter_rotation')) or any(p.field(d, 'emitter_translation')) or \
+                        (moving and p.field(d, 'dispersion_angle') < 180):
+                    bad.append((p.set_name(si), p.emitter_name(d)))
+        check('the skill\'s emitters: unturned, at the origin, spreading every way (alike with either facing)',
+              bad, [])
 
 
 def diag_tests(game_bin):
