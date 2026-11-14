@@ -39001,7 +39001,7 @@ void func_2323()
         func_16(0x176, 0);
         return 0x1;
     }
-    if (WorkModule(0x6, 0x11000002) >= WorkModule(0x6, 0x18000000))
+    if (WorkModule(0x6, 0x11000002) >= WorkModule(0x6, 0x18000000) && khm_zooming() == 0) // fix v4: not in a Zoom
     {
         func_16(0x176, 0);
         return 0x1;
@@ -75567,7 +75567,57 @@ int khm_once(int bit)
 
 int khm_blocking()
 {
-    return WorkModule(0x6, 0x0f0003bf) == 0x1 || WorkModule(0x6, 0x0f0003b5) || WorkModule(0x6, 0x0f0003a2) && WorkModule(0x6, 0x0f0003a1) < khm_sw_cancel(WorkModule(0x6, 0x0f0003a2));   // v6: a sword spell
+    return WorkModule(0x6, 0x0f0003bf) == 0x1 || WorkModule(0x6, 0x0f0003b5) || WorkModule(0x6, 0x0f0003a2) && WorkModule(0x6, 0x0f0003a1) < khm_sw_cancel(WorkModule(0x6, 0x0f0003a2))   // v6: a sword spell
+        || khm_zooming();       // fix v4: Zoom / Zoom 2 U
+}
+
+// fix v4 (user: "using Zoom offstage, Kirby can get KO'd twice ... make Kirby unable to leave the stone during the
+// whole duration of Zoom and Zoom 2 U"): from the choice until the flight is over (khm_sub 0x7F) the stone's own ends
+// are held off (special and the ground timer in its hold loop func_2323, the air drop khm_stone_drop) and he is
+// invincible until the launch (intangible in the flight, as before), so no hit ends the stone either; a KO still
+// happens (the game's own, once): khm_cast_guard then stops the spell
+int khm_zooming()
+{
+    return WorkModule(0x6, 0x0f0003bf) == 0x2 && (WorkModule(0x6, 0x0f0003bb) == 0x10 || WorkModule(0x6, 0x0f0003bb) == 0x17)
+        && WorkModule(0x6, 0x0f0003a8) != 0x7f;
+}
+
+// fix v4: the double KO. khm_update ran the cast every frame whatever his status, and Zoom / Zoom 2 U never looked at
+// it (Kaclang did): KO'd during the cast (the stone falling past the bottom blast line in Zoom's 29 frames before the
+// launch, offstage), the spell went on in the KO / respawn statuses: at 29 it set him airborne (func_20(2)) and flew
+// him up 40 frames, put him 120 above a fighter (his position variables), then pushed him down at 7 a frame for up to
+// 150 frames: off the respawn platform and through the bottom blast line again. Zoom 2 U moved him by his position
+// too, and Kamikazee's KO flag (frame 49) could land after the respawn. Now a cast stops at a KO (status 0xB1 Dead,
+// 0xB2 Rebirth: nothing of it touches him after) and Kamikazee / Zoom / Zoom 2 U also when he is no longer the stone
+// (the fall put back as the zooms' own end does). Returns 1 when it stopped one.
+int khm_cast_guard()
+{
+    int n;
+    if (WorkModule(0x6, 0x0f0003bf) != 0x2)
+    {
+        return 0;
+    }
+    n = WorkModule(0x6, 0x0f0003bb);
+    if (global4 == 0xb1 || global4 == 0xb2)
+    {
+        WorkModule(0x7, 0x7f, 0x0f0003a8);
+        WorkModule(0x7, 0, 0x0f0003bf);
+        khm_close();
+        return 0x1;
+    }
+    if (khm_stone() == 0 && (n == 0x9 || n == 0x10 || n == 0x17))
+    {
+        if ((n == 0x10 || n == 0x17) && WorkModule(0x6, 0x0f0003a8) != 0x7f && WorkModule(0x6, 0x0f0003a8) != 0)
+        {
+            KineticModule(0xf, 0x1, -0.089f);       // the flight's gravity hold undone (as khm_z2_end / Zoom's end)
+            KineticModule(0x14, 0x1, 1.5f);
+        }
+        WorkModule(0x7, 0x7f, 0x0f0003a8);
+        WorkModule(0x7, 0, 0x0f0003bf);
+        khm_close();
+        return 0x1;
+    }
+    return 0;
 }
 
 // an article (copy article id) with its custom number (as ncp_hero_generate). The custom number reaches the article
@@ -75923,11 +75973,13 @@ void khm_shut()
     khm_close();
 }
 
-// fix v3: the menu cancelled with shield / jump opens again at once, the same four spells: its window shown again
-// from the start (the open animation, the opening sound), the 8 seconds from 0, the cursor on the first row, special
-// to be let go again before it casts
+// fix v3: the menu cancelled with shield / jump opens again at once: its window shown again from the start (the open
+// animation, the opening sound), the 8 seconds from 0, the cursor on the first row, special to be let go again before
+// it casts. Fix v4 (user): with four spells drawn anew, as Hero's menu opened again (brave.c brave_lw_main draws them
+// each time down special starts it); fix v3 kept the same four
 void khm_reopen()
 {
+    khm_draw();
     WorkModule(0x7, 0, 0x0f0003be);
     WorkModule(0x7, 0, 0x0f0003bd);
     WorkModule(0x7, 0, 0x0f0003ba);
@@ -75939,6 +75991,20 @@ void khm_reopen()
     WorkModule(0x7, WorkModule(0x6, 0x0f0003bc), 0x0f0003b0);
     WorkModule(0x7, khm_grey_bits(), 0x0f0003af);
     SoundModule(0x2710, 0x76400dd);     // se_brave_special_l18: the window opens
+}
+
+// fix v4 (user: "spells should be castable in the direction the stick is held, the same way Hero does it"): Hero's
+// cast (brave.c brave_lw_loop, fix 68) turns him round when the stick is held back past half (ControlModuleF(0) x
+// the facing < -0.5) on the frame a spell is chosen, then every spell goes his facing's way (the projectiles take
+// it at the spawn, the sword spells' hitboxes, Zoom 2 U aims itself; Hero has no angled spell). The same here at
+// the choice: the stone turned with him (its motion as it is), the spell from then on cast his new way
+void khm_turn()
+{
+    if (ControlModuleF(0) * PostureModuleF(0) < -0.5f)
+    {
+        PostureModule(0, -PostureModuleF(0));
+        PostureModule(0x2);
+    }
 }
 
 // fix v3 (user): in the stone in the air, with the menu shut (a spell cast and over, or its 8 seconds up), down
@@ -75953,7 +76019,7 @@ int khm_stone_drop()
     {
         return 0;
     }
-    if (WorkModule(0x6, 0x0f0003a8) != 0x7f && WorkModule(0x6, 0x0f0003a8) != 0)
+    if (WorkModule(0x6, 0x0f0003a8) != 0x7f && WorkModule(0x6, 0x0f0003a8) != 0 || khm_zooming())
     {
         return 0;           // a spell with parts (Zoom, Kaclang, Kamikazee ...) still going
     }
@@ -76018,6 +76084,7 @@ void khm_update()
             {
                 WorkModule(0x7, 0x1, 0x0f0003b5);
                 SoundModule(0x2710, 0x76400c0);     // a spell chosen
+                khm_turn();                         // fix v4: to the stick held back, as Hero
                 WorkModule(0x7, 0x2, 0x0f0003b3);
                 WorkModule(0x7, n * khm_bit(0x5 * WorkModule(0x6, 0x0f0003bd)), 0x0f0003b0);
                 WorkModule(0x7, (WorkModule(0x6, 0x0f0003af) / khm_bit(WorkModule(0x6, 0x0f0003bd))) % 0x2 * khm_bit(WorkModule(0x6, 0x0f0003bd)), 0x0f0003af);
@@ -76054,7 +76121,7 @@ void khm_update()
             }
         }
     }
-    else if (WorkModule(0x6, 0x0f0003bf) == 0x2)
+    else if (WorkModule(0x6, 0x0f0003bf) == 0x2 && khm_cast_guard() == 0)
     {
         khm_cast(WorkModule(0x6, 0x0f0003be));
         WorkModule(0x7, WorkModule(0x6, 0x0f0003be) + 1, 0x0f0003be);
@@ -76198,6 +76265,7 @@ void khm_zoom(int f)
 {
     if (WorkModule(0x6, 0x0f0003a8) == 0)
     {
+        WorkModule(0, 2.0f, 0x0f00011c);    // fix v4: invincible until the launch (no hit ends the stone)
         if (f >= 29)
         {
             WorkModule(0x7, 0x1, 0x0f0003a8);
@@ -76530,6 +76598,7 @@ void khm_zoom2u(int f)
 {
     if (WorkModule(0x6, 0x0f0003a8) == 0)
     {
+        WorkModule(0, 2.0f, 0x0f00011c);    // fix v4: invincible until the launch (no hit ends the stone)
         if (khm_once(0x1))
         {
             WorkModule(0x7, khm_z2_nearest(), 0x0f00039d);
