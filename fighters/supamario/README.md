@@ -846,3 +846,83 @@ the flag: hit, but not caught (the status backup); a God Fist on its own downed 
 0 of 2323. `msc_fingerprint` v8 vs v9: only `func_2320` (GF_IASA 136 -> 92). The sound bank is byte for byte v8's.
 Approximated: the 42 frames from contact to launch are read off the clip by eye (+-2 frames); the hold's lean
 (XV2 #179 0-40) plays twice as fast to match the shorter hold.
+
+## Super God Fist v10 (`supamario_god_fist_v10.zip`): 1.4x travel, Leave_Ground_Cancel, his height, a startup sound, no hitting through invulnerability
+
+Install over v9, exe B (`exe_v46i`, no change). User: "make Super God Fist move Supamario a bit less far than it does
+now, but still farther than before, and give it Leave_Ground_Cancel. Also, it's still missing its startup sound
+effects"; v9's clip: "make Supamario's distance from the ground consistent", then "The initial hit of Super God
+Fist doesn't make Supamario move high enough. That is the problem"; "make Super God Fist not hit through
+invulnerability".
+
+### Travel x1.4
+`TRAVEL` is 1.4 (v8 1.0, v9 1.6). The whiff now ends 38.9 forward (v9 44.4, v8 27.8) and the full God Fist 34.6
+(v9 39.5, v8 24.7). As in v9, the victim's path is written relative to him minus his own travel.
+
+### Leave_Ground_Cancel
+The move uses the command as Diddy Kong's dash attack does (`docs/acmd-extra-commands.md`). The game script turns it
+off (`Enabled=0`) at frame 0, so the dash runs off a ledge and the punch goes on in the air.
+- **Whiff:** turned back on at WHIFF_END - 1. In the air, the MSC's Fall then goes through, so the move ends in Fall
+  by its end: at 39 if the vl cancel window opens there, else at 43.
+- **Catch:** `Enabled=2` from the catch. That is still off, but the hold, the strike and the flip stop at a ledge as
+  in v9, so the victim's choreography stays on the stage.
+- **Caught in the air** (he ran off before the punch): the God Fist goes on in the air to the hand-off.
+- **Hand-off:** turned back on at the hand-off (91).
+- **MSC:** gf_update's hit path asks for Fall in the air only from GF_IASA (v9: every frame, which the cave dropped
+  until the vl cancel window opened, so it would have cut the hold short). In the air the move therefore ends in Fall
+  at 92, after the victim has been handed off and knocked down, and the usual paths release it.
+- **No Gravity_Set:** the fall uses his own gravity, unlike Diddy's floaty version.
+
+### His height
+v3-v9 put his lower foot on the floor on every frame except the flip's. So he stood on the floor through the punch
+and the hold, then jumped up to XV2's height (the hold's hang, about 3.4 over the floor) at frame 63, three frames
+before the strike, where the flip's ramp began. XV2 rises with the punch (#1 frames 10-14) and stays up through the
+hold, the strike and the flip.
+- **Raised:** from the punch's rise (eased over frames 10-14) to the flip's landing, he is at XV2's own height
+  (`anim.raise_weight`). The punch (frames 14-18), the hold (46-65) and the strike are at one height (3.3-3.6).
+- **Whiff:** comes back down with #1's own descent (frames 18-23).
+- **Flip:** lands at 92 as before.
+- **What goes up with him:**
+  - the held victim (`LH_OFFY` = his height each frame);
+  - the strike's body hitbox (Y 6.5 + 3.5);
+  - the launch (the flight's first 14 frames 3.5 higher, eased away by the end of the flight);
+  - the hit spark at the victim's head.
+  
+  The punch's fist hitbox follows the fist. Its body hitbox (ID 1) stays where it was, so short fighters are still
+  hit.
+- **Build check:** feet on the floor (0 to 0.15) on every ground frame; no jump over 1.3 a frame outside the MSC's
+  jump and the flip; the punch, the hold and the strike within 0.2 of one height.
+
+### Startup sound
+The God Fist's BAC has one startup sound: entry 0's skill SE cue 0 at frame 0, along with skill voice cue 0, which is
+a voice and is left out. Skill SE is the skill's own bank, named by its CUS entry (the 030_GOD skill's SE ACB and AWB,
+`CAR_BTL_S030_GOD...SE`), and it isn't among the uploads:
+- `CAR_BTL_GOK_SE` (Goku's character SE) has six throw cues (`BRD_BTL_nage_*`);
+- `CAR_BTL_CMN` has no God Fist cue.
+
+As a stand-in, CMN cue 138 `CAR_BTL_CMN_BurstDash_Atk` (XV2's burst-dash strike, 1.0 s, loudest 10 frames in) is
+added to his bank (`gf_start`, sound id 0x0CB10091) and plays at frame 1. Mario's own dash sound at 10 stays. The
+bank and the soundlabeltable change: row 3249 gains one label.
+
+### Not through invulnerability
+- **Invincible:** the punch's hitboxes don't ignore invincibility, but an invincible fighter's hurtbox still collides.
+  The attack's hit record counts as Hit_Check's "hurtbox" (2) with no damage, so v3-v9 caught it. Now the catch also
+  needs the fighter it hit to have body state 0 (`0x0F00015B`, its INTANGIBLE: 1 invincible, 2-4 intangible, the
+  stronger of its status's own and its timed one).
+- **Intangible** (spot dodge, rolls): it doesn't collide, so it isn't caught.
+- **Shield:** a shielded punch is Hit_Check's 4, so it isn't caught either. The punch does its shield damage and the
+  move whiffs. Super armor is unchanged.
+- **Not confirmed in the exe:** that an invincible collision makes a hit record of the hurtbox kind (taken from the
+  user's report).
+
+### Tests
+`supamario_godfist_test.py --vbn MODEL_VBN --all-models` (the test now reads his height from the built motion):
+0 problems on the normal and diag builds. New checks:
+- the Leave_Ground_Cancel schedule on both paths;
+- the MSC off a ledge on the whiff (with and without the vl cancel window);
+- the MSC in the air from frame 14, 50 and 71 on the hit path (no Fall before GF_IASA; v9's MSC fails them);
+- Fall at GF_IASA: the victim still downed and released;
+- the hold at his height;
+- invincible / intangible / shielding at the punch (no damage, no catch).
+
+`msc_stack_check`: 0 of 2323. `msc_fingerprint` v9 vs v10: only `func_2320` (the air check).

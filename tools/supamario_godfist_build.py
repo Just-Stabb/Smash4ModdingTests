@@ -89,6 +89,11 @@ NO_DOWN = 0x80000000
 LGC_ON, LGC_OFF, LGC_EDGES = 1, 0, 2         # Leave_Ground_Cancel's Enabled
 PUNCH_SITUATION = NO_DOWN | 3
 LASTHIT_STATUS = 0x0F0000B2
+# v10: the last fighter hit's body state (docs/position-variables.md "Inputs and state" +0x1B INTANGIBLE: 0 normal,
+# 1 invincible, 2-4 intangible). The punch's hitboxes don't ignore invincibility (IgnoreInvuln 0), but an invincible
+# fighter's hurtbox still collides (the attack's hit record, kind "hurtbox": Hit_Check's 2, no damage), so v3-v9
+# caught it. An intangible one doesn't collide at all; a shield is Hit_Check's 4 (not caught: a whiff on shield)
+LASTHIT_BODY = 0x0F000100 + 0x20 * 2 + 0x1B
 DOWN_LO, DOWN_HI, DOWN_FURAFURA = 0x4D, 0x57, 0x5B
 PUNCH_FREEZE = 9                        # the punch's hitstop, both: CMN.bdm #160's stun 9 / 9 (the BDM the hitbox
                                         # names: #160 isn't in GOK_PLAYER.bdm)
@@ -497,6 +502,9 @@ def game_script():
     # not a fighter lying down (V_TMP 1: catch it)
     s += [setf(1, V_TMP)] + if_(LASTHIT_STATUS, 3, DOWN_LO, if_(LASTHIT_STATUS, 2, DOWN_HI, [setf(0, V_TMP)]))
     s += if_(LASTHIT_STATUS, 0, DOWN_FURAFURA, [setf(0, V_TMP)])
+    # v10 (user: "make Super God Fist not hit through invulnerability"): not a fighter invincible or intangible
+    # (LASTHIT_BODY: its body state, the stronger of its status's own and its timed one; 0 normal)
+    s += if_(LASTHIT_BODY, 1, 0, [setf(0, V_TMP)])
     caught = if_(V_TMP, 0, 1, caught)
     s += [cmd('hit_check', 0, 0, 2), cmd('true', 2 + size(caught))] + caught
     # a whiff: Leave_Ground_Cancel on again before its end (in the air: the MSC's Fall at WHIFF_END goes through)

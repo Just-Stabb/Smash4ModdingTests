@@ -236,6 +236,8 @@ class Victim:
         self.push = None              # the PUSH (energy 4 speed) written
         self.push_log = []            # (game frame, its status, value)
         self.hits_taken = []          # (game frame, part)
+        self.body = 0                 # v10: body state (0 normal, 1 invincible: collides, no damage; 2 intangible)
+        self.shielding = False        # v10: its shield up (a collision with it: Hit_Check's 4)
 
     def frame(self, n):
         frozen = self.stop > 0
@@ -380,6 +382,13 @@ class Acmd:
                 continue
             if self.NO_DOWN and sit & B.NO_DOWN and self.v.lying():
                 continue
+            if self.v.body >= 2:            # intangible: no collision
+                continue
+            if self.v.shielding or self.v.body == 1:
+                rec.add(self.v.slot)        # a collision (a hit record), no damage
+                self.pending_bits |= 4 if self.v.shielding else 2
+                freeze = max(freeze, stop)
+                break
             rec.add(self.v.slot)
             self.pending_bits |= 2
             self.v.hit(g, part, 20)
@@ -502,6 +511,10 @@ class Acmd:
             return 0.0                      # the diag IDs read 0
         if var == B.SELF_FACING:
             return self.FACING
+        i = var - 0x0F000100
+        if 0 <= i < 0x160 and i % 0x20 == 0x1B:  # a target's body state (INTANGIBLE)
+            tv = self.target(i // 0x20, self.in_thread)
+            return float(tv.body) if tv else 0.0
         tq = self.slot_var(var)
         if tq and tq[1] == 8 + 2:               # a target's status
             tv = self.target(tq[0], self.in_thread)
@@ -842,6 +855,17 @@ def acmd_tests(game_bin):
                 check('lying (%s), the flag ignored by the game: hit, but not caught (the status guard)' % name,
                       (len(v.hits_taken) > 0,) + got, (True, 0.0, False, (0.0, 0.0, 0.0), None))
     Acmd.NO_DOWN = True
+    # v10: invincible / intangible / shielding at the punch: not caught, not held, no damage, no launch: a whiff
+    for what in ('invincible', 'intangible', 'shielding'):
+        v = Victim()
+        if what == 'shielding':
+            v.shielding = True
+        else:
+            v.body = 1 if what == 'invincible' else 2
+        a, rec = run_move(script, v, frames=80)
+        check('%s at the punch: no damage, not caught (gf 0, no jump to the God Fist), not moved / turned / held'
+              % what, (len(v.hits_taken), a.vars.get(B.GF_VAR, 0.0), any(r[1] >= B.JUMP_TO for r in rec), v.offx,
+                       v.rot, v.input_off), (0, 0.0, False, None, (0.0, 0.0, 0.0), 0.0))
     # the victim of a God Fist, held down by the MSC, under a second God Fist: missed, still held, then gets up
     v = Victim()
     a, rec = run_move(script, v, frames=land + 10)
