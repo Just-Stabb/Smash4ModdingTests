@@ -160,7 +160,7 @@ names `Bound`, `Bound_C2`-`_C4` at `0x10420928`, a null past them).
 - Hero's Whack / Thwack pass the level only now; the deathball finds his slot itself (shot.c `sh_find_owner`: the
   fighter of his kind nearest to where it was made, his hand).
 - `port_check` X4 (an unclamped getter in the install's executable: ERROR), W10 (a slot worked into a custom number in
-  the fighter's MSC: WARN).
+  the fighter's MSC: an ERROR since Kirby's Hero copy fix v4, after Hero's Magic Burst past P1 never appeared).
 
 ## Inline kind compares in the base fighter's code (multi-instance bugs v2)
 

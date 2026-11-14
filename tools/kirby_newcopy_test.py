@@ -60,6 +60,8 @@ class Game:
         self.tag = lambda: None
         self.animcmd = []                                      # fix v1: MotionAnimcmdModule(0, set, motion, kind)
         self.nv = {}                                           # category-F user variables / New_Var slots (floats)
+        self.stick_x, self.lr = 0.0, 0.0                       # fix v4: ControlModuleF(0), PostureModuleF(0)
+        self.posture = []                                      # fix v4: PostureModule calls
 
     # fix v2: the copy article's spawner as the executable runs it (traced: tools/kirby_robin_book_cave.py). Robin's
     # thunder spawner 0x02F643A4 (the Robin copy's records 2, 6 and 8-12) first calls Robin's tome code 0x02F613B8
@@ -153,6 +155,15 @@ class Game:
             return 0
         if sid == 0xF and a == [1]:
             return R.f2i(self.stick_y)
+        if sid == 0xF and a == [0]:
+            return R.f2i(self.stick_x)
+        if sid == 0x15 and a == [0]:
+            return R.f2i(self.lr)
+        if sid == 0x14 and a:
+            self.posture.append(list(a))
+            if a[0] == 0 and len(a) == 2:
+                self.lr = R.i2f(a[1])
+            return 0
         if sid == 0x20 and a and a[0] == 0x2710:                # ArticleModule generate
             self.articles.append((a[1], self.frame, self.ints.get(0x10000048), self.ints.get(0x1000009F),
                                   self.ints.get(0x10000049), self.spawn(a[1])))
@@ -650,10 +661,12 @@ def fix_v3_tests(path, src):
     for btn, name in ((3, 'shield'), (2, 'jump')):
         g.press = {btn}
         g.sounds = []
+        kset(r, 'khm_spells', 0x1F * 0x8421)    # fix v4: a stand-in draw, to see it drawn again
         r.vm.call(r.fn['khm_update'])
         g.press = set()
         r.vm.call(r.fn['khm_update'])
-        check('the menu cancelled with %s: still open (state 1), the same spells, its time from 0, the open sound'
+        check('the menu cancelled with %s: still open (state 1), fix v4: four spells drawn anew (the VM\'s randi 0: '
+              'the first draw\'s), its time from 0, the open sound'
               % name, (kget(r, 'khm_state'), kget(r, 'khm_spells'), kget(r, 'khm_frame') <= 2,
                        (0x2710, 0x76400DD) in g.sounds), (1, spells, True, True))
     for _ in range(0x1e0):
@@ -702,6 +715,91 @@ def fix_v3_tests(path, src):
                        ((True, 0, True, True, 1), 'Zoom still going')):
         r, got = stone(*args)
         check('no drop: %s' % name, (got, r.game.statuses), (0, []))
+
+
+def fcall(r, name, default=None):
+    """a kirby.c function's value, or `default` when this build has none (fix v4's run on an older MSC)"""
+    return r.vm.call(r.fn[name]) if name in r.fn else default
+
+
+def fix_v4_tests(path, src):
+    """Hero copy fix v4: the reopened menu draws anew; Zoom / Zoom 2 U keep him in the stone and stop at a KO (the
+    double KO); Kamikazee's KO not after a KO; the cast turns him to the stick held back"""
+    # Zoom: the stone's ends held off from the choice to the flight's end, invincible before the launch
+    for spell, name in ((0x10, 'Zoom'), (0x17, 'Zoom 2 U')):
+        r = Run(path, src, 2)
+        g = r.game
+        r.update()
+        g.fvars.update({0x0F000000: 10.0, 0x0F000001: 0.0, 0x0F000020: 10.0, 0x0F000023: 1.0,
+                        0x0F000024: 50.0, 0x0F000027: 1.0})
+        cast(r, spell, 10)
+        check('%s: before the launch, zooming, the stone\'s special end blocked, invincible (0x0F00011C)' % name,
+              (fcall(r, 'khm_zooming'), r.vm.call(r.fn['khm_blocking']), g.fvars.get(0x0F00011C)), (1, 1, 2.0))
+        g.statuses = []
+        g.press = {1}
+        r.vm.call(r.fn['func_2323'])
+        g.press = set()
+        check('%s: special in the stone\'s hold (0x175) doesn\'t end it (no 0x176)' % name, g.statuses, [])
+        g.ints[0x18000000] = 0
+        r.vm.call(r.fn['func_2323'])
+        check('%s: nor its ground timer' % name, g.statuses, [])
+        r.vm.g[r.gi['global24']] = 0x8000
+        r.vm.g[r.gi['global18']] = 2
+        g.press = {1}
+        check('%s: nor the air drop' % name, r.vm.call(r.fn['khm_stone_drop']), 0)
+        g.press = set()
+        r.vm.g[r.gi['global18']] = 0
+        # the double KO: KO'd before the launch (the stone falling past the bottom line), the spell stops there
+        r.vm.g[r.gi['global4']] = 0xB1
+        g.speeds = []
+        n_post = len(g.posture)
+        g.fvars[0x0F000000], g.fvars[0x0F000001] = -500.0, -300.0
+        for k in range(200):
+            if k == 60:
+                r.vm.g[r.gi['global4']] = 0xB2      # the respawn
+            if k == 120:
+                r.vm.g[r.gi['global4']] = 0
+            r.vm.call(r.fn['khm_update'])
+        check('%s: KO\'d mid-cast (0xB1): the cast over (state 0, sub 0x7F), and through the KO / respawn nothing of '
+              'it: no flight speed, his position untouched (the double KO: Zoom went on, put him 120 above a fighter '
+              'and pushed him down at 7 a frame)' % name,
+              (kget(r, 'khm_state'), kget(r, 'khm_sub'), g.speeds, (g.fvars[0x0F000000], g.fvars[0x0F000001]),
+               len(g.posture) - n_post), (0, 0x7f, [], (-500.0, -300.0), 0))
+        check('%s: over: the stone\'s ends free again' % name, (fcall(r, 'khm_zooming'),
+                                                               r.vm.call(r.fn['khm_blocking'])), (0, 0))
+    # Zoom left by another way (not a KO) mid-flight: stopped, the fall put back
+    r = Run(path, src, 2)
+    g = r.game
+    r.update()
+    g.fvars.update({0x0F000000: 10.0, 0x0F000020: 10.0, 0x0F000023: 1.0})
+    cast(r, 0x10, 35)
+    r.vm.g[r.gi['global4']] = 0xE
+    r.vm.call(r.fn['khm_update'])
+    check('Zoom: out of the stone mid-flight (status 0xE): stopped (sub 0x7F, state 0)', (kget(r, 'khm_sub'), kget(r, 'khm_state')),
+          (0x7f, 0))
+    # Kamikazee: KO'd before 49: no KO flag after the respawn
+    r = Run(path, src, 2)
+    g = r.game
+    r.update()
+    cast(r, 0x9, 25)
+    r.vm.g[r.gi['global4']] = 0xB1
+    for k in range(60):
+        if k == 30:
+            r.vm.g[r.gi['global4']] = 0
+        r.vm.call(r.fn['khm_update'])
+    check('Kamikazee KO\'d at 25 (0xB1): no "causes KO" flag after it (a second KO)', 0x20000043 in g.flags, False)
+    # the cast turns him to the stick held back (Hero's brave_lw_loop), not to one held forward or neutral
+    for lr, sx, turned in ((1.0, -1.0, True), (1.0, -0.3, False), (1.0, 1.0, False), (-1.0, 1.0, True),
+                           (-1.0, 0.0, False)):
+        r = Run(path, src, 2)
+        g = r.game
+        r.update()
+        g.lr, g.stick_x = lr, sx
+        cast(r, 0x2, 8)
+        check('the cast, facing %+d, stick x %+.1f: %s' % (lr, sx, 'turned round (PostureModule(0, %+d), then 2)' % -lr
+                                                         if turned else 'his facing kept'),
+              [p for p in g.posture if p[0] in (0, 2)], [[0, R.f2i(-lr)], [2]] if turned else [])
+        check('...the Sizz made after it (frame 6)', [a[0] for a in g.articles], [8])
 
 
 def main():
@@ -800,6 +898,7 @@ def main():
     fix_v1_tests(path, src)
     fix_v2_tests(path, src)
     fix_v3_tests(path, src)
+    fix_v4_tests(path, src)
     menu_tests(path, src)
     if 'khm_sword' in names(src)[0]:
         v6_tests(path, src)

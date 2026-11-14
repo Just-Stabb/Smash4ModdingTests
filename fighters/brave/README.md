@@ -1574,3 +1574,35 @@ Kirby's fix v3: the projectiles drew invisible with those custom numbers (past 3
 and the articles find him themselves: `shot.c` / `placed.c` (crash) take a Kirby in his stone (statuses 0x155 / 0x175 /
 0x176) within 30 of the article as the caster, before Hero's search. Hero's own casts are unchanged
 (`tools/brave_shot_owner_test.py`); rebuilt: flash, explosion, deathball, sleep, crash, spark, tornado.
+
+## Magic Burst / Kamikazee / Woosh / Zap from any player slot (with Kirby's Hero copy fix v4, `kirby_hero_copy_fix_v4`)
+
+User: "Magic Burst as Hero on a slot other than player 1 doesn't spawn anything."
+- **Cause:** port_check's W10 (it warned): `brave.c` sent Magic Burst's crash `tier + 8 x slot`, Kamikazee's `1 + 8 x
+  slot`, Woosh's tornado and Zap's spark `level + 4 x slot` (his own / the target's). A copy of Robin's Thunder with a
+  custom number past 3 reads its base's 4-entry per-custom data past its end and isn't made / drawn (the clamp of
+  the param getters, `CUSTOM_CLAMP`, isn't the only per-custom read: Kirby's Hero copy fix v2 / v3). So every slot
+  but P1's lost Magic Burst / Kamikazee, and P1's Magic Burst with 21-80 MP (tiers 4-6) too; Woosh / Zap past P1
+  the same (Zap: the target's slot, so a P1 target's spark worked).
+- **Fix:** every Hero article's custom number is the level, 0-3 (Magic Burst 0, Kamikazee 1, Woosh / Zap the
+  level). What else the article needs comes through a **marker on Hero**: `brave_mark(payload)` sets his
+  ARMOR_THRESHOLD (position variable `0x0F00011E`: DamageModule's armour thresholds, unused while no armour is on:
+  none of his special statuses set one, every armour he gets sets its own) to 9000 + payload for 3 frames, then puts
+  his own value back (`brave_mark_update`, first in `brave_frame`). Payloads: the crash's motion (0 / 3-6 by the MP
+  spent, 1 Kamikazee), the spark's target slot, 0 for the tornado. `weapons/placed.c` `pl_marked_hero`: the Hero
+  (kind 0x45) with a marker nearest to the article (made at his hand, within 30) is the caster; `pl_mark_kind`
+  (`placed_config`: spark 1, crash 2) says what the payload is. One marked article at a time: Zap's second target in
+  the same frame waits for the marker to be free (3 frames later). The state is in his New_Var slots `0x0F0003BD`-
+  `0x0F0003BF`. Kirby's stone crash (no marker) keeps `pl_stone_kirby`; the old `level + n x slot` numbers are still
+  read.
+- **His globals:** `brave.c` used globals up to index 134, past the game's 128 (msc_stack_check / port_check C1 ERROR;
+  crash fix v2: 128-134 wrote over the MSC script context's 7-word sub-object at +0x204; port_check's C5 "0x86 proven"
+  was this). The last seven, `brave_lw_released` ... `brave_lw_burst`, are New_Var slots `0x0F0003B6`-`0x0F0003BC` now:
+  128 globals. `brave_mark_test.py` checks Command Selection makes the same calls with them as globals and as slots.
+- Tests: `tools/brave_mark_test.py` (the globals move; Hero in each slot 0-7: Magic Burst at 100 / 70 / 50 / 30 / 10 MP, Kamikazee,
+  Woosh, Zap on two targets at once; the article decodes his slot and tier / target with an opponent Hero nearer to
+  it; his threshold back; the old code's numbers reproduced), `tools/brave_shot_owner_test.py`, `port_check brave`
+  (W10 gone; it is an ERROR now).
+- Changed: `script/msc/brave.mscsb`, `script/msc/{crash,spark,tornado}/*.mscsb` (placed.c), and (Kirby's fix v4,
+  `weapons/shot.c`: a projectile cast from Kirby's stone put on his plane) `script/msc/{flash,explosion,deathball,sleep}`.
+

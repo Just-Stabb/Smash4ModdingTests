@@ -2008,3 +2008,93 @@ No executable change: A stays exe_v45h, B exe_v46f.
 python3 tools/kirby_copy_sword.py --fix-skeletons OUT/fighter/kirby/model      # v6's bravesword tree
 sh tools/kirby_hero_copy_build.sh OUT; python3 tools/brave_shot_owner_test.py OUT/shot
 ```
+
+### Hero copy fix v4 (`kirby_hero_copy_fix_v4`): exe_v46g (B), the held sword made; spells on Kirby's plane; Zoom; turning
+
+User (fix v3 A / B): (1) the B build's sword still never shows in the sword spells (`bravesword` installed with v3's
+skeletons); (2) the Stone's projectiles show now but Sizz / Sizzle / Bang / Kaboom ... don't hit; the user's
+clarification: they hit every other opponent and fail **only against Hero**; (3) the menu cancelled and reopened should
+draw new spells; (4) Zoom offstage can KO Kirby twice: no leaving the stone during Zoom / Zoom 2 U; (5) cast to the
+stick held left / right, as Hero (left / right only: no angles; neutral keeps the facing). Also, for Hero himself: (6)
+"Magic Burst as Hero on a slot other than player 1 doesn't spawn anything".
+
+**(1) The sword: the held article was never generated (found statically, certain).** The copy model function
+`0x02EFE138` makes the hat first (article 0x19, `0x02EFE254`-`0x02EFE268`). On success the compiler's tail duplication
+gives that path its own copy of the held-model kind chain's first compare: `0x02EFE284 cmplwi r27, 0x22; bge
+0x02EFE6A0; b 0x02EFE66C`, which skips `0x02EFE664`, where v6's GEN stub sat. `0x02EFE664` is reached only when the
+hat's generate fails (`0x02EFE270 beq`) or from the -1 / 4 / 0x13 / 0x15 / 0x28 paths. The Hero copy's hat is made, so
+kind 0x2C went `0x02EFE6A0` -> `0x02EFE7EC`: no article 0x1A, nothing for the stone check to show. v6's unicorn test ran
+the stub from `0x02EFE664` itself and never the function's path to it. Fix (`tools/kirby_hero_sword_cave.py`, exe_v46g =
+exe_v46f + three words): `0x02EFE284` -> the same GEN stub (cr0 as the `cmplwi` for every other kind). Also the two
+other reads of the held-item table for a Hero player's slot, which still gave Robin's empty name: `0x030C49D8` (the
+`c00` fallback when `model/<name>/cNN` is missing) and `0x030C4BE8` (the held item's motion folder,
+`fighter/kirby/motion/<name>`: Robin's "" named the motion root) -> the name stub (`r11` / `r12` = `r28 << 2` = `r21`
+there). Only those three words differ from exe_v46f (checked word by word); none has a relocation (rpx_patch).
+`tools/kirby_hero_sword_test.py exe_v46g exe_v45h exe_v46f`: the function run in unicorn from the hat's generate
+(its calls stubbed) for hat made / not made: the Hero copy reaches `0x02EFE748` both ways, Robin's / Sephiroth's
+copies never, Marth-style kinds as before; exe_v46f reproduces it (`0x02EFE7EC` with the hat made, `0x02EFE748`
+only when it fails); the new name reads give "bravesword".
+
+**(2) Hits on Hero only fail: the projectile is 5 off Kirby's plane, and Hero's hurtboxes are thin.** Robin's thunder
+spawner places the weapon at the owner's hand joint in 3D (`0x020073FC`: the joint's world position, z included;
+joint 0x10 LHandN for a Kirby). Kirby's stone end pose (SpecialLw1 / SpecialAirLw1 last frames, held through the stone)
+has LHandN at model (-5.0, 10.7, 4.0): the first axis is the game's depth, so the spell flies 5.0 off his plane (the
+Frizz cast pose: 0.9). Smash 4's hit test is 3D, so a hitbox of radius r 5 deep reaches only hurtboxes of radius > 5 - r.
+Hero's are Ultimate's (`brave/param/vl.prc` hit_data: hip / waist 2.0, head 1.55, legs 1.3, arms 0.95), the thinnest of
+any fighter; vanilla widest are Robin 2.4, Link 2.6, Mario 3.1, Kirby 5.0. Sizz / Sizzle (3.0) reach every vanilla body
+and miss Hero, which is the user's report. Nothing in the MSC, ACMD or native spawn excludes Hero: the spawner passes
+Kirby's id and Kirby's team (`0x02F64424`-`0x02F64438`, the weapon set-up `0x02B64740` takes them; `0x02B64074` walks
+to the root owner); Hero's MSC has no self-immunity. Fix: `fighters/brave/weapons/shot.c` `sh_plane`: a projectile
+whose caster is a stone Kirby (`sh_stone_kirby`) is put on his plane at its start (PostureModule(3, its x, its y, his
+position-variable Z)); Hero's own casts untouched. `tools/brave_shot_owner_test.py` checks the placement (every shot,
+both levels, the three stone statuses; none for Hero's own) and reproduces the miss from those shapes.
+
+**(3)** `khm_reopen` draws four spells anew (`khm_draw`), as Hero's menu opened again (brave.c `brave_lw_main`).
+
+**(4) The double KO, found:** `khm_update` ran the cast every frame whatever his status and Zoom / Zoom 2 U never
+looked at it (Kaclang did). KO'd during the cast (e.g. the stone falling past the bottom blast line in Zoom's 29 frames
+before the launch, offstage), the spell went on through the KO / respawn statuses: at 29 it set him airborne
+(`func_20(2)`) with a 9-a-frame rise for 40 frames, then put him 120 above a fighter (his position variables) and
+pushed him down at 7 a frame for up to 150 frames: off the respawn platform and through the bottom line again. Zoom 2 U
+moved him through his position too, and Kamikazee's KO flag (frame 49) could land after the respawn. Fix:
+`khm_cast_guard` stops any cast at a KO (status 0xB1 Dead / 0xB2 Rebirth: nothing touches him after) and Kamikazee /
+Zoom / Zoom 2 U when he is no longer the stone (the fall put back if mid-flight). `khm_zooming` (the choice to the
+flight's end) holds the stone's ends off: special and the ground timer in its hold loop `func_2323`, the air drop
+`khm_stone_drop`; he is invincible (`0x0F00011C`) until the launch (intangible in the flight, as before), so no hit ends
+the stone either. The game's own KO still happens, once.
+
+**(5)** `khm_turn` at the choice: Hero's rule (brave.c `brave_lw_loop`, fix 68): the stick held back past half (stick x
+x facing < -0.5) turns him round (PostureModule(0, -lr), then 2); every spell then goes his facing's way (the projectiles
+take it at the spawn, the sword hitboxes, Zoom 2 U aims itself). The stone's motion is untouched (the stone turns with
+him).
+
+**(6) Hero's Magic Burst / Kamikazee / Woosh / Zap from any slot** (Hero files; fighters/brave/README.md): his MSC sent
+`tier + 8 x slot` (Magic Burst), `1 + 8 x slot` (Kamikazee), `level + 4 x slot` (Woosh, Zap's target): past 3 for every
+slot but P1 and for P1's 21-80 MP tiers (port_check W10, the rule of fix v3's invisible spells). Now the level alone
+(0-3) and a marker on Hero (`brave_mark`: his ARMOR_THRESHOLD = 9000 + the tier / target slot for 3 frames, then his
+own back) that `placed.c` `pl_marked_hero` reads off the position variables. `tools/brave_mark_test.py`; port_check W10
+is an ERROR now (docs/ultimate-port-guide.md catalogue). Shipping `brave.mscsb` again brought up an older ERROR
+(port_check C1 / msc_stack_check): `brave.c` used globals up to index 134, past the game's 128 (crash fix v2: 128-134
+wrote over the script context's 7-word sub-object at +0x204). The last seven (`brave_lw_released` ... `brave_lw_burst`)
+now live in his New_Var slots 0x0F0003B6-BC (the marker's in 0x0F0003BD-BF): 128 globals (0-127). `brave_mark_test.py`
+runs Command Selection for 16 spells with them as globals (the substitution reversed) and as slots: the same calls.
+
+**Diagnostic executable** (`tools/diag_kirby_hero_cave.py`, tested by `tools/diag_kirby_hero_test.py`; exe_v46g_diag =
+exe_v46g + 12 hooks in 0x04BAC000-0x04BAF000): OSReport lines `S4KH cpy / gen / res / stn / swd / spawn / hit` (the copy
+model function's kinds, the held article's handle, the model path test, the held article's update in the stone, the
+sword int and visibility, the thunder spawner's positions for Kirby / Hero, the spells' hit methods), each tag capped.
+Shipped beside B in case the sword still doesn't show or a spell still misses Hero.
+
+Tests: `kirby_newcopy_test.py` A and B (fix v4: the reopen draws anew; Zoom / Zoom 2 U: zooming, the special / ground
+timer / drop held off, invincible before the launch, KO'd mid-cast then nothing through KO / respawn, out of the stone
+mid-flight stopped; Kamikazee no KO after a KO; the turn for stick back / forward / neutral, both facings; fix v3's MSC
+fails these 16 checks), `kirby_hero_sword_test.py`, `diag_kirby_hero_test.py`, `brave_shot_owner_test.py`,
+`brave_mark_test.py`, `msc_stack_check.py` (Kirby 118 globals), `rolloff_hold_test.py`, `port_check brave` (0 errors).
+```
+python3 tools/rpx_patch.py EXE_V46F.rpx EXE_V46G.rpx $(python3 tools/kirby_hero_sword_cave.py)
+python3 tools/kirby_hero_sword_test.py EXE_V46G.rpx EXE_V45H.rpx EXE_V46F.rpx
+python3 tools/rpx_patch.py EXE_V46G.rpx EXE_V46G_DIAG.rpx $(python3 tools/diag_kirby_hero_cave.py --rpx EXE_V46G.rpx)
+python3 tools/diag_kirby_hero_test.py EXE_V46G_DIAG.rpx EXE_V46G.rpx
+sh tools/kirby_hero_copy_build.sh OUT; python3 tools/kirby_newcopy_test.py OUT/kirby_B.mscsb
+python3 tools/brave_mark_test.py HERO_OUT; python3 tools/brave_shot_owner_test.py HERO_OUT    # brave + 7 articles
+```

@@ -1319,9 +1319,13 @@ def check_weapon_custom_source(name, rep):
     for m in re.finditer(r'WorkModule\(0x7, ([^;]*slot[^;]*[*+][^;]*|[^;]*[*+][^;]*slot[^;]*), 0x1000004[89ab]\);', text):
         hits.append('%d: %s' % (text.count('\n', 0, m.start()) + 1, m.group(0)))
     if hits:
-        rep.add('WARN', 'W10 weapon-custom', 'fighters/%s/%s.c: a player slot in a weapon\'s custom number (%s): past 3 '
+        # an ERROR since Kirby's Hero copy fix v4: confirmed in game three times (Hero's P2 Whack, multi-instance
+        # bugs v1; Kirby's Hero-copy projectiles drawn invisible, Kirby fix v2; Hero's Magic Burst from any slot but
+        # P1's never made, Kirby fix v4)
+        rep.add('ERROR', 'W10 weapon-custom', 'fighters/%s/%s.c: a player slot in a weapon\'s custom number (%s): past 3 '
                 'it reads the base weapon\'s per-custom data past its 4 entries (Hero\'s Whack / Thwack for P2, '
-                'multi-instance bugs v1); keep it 0-3 and find the slot in the article' % (name, name, '; '.join(hits[:4])))
+                'multi-instance bugs v1; his Magic Burst past P1, Kirby fix v4): keep it 0-3 and carry the slot another '
+                'way (find the caster in the article: weapons/shot.c, placed.c pl_marked_hero)' % (name, name, '; '.join(hits[:4])))
 
 
 def check_weapon_endless_effects(inst, name, rec, vanilla, rep):

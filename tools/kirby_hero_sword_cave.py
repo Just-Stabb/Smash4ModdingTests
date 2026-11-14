@@ -26,6 +26,16 @@ The patch:
 3. STONE: copy_held_cave.py --stone: its hide path comes here: in the stone statuses (0x155 / 0x175 / 0x176) with
    Kirby's int 0x1000008B == 1 (kirby.c khm_sw_*: a sword spell being cast) it takes the show path (0x02B026B4), else
    the hook's own `lwz r3, 0xA8(r30)` and back to 0x02B02734 (both through ctr: 0x02Bxxxxx is out of `b` reach).
+Fix v4 (Hero copy fix v4; the user: the sword STILL doesn't appear): the GEN stub was never reached. The copy model
+function generates the hat (article 0x19, 0x02EFE268) first, and on success its own copy of the kind compare
+(0x02EFE284 `cmplwi r27, 0x22`, then `bge 0x02EFE6A0` / `b 0x02EFE66C`: the compiler's tail duplication) jumps past
+0x02EFE664, which only the hat's failure path (0x02EFE270 `beq`) and the -1 / 4 / 0x13 / 0x15 / 0x28 paths reach. The
+Hero copy's hat is made, so for 0x2C the chain went 0x02EFE6A0 -> 0x02EFE7EC: no held article, nothing to show.
+GEN2: 0x02EFE284 -> the same stub (cr0 as `cmplwi r27, 0x22` for every other kind; the Hero copy into 0x02EFE748).
+Also the held model's two other reads of the held-item table, which still read Robin's (empty) name for a Hero
+player's slot: ITEM2 0x030C49D8 `lwzx r7, r11, r24` (the c00 fallback path when model/<name>/cNN is missing) and ITEM3
+0x030C4BE8 `lwzx r7, r12, r24` (the item's motion folder, fighter/kirby/motion/<name>: Robin's "" named the motion
+root) -> the same name stub (r11 / r12 = r28 << 2 = r21 there, which the stub indexes with).
 Space: 0x04BAF620-0x04BAF700, the end of kirby_copy_new_cave.py's space (its code ends at 0x04BAF610 since crash fix v3), in the code
 region the standard build already runs (kind_expand.py's; never the grown text region: crash fix v1).
 """
@@ -42,6 +52,11 @@ CAVE = 0x04BAF620
 LIMIT = 0x04BAF700
 HOOK_ITEM = 0x030C487C          # lwzx r7, r24, r21 (r24 = 0x1041A8A0, the held-item table)
 HOOK_GEN = 0x02EFE664           # cmplwi r27, 0x22
+HOOK_GEN2 = 0x02EFE284          # fix v4: cmplwi r27, 0x22 (the hat's success path: bge 0x02EFE6A0 / b 0x02EFE66C)
+HOOK_ITEM2 = 0x030C49D8         # fix v4: lwzx r7, r11, r24 (the c00 fallback's name)
+HOOK_ITEM3 = 0x030C4BE8         # fix v4: lwzx r7, r12, r24 (the held item's motion folder name)
+ORIGINAL = {HOOK_ITEM: 0x7CF8A82E, HOOK_GEN: 0x281B0022, HOOK_GEN2: 0x281B0022, HOOK_ITEM2: 0x7CEBC02E,
+            HOOK_ITEM3: 0x7CECC02E}
 GEN_ARTICLE = 0x02EFE748        # lwz r3, 0x7284(r24); li r5, 0; li r4, 0x1A; ... bl 0x02C03EA0 (generate)
 HELD_BACK = 0x02B02734          # after the hide path's lwz r3, 0xA8(r30)
 SWORD_INT = 0x1000008B          # Kirby: 1 while a sword spell is cast (kirby.c khm_sw_*; copy_grant clears it)
@@ -86,6 +101,9 @@ def build():
     out = {CAVE + 4 * i: w for i, w in enumerate(words)}
     out[HOOK_ITEM] = V44.bl(HOOK_ITEM, a.labels['name_item'])
     out[HOOK_GEN] = V44.bl(HOOK_GEN, a.labels['gen_stub'])
+    out[HOOK_GEN2] = V44.bl(HOOK_GEN2, a.labels['gen_stub'])          # fix v4
+    out[HOOK_ITEM2] = V44.bl(HOOK_ITEM2, a.labels['name_item'])       # fix v4
+    out[HOOK_ITEM3] = V44.bl(HOOK_ITEM3, a.labels['name_item'])       # fix v4
     held, hook = HELD.build(HELD.MOTIONS, a.labels['held_stone'])
     for i, w in enumerate(held):
         out[HELD.CAVE + 4 * i] = w

@@ -21,6 +21,9 @@ int pl_wait;
 int pl_life;
 int pl_levels;
 int pl_started;
+int pl_mark_kind;   // fix v4: what Hero's marker carries (placed_config): 0 nothing (the article goes on him), 1 a
+                    // fighter's slot (spark), 2 the level (crash)
+int pl_mark;        // the payload read
 
 // thunder's own (func_47)
 int pl_pre()
@@ -115,6 +118,44 @@ int pl_stone_kirby()
     return best;
 }
 
+// fix v4 (Hero's Magic Burst / Kamikazee, Woosh, Zap from any player slot): Hero sends the level alone (0-3: a custom
+// number past 3 leaves the article unmade or unseen, port_check W10) and marks himself while he makes it: his
+// ARMOR_THRESHOLD (position variables 0x0F00017E + 0x20 x slot) = 9000 + the payload for 3 frames (brave.c brave_mark).
+// The caster: the Hero (kind 0x45) with a marker nearest to the article (made at his hand), within 30; pl_mark = its
+// payload; 8 none.
+int pl_marked_hero()
+{
+    int s;
+    int best;
+    float t;
+    float d;
+    float bd;
+    float dx;
+    float dy;
+    best = 0x8;
+    bd = 900.0f;
+    s = 0;
+    while (s < 0x8)
+    {
+        t = WorkModuleF(0, 0x0f00017e + 0x20 * s);
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0 && (int)WorkModuleF(0, 0x0f0000bd + 0x8 * s) == 0x45
+            && t > 8999.5f && t < 9099.5f)
+        {
+            dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - PostureModuleF(0x1);
+            dy = WorkModuleF(0, 0x0f000021 + 0x4 * s) - PostureModuleF(0x2);
+            d = dx * dx + dy * dy;
+            if (d < bd)
+            {
+                best = s;
+                bd = d;
+                pl_mark = (int)(t - 9000.0f + 0.5f);
+            }
+        }
+        s += 1;
+    }
+    return best;
+}
+
 // status 1: the article's set-up and life (once), then on as before
 void pl_hit_main()
 {
@@ -132,7 +173,19 @@ void pl_hit_main()
     }
     pl_slot = c / pl_levels;
     pl_level = c - pl_slot * pl_levels;
-    if (pl_levels == 0x8 && c < 0x4 && pl_stone_kirby() != 0x8)
+    if (c < 0x4 && pl_marked_hero() != 0x8)
+    {
+        pl_slot = pl_marked_hero();     // fix v4: Hero's, by his marker
+        if (pl_mark_kind == 0x1 && pl_mark >= 0 && pl_mark < 0x8)
+        {
+            pl_slot = pl_mark;          // Zap: the fighter the bolt hit
+        }
+        else if (pl_mark_kind == 0x2 && pl_mark >= 0 && pl_mark < pl_levels)
+        {
+            pl_level = pl_mark;         // Magic Burst's tier / Kamikazee
+        }
+    }
+    else if (pl_levels == 0x8 && c < 0x4 && pl_stone_kirby() != 0x8)
     {
         pl_slot = pl_stone_kirby();     // crash from Kirby's stone (fix v3: his custom number keeps 0-3)
     }
@@ -171,6 +224,7 @@ void main()
     global0 = sys_7(0);
     global1 = sys_7(0x1);
     pl_levels = 0x4;
+    pl_mark_kind = 0;
     placed_config();
     pl_setup();
     sys_0(0x2, func_3);

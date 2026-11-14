@@ -16,6 +16,14 @@
 - the held model's visibility, the whole chain from the hook (0x02B02730) with a stub status / motion / work module:
   shown (0x02B026B4) in the Marth sword motions 0x380 / 0x382 / 0x384 (as before) and in the stone statuses 0x155 /
   0x175 / 0x176 when Kirby's int 0x1000008B is 1; else hidden (0x02B02734, r3 = the module at +0xA8).
+- fix v4 (the user: the sword still never shows): the copy model function run from the hat's generate (0x02EFE254)
+  to its kind chain, the hat made (the Hero copy's case) and not: the Hero copy (grant 0x45, kind 0x2C) must reach
+  the held article's generate 0x02EFE748 both ways, every other pair must not. A third argument (exe_v46f, fix v2's)
+  shows the failure: with the hat made it went 0x02EFE284 -> 0x02EFE6A0 -> 0x02EFE7EC, past the v6 stub at
+  0x02EFE664 (reached only when the hat failed). The two other reads of the held-item table for the slot
+  (0x030C49D8 the c00 fallback, 0x030C4BE8 the motion folder) give "bravesword" too.
+
+  python3 tools/kirby_hero_sword_test.py PATCHED.rpx ORIGINAL.rpx [OLD_PATCHED.rpx]   (exe_v46g, exe_v45h, exe_v46f)
 """
 import os
 import struct
@@ -50,7 +58,7 @@ def sections(img):
 def emu(img):
     mu = Uc(UC_ARCH_PPC, UC_MODE_32 | UC_MODE_BIG_ENDIAN)
     for base, size in ((C.CAVE & ~0xFFF, 0x2000), (HELD.CAVE & ~0xFFF, 0x1000), (HELD.HOOK & ~0xFFF, 0x1000),
-                       (C.GEN_ARTICLE & ~0xFFF, 0x1000), (0x10150000, 0x10000), (0x10400000, 0x40000)):
+                       (C.GEN_ARTICLE & ~0xFFF, 0x1000), (C.HOOK_ITEM2 & ~0xFFF, 0x1000), (0x10150000, 0x10000), (0x10400000, 0x40000)):
         mu.mem_map(base, size)
         mu.mem_write(base, img.read(base, size))
     mu.mem_map(0x7F000000, 0x10000)
@@ -109,8 +117,24 @@ def fake_modules(mu, status, motion, sword):
     return acc, held
 
 
+GEN_FROM = 0x02EFE254           # lwz r3, 0x7284(r24): the hat's generate (article 0x19) on a granted kind
+HAT_GENERATE, HAT_ATTACH = 0x02EFE268, 0x02EFE280      # bl 0x02C03EA0 / bl 0x02C04EA4
+GEN_ENDS = (0x02EFE748, 0x02EFE7EC, 0x02EFE814)        # the held article's generate / the common tails
+
+
+def gen_path(img, grant, kind, hat_made):
+    """where the copy model function goes from the hat's generate (the calls stubbed: the hat made or not)"""
+    mu = emu(img)
+    mu.mem_write(HAT_GENERATE, struct.pack('>I', 0x38600001 if hat_made else 0x38600000))     # li r3, 1 / 0
+    mu.mem_write(HAT_ATTACH, struct.pack('>I', 0x60000000))
+    a44, _r = V44.args()
+    mu.mem_write(a44.labels['grant_kind'], struct.pack('>I', grant))
+    return run(mu, GEN_FROM, {27: kind, 24: STUBS + 0x8000, 1: 0x7F008000}, set(GEN_ENDS))
+
+
 def main():
     new, old = Img(sys.argv[1]), Img(sys.argv[2])
+    prev = Img(sys.argv[3]) if len(sys.argv) > 3 else None
     # the original
     check('original 0x%08X lwzx r7, r24, r21' % C.HOOK_ITEM, old.w(C.HOOK_ITEM), 0x7CF8A82E)
     base = (old.w(C.HOOK_ITEM) >> 16) & 31
@@ -144,6 +168,29 @@ def main():
     lab = a.labels
     check('0x%08X bl name_item' % C.HOOK_ITEM, bl_target(C.HOOK_ITEM, new.w(C.HOOK_ITEM)), lab['name_item'])
     check('0x%08X bl gen_stub' % C.HOOK_GEN, bl_target(C.HOOK_GEN, new.w(C.HOOK_GEN)), lab['gen_stub'])
+    # fix v4
+    for at, w in sorted(C.ORIGINAL.items()):
+        check('fix v4: original 0x%08X = 0x%08X' % (at, w), old.w(at), w)
+    check('fix v4: 0x%08X bl gen_stub (the hat\'s success path)' % C.HOOK_GEN2, bl_target(C.HOOK_GEN2, new.w(C.HOOK_GEN2)),
+          lab['gen_stub'])
+    for h in (C.HOOK_ITEM2, C.HOOK_ITEM3):
+        check('fix v4: 0x%08X bl name_item' % h, bl_target(h, new.w(h)), lab['name_item'])
+    check('fix v4: the hat\'s success path compares the kind itself (0x%08X cmplwi r27, 0x22; bge 0x02EFE6A0; b 0x02EFE66C)'
+          % C.HOOK_GEN2, [hex(old.w(C.HOOK_GEN2 + 4 * i)) for i in range(3)], ['0x281b0022', '0x40800418', '0x480003e0'])
+    bad = []
+    for grant, kind in ((0x45, 0x2C), (0x42, 0x2C), (0x2C, 0x2C), (0x45, 0x12), (0x12, 0x12), (0x41, 0x1), (0, 0x2B)):
+        for hat in (True, False):
+            want = 0x02EFE748 if (grant, kind) == (0x45, 0x2C) or kind in (0x1, 0x12, 0x2B) else None
+            got = gen_path(new, grant, kind, hat)
+            if (want and got != want) or (not want and got == 0x02EFE748):
+                bad.append((hex(grant), hex(kind), hat, hex(got)))
+    check('fix v4: the copy model function from the hat\'s generate: the Hero copy reaches the held article\'s generate '
+          '(0x02EFE748) with the hat made and not; Robin\'s / Sephiroth\'s copy never; Marth / Ike-style kinds as before', bad, [])
+    if prev:
+        check('fix v4: the failure in the old build (%s): the Hero copy with its hat made never reaches the held '
+              'article\'s generate (0x02EFE7EC); with the hat failing it did' % os.path.basename(sys.argv[3]),
+              (hex(gen_path(prev, 0x45, 0x2C, True)), hex(gen_path(prev, 0x45, 0x2C, False))),
+              (hex(0x02EFE7EC), hex(0x02EFE748)))
     mu = emu(new)
     mapping = {k: to for k, to, _m in V44.MAP}
     # 1. the item name
@@ -159,6 +206,17 @@ def main():
         if got != want:
             bad.append((hex(k), got, want))
     check('held-item name: "bravesword" for a Hero slot, every other kind the table\'s own', bad, [])
+    bad = []
+    for h, reg in ((C.HOOK_ITEM2, 11), (C.HOOK_ITEM3, 12)):
+        for k in (0x45, 0x2C, 0x12):
+            mk = mapping.get(k, k)
+            mu.mem_write(a44.labels['res_kind'], struct.pack('>I', k))
+            end = run(mu, h, {21: 4 * mk, reg: 4 * mk, 24: 0x1041A8A0, 28: mk, 7: 0}, {h + 4})
+            got = mem_cstr(mu, mu.reg_read(UC_PPC_REG_0 + 7))
+            want = C.ITEM_NAME if k == C.BRAVE else new.cstr(new.w(0x1041A8A0 + 4 * mk))
+            if got != want or end != h + 4:
+                bad.append((hex(h), hex(k), got, hex(end)))
+    check('fix v4: the c00 fallback and motion-folder reads: "bravesword" for a Hero slot, the table\'s own else', bad, [])
     check('the table\'s Robin row is empty (the Hero copy had no held model)', new.cstr(new.w(0x1041A8A0 + 4 * 0x2C)), '')
     # 2. the generate stub
     bad = []
