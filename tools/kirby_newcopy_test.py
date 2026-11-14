@@ -684,19 +684,78 @@ STONE_AIR_HITBOX = dict(ID=0, Bone=0, Damage=18.0, Angle=0x46, KBG=0x46, FKB=0, 
                         DisableHitlag=0, NoGFX=0, Flinchless=0)
 
 
-def z2_gap(sx, sy, tx, ty):
-    """fix v8: the gap along the approach between the stone over (sx, sy) and a target standing at (tx, ty), computed
-    here on its own: the stone's box (every stone form's extents: X +-7.6, Y -1.35 .. 13.17) and the target's (X +-4,
-    Y 0 .. 12) touch when the centres are within the summed half-extents; the gap is how much further the stone's
-    centre can move toward the target's before that. Returns (gap, the boxes overlap)"""
-    cs = (sx, sy + (13.17 - 1.35) / 2)
-    ct = (tx, ty + 6.0)
-    hx, hy = 7.6 + 4.0, (13.17 + 1.35) / 2 + 6.0
-    dx, dy = ct[0] - cs[0], ct[1] - cs[1]
-    d = (dx * dx + dy * dy) ** 0.5
-    ux, uy = abs(dx) / d, abs(dy) / d
-    e = min(hx / ux if ux > 1e-4 else 1e9, hy / uy if uy > 1e-4 else 1e9)
-    return d - e, abs(dx) < hx - 1e-6 and abs(dy) < hy - 1e-6
+def z2_run(path, src, lr, tx, ty, move=None, frames=29 + 45):
+    """fix v9: a Zoom 2 U cast in the air from (10, 0) at a fighter in slot 1 standing at (tx, ty) (move(i) -> its
+    position at flight frame i, or None: it stays); [(stone x, y, target x, y, khm_sub)] a frame, the hitbox calls"""
+    r = Run(path, src, 2, situation=2)
+    g = r.game
+    g.lr = lr
+    r.update()
+    g.fvars.update({0x0F000000: 10.0, 0x0F000001: 0.0, 0x0F000020: 10.0, 0x0F000021: 0.0, 0x0F000023: 1.0,
+                    0x0F000024: tx, 0x0F000025: ty, 0x0F000027: 1.0, 0x03000019: 2.0})
+    r.vm.g[r.gi['global4']] = 0
+    r.vm.call(r.fn['khm_update'])
+    r.vm.g[r.gi['global4']] = 0x175
+    r.vm.call(r.fn['khm_update'])
+    kset(r, 'khm_spells', 0x17)
+    kset(r, 'khm_cursor', 0)
+    g.press = {0}
+    r.vm.call(r.fn['khm_update'])
+    g.press = set()
+    g.tag = lambda: kget(r, 'khm_frame') if kget(r, 'khm_state') == 2 else None
+    out = []
+    for i in range(frames):
+        if move and i >= 29:
+            g.fvars[0x0F000024], g.fvars[0x0F000025] = move(i - 29)
+        r.vm.call(r.fn['khm_update'])
+        g.fvars[0x0F000020] = g.fvars[0x0F000000]
+        g.fvars[0x0F000021] = g.fvars[0x0F000001]
+        out.append((g.fvars[0x0F000000], g.fvars[0x0F000001], g.fvars[0x0F000024], g.fvars[0x0F000025],
+                    kget(r, 'khm_sub')))
+    return out, [(f, v) for f, k, v in g.calls if k == 'hitbox']
+
+
+def fix_v9_zoom2u(path, src):
+    """Hero copy fix v9 (user: "make Kirby's Zoom 2 U go directly to the opponent, stopping at their center"): the
+    stone's centre (his position + 4) straight at the target's centre (its feet + 6), ending on it"""
+    STONE_C, TARGET_C = 4.0, 6.0
+    cases = [('ahead, facing right', 1.0, (50.0, 0.0)), ('behind, facing right (turns)', 1.0, (-40.0, 0.0)),
+             ('behind, facing left', -1.0, (-40.0, 0.0)), ('above', 1.0, (12.0, 70.0)), ('below', 1.0, (8.0, -60.0)),
+             ('on a platform up and ahead', 1.0, (45.0, 30.0)), ('below and behind', -1.0, (40.0, -35.0)),
+             ('within one step (5 ahead)', 1.0, (15.0, -2.0))]
+    for what, lr, (tx, ty) in cases:
+        out, hbs = z2_run(path, src, lr, tx, ty)
+        fl = [o for o in out[29:]]
+        end = next(i for i, o in enumerate(fl) if o[4] == 0x7F)
+        sx, sy = fl[end][0], fl[end][1]
+        cx, cy = sx, sy + STONE_C
+        # straight: every flight position on the line from the start (10, 0) to the end, in order
+        x0, y0 = 10.0, 0.0
+        L = max(1e-6, ((sx - x0) ** 2 + (sy - y0) ** 2) ** 0.5)
+        off = max(abs((p[0] - x0) * (sy - y0) - (p[1] - y0) * (sx - x0)) / L for p in fl[:end + 1])
+        prog = [((p[0] - x0) * (sx - x0) + (p[1] - y0) * (sy - y0)) / L for p in fl[:end + 1]]
+        steps = [round(b - a, 3) for a, b in zip(prog, prog[1:])]          # fl[0]: the launch frame, at the start
+        hb_parts = sorted(set(v[1] for f, v in hbs if f is not None and f >= 29 + 1))
+        check('fix v9: Zoom 2 U, target %s: a straight line (largest sideways error %.4f), 9 a frame (the last %.2f), '
+              'over on the target\'s centre (its feet + 6); the stone\'s hitbox out the whole flight with its own hit '
+              'record (Part 4); its bottom above the target\'s feet' % (what, off, steps[-1]),
+              (off < 1e-3, all(abs(x - 9.0) < 1e-3 for x in steps[:-1]), 0 < steps[-1] <= 9.0 + 1e-3,
+               round(cx - tx, 3), round(cy - (ty + TARGET_C), 3), hb_parts, sy - 1.35 > ty),
+              (True, True, True, 0.0, 0.0, [4], True))
+    # a target moving during the flight: homed on its current position every frame, ends on its centre
+    for what, move in (('running away at 2 a frame', lambda i: (60.0 + 2.0 * i, 0.0)),
+                       ('jumping (up 3 a frame)', lambda i: (50.0, 3.0 * i))):
+        out, _hbs = z2_run(path, src, 1.0, 60.0, 0.0, move)
+        fl = out[29:]
+        end = next(i for i, o in enumerate(fl) if o[4] == 0x7F)
+        sx, sy, tx, ty = fl[end][:4]
+        aimed = []
+        for p, q in zip(fl[:end], fl[1:end + 1]):            # each step points at the target's centre that frame
+            dx, dy = q[2] - p[0], q[3] + TARGET_C - (p[1] + STONE_C)
+            mx, my = q[0] - p[0], q[1] - p[1]
+            aimed.append(abs(dx * my - dy * mx) / max(1e-6, (dx * dx + dy * dy) ** 0.5) < 1e-3)
+        check('fix v9: Zoom 2 U, target %s: each step aimed at its centre that frame, over on it' % what,
+              (all(aimed), round(sx - tx, 3), round(sy + STONE_C - (ty + TARGET_C), 3)), (True, 0.0, 0.0))
 
 
 def fix_v8_tests(path, src):
@@ -788,43 +847,7 @@ def fix_v8_tests(path, src):
           ({2: (29, 68, 40), 3: (69, 88, 20)}, []))
     check('fix v8: Zoom: a hit record for each leg (Parts 2 / 3: the game keeps one per Part for the status), so a '
           'fighter hit on the way up can be hit again on the way down, each leg once', sorted(parts), [2, 3])
-    # Zoom 2 U: 1 from the target, every approach
-    cases = [('right, facing right', 1.0, (50.0, 0.0)), ('left, facing right (turns)', 1.0, (-40.0, 0.0)),
-             ('left, facing left', -1.0, (-40.0, 0.0)), ('above', 1.0, (12.0, 70.0)), ('below', 1.0, (8.0, -60.0)),
-             ('on a platform up and ahead', 1.0, (45.0, 30.0)), ('below and behind', -1.0, (40.0, -35.0)),
-             ('already within 1', 1.0, (22.0, 0.0))]
-    for what, lr, (tx, ty) in cases:
-        r = Run(path, src, 2, situation=2)
-        g = r.game
-        g.lr = lr
-        r.update()
-        g.fvars.update({0x0F000000: 10.0, 0x0F000001: 0.0, 0x0F000020: 10.0, 0x0F000021: 0.0, 0x0F000023: 1.0,
-                        0x0F000024: tx, 0x0F000025: ty, 0x0F000027: 1.0, 0x03000019: 2.0})
-        r.vm.g[r.gi['global4']] = 0
-        r.vm.call(r.fn['khm_update'])
-        r.vm.g[r.gi['global4']] = 0x175
-        r.vm.call(r.fn['khm_update'])
-        kset(r, 'khm_spells', 0x17)
-        kset(r, 'khm_cursor', 0)
-        g.press = {0}
-        r.vm.call(r.fn['khm_update'])
-        g.press = set()
-        path_ = []
-        g0 = z2_gap(10.0, 0.0, tx, ty)[0]
-        for _ in range(29 + 45):
-            r.vm.call(r.fn['khm_update'])
-            g.fvars[0x0F000020] = g.fvars[0x0F000000]
-            g.fvars[0x0F000021] = g.fvars[0x0F000001]
-            path_.append((g.fvars[0x0F000000], g.fvars[0x0F000001]))
-        x, y = path_[-1]
-        gap, overlap = z2_gap(x, y, tx, ty)
-        gaps = [z2_gap(px, py, tx, ty)[0] for px, py in path_]
-        dec = all(b <= a + 1e-3 for a, b in zip(gaps, gaps[1:]))
-        want_gap = round(min(g0, 1.0), 2) if g0 < 1.0 else 1.0
-        check('fix v8: Zoom 2 U, target %s: over (khm_sub 0x7F) with the gap along the approach %.2f (the stone %s), '
-              'never inside, never past (the gap only shrinks)' % (what, want_gap, 'not moved' if g0 <= 1.0 else
-                                                                  'stopped 1 away'),
-              (kget(r, 'khm_sub'), round(gap, 2), overlap, dec, len(path_)), (0x7f, want_gap, False, True, 29 + 45))
+    fix_v9_zoom2u(path, src)
     # the copy traits (user, 2026-11-14): Hero Technical, Sephiroth Shooter
     r = Run(path, src, 2)
     check('copy traits: Hero (0x45) Technical, Sephiroth (0x42) Shooter (kirby_copy_trait)',

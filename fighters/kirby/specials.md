@@ -2456,7 +2456,8 @@ Remove / new hitboxes don't clear it, no MSC op does) let it hit a fighter once 
 Part 2 every frame of the rise (cast frames 29-68) and with Part 3 from the fall's first frame (69) to the landing:
 each leg has its own record, so a fighter hit on the way up can be hit again on the way down (once per leg).
 
-**Zoom 2 U: 1 unit from the target (Kirby only, `khm_z2_step`; Hero's brave.c keeps 15).** The gap is measured along
+**Zoom 2 U: 1 unit from the target (Kirby only, `khm_z2_step`; Hero's brave.c keeps 15; replaced by fix v9's stop on the
+target's centre).** The gap is measured along
 the approach as how much further the stone could move toward the target before touching it: the stone a box over
 Kirby's position holding every stone form (half-width 7.6, from 1.35 below his feet to 13.17 above:
 `model/stone/c00`), the target a medium fighter's body (half-width 4, 12 tall over its feet: centre its feet + 6,
@@ -2498,3 +2499,34 @@ python3 tools/kirby_hero_sword_swing_test.py EXE_V46I.rpx EXE_V46H.rpx OUT/motio
 python3 tools/kirby_hero_sword_hitboxes.py OUT/motion/body/main.pac KIRBY/model/body/c00/model.vbn --out PREVIEW \
     --before FIX_V7_MSC_PY
 ```
+
+### Hero copy fix v9 (`kirby_hero_copy_fix_v9`): Zoom 2 U straight to the opponent's centre
+
+User (fix v8): "make Kirby's Zoom 2 U go directly to the opponent, stopping at their center". Kirby only (Hero's brave.c
+keeps his 15); it replaces fix v8's gap of 1. MSC only: exe_v46i and fix v8's other files stay.
+
+- **The path:** `khm_z2_step` flies the stone's centre in a straight line at the target's centre, re-aimed at the
+  target's current position every frame (as Hero's), 9 a frame. The last step is shorter, so it ends exactly on the
+  centre, and the flight is then over (`khm_z2_end`: the stone falls from there).
+  - Hero's own path is direct too: at Zoom's frame 29 a lift of 6 off the ground when cast grounded, then straight at
+    its target. There is no detour above or around; Kirby keeps the 6 lift at the launch.
+- **The centres:**
+  - The target's centre is its position (feet) + 6. No fighter's height reaches the MSC, so this is a medium fighter's
+    half height, the point Hero's Zoom 2 U aims at.
+  - The stone's centre is Kirby's position + 4. The 100t / Kirby stones are about 8 tall from his feet (stone forms
+    7.3-9.3; the Thwomp -1.35 to 13.17, its centre 1.9 higher).
+- **The floor:** a grounded target's centre is 6 over its feet, so the stone ends with its bottom 2 over the floor (the
+  Thwomp's 0.65). It never ends in the ground, so nothing needed clamping.
+- **The hit:** the flying stone's hitbox (the air hold 0x2F1's ID 0, 18%, 6.5 at (0, 2, 0): `khm_zoom_hitbox`) is
+  remade every flight frame with Part 4, the flight's own hit record. It is out all the way to the stop, overlapping
+  the target there, so it hits the target even if the stone hit that fighter earlier in the same Stone.
+- **Tests:** `kirby_newcopy_test.py` `fix_v9_zoom2u` (replaces fix v8's 1-unit checks).
+  - Targets: ahead, behind (facing right: turns; facing left), above, below, up on a platform, below and behind, and
+    within one step.
+  - Each case: a straight line (sideways error 0.0000), 9 a frame then the remainder, over on the target's centre
+    (0.000), Part 4 hitboxes all flight, the stone's bottom (the Thwomp's too) above the target's feet.
+  - A target running away and one jumping: each step aimed at its centre that frame, over on it.
+  - Fix v8's MSC fails all 10.
+  - The model doesn't apply the launch's 6 lift (WorkModule op 2), so the flights there start at the cast position.
+- `preview/zoom2u_v9.png`: the paths and stops.
+- **Not checked in game:** the target's centre is a fixed + 6, not each fighter's own height.

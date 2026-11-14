@@ -76498,7 +76498,7 @@ void khm_v3_timers()
 // ---- v4: Zoom 2 U (brave.c brave_zoom2u, the mod's own spell: Zoom on its side after the nearest opponent). Hero's:
 // the target picked at the cast (the nearest other fighter), launched at Zoom's frame (29: it starts as Zoom), lifted
 // 6 off the ground first, then 9 a frame at the target's feet + 6, intangible, re-aimed every frame, through
-// platforms; over within 15 of it (fix 85; Kirby's since fix v8: a gap of 1, khm_z2_step), after 40 frames, or on meeting the ground; then the speed clamped to the
+// platforms; over within 15 of it (fix 85; Kirby's since fix v9: on its centre, khm_z2_step), after 40 frames, or on meeting the ground; then the speed clamped to the
 // air maximums (brave_z2_clamp: x to 0x3000016, y to 0x3000019) and a fall. On Kirby the stone keeps its kinetics
 // (its status sets them), so the flight moves it straight through his position variables (0x0F000000 / 1), 9 a frame
 // (less on the last step), gravity held at 0 meanwhile (khm_fly(0)); the end gives the stone the clamped speed in
@@ -76570,43 +76570,15 @@ float khm_clampf(float v, float m)
     return v;
 }
 
-// fix v8 (user: "for Kirby specifically, please make it so that his Stone Zoom 2 U stops only 1 unit away from the
-// opponent rather than the amount that Hero uses"; Hero's brave.c keeps his 15): the gap between the stone and the
-// target along the approach, i.e. how much further the stone could move along it before it touches the target. Both
-// are boxes: the stone over Kirby's position (every stone form inside it: the largest extents of the five,
-// model/stone/c00: half-width 7.6 (Thwomp), from 1.35 below his feet to 13.17 above: centre his feet + 5.91, half
-// height 7.26), the target a medium fighter's body over its feet (half-width 4, 12 tall: centre its feet + 6, Hero's
-// aim point). They touch when the centres are within the summed box (half 11.6 x 13.26); along the unit vector u
-// from the stone's centre to the target's that is min(11.6 / |ux|, 13.26 / |uy|) away, so the gap is the centres'
-// distance less that. Each step moves 9 (or less) along u; the flight is over once the gap is 1 (never less: no step
-// goes past it, and a stone already within 1 doesn't move)
-float khm_z2_edge(float ux, float uy, float hx, float hy)
-{
-    float t;
-    float a;
-    t = 1000.0f;
-    a = ux;
-    if (a < 0)
-    {
-        a = -a;
-    }
-    if (a > 0.0001f)
-    {
-        t = hx / a;
-    }
-    a = uy;
-    if (a < 0)
-    {
-        a = -a;
-    }
-    if (a > 0.0001f && hy / a < t)
-    {
-        t = hy / a;
-    }
-    return t;
-}
-
-// one step at the target: 1 = within 1 of it (over); fix v8 (Hero's: within 15 of its feet + 6)
+// fix v9 (user: "make Kirby's Zoom 2 U go directly to the opponent, stopping at their center"; Kirby only, Hero's
+// brave.c keeps his 15; replaces fix v8's gap of 1): the stone's centre flies in a straight line at the target's
+// centre and stops on it. The target's centre is its position (its feet) + 6: no fighter's height reaches the MSC, so a
+// medium fighter's half height, the point Hero's own Zoom 2 U aims at. The stone's centre is Kirby's position + 4 (the
+// stone forms are 7.3-9.3 tall from his feet, the Thwomp -1.35 to 13.17: model/stone/c00). Re-aimed at the target's
+// current position every frame (as Hero's), 9 a frame, the last step shorter so it ends exactly on the centre. A
+// grounded target's centre is 6 over its feet, so the stone ends with its bottom 2 over the floor (the Thwomp's 0.65):
+// never in the ground, nothing clamped. The 6 lift off the ground at the launch (khm_zoom2u, Hero's) stays: the flight
+// starts from there
 int khm_z2_step()
 {
     float x;
@@ -76615,7 +76587,6 @@ int khm_z2_step()
     float dy;
     float d;
     float k;
-    float gap;
     int t;
     t = WorkModule(0x6, 0x0f00039d);
     x = WorkModuleF(0, 0x0f000000);
@@ -76626,7 +76597,7 @@ int khm_z2_step()
         return 0;
     }
     dx = WorkModuleF(0, 0x0f000020 + 0x4 * t) - x;
-    dy = WorkModuleF(0, 0x0f000021 + 0x4 * t) + 6.0f - (y + 5.91f);    // the centres: its feet + 6, the stone's
+    dy = WorkModuleF(0, 0x0f000021 + 0x4 * t) + 6.0f - (y + 4.0f);     // centre to centre
     d = khm_sqrt(dx * dx + dy * dy);
     if (d < 0.01f)
     {
@@ -76637,27 +76608,21 @@ int khm_z2_step()
         PostureModule(0, -PostureModuleF(0));   // turned to the target, as brave_z2_fly
         PostureModule(0x2);
     }
-    gap = d - khm_z2_edge(dx / d, dy / d, 11.6f, 13.26f);
-    k = gap - 1.0f;
-    if (k > 9.0f)
+    k = 9.0f;
+    if (d < k)
     {
-        k = 9.0f;
-    }
-    if (k < 0)
-    {
-        k = 0;
+        k = d;
     }
     WorkModule(0, x + dx / d * k, 0x0f000000);
     WorkModule(0, y + dy / d * k, 0x0f000001);
     WorkModule(0, dx / d * 9.0f, 0x0f00039c);
     WorkModule(0, dy / d * 9.0f, 0x0f00039b);
-    if (gap - k <= 1.001f)
+    if (d - k < 0.01f)
     {
-        return 0x1;
+        return 0x1;                             // on the target's centre
     }
     return 0;
 }
-
 
 void khm_z2_end()
 {
@@ -76697,6 +76662,8 @@ void khm_zoom2u(int f)
     WorkModule(0x7, WorkModule(0x6, 0x0f0003a7) + 1, 0x0f0003a7);
     GroundModule(0x2715);               // through platforms
     khm_fly(0);
+    khm_zoom_hitbox(0x4);               // fix v9: the stone's hitbox with the flight's own hit record (Part 4), so it
+                                        // hits the target it ends on even if the stone hit it earlier in this Stone
     if (global18 == 0 && WorkModule(0x6, 0x0f0003a7) > 0x2)
     {
         WorkModule(0, 0, 0x0f00039c);
