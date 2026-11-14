@@ -182,6 +182,20 @@ int sh_find_owner()
     return s;
 }
 
+// Kirby's Hero copy (fix v4; the user: "Kirby's Stone spells hit other opponents; they fail only against Hero"): the
+// spawner (Robin's thunder's, 0x02F643A4) makes the projectile at the caster's hand joint in 3D (0x020073FC, the joint's
+// world position: joint 0x10 LHandN for a Kirby), and the stone's pose holds that hand 5.0 off his plane (Kirby's
+// SpecialLw / SpecialAirLw end poses: LHandN at model (-5.0, 10.7, 4.0), the first axis the game's depth; Frizz's
+// cast pose 0.9). Smash 4's hit test is 3D: Sizz (radius 3) 5 deep reaches only hurtboxes wider than 2, and Hero's
+// are Ultimate's (hip / waist 2.0, head 1.55, arms 0.95: param/vl.prc hit_data) where vanilla bodies are 2.4 - 5.0
+// (Robin 2.4, Link 2.6, Mario 3.1, Kirby 5.0): it passed in front of Hero only. Cast from the stone, the projectile is
+// put on its caster's plane (his position variable Z) at the start; Hero's own (made at his hand, near his plane)
+// unchanged.
+void sh_plane(int s)
+{
+    PostureModule(0x3, PostureModuleF(0x1), PostureModuleF(0x2), WorkModuleF(0, 0x0f000022 + 0x4 * s));
+}
+
 void sh_main()
 {
     int c;
@@ -201,6 +215,10 @@ void sh_main()
     if (sh_owner == 0)
     {
         sh_owner = sh_find_owner();    // the level alone in the custom number (Hero's own and Kirby's Hero copy's)
+        if (sh_owner < 0x8 && sh_owner == sh_stone_kirby())
+        {
+            sh_plane(sh_owner);        // fix v4: cast from Kirby's stone: on his plane
+        }
     }
     else
     {
