@@ -76982,6 +76982,7 @@ void khm_sw_stop()
         EffectModule(0x2723, 0x345004a, 0, 0x1);    // Hero's ends with his motion)
         EffectModule(0x2723, 0x3450049, 0, 0x1);
         SoundModule(0x2714, 0x76400e2);
+        EffectModule(0x26, 0x1);                    // fix v8: his effects follow his (hidden) model again
     }
     WorkModule(0x7, 0, 0x0f0003a2);
     WorkModule(0x7, 0, 0x1000008b);
@@ -77069,6 +77070,13 @@ void khm_sword(int f)
         WorkModule(0x7, 0x7f, 0x0f0003a8);
         return;
     }
+    // fix v8 (user: the moves' effects "don't appear"): Kirby is hidden in the stone, and his EffectModule follows his
+    // model's visibility (+0x9B, set at its reset): every frame the VisibilityModule update hides all his effects,
+    // and a following effect (the blade's fire / ice / dark blade, on LHaveN) is made hidden. For the spell: op 0x26
+    // 0 (don't follow the model), op 0x1C 1 (his effects shown); khm_sw_stop gives op 0x26 1 back
+    // (tools/kirby_hero_sword_fx_vis_test.py runs the game's code)
+    EffectModule(0x26, 0);
+    EffectModule(0x1c, 0x1);
     WorkModule(0x7, khm_sw_shown(n, f), 0x1000008b);   // the sword shown (exe_v46); fix v8: only while Hero's trail
                                                         // is (user: "only visible ... when the trail begins and
                                                         // disappear when it ends"; khm_sw_shown, generated)

@@ -186,6 +186,9 @@ class Game:
             if a[0] == 0x2710:
                 self.calls.append((self.tag(), 'effect', list(a[1:])))
             return 0
+        if sid == 0x1C and len(a) == 2 and a[0] in (0x26, 0x1C):      # fix v8: follow the model / set_visible
+            self.calls.append((self.tag(), 'effvis', list(a)))
+            return 0
         if sid == 0x1C and a and a[0] in (0x2712, 0x2723):             # v6: EffectModule follow / kill
             self.calls.append((self.tag(), 'follow' if a[0] == 0x2712 else 'kill', list(a[1:])))
             return 0
@@ -489,7 +492,7 @@ def v6_tests(path, src):
                 return [(f, k, [round(R.i2f(x) if bits else float(x), 4) if SW.is_float(k, i) else x
                                 for i, x in enumerate(v)]) for f, k, v in lst]
             want = norm([(f, k, v) for f, k, v in ev[n][sit] if k != 'remove'], False)
-            got = norm([(f, k, v) for f, k, v in g.calls if f is not None and f < end], True)
+            got = norm([(f, k, v) for f, k, v in g.calls if f is not None and f < end and k != 'effvis'], True)
             check('%s (%s): Hero\'s %d hitbox / effect / sound commands at their frames, Kirby\'s bones'
                   % (names[n], sit, len(want)), got, want)
             rm = [f for f, k, _v in ev[n][sit] if k == 'remove']
@@ -701,9 +704,8 @@ def fix_v8_tests(path, src):
     effect scripts), Zoom's hitbox refreshed up and down, Zoom 2 U stopping 1 from the target, the copy traits"""
     import kirby_hero_sword_msc as SW
     ev = SW.events(SW.parse())
-    names = {0x11: 'Flame Slash', 0x12: 'Kacrackle Slash', 0x13: 'Metal Slash', 0x14: 'Hatchet Man'}
     # the hitboxes the MSC makes, run frame by frame
-    bad, follows, ids, hero_bank = [], [], set(), []
+    bad, follows, ids, hero_bank, effvis_bad = [], [], set(), [], []
     for n in (0x11, 0x12, 0x13, 0x14):
         for sit, situation in (('ground', 0), ('air', 2)):
             r = Run(path, src, 2, situation=situation)
@@ -724,16 +726,41 @@ def fix_v8_tests(path, src):
                 elif k == 'effect' and v[0] >> 16 == 0x345:
                     hero_bank.append((hex(n), sit, f, hex(v[0]), v[-1]))
             stop_kills = [v[0] for _f, k, v in g.calls if k == 'kill']
+            vis = [(f, tuple(v)) for f, k, v in g.calls if k == 'effvis']
+            per_frame = {}
+            for f, v in vis:
+                per_frame.setdefault(f, []).append(v)
+            spell_frames = sorted(f for f in per_frame if f is not None and f < ev[n]['end'])
+            if (spell_frames != list(range(0, ev[n]['end'])) or any(per_frame[f] != [(0x26, 0), (0x1C, 1)]
+                                                                    for f in spell_frames)
+                    or not vis or vis[-1][1] != (0x26, 1)):
+                effvis_bad.append((hex(n), sit, spell_frames[:3], spell_frames[-1:], vis[-2:]))
             if any(e[3] == '0x3450049' for e in hero_bank if e[0] == hex(n) and e[1] == sit) and 0x3450049 not in stop_kills:
                 bad.append(('Hatchet Man\'s ground burst not ended by khm_sw_stop', sit))
     check('fix v8: every sword spell hitbox on LHaveN on the blade\'s axis (Hero\'s Sword1 X along it, Y -0.2023, Z 0, '
           'X within the blade 0-12.1), the arm one (ID 7) at the blade\'s base X %.1f; no bone-0 hitbox' % SW.HILT_X,
           bad, [])
     check('fix v8: the hitbox IDs made: 5-7 (Hero\'s 0-2; his bone-0 3-4 left out)', sorted(ids), [5, 6, 7])
+    check('fix v8: every frame of a sword spell EffectModule(0x26, 0) then (0x1C, 1) (his effects shown though he is '
+          'hidden: tools/kirby_hero_sword_fx_vis_test.py), and (0x26, 1) at its end', effvis_bad, [])
     check('fix v8: no sword-following effect (EffectModule 0x2712) from the MSC: the swing slots\' effect scripts '
           'make them', follows, [])
     check('fix v8: Hero\'s-bank one-shot effects from the MSC (Hatchet Man\'s ground burst, ground only) with '
           'Terminate 0, ended by khm_sw_stop', hero_bank, [('0x14', 'ground', 38, '0x3450049', 0)])
+    # the stone ended mid-spell (SpecialLwEnd) or the copy lost: his effects follow his model again
+    tails = []
+    for st, kind in ((0x176, 0x2C), (0x175, 0x0)):
+        r = Run(path, src, 2)
+        g = r.game
+        r.update()
+        cast(r, 0x14, 36)
+        r.vm.g[r.gi['global4']] = st
+        g.ints[0x100000A4] = kind
+        for _ in range(3):
+            r.vm.call(r.fn['khm_update'])
+        tails.append(([tuple(v) for _f, k, v in g.calls if k == 'effvis'] or [None])[-1])
+    check('fix v8: Hatchet Man stopped mid-spell (status 0x176; the copy lost): EffectModule(0x26, 1) given back', tails,
+          [(0x26, 1), (0x26, 1)])
     # Zoom: the stone's hitbox, Part 2 on the way up, Part 3 on the way down
     r = Run(path, src, 2)
     g = r.game

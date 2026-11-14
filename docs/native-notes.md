@@ -2004,6 +2004,16 @@ Manifold by Fitz Null (zlib License), https://gitlab.com/fitz.lol/manifold, targ
   sincos `0x033723D8` writing sin to r3, cos to r4); without it the bone's whole
   matrix times the offset. So Smash 4's `EFFECT_FLW_POS` offsets don't turn with the bone (Ultimate's
   do): `tools/ultimate_acmd.py` follows fully when the offset isn't zero.
+- **Effects follow the model's visibility** (Kirby's Hero copy fix v8, `tools/kirby_hero_sword_fx_vis_test.py` runs
+  it): every frame an object's VisibilityModule update (`0x02C76F70`, from the object updates, e.g. `0x02B94164`)
+  passes its is_visible (vt `+0xA4`) to EffectModule vt `+0x34C` (`0x02C317A4`), which, while the module's byte
+  `+0x9B` is set (1 from its reset, `0x02C28528`), calls set_visible vt `+0x17C` (`0x02C2C178`): `+0x9A` = the value
+  and, on a change, every effect of the module switched through the manager (`0x0334CA64`). A following request
+  (vt `+0x64`) made while `+0x9A` is 0 is hidden at once (`0x02C2B4A8` -> `0x0334CA4C(handle, 0)`); one-shot
+  requests (vt `+0x4C` / `+0x54`) aren't checked, sword trails aren't module effects. So a fighter hidden with MSC
+  `VisibilityModule(0x2710, 0)` (Kirby's Stone) draws one-shot effects and trails but no following effect. MSC
+  `EffectModule(0x26, v)` sets `+0x9B` (vt `+0x21C`; `0x27` reads it, vt `+0x224`), `EffectModule(0x1C, v)` is
+  set_visible; the native hide paths (`0x0275DF1C`, `0x027F4xxx`-`0x027F7xxx`) call vt `+0x17C` themselves.
 
 ## The eft runtime (particles: cross_f.rpx 0x04A40000-0x04A90000)
 

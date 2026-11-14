@@ -2395,3 +2395,106 @@ python3 tools/kirby_hero_sword_swing_test.py EXE_V46I.rpx EXE_V46H.rpx OUT/motio
     KIRBY/model/body/c00/model.vbn ULT/brave ACMD_OUT/effect.bin ACMD_OUT/motion.mtable
 python3 tools/kirby_newcopy_test.py MSC_OUT/kirby_B.mscsb
 ```
+
+### Hero copy fix v8 (`kirby_hero_copy_fix_v8`): the blade's effects shown, hitboxes on the blade, the sword with its trail, Zoom / Zoom 2 U
+
+User (fix v7, exe_v46i): "the sword angle is right now, trails work, the additional effects from the moves (ex.
+Kacrackle Slash ice, Hatchet Man fire, Flame Slash fire, etc.) don't appear. Also please make the hitboxes for the sword
+attack match the sword. And make the sword only visible during when the trail begins and disappear when it ends." Then:
+"for Kirby specifically, please make it so that his Stone Zoom 2 U stops only 1 unit away from the opponent rather than
+the amount that Hero uses, and make it so Stone refreshes its hitbox during regular Zoom on the way up and down". Also
+in this build: the copy traits swapped at the user's request (Hero Technical, Sephiroth Shooter: `kirby_copy_trait`,
+docs/character-traits.md). No executable change: exe_v46i stays.
+
+**The missing effects (cause found and run with the game's code: `tools/kirby_hero_sword_fx_vis_test.py`).**
+- The blade effects are Hero's following ones (External_Graphic on his sword: Flame Slash's fire blade `0x3450078`,
+  Kacrackle Slash's ice `0x3450076`, Hatchet Man's dark blade `0x3450072`: his turned variants `brave_*_sword@0,0,-90`).
+  Their ids resolve: entries 0x72-0x78 of Hero's `brave.010d0000.efc` (125 entries; sets `PtcBraveBraveFireSwordR82`,
+  `IceSwordR80`, `DevilSwordR76`), bank 0x345, registered while Hero is in the match (his trails, which Kirby's show,
+  come from the same folder).
+- Kirby is hidden for the whole Stone (`VisibilityModule(0x2710, 0)`), and an EffectModule follows its model's
+  visibility (docs/native-notes.md "Effects follow the model's visibility"): every frame the VisibilityModule update
+  hands is_visible (0) to EffectModule vt +0x34C, which (byte +0x9B, 1 from the module's reset) sets +0x9A = 0 and hides
+  all his effects; a following effect made while +0x9A is 0 is hidden at once (`0x02C2B4A8`). One-shot effects aren't
+  checked there, and trails aren't module effects: the user's fix v6 clip shows Flame Slash's and Hatchet Man's speed
+  lines and bursts (one-shot, common bank) and no blade effect, exactly that split. MSC or ACMD made no difference
+  (ACMD External_Graphic builds the same 0x2712 request).
+- Fix: `khm_sword` gives `EffectModule(0x26, 0)` (op 0x26: +0x9B, vt +0x21C) and `EffectModule(0x1C, 1)` (set_visible,
+  vt +0x17C) every frame of a sword spell; `khm_sw_stop` (the end, a stop, the copy lost) gives `EffectModule(0x26, 1)`
+  back, and the game's own update hides his effects again. While a spell is cast, Kirby's other effects (a buff's
+  glow on his hip) are drawn too.
+- The blade effects moved to the swing slots' effect scripts (`tools/kirby_hero_sword_acmd.py`, with the trails), at
+  Hero's frames clipped to the sword's drawn window (below), LHaveN with the v7 offsets, Hero's rotations and sizes,
+  Terminate 0, each ended by Hero's Terminate_Graphic_Effect (by the window's end) and by `khm_sw_stop`. No colour or
+  alpha is set on them: Hero's scripts set none, so they are his emitters' own colours. Hatchet Man's ground burst
+  (`0x3450049`, one-shot) stays an MSC call, Terminate 0, ended at the spell's end (Hero's: with his motion).
+
+  | Spell | Blade effect (cast frames) | Hero's |
+  |---|---|---|
+  | Flame Slash | `0x3450078` 3-8 | 2-10 |
+  | Kacrackle Slash | `0x3450076` 4-8 | 4-9 |
+  | Metal Slash | none (Hero has none) | |
+  | Hatchet Man | `0x3450072` 34-42 | 6-77 |
+
+**The sword only while its trail is:** `khm_sw_shown(n, f)` (generated from Hero's Sword_Glow / Terminate_Sword_Glow):
+the sword int `0x1000008B` is 1 from the trail's first frame to the frame before its end: Flame Slash 3-7, Kacrackle
+Slash 4-7, Metal Slash 9-15, Hatchet Man 34-41.
+
+**Hitboxes on the blade** (`tools/kirby_hero_sword_msc.py`, `tools/kirby_hero_sword_hitboxes.py` renders them):
+- Measured under fix v7's drawing rules (`hitboxes_17-20.png`, grey = fix v7): Hero's sword hitboxes sat 1.5-2.5 off
+  the drawn blade (his Sword1 Z -2.5 / -2 / -1.5, beyond the blade's flat of +-1.8), the arm one on Hero's forearm
+  (1.8-3.4 off), and Flame / Kacrackle Slash's bone-0 hitboxes (IDs 3-4: 8.5 / 10.5 wide, the burst ahead of the
+  blade) 9.7-16.3 off it.
+- Now: every sword hitbox on the blade's own axis at Hero's X along it (Z 0), the arm one (ID 2 -> 7) on the blade's
+  base (Sword1 X 1.5, where the blade and the trail start), the bone-0 ones left out. Sizes, damage, angles,
+  knockback and the rest Hero's: 4.5 / 4.5 / 3 (Flame, Kacrackle), 3.3 / 3.8 / 2.5 (Metal, Hatchet Man), covering the
+  blade from below the guard to past the tip.
+
+**Zoom: the hitbox refreshed up and down (Kirby only, `khm_zoom_hitbox`).** The flying stone's hitbox is the air hold
+motion 0x2F1's (ID 0, Part 0, 18%, 6.5 at (0, 2, 0)), made once, so its Part's hit record (kept for the whole status;
+Remove / new hitboxes don't clear it, no MSC op does) let it hit a fighter once per Zoom. Now it is made again with
+Part 2 every frame of the rise (cast frames 29-68) and with Part 3 from the fall's first frame (69) to the landing:
+each leg has its own record, so a fighter hit on the way up can be hit again on the way down (once per leg).
+
+**Zoom 2 U: 1 unit from the target (Kirby only, `khm_z2_step`; Hero's brave.c keeps 15).** The gap is measured along
+the approach as how much further the stone could move toward the target before touching it: the stone a box over
+Kirby's position holding every stone form (half-width 7.6, from 1.35 below his feet to 13.17 above:
+`model/stone/c00`), the target a medium fighter's body (half-width 4, 12 tall over its feet: centre its feet + 6,
+Hero's aim point). They touch when the centres are within the summed box (11.6 x 13.26); along the unit vector u from
+centre to centre that is min(11.6 / |ux|, 13.26 / |uy|) away. Each step moves 9 or less, never past a gap of 1, and a
+stone already within 1 doesn't move. Exactly 1 for the largest form (Thwomp) and the medium body; the smaller forms
+stop further out (up to 2.2 sideways, 5.8 under a target above, 1.35 over one below), so no form ends inside a target.
+
+**Tests:**
+- `kirby_hero_sword_fx_vis_test.py EXE_V46I.rpx` (new, unicorn, the game's VisibilityModule update, EffectModule MSC
+  handler and the following request's creation check): Kirby hidden -> his effects hidden and a following effect made
+  hidden; ops 0x26 0 / 0x1C 1 -> shown and kept shown; op 0x26 1 -> hidden again; Kirby visible -> untouched; the
+  one-shot path never reads +0x9A.
+- `kirby_newcopy_test.py` (fix v8): the sword int by the trail's window; every sword hitbox on the blade's axis, IDs
+  5-7 only; no 0x2712 from the MSC; the effect switches every frame of a spell and given back at its end, after
+  0x176 mid-spell and after the copy's loss; Zoom's hitbox (motion 0x2F1's values) Part 2 for frames 29-68, Part 3 for
+  69 to the landing; Zoom 2 U with the target ahead, behind (both facings), above, below, up on a platform, below
+  and behind, already within 1: gap 1 (0.4 for the last, not moved), never overlapping, the gap only shrinking; the
+  traits. Fix v7's MSC fails all 17.
+- `kirby_hero_sword_swing_test.py`: the hitboxes on the drawn blade's axis at Hero's X, the arm at the base, no bone 0;
+  the effect scripts' blade effects at Hero's blade origin (his rotation, size, Terminate 0) within the trail window
+  and their ends.
+- `kirby_hero_sword_hitboxes.py MAIN.pac KIRBY_VBN --out DIR --before OLD_MSC_PY` (new): per active frame the hitboxes'
+  distance from the drawn blade (0.00 for all) and the renders.
+- Also: `msc_stack_check.py` (globals 118), `rolloff_hold_test.py`, the A build's `kirby_newcopy_test.py`.
+
+**Not checked in game / approximated:**
+- Zoom 2 U's target body is a fixed medium box (no fighter's size reaches the MSC).
+- Whether hitbox collision uses the sword's depth (the blade swings up to 15 into the screen in Flame Slash's
+  follow-through, as Hero's does).
+```
+python3 tools/kirby_hero_sword_msc.py > /tmp/sw.c       # the GENERATED block in kirby.c
+sh tools/kirby_hero_copy_build.sh MSC_OUT
+python3 tools/kirby_hero_sword_acmd.py KIRBY/script/animcmd/body ACMD_OUT
+python3 tools/kirby_newcopy_test.py MSC_OUT/kirby_B.mscsb
+python3 tools/kirby_hero_sword_fx_vis_test.py EXE_V46I.rpx
+python3 tools/kirby_hero_sword_swing_test.py EXE_V46I.rpx EXE_V46H.rpx OUT/motion/body/main.pac KIRBY/motion/body/main.pac \
+    KIRBY/model/body/c00/model.vbn ULT/brave ACMD_OUT/effect.bin ACMD_OUT/motion.mtable
+python3 tools/kirby_hero_sword_hitboxes.py OUT/motion/body/main.pac KIRBY/model/body/c00/model.vbn --out PREVIEW \
+    --before FIX_V7_MSC_PY
+```
