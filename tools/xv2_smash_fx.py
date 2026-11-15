@@ -235,8 +235,8 @@ def retime_model(folder, frames):
 # (the God Fist glow test: glow_3 / 4 / 5 looked alike). A halo fakes it: for each converted emitter whose material
 # glows, a copy drawn additive with a soft round falloff, HALO_SIZE x larger, at HALO_ALPHA of its alpha (same timing,
 # emission and motion, so it follows the particle); for a glowing model, one soft particle at its centre for its life.
-HALO_ALPHA = 0.25               # the strength: the halo's alpha x the emitter's (user, after the test's 0.25 / 0.45 /
-                                # 0.7: "The glow is good as-is" at the weakest, 0.25)
+HALO_ALPHA = 0.16               # the strength: the halo's alpha x the emitter's (user, after the test's 0.25 / 0.45 /
+                                # 0.7: "the halo glow at 0.25 is too strong. Maybe reduce to 0.16")
 HALO_SIZE = 2.5                 # billboards x this; rings (polygons) x HALO_RING, streaks x HALO_SIZE wide
 HALO_RING = 1.2
 HALO_SUFFIX = 'H'
