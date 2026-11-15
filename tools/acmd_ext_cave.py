@@ -530,6 +530,32 @@ VB = {'status': (0xA0, 8, 2), 'hitstun': (0x40, 8, 0), 'dealt': (0x40, 8, 1), 's
       'joint': (0x290, 4, 0)}
 
 
+def ms_fix_code(b):
+    """exe_v46j: Motion_Set on the script's own object. The motion change (MotionModule(1)) rebinds the object's game /
+    expression agents to the new motion's scripts inside the call (0x027608B0 -> 0x02BEE560: state +0 = +4 = the new
+    script, +8 = 0) and its frame sync (0x02760EB0) may run the new script at once, in this same state (0x02BEE950:
+    +8 = -1 while it waits). exe_v40-v46i's handler then stepped +4 by its own 5 words and returned 2: the interpreter
+    went on in the NEW script, 5 words off (a misread command: nothing after the Motion_Set ran, the new motion's
+    script didn't either). Now: the script's start is kept before the call (r26); rebound (+0 changed) -> +8 = 0 and
+    the handler returns 0 without stepping: the interpreter stops this run (0x02BEE874: +8 isn't -1) and the new
+    motion's script goes on from where it is next frame (0x02BEE6C0 / 0x02BEE748). Not rebound (another object, a
+    motion with no script): as before. The rest of the old script never runs: the object's game script is now the
+    new motion's (the game's own rule: a motion change binds its scripts)"""
+    b.asm("""
+ms_pre:
+        lwz r26, 0(r31)
+        lwz r6, 0x10(r1)
+        b ms_rt_b
+ms_post:
+        lwz r0, 0(r31)
+        cmplw r0, r26
+        beq nc_out
+        li r0, 0
+        stw r0, 8(r31)
+        b nc_out
+""")
+
+
 def newcmd_code(b):
     """the new commands' handlers and their helpers, in their own Asm (b, at CODE2)"""
     pro = lambda lab, n, skip=True: """
@@ -888,9 +914,10 @@ ms_fr:
         lfs f1, one@l(r12)
         stfs f1, 0x14(r1)
 ms_rt:
-        lwz r6, 0x10(r1)
+        b ms_pre                        # exe_v46j: lwz r26, 0(r31); lwz r6, 0x10(r1) (ms_fix_code)
+ms_rt_b:
         lwz r7, 0x14(r1)""" + msc_args(1, ('p', 1), ('r', 'r6'), ('r', 'r7')) + call(MOTION_W, 4) + """
-        b nc_out
+        b ms_post                       # exe_v46j: the motion change rebound this script? (ms_fix_code)
 ms_keep:
         lfs f1, 8(r30)
         fcmpu cr0, f1, f0
@@ -2722,6 +2749,7 @@ next_entry:
     newcmd_code(b2)
     b3 = Asm(LGC_CODE)                  # Leave_Ground_Cancel (its own space: CODE2 is full)
     lgc_code(b3)
+    ms_fix_code(b3)                     # exe_v46j: Motion_Set on itself (after LGC's code: nothing else moves)
     assert not set(b3.labels) & (set(a.labels) | set(b2.labels)), set(b3.labels) & (set(a.labels) | set(b2.labels))
     a.labels.update(b3.labels)
     b4 = Asm(NV_CODE)                   # New_Var (the grown text region, after its slots' pool)
