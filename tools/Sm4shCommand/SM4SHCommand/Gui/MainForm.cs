@@ -1047,7 +1047,7 @@ namespace Sm4shCommand
             }
             if (hitboxViewerForm != null && !hitboxViewerForm.IsDisposed && hitboxViewerGame == game.Key)
             {
-                hitboxViewerForm.ShowScript(crc, GameEditor(page), TabTitle(page, crc));
+                hitboxViewerForm.ShowScript(crc, GameEditor(page), TabTitle(page, crc), EffectEditor(page));
                 hitboxViewerForm.Activate();
                 return;
             }
@@ -1079,9 +1079,23 @@ namespace Sm4shCommand
                 IScript s;
                 return file.Scripts.TryGetValue(id, out s) && s is ACMDScript ? ((ACMDScript)s).Commands : null;
             };
+            // v1.5.0: the effect scripts (effect.bin: the one open, else the file next to game.bin)
+            var fxFile = ScriptFiles.FirstOrDefault(x => x.Value is ACMDFile &&
+                Path.GetFileNameWithoutExtension(x.Key).Equals("effect", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(Path.GetDirectoryName(x.Key), Path.GetDirectoryName(game.Key), StringComparison.OrdinalIgnoreCase)).Value as ACMDFile;
+            if (fxFile == null)
+            {
+                string fxPath = Path.Combine(Path.GetDirectoryName(game.Key) ?? "", "effect.bin");
+                try { if (File.Exists(fxPath)) fxFile = new ACMDFile(fxPath); } catch (Exception) { fxFile = null; }
+            }
+            Func<uint, IList<ICommand>> getEffect = id =>
+            {
+                IScript s;
+                return fxFile != null && fxFile.Scripts.TryGetValue(id, out s) && s is ACMDScript ? ((ACMDScript)s).Commands : null;
+            };
             if (hitboxViewerForm != null && !hitboxViewerForm.IsDisposed)
                 hitboxViewerForm.Close();       // another fighter's
-            var viewer = new HitboxViewer(assets, GameEditor(page), crc, TabTitle(page, crc), getScript);
+            var viewer = new HitboxViewer(assets, GameEditor(page), crc, TabTitle(page, crc), getScript, getEffect, EffectEditor(page));
             viewer.FormClosed += (o, a) => { if (hitboxViewerForm == viewer) hitboxViewerForm = null; };
             hitboxViewerForm = viewer;
             hitboxViewerGame = game.Key;
@@ -1099,6 +1113,13 @@ namespace Sm4shCommand
                 !uint.TryParse(page.Name.Substring(7), System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out crc))
                 return 0;
             return page.Editors.Any(x => x.Script is ACMDScript) ? crc : 0;
+        }
+
+        /// <summary>v1.5.0: the tab's effect script editor (fighter / project mode), or null.</summary>
+        ITS_EDITOR EffectEditor(CodeEditor page)
+        {
+            var ed = page?.EditorFor("effect");
+            return ed != null && ed.Script is ACMDScript ? ed : null;
         }
 
         /// <summary>The tab's game script editor (the only one when a single game.bin is open), or null.</summary>

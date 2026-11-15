@@ -69,6 +69,12 @@ namespace Sm4shCommand.Viewer
         public List<HitboxData> Hitboxes = new List<HitboxData>();
         public bool Intangible, Invincible, SuperArmor;
         public List<VarWrite> Writes = new List<VarWrite>();   // SET_FLOATs done on this frame
+        public double Speed = 1;                                // the animation frames this game frame moved on
+        // the effect script's, on the same timeline (v1.5.0): the effects on now, the sword trails, the screen
+        // events of this frame
+        public List<EffectData> Effects = new List<EffectData>();
+        public List<TrailData> Trails = new List<TrailData>();
+        public List<ScreenEvent> Screen = new List<ScreenEvent>();
     }
 
     /// <summary>
@@ -82,6 +88,13 @@ namespace Sm4shCommand.Viewer
         public bool ConditionsTrue = true;
         public bool UseFrameSpeed = true;
         public Func<uint, IList<ICommand>> GetScript;
+        /// <summary>v1.5.0, the effect script: the game script's per-frame speeds (FrameState.Speed), so it runs on the
+        /// game script's timeline (its Set_Frame_Duration changes the motion's rate, which every script follows).</summary>
+        public double[] SpeedSchedule;
+        /// <summary>A one-shot effect's play time in frames: &gt; 0 that long, 0 not known (DefaultLife), -1 never ends by
+        /// itself (on until terminated).</summary>
+        public Func<uint, int> OneShotLife;
+        public int DefaultLife = 20;
 
         const uint ASYNC = 0x42ACFE7D, SYNC = 0x4B7B6E51, FRAME_DURATION = 0x7172A764, FRAME_DURATION2 = 0xB2E91D0C,
             FRAME_MUL = 0xA546845C, CALL1 = 0x9126EBA2, CALL2 = 0xFA1BC28A, HITBOX = 0xB738EABD,
@@ -102,7 +115,16 @@ namespace Sm4shCommand.Viewer
         Dictionary<uint, float> varValues = new Dictionary<uint, float>();   // SET_FLOATs so far (threads share them)
         // what a variable in an Extra hitbox is drawn with when the script doesn't SET_FLOAT it first
         static readonly float[] VarStandIn = { 10, 0, 100, 0, 40, 4 };
-        double Speed { get { return frameSpeed * rate; } }   // the move's frame speed x the animation rate variable
+        double Speed
+        {
+            get
+            {
+                var sched = (root ?? this).SpeedSchedule;
+                int g = (root ?? this).gameFrame - 1;
+                if (sched != null && !isThread && g >= 0 && g < sched.Length) return sched[g];
+                return frameSpeed * rate;     // the move's frame speed x the animation rate variable
+            }
+        }
         bool incrementFrame;
         SortedDictionary<int, HitboxData> hitboxes = new SortedDictionary<int, HitboxData>();
         bool intangible, invincible, armor;
@@ -129,6 +151,7 @@ namespace Sm4shCommand.Viewer
             th.root = r;
             th.hitboxes = r.hitboxes;
             th.varValues = r.varValues;
+            th.fx = r.fx;
             th.script = block;
             th.frameSpeed = 1; th.rate = 1; th.syncFrames = -1;
             r.threads.Add(new ScriptThread { Id = id, StartFrame = r.gameFrame, Runner = th });
@@ -179,6 +202,7 @@ namespace Sm4shCommand.Viewer
         {
             script = commands;
             subscripts.Clear(); states.Clear(); hitboxes.Clear(); threads.Clear(); varValues.Clear();
+            fx = new EffectState();
             index = 0; loopStart = 0; loopIterations = 0; skipWords = 0;
             currentFrame = 0; animFrame = 0; frameSpeed = 1; syncFrames = -1; rate = 1;
             incrementFrame = true;
@@ -189,6 +213,8 @@ namespace Sm4shCommand.Viewer
             {
                 gameFrame = game + 1;
                 writes = new List<VarWrite>();
+                fx.Screen = new List<ScreenEvent>();
+                double speedNow = Speed;
                 if (incrementFrame)
                     currentFrame += Speed;
                 animFrame += Speed;
@@ -217,9 +243,17 @@ namespace Sm4shCommand.Viewer
                     GameFrame = game + 1,
                     AnimFrame = (float)(animFrame - 1),
                     Intangible = intangible, Invincible = invincible, SuperArmor = armor, Writes = writes,
+                    Speed = speedNow, Screen = fx.Screen,
                 };
                 foreach (var h in hitboxes.Values)
                     st.Hitboxes.Add(h.Clone());
+                ExpireEffects();
+                // a trail shows to its end and its fade after it (Terminate_Sword_Glow's FadeTime)
+                fx.Trails.RemoveAll(t => t.EndFrame >= 0 && gameFrame >= t.EndFrame + t.Fade);
+                foreach (var e in fx.Live)
+                    st.Effects.Add(e.Clone());
+                foreach (var t in fx.Trails)
+                    st.Trails.Add(t.Clone());
                 outList.Add(st);
             }
             return outList;
@@ -499,8 +533,262 @@ namespace Sm4shCommand.Viewer
                     break;
                 case END:
                     break;
+                default:
+                    EffectCommand(cmd, p);
+                    break;
             }
             return true;
+        }
+
+        // ---- the effect script's commands (v1.5.0): effects, sword trails, screen events ------------------------------
+        class EffectState
+        {
+            public List<EffectData> Live = new List<EffectData>();
+            public List<EffectData> All = new List<EffectData>();
+            public List<TrailData> Trails = new List<TrailData>();
+            public List<TrailData> AllTrails = new List<TrailData>();
+            public List<ScreenEvent> Screen = new List<ScreenEvent>();
+            public List<ScreenEvent> AllScreen = new List<ScreenEvent>();
+            public EffectData Last;
+        }
+        EffectState fx = new EffectState();
+
+        /// <summary>Every effect the last Run started (one entry each, with its end), every trail, every screen event.</summary>
+        public List<EffectData> AllEffects { get { return fx.All; } }
+        public List<TrailData> AllTrails { get { return fx.AllTrails; } }
+        public List<ScreenEvent> AllScreen { get { return fx.AllScreen; } }
+
+        enum FxKind { None, Spawn, Off, OffAll, OffLast, Detach, Last, Trail, TrailOff, Screen, Note }
+
+        /// <summary>What an effect command does and where its parameters are, from its name and its parameters' names
+        /// (Events.cfg's syntax, from the ACMD events sheet: no fixed positions guessed).</summary>
+        class FxCmd
+        {
+            public FxKind Kind;
+            public bool Follow, World, Flip;
+            public int G = -1, GL = -1, Work = -1, Bone = -1, BoneHash = -1, X = -1, Y = -1, Z = -1, RX = -1, RY = -1,
+                RZ = -1, Size = -1, Term = -1, R = -1, Gr = -1, B = -1, Alpha = -1, Rate = -1, Fade = -1,
+                B1 = -1, B2 = -1, Blur = -1;
+        }
+        static readonly Dictionary<uint, FxCmd> fxCmds = new Dictionary<uint, FxCmd>();
+        static readonly HashSet<string> followNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
+            // the conventional names of the developers' EFFECT_FOLLOW* (the ACMD events sheet)
+            "External_Graphic", "External_Graphic_Effect2", "Graphic_Effect4", "Graphic_Effect5", "Graphic_Effect6" };
+        static readonly HashSet<string> screenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
+            "Screen_Tint", "Screen_Tint2", "Limited_Screen_Tint", "End_Screen_Tint", "Color_Overlay", "FLASH_NO_STOP",
+            "FLASH_OFF", "Flash_Light_Effect", "Change_Flash_Light_Color", "LIGHT_AXIS", "LIGHT_AXIS_FRM", "LIGHT_OFF",
+            "SET_LIGHT_LENGTH", "SET_LIGHT_RADIUS", "EFFECT_LIGHT_END", "Aesthetic_Wind_Effect", "Aesthetic_Wind_Effect2",
+            "Aesthetic_Wind_Effect3", "Terminate_Wind_Effect", "Pause_Graphic_Effect_Animation", "EFFECT_RESUME",
+            "EFFECT_REQ_LINE_CIRCLE", "EFFECT_REQ_LINE_CIRCLE_OFFSET", "EFFECT_REMOVE_LINE_CIRCLE", "EFFECT_SYNC_SCALE",
+            "EFFECT_OFF_KIND_WORK", "EFFECT_DETACH_KIND_WORK", "EFFECT_CONTINUAL_OFF", "LAST_EFFECT_SET_DISABLE_SYSTEM_SLOW",
+            "LAST_EFFECT_SET_OFFSET_TO_CAMERA_FLAT", "LAST_EFFECT_SET_RATE_WORK", "LAST_EFFECT_SET_SCALE_W" };
+
+        static FxCmd Describe(ACMDCommand c)
+        {
+            FxCmd d;
+            if (fxCmds.TryGetValue(c.Ident, out d)) return d;
+            d = new FxCmd();
+            string n = c.Name ?? "";
+            string[] syn;
+            try { syn = c.ParamSyntax.Select(x => x.Trim()).ToArray(); } catch { syn = new string[0]; }
+            Func<string[], int> at = names =>
+            {
+                for (int i = 0; i < syn.Length; i++)
+                    foreach (var nm in names)
+                        if (syn[i].Equals(nm, StringComparison.OrdinalIgnoreCase)) return i;
+                return -1;
+            };
+            string up = n.ToUpperInvariant();
+            if (screenNames.Contains(n))
+                d.Kind = FxKind.Screen;
+            else if (n == "Terminate_Graphic_Effect" || n == "EFFECT_REMOVE_COMMON")
+            {
+                d.Kind = FxKind.Off;
+                d.G = at(new[] { "Graphic", "CommonEffectId" });
+            }
+            else if (n == "EFFECT_OFF" || n == "EFFECT_REMOVE_ATTR")
+                d.Kind = FxKind.OffAll;
+            else if (n == "EFFECT_OFF_HANDLE")
+                d.Kind = FxKind.OffLast;
+            else if (n == "EFFECT_DETACH_KIND")
+            {
+                d.Kind = FxKind.Detach;
+                d.G = at(new[] { "Graphic" });
+            }
+            else if (up.StartsWith("LAST_EFFECT_SET_") || up == "LAST_PARTICLE_SET_COLOR")
+            {
+                d.Kind = FxKind.Last;
+                d.R = at(new[] { "Red", "R" }); d.Gr = at(new[] { "Green", "G" }); d.B = at(new[] { "Blue", "B" });
+                d.Alpha = at(new[] { "Alpha" }); d.Rate = at(new[] { "Rate" });
+                d.X = at(new[] { "ScaleX" }); d.Y = at(new[] { "ScaleY" }); d.Z = at(new[] { "ScaleZ" });
+            }
+            else if (n == "Terminate_Sword_Glow")
+            {
+                d.Kind = FxKind.TrailOff;
+                d.Fade = at(new[] { "FadeTime" });
+            }
+            else if (at(new[] { "Bone1" }) >= 0 && at(new[] { "Bone2" }) >= 0)
+            {
+                d.Kind = FxKind.Trail;
+                d.B1 = at(new[] { "Bone1" }); d.B2 = at(new[] { "Bone2" });
+                d.Blur = at(new[] { "BlurLength", "BlurLen" });
+                d.G = at(new[] { "Graphic", "Effect" });
+            }
+            else
+            {
+                d.G = at(new[] { "Graphic", "GFXRight", "Effect", "EffectR" });
+                d.Work = at(new[] { "GraphicWork" });
+                d.Bone = at(new[] { "Bone" });
+                d.BoneHash = at(new[] { "BoneNameHash" });
+                bool world = up.StartsWith("EFFECT_GLOBAL") || up.StartsWith("EM_EFFECT");
+                bool named = up.Contains("EFFECT") || up.Contains("GRAPHIC");
+                if (named && (d.G == 0 || d.Work == 0) && (d.Bone >= 0 || d.BoneHash >= 0 || world))
+                {
+                    d.Kind = FxKind.Spawn;
+                    d.World = world;
+                    d.Follow = followNames.Contains(n) || up.Contains("FOLLOW") || up.Contains("FLW");
+                    d.GL = at(new[] { "GFXLeft", "EffectL" });
+                    d.Flip = d.GL >= 0;
+                    d.X = at(new[] { "X" }); d.Y = at(new[] { "Y" }); d.Z = at(new[] { "Z" });
+                    d.RX = at(new[] { "XRot", "RotX" }); d.RY = at(new[] { "YRot", "RotY" }); d.RZ = at(new[] { "ZRot", "RotZ" });
+                    d.Size = at(new[] { "Size", "Scale" });
+                    d.Term = at(new[] { "Terminate" });
+                    d.R = at(new[] { "Red" }); d.Gr = at(new[] { "Green" }); d.B = at(new[] { "Blue" });
+                    d.Alpha = at(new[] { "Alpha" });
+                }
+                else if (named && (up.Contains("EFFECT") || up.Contains("TRACE")))
+                    d.Kind = FxKind.Note;
+            }
+            fxCmds[c.Ident] = d;
+            return d;
+        }
+
+        static string Text(ACMDCommand c)
+        {
+            try { return c.ToString(); } catch { return c.Name; }
+        }
+
+        void EffectCommand(ACMDCommand cmd, IList<object> p)
+        {
+            var d = Describe(cmd);
+            if (d.Kind == FxKind.None) return;
+            Func<int, float, float> fl = (i, def) => i >= 0 && i < p.Count ? F(p[i]) : def;
+            Func<int, int> it = i => i >= 0 && i < p.Count ? I(p[i]) : 0;
+            var r = root ?? this;
+            var fs = r.fx;
+            switch (d.Kind)
+            {
+                case FxKind.Spawn:
+                    {
+                        var e = new EffectData
+                        {
+                            Index = fs.All.Count, Command = cmd.Name, Line = Text(cmd), World = d.World, Follow = d.Follow,
+                            Id = d.G >= 0 ? (uint)it(d.G) : 0, WorkVar = d.Work >= 0 ? (uint)it(d.Work) : 0,
+                            Bone = d.Bone >= 0 ? it(d.Bone) : 0,
+                            X = fl(d.X, 0), Y = fl(d.Y, 0), Z = fl(d.Z, 0), RX = fl(d.RX, 0), RY = fl(d.RY, 0), RZ = fl(d.RZ, 0),
+                            Size = fl(d.Size, 1), Terminate = it(d.Term),
+                            StartFrame = r.gameFrame, SpawnAnimFrame = (float)(r.animFrame - 1),
+                        };
+                        if (d.Work >= 0) e.Id = 0;
+                        if (d.BoneHash >= 0) e.Bone = -1;
+                        if (d.Flip) { e.HasLeft = true; e.IdLeft = (uint)it(d.GL); }
+                        if (d.R >= 0) { e.HasColor = true; e.R = fl(d.R, 1); e.G = fl(d.Gr, 1); e.B = fl(d.B, 1); }
+                        if (d.Alpha >= 0) { e.HasAlpha = true; e.A = fl(d.Alpha, 1); }
+                        fs.Live.Add(e);
+                        fs.All.Add(e);
+                        fs.Last = e;
+                        break;
+                    }
+                case FxKind.Off:
+                    {
+                        uint id = (uint)it(d.G);
+                        foreach (var e in fs.Live.Where(x => x.Id == id || (x.HasLeft && x.IdLeft == id)).ToList())
+                            End(e, "terminated (" + cmd.Name + ")");
+                        break;
+                    }
+                case FxKind.OffAll:
+                    foreach (var e in fs.Live.ToList()) End(e, "terminated (" + cmd.Name + ")");
+                    break;
+                case FxKind.OffLast:
+                    if (fs.Last != null && fs.Live.Contains(fs.Last)) End(fs.Last, "terminated (" + cmd.Name + ")");
+                    break;
+                case FxKind.Detach:
+                    {
+                        uint id = (uint)it(d.G);
+                        foreach (var e in fs.Live.Where(x => x.Id == id && x.Follow && x.DetachFrame < 0))
+                        {
+                            e.DetachFrame = r.gameFrame;
+                            e.DetachAnimFrame = (float)(r.animFrame - 1);
+                        }
+                        break;
+                    }
+                case FxKind.Last:
+                    {
+                        var e = fs.Last;
+                        if (e == null) break;
+                        if (d.R >= 0) { e.HasColor = true; e.R = fl(d.R, 1); e.G = fl(d.Gr, 1); e.B = fl(d.B, 1); }
+                        if (d.Alpha >= 0) { e.HasAlpha = true; e.A = fl(d.Alpha, 1); }
+                        if (d.Rate >= 0) e.Rate = fl(d.Rate, 1);
+                        if (d.X >= 0) { e.HasScale = true; e.SX = fl(d.X, 1); e.SY = fl(d.Y, 1); e.SZ = fl(d.Z, 1); }
+                        break;
+                    }
+                case FxKind.Trail:
+                    {
+                        var t = new TrailData
+                        {
+                            Index = fs.AllTrails.Count, Command = cmd.Name, Line = Text(cmd),
+                            Bone1 = it(d.B1), X1 = fl(d.B1 + 1, 0), Y1 = fl(d.B1 + 2, 0), Z1 = fl(d.B1 + 3, 0),
+                            Bone2 = it(d.B2), X2 = fl(d.B2 + 1, 0), Y2 = fl(d.B2 + 2, 0), Z2 = fl(d.B2 + 3, 0),
+                            Blur = it(d.Blur), Graphic = d.G >= 0 ? (uint)it(d.G) : 0, StartFrame = r.gameFrame,
+                        };
+                        foreach (var o in fs.Trails.Where(x => x.EndFrame < 0)) o.EndFrame = r.gameFrame;   // one at a time
+                        fs.Trails.Add(t);
+                        fs.AllTrails.Add(t);
+                        break;
+                    }
+                case FxKind.TrailOff:
+                    foreach (var t in fs.Trails.Where(x => x.EndFrame < 0))
+                    {
+                        t.EndFrame = r.gameFrame;
+                        t.Fade = Math.Max(0, it(d.Fade));
+                    }
+                    break;
+                case FxKind.Screen:
+                case FxKind.Note:
+                    {
+                        var ev = new ScreenEvent { Frame = r.gameFrame, Text = Text(cmd) };
+                        fs.Screen.Add(ev);
+                        fs.AllScreen.Add(ev);
+                        break;
+                    }
+            }
+        }
+
+        void End(EffectData e, string why)
+        {
+            var fs = (root ?? this).fx;
+            e.EndFrame = (root ?? this).gameFrame;
+            e.EndReason = why;
+            fs.Live.Remove(e);
+        }
+
+        /// <summary>One-shot effects whose play time is over end (after this frame is shown, so a 1-frame one shows).</summary>
+        void ExpireEffects()
+        {
+            foreach (var e in fx.Live.ToList())
+            {
+                if (e.Follow && e.DetachFrame < 0) continue;
+                int life = OneShotLife != null ? OneShotLife(e.Id) : 0;
+                if (life < 0) continue;
+                if (life == 0) life = DefaultLife;
+                int from = e.DetachFrame >= 0 ? e.DetachFrame : e.StartFrame;
+                if (gameFrame >= from + life - 1)
+                {
+                    fx.Live.Remove(e);
+                    e.EndFrame = gameFrame + 1;
+                    e.EndReason = OneShotLife != null && OneShotLife(e.Id) > 0 ? "its particles' life" : "(life not known: " + DefaultLife + " frames)";
+                }
+            }
         }
     }
 }

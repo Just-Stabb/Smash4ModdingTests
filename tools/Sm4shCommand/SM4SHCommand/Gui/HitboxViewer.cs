@@ -22,6 +22,25 @@ namespace Sm4shCommand.GUI
         ITS_EDITOR editor;
         uint scriptCrc;
         readonly Func<uint, IList<ICommand>> getScript;
+        // v1.5.0: the effect script (effect.bin's script of the same name, the open tab's effect editor while edited)
+        Func<uint, IList<ICommand>> getEffect;
+        ITS_EDITOR effectEditor;
+        EffectLibrary library;
+        List<EffectData> allEffects = new List<EffectData>();
+        List<TrailData> allTrails = new List<TrailData>();
+        string effectError;
+        readonly CheckBox showEffects = new CheckBox { Text = "Effects", AutoSize = true, Checked = Runtime.GetSetting("ViewerEffects", true) };
+        readonly CheckBox showLabels = new CheckBox { Text = "Labels", AutoSize = true, Checked = Runtime.GetSetting("ViewerEffectLabels", true) };
+        readonly CheckBox showTrails = new CheckBox { Text = "Trails", AutoSize = true, Checked = Runtime.GetSetting("ViewerTrails", true) };
+        readonly CheckBox flip = new CheckBox { Text = "Flip facing", AutoSize = true };
+        readonly CheckBox allFx = new CheckBox { Text = "List every effect of the script", AutoSize = true };
+        readonly DataGridView fxGrid = new DataGridView
+        {
+            Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false, AllowUserToDeleteRows = false,
+            RowHeadersVisible = false, SelectionMode = DataGridViewSelectionMode.FullRowSelect, MultiSelect = false,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells,
+        };
+        bool fxFilling;
         List<FrameState> frames = new List<FrameState>();
         List<FrameState> probe = new List<FrameState>();   // the script run long past the animation
         int animCount = 1;                                   // game frames the animation lasts
@@ -84,9 +103,16 @@ namespace Sm4shCommand.GUI
         }
 
         public HitboxViewer(FighterAssets assets, ITS_EDITOR editor, uint scriptCrc, string title, Func<uint, IList<ICommand>> getScript)
+            : this(assets, editor, scriptCrc, title, getScript, null, null) { }
+
+        public HitboxViewer(FighterAssets assets, ITS_EDITOR editor, uint scriptCrc, string title, Func<uint, IList<ICommand>> getScript,
+                            Func<uint, IList<ICommand>> getEffect, ITS_EDITOR effectEditor)
         {
             this.assets = assets;
             this.getScript = getScript;
+            this.getEffect = getEffect;
+            library = new EffectLibrary(assets.Root) { CommonName = CommonEffectName };
+            view.EffectLabel = EffectLabel;
             Size = new Size(1150, 720);
             StartPosition = FormStartPosition.CenterParent;
             view.Assets = assets;
@@ -105,8 +131,13 @@ namespace Sm4shCommand.GUI
             LoadEnemy(Runtime.GetSettingText("ViewerEnemyFolder", ""), false);
             timer.Tick += (o, e) => { bar.Value = bar.Value >= bar.Maximum ? bar.Minimum : bar.Value + 1; };
             editTimer.Tick += (o, e) => { editTimer.Stop(); Rerun(); };
-            FormClosed += (o, e) => { timer.Stop(); if (this.editor != null) this.editor.TextChanged -= Editor_TextChanged; };
-            ShowScript(scriptCrc, editor, title);
+            FormClosed += (o, e) =>
+            {
+                timer.Stop();
+                if (this.editor != null) this.editor.TextChanged -= Editor_TextChanged;
+                if (this.effectEditor != null) this.effectEditor.TextChanged -= Editor_TextChanged;
+            };
+            ShowScript(scriptCrc, editor, title, effectEditor);
         }
 
         bool picking;           // ShowScript is setting the animation list
@@ -114,11 +145,17 @@ namespace Sm4shCommand.GUI
         /// <summary>The game script this viewer is for (and the editor whose edits it follows): the
         /// main window calls this again when another script's tab is picked. Shows the script's own
         /// animation; with none known, the animation list says (none).</summary>
-        public void ShowScript(uint crc, ITS_EDITOR scriptEditor, string title)
+        public void ShowScript(uint crc, ITS_EDITOR scriptEditor, string title) { ShowScript(crc, scriptEditor, title, effectEditor); }
+
+        /// <summary>v1.5.0: with the tab's effect editor, whose edits the effects follow.</summary>
+        public void ShowScript(uint crc, ITS_EDITOR scriptEditor, string title, ITS_EDITOR fxEditor)
         {
             if (editor != null) editor.TextChanged -= Editor_TextChanged;
             editor = scriptEditor;
             if (editor != null) editor.TextChanged += Editor_TextChanged;
+            if (effectEditor != null) effectEditor.TextChanged -= Editor_TextChanged;
+            effectEditor = fxEditor;
+            if (effectEditor != null) effectEditor.TextChanged += Editor_TextChanged;
             scriptCrc = crc;
             currentCrc = crc;
             Text = "Hitbox Viewer - " + title;
@@ -200,8 +237,10 @@ namespace Sm4shCommand.GUI
         void Build()
         {
             var tools = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 58, WrapContents = true };
+            tools.Height = 84;
             tools.Controls.AddRange(new Control[] { new Label { Text = "Animation:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, animBox,
-                ifTrue, frameSpeed, showModel, showTextures, showBones, showAngles, showEnemy, untilActionable, showFreeze, floor });
+                ifTrue, frameSpeed, showModel, showTextures, showBones, showAngles, showEnemy, untilActionable, showFreeze, floor,
+                showEffects, showLabels, showTrails, flip });
             var bottom = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 34, ColumnCount = 5 };
             var prev = new Button { Text = "<", Width = 30 };
             var next = new Button { Text = ">", Width = 30 };
@@ -255,7 +294,24 @@ namespace Sm4shCommand.GUI
                 else if (c is ComboBox) ((ComboBox)c).SelectedIndexChanged += (o, e) => Calc();
             }
             var right = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterDistance = 200 };
-            right.Panel1.Controls.Add(grid);
+            var tabs = new TabControl { Dock = DockStyle.Fill };
+            var hbTab = new TabPage("Hitboxes");
+            hbTab.Controls.Add(grid);
+            var fxTab = new TabPage("Effects");
+            fxTab.Controls.Add(fxGrid);
+            fxTab.Controls.Add(allFx);
+            allFx.Dock = DockStyle.Bottom;
+            tabs.TabPages.Add(hbTab);
+            tabs.TabPages.Add(fxTab);
+            right.Panel1.Controls.Add(tabs);
+            fxGrid.SelectionChanged += (o, e) =>
+            {
+                if (fxFilling) return;
+                view.SelectedEffect = fxGrid.SelectedRows.Count > 0 && fxGrid.SelectedRows[0].Tag is EffectData
+                    ? ((EffectData)fxGrid.SelectedRows[0].Tag).Index : -1;
+                view.Invalidate();
+            };
+            allFx.CheckedChanged += (o, e) => ShowFrame();
             var calcGroup = new GroupBox { Text = "Knockback / hitstun (pick a hitbox above)", Dock = DockStyle.Fill };
             calcGroup.Controls.Add(results);
             calcGroup.Controls.Add(calc);
@@ -283,6 +339,13 @@ namespace Sm4shCommand.GUI
             showAngles.CheckedChanged += (o, e) => { view.ShowAngles = showAngles.Checked; view.Invalidate(); };
             showTextures.CheckedChanged += (o, e) => { view.ShowTextures = showTextures.Checked; view.Invalidate(); };
             showEnemy.CheckedChanged += (o, e) => Calc();
+            showEffects.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerEffects", showEffects.Checked); view.ShowEffects = showEffects.Checked; view.Invalidate(); };
+            showLabels.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerEffectLabels", showLabels.Checked); view.ShowEffectLabels = showLabels.Checked; view.Invalidate(); };
+            showTrails.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerTrails", showTrails.Checked); view.ShowTrails = showTrails.Checked; view.Invalidate(); };
+            flip.CheckedChanged += (o, e) => { view.Flip = flip.Checked; ShowFrame(); };
+            view.ShowEffects = showEffects.Checked;
+            view.ShowEffectLabels = showLabels.Checked;
+            view.ShowTrails = showTrails.Checked;
             untilActionable.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerUntilActionable", untilActionable.Checked); Calc(); };
             showFreeze.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerShowFreeze", showFreeze.Checked); Calc(); };
             floor.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerFloor", floor.Checked); Calc(); };
@@ -355,6 +418,7 @@ namespace Sm4shCommand.GUI
                 n = Math.Max(60, last + 20);
             }
             animCount = Math.Max(1, n);
+            RunEffects();
             frames = probe.Take(animCount).ToList();
             SetTimeline(animCount, null, 0);
             view.Animation = anim;
@@ -364,6 +428,7 @@ namespace Sm4shCommand.GUI
             Text = "Hitbox Viewer - " + (currentCrc == 0 ? "(no script)" : Runtime.ScriptLabel(currentCrc)) +
                    (currentCrc != scriptCrc && currentCrc != 0 ? " (saved game.bin; edits follow the open script only)" : "");
             status.Text = (error != null ? "Doesn't compile (showing the last saved script): " + error + "   " : "") +
+                          (effectError != null ? "Effect script doesn't compile (showing the saved one): " + effectError + "   " : "") +
                           (animName != null ? animName + ", " + length + " frames" : "No animation found for this script: pick one above") +
                           (cmds == null ? "   (no game script for this animation: no hitboxes)" : "");
             ShowFrame();
@@ -377,6 +442,10 @@ namespace Sm4shCommand.GUI
             float af = Math.Max(0, f.AnimFrame);
             if (anim != null && anim.Frames > 0) af = Math.Min(af, anim.Frames - 1);   // holds its last frame after the end
             view.AnimFrame = af;
+            view.TrailFrames = new List<float>();
+            for (int i = ScriptIndex() - 1; i >= 0 && view.TrailFrames.Count < 16; i--)
+                view.TrailFrames.Add(Math.Max(0, frames[i].AnimFrame));
+            FillEffects(f);
             UpdateLabel(f, af);
             int sel = view.SelectedHitbox;
             filling = true;
@@ -400,6 +469,128 @@ namespace Sm4shCommand.GUI
             filling = false;
             view.SelectedHitbox = grid.SelectedRows.Count > 0 ? (int)grid.SelectedRows[0].Cells[0].Value : sel;
             Calc();
+        }
+
+        // ---- effects (v1.5.0) -----------------------------------------------------------------------------------------
+
+        /// <summary>The effect script for the shown script: the effect editor's text while it's the open script (a
+        /// preview compile), else effect.bin's.</summary>
+        IList<ICommand> EffectCommands(out string error)
+        {
+            error = null;
+            if (currentCrc == 0) return null;
+            if (currentCrc == scriptCrc && effectEditor != null)
+            {
+                var names = SALT.Moveset.FighterVariable.SaveNewVars();
+                try
+                {
+                    var lines = ACMDCompiler.StripComments(effectEditor.Lines.ToArray());
+                    return ACMDCompiler.CompileCommands(lines.ToArray()).Cast<ICommand>().ToList();
+                }
+                catch (Exception ex) { error = ex.Message.Split('\n')[0]; }
+                finally { SALT.Moveset.FighterVariable.RestoreNewVars(names); }
+            }
+            return getEffect != null ? getEffect(currentCrc) : null;
+        }
+
+        /// <summary>Runs the effect script on the game script's timeline (its per-frame speeds) and puts its effects,
+        /// trails and screen events on the probe's frames.</summary>
+        void RunEffects()
+        {
+            var cmds = EffectCommands(out effectError);
+            allEffects = new List<EffectData>();
+            allTrails = new List<TrailData>();
+            if (cmds == null || probe.Count == 0) return;
+            var r = new HitboxRunner
+            {
+                ConditionsTrue = ifTrue.Checked, GetScript = getEffect, SpeedSchedule = probe.Select(x => x.Speed).ToArray(),
+                OneShotLife = LifeOf,
+            };
+            var fx = r.Run(cmds, probe.Count);
+            for (int i = 0; i < probe.Count && i < fx.Count; i++)
+            {
+                probe[i].Effects = fx[i].Effects;
+                probe[i].Trails = fx[i].Trails;
+                probe[i].Screen = fx[i].Screen;
+            }
+            allEffects = r.AllEffects;
+            allTrails = r.AllTrails;
+        }
+
+        int LifeOf(uint id)
+        {
+            if (id == 0) return 0;
+            var l = library.Lifetime(id);
+            return l.HasValue ? Math.Max(1, l.Value) : (library.GetBank((int)(id >> 16)) != null ? -1 : 0);
+        }
+
+        static string CommonEffectName(uint id)
+        {
+            var e = Sm4shCommand.Classes.Tooltips.Find(id, "Graphic_Effect", "Graphic", "int").FirstOrDefault();
+            return e != null ? e.Name : null;
+        }
+
+        string NameOf(EffectData e)
+        {
+            uint id = e.IdFor(flip.Checked);
+            if (id == 0) return e.WorkVar != 0 ? "(from variable 0x" + e.WorkVar.ToString("X") + ")" : "";
+            return library.Name(id);
+        }
+
+        string EffectLabel(EffectData e)
+        {
+            uint id = e.IdFor(flip.Checked);
+            string name = NameOf(e);
+            return (id != 0 ? "0x" + id.ToString("X") : "?") + (name.Length > 0 ? " " + name : "");
+        }
+
+        void FillEffects(FrameState f)
+        {
+            var ic = CultureInfo.InvariantCulture;
+            int sel = view.SelectedEffect;
+            fxFilling = true;
+            fxGrid.SuspendLayout();
+            fxGrid.Rows.Clear();
+            if (fxGrid.Columns.Count == 0)
+                foreach (var c in new[] { "#", "ID", "Name", "Bone", "Offset", "Rotation", "Size", "Colour / alpha", "Kind",
+                                          "Frames", "Facing left", "Command" })
+                    fxGrid.Columns.Add(c, c);
+            var list = allFx.Checked ? allEffects : f.Effects ?? new List<EffectData>();
+            foreach (var e in list)
+            {
+                uint id = e.IdFor(flip.Checked);
+                string kind = e.Follow ? (e.DetachFrame >= 0 ? "follow, detached " + e.DetachFrame : "follow") : "one-shot";
+                if (e.World) kind += ", world";
+                string frames = e.StartFrame + "-" + (e.EndFrame >= 0 ? (e.EndFrame - 1).ToString() : "end") +
+                                (e.EndReason.Length > 0 ? " (" + e.EndReason + ")" : "");
+                string col = (e.HasColor ? string.Format(ic, "{0:0.###} {1:0.###} {2:0.###}", e.R, e.G, e.B) : "-") +
+                             (e.HasAlpha ? string.Format(ic, " a {0:0.###}", e.A) : "") + (e.Rate != 1 ? string.Format(ic, " rate {0:0.###}", e.Rate) : "") +
+                             (e.HasScale ? string.Format(ic, " scale {0:0.##} {1:0.##} {2:0.##}", e.SX, e.SY, e.SZ) : "");
+                string facing = FacingRule.Check(e);
+                if (e.HasLeft) facing = (facing.Length > 0 ? facing + "; " : "") + "left: 0x" + e.IdLeft.ToString("X");
+                int row = fxGrid.Rows.Add(e.Index, id != 0 ? "0x" + id.ToString("X") : "?", NameOf(e),
+                    e.World ? "-" : e.Bone < 0 ? "(by name)" : "0x" + e.Bone.ToString("X"),
+                    string.Format(ic, "{0:0.##}, {1:0.##}, {2:0.##}", e.X, e.Y, e.Z),
+                    string.Format(ic, "{0:0.##}, {1:0.##}, {2:0.##}", e.RX, e.RY, e.RZ),
+                    e.Size.ToString("0.###", ic), col, kind, frames, facing.Length > 0 ? "! " + facing : "ok", e.Command);
+                fxGrid.Rows[row].Tag = e;
+                var c0 = Viewport.EffectColor(e);
+                fxGrid.Rows[row].DefaultCellStyle.BackColor = Color.FromArgb(255 - (255 - c0.R) * 2 / 10, 255 - (255 - c0.G) * 2 / 10, 255 - (255 - c0.B) * 2 / 10);
+                if (sel == e.Index) fxGrid.Rows[row].Selected = true;
+            }
+            foreach (var t in (allFx.Checked ? allTrails : f.Trails ?? new List<TrailData>()))
+                fxGrid.Rows.Add("trail " + t.Index, t.Graphic != 0 ? "0x" + t.Graphic.ToString("X") : "", "sword trail",
+                    "0x" + t.Bone1.ToString("X") + " / 0x" + t.Bone2.ToString("X"),
+                    string.Format(ic, "{0:0.##}, {1:0.##}, {2:0.##} / {3:0.##}, {4:0.##}, {5:0.##}", t.X1, t.Y1, t.Z1, t.X2, t.Y2, t.Z2),
+                    "", "", "", "trail (blur " + t.Blur + ")",
+                    t.StartFrame + "-" + (t.EndFrame >= 0 ? (t.EndFrame - 1).ToString() : "end") + (t.Fade > 0 ? " + fade " + t.Fade : ""), "", t.Command);
+            foreach (var ev in f.Screen ?? new List<ScreenEvent>())
+                fxGrid.Rows.Add("screen", "", "", "", "", "", "", "", "listed only", ev.Frame.ToString(), "", ev.Text);
+            fxGrid.ClearSelection();
+            foreach (DataGridViewRow r in fxGrid.Rows)
+                if (r.Tag is EffectData && ((EffectData)r.Tag).Index == sel) r.Selected = true;
+            fxGrid.ResumeLayout();
+            fxFilling = false;
         }
 
         /// <summary>The picked hitbox (on this frame, or where it last came out before it) and the game

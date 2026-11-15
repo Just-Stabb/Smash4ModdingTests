@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace Sm4shCommand.Viewer
@@ -33,6 +34,14 @@ namespace Sm4shCommand.Viewer
         public string EnemyStatus;          // its hitlag / hitstun state, shown in the corner
         public float[] TrajectoryOrigin;    // where the trajectory starts (x, y, z); null: at the hitbox
         public List<float[]> Trajectory;    // forward / up from the selected hitbox (calculator)
+        // v1.5.0: the effect script's effects (Frame.Effects / Trails): markers at their bone + offset, turned and
+        // sized as the call says, coloured by its colour; trails as the blade's line with a fading history
+        public bool ShowEffects = true, ShowEffectLabels = true, ShowTrails = true;
+        public bool Flip;                   // the scene turned round (the fighter facing left), as the game turns it
+        public int SelectedEffect = -1;     // EffectData.Index
+        public Func<EffectData, string> EffectLabel;
+        public List<float> TrailFrames = new List<float>();   // animation frames of the game frames before this one
+                                                              // (newest first), for the trails' history
 
         float yaw, pitch, zoom = 9f, panX, panY;
         Point dragFrom;
@@ -81,7 +90,8 @@ namespace Sm4shCommand.Viewer
         // camera: screen right = model +Z (the fighter faces right), up = +Y, depth = +X (away)
         void Axes(out float[] right, out float[] up, out float[] fwd)
         {
-            double cy = Math.Cos(yaw), sy = Math.Sin(yaw), cp = Math.Cos(pitch), sp = Math.Sin(pitch);
+            double y = yaw + (Flip ? Math.PI : 0);    // facing left: the game turns the fighter (and all it does) round
+            double cy = Math.Cos(y), sy = Math.Sin(y), cp = Math.Cos(pitch), sp = Math.Sin(pitch);
             right = new[] { (float)sy, 0f, (float)cy };
             fwd = new[] { (float)(cy * cp), (float)sp, (float)(-sy * cp) };
             up = new[] { (float)(-cy * sp), (float)cp, (float)(sy * sp) };
@@ -186,6 +196,8 @@ namespace Sm4shCommand.Viewer
                     DrawGround(g, r, u);
                     if (ShowBones && world != null) DrawBones(g, r, u);
                     DrawHitboxes(g, r, u);
+                    if (ShowTrails) DrawTrails(g, r, u);
+                    if (ShowEffects) DrawEffects(g, r, u);
                     DrawTrajectory(g, r, u);
                     DrawStatus(g);
                 }
@@ -373,6 +385,139 @@ namespace Sm4shCommand.Viewer
 
         static Color Darker(Color c) { return Color.FromArgb(c.R * 6 / 10, c.G * 6 / 10, c.B * 6 / 10); }
 
+        // ---- effects (v1.5.0) ---------------------------------------------------------------------------------------
+        readonly Dictionary<float, Mat4[]> worldAt = new Dictionary<float, Mat4[]>();
+        Omo worldAnim;
+
+        /// <summary>The skeleton on an animation frame (cached per frame while the animation is the same).</summary>
+        Mat4[] WorldAt(float frame)
+        {
+            if (Assets == null) return null;
+            if (Animation != null && Animation.Frames > 0) frame = Math.Max(0, Math.Min(frame, Animation.Frames - 1));
+            else frame = 0;
+            if (worldAnim != Animation) { worldAt.Clear(); worldAnim = Animation; }
+            Mat4[] w;
+            if (!worldAt.TryGetValue(frame, out w))
+            {
+                if (worldAt.Count > 400) worldAt.Clear();
+                w = Assets.Skeleton.World(Animation, frame);
+                worldAt[frame] = w;
+            }
+            return w;
+        }
+
+        /// <summary>An effect's frame in model space: its bone (on its spawn frame for a one-shot effect, now for a
+        /// following one; scale left out, as for hitboxes), then its offset and its turn (degrees, X then Y then Z as the
+        /// VBN's; the game's order for effects isn't confirmed). Null when its bone isn't known.</summary>
+        public Mat4 EffectMatrix(EffectData e)
+        {
+            var local = Mat4.TRS(new[] { e.X, e.Y, e.Z },
+                Mat4.EulerToQuat(e.RX * (float)Math.PI / 180, e.RY * (float)Math.PI / 180, e.RZ * (float)Math.PI / 180),
+                new[] { 1f, 1f, 1f });
+            if (e.World) return local;
+            float at = e.DetachFrame >= 0 ? e.DetachAnimFrame : e.Follow ? AnimFrame : e.SpawnAnimFrame;
+            var w = WorldAt(at);
+            if (w == null || e.Bone < 0) return null;
+            int bi = Assets.Skeleton.ScriptBone(e.Bone);
+            if (bi < 0 || bi >= w.Length) return null;
+            return w[bi].ClearScale() * local;
+        }
+
+        /// <summary>The colour an effect is drawn with: its set colour (scaled into 0-255 when over 1), else grey-blue.</summary>
+        public static Color EffectColor(EffectData e)
+        {
+            if (!e.HasColor) return Color.FromArgb(70, 110, 200);
+            float m = Math.Max(1, Math.Max(e.R, Math.Max(e.G, e.B)));
+            Func<float, int> c = v => Math.Max(0, Math.Min(255, (int)(v / m * 255)));
+            return Color.FromArgb(c(e.R), c(e.G), c(e.B));
+        }
+
+        void DrawEffects(Graphics g, float[] r, float[] u)
+        {
+            if (Frame == null || Frame.Effects == null) return;
+            float d;
+            var labels = new List<RectangleF>();          // placed so far: a label overlapping one goes below it
+            foreach (var e in Frame.Effects)
+            {
+                var m = EffectMatrix(e);
+                if (m == null) continue;
+                bool sel = e.Index == SelectedEffect;
+                var col = EffectColor(e);
+                float size = Math.Max(0.05f, e.Size * (e.HasScale ? Math.Max(e.SX, Math.Max(e.SY, e.SZ)) : 1));
+                var o = Project(m.Transform(0, 0, 0), r, u, out d);
+                float rad = Math.Max(3, 2f * size * zoom);
+                int a = (int)(Math.Max(0.15f, Math.Min(1, e.A)) * (sel ? 120 : 70));
+                using (var br = new SolidBrush(Color.FromArgb(a, col)))
+                    g.FillEllipse(br, o.X - rad, o.Y - rad, rad * 2, rad * 2);
+                using (var pen = new Pen(Color.FromArgb(sel ? 255 : 200, Darker(col)), sel ? 2.5f : 1.2f))
+                {
+                    if (!e.Follow || e.DetachFrame >= 0) pen.DashStyle = DashStyle.Dash;     // one-shot: dashed
+                    g.DrawEllipse(pen, o.X - rad, o.Y - rad, rad * 2, rad * 2);
+                }
+                // its axes: X red, Y green, Z (its forward) blue
+                float len = Math.Max(1.5f, 2f * size);
+                var axes = new[] { Tuple.Create(new[] { len, 0f, 0f }, Color.FromArgb(220, 40, 40)),
+                                   Tuple.Create(new[] { 0f, len, 0f }, Color.FromArgb(30, 170, 30)),
+                                   Tuple.Create(new[] { 0f, 0f, len }, Color.FromArgb(40, 70, 230)) };
+                foreach (var ax in axes)
+                    using (var pen = new Pen(ax.Item2, 1.5f) { EndCap = LineCap.ArrowAnchor })
+                        g.DrawLine(pen, o, Project(m.Transform(ax.Item1[0], ax.Item1[1], ax.Item1[2]), r, u, out d));
+                if (ShowEffectLabels)
+                {
+                    string label = EffectLabel != null ? EffectLabel(e) : "0x" + e.IdFor(Flip).ToString("X");
+                    if (Flip && FacingRule.Check(e).Length > 0) label = "! " + label;
+                    var sz = g.MeasureString(label, Font);
+                    var at = new RectangleF(o.X + rad * 0.7f + 2, o.Y - rad * 0.7f - 12, sz.Width, sz.Height);
+                    for (int k = 0; k < 40 && labels.Any(x => x.IntersectsWith(at)); k++) at.Y += sz.Height;
+                    labels.Add(at);
+                    using (var br = new SolidBrush(Color.FromArgb(230, Darker(Darker(col)))))
+                        g.DrawString(label, Font, br, at.X, at.Y);
+                }
+            }
+        }
+
+        /// <summary>A trail's two points in model space on an animation frame (bone 1 + offset 1, bone 2 + offset 2).</summary>
+        bool TrailPoints(TrailData t, float frame, out float[] a, out float[] b)
+        {
+            a = b = null;
+            var w = WorldAt(frame);
+            if (w == null) return false;
+            int b1 = Assets.Skeleton.ScriptBone(t.Bone1), b2 = Assets.Skeleton.ScriptBone(t.Bone2);
+            if (b1 < 0 || b1 >= w.Length || b2 < 0 || b2 >= w.Length) return false;
+            a = w[b1].ClearScale().Transform(t.X1, t.Y1, t.Z1);
+            b = w[b2].ClearScale().Transform(t.X2, t.Y2, t.Z2);
+            return true;
+        }
+
+        void DrawTrails(Graphics g, float[] r, float[] u)
+        {
+            if (Frame == null || Frame.Trails == null) return;
+            float d;
+            foreach (var t in Frame.Trails)
+            {
+                float[] a, b;
+                bool fading = t.EndFrame >= 0 && Frame.GameFrame >= t.EndFrame;
+                // the history: the blade on the frames before, back to the trail's start (BlurLength of them, at
+                // least 4, at most 12), fading out
+                int n = Math.Min(Math.Max(4, Math.Min(t.Blur, 12)), Math.Max(0, Frame.GameFrame - t.StartFrame));
+                var pts = new List<PointF[]>();
+                if (!fading && TrailPoints(t, AnimFrame, out a, out b))
+                    pts.Add(new[] { Project(a, r, u, out d), Project(b, r, u, out d) });
+                for (int k = 0; k < n && k < TrailFrames.Count; k++)
+                    if (TrailPoints(t, TrailFrames[k], out a, out b))
+                        pts.Add(new[] { Project(a, r, u, out d), Project(b, r, u, out d) });
+                for (int k = 0; k + 1 < pts.Count; k++)
+                {
+                    int alpha = Math.Max(10, 120 - 110 * k / Math.Max(1, pts.Count - 1));
+                    using (var br = new SolidBrush(Color.FromArgb(alpha, 255, 200, 60)))
+                        g.FillPolygon(br, new[] { pts[k][0], pts[k][1], pts[k + 1][1], pts[k + 1][0] });
+                }
+                if (pts.Count > 0 && !fading)
+                    using (var pen = new Pen(Color.FromArgb(230, 200, 120, 0), 2.5f))
+                        g.DrawLine(pen, pts[0][0], pts[0][1]);
+            }
+        }
+
         void DrawTrajectory(Graphics g, float[] r, float[] u)
         {
             if (Trajectory == null || Trajectory.Count < 2 || Frame == null) return;
@@ -401,6 +546,11 @@ namespace Sm4shCommand.Viewer
             if (Frame.SuperArmor) parts.Add("super armor");
             if (parts.Count > 0)
                 g.DrawString(string.Join(", ", parts.ToArray()), Font, Brushes.DarkBlue, 6, 6);
+            if (Flip)
+                g.DrawString("Facing left (turned round). ! = an effect call the God Fist / Core Breaker ports found looks different facing left",
+                             Font, Brushes.DarkMagenta, 6, Height - 18);
+            if (Frame.Screen != null && Frame.Screen.Count > 0)
+                g.DrawString("Screen: " + string.Join("; ", Frame.Screen.Select(x => x.Text).ToArray()), Font, Brushes.DarkGreen, 6, 38);
         }
 
         protected override void OnMouseDown(MouseEventArgs e)
