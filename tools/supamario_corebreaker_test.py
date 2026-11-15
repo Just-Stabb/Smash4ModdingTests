@@ -384,8 +384,8 @@ def msc_tests(path):
           (g.status, max(t[1] for t in tr), len(held) > 20, tr[-1][5], used(g)),
           (0x17, float(B.HOVER_FROM - 1), True, False, 1.0))
     top = next(t for t in tr if t[1] >= B.HOVER_FROM - 1 - 1e-6)
-    check('the rise: super armor to its top, off after', (armor_at(g, 0), armor_at(g, top[7] - 1), armor_at(g, g.t)),
-          (1, 1, 0))
+    check('the rise: no armor at all (v4; v1-v3: super armor to its top)',
+          [armor_at(g, t[7]) for t in tr if t[7] <= top[7]] == [0] * len([t for t in tr if t[7] <= top[7]]), True)
     check('the rise: from frame %d the fall\'s kinetic type (drift), its own forward speed off' % B.RISE_CANCEL,
           (g.kin, g.vx), (0, 0.0))
     # 2. up special again (from the held top): the hover / dive; a miss landing on the stage
@@ -647,9 +647,15 @@ def msc_tests(path):
     g, v, far, tr = on_path()
     dv = [t for t in tr if t[4] == 2.0]
     check('the dive catches a fighter standing in its way (%d frames into it, far from the detection box): its slot '
-          '(2), the hitboxes cleared, invincible %d frames, the hold on the ground, the crash' % (len(dv), B.INVINCIBLE),
-          (len(dv) > 3 and far > 30.0, g.vars.get(B.CB_V_SLOT), len(g.cleared) > 0, g.vars.get(0x0F00011C),
-           phases_of(tr)), (True, 2.0, True, float(B.INVINCIBLE), [1.0, 2.0, 8.0, 6.0]))
+          '(2), the hitboxes cleared, the hold on the ground, the crash' % len(dv),
+          (len(dv) > 3 and far > 30.0, g.vars.get(B.CB_V_SLOT), len(g.cleared) > 0, phases_of(tr)),
+          (True, 2.0, True, [1.0, 2.0, 8.0, 6.0]))
+    # v4 (user: "make it so that there's no armor during the leap or hover, and the dive has armor instead of
+    # invincibility"): armor in the dive and through the catch (the hold, the crash), never invincible
+    arm = {ph: sorted({armor_at(g, t[7]) for t in tr if t[4] == ph}) for ph in (1.0, 2.0, 8.0, 6.0)}
+    check('armor: none in the hover, super armor in the dive, the hold and the crash; never invincible / intangible '
+          '(no INVINCIBLE / INTANGIBLE write)', (arm, g.vars.get(0x0F00011C), g.vars.get(0x0F00011B)),
+          ({1.0: [0], 2.0: [1], 8.0: [1], 6.0: [1]}, None, None))
     for name, extra in (('lying down (DownWait)', {'status': 0x50}), ('invincible', {'body': 1})):
         g, v, far, tr = on_path(extra)
         check('the dive refuses a fighter %s: no catch, the hitboxes gone, it dives on and lands' % name,
