@@ -4,7 +4,7 @@
   python3 tools/supamario_godfist_build.py SUPAMARIO_DIR OUT_DIR --ean 030_GOD_CSA.ean [--cmn-vfx VFX_CMN_DIR]
                                            [--skill-vfx 002_GOK_CSG_DIR] [--cmn-se WAV_DIR --stb SOUNDLABELTABLE]
                                            [--png SHEET.png] [--diag] [--glow PEAK]
-  --glow: the glow test's variants (GLOW: only XV2's glaring parts drawn past 1, peak PEAK x GlareCol / 1.5)
+  --glow: the glow test's variants (GLOW: v17, with XV2's glaring parts brighter: peak PEAK x GlareCol / 1.5)
   --cmn-se: XV2's CMN battle SE the move plays (CMN_SE), decoded to WAV_DIR/<cue name>.wav by
   `python3 -I tools/xv2acb.py extract CAR_BTL_CMN.acb CAR_BTL_CMN.awb HCA_DIR Hit_LL Down` and
   `node tools/xv2acb_decode.mjs HCA_JS_DIR HCA_DIR WAV_DIR`; --stb: the soundlabeltable to grow (the latest)
@@ -365,37 +365,30 @@ FIST_TIP = 1.2
 # - more vibrant: alpha x SKILL_ALPHA 2 (capped at 1: v5-v6 x1.5), the model's colour gain x2.5 / x2 / x1.5 (R / G /
 #   B: brighter, keeping its orange)
 SKILL_SCALE = 1.75
-# Glow test (README "Glow test"): Smash 4 does bloom / glare colours drawn past 1 (fighters/brave/README.md fix 21 /
-# 23 / 27: past ~1.05 glows, past ~2.5 a pink-white haze with purple fringes; docs/minecraft-world.md: the sun / moon
-# past white). v5-v17 drew every skill emitter at SKILL_GAIN 2 (its colour keys x 2: peaks 2.0, glaring or not) and the
-# aura model's gain up to 2.5 (MODEL_TINT). --glow V: only the parts XV2 glares (the EMM material's Glare / GlareCol,
-# 1.1 - 2.0 here; tools/xv2_to_ptcl.py notes it per emitter) past 1: x V x GlareCol / 1.5, the rest x 1 (no bloom);
-# no peak past GLOW_CAP (the haze); the aura model's gain scaled to a peak of V (its hue kept)
+# Glow test (README "glow test"): Smash 4 does bloom / glare colours drawn past 1 (fighters/brave/README.md fixes 21 /
+# 23 / 27; docs/minecraft-world.md: the sun / moon past white), and v5-v17 already draw every skill emitter past it
+# (SKILL_GAIN 2: its colour keys x 2, peaks 2.0) and the aura model's gain to 2.5 (MODEL_TINT), yet the user doesn't
+# see XV2's glow. --glow PEAK (the test, upward from v17): everything as v17, and only the parts XV2 glares (the EMM
+# material's Glare / GlareCol; tools/xv2_to_ptcl.py notes it per emitter) brighter, to a peak of PEAK x GlareCol /
+# GLOW_REF (hue kept: all channels scaled; never below v17's, never past GLOW_CAP); the aura model as v17
 GLOW = None
 GLOW_REF = 1.5
-GLOW_CAP = 2.5
+GLOW_CAP = 8.0
 
 
 def glow_factor(p, d, notes):
-    """an emitter's colour scale factor: SKILL_GAIN (v5-v17), or with GLOW its glare's (see GLOW)"""
-    if GLOW is None:
-        return SKILL_GAIN
+    """an emitter's colour scale factor: SKILL_GAIN (v5-v17); with GLOW, a glaring part's to its target (see GLOW)"""
     g = next((float(n.split()[1]) for n in notes if n.startswith('glare ')), 0.0)
-    if g <= 0.0:
-        return 1.0
-    f = GLOW * g / GLOW_REF
+    if GLOW is None or g <= 0.0:
+        return SKILL_GAIN
     peak = p.field(d, 'color_scale') * max(max(c[:3]) for t in (0, 1) for c in p.color_keys(d, t))
-    if peak * f > GLOW_CAP:
-        f = GLOW_CAP / peak
-    return max(1.0, f)
+    target = min(GLOW_CAP, GLOW * g / GLOW_REF)
+    return max(SKILL_GAIN, target / peak) if peak > 0 else SKILL_GAIN
 
 
 def model_tint():
-    """the aura model's colour gain multipliers (MODEL_TINT; with GLOW scaled to a peak of GLOW)"""
-    if GLOW is None:
-        return MODEL_TINT
-    k = GLOW / max(MODEL_TINT)
-    return tuple(round(c * k, 4) for c in MODEL_TINT)
+    """the aura model's colour gain multipliers (MODEL_TINT: v17's in the glow test too, already at Hero's haze edge)"""
+    return MODEL_TINT
 # v8 (user, v7's screenshots: "slightly too large now, and is inverted"): x1.75 (between v6's 1.5 and v7's 2: XV2's
 # aura spans ~0.9 of the character's height, 1.5 m-scale on ~1.75 m; v7's came out over his height); the model
 # turned back to XV2's way (its front, its apex, leading along his facing, its swirl and wind trailing back over the
