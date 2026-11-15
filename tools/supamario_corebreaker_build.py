@@ -227,6 +227,8 @@ HB = {'catch': (5.5, round(5.5 * _CB_SCALE / 1.75, 2)), 'burn': (7.0, round(7.0 
 CRASH_AT = (6.26, 1.93)                      # the crash explosion's place (the crash pose's RHandN, effect 3's call)
 DETECT_AT = (1.0, 6.5)                       # at his middle (ahead, up)
 VICTIM_MID = (HOLD_X, HOLD_Y + 5.0)          # the held victim's middle
+BURN_POS = (6.24, 2.57)                      # v3: the burn box on the hit loop (effect 8's call); its 9.0 covers the
+                                             # held victim (its middle 2.8 away, its head ~8)
 
 
 def game_script():
@@ -281,7 +283,7 @@ def game_script():
     for f in BURN_AT:
         blocks.append((f, if_(CB_VAR, 0, 3, [cmd('hit_log_clear', 1),
                                              hitbox(ID=0, Part=1, Bone=0, Damage=BURN_DMG, BKB=10, Size=HB['burn'][1],
-                                                    Y=VICTIM_MID[1], Z=VICTIM_MID[0], SFXLevel=0, SFXType=4,
+                                                    Y=BURN_POS[1], Z=BURN_POS[0], SFXLevel=0, SFXType=4,
                                                     Effect=1, HitstopFrames=3, SelfHitstopFrames=0,
                                                     Shieldable=0, DIMul=0.001, SDI=0.0)])))
         blocks.append((f + 1, if_(CB_VAR, 0, 3, [cmd('remove_all_hitboxes')])))
