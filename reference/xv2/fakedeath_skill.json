@@ -1,0 +1,3332 @@
+{
+ "source": "XV2 116_YMC_DIE (Fake Death, Yamcha) via tools/supamario_fakedeath_xv2.py; names: XV2-Tools",
+ "bcm": [
+  {
+   "index": 0,
+   "sibling": null,
+   "child": 1,
+   "parent": null,
+   "root": null,
+   "DirectionalInput": 0,
+   "ButtonInput": "0x0 []",
+   "HoldDownConditions": "0x0",
+   "OpponentSizeConditions": "0x0",
+   "MinimumLoopDuration": 0,
+   "MaximumLoopDuration": 0,
+   "PrimaryActivatorConditions": "0x0 []",
+   "ActivatorState": "0x0 []",
+   "BacEntryPrimary": -1,
+   "BacEntryCharge": 0,
+   "BacEntryUserConnect": 0,
+   "BacEntryVictimConnect": 0,
+   "BacEntryAirborne": -1,
+   "RandomFlag": 0,
+   "KiCost": 0,
+   "ReceiverLinkID": "0x0 []",
+   "StaminaCost": 0,
+   "KiRequired": 0,
+   "HealthRequired": 0.0
+  },
+  {
+   "index": 1,
+   "sibling": 2,
+   "child": null,
+   "parent": null,
+   "root": 1,
+   "DirectionalInput": 0,
+   "ButtonInput": "0x100 ['SuperSkill1']",
+   "HoldDownConditions": "0x20000",
+   "OpponentSizeConditions": "0x0",
+   "MinimumLoopDuration": 0,
+   "MaximumLoopDuration": 480,
+   "PrimaryActivatorConditions": "0xC01 ['Standing', 'Unk11', 'Idle']",
+   "ActivatorState": "0x3 ['Idle', 'Attacking']",
+   "BacEntryPrimary": 0,
+   "BacEntryCharge": 0,
+   "BacEntryUserConnect": 0,
+   "BacEntryVictimConnect": 0,
+   "BacEntryAirborne": -1,
+   "RandomFlag": 2,
+   "KiCost": 0,
+   "ReceiverLinkID": "0x2 ['Supers']",
+   "StaminaCost": 0,
+   "KiRequired": 0,
+   "HealthRequired": 0.0
+  },
+  {
+   "index": 2,
+   "sibling": null,
+   "child": 3,
+   "parent": null,
+   "root": 2,
+   "DirectionalInput": 0,
+   "ButtonInput": "0x100 ['SuperSkill1']",
+   "HoldDownConditions": "0x20000",
+   "OpponentSizeConditions": "0x0",
+   "MinimumLoopDuration": 0,
+   "MaximumLoopDuration": 0,
+   "PrimaryActivatorConditions": "0xC02 ['Floating', 'Unk11', 'Idle']",
+   "ActivatorState": "0x3 ['Idle', 'Attacking']",
+   "BacEntryPrimary": 4,
+   "BacEntryCharge": 0,
+   "BacEntryUserConnect": 0,
+   "BacEntryVictimConnect": 0,
+   "BacEntryAirborne": -1,
+   "RandomFlag": 2,
+   "KiCost": 0,
+   "ReceiverLinkID": "0x2 ['Supers']",
+   "StaminaCost": 0,
+   "KiRequired": 0,
+   "HealthRequired": 0.0
+  },
+  {
+   "index": 3,
+   "sibling": null,
+   "child": null,
+   "parent": 2,
+   "root": 2,
+   "DirectionalInput": 0,
+   "ButtonInput": "0x20000 ['SuperMenuPlusSkillInput']",
+   "HoldDownConditions": "0x20002",
+   "OpponentSizeConditions": "0x0",
+   "MinimumLoopDuration": 1,
+   "MaximumLoopDuration": 480,
+   "PrimaryActivatorConditions": "0xC00 ['Unk11', 'Idle']",
+   "ActivatorState": "0x2 ['Attacking']",
+   "BacEntryPrimary": 5,
+   "BacEntryCharge": 0,
+   "BacEntryUserConnect": 0,
+   "BacEntryVictimConnect": 0,
+   "BacEntryAirborne": -1,
+   "RandomFlag": 0,
+   "KiCost": 0,
+   "ReceiverLinkID": "0x2 ['Supers']",
+   "StaminaCost": 0,
+   "KiRequired": 0,
+   "HealthRequired": 0.0
+  }
+ ],
+ "entries": {
+  "0": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     32
+    ],
+    "ean": 10,
+    "index": 16,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     157
+    ],
+    "ean": "skill",
+    "index": 0,
+    "src": [
+     0,
+     157
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     32
+    ],
+    "ean": 11,
+    "index": 16,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Invulnerability",
+    "frames": [
+     0,
+     19
+    ],
+    "invulnerability": "All Attacks Miss"
+   },
+   {
+    "type": "BoneModification",
+    "frames": [
+     0,
+     1
+    ],
+    "bone_modification": "0x2 (2 = Spine_Vert)"
+   },
+   {
+    "type": "Functions",
+    "frames": [
+     0,
+     92
+    ],
+    "function": "0x17 Recover Health (instant) [XV2-Tools name; params all 0 here]",
+    "params": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     0,
+     1
+    ],
+    "eye_movement": [
+     0,
+     0,
+     4,
+     4,
+     1,
+     0,
+     1,
+     0,
+     0,
+     16256,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     1,
+     2
+    ],
+    "eepk": "Stage BG (the stage's own)",
+    "id": 20,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     1,
+     2
+    ],
+    "acb": "character voice",
+    "cue": 57
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     1,
+     2
+    ],
+    "acb": "skill SE",
+    "cue": 0
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     1,
+     2
+    ],
+    "eye_movement": [
+     0,
+     0,
+     4,
+     1,
+     3,
+     0,
+     50,
+     0,
+     0,
+     16256,
+     52429,
+     16204
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     7,
+     8
+    ],
+    "eye_movement": [
+     0,
+     0,
+     1,
+     2,
+     3,
+     0,
+     100,
+     0,
+     52429,
+     16204,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     20,
+     21
+    ],
+    "eye_movement": [
+     0,
+     0,
+     2,
+     0,
+     2,
+     0,
+     30,
+     0,
+     0,
+     16256,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     24,
+     25
+    ],
+    "eye_movement": [
+     0,
+     0,
+     0,
+     2,
+     2,
+     0,
+     100,
+     0,
+     0,
+     16256,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     30,
+     31
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 26,
+    "bone": "b_C_Pelvis",
+    "off": false
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     32,
+     92
+    ],
+    "ean": 10,
+    "index": 13,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     32,
+     92
+    ],
+    "ean": 11,
+    "index": 13,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Functions",
+    "frames": [
+     32,
+     92
+    ],
+    "function": "0x22 BAC Loop (instant end)",
+    "params": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     92,
+     157
+    ],
+    "ean": 11,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     92,
+     157
+    ],
+    "ean": 10,
+    "index": 18,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     92,
+     93
+    ],
+    "eye_movement": [
+     0,
+     0,
+     2,
+     2,
+     1,
+     0,
+     1,
+     0,
+     0,
+     16256,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     93,
+     94
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 26,
+    "bone": "b_C_Base",
+    "off": true
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     93,
+     94
+    ],
+    "eye_movement": [
+     0,
+     0,
+     2,
+     7,
+     2,
+     0,
+     50,
+     0,
+     0,
+     16256,
+     0,
+     16128
+    ]
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     94,
+     101
+    ],
+    "strength": 1.0,
+    "flags": [
+     "TrackForwardAndBackwards"
+    ]
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     95,
+     96
+    ],
+    "acb": "skill SE",
+    "cue": 1
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     100,
+     101
+    ],
+    "acb": "character voice",
+    "cue": 51
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     101,
+     108
+    ],
+    "strength": 1.0,
+    "flags": []
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     106,
+     107
+    ],
+    "eye_movement": [
+     0,
+     0,
+     7,
+     1,
+     3,
+     0,
+     50,
+     0,
+     0,
+     16128,
+     26214,
+     16166
+    ]
+   },
+   {
+    "type": "Movement",
+    "frames": [
+     110,
+     116
+    ],
+    "flags": "0x1",
+    "per_frame_m": [
+     0.0,
+     0.0,
+     -0.2
+    ],
+    "drag": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "note": "-Z is forward (XV2 faces -Z; Core Breaker's dive (0, -1, -1.1) is forward)"
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     112,
+     116
+    ],
+    "bdm": 20,
+    "bdm_file": "Common (CMN.bdm)",
+    "hitbox_flags": "0x0",
+    "damage": 20,
+    "damage_when_blocked": 2,
+    "stamina_taken_when_blocked": 18,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     0.5,
+     -0.75
+    ],
+    "size_m": 0.75
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     114,
+     115
+    ],
+    "eye_movement": [
+     0,
+     0,
+     1,
+     7,
+     4,
+     0,
+     20,
+     0,
+     26214,
+     16166,
+     0,
+     16128
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     118,
+     119
+    ],
+    "eye_movement": [
+     0,
+     0,
+     7,
+     1,
+     3,
+     0,
+     50,
+     0,
+     0,
+     16128,
+     13107,
+     16179
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     145,
+     146
+    ],
+    "eye_movement": [
+     0,
+     0,
+     1,
+     4,
+     8,
+     0,
+     20,
+     0,
+     13107,
+     16179,
+     0,
+     16256
+    ]
+   }
+  ],
+  "1": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     32
+    ],
+    "ean": 10,
+    "index": 16,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     157
+    ],
+    "ean": "skill",
+    "index": 0,
+    "src": [
+     92,
+     157
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     32
+    ],
+    "ean": 11,
+    "index": 16,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     32,
+     92
+    ],
+    "ean": 10,
+    "index": 13,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     32,
+     92
+    ],
+    "ean": 11,
+    "index": 13,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     92,
+     157
+    ],
+    "ean": 11,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     92,
+     157
+    ],
+    "ean": 10,
+    "index": 18,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     92,
+     93
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 26,
+    "bone": "b_C_Base",
+    "off": true
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     92,
+     93
+    ],
+    "eye_movement": [
+     0,
+     0,
+     2,
+     2,
+     1,
+     0,
+     1,
+     0,
+     0,
+     16256,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     93,
+     94
+    ],
+    "eye_movement": [
+     0,
+     0,
+     2,
+     7,
+     2,
+     0,
+     50,
+     0,
+     0,
+     16256,
+     0,
+     16128
+    ]
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     94,
+     101
+    ],
+    "strength": 1.0,
+    "flags": [
+     "TrackForwardAndBackwards"
+    ]
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     100,
+     101
+    ],
+    "acb": "character voice",
+    "cue": 51
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     101,
+     108
+    ],
+    "strength": 1.0,
+    "flags": []
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     106,
+     107
+    ],
+    "eye_movement": [
+     0,
+     0,
+     7,
+     1,
+     3,
+     0,
+     50,
+     0,
+     0,
+     16128,
+     26214,
+     16166
+    ]
+   },
+   {
+    "type": "Movement",
+    "frames": [
+     110,
+     116
+    ],
+    "flags": "0x1",
+    "per_frame_m": [
+     0.0,
+     0.0,
+     -0.2
+    ],
+    "drag": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "note": "-Z is forward (XV2 faces -Z; Core Breaker's dive (0, -1, -1.1) is forward)"
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     112,
+     116
+    ],
+    "bdm": 20,
+    "bdm_file": "Common (CMN.bdm)",
+    "hitbox_flags": "0x0",
+    "damage": 20,
+    "damage_when_blocked": 1,
+    "stamina_taken_when_blocked": 18,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     0.5,
+     -0.75
+    ],
+    "size_m": 0.75
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     114,
+     115
+    ],
+    "eye_movement": [
+     0,
+     0,
+     1,
+     7,
+     4,
+     0,
+     20,
+     0,
+     26214,
+     16166,
+     0,
+     16128
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     118,
+     119
+    ],
+    "eye_movement": [
+     0,
+     0,
+     7,
+     1,
+     3,
+     0,
+     50,
+     0,
+     0,
+     16128,
+     13107,
+     16179
+    ]
+   },
+   {
+    "type": "BcmCallback",
+    "frames": [
+     122,
+     144
+    ],
+    "link": [
+     "Movement",
+     "Guard",
+     "FlyingAndStepDash"
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     145,
+     146
+    ],
+    "eye_movement": [
+     0,
+     0,
+     1,
+     4,
+     8,
+     0,
+     20,
+     0,
+     13107,
+     16179,
+     0,
+     16256
+    ]
+   }
+  ],
+  "2": [],
+  "3": [],
+  "4": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     32
+    ],
+    "ean": 10,
+    "index": 16,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": []
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     55
+    ],
+    "ean": "skill",
+    "index": 1,
+    "src": [
+     0,
+     113
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     32
+    ],
+    "ean": 11,
+    "index": 16,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Invulnerability",
+    "frames": [
+     0,
+     19
+    ],
+    "invulnerability": "All Attacks Miss"
+   },
+   {
+    "type": "Functions",
+    "frames": [
+     0,
+     50
+    ],
+    "function": "0x17 Recover Health (instant) [XV2-Tools name; params all 0 here]",
+    "params": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     0,
+     1
+    ],
+    "eye_movement": [
+     0,
+     0,
+     4,
+     4,
+     1,
+     0,
+     1,
+     0,
+     0,
+     16256,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     1,
+     2
+    ],
+    "eepk": "Stage BG (the stage's own)",
+    "id": 20,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     1,
+     2
+    ],
+    "acb": "character voice",
+    "cue": 57
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     1,
+     2
+    ],
+    "acb": "skill SE",
+    "cue": 0
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     1,
+     2
+    ],
+    "eye_movement": [
+     0,
+     0,
+     4,
+     1,
+     3,
+     0,
+     50,
+     0,
+     0,
+     16256,
+     52429,
+     16204
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     7,
+     8
+    ],
+    "eye_movement": [
+     0,
+     0,
+     1,
+     2,
+     3,
+     0,
+     100,
+     0,
+     52429,
+     16204,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     20,
+     21
+    ],
+    "eye_movement": [
+     0,
+     0,
+     2,
+     0,
+     2,
+     0,
+     30,
+     0,
+     0,
+     16256,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     24,
+     25
+    ],
+    "eye_movement": [
+     0,
+     0,
+     0,
+     2,
+     2,
+     0,
+     100,
+     0,
+     0,
+     16256,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     31,
+     32
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 26,
+    "bone": "b_C_Pelvis",
+    "off": false
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     32,
+     113
+    ],
+    "ean": 10,
+    "index": 13,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": []
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     32,
+     113
+    ],
+    "ean": 11,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Functions",
+    "frames": [
+     32,
+     55
+    ],
+    "function": "0x22 BAC Loop (instant end)",
+    "params": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "type": "BcmCallback",
+    "frames": [
+     50,
+     55
+    ],
+    "link": [
+     "DisableKiBlastLink",
+     "Supers"
+    ]
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     53,
+     54
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 26,
+    "bone": "b_C_Pelvis",
+    "off": false
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     55,
+     113
+    ],
+    "ean": "skill",
+    "index": 1,
+    "src": [
+     112,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     55,
+     56
+    ],
+    "eye_movement": [
+     0,
+     0,
+     2,
+     7,
+     2,
+     0,
+     50,
+     0,
+     0,
+     16256,
+     0,
+     16128
+    ]
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     56,
+     57
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 26,
+    "bone": "b_C_Base",
+    "off": true
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     57,
+     64
+    ],
+    "strength": 1.0,
+    "flags": [
+     "TrackForwardAndBackwards"
+    ]
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     58,
+     59
+    ],
+    "acb": "skill SE",
+    "cue": 1
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     64,
+     71
+    ],
+    "strength": 1.0,
+    "flags": []
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     70,
+     71
+    ],
+    "eye_movement": [
+     0,
+     0,
+     7,
+     1,
+     3,
+     0,
+     50,
+     0,
+     0,
+     16128,
+     26214,
+     16166
+    ]
+   },
+   {
+    "type": "Movement",
+    "frames": [
+     73,
+     79
+    ],
+    "flags": "0x1",
+    "per_frame_m": [
+     0.0,
+     0.0,
+     -0.2
+    ],
+    "drag": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "note": "-Z is forward (XV2 faces -Z; Core Breaker's dive (0, -1, -1.1) is forward)"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     73,
+     74
+    ],
+    "acb": "character voice",
+    "cue": 51
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     75,
+     79
+    ],
+    "bdm": 20,
+    "bdm_file": "Common (CMN.bdm)",
+    "hitbox_flags": "0x0",
+    "damage": 20,
+    "damage_when_blocked": 2,
+    "stamina_taken_when_blocked": 18,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     0.5,
+     -0.75
+    ],
+    "size_m": 0.75
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     77,
+     78
+    ],
+    "eye_movement": [
+     0,
+     0,
+     1,
+     7,
+     4,
+     0,
+     20,
+     0,
+     26214,
+     16166,
+     0,
+     16128
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     81,
+     82
+    ],
+    "eye_movement": [
+     0,
+     0,
+     7,
+     1,
+     3,
+     0,
+     50,
+     0,
+     0,
+     16128,
+     13107,
+     16179
+    ]
+   },
+   {
+    "type": "BcmCallback",
+    "frames": [
+     91,
+     113
+    ],
+    "link": [
+     "Movement",
+     "Guard",
+     "FlyingAndStepDash"
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     108,
+     109
+    ],
+    "eye_movement": [
+     0,
+     0,
+     1,
+     4,
+     8,
+     0,
+     20,
+     0,
+     13107,
+     16179,
+     0,
+     16256
+    ]
+   }
+  ],
+  "5": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     32
+    ],
+    "ean": 10,
+    "index": 16,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": []
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     108
+    ],
+    "ean": "skill",
+    "index": 1,
+    "src": [
+     50,
+     173
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Z",
+     "ContinueFromLast"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     32
+    ],
+    "ean": 11,
+    "index": 16,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Invulnerability",
+    "frames": [
+     0,
+     32
+    ],
+    "invulnerability": "All Attacks Miss"
+   },
+   {
+    "type": "Functions",
+    "frames": [
+     0,
+     92
+    ],
+    "function": "0x17 Recover Health (instant) [XV2-Tools name; params all 0 here]",
+    "params": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     32,
+     109
+    ],
+    "ean": 10,
+    "index": 13,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": []
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     32,
+     92
+    ],
+    "ean": 11,
+    "index": 13,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Functions",
+    "frames": [
+     50,
+     108
+    ],
+    "function": "0x22 BAC Loop (instant end)",
+    "params": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     92,
+     173
+    ],
+    "ean": 11,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     108,
+     173
+    ],
+    "ean": "skill",
+    "index": 1,
+    "src": [
+     110,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     109,
+     173
+    ],
+    "ean": 10,
+    "index": 18,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": []
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     110,
+     111
+    ],
+    "eye_movement": [
+     0,
+     0,
+     2,
+     2,
+     1,
+     0,
+     1,
+     0,
+     0,
+     16256,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     111,
+     112
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 26,
+    "bone": "b_C_Base",
+    "off": true
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     111,
+     112
+    ],
+    "eye_movement": [
+     0,
+     0,
+     2,
+     7,
+     2,
+     0,
+     50,
+     0,
+     0,
+     16256,
+     0,
+     16128
+    ]
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     112,
+     119
+    ],
+    "strength": 1.0,
+    "flags": [
+     "TrackForwardAndBackwards"
+    ]
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     113,
+     114
+    ],
+    "acb": "skill SE",
+    "cue": 1
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     119,
+     126
+    ],
+    "strength": 1.0,
+    "flags": []
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     124,
+     125
+    ],
+    "eye_movement": [
+     0,
+     0,
+     7,
+     1,
+     3,
+     0,
+     50,
+     0,
+     0,
+     16128,
+     26214,
+     16166
+    ]
+   },
+   {
+    "type": "Movement",
+    "frames": [
+     128,
+     134
+    ],
+    "flags": "0x1",
+    "per_frame_m": [
+     0.0,
+     0.0,
+     -0.2
+    ],
+    "drag": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "note": "-Z is forward (XV2 faces -Z; Core Breaker's dive (0, -1, -1.1) is forward)"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     128,
+     129
+    ],
+    "acb": "character voice",
+    "cue": 51
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     130,
+     134
+    ],
+    "bdm": 20,
+    "bdm_file": "Common (CMN.bdm)",
+    "hitbox_flags": "0x0",
+    "damage": 20,
+    "damage_when_blocked": 2,
+    "stamina_taken_when_blocked": 18,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     0.5,
+     -0.75
+    ],
+    "size_m": 0.75
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     132,
+     133
+    ],
+    "eye_movement": [
+     0,
+     0,
+     1,
+     7,
+     4,
+     0,
+     20,
+     0,
+     26214,
+     16166,
+     0,
+     16128
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     136,
+     137
+    ],
+    "eye_movement": [
+     0,
+     0,
+     7,
+     1,
+     3,
+     0,
+     50,
+     0,
+     0,
+     16128,
+     13107,
+     16179
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     163,
+     164
+    ],
+    "eye_movement": [
+     0,
+     0,
+     1,
+     4,
+     8,
+     0,
+     20,
+     0,
+     13107,
+     16179,
+     0,
+     16256
+    ]
+   }
+  ],
+  "6": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     32
+    ],
+    "ean": 10,
+    "index": 16,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": []
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     177
+    ],
+    "ean": "skill",
+    "index": 1,
+    "src": [
+     112,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     32
+    ],
+    "ean": 11,
+    "index": 16,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     32,
+     92
+    ],
+    "ean": 10,
+    "index": 13,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": []
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     32,
+     92
+    ],
+    "ean": 11,
+    "index": 13,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     92,
+     157
+    ],
+    "ean": 11,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     92,
+     157
+    ],
+    "ean": 10,
+    "index": 18,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": []
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     112,
+     113
+    ],
+    "eye_movement": [
+     0,
+     0,
+     2,
+     2,
+     1,
+     0,
+     1,
+     0,
+     0,
+     16256,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     113,
+     114
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 26,
+    "bone": "b_C_Base",
+    "off": true
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     113,
+     114
+    ],
+    "eye_movement": [
+     0,
+     0,
+     2,
+     7,
+     2,
+     0,
+     50,
+     0,
+     0,
+     16256,
+     0,
+     16128
+    ]
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     114,
+     121
+    ],
+    "strength": 1.0,
+    "flags": [
+     "TrackForwardAndBackwards"
+    ]
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     121,
+     128
+    ],
+    "strength": 1.0,
+    "flags": []
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     126,
+     127
+    ],
+    "eye_movement": [
+     0,
+     0,
+     7,
+     1,
+     3,
+     0,
+     50,
+     0,
+     0,
+     16128,
+     26214,
+     16166
+    ]
+   },
+   {
+    "type": "Movement",
+    "frames": [
+     130,
+     136
+    ],
+    "flags": "0x1",
+    "per_frame_m": [
+     0.0,
+     0.0,
+     -0.2
+    ],
+    "drag": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "note": "-Z is forward (XV2 faces -Z; Core Breaker's dive (0, -1, -1.1) is forward)"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     130,
+     131
+    ],
+    "acb": "character voice",
+    "cue": 51
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     132,
+     136
+    ],
+    "bdm": 20,
+    "bdm_file": "Common (CMN.bdm)",
+    "hitbox_flags": "0x0",
+    "damage": 20,
+    "damage_when_blocked": 1,
+    "stamina_taken_when_blocked": 18,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     0.5,
+     -0.75
+    ],
+    "size_m": 0.75
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     134,
+     135
+    ],
+    "eye_movement": [
+     0,
+     0,
+     1,
+     7,
+     4,
+     0,
+     20,
+     0,
+     26214,
+     16166,
+     0,
+     16128
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     138,
+     139
+    ],
+    "eye_movement": [
+     0,
+     0,
+     7,
+     1,
+     3,
+     0,
+     50,
+     0,
+     0,
+     16128,
+     13107,
+     16179
+    ]
+   },
+   {
+    "type": "BcmCallback",
+    "frames": [
+     142,
+     164
+    ],
+    "link": [
+     "Movement",
+     "Guard",
+     "FlyingAndStepDash"
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     165,
+     166
+    ],
+    "eye_movement": [
+     0,
+     0,
+     1,
+     4,
+     8,
+     0,
+     20,
+     0,
+     13107,
+     16179,
+     0,
+     16256
+    ]
+   }
+  ]
+ },
+ "animations": [
+  {
+   "index": 0,
+   "name": "YMC_SPA_DIE_C",
+   "frames": 158
+  },
+  {
+   "index": 1,
+   "name": "YMC_SPA_DIE_C_S",
+   "frames": 178
+  }
+ ],
+ "user_root": {
+  "note": "b_C_Base, metres, smash axes (+Z his facing, +Y up). BAC animation flags 5 = MoveWithAxis X + Z: its X / Z move him, its Y does not",
+  "#0": [
+   [
+    0,
+    -0.002,
+    0.076,
+    0.031
+   ],
+   [
+    2,
+    -0.01,
+    0.402,
+    -0.222
+   ],
+   [
+    4,
+    -0.021,
+    0.539,
+    -0.373
+   ],
+   [
+    6,
+    -0.045,
+    0.595,
+    -0.498
+   ],
+   [
+    8,
+    -0.085,
+    0.602,
+    -0.609
+   ],
+   [
+    10,
+    -0.137,
+    0.604,
+    -0.709
+   ],
+   [
+    12,
+    -0.191,
+    0.57,
+    -0.799
+   ],
+   [
+    14,
+    -0.236,
+    0.465,
+    -0.883
+   ],
+   [
+    16,
+    -0.266,
+    0.258,
+    -0.967
+   ],
+   [
+    18,
+    -0.277,
+    0.0,
+    -1.062
+   ],
+   [
+    20,
+    -0.255,
+    0.0,
+    -1.088
+   ],
+   [
+    22,
+    -0.207,
+    0.0,
+    -1.118
+   ],
+   [
+    24,
+    -0.164,
+    0.0,
+    -1.135
+   ],
+   [
+    26,
+    -0.147,
+    0.0,
+    -1.14
+   ],
+   [
+    28,
+    -0.146,
+    0.0,
+    -1.14
+   ],
+   [
+    30,
+    -0.145,
+    0.0,
+    -1.14
+   ],
+   [
+    32,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    34,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    36,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    38,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    40,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    42,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    44,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    46,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    48,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    50,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    52,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    54,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    56,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    58,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    60,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    62,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    64,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    66,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    68,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    70,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    72,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    74,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    76,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    78,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    80,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    82,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    84,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    86,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    88,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    90,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    92,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    94,
+    -0.136,
+    0.0,
+    -1.143
+   ],
+   [
+    96,
+    -0.114,
+    0.0,
+    -1.153
+   ],
+   [
+    98,
+    -0.088,
+    0.0,
+    -1.172
+   ],
+   [
+    100,
+    -0.074,
+    0.0,
+    -1.202
+   ],
+   [
+    102,
+    -0.073,
+    0.0,
+    -1.248
+   ],
+   [
+    104,
+    -0.073,
+    0.0,
+    -1.308
+   ],
+   [
+    106,
+    -0.074,
+    0.0,
+    -1.374
+   ],
+   [
+    108,
+    -0.075,
+    0.0,
+    -1.438
+   ],
+   [
+    110,
+    -0.075,
+    0.121,
+    -1.372
+   ],
+   [
+    112,
+    -0.075,
+    0.325,
+    -1.188
+   ],
+   [
+    114,
+    -0.075,
+    0.361,
+    -0.9
+   ],
+   [
+    116,
+    -0.075,
+    0.302,
+    -0.593
+   ],
+   [
+    118,
+    -0.076,
+    0.188,
+    -0.334
+   ],
+   [
+    120,
+    -0.079,
+    0.03,
+    -0.359
+   ],
+   [
+    122,
+    -0.078,
+    0.0,
+    -0.422
+   ],
+   [
+    124,
+    -0.078,
+    0.0,
+    -0.445
+   ],
+   [
+    126,
+    -0.078,
+    0.0,
+    -0.446
+   ],
+   [
+    128,
+    -0.078,
+    0.0,
+    -0.446
+   ],
+   [
+    130,
+    -0.078,
+    0.0,
+    -0.446
+   ],
+   [
+    132,
+    -0.078,
+    0.0,
+    -0.446
+   ],
+   [
+    134,
+    -0.078,
+    0.0,
+    -0.445
+   ],
+   [
+    136,
+    -0.078,
+    0.0,
+    -0.444
+   ],
+   [
+    138,
+    -0.078,
+    0.0,
+    -0.443
+   ],
+   [
+    140,
+    -0.078,
+    0.0,
+    -0.441
+   ],
+   [
+    142,
+    -0.078,
+    0.0,
+    -0.439
+   ],
+   [
+    144,
+    -0.08,
+    0.0,
+    -0.404
+   ],
+   [
+    146,
+    -0.084,
+    0.0,
+    -0.324
+   ],
+   [
+    148,
+    -0.088,
+    0.0,
+    -0.225
+   ],
+   [
+    150,
+    -0.09,
+    0.0,
+    -0.13
+   ],
+   [
+    152,
+    -0.106,
+    0.0,
+    -0.062
+   ],
+   [
+    154,
+    -0.135,
+    0.0,
+    -0.021
+   ],
+   [
+    156,
+    -0.158,
+    0.0,
+    -0.002
+   ]
+  ],
+  "#1": [
+   [
+    0,
+    -0.002,
+    0.076,
+    0.031
+   ],
+   [
+    2,
+    -0.01,
+    0.402,
+    -0.222
+   ],
+   [
+    4,
+    -0.021,
+    0.54,
+    -0.374
+   ],
+   [
+    6,
+    -0.045,
+    0.595,
+    -0.498
+   ],
+   [
+    8,
+    -0.085,
+    0.602,
+    -0.608
+   ],
+   [
+    10,
+    -0.137,
+    0.604,
+    -0.709
+   ],
+   [
+    12,
+    -0.191,
+    0.571,
+    -0.799
+   ],
+   [
+    14,
+    -0.236,
+    0.465,
+    -0.883
+   ],
+   [
+    16,
+    -0.266,
+    0.258,
+    -0.967
+   ],
+   [
+    18,
+    -0.277,
+    0.0,
+    -1.062
+   ],
+   [
+    20,
+    -0.255,
+    0.0,
+    -1.088
+   ],
+   [
+    22,
+    -0.207,
+    0.0,
+    -1.118
+   ],
+   [
+    24,
+    -0.164,
+    0.0,
+    -1.135
+   ],
+   [
+    26,
+    -0.147,
+    0.0,
+    -1.14
+   ],
+   [
+    28,
+    -0.147,
+    0.0,
+    -1.14
+   ],
+   [
+    30,
+    -0.146,
+    0.0,
+    -1.14
+   ],
+   [
+    32,
+    -0.146,
+    0.0,
+    -1.14
+   ],
+   [
+    34,
+    -0.146,
+    0.0,
+    -1.14
+   ],
+   [
+    36,
+    -0.146,
+    0.0,
+    -1.14
+   ],
+   [
+    38,
+    -0.145,
+    0.0,
+    -1.14
+   ],
+   [
+    40,
+    -0.145,
+    0.0,
+    -1.14
+   ],
+   [
+    42,
+    -0.145,
+    0.0,
+    -1.14
+   ],
+   [
+    44,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    46,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    48,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    50,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    52,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    54,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    56,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    58,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    60,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    62,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    64,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    66,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    68,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    70,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    72,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    74,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    76,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    78,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    80,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    82,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    84,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    86,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    88,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    90,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    92,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    94,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    96,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    98,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    100,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    102,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    104,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    106,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    108,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    110,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    112,
+    -0.144,
+    0.0,
+    -1.14
+   ],
+   [
+    114,
+    -0.136,
+    0.0,
+    -1.143
+   ],
+   [
+    116,
+    -0.114,
+    0.0,
+    -1.153
+   ],
+   [
+    118,
+    -0.088,
+    0.0,
+    -1.172
+   ],
+   [
+    120,
+    -0.074,
+    0.0,
+    -1.203
+   ],
+   [
+    122,
+    -0.073,
+    0.0,
+    -1.248
+   ],
+   [
+    124,
+    -0.073,
+    0.0,
+    -1.308
+   ],
+   [
+    126,
+    -0.074,
+    0.0,
+    -1.374
+   ],
+   [
+    128,
+    -0.075,
+    0.0,
+    -1.438
+   ],
+   [
+    130,
+    -0.075,
+    0.121,
+    -1.372
+   ],
+   [
+    132,
+    -0.075,
+    0.325,
+    -1.163
+   ],
+   [
+    134,
+    -0.075,
+    0.361,
+    -0.9
+   ],
+   [
+    136,
+    -0.075,
+    0.302,
+    -0.582
+   ],
+   [
+    138,
+    -0.076,
+    0.188,
+    -0.351
+   ],
+   [
+    140,
+    -0.079,
+    0.03,
+    -0.361
+   ],
+   [
+    142,
+    -0.078,
+    0.0,
+    -0.422
+   ],
+   [
+    144,
+    -0.078,
+    0.0,
+    -0.445
+   ],
+   [
+    146,
+    -0.078,
+    0.0,
+    -0.446
+   ],
+   [
+    148,
+    -0.078,
+    0.0,
+    -0.446
+   ],
+   [
+    150,
+    -0.078,
+    0.0,
+    -0.446
+   ],
+   [
+    152,
+    -0.078,
+    0.0,
+    -0.446
+   ],
+   [
+    154,
+    -0.078,
+    0.0,
+    -0.445
+   ],
+   [
+    156,
+    -0.078,
+    0.0,
+    -0.444
+   ],
+   [
+    158,
+    -0.078,
+    0.0,
+    -0.443
+   ],
+   [
+    160,
+    -0.078,
+    0.0,
+    -0.441
+   ],
+   [
+    162,
+    -0.078,
+    0.0,
+    -0.439
+   ],
+   [
+    164,
+    -0.08,
+    0.0,
+    -0.428
+   ],
+   [
+    166,
+    -0.083,
+    0.0,
+    -0.405
+   ],
+   [
+    168,
+    -0.086,
+    0.0,
+    -0.375
+   ],
+   [
+    170,
+    -0.085,
+    0.0,
+    -0.34
+   ],
+   [
+    172,
+    -0.083,
+    0.0,
+    -0.307
+   ],
+   [
+    174,
+    -0.078,
+    0.0,
+    -0.281
+   ],
+   [
+    176,
+    -0.075,
+    0.0,
+    -0.266
+   ]
+  ]
+ },
+ "bdm": {
+  "20": {
+   "id": 20,
+   "sub0": {
+    "DamageType": 3,
+    "DamageAmount": 0,
+    "AcbType": 0,
+    "CueId": -1,
+    "Effect1_ID": 2,
+    "Effect1_EepkType": 0,
+    "Effect2_ID": -1,
+    "Effect2_EepkType": 0,
+    "Effect3_ID": -1,
+    "Effect3_EepkType": 0,
+    "PushbackStrength": 0.25,
+    "PushbackAcceleration": 0.7,
+    "UserStun": 9,
+    "VictimStun": 9,
+    "KnockbackDuration": 30,
+    "KnockbackRecoveryAfterImpactTime": 0,
+    "KnockbackGroundImpactTime": 0,
+    "KnockbackStrengthX": 0.0,
+    "KnockbackStrengthY": 0.1,
+    "KnockbackStrengthZ": 0.04,
+    "KnockbackDragY": 0.0,
+    "KnockbackGravityTime": 0,
+    "VictimInvincibilityTime": 4,
+    "AlimentType": 0,
+    "DamageSpecial": 0,
+    "StumbleType": 160,
+    "DamageSecondaryType": 0,
+    "CameraShakeTime": 0,
+    "UserBpeID": -1,
+    "VictimBpeID": -1,
+    "StaminaBrokenOverrideBdmId": -1,
+    "ZVanishEnableTime": 0,
+    "UserAnimationTime": 0,
+    "VictimAnimationTime": 0,
+    "UserAnimationSpeed": 0.0,
+    "VictimAnimationSpeed": 0.0
+   },
+   "other_subs_differ": {
+    "2": {
+     "DamageType": 7,
+     "KnockbackDuration": 32,
+     "KnockbackRecoveryAfterImpactTime": 32,
+     "KnockbackGroundImpactTime": 32,
+     "KnockbackStrengthY": 0.0,
+     "KnockbackStrengthZ": 0.048,
+     "KnockbackGravityTime": 32,
+     "ZVanishEnableTime": 4
+    },
+    "4": {
+     "DamageType": 5
+    },
+    "5": {
+     "DamageType": 1,
+     "Effect1_ID": 21,
+     "KnockbackDuration": 0,
+     "KnockbackStrengthY": 0.0,
+     "KnockbackStrengthZ": 0.0,
+     "StumbleType": 0
+    },
+    "6": {
+     "Effect1_ID": 1,
+     "KnockbackDuration": 0
+    }
+   }
+  }
+ },
+ "btl_cmn_26": [
+  {
+   "AssetType": "PBIND",
+   "AttachementType": "Bone",
+   "Orientation": "None",
+   "Deactivation": "LoopCancel",
+   "ESK": "b_C_Pelvis",
+   "ScaleMin": 1.0,
+   "ScaleMax": 1.0,
+   "Position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "Files": [
+    "Btl_RvlRingON.emp"
+   ],
+   "Flags1_names": [
+    "PositionUpdate",
+    "InstantUpdate",
+    "UseScreenCenterToBoneDirection"
+   ]
+  }
+ ]
+}
