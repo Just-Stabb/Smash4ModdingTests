@@ -38366,7 +38366,7 @@ void gf_tick()
 //   1 the hover   from CB_HOVER_FROM: still (speed, gravity 0); he can turn (B-reverse, the stick back); no armor
 //   2 the dive    from CB_DIVE_FROM: CB_DIVE_V a frame, cb_ang below level (CB_DIVE_DEG, light homing within
 //                 CB_HOME_MAX of it, cb_steer); super armor; ledges grabbed (func_56); landing -> 5; the catch
-//                 (v4: the MSC's cb_dive_catch; the hover's detection box: the game script's) -> 3 / 8; a wall ahead or a ceiling -> FallSpecial. v3 (user: "make the Core Breaker dive
+//                 (v4: the MSC's; v9: the hover's detection box's too, the same cb_try_catch) -> 3 / 8; a wall ahead or a ceiling -> FallSpecial. v3 (user: "make the Core Breaker dive
 //                 continue until either landing or something (unless KOd)"): nothing else ends it (no frame limit, no
 //                 floor; the motion's dive loop looped: CB_DIVE_LAST back by CB_DIVE_LOOP)
 //   3 the hold    an airborne victim held at his fist (cb_hold: its offsets, hitstun, hitstop, no stage collision,
@@ -38406,6 +38406,7 @@ int cb_my_gseen;
 int cb_under;           // v7: caught from below / at a ledge: the victim held where it was caught, no drive down
 float cb_ox;            // v7: its offset then (forward, up)
 float cb_oy;
+int cb_hcheck;          // v9: the hover's detection box checked (0 on; 1 refused / done)
 int cb_shielded;        // v8: his dive's hit on a shield handled (once a move)
 int cb_burns;           // v6: the hold's burn hits he has taken his own damage for
 int cb_gseen;           // v6: the slots seen on the ground this hover / dive (their ground's height: New_Var CB_GY0 + slot)
@@ -38819,6 +38820,12 @@ void cb_gtrack()
 // the hover's start: from the rise (up special again in its cancel window) or the second up special (cb_init)
 void cb_hover_start()
 {
+    // v9 (user: "It becomes invulnerable during the hover and ending if the leap isn't cancelled into the hover/dive"):
+    // the attack's hit flag cleared here, at the up special's press, before the detection box comes out (frame 30): a
+    // hit from before the hover (an aerial out of Fall) left the "since the start" flag set, and v3-v8's game-script
+    // check (Hit_Check When 0 at 31-33) took it for a catch (invincible, the last fighter hit held)
+    AttackModule(0x2724);
+    cb_hcheck = 0;
     WorkModule(0, 2.0f, CB_USED);
     cb_gtrack();
     cb_set_ph(0x1);
@@ -38835,7 +38842,17 @@ int cb_hover_phase(float fr)
     cb_gtrack();
     cb_speed(0.0f, 0.0f);
     KineticModule(0x14, 0x1, 0.0f);
-    // v3: the detection box at the hover's start caught someone (the game script: cb 3): straight to the hold
+    // v3: the detection box at the hover's start (the game script, frames 30-31) caught someone: straight to the hold.
+    // v9: its check is the MSC's, the dive's own (cb_try_catch: the hit flag since the hover's start, the fighter, its
+    // slot, the refusals), on the box's frames and a few after (its hit can reach the flag a frame late)
+    if (cb_hcheck == 0 && fr <= CB_HOVER_FROM + 3.0f + 0.01f)
+    {
+        if (cb_try_catch() == 0x1)
+        {
+            cb_catch();
+            return 0;
+        }
+    }
     if (WorkModuleF(0, CB_VAR) > 2.5f && WorkModuleF(0, CB_VAR) < 3.5f)
     {
         cb_catch();
@@ -38912,7 +38929,7 @@ void cb_steer()
             dy = WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) - y;
             d2 = dx * dx + dy * dy;
             st = WorkModuleF(0, 0x0f0000a2 + 8 * (s + 2));
-            if (dx > 0.0f && dy < 0.0f && d2 <= CB_HOME_D2 && (st < CB_DOWN_LO || st > CB_DOWN_HI))
+            if (dx > 0.0f && dy < 0.0f && d2 <= CB_HOME_D2)
             {
                 ta = MathF(0x1, -dy, dx) * 57.29578f;
                 if (ta > cb_ang - CB_HOME_CONE && ta < cb_ang + CB_HOME_CONE && (best < 0.0f || d2 < bd))
@@ -38988,7 +39005,7 @@ int cb_dive_phase(float fr)
     }
     // v4 (user: "The catch doesn't happen anymore on the dive unless the point-blank detection box is hit"): the
     // dive's catch from here, every frame, before the landing (the hit and the touch-down can come together)
-    if (cb_dive_catch() == 0x1)
+    if (cb_try_catch() == 0x1)
     {
         cb_catch();
         return 0;
@@ -39135,13 +39152,16 @@ int cb_near_slot()
     return best;
 }
 
-int cb_dive_catch()
+// v9: one catch for the hover's box and the dive (the user: "Core Breaker should be able to hit downed opponents"):
+// fighters lying down are caught by both; shields, a shield break, invincible / intangible fighters by neither (a
+// refusal: the dive goes on without its hitboxes, the hover's box stops checking)
+int cb_try_catch()
 {
     float st;
     int s;
     int t;
     int found;
-    if (cb_refused != 0)
+    if (cb_refused != 0 || (cb_ph == 0x1 && cb_hcheck != 0))
     {
         return 0;
     }
@@ -39157,10 +39177,17 @@ int cb_dive_catch()
     {
         return 0;
     }
-    if ((st >= CB_DOWN_LO && st <= CB_DOWN_HI) || st == CB_DOWN_FURAFURA || WorkModuleF(0, 0x0F00015B) != 0.0f)
+    if (WorkModuleF(0, 0x0F00015B) != 0.0f)
     {
-        cb_refused = 0x1;
-        AttackModule(0x2719);
+        if (cb_ph == 0x1)
+        {
+            cb_hcheck = 0x1;
+        }
+        else
+        {
+            cb_refused = 0x1;
+            AttackModule(0x2719);
+        }
         return 0;
     }
     found = 0;
@@ -39189,7 +39216,6 @@ int cb_dive_catch()
     }
     WorkModule(0, (float)found, CB_V_SLOT);
     WorkModule(0, 3.0f, CB_VAR);
-    WorkModule(0, CB_INV_STEP, 0x0F00011C);
     AttackModule(0x2719);
     return 0x1;
 }
@@ -39315,6 +39341,7 @@ void cb_catch()
     // ledge. Already below it at the catch (under the stage): the drive's first frame is the explosion, where they are
     cb_floor = cb_floor_at(WorkModuleF(0, 0x0f000001));
     cb_inv = 0x1;
+    WorkModule(0, CB_INV_STEP, 0x0F00011C);     // v9: the only first write, here, on a catch with a victim
     cb_burns = 0;
     // v7 (user: "If the move hits an opponent at a ledge / near a ledge with Supamario under them, it drags both
     // characters under the ledge"): a fighter more than CB_UNDER above his feet, or on a ledge (its situation 1 / a
@@ -39337,7 +39364,7 @@ void cb_catch()
         WorkModule(0, CB_HOLD_STATUS, 0x0F0000A2 + 8 * cb_t());
     }
     SoundModule(0x2714, CB_SND_RUSH);
-    // the hold: invincible (the game script's Body_State_Set / cb_dive_catch's INVINCIBLE), no armor needed; any end
+    // the hold: invincible (v9: written only here and renewed while holding), no armor needed; any end
     // of the status lets the victim go (cb_end -> cb_release)
     cb_armor(0);
     cb_aircap(0);
@@ -39622,7 +39649,7 @@ int cb_update()
     // drive, the hold on the ground, the crash / the explosion until the victim is let go), so it runs out within
     // CB_INV_STEP frames of the release whatever the game does with a write of 0 (v5-v6 set 187 frames at the catch
     // and cleared it with 0 at the status's end)
-    if (cb_ph >= 0x3 && cb_ph != 0x5 && cb_handed == 0 && cb_slot != 0)
+    if (cb_ph >= 0x3 && cb_ph != 0x5 && cb_handed == 0 && cb_slot != 0 && cb_inv != 0)
     {
         WorkModule(0, CB_INV_STEP, 0x0F00011C);
     }

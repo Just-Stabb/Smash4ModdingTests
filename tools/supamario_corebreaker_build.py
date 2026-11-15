@@ -285,26 +285,15 @@ def game_script():
     blocks.append((DIVE_FROM, [cmd('allow/disallow_ledgegrab', 1)] + cb_in(1, 2, [
                                hitbox(ID=0, Bone=0, Damage=CATCH_DMG, BKB=20, Size=HB['catch'][1], Y=FIST[1], Z=FIST[0],
                                       HitstopFrames=CATCH_FREEZE, SelfHitstopFrames=CATCH_FREEZE,
-                                      **{'Ground/Air': NO_DOWN | 3}),
+                                      **{'Ground/Air': 3}),
                                hitbox(ID=1, Bone=0, Damage=CATCH_DMG, BKB=20, Size=4.5, Y=5.3, Z=2.0,
                                       HitstopFrames=CATCH_FREEZE, SelfHitstopFrames=CATCH_FREEZE,
-                                      **{'Ground/Air': NO_DOWN | 3})])))
-    # the catch, checked every dive frame while diving (cb 2): a fighter's body (Hit_Check kinds 2: not a shield),
-    # not lying down (LASTHIT_STATUS), not invincible / intangible (LASTHIT_BODY 0); a refused one ends the checks
-    # (cb 2.25: the MSC dives on)
-    def catch_check(refused, downed=False):
-        take = [setf(3, CB_VAR), cmd('target_slot_get', 2, CB_V_SLOT), cmd('remove_all_hitboxes'),
-                cmd('body_state_set', 0, 1, INV_STEP + 1)]     # v7: a few frames; the MSC renews it while holding
-        ok = [setf(1, 0x0F000380 + 0x22)]
-        if not downed:              # the dive: not a fighter lying down (v3's hover box: yes, the user)
-            ok += if_(LASTHIT_STATUS, 3, DOWN_LO, if_(LASTHIT_STATUS, 2, DOWN_HI, [setf(0, 0x0F000380 + 0x22)]))
-            ok += if_(LASTHIT_STATUS, 0, DOWN_FURAFURA, [setf(0, 0x0F000380 + 0x22)])
-        ok += if_(LASTHIT_BODY, 1, 0, [setf(0, 0x0F000380 + 0x22)])
-        # v8: never a fighter in a shield status (GuardOn .. GuardDamage)
-        ok += if_(LASTHIT_STATUS, 3, 0x1B, if_(LASTHIT_STATUS, 2, 0x1E, [setf(0, 0x0F000380 + 0x22)]))
-        ok += if_(0x0F000380 + 0x22, 0, 1, take)
-        ok += if_(0x0F000380 + 0x22, 0, 0, [setf(refused, CB_VAR), cmd('remove_all_hitboxes')])
-        return [cmd('hit_check', 0, 0, 2), cmd('true', 2 + size(ok))] + ok
+                                      **{'Ground/Air': 3})])))
+    # v9 (user: "Core Breaker should be able to hit downed opponents as specified previously"): the dive's boxes hit
+    # fighters lying down too (Ground/Air 3, no bit 31 since v9)
+    # v9: no catch checks in the game script at all: both catches (the hover's box, the dive) are the MSC's cb_try_catch
+    # (his attack's hit flag, the fighter, its slot, the refusals); v3-v8's Hit_Check (When 0: "since the start") here
+    # took a hit from before the hover for a catch, with Body_State_Set's invincibility
     # v4: the dive's catch is the MSC's (cb_dive_catch: his attack's hit result each frame); v3's loop of per-frame
     # Hit_Checks here lost it in game (user: "The catch doesn't happen anymore on the dive unless the point-blank
     # detection box is hit")
@@ -315,13 +304,11 @@ def game_script():
     # hold; refused (cb 1.25) -> the hover goes on
     # (user: "The detection box for Core Breaker should be able to hit a downed opponent": Ground/Air 3, no bit 31,
     # no down-status refusal; shields, invincible and intangible fighters still aren't caught)
-    blocks.append((HOVER_FROM, if_(CB_VAR, 0, 1, [hitbox(
+    # v9: Hit_Reset before the box (the MSC's cb_hover_start clears the flag too, at the press)
+    blocks.append((HOVER_FROM, if_(CB_VAR, 0, 1, [cmd('hit_reset'), hitbox(
         ID=0, Bone=0, Damage=CATCH_DMG, BKB=20, Size=DETECT_SIZE, Y=DETECT_AT[1], Z=DETECT_AT[0],
         HitstopFrames=CATCH_FREEZE, SelfHitstopFrames=CATCH_FREEZE, **{'Ground/Air': 3})])))
     blocks.append((HOVER_FROM + 2, [cmd('remove_all_hitboxes')]))
-    det = catch_check(1.25, downed=True)
-    for f in range(HOVER_FROM + 1, HOVER_FROM + 4):
-        blocks.append((f, if_(CB_VAR, 0, 1, det)))
     # the dive starts with a clean hit record (a refused detection hit can't catch later)
     blocks.insert(0, (DIVE_FROM, [cmd('hit_reset'), cmd('hit_log_clear', 0)]))   # before the dive's hitboxes
     # every later segment starts with no hitboxes (the dive's gone)

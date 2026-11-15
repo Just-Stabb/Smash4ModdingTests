@@ -2458,3 +2458,49 @@ the case by keeping the hold running). Repeats are counted per Supamario (his Ne
 
 **Not confirmed in game:** the ring's look flat (the ~2.35 units of drawn radius per size unit is read off one
 screenshot); the knockback distances (no DI, no rage, Mario weight).
+
+## Core Breaker v9 (`supamario_corebreaker_v9.zip`): one catch, cleared at the hover, downed fighters
+
+Install over Fake Death v2, exe B (exe_v46k, no exe change). Built with `tools/supamario_fakedeath_build.py` (the God
+Fist, Core Breaker, Fake Death), halos 0.16.
+
+### 1. Invulnerable in the hover and the ending (user: "It becomes invulnerable during the hover and ending if the leap isn't cancelled into the hover/dive")
+**Cause:** v3-v8's game script checked the hover's detection box on frames 31-33 with `Hit_Check(When=0)`, "since the
+start", and nothing cleared that flag before the hover.
+- After a rise that plays out to Fall, the player can attack (an aerial). Its hit left his attack's flag set.
+- The second up special's check took that for a catch: `Body_State_Set` invincible, cb 3, and `Target_Slot_Get(2)`
+  (the last fighter hit: the aerial's victim, wherever it was).
+- The MSC then held that fighter, renewing his invincibility every frame through the hold and the crash / explosion.
+- Cancelled into the hover, the rise leaves no window to hit anything between, so it didn't happen there.
+- Reproduced offline on the v8 build: an earlier hit makes the second up special catch a fighter 150 away and write
+  invincibility from frame 62 on.
+
+**Fix:**
+- `cb_hover_start` clears the flag (`AttackModule(0x2724)`) at the press, before the box comes out at frame 30. The
+  game script's `Hit_Reset` also runs at 30, before the box.
+- **One catch:** the game script has no catch check any more (no `Hit_Check`, `Target_Slot_Get` or
+  `Body_State_Set`), only the box. The hover's catch is the MSC's `cb_try_catch` (the dive's v4-v8 function: the hit
+  flag, target 2, its slot or the nearest fighter), on the box's frames and up to 3 after (its hit can reach the flag a
+  frame late). Caught: the hold as before.
+- **Invincibility only on a catch with a victim:** the first write is in `cb_catch` after its slot check, and the
+  per-frame renewal also needs that catch (`cb_inv`).
+
+### 2. Downed fighters (user: "Core Breaker should be able to hit downed opponents as specified previously")
+- The dive's catch box and body box are now Ground/Air 3: they hit fighters lying down (v3-v8: 0x80000003, bit 31
+  set, so they missed them).
+- `cb_try_catch` has no down-status refusal on any path; shields, a shield break and invincible / intangible
+  fighters are still refused.
+- A downed victim goes into the hold as the box's always did: out of the down status into Damage (0x46), and a God
+  Fist victim held down is taken over (gf_tick stops holding it).
+- The light homing now also steers toward fighters lying down.
+- The crash, the explosion and the burn hits were already Ground/Air 3 (they hit fighters lying down).
+
+### Tests (v9 build)
+- rise -> Fall -> up special, with and without a hit from before the hover and a fighter far away: the hover, the
+  dive, the landing; no catch, no invincibility write;
+- the dive catches DownWait, DownBound and a God Fist victim held down (into Damage, the hold on the ground, the
+  crash; gf_tick lets go);
+- an invincible fighter: refused, the dive goes on;
+- the game script has no `Hit_Check` / `Target_Slot_Get` / `Body_State_Set`, has `Hit_Reset` before the hover's box,
+  and every box is Ground/Air 3;
+- the point-blank catches (standing, downed, a God Fist victim) through the MSC as before.

@@ -345,11 +345,10 @@ def run(path, g, frames=420, catch_at=None, cut_at=None, victim_reach=None, pres
                 g.hit = True                    # v4: the hit; the MSC's cb_dive_catch does the rest
                 if g.hit_kind == 4:             # v8: on a shield: the game's own shield damage first
                     g.victim['shield'] = g.victim.get('shield', 50.0) - B.CATCH_DMG * 1.19
-        if detect and cbv == 1.0 and g.victim is not None and B.HOVER_FROM <= g.frame <= B.HOVER_FROM + 3:
+        if detect and cbv == 1.0 and g.victim is not None and B.HOVER_FROM <= g.frame <= B.HOVER_FROM + 1:
             mx, my = g.x + B.DETECT_AT[0] * g.face, g.y + B.DETECT_AT[1]
             if math.hypot(g.victim['x'] - mx, g.victim['y'] + 5 - my) < B.DETECT_SIZE + 2.0:
-                g.vars[B.CB_VAR] = 3.0
-                g.vars[B.CB_V_SLOT] = 2.0
+                g.hit = True                    # v9: the box's hit; the MSC's cb_try_catch does the rest
         if victim_move is not None and g.victim is not None and not g.hit:
             victim_move(g, g.victim)            # v6: the victim moving before the hit (a jump)
         if hit_at_dive and g.frame >= B.DIVE_FROM - 1e-6 and cbv == 1.0:
@@ -770,10 +769,40 @@ def msc_tests(path):
           'but its 1-frame end' % (B.INV_STEP, len(held), rel, B.INV_STEP, tr[-1][7] - rel),
           (max(held) <= rel, max(v_ for _n, v_ in g.inv_log) <= B.INV_STEP,
            [v_ for n_, v_ in g.inv_log if n_ > rel]), (True, True, [1.0]))
-    for name, extra in (('lying down (DownWait)', {'status': 0x50}), ('invincible', {'body': 1})):
-        g, v, far, tr = on_path(extra)
-        check('the dive refuses a fighter %s: no catch, the hitboxes gone, it dives on and lands' % name,
-              (phases_of(tr), len(g.cleared) > 0), ([1.0, 2.0, 5.0], True))
+    g, v, far, tr = on_path({'body': 1})
+    check('the dive refuses an invincible fighter: no catch, the hitboxes gone, it dives on and lands',
+          (phases_of(tr), len(g.cleared) > 0), ([1.0, 2.0, 5.0], True))
+    # v9 (user: "Core Breaker should be able to hit downed opponents as specified previously"): the dive catches
+    # fighters lying down too (DownWait, DownBound, a God Fist victim held down): out of the down status into Damage,
+    # the hold on the ground, the crash
+    out = []
+    for name, st, gf in (('DownWait', 0x50, False), ('DownBound', 0x4D, False), ('a God Fist victim held down', 0x50,
+                                                                                   True)):
+        v = {'x': 0.0, 'y': 0.0, 'status': st}
+        g = Game(stage=(-200.0, 200.0), victim=v)
+        run(path, g, frames=B.HOVER_FROM + 3)
+        v['x'] = g.x + g.face * (g.y / math.tan(math.radians(B.DIVE_DEG)) - 2.0)
+        if gf:
+            g.vars[GB.V_PHASE], g.vars[GB.V_SLOT], g.vars[GB.V_LOCK] = 2.0, 2.0, 2.0
+        tr = run(path, g, victim_reach=B.HB['catch'][1] + 4.0)
+        out.append((name, phases_of(tr), v.get('status_log', [None])[0]) + ((g.vars.get(GB.V_PHASE),) if gf else ()))
+    check('the dive catches fighters lying down: into Damage (0x%X), the hold on the ground, the crash (a God Fist '
+          'victim: gf_tick stops holding it)' % B.HOLD_STATUS, out,
+          [('DownWait', [1.0, 2.0, 8.0, 6.0], B.HOLD_STATUS), ('DownBound', [1.0, 2.0, 8.0, 6.0], B.HOLD_STATUS),
+           ('a God Fist victim held down', [1.0, 2.0, 8.0, 6.0], B.HOLD_STATUS, 0.0)])
+    # v9 (user: "It becomes invulnerable during the hover and ending if the leap isn't cancelled into the hover/dive"):
+    # rise -> Fall -> up special, with a hit from before (an aerial out of Fall: the attack's "since the start" flag
+    # still set) and a fighter far away: the hover's start clears the flag; no catch, no invincibility at any frame
+    out = []
+    for stale in (False, True):
+        v = {'x': 150.0, 'y': 0.0, 'status': 0x47}
+        g = Game(stage=(-300.0, 300.0), victim=v)
+        run(path, g, tick=True)
+        g.hit = stale
+        tr = run(path, g, tick=True)
+        out.append((stale, phases_of(tr), g.inv_log))
+    check('rise -> Fall -> up special (with or without a hit from before the hover): the hover, the dive, the landing; '
+          'no catch, no invincibility', out, [(False, [1.0, 2.0, 5.0], []), (True, [1.0, 2.0, 5.0], [])])
     # 9c. v5 (user: "There are cases where it will hit an opponent but they won't be put in the hold"): point-blank,
     # the dive's hitboxes connect on its very first frame (v4 reset the hit flag in the MSC after that hit): caught
     v = {'x': 0.0, 'y': 0.0, 'status': 0x47}
@@ -1087,6 +1116,17 @@ def script_tests(fdir):
     ext = [c for c in eff if c.ident == acmd.BY_NAME['external_graphic']]
     check('no Core Breaker (XV2) effect the rise (cb 0) can reach', (len(ext) > 10, unguarded(
         eff, {acmd.BY_NAME['external_graphic']})), (True, []))
+    at, seq30 = 0.0, []
+    for c in s:
+        if c.ident == acmd.BY_NAME['frame']:
+            at = c.params[0]
+        if at == B.HOVER_FROM and acmd.INFO[c.ident]['name'] in ('Hit_Reset', 'Extra_Special_Hitbox'):
+            seq30.append(acmd.INFO[c.ident]['name'])
+    names = {acmd.INFO[c.ident]['name'] for c in s}
+    check('v9: no catch check in the game script (Hit_Check, Target_Slot_Get, Body_State_Set: the MSC\'s now); '
+          'Hit_Reset before the hover\'s box; every Core Breaker box hits fighters lying down (Ground/Air 3)',
+          (sorted(names & {'Hit_Check', 'Target_Slot_Get', 'Body_State_Set'}), seq30,
+           sorted({c.params[syn.index('Ground/Air')] for c in hits})), ([], ['Hit_Reset', 'Extra_Special_Hitbox'], [3]))
     burns = [c for c in hits if abs(c.params[syn.index('Damage')] - B.BURN_DMG) < 1e-6]
     el = lambda c, n: c.params[syn.index(n)]      # noqa: E731
     check('the burn hits (both holds) the coin\'s (user: "make the catch multihits of the dive use the coin hit '
