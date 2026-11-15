@@ -35,7 +35,7 @@ sys.path.insert(0, HERE)
 import acmd_ext_cave as C  # noqa: E402
 import rpx_patch as R  # noqa: E402
 from stage_slot_test import machine, RET  # noqa: E402
-from unicorn.ppc_const import (UC_PPC_REG_1, UC_PPC_REG_3, UC_PPC_REG_4, UC_PPC_REG_5, UC_PPC_REG_6,  # noqa: E402
+from unicorn.ppc_const import (UC_PPC_REG_1, UC_PPC_REG_31, UC_PPC_REG_3, UC_PPC_REG_4, UC_PPC_REG_5, UC_PPC_REG_6,  # noqa: E402
                                UC_PPC_REG_19, UC_PPC_REG_20, UC_PPC_REG_27, UC_PPC_REG_26, UC_PPC_REG_10, UC_PPC_REG_FPR1, UC_PPC_REG_FPR28,
                                UC_PPC_REG_7, UC_PPC_REG_0, UC_PPC_REG_12, UC_PPC_REG_28, UC_PPC_REG_29,
                                UC_PPC_REG_30, UC_PPC_REG_LR, UC_PPC_REG_MSR)
@@ -815,10 +815,14 @@ common:                         # log {wrapper, accessor, n, words[0..3]}; retur
 st_ret:
         lwz r3, 0xFF8(r11)
         blr
-get:                            # WorkModule vt +0x44: ACC 0x0F0002BC + t -> M + 0x1000 t (as float bits)
-        clrlwi r4, r4, 16
+get:                            # WorkModule vt +0x44: ACC 0x0F0002BC + t -> M + 0x1000 t (as float bits); target 12's
+        clrlwi r4, r4, 16               # ACC (0x0F0002FB) -> M + 0xC000
+        cmplwi r4, 0x2FB
+        bne get_acc
+        li r4, 0x2C8
+get_acc:
         addi r5, r4, -0x2BC
-        cmplwi r5, 11
+        cmplwi r5, 13
         bge get_q
         slwi r5, r5, 12
         addis r5, r5, 0x6100
@@ -863,7 +867,7 @@ am_now:
         for i, wd in enumerate([0x3D800000 | (to >> 16), 0x618C0000 | (to & 0xFFFF), 0x7D8903A6, 0x4E800420]):
             w32(pm, wrap + 4 * i, wd)
     me, wm, am = M + 0x20000, M + 0x30000, M + 0x40000
-    for acc in [me] + [M + 0x1000 * t for t in range(11)]:
+    for acc in [me] + [M + 0x1000 * t for t in range(13)]:
         w32(pm, acc + 0x28, wm)
         w32(pm, acc + 0x50, am)
     w32(pm, wm, wm + 0x100)
@@ -919,7 +923,8 @@ am_now:
     check('Hit_Check(since start, anything (0)): True', cmd('Hit_Check', 0, 0, 0)[4], 1)
     check('Hit_Check(this frame, hurtbox) with a hurtbox hit (2): True; steps 4 words', cmd('Hit_Check', 0, 1, 2)[4:] +
           (cmd('Hit_Check', 0, 1, 6)[1],), (1, 16))
-    check('Hit_Check(target 12: none): False', cmd('Hit_Check', 12, 0, 0)[4], 0)
+    check('Hit_Check(target 13: none): False', cmd('Hit_Check', 13, 0, 0)[4], 0)
+    check('Hit_Check(target 12, this attack\'s hit: its ACC 0x0F0002FB): True', cmd('Hit_Check', 12, 0, 0)[4], 1)
     check('Hit_Get(since start): VAR_0 = 4 (shield)', cmd('Hit_Get', 0, 0, 0x0F000300)[3], [(0x0F000300, 4.0)])
     _r, _s, calls, _st, _c = cmd('Motion_Set', 0, 0x50, 5.0, 0.0)
     check('Motion_Set(0x50, 5, 0): MotionModule(1, 0x50, 5.0, 1.0)', [c[:7] for c in calls],
@@ -976,12 +981,169 @@ am_now:
     check('Target_Slot_Get(target 5 = table entry 2): 3', cmd('Target_Slot_Get', 5, 0x0F000300)[3], [(0x0F000300, 3.0)])
     check('Target_Slot_Get(target 6, not in the table): 0', cmd('Target_Slot_Get', 6, 0x0F000300)[3], [(0x0F000300, 0.0)])
     check('Status_Set(target 11, int 9 = no slot): nothing', cmd('Status_Set', 11, 0x59, ret=9)[3], [])
+    apc_tests(pm, a, cmd, me, M, LOG, fb)
     pm.mem_write(ctx + 8, b'\0')
     w32(pm, state + 4, 0x1000)
     w32(pm, LOG + 0xFFC, 0)
     run(pm, a.addr('h_rset'), RET, {UC_PPC_REG_3: me, UC_PPC_REG_4: 0, UC_PPC_REG_5: state, UC_PPC_REG_6: ctx,
                                     UC_PPC_REG_7: prm})
     check('skipped (fast-forward): steps only', (r32(pm, state + 4) - 0x1000, r32(pm, LOG + 0xFFC)), (20, 0))
+
+
+def apc_tests(pm, a, cmd, me, M, LOG, fb):
+    """exe_v46k: target 12 (this attack's hit, its own block of position_vars IDs) in the variable-backed and input
+    commands, Last_Hit_Get(2), Position_Place (once, every Relative / Axes / Collision, holds re-applied by the frame
+    hook, ended by Frames, a status change or a reset) and Position_Offset_Get"""
+    PW, PF = 0, 1
+    t12 = M + 0xC000
+    # the variable-backed commands: target 12 -> its block (0x0F0002C8-0x0F0002FF), the same quantity as target 2
+    check('target 12: Status_Set -> 0x0F0002D2 (target 2: 0x0F0000B2)', cmd('Status_Set', 12, 0x59)[3], [(0x0F0002D2, 89.0)])
+    check('target 12: Status_Get / Damage_Get / Hitstun_Get(dealt)',
+          (cmd('Status_Get', 12, 0x0F000300)[3], cmd('Damage_Get', 12, 0x0F000300)[3], cmd('Hitstun_Get', 12, 1, 0x0F000300)[3]),
+          ([(0x0F000300, 0x2D2 / 16)], [(0x0F000300, 0x2EF / 16)], [(0x0F000300, 0x2C9 / 16)]))
+    check('target 12: Hitstun_Set / Hitstop_Set (shake, no shake)',
+          (cmd('Hitstun_Set', 12, 20)[3], cmd('Hitstop_Set', 12, 8, 1)[3], cmd('Hitstop_Set', 12, 8, 0)[3]),
+          ([(0x0F0002C8, 20.0)], [(0x0F0002CB, 8.0)], [(0x0F0002CC, 8.0)]))
+    check('target 12: Damage_Set / Body_State_Set (intangible, invincible) / Armor_Set',
+          (cmd('Damage_Set', 12, 50.0)[3], cmd('Body_State_Set', 12, 0, 30)[3], cmd('Body_State_Set', 12, 1, 30)[3],
+           cmd('Armor_Set', 12, 2, 40.0)[3]),
+          ([(0x0F0002EF, 50.0)], [(0x0F0002F3, 30.0)], [(0x0F0002F4, 30.0)], [(0x0F0002F6, 40.0), (0x0F0002F5, 2.0)]))
+    check('target 12: Item_State_Set / Stage_Collision_Set', (cmd('Item_State_Set', 12, 1)[3], cmd('Stage_Collision_Set', 12, 0)[3]),
+          ([(0x0F0002FA, 1.0)], [(0x0F0002D6, 0.0)]))
+    check('target 12: Joint_Position_Get: 0x0F0002FC, then 0x2FD-0x2FF',
+          cmd('Joint_Position_Get', 12, 11, 0x0F000300, 0x0F000301, 0x0F000302)[3],
+          [(0x0F0002FC, 11.0), (0x0F000300, 0x2FD / 16), (0x0F000301, 0x2FE / 16), (0x0F000302, 0x2FF / 16)])
+    check('target 13: Status_Set does nothing', cmd('Status_Set', 13, 0x59)[3], [])
+    _r, _s, calls, sets, _c = cmd('Rotation_Get', 12, 2, 0x0F000300, ret=fb(30.0))
+    check('target 12: Rotation_Get on its accessor (ACC 0x0F0002FB)', [c[:4] for c in calls], [(PF, t12, 1, 6)])
+    check('target 12: Target_Slot_Get (not in the table): 0', cmd('Target_Slot_Get', 12, 0x0F000300)[3], [(0x0F000300, 0.0)])
+    tab_e = r32(pm, r32(pm, r32(pm, C.FIGHTERS)) + 0)         # fighter table entries
+    pm.mem_write(tab_e + 5 * C.FIGHTER_ENTRY + 0x1E, b'\4')
+    w32(pm, tab_e + 5 * C.FIGHTER_ENTRY + 0xC, t12)
+    check('Last_Hit_Get(2): target 12 (table entry 5) -> slot 6', cmd('Last_Hit_Get', 2, 0x0F000300)[3], [(0x0F000300, 6.0)])
+    check('Last_Hit_Get(0): target 2 (M + 0x2000, not in the table) -> 0', cmd('Last_Hit_Get', 0, 0x0F000300)[3],
+          [(0x0F000300, 0.0)])
+
+    def in_id(t, q):
+        run(pm, a.addr('in_id'), RET, {UC_PPC_REG_4: t, UC_PPC_REG_5: q})
+        return pm.reg_read(UC_PPC_REG_4)
+    check('in_id: target 12 inputs (0x0F0002D8 + q), raw X (0x0F0002F8 / 9), 34: none; targets 2 / 11 as before',
+          [in_id(12, 0), in_id(12, 0x17), in_id(12, 0x1F), in_id(12, 32), in_id(12, 33), in_id(12, 34), in_id(2, 0x17),
+           in_id(2, 33), in_id(11, 0)],
+          [0x0F0002D8, 0x0F0002EF, 0x0F0002F7, 0x0F0002F8, 0x0F0002F9, 0, 0x0F000157, 0x0F000265, 0])
+
+    # Position_Place / Position_Offset_Get: postures at accessor + 0x600 (pos +0x10, facing +0x60)
+    def post(acc, x, y, z, lr):
+        w32(pm, acc + 0x18, acc + 0x600)
+        pm.mem_write(acc + 0x610, struct.pack('>fff', x, y, z))
+        pm.mem_write(acc + 0x660, struct.pack('>f', lr))
+    t1 = M + 0x1000
+    post(me, 10.0, 5.0, 0.0, 1.0)
+    post(t1, 20.0, 0.0, 0.0, -1.0)
+    post(t12, -4.0, 2.0, 0.0, -1.0)
+    tab = a.addr('apc_tab')
+    pm.mem_write(tab, b'\0' * C.APC_N * C.APC_SIZE)
+
+    def place(*p):
+        r, step, calls, sets, _c = cmd('Position_Place', *p)
+        return r, step, [c[1:7] for c in calls if c[0] == PW], sets
+
+    def pw(acc, x, y, z):
+        return (acc, 4, 3, fb(x), fb(y), fb(z))
+    check('Place(1, Relative 1, 12 fwd, 5 up): the nearest opponent to self + (12, 5): returns 2, steps 9 words',
+          place(1, 1, 12.0, 5.0, 0.0, 0, 0, 0), (2, 36, [pw(t1, 22.0, 10.0, 0.0)], []))
+    check('Place(12, Relative 0 (world)): at (3, 4, 5)', place(12, 0, 3.0, 4.0, 5.0, 0, 0, 0)[2], [pw(t12, 3.0, 4.0, 5.0)])
+    check('Place(12, Relative 2: moved by 3 along its own facing (-1), 1 up)', place(12, 2, 3.0, 1.0, 0.0, 0, 0, 0)[2],
+          [pw(t12, -7.0, 3.0, 0.0)])
+    check('Place(1, Relative 3: self at the opponent + (-2 along self\'s facing))', place(1, 3, -2.0, 0.0, 0.0, 0, 0, 0)[2],
+          [pw(me, 18.0, 0.0, 0.0)])
+    check('Place(1, Relative 1, Axes 1: X only; Axes 2: Y only; Axes 6: Y and Z)',
+          (place(1, 1, 12.0, 5.0, 1.0, 1, 0, 0)[2], place(1, 1, 12.0, 5.0, 1.0, 2, 0, 0)[2],
+           place(1, 1, 12.0, 5.0, 1.0, 6, 0, 0)[2]),
+          ([pw(t1, 22.0, 0.0, 0.0)], [pw(t1, 20.0, 10.0, 0.0)], [pw(t1, 20.0, 10.0, 1.0)]))
+    check('Place(Relative 4): nothing', place(1, 4, 1.0, 1.0, 1.0, 0, 0, 0)[2:], ([], []))
+    check('Place(target 13: nobody): nothing', place(13, 1, 1.0, 1.0, 1.0, 0, 0, 0)[2:], ([], []))
+    check('Place(Collision 2, Frames 0): placed, its GROUND (its own 0x0F0000A6) = 0, no hold',
+          place(1, 1, 0.0, 0.0, 0.0, 0, 0, 2)[2:] + (r32(pm, tab),), ([pw(t1, 10.0, 5.0, 0.0)], [(0x0F0000A6, 0.0)], 0))
+    check('Place(Collision 1, Frames 1): no hold (stays off)', (place(1, 1, 0.0, 0.0, 0.0, 0, 1, 1)[3], r32(pm, tab)),
+          ([(0x0F0000A6, 0.0)], 0))
+
+    mm = M + 0x80000                    # a MotionModule: +4 the accessor (FRAME_HOOK's r31)
+    w32(pm, mm + 4, me)
+    check('FRAME_HOOK -> apc_fhook (then hv_fhook), WM_RESET -> apc_wmreset (then hv_wmreset)',
+          (r32(pm, C.FRAME_HOOK) == C.b(C.FRAME_HOOK, a.addr('apc_fhook')), r32(pm, C.WM_RESET) == C.b(C.WM_RESET, a.addr('apc_wmreset')),
+           r32(pm, a.addr('apc_fhook') + 8) == C.b(a.addr('apc_fhook') + 8, a.addr('hv_fhook'))), (True, True, True))
+    saved = {k: r32(pm, a.addr(k)) for k in ('hv_wmreset',)}
+    for k in saved:                     # (the chained code: a blr, so a run ends at RET; its translated code dropped)
+        w32(pm, a.addr(k), 0x4E800020)
+        pm.ctl_remove_cache(a.addr(k), a.addr(k) + 4)
+
+    def tick(owner=me):
+        w32(pm, mm + 4, owner)
+        w32(pm, LOG + 0xFFC, 0)
+        w32(pm, LOG + 0xF14, 0)
+        run(pm, a.addr('apc_frame'), RET, {UC_PPC_REG_3: owner})    # (apc_fhook: lwz r3, 4(r31); bl apc_frame)
+        calls = [struct.unpack('>7I', pm.mem_read(LOG + 0x20 * k, 0x1C)) for k in range(r32(pm, LOG + 0xFFC))]
+        sets = [(r32(pm, LOG + 0x800 + 8 * k), round(struct.unpack('>f', pm.mem_read(LOG + 0x804 + 8 * k, 4))[0], 4))
+                for k in range(r32(pm, LOG + 0xF14))]
+        return [c[1:7] for c in calls if c[0] == PW], sets
+
+    def entry(k=0):
+        return struct.unpack('>11I', pm.mem_read(tab + C.APC_SIZE * k, 0x2C))
+    r = place(12, 1, 6.0, 0.0, 0.0, 0, 3, 1)
+    e = entry()
+    check('Hold(12, 6 in front, Frames 3, Collision 1): placed now, collision off, entry {me, t12, me, me, 7, 6, 0, 0, 3, 1, '
+          'status}', (r[2:], e), (([pw(t12, 16.0, 5.0, 0.0)], [(0x0F0000A6, 0.0)]),
+                                 (me, t12, me, me, 7, fb(6.0), 0, 0, 3, 1, fb(0xA2 / 16))))
+    check('  frame hook, another object: nothing', (tick(t1), entry()[8]), (([], []), 3))
+    check('  frame hook (the command\'s own frame): placed again, collision off, 2 left',
+          (tick(), entry()[8]), (([pw(t12, 16.0, 5.0, 0.0)], [(0x0F0000A6, 0.0)]), 2))
+    post(me, 30.0, 8.0, 0.0, -1.0)
+    check('  self moved and turned: it follows (30 - 6, 8), 1 left', (tick(), entry()[8]),
+          (([pw(t12, 24.0, 8.0, 0.0)], [(0x0F0000A6, 0.0)]), 1))
+    check('  the last frame: placed, then the hold ends: collision back to air (5), entry free',
+          (tick(), entry()[0]), (([pw(t12, 24.0, 8.0, 0.0)], [(0x0F0000A6, 0.0), (0x0F0000A6, 5.0)]), 0))
+    check('  after it: nothing', tick(), ([], []))
+    post(me, 10.0, 5.0, 0.0, 1.0)
+    place(1, 1, 2.0, 0.0, 0.0, 1, -1, 1)
+    check('Hold(-1): every frame, the count left alone', (tick(), tick()[0], entry()[8]),
+          (([pw(t1, 12.0, 0.0, 0.0)], [(0x0F0000A6, 0.0)]), [pw(t1, 12.0, 0.0, 0.0)], 0xFFFFFFFF))
+    w32(pm, tab + 0x28, fb(1.0))        # this object's status changed
+    check('  its status changed: not placed, collision back to air, entry free', (tick(), entry()[0]),
+          (([], [(0x0F0000A6, 5.0)]), 0))
+    place(1, 1, 2.0, 0.0, 0.0, 0, 10, 0)
+    place(1, 1, 4.0, 0.0, 0.0, 0, 10, 0)
+    place(12, 1, 4.0, 0.0, 0.0, 0, 10, 0)
+    check('Two Places of the same target: one hold (the newer), another target its own',
+          (entry(0)[:2] + (entry(0)[5],), entry(1)[:2], entry(2)[0]), ((me, t1, fb(4.0)), (me, t12), 0))
+    check('  Collision 0: never touched', tick(), ([pw(t1, 14.0, 5.0, 0.0), pw(t12, 14.0, 5.0, 0.0)], []))
+    run(pm, a.addr('apc_wmreset'), RET, {UC_PPC_REG_31: t12})
+    check('WM_RESET of the placed one: its hold goes', (entry(0)[0], entry(1)[0]), (me, 0))
+    run(pm, a.addr('apc_wmreset'), RET, {UC_PPC_REG_31: me})
+    check('WM_RESET of the owner: its holds go', entry(0)[0], 0)
+    for k in range(C.APC_N + 2):         # a full table: placed once, no hold
+        w32(pm, tab + C.APC_SIZE * (k % C.APC_N), M + 0x90000 + k)
+    check('a full table: placed once, no hold', (place(1, 1, 0.0, 0.0, 0.0, 0, 5, 0)[2],
+                                               [entry(k)[0] for k in range(C.APC_N)].count(me)),
+          ([pw(t1, 10.0, 5.0, 0.0)], 0))
+    pm.mem_write(tab, b'\0' * C.APC_N * C.APC_SIZE)
+    for k, v in saved.items():
+        w32(pm, a.addr(k), v)
+        pm.ctl_remove_cache(a.addr(k), a.addr(k) + 4)
+
+    def oget(t, axis, rel):
+        return cmd('Position_Offset_Get', t, axis, rel, 0x0F000300)[3]
+    check('Offset_Get(1, world): X 20, Y 0, facing -1',
+          (oget(1, 0, 0), oget(1, 1, 0), oget(1, 3, 0)), ([(0x0F000300, 20.0)], [(0x0F000300, 0.0)], [(0x0F000300, -1.0)]))
+    check('Offset_Get(1, target - self): X fwd 10, Y -5, distance 11.1803',
+          (oget(1, 0, 1), oget(1, 1, 1), oget(1, 3, 1)),
+          ([(0x0F000300, 10.0)], [(0x0F000300, -5.0)], [(0x0F000300, 11.1803)]))
+    check('Offset_Get(1, self - target): X -10 (along self\'s facing), Y 5; along the target\'s facing: 10 (in front of it)',
+          (oget(1, 0, 2), oget(1, 1, 2), oget(1, 0, 3)), ([(0x0F000300, -10.0)], [(0x0F000300, 5.0)], [(0x0F000300, 10.0)]))
+    check('Offset_Get(12, target - self): X -14; nobody (13) / Axis 4 / RelativeTo 4: 0',
+          (oget(12, 0, 1), oget(13, 0, 1), oget(1, 4, 1), oget(1, 0, 4)),
+          ([(0x0F000300, -14.0)], [(0x0F000300, 0.0)], [(0x0F000300, 0.0)], [(0x0F000300, 0.0)]))
+    post(me, 0.0, 0.0, 0.0, 1.0)
 
 
 def main():

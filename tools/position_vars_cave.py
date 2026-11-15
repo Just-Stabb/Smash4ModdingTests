@@ -454,8 +454,20 @@ def check_code(reg, fail):
 GROW_END = 0x04B7C000
 EXT_REGIONS = [
     (0x04B78000, 0x04B78A00),           # 0x04B78A00-0x04B79000: tools/strike_cave.py, copy_fx_cave.py
-    (0x04B79000, 0x04B7C000),           # input / state variables (inp_*)
+    (0x04B79000, 0x04B7AE00),           # input / state variables (inp_*)
 ]
+# Target 12, "this attack's hit" (exe_v46k): the newest hit record of self's current attack, with NO fallback (target 2
+# falls back to the fighter whose last attacker is self once the records are gone). Its variables are a block of their
+# own, 0x0F0002C8-0x0F0002FF (the families' layouts have no room for a 12th target), each the target-2 ID of the same
+# quantity: 0x2C8 + q combat (0x50 + q), 0x2D0 + q hit / status / motion (0xB0 + q), 0x2D8 + q inputs / state
+# (0x140 + q), 0x2F8 / 0x2F9 raw stick / C-stick X (0x264 / 0x265), 0x2FA ITEM (0x278), 0x2FB ACC (0x2BE), 0x2FC + n
+# a joint (0x298 + n). nb_code at NB_CODE (EXT_REGIONS' second region was cut short for it); 0x04B7B000-0x04B7C000
+# is tools/acmd_ext_cave.py's (APC_CODE: Position_Place / Position_Offset_Get, the target-12 helpers).
+NB_CODE = 0x04B7AE00
+NB_LIMIT = 0x04B7B000
+NB_BASE = 0x2C8
+NB_MAP = [(0x2C8, 8, 0x00), (0x2D0, 8, 0x08), (0x2D8, 0x20, 0x40), (0x2F8, 2, 0x60), (0x2FA, 1, 0x62),
+          (0x2FB, 1, 0x67), (0x2FC, 4, 0x63)]      # (first ID, count, quantity code of the first)
 MSC_WORK = 0x030B2B28      # MSC syscall wrappers (ctx, args): 0x16 WorkModule
 MSC_DAMAGE = 0x030B2F8C    # 0x24 DamageModule
 MSC_DAMAGE_F = 0x030B2FC4  # 0x25 DamageModuleF
@@ -748,7 +760,7 @@ ext_last_next:
 """, F),
 ("""
 ext_last_fb:                            # attack over: a fighter whose last attacker is self's slot
-        li r22, 0
+        b nb_fb                         # (target 12: nobody; else li r22, 0)
 ext_fb_loop:
         mr r3, r22
         bl slot
@@ -1417,8 +1429,8 @@ inp_entry_joint:                        # 0x290 + 4 * target + n: a joint's posi
         b ext_target
 inp_entry_acc:                          # 0x2BC + target (read only): the target's module accessor, its bits as
         addi r3, r3, -44                # the float (acmd_ext_cave.py's commands act on it; q 0x27)
-        cmplwi r3, 11
-        bge ext_zero
+        cmplwi r3, 11                   # past the targets: 0x2C8-0x2FF is target 12's block (nb_code)
+        bge nb_entry
         li r11, 0x67
         stw r11, 0x14(r1)
         mr r22, r3
@@ -1998,6 +2010,39 @@ inp_state:                              # per slot: held, tapped, inputs off, st
         INP_STATE="\n".join(["        .word 0"] * (8 * SLOTS)))
 
 
+def nb_code():
+    """Target 12's block (0x0F0002C8-0x0F0002FF): the quantity code of the family it mirrors, then the target-2 path
+    (ext_t_last_pre) with r22 = 12; ext_t_last's fallback (ext_last_fb) gives nobody for 12 (nb_fb)."""
+    out = ["""
+nb_entry:                               # inp_entry's frame (find_self done); r30 = the ID's index, past the ACC block
+        cmplwi r30, 0x%X
+        blt.far ext_zero
+        cmplwi r30, 0x300
+        bge.far ext_zero""" % NB_BASE]
+    for k, (first, n, code) in enumerate(NB_MAP):
+        assert first == (NB_MAP[k - 1][0] + NB_MAP[k - 1][1] if k else NB_BASE)
+        out.append("""
+        cmplwi r30, 0x%X
+        bge nb_m%d
+        addi r11, r30, %d
+        b nb_go
+nb_m%d:""" % (first + n, k + 1, code - first, k + 1))
+    assert NB_MAP[-1][0] + NB_MAP[-1][1] == 0x300
+    out.append("""
+        b ext_zero
+nb_go:
+        stw r11, 0x14(r1)               # the quantity code, as inp_entry / ext store it
+        li r22, 12
+        b ext_t_last_pre
+nb_fb:                                  # ext_t_last found no hit record of the current attack
+        cmpwi r22, 12
+        beq.far ext_zero                # target 12: nobody
+        li r22, 0                       # target 2: the fallback (ext_last_fb's own first instruction)
+        b ext_fb_loop
+""")
+    return "".join(out)
+
+
 def count(text):
     n = 0
     for l in text.splitlines():
@@ -2082,6 +2127,7 @@ def assemble():
     a.asm(src)
     tail = (a.pc + 7) & ~7          # the rest of the first cave is free for the combat variables
     parts = [(CAVE, LIMIT, src), (CAVE2, LIMIT2, src2)] + pack([(tail, LIMIT)] if tail < LIMIT else [])
+    parts.append((NB_CODE, NB_LIMIT, nb_code()))
     labels = {}
     for base, _, text in parts:     # first pass: every label of both parts
         a = Asm(base)

@@ -43,6 +43,7 @@ KBG / FKB / BKB / Size take a variable (handler table -> hv_extra, which wraps h
 gs_var's gv_zero) are the stick angles / lengths and the rotation.
 """
 import os
+import re
 import struct
 import sys
 import zlib
@@ -372,7 +373,8 @@ HV_PARAM_DESC = [' ' + d + ' Or a variable (exe_v43): its value when the command
 HV_SPECIAL = (361, 368)          # angles kept as they are (361 Sakurai, 362-368 the game's other special angles)
 
 _T = ('Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 '
-      'player slots 1-8, 11 the last fighter that hit this one. 1, 2 and 11 are found from a fighter\'s own script.')
+      'player slots 1-8, 11 the last fighter that hit this one, 12 the fighter this attack hit (exe_v46k: its newest '
+      'hit, nobody once the attack is over: no fallback). 1, 2, 11 and 12 are found from a fighter\'s own script.')
 _V = 'Float variable that gets the value (e.g. VAR_0 0x0F000300; any float variable).'
 # name, handler label, params (name, type 0 int / 1 float / 3 variable, description), description
 NEW_CMDS = [
@@ -430,10 +432,11 @@ NEW_CMDS = [
     ('Last_Hit_Get', 'h_lastget', [
         ('Which', 0, '0: the last fighter this one hit (its current attack\'s newest hit; once the attack is over, a '
                      'fighter whose last attacker is this one); 1: the last fighter that hit this one (the game\'s own '
-                     'record, its projectiles included).'),
+                     'record, its projectiles included); 2 (exe_v46k): the fighter this attack hit (its newest hit '
+                     'only: 0 once the attack is over).'),
         ('Variable', 3, _V + ' Gets its player slot, 1-8; 0 = none.')],
-     'Stores the player slot (1-8) of the last fighter this one hit, or of the last fighter that hit it. The same '
-     'fighters are Target 2 / 11 of the other commands.'),
+     'Stores the player slot (1-8) of the last fighter this one hit, or of the last fighter that hit it, or (Which 2, '
+     'exe_v46k) of the fighter this attack hit. The same fighters are Target 2 / 11 / 12 of the other commands.'),
     ('Target_Slot_Get', 'h_tslot', [
         ('Target', 0, _T),
         ('Variable', 3, _V + ' Gets the player slot, 1-8; 0 = none / not a fighter.')],
@@ -519,6 +522,41 @@ NEW_CMDS = [
      'Sets this fighter\'s gravity and max fall speed for the rest of the move (aerials, specials, a grounded move '
      'that went on in the air with Leave_Ground_Cancel, ...). Back to the fighter\'s own by itself at the next status '
      '(move), when a hit takes effect, on a ledge grab and on a KO. Fighters only.'),
+    ('Position_Place', 'h_pplace', [
+        ('Target', 0, _T + ' The fighter (or this object) placed; with Relative 3 the one this object is placed at.'),
+        ('Relative', 0, 'Where Fwd / Up / Depth are measured from. 0 the stage (world X / Y / Z: Fwd is X, right +); 1 '
+                        'this object: the target goes to this object + Fwd along this object\'s facing (in front +), '
+                        'Up, Depth; 2 the target itself: it moves by Fwd along its own facing, Up, Depth; 3 this object '
+                        'goes to the target + Fwd along this object\'s facing, Up, Depth (behind it: Fwd below 0).'),
+        ('Fwd', 1, 'Forward distance (Relative 0: world X).'),
+        ('Up', 1, 'Up distance (Relative 0: world Y).'),
+        ('Depth', 1, 'Z distance (toward the camera +; Relative 0: world Z). 0 for most uses.'),
+        ('Axes', 0, 'Bits, which coordinates change: 1 X, 2 Y, 4 Z; 0 = all three. The others keep their current '
+                    'value (Axes 1: only the horizontal place, it keeps its height).'),
+        ('Frames', 0, '0 / 1: once, now. 2 or more: now and again every frame (this object\'s frames out of hitlag) '
+                      'for that many frames in all; -1: every frame until this object\'s status changes. A hold '
+                      'ends early when this object\'s status changes (the move ends, it is hit) or it is set up '
+                      'again; a new Position_Place of the same target replaces it.'),
+        ('Collision', 0, 'The placed one\'s stage collision: 0 left as it is; 1 off while it is held (it passes '
+                         'through floors and walls, as a grabbed fighter; GroundModule(0x2710, 0)), back to air '
+                         'collision (5) when the hold ends (Frames 0 / 1: no hold, it stays off); 2 off, and left '
+                         'off (Stage_Collision_Set puts it back).')],
+     'Puts a fighter (or this object) somewhere: at a stage position, in front of / above this object, moved from where '
+     'it is, or this object next to the target; X, Y, Z or some of them; once or held there every frame for a number '
+     'of frames, optionally through the stage. The position variables\' uses (docs/position-variables.md) in one '
+     'command, for every target.'),
+    ('Position_Offset_Get', 'h_poget', [
+        ('Target', 0, _T),
+        ('Axis', 0, '0 X (along the facing in RelativeTo 1-3: forward +), 1 Y, 2 Z; 3: RelativeTo 0 the target\'s '
+                    'facing (1 right, -1 left), RelativeTo 1-3 the X/Y distance between them.'),
+        ('RelativeTo', 0, '0 the stage (the target\'s world position); 1 the target - this object, X along this '
+                          'object\'s facing (+ = the target is in front of it); 2 this object - the target, X along '
+                          'this object\'s facing; 3 this object - the target, X along the target\'s facing (+ = this '
+                          'object is in front of the target, - = behind it).'),
+        ('Variable', 3, _V + ' Gets the value; 0 when there is no such target.')],
+     'Reads where a fighter is: its stage position or facing, how far it is in front of / above this object, how far '
+     'this object is in front of or behind it, or the distance between them. Every target, the new one (12) '
+     'included.'),
 ]
 SM4SHCOMMAND_DESC.update({n: d + ' New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).'
                           for n, _l, _p, d in NEW_CMDS})
@@ -557,6 +595,432 @@ ms_post:
 """)
 
 
+APC_CODE = 0x04B7B000             # exe_v46k: Position_Place / Position_Offset_Get, target 12's helpers and the holds;
+APC_LIMIT = 0x04B7C000            # position_vars_cave.py's grown text (its EXT_REGIONS stop at 0x04B7AE00, its target-12
+                                  # code NB_CODE 0x04B7AE00-0x04B7B000): zero in exe_v46j
+APC_N = 16                        # holds (Position_Place with Frames): APC_N entries of APC_SIZE, after the code
+APC_SIZE = 0x30
+SELF_STATUS = 0x0F0000A2          # position_vars: this fighter's status kind (0 for an article)
+SELF_GROUND = 0x0F0000A6          # position_vars: write its stage collision (GroundModule(0x2710, value))
+NB_MAP = [(0x40, 8, 0x2C8), (0xA0, 8, 0x2D0), (0x100, 0x20, 0x2D8), (0x260, 2, 0x2F8), (0x276, 1, 0x2FA),
+          (0x290, 4, 0x2FC), (0x2BC, 1, 0x2FB)]    # target 0's ID of a quantity -> target 12's (position_vars NB_MAP)
+
+
+def apc_code(b, h):
+    """exe_v46k (APC_CODE): target 12 for the variable-backed commands (nc_vid) and the input commands (in_id_x);
+    Position_Place (h_pplace: apc_apply now, a hold in apc_tab re-applied from the frame hook, apc_frame) and
+    Position_Offset_Get (h_poget). Record / hold entry (APC_SIZE): +0 this object's accessor (0 = free), +4 the placed
+    one's, +8 the base's (0: the stage's origin), +0xC the facing's (0: 1.0), +0x10 axes (bits 1 X, 2 Y, 4 Z), +0x14 /
+    +0x18 / +0x1C Fwd / Up / Depth, +0x20 frames left (< 0: until the status changes), +0x24 Collision, +0x28 the
+    owner's status when it was set (SELF_STATUS's bits)."""
+    pro, S, tgt, store, msc_args, call = h['pro'], h['S'], h['tgt'], h['store'], h['msc_args'], h['call']
+    asm = b.asm
+    # nc_out is in CODE2, out of a conditional branch's reach from here: conditional branches go to apc_out (b nc_out)
+    b.asm = lambda text: asm(re.sub(r'^([ \t]+b(?:eq|ne|lt|gt|le|ge)) nc_out\b', r'\1 apc_out', text, flags=re.M))
+    b.asm("""
+apc_out:
+        b nc_out
+""")
+    nb = "".join("""
+        addi r7, r6, -0x%X
+        cmplwi r7, %d
+        bge nvm_%d
+        addi r4, r7, 0x%X
+        b nv_hi
+nvm_%d:""" % (lo, n, k, new, k) for k, (lo, n, new) in enumerate(NB_MAP))
+    b.asm("""
+# --- nc_vid(r3 accessor, r4 target, r5 stride, r6 target 0's ID of the quantity) -> r4 the target's position_vars ID,
+#     0 = none (a bad target). Target 12: its own block (NB_MAP) ------------------------------------------------------
+nc_vid:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r5, 0x8(r1)
+        stw r6, 0xC(r1)
+        bl nc_tid
+        lwz r5, 0x8(r1)
+        lwz r6, 0xC(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        cmpwi r3, 0
+        blt nv_none
+        cmpwi r3, 12
+        beq nv_12
+        mullw r4, r3, r5
+        add r4, r4, r6
+nv_hi:
+        addis r4, r4, 0x0F00
+        blr
+nv_12:""" + nb + """
+nv_none:
+        li r4, 0
+        blr
+
+# --- in_id's target 12 (in_id's first word branches here): r4 target, r5 input -> r4 ID (0 = none); leaf ------------
+in_id_x:
+        cmpwi r4, 12
+        beq iix_12
+        cmplwi r4, 10
+        b in_id_b
+iix_12:
+        cmplwi r5, 0x20
+        blt iix_q
+        addi r4, r5, -0x20
+        cmplwi r4, 2
+        bge iix_none
+        addis r4, r4, 0x0F00
+        addi r4, r4, 0x2F8
+        blr
+iix_q:
+        addis r4, r5, 0x0F00
+        addi r4, r4, 0x2D8
+        blr
+iix_none:
+        li r4, 0
+        blr
+
+# --- apc_apply(r3 record): put the placed one where the record says (PostureModule(3, x, y, z), as Position_Set), and
+#     its stage collision off (Collision 1 / 2) ---------------------------------------------------------------------
+apc_apply:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r29, 0x24(r1)
+        mr r31, r3
+        lwz r30, 4(r31)                 # the placed one's accessor""" + chk_t('r30', 'r0', 'aa_out') + """
+        lwz r29, 0x18(r30)              # its PostureModule""" + chk_t('r29', 'r0', 'aa_out') + """
+        lis r12, one@ha
+        lfs f13, one@l(r12)
+        lwz r3, 0xC(r31)                # facing: of the facing's object, else 1
+        cmpwi r3, 0
+        beq aa_base""" + chk_t('r3', 'r0', 'aa_out') + """
+        lwz r3, 0x18(r3)""" + chk_t('r3', 'r0', 'aa_out') + """
+        lfs f13, 0x60(r3)
+aa_base:
+        lis r12, zero@ha
+        lfs f10, zero@l(r12)
+        fmr f11, f10
+        fmr f12, f10
+        lwz r3, 8(r31)                  # base: the base object's position, else the origin
+        cmpwi r3, 0
+        beq aa_add""" + chk_t('r3', 'r0', 'aa_out') + """
+        lwz r3, 0x18(r3)""" + chk_t('r3', 'r0', 'aa_out') + """
+        lfs f10, 0x10(r3)
+        lfs f11, 0x14(r3)
+        lfs f12, 0x18(r3)
+aa_add:
+        lfs f0, 0x14(r31)
+        fmadds f10, f0, f13, f10        # x = base + Fwd x facing
+        lfs f0, 0x18(r31)
+        fadds f11, f11, f0
+        lfs f0, 0x1C(r31)
+        fadds f12, f12, f0
+        lwz r0, 0x10(r31)               # axes not set keep the placed one's own
+        andi. r3, r0, 1
+        bne aa_y
+        lfs f10, 0x10(r29)
+aa_y:
+        andi. r3, r0, 2
+        bne aa_z
+        lfs f11, 0x14(r29)
+aa_z:
+        andi. r3, r0, 4
+        bne aa_set
+        lfs f12, 0x18(r29)
+aa_set:
+        stfs f10, 0x8(r1)
+        stfs f11, 0xC(r1)
+        stfs f12, 0x10(r1)
+        lwz r6, 0x8(r1)
+        lwz r7, 0xC(r1)
+        lwz r8, 0x10(r1)""" + msc_args(3, ('r', 'r6'), ('r', 'r7'), ('r', 'r8')) + call(POSTURE_W, 4, acc='r30') + """
+        lwz r0, 0x24(r31)
+        cmpwi r0, 0
+        beq aa_out
+        lis r12, zero@ha
+        lfs f1, zero@l(r12)
+        mr r3, r30
+        lis r4, 0x%(sg_hi)X
+        ori r4, r4, 0x%(sg_lo)X
+        bl nc_set                       # its own GROUND variable: GroundModule(0x2710, 0)
+aa_out:
+        lmw r29, 0x24(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+
+# --- apc_status(r3 accessor) -> r3 its status kind's float bits (SELF_STATUS; 0 for an article) -------------------
+apc_status:
+        stwu r1, -0x10(r1)
+        mflr r0
+        stw r0, 0x14(r1)
+        lis r4, 0x%(st_hi)X
+        ori r4, r4, 0x%(st_lo)X
+        bl nc_get
+        stfs f1, 0x8(r1)
+        lwz r3, 0x8(r1)
+        lwz r0, 0x14(r1)
+        mtlr r0
+        addi r1, r1, 0x10
+        blr
+
+# --- Position_Place(Target, Relative, Fwd, Up, Depth, Axes, Frames, Collision) ---------------------------------------
+""" % dict(sg_hi=SELF_GROUND >> 16, sg_lo=SELF_GROUND & 0xFFFF, st_hi=SELF_STATUS >> 16, st_lo=SELF_STATUS & 0xFFFF)
+        + pro('h_pplace', S('Position_Place')) + tgt + """
+        lis r26, apc_rec@ha
+        addi r26, r26, apc_rec@l
+        stw r29, 0(r26)                 # owner: this object
+        lwz r0, 4(r30)                  # Relative: placed, base, facing
+        mr r3, r27
+        li r4, 0
+        li r5, 0
+        cmpwi r0, 0
+        beq pp_rel
+        mr r4, r29
+        mr r5, r29
+        cmpwi r0, 1
+        beq pp_rel
+        mr r4, r27
+        mr r5, r27
+        cmpwi r0, 2
+        beq pp_rel
+        cmpwi r0, 3
+        bne nc_out
+        mr r3, r29
+        mr r4, r27
+        mr r5, r29
+pp_rel:
+        stw r3, 4(r26)
+        stw r4, 8(r26)
+        stw r5, 0xC(r26)
+        lwz r0, 20(r30)                 # Axes (0 = all)
+        andi. r0, r0, 7
+        bne pp_ax
+        li r0, 7
+pp_ax:
+        stw r0, 0x10(r26)
+        lwz r0, 8(r30)
+        stw r0, 0x14(r26)
+        lwz r0, 12(r30)
+        stw r0, 0x18(r26)
+        lwz r0, 16(r30)
+        stw r0, 0x1C(r26)
+        lwz r0, 24(r30)
+        stw r0, 0x20(r26)
+        lwz r0, 28(r30)
+        stw r0, 0x24(r26)
+        mr r3, r29
+        bl apc_status
+        stw r3, 0x28(r26)
+        mr r3, r26
+        bl apc_apply
+        lwz r0, 0x20(r26)               # Frames 0 / 1: no hold
+        cmplwi r0, 1
+        ble nc_out
+        lis r12, apc_tab@ha             # the hold: this object's entry for the same placed one, else a free one
+        addi r12, r12, apc_tab@l
+        lwz r3, 4(r26)
+        li r0, %(n)d
+        mtctr r0
+        li r11, 0
+pp_find:
+        lwz r0, 0(r12)
+        cmpwi r0, 0
+        bne pp_mine
+        cmpwi r11, 0
+        bne pp_next
+        mr r11, r12                     # the first free one
+        b pp_next
+pp_mine:
+        cmplw r0, r29
+        bne pp_next
+        lwz r0, 4(r12)
+        cmplw r0, r3
+        bne pp_next
+        mr r11, r12
+        b pp_copy
+pp_next:
+        addi r12, r12, %(size)d
+        bdnz pp_find
+        cmpwi r11, 0
+        beq nc_out                      # (all taken: placed once)
+pp_copy:
+        li r0, %(words)d
+        mtctr r0
+        addi r12, r26, -4
+        addi r11, r11, -4
+pp_cp:
+        lwzu r0, 4(r12)
+        stwu r0, 4(r11)
+        bdnz pp_cp
+        b nc_out
+""" % dict(n=APC_N, size=APC_SIZE, words=APC_SIZE // 4))
+    b.asm("""
+# --- FRAME_HOOK (every object, every frame it moves, after its ACMD; r31 MotionModule) -> its holds, then hv_fhook ---
+apc_fhook:
+        lwz r3, 4(r31)                  # accessor
+        bl apc_frame
+        b hv_fhook
+
+# --- apc_frame(r3 accessor): its holds: its status changed -> the hold ends; else placed again, a frame counted -------
+apc_frame:""" + chk_t('r3', 'r0', 'af_ret') + """
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r28, 0x20(r1)
+        mr r31, r3
+        lis r30, apc_tab@ha
+        addi r30, r30, apc_tab@l
+        li r29, %(n)d
+        li r28, -1                      # its status: read once, when it has a hold
+af_loop:
+        lwz r0, 0(r30)
+        cmplw r0, r31
+        bne af_next
+        cmpwi r28, -1
+        bne af_st
+        mr r3, r31
+        bl apc_status
+        mr r28, r3
+af_st:
+        lwz r0, 0x28(r30)
+        cmplw r0, r28
+        bne af_end
+        mr r3, r30
+        bl apc_apply
+        lwz r3, 0x20(r30)
+        cmpwi r3, 0
+        blt af_next                     # -1: until the status changes
+        addi r3, r3, -1
+        stw r3, 0x20(r30)
+        cmpwi r3, 0
+        bgt af_next
+af_end:
+        lwz r0, 0x24(r30)               # Collision 1: back to air collision (5)
+        cmpwi r0, 1
+        bne af_free
+        lis r12, apc_five@ha
+        lfs f1, apc_five@l(r12)
+        lwz r3, 4(r30)
+        lis r4, 0x%(sg_hi)X
+        ori r4, r4, 0x%(sg_lo)X
+        bl nc_set
+af_free:
+        li r0, 0
+        stw r0, 0(r30)
+af_next:
+        addi r30, r30, %(size)d
+        addi r29, r29, -1
+        cmpwi r29, 0
+        bgt af_loop
+        lmw r28, 0x20(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+af_ret:
+        blr
+
+# --- WM_RESET (an object set up / reused; r31 its accessor; r0 r10 ctr free): its holds, and holds placing it, go;
+#     then hv_wmreset ---------------------------------------------------------------------------------------------
+apc_wmreset:
+        lis r10, apc_tab@ha
+        addi r10, r10, apc_tab@l
+        li r0, %(n)d
+        mtctr r0
+aw_loop:
+        lwz r0, 0(r10)
+        cmplw r0, r31
+        beq aw_clr
+        lwz r0, 4(r10)
+        cmplw r0, r31
+        bne aw_next
+aw_clr:
+        li r0, 0
+        stw r0, 0(r10)
+aw_next:
+        addi r10, r10, %(size)d
+        bdnz aw_loop
+        b hv_wmreset
+""" % dict(n=APC_N, size=APC_SIZE, sg_hi=SELF_GROUND >> 16, sg_lo=SELF_GROUND & 0xFFFF))
+    b.asm(pro('h_poget', S('Position_Offset_Get')) + """
+        mr r3, r29
+        lwz r4, 0(r30)
+        bl nc_target
+        mr. r27, r3
+        beq po_zero
+        lwz r3, 0x18(r27)               # the target's PostureModule""" + chk_t('r3', 'r0', 'po_zero') + """
+        lwz r4, 0x18(r29)               # this object's""" + chk_t('r4', 'r0', 'po_zero') + """
+        lwz r5, 8(r30)                  # RelativeTo
+        lwz r6, 4(r30)                  # Axis
+        cmplwi r6, 3
+        bgt po_zero
+        cmpwi r5, 0
+        bne po_rel
+        cmpwi r6, 3
+        bne po_world
+        lfs f1, 0x60(r3)                # facing
+        b po_st
+po_world:
+        slwi r6, r6, 2
+        add r6, r6, r3
+        lfs f1, 0x10(r6)
+        b po_st
+po_rel:
+        cmplwi r5, 3
+        bgt po_zero
+        lfs f2, 0x10(r3)                # target - self
+        lfs f0, 0x10(r4)
+        fsubs f2, f2, f0
+        lfs f3, 0x14(r3)
+        lfs f0, 0x14(r4)
+        fsubs f3, f3, f0
+        lfs f4, 0x18(r3)
+        lfs f0, 0x18(r4)
+        fsubs f4, f4, f0
+        lfs f5, 0x60(r4)                # X along this object's facing (RelativeTo 1 / 2)
+        cmpwi r5, 1
+        beq po_ax
+        fneg f2, f2                     # 2 / 3: self - target
+        fneg f3, f3
+        fneg f4, f4
+        cmpwi r5, 3
+        bne po_ax
+        lfs f5, 0x60(r3)                # 3: along the target's facing
+po_ax:
+        cmpwi r6, 1
+        blt po_x
+        beq po_y
+        cmpwi r6, 2
+        beq po_z
+        fmuls f1, f2, f2                # 3: the X/Y distance
+        fmadds f1, f3, f3, f1
+        bl fsqrt
+        b po_st
+po_x:
+        fmuls f1, f2, f5
+        b po_st
+po_y:
+        fmr f1, f3
+        b po_st
+po_z:
+        fmr f1, f4
+        b po_st
+po_zero:
+        lis r12, zero@ha
+        lfs f1, zero@l(r12)
+po_st:""" + store(3) + """
+        b nc_out
+""")
+    b.asm("""
+apc_five:
+        .float 5.0
+apc_rec:
+""" + "        .word 0\n" * (APC_SIZE // 4) + """apc_tab:
+""" + "        .word 0\n" * (APC_N * APC_SIZE // 4))
+
+
 def newcmd_code(b):
     """the new commands' handlers and their helpers, in their own Asm (b, at CODE2)"""
     pro = lambda lab, n, skip=True: """
@@ -576,17 +1040,17 @@ def newcmd_code(b):
     S = lambda name: size[name]          # noqa: E731
 
     def vid(key, treg='r4'):
-        """r4 = position_vars ID of key for target in treg (0 -> nc_out on a bad target)"""
+        """r4 = position_vars ID of key for target in treg (nc_out on a bad target). exe_v46k: through nc_vid (APC_CODE),
+        which gives target 12 its own block's ID"""
         base, stride, q = VB[key]
         return """
         mr r3, r29
         mr r4, %(t)s
-        bl nc_tid
-        cmpwi r3, 0
-        blt nc_out
-        mulli r4, r3, %(stride)d
-        addis r4, r4, 0x0F00
-        addi r4, r4, %(bq)d""" % dict(t=treg, stride=stride, bq=base + q)
+        li r5, %(stride)d
+        li r6, %(bq)d
+        bl nc_vid
+        cmpwi r4, 0
+        beq nc_out""" % dict(t=treg, stride=stride, bq=base + q)
 
     def msc_args(*words):
         """nc_args = words: ints, ('p', k) parameter k, ('r', reg)"""
@@ -669,7 +1133,7 @@ nc_msc:
         blr
 
 # --- nc_tid(r3 accessor, r4 target) -> r3 target 0-10 of position_vars' IDs (11, the last attacker: its slot's
-#     3 + slot), or -1 -------------------------------------------------------------------------------------------
+#     3 + slot; 12, this attack's hit: 12, its own block, nc_vid / nc_target), or -1 ----------------------------------
 nc_tid:
         cmplwi r4, 10
         bgt nt_last
@@ -677,7 +1141,7 @@ nc_tid:
         blr
 nt_last:
         cmpwi r4, 11
-        bne nt_bad
+        bne nt_12
         stwu r1, -0x20(r1)
         mflr r0
         stw r0, 0x24(r1)""" + msc_args(6, LAST_ATTACKER) + """
@@ -691,6 +1155,11 @@ nt_last:
         cmplwi r3, 7
         bgt nt_bad
         addi r3, r3, 3
+        blr
+nt_12:
+        cmpwi r4, 12
+        bne nt_bad
+        li r3, 12
         blr
 nt_bad:
         li r3, -1
@@ -711,6 +1180,10 @@ ntg_go:
         cmpwi r3, 0
         blt ntg_none
         beq ntg_self
+        cmpwi r3, 12                    # target 12: its block's ACC (0x0F0002FB = 0x2BC + 0x3F)
+        bne ntg_acc
+        li r3, 0x3F
+ntg_acc:
         lis r4, 0x%(acch)X
         ori r4, r4, 0x%(accl)X
         add r4, r4, r3
@@ -938,6 +1411,9 @@ ms_k_rate:
         cmpwi r0, 0
         beq lg_go
         li r4, 11
+        cmpwi r0, 2                     # exe_v46k: Which 2 = target 12, this attack's hit (no fallback)
+        bne lg_go
+        li r4, 12
 lg_go:
         mr r3, r29
         bl nc_target
@@ -1036,6 +1512,7 @@ nc_args:
         .word 0
         .word 0
 """)
+    return dict(pro=pro, S=S, tgt=tgt, store=store, msc_args=msc_args, call=call, fbits=fbits)
 
 
 def lgc_code(b):
@@ -2747,7 +3224,7 @@ next_entry:
     thread_code(a)
     input_code(a)
     b2 = Asm(CODE2)                     # the new commands (their labels resolve with the main part's, below)
-    newcmd_code(b2)
+    helpers = newcmd_code(b2)
     b3 = Asm(LGC_CODE)                  # Leave_Ground_Cancel (its own space: CODE2 is full)
     lgc_code(b3)
     ms_fix_code(b3)                     # exe_v46j: Motion_Set on itself (after LGC's code: nothing else moves)
@@ -2763,6 +3240,11 @@ next_entry:
     a.labels.update(b5.labels)
     b6 = Asm(HV_CODE)                   # hitbox variables (exe_v43: free space after ACC_CACHE)
     hv_code(b6)
+    b7 = Asm(APC_CODE)                  # exe_v46k: Position_Place / Position_Offset_Get, target 12 (position_vars' space)
+    apc_code(b7, helpers)
+    assert not set(b7.labels) & (set(a.labels) | set(b2.labels) | set(b6.labels)), \
+        set(b7.labels) & (set(a.labels) | set(b2.labels) | set(b6.labels))
+    a.labels.update(b7.labels)
     assert not set(b6.labels) & (set(a.labels) | set(b2.labels)), set(b6.labels) & (set(a.labels) | set(b2.labels))
     a.labels.update(b6.labels)
     b2.asm('cmd_crcs:\n' + ''.join('        .word 0x%08X\n' % crc(c[0]) for c in COMMANDS))
@@ -2796,6 +3278,7 @@ ue_nv_far:                              # user_entry's New_Var IDs (exe_v40): ue
     b4.labels.update(a.labels)
     b5.labels.update(a.labels)
     b6.labels.update(a.labels)
+    b7.labels.update(a.labels)
     b6.labels['hv_tab'] = HV_TAB
     a.labels['hv_tab'] = HV_TAB
     a.labels['gs_tab'] = GS
@@ -2820,6 +3303,9 @@ ue_nv_far:                              # user_entry's New_Var IDs (exe_v40): ue
     assert ACC_CACHE + 64 * 8 <= HV_CODE and HV_CODE + 4 * len(words6) <= HV_TAB, hex(HV_CODE + 4 * len(words6))
     assert HV_TAB + HV_N * HV_ENTRY <= HV_LIMIT
     a.part6 = (HV_CODE, words6)
+    words7 = b7.words()
+    assert APC_CODE + 4 * len(words7) <= APC_LIMIT, hex(APC_CODE + 4 * len(words7))
+    a.part7 = (APC_CODE, words7)
     assert ACC_CACHE + 64 * 8 <= THREADS and THREADS + THREAD_N * THREAD_SIZE <= GROW <= LIMIT
     hooks = {LOOKUP: b(LOOKUP, a.addr('lookup')), SIZE1: b(SIZE1, a.addr('size1')),
              SIZE2: b(SIZE2, a.addr('size2')), FETCH: b(FETCH, a.addr('fetch')),
@@ -2831,7 +3317,7 @@ ue_nv_far:                              # user_entry's New_Var IDs (exe_v40): ue
              LGC_TRAMP[LGC_SIT]: b(LGC_TRAMP[LGC_SIT], a.addr('hk_lgc_sit')),
              LGC_TRAMP[LGC_REQ]: b(LGC_TRAMP[LGC_REQ], a.addr('hk_lgc_req')),
              LGC_CHG: b(LGC_CHG, a.addr('hk_lgc_chg')),
-             FRAME_HOOK: b(FRAME_HOOK, a.addr('hv_fhook')), WM_RESET: b(WM_RESET, a.addr('hv_wmreset')),
+             FRAME_HOOK: b(FRAME_HOOK, a.addr('apc_fhook')), WM_RESET: b(WM_RESET, a.addr('apc_wmreset')),
              VAR_ENTRY: b(VAR_ENTRY, a.addr('user_gate')),
              GS_UPD: b(GS_UPD, a.addr('gs_upd')), GS_UPD_END: b(GS_UPD_END, a.addr('gs_end')),
              GS_HIT: b(GS_HIT, a.addr('gs_hit'))}
@@ -3921,7 +4407,8 @@ def input_code(a):
     a.asm("""
 # --- in_id(r4 target, r5 input) -> r4 variable ID (0 = none); leaf: r0 -------------------------------------
 in_id:
-        cmplwi r4, 10
+        b in_id_x                       # exe_v46k: target 12 (APC_CODE); then cmplwi r4, 10
+in_id_b:
         bgt iid_none
         cmplwi r5, 0x20
         blt iid_q
@@ -4534,6 +5021,7 @@ def main():
     out += ['0x%08X=0x%08X' % (a.part4[0] + 4 * i, w) for i, w in enumerate(a.part4[1])]
     out += ['0x%08X=0x%08X' % (a.part5[0] + 4 * i, w) for i, w in enumerate(a.part5[1])]
     out += ['0x%08X=0x%08X' % (a.part6[0] + 4 * i, w) for i, w in enumerate(a.part6[1])]
+    out += ['0x%08X=0x%08X' % (a.part7[0] + 4 * i, w) for i, w in enumerate(a.part7[1])]
     out += ['0x%08X=0x%08X' % kv for kv in sorted(hooks.items())]
     # the vtable words have ADDR32 relocations to the classes' own functions: moved to a dead word, or the loader
     # would write those back over ours

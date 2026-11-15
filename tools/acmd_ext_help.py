@@ -24,7 +24,8 @@ for _g, _names in (
                            'Damage_Set', 'Body_State_Set', 'Armor_Set', 'Item_State_Set', 'Stage_Collision_Set',
                            'Leave_Ground_Cancel', 'Gravity_Set']),
         ('Inputs', ['Input_Compare', 'Input_Get', 'Input_Set']),
-        ('Position & rotation', ['Position_Get', 'Position_Set', 'Rotation_Get', 'Rotation_Set', 'Joint_Position_Get']),
+        ('Position & rotation', ['Position_Get', 'Position_Set', 'Position_Place', 'Position_Offset_Get', 'Rotation_Get',
+                                 'Rotation_Set', 'Joint_Position_Get']),
         ('Animation', ['Motion_Get', 'Motion_Set', 'Animation_Rate_Set']),
         ('Targets & tracking', ['Track_Target', 'Last_Hit_Get', 'Target_Slot_Get']),
         ('Threads', ['Thread_Start', 'Thread_Stop']),
@@ -43,8 +44,14 @@ TARGETS = [
     'last attacker is this one).',
     '- 3-10: player slots 1-8 (Target = 2 + slot: player 1 is 3, player 2 is 4, ...).',
     '- 11: the last fighter that hit this one (the game\'s own record, its projectiles included).',
-    'Targets 1, 2 and 11 are worked out from a fighter\'s own script; from an article\'s script they find nobody. A '
-    'target that isn\'t there (empty slot, nobody hit yet): the command does nothing and reads give 0.',
+    '- 12: the fighter this attack hit (new in exe_v46k): the current attack\'s newest hit only, with NO fallback: '
+    'before the attack hits and once it is over, it is nobody (the command does nothing, reads give 0). Target 2 '
+    'goes on meaning someone after the attack (the fighter whose last attacker is this one, which the game keeps for '
+    'KO credit and can\'t be cleared); use 12 when acting on a fighter this attack didn\'t hit would be wrong.',
+    'Targets 1, 2, 11 and 12 are worked out from a fighter\'s own script; from an article\'s script they find nobody. '
+    'A target that isn\'t there (empty slot, nobody hit yet): the command does nothing and reads give 0.',
+    'Changed in exe_v46k: Target 12 works in every command that takes a Target (the input commands too) and has its '
+    'own variables, ATKHIT_... (0x0F0002C8-0x0F0002FF; docs/position-variables.md). Targets 0-11 are unchanged.',
 ]
 VARS = [
     '## Where the value goes',
@@ -150,11 +157,17 @@ GROUP_HELP = {
     ],
     NEW_GROUP + ' / Inputs': [
         'A fighter\'s controller: test an input (Input_Compare, then True / Else), copy it into a variable '
-        '(Input_Get), or force it as if the controller did it (Input_Set). Targets 0-10 (not 11).',
+        '(Input_Get), or force it as if the controller did it (Input_Set). Targets 0-10 and 12 (exe_v46k: the fighter '
+        'this attack hit); not 11.',
     ],
     NEW_GROUP + ' / Position & rotation': [
         'Where a fighter or article is, which way it faces, its rotation, and a joint\'s place, read into variables '
         'or set. They run the same PostureModule ops MSC does, so articles work too.',
+        'Position_Place and Position_Offset_Get (exe_v46k) do what the position variables (POS_..., ..._OFFSET_X, '
+        'docs/position-variables.md) do, as commands, for every target: put a fighter in front of / above this one, at '
+        'a stage point, move it, put this fighter next to it, some axes only, once or held every frame (through the '
+        'stage if wanted); read where it is, how far in front / above / behind, or the distance. The variables still '
+        'work as before.',
     ],
     NEW_GROUP + ' / Animation': [
         'Which animation (motion) a fighter or article plays, its frame and rate; play another one or jump within '
@@ -162,7 +175,8 @@ GROUP_HELP = {
     ],
     NEW_GROUP + ' / Targets & tracking': [
         'Track_Target makes a fighter or projectile home in on the nearest fighter. Last_Hit_Get and '
-        'Target_Slot_Get give player slots (1-8) of the last fighter hit, the last attacker or any target.',
+        'Target_Slot_Get give player slots (1-8) of the last fighter hit, the last attacker, the fighter this attack '
+        'hit (exe_v46k: Which 2 / Target 12, nobody once the attack is over) or any target.',
     ],
     NEW_GROUP + ' / Threads': [
         'Thread_Start(ID, Flags){ ... } runs its block on its own, frame by frame, while the script goes on; it '
@@ -904,6 +918,8 @@ HELP = {
         'fighter whose last attacker is this one). The same fighter is Target 2 of the other commands.',
         '- Which 1: the last fighter that hit this one (the game\'s own record, the player number it keeps for the hit '
         'effects\' colour, so its projectiles count). Target 11 of the other commands.',
+        '- Which 2 (new in exe_v46k): the fighter this attack hit: the current attack\'s newest hit only, 0 before it '
+        'hits and once the attack is over (no fallback, unlike Which 0). Target 12 of the other commands.',
         '',
     ] + VARS + [
         '',

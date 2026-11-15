@@ -504,9 +504,42 @@ mu.mem_write(ARR + 0x174 + 0x128, struct.pack('>I', ARR + 0x174 + 0x124))   # hi
 mu.mem_write(NODE + 0x18, struct.pack('>I', 1 << 16))
 check('last hit (record) hitstun', call(mu, FGET, w0, cid(2, 0)), 20)
 call(mu, FSET, w0, cid(2, 5), 10.0); check('put last hit 10 in front', pos(mu, O[1][1]), (10, 0, 0))
+# exe_v46k: target 12, this attack's hit: its own block 0x0F0002C8-0x0F0002FF (the target-2 quantities), no fallback
+T12 = {'hitstun': 0x0F0002C8, 'off_x': 0x0F0002CD, 'off_y': 0x0F0002CE, 'status': 0x0F0002D2, 'kind': 0x0F0002D5,
+       'damage': 0x0F0002EF, 'jumps': 0x0F0002F0, 'raw_x': 0x0F0002F8, 'item': 0x0F0002FA, 'acc': 0x0F0002FB,
+       'joint': 0x0F0002FC}
+check('target 12 (a record: slot 1): hitstun (0x0F0002C8)', call(mu, FGET, w0, T12['hitstun']), 20)
+check('target 12: offset X / Y (0x0F0002CD / CE)', (call(mu, FGET, w0, T12['off_x']), call(mu, FGET, w0, T12['off_y'])), (10, 0))
+call(mu, FSET, w0, T12['off_x'], 7.0); call(mu, FSET, w0, T12['off_y'], 2.0)
+check('target 12: put it 7 in front, 2 up', pos(mu, O[1][1]), (7, 2, 0))
+wint(mu, 1, 0xA1C, 0x4B)
+check('target 12: status (0x0F0002D2, q2 of hit / status)', call(mu, FGET, w0, T12['status']), 0x4B)
+call(mu, FSET, w0, T12['status'], 0x59)
+check('target 12: status write (StatusModule(3, 0x59))', ri(mu, 1, 0xA1C), 0x59)
+check('target 12: ACC (0x0F0002FB) = slot 1\'s accessor', struct.unpack('>I', struct.pack('>f', call(mu, FGET, w0, T12['acc'])))[0],
+      0x10371000)
+wf(mu, 1, 0xA4C, 37.5)
+check('target 12: damage (0x0F0002EF, inputs / state q 0x17)', call(mu, FGET, w0, T12['damage']), 37.5)
+check('target 12 = target 2 while the attack has records: hitstun', (call(mu, FGET, w0, cid(2, 0)), call(mu, FGET, w0, T12['hitstun'])),
+      (20, 20))
+check('past the block / before it (0x0F0002C7) read 0', call(mu, FGET, w0, 0x0F0002C7), 0)
 mu.mem_write(AM + 0x4C, struct.pack('>I', 0))                           # attack over: records off
 wint(mu, 1, LA, 3); wint(mu, 2, LA, 0)                                  # slot 2's last attacker = slot 0
 check('last hit (fallback) hitstun', call(mu, FGET, w0, cid(2, 0)), 67)
+check('target 12 after the attack: nobody (no fallback): hitstun / damage / status / ACC read 0',
+      tuple(call(mu, FGET, w0, T12[k]) for k in ('hitstun', 'damage', 'status', 'acc', 'off_x')), (0, 0, 0, 0, 0))
+p2 = pos(mu, O[2][1]); n2 = sets(mu, O[2][1])
+call(mu, FSET, w0, T12['off_x'], 3.0); call(mu, FSET, w0, T12['status'], 0x5D)
+check('target 12 after the attack: writes do nothing (the fallback fighter, slot 2, untouched)',
+      pos(mu, O[2][1]) + (sets(mu, O[2][1]) - n2, int(ri(mu, 2, 0xA1C) == 0x5D)), p2 + (0, 0))
+wint(mu, 2, 0xA1C, 0x31)
+check('target 2 still falls back: slot 2\'s status', call(mu, FGET, w0, hid(2, 2)), 0x31)
+mu.mem_write(AM + 0x4C, struct.pack('>I', 1))                           # records on again, but none for a fighter
+mu.mem_write(NODE + 0x18, struct.pack('>I', 0x40000000 | (1 << 16)))   # (a weapon's ID)
+check('target 12: records with no fighter: nobody; target 2: the fallback',
+      (call(mu, FGET, w0, T12['hitstun']), call(mu, FGET, w0, cid(2, 0))), (0, 67))
+mu.mem_write(NODE + 0x18, struct.pack('>I', 1 << 16))
+mu.mem_write(AM + 0x4C, struct.pack('>I', 0))
 wint(mu, 2, LA, 1)
 check('last hit: nobody', call(mu, FGET, w0, cid(2, 0)), 0)
 check('index past the end', call(mu, FGET, w0, 0x0F0000A0), 0)
