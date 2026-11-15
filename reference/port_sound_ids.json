@@ -114,6 +114,29 @@
     "snd_vc_Pzenigame_ouen": 46162
    },
    "_note": "Mario's ids (ultimate_sound.py, base rows grown); his banks not renumbered yet (files not at hand)"
+  },
+  "master": {
+   "kind": "0x47",
+   "cap": "Master",
+   "base": "szerosuit",
+   "alias": {
+    "se": 2028,
+    "vc": 6023,
+    "ouen": 6106
+   },
+   "banks": {
+    "snd_se_Master": 46192,
+    "snd_se_Master_c01": 46201,
+    "snd_se_Master_c03": 46203,
+    "snd_se_Master_c05": 46205,
+    "snd_se_Master_c07": 46207,
+    "snd_vc_Master": 46193,
+    "snd_vc_Master_c01": 46209,
+    "snd_vc_Master_c03": 46211,
+    "snd_vc_Master_c05": 46213,
+    "snd_vc_Master_c07": 46215,
+    "snd_vc_Master_ouen": 46194
+   }
   }
  }
 }
