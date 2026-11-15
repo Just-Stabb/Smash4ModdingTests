@@ -559,6 +559,26 @@ NEW_CMDS = [
      'Reads where a fighter is: its stage position or facing, how far it is in front of / above this object, how far '
      'this object is in front of or behind it, or the distance between them. Every target, the new one (12) '
      'included.'),
+    ('Buffer_Clear', 'h_bufclr', [
+        ('Target', 0, _T + ' A fighter (an article has no input buffer).'),
+        ('Inputs', 0, 'Which buffered inputs go, bits (add them): 1 attacks (tilts, smashes, aerials, jab), 2 specials, '
+                      '4 jump (button and tap jump), 8 shield / air dodge / spot dodge / rolls, 16 grab, 32 taunts, '
+                      '64 stick commands (dash, turn) and the stick flicks; 0 (or 128) everything, as the game\'s own '
+                      'clear at a status change (also this frame\'s presses and the per-button counters).'),
+        ('Frames', 0, '0 / 1: once, now. 2 or more: now, and again after each of its next Frames - 1 input reads (the '
+                      'game buffers presses as they come: what it presses in those frames goes too).')],
+     'Empties a fighter\'s input buffer (all of it or some inputs), so nothing it pressed before comes out when it can '
+     'act: e.g. the fighter a grab-like move releases. Once, or for some frames.'),
+    ('Buffer_Set', 'h_bufset', [
+        ('Target', 0, _T + ' A fighter (an article has no input buffer).'),
+        ('Input', 0, 'The button: 0 attack, 1 special, 2 jump, 3 shield, 4 grab, 5 taunt up, 6 taunt side, 7 taunt down.'),
+        ('Direction', 0, 'The stick with it: 0 the fighter\'s own stick; 1 neutral, 2 forward (along its facing), 3 back, '
+                         '4 up, 5 down; + 8 flicked (a smash input: 10 forward smash, 12 up smash, 13 down smash; 12 '
+                         'with Input 2 a tap jump...).'),
+        ('Frames', 0, 'How long it stays buffered: 0 the game\'s buffer window (10 frames), 1-255 that many frames.')],
+     'Puts an input in a fighter\'s buffer as if it had pressed it (with a stick direction): the game makes its own '
+     'commands of it at the fighter\'s next input read, and the fighter does it as soon as it can act (a jump at the '
+     'end of a move, an attack out of hitstun, ...).'),
 ]
 SM4SHCOMMAND_DESC.update({n: d + ' New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).'
                           for n, _l, _p, d in NEW_CMDS})
@@ -1021,6 +1041,418 @@ apc_five:
 apc_rec:
 """ + "        .word 0\n" * (APC_SIZE // 4) + """apc_tab:
 """ + "        .word 0\n" * (APC_N * APC_SIZE // 4))
+
+
+# --- exe_v46l: Buffer_Clear / Buffer_Set (docs/native-notes.md "The input buffer") ----------------------------------
+FCM_VT = 0x1012B30C               # the fighters' ControlModule class (accessor +0x24); the buffer is theirs only
+BUILDER = 0x02E71774              # its command builder (this, ): the frame's commands from the controller struct
+BUF_HOOK = 0x02E72B9C             # the control update 0x02E729E4's bl BUILDER (no relocation): -> buf_build
+BUF_HOOK_ORIG = 0x4BFFEBD9
+GAME_CLEAR = 0x02E70FB4           # clear_command: the trigger buffer (+0xB4 / +0xB8) and the 4 command categories
+RESET_TRIG = 0x02003568           # (controller struct) pressed = 0, the 16 per-button frame counters 0xFE (MSC 0x271B; buf_clear does the same inline)
+BUF_TAB = 0x04BD3D00              # BUF_N requests of BUF_SIZE (zero at load; free between Gravity_Set's code and GS):
+BUF_N = 12                        # +0 the ControlModule (0 = free), +4 kind (1 clear, 2 set), +8 Inputs / Input,
+BUF_SIZE = 0x14                   # +0xC Direction, +0x10 frames (clear: re-clears left; set: the life asked)
+# Buffer_Clear's groups (Inputs bits 1-64): (category 0 mask, category 1 mask, trigger mask, pressed mask), from the
+# builder (0x02E71774 / 0x02E738AC); 64 also resets the stick flick counters
+BUF_GROUPS = [(0x0000007F, 0, 0x03, 0x03E1),     # 1 attack: N / S3 / HI3 / LW3 / S4 / HI4 / LW4 (C-stick, A+B too)
+              (0x0000F000, 0, 0x0C, 0x0802),     # 2 special: N / S / HI / LW
+              (0x00300000, 0, 0x30, 0x0004),     # 4 jump: the stick (tap) jump 0x100000, the button 0x200000
+              (0x07400000, 0, 0xC0, 0x0008),     # 8 shield: shield / air dodge 0x400000, spot dodge, rolls
+              (0x20000000, 0, 0x00, 0x0010),     # 16 grab
+              (0x00000000, 7, 0x00, 0x7400),     # 32 taunts (category 1: side 1, up 2, down 4)
+              (0x000F0000, 0, 0x00, 0x0000)]     # 64 stick: dash / turn / walk-type commands, flick counters
+# Buffer_Set's buttons (Input 0-7): (pressed bits, held bits) put in the controller struct around the builder
+BUF_PRESS = [(0x0201, 0x0001), (0x0802, 0x0002), (0x0004, 0x0004), (0x0008, 0x0008), (0x0211, 0x0019),
+             (0x0400, 0x0400), (0x2000, 0x2000), (0x1000, 0x1000)]
+
+
+def buf_code(b, h):
+    """exe_v46l (in APC_CODE after apc_code): Buffer_Clear / Buffer_Set and buf_build, which the fighters' control update
+    calls instead of the builder (BUF_HOOK): a pending Buffer_Set's press (and stick) is put in the controller struct
+    around the builder, which makes the game's own commands of it (its timer set to Frames when asked); a pending
+    Buffer_Clear clears again after the builder, for its frames"""
+    pro, S, tgt = h['pro'], h['S'], h['tgt']
+    tab = dict(th=ha(BUF_TAB), tl=lo(BUF_TAB), n=BUF_N, size=BUF_SIZE, vh=FCM_VT >> 16, vl=FCM_VT & 0xFFFF)
+    b.asm(("""
+# --- buf_cm(r3 accessor) -> r3 its fighter ControlModule, 0 = none / not a fighter's; leaf (r0, r12) ----------------
+buf_cm:""" + chk_t('r3', 'r0', 'bcm_none') + """
+        lwz r3, 0x24(r3)""" + chk_t('r3', 'r0', 'bcm_none') + """
+        lwz r12, 0(r3)
+        lis r0, 0x%(vh)X
+        ori r0, r0, 0x%(vl)X
+        cmplw r12, r0
+        beqlr
+bcm_none:
+        li r3, 0
+        blr
+
+# --- buf_slot(r3 ControlModule, r4 kind) -> r3 its request of that kind, else a free one, else 0; leaf ---------------
+# --- buf_find(r3, r4) -> r3 its request of that kind, else 0; leaf (r0, r10-r12) -----------------------------------
+buf_find:
+        li r10, -1
+        b bs_go
+buf_slot:
+        li r10, 0
+bs_go:
+        lis r12, 0x%(th)X
+        addi r12, r12, %(tl)d
+        li r11, %(n)d
+        mtctr r11
+bs_loop:
+        lwz r0, 0(r12)
+        cmpwi r0, 0
+        bne bs_mine
+        cmpwi r10, 0
+        bne bs_next
+        mr r10, r12                     # the first free one
+        b bs_next
+bs_mine:
+        cmplw r0, r3
+        bne bs_next
+        lwz r0, 4(r12)
+        cmpw r0, r4
+        bne bs_next
+        mr r3, r12
+        blr
+bs_next:
+        addi r12, r12, %(size)d
+        bdnz bs_loop
+        li r3, 0
+        cmpwi r10, -1
+        beqlr
+        mr r3, r10
+        blr
+
+# --- buf_clear(r3 ControlModule, r4 Inputs): its buffered inputs of those groups go now (0 / 128: all of them, as the
+#     game's clear_command and reset_trigger: every category, the trigger buffer, this frame's presses, the counters) -
+buf_clear:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r30, 0x18(r1)
+        stw r31, 0x1C(r1)
+        mr r31, r3
+        mr r30, r4
+        andi. r0, r30, 0x7F
+        beq bc_all
+        andi. r0, r30, 0x80
+        bne bc_all
+        lis r12, buf_groups@ha
+        addi r12, r12, buf_groups@l
+        li r11, 0
+bc_loop:
+        li r0, 1
+        slw r0, r0, r11
+        and. r0, r0, r30
+        beq bc_next
+        lwz r9, 0x158(r31)              # category 0
+        lwz r10, 0(r12)
+        andc r9, r9, r10
+        stw r9, 0x158(r31)
+        lwz r9, 0x168(r31)              # category 1
+        lwz r10, 4(r12)
+        andc r9, r9, r10
+        stw r9, 0x168(r31)
+        lwz r9, 0xB4(r31)               # the trigger buffer
+        lwz r10, 8(r12)
+        andc r9, r9, r10
+        stw r9, 0xB4(r31)
+        lwz r8, 0xA0(r31)               # the controller struct's presses this frame""" + chk_t('r8', 'r0', 'bc_flick') + """
+        lwz r9, 0x48(r8)
+        lwz r10, 0xC(r12)
+        andc r9, r9, r10
+        stw r9, 0x48(r8)
+bc_flick:
+        cmpwi r11, 6                    # 64: the flick counters (as MSC ControlModule(0x2719 / 0x271A))
+        bne bc_next
+        bl bc_flicks
+bc_next:
+        addi r12, r12, 0x10
+        addi r11, r11, 1
+        cmpwi r11, 7
+        blt bc_loop
+        b bc_out
+bc_all:
+        mr r3, r31
+        bl 0x%(gclear)08X
+        addi r3, r31, 0x10              # reset_trigger (0x02003568, out of bl's reach: its loop here): the struct's
+        li r0, 0                        # presses this frame, the per-button counters 0xFE
+        stw r0, 0x48(r3)
+        li r0, 0xFE
+        li r9, 32
+        mtctr r9
+        addi r9, r3, 0x4F
+bc_rt:
+        stbu r0, 1(r9)
+        bdnz bc_rt
+        lwz r3, 0xA0(r31)""" + chk_t('r3', 'r0', 'bc_af') + """
+        li r0, 0
+        stw r0, 0x48(r3)
+bc_af:
+        bl bc_flicks
+bc_out:
+        lwz r30, 0x18(r1)
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+bc_flicks:                              # leaf: r0
+        li r0, 0xFE
+        stb r0, 0x80(r31)
+        stb r0, 0x82(r31)
+        li r0, 0
+        stb r0, 0x81(r31)
+        stb r0, 0x83(r31)
+        blr
+
+# --- buf_build(r3 ControlModule): BUF_HOOK's call, instead of bl BUILDER ---------------------------------------------
+buf_build:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r26, 0x28(r1)
+        mr r31, r3
+        li r4, 2
+        bl buf_find
+        mr. r30, r3
+        beq bb_build
+        lwz r29, 0xA0(r31)              # the controller struct: its presses, held buttons, stick, flick counters""" +
+          chk_t('r29', 'r0', 'bb_drop') + """
+        lwz r0, 0x48(r29)
+        stw r0, 0x8(r1)
+        lwz r0, 0x3C(r29)
+        stw r0, 0xC(r1)
+        lwz r0, 0(r29)
+        stw r0, 0x10(r1)
+        lwz r0, 4(r29)
+        stw r0, 0x14(r1)
+        lwz r0, 0x70(r29)
+        stw r0, 0x18(r1)
+        lwz r4, 8(r30)                  # Input: its press and held bits
+        slwi r4, r4, 3
+        lis r12, buf_press@ha
+        addi r12, r12, buf_press@l
+        add r12, r12, r4
+        lwz r0, 0(r12)
+        lwz r9, 0x48(r29)
+        or r9, r9, r0
+        stw r9, 0x48(r29)
+        lwz r0, 4(r12)
+        lwz r9, 0x3C(r29)
+        or r9, r9, r0
+        stw r9, 0x3C(r29)
+        lwz r5, 0xC(r30)                # Direction: 0 its own stick; 1-5 neutral / forward / back / up / down, + 8 flicked
+        andi. r6, r5, 7
+        beq bb_build
+        slwi r6, r6, 3
+        lis r12, buf_dirs@ha
+        addi r12, r12, buf_dirs@l
+        add r12, r12, r6
+        lfs f1, 0(r12)                  # forward: along its facing
+        lfs f2, 4(r12)
+        lwz r7, 4(r31)                  # its accessor -> PostureModule's facing""" + chk_t('r7', 'r0', 'bb_dir') + """
+        lwz r7, 0x18(r7)""" + chk_t('r7', 'r0', 'bb_dir') + """
+        lfs f0, 0x60(r7)
+        fmuls f1, f1, f0
+        lwz r0, 0xA8(r31)               # (the builder flips X when this is set)
+        cmpwi r0, 0
+        beq bb_dir
+        fneg f1, f1
+bb_dir:
+        stfs f1, 0(r29)
+        stfs f2, 4(r29)
+        li r0, 0xFE                     # flick counters: long ago, or (+8) this frame
+        andi. r6, r5, 8
+        beq bb_fl
+        li r0, 1
+bb_fl:
+        stb r0, 0x70(r29)
+        stb r0, 0x72(r29)
+        b bb_build
+bb_drop:
+        li r0, 0
+        stw r0, 0(r30)
+        li r30, 0
+bb_build:
+        mr r3, r31
+        bl 0x%(builder)08X
+        cmpwi r30, 0
+        beq bb_clear
+        lwz r0, 0x8(r1)                 # the struct as the controller left it
+        stw r0, 0x48(r29)
+        lwz r0, 0xC(r1)
+        stw r0, 0x3C(r29)
+        lwz r0, 0x10(r1)
+        stw r0, 0(r29)
+        lwz r0, 0x14(r1)
+        stw r0, 4(r29)
+        lwz r0, 0x18(r1)
+        stw r0, 0x70(r29)
+        lwz r28, 0x10(r30)              # Frames: the commands this press made (timer = their fresh value) last that long
+        cmpwi r28, 0
+        ble bb_free
+        cmpwi r28, 255
+        ble bb_fr
+        li r28, 255
+bb_fr:
+        lwz r27, 0x198(r31)             # the life a command gets: [+0x198] (buffering on, +0x1B8) or 2, one already gone
+        clrlwi r27, r27, 24
+        addi r26, r27, -1               # (the trigger buffer's: [+0x198] always)
+        lbz r0, 0x1B8(r31)
+        cmpwi r0, 0
+        bne bb_life
+        li r27, 2
+bb_life:
+        addi r27, r27, -1
+        addi r11, r31, 0x158
+        li r12, 4
+bb_cat:
+        lwz r9, 0(r11)                  # flags, count, timers
+        lwz r10, 4(r11)
+        lwz r8, 8(r11)
+        cmplwi r10, 32
+        ble bb_cnt
+        li r10, 32
+bb_cnt:
+        cmpwi r10, 0
+        ble bb_cnext""" + chk_t('r8', 'r0', 'bb_cnext') + """
+        mtctr r10
+        li r7, 0
+bb_bit:
+        li r0, 1
+        slw r0, r0, r7
+        and. r0, r0, r9
+        beq bb_bnext
+        lbzx r0, r8, r7
+        cmpw r0, r27
+        bne bb_bnext
+        stbx r28, r8, r7
+bb_bnext:
+        addi r7, r7, 1
+        bdnz bb_bit
+bb_cnext:
+        addi r11, r11, 0x10
+        addi r12, r12, -1
+        cmpwi r12, 0
+        bgt bb_cat
+        lwz r9, 0xB4(r31)               # the trigger buffer: bits 0-7, timers +0xB8
+        li r7, 0
+bb_trig:
+        li r0, 1
+        slw r0, r0, r7
+        and. r0, r0, r9
+        beq bb_tnext
+        addi r8, r31, 0xB8
+        lbzx r0, r8, r7
+        cmpw r0, r26
+        bne bb_tnext
+        stbx r28, r8, r7
+bb_tnext:
+        addi r7, r7, 1
+        cmpwi r7, 8
+        blt bb_trig
+bb_free:
+        li r0, 0
+        stw r0, 0(r30)
+bb_clear:
+        mr r3, r31                      # a Buffer_Clear with frames left: again, after the builder
+        li r4, 1
+        bl buf_find
+        mr. r30, r3
+        beq bb_out
+        mr r3, r31
+        lwz r4, 8(r30)
+        bl buf_clear
+        lwz r3, 0x10(r30)
+        addi r3, r3, -1
+        stw r3, 0x10(r30)
+        cmpwi r3, 0
+        bgt bb_out
+        li r0, 0
+        stw r0, 0(r30)
+bb_out:
+        lmw r26, 0x28(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+
+# --- Buffer_Clear(Target, Inputs, Frames) ----------------------------------------------------------------------------
+""") % dict(tab, gclear=GAME_CLEAR, reset=RESET_TRIG, builder=BUILDER) + pro('h_bufclr', S('Buffer_Clear')) + tgt + """
+        mr r3, r27
+        bl buf_cm
+        mr. r26, r3
+        beq nc_out
+        lwz r4, 4(r30)
+        bl buf_clear
+        lwz r0, 8(r30)                  # Frames 2+: again after each of its next Frames - 1 builds
+        cmpwi r0, 1
+        ble nc_out
+        mr r3, r26
+        li r4, 1
+        bl buf_slot
+        cmpwi r3, 0
+        beq nc_out
+        stw r26, 0(r3)
+        li r0, 1
+        stw r0, 4(r3)
+        lwz r0, 4(r30)
+        stw r0, 8(r3)
+        lwz r0, 8(r30)
+        addi r0, r0, -1
+        stw r0, 0x10(r3)
+        b nc_out
+
+# --- Buffer_Set(Target, Input, Direction, Frames): made at its next build ----------------------------------------------
+""" + pro('h_bufset', S('Buffer_Set')) + tgt + """
+        lwz r0, 4(r30)
+        cmplwi r0, 7
+        bgt nc_out
+        lwz r0, 8(r30)
+        cmplwi r0, 15
+        bgt nc_out
+        andi. r0, r0, 7
+        cmplwi r0, 5
+        bgt nc_out
+        mr r3, r27
+        bl buf_cm
+        mr. r26, r3
+        beq nc_out
+        li r4, 2
+        bl buf_slot
+        cmpwi r3, 0
+        beq nc_out
+        stw r26, 0(r3)
+        li r0, 2
+        stw r0, 4(r3)
+        lwz r0, 4(r30)
+        stw r0, 8(r3)
+        lwz r0, 8(r30)
+        stw r0, 0xC(r3)
+        lwz r0, 12(r30)
+        stw r0, 0x10(r3)
+        b nc_out
+""")
+    b.asm("""
+buf_groups:
+""" + "".join("        .word 0x%08X\n        .word 0x%08X\n        .word 0x%08X\n        .word 0x%08X\n" % g
+              for g in BUF_GROUPS) + """buf_press:
+""" + "".join("        .word 0x%08X\n        .word 0x%08X\n" % p for p in BUF_PRESS) + """buf_dirs:
+        .float 0.0
+        .float 0.0
+        .float 0.0
+        .float 0.0
+        .float 1.0
+        .float 0.0
+        .float -1.0
+        .float 0.0
+        .float 0.0
+        .float 1.0
+        .float 0.0
+        .float -1.0
+""")
 
 
 def newcmd_code(b):
@@ -3244,6 +3676,7 @@ next_entry:
     hv_code(b6)
     b7 = Asm(APC_CODE)                  # exe_v46k: Position_Place / Position_Offset_Get, target 12 (position_vars' space)
     apc_code(b7, helpers)
+    buf_code(b7, helpers)                # exe_v46l: Buffer_Clear / Buffer_Set
     assert not set(b7.labels) & (set(a.labels) | set(b2.labels) | set(b6.labels)), \
         set(b7.labels) & (set(a.labels) | set(b2.labels) | set(b6.labels))
     a.labels.update(b7.labels)
@@ -3322,7 +3755,7 @@ ue_nv_far:                              # user_entry's New_Var IDs (exe_v40): ue
              FRAME_HOOK: b(FRAME_HOOK, a.addr('apc_fhook')), WM_RESET: b(WM_RESET, a.addr('apc_wmreset')),
              VAR_ENTRY: b(VAR_ENTRY, a.addr('user_gate')),
              GS_UPD: b(GS_UPD, a.addr('gs_upd')), GS_UPD_END: b(GS_UPD_END, a.addr('gs_end')),
-             GS_HIT: b(GS_HIT, a.addr('gs_hit'))}
+             GS_HIT: b(GS_HIT, a.addr('gs_hit')), BUF_HOOK: b(BUF_HOOK, a.addr('buf_build')) | 1}
     for k, h in enumerate(STEP_HOOKS):
         hooks[h] = b(h, a.addr('hk_step%d' % k))
     for vt in WM_VTABLES:               # New_Var: the WorkModule int ops (absolute addresses: no branch range)
