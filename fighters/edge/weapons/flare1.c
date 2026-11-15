@@ -1085,6 +1085,7 @@ void fl_target_shape(int k)
     if (k == 0x44) { fl_rad = 13.00f; fl_joint = 0xb; fl_oup = 1.50f; fl_ofwd = 0.00f; fl_up = 8.50f; fl_fwd = 0.00f; }   // pickel (pickel WaistN)
     if (k == 0x45) { fl_rad = 15.00f; fl_joint = 0xb; fl_oup = -1.50f; fl_ofwd = 0.00f; fl_up = 10.52f; fl_fwd = 0.00f; }   // brave (brave WaistN)
     if (k == 0x46) { fl_rad = 11.00f; fl_joint = 0xb; fl_oup = 0.45f; fl_ofwd = 0.22f; fl_up = 5.52f; fl_fwd = 0.71f; }   // pzenigame (pzenigame WaistN)
+    if (k == 0x47) { fl_rad = 14.50f; fl_joint = 0xb; fl_oup = -1.50f; fl_ofwd = 0.00f; fl_up = 9.66f; fl_fwd = 0.00f; }   // master (master WaistN)
 }
 // ---- end of flare targets ----
 

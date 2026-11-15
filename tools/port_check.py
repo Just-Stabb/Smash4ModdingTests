@@ -1930,9 +1930,13 @@ def check_effects(inst, name, rep):
         # E5: a type-4 mesh that only ever moves along its emitter's Y (no all-direction speed, no spread,
         # emitted along +-Y, gravity along Y, the emitter unturned): X = emitter Y x motion is zero, every
         # vertex of its width on one line: drawn as nothing (Squirtle's up-smash water columns, eft2 type-5
-        # meshes, test 15; convert as type 3, eft2's type 5 being a directional billboard)
+        # meshes, test 15; convert as type 3, eft2's type 5 being a directional billboard). Converted sets only: the
+        # base's own vanilla sets are eft art the game draws as they are (Byleth's bank: ZSS's PtcSzerosuitSmashArc)
+        own = 'Ptc' + name[:1].upper() + name[1:]
         upright = []
         for si in range(len(p.sets)):
+            if not p.set_name(si).startswith(own):
+                continue
             for x in p.sets[si]['emitters']:
                 d = x['data']
                 if d is None or p.field(d, 'particle_type') != 4 or p.field(d, 'primitive_index') < 0 \

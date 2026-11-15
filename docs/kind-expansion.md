@@ -198,6 +198,16 @@ kind on such a base gets 0 there (the generator warns). Mario has none.
    in one call on the vanilla files).
 3. Rebuild the RPX with the command above and run the test. No RAM change below the capacity.
 
+### Adding a fighter to an executable that grew past the caves (exe_v44 on)
+
+kind_expand.py / base_effects_cave.py / base_customs_cave.py need an un-grown base RPX, which the user's executable
+stopped being at exe_v44 (and no un-grown base of it is kept). `tools/kind_expand_incremental.py build` runs them on
+the current executable as on a virtual base (each hooked word read as the original the generator states): with the
+spec the executable was built with they must reproduce it (all but the words other caves re-hooked), and the words
+the new spec changes are the patch; then `kirby_copy_pool_cave.py` again on the result (its hooks sit on the moved
+load / unload cases). `test` runs the cave tests the same way. First used for Byleth (exe_v46n -> exe_v46o,
+fighters/master/README.md).
+
 ### Adding a fighter to a pack that already has one
 
 How Sephiroth v1 (`build/sephiroth_v1_test.zip`) was built on top of Supamario (v5 data, test 18

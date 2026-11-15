@@ -744,6 +744,9 @@ EFFECT_MACROS = {
     'EFFECT_FLW_POS_NO_STOP': ('External_Graphic_Effect2', 'follow'),
     'EFFECT_FOLLOW_ALPHA': ('Graphic_Effect6', 'follow+alpha'),
     'EFFECT_FOLLOW_COLOR': ('EFFECT_FOLLOW_COLOR', 'follow+color'),
+    # Smash 4's own EFFECT_GLOBAL (name, x .. rz, size: no bone); Ultimate's has a trailing bool more (Byleth's Final
+    # Smash screens, VisualScene01 / 02)
+    'EFFECT_GLOBAL': ('EFFECT_GLOBAL', 'global'),
 }
 
 # LAST_EFFECT_SET_* -> the Smash 4 command of the same name, its arguments scaled: Ultimate passes
@@ -770,7 +773,8 @@ def same_name_syntax(macro):
         _SYNTAX['_crc'] = lambda n: '%08X' % zlib.crc32(n.encode())
     v = _SYNTAX.get(_SYNTAX['_crc'](macro))
     syn = v and v.get('syntax') or []
-    return (v['name'], syn) if syn[:1] in (['Graphic'], ['GFXRight']) and 'Bone' in syn else None
+    # 'Effect': EFFECT_FLW_UNSYNC_VIS / EFFECT_FLW_POS_UNSYNC_VIS name their id field so (Byleth's side special dash)
+    return (v['name'], syn) if syn[:1] in (['Graphic'], ['GFXRight'], ['Effect']) and 'Bone' in syn else None
 
 
 def euler_matrix(rot):
@@ -942,6 +946,15 @@ class EffectTranslator(Translator):
             self.skip(short)
             return []
         target, shape = EFFECT_MACROS[short]
+        if shape == 'global':
+            # no bone: a place in the world (Smash 4's EFFECT_GLOBAL); Ultimate's last bool (its terminate) dropped
+            eid = self.ids.get(a[1])
+            self.last, self.last_name = eid is not None, a[1]
+            if eid is None:
+                if a[1] != 'null':
+                    self.missing[a[1]] = self.missing.get(a[1], 0) + 1
+                return []
+            return [cmd(target, eid, *[float(v) for v in a[2:9]])]
         if short.startswith('EFFECT_FLW_POS') and any(abs(float(v)) > 1e-6 for v in a[3:6]):
             # Smash 4's position-only follow adds the offset unturned to the bone's position
             # (cross_f.rpx 0x0334E4B0: effect record +0x144 bit 0x1000), Ultimate turns it with the
@@ -993,7 +1006,7 @@ def _same_name(self, short, a):
     k = 0
     while k < len(syn):
         f, v = syn[k], args[k]
-        if f in ('Graphic', 'GFXRight', 'GFXLeft'):
+        if f in ('Graphic', 'GFXRight', 'GFXLeft', 'Effect'):
             eid = self.ids.get(v)
             if eid is None:
                 if v != 'null':

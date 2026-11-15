@@ -52,12 +52,28 @@
    "Part pacs koopapt1-3 / lhand / rhand are his own bones: keep them next to the new main.pac."
   ]
  },
+ "szerosuit": {
+  "fighter": "Zero Suit Samus (costumes 6 / 7 have no back mark: 33 meshes)", "profile": "szerosuit / szerosuit_nomark (by costume)", "vl_kind": "szerosuit",
+  "ports": ["master"],
+  "fighter_param": {"0x1300011F": "Has Tether (fighter_param_attributes.csv column 287): 1 for her (whip grab, zair); 0 unless the port tethers (Byleth: decision pending)"},
+  "traps": [
+   "Her kind (0x19) is in kind_expand.py TAIL_EXTRA_KINDS: the vl load tail stores the x152C vector for its own kind only, and the kinds that have one are exactly the tether fighters (Link, Samus, ZSS, Toon Link, Lucas): a new kind on her base gets 0 there. Any of her native tether code the port reaches (grab whip, zair, the lasso hang statuses 0xF3 / 0xF4) may read a null vector: give the new kind the base's x152C in its vl load case (kind_expand.py) or keep the port off every tether path (Has Tether 0, her grab / air-grab statuses replaced) before the first in-game test (Byleth, unverified).",
+   "Her eyelid pac keys her face skin (SZerosuit_Face_Main) by expression: the port's face must not go there (port_check F1); Byleth's is in Gamemodel.",
+   "Costumes 6 / 7 have no Mark_back1 mesh (33 slots): profile szerosuit_nomark.",
+   "The Paralyzer slot (her holster) is shown / hidden by her own code: keep it empty.",
+   "Her motion table has a 3-hit jab and no rapid jab, and AttackS4 S only (no Hi / Lw): a port with a rapid jab / angled forward smash needs motion slots of its own (motions.add, extra_kinds.json motions).",
+   "Her articles (whip, paralyzer, laser = paralyzer_bullet, gunship, cockpit) load from fighter/szerosuit/ by owner (W7): a port's own model / ACMD on one needs a kind of its own (extra_kinds.json plain entry).",
+   "material_anime_eye.pac (her eye material UV animation, by material hash) and the *_lang pacs (eye / eyelid / face) are kept as hers: the motions step rewrites only material_anime_face / eyelid.pac (check the _lang ones before shipping).",
+   "szerosuitpt1.pac / szerosuitsw1.pac drive her own bones (the holstered Paralyzer's parts, the ponytail): keep them next to the new main.pac."
+  ]
+ },
  "_texture_ids": {
   "supamario": {"kind": "0x41", "base": "0x40C10000", "articles": []},
   "edge": {"kind": "0x42", "base": "0x40C20000", "articles": ["snake", "snaketip", "trail", "fill"]},
   "gaogaen": {"kind": "0x43", "base": "0x40C30000", "articles": []},
   "pickel": {"kind": "0x44", "base": "0x40C40000", "articles": []},
   "brave": {"kind": "0x45", "base": "0x40C50000", "articles": []},
-  "pzenigame": {"kind": "0x46", "base": "0x40C60000", "articles": []}
+  "pzenigame": {"kind": "0x46", "base": "0x40C60000", "articles": []},
+  "master": {"kind": "0x47", "base": "0x40C70000", "articles": []}
  }
 }

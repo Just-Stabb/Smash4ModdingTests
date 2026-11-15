@@ -72867,6 +72867,7 @@ int kirby_copy_trait(int kind)
     if (kind == 0x44) { return trait_technical(); } // Steve (pickel, new kind, Pit base)
     if (kind == 0x45) { return trait_technical(); } // Hero (brave, new kind, Robin base)
     if (kind == 0x46) { return trait_shooter(); }   // Squirtle (pzenigame, new kind, Mario base)
+    if (kind == 0x47) { return trait_strike(); }    // Byleth (master, new kind, Zero Suit Samus base)
     if (kind == 0x17) { return trait_normal(); }    // Meta Knight
     if (kind == 0x6)  { return trait_shooter(); }   // Samus
     if (kind == 0x36) { return trait_technical(); } // Roy

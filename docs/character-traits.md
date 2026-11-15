@@ -24,6 +24,7 @@ Traits: **Rush**, **Shooter**, **Strike**, **Juggernaut**, **Normal**, **Technic
 | Steve (`pickel`, new kind, Ultimate port on Pit's base) | `0x44` | Technical |
 | Hero (`brave`, new kind, Ultimate port on Robin's base) | `0x45` | Technical |
 | Squirtle (`pzenigame`, new kind, Ultimate port on Mario's base) | `0x46` | Shooter |
+| Byleth (`master`, new kind, Ultimate port on Zero Suit Samus's base) | `0x47` | Strike |
 | Meta Knight | `0x17` | Normal |
 | Samus | `0x06` | Shooter |
 | Roy | `0x36` | Technical |

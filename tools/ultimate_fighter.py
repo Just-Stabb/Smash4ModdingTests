@@ -1221,6 +1221,88 @@ MARIO_MOTIONS = {
     'j01appealhi': 'j01appealhir', 'j01appeals': 'j01appealsr', 'j01appeallw': 'j01appeallwr',
 }
 
+# Zero Suit Samus's mesh slots for Byleth (master). ZSS's eyelid pac keys her face skin (Face_Main) and the eye slots by
+# her expressions, her face pac the mouth slots. Byleth's face is part of his body (c00) / faceShape (c01): both go in
+# Gamemodel with the rest of the body, never in Face_Main (the eyelid keys hide it: port_check F1). His eyes go in the
+# eye slot of the same expression (ZSS keys them as Ultimate's blink: Openblink -> half blinks -> Blink); EyeN (shown
+# with Openblink) takes his open eyeballs, an expression's own eyes ride with its lids. His mouths are driven per frame
+# from Ultimate's visibility (MASTER_MOUTHS: profile "drive"). The Sword of the Creator (master_sword: hidden while an
+# article weapon is out) is in Mouth_Result, a slot only results motions key, driven by Ultimate's track (vis). The
+# holstered Paralyzer and ZSS's back mark: empty. Hair in OMOTE (sorted, never keyed). Not used: low / final meshes.
+_MS = 'master_%s_VIS_O_OBJShape'
+_ZS = 'SZerosuit_%s_VIS_O_OBJ_O_NOSORT_FAR'
+SZEROSUIT_SLOTS = [
+    ('Mark_back1_O_OBJ_O_NOSORT_FAR', []),
+    ('SZerosuit_Face_Main_VIS_O_OBJ', []),
+    ('SZerosuit_Eye_VIS_O_OBJ', []),
+    ('SZerosuit_EyeN_VIS_O_OBJ_O_NOSORT_FAR', [_MS % 'Eye']),
+    (_ZS % 'Eye_Openblink', [_MS % 'Openblink']),
+    (_ZS % 'Eye_Halfblink05', [_MS % 'Halfblink01', _MS % 'Eye_Halfblink01']),
+    (_ZS % 'Eye_Halfblink1', [_MS % 'Halfblink01', _MS % 'Eye_Halfblink01']),
+    (_ZS % 'Eye_Halfblink15', [_MS % 'Halfblink02', _MS % 'Eye_Halfblink02']),
+    (_ZS % 'Eye_Halfblink2', [_MS % 'Halfblink03', _MS % 'Eye_Halfblink03']),
+    (_ZS % 'Eye_Halfblink25', [_MS % 'Halfblink03', _MS % 'Eye_Halfblink03']),
+    (_ZS % 'Eye_Blink', [_MS % 'Blink', _MS % 'Blink_Down']),
+    (_ZS % 'Eye_Talk', [_MS % 'Blink_Talk', _MS % 'Blink_Capture']),
+    (_ZS % 'Eye_Ouch', [_MS % 'Blink_Ouch', _MS % 'Eye_Ouch']),
+    (_ZS % 'Eye_HeavyAttack', [_MS % 'Blink_Heavyattack', _MS % 'Eye_Heavyattack']),
+    (_ZS % 'Eye_HeavyOuch', [_MS % 'Blink_HeavyOuch', _MS % 'Blink_HeavyHit', _MS % 'Eye_HeavyHit']),
+    (_ZS % 'Eye_Ottotto', [_MS % 'Blink_Ottotto']),
+    (_ZS % 'Eye_Furafura', [_MS % 'Blink_Furafura']),
+    (_ZS % 'Eye_Hot', [_MS % 'Hot']),
+    ('SZerosuit_MouthN_VIS_O_OBJ', [_MS % 'Mouth_FaceN']),
+    ('SZerosuit_Mouth_Talk_VIS_O_OBJ', [_MS % 'Mouth_Talk']),
+    ('SZerosuit_Mouth_Ouch_VIS_O_OBJ', [_MS % 'Mouth_Ouch']),
+    ('SZerosuit_Mouth_Down_VIS_O_OBJ', [_MS % 'Mouth_Down']),
+    ('SZerosuit_Mouth_HeavyAttack_VIS_O_OBJ', [_MS % 'Mouth_Heavyattack']),
+    ('SZerosuit_Mouth_Escape_VIS_O_OBJ', [_MS % 'Mouth_Escape']),
+    ('SZerosuit_Mouth_HeavyOuch_VIS_O_OBJ', [_MS % 'Mouth_HeavyHit']),
+    ('SZerosuit_Moutn_Furafura_VIS_O_OBJ', [_MS % 'Mouth_Furafura']),
+    ('SZerosuit_Mouth_VoiceA_VIS_O_OBJ', [_MS % 'Mouth_VoiceA']),
+    (_ZS % 'Eye_Result', []),
+    ('SZerosuit_Mouth_Result_VIS_O_OBJ', [_MS % 'sword']),
+    ('Paralyzer_VIS_O_OBJ', []),
+    ('base_O_OBJ_O_NOSORT_FAR', []),
+    ('OMOTE_O_OBJ_O_SORTEACHNODE', ['hair_VIS_O_OBJShape']),
+    ('Tail_O_OBJ__O_SORTEACHNODE', []),
+    ('Gamemodel', ['body_highShape', 'body_high2Shape', 'GamemodelShape', 'faceShape', 'coatG_highShape',
+                   'skirtG_highShape', 'knifeShape', 'matsubokkuriShape']),
+]
+SZEROSUIT_VIS = {'master_sword': 'SZerosuit_Mouth_Result_VIS_O_OBJ'}
+# his mouths per frame (Ultimate's visibility node names); one with no slot of its own goes to the nearest
+MASTER_MOUTHS = {
+    'SZerosuit_MouthN_VIS_O_OBJ': ['master_Mouth_FaceN', 'master_Mouth_PatternA', 'master_Mouth_Capture',
+                                   'master_Mouth_Cliff', 'master_Mouth_Result'],
+    'SZerosuit_Mouth_Talk_VIS_O_OBJ': ['master_Mouth_Talk'],
+    'SZerosuit_Mouth_Ouch_VIS_O_OBJ': ['master_Mouth_Ouch'],
+    'SZerosuit_Mouth_Down_VIS_O_OBJ': ['master_Mouth_Down'],
+    'SZerosuit_Mouth_HeavyAttack_VIS_O_OBJ': ['master_Mouth_Heavyattack', 'master_Mouth_Attack'],
+    'SZerosuit_Mouth_Escape_VIS_O_OBJ': ['master_Mouth_Escape', 'master_Mouth_VoiceB'],
+    'SZerosuit_Mouth_HeavyOuch_VIS_O_OBJ': ['master_Mouth_HeavyHit', 'master_Mouth_Ottotto'],
+    'SZerosuit_Moutn_Furafura_VIS_O_OBJ': ['master_Mouth_Furafura'],
+    'SZerosuit_Mouth_VoiceA_VIS_O_OBJ': ['master_Mouth_VoiceA', 'master_Mouth_Final'],
+}
+# ZSS's specials -> Byleth's (Phase 1: the animations in her slots; the moves, their extra phases (motions.add) and
+# the statuses come with the specials step: fighters/master/README.md "Plan"). Paralyzer -> Failnaught (start, the
+# shot, the max shot), Plasma Whip -> Areadbhar (its start; the dash in an added slot), Boost Kick -> Sword of the
+# Creator, Flip Jump -> Aymr; appeals: the facing-right ones
+SZEROSUIT_MOTIONS = {
+    'd00specialnshoot': 'd00specialn', 'd00specialnshooth': 'd00specialnmax', 'd00specialnlanding': 'd00specialncancel',
+    'd00specialairnshoot': 'd00specialairn', 'd00specialairnshooth': 'd00specialairnmax',
+    'd01specials': 'd01specialsstart', 'd01specialairs': 'd01specialairsstart',
+    'd02specialhi': 'd02specialhi', 'd02specialairhi': 'd02specialairhi',
+    'd03speciallwstart': 'd03speciallw', 'd03speciallwlanding': 'd03speciallwlanding1',
+    'd03speciallwkicklanding': 'd03speciallwlanding2', 'd03specialairlwstart': 'd03specialairlw',
+    'd03specialairlwkick': 'd03specialairlwhit', 'd03specialairlwflip': 'd03specialairlwcancel',
+    'd03specialairlwstep': 'd03specialairlwhit',
+    'd04final': 'd04finalstart', 'd04finalair': 'd04finalairstart',
+    'j01appealhi': 'j01appealhir', 'j01appeals': 'j01appealsr', 'j01appeallw': 'j01appeallwr',
+    # ZSS slots Byleth has no animation of his own for: the nearest he has (his one forward tilt, his second
+    # wait, the face-down get-up dodge as the face-up one); crawls / item motions stay on Wait1
+    'c01attacks3hi': 'c01attacks3s', 'c01attacks3lw': 'c01attacks3s', 'a00wait3': 'a00wait2',
+    'f04downspotd': 'f03downspotu',
+}
+
 PROFILES = {
     'zelda': dict(slots=MESH_SLOTS, joints=JOINT_STANDINS, motions=MOTION_STANDINS, vis=VIS_SLOTS,
                   vis_default={'skirt_VIS_O_OBJ16': 1}, hidden=HIDDEN_SLOTS),
@@ -1237,6 +1319,14 @@ PROFILES = {
                   vis_default={}, hidden=()),
     'reflet_f': dict(slots=REFLET_F_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS),
                      vis=REFLET_F_VIS, vis_default={REFLET_F_VIS['brave_shield']: 1}, hidden=()),
+    'szerosuit': dict(slots=SZEROSUIT_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **SZEROSUIT_MOTIONS),
+                      vis=SZEROSUIT_VIS, vis_default={SZEROSUIT_VIS['master_sword']: 1},
+                      drive={'material_anime_face.pac': (MASTER_MOUTHS, 'SZerosuit_MouthN_VIS_O_OBJ')}, hidden=()),
+    # her costumes 6 / 7 have no back mark (33 meshes)
+    'szerosuit_nomark': dict(slots=SZEROSUIT_SLOTS[1:], joints={}, motions=dict(MOTION_STANDINS, **SZEROSUIT_MOTIONS),
+                             vis=SZEROSUIT_VIS, vis_default={SZEROSUIT_VIS['master_sword']: 1},
+                             drive={'material_anime_face.pac': (MASTER_MOUTHS, 'SZerosuit_MouthN_VIS_O_OBJ')},
+                             hidden=()),
 }
 
 

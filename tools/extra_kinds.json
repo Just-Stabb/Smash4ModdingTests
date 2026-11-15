@@ -238,6 +238,18 @@
       "weapons": {
         "water": {"kind": "0x198", "base": "fireball", "max": 6, "on_hit": 1, "nop2": ["0x1C", "0x3C"]}
       }
+    },
+    {
+      "kind": "0x47",
+      "name": "master",
+      "cap": "Master",
+      "base": "szerosuit",
+      "ai": "base",
+      "ui": {
+        "id": 65,
+        "name": "Byleth",
+        "subtitle": "Ashen Demon"
+      }
     }
   ],
   "weapon_capacity": "0x1C0"
