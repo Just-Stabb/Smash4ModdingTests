@@ -25,6 +25,12 @@ if HERE not in sys.path:
     sys.path.append(HERE)
 import xv2_smash_fx as FX  # noqa: E402
 
+# v3 (user: "I'd like Core Breaker's effects to be larger in scale than Super God Fist's effects"): Core Breaker's own
+# scale over XV2's (the EEPK part's scale) at 5.04 units a metre, for every one of its effects. The God Fist's is
+# xv2_smash_fx.SIZE / its build's SKILL_SCALE 1.75 (unchanged). In XV2 the orb is 1.3 m in radius round a 1.75 m Fu;
+# in Supamario's proportion (12 units tall: 6.9 a metre) that is x1.36; 1.75 is the God Fist's; 2.25 is ~1.65x XV2's
+# proportion and ~1.3x the God Fist's
+CB_FX_SCALE = 2.25
 PREFIX = 'PtcSupamarioCb'
 MODEL_PREFIX = 'EffSupamarioCb'
 TEX_BASE = 0x15141C00            # after the God Fist's model textures 0x15141B00-01
@@ -206,7 +212,7 @@ def placements(pkg, frames, conv):
                 parts.append(item)
                 continue
             sm = BONES.get(prt['ESK'])
-            size = round(prt['ScaleMin'] * FX.SIZE, 3)
+            size = round(prt['ScaleMin'] * CB_FX_SCALE, 3)
             if plan['place'] == 'limb' and sm:
                 item.update(bone=sm, offset=[0, 0, 0], rot=[0, 0, 0], size=size)
             else:
@@ -386,7 +392,7 @@ def main():
     fx, facing = placements(pkg, frames, conv)
     doc = {'source': '2070_FIT_COR.eepk via tools/supamario_corebreaker_fx.py (phase 1: onto the bank in %s)' %
            os.path.basename(os.path.normpath(effect_dir)),
-           'settings': {'unit': FX.UNIT, 'size': FX.SIZE, 'hdr': opts.get('--hdr', 'glare'), 'hdr_gain': FX.HDR_GAIN,
+           'settings': {'unit': FX.UNIT, 'size': CB_FX_SCALE, 'hdr': opts.get('--hdr', 'glare'), 'hdr_gain': FX.HDR_GAIN,
                         'hdr_cap': FX.HDR_CAP, 'alpha': FX.ALPHA, 'model_gain': FX.MODEL_GAIN, 'dive_deg': DIVE_DEG},
            'facing_problems': facing + conv['emitter_facing_problems'], 'effects': fx,
            'common': [dict(zip(('xv2', 'bac', 'what', 'segment'), c)) for c in CMN_FX_PLAN]}

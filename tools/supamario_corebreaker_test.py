@@ -40,6 +40,7 @@ import ptcl  # noqa: E402
 import rolloff_hold_test as R  # noqa: E402
 import supamario_corebreaker_build as B  # noqa: E402
 import supamario_godfist_build as GB  # noqa: E402
+import supamario_corebreaker_fx as CF  # noqa: E402
 import xv2_smash_fx as FX  # noqa: E402
 
 PROBLEMS = []
@@ -552,6 +553,13 @@ def script_tests(fdir):
     big = [d for d in dmg if abs(d - B.CRASH_DMG) < 1e-6]
     check('damage: catch %g + %d x %g + crash / explosion %g = 26 (both endings)' % (
         B.CATCH_DMG, len(burn), B.BURN_DMG, B.CRASH_DMG), (catch + sum(burn) + B.CRASH_DMG, len(big)), (26.0, 2))
+    szs = sorted({round(c.params[syn.index('Size')], 2) for c in hits})
+    want = sorted({B.HB[k][1] for k in B.HB})
+    check('hitbox sizes (v3: scaled with their effects; the detection box and the body box not): %s' % (
+        ', '.join('%s %g -> %g' % (k, a, b) for k, (a, b) in B.HB.items())), szs, want)
+    det = [c for c in hits if abs(c.params[syn.index('Size')] - B.DETECT_SIZE) < 1e-6]
+    check('the detection box hits fighters lying down (Ground/Air 3, no bit 31)',
+          [c.params[syn.index('Ground/Air')] for c in det], [3])
     air = f.script('specialairhi')
     check('specialairhi: the same script', [(c.ident, c.params) for c in air], [(c.ident, c.params) for c in s])
     est = ko_estimate()
@@ -618,8 +626,15 @@ def effect_tests(out_dir, fdir):
     sizes = [dict(zip(syn_e, c.params))['Size'] for c in acmd.ACMDFile.load(os.path.join(
         fdir, 'script', 'animcmd', 'body', 'effect.bin')).script('specialhi') if c.ident == acmd.BY_NAME[
         'external_graphic'] and c.params[0] == orb_id]
-    check('every effect at x%.2f: the orb\'s call %.2f (XV2 2.8 x %.2f)' % (FX.SIZE, sizes[0], FX.SIZE),
-          (B.SIZE_MUL, round(sizes[0], 3)), ({}, round(2.8 * FX.SIZE, 3)))
+    check('every effect at Core Breaker\'s x%.2f (above the God Fist\'s %.2f): the orb\'s call %.2f (XV2 2.8 x %.2f)'
+          % (CF.CB_FX_SCALE, FX.SIZE, sizes[0], CF.CB_FX_SCALE),
+          (B.SIZE_MUL, round(sizes[0], 3), CF.CB_FX_SCALE > FX.SIZE), ({}, round(2.8 * CF.CB_FX_SCALE, 3), True))
+    calls = []
+    for e in doc['effects']:
+        for pt in e['parts']:
+            if 'size' in pt:
+                calls.append(abs(pt['size'] - pt['xv2_scale'] * CF.CB_FX_SCALE) < 1e-3)
+    check('every placement at CB_FX_SCALE', all(calls), True)
     quarter = []
     for v in doc['sets'].get('Cor_Crg_End_01.emp', []):
         si = p.find_set(v['set'])

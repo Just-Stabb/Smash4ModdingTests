@@ -214,7 +214,17 @@ def timeline(blocks):
 
 # ---------------------------------------------------------------- the game script
 FIST = (6.3, 3.1)                            # the dive pose's RHandN (ahead, up of TransN)
-DETECT_SIZE = 2.5                            # v3: the hover's detection box (his body is ~4 across)
+DETECT_SIZE = 2.5                            # v3: the hover's detection box (his body is ~4 across): not scaled
+# v3 (user: "I'd like for the hitboxes to match the adjustments"): the hitboxes sized to an effect grow with it, by
+# the effect's new scale over its v2 one, centred on the effect: (v2 size, v3 size)
+#   catch (the dive's fist box): the fist fire, 1.75 -> CB_FX_SCALE; the body box (ID 1, 4.5) is his body: unchanged
+#   burn (the hold's hits): the hit loop on the fist, 1.75 -> CB_FX_SCALE
+#   crash / explosion: the explosion (effect 3), v2's half of 1.75 -> CB_FX_SCALE; at the explosion's place (his fist)
+_CB_SCALE = 2.25                             # supamario_corebreaker_fx.CB_FX_SCALE (asserted in build())
+HB = {'catch': (5.5, round(5.5 * _CB_SCALE / 1.75, 2)), 'burn': (7.0, round(7.0 * _CB_SCALE / 1.75, 2)),
+      'crash': (9.0, round(9.0 * _CB_SCALE / 0.875, 2)), 'explosion': (11.0, round(11.0 * _CB_SCALE / 0.875, 2)),
+      'detect': (DETECT_SIZE, DETECT_SIZE), 'body': (4.5, 4.5)}
+CRASH_AT = (6.26, 1.93)                      # the crash explosion's place (the crash pose's RHandN, effect 3's call)
 DETECT_AT = (1.0, 6.5)                       # at his middle (ahead, up)
 VICTIM_MID = (HOLD_X, HOLD_Y + 5.0)          # the held victim's middle
 
@@ -225,7 +235,7 @@ def game_script():
     # the dive (60-): the catch box on his fist and his body (3%; misses a fighter lying down: Ground/Air bit 31),
     # ledges on (vanilla's Allow/Disallow_Ledgegrab 1, the MSC's func_56)
     blocks.append((DIVE_FROM, [cmd('allow/disallow_ledgegrab', 1),
-                               hitbox(ID=0, Bone=0, Damage=CATCH_DMG, BKB=20, Size=5.5, Y=FIST[1], Z=FIST[0],
+                               hitbox(ID=0, Bone=0, Damage=CATCH_DMG, BKB=20, Size=HB['catch'][1], Y=FIST[1], Z=FIST[0],
                                       HitstopFrames=CATCH_FREEZE, SelfHitstopFrames=CATCH_FREEZE,
                                       **{'Ground/Air': NO_DOWN | 3}),
                                hitbox(ID=1, Bone=0, Damage=CATCH_DMG, BKB=20, Size=4.5, Y=5.3, Z=2.0,
@@ -270,19 +280,20 @@ def game_script():
     # the burn (cb 3): BURN_HITS x BURN_DMG on the held victim (Part 1, its record cleared before each)
     for f in BURN_AT:
         blocks.append((f, if_(CB_VAR, 0, 3, [cmd('hit_log_clear', 1),
-                                             hitbox(ID=0, Part=1, Bone=0, Damage=BURN_DMG, BKB=10, Size=7.0,
+                                             hitbox(ID=0, Part=1, Bone=0, Damage=BURN_DMG, BKB=10, Size=HB['burn'][1],
                                                     Y=VICTIM_MID[1], Z=VICTIM_MID[0], SFXLevel=0, SFXType=4,
                                                     Effect=1, HitstopFrames=3, SelfHitstopFrames=0,
                                                     Shieldable=0, DIMul=0.001, SDI=0.0)])))
         blocks.append((f + 1, if_(CB_VAR, 0, 3, [cmd('remove_all_hitboxes')])))
     # the crash on the stage (cb 6): CRASH_DMG, a flinch (the MSC puts it down at HANDOFF: no launch, no tech)
     blocks.append((CRASH + 1, if_(CB_VAR, 0, 6, [cmd('hit_log_clear', 2), hitbox(
-        ID=0, Part=2, Bone=0, Damage=CRASH_DMG, Size=9.0, Y=4.0, Z=CRASH_X, SFXLevel=2, SFXType=1, Effect=1,
+        ID=0, Part=2, Bone=0, Damage=CRASH_DMG, Size=HB['crash'][1], Y=CRASH_AT[1], Z=CRASH_AT[0], SFXLevel=2,
+        SFXType=1, Effect=1,
         HitstopFrames=8, SelfHitstopFrames=6, Shieldable=0, SDI=0.0, DIMul=0.001, **CRASH_KB)])))
     blocks.append((CRASH + 2, [cmd('remove_all_hitboxes')]))
     # the explosion off the stage (cb 7): CRASH_DMG, KO knockback; the MSC lets the victim go the same frame
     blocks.append((AIRREL + 1, if_(CB_VAR, 0, 7, [cmd('hit_log_clear', 2), hitbox(
-        ID=0, Part=2, Bone=0, Damage=CRASH_DMG, Size=11.0, Y=VICTIM_MID[1], Z=VICTIM_MID[0], SFXLevel=2, SFXType=1,
+        ID=0, Part=2, Bone=0, Damage=CRASH_DMG, Size=HB['explosion'][1], Y=FIST[1], Z=FIST[0], SFXLevel=2, SFXType=1,
         Effect=1, HitstopFrames=10, SelfHitstopFrames=6, Shieldable=1, **EXPLOSION_KB)])))
     blocks.append((AIRREL + 2, [cmd('remove_all_hitboxes')]))
     return s + timeline(blocks)
@@ -290,9 +301,9 @@ def game_script():
 
 # ---------------------------------------------------------------- effects
 FX_DASH_CLOUD, FX_BIG_CLOUD = 0x1000009, 0x1000020
-SIZE_MUL = {}                                 # v3 (user, v2's clip: "The effects for Core Breaker are too small"): every
-                                              # effect at the God Fist's x1.75 (v1 / v2 halved the charge orb, its end
-                                              # flash and the explosion: the Q10 default)
+SIZE_MUL = {}                                 # v3 (user, v2's clip: "The effects for Core Breaker are too small"): no
+                                              # halving (v1 / v2 halved the charge orb, its end flash and the explosion:
+                                              # the Q10 default); every effect at supamario_corebreaker_fx.CB_FX_SCALE
 GUARD = {9: 5, 8: 3, 12: 3, 3: 6}             # BAC effect -> the phase whose segment it plays in (cb)
 
 
@@ -439,9 +450,10 @@ def build(sm_dir, out_dir, skill_dir, se_wav, gf_args, png=None):
     # from its start to the flare), so it is seen whole (fading in, swirling) instead of only its first frames
     orb = conv['models']['Cor_Crg.emo']['folder']
     FX.retime_model(os.path.join(fx_dir, 'model', orb), ORB_FRAMES)
+    assert CF.CB_FX_SCALE == _CB_SCALE, 'HB is out of date'
     fx_doc, facing = CF.placements(pkg, doc, conv)
     assert not facing and not conv['emitter_facing_problems'], (facing, conv['emitter_facing_problems'])
-    fx = {'effects': fx_doc, 'settings': {'hdr_cap': FX.HDR_CAP, 'size': FX.SIZE, 'size_mul': SIZE_MUL}}
+    fx = {'effects': fx_doc, 'settings': {'hdr_cap': FX.HDR_CAP, 'size': CF.CB_FX_SCALE, 'size_mul': SIZE_MUL}}
     fx.update({k: v for k, v in conv.items() if k != 'emitter_facing_problems'})
     with open(os.path.join(out_dir, 'corebreaker_fx.json'), 'w') as fh:
         json.dump(fx, fh, indent=1)
