@@ -363,6 +363,37 @@ FIST_TIP = 1.2
 # - more vibrant: alpha x SKILL_ALPHA 2 (capped at 1: v5-v6 x1.5), the model's colour gain x2.5 / x2 / x1.5 (R / G /
 #   B: brighter, keeping its orange)
 SKILL_SCALE = 1.75
+# Glow test (README "Glow test"): Smash 4 does bloom / glare colours drawn past 1 (fighters/brave/README.md fix 21 /
+# 23 / 27: past ~1.05 glows, past ~2.5 a pink-white haze with purple fringes; docs/minecraft-world.md: the sun / moon
+# past white). v5-v17 drew every skill emitter at SKILL_GAIN 2 (its colour keys x 2: peaks 2.0, glaring or not) and the
+# aura model's gain up to 2.5 (MODEL_TINT). --glow V: only the parts XV2 glares (the EMM material's Glare / GlareCol,
+# 1.1 - 2.0 here; tools/xv2_to_ptcl.py notes it per emitter) past 1: x V x GlareCol / 1.5, the rest x 1 (no bloom);
+# no peak past GLOW_CAP (the haze); the aura model's gain scaled to a peak of V (its hue kept)
+GLOW = None
+GLOW_REF = 1.5
+GLOW_CAP = 2.5
+
+
+def glow_factor(p, d, notes):
+    """an emitter's colour scale factor: SKILL_GAIN (v5-v17), or with GLOW its glare's (see GLOW)"""
+    if GLOW is None:
+        return SKILL_GAIN
+    g = next((float(n.split()[1]) for n in notes if n.startswith('glare ')), 0.0)
+    if g <= 0.0:
+        return 1.0
+    f = GLOW * g / GLOW_REF
+    peak = p.field(d, 'color_scale') * max(max(c[:3]) for t in (0, 1) for c in p.color_keys(d, t))
+    if peak * f > GLOW_CAP:
+        f = GLOW_CAP / peak
+    return max(1.0, f)
+
+
+def model_tint():
+    """the aura model's colour gain multipliers (MODEL_TINT; with GLOW scaled to a peak of GLOW)"""
+    if GLOW is None:
+        return MODEL_TINT
+    k = GLOW / max(MODEL_TINT)
+    return tuple(round(c * k, 4) for c in MODEL_TINT)
 # v8 (user, v7's screenshots: "slightly too large now, and is inverted"): x1.75 (between v6's 1.5 and v7's 2: XV2's
 # aura spans ~0.9 of the character's height, 1.5 m-scale on ~1.75 m; v7's came out over his height); the model
 # turned back to XV2's way (its front, its apex, leading along his facing, its swirl and wind trailing back over the
@@ -957,13 +988,13 @@ def skill_effects(skill_dir, p, e, dst):
     finally:
         xv2_to_ptcl.TEX_MAX = old
     by_emp = {}
-    for si, name, _chunk in made:
+    for si, name, chunk in made:
         by_emp.setdefault(name.replace('PtcSupamarioGf', '') + '.emp', e.add(si + 1))
-        for em in p.sets[si]['emitters']:
+        for em, (_b, _en, notes) in zip(p.sets[si]['emitters'], chunk):
             d = em['data']
             if d is None:
                 continue
-            p.set_field(d, 'color_scale', p.field(d, 'color_scale') * SKILL_GAIN)
+            p.set_field(d, 'color_scale', p.field(d, 'color_scale') * glow_factor(p, d, notes))
             p.set_field(d, 'alpha_init', min(1.0, p.field(d, 'alpha_init') * SKILL_ALPHA))
             facing_safe(p, d)
     SKILL_FX.clear()
@@ -973,7 +1004,7 @@ def skill_effects(skill_dir, p, e, dst):
     subprocess.run([sys.executable, '-I', os.path.join(HERE, 'xv2_to_nud.py'), skill_dir, SKILL_MODEL,
                     os.path.join(dst, 'model'), '--prefix', SKILL_MODEL_PREFIX, '--tex-base', hex(SKILL_TEX_BASE),
                     '--plain', '1', '--scale', str(SKILL_UNIT),
-                    '--tint', ';'.join('%s=%g,%g,%g' % ((m,) + MODEL_TINT)
+                    '--tint', ';'.join('%s=%g,%g,%g' % ((m,) + model_tint())
                                        for m in ('BasC', 'Wind01', 'Wind02'))], check=True, capture_output=True)
     assert os.path.exists(os.path.join(dst, 'model', folder, 'model.nud')), folder
     SKILL_FX['Model'] = 0x03410000 | e.add(0, folder)
@@ -1033,10 +1064,14 @@ def build(sm_dir, out_dir, ean_path, cmn_dir=None, png=None, skill_dir=None, cmn
 def main():
     a = sys.argv[1:]
     opts = {}
-    global DIAG
+    global DIAG, GLOW
     if '--diag' in a:
         a.remove('--diag')
         DIAG = True
+    if '--glow' in a:
+        i = a.index('--glow')
+        GLOW = float(a[i + 1])
+        del a[i:i + 2]
     for k in ('--png', '--ean', '--cmn-vfx', '--skill-vfx', '--cmn-se', '--stb'):
         if k in a:
             i = a.index(k)
