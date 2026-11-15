@@ -37122,6 +37122,12 @@ int func_2286()
     {
         var1 = 0;
     }
+    // Core Breaker v6 (user: "make all of Core Breaker's hitboxes unaffected by staling"): the status's attack log
+    // (StatusModule 0x2713's 6th value, packed into the status data's +0xA4 bits 31-12: Ultimate's log_mask_flag,
+    // 0x1422 = the up special's attack kind 0x22 with its category bits) left empty, as vanilla's own custom up special
+    // 2 (Super Jump, 0x1000004a = 1) does: the move isn't logged, so it neither stales nor is staled
+    // (docs/native-notes.md "The status's attack log and staling")
+    var1 = 0;
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0x4, 0x1, 0, 0, 0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, var1, 0, 0x100, 0x1000);
     return 0;

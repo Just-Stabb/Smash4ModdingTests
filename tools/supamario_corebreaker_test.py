@@ -88,6 +88,7 @@ class Game:
         self.self_status = None         # his status as the variables read it (cb_reset_tick's test)
         self.frame_sets = []            # (n, frame) MotionModule(0x2713)
         self.used_log = []
+        self.status_data = []
         self.stick_world = None
         self.turns = []
         self.inv_log = []               # (n, frames) the self INVINCIBLE writes
@@ -216,6 +217,9 @@ class Game:
             return 0
         if sid == 0x13 and a == [0x1]:
             return R.f2i(self.frame)
+        if sid == 0x18 and a and a[0] == 0x2713:   # v6: the status data (its attack log: the 6th value)
+            self.status_data.append(list(a[1:]))
+            return 0
         if sid == 0x18:                             # StatusModule
             if a[0] == 0x2:
                 self.air = a[1] == 2
@@ -493,6 +497,17 @@ def msc_tests(path):
           '-> hit out of it -> up special: the rise; rise -> ledge -> up special: the rise',
           [seq([(0x46, 2)]), seq([(0x46, 2), (0x45, 0)]), seq([('dive', 2), (0x46, 2)]), seq([(0x74, 1), (0xE, 2)])],
           [(1.0, 1.0), (0.0, 0.0), (0.0, 0.0), (0.0, 0.0)])
+    # 3d. v6 (user: "make all of Core Breaker's hitboxes unaffected by staling"): the up special status's attack log
+    # (StatusModule 0x2713's 6th value) empty, on both custom move IDs (vanilla: 0x1422 / 0 for custom 2)
+    out = []
+    for cid in (0, 1, 2):
+        g = Game()
+        g.vars[0x1000004a] = float(cid)
+        vm = vm_for(path, g)
+        vm.call(vm.func(2286))
+        out.append(g.status_data[-1][5] if g.status_data else None)
+    check('the up special status logs no attack (its 6th status-data value 0, every custom ID): no staling',
+          out, [0, 0, 0])
     # 3c. v6 (user: "make sure that getting hit during/after the rise only consumes it after the vertical speed begins
     # being added"): the rise is used at its lift-off (frame RISE_FROM): cut in the crouch, the next up special is the
     # rise again; cut after the lift-off and hit, the next is the hover / dive
@@ -516,7 +531,7 @@ def msc_tests(path):
     # stays used; up special again: the hover / dive; a third does nothing in the air; the landing gives it back
     g = Game()
     r1 = run(path, g, tick=True)
-    first = min(u for n, u, _a in g.used_log if n >= B.RISE_FROM)     # v6: used from the lift-off
+    first = min(u for n, u, _a in g.used_log if n > B.RISE_FROM)      # v6: used from the lift-off
     tr = run(path, g, tick=True, frames=B.DIVE_FROM - B.HOVER_FROM + 15)
     vm = vm_for(path, g)
     vm.g[18] = 2

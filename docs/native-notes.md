@@ -594,6 +594,36 @@ that used the `+0x35` byte (this fighter state, and the non-fighter objects at `
 **Result:** `grab_test` (build A + the kind patch, with the per-frame `BattleObject(0x26)`) did
 NOT remove the grab immunity.
 
+### The status's attack log and staling (Core Breaker v6)
+
+What the code and the data show:
+- MSC `StatusModule(0x2713, a, b, c, d, e, f, g, h, i)` (handler `0x02E882AC`, exe_v46j) packs its values into the
+  status data at StatusModule `+0xA0`:
+  - the 6th, `f` (args `+0x18`), goes into `+0xA4` bits 31-12 (`rlwimi r30, r0, 12, 0, 19` at `0x02E883C4`);
+  - `g` is bit-spread into `+0xA4` bits 11-0 and `+0xA8`;
+  - `h` (`+0x20`) into `+0xA8`, `i` (`+0x24`) into `+0xAC`;
+  - the previous status's words are kept at `+0xB4`-`+0xC4`;
+  - vtable `+0x104` / `+0x10C` then take `+0xA0` / `+0xB4`.
+- In Ultimate the same call is `FighterStatusModuleImpl::set_fighter_status_data(arousal, treaded_kind,
+  disable_passive, ..., log_mask_flag, status_attr, power_up_attack_bit, ...)`. `f` sits where `log_mask_flag` is:
+  the attack kind the move is logged under (the stale queue's entry) plus its category / trigger bits.
+- The vanilla values read that way:
+  - Mario's specials: 0x1412 side special (0x153), 0x1422 up special (0x154), 0x1442 status 0x156;
+  - 0 for the neutral special (0x152: its fireball, an article, does the damage), 0x1 for the down special (0x155);
+  - normal attacks: 0x832, 0x772 and so on; non-attacks: 0.
+  - Mario's own up special (`func_2286`, status 0x154) logs 0x1422, but 0 for custom move 2 (Super Jump,
+    `0x1000004a` = 1, a no-damage version): the game's own way of leaving a move out of the log.
+
+Applied: Core Breaker (Supamario's 0x154) always passes 0, so its hits aren't logged (they don't stale and aren't
+staled). This covers every Core Breaker hitbox: catch, body, detection, burn, crash, explosion; all are in that
+status.
+
+**Not proven to the instruction:** a scan for code reading `+0xA4 >> 12` (`lwz 0xa4` then `srwi 12`) found nothing.
+The reader goes through the data pointer, so the stale queue's use of the field isn't traced. The in-game check:
+repeat Core Breaker on a training dummy; with staling the dive's 3% and the crash's 17% would drop after a few uses.
+There is no hitbox field for it: the Special_Hitbox fields in reference/spreadsheets (Hitbox sheet) have none, and the
+staling factors are per fighter in `fighter_param_etc` group 3 (0.05, 0.08, 0.07594, ...).
+
 ### Fighter specializer vtables (98 entries, 8-byte stride)
 
 These are per-fighter tables, e.g. lucariom `0x100977D0`, littlemacg `0x1009710C`, koopag

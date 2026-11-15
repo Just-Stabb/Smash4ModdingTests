@@ -2197,6 +2197,16 @@ Tests:
 - rise -> hit -> up special = the hover / dive; rise -> hit -> landing -> the rise; dive -> hit out of it -> the rise;
   rise -> ledge -> the rise.
 
+### No staling (user: "make all of Core Breaker's hitboxes unaffected by staling")
+- The up special status's setup (`func_2286`, `StatusModule(0x2713, ...)`) now always passes 0 as the 6th value: the
+  status's attack log. Vanilla logs Mario's up special there as 0x1422. Every Core Breaker hitbox is in that status,
+  so none is logged: they don't stale, and using the move doesn't push anything into the stale queue.
+- 0 is what vanilla itself does for its no-damage custom up special (Super Jump). The evidence and what isn't traced
+  are in docs/native-notes.md "The status's attack log and staling".
+- It isn't a hitbox field, so Sm4shCommand's labels don't change.
+- Test: the status data's 6th value is 0 for every custom move ID.
+- To check in game: Core Breaker on a training dummy several times running should stay at 3 + 4 x 1.5 + 17.
+
 ### Tests (v6 build, halos 0.16)
 - dive catches:
   - a standing fighter: the hold on the ground, he lands, the victim on its ground, the crash;
@@ -2208,7 +2218,7 @@ Tests:
 - his percent +1.75 on each burn hit's frame, +7 in all, on the hold on the ground, the air hold with the crash, the
   air hold with the explosion off the stage, and the point-blank catch.
 - the new reset rule's cases and sequences (above);
-- `supamario_corebreaker_test.py`: 92 checks, 0 problems; `supamario_godfist_test.py --all-models`: 0 problems;
+- `supamario_corebreaker_test.py`: 93 checks, 0 problems; `supamario_godfist_test.py --all-models`: 0 problems;
   `msc_stack_check.py`: 0 stack problems (2369 scripts).
 
 **Not confirmed in game:**
