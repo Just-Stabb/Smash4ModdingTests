@@ -664,7 +664,8 @@ def _emp_nodes(r, o, ctx, depth=0):
 def read_emp(data, strict=True):
     """EMP header (32 bytes): +0 "#EMP", +4 u16 0xFFFE, +6 u16 24, +8 u16 Version (37568 DBXV2,
     37632 SDBH), +10 u16 0, +12 i16 root node count, +14 i16 texture sampler count, +16 i32 node
-    offset (32), +20 i32 texture sampler offset, +24 8 x 0. Returns {Version, Textures (samplers),
+    offset (32), +20 i32 texture sampler offset, +24 8 x 0 (+10 and +24: not read by XV2-Tools; noted when
+    not zero). Returns {Version, Textures (samplers),
     ParticleNodes (tree)}."""
     r = Bin(data, 'EMP')
     if r.raw(0, 4) != b'#EMP':
@@ -672,8 +673,8 @@ def read_emp(data, strict=True):
     ver = r.u16(8)
     out = {'Endian': r.u16(4), 'HeaderSize': r.u16(6), 'Version': ver,
            'VersionName': _enum(ver, EMP_VERSIONS, 'version', r)}
-    r.zero(10, 2, 'header')
-    roots, ntex = r.i16(12), r.i16(14)
+    h10 = r.raw(10, 2)                  # XV2-Tools never reads +10 either: 2070_FIT_COR's EMPs (Core Breaker)
+    roots, ntex = r.i16(12), r.i16(14)  # have 1 there
     node_off, tex_off = r.i32(16), r.i32(20)
     pad = r.raw(24, 8)                  # zero in most files; some tools leave junk there (002_GOK_CSG's
     vn = out['VersionName']             # Csg_Crg / Bas / Circle): XV2-Tools never reads these 8 bytes
@@ -684,6 +685,8 @@ def read_emp(data, strict=True):
         r.err('root node count %d, chain has %d' % (roots, len(out['ParticleNodes'])))
     if any(pad):
         ctx['notes'].append('header padding (+0x18) not zero: %s (unused)' % pad.hex())
+    if any(h10):
+        ctx['notes'].append('header +0xA not zero: %s (unused)' % h10.hex())
     out['_notes'] = ctx['notes']
     out['_coverage'] = r.coverage(strict)
     return out
@@ -987,7 +990,7 @@ def load_package(d, strict=True):
         raise FormatError('%s: expected one .eepk, found %s' % (d, eepks))
     name = eepks[0]
     pkg = {'dir': d, 'eepk_name': name, 'eepk': read_eepk(_read(os.path.join(d, name)), strict),
-           'emp': {}, 'etr': {}, 'emm': {}, 'emb_textures': {}, 'ema': {}, 'missing': [], 'other_files': []}
+           'emp': {}, 'etr': {}, 'ecf': {}, 'emm': {}, 'emb_textures': {}, 'ema': {}, 'missing': [], 'other_files': []}
     used = {name}
     for c in pkg['eepk']['AssetContainers']:
         for key in ('ContainerEmbPath', 'MaterialEmmPath', 'TextureEmbPath'):
@@ -1010,6 +1013,10 @@ def load_package(d, strict=True):
                             pkg['emp'][n] = read_emp(b, strict)
                         elif n.lower().endswith('.etr'):
                             pkg['etr'][n] = read_etr(b, strict)
+                        elif n.lower().endswith('.ecf'):
+                            # a CBIND container's colour fade (ECF: a model / character tint over time); not
+                            # parsed (no Smash 4 equivalent is converted), kept as bytes for inspection
+                            pkg['ecf'][n] = {'bytes': len(b), 'raw': b}
                         elif strict:
                             raise FormatError('%s: unexpected entry %s' % (fn, n))
                     except FormatError as ex:
@@ -1023,8 +1030,8 @@ def load_package(d, strict=True):
             for fn in a['Files']:
                 if not fn:
                     continue
-                if c['AssetType'] in ('PBIND', 'TBIND'):
-                    have = pkg['emp'] if c['AssetType'] == 'PBIND' else pkg['etr']
+                if c['AssetType'] in ('PBIND', 'TBIND', 'CBIND'):
+                    have = {'PBIND': pkg['emp'], 'TBIND': pkg['etr'], 'CBIND': pkg['ecf']}[c['AssetType']]
                     if fn not in have:
                         pkg['missing'].append(fn)
                     continue

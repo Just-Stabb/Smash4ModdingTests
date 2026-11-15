@@ -39,7 +39,10 @@ Fields decoded (offsets in the item):
   20 HomingMovement / 21 EyeMovement / 18 PhysicsObject: raw words.
 BCM (0x70 bytes an entry after a 0x10 header; +8 u32 count, +12 u32 offset): +0x18 u32 activator conditions,
   +0x1C u32 state, +0x20 u16 BAC entry (primary), +0x22 u16 charge entry, +0x26 u16 user's entry on connect,
-  +0x28 u16 victim's entry on connect, +0x2A u16 airborne entry, +0x30 u32 ki cost (?), +0x40 u32 (?).
+  +0x28 u16 victim's entry on connect, +0x2A u16 airborne entry, +0x30 / +0x34 / +0x38 / +0x3C u32 the sibling /
+  child / parent / root entries' addresses (the BCM is a tree: a child is the next move in the chain, siblings
+  are alternatives tried in order), +0x10 u32 (Core Breaker's giant-opponent chain has 0x80000: the opponent size
+  condition?), +0x40 u32 (500 on the roots: ki cost?).
 """
 import json
 import struct
@@ -149,10 +152,41 @@ def read_bcm(path):
     for i in range(n):
         o = off + 0x70 * i
         u = _u16s(d, o + 0x20, 7)
-        out.append({'index': i, 'conditions': struct.unpack_from('<I', d, o + 0x18)[0],
+        sib, child, parent, root = struct.unpack_from('<4I', d, o + 0x30)
+        link = lambda a: (a - off) // 0x70 if a else None          # noqa: E731 (an entry's address -> index)
+        out.append({'index': i, 'sibling': link(sib), 'child': link(child), 'parent': link(parent) if parent else None,
+                    'root': link(root), 'opponent_size?': struct.unpack_from('<I', d, o + 0x10)[0],
+                    'button?': struct.unpack_from('<I', d, o + 0x08)[0],
+                    'conditions': struct.unpack_from('<I', d, o + 0x18)[0],
                     'state': struct.unpack_from('<I', d, o + 0x1C)[0], 'bac_entry': u[0], 'charge_entry': u[1],
                     'user_connect': u[3], 'victim_connect': u[4], 'airborne_entry': u[5],
-                    'ki_cost?': struct.unpack_from('<I', d, o + 0x30)[0]})
+                    'ki_cost?': struct.unpack_from('<I', d, o + 0x40)[0]})
+    return out
+
+
+def read_bdm(path):
+    """BDM (damage / reaction entries): +0 "#BDM", +8 u32 count, +0xC u32 offset; an entry: u32 id, then 10 sub-entries
+    of 0x80 bytes (the reaction per victim state; Core Breaker's and CMN's are all alike). Fields read from the
+    God Fist's CMN.bdm and Core Breaker's 2070_FIT_COR_PLAYER.bdm against the BAC (names with `?` are guesses):
+    +0 u16 damage type, +2 u16 damage % (100 in every entry: the BAC hitbox's damage is the amount), +0xC u16 ACB
+    type, +0xE i16 hit SE cue (-1 none), +0x10 i16 hit effect (-1 none), +0x28 / +0x2C f32 pushback, +0x30 / +0x32
+    u16 hitstop (user / victim), +0x34-0x38 u16 x3 (stun / knockdown times?), +0x40 / +0x44 f32 knockback speeds?"""
+    d = open(path, 'rb').read()
+    assert d[:4] == b'#BDM', path
+    n, off = struct.unpack_from('<II', d, 8)
+    out = []
+    for i in range(n):
+        o = off + (4 + 10 * 0x80) * i
+        b = d[o + 4:o + 4 + 0x80]
+        h = struct.unpack_from('<64h', b)
+        f = struct.unpack_from('<32f', b)
+        out.append({'id': struct.unpack_from('<I', d, o)[0], 'damage_type': h[0], 'damage_pct': h[1],
+                    'acb_type': h[6], 'hit_se_cue': h[7], 'hit_effect': h[8], 'pushback': [round(f[10], 4),
+                                                                                         round(f[11], 4)],
+                    'hitstop': [h[24], h[25]], 'times?': [h[26], h[27], h[28]],
+                    'knockback?': [round(f[16], 4), round(f[17], 4)],
+                    'subs_alike': all(d[o + 4 + 0x80 * k:o + 4 + 0x80 * (k + 1)] == b for k in range(10)),
+                    'raw_u16': list(h)})
     return out
 
 
