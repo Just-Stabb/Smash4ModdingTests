@@ -38373,6 +38373,7 @@ int cb_brev;            // v4: the rise's B-reverse checked (1) / done (2)
 int cb_gstart;          // v4: the rise started on the ground
 int cb_gmask;           // v5: the player slots on the ground (bit 1 << slot) the frame before his attack hit
 int cb_gvalid;
+int cb_burns;           // v6: the hold's burn hits he has taken his own damage for
 int cb_gseen;           // v6: the slots seen on the ground this hover / dive (their ground's height: New_Var CB_GY0 + slot)
 int cb_inv;             // v5: the hold's invincibility set (cleared at every end: cb_end)
 
@@ -39176,6 +39177,7 @@ void cb_catch()
         }
     }
     cb_inv = 0x1;
+    cb_burns = 0;
     // a fighter lying down (v3: the detection box): out of the down statuses into the hold's hitstun (Damage), as a
     // hit on it in the air would be
     vst = WorkModuleF(0, 0x0F0000A2 + 8 * cb_t());
@@ -39215,8 +39217,27 @@ void cb_catch()
     cb_hold(CB_HOLD_X, CB_HOLD_Y);
 }
 
+// v6 (user: "make Supamario take 7% in damage during the hold multihits for all versions of Core Breaker"): on each
+// burn hit's frame (CB_BURN_FIRST + CB_BURN_EVERY k into the hold, either hold) his own percent goes up CB_BURN_SELF
+// through the DAMAGE variable (the counter, no hit: no flinch, nothing that breaks the hold; he's invincible). The fire
+// puff on him is the effect script's, on the same frames
+void cb_burn_self(float rel)
+{
+    if (cb_burns >= CB_BURN_HITS)
+    {
+        return;
+    }
+    if (rel < CB_BURN_FIRST + CB_BURN_EVERY * (float)cb_burns - 0.01f)
+    {
+        return;
+    }
+    cb_burns = cb_burns + 1;
+    WorkModule(0, WorkModuleF(0, 0x0F000117) + CB_BURN_SELF, 0x0F000117);
+}
+
 int cb_hold_phase(float fr)
 {
+    cb_burn_self(fr - CB_HOLD);
     if (cb_n < CB_HOLD_RISE_N)
     {
         cb_speed(0.0f, CB_HOLD_RISE_V);
@@ -39290,6 +39311,7 @@ int cb_holdg_phase(float fr)
 {
     float dy;
     float y;
+    cb_burn_self(fr - CB_HOLDG);
     y = WorkModuleF(0, 0x0f000001);
     if (global18 != 0)
     {

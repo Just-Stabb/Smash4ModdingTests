@@ -91,6 +91,7 @@ class Game:
         self.stick_world = None
         self.turns = []
         self.inv_log = []               # (n, frames) the self INVINCIBLE writes
+        self.dmg_log = []               # (n, %) his own DAMAGE writes (v6)
         self.vx2 = 0.0                  # energy 2 (the stick's air control: his air momentum), world X
         self.hit = False                # v4: his attack has hit the victim (AttackModule 0x2726 / 0x2727)
         self.cleared = []               # AttackModule(0x2719): his hitboxes cleared
@@ -161,6 +162,8 @@ class Game:
                 return
         if v == 0x0F00011C:
             self.inv_log.append((self.n, val))
+        if v == 0x0F000117:
+            self.dmg_log.append((self.n, val))
         self.vars[v] = val
 
     def sys(self, sid, a):
@@ -728,7 +731,7 @@ def msc_tests(path):
                 v_['y'] = jump[0]
         tr = run(path, g, victim_reach=8.0, victim_move=move)
         return g, v, tr
-    crash_frames = lambda tr: [t[1] for t in tr if t[4] == 6.0]      # noqa: E731
+    crash_frames = lambda tr: [t[1] for t in tr if t[4] == 6.0 and t[1] >= B.CRASH - 1e-6]      # noqa: E731
     # the point-blank catch (the detection box, a fighter in the air at his middle): the air hold, the drive, the crash
     v = {'x': 1.0, 'y': 0.0, 'status': 0x47}
     g = Game(stage=(-200.0, 200.0), victim=v)
@@ -757,6 +760,33 @@ def msc_tests(path):
             0.5),
            ('just jumped, 10 up', [1.0, 2.0, 8.0, 6.0], True, True, True, 0.0),
            ('jumped high, 40 up', [1.0, 2.0, 3.0, 4.0, 6.0], True, True, None, None)])
+    # 9g. v6 (user: "make Supamario take 7% in damage during the hold multihits for all versions of Core Breaker"): his
+    # percent +1.75 on each burn hit's frame, +7 in all, on every catch path
+    paths = []
+    g, v, tr = dive_at(0.0)
+    paths.append(('the dive, a standing fighter (the hold on the ground)', g, tr, 8.0, B.HOLDG))
+    g, v, tr = dive_at(0.0, (40.0,))
+    paths.append(('the dive, a high one (the air hold, the drive, the crash)', g, tr, 3.0, B.HOLD))
+    v = {'x': 30.0, 'y': -40.0, 'status': 0x47}
+    g = Game(x=0.0, y=0.0, stage=(-1000.0, -900.0), victim=v)
+    g.air = True
+    r1, tr = both(path, g, catch_at=B.DIVE_FROM - B.HOVER_FROM + 4)
+    paths.append(('off the stage (the explosion in the air)', g, tr, 3.0, B.HOLD))
+    v = {'x': 1.0, 'y': 0.0, 'status': 0x47}
+    g = Game(stage=(-200.0, 200.0), victim=v)
+    run(path, g, frames=B.HOVER_FROM + 3)
+    v['x'], v['y'] = g.x + B.DETECT_AT[0] * g.face, g.y + B.DETECT_AT[1] - 5.0
+    tr = run(path, g, detect=True)
+    paths.append(('the point-blank catch', g, tr, 3.0, B.HOLD))
+    out, want = [], []
+    for name, g, tr, ph, seg in paths:
+        at = {t[7]: t[1] for t in tr}
+        steps = [(round(at.get(n_, -1) - seg), round(val, 3)) for n_, val in g.dmg_log]
+        out.append((name, steps))
+        want.append((name, [(f - B.HOLD, round(B.BURN_SELF * (k + 1), 3)) for k, f in enumerate(B.BURN_AT)]))
+    check('his own %.2f%% on each burn hit\'s frame (+%g in all), every catch path' % (B.BURN_SELF,
+                                                                                    B.BURN_SELF * B.BURN_HITS),
+          out, want)
     # 9b. a victim in the air over the stage: the hold, the lift, the drive, the crash
     v = {'x': 30.0, 'y': 20.0, 'status': 0x47}
     g = Game(stage=(-200.0, 200.0), victim=v)

@@ -94,6 +94,8 @@ BURN_DMG = 1.5
 CRASH_DMG = 17.0
 assert abs(CATCH_DMG + BURN_HITS * BURN_DMG + CRASH_DMG - 26.0) < 1e-6
 BURN_AT = [HOLD + 4 + 8 * k for k in range(BURN_HITS)]      # 168, 176, 184, 192
+BURN_SELF = 7.0 / BURN_HITS                 # v6 (user): his own damage on each burn hit, 7% in all
+FX_BURN_SELF = 0x1000011                    # v6: the common "fire puff (fire damage)" (Global_GFX_IDs 0x11) on him
 EXPLOSION_KB = dict(Angle=40, KBG=60, FKB=0, BKB=30)          # off the stage: KOs (README "Core Breaker": ~75% before)
 # v3 (user: "The grounded explosion also seems extremely weak in terms of knockback"): the crash on the stage launches,
 # stronger than the explosion in the air (README "Core Breaker v3": KOs a Mario-weight from mid-stage at ~105%)
@@ -173,6 +175,8 @@ def msc_values():
             'CB_FIST_Z': fl(FIST[0]), 'CB_FIST_Y': fl(FIST[1]), 'CB_NEAR': fl(NEAR),
             'CB_GY0': '0x%X' % CB_GY0, 'CB_NEAR_GROUND': fl(NEAR_GROUND), 'CB_GROUND_BELOW': fl(GROUND_BELOW),
             'CB_GROUND_MISS': fl(GROUND_MISS),
+            'CB_BURN_SELF': fl(BURN_SELF), 'CB_BURN_HITS': str(BURN_HITS), 'CB_BURN_FIRST': fl(BURN_AT[0] - HOLD),
+            'CB_BURN_EVERY': fl(BURN_AT[1] - BURN_AT[0]),
             'CB_RISE_CANCEL': fl(RISE_CANCEL), 'CB_FLOOR_MARGIN': fl(FLOOR_MARGIN),
             'CB_RESET_LO': fl(0x3F), 'CB_RESET_HI': fl(0x4C),
             'CB_CLIFF_LO': fl(0x72), 'CB_CLIFF_HI': fl(0x7A), 'CB_DEAD': fl(0xB1), 'CB_REBIRTH': fl(0xB2),
@@ -409,6 +413,10 @@ def effect_script(fx, bones, cmn_fx):
     if cmn_fx.get('PHitSmk'):
         crash.append(gfx('graphic_effect', cmn_fx['PHitSmk'], 0, 0.0, 0.0, CRASH_X, 5.04 / 8.5 * 1.5 * CMN_MUL))
     blocks.append((CRASH, if_(CB_VAR, 0, 6, crash)))
+    # v6 (user: "he should also have the burn effect put on him"): on each burn hit, the fire-damage puff on his middle
+    # (bone 0, up only: facing-safe), the hold's phase
+    for f, ph in [(f, 3) for f in BURN_AT] + [(f - HOLD + HOLDG, 8) for f in BURN_AT]:
+        blocks.append((f, if_(CB_VAR, 0, ph, [gfx('graphic_effect', FX_BURN_SELF, 0, 0.0, 6.0, 0.0, 1.0)])))
     if cmn_fx.get('MHit'):
         for f, ph in ((HOLD, 3), (HOLDG, 8)):
             blocks.append((f, if_(CB_VAR, 0, ph, [gfx('graphic_effect', cmn_fx['MHit'], 0, 0.0, VICTIM_MID[1],

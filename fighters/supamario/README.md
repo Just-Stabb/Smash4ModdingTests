@@ -2116,3 +2116,67 @@ The user: far too large, except the explosion.
 
 **Not confirmed in game:** that writing INVINCIBLE 0 (`HitModule(1, 0, 0)`) ends the timed invincibility at once, and
 that target 2 is readable from the MSC on every catch (the nearest-fighter fallback covers a failed match).
+
+## Core Breaker v6 (`supamario_corebreaker_v6.zip`): the dive's catch on the ground = the point-blank catch's end
+
+Install over v5, exe B (exe_v46j, no exe change). The user's clip (`150542b9-...-render.mp4`, 1920x1080 at 60 fps):
+"The point-blank hitbox plays the animation how I like it currently. Hitting the dive on a grounded/near ground
+opponent should work the same, using the same final hit and leaving Supamario in the grounded finisher animation."
+
+### What the clip shows
+- **0-2.6 s, the point-blank catch:** Donkey Kong is in the air over him. The detection box catches him, the air hold
+  rises with the coins, then the drive down and the crash on the stage: the big yellow explosion (CRASH_KB, angle 42 /
+  KBG 75 / BKB 45) launches DK far (27% -> 53%). Supamario ends in the crash animation on the ground (the grounded
+  finisher: crouched, the slide back, standing).
+- **4.4-8 s, the dive on DK standing:** the hold on the ground with the coins (v5's fix), then the hold's end took the
+  explosion in the air (phase 7: angle 40 / KBG 60 / BKB 30, the weaker hit at his fist). DK is thrown a short way
+  and lies on the stage (79%); Supamario ends with the air release, not the crash.
+
+### Cause
+The hold on the ground eased him down onto the victim's height exactly (speed = the distance left). He could stop just
+above the floor with no speed left, so he never touched it and the game never landed him. At the hold's end
+`global18` still read the air, so it took the explosion in the air.
+
+### Fix
+- **Landing:** in the hold on the ground he goes down at the dive's speed until he lands (the ground stops him). If
+  he gets more than `GROUND_MISS` (15) below the victim's ground, there's no ground under him: he stops there, and the
+  hold's end takes the explosion in the air.
+- **Near the ground counts as on it:** `cb_gtrack` now also keeps each player slot's height whenever it's on the
+  ground during the hover / dive (New_Vars `cb_gy1`-`cb_gy8`, object scope), until his attack hits.
+  - At the catch (`cb_catch`, the same function for the detection box and the dive), a fighter on the ground the frame
+    before the hit takes the hold on the ground.
+  - So does one seen on the ground this hover / dive that is now no more than `NEAR_GROUND` (15) above that ground,
+    and not more than 3 below it (below it is off the stage).
+  - The victim is held on that ground (a near-ground one is put down on it).
+- **Clearly airborne fighters** (higher than 15, never seen on the ground this hover / dive, or off the stage) keep
+  the air hold, the drive, then the crash on the stage or the explosion in the air.
+- **The same end on both paths:** the hold on the ground and the drive both end in `cb_crash_start` and the crash
+  segment (the victim let go at its first frame, the crash hitbox / effects at CRASH + 1, the slide back, Wait). The
+  final hit and the finisher animation are the same code and frames as the point-blank catch's.
+
+Note: the point-blank catch in the clip was on a DK in the air, so it took the air hold and the drive. The dive now
+uses the hold on the ground for standing and near-ground fighters (the v3 request: "the grounded part of the
+animation instead of being dragged up") and ends with the same crash. If the user wants the air hold and drive there
+too, that's a one-line change in `cb_catch`.
+
+### Supamario takes 7% from the hold (user: "make Supamario take 7% in damage during the hold multihits for all versions of Core Breaker", "he should also have the burn effect put on him")
+- On each of the 4 burn hits' frames (4 + 8k into either hold), `cb_burn_self` adds 1.75% to his own percent through
+  the DAMAGE variable (`0x0F000117`: the game's counter, no hit). He doesn't flinch and nothing breaks the hold (he's
+  invincible). It counts as normal damage.
+- **The burn on him:** on the same frames the effect script plays the common "fire puff (fire damage)" effect
+  (`0x1000011`, Global_GFX_IDs 0x11, the puff fire-element hits draw) on his middle: bone 0, 6 up, facing-safe, size 1,
+  guarded by the hold's phase.
+- Smash's colour flash for fire hits comes with a real hit, and he's invincible, so it isn't reproduced. The puff is
+  the visible burn.
+- The victim's coins (Element 6) and the XV2 hit loop are unchanged.
+
+### Tests (v6 build, halos 0.16)
+- dive catches:
+  - a standing fighter: the hold on the ground, he lands, the victim on its ground, the crash;
+  - one whose height reads 0.5 above the floor (v5: no landing, the air explosion): the same;
+  - one that jumped 10 up at the dive's start: the same, put down on its ground;
+  - one that jumped 40 up: the air hold, the drive, the crash.
+
+  Each ends exactly as the point-blank catch does: the crash phase, the same crash frames, Wait on the ground.
+- his percent +1.75 on each burn hit's frame, +7 in all, on the hold on the ground, the air hold with the crash, the
+  air hold with the explosion off the stage, and the point-blank catch.
