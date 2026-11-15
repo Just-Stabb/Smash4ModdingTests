@@ -122,6 +122,10 @@ class Game:
             if v == 0x0F000115 + 0x20 * t:
                 vi['input'] = val
                 return
+            if v == 0x0F0000A2 + 8 * t:
+                vi['status'] = int(val)
+                vi.setdefault('status_log', []).append(int(val))
+                return
             if v in (0x0F000040 + 8 * t, 0x0F000044 + 8 * t):
                 vi.setdefault('held', []).append(self.n)
                 return
@@ -397,6 +401,23 @@ def msc_tests(path):
     run(path, g)
     tr = run(path, g, detect=True)
     check('the detection box misses (nobody at his middle): the hover, then the dive', phases_of(tr)[:2], [1.0, 2.0])
+    # 5b. (user: "The detection box for Core Breaker should be able to hit a downed opponent"): lying fighters (DownWait,
+    # DownBound) and a God Fist victim held down by gf_tick are caught, out of the down status into Damage
+    for name, st, gf in (('DownWait', 0x50, False), ('DownBound', 0x4D, False), ('a God Fist victim held down', 0x50,
+                                                                                   True)):
+        v = {'x': 1.0, 'y': 0.0, 'status': st}
+        g = Game(stage=(-200.0, 200.0), victim=v)
+        run(path, g)
+        v['x'], v['y'] = g.x + B.DETECT_AT[0] * g.face, g.y + B.DETECT_AT[1] - 5.0
+        if gf:
+            g.vars[GB.V_PHASE], g.vars[GB.V_SLOT], g.vars[GB.V_LOCK] = 2.0, 2.0, 2.0
+        tr = run(path, g, detect=True)
+        hold = [t for t in tr if t[4] == 3.0]
+        check('the detection box catches %s: the hold (into Damage 0x%X), its controller off, no stage collision%s'
+              % (name, B.HOLD_STATUS, ', gf_tick lets go of it' if gf else ''),
+              (phases_of(tr)[:2], v.get('status_log', [None])[0], hold[2][6].get('input'), hold[2][6].get('ground'))
+              + ((g.vars.get(GB.V_PHASE) if g.vars.get(GB.V_PHASE) != 5.0 else 'handed', ) if gf else ()),
+              ([1.0, 3.0], B.HOLD_STATUS, 1.0, 0.0) + (('handed', ) if gf else ()))
     # 6. off the stage (no ground): the rise, then the dive stops no lower than the rise's start -> FallSpecial
     g = Game(x=0.0, y=-30.0, stage=(1000.0, 1001.0))
     r1, tr = both(path, g)

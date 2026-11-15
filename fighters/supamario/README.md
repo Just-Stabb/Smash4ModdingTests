@@ -1630,3 +1630,90 @@ in `tools/xv2_smash_fx.py`):
 - **Tests:** `supamario_corebreaker_test.py` and `supamario_godfist_test.py` on the 0.45 build: 0 problems. Every
   True block of the changed scripts ends on a command and still holds its original commands.
 - **The bank:** ptcl 3.89 -> 4.16 MB.
+
+## Core Breaker v3 (`supamario_corebreaker_v3.zip`): the rise and the hover / dive split
+
+Install over v2, exe B (no exe change). The user asked for three things:
+- "make the rise from up special cancelable after the initial burst of speed into any attack";
+- "make the hover and dive happen of the next up special input. Up special would be usable once per airtime,
+  resetting when getting hit, ledge, grabbed, ko'd";
+- "The moment the button is pressed for the hover, there should be a very small detection box ... If it hits an
+  opponent it should skip Supamario to the catch part of the dive"; then "The detection box ... should be able to hit
+  a downed opponent".
+
+### How it is split: one status, two entries
+Both halves stay in the SpecialHi status (0x154, the cb_* phases unchanged). `cb_init` picks the entry from
+`CB_USED`, a New_Var (slot 0x23, per fighter, object scope):
+
+| CB_USED | Up special does | Notes |
+|---|---|---|
+| 0 (or on the ground) | **the rise** (phase 0); CB_USED 1; his height kept (`CB_RISE_Y`, slot 0x24) | |
+| 1 | **the hover / dive** (phases 1-7; the motion jumps to the hover, frame 30, as the God Fist's jump); CB_USED 2 | |
+| 2 | nothing | `cb_can_up` is the up special's own hook (`global26`, set in func_2249). The game's special-move check (`func_72(global26)` in every status's transition code) refuses it, so the up special input does nothing. `cb_init` also falls straight to Fall as a safeguard. |
+
+- Two statuses would need new status slots; one status keeps the phases, the motion and the scripts as they are.
+- The game's own up special state: Mario has no "used" flag; vanilla Super Jump Punch ends in FallSpecial, which
+  allows no specials. The rise now ends in Fall (actionable), so the once-per-airtime rule is CB_USED's.
+- After the hover / dive: FallSpecial (a spent dive, the explosion) or the landing lag / the crash on the ground, as
+  in v2.
+
+### Resets
+`cb_reset_tick`, from the per-frame hook func_82, every status. CB_USED goes back to 0:
+- on the ground or a ledge (`global18` 0 / 1);
+- in a damage / capture status 0x3F-0x4C (CapturePull .. DamageFall: being grabbed, thrown, hit, tumbling);
+- in a cliff status 0x72-0x7A;
+- on Dead 0xB1, Rebirth 0xB2 or Entry 0x14F (a KO also clears New_Vars).
+
+It never resets while he is in the up special itself in the air (status 0x154 with situation 2). Not covered:
+special captures by other moves (Ganondorf's 0xB8 and the like, item captures).
+
+### The rise (first up special)
+- Crouch, then about 55 up with super armor, as before.
+- From frame 16 (`RISE_CANCEL`: 10 frames into the rise, ~37 of its ~55 units, the speed down from 4.7 to 2.7) it can
+  be cancelled into any attack: an aerial (AttackAir), the neutral / side / down special, or up special again. Up
+  special again starts the hover / dive in place: CB_USED 2, the motion to frame 30.
+- The cancels go straight through the game's status change (`cb_rise_attack`, as `gf_air_act`'s direct actions),
+  not `func_41`. So jumps and air dodges are not offered in the rise.
+- With nothing pressed, it ends at frame 30 in **Fall** (not FallSpecial). Fall itself allows everything (jumps,
+  air dodge, aerials, specials), and up special there is the hover / dive.
+
+### The hover / dive (second up special)
+- As v2: the hover (30 frames, no armor, B-reverse), the dive (48 degrees, super armor, light homing, ledges), the
+  catch, the hold, the drive, the crash / explosion, the 60-frame landing lag, FallSpecial after.
+- **The floor** (the dive / drive never go below it): the rise's start (less 3), but at least `DIVE_MIN_DROP` (30)
+  below where the dive starts. v2: the move's start, which for a second up special would be the hover's own height.
+- **The detection box:**
+  - on the hover's first frame, 2.5 across (`DETECT_SIZE`; his body is ~4) at his middle (1 ahead, 6.5 up);
+  - the catch's 3%; caught on the frames after it;
+  - its catch goes straight to the hold, then the drive and the crash / explosion (no hover, no dive);
+  - **It hits fighters lying down** (Ground/Air 3, without the God Fist's bit 31; no down-status refusal). A caught
+    downed fighter is put in Damage (0x46) by the MSC: out of the down status, held in hitstun as any held victim.
+  - A God Fist / Core Breaker victim being held down by gf_tick: the same fighter is taken over (gf_phase and
+    gf_lock to 0: this move holds it); another fighter is let go first (gf_release), as before.
+  - Shields, invincible and intangible fighters are still refused (the hover goes on).
+- The dive's own catch is unchanged (it misses fighters lying down).
+- The dive starts with Hit_Reset and Hit_Log_Clear(0), so a refused detection hit can't become a late catch.
+- The scripts' New_Vars are now all object-scoped. A move-scoped `cb` was reset to 0 by the script's start, after the
+  MSC's init had set it to 1 for the second entry, which would have skipped the detection checks.
+
+### Tests
+`supamario_corebreaker_test.py`. New checks:
+- the rise alone ends in Fall at 30 with the rise used, armor to its end;
+- up special again gives the hover / dive;
+- cb_can_up refuses a third up special in the air, allows it on the ground, and is the global26 hook;
+- every reset event (landing, ledge, hit, tumble, grab, throw, KO, respawn), and no reset while falling, attacking or
+  in the move;
+- each attack cancels the rise from frame 16 and not before; up special in the rise gives the hover / dive in place;
+  jump / air dodge inputs don't cancel it;
+- the detection box hit skips to the hold / drive / crash, and a miss gives the hover and the dive;
+- the detection box catches DownWait, DownBound and a God Fist victim held down (into Damage 0x46, gf_tick lets go);
+- off the stage, the floor is the rise's start, with at least 30 of dive from below it;
+- the v2 scenarios (homing, catches on and off the stage, cut mid-hold, an earlier victim) through the two entries.
+
+`supamario_godfist_test.py --all-models`: 0 problems.
+
+**Not confirmed in game:**
+- that `global26` (the hook the game's own special transitions read) refuses a third up special everywhere in the
+  air;
+- that a status change straight from the rise to an aerial / special works as the God Fist's direct actions did;
+- that a downed fighter put in Damage from DownWait leaves its lying pose at once.

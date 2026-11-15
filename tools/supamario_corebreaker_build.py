@@ -112,6 +112,7 @@ LASTHIT_STATUS = 0x0F0000B2
 LASTHIT_BODY = 0x0F000100 + 0x20 * 2 + 0x1B
 NO_DOWN = 0x80000000
 DOWN_LO, DOWN_HI, DOWN_FURAFURA = 0x4D, 0x57, 0x5B
+HOLD_STATUS = 0x46                          # v3: a downed fighter caught by the hover's box is put in Damage (hitstun)
 
 # ---------------------------------------------------------------- sounds (his bank 2144, row 3249: after the God Fist's)
 SE_ROW = 0xCB1
@@ -160,7 +161,7 @@ def msc_values():
             'CB_USED': '0x%X' % CB_USED, 'CB_RISE_Y': '0x%X' % CB_RISE_Y, 'CB_RISE_CANCEL': fl(RISE_CANCEL),
             'CB_DIVE_MIN_DROP': fl(DIVE_MIN_DROP), 'CB_RESET_LO': fl(0x3F), 'CB_RESET_HI': fl(0x4C),
             'CB_CLIFF_LO': fl(0x72), 'CB_CLIFF_HI': fl(0x7A), 'CB_DEAD': fl(0xB1), 'CB_REBIRTH': fl(0xB2),
-            'CB_ENTRY': fl(0x14F)}
+            'CB_ENTRY': fl(0x14F), 'CB_DOWN_FURAFURA': fl(DOWN_FURAFURA), 'CB_HOLD_STATUS': fl(HOLD_STATUS)}
 
 
 # ---------------------------------------------------------------- ACMD helpers (the God Fist's)
@@ -233,12 +234,13 @@ def game_script():
     # the catch, checked every dive frame while diving (cb 2): a fighter's body (Hit_Check kinds 2: not a shield),
     # not lying down (LASTHIT_STATUS), not invincible / intangible (LASTHIT_BODY 0); a refused one ends the checks
     # (cb 2.25: the MSC dives on)
-    def catch_check(refused):
+    def catch_check(refused, downed=False):
         take = [setf(3, CB_VAR), cmd('target_slot_get', 2, CB_V_SLOT), cmd('remove_all_hitboxes'),
                 cmd('body_state_set', 0, 1, INVINCIBLE)]
         ok = [setf(1, 0x0F000380 + 0x22)]
-        ok += if_(LASTHIT_STATUS, 3, DOWN_LO, if_(LASTHIT_STATUS, 2, DOWN_HI, [setf(0, 0x0F000380 + 0x22)]))
-        ok += if_(LASTHIT_STATUS, 0, DOWN_FURAFURA, [setf(0, 0x0F000380 + 0x22)])
+        if not downed:              # the dive: not a fighter lying down (v3's hover box: yes, the user)
+            ok += if_(LASTHIT_STATUS, 3, DOWN_LO, if_(LASTHIT_STATUS, 2, DOWN_HI, [setf(0, 0x0F000380 + 0x22)]))
+            ok += if_(LASTHIT_STATUS, 0, DOWN_FURAFURA, [setf(0, 0x0F000380 + 0x22)])
         ok += if_(LASTHIT_BODY, 1, 0, [setf(0, 0x0F000380 + 0x22)])
         ok += if_(0x0F000380 + 0x22, 0, 1, take)
         ok += if_(0x0F000380 + 0x22, 0, 0, [setf(refused, CB_VAR), cmd('remove_all_hitboxes')])
@@ -251,11 +253,13 @@ def game_script():
     # the catch part of the dive"): the hover's first frame (both ways in: the second up special's jump to it, or up
     # special again in the rise), DETECT_SIZE at his middle, the catch's damage and rules; caught (cb 3) -> the MSC's
     # hold; refused (cb 1.25) -> the hover goes on
+    # (user: "The detection box for Core Breaker should be able to hit a downed opponent": Ground/Air 3, no bit 31,
+    # no down-status refusal; shields, invincible and intangible fighters still aren't caught)
     blocks.append((HOVER_FROM, [hitbox(ID=0, Bone=0, Damage=CATCH_DMG, BKB=20, Size=DETECT_SIZE, Y=DETECT_AT[1],
                                        Z=DETECT_AT[0], HitstopFrames=CATCH_FREEZE, SelfHitstopFrames=CATCH_FREEZE,
-                                       **{'Ground/Air': NO_DOWN | 3})]))
+                                       **{'Ground/Air': 3})]))
     blocks.append((HOVER_FROM + 2, [cmd('remove_all_hitboxes')]))
-    det = catch_check(1.25)
+    det = catch_check(1.25, downed=True)
     for f in range(HOVER_FROM + 1, HOVER_FROM + 4):
         blocks.append((f, if_(CB_VAR, 0, 1, det)))
     # the dive starts with a clean hit record (a refused detection hit can't catch later)

@@ -38605,7 +38605,7 @@ int cb_hover_phase(float fr)
     // v3: the detection box at the hover's start caught someone (the game script: cb 3): straight to the hold
     if (WorkModuleF(0, CB_VAR) > 2.5f && WorkModuleF(0, CB_VAR) < 3.5f)
     {
-        cb_floor = WorkModuleF(0, 0x0f000001) - CB_DIVE_MIN_DROP;
+        cb_set_floor();
         cb_catch();
         return 0;
     }
@@ -38627,16 +38627,22 @@ int cb_hover_phase(float fr)
 }
 
 // ---- the dive (phase 2)
-void cb_dive_start()
+// the dive's / drive's floor (v1: the height the move started at): the rise's start, but at least CB_DIVE_MIN_DROP
+// below him
+void cb_set_floor()
 {
     float y;
     y = WorkModuleF(0, 0x0f000001);
-    // the floor (v1: the height the move started at): the rise's start, but at least CB_DIVE_MIN_DROP below him
     cb_floor = WorkModuleF(0, CB_RISE_Y) - CB_FLOOR_MARGIN;
     if (cb_floor > y - CB_DIVE_MIN_DROP)
     {
         cb_floor = y - CB_DIVE_MIN_DROP;
     }
+}
+
+void cb_dive_start()
+{
+    cb_set_floor();
     cb_set_ph(0x2);
     cb_ang = CB_DIVE_DEG;
     cb_armor(0x1);
@@ -38806,6 +38812,7 @@ void cb_release()
 void cb_catch()
 {
     int old;
+    float vst;
     cb_slot = WorkModule(0x6, CB_V_SLOT);
     if (cb_slot < 1 || cb_slot > 8)
     {
@@ -38813,11 +38820,24 @@ void cb_catch()
         WorkModule(0, 2.0f, CB_VAR);
         return;
     }
-    // a God Fist / Core Breaker victim still held down by gf_tick (another fighter): let go first
+    // a God Fist / Core Breaker victim still held down by gf_tick (another fighter): let go first; the same fighter
+    // (v3: the hover's detection box catches downed fighters): gf_tick stops holding it, this move takes it over
     old = WorkModule(0x6, GF_V_SLOT);
     if (WorkModuleF(0, GF_V_PHASE) > 0.5f && old != cb_slot)
     {
         gf_release(old + 0x2);
+    }
+    if (WorkModuleF(0, GF_V_PHASE) > 0.5f && old == cb_slot)
+    {
+        WorkModule(0, 0.0f, GF_V_PHASE);
+        WorkModule(0, 0.0f, GF_V_LOCK);
+    }
+    // a fighter lying down (v3: the detection box): out of the down statuses into the hold's hitstun (Damage), as a
+    // hit on it in the air would be
+    vst = WorkModuleF(0, 0x0F0000A2 + 8 * cb_t());
+    if ((vst >= CB_DOWN_LO && vst <= CB_DOWN_HI) || vst == CB_DOWN_FURAFURA)
+    {
+        WorkModule(0, CB_HOLD_STATUS, 0x0F0000A2 + 8 * cb_t());
     }
     cb_set_ph(0x3);
     SoundModule(0x2714, CB_SND_RUSH);
