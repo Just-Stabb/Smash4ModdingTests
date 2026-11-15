@@ -36403,7 +36403,10 @@ int func_2251()
 int func_2252()
 {
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
-    StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x1, 0, 0x400, 0x1000);
+    // Fake Death v2 (user: no staling): the status's attack log (the 6th value, vanilla 0x1 for the down special)
+    // left empty, Core Breaker v6's way (docs/native-notes.md "The status's attack log and staling"); F.L.U.D.D. (the
+    // same status in the air) has no hitboxes
+    StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0, 0x400, 0x1000);
     return 0;
 }
 
@@ -39697,7 +39700,8 @@ void cb_end()
 //   intangible to its frame FD_INT_B, the hit (the game script: a ground-only and an air-only hitbox) and Wait at its
 //   end (FD_WAKE_END)
 // - a grounded victim (fd_hits / fd_tick): kept where it is and held in hitstun FD_HITSTUN x FD_REP_MULn (the n-th
-//   hit on it within FD_REPEAT_WINDOW frames of the one before); an airborne one: the air hitbox's own launch
+//   Fake Death hit on it while it is still in the previous one's hitstun: v2); an airborne one: the air hitbox's own
+//   launch
 // His travel is his speed (energy 3) each frame from XV2's root (no TransN), on the ground with GroundModule's ledge
 // stop; off the ground: Fall.
 // ===================================================================
@@ -39709,6 +39713,7 @@ int fd_turned;          // the wake-up's turn toward the nearest opponent done
 int fd_gmask;           // player slots on the ground the frame before (until the attack hits)
 int fd_done;            // player slots already taken as a grounded victim this move
 float fd_lastfr;        // the wake-up's motion frame last frame (its slot loops: the end is the wrap back)
+int fd_tap;             // v2: the button released during the collapse (a tap): intangible to the attack, no lying
 
 
 float fd_vc(float f)
@@ -39731,6 +39736,7 @@ void fd_init()
     fd_turned = 0;
     fd_gmask = 0;
     fd_done = 0;
+    fd_tap = 0;
     KineticModule(0, 0x6);
     GroundModule(0x2710, 0x2);
     func_22(0x229, 0, 1.0f);
@@ -39829,7 +39835,11 @@ void fd_hits()
         {
             fd_done = fd_done | (0x1 << s);
             rep = WorkModuleF(0, FD_V_REP + s);
-            if (WorkModuleF(0, FD_V_CLOCK) - WorkModuleF(0, FD_V_LAST + s) > FD_REPEAT_WINDOW)
+            // v2 (user): a repeat only while it is still in the previous Fake Death hit's hitstun: fd_tick still holding
+            // it, or its hold broken by this very hit's hitstop (fd_tick may run first in the frame: FD_V_LAST, the
+            // clock when a new hit froze it, within FD_REHIT frames)
+            if (WorkModuleF(0, FD_V_HS + s) == 0.0f &&
+                WorkModuleF(0, FD_V_CLOCK) - WorkModuleF(0, FD_V_LAST + s) > FD_REHIT)
             {
                 rep = 0.0f;
             }
@@ -39848,7 +39858,7 @@ void fd_hits()
                 hs = FD_HITSTUN;
             }
             WorkModule(0, rep, FD_V_REP + s);
-            WorkModule(0, WorkModuleF(0, FD_V_CLOCK), FD_V_LAST + s);
+            WorkModule(0, -1000.0f, FD_V_LAST + s);
             WorkModule(0, (float)(int)(hs + 0.5f), FD_V_HS + s);
             WorkModule(0, x, FD_V_HX + s);
             WorkModule(0, (float)(int)(hs + 0.5f), 0x0F000040 + 0x8 * (s + 0x2));
@@ -39873,11 +39883,27 @@ void fd_loop()
     held = ControlModule(0x2712, 0x1);
     if (fd_ph == 0)
     {
-        fd_intangible(fr, FD_INT_A);
+        // v2 (user: "the first fake collapse idle loop (happens if you release the button immediately) should also be
+        // invulnerable"): once the button is let go during the collapse it is a tap (latched: pressing again doesn't
+        // make it a hold); from the release on, every collapse frame is intangible too, up to the attack (whose own
+        // intangibility starts on its first frame). Released by frame FD_INT_A + 1 (19): intangible from frame 1
+        // through the attack without a gap
+        if (held == 0)
+        {
+            fd_tap = 0x1;
+        }
+        if (fd_tap != 0 && fr > FD_INT_A - 0.5f)
+        {
+            fd_intangible(fr, FD_LIE_FROM);
+        }
+        else
+        {
+            fd_intangible(fr, FD_INT_A);
+        }
         v = fd_vc(fr);
         if (fr > FD_LIE_FROM - 0.5f)
         {
-            if (held != 0 && (float)fd_t < FD_HOLD_MAX - 0.5f)
+            if (fd_tap == 0 && held != 0 && (float)fd_t < FD_HOLD_MAX - 0.5f)
             {
                 fd_ph = 0x1;
                 v = 0.0f;
@@ -39959,7 +39985,8 @@ void fd_tick()
             {
                 if (hs < 0.0f)
                 {
-                    hs = 0.0f;                  // frozen again after its hitstop had ended: another hit
+                    hs = 0.0f;                  // frozen again after its hitstop had ended: another hit (if it is
+                    WorkModule(0, WorkModuleF(0, FD_V_CLOCK), FD_V_LAST + s);   // Fake Death's: a repeat)
                 }
                 else
                 {

@@ -99,6 +99,7 @@ class Game:
         self.hitstop = 0                 # his own
         self.calls = []
         self.trace = []
+        self.status_data = []
 
     # slot s (1-8): target s + 2; slot 1 is him
     def slot_of(self, v, base, stride, quantity=0):
@@ -182,6 +183,9 @@ class Game:
             return 0
         if sid == 0x13 and a == [0x1]:
             return R.f2i(self.frame)
+        if sid == 0x18 and a and a[0] == 0x2713:
+            self.status_data.append(list(a))
+            return 0
         if sid == 0x18:
             if a[0] == 0x3:
                 self.status = a[1]
@@ -257,7 +261,7 @@ def vm_for(path, g):
     return vm
 
 
-def run(path, g, frames=400, vm=None, cut_at=None, air_at=None):
+def run(path, g, frames=400, vm=None, cut_at=None, air_at=None, tick_first=False):
     """the down special from its main frame by frame; returns the per-frame trace"""
     vm = vm or vm_for(path, g)
     g.status, g.hitflag, g.hitstop = None, 0, 0
@@ -285,6 +289,8 @@ def run(path, g, frames=400, vm=None, cut_at=None, air_at=None):
                 vm.call(vm.func(func_index(vm, 'func_2282')))
             break
         g.collide()
+        if tick_first and any(f.hit_at == g.n for f in g.fighters.values()):
+            vm.call(vm.func(func_index(vm, 'fd_tick')))       # fd_tick sees the new hit before fd_loop does
         for f in g.fighters.values():
             f.step(g.n)
         g.x += g.vx
@@ -341,12 +347,12 @@ def msc_tests(path):
     check('tap: Wait (0) after the wake-up\'s last frame: actionable on game frame %d' % (B.LIE_FROM + 1 + B.WAKE_END),
           (end[4], end[0]), (0, B.LIE_FROM + 1 + B.WAKE_END))
     ints = sorted({n for n, _v in g.int_log})
-    want = list(range(1, B.INT_A + 2)) + list(range(wf, wf + B.INT_B + 1))
-    check('tap: intangible game frames 1-%d (collapse 0-%d) and %d-%d (wake-up 0-%d), nothing else' % (
-        B.INT_A + 1, B.INT_A, wf, wf + B.INT_B, B.INT_B), ints, want)
-    lasts = [v for n, v in g.int_log if n in (B.INT_A + 1, wf + B.INT_B)]
-    check('tap: each window\'s last write is 1 frame, the others %g (renewed, never more)' % B.INT_STEP,
-          (lasts, max(v for _n, v in g.int_log)), ([1.0, 1.0], B.INT_STEP))
+    want = list(range(1, wf + B.INT_B + 1))
+    check('tap (released at 4): intangible every frame from 1 through the collapse and the attack\'s 0-%d (v2: no gap '
+          'after 19), nothing after' % B.INT_B, ints, want)
+    lasts = [v for n, v in g.int_log if n == wf + B.INT_B]
+    check('tap: the window\'s last write is 1 frame, the others %g (renewed, never more)' % B.INT_STEP,
+          (lasts, max(v for _n, v in g.int_log)), ([1.0], B.INT_STEP))
     check('tap: the ring killed at the wake-up and at the status\'s end (0x%08X)' % B.FX_RING,
           [(n, e) for n, e in g.kills], [(wf, B.FX_RING), (tr[-1][0], B.FX_RING)])
     # his travel: the collapse back, the wake-up forward: XV2's root + the BAC's Movement
@@ -372,9 +378,17 @@ def msc_tests(path):
     check('held past the cap: the wake-up comes out on game frame %d (HOLD_MAX)' % B.HOLD_MAX, wake_frame(tr),
           B.HOLD_MAX)
     # 4. released during the collapse: the collapse plays out, then the wake-up (a tap)
-    g = Game(held=lambda n: n <= 20)
+    g = Game(held=lambda n: n <= 24)
     tr, _vm = run(path, g)
-    check('released at 20 (in the collapse): the wake-up at %d' % (B.LIE_FROM + 1), wake_frame(tr), B.LIE_FROM + 1)
+    wf = wake_frame(tr)
+    check('released at 25 (in the collapse): the wake-up at %d' % (B.LIE_FROM + 1), wf, B.LIE_FROM + 1)
+    check('released at 25: intangible 1-%d, then from the release (25) on through the attack\'s %d' % (
+        B.INT_A + 1, B.INT_B), sorted({n for n, _v in g.int_log}),
+          list(range(1, B.INT_A + 2)) + list(range(25, wf + B.INT_B + 1)))
+    g = Game(held=lambda n: n <= 10 or 14 <= n)
+    tr, _vm = run(path, g)
+    check('released at 11, pressed again at 14: still a tap (latched): the wake-up at %d, no lying' % (
+        B.LIE_FROM + 1), wake_frame(tr), B.LIE_FROM + 1)
     # 5. the turn toward the nearest opponent behind him at the wake-up
     behind = Fighter(2, -30.0)
     g = Game([behind], held=lambda n: False)
@@ -393,7 +407,10 @@ def msc_tests(path):
     tr, _vm = run(path, g, cut_at=80)
     check('cut at 81 while lying: the ring killed then, nothing written after', (g.kills[-1], max(n for n, _ in g.int_log)),
           ((81, B.FX_RING), B.INT_A + 1))
-    # 8. the ground hit: stays where it is, HITSTUN frames, less on repeats, reset after the window
+    # 8. the ground hit: stays where it is, HITSTUN frames; v2: less only when it lands while the fighter is still in
+    # the previous Fake Death hit's hitstun. One Supamario's next Fake Death can't reach that (his attack is 52+
+    # frames from his next action, the fighter has ~20 of its 66 left): the "still in it" case is made here by keeping
+    # the hold running (FD_V_HS) when the next one starts
     wake_x = sum(B.VC) + sum(B.VW[:B.HIT_FROM])
     v = Fighter(2, wake_x + B.HIT_Z + 2.0)
     x0 = v.x
@@ -401,17 +418,37 @@ def msc_tests(path):
     vm = None
     got = []
     for k in range(5):
-        if k == 4:
-            after(g, vm, B.REPEAT_WINDOW + 20)
+        v.x, v.status, v.hitstun, v.hitstop, v.log, v.writes = x0, 0, 0, 0, [], []
+        g.x, g.face = 0.0, 1.0
+        if 0 < k < 4:                          # still in the last one's hitstun: its hold running
+            g.vars[B.V_HS + 2] = -500.0
+            v.status, v.hitstun = 0x45, 500
+        tr, vm = run(path, g, vm=vm)
+        after(g, vm, 140)
+        got.append((stun_frames(v), {x for _n, st, _hs, _hp, x in v.log if st == 0x45} == {round(x0, 3)}))
+        after(g, vm, 30)
+    want = [(int(B.HITSTUN * m + 0.5), True) for m in B.REP_MUL] + [(B.HITSTUN, True)]
+    check('ground hit x5 on one fighter, hits 2-4 while still in the last one\'s hitstun, the 5th after it was over: '
+          'hitstun %s, kept where it was hit' % [w[0] for w in want], got, want)
+    # the same, but each next hit after the hitstun is over (the real 1-on-1 case): always the full one
+    got = []
+    for k in range(3):
         v.x, v.status, v.hitstun, v.hitstop, v.log, v.writes = x0, 0, 0, 0, [], []
         g.x, g.face = 0.0, 1.0
         tr, vm = run(path, g, vm=vm)
-        after(g, vm, 120)
-        got.append((stun_frames(v), {x for _n, st, _hs, _hp, x in v.log if st == 0x45} == {round(x0, 3)}))
-        after(g, vm, 60)
-    want = [(int(B.HITSTUN * m + 0.5), True) for m in B.REP_MUL] + [(B.HITSTUN, True)]
-    check('ground hit x5 on one fighter: hitstun frames after the hitstop %s, kept where it was hit (the 5th after %d '
-          'frames: reset)' % ([w[0] for w in want], B.REPEAT_WINDOW), got, want)
+        after(g, vm, 140)
+        got.append(stun_frames(v))
+    check('three hits each after the last hitstun ended (no 300-frame window any more): %d each' % B.HITSTUN, got,
+          [B.HITSTUN] * 3)
+    # fd_tick seeing the new hit first (it breaks the running hold, marks the frame): still a repeat
+    v.x, v.status, v.hitstun, v.hitstop, v.log, v.writes = x0, 0x45, 500, 0, [], []
+    g.vars[B.V_HS + 2] = -500.0
+    g.vars[B.V_REP + 2] = 1.0
+    g.x, g.face = 0.0, 1.0
+    run(path, g, vm=vm, tick_first=True)
+    after(g, vm, 140)
+    check('the hold broken by the hit before the MSC finds it: still a repeat (%d)' % int(B.HITSTUN * B.REP_MUL[1] + 0.5),
+          stun_frames(v), int(B.HITSTUN * B.REP_MUL[1] + 0.5))
     # a second fighter's first hit is a first hit
     v2 = Fighter(3, wake_x + B.HIT_Z + 2.0)
     g.fighters = {3: v2}
@@ -428,6 +465,14 @@ def msc_tests(path):
     check('an airborne fighter: launched (DamageFly), the game\'s hitstun %d, no hitstun written, not counted' %
           int(kb * 0.4), (va.status in (0xE, 0x47), va.writes, R.i2f(R.f2i(g.vars.get(B.V_REP + 2, 0.0))),
                           va.x > wake_x + B.HIT_Z + 20), (True, [], 0.0, True))
+    d1, d2 = B.flight(B.knockback(B.AIR_HIT_V1, 0))[0], B.flight(B.knockback(B.AIR_HIT, 0))[0]
+    check('the air hit at 0%%: %.0f units away (v1 %.0f): about 4x (3.8-4.2)' % (d2, d1), 3.8 <= d2 / d1 <= 4.2, True)
+    # 9b. the status's attack log: 0 (no staling)
+    g = Game()
+    vm2 = vm_for(path, g)
+    vm2.call(vm2.func(2252))
+    check('the down special\'s status data: attack log (6th value) 0, no staling (Core Breaker v6)',
+          [a[6] for a in g.status_data], [0])
     # 10. on a shield: the frame disadvantage
     vs = Fighter(2, wake_x + B.HIT_Z + 2.0, shield=True)
     g = Game([vs], held=lambda n: False)
@@ -481,6 +526,8 @@ def script_tests(out, base):
           (hb[0]['Ground/Air'], hb[0]['Damage'], hb[0]['BKB'], hb[0]['KBG'], hb[0]['FKB'], hb[0]['SDI'],
            hb[0]['HitstunMul'], hb[0]['HitstopFrames'], hb[0]['Bone'], hb[0]['X']),
           (1, B.GROUND_HIT['Damage'], 1, 0, 0, 0.0, -float(B.HITSTUN), B.HITSTOP, 0, 0.0))
+    check('v2: both 6%, neither clanks nor rebounds (Clang 0, Rebound 0)',
+          [(h['Damage'], h['Clang'], h['Rebound']) for h in hb], [(6.0, 0, 0), (6.0, 0, 0)])
     check('the air one: airborne only, %g%%, angle %d, BKB %d, KBG %d, the game\'s hitstun' % (
         B.AIR_HIT['Damage'], B.AIR_HIT['Angle'], B.AIR_HIT['BKB'], B.AIR_HIT['KBG']),
           (hb[1]['Ground/Air'], hb[1]['Damage'], hb[1]['Angle'], hb[1]['BKB'], hb[1]['KBG'], hb[1]['HitstunMul'],
@@ -493,9 +540,10 @@ def script_tests(out, base):
     eff = f['effect'].script('speciallwstart')
     calls = [(nm(c), c.params) for c in eff if nm(c) in ('External_Graphic', 'Graphic_Effect')]
     ring = [p for n, p in calls if n == 'External_Graphic']
-    check('effect: the ring once, on bone 0, only up (no X / Z, no turn), x%.2f' % B.FD_FX_SCALE,
-          [(p[0], p[1], p[2], p[4], p[5], p[6], p[7], round(p[8], 3)) for p in ring],
-          [(B.FX_RING, 0, 0.0, 0.0, 0.0, 0.0, 0.0, B.FD_FX_SCALE)])
+    check('effect: the ring once, on bone 0, up %.1f and %.1f along his facing (no X, no turn), x%.2f' % (
+        B.RING_Y, B.RING_Z, B.FD_FX_SCALE),
+          [(p[0], p[1], p[2], round(p[3], 3), round(p[4], 3), p[5], p[6], p[7], round(p[8], 3)) for p in ring],
+          [(B.FX_RING, 0, 0.0, B.RING_Y, B.RING_Z, 0.0, 0.0, 0.0, B.FD_FX_SCALE)])
     check('effect: the ring at frame %d, its terminate at the wake-up\'s first frame' % B.RING_AT,
           ([c.params for c in eff if nm(c) == 'FRAME'][-1], [(nm(c), c.params[0]) for c in
                                                              f['effect'].script('speciallwhold') if c.params][:1]),
@@ -527,7 +575,8 @@ def script_tests(out, base):
 
 def effect_tests(out):
     """the ring's emitters facing-safe: at the effect's origin but for their height (no X / Z), unturned but the
-    rings (polygons) turned Y 90 only (a symmetric ring: the same both facings); in the bank under its id"""
+    rings (polygons) turned X 90 only (v2: flat round him; a symmetric flat ring is the same both facings); in the
+    bank under its id"""
     import efc
     import ptcl
     import math
@@ -545,13 +594,21 @@ def effect_tests(out):
             continue
         t, r = p.field(d, 'emitter_translation'), p.field(d, 'emitter_rotation')
         ring = p.field(d, 'particle_type') == 1
-        want_r = (0.0, math.pi / 2, 0.0) if ring else (0.0, 0.0, 0.0)
-        if abs(t[0]) > 1e-6 or abs(t[2]) > 1e-6 or max(abs(a - b) for a, b in zip(r, want_r)) > 1e-5:
+        want_r = (math.pi / 2, 0.0, 0.0) if ring else (0.0, 0.0, 0.0)
+        want_y = B.RING_HEIGHTS.get(p.emitter_name(d), None)
+        if abs(t[0]) > 1e-6 or abs(t[2]) > 1e-6 or max(abs(a - b) for a, b in zip(r, want_r)) > 1e-5 or \
+                (want_y is not None and abs(t[1] * B.FD_FX_SCALE - want_y) > 1e-3):
             bad.append((p.emitter_name(d), t, r))
         rgb = [c * p.field(d, 'color_scale') for c in p.color_keys(d, 0)[0][:3]]
         if max(rgb) > 2.0 + 1e-3:
             bad.append((p.emitter_name(d), 'HDR', rgb))
-    check('the ring\'s emitters facing-safe (height only; rings Y 90, the rest unturned), HDR within 2.0', bad, [])
+    check('the ring\'s emitters facing-safe (heights %s only; rings X 90: flat, the rest unturned), HDR within 2.0' %
+          B.RING_HEIGHTS, bad, [])
+    rings = [max(p.field(em['data'], 'scale')) * B.FD_FX_SCALE * B.RING_DRAWN for em in p.sets[si]['emitters']
+             if em['data'] is not None and p.field(em['data'], 'particle_type') == 1 and
+             p.emitter_name(em['data']) == 'line']
+    check('the main ring round him lying (radius %.1f, his lying body z -6.7 .. 4.1: half 5.4 + 0.5)' % rings[0],
+          rings[0] >= 5.9, True)
     check('the ring\'s set: 4 emitters + 1 halo (its glowing ring line)', len(p.sets[si]['emitters']), 5)
 
 

@@ -60,18 +60,24 @@ VW_ANIM = [-0.005, -0.01, -0.02, -0.034, -0.039, -0.054, -0.069, -0.084, -0.108,
            0.153, 0.12, 0.088, 0.06, 0.034, 0.011]
 BAC_MOVE = 0.2 * anim.SCALE         # 1.008 a frame
 BAC_MOVE_FRAMES = range(18, 24)     # XV2 110-115
-VW = [round(v + (BAC_MOVE if f in BAC_MOVE_FRAMES else 0.0), 4) for f, v in enumerate(VW_ANIM)]
+EXTRA_PUSH = 1.0                    # v2 (user: "should move him a bit forward"): +1 a frame more over the same frames:
+                                    # +6.0 units (the attack's forward travel 11.9, v1 5.9)
+VW = [round(v + (BAC_MOVE + EXTRA_PUSH if f in BAC_MOVE_FRAMES else 0.0), 4) for f, v in enumerate(VW_ANIM)]
 
 # ---------------------------------------------------------------- the hit
 # XV2: one hitbox, b_C_Base + (0, 0.5 m, 0.75 m ahead), 0.75 m, BDM #20 of CMN.bdm (a Standard hit: 30 frames of
 # stun, 9 / 9 hitstop, a 0.25 m push; struck in a floating hit: a knock away 32 frames), 20 damage (2 guarded)
 HIT_Z, HIT_Y, HIT_SIZE = round(0.75 * anim.SCALE, 2), round(0.5 * anim.SCALE, 2), round(0.75 * anim.SCALE, 2)
 GROUND_HIT = dict(Damage=6.0, Angle=0, KBG=0, FKB=0, BKB=1)        # the user: a grounded victim stays where it is
-AIR_HIT = dict(Damage=3.0, Angle=45, KBG=25, FKB=0, BKB=80)        # the user: high BKB, low KBG, weak, away
+# v2 (user: 6% both; "should knock opponents away about 4x further than it does now at 0%"): BKB 80 -> 165 (KBG 25,
+# 45 degrees): ~183 units at 0% (v1 ~46), knockback() / flight()
+AIR_HIT = dict(Damage=6.0, Angle=45, KBG=25, FKB=0, BKB=165)
+AIR_HIT_V1 = dict(Damage=3.0, Angle=45, KBG=25, FKB=0, BKB=80)
 HITSTOP = 9                          # XV2 BDM #20: UserStun / VictimStun 9 (the ground hit)
-HITSTUN = 60                         # the ground hit's hitstun (the user: "a lot"; XV2's stun is 30)
-REP_MUL = (1.0, 0.6, 0.35, 0.2)     # the n-th ground hit on the same fighter within REPEAT_WINDOW of the one before
-REPEAT_WINDOW = 300                  # frames
+HITSTUN = 66                         # the ground hit's hitstun (v2, the user: 66; v1 60; XV2's stun is 30)
+REP_MUL = (1.0, 0.6, 0.35, 0.2)     # v2: the n-th ground hit on a fighter still in the previous one's hitstun
+REHIT = HITSTOP + 3                  # a hold broken by a new hitstop this many frames ago still counts (fd_tick may
+                                     # see the hit first; HIT_LATE: the MSC finds the victim within 3 frames)
 VICTIM_MID = 5.0                     # a fighter's middle above its feet (the victim search)
 VICTIM_R = HIT_SIZE + 10.0
 ST_DAMAGE, ST_DAMAGE_AIR = 0x45, 0x46
@@ -84,10 +90,19 @@ V_HX = 0x0F000398 - 1                # + slot: its X when hit (0x18-0x1F)
 V_CLOCK = 0x0F0003BD                 # frames counted by fd_tick (slot 0x3D)
 
 # ---------------------------------------------------------------- effects / sounds
-FD_FX_SCALE = 1.36                   # XV2's proportion: Supamario ~12 units tall / Yamcha's 1.75 m / 5.04 units a m
-                                     # (the God Fist 1.75, Core Breaker 2.25: the user's picks for theirs)
+# v2 (user, v1's screenshot: "it should surround Supamario horizontally"): the rings lie flat (X 90) round his lying
+# body. Sized from the screenshot: at v1's 1.36 the main ring was ~3.2 units in radius (6.5 across on a ~10.8-unit
+# lying Supamario), so ~2.35 a unit of size; 2.6 makes it ~6.1: round him head to boots (his lying body spans
+# z -6.7 .. +4.1 from TransN)
+FD_FX_SCALE = 2.6
+RING_Z = -1.3                        # the call: centred on his lying body along his facing (bone 0, forward offset)
+RING_HEIGHTS = {'line': 0.9, 'line_1': 0.0, '9': 0.45, 'sprite': 0.0}   # each emitter's height over the call
+                                     # (units at the final size: XV2's 0.8 / 0.3 / 0.6 / 0.2 m stack kept low round him)
 FX_DUST = 0x1000009                  # Smash's dash cloud: XV2's Stage BG effect 20 at frame 1 (the stage's own, not
                                      # in the files)
+RING_DRAWN = 2.35 / 8.06             # a ring's drawn radius per unit of its emitter scale x the call's size (v1's
+                                     # screenshot: radius ~3.2 at size 1.36, scale 8.06): the preview's
+RING_Y = 1.8                         # v2: the call's height: his lying body's middle (hips 2.8, the floor 0)
 RING_AT = 30                         # XV2: BTL_CMN 26 (Btl_RvlRingON, the knocked-out revive ring) at 30, b_C_Pelvis
 RING_EMP = 'Btl_RvlRingON.emp'
 SE_ROW = 0xCB1
@@ -124,7 +139,7 @@ def msc_values():
             'FD_WAKE_END': fl(WAKE_END), 'FD_HIT_Z': fl(HIT_Z), 'FD_HIT_Y': fl(HIT_Y),
             'FD_VICTIM_MID': fl(VICTIM_MID), 'FD_VICTIM_R2': fl(VICTIM_R ** 2), 'FD_HITSTUN': fl(HITSTUN),
             'FD_REP_MUL2': fl(REP_MUL[1]), 'FD_REP_MUL3': fl(REP_MUL[2]), 'FD_REP_MUL4': fl(REP_MUL[3]),
-            'FD_REPEAT_WINDOW': fl(REPEAT_WINDOW), 'FD_V_REP': '0x%X' % V_REP, 'FD_V_LAST': '0x%X' % V_LAST,
+            'FD_REHIT': fl(REHIT), 'FD_V_REP': '0x%X' % V_REP, 'FD_V_LAST': '0x%X' % V_LAST,
             'FD_V_HS': '0x%X' % V_HS, 'FD_V_HX': '0x%X' % V_HX, 'FD_V_CLOCK': '0x%X' % V_CLOCK,
             'FD_ST_DAMAGE_AIR': fl(ST_DAMAGE_AIR), 'FD_ST_DAMAGE': fl(ST_DAMAGE),
             'FD_FX_RING': '0x%X' % FX_RING}
@@ -163,7 +178,7 @@ def cmd(name, *params):
 
 def hitbox(**kw):
     d = dict(ID=0, Part=0, Bone=0, Damage=1.0, Angle=0, KBG=0, FKB=0, BKB=0, Size=1.0, X=0.0, Y=0.0, Z=0.0,
-             Effect=0, Trip=0.0, Hitlag=1.0, SDI=1.0, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=1, SFXType=2,
+             Effect=0, Trip=0.0, Hitlag=1.0, SDI=1.0, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=1, SFXType=2,
              **{'Ground/Air': 3, 'Direct/Indirect': 1}, Type=6, HitBits=0x3F, Unk41=0, CollisionPart=0xF, NoScale=0,
              Shieldable=1, Reflectable=0, Absorbable=0, Rehit=0, IgnoreInvuln=0, HitAllStates=0, FacingRestrict=3,
              NoGrabRelease=0, TeamDamage=0, DisableHitlag=0, NoGFX=0, Flinchless=0, Shape=0, HitstunMul=0.0,
@@ -207,7 +222,7 @@ def effect_scripts(ring_y):
     end)"""
     ring = FX_IDS['ring']
     start = [cmd('frame', 1.0), gfx('graphic_effect', FX_DUST, 0, 0.0, 0.0, 0.0, 1.0),
-             cmd('frame', float(RING_AT)), gfx('external_graphic', ring, 0, 0.0, float(ring_y), 0.0, FD_FX_SCALE)]
+             cmd('frame', float(RING_AT)), gfx('external_graphic', ring, 0, 0.0, float(ring_y), RING_Z, FD_FX_SCALE)]
     hold = [cmd('terminate_graphic_effect', ring, 1, 0)]
     return start, hold
 
@@ -244,13 +259,14 @@ def scripts(body_dir, ring_y):
 
 # ---------------------------------------------------------------- effects (XV2's BTL_CMN effect 26)
 def facing_ring(p, d):
-    """the revive ring facing-safe: its emitter at the effect's origin but for its height; a ring (polygon, type 1)
-    turned Y 90 to face Smash's side camera (XV2 draws it facing the character's front, Orientation None, which its
-    camera behind him sees face-on; a symmetric ring looks the same turned either way, so both facings agree);
-    particles unturned with a full-sphere spread (the God Fist's facing_safe)"""
-    ty = p.field(d, 'emitter_translation')[1]
+    """the revive ring facing-safe: its emitter at the effect's origin but for its height (RING_HEIGHTS); a ring
+    (polygon, type 1: drawn in its emitter's XY plane) turned X 90 to lie flat round him (v2, the user: "it should
+    surround Supamario horizontally"; v1 turned it Y 90 to face the camera: a flat circle behind him); a flat ring is
+    symmetric under the facing's turn, so both facings agree; particles unturned with a full-sphere spread (the God
+    Fist's facing_safe)"""
+    ty = RING_HEIGHTS.get(p.emitter_name(d), 0.0) / FD_FX_SCALE
     if p.field(d, 'particle_type') == 1:
-        p.set_emitter_srt(d, tuple(p.field(d, 'emitter_scale')), (0.0, math.pi / 2, 0.0), (0.0, ty, 0.0))
+        p.set_emitter_srt(d, tuple(p.field(d, 'emitter_scale')), (math.pi / 2, 0.0, 0.0), (0.0, ty, 0.0))
     else:
         p.set_emitter_srt(d, tuple(p.field(d, 'emitter_scale')), (0.0, 0.0, 0.0), (0.0, ty, 0.0))
         if p.field(d, 'dispersion_angle') > 0 or p.field(d, 'emitter_velocity') or p.field(d, 'figure_velocity'):
@@ -376,10 +392,11 @@ def preview(out_png, p, rep, outs, bones, ring_y):
                     ty = p.field(dd, 'emitter_translation')[1] * FD_FX_SCALE
                     rgb = [c * p.field(dd, 'color_scale') for c in p.color_keys(dd, 0)[0][:3]]
                     col = tuple(int(255 * c / max(max(rgb), 1e-6)) for c in rgb)     # the hue (drawn past 1: bloom)
-                    r = max(p.field(dd, 'scale')) * FD_FX_SCALE
-                    cx, cy = pt(0.0, ring_y + ty)
-                    if p.field(dd, 'particle_type') == 1:
-                        d.ellipse([cx - r * sc, cy - r * sc, cx + r * sc, cy + r * sc], outline=col, width=2)
+                    r = max(p.field(dd, 'scale')) * FD_FX_SCALE * RING_DRAWN
+                    cx, cy = pt(RING_Z, ring_y + ty)
+                    if p.field(dd, 'particle_type') == 1:        # flat: seen from the side camera (~10 degrees up)
+                        d.ellipse([cx - r * sc, cy - 0.17 * r * sc, cx + r * sc, cy + 0.17 * r * sc], outline=col,
+                                  width=2)
                     else:
                         d.ellipse([cx - 3, cy - 3, cx + 3, cy + 3], fill=col)
             else:
@@ -415,7 +432,7 @@ def build(sm_dir, out_dir, fd_skill, fd_se_wav, cb_args, png=None, halo=True):
         o = outs[('main', m)]
         assert all(max(abs(v) for v in o.sample(trans, f)[0]) < 1e-6 for f in range(o.frames)), 'TransN moves'
     js = {m: anim.joints(info['frames'][m], info['smash']) for m in anim.MOTIONS}
-    ring_y = round(js[anim.START][RING_AT]['HipN'][1], 2)
+    ring_y = RING_Y
     with open(os.path.join(out_dir, 'fakedeath_frames.json'), 'w') as fh:
         json.dump({'segments': [{'name': n, 'motion': s[1], 'start': a0, 'end': b0 - 1, 'src': [s[3], s[4]]}
                                 for m in anim.MOTIONS for n, a0, b0, s in anim.timeline(m)],
