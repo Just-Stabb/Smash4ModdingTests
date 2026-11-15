@@ -166,7 +166,7 @@ namespace Sm4shCommand.Viewer
             float cx = w / 2f + panX, cy = h * 0.72f + panY;
             int g = Frame.GameFrame;
             var items = new List<FxItem>();
-            int particles = 0, models = 0, markerOnly = 0, quads = 0, capped = 0;
+            int particles = 0, models = 0, markerOnly = 0, quads = 0, capped = 0, untextured = 0;
             if (Frame.Effects != null)
                 foreach (var e in Frame.Effects)
                 {
@@ -184,10 +184,21 @@ namespace Sm4shCommand.Viewer
                         particles += es.Live.Count;
                         if (es.Live.Count >= sim.Cap) capped++;
                         if (es.D.Distortion) continue;
+                        // v1.6.3: an emitter whose texture can't be read isn't drawn (a quad with no texture is a solid
+                        // block: Pac-Man's / Link's common effects drew translucent squares and bars)
+                        if (es.D.Tex == null) { untextured++; continue; }
+                        if (es.D.PType == 6)
+                        {
+                            // a complex stripe: one ribbon through the emitter's particles, newest first
+                            var it6 = StripeItem(sim, es, es.Live.AsEnumerable().Reverse().ToList(), null, sim.NextK - 1, r, u, f, cx, cy, cr, cg, cb, ca);
+                            if (it6 != null) { items.Add(it6); quads++; }
+                            continue;
+                        }
                         foreach (var q in es.Live)
                         {
                             if (quads >= MaxQuads) break;
-                            var it = ParticleItem(sim, es, q, sim.NextK - 1, r, u, f, cx, cy, cr, cg, cb, ca);
+                            var it = es.D.PType == 5 ? StripeItem(sim, es, null, q, sim.NextK - 1, r, u, f, cx, cy, cr, cg, cb, ca)
+                                                     : ParticleItem(sim, es, q, sim.NextK - 1, r, u, f, cx, cy, cr, cg, cb, ca);
                             if (it != null) { items.Add(it); quads++; }
                         }
                     }
@@ -273,7 +284,8 @@ namespace Sm4shCommand.Viewer
             if (particles > 0 || models > 0 || markerOnly > 0)
                 FxStats = particles + " particles" + (models > 0 ? ", " + models + " effect model" + (models > 1 ? "s" : "") : "") +
                           (markerOnly > 0 ? ", " + markerOnly + " effect" + (markerOnly > 1 ? "s" : "") + " marker only (files not found" + MarkerOnlyHint + ")" : "") +
-                          (capped > 0 || quads >= MaxQuads ? " (capped: HQ for more)" : "");
+                          (capped > 0 || quads >= MaxQuads ? " (capped: HQ for more)" : "") +
+                          (untextured > 0 ? ", " + untextured + " emitter" + (untextured > 1 ? "s" : "") + " without a readable texture (not drawn)" : "");
         }
 
         /// <summary>Adds what the half-resolution pass changed (its pixels less the half-size picture it started from) to
@@ -312,6 +324,119 @@ namespace Sm4shCommand.Viewer
                     pix[y * w + x] = unchecked((int)0xFF000000) | Clamp(r) << 16 | Clamp(g) << 8 | Clamp(b);
                 }
             }
+        }
+
+        /// <summary>
+        /// v1.6.3: a stripe (eft's ribbon, particle type 5: through one particle's history of places; 6: through the
+        /// emitter's particles, newest first) in screen space: its points smoothed (Catmull-Rom, the stripe's divisions
+        /// between each two), its width the particle's scale X across it: facing the camera (stripe type 0), else along
+        /// the emitter's Y axis of each point's frame (1 emitter matrix, 2 up-down); connect 2 starts it at the emitter;
+        /// alpha from the stripe's start alpha (head) to its end alpha (tail); the texture's U across, V along.
+        /// </summary>
+        FxItem StripeItem(EffectSim sim, EmitterSim es, List<Particle> chain, Particle q, int k, float[] r, float[] u, float[] f,
+                          float cx, float cy, float cr, float cg, float cb, float ca)
+        {
+            var D = es.D;
+            var pts = new List<float[]>();
+            var axes = new List<float[]>();
+            var widths = new List<float>();
+            Particle head = q;
+            if (q != null)
+            {
+                if (q.Hist == null || q.Hist.Count < 2) return null;
+                float w = StripeWidth(sim, D, q);
+                for (int i = 0; i < q.Hist.Count; i++) { pts.Add(q.Hist[i]); axes.Add(q.HistAxis[i]); widths.Add(w); }
+            }
+            else
+            {
+                if (chain == null || chain.Count < 2) return null;
+                head = chain[0];
+                foreach (var c in chain)
+                {
+                    pts.Add(es.World(c));
+                    axes.Add(es.LastM != null ? Fx.Norm(new[] { es.LastM[0, 1], es.LastM[1, 1], es.LastM[2, 1] }) : new[] { 0f, 1f, 0f });
+                    widths.Add(StripeWidth(sim, D, c));
+                }
+            }
+            if (D.StripeConnect == 2 && es.LastM != null)
+            {
+                pts.Insert(0, new[] { es.LastM[0, 3], es.LastM[1, 3], es.LastM[2, 3] });
+                axes.Insert(0, axes[0]); widths.Insert(0, widths[0]);
+            }
+            // smoothed through the points
+            var P = new List<float[]>(); var A = new List<float[]>(); var W = new List<float>();
+            int div = Math.Max(1, D.StripeDivide);
+            for (int i = 0; i + 1 < pts.Count; i++)
+            {
+                var p0 = pts[Math.Max(0, i - 1)]; var p1 = pts[i]; var p2 = pts[i + 1]; var p3 = pts[Math.Min(pts.Count - 1, i + 2)];
+                for (int s = 0; s < div; s++)
+                {
+                    float t = s / (float)div, t2 = t * t, t3 = t2 * t;
+                    var pt = new float[3];
+                    for (int c = 0; c < 3; c++)
+                        pt[c] = 0.5f * (2 * p1[c] + (-p0[c] + p2[c]) * t + (2 * p0[c] - 5 * p1[c] + 4 * p2[c] - p3[c]) * t2 + (-p0[c] + 3 * p1[c] - 3 * p2[c] + p3[c]) * t3);
+                    P.Add(pt);
+                    A.Add(axes[i]); W.Add(widths[i] + (widths[i + 1] - widths[i]) * t);
+                }
+            }
+            P.Add(pts[pts.Count - 1]); A.Add(axes[axes.Count - 1]); W.Add(widths[widths.Count - 1]);
+            int n = P.Count;
+            if (n < 2) return null;
+            float t0 = head.Age / (float)Math.Max(1, head.Life);
+            float alpha = D.Alpha(Math.Min(1, t0)) * D.A(14, D.EmAlpha, k) * ca;
+            if (alpha <= 0.002f) return null;
+            var c0 = new float[3];
+            D.Colour(0, Math.Min(1, t0), c0);
+            var it = new FxItem
+            {
+                R = c0[0] * D.A(11, D.EmColor0[0], k) * cr, G = c0[1] * D.A(12, D.EmColor0[1], k) * cg,
+                B = c0[2] * D.A(13, D.EmColor0[2], k) * cb, A = alpha, Tex = D.Tex,
+                Blend = D.Blend == 1 ? FxRaster.Add : D.Blend == 2 ? FxRaster.Sub : FxRaster.Alpha, Combiner = D.Combiner,
+                Mask = D.Tex1, MaskU = D.U1Scale / D.UScale, MaskV = D.V1Scale / D.VScale,
+                S = new float[n * 2 * 3], UV = new float[n * 2 * 2], VCol = new float[n * 2 * 4],
+            };
+            if (D.Combiner == 2)
+            {
+                var c1 = new float[3];
+                D.Colour(1, Math.Min(1, t0), c1);
+                it.Col1 = new[] { c1[0] * D.A(19, D.EmColor1[0], k), c1[1] * D.A(20, D.EmColor1[1], k), c1[2] * D.A(21, D.EmColor1[2], k) };
+            }
+            var toCam = new[] { -f[0], -f[1], -f[2] };
+            float depth = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var dir = new float[3];
+                var pa = P[Math.Max(0, i - 1)]; var pb = P[Math.Min(n - 1, i + 1)];
+                for (int c = 0; c < 3; c++) dir[c] = pa[c] - pb[c];
+                float[] across = D.StripeType == 0 ? Fx.Cross(dir, toCam) : A[i];
+                if (Fx.Len(across) < 1e-6f) across = r;
+                across = Fx.Norm(across);
+                float half = W[i] / 2, v = i / (float)(n - 1);
+                float sa = D.StripeStartAlpha + (D.StripeEndAlpha - D.StripeStartAlpha) * v;
+                for (int e2 = 0; e2 < 2; e2++)
+                {
+                    float sgn = e2 == 0 ? -1 : 1;
+                    float wx = P[i][0] + across[0] * half * sgn, wy = P[i][1] + across[1] * half * sgn, wz = P[i][2] + across[2] * half * sgn;
+                    int o = (i * 2 + e2);
+                    it.S[o * 3] = cx + (wx * r[0] + wy * r[1] + wz * r[2]) * zoom;
+                    it.S[o * 3 + 1] = cy - (wx * u[0] + wy * u[1] + wz * u[2]) * zoom;
+                    it.S[o * 3 + 2] = wx * f[0] + wy * f[1] + wz * f[2];
+                    depth += it.S[o * 3 + 2];
+                    it.UV[o * 2] = e2 * D.UScale; it.UV[o * 2 + 1] = v * D.VScale;
+                    it.VCol[o * 4] = 1; it.VCol[o * 4 + 1] = 1; it.VCol[o * 4 + 2] = 1; it.VCol[o * 4 + 3] = Math.Max(0, sa);
+                }
+            }
+            var idx = new List<int>();
+            for (int i = 0; i + 1 < n; i++) { int a0 = i * 2, a1 = i * 2 + 1, b0 = i * 2 + 2, b1 = i * 2 + 3; idx.AddRange(new[] { a0, b0, b1, a0, b1, a1 }); }
+            it.Idx = idx.ToArray();
+            it.Depth = depth / (n * 2);
+            return it;
+        }
+
+        float StripeWidth(EffectSim sim, EmitterDef D, Particle q)
+        {
+            float t = q.Age / (float)Math.Max(1, q.Life);
+            return D.SizeX * D.SizeCurve(0, Math.Min(1, t)) * q.Sr * q.SaX * sim.CSize;
         }
 
         /// <summary>One particle as a quad (or its emitter's primitive) in screen space, or null when it's invisible.</summary>

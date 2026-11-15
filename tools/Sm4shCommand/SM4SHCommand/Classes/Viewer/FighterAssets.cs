@@ -18,6 +18,46 @@ namespace Sm4shCommand.Viewer
         public MaterialVis MaterialVis = new MaterialVis();     // v1.6.2
         public Dictionary<int, Texture> Textures = new Dictionary<int, Texture>();
         public Dictionary<string, byte[]> Animations = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+        /// <summary>v1.6.3: the part animations next to each main.pac (lhand / rhand.pac, the hands' poses; NAMEpt1.pac,
+        /// NAMEsw1.pac ...: props, swords, Pac-Man's ghosts and signs), by file name; and the parts' names (pac stems).
+        /// Each animates its own bones (none of main.pac's), played with the main motion of the same name.</summary>
+        public Dictionary<string, byte[]> PartAnimations = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+        public List<string> PartNames = new List<string>();
+
+        /// <summary>The part animations (every .pac but main.pac) of a motion folder.</summary>
+        public void LoadParts(string dir)
+        {
+            if (!Directory.Exists(dir)) return;
+            foreach (var f in Directory.GetFiles(dir, "*.pac").OrderBy(x => x))
+            {
+                string stem = Path.GetFileNameWithoutExtension(f);
+                if (stem.Equals("main", StringComparison.OrdinalIgnoreCase)) continue;
+                try
+                {
+                    foreach (var e in Pac.Load(f))
+                        if (!PartAnimations.ContainsKey(e.Key)) PartAnimations[e.Key] = e.Value;
+                    if (stem.Length > 0 && !PartNames.Contains(stem, StringComparer.OrdinalIgnoreCase))
+                        PartNames.Add(char.ToUpperInvariant(stem[0]) + stem.Substring(1).ToLowerInvariant());
+                }
+                catch (Exception) { }
+            }
+        }
+
+        /// <summary>The part animations played with a main motion: FitPacmanBodyMainC03AttackS4S.omo ->
+        /// FitPacmanBodyPacmanpt1C03AttackS4S.omo, FitPacmanBodyLhandC03AttackS4S.omo, ...</summary>
+        public List<Omo> PartsOf(string file)
+        {
+            var o = new List<Omo>();
+            int i = file.IndexOf("Main", StringComparison.Ordinal);
+            if (i < 0) return o;
+            foreach (var part in PartNames)
+            {
+                byte[] d;
+                if (!PartAnimations.TryGetValue(file.Substring(0, i) + part + file.Substring(i + 4), out d)) continue;
+                try { o.Add(new Omo(d)); } catch (InvalidDataException) { }
+            }
+            return o;
+        }
         readonly Dictionary<uint, string> byScript = new Dictionary<uint, string>();
         readonly Dictionary<string, Omo> loaded = new Dictionary<string, Omo>();
 
@@ -45,6 +85,7 @@ namespace Sm4shCommand.Viewer
             string pac = Path.Combine(root, "motion", "body", "main.pac");
             if (File.Exists(pac))
                 a.Animations = Pac.Load(pac);
+            a.LoadParts(Path.Combine(root, "motion", "body"));
             a.MapScripts();
             a.MapModScripts();
             return a;
@@ -94,6 +135,7 @@ namespace Sm4shCommand.Viewer
                     string pac = Path.Combine(Root, "motion", v.Folder, "main.pac");
                     anims = null;
                     try { if (File.Exists(pac)) anims = Pac.Load(pac); } catch (Exception) { }
+                    if (anims != null) LoadParts(Path.Combine(Root, "motion", v.Folder));
                     folders[v.Folder] = anims;
                     if (anims != null)
                         foreach (var e in anims)
@@ -221,6 +263,7 @@ namespace Sm4shCommand.Viewer
             byte[] d;
             if (!Animations.TryGetValue(file, out d)) return null;
             try { o = new Omo(d); } catch (InvalidDataException) { o = null; }
+            if (o != null) o.Parts = PartsOf(file);
             loaded[file] = o;
             return o;
         }

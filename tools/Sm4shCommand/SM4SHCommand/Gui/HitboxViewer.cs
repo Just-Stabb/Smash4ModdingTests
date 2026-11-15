@@ -52,7 +52,8 @@ namespace Sm4shCommand.GUI
         bool partsFilling;
         Func<uint, IList<ICommand>> getExpression;
         ITS_EDITOR expressionEditor;
-        VisGroups visGroups = VisGroups.Load(Path.Combine(Application.StartupPath, "VisGroups.txt"));
+        static VisGroups visGroups = VisGroups.Load(Path.Combine(Application.StartupPath, "VisGroups.txt"),
+                                                   Path.Combine(Application.StartupPath, "VisUser.txt"));
         // the parts tab's choices, per fighter, while the program runs
         static readonly Dictionary<string, Dictionary<string, bool>> partChoices = new Dictionary<string, Dictionary<string, bool>>(StringComparer.OrdinalIgnoreCase);
         Dictionary<string, bool> UserParts

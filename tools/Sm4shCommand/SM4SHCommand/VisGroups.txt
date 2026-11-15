@@ -1,4 +1,4 @@
-// Visibility groups for Sm4shCommand's Hitbox Viewer (v1.6.2): which meshes each state of a fighter's visibility group
+// Visibility groups for Sm4shCommand's Hitbox Viewer (v1.6.2; defaults and Pac-Man v1.6.3): which meshes each state of a fighter's visibility group
 // shows, so Model_Changer(ChangerID, ChangerState) / VIS_SET_DEFAULT / VIS_BACK_DEFAULT / VIS_RESET_DEFAULT in the game
 // and expression scripts show and hide them on the timeline.
 //
@@ -11,5 +11,53 @@
 //   reflet 0 1: bronzeswordM
 //   reflet 0 2: thunderswordM
 //   reflet 0 default: 1
-// A group with lines shows the meshes of its current state (the script's, else its default) and hides the other
-// meshes it lists. Lines starting with // are comments.
+// A group with lines hides the meshes it lists under other states than its current one (the script's, else its
+// default), and shows those of its current state unless the motion's visibility animation (material_anime) hides
+// them. Lines starting with // are comments.
+//
+// v1.6.3: a fighter's meshes hidden or shown by default (below the groups and the visibility animations):
+//   pacman hide: Ijike
+//   pacman show: PizaM
+// Your own defaults (the Model parts tab: right-click a part, "Hidden by default for this fighter" / "Visible by
+// default") go to VisUser.txt next to the program, in the same format; they win over these. "Follow the script /
+// default" takes yours away again.
+
+// ---- Pac-Man (pacman): read from his scripts (expression.bin Model_Changer calls) and his model (meshes, bones,
+// part animations). Group 0: the 3D body / the 2D Pac-Man (subroutine 0x669E43CF, called by neutral air, dash attack
+// and others: state 1; 0xF7FA88CD: state 0; win2: state 2). Group 1: the ghosts (forward smash state 1, up smash 2,
+// down smash 3, down taunt 4, win2 5). Group 2: the Final Smash power pellets (finalstart: state 1). Group 3: the up
+// taunt's signs (appealhi: states 1 - 18, one sign each). The ghosts / signs are sprites on billboard bones: GhostA1N
+// carries Aaka, Aosuke, Guzuta, Ijike and the signs, GhostB1N carries Pinkey; Blinky (Aaka) in forward smash is
+// certain, the others' states are read from which bone each move raises (up smash: GhostA1N only; down smash and
+// the down taunt: both), the ghost on GhostA1N for up / down smash and the down taunt is inferred.
+pacman 0 0: Pacman_, colorparts
+pacman 0 1: PizaM
+pacman 0 2: Pacman_, colorparts
+pacman 0 default: 0
+pacman 1 1: Aaka
+pacman 1 2: Aosuke
+pacman 1 3: Guzuta, Pinkey
+pacman 1 4: Aaka, Pinkey
+pacman 1 5: Ijike
+pacman 1 default: 0
+pacman 2 1: FinalpoweresaA, FinalpoweresaB
+pacman 2 default: 0
+pacman 3 1: boardA
+pacman 3 2: boardB
+pacman 3 3: boardC
+pacman 3 4: boardD
+pacman 3 5: boardE
+pacman 3 6: boardF
+pacman 3 7: boardG
+pacman 3 8: boardH
+pacman 3 9: boardI
+pacman 3 10: boardJ
+pacman 3 11: boardK
+pacman 3 12: boardL
+pacman 3 13: boardM
+pacman 3 14: boardN
+pacman 3 15: boardO
+pacman 3 16: boardP
+pacman 3 17: boardQ
+pacman 3 18: boardR
+pacman 3 default: 0

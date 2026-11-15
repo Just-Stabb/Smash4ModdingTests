@@ -78,6 +78,12 @@ namespace Sm4shCommand.Viewer
         public float[] EmColor0, EmColor1, ShapeScale;   // the emitter's colour / alpha / shape-scale multipliers (0x378-0x3A7)
         public float EmAlpha;
         public float UScale = 1, VScale = 1;
+        // v1.6.3: stripes (particle types 5 stripe / 6 complex stripe, eft's ribbons): the complex emitter's stripe block
+        // (+0x8CE, 13 words: type 0 billboard / 1 emitter matrix / 2 emitter up-down, option, connect (2: to the emitter),
+        // texture coordinates, history length, divisions, start / end alpha, UV scroll, ...)
+        public int StripeType, StripeConnect, StripeHistory = 8, StripeDivide = 1;
+        public float StripeStartAlpha = 1, StripeEndAlpha = 1;
+        public bool IsStripe { get { return PType == 5 || PType == 6; } }
         public Texture Tex;
         // v1.6.1: texture slot 1 (29 of Mario's 497 emitters: a shape over slot 0's noise), taken as a mask on the colour
         // and alpha, its first cell (its own UV scale, 0x584)
@@ -174,6 +180,14 @@ namespace Sm4shCommand.Viewer
                 if (k.Target < 0x1C) d.Anims[k.Target] = k;
             try { d.Tex = PtclData.DecodeTexture(e, 0); }
             catch (Exception) { d.Tex = null; d.Note += "texture not decoded; "; }
+            // v1.6.3: a texture with no alpha (every texel opaque: a one-channel BC4 whose selector names an alpha it
+            // hasn't, an RGB image) drawn by a combiner that reads the alpha covered its whole quad, a translucent
+            // square (Pac-Man's neutral air, Dr. Mario's Cyclone ring): its red is the shape, as the combiners that read red
+            if (d.Tex != null && (d.Combiner == 1 || d.Combiner == 4 || d.Combiner == 5) && PtclData.Opaque(d.Tex))
+            {
+                d.Combiner = d.Combiner == 1 ? 3 : d.Combiner == 4 ? 2 : 0;
+                d.Note += "texture has no alpha: alpha from red; ";
+            }
             try { d.Tex1 = PtclData.DecodeTexture(e, 1); } catch (Exception) { d.Tex1 = null; }
             d.U1Scale = e.F(0x584); d.V1Scale = e.F(0x588);
             if (d.U1Scale == 0) d.U1Scale = 1;
@@ -184,6 +198,17 @@ namespace Sm4shCommand.Viewer
                 try { d.Mesh = PtclData.Primitive(e.File, prim); } catch (Exception) { d.Mesh = null; }
             }
             d.Distortion = PtclData.Distortion(e);
+            if (e.I(0) == 1)
+            {
+                int so = BE.U16(e.File.Data, e.Pos + 0x8CE);
+                if (so > 0 && e.Pos + so + 0x34 <= e.File.Data.Length)
+                {
+                    d.StripeType = e.I(so); d.StripeConnect = e.I(so + 8);
+                    d.StripeHistory = Math.Max(2, Math.Min(256, e.I(so + 0x10)));
+                    d.StripeDivide = Math.Max(1, Math.Min(16, e.I(so + 0x14)));
+                    d.StripeStartAlpha = e.F(so + 0x18); d.StripeEndAlpha = e.F(so + 0x1C);
+                }
+            }
             if (d.Distortion) d.Note += "distortion pass (not drawn); ";
             if (e.I(0) == 1) d.Note += "complex emitter (fields / fluctuation / children not simulated); ";
             return d;
@@ -245,6 +270,20 @@ namespace Sm4shCommand.Viewer
             { 2, 0x1A }, { 3, 0x31 }, { 4, 0x431 }, { 5, 0x32 }, { 6, 0x432 }, { 7, 0x33 }, { 8, 0x433 }, { 9, 0x34 },
             { 10, 0x234 }, { 11, 0x35 }, { 12, 0x235 } };
 
+        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Texture, object> opaque =
+            new System.Runtime.CompilerServices.ConditionalWeakTable<Texture, object>();
+
+        /// <summary>Every texel's alpha 255 (cached per texture).</summary>
+        public static bool Opaque(Texture t)
+        {
+            object o;
+            if (opaque.TryGetValue(t, out o)) return (bool)o;
+            bool all = true;
+            foreach (int c in t.Argb) if ((uint)c >> 24 != 255) { all = false; break; }
+            opaque.Add(t, all);
+            return all;
+        }
+
         public static List<KeyAnim> KeyAnims(PtclFile.Emitter e)
         {
             var o = new List<KeyAnim>();
@@ -280,21 +319,37 @@ namespace Sm4shCommand.Viewer
             int w = BE.U16(d, e.Pos + o), h = BE.U16(d, e.Pos + o + 2);
             int tile = e.I(o + 4), swizzle = e.I(o + 8), sel = e.I(o + 0x14);
             int fmt = e.I(o + 0x2C), nsize = e.I(o + 0x30), npos = e.I(o + 0x34);
-            if (w == 0 || h == 0 || nsize <= 0) return null;
-            long key = (long)npos << 20 ^ (long)sel << 4 ^ fmt;
+            if (w == 0 || h == 0) return null;
+            // v1.6.3: no native surface but the original image (+0x20 format, +0x24 pos, +0x28 size): format 2 is plain
+            // RGBA8, row after row (Pac-Man's Final Smash eyes / scores, its light: v1.6.2 drew them as solid squares)
+            int ofmt = e.I(o + 0x20), opos = e.I(o + 0x24), osize = e.I(o + 0x28);
+            bool original = nsize <= 0;
+            if (original && (ofmt != 2 || osize < w * h * 4)) return null;
+            long key = original ? ((long)opos << 20 ^ (long)sel << 4 ^ 0x7F000) : ((long)npos << 20 ^ (long)sel << 4 ^ fmt);
             Texture t;
             if (e.File.TextureCache.TryGetValue(key, out t)) return t;
             int gx2;
-            if (!EftGx2.TryGetValue(fmt, out gx2)) { e.File.TextureCache[key] = null; return null; }
-            int start = e.File.TexPos + npos;
-            int len = Math.Min(nsize, d.Length - start);
+            if (original) gx2 = 0x1A;
+            else if (!EftGx2.TryGetValue(fmt, out gx2)) { e.File.TextureCache[key] = null; return null; }
+            int start = e.File.TexPos + (original ? opos : npos);
+            int len = Math.Min(original ? w * h * 4 : nsize, d.Length - start);
             if (start < 0 || len <= 0) return null;
             var data = new byte[len];
             Array.Copy(d, start, data, 0, len);
-            bool bc = (gx2 & 0x3F) >= 0x31 && (gx2 & 0x3F) <= 0x35;
-            int ew = bc ? (w + 3) / 4 : w;
-            int pitch = (ew + 31) / 32 * 32;          // tools/ptcl.py surface(): the pitch the table's surfaces have
-            t = Nut.DecodeSurface(data, w, h, gx2 & 0x3F, tile, swizzle, pitch);
+            if (original)
+            {
+                if (len < w * h * 4) { e.File.TextureCache[key] = null; return null; }
+                t = new Texture { Width = w, Height = h, Argb = new int[w * h] };
+                for (int i = 0; i < w * h; i++)
+                    t.Argb[i] = data[i * 4 + 3] << 24 | data[i * 4] << 16 | data[i * 4 + 1] << 8 | data[i * 4 + 2];
+            }
+            else
+            {
+                bool bc = (gx2 & 0x3F) >= 0x31 && (gx2 & 0x3F) <= 0x35;
+                int ew = bc ? (w + 3) / 4 : w;
+                int pitch = (ew + 31) / 32 * 32;          // tools/ptcl.py surface(): the pitch the table's surfaces have
+                t = Nut.DecodeSurface(data, w, h, gx2 & 0x3F, tile, swizzle, pitch);
+            }
             if (t != null)
             {
                 int f = gx2 & 0x3F;
@@ -468,6 +523,8 @@ namespace Sm4shCommand.Viewer
     public class Particle
     {
         public float[] P, V, Rot, Lin;
+        // v1.6.3: a stripe's history (newest first): where it was in model space each frame, and the emitter's Y axis then
+        public List<float[]> Hist, HistAxis;
         public int Age, Life;
         public float Sr, Sry, SaX, SaY;
         public bool Local;      // v1.6.2: in the emitter's own space, placed by its live matrix each frame (0x310 = 0)
@@ -486,6 +543,17 @@ namespace Sm4shCommand.Viewer
         public float[] PrevOrg;
         /// <summary>v1.6.2: call x emitter matrix of the last frame stepped (the following particles are placed by it).</summary>
         public Mat4 LastM;
+
+        /// <summary>v1.6.3: a stripe particle's history: its place in model space this frame (newest first, as many as the
+        /// stripe's history length) and the emitter's Y axis then.</summary>
+        void Remember(Particle q, Mat4 m, float[] axis)
+        {
+            if (q.Hist == null) { q.Hist = new List<float[]>(); q.HistAxis = new List<float[]>(); }
+            var w = q.Local ? m.Transform(q.P[0], q.P[1], q.P[2]) : (float[])q.P.Clone();
+            q.Hist.Insert(0, w);
+            q.HistAxis.Insert(0, axis);
+            while (q.Hist.Count > D.StripeHistory) { q.Hist.RemoveAt(q.Hist.Count - 1); q.HistAxis.RemoveAt(q.HistAxis.Count - 1); }
+        }
 
         /// <summary>A particle's place in model space (a following one through the live emitter matrix).</summary>
         public float[] World(Particle q) { return q.Local && LastM != null ? LastM.Transform(q.P[0], q.P[1], q.P[2]) : q.P; }
@@ -598,6 +666,11 @@ namespace Sm4shCommand.Viewer
                 if (q.Age < q.Life) keep.Add(q);
             }
             Live = keep;
+            if (D.IsStripe)
+            {
+                var axis = Fx.Norm(new[] { lin[1], lin[4], lin[7] });
+                foreach (var q in Live) Remember(q, m, axis);
+            }
             PrevOrg = org;
             // births: when the gap has run out (the first on the window's first frame), rate (key-animated) a time
             int kk = k - D.Start;
@@ -648,6 +721,7 @@ namespace Sm4shCommand.Viewer
                     q.Lin = lin;
                 }
                 Live.Add(q);
+                if (D.IsStripe) Remember(q, m, Fx.Norm(new[] { lin[1], lin[4], lin[7] }));
             }
         }
     }

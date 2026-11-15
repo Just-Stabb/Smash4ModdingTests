@@ -522,14 +522,24 @@ namespace Sm4shCommand.Viewer
             }
         }
 
-        public bool Has(uint hash) { return nodes.ContainsKey(hash); }
+        /// <summary>v1.6.3: the part animations played with it (FighterAssets.PartsOf): their bones' tracks.</summary>
+        public List<Omo> Parts;
+
+        public bool Has(uint hash) { return nodes.ContainsKey(hash) || (Parts != null && Parts.Any(p => p.Has(hash))); }
 
         /// <summary>Overwrite the tracks the animation has for this bone (frame clamped, linearly
         /// interpolated between whole frames).</summary>
         public void Sample(uint hash, float frame, ref float[] pos, ref float[] rot, ref float[] scl)
         {
             Node n;
-            if (!nodes.TryGetValue(hash, out n) || Frames <= 0)
+            if (!nodes.TryGetValue(hash, out n))
+            {
+                if (Parts != null)
+                    foreach (var p in Parts)
+                        if (p.nodes.ContainsKey(hash)) { p.Sample(hash, frame, ref pos, ref rot, ref scl); return; }
+                return;
+            }
+            if (Frames <= 0)
                 return;
             frame = Math.Max(0, Math.Min(frame, Frames - 1));
             int a = (int)Math.Floor(frame), b = Math.Min(a + 1, Frames - 1);

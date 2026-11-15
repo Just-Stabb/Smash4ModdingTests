@@ -135,6 +135,35 @@ namespace Sm4shCommand.Viewer
             public FighterAssets Assets;
             public float[] Pos;
             public int[] PolyStart;
+            /// <summary>v1.6.3: vertices on a billboard bone (a name with BILLBOARD: Pac-Man's ghosts and signs, flat
+            /// sprites): the vertex index, then its place in the bone's frame (scaled) and the bone's origin, turned
+            /// to the camera when drawn (BILLBOARDY / BILLBOARD_Y: about the vertical only).</summary>
+            public List<float[]> Bill;
+        }
+
+        static int BillboardKind(string bone)
+        {
+            if (bone == null) return 0;
+            string b = bone.ToUpperInvariant();
+            int i = b.IndexOf("BILLBOARD", StringComparison.Ordinal);
+            if (i < 0) return 0;
+            string rest = b.Substring(i + 9).TrimStart('_');
+            return rest.StartsWith("Y") && (rest.Length == 1 || !char.IsLetter(rest[1])) ? 2 : 1;
+        }
+
+        /// <summary>Turns a model's billboard vertices to the camera (r right, u up, f into the screen).</summary>
+        static void FaceCamera(Skinned s, float[] r, float[] u, float[] f)
+        {
+            if (s == null || s.Bill == null) return;
+            var x = r; var y = u; var z = new[] { -f[0], -f[1], -f[2] };
+            var hx = Fx.Norm(new[] { r[0], 0, r[2] });
+            foreach (var b in s.Bill)
+            {
+                int v = (int)b[0];
+                bool yOnly = b[7] == 2;
+                var X = yOnly ? hx : x; var Y = yOnly ? new[] { 0f, 1f, 0f } : y; var Z = yOnly ? Fx.Cross(hx, new[] { 0f, 1f, 0f }) : z;
+                for (int c = 0; c < 3; c++) s.Pos[v * 3 + c] = b[4 + c] + X[c] * b[1] + Y[c] * b[2] + Z[c] * b[3];
+            }
         }
 
         static Skinned Skin(FighterAssets assets, Mat4[] world, float z0, float y0, bool faceLeft)
@@ -147,6 +176,8 @@ namespace Sm4shCommand.Viewer
             var skel = assets.Skeleton;
             var skin = new Mat4[world.Length];
             for (int i = 0; i < world.Length; i++) skin[i] = world[i] * skel.InverseBind[i];
+            var bill = new int[world.Length];
+            for (int i = 0; i < world.Length && i < skel.Bones.Count; i++) bill[i] = BillboardKind(skel.Bones[i].Name);
             int k = 0;
             foreach (var m in assets.Model.Meshes)
                 foreach (var p in m.Polys)
@@ -155,6 +186,18 @@ namespace Sm4shCommand.Viewer
                     for (int v = 0; v < vc; v++)
                     {
                         float x = p.Pos[v * 3], y = p.Pos[v * 3 + 1], z = p.Pos[v * 3 + 2], ox = 0, oy = 0, oz = 0, wsum = 0;
+                        int b0 = p.Bones[v * 4];
+                        if (!faceLeft && p.Weights[v * 4] >= 0.999f && b0 >= 0 && b0 < bill.Length && bill[b0] != 0)
+                        {
+                            // a billboard bone's sprite: its place in the bone's frame, scaled as the bone, at the bone
+                            var L = skel.InverseBind[b0].Transform(x, y, z);
+                            var W = world[b0].M;
+                            float sx = (float)Math.Sqrt(W[0] * W[0] + W[4] * W[4] + W[8] * W[8]);
+                            float sy = (float)Math.Sqrt(W[1] * W[1] + W[5] * W[5] + W[9] * W[9]);
+                            float sz = (float)Math.Sqrt(W[2] * W[2] + W[6] * W[6] + W[10] * W[10]);
+                            if (s.Bill == null) s.Bill = new List<float[]>();
+                            s.Bill.Add(new[] { (b + v * 3) / 3, L[0] * sx, L[1] * sy, L[2] * sz, W[3], W[7] + y0, W[11] + z0, bill[b0] });
+                        }
                         for (int j = 0; j < 4; j++)
                         {
                             float w = p.Weights[v * 4 + j];
@@ -190,6 +233,8 @@ namespace Sm4shCommand.Viewer
                 // v1.6.2: the body overlay / flash on this frame (Color_Overlay & co.) tints the fighter and what it holds
                 var ov = ShowOverlays && Frame != null ? Frame.Overlay : null;
                 bool ovAdd = Frame != null && Frame.OverlayLight;
+                FaceCamera(attacker, r, u, f);
+                FaceCamera(held, r, u, f);
                 if (attacker != null && WholeVisible) Rasterize(attacker, pix, zbuf, w, h, r, u, f, ov, ovAdd);
                 if (held != null && WholeVisible) Rasterize(held, pix, zbuf, w, h, r, u, f, ov, ovAdd);
                 if (enemy != null) Rasterize(enemy, pix, zbuf, w, h, r, u, f);
