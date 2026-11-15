@@ -299,6 +299,13 @@ def convert_emission(p, pkg, images, chain, unit, name, spawn_times):
     k = [p.emitter_name(e['data']) for e in p.sets[si]['emitters']].index(ename)
     em = p.emitter_bytes(si, k)
     notes = []
+    mat = xv2vfx.resolve_material(pkg, 'PBIND', tex['MaterialID'])
+    if mat:
+        mp = xv2vfx.emm_params(mat)
+        glare = max(float(mp.get('GlareCol' + c, 0.0)) for c in 'RGB')
+        # the material's glare (XV2's bloom on it: EMM Glare / GlareCol; 0 none): 'glare G material NAME', for the
+        # caller (e.g. tools/supamario_godfist_build.py's glow: only the glaring parts drawn past 1)
+        notes.append('glare %.3f material %s' % (glare if (mp.get('Glare') or glare > 1.0) else 0.0, mat.get('Name')))
     if blend == 'normal' and tkey[1] == 'add':
         notes.append('normal blend drawn additive')
 

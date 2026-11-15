@@ -1338,3 +1338,75 @@ flight and Supamario's own timing are unchanged.
 
 **Not confirmed in game:** that SITUATION 0 with stage collision 2 holds a victim put at floor height through
 DownWait's first frame.
+
+## Core Breaker (up special): phase 1, the XV2 skill read and converted (not built, not packaged)
+
+User: put Xenoverse 2's **Core Breaker** (Fu's Ultimate, skill folder `2070_FIT_COR`) on his up special, the way the
+Super God Fist went on his dash attack. Phase 1 reads the skill, converts its animation and effects and proposes the
+Smash version; the move itself (status 0x154, game / effect / sound scripts, the package) is phase 2, after the
+user's answers.
+
+### What the files say (`tools/supamario_corebreaker_xv2.py report` -> `reference/xv2/corebreaker_skill.json`)
+Readers: `tools/xv2bac.py` (BAC / BCM, now with the BCM tree links and `read_bdm`), XV2-Tools' names for BAC types,
+EEPK types (0 Common = vfx/cmn/BTL_CMN, **1 StageBG = the stage's own ground effects**, 5 Super, 6 Ultimate),
+functions (0x2 Damage, 0x6 Invisibility, 0xB ThrowHandler duration, 0x28 Invisible opponents) and ThrowHandler flags.
+The BAC's item frames are the skill EAN's own frames (an entry starts at its animation's start frame).
+- **BCM:** two chains. #1 (an extra +0x10 condition 0x80000: giant opponents) BAC 0 -> 1 -> 2 -> 7 (a dive without a
+  grab) -> 11 (hits of 5 and 450) / 5. **#9, the normal one:** BAC 0 -> 1 -> 2 -> 3 (a target found: homing first) or
+  4 (none) -> on connect the user plays 10, the victim 17; -> 5 when the dive meets nothing.
+- **0-25 (entry 0):** crouch 0-9, then straight up: the root (b_C_Base, MoveWithAxis XYZ) rises 10.0 m by 25 and
+  10.9 m by 40, plus BAC Movement (0, +0.16, 0.1 forward) a frame 9-25. Invulnerable (no damage) 0-215. Skill SE cue
+  1 at 0; StageBG 140 (ground smoke) at 1; Common 40 (Fly_Wind trail) at 8.
+- **25-110 (entry 1):** hovering at the apex, charging: screen darkened (BPE 70 / 55), opponents hidden (0x28),
+  skill SE 2 at 25, skill effect 0 at 45 (the Cor_Crg orb + Cor_Crg_Loop at the head).
+- **110-168 (entry 2):** effect 1 (charge end) at 110, SE 3, effect 5 (blue flame aura on 7 body bones) at 125; the
+  turn and wind-up into the dive pose; at 164-167 three 16 m "probe" spheres 22 m below, 14-20 m ahead (BDM #2: type
+  29, no damage): they pick entry 3 (a target) or 4.
+- **168-214 (entries 3 / 4):** the dive, fist first: effect 2 (Cor_Fire blazing fist + its cone model) at 168, SE 4,
+  wind (effect 7) at 173 / 181. Entry 3 homes onto the target (+0.8 m up, HomingMovement) then dives from 188, entry 4
+  dives at once: **Movement (0, -1.0, 1.1 forward) a frame = 1.49 m a frame, 48 degrees below level**, up to 46
+  frames. Hitboxes 168-214: the connect box (BDM #0, flag 8) and 10 damage 1.8 m ahead.
+- **On connect (user 10, victim 17):** he goes 2 m up at once and holds the victim chest to chest (ThrowHandler,
+  bones 18 / 18) **86 frames** (195-281) in his dive pose, the fist in it: effect 8 (impact + loop), effect 12 (a
+  flare) at 228; the victim takes 0x2 Damage -15 every 10 frames (9 ticks). Then he **drives it down at 45 degrees**
+  (0.9 / 0.9 m a frame) until the ground (BacJump_ReachGround -> entry 12) or 64 frames (-> entry 13).
+- **Entry 12, the crash (290-426):** effect 3 (the explosion: Cor_Bomb_*), StageBG 440 and 160, SE 5 + 6; he lands
+  crouched and slides 6.5 m back, standing by 426. **The victim (18 -> 19 -> 20):** 0x2 Damage 405, blown back
+  (CMN #71 BLOW_F, 0.6 m a frame back, 0.2 up, gravity) 30 frames, then CMN #96's face-up slide (0.8 m a frame
+  decaying, ~29 m), CMN SE 52 Hit_L. **Entry 13 (no ground):** the release in the air, a 250 hit.
+- **Entry 5 (a miss lands):** effect 9 (Cor_Nohit blast), StageBG 640 / 60, SE 6; no hitbox.
+- **Damage split (XV2's numbers):** 10 (dive) + 9 x 15 (hold) + 405 (crash) = 550; air release 250 instead of 405.
+- **Cameras** (`2070_FIT_COR.cam.ean`, 4): #0 follows him up and closes in on the charge, #3 looks down from above
+  him over the dive, #1 the close-up of the hold, #2 starts at the impact point on the ground and pulls back 10 m
+  up / 8 m away. Smash 4 can't take the camera: the cinematic parts (the 85-frame charge, the hidden opponents,
+  the darkened screen, the 86-frame hold) are shortened in the proposal.
+- **Body type:** the base `2070_FIT_COR.ean` (`_C`, as the God Fist's 030_GOD_CSA.ean); `_F` / `_MAM` the other
+  builds, `_FIT` Fu's own skeleton (143 bones).
+- **Sound:** `CAR_BTL_B2070_GLT_SE.acb` is **not** Core Breaker's: it holds 2 cues (0 S2061_SHS Shot_F21,
+  1 B2060_GLO ChargeShot) and the BAC plays skill SE cues 1-6. The skill's own bank (the Ultimate's,
+  likely `CAR_BTL_U2070_COR_SE.acb` / `.awb`) is still needed. CMN cues it uses: 52 Hit_L (the crash, on the
+  victim) and, as the God Fist inferred, 106 Down for the slide. Voices (skill voice 1-4, 7; character voice 26, 39,
+  51, 82, 88) left out.
+
+### Converted (phase 1, scratch only; the tools)
+- `tools/supamario_corebreaker_anim.py`: SpecialHi / SpecialAirHi (the same motion) from `2070_FIT_COR.ean`,
+  retargeted as the God Fist's; one 292-frame motion of segments the MSC jumps between (`SEGMENTS`: crouch 0-5,
+  rise 6-29, charge 30-39, flare 40-59, dive 60-65, dive loop 66-84, miss landing 85-124, grab hold 125-160, drive
+  loop 161-179, crash 180-247, air release 248-291). The rise is TransN (as vanilla Super Jump Punch's), 54.8 units
+  (XV2's 10.9 m x 5.04; vanilla 44.8); everything else's travel is left to the MSC (God Fist v16). `--json`: the
+  timeline, the root table and his joints per frame.
+- `tools/xv2_smash_fx.py` (shared): the God Fist's final effect settings as defaults (x1.75 over 5.04 a metre;
+  facing-safe emitters; calls on bone 0 with only height / forward offsets and Y 0 / 180, or a body bone with
+  nothing; model turns baked into the model's own animation) plus **HDR from each material's glare**: colour keys x
+  the material's GlareCol (XV2's glare tint), colour scale x2 (the God Fist's), the brightest drawn channel capped at
+  2.0 (Smash 4 blooms past 1; far past it Hero's effects hazed purple, fighters/brave fixes 21-27); refraction
+  materials (heat haze) hidden instead of drawn as light, subtractive ones kept subtractive.
+- `tools/supamario_corebreaker_fx.py`: the 17 EMPs -> 20 sets `PtcSupamarioCb*` (162 emitters; skipped: 4 ConeExtrude,
+  3 Default nodes), the models `EffSupamarioCbCrg` (the charge orb, turned to face the side camera) and
+  `EffSupamarioCbFire` (the fist's flame, its bulb leading, pitched 48 degrees down along the dive), textures from
+  0x15141C00; Cor_Wev (refraction) left out; `corebreaker_fx.json`: every BAC effect's parts, bone 0 offsets from
+  the built motion, sizes, frames; previews of each effect at its final size beside his pose, both facings.
+  Not converted: the ECF colour fades (CBIND), the EMA lights, the trace Fly_Wind.
+- `tools/supamario_corebreaker_test.py`: the facing rule, the HDR cap, the sizes, the motion (0 problems).
+- `tools/xv2vfx.py`: reads CBIND containers (ECF colour fades, kept as bytes) and EMP headers with +0xA set (XV2-Tools
+  never reads it). `tools/xv2bac.py`: an EEPK type it has no name for printed as a number.

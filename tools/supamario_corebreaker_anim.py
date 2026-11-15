@@ -29,7 +29,6 @@ plays an animation's source frames over a number of output frames; `loop` segmen
 `root` scales the segment's b_C_Base travel into TransN (Y, Z) or leaves it to the MSC (None).
 """
 import json
-import math
 import os
 import sys
 
