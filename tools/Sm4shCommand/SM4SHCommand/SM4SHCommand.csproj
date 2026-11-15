@@ -104,6 +104,11 @@
     <Compile Include="Classes\Tooltips.cs" />
     <Compile Include="Classes\Viewer\Model.cs" />
     <Compile Include="Classes\Viewer\Effects.cs" />
+    <Compile Include="Classes\Viewer\Particles.cs" />
+    <Compile Include="Classes\Viewer\TrailNames.cs" />
+    <Compile Include="Classes\Viewer\ViewportFx.cs">
+      <DependentUpon>Viewport.cs</DependentUpon>
+    </Compile>
     <Compile Include="Classes\Viewer\HitboxRunner.cs" />
     <Compile Include="Classes\Viewer\KnockbackCalc.cs" />
     <Compile Include="Classes\Viewer\FighterAssets.cs" />

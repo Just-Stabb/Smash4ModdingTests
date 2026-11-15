@@ -1,11 +1,11 @@
-// The Hitbox Viewer's effects (v1.5.0, Level 1), headless (Mono): the effect script run on the game script's timeline
+// The Hitbox Viewer's effects (v1.5.0, Level 1; v1.6.0, Level 2: particles, models, trail textures), headless (Mono): the effect script run on the game script's timeline
 // (HitboxRunner with SpeedSchedule), the effects it starts / ends, their names and lifetimes from the fighter's .efc /
 // .ptcl (EffectLibrary), their place (Viewport.EffectMatrix), sword trails, flip IDs, colours, rates, the facing rule.
 // Run through effect_viewer_test.py, which builds the fighter folders and the expected names / lifetimes (tools/efc.py,
 // tools/ptcl.py). Build (next to the built SM4SHCommand.exe / SALT.dll): csc -out:EvTest.exe -r:SALT.dll
 // -r:SM4SHCommand.exe -r:<mono 4.5>/mscorlib.dll -r:<mono 4.5>/System.dll -r:<mono 4.5>/System.Core.dll
 // -r:<mono 4.5>/System.Windows.Forms.dll -r:<mono 4.5>/System.Drawing.dll -nostdlib effect_viewer_test.cs.
-// Run: mono EvTest.exe Events.cfg FIGHTERS_DIR EXPECT.txt
+// Run: mono EvTest.exe Events.cfg FIGHTERS_DIR EXPECT.txt [EXPECT_FX.txt]
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -85,6 +85,156 @@ class EvTest
         for (int i = 0; i < game.Count; i++)
             if (game[i].AnimFrame + 1 >= n - 0.001f) return i + 1;
         return -1;
+    }
+
+    /// <summary>An effect id played at (0, 5, 2), size 1.5, from game frame 1 (effect_viewer_test.py's fx_render runs).</summary>
+    static EffectSim SimOf(EffectLibrary lib, uint id, bool follow = true)
+    {
+        var a = lib.AssetsFor(id);
+        if (a == null) return null;
+        return new EffectSim(new EffectData { Index = 0, Id = id, StartFrame = 1, Size = 1.5f, Follow = follow }, a, 1000000);
+    }
+
+    static Mat4 At052(int g) { return Mat4.TRS(new[] { 0f, 5f, 2f }, Mat4.EulerToQuat(0, 0, 0), new[] { 1f, 1f, 1f }); }
+
+    static float[] WorldPos(EffectSim s, Particle q) { return q.Local ? s.Call.Transform(q.P[0], q.P[1], q.P[2]) : q.P; }
+
+    static void Level2(string path, EffectLibrary lib, EffectLibrary kbLib, Run kirbyRun)
+    {
+        var lines = File.ReadAllLines(path).Select(l => l.Split('\t')).Where(p => p.Length >= 3).ToList();
+        int frames = 30;
+        // per id: each emitter's live count and first particle on frames 0 .. 29 (game frames 1 .. 30)
+        var counts = new Dictionary<uint, List<int[]>>();
+        var firsts = new Dictionary<uint, List<float[][]>>();
+        foreach (uint id in lines.Where(p => p[0] == "count" || p[0] == "pos").Select(p => Convert.ToUInt32(p[1], 16)).Distinct())
+        {
+            var sim = SimOf(lib, id);
+            if (sim == null) { Check("v1.6.0: 0x" + id.ToString("X") + "'s emitters found", false, true); continue; }
+            var c = sim.Emitters.Select(x => new int[frames]).ToList();
+            var f0 = sim.Emitters.Select(x => new float[frames][]).ToList();
+            for (int t = 0; t < frames; t++)
+            {
+                sim.StepTo(1 + t, At052);
+                for (int k = 0; k < sim.Emitters.Count; k++)
+                {
+                    c[k][t] = sim.Emitters[k].Live.Count;
+                    f0[k][t] = sim.Emitters[k].Live.Count > 0 ? WorldPos(sim, sim.Emitters[k].Live[0]) : null;
+                }
+            }
+            counts[id] = c;
+            firsts[id] = f0;
+        }
+        foreach (var g in lines.Where(p => p[0] == "count").GroupBy(p => p[1]))
+        {
+            uint id = Convert.ToUInt32(g.Key, 16);
+            if (!counts.ContainsKey(id)) continue;
+            var bad = new List<string>();
+            foreach (var p in g)
+            {
+                int k = int.Parse(p[2]);
+                string got = k < counts[id].Count ? string.Join(" ", counts[id][k].Select(x => x.ToString()).ToArray()) : "none";
+                if (got != p[3]) bad.Add("emitter " + k + ": " + got + " (fx_render " + p[3] + ")");
+            }
+            Check(string.Format("v1.6.0: 0x{0} ({1}): live particles on frames 0-{2} of its {3} emitters with no random life / gap (> 1) "
+                                + "= tools/fx_render.py's simulate", g.Key.Substring(2), lib.Name(id), frames - 1, g.Count()),
+                  string.Join("; ", bad.ToArray()), "");
+        }
+        foreach (var g in lines.Where(p => p[0] == "pos").GroupBy(p => p[1] + " " + p[2]))
+        {
+            var first = g.First();
+            uint id = Convert.ToUInt32(first[1], 16);
+            int k = int.Parse(first[2]);
+            if (!firsts.ContainsKey(id)) continue;
+            var bad = new List<string>();
+            foreach (var p in g)
+            {
+                int t = int.Parse(p[3]);
+                var want = p[4].Split(' ').Select(x => float.Parse(x, IC)).ToArray();
+                var got = k < firsts[id].Count ? firsts[id][k][t] : null;
+                if (!Near(got, want, 2e-3f)) bad.Add("frame " + t + ": " + V(got) + " (fx_render " + V(want) + ")");
+            }
+            Check(string.Format("v1.6.0: 0x{0} emitter {1}: its first particle's place on {2} frames (velocity, air, gravity; at "
+                                + "(0, 5, 2), size 1.5) = fx_render's", first[1].Substring(2), k, g.Count()), string.Join("; ", bad.Take(3).ToArray()), "");
+        }
+        // the same frames again after stepping further: the fixed seeds give the same particles (scrubbing back)
+        {
+            uint id = 0x3410031;
+            var s1 = SimOf(lib, id);
+            var s2 = SimOf(lib, id);
+            if (s1 != null)
+            {
+                s1.StepTo(12, At052);
+                s2.StepTo(25, At052);
+                s2.StepTo(12, At052);
+                Func<EffectSim, string> dump = s => string.Join(";", s.Emitters.SelectMany(e => e.Live.Select(q => V(WorldPos(s, q)))).ToArray());
+                Check("v1.6.0: fixed seeds: 0x3410031 stepped to 25 then back to 12 = stepped to 12 (every particle's place)", dump(s2) == dump(s1) && dump(s1).Length > 0, true);
+            }
+        }
+        // textures: slot 0 through the model textures' decoder and comp_sel, as ptcl.py decode_texture
+        foreach (var p in lines.Where(x => x[0] == "tex"))
+        {
+            uint id = Convert.ToUInt32(p[1], 16);
+            var a = lib.AssetsFor(id);
+            var t = a != null && a.Emitters.Count > 0 ? a.Emitters[0].Tex : null;
+            var want = p[3].Split(' ');
+            string got = t == null ? "none" : string.Format(IC, "{0} {1} {2:0.000} {3:0.000}", t.Width, t.Height,
+                t.Argb.Average(c => (double)(c >> 16 & 255)), t.Argb.Average(c => (double)((uint)c >> 24)));
+            bool ok = t != null && t.Width == int.Parse(want[0]) && t.Height == int.Parse(want[1]) &&
+                      Math.Abs(t.Argb.Average(c => (double)(c >> 16 & 255)) - double.Parse(want[2], IC)) < 0.6 &&
+                      Math.Abs(t.Argb.Average(c => (double)((uint)c >> 24)) - double.Parse(want[3], IC)) < 0.6;
+            Check(string.Format("v1.6.0: 0x{0}'s first emitter's texture (size, mean red, mean alpha) = tools/ptcl.py decode_texture's", p[1].Substring(2)),
+                  ok ? "ok" : got, ok ? "ok" : string.Join(" ", want));
+        }
+        // effect models: their frames, the MTA's colour gain, the model frame over time
+        foreach (var p in lines.Where(x => x[0] == "model"))
+        {
+            uint id = Convert.ToUInt32(p[1], 16);
+            var a = lib.AssetsFor(id);
+            var m = a != null ? a.Model : null;
+            Check(string.Format("v1.6.0: 0x{0}'s model: model.omo / model.mta frames", p[1].Substring(2)),
+                  m != null ? (m.Anim != null ? m.Anim.Frames : -1) + " " + (m.Mta != null ? m.Mta.Frames : -1) : "none", p[2] + " " + p[3]);
+            if (m == null || m.Mta == null) continue;
+            var gain = m.Mta.Value(Convert.ToUInt32(p[4], 16), "NU_effColorGain", 10);
+            Check(string.Format("v1.6.0: 0x{0}'s first material's NU_effColorGain on frame 10 = tools/mta.py's", p[1].Substring(2)),
+                  V(gain), V(p[5].Split(' ').Select(x => float.Parse(x, IC)).ToArray()));
+            var follow = SimOf(lib, id, true);
+            var once = SimOf(lib, id, false);
+            int n = m.Frames;
+            Check(string.Format("v1.6.0: 0x{0}'s model frame {1} frames after its start: looped while it follows, held on its last "
+                                + "for a one-shot", p[1].Substring(2), n + 3),
+                  follow.ModelFrame(1 + n + 3) + " " + once.ModelFrame(1 + n + 3), 3 + " " + (n - 1));
+            var p0 = m.Pose(0);
+            var p5 = m.Pose(Math.Min(5, n - 1));
+            bool moved = p0.Zip(p5, (x, y) => x.Zip(y, (u, v) => Math.Abs(u - v)).Max()).Max() > 1e-3;
+            Check(string.Format("v1.6.0: 0x{0}'s model is posed by its model.omo (vertices move between frames 0 and 5)", p[1].Substring(2)),
+                  moved || m.Anim == null, true);
+        }
+        foreach (uint id in new uint[] { 0x3410034 })
+        {
+            var l = lib.Lifetime(id);
+            Check("v1.6.0: a model-only entry's one-shot life = its model's animation length (0x3410034)",
+                  l.HasValue ? l.Value : -1, expect.ContainsKey(id) ? expect[id].Item2 : -2);
+        }
+        // trails: the texture ids and shader, the names table, the textures found next door
+        var trail = kirbyRun.FxRunner.AllTrails.FirstOrDefault();
+        Check("v1.6.0: BraveSword17's Sword_Glow textures 0x10A / 0x109, shader 3",
+              trail != null ? string.Format("0x{0:X} 0x{1:X} {2}", trail.Texture1, trail.Texture2, trail.Shader) : "none", "0x10A 0x109 3");
+        Check("v1.6.0: trail names: id 4 TexIkeSwordTrace (the game's table), 266 / 265 Hero's (trail_table_cave.py)",
+              TrailNames.Name(4) + " " + TrailNames.Name(266) + " " + TrailNames.Name(265), "TexIkeSwordTrace TexBraveFireSwordTrace TexBraveSwordTraceAdd");
+        var tt = kbLib.TrailTexture(0x10A);
+        Check("v1.6.0: Kirby's trail texture 266 found in brave's effect/brave/trail (NTP3, DXT5)",
+              tt != null ? tt.Width + "x" + tt.Height + " " + (tt.Argb.Any(c => (uint)c >> 24 < 10) && tt.Argb.Any(c => (uint)c >> 24 > 200)) : "none", "128x128 True");
+        // the blending: add / alpha / subtract, the depth test
+        {
+            var pix = Enumerable.Repeat(unchecked((int)0xFF404040), 16).ToArray();
+            var zb = Enumerable.Repeat(float.MaxValue, 16).ToArray();
+            zb[15] = -1;     // in front: kept
+            FxRaster.Tri(pix, zb, 4, 4, 0, 0, 0, 8, 0, 0, 0, 8, 0, null, null, false, 1, 0.5f, 0, 0.5f, null, null, FxRaster.Add);
+            int add = pix[5];
+            FxRaster.Tri(pix, zb, 4, 4, 0, 0, 0, 8, 0, 0, 0, 8, 0, null, null, false, 0, 0, 1, 0.5f, null, null, FxRaster.Alpha);
+            Check("v1.6.0: blending: add 0x40 + (255, 128, 0) x 0.5, then alpha (0, 0, 255) at 0.5; the depth test keeps a nearer pixel",
+                  string.Format("{0:X6} {1:X6} {2:X6}", add & 0xFFFFFF, pix[5] & 0xFFFFFF, pix[15] & 0xFFFFFF), "C08040 6040A0 404040");
+        }
     }
 
     static int Main(string[] args)
@@ -199,6 +349,9 @@ class EvTest
               string.Join(",", Enumerable.Range(FrameOf(ks.Game, 3), FrameOf(ks.Game, 8) + 4 - FrameOf(ks.Game, 3)).Select(x => x.ToString()).ToArray()));
         Check("BraveSword17: 0x3450078 named from the sibling brave folder (Hero's bank 0x345)", kbLib.Name(0x3450078),
               expect.ContainsKey(0x3450078) ? expect[0x3450078].Item1 : "?");
+
+        // ---- v1.6.0 (Level 2): particles, textures, effect models, trail textures ------------------------------------
+        if (args.Length > 3) Level2(args[3], smLib, kbLib, ks);
 
         // ---- the timeline: the game script's speed, threads, effect commands -----------------------------------------
         var g2 = Compile("FRAME(Frames=5)\nSet_Frame_Duration(Speed=2)\n");

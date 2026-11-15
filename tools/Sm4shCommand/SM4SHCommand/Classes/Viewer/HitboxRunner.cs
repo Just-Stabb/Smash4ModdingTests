@@ -568,7 +568,7 @@ namespace Sm4shCommand.Viewer
             public bool Follow, World, Flip;
             public int G = -1, GL = -1, Work = -1, Bone = -1, BoneHash = -1, X = -1, Y = -1, Z = -1, RX = -1, RY = -1,
                 RZ = -1, Size = -1, Term = -1, R = -1, Gr = -1, B = -1, Alpha = -1, Rate = -1, Fade = -1,
-                B1 = -1, B2 = -1, Blur = -1;
+                B1 = -1, B2 = -1, Blur = -1, T1 = -1, T2 = -1, T1W = -1, T2W = -1, Shader = -1;
         }
         static readonly Dictionary<uint, FxCmd> fxCmds = new Dictionary<uint, FxCmd>();
         static readonly HashSet<string> followNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
@@ -633,6 +633,9 @@ namespace Sm4shCommand.Viewer
                 d.B1 = at(new[] { "Bone1" }); d.B2 = at(new[] { "Bone2" });
                 d.Blur = at(new[] { "BlurLength", "BlurLen" });
                 d.G = at(new[] { "Graphic", "Effect" });
+                d.T1 = at(new[] { "Texture", "Texture1" }); d.T2 = at(new[] { "Texture2" });
+                d.T1W = at(new[] { "TextureWork", "Texture1Work" }); d.T2W = at(new[] { "Texture2Work" });
+                d.Shader = at(new[] { "Shader" });
             }
             else
             {
@@ -740,6 +743,8 @@ namespace Sm4shCommand.Viewer
                             Bone1 = it(d.B1), X1 = fl(d.B1 + 1, 0), Y1 = fl(d.B1 + 2, 0), Z1 = fl(d.B1 + 3, 0),
                             Bone2 = it(d.B2), X2 = fl(d.B2 + 1, 0), Y2 = fl(d.B2 + 2, 0), Z2 = fl(d.B2 + 3, 0),
                             Blur = it(d.Blur), Graphic = d.G >= 0 ? (uint)it(d.G) : 0, StartFrame = r.gameFrame,
+                            Texture1 = d.T1 >= 0 ? it(d.T1) : d.T1W >= 0 ? -1 : 0, Texture2 = d.T2 >= 0 ? it(d.T2) : d.T2W >= 0 ? -1 : 0,
+                            Shader = d.Shader >= 0 ? it(d.Shader) : 1,
                         };
                         foreach (var o in fs.Trails.Where(x => x.EndFrame < 0)) o.EndFrame = r.gameFrame;   // one at a time
                         fs.Trails.Add(t);

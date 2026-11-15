@@ -33,6 +33,7 @@ namespace Sm4shCommand.Viewer
             var o = new Dictionary<int, Texture>();
             if (!File.Exists(path)) return o;
             var d = File.ReadAllBytes(path);
+            if (d.Length >= 0x10 && Encoding.ASCII.GetString(d, 0, 4) == "NTP3") return LoadNtp3(d);
             if (d.Length < 0x10 || Encoding.ASCII.GetString(d, 0, 4) != "NTWU") return o;
             int count = BE.U16(d, 6), hp = 0x10;
             for (int i = 0; i < count && hp + 0x50 < d.Length; i++)
@@ -62,6 +63,56 @@ namespace Sm4shCommand.Viewer
                 hp += headerSize;
             }
             return o;
+        }
+
+        /// <summary>v1.6.0: an NTP3 .nut (the untiled kind: the sword trails' textures, some models'; layout as Smash
+        /// Forge's NUT.cs and tools/nut.py write_ntp3): formats 0 DXT1, 1 DXT3, 2 DXT5, 14 RGBA8 (stored A R G B); the
+        /// first mip of each, by its GIDX hash.</summary>
+        static Dictionary<int, Texture> LoadNtp3(byte[] d)
+        {
+            var o = new Dictionary<int, Texture>();
+            int count = BE.U16(d, 6), hp = 0x10;
+            for (int i = 0; i < count && hp + 0x30 <= d.Length; i++)
+            {
+                int headerSize = BE.U16(d, hp + 12);
+                try
+                {
+                    int fmt = d[hp + 0x13], w = BE.U16(d, hp + 0x14), h = BE.U16(d, hp + 0x16);
+                    int dataOffset = BE.I32(d, hp + 0x20) + hp;
+                    int hash = i;
+                    for (int p = hp; p + 12 <= hp + headerSize; p += 4)
+                        if (d[p] == 'G' && d[p + 1] == 'I' && d[p + 2] == 'D' && d[p + 3] == 'X') { hash = BE.I32(d, p + 8); break; }
+                    Texture tex = null;
+                    if (fmt == 14)
+                    {
+                        tex = new Texture { Width = w, Height = h, Argb = new int[w * h] };
+                        for (int k = 0; k < w * h && dataOffset + 4 * k + 3 < d.Length; k++)
+                            tex.Argb[k] = BE.I32(d, dataOffset + 4 * k);      // A R G B: ARGB as stored
+                        tex.HasAlpha = true;
+                    }
+                    else if (fmt <= 2)
+                    {
+                        int gx2 = fmt == 0 ? 0x31 : fmt == 1 ? 0x32 : 0x33;
+                        int ew = (w + 3) / 4, eh = (h + 3) / 4, size = ew * eh * (fmt == 0 ? 8 : 16);
+                        size = Math.Min(size, d.Length - dataOffset);
+                        var data = new byte[size];
+                        Array.Copy(d, dataOffset, data, 0, size);
+                        tex = Decode(data, w, h, gx2, 1, 0, ew);
+                    }
+                    if (tex != null && !o.ContainsKey(hash)) o[hash] = tex;
+                }
+                catch (Exception) { }
+                if (headerSize <= 0) break;
+                hp += headerSize;
+            }
+            return o;
+        }
+
+        /// <summary>v1.6.0: one GX2 surface's first mip (a .ptcl's textures: tools/ptcl.py decode_texture), null when the
+        /// format isn't one of these (RGBA8, 565, 5551, 4444, BC1-5).</summary>
+        public static Texture DecodeSurface(byte[] data, int w, int h, int format, int tileMode, int swizzle, int pitch)
+        {
+            return Decode(data, w, h, format, tileMode, swizzle, pitch);
         }
 
         static Texture Decode(byte[] data, int w, int h, int format, int tileMode, int swizzle, int pitch)

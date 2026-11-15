@@ -45,6 +45,8 @@ namespace Sm4shCommand.Viewer
         public int Bone1, Bone2, Blur, Fade;
         public float X1, Y1, Z1, X2, Y2, Z2;
         public uint Graphic;
+        public int Texture1, Texture2;      // v1.6.0: the trail texture ids (TrailNames; 0 none, -1 from a variable)
+        public int Shader = 1;              // v1.6.0: the trail shader (effect_trail.nsh: 1, 2, 3; docs/native-notes.md)
         public int StartFrame, EndFrame = -1;
         public TrailData Clone() { return (TrailData)MemberwiseClone(); }
     }
@@ -157,16 +159,125 @@ namespace Sm4shCommand.Viewer
         }
 
         /// <summary>How long a one-shot effect plays, in frames: the latest emitter's end (start + emission (one-time
-        /// emitters) + particle life) of its .ptcl set; null when the set never stops by itself, has no emitters, or the
-        /// files aren't there.</summary>
+        /// emitters) + particle life) of its .ptcl set, and (v1.6.0) its effect model's animation length (model.omo /
+        /// .mta frames) when it has one; null when the set never stops by itself, the entry has neither, or the files
+        /// aren't there.</summary>
         public int? Lifetime(uint id)
         {
             int bank = (int)(id >> 16), entry = (int)(id & 0xFFFF);
             var b = bank == 0x100 ? null : GetBank(bank);
-            if (b == null || b.Efc == null || b.Ptcl == null || entry >= b.Efc.Entries.Count) return null;
-            int set = (int)b.Efc.Entries[entry].Set - 1;
-            if (set < 0 || set >= b.Ptcl.Sets.Count) return null;
-            return b.Ptcl.Sets[set].Lifetime();
+            if (b == null || b.Efc == null || entry >= b.Efc.Entries.Count) return null;
+            var en = b.Efc.Entries[entry];
+            int set = (int)en.Set - 1;
+            int? life = null;
+            if (set >= 0)
+            {
+                if (b.Ptcl == null || set >= b.Ptcl.Sets.Count) return null;
+                life = b.Ptcl.Sets[set].Lifetime();
+                if (!life.HasValue) return null;
+            }
+            var model = en.Model > 0 ? ModelFor(b, (int)en.Model) : null;
+            if (model != null && model.Frames > 0) life = Math.Max(life ?? 0, model.Frames);
+            return life;
+        }
+
+        // ---- v1.6.0 (Level 2): what an effect draws ----------------------------------------------------------------
+
+        readonly Dictionary<uint, EffectAssets> assets = new Dictionary<uint, EffectAssets>();
+        readonly Dictionary<string, EffectModel> models = new Dictionary<string, EffectModel>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>The effect model an entry names (model/&lt;name&gt;/ in the bank's folder), loaded once; null when it
+        /// isn't there.</summary>
+        public EffectModel ModelFor(Bank b, int model)
+        {
+            if (b == null || b.Efc == null || model <= 0 || model > b.Efc.Models.Count) return null;
+            string dir = Path.Combine(Path.Combine(b.Folder, "model"), b.Efc.Models[model - 1]);
+            EffectModel m;
+            if (models.TryGetValue(dir, out m)) return m;
+            try { m = EffectModel.Load(dir); } catch (Exception) { m = null; }
+            models[dir] = m;
+            return m;
+        }
+
+        /// <summary>An effect id's emitters (its .ptcl set's, read once) and model; null for common effects (their bank
+        /// isn't in the fighter's folder) and when the files aren't there.</summary>
+        public EffectAssets AssetsFor(uint id)
+        {
+            EffectAssets a;
+            if (assets.TryGetValue(id, out a)) return a;
+            a = null;
+            int bank = (int)(id >> 16), entry = (int)(id & 0xFFFF);
+            var b = bank == 0x100 ? null : GetBank(bank);
+            if (b != null && b.Efc != null && entry < b.Efc.Entries.Count)
+            {
+                var en = b.Efc.Entries[entry];
+                a = new EffectAssets();
+                int set = (int)en.Set - 1;
+                if (set >= 0 && b.Ptcl != null && set < b.Ptcl.Sets.Count)
+                {
+                    a.SetName = b.Ptcl.Sets[set].Name;
+                    foreach (var e in b.Ptcl.Sets[set].Emitters)
+                    {
+                        EmitterDef d;
+                        try { d = e.Def; } catch (Exception) { d = null; }
+                        if (d != null) a.Emitters.Add(d);
+                    }
+                }
+                if (en.Model > 0) a.Model = ModelFor(b, (int)en.Model);
+                if (a.Emitters.Count == 0 && a.Model == null) a = null;
+            }
+            assets[id] = a;
+            return a;
+        }
+
+        readonly Dictionary<string, Texture> trailTextures = new Dictionary<string, Texture>(StringComparer.OrdinalIgnoreCase);
+        List<string> trailDirs;
+
+        /// <summary>A sword trail texture by id (TrailNames): "&lt;name&gt;.nut" in this fighter's effect/*/trail folders,
+        /// else in the other fighters' next to it (the game looks among every loaded trail texture); null when not found.</summary>
+        public Texture TrailTexture(int id)
+        {
+            string name = TrailNames.Name(id);
+            if (name == null) return null;
+            Texture t;
+            if (trailTextures.TryGetValue(name, out t)) return t;
+            t = null;
+            if (trailDirs == null)
+            {
+                trailDirs = new List<string>();
+                var roots = new List<string>();
+                if (fighterRoot != null) roots.Add(fighterRoot);
+                string parent = fighterRoot != null ? Path.GetDirectoryName(fighterRoot) : null;
+                try
+                {
+                    if (parent != null && Directory.Exists(parent))
+                        roots.AddRange(Directory.GetDirectories(parent).Where(x => !string.Equals(x, fighterRoot, StringComparison.OrdinalIgnoreCase)).OrderBy(x => x));
+                }
+                catch (Exception) { }
+                foreach (var r in roots)
+                {
+                    string fx = Path.Combine(r, "effect");
+                    try
+                    {
+                        if (!Directory.Exists(fx)) continue;
+                        foreach (var bdir in Directory.GetDirectories(fx).OrderBy(x => x))
+                        {
+                            string tr = Path.Combine(bdir, "trail");
+                            if (Directory.Exists(tr)) trailDirs.Add(tr);
+                        }
+                    }
+                    catch (Exception) { }
+                }
+            }
+            foreach (var dir in trailDirs)
+            {
+                string f = Path.Combine(dir, name + ".nut");
+                if (!File.Exists(f)) continue;
+                try { t = Nut.Load(f).Values.FirstOrDefault(); } catch (Exception) { t = null; }
+                if (t != null) break;
+            }
+            trailTextures[name] = t;
+            return t;
         }
     }
 
@@ -208,7 +319,9 @@ namespace Sm4shCommand.Viewer
     public class PtclFile
     {
         public byte[] Data;
-        public int NamePos, TexPos, TexSize, KeyAnimPos, KeyAnimSize, PrimPos, PrimSize;
+        public int NamePos, TexPos, TexSize, ShaderPos, ShaderSize, KeyAnimPos, KeyAnimSize, PrimPos, PrimSize;
+        // v1.6.0: decoded textures (by their place in the texture table) and the emitters' particle definitions
+        internal readonly Dictionary<long, Texture> TextureCache = new Dictionary<long, Texture>();
         public List<EmitterSet> Sets = new List<EmitterSet>();
 
         public class Emitter
@@ -229,11 +342,15 @@ namespace Sm4shCommand.Viewer
             public int BlendType { get { return I(0x324); } }
             public int ParticleType { get { return I(0x4BC); } }
             public float EmitRate { get { return F(0x444); } }
+            EmitterDef def;
+            /// <summary>v1.6.0: the emitter's particle definition (Particles.cs), read once.</summary>
+            public EmitterDef Def { get { return def ?? (def = EmitterDef.Read(this)); } }
         }
 
         public class EmitterSet
         {
             public string Name;
+            public int Index;
             public List<Emitter> Emitters = new List<Emitter>();
 
             /// <summary>Frames until the set's last particle is gone: max over its emitters of start + emission end
@@ -260,11 +377,12 @@ namespace Sm4shCommand.Viewer
             Data = d;
             int nsets = BE.I32(d, 8);
             NamePos = BE.I32(d, 0x10); TexPos = BE.I32(d, 0x14); TexSize = BE.I32(d, 0x18);
+            ShaderPos = BE.I32(d, 0x1C); ShaderSize = BE.I32(d, 0x20);
             KeyAnimPos = BE.I32(d, 0x24); KeyAnimSize = BE.I32(d, 0x28); PrimPos = BE.I32(d, 0x2C); PrimSize = BE.I32(d, 0x30);
             for (int i = 0; i < nsets && 0x48 + 0x1C * i + 0x1C <= d.Length; i++)
             {
                 int o = 0x48 + 0x1C * i;
-                var s = new EmitterSet { Name = NameAt(BE.I32(d, o + 8)) };
+                var s = new EmitterSet { Name = NameAt(BE.I32(d, o + 8)), Index = i };
                 int n = BE.I32(d, o + 0x10), tbl = BE.I32(d, o + 0x14);
                 for (int k = 0; k < n && tbl + 0x10 * k + 4 <= d.Length; k++)
                 {

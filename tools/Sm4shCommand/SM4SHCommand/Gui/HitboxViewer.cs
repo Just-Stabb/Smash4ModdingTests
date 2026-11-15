@@ -29,7 +29,11 @@ namespace Sm4shCommand.GUI
         List<EffectData> allEffects = new List<EffectData>();
         List<TrailData> allTrails = new List<TrailData>();
         string effectError;
-        readonly CheckBox showEffects = new CheckBox { Text = "Effects", AutoSize = true, Checked = Runtime.GetSetting("ViewerEffects", true) };
+        readonly CheckBox showEffects = new CheckBox { Text = "Markers", AutoSize = true, Checked = Runtime.GetSetting("ViewerEffects", true) };
+        // v1.6.0 (Level 2): the effects drawn (particles, effect models, textured trails), their quality, a dark background
+        readonly CheckBox showParticles = new CheckBox { Text = "Effects", AutoSize = true, Checked = Runtime.GetSetting("ViewerParticles", true) };
+        readonly CheckBox fxQuality = new CheckBox { Text = "HQ", AutoSize = true, Checked = Runtime.GetSetting("ViewerFxQuality", false) };
+        readonly CheckBox darkBg = new CheckBox { Text = "Dark bg", AutoSize = true, Checked = Runtime.GetSetting("ViewerDarkBg", true) };
         readonly CheckBox showLabels = new CheckBox { Text = "Labels", AutoSize = true, Checked = Runtime.GetSetting("ViewerEffectLabels", true) };
         readonly CheckBox showTrails = new CheckBox { Text = "Trails", AutoSize = true, Checked = Runtime.GetSetting("ViewerTrails", true) };
         readonly CheckBox flip = new CheckBox { Text = "Flip facing", AutoSize = true };
@@ -113,6 +117,8 @@ namespace Sm4shCommand.GUI
             this.getEffect = getEffect;
             library = new EffectLibrary(assets.Root) { CommonName = CommonEffectName };
             view.EffectLabel = EffectLabel;
+            view.GetEffectAssets = library.AssetsFor;
+            view.GetTrailTexture = library.TrailTexture;
             Size = new Size(1150, 720);
             StartPosition = FormStartPosition.CenterParent;
             view.Assets = assets;
@@ -240,7 +246,7 @@ namespace Sm4shCommand.GUI
             tools.Height = 84;
             tools.Controls.AddRange(new Control[] { new Label { Text = "Animation:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, animBox,
                 ifTrue, frameSpeed, showModel, showTextures, showBones, showAngles, showEnemy, untilActionable, showFreeze, floor,
-                showEffects, showLabels, showTrails, flip });
+                showParticles, fxQuality, darkBg, showEffects, showLabels, showTrails, flip });
             var bottom = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 34, ColumnCount = 5 };
             var prev = new Button { Text = "<", Width = 30 };
             var next = new Button { Text = ">", Width = 30 };
@@ -286,6 +292,11 @@ namespace Sm4shCommand.GUI
             var tips = new ToolTip();
             tips.SetToolTip(diMul, "DI multiplier: how far DI can turn the launch angle (1 = normal, 0.5 = half, 2 = double, 0 = no DI). " +
                 "Multiplies the hitbox's own DIMul (Extra hitboxes).");
+            tips.SetToolTip(showParticles, "Draw the effects: the .ptcl particles (simulated from each effect's start), the effect models " +
+                "(animated) and the sword trails' textures. Approximate: no game shaders, bloom or distortion (README).");
+            tips.SetToolTip(fxQuality, "Higher effect quality: smooth (bilinear) textures and more particles (slower).");
+            tips.SetToolTip(darkBg, "A dark background: additive effects show as they do on a stage.");
+            tips.SetToolTip(showEffects, "Level 1's effect markers: a circle with the effect's axes at its bone + offset (dashed: one-shot).");
             foreach (Control c in new Control[] { target, targetPct, attackerPct, charge, stale, kbMult, launchRate, diAngle, crouch, aerial, useDI,
                                                   hitstunMul, selfStopMul, enemyStopMul, diMul })
             {
@@ -343,6 +354,12 @@ namespace Sm4shCommand.GUI
             showLabels.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerEffectLabels", showLabels.Checked); view.ShowEffectLabels = showLabels.Checked; view.Invalidate(); };
             showTrails.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerTrails", showTrails.Checked); view.ShowTrails = showTrails.Checked; view.Invalidate(); };
             flip.CheckedChanged += (o, e) => { view.Flip = flip.Checked; ShowFrame(); };
+            showParticles.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerParticles", showParticles.Checked); view.ShowParticles = showParticles.Checked; view.Invalidate(); };
+            fxQuality.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerFxQuality", fxQuality.Checked); view.HighQuality = fxQuality.Checked; view.ResetEffects(); };
+            darkBg.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerDarkBg", darkBg.Checked); view.DarkBackground = darkBg.Checked; view.Invalidate(); };
+            view.ShowParticles = showParticles.Checked;
+            view.HighQuality = fxQuality.Checked;
+            view.DarkBackground = darkBg.Checked;
             view.ShowEffects = showEffects.Checked;
             view.ShowEffectLabels = showLabels.Checked;
             view.ShowTrails = showTrails.Checked;
@@ -420,6 +437,8 @@ namespace Sm4shCommand.GUI
             animCount = Math.Max(1, n);
             RunEffects();
             frames = probe.Take(animCount).ToList();
+            view.History = probe;
+            view.ResetEffects();
             SetTimeline(animCount, null, 0);
             view.Animation = anim;
             var hm = assets.HeldFor(animName);

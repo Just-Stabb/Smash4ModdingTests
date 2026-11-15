@@ -22,7 +22,7 @@ namespace Sm4shCommand.Viewer
         public float Frame, Z, Y;
     }
 
-    public class Viewport : Control
+    public partial class Viewport : Control
     {
         public FighterAssets Assets;
         public Omo Animation;
@@ -180,13 +180,16 @@ namespace Sm4shCommand.Viewer
             using (var bmp = new Bitmap(w, h, PixelFormat.Format32bppArgb))
             {
                 var pix = new int[w * h];
-                int bg = BackColor.ToArgb();
+                int bg = Background.ToArgb();
                 for (int i = 0; i < pix.Length; i++) pix[i] = bg;
                 var zbuf = new float[w * h];
                 for (int i = 0; i < zbuf.Length; i++) zbuf[i] = float.MaxValue;
                 if (attacker != null) Rasterize(attacker, pix, zbuf, w, h, r, u, f);
                 if (held != null) Rasterize(held, pix, zbuf, w, h, r, u, f);
                 if (enemy != null) Rasterize(enemy, pix, zbuf, w, h, r, u, f);
+                texturedTrails.Clear();
+                try { DrawFx(pix, zbuf, w, h, r, u, f); }
+                catch (Exception ex) { FxStats = "effects not drawn: " + ex.Message; }
                 var data = bmp.LockBits(new Rectangle(0, 0, w, h), ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
                 Marshal.Copy(pix, 0, data.Scan0, pix.Length);
                 bmp.UnlockBits(data);
@@ -370,13 +373,13 @@ namespace Sm4shCommand.Viewer
                 {
                     float len = rad + 10;
                     if (hb.Angle == 361)
-                        g.DrawString("S", Font, Brushes.Black, pa.X - 4, pa.Y - 6);
+                        using (var br = new SolidBrush(Ink(Color.Black))) g.DrawString("S", Font, br, pa.X - 4, pa.Y - 6);
                     else
                     {
                         // the angle is in the fighter's facing plane: forward = model +Z, up = +Y
                         double ang = hb.Angle * Math.PI / 180;
                         var tip = Project(new[] { a[0], a[1] + (float)Math.Sin(ang) * len / zoom, a[2] + (float)Math.Cos(ang) * len / zoom }, r, u, out d);
-                        using (var pen = new Pen(Color.Black, 1.5f) { EndCap = LineCap.ArrowAnchor })
+                        using (var pen = new Pen(Ink(Color.Black), 1.5f) { EndCap = LineCap.ArrowAnchor })
                             g.DrawLine(pen, pa, tip);
                     }
                 }
@@ -470,7 +473,7 @@ namespace Sm4shCommand.Viewer
                     var at = new RectangleF(o.X + rad * 0.7f + 2, o.Y - rad * 0.7f - 12, sz.Width, sz.Height);
                     for (int k = 0; k < 40 && labels.Any(x => x.IntersectsWith(at)); k++) at.Y += sz.Height;
                     labels.Add(at);
-                    using (var br = new SolidBrush(Color.FromArgb(230, Darker(Darker(col)))))
+                    using (var br = new SolidBrush(Color.FromArgb(230, DarkBackground ? Ink(Darker(col)) : Darker(Darker(col)))))
                         g.DrawString(label, Font, br, at.X, at.Y);
                 }
             }
@@ -495,6 +498,7 @@ namespace Sm4shCommand.Viewer
             float d;
             foreach (var t in Frame.Trails)
             {
+                if (ShowParticles && texturedTrails.Contains(t.Index)) continue;     // drawn textured (v1.6.0)
                 float[] a, b;
                 bool fading = t.EndFrame >= 0 && Frame.GameFrame >= t.EndFrame;
                 // the history: the blade on the frames before, back to the trail's start (BlurLength of them, at
@@ -537,20 +541,26 @@ namespace Sm4shCommand.Viewer
 
         void DrawStatus(Graphics g)
         {
+            Func<Color, Brush> ink = c => new SolidBrush(Ink(c));
             if (EnemyStatus != null)
-                g.DrawString(EnemyStatus, Font, Brushes.DarkRed, 6, 22);
+                using (var br = ink(Color.DarkRed)) g.DrawString(EnemyStatus, Font, br, 6, 22);
             if (Frame == null) return;
+            if (ShowParticles && FxStats.Length > 0)
+                using (var br = ink(Color.FromArgb(90, 70, 20)))
+                    g.DrawString("Effects: " + FxStats, Font, br, 6, Height - (Flip ? 34 : 18));
             var parts = new List<string>();
             if (Frame.Intangible) parts.Add("intangible");
             if (Frame.Invincible) parts.Add("invincible");
             if (Frame.SuperArmor) parts.Add("super armor");
             if (parts.Count > 0)
-                g.DrawString(string.Join(", ", parts.ToArray()), Font, Brushes.DarkBlue, 6, 6);
+                using (var br = ink(Color.DarkBlue)) g.DrawString(string.Join(", ", parts.ToArray()), Font, br, 6, 6);
             if (Flip)
-                g.DrawString("Facing left (turned round). ! = an effect call the God Fist / Core Breaker ports found looks different facing left",
-                             Font, Brushes.DarkMagenta, 6, Height - 18);
+                using (var br = ink(Color.DarkMagenta))
+                    g.DrawString("Facing left (turned round). ! = an effect call the God Fist / Core Breaker ports found looks different facing left",
+                                 Font, br, 6, Height - 18);
             if (Frame.Screen != null && Frame.Screen.Count > 0)
-                g.DrawString("Screen: " + string.Join("; ", Frame.Screen.Select(x => x.Text).ToArray()), Font, Brushes.DarkGreen, 6, 38);
+                using (var br = ink(Color.DarkGreen))
+                    g.DrawString("Screen: " + string.Join("; ", Frame.Screen.Select(x => x.Text).ToArray()), Font, br, 6, 38);
         }
 
         protected override void OnMouseDown(MouseEventArgs e)

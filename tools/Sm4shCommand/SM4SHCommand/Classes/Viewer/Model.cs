@@ -283,6 +283,8 @@ namespace Sm4shCommand.Viewer
             public bool AlphaTest;  // the material blends or alpha-tests
             public Texture Texture; // resolved from model.nut by FighterAssets
             public Dictionary<string, float[]> Props = new Dictionary<string, float[]>();   // NU_ material values
+            public int Src, Dst;    // v1.6.0: the material's blend factors (effect models: dst 1 alpha, 2 add, 3 subtract)
+            public float[] Color;   // v1.6.0: r g b a per vertex (127 = 1.0), or null
         }
         public class Mesh
         {
@@ -350,6 +352,13 @@ namespace Sm4shCommand.Viewer
             var poly = new Poly { Pos = new float[vc * 3], Bones = new int[vc * 4], Weights = new float[vc * 4] };
             int cb = colorType == 2 ? 4 : colorType == 4 ? 8 : 0;
             if (uvCount > 0) poly.UV = new float[vc * 2];
+            if (cb > 0) poly.Color = new float[vc * 4];
+            Action<int, int> readColor = (k, q) =>
+            {
+                if (poly.Color == null) return;
+                for (int c = 0; c < 4; c++)
+                    poly.Color[k * 4 + c] = colorType == 2 ? d[q + c] / 127f : BE.Half(d, q + 2 * c);
+            };
             Action<int, int> readUV = (k, q) =>
             {
                 if (poly.UV == null) return;
@@ -359,7 +368,7 @@ namespace Sm4shCommand.Viewer
             };
             if (boneType != 0)
             {
-                for (int k = 0; k < vc; k++) readUV(k, vs + k * uvb);
+                for (int k = 0; k < vc; k++) { readColor(k, vs + k * uvb); readUV(k, vs + k * uvb); }
                 int bsz = boneType == 0x10 ? 32 : boneType == 0x20 ? 16 : 8;
                 int p = va;
                 for (int k = 0; k < vc; k++, p += 12 + nsize + bsz)
@@ -380,6 +389,7 @@ namespace Sm4shCommand.Viewer
                 for (int k = 0; k < vc; k++, p += 12 + nsize + uvb)
                 {
                     for (int c = 0; c < 3; c++) poly.Pos[k * 3 + c] = BE.F32(d, p + 4 * c);
+                    readColor(k, p + 12 + nsize);
                     readUV(k, p + 12 + nsize);
                     poly.Bones[k * 4] = Math.Max(0, single);
                     poly.Weights[k * 4] = 1;
@@ -423,6 +433,7 @@ namespace Sm4shCommand.Viewer
             if (mat <= 0 || mat + 32 > d.Length) return;
             int src = BE.U16(d, mat + 8), texCount = BE.U16(d, mat + 10), dst = BE.U16(d, mat + 12), alphaFunc = BE.U16(d, mat + 14);
             poly.AlphaTest = src != 0 || dst != 0 || alphaFunc != 0;
+            poly.Src = src; poly.Dst = dst;
             if (texCount > 0 && mat + 36 <= d.Length)
                 poly.TextureHash = BE.I32(d, mat + 32);
             // the material's values (NU_colorGain, NU_diffuseColor, ...): size, name, count, values
