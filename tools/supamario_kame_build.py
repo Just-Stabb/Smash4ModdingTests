@@ -514,7 +514,9 @@ def supamario_values(fx):
         # the Super God Fist's (dash attack, tools/supamario_godfist_build.py)
         **godfist_values(),
         # Core Breaker's (up special, tools/supamario_corebreaker_build.py)
-        **corebreaker_values()}
+        **corebreaker_values(),
+        # Fake Death's (the grounded down special, tools/supamario_fakedeath_build.py)
+        **fakedeath_values()}
 
 
 def godfist_values():
@@ -525,6 +527,11 @@ def godfist_values():
 def corebreaker_values():
     import supamario_corebreaker_build
     return supamario_corebreaker_build.msc_values()
+
+
+def fakedeath_values():
+    import supamario_fakedeath_build
+    return supamario_fakedeath_build.msc_values()
 
 
 def msc_only(out_path):

@@ -1782,6 +1782,7 @@ void func_82()
     rolloff_hold_update(); // roll-off: the air speed cap off while the stick holds the way he moves (universal mechanics)
     gf_tick(); // Super God Fist: the downed victim (fighters/supamario/README.md "Super God Fist v5")
     cb_reset_tick(); // Core Breaker v3: its once-per-airtime uses back on landing, a hit, a ledge, a grab, a KO
+    fd_tick(); // Fake Death: the grounded victim's hitstun and place, the repeats' clock
 }
 
 float func_83()
@@ -36664,6 +36665,14 @@ void func_2264()
 void func_2265()
 {
     int var0;
+    // Fake Death (fighters/supamario/README.md "Fake Death"): the GROUNDED down special; in the air F.L.U.D.D. as before
+    if (global18 == 0)
+    {
+        fd_init();
+        func_78(fd_loop);
+        return;
+    }
+    fd_on = 0;
     if (ArticleModule(0, 0x2) == 0)
     {
         ArticleModule(0x2710, 0x2);
@@ -36713,13 +36722,15 @@ void func_2267()
     {
         KineticModule(0, 0x6);
         GroundModule(0x2710, 0x2);
+        // Fake Death: the ground start's motion (0x229) is Fake Death's collapse now; an air F.L.U.D.D. that lands
+        // keeps playing its air start (0x239) on the ground
         if (WorkModule(0x2712, 0x2100000d))
         {
-            func_23(0x229);
+            func_23(0x239);
         }
         else
         {
-            func_22(0x229, 0, 1.0f);
+            func_22(0x239, 0, 1.0f);
             WorkModule(0x2710, 0x2100000d);
         }
     }
@@ -36814,13 +36825,15 @@ void func_2270()
     {
         KineticModule(0, 0x6);
         GroundModule(0x2710, 0x2);
+        // Fake Death: the ground hold's motion (0x22D) is Fake Death's wake-up now; a landed F.L.U.D.D. keeps its air
+        // hold (0x23D)
         if (WorkModule(0x2712, 0x2100000d))
         {
-            func_23(0x22d);
+            func_23(0x23d);
         }
         else
         {
-            func_22(0x22d, 0, 1.0f);
+            func_22(0x23d, 0, 1.0f);
             WorkModule(0x2710, 0x2100000d);
         }
         WorkModule(0x16, 0x1e00009a);
@@ -37053,6 +37066,11 @@ void func_2281()
 void func_2282()
 {
     int var0;
+    if (fd_on != 0)
+    {
+        fd_end();
+        return;
+    }
     var0 = global6;
     if (var0 != 0x157)
     {
@@ -39663,4 +39681,315 @@ void cb_end()
     SoundModule(0x2714, CB_SND_CHARGE);
     cb_ph = 0;
     WorkModule(0, 0.0f, CB_VAR);
+}
+
+
+// ===================================================================
+// Fake Death (the GROUNDED down special, status 0x155; Dragon Ball Xenoverse 2's Super skill 116_YMC_DIE, Yamcha's;
+// fighters/supamario/README.md "Fake Death"). In the air the down special is F.L.U.D.D. as before (func_2265).
+// Two motions (tools/supamario_fakedeath_anim.py): 0x229 (SpecialLwStart) the collapse 0-31 and the lying loop 32-51,
+// 0x22D (SpecialLwHold) the wake-up attack 0-65, a motion change between them so the wake-up's scripts start fresh
+// whatever the lying lasted (the game script keeps its own frame count: Core Breaker v4 / v5).
+// - the collapse: intangible FD_INT_A frames (XV2: All Attacks Miss 0-19), the hop back (FD_VC_CODE: XV2's root)
+// - at its end (frame FD_LIE_FROM) the special button still held: lying, looped (XV2's "BAC Loop (instant end)"
+//   32-92) until it is released or FD_HOLD_MAX frames from the start; not intangible (XV2 isn't)
+// - the wake-up (released, tapped, or the cap): turned toward the nearest opponent (XV2's TrackForwardAndBackwards),
+//   intangible to its frame FD_INT_B, the hit (the game script: a ground-only and an air-only hitbox) and Wait at its
+//   end (FD_WAKE_END)
+// - a grounded victim (fd_hits / fd_tick): kept where it is and held in hitstun FD_HITSTUN x FD_REP_MULn (the n-th
+//   hit on it within FD_REPEAT_WINDOW frames of the one before); an airborne one: the air hitbox's own launch
+// His travel is his speed (energy 3) each frame from XV2's root (no TransN), on the ground with GroundModule's ledge
+// stop; off the ground: Fall.
+// ===================================================================
+// Fake Death's globals (used in func_2265 / func_2282 / func_82 above too: declared last, so the earlier globals keep their numbers)
+int fd_on;              // 1 while the down special is Fake Death (a ground start), 0 for F.L.U.D.D.
+int fd_ph;              // 0 the collapse, 1 lying (the button held), 2 the wake-up attack
+int fd_t;               // frames since the status started (1 on its first)
+int fd_turned;          // the wake-up's turn toward the nearest opponent done
+int fd_gmask;           // player slots on the ground the frame before (until the attack hits)
+int fd_done;            // player slots already taken as a grounded victim this move
+float fd_lastfr;        // the wake-up's motion frame last frame (its slot loops: the end is the wrap back)
+
+
+float fd_vc(float f)
+{
+    FD_VC_CODE
+    return 0.0f;
+}
+
+float fd_vw(float f)
+{
+    FD_VW_CODE
+    return 0.0f;
+}
+
+void fd_init()
+{
+    fd_on = 0x1;
+    fd_ph = 0;
+    fd_t = 0;
+    fd_turned = 0;
+    fd_gmask = 0;
+    fd_done = 0;
+    KineticModule(0, 0x6);
+    GroundModule(0x2710, 0x2);
+    func_22(0x229, 0, 1.0f);
+    KineticModule(0x11, 0x3, 0.0f, 0.0f);
+}
+
+// intangible this frame: FD_INT_STEP frames renewed every frame of a window, 1 on its last (the God Fist / Core
+// Breaker rule: no timer runs on past the move)
+void fd_intangible(float fr, float last)
+{
+    if (fr < last - 0.5f)
+    {
+        WorkModule(0, FD_INT_STEP, 0x0F00011B);
+    }
+    else if (fr < last + 0.5f)
+    {
+        WorkModule(0, 1.0f, 0x0F00011B);
+    }
+}
+
+void fd_wake()
+{
+    fd_ph = 0x2;
+    func_22(0x22d, 0, 1.0f);
+    fd_lastfr = 0.0f;
+    EffectModule(0x2723, FD_FX_RING, 0x1, 0x1);
+}
+
+// the nearest opponent behind him at the wake-up: turned to face it (XV2's tracking forward and backwards, 94-101)
+void fd_turn()
+{
+    fd_turned = 0x1;
+    if (WorkModuleF(0, 0x0f00000b) > 0.0f && WorkModuleF(0, 0x0f00000c) < 0.0f)
+    {
+        PostureModule(0x1);
+        PostureModule(0x2);
+    }
+}
+
+// the slots on the ground, the frame before his attack hits (Core Breaker v6's cb_gtrack)
+void fd_gtrack()
+{
+    int s;
+    int m;
+    if (AttackModule(0x2726, 0x2) != 0 || AttackModule(0x2727, 0x2) != 0)
+    {
+        return;
+    }
+    m = 0;
+    s = 1;
+    while (s <= 8)
+    {
+        if (WorkModuleF(0, 0x0F000116 + 0x20 * (s + 0x2)) < 0.5f)
+        {
+            m = m | (0x1 << s);
+        }
+        s = s + 1;
+    }
+    fd_gmask = m;
+}
+
+// a slot hit by the ground hitbox: on the ground the frame before and now, frozen in the hit's hitstop, near the hitbox,
+// not him; its repeat count and its hitstun (fd_tick holds it)
+void fd_hits()
+{
+    int s;
+    float x;
+    float y;
+    float hx;
+    float hy;
+    float dx;
+    float dy;
+    float face;
+    float rep;
+    float hs;
+    if (AttackModule(0x2726, 0x2) == 0 && AttackModule(0x2727, 0x2) == 0)
+    {
+        return;
+    }
+    face = WorkModuleF(0, 0x0f000003);
+    hx = WorkModuleF(0, 0x0f000000) + FD_HIT_Z * face;
+    hy = WorkModuleF(0, 0x0f000001) + FD_HIT_Y;
+    s = 1;
+    while (s <= 8)
+    {
+        x = WorkModuleF(0, 0x0f000020 + 4 * (s - 1));
+        y = WorkModuleF(0, 0x0f000021 + 4 * (s - 1));
+        dx = x - hx;
+        dy = y + FD_VICTIM_MID - hy;
+        if ((fd_done & (0x1 << s)) == 0 && (fd_gmask & (0x1 << s)) != 0 &&
+            WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f &&
+            (x != WorkModuleF(0, 0x0f000000) || y != WorkModuleF(0, 0x0f000001)) &&
+            WorkModuleF(0, 0x0F000116 + 0x20 * (s + 0x2)) < 0.5f &&
+            WorkModuleF(0, 0x0F000043 + 0x8 * (s + 0x2)) > 0.5f &&
+            dx * dx + dy * dy < FD_VICTIM_R2)
+        {
+            fd_done = fd_done | (0x1 << s);
+            rep = WorkModuleF(0, FD_V_REP + s);
+            if (WorkModuleF(0, FD_V_CLOCK) - WorkModuleF(0, FD_V_LAST + s) > FD_REPEAT_WINDOW)
+            {
+                rep = 0.0f;
+            }
+            rep = rep + 1.0f;
+            hs = FD_HITSTUN * FD_REP_MUL4;
+            if (rep < 3.5f)
+            {
+                hs = FD_HITSTUN * FD_REP_MUL3;
+            }
+            if (rep < 2.5f)
+            {
+                hs = FD_HITSTUN * FD_REP_MUL2;
+            }
+            if (rep < 1.5f)
+            {
+                hs = FD_HITSTUN;
+            }
+            WorkModule(0, rep, FD_V_REP + s);
+            WorkModule(0, WorkModuleF(0, FD_V_CLOCK), FD_V_LAST + s);
+            WorkModule(0, (float)(int)(hs + 0.5f), FD_V_HS + s);
+            WorkModule(0, x, FD_V_HX + s);
+            WorkModule(0, (float)(int)(hs + 0.5f), 0x0F000040 + 0x8 * (s + 0x2));
+        }
+        s = s + 1;
+    }
+}
+
+void fd_loop()
+{
+    float fr;
+    float v;
+    int held;
+    fd_t = fd_t + 1;
+    fr = MotionModuleF(0x1);
+    if (global18 == 0x2)
+    {
+        func_16(0xe, 0);            // off the ground (a ledge the stop missed, a platform gone): Fall
+        return;
+    }
+    v = 0.0f;
+    held = ControlModule(0x2712, 0x1);
+    if (fd_ph == 0)
+    {
+        fd_intangible(fr, FD_INT_A);
+        v = fd_vc(fr);
+        if (fr > FD_LIE_FROM - 0.5f)
+        {
+            if (held != 0 && (float)fd_t < FD_HOLD_MAX - 0.5f)
+            {
+                fd_ph = 0x1;
+                v = 0.0f;
+            }
+            else
+            {
+                fd_wake();
+                fr = 0.0f;
+            }
+        }
+    }
+    else if (fd_ph == 0x1)
+    {
+        if (held == 0 || (float)fd_t > FD_HOLD_MAX - 0.5f)
+        {
+            fd_wake();
+            fr = 0.0f;
+        }
+        else if (fr > FD_LIE_LAST - 0.5f)
+        {
+            MotionModule(0x2713, fr - FD_LIE_BACK);
+        }
+    }
+    if (fd_ph == 0x2)
+    {
+        // the end: after its last frame (FD_WAKE_END - 1). 0x22D is a looping motion slot (F.L.U.D.D.'s hold: motion
+        // table flag 0x2), so its frame wraps to 0 there rather than ending: the wrap is the end too
+        if (fr > FD_WAKE_END - 0.5f || fr < fd_lastfr - 0.5f)
+        {
+            func_16(0, 0);
+            return;
+        }
+        fd_lastfr = fr;
+        fd_intangible(fr, FD_INT_B);
+        if (fd_turned == 0 && fr > FD_TURN_AT - 0.5f)
+        {
+            fd_turn();
+        }
+        if (fr < FD_HIT_TO + 0.5f)
+        {
+            fd_gtrack();
+        }
+        if (fr > FD_HIT_FROM - 0.5f && fr < FD_HIT_TO + FD_HIT_LATE)
+        {
+            fd_hits();
+        }
+        v = fd_vw(fr);
+    }
+    KineticModule(0x11, 0x3, v * WorkModuleF(0, 0x0f000003), 0.0f);
+}
+
+void fd_end()
+{
+    EffectModule(0x2723, FD_FX_RING, 0x1, 0x1);
+    KineticModule(0x11, 0x3, 0.0f, 0.0f);
+    fd_on = 0;
+    fd_ph = 0;
+}
+
+// every frame (func_82): the repeats' clock, and each grounded victim held: its hitstun FD_V_HS (positive: still in
+// the hit's hitstop, renewed; then counted down as -left) and its X kept where it was hit. Let go when its hitstun is
+// over, it leaves the hitstun statuses, or a new hit freezes it again (someone else's)
+void fd_tick()
+{
+    int s;
+    int t;
+    float hs;
+    float st;
+    WorkModule(0, WorkModuleF(0, FD_V_CLOCK) + 1.0f, FD_V_CLOCK);
+    s = 1;
+    while (s <= 8)
+    {
+        hs = WorkModuleF(0, FD_V_HS + s);
+        if (hs != 0.0f)
+        {
+            t = s + 0x2;
+            st = WorkModuleF(0, 0x0F0000A2 + 0x8 * t);
+            if (WorkModuleF(0, 0x0F000043 + 0x8 * t) > 0.5f)
+            {
+                if (hs < 0.0f)
+                {
+                    hs = 0.0f;                  // frozen again after its hitstop had ended: another hit
+                }
+                else
+                {
+                    WorkModule(0, hs, 0x0F000040 + 0x8 * t);
+                    WorkModule(0, WorkModuleF(0, FD_V_HX + s), 0x0f000020 + 4 * (s - 1));
+                }
+            }
+            else
+            {
+                if (hs > 0.0f)
+                {
+                    hs = -hs;                   // its hitstop over: its hitstun counts from here
+                }
+                if (st != FD_ST_DAMAGE && st != FD_ST_DAMAGE_AIR)
+                {
+                    hs = 0.0f;
+                }
+                else
+                {
+                    WorkModule(0, -hs, 0x0F000040 + 0x8 * t);
+                    WorkModule(0, WorkModuleF(0, FD_V_HX + s), 0x0f000020 + 4 * (s - 1));
+                    hs = hs + 1.0f;
+                    if (hs > -0.5f)
+                    {
+                        hs = 0.0f;
+                    }
+                }
+            }
+            WorkModule(0, hs, FD_V_HS + s);
+        }
+        s = s + 1;
+    }
 }

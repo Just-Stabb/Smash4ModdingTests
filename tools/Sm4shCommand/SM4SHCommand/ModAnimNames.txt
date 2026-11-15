@@ -60,6 +60,10 @@ fly3 -> kamehameha/FitMarioFireballMain.omo
 finish1 -> kamehameha/FitMarioFireballMain.omo
 finish2 -> kamehameha/FitMarioFireballMain.omo
 finish3 -> kamehameha/FitMarioFireballMain.omo
+// Fake Death (the grounded down special; vanilla motion slots 0x229 / 0x22D, game.bin had no scripts for them):
+// speciallwstart = the collapse and the lying loop, speciallwhold = the wake-up attack (its hitboxes):
+// tools/supamario_fakedeath_build.py. speciallwhold is in AnimNames.txt already; speciallwstart isn't
+speciallwstart
 
 // ---- Sephiroth (edge)
 // his 3-hit jab: motion slots 0x51 / 0x52 (Zelda, his base, has one jab; extra_kinds.json "motions",

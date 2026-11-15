@@ -2328,3 +2328,98 @@ No staling (v6) means the hit's own shield damage is always 3 x 1.19.
   - the shield at 16.67 / 6.67 (2/3 of 50 below its health before the hit);
   - shieldstun 1016 (16 frames);
   - with 30 left, broken (0x59).
+
+## Fake Death (grounded down special): phase 1, the XV2 skill read
+
+User: put Xenoverse 2's **Fake Death** (Yamcha's Super skill, skill folder `116_YMC_DIE`) on his **grounded** down
+special; the aerial down special stays F.L.U.D.D. Files given: the skill's BAC / BCM / BAS / EAN (`_C`, `_F`, `_MAM`;
+no EEPK, no BDM: it uses the common ones) and its SE bank `CAR_BTL_S116_DIE_SE.acb` (internal name
+`BIRD_BTL_S116_DIE_SE`, waveforms in the ACB). `tools/supamario_fakedeath_xv2.py report` ->
+`reference/xv2/fakedeath_skill.json` (names from LazyBone152's XV2-Tools, read from its source).
+
+### What the files say
+- **BCM:** two siblings under the root: **#1 "Standing"** (PrimaryActivator 0xC01, the button held: HoldDownConditions
+  0x20000, MaximumLoopDuration 480) plays **BAC 0** (the ground version, the one ported); #2 "Floating" plays BAC 4, with
+  a child #3 (the button still held in BAC 4's Supers link window 50-55) -> BAC 5 (a longer lie). BAC 1 / 6 (the wake-up
+  alone) are not reached from the BCM. No counter: no CounterMelee / OnAttackHit condition, no "on connect" entries.
+- **BAC 0 (skill EAN #0 YMC_SPA_DIE_C, 158 frames, MoveWithAxis X / Z: the root moves him):**
+  - 0-19 **Invulnerability "All Attacks Miss"**; the collapse: a hop back (b_C_Base 1.14 m back, up 0.6 m at 8) onto his
+    back by ~20, settled by 32. Frame 1: skill SE cue 0 **FakeDown**, a Stage BG effect 20 (the stage's own dust: not in
+    the files), character voice 57 (left out: no voices).
+  - 30: BTL_CMN effect 26 **Btl_RvlRingON** on b_C_Pelvis: XV2's **knocked-out "revive" ring** (he fakes a KO).
+  - 32-92: function 0x22 **"BAC Loop (instant end)"**: lying still, looped while the button is held (BCM: at most 480
+    frames); released (or tapped) it ends at once and goes on at 92. Function 0x17 ("Recover Health (instant)" in
+    XV2-Tools) runs 0-92 with all parameters 0: nothing known it does. Not invulnerable while lying.
+  - 92-157 the wake-up: the ring off at 93, **tracking 94-108** (94-101 forward and backwards: he turns to his target),
+    skill SE cue 1 **WakeUp** at 95, voice 51 (left out), the wind-up back (1.5 m) then a kip-up kick springing forward
+    108-120 (the root +5.4 m plus the BAC's Movement 0.2 m a frame 110-116), **the hitbox 112-116** (BDM #20 of CMN.bdm,
+    20 damage / 2 guarded, at the root + 0.5 m up + 0.75 m ahead, 0.75 m), the recovery to his stance by 157. No
+    BcmCallback (no cancel) in entry 0; entry 1's movement / guard / dash window is 122-144.
+- **CMN.bdm #20:** a Standard hit (stun 30 frames, hitstop 9 / 9, a 0.25 m push); struck in a floating hit: a knock
+  away (32 frames); struck guarding: blocked. Hit effect BTL_CMN 2 (Btl_HitL), no hit sound. XV2's damage 20 is small
+  (Core Breaker's crash is 405): a light hit whose point is the stun.
+- **xv2bac.py (shared) misreads two fields** (not changed here): an Effect item's bone is at +0xA (`i_a`) and its id an
+  i32 at +0x10 (the `bone` it prints is the id's high half); a Hitbox's +0x10 is "stamina taken when blocked" and its BDM
+  file is +0x13's low nibble (0 common). `supamario_fakedeath_xv2.py` reads them right. The SE bank is the older ACB
+  layout (waveform `Id`, not `MemoryAwbId`): `xv2acb.py extract` fails on it; `supamario_fakedeath_xv2.py se-extract`
+  handles it.
+
+## Fake Death v1 (`supamario_fakedeath_v1.zip`): the grounded down special
+
+Install over Core Breaker v8, exe B (`exe_v46k`, no exe change). Built by `tools/supamario_fakedeath_build.py` (it runs
+Core Breaker's build, which runs the God Fist's: their files are theirs byte for byte except the shared ones below).
+
+### The user's spec, and what was chosen
+| | |
+|---|---|
+| The collapse | XV2 0-31 at 1:1 (motion SpecialLwStart 0-31), **intangible frames 1-19** (motion 0-18: XV2's "All Attacks Miss" 0-19) |
+| The hold | the special button still held when the collapse ends (frame 33): lying, looped (XV2 32-51, a still pose) until it is released or **`HOLD_MAX` = 300 frames from the move's start** (then the attack comes out as if released). **Not intangible while lying** (XV2 isn't) |
+| A tap | released before frame 33: the collapse plays out, the wake-up starts at frame 33 |
+| The attack | XV2 92-157 at 1:1 (motion SpecialLwHold 0-65), **intangible from its first frame to its frame 52** (XV2 144: the end of XV2's own move / guard window), turned once at its frame 2 toward the nearest opponent if it is behind him (XV2's TrackForwardAndBackwards), Wait after its last frame |
+| Hit frames | the attack's frames 20-23 (XV2 112-115): tap = game frames 53-56; he acts on frame 99 (tap) |
+| On shield | the ground hitbox (6%): shieldstun INT(6 x 0.58 + 4) - 2 = 5; he acts 46 frames after the first active frame: **-41 on shield** (-38 on the last active frame); he is intangible to the attack's frame 52, so the punish window is its last 13 frames (53-65) |
+| Grounded victim | **ground-only hitbox (Ground/Air 1)**: 6%, angle 0, knockback 1 (BKB 1, KBG 0), no SDI, no trip, hitstop 9 / 9 (XV2's), hitstun +60 natively (HitstunMul -60). The MSC (`fd_hits` / `fd_tick`) then holds its hitstun (renewed every frame: 60 x the repeat's factor once the hitstop ends) and its X where it was hit. **+14 on hit** from the first active frame (60 vs his 46) |
+| Repeats | the n-th ground hit on the **same fighter (player slot)** within **300 frames** of its previous one: hitstun **x1, x0.6, x0.35, x0.2** (60, 36, 21, 12); 300 frames without one resets it. Another fighter has its own count. Kept in New_Vars 0x00-0x1F (count, last time, held hitstun, X per slot) and 0x3D (the clock) |
+| Airborne victim | **air-only hitbox (Ground/Air 2)**: 3%, angle 45, **BKB 80, KBG 25**, the game's own hitstun and hitlag, no MSC hold, not counted. Mario weight, no DI: knockback 84.8 at 0% (hitstun 33, ~46 units away), 93.5 at 100% (37, ~56 away): about the same distance at any percent (tumble from 0%) |
+| Which hitbox | the game picks by the fighter's own situation at the collision (before the hit's knockback), so a hit that pops someone up can't be misread; the MSC's own record (`fd_gtrack`: on the ground the frame before the hit, as Core Breaker v6) only decides whom it holds |
+| Movement | his speed (energy 3) each frame from XV2's root (no TransN): back 5.9 in the collapse, forward 5.9 net over the attack (the root's +5.7 / -1.7 / +1.9 and the BAC's Movement 6.0); GroundModule's ledge stop as F.L.U.D.D.'s ground start; off the ground: Fall |
+| Effects | Smash's dash cloud at frame 1 (XV2's stage dust); the **revive ring** (BTL_CMN 26, `PtcSupamarioFdBtl_RvlRingON`, id 0x03410057) at frame 30 on bone 0 at his lying hips (2.79 up), size **`FD_FX_SCALE` 1.36** (XV2's proportion: Supamario ~12 units / Yamcha 1.75 m / 5.04), HDR from its glare (capped 2.0), one halo (its glowing line, HALO_ALPHA 0.16); its rings turned Y 90 to face the side camera (XV2 draws them facing his front, which its camera behind him sees face-on; a symmetric ring looks the same both facings); ended at the wake-up (script and MSC) and at any end of the status. The hit's spark is Smash's own (XV2's Btl_HitL is on-hit only) |
+| Sounds | FakeDown at 1, WakeUp at the attack's 3 (XV2 95), levelled to -0.5 dBFS peak: tones `fd_fakedown` 0x0CB10098, `fd_wakeup` 0x0CB10099 (RMS over 0.5 s -13.1 / -9.5 dB). No voices |
+| Staling | the status's attack log is F.L.U.D.D.'s (0x1), unchanged |
+
+### How (files)
+- **Two motion slots** (`tools/supamario_fakedeath_anim.py`): 0x229 SpecialLwStart = the collapse and the lying loop
+  (52 frames), 0x22D SpecialLwHold = the attack (66 frames). The attack is its own motion so its scripts start at 0
+  whatever the lying lasted (the game script keeps its own frame count while the MSC loops a motion: Core Breaker v4 /
+  v5). Supamario's motion table gives every custom slot (`_c2` ...) the same animation, so there is no free slot without
+  an exe change: the ground F.L.U.D.D. start / hold were taken (they only played on the ground). An **air F.L.U.D.D.
+  that lands** now keeps playing its air start / hold animation (0x239 / 0x23D) on the ground (`func_2267` / `func_2270`);
+  everything else about it is as before. 0x22D is a looping slot (motion table flag 0x2): the MSC ends the attack at its
+  wrap.
+- **Scripts:** game.bin had none for these two (F.L.U.D.D. has no hitboxes): added. specialairlwhold's sound /
+  expression JUMPed into speciallwhold: it now has its own copy of vanilla's (its JUMPs aimed at itself), so the air hold
+  sounds / rumbles as before.
+- **MSC** (`supamario.c`, end of the file): `fd_*`; `func_2265` (the main) takes the ground path, `func_2282` (the end)
+  `fd_end`, `func_82` (every frame) `fd_tick`. `FD_*` from `supamario_fakedeath_build.msc_values()` (also in
+  `supamario_kame_build.py`). `msc_fingerprint` vs Core Breaker v8: only func_82 / 2265 / 2267 / 2270 / 2282 differ, +11
+  functions; globals 122 of 128 (7 new, declared last so no earlier global moves).
+- `tools/supamario_fakedeath_xv2.py` (report, SE), `tools/supamario_fakedeath_build.py`, `tools/supamario_fakedeath_test.py`;
+  `ModAnimNames.txt` names `speciallwstart` (not in AnimNames.txt).
+
+### Tests
+- `supamario_fakedeath_test.py OUT BASE`: 40 checks, 0 problems: the tap (wake at 33, Wait at 99), held to 60 / 150 (the
+  loop, the wake the frame after the release), the cap (wake at 300), a release in the collapse, the intangible frames
+  exactly (1-19 and the attack's 0-52, renewed 2 frames, the last 1; none while lying), the turn (behind only), off the
+  ground -> Fall, a cut while lying (the ring killed, nothing after), his travel; five ground hits on one fighter (60, 36,
+  21, 12, then 60 after 300 frames; kept where it was hit), another fighter's own count, an airborne fighter (launched,
+  the game's hitstun, nothing written, not counted), a shield (-41, no hold), the air F.L.U.D.D. (its own path, the air
+  motions on landing); the scripts (both hitboxes' fields, the ring's call, the sounds, specialairlwhold's copies, every
+  other script the user's), the ring's emitters facing-safe and within the HDR cap, the motions' lengths.
+- `supamario_corebreaker_test.py`: 0 problems; `supamario_godfist_test.py --all-models`: 0 problems;
+  `msc_stack_check.py`: 0 of 2384.
+
+**Not confirmed in game:** that a knockback-1 hit puts a grounded fighter in Damage (0x45) with HitstunMul's added
+frames, and that writing its hitstun left from the MSC every frame (from its hitstop on) holds it for exactly that
+long; that the slot search finds the victim on the frame the hit flag shows (in its hitstop, on the ground, near the
+hitbox); GroundModule's ledge stop with the energy-3 speed; the intangibility renewal (2 frames a frame, 1 on the last);
+the ring's look (its size, the rings facing the camera); the attack's end at the looping slot's wrap.
