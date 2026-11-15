@@ -2423,3 +2423,38 @@ frames, and that writing its hitstun left from the MSC every frame (from its hit
 long; that the slot search finds the victim on the frame the hit flag shows (in its hitstop, on the ground, near the
 hitbox); GroundModule's ledge stop with the energy-3 speed; the intangibility renewal (2 frames a frame, 1 on the last);
 the ring's look (its size, the rings facing the camera); the attack's end at the looping slot's wrap.
+
+## Fake Death v2 (`supamario_fakedeath_v2.zip`): the user's v1 answers
+
+Install over v1, exe B (`exe_v46k`, no exe change). Changed: the ptcl (the ring's emitters), effect.bin / game.bin
+(speciallwstart's ring call, speciallwhold's hitboxes), the MSC.
+
+| # | User | v2 |
+|---|---|---|
+| 1 | "The ring displays facing entirely towards the camera, so it looks like a flat circle. It should surround Supamario horizontally." (v1 screenshot: a vertical green circle behind him) | The rings lie flat (emitter X 90; v1 turned them Y 90 to face the camera), centred on his lying body (bone 0, 1.8 up, 1.3 back along his facing: his lying body spans -6.7 .. +4.1 from TransN), their XV2 height stack kept low round him (main ring +0.9, the "ON" flash +0.45, the inner ring and the sparkles 0). **`FD_FX_SCALE` 2.6** (v1 1.36): the screenshot put v1's main ring at ~3.2 units radius, so ~6.1 now, round him head to boots. A flat ring is the same in both facings |
+| 2 | "positioned fine but should move him a bit forward. It should also not clank." | +1 unit a frame over the attack's push frames 18-23: **+6.0 units**, the attack's forward travel 11.9 (v1 5.9; the ledge stop is unchanged). Both hitboxes **Clang 0, Rebound 0** |
+| 3 | 6% on both | ground and air hitboxes 6% |
+| 4 | 66 frames; the reduction only while the opponent is still in the previous Fake Death hit's hitstun | **66 frames** of hitstun; a hit landing while the fighter is still held in the previous Fake Death hit's hitstun (fd_tick still holding it, or its hold broken by this very hit's hitstop within `REHIT` = 12 frames) is a repeat: **66, 40, 23, 13** (x1, x0.6, x0.35, x0.2); otherwise the full 66 (no 300-frame window) |
+| 5 | No staling | the down special's status setup (`func_2252`) passes attack log 0 (Core Breaker v6's way; vanilla 0x1). F.L.U.D.D. shares the status and has no hitboxes |
+| 9 | "the first fake collapse idle loop (happens if you release the button immediately) should also be invulnerable" | A **tap** = the special button released at any point before the collapse ends (frame 33; latched: pressing it again doesn't make it a hold). From the release on, every collapse frame is intangible too, up to the attack (intangible from its first frame), so **released by frame 19 = intangible from frame 1 to the attack's frame 52 with no gap** (game frames 1-85 on a tap); released at 20-32, intangible 1-19 and from the release on. Held through frame 33 (lying): 1-19 only, as v1 |
+| 10 | "should knock opponents away about 4x further than it does now at 0%" | Air hitbox **BKB 165** (v1 80), KBG 25, 45 degrees, 6%, the game's hitstun. Mario weight, no DI (`flight()`): **0%: knockback 170, ~183 units away (v1 ~46: x4.0), hitstun 68; 100%: 184, ~214 units, 73**; 150%: ~231. With an FD-size stage (side blast zones ~240 from the centre) it doesn't KO from mid-stage until ~170%, but near the ledge, sent off-stage, it does from 0% |
+| 6-8 | the F.L.U.D.D. landing compromise, hitting downed opponents, Smash's hit sparks | kept |
+
+**Note on rule 4:** with the current timing one Supamario can't land a second Fake Death while the first one's 66
+frames are running: he acts 46 frames after his hit and his next Fake Death's hitbox is 52 frames later, while the
+fighter has ~20 left. So the reduction only shows if something else keeps the fighter in that hitstun (the test makes
+the case by keeping the hold running). Repeats are counted per Supamario (his New_Vars).
+
+### Tests
+- `supamario_fakedeath_test.py`: 48 checks, 0 problems. New / changed: a tap released at 4 intangible from 1 through
+  the attack's 52 with no gap; released at 25: 1-19 and 25 on; a release then a press again stays a tap; four hits
+  with 2-4 while the last one's hitstun is still held (66, 40, 23, 13) and the 5th after it was over (66); three hits
+  each after the hitstun ended (66 each); the hold broken by the new hit before the MSC finds it (still a repeat, 40);
+  the air hit's distance at 0% x3.8-4.2 of v1's; the status data's attack log 0; both hitboxes 6%, Clang / Rebound 0;
+  the ring call (1.8 up, -1.3 along his facing, x2.6) and its emitters (X 90, the heights), the main ring's radius
+  round him.
+- `supamario_corebreaker_test.py`: 0 problems; `supamario_godfist_test.py --all-models`: 0 problems;
+  `msc_stack_check.py`: 0 of 2384 (globals 123 of 128). `msc_fingerprint` v1 vs v2: func_2252 and fd_* only.
+
+**Not confirmed in game:** the ring's look flat (the ~2.35 units of drawn radius per size unit is read off one
+screenshot); the knockback distances (no DI, no rage, Mario weight).
