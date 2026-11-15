@@ -1717,17 +1717,22 @@ special captures by other moves (Ganondorf's 0xB8 and the like, item captures).
   - the explosion: about Donkey Kong's size.
 
   In XV2 the orb (EEPK scale 2.8 on a 0.47 m disc) is 1.3 m in radius round a 1.75 m Fu: it surrounds him. v1 / v2
-  halved the orb, its flash and the explosion (`SIZE_MUL`, the Q10 default). v3: every effect at the God Fist's x1.75
-  of XV2's scale, with no halving.
+  halved the orb, its flash and the explosion (`SIZE_MUL`, the Q10 default); v3 has no halving.
+- "I'd like Core Breaker's effects to be larger in scale than Super God Fist's effects": Core Breaker has its own
+  scale, `supamario_corebreaker_fx.CB_FX_SCALE` = **2.25** (each placement's size = XV2's ScaleMin x 2.25). The God
+  Fist keeps `xv2_smash_fx.SIZE` 1.75; 2.25 is ~1.3x it (XV2's own proportion, Fu's height to Supamario's, is
+  ~x1.36 of the unit scale). The God Fist's files and sizes don't change.
 
-  | Effect | Size now (v2) |
+  | Effect | v3 size (v2) |
   |---|---|
-  | the orb | 4.9 (2.45): radius ~11.7, it surrounds him from his head |
-  | the charge flash | 1.225 (0.61) |
-  | the explosion | 3.5 (1.75) |
-  | the fist fire | 1.75 particles, 2.625 cone (unchanged) |
-  | the dive impact / the miss blast | 1.75 / 2.625 (unchanged) |
-  | the aura | its 7 bones' 0.4-0.8 x 1.75 (unchanged) |
+  | the orb (`Cor_Crg.emo`) | 6.3 (2.45): it surrounds him from his head |
+  | the charge particles (`Cor_Crg_Loop`) | 1.35 (1.05) |
+  | the charge flash | 1.575 (0.61) |
+  | the explosion | 4.5 (1.75) |
+  | the fist fire | 2.25 particles, 3.375 cone (1.75 / 2.625) |
+  | the wind, the dive impact, the flare | 2.25 (1.75) |
+  | the miss blast | 3.375 (2.625) |
+  | the aura | its 7 bones' 0.4-0.8 x 2.25: 0.9-1.8 (x 1.75) |
 
   Placements are unchanged: bone 0, at the same joints, unturned.
 - "the initial circle looks flat. It should cover around supamario like the auras": the first circle of the move is
@@ -1738,10 +1743,39 @@ special captures by other moves (Ganondorf's 0xB8 and the like, item captures).
   - a front and a back copy share the disc's UVs, colours and triangles, normals outward.
 
   Face-on it draws as XV2's disc did; he is inside it (the front half over him, the back half behind). Its centre is
-  where it was (his head; with the x1.75 radius it covers him). Facing-safe as before: the turn is baked into the
-  model, and the call is on bone 0, unturned.
+  where it was (his head; at x2.25 it covers him). Facing-safe as before: the turn is baked into the
+  model, and the call is on bone 0, unturned (its size 2.8 x 2.25 = 6.3).
 
-`supamario_godfist_test.py --all-models`: 0 problems.
+### The hitboxes (user: "I'd like for the hitboxes to match the adjustments")
+The hitboxes sized to an effect grow with it, by the effect's v3 scale over its v2 one, centred on the effect
+(`HB` in `tools/supamario_corebreaker_build.py`; Size as the ACMD's, bone 0):
+
+| Box | v2 | v3 | Why |
+|---|---|---|---|
+| the dive's catch (ID 0, on his fist) | 5.5 | 7.07 | the fist fire: 1.75 -> 2.25 |
+| the dive's body box (ID 1) | 4.5 | 4.5 | his body, not an effect |
+| the detection box | 2.5 | 2.5 | the user's "very small" box: not scaled |
+| the burn (4 hits on the held victim) | 7.0 | 9.0 | the hit loop: 1.75 -> 2.25; moved from the victim's middle (9, 3) onto the hit effect (6.24, 2.57), still round the victim |
+| the crash (on the stage) | 9.0 | 23.14 | the explosion: v2's halved 0.875 -> 2.25; at the explosion's place (6.26, 1.93) |
+| the explosion (off the stage) | 11.0 | 28.29 | the same ratio, at his fist (6.3, 3.1), where the effect plays |
+
+Preview: `hitboxes_on_effects.png` in the package (each box over its effect at its frame, both facings; grey: the v2
+size). The crash / explosion boxes are big (radius 23 / 28 units, about two and a half Supamarios): they hit
+bystanders round the explosion as the effect shows it.
+
+### The halos (on, both moves)
+After the halo test the user chose the weakest strength, then "the halo glow at 0.25 is too strong. Maybe reduce to
+0.16": `xv2_smash_fx.HALO_ALPHA` = **0.16**, size x2.5, built into v3 for **both moves** (the God Fist's effects
+change too: approved). `supamario_corebreaker_build.py` runs `supamario_halo_test.build` over the finished bank by
+default (`--no-halo` leaves them out); `halo_report.json` lists them: 113 glowing emitters, 9 companion sets, the
+three model halos, 63 calls added (attackdash 3, specialhi / specialairhi 30 each). The halo calls carry their
+effect's size, so Core Breaker's halos grow with CB_FX_SCALE. The bank: ptcl 4.16 MB.
+
+### Tests (v3 build, halos on)
+- `supamario_corebreaker_test.py`: everything above, plus every placement at CB_FX_SCALE, the orb shell, and the
+  hitbox sizes equal to `HB`;
+- `supamario_godfist_test.py --all-models`: 0 problems;
+- `msc_stack_check.py`: 0 stack problems.
 
 **Not confirmed in game:**
 - that `global26` (the hook the game's own special transitions read) refuses a third up special everywhere in the

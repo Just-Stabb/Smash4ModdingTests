@@ -285,10 +285,12 @@ def _place(face, y, z, size):
     return R @ T @ S
 
 
-def effect_previews(out_dir, fx, vbn, motion_pac, p):
+def effect_previews(out_dir, fx, vbn, motion_pac, p, name='effects_on_supamario.png', size_px=300, span=48.0):
     """each BAC effect at its frame and final size beside his pose, facing right and left (the side camera: screen x
     = world Z, his facing; the models through xv2_to_nud's renderer, the particles as each emitter's shape x colour at
-    its base size; no motion, no bloom: a size / place / colour check, not a render of the game)"""
+    its base size; no motion, no bloom: a size / place / colour check, not a render of the game). An entry's
+    'hitboxes' [(label, Z, Y, size, rgb)] (bone 0 offsets, as the ACMD's) are drawn over it as circles; 'title'
+    replaces the panel's caption"""
     import numpy as np
     from PIL import Image, ImageDraw
     import omo
@@ -296,7 +298,7 @@ def effect_previews(out_dir, fx, vbn, motion_pac, p):
     bones = omo.vbn_read(vbn)
     ents = dict(omo.pac_read(motion_pac))
     o = omo.Omo(ents[[n for n in ents if n.endswith('SpecialHi.omo') and 'Air' not in n][0]])
-    size_px, span, cy = 300, 48.0, 6.0
+    cy = 6.0
     bounds = ((-span / 2, cy - span / 2), span)
     tiles = []
     for x in fx:
@@ -363,8 +365,16 @@ def effect_previews(out_dir, fx, vbn, motion_pac, p):
                     continue
                 c = (255, 90, 80) if nme.startswith('R') else (90, 140, 255) if nme.startswith('L') else (235, 235, 235)
                 dr.line([P(w[bones[par][0]]), P(w[nme])], fill=c, width=2)
-            dr.text((4, 4), 'BAC effect %d at frame %d, facing %s' % (x['bac_effect'], f, 'right' if face > 0
-                                                                      else 'left'), fill=(255, 255, 140))
+            for lab, hz, hy, hr, hc in x.get('hitboxes', []):
+                px = (hz * face + span / 2) / span * size_px
+                py = size_px - (hy - (cy - span / 2)) / span * size_px
+                rr = hr / span * size_px
+                dr.ellipse([px - rr, py - rr, px + rr, py + rr], outline=tuple(hc), width=2)
+                dr.line([px - 3, py, px + 3, py], fill=tuple(hc))
+                dr.line([px, py - 3, px, py + 3], fill=tuple(hc))
+                dr.text((px - rr + 2, py - rr - 12 if py - rr > 16 else py + rr + 2), lab, fill=tuple(hc))
+            dr.text((4, 4), x.get('title', 'BAC effect %d' % x['bac_effect']) + ' at frame %d, facing %s' % (
+                f, 'right' if face > 0 else 'left'), fill=(255, 255, 140))
             dr.text((4, size_px - 14), 'panel %.0f units; Supamario ~12 tall' % span, fill=(170, 170, 170))
             row.append(im)
         tiles.append(row)
@@ -372,7 +382,7 @@ def effect_previews(out_dir, fx, vbn, motion_pac, p):
     for i, row in enumerate(tiles):
         for j, im in enumerate(row):
             W.paste(im, (((i % 2) * 2 + j) * size_px, (i // 2) * size_px))
-    W.save(os.path.join(out_dir, 'preview', 'effects_on_supamario.png'))
+    W.save(os.path.join(out_dir, 'preview', name))
 
 
 def main():
