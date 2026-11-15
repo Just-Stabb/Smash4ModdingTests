@@ -105,7 +105,7 @@ def _emp_of(set_name, names):
     return set_name + '.emp'
 
 
-def convert(skill_dir, effect_dir, out_dir, hdr='glare'):
+def convert(skill_dir, effect_dir, out_dir, hdr='glare', preview_dir=None):
     import efc
     import ptcl
     import xv2_to_ptcl
@@ -159,7 +159,8 @@ def convert(skill_dir, effect_dir, out_dir, hdr='glare'):
         folder = MODEL_PREFIX + name.split('_', 1)[1]
         FX.bake_model_turn(os.path.join(dst, 'model', folder), q)
         r = subprocess.run([sys.executable, '-I', os.path.join(HERE, 'xv2_to_nud.py'), 'verify',
-                            os.path.join(dst, 'model', folder), '--preview', os.path.join(out_dir, 'preview')],
+                            os.path.join(dst, 'model', folder), '--preview',
+                            preview_dir or os.path.join(out_dir, 'preview')],
                            capture_output=True, text=True)
         assert r.returncode == 0, (r.stdout + r.stderr)[-2000:]
         idx = e.add(0, folder)

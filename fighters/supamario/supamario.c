@@ -37150,18 +37150,18 @@ void func_2287()
     printf("stick x: %f dir stick x: %f dir mul: %f", WorkModuleF(0, 0x7000000), WorkModuleF(0, 0x7000001), WorkModuleF(0, 0x7000002));
     printf("fall x mul: %f accel y: %f", WorkModuleF(0, 0x7000005), WorkModuleF(0, 0x7000009));
     WorkModule(0x7, 0x10, 0x11000004);
-    func_2292();
+    cb_init();              // Core Breaker (up special; README "Core Breaker"): vanilla's func_2292 no longer called
     func_78(func_2288);
 }
 
 void func_2288()
 {
-    func_2293();
+    cb_update();            // Core Breaker (vanilla: func_2293)
 }
 
 void func_2289()
 {
-    
+    cb_end();               // Core Breaker: the victim let go if the move is cut short, armor / air cap off
 }
 
 void func_2290()
@@ -38322,4 +38322,566 @@ void gf_tick()
     {
         gf_release(t);
     }
+}
+
+// ===================================================================
+// Core Breaker (up special, status 0x154; Dragon Ball Xenoverse 2's 2070_FIT_COR, fighters/supamario/README.md "Core
+// Breaker"). tools/supamario_corebreaker_build.py replaces the CB_* names. His movement is set speeds (user: "The
+// animation movement should become speed values that are set"): the motion has no TransN; gravity is energy 1 (speed
+// 0x11, acceleration 0xf, limit 0x14, the Kamehameha's air stall's ops), his horizontal speed energy 3 (0x11, the
+// roll-off's; its air cap lifted for the dive: flag 0x20000044 and op 0x15 -1), so the game's own physics, landing,
+// walls, platforms and ledges apply. The phases (cb_ph, mirrored in New_Var CB_VAR for the scripts):
+//   0 the rise    crouch to CB_RISE_FROM, then up at CB_RISE_V slowing by CB_RISE_DECEL a frame (RISE_HEIGHT);
+//                 super armor
+//   1 the hover   from CB_HOVER_FROM: still (speed, gravity 0); he can turn (B-reverse, the stick back); no armor
+//   2 the dive    from CB_DIVE_FROM: CB_DIVE_V a frame, cb_ang below level (CB_DIVE_DEG, light homing within
+//                 CB_HOME_MAX of it, cb_steer); super armor; ledges grabbed (func_56); landing -> 5; the game script's
+//                 catch -> 3; CB_DIVE_MAX frames or below the height he started at (cb_sy - CB_FLOOR_MARGIN: no
+//                 height lost overall) -> FallSpecial
+//   3 the hold    the victim held at his fist (cb_hold: its offsets, hitstun, hitstop, no stage collision, controller
+//                 off), he goes CB_HOLD_RISE up; the game script's burn hits; to CB_DRIVE -> 4
+//   4 the drive   down CB_DRIVE_DEG at CB_DRIVE_V with it: landing -> 6; CB_DRIVE_MAX frames or the floor height
+//                 (off the stage) -> 7
+//   5 land miss   the landing blast (XV2 entry 5), CB_LAND_LAG frames of landing lag, then Wait
+//   6 the crash   on the ground: the game script's crash hit, the victim handed to gf_tick's put-down (God Fist v17:
+//                 DownWait on the stage, no tech) at CB_HANDOFF; he slides back CB_CRASH_BACK_V; Wait at the end
+//   7 air release (off the stage) the game script's KO explosion, the victim let go at once; FallSpecial at the end
+// To split the rise and the dive into two moves later: cb_rise_phase / cb_dive_phase are self-contained (their own
+// constants, their own speed setting); the dive's entry needs only cb_dive_start() (README "Splitting").
+int cb_ph;
+int cb_n;               // frames in the phase
+int cb_jump;            // a motion jump on its way (the target frame), 0 none
+float cb_sy;            // his height when the move started (the dive's floor)
+float cb_ang;           // the dive's angle below level (degrees)
+int cb_turned;
+int cb_slot;            // the victim's player slot (1-8), 0 none
+int cb_handed;          // the victim handed to gf_tick (6) / released (7)
+int cb_lifted;
+
+void cb_set_ph(int ph)
+{
+    cb_ph = ph;
+    cb_n = 0;
+    WorkModule(0, (float)ph, CB_VAR);
+}
+
+// the motion to frame `to` (forward) in one frame: the rate that reaches it, then 1 (the God Fist's jump); the scripts
+// run every command on the way, so their blocks are guarded by CB_VAR
+void cb_goto(float to)
+{
+    float fr;
+    fr = MotionModuleF(0x1);
+    if (to > fr + 0.5f)
+    {
+        MotionModule(0x4, to - fr);
+        cb_jump = (int)to;
+    }
+}
+
+void cb_jump_done()
+{
+    if (cb_jump != 0 && MotionModuleF(0x1) >= (float)cb_jump - 0.01f)
+    {
+        MotionModule(0x4, 1.0f);
+        cb_jump = 0;
+    }
+}
+
+// his speed: vx along his facing (energy 3, world X), vy up (energy 1, gravity's: no acceleration)
+void cb_speed(float vx, float vy)
+{
+    float face;
+    face = WorkModuleF(0, 0x0f000003);
+    KineticModule(0x11, 0x3, vx * face, 0.0f);
+    KineticModule(0x11, 0x1, vy);
+    KineticModule(0xf, 0x1, 0.0f);
+    KineticModule(0x14, 0x1, CB_FALL_LIMIT);
+}
+
+void cb_armor(int on)
+{
+    if (on == 0x1)
+    {
+        DamageModule(0xb, 0x1, 0.0f);
+    }
+    else
+    {
+        DamageModule(0xb, 0, 0.0f);
+    }
+}
+
+void cb_aircap(int off)
+{
+    if (off == 0x1)
+    {
+        WorkModule(0x2710, 0x20000044);
+        KineticModule(0x15, 0x3, -1.0f, -1.0f);
+    }
+    else
+    {
+        WorkModule(0x2711, 0x20000044);
+    }
+}
+
+void cb_init()
+{
+    cb_ph = 0;
+    cb_n = 0;
+    cb_jump = 0;
+    cb_turned = 0;
+    cb_slot = 0;
+    cb_handed = 0;
+    cb_lifted = 0;
+    cb_ang = CB_DIVE_DEG;
+    cb_sy = WorkModuleF(0, 0x0f000001);
+    WorkModule(0, 0.0f, CB_VAR);
+    if (global18 == 0)
+    {
+        KineticModule(0, 0x6);
+        func_22(WorkModule(0x6, 0x11000002), 0, 1.0f);
+    }
+    else
+    {
+        func_94();
+        KineticModule(0, 0);
+        func_22(WorkModule(0x6, 0x11000003), 0, 1.0f);
+        cb_speed(0.0f, 0.0f);
+        KineticModule(0x14, 0x1, 0.0f);
+    }
+    WorkModule(0x16, 0x1e00001e);
+    cb_armor(0x1);
+    SoundModule(0x2710, CB_SND_RISE);
+}
+
+// ---- the rise (phase 0) and the hover (phase 1)
+int cb_rise_phase(float fr)
+{
+    if (fr < CB_RISE_FROM)
+    {
+        if (global18 != 0)
+        {
+            cb_speed(0.0f, 0.0f);
+            KineticModule(0x14, 0x1, 0.0f);
+        }
+        return 0;
+    }
+    if (cb_lifted == 0)
+    {
+        cb_lifted = 0x1;
+        if (global18 == 0)
+        {
+            func_94();
+        }
+        KineticModule(0, 0);
+        KineticModule(0x11, 0x2, 0.0f, 0.0f);
+        cb_speed(CB_RISE_VX, CB_RISE_V);
+    }
+    else
+    {
+        KineticModule(0x11, 0x3, CB_RISE_VX * WorkModuleF(0, 0x0f000003), 0.0f);
+    }
+    KineticModule(0xf, 0x1, -CB_RISE_DECEL);
+    KineticModule(0x14, 0x1, CB_FALL_LIMIT);
+    if (fr >= CB_HOVER_FROM - 0.01f)
+    {
+        cb_set_ph(0x1);
+        cb_armor(0);
+        cb_speed(0.0f, 0.0f);
+        KineticModule(0x14, 0x1, 0.0f);
+        SoundModule(0x2710, CB_SND_CHARGE);
+    }
+    return 0;
+}
+
+int cb_hover_phase(float fr)
+{
+    cb_speed(0.0f, 0.0f);
+    KineticModule(0x14, 0x1, 0.0f);
+    // B-reverse (Q2 default): the stick held back once turns him
+    if (cb_turned == 0 && WorkModuleF(0, 0x0f000110) < -CB_TURN_STICK)
+    {
+        cb_turned = 0x1;
+        func_33();
+    }
+    if (cb_n == CB_RELEASE_SND_AT)
+    {
+        SoundModule(0x2710, CB_SND_RELEASE);
+    }
+    if (fr >= CB_DIVE_FROM - 0.01f)
+    {
+        cb_dive_start();
+    }
+    return 0;
+}
+
+// ---- the dive (phase 2)
+void cb_dive_start()
+{
+    cb_set_ph(0x2);
+    cb_ang = CB_DIVE_DEG;
+    cb_armor(0x1);
+    cb_aircap(0x1);
+    WorkModule(0x16, 0x1e00001f);           // ledges (func_56's term: 0x16 on)
+    SoundModule(0x2714, CB_SND_CHARGE);
+    SoundModule(0x2710, CB_SND_RUSH);
+    cb_dive_speed();
+}
+
+void cb_dive_speed()
+{
+    float r;
+    r = cb_ang * 0.01745329f;
+    cb_speed(CB_DIVE_V * MathF(0x4, r), -CB_DIVE_V * MathF(0x5, r));
+    KineticModule(0x15, 0x3, -1.0f, -1.0f);
+}
+
+// XV2's homing (entry 3), light (user: "The homing should be fixed and light for the dive part of the move"): toward
+// the nearest fighter ahead of and below him within CB_HOME_RANGE, within CB_HOME_CONE of the dive's line, the angle
+// turned at most CB_HOME_TURN a frame and kept within CB_HOME_MAX of CB_DIVE_DEG
+void cb_steer()
+{
+    int s;
+    float x;
+    float y;
+    float face;
+    float dx;
+    float dy;
+    float d2;
+    float bd;
+    float ta;
+    float best;
+    float st;
+    x = WorkModuleF(0, 0x0f000000);
+    y = WorkModuleF(0, 0x0f000001);
+    face = WorkModuleF(0, 0x0f000003);
+    best = -1.0f;
+    bd = 0.0f;
+    s = 1;
+    while (s <= 8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f)
+        {
+            dx = (WorkModuleF(0, 0x0f000020 + 4 * (s - 1)) - x) * face;
+            dy = WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) - y;
+            d2 = dx * dx + dy * dy;
+            st = WorkModuleF(0, 0x0f0000a2 + 8 * (s + 2));
+            if (dx > 0.0f && dy < 0.0f && d2 <= CB_HOME_D2 && (st < CB_DOWN_LO || st > CB_DOWN_HI))
+            {
+                ta = MathF(0x1, -dy, dx) * 57.29578f;
+                if (ta > cb_ang - CB_HOME_CONE && ta < cb_ang + CB_HOME_CONE && (best < 0.0f || d2 < bd))
+                {
+                    best = ta;
+                    bd = d2;
+                }
+            }
+        }
+        s = s + 1;
+    }
+    if (best < 0.0f)
+    {
+        return;
+    }
+    if (best > cb_ang + CB_HOME_TURN)
+    {
+        best = cb_ang + CB_HOME_TURN;
+    }
+    if (best < cb_ang - CB_HOME_TURN)
+    {
+        best = cb_ang - CB_HOME_TURN;
+    }
+    if (best > CB_DIVE_DEG + CB_HOME_MAX)
+    {
+        best = CB_DIVE_DEG + CB_HOME_MAX;
+    }
+    if (best < CB_DIVE_DEG - CB_HOME_MAX)
+    {
+        best = CB_DIVE_DEG - CB_HOME_MAX;
+    }
+    cb_ang = best;
+}
+
+int cb_dive_phase(float fr)
+{
+    if (func_56() == 0x1)
+    {
+        cb_end();
+        return 0x1;
+    }
+    if (WorkModuleF(0, CB_VAR) > 2.5f && WorkModuleF(0, CB_VAR) < 3.5f)
+    {
+        cb_catch();
+        return 0;
+    }
+    if (global18 == 0)
+    {
+        cb_land_miss();
+        return 0;
+    }
+    if (cb_n >= CB_DIVE_MAX || WorkModuleF(0, 0x0f000001) < cb_sy - CB_FLOOR_MARGIN)
+    {
+        cb_fall_special();
+        return 0x1;
+    }
+    cb_steer();
+    cb_dive_speed();
+    return 0;
+}
+
+void cb_fall_special()
+{
+    float face;
+    face = WorkModuleF(0, 0x0f000003);
+    SoundModule(0x2714, CB_SND_RUSH);
+    cb_armor(0);
+    cb_aircap(0);
+    KineticModule(0, 0);
+    KineticModule(0x11, 0x3, CB_FALL_VX * face, 0.0f);
+    func_16(0x10, 0);
+}
+
+void cb_land_miss()
+{
+    cb_set_ph(0x5);
+    SoundModule(0x2714, CB_SND_RUSH);
+    cb_armor(0);
+    cb_aircap(0);
+    func_101();
+    KineticModule(0x11, 0x3, 0.0f, 0.0f);
+    MotionModule(0x4, 1.0f);
+    cb_goto(CB_LAND);
+}
+
+// ---- the catch, the hold (phase 3) and the drive (phase 4): the victim through its player slot's variables
+// (docs/position-variables.md), as gf_tick reaches the God Fist's: never its rotation (no lean: nothing to turn back)
+int cb_t()
+{
+    return cb_slot + 0x2;
+}
+
+void cb_hold(float ox, float oy)
+{
+    int t;
+    t = cb_t();
+    WorkModule(0, ox, 0x0F000045 + 8 * t);
+    WorkModule(0, oy, 0x0F000046 + 8 * t);
+    WorkModule(0, CB_HOLD_HITSTUN, 0x0F000040 + 8 * t);
+    WorkModule(0, 2.0f, 0x0F000044 + 8 * t);
+    WorkModule(0, 0.0f, 0x0F0000A6 + 8 * t);
+    WorkModule(0, 1.0f, 0x0F000115 + 0x20 * t);
+}
+
+void cb_release()
+{
+    int t;
+    if (cb_slot < 1 || cb_slot > 8 || cb_handed != 0)
+    {
+        return;
+    }
+    t = cb_t();
+    WorkModule(0, 5.0f, 0x0F0000A6 + 8 * t);
+    WorkModule(0, 0.0f, 0x0F000115 + 0x20 * t);
+    cb_handed = 0x1;
+}
+
+void cb_catch()
+{
+    int old;
+    cb_slot = WorkModule(0x6, CB_V_SLOT);
+    if (cb_slot < 1 || cb_slot > 8)
+    {
+        cb_slot = 0;
+        WorkModule(0, 2.0f, CB_VAR);
+        return;
+    }
+    // a God Fist / Core Breaker victim still held down by gf_tick (another fighter): let go first
+    old = WorkModule(0x6, GF_V_SLOT);
+    if (WorkModuleF(0, GF_V_PHASE) > 0.5f && old != cb_slot)
+    {
+        gf_release(old + 0x2);
+    }
+    cb_set_ph(0x3);
+    SoundModule(0x2714, CB_SND_RUSH);
+    cb_armor(0);
+    cb_aircap(0);
+    cb_speed(0.0f, CB_HOLD_RISE_V);
+    KineticModule(0x14, 0x1, 0.0f);
+    MotionModule(0x4, 1.0f);
+    cb_goto(CB_HOLD);
+    cb_hold(CB_HOLD_X, CB_HOLD_Y);
+}
+
+int cb_hold_phase(float fr)
+{
+    if (cb_n < CB_HOLD_RISE_N)
+    {
+        cb_speed(0.0f, CB_HOLD_RISE_V);
+    }
+    else
+    {
+        cb_speed(0.0f, 0.0f);
+    }
+    KineticModule(0x14, 0x1, 0.0f);
+    cb_hold(CB_HOLD_X, CB_HOLD_Y);
+    if (fr >= CB_DRIVE - 0.01f && cb_jump == 0)
+    {
+        cb_set_ph(0x4);
+        cb_drive_speed();
+    }
+    return 0;
+}
+
+void cb_drive_speed()
+{
+    cb_speed(CB_DRIVE_V * CB_DRIVE_COS, -CB_DRIVE_V * CB_DRIVE_SIN);
+    KineticModule(0x15, 0x3, -1.0f, -1.0f);
+    cb_aircap(0x1);
+}
+
+int cb_drive_phase(float fr)
+{
+    cb_hold(CB_HOLD_X, CB_HOLD_Y);
+    if (global18 == 0)
+    {
+        cb_set_ph(0x6);
+        cb_aircap(0);
+        func_101();
+        KineticModule(0x11, 0x3, -CB_CRASH_BACK_V * WorkModuleF(0, 0x0f000003), 0.0f);
+        MotionModule(0x4, 1.0f);
+        cb_goto(CB_CRASH);
+        cb_hold(CB_CRASH_X, 0.0f);
+        SoundModule(0x2710, CB_SND_EXPLOSION);
+        return 0;
+    }
+    if (cb_n >= CB_DRIVE_MAX || WorkModuleF(0, 0x0f000001) < cb_sy - CB_FLOOR_MARGIN)
+    {
+        cb_set_ph(0x7);
+        cb_aircap(0);
+        cb_speed(0.0f, 0.0f);
+        KineticModule(0x14, 0x1, 0.0f);
+        MotionModule(0x4, 1.0f);
+        cb_goto(CB_AIRREL);
+        SoundModule(0x2710, CB_SND_EXPLOSION);
+        return 0;
+    }
+    cb_drive_speed();
+    return 0;
+}
+
+// ---- the crash (phase 6): the God Fist's down for the victim (gf_tick phase 5, v17: put down on the stage, no tech;
+// off the edge it falls); an earlier God Fist / Core Breaker victim was let go at the catch
+int cb_crash_phase(float fr)
+{
+    int t;
+    if (cb_handed == 0)
+    {
+        if (fr < CB_HANDOFF)
+        {
+            cb_hold(CB_CRASH_X, 0.0f);
+        }
+        else
+        {
+            t = cb_t();
+            WorkModule(0, (float)cb_slot, GF_V_SLOT);
+            WorkModule(0, (float)cb_slot, GF_V_LOCK);
+            WorkModule(0, CB_FALL_WAIT, GF_V_CNT);
+            WorkModule(0, 5.0f, GF_V_PHASE);
+            cb_handed = 0x1;
+            SoundModule(0x2710, CB_SND_DOWN);
+        }
+    }
+    if (fr >= CB_CRASH_END - 0.01f || MotionModule(0x2712) == 0x1)
+    {
+        func_16(0, 0);
+        return 0x1;
+    }
+    return 0;
+}
+
+// ---- off the stage (phase 7): the KO explosion (the game script, at CB_AIRREL + 1), the victim let go then; he
+// stays in place to the end, then FallSpecial (no infinite recovery)
+int cb_airrel_phase(float fr)
+{
+    cb_speed(0.0f, 0.0f);
+    KineticModule(0x14, 0x1, 0.0f);
+    if (fr < CB_AIRREL + 0.5f)
+    {
+        cb_hold(CB_HOLD_X, CB_HOLD_Y);
+    }
+    else
+    {
+        cb_release();
+    }
+    if (fr >= CB_AIRREL_END - 0.01f || MotionModule(0x2712) == 0x1)
+    {
+        cb_fall_special();
+        return 0x1;
+    }
+    return 0;
+}
+
+int cb_land_phase(float fr)
+{
+    if (fr >= CB_LAND_END - 0.01f || MotionModule(0x2712) == 0x1)
+    {
+        func_16(0, 0);
+        return 0x1;
+    }
+    return 0;
+}
+
+int cb_update()
+{
+    float fr;
+    int r;
+    cb_jump_done();
+    fr = MotionModuleF(0x1);
+    cb_n = cb_n + 1;
+    r = 0;
+    if (cb_ph == 0)
+    {
+        r = cb_rise_phase(fr);
+    }
+    else if (cb_ph == 0x1)
+    {
+        r = cb_hover_phase(fr);
+    }
+    else if (cb_ph == 0x2)
+    {
+        r = cb_dive_phase(fr);
+    }
+    else if (cb_ph == 0x3)
+    {
+        r = cb_hold_phase(fr);
+    }
+    else if (cb_ph == 0x4)
+    {
+        r = cb_drive_phase(fr);
+    }
+    else if (cb_ph == 0x5)
+    {
+        r = cb_land_phase(fr);
+    }
+    else if (cb_ph == 0x6)
+    {
+        r = cb_crash_phase(fr);
+    }
+    else if (cb_ph == 0x7)
+    {
+        r = cb_airrel_phase(fr);
+    }
+    return r;
+}
+
+void cb_end()
+{
+    if (cb_ph >= 0x3 && cb_ph != 0x5)
+    {
+        cb_release();
+    }
+    cb_armor(0);
+    cb_aircap(0);
+    SoundModule(0x2714, CB_SND_RUSH);
+    SoundModule(0x2714, CB_SND_CHARGE);
+    cb_ph = 0;
+    WorkModule(0, 0.0f, CB_VAR);
 }

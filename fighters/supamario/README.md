@@ -1397,7 +1397,7 @@ GlareCol / 1.5. The hue is kept, they never go below v17's 2.0, and they never g
 The user is asked to report where the glow appears and any purple. The aura stays at 2.5: it's an opaque-ish mesh
 like fix 23's, and there's no evidence it's safe to raise.
 
-## Core Breaker (up special): phase 1, the XV2 skill read and converted (not built, not packaged)
+## Core Breaker (up special): phase 1, the XV2 skill read and converted
 
 User: put Xenoverse 2's **Core Breaker** (Fu's Ultimate, skill folder `2070_FIT_COR`) on his up special, the way the
 Super God Fist went on his dash attack. Phase 1 reads the skill, converts its animation and effects and proposes the
@@ -1468,3 +1468,88 @@ The BAC's item frames are the skill EAN's own frames (an entry starts at its ani
 - `tools/supamario_corebreaker_test.py`: the facing rule, the HDR cap, the sizes, the motion (0 problems).
 - `tools/xv2vfx.py`: reads CBIND containers (ECF colour fades, kept as bytes) and EMP headers with +0xA set (XV2-Tools
   never reads it). `tools/xv2bac.py`: an EEPK type it has no name for printed as a number.
+
+## Core Breaker v1 (`supamario_corebreaker_v1.zip`): the up special
+
+Install over Super God Fist v17, exe B (`exe_v46i`, no exe change). Not tested in game. Built by
+`tools/supamario_corebreaker_build.py` (it runs the God Fist's build first: the dash attack's files are v17's byte for
+byte except what the two moves share: the motion pacs, the four ACMD files, the MSC, the effect bank, the sound bank and
+the soundlabeltable, where only SpecialHi / SpecialAirHi, specialhi / specialairhi, func_2287-2289 and new entries
+change).
+
+### The user's answers, and the defaults used where there was none
+| | |
+|---|---|
+| Movement | "The animation movement should become speed values that are set": the motion has no TransN; the MSC sets his speeds every phase (gravity energy 1: speed / acceleration / limit, the Kamehameha's ops; energy 3 for along his facing), so landing, walls, platforms and ledges are the game's. |
+| Homing | "fixed and light for the dive part": 48 degrees, bent at most 10 degrees (1.5 a frame) toward a fighter ahead of and below him within 50, inside a 30-degree cone; none in the rise or hover. |
+| Off-stage hit | "a catch into a multihit that then explodes and can KO": the hold's 4 burn hits, then the drive; with no ground before the drive's end (30 frames, or his start height) the explosion in the air: 17%, angle 40, BKB 30, KBG 60. Mario-weight near the ledge: knockback 120 from ~75% (their % before the move); 0%: 62, 50%: 102, 100%: 142. |
+| Armor | "armor the rise and armor during the dive, but no armor during the hover": super armor (DamageModule 0xB type 1) frames 0-29 and from the dive's first frame; off for the hover, at a catch, a landing and the status end. |
+| Landing lag | "very long": 60 frames (XV2's own landing, entry 5, 59 frames). |
+| Damage | "26%": catch 3% + 4 x 1.5% burn + 17% crash or explosion, both endings. |
+| Q1 rise (default) | ~55 units (XV2's 10.9 m; vanilla Super Jump Punch ~45): speed 4.66 slowing by 0.19 a frame over 24 frames. |
+| Q2 hover (default) | 30 frames; the stick back turns him (B-reverse). |
+| Q4 dive off the stage (default) | the dive (and the drive) never go below the height he started the move from (less 3): no height lost overall. With no ground by then (or after 40 frames) he goes into FallSpecial. This stands in for "only dive with ground in reach" (no ground probe is used: GroundModule(0xC)'s isn't verified here). |
+| Q5 (default) | the dive is a catch plus its small hit (3%); the miss's landing blast does no damage. |
+| Q6 on the stage (default) | the God Fist's ending: put down into DownWait on the stage by gf_tick (v17, no tech), the slide, no KO. |
+| Q9 rest (default) | FallSpecial after an off-stage ending or a spent dive; ledges grabbed during the dive (not while carrying the victim). |
+| Q10 (default) | the explosion and the charge orb / its flash at half the x1.75 scale. |
+
+### The move, frame by frame (motion frames; the motion plays straight through, the MSC only jumps forward)
+| Frames | Phase (`cb`) | What |
+|---|---|---|
+| 0-5 | 0 | crouch (ground: still; air: held in place), armor |
+| 6-29 | 0 | the rise: lift-off, up 4.66 a frame slowing 0.19 a frame, 0.4 forward; armor |
+| 30-59 | 1 | the hover: still (speed, gravity 0), no armor, B-reverse; Ki_Rservoir at 30, Ki_Rlease at 40 |
+| 60-103 | 2 | the dive: 7.49 a frame at 48 degrees (+-10 homing), armor, air cap lifted, ledges; the catch box (3%) on his fist and body; Rush |
+| 104-163 | 5 | a miss landed: the landing blast, 60 frames, then Wait |
+| 164-199 | 3 | caught: invincible; the victim at his fist (its feet 9 ahead, 2 below him), held (hitstun / hitstop each frame, no stage collision, controller off); he rises 10 over 6 frames; burn hits at 168 / 176 / 184 / 192 |
+| 200-237 | 4 | the drive: 6.41 a frame at 45 degrees with the victim |
+| 238-305 | 6 | landed: the crash (17%, a flinch) at 239; at 241 the victim to gf_tick (gf_phase 5: put down, the slide); he slides back 1.6 a frame (friction stops it); Wait at 305 |
+| 306-349 | 7 | off the stage: the explosion (17%, KO) at 307, the victim let go there (stage collision back, controller on); he stays in place, FallSpecial at 349 |
+
+### How (files)
+- `supamario.c`: `cb_*` (end of the file; func_2287 / func_2288 / func_2289, the vanilla SpecialHi main / loop / end,
+  call cb_init / cb_update / cb_end). Each phase is its own function with its own constants (`CB_*` from
+  `supamario_corebreaker_build.msc_values()`, also in `supamario_kame_build.py --msc-only`). The victim goes through its
+  player slot's variables, never its rotation (no lean: nothing to turn back). New_Var slots 0x20-0x22 (`cb`, `cb_slot`,
+  `cb_tmp`); 9 new globals (98 of 128).
+- `tools/supamario_corebreaker_anim.py`: the motion (350 frames, TransN 0; the dive and the drive loops written out
+  twice). `tools/supamario_corebreaker_fx.py` + `tools/xv2_smash_fx.py`: the effects onto the God Fist's bank (HDR from
+  each material's glare, capped at `xv2_smash_fx.HDR_CAP` = 2.0: one constant for the glow test's pick).
+- The game script: the catch every dive frame (Hit_Check kinds 2, not lying, not invincible; a refused hit ends the
+  checks), the burn / crash / explosion hits guarded by `cb` (the motion jumps run the commands on the way). The
+  effect script: the BAC's effects at their frames on bone 0 (up / forward offsets, no turn) or on his body bones (the
+  aura), guarded the same way, the loops terminated as their part ends. The sound script is empty: the MSC plays them
+  (the Kamehameha's test 25).
+- Sounds (`CB_SE`): the skill's bank `CAR_BTL_U2070_COR_SE.acb` (cues 1 Rise, 2 Ki_Rservoir (cut to 50 frames with a
+  10-frame fade), 3 Ki_Rlease, 4 Rush, 5 Explosion; cue 6 is "Stop_4_Rush": the MSC stops Rush) and CMN cue 52 Hit_L,
+  levelled to -0.5 dBFS peak as the God Fist's: sound ids 0x0CB10092-0x0CB10097. Down at the hand-off is the God Fist's
+  (0x0CB10090).
+- The bank: ptcl 3.09 -> 3.89 MB (20 sets `PtcSupamarioCb*`), models `EffSupamarioCbCrg` / `EffSupamarioCbFire`
+  (textures 0x15141C00 / 0x15141C10).
+- No new motion or script slots (SpecialHi / SpecialAirHi replaced): ModAnimNames.txt unchanged.
+
+### Splitting the rise and the dive later
+The rise (cb_rise_phase, CB_RISE_*) and the hover end in `cb_dive_start()`, the only way into the dive; the dive and
+everything after it (catch, hold, drive, crash, explosion) don't read anything the rise set except `cb_sy` (the start
+height, the dive's floor) and the facing. To make two moves: keep phases 0-1 in SpecialHi ending in FallSpecial (or a
+new hover-end), and call `cb_init`'s reset + `cb_dive_start()` from the other move's status (e.g. down special in the
+air), with that move's motion holding the dive / land / hold / drive / crash / release segments (the frame constants
+are the segments' starts: `supamario_corebreaker_build.SEG`).
+
+### Tests
+- `tools/supamario_corebreaker_test.py OUT MODEL_VBN`: the compiled MSC in the interpreter with a physics model (the
+  rise's height and armor, the hover, the dive's speed / angle / armor / air cap, homing (only ahead and below, its
+  turn rate and limit), a miss landing (60 frames, Wait), a dive off the stage (no lower than the start, FallSpecial),
+  the B-reverse, a catch on the stage (hold, drive, crash, the hand-off to gf_tick), a catch off the stage (the
+  explosion, the victim let go, FallSpecial), cut mid-hold (let go), an earlier God Fist victim let go at the catch),
+  the scripts' damage (26 both ways), TransN 0, the effects' facing and HDR cap: 0 problems.
+- `supamario_godfist_test.py --all-models` on this build: 0 problems (it now finds gf_tick by its place in
+  supamario.c: the cb functions come after it). `msc_stack_check`: 0 of 2355. `msc_fingerprint` vs v17: only
+  func_2287 / func_2288 / func_2289 differ (+27 functions).
+- `port_check` doesn't apply (not an Ultimate port).
+
+**Not confirmed in game:** that op 0x11 on energy 3 with the air cap lifted (flag 0x20000044, op 0x15 -1) holds 7.5 a
+frame in the air (the roll-off's ops; the air one untested); that the status lands him (global18 0) and func_56 grabs
+ledges with these kinetics; the rise's exact height (+-2: when the game adds the acceleration); the crash's 1.6
+slide (Mario's ground friction assumed 0.08); the victim's place at his fist for big / small fighters.

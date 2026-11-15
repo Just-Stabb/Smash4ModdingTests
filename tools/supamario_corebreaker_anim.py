@@ -39,24 +39,27 @@ import omo  # noqa: E402
 import xv2ean as X  # noqa: E402
 
 SCALE = 5.04                # metres -> units: the God Fist's (Mario's hip-to-foot 3.93 / XV2's pelvis-to-foot 0.78)
-RISE_HEIGHT = 54.8          # his rise in units (XV2: 10.88 m x 5.04; vanilla Super Jump Punch ~44.8): proposal
-ROOT_IN_MOTION = True       # the rise in TransN (vanilla SpecialHi moves him by its motion, in the air too);
-                            # False: TransN 0, the MSC moves him by ROOT_TABLE (God Fist v16's way)
+RISE_HEIGHT = 54.8          # his rise in units (XV2: 10.88 m x 5.04; vanilla Super Jump Punch ~44.8): the MSC's speeds
+ROOT_IN_MOTION = False      # phase 2 (user: "The animation movement should become speed values that are set"): TransN 0
+                            # on every frame; the MSC sets his speeds (supamario.c cb_*). True: phase 1's TransN rise
 
 # (name, EAN animation, source start, source end, output frames, loop, root (y scale, z scale) or None, ground)
-# ground: the lower foot put on the floor (frames he stands on the stage)
+# ground: the lower foot put on the floor (frames he stands on the stage). The loops (the dive, the drive with the
+# victim) are written out twice so the motion plays straight through them (the MSC only ever jumps forward)
 SEGMENTS = [
-    ('crouch',     0,   0,  10,  6, False, (1.0, 1.0), True),    # XV2 0-9 (x1.7)
-    ('rise',       0,  10,  40, 24, False, (1.0, 1.0), False),   # the launch and the apex (x1.25)
-    ('charge',     0,  40, 110, 10, False, None, False),         # XV2's 70-frame charge (x7: the pose barely moves)
-    ('flare',      0, 110, 168, 20, False, None, False),         # the flare, the turn, the wind-up (x2.9)
-    ('dive',       0, 168, 176,  6, False, None, False),         # into the dive pose
-    ('dive_loop',  0, 176, 195, 19, True, None, False),          # the dive (looped until the ground / a catch / time)
-    ('land_miss',  0, 196, 255, 40, False, None, True),          # entry 5: the landing after a miss (x1.5)
-    ('grab_hold',  1, 195, 281, 36, False, None, False),         # entry 10: the victim held at his chest (x2.4)
-    ('grab_dive',  0, 174, 193, 19, True, None, False),          # entry 10 from 286: the dive with it (looped)
-    ('crash',      1, 290, 426, 68, False, (0.0, 0.5), True),    # entry 12: the crash, a slide back (x0.5), stand
-    ('air_release', 0, 190, 255, 44, False, None, False),        # entry 13: the release in the air (timeout)
+    ('crouch',      0,   0,  10,  6, False, None, True),          # XV2 0-9 (x1.7)
+    ('rise',        0,  10,  40, 24, False, None, False),         # the launch and the apex (x1.25)
+    ('charge',      0,  40, 110, 10, False, None, False),         # XV2's 70-frame charge (x7: the pose barely moves)
+    ('flare',       0, 110, 168, 20, False, None, False),         # the flare, the turn, the wind-up (x2.9)
+    ('dive',        0, 168, 176,  6, False, None, False),         # into the dive pose
+    ('dive_loop',   0, 176, 195, 19, True, None, False),          # the dive (XV2 loops 176-195)
+    ('dive_loop2',  0, 176, 195, 19, True, None, False),
+    ('land_miss',   0, 196, 255, 60, False, None, True),          # entry 5: the landing after a miss (1:1, the lag)
+    ('grab_hold',   1, 195, 281, 36, False, None, False),         # entry 10: the victim held at his fist (x2.4)
+    ('grab_dive',   0, 174, 193, 19, True, None, False),          # entry 10 from 286: the drive with it (looped)
+    ('grab_dive2',  0, 174, 193, 19, True, None, False),
+    ('crash',       1, 290, 426, 68, False, None, True),          # entry 12: the crash, the slide back, standing (x2)
+    ('air_release', 0, 190, 255, 44, False, None, False),         # entry 13: the release in the air (x1.5)
 ]
 FLOOR = {'HeadN': 3.0, 'LHandN': 1.0, 'RHandN': 1.0, 'LFootJ': 1.3, 'RFootJ': 1.3, 'LToeN': 0.4, 'RToeN': 0.4,
          'LKneeJ': 1.5, 'RKneeJ': 1.5}

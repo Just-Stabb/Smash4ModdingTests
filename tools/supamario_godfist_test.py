@@ -868,6 +868,15 @@ class Acmd:
             self.vars[var] = val
 
 
+def funcs_after(name):
+    """how many functions fighters/supamario/supamario.c defines after `name` (gf_tick was the last one until Core
+    Breaker's cb_* came after it): the compiled scripts are numbered in the order they are defined"""
+    import re
+    src = open(os.path.join(HERE, '..', 'fighters', 'supamario', 'supamario.c')).read()
+    names = [m.group(2) for m in re.finditer(r'^(int|void|float|bool)\s+(\w+)\s*\([^;]*$', src, re.M)]
+    return len(names) - 1 - names.index(name)
+
+
 class MscTick:
     """the compiled gf_tick (the MSC's per-frame hook calls it every frame, every status), run on the game
     script's New_Vars (a.vars) and the victim / his status through the variables it reads and writes"""
@@ -877,7 +886,7 @@ class MscTick:
         self.a = a
         self.vm = R.VM(self.PATH)
         self.vm.game = self
-        self.fn = self.vm.func(len(self.vm.m.scripts) - 1)     # gf_tick: the last function
+        self.fn = self.vm.func(len(self.vm.m.scripts) - 1 - funcs_after('gf_tick'))     # gf_tick
 
     def var(self, i):
         a, v = self.a, self.a.v
