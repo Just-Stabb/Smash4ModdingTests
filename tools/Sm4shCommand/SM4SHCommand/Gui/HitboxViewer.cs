@@ -116,6 +116,10 @@ namespace Sm4shCommand.GUI
             this.getScript = getScript;
             this.getEffect = getEffect;
             library = new EffectLibrary(assets.Root) { CommonName = CommonEffectName };
+            // v1.6.1: the common effects' bank: the folder picked before (Common effects..), else the game's
+            // data/effect/common found above the fighter's folder
+            library.CommonFolder = EffectLibrary.CommonFolderIn(Runtime.GetSettingText("ViewerCommonEffects", "")) ??
+                                   EffectLibrary.FindCommonFolder(assets.Root);
             view.EffectLabel = EffectLabel;
             view.GetEffectAssets = library.AssetsFor;
             view.GetTrailTexture = library.TrailTexture;
@@ -151,7 +155,7 @@ namespace Sm4shCommand.GUI
         /// <summary>The game script this viewer is for (and the editor whose edits it follows): the
         /// main window calls this again when another script's tab is picked. Shows the script's own
         /// animation; with none known, the animation list says (none).</summary>
-        public void ShowScript(uint crc, ITS_EDITOR scriptEditor, string title) { ShowScript(crc, scriptEditor, title, effectEditor); }
+        public void ShowScript(uint crc, ITS_EDITOR scriptEditor, string title) { ShowScript(crc, scriptEditor, title, null); }
 
         /// <summary>v1.5.0: with the tab's effect editor, whose edits the effects follow.</summary>
         public void ShowScript(uint crc, ITS_EDITOR scriptEditor, string title, ITS_EDITOR fxEditor)
@@ -176,6 +180,18 @@ namespace Sm4shCommand.GUI
         /// picked through another animation).</summary>
         public uint ScriptCrc { get { return scriptCrc; } }
         public ITS_EDITOR Editor { get { return editor; } }
+        /// <summary>v1.6.1: the effect editor whose edits the effects follow (the open tab's), or null.</summary>
+        public ITS_EDITOR EffectEditorShown { get { return effectEditor; } }
+        /// <summary>v1.6.1: the shown script's game / effect commands as the viewer runs them (tests).</summary>
+        public IList<ICommand> ShownGameCommands(out string error) { return CurrentCommands(out error); }
+        public IList<ICommand> ShownEffectCommands(out string error) { return EffectCommands(out error); }
+        public uint ShownCrc { get { return currentCrc; } }
+        public void PickAnimation(string anim)
+        {
+            int i = animBox.Items.IndexOf(anim);
+            animBox.SelectedIndex = i >= 0 ? i : 0;
+        }
+        public EffectLibrary Library { get { return library; } }
         public FighterAssets Assets { get { return assets; } }
 
         void Editor_TextChanged(object sender, EventArgs e) { editTimer.Stop(); editTimer.Start(); }
@@ -188,7 +204,7 @@ namespace Sm4shCommand.GUI
             var list = assets.ScriptsFor(anim);
             if (list.Contains(scriptCrc) || anim == assets.AnimationFor(scriptCrc)) return scriptCrc;
             foreach (var crc in list)
-                if (getScript(crc) != null) return crc;
+                if (getScript(crc) != null || (getEffect != null && getEffect(crc) != null)) return crc;
             return 0;
         }
 
@@ -225,6 +241,26 @@ namespace Sm4shCommand.GUI
             var sb = new System.Text.StringBuilder();
             foreach (char c in (name ?? "").ToLowerInvariant()) if (char.IsLetterOrDigit(c)) sb.Append(c);
             return sb.ToString();
+        }
+
+        /// <summary>v1.6.1: the folder with the common effects (the game's data/effect/common: common.010d0000.efc / .ptcl /
+        /// model / trail), remembered in Sm4shCommand.ini.</summary>
+        void PickCommonEffects()
+        {
+            using (var dlg = new FolderBrowserDialog { Description = "The common effects folder: the game's data\\effect\\common (common.010d0000.efc and .ptcl), or a folder above it" })
+            {
+                if (library.CommonFolder != null) dlg.SelectedPath = library.CommonFolder;
+                if (dlg.ShowDialog(this) != DialogResult.OK) return;
+                string dir = EffectLibrary.CommonFolderIn(dlg.SelectedPath);
+                if (dir == null)
+                {
+                    MessageBox.Show(this, "No common.010d0000.efc there (or in its effect\\common).", "Common effects", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                Runtime.SetSettingText("ViewerCommonEffects", dir);
+                library.CommonFolder = dir;
+                Rerun();
+            }
         }
 
         void PickEnemy()
@@ -370,8 +406,11 @@ namespace Sm4shCommand.GUI
             meshes.Click += (o, e) => PickMeshes();
             var enemyButton = new Button { Text = "Enemy model..", AutoSize = true };
             enemyButton.Click += (o, e) => PickEnemy();
+            var commonButton = new Button { Text = "Common effects..", AutoSize = true };
+            commonButton.Click += (o, e) => PickCommonEffects();
             tools.Controls.Add(meshes);
             tools.Controls.Add(enemyButton);
+            tools.Controls.Add(commonButton);
         }
 
         void PickMeshes()
@@ -388,34 +427,44 @@ namespace Sm4shCommand.GUI
             }
         }
 
-        IList<ICommand> CurrentCommands(out string error)
+        /// <summary>The game script for the shown script (ScriptCommands: the open tab's game editor, else game.bin's).</summary>
+        IList<ICommand> CurrentCommands(out string error) { return ScriptCommands(getScript, editor, out error); }
+
+        /// <summary>
+        /// v1.6.1: one rule for the game script (hitboxes) and the effect script (effects): the shown script is the open
+        /// tab's while its animation is shown (the editor's text, compiled as you type; a compile error falls back to the
+        /// saved script and says why), else the saved file's script of the animation picked here (getScript / getEffect:
+        /// the open file in the main window, else the file on disk next to it).
+        /// </summary>
+        IList<ICommand> ScriptCommands(Func<uint, IList<ICommand>> saved, ITS_EDITOR open, out string error)
+        {
+            return PickCommands(currentCrc, scriptCrc, saved, open != null ? (Func<IList<string>>)(() => open.Lines) : null, out error);
+        }
+
+        /// <summary>The rule itself (static, for tests): shown = the animation shown, tab = the open tab's script, lines =
+        /// the tab's editor text for this kind (null: no editor).</summary>
+        public static IList<ICommand> PickCommands(uint shown, uint tab, Func<uint, IList<ICommand>> saved, Func<IList<string>> lines, out string error)
         {
             error = null;
-            if (currentCrc == 0) return null;
-            if (currentCrc != scriptCrc) return getScript(currentCrc);
-            if (editor != null)
+            if (shown == 0) return null;
+            if (shown == tab && lines != null)
             {
                 // a preview compile while typing: New_Var names typed half-way (c, ch, cha, ...) mustn't take slots
                 var names = SALT.Moveset.FighterVariable.SaveNewVars();
                 try
                 {
-                    var lines = ACMDCompiler.StripComments(editor.Lines.ToArray());
-                    return ACMDCompiler.CompileCommands(lines.ToArray()).Cast<ICommand>().ToList();
+                    var stripped = ACMDCompiler.StripComments(lines().ToArray());
+                    return ACMDCompiler.CompileCommands(stripped.ToArray()).Cast<ICommand>().ToList();
                 }
-                catch (Exception ex)
-                {
-                    error = ex.Message.Split('\n')[0];
-                }
-                finally
-                {
-                    SALT.Moveset.FighterVariable.RestoreNewVars(names);
-                }
+                catch (Exception ex) { error = ex.Message.Split('\n')[0]; }
+                finally { SALT.Moveset.FighterVariable.RestoreNewVars(names); }
             }
-            return getScript(scriptCrc);
+            return saved != null ? saved(shown) : null;
         }
 
         void Rerun()
         {
+            view.MarkerOnlyHint = library.CommonFolder == null ? "; common effects: Common effects.. picks data\\effect\\common" : "";
             string error;
             var cmds = CurrentCommands(out error);
             anim = assets.GetAnimation(animName);
@@ -492,25 +541,8 @@ namespace Sm4shCommand.GUI
 
         // ---- effects (v1.5.0) -----------------------------------------------------------------------------------------
 
-        /// <summary>The effect script for the shown script: the effect editor's text while it's the open script (a
-        /// preview compile), else effect.bin's.</summary>
-        IList<ICommand> EffectCommands(out string error)
-        {
-            error = null;
-            if (currentCrc == 0) return null;
-            if (currentCrc == scriptCrc && effectEditor != null)
-            {
-                var names = SALT.Moveset.FighterVariable.SaveNewVars();
-                try
-                {
-                    var lines = ACMDCompiler.StripComments(effectEditor.Lines.ToArray());
-                    return ACMDCompiler.CompileCommands(lines.ToArray()).Cast<ICommand>().ToList();
-                }
-                catch (Exception ex) { error = ex.Message.Split('\n')[0]; }
-                finally { SALT.Moveset.FighterVariable.RestoreNewVars(names); }
-            }
-            return getEffect != null ? getEffect(currentCrc) : null;
-        }
+        /// <summary>The effect script for the shown script: the same rule as the game script's (ScriptCommands).</summary>
+        IList<ICommand> EffectCommands(out string error) { return ScriptCommands(getEffect, effectEditor, out error); }
 
         /// <summary>Runs the effect script on the game script's timeline (its per-frame speeds) and puts its effects,
         /// trails and screen events on the probe's frames.</summary>

@@ -1038,23 +1038,28 @@ namespace Sm4shCommand
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
-            var game = ScriptFiles.FirstOrDefault(x => x.Value is ACMDFile &&
-                Path.GetFileNameWithoutExtension(x.Key).Equals("game", StringComparison.OrdinalIgnoreCase));
-            if (game.Value == null)
+            // v1.6.1: the game and effect scripts come from the same place by the same rule (Viewer.ViewerScripts): the
+            // files open here in the script folder, else the files on disk next to them; an effect.bin (or sound /
+            // expression.bin) opened alone works too, the game script from the game.bin next to it
+            string folder = Viewer.ViewerScripts.FolderFor(ScriptFiles);
+            var sources = folder != null ? new Viewer.ViewerScripts(folder, () => ScriptFiles) : null;
+            if (sources == null || (sources.File("game") == null && sources.File("effect") == null))
             {
-                MessageBox.Show(this, "No game.bin is open.", "Hitbox Viewer", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(this, "No game.bin or effect.bin is open (or next to the open script file).", "Hitbox Viewer",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
-            if (hitboxViewerForm != null && !hitboxViewerForm.IsDisposed && hitboxViewerGame == game.Key)
+            string gamePath = Path.Combine(folder, "game.bin");
+            if (hitboxViewerForm != null && !hitboxViewerForm.IsDisposed && string.Equals(hitboxViewerGame, gamePath, StringComparison.OrdinalIgnoreCase))
             {
                 hitboxViewerForm.ShowScript(crc, GameEditor(page), TabTitle(page, crc), EffectEditor(page));
                 hitboxViewerForm.Activate();
                 return;
             }
-            string root = Viewer.FighterAssets.FindRoot(game.Key);
+            string root = Viewer.FighterAssets.FindRoot(gamePath);
             if (root == null)
             {
-                MessageBox.Show(this, "Couldn't find the fighter's model and motion folders above\n" + game.Key +
+                MessageBox.Show(this, "Couldn't find the fighter's model and motion folders above\n" + gamePath +
                     "\n\nThe viewer needs the fighter folder laid out as in the game: NAME\\model\\body\\c00 (model.nud, model.vbn, model.jtb), " +
                     "NAME\\motion\\body (main.pac or the .omo files) and NAME\\script\\animcmd\\body.",
                     "Hitbox Viewer", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1073,32 +1078,13 @@ namespace Sm4shCommand
                 return;
             }
             finally { Cursor = Cursors.Default; }
-            var file = (ACMDFile)game.Value;
-            Func<uint, IList<ICommand>> getScript = id =>
-            {
-                IScript s;
-                return file.Scripts.TryGetValue(id, out s) && s is ACMDScript ? ((ACMDScript)s).Commands : null;
-            };
-            // v1.5.0: the effect scripts (effect.bin: the one open, else the file next to game.bin)
-            var fxFile = ScriptFiles.FirstOrDefault(x => x.Value is ACMDFile &&
-                Path.GetFileNameWithoutExtension(x.Key).Equals("effect", StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(Path.GetDirectoryName(x.Key), Path.GetDirectoryName(game.Key), StringComparison.OrdinalIgnoreCase)).Value as ACMDFile;
-            if (fxFile == null)
-            {
-                string fxPath = Path.Combine(Path.GetDirectoryName(game.Key) ?? "", "effect.bin");
-                try { if (File.Exists(fxPath)) fxFile = new ACMDFile(fxPath); } catch (Exception) { fxFile = null; }
-            }
-            Func<uint, IList<ICommand>> getEffect = id =>
-            {
-                IScript s;
-                return fxFile != null && fxFile.Scripts.TryGetValue(id, out s) && s is ACMDScript ? ((ACMDScript)s).Commands : null;
-            };
             if (hitboxViewerForm != null && !hitboxViewerForm.IsDisposed)
                 hitboxViewerForm.Close();       // another fighter's
-            var viewer = new HitboxViewer(assets, GameEditor(page), crc, TabTitle(page, crc), getScript, getEffect, EffectEditor(page));
+            var viewer = new HitboxViewer(assets, GameEditor(page), crc, TabTitle(page, crc), sources.Getter("game"), sources.Getter("effect"),
+                                          EffectEditor(page));
             viewer.FormClosed += (o, a) => { if (hitboxViewerForm == viewer) hitboxViewerForm = null; };
             hitboxViewerForm = viewer;
-            hitboxViewerGame = game.Key;
+            hitboxViewerGame = gamePath;
             viewer.Show(this);
         }
 
@@ -1115,19 +1101,16 @@ namespace Sm4shCommand
             return page.Editors.Any(x => x.Script is ACMDScript) ? crc : 0;
         }
 
-        /// <summary>v1.5.0: the tab's effect script editor (fighter / project mode), or null.</summary>
-        ITS_EDITOR EffectEditor(CodeEditor page)
-        {
-            var ed = page?.EditorFor("effect");
-            return ed != null && ed.Script is ACMDScript ? ed : null;
-        }
+        /// <summary>The kind of the one file open in single-file mode ("game", "effect", ...), else null.</summary>
+        string SingleFileKind { get { return IDEMode == IDE_MODE.File && ScriptFiles.Count > 0 ? Viewer.ViewerScripts.Kind(ScriptFiles.Keys[0]) : null; } }
 
-        /// <summary>The tab's game script editor (the only one when a single game.bin is open), or null.</summary>
-        ITS_EDITOR GameEditor(CodeEditor page)
-        {
-            var ed = page?.EditorFor("game") ?? (IDEMode == IDE_MODE.File ? page?.EditorFor("Script") : null);
-            return ed != null && ed.Script is ACMDScript ? ed : null;
-        }
+        /// <summary>The tab's effect script editor: its effect sub-tab, or its script when the file open alone is an
+        /// effect.bin (v1.6.1); null when none.</summary>
+        ITS_EDITOR EffectEditor(CodeEditor page) { return Viewer.ViewerScripts.EditorFor(page, "effect", SingleFileKind); }
+
+        /// <summary>The tab's game script editor: its game sub-tab, or its script when the file open alone is a game.bin
+        /// (v1.6.1: only then: an effect.bin's script isn't taken for the game script); null when none.</summary>
+        ITS_EDITOR GameEditor(CodeEditor page) { return Viewer.ViewerScripts.EditorFor(page, "game", SingleFileKind); }
 
         string TabTitle(CodeEditor page, uint crc)
         {
@@ -1142,8 +1125,10 @@ namespace Sm4shCommand
             uint crc = AcmdTabScript(page);
             if (crc == 0) return;
             var editor = GameEditor(page);
-            if (crc == hitboxViewerForm.ScriptCrc && editor == hitboxViewerForm.Editor) return;
-            hitboxViewerForm.ShowScript(crc, editor, TabTitle(page, crc));
+            var fxEditor = EffectEditor(page);
+            if (crc == hitboxViewerForm.ScriptCrc && editor == hitboxViewerForm.Editor && fxEditor == hitboxViewerForm.EffectEditorShown) return;
+            // v1.6.1: the tab's effect editor too (the viewer kept the first tab's effect editor while following others)
+            hitboxViewerForm.ShowScript(crc, editor, TabTitle(page, crc), fxEditor);
         }
 
         CommandListForm commandList;

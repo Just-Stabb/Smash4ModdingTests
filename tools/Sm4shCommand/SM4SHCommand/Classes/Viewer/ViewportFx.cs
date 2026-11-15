@@ -20,6 +20,7 @@ namespace Sm4shCommand.Viewer
         public Func<int, Texture> GetTrailTexture;
         public List<FrameState> History;            // every game frame of the run (index = game frame - 1)
         public string FxStats = "";
+        public string MarkerOnlyHint = "";          // v1.6.1: why effects stay markers (no common bank found)
 
         readonly Dictionary<string, EffectSim> sims = new Dictionary<string, EffectSim>();
 
@@ -84,6 +85,7 @@ namespace Sm4shCommand.Viewer
             // the shown frame's copy of the call (its LAST_EFFECT_SET_* values, its detach)
             s.Effect.DetachFrame = e.DetachFrame;
             s.Effect.DetachAnimFrame = e.DetachAnimFrame;
+            if (s.Effect.Rate != e.Rate) { s.Effect.Rate = e.Rate; s.Reset(); }     // (v1.6.1: its rate set after it)
             s.StepTo(g, k => EffectMatrixAt(s.Effect, k));
             return s;
         }
@@ -112,6 +114,8 @@ namespace Sm4shCommand.Viewer
             public float R, G, B, A;
             public float[] Col1;
             public int Blend, Combiner = 1;
+            public Texture Mask;        // a particle's texture slot 1 (v1.6.1)
+            public float MaskU = 1, MaskV = 1;
             public float[] T;           // a trail: t per vertex (0 at the blade, 1 at the tail end)
             public Texture Tex1;        // a trail's second texture
             public int Shader;          // a trail's shader (> 0: drawn by FxRaster.TrailTri)
@@ -153,7 +157,7 @@ namespace Sm4shCommand.Viewer
                         foreach (var q in es.Live)
                         {
                             if (quads >= MaxQuads) break;
-                            var it = ParticleItem(sim, es.D, q, g - e.StartFrame, r, u, f, cx, cy, cr, cg, cb, ca);
+                            var it = ParticleItem(sim, es.D, q, sim.NextK - 1, r, u, f, cx, cy, cr, cg, cb, ca);
                             if (it != null) { items.Add(it); quads++; }
                         }
                     }
@@ -231,13 +235,14 @@ namespace Sm4shCommand.Viewer
                     if (vc != null)
                         for (int c = 0; c < 4; c++) { vc[c] = it.VCol[i0 * 4 + c]; vc[4 + c] = it.VCol[i1 * 4 + c]; vc[8 + c] = it.VCol[i2 * 4 + c]; }
                     FxRaster.Tri(tp, tz, tw, th, S[i0 * 3], S[i0 * 3 + 1], S[i0 * 3 + 2], S[i1 * 3], S[i1 * 3 + 1], S[i1 * 3 + 2],
-                                 S[i2 * 3], S[i2 * 3 + 1], S[i2 * 3 + 2], uv, it.Tex, bil, it.R, it.G, it.B, it.A, it.Col1, vc, it.Blend, it.Combiner);
+                                 S[i2 * 3], S[i2 * 3 + 1], S[i2 * 3 + 2], uv, it.Tex, bil, it.R, it.G, it.B, it.A, it.Col1, vc, it.Blend, it.Combiner,
+                                 it.Mask, it.MaskU, it.MaskV);
                 }
             }
             if (half) Upsample(pix, w, h, tp, basePix, tw, th);
             if (particles > 0 || models > 0 || markerOnly > 0)
                 FxStats = particles + " particles" + (models > 0 ? ", " + models + " effect model" + (models > 1 ? "s" : "") : "") +
-                          (markerOnly > 0 ? ", " + markerOnly + " effect" + (markerOnly > 1 ? "s" : "") + " marker only (common / not found)" : "") +
+                          (markerOnly > 0 ? ", " + markerOnly + " effect" + (markerOnly > 1 ? "s" : "") + " marker only (files not found" + MarkerOnlyHint + ")" : "") +
                           (capped > 0 || quads >= MaxQuads ? " (capped: HQ for more)" : "");
         }
 
@@ -283,7 +288,9 @@ namespace Sm4shCommand.Viewer
         FxItem ParticleItem(EffectSim sim, EmitterDef D, Particle q, int k, float[] r, float[] u, float[] f, float cx, float cy,
                             float cr, float cg, float cb, float ca)
         {
-            float t = q.Age / (float)Math.Max(1, q.Life);
+            // (v1.6.1) moved on by how far the effect's time is past its last step (a rate under 1, or a fractional one)
+            float frac = sim.Frac, age = q.Age + frac;
+            float t = Math.Min(1, age / (float)Math.Max(1, q.Life));
             float alpha = D.Alpha(t) * D.A(14, D.EmAlpha, k) * ca;
             if (alpha <= 0.002f) return null;
             float sx = D.SizeX * D.SizeCurve(0, t) * q.Sr * q.SaX * sim.CSize;
@@ -296,6 +303,7 @@ namespace Sm4shCommand.Viewer
                 R = c0[0] * D.A(11, D.EmColor0[0], k) * cr, G = c0[1] * D.A(12, D.EmColor0[1], k) * cg,
                 B = c0[2] * D.A(13, D.EmColor0[2], k) * cb, A = alpha, Tex = D.Tex,
                 Blend = D.Blend == 1 ? FxRaster.Add : D.Blend == 2 ? FxRaster.Sub : FxRaster.Alpha, Combiner = D.Combiner,
+                Mask = D.Tex1, MaskU = D.U1Scale / D.UScale, MaskV = D.V1Scale / D.VScale,
             };
             if (D.Combiner == 2)
             {
@@ -305,7 +313,8 @@ namespace Sm4shCommand.Viewer
             }
             var call = sim.Call;
             var callLin = Fx.Lin(call);
-            float[] p = q.Local ? call.Transform(q.P[0], q.P[1], q.P[2]) : q.P;
+            var qp = frac > 0 ? new[] { q.P[0] + q.V[0] * frac, q.P[1] + q.V[1] * frac, q.P[2] + q.V[2] * frac } : q.P;
+            float[] p = q.Local ? call.Transform(qp[0], qp[1], qp[2]) : qp;
             float[] v = q.Local ? Fx.Apply(callLin, q.V[0], q.V[1], q.V[2]) : q.V;
             float[] frame = Fx.NormCols(q.Local ? Fx.Mul(callLin, q.Lin) : q.Lin);
             float[] b;
@@ -341,7 +350,7 @@ namespace Sm4shCommand.Viewer
                 }
             }
             var rot = new float[3];
-            for (int i = 0; i < 3; i++) rot[i] = q.Rot[i] + D.RotAdd[i] * q.Age;
+            for (int i = 0; i < 3; i++) rot[i] = q.Rot[i] + D.RotAdd[i] * age;
             var R = Fx.Rot(rot, "xzy");
             b = pt == 2 ? Fx.Mul(Fx.Mul(Fx.Mul(b, XZT), R), XZ) : Fx.Mul(b, R);
             float[] pos = D.Mesh != null ? D.Mesh.Pos : QuadPos;

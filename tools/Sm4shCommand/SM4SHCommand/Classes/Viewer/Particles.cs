@@ -79,6 +79,10 @@ namespace Sm4shCommand.Viewer
         public float EmAlpha;
         public float UScale = 1, VScale = 1;
         public Texture Tex;
+        // v1.6.1: texture slot 1 (29 of Mario's 497 emitters: a shape over slot 0's noise), taken as a mask on the colour
+        // and alpha, its first cell (its own UV scale, 0x584)
+        public Texture Tex1;
+        public float U1Scale = 1, V1Scale = 1;
         public PtclMesh Mesh;
         public Dictionary<int, KeyAnim> Anims = new Dictionary<int, KeyAnim>();
         public string Note = "";
@@ -170,6 +174,10 @@ namespace Sm4shCommand.Viewer
                 if (k.Target < 0x1C) d.Anims[k.Target] = k;
             try { d.Tex = PtclData.DecodeTexture(e, 0); }
             catch (Exception) { d.Tex = null; d.Note += "texture not decoded; "; }
+            try { d.Tex1 = PtclData.DecodeTexture(e, 1); } catch (Exception) { d.Tex1 = null; }
+            d.U1Scale = e.F(0x584); d.V1Scale = e.F(0x588);
+            if (d.U1Scale == 0) d.U1Scale = 1;
+            if (d.V1Scale == 0) d.V1Scale = 1;
             int prim = e.I(0x2DC);
             if (prim >= 0)
             {
@@ -656,6 +664,13 @@ namespace Sm4shCommand.Viewer
         public int Cap;
         public Mat4 Call;                      // effect -> model on the frame stepped to (size included)
         public float CSize = 1;
+        // v1.6.1: the effect's own time (its frames, at its rate: LAST_EFFECT_SET_RATE; eft's set step x the rate) on game
+        // frame At: 0 on its first frame, + Rate each game frame after; NextK the next emitter frame to step
+        public double Time;
+        public int NextK;
+        /// <summary>How far the effect's time is past its last whole step (0-1): particles are drawn moved on by it.</summary>
+        public float Frac { get { return NextK <= 0 ? 0 : (float)Math.Max(0, Math.Min(1, Time - (NextK - 1))); } }
+        public static float RateOf(EffectData e) { return Math.Max(0, e.Rate); }
 
         public EffectSim(EffectData e, EffectAssets a, int cap)
         {
@@ -670,6 +685,9 @@ namespace Sm4shCommand.Viewer
                 for (int i = 0; i < Assets.Emitters.Count; i++)
                     Emitters.Add(new EmitterSim { D = Assets.Emitters[i], Rng = new Random(1 + 7919 * i + 104729 * (Effect.Index + 1)) });
             At = Effect.StartFrame - 1;
+            Time = 0;
+            NextK = 0;
+            Call = null;
         }
 
         /// <summary>The call's size (the effect's Size x LAST_EFFECT_SET_SCALE_W's mean).</summary>
@@ -689,15 +707,21 @@ namespace Sm4shCommand.Viewer
             sc[1, 1] = Effect.Size * (Effect.HasScale ? Effect.SY : 1);
             sc[2, 2] = Effect.Size * (Effect.HasScale ? Effect.SZ : 1);
             CSize = size;
+            float rate = RateOf(Effect);
             while (At < g)
             {
                 At++;
+                if (At > Effect.StartFrame) Time += rate;
                 var m = callAt(At);
                 if (m == null) continue;
                 Call = m * sc;
-                int k = At - Effect.StartFrame;
-                foreach (var es in Emitters)
-                    es.Step(k, Call, size, true, Cap);
+                // the emitter frames this game frame reaches (rate 2: two a frame; 0.5: one every other frame)
+                while (NextK <= Math.Floor(Time + 1e-6))
+                {
+                    foreach (var es in Emitters)
+                        es.Step(NextK, Call, size, true, Cap);
+                    NextK++;
+                }
             }
             if (Call == null)
             {
@@ -708,12 +732,13 @@ namespace Sm4shCommand.Viewer
 
         public int ParticleCount { get { return Emitters.Sum(x => x.Live.Count); } }
 
-        /// <summary>The model's animation frame on game frame g: the frames since the effect started, looped while it
-        /// follows (an aura), held on the last for a one-shot.</summary>
+        /// <summary>The model's animation frame on game frame g: the effect's time since it started (game frames x its
+        /// rate), looped while it follows (an aura), held on the last for a one-shot.</summary>
         public float ModelFrame(int g)
         {
             if (Assets == null || Assets.Model == null) return 0;
-            int n = Assets.Model.Frames, k = Math.Max(0, g - Effect.StartFrame);
+            int n = Assets.Model.Frames;
+            float k = Math.Max(0, g - Effect.StartFrame) * RateOf(Effect);
             if (n <= 1) return 0;
             if (Effect.Follow && Effect.DetachFrame < 0) return k % n;
             return Math.Min(k, n - 1);
@@ -911,7 +936,7 @@ namespace Sm4shCommand.Viewer
         /// </summary>
         public static int Tri(int[] pix, float[] zb, int w, int h, float ax, float ay, float az, float bx, float by, float bz,
                               float cx, float cy, float cz, float[] uv, Texture tex, bool bilinear, float cr, float cg, float cb,
-                              float ca, float[] col1, float[] vcol, int blend, int combiner = 1)
+                              float ca, float[] col1, float[] vcol, int blend, int combiner = 1, Texture mask = null, float mu = 1, float mv = 1)
         {
             int minX = Math.Max(0, (int)Math.Floor(Math.Min(ax, Math.Min(bx, cx))));
             int maxX = Math.Min(w - 1, (int)Math.Ceiling(Math.Max(ax, Math.Max(bx, cx))));
@@ -948,6 +973,12 @@ namespace Sm4shCommand.Viewer
                         r = c1r + (cr - c1r) * tr; g = c1g + (cg - c1g) * tg; b = c1b + (cb - c1b) * tb; a = ca * (combiner == 4 ? ta : tr);
                     }
                     else { r = cr * tr; g = cg * tg; b = cb * tb; a = ca * (combiner == 3 ? tr : ta); }
+                    if (mask != null)
+                    {
+                        float mr, mg, mb, ma;
+                        Sample(mask, (w0 * uv[0] + w1 * uv[2] + w2 * uv[4]) * mu, (w0 * uv[1] + w1 * uv[3] + w2 * uv[5]) * mv, bilinear, out mr, out mg, out mb, out ma);
+                        r *= mr; g *= mg; b *= mb; a *= ma;
+                    }
                     if (vcol != null)
                     {
                         r *= w0 * vcol[0] + w1 * vcol[4] + w2 * vcol[8];

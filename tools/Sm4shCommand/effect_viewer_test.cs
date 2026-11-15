@@ -14,6 +14,7 @@ using System.Linq;
 using SALT.Moveset;
 using SALT.Moveset.AnimCMD;
 using Sm4shCommand.Viewer;
+using Sm4shCommand;
 
 class EvTest
 {
@@ -237,6 +238,143 @@ class EvTest
         }
     }
 
+    /// <summary>v1.6.1: LAST_EFFECT_SET_RATE (and a spawn's own Rate) speeds an effect's particles, model and life up.</summary>
+    static void Rates(EffectLibrary lib, Func<uint, string> common)
+    {
+        Check("v1.6.1: a rated effect's life: 20 frames at rate 2 = 10, at 0.5 = 40, at 1.5 = 14 (ceil), at 1 = 20",
+              HitboxRunner.RatedLife(20, 2) + " " + HitboxRunner.RatedLife(20, 0.5f) + " " + HitboxRunner.RatedLife(20, 1.5f) + " " + HitboxRunner.RatedLife(20, 1),
+              "10 40 14 20");
+        // the God Fist's one-shot hit (0x341002C, its set's life 19 from expect.txt) at rates 2 and 0.5
+        var g = Compile("FRAME(Frames=1)\n");
+        var f = Compile("FRAME(Frames=1)\nGraphic_Effect(Graphic=0x341002C, Bone=0, X=0, Y=5, Z=0, XRot=0, YRot=0, ZRot=0, Size=1, RandomX=0, " +
+                        "RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=1)\nLAST_EFFECT_SET_RATE(Rate=2)\n" +
+                        "Graphic_Effect(Graphic=0x341002C, Bone=0, X=0, Y=5, Z=0, XRot=0, YRot=0, ZRot=0, Size=1, RandomX=0, " +
+                        "RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=1)\nLAST_EFFECT_SET_RATE(Rate=0.5)\n" +
+                        "Graphic_Effect(Graphic=0x341002C, Bone=0, X=0, Y=5, Z=0, XRot=0, YRot=0, ZRot=0, Size=1, RandomX=0, " +
+                        "RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=1)\n");
+        var r = RunPair(g, f, lib, 120);
+        int life = expect.ContainsKey(0x341002C) ? expect[0x341002C].Item2 : -2;
+        Check("v1.6.1: LAST_EFFECT_SET_RATE 2 / 0.5 / none on three 0x341002C: they play life / 2, life x 2, life game frames (life " + life + ")",
+              string.Join(" ", r.FxRunner.AllEffects.Select(e => (e.EndFrame - e.StartFrame) + "@" + e.Rate.ToString(IC)).ToArray()),
+              string.Format(IC, "{1}@2 {2}@0.5 {0}@1", life, HitboxRunner.RatedLife(life, 2), HitboxRunner.RatedLife(life, 0.5f)));
+        var f2 = Compile("FRAME(Frames=1)\nEFFECT_FLW_POS_STRENGTH(Effect=0x341002C, Bone=0, X=0, Y=0, Z=0, RotX=0, RotY=0, RotZ=0, Scale=1, " +
+                         "Strength=1, Terminate=1, Rate=1.5)\n");
+        var r2 = RunPair(g, f2, lib, 60);
+        var e2 = r2.FxRunner.AllEffects.FirstOrDefault();
+        Check("v1.6.1: EFFECT_FLW_POS_STRENGTH's own Rate is the effect's rate", e2 != null ? e2.Rate.ToString(IC) : "none", "1.5");
+        // the particles: at rate 2, game frame 1 + t is the effect's frame 2t; at 0.5, 1 + 2t is its frame t
+        Func<float, EffectSim> sim = rate =>
+        {
+            var a = lib.AssetsFor(0x3410031);
+            return new EffectSim(new EffectData { Index = 0, Id = 0x3410031, StartFrame = 1, Size = 1.5f, Follow = true, Rate = rate }, a, 1000000);
+        };
+        Func<EffectSim, string> dump = s => string.Join(";", s.Emitters.Select(e => e.Live.Count + ":" +
+            string.Join(",", e.Live.Select(q => V(WorldPos(s, q))).ToArray())).ToArray());
+        var one = sim(1); var two = sim(2); var half = sim(0.5f);
+        var bad = new List<string>();
+        for (int t = 0; t <= 14; t++)
+        {
+            one.StepTo(1 + 2 * t, At052); two.StepTo(1 + t, At052);
+            if (dump(one) != dump(two)) bad.Add("rate 2, frame " + t);
+        }
+        one = sim(1);
+        for (int t = 0; t <= 14; t++)
+        {
+            one.StepTo(1 + t, At052); half.StepTo(1 + 2 * t, At052);
+            if (dump(one) != dump(half)) bad.Add("rate 0.5, frame " + 2 * t);
+        }
+        half.StepTo(2 + 2 * 14, At052);
+        Check("v1.6.1: 0x3410031 at rate 2 on game frame 1 + t = at rate 1 on 1 + 2t (every particle), at 0.5 on 1 + 2t = at 1 on 1 + t; "
+              + "halfway between, drawn half a step on", string.Join(", ", bad.ToArray()) + " frac " + half.Frac.ToString(IC), " frac 0.5");
+        var m = sim(0.5f);
+        var model = lib.AssetsFor(0x3410034);
+        var ms = new EffectSim(new EffectData { Index = 0, Id = 0x3410034, StartFrame = 1, Size = 1, Follow = true, Rate = 0.5f }, model, 1000);
+        var ms2 = new EffectSim(new EffectData { Index = 0, Id = 0x3410034, StartFrame = 1, Size = 1, Follow = true, Rate = 2 }, model, 1000);
+        int n = model != null && model.Model != null ? model.Model.Frames : 0;
+        Check("v1.6.1: the aura model's frame at rate 0.5 / 2, 11 game frames on (looped at its " + n + " frames)",
+              ms.ModelFrame(12).ToString(IC) + " " + ms2.ModelFrame(12).ToString(IC), "5.5 " + (22 % Math.Max(1, n)).ToString(IC));
+    }
+
+    /// <summary>v1.6.1: the common bank (0x0100nnnn) from the game's data/effect/common above the fighter's folder
+    /// (effect_viewer_test.py puts a stand-in there: Supamario's bank under the common name).</summary>
+    static void Common(string fighters, string sm, Func<uint, string> common)
+    {
+        string want = Path.Combine(Path.Combine(Path.GetDirectoryName(fighters), "effect"), "common");
+        string found = EffectLibrary.FindCommonFolder(sm);
+        Check("v1.6.1: the common bank found where the game keeps it: data/effect/common next to data/fighter", found, want);
+        Check("v1.6.1: a picked folder may be data, data/effect or data/effect/common",
+              EffectLibrary.CommonFolderIn(Path.GetDirectoryName(fighters)) + "|" + EffectLibrary.CommonFolderIn(Path.Combine(Path.GetDirectoryName(fighters), "effect")) +
+              "|" + EffectLibrary.CommonFolderIn(want) + "|" + (EffectLibrary.CommonFolderIn(sm) ?? "null"), want + "|" + want + "|" + want + "|null");
+        var lib = new EffectLibrary(sm) { CommonName = common, CommonFolder = found };
+        var plain = new EffectLibrary(sm) { CommonName = common };
+        var a = lib.AssetsFor(0x1000031);
+        var b = lib.AssetsFor(0x3410031);
+        Check("v1.6.1: common 0x1000031's emitters / model from the common bank (the stand-in: Supamario's entry 0x31)",
+              a != null ? a.SetName + " " + a.Emitters.Count : "none", b != null ? b.SetName + " " + b.Emitters.Count : "?");
+        var am = lib.AssetsFor(0x1000034);
+        Check("v1.6.1: common 0x1000034's effect model from the common bank's model folder", am != null && am.Model != null ? am.Model.Name : "none", "EffSupamarioGfCsgBas");
+        Check("v1.6.1: without the bank, common effects stay markers (no assets) and their tooltip names",
+              (plain.AssetsFor(0x1000031) == null) + " " + plain.Name(0x1000011), "True " + (common(0x1000011) ?? ""));
+        string tip = common(0x1000031);
+        Check("v1.6.1: a common effect's name: its tooltip name (the bank's set after it)", lib.Name(0x1000031),
+              tip != null ? tip + " (PtcSupamarioGfCsg_Circle)" : "PtcSupamarioGfCsg_Circle");
+        Check("v1.6.1: a common one-shot's life from its set (as the fighter's)", lib.Lifetime(0x1000031).ToString(), lib.Lifetime(0x3410031).ToString());
+        var s1 = new EffectSim(new EffectData { Index = 0, Id = 0x1000031, StartFrame = 1, Size = 1.5f }, a, 100000);
+        var s2 = new EffectSim(new EffectData { Index = 0, Id = 0x3410031, StartFrame = 1, Size = 1.5f }, b, 100000);
+        s1.StepTo(12, At052); s2.StepTo(12, At052);
+        Check("v1.6.1: the common effect's particles drawn as the fighter's (live on frame 12)", s1.ParticleCount + " " + (s1.ParticleCount > 0), s2.ParticleCount + " True");
+    }
+
+    /// <summary>v1.6.1: the game and effect scripts found and followed by one rule (ViewerScripts, HitboxViewer.ScriptCommands).</summary>
+    static void Sources(FighterAssets assets, string body, uint crc)
+    {
+        string tmp = Path.Combine(Path.GetTempPath(), "evtest_src_" + System.Diagnostics.Process.GetCurrentProcess().Id);
+        Directory.CreateDirectory(tmp);
+        foreach (var k in new[] { "game", "effect" }) File.Copy(Path.Combine(body, k + ".bin"), Path.Combine(tmp, k + ".bin"), true);
+        // only effect.bin open (single-file mode): the folder is its, the game script from game.bin there
+        var fx = new ACMDFile(Path.Combine(tmp, "effect.bin"));
+        var openList = new List<KeyValuePair<string, IScriptCollection>> { new KeyValuePair<string, IScriptCollection>(Path.Combine(tmp, "effect.bin"), fx) };
+        string folder = ViewerScripts.FolderFor(openList);
+        var src = new ViewerScripts(folder, () => openList);
+        var gameDisk = src.File("game");
+        Check("v1.6.1: effect.bin open alone: its folder; effect = the open file, game = game.bin next to it (read from disk)",
+              (folder == tmp) + " " + ReferenceEquals(src.File("effect"), fx) + " " + (gameDisk != null && gameDisk.Scripts.ContainsKey(crc)), "True True True");
+        File.SetLastWriteTimeUtc(Path.Combine(tmp, "game.bin"), DateTime.UtcNow.AddMinutes(1));
+        var again = src.File("game");
+        Check("v1.6.1: a file on disk is read again when it changes (saved from elsewhere)",
+              again != null && !ReferenceEquals(again, gameDisk) && again.Scripts.ContainsKey(crc), true);
+        // the tab's editors (FastColoredTextBox doesn't load on Mono: the rule picking the sub-tab is checked)
+        Check("v1.6.1: single-file effect.bin: its one editor (\"Script\") is the effect editor, not the game script's",
+              ViewerScripts.EditorTab(new[] { "Script" }, "effect", "effect") + " " + (ViewerScripts.EditorTab(new[] { "Script" }, "game", "effect") ?? "none"), "Script none");
+        Check("v1.6.1: single-file game.bin: its one editor is the game editor; fighter mode: the game / effect sub-tabs",
+              ViewerScripts.EditorTab(new[] { "Script" }, "game", "game") + " " + (ViewerScripts.EditorTab(new[] { "Script" }, "effect", "game") ?? "none") + " " +
+              ViewerScripts.EditorTab(new[] { "game", "effect", "sound", "expression" }, "effect", null) + " " +
+              ViewerScripts.EditorTab(new[] { "game", "effect", "sound", "expression" }, "game", null), "Script none effect game");
+        // the one rule for both scripts (HitboxViewer.PickCommands): the tab's editor text while its animation is shown,
+        // compiled; an error falls back to the saved one; another animation: its saved script
+        var gameScript = (ACMDScript)gameDisk.Scripts[crc];
+        var fxScript = (ACMDScript)fx.Scripts[crc];
+        Func<uint, IList<ICommand>> savedFx = src.Getter("effect");
+        var text = fxScript.Deserialize().Split('\n').ToList();
+        string err;
+        var got = Sm4shCommand.GUI.HitboxViewer.PickCommands(crc, crc, savedFx, () => text, out err);
+        Check("v1.6.1: the tab's effect text, compiled (as the game script's)", (got != null && got.Count == fxScript.Commands.Count) + " " + (err == null), "True True");
+        var edited = text.Concat(new[] { "FRAME(Frames=40)", "EFFECT_OFF(AttrMask=0, KillParticles=1)" }).ToList();
+        got = Sm4shCommand.GUI.HitboxViewer.PickCommands(crc, crc, savedFx, () => edited, out err);
+        Check("v1.6.1: an edit is run (2 more commands)", got != null ? got.Count : -1, fxScript.Commands.Count + 2);
+        var broken = text.Concat(new[] { "NOT_A_COMMAND(" }).ToList();
+        got = Sm4shCommand.GUI.HitboxViewer.PickCommands(crc, crc, savedFx, () => broken, out err);
+        Check("v1.6.1: a script that doesn't compile: the saved one, and the error", (got != null && got.Count == fxScript.Commands.Count) + " " + (err != null), "True True");
+        uint other = fx.Scripts.Keys.First(k => k != crc && ((ACMDScript)fx.Scripts[k]).Commands.Count > 0);
+        got = Sm4shCommand.GUI.HitboxViewer.PickCommands(other, crc, savedFx, () => edited, out err);
+        Check("v1.6.1: another animation picked in the viewer: its saved effect script (the tab's edits are the tab's only)",
+              got != null && got.Count == ((ACMDScript)fx.Scripts[other]).Commands.Count, true);
+        got = Sm4shCommand.GUI.HitboxViewer.PickCommands(crc, crc, src.Getter("game"), null, out err);
+        Check("v1.6.1: no game editor (effect.bin open alone): the game script from game.bin next to it (its commands)",
+              got != null ? got.Count : -1, gameScript.Commands.Count);
+        try { Directory.Delete(tmp, true); } catch (Exception) { }
+    }
+
     static int Main(string[] args)
     {
         var errors = new List<string>();
@@ -352,6 +490,10 @@ class EvTest
 
         // ---- v1.6.0 (Level 2): particles, textures, effect models, trail textures ------------------------------------
         if (args.Length > 3) Level2(args[3], smLib, kbLib, ks);
+        // ---- v1.6.1: effect rates, common effects, the scripts' sources -------------------------------------------------
+        Rates(smLib, common);
+        Common(root, sm, common);
+        Sources(smAssets, smBody, dash);
 
         // ---- the timeline: the game script's speed, threads, effect commands -----------------------------------------
         var g2 = Compile("FRAME(Frames=5)\nSet_Frame_Duration(Speed=2)\n");

@@ -658,6 +658,7 @@ namespace Sm4shCommand.Viewer
                     d.Term = at(new[] { "Terminate" });
                     d.R = at(new[] { "Red" }); d.Gr = at(new[] { "Green" }); d.B = at(new[] { "Blue" });
                     d.Alpha = at(new[] { "Alpha" });
+                    d.Rate = at(new[] { "Rate" });          // v1.6.1: a spawn with its own rate (EFFECT_FLW_POS_STRENGTH)
                 }
                 else if (named && (up.Contains("EFFECT") || up.Contains("TRACE")))
                     d.Kind = FxKind.Note;
@@ -697,6 +698,7 @@ namespace Sm4shCommand.Viewer
                         if (d.Flip) { e.HasLeft = true; e.IdLeft = (uint)it(d.GL); }
                         if (d.R >= 0) { e.HasColor = true; e.R = fl(d.R, 1); e.G = fl(d.Gr, 1); e.B = fl(d.B, 1); }
                         if (d.Alpha >= 0) { e.HasAlpha = true; e.A = fl(d.Alpha, 1); }
+                        if (d.Rate >= 0) e.Rate = fl(d.Rate, 1);
                         fs.Live.Add(e);
                         fs.All.Add(e);
                         fs.Last = e;
@@ -777,6 +779,14 @@ namespace Sm4shCommand.Viewer
             fs.Live.Remove(e);
         }
 
+        /// <summary>v1.6.1: game frames an effect of `life` frames of its own plays at `rate` (eft's step x the rate; a rate
+        /// under 1/16 taken as 1/16, as the game's trail tick floors its step).</summary>
+        public static int RatedLife(int life, float rate)
+        {
+            if (life <= 0 || Math.Abs(rate - 1) < 1e-6f) return life;
+            return Math.Max(1, (int)Math.Ceiling(life / Math.Max(1 / 16f, rate) - 1e-4));
+        }
+
         /// <summary>One-shot effects whose play time is over end (after this frame is shown, so a 1-frame one shows).</summary>
         void ExpireEffects()
         {
@@ -786,12 +796,16 @@ namespace Sm4shCommand.Viewer
                 int life = OneShotLife != null ? OneShotLife(e.Id) : 0;
                 if (life < 0) continue;
                 if (life == 0) life = DefaultLife;
+                // v1.6.1: the effect plays at its rate (LAST_EFFECT_SET_RATE: the emitter set's step x the rate), so its
+                // frames of play last life / rate game frames
+                life = RatedLife(life, e.Rate);
                 int from = e.DetachFrame >= 0 ? e.DetachFrame : e.StartFrame;
                 if (gameFrame >= from + life - 1)
                 {
                     fx.Live.Remove(e);
                     e.EndFrame = gameFrame + 1;
-                    e.EndReason = OneShotLife != null && OneShotLife(e.Id) > 0 ? "its particles' life" : "(life not known: " + DefaultLife + " frames)";
+                    e.EndReason = (OneShotLife != null && OneShotLife(e.Id) > 0 ? "its particles' life" : "(life not known: " + DefaultLife + " frames)") +
+                                  (Math.Abs(e.Rate - 1) > 1e-6f ? string.Format(System.Globalization.CultureInfo.InvariantCulture, " at rate {0:0.###}", e.Rate) : "");
                 }
             }
         }

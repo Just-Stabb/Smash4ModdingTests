@@ -110,6 +110,13 @@ namespace Sm4shCommand.Viewer
             Bank b;
             if (banks.TryGetValue(id, out b)) return b;
             b = null;
+            if (id == CommonBank)
+            {
+                // v1.6.1: the common bank, from the game's effect/common folder (CommonFolder)
+                b = LoadBank(id, CommonFolder, "common");
+                banks[id] = b;
+                return b;
+            }
             string folder = BankFolder(id);
             var tries = new List<Tuple<string, string>>();       // (fighter folder, bank folder)
             if (folder != null && fighterRoot != null)
@@ -142,20 +149,80 @@ namespace Sm4shCommand.Viewer
             return b;
         }
 
+        // ---- v1.6.1: the common effects (bank 0x100: ids 0x01000000 +) ---------------------------------------------------
+        public const int CommonBank = 0x100;
+        public const string CommonEfc = "common.010d0000.efc";
+        string commonFolder;
+
+        /// <summary>The folder with the common bank (common.010d0000.efc / .ptcl / model / trail): the game's
+        /// data/effect/common. Setting it forgets what was loaded from the old one.</summary>
+        public string CommonFolder
+        {
+            get { return commonFolder; }
+            set
+            {
+                if (string.Equals(commonFolder, value, StringComparison.OrdinalIgnoreCase)) return;
+                commonFolder = value;
+                banks.Remove(CommonBank);
+                assets.Clear();
+                trailTextures.Clear();
+                trailDirs = null;
+            }
+        }
+
+        /// <summary>A folder that holds the common bank: the folder itself, its effect/common, or its common subfolder;
+        /// null when none does.</summary>
+        public static string CommonFolderIn(string dir)
+        {
+            if (string.IsNullOrEmpty(dir)) return null;
+            foreach (var d in new[] { dir, Path.Combine(Path.Combine(dir, "effect"), "common"), Path.Combine(dir, "common"),
+                                      Path.Combine(Path.Combine(Path.Combine(dir, "data"), "effect"), "common") })
+                try { if (File.Exists(Path.Combine(d, CommonEfc))) return d; } catch (Exception) { }
+            return null;
+        }
+
+        /// <summary>The common bank for a fighter folder: as the game lays its files out, data/effect/common next to
+        /// data/fighter (fighter/NAME/../../effect/common), looked for in every folder above the fighter's (a dump's
+        /// content/patch/data, a mod's own data folder, ...); null when none has it.</summary>
+        public static string FindCommonFolder(string fighterRoot)
+        {
+            string d = fighterRoot;
+            for (int up = 0; up < 8 && !string.IsNullOrEmpty(d); up++)
+            {
+                d = Path.GetDirectoryName(d);
+                var f = CommonFolderIn(d);
+                if (f != null) return f;
+            }
+            return null;
+        }
+
+        static Bank LoadBank(int id, string dir, string name)
+        {
+            if (string.IsNullOrEmpty(dir)) return null;
+            string efc = Path.Combine(dir, name + ".010d0000.efc");
+            if (!File.Exists(efc)) return null;
+            var b = new Bank { Id = id, Folder = dir, Name = name };
+            try { b.Efc = new EfcFile(File.ReadAllBytes(efc)); } catch (Exception) { b.Efc = null; }
+            string ptcl = Path.Combine(dir, name + ".010d0000.ptcl");
+            try { if (File.Exists(ptcl)) b.Ptcl = new PtclFile(File.ReadAllBytes(ptcl)); } catch (Exception) { b.Ptcl = null; }
+            return b;
+        }
+
         /// <summary>"name" for an effect ID: the .ptcl set (and the model, when the entry has one), the common effect's
         /// tooltip name, or "" when not known.</summary>
         public string Name(uint id)
         {
             int bank = (int)(id >> 16), entry = (int)(id & 0xFFFF);
-            if (bank == 0x100)
-                return CommonName != null ? CommonName(id) ?? "" : "";
+            string common = bank == CommonBank && CommonName != null ? CommonName(id) ?? "" : "";
             var b = GetBank(bank);
-            if (b == null || b.Efc == null || entry >= b.Efc.Entries.Count) return "";
+            if (b == null || b.Efc == null || entry >= b.Efc.Entries.Count) return common;
             var e = b.Efc.Entries[entry];
             var parts = new List<string>();
             if (e.Set > 0 && b.Ptcl != null && e.Set - 1 < b.Ptcl.Sets.Count) parts.Add(b.Ptcl.Sets[(int)e.Set - 1].Name);
             if (e.Model > 0 && e.Model - 1 < b.Efc.Models.Count) parts.Add("model " + b.Efc.Models[(int)e.Model - 1]);
-            return string.Join(" + ", parts.ToArray());
+            string own = string.Join(" + ", parts.ToArray());
+            if (common.Length > 0) return own.Length > 0 ? common + " (" + own + ")" : common;
+            return own;
         }
 
         /// <summary>How long a one-shot effect plays, in frames: the latest emitter's end (start + emission (one-time
@@ -165,7 +232,7 @@ namespace Sm4shCommand.Viewer
         public int? Lifetime(uint id)
         {
             int bank = (int)(id >> 16), entry = (int)(id & 0xFFFF);
-            var b = bank == 0x100 ? null : GetBank(bank);
+            var b = GetBank(bank);
             if (b == null || b.Efc == null || entry >= b.Efc.Entries.Count) return null;
             var en = b.Efc.Entries[entry];
             int set = (int)en.Set - 1;
@@ -207,7 +274,7 @@ namespace Sm4shCommand.Viewer
             if (assets.TryGetValue(id, out a)) return a;
             a = null;
             int bank = (int)(id >> 16), entry = (int)(id & 0xFFFF);
-            var b = bank == 0x100 ? null : GetBank(bank);
+            var b = GetBank(bank);
             if (b != null && b.Efc != null && entry < b.Efc.Entries.Count)
             {
                 var en = b.Efc.Entries[entry];
@@ -245,6 +312,8 @@ namespace Sm4shCommand.Viewer
             if (trailDirs == null)
             {
                 trailDirs = new List<string>();
+                if (commonFolder != null && Directory.Exists(Path.Combine(commonFolder, "trail")))
+                    trailDirs.Add(Path.Combine(commonFolder, "trail"));     // (the common trails: TexCommonHammerTrace ...)
                 var roots = new List<string>();
                 if (fighterRoot != null) roots.Add(fighterRoot);
                 string parent = fighterRoot != null ? Path.GetDirectoryName(fighterRoot) : null;

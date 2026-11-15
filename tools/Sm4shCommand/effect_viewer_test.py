@@ -162,6 +162,15 @@ def main():
     open(exp, 'w').write('\n'.join(lines) + '\n')
     fx = particles(os.path.join(sm, 'effect', 'supamario'), 'supamario',
                    [0x341002F, 0x3410031, 0x3410040, 0x3410057, 0x3410034, 0x3410049, 0x3410000 + SUPERJUMP])
+    # v1.6.1: a stand-in common bank where the game keeps it (data/effect/common next to data/fighter: WORK/effect/common):
+    # the game's own common.010d0000.* aren't in this repository, so Supamario's bank is copied under the common name
+    # (the lookup, loading and drawing are what's tested; ids 0x0100nnnn then mean his entries nnnn)
+    smfx = os.path.join(sm, 'effect', 'supamario')
+    common = os.path.join(work, 'effect', 'common')
+    os.makedirs(common, exist_ok=True)
+    for ext in ('efc', 'ptcl'):
+        shutil.copy(os.path.join(smfx, 'supamario.010d0000.' + ext), os.path.join(common, 'common.010d0000.' + ext))
+    copy(os.path.join(smfx, 'model'), os.path.join(common, 'model'))
     exp_fx = os.path.join(work, 'expect_fx.txt')
     open(exp_fx, 'w').write('\n'.join(fx) + '\n')
     print('expect_fx: %d lines (%d counts, %d positions)' % (len(fx), sum(x.startswith('count') for x in fx),
@@ -171,7 +180,7 @@ def main():
     test = os.path.join(work, 'run')
     copy(built, test)
     src = os.path.join(HERE, 'effect_viewer_test.cs')
-    refs = ['-r:SALT.dll', '-r:SM4SHCommand.exe'] + ['-r:%s/%s.dll' % (MONO, n) for n in (
+    refs = ['-r:SALT.dll', '-r:SM4SHCommand.exe', '-r:FastColoredTextBox.dll'] + ['-r:%s/%s.dll' % (MONO, n) for n in (
         'mscorlib', 'System', 'System.Core', 'System.Windows.Forms', 'System.Drawing')]
     subprocess.check_call(CSC + ['-nologo', '-out:EvTest.exe', '-nostdlib'] + refs + [src], cwd=test)
     # (Runtime and the Viewport are WinForms: an X display, xvfb-run when there's none)

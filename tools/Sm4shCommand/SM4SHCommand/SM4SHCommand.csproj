@@ -106,6 +106,7 @@
     <Compile Include="Classes\Viewer\Effects.cs" />
     <Compile Include="Classes\Viewer\Particles.cs" />
     <Compile Include="Classes\Viewer\TrailNames.cs" />
+    <Compile Include="Classes\Viewer\ViewerScripts.cs" />
     <Compile Include="Classes\Viewer\ViewportFx.cs">
       <DependentUpon>Viewport.cs</DependentUpon>
     </Compile>
