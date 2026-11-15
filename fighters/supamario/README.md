@@ -2182,6 +2182,15 @@ too, that's a one-line change in `cb_catch`.
 A rise interrupted by a hit leaves the status with the use at 1, so it keeps the hover / dive too. A hit in the hover
 counts as the dive's (2): reset.
 
+**When the uses are spent** (user: "make sure that getting hit during/after the rise only consumes it after the
+vertical speed begins being added"):
+- the rise is used (1) at its lift-off, frame 6 (`RISE_FROM`, the first frame its upward speed is set), not when up
+  special is pressed. Cut in the crouch (frames 0-5, e.g. hit), it isn't spent, and the next up special is the rise
+  again. On the ground it's spent at the lift-off too, so v4's ground fix holds.
+- the hover / dive is used (2) at the hover's start (the up special press), as before: the move commits there.
+
+Tests: a hit in the crouch -> the rise again; a hit after the lift-off -> the hover / dive.
+
 Tests:
 - with the rise used: a hit, a tumble or a ground hit keep it, while grabbed / thrown reset it; with the dive used, a
   hit resets it;
@@ -2199,7 +2208,7 @@ Tests:
 - his percent +1.75 on each burn hit's frame, +7 in all, on the hold on the ground, the air hold with the crash, the
   air hold with the explosion off the stage, and the point-blank catch.
 - the new reset rule's cases and sequences (above);
-- `supamario_corebreaker_test.py`: 91 checks, 0 problems; `supamario_godfist_test.py --all-models`: 0 problems;
+- `supamario_corebreaker_test.py`: 92 checks, 0 problems; `supamario_godfist_test.py --all-models`: 0 problems;
   `msc_stack_check.py`: 0 stack problems (2369 scripts).
 
 **Not confirmed in game:**

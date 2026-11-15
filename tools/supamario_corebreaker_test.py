@@ -493,17 +493,35 @@ def msc_tests(path):
           '-> hit out of it -> up special: the rise; rise -> ledge -> up special: the rise',
           [seq([(0x46, 2)]), seq([(0x46, 2), (0x45, 0)]), seq([('dive', 2), (0x46, 2)]), seq([(0x74, 1), (0xE, 2)])],
           [(1.0, 1.0), (0.0, 0.0), (0.0, 0.0), (0.0, 0.0)])
+    # 3c. v6 (user: "make sure that getting hit during/after the rise only consumes it after the vertical speed begins
+    # being added"): the rise is used at its lift-off (frame RISE_FROM): cut in the crouch, the next up special is the
+    # rise again; cut after the lift-off and hit, the next is the hover / dive
+    out = []
+    for name, cut in (('hit in the crouch (frame 3)', 3), ('hit after the lift-off (frame %d)' % (B.RISE_FROM + 3),
+                                                            B.RISE_FROM + 3)):
+        g = Game(x=0.0, y=40.0, stage=(1000.0, 1001.0))
+        run(path, g, cut_at=cut, frames=cut + 2)
+        vm = vm_for(path, g)
+        g.self_status, vm.g[18] = 0x46, 2
+        vm.call(vm.func(func_index(vm, 'cb_reset_tick')))
+        g.self_status = None
+        u = used(g)
+        tr = run(path, g, frames=8)
+        out.append((name, u, phases_of(tr)[0]))
+    check('the rise used only from its lift-off: a hit in the crouch -> the rise again; after it -> the hover / dive',
+          out, [('hit in the crouch (frame 3)', 0.0, 0.0), ('hit after the lift-off (frame %d)' % (B.RISE_FROM + 3),
+                                                             1.0, 1.0)])
     # 3b. v4 (user: "The first press of up special on the ground should consume its one rising use"): a ground up
     # special with the per-frame reset running and his status read as the one before on its first frame: the rise
     # stays used; up special again: the hover / dive; a third does nothing in the air; the landing gives it back
     g = Game()
     r1 = run(path, g, tick=True)
-    first = min(u for n, u, _a in g.used_log)
+    first = min(u for n, u, _a in g.used_log if n >= B.RISE_FROM)     # v6: used from the lift-off
     tr = run(path, g, tick=True, frames=B.DIVE_FROM - B.HOVER_FROM + 15)
     vm = vm_for(path, g)
     vm.g[18] = 2
     third = vm.call(vm.func(func_index(vm, 'cb_can_up')))
-    check('a ground up special: the rise used from its first frame (no reset on the ground before he leaves it), the '
+    check('a ground up special: the rise used from its lift-off on (no reset on the ground before he leaves it), the '
           'second (from Fall) the hover / dive (cb_used 2), a third refused in the air',
           (first, phases_of(r1), phases_of(tr)[:2], used(g), third), (1.0, [0.0], [1.0, 2.0], 2.0, 0))
     g = Game()
