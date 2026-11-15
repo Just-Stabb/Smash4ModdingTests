@@ -38369,6 +38369,8 @@ int cb_lifted;
 int cb_free;            // v4: the rise actionable (from CB_RISE_CANCEL: the air actions, drift; 2: its pose held)
 int cb_terms;           // v4: the rise's air transition groups / terms turned on
 int cb_refused;         // v4: the dive's catch refused (a fighter lying down, invincible / intangible)
+int cb_brev;            // v4: the rise's B-reverse checked (1) / done (2)
+int cb_gstart;          // v4: the rise started on the ground
 
 void cb_set_ph(int ph)
 {
@@ -38489,6 +38491,12 @@ void cb_init()
     cb_free = 0;
     cb_terms = 0;
     cb_refused = 0;
+    cb_brev = 0;
+    cb_gstart = 0;
+    if (global18 == 0)
+    {
+        cb_gstart = 0x1;
+    }
     cb_ang = CB_DIVE_DEG;
     used = WorkModuleF(0, CB_USED);
     if (global18 == 0)
@@ -38543,9 +38551,37 @@ void cb_init()
 // and drifts (kinetic type 0, FALL: the stick's air control); the leap's arc goes on to its top (its own slowing),
 // then his own gravity; the motion plays the rise to its last frame and holds it (rate 0) until he acts or lands (a
 // normal landing). Up special in it: the hover / dive in place
+// v4 (user: "make the up special leap B-reversable/change facing direction based on direction held at the start of the
+// move"): in its first CB_TURN_WINDOW frames, the stick held back (along his facing, below -CB_TURN_STICK) turns him
+// (ReverseLr, PostureModule 1 / 2); in the air his horizontal momentum turns with him (the stick's air control energy
+// 2 and energy 3, KineticModuleF 0xa / 0xb: their x / y), as Smash's B-reverse. Once per rise
+void cb_rise_brev(float fr)
+{
+    float x;
+    if (cb_brev != 0 || fr >= CB_TURN_WINDOW)
+    {
+        return;
+    }
+    if (WorkModuleF(0, 0x0f000110) >= -CB_TURN_STICK)
+    {
+        return;
+    }
+    cb_brev = 0x2;
+    PostureModule(0x1);
+    PostureModule(0x2);
+    if (global18 != 0)
+    {
+        x = KineticModuleF(0xa, 0x2);
+        KineticModule(0x11, 0x2, -x, KineticModuleF(0xb, 0x2));
+        x = KineticModuleF(0xa, 0x3);
+        KineticModule(0x11, 0x3, -x, KineticModuleF(0xb, 0x3));
+    }
+}
+
 int cb_rise_phase(float fr)
 {
     float vy;
+    cb_rise_brev(fr);
     if (fr < CB_RISE_FROM)
     {
         if (global18 != 0)
@@ -38563,7 +38599,15 @@ int cb_rise_phase(float fr)
             func_94();
         }
         KineticModule(0, 0);
-        KineticModule(0x11, 0x2, 0.0f, 0.0f);
+        if (cb_gstart == 0x1)
+        {
+            KineticModule(0x11, 0x2, 0.0f, 0.0f);
+        }
+        else
+        {
+            // v4: an air rise keeps his air momentum (the B-reverse turns it), only its vertical part off
+            KineticModule(0x11, 0x2, KineticModuleF(0xa, 0x2), 0.0f);
+        }
         cb_speed(CB_RISE_VX, CB_RISE_V);
     }
     else if (cb_free == 0)
@@ -38581,7 +38625,7 @@ int cb_rise_phase(float fr)
         {
             // actionable: the fall's kinetic type (the stick drifts him), the leap's vertical speed kept
             cb_free = 0x1;
-            vy = KineticModuleF(0x1, 0x1);
+            vy = KineticModuleF(0xb, 0x1);
             KineticModule(0, 0);
             KineticModule(0x11, 0x3, 0.0f, 0.0f);
             KineticModule(0x11, 0x1, vy);
@@ -38618,7 +38662,7 @@ int cb_rise_phase(float fr)
         cb_free = 0x2;
         MotionModule(0x4, 0.0f);
         cb_armor(0);
-        vy = KineticModuleF(0x1, 0x1);
+        vy = KineticModuleF(0xb, 0x1);
         KineticModule(0, 0);
         KineticModule(0x11, 0x3, 0.0f, 0.0f);
         KineticModule(0x11, 0x1, vy);

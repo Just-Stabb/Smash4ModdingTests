@@ -1857,7 +1857,7 @@ DownWait, no tech, no KO). Now:
 
 ## Core Breaker v4 (`supamario_corebreaker_v4.zip`): the user's v3 feedback
 
-Install over v3, exe B (no exe change). Five changes.
+Install over v3, exe B (no exe change). Six changes.
 
 ### 1. The ground up special uses the rise (user: "The first press of up special on the ground should consume its one rising use")
 **Cause:** `cb_reset_tick` was meant to skip its reset while he is in the up special itself (`st == 0x154`). `st` is a
@@ -1975,6 +1975,21 @@ Tests:
 - up special in the rise or from the held top gives the hover / dive;
 - an air start keeps its top held in the air (no Fall).
 
+### 6. The rise's B-reverse (user: "make the up special leap B-reversable/change facing direction based on direction held at the start of the move")
+- **The window:** the rise's first 4 frames (`TURN_WINDOW`, before the lift-off at 6). Vanilla Super Jump Punch checks
+  its turn at frame 4 (its flag 0x2100000F, then `func_33`). Once per rise.
+- **The turn:** the stick held back along his facing (below -0.5, `TURN_STICK`, as the hover's) turns him
+  (`PostureModule(1)` ReverseLr, then `PostureModule(2)`).
+- **In the air:** his horizontal momentum turns too, as Smash's B-reverse: energy 2 (the stick's air control, his air
+  speed) and energy 3 get their x negated (`KineticModuleF(0xa / 0xb, energy)` read their x / y, as vanilla's MSC
+  does). For that momentum to mean something, an air rise now keeps his air momentum at the lift-off (only its
+  vertical part is set). v3 zeroed energy 2 there; a ground rise still does.
+- Forward or neutral: nothing.
+- The rise's own forward speed follows his facing, so it goes the new way.
+
+Tests: ground and air, both facings, stick back / forward / neutral: turned once only with the stick back, the air
+momentum turned with him; a stick back after the window does nothing.
+
 ### Tests (v4 build, halos 0.16)
 See the report numbers below the package; the README's earlier test lists still hold except where v4 changed them.
 
@@ -1983,4 +1998,5 @@ See the report numbers below the package; the README's earlier test lists still 
   match (status, damage, kind) finds it; two fighters of the same kind, % and status hit together would be ambiguous;
 - the kinetic FALL type during the rise: that the stick drift and the game's fast fall work from the rise's status as
   in Fall; that the leap's own slowing holds after the type change;
+- the B-reverse's momentum flip through energy 2 / 3 (KineticModuleF 0xa / 0xb and KineticModule 0x11 on energy 2);
 - the burn hits' coins on a held victim (hitstun, no stage collision).

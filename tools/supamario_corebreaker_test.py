@@ -88,6 +88,9 @@ class Game:
         self.self_status = None         # his status as the variables read it (cb_reset_tick's test)
         self.frame_sets = []            # (n, frame) MotionModule(0x2713)
         self.used_log = []
+        self.stick_world = None
+        self.turns = []
+        self.vx2 = 0.0                  # energy 2 (the stick's air control: his air momentum), world X
         self.hit = False                # v4: his attack has hit the victim (AttackModule 0x2726 / 0x2727)
         self.cleared = []               # AttackModule(0x2719): his hitboxes cleared
 
@@ -102,6 +105,8 @@ class Game:
             return self.face
         if v == 0x0F0000A2:
             return float(self.self_status if self.self_status is not None else 0x154)
+        if v == 0x0F000110 and self.stick_world is not None:      # v4: a stick held (world X), along his facing
+            return self.stick_world * self.face
         if v == 0x0F000110:                         # his stick X along his facing
             return -1.0 if self.stick_back is not None and self.n >= self.stick_back else 0.0
         vi = self.victim
@@ -186,7 +191,7 @@ class Game:
             elif op == 0x11 and a[1] == 1:
                 self.vy = f(a[2])
             elif op == 0x11 and a[1] == 2:
-                pass
+                self.vx2 = f(a[2])
             elif op == 0xF and a[1] == 1:
                 self.acc = f(a[2])
             elif op == 0x14 and a[1] == 1:
@@ -211,8 +216,9 @@ class Game:
             if a[0] == 0x1:
                 return 2 if self.air else 0
             return 0
-        if sid == 0x11 and a[:2] == [0x1, 0x1]:     # KineticModuleF(1, 1): his vertical speed (v4's rise)
-            return R.f2i(self.vy)
+        if sid == 0x11 and len(a) == 2 and a[0] in (0xA, 0xB):   # KineticModuleF(0xa / 0xb, energy): its x / y
+            return R.f2i({(0xA, 1): 0.0, (0xB, 1): self.vy, (0xA, 2): self.vx2, (0xB, 2): 0.0,
+                          (0xA, 3): self.vx, (0xB, 3): 0.0}.get((a[0], a[1]), 0.0))
         if sid == 0x2E and a:                        # AttackModule (v4: the dive's catch in the MSC)
             if a[0] == 0x2724:
                 self.hit = False
@@ -223,6 +229,10 @@ class Game:
             return 0
         if sid == 0x1A and a and a[0] == 0x2722:     # GroundModule: touching (1 ceiling, 2 / 4 left / right wall)
             return 1 if a[1] == self.touch else 0
+        if sid == 0x14 and a and a[0] == 0x1:        # PostureModule: ReverseLr (v4's B-reverse)
+            self.face = -self.face
+            self.turns.append(self.n)
+            return 0
         if sid == 0x14 and a and a[0] == 0x271C:     # PostureModule: turn
             self.face = -self.face
             return 0
@@ -250,7 +260,7 @@ class Game:
             self.vy += self.acc
             if self.vy < -self.lim:
                 self.vy = -self.lim
-            nx = self.x + self.vx
+            nx = self.x + self.vx + self.vx2
             if self.wall is not None and self.vx != 0.0 and self.y < self.wall[1] and \
                     (self.x - self.wall[0]) * (nx - self.wall[0]) <= 0.0:
                 nx = self.wall[0] - (0.01 if self.vx > 0 else -0.01)
@@ -417,7 +427,7 @@ def msc_tests(path):
     for name, sit, st in (('landing', 0, 0x0), ('a ledge', 1, 0x74), ('a hit', 2, 0x46), ('a tumble', 2, 0x4C),
                           ('grabbed', 2, 0x3F), ('thrown', 2, 0x44), ('KO', 2, 0xB1), ('respawn', 2, 0xB2),
                           ('falling (no reset)', 2, 0xE), ('in the move (no reset)', 2, 0x154),
-                          ('in the move on the ground (no reset: v3 compared the float status with an int)', 0, 0x154),
+                          ('in the move on the ground (no reset)', 0, 0x154),      # v3 compared it as an int
                           ('an aerial (no reset)', 2, 0x34)):
         g.vars[B.CB_USED] = 2.0
         g.vars[B.CB_AIR] = 1.0                       # in the air since the use
@@ -472,6 +482,29 @@ def msc_tests(path):
     check('the rise: up special again in it goes to the hover / dive in place (cb_used 2, the motion to %d)'
           % B.HOVER_FROM, (used(g), any(t[1] == B.HOVER_FROM for t in tr), phases_of(tr)), (2.0, True, [0.0, 1.0, 2.0,
                                                                                                    5.0]))
+    # 4b. v4 (user: "make the up special leap B-reversable/change facing direction based on direction held at the start
+    # of the move"): the stick back in its first frames turns him, in the air his momentum with him; forward / neutral
+    # nothing; both facings, ground and air
+    out, want = [], []
+    for air in (False, True):
+        for face in (1.0, -1.0):
+            for stick in ('back', 'forward', 'neutral'):
+                g = Game(x=0.0, y=40.0 if air else 0.0, face=face,
+                         stage=(1000.0, 1001.0) if air else (-200.0, 200.0))
+                g.vx2 = 1.0 * face if air else 0.0                      # moving forward in the air
+                g.stick_world = {'back': -face, 'forward': face, 'neutral': 0.0}[stick]
+                tr = run(path, g, frames=B.RISE_FROM + 3)
+                g.stick_world = None
+                flip = stick == 'back'
+                out.append((air, face, stick, g.face, len(g.turns), round(g.vx2, 3)))
+                want.append((air, face, stick, -face if flip else face, 1 if flip else 0,
+                             round((-1.0 if flip else 1.0) * face, 3) if air else 0.0))
+    check('the rise\'s B-reverse: the stick back in its first %d frames turns him once (ground and air, both facings), '
+          'his air momentum turned with him; forward / neutral: nothing' % B.TURN_WINDOW, out, want)
+    g = Game()
+    g.stick_back = B.TURN_WINDOW + 1
+    run(path, g, frames=B.RISE_FROM + 3)
+    check('the rise\'s B-reverse: not after its first %d frames' % B.TURN_WINDOW, (g.face, len(g.turns)), (1.0, 0))
     # 5. the hover's detection box: a fighter at his middle -> straight to the catch (no hover / dive)
     v = {'x': 1.0, 'y': 0.0, 'status': 0x47}
     g = Game(stage=(-200.0, 200.0), victim=v)

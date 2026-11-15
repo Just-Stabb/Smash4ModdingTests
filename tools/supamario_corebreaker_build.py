@@ -79,6 +79,8 @@ FALL_LIMIT = 30.0                          # gravity's limit while his speeds ar
 FALL_VX = 1.0                              # his speed along his facing into FallSpecial after a dive
 CRASH_BACK_V = 1.6                         # XV2 entry 12: a 6.5 m slide back (x0.5 here), ground friction stops it
 TURN_STICK = 0.5                           # the hover's B-reverse: the stick this far back
+TURN_WINDOW = 4                            # v4: the rise's B-reverse: in its first frames (vanilla Super Jump Punch's
+                                           # turn check: its flag 0x2100000F at frame 4), before the lift-off (6)
 
 # ---------------------------------------------------------------- the victim, the hits
 HOLD_X, HOLD_Y = 9.0, -2.0                 # its feet at his fist (the dive pose's RHandN: 6.3 ahead, 3.1 up)
@@ -154,7 +156,7 @@ def msc_values():
             'CB_FALL_LIMIT': fl(FALL_LIMIT), 'CB_FALL_VX': fl(FALL_VX),
             'CB_HOME_D2': fl(HOME_RANGE ** 2), 'CB_HOME_CONE': fl(HOME_CONE), 'CB_HOME_TURN': fl(HOME_TURN),
             'CB_HOME_MAX': fl(HOME_MAX), 'CB_DOWN_LO': fl(DOWN_LO), 'CB_DOWN_HI': fl(DOWN_HI),
-            'CB_TURN_STICK': fl(TURN_STICK), 'CB_RELEASE_SND_AT': str(RELEASE_SND_AT),
+            'CB_TURN_STICK': fl(TURN_STICK), 'CB_TURN_WINDOW': fl(TURN_WINDOW), 'CB_RELEASE_SND_AT': str(RELEASE_SND_AT),
             'CB_SND_RISE': '0x%X' % SE_IDS['cb_rise'], 'CB_SND_CHARGE': '0x%X' % SE_IDS['cb_charge'],
             'CB_SND_RELEASE': '0x%X' % SE_IDS['cb_release'], 'CB_SND_RUSH': '0x%X' % SE_IDS['cb_rush'],
             'CB_SND_EXPLOSION': '0x%X' % SE_IDS['cb_explosion'], 'CB_SND_HIT': '0x%X' % SE_IDS['cb_hit_l'],
