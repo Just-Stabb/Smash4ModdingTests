@@ -458,14 +458,43 @@ nothing / reads 0). A target that isn't there: nothing happens, reads give 0.
 
 - They run the same module ops MSC does, on the target, so articles work too (an article's rotation is kept until
   changed; a fighter's status may set its own every frame).
-- Motion numbers are per fighter (Sm4shCommand's View > Show Animation IDs). The status keeps running and may play
-  its own motion again.
+- Motion numbers are per fighter (Sm4shCommand's View > Show Animation IDs, in hex; a plain number in a script is
+  decimal, so `Motion=42` is `0x2A`). Kinds 0x000-0x210 are common to every fighter (0x24 Fall, 0x2A FallSpecial,
+  0x2D LandingFallSpecial, ...; `tools/mtable.py`). The status keeps running and may play its own motion again, or
+  end when the new motion ends (Link's AirCatch goes to Fall then).
+- **`Motion_Set` on the fighter itself ends the script it is in.** The game binds the new motion's game /
+  expression scripts the moment the motion changes (its rule for every motion change, MSC's too:
+  0x027608B0 -> 0x02BEE560), so nothing after the `Motion_Set` runs; the new motion's game script starts from its
+  beginning on the next frame. Put what must still happen before it (a `Rate` in the `Motion_Set` itself instead
+  of a `Set_Frame_Duration` after it). exe_v46j: if the motion change ran the new script at once (its frame sync,
+  0x02760EB0), exe_v40-v46i's handler stepped 5 words into the *new* script and the interpreter went on reading it
+  from there; now the old script stops cleanly and the new one is left as the game set it.
+- To be in another *state* (helpless special fall, a landing, ...), change the status (`Status_Set`), not the
+  animation: the status plays its own motion and lands, acts and ends as that state does.
 - A grounded fighter moved up may snap back or fall, as with MSC's `PostureModule(3, ...)`.
 
 ```
 Rotation_Set(Target=0, X=0, Y=0, Z=45)                     // this projectile, tilted 45 degrees
 Motion_Set(Target=0, Motion=0x5F, Frame=10, Rate=0.5)      // motion 0x5F from frame 10, half speed
 Position_Get(Target=1, Axis=1, Variable=VAR_0)             // VAR_0 = the nearest opponent's Y
+```
+
+Fox, any move's game script: from frame 20 play FallSpecial (0x2A, common) at half speed. Nothing after the
+`Motion_Set` runs (FallSpecial's own script takes over), and the move's status still decides when it ends:
+
+```
+FRAME(Frames=20)
+Motion_Set(Target=0, Motion=0x2A, Frame=0, Rate=0.5)
+```
+
+Link's AirCatch (Zair), helpless from frame 11: that is the SpecialFall *status* (0x10), which plays FallSpecial
+itself, can't act until it lands, lands with LandingFallSpecial (status 0x19), and on leaving AirCatch the hookshot
+is put away:
+
+```
+FRAME(Frames=11)
+Remove_All_Hitboxes()
+Status_Set(Target=0, Status=0x10)
 ```
 
 ## Last_Hit_Get / Target_Slot_Get

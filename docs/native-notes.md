@@ -1864,6 +1864,18 @@ by its name `0x4f%06x` (`0x032F5640`), so shader 3 is a new record (after 2, ids
 - A motion change inside a status (e.g. landing: SpecialAirN -> SpecialN) runs the new motion's
   sound script from its start, so a move that keeps its status across it plays its sounds from the
   MSC (Supamario's Kamehameha, test 26).
+- ACMD `Motion_Set` on the fighter itself (motion_set_fix v1, exe_v46j): the motion change binds the
+  game agent to the new motion's script (`0x027608B0` -> `0x02BEE560`: state `+0` = `+4` = new script,
+  `+8` = 0), so after the handler returns the interpreter (`0x02BEE874`: `+8 != -1` -> return) stops
+  the old script; the new script runs from its start on the next frame. If the change's frame sync
+  (`0x02760EB0`, nested `0x02BEE950` on `this+0x50` / `+0x88`) ran the new script at once, `+8` is
+  -1 again and v40-v46i's handler stepped `+4` 5 words into the new script and returned 2 (the
+  interpreter went on reading it misaligned). v46j: the handler saves `[state+0]` before the call;
+  if it changed, it sets `+8 = 0` and returns 0 without touching `+4` (`ms_fix_code`;
+  `acmd_ext_test.py` simulates both rebinds). Whether the in-game change runs that nested sync is
+  unverified. User case: Link AirCatch `Motion_Set(0, 42, 1, 1)` + `Set_Frame_Duration(0.1)` at
+  frame 11 - 42 = 0x2A FallSpecial is right; the duration never runs (script ended), AirCatch
+  stays the status (Fall at the motion's end, not helpless): special fall is `Status_Set(0, 0x10)`.
 
 ## Fighter sound banks: one bank an id (new kinds' sound fix v1)
 

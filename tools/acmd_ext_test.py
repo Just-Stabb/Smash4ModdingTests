@@ -804,6 +804,15 @@ common:                         # log {wrapper, accessor, n, words[0..3]}; retur
         stw r0, 0x18(r9)
         addi r12, r12, 1
         stw r12, 0xFFC(r11)
+        lwz r0, 0xF20(r11)              # a motion change rebinding the script (Motion_Set on itself): [0xF20] the
+        cmpwi r0, 0                     # new script's start (0: off), [0xF24] the script state, [0xF28] its +8 after
+        beq st_ret                      # (0: bound, -1: the frame sync ran it already)
+        lwz r9, 0xF24(r11)
+        stw r0, 0(r9)
+        stw r0, 4(r9)
+        lwz r0, 0xF28(r11)
+        stw r0, 8(r9)
+st_ret:
         lwz r3, 0xFF8(r11)
         blr
 get:                            # WorkModule vt +0x44: ACC 0x0F0002BC + t -> M + 0x1000 t (as float bits)
@@ -915,6 +924,19 @@ am_now:
     _r, _s, calls, _st, _c = cmd('Motion_Set', 0, 0x50, 5.0, 0.0)
     check('Motion_Set(0x50, 5, 0): MotionModule(1, 0x50, 5.0, 1.0)', [c[:7] for c in calls],
           [(MW, me, 4, 1, 0x50, fb(5.0), fb(1.0))])
+    # exe_v46j: Motion_Set on itself rebinds the running script (the motion change binds the new motion's scripts):
+    # the handler must not step the new script on, and the interpreter must stop this run (+8 not -1)
+    for after in (0, 0xFFFFFFFF):
+        w32(pm, LOG + 0xF20, 0x2000)
+        w32(pm, LOG + 0xF24, state)
+        w32(pm, LOG + 0xF28, after)
+        w32(pm, state, 0x1000)
+        r, step, calls, _st, _c = cmd('Motion_Set', 0, 0x2A, 1.0, 1.0)
+        w32(pm, LOG + 0xF20, 0)
+        check('Motion_Set on itself, rebound (+8 %d after the call): returns 0, the new script untouched (+4 at its '
+              'start), +8 = 0 (the interpreter stops; the new script runs next frame)' % (-1 if after else 0),
+              (r, step, r32(pm, state + 8)), (0, 0x1000, 0))
+    w32(pm, state, 0x1000)
     _r, _s, calls, _st, _c = cmd('Motion_Set', 0, -1, 7.0, 2.0)
     check('Motion_Set(-1, 7, 2): MotionModule(0x2713, 7.0), MotionModule(4, 2.0)', [c[:5] for c in calls],
           [(MW, me, 2, 0x2713, fb(7.0)), (MW, me, 2, 4, fb(2.0))])

@@ -425,7 +425,8 @@ NEW_CMDS = [
         ('Frame', 1, 'The frame to start at (Motion -1: jump to it; a negative Frame leaves the frame as it is).'),
         ('Rate', 1, 'Playback rate (1 = normal). 0 or less: 1 for a new motion; Motion -1: the rate is left as it is.')],
      'Plays an animation on a fighter (or article) from a frame at a rate, or changes the current one\'s frame / rate '
-     '(MSC MotionModule(1 / 0x2713 / 4)). The status keeps running: it may change the motion again.'),
+     '(MSC MotionModule(1 / 0x2713 / 4)). The status keeps running: it may change the motion again. On this fighter '
+     'itself a new motion ends this script (the new motion\'s scripts take over; exe_v46j: cleanly).'),
     ('Last_Hit_Get', 'h_lastget', [
         ('Which', 0, '0: the last fighter this one hit (its current attack\'s newest hit; once the attack is over, a '
                      'fighter whose last attacker is this one); 1: the last fighter that hit this one (the game\'s own '
