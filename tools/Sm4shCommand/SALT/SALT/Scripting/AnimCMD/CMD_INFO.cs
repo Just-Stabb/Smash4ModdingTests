@@ -167,7 +167,9 @@ namespace SALT.Moveset.AnimCMD
             {0xA321746C,11},
             {0x8F468450,4},
             {0x9D1183FB,5},
-            {0xF478E0CC,9}
+            {0xF478E0CC,9},
+            {0x270E6148,4},
+            {0x544E610E,5}
         };
         #endregion
         #region Names
@@ -795,6 +797,8 @@ namespace SALT.Moveset.AnimCMD
             {0x8F468450,"Gravity_Set"},
             {0x9D1183FB,"Position_Offset_Get"},
             {0xF478E0CC,"Position_Place"},
+            {0x270E6148,"Buffer_Clear"},
+            {0x544E610E,"Buffer_Set"},
         };
         #endregion
         #region Params
@@ -1424,6 +1428,8 @@ namespace SALT.Moveset.AnimCMD
             {0x8F468450,"1,1,0"},
             {0x9D1183FB,"0,0,0,3"},
             {0xF478E0CC,"0,0,1,1,1,0,0,0"},
+            {0x270E6148,"0,0,0"},
+            {0x544E610E,"0,0,0,0"},
         };
         #endregion
         #region syntax
@@ -2051,6 +2057,8 @@ namespace SALT.Moveset.AnimCMD
             {0x8F468450,"Accel,MaxFall,Mode"},
             {0x9D1183FB,"Target,Axis,RelativeTo,Variable"},
             {0xF478E0CC,"Target,Relative,Fwd,Up,Depth,Axes,Frames,Collision"},
+            {0x270E6148,"Target,Inputs,Frames"},
+            {0x544E610E,"Target,Input,Direction,Frames"},
         };
         #endregion
 
@@ -2680,6 +2688,8 @@ namespace SALT.Moveset.AnimCMD
             {0x8F468450,"Sets this fighter's gravity and max fall speed for the rest of the move (aerials, specials, a grounded move that went on in the air with Leave_Ground_Cancel, ...). Back to the fighter's own by itself at the next status (move), when a hit takes effect, on a ledge grab and on a KO. Fighters only. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x9D1183FB,"Reads where a fighter is: its stage position or facing, how far it is in front of / above this object, how far this object is in front of or behind it, or the distance between them. Every target, the new one (12) included. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0xF478E0CC,"Puts a fighter (or this object) somewhere: at a stage position, in front of / above this object, moved from where it is, or this object next to the target; X, Y, Z or some of them; once or held there every frame for a number of frames, optionally through the stage. The position variables' uses (docs/position-variables.md) in one command, for every target. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0x270E6148,"Empties a fighter's input buffer (all of it or some inputs), so nothing it pressed before comes out when it can act: e.g. the fighter a grab-like move releases. Once, or for some frames. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0x544E610E,"Puts an input in a fighter's buffer as if it had pressed it (with a stick direction): the game makes its own commands of it at the fighter's next input read, and the fighter does it as soon as it can act (a jump at the end of a move, an attack out of hitstun, ...). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
         };
         #endregion
         /// <summary>

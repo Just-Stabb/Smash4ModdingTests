@@ -10650,6 +10650,36 @@
 "Frames",
 "Collision"
 ]
+},
+"270E6148": {
+"size": 4,
+"name": "Buffer_Clear",
+"format": [
+0,
+0,
+0
+],
+"syntax": [
+"Target",
+"Inputs",
+"Frames"
+]
+},
+"544E610E": {
+"size": 5,
+"name": "Buffer_Set",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"Target",
+"Input",
+"Direction",
+"Frames"
+]
 }
 }
 }

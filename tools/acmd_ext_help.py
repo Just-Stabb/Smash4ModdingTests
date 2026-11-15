@@ -23,7 +23,7 @@ for _g, _names in (
         ('Fighter state', ['Status_Get', 'Status_Set', 'Hitstun_Get', 'Hitstun_Set', 'Hitstop_Set', 'Damage_Get',
                            'Damage_Set', 'Body_State_Set', 'Armor_Set', 'Item_State_Set', 'Stage_Collision_Set',
                            'Leave_Ground_Cancel', 'Gravity_Set']),
-        ('Inputs', ['Input_Compare', 'Input_Get', 'Input_Set']),
+        ('Inputs', ['Input_Compare', 'Input_Get', 'Input_Set', 'Buffer_Clear', 'Buffer_Set']),
         ('Position & rotation', ['Position_Get', 'Position_Set', 'Position_Place', 'Position_Offset_Get', 'Rotation_Get',
                                  'Rotation_Set', 'Joint_Position_Get']),
         ('Animation', ['Motion_Get', 'Motion_Set', 'Animation_Rate_Set']),
@@ -159,6 +159,9 @@ GROUP_HELP = {
         'A fighter\'s controller: test an input (Input_Compare, then True / Else), copy it into a variable '
         '(Input_Get), or force it as if the controller did it (Input_Set). Targets 0-10 and 12 (exe_v46k: the fighter '
         'this attack hit); not 11.',
+        'Buffer_Clear / Buffer_Set (exe_v46l) work on the input buffer instead: what the game keeps of presses for 10 '
+        'frames so a move comes out as soon as the fighter can act. Clear it (all, or attacks / specials / jump / ...), '
+        'or put an input in it as if pressed. Every target (11 included).',
     ],
     NEW_GROUP + ' / Position & rotation': [
         'Where a fighter or article is, which way it faces, its rotation, and a joint\'s place, read into variables '
@@ -2066,3 +2069,148 @@ for _n, _lines in _T12.items():
     _k = sum(1 for _l in EXAMPLES[_n] if _l.startswith('// Example')) + 1
     _head = '// Example %d (exe_v46k): %s' % (_k, _lines[0][3:])
     EXAMPLES[_n] = EXAMPLES[_n] + ['', _head] + _lines[1:]
+
+# --- exe_v46l: Buffer_Clear / Buffer_Set (the input buffer) ----------------------------------------------------------
+_BUFFER = [
+    '## The input buffer',
+    'A fighter doesn\'t act on a press only on the frame it presses: the game turns each press into commands (attack, '
+    'forward tilt, up special, jump, roll, ...: worked out from the button and the stick that frame) and keeps them '
+    'for 10 frames (the buffer window). Whenever the fighter can act (the move\'s end, its interrupt frame, hitstun\'s '
+    'end, landing), its status picks the first command still there: so a button pressed during a move, or during '
+    'hitstun / a grab, comes out the moment it can. The game empties the buffer itself at many status changes.',
+    'The buffer counts down when the fighter\'s input is read (once a frame). Unconfirmed: whether that stops while it '
+    'is frozen in hitstop; if so, a press made before a long freeze (a grab-like move holding it) is still there when '
+    'it ends: clear it on release.',
+]
+HELP['Buffer_Clear'] = [
+    '## How it works',
+    'Empties the target\'s input buffer (new in exe_v46l), so nothing it pressed before comes out when it can act. '
+    'Inputs picks what goes (bits, add them):',
+    '- 1 attacks: jab, tilts, smashes (A, the C-stick, A+B), aerials.',
+    '- 2 specials (neutral, side, up, down).',
+    '- 4 jump: the jump button and the stick (tap) jump.',
+    '- 8 shield: shield / air dodge, spot dodge, rolls.',
+    '- 16 grab.',
+    '- 32 taunts.',
+    '- 64 stick commands: dash, turn and the stick\'s flicks (a flick just made won\'t count as a smash input).',
+    '- 0 (or 128): everything, as the game\'s own clear at a status change: every command, the press / release '
+    'buffer, this frame\'s presses and the per-button "pressed N frames ago" counters.',
+    'The selected inputs\' presses this frame go too, so the target\'s status this frame doesn\'t see them either.',
+    '',
+    '## Frames',
+    '- 0 / 1: once, now.',
+    '- 2 or more: now, and again after each of its next Frames - 1 input reads (one a frame): what it presses in that '
+    'time goes too. Use it when the target may still be pressing (mashing) '
+    'until it is let go. A Buffer_Clear with Frames replaces the target\'s earlier one.',
+    '',
+] + _BUFFER + [
+    '',
+    '## Buffer_Clear, Buffer_Set and Input_Set',
+    '- Input_Set (and the input variables) forces the controller itself: a held or pressed button, a tilted stick, '
+    'or the controller ignored (Input 21). The game then sees those presses as real ones, and buffers them as it does '
+    'any press.',
+    '- Buffer_Clear empties what is already in the buffer; it doesn\'t stop new presses (for that, Input_Set(Target, '
+    '21, 1) ignores its controller; set it back with 0). A held button isn\'t a new press: holding attack through a '
+    'Buffer_Clear doesn\'t buffer another attack; holding shield still shields, as holding does.',
+    '- Buffer_Set puts a press in the buffer without touching the controller (Buffer_Set\'s help).',
+    '',
+    'MSC (no ACMD command there): WorkModule(0, slot, 0x0F0003C9) (BUFFER_CLEAR) clears player slot 1-8\'s buffer '
+    'now (0: this fighter\'s), everything; slot + 16 x Inputs for some inputs only. SET_FLOAT works too.',
+    '',
+] + TARGETS + [
+    '',
+    '## Gotchas',
+    '- Fighters only (Target an article: nothing).',
+    '- It clears the buffer at this moment of the frame: if the target already acted on it this frame (its status ran '
+    'before this script), that action stays. Clear a frame early, or use Frames.',
+    '- Target 2 / 12 is only "the fighter this attack hit" while the attack lasts; to clear the buffer of a fighter '
+    'released later, keep its slot (Target_Slot_Get) and use Target 2 + slot, or BUFFER_CLEAR from the MSC.',
+    '',
+    NOT_VIEWER,
+    'Needs exe_v46l (the patched cross_f.rpx, tools/acmd_ext_cave.py).',
+]
+HELP['Buffer_Set'] = [
+    '## How it works',
+    'Puts an input in the target\'s buffer as if it had pressed it (new in exe_v46l): at the target\'s next input read '
+    '(its next frame), the game builds its commands from that press as from a real one (with the stick it is told), '
+    'and the target does it as soon as it can act: a jump at the end of a move, an attack out of hitstun, a shield '
+    'the moment it lands. Its controller is left alone: nothing is held after, and its own stick is back the same '
+    'frame.',
+    '- Input: 0 attack, 1 special, 2 jump, 3 shield, 4 grab, 5 taunt up, 6 taunt side, 7 taunt down.',
+    '- Direction: 0 the fighter\'s own stick (as it is held); 1 neutral, 2 forward (along its facing), 3 back, 4 up, '
+    '5 down; add 8 for a flick (the stick slammed that frame: a smash attack with Input 0, a tap jump with 12 and Input '
+    '2, a roll / spot dodge with Input 3, a dash ...). Attack + 2 = a forward tilt (or forward air in the air); + 10 = '
+    'a forward smash.',
+    '- Frames: 0 the game\'s buffer window (10 frames from its next input read); 1-255: the commands it made stay '
+    'that many frames instead.',
+    'One Buffer_Set waits per fighter (a new one replaces it); it is used at the target\'s next input read.',
+    '',
+] + _BUFFER + [
+    '',
+    '## Buffer_Set or Input_Set?',
+    '- Input_Set(Target, Input, 2) presses the button on its controller for one frame (and Input_Set 16-19 tilts its '
+    'stick until set back): its status also sees the press that frame (ControlModule pressed), and the stick stays '
+    'forced until you stop it.',
+    '- Buffer_Set only fills the buffer: the press is never on the controller, its stick isn\'t moved, and Frames can '
+    'keep it waiting longer than the game\'s window. What the fighter does with it is the game\'s own choice for '
+    'that command in its status (a buffered attack in the air is an aerial, on the ground a tilt or jab).',
+    '',
+] + TARGETS + [
+    '',
+    '## Gotchas',
+    '- Fighters only. CPUs too (their inputs go through the same buffer).',
+    '- It takes effect at the target\'s next frame, not this one, and only when the target can act does the command '
+    'come out: in a status that ignores the command (or with the move\'s own conditions unmet) nothing happens, and '
+    'after its window it\'s gone.',
+    '- The game clears the buffer at many status changes (the start of most moves): a Buffer_Set made long before a '
+    'status change may be gone by then; make it within the last frames.',
+    '- Tilt or smash, which aerial, which special: the game decides from the stick it is given, as for a player. With '
+    'Direction 0 the fighter\'s own stick decides.',
+    '- A Buffer_Clear with Frames on the same fighter clears what Buffer_Set made (the clear runs after it).',
+    '',
+    NOT_VIEWER,
+    'Needs exe_v46l (the patched cross_f.rpx, tools/acmd_ext_cave.py).',
+]
+EXAMPLES['Buffer_Clear'] = [
+    '// Example 1: a grab-like move (Super God Fist): the fighter it hit is held, then let go at frame 40 with nothing',
+    '// buffered: everything it pressed while held is gone, and for 5 more frames whatever it mashes',
+    'FRAME(Frames=40)',
+    'Remove_All_Hitboxes()',
+    'Buffer_Clear(Target=2, Inputs=0, Frames=5)',
+    '',
+    '// Example 2: the nearest opponent loses its buffered attacks and specials (it can still jump or shield)',
+    'Buffer_Clear(Target=1, Inputs=3, Frames=0)',
+    '',
+    '// Example 3: on the catch, empty the buffer of the fighter this attack hit (Target 12: nobody if it missed),',
+    '// and remember its slot for the release',
+    'FRAME(Frames=8)',
+    'Buffer_Clear(Target=12, Inputs=0, Frames=0)',
+    'Target_Slot_Get(Target=12, Variable=VAR_0)',
+    '',
+    '// Example 4: this fighter\'s own buffer emptied at the start of a move (no jump or shield buffered into it)',
+    'Buffer_Clear(Target=0, Inputs=12, Frames=0)',
+    '',
+    '// Example 5: the MSC\'s way, as a variable: player 2\'s buffer, everything (player 2 + 16 x 1: attacks only)',
+    'SET_FLOAT(Value=2, Variable=BUFFER_CLEAR)',
+    'SET_FLOAT(Value=18, Variable=BUFFER_CLEAR)',
+]
+EXAMPLES['Buffer_Set'] = [
+    '// Example 1: buffer a jump for this fighter near the end of a move: it jumps the frame the move ends',
+    '// (Frames 20: kept 20 frames, so it can go 10 frames before the end)',
+    'FRAME(Frames=30)',
+    'Buffer_Set(Target=0, Input=2, Direction=0, Frames=20)',
+    '',
+    '// Example 2: the fighter this attack hit does a down smash as soon as it can act (kept 40 frames)',
+    'FRAME(Frames=12)',
+    'Buffer_Set(Target=12, Input=0, Direction=13, Frames=40)',
+    '',
+    '// Example 3: a buffered forward air out of this fighter\'s up special (in the air: attack + forward)',
+    'FRAME(Frames=25)',
+    'Buffer_Set(Target=0, Input=0, Direction=2, Frames=0)',
+    '',
+    '// Example 4: the nearest opponent shields the moment it can (kept 15 frames)',
+    'Buffer_Set(Target=1, Input=3, Direction=1, Frames=15)',
+    '',
+    '// Example 5: player 1 (Target 3) does a neutral special out of the move\'s freeze',
+    'Buffer_Set(Target=3, Input=1, Direction=1, Frames=0)',
+]

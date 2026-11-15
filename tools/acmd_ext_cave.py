@@ -1050,6 +1050,8 @@ BUF_HOOK = 0x02E72B9C             # the control update 0x02E729E4's bl BUILDER (
 BUF_HOOK_ORIG = 0x4BFFEBD9
 GAME_CLEAR = 0x02E70FB4           # clear_command: the trigger buffer (+0xB4 / +0xB8) and the 4 command categories
 RESET_TRIG = 0x02003568           # (controller struct) pressed = 0, the 16 per-button frame counters 0xFE (MSC 0x271B; buf_clear does the same inline)
+BUF_VAR = 0x0F0003C9              # BUFFER_CLEAR: write a player slot (+ 16 x groups) to clear its buffer (MSC's way)
+BUF_DATA = 0x04BD3B00             # buf_data's tables (after Gravity_Set's code, which ends at 0x04BD3ACC)
 BUF_TAB = 0x04BD3D00              # BUF_N requests of BUF_SIZE (zero at load; free between Gravity_Set's code and GS):
 BUF_N = 12                        # +0 the ControlModule (0 = free), +4 kind (1 clear, 2 set), +8 Inputs / Input,
 BUF_SIZE = 0x14                   # +0xC Direction, +0x10 frames (clear: re-clears left; set: the life asked)
@@ -1067,12 +1069,11 @@ BUF_PRESS = [(0x0201, 0x0001), (0x0802, 0x0002), (0x0004, 0x0004), (0x0008, 0x00
              (0x0400, 0x0400), (0x2000, 0x2000), (0x1000, 0x1000)]
 
 
-def buf_code(b, h):
+def buf_code(b):
     """exe_v46l (in APC_CODE after apc_code): Buffer_Clear / Buffer_Set and buf_build, which the fighters' control update
     calls instead of the builder (BUF_HOOK): a pending Buffer_Set's press (and stick) is put in the controller struct
     around the builder, which makes the game's own commands of it (its timer set to Frames when asked); a pending
     Buffer_Clear clears again after the builder, for its frames"""
-    pro, S, tgt = h['pro'], h['S'], h['tgt']
     tab = dict(th=ha(BUF_TAB), tl=lo(BUF_TAB), n=BUF_N, size=BUF_SIZE, vh=FCM_VT >> 16, vl=FCM_VT & 0xFFFF)
     b.asm(("""
 # --- buf_cm(r3 accessor) -> r3 its fighter ControlModule, 0 = none / not a fighter's; leaf (r0, r12) ----------------
@@ -1182,9 +1183,10 @@ bc_all:
         li r0, 0xFE
         li r9, 32
         mtctr r9
-        addi r9, r3, 0x4F
+        addi r9, r3, 0x50
 bc_rt:
-        stbu r0, 1(r9)
+        stb r0, 0(r9)
+        addi r9, r9, 1
         bdnz bc_rt
         lwz r3, 0xA0(r31)""" + chk_t('r3', 'r0', 'bc_af') + """
         li r0, 0
@@ -1379,8 +1381,63 @@ bb_out:
         addi r1, r1, 0x40
         blr
 
-# --- Buffer_Clear(Target, Inputs, Frames) ----------------------------------------------------------------------------
-""") % dict(tab, gclear=GAME_CLEAR, reset=RESET_TRIG, builder=BUILDER) + pro('h_bufclr', S('Buffer_Clear')) + tgt + """
+# --- user_entry's 0x3C9 BUFFER_CLEAR (from hv_var's zero; r31 WorkModule, r30 index, r29 write, the value at
+#     0x18(r1); r27 r28 free): a write clears the buffer of player slot (value & 15; 0 = this object's fighter) now,
+#     the groups value >> 4 (Buffer_Clear's Inputs; 0 everything). Reads 0. For MSC: WorkModule(0, slot, 0x0F0003C9)
+buf_var:
+        cmplwi r30, %(bvid)d
+        bne bv_zero
+        cmpwi r29, 0
+        beq bv_zero
+        lfs f1, 0x18(r1)
+        bl f2i
+        mr r28, r3
+        mr r3, r31
+        bl acc_of
+        cmpwi r3, 0
+        beq bv_zero
+        clrlwi. r4, r28, 28
+        beq bv_tg
+        addi r4, r4, 2                  # player slot n = target 2 + n
+bv_tg:
+        bl nc_target
+        bl buf_cm
+        cmpwi r3, 0
+        beq bv_zero
+        srwi r4, r28, 4
+        bl buf_clear
+bv_zero:
+        b ue_zero
+""") % dict(tab, gclear=GAME_CLEAR, reset=RESET_TRIG, builder=BUILDER, bvid=BUF_VAR & 0x3FF))
+
+
+def buf_data(b):
+    """Buffer_Clear's groups, Buffer_Set's buttons and stick directions (at BUF_DATA)"""
+    b.asm("""
+buf_groups:
+""" + "".join("        .word 0x%08X\n        .word 0x%08X\n        .word 0x%08X\n        .word 0x%08X\n" % g
+              for g in BUF_GROUPS) + """buf_press:
+""" + "".join("        .word 0x%08X\n        .word 0x%08X\n" % p for p in BUF_PRESS) + """buf_dirs:
+        .float 0.0
+        .float 0.0
+        .float 0.0
+        .float 0.0
+        .float 1.0
+        .float 0.0
+        .float -1.0
+        .float 0.0
+        .float 0.0
+        .float 1.0
+        .float 0.0
+        .float -1.0
+""")
+
+
+def buf_handlers(b, h):
+    """Buffer_Clear / Buffer_Set's handlers (in CODE2, with the other new commands': APC_CODE is full); their helpers
+    (buf_cm, buf_clear, buf_slot) in APC_CODE"""
+    pro, S, tgt = h['pro'], h['S'], h['tgt']
+    b.asm(pro('h_bufclr', S('Buffer_Clear')) + tgt + """
         mr r3, r27
         bl buf_cm
         mr. r26, r3
@@ -1400,9 +1457,9 @@ bb_out:
         stw r0, 4(r3)
         lwz r0, 4(r30)
         stw r0, 8(r3)
-        lwz r0, 8(r30)
-        addi r0, r0, -1
-        stw r0, 0x10(r3)
+        lwz r11, 8(r30)
+        addi r11, r11, -1               # (not r0: addi rD, r0, n is li)
+        stw r11, 0x10(r3)
         b nc_out
 
 # --- Buffer_Set(Target, Input, Direction, Frames): made at its next build ----------------------------------------------
@@ -1434,24 +1491,6 @@ bb_out:
         lwz r0, 12(r30)
         stw r0, 0x10(r3)
         b nc_out
-""")
-    b.asm("""
-buf_groups:
-""" + "".join("        .word 0x%08X\n        .word 0x%08X\n        .word 0x%08X\n        .word 0x%08X\n" % g
-              for g in BUF_GROUPS) + """buf_press:
-""" + "".join("        .word 0x%08X\n        .word 0x%08X\n" % p for p in BUF_PRESS) + """buf_dirs:
-        .float 0.0
-        .float 0.0
-        .float 0.0
-        .float 0.0
-        .float 1.0
-        .float 0.0
-        .float -1.0
-        .float 0.0
-        .float 0.0
-        .float 1.0
-        .float 0.0
-        .float -1.0
 """)
 
 
@@ -3326,7 +3365,7 @@ hvv_pzero:
         mtlr r0
         addi r1, r1, 0x30
 hvv_zero:
-        b ue_zero
+        b buf_var                       # exe_v46l: 0x3C9 BUFFER_CLEAR (buf_code), else ue_zero
 
 # --- hv_atan2(f1 y, f2 x) -> f1 degrees, 0 to 360 (0: +x, 90: +y; 0 for (0, 0)); f0 f3-f8, cr0 cr1, r12 ---------
 hv_atan2:
@@ -3659,6 +3698,7 @@ next_entry:
     input_code(a)
     b2 = Asm(CODE2)                     # the new commands (their labels resolve with the main part's, below)
     helpers = newcmd_code(b2)
+    buf_handlers(b2, helpers)            # exe_v46l
     b3 = Asm(LGC_CODE)                  # Leave_Ground_Cancel (its own space: CODE2 is full)
     lgc_code(b3)
     ms_fix_code(b3)                     # exe_v46j: Motion_Set on itself (after LGC's code: nothing else moves)
@@ -3676,7 +3716,11 @@ next_entry:
     hv_code(b6)
     b7 = Asm(APC_CODE)                  # exe_v46k: Position_Place / Position_Offset_Get, target 12 (position_vars' space)
     apc_code(b7, helpers)
-    buf_code(b7, helpers)                # exe_v46l: Buffer_Clear / Buffer_Set
+    buf_code(b7)                         # exe_v46l: Buffer_Clear / Buffer_Set (their handlers in CODE2)
+    b8 = Asm(BUF_DATA)                   # exe_v46l: their tables (free after Gravity_Set's code)
+    buf_data(b8)
+    assert not set(b8.labels) & set(a.labels), set(b8.labels) & set(a.labels)
+    a.labels.update(b8.labels)
     assert not set(b7.labels) & (set(a.labels) | set(b2.labels) | set(b6.labels)), \
         set(b7.labels) & (set(a.labels) | set(b2.labels) | set(b6.labels))
     a.labels.update(b7.labels)
@@ -3741,6 +3785,11 @@ ue_nv_far:                              # user_entry's New_Var IDs (exe_v40): ue
     words7 = b7.words()
     assert APC_CODE + 4 * len(words7) <= APC_LIMIT, hex(APC_CODE + 4 * len(words7))
     a.part7 = (APC_CODE, words7)
+    b8.labels.update(a.labels)
+    words8 = b8.words()
+    assert GS_CODE + 4 * len(words5) <= BUF_DATA and BUF_DATA + 4 * len(words8) <= BUF_TAB, hex(BUF_DATA + 4 * len(words8))
+    assert BUF_TAB + BUF_N * BUF_SIZE <= GS
+    a.part8 = (BUF_DATA, words8)
     assert ACC_CACHE + 64 * 8 <= THREADS and THREADS + THREAD_N * THREAD_SIZE <= GROW <= LIMIT
     hooks = {LOOKUP: b(LOOKUP, a.addr('lookup')), SIZE1: b(SIZE1, a.addr('size1')),
              SIZE2: b(SIZE2, a.addr('size2')), FETCH: b(FETCH, a.addr('fetch')),
@@ -5457,6 +5506,7 @@ def main():
     out += ['0x%08X=0x%08X' % (a.part5[0] + 4 * i, w) for i, w in enumerate(a.part5[1])]
     out += ['0x%08X=0x%08X' % (a.part6[0] + 4 * i, w) for i, w in enumerate(a.part6[1])]
     out += ['0x%08X=0x%08X' % (a.part7[0] + 4 * i, w) for i, w in enumerate(a.part7[1])]
+    out += ['0x%08X=0x%08X' % (a.part8[0] + 4 * i, w) for i, w in enumerate(a.part8[1])]
     out += ['0x%08X=0x%08X' % kv for kv in sorted(hooks.items())]
     # the vtable words have ADDR32 relocations to the classes' own functions: moved to a dead word, or the loader
     # would write those back over ours

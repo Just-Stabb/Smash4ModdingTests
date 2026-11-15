@@ -760,6 +760,7 @@ HURT_TEAM              = 0x0F000335
 ATTACK_TEAM            = 0x0F000336
 GRAVITY                = 0x0F000337   # the fighter's gravity in effect, Gravity_Set's included (read only)
 MAX_FALL               = 0x0F000338   # the fighter's max fall speed in effect, Gravity_Set's included (read only)
+BUFFER_CLEAR           = 0x0F0003C9   # write a player slot (0 self; + 16 x Buffer_Clear's Inputs): its input buffer emptied (exe_v46l)
 STICK_ANGLE            = 0x0F0003C0   # stick angle along the facing, degrees (0 fwd, 90 up): a hitbox angle (read only)
 STICK_ANGLE_RAW        = 0x0F0003C1   # stick angle on screen, degrees (0 right, 90 up)
 STICK_LEN              = 0x0F0003C2   # how far the stick is pushed, 0-1

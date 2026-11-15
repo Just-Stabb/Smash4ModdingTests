@@ -63,7 +63,7 @@ def w32(mu, a, v):
 def run(mu, start, stop, regs, count=200000):
     mu.reg_write(UC_PPC_REG_1, 0x7F00F000)
     for r, v in regs.items():
-        mu.reg_write(r, v & 0xFFFFFFFF)
+        mu.reg_write(r, v if r == UC_PPC_REG_FPR1 else v & 0xFFFFFFFF)     # (f1: a double's bits)
     mu.reg_write(UC_PPC_REG_LR, RET)
     mu.reg_write(UC_PPC_REG_MSR, mu.reg_read(UC_PPC_REG_MSR) | 0x2000)     # FP on
     mu.emu_start(start, stop, count=count)
@@ -231,7 +231,8 @@ def shared_tests(pm, me_wm, own_wm, foe_wm, ents):
         fcall(pm, FSET, me_wm, S(1, 3), 99.0)
         check('shared: fighter table 0x%X -> 0, no write' % bad, (r, objs() == before), (0.0, True))
     w32(pm, C.FIGHTERS, tab)
-    for ident in (0x337, 0x33F, 0x3C9, 0x3FF):           # (0x380-0x3BF: New_Var's; 0x3C0-0x3C8: hitbox_var_test.py)
+    for ident in (0x337, 0x33F, 0x3CA, 0x3FF):           # (0x380-0x3BF: New_Var's; 0x3C0-0x3C8: hitbox_var_test.py;
+                                                          # 0x3C9: BUFFER_CLEAR, exe_v46l: buf_tests)
         fcall(pm, FSET, me_wm, 0x0F000000 + ident, 5.0)
         check('ID 0x0F000%03X: reads 0, a write changes nothing' % ident,
               (fcall(pm, FGET, me_wm, 0x0F000000 + ident), objs() == before), (0.0, True))
@@ -982,6 +983,7 @@ am_now:
     check('Target_Slot_Get(target 6, not in the table): 0', cmd('Target_Slot_Get', 6, 0x0F000300)[3], [(0x0F000300, 0.0)])
     check('Status_Set(target 11, int 9 = no slot): nothing', cmd('Status_Set', 11, 0x59, ret=9)[3], [])
     apc_tests(pm, a, cmd, me, M, LOG, fb)
+    buf_tests(pm, a, cmd, me, M, LOG, fb)
     pm.mem_write(ctx + 8, b'\0')
     w32(pm, state + 4, 0x1000)
     w32(pm, LOG + 0xFFC, 0)
@@ -1144,6 +1146,240 @@ def apc_tests(pm, a, cmd, me, M, LOG, fb):
           (oget(12, 0, 1), oget(13, 0, 1), oget(1, 4, 1), oget(1, 0, 4)),
           ([(0x0F000300, -14.0)], [(0x0F000300, 0.0)], [(0x0F000300, 0.0)], [(0x0F000300, 0.0)]))
     post(me, 0.0, 0.0, 0.0, 1.0)
+
+
+def buf_tests(pm, a, cmd, me, M, LOG, fb):
+    """exe_v46l: Buffer_Clear / Buffer_Set on a fake fighter ControlModule (the game's clear_command 0x02E70FB4 runs as
+    it is; the builder 0x02E71774 is a stand-in: an attack press -> category 0 bit 0 and trigger bit 0 with the life,
+    then its end-of-frame count down; it logs the controller struct it saw)"""
+    from ppcasm import Asm
+    cm, st = M + 0x90000, M + 0x90010             # ControlModule, its controller struct (inline at +0x10)
+    pm.mem_write(cm, b'\0' * 0x300)
+    w32(pm, cm, C.FCM_VT)
+    w32(pm, cm + 4, me)
+    w32(pm, cm + 0xA0, st)
+    for c in range(4):                             # categories: flags, count 32, timers, states
+        w32(pm, cm + 0x15C + 0x10 * c, 32)
+        w32(pm, cm + 0x160 + 0x10 * c, M + 0x91000 + 0x40 * c)
+        w32(pm, cm + 0x164 + 0x10 * c, M + 0x91020 + 0x40 * c)
+    w32(pm, cm + 0x198, 11)                        # the life (the buffer window, 10 frames, + 1)
+    pm.mem_write(cm + 0x1B8, b'\1')
+    w32(pm, me + 0x24, cm)
+    w32(pm, M + 0x3000 + 0x24, M + 0x92000)         # target 3: a ControlModule of another class
+    w32(pm, M + 0x92000, 0x10104D3C)
+    old = bytes(pm.mem_read(C.BUILDER, 0x80))
+    bl = Asm(C.BUILDER)
+    bl.asm("""
+        lwz r12, 0xA0(r3)
+        lis r11, 0x%(lh)X
+        lwz r0, 0x48(r12)
+        stw r0, 0xE00(r11)
+        lwz r0, 0x3C(r12)
+        stw r0, 0xE04(r11)
+        lwz r0, 0(r12)
+        stw r0, 0xE08(r11)
+        lwz r0, 4(r12)
+        stw r0, 0xE0C(r11)
+        lwz r0, 0x70(r12)
+        stw r0, 0xE10(r11)
+        lwz r0, 0xE14(r11)
+        addi r0, r0, 1
+        stw r0, 0xE14(r11)
+        lwz r0, 0x48(r12)
+        andi. r0, r0, 1
+        beq sk
+        lwz r9, 0x158(r3)
+        ori r9, r9, 1
+        stw r9, 0x158(r3)
+        lwz r8, 0x160(r3)
+        lwz r7, 0x198(r3)
+        stb r7, 0(r8)
+        lwz r9, 0xB4(r3)
+        ori r9, r9, 1
+        stw r9, 0xB4(r3)
+        stb r7, 0xB8(r3)
+sk:
+        lwz r9, 0x158(r3)
+        andi. r0, r9, 1
+        beq tr
+        lwz r8, 0x160(r3)
+        lbz r7, 0(r8)
+        addi r7, r7, -1
+        stb r7, 0(r8)
+        cmpwi r7, 0
+        bne tr
+        rlwinm r9, r9, 0, 0, 30
+        stw r9, 0x158(r3)
+tr:
+        lwz r9, 0xB4(r3)
+        andi. r0, r9, 1
+        beqlr
+        lbz r7, 0xB8(r3)
+        addi r7, r7, -1
+        stb r7, 0xB8(r3)
+        blr
+""" % dict(lh=(LOG >> 16)))
+    for i, wd in enumerate(bl.words()):
+        w32(pm, C.BUILDER + 4 * i, wd)
+    pm.ctl_remove_cache(C.BUILDER, C.BUILDER + 0x100)
+    check('BUF_HOOK: bl buf_build (was bl the builder)', (r32(pm, C.BUF_HOOK), C.BUF_HOOK_ORIG),
+          (C.b(C.BUF_HOOK, a.addr('buf_build')) | 1, 0x4BFFEBD9))
+    tab = C.BUF_TAB
+
+    def fill():
+        for c in range(4):
+            w32(pm, cm + 0x158 + 0x10 * c, 0xFFFFFFFF)
+            pm.mem_write(M + 0x91000 + 0x40 * c, bytes([7] * 32))
+        w32(pm, cm + 0xB4, 0xFF)
+        pm.mem_write(cm + 0xB8, bytes([5] * 8))
+        w32(pm, st + 0x48, 0xFFFF)
+        pm.mem_write(st + 0x50, bytes(range(1, 33)))
+        pm.mem_write(cm + 0x80, bytes([3, 1, 3, 1]))
+
+    def state():
+        return (tuple(r32(pm, cm + 0x158 + 0x10 * c) for c in range(4)), r32(pm, cm + 0xB4), r32(pm, st + 0x48),
+                bytes(pm.mem_read(cm + 0x80, 4)).hex(), bytes(pm.mem_read(st + 0x50, 32)).hex())
+    FE32 = 'fe' * 32
+    raw = bytes(range(1, 33)).hex()
+    pm.mem_write(tab, b'\0' * C.BUF_N * C.BUF_SIZE)
+    fill()
+    r, step, _c, _s, _x = cmd('Buffer_Clear', 0, 0, 0)
+    check('Buffer_Clear(self, everything): every category 0, the trigger buffer 0, this frame\'s presses 0, the counters '
+          '0xFE, the flicks reset; returns 2, steps 4 words', (state(), r, step, r32(pm, tab)),
+          (((0, 0, 0, 0), 0, 0, 'fe00fe00', FE32), 2, 16, 0))
+    check('  the category timers zeroed too (the game\'s clear_command)', bytes(pm.mem_read(M + 0x91000, 4)).hex(), '00000000')
+    fill()
+    cmd('Buffer_Clear', 0, 1 | 4, 0)
+    check('Buffer_Clear(self, attack + jump): category 0 ~0x37007F, trigger ~0x33, presses ~0x3E5; the rest kept',
+          state(), ((0xFFFFFFFF & ~0x0030007F, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF), 0xFF & ~0x33, 0xFFFF & ~0x3E5,
+                    '03010301', raw))
+    fill()
+    cmd('Buffer_Clear', 0, 2 | 8 | 16, 0)
+    check('Buffer_Clear(special + shield + grab): category 0 ~0x2740F000, trigger ~0xCC, presses ~0x81A',
+          state()[:3], ((0xFFFFFFFF & ~0x2740F000, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF), 0xFF & ~0xCC, 0xFFFF & ~0x81A))
+    fill()
+    cmd('Buffer_Clear', 0, 32 | 64, 0)
+    check('Buffer_Clear(taunts + stick): category 1 ~7, category 0 ~0xF0000, presses ~0x7400, flicks reset',
+          state()[:4], ((0xFFFFFFFF & ~0xF0000, 0xFFFFFFF8, 0xFFFFFFFF, 0xFFFFFFFF), 0xFF, 0xFFFF & ~0x7400, 'fe00fe00'))
+    fill()
+    cmd('Buffer_Clear', 0, 0x81, 0)
+    check('Buffer_Clear(128 + 1): everything', state()[:3], ((0, 0, 0, 0), 0, 0))
+    fill()
+    s0 = state()
+    cmd('Buffer_Clear', 3, 0, 0)
+    cmd('Buffer_Clear', 13, 0, 0)
+    check('Buffer_Clear(target 3: not a fighter\'s ControlModule; target 13: nobody): nothing', state(), s0)
+
+    def build():
+        w32(pm, LOG + 0xE14, 0)
+        run(pm, a.addr('buf_build'), RET, {UC_PPC_REG_3: cm})
+        return r32(pm, LOG + 0xE14)
+    pm.mem_write(tab, b'\0' * C.BUF_N * C.BUF_SIZE)
+    for c in range(4):
+        w32(pm, cm + 0x158 + 0x10 * c, 0)
+    w32(pm, cm + 0xB4, 0)
+    w32(pm, st + 0x48, 1)                          # attack pressed (held) this frame: the builder buffers it
+    cmd('Buffer_Clear', 0, 1, 3)
+    check('Buffer_Clear(attack, Frames 3): now, and a request {cm, 1, 1, -, 2}',
+          (r32(pm, st + 0x48), [r32(pm, tab + 4 * k) for k in (0, 1, 2, 4)]), (0, [cm, 1, 1, 2]))
+    w32(pm, st + 0x48, 1)
+    n = build()
+    check('  its next build: the builder ran once, then the attack it buffered was cleared; 1 left',
+          (n, r32(pm, cm + 0x158) & 1, r32(pm, cm + 0xB4) & 1, r32(pm, st + 0x48), r32(pm, tab + 0x10)), (1, 0, 0, 0, 1))
+    w32(pm, st + 0x48, 1)
+    build()
+    check('  the next: cleared again, the request ends', (r32(pm, cm + 0x158) & 1, r32(pm, tab)), (0, 0))
+    w32(pm, st + 0x48, 1)
+    build()
+    check('  after it: the press is buffered as usual (timer 10)', (r32(pm, cm + 0x158) & 1, pm.mem_read(M + 0x91000, 1)[0]),
+          (1, 10))
+    for c in range(4):
+        w32(pm, cm + 0x158 + 0x10 * c, 0)
+    w32(pm, cm + 0xB4, 0)
+    pm.mem_write(M + 0x91000, b'\0')
+
+    # Buffer_Set: facing -1 (left); the struct's own stick (0.25, -0.5), nothing pressed, flicks 0x30
+    w32(pm, me + 0x18, me + 0x600)
+    pm.mem_write(me + 0x660, struct.pack('>f', -1.0))
+    pm.mem_write(st, struct.pack('>ff', 0.25, -0.5))
+    w32(pm, st + 0x48, 0)
+    w32(pm, st + 0x3C, 0x40)
+    w32(pm, st + 0x70, 0x30003000)
+    r, step, _c, _s, _x = cmd('Buffer_Set', 0, 0, 2 + 8, 0)
+    check('Buffer_Set(self, attack, forward flicked, 0): returns 2, steps 5 words; a request {cm, 2, 0, 10, 0}; nothing '
+          'buffered yet', (r, step, [r32(pm, tab + 4 * k) for k in range(5)], r32(pm, cm + 0x158)), (2, 20, [cm, 2, 0, 10, 0], 0))
+    build()
+    seen = [r32(pm, LOG + 0xE00 + 4 * k) for k in range(5)]
+    check('  its next build: the builder saw attack pressed (0x201) and held, the stick forward = -1 (facing left), 0, '
+          'flicks 1 (this frame)', seen, [0x201, 0x41, fb(-1.0), fb(0.0), 0x01000100])
+    check('  after it: the struct as it was, the attack buffered (timer 10: the window), the request ended',
+          (r32(pm, st + 0x48), r32(pm, st + 0x3C), r32(pm, st), r32(pm, st + 4), r32(pm, st + 0x70),
+           r32(pm, cm + 0x158) & 1, pm.mem_read(M + 0x91000, 1)[0], r32(pm, tab)),
+          (0, 0x40, fb(0.25), fb(-0.5), 0x30003000, 1, 10, 0))
+    for c in range(4):
+        w32(pm, cm + 0x158 + 0x10 * c, 0)
+    w32(pm, cm + 0xB4, 0)
+    w32(pm, cm + 0xA8, 1)                          # the builder's X flip
+    cmd('Buffer_Set', 0, 4, 5, 30)
+    build()
+    seen = [r32(pm, LOG + 0xE00 + 4 * k) for k in range(5)]
+    check('Buffer_Set(grab, down, Frames 30): pressed 0x211, held 0x19 (+ its own 0x40), stick (0, -1), flicks 0xFE '
+          '(not flicked); the commands made get timer 30 (category and trigger)',
+          (seen, pm.mem_read(M + 0x91000, 1)[0], pm.mem_read(cm + 0xB8, 1)[0]),
+          ([0x211, 0x59, fb(0.0), fb(-1.0), 0xFE00FE00], 30, 30))
+    w32(pm, cm + 0xA8, 0)
+    pm.mem_write(M + 0x91005, b'\x03')            # an older command (bit 5, timer 3) keeps its own count
+    w32(pm, cm + 0x158, 0x21)
+    cmd('Buffer_Set', 0, 0, 2, 20)
+    build()
+    check('  (+0xA8 set: X flipped back) Frames 20: the new attack 20, an older command untouched (3 - 0)',
+          (r32(pm, LOG + 0xE08), pm.mem_read(M + 0x91000, 1)[0], pm.mem_read(M + 0x91005, 1)[0]), (fb(-1.0), 20, 3))
+    cmd('Buffer_Set', 0, 2, 0, 0)
+    build()
+    check('Buffer_Set(jump, Direction 0): its own stick kept', (r32(pm, LOG + 0xE00), r32(pm, LOG + 0xE08), r32(pm, LOG + 0xE10)),
+          (0x4, fb(0.25), 0x30003000))
+    pm.mem_write(tab, b'\0' * C.BUF_N * C.BUF_SIZE)
+    cmd('Buffer_Set', 0, 8, 1, 0)
+    cmd('Buffer_Set', 0, 0, 6, 0)
+    cmd('Buffer_Set', 0, 0, 16, 0)
+    cmd('Buffer_Set', 3, 0, 1, 0)
+    check('Buffer_Set(Input 8 / Direction 6 / Direction 16 / target 3, not a fighter): no request', r32(pm, tab), 0)
+    cmd('Buffer_Set', 0, 1, 1, 0)
+    cmd('Buffer_Set', 0, 2, 1, 0)
+    cmd('Buffer_Clear', 0, 0, 5)
+    check('A second Buffer_Set replaces the first (one each); a Buffer_Clear has its own',
+          ([r32(pm, tab + 4 * k) for k in range(3)], [r32(pm, tab + C.BUF_SIZE + 4 * k) for k in (0, 1, 4)],
+           r32(pm, tab + 2 * C.BUF_SIZE)), ([cm, 2, 2], [cm, 1, 4], 0))
+    pm.mem_write(tab, b'\0' * C.BUF_N * C.BUF_SIZE)
+    # BUFFER_CLEAR (0x0F0003C9, user_entry): MSC's way; player slot 2 = target 4 = M + 0x4000 here
+    wm = r32(pm, me + 0x28)
+    pm.mem_write(C.ACC_CACHE, struct.pack('>II', wm, me))
+    w32(pm, M + 0x4000 + 0x24, cm)
+
+    def bvar(v, write=1):
+        run(pm, a.addr('user_entry'), RET, {UC_PPC_REG_3: wm, UC_PPC_REG_4: C.BUF_VAR, UC_PPC_REG_5: write,
+                                            UC_PPC_REG_FPR1: f2bits(v)})
+        return struct.unpack('>d', struct.pack('>Q', pm.reg_read(UC_PPC_REG_FPR1)))[0]
+    fill()
+    bvar(2.0 + 16)
+    check('BUFFER_CLEAR = 2 + 16 x 1 (slot 2, attack): category 0 ~0x7F, the rest kept', state()[0][:2],
+          (0xFFFFFF80, 0xFFFFFFFF))
+    fill()
+    bvar(2.0)
+    check('BUFFER_CLEAR = 2 (slot 2, everything)', state()[:3], ((0, 0, 0, 0), 0, 0))
+    fill()
+    w32(pm, me + 0x24, M + 0x92000)
+    bvar(0.0)
+    s1 = state()
+    w32(pm, me + 0x24, cm)
+    bvar(0.0)
+    check('BUFFER_CLEAR = 0: this object\'s own (not a fighter\'s ControlModule: nothing; a fighter\'s: cleared)',
+          (s1[0][0], state()[0][0]), (0xFFFFFFFF, 0))
+    fill()
+    check('BUFFER_CLEAR reads 0, and a read clears nothing', (bvar(5.0, 0), state()[0][0]), (0.0, 0xFFFFFFFF))
+    pm.mem_write(C.ACC_CACHE, b'\0' * 8)
+    pm.mem_write(C.BUILDER, old)
+    pm.ctl_remove_cache(C.BUILDER, C.BUILDER + 0x100)
 
 
 def main():

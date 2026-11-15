@@ -811,6 +811,8 @@ class Acmd:
                 elif n == 'Input_Set' and tv and p[1] == 21:
                     tv.input_off = p[2]
                     tv.log.append(('input_off', p[2]))
+                elif n == 'Buffer_Clear' and tv:
+                    tv.log.append(('buffer_clear', self.motion_frame, p[1], p[2]))
                 elif n == 'Input_Get':
                     self.vars[p[2]] = float(tv.situation if tv and p[1] == 22 else 0)
                 elif n == 'Rotation_Set' and tv:
@@ -1119,6 +1121,9 @@ def acmd_tests(game_bin):
     check('no getup before the end (status stays DownBound / DownWait)', up is not None and
           all(r[5] in (0x4D, 0x50) for r in rec if first_down <= r[0] < up), True)
     check('controller back at the end', (v.input_off, a.vars.get(B.V_LOCK)), (0.0, 0.0))
+    check('buffer fix v1: the victim\'s buffer emptied (everything) at the catch and at the hand-off (%d frames: '
+          'Buffer_Clear, exe_v46l)' % B.BUFFER_CLEAR_FRAMES, [x[1:] for x in v.log if x[0] == 'buffer_clear'],
+          [(float(B.PUNCH_END), 0, 0), (float(B.HANDOFF), 0, B.BUFFER_CLEAR_FRAMES)])
     check('no thread left running at the end', sorted(a.threads), [])
     # a weak hit while down (20 frames in): DownDamage, then it stands
     land = first_down

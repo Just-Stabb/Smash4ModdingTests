@@ -207,6 +207,8 @@ EASE_SPEED = 1.0                        # its travel a frame while easing down (
 # strike + 62). Both 10 less: hitstun 30 (88 + 30 = 118) and the wait 27 (91 + 27 = 118): it acts at 118 (the strike
 # + 52). On the stage it is down at the hand-off (gf_phase 5), neither counts
 GF_FALL_WAIT = 27                       # frames the MSC waits for the down after the hand-off (v16 30)
+BUFFER_CLEAR_FRAMES = 5                 # buffer fix v1: the victim's buffer emptied at the hand-off and after its next
+                                        # 4 input reads (exe_v46l Buffer_Clear; everything)
 FLIGHT_HITSTUN = 30                     # the victim's hitstun, written every flight frame to DOWNFALL_K (v16 40)
 SLIDE_DIST = 9.44 * GF_DIST / 20.0      # XV2 #96's travel (9.44 m) at the flight's scale (60 units for 20 m): 28.3
 SLIDE_DECAY = 0.92                      # its speed x this a frame
@@ -626,7 +628,11 @@ def game_script():
     s += [cmd('frame', float(PUNCH_END)), cmd('remove_all_hitboxes')]
     s += dlog_get(D_CATCH_KINDS, cmd('hit_get', 0, 0, V_TMP))
     # the catch: a fighter's body hit (not a shield)
-    caught = [setf(1, GF_VAR), cmd('target_slot_get', 2, V_SLOT),
+    # buffer fix v1 (user: "Super God Fist should clear the hit opponent's buffer after releasing them, so they don't
+    # go into the hold of the move with a buffered attack"; exe_v46l's Buffer_Clear): its buffer emptied at the catch
+    # (what it pressed before) and at the hand-off (BUFFER_CLEAR_FRAMES: what it pressed while held; from the launch
+    # to gf_tick's release its controller is off, so nothing new comes in)
+    caught = [setf(1, GF_VAR), cmd('buffer_clear', 2, 0, 0), cmd('target_slot_get', 2, V_SLOT),
               cmd('body_state_set', 0, 1, INVINCIBLE),                 # invincible (XV2: 0-40 of the follow-up)
               cmd('hitstun_set', 2, 20), setf(HOLD_X, LH_OFFX), setf(FOOT_UP[PUNCH_END], LH_OFFY)]
     caught += dlog(D_SLOT, V_SLOT)
@@ -704,7 +710,8 @@ def game_script():
     s += [cmd('frame', float(HANDOFF)), cmd('input_get', 0, SITUATION_VAR, V_TMP2)]
     s += if_(V_TMP2, 1, 2, [cmd('leave_ground_cancel', LGC_ON)]) + if_(GF_VAR, 0, 2, [
         setf(x, LH_OFFX), setf(0.0, LH_OFFY), setf(0, LH_GROUND), cmd('rotation_set', 2, 0.0, 0.0, 0.0),
-        setf(0, V_SPIN), setf(GF_FALL_WAIT, V_CNT), setf(5, V_PHASE)] + dlog(D_PHASE, value=5))
+        setf(0, V_SPIN), setf(GF_FALL_WAIT, V_CNT), setf(5, V_PHASE)] + dlog(D_PHASE, value=5)
+        + per_slot(lambda t: [cmd('buffer_clear', t, 0, BUFFER_CLEAR_FRAMES)]))
     # v17: gf_phase 5: the MSC decides (gf_tick): on the stage it puts the victim down itself (DownWait, no tech
     # possible), off it the victim's stage collision comes back and it falls (DamageFall, gf_phase 4); its stage
     # collision stays off here, so it doesn't land (and tech) on its own first

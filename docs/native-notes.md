@@ -1012,6 +1012,55 @@ to `inp_entry`. Code in `.text` grown to `0x04B7C000` (`0x04B79000`–`0x04B7C00
 - Float_Var_Compare / the compare functions (`0x02BEE010`, table `0x10351804`): method 0 `==`,
   1 `!=`, 2 `<=`, 3 `>=`, 4 `<`, 5 `>`.
 
+## The input buffer (exe_v46l: Buffer_Clear / Buffer_Set)
+
+Read from the fighters' ControlModule code (class vtable `0x1012B30C`, accessor `+0x24`; MSC handler `0x02C1C7D0`,
+op table `0x02C1C850` for 0-0x1E and `0x02C1C8EC` for 0x2710-0x2727, vtable entries 8 bytes, the function at +4).
+
+- **Where it's built.** The control update `0x02E729E4` (per fighter, every frame it reads its pad) runs the
+  controller struct update `0x020035FC(cm + 0x10, ...)` (presses / releases / flicks, where position_vars' forced
+  inputs go in), then at its end: `+0x1B4` set -> clear_command again (`0x02E72B5C`), `0x02E71324`, and the
+  **command builder** `0x02E71774` (`bl` at `0x02E72B9C`, no relocation: exe_v46l's hook). The builder reads the
+  struct through `[cm + 0xA0]` (`+0x48` pressed this frame, `+0x4C` released, `+0x3C` held, `+0` / `+4` stick X
+  (screen, negated when `[cm + 0xA8]`) / Y, `+0x70` / `+0x72` frames since the stick flicked X / Y) and the
+  global params `[0x1030F448]` (thresholds at `+0x7C` ... `+0x18C`; `+0x38` the buffer life).
+- **The commands** are 4 categories at `cm + 0x158 + 0x10 c` (MSC `ControlModule(0xA, c)` = `0x02E74978`; common
+  MSC keeps category 0 in `global24`, 1-3 in `global31` / `global29` / `global45`): `+0` the flag word (buffered
+  commands), `+4` the count, `+8` a timer byte per command, `+0xC` a state byte (0 / 1 read, 2 not: a direction
+  that needs a turn). A triggered command: flag set, timer = `[cm + 0x198]` (`[[0x1030F448] + 0x38] + 1`, stored
+  every build; fighter_param_common 0 = 11.0, "buffer window = 10 F") when `cm + 0x1B8` (buffering on,
+  `0x02E74AF0`) is set, else 2; state 0 (or 1 / 2). At the builder's end (`0x02E728C4`) every set flag's timer
+  counts down and the flag clears at 0: a command stays readable 10 frames after its press (1 with buffering off).
+  Category 0 bits read from the builder: `0x1` attack (any), `0x2` / `0x4` / `0x8` S3 / HI3 / LW3 (tilt by stick),
+  `0x10` / `0x20` / `0x40` S4 / HI4 / LW4 (C-stick / A+B smash, or attack with a flick), `0x1000` / `0x2000` /
+  `0x4000` / `0x8000` specials N / S / HI / LW, `0x20000`-`0x80000` stick commands (dash / turn: flicks
+  sideways), `0x100000` the stick (tap) jump (flick up within `[+0x80]`, when the tap jump setting is on), `0x200000`
+  the jump button, `0x400000` shield pressed (guard / air dodge), `0x1000000` spot dodge, `0x2000000` /
+  `0x4000000` rolls (shield held + flick), `0x8000000` / `0x10000000` from `cm vt +0x11C` (+1 / -1), `0x20000000` grab
+  (shield held + attack: a Z press sets attack `0x201` in the struct update, `0x02003878`). Category 1: taunts
+  (`0x1` side, `0x2` up, `0x4` down: d-pad presses) and, from `0x02E738AC`, more (throw directions and others,
+  bits `0x8`-`0x20000`: not each named). Categories 2 / 3: not decoded (cleared by "everything").
+- **The trigger buffer**: `cm + 0xB4` (MSC `ControlModule(9)`, `global38`), 8 bits: attack / special / jump / shield
+  pressed (`0x1` / `0x4` / `0x10` / `0x40`) and released (`0x2` / `0x8` / `0x20` / `0x80`), timers `+0xB8 + i` = the
+  same life, counted down at the builder's end (`0x02E7286C`).
+- **"Pressed within N frames"**: the struct's per-button counters `+0x50 + 2 n` (frames since pressed / released;
+  MSC `ControlModule(0x2723 / 0x2722, button)` -> vt `+0x18C` / `+0x184`), 0xFE = long ago.
+- **The game's clears**: `0x02E70FB4` clear_command (every category's flags and timers, the trigger buffer) is
+  MSC `ControlModule(0x271F, 0)` (vt `+0x244`, `0x02E72BC4`: clear, and `+0x1B4` = 1 to clear once more at the next
+  update before the builder); `ControlModule(0x271B)` (vt `+0x94` -> `0x02003568`) is reset_trigger (pressed = 0,
+  the per-button counters 0xFE); `0x2719` / `0x271A` reset the flick counters (`cm + 0x80` / `+0x82` = 0xFE, `+0x81`
+  / `+0x83` = 0). Common MSC calls `0x271B` / `0x271F` at many status starts. (`0x2714` / `0x2718`: vt `+0x1CC`, the
+  pad's `+0x4C`: rumble, not the buffer.)
+- **exe_v46l** (`tools/acmd_ext_cave.py` `buf_code`): `Buffer_Clear` clears groups of the above (or everything as
+  the game's clear + reset_trigger + the flicks) now and, with Frames, again after each of the next builds
+  (`buf_build`, the `0x02E72B9C` hook, wraps the builder). `Buffer_Set` asks for a press: at the target's next
+  build the press (and held) bits, the stick (forward = its facing, PostureModule `+0x60`, flipped back when
+  `cm + 0xA8`) and the flick counters (1: flicked, 0xFE: not) are put in the struct, the builder makes the game's
+  own commands of them, then the struct is put back; with Frames the commands this build made (timer = the fresh
+  value) get that timer. `BUFFER_CLEAR` (`0x0F0003C9`, user_entry -> hv_var's zero -> `buf_var`): MSC's way.
+  Tested in unicorn with a stand-in builder (`tools/acmd_ext_test.py` `buf_tests`); the real builder's mapping is
+  read from the code, not run. Not tried in game yet.
+
 ## Buffered aerials out of ground statuses (edge-cancel bug)
 
 Base-game bug (user): an aerial buffered during landing lag that edge-cancels into Fall always came out as
@@ -1111,6 +1160,24 @@ MSC handlers: int `+0x2D4` (`0x02C6164C`, ops 0–`0x38`, `0x2710`+), float `+0x
 (`0x02C5B30C`, `0x02C5BAEC`) besides the commands above, so `+0xF4` stays put across motions:
 `tools/position_vars_cave.py` exposes it as float ID `0x0F000098` (self), used by Kirby's
 Overdrive (×1.2 animations).
+
+### The motion's intangible window (vl group 1 bytes 3 / 4; Core Breaker v11)
+
+The fighter update (`0x02E24270`, called from the object loop at `0x02BF2E2C`, vtable `+0x1E4`) ends
+(`0x02E24D1C`-`0x02E24F90`) by reading the current motion kind (MotionModule `[fighter+0x74AC]` `+0x38`; -1 skips)
+and its 6 bytes in the kind's vl group 1 (`[[mgr+0x25B0+4*kind]+0xC] + motion*6`, the expanded vl array of
+docs/kind-expansion.md; `0x02E3BD08` returns the same entry):
+- byte 2 > 0: the cancel frame (its crossing calls `[fighter+0x74D4]`'s `0x02E6FB1C` / `0x02E6FBF8`);
+- byte 4 > 0 (the window's end; dodges `0x4B`-`0x4E`, `0xDC`-`0xDD`, `0xE6`-`0xE7` scale it, `0x02E67354`): byte 3 is
+  its start. With the frame now (`+0x3C`) and the frame before (`+0x40`; both less 1 when `0x02C61538`): the start
+  crossed (now >= start > before) -> `0x02C42F00(hit, 2, 0)`, the status's body state intangible (the MSC's
+  `HitModule(0, 2)`); **else** the end crossed -> `0x02C42F00(hit, 0, 0)`.
+
+The `else` is a trap: a motion that jumps over both in one frame (a rate jump, `MotionModule(0x4, big)`) gets 2 and
+never 0; the status change's reset is the next to clear it. Mario's SpecialHi / SpecialAirHi (kinds `0x221` /
+`0x225`) have 3 / 7 (Super Jump Punch: intangible 3-6); Supamario's Core Breaker v10 jumped 0 -> 30 at its second
+up special and stayed intangible to its end (the user's "invincible" blink after the landing; diag log `S4HS op=0 v=2
+lr=02E24F70 lr2=02BF2E30`). v11: his vl file has 0 / 0 there, and the status sets `HitModule(0, 0)` every frame.
 
 ## Weapon modules: each kind's row (Sephiroth test 82)
 

@@ -1397,6 +1397,22 @@ GlareCol / 1.5. The hue is kept, they never go below v17's 2.0, and they never g
 The user is asked to report where the glow appears and any purple. The aura stays at 2.5: it's an opaque-ish mesh
 like fix 23's, and there's no evidence it's safe to raise.
 
+## Super God Fist: buffer fix v1 (`buffer_commands_v1.zip`, exe B `exe_v46l`)
+
+User: "Super God Fist should clear the hit opponent's buffer after releasing them, so they don't go into the hold of
+the move with a buffered attack". The game keeps a press's commands 10 frames (docs/native-notes.md "The input
+buffer") and a fighter acts on the first one still there when it can; what the victim pressed before the catch or while
+held (its controller is on until the launch) could come out when it's let go. The game script now empties its buffer
+(exe_v46l's `Buffer_Clear`, everything) at the catch (`Buffer_Clear(2, 0, 0)`, before Target_Slot_Get) and at the
+hand-off (`HANDOFF`, by its slot like the other hand-off commands: `Buffer_Clear(2 + slot, 0, BUFFER_CLEAR_FRAMES)`,
+5: again after its next 4 input reads). From the launch to gf_tick's release its controller is off (Input_Set 21),
+so nothing new is buffered; at the release a button it is holding counts as a new press, as for any fighter.
+No MSC change (globals still 127 of 128); only `game.bin` differs from Core Breaker v10's build (the God Fist's game
+script). Built with the full Supamario build (Fake Death's, Core Breaker v10's source; CB_DIAG off).
+`tools/supamario_godfist_test.py` checks both clears (the victim's log); every suite passes (God Fist, Core Breaker,
+Fake Death, the MSC stack check). Not tried in game yet. (`BUFFER_CLEAR`, `0x0F0003C9`, is the MSC's way, if
+gf_release should ever clear it too.)
+
 ## Core Breaker (up special): phase 1, the XV2 skill read and converted
 
 User: put Xenoverse 2's **Core Breaker** (Fu's Ultimate, skill folder `2070_FIT_COR`) on his up special, the way the
@@ -2627,3 +2643,77 @@ confirm both.
 ### Tests (v10 build)
 `supamario_corebreaker_test.py`, `supamario_fakedeath_test.py`, `supamario_godfist_test.py --all-models`,
 `msc_stack_check.py`; the diag cave tests on the diag executable (below the package).
+
+## Core Breaker v11 (`supamario_corebreaker_v11.zip`): the up special's intangible window; the shieldstun read
+
+Install over Core Breaker v10 (Fake Death v3 under it), exe B (exe_v46k). The user ran v10's diag build (log
+`babdf45b-log.txt`, 405 lines: 271 `S4GF`, 10 `S4HS`).
+
+### 1. What the log says
+- Every up special start has `S4HS op=0 v=2 a=0 lr=02E24F70 lr2=02BF2E30` (6 times): the status's body state set to
+  2, intangible (not invincible; the k 13 value 34020 = status 0x154, intangible 2, invincible 0).
+- **Rises** (k 12 v=0; 04:07:24.121, 32.387, 39.207, 58.153): k 13 on exactly 4 frames, then normal: frames 3-6.
+- **A** (04:07:39.207, the rise cancelled into the hover in place: k 14 161 = phase 1 at motion frame 16, 602 the
+  dive, 675 the landing, 99 the end): the same 4 frames, nothing after. No blink, as in the clip.
+- **B** (04:07:33.252 and 59.018, the second up special in the air: k 12 21 = used 1, air; k 14 1 = the hover at
+  frame 0): intangible from its first frame to its end, 100 frames (hover, dive, the 60-frame landing) and 106 frames.
+  The clip's blink after the landing.
+- The 4 `S4HS op=1 v=0` lines at the match start are the 4 fighters' invincible frames cleared (benign).
+
+### 2. Who sets it (exe_v46k)
+- `0x02BF2E30`: the object loop's return after its call of the fighter update (vtable `+0x1E4`, `0x02BF2E2C`).
+- `0x02E24F70`: the return of `bl 0x02C42F00` (`li r4, 2`) at `0x02E24F6C`, in the fighter update `0x02E24270`'s tail
+  (`0x02E24D1C`-`0x02E24F90`). It takes the current motion kind (MotionModule `[fighter+0x74AC]` `+0x38`: 0x221
+  SpecialHi / 0x225 SpecialAirHi) and its 6 bytes in his vl file's group 1 (`[[mgr+0x25B0+4*kind]+0xC] + kind*6`;
+  the vl is `fighter_param_vl_supamario.bin`, Mario's copy): byte 3 = 3 the start, byte 4 = 7 the end (Mario's Super
+  Jump Punch: intangible 3-6). Each frame: now >= start > the frame before -> state 2; **else** now >= end > before
+  -> state 0.
+- **B:** `cb_init` -> `cb_goto(HOVER_FROM)` sets the rate to 30, so the motion goes 0 -> 30 in one frame: the start
+  crossing sets 2, and the end check (an `else`) is skipped that frame; after it no crossing. 2 stays to the status
+  end (the status change resets it).
+- **A, the rise:** the motion plays 0, 1, 2 ... 7 at rate 1, so the end clears it at frame 7; A's hover begins at 16,
+  past the window. The clip's "one pale frame at B's rise start" is these frames 3-6.
+- docs/native-notes.md "The motion's intangible window".
+
+### 3. Fix
+- **The data:** the package has `param/fighter/fighter_param_vl_supamario.bin` = Mario's vl with SpecialHi /
+  SpecialAirHi bytes 3 / 4 = 0 (4 bytes changed; byte 4 0 skips the window). `supamario_corebreaker_build.py vl
+  MARIO_VL OUT_DIR` writes it (`vl_no_window`; it fails if the window isn't Mario's 3 / 7 or already 0 / 0).
+- **The status (`cb_update`, every frame of 0x154):** `HitModule(0, 0)`. With an old vl file installed, the window
+  can still set 2 on its crossing frame, but the next frame clears it: at most that one frame, once a status.
+- The hold's invincibility is the INVINCIBLE frames (`HitModule(1)`, another field): unchanged.
+- The rise loses Super Jump Punch's frames 3-6 intangibility (Core Breaker's own rise never asked for it).
+
+### 4. The shieldstun (user: "The shieldstun didn't seem to work. Maybe self shieldstun and victim shieldstun are different?")
+The k 11 lines (`status x 100 + frames left + 10000 x hitstop`), B at 04:07:59:
+- 13016 x 4: the shielder in GuardDamage (0x1E), frozen (hitlag), our count at 16.
+- 3016 .. 3001: GuardDamage, 16 frames, one a frame. **The 16 frames worked** (vanilla for this 3% hit: INT(3 x 0.58 +
+  4) = 5).
+- 2800 .. 2790: Guard (0x1C, shielding) with our count past 0 (0, -1 .. -10: the diag's 10 frames after). From Guard
+  every out-of-shield option is immediate (jump, grab, up special, up smash); a shield drop takes 8 (`0x120000df`).
+
+Frame by frame (k 14 / k 11 times, 60 fps; N = the dive's start, 59.533):
+- N+4: the shield hit; both frozen about 4-5 frames (his motion goes 60 -> 66 in 11 frames).
+- N+8 .. N+23: the 16 frames of shieldstun; N+24: the shielder can act.
+- N+11: he lands (phase 5 at motion frame 66); his landing is 60 frames (`LAND_LAG`), the status ends at N+71.
+- **On shield: -47** (he is free 47 frames after the shielder). With vanilla's 5 frames: -58. The 11 extra frames
+  don't change what can punish him.
+
+"Self" shieldstun: Smash 4 has none for the attacker; his only lag on a shield hit is his hitlag (the box's
+`Hitlag` 1.0, the same frames as the shielder's) and then his own move: here the 60-frame miss landing.
+
+To make it feel like they want (not built; for the user to choose):
+- **A shorter recovery on a shield hit:** e.g. the dive's shield hit goes to a bounce (FallSpecial) or a short landing
+  (15 frames: about -2 with the 16 frames of stun).
+- **Or more shieldstun:** about 63 frames for 0 with the 60-frame landing.
+
+### Tests (v11 build)
+- `supamario_corebreaker_test.py`: 104 ok (v11 `body_tests`: the package's vl file has 0 / 0 on both motions and
+  nothing else to change; the model, with the engine's window after each frame's motion advance, reproduces the log
+  without the fix (A: 4 frames, B: the whole status); with Mario's 3 / 7 and the fix: at most the crossing frame,
+  once a status; with the package's vl: normal on every frame of the rise, A, B, a grounded catch, a catch in the
+  air and a shielded dive).
+- `supamario_fakedeath_test.py` 50 ok, `supamario_godfist_test.py --all-models` 538 ok, `msc_stack_check.py`: 0 of
+  2385 (globals 127 of 128, none added); the diag MSC: stack 0, the Core Breaker suite 104 ok.
+- The package ships the MSC and the vl file only: this build's `game.bin` has the buffer commands' work in progress
+  (exe_v46l's `Buffer_Clear` in the God Fist), so v10's stays.

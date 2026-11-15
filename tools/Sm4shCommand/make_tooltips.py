@@ -250,6 +250,7 @@ def _position_lines():
                                  ("Attack team", "the team its attacks can't hit (-1 = none; a projectile's is its owner's, or the reflector's after a reflect)"))):
         out.append((0x0F000334 + i, nm, "Read only: %s. Needs tools/acmd_ext_cave.py." % d))
     out.append((0x0F000337, "Gravity", "Read only: this fighter's gravity in effect (how much its vertical speed drops each frame, as the fighter_param Gravity): Gravity_Set's while it holds, else its own (its gravity energy's). Other objects read 0. Needs exe_v42 (tools/acmd_ext_cave.py)."))
+    out.append((0x0F0003C9, "Buffer clear", "Write: empties the input buffer of the fighter in player slot (value): 1-8, 0 = this fighter; add 16 x Buffer_Clear's Inputs bits for some inputs only (2 + 16 = player 2's attacks), else everything. The MSC's way to Buffer_Clear (WorkModule(0, slot, 0x0F0003C9)). Reads 0. Needs exe_v46l (tools/acmd_ext_cave.py)."))
     out.append((0x0F000338, "Max fall speed", "Read only: this fighter's max fall speed in effect: Gravity_Set's while it holds, else its own (its gravity energy's). Other objects read 0. Needs exe_v42 (tools/acmd_ext_cave.py)."))
     hv = "Needs exe_v43 (tools/acmd_ext_cave.py)."
     for c, stick, base in ((0, "control stick", "STICK_X / STICK_Y"), (1, "C-stick", "CSTICK_X / CSTICK_Y")):
@@ -362,6 +363,7 @@ def alias_lines():
             ("TEAM", 0x0F000334, "team ids (read only)"), ("HURT_TEAM", 0x0F000335, ""), ("ATTACK_TEAM", 0x0F000336, ""),
             ("GRAVITY", 0x0F000337, "the fighter's gravity in effect, Gravity_Set's included (read only)"),
             ("MAX_FALL", 0x0F000338, "the fighter's max fall speed in effect, Gravity_Set's included (read only)"),
+            ("BUFFER_CLEAR", 0x0F0003C9, "write a player slot (0 self; + 16 x Buffer_Clear's Inputs): its input buffer emptied (exe_v46l)"),
             ("STICK_ANGLE", 0x0F0003C0, "stick angle along the facing, degrees (0 fwd, 90 up): a hitbox angle (read only)"),
             ("STICK_ANGLE_RAW", 0x0F0003C1, "stick angle on screen, degrees (0 right, 90 up)"),
             ("STICK_LEN", 0x0F0003C2, "how far the stick is pushed, 0-1"),

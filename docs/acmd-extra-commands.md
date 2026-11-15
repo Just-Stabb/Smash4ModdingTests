@@ -4,14 +4,14 @@ These are new commands for game, effect, sound and expression scripts. They need
 `cross_f.rpx` (`tools/acmd_ext_cave.py`, part of the standard build). Without it, a script that uses
 them won't load properly, so ship the executable with any script that uses them.
 
-Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12) lists all of them in one
+Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12, Buffer_Clear / Buffer_Set from v1.4.13) lists all of them in one
 group, **New Commands**, at the top of the list (vanilla commands stay in their own groups), in subgroups:
 
 | Subgroup | Commands |
 |---|---|
 | Hitboxes & hits | Extra_Special_Hitbox, Extra_Extended_Special_Hitbox, Hit_Check, Hit_Get, Hit_Reset, Hit_Log_Clear |
 | Fighter state | Status_Get / _Set, Hitstun_Get / _Set, Hitstop_Set, Damage_Get / _Set, Body_State_Set, Armor_Set, Item_State_Set, Stage_Collision_Set, Leave_Ground_Cancel, Gravity_Set |
-| Inputs | Input_Compare, Input_Get, Input_Set |
+| Inputs | Input_Compare, Input_Get, Input_Set, Buffer_Clear, Buffer_Set |
 | Position & rotation | Position_Get / _Set, Position_Place, Position_Offset_Get, Rotation_Get / _Set, Joint_Position_Get |
 | Animation | Motion_Get / _Set, Animation_Rate_Set |
 | Targets & tracking | Track_Target, Last_Hit_Get, Target_Slot_Get |
@@ -31,6 +31,7 @@ them too.
 | `Track_Target` | homing on the nearest fighter |
 | `Thread_Start` / `Thread_Stop` | a block that runs on its own |
 | `Input_Compare` / `Input_Get` / `Input_Set` | a fighter's buttons and sticks |
+| `Buffer_Clear` / `Buffer_Set` | a fighter's input buffer: empty it (all or some inputs, once or for some frames), or put an input in it as if pressed (exe_v46l, Sm4shCommand v1.4.13: below) |
 | `Hit_Reset` / `Hit_Log_Clear` | the "has hit" flag / who a hitbox has hit |
 | `Hit_Check` / `Hit_Get` | whether an attack connected, and with what (hurtbox, shield, ...) |
 | `Rotation_Get` / `Rotation_Set`, `Position_Get` / `Position_Set` | a fighter's or article's rotation / position |
@@ -354,6 +355,41 @@ Input_Set(Target=2, Input=2, Value=2)
 WAIT(Frames=30)
 Input_Set(Target=2, Input=21, Value=0)
 ```
+
+## Buffer_Clear / Buffer_Set (exe_v46l, Sm4shCommand v1.4.13)
+
+The game doesn't act on a press only on its frame: each press becomes commands (attack, forward tilt, up special,
+jump, roll, ...: from the button and the stick that frame) that stay buffered 10 frames, and a fighter that can act
+takes the first one still there. These two commands work on that buffer (docs/native-notes.md "The input buffer").
+
+| Command | Does |
+|---|---|
+| `Buffer_Clear(Target, Inputs, Frames)` | empties the target's buffer. Inputs, bits: 1 attacks, 2 specials, 4 jump (button and tap), 8 shield / air dodge / spot dodge / rolls, 16 grab, 32 taunts, 64 stick commands (dash, turn) and flicks; 0 (or 128) everything, as the game's own clear at a status change (also this frame's presses and the per-button counters). Frames 0 / 1 now; N: now and after each of its next N - 1 input reads |
+| `Buffer_Set(Target, Input, Direction, Frames)` | puts a press in the target's buffer, as if pressed at its next input read: Input 0 attack, 1 special, 2 jump, 3 shield, 4 grab, 5-7 taunts up / side / down; Direction 0 its own stick, 1 neutral, 2 forward, 3 back, 4 up, 5 down, + 8 flicked (a smash input, a tap jump, a roll); Frames 0 the game's window (10), 1-255 that long |
+
+- Every target (12 included). Fighters only.
+- **vs Input_Set:** Input_Set forces the controller (the status sees the press, a forced stick stays until stopped,
+  Input 21 ignores the controller); Buffer_Set only fills the buffer (the press and stick are put in for the game's
+  command builder that frame, then put back), and its Frames can keep the command longer than the window.
+  Buffer_Clear empties the buffer but doesn't stop new presses (Input_Set 21 does); a held button isn't a new press.
+- **From MSC:** `BUFFER_CLEAR` (`0x0F0003C9`): `WorkModule(0, slot, 0x0F0003C9)` clears player slot 1-8's buffer
+  (0: this fighter), everything; slot + 16 x Inputs for some inputs.
+- Unconfirmed: whether the buffer counts down while a fighter is frozen in hitstop (if not, a press made before a
+  long freeze is still there at its end: clear it on release).
+
+```
+// a grab-like move lets go of the fighter it hit with nothing buffered, and eats its mashing for 5 frames
+Buffer_Clear(Target=2, Inputs=0, Frames=5)
+// buffer a jump for this fighter near the end of a move (kept 20 frames)
+Buffer_Set(Target=0, Input=2, Direction=0, Frames=20)
+// the fighter this attack hit down-smashes as soon as it can
+Buffer_Set(Target=12, Input=0, Direction=13, Frames=40)
+```
+
+Code: `tools/acmd_ext_cave.py` `buf_code` (APC_CODE, after the position commands), `buf_handlers` (CODE2), the tables
+at `0x04BD3B00` and the requests at `0x04BD3D00` (12 x 0x14); the control update's builder call `0x02E72B9C` ->
+`buf_build`. Tested in unicorn (`tools/acmd_ext_test.py` `buf_tests`). Super God Fist clears its victim's buffer at
+the catch and the hand-off (fighters/supamario/README.md).
 
 ## Hit_Reset
 
