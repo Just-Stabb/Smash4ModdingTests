@@ -98,7 +98,6 @@ class EvTest
 
     static Mat4 At052(int g) { return Mat4.TRS(new[] { 0f, 5f, 2f }, Mat4.EulerToQuat(0, 0, 0), new[] { 1f, 1f, 1f }); }
 
-    static float[] WorldPos(EffectSim s, Particle q) { return q.Local ? s.Call.Transform(q.P[0], q.P[1], q.P[2]) : q.P; }
 
     static void Level2(string path, EffectLibrary lib, EffectLibrary kbLib, Run kirbyRun)
     {
@@ -119,7 +118,7 @@ class EvTest
                 for (int k = 0; k < sim.Emitters.Count; k++)
                 {
                     c[k][t] = sim.Emitters[k].Live.Count;
-                    f0[k][t] = sim.Emitters[k].Live.Count > 0 ? WorldPos(sim, sim.Emitters[k].Live[0]) : null;
+                    f0[k][t] = sim.Emitters[k].Live.Count > 0 ? sim.Emitters[k].World(sim.Emitters[k].Live[0]) : null;
                 }
             }
             counts[id] = c;
@@ -167,7 +166,7 @@ class EvTest
                 s1.StepTo(12, At052);
                 s2.StepTo(25, At052);
                 s2.StepTo(12, At052);
-                Func<EffectSim, string> dump = s => string.Join(";", s.Emitters.SelectMany(e => e.Live.Select(q => V(WorldPos(s, q)))).ToArray());
+                Func<EffectSim, string> dump = s => string.Join(";", s.Emitters.SelectMany(e => e.Live.Select(q => V(e.World(q)))).ToArray());
                 Check("v1.6.0: fixed seeds: 0x3410031 stepped to 25 then back to 12 = stepped to 12 (every particle's place)", dump(s2) == dump(s1) && dump(s1).Length > 0, true);
             }
         }
@@ -269,7 +268,7 @@ class EvTest
             return new EffectSim(new EffectData { Index = 0, Id = 0x3410031, StartFrame = 1, Size = 1.5f, Follow = true, Rate = rate }, a, 1000000);
         };
         Func<EffectSim, string> dump = s => string.Join(";", s.Emitters.Select(e => e.Live.Count + ":" +
-            string.Join(",", e.Live.Select(q => V(WorldPos(s, q))).ToArray())).ToArray());
+            string.Join(",", e.Live.Select(q => V(e.World(q))).ToArray())).ToArray());
         var one = sim(1); var two = sim(2); var half = sim(0.5f);
         var bad = new List<string>();
         for (int t = 0; t <= 14; t++)
@@ -373,6 +372,136 @@ class EvTest
         Check("v1.6.1: no game editor (effect.bin open alone): the game script from game.bin next to it (its commands)",
               got != null ? got.Count : -1, gameScript.Commands.Count);
         try { Directory.Delete(tmp, true); } catch (Exception) { }
+    }
+
+    /// <summary>v1.6.2: the model's visibility animations (material_anime_*.pac) = tools/mta.py's reading; the parts'
+    /// priority (your choice > a VisGroups group > the visibility animation > the name rule); the script's visibility
+    /// commands on the timeline.</summary>
+    static void Visibility(string path, FighterAssets a)
+    {
+        var lines = File.ReadAllLines(path).Select(l => l.Split('\t')).Where(p => p[0] == "vis").ToList();
+        var bad = new List<string>();
+        foreach (var p in lines)
+        {
+            var at = a.MaterialVis.At(p[1] + ".omo", int.Parse(p[2]));
+            bool got;
+            if (!at.TryGetValue(p[3], out got) || got != (p[4] == "1")) bad.Add(p[2] + " " + p[3]);
+        }
+        Check("v1.6.2: Mario's DamageHi1 face meshes on frames 0 / 3 / 11 (" + lines.Count + " tracks x frames) = tools/mta.py's reading of "
+              + "material_anime_face / eye / eyelid.pac", string.Join(", ", bad.ToArray()), "");
+        var groups = new VisGroups();
+        groups.AddLine(a.Name + " 0 1: Mario_Hathead");
+        groups.AddLine(a.Name + " 0 2: Mario_Nohat");
+        groups.AddLine(a.Name + " 0 default: 1");
+        var vis = new VisState();
+        var user = new Dictionary<string, bool>();
+        ModelParts.Apply(a, "FitMarioBodyMainF00DamageHi1.omo", 3, vis, groups, user);
+        Func<string, string> st = n => { var m = a.Model.Meshes.First(x => x.Name.StartsWith(n)); return (m.Visible ? "on" : "off") + "/" + m.Why; };
+        Check("v1.6.2: a visibility group's default (VisGroups) decides its meshes; the visibility animation the others (Ouch on frame 3)",
+              st("Mario_Hathead") + " " + st("Mario_Nohat") + " " + st("Mario_Ouch_"), "on/group 0 default 1 off/group 0 default 1 on/visibility animation (material_anime)");
+        vis.Groups[0] = 2;
+        ModelParts.Apply(a, "FitMarioBodyMainF00DamageHi1.omo", 3, vis, groups, user);
+        Check("v1.6.2: Model_Changer(0, 2) switches the group's meshes", st("Mario_Hathead") + " " + st("Mario_Nohat"),
+              "off/group 0 state 2 (script) on/group 0 state 2 (script)");
+        user[a.Model.Meshes.First(x => x.Name.StartsWith("Mario_Nohat")).Name] = false;
+        ModelParts.Apply(a, "FitMarioBodyMainF00DamageHi1.omo", 3, vis, groups, user);
+        Check("v1.6.2: the parts tab's choice wins", st("Mario_Nohat"), "off/your choice");
+        ModelParts.Apply(a, "FitMarioBodyMainF00DamageHi1.omo", 3, new VisState(), null, null);
+        // the script's visibility commands on the timeline (the game / expression scripts)
+        var g = Compile("FRAME(Frames=1)\n");
+        var x = Compile("FRAME(Frames=2)\nModel_Changer(ChangerID=0, ChangerState=2)\nFRAME(Frames=5)\nVIS_SET_DEFAULT(Group=1, State=3)\n" +
+                        "FRAME(Frames=8)\nVIS_BACK_DEFAULT(Group=0)\nModel_Changer(ChangerID=1, ChangerState=0)\nFRAME(Frames=10)\nVIS_BACK_DEFAULT(Group=1)\n" +
+                        "Visibility(State=0)\nFRAME(Frames=12)\nVIS_RESET_DEFAULT(Group=1)\nVisibility(State=1)\n");
+        var r = RunPair(g, x, null, 20);
+        Func<int, string> vs = fr => { var v = r.Fx[fr - 1].Vis; return string.Join(",", v.Groups.OrderBy(k => k.Key).Select(k => k.Key + "=" + k.Value).ToArray()) + (v.Whole == false ? " hidden" : ""); };
+        Check("v1.6.2: Model_Changer / VIS_SET_DEFAULT / VIS_BACK_DEFAULT / Visibility / VIS_RESET_DEFAULT on frames 1, 2, 5, 8, 10, 12",
+              vs(1) + "|" + vs(2) + "|" + vs(5) + "|" + vs(8) + "|" + vs(10) + "|" + vs(12), "|0=2|0=2,1=3|1=0|1=3 hidden|");
+        var merged = VisState.Merge(r.Fx[7].Vis, new VisState { Groups = { { 1, 7 } }, Changed = { { 1, 9 } } });
+        Check("v1.6.2: two scripts' visibility merged: per group the later change", merged.Groups[1], 7);
+    }
+
+    /// <summary>v1.6.2: effect colours and alphas as the game applies them; the body overlays.</summary>
+    static void Colours()
+    {
+        var g = Compile("FRAME(Frames=1)\n");
+        var f = Compile("FRAME(Frames=1)\nEFFECT_FOLLOW_FLIP_COLOR(GFXRight=0x1000001, GFXLeft=0x1000001, Bone=0, X=0, Y=0, Z=0, XRot=0, YRot=0, ZRot=0, " +
+                        "Size=1, Terminate=1, FlipType=1, Red=100, Green=180, Blue=510)\nLAST_EFFECT_SET_ALPHA(Alpha=50)\nLAST_PARTICLE_SET_COLOR(R=0.5, G=1, B=1)\n" +
+                        "Graphic_Effect6(Graphic=0x1000002, Bone=0, X=0, Y=0, Z=0, XRot=0, YRot=0, ZRot=0, Size=1, Terminate=1, Alpha=70)\n" +
+                        "LAST_EFFECT_SET_COLOR(Red=255, Green=0, Blue=51)\n" +
+                        "EFFECT_LIGHT(Graphic=0x1000003, Bone=0, X=0, Y=0, Z=0, XRot=0, YRot=0, ZRot=0, Size=1, RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, " +
+                        "RandomYRot=0, RandomZRot=0, Terminate=1, Red=120, Green=80, Blue=180, LightIntensity=1, LightX=0, LightY=0, LightZ=0)\n" +
+                        "FRAME(Frames=2)\nColor_Overlay(Red=255, Green=0, Blue=0, Alpha=128)\nFRAME(Frames=6)\nChange_Overlay(Transition=4, Red=0, Green=0, Blue=255, Alpha=255)\n" +
+                        "FRAME(Frames=12)\nTerminate_Overlays()\n");
+        var r = RunPair(g, f, null, 20);
+        Func<EffectData, string> c = e => { float rr, gg, bb, aa; Viewport.CallColour(e, out rr, out gg, out bb, out aa); return string.Format(IC, "{0:0.###} {1:0.###} {2:0.###} {3:0.###}", rr, gg, bb, aa); };
+        var all = r.FxRunner.AllEffects;
+        Check("v1.6.2: colours / 255 (510 = 2), alpha percent / 100, LAST_PARTICLE_SET_COLOR multiplies; Graphic_Effect6's Alpha 70 %; "
+              + "LAST_EFFECT_SET_COLOR / 255; EFFECT_LIGHT's colour is its light's (not the effect's)",
+              string.Join(" | ", all.Select(c).ToArray()), "0.196 0.706 2 0.5 | 1 0 0.2 0.7 | 1 1 1 1");
+        Func<int, string> ov = fr => { var o = r.Fx[fr - 1].Overlay; return o == null ? "none" : string.Format(IC, "{0:0.##} {1:0.##} {2:0.##} {3:0.##}", o[0], o[1], o[2], o[3]); };
+        Check("v1.6.2: Color_Overlay at 2, Change_Overlay over 4 frames from 6 (halfway on 8), Terminate_Overlays at 12",
+              ov(1) + " | " + ov(2) + " | " + ov(8) + " | " + ov(10) + " | " + ov(12), "none | 1 0 0 0.5 | 0.5 0 0.5 0.75 | 0 0 1 1 | none");
+    }
+
+    /// <summary>v1.6.2: the swoosh arcs (follow-0 emitters whose rotation is key-animated: Mario's up smash 0x341000B, the
+    /// same make as the common forward-air arc) follow the emitter's live rotation, and come out mirrored for the other
+    /// facing; billboards aren't mirrored.</summary>
+    static void Arcs(FighterAssets a, EffectLibrary lib, string body)
+    {
+        uint hi4 = 0xBF7EF5B8;
+        var up = RunPair(Script(Path.Combine(body, "game.bin"), hi4), Script(Path.Combine(body, "effect.bin"), hi4), lib);
+        var arc = up.FxRunner.AllEffects.First(e => e.Id == 0x341000B);
+        var anim = a.GetAnimation(a.AnimationFor(hi4));
+        var vp = new Viewport { Assets = a, Animation = anim, Width = 800, Height = 600, History = up.Game, GetEffectAssets = lib.AssetsFor };
+        Func<int, bool, List<Tuple<float[], float[]>>> quads = (gf, flip) =>
+        {
+            vp.Flip = flip;
+            vp.ResetEffects();
+            vp.AnimFrame = up.Game[gf - 1].AnimFrame;
+            vp.Frame = up.Fx[gf - 1];
+            var e = up.Fx[gf - 1].Effects.First(x => x.Index == arc.Index);
+            return vp.EffectScreenQuads(e, gf);
+        };
+        int f2 = Math.Min(arc.StartFrame + 6, arc.EndFrame - 1);
+        // the live emitter matrix: on f2 the swoosh's emitter (line1_b) has turned by its Y key; a particle born before
+        // sits where the turned emitter puts it
+        var sim = vp.SimFor(up.Fx[f2 - 1].Effects.First(x => x.Index == arc.Index), f2);
+        var es = sim.Emitters[2];
+        var want = sim.Call * es.D.Matrix(sim.NextK - 1);
+        Check("v1.6.2: a following particle is placed by the call x the emitter's matrix of the frame shown (its key-animated Y turn)",
+              es.Live.Count > 0 && Near(es.World(es.Live[0]), want.Transform(es.Live[0].P[0], es.Live[0].P[1], es.Live[0].P[2])) && es.Live[0].Local, true);
+        Func<List<Tuple<float[], float[]>>, float> cxOf = l => l.Count == 0 ? float.NaN : l.Average(t => (t.Item1[0] + t.Item1[3] + t.Item1[6]) / 3);
+        var origin = vp.ScreenOf(new[] { 0f, 0f, 0f });
+        vp.Flip = true;
+        var originL = vp.ScreenOf(new[] { 0f, 0f, 0f });
+        float r1 = cxOf(quads(f2, false)) - origin[0], l1 = cxOf(quads(f2, true)) - originL[0];
+        Check(string.Format(IC, "v1.6.2: Mario's up smash swoosh {0} frames in: facing right {1:0} px from him, facing left {2:0} (mirrored)", f2 - arc.StartFrame, r1, l1),
+              !float.IsNaN(r1) && Math.Abs(r1 + l1) < 1.5f, true);
+        // a camera billboard's texture runs left to right on screen (u 0 -> 1) in both facings (v1.6.0 had it mirrored)
+        var bb = Compile("FRAME(Frames=1)\nGraphic_Effect(Graphic=0x341002C, Bone=0, X=0, Y=8, Z=0, XRot=0, YRot=0, ZRot=0, Size=1, RandomX=0, RandomY=0, " +
+                         "RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=1)\n");
+        var rb = RunPair(Compile("FRAME(Frames=1)\n"), bb, lib, 30);
+        var hit = rb.FxRunner.AllEffects.First();
+        var vp2 = new Viewport { Assets = a, Animation = anim, Width = 800, Height = 600, History = rb.Game, GetEffectAssets = lib.AssetsFor };
+        Func<bool, string> dir = flip =>
+        {
+            vp2.Flip = flip; vp2.ResetEffects(); vp2.Frame = rb.Fx[3]; vp2.AnimFrame = rb.Game[3].AnimFrame;
+            var q = vp2.EffectScreenQuads(rb.Fx[3].Effects.First(), 4);
+            int right = 0, total = 0;
+            foreach (var t in q)
+            {
+                // corners 0 (u 0, v 0), 1 (u 1, v 0), 2 (u 1, v 1) run clockwise on screen (y down) unless the texture is
+                // mirrored; the particle's own turn doesn't change that
+                var S = t.Item1;
+                float cross = (S[3] - S[0]) * (S[7] - S[1]) - (S[4] - S[1]) * (S[6] - S[0]);
+                total++;
+                if (cross > 0) right++;
+            }
+            return right + "/" + total;
+        };
+        string dr = dir(false), dl = dir(true);
+        Check("v1.6.2: camera billboards (0x341002C's sprites): the texture isn't mirrored on screen (u 0 -> 1 then v 0 -> 1 clockwise), facing right and left",
+              dr.Split('/')[1] != "0" && dr.Split('/')[0] == dr.Split('/')[1] && dl == dr, true);
     }
 
     static int Main(string[] args)
@@ -494,6 +623,10 @@ class EvTest
         Rates(smLib, common);
         Common(root, sm, common);
         Sources(smAssets, smBody, dash);
+        // ---- v1.6.2: colours, overlays, visibility, model parts, the arcs' direction --------------------------------
+        if (args.Length > 3) Visibility(args[3], smAssets);
+        Colours();
+        Arcs(smAssets, smLib, smBody);
 
         // ---- the timeline: the game script's speed, threads, effect commands -----------------------------------------
         var g2 = Compile("FRAME(Frames=5)\nSet_Frame_Duration(Speed=2)\n");

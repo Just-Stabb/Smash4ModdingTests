@@ -291,6 +291,8 @@ namespace Sm4shCommand.Viewer
             public string Name;
             public List<Poly> Polys = new List<Poly>();
             public bool Visible = true;
+            public bool DefaultVisible = true;      // v1.6.2: the name rule's default (FighterAssets.HiddenByDefault)
+            public string Why = "";                 // v1.6.2: why it's shown / hidden on the frame shown
         }
         public List<Mesh> Meshes = new List<Mesh>();
 

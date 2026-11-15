@@ -37,6 +37,9 @@ namespace Sm4shCommand.Viewer
         // v1.5.0: the effect script's effects (Frame.Effects / Trails): markers at their bone + offset, turned and
         // sized as the call says, coloured by its colour; trails as the blade's line with a fading history
         public bool ShowEffects = true, ShowEffectLabels = true, ShowTrails = true;
+        // v1.6.2: hitbox spheres / capsules and their angle arrows (the list and the calculator keep working), the body
+        // overlays / flashes, the whole model's visibility (the script's Visibility command)
+        public bool ShowHitboxes = true, ShowOverlays = true, WholeVisible = true;
         public bool Flip;                   // the scene turned round (the fighter facing left), as the game turns it
         public int SelectedEffect = -1;     // EffectData.Index
         public Func<EffectData, string> EffectLabel;
@@ -184,8 +187,11 @@ namespace Sm4shCommand.Viewer
                 for (int i = 0; i < pix.Length; i++) pix[i] = bg;
                 var zbuf = new float[w * h];
                 for (int i = 0; i < zbuf.Length; i++) zbuf[i] = float.MaxValue;
-                if (attacker != null) Rasterize(attacker, pix, zbuf, w, h, r, u, f);
-                if (held != null) Rasterize(held, pix, zbuf, w, h, r, u, f);
+                // v1.6.2: the body overlay / flash on this frame (Color_Overlay & co.) tints the fighter and what it holds
+                var ov = ShowOverlays && Frame != null ? Frame.Overlay : null;
+                bool ovAdd = Frame != null && Frame.OverlayLight;
+                if (attacker != null && WholeVisible) Rasterize(attacker, pix, zbuf, w, h, r, u, f, ov, ovAdd);
+                if (held != null && WholeVisible) Rasterize(held, pix, zbuf, w, h, r, u, f, ov, ovAdd);
                 if (enemy != null) Rasterize(enemy, pix, zbuf, w, h, r, u, f);
                 texturedTrails.Clear();
                 try { DrawFx(pix, zbuf, w, h, r, u, f); }
@@ -198,7 +204,7 @@ namespace Sm4shCommand.Viewer
                     g.SmoothingMode = SmoothingMode.AntiAlias;
                     DrawGround(g, r, u);
                     if (ShowBones && world != null) DrawBones(g, r, u);
-                    DrawHitboxes(g, r, u);
+                    if (ShowHitboxes) DrawHitboxes(g, r, u);
                     if (ShowTrails) DrawTrails(g, r, u);
                     if (ShowEffects) DrawEffects(g, r, u);
                     DrawTrajectory(g, r, u);
@@ -208,7 +214,7 @@ namespace Sm4shCommand.Viewer
             }
         }
 
-        void Rasterize(Skinned s, int[] pix, float[] zbuf, int w, int h, float[] r, float[] u, float[] f)
+        void Rasterize(Skinned s, int[] pix, float[] zbuf, int w, int h, float[] r, float[] u, float[] f, float[] ov = null, bool ovAdd = false)
         {
             float cx = w / 2f + panX, cy = h * 0.72f + panY;
             int k = 0;
@@ -243,14 +249,14 @@ namespace Sm4shCommand.Viewer
                             int i0 = t[i] * 2, i1 = t[i + 1] * 2, i2 = t[i + 2] * 2;
                             tv[0] = p.UV[i0]; tv[1] = p.UV[i0 + 1]; tv[2] = p.UV[i1]; tv[3] = p.UV[i1 + 1]; tv[4] = p.UV[i2]; tv[5] = p.UV[i2 + 1];
                             Tri(pix, zbuf, w, h, cx + x0 * zoom, cy - y0 * zoom, z0, cx + x1 * zoom, cy - y1 * zoom, z1,
-                                cx + x2 * zoom, cy - y2 * zoom, z2, 0, shade, tex, tv, p.AlphaTest || tex.HasAlpha);
+                                cx + x2 * zoom, cy - y2 * zoom, z2, 0, shade, tex, tv, p.AlphaTest || tex.HasAlpha, ov, ovAdd);
                         }
                         else
                         {
                             int cr = Clamp((int)((196 + tint) * shade)), cg = Clamp((int)((188 + tint / 2) * shade)), cb = Clamp((int)((178 - tint) * shade));
                             int col = unchecked((int)0xFF000000) | cr << 16 | cg << 8 | cb;
                             Tri(pix, zbuf, w, h, cx + x0 * zoom, cy - y0 * zoom, z0, cx + x1 * zoom, cy - y1 * zoom, z1,
-                                cx + x2 * zoom, cy - y2 * zoom, z2, col, 1, null, null, false);
+                                cx + x2 * zoom, cy - y2 * zoom, z2, col, 1, null, null, false, ov, ovAdd);
                         }
                     }
                 }
@@ -259,10 +265,22 @@ namespace Sm4shCommand.Viewer
 
         static int Clamp(int v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
 
+        /// <summary>v1.6.2: a body pixel under a colour overlay (r g b a 0-1: the colour mixed in by its alpha) or a flash
+        /// light (added by its alpha). Approximate: the game's overlay shader isn't run.</summary>
+        static int Overlay(int c, float[] ov, bool add)
+        {
+            float a = Math.Max(0, Math.Min(1, ov[3]));
+            int r = c >> 16 & 255, g = c >> 8 & 255, b = c & 255;
+            if (add) { r += (int)(ov[0] * 255 * a); g += (int)(ov[1] * 255 * a); b += (int)(ov[2] * 255 * a); }
+            else { r = (int)(r + (ov[0] * 255 - r) * a); g = (int)(g + (ov[1] * 255 - g) * a); b = (int)(b + (ov[2] * 255 - b) * a); }
+            return unchecked((int)0xFF000000) | Clamp(r) << 16 | Clamp(g) << 8 | Clamp(b);
+        }
+
         /// <summary>One triangle into the z-buffer: a flat color, or the texture (affine UVs: the view
         /// is orthographic) times the shade. Texels with little alpha are left out (alpha test).</summary>
         static void Tri(int[] pix, float[] zb, int w, int h, float ax, float ay, float az, float bx, float by, float bz,
-                        float cx, float cy, float cz, int col, float shade, Texture tex, float[] uv, bool alphaTest)
+                        float cx, float cy, float cz, int col, float shade, Texture tex, float[] uv, bool alphaTest,
+                        float[] ov = null, bool ovAdd = false)
         {
             int minX = Math.Max(0, (int)Math.Floor(Math.Min(ax, Math.Min(bx, cx))));
             int maxX = Math.Min(w - 1, (int)Math.Ceiling(Math.Max(ax, Math.Max(bx, cx))));
@@ -295,6 +313,7 @@ namespace Sm4shCommand.Viewer
                     }
                     else
                         pix[i] = col;
+                    if (ov != null) pix[i] = Overlay(pix[i], ov, ovAdd);
                     zb[i] = z;
                 }
             }

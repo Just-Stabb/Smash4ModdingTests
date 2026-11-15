@@ -15,6 +15,7 @@ namespace Sm4shCommand.Viewer
         public string Root, Name, ModelPath;
         public Skeleton Skeleton;
         public NudModel Model;
+        public MaterialVis MaterialVis = new MaterialVis();     // v1.6.2
         public Dictionary<int, Texture> Textures = new Dictionary<int, Texture>();
         public Dictionary<string, byte[]> Animations = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
         readonly Dictionary<uint, string> byScript = new Dictionary<uint, string>();
@@ -55,7 +56,9 @@ namespace Sm4shCommand.Viewer
             a.Skeleton = Skeleton.Load(Path.Combine(cdir, "model.vbn"));
             a.Model = NudModel.Load(Path.Combine(cdir, "model.nud"));
             foreach (var m in a.Model.Meshes)
-                m.Visible = !HiddenByDefault(m.Name);
+                m.Visible = m.DefaultVisible = !HiddenByDefault(m.Name);
+            // v1.6.2: the model's own visibility animations (material_anime_face / eye / eyelid.pac)
+            try { a.MaterialVis = MaterialVis.Load(cdir); } catch (Exception) { a.MaterialVis = new MaterialVis(); }
             try { a.Textures = Nut.Load(Path.Combine(cdir, "model.nut")); }
             catch (Exception) { }
             foreach (var m in a.Model.Meshes)
@@ -134,7 +137,7 @@ namespace Sm4shCommand.Viewer
 
         /// <summary>Expression variants of the face / eyes / body (shown instead of the normal mesh by
         /// expression scripts) start hidden; the viewer's mesh list can show them.</summary>
-        static bool HiddenByDefault(string mesh)
+        public static bool HiddenByDefault(string mesh)
         {
             string[] words = { "blink", "halfblink", "ouch", "talk", "capture", "furafura", "sorori", "steppose",
                                "pattern", "damagefly", "heavyouch", "bodybig2", "openmouth", "smile", "shout", "fura",

@@ -37,6 +37,33 @@ namespace Sm4shCommand.GUI
         readonly CheckBox showLabels = new CheckBox { Text = "Labels", AutoSize = true, Checked = Runtime.GetSetting("ViewerEffectLabels", true) };
         readonly CheckBox showTrails = new CheckBox { Text = "Trails", AutoSize = true, Checked = Runtime.GetSetting("ViewerTrails", true) };
         readonly CheckBox flip = new CheckBox { Text = "Flip facing", AutoSize = true };
+        // v1.6.2: hitboxes drawn or not, the body overlays; the model parts (meshes) tab; the expression script (its
+        // visibility commands) followed as the game / effect scripts are
+        readonly CheckBox showHitboxes = new CheckBox { Text = "Hitboxes", AutoSize = true, Checked = Runtime.GetSetting("ViewerHitboxes", true) };
+        readonly CheckBox showOverlays = new CheckBox { Text = "Overlays", AutoSize = true, Checked = Runtime.GetSetting("ViewerOverlays", true) };
+        readonly DataGridView partsGrid = new DataGridView
+        {
+            Dock = DockStyle.Fill, AllowUserToAddRows = false, AllowUserToDeleteRows = false, RowHeadersVisible = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.AllCells,
+        };
+        readonly Label partsInfo = new Label { Dock = DockStyle.Bottom, Height = 54, AutoEllipsis = true };
+        TabControl tabsRight;
+        TabPage partsTab;
+        bool partsFilling;
+        Func<uint, IList<ICommand>> getExpression;
+        ITS_EDITOR expressionEditor;
+        VisGroups visGroups = VisGroups.Load(Path.Combine(Application.StartupPath, "VisGroups.txt"));
+        // the parts tab's choices, per fighter, while the program runs
+        static readonly Dictionary<string, Dictionary<string, bool>> partChoices = new Dictionary<string, Dictionary<string, bool>>(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, bool> UserParts
+        {
+            get
+            {
+                Dictionary<string, bool> d;
+                if (!partChoices.TryGetValue(assets.Root ?? "", out d)) partChoices[assets.Root ?? ""] = d = new Dictionary<string, bool>();
+                return d;
+            }
+        }
         readonly CheckBox allFx = new CheckBox { Text = "List every effect of the script", AutoSize = true };
         readonly DataGridView fxGrid = new DataGridView
         {
@@ -282,7 +309,7 @@ namespace Sm4shCommand.GUI
             tools.Height = 84;
             tools.Controls.AddRange(new Control[] { new Label { Text = "Animation:", AutoSize = true, Padding = new Padding(0, 6, 0, 0) }, animBox,
                 ifTrue, frameSpeed, showModel, showTextures, showBones, showAngles, showEnemy, untilActionable, showFreeze, floor,
-                showParticles, fxQuality, darkBg, showEffects, showLabels, showTrails, flip });
+                showHitboxes, showParticles, fxQuality, darkBg, showEffects, showLabels, showTrails, showOverlays, flip });
             var bottom = new TableLayoutPanel { Dock = DockStyle.Bottom, Height = 34, ColumnCount = 5 };
             var prev = new Button { Text = "<", Width = 30 };
             var next = new Button { Text = ">", Width = 30 };
@@ -342,6 +369,7 @@ namespace Sm4shCommand.GUI
             }
             var right = new SplitContainer { Dock = DockStyle.Fill, Orientation = Orientation.Horizontal, SplitterDistance = 200 };
             var tabs = new TabControl { Dock = DockStyle.Fill };
+            tabsRight = tabs;
             var hbTab = new TabPage("Hitboxes");
             hbTab.Controls.Add(grid);
             var fxTab = new TabPage("Effects");
@@ -350,6 +378,9 @@ namespace Sm4shCommand.GUI
             allFx.Dock = DockStyle.Bottom;
             tabs.TabPages.Add(hbTab);
             tabs.TabPages.Add(fxTab);
+            partsTab = new TabPage("Model parts");
+            BuildParts(partsTab);
+            tabs.TabPages.Add(partsTab);
             right.Panel1.Controls.Add(tabs);
             fxGrid.SelectionChanged += (o, e) =>
             {
@@ -393,6 +424,10 @@ namespace Sm4shCommand.GUI
             showParticles.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerParticles", showParticles.Checked); view.ShowParticles = showParticles.Checked; view.Invalidate(); };
             fxQuality.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerFxQuality", fxQuality.Checked); view.HighQuality = fxQuality.Checked; view.ResetEffects(); };
             darkBg.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerDarkBg", darkBg.Checked); view.DarkBackground = darkBg.Checked; view.Invalidate(); };
+            showHitboxes.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerHitboxes", showHitboxes.Checked); view.ShowHitboxes = showHitboxes.Checked; view.Invalidate(); };
+            showOverlays.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerOverlays", showOverlays.Checked); view.ShowOverlays = showOverlays.Checked; view.Invalidate(); };
+            view.ShowHitboxes = showHitboxes.Checked;
+            view.ShowOverlays = showOverlays.Checked;
             view.ShowParticles = showParticles.Checked;
             view.HighQuality = fxQuality.Checked;
             view.DarkBackground = darkBg.Checked;
@@ -402,7 +437,7 @@ namespace Sm4shCommand.GUI
             untilActionable.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerUntilActionable", untilActionable.Checked); Calc(); };
             showFreeze.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerShowFreeze", showFreeze.Checked); Calc(); };
             floor.CheckedChanged += (o, e) => { Runtime.SetSetting("ViewerFloor", floor.Checked); Calc(); };
-            var meshes = new Button { Text = "Meshes..", AutoSize = true };
+            var meshes = new Button { Text = "Model parts..", AutoSize = true };
             meshes.Click += (o, e) => PickMeshes();
             var enemyButton = new Button { Text = "Enemy model..", AutoSize = true };
             enemyButton.Click += (o, e) => PickEnemy();
@@ -413,18 +448,83 @@ namespace Sm4shCommand.GUI
             tools.Controls.Add(commonButton);
         }
 
-        void PickMeshes()
+        /// <summary>Meshes..: the Model parts tab (v1.6.2; it replaces the old mesh dialog).</summary>
+        void PickMeshes() { tabsRight.SelectedTab = partsTab; }
+
+        /// <summary>v1.6.2: the Model parts tab: every mesh of the model (and of the held model) with a box to show / hide
+        /// it, what the frame would show without your choice and why; Reset to script / default, Show all, Hide all.</summary>
+        void BuildParts(TabPage page)
         {
-            using (var f = new Form { Text = "Meshes shown", Size = new Size(320, 480), StartPosition = FormStartPosition.CenterParent })
+            partsGrid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Show", HeaderText = "Show", Width = 44 });
+            foreach (var c in new[] { "Mesh", "Now", "Why" })
+                partsGrid.Columns.Add(new DataGridViewTextBoxColumn { Name = c, HeaderText = c, ReadOnly = true });
+            partsGrid.CurrentCellDirtyStateChanged += (o, e) => { if (partsGrid.IsCurrentCellDirty) partsGrid.CommitEdit(DataGridViewDataErrorContexts.Commit); };
+            partsGrid.CellValueChanged += (o, e) =>
             {
-                var list = new CheckedListBox { Dock = DockStyle.Fill, CheckOnClick = true };
-                foreach (var m in assets.Model.Meshes) list.Items.Add(m.Name, m.Visible);
-                f.Controls.Add(list);
-                f.ShowDialog(this);
-                for (int i = 0; i < assets.Model.Meshes.Count; i++)
-                    assets.Model.Meshes[i].Visible = list.GetItemChecked(i);
-                view.Invalidate();
+                if (partsFilling || e.RowIndex < 0 || e.ColumnIndex != 0) return;
+                var row = partsGrid.Rows[e.RowIndex];
+                string mesh = (string)row.Tag;
+                if (mesh == null) return;
+                UserParts[mesh] = (bool)row.Cells[0].Value;
+                ShowFrame();
+            };
+            var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 32 };
+            var reset = new Button { Text = "Reset to script / default", AutoSize = true };
+            reset.Click += (o, e) => { UserParts.Clear(); ShowFrame(); };
+            var all = new Button { Text = "Show all", AutoSize = true };
+            all.Click += (o, e) => { foreach (var m in AllMeshes()) UserParts[m] = true; ShowFrame(); };
+            var none = new Button { Text = "Hide all", AutoSize = true };
+            none.Click += (o, e) => { foreach (var m in AllMeshes()) UserParts[m] = false; ShowFrame(); };
+            buttons.Controls.AddRange(new Control[] { reset, all, none });
+            page.Controls.Add(partsGrid);
+            page.Controls.Add(partsInfo);
+            page.Controls.Add(buttons);
+        }
+
+        IEnumerable<string> AllMeshes()
+        {
+            foreach (var m in assets.Model.Meshes) yield return m.Name;
+            if (view.Held != null) foreach (var m in view.Held.Model.Meshes) yield return "held: " + m.Name;
+        }
+
+        /// <summary>The meshes shown on this frame (ModelParts.Apply) and the parts tab's rows.</summary>
+        void ApplyParts(FrameState f, float af)
+        {
+            var vis = f != null ? f.Vis : null;
+            ModelParts.Apply(assets, animName, af, vis, visGroups, UserParts);
+            view.WholeVisible = vis == null || !vis.Whole.HasValue || vis.Whole.Value;
+            if (view.Held != null)
+                foreach (var m in view.Held.Model.Meshes)
+                {
+                    bool v;
+                    if (UserParts.TryGetValue("held: " + m.Name, out v)) { m.Visible = v; m.Why = "your choice"; }
+                    else { m.Visible = m.DefaultVisible; m.Why = "held model (" + view.Held.Name + ")"; }
+                }
+            view.Invalidate();
+            if (partsTab == null) return;
+            partsFilling = true;
+            partsGrid.SuspendLayout();
+            var rows = new List<Tuple<string, bool, string>>();
+            foreach (var m in assets.Model.Meshes) rows.Add(Tuple.Create(m.Name, m.Visible, m.Why));
+            if (view.Held != null) foreach (var m in view.Held.Model.Meshes) rows.Add(Tuple.Create("held: " + m.Name, m.Visible, m.Why));
+            if (partsGrid.Rows.Count != rows.Count) { partsGrid.Rows.Clear(); foreach (var r in rows) partsGrid.Rows.Add(false, "", "", ""); }
+            for (int i = 0; i < rows.Count; i++)
+            {
+                var row = partsGrid.Rows[i];
+                row.Tag = rows[i].Item1;
+                row.Cells[0].Value = rows[i].Item2;
+                row.Cells[1].Value = rows[i].Item1;
+                row.Cells[2].Value = rows[i].Item2 ? "shown" : "hidden";
+                row.Cells[3].Value = rows[i].Item3 + (UserParts.ContainsKey(rows[i].Item1) ? "" : "");
+                row.DefaultCellStyle.ForeColor = rows[i].Item2 ? SystemColors.ControlText : SystemColors.GrayText;
             }
+            partsGrid.ResumeLayout();
+            partsFilling = false;
+            var ev = vis != null ? vis.Events.Where(x => x.Frame <= f.GameFrame).Select(x => x.Frame + ": " + x.Text.Split('(')[0] + "(" + x.Text.Split('(').Skip(1).FirstOrDefault()).ToList() : new List<string>();
+            partsInfo.Text = (ev.Count > 0 ? "Script visibility so far: " + string.Join("; ", ev.ToArray()) : "No visibility commands so far in this script.") +
+                             (vis != null && vis.Groups.Count > 0 ? "  Groups now: " + string.Join(", ", vis.Groups.Select(kv => kv.Key + "=" + kv.Value).ToArray()) +
+                              (visGroups.Fighters.ContainsKey(assets.Name) ? "" : " (VisGroups.txt has no groups for " + assets.Name + ": not applied to meshes)") : "") +
+                             (assets.MaterialVis != null && assets.MaterialVis.Files > 0 ? "  Visibility animations: " + assets.MaterialVis.Files + " motion files." : "");
         }
 
         /// <summary>The game script for the shown script (ScriptCommands: the open tab's game editor, else game.bin's).</summary>
@@ -485,6 +585,7 @@ namespace Sm4shCommand.GUI
             }
             animCount = Math.Max(1, n);
             RunEffects();
+            RunExpression();
             frames = probe.Take(animCount).ToList();
             view.History = probe;
             view.ResetEffects();
@@ -514,6 +615,7 @@ namespace Sm4shCommand.GUI
             for (int i = ScriptIndex() - 1; i >= 0 && view.TrailFrames.Count < 16; i--)
                 view.TrailFrames.Add(Math.Max(0, frames[i].AnimFrame));
             FillEffects(f);
+            ApplyParts(f, af);
             UpdateLabel(f, af);
             int sel = view.SelectedHitbox;
             filling = true;
@@ -546,6 +648,31 @@ namespace Sm4shCommand.GUI
 
         /// <summary>Runs the effect script on the game script's timeline (its per-frame speeds) and puts its effects,
         /// trails and screen events on the probe's frames.</summary>
+        /// <summary>v1.6.2: the expression script on the same timeline (the same rule as the game / effect scripts): its
+        /// visibility commands (Model_Changer & co.) and overlays join the frames'.</summary>
+        void RunExpression()
+        {
+            string err;
+            var cmds = ScriptCommands(getExpression, expressionEditor, out err);
+            if (cmds == null || probe.Count == 0) return;
+            var r = new HitboxRunner { ConditionsTrue = ifTrue.Checked, GetScript = getExpression, SpeedSchedule = probe.Select(x => x.Speed).ToArray() };
+            var ex = r.Run(cmds, probe.Count);
+            for (int i = 0; i < probe.Count && i < ex.Count; i++)
+            {
+                if (probe[i].Overlay == null && ex[i].Overlay != null) { probe[i].Overlay = ex[i].Overlay; probe[i].OverlayLight = ex[i].OverlayLight; }
+                probe[i].Vis = VisState.Merge(ex[i].Vis, probe[i].Vis);
+            }
+        }
+
+        /// <summary>v1.6.2: the expression scripts (expression.bin's, and the open tab's expression editor while it shows).</summary>
+        public void SetExpression(Func<uint, IList<ICommand>> saved, ITS_EDITOR open)
+        {
+            if (expressionEditor != null) expressionEditor.TextChanged -= Editor_TextChanged;
+            getExpression = saved;
+            expressionEditor = open;
+            if (expressionEditor != null) expressionEditor.TextChanged += Editor_TextChanged;
+        }
+
         void RunEffects()
         {
             var cmds = EffectCommands(out effectError);
@@ -563,6 +690,9 @@ namespace Sm4shCommand.GUI
                 probe[i].Effects = fx[i].Effects;
                 probe[i].Trails = fx[i].Trails;
                 probe[i].Screen = fx[i].Screen;
+                // v1.6.2: an overlay / visibility command in the effect script too
+                if (fx[i].Overlay != null) { probe[i].Overlay = fx[i].Overlay; probe[i].OverlayLight = fx[i].OverlayLight; }
+                probe[i].Vis = VisState.Merge(probe[i].Vis, fx[i].Vis);
             }
             allEffects = r.AllEffects;
             allTrails = r.AllTrails;

@@ -1,0 +1,15 @@
+// Visibility groups for Sm4shCommand's Hitbox Viewer (v1.6.2): which meshes each state of a fighter's visibility group
+// shows, so Model_Changer(ChangerID, ChangerState) / VIS_SET_DEFAULT / VIS_BACK_DEFAULT / VIS_RESET_DEFAULT in the game
+// and expression scripts show and hide them on the timeline.
+//
+// The game keeps these groups in its code (VisibilityModule, accessor +0xA8: per group, per state the meshes it
+// shows), not in the fighter's files, so they are listed here by hand. Without a line for a group, the viewer lists
+// the script's group changes (Model parts tab) but leaves the meshes to the model's visibility animations
+// (material_anime_face / eye / eyelid.pac) and the name rule.
+//
+// Format, one line per state (fighter folder name, group, state, then mesh names or their beginnings, any case):
+//   reflet 0 1: bronzeswordM
+//   reflet 0 2: thunderswordM
+//   reflet 0 default: 1
+// A group with lines shows the meshes of its current state (the script's, else its default) and hides the other
+// meshes it lists. Lines starting with // are comments.

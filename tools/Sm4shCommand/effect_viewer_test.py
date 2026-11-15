@@ -123,6 +123,31 @@ def particles(bank_dir, name, ids, frames=30):
     return out
 
 
+def visibility(model_dir, motion, frames):
+    """v1.6.2: what the model's visibility animations (material_anime_face / eye / eyelid.pac, read with tools/omo.py
+    pac_read and tools/mta.py read) show on a motion's frames: each track's last key at or before the frame"""
+    import omo as OMO
+    import mta as MTA
+    out = []
+    state = {}
+    for pac in ('material_anime_face.pac', 'material_anime_eye.pac', 'material_anime_eyelid.pac'):
+        path = os.path.join(model_dir, pac)
+        if not os.path.exists(path):
+            continue
+        for name, data in OMO.pac_read(path):
+            if name == motion + '.mta':
+                for v in MTA.read(data)['vis']:
+                    state[v['name']] = v['keys']
+    for f in frames:
+        for mesh, keys in sorted(state.items()):
+            on = keys[0][1] if keys else 0
+            for k in keys:
+                if k[0] <= f:
+                    on = k[1]
+            out.append('vis\t%s\t%d\t%s\t%d' % (motion, f, mesh, 1 if on else 0))
+    return out
+
+
 def model_frames(bank_dir, model):
     """an effect model's animation length: the longer of model.omo's frames and model.mta's (the viewer's
     EffectModel.Frames)"""
@@ -171,6 +196,7 @@ def main():
     for ext in ('efc', 'ptcl'):
         shutil.copy(os.path.join(smfx, 'supamario.010d0000.' + ext), os.path.join(common, 'common.010d0000.' + ext))
     copy(os.path.join(smfx, 'model'), os.path.join(common, 'model'))
+    fx += visibility(os.path.join(sm, 'model', 'body', 'c00'), 'FitMarioBodyMainF00DamageHi1', (0, 3, 11))
     exp_fx = os.path.join(work, 'expect_fx.txt')
     open(exp_fx, 'w').write('\n'.join(fx) + '\n')
     print('expect_fx: %d lines (%d counts, %d positions)' % (len(fx), sum(x.startswith('count') for x in fx),

@@ -107,6 +107,7 @@
     <Compile Include="Classes\Viewer\Particles.cs" />
     <Compile Include="Classes\Viewer\TrailNames.cs" />
     <Compile Include="Classes\Viewer\ViewerScripts.cs" />
+    <Compile Include="Classes\Viewer\MeshVisibility.cs" />
     <Compile Include="Classes\Viewer\ViewportFx.cs">
       <DependentUpon>Viewport.cs</DependentUpon>
     </Compile>
@@ -198,6 +199,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="ModAnimNames.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="VisGroups.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="Tooltips\**\*.txt">

@@ -470,7 +470,7 @@ namespace Sm4shCommand.Viewer
         public float[] P, V, Rot, Lin;
         public int Age, Life;
         public float Sr, Sry, SaX, SaY;
-        public bool Local;      // in the call's space (the emitter follows the effect: 0x310 = 0)
+        public bool Local;      // v1.6.2: in the emitter's own space, placed by its live matrix each frame (0x310 = 0)
     }
 
     /// <summary>One emitter's particles over time (tools/fx_render.py simulate): emission by rate / interval, the
@@ -484,6 +484,11 @@ namespace Sm4shCommand.Viewer
         public List<Particle> Live = new List<Particle>();
         public int Born;                       // particles emitted so far
         public float[] PrevOrg;
+        /// <summary>v1.6.2: call x emitter matrix of the last frame stepped (the following particles are placed by it).</summary>
+        public Mat4 LastM;
+
+        /// <summary>A particle's place in model space (a following one through the live emitter matrix).</summary>
+        public float[] World(Particle q) { return q.Local && LastM != null ? LastM.Transform(q.P[0], q.P[1], q.P[2]) : q.P; }
 
         float U() { return (float)Rng.NextDouble(); }
 
@@ -549,13 +554,15 @@ namespace Sm4shCommand.Viewer
             var org = new[] { m[0, 3], m[1, 3], m[2, 3] };
             var callLin = Fx.Lin(call);
             var emLin = Fx.Lin(em);
+            LastM = m;
             float[] gWorld = null, gLocalCall = null;
             if (D.Gravity[0] != 0 || D.Gravity[1] != 0 || D.Gravity[2] != 0)
             {
+                // gLocalCall: the gravity in the emitter's own space (its following particles)
                 if (D.WorldGravity)
                 {
                     gWorld = new[] { D.Gravity[0] * csize, D.Gravity[1] * csize, D.Gravity[2] * csize };
-                    var inv = call.Inverse();
+                    var inv = m.Inverse();
                     gLocalCall = new[] {
                         inv[0, 0] * gWorld[0] + inv[0, 1] * gWorld[1] + inv[0, 2] * gWorld[2],
                         inv[1, 0] * gWorld[0] + inv[1, 1] * gWorld[1] + inv[1, 2] * gWorld[2],
@@ -563,9 +570,10 @@ namespace Sm4shCommand.Viewer
                 }
                 else
                 {
-                    var ge = Fx.Apply(emLin, D.Gravity[0], D.Gravity[1], D.Gravity[2]);
-                    float l = (float)Math.Max(1e-6, Math.Sqrt(emLin[1] * emLin[1] + emLin[4] * emLin[4] + emLin[7] * emLin[7]));
-                    gLocalCall = new[] { ge[0] / l, ge[1] / l, ge[2] / l };
+                    // fx_render: lin @ gravity / |lin[:, 1]| x the size, in the top frame: in the emitter's own frame that
+                    // is the gravity x the size / |lin[:, 1]|
+                    float l = (float)Math.Max(1e-6, Math.Sqrt(lin[1] * lin[1] + lin[4] * lin[4] + lin[7] * lin[7]));
+                    gLocalCall = new[] { D.Gravity[0] * csize / l, D.Gravity[1] * csize / l, D.Gravity[2] * csize / l };
                 }
             }
             var drift = PrevOrg != null && D.Follow == 2 ? new[] { org[0] - PrevOrg[0], org[1] - PrevOrg[1], org[2] - PrevOrg[2] } : null;
@@ -622,13 +630,15 @@ namespace Sm4shCommand.Viewer
                 var q = new Particle { Age = 0, Life = life, Sr = sr, Sry = sry, SaX = D.A(17, 1, k), SaY = D.A(18, 1, k), Rot = rot };
                 if (D.Follow == 0)
                 {
-                    // follows the effect: kept in the call's space (the emitter matrix at birth applied), placed by the
-                    // call's matrix each frame
+                    // follows the emitter (docs/ptcl-format.md 0x310: the particle points at the emitter's live matrices):
+                    // kept in the emitter's own space, placed by the call x the emitter matrix of the frame shown, its key
+                    // animations included (v1.6.2: v1.6.0 froze the emitter's rotation at the particle's birth, so a
+                    // swoosh whose emitter turns with the swing stayed where the swing started: Mario's up smash / forward
+                    // air arcs drawn behind him)
                     q.Local = true;
-                    var pe = em.Transform(p[0], p[1], p[2]);
-                    q.P = pe;
-                    q.V = Fx.Apply(emLin, v[0], v[1], v[2]);
-                    q.Lin = emLin;
+                    q.P = (float[])p.Clone();
+                    q.V = (float[])v.Clone();
+                    q.Lin = null;
                 }
                 else
                 {

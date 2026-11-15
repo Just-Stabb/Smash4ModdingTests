@@ -23,6 +23,11 @@ namespace Sm4shCommand.Viewer
         public float X, Y, Z, RX, RY, RZ, Size = 1;
         public float R = 1, G = 1, B = 1, A = 1, Rate = 1, SX = 1, SY = 1, SZ = 1;
         public bool HasColor, HasAlpha, HasScale;
+        // v1.6.2: the colour and alpha as the game applies them: the commands' 0-255 colours / 255 and percent alphas / 100
+        // (Events.cfg: "divided by 255" / "handler divides by 100"); LAST_PARTICLE_SET_COLOR's multipliers on top
+        public float CR = 1, CG = 1, CB = 1, CA = 1, PR = 1, PG = 1, PB = 1;
+        public bool HasParticleColor;
+        public void SetColour255() { CR = R / 255; CG = G / 255; CB = B / 255; }
         public bool Follow;
         public int Terminate;               // the call's Terminate parameter (as written)
         public int StartFrame, EndFrame = -1;   // game frames (1-based); EndFrame -1: still on

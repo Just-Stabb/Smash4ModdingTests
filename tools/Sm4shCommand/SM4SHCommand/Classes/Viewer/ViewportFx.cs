@@ -90,16 +90,14 @@ namespace Sm4shCommand.Viewer
             return s;
         }
 
-        /// <summary>A call's colour as the particles take it: its set colour (0-255 values over 5 taken as bytes) and alpha.</summary>
-        static void CallColour(EffectData e, out float r, out float g, out float b, out float a)
+        /// <summary>A call's colour as the drawn effect takes it (v1.6.2, as the game: the colour commands' 0-255 values / 255,
+        /// the alphas' percents / 100, LAST_PARTICLE_SET_COLOR's multipliers on top); it multiplies every emitter's colour
+        /// (x the emitter's own colour x its particles') and the effect model's colour gain.</summary>
+        public static void CallColour(EffectData e, out float r, out float g, out float b, out float a)
         {
-            r = g = b = 1;
-            if (e.HasColor)
-            {
-                float m = Math.Max(e.R, Math.Max(e.G, e.B)), k = m > 5 ? 1 / 255f : 1;
-                r = e.R * k; g = e.G * k; b = e.B * k;
-            }
-            a = e.HasAlpha ? Math.Max(0, e.A) : 1;
+            r = e.HasColor ? e.CR : 1; g = e.HasColor ? e.CG : 1; b = e.HasColor ? e.CB : 1;
+            if (e.HasParticleColor) { r *= e.PR; g *= e.PG; b *= e.PB; }
+            a = e.HasAlpha ? Math.Max(0, e.CA) : 1;
         }
 
         /// <summary>A triangle list to draw: screen corners (x, y, depth), UVs, texture, colour, blend.</summary>
@@ -127,6 +125,38 @@ namespace Sm4shCommand.Viewer
         static readonly int[] QuadIdx = { 0, 1, 2, 0, 2, 3 };
         static readonly float[] XZ = { 1, 0, 0, 0, 0, -1, 0, 1, 0 };          // a plate's Y onto the emitter's Z
         static readonly float[] XZT = { 1, 0, 0, 0, 0, 1, 0, -1, 0 };
+
+        /// <summary>v1.6.2 (tests): an effect's particles on game frame g as the view would draw them: per particle its
+        /// corners on screen (x, y, depth) and their UVs.</summary>
+        public List<Tuple<float[], float[]>> EffectScreenQuads(EffectData e, int g)
+        {
+            var o = new List<Tuple<float[], float[]>>();
+            int w = Math.Max(1, Width), h = Math.Max(1, Height);
+            float[] r, u, f;
+            Axes(out r, out u, out f);
+            float cx = w / 2f + panX, cy = h * 0.72f + panY;
+            var sim = SimFor(e, g);
+            if (sim == null || sim.Call == null) return o;
+            float cr, cg, cb, ca;
+            CallColour(e, out cr, out cg, out cb, out ca);
+            foreach (var es in sim.Emitters)
+                foreach (var q in es.Live)
+                {
+                    var it = ParticleItem(sim, es, q, sim.NextK - 1, r, u, f, cx, cy, cr, cg, cb, 1);
+                    if (it != null) o.Add(Tuple.Create(it.S, it.UV));
+                }
+            return o;
+        }
+
+        /// <summary>v1.6.2 (tests): a model-space point on screen (x, y).</summary>
+        public float[] ScreenOf(float[] p)
+        {
+            float[] r, u, f;
+            Axes(out r, out u, out f);
+            float d;
+            var s = Project(p, r, u, out d);
+            return new[] { s.X, s.Y };
+        }
 
         /// <summary>Particles, effect models and trails into the pixels (after the opaque models).</summary>
         void DrawFx(int[] pix, float[] zb, int w, int h, float[] r, float[] u, float[] f)
@@ -157,7 +187,7 @@ namespace Sm4shCommand.Viewer
                         foreach (var q in es.Live)
                         {
                             if (quads >= MaxQuads) break;
-                            var it = ParticleItem(sim, es.D, q, sim.NextK - 1, r, u, f, cx, cy, cr, cg, cb, ca);
+                            var it = ParticleItem(sim, es, q, sim.NextK - 1, r, u, f, cx, cy, cr, cg, cb, ca);
                             if (it != null) { items.Add(it); quads++; }
                         }
                     }
@@ -285,9 +315,10 @@ namespace Sm4shCommand.Viewer
         }
 
         /// <summary>One particle as a quad (or its emitter's primitive) in screen space, or null when it's invisible.</summary>
-        FxItem ParticleItem(EffectSim sim, EmitterDef D, Particle q, int k, float[] r, float[] u, float[] f, float cx, float cy,
+        FxItem ParticleItem(EffectSim sim, EmitterSim es, Particle q, int k, float[] r, float[] u, float[] f, float cx, float cy,
                             float cr, float cg, float cb, float ca)
         {
+            var D = es.D;
             // (v1.6.1) moved on by how far the effect's time is past its last step (a rate under 1, or a fractional one)
             float frac = sim.Frac, age = q.Age + frac;
             float t = Math.Min(1, age / (float)Math.Max(1, q.Life));
@@ -311,19 +342,23 @@ namespace Sm4shCommand.Viewer
                 D.Colour(1, t, c1);
                 it.Col1 = new[] { c1[0] * D.A(19, D.EmColor1[0], k), c1[1] * D.A(20, D.EmColor1[1], k), c1[2] * D.A(21, D.EmColor1[2], k) };
             }
-            var call = sim.Call;
+            var call = es.LastM ?? sim.Call;       // a following particle: the live call x emitter matrix
             var callLin = Fx.Lin(call);
             var qp = frac > 0 ? new[] { q.P[0] + q.V[0] * frac, q.P[1] + q.V[1] * frac, q.P[2] + q.V[2] * frac } : q.P;
             float[] p = q.Local ? call.Transform(qp[0], qp[1], qp[2]) : qp;
             float[] v = q.Local ? Fx.Apply(callLin, q.V[0], q.V[1], q.V[2]) : q.V;
-            float[] frame = Fx.NormCols(q.Local ? Fx.Mul(callLin, q.Lin) : q.Lin);
+            float[] frame = Fx.NormCols(q.Local ? callLin : q.Lin);
             float[] b;
             int pt = D.PType;
+            // billboards (v1.6.2): X along the screen's right, Y up, Z toward the camera, as eft's programs build them
+            // from the view block's billboard matrix (fx_render's s4_view_block: bm = view -> world, its X the screen's
+            // right). v1.6.0 took fx_render's CPU basis, whose X pointed left: the quad seen from behind, every billboard
+            // mirrored (streaks / arcs pointing back, Pac-Man's streak behind him)
             if (pt == 0 || pt == 7)
-                b = Fx.Cols(new[] { -r[0], -r[1], -r[2] }, u, f);
+                b = Fx.Cols(r, u, new[] { -f[0], -f[1], -f[2] });
             else if (pt == 8)
             {
-                var x = Fx.Norm(new[] { -r[0], 0, -r[2] });
+                var x = Fx.Norm(new[] { r[0], 0, r[2] });
                 b = Fx.Cols(x, new[] { 0f, 1f, 0f }, Fx.Cross(x, new[] { 0f, 1f, 0f }));
             }
             else if (pt == 1) b = frame;

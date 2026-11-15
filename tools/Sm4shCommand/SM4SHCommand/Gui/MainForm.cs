@@ -1052,6 +1052,7 @@ namespace Sm4shCommand
             string gamePath = Path.Combine(folder, "game.bin");
             if (hitboxViewerForm != null && !hitboxViewerForm.IsDisposed && string.Equals(hitboxViewerGame, gamePath, StringComparison.OrdinalIgnoreCase))
             {
+                hitboxViewerForm.SetExpression(new Viewer.ViewerScripts(folder, () => ScriptFiles).Getter("expression"), ExpressionEditor(page));
                 hitboxViewerForm.ShowScript(crc, GameEditor(page), TabTitle(page, crc), EffectEditor(page));
                 hitboxViewerForm.Activate();
                 return;
@@ -1082,14 +1083,17 @@ namespace Sm4shCommand
                 hitboxViewerForm.Close();       // another fighter's
             var viewer = new HitboxViewer(assets, GameEditor(page), crc, TabTitle(page, crc), sources.Getter("game"), sources.Getter("effect"),
                                           EffectEditor(page));
+            viewer.SetExpression(sources.Getter("expression"), ExpressionEditor(page));       // v1.6.2
             viewer.FormClosed += (o, a) => { if (hitboxViewerForm == viewer) hitboxViewerForm = null; };
             hitboxViewerForm = viewer;
             hitboxViewerGame = gamePath;
+            hitboxViewerExpr = sources.Getter("expression");
             viewer.Show(this);
         }
 
         HitboxViewer hitboxViewerForm;
         string hitboxViewerGame;        // the game.bin it shows
+        Func<uint, IList<ICommand>> hitboxViewerExpr;     // v1.6.2: its expression scripts
 
         /// <summary>The ACMD script open in a tab (its hash, from the tab's name script_XXXXXXXX), or 0.</summary>
         uint AcmdTabScript(CodeEditor page)
@@ -1107,6 +1111,9 @@ namespace Sm4shCommand
         /// <summary>The tab's effect script editor: its effect sub-tab, or its script when the file open alone is an
         /// effect.bin (v1.6.1); null when none.</summary>
         ITS_EDITOR EffectEditor(CodeEditor page) { return Viewer.ViewerScripts.EditorFor(page, "effect", SingleFileKind); }
+
+        /// <summary>v1.6.2: the tab's expression script editor (its visibility commands), or null.</summary>
+        ITS_EDITOR ExpressionEditor(CodeEditor page) { return Viewer.ViewerScripts.EditorFor(page, "expression", SingleFileKind); }
 
         /// <summary>The tab's game script editor: its game sub-tab, or its script when the file open alone is a game.bin
         /// (v1.6.1: only then: an effect.bin's script isn't taken for the game script); null when none.</summary>
@@ -1128,6 +1135,7 @@ namespace Sm4shCommand
             var fxEditor = EffectEditor(page);
             if (crc == hitboxViewerForm.ScriptCrc && editor == hitboxViewerForm.Editor && fxEditor == hitboxViewerForm.EffectEditorShown) return;
             // v1.6.1: the tab's effect editor too (the viewer kept the first tab's effect editor while following others)
+            hitboxViewerForm.SetExpression(hitboxViewerExpr, ExpressionEditor(page));
             hitboxViewerForm.ShowScript(crc, editor, TabTitle(page, crc), fxEditor);
         }
 

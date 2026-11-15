@@ -75,6 +75,69 @@ namespace Sm4shCommand.Viewer
         public List<EffectData> Effects = new List<EffectData>();
         public List<TrailData> Trails = new List<TrailData>();
         public List<ScreenEvent> Screen = new List<ScreenEvent>();
+        // v1.6.2: the body colour overlay on this frame (r g b a, 0-1; null: none; OverlayLight: a flash light, added) and
+        // the visibility groups' states (Model_Changer & co.)
+        public float[] Overlay;
+        public bool OverlayLight;
+        public VisState Vis = new VisState();
+    }
+
+    /// <summary>v1.6.2: a script's visibility state: each group's state (Model_Changer / VIS_SET_DEFAULT ...), the defaults
+    /// it set, the whole model's visibility (Visibility; null: as is), the frame each last changed and the commands.</summary>
+    public class VisState
+    {
+        public Dictionary<int, int> Groups = new Dictionary<int, int>(), Defaults = new Dictionary<int, int>(), Changed = new Dictionary<int, int>();
+        public bool? Whole;
+        public List<ScreenEvent> Events = new List<ScreenEvent>();
+        public VisState Clone()
+        {
+            return new VisState { Groups = new Dictionary<int, int>(Groups), Defaults = new Dictionary<int, int>(Defaults),
+                                  Changed = new Dictionary<int, int>(Changed), Whole = Whole, Events = new List<ScreenEvent>(Events) };
+        }
+
+        /// <summary>Two scripts' states (the game script's and the expression script's) as one: per group the one changed
+        /// last.</summary>
+        public static VisState Merge(VisState a, VisState b)
+        {
+            if (a == null) return b; if (b == null) return a;
+            var o = a.Clone();
+            foreach (var kv in b.Changed)
+            {
+                int ca;
+                if (o.Changed.TryGetValue(kv.Key, out ca) && ca > kv.Value) continue;
+                o.Changed[kv.Key] = kv.Value;
+                if (kv.Key == -1) o.Whole = b.Whole;
+                else if (b.Groups.ContainsKey(kv.Key)) o.Groups[kv.Key] = b.Groups[kv.Key];
+                else o.Groups.Remove(kv.Key);
+            }
+            foreach (var kv in b.Defaults) o.Defaults[kv.Key] = kv.Value;
+            o.Events.AddRange(b.Events);
+            return o;
+        }
+    }
+
+    /// <summary>v1.6.2: the body colour overlay over time: set at once, or changed over a transition (Change_Overlay).</summary>
+    public class OverlayState
+    {
+        float[] from, to;
+        int start, frames;
+        public bool Light;
+
+        public void Set(int frame, float[] c, int transition)
+        {
+            var now = At(frame);
+            from = transition > 0 ? (now ?? (c == null ? null : new[] { c[0], c[1], c[2], 0f })) : c;
+            to = c; start = frame; frames = transition;
+        }
+
+        public float[] At(int frame)
+        {
+            if (to == null && (frames <= 0 || from == null)) return null;
+            if (frames <= 0 || frame >= start + frames || from == null) return to == null ? null : (float[])to.Clone();
+            float t = Math.Max(0, Math.Min(1, (frame - start) / (float)frames));
+            var a = from; var b = to ?? new[] { from[0], from[1], from[2], 0f };
+            return new[] { a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t };
+        }
     }
 
     /// <summary>
@@ -113,6 +176,9 @@ namespace Sm4shCommand.Viewer
         int gameFrame;
         List<VarWrite> writes = new List<VarWrite>();
         Dictionary<uint, float> varValues = new Dictionary<uint, float>();   // SET_FLOATs so far (threads share them)
+        // v1.6.2: the body overlay and the visibility groups as the script sets them (threads share the root's)
+        OverlayState overlay = new OverlayState();
+        VisState vis = new VisState();
         // what a variable in an Extra hitbox is drawn with when the script doesn't SET_FLOAT it first
         static readonly float[] VarStandIn = { 10, 0, 100, 0, 40, 4 };
         double Speed
@@ -151,6 +217,8 @@ namespace Sm4shCommand.Viewer
             th.root = r;
             th.hitboxes = r.hitboxes;
             th.varValues = r.varValues;
+            th.overlay = r.overlay;
+            th.vis = r.vis;
             th.fx = r.fx;
             th.script = block;
             th.frameSpeed = 1; th.rate = 1; th.syncFrames = -1;
@@ -203,6 +271,8 @@ namespace Sm4shCommand.Viewer
             script = commands;
             subscripts.Clear(); states.Clear(); hitboxes.Clear(); threads.Clear(); varValues.Clear();
             fx = new EffectState();
+            overlay = new OverlayState();
+            vis = new VisState();
             index = 0; loopStart = 0; loopIterations = 0; skipWords = 0;
             currentFrame = 0; animFrame = 0; frameSpeed = 1; syncFrames = -1; rate = 1;
             incrementFrame = true;
@@ -244,6 +314,7 @@ namespace Sm4shCommand.Viewer
                     AnimFrame = (float)(animFrame - 1),
                     Intangible = intangible, Invincible = invincible, SuperArmor = armor, Writes = writes,
                     Speed = speedNow, Screen = fx.Screen,
+                    Overlay = overlay.At(game + 1), OverlayLight = overlay.Light, Vis = vis.Clone(),
                 };
                 foreach (var h in hitboxes.Values)
                     st.Hitboxes.Add(h.Clone());
@@ -558,14 +629,15 @@ namespace Sm4shCommand.Viewer
         public List<TrailData> AllTrails { get { return fx.AllTrails; } }
         public List<ScreenEvent> AllScreen { get { return fx.AllScreen; } }
 
-        enum FxKind { None, Spawn, Off, OffAll, OffLast, Detach, Last, Trail, TrailOff, Screen, Note }
+        enum FxKind { None, Spawn, Off, OffAll, OffLast, Detach, Last, Trail, TrailOff, Screen, Note, Overlay, Vis }
 
         /// <summary>What an effect command does and where its parameters are, from its name and its parameters' names
         /// (Events.cfg's syntax, from the ACMD events sheet: no fixed positions guessed).</summary>
         class FxCmd
         {
             public FxKind Kind;
-            public bool Follow, World, Flip;
+            public bool Follow, World, Flip, Light, Particle;
+            public string Op;           // v1.6.2: an overlay / visibility command's operation
             public int G = -1, GL = -1, Work = -1, Bone = -1, BoneHash = -1, X = -1, Y = -1, Z = -1, RX = -1, RY = -1,
                 RZ = -1, Size = -1, Term = -1, R = -1, Gr = -1, B = -1, Alpha = -1, Rate = -1, Fade = -1,
                 B1 = -1, B2 = -1, Blur = -1, T1 = -1, T2 = -1, T1W = -1, T2W = -1, Shader = -1;
@@ -599,7 +671,23 @@ namespace Sm4shCommand.Viewer
                 return -1;
             };
             string up = n.ToUpperInvariant();
-            if (screenNames.Contains(n))
+            // v1.6.2: the body colour overlays / flashes (drawn on the fighter) and the visibility commands (meshes, the
+            // whole model) on the timeline
+            if (n == "Color_Overlay" || n == "Change_Overlay" || n == "Terminate_Overlays" || n == "FLASH_NO_STOP" ||
+                n == "FLASH_OFF" || n == "Flash_Light_Effect" || n == "Change_Flash_Light_Color")
+            {
+                d.Kind = FxKind.Overlay;
+                d.Op = n;
+                d.R = at(new[] { "Red" }); d.Gr = at(new[] { "Green" }); d.B = at(new[] { "Blue" }); d.Alpha = at(new[] { "Alpha" });
+                d.Fade = at(new[] { "Transition", "TransitionFrames" });
+            }
+            else if (n == "Model_Changer" || n == "VIS_SET_DEFAULT" || n == "VIS_BACK_DEFAULT" || n == "VIS_RESET_DEFAULT" || n == "Visibility")
+            {
+                d.Kind = FxKind.Vis;
+                d.Op = n;
+                d.X = at(new[] { "ChangerID", "Group" }); d.Y = at(new[] { "ChangerState", "State" });
+            }
+            else if (screenNames.Contains(n))
                 d.Kind = FxKind.Screen;
             else if (n == "Terminate_Graphic_Effect" || n == "EFFECT_REMOVE_COMMON")
             {
@@ -618,6 +706,7 @@ namespace Sm4shCommand.Viewer
             else if (up.StartsWith("LAST_EFFECT_SET_") || up == "LAST_PARTICLE_SET_COLOR")
             {
                 d.Kind = FxKind.Last;
+                d.Particle = up == "LAST_PARTICLE_SET_COLOR";
                 d.R = at(new[] { "Red", "R" }); d.Gr = at(new[] { "Green", "G" }); d.B = at(new[] { "Blue", "B" });
                 d.Alpha = at(new[] { "Alpha" }); d.Rate = at(new[] { "Rate" });
                 d.X = at(new[] { "ScaleX" }); d.Y = at(new[] { "ScaleY" }); d.Z = at(new[] { "ScaleZ" });
@@ -658,6 +747,7 @@ namespace Sm4shCommand.Viewer
                     d.Term = at(new[] { "Terminate" });
                     d.R = at(new[] { "Red" }); d.Gr = at(new[] { "Green" }); d.B = at(new[] { "Blue" });
                     d.Alpha = at(new[] { "Alpha" });
+                    d.Light = at(new[] { "LightIntensity" }) >= 0;   // EFFECT_LIGHT / _FOLLOW_LIGHT: a light's colour
                     d.Rate = at(new[] { "Rate" });          // v1.6.1: a spawn with its own rate (EFFECT_FLW_POS_STRENGTH)
                 }
                 else if (named && (up.Contains("EFFECT") || up.Contains("TRACE")))
@@ -696,8 +786,8 @@ namespace Sm4shCommand.Viewer
                         if (d.Work >= 0) e.Id = 0;
                         if (d.BoneHash >= 0) e.Bone = -1;
                         if (d.Flip) { e.HasLeft = true; e.IdLeft = (uint)it(d.GL); }
-                        if (d.R >= 0) { e.HasColor = true; e.R = fl(d.R, 1); e.G = fl(d.Gr, 1); e.B = fl(d.B, 1); }
-                        if (d.Alpha >= 0) { e.HasAlpha = true; e.A = fl(d.Alpha, 1); }
+                        if (d.R >= 0 && !d.Light) { e.HasColor = true; e.R = fl(d.R, 1); e.G = fl(d.Gr, 1); e.B = fl(d.B, 1); e.SetColour255(); }
+                        if (d.Alpha >= 0) { e.HasAlpha = true; e.A = fl(d.Alpha, 1); e.CA = e.A / 100; }
                         if (d.Rate >= 0) e.Rate = fl(d.Rate, 1);
                         fs.Live.Add(e);
                         fs.All.Add(e);
@@ -731,8 +821,13 @@ namespace Sm4shCommand.Viewer
                     {
                         var e = fs.Last;
                         if (e == null) break;
-                        if (d.R >= 0) { e.HasColor = true; e.R = fl(d.R, 1); e.G = fl(d.Gr, 1); e.B = fl(d.B, 1); }
-                        if (d.Alpha >= 0) { e.HasAlpha = true; e.A = fl(d.Alpha, 1); }
+                        if (d.R >= 0 && d.Particle)
+                        {
+                            // LAST_PARTICLE_SET_COLOR: multipliers as they are (0-1.5), on top of the effect's colour
+                            e.HasParticleColor = true; e.PR = fl(d.R, 1); e.PG = fl(d.Gr, 1); e.PB = fl(d.B, 1);
+                        }
+                        else if (d.R >= 0) { e.HasColor = true; e.R = fl(d.R, 1); e.G = fl(d.Gr, 1); e.B = fl(d.B, 1); e.SetColour255(); }
+                        if (d.Alpha >= 0) { e.HasAlpha = true; e.A = fl(d.Alpha, 1); e.CA = e.A / 100; }
                         if (d.Rate >= 0) e.Rate = fl(d.Rate, 1);
                         if (d.X >= 0) { e.HasScale = true; e.SX = fl(d.X, 1); e.SY = fl(d.Y, 1); e.SZ = fl(d.Z, 1); }
                         break;
@@ -760,6 +855,43 @@ namespace Sm4shCommand.Viewer
                         t.Fade = Math.Max(0, it(d.Fade));
                     }
                     break;
+                case FxKind.Overlay:
+                    {
+                        var ov = r.overlay;
+                        string op = d.Op;
+                        if (op == "Terminate_Overlays" || op == "FLASH_OFF")
+                            ov.Set(r.gameFrame, null, 0);
+                        else
+                        {
+                            var c = new[] { fl(d.R, 255) / 255, fl(d.Gr, 255) / 255, fl(d.B, 255) / 255, fl(d.Alpha, 255) / 255 };
+                            bool change = op == "Change_Overlay" || op == "Change_Flash_Light_Color";
+                            bool light = op == "Flash_Light_Effect" || op == "Change_Flash_Light_Color";
+                            ov.Light = light;
+                            ov.Set(r.gameFrame, c, change ? Math.Max(0, it(d.Fade)) : 0);
+                        }
+                        var ev = new ScreenEvent { Frame = r.gameFrame, Text = Text(cmd) };
+                        fs.Screen.Add(ev);
+                        fs.AllScreen.Add(ev);
+                        break;
+                    }
+                case FxKind.Vis:
+                    {
+                        var vs = r.vis;
+                        int g = it(d.X), st2 = d.Y >= 0 ? it(d.Y) : 0;
+                        switch (d.Op)
+                        {
+                            case "Model_Changer": vs.Groups[g] = st2; break;
+                            case "VIS_SET_DEFAULT": vs.Defaults[g] = st2; vs.Groups[g] = st2; break;
+                            case "VIS_BACK_DEFAULT":
+                                if (vs.Defaults.ContainsKey(g)) vs.Groups[g] = vs.Defaults[g]; else vs.Groups.Remove(g);
+                                break;
+                            case "VIS_RESET_DEFAULT": vs.Defaults.Remove(g); vs.Groups.Remove(g); break;
+                            case "Visibility": vs.Whole = st2 != 0; break;
+                        }
+                        vs.Changed[d.Op == "Visibility" ? -1 : g] = r.gameFrame;
+                        vs.Events.Add(new ScreenEvent { Frame = r.gameFrame, Text = Text(cmd) });
+                        break;
+                    }
                 case FxKind.Screen:
                 case FxKind.Note:
                     {
