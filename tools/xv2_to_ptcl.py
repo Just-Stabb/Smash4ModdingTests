@@ -126,8 +126,22 @@ def emb_images(pkg):
     return {n: xv2emb.dds_rgba(b).astype(np.float32) / 255 for n, b in xv2emb.Emb(data)}
 
 
+def _repeat_index(n, size, mode):
+    """texel indices 0 .. n-1 of a UV range starting at texel 0, repeated past the texture's edge as XV2's sampler
+    does: Mirror flips every other copy, Clamp holds the edge, Wrap (default) tiles"""
+    i = np.arange(n)
+    if mode == 'Mirror':
+        t = i % (2 * size)
+        return np.where(t < size, t, 2 * size - 1 - t)
+    if mode == 'Clamp':
+        return np.minimum(i, size - 1)
+    return i % size
+
+
 def first_cell(img, sampler):
-    """the sampler's first sprite-sheet cell, or its static UV rectangle"""
+    """the sampler's first sprite-sheet cell, or its static UV rectangle; a rectangle larger than the texture (UV
+    scale over 1) is the texture repeated by the sampler's RepetitionU / V (Core Breaker v2: ptcl01.dds is a quarter
+    of a glow that XV2 mirrors at x2 x2 into a whole one; taking the quarter alone drew a square with a bright corner)"""
     ks = (sampler.get('ScrollState') or {}).get('Keyframes') or []
     if not ks:
         return img
@@ -136,8 +150,16 @@ def first_cell(img, sampler):
     u0, v0 = k['ScrollU'] % 1.0, k['ScrollV'] % 1.0
     su, sv = abs(k['ScaleU']) or 1.0, abs(k['ScaleV']) or 1.0
     x0, y0 = int(round(u0 * w)), int(round(v0 * h))
-    x1, y1 = min(w, x0 + max(4, int(round(su * w)))), min(h, y0 + max(4, int(round(sv * h))))
-    return img[y0:y1, x0:x1]
+    if su <= 1.0 + 1e-6 and sv <= 1.0 + 1e-6:
+        x1, y1 = min(w, x0 + max(4, int(round(su * w)))), min(h, y0 + max(4, int(round(sv * h))))
+        return img[y0:y1, x0:x1]
+    nu = max(4, int(round(min(su, 4.0) * w)))
+    nv = max(4, int(round(min(sv, 4.0) * h)))
+    xs = (x0 + _repeat_index(nu, w, sampler.get('RepetitionU'))) % w if su > 1.0 + 1e-6 else \
+        np.arange(x0, min(w, x0 + max(4, int(round(su * w)))))
+    ys = (y0 + _repeat_index(nv, h, sampler.get('RepetitionV'))) % h if sv > 1.0 + 1e-6 else \
+        np.arange(y0, min(h, y0 + max(4, int(round(sv * h)))))
+    return img[ys][:, xs]
 
 
 def pow2(n, lo=16, hi=256):
