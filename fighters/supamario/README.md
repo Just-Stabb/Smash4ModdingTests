@@ -2646,7 +2646,8 @@ confirm both.
 
 ## Core Breaker v11 (`supamario_corebreaker_v11.zip`): the up special's intangible window; the shieldstun read
 
-Install over Core Breaker v10 (Fake Death v3 under it), exe B (exe_v46k). The user ran v10's diag build (log
+Install over Core Breaker v10 and the buffer commands v1 (Fake Death v3 under them), exe B (exe_v46l). The user ran
+v10's diag build (log
 `babdf45b-log.txt`, 405 lines: 271 `S4GF`, 10 `S4HS`).
 
 ### 1. What the log says
@@ -2713,7 +2714,10 @@ To make it feel like they want (not built; for the user to choose):
   without the fix (A: 4 frames, B: the whole status); with Mario's 3 / 7 and the fix: at most the crossing frame,
   once a status; with the package's vl: normal on every frame of the rise, A, B, a grounded catch, a catch in the
   air and a shielded dive).
-- `supamario_fakedeath_test.py` 50 ok, `supamario_godfist_test.py --all-models` 538 ok, `msc_stack_check.py`: 0 of
+- `supamario_fakedeath_test.py` 50 ok, `supamario_godfist_test.py --all-models` 546 ok, `msc_stack_check.py`: 0 of
   2385 (globals 127 of 128, none added); the diag MSC: stack 0, the Core Breaker suite 104 ok.
-- The package ships the MSC and the vl file only: this build's `game.bin` has the buffer commands' work in progress
-  (exe_v46l's `Buffer_Clear` in the God Fist), so v10's stays.
+- Built from the sources with the buffer commands (exe_v46l): `game.bin` is buffer_commands_v1's (the God Fist's
+  `Buffer_Clear`), shipped with the MSC and the vl file.
+- The diag executable is exe_v46l + `diag_godfist_cave.py` + `diag_hitstate_cave.py` (the same words as v10's on
+  exe_v46k: the caves `0x04BAC000`-`0x04BAE000`, free in exe_v46l, and the setters' first words);
+  `diag_hitstate_test.py` / `diag_godfist_test.py` on it: 0 failed.
