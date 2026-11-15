@@ -38408,6 +38408,9 @@ float cb_ox;            // v7: its offset then (forward, up)
 float cb_oy;
 int cb_hcheck;          // v9: the hover's detection box checked (0 on; 1 refused / done)
 int cb_shielded;        // v8: his dive's hit on a shield handled (once a move)
+int cb_sh_slot;         // v10: the shielder whose shieldstun cb_shield_tick keeps (0 none)
+int cb_sh_left;         // v10: its shieldstun frames left
+int cb_sh_wait;         // v10: frames waited for it to enter GuardDamage (-1: it has)
 int cb_burns;           // v6: the hold's burn hits he has taken his own damage for
 int cb_gseen;           // v6: the slots seen on the ground this hover / dive (their ground's height: New_Var CB_GY0 + slot)
 int cb_inv;             // v5: the hold's invincibility set (cleared at every end: cb_end)
@@ -38498,6 +38501,7 @@ int cb_can_up()
 void cb_reset_tick()
 {
     float st;
+    cb_shield_tick();
     // v10 diag (supamario_godfist_build.CB_DIAG: these //CBD lines on; k = the ID - 0x0F0003F0): k 13, every
     // frame he is invincible / intangible: his status x 100 + intangible state x 10 + invincible
     //CBD if (WorkModuleF(0, 0x0F00011C) != 0.0f || WorkModuleF(0, 0x0F00011B) != 0.0f) { WorkModule(0, WorkModuleF(0, 0x0F0000A2) * 100.0f + WorkModuleF(0, 0x0F00011B) * 10.0f + WorkModuleF(0, 0x0F00011C), 0x0F0003FD); }
@@ -39118,6 +39122,51 @@ void cb_dive_shield()
     }
     WorkModule(0, hp, 0x0F00011A + 0x20 * t);
     WorkModule(0, 1000.0f + CB_SHIELD_STUN, 0x0F0000A7 + 8 * t);
+    // v10 (user: "setting shieldstun frames seems to not work"): one write can come before GuardDamage's own start
+    // (its init key 3, func_460, sets the count 0x11000009 from the hit) and be replaced; cb_shield_tick writes it every
+    // frame from here, the frames left counted down only outside the shielder's hitstop
+    cb_sh_slot = best;
+    cb_sh_left = (int)CB_SHIELD_STUN;
+    cb_sh_wait = 0;
+}
+
+// v10: the dive's shieldstun kept, every frame (cb_reset_tick, every status): while the shielder is in GuardDamage
+// (0x1E), its count (PUSH: 1000 + frames) = the frames left; one less each frame it isn't in hitstop. It ends with 0
+// left (GuardDamage's own loop then lets it go, func_414) or when it leaves the shield statuses. A general method: any
+// move could keep a shieldstun this way (the count GuardDamage itself counts down, func_415)
+void cb_shield_tick()
+{
+    int t;
+    float st;
+    if (cb_sh_slot == 0)
+    {
+        return;
+    }
+    t = cb_sh_slot + 0x2;
+    st = WorkModuleF(0, 0x0F0000A2 + 8 * t);
+    //CBD WorkModule(0, st * 100.0f + (float)cb_sh_left, 0x0F0003FB);
+    if (cb_sh_left <= 0 || st < CB_GUARD_LO || st > CB_GUARD_HI)
+    {
+        cb_sh_slot = 0;
+        return;
+    }
+    if (st != CB_GUARD_HI)
+    {
+        // not in GuardDamage yet: wait a few frames; back out of it (once in): done
+        if (cb_sh_wait < 0 || cb_sh_wait >= 10)
+        {
+            cb_sh_slot = 0;
+            return;
+        }
+        cb_sh_wait = cb_sh_wait + 1;
+        return;
+    }
+    cb_sh_wait = -1;
+    WorkModule(0, 1000.0f + (float)cb_sh_left, 0x0F0000A7 + 8 * t);
+    if (WorkModuleF(0, 0x0F000043 + 8 * t) < 0.5f)
+    {
+        cb_sh_left = cb_sh_left - 1;
+    }
 }
 
 // v5: the slot the hit can only be: the nearest other fighter to his fist (within CB_NEAR), when target 2's values
