@@ -127,6 +127,8 @@ class Game:
             if v in (0x0F0000B5, 0x0F0000C5) and (self.hit or v == 0x0F0000C5):
                 return float(vi.get('kind', 4.0))
             if v == 0x0F000116 + 0x20 * 4:              # its SITUATION (v3): 0 ground, 2 air
+                if self.hit and 'sit_after_hit' in vi:  # v5: launched by the hit before the catch reads it
+                    return float(vi['sit_after_hit'])
                 if 'sit' in vi:
                     return float(vi['sit'])
                 on = self.stage[0] <= vi['x'] <= self.stage[1] and abs(vi['y'] - self.floor) < 1e-6
@@ -297,7 +299,8 @@ def func_index(vm, name):
     return len(vm.m.scripts) - 1 - (len(names) - 1 - names.index(name))
 
 
-def run(path, g, frames=420, catch_at=None, cut_at=None, victim_reach=None, press=None, detect=False, tick=False):
+def run(path, g, frames=420, catch_at=None, cut_at=None, victim_reach=None, press=None, detect=False, tick=False,
+        hit_at_dive=False):
     """the status from its main (func_2287) frame by frame; catch_at: the game frame of this run the game script's
     dive catch is modelled at (cb 2 -> 3), victim_reach: catch when the victim is within this of his fist instead;
     detect: the hover's detection box catches (cb 1 -> 3) when the victim is within DETECT_SIZE + 2 of his middle on
@@ -325,6 +328,8 @@ def run(path, g, frames=420, catch_at=None, cut_at=None, victim_reach=None, pres
             if math.hypot(g.victim['x'] - mx, g.victim['y'] + 5 - my) < B.DETECT_SIZE + 2.0:
                 g.vars[B.CB_VAR] = 3.0
                 g.vars[B.CB_V_SLOT] = 2.0
+        if hit_at_dive and g.frame >= B.DIVE_FROM - 1e-6 and cbv == 1.0:
+            g.hit = True                        # v5: point-blank: his dive hitboxes connect on its first frame
         if cut_at is not None and n == cut_at:
             vm.call(vm.func(FUNC_END))
             g.status = 'cut'
@@ -379,13 +384,12 @@ def msc_tests(path):
     top = max(t[3] for t in tr)
     check('the rise: %.1f up (RISE_HEIGHT %.1f, within 3)' % (top, B.anim.RISE_HEIGHT),
           near(top, B.anim.RISE_HEIGHT, 3.0), True)
-    # v4 (user: "make it so that the Up special leap doesn't cut to fall, but keeps the same animation while being
-    # actionable"): no Fall; the rise's last frame held to the landing, a normal landing
-    held = [t for t in tr if t[1] >= B.HOVER_FROM - 1 - 1e-6]
-    check('the rise: no Fall, its last frame (%d) held (never the hover\'s %d) until he lands: LandingLight (0x17), '
-          'the rise still used' % (B.HOVER_FROM - 1, B.HOVER_FROM),
-          (g.status, max(t[1] for t in tr), len(held) > 20, tr[-1][5], used(g)),
-          (0x17, float(B.HOVER_FROM - 1), True, False, 1.0))
+    # v5 (user: v4's leap "never transitions to fall and keeps its pose until landing"): the whole rise animation,
+    # then Fall at its last frame (actionable before it: v4)
+    check('the rise: its whole animation, Fall (0xE) at its last frame (%d, never the hover\'s %d), in the air, the '
+          'rise still used' % (B.HOVER_FROM - 1, B.HOVER_FROM),
+          (g.status, max(t[1] for t in tr), tr[-1][1], tr[-1][5], used(g)),
+          (0xE, float(B.HOVER_FROM - 1), float(B.HOVER_FROM - 1), True, 1.0))
     top = next(t for t in tr if t[1] >= B.HOVER_FROM - 1 - 1e-6)
     check('the rise: no armor at all (v4; v1-v3: super armor to its top)',
           [armor_at(g, t[7]) for t in tr if t[7] <= top[7]] == [0] * len([t for t in tr if t[7] <= top[7]]), True)
@@ -449,15 +453,18 @@ def msc_tests(path):
     # special with the per-frame reset running and his status read as the one before on its first frame: the rise
     # stays used; up special again: the hover / dive; a third does nothing in the air; the landing gives it back
     g = Game()
-    tr = run(path, g, press={B.HOVER_FROM + 3: 0x4000}, tick=True, frames=B.HOVER_FROM + 45)
+    r1 = run(path, g, tick=True)
+    first = min(u for n, u, _a in g.used_log)
+    tr = run(path, g, tick=True, frames=B.DIVE_FROM - B.HOVER_FROM + 15)
     vm = vm_for(path, g)
     vm.g[18] = 2
     third = vm.call(vm.func(func_index(vm, 'cb_can_up')))
     check('a ground up special: the rise used from its first frame (no reset on the ground before he leaves it), the '
-          'second the hover / dive (cb_used 2), a third refused in the air',
-          (min(u for n, u, _a in g.used_log), phases_of(tr)[:3], used(g), third), (1.0, [0.0, 1.0, 2.0], 2.0, 0))
+          'second (from Fall) the hover / dive (cb_used 2), a third refused in the air',
+          (first, phases_of(r1), phases_of(tr)[:2], used(g), third), (1.0, [0.0], [1.0, 2.0], 2.0, 0))
     g = Game()
-    run(path, g, press={B.HOVER_FROM + 3: 0x4000}, tick=True)
+    run(path, g, tick=True)
+    run(path, g, tick=True)
     g.self_status = 0x0
     vm = vm_for(path, g)
     vm.g[18] = 0
@@ -473,13 +480,13 @@ def msc_tests(path):
         run(path, g, press={B.RISE_CANCEL - 2: bits})
         early = g.status
         out = []
-        for at in (B.RISE_CANCEL + 1, B.HOVER_FROM + 10):
+        for at in (B.RISE_CANCEL + 1, B.HOVER_FROM - 3):
             g = Game()
             g.vars[0x10000002] = 2.0
             tr = run(path, g, press={at: bits})
             out.append((g.status, tr[-1][0] == at))
-        check('the rise: %s acts from frame %d (not before: it lands), in the rise and in its held top'
-              % (name, B.RISE_CANCEL), (early, out), (0x17, [(want, True), (want, True)]))
+        check('the rise: %s acts from frame %d to its end (not before: it goes on to Fall)'
+              % (name, B.RISE_CANCEL), (early, out), (0xE, [(want, True), (want, True)]))
     g = Game()
     tr = run(path, g, press={B.RISE_CANCEL + 1: 0x4000})
     check('the rise: up special again in it goes to the hover / dive in place (cb_used 2, the motion to %d)'
@@ -651,19 +658,55 @@ def msc_tests(path):
     dv = [t for t in tr if t[4] == 2.0]
     check('the dive catches a fighter standing in its way (%d frames into it, far from the detection box): its slot '
           '(2), the hitboxes cleared, invincible %d frames, the hold on the ground, the crash' % (len(dv), B.INVINCIBLE),
-          (len(dv) > 3 and far > 30.0, g.vars.get(B.CB_V_SLOT), len(g.cleared) > 0, g.vars.get(0x0F00011C),
+          (len(dv) > 3 and far > 30.0, g.vars.get(B.CB_V_SLOT), len(g.cleared) > 0, g.inv_log[0][1],
            phases_of(tr)), (True, 2.0, True, float(B.INVINCIBLE), [1.0, 2.0, 8.0, 6.0]))
     # v4 (user: "make it so that there's no armor during the leap or hover, and the dive has armor instead of
     # invincibility"; then "He should keep invincibility during the hold only"): the hover nothing, the dive super armor
     # and not invincible, the hold invincible (written at the catch, not before), no armor there
     arm = {ph: sorted({armor_at(g, t[7]) for t in tr if t[4] == ph}) for ph in (1.0, 2.0, 8.0, 6.0)}
     check('armor / invincibility: the hover none, the dive super armor (invincibility only written at the catch), the '
-          'hold / crash invincible without armor', (arm, len(g.inv_log) == 1 and g.inv_log[0][0] > dv[0][7]),
+          'hold / crash invincible without armor', (arm, [v_ for _n, v_ in g.inv_log] == [float(B.INVINCIBLE), 0.0] and g.inv_log[0][0] > dv[0][7]),
           ({1.0: [0], 2.0: [1], 8.0: [0], 6.0: [0]}, True))
     for name, extra in (('lying down (DownWait)', {'status': 0x50}), ('invincible', {'body': 1})):
         g, v, far, tr = on_path(extra)
         check('the dive refuses a fighter %s: no catch, the hitboxes gone, it dives on and lands' % name,
               (phases_of(tr), len(g.cleared) > 0), ([1.0, 2.0, 5.0], True))
+    # 9c. v5 (user: "There are cases where it will hit an opponent but they won't be put in the hold"): point-blank,
+    # the dive's hitboxes connect on its very first frame (v4 reset the hit flag in the MSC after that hit): caught
+    v = {'x': 0.0, 'y': 0.0, 'status': 0x47}
+    g = Game(stage=(-200.0, 200.0), victim=v)
+    run(path, g, frames=B.HOVER_FROM + 3)
+    v['x'], v['y'] = g.x + 6.3 * g.face, g.y - 2.0
+    tr = run(path, g, hit_at_dive=True)
+    check('point-blank: a hit on the dive\'s first frame catches (v4: no hold)', (phases_of(tr)[:3],
+                                                                                   g.vars.get(B.CB_V_SLOT)),
+          ([1.0, 2.0, 3.0], 2.0))
+    # 9d. v5 (user: "When catching an opponent on the ground, the move plays the animation as if it was in the air"):
+    # a fighter standing on the ground whose situation already reads the air when the catch is read: the hold on the
+    # ground (the frame before the hit decides), as the detection box's catch
+    g, v, far, tr = on_path({'sit_after_hit': 2})
+    check('a fighter on the ground, airborne by the time the catch is read: the hold on the ground, the crash',
+          phases_of(tr), [1.0, 2.0, 8.0, 6.0])
+    # 9e. v5 (user: "Sometimes after finishing the move, Supamario will keep the grey invincibility flashing"): the
+    # hold's invincibility ends with the move, every way it ends
+    ends = []
+    g, v, far, tr = on_path()
+    ends.append(('the crash (Wait)', g.status, [x for _n, x in g.inv_log][-1:]))
+    v = {'x': 30.0, 'y': -40.0, 'status': 0x47}
+    g = Game(x=0.0, y=0.0, stage=(-1000.0, -900.0), victim=v)
+    g.air = True
+    both(path, g, catch_at=B.DIVE_FROM - B.HOVER_FROM + 4)
+    ends.append(('the explosion in the air (FallSpecial)', g.status, [x for _n, x in g.inv_log][-1:]))
+    v = {'x': 30.0, 'y': 0.0, 'status': 0x47}
+    g = Game(stage=(-200.0, 200.0), victim=v)
+    both(path, g, catch_at=B.DIVE_FROM - B.HOVER_FROM + 4, cut_at=B.DIVE_FROM - B.HOVER_FROM + 20)
+    ends.append(('cut mid-hold', g.status, [x for _n, x in g.inv_log][-1:]))
+    g = Game()
+    run(path, g)
+    ends.append(('no catch (the rise alone: nothing set, nothing cleared)', g.status, g.inv_log))
+    check('the hold\'s invincibility cleared (INVINCIBLE 0) at every end; nothing written without a catch', ends,
+          [('the crash (Wait)', 0, [0.0]), ('the explosion in the air (FallSpecial)', 0x10, [0.0]),
+           ('cut mid-hold', 'cut', [0.0]), ('no catch (the rise alone: nothing set, nothing cleared)', 0xE, [])])
     # 9b. a victim in the air over the stage: the hold, the lift, the drive, the crash
     v = {'x': 30.0, 'y': 20.0, 'status': 0x47}
     g = Game(stage=(-200.0, 200.0), victim=v)
@@ -716,8 +759,8 @@ def msc_tests(path):
     # 13. an air start: the rise, Fall
     g = Game(x=0.0, y=40.0, stage=(1000.0, 1001.0))
     tr = run(path, g, frames=200)
-    check('an air start: the rise, its top held in the air (no Fall), the rise used',
-          (g.status, max(t[1] for t in tr), used(g)), (None, float(B.HOVER_FROM - 1), 1.0))
+    check('an air start: the rise, Fall at its last frame, the rise used',
+          (g.status, max(t[1] for t in tr), used(g)), (0xE, float(B.HOVER_FROM - 1), 1.0))
 
 
 def ko_estimate(kb=None):
@@ -787,6 +830,33 @@ def script_tests(fdir):
     check('the dive: no game-script catch checks (the MSC\'s cb_dive_catch); Hit_Reset, Hit_Log_Clear(0), then its '
           'hitboxes', (in_dive, order), ([], ['Hit_Reset', 'Hit_Log_Clear', 'Extra_Special_Hitbox',
                                              'Extra_Special_Hitbox']))
+    # v5 (user: "Up special's leap has a hitbox and it persists until cancelled": v4 held the rise's pose and the game
+    # script, on its own frame count, reached the dive's catch / body boxes at 60 with cb 0): every hitbox, and every
+    # hover / dive effect call, inside a cb guard that cb 0 fails
+    def unguarded(script, idents):
+        out, stack, w = [], [], 0
+        cmp_ = None
+        for c in script:
+            stack = [b for b in stack if b[0] > w]
+            nm = acmd.INFO[c.ident]['name']
+            if nm == 'Float_Var_Compare':
+                cmp_ = c.params
+            if nm == 'True':
+                stack.append((w + c.params[0], cmp_))
+            if c.ident in idents:
+                ok0 = all(not (cm and cm[0] == B.CB_VAR) or
+                          {0: 0.0 == cm[2], 1: 0.0 != cm[2], 2: 0.0 <= cm[2], 3: 0.0 >= cm[2]}.get(cm[1], True)
+                          for _e, cm in stack)
+                if ok0:
+                    out.append((nm, w))
+            w += acmd.INFO[c.ident]['size']
+        return out
+    eff = acmd.ACMDFile.load(os.path.join(fdir, 'script', 'animcmd', 'body', 'effect.bin')).script('specialhi')
+    check('no hitbox the rise (cb 0) can reach, whatever frame the script gets to (v4: the dive\'s 3% catch / body '
+          'boxes in the held rise)', unguarded(s, {acmd.BY_NAME['extra_special_hitbox']}), [])
+    ext = [c for c in eff if c.ident == acmd.BY_NAME['external_graphic']]
+    check('no Core Breaker (XV2) effect the rise (cb 0) can reach', (len(ext) > 10, unguarded(
+        eff, {acmd.BY_NAME['external_graphic']})), (True, []))
     burns = [c for c in hits if abs(c.params[syn.index('Damage')] - B.BURN_DMG) < 1e-6]
     el = lambda c, n: c.params[syn.index(n)]      # noqa: E731
     check('the burn hits (both holds) the coin\'s (user: "make the catch multihits of the dive use the coin hit '
@@ -875,9 +945,31 @@ def effect_tests(out_dir, fdir):
     check('every effect at Core Breaker\'s x%.2f (above the God Fist\'s %.2f), v4: all but the aura x%.1f over it: the '
           'orb\'s call %.2f (XV2 2.8 x %.2f x %.1f)' % (CF.CB_FX_SCALE, FX.SIZE, B.FX_MUL, sizes[0], CF.CB_FX_SCALE,
                                                         B.FX_MUL),
-          (sorted(B.SIZE_MUL), set(B.SIZE_MUL.values()), round(sizes[0], 3), CF.CB_FX_SCALE > FX.SIZE),
-          (sorted(e['bac_effect'] for e in doc['effects'] if e['bac_effect'] != 5), {B.FX_MUL},
-           round(2.8 * CF.CB_FX_SCALE * B.FX_MUL, 3), True))
+          (sorted(B.SIZE_MUL), set(B.SIZE_MUL.values()), B.CMN_MUL, round(sizes[0], 3), CF.CB_FX_SCALE > FX.SIZE),
+          ([0, 1, 2, 3, 7], {B.FX_MUL}, 1.0, round(2.8 * CF.CB_FX_SCALE * B.FX_MUL, 3), True))
+    # v5 (user: "The ending effects (aside from the explosion) are far too large"): the hit / hit loop, the miss blast,
+    # the flare and the common dust / clouds / smoke / sparks at v3's size; the explosion and the dive's at v4's
+    syn_e2 = acmd.INFO[acmd.BY_NAME['graphic_effect']]['syntax']
+    eff = acmd.ACMDFile.load(os.path.join(fdir, 'script', 'animcmd', 'body', 'effect.bin')).script('specialhi')
+    by_id = {}
+    for e in doc['effects']:
+        for pt in e['parts']:
+            for st in pt.get('ptcl') or []:
+                by_id.setdefault(int(st['id'], 16), set()).add((e['bac_effect'], round(pt['size'], 4)))
+    bad = []
+    for c in eff:
+        if c.ident == acmd.BY_NAME['external_graphic']:
+            d = dict(zip(syn_e, c.params))
+            for eid, sz in by_id.get(d['Graphic'] if 'Graphic' in d else c.params[0], ()):
+                want_sz = sz * B.SIZE_MUL.get(eid, 1.0)
+                if eid in (8, 9, 12) and abs(d['Size'] - sz) > 1e-3 and abs(d['Size'] - want_sz) > 1e-3:
+                    bad.append((eid, d['Size'], sz))
+        if c.ident == acmd.BY_NAME['graphic_effect']:
+            d = dict(zip(syn_e2, c.params))
+            if d['Size'] > 1.25:
+                bad.append(('common', d['Size']))
+    check('v5: the ending effects (the hit and its loop, the miss blast, the flare, the common clouds / smoke / '
+          'sparks) at v3\'s sizes; the explosion at v4\'s', bad, [])
     calls = []
     for e in doc['effects']:
         for pt in e['parts']:

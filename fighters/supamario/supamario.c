@@ -38366,7 +38366,7 @@ int cb_turned;
 int cb_slot;            // the victim's player slot (1-8), 0 none
 int cb_handed;          // the victim handed to gf_tick (6) / released (7)
 int cb_lifted;
-int cb_free;            // v4: the rise actionable (from CB_RISE_CANCEL: the air actions, drift; 2: its pose held)
+int cb_free;            // v4: the rise actionable (from CB_RISE_CANCEL: the air actions, drift)
 int cb_terms;           // v4: the rise's air transition groups / terms turned on
 int cb_refused;         // v4: the dive's catch refused (a fighter lying down, invincible / intangible)
 int cb_brev;            // v4: the rise's B-reverse checked (1) / done (2)
@@ -38969,6 +38969,43 @@ int cb_dive_phase(float fr)
 // (cb_refused: the dive goes on without its hitboxes). Caught: invincible CB_INVINCIBLE frames, the hitboxes gone,
 // cb 3 and the slot for the scripts. The hold keeps v1-v3's invincibility (v4, user: "He should keep invincibility
 // during the hold only"; the dive itself: super armor only)
+// v5: the slot the hit can only be: the nearest other fighter to his fist (within CB_NEAR), when target 2's values
+// match no slot (the user's "it will hit an opponent but they won't be put in the hold")
+int cb_near_slot()
+{
+    int s;
+    int best;
+    float d;
+    float bd;
+    float fx;
+    float fy;
+    float dx;
+    float dy;
+    fx = WorkModuleF(0, 0x0f000000) + CB_FIST_Z * WorkModuleF(0, 0x0f000003);
+    fy = WorkModuleF(0, 0x0f000001) + CB_FIST_Y;
+    best = 0;
+    bd = CB_NEAR * CB_NEAR;
+    s = 1;
+    while (s <= 8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f &&
+            (WorkModuleF(0, 0x0f000020 + 4 * (s - 1)) != WorkModuleF(0, 0x0f000000) ||
+             WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) != WorkModuleF(0, 0x0f000001)))
+        {
+            dx = WorkModuleF(0, 0x0f000020 + 4 * (s - 1)) - fx;
+            dy = WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) + 5.0f - fy;
+            d = dx * dx + dy * dy;
+            if (d < bd)
+            {
+                bd = d;
+                best = s;
+            }
+        }
+        s = s + 1;
+    }
+    return best;
+}
+
 int cb_dive_catch()
 {
     float st;
@@ -39005,6 +39042,10 @@ int cb_dive_catch()
             found = s;
         }
         s = s + 1;
+    }
+    if (found == 0)
+    {
+        found = cb_near_slot();
     }
     if (found == 0)
     {
@@ -39104,6 +39145,17 @@ void cb_catch()
     }
     // v3: on the ground or not (its SITUATION: 0 ground, 1 ledge, 2 air), read before its status is changed
     vsit = WorkModuleF(0, 0x0F000116 + 0x20 * cb_t());
+    // v5: on the ground the frame before the hit (cb_gtrack) decides (the dive's catch read it after the hit: the air
+    // hold for a fighter standing on the ground, the user's clip); the live read only without that frame
+    if (cb_gvalid == 0x1)
+    {
+        vsit = 2.0f;
+        if ((cb_gmask & (0x1 << cb_slot)) != 0)
+        {
+            vsit = 0.0f;
+        }
+    }
+    cb_inv = 0x1;
     // a fighter lying down (v3: the detection box): out of the down statuses into the hold's hitstun (Damage), as a
     // hit on it in the air would be
     vst = WorkModuleF(0, 0x0F0000A2 + 8 * cb_t());
@@ -39367,6 +39419,13 @@ void cb_end()
     }
     cb_armor(0);
     cb_aircap(0);
+    // v5 (user: "Sometimes after finishing the move, Supamario will keep the grey invincibility flashing"): the hold's
+    // invincibility (CB_INVINCIBLE frames from the catch, longer than the hold on the ground's path) ends with the move
+    if (cb_inv != 0)
+    {
+        WorkModule(0, 0.0f, 0x0F00011C);
+        cb_inv = 0;
+    }
     SoundModule(0x2714, CB_SND_RUSH);
     SoundModule(0x2714, CB_SND_CHARGE);
     cb_ph = 0;

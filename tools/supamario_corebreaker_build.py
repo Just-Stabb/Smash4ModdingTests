@@ -101,6 +101,7 @@ CRASH_KB = dict(Angle=42, KBG=75, FKB=0, BKB=45)
 INVINCIBLE = (CRASH_END - HOLD) + 10        # the hold: from the catch through the crash / the explosion (v4, user: "He
                                             # should keep invincibility during the hold only")
 CATCH_FREEZE = 6
+NEAR = 20.0                                 # v5: the dive's catch, no slot matching target 2: the nearest within this
 
 # ---------------------------------------------------------------- variables (New_Var slots 0x20-0x21)
 CB_VAR = 0x0F000380 + 0x20                  # the phase (the MSC's cb_ph; the catch: the game script's 3)
@@ -164,6 +165,7 @@ def msc_values():
             # v3: the split (the rise; up special again: the hover / dive)
             'CB_USED': '0x%X' % CB_USED, 'CB_RISE_Y': '0x%X' % CB_RISE_Y, 'CB_AIR': '0x%X' % CB_AIR,
             'CB_INVINCIBLE': fl(INVINCIBLE),
+            'CB_FIST_Z': fl(FIST[0]), 'CB_FIST_Y': fl(FIST[1]), 'CB_NEAR': fl(NEAR),
             'CB_RISE_CANCEL': fl(RISE_CANCEL), 'CB_FLOOR_MARGIN': fl(FLOOR_MARGIN),
             'CB_RESET_LO': fl(0x3F), 'CB_RESET_HI': fl(0x4C),
             'CB_CLIFF_LO': fl(0x72), 'CB_CLIFF_HI': fl(0x7A), 'CB_DEAD': fl(0xB1), 'CB_REBIRTH': fl(0xB2),
@@ -189,6 +191,11 @@ def if_(var, method, value, body):
 def loop(n, body):
     """Set_Loop(n){ body } Goto(minus the block's words: back to its start), as vanilla's (Mario's game.bin)"""
     return [cmd('set_loop', n)] + body + [cmd('goto', -size(body))]
+
+
+def cb_in(lo, hi, body):
+    """body only while lo <= cb <= hi (Float_Var_Compare methods 3: >=, 2: <=)"""
+    return if_(CB_VAR, 3, lo, if_(CB_VAR, 2, hi, body))
 
 
 def setf(value, var):
@@ -242,6 +249,7 @@ _V3 = {'catch': round(5.5 * _CB_SCALE / 1.75, 2), 'burn': round(7.0 * _CB_SCALE 
        'crash': round(9.0 * _CB_SCALE / 0.875, 2), 'explosion': round(11.0 * _CB_SCALE / 0.875, 2)}
 HB = dict({k: (v, round(v * FX_MUL, 2)) for k, v in _V3.items()},
           detect=(DETECT_SIZE, DETECT_SIZE), body=(4.5, 4.5))
+HB['burn'] = (HB['burn'][1], _V3['burn'])    # v5: the hit loop back to v3's size, its box with it (v4 13.5 -> 9.0)
 CRASH_AT = (6.26, 1.93)                      # the crash explosion's place (the crash pose's RHandN, effect 3's call)
 DETECT_AT = (1.0, 6.5)                       # at his middle (ahead, up)
 VICTIM_MID = (HOLD_X, HOLD_Y + 5.0)          # the held victim's middle
@@ -254,13 +262,16 @@ def game_script():
     blocks = []
     # the dive (60-): the catch box on his fist and his body (3%; misses a fighter lying down: Ground/Air bit 31),
     # ledges on (vanilla's Allow/Disallow_Ledgegrab 1, the MSC's func_56)
-    blocks.append((DIVE_FROM, [cmd('allow/disallow_ledgegrab', 1),
+    # v5: only in the hover / dive (cb 1-2): the script runs on its own frame count, and v4's held rise pose let it
+    # reach this frame with cb 0 (the user: "Up special's leap has a hitbox", 3%, no hit effect: this catch box and the
+    # body box, live from script frame 60 to the landing's Remove_All_Hitboxes)
+    blocks.append((DIVE_FROM, [cmd('allow/disallow_ledgegrab', 1)] + cb_in(1, 2, [
                                hitbox(ID=0, Bone=0, Damage=CATCH_DMG, BKB=20, Size=HB['catch'][1], Y=FIST[1], Z=FIST[0],
                                       HitstopFrames=CATCH_FREEZE, SelfHitstopFrames=CATCH_FREEZE,
                                       **{'Ground/Air': NO_DOWN | 3}),
                                hitbox(ID=1, Bone=0, Damage=CATCH_DMG, BKB=20, Size=4.5, Y=5.3, Z=2.0,
                                       HitstopFrames=CATCH_FREEZE, SelfHitstopFrames=CATCH_FREEZE,
-                                      **{'Ground/Air': NO_DOWN | 3})]))
+                                      **{'Ground/Air': NO_DOWN | 3})])))
     # the catch, checked every dive frame while diving (cb 2): a fighter's body (Hit_Check kinds 2: not a shield),
     # not lying down (LASTHIT_STATUS), not invincible / intangible (LASTHIT_BODY 0); a refused one ends the checks
     # (cb 2.25: the MSC dives on)
@@ -285,9 +296,9 @@ def game_script():
     # hold; refused (cb 1.25) -> the hover goes on
     # (user: "The detection box for Core Breaker should be able to hit a downed opponent": Ground/Air 3, no bit 31,
     # no down-status refusal; shields, invincible and intangible fighters still aren't caught)
-    blocks.append((HOVER_FROM, [hitbox(ID=0, Bone=0, Damage=CATCH_DMG, BKB=20, Size=DETECT_SIZE, Y=DETECT_AT[1],
-                                       Z=DETECT_AT[0], HitstopFrames=CATCH_FREEZE, SelfHitstopFrames=CATCH_FREEZE,
-                                       **{'Ground/Air': 3})]))
+    blocks.append((HOVER_FROM, if_(CB_VAR, 0, 1, [hitbox(
+        ID=0, Bone=0, Damage=CATCH_DMG, BKB=20, Size=DETECT_SIZE, Y=DETECT_AT[1], Z=DETECT_AT[0],
+        HitstopFrames=CATCH_FREEZE, SelfHitstopFrames=CATCH_FREEZE, **{'Ground/Air': 3})])))
     blocks.append((HOVER_FROM + 2, [cmd('remove_all_hitboxes')]))
     det = catch_check(1.25, downed=True)
     for f in range(HOVER_FROM + 1, HOVER_FROM + 4):
@@ -321,12 +332,16 @@ def game_script():
 
 # ---------------------------------------------------------------- effects
 FX_DASH_CLOUD, FX_BIG_CLOUD = 0x1000009, 0x1000020
-SIZE_MUL = {e: FX_MUL for e in (0, 1, 2, 3, 7, 8, 9, 12)}   # v4: all but the aura (5) x1.5 over v3
-CMN_MUL = FX_MUL                              # v4: the common effects with them (the dust, the clouds, the sparks)
+SIZE_MUL = {e: FX_MUL for e in (0, 1, 2, 3, 7)}   # v4: all but the aura (5) x1.5 over v3; v5 (user: "The ending
+                                              # effects (aside from the explosion) are far too large"): the hit / hit
+                                              # loop (8), the miss blast (9), the flare (12) back to v3's
+CMN_MUL = 1.0                                 # v5: the dust, the clouds, the smoke, the sparks back to v3's (v4 x1.5)
 # v3 (user, v2's clip: "The effects for Core Breaker are too small"): no
                                               # halving (v1 / v2 halved the charge orb, its end flash and the explosion:
                                               # the Q10 default); every effect at supamario_corebreaker_fx.CB_FX_SCALE
 GUARD = {9: 5, 8: 3, 12: 3, 3: 6}             # BAC effect -> the phase whose segment it plays in (cb)
+GUARD_IN = {0: (1, 1), 1: (1, 1), 5: (1, 2), 2: (1, 2), 7: (1, 2)}   # v5: the hover / dive ones (cb lo-hi): never in
+                                              # the rise (the scripts run on their own frame count)
 
 
 def effect_script(fx, bones, cmn_fx):
@@ -358,6 +373,8 @@ def effect_script(fx, bones, cmn_fx):
             blocks.append((x['frame'] - HOLD + HOLDG, if_(CB_VAR, 0, 8, list(body))))
         if eid in GUARD:
             body = if_(CB_VAR, 0, GUARD[eid], body)
+        elif eid in GUARD_IN:
+            body = cb_in(GUARD_IN[eid][0], GUARD_IN[eid][1], body)
         blocks.append((x['frame'], body))
     # the air release (cb 7): the explosion (effect 3) and XV2 entry 13's effect 9 where his fist is
     rel = []
@@ -393,7 +410,7 @@ def effect_script(fx, bones, cmn_fx):
 
 
 def expression_script():
-    blocks = [(DIVE_FROM, [cmd('rumble', 0x10, 0)]),
+    blocks = [(DIVE_FROM, cb_in(1, 2, [cmd('rumble', 0x10, 0)])),
               (HOLD, if_(CB_VAR, 0, 3, [cmd('rumble', 0x12, 0)])),
               (HOLDG, if_(CB_VAR, 0, 8, [cmd('rumble', 0x12, 0)])),
               (CRASH, if_(CB_VAR, 0, 6, [cmd('rumble', 0x12, 0), cmd('quake', 4)])),

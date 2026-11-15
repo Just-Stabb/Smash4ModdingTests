@@ -2022,3 +2022,97 @@ the ptcl / efc and the motion are v3's).
   in Fall; that the leap's own slowing holds after the type change;
 - the B-reverse's momentum flip through energy 2 / 3 (KineticModuleF 0xa / 0xb and KineticModule 0x11 on energy 2);
 - the burn hits' coins on a held victim (hitstun, no stage collision).
+
+## Core Breaker v5 (`supamario_corebreaker_v5.zip`): the user's v4 clips
+
+Install over v4, exe B (exe_v46j: v46i plus acmd_ext's Motion_Set fix; no exe change). Four clips
+(`MedalTVCemuWiiUEmulator20261115000020473` / `...000243660` / `...000416068` / `...000723961`, 1296x778 at 60 fps).
+Six fixes, each with a test that fails on the v4 build (`supamario_corebreaker_test.py` run on v4's output: 20
+problems, among them each of the six below).
+
+### 1. A hit but no hold (clip 1)
+**What the clip shows:**
+- he hovers with the orb over Donkey Kong (the detection box at his middle misses DK's body);
+- the dive starts point-blank: DK flashes red on its first frames (1.5-1.7 s), takes 3% (118 -> 121);
+- he passes through and lands behind DK, with no hold.
+
+In clip 3 a dive that travelled before hitting did catch.
+
+**Cause:** v4's `cb_dive_start` called `AttackModule(0x2724)` (the hit flag's reset) on the dive's first frame. A hit
+on that frame (the game script sets the dive's boxes at 60, they connect, then the MSC's frame runs) was wiped. Its
+hit record then kept the boxes from hitting DK again, so the flag never came back.
+
+**Fix:**
+- no reset in the MSC: the game script's `Hit_Reset` at 60, before the hitboxes, is the only one;
+- if target 2's values match no player slot, `cb_near_slot` takes the nearest other fighter to his fist (within 20).
+
+**Test:** a hit on the dive's first frame catches (v4: phases hover, dive, landing; no slot).
+
+### 2. The grey invincibility flashing after the move (clip 4, from 2.9 s)
+**Cause:** the hold's invincibility is a timed state, 187 frames from the catch (the air path's catch-to-crash-end).
+The hold on the ground's path is shorter (catch at 238, the crash's end 341), so it ran past the move's end; nothing
+cleared it.
+
+**Fix:** `cb_end` (every end of the status: the crash's Wait, the air explosion's FallSpecial, any cut) writes
+INVINCIBLE 0 when the catch set it (`cb_inv`). Nothing is written without a catch, so respawn invincibility is never
+touched.
+
+**Test:** the crash, the air explosion and a cut mid-hold each end with INVINCIBLE 0; a rise alone writes nothing.
+
+### 3. The leap's hitbox (clip 2: DK takes 3% from the leap's held pose falling on him, no hit effect)
+**Cause:** it was the dive's catch box and body box (3%, Element 0), from game-script frame 60 to the landing
+segment's `Remove_All_Hitboxes`.
+- v4 held the rise's last frame with motion rate 0, but the game script runs on its own frame count. It reached the
+  hover's detection box at 30 (a 2-frame blip) and the dive's boxes at 60, with cb 0.
+- Those blocks weren't guarded by the phase (v3 left the status at frame 30, so they were never reached there).
+
+**Fix:**
+- the rise no longer holds (item 4);
+- the detection box is guarded by cb 1, the dive's boxes and the dive's rumble by cb 1-2;
+- the hover / dive XV2 effects by their phases: the orb and flash cb 1, the aura / fist fire / wind cb 1-2. So no
+  frame count can bring them out in the rise.
+
+**Test:** every hitbox and every XV2 effect call sits inside a cb guard that cb 0 fails (v4: 3 hitboxes and the
+effects unguarded).
+
+### 4. The leap ends in Fall
+The user called v4's endless hold a bug. The rise plays its whole animation (actionable from frame 16 as in v4: the
+air actions, drift, up special = the hover / dive in place), then Fall at its last frame (29). From Fall everything
+is normal; up special there is the hover / dive (the use rules unchanged).
+
+**Tests:** Fall at 29 (never 30), in the air, the rise used; each action from 16 to the end, not before; an air
+start: Fall at 29.
+
+### 5. A dive catch on the ground plays the air hold (clip 3)
+**What clip 3 shows:** the dive catches DK standing on the stage. Supamario holds him in the air pose (the grab_hold
+segment), then the drive and the crash. The point-blank detection catch (clip 4) took the hold on the ground.
+
+**Cause:** both catches go through `cb_catch`, which read the victim's situation live. The detection catch reads it
+in the game script's check right after the hit. The dive's MSC catch reads it after the hit's freeze, by which time
+the catch hit (BKB 20) can have the victim's situation in the air.
+
+**Fix:** `cb_gtrack` keeps the player slots on the ground every hover / dive frame until his attack has hit (and once
+at the hover's start). `cb_catch` uses that frame-before-the-hit mask for both catches; the live read is only a
+fallback.
+
+**Test:** a fighter on the ground whose situation reads the air by the time the catch is read: the hold on the
+ground and the crash (v4: the air hold, the drive).
+
+### 6. The ending effects too large
+The user: far too large, except the explosion.
+- Back to v3's sizes: the hit and its loop (8), the miss blast (9), the flare (12), and the common dust / landing
+  cloud / crash cloud / crash smoke / hit spark (`CMN_MUL` 1.0).
+- In clip 3's crash (2.9-4.0 s) the smoke and the clouds spread wider than the explosion's own core. I didn't
+  measure them to a size; v3's are the last sizes the user didn't call too big, so they go back to those.
+- The explosion (3), the orb, the flash, the fist fire and the wind keep v4's x1.5.
+- The burn box follows its hit loop back: 13.5 -> 9.0. The catch, crash and explosion boxes are unchanged.
+
+**Test:** those calls at v3's sizes, every common one at 1.2 or less.
+
+### Tests (v5 build, halos 0.16)
+- `supamario_corebreaker_test.py`: 87 checks, 0 problems;
+- `supamario_godfist_test.py --all-models`: 0 problems;
+- `msc_stack_check.py`: 0 stack problems (2368 scripts).
+
+**Not confirmed in game:** that writing INVINCIBLE 0 (`HitModule(1, 0, 0)`) ends the timed invincibility at once, and
+that target 2 is readable from the MSC on every catch (the nearest-fighter fallback covers a failed match).
