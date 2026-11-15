@@ -418,7 +418,7 @@ def sound_bank(fdir, out_dir, wav_dir):
 
 
 # ---------------------------------------------------------------- build
-def build(sm_dir, out_dir, skill_dir, se_wav, gf_args, png=None):
+def build(sm_dir, out_dir, skill_dir, se_wav, gf_args, png=None, halo=True):
     import omo
     import supamario_godfist_build as GB
     import supamario_corebreaker_fx as CF
@@ -459,6 +459,15 @@ def build(sm_dir, out_dir, skill_dir, se_wav, gf_args, png=None):
         json.dump(fx, fh, indent=1)
     # the scripts, the sound bank, the MSC
     scripts(os.path.join(fdir, 'script', 'animcmd', 'body'), fx, omo.vbn_read(vbn), cmn_fx)
+    if halo:
+        # v3 (user): the fake-glow halos on, both moves (they share the bank): tools/supamario_halo_test.py's pass
+        # over the finished effect files, at xv2_smash_fx.HALO_ALPHA
+        import supamario_halo_test as HT
+        rep, _p, _g = HT.build(out_dir, out_dir, {'PtcSupamarioCb': skill_dir,
+                                                  'PtcSupamarioGfCsg_': gf_args.get('skill_vfx'),
+                                                  'PtcSupamarioGfBtl_': gf_args.get('cmn_vfx')}, FX.HALO_ALPHA)
+        with open(os.path.join(out_dir, 'halo_report.json'), 'w') as fh:
+            json.dump(rep, fh, indent=1)
     sound_bank(fdir, out_dir, se_wav)
     GB.msc(os.path.join(fdir, 'script', 'msc', 'supamario.mscsb'))
     return fdir
@@ -467,6 +476,9 @@ def build(sm_dir, out_dir, skill_dir, se_wav, gf_args, png=None):
 def main():
     a = sys.argv[1:]
     opts = {}
+    halo = '--no-halo' not in a
+    if not halo:
+        a.remove('--no-halo')
     for k in ('--skill', '--se-wav', '--ean', '--cmn-vfx', '--skill-vfx', '--cmn-se', '--stb', '--png'):
         if k in a:
             i = a.index(k)
@@ -476,7 +488,7 @@ def main():
         sys.exit(__doc__)
     gf = {'ean': opts['--ean'], 'cmn_vfx': opts.get('--cmn-vfx'), 'skill_vfx': opts.get('--skill-vfx'),
           'cmn_se': opts.get('--cmn-se'), 'stb': opts.get('--stb')}
-    print(build(a[0], a[1], opts['--skill'], opts['--se-wav'], gf, opts.get('--png')))
+    print(build(a[0], a[1], opts['--skill'], opts['--se-wav'], gf, opts.get('--png'), halo))
     print('sounds: ' + ', '.join('%s 0x%08X' % kv for kv in SE_IDS.items()))
 
 
