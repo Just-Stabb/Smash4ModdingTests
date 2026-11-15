@@ -2170,6 +2170,24 @@ too, that's a one-line change in `cb_catch`.
   the visible burn.
 - The victim's coins (Element 6) and the XV2 hit loop are unchanged.
 
+### A hit after the rise keeps the dive (user: "make it so if Supamario is hit during or after the leap part of Core Breaker (without doing the dive yet) he does the dive next time he uses up special (until it gets reset by landing, getting hit out of the dive if possible, grabbing ledge, ko, etc)")
+`cb_reset_tick` splits v3's reset range (0x3F-0x4C):
+
+| Event | Rise used (1) | Hover / dive used (2) |
+|---|---|---|
+| a hit: Damage .. DamageFall (0x45-0x4C), during the rise or after it | kept: the next up special is the hover / dive | reset (as before) |
+| grabbed / thrown (CapturePull .. Thrown, 0x3F-0x44) | reset (as before; `CB_HIT_LO` moves the line) | reset |
+| landing (on the ground after being in the air), a ledge, KO / respawn / entry | reset | reset |
+
+A rise interrupted by a hit leaves the status with the use at 1, so it keeps the hover / dive too. A hit in the hover
+counts as the dive's (2): reset.
+
+Tests:
+- with the rise used: a hit, a tumble or a ground hit keep it, while grabbed / thrown reset it; with the dive used, a
+  hit resets it;
+- rise -> hit -> up special = the hover / dive; rise -> hit -> landing -> the rise; dive -> hit out of it -> the rise;
+  rise -> ledge -> the rise.
+
 ### Tests (v6 build, halos 0.16)
 - dive catches:
   - a standing fighter: the hold on the ground, he lands, the victim on its ground, the crash;
@@ -2180,3 +2198,11 @@ too, that's a one-line change in `cb_catch`.
   Each ends exactly as the point-blank catch does: the crash phase, the same crash frames, Wait on the ground.
 - his percent +1.75 on each burn hit's frame, +7 in all, on the hold on the ground, the air hold with the crash, the
   air hold with the explosion off the stage, and the point-blank catch.
+- the new reset rule's cases and sequences (above);
+- `supamario_corebreaker_test.py`: 91 checks, 0 problems; `supamario_godfist_test.py --all-models`: 0 problems;
+  `msc_stack_check.py`: 0 stack problems (2369 scripts).
+
+**Not confirmed in game:**
+- that the DAMAGE write raises his percent with no side effect;
+- that the fire puff (`0x1000011`) reads as a burn on him;
+- that he lands at the dive's speed in the hold on the ground on every floor (slopes, platforms).

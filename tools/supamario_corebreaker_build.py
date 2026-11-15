@@ -178,7 +178,7 @@ def msc_values():
             'CB_BURN_SELF': fl(BURN_SELF), 'CB_BURN_HITS': str(BURN_HITS), 'CB_BURN_FIRST': fl(BURN_AT[0] - HOLD),
             'CB_BURN_EVERY': fl(BURN_AT[1] - BURN_AT[0]),
             'CB_RISE_CANCEL': fl(RISE_CANCEL), 'CB_FLOOR_MARGIN': fl(FLOOR_MARGIN),
-            'CB_RESET_LO': fl(0x3F), 'CB_RESET_HI': fl(0x4C),
+            'CB_RESET_LO': fl(0x3F), 'CB_RESET_HI': fl(0x4C), 'CB_HIT_LO': fl(0x45),
             'CB_CLIFF_LO': fl(0x72), 'CB_CLIFF_HI': fl(0x7A), 'CB_DEAD': fl(0xB1), 'CB_REBIRTH': fl(0xB2),
             'CB_ENTRY': fl(0x14F), 'CB_DOWN_FURAFURA': fl(DOWN_FURAFURA), 'CB_HOLD_STATUS': fl(HOLD_STATUS),
             # v3: the endless dive, the hold on the ground

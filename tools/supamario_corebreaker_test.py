@@ -454,6 +454,45 @@ def msc_tests(path):
           'on the ground before he has left it (v4)',
           resets, [(n, 0.0 if '(no reset)' not in n else (1.0 if 'never' in n else 2.0)) for n, _u in resets])
     g.self_status = None
+    # 3a. v6 (user: "if Supamario is hit during or after the leap part of Core Breaker (without doing the dive yet) he
+    # does the dive next time he uses up special"): with only the rise used, a hit (0x45-0x4C) keeps it; grabbed /
+    # thrown (0x3F-0x44) still resets
+    out = []
+    for name, sit, st, u in (('rise used, hit', 2, 0x46, 1.0), ('rise used, tumbling', 2, 0x4C, 1.0),
+                             ('rise used, hit on the ground (no landing yet)', 0, 0x45, 1.0),
+                             ('rise used, grabbed', 2, 0x3F, 1.0), ('rise used, thrown', 2, 0x44, 1.0),
+                             ('dive used, hit', 2, 0x46, 2.0)):
+        g.vars[B.CB_USED], g.vars[B.CB_AIR], g.self_status, vm.g[18] = u, 0.0 if sit == 0 else 1.0, st, sit
+        vm.call(tick)
+        out.append((name, used(g)))
+    check('a hit keeps the rise\'s use (the next up special: the hover / dive); grabbed / thrown resets; a hit after '
+          'the dive resets', out, [('rise used, hit', 1.0), ('rise used, tumbling', 1.0),
+                                   ('rise used, hit on the ground (no landing yet)', 1.0), ('rise used, grabbed', 0.0),
+                                   ('rise used, thrown', 0.0), ('dive used, hit', 0.0)])
+    g.self_status = None
+
+    def seq(events):
+        """the rise, then events [(status, situation)] through the per-frame reset, then up special: its first phase"""
+        g_ = Game(stage=(-200.0, 200.0))
+        run(path, g_)
+        vm_ = vm_for(path, g_)
+        tk = vm_.func(func_index(vm_, 'cb_reset_tick'))
+        for st_, sit_ in [(0xE, 2)] + events:           # falling first (in the air since the use)
+            if st_ == 'dive':
+                run(path, g_, frames=B.DIVE_FROM - B.HOVER_FROM + 5)
+                continue
+            g_.self_status, vm_.g[18] = st_, sit_
+            vm_.call(tk)
+        g_.self_status = None
+        if events and events[-1][1] == 0:
+            g_.air, g_.y = False, 0.0
+        u_ = used(g_)
+        tr_ = run(path, g_, frames=8)
+        return (u_, phases_of(tr_)[0])
+    check('rise -> hit -> up special: the hover / dive (1); rise -> hit -> landing -> up special: the rise (0); dive '
+          '-> hit out of it -> up special: the rise; rise -> ledge -> up special: the rise',
+          [seq([(0x46, 2)]), seq([(0x46, 2), (0x45, 0)]), seq([('dive', 2), (0x46, 2)]), seq([(0x74, 1), (0xE, 2)])],
+          [(1.0, 1.0), (0.0, 0.0), (0.0, 0.0), (0.0, 0.0)])
     # 3b. v4 (user: "The first press of up special on the ground should consume its one rising use"): a ground up
     # special with the per-frame reset running and his status read as the one before on its first frame: the rise
     # stays used; up special again: the hover / dive; a third does nothing in the air; the landing gives it back

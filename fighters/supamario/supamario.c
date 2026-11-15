@@ -38475,7 +38475,11 @@ void cb_reset_tick()
     {
         return;
     }
-    if ((global18 == 0 && WorkModuleF(0, CB_AIR) > 0.5f) || global18 == 0x1 || (st >= CB_RESET_LO && st <= CB_RESET_HI) ||
+    // v6 (user: "if Supamario is hit during or after the leap part of Core Breaker (without doing the dive yet) he does
+    // the dive next time he uses up special"): a hit (the damage statuses CB_HIT_LO-CB_RESET_HI) resets only once the
+    // hover / dive is used (2); grabbed / thrown (CB_RESET_LO up to CB_HIT_LO) still always resets
+    if ((global18 == 0 && WorkModuleF(0, CB_AIR) > 0.5f) || global18 == 0x1 || (st >= CB_RESET_LO && st < CB_HIT_LO) ||
+        (st >= CB_HIT_LO && st <= CB_RESET_HI && WorkModuleF(0, CB_USED) > 1.5f) ||
         (st >= CB_CLIFF_LO && st <= CB_CLIFF_HI) || st == CB_DEAD || st == CB_REBIRTH || st == CB_ENTRY)
     {
         WorkModule(0, 0.0f, CB_USED);
@@ -38539,15 +38543,8 @@ void cb_init()
         func_16(0xe, 0);            // both used (cb_can_up refuses it; a safeguard)
         return;
     }
-    WorkModule(0, 1.0f, CB_USED);
-    if (global18 == 0x2)
-    {
-        WorkModule(0, 1.0f, CB_AIR);
-    }
-    else
-    {
-        WorkModule(0, 0.0f, CB_AIR);
-    }
+    // v6 (user: "make sure that getting hit during/after the rise only consumes it after the vertical speed begins
+    // being added"): the rise is used (CB_USED 1) at its lift-off (cb_rise_phase), not here: cut in the crouch, it isn't
     WorkModule(0, WorkModuleF(0, 0x0f000001), CB_RISE_Y);
     // v4 (user: "make it so that there's no armor during the leap or hover, and the dive has armor instead of
     // invincibility"): no armor in the rise (v1-v3: super armor to its top)
@@ -38604,6 +38601,16 @@ int cb_rise_phase(float fr)
     if (cb_lifted == 0)
     {
         cb_lifted = 0x1;
+        // v6: the rise used from its first upward speed
+        WorkModule(0, 1.0f, CB_USED);
+        if (global18 == 0x2)
+        {
+            WorkModule(0, 1.0f, CB_AIR);
+        }
+        else
+        {
+            WorkModule(0, 0.0f, CB_AIR);
+        }
         if (global18 == 0)
         {
             func_94();
