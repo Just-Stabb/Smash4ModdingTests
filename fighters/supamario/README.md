@@ -2225,3 +2225,64 @@ Tests:
 - that the DAMAGE write raises his percent with no side effect;
 - that the fire puff (`0x1000011`) reads as a burn on him;
 - that he lands at the dive's speed in the hold on the ground on every floor (slopes, platforms).
+
+## Core Breaker v7 (`supamario_corebreaker_v7.zip`)
+
+Install over v6, exe B (exe_v46j, no exe change). The user's clip `MedalTVCemuWiiUEmulator20261115005737991` (1296x778,
+60 fps, 6.7 s):
+- **0-1.3 s:** a crash on the stage. Supamario stands at the crash site afterwards; his HUD icon looks faded in some
+  frames after the animation. At this size the clip doesn't show the grey flash clearly; the report is the user's.
+- **2-4.4 s:** at the stage's right edge he hovers beside Donkey Kong, who is in the air just past the ledge. The
+  point-blank box catches DK, the hold (coins, Supamario's own +7%: 98 -> 105), then the drive down and right, away
+  from the stage. Both go below the ledge and the explosion goes off under the stage; DK is KO'd (109%).
+
+### 1. The invincibility after the move
+The user means Supamario: nothing in the move writes the victim's body state.
+
+**Cause:**
+- v5 / v6 gave him 187 frames of timed invincibility at the catch (`HitModule(1, 187)` through the INVINCIBLE
+  variable, or `Body_State_Set` for the point-blank catch), sized for the air path's catch-to-crash-end.
+- At the status's end they wrote 0 to clear it. If the game takes a 0-frame write as "no change" (or keeps the larger
+  timer), nothing is cleared, and the hold on the ground's path is 84 frames shorter, so the rest runs on after the
+  finisher.
+- MSC can't read the timer's frames (INVINCIBLE reads 1 / 0), so the clear can't be read back.
+
+**Fix:** invincibility is no longer one long timer.
+- `cb_update` renews it every frame he holds the victim (`INV_STEP`, 2 frames), in the hold, the drive, the hold on
+  the ground, and the crash / the explosion until the victim is let go.
+- At the release it isn't renewed, so it ends within 2 frames whatever the game does with any write.
+- The catch writes are 2 / 3 frames (not 187). The status's end writes 1 frame, not 0.
+
+**Tests:**
+- a write every frame of the hold, the last one at the release frame or before, none above 2;
+- only the 1-frame end after the release;
+- each end (the crash, the explosion in the air, a cut) ends on the 1-frame write.
+
+### 2. Dragged under the ledge
+**Cause:** the drive's floor (where it turns into the explosion in the air) was the rise's start less 3, but at least
+30 below the catch. Caught at the ledge's height and facing away from the stage, the drive went 30+ down past the
+ledge. And a catch from under a ledge pulled the victim down to his fist.
+
+**Fix:**
+- **The floor** (`cb_floor_at`): the highest known ground at or below him at the catch, less 0.5. Known grounds are
+  the victim's last ground (tracked in the hover / dive), his own last ground (tracked every frame in
+  `cb_reset_tick`) and the rise's start. On the stage the drive lands first (the crash); past the ledge it stops at
+  the stage's height and explodes there. Nobody is carried below it.
+- **Under** (`cb_under`), when either holds:
+  - the victim is more than 8 above his feet;
+  - the victim is on a ledge (its situation 1 or a cliff status);
+  - he is below every known ground.
+
+  Then the victim is held where it was caught (its offset at the catch, not at his fist). The hold rises as before,
+  then there's no drive: the explosion in the air in place.
+
+**Tests:**
+- the clip's case (rose from the stage by its edge, the point-blank catch past the ledge, facing away): the drive
+  stops within one step of the stage's height, and the explosion goes off there;
+- under the ledge, a victim standing at it: the hold, the explosion in place, nobody lower than at the hold's start,
+  FallSpecial;
+- a victim hanging on the ledge: the same.
+
+### Not confirmed in game
+- whether a 0-frame INVINCIBLE write was really ignored (the renewal makes it not matter);
+- that the INVINCIBLE write of 2 frames every frame keeps the grey flash on only while he holds.

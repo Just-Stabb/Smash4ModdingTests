@@ -22,7 +22,7 @@ The move (fighters/supamario/README.md "Core Breaker"; his movement is speeds th
 - a catch (a fighter's body, not lying down, not invincible / intangible): he's invincible (the hold only, v4), holds it at his fist
   (36 frames: BURN_HITS x BURN_DMG), then drives it down 45 degrees: on the ground the crash (CRASH_DMG, KO
   knockback CRASH_KB, the victim let go the frame before), else (off the stage: CB_DRIVE_MAX frames or the floor:
-  the rise's start less FLOOR_MARGIN, at least DRIVE_MIN_DROP below the catch) the explosion in the air (CRASH_DMG, KO knockback EXPLOSION_KB) and FallSpecial. v3: a victim on
+  v7: the lower of the rise's start and the victim's ground, less FLOOR_MARGIN) the explosion in the air (CRASH_DMG, KO knockback EXPLOSION_KB) and FallSpecial. v3: a victim on
   the ground at the catch: the hold on the ground (hold_gnd: the same burn hits), then the crash (no lift, no drive).
 """
 import json
@@ -64,8 +64,8 @@ RISE_DECEL = RISE_V / RISE_FRAMES                      # 0.19 a frame
 RISE_VX = 0.4                              # XV2: 0.1 m a frame forward over the launch (entry 0 Movement 9-25)
 DIVE_DEG = 48.0                            # XV2 entries 3 / 4: Movement (0, -1.0, 1.1 forward) a frame
 DIVE_V = 1.4866 * 5.04                     # 7.49: XV2's 1.49 m a frame at the body's 5.04 units a metre
-FLOOR_MARGIN = 3.0                         # the drive's floor: the rise's start less this (v3: the dive has none)
-DRIVE_MIN_DROP = 30.0                      # v3: but at least this far below the catch
+FLOOR_MARGIN = 0.5                         # the drive's floor: the rise's start / the victim's ground less this (v7:
+                                           # 0.5, was 3 with 30 below the catch at least: past the ledge)
 HOME_RANGE = 50.0                          # light homing (user): fighters ahead and below within this
 HOME_CONE = 30.0                           # degrees either side of the dive's line
 HOME_TURN = 1.5                            # degrees a frame
@@ -103,6 +103,8 @@ CRASH_KB = dict(Angle=42, KBG=75, FKB=0, BKB=45)
 INVINCIBLE = (CRASH_END - HOLD) + 10        # the hold: from the catch through the crash / the explosion (v4, user: "He
                                             # should keep invincibility during the hold only")
 CATCH_FREEZE = 6
+INV_STEP = 2                                # v7: the hold's invincibility, renewed every frame while holding
+UNDER = 8.0                                 # v7: a victim this far above his feet (or on a ledge): no drive down
 NEAR_GROUND = 15.0                          # v6: an airborne victim this close above its ground: the grounded path
 GROUND_BELOW = 3.0                          # v6: ... and not more than this below it (off the stage: the air path)
 GROUND_MISS = 15.0                          # v6: the grounded hold: this far below the victim's ground, no ground
@@ -171,7 +173,7 @@ def msc_values():
             'CB_SND_EXPLOSION': '0x%X' % SE_IDS['cb_explosion'], 'CB_SND_HIT': '0x%X' % SE_IDS['cb_hit_l'],
             # v3: the split (the rise; up special again: the hover / dive)
             'CB_USED': '0x%X' % CB_USED, 'CB_RISE_Y': '0x%X' % CB_RISE_Y, 'CB_AIR': '0x%X' % CB_AIR,
-            'CB_INVINCIBLE': fl(INVINCIBLE),
+            'CB_INVINCIBLE': fl(INVINCIBLE), 'CB_INV_STEP': fl(INV_STEP), 'CB_UNDER': fl(UNDER),
             'CB_FIST_Z': fl(FIST[0]), 'CB_FIST_Y': fl(FIST[1]), 'CB_NEAR': fl(NEAR),
             'CB_GY0': '0x%X' % CB_GY0, 'CB_NEAR_GROUND': fl(NEAR_GROUND), 'CB_GROUND_BELOW': fl(GROUND_BELOW),
             'CB_GROUND_MISS': fl(GROUND_MISS),
@@ -182,7 +184,7 @@ def msc_values():
             'CB_CLIFF_LO': fl(0x72), 'CB_CLIFF_HI': fl(0x7A), 'CB_DEAD': fl(0xB1), 'CB_REBIRTH': fl(0xB2),
             'CB_ENTRY': fl(0x14F), 'CB_DOWN_FURAFURA': fl(DOWN_FURAFURA), 'CB_HOLD_STATUS': fl(HOLD_STATUS),
             # v3: the endless dive, the hold on the ground
-            'CB_DIVE_LAST': fl(DIVE_LAST), 'CB_DIVE_LOOP': fl(DIVE_LOOP), 'CB_DRIVE_MIN_DROP': fl(DRIVE_MIN_DROP),
+            'CB_DIVE_LAST': fl(DIVE_LAST), 'CB_DIVE_LOOP': fl(DIVE_LOOP),
             'CB_HOLDG': fl(HOLDG), 'CB_HOLDG_END': fl(HOLDG_END)}
 
 
@@ -288,7 +290,7 @@ def game_script():
     # (cb 2.25: the MSC dives on)
     def catch_check(refused, downed=False):
         take = [setf(3, CB_VAR), cmd('target_slot_get', 2, CB_V_SLOT), cmd('remove_all_hitboxes'),
-                cmd('body_state_set', 0, 1, INVINCIBLE)]
+                cmd('body_state_set', 0, 1, INV_STEP + 1)]     # v7: a few frames; the MSC renews it while holding
         ok = [setf(1, 0x0F000380 + 0x22)]
         if not downed:              # the dive: not a fighter lying down (v3's hover box: yes, the user)
             ok += if_(LASTHIT_STATUS, 3, DOWN_LO, if_(LASTHIT_STATUS, 2, DOWN_HI, [setf(0, 0x0F000380 + 0x22)]))

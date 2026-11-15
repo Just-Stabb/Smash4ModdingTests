@@ -38351,7 +38351,8 @@ void gf_tick()
 //   3 the hold    an airborne victim held at his fist (cb_hold: its offsets, hitstun, hitstop, no stage collision,
 //                 controller off), he goes CB_HOLD_RISE up; the game script's burn hits; to CB_DRIVE -> 4
 //   4 the drive   down CB_DRIVE_DEG at CB_DRIVE_V with it: landing -> 6; CB_DRIVE_MAX frames or the floor (cb_floor:
-//                 the rise's start less CB_FLOOR_MARGIN, at least CB_DRIVE_MIN_DROP below the catch) -> 7
+//                 v7: the lower of the rise's start and the victim's ground, less CB_FLOOR_MARGIN) -> 7. v7: caught
+//                 from under a ledge / on one (cb_under): no drive, the explosion in place
 //   5 land miss   the landing blast (XV2 entry 5), CB_LAND_LAG frames of landing lag, then Wait
 //   6 the crash   on the ground: the victim let go at CB_CRASH, the game script's crash explosion (KO knockback) the
 //                 next frame; he slides back CB_CRASH_BACK_V; Wait at the end
@@ -38379,6 +38380,11 @@ int cb_brev;            // v4: the rise's B-reverse checked (1) / done (2)
 int cb_gstart;          // v4: the rise started on the ground
 int cb_gmask;           // v5: the player slots on the ground (bit 1 << slot) the frame before his attack hit
 int cb_gvalid;
+float cb_my_gy;         // v7: his own last ground height (cb_reset_tick, every frame)
+int cb_my_gseen;
+int cb_under;           // v7: caught from below / at a ledge: the victim held where it was caught, no drive down
+float cb_ox;            // v7: its offset then (forward, up)
+float cb_oy;
 int cb_burns;           // v6: the hold's burn hits he has taken his own damage for
 int cb_gseen;           // v6: the slots seen on the ground this hover / dive (their ground's height: New_Var CB_GY0 + slot)
 int cb_inv;             // v5: the hold's invincibility set (cleared at every end: cb_end)
@@ -38468,6 +38474,11 @@ int cb_can_up()
 void cb_reset_tick()
 {
     float st;
+    if (global18 == 0)
+    {
+        cb_my_gy = WorkModuleF(0, 0x0f000001);
+        cb_my_gseen = 0x1;
+    }
     if (WorkModuleF(0, CB_USED) < 0.5f)
     {
         return;
@@ -39071,7 +39082,7 @@ int cb_dive_catch()
     }
     WorkModule(0, (float)found, CB_V_SLOT);
     WorkModule(0, 3.0f, CB_VAR);
-    WorkModule(0, CB_INVINCIBLE, 0x0F00011C);
+    WorkModule(0, CB_INV_STEP, 0x0F00011C);
     AttackModule(0x2719);
     return 0x1;
 }
@@ -39144,6 +39155,7 @@ void cb_catch()
     float vsit;
     float vy;
     float gy;
+    float vsit_live;
     cb_slot = WorkModule(0x6, CB_V_SLOT);
     if (cb_slot < 1 || cb_slot > 8)
     {
@@ -39165,6 +39177,7 @@ void cb_catch()
     }
     // v3: on the ground or not (its SITUATION: 0 ground, 1 ledge, 2 air), read before its status is changed
     vsit = WorkModuleF(0, 0x0F000116 + 0x20 * cb_t());
+    vsit_live = vsit;
     // v5: on the ground the frame before the hit (cb_gtrack) decides (the dive's catch read it after the hit: the air
     // hold for a fighter standing on the ground, the user's clip); the live read only without that frame
     // v6 (user: "Hitting the dive on a grounded/near ground opponent should work the same [as the point-blank catch],
@@ -39189,8 +39202,26 @@ void cb_catch()
             }
         }
     }
+    // the drive's floor (off the stage: the explosion in the air). v7 (user: the catch at a ledge "drags both characters
+    // under the ledge"): the lower of the rise's start and the ground the victim was last seen on, less CB_FLOOR_MARGIN
+    // (0.5): the drive never takes them below the stage's height. v3-v6 let it go at least 30 below the catch, past the
+    // ledge. Already below it at the catch (under the stage): the drive's first frame is the explosion, where they are
+    cb_floor = cb_floor_at(WorkModuleF(0, 0x0f000001));
     cb_inv = 0x1;
     cb_burns = 0;
+    // v7 (user: "If the move hits an opponent at a ledge / near a ledge with Supamario under them, it drags both
+    // characters under the ledge"): a fighter more than CB_UNDER above his feet, or on a ledge (its situation 1 / a
+    // cliff status), is held where it was caught (its offset kept), the hold with no drive: the explosion in the air
+    // in place at the hold's end. Nobody is carried down under the stage
+    cb_under = 0;
+    if (vy > WorkModuleF(0, 0x0f000001) + CB_UNDER || WorkModuleF(0, 0x0f000001) < cb_floor || (vsit_live > 0.5f && vsit_live < 1.5f) ||
+        (WorkModuleF(0, 0x0F0000A2 + 8 * cb_t()) >= CB_CLIFF_LO && WorkModuleF(0, 0x0F0000A2 + 8 * cb_t()) <= CB_CLIFF_HI))
+    {
+        cb_under = 0x1;
+        cb_ox = (WorkModuleF(0, 0x0F000020 + 4 * (cb_slot - 1)) - WorkModuleF(0, 0x0f000000)) * WorkModuleF(0, 0x0f000003);
+        cb_oy = vy - WorkModuleF(0, 0x0f000001);
+        vsit = 2.0f;
+    }
     // a fighter lying down (v3: the detection box): out of the down statuses into the hold's hitstun (Damage), as a
     // hit on it in the air would be
     vst = WorkModuleF(0, 0x0F0000A2 + 8 * cb_t());
@@ -39204,13 +39235,6 @@ void cb_catch()
     cb_armor(0);
     cb_aircap(0);
     MotionModule(0x4, 1.0f);
-    // the drive's floor (off the stage: the explosion in the air): the rise's start, but at least CB_DRIVE_MIN_DROP
-    // below the catch (v3: the dive itself has none, so the catch can be far below the rise's start)
-    cb_floor = WorkModuleF(0, CB_RISE_Y) - CB_FLOOR_MARGIN;
-    if (cb_floor > WorkModuleF(0, 0x0f000001) - CB_DRIVE_MIN_DROP)
-    {
-        cb_floor = WorkModuleF(0, 0x0f000001) - CB_DRIVE_MIN_DROP;
-    }
     if (vsit < 0.5f)
     {
         // v3: a victim on the ground: the hold on the ground (phase 8), then the crash; no lift, no drive. v6: held on
@@ -39227,7 +39251,60 @@ void cb_catch()
     cb_speed(0.0f, CB_HOLD_RISE_V);
     KineticModule(0x14, 0x1, 0.0f);
     cb_goto(CB_HOLD);
-    cb_hold(CB_HOLD_X, CB_HOLD_Y);
+    cb_hold_air();
+}
+
+// v7: the drive's floor: the highest known ground at or below him (the victim's last ground, his own last ground, the
+// rise's start), less CB_FLOOR_MARGIN; none below him (he is under them all): above him (cb_catch: cb_under)
+float cb_floor_at(float y)
+{
+    float best;
+    float g;
+    int any;
+    any = 0;
+    best = 0.0f;
+    g = WorkModuleF(0, CB_RISE_Y);
+    if (g <= y + CB_FLOOR_MARGIN)
+    {
+        best = g;
+        any = 0x1;
+    }
+    if ((cb_gseen & (0x1 << cb_slot)) != 0)
+    {
+        g = WorkModuleF(0, CB_GY0 + cb_slot);
+        if (g <= y + CB_FLOOR_MARGIN && (any == 0 || g > best))
+        {
+            best = g;
+            any = 0x1;
+        }
+    }
+    if (cb_my_gseen != 0)
+    {
+        g = cb_my_gy;
+        if (g <= y + CB_FLOOR_MARGIN && (any == 0 || g > best))
+        {
+            best = g;
+            any = 0x1;
+        }
+    }
+    if (any == 0)
+    {
+        return y + 1.0f;
+    }
+    return best - CB_FLOOR_MARGIN;
+}
+
+// the air hold's place for the victim: at his fist, or (v7, cb_under) where it was caught
+void cb_hold_air()
+{
+    if (cb_under == 0x1)
+    {
+        cb_hold(cb_ox, cb_oy);
+    }
+    else
+    {
+        cb_hold(CB_HOLD_X, CB_HOLD_Y);
+    }
 }
 
 // v6 (user: "make Supamario take 7% in damage during the hold multihits for all versions of Core Breaker"): on each
@@ -39260,9 +39337,14 @@ int cb_hold_phase(float fr)
         cb_speed(0.0f, 0.0f);
     }
     KineticModule(0x14, 0x1, 0.0f);
-    cb_hold(CB_HOLD_X, CB_HOLD_Y);
+    cb_hold_air();
     if (fr >= CB_DRIVE - 0.01f && cb_jump == 0)
     {
+        if (cb_under == 0x1)
+        {
+            cb_airrel_start();              // v7: no drive down from under a ledge: the explosion where they are
+            return 0;
+        }
         cb_set_ph(0x4);
         cb_drive_speed();
     }
@@ -39396,7 +39478,7 @@ int cb_airrel_phase(float fr)
     KineticModule(0x14, 0x1, 0.0f);
     if (fr < CB_AIRREL + 0.5f)
     {
-        cb_hold(CB_HOLD_X, CB_HOLD_Y);
+        cb_hold_air();
     }
     else
     {
@@ -39428,6 +39510,15 @@ int cb_update()
     fr = MotionModuleF(0x1);
     cb_n = cb_n + 1;
     r = 0;
+    // v7 (user: "The invulnerability on the grounded release for the move persists after the animation is finished"):
+    // the hold's invincibility is CB_INV_STEP frames renewed every frame while he holds the victim (the hold, the
+    // drive, the hold on the ground, the crash / the explosion until the victim is let go), so it runs out within
+    // CB_INV_STEP frames of the release whatever the game does with a write of 0 (v5-v6 set 187 frames at the catch
+    // and cleared it with 0 at the status's end)
+    if (cb_ph >= 0x3 && cb_ph != 0x5 && cb_handed == 0 && cb_slot != 0)
+    {
+        WorkModule(0, CB_INV_STEP, 0x0F00011C);
+    }
     if (cb_ph == 0)
     {
         r = cb_rise_phase(fr);
@@ -39479,7 +39570,7 @@ void cb_end()
     // invincibility (CB_INVINCIBLE frames from the catch, longer than the hold on the ground's path) ends with the move
     if (cb_inv != 0)
     {
-        WorkModule(0, 0.0f, 0x0F00011C);
+        WorkModule(0, 1.0f, 0x0F00011C);    // v7: a 1-frame value (if the game ignores 0, this still ends it)
         cb_inv = 0;
     }
     SoundModule(0x2714, CB_SND_RUSH);

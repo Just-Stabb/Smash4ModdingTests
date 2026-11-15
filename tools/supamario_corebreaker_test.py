@@ -734,16 +734,27 @@ def msc_tests(path):
     g, v, far, tr = on_path()
     dv = [t for t in tr if t[4] == 2.0]
     check('the dive catches a fighter standing in its way (%d frames into it, far from the detection box): its slot '
-          '(2), the hitboxes cleared, invincible %d frames, the hold on the ground, the crash' % (len(dv), B.INVINCIBLE),
-          (len(dv) > 3 and far > 30.0, g.vars.get(B.CB_V_SLOT), len(g.cleared) > 0, g.inv_log[0][1],
-           phases_of(tr)), (True, 2.0, True, float(B.INVINCIBLE), [1.0, 2.0, 8.0, 6.0]))
+          '(2), the hitboxes cleared, invincible (%d frames, renewed while holding), the hold on the ground, the crash'
+          % (len(dv), B.INV_STEP), (len(dv) > 3 and far > 30.0, g.vars.get(B.CB_V_SLOT), len(g.cleared) > 0,
+                                    g.inv_log[0][1], phases_of(tr)), (True, 2.0, True, float(B.INV_STEP),
+                                                                      [1.0, 2.0, 8.0, 6.0]))
     # v4 (user: "make it so that there's no armor during the leap or hover, and the dive has armor instead of
     # invincibility"; then "He should keep invincibility during the hold only"): the hover nothing, the dive super armor
     # and not invincible, the hold invincible (written at the catch, not before), no armor there
     arm = {ph: sorted({armor_at(g, t[7]) for t in tr if t[4] == ph}) for ph in (1.0, 2.0, 8.0, 6.0)}
     check('armor / invincibility: the hover none, the dive super armor (invincibility only written at the catch), the '
-          'hold / crash invincible without armor', (arm, [v_ for _n, v_ in g.inv_log] == [float(B.INVINCIBLE), 0.0] and g.inv_log[0][0] > dv[0][7]),
+          'hold / crash invincible without armor', (arm, g.inv_log[0][0] > dv[0][7]),
           ({1.0: [0], 2.0: [1], 8.0: [0], 6.0: [0]}, True))
+    # v7 (user: "The invulnerability on the grounded release for the move persists after the animation is finished"):
+    # renewed (INV_STEP frames) every frame he holds the victim, never after its release, never more than INV_STEP;
+    # then 1 frame at the status's end
+    rel = next(t[7] for t in tr if t[4] == 6.0 and t[6].get('ground') == 5.0)
+    held = [n_ for n_, v_ in g.inv_log if v_ == float(B.INV_STEP)]
+    check('the hold\'s invincibility: %d frames renewed every frame of the hold (%d writes), the last at the release '
+          '(frame %d) or before, every write %d or less; nothing in the %d frames from the release to the move\'s end '
+          'but its 1-frame end' % (B.INV_STEP, len(held), rel, B.INV_STEP, tr[-1][7] - rel),
+          (max(held) <= rel, max(v_ for _n, v_ in g.inv_log) <= B.INV_STEP,
+           [v_ for n_, v_ in g.inv_log if n_ > rel]), (True, True, [1.0]))
     for name, extra in (('lying down (DownWait)', {'status': 0x50}), ('invincible', {'body': 1})):
         g, v, far, tr = on_path(extra)
         check('the dive refuses a fighter %s: no catch, the hitboxes gone, it dives on and lands' % name,
@@ -781,9 +792,42 @@ def msc_tests(path):
     g = Game()
     run(path, g)
     ends.append(('no catch (the rise alone: nothing set, nothing cleared)', g.status, g.inv_log))
-    check('the hold\'s invincibility cleared (INVINCIBLE 0) at every end; nothing written without a catch', ends,
-          [('the crash (Wait)', 0, [0.0]), ('the explosion in the air (FallSpecial)', 0x10, [0.0]),
-           ('cut mid-hold', 'cut', [0.0]), ('no catch (the rise alone: nothing set, nothing cleared)', 0xE, [])])
+    check('the hold\'s invincibility ended (INVINCIBLE 1: one frame) at every end; nothing written without a catch',
+          ends, [('the crash (Wait)', 0, [1.0]), ('the explosion in the air (FallSpecial)', 0x10, [1.0]),
+                 ('cut mid-hold', 'cut', [1.0]), ('no catch (the rise alone: nothing set, nothing cleared)', 0xE, [])])
+    # 9h. v7 (user: "If the move hits an opponent at a ledge / near a ledge with Supamario under them, it drags both
+    # characters under the ledge"): caught from under a ledge (a fighter standing at it, more than UNDER above his
+    # feet) or a fighter hanging on the ledge: held where it was caught, no drive: the explosion in place; nobody
+    # goes below where they were caught
+    out = []
+    for name, vic, sx, sy in (
+            ('standing at the ledge, he under it', {'x': -3.0, 'y': 0.0, 'status': 0x47}, 4.0, -100.0),
+            ('hanging on the ledge', {'x': 2.0, 'y': -12.0, 'status': 0x74, 'sit': 1}, 6.0, -70.0)):
+        v = vic
+        g = Game(x=sx, y=sy, face=-1.0, stage=(-200.0, 0.0), victim=v)
+        g.air = True
+        run(path, g, frames=B.HOVER_FROM + 3)
+        tr = run(path, g, catch_at=B.DIVE_FROM - B.HOVER_FROM + 2)
+        hold = [t for t in tr if t[4] in (3.0, 4.0, 7.0) and t[6] is not None]
+        c = next(t for t in tr if t[4] == 3.0)
+        out.append((name, phases_of(tr), min(t[3] for t in hold) >= c[3] - 0.01,
+                    min(t[6]['y'] for t in hold) >= hold[0][6]['y'] - 0.01, g.status))
+    # the clip's case: he rose from the stage by its edge, the point-blank catch of a fighter in the air past the ledge,
+    # facing away from the stage: the drive stops at the stage's height (his own last ground), the explosion there
+    v = {'x': 0.0, 'y': 0.0, 'status': 0x47}
+    g = Game(x=-2.0, y=0.0, face=1.0, stage=(-200.0, 0.0), victim=v)
+    run(path, g, tick=True, frames=B.HOVER_FROM + 3)
+    v['x'], v['y'] = g.x + B.DETECT_AT[0] * g.face, g.y + B.DETECT_AT[1] - 5.0
+    tr = run(path, g, detect=True, tick=True)
+    low = [t for t in tr if t[4] in (4.0, 7.0)]
+    check('caught past the ledge (he rose from the stage): the drive stops at the stage\'s height (lowest %.1f), the '
+          'explosion there, nobody dragged under it (v6: 30 below the catch at least)' % min(t[3] for t in low),
+          (phases_of(tr), min(t[3] for t in low) >= -0.5 - B.DRIVE_V, min(t[6]['y'] for t in low) >= -0.5 - B.DRIVE_V
+           + B.HOLD_Y), ([1.0, 3.0, 4.0, 7.0], True, True))
+    check('caught from under a ledge / hanging on it: the hold, then the explosion in place (no drive); neither he nor '
+          'the victim below where the hold started; FallSpecial', out,
+          [(n_, [1.0, 2.0, 3.0, 7.0], True, True, 0x10) for n_ in ('standing at the ledge, he under it',
+                                                                   'hanging on the ledge')])
     # 9f. v6 (user: "Hitting the dive on a grounded/near ground opponent should work the same, using the same final hit
     # and leaving Supamario in the grounded finisher animation"; the clip: a dive catch on Donkey Kong standing took
     # the hold on the ground, then the weaker air explosion: he stopped just above the floor and never landed)
