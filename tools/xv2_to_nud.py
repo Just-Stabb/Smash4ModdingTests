@@ -305,6 +305,12 @@ class Model:
         a = self.mat_anim
         col1 = xv2.mat_vector(m, 'MatCol1', (1.0, 1.0, 1.0, 1.0))
         col2 = xv2.mat_vector(m, 'MatCol2', (1.0, 1.0, 1.0, 1.0))
+        # T1_VFX_PRLX_* (Core Breaker's charge orb, Cor_Crg) with MatCol2's RGB 0: that material's colour is MatCol0
+        # (core_a 0.5 / 1 / 1); taken as MatCol1 x MatCol2 it came out black (an opaque dark disc in game, Core
+        # Breaker v1). MatCol2 0 can't be a tint there: the material glares (Glare 1, GlareCol up to 1.2)
+        prlx0 = 'PRLX' in (m.get('shader') or '').upper() and not any(col2[:3])
+        if prlx0:
+            col0 = xv2.mat_vector(m, 'MatCol0', (1.0, 1.0, 1.0, 1.0))
         scr = xv2.mat_vector(m, 'TexScrl0', (0.0, 0.0))
         animated = set()
         if a is not None:
@@ -313,6 +319,9 @@ class Model:
         for fr in range(self.frames):
             c1 = _sample_vec(a, mi, 1, 4, fr, col1)
             c2 = _sample_vec(a, mi, 2, 4, fr, col2)
+            if prlx0:
+                c0 = _sample_vec(a, mi, 0, 4, fr, col0)
+                c2 = [c0[0], c0[1], c0[2], c2[3]]
             if self.matcol1 == 'mean':
                 # MatCol1's RGB as a brightness (their mean), its A the alpha: taken as an RGB
                 # multiplier Kmh_Bas's core (MatCol1 G up to 2, B down to 0.5) turns yellow-green

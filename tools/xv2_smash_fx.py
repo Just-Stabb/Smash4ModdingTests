@@ -197,3 +197,185 @@ def facing_emitters(p, set_indices):
                     p.field(d, 'figure_velocity')) and p.field(d, 'dispersion_angle') < 180.0:
                 bad.append('set %d emitter %d: directional, spread %.0f' % (si, k, p.field(d, 'dispersion_angle')))
     return bad
+
+
+def retime_model(folder, frames):
+    """play an effect model's own animation (model.omo, model.mta) in `frames` frames: every node and material value
+    sampled at its time scaled (nearest frame). Core Breaker v2: XV2 plays the charge orb's 72-frame animation over
+    its 66-frame charge; the Smash hover shows it ~18 frames, so in v1 only its fade-in was seen before it was ended"""
+    import omo
+    import mta
+    bones = omo.vbn_read(os.path.join(folder, 'model.vbn'))
+    path = os.path.join(folder, 'model.omo')
+    o = omo.Omo(open(path, 'rb').read())
+    src = o.frames
+    pick = [min(src - 1, int(round(f * (src - 1) / float(max(1, frames - 1))))) for f in range(frames)]
+    vals = {h: [o.sample(h, f) for f in range(src)] for _n, _p, h in bones if o.node(h) is not None}
+    o.frames = frames
+    for n in o.nodes:
+        n[3] = [b''] * frames
+    for h, v in vals.items():
+        tr = omo.tracks(o, h)
+        omo.set_node(o, h, [v[k][0] for k in pick] if 'pos' in tr else None,
+                     [v[k][1] for k in pick] if 'rot' in tr else None, [v[k][2] for k in pick] if 'scl' in tr else None)
+    open(path, 'wb').write(o.encode())
+    mp = os.path.join(folder, 'model.mta')
+    md = open(mp, 'rb').read()
+    if md:
+        a = mta.read(md)
+        mats = [dict(name=e['name'], hash=e['hash'], props=[
+            dict(name=p['name'], values=[p['values'][min(len(p['values']) - 1, k)] for k in pick] if p['type'] == 1
+                 else p['values'], u1=p['u1'], u2=p['u2'], type=p['type']) for p in e['props']]) for e in a['mats']]
+        open(mp, 'wb').write(mta.write(frames, mats, rate=a['rate'], unk=a['unk']))
+    return src
+
+
+# ---------------------------------------------------------------- fake glow halos (test)
+# XV2 glares its glowing materials (EMM Glare / GlareCol); Smash 4 draws colours past white with no visible bloom
+# (the God Fist glow test: glow_3 / 4 / 5 looked alike). A halo fakes it: for each converted emitter whose material
+# glows, a copy drawn additive with a soft round falloff, HALO_SIZE x larger, at HALO_ALPHA of its alpha (same timing,
+# emission and motion, so it follows the particle); for a glowing model, one soft particle at its centre for its life.
+HALO_ALPHA = 0.45               # the strength: the halo's alpha x the emitter's
+HALO_SIZE = 2.5                 # billboards x this; rings (polygons) x HALO_RING, streaks x HALO_SIZE wide
+HALO_RING = 1.2
+HALO_SUFFIX = 'H'
+
+
+def soft_glow_rgba(n=64):
+    """a soft round falloff (a blurred radial gradient), white in RGB (the BC4 shape the converter's templates use)"""
+    import numpy as np
+    yy, xx = np.mgrid[0:n, 0:n]
+    r = np.hypot((xx + 0.5) / n * 2 - 1, (yy + 0.5) / n * 2 - 1)
+    f = np.clip(1.0 - r, 0.0, 1.0) ** 2.2
+    v = (f * 255 + 0.5).astype(np.uint8)
+    return np.stack([v, v, v, np.full_like(v, 255)], 2)
+
+
+def _halo_texture(p, em, cache):
+    import ptcl
+    o = ptcl.TEXRES
+    if 'block' in cache:
+        em[o:o + ptcl.TEXRES_SIZE] = cache['block']
+        return
+    p.set_texture(em, 0, soft_glow_rgba(), 0x34)
+    struct.pack_into('>I', em, o + 0x0C, 0x22000100)          # clamped (the converter's SAMPLER_CLAMP)
+    cache['block'] = bytes(em[o:o + ptcl.TEXRES_SIZE])
+
+
+def halo_emitter(p, d, alpha=None, cache=None):
+    """an additive soft copy of emitter bytes d (its timing / emission / motion kept)"""
+    alpha = HALO_ALPHA if alpha is None else alpha
+    em = bytearray(d)
+    p.set_field(em, 'blend_type', 1)
+    _halo_texture(p, em, cache if cache is not None else {})
+    t = p.field(em, 'particle_type')
+    sx, sy = p.field(em, 'scale')
+    if t == 1:
+        p.set_field(em, 'scale', [sx * HALO_RING, sy * HALO_RING])
+    elif t == 3:
+        p.set_field(em, 'scale', [sx * HALO_SIZE, sy * HALO_RING])
+    else:
+        p.set_field(em, 'scale', [sx * HALO_SIZE, sy * HALO_SIZE])
+    for k in ('alpha_init', 'alpha_diff21', 'alpha_diff32'):
+        p.set_field(em, k, p.field(em, k) * alpha)
+    peak = max(max(k[:3]) for tr in (0, 1) for k in p.color_keys(em, tr)) * p.field(em, 'color_scale')
+    if peak > HDR_CAP:
+        p.set_field(em, 'color_scale', p.field(em, 'color_scale') * HDR_CAP / peak)
+    return em
+
+
+def model_halo_emitter(p, template, radius, rgb, frames, loop, alpha=None, cache=None):
+    """one soft additive particle at a model's centre: `radius` x HALO_SIZE across, colour rgb, `frames` long (a
+    looping model: one every `frames` frames until its effect is ended)"""
+    alpha = HALO_ALPHA if alpha is None else alpha
+    em = bytearray(template)
+    p.set_field(em, 'blend_type', 1)
+    _halo_texture(p, em, cache if cache is not None else {})
+    p.set_field(em, 'scale', [radius * HALO_SIZE] * 2)
+    p.set_field(em, 'scale_init_ratio', [1.0, 1.0])
+    p.set_field(em, 'scale_diff21', [0.0, 0.0])
+    p.set_field(em, 'scale_diff32', [0.0, 0.0])
+    p.set_field(em, 'scale_random', [0.0, 0.0])
+    p.set_field(em, 'alpha_init', alpha)
+    p.set_field(em, 'alpha_diff21', 0.0)
+    p.set_field(em, 'alpha_diff32', 0.0)
+    for tr in (0, 1):
+        p.set_color_keys(em, tr, [(float(rgb[0]), float(rgb[1]), float(rgb[2]), 1.0)])
+    p.set_field(em, 'color_scale', min(HDR_CAP / max(max(rgb), 1e-6), 1.5))
+    p.set_field(em, 'start_frame', 0)
+    p.set_field(em, 'one_time', 0 if loop else 1)
+    p.set_field(em, 'end_frame', 0x7FFFFFFF if loop else 1)
+    p.set_field(em, 'emit_start', 0)
+    p.set_field(em, 'emit_interval', int(frames) if loop else 0)
+    p.set_field(em, 'emit_rate', 1.0)
+    p.set_field(em, 'ptcl_life', max(1, int(frames)))
+    p.set_field(em, 'ptcl_life_random', 0)
+    p.set_field(em, 'volume_type', 0)
+    p.set_field(em, 'volume_radius', [0.0, 0.0, 0.0])
+    for k in ('figure_velocity', 'emitter_velocity', 'init_velocity_random', 'dispersion_angle'):
+        p.set_field(em, k, 0.0)
+    p.set_field(em, 'gravity', [0.0, 0.0, 0.0])
+    p.set_field(em, 'rotation_velocity', [0.0, 0.0, 0.0])
+    p.set_field(em, 'rotation_velocity_random', [0.0, 0.0, 0.0])
+    facing_safe(p, em)
+    return em
+
+
+def add_halos(p, e, glowing, alpha=None, cache=None):
+    """glowing: {set index: [emitter indices]}. Each glowing emitter gets a halo copy: in its own set while it has room
+    (16 emitters at most), else in a companion set '<name>H' (returned: {its .efc index: [companion .efc indices]},
+    for every script call of the set to call the companion too: add_halo_calls)"""
+    cache = {} if cache is None else cache
+    companions = {}
+    efc_of = {ent[1] - 1: i for i, ent in enumerate(e.entries) if ent[1]}
+    for si, ks in sorted(glowing.items()):
+        halos = [halo_emitter(p, p.sets[si]['emitters'][k]['data'], alpha, cache) for k in ks]
+        room = 16 - len(p.sets[si]['emitters'])
+        inside, outside = halos[:max(0, room)], halos[max(0, room):]
+        for em in inside:
+            p.sets[si]['emitters'].append({'pos': 0, 'rt': (0, 0, 0), 'data': em})
+            p.dirty_layout = True
+        if outside:
+            ns = p.new_set(p.set_name(si) + HALO_SUFFIX, outside)
+            companions.setdefault(efc_of[si], []).append(e.add(ns + 1))
+    return companions
+
+
+def add_halo_calls(script, mapping):
+    """every Graphic_Effect / External_Graphic / Terminate_Graphic_Effect of an effect id in mapping ({id: [ids]})
+    followed by the same call with each mapped id; the enclosing True blocks' offsets grown to match. Returns the new
+    list (raises on a script with other branching: Else / Goto / loops / threads)"""
+    import acmd
+    names = {'Graphic_Effect', 'External_Graphic', 'Terminate_Graphic_Effect'}
+    branch = {'Else', 'Goto', 'Set_Loop', 'Thread_Start', 'Script_Run_Subroutine'}
+    pos, w = [], 0
+    for c in script:
+        pos.append(w)
+        w += acmd.INFO[c.ident]['size']
+    blocks = []                                              # (index of True, its end word)
+    for i, c in enumerate(script):
+        n = acmd.INFO[c.ident]['name']
+        if n in branch:
+            raise ValueError('add_halo_calls: %s in the script' % n)
+        if n == 'True':
+            blocks.append((i, pos[i] + int(c.params[0])))
+    out, grow = [], {i: 0 for i, _e in blocks}
+    for i, c in enumerate(script):
+        out.append(c)
+        if acmd.INFO[c.ident]['name'] in names and c.params and c.params[0] in mapping:
+            for hid in mapping[c.params[0]]:
+                dup = acmd.Command(c.ident, [hid] + list(c.params[1:]))
+                out.append(dup)
+                at = pos[i]
+                for bi, end in blocks:
+                    if pos[bi] < at < end:
+                        grow[bi] += acmd.INFO[c.ident]['size']
+    idx_of = {id(c): i for i, c in enumerate(script)}
+    final = []
+    for c in out:
+        if acmd.INFO[c.ident]['name'] == 'True':
+            idx = idx_of.get(id(c))
+            if idx is not None and grow.get(idx):
+                c = acmd.Command(c.ident, [int(c.params[0]) + grow[idx]] + list(c.params[1:]))
+        final.append(c)
+    return final

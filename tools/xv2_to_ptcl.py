@@ -138,6 +138,10 @@ def _repeat_index(n, size, mode):
     return i % size
 
 
+REPEAT_UV = False                  # Core Breaker v2: a UV range past the texture repeated by the sampler's mode
+                                   # (first_cell); off by default so earlier builds (the God Fist's) stay as they are
+
+
 def first_cell(img, sampler):
     """the sampler's first sprite-sheet cell, or its static UV rectangle; a rectangle larger than the texture (UV
     scale over 1) is the texture repeated by the sampler's RepetitionU / V (Core Breaker v2: ptcl01.dds is a quarter
@@ -150,7 +154,7 @@ def first_cell(img, sampler):
     u0, v0 = k['ScrollU'] % 1.0, k['ScrollV'] % 1.0
     su, sv = abs(k['ScaleU']) or 1.0, abs(k['ScaleV']) or 1.0
     x0, y0 = int(round(u0 * w)), int(round(v0 * h))
-    if su <= 1.0 + 1e-6 and sv <= 1.0 + 1e-6:
+    if not REPEAT_UV or (su <= 1.0 + 1e-6 and sv <= 1.0 + 1e-6):
         x1, y1 = min(w, x0 + max(4, int(round(su * w)))), min(h, y0 + max(4, int(round(sv * h))))
         return img[y0:y1, x0:x1]
     nu = max(4, int(round(min(su, 4.0) * w)))

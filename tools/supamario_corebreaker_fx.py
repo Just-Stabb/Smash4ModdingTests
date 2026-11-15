@@ -117,12 +117,13 @@ def convert(skill_dir, effect_dir, out_dir, hdr='glare', preview_dir=None):
     before = len(p.build())
     pkg = xv2vfx.load_package(skill_dir, strict=False)
     mats = FX.material_table(pkg)
-    old = xv2_to_ptcl.TEX_MAX
+    old, old_rep = xv2_to_ptcl.TEX_MAX, xv2_to_ptcl.REPEAT_UV
     xv2_to_ptcl.TEX_MAX = TEX_MAX
+    xv2_to_ptcl.REPEAT_UV = True          # v2: the mirrored quarter glows (ptcl01) whole, not a square
     try:
         made, log = xv2_to_ptcl.convert_package(p, skill_dir, PREFIX, unit=FX.UNIT, strict=False)
     finally:
-        xv2_to_ptcl.TEX_MAX = old
+        xv2_to_ptcl.TEX_MAX, xv2_to_ptcl.REPEAT_UV = old, old_rep
     sets, notes = {}, []
     for si, name, chunk in made:
         emp = _emp_of(name[len(PREFIX):], list(pkg['emp']))

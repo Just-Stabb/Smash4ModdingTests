@@ -49,8 +49,9 @@ ROOT_IN_MOTION = False      # phase 2 (user: "The animation movement should beco
 SEGMENTS = [
     ('crouch',      0,   0,  10,  6, False, None, True),          # XV2 0-9 (x1.7)
     ('rise',        0,  10,  40, 24, False, None, False),         # the launch and the apex (x1.25)
-    ('charge',      0,  40, 110, 10, False, None, False),         # XV2's 70-frame charge (x7: the pose barely moves)
-    ('flare',       0, 110, 168, 20, False, None, False),         # the flare, the turn, the wind-up (x2.9)
+    ('charge',      0,  40, 110, 18, False, None, False),         # XV2's 70-frame charge (x3.9; v1 10 frames: the
+                                                                  # charge orb was ended before it had faded in)
+    ('flare',       0, 110, 168, 12, False, None, False),         # the flare, the turn, the wind-up (x4.8)
     ('dive',        0, 168, 176,  6, False, None, False),         # into the dive pose
     ('dive_loop',   0, 176, 195, 19, True, None, False),          # the dive (XV2 loops 176-195)
     ('dive_loop2',  0, 176, 195, 19, True, None, False),

@@ -1553,3 +1553,80 @@ are the segments' starts: `supamario_corebreaker_build.SEG`).
 frame in the air (the roll-off's ops; the air one untested); that the status lands him (global18 0) and func_56 grabs
 ledges with these kinetics; the rise's exact height (+-2: when the game adds the acceleration); the crash's 1.6
 slide (Mario's ground friction assumed 0.08); the victim's place at his fist for big / small fighters.
+
+## Core Breaker v2 (`supamario_corebreaker_v2.zip`): the charge
+
+Install over v1, exe B (no exe change). User, v1's clip (`MedalTVCemuWiiUEmulator20261114220855534`): "Up special's
+charging effect seems to be played incorrectly".
+
+### What the clip shows (clip frames ~66-90 = the hover)
+- From the hover's start a dark grey disc round his head and chest for ~8 frames, then nothing: the orb (BAC effect 0,
+  `EffSupamarioCbCrg`).
+- Then a hard-edged cyan square beside him for ~12 frames: the charge's end flash (effect 1).
+
+### Causes and fixes
+- **The orb was black.** Its three materials are `T1_VFX_PRLX_MTN`. `xv2_to_nud` takes a material's colour as
+  MatCol1 x MatCol2. core_a and core_b2 have MatCol2 (0, 0, 0), so they were drawn as opaque black. MatCol2 0 can't be
+  a tint here: those materials glare (Glare 1, GlareCol up to 1.2). For a PRLX material whose MatCol2 RGB is 0, the
+  colour is now MatCol0: core_a (0.5, 1, 1), core_b2 white. core_b keeps its cyan MatCol2. The God Fist's and the
+  Kamehameha's models aren't PRLX, so they are unchanged.
+- **The orb was ended before it showed.** XV2 plays it from 45 to 111 (66 of its 72-frame animation, which fades in
+  over ~16 frames). v1 squeezed XV2's 70-frame charge into 10 frames and ended the orb at the flare, so only its
+  fade-in was ever seen. Now:
+  - the hover's charge is 18 frames (30-47) and its flare / wind-up 12 (48-59; the hover is still 30);
+  - the orb is on from 31 (`ORB_ON`) to 48 (`FLARE_FROM`);
+  - its own animation (omo and mta) is played in `ORB_FRAMES` = 19 frames (`xv2_smash_fx.retime_model`).
+- **The square.** The end flash's `ptcl01.dds` is a quarter of a glow. XV2's sampler mirrors it (Mirror / Mirror, UV
+  x2 x2) into a whole one, but `xv2_to_ptcl.first_cell` took the UV rectangle clipped to the texture. Its bright
+  corner was drawn as a square.
+  - `first_cell` now repeats past the edge by the sampler's RepetitionU / V (Mirror / Clamp / Wrap).
+  - This is opt-in (`xv2_to_ptcl.REPEAT_UV`, on for Core Breaker's conversion), so the God Fist build stays byte for
+    byte v17's.
+  - The God Fist's `Csg_Bas.emp` has one such sampler (`4circle00.dds`, Mirror x2 x2): its burst ring may be drawn
+    from a quarter too. Not changed (the user's call).
+- Ki_Rlease (the release sound) moves with the flare to 48.
+
+### Tests
+`supamario_corebreaker_test.py`: 0 problems. New checks:
+- the orb's animation is 19 frames;
+- every orb material is coloured;
+- ptcl01's textures are round (bright centre, dark corners);
+- the orb is on at 31 and off at 48.
+
+On v1's build these new checks fail with exactly the clip's three problems.
+
+Other results:
+- `supamario_godfist_test.py --all-models`: 0 problems.
+- `msc_stack_check`: 0 of 2355.
+- `msc_fingerprint` v1 vs v2: only func_2336 (the release sound's frame).
+
+## Fake-glow halo test (`supamario_halo_test.zip`): both moves, three strengths
+
+The God Fist glow test showed that colours drawn past white don't visibly bloom (glow_3 / 4 / 5 looked the same),
+so `xv2_smash_fx.HDR_CAP` stays 2.0. This test fakes XV2's glare instead.
+
+How it is built (`tools/supamario_halo_test.py` over the combined build: God Fist v17 + Core Breaker v2; the logic is
+in `tools/xv2_smash_fx.py`):
+- **Which emitters:** every converted emitter whose XV2 material has its Glare flag on (not refraction, not hidden):
+  113 of the two moves' emitters.
+- **The halo:** an additive copy of the emitter (`halo_emitter`):
+  - the same timing, emission and motion;
+  - a soft round falloff texture (`soft_glow_rgba`);
+  - `HALO_SIZE` x2.5 larger (rings x1.2; streaks x2.5 wide);
+  - `HALO_ALPHA` x its alpha;
+  - its colour capped at `HDR_CAP`.
+- **Where the halo goes:** into the emitter's own set while the set has room (16 emitters). Otherwise into a
+  companion set `<name>H`; 9 sets needed one. `add_halo_calls` makes every Graphic_Effect / External_Graphic /
+  Terminate_Graphic_Effect of the set in the attackdash / specialhi / specialairhi effect scripts also call its
+  companion, growing the enclosing True blocks' offsets to match.
+- **Glowing models** (`model_halo_emitter`): one soft particle at the model's centre for its animation's length, the
+  looping fist flame's one per loop, with the model's hue:
+  - Core Breaker's orb: radius 2.4, cyan;
+  - its fist flame: core radius 3, blue;
+  - the God Fist's aura: orb radius 2.5, orange.
+- **Strengths:** `HALO_ALPHA` is one constant; the test has halo_0.25 / halo_0.45 / halo_0.7, all at size x2.5.
+- **Facing:** every halo is a copy of a facing-safe emitter (no turn, at the origin); the model halos are made
+  facing-safe too.
+- **Tests:** `supamario_corebreaker_test.py` and `supamario_godfist_test.py` on the 0.45 build: 0 problems. Every
+  True block of the changed scripts ends on a command and still holds its original commands.
+- **The bank:** ptcl 3.89 -> 4.16 MB.

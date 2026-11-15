@@ -29,6 +29,8 @@ import math
 import os
 import sys
 
+import numpy as np
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.append(HERE)
@@ -475,7 +477,41 @@ def effect_tests(out_dir, fdir):
     check('effects: nothing drawn past the HDR cap (%.1f)' % FX.HDR_CAP, over, [])
     gf = [i for i in range(len(p.sets)) if p.set_name(i).startswith('PtcSupamarioGf')]
     check('effects: the God Fist\'s sets still there', len(gf) > 0, True)
+    # v2 (user, v1's clip: "Up special's charging effect seems to be played incorrectly"): the orb's own animation
+    # in its frames on screen, its colours (not black), the mirrored quarter glows whole (no square)
+    import mta
+    orb = os.path.join(fdir, 'effect', 'supamario', 'model', doc['models']['Cor_Crg.emo']['folder'])
+    oo = omo.Omo(open(os.path.join(orb, 'model.omo'), 'rb').read())
+    m = mta.read(open(os.path.join(orb, 'model.mta'), 'rb').read())
+    gains = {e['name'].split('_', 1)[1]: [v for pr in e['props'] if pr['name'] == 'NU_effColorGain'
+                                          for v in pr['values']] for e in m['mats']}
+    check('the charge orb: its animation in %d frames (on screen %d-%d), every material coloured (v1: core_a / '
+          'core_b2 black)' % (B.ORB_FRAMES, B.ORB_ON, B.FLARE_FROM),
+          (oo.frames, m['frames'], all(max(v[:3]) > 0.3 for g in gains.values() for v in g)),
+          (B.ORB_FRAMES, B.ORB_FRAMES, True))
+    quarter = []
+    for v in doc['sets'].get('Cor_Crg_End_01.emp', []):
+        si = p.find_set(v['set'])
+        for k, em in enumerate(p.sets[si]['emitters']):
+            d = em['data']
+            if d is None or k >= len(v['emitters']) or v['emitters'][k] not in ('ptcl01', 'ptcl01_1', 'pitcl_01_st',
+                                                                              'pitcl_01_st_1'):
+                continue
+            t = np.asarray(p.decode_texture(d, 0), dtype=np.float32)[..., 0]
+            h, w = t.shape
+            if not (t[h // 2, w // 2] > 200 and max(t[0, 0], t[0, -1], t[-1, 0], t[-1, -1]) < 40):
+                quarter.append(v['emitters'][k])
+    check('the charge end flash: ptcl01 a whole round glow (XV2 mirrors its quarter x2 x2; v1: a square)', quarter, [])
     e = acmd.ACMDFile.load(os.path.join(fdir, 'script', 'animcmd', 'body', 'effect.bin')).script('specialhi')
+    eid = int(doc['models']['Cor_Crg.emo']['id'], 16)
+    at, f_ = {}, 0
+    for c in e:
+        if c.ident == acmd.BY_NAME['frame']:
+            f_ = int(c.params[0])
+        if c.params and c.params[0] == eid:
+            at.setdefault(acmd.INFO[c.ident]['name'], f_)
+    check('the charge orb: on at %d, off at the flare (%d)' % (B.ORB_ON, B.FLARE_FROM),
+          (at.get('External_Graphic'), at.get('Terminate_Graphic_Effect')), (B.ORB_ON, B.FLARE_FROM))
     bad = []
     syn = acmd.INFO[acmd.BY_NAME['external_graphic']]['syntax']
     for c in e:

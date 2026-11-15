@@ -117,6 +117,9 @@ SE_IDS = {'cb_rise': 0x0CB10092, 'cb_charge': 0x0CB10093, 'cb_release': 0x0CB100
           'cb_explosion': 0x0CB10096, 'cb_hit_l': 0x0CB10097}
 GF_DOWN_SE = 0x0CB10090                     # the God Fist's Down (CMN cue 106), at the hand-off
 RELEASE_SND_AT = FLARE_FROM - HOVER_FROM    # the hover's frame of Ki_Rlease (XV2 entry 2 at 110: our flare)
+# v2: the charge orb (BAC effect 0, XV2 45 -> 111 of its 72-frame animation) on screen from its frame to the flare
+ORB_ON = HOVER_FROM + int(round((45 - 40) * (SEG['charge'][1] - SEG['charge'][0] + 1) / 70.0))
+ORB_FRAMES = int(round(72 * (FLARE_FROM - ORB_ON) / 66.0))
 
 
 def fl(v):
@@ -395,6 +398,10 @@ def build(sm_dir, out_dir, skill_dir, se_wav, gf_args, png=None):
     # the effects onto the God Fist's bank
     fx_dir = os.path.join(fdir, 'effect', 'supamario')
     conv, p, made, pkg = CF.convert(skill_dir, fx_dir, fdir, preview_dir=os.path.join(out_dir, 'preview'))
+    # v2: the charge orb's own 72-frame animation in the frames it is on screen (XV2: 66 of them, 45 -> 111; ours
+    # from its start to the flare), so it is seen whole (fading in, swirling) instead of only its first frames
+    orb = conv['models']['Cor_Crg.emo']['folder']
+    FX.retime_model(os.path.join(fx_dir, 'model', orb), ORB_FRAMES)
     fx_doc, facing = CF.placements(pkg, doc, conv)
     assert not facing and not conv['emitter_facing_problems'], (facing, conv['emitter_facing_problems'])
     fx = {'effects': fx_doc, 'settings': {'hdr_cap': FX.HDR_CAP, 'size': FX.SIZE, 'size_mul': SIZE_MUL}}
