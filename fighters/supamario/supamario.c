@@ -38334,11 +38334,12 @@ void gf_tick()
 // roll-off's; its air cap lifted for the dive: flag 0x20000044 and op 0x15 -1), so the game's own physics, landing,
 // walls, platforms and ledges apply. The phases (cb_ph, mirrored in New_Var CB_VAR for the scripts):
 //   0 the rise    crouch to CB_RISE_FROM, then up at CB_RISE_V slowing by CB_RISE_DECEL a frame (RISE_HEIGHT);
-//                 super armor
+//                 super armor to its top. v4: from CB_RISE_CANCEL actionable as in Fall (cb_rise_act, drift, fast
+//                 fall), its last frame held to the landing (a normal one); up special again: the hover / dive
 //   1 the hover   from CB_HOVER_FROM: still (speed, gravity 0); he can turn (B-reverse, the stick back); no armor
 //   2 the dive    from CB_DIVE_FROM: CB_DIVE_V a frame, cb_ang below level (CB_DIVE_DEG, light homing within
-//                 CB_HOME_MAX of it, cb_steer); super armor; ledges grabbed (func_56); landing -> 5; the game script's
-//                 catch -> 3 / 8; a wall ahead or a ceiling -> FallSpecial. v3 (user: "make the Core Breaker dive
+//                 CB_HOME_MAX of it, cb_steer); super armor; ledges grabbed (func_56); landing -> 5; the catch
+//                 (v4: the MSC's cb_dive_catch; the hover's detection box: the game script's) -> 3 / 8; a wall ahead or a ceiling -> FallSpecial. v3 (user: "make the Core Breaker dive
 //                 continue until either landing or something (unless KOd)"): nothing else ends it (no frame limit, no
 //                 floor; the motion's dive loop looped: CB_DIVE_LAST back by CB_DIVE_LOOP)
 //   3 the hold    an airborne victim held at his fist (cb_hold: its offsets, hitstun, hitstop, no stage collision,
@@ -38365,6 +38366,9 @@ int cb_turned;
 int cb_slot;            // the victim's player slot (1-8), 0 none
 int cb_handed;          // the victim handed to gf_tick (6) / released (7)
 int cb_lifted;
+int cb_free;            // v4: the rise actionable (from CB_RISE_CANCEL: the air actions, drift; 2: its pose held)
+int cb_terms;           // v4: the rise's air transition groups / terms turned on
+int cb_refused;         // v4: the dive's catch refused (a fighter lying down, invincible / intangible)
 
 void cb_set_ph(int ph)
 {
@@ -38445,6 +38449,9 @@ int cb_can_up()
     return 0;
 }
 
+// v4 (user: "The first press of up special on the ground should consume its one rising use"): the ground resets it only
+// after he has been in the air since the use (CB_AIR): on the rise's first frames on the ground the status variable can
+// still read the status before (the reset saw "on the ground, not in the up special" and gave the rise back)
 void cb_reset_tick()
 {
     float st;
@@ -38452,15 +38459,20 @@ void cb_reset_tick()
     {
         return;
     }
+    if (global18 == 0x2)
+    {
+        WorkModule(0, 1.0f, CB_AIR);
+    }
     st = WorkModuleF(0, 0x0F0000A2);
-    if (st == 0x154 && global18 != 0x1)
+    if (st == 340.0f && global18 != 0x1)       // 0x154 (v4: a float: v3 compared the float with the int 0x154)
     {
         return;
     }
-    if (global18 != 0x2 || (st >= CB_RESET_LO && st <= CB_RESET_HI) || (st >= CB_CLIFF_LO && st <= CB_CLIFF_HI) ||
-        st == CB_DEAD || st == CB_REBIRTH || st == CB_ENTRY)
+    if ((global18 == 0 && WorkModuleF(0, CB_AIR) > 0.5f) || global18 == 0x1 || (st >= CB_RESET_LO && st <= CB_RESET_HI) ||
+        (st >= CB_CLIFF_LO && st <= CB_CLIFF_HI) || st == CB_DEAD || st == CB_REBIRTH || st == CB_ENTRY)
     {
         WorkModule(0, 0.0f, CB_USED);
+        WorkModule(0, 0.0f, CB_AIR);
     }
 }
 
@@ -38474,6 +38486,9 @@ void cb_init()
     cb_slot = 0;
     cb_handed = 0;
     cb_lifted = 0;
+    cb_free = 0;
+    cb_terms = 0;
+    cb_refused = 0;
     cb_ang = CB_DIVE_DEG;
     used = WorkModuleF(0, CB_USED);
     if (global18 == 0)
@@ -38508,14 +38523,29 @@ void cb_init()
         return;
     }
     WorkModule(0, 1.0f, CB_USED);
+    if (global18 == 0x2)
+    {
+        WorkModule(0, 1.0f, CB_AIR);
+    }
+    else
+    {
+        WorkModule(0, 0.0f, CB_AIR);
+    }
     WorkModule(0, WorkModuleF(0, 0x0f000001), CB_RISE_Y);
     cb_armor(0x1);
     SoundModule(0x2710, CB_SND_RISE);
 }
 
 // ---- the rise (phase 0) and the hover (phase 1)
+// v4 (user: "make it so that the Up special leap doesn't cut to fall, but keeps the same animation while being
+// actionable"): from CB_RISE_CANCEL he acts in the air as in Fall (cb_rise_act: the game's own air transitions,
+// func_41, through the groups / terms turned on, then the inputs directly; fast fall through the fall's own func_550)
+// and drifts (kinetic type 0, FALL: the stick's air control); the leap's arc goes on to its top (its own slowing),
+// then his own gravity; the motion plays the rise to its last frame and holds it (rate 0) until he acts or lands (a
+// normal landing). Up special in it: the hover / dive in place
 int cb_rise_phase(float fr)
 {
+    float vy;
     if (fr < CB_RISE_FROM)
     {
         if (global18 != 0)
@@ -38536,40 +38566,93 @@ int cb_rise_phase(float fr)
         KineticModule(0x11, 0x2, 0.0f, 0.0f);
         cb_speed(CB_RISE_VX, CB_RISE_V);
     }
-    else
+    else if (cb_free == 0)
     {
         KineticModule(0x11, 0x3, CB_RISE_VX * WorkModuleF(0, 0x0f000003), 0.0f);
     }
-    KineticModule(0xf, 0x1, -CB_RISE_DECEL);
-    KineticModule(0x14, 0x1, CB_FALL_LIMIT);
-    // v3: after the burst, any attack: up special again (the hover / dive, here), the other specials, an aerial
+    if (cb_free < 0x2)
+    {
+        KineticModule(0xf, 0x1, -CB_RISE_DECEL);
+        KineticModule(0x14, 0x1, CB_FALL_LIMIT);
+    }
     if (fr >= CB_RISE_CANCEL - 0.01f)
     {
+        if (cb_free == 0)
+        {
+            // actionable: the fall's kinetic type (the stick drifts him), the leap's vertical speed kept
+            cb_free = 0x1;
+            vy = KineticModuleF(0x1, 0x1);
+            KineticModule(0, 0);
+            KineticModule(0x11, 0x3, 0.0f, 0.0f);
+            KineticModule(0x11, 0x1, vy);
+            KineticModule(0xf, 0x1, -CB_RISE_DECEL);
+            KineticModule(0x14, 0x1, CB_FALL_LIMIT);
+        }
+        // up special again: the hover / dive in place
         if (global24 & 0x4000)
         {
             cb_hover_start();
             cb_goto(CB_HOVER_FROM);
             return 0;
         }
-        if (cb_rise_attack() == 0x1)
+        if (cb_rise_act() == 0x1)
         {
             cb_end();
             return 0x1;
         }
+        // landed: a normal landing (the game's own, func_55, else LandingLight)
+        if (global18 == 0)
+        {
+            if (func_55() == 0)
+            {
+                func_16(0x17, 0);
+            }
+            cb_end();
+            return 0x1;
+        }
+        func_550();
     }
-    if (fr >= CB_HOVER_FROM - 0.01f)
+    if (fr >= CB_HOVER_FROM - 1.0f - 0.01f && cb_free == 0x1)
     {
-        // nothing pressed: a normal fall (he stays actionable; up special again is the hover / dive)
+        // the leap's top: its last frame held; his own gravity and fall speed from here, no armor
+        cb_free = 0x2;
+        MotionModule(0x4, 0.0f);
         cb_armor(0);
+        vy = KineticModuleF(0x1, 0x1);
         KineticModule(0, 0);
-        func_16(0xe, 0);
-        return 0x1;
+        KineticModule(0x11, 0x3, 0.0f, 0.0f);
+        KineticModule(0x11, 0x1, vy);
     }
     return 0;
 }
 
-int cb_rise_attack()
+// the rise's air actions (gf_air_act's pattern, God Fist v14): the air transition groups (func_40) and terms on once,
+// the game's own transitions (func_41: landing, ledge, air dodge, aerials, specials, jumps), then the inputs directly
+int cb_rise_act()
 {
+    if (cb_terms == 0)
+    {
+        cb_terms = 0x1;
+        func_40();
+        WorkModule(0x16, 0x1e000061);
+        WorkModule(0x16, 0x1e00008a);
+        WorkModule(0x16, 0x1e000062);
+        WorkModule(0x16, 0x1e000063);
+        WorkModule(0x16, 0x1e000065);
+        WorkModule(0x16, 0x1e000094);
+        WorkModule(0x16, 0x1e00003d);
+        WorkModule(0x16, 0x1e00003e);
+        WorkModule(0x16, 0x1e00003f);
+        WorkModule(0x16, 0x1e000043);
+        WorkModule(0x16, 0x1e000044);
+        WorkModule(0x16, 0x1e000045);
+        WorkModule(0x16, 0x1e00001c);
+        WorkModule(0x16, 0x1e00001b);
+    }
+    if (func_41() != 0)
+    {
+        return 0x1;
+    }
     if (global24 & 0x8000 && func_72(global27))
     {
         func_16(0x155, 0x1);
@@ -38585,9 +38668,26 @@ int cb_rise_attack()
         func_16(0x152, 0x1);
         return 0x1;
     }
+    if (global24 & 0x400000)
+    {
+        func_16(0x22, 0x1);
+        return 0x1;
+    }
     if (global24 & 0x1)
     {
         func_16(0x34, 0x1);
+        return 0x1;
+    }
+    if ((global24 & 0x200000 || global24 & 0x100000 && ControlModule(0x271c)) && WorkModule(0x6, 0x10000001) < WorkModule(0x6, 0x10000002))
+    {
+        if (WorkModule(0x6, 0x1300010c) == 0x1)
+        {
+            func_16(0xc, 0x1);
+        }
+        else
+        {
+            func_16(0xd, 0x1);
+        }
         return 0x1;
     }
     return 0;
@@ -38599,6 +38699,8 @@ void cb_hover_start()
     WorkModule(0, 2.0f, CB_USED);
     cb_set_ph(0x1);
     cb_armor(0);
+    MotionModule(0x4, 1.0f);
+    KineticModule(0x11, 0x2, 0.0f, 0.0f);
     cb_speed(0.0f, 0.0f);
     KineticModule(0x14, 0x1, 0.0f);
     SoundModule(0x2710, CB_SND_CHARGE);
@@ -38634,6 +38736,7 @@ int cb_hover_phase(float fr)
 // ---- the dive (phase 2)
 void cb_dive_start()
 {
+    AttackModule(0x2724);                   // v4: the hit flag from here (a detection box hit before doesn't count)
     cb_set_ph(0x2);
     cb_ang = CB_DIVE_DEG;
     cb_armor(0x1);
@@ -38754,6 +38857,13 @@ int cb_dive_phase(float fr)
         cb_catch();
         return 0;
     }
+    // v4 (user: "The catch doesn't happen anymore on the dive unless the point-blank detection box is hit"): the
+    // dive's catch from here, every frame, before the landing (the hit and the touch-down can come together)
+    if (cb_dive_catch() == 0x1)
+    {
+        cb_catch();
+        return 0;
+    }
     if (global18 == 0)
     {
         cb_land_miss();
@@ -38774,6 +38884,60 @@ int cb_dive_phase(float fr)
     cb_steer();
     cb_dive_speed();
     return 0;
+}
+
+// v4: the dive's catch in the MSC (v3's game-script loop of per-frame Hit_Checks lost it in game). His attack's hit
+// result (AttackModule 0x2726 / 0x2727 with kind 2, a hurtbox: since the dive's start, AttackModule 0x2724 there, or
+// this frame), the fighter it hit (target 2, the last fighter hit: its status, body state, damage, kind) and its player
+// slot (the slot whose status, damage and kind are target 2's). Refused as before: lying down, invincible / intangible
+// (cb_refused: the dive goes on without its hitboxes). Caught: invincible CB_INVINCIBLE frames, the hitboxes gone,
+// cb 3 and the slot for the scripts
+int cb_dive_catch()
+{
+    float st;
+    int s;
+    int t;
+    int found;
+    if (cb_refused != 0)
+    {
+        return 0;
+    }
+    if (AttackModule(0x2726, 0x2) == 0 && AttackModule(0x2727, 0x2) == 0)
+    {
+        return 0;
+    }
+    st = WorkModuleF(0, 0x0F0000B2);
+    if ((st >= CB_DOWN_LO && st <= CB_DOWN_HI) || st == CB_DOWN_FURAFURA || WorkModuleF(0, 0x0F00015B) != 0.0f)
+    {
+        cb_refused = 0x1;
+        AttackModule(0x2719);
+        return 0;
+    }
+    found = 0;
+    s = 1;
+    while (s <= 8 && found == 0)
+    {
+        t = s + 0x2;
+        if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f &&
+            (WorkModuleF(0, 0x0f000020 + 4 * (s - 1)) != WorkModuleF(0, 0x0f000000) ||
+             WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) != WorkModuleF(0, 0x0f000001)) &&
+            WorkModuleF(0, 0x0F0000A2 + 8 * t) == st &&
+            WorkModuleF(0, 0x0F000117 + 0x20 * t) == WorkModuleF(0, 0x0F000157) &&
+            WorkModuleF(0, 0x0F0000A5 + 8 * t) == WorkModuleF(0, 0x0F0000B5))
+        {
+            found = s;
+        }
+        s = s + 1;
+    }
+    if (found == 0)
+    {
+        return 0;
+    }
+    WorkModule(0, (float)found, CB_V_SLOT);
+    WorkModule(0, 3.0f, CB_VAR);
+    WorkModule(0, CB_INVINCIBLE, 0x0F00011C);
+    AttackModule(0x2719);
+    return 0x1;
 }
 
 void cb_fall_special_vx(float vx)

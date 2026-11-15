@@ -1854,3 +1854,133 @@ DownWait, no tech, no KO). Now:
 - that `MotionModule(0x2713)` (the set-frame) keeps the game script waiting where it is (the catch-check loop is
   built not to depend on it either way), and the wall / ceiling flags (GroundModule 0x2722) during the dive;
 - the KO percent of the crash (an estimate).
+
+## Core Breaker v4 (`supamario_corebreaker_v4.zip`): the user's v3 feedback
+
+Install over v3, exe B (no exe change). Five changes.
+
+### 1. The ground up special uses the rise (user: "The first press of up special on the ground should consume its one rising use")
+**Cause:** `cb_reset_tick` was meant to skip its reset while he is in the up special itself (`st == 0x154`). `st` is a
+float (the status variable) and `0x154` an int literal, and the compiled compare never matched. So every frame of the
+rise's crouch on the ground (status 0x154, on the ground) reset `CB_USED` to 0, right after `cb_init` had set it to 1.
+The rise then counted as unused: up special again gave another rise.
+
+**Fix:**
+- the compare is `st == 340.0f` (0x154);
+- the ground resets the use only after he has been in the air since it was used (`CB_AIR`, New_Var slot 0x25, object
+  scope; set in `cb_init` and by the tick whenever he's airborne). This also covers the frame where the status
+  variable still reads the status before the up special.
+
+Tests:
+- a ground up special with the per-frame reset running, its first frame read as Wait: the use stays 1 from the first
+  frame; the second up special gives the hover / dive (use 2); a third is refused in the air; the landing gives it back;
+- the reset cases gain "in the move on the ground" (no reset: the v3 bug) and "on the ground, never in the air since"
+  (no reset).
+
+### 2. The dive catches again (user: "The catch doesn't happen anymore on the dive unless the point-blank detection box is hit")
+v3 had moved the dive's per-frame catch checks into one game-script loop (`Set_Loop(180) { if cb = 2 { Hit_Check
+...; WAIT(1) } } Goto`), so that they would keep running while the MSC loops the dive animation.
+
+**What the files show:** I couldn't confirm offline why the loop never caught in game.
+- Vanilla Mario's Super Jump Punch uses the same `Set_Loop` / `WAIT` / `Goto` shape, so the loop itself is valid.
+- The game's interpreter state (docs/native-notes.md "ACMD threads") keeps its own frame counter, advanced each frame
+  by the motion's rate. Setting the motion frame back doesn't rewind the script, so the loop isn't restarted by the
+  dive's loop either.
+- So the exact cause stays open. One candidate is v3's ordering at frame 60: `Hit_Reset` / `Hit_Log_Clear(0)` came
+  right after the dive's hitboxes were set, and clearing Part 0's hit records right after setting its hitboxes could
+  disable them.
+
+**Fix, robust either way:** the dive's catch is the MSC's own (`cb_dive_catch`, every dive frame, before the landing
+check, since the hit and the touch-down can come together):
+- **the hit:** his attack's hit result, `AttackModule(0x2726, 2)` / `AttackModule(0x2727, 2)` (a hurtbox; kind bits as
+  in docs/native-notes.md; the same flags ACMD `Hit_Check` reads). The flag is cleared at the dive's start
+  (`AttackModule(0x2724)`, the game's own Hit_Reset), so a detection-box hit before doesn't count.
+- **who:** target 2 (the last fighter hit: its status, body state, damage, kind, docs/position-variables.md). Its
+  player slot is the slot whose status, damage % and fighter kind are the same as target 2's, and which isn't him.
+- **refused** as before: lying down (the down statuses, the dizzy status) or invincible / intangible. The hitboxes go
+  (`AttackModule(0x2719)`) and the dive goes on.
+- **caught:** invincible 187 frames (the self `INVINCIBLE` variable: `HitModule(1, N, 0)`), the hitboxes gone, the
+  slot in `cb_slot`, then `cb_catch` as before (the hold on the ground or in the air).
+
+The game script keeps the dive's hitboxes (now after `Hit_Reset` / `Hit_Log_Clear(0)` at frame 60) and the hover's
+detection box with its own checks (which work, per the user).
+
+Tests:
+- a fighter standing in the dive's path, more than 30 from the detection box: caught (slot 2, the hitboxes cleared,
+  invincible), the hold on the ground, the crash;
+- a fighter lying down and an invincible one: refused (the hitboxes gone, the dive goes on and lands);
+- the game script has no catch checks between 60 and the landing, and the hit flag / Part 0 record are cleared before
+  the dive's hitboxes.
+
+### 3. Effects x1.5, but not the aura (user: "The effects look better but only for the dive's aura. Please resize them to be 1.5x larger than what they were before")
+Read as: the aura on his body (BAC effect 5) stays at its v3 size; every other Core Breaker effect is 1.5x its v3 size.
+Done in `SIZE_MUL` (effects 0, 1, 2, 3, 7, 8, 9, 12) and `CMN_MUL` (the common dust / clouds / sparks the move calls).
+The halos' calls carry their effect's size, so they follow. The God Fist is unchanged.
+
+| Effect | v4 (v3) |
+|---|---|
+| the orb | 9.45 (6.3) |
+| the charge particles | 2.025 (1.35) |
+| the charge flash | 2.3625 (1.575) |
+| the fist fire | 3.375 particles, 5.0625 cone (2.25 / 3.375) |
+| the wind, the dive impact / hit loop, the flare | 3.375 (2.25) |
+| the explosion (crash and air) | 6.75 (4.5) |
+| the miss blast | 5.0625 (3.375) |
+| the aura | 0.9-1.8 (unchanged) |
+| the rise dust / the landing and crash clouds / the crash smoke / the hit spark | 1.5 / 1.2 / 1.8 / x1.5 (1.0 / 0.8 / 1.2) |
+
+The hitboxes sized to those effects grow with them (`HB`, `FX_MUL` 1.5):
+
+| Box | v3 | v4 |
+|---|---|---|
+| the dive's catch | 7.07 | 10.61 |
+| the burn | 9.0 | 13.5 |
+| the crash | 23.14 | 34.71 |
+| the explosion in the air | 28.29 | 42.44 |
+| the dive's body box, the detection box | 4.5, 2.5 | unchanged |
+
+### 4. The burn hits are coins (user: "please make the catch multihits of the dive use the coin hit effect")
+The 4 burn hits (both holds) are Element 6 (Coin), SFX type 4 (Coin 1), SFX level 1. These are vanilla Super Jump
+Punch's (Mario's specialhi: every hit Effect 6, SFXType 4, level 1, its last hit SFXType 30 "Coin 2";
+reference/spreadsheets Element / SFX_Type). Damage and knockback are unchanged. XV2's hit effects on the victim (the
+impact and its loop, the hit spark) stay, drawn with the coins.
+
+The crash and the explosion in the air had Element 1 ("Detect", Raptor Boost's: transit on hit) since v1. They are
+now 0 (normal); nothing else about them changed.
+
+### 5. The rise stays in its animation, actionable (user: "make it so that the Up special leap doesn't cut to fall, but keeps the same animation while being actionable")
+No Fall after the rise:
+- the rise's motion plays to its last frame (29) and holds it (rate 0) until he acts or lands. It never reaches the
+  hover's frames, so the detection box isn't set by mistake;
+- from frame 16 (`RISE_CANCEL`) he acts as in Fall (`cb_rise_act`, the God Fist's `gf_air_act` pattern):
+  - once: the air transition groups (`func_40`) and the terms on (`WorkModule 0x16`: aerials, specials, air dodge,
+    jumps, the landings 0x1e00001c / 0x1e00001b);
+  - every frame: the game's own air transitions (`func_41`), then the inputs directly: down / side / neutral special,
+    air dodge (0x22), an aerial (0x34), a double jump (0xC / 0xD) while he has one;
+  - up special: the hover / dive in place (as v3);
+  - fast fall: the fall's own `func_550` (`func_553`'s stick flick, the game's fast-fall flag);
+- **drift:** from frame 16 the kinetic type is 0 (FALL: "air mobility enabled"), with his own forward rise speed off,
+  so the stick drifts him;
+- **the leap's height is kept:** its vertical speed and its own slowing go on to its top (55 up, as before). From the
+  top (the held frame), his own gravity and fall speed;
+- super armor to the top (as v3's to frame 30);
+- **landing:** the game's own landing (`func_55`: LandingLight / LandingHeavy by its terms), else LandingLight (0x17).
+  No landing lag beyond normal. The use stays spent until that landing.
+
+Tests:
+- the rise alone: no Fall, its last frame held (never frame 30), LandingLight on the floor, the rise still used, armor
+  to its top, the FALL kinetic type with no forward rise speed;
+- each action (an aerial, the three other specials, an air dodge, a double jump) works from frame 16 in the rise and
+  in its held top, and not before it (pressed at 14 it just lands);
+- up special in the rise or from the held top gives the hover / dive;
+- an air start keeps its top held in the air (no Fall).
+
+### Tests (v4 build, halos 0.16)
+See the report numbers below the package; the README's earlier test lists still hold except where v4 changed them.
+
+**Not confirmed in game:**
+- the MSC catch: that target 2 (the last fighter hit) is the dive's victim on the frame its hit flag shows, and the slot
+  match (status, damage, kind) finds it; two fighters of the same kind, % and status hit together would be ambiguous;
+- the kinetic FALL type during the rise: that the stick drift and the game's fast fall work from the rise's status as
+  in Fall; that the leap's own slowing holds after the type change;
+- the burn hits' coins on a held victim (hitstun, no stage collision).

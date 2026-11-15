@@ -64,8 +64,6 @@ RISE_DECEL = RISE_V / RISE_FRAMES                      # 0.19 a frame
 RISE_VX = 0.4                              # XV2: 0.1 m a frame forward over the launch (entry 0 Movement 9-25)
 DIVE_DEG = 48.0                            # XV2 entries 3 / 4: Movement (0, -1.0, 1.1 forward) a frame
 DIVE_V = 1.4866 * 5.04                     # 7.49: XV2's 1.49 m a frame at the body's 5.04 units a metre
-DIVE_CHECKS = 180                          # v3: the dive's catch checks (the game script's loop, a frame each): past
-                                           # any blast zone (>= 830 units down at its slowest, 4.6 a frame)
 FLOOR_MARGIN = 3.0                         # the drive's floor: the rise's start less this (v3: the dive has none)
 DRIVE_MIN_DROP = 30.0                      # v3: but at least this far below the catch
 HOME_RANGE = 50.0                          # light homing (user): fighters ahead and below within this
@@ -107,7 +105,8 @@ CB_V_SLOT = 0x0F000380 + 0x21               # the victim's player slot (Target_S
 # v3: every one per object (scope 0): a move-scoped New_Var is reset to 0 by the script's start, after the MSC's init
 # has set cb (1: the second up special's hover), which would skip the hover's detection box
 VARS = [('cb', CB_VAR, 0), ('cb_slot', CB_V_SLOT, 0), ('cb_tmp', 0x0F000380 + 0x22, 0),
-        ('cb_used', 0x0F000380 + 0x23, 0), ('cb_rise_y', 0x0F000380 + 0x24, 0)]
+        ('cb_used', 0x0F000380 + 0x23, 0), ('cb_rise_y', 0x0F000380 + 0x24, 0), ('cb_air', 0x0F000380 + 0x25, 0)]
+CB_AIR = 0x0F000380 + 0x25                # v4: in the air since the up special was used (the ground resets it only then)
 CB_RISE_Y = 0x0F000380 + 0x24             # v3: his height at the rise's start (the drive's floor)
 CB_USED = 0x0F000380 + 0x23               # v3: per fighter (object scope): 0 none used, 1 the rise, 2 the hover / dive
 RISE_CANCEL = RISE_FROM + 10              # v3: the rise cancellable into an attack from here (its burst: 10 frames,
@@ -160,7 +159,8 @@ def msc_values():
             'CB_SND_RELEASE': '0x%X' % SE_IDS['cb_release'], 'CB_SND_RUSH': '0x%X' % SE_IDS['cb_rush'],
             'CB_SND_EXPLOSION': '0x%X' % SE_IDS['cb_explosion'], 'CB_SND_HIT': '0x%X' % SE_IDS['cb_hit_l'],
             # v3: the split (the rise; up special again: the hover / dive)
-            'CB_USED': '0x%X' % CB_USED, 'CB_RISE_Y': '0x%X' % CB_RISE_Y,
+            'CB_USED': '0x%X' % CB_USED, 'CB_RISE_Y': '0x%X' % CB_RISE_Y, 'CB_AIR': '0x%X' % CB_AIR,
+            'CB_INVINCIBLE': fl(INVINCIBLE),
             'CB_RISE_CANCEL': fl(RISE_CANCEL), 'CB_FLOOR_MARGIN': fl(FLOOR_MARGIN),
             'CB_RESET_LO': fl(0x3F), 'CB_RESET_HI': fl(0x4C),
             'CB_CLIFF_LO': fl(0x72), 'CB_CLIFF_HI': fl(0x7A), 'CB_DEAD': fl(0xB1), 'CB_REBIRTH': fl(0xB2),
@@ -232,9 +232,13 @@ DETECT_SIZE = 2.5                            # v3: the hover's detection box (hi
 #   burn (the hold's hits): the hit loop on the fist, 1.75 -> CB_FX_SCALE
 #   crash / explosion: the explosion (effect 3), v2's half of 1.75 -> CB_FX_SCALE; at the explosion's place (his fist)
 _CB_SCALE = 2.25                             # supamario_corebreaker_fx.CB_FX_SCALE (asserted in build())
-HB = {'catch': (5.5, round(5.5 * _CB_SCALE / 1.75, 2)), 'burn': (7.0, round(7.0 * _CB_SCALE / 1.75, 2)),
-      'crash': (9.0, round(9.0 * _CB_SCALE / 0.875, 2)), 'explosion': (11.0, round(11.0 * _CB_SCALE / 0.875, 2)),
-      'detect': (DETECT_SIZE, DETECT_SIZE), 'body': (4.5, 4.5)}
+# v4 (user: "The effects look better but only for the dive's aura. Please resize them to be 1.5x larger than what they
+# were before"): every effect but the aura x FX_MUL over v3 (SIZE_MUL), the hitboxes sized to them too: (v3, v4)
+FX_MUL = 1.5
+_V3 = {'catch': round(5.5 * _CB_SCALE / 1.75, 2), 'burn': round(7.0 * _CB_SCALE / 1.75, 2),
+       'crash': round(9.0 * _CB_SCALE / 0.875, 2), 'explosion': round(11.0 * _CB_SCALE / 0.875, 2)}
+HB = dict({k: (v, round(v * FX_MUL, 2)) for k, v in _V3.items()},
+          detect=(DETECT_SIZE, DETECT_SIZE), body=(4.5, 4.5))
 CRASH_AT = (6.26, 1.93)                      # the crash explosion's place (the crash pose's RHandN, effect 3's call)
 DETECT_AT = (1.0, 6.5)                       # at his middle (ahead, up)
 VICTIM_MID = (HOLD_X, HOLD_Y + 5.0)          # the held victim's middle
@@ -268,11 +272,9 @@ def game_script():
         ok += if_(0x0F000380 + 0x22, 0, 1, take)
         ok += if_(0x0F000380 + 0x22, 0, 0, [setf(refused, CB_VAR), cmd('remove_all_hitboxes')])
         return [cmd('hit_check', 0, 0, 2), cmd('true', 2 + size(ok))] + ok
-    # v3 (the endless dive): the checks in a loop, a frame each while diving (the motion's dive loop is looped by the
-    # MSC, so frame blocks would stop at its first pass); once cb isn't 2 (a catch, a refusal, a jump through) the
-    # rest of the loop runs at once, no waits, and the script goes on
-    check = catch_check(2.25)
-    blocks.append((DIVE_FROM + 1, loop(DIVE_CHECKS, if_(CB_VAR, 0, 2, check + [cmd('wait', 1.0)]))))
+    # v4: the dive's catch is the MSC's (cb_dive_catch: his attack's hit result each frame); v3's loop of per-frame
+    # Hit_Checks here lost it in game (user: "The catch doesn't happen anymore on the dive unless the point-blank
+    # detection box is hit")
     # v3 (user: "The moment the button is pressed for the hover, there should be a very small detection box (smaller
     # than Supamario's hurtbox) that checks if it hit an opponent. If it hits an opponent it should skip Supamario to
     # the catch part of the dive"): the hover's first frame (both ways in: the second up special's jump to it, or up
@@ -288,7 +290,7 @@ def game_script():
     for f in range(HOVER_FROM + 1, HOVER_FROM + 4):
         blocks.append((f, if_(CB_VAR, 0, 1, det)))
     # the dive starts with a clean hit record (a refused detection hit can't catch later)
-    blocks.append((DIVE_FROM, [cmd('hit_reset'), cmd('hit_log_clear', 0)]))
+    blocks.insert(0, (DIVE_FROM, [cmd('hit_reset'), cmd('hit_log_clear', 0)]))   # before the dive's hitboxes
     # every later segment starts with no hitboxes (the dive's gone)
     for f in (LAND, HOLD, HOLDG, CRASH, AIRREL):
         blocks.append((f, [cmd('remove_all_hitboxes')]))
@@ -297,26 +299,28 @@ def game_script():
     for f, ph in [(f, 3) for f in BURN_AT] + [(f - HOLD + HOLDG, 8) for f in BURN_AT]:
         blocks.append((f, if_(CB_VAR, 0, ph, [cmd('hit_log_clear', 1),
                                              hitbox(ID=0, Part=1, Bone=0, Damage=BURN_DMG, BKB=10, Size=HB['burn'][1],
-                                                    Y=BURN_POS[1], Z=BURN_POS[0], SFXLevel=0, SFXType=4,
-                                                    Effect=1, HitstopFrames=3, SelfHitstopFrames=0,
+                                                    Y=BURN_POS[1], Z=BURN_POS[0], SFXLevel=1, SFXType=4,
+                                                    Effect=6, HitstopFrames=3, SelfHitstopFrames=0,
                                                     Shieldable=0, DIMul=0.001, SDI=0.0)])))
         blocks.append((f + 1, if_(CB_VAR, 0, ph, [cmd('remove_all_hitboxes')])))
     # the crash on the stage (cb 6): CRASH_DMG, v3: KO knockback (CRASH_KB; the MSC lets the victim go the frame before)
     blocks.append((CRASH + 1, if_(CB_VAR, 0, 6, [cmd('hit_log_clear', 2), hitbox(
         ID=0, Part=2, Bone=0, Damage=CRASH_DMG, Size=HB['crash'][1], Y=CRASH_AT[1], Z=CRASH_AT[0], SFXLevel=2,
-        SFXType=1, Effect=1, HitstopFrames=10, SelfHitstopFrames=6, Shieldable=1, **CRASH_KB)])))
+        SFXType=1, Effect=0, HitstopFrames=10, SelfHitstopFrames=6, Shieldable=1, **CRASH_KB)])))
     blocks.append((CRASH + 2, [cmd('remove_all_hitboxes')]))
     # the explosion off the stage (cb 7): CRASH_DMG, KO knockback; the MSC lets the victim go the same frame
     blocks.append((AIRREL + 1, if_(CB_VAR, 0, 7, [cmd('hit_log_clear', 2), hitbox(
         ID=0, Part=2, Bone=0, Damage=CRASH_DMG, Size=HB['explosion'][1], Y=FIST[1], Z=FIST[0], SFXLevel=2, SFXType=1,
-        Effect=1, HitstopFrames=10, SelfHitstopFrames=6, Shieldable=1, **EXPLOSION_KB)])))
+        Effect=0, HitstopFrames=10, SelfHitstopFrames=6, Shieldable=1, **EXPLOSION_KB)])))
     blocks.append((AIRREL + 2, [cmd('remove_all_hitboxes')]))
     return s + timeline(blocks)
 
 
 # ---------------------------------------------------------------- effects
 FX_DASH_CLOUD, FX_BIG_CLOUD = 0x1000009, 0x1000020
-SIZE_MUL = {}                                 # v3 (user, v2's clip: "The effects for Core Breaker are too small"): no
+SIZE_MUL = {e: FX_MUL for e in (0, 1, 2, 3, 7, 8, 9, 12)}   # v4: all but the aura (5) x1.5 over v3
+CMN_MUL = FX_MUL                              # v4: the common effects with them (the dust, the clouds, the sparks)
+# v3 (user, v2's clip: "The effects for Core Breaker are too small"): no
                                               # halving (v1 / v2 halved the charge orb, its end flash and the explosion:
                                               # the Q10 default); every effect at supamario_corebreaker_fx.CB_FX_SCALE
 GUARD = {9: 5, 8: 3, 12: 3, 3: 6}             # BAC effect -> the phase whose segment it plays in (cb)
@@ -371,17 +375,17 @@ def effect_script(fx, bones, cmn_fx):
     for f in (CRASH, AIRREL):
         blocks.append((f, list(stop2)))
     # XV2's ground effects (StageBG 140 / 640 / 440 / 160) with Smash's own and the God Fist's converted BTL_CMN ones
-    blocks.append((RISE_FROM, if_(CB_VAR, 0, 0, [gfx('graphic_effect', FX_DASH_CLOUD, 0, 0.0, 0.0, 0.0, 1.0)])))
-    land = [gfx('graphic_effect', FX_BIG_CLOUD, 0, 0.0, 0.0, 4.0, 0.8)]
+    blocks.append((RISE_FROM, if_(CB_VAR, 0, 0, [gfx('graphic_effect', FX_DASH_CLOUD, 0, 0.0, 0.0, 0.0, 1.0 * CMN_MUL)])))
+    land = [gfx('graphic_effect', FX_BIG_CLOUD, 0, 0.0, 0.0, 4.0, 0.8 * CMN_MUL)]
     blocks.append((LAND, if_(CB_VAR, 0, 5, land)))
-    crash = [gfx('graphic_effect', FX_BIG_CLOUD, 0, 0.0, 0.0, CRASH_X, 1.2)]
+    crash = [gfx('graphic_effect', FX_BIG_CLOUD, 0, 0.0, 0.0, CRASH_X, 1.2 * CMN_MUL)]
     if cmn_fx.get('PHitSmk'):
-        crash.append(gfx('graphic_effect', cmn_fx['PHitSmk'], 0, 0.0, 0.0, CRASH_X, 5.04 / 8.5 * 1.5))
+        crash.append(gfx('graphic_effect', cmn_fx['PHitSmk'], 0, 0.0, 0.0, CRASH_X, 5.04 / 8.5 * 1.5 * CMN_MUL))
     blocks.append((CRASH, if_(CB_VAR, 0, 6, crash)))
     if cmn_fx.get('MHit'):
         for f, ph in ((HOLD, 3), (HOLDG, 8)):
             blocks.append((f, if_(CB_VAR, 0, ph, [gfx('graphic_effect', cmn_fx['MHit'], 0, 0.0, VICTIM_MID[1],
-                                                         VICTIM_MID[0], 5.04 / 8.5)])))
+                                                         VICTIM_MID[0], 5.04 / 8.5 * CMN_MUL)])))
     return timeline(blocks)
 
 
