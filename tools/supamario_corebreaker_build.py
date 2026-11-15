@@ -99,7 +99,15 @@ CATCH_FREEZE = 6
 # ---------------------------------------------------------------- variables (New_Var slots 0x20-0x21)
 CB_VAR = 0x0F000380 + 0x20                  # the phase (the MSC's cb_ph; the catch: the game script's 3)
 CB_V_SLOT = 0x0F000380 + 0x21               # the victim's player slot (Target_Slot_Get)
-VARS = [('cb', CB_VAR, 1), ('cb_slot', CB_V_SLOT, 1), ('cb_tmp', 0x0F000380 + 0x22, 1)]
+# v3: every one per object (scope 0): a move-scoped New_Var is reset to 0 by the script's start, after the MSC's init
+# has set cb (1: the second up special's hover), which would skip the hover's detection box
+VARS = [('cb', CB_VAR, 0), ('cb_slot', CB_V_SLOT, 0), ('cb_tmp', 0x0F000380 + 0x22, 0),
+        ('cb_used', 0x0F000380 + 0x23, 0), ('cb_rise_y', 0x0F000380 + 0x24, 0)]
+CB_USED = 0x0F000380 + 0x23               # v3: per fighter (object scope): 0 none used, 1 the rise, 2 the hover / dive
+CB_RISE_Y = 0x0F000380 + 0x24             # v3: his height at the rise's start (the dive's floor)
+RISE_CANCEL = RISE_FROM + 10              # v3: the rise cancellable into an attack from here (its burst: 10 frames,
+                                          # ~37 of its ~55 units, the speed 4.7 -> 2.7)
+DIVE_MIN_DROP = 30.0                      # v3: the dive may always go this far below where it starts
 LASTHIT_STATUS = 0x0F0000B2
 LASTHIT_BODY = 0x0F000100 + 0x20 * 2 + 0x1B
 NO_DOWN = 0x80000000
@@ -147,7 +155,12 @@ def msc_values():
             'CB_SND_RISE': '0x%X' % SE_IDS['cb_rise'], 'CB_SND_CHARGE': '0x%X' % SE_IDS['cb_charge'],
             'CB_SND_RELEASE': '0x%X' % SE_IDS['cb_release'], 'CB_SND_RUSH': '0x%X' % SE_IDS['cb_rush'],
             'CB_SND_EXPLOSION': '0x%X' % SE_IDS['cb_explosion'], 'CB_SND_HIT': '0x%X' % SE_IDS['cb_hit_l'],
-            'CB_SND_DOWN': '0x%X' % GF_DOWN_SE}
+            'CB_SND_DOWN': '0x%X' % GF_DOWN_SE,
+            # v3: the split (the rise; up special again: the hover / dive)
+            'CB_USED': '0x%X' % CB_USED, 'CB_RISE_Y': '0x%X' % CB_RISE_Y, 'CB_RISE_CANCEL': fl(RISE_CANCEL),
+            'CB_DIVE_MIN_DROP': fl(DIVE_MIN_DROP), 'CB_RESET_LO': fl(0x3F), 'CB_RESET_HI': fl(0x4C),
+            'CB_CLIFF_LO': fl(0x72), 'CB_CLIFF_HI': fl(0x7A), 'CB_DEAD': fl(0xB1), 'CB_REBIRTH': fl(0xB2),
+            'CB_ENTRY': fl(0x14F)}
 
 
 # ---------------------------------------------------------------- ACMD helpers (the God Fist's)
@@ -200,6 +213,8 @@ def timeline(blocks):
 
 # ---------------------------------------------------------------- the game script
 FIST = (6.3, 3.1)                            # the dive pose's RHandN (ahead, up of TransN)
+DETECT_SIZE = 2.5                            # v3: the hover's detection box (his body is ~4 across)
+DETECT_AT = (1.0, 6.5)                       # at his middle (ahead, up)
 VICTIM_MID = (HOLD_X, HOLD_Y + 5.0)          # the held victim's middle
 
 
@@ -218,17 +233,33 @@ def game_script():
     # the catch, checked every dive frame while diving (cb 2): a fighter's body (Hit_Check kinds 2: not a shield),
     # not lying down (LASTHIT_STATUS), not invincible / intangible (LASTHIT_BODY 0); a refused one ends the checks
     # (cb 2.25: the MSC dives on)
-    take = [setf(3, CB_VAR), cmd('target_slot_get', 2, CB_V_SLOT), cmd('remove_all_hitboxes'),
-            cmd('body_state_set', 0, 1, INVINCIBLE)]
-    ok = [setf(1, 0x0F000380 + 0x22)]
-    ok += if_(LASTHIT_STATUS, 3, DOWN_LO, if_(LASTHIT_STATUS, 2, DOWN_HI, [setf(0, 0x0F000380 + 0x22)]))
-    ok += if_(LASTHIT_STATUS, 0, DOWN_FURAFURA, [setf(0, 0x0F000380 + 0x22)])
-    ok += if_(LASTHIT_BODY, 1, 0, [setf(0, 0x0F000380 + 0x22)])
-    ok += if_(0x0F000380 + 0x22, 0, 1, take)
-    ok += if_(0x0F000380 + 0x22, 0, 0, [setf(2.25, CB_VAR), cmd('remove_all_hitboxes')])
-    check = [cmd('hit_check', 0, 0, 2), cmd('true', 2 + size(ok))] + ok
+    def catch_check(refused):
+        take = [setf(3, CB_VAR), cmd('target_slot_get', 2, CB_V_SLOT), cmd('remove_all_hitboxes'),
+                cmd('body_state_set', 0, 1, INVINCIBLE)]
+        ok = [setf(1, 0x0F000380 + 0x22)]
+        ok += if_(LASTHIT_STATUS, 3, DOWN_LO, if_(LASTHIT_STATUS, 2, DOWN_HI, [setf(0, 0x0F000380 + 0x22)]))
+        ok += if_(LASTHIT_STATUS, 0, DOWN_FURAFURA, [setf(0, 0x0F000380 + 0x22)])
+        ok += if_(LASTHIT_BODY, 1, 0, [setf(0, 0x0F000380 + 0x22)])
+        ok += if_(0x0F000380 + 0x22, 0, 1, take)
+        ok += if_(0x0F000380 + 0x22, 0, 0, [setf(refused, CB_VAR), cmd('remove_all_hitboxes')])
+        return [cmd('hit_check', 0, 0, 2), cmd('true', 2 + size(ok))] + ok
+    check = catch_check(2.25)
     for f in range(DIVE_FROM + 1, DIVE_LAST + 1):
         blocks.append((f, if_(CB_VAR, 0, 2, check)))
+    # v3 (user: "The moment the button is pressed for the hover, there should be a very small detection box (smaller
+    # than Supamario's hurtbox) that checks if it hit an opponent. If it hits an opponent it should skip Supamario to
+    # the catch part of the dive"): the hover's first frame (both ways in: the second up special's jump to it, or up
+    # special again in the rise), DETECT_SIZE at his middle, the catch's damage and rules; caught (cb 3) -> the MSC's
+    # hold; refused (cb 1.25) -> the hover goes on
+    blocks.append((HOVER_FROM, [hitbox(ID=0, Bone=0, Damage=CATCH_DMG, BKB=20, Size=DETECT_SIZE, Y=DETECT_AT[1],
+                                       Z=DETECT_AT[0], HitstopFrames=CATCH_FREEZE, SelfHitstopFrames=CATCH_FREEZE,
+                                       **{'Ground/Air': NO_DOWN | 3})]))
+    blocks.append((HOVER_FROM + 2, [cmd('remove_all_hitboxes')]))
+    det = catch_check(1.25)
+    for f in range(HOVER_FROM + 1, HOVER_FROM + 4):
+        blocks.append((f, if_(CB_VAR, 0, 1, det)))
+    # the dive starts with a clean hit record (a refused detection hit can't catch later)
+    blocks.append((DIVE_FROM, [cmd('hit_reset'), cmd('hit_log_clear', 0)]))
     # every later segment starts with no hitboxes (the dive's gone)
     for f in (LAND, HOLD, CRASH, AIRREL):
         blocks.append((f, [cmd('remove_all_hitboxes')]))
@@ -306,7 +337,7 @@ def effect_script(fx, bones, cmn_fx):
     for f in (CRASH, AIRREL):
         blocks.append((f, list(stop2)))
     # XV2's ground effects (StageBG 140 / 640 / 440 / 160) with Smash's own and the God Fist's converted BTL_CMN ones
-    blocks.append((RISE_FROM, [gfx('graphic_effect', FX_DASH_CLOUD, 0, 0.0, 0.0, 0.0, 1.0)]))
+    blocks.append((RISE_FROM, if_(CB_VAR, 0, 0, [gfx('graphic_effect', FX_DASH_CLOUD, 0, 0.0, 0.0, 0.0, 1.0)])))
     land = [gfx('graphic_effect', FX_BIG_CLOUD, 0, 0.0, 0.0, 4.0, 0.8)]
     blocks.append((LAND, if_(CB_VAR, 0, 5, land)))
     crash = [gfx('graphic_effect', FX_BIG_CLOUD, 0, 0.0, 0.0, CRASH_X, 1.2)]

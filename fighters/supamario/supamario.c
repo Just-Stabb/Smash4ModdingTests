@@ -1781,6 +1781,7 @@ void func_82()
     }
     rolloff_hold_update(); // roll-off: the air speed cap off while the stick holds the way he moves (universal mechanics)
     gf_tick(); // Super God Fist: the downed victim (fighters/supamario/README.md "Super God Fist v5")
+    cb_reset_tick(); // Core Breaker v3: its once-per-airtime uses back on landing, a hit, a ledge, a grab, a KO
 }
 
 float func_83()
@@ -36378,6 +36379,7 @@ void func_2249()
     global53 = 0x221;
     global54 = 0x229;
     global55 = 0x249;
+    global26 = cb_can_up;   // Core Breaker v3: up special once per airtime for the rise, once for the hover / dive
 }
 
 int func_2250()
@@ -38351,7 +38353,7 @@ void gf_tick()
 int cb_ph;
 int cb_n;               // frames in the phase
 int cb_jump;            // a motion jump on its way (the target frame), 0 none
-float cb_sy;            // his height when the move started (the dive's floor)
+float cb_floor;         // v3: the dive's / drive's floor (cb_dive_start)
 float cb_ang;           // the dive's angle below level (degrees)
 int cb_turned;
 int cb_slot;            // the victim's player slot (1-8), 0 none
@@ -38423,8 +38425,42 @@ void cb_aircap(int off)
     }
 }
 
+// v3 (user: "make the rise from up special cancelable after the initial burst of speed into any attack and make the
+// hover and dive happen of the next up special input. Up special would be usable once per airtime, resetting when
+// getting hit, ledge, grabbed, ko'd"): CB_USED (New_Var, per fighter) 0 nothing used, 1 the rise used (up special
+// again: the hover / dive), 2 both used (up special refused: cb_can_up, the status's own hook global26); back to 0 by
+// cb_reset_tick. On the ground up special is always the rise
+int cb_can_up()
+{
+    if (global18 == 0 || WorkModuleF(0, CB_USED) < 1.5f)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+void cb_reset_tick()
+{
+    float st;
+    if (WorkModuleF(0, CB_USED) < 0.5f)
+    {
+        return;
+    }
+    st = WorkModuleF(0, 0x0F0000A2);
+    if (st == 0x154 && global18 != 0x1)
+    {
+        return;
+    }
+    if (global18 != 0x2 || (st >= CB_RESET_LO && st <= CB_RESET_HI) || (st >= CB_CLIFF_LO && st <= CB_CLIFF_HI) ||
+        st == CB_DEAD || st == CB_REBIRTH || st == CB_ENTRY)
+    {
+        WorkModule(0, 0.0f, CB_USED);
+    }
+}
+
 void cb_init()
 {
+    float used;
     cb_ph = 0;
     cb_n = 0;
     cb_jump = 0;
@@ -38433,7 +38469,11 @@ void cb_init()
     cb_handed = 0;
     cb_lifted = 0;
     cb_ang = CB_DIVE_DEG;
-    cb_sy = WorkModuleF(0, 0x0f000001);
+    used = WorkModuleF(0, CB_USED);
+    if (global18 == 0)
+    {
+        used = 0.0f;
+    }
     WorkModule(0, 0.0f, CB_VAR);
     if (global18 == 0)
     {
@@ -38449,6 +38489,20 @@ void cb_init()
         KineticModule(0x14, 0x1, 0.0f);
     }
     WorkModule(0x16, 0x1e00001e);
+    if (used > 0.5f && used < 1.5f)
+    {
+        // the second up special: the hover / dive (the motion to its hover in one frame)
+        cb_hover_start();
+        cb_goto(CB_HOVER_FROM);
+        return;
+    }
+    if (used > 1.5f)
+    {
+        func_16(0xe, 0);            // both used (cb_can_up refuses it; a safeguard)
+        return;
+    }
+    WorkModule(0, 1.0f, CB_USED);
+    WorkModule(0, WorkModuleF(0, 0x0f000001), CB_RISE_Y);
     cb_armor(0x1);
     SoundModule(0x2710, CB_SND_RISE);
 }
@@ -38482,21 +38536,79 @@ int cb_rise_phase(float fr)
     }
     KineticModule(0xf, 0x1, -CB_RISE_DECEL);
     KineticModule(0x14, 0x1, CB_FALL_LIMIT);
+    // v3: after the burst, any attack: up special again (the hover / dive, here), the other specials, an aerial
+    if (fr >= CB_RISE_CANCEL - 0.01f)
+    {
+        if (global24 & 0x4000)
+        {
+            cb_hover_start();
+            cb_goto(CB_HOVER_FROM);
+            return 0;
+        }
+        if (cb_rise_attack() == 0x1)
+        {
+            cb_end();
+            return 0x1;
+        }
+    }
     if (fr >= CB_HOVER_FROM - 0.01f)
     {
-        cb_set_ph(0x1);
+        // nothing pressed: a normal fall (he stays actionable; up special again is the hover / dive)
         cb_armor(0);
-        cb_speed(0.0f, 0.0f);
-        KineticModule(0x14, 0x1, 0.0f);
-        SoundModule(0x2710, CB_SND_CHARGE);
+        KineticModule(0, 0);
+        func_16(0xe, 0);
+        return 0x1;
     }
     return 0;
+}
+
+int cb_rise_attack()
+{
+    if (global24 & 0x8000 && func_72(global27))
+    {
+        func_16(0x155, 0x1);
+        return 0x1;
+    }
+    if (global24 & 0x2000 && func_72(global25))
+    {
+        func_16(0x153, 0x1);
+        return 0x1;
+    }
+    if (global24 & 0x1000 && func_72(global28))
+    {
+        func_16(0x152, 0x1);
+        return 0x1;
+    }
+    if (global24 & 0x1)
+    {
+        func_16(0x34, 0x1);
+        return 0x1;
+    }
+    return 0;
+}
+
+// the hover's start: from the rise (up special again in its cancel window) or the second up special (cb_init)
+void cb_hover_start()
+{
+    WorkModule(0, 2.0f, CB_USED);
+    cb_set_ph(0x1);
+    cb_armor(0);
+    cb_speed(0.0f, 0.0f);
+    KineticModule(0x14, 0x1, 0.0f);
+    SoundModule(0x2710, CB_SND_CHARGE);
 }
 
 int cb_hover_phase(float fr)
 {
     cb_speed(0.0f, 0.0f);
     KineticModule(0x14, 0x1, 0.0f);
+    // v3: the detection box at the hover's start caught someone (the game script: cb 3): straight to the hold
+    if (WorkModuleF(0, CB_VAR) > 2.5f && WorkModuleF(0, CB_VAR) < 3.5f)
+    {
+        cb_floor = WorkModuleF(0, 0x0f000001) - CB_DIVE_MIN_DROP;
+        cb_catch();
+        return 0;
+    }
     // B-reverse (Q2 default): the stick held back once turns him
     if (cb_turned == 0 && WorkModuleF(0, 0x0f000110) < -CB_TURN_STICK)
     {
@@ -38517,6 +38629,14 @@ int cb_hover_phase(float fr)
 // ---- the dive (phase 2)
 void cb_dive_start()
 {
+    float y;
+    y = WorkModuleF(0, 0x0f000001);
+    // the floor (v1: the height the move started at): the rise's start, but at least CB_DIVE_MIN_DROP below him
+    cb_floor = WorkModuleF(0, CB_RISE_Y) - CB_FLOOR_MARGIN;
+    if (cb_floor > y - CB_DIVE_MIN_DROP)
+    {
+        cb_floor = y - CB_DIVE_MIN_DROP;
+    }
     cb_set_ph(0x2);
     cb_ang = CB_DIVE_DEG;
     cb_armor(0x1);
@@ -38617,7 +38737,7 @@ int cb_dive_phase(float fr)
         cb_land_miss();
         return 0;
     }
-    if (cb_n >= CB_DIVE_MAX || WorkModuleF(0, 0x0f000001) < cb_sy - CB_FLOOR_MARGIN)
+    if (cb_n >= CB_DIVE_MAX || WorkModuleF(0, 0x0f000001) < cb_floor)
     {
         cb_fall_special();
         return 0x1;
@@ -38752,7 +38872,7 @@ int cb_drive_phase(float fr)
         SoundModule(0x2710, CB_SND_EXPLOSION);
         return 0;
     }
-    if (cb_n >= CB_DRIVE_MAX || WorkModuleF(0, 0x0f000001) < cb_sy - CB_FLOOR_MARGIN)
+    if (cb_n >= CB_DRIVE_MAX || WorkModuleF(0, 0x0f000001) < cb_floor)
     {
         cb_set_ph(0x7);
         cb_aircap(0);
