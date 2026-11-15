@@ -126,6 +126,8 @@ class Game:
                 return float(vi.get('status', 0x47))
             if v == 0x0F00011A + 0x20 * 4:
                 return float(vi.get('shield', 50.0))
+            if v == 0x0F000043 + 8 * 4:                 # v10: its hitstop (1 while frozen)
+                return 1.0 if self.n < vi.get('hs_until', -1) else 0.0
             if v in (0x0F0000B2, ) and self.hit:         # v4: target 2 (the last fighter hit): the victim
                 return float(vi.get('status', 0x47))
             if v == 0x0F00015B and self.hit:
@@ -165,6 +167,7 @@ class Game:
                 return
             if v == 0x0F0000A7 + 8 * t:             # v8: PUSH (1000 + its shieldstun)
                 vi['push'] = val
+                vi.setdefault('push_log', []).append((self.n, val))
                 return
             if v == 0x0F0000A2 + 8 * t:
                 vi['status'] = int(val)
@@ -345,6 +348,8 @@ def run(path, g, frames=420, catch_at=None, cut_at=None, victim_reach=None, pres
                 g.hit = True                    # v4: the hit; the MSC's cb_dive_catch does the rest
                 if g.hit_kind == 4:             # v8: on a shield: the game's own shield damage first
                     g.victim['shield'] = g.victim.get('shield', 50.0) - B.CATCH_DMG * 1.19
+                    g.victim['status'] = 0x1E   # v10: GuardDamage from the hit, frozen CATCH_FREEZE frames
+                    g.victim['hs_until'] = g.n + B.CATCH_FREEZE
         if detect and cbv == 1.0 and g.victim is not None and B.HOVER_FROM <= g.frame <= B.HOVER_FROM + 1:
             mx, my = g.x + B.DETECT_AT[0] * g.face, g.y + B.DETECT_AT[1]
             if math.hypot(g.victim['x'] - mx, g.victim['y'] + 5 - my) < B.DETECT_SIZE + 2.0:
@@ -958,14 +963,20 @@ def msc_tests(path):
         g.hit_kind = 4
         run(path, g, frames=B.HOVER_FROM + 3)
         v['x'] = g.x + g.face * (g.y / math.tan(math.radians(B.DIVE_DEG)) - 2.0)
-        tr = run(path, g, victim_reach=B.HB['catch'][1] + 4.0)
+        tr = run(path, g, victim_reach=B.HB["catch"][1] + 4.0, tick=True)
         want_hp = round(hp - 50.0 * 2.0 / 3.0, 3)
+        pl = v.get('push_log', [])
+        hs = [p_ for n_, p_ in pl if n_ < v.get('hs_until', 0)]
+        after = [p_ for n_, p_ in pl if n_ >= v.get('hs_until', 0)]
         out.append((name, phases_of(tr), g.inv_log, round(v.get('shield', 0.0), 3) if want_hp > 0 else v.get('status'),
-                    v.get('push')))
+                    sorted(set(hs)) if want_hp > 0 else None, after if want_hp > 0 else None))
     check('a shielded dive: no catch, no invincibility, the miss\'s landing; the shield 2/3 of the max (33.3) lower '
-          'than before the hit, 16 frames of shieldstun; less left than that: broken (0x59)', out,
-          [('a full shield', [1.0, 2.0, 5.0], [], 16.667, 1016.0), ('40 left', [1.0, 2.0, 5.0], [], 6.667, 1016.0),
-           ('30 left (breaks)', [1.0, 2.0, 5.0], [], 0x59, None)])
+          'than before the hit; v10: its shieldstun kept at 16 (1016) every frame of its hitstop, then 16, 15 .. 1 left, '
+          'one a frame (the count GuardDamage itself counts down: 16 frames after the freeze); less left than that: '
+          'broken (0x59)', out,
+          [(n_, [1.0, 2.0, 5.0], [], hp_, [1016.0], [1000.0 + k for k in range(16, 0, -1)])
+           for n_, hp_ in (('a full shield', 16.667), ('40 left', 6.667))] +
+          [('30 left (breaks)', [1.0, 2.0, 5.0], [], 0x59, None, None)])
     # 9b. a victim in the air over the stage: the hold, the lift, the drive, the crash
     v = {'x': 30.0, 'y': 20.0, 'status': 0x47}
     g = Game(stage=(-200.0, 200.0), victim=v)

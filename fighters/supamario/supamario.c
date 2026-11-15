@@ -39144,8 +39144,19 @@ void cb_shield_tick()
     }
     t = cb_sh_slot + 0x2;
     st = WorkModuleF(0, 0x0F0000A2 + 8 * t);
-    //CBD WorkModule(0, st * 100.0f + (float)cb_sh_left, 0x0F0003FB);
-    if (cb_sh_left <= 0 || st < CB_GUARD_LO || st > CB_GUARD_HI)
+    // diag k 11, every frame: the shielder's status x 100 + the frames left we keep (+ 10000 in its hitstop; after 0:
+    // 10 more frames logged, so the log shows the frame GuardDamage really ends)
+    //CBD WorkModule(0, st * 100.0f + (float)cb_sh_left + 10000.0f * WorkModuleF(0, 0x0F000043 + 8 * t), 0x0F0003FB);
+    if (cb_sh_left <= 0)
+    {
+        cb_sh_left = cb_sh_left - 1;
+        if (cb_sh_left < -10)
+        {
+            cb_sh_slot = 0;
+        }
+        return;
+    }
+    if (st < CB_GUARD_LO || st > CB_GUARD_HI)
     {
         cb_sh_slot = 0;
         return;

@@ -2529,3 +2529,101 @@ Tests: `supamario_fakedeath_test.py` (new: a fighter 9.4 ahead of him on the las
 reach; the air knockback 0.6x v2's at 0 / 50 / 100 / 150%; the ring's radius at least 1.5x his lying half-length + 1),
 `supamario_corebreaker_test.py`, `supamario_godfist_test.py --all-models`, `msc_stack_check.py`: all 0 problems (Fake
 Death 50 checks; 0 of 2384 scripts, globals 124 of 128).
+
+## Core Breaker v10 (`supamario_corebreaker_v10.zip`): the invincibility hunt (diag), the dive's shieldstun
+
+Install over Fake Death v3, exe B (exe_v46k). The user: "The invulnerability bug is still present" (clip
+`MedalTVCemuWiiUEmulator20261115033819819`, 1920x1080, 6.5 s), and "setting shieldstun frames seems to not work".
+
+### 1. The clip
+- **A (0-2.6 s):** a rise from the stage, cancelled into the hover in place, the dive, a miss landing. In the landing
+  and after it (30 fps frames) his colours stay normal: no blink.
+- **B (2.8-6.5 s):** a rise from the stage played out to Fall (off camera above), then up special again in the air:
+  the hover, the dive, a miss landing. From the landing (about 5.0 s) he blinks white on alternate frames for about
+  33 frames, through the landing lag into Wait: Smash's invincible blink.
+  - At B's rise start (2.95 s) there's one pale frame.
+  - In the hover the orb covers him. The user's "during the hover" can't be seen in this clip.
+- Nothing hits anyone in the clip (DK stays at 26%). There's no catch, so no Core Breaker invincibility write can run.
+
+### 2. Everything that can make him invincible / intangible (current build)
+- **MSC, Core Breaker:** the catch's first write (`cb_catch`, after its slot check), the hold's renewal (needs that
+  catch: `cb_inv`), the status end's 1-frame write (needs `cb_inv`). None on a miss.
+  - The model runs B's exact path (ground rise -> Fall -> air up special -> hover -> dive -> miss landing, the per-frame
+    hook on) and A's.
+  - Neither makes a HitModule call or a body-state write; the only DamageModule calls are the armor's (on at the
+    dive, off at the landing).
+- **MSC, Fake Death:** `fd_intangible`, only inside its own status (`fd_on`).
+- **MSC, God Fist (`gf_tick`):** no body-state writes.
+- **Vanilla MSC:** the timed / status body-state setters run only in vanilla statuses Core Breaker never enters.
+  - `HitModule(1)` in `func_243` (rebirth), `func_1081`, `func_1140`; `HitModule(0 / 2 / 0x2710)` in others.
+  - The up special status (0x154) has only Core Breaker's three functions (`func_2286` / `2287` / `2289`).
+- **ACMD (every script in game / effect / sound / expression):**
+  - `Body_State_Set`: only in attackdash (the God Fist);
+  - bone intangibility: only in attackhi4;
+  - `Body_Collision`: only in final;
+  - the up special's four scripts have none (v9 removed the last).
+- **Engine:** the setters' 22 direct callers in the executable (`0x0279EB90` .. `0x031CBC5C`).
+
+Nothing in the mod's code explains B's blink, so the diag build is there to find it.
+
+### 3. The diag build (`diag/` in the package; exe_v46k + two diagnostic caves)
+- `tools/diag_hitstate_cave.py` (new, temporary): HitModule's three body-state setters each print a line on every
+  call:
+  - `0x02C42F00`: the status's body state (op 0; 0 isn't printed);
+  - `0x02C43188`: invincible frames (op 1);
+  - `0x02C43108`: intangible frames (op 2).
+
+  The line: `S4HS op= v= a= lr= lr2= m= n=`, with the value, the second argument, the setter's caller, that caller's
+  caller and the module. Unicorn test `tools/diag_hitstate_test.py`: every setter prints once, comes back to its
+  second word with every register kept; op 0 with 0 doesn't print.
+- `tools/diag_godfist_cave.py` (as the God Fist's): a write to `0x0F0003F0 + k` prints `S4GF k= v= c= n=`.
+- **The diag MSC** (`supamario_godfist_build.CB_DIAG`: supamario.c's `//CBD` lines):
+
+| k | When | v |
+|---|---|---|
+| 11 | every frame after the dive's shield hit, until 10 frames after its stun | the shielder's status x 100 + the frames left kept (+ 10000 in its hitstop) |
+| 12 | each up special start | `CB_USED` + 10 x the situation (0 ground, 2 air) |
+| 13 | every frame he is invincible or intangible, any status | his status x 100 + intangible state x 10 + invincible |
+| 14 | each Core Breaker phase change; 99 at the status end | phase + 10 x the motion frame |
+| 15 | each Core Breaker invincibility write | 1 catch, 2 renewal, 3 end |
+
+How to read the user's log for B:
+- the k 13 lines give the frames and the status he's invincible in;
+- the S4HS lines just before them give which setter, with what, from where (`lr` / `lr2`);
+- k 14 places it in the move.
+
+If the caller is engine code, its address names it.
+
+### 4. The dive's shieldstun (user: "setting shieldstun frames seems to not work")
+**How the game does it** (Supamario's own MSC, the common statuses):
+- GuardDamage (0x1E) init (key 3, `func_460`): count `0x11000009` = INT(the hit's damage `0x100000b` x 0.58
+  (`0x020000cc`, x the projectile / power-shield multipliers) + 4 (`0x020000cd`)).
+- Its per-frame substatus (`func_415`, `global16`) takes 1 off while it isn't frozen.
+- Its loop (`func_414`) goes back to Guard when it reaches 0 (and term `0x1e00002a`).
+
+**Why v8's one write could be lost:** it was a single write of the count (PUSH 1016: the position variable sets that int
+for another fighter). If it landed before GuardDamage's own init ran (its status start can follow the hit by a frame),
+the init replaced it with the hit's own count (INT(3 x 0.58 + 4) = 5).
+
+**Fix (`cb_shield_tick`, every frame, every status, from the per-frame hook):**
+- While the shielder is in GuardDamage, its count is written as the frames left, starting at 16.
+- One frame comes off only on frames it isn't in hitstop (+3 HITSTOP).
+- It waits up to 10 frames for GuardDamage to start, and stops if the shielder leaves it.
+- So the count is 16 when its freeze ends and goes 16, 15 .. 1: 16 frames whatever order the init and the write come
+  in.
+- This is a general method (keep the count GuardDamage itself counts down, every frame); a general shieldstun command
+  could do the same.
+
+**Sephiroth:** forward smash's push (fighters/edge, `edge_s4_push`) also writes PUSH 1000 + 3 every frame while the
+shielder slides. A per-frame write like this one, so it should hold too; the user wasn't sure it did. The diag's k 11
+lines (the shielder's status each frame to 10 frames after the stun) show the frame GuardDamage really ends: they
+confirm both.
+
+**Test:**
+- the dive's shield hit: the count kept at 1016 through the shielder's 6 hitstop frames, then 1016, 1015 .. 1001,
+  one a frame;
+- the shield's 2/3 as before.
+
+### Tests (v10 build)
+`supamario_corebreaker_test.py`, `supamario_fakedeath_test.py`, `supamario_godfist_test.py --all-models`,
+`msc_stack_check.py`; the diag cave tests on the diag executable (below the package).
