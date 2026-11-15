@@ -19,7 +19,7 @@ The move (fighters/supamario/README.md "Core Breaker"; his movement is speeds th
   hover (still, no armor; the stick back turns him); 60- the dive (CB_DIVE_V at CB_DIVE_DEG below level, light homing,
   super armor, ledges): the catch box on his fist (CATCH_DMG); landing -> the miss's landing (CB_LAND_LAG frames);
   a wall / ceiling -> FallSpecial; v3: nothing else ends it (no frame limit, no floor: the dive loop is looped).
-- a catch (a fighter's body, not lying down, not invincible / intangible): super armor (v4; v1-v3 invincible), holds it at his fist
+- a catch (a fighter's body, not lying down, not invincible / intangible): he's invincible (the hold only, v4), holds it at his fist
   (36 frames: BURN_HITS x BURN_DMG), then drives it down 45 degrees: on the ground the crash (CRASH_DMG, KO
   knockback CRASH_KB, the victim let go the frame before), else (off the stage: CB_DRIVE_MAX frames or the floor:
   the rise's start less FLOOR_MARGIN, at least DRIVE_MIN_DROP below the catch) the explosion in the air (CRASH_DMG, KO knockback EXPLOSION_KB) and FallSpecial. v3: a victim on
@@ -98,6 +98,8 @@ EXPLOSION_KB = dict(Angle=40, KBG=60, FKB=0, BKB=30)          # off the stage: K
 # v3 (user: "The grounded explosion also seems extremely weak in terms of knockback"): the crash on the stage launches,
 # stronger than the explosion in the air (README "Core Breaker v3": KOs a Mario-weight from mid-stage at ~105%)
 CRASH_KB = dict(Angle=42, KBG=75, FKB=0, BKB=45)
+INVINCIBLE = (CRASH_END - HOLD) + 10        # the hold: from the catch through the crash / the explosion (v4, user: "He
+                                            # should keep invincibility during the hold only")
 CATCH_FREEZE = 6
 
 # ---------------------------------------------------------------- variables (New_Var slots 0x20-0x21)
@@ -161,6 +163,7 @@ def msc_values():
             'CB_SND_EXPLOSION': '0x%X' % SE_IDS['cb_explosion'], 'CB_SND_HIT': '0x%X' % SE_IDS['cb_hit_l'],
             # v3: the split (the rise; up special again: the hover / dive)
             'CB_USED': '0x%X' % CB_USED, 'CB_RISE_Y': '0x%X' % CB_RISE_Y, 'CB_AIR': '0x%X' % CB_AIR,
+            'CB_INVINCIBLE': fl(INVINCIBLE),
             'CB_RISE_CANCEL': fl(RISE_CANCEL), 'CB_FLOOR_MARGIN': fl(FLOOR_MARGIN),
             'CB_RESET_LO': fl(0x3F), 'CB_RESET_HI': fl(0x4C),
             'CB_CLIFF_LO': fl(0x72), 'CB_CLIFF_HI': fl(0x7A), 'CB_DEAD': fl(0xB1), 'CB_REBIRTH': fl(0xB2),
@@ -262,8 +265,8 @@ def game_script():
     # not lying down (LASTHIT_STATUS), not invincible / intangible (LASTHIT_BODY 0); a refused one ends the checks
     # (cb 2.25: the MSC dives on)
     def catch_check(refused, downed=False):
-        # v4: no Body_State_Set invincibility (user: armor instead; the MSC's cb_catch puts his super armor on)
-        take = [setf(3, CB_VAR), cmd('target_slot_get', 2, CB_V_SLOT), cmd('remove_all_hitboxes')]
+        take = [setf(3, CB_VAR), cmd('target_slot_get', 2, CB_V_SLOT), cmd('remove_all_hitboxes'),
+                cmd('body_state_set', 0, 1, INVINCIBLE)]
         ok = [setf(1, 0x0F000380 + 0x22)]
         if not downed:              # the dive: not a fighter lying down (v3's hover box: yes, the user)
             ok += if_(LASTHIT_STATUS, 3, DOWN_LO, if_(LASTHIT_STATUS, 2, DOWN_HI, [setf(0, 0x0F000380 + 0x22)]))

@@ -1857,7 +1857,7 @@ DownWait, no tech, no KO). Now:
 
 ## Core Breaker v4 (`supamario_corebreaker_v4.zip`): the user's v3 feedback
 
-Install over v3, exe B (no exe change). Six changes.
+Install over v3, exe B (no exe change). Seven changes.
 
 ### 1. The ground up special uses the rise (user: "The first press of up special on the ground should consume its one rising use")
 **Cause:** `cb_reset_tick` was meant to skip its reset while he is in the up special itself (`st == 0x154`). `st` is a
@@ -1899,8 +1899,9 @@ check, since the hit and the touch-down can come together):
   player slot is the slot whose status, damage % and fighter kind are the same as target 2's, and which isn't him.
 - **refused** as before: lying down (the down statuses, the dizzy status) or invincible / intangible. The hitboxes go
   (`AttackModule(0x2719)`) and the dive goes on.
-- **caught:** invincible 187 frames (the self `INVINCIBLE` variable: `HitModule(1, N, 0)`), the hitboxes gone, the
-  slot in `cb_slot`, then `cb_catch` as before (the hold on the ground or in the air).
+- **caught:** invincible 187 frames (the hold: the self `INVINCIBLE` variable, `HitModule(1, N, 0)`, as the
+  detection catch's `Body_State_Set`), the hitboxes gone, the slot in `cb_slot`, then `cb_catch` as before (the hold
+  on the ground or in the air).
 
 The game script keeps the dive's hitboxes (now after `Hit_Reset` / `Hit_Log_Clear(0)` at frame 60) and the hover's
 detection box with its own checks (which work, per the user).
@@ -1963,7 +1964,7 @@ No Fall after the rise:
   so the stick drifts him;
 - **the leap's height is kept:** its vertical speed and its own slowing go on to its top (55 up, as before). From the
   top (the held frame), his own gravity and fall speed;
-- super armor to the top (as v3's to frame 30);
+- no armor (see 7);
 - **landing:** the game's own landing (`func_55`: LandingLight / LandingHeavy by its terms), else LandingLight (0x17).
   No landing lag beyond normal. The use stays spent until that landing.
 
@@ -1990,8 +1991,29 @@ Tests:
 Tests: ground and air, both facings, stick back / forward / neutral: turned once only with the stick back, the air
 momentum turned with him; a stick back after the window does nothing.
 
+### 7. Armor and invincibility (user: "make it so there's no armor during the leap or hover, and the dive has armor instead of invincibility", then "He should keep invincibility during the hold only")
+| Part | v3 | v4 |
+|---|---|---|
+| the rise | super armor to frame 30 | nothing |
+| the hover | nothing | nothing |
+| the dive | super armor | super armor, never invincible |
+| the hold (catch -> burn hits -> drive -> crash / explosion) | invincible 187 frames from the catch | the same (the user: "invincibility during the hold only"), no armor |
+
+The only invincibility writes are at the catch: the detection box's `Body_State_Set` (the game script) and the dive
+catch's INVINCIBLE variable (the MSC). Nothing else in the move sets a body state: XV2's own invulnerability window
+was never ported. Any end of the status during the hold still lets the victim go (`cb_end` -> `cb_release`: its
+controller and stage collision back).
+
+Tests: no armor in the rise or the hover; the dive armored with no invincibility written before the catch; one
+invincibility write, at the catch; no armor in the hold / crash; a status cut mid-hold lets the victim go.
+
 ### Tests (v4 build, halos 0.16)
-See the report numbers below the package; the README's earlier test lists still hold except where v4 changed them.
+- `supamario_corebreaker_test.py`: 81 checks, 0 problems (the earlier lists still hold, except where v4 changed them);
+- `supamario_godfist_test.py --all-models`: 0 problems;
+- `msc_stack_check.py`: 0 stack problems (2366 scripts).
+
+Package: only the MSC and the game / effect scripts changed from v3 (the effect sizes are in the effect script's calls;
+the ptcl / efc and the motion are v3's).
 
 **Not confirmed in game:**
 - the MSC catch: that target 2 (the last fighter hit) is the dive's victim on the frame its hit flag shows, and the slot

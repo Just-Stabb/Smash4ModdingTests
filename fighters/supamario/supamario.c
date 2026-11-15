@@ -38935,8 +38935,9 @@ int cb_dive_phase(float fr)
 // result (AttackModule 0x2726 / 0x2727 with kind 2, a hurtbox: since the dive's start, AttackModule 0x2724 there, or
 // this frame), the fighter it hit (target 2, the last fighter hit: its status, body state, damage, kind) and its player
 // slot (the slot whose status, damage and kind are target 2's). Refused as before: lying down, invincible / intangible
-// (cb_refused: the dive goes on without its hitboxes). Caught: the hitboxes gone,
-// cb 3 and the slot for the scripts. v4: no invincibility (the user: armor instead): his super armor stays on
+// (cb_refused: the dive goes on without its hitboxes). Caught: invincible CB_INVINCIBLE frames, the hitboxes gone,
+// cb 3 and the slot for the scripts. The hold keeps v1-v3's invincibility (v4, user: "He should keep invincibility
+// during the hold only"; the dive itself: super armor only)
 int cb_dive_catch()
 {
     float st;
@@ -38980,6 +38981,7 @@ int cb_dive_catch()
     }
     WorkModule(0, (float)found, CB_V_SLOT);
     WorkModule(0, 3.0f, CB_VAR);
+    WorkModule(0, CB_INVINCIBLE, 0x0F00011C);
     AttackModule(0x2719);
     return 0x1;
 }
@@ -39079,9 +39081,9 @@ void cb_catch()
         WorkModule(0, CB_HOLD_STATUS, 0x0F0000A2 + 8 * cb_t());
     }
     SoundModule(0x2714, CB_SND_RUSH);
-    // v4: super armor through the hold, the drive and the crash / the explosion (v1-v3: invincible from the catch); hit
-    // out of it anyway (a grab, an armor-breaking hit), the status's end lets the victim go (cb_end -> cb_release)
-    cb_armor(0x1);
+    // the hold: invincible (the game script's Body_State_Set / cb_dive_catch's INVINCIBLE), no armor needed; any end
+    // of the status lets the victim go (cb_end -> cb_release)
+    cb_armor(0);
     cb_aircap(0);
     MotionModule(0x4, 1.0f);
     // the drive's floor (off the stage: the explosion in the air): the rise's start, but at least CB_DRIVE_MIN_DROP

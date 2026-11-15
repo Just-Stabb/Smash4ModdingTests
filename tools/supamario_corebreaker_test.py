@@ -90,6 +90,7 @@ class Game:
         self.used_log = []
         self.stick_world = None
         self.turns = []
+        self.inv_log = []               # (n, frames) the self INVINCIBLE writes
         self.vx2 = 0.0                  # energy 2 (the stick's air control: his air momentum), world X
         self.hit = False                # v4: his attack has hit the victim (AttackModule 0x2726 / 0x2727)
         self.cleared = []               # AttackModule(0x2719): his hitboxes cleared
@@ -156,6 +157,8 @@ class Game:
             if v in (0x0F000040 + 8 * t, 0x0F000044 + 8 * t):
                 vi.setdefault('held', []).append(self.n)
                 return
+        if v == 0x0F00011C:
+            self.inv_log.append((self.n, val))
         self.vars[v] = val
 
     def sys(self, sid, a):
@@ -647,15 +650,16 @@ def msc_tests(path):
     g, v, far, tr = on_path()
     dv = [t for t in tr if t[4] == 2.0]
     check('the dive catches a fighter standing in its way (%d frames into it, far from the detection box): its slot '
-          '(2), the hitboxes cleared, the hold on the ground, the crash' % len(dv),
-          (len(dv) > 3 and far > 30.0, g.vars.get(B.CB_V_SLOT), len(g.cleared) > 0, phases_of(tr)),
-          (True, 2.0, True, [1.0, 2.0, 8.0, 6.0]))
+          '(2), the hitboxes cleared, invincible %d frames, the hold on the ground, the crash' % (len(dv), B.INVINCIBLE),
+          (len(dv) > 3 and far > 30.0, g.vars.get(B.CB_V_SLOT), len(g.cleared) > 0, g.vars.get(0x0F00011C),
+           phases_of(tr)), (True, 2.0, True, float(B.INVINCIBLE), [1.0, 2.0, 8.0, 6.0]))
     # v4 (user: "make it so that there's no armor during the leap or hover, and the dive has armor instead of
-    # invincibility"): armor in the dive and through the catch (the hold, the crash), never invincible
+    # invincibility"; then "He should keep invincibility during the hold only"): the hover nothing, the dive super armor
+    # and not invincible, the hold invincible (written at the catch, not before), no armor there
     arm = {ph: sorted({armor_at(g, t[7]) for t in tr if t[4] == ph}) for ph in (1.0, 2.0, 8.0, 6.0)}
-    check('armor: none in the hover, super armor in the dive, the hold and the crash; never invincible / intangible '
-          '(no INVINCIBLE / INTANGIBLE write)', (arm, g.vars.get(0x0F00011C), g.vars.get(0x0F00011B)),
-          ({1.0: [0], 2.0: [1], 8.0: [1], 6.0: [1]}, None, None))
+    check('armor / invincibility: the hover none, the dive super armor (invincibility only written at the catch), the '
+          'hold / crash invincible without armor', (arm, len(g.inv_log) == 1 and g.inv_log[0][0] > dv[0][7]),
+          ({1.0: [0], 2.0: [1], 8.0: [0], 6.0: [0]}, True))
     for name, extra in (('lying down (DownWait)', {'status': 0x50}), ('invincible', {'body': 1})):
         g, v, far, tr = on_path(extra)
         check('the dive refuses a fighter %s: no catch, the hitboxes gone, it dives on and lands' % name,
