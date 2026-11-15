@@ -410,7 +410,7 @@ vanilla.
 
 ## 9. Not known yet
 
-- Groups 6 and 11 (General.csv): unknown; group 1 bytes 1-5 only partly checked.
+- Groups 6 and 11 (General.csv): unknown; group 1 bytes 1-5 only partly checked (byte 0 sets the motion table's flag 0x80 and byte 1 its +4, `0x02EA9008`; byte 2 the cancel frame, bytes 3 / 4 the intangible window's start / end: docs/native-notes.md "The motion's intangible window").
 - Fighter-specific non-weapon members: most are read by native code not traced here.
 - Marth's counter fields 6-13, Captain Falcon's category 4 (Blue Falcon), many article fields:
   no read found (native code with IDs in registers other than r4, or tables).

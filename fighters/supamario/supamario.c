@@ -39706,6 +39706,16 @@ int cb_update()
 {
     float fr;
     int r;
+    // v11 (user: v10's B, the second up special in the air, "blinks" after the landing; the diag log: the status's
+    // body state 2, intangible, set at its entry and kept to its end): the fighter update (0x02E24270, its tail
+    // 0x02E24D1C-0x02E24F90) applies the motion's intangible window from his vl file (group 1, the motion's 6 bytes:
+    // byte 3 its start, byte 4 its end; SpecialHi / SpecialAirHi: Mario's 3 / 7, Super Jump Punch's frames 3-6)
+    // each frame: 2 when the frame crosses the start, 0 when it crosses the end, an `else`: cb_goto's jump 0 ->
+    // HOVER_FROM crosses both in one frame, so the start set it and nothing cleared it. The build's vl file has no
+    // window for the up special (supamario_corebreaker_build.vl_no_window); this is the status's own guard (an old
+    // vl file installed, any other path): normal every frame. The hold's invincibility is the INVINCIBLE frames
+    // (HitModule(1)), another state, untouched
+    HitModule(0, 0);
     cb_jump_done();
     fr = MotionModuleF(0x1);
     cb_n = cb_n + 1;

@@ -5,6 +5,7 @@ built over the Super God Fist's (v17: tools/supamario_godfist_build.py, run firs
   python3 -I tools/supamario_corebreaker_build.py SUPAMARIO_DIR OUT_DIR --skill 2070_FIT_COR_DIR
         --se-wav COR_WAV_DIR [the God Fist's: --ean 030_GOD_CSA.ean --cmn-vfx VFX_CMN_DIR --skill-vfx 002_GOK_CSG_DIR
         --cmn-se GF_WAV_DIR --stb SOUNDLABELTABLE] [--png SHEET.png]
+  python3 -I tools/supamario_corebreaker_build.py vl MARIO_VL.bin OUT_DIR     (v11, after it: vl_no_window)
 
 COR_WAV_DIR: the skill's SE (CAR_BTL_U2070_COR_SE.acb, cues 1-5 decoded: `python3 -I tools/xv2acb.py extract ...` +
 `node tools/xv2acb_decode.mjs ...`) and CMN's Hit_L (CAR_BTL_CMN.acb cue 52). Writes OUT_DIR/fighter/supamario (the
@@ -526,8 +527,59 @@ def build(sm_dir, out_dir, skill_dir, se_wav, gf_args, png=None, halo=True):
     return fdir
 
 
+# ---------------------------------------------------------------- v11: the vl file (the up special's intangible window)
+VL_NAME = os.path.join('param', 'fighter', 'fighter_param_vl_supamario.bin')
+VL_UP_SPECIAL = (0x221, 0x225)          # SpecialHi / SpecialAirHi (vl group 1 entries 545 / 549, the motion kinds)
+VL_WINDOW = (3, 7)                      # Mario's (Super Jump Punch: intangible 3-6): group 1 bytes 3 / 4
+
+
+def vl_motion_offsets(data):
+    """file offsets of the 6 s8 values of each motion in fighter_param_vl group 1 (kirby_marth_sword's reader)"""
+    import kirby_marth_sword as KMS
+    return KMS.vl_motion_offsets(data)
+
+
+def vl_no_window(data):
+    """v11: his vl file (Mario's, add_fighter.py's copy) with no intangible window on the up special's motions.
+    The fighter update (exe 0x02E24270, its tail 0x02E24D1C-0x02E24F90) reads the current motion kind's 6 bytes
+    (group 1, [vl + 0xC] + kind * 6): byte 3 the start, byte 4 the end; a frame crossing the start sets the status's
+    body state 2 (intangible, HitModule 0x02C42F00), one crossing the end 0 (an else: a jump over both leaves 2, the
+    v10 bug: cb_goto 0 -> HOVER_FROM); byte 4 0 skips it. Both bytes 0 for SpecialHi / SpecialAirHi; every other byte
+    as it was. Returns (bytes, [(kind, old 6 bytes, new 6 bytes)])"""
+    out = bytearray(data)
+    offs = vl_motion_offsets(data)
+    changes = []
+    for k in VL_UP_SPECIAL:
+        o = offs[k]
+        old = [data[i] for i in o]
+        assert (old[3], old[4]) in (VL_WINDOW, (0, 0)), 'kind 0x%X: window %r, not Mario\'s %r' % (k, old[3:5], VL_WINDOW)
+        out[o[3]] = 0
+        out[o[4]] = 0
+        changes.append((k, old, [out[i] for i in o]))
+    return bytes(out), changes
+
+
+def vl_write(src, out_dir):
+    """OUT_DIR/param/fighter/fighter_param_vl_supamario.bin from SRC (Mario's vl or his installed copy)"""
+    data, changes = vl_no_window(open(src, 'rb').read())
+    dst = os.path.join(out_dir, VL_NAME)
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    with open(dst, 'wb') as fh:
+        fh.write(data)
+    return dst, changes
+
+
 def main():
     a = sys.argv[1:]
+    if a and a[0] == 'vl':
+        # python3 -I tools/supamario_corebreaker_build.py vl SRC_VL.bin OUT_DIR (v11: run after the package's build)
+        if len(a) != 3:
+            sys.exit(__doc__)
+        dst, changes = vl_write(a[1], a[2])
+        for k, old, new in changes:
+            print('vl kind 0x%X: %r -> %r' % (k, old, new))
+        print(dst)
+        return
     opts = {}
     halo = '--no-halo' not in a
     if not halo:

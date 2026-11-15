@@ -98,6 +98,11 @@ class Game:
         self.hit_kind = 2               # v8: what his hit met (2 a body, 4 a shield)
         self.hit = False                # v4: his attack has hit the victim (AttackModule 0x2726 / 0x2727)
         self.cleared = []               # AttackModule(0x2719): his hitboxes cleared
+        self.window = (0, 0)            # v11: the motion's intangible window (vl group 1 bytes 3 / 4; 0 / 0 none)
+        self.body = 0                   # v11: the status's body state (HitModule 0x02C42F00: 0 normal, 2 intangible)
+        self.body_log = []              # (n, state) after the engine's window, each frame (what the hits meet)
+        self.body_resets = 0            # MSC HitModule(0, 0) calls
+        self.keep_body = False          # True: the MSC's HitModule(0, x) ignored (the v10 MSC, for the log's check)
 
     def fvar(self, v):
         if v in self.vars:
@@ -246,6 +251,12 @@ class Game:
         if sid == 0x11 and len(a) == 2 and a[0] in (0xA, 0xB):   # KineticModuleF(0xa / 0xb, energy): its x / y
             return R.f2i({(0xA, 1): 0.0, (0xB, 1): self.vy, (0xA, 2): self.vx2, (0xB, 2): 0.0,
                           (0xA, 3): self.vx, (0xB, 3): 0.0}.get((a[0], a[1]), 0.0))
+        if sid == 0x2D and a and a[0] == 0:         # v11: HitModule(0, state): the status's body state
+            if a[1] == 0:
+                self.body_resets += 1
+            if not self.keep_body:
+                self.body = a[1]
+            return 0
         if sid == 0x2E and a:                        # AttackModule (v4: the dive's catch in the MSC)
             if a[0] == 0x2724:
                 self.hit = False
@@ -303,7 +314,20 @@ class Game:
         else:
             self.x += self.vx
             self.vx = self.vx - FRICTION * (1 if self.vx > 0 else -1) if abs(self.vx) > FRICTION else 0.0
+        prev = self.frame
         self.frame += self.rate
+        self.engine_window(prev, self.frame)
+
+    def engine_window(self, prev, cur):
+        """v11: the fighter update's tail (exe 0x02E24D1C-0x02E24F90), after the motion's advance: the window's
+        start crossed -> body state 2, else its end crossed -> 0 (byte 4 0: nothing); logged (the frame's hits)"""
+        start, end = self.window
+        if end > 0:
+            if cur >= start and prev < start:
+                self.body = 2
+            elif cur >= end and prev < end:
+                self.body = 0
+        self.body_log.append((self.n, self.body))
 
 
 def vm_for(path, g):
@@ -330,6 +354,8 @@ def run(path, g, frames=420, catch_at=None, cut_at=None, victim_reach=None, pres
     the hover's first frames; press: {frame of this run: global24 bits}; cut_at: the status cut (func_2289) then.
     Returns the per-frame trace [(n, motion frame, x, y, cb var, air, victim)]"""
     g.frame, g.rate, g.status = 0.0, 1.0, None
+    g.body = 0                                  # v11: a status change resets the status's body state
+    g.statuses = getattr(g, 'statuses', 0) + 1
     vm = vm_for(path, g)
     vm.g[24] = 0
     vm.call(vm.func(FUNC_MAIN))
@@ -1292,6 +1318,92 @@ def effect_tests(out_dir, fdir):
           bad, [])
 
 
+def body_tests(path, out_dir):
+    """v11 (user's v10 clip: B, the second up special in the air, blinks after its landing; the diag log: the status's
+    body state 2 set at the entry by the fighter update's motion window, 0x02E24F70, and kept to the status's end)"""
+    vl = os.path.join(out_dir, B.VL_NAME)
+    if not os.path.exists(vl):
+        check('v11: the package has his vl file (%s)' % B.VL_NAME, False, True)
+        return
+    data = open(vl, 'rb').read()
+    offs = B.vl_motion_offsets(data)
+    win = {k: (data[offs[k][3]], data[offs[k][4]]) for k in B.VL_UP_SPECIAL}
+    check('v11: his vl file: no intangible window on SpecialHi / SpecialAirHi (group 1 bytes 3 / 4 = 0; Mario\'s 3 / 7)',
+          win, {k: (0, 0) for k in B.VL_UP_SPECIAL})
+    check('v11: his vl file: nothing else to change (vl_no_window idempotent on it, %d motions)' % len(offs),
+          B.vl_no_window(data)[0] == data, True)
+    hold_t = B.DIVE_FROM - B.HOVER_FROM + 4
+
+    def paths():
+        """(name, fn(mk): the run(s) on a Game mk(**Game kwargs) makes; returns it)"""
+        def rise(mk):
+            g = mk()
+            run(path, g)
+            return g
+
+        def a_seq(mk):                  # A: the rise cancelled into the hover in place (one status)
+            g = mk()
+            run(path, g, press={B.RISE_CANCEL + 1: 0x4000})
+            return g
+
+        def b_seq(mk):                  # B: the rise to Fall, up special again in the air (the hover from the jump)
+            g = mk()
+            both(path, g)
+            return g
+
+        def catch_g(mk):
+            g = mk(stage=(-200.0, 200.0), victim={'x': 30.0, 'y': 0.0, 'status': 0x47})
+            both(path, g, catch_at=hold_t)
+            return g
+
+        def catch_air(mk):
+            g = mk(x=0.0, y=-30.0, stage=(1000.0, 1001.0), victim={'x': 0.0, 'y': -60.0, 'status': 0x47, 'sit': 2})
+            both(path, g, catch_at=hold_t)
+            return g
+
+        def shield(mk):
+            v = {'x': 0.0, 'y': 0.0, 'status': 0x1C, 'shield': 50.0}
+            g = mk(stage=(-200.0, 200.0), victim=v)
+            g.hit_kind = 4
+            run(path, g, frames=B.HOVER_FROM + 3)
+            v['x'] = g.x + g.face * (g.y / math.tan(math.radians(B.DIVE_DEG)) - 2.0)
+            run(path, g, victim_reach=B.HB["catch"][1] + 4.0, tick=True)
+            return g
+        return (('the rise alone', rise), ('A: the rise cancelled into the hover', a_seq),
+                ('B: the second up special in the air', b_seq), ('a grounded catch', catch_g),
+                ('a catch in the air', catch_air), ('a shielded dive', shield))
+
+    def go(fn, window, keep=False):
+        def mk(**kw):
+            g = Game(**kw)
+            g.window, g.keep_body = window, keep
+            return g
+        return fn(mk)
+
+    # the model against the log (the v10 MSC: its HitModule(0, x) ignored, Mario's window 3 / 7)
+    ga = go(paths()[1][1], B.VL_WINDOW, keep=True)
+    gb = go(paths()[2][1], B.VL_WINDOW, keep=True)
+    a2 = [n for n, st in ga.body_log if st == 2]
+    rise_n = B.HOVER_FROM + 3
+    b2 = [st for n, st in gb.body_log if n >= rise_n]
+    check('v11: the model reproduces the log without the fix: A intangible 4 frames (the rise\'s 3-6, the k13 lines '
+          'after 04:07:39.240), B from its first frame to its end (the k13 lines after 04:07:33.269 / 59.034)',
+          (len(a2), len(b2) > 50, set(b2)), (4, True, {2}))
+    out_old, out_new = [], []
+    for name, fn in paths():
+        g = go(fn, B.VL_WINDOW)                 # the fix with an old vl file (Mario's window): the MSC's guard
+        runs = [n for n, st in g.body_log if st == 2]
+        out_old.append((name, all(n + 1 not in runs for n in runs), len(runs) <= g.statuses, g.body_log[-1][1]))
+        g = go(fn, (0, 0))                      # the package: the vl without the window
+        out_new.append((name, sorted(set(st for _n, st in g.body_log)), g.body_resets > 0))
+    check('v11: an old vl file (window 3 / 7): the status\'s own HitModule(0, 0) every frame leaves at most the '
+          'crossing frame itself intangible, once a status, never 2 frames running, normal at the end', out_old,
+          [(n, True, True, 0) for n, _f in paths()])
+    check('v11: the package (no window): the body state normal on every frame of every path (the hold\'s '
+          'invincibility is the INVINCIBLE frames, apart), the status resetting it every frame', out_new,
+          [(n, [0], True) for n, _f in paths()])
+
+
 def main():
     a = sys.argv[1:]
     if len(a) != 2:
@@ -1299,6 +1411,7 @@ def main():
     out_dir, vbn = a
     fdir = os.path.join(out_dir, 'fighter', 'supamario')
     msc_tests(os.path.join(fdir, 'script', 'msc', 'supamario.mscsb'))
+    body_tests(os.path.join(fdir, 'script', 'msc', 'supamario.mscsb'), out_dir)
     script_tests(fdir)
     motion_tests(fdir, vbn)
     effect_tests(out_dir, fdir)
