@@ -86,6 +86,10 @@ EMPTY = ['attacks4hi', 'attacks4lw', 'landingairn', 'landingairf', 'landingairb'
 # TRANSLATE names emptied when Ultimate has no game script for them (the base's landing hit stayed on
 # Squirtle's down air: port_check S7)
 EMPTY_IF_ABSENT = {'landingairlw'}
+# a TRANSLATE slot whose Ultimate file is absent but whose motion plays another move's animation (the profile's stand-in:
+# ultimate_fighter.py) takes that move's script: one forward tilt on a base with angled ones (Byleth on ZSS: her
+# AttackS3Hi / Lw hitboxes stayed on his forward-tilt animation, a base leftover: port_check B1)
+FALLBACK = {'attacks3hi': 'AttackS3', 'attacks3lw': 'AttackS3'}
 
 EFFECT = {'collision_attr_normal': 0, 'collision_attr_cutup': 2, 'collision_attr_sting': 2,
           'collision_attr_elec': 3, 'collision_attr_fire': 5, 'collision_attr_purple': 0x13,
@@ -1589,6 +1593,9 @@ def main():
         body = None
         if os.path.exists(path):
             body = functions(open(path).read()).get('game_' + src.lower())
+        elif name in FALLBACK and os.path.exists(os.path.join(a.scripts, FALLBACK[name] + '.txt')):
+            body = functions(open(os.path.join(a.scripts, FALLBACK[name] + '.txt')).read()).get(
+                'game_' + FALLBACK[name].lower())
         if body is None and name not in SLOTS:
             if name in EMPTY_IF_ABSENT and not a.only:
                 f.scripts[acmd.crc(name)] = [acmd.Command(acmd.END)]

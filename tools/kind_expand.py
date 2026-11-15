@@ -189,6 +189,34 @@ def sound_record(table, kind):
 # kinds whose vl load tail (0x02EA8DA4-) stores an extra vector (x1324 / x152C) keyed by the kind
 # itself: a new kind with one of these bases doesn't get it (the base's own slot still has it)
 TAIL_EXTRA_KINDS = (5, 6, 8, 0x17, 0x18, 0x19, 0x1C, 0x20, 0x21, 0x23, 0x26, 0x35)
+# Each such kind's block (0x02EA8E38-0x02EA8FE0) is: lwz r10, 0x2574(r29) (the equipment-ability object);
+# lwz rS, 0x320 + 4 kind(r10) (the kind's parsed vl struct); lwz rC, COUNT(rS); cmpwi rC, 0; ble; lwz rV, DATA(rS);
+# lwzx; stw rV, ARRAY + 4 kind(r29). The vector's kinds: x152C = the tether fighters (Link, Samus, ZSS, Toon Link,
+# Lucas: ZSS's COUNT 0x198 / DATA 0x19C), x1324 = 8, 0x17, 0x18, 0x1C, 0x21, 0x23, 0x26. A record with
+# "tail_vector": true gets its base's block for its own kind in hook A (Byleth on ZSS: her tether set; port_bases.json
+# szerosuit). Off by default: Steve (Pit's x1324, his equipment data) built without it.
+TAIL_BLOCKS = (0x02EA8E38, 0x02EA8FE0)
+
+
+def tail_block(img, bkind):
+    """(count offset, data offset, array name) of a TAIL_EXTRA_KINDS base's vl tail block"""
+    def fields(w):
+        return w >> 26, (w >> 21) & 31, (w >> 16) & 31, sx16(w)
+    for a in range(TAIL_BLOCKS[0], TAIL_BLOCKS[1], 4):
+        op, rd, ra, d = fields(img.w(a))
+        if op == 32 and ra == 10 and d == EQ_ARRAY + 4 * bkind and fields(img.w(a - 4))[1:] == (10, 29, 0x2574):
+            s_reg = rd
+            o1, rc, rs1, count = fields(img.w(a + 4))
+            assert o1 == 32 and rs1 == s_reg, 'tail block 0x%08X: count' % a
+            o2, rv, rs2, data = fields(img.w(a + 16))
+            assert o2 == 32 and rs2 == s_reg, 'tail block 0x%08X: data' % a
+            o3, rv2, r29, dest = fields(img.w(a + 24))
+            assert o3 == 36 and rv2 == rv and r29 == 29, 'tail block 0x%08X: store' % a
+            for name, old in (('x1324', 0x1324), ('x152C', 0x152C)):
+                if dest == old + 4 * bkind:
+                    return count, data, name
+            raise AssertionError('tail block 0x%08X: store to 0x%X' % (a, dest))
+    raise AssertionError('no vl tail block for kind 0x%X' % bkind)
 KIND_NAMES = None              # filled from the RPX (lowercase name table)
 
 
@@ -304,6 +332,7 @@ def load_spec(path):
         rec['desc_from'] = (r.get('descriptor') or {}).get('from', r['base'])
         # motion table entries changed from the base's: {index: {"anim": main.pac name, "flags": word}}
         rec['motions'] = {num(i): m for i, m in (r.get('motions') or {}).items()}
+        rec['tail_vector'] = bool(r.get('tail_vector'))     # the base's x1324 / x152C vector for this kind too
         assert rec['kind'] == OLD_N + i, 'kinds must be consecutive from 0x41 (record %d is 0x%X)' % (i, rec['kind'])
         assert rec['ai'] in ('base', 'generic'), rec['ai']
         assert len(rec['vl']) + len('param/fighter/.bin') < 0x64, 'vl file name too long'
@@ -803,16 +832,38 @@ sr_none:
             B.put(at + 4 * i, w, nt)
         r['unload_case'] = at
     # hook A: the vl load's common tail (lwz r7, 0xC(r10)): mirror old vl[k] -> new vl[k], k < 0x41
-    hook_a = B.alloc(7 * 4)
+    # then, for a new kind with "tail_vector", its base's tail block for the kind (r3 - r6 are written before
+    # the tail reads them; r7, r10, r12 live)
+    tv = ''
+    for r in kinds:
+        if not r.get('tail_vector'):
+            continue
+        assert r['bkind'] in TAIL_EXTRA_KINDS, '%s: tail_vector on a base without one' % r['name']
+        count, data, arr = tail_block(img, r['bkind'])
+        k = r['kind']
+        tv += '''
+        cmplwi r31, 0x%(k)X               # kind 0x%(k)X: its base's %(arr)s vector (count +0x%(c)X, data +0x%(d)X)
+        bne tv_%(k)x
+        lwz r3, 0x2574(r29)
+        lwz r4, 0x%(eq)X(r3)
+        lwz r5, 0x%(c)X(r4)
+        cmpwi r5, 0
+        ble tv_%(k)x
+        lwz r6, 0x%(d)X(r4)
+        stw r6, 0x%(dst)X(r29)
+tv_%(k)x:''' % dict(k=k, arr=arr, c=count, d=data, eq=EQ_ARRAY + 4 * k, dst=lay[arr][1] + 4 * k)
+        info.setdefault('tail_vectors', []).append((k, arr, count, data))
+    hook_a = B.alloc((7 + 9 * len(info.get('tail_vectors', []))) * 4)
     B.code(hook_a, '''
         cmplwi r31, 0x41
-        bge ha_done
+        bge ha_new
         add r11, r29, r27               # mgr + 4 * kind (r7 / r11 are written next anyway)
         lwz r7, 0x111C(r11)
         stw r7, %d(r11)
+ha_new:%s
 ha_done:
         lwz r7, 0xC(r10)
-        b 0x%08X''' % (lay['vl'][1], VL_TAIL + 4))
+        b 0x%08X''' % (lay['vl'][1], tv, VL_TAIL + 4))
     B.put(VL_TAIL, b_word(VL_TAIL, hook_a), 'b 0x%08X' % hook_a, 'lwz r7, 0xC(r10)')
     # hook B: the unload's store (stw r29, 0x111C(r12), r29 = 0, r12 = mgr + 4 * kind): both arrays
     hook_b = B.alloc(5 * 4)

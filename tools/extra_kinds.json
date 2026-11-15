@@ -245,6 +245,7 @@
       "cap": "Master",
       "base": "szerosuit",
       "ai": "base",
+      "tail_vector": true,
       "ui": {
         "id": 65,
         "name": "Byleth",

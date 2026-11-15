@@ -1,8 +1,8 @@
 # Byleth (`master`)
 
 A port of Ultimate's Byleth (internal name `master`) to Smash 4, on **Zero Suit Samus's base** (`szerosuit`, kind
-0x19). New fighter kind **`0x47`**, character id **65**, UI name `Byleth` (subtitle "Ashen Demon": a placeholder, the
-user's call), texture-id block `0x40C70000` (`reference/port_bases.json` `_texture_ids`). Trait: **Strike** (the user's
+0x19). New fighter kind **`0x47`**, character id **65**, UI name `Byleth` (subtitle "A Heroic Legacy": Ultimate's own
+string for him, `msg_menu.msbt` `mnu_standard_sub_master`; Ultimate has no other per-fighter subtitle), texture-id block `0x40C70000` (`reference/port_bases.json` `_texture_ids`). Trait: **Strike** (the user's
 choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default 2.2 / 1.0 with Hero's momentum
 (ZSS's universal-mechanics body, below).
 
@@ -90,6 +90,67 @@ exe_v46o sha1 bd818233d2c55b8b16fe7a104bd030fc95dbe587.
 **Still to come in the executable:** his weapon kinds (articles, below), the sound aliases (after the sound step),
 motion slots (`extra_kinds.json` "motions": the kind's motion table is in the cave), the x152C tether vector (Risks 1),
 the female voice / per-costume motions if wanted (Open questions).
+
+## Phase 2 (in progress; nothing packaged)
+
+The user's answers (coordinator): Ultimate's specials order; the up special on ZSS's tether as the base with his own
+Sword of the Creator on top; female costumes with their own animations and voice; the Final Smash stays ZSS's for now
+(no crash); subtitle from Ultimate's files; Kirby's Failnaught copy with his hat; Aymr's KO zoom in 1-on-1; their
+install files later (everything that needs them re-runs on them with one command; vanilla stand-ins until then).
+
+Done so far:
+- **exe_v46p** (`scratchpad/byleth/exe/exe_v46p.rpx`, sha1 e4fe65797487e5aa7f859cb5c9c0c2107ee3a1c5) = exe_v46n + the
+  kind (as exe_v46o) + **his tether set** + **his sound aliases**:
+  - `kind_expand.py`: a record's `"tail_vector": true` runs its base's vl-tail block for the new kind in hook A (ZSS's:
+    count +0x198 / vector +0x19C of the kind's parsed vl struct -> x152C[kind]; registers r3-r6, written before the
+    tail reads them). `kind_expand_test` checks it: `x152C[0x47]` = his own struct's +0x19C (unicorn), the other new
+    kinds unchanged (Steve keeps no Pit x1324 vector: off unless asked). Risk 1 is closed for the vl data; his tether
+    statuses still need an in-game test.
+  - `sound_alias_cave.py`: kind 0x47's aliases (se 2028, vc 6023, cheer 6106) from `reference/port_sound_ids.json`;
+    `sound_alias_cave_test`: kind 0x47 ok (4 "unpatched" failures: the original is already aliased for the others).
+- **Sound** (`ultimate_sound.py`, on the vanilla soundlabeltable): se 154 + 130 Ultimate tones, voice 44 + 55 (the
+  base's game-played voices given his), cheer, 14 sequences; **the female costumes' own banks**
+  (`snd_se_Master_c01/03/05/07`, `snd_vc_Master_c01/03/05/07`, Ultimate's `se_ / vc_master_c01`): the game already
+  loads `_cNN` banks by costume for a new kind, so the female voice needs no executable change. Own bank ids 46192-
+  46215. The female cheer (`vc_master_c01_cheer`) isn't used yet (one cheer bank).
+- **Scripts** (`ultimate_acmd.py`): 30 game scripts (normals, grabs, throws, ledge / get-up attacks, the dash) with
+  Ultimate's cancel / intangible frames into the vl file, 75 effect, 159 sound, 191 expression scripts. Every normal's
+  hitboxes are in his body scripts (on `haver` / `top`): the weapon articles carry none, so the normals hit as
+  Ultimate's without the article models. Left out: the sword trails (`tex_master_sword1/2`: trail_table_cave ids to
+  add), 9 sounds without an id (containers / other fighters' / raw hashes), rumble kinds with no Smash 4 match.
+
+### ZSS leftovers ("ZSS's statuses don't override Byleth's")
+
+Found and fixed / guarded so far:
+- **Her angled forward tilts' hitboxes** (`AttackS3Hi` / `Lw`) stayed on his one forward tilt's animation: the
+  translator's new `FALLBACK` gives a stand-in slot the stand-in's script.
+- **Her per-kind tether vector** (x152C): 0 for a new kind; given to 0x47 (`tail_vector`, above).
+- **`port_check` B1 base-leftovers** (new; guide catalogue row): every script of the four body files still byte for
+  byte the base's vanilla one that acts. On the current build: game 16 (her specials, custom-move variants, item
+  and other ZSS-only slots), effect 28, sound 72, expression 66: the specials step replaces / empties them (none may
+  stay unless listed in `port.json` `base_scripts_kept`).
+- **vl bytes:** C1 flags her specials' cancel frames (0x239 / 0x23D: 0, Ultimate 54); to do: every motion byte of
+  group 1 (cancel, intangibility, armor) set from Ultimate's motion_list for every slot he plays and cleared on the
+  others (Supamario Core Breaker v11's leftover intangible window).
+- **Still to audit:** her MSC status functions (0x152-0x162, her tether 0xF3 / 0xF4, Catch's whip) each replaced or
+  kept on purpose; her status transitions into her specials; her native per-kind code on kind 0x47 (the Paralyzer /
+  whip articles and their special params, the jetpack / Boost Kick, the Gunship); item swing timings (her
+  `*Swing4` scripts: item timings, not hitboxes; Ultimate's item scripts to translate).
+
+Not started yet: the specials (MSC, articles: Failnaught's arrows, Areadbhar, the sword on her tether, Aymr's armor and
+zoom), the plain grab / zair off, held-weapon models, per-costume (female) motion folders in the executable, Kirby's
+Failnaught copy (hat, motions, the copy grant), the effect-colour comparison, portraits, the package.
+
+### Re-run on the user's files
+
+When their files arrive (port_sources.json: `fighter_param`, `soundlabeltable`, `s4_chr`, `templates.master`, and
+add_fighter's `--param` / `--ui` on theirs):
+```
+python3 tools/add_fighter.py --param THEIRS/param --param VANILLA/param --ui THEIRS/ui --kinds tools/extra_kinds.json --only master --out DATA
+python3 tools/ultimate_port.py run master sound stats portraits --out OUT
+```
+Until then the outputs on vanilla files (`port/master/sound/config/soundlabeltable.bin`, `param/fighter/fighter_param.bin`,
+the add_fighter data) are **not for install**: they would overwrite the user's own rows.
 
 ## Model and motions
 

@@ -57,7 +57,7 @@
   "ports": ["master"],
   "fighter_param": {"0x1300011F": "Has Tether (fighter_param_attributes.csv column 287): 1 for her (whip grab, zair); 0 unless the port tethers (Byleth: decision pending)"},
   "traps": [
-   "Her kind (0x19) is in kind_expand.py TAIL_EXTRA_KINDS: the vl load tail stores the x152C vector for its own kind only, and the kinds that have one are exactly the tether fighters (Link, Samus, ZSS, Toon Link, Lucas): a new kind on her base gets 0 there. Any of her native tether code the port reaches (grab whip, zair, the lasso hang statuses 0xF3 / 0xF4) may read a null vector: give the new kind the base's x152C in its vl load case (kind_expand.py) or keep the port off every tether path (Has Tether 0, her grab / air-grab statuses replaced) before the first in-game test (Byleth, unverified).",
+   "Her kind (0x19) is in kind_expand.py TAIL_EXTRA_KINDS: the vl load tail stores the x152C vector for its own kind only, and the kinds that have one are exactly the tether fighters (Link, Samus, ZSS, Toon Link, Lucas): a new kind on her base gets 0 there. Any of her native tether code the port reaches (grab whip, zair, the lasso hang statuses 0xF3 / 0xF4) may read a null vector: give the new kind the base's x152C: extra_kinds.json \"tail_vector\": true (kind_expand.py hook A runs her tail block for it; kind_expand_test checks x152C[kind] = its struct's +0x19C; Byleth, exe_v46p), or keep the port off every tether path.",
    "Her eyelid pac keys her face skin (SZerosuit_Face_Main) by expression: the port's face must not go there (port_check F1); Byleth's is in Gamemodel.",
    "Costumes 6 / 7 have no Mark_back1 mesh (33 slots): profile szerosuit_nomark.",
    "The Paralyzer slot (her holster) is shown / hidden by her own code: keep it empty.",

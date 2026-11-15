@@ -538,6 +538,14 @@ def main():
         check('  its struct in new vl / equipment field / vl50 / refcount', (sk['vl'], sk['eq'], sk['vl50'], sk['refcnt']),
               (log[5][2], log[5][2], 0x50, 1))
         check('  att / attp records (as the base\'s, from its own struct)', (sk['att'], sk['attp']), (sb['att'], [0, 3]))
+        if r.get('tail_vector'):
+            # its base's x1324 / x152C block run for it: the vector word of its own struct (fake words: id << 16 | offset)
+            count, data, arrn = K.tail_block(img, b)
+            v = sk['x'][('x1324', 'x1428', 'x152C').index(arrn)]
+            check('  tail_vector: %s[0x%X] = its own struct\'s +0x%X (the base\'s block, count +0x%X > 0)' % (arrn, k, data, count),
+                  (v >> 16, v & 0xFFFF), (sk['vl'], data))
+        else:
+            check('  no tail vector of its base\'s (x1324 / x152C 0)', sk['x'][0] | sk['x'][2], 0)
         check('  (and they are filled)', sum(isinstance(v, tuple) for v in sk['att']), 4)
         check('  the base loaded once, mirrored', (sb['refcnt'], sb['vl'], arr(P, OLDL, 'vl', b) == arr(P, NEWL, 'vl', b)),
               (1, log[2][2], True))

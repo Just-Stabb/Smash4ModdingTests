@@ -431,6 +431,34 @@ def check_scripts(inst, name, kind, base, joints, vanilla, rep):
             if custom:
                 rep.add('INFO', 'S7 base-customs', '%d custom-move slots keep the base\'s (only with custom moves '
                         'equipped: base_customs_cave): %s' % (len(custom), ', '.join(custom[:20])))
+    # B1 base leftovers (user, Byleth phase 2: "make sure Zero Suit Samus' statuses don't override Byleth's, like the
+    # issues we had with Sephiroth and Supamario"): every script of the four body files still byte for byte the base's
+    # vanilla one that does something (hitbox / grab / body state / intangibility; an effect, sound, rumble, quake,
+    # visibility) runs the base's move on the port's animation. ERROR for game scripts that act, WARN for effect /
+    # sound / expression ones; port.json "base_scripts_kept" {script name: reason} lists the ones kept on purpose
+    if vanilla:
+        kept = {k.lower() for k in (load_port_cfg(name).get('base_scripts_kept') or {})}
+        vocab = {acmd.crc(n): n for n in vocabulary()}
+        acts = {'game': ('Hitbox', 'Special_Hitbox', 'Extended', 'Grab', 'Body_Collision', 'Set_Body_State',
+                         'Intangib', 'Invincib', 'Super_Armor', 'Armor', 'Reflect', 'Absorb', 'Search', 'Shield',
+                         'Generate_Article', 'Article'),
+                'effect': ('Graphic', 'External_Graphic', 'EFFECT', 'Sword_Glow', 'LANDING', 'FOOT', 'DOWN_EFFECT'),
+                'sound': ('Sound', 'PLAY', 'Voice', 'SFX'),
+                'expression': ('Rumble', 'QUAKE', 'Screen', 'Visibility', 'Model_Changer', 'Flash')}
+        for fn, words in acts.items():
+            vp = os.path.join(vanilla, 'fighter', base['base'], 'script/animcmd/body/%s.bin' % fn)
+            mine = game if fn == 'game' else (scripts(inst, body + fn + '.bin') or {})
+            if not os.path.exists(vp) or not mine:
+                continue
+            van = acmd.ACMDFile.load(vp).scripts
+            left = sorted(vocab.get(h, '%08X' % h) for h, cmds in mine.items()
+                          if h in van and [str(c) for c in cmds] == [str(c) for c in van[h]]
+                          and any(str(c).startswith(words) for c in cmds)
+                          and vocab.get(h, '%08X' % h).lower() not in kept)
+            if left:
+                rep.add('ERROR' if fn == 'game' else 'WARN', 'B1 base-leftovers', '%s.bin: %d scripts still the base\'s '
+                        'vanilla ones (its move / effects / sounds on the port\'s animation; replace, empty, or list '
+                        'in port.json base_scripts_kept): %s' % (fn, len(left), ', '.join(left[:24])))
     # S8 a plain Rumble on a Smash 4 kind whose pattern never ends (param/pad_rumble: ultimate_acmd.RUMBLE_ENDLESS): it
     # runs on for seconds (Squirtle's up smash, test 25: rbkind_loopattack -> Rumble 8). Vanilla plays those kinds as
     # Rumble_Loop, which the status's end stops; the base's own scripts (unchanged from vanilla) are left alone
@@ -502,6 +530,12 @@ def check_params(inst, name, kind, base, vanilla, ult_param, labels, rep):
                 if i in row and abs(row[i] - float(w[0])) > 0.011 * max(1, abs(float(w[0])))]
         if diff:
             rep.add('WARN', 'P2 stats-ultimate', 'differ from Ultimate\'s (tools/ultimate_stats.py): ' + '; '.join(diff[:12]))
+
+
+def load_port_cfg(name):
+    """fighters/NAME/port.json, or {} (the ports made before the framework have none)"""
+    p = os.path.join(ROOT, 'fighters', name, 'port.json')
+    return json.load(open(p)) if os.path.exists(p) else {}
 
 
 def vocabulary():
