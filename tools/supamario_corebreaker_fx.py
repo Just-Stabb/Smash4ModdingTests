@@ -42,6 +42,10 @@ MODELS = {'Cor_Crg': FX.euler_q(0.0, 90.0, 0.0),
           'Cor_Fire': FX._qmul(FX.euler_q(DIVE_DEG, 0.0, 0.0), FX.euler_q(0.0, 180.0, 0.0)),
           'Cor_Wev': None}
 
+# v3 (user: "the initial circle looks flat. It should cover around supamario like the auras"): the charge orb's discs
+# (XV2 draws them facing the camera) made into closed shells round him (xv2_smash_fx.inflate_discs)
+INFLATE = {'Cor_Crg'}
+
 BONES = {'g_C_Head': 'HeadN', 'g_R_Hand': 'RHandN', 'g_L_Hand': 'LHandN', 'b_C_Pelvis': 'HipN',
          'b_L_Knee': 'LKneeJ', 'b_R_Knee': 'RKneeJ', 'b_R_Foot': 'RFootJ', 'b_L_Elbow': 'LArmJ',
          'b_L_Shoulder': 'LShoulderN', 'b_R_Arm1': 'RShoulderJ', 'b_C_Chest': 'BustN'}
@@ -158,6 +162,8 @@ def convert(skill_dir, effect_dir, out_dir, hdr='glare', preview_dir=None):
                            capture_output=True, text=True)
         assert r.returncode == 0, r.stderr[-2000:]
         folder = MODEL_PREFIX + name.split('_', 1)[1]
+        if name in INFLATE:
+            FX.inflate_discs(os.path.join(dst, 'model', folder))
         FX.bake_model_turn(os.path.join(dst, 'model', folder), q)
         r = subprocess.run([sys.executable, '-I', os.path.join(HERE, 'xv2_to_nud.py'), 'verify',
                             os.path.join(dst, 'model', folder), '--preview',

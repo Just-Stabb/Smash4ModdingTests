@@ -290,7 +290,9 @@ def game_script():
 
 # ---------------------------------------------------------------- effects
 FX_DASH_CLOUD, FX_BIG_CLOUD = 0x1000009, 0x1000020
-SIZE_MUL = {0: 0.5, 1: 0.5, 3: 0.5}           # Q10 (default): the charge orb / end flash and the explosion x0.5
+SIZE_MUL = {}                                 # v3 (user, v2's clip: "The effects for Core Breaker are too small"): every
+                                              # effect at the God Fist's x1.75 (v1 / v2 halved the charge orb, its end
+                                              # flash and the explosion: the Q10 default)
 GUARD = {9: 5, 8: 3, 12: 3, 3: 6}             # BAC effect -> the phase whose segment it plays in (cb)
 
 

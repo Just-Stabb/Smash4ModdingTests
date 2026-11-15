@@ -608,6 +608,18 @@ def effect_tests(out_dir, fdir):
           'core_b2 black)' % (B.ORB_FRAMES, B.ORB_ON, B.FLARE_FROM),
           (oo.frames, m['frames'], all(max(v[:3]) > 0.3 for g in gains.values() for v in g)),
           (B.ORB_FRAMES, B.ORB_FRAMES, True))
+    # v3: the orb a closed shell round him (front and back), every effect at x1.75 (no halving)
+    import nud
+    zs = np.concatenate([np.asarray(pp.pos)[:, 2] for mm in nud.read(os.path.join(orb, 'model.nud'))
+                         for pp in mm.polygons])
+    check('the charge orb: a closed shell (v2: flat discs)', (zs.min() < -1.0, zs.max() > 1.0), (True, True))
+    syn_e = acmd.INFO[acmd.BY_NAME['external_graphic']]['syntax']
+    orb_id = int(doc['models']['Cor_Crg.emo']['id'], 16)
+    sizes = [dict(zip(syn_e, c.params))['Size'] for c in acmd.ACMDFile.load(os.path.join(
+        fdir, 'script', 'animcmd', 'body', 'effect.bin')).script('specialhi') if c.ident == acmd.BY_NAME[
+        'external_graphic'] and c.params[0] == orb_id]
+    check('every effect at x%.2f: the orb\'s call %.2f (XV2 2.8 x %.2f)' % (FX.SIZE, sizes[0], FX.SIZE),
+          (B.SIZE_MUL, round(sizes[0], 3)), ({}, round(2.8 * FX.SIZE, 3)))
     quarter = []
     for v in doc['sets'].get('Cor_Crg_End_01.emp', []):
         si = p.find_set(v['set'])

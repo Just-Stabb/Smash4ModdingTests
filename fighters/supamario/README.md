@@ -1710,6 +1710,37 @@ special captures by other moves (Ganondorf's 0xB8 and the like, item captures).
 - off the stage, the floor is the rise's start, with at least 30 of dive from below it;
 - the v2 scenarios (homing, catches on and off the stage, cut mid-hold, an earlier victim) through the two entries.
 
+### The effects' size and the orb (user, v2's clip `MedalTVCemuWiiUEmulator20261114224043912`)
+- "The effects for Core Breaker are too small". In the clip, Supamario is ~90 px tall (12 units):
+  - the charge orb: ~37 px radius (~5 units);
+  - the charge flash: about his size;
+  - the explosion: about Donkey Kong's size.
+
+  In XV2 the orb (EEPK scale 2.8 on a 0.47 m disc) is 1.3 m in radius round a 1.75 m Fu: it surrounds him. v1 / v2
+  halved the orb, its flash and the explosion (`SIZE_MUL`, the Q10 default). v3: every effect at the God Fist's x1.75
+  of XV2's scale, with no halving.
+
+  | Effect | Size now (v2) |
+  |---|---|
+  | the orb | 4.9 (2.45): radius ~11.7, it surrounds him from his head |
+  | the charge flash | 1.225 (0.61) |
+  | the explosion | 3.5 (1.75) |
+  | the fist fire | 1.75 particles, 2.625 cone (unchanged) |
+  | the dive impact / the miss blast | 1.75 / 2.625 (unchanged) |
+  | the aura | its 7 bones' 0.4-0.8 x 1.75 (unchanged) |
+
+  Placements are unchanged: bone 0, at the same joints, unturned.
+- "the initial circle looks flat. It should cover around supamario like the auras": the first circle of the move is
+  the charge orb (`Cor_Crg.emo`). XV2 draws its three meshes (core_a ring, core_b / core_b2 swirls) as flat discs that
+  face the camera (EEPK Orientation Camera; the PRLX shader's depth makes it read as a ball). v1 / v2 turned the discs
+  to face the side camera: flat, drawn behind him. `xv2_smash_fx.inflate_discs` now makes each disc a closed shell:
+  - every vertex is lifted onto the sphere of the disc's radius;
+  - a front and a back copy share the disc's UVs, colours and triangles, normals outward.
+
+  Face-on it draws as XV2's disc did; he is inside it (the front half over him, the back half behind). Its centre is
+  where it was (his head; with the x1.75 radius it covers him). Facing-safe as before: the turn is baked into the
+  model, and the call is on bone 0, unturned.
+
 `supamario_godfist_test.py --all-models`: 0 problems.
 
 **Not confirmed in game:**

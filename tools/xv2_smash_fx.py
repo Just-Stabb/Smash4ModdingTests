@@ -379,3 +379,42 @@ def add_halo_calls(script, mapping):
                 c = acmd.Command(c.ident, [int(c.params[0]) + grow[idx]] + list(c.params[1:]))
         final.append(c)
     return final
+
+
+def inflate_discs(folder):
+    """an effect model's flat discs (meshes lying in their XY plane, as XV2's camera-facing charge orb Cor_Crg) made
+    into closed shells: every vertex lifted onto the sphere of the disc's radius, a front and a back copy (same UVs,
+    colours, triangles; the back one wound the other way), normals outward. Seen face-on it draws as the disc did,
+    from any other side it surrounds what is inside it (Core Breaker v3, user: "the initial circle looks flat. It
+    should cover around supamario like the auras")"""
+    import numpy as np
+    import nud
+    path = os.path.join(folder, 'model.nud')
+    meshes = nud.read(path)
+    n = 0
+    for m in meshes:
+        for p in m.polygons:
+            pos = np.asarray(p.pos, dtype=np.float64)
+            if pos.shape[0] < 3 or np.abs(pos[:, 2]).max() > 1e-4:
+                continue
+            r = np.hypot(pos[:, 0], pos[:, 1]).max()
+            if r <= 0:
+                continue
+            z = np.sqrt(np.clip(r * r - pos[:, 0] ** 2 - pos[:, 1] ** 2, 0.0, None))
+            front = np.stack([pos[:, 0], pos[:, 1], z], 1)
+            back = np.stack([pos[:, 0], pos[:, 1], -z], 1)
+            k = len(pos)
+            p.pos = np.concatenate([front, back]).astype(np.float32)
+            p.nrm = (p.pos / r).astype(np.float32)
+            if p.col is not None:
+                p.col = np.concatenate([p.col, p.col])
+            p.uvs = [np.concatenate([u, u]) for u in p.uvs]
+            tri = np.asarray(p.idx).reshape(-1, 3)
+            p.idx = np.concatenate([tri.ravel(), (tri[:, ::-1] + k).ravel()]).astype(p.idx.dtype)
+            for attr in ('tan', 'bit'):
+                v = getattr(p, attr)
+                if v is not None:
+                    setattr(p, attr, np.concatenate([v, v]))
+            n += 1
+    open(path, 'wb').write(nud.write(meshes))
+    return n
