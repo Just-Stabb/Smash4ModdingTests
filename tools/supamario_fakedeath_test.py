@@ -465,8 +465,18 @@ def msc_tests(path):
     check('an airborne fighter: launched (DamageFly), the game\'s hitstun %d, no hitstun written, not counted' %
           int(kb * 0.4), (va.status in (0xE, 0x47), va.writes, R.i2f(R.f2i(g.vars.get(B.V_REP + 2, 0.0))),
                           va.x > wake_x + B.HIT_Z + 20), (True, [], 0.0, True))
-    d1, d2 = B.flight(B.knockback(B.AIR_HIT_V1, 0))[0], B.flight(B.knockback(B.AIR_HIT, 0))[0]
-    check('the air hit at 0%%: %.0f units away (v1 %.0f): about 4x (3.8-4.2)' % (d2, d1), 3.8 <= d2 / d1 <= 4.2, True)
+    k2 = [B.knockback(B.AIR_HIT_V2, pc) for pc in (0, 50, 100, 150)]
+    k3 = [B.knockback(B.AIR_HIT, pc) for pc in (0, 50, 100, 150)]
+    check('v3: the air hit\'s knockback 0.6x v2\'s at 0 / 50 / 100 / 150%% (%s)' % [round(k, 1) for k in k3],
+          [round(a / b, 4) for a, b in zip(k3, k2)], [0.6] * 4)
+    # 9a. v3: the clip's whiff: a fighter whose front is 9.4 ahead of him on the last active frame (wake 23) is hit
+    x23 = sum(B.VC) + sum(B.VW[:B.HIT_TO])
+    vd = Fighter(2, x23 + 9.4 + 3.5)
+    g = Game([vd], held=lambda n: False)
+    run(path, g)
+    reach_v2 = B.HIT_Z_V2 + B.HIT_SIZE_V2
+    check('v3: the clip\'s whiff (its front 9.4 ahead of him on the last active frame) is hit now (v2\'s reach %.2f '
+          'missed it)' % reach_v2, (vd.hit_at is not None, 9.4 > reach_v2), (True, True))
     # 9b. the status's attack log: 0 (no staling)
     g = Game()
     vm2 = vm_for(path, g)
@@ -533,7 +543,9 @@ def script_tests(out, base):
           (hb[1]['Ground/Air'], hb[1]['Damage'], hb[1]['Angle'], hb[1]['BKB'], hb[1]['KBG'], hb[1]['HitstunMul'],
            hb[1]['Bone'], hb[1]['X']), (2, B.AIR_HIT['Damage'], B.AIR_HIT['Angle'], B.AIR_HIT['BKB'], B.AIR_HIT['KBG'],
                                        0.0, 0, 0.0))
-    check('both at XV2\'s place (bone 0: %.2f ahead, %.2f up, %.2f)' % (B.HIT_Z, B.HIT_Y, B.HIT_SIZE),
+    check('v3: the reach (ahead + size) %.1f (v2 %.2f: the clip\'s whiff at ~9.4 + margin)' % (
+        B.HIT_Z + B.HIT_SIZE, B.HIT_Z_V2 + B.HIT_SIZE_V2), B.HIT_Z + B.HIT_SIZE >= 9.4 + 1.5, True)
+    check('both at their place (bone 0: %.2f ahead, %.2f up, %.2f)' % (B.HIT_Z, B.HIT_Y, B.HIT_SIZE),
           [tuple(round(h[k], 3) for k in ('Z', 'Y', 'Size')) for h in hb], [(B.HIT_Z, B.HIT_Y, B.HIT_SIZE)] * 2)
     check('both shieldable, the same Part (one hit per fighter)', [(h['Shieldable'], h['Part']) for h in hb],
           [(1, 0), (1, 0)])

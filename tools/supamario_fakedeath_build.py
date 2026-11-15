@@ -67,11 +67,20 @@ VW = [round(v + (BAC_MOVE + EXTRA_PUSH if f in BAC_MOVE_FRAMES else 0.0), 4) for
 # ---------------------------------------------------------------- the hit
 # XV2: one hitbox, b_C_Base + (0, 0.5 m, 0.75 m ahead), 0.75 m, BDM #20 of CMN.bdm (a Standard hit: 30 frames of
 # stun, 9 / 9 hitstop, a 0.25 m push; struck in a floating hit: a knock away 32 frames), 20 damage (2 guarded)
-HIT_Z, HIT_Y, HIT_SIZE = round(0.75 * anim.SCALE, 2), round(0.5 * anim.SCALE, 2), round(0.75 * anim.SCALE, 2)
+HIT_Z_V2, HIT_SIZE_V2 = round(0.75 * anim.SCALE, 2), round(0.75 * anim.SCALE, 2)    # v1-v2: XV2's (reach 7.56)
+HIT_Y = round(0.5 * anim.SCALE, 2)
+# v3 (user, clip MedalTVCemuWiiUEmulator20261115032700479: "make Fake Death able to hit slightly further from the
+# distance it whiffed at"): Donkey Kong's front arm was ~9.4 units ahead of his TransN on the last active frame (wake
+# 23: ~5.6 when he stood up at wake ~25, read off the clip at ~17.5 px a unit, less his 3.8 of travel between); the
+# reach (the centre ahead + the size) 7.56 -> 11.0: centre 5.5 ahead, size 5.5 (both hitboxes), 1.6 of margin
+HIT_Z, HIT_SIZE = 5.5, 5.5
 GROUND_HIT = dict(Damage=6.0, Angle=0, KBG=0, FKB=0, BKB=1)        # the user: a grounded victim stays where it is
 # v2 (user: 6% both; "should knock opponents away about 4x further than it does now at 0%"): BKB 80 -> 165 (KBG 25,
 # 45 degrees): ~183 units at 0% (v1 ~46), knockback() / flight()
-AIR_HIT = dict(Damage=6.0, Angle=45, KBG=25, FKB=0, BKB=165)
+AIR_HIT_V2 = dict(Damage=6.0, Angle=45, KBG=25, FKB=0, BKB=165)
+# v3 (user: "please reduce its knockback by 40%"): BKB and KBG x0.6, so the knockback is 0.6x v2's at every percent
+# (Smash 4's knockback is BKB + KBG x a percent term): 0%: 102 (v2 170), ~66 units; 100%: 111 (v2 184), ~78
+AIR_HIT = dict(Damage=6.0, Angle=45, KBG=15, FKB=0, BKB=99)
 AIR_HIT_V1 = dict(Damage=3.0, Angle=45, KBG=25, FKB=0, BKB=80)
 HITSTOP = 9                          # XV2 BDM #20: UserStun / VictimStun 9 (the ground hit)
 HITSTUN = 66                         # the ground hit's hitstun (v2, the user: 66; v1 60; XV2's stun is 30)
