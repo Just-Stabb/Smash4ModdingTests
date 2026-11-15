@@ -1339,6 +1339,63 @@ flight and Supamario's own timing are unchanged.
 **Not confirmed in game:** that SITUATION 0 with stage collision 2 holds a victim put at floor height through
 DownWait's first frame.
 
+## Super God Fist glow test (`supamario_god_fist_glow_test.zip`): only XV2's glaring parts past 1
+
+### Correcting the bloom statement
+v5's "XV2 draws these with glare ... bloom Smash 4 doesn't have" (also v6's "none in Smash 4") was wrong. Smash 4
+blooms / glares colours drawn past 1:
+- fighters/brave/README.md fixes 21 / 23 / 27: from about 1.05 a part glows; past about 2.5 it becomes a wide
+  pink-white haze with purple fringes. Vanilla's 99th percentile is 2.0.
+- docs/minecraft-world.md: the sun and moon drawn past white.
+
+The God Fist's effects already reach that bloom, and have since v5:
+- **Particles:** every converted skill emitter is drawn at its colour keys x `SKILL_GAIN` 2, so its peak is 2.0
+  (keys at most 1; a few dim lines 0.66 / 1.14). That holds whether XV2 glares that part or not. The drawn colour is
+  keys x colour scale x the texture's R, and the vanilla template programs don't clamp it (Hero fix 27: only the port's
+  own programs clamp).
+- **The aura model:** gain `NU_effColorGain` = MatCol x `MODEL_TINT` (2.5, 2.0, 1.5), giving (2.5, 0.99, 0.73) on
+  BasC and (2.5, 0.24, 0) on the wind (additive). Its red is at the haze's edge.
+
+The CMN hit / smoke sets are at 1.0.
+
+### XV2's glare per material (`002_GOK_CSG.ptcl.emm`)
+`tools/xv2_to_ptcl.py` now notes each emitter's material and glare (`glare G material NAME`).
+
+| Material | GlareCol / flag | Emitters |
+|---|---|---|
+| `add_LR2_GY_BF` | GlareCol (2.0, 2.0, 1.0), no Glare flag but GY | Crg `sprite_ring00` |
+| `nml_GY_BF` | (1.5, 1.5, 1.0), Glare | Circle `sprite_tsubu00` (x2), drop `sprite` (x2) |
+| `nml_LR2_G` | (1.1, 1.1, 0.5), Glare | Circle `line_line01` (x2) |
+| everything else | no glare | Crg's other three, Bas, Circle's base / rays / last line, HitPt |
+
+The model's `Csg_Bas.emm` has GlareCol (1, 1, 1) and no flag.
+
+### The variants (`--glow PEAK`; everything else v17)
+- **Parts XV2 doesn't glare:** colour scale x1, peak 1.0, no bloom.
+- **Glaring parts:** x `PEAK` x GlareCol / 1.5 (the hue kept: all channels scaled), never past `GLOW_CAP` 2.5.
+- **The aura model's gain:** scaled to a peak of `PEAK`, hue kept.
+
+| Peak | v17 | glow 1.3 | glow 1.7 | glow 2.2 |
+|---|---|---|---|---|
+| Crg ring (glare 2.0) | 2.00 | 1.73 | 2.27 | 2.50 (capped) |
+| tsubu / drop (glare 1.5) | 2.00 | 1.30 | 1.70 | 2.20 |
+| Circle lines (glare 1.1) | 2.00 | 1.00 | 1.25 | 1.61 |
+| the rest | 2.00 | 1.00 | 1.00 | 1.00 |
+| aura red (BasC, wind) | 2.50 | 1.30 | 1.70 | 2.20 |
+
+Every variant is otherwise byte for byte v17. Only `supamario.010d0000.ptcl` and the aura's `model.nud` / `model.mta`
+differ.
+
+**Haze risk:** v17's aura (2.5) and glow 2.2's Crg ring (capped at 2.5) are at the edge where Hero's effects went
+purple. Glow 1.3 / 1.7 stay well under it.
+
+**What the test shows:** all three variants are dimmer than v17 outside the glaring parts. v17 has every part in the
+bloom; the variants put XV2's own contrast back (bright glaring cores, plain body). If v17 looks better, its blanket
+x2 stays.
+
+`tools/xv2_smash_fx.py` (Core Breaker's shared settings) caps at 2.0. The test's result should settle one value for
+both.
+
 ## Core Breaker (up special): phase 1, the XV2 skill read and converted (not built, not packaged)
 
 User: put Xenoverse 2's **Core Breaker** (Fu's Ultimate, skill folder `2070_FIT_COR`) on his up special, the way the

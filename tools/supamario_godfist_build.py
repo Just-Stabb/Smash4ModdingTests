@@ -3,7 +3,8 @@
 
   python3 tools/supamario_godfist_build.py SUPAMARIO_DIR OUT_DIR --ean 030_GOD_CSA.ean [--cmn-vfx VFX_CMN_DIR]
                                            [--skill-vfx 002_GOK_CSG_DIR] [--cmn-se WAV_DIR --stb SOUNDLABELTABLE]
-                                           [--png SHEET.png] [--diag]
+                                           [--png SHEET.png] [--diag] [--glow PEAK]
+  --glow: the glow test's variants (GLOW: only XV2's glaring parts drawn past 1, peak PEAK x GlareCol / 1.5)
   --cmn-se: XV2's CMN battle SE the move plays (CMN_SE), decoded to WAV_DIR/<cue name>.wav by
   `python3 -I tools/xv2acb.py extract CAR_BTL_CMN.acb CAR_BTL_CMN.awb HCA_DIR Hit_LL Down` and
   `node tools/xv2acb_decode.mjs HCA_JS_DIR HCA_DIR WAV_DIR`; --stb: the soundlabeltable to grow (the latest)
@@ -338,7 +339,8 @@ SKILL_TEX_BASE = 0x15141B00             # after the Kamehameha models' 0x15141A0
 SKILL_UNIT = 5.04
 SKILL_FX = {}                           # {'Crg': id, ..., 'Model': id} (effects() fills it)
 # v5 (user, v4: "the effect seems faint", "move it closer to the tip of the fist"): XV2 draws these with glare
-# (bloom: the EMMs' GlareCol 1.5-2.0) that Smash 4 doesn't have: colour x SKILL_GAIN, alpha x SKILL_ALPHA (capped
+# (bloom: the EMMs' GlareCol 1.1-2.0); Smash 4 blooms too, past 1 (the glow test, GLOW: the v5 note here said it
+# doesn't, wrongly; x SKILL_GAIN put every emitter at 2.0, in the bloom): colour x SKILL_GAIN, alpha x SKILL_ALPHA (capped
 # at 1) on every converted emitter, the model's colour gain x SKILL_GAIN (--tint). On his fist: RHandN (FIST),
 # FIST_TIP along its local +X (the forearm's way: at the punch +X points forward, the fingers 0.74 along it; the
 # knuckles ~1.2), following the hand (External_Graphic) as XV2's follow b_R_Hand (PositionUpdate / RotateUpdate);
