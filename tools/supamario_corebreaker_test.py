@@ -300,7 +300,7 @@ def func_index(vm, name):
 
 
 def run(path, g, frames=420, catch_at=None, cut_at=None, victim_reach=None, press=None, detect=False, tick=False,
-        hit_at_dive=False):
+        hit_at_dive=False, victim_move=None):
     """the status from its main (func_2287) frame by frame; catch_at: the game frame of this run the game script's
     dive catch is modelled at (cb 2 -> 3), victim_reach: catch when the victim is within this of his fist instead;
     detect: the hover's detection box catches (cb 1 -> 3) when the victim is within DETECT_SIZE + 2 of his middle on
@@ -328,6 +328,8 @@ def run(path, g, frames=420, catch_at=None, cut_at=None, victim_reach=None, pres
             if math.hypot(g.victim['x'] - mx, g.victim['y'] + 5 - my) < B.DETECT_SIZE + 2.0:
                 g.vars[B.CB_VAR] = 3.0
                 g.vars[B.CB_V_SLOT] = 2.0
+        if victim_move is not None and g.victim is not None and not g.hit:
+            victim_move(g, g.victim)            # v6: the victim moving before the hit (a jump)
         if hit_at_dive and g.frame >= B.DIVE_FROM - 1e-6 and cbv == 1.0:
             g.hit = True                        # v5: point-blank: his dive hitboxes connect on its first frame
         if cut_at is not None and n == cut_at:
@@ -707,6 +709,54 @@ def msc_tests(path):
     check('the hold\'s invincibility cleared (INVINCIBLE 0) at every end; nothing written without a catch', ends,
           [('the crash (Wait)', 0, [0.0]), ('the explosion in the air (FallSpecial)', 0x10, [0.0]),
            ('cut mid-hold', 'cut', [0.0]), ('no catch (the rise alone: nothing set, nothing cleared)', 0xE, [])])
+    # 9f. v6 (user: "Hitting the dive on a grounded/near ground opponent should work the same, using the same final hit
+    # and leaving Supamario in the grounded finisher animation"; the clip: a dive catch on Donkey Kong standing took
+    # the hold on the ground, then the weaker air explosion: he stopped just above the floor and never landed)
+    def dive_at(h, jump=None, extra=None):
+        """a victim in the dive's line at height h (its feet); jump: (height, from the dive's frame) it jumps to"""
+        v = dict({'x': 0.0, 'y': 0.0, 'status': 0x47}, **(extra or {}))
+        g = Game(stage=(-300.0, 300.0), victim=v)
+        run(path, g, frames=B.HOVER_FROM + 3)
+        a = math.radians(B.DIVE_DEG)
+        hh = jump[0] if jump else h
+        t = (g.y - hh - 1.9) / math.sin(a)
+        v['x'] = g.x + g.face * (t * math.cos(a) + 6.3)
+        v['y'] = h
+
+        def move(g_, v_):
+            if jump and g_.frame >= B.DIVE_FROM - 1e-6:
+                v_['y'] = jump[0]
+        tr = run(path, g, victim_reach=8.0, victim_move=move)
+        return g, v, tr
+    crash_frames = lambda tr: [t[1] for t in tr if t[4] == 6.0]      # noqa: E731
+    # the point-blank catch (the detection box, a fighter in the air at his middle): the air hold, the drive, the crash
+    v = {'x': 1.0, 'y': 0.0, 'status': 0x47}
+    g = Game(stage=(-200.0, 200.0), victim=v)
+    run(path, g, frames=B.HOVER_FROM + 3)
+    v['x'], v['y'] = g.x + B.DETECT_AT[0] * g.face, g.y + B.DETECT_AT[1] - 5.0
+    pb = run(path, g, detect=True)
+    pb_end = (pb[-1][4], g.status, pb[-1][5])
+    out = []
+    for name, h, jump, extra, want in (
+            ('standing', 0.0, None, None, [1.0, 2.0, 8.0, 6.0]),
+            ('standing, its height read 0.5 above the floor (v5 never landed)', 0.5, None, {'sit': 0},
+             [1.0, 2.0, 8.0, 6.0]),
+            ('just jumped, 10 up', 0.0, (10.0,), None, [1.0, 2.0, 8.0, 6.0]),
+            ('jumped high, 40 up', 0.0, (40.0,), None, [1.0, 2.0, 3.0, 4.0, 6.0])):
+        g, v, tr = dive_at(h, jump, extra)
+        hold = [t for t in tr if t[4] == 8.0]
+        out.append((name, phases_of(tr), (tr[-1][4], g.status, tr[-1][5]) == pb_end,
+                    crash_frames(tr) == crash_frames(pb), (not hold[-1][5]) if hold else None,
+                    round(hold[-1][6]['y'], 3) if hold else None))
+    check('dive catches: standing and near the ground (<= %.0f above where it stood) take the hold on the ground, he '
+          'lands, the victim on its ground, then the crash with the point-blank catch\'s final hit and end pose (the '
+          'crash phase, its frames, Wait on the ground); high: the air hold, the drive, the same crash'
+          % B.NEAR_GROUND, out,
+          [('standing', [1.0, 2.0, 8.0, 6.0], True, True, True, 0.0),
+           ('standing, its height read 0.5 above the floor (v5 never landed)', [1.0, 2.0, 8.0, 6.0], True, True, True,
+            0.5),
+           ('just jumped, 10 up', [1.0, 2.0, 8.0, 6.0], True, True, True, 0.0),
+           ('jumped high, 40 up', [1.0, 2.0, 3.0, 4.0, 6.0], True, True, None, None)])
     # 9b. a victim in the air over the stage: the hold, the lift, the drive, the crash
     v = {'x': 30.0, 'y': 20.0, 'status': 0x47}
     g = Game(stage=(-200.0, 200.0), victim=v)

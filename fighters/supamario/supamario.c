@@ -38373,6 +38373,7 @@ int cb_brev;            // v4: the rise's B-reverse checked (1) / done (2)
 int cb_gstart;          // v4: the rise started on the ground
 int cb_gmask;           // v5: the player slots on the ground (bit 1 << slot) the frame before his attack hit
 int cb_gvalid;
+int cb_gseen;           // v6: the slots seen on the ground this hover / dive (their ground's height: New_Var CB_GY0 + slot)
 int cb_inv;             // v5: the hold's invincibility set (cleared at every end: cb_end)
 
 void cb_set_ph(int ph)
@@ -38498,6 +38499,7 @@ void cb_init()
     cb_gstart = 0;
     cb_gmask = 0;
     cb_gvalid = 0;
+    cb_gseen = 0;
     cb_inv = 0;
     if (global18 == 0)
     {
@@ -38757,6 +38759,8 @@ void cb_gtrack()
         if (WorkModuleF(0, 0x0F000116 + 0x20 * (s + 0x2)) < 0.5f)
         {
             m = m | (0x1 << s);
+            cb_gseen = cb_gseen | (0x1 << s);
+            WorkModule(0, WorkModuleF(0, 0x0f000021 + 4 * (s - 1)), CB_GY0 + s);
         }
         s = s + 1;
     }
@@ -39124,6 +39128,8 @@ void cb_catch()
     int old;
     float vst;
     float vsit;
+    float vy;
+    float gy;
     cb_slot = WorkModule(0x6, CB_V_SLOT);
     if (cb_slot < 1 || cb_slot > 8)
     {
@@ -39147,12 +39153,26 @@ void cb_catch()
     vsit = WorkModuleF(0, 0x0F000116 + 0x20 * cb_t());
     // v5: on the ground the frame before the hit (cb_gtrack) decides (the dive's catch read it after the hit: the air
     // hold for a fighter standing on the ground, the user's clip); the live read only without that frame
+    // v6 (user: "Hitting the dive on a grounded/near ground opponent should work the same [as the point-blank catch],
+    // using the same final hit and leaving Supamario in the grounded finisher animation"): near the ground counts as
+    // on it: a fighter seen on the ground this hover / dive (cb_gtrack) now no more than CB_NEAR_GROUND above that
+    // ground (and not below it: off the stage)
+    vy = WorkModuleF(0, 0x0F000021 + 4 * (cb_slot - 1));
+    gy = vy;
     if (cb_gvalid == 0x1)
     {
         vsit = 2.0f;
         if ((cb_gmask & (0x1 << cb_slot)) != 0)
         {
             vsit = 0.0f;
+        }
+        if ((cb_gseen & (0x1 << cb_slot)) != 0)
+        {
+            gy = WorkModuleF(0, CB_GY0 + cb_slot);
+            if (vy - gy <= CB_NEAR_GROUND && vy - gy >= -CB_GROUND_BELOW)
+            {
+                vsit = 0.0f;
+            }
         }
     }
     cb_inv = 0x1;
@@ -39178,8 +39198,9 @@ void cb_catch()
     }
     if (vsit < 0.5f)
     {
-        // v3: a victim on the ground: the hold on the ground (phase 8), then the crash; no lift, no drive
-        cb_vy = WorkModuleF(0, 0x0F000021 + 4 * (cb_slot - 1));
+        // v3: a victim on the ground: the hold on the ground (phase 8), then the crash; no lift, no drive. v6: held on
+        // its ground (the height it was last seen on the ground at, a near-ground one put down on it)
+        cb_vy = gy;
         cb_set_ph(0x8);
         cb_speed(0.0f, 0.0f);
         KineticModule(0x14, 0x1, 0.0f);
@@ -39272,12 +39293,12 @@ int cb_holdg_phase(float fr)
     y = WorkModuleF(0, 0x0f000001);
     if (global18 != 0)
     {
-        dy = y - cb_vy;
-        if (dy > CB_DIVE_V)
-        {
-            dy = CB_DIVE_V;
-        }
-        if (dy < 0.0f)
+        // v6: down at the dive's speed until he lands (the ground stops him). v3-v5 eased him onto the victim's height
+        // exactly and could stop just above the floor, never landing: the hold's end then took the air explosion (the
+        // weaker hit, no grounded finisher: the user's clip). More than CB_GROUND_MISS below that height: no ground
+        // under him, he waits there (the hold's end: the explosion in the air)
+        dy = CB_DIVE_V;
+        if (y < cb_vy - CB_GROUND_MISS)
         {
             dy = 0.0f;
         }

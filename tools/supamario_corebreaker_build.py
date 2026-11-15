@@ -101,6 +101,9 @@ CRASH_KB = dict(Angle=42, KBG=75, FKB=0, BKB=45)
 INVINCIBLE = (CRASH_END - HOLD) + 10        # the hold: from the catch through the crash / the explosion (v4, user: "He
                                             # should keep invincibility during the hold only")
 CATCH_FREEZE = 6
+NEAR_GROUND = 15.0                          # v6: an airborne victim this close above its ground: the grounded path
+GROUND_BELOW = 3.0                          # v6: ... and not more than this below it (off the stage: the air path)
+GROUND_MISS = 15.0                          # v6: the grounded hold: this far below the victim's ground, no ground
 NEAR = 20.0                                 # v5: the dive's catch, no slot matching target 2: the nearest within this
 
 # ---------------------------------------------------------------- variables (New_Var slots 0x20-0x21)
@@ -109,7 +112,9 @@ CB_V_SLOT = 0x0F000380 + 0x21               # the victim's player slot (Target_S
 # v3: every one per object (scope 0): a move-scoped New_Var is reset to 0 by the script's start, after the MSC's init
 # has set cb (1: the second up special's hover), which would skip the hover's detection box
 VARS = [('cb', CB_VAR, 0), ('cb_slot', CB_V_SLOT, 0), ('cb_tmp', 0x0F000380 + 0x22, 0),
-        ('cb_used', 0x0F000380 + 0x23, 0), ('cb_rise_y', 0x0F000380 + 0x24, 0), ('cb_air', 0x0F000380 + 0x25, 0)]
+        ('cb_used', 0x0F000380 + 0x23, 0), ('cb_rise_y', 0x0F000380 + 0x24, 0), ('cb_air', 0x0F000380 + 0x25, 0)] + \
+    [('cb_gy%d' % k, 0x0F000380 + 0x26 + k, 0) for k in range(1, 9)]     # v6: each slot's ground height (cb_gtrack)
+CB_GY0 = 0x0F000380 + 0x26
 CB_AIR = 0x0F000380 + 0x25                # v4: in the air since the up special was used (the ground resets it only then)
 CB_RISE_Y = 0x0F000380 + 0x24             # v3: his height at the rise's start (the drive's floor)
 CB_USED = 0x0F000380 + 0x23               # v3: per fighter (object scope): 0 none used, 1 the rise, 2 the hover / dive
@@ -166,6 +171,8 @@ def msc_values():
             'CB_USED': '0x%X' % CB_USED, 'CB_RISE_Y': '0x%X' % CB_RISE_Y, 'CB_AIR': '0x%X' % CB_AIR,
             'CB_INVINCIBLE': fl(INVINCIBLE),
             'CB_FIST_Z': fl(FIST[0]), 'CB_FIST_Y': fl(FIST[1]), 'CB_NEAR': fl(NEAR),
+            'CB_GY0': '0x%X' % CB_GY0, 'CB_NEAR_GROUND': fl(NEAR_GROUND), 'CB_GROUND_BELOW': fl(GROUND_BELOW),
+            'CB_GROUND_MISS': fl(GROUND_MISS),
             'CB_RISE_CANCEL': fl(RISE_CANCEL), 'CB_FLOOR_MARGIN': fl(FLOOR_MARGIN),
             'CB_RESET_LO': fl(0x3F), 'CB_RESET_HI': fl(0x4C),
             'CB_CLIFF_LO': fl(0x72), 'CB_CLIFF_HI': fl(0x7A), 'CB_DEAD': fl(0xB1), 'CB_REBIRTH': fl(0xB2),
