@@ -38371,6 +38371,9 @@ int cb_terms;           // v4: the rise's air transition groups / terms turned o
 int cb_refused;         // v4: the dive's catch refused (a fighter lying down, invincible / intangible)
 int cb_brev;            // v4: the rise's B-reverse checked (1) / done (2)
 int cb_gstart;          // v4: the rise started on the ground
+int cb_gmask;           // v5: the player slots on the ground (bit 1 << slot) the frame before his attack hit
+int cb_gvalid;
+int cb_inv;             // v5: the hold's invincibility set (cleared at every end: cb_end)
 
 void cb_set_ph(int ph)
 {
@@ -38493,6 +38496,9 @@ void cb_init()
     cb_refused = 0;
     cb_brev = 0;
     cb_gstart = 0;
+    cb_gmask = 0;
+    cb_gvalid = 0;
+    cb_inv = 0;
     if (global18 == 0)
     {
         cb_gstart = 0x1;
@@ -38615,11 +38621,8 @@ int cb_rise_phase(float fr)
     {
         KineticModule(0x11, 0x3, CB_RISE_VX * WorkModuleF(0, 0x0f000003), 0.0f);
     }
-    if (cb_free < 0x2)
-    {
-        KineticModule(0xf, 0x1, -CB_RISE_DECEL);
-        KineticModule(0x14, 0x1, CB_FALL_LIMIT);
-    }
+    KineticModule(0xf, 0x1, -CB_RISE_DECEL);
+    KineticModule(0x14, 0x1, CB_FALL_LIMIT);
     if (fr >= CB_RISE_CANCEL - 0.01f)
     {
         if (cb_free == 0)
@@ -38657,16 +38660,14 @@ int cb_rise_phase(float fr)
         }
         func_550();
     }
-    if (fr >= CB_HOVER_FROM - 1.0f - 0.01f && cb_free == 0x1)
+    // v5 (user: the endless hold of the leap's pose "never transitions to fall"): the whole rise animation plays, then
+    // Fall at its last frame (still actionable there: Fall's own actions; up special in it is the hover / dive)
+    if (fr >= CB_HOVER_FROM - 1.0f - 0.01f)
     {
-        // the leap's top: its last frame held; his own gravity and fall speed from here, no armor
-        cb_free = 0x2;
-        MotionModule(0x4, 0.0f);
-        cb_armor(0);
-        vy = KineticModuleF(0xb, 0x1);
         KineticModule(0, 0);
-        KineticModule(0x11, 0x3, 0.0f, 0.0f);
-        KineticModule(0x11, 0x1, vy);
+        func_16(0xe, 0);
+        cb_end();
+        return 0x1;
     }
     return 0;
 }
@@ -38738,10 +38739,36 @@ int cb_rise_act()
     return 0;
 }
 
+// v5: the slots on the ground, kept every hover / dive frame until his attack has hit (the frame before the hit: a
+// caught fighter's situation read after the hit can already be the air's, and the dive's catch took the air hold for
+// a fighter standing on the ground: the user's clip)
+void cb_gtrack()
+{
+    int s;
+    int m;
+    if (AttackModule(0x2726, 0x2) != 0 || AttackModule(0x2727, 0x2) != 0)
+    {
+        return;
+    }
+    m = 0;
+    s = 1;
+    while (s <= 8)
+    {
+        if (WorkModuleF(0, 0x0F000116 + 0x20 * (s + 0x2)) < 0.5f)
+        {
+            m = m | (0x1 << s);
+        }
+        s = s + 1;
+    }
+    cb_gmask = m;
+    cb_gvalid = 0x1;
+}
+
 // the hover's start: from the rise (up special again in its cancel window) or the second up special (cb_init)
 void cb_hover_start()
 {
     WorkModule(0, 2.0f, CB_USED);
+    cb_gtrack();
     cb_set_ph(0x1);
     cb_armor(0);
     MotionModule(0x4, 1.0f);
@@ -38753,6 +38780,7 @@ void cb_hover_start()
 
 int cb_hover_phase(float fr)
 {
+    cb_gtrack();
     cb_speed(0.0f, 0.0f);
     KineticModule(0x14, 0x1, 0.0f);
     // v3: the detection box at the hover's start caught someone (the game script: cb 3): straight to the hold
@@ -38781,7 +38809,9 @@ int cb_hover_phase(float fr)
 // ---- the dive (phase 2)
 void cb_dive_start()
 {
-    AttackModule(0x2724);                   // v4: the hit flag from here (a detection box hit before doesn't count)
+    // v5: no AttackModule(0x2724) here (v4 had it): the game script's Hit_Reset at the dive's frame, before its
+    // hitboxes, clears the flag; a reset here came after a point-blank hit on the dive's first frame (the user's clip:
+    // a hit, no catch)
     cb_set_ph(0x2);
     cb_ang = CB_DIVE_DEG;
     cb_armor(0x1);
@@ -38892,6 +38922,7 @@ int cb_dive_blocked()
 
 int cb_dive_phase(float fr)
 {
+    cb_gtrack();
     if (func_56() == 0x1)
     {
         cb_end();
