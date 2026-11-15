@@ -18,11 +18,13 @@ place follows the offsets the MSC writes.
 
 Checks: the rise's height and armor, the hover (still, no armor, the B-reverse), the dive's speed and angle, its
 armor and air cap, the light homing (only ahead / below, within its cone, its turn rate and limit), a miss landing on
-the stage (the long landing lag, Wait), a dive off the stage (no lower than his start: FallSpecial), an air start,
-a catch on the stage (the hold at his fist, the controller off, the drive, the crash, the hand-off to gf_tick's
-put-down, Wait), a catch off the stage (the explosion, the victim let go: stage collision back, controller on,
-FallSpecial), the status cut mid-hold (let go), an earlier God Fist victim let go at the catch; the scripts' damage
-(26% each way), the explosion's KO knockback; TransN 0 in the motion; the effects' facing rule (the God Fist's).
+the stage (the long landing lag, Wait), v3's endless dive (off the stage it goes on, the motion's loop looped; a
+landing far below his start; a wall ahead -> FallSpecial), an air start, a catch of a victim on the ground (v3: the
+hold on the ground, the crash), of one in the air over the stage (the hold at his fist, the controller off, the drive,
+the crash; the victim let go the frame before the crash's KO hit, Wait), a catch off the stage (the explosion, the
+victim let go: stage collision back, controller on, FallSpecial), the status cut mid-hold (let go), an earlier God
+Fist victim let go at the catch; the scripts' damage (26% on every path), the dive's catch-check loop, the crash's and
+the explosion's KO knockback; TransN 0 in the motion; the effects' facing rule (the God Fist's).
 """
 import json
 import math
@@ -64,8 +66,10 @@ FUNC_MAIN, FUNC_LOOP, FUNC_END = 2287, 2288, 2289
 class Game:
     """his physics, the motion, the variables, the victim (player slot 2)"""
 
-    def __init__(self, x=0.0, y=0.0, face=1.0, stage=(-80.0, 80.0), floor=0.0, victim=None):
+    def __init__(self, x=0.0, y=0.0, face=1.0, stage=(-80.0, 80.0), floor=0.0, victim=None, wall=None):
         self.x, self.y, self.face = x, y, face
+        self.wall = wall                # (x, top): a wall at x from below up to top (v3: the dive stops at it)
+        self.touch = 0                  # GroundModule(0x2722)'s side touched this frame: 2 left / 4 right wall
         self.stage, self.floor = stage, floor
         self.vx, self.vy, self.acc, self.lim = 0.0, 0.0, 0.0, 30.0
         self.kin = None
@@ -82,6 +86,7 @@ class Game:
         self.n = 0                      # game frames run (the logs' clock)
         self.t = 0
         self.self_status = None         # his status as the variables read it (cb_reset_tick's test)
+        self.frame_sets = []            # (n, frame) MotionModule(0x2713)
 
     def fvar(self, v):
         if v in self.vars:
@@ -104,6 +109,11 @@ class Game:
                 return vi.get('facing', -1.0)
             if v == 0x0F0000A2 + 8 * 4:
                 return float(vi.get('status', 0x47))
+            if v == 0x0F000116 + 0x20 * 4:              # its SITUATION (v3): 0 ground, 2 air
+                if 'sit' in vi:
+                    return float(vi['sit'])
+                on = self.stage[0] <= vi['x'] <= self.stage[1] and abs(vi['y'] - self.floor) < 1e-6
+                return 0.0 if on else 2.0
         return 0.0
 
     def setvar(self, v, val):
@@ -174,6 +184,9 @@ class Game:
         if sid == 0x12:                             # MotionModule
             if a[0] == 0x4:
                 self.rate = f(a[1])
+            if a[0] == 0x2713:                      # its frame set (v3: the dive's loop)
+                self.frame = f(a[1])
+                self.frame_sets.append((self.n, f(a[1])))
             if a[0] == 0x2712:
                 return 0
             return 0
@@ -187,6 +200,8 @@ class Game:
             if a[0] == 0x1:
                 return 2 if self.air else 0
             return 0
+        if sid == 0x1A and a and a[0] == 0x2722:     # GroundModule: touching (1 ceiling, 2 / 4 left / right wall)
+            return 1 if a[1] == self.touch else 0
         if sid == 0x14 and a and a[0] == 0x271C:     # PostureModule: turn
             self.face = -self.face
             return 0
@@ -209,11 +224,17 @@ class Game:
         return 0
 
     def physics(self):
+        self.touch = 0
         if self.air:
             self.vy += self.acc
             if self.vy < -self.lim:
                 self.vy = -self.lim
-            self.x += self.vx
+            nx = self.x + self.vx
+            if self.wall is not None and self.vx != 0.0 and self.y < self.wall[1] and \
+                    (self.x - self.wall[0]) * (nx - self.wall[0]) <= 0.0:
+                nx = self.wall[0] - (0.01 if self.vx > 0 else -0.01)
+                self.touch = 4 if self.vx > 0 else 2
+            self.x = nx
             ny = self.y + self.vy
             if self.vy < 0 and self.stage[0] <= self.x <= self.stage[1] and ny <= self.floor <= self.y:
                 ny = self.floor
@@ -406,34 +427,51 @@ def msc_tests(path):
     # DownBound) and a God Fist victim held down by gf_tick are caught, out of the down status into Damage
     for name, st, gf in (('DownWait', 0x50, False), ('DownBound', 0x4D, False), ('a God Fist victim held down', 0x50,
                                                                                    True)):
-        v = {'x': 1.0, 'y': 0.0, 'status': st}
+        # (lying on the ground, a platform at his middle's height: the hold on the ground, v3)
+        v = {'x': 1.0, 'y': 0.0, 'status': st, 'sit': 0}
         g = Game(stage=(-200.0, 200.0), victim=v)
         run(path, g)
         v['x'], v['y'] = g.x + B.DETECT_AT[0] * g.face, g.y + B.DETECT_AT[1] - 5.0
         if gf:
             g.vars[GB.V_PHASE], g.vars[GB.V_SLOT], g.vars[GB.V_LOCK] = 2.0, 2.0, 2.0
         tr = run(path, g, detect=True)
-        hold = [t for t in tr if t[4] == 3.0]
-        check('the detection box catches %s: the hold (into Damage 0x%X), its controller off, no stage collision%s'
-              % (name, B.HOLD_STATUS, ', gf_tick lets go of it' if gf else ''),
+        hold = [t for t in tr if t[4] == 8.0]
+        check('the detection box catches %s: the hold on the ground (into Damage 0x%X), its controller off, no stage '
+              'collision%s' % (name, B.HOLD_STATUS, ', gf_tick stops holding it' if gf else ''),
               (phases_of(tr)[:2], v.get('status_log', [None])[0], hold[2][6].get('input'), hold[2][6].get('ground'))
-              + ((g.vars.get(GB.V_PHASE) if g.vars.get(GB.V_PHASE) != 5.0 else 'handed', ) if gf else ()),
-              ([1.0, 3.0], B.HOLD_STATUS, 1.0, 0.0) + (('handed', ) if gf else ()))
-    # 6. off the stage (no ground): the rise, then the dive stops no lower than the rise's start -> FallSpecial
+              + ((g.vars.get(GB.V_PHASE), ) if gf else ()),
+              ([1.0, 8.0], B.HOLD_STATUS, 1.0, 0.0) + ((0.0, ) if gf else ()))
+    # 6. v3 (user: "make the Core Breaker dive continue until either landing or something (unless KOd)"): off the
+    # stage (no ground) the dive goes on: no frame limit, no floor, the motion's dive loop looped, the same speed
     g = Game(x=0.0, y=-30.0, stage=(1000.0, 1001.0))
-    r1, tr = both(path, g)
-    low = min(t[3] for t in tr)
-    check('off the stage: FallSpecial (0x10) after the dive, never below the rise\'s start - %.0f (lowest %.1f)'
-          % (B.FLOOR_MARGIN, low), (g.status, low >= -30.0 - B.FLOOR_MARGIN - B.DIVE_V), (0x10, True))
-    check('off the stage: no armor left, air cap back', (armor_at(g, 10 ** 6), 0x20000044 in g.flags), (0, False))
-    # 6b. the second up special after falling below the rise's start: the dive still has DIVE_MIN_DROP
-    g = Game(x=0.0, y=-30.0, stage=(1000.0, 1001.0))
-    run(path, g)
-    g.y = -90.0
-    tr = run(path, g)
+    r1, tr = both(path, g, frames=400)
     dive = [t for t in tr if t[4] == 2.0]
-    check('below the rise\'s start: the dive still goes %.0f down' % B.DIVE_MIN_DROP,
-          dive[0][3] - min(t[3] for t in tr) >= B.DIVE_MIN_DROP - B.DIVE_V, True)
+    steps = [math.hypot(b[2] - a[2], b[3] - a[3]) for a, b in zip(dive[1:], dive[2:])]
+    check('off the stage: still diving after %d frames (%.0f down: past any bottom blast zone), at %.2f a frame, '
+          'armor on, the air cap lifted' % (len(dive), dive[0][3] - dive[-1][3], B.DIVE_V),
+          (g.status, len(dive) >= 330, dive[0][3] - dive[-1][3] > 1500.0, all(near(x, B.DIVE_V, 0.01) for x in steps),
+           armor_at(g, dive[-1][7]), 0x20000044 in g.flags), (None, True, True, True, 1, True))
+    fr = [t[1] for t in dive[1:]]
+    check('the endless dive: the motion stays in the dive (%d-%d), looped back by %d (%d times)'
+          % (B.DIVE_FROM, B.DIVE_LAST, B.DIVE_LOOP, len(g.frame_sets)),
+          (min(fr) >= B.DIVE_FROM, max(fr) <= B.DIVE_LAST + 1e-6, len(g.frame_sets) >= 10,
+           all(near(b - a, -B.DIVE_LOOP, 1e-3) for a, b in [(B.DIVE_LAST, f) for _n, f in g.frame_sets])),
+          (True, True, True, True))
+    # 6b. landing far below the height he started at: the dive goes on to it (v2 stopped it at the rise's start)
+    g = Game(x=0.0, y=0.0, stage=(-1000.0, 1000.0), floor=-400.0)
+    r1, tr = both(path, g)
+    land = next(t for t in tr if t[4] == 5.0)
+    check('landing 400 below the rise\'s start: the dive goes on to it, the miss\'s landing, Wait',
+          (phases_of(tr), round(land[3], 3), g.status), ([1.0, 2.0, 5.0], -400.0, 0))
+    # 6c. a wall ahead: the dive stops there (FallSpecial, no speed into the wall)
+    g = Game(x=0.0, y=0.0, stage=(1000.0, 1001.0), wall=(60.0, 1000.0))
+    r1, tr = both(path, g)
+    check('a wall ahead: the dive stops at it, FallSpecial (0x10), still against it, no armor, the air cap back',
+          (g.status, max(t[2] for t in tr) <= 60.0, g.vx, armor_at(g, 10 ** 6), 0x20000044 in g.flags),
+          (0x10, True, 0.0, 0, False))
+    g = Game(x=0.0, y=0.0, face=-1.0, stage=(1000.0, 1001.0), wall=(60.0, 1000.0))
+    r1, tr = both(path, g)
+    check('a wall behind him (facing away): no stop (still diving)', (g.status, phases_of(tr)), (None, [1.0, 2.0]))
     # 7. the B-reverse in the hover
     g = Game(stage=(-1000.0, 1000.0))
     run(path, g)
@@ -474,11 +512,38 @@ def msc_tests(path):
                    max(angs) <= B.DIVE_DEG + B.HOME_MAX + 1e-3), (True, True, True))
         else:
             check('homing (%s): none' % name, max(abs(x - B.DIVE_DEG) for x in angs) < 1e-3, True)
-    # 9. a dive catch on the stage: the hold, the drive, the crash, the hand-off, Wait
+    # 9. v3 (user: "if a grounded opponent is hit by Core Breaker, Supamario and the opponent should do the grounded
+    # part of the animation instead of being dragged up"): a victim on the ground: the hold on the ground, the crash
     v = {'x': 30.0, 'y': 0.0, 'status': 0x47}
     g = Game(stage=(-200.0, 200.0), victim=v)
     r1, tr = both(path, g, catch_at=B.DIVE_FROM - B.HOVER_FROM + 4)
-    check('dive catch on the stage: the phases', phases_of(tr), [1.0, 2.0, 3.0, 4.0, 6.0])
+    check('a grounded victim: the hold on the ground, then the crash (no lift, no drive)', phases_of(tr),
+          [1.0, 2.0, 8.0, 6.0])
+    hg = [t for t in tr if t[4] == 8.0]
+    late = hg[len(hg) // 2]
+    check('the hold on the ground: he comes down and lands, the victim on the ground at his fist (%.0f ahead), its '
+          'controller off, no stage collision, held every frame, the motion through hold_gnd (%d-%d)'
+          % (B.HOLD_X, B.HOLDG, B.HOLDG_END),
+          (late[5], round(late[3], 3), late[6].get('offx'), round(late[6]['y'], 3), late[6].get('input'),
+           late[6].get('ground'), all(t[7] in t[6].get('held', []) for t in hg[1:]),
+           min(t[1] for t in hg[1:]) >= B.HOLDG, max(t[1] for t in hg) <= B.HOLDG_END + 1e-6),
+          (False, 0.0, B.HOLD_X, 0.0, 1.0, 0.0, True, True, True))
+    check('the hold on the ground: never above where it started (no lift)', max(t[3] for t in hg) <= hg[0][3] + 1e-6,
+          True)
+    crash = [t for t in tr if t[4] == 6.0]
+    rel = next(t for t in crash if t[6].get('ground') == 5.0)
+    check('the crash: the victim let go (stage collision 5, controller on) at the crash\'s first frame (%d, the '
+          'explosion hit the next), no gf_tick put-down; Wait at the end'
+          % B.CRASH, (int(round(rel[1])), rel[6].get('input'), g.vars.get(GB.V_PHASE, 0.0), tr[-1][5], g.status),
+          (B.CRASH, 0.0, 0.0, False, 0))
+    check('the crash: the explosion sound',
+          any(s_[1] == 'play' and s_[2] == B.SE_IDS['cb_explosion'] for s_ in g.sounds), True)
+    # 9b. a victim in the air over the stage: the hold, the lift, the drive, the crash
+    v = {'x': 30.0, 'y': 20.0, 'status': 0x47}
+    g = Game(stage=(-200.0, 200.0), victim=v)
+    r1, tr = both(path, g, catch_at=B.DIVE_FROM - B.HOVER_FROM + 4)
+    check('an airborne victim on the stage: the phases (the hold, the drive, the crash)', phases_of(tr),
+          [1.0, 2.0, 3.0, 4.0, 6.0])
     hold = [t for t in tr if t[4] == 3.0]
     mid = hold[len(hold) // 2][6]
     check('the hold: the victim at his fist (offsets %.0f, %.0f), its controller off, no stage collision'
@@ -491,13 +556,11 @@ def msc_tests(path):
     drive = [t for t in tr if t[4] == 4.0]
     da = math.degrees(math.atan2(-(drive[2][3] - drive[1][3]), drive[2][2] - drive[1][2]))
     check('the drive: down %.0f degrees' % B.DRIVE_DEG, near(da, B.DRIVE_DEG, 0.3), True)
-    check('the crash: on the ground, Wait at the end', (tr[-1][5], g.status), (False, 0))
-    check('the hand-off: gf_tick put-down (gf_phase 5), its slot and lock, %d frames' % B.FALL_WAIT,
-          (g.vars.get(GB.V_PHASE), g.vars.get(GB.V_SLOT), g.vars.get(GB.V_LOCK), g.vars.get(GB.V_CNT)),
-          (5.0, 2.0, 2.0, B.FALL_WAIT))
-    check('the crash: the explosion sound, Down at the hand-off',
-          all(any(s[1] == 'play' and s[2] == i for s in g.sounds) for i in (B.SE_IDS['cb_explosion'], B.GF_DOWN_SE)),
-          True)
+    crash = [t for t in tr if t[4] == 6.0]
+    rel = next(t for t in crash if t[6].get('ground') == 5.0)
+    check('the crash (after the drive): on the ground, the victim let go at its first frame (%d), no put-down, Wait'
+          % B.CRASH, (tr[-1][5], int(round(rel[1])), rel[6].get('input'), g.vars.get(GB.V_PHASE, 0.0), g.status),
+          (False, B.CRASH, 0.0, 0.0, 0))
     # 10. a catch off the stage: the explosion in the air, the victim let go, FallSpecial
     v = {'x': 30.0, 'y': -40.0, 'status': 0x47}
     g = Game(x=0.0, y=0.0, stage=(-1000.0, -900.0), victim=v)
@@ -530,16 +593,36 @@ def msc_tests(path):
     check('an air start: the rise, Fall, the rise used', (g.status, used(g)), (0xE, 1.0))
 
 
-def ko_estimate():
+def ko_estimate(kb=None):
     """Smash 4's knockback for the explosion (CRASH_DMG): KB = ((p/10 + p d/20) 200/(w+100) 1.4 + 18) KBG/100 + BKB,
     p the percent after the hit, w the weight (Mario 98); ~120 off the stage near the ledge KOs on a mid-size stage"""
-    kb = B.EXPLOSION_KB
+    kb = kb or B.EXPLOSION_KB
     out = []
     for start in range(0, 200, 5):
         p = start + B.CATCH_DMG + B.BURN_HITS * B.BURN_DMG + B.CRASH_DMG
         k = ((p / 10.0 + p * B.CRASH_DMG / 20.0) * 200.0 / 198.0 * 1.4 + 18.0) * kb['KBG'] / 100.0 + kb['BKB']
         out.append((start, round(k, 1)))
     return out
+
+
+def ko_percent(kb, x0=9.0, side=240.0, top=200.0, grav=0.087, max_fall=1.5):
+    """a rough KO percent (before the move) for a Mario-weight victim at x0 from a Final Destination-size stage's
+    middle: launched at KB x 0.03 a frame along the angle, that speed less 0.051 a frame, its own gravity on top, KO
+    past the side (240) or top (200) blast zone; no DI, no rage (an estimate, not the game)"""
+    for start, k in ko_estimate(kb) + [(s, None) for s in range(200, 400, 5)]:
+        if k is None:
+            p = start + B.CATCH_DMG + B.BURN_HITS * B.BURN_DMG + B.CRASH_DMG
+            k = ((p / 10.0 + p * B.CRASH_DMG / 20.0) * 200.0 / 198.0 * 1.4 + 18.0) * kb['KBG'] / 100.0 + kb['BKB']
+        sp, a = k * 0.03, math.radians(kb['Angle'])
+        x, y, vg = x0, 0.0, 0.0
+        for _f in range(300):
+            vg = max(vg - grav, -max_fall)
+            x += sp * math.cos(a)
+            y += sp * math.sin(a) + vg
+            sp = max(0.0, sp - 0.051)
+            if x > side or y > top:
+                return start
+    return None
 
 
 def script_tests(fdir):
@@ -549,10 +632,45 @@ def script_tests(fdir):
     syn = acmd.INFO[acmd.BY_NAME['extra_special_hitbox']]['syntax']
     dmg = [c.params[syn.index('Damage')] for c in hits]
     catch = max(d for d in dmg if d <= B.CATCH_DMG + 1e-6 and d >= B.CATCH_DMG - 1e-6)
-    burn = [d for d in dmg if abs(d - B.BURN_DMG) < 1e-6]
     big = [d for d in dmg if abs(d - B.CRASH_DMG) < 1e-6]
-    check('damage: catch %g + %d x %g + crash / explosion %g = 26 (both endings)' % (
-        B.CATCH_DMG, len(burn), B.BURN_DMG, B.CRASH_DMG), (catch + sum(burn) + B.CRASH_DMG, len(big)), (26.0, 2))
+    # the burn hits by the frame they come out at: the hold (grab_hold) and v3's hold on the ground (hold_gnd)
+    at, burn_at = 0.0, []
+    for c in s:
+        if c.ident == acmd.BY_NAME['frame']:
+            at = c.params[0]
+        if c.ident == acmd.BY_NAME['extra_special_hitbox'] and abs(c.params[syn.index('Damage')] - B.BURN_DMG) < 1e-6:
+            burn_at.append(at)
+    air = [f for f in burn_at if B.HOLD <= f <= B.HOLD_END]
+    gnd = [f for f in burn_at if B.HOLDG <= f <= B.HOLDG_END]
+    check('damage: catch %g + %d x %g + crash / explosion %g = 26, the same burn hits in the hold and the hold on the '
+          'ground' % (B.CATCH_DMG, B.BURN_HITS, B.BURN_DMG, B.CRASH_DMG),
+          (catch + len(air) * B.BURN_DMG + B.CRASH_DMG, catch + len(gnd) * B.BURN_DMG + B.CRASH_DMG, len(big),
+           [f - B.HOLD for f in air] == [f - B.HOLDG for f in gnd], len(burn_at)), (26.0, 26.0, 2, True, 2 * B.BURN_HITS))
+    # v3: the dive's catch checks: a loop of DIVE_CHECKS, a frame each (WAIT 1) while cb is 2; no frame blocks in
+    # the dive (the MSC loops its motion)
+    k = next(i for i, c in enumerate(s) if c.ident == acmd.BY_NAME['set_loop'])
+    words = 0
+    j = k + 1
+    while s[j].ident != acmd.BY_NAME['goto']:
+        words += acmd.INFO[s[j].ident]['size']
+        j += 1
+    body = s[k + 1:j]
+    names = [acmd.INFO[c.ident]['name'] for c in body]
+    goto = s[j].params[0]
+    goto = goto - (1 << 32) if goto >= 1 << 31 else goto
+    frames = [c.params[0] for c in s if c.ident == acmd.BY_NAME['frame']]
+    check('the dive\'s catch checks: Set_Loop(%d) {cb 2: Hit_Check .. WAIT 1} Goto(-%d), from frame %d; no frame '
+          'block inside the dive' % (B.DIVE_CHECKS, words, B.DIVE_FROM + 1),
+          (s[k].params[0], 'Hit_Check' in names, names[-1], body[-1].params[0], goto,
+           max(f for f in frames if f <= B.LAND - 1)),
+          (B.DIVE_CHECKS, True, 'WAIT', 1.0, -words, float(B.DIVE_FROM + 1)))
+    crash = [c for c in hits if abs(c.params[syn.index('Size')] - B.HB['crash'][1]) < 1e-6][0]
+    ex = [c for c in hits if abs(c.params[syn.index('Size')] - B.HB['explosion'][1]) < 1e-6][0]
+    kbs = lambda c: tuple(c.params[syn.index(n)] for n in ('Angle', 'KBG', 'BKB'))      # noqa: E731
+    check('the crash on the stage launches (v3): angle %d, KBG %d, BKB %d, at least the explosion in the air\'s'
+          % kbs(crash), (kbs(crash), all(a >= b for a, b in zip(kbs(crash)[1:], kbs(ex)[1:])),
+                         40 <= kbs(crash)[0] <= 45), ((B.CRASH_KB['Angle'], B.CRASH_KB['KBG'], B.CRASH_KB['BKB']),
+                                                       True, True))
     szs = sorted({round(c.params[syn.index('Size')], 2) for c in hits})
     want = sorted({B.HB[k][1] for k in B.HB})
     check('hitbox sizes (v3: scaled with their effects; the detection box and the body box not): %s' % (
@@ -562,10 +680,10 @@ def script_tests(fdir):
           [c.params[syn.index('Ground/Air')] for c in det], [3])
     air = f.script('specialairhi')
     check('specialairhi: the same script', [(c.ident, c.params) for c in air], [(c.ident, c.params) for c in s])
-    est = ko_estimate()
-    first = next(st for st, k in est if k >= 120)
-    print('     the explosion\'s knockback (Mario-weight, %% before the move -> KB): %s; KB 120 from %d%%' % (
-        ', '.join('%d%%: %g' % e for e in est[::4]), first))
+    for name, kb in (('the explosion in the air', B.EXPLOSION_KB), ('the crash on the stage', B.CRASH_KB)):
+        est = ko_estimate(kb)
+        print('     %s\'s knockback (Mario-weight, %% before the move -> KB): %s; KO from mid-stage (rough) at ~%s%%' % (
+            name, ', '.join('%d%%: %g' % e for e in est[::4]), ko_percent(kb)))
 
 
 def motion_tests(fdir, vbn):

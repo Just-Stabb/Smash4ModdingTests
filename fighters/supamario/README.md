@@ -1680,12 +1680,14 @@ special captures by other moves (Ganondorf's 0xB8 and the like, item captures).
 ### The hover / dive (second up special)
 - As v2: the hover (30 frames, no armor, B-reverse), the dive (48 degrees, super armor, light homing, ledges), the
   catch, the hold, the drive, the crash / explosion, the 60-frame landing lag, FallSpecial after.
-- **The floor** (the dive / drive never go below it): the rise's start (less 3), but at least `DIVE_MIN_DROP` (30)
-  below where the dive starts. v2: the move's start, which for a second up special would be the hover's own height.
+- **The dive has no floor and no frame limit** (see "The dive goes on" below). The drive (with an airborne victim)
+  keeps a floor, for the explosion in the air off the stage: the rise's start (less 3), but at least
+  `DRIVE_MIN_DROP` (30) below the catch.
 - **The detection box:**
   - on the hover's first frame, 2.5 across (`DETECT_SIZE`; his body is ~4) at his middle (1 ahead, 6.5 up);
   - the catch's 3%; caught on the frames after it;
-  - its catch goes straight to the hold, then the drive and the crash / explosion (no hover, no dive);
+  - its catch goes straight to the hold, then the drive and the crash / explosion (no hover, no dive); a victim on
+    the ground: the hold on the ground and the crash (below);
   - **It hits fighters lying down** (Ground/Air 3, without the God Fist's bit 31; no down-status refusal). A caught
     downed fighter is put in Damage (0x46) by the MSC: out of the down status, held in hitstun as any held victim.
   - A God Fist / Core Breaker victim being held down by gf_tick: the same fighter is taken over (gf_phase and
@@ -1706,9 +1708,10 @@ special captures by other moves (Ganondorf's 0xB8 and the like, item captures).
 - each attack cancels the rise from frame 16 and not before; up special in the rise gives the hover / dive in place;
   jump / air dodge inputs don't cancel it;
 - the detection box hit skips to the hold / drive / crash, and a miss gives the hover and the dive;
-- the detection box catches DownWait, DownBound and a God Fist victim held down (into Damage 0x46, gf_tick lets go);
-- off the stage, the floor is the rise's start, with at least 30 of dive from below it;
-- the v2 scenarios (homing, catches on and off the stage, cut mid-hold, an earlier victim) through the two entries.
+- the detection box catches DownWait, DownBound and a God Fist victim held down (into Damage 0x46, gf_tick stops
+  holding it; on the ground: the hold on the ground);
+- the v2 scenarios (homing, catches on and off the stage, cut mid-hold, an earlier victim) through the two entries;
+- the later v3 changes' checks: under "The dive goes on", "A victim on the ground" and "The crash launches".
 
 ### The effects' size and the orb (user, v2's clip `MedalTVCemuWiiUEmulator20261114224043912`)
 - "The effects for Core Breaker are too small". In the clip, Supamario is ~90 px tall (12 units):
@@ -1771,14 +1774,83 @@ default (`--no-halo` leaves them out); `halo_report.json` lists them: 113 glowin
 three model halos, 63 calls added (attackdash 3, specialhi / specialairhi 30 each). The halo calls carry their
 effect's size, so Core Breaker's halos grow with CB_FX_SCALE. The bank: ptcl 4.16 MB.
 
+### The dive goes on (user: "please make the Core Breaker dive continue until either landing or something (unless KOd)")
+v1 / v2 ended the dive in FallSpecial after 40 frames (`DIVE_MAX`) or below the rise's start (less 3). Both are gone.
+The dive keeps its speed (7.49 a frame) and angle (48 degrees, the light homing) until:
+- he lands: the miss's landing, 60 frames of lag (however far below his start);
+- the catch connects (the dive's box, or the hover's detection box before it);
+- a wall ahead of him or a ceiling (`cb_dive_blocked`: GroundModule 0x2722, 1 the ceiling, 2 / 4 the left / right
+  wall, as Sephiroth's `edge_hi_slide` reads them): FallSpecial with no speed, against it. Chosen over sliding along
+  it: the dive is straight, so a wall it meets is the stage's side; sliding down it would only end lower;
+- he grabs a ledge (as before), is hit out of it (super armor permitting), or is KO'd: diving past the bottom blast
+  zone is a self-KO (the user accepts it).
+
+Nothing else ends it:
+- his speeds are set every frame: gravity's limit (30) above them, the air speed cap lifted (as before);
+- **the motion**: the dive loop's second copy (85-103) is played back to the first's end when it reaches 103
+  (`MotionModule(0x2713, frame - 19)`, the game's set-frame, as vanilla Mario's MSC uses it): it loops as long as he
+  dives, so the status never reaches the landing segment by itself;
+- **the catch checks**: the game script's per-frame checks in the dive were frame blocks (61-103), which stop when the
+  motion goes back. They are now one loop at 61, `Set_Loop(180) { if cb = 2 { the check; WAIT(1) } } Goto(-words)`, as
+  vanilla's loops (Mario's game.bin: `Goto` minus the block's words). 180 frames is past any blast zone (830 units
+  down at the dive's slowest, 4.6 a frame). Once cb isn't 2 (a catch, a refusal, the motion jumping through) the rest
+  of the loop runs at once with no waits and the script goes on to the later blocks. Threads were not used: the God
+  Fist's in-game test showed a fighter's `Thread_Start` block doing nothing.
+- The dive's wind streaks (effect 7) play at their frames on the first pass only; the fist's fire loops until the
+  dive ends.
+
+Tests: a dive off the stage still diving after 330+ frames, 1500+ units down, at its speed, armor on, the motion looped
+back by 19 each time (never into the landing); a landing 400 below the rise's start (the miss's landing, Wait); a wall
+ahead (FallSpecial against it), a wall behind (no stop); the game script's loop (its count, the check, WAIT 1, the
+Goto, no frame block in the dive).
+
+### A victim on the ground (user: "if a grounded opponent is hit by Core Breaker, Supamario and the opponent should do the grounded part of the animation instead of being dragged up")
+At the catch (the dive's or the detection box's), the victim's situation (SITUATION, `0x0F000116 + 0x20 x target`,
+read before its status is changed) picks the path:
+- **on the ground: the hold on the ground (phase 8)**, then the crash:
+  - he comes down onto its height (`cb_vy`, its Y at the catch: at most the dive's speed a frame) and lands; no lift;
+  - it stays on the ground at his fist (9 ahead, its own height), held as before (hitstun, controller off, no stage
+    collision);
+  - the motion: a new segment `hold_gnd` (frames 238-273, before the crash), the crash's first pose (XV2 #1 290-292,
+    nearly still, his feet on the floor), so they're both in the grounded part of the animation;
+  - the same 4 burn hits (1.5% each, 4 + 8k frames into the hold), the impact / hit-loop effect, the hit spark and the
+    rumble, under their own phase (cb 8), so jumping through one hold never fires the other's;
+  - at its end the motion goes straight on into the crash (no drive);
+  - over no ground at its end (it stood on an edge he isn't over): the explosion in the air instead (phase 7).
+- **in the air: as before**, the hold with the lift, the 45 degree drive, the crash / the explosion in the air.
+
+Total damage on every path: 3 + 4 x 1.5 + 17 = 26% (checked per path in the script).
+
+The segments after it moved by 36: the crash 274-341, the air release 342-385 (the motion is 386 frames).
+
+Tests: a victim on the ground (the phases hold on the ground -> crash, he lands, never goes up, the victim at his fist
+on the ground, held every frame, the motion inside hold_gnd, let go at the crash); an airborne victim over the stage
+(hold, drive, crash); the detection box on a downed victim (the hold on the ground).
+
+### The crash launches (user: "The grounded explosion also seems extremely weak in terms of knockback")
+v1 / v2's crash was a flinch (BKB 20, angle 0), then the victim was handed to the God Fist's put-down (gf_tick:
+DownWait, no tech, no KO). Now:
+- `CRASH_KB`: **angle 42, KBG 75, BKB 45** (the explosion in the air: angle 40, KBG 60, BKB 30; the crash is
+  stronger at every percent); 17%, shieldable (the victim is in hitstun; bystanders can shield), normal DI;
+- the MSC lets the victim go (`cb_release`: stage collision and controller back; its rotation is never changed) at the
+  crash's first frame, the frame before the hit (CRASH + 1), so it takes the full knockback; no hand-off to gf_tick.
+- Knockback for a Mario-weight victim (% before the move, the move's 26% added): 0%: 85, 40%: 125, 80%: 165,
+  100%: 186 (the explosion in the air: 62 / 94 / 126 / 142). A rough estimate (the test prints it: launch speed KB x
+  0.03 less 0.051 a frame, Mario's gravity, Final Destination-size blast zones 240 to the side and 200 up, no DI, no
+  rage) puts the KO from mid-stage at **~105%** before the move (the explosion in the air: ~155% from mid-stage,
+  much sooner off the stage, where it happens).
+
 ### Tests (v3 build, halos on)
 - `supamario_corebreaker_test.py`: everything above, plus every placement at CB_FX_SCALE, the orb shell, and the
-  hitbox sizes equal to `HB`;
+  hitbox sizes equal to `HB`: 70 checks, 0 problems;
 - `supamario_godfist_test.py --all-models`: 0 problems;
-- `msc_stack_check.py`: 0 stack problems.
+- `msc_stack_check.py`: 0 stack problems (2364 scripts).
 
 **Not confirmed in game:**
 - that `global26` (the hook the game's own special transitions read) refuses a third up special everywhere in the
   air;
 - that a status change straight from the rise to an aerial / special works as the God Fist's direct actions did;
-- that a downed fighter put in Damage from DownWait leaves its lying pose at once.
+- that a downed fighter put in Damage from DownWait leaves its lying pose at once;
+- that `MotionModule(0x2713)` (the set-frame) keeps the game script waiting where it is (the catch-check loop is
+  built not to depend on it either way), and the wall / ceiling flags (GroundModule 0x2722) during the dive;
+- the KO percent of the crash (an estimate).

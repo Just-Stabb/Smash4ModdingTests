@@ -38338,22 +38338,28 @@ void gf_tick()
 //   1 the hover   from CB_HOVER_FROM: still (speed, gravity 0); he can turn (B-reverse, the stick back); no armor
 //   2 the dive    from CB_DIVE_FROM: CB_DIVE_V a frame, cb_ang below level (CB_DIVE_DEG, light homing within
 //                 CB_HOME_MAX of it, cb_steer); super armor; ledges grabbed (func_56); landing -> 5; the game script's
-//                 catch -> 3; CB_DIVE_MAX frames or below the height he started at (cb_sy - CB_FLOOR_MARGIN: no
-//                 height lost overall) -> FallSpecial
-//   3 the hold    the victim held at his fist (cb_hold: its offsets, hitstun, hitstop, no stage collision, controller
-//                 off), he goes CB_HOLD_RISE up; the game script's burn hits; to CB_DRIVE -> 4
-//   4 the drive   down CB_DRIVE_DEG at CB_DRIVE_V with it: landing -> 6; CB_DRIVE_MAX frames or the floor height
-//                 (off the stage) -> 7
+//                 catch -> 3 / 8; a wall ahead or a ceiling -> FallSpecial. v3 (user: "make the Core Breaker dive
+//                 continue until either landing or something (unless KOd)"): nothing else ends it (no frame limit, no
+//                 floor; the motion's dive loop looped: CB_DIVE_LAST back by CB_DIVE_LOOP)
+//   3 the hold    an airborne victim held at his fist (cb_hold: its offsets, hitstun, hitstop, no stage collision,
+//                 controller off), he goes CB_HOLD_RISE up; the game script's burn hits; to CB_DRIVE -> 4
+//   4 the drive   down CB_DRIVE_DEG at CB_DRIVE_V with it: landing -> 6; CB_DRIVE_MAX frames or the floor (cb_floor:
+//                 the rise's start less CB_FLOOR_MARGIN, at least CB_DRIVE_MIN_DROP below the catch) -> 7
 //   5 land miss   the landing blast (XV2 entry 5), CB_LAND_LAG frames of landing lag, then Wait
-//   6 the crash   on the ground: the game script's crash hit, the victim handed to gf_tick's put-down (God Fist v17:
-//                 DownWait on the stage, no tech) at CB_HANDOFF; he slides back CB_CRASH_BACK_V; Wait at the end
+//   6 the crash   on the ground: the victim let go at CB_CRASH, the game script's crash explosion (KO knockback) the
+//                 next frame; he slides back CB_CRASH_BACK_V; Wait at the end
 //   7 air release (off the stage) the game script's KO explosion, the victim let go at once; FallSpecial at the end
+//   8 the hold on the ground (v3, user: "if a grounded opponent is hit by Core Breaker, Supamario and the opponent
+//                 should do the grounded part of the animation instead of being dragged up"): a victim on the ground
+//                 at the catch: he comes down to its height (cb_vy) and they stay on the ground, the same burn hits
+//                 (the hold_gnd segment, CB_HOLDG), then straight into the crash (6); over no ground at its end -> 7
 // To split the rise and the dive into two moves later: cb_rise_phase / cb_dive_phase are self-contained (their own
 // constants, their own speed setting); the dive's entry needs only cb_dive_start() (README "Splitting").
 int cb_ph;
 int cb_n;               // frames in the phase
 int cb_jump;            // a motion jump on its way (the target frame), 0 none
-float cb_floor;         // v3: the dive's / drive's floor (cb_dive_start)
+float cb_floor;         // the drive's floor (cb_catch)
+float cb_vy;            // v3: a grounded victim's height at the catch (phase 8)
 float cb_ang;           // the dive's angle below level (degrees)
 int cb_turned;
 int cb_slot;            // the victim's player slot (1-8), 0 none
@@ -38605,7 +38611,6 @@ int cb_hover_phase(float fr)
     // v3: the detection box at the hover's start caught someone (the game script: cb 3): straight to the hold
     if (WorkModuleF(0, CB_VAR) > 2.5f && WorkModuleF(0, CB_VAR) < 3.5f)
     {
-        cb_set_floor();
         cb_catch();
         return 0;
     }
@@ -38627,22 +38632,8 @@ int cb_hover_phase(float fr)
 }
 
 // ---- the dive (phase 2)
-// the dive's / drive's floor (v1: the height the move started at): the rise's start, but at least CB_DIVE_MIN_DROP
-// below him
-void cb_set_floor()
-{
-    float y;
-    y = WorkModuleF(0, 0x0f000001);
-    cb_floor = WorkModuleF(0, CB_RISE_Y) - CB_FLOOR_MARGIN;
-    if (cb_floor > y - CB_DIVE_MIN_DROP)
-    {
-        cb_floor = y - CB_DIVE_MIN_DROP;
-    }
-}
-
 void cb_dive_start()
 {
-    cb_set_floor();
     cb_set_ph(0x2);
     cb_ang = CB_DIVE_DEG;
     cb_armor(0x1);
@@ -38726,6 +38717,31 @@ void cb_steer()
     cb_ang = best;
 }
 
+// a wall ahead of him or a ceiling (GroundModule 0x2722: 1 the ceiling, 2 / 4 the left / right wall, as edge_hi_slide
+// reads them): the dive stops there
+int cb_dive_blocked()
+{
+    if (GroundModule(0x2722, 0x1) != 0)
+    {
+        return 0x1;
+    }
+    if (WorkModuleF(0, 0x0f000003) > 0.0f)
+    {
+        if (GroundModule(0x2722, 0x4) != 0)
+        {
+            return 0x1;
+        }
+    }
+    else
+    {
+        if (GroundModule(0x2722, 0x2) != 0)
+        {
+            return 0x1;
+        }
+    }
+    return 0;
+}
+
 int cb_dive_phase(float fr)
 {
     if (func_56() == 0x1)
@@ -38743,17 +38759,24 @@ int cb_dive_phase(float fr)
         cb_land_miss();
         return 0;
     }
-    if (cb_n >= CB_DIVE_MAX || WorkModuleF(0, 0x0f000001) < cb_floor)
+    // v3: no frame limit, no floor: a wall / ceiling (into FallSpecial, still), else on until he lands, catches,
+    // grabs a ledge, is hit out of it or is KO'd
+    if (cb_dive_blocked() == 0x1)
     {
-        cb_fall_special();
+        cb_fall_special_vx(0.0f);
         return 0x1;
+    }
+    // the dive's loop, looped for as long as he dives (its second copy's end back to the first's: the same pose)
+    if (fr >= CB_DIVE_LAST - 0.01f)
+    {
+        MotionModule(0x2713, fr - CB_DIVE_LOOP);
     }
     cb_steer();
     cb_dive_speed();
     return 0;
 }
 
-void cb_fall_special()
+void cb_fall_special_vx(float vx)
 {
     float face;
     face = WorkModuleF(0, 0x0f000003);
@@ -38761,8 +38784,13 @@ void cb_fall_special()
     cb_armor(0);
     cb_aircap(0);
     KineticModule(0, 0);
-    KineticModule(0x11, 0x3, CB_FALL_VX * face, 0.0f);
+    KineticModule(0x11, 0x3, vx * face, 0.0f);
     func_16(0x10, 0);
+}
+
+void cb_fall_special()
+{
+    cb_fall_special_vx(CB_FALL_VX);
 }
 
 void cb_land_miss()
@@ -38813,6 +38841,7 @@ void cb_catch()
 {
     int old;
     float vst;
+    float vsit;
     cb_slot = WorkModule(0x6, CB_V_SLOT);
     if (cb_slot < 1 || cb_slot > 8)
     {
@@ -38832,6 +38861,8 @@ void cb_catch()
         WorkModule(0, 0.0f, GF_V_PHASE);
         WorkModule(0, 0.0f, GF_V_LOCK);
     }
+    // v3: on the ground or not (its SITUATION: 0 ground, 1 ledge, 2 air), read before its status is changed
+    vsit = WorkModuleF(0, 0x0F000116 + 0x20 * cb_t());
     // a fighter lying down (v3: the detection box): out of the down statuses into the hold's hitstun (Damage), as a
     // hit on it in the air would be
     vst = WorkModuleF(0, 0x0F0000A2 + 8 * cb_t());
@@ -38839,13 +38870,31 @@ void cb_catch()
     {
         WorkModule(0, CB_HOLD_STATUS, 0x0F0000A2 + 8 * cb_t());
     }
-    cb_set_ph(0x3);
     SoundModule(0x2714, CB_SND_RUSH);
     cb_armor(0);
     cb_aircap(0);
+    MotionModule(0x4, 1.0f);
+    // the drive's floor (off the stage: the explosion in the air): the rise's start, but at least CB_DRIVE_MIN_DROP
+    // below the catch (v3: the dive itself has none, so the catch can be far below the rise's start)
+    cb_floor = WorkModuleF(0, CB_RISE_Y) - CB_FLOOR_MARGIN;
+    if (cb_floor > WorkModuleF(0, 0x0f000001) - CB_DRIVE_MIN_DROP)
+    {
+        cb_floor = WorkModuleF(0, 0x0f000001) - CB_DRIVE_MIN_DROP;
+    }
+    if (vsit < 0.5f)
+    {
+        // v3: a victim on the ground: the hold on the ground (phase 8), then the crash; no lift, no drive
+        cb_vy = WorkModuleF(0, 0x0F000021 + 4 * (cb_slot - 1));
+        cb_set_ph(0x8);
+        cb_speed(0.0f, 0.0f);
+        KineticModule(0x14, 0x1, 0.0f);
+        cb_goto(CB_HOLDG);
+        cb_hold(CB_HOLD_X, cb_vy - WorkModuleF(0, 0x0f000001));
+        return;
+    }
+    cb_set_ph(0x3);
     cb_speed(0.0f, CB_HOLD_RISE_V);
     KineticModule(0x14, 0x1, 0.0f);
-    MotionModule(0x4, 1.0f);
     cb_goto(CB_HOLD);
     cb_hold(CB_HOLD_X, CB_HOLD_Y);
 }
@@ -38882,51 +38931,102 @@ int cb_drive_phase(float fr)
     cb_hold(CB_HOLD_X, CB_HOLD_Y);
     if (global18 == 0)
     {
-        cb_set_ph(0x6);
-        cb_aircap(0);
         func_101();
-        KineticModule(0x11, 0x3, -CB_CRASH_BACK_V * WorkModuleF(0, 0x0f000003), 0.0f);
+        cb_crash_start();
         MotionModule(0x4, 1.0f);
         cb_goto(CB_CRASH);
-        cb_hold(CB_CRASH_X, 0.0f);
-        SoundModule(0x2710, CB_SND_EXPLOSION);
         return 0;
     }
     if (cb_n >= CB_DRIVE_MAX || WorkModuleF(0, 0x0f000001) < cb_floor)
     {
-        cb_set_ph(0x7);
-        cb_aircap(0);
-        cb_speed(0.0f, 0.0f);
-        KineticModule(0x14, 0x1, 0.0f);
-        MotionModule(0x4, 1.0f);
-        cb_goto(CB_AIRREL);
-        SoundModule(0x2710, CB_SND_EXPLOSION);
+        cb_airrel_start();
         return 0;
     }
     cb_drive_speed();
     return 0;
 }
 
-// ---- the crash (phase 6): the God Fist's down for the victim (gf_tick phase 5, v17: put down on the stage, no tech;
-// off the edge it falls); an earlier God Fist / Core Breaker victim was let go at the catch
+// the crash (6) from the drive's landing or the hold on the ground's end: the slide back, the explosion's sound
+void cb_crash_start()
+{
+    cb_set_ph(0x6);
+    cb_aircap(0);
+    KineticModule(0x11, 0x3, -CB_CRASH_BACK_V * WorkModuleF(0, 0x0f000003), 0.0f);
+    cb_hold(CB_CRASH_X, 0.0f);
+    SoundModule(0x2710, CB_SND_EXPLOSION);
+}
+
+// the explosion in the air (7): from the drive off the stage, or a hold on the ground with no ground under him
+void cb_airrel_start()
+{
+    cb_set_ph(0x7);
+    cb_aircap(0);
+    cb_speed(0.0f, 0.0f);
+    KineticModule(0x14, 0x1, 0.0f);
+    MotionModule(0x4, 1.0f);
+    cb_goto(CB_AIRREL);
+    SoundModule(0x2710, CB_SND_EXPLOSION);
+}
+
+// ---- the hold on the ground (phase 8, v3): he comes down onto the victim's height (it stays on the ground at his
+// fist), the hold_gnd segment's burn hits, then the crash where they are
+int cb_holdg_phase(float fr)
+{
+    float dy;
+    float y;
+    y = WorkModuleF(0, 0x0f000001);
+    if (global18 != 0)
+    {
+        dy = y - cb_vy;
+        if (dy > CB_DIVE_V)
+        {
+            dy = CB_DIVE_V;
+        }
+        if (dy < 0.0f)
+        {
+            dy = 0.0f;
+        }
+        cb_speed(0.0f, -dy);
+        KineticModule(0x14, 0x1, CB_FALL_LIMIT);
+    }
+    else
+    {
+        if (cb_lifted != 0x2)
+        {
+            cb_lifted = 0x2;
+            func_101();
+        }
+        KineticModule(0x11, 0x3, 0.0f, 0.0f);
+    }
+    cb_hold(CB_HOLD_X, cb_vy - y);
+    if (fr >= CB_HOLDG_END - 0.01f && cb_jump == 0)
+    {
+        if (global18 == 0)
+        {
+            cb_crash_start();
+        }
+        else
+        {
+            cb_airrel_start();
+        }
+    }
+    return 0;
+}
+
+// ---- the crash (phase 6): v3 (user: "The grounded explosion also seems extremely weak in terms of knockback"): the
+// victim let go (its controller and stage collision back; its rotation never changed) at CB_CRASH, the frame before
+// the game script's crash explosion (KO knockback, CRASH_KB) at CB_CRASH + 1; no gf_tick put-down
 int cb_crash_phase(float fr)
 {
-    int t;
     if (cb_handed == 0)
     {
-        if (fr < CB_HANDOFF)
+        if (fr < CB_CRASH - 0.01f)
         {
             cb_hold(CB_CRASH_X, 0.0f);
         }
         else
         {
-            t = cb_t();
-            WorkModule(0, (float)cb_slot, GF_V_SLOT);
-            WorkModule(0, (float)cb_slot, GF_V_LOCK);
-            WorkModule(0, CB_FALL_WAIT, GF_V_CNT);
-            WorkModule(0, 5.0f, GF_V_PHASE);
-            cb_handed = 0x1;
-            SoundModule(0x2710, CB_SND_DOWN);
+            cb_release();
         }
     }
     if (fr >= CB_CRASH_END - 0.01f || MotionModule(0x2712) == 0x1)
@@ -39008,6 +39108,10 @@ int cb_update()
     else if (cb_ph == 0x7)
     {
         r = cb_airrel_phase(fr);
+    }
+    else if (cb_ph == 0x8)
+    {
+        r = cb_holdg_phase(fr);
     }
     return r;
 }

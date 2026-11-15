@@ -18,11 +18,12 @@ The move (fighters/supamario/README.md "Core Breaker"; his movement is speeds th
 - 0-5 crouch, 6-29 the rise (CB_RISE_V a frame slowing by CB_RISE_DECEL: RISE_HEIGHT up), super armor; 30-59 the
   hover (still, no armor; the stick back turns him); 60- the dive (CB_DIVE_V at CB_DIVE_DEG below level, light homing,
   super armor, ledges): the catch box on his fist (CATCH_DMG); landing -> the miss's landing (CB_LAND_LAG frames);
-  CB_DIVE_MAX frames or the height he started from -> FallSpecial.
+  a wall / ceiling -> FallSpecial; v3: nothing else ends it (no frame limit, no floor: the dive loop is looped).
 - a catch (a fighter's body, not lying down, not invincible / intangible): he's invincible, holds it at his fist
-  (36 frames: BURN_HITS x BURN_DMG), then drives it down 45 degrees: on the ground the crash (CRASH_DMG; it's put down
-  on the stage as the God Fist's victim and slides: no tech, no KO), else (off the stage: CB_DRIVE_MAX frames or the
-  floor height) the explosion in the air (CRASH_DMG, KO knockback EXPLOSION_KB) and FallSpecial.
+  (36 frames: BURN_HITS x BURN_DMG), then drives it down 45 degrees: on the ground the crash (CRASH_DMG, KO
+  knockback CRASH_KB, the victim let go the frame before), else (off the stage: CB_DRIVE_MAX frames or the floor:
+  the rise's start less FLOOR_MARGIN, at least DRIVE_MIN_DROP below the catch) the explosion in the air (CRASH_DMG, KO knockback EXPLOSION_KB) and FallSpecial. v3: a victim on
+  the ground at the catch: the hold on the ground (hold_gnd: the same burn hits), then the crash (no lift, no drive).
 """
 import json
 import math
@@ -48,6 +49,8 @@ DIVE_FROM = SEG['dive'][0]                 # 60
 DIVE_LAST = SEG['dive_loop2'][1]           # 103
 LAND, LAND_END = SEG['land_miss']          # 104, 163
 HOLD, HOLD_END = SEG['grab_hold']          # 164, 199
+HOLDG, HOLDG_END = SEG['hold_gnd']         # v3: the hold on the ground (238, 273)
+DIVE_LOOP = SEG['dive_loop2'][0] - SEG['dive_loop'][0]   # 19: the dive loop's length (the MSC loops its copies)
 DRIVE = SEG['grab_dive'][0]                # 200
 CRASH, CRASH_END = SEG['crash']            # 238, 305
 AIRREL, AIRREL_END = SEG['air_release']    # 306, 349
@@ -61,8 +64,10 @@ RISE_DECEL = RISE_V / RISE_FRAMES                      # 0.19 a frame
 RISE_VX = 0.4                              # XV2: 0.1 m a frame forward over the launch (entry 0 Movement 9-25)
 DIVE_DEG = 48.0                            # XV2 entries 3 / 4: Movement (0, -1.0, 1.1 forward) a frame
 DIVE_V = 1.4866 * 5.04                     # 7.49: XV2's 1.49 m a frame at the body's 5.04 units a metre
-DIVE_MAX = 40                              # frames (XV2: up to 46)
-FLOOR_MARGIN = 3.0                         # the dive / drive never go below the height he started at, less this
+DIVE_CHECKS = 180                          # v3: the dive's catch checks (the game script's loop, a frame each): past
+                                           # any blast zone (>= 830 units down at its slowest, 4.6 a frame)
+FLOOR_MARGIN = 3.0                         # the drive's floor: the rise's start less this (v3: the dive has none)
+DRIVE_MIN_DROP = 30.0                      # v3: but at least this far below the catch
 HOME_RANGE = 50.0                          # light homing (user): fighters ahead and below within this
 HOME_CONE = 30.0                           # degrees either side of the dive's line
 HOME_TURN = 1.5                            # degrees a frame
@@ -81,8 +86,6 @@ TURN_STICK = 0.5                           # the hover's B-reverse: the stick th
 HOLD_X, HOLD_Y = 9.0, -2.0                 # its feet at his fist (the dive pose's RHandN: 6.3 ahead, 3.1 up)
 CRASH_X = 9.0
 HOLD_HITSTUN = 30.0
-HANDOFF = CRASH + 3                        # the victim to gf_tick's put-down (God Fist v17: no tech)
-FALL_WAIT = 27.0                           # gf_tick's wait for a down (off the edge)
 LAND_LAG = LAND_END - LAND + 1             # 60: the miss's landing (user: "very long"; XV2 entry 5 is 59 frames)
 # damage (user: "The total damage should be 26%"): 3 + 4 x 1.5 + 17
 CATCH_DMG = 3.0
@@ -92,7 +95,9 @@ CRASH_DMG = 17.0
 assert abs(CATCH_DMG + BURN_HITS * BURN_DMG + CRASH_DMG - 26.0) < 1e-6
 BURN_AT = [HOLD + 4 + 8 * k for k in range(BURN_HITS)]      # 168, 176, 184, 192
 EXPLOSION_KB = dict(Angle=40, KBG=60, FKB=0, BKB=30)          # off the stage: KOs (README "Core Breaker": ~75% before)
-CRASH_KB = dict(Angle=0, KBG=0, FKB=0, BKB=20)                # on the stage: a flinch; the MSC puts it down
+# v3 (user: "The grounded explosion also seems extremely weak in terms of knockback"): the crash on the stage launches,
+# stronger than the explosion in the air (README "Core Breaker v3": KOs a Mario-weight from mid-stage at ~105%)
+CRASH_KB = dict(Angle=42, KBG=75, FKB=0, BKB=45)
 INVINCIBLE = (CRASH_END - HOLD) + 10        # from the catch through the crash / the explosion
 CATCH_FREEZE = 6
 
@@ -103,11 +108,10 @@ CB_V_SLOT = 0x0F000380 + 0x21               # the victim's player slot (Target_S
 # has set cb (1: the second up special's hover), which would skip the hover's detection box
 VARS = [('cb', CB_VAR, 0), ('cb_slot', CB_V_SLOT, 0), ('cb_tmp', 0x0F000380 + 0x22, 0),
         ('cb_used', 0x0F000380 + 0x23, 0), ('cb_rise_y', 0x0F000380 + 0x24, 0)]
+CB_RISE_Y = 0x0F000380 + 0x24             # v3: his height at the rise's start (the drive's floor)
 CB_USED = 0x0F000380 + 0x23               # v3: per fighter (object scope): 0 none used, 1 the rise, 2 the hover / dive
-CB_RISE_Y = 0x0F000380 + 0x24             # v3: his height at the rise's start (the dive's floor)
 RISE_CANCEL = RISE_FROM + 10              # v3: the rise cancellable into an attack from here (its burst: 10 frames,
                                           # ~37 of its ~55 units, the speed 4.7 -> 2.7)
-DIVE_MIN_DROP = 30.0                      # v3: the dive may always go this far below where it starts
 LASTHIT_STATUS = 0x0F0000B2
 LASTHIT_BODY = 0x0F000100 + 0x20 * 2 + 0x1B
 NO_DOWN = 0x80000000
@@ -124,7 +128,6 @@ CB_SE = {'cb_rise': ('CAR_BTL_U2070_COR_SE_Rise', 0.0),                   # BAC 
          'cb_hit_l': ('Hit_L', 0.0)}                                      # CMN cue 52 (the victim, entry 19)
 SE_IDS = {'cb_rise': 0x0CB10092, 'cb_charge': 0x0CB10093, 'cb_release': 0x0CB10094, 'cb_rush': 0x0CB10095,
           'cb_explosion': 0x0CB10096, 'cb_hit_l': 0x0CB10097}
-GF_DOWN_SE = 0x0CB10090                     # the God Fist's Down (CMN cue 106), at the hand-off
 RELEASE_SND_AT = FLARE_FROM - HOVER_FROM    # the hover's frame of Ki_Rlease (XV2 entry 2 at 110: our flare)
 # v2: the charge orb (BAC effect 0, XV2 45 -> 111 of its 72-frame animation) on screen from its frame to the flare
 ORB_ON = HOVER_FROM + int(round((45 - 40) * (SEG['charge'][1] - SEG['charge'][0] + 1) / 70.0))
@@ -145,23 +148,26 @@ def msc_values():
             'CB_DRIVE_V': fl(DRIVE_V), 'CB_DRIVE_COS': fl(math.cos(math.radians(DRIVE_DEG))),
             'CB_DRIVE_SIN': fl(math.sin(math.radians(DRIVE_DEG))), 'CB_DRIVE_MAX': str(DRIVE_MAX),
             'CB_DRIVE': fl(DRIVE), 'CB_CRASH_END': fl(CRASH_END), 'CB_CRASH_BACK_V': fl(CRASH_BACK_V),
-            'CB_CRASH_X': fl(CRASH_X), 'CB_CRASH': fl(CRASH), 'CB_HANDOFF': fl(HANDOFF),
-            'CB_AIRREL_END': fl(AIRREL_END), 'CB_AIRREL': fl(AIRREL), 'CB_FALL_WAIT': fl(FALL_WAIT),
+            'CB_CRASH_X': fl(CRASH_X), 'CB_CRASH': fl(CRASH),
+            'CB_AIRREL_END': fl(AIRREL_END), 'CB_AIRREL': fl(AIRREL),
             'CB_RISE_VX': fl(RISE_VX), 'CB_RISE_V': fl(RISE_V), 'CB_RISE_DECEL': fl(RISE_DECEL),
-            'CB_DIVE_DEG': fl(DIVE_DEG), 'CB_DIVE_V': fl(DIVE_V), 'CB_DIVE_MAX': str(DIVE_MAX),
-            'CB_FLOOR_MARGIN': fl(FLOOR_MARGIN), 'CB_FALL_LIMIT': fl(FALL_LIMIT), 'CB_FALL_VX': fl(FALL_VX),
+            'CB_DIVE_DEG': fl(DIVE_DEG), 'CB_DIVE_V': fl(DIVE_V),
+            'CB_FALL_LIMIT': fl(FALL_LIMIT), 'CB_FALL_VX': fl(FALL_VX),
             'CB_HOME_D2': fl(HOME_RANGE ** 2), 'CB_HOME_CONE': fl(HOME_CONE), 'CB_HOME_TURN': fl(HOME_TURN),
             'CB_HOME_MAX': fl(HOME_MAX), 'CB_DOWN_LO': fl(DOWN_LO), 'CB_DOWN_HI': fl(DOWN_HI),
             'CB_TURN_STICK': fl(TURN_STICK), 'CB_RELEASE_SND_AT': str(RELEASE_SND_AT),
             'CB_SND_RISE': '0x%X' % SE_IDS['cb_rise'], 'CB_SND_CHARGE': '0x%X' % SE_IDS['cb_charge'],
             'CB_SND_RELEASE': '0x%X' % SE_IDS['cb_release'], 'CB_SND_RUSH': '0x%X' % SE_IDS['cb_rush'],
             'CB_SND_EXPLOSION': '0x%X' % SE_IDS['cb_explosion'], 'CB_SND_HIT': '0x%X' % SE_IDS['cb_hit_l'],
-            'CB_SND_DOWN': '0x%X' % GF_DOWN_SE,
             # v3: the split (the rise; up special again: the hover / dive)
-            'CB_USED': '0x%X' % CB_USED, 'CB_RISE_Y': '0x%X' % CB_RISE_Y, 'CB_RISE_CANCEL': fl(RISE_CANCEL),
-            'CB_DIVE_MIN_DROP': fl(DIVE_MIN_DROP), 'CB_RESET_LO': fl(0x3F), 'CB_RESET_HI': fl(0x4C),
+            'CB_USED': '0x%X' % CB_USED, 'CB_RISE_Y': '0x%X' % CB_RISE_Y,
+            'CB_RISE_CANCEL': fl(RISE_CANCEL), 'CB_FLOOR_MARGIN': fl(FLOOR_MARGIN),
+            'CB_RESET_LO': fl(0x3F), 'CB_RESET_HI': fl(0x4C),
             'CB_CLIFF_LO': fl(0x72), 'CB_CLIFF_HI': fl(0x7A), 'CB_DEAD': fl(0xB1), 'CB_REBIRTH': fl(0xB2),
-            'CB_ENTRY': fl(0x14F), 'CB_DOWN_FURAFURA': fl(DOWN_FURAFURA), 'CB_HOLD_STATUS': fl(HOLD_STATUS)}
+            'CB_ENTRY': fl(0x14F), 'CB_DOWN_FURAFURA': fl(DOWN_FURAFURA), 'CB_HOLD_STATUS': fl(HOLD_STATUS),
+            # v3: the endless dive, the hold on the ground
+            'CB_DIVE_LAST': fl(DIVE_LAST), 'CB_DIVE_LOOP': fl(DIVE_LOOP), 'CB_DRIVE_MIN_DROP': fl(DRIVE_MIN_DROP),
+            'CB_HOLDG': fl(HOLDG), 'CB_HOLDG_END': fl(HOLDG_END)}
 
 
 # ---------------------------------------------------------------- ACMD helpers (the God Fist's)
@@ -175,6 +181,11 @@ def size(cmds):
 
 def if_(var, method, value, body):
     return [cmd('float_var_compare', var, method, float(value)), cmd('true', 2 + size(body))] + body
+
+
+def loop(n, body):
+    """Set_Loop(n){ body } Goto(minus the block's words: back to its start), as vanilla's (Mario's game.bin)"""
+    return [cmd('set_loop', n)] + body + [cmd('goto', -size(body))]
 
 
 def setf(value, var):
@@ -257,9 +268,11 @@ def game_script():
         ok += if_(0x0F000380 + 0x22, 0, 1, take)
         ok += if_(0x0F000380 + 0x22, 0, 0, [setf(refused, CB_VAR), cmd('remove_all_hitboxes')])
         return [cmd('hit_check', 0, 0, 2), cmd('true', 2 + size(ok))] + ok
+    # v3 (the endless dive): the checks in a loop, a frame each while diving (the motion's dive loop is looped by the
+    # MSC, so frame blocks would stop at its first pass); once cb isn't 2 (a catch, a refusal, a jump through) the
+    # rest of the loop runs at once, no waits, and the script goes on
     check = catch_check(2.25)
-    for f in range(DIVE_FROM + 1, DIVE_LAST + 1):
-        blocks.append((f, if_(CB_VAR, 0, 2, check)))
+    blocks.append((DIVE_FROM + 1, loop(DIVE_CHECKS, if_(CB_VAR, 0, 2, check + [cmd('wait', 1.0)]))))
     # v3 (user: "The moment the button is pressed for the hover, there should be a very small detection box (smaller
     # than Supamario's hurtbox) that checks if it hit an opponent. If it hits an opponent it should skip Supamario to
     # the catch part of the dive"): the hover's first frame (both ways in: the second up special's jump to it, or up
@@ -277,21 +290,21 @@ def game_script():
     # the dive starts with a clean hit record (a refused detection hit can't catch later)
     blocks.append((DIVE_FROM, [cmd('hit_reset'), cmd('hit_log_clear', 0)]))
     # every later segment starts with no hitboxes (the dive's gone)
-    for f in (LAND, HOLD, CRASH, AIRREL):
+    for f in (LAND, HOLD, HOLDG, CRASH, AIRREL):
         blocks.append((f, [cmd('remove_all_hitboxes')]))
     # the burn (cb 3): BURN_HITS x BURN_DMG on the held victim (Part 1, its record cleared before each)
-    for f in BURN_AT:
-        blocks.append((f, if_(CB_VAR, 0, 3, [cmd('hit_log_clear', 1),
+    # v3: the same hits in the hold on the ground (cb 8)
+    for f, ph in [(f, 3) for f in BURN_AT] + [(f - HOLD + HOLDG, 8) for f in BURN_AT]:
+        blocks.append((f, if_(CB_VAR, 0, ph, [cmd('hit_log_clear', 1),
                                              hitbox(ID=0, Part=1, Bone=0, Damage=BURN_DMG, BKB=10, Size=HB['burn'][1],
                                                     Y=BURN_POS[1], Z=BURN_POS[0], SFXLevel=0, SFXType=4,
                                                     Effect=1, HitstopFrames=3, SelfHitstopFrames=0,
                                                     Shieldable=0, DIMul=0.001, SDI=0.0)])))
-        blocks.append((f + 1, if_(CB_VAR, 0, 3, [cmd('remove_all_hitboxes')])))
-    # the crash on the stage (cb 6): CRASH_DMG, a flinch (the MSC puts it down at HANDOFF: no launch, no tech)
+        blocks.append((f + 1, if_(CB_VAR, 0, ph, [cmd('remove_all_hitboxes')])))
+    # the crash on the stage (cb 6): CRASH_DMG, v3: KO knockback (CRASH_KB; the MSC lets the victim go the frame before)
     blocks.append((CRASH + 1, if_(CB_VAR, 0, 6, [cmd('hit_log_clear', 2), hitbox(
         ID=0, Part=2, Bone=0, Damage=CRASH_DMG, Size=HB['crash'][1], Y=CRASH_AT[1], Z=CRASH_AT[0], SFXLevel=2,
-        SFXType=1, Effect=1,
-        HitstopFrames=8, SelfHitstopFrames=6, Shieldable=0, SDI=0.0, DIMul=0.001, **CRASH_KB)])))
+        SFXType=1, Effect=1, HitstopFrames=10, SelfHitstopFrames=6, Shieldable=1, **CRASH_KB)])))
     blocks.append((CRASH + 2, [cmd('remove_all_hitboxes')]))
     # the explosion off the stage (cb 7): CRASH_DMG, KO knockback; the MSC lets the victim go the same frame
     blocks.append((AIRREL + 1, if_(CB_VAR, 0, 7, [cmd('hit_log_clear', 2), hitbox(
@@ -334,6 +347,8 @@ def effect_script(fx, bones, cmn_fx):
                                     sz))
                 else:
                     body.append(gfx('external_graphic', g, bi[pt['bone']], 0.0, 0.0, 0.0, sz))
+        if eid == 8:                          # v3: the impact and its loop on the hold on the ground (cb 8) too
+            blocks.append((x['frame'] - HOLD + HOLDG, if_(CB_VAR, 0, 8, list(body))))
         if eid in GUARD:
             body = if_(CB_VAR, 0, GUARD[eid], body)
         blocks.append((x['frame'], body))
@@ -364,14 +379,16 @@ def effect_script(fx, bones, cmn_fx):
         crash.append(gfx('graphic_effect', cmn_fx['PHitSmk'], 0, 0.0, 0.0, CRASH_X, 5.04 / 8.5 * 1.5))
     blocks.append((CRASH, if_(CB_VAR, 0, 6, crash)))
     if cmn_fx.get('MHit'):
-        blocks.append((HOLD, if_(CB_VAR, 0, 3, [gfx('graphic_effect', cmn_fx['MHit'], 0, 0.0, VICTIM_MID[1],
-                                                       VICTIM_MID[0], 5.04 / 8.5)])))
+        for f, ph in ((HOLD, 3), (HOLDG, 8)):
+            blocks.append((f, if_(CB_VAR, 0, ph, [gfx('graphic_effect', cmn_fx['MHit'], 0, 0.0, VICTIM_MID[1],
+                                                         VICTIM_MID[0], 5.04 / 8.5)])))
     return timeline(blocks)
 
 
 def expression_script():
     blocks = [(DIVE_FROM, [cmd('rumble', 0x10, 0)]),
               (HOLD, if_(CB_VAR, 0, 3, [cmd('rumble', 0x12, 0)])),
+              (HOLDG, if_(CB_VAR, 0, 8, [cmd('rumble', 0x12, 0)])),
               (CRASH, if_(CB_VAR, 0, 6, [cmd('rumble', 0x12, 0), cmd('quake', 4)])),
               (AIRREL + 1, if_(CB_VAR, 0, 7, [cmd('rumble', 0x12, 0), cmd('quake', 3)]))]
     return timeline(blocks)

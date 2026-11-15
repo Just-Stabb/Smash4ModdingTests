@@ -59,6 +59,8 @@ SEGMENTS = [
     ('grab_hold',   1, 195, 281, 36, False, None, False),         # entry 10: the victim held at his fist (x2.4)
     ('grab_dive',   0, 174, 193, 19, True, None, False),          # entry 10 from 286: the drive with it (looped)
     ('grab_dive2',  0, 174, 193, 19, True, None, False),
+    ('hold_gnd',    1, 290, 292, 36, False, None, True),          # v3: the hold on the ground (a grounded victim): the
+                                                                  # crash's first pose, nearly still, the burn hits
     ('crash',       1, 290, 426, 68, False, None, True),          # entry 12: the crash, the slide back, standing (x2)
     ('air_release', 0, 190, 255, 44, False, None, False),         # entry 13: the release in the air (x1.5)
 ]
