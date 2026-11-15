@@ -60,6 +60,7 @@ def near(a, b, tol):
 
 
 GRAVITY, MAX_FALL, FRICTION = 0.09, 1.5, 0.08
+COMMON = {0x20000c2: 50.0, 0x20000ca: 1.19, 0x20000cb: 0.0}     # fighter_param_common: max shield, its damage x / +
 FUNC_MAIN, FUNC_LOOP, FUNC_END = 2287, 2288, 2289
 
 
@@ -94,12 +95,15 @@ class Game:
         self.inv_log = []               # (n, frames) the self INVINCIBLE writes
         self.dmg_log = []               # (n, %) his own DAMAGE writes (v6)
         self.vx2 = 0.0                  # energy 2 (the stick's air control: his air momentum), world X
+        self.hit_kind = 2               # v8: what his hit met (2 a body, 4 a shield)
         self.hit = False                # v4: his attack has hit the victim (AttackModule 0x2726 / 0x2727)
         self.cleared = []               # AttackModule(0x2719): his hitboxes cleared
 
     def fvar(self, v):
         if v in self.vars:
             return self.vars[v]
+        if v in COMMON:                             # v8: the common params the shield hit reads
+            return COMMON[v]
         if v == 0x0F000000:
             return self.x
         if v == 0x0F000001:
@@ -120,6 +124,8 @@ class Game:
                 return vi.get('facing', -1.0)
             if v == 0x0F0000A2 + 8 * 4:
                 return float(vi.get('status', 0x47))
+            if v == 0x0F00011A + 0x20 * 4:
+                return float(vi.get('shield', 50.0))
             if v in (0x0F0000B2, ) and self.hit:         # v4: target 2 (the last fighter hit): the victim
                 return float(vi.get('status', 0x47))
             if v == 0x0F00015B and self.hit:
@@ -153,6 +159,12 @@ class Game:
                 return
             if v == 0x0F000115 + 0x20 * t:
                 vi['input'] = val
+                return
+            if v == 0x0F00011A + 0x20 * t:          # v8: its shield health
+                vi['shield'] = val
+                return
+            if v == 0x0F0000A7 + 8 * t:             # v8: PUSH (1000 + its shieldstun)
+                vi['push'] = val
                 return
             if v == 0x0F0000A2 + 8 * t:
                 vi['status'] = int(val)
@@ -235,7 +247,8 @@ class Game:
             if a[0] == 0x2724:
                 self.hit = False
             elif a[0] in (0x2726, 0x2727):
-                return 1 if self.hit and (len(a) < 2 or a[1] & 2) else 0
+                kind = self.hit_kind if self.hit else 0             # v8: 2 a hurtbox, 4 a shield
+                return 1 if kind and (len(a) < 2 or a[1] & kind) else 0
             elif a[0] == 0x2719:
                 self.cleared.append(self.n)
             return 0
@@ -328,8 +341,10 @@ def run(path, g, frames=420, catch_at=None, cut_at=None, victim_reach=None, pres
             fx = g.x + 6.3 * g.face
             fy = g.y + 3.1
             reach = victim_reach is not None and math.hypot(g.victim['x'] - fx, g.victim['y'] + 5 - fy) < victim_reach
-            if (catch_at is not None and n >= catch_at) or reach:
+            if ((catch_at is not None and n >= catch_at) or reach) and not g.hit:
                 g.hit = True                    # v4: the hit; the MSC's cb_dive_catch does the rest
+                if g.hit_kind == 4:             # v8: on a shield: the game's own shield damage first
+                    g.victim['shield'] = g.victim.get('shield', 50.0) - B.CATCH_DMG * 1.19
         if detect and cbv == 1.0 and g.victim is not None and B.HOVER_FROM <= g.frame <= B.HOVER_FROM + 3:
             mx, my = g.x + B.DETECT_AT[0] * g.face, g.y + B.DETECT_AT[1]
             if math.hypot(g.victim['x'] - mx, g.victim['y'] + 5 - my) < B.DETECT_SIZE + 2.0:
@@ -903,6 +918,25 @@ def msc_tests(path):
     check('his own %.2f%% on each burn hit\'s frame (+%g in all), every catch path' % (B.BURN_SELF,
                                                                                     B.BURN_SELF * B.BURN_HITS),
           out, want)
+    # 9i. v8 (user: "When Core Breaker hits a shield, Supamario gets invulnerability during the landing", "make Core
+    # Breaker's dive do 2/3 of an opponent's shield and have 16 frames of shieldstun"): a shielded dive: no catch, no
+    # invincibility, the miss's landing; the shield 2/3 of the max lower than before the hit, 16 frames of shieldstun;
+    # too little shield left: it breaks
+    out = []
+    for name, hp in (('a full shield', 50.0), ('40 left', 40.0), ('30 left (breaks)', 30.0)):
+        v = {'x': 0.0, 'y': 0.0, 'status': 0x1C, 'shield': hp}
+        g = Game(stage=(-200.0, 200.0), victim=v)
+        g.hit_kind = 4
+        run(path, g, frames=B.HOVER_FROM + 3)
+        v['x'] = g.x + g.face * (g.y / math.tan(math.radians(B.DIVE_DEG)) - 2.0)
+        tr = run(path, g, victim_reach=B.HB['catch'][1] + 4.0)
+        want_hp = round(hp - 50.0 * 2.0 / 3.0, 3)
+        out.append((name, phases_of(tr), g.inv_log, round(v.get('shield', 0.0), 3) if want_hp > 0 else v.get('status'),
+                    v.get('push')))
+    check('a shielded dive: no catch, no invincibility, the miss\'s landing; the shield 2/3 of the max (33.3) lower '
+          'than before the hit, 16 frames of shieldstun; less left than that: broken (0x59)', out,
+          [('a full shield', [1.0, 2.0, 5.0], [], 16.667, 1016.0), ('40 left', [1.0, 2.0, 5.0], [], 6.667, 1016.0),
+           ('30 left (breaks)', [1.0, 2.0, 5.0], [], 0x59, None)])
     # 9b. a victim in the air over the stage: the hold, the lift, the drive, the crash
     v = {'x': 30.0, 'y': 20.0, 'status': 0x47}
     g = Game(stage=(-200.0, 200.0), victim=v)

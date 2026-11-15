@@ -1851,3 +1851,218 @@ EXAMPLES = {
         '}',
     ],
 }
+
+# --- exe_v46k: Position_Place / Position_Offset_Get, and Target 12 (the fighter this attack hit) -------------------
+HELP['Position_Place'] = [
+    '## How it works',
+    'Puts a fighter (or this object) at a place worked out from Fwd, Up and Depth (new in exe_v46k). Relative says '
+    'what they are measured from:',
+    '- 0: the stage. Fwd / Up / Depth are the world X / Y / Z (X right +, Y up +).',
+    '- 1: this object. The target goes to this object\'s position + Fwd along this object\'s facing (+ = in front of '
+    'it), Up, Depth. (As the ..._OFFSET_X / Y / Z and POS_OPP_OFFSET_ variables\' writes.)',
+    '- 2: the target itself. It moves by Fwd along its own facing, Up, Depth from where it is (as POS_SELF_MOVE_FWD / '
+    'UP / Z, and Position_Set Mode 1).',
+    '- 3: this object goes next to the target: the target\'s position + Fwd along this object\'s facing, Up, Depth '
+    '(Fwd below 0 = on this side of it: "teleport behind" is Fwd -15 when facing it). (As POS_SELF_OFFSET_.)',
+    'Axes picks which coordinates change (bits: 1 X, 2 Y, 4 Z; 0 = all three); the others keep the placed one\'s own '
+    'value: Axes=1 moves only sideways (it keeps its height), Axes=2 only up / down.',
+    '',
+    '## Frames: once, or held',
+    '- 0 or 1: once, at once (the next command already sees the new position).',
+    '- 2 or more: now, and again every frame after this object\'s script (its frame step, not in its hitlag), that '
+    'many frames in all, worked out again each time: held 12 in front of a fighter that moves, it moves along.',
+    '- -1: every frame until this object\'s status changes.',
+    'A hold ends early when this object\'s status changes (the move ends, it is hit, it grabs a ledge), or when this '
+    'object or the placed one is set up again (a KO). A new Position_Place of the same target from this object '
+    'replaces the hold; up to 16 holds at a time in all (more: placed once, not held).',
+    '',
+    '## Collision',
+    '- 0: the placed one\'s stage collision is left as it is.',
+    '- 1: off while it is held (it passes through floors and walls, as a grabbed fighter does; '
+    'GroundModule(0x2710, 0) every frame), then back to air collision (5) when the hold ends. With Frames 0 / 1 there '
+    'is no hold: it stays off, as 2.',
+    '- 2: off, and left off. Put it back with Stage_Collision_Set(Target, 5) (air) yourself.',
+    '',
+] + TARGETS + [
+    '',
+    '## Gotchas',
+    '- It is a teleport: no collision on the way, and Collision 1 / 2 let it go inside the stage. A fighter left '
+    'inside the floor or a wall with its collision back on is pushed out by the game.',
+    '- A grounded fighter moved up is still in a grounded status: the game may snap it back down or switch it to a '
+    'fall on the next frame (as MSC\'s PostureModule(3, ...)). Hold it (Frames) with Collision 1, or put it in the '
+    'air first.',
+    '- The placed fighter\'s own status keeps moving it: its speed (knockback, gravity) applies on its own frame, so '
+    'between two placements it may drift a little; hold it (Frames) for a firm hold, and give it hitstun / hitstop '
+    'if it shouldn\'t act.',
+    '- Facing: Relative 1 and 3 use this object\'s facing, Relative 2 the target\'s own. Turning this object '
+    'during a hold moves the held one to its other side.',
+    '- With Target 12 (the fighter this attack hit) place it on a frame after the hit: the hit is made after the '
+    'script runs, so on the hitbox\'s own frame the attack hasn\'t hit anyone yet (nothing happens). Once a hold is '
+    'set it keeps the fighter it found, even after the attack is over.',
+    '- Relative 1 with Target 0 or Relative 2 held every frame moves it by that much every frame (a constant drift).',
+    '- The position variables (POS_..., ..._OFFSET_X) keep working as before.',
+    '',
+    NOT_VIEWER,
+    NEEDS,
+]
+HELP['Position_Offset_Get'] = [
+    '## How it works',
+    'Stores where a target is in a float variable (new in exe_v46k). RelativeTo:',
+    '- 0: the stage: Axis 0 / 1 / 2 its world X / Y / Z, Axis 3 its facing (1 right, -1 left). (As Position_Get.)',
+    '- 1: the target - this object: Axis 0 X along this object\'s facing (+ = the target is in front of it), 1 Y (+ = '
+    'above it), 2 Z, 3 the X/Y distance between them. (As the ..._OFFSET_X / Y / Z variables and POS_OPP_DIST.)',
+    '- 2: this object - the target: Axis 0 X along this object\'s facing, 1 Y, 2 Z (the minus of 1), 3 the distance. '
+    '(As POS_SELF_OFFSET_.)',
+    '- 3: this object - the target, X along the TARGET\'s facing: Axis 0 + = this object is in front of the target '
+    '(it faces this object), - = behind its back; 1 / 2 / 3 as 2.',
+    'Positions are the objects\' bases (a fighter\'s feet).',
+    '',
+] + TARGETS + [''] + VARS + [
+    '',
+    '## Gotchas',
+    '- No such target (empty slot, Target 12 before the hit or after the attack): the variable gets 0, so check '
+    'Target_Slot_Get (or the distance being 0) when 0 is a real answer.',
+    '- Axis 4 or more, RelativeTo 4 or more: 0.',
+    '',
+    NOT_VIEWER,
+    NEEDS,
+]
+EXAMPLES['Position_Place'] = [
+    '// Example 1: a grab-like hit: once it connects, hold the fighter this attack hit 12 in front of this fighter',
+    '// and 5 up for 10 frames, through the stage (Target 12: nothing happens if the hit missed)',
+    'FRAME(Frames=6)',
+    _hitbox('Hitbox', Damage=3, Angle=361, KBG=0, BKB=10, Size=6, Z=10, Hitlag=0.5),
+    'WAIT(Frames=1)',
+    'Remove_All_Hitboxes()',
+    'Position_Place(Target=12, Relative=1, Fwd=12, Up=5, Depth=0, Axes=0, Frames=10, Collision=1)',
+    'Hitstun_Set(Target=12, Frames=20)',
+    'FRAME(Frames=17)',
+    _hitbox('Hitbox', Damage=8, Angle=45, KBG=90, BKB=60, Size=8, Y=10, Z=12),
+    'WAIT(Frames=2)',
+    'Remove_All_Hitboxes()',
+    '',
+    '// Example 2: pull the nearest opponent to 8 in front of this fighter, sideways only (it keeps its height)',
+    'FRAME(Frames=12)',
+    'Position_Place(Target=1, Relative=1, Fwd=8, Up=0, Depth=0, Axes=1, Frames=0, Collision=0)',
+    '',
+    '// Example 3: move player 2 (Target 4) 3 up from where it is',
+    'Position_Place(Target=4, Relative=2, Fwd=0, Up=3, Depth=0, Axes=0, Frames=0, Collision=0)',
+    '',
+    '// Example 4: teleport 15 behind the nearest opponent, on its level (this fighter facing it)',
+    'FRAME(Frames=9)',
+    'Position_Place(Target=1, Relative=3, Fwd=15, Up=0, Depth=0, Axes=0, Frames=0, Collision=0)',
+    'Position_Offset_Get(Target=1, Axis=0, RelativeTo=1, Variable=VAR_0)',
+    '// (VAR_0 is now -15: the opponent is behind this fighter; turn around with your own TURN command if wanted)',
+    '',
+    '// Example 5: ride the fighter this attack hit for the rest of the move: this fighter stays 4 above it',
+    'Position_Place(Target=12, Relative=3, Fwd=0, Up=4, Depth=0, Axes=0, Frames=-1, Collision=1)',
+    '',
+    '// Example 6: put this fighter at height 40 on the stage, where it is sideways (Axes 2: Y only)',
+    'Position_Place(Target=0, Relative=0, Fwd=0, Up=40, Depth=0, Axes=2, Frames=0, Collision=0)',
+]
+EXAMPLES['Position_Offset_Get'] = [
+    '// Example 1: only if the nearest opponent is in front of this fighter, closer than 20',
+    'Position_Offset_Get(Target=1, Axis=0, RelativeTo=1, Variable=VAR_0)',
+    'Float_Var_Compare(Variable=VAR_0, Method=5, Value=0)',
+    'True(Offset=0){',
+    '    Float_Var_Compare(Variable=VAR_0, Method=4, Value=20)',
+    '    True(Offset=0){',
+    '        ' + _hitbox('Hitbox', Damage=11, Size=7, Z=12),
+    '        WAIT(Frames=2)',
+    '        Remove_All_Hitboxes()',
+    '    }',
+    '}',
+    '',
+    '// Example 2: a backstab: a stronger hit when this fighter is behind the opponent\'s back',
+    'Position_Offset_Get(Target=1, Axis=0, RelativeTo=3, Variable=VAR_1)',
+    'Float_Var_Compare(Variable=VAR_1, Method=4, Value=0)',
+    'True(Offset=0){',
+    '    ' + _hitbox('Hitbox', Damage=16, KBG=110, BKB=50, Size=6, Z=9),
+    '}',
+    'Else(Offset=0){',
+    '    ' + _hitbox('Hitbox', Damage=9, Size=6, Z=9),
+    '}',
+    'WAIT(Frames=2)',
+    'Remove_All_Hitboxes()',
+    '',
+    '// Example 3: VAR_2 = the distance to the nearest opponent; VAR_3 = how far above this fighter the fighter',
+    '// this attack hit is (0 if it hit nobody)',
+    'Position_Offset_Get(Target=1, Axis=3, RelativeTo=1, Variable=VAR_2)',
+    'Position_Offset_Get(Target=12, Axis=1, RelativeTo=1, Variable=VAR_3)',
+    '',
+    '// Example 4: player 1\'s world X / Y and facing',
+    'Position_Offset_Get(Target=3, Axis=0, RelativeTo=0, Variable=VAR_4)',
+    'Position_Offset_Get(Target=3, Axis=1, RelativeTo=0, Variable=VAR_5)',
+    'Position_Offset_Get(Target=3, Axis=3, RelativeTo=0, Variable=VAR_6)',
+]
+# every command that takes a Target gains Target 12 (exe_v46k): one example each showing it
+_T12 = {
+    'Hit_Check': ['// Target 12: did the fighter this attack hit trade hits (its own attack connected this frame)?',
+                  'Hit_Check(Target=12, When=1, Kinds=2)',
+                  'True(Offset=0){',
+                  '    Hitstop_Set(Target=0, Frames=10, Shake=1)',
+                  '}'],
+    'Hit_Get': ['// Target 12: what the fighter this attack hit has connected with in its own move (0: nothing, or this',
+                '// attack hit nobody)',
+                'Hit_Get(Target=12, When=0, Variable=VAR_3)'],
+    'Rotation_Get': ['// Target 12: the fighter this attack hit, its rotation about Z (0 if the attack hit nobody)',
+                     'Rotation_Get(Target=12, Axis=2, Variable=VAR_1)'],
+    'Rotation_Set': ['// Target 12: lay the fighter this attack hit on its side (nobody hit: nothing)',
+                     'Rotation_Set(Target=12, X=0, Y=0, Z=90)'],
+    'Position_Get': ['// Target 12: the height of the fighter this attack hit (0 if it hit nobody, or after the attack)',
+                     'Position_Get(Target=12, Axis=1, Variable=VAR_0)'],
+    'Position_Set': ['// Target 12: pop the fighter this attack hit 3 up, only if this attack hit someone (Target 2',
+                     '// would move the last fighter hit even when this attack missed)',
+                     'Position_Set(Target=12, X=0, Y=3, Z=0, Mode=1)'],
+    'Motion_Get': ['// Target 12: the motion kind the fighter this attack hit is playing',
+                   'Motion_Get(Target=12, What=0, Variable=VAR_0)'],
+    'Motion_Set': ['// Target 12: slow the fighter this attack hit\'s animation to a quarter (frame unchanged)',
+                   'Motion_Set(Target=12, Motion=-1, Frame=-1, Rate=0.25)'],
+    'Target_Slot_Get': ['// Target 12: VAR_0 = the player slot this attack hit, 0 = it hit nobody (yet)',
+                        'Target_Slot_Get(Target=12, Variable=VAR_0)'],
+    'Status_Get': ['// Target 12: the status of the fighter this attack hit',
+                   'Status_Get(Target=12, Variable=VAR_0)'],
+    'Status_Set': ['// Target 12: dizzy (0x5D) only the fighter this attack hit; nobody if it missed',
+                   'FRAME(Frames=12)',
+                   'Status_Set(Target=12, Status=0x5D)'],
+    'Hitstun_Get': ['// Target 12: frames of hitstun the fighter this attack hit has left',
+                    'Hitstun_Get(Target=12, What=0, Variable=VAR_0)'],
+    'Hitstun_Set': ['// Target 12: 40 frames of hitstun for the fighter this attack hit',
+                    'Hitstun_Set(Target=12, Frames=40)'],
+    'Hitstop_Set': ['// Target 12: freeze the fighter this attack hit for 15 frames, shaking',
+                    'Hitstop_Set(Target=12, Frames=15, Shake=1)'],
+    'Damage_Get': ['// Target 12: the damage % of the fighter this attack hit',
+                   'Damage_Get(Target=12, Variable=VAR_0)'],
+    'Damage_Set': ['// Target 12: set the fighter this attack hit to 100%',
+                   'Damage_Set(Target=12, Percent=100)'],
+    'Body_State_Set': ['// Target 12: the fighter this attack hit can\'t be hit for 20 frames (no double hits)',
+                       'Body_State_Set(Target=12, State=0, Frames=20)'],
+    'Armor_Set': ['// Target 12: break the armor of the fighter this attack hit',
+                  'Armor_Set(Target=12, Type=0, Threshold=0)'],
+    'Item_State_Set': ['// Target 12: the fighter this attack hit goes metal',
+                       'Item_State_Set(Target=12, Code=1)'],
+    'Stage_Collision_Set': ['// Target 12: the fighter this attack hit passes through the stage, then back to air collision',
+                            'Stage_Collision_Set(Target=12, Mode=0)',
+                            'WAIT(Frames=10)',
+                            'Stage_Collision_Set(Target=12, Mode=5)'],
+    'Joint_Position_Get': ['// Target 12: where the waist (joint 11) of the fighter this attack hit is',
+                           'Joint_Position_Get(Target=12, Joint=11, VariableX=VAR_0, VariableY=VAR_1, VariableZ=VAR_2)'],
+    'Input_Compare': ['// Target 12: is the fighter this attack hit holding shield?',
+                      'Input_Compare(Target=12, Input=3, Method=0, Value=1)',
+                      'True(Offset=0){',
+                      '    Hitstop_Set(Target=12, Frames=8, Shake=1)',
+                      '}'],
+    'Input_Get': ['// Target 12: the stick X of the fighter this attack hit (forward +)',
+                  'Input_Get(Target=12, Input=16, Variable=VAR_0)'],
+    'Input_Set': ['// Target 12: the fighter this attack hit can\'t use its controller for 30 frames',
+                  'Input_Set(Target=12, Input=21, Value=1)',
+                  'WAIT(Frames=30)',
+                  'Input_Set(Target=12, Input=21, Value=0)'],
+    'Last_Hit_Get': ['// Which 2: the player slot this attack hit (0: it hit nobody, or the attack is over); Which 0 still',
+                     '// gives a fighter after the attack (the one whose last attacker is this one)',
+                     'Last_Hit_Get(Which=2, Variable=VAR_0)'],
+}
+for _n, _lines in _T12.items():
+    _k = sum(1 for _l in EXAMPLES[_n] if _l.startswith('// Example')) + 1
+    _head = '// Example %d (exe_v46k): %s' % (_k, _lines[0][3:])
+    EXAMPLES[_n] = EXAMPLES[_n] + ['', _head] + _lines[1:]

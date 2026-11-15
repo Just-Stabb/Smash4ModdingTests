@@ -10610,6 +10610,46 @@
 "MaxFall",
 "Mode"
 ]
+},
+"9D1183FB": {
+"size": 5,
+"name": "Position_Offset_Get",
+"format": [
+0,
+0,
+0,
+3
+],
+"syntax": [
+"Target",
+"Axis",
+"RelativeTo",
+"Variable"
+]
+},
+"F478E0CC": {
+"size": 9,
+"name": "Position_Place",
+"format": [
+0,
+0,
+1,
+1,
+1,
+0,
+0,
+0
+],
+"syntax": [
+"Target",
+"Relative",
+"Fwd",
+"Up",
+"Depth",
+"Axes",
+"Frames",
+"Collision"
+]
 }
 }
 }

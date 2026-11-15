@@ -2286,3 +2286,45 @@ ledge. And a catch from under a ledge pulled the victim down to his fist.
 ### Not confirmed in game
 - whether a 0-frame INVINCIBLE write was really ignored (the renewal makes it not matter);
 - that the INVINCIBLE write of 2 frames every frame keeps the grey flash on only while he holds.
+
+## Core Breaker v8 (`supamario_corebreaker_v8.zip`): shields
+
+Install over v7, exe B (exe_v46j, no exe change).
+
+### 1. No invincibility from a shielded dive (user: "When Core Breaker hits a shield, Supamario gets invulnerability during the landing")
+The only writes of his invincibility are the catch's (v7: 2-frame renewals while holding, the 1-frame end). A shield
+hit reaching them means a catch started on a shielding fighter. Three ways that could happen:
+- the MSC's hit flags (`AttackModule 0x2726 / 0x2727` with kind 2, "a hurtbox"); the kind bits are only known from
+  vanilla's uses (docs/native-notes.md), not confirmed;
+- the nearest-fighter fallback (v5), when target 2 doesn't match a slot after a shield hit;
+- the point-blank box's check.
+
+**Fix:** a fighter in a shield status (GuardOn 0x1B .. GuardDamage 0x1E) or its break (0x59 / 0x5A) is never caught:
+- `cb_dive_catch` returns before anything is written;
+- the nearest-fighter fallback skips shielding fighters;
+- the point-blank box's check refuses them (1.25: the hover goes on).
+
+No catch means no invincibility write, no hold and the normal miss landing.
+
+### 2. 2/3 of the shield and 16 frames of shieldstun (user: "make Core Breaker's dive do 2/3 of an opponent's shield and have 16 frames of shieldstun")
+`cb_dive_shield`, every dive frame, once a move: his attack's shield hit (`AttackModule 0x2726 / 0x2727` with kind
+4). The shielding fighter is the nearest one in a shield status to his fist (within 40). Then:
+- **Shield damage:** its shield health before the hit, less 2/3 of the max shield health.
+  - "Before the hit" = now + the hit's own shield damage: 3 x the common shield damage multiplier `0x020000ca`
+    (1.19) + the base `0x020000cb` (0), read from the game.
+  - The max is the common param `0x020000c2` (fighter_param_common "Shield HP" 50), the same for every fighter, so
+    2/3 is exactly 33.33 for all of them.
+  - Written through SHIELD_HP (docs/position-variables.md). The catch box and the body box share Part 0, so the
+    shield takes one hit, and it's counted once.
+- **Too little left:** its shield breaks (status 0x59, Shieldbreak, as the docs' example breaks a shield).
+- **Shieldstun:** 16 frames, whatever the hit's damage, through PUSH (1000 + 16: the guard damage status's count of
+  frames left; Sephiroth's test 153).
+
+No staling (v6) means the hit's own shield damage is always 3 x 1.19.
+
+### Tests (v8 build, halos 0.16)
+- a shielded dive with a full shield, with 40 left, and with 30 left:
+  - no catch, no invincibility write, the miss's landing;
+  - the shield at 16.67 / 6.67 (2/3 of 50 below its health before the hit);
+  - shieldstun 1016 (16 frames);
+  - with 30 left, broken (0x59).

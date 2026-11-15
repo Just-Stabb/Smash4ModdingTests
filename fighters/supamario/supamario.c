@@ -38385,6 +38385,7 @@ int cb_my_gseen;
 int cb_under;           // v7: caught from below / at a ledge: the victim held where it was caught, no drive down
 float cb_ox;            // v7: its offset then (forward, up)
 float cb_oy;
+int cb_shielded;        // v8: his dive's hit on a shield handled (once a move)
 int cb_burns;           // v6: the hold's burn hits he has taken his own damage for
 int cb_gseen;           // v6: the slots seen on the ground this hover / dive (their ground's height: New_Var CB_GY0 + slot)
 int cb_inv;             // v5: the hold's invincibility set (cleared at every end: cb_end)
@@ -38522,6 +38523,7 @@ void cb_init()
     cb_gmask = 0;
     cb_gvalid = 0;
     cb_gseen = 0;
+    cb_shielded = 0;
     cb_inv = 0;
     if (global18 == 0)
     {
@@ -38952,6 +38954,7 @@ int cb_dive_blocked()
 int cb_dive_phase(float fr)
 {
     cb_gtrack();
+    cb_dive_shield();
     if (func_56() == 0x1)
     {
         cb_end();
@@ -38998,6 +39001,82 @@ int cb_dive_phase(float fr)
 // (cb_refused: the dive goes on without its hitboxes). Caught: invincible CB_INVINCIBLE frames, the hitboxes gone,
 // cb 3 and the slot for the scripts. The hold keeps v1-v3's invincibility (v4, user: "He should keep invincibility
 // during the hold only"; the dive itself: super armor only)
+// v8: a player slot shielding (GuardOn .. GuardDamage)
+int cb_guarding(int s)
+{
+    float st;
+    st = WorkModuleF(0, 0x0F0000A2 + 8 * (s + 0x2));
+    if (st >= CB_GUARD_LO && st <= CB_GUARD_HI)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// v8 (user: "make Core Breaker's dive do 2/3 of an opponent's shield and have 16 frames of shieldstun"): his attack's
+// shield hit (AttackModule 0x2726 / 0x2727 kind 4), once a move; the shielding fighter (the nearest one in a shield
+// status to his fist, within CB_NEAR x 2):
+// - its shield: the health before the hit (now + the hit's own: CB_CATCH_DMG x the common shield damage multiplier
+//   0x020000ca + the base 0x020000cb) less 2/3 of the common max shield health (0x020000c2, 50: the same for every
+//   fighter); nothing left: its shield breaks (status 0x59, as a break from damage);
+// - its shieldstun: 16 frames (CB_SHIELD_STUN) through PUSH (1000 + frames: the guard damage status's count)
+void cb_dive_shield()
+{
+    int s;
+    int best;
+    int t;
+    float bd;
+    float d;
+    float dx;
+    float dy;
+    float fx;
+    float fy;
+    float hp;
+    if (cb_shielded != 0)
+    {
+        return;
+    }
+    if (AttackModule(0x2726, 0x4) == 0 && AttackModule(0x2727, 0x4) == 0)
+    {
+        return;
+    }
+    fx = WorkModuleF(0, 0x0f000000) + CB_FIST_Z * WorkModuleF(0, 0x0f000003);
+    fy = WorkModuleF(0, 0x0f000001) + CB_FIST_Y;
+    best = 0;
+    bd = 4.0f * CB_NEAR * CB_NEAR;
+    s = 1;
+    while (s <= 8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f && cb_guarding(s) == 0x1)
+        {
+            dx = WorkModuleF(0, 0x0f000020 + 4 * (s - 1)) - fx;
+            dy = WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) + 5.0f - fy;
+            d = dx * dx + dy * dy;
+            if (d < bd)
+            {
+                bd = d;
+                best = s;
+            }
+        }
+        s = s + 1;
+    }
+    if (best == 0)
+    {
+        return;
+    }
+    cb_shielded = 0x1;
+    t = best + 0x2;
+    hp = WorkModuleF(0, 0x0F00011A + 0x20 * t) + CB_CATCH_DMG * WorkModuleF(0, 0x20000ca) + WorkModuleF(0, 0x20000cb);
+    hp = hp - WorkModuleF(0, 0x20000c2) * CB_SHIELD_TAKE;
+    if (hp <= 0.0f)
+    {
+        WorkModule(0, CB_SHIELD_BREAK, 0x0F0000A2 + 8 * t);
+        return;
+    }
+    WorkModule(0, hp, 0x0F00011A + 0x20 * t);
+    WorkModule(0, 1000.0f + CB_SHIELD_STUN, 0x0F0000A7 + 8 * t);
+}
+
 // v5: the slot the hit can only be: the nearest other fighter to his fist (within CB_NEAR), when target 2's values
 // match no slot (the user's "it will hit an opponent but they won't be put in the hold")
 int cb_near_slot()
@@ -39017,7 +39096,7 @@ int cb_near_slot()
     s = 1;
     while (s <= 8)
     {
-        if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f &&
+        if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f && cb_guarding(s) == 0 &&
             (WorkModuleF(0, 0x0f000020 + 4 * (s - 1)) != WorkModuleF(0, 0x0f000000) ||
              WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) != WorkModuleF(0, 0x0f000001)))
         {
@@ -39050,6 +39129,13 @@ int cb_dive_catch()
         return 0;
     }
     st = WorkModuleF(0, 0x0F0000B2);
+    // v8 (user: "When Core Breaker hits a shield, Supamario gets invulnerability during the landing"): a fighter in a
+    // shield status (GuardOn .. GuardDamage) or its break is never caught, whatever the hit flags say: no catch, no
+    // invincibility (cb_dive_shield handles the shield)
+    if ((st >= CB_GUARD_LO && st <= CB_GUARD_HI) || st == CB_SHIELD_BREAK || st == CB_SHIELD_BREAK + 1.0f)
+    {
+        return 0;
+    }
     if ((st >= CB_DOWN_LO && st <= CB_DOWN_HI) || st == CB_DOWN_FURAFURA || WorkModuleF(0, 0x0F00015B) != 0.0f)
     {
         cb_refused = 0x1;

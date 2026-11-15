@@ -872,6 +872,22 @@ set; Kirby's JumpSquat sets it from `0x2000004C`, and the Jump status picks the 
 
 `tools/position_vars_cave.py`; user docs in `docs/position-variables.md`.
 
+- **Target 12, "the fighter this attack hit" (exe_v46k, ACMD position commands v1).** Asked: can target 2 / its
+  variables (`0x0F000055`-`57`, ...) be cleared? Target 2 = the newest hit record of self's attack (AttackModule
+  `+0x50`: `+0x4C` records on, `+0x18` hitbox count, `+0x14` hitboxes of `0x174`, list `+0x124` / first node `+0x128`,
+  node `+0x18` object ID), else (`ext_last_fb`) the fighter whose int `0x10000065` (last attacker, also the KO
+  credit: not ours to wipe) is self's slot. Target 12 is the same walk with no fallback: `nb_entry` (IDs
+  `0x2C8`-`0x2FF`, past the ACC block, where `inp_entry_acc` used to give 0) stores the mirrored family's quantity
+  code and enters `ext_t_last_pre` with r22 = 12; `ext_last_fb`'s first word (`li r22, 0`) is now `b nb_fb`, which
+  gives nobody for 12 (r22 is untouched by `ext_t_last_pre` / `ext_t_last` / `slot` / `ext_msc`). Two words of the
+  old code change (`0x04B79360`, `0x04B79974`), the rest is new
+  at `NB_CODE` `0x04B7AE00` (EXT_REGIONS' second region cut to end there: pack()'s placement is unchanged, checked
+  word for word against exe_v46j). The ACMD side (`acmd_ext_cave.py`): `nc_tid` 12 -> 12, `nc_target` reads ACC
+  `0x2FB`, `vid` goes through `nc_vid` (target 12: `NB_MAP` from target 0's ID), `in_id`'s first word branches to
+  `in_id_x`. `Position_Place` / `Position_Offset_Get` and the holds: `apc_code` at `0x04B7B000`
+  (docs/acmd-extra-commands.md). Not tried in game yet: the record timing (the hit's records exist from the frame
+  after the hitbox's) is the same as target 2's.
+
 - **WorkModuleImpl has four subclasses with their own copies** of get / set / add / sub / mul / div
   float (identical code): vtables `0x10003224` (base), `0x100F93CC`, `0x1012132C`, `0x1013A1C0` /
   `0x1013AFFC` (**fighters**: get `0x02F1DBE4`, set `0x02F1DC04`), `0x10153184` (all share the MSC

@@ -103,6 +103,8 @@ CRASH_KB = dict(Angle=42, KBG=75, FKB=0, BKB=45)
 INVINCIBLE = (CRASH_END - HOLD) + 10        # the hold: from the catch through the crash / the explosion (v4, user: "He
                                             # should keep invincibility during the hold only")
 CATCH_FREEZE = 6
+SHIELD_TAKE = 2.0 / 3.0                     # v8 (user): the dive's shield hit takes 2/3 of the max shield health
+SHIELD_STUN = 16                            # v8 (user): and 16 frames of shieldstun
 INV_STEP = 2                                # v7: the hold's invincibility, renewed every frame while holding
 UNDER = 8.0                                 # v7: a victim this far above his feet (or on a ledge): no drive down
 NEAR_GROUND = 15.0                          # v6: an airborne victim this close above its ground: the grounded path
@@ -174,6 +176,8 @@ def msc_values():
             # v3: the split (the rise; up special again: the hover / dive)
             'CB_USED': '0x%X' % CB_USED, 'CB_RISE_Y': '0x%X' % CB_RISE_Y, 'CB_AIR': '0x%X' % CB_AIR,
             'CB_INVINCIBLE': fl(INVINCIBLE), 'CB_INV_STEP': fl(INV_STEP), 'CB_UNDER': fl(UNDER),
+            'CB_GUARD_LO': fl(0x1B), 'CB_GUARD_HI': fl(0x1E), 'CB_SHIELD_BREAK': fl(0x59), 'CB_CATCH_DMG': fl(CATCH_DMG),
+            'CB_SHIELD_TAKE': fl(SHIELD_TAKE), 'CB_SHIELD_STUN': fl(SHIELD_STUN),
             'CB_FIST_Z': fl(FIST[0]), 'CB_FIST_Y': fl(FIST[1]), 'CB_NEAR': fl(NEAR),
             'CB_GY0': '0x%X' % CB_GY0, 'CB_NEAR_GROUND': fl(NEAR_GROUND), 'CB_GROUND_BELOW': fl(GROUND_BELOW),
             'CB_GROUND_MISS': fl(GROUND_MISS),
@@ -296,6 +300,8 @@ def game_script():
             ok += if_(LASTHIT_STATUS, 3, DOWN_LO, if_(LASTHIT_STATUS, 2, DOWN_HI, [setf(0, 0x0F000380 + 0x22)]))
             ok += if_(LASTHIT_STATUS, 0, DOWN_FURAFURA, [setf(0, 0x0F000380 + 0x22)])
         ok += if_(LASTHIT_BODY, 1, 0, [setf(0, 0x0F000380 + 0x22)])
+        # v8: never a fighter in a shield status (GuardOn .. GuardDamage)
+        ok += if_(LASTHIT_STATUS, 3, 0x1B, if_(LASTHIT_STATUS, 2, 0x1E, [setf(0, 0x0F000380 + 0x22)]))
         ok += if_(0x0F000380 + 0x22, 0, 1, take)
         ok += if_(0x0F000380 + 0x22, 0, 0, [setf(refused, CB_VAR), cmd('remove_all_hitboxes')])
         return [cmd('hit_check', 0, 0, 2), cmd('true', 2 + size(ok))] + ok

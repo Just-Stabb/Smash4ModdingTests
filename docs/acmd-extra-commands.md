@@ -4,7 +4,7 @@ These are new commands for game, effect, sound and expression scripts. They need
 `cross_f.rpx` (`tools/acmd_ext_cave.py`, part of the standard build). Without it, a script that uses
 them won't load properly, so ship the executable with any script that uses them.
 
-Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11) lists all of them in one
+Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12) lists all of them in one
 group, **New Commands**, at the top of the list (vanilla commands stay in their own groups), in subgroups:
 
 | Subgroup | Commands |
@@ -12,7 +12,7 @@ group, **New Commands**, at the top of the list (vanilla commands stay in their 
 | Hitboxes & hits | Extra_Special_Hitbox, Extra_Extended_Special_Hitbox, Hit_Check, Hit_Get, Hit_Reset, Hit_Log_Clear |
 | Fighter state | Status_Get / _Set, Hitstun_Get / _Set, Hitstop_Set, Damage_Get / _Set, Body_State_Set, Armor_Set, Item_State_Set, Stage_Collision_Set, Leave_Ground_Cancel, Gravity_Set |
 | Inputs | Input_Compare, Input_Get, Input_Set |
-| Position & rotation | Position_Get / _Set, Rotation_Get / _Set, Joint_Position_Get |
+| Position & rotation | Position_Get / _Set, Position_Place, Position_Offset_Get, Rotation_Get / _Set, Joint_Position_Get |
 | Animation | Motion_Get / _Set, Animation_Rate_Set |
 | Targets & tracking | Track_Target, Last_Hit_Get, Target_Slot_Get |
 | Threads | Thread_Start, Thread_Stop |
@@ -34,6 +34,7 @@ them too.
 | `Hit_Reset` / `Hit_Log_Clear` | the "has hit" flag / who a hitbox has hit |
 | `Hit_Check` / `Hit_Get` | whether an attack connected, and with what (hurtbox, shield, ...) |
 | `Rotation_Get` / `Rotation_Set`, `Position_Get` / `Position_Set` | a fighter's or article's rotation / position |
+| `Position_Place` / `Position_Offset_Get` | the position variables' uses as commands, for every target: put a fighter in front of / above this one, at a stage point, move it, put this fighter next to it, some axes only, once or held every frame (through the stage if wanted); read where it is relative to this one (exe_v46k, Sm4shCommand v1.4.12: below) |
 | `Motion_Get` / `Motion_Set`, `Animation_Rate_Set` | the animation playing, its frame and rate |
 | `Last_Hit_Get`, `Target_Slot_Get` | the last fighter hit / the last attacker, any target's player slot |
 | `Status_*`, `Hitstun_*`, `Hitstop_Set`, `Damage_*`, `Body_State_Set`, `Armor_Set`, `Item_State_Set`, `Stage_Collision_Set`, `Joint_Position_Get` | the variable-based features (docs/position-variables.md) as commands with parameters |
@@ -307,7 +308,8 @@ Commands for a fighter's controller: check an input, copy it into a variable, or
 | `Input_Get(Target, Input, Variable)` | Stores the input in a float variable, e.g. `VAR_0` (`0x0F000300`). |
 | `Input_Set(Target, Input, Value)` | Forces the input, as if the controller did it. |
 
-**Target:** 0 self, 1 the nearest opponent, 2 the last fighter hit, 3–10 player slots 1–8.
+**Target:** 0 self, 1 the nearest opponent, 2 the last fighter hit, 3–10 player slots 1–8, 12 the fighter this
+attack hit (exe_v46k: nobody once the attack is over; "Targets" below). 11 isn't supported here.
 
 **Input:**
 
@@ -440,9 +442,25 @@ The commands below (and `Hit_Check` / `Hit_Get`) take a **Target**:
 | 2 | the last fighter this one hit (its current attack's newest hit; once the attack is over, a fighter whose last attacker is this one) |
 | 3-10 | player slots 1-8 |
 | 11 | the last fighter that hit this one (the game's own record, int `0x10000065`, its projectiles included) |
+| 12 | the fighter this attack hit (exe_v46k): the current attack's newest hit record only, **no fallback**: before the attack hits and once it is over it is nobody |
 
-1, 2 and 11 are worked out from a fighter's own script (from an article's, they find nobody: the command does
+1, 2, 11 and 12 are worked out from a fighter's own script (from an article's, they find nobody: the command does
 nothing / reads 0). A target that isn't there: nothing happens, reads give 0.
+
+**Target 12 vs 2.** Target 2 falls back, once the attack's hit records are gone, to a fighter whose last attacker
+(int `0x10000065`) is this one. That int is also the game's KO credit, so it can't be cleared, and target 2 goes on
+meaning that fighter for the rest of the match. Target 12 is the same record walk without the fallback (exe_v46k):
+use it when acting on a fighter this attack didn't hit would be wrong (a follow-up that should only happen on a hit).
+Both read the attack's records, which the hit makes after the script runs: on the hitbox's own frame nobody is hit
+yet. Target 12 works in every command that takes a Target (and the input commands, and `Last_Hit_Get` Which 2), and
+has its own variables, `ATKHIT_...` (`0x0F0002C8`-`0x0F0002FF`, docs/position-variables.md). Targets 0-11 and their
+variables are unchanged.
+
+```
+FRAME(Frames=7)
+Status_Set(Target=12, Status=0x5D)                         // dizzy, only if this attack hit someone
+Hitstop_Set(Target=2, Frames=8, Shake=1)                   // the last fighter hit: someone even when this attack missed
+```
 
 ## Rotation, position, motion
 
@@ -497,14 +515,64 @@ Remove_All_Hitboxes()
 Status_Set(Target=0, Status=0x10)
 ```
 
+### Position_Place / Position_Offset_Get (exe_v46k, Sm4shCommand v1.4.12)
+
+What the position variables (`POS_...`, `..._OFFSET_X`, docs/position-variables.md) do, as commands, for every target
+(12 included). The variables and `Position_Get` / `Position_Set` keep working as before.
+
+`Position_Place(Target, Relative, Fwd, Up, Depth, Axes, Frames, Collision)` puts a fighter (or this object)
+somewhere:
+
+| Parameter | Values |
+|---|---|
+| Relative | 0 the stage: Fwd / Up / Depth are the world X / Y / Z. 1 this object: the target goes to this object + Fwd along this object's facing (in front +), Up, Depth (the `..._OFFSET_` writes). 2 the target itself: it moves by Fwd along its own facing, Up, Depth (`POS_SELF_MOVE_`, `Position_Set` Mode 1). 3 this object goes to the target + Fwd along this object's facing, Up, Depth (`POS_SELF_OFFSET_`; Fwd 15 when facing it = behind it) |
+| Axes | bits 1 X, 2 Y, 4 Z; 0 = all three. The others keep the placed one's value (1: sideways only, keeps its height) |
+| Frames | 0 / 1 once, now. N >= 2: now and again every frame after this object's script (its frame step, not in its hitlag), N frames in all, worked out again each time (it follows this object). -1: every frame until this object's status changes |
+| Collision | 0 the placed one's stage collision as it is. 1 off while held (`GroundModule(0x2710, 0)` every frame: through floors and walls, as a grabbed fighter), back to air (5) when the hold ends; with Frames 0 / 1 it stays off. 2 off and left off |
+
+A hold ends early when this object's status changes (the move ends, it's hit), or this object or the placed one is set
+up again (a KO); a new `Position_Place` of the same target from this object replaces it. 16 holds at a time in all
+(more: placed once). The placement is `PostureModule(3, x, y, z)` on the placed one, as `Position_Set`.
+
+`Position_Offset_Get(Target, Axis, RelativeTo, Variable)` reads where it is:
+
+| RelativeTo | Axis 0 / 1 / 2 | Axis 3 |
+|---|---|---|
+| 0 the stage | its world X / Y / Z (`Position_Get`) | its facing (1 right, -1 left) |
+| 1 target - this object | X along this object's facing (+ = it is in front), Y (+ = above), Z (the `..._OFFSET_` reads) | the X/Y distance (`POS_OPP_DIST`) |
+| 2 this object - target | X along this object's facing, Y, Z (`POS_SELF_OFFSET_`) | the distance |
+| 3 this object - target, X along the target's facing | + = this object is in front of the target, - = behind its back; Y, Z | the distance |
+
+No such target: the variable gets 0. Gotchas: it's a teleport (no collision on the way); a grounded fighter moved up
+may be snapped back or put in a fall by its status on the next frame (hold it, or put it in the air); the placed
+fighter's own speed still moves it on its own frame between placements; Relative 1 / 3 use this object's facing,
+2 the target's.
+
+```
+// a grab-like hit: once it has hit, hold the fighter this attack hit 12 in front and 5 up for 10 frames
+FRAME(Frames=7)
+Position_Place(Target=12, Relative=1, Fwd=12, Up=5, Depth=0, Axes=0, Frames=10, Collision=1)
+// pull the nearest opponent to 8 in front, sideways only
+Position_Place(Target=1, Relative=1, Fwd=8, Up=0, Depth=0, Axes=1, Frames=0, Collision=0)
+// player 2 (Target 4): 3 up from where it is
+Position_Place(Target=4, Relative=2, Fwd=0, Up=3, Depth=0, Axes=0, Frames=0, Collision=0)
+// a backstab check: VAR_1 < 0 when this fighter is behind the opponent's back
+Position_Offset_Get(Target=1, Axis=0, RelativeTo=3, Variable=VAR_1)
+```
+
+Code: `tools/acmd_ext_cave.py` `apc_code` (APC_CODE `0x04B7B000`-`0x04B7C000`, position_vars_cave.py's grown text:
+its EXT_REGIONS stop at `0x04B7AE00`): the handlers, `apc_apply`, the holds `apc_tab` (16 x 0x30) re-applied from
+the frame hook (`FRAME_HOOK` -> `apc_fhook` -> `hv_fhook`) and dropped on an object's set-up (`WM_RESET` ->
+`apc_wmreset` -> `hv_wmreset`). Tested in unicorn (`tools/acmd_ext_test.py` `apc_tests`).
+
 ## Last_Hit_Get / Target_Slot_Get
 
 | Command | Does |
 |---|---|
-| `Last_Hit_Get(Which, Variable)` | Which 0: the player slot (1-8) of the last fighter this one hit; 1: of the last fighter that hit this one. 0 = none |
+| `Last_Hit_Get(Which, Variable)` | Which 0: the player slot (1-8) of the last fighter this one hit; 1: of the last fighter that hit this one; 2 (exe_v46k): of the fighter this attack hit (0 before the hit and once the attack is over). 0 = none |
 | `Target_Slot_Get(Target, Variable)` | the player slot (1-8) of any target (the nearest opponent, ...); 0 = none |
 
-The same fighters are Target 2 and 11 of the other commands, so a move can act on them directly:
+The same fighters are Target 2, 11 and 12 of the other commands, so a move can act on them directly:
 
 ```
 Last_Hit_Get(Which=1, Variable=VAR_0)                      // VAR_0 = who hit me last (player 1-8)

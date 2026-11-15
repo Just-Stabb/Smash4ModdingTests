@@ -9,6 +9,11 @@ each read looks the position up, and each write moves the fighter through the ga
 Needs the executable patch `tools/position_vars_cave.py` (in the standard `build/cross_f.rpx`).
 Sm4shCommand shows each ID's name and description when you hover it (`Tooltips/position_variables.txt`).
 
+**As commands (exe_v46k):** `Position_Place` and `Position_Offset_Get` (docs/acmd-extra-commands.md) do what these
+position variables do, for every target, without SET_FLOAT on IDs: put a fighter in front of / above this one, at a
+stage point, move it, put this fighter next to it, some axes only, once or held every frame (through the stage if
+wanted); read where it is relative to this one. The variables below keep working exactly as before.
+
 Terms used below:
 
 - **Self** is the fighter running the script.
@@ -63,6 +68,7 @@ opponent 1 unit further forward.
 | 1 nearest opponent | `0x0F000048`–`4F` | |
 | 2 last fighter hit | `0x0F000050`–`57` | the newest hit of self's current attack; once the attack is over, the fighter whose last attacker was self |
 | 3–10 player slot 1–8 | `0x0F000058`–`97` | slot 1 `58`–`5F`, slot 2 `60`–`67`, … slot 8 `90`–`97` |
+| 12 the fighter this attack hit | `0x0F0002C8`–`CF` | exe_v46k, its own block: "Target 12" below |
 
 | quantity | read | write |
 |---|---|---|
@@ -247,9 +253,36 @@ waist with it (`fighters/edge/weapons/flare1.c`, as Ultimate's dummy follows `ed
     SET_FLOAT(Value=11, Variable=0x0F00029C)   // slot 1: bone 0xB (WaistN for most fighters)
     Float_Var_Compare(Variable=0x0F00029E, Method=5, Value=20)   // its Y above 20?
 
+## Target 12: the fighter this attack hit (exe_v46k)
+
+Target 2 ("last fighter hit") is the newest hit record of self's current attack, and once the records are gone (the
+attack is over) the fighter whose last attacker (int `0x10000065`) is self. That int is also the game's KO credit, so
+it can't be cleared: target 2 goes on naming that fighter. **Target 12** is the same record walk with **no
+fallback**: before the attack hits and once it is over it is nobody (reads 0, writes do nothing). The families'
+layouts have no room for a 12th target, so its variables are a block of their own, `0x0F0002C8`-`0x0F0002FF`
+(Sm4shCommand names `ATKHIT_...`), each the same quantity as target 2's:
+
+| IDs | as target 2's | Sm4shCommand names |
+|---|---|---|
+| `0x0F0002C8`-`2CF` | combat `0x0F000050`-`57` (hitstun, dealt, x, hitstop, offsets) | `ATKHIT_HITSTUN` ... `ATKHIT_OFFSET_Z` |
+| `0x0F0002D0`-`2D7` | hit / status / motion `0x0F0000B0`-`B7` | `ATKHIT_HIT` ... `ATKHIT_GROUND` |
+| `0x0F0002D8`-`2F7` | inputs and state `0x0F000140`-`15F` | `ATKHIT_ATTACK` ... `ATKHIT_KO` |
+| `0x0F0002F8` / `2F9` | raw stick / C-stick X `0x0F000264` / `265` | `ATKHIT_STICK_X_RAW`, `ATKHIT_CSTICK_X_RAW` |
+| `0x0F0002FA` | ITEM `0x0F000278` | `ATKHIT_ITEM` |
+| `0x0F0002FB` | ACC `0x0F0002BE` (internal) | |
+| `0x0F0002FC`-`2FF` | joint `0x0F000298`-`29B` | `ATKHIT_JOINT`, `ATKHIT_JOINT_X` ... |
+
+    SET_FLOAT(Value=93, Variable=ATKHIT_STATUS)    // dizzy (0x5D), only if this attack hit someone
+    SET_FLOAT(Value=12, Variable=ATKHIT_OFFSET_X)  // put the fighter this attack hit 12 in front
+
+The hit records are made after the script runs: on a hitbox's own frame nobody is hit yet. The ACMD commands take it
+as Target 12 (and `Last_Hit_Get` Which 2). Code: `position_vars_cave.py` `nb_code` (`NB_CODE` `0x04B7AE00`: the
+quantity code of the mirrored family, then the target-2 path with target 12, whose fallback gives nobody); tested by
+`tools/position_vars_test.py`.
+
 ## Target accessors (internal)
 
-`0x0F0002BC + target` (targets as above, 0-10), read only: the target's module accessor, its bits returned as the
+`0x0F0002BC + target` (targets as above, 0-10; target 12's is `0x0F0002FB`), read only: the target's module accessor, its bits returned as the
 float. It is how the new ACMD commands (`docs/acmd-extra-commands.md`, "Targets") find another fighter; it's no use
 as a number in a script.
 
@@ -287,7 +320,7 @@ MSC: read positions:
 
 Sm4shCommand shows and accepts names for all of these (`tools/Sm4shCommand/SM4SHCommand/Aliases/variables.txt`):
 `POS_SELF_X`, `POS_OPP_OFFSET_X`, `POS_SLOT3_Y`, ...; the combat and hit / status / motion
-variables as `TARGET_QUANTITY` (`SELF` / `OPP` / `LASTHIT` / `SLOT1`-`SLOT8` + `HITSTUN`,
+variables as `TARGET_QUANTITY` (`SELF` / `OPP` / `LASTHIT` / `SLOT1`-`SLOT8` / `ATKHIT` (target 12, exe_v46k) + `HITSTUN`,
 `HITSTUN_DEALT`, `HITSTUN_MUL`, `HITSTOP_SHAKE`, `HITSTOP`, `OFFSET_X`, `OFFSET_Y`, `OFFSET_Z`,
 `HIT`, `HIT_NOW`, `STATUS`, `MOTION`, `MOTION_FRAME`, `KIND`, `GROUND`), e.g. `LASTHIT_HITSTUN_MUL` = `0x0F000052`,
 `OPP_STATUS` = `0x0F0000AA`; `SELF_ANIM_RATE` = `0x0F000098`; and `SELF_ITEM` = `0x0F000099`.

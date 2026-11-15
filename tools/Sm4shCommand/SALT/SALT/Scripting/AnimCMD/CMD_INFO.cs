@@ -165,7 +165,9 @@ namespace SALT.Moveset.AnimCMD
             {0xFC5AB6DC,3},
             {0x224CF650,2},
             {0xA321746C,11},
-            {0x8F468450,4}
+            {0x8F468450,4},
+            {0x9D1183FB,5},
+            {0xF478E0CC,9}
         };
         #endregion
         #region Names
@@ -791,6 +793,8 @@ namespace SALT.Moveset.AnimCMD
             {0x224CF650,"Leave_Ground_Cancel"},
             {0xA321746C,"New_Var"},
             {0x8F468450,"Gravity_Set"},
+            {0x9D1183FB,"Position_Offset_Get"},
+            {0xF478E0CC,"Position_Place"},
         };
         #endregion
         #region Params
@@ -1418,6 +1422,8 @@ namespace SALT.Moveset.AnimCMD
             {0x224CF650,"0"},
             {0xA321746C,"3,0,1,0,0,0,0,0,0,0"},
             {0x8F468450,"1,1,0"},
+            {0x9D1183FB,"0,0,0,3"},
+            {0xF478E0CC,"0,0,1,1,1,0,0,0"},
         };
         #endregion
         #region syntax
@@ -2043,6 +2049,8 @@ namespace SALT.Moveset.AnimCMD
             {0x224CF650,"Enabled"},
             {0xA321746C,"Name,Type,Initial,Scope,Text1,Text2,Text3,Text4,Text5,Text6"},
             {0x8F468450,"Accel,MaxFall,Mode"},
+            {0x9D1183FB,"Target,Axis,RelativeTo,Variable"},
+            {0xF478E0CC,"Target,Relative,Fwd,Up,Depth,Axes,Frames,Collision"},
         };
         #endregion
 
@@ -2646,12 +2654,12 @@ namespace SALT.Moveset.AnimCMD
             {0x3B130D3B,"Forgets who this object's hitboxes of Part have hit (-1: every part), so they can hit the same fighter again, as a new attack would. Out-of-range parts do nothing (a weapon has fewer parts than a fighter: Zelda's Din's Fire and its copies 2, fighters 20). New command: needs the patched cross_f.rpx."},
             {0x0F4F6EF4,"Puts a fighter in hitstop (hitlag) for some frames. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x1AA4CD3E,"Puts one of the items' states on a fighter (the item's own function and durations). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
-            {0x1EC5B53B,"Stores the player slot (1-8) of the last fighter this one hit, or of the last fighter that hit it. The same fighters are Target 2 / 11 of the other commands. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0x1EC5B53B,"Stores the player slot (1-8) of the last fighter this one hit, or of the last fighter that hit it, or (Which 2, exe_v46k) of the fighter this attack hit. The same fighters are Target 2 / 11 / 12 of the other commands. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x29F1BB70,"Stores a fighter's or article's world position (one axis) or facing in a variable. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x32DEB0DC,"Moves a fighter or article (MSC PostureModule(3, x, y, z)). A grounded fighter moved up may snap back or fall. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x4BD9E69A,"Stores which animation a fighter (or article) plays, its frame or its rate in a variable. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x4F6B304E,"Changes a fighter's status (StatusModule(3, status, 0)). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
-            {0x50F6ED36,"Plays an animation on a fighter (or article) from a frame at a rate, or changes the current one's frame / rate (MSC MotionModule(1 / 0x2713 / 4)). The status keeps running: it may change the motion again. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0x50F6ED36,"Plays an animation on a fighter (or article) from a frame at a rate, or changes the current one's frame / rate (MSC MotionModule(1 / 0x2713 / 4)). The status keeps running: it may change the motion again. On this fighter itself a new motion ends this script (the new motion's scripts take over; exe_v46j: cleanly). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x54443BE2,"Stores a fighter's status (action) kind in a variable. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x6078528B,"Stores what this object's (or another's) attack connected with (bits: 2 hurtbox, 4 shield, ...) in a variable. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x69FD6D46,"Stores a fighter's hitstun frames left, or the last hit's hitstun, in a variable. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
@@ -2670,6 +2678,8 @@ namespace SALT.Moveset.AnimCMD
             {0x224CF650,"Whether this grounded move is cut into Fall when the fighter leaves the ground (walks / slides off an edge, or moves up). Off: the move (animation, hitboxes, scripts) goes on in the air with air physics (gravity, air drift) until its interrupt frame or its end, then Fall; landing during it, it goes on grounded. Back on by itself at the next status (move). Fighters only. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0xA321746C,"Declares a named variable (Type int or float, a starting value) that every variable parameter takes by name: SET_FLOAT / SET_INT / ADD_INT / INC_INT, Float_Var_Compare / Int_Var_Compare, Hit_Get(Variable=...), ... 64 slots per object (fighter or article), beyond VAR_0-VAR_31. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x8F468450,"Sets this fighter's gravity and max fall speed for the rest of the move (aerials, specials, a grounded move that went on in the air with Leave_Ground_Cancel, ...). Back to the fighter's own by itself at the next status (move), when a hit takes effect, on a ledge grab and on a KO. Fighters only. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0x9D1183FB,"Reads where a fighter is: its stage position or facing, how far it is in front of / above this object, how far this object is in front of or behind it, or the distance between them. Every target, the new one (12) included. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0xF478E0CC,"Puts a fighter (or this object) somewhere: at a stage position, in front of / above this object, moved from where it is, or this object next to the target; X, Y, Z or some of them; once or held there every frame for a number of frames, optionally through the stage. The position variables' uses (docs/position-variables.md) in one command, for every target. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
         };
         #endregion
         /// <summary>

@@ -196,8 +196,9 @@ THREAD_PARAMS = [
     ('ID', 0, 'This thread\'s number (any). Starting it again restarts it; Thread_Stop(ID) stops it.'),
     ('Flags', 0, 'Bits: 1 = keep running during hitlag (normally the thread pauses with the object).'),
 ]
-_TARGET = ('Whose inputs: 0 self, 1 the nearest opponent, 2 the last fighter hit, 3-10 player slots 1-8 '
-           '(as the input variables, docs/position-variables.md).')
+_TARGET = ('Whose inputs: 0 self, 1 the nearest opponent, 2 the last fighter hit, 3-10 player slots 1-8, 12 the '
+           'fighter this attack hit (exe_v46k: nobody once the attack is over) (as the input variables, '
+           'docs/position-variables.md).')
 _INPUT = ('Which input: 0 attack, 1 special, 2 jump, 3 shield, 4 grab, 5 / 6 / 7 taunt up / side / down (held); '
           '8-15 the same buttons pressed this frame; 16 / 17 stick X (forward +) / Y, 18 / 19 C-stick X (forward +) / Y '
           '(-1 to 1); 20 a stick is forced; 21 inputs off; 22-31 the state quantities of the input variables '

@@ -85,10 +85,10 @@ class NvTest
         var errors = new List<string>();
         int n = ACMD_INFO.OverrideInfo(args[0], errors);
         Check("Events.cfg loads with no errors", string.Join("; ", errors), "");
-        Check("commands", ACMD_INFO.CMD_NAMES.Count, 620);
+        Check("commands", ACMD_INFO.CMD_NAMES.Count, 622);   // v1.4.12: + Position_Place, Position_Offset_Get
         Check("New_Var known: size 11, group", ACMD_INFO.CMD_SIZES[FighterVariable.NewVarIdent] + " " +
               ACMD_INFO.GetCategory(FighterVariable.NewVarIdent), "11 New Commands / Variables");
-        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 36);
+        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 38);
         Check("group help blocks", ACMD_INFO.GROUP_HELP.Count, 9);
         LoadAliases(args[1]);
         Check("aliases loaded", FighterVariable.AliasCount > 500, true);
