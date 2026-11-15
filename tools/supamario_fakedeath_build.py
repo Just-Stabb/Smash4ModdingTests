@@ -103,7 +103,10 @@ V_CLOCK = 0x0F0003BD                 # frames counted by fd_tick (slot 0x3D)
 # body. Sized from the screenshot: at v1's 1.36 the main ring was ~3.2 units in radius (6.5 across on a ~10.8-unit
 # lying Supamario), so ~2.35 a unit of size; 2.6 makes it ~6.1: round him head to boots (his lying body spans
 # z -6.7 .. +4.1 from TransN)
-FD_FX_SCALE = 2.6
+FD_FX_SCALE = 4.2                    # v3 (user, v2's screenshot: "Fake death's ring is wrapped too closely to
+                                     # Supamario"): v2's 2.6 put the main ring's edge ~0.6 of his lying length from
+                                     # its centre (~6.6 units: his half-length ~5.4); x1.6: ~9.9, clear space round him
+                                     # as XV2's ring round a downed fighter (the heights stay RING_HEIGHTS)
 RING_Z = -1.3                        # the call: centred on his lying body along his facing (bone 0, forward offset)
 RING_HEIGHTS = {'line': 0.9, 'line_1': 0.0, '9': 0.45, 'sprite': 0.0}   # each emitter's height over the call
                                      # (units at the final size: XV2's 0.8 / 0.3 / 0.6 / 0.2 m stack kept low round him)

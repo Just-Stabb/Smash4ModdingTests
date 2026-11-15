@@ -2504,3 +2504,28 @@ start", and nothing cleared that flag before the hover.
 - the game script has no `Hit_Check` / `Target_Slot_Get` / `Body_State_Set`, has `Hit_Reset` before the hover's box,
   and every box is Ground/Air 3;
 - the point-blank catches (standing, downed, a God Fist victim) through the MSC as before.
+
+## Fake Death v3 (`supamario_fakedeath_v3.zip`): reach, 40% less knockback, a wider ring
+
+Install over Core Breaker v9, exe B (`exe_v46k`, no exe change). The user, with a v2 clip
+(`MedalTVCemuWiiUEmulator20261115032700479`: the attack whiffs on Donkey Kong) and a screenshot.
+
+1. **Reach** ("make Fake Death able to hit slightly further from the distance it whiffed at"). The clip, frame by frame
+   (60 fps): the kip-up's handspring (the hit frames, wake 20-23) at 1.60-1.63 s, standing at ~1.67 s with Donkey
+   Kong's front arm ~5.6 units ahead of his TransN (~17.5 px a unit from his standing height, ~12 units). His travel
+   from wake 23 to standing is ~3.8 units, so on the last active frame Donkey Kong's front was ~9.4 ahead; the hitbox
+   reached 7.56 (3.78 ahead + 3.78). Both hitboxes now **5.5 ahead, size 5.5: reach 11.0** (+3.4), 2.52 up as before.
+   The ground hitbox now also reaches a little behind his TransN (5.5 - 5.5 = 0).
+2. **Knockback -40%** ("please reduce its knockback by 40%"): the air hit's **BKB 165 -> 99, KBG 25 -> 15**, so its
+   knockback is exactly 0.6x v2's at every percent. Mario weight, no DI: **0%: 102 (~66 units away, hitstun 40); 100%:
+   111 (~78 units, 44)** (v2: 170 / ~183, 184 / ~214). The clip shows no ground hit (a whiff), and the ground hit has no
+   knockback travel (knockback 1, held in place): unchanged.
+3. **The ring** ("Fake death's ring is wrapped too closely to Supamario"): the v2 screenshot puts the main ring's edge
+   ~0.6 of his lying length from its centre (~6.6 units; his half-length ~5.4). **`FD_FX_SCALE` 2.6 -> 4.2** (x1.6):
+   ~9.9 units, clear space round him; still flat (X 90), centred on his body, the heights unchanged.
+4. The hitstun-reduction rule stays (the user).
+
+Tests: `supamario_fakedeath_test.py` (new: a fighter 9.4 ahead of him on the last active frame is hit now, beyond v2's
+reach; the air knockback 0.6x v2's at 0 / 50 / 100 / 150%; the ring's radius at least 1.5x his lying half-length + 1),
+`supamario_corebreaker_test.py`, `supamario_godfist_test.py --all-models`, `msc_stack_check.py`: all 0 problems (Fake
+Death 50 checks; 0 of 2384 scripts, globals 124 of 128).

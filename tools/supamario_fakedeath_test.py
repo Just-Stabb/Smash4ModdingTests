@@ -619,8 +619,8 @@ def effect_tests(out):
     rings = [max(p.field(em['data'], 'scale')) * B.FD_FX_SCALE * B.RING_DRAWN for em in p.sets[si]['emitters']
              if em['data'] is not None and p.field(em['data'], 'particle_type') == 1 and
              p.emitter_name(em['data']) == 'line']
-    check('the main ring round him lying (radius %.1f, his lying body z -6.7 .. 4.1: half 5.4 + 0.5)' % rings[0],
-          rings[0] >= 5.9, True)
+    check('the main ring round him lying with space (v3: radius %.1f, at least 1.5x his lying half-length 5.4)' %
+          rings[0], rings[0] >= 1.5 * 5.4 + 1.0, True)
     check('the ring\'s set: 4 emitters + 1 halo (its glowing ring line)', len(p.sets[si]['emitters']), 5)
 
 
