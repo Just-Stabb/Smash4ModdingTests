@@ -10680,6 +10680,44 @@
 "Direction",
 "Frames"
 ]
+},
+"27A8E82C": {
+"size": 3,
+"name": "Time_Scale",
+"format": [
+1,
+0
+],
+"syntax": [
+"Rate",
+"Frames"
+]
+},
+"3BE70247": {
+"size": 4,
+"name": "Target_Time_Scale",
+"format": [
+0,
+1,
+0
+],
+"syntax": [
+"Target",
+"Rate",
+"Frames"
+]
+},
+"C5858BCF": {
+"size": 3,
+"name": "Stage_Freeze",
+"format": [
+0,
+0
+],
+"syntax": [
+"On",
+"Frames"
+]
 }
 }
 }

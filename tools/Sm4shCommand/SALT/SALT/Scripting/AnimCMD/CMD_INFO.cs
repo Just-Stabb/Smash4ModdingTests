@@ -169,7 +169,10 @@ namespace SALT.Moveset.AnimCMD
             {0x9D1183FB,5},
             {0xF478E0CC,9},
             {0x270E6148,4},
-            {0x544E610E,5}
+            {0x544E610E,5},
+            {0x27A8E82C,3},
+            {0x3BE70247,4},
+            {0xC5858BCF,3}
         };
         #endregion
         #region Names
@@ -799,6 +802,9 @@ namespace SALT.Moveset.AnimCMD
             {0xF478E0CC,"Position_Place"},
             {0x270E6148,"Buffer_Clear"},
             {0x544E610E,"Buffer_Set"},
+            {0x27A8E82C,"Time_Scale"},
+            {0x3BE70247,"Target_Time_Scale"},
+            {0xC5858BCF,"Stage_Freeze"},
         };
         #endregion
         #region Params
@@ -1430,6 +1436,9 @@ namespace SALT.Moveset.AnimCMD
             {0xF478E0CC,"0,0,1,1,1,0,0,0"},
             {0x270E6148,"0,0,0"},
             {0x544E610E,"0,0,0,0"},
+            {0x27A8E82C,"1,0"},
+            {0x3BE70247,"0,1,0"},
+            {0xC5858BCF,"0,0"},
         };
         #endregion
         #region syntax
@@ -2059,6 +2068,9 @@ namespace SALT.Moveset.AnimCMD
             {0xF478E0CC,"Target,Relative,Fwd,Up,Depth,Axes,Frames,Collision"},
             {0x270E6148,"Target,Inputs,Frames"},
             {0x544E610E,"Target,Input,Direction,Frames"},
+            {0x27A8E82C,"Rate,Frames"},
+            {0x3BE70247,"Target,Rate,Frames"},
+            {0xC5858BCF,"On,Frames"},
         };
         #endregion
 
@@ -2654,7 +2666,7 @@ namespace SALT.Moveset.AnimCMD
             {0x974EA5BE,"Special_Hitbox with 6 more parameters at the end: hitstun multiplier, hitstop / self hitstop multiplier and frames, DI multiplier. Damage, Angle, KBG, FKB, BKB and Size can be variables (exe_v43: Angle=STICK_ANGLE, Damage=VAR_0, |FOLLOW, |WORLD, |NEG). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x113030DB,"Makes this object (a fighter, or a projectile in its own script) home in on the nearest other fighter for Frames frames: its direction turns toward the target by up to TurnRate degrees a frame, at Speed. Projectiles skip their owner; a reflected one goes back at its original owner instead (any distance). Read / stop it with variable 0x0F000331. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x1B492AD1,"Stops this object's thread ID (-1 = all of them). New command: needs the patched cross_f.rpx."},
-            {0x4C0DBE48,"Thread_Start(ID, Flags){ ... }: the commands in the block run on their own, frame by frame, from the next frame on, while the script goes on past the block. The thread keeps running after the animation ends or changes and while the character is KO'd, until the block ends, Thread_Stop(ID), or the object is set up again. FRAME inside counts from the thread's start. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0x4C0DBE48,"Thread_Start(ID, Flags){ ... }: the commands in the block run on their own, frame by frame, from the next frame on, while the script goes on past the block. The thread keeps running after the animation ends or changes and while the character is KO'd, until the block ends, Thread_Stop(ID), or the object is set up again. FRAME inside counts from the thread's start. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md); exe_v46m or later for it to run in game (before it, no thread ever ran)."},
             {0x43D5B75B,"Stores a fighter's input (1 / 0 for a button, -1 to 1 for a stick) in a float variable (e.g. VAR_0). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x58FABCF7,"Forces a fighter's input as if its controller did it: hold or tap a button, tilt a stick, or ignore its controller. Forced inputs last until changed and are cleared when it is KO'd. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0xD41CE3F4,"Compares a fighter's input (a button held / pressed, a stick) with Value; True / Else after it run on the result, like Float_Var_Compare. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
@@ -2690,6 +2702,9 @@ namespace SALT.Moveset.AnimCMD
             {0xF478E0CC,"Puts a fighter (or this object) somewhere: at a stage position, in front of / above this object, moved from where it is, or this object next to the target; X, Y, Z or some of them; once or held there every frame for a number of frames, optionally through the stage. The position variables' uses (docs/position-variables.md) in one command, for every target. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x270E6148,"Empties a fighter's input buffer (all of it or some inputs), so nothing it pressed before comes out when it can act: e.g. the fighter a grab-like move releases. Once, or for some frames. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x544E610E,"Puts an input in a fighter's buffer as if it had pressed it (with a stick direction): the game makes its own commands of it at the fighter's next input read, and the fighter does it as soon as it can act (a jump at the end of a move, an attack out of hitstun, ...). New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0x27A8E82C,"Slows down or speeds up the whole match: every fighter, item and projectile and the stage. Ends by itself after Frames, at Time_Scale(1) or when the match ends. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0x3BE70247,"Slows down one fighter (or article), as the Timer item slows the opponents: its animation, movement, status and hitstun counting. Uses the Timer's own slow: a Timer and this replace each other. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0xC5858BCF,"Freezes or resumes the stage (the game's own stage stop: StageManager +0xD0), the fighters, items and projectiles unaffected. Ends by itself after Frames, at Stage_Freeze(0) or when the match ends. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
         };
         #endregion
         /// <summary>

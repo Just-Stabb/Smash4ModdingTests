@@ -730,6 +730,159 @@ def fighter_thread_tests(pm, om, a, stack_top=0x0E00F000, quiet=False):
     return out
 
 
+def ts_tests(pm, a):
+    """exe_v46n: Stage_Freeze / Time_Scale / Target_Time_Scale. The handlers run as the interpreter calls them; the
+    game's own functions do the work: the global slow manager's request / free (0x02FB35AC / 0x02FB3600) on a fake
+    manager, the stage manager's stop (0x0316505C, no stage loaded), a SlowModule on the game's own vtable
+    (0x101211D4: set slot 0x0200CC14, clear 0x02DA6BDC, its tick 0x0200CFC8). The battle scene's call (TS_SCENE) runs
+    ts_scene with the battle step / its second half stubbed (they count their calls) and the scene's check
+    (0x0334CCE8) answering 1."""
+    f = lambda v: struct.unpack('>I', struct.pack('>f', v))[0]        # noqa: E731
+    B = 0x103C0000
+    me, state, ctx, params, mgr, smgr, battle, bstate, slow, slots, cnt = (B + 0x400 * i for i in range(11))
+    for i in range(11):
+        pm.mem_write(B + 0x400 * i, b'\0' * 0x400)
+    saved = {x: r32(pm, x) for x in (C.SLOW_MGR, C.STAGE_MGR, C.BATTLE, C.BATTLE_UPD, C.BATTLE_POST, C.BATTLE_PLAY,
+                                     C.BATTLE_UPD + 4, C.BATTLE_UPD + 8, C.BATTLE_UPD + 12, C.BATTLE_POST + 4,
+                                     C.BATTLE_POST + 8, C.BATTLE_POST + 12, C.BATTLE_PLAY + 4)}
+    saved_data = bytes(pm.mem_read(C.TS_DATA, 0x40))
+    from ppcasm import Asm
+    for fn, k in ((C.BATTLE_UPD, 0), (C.BATTLE_POST, 4)):       # stubs: [cnt + k] += 1
+        st = Asm(fn)
+        st.asm("""
+        lis r12, 0x%X
+        lwz r11, 0x%X(r12)
+        addi r11, r11, 1
+        stw r11, 0x%X(r12)
+        blr""" % (cnt >> 16, (cnt & 0xFFFF) + k, (cnt & 0xFFFF) + k))
+        for i, w in enumerate(st.words()):
+            w32(pm, fn + 4 * i, w)
+    w32(pm, C.BATTLE_PLAY, 0x38600001)                          # li r3, 1
+    w32(pm, C.BATTLE_PLAY + 4, 0x4E800020)
+    w32(pm, C.SLOW_MGR, mgr)
+    w32(pm, C.STAGE_MGR, smgr)
+    w32(pm, C.BATTLE, battle)
+    w32(pm, battle, bstate)
+    pm.mem_write(bstate + 0x88, b'\1')
+    w32(pm, me + 0xB8, slow)
+    w32(pm, smgr, smgr + 0x200)                                 # its stage: +0xC8 bit 4 (0x031427D0 returns early)
+    w32(pm, smgr + 0x200 + 0xC8, 4)
+    pm.mem_write(C.TS_DATA, b'\0' * 0x40)
+
+    def cmd(label, words, exe=1):
+        for i, w in enumerate(words):
+            w32(pm, params + 4 * i, w)
+        w32(pm, state + 4, 0x1000)
+        w32(pm, state + 8, -1)
+        pm.mem_write(ctx + 8, bytes([exe]))
+        run(pm, a.addr(label), RET, {UC_PPC_REG_3: me, UC_PPC_REG_4: 0, UC_PPC_REG_5: state, UC_PPC_REG_6: ctx,
+                                     UC_PPC_REG_7: params})
+        return pm.reg_read(UC_PPC_REG_3), r32(pm, state + 4) - 0x1000
+
+    def requests():                                     # the manager's active requests {request: rate}
+        return {k: pm.mem_read(mgr + 0x10 + 2 * k + 1, 1)[0] for k in range(16) if pm.mem_read(mgr + 0x10 + 2 * k, 1)[0]}
+
+    def frame():                                        # the battle scene's frame: its call of the battle step
+        w32(pm, cnt, 0)
+        w32(pm, cnt + 4, 0)
+        run(pm, C.TS_SCENE, C.TS_SCENE + 4, {UC_PPC_REG_3: r32(pm, C.BATTLE)})
+        return r32(pm, cnt), r32(pm, cnt + 4)
+    try:
+        check('Time_Scale: returns 2 and steps over its 3 words', cmd('h_tscale', [f(0.5), 0]), (2, 12))
+        check('Time_Scale(0.5): the game\'s global slow manager has our request, rate 2 (half speed)', requests(), {0: 2})
+        cmd('h_tscale', [f(0.3), 0])
+        check('Time_Scale(0.3): rate 3 (1/3: rounded), the earlier request freed', requests(), {0: 3})
+        cmd('h_tscale', [f(0.01), 0])
+        check('Time_Scale(0.01): rate 20 (the slowest it takes)', requests(), {0: 20})
+        pm.mem_write(mgr + 0x10 + 2 * 1, b'\1\4')                 # the game's own request (e.g. a Final Smash)
+        cmd('h_tscale', [f(1.0), 0])
+        check('Time_Scale(1): ours freed, the game\'s own request kept', requests(), {1: 4})
+        pm.mem_write(mgr + 0x10, b'\0' * 0x20)
+        check('normal: one battle step a frame, its second half by the scene', frame(), (1, 0))
+        cmd('h_tscale', [f(2.0), 3])
+        check('Time_Scale(2, 3): no slow request; two steps a frame (the extra one with its second half)',
+              (requests(), frame()), ({}, (2, 1)))
+        frame()
+        check('...for 3 frames, then back to one', (frame(), frame()), ((2, 1), (1, 0)))
+        cmd('h_tscale', [f(3.6), 0])
+        check('Time_Scale(3.6): 4 steps a frame (rounded, at most 4)', frame(), (4, 3))
+        pm.mem_write(bstate + 0x8C, b'\1')
+        check('...not while the match is paused (battle +0x8C)', frame(), (1, 0))
+        pm.mem_write(bstate + 0x8C, b'\0')
+        cmd('h_tscale', [f(0.5), 2])
+        check('Time_Scale(0.5, 2): the slow request, one step a frame', (requests(), frame()), ({0: 2}, (1, 0)))
+        frame()
+        check('...freed by itself after its 2 frames', requests(), {})
+        cmd('h_tscale', [f(0.5), 0])
+        cmd('h_tscale', [f(0.5), 0], exe=0)
+        check('not executed (skipped command): nothing changes', requests(), {0: 2})
+        pm.mem_write(bstate + 0x88, b'\0')
+        frame()
+        check('the match not running (battle +0x88 0): our slow freed', requests(), {})
+        pm.mem_write(bstate + 0x88, b'\1')
+        cmd('h_tscale', [f(0.25), 0])
+        w32(pm, C.BATTLE, battle + 0x10)                        # another match
+        w32(pm, battle + 0x10, bstate)
+        frame()
+        check('a new match: our slow from the last one freed', requests(), {})
+        w32(pm, C.BATTLE, battle)
+        frame()
+        # Stage_Freeze: the stage manager's stop flag (+0xD0) through the game's own 0x0316505C
+        check('Stage_Freeze(1, 3): returns 2, steps over 3 words; the stage manager stops the stage (+0xD0)',
+              (cmd('h_sfreeze', [1, 3]), pm.mem_read(smgr + 0xD0, 1)[0]), ((2, 12), 1))
+        frame()
+        frame()
+        a1 = pm.mem_read(smgr + 0xD0, 1)[0]
+        frame()
+        check('...still stopped 2 frames later, going on after its 3rd', (a1, pm.mem_read(smgr + 0xD0, 1)[0]), (1, 0))
+        cmd('h_sfreeze', [1, 0])
+        frame()
+        a1 = pm.mem_read(smgr + 0xD0, 1)[0]
+        cmd('h_sfreeze', [0, 0])
+        check('Stage_Freeze(1, 0): stopped until Stage_Freeze(0)', (a1, pm.mem_read(smgr + 0xD0, 1)[0]), (1, 0))
+        cmd('h_sfreeze', [1, 0])
+        w32(pm, C.BATTLE, battle + 0x10)
+        frame()
+        check('a new match: the stage stop let go', pm.mem_read(smgr + 0xD0, 1)[0], 0)
+        w32(pm, C.BATTLE, battle)
+        frame()
+        # Target_Time_Scale: the Timer's SlowModule slot (3), the module on the game's own vtable
+        w32(pm, slow, 0x101211D4)
+        w32(pm, slow + 0x20, 4)
+        w32(pm, slow + 0x24, slots)
+        for k in range(4):
+            w32(pm, slots + 0x14 * k + 4, 1)
+            w32(pm, slots + 0x14 * k + 8, f(1.0))
+            w32(pm, slots + 0x14 * k + 0xC, 0x50000000)
+        w32(pm, slow + 0x18, 1)
+        w32(pm, slow + 8, f(1.0))
+        check('Target_Time_Scale(0, 0.5, 60): returns 2, steps over its 4 words', cmd('h_ttscale', [0, f(0.5), 60]), (2, 16))
+        got = struct.unpack('>IIfI', bytes(pm.mem_read(slots + 0x14 * 3, 16)))
+        check('...the Timer\'s slot 3: 61 frames (the game adds the current one), rate 2, 0.5, no owner', got,
+              (61, 2, 0.5, 0x50000000))
+        skips = []
+        for _ in range(4):
+            run(pm, 0x0200CFC8, RET, {UC_PPC_REG_3: slow})
+            skips.append(pm.mem_read(slow + 0xC, 1)[0])
+        check('...the game\'s SlowModule tick: its rate 0.5 and a frame skipped in two',
+              (struct.unpack('>f', pm.mem_read(slow + 8, 4))[0], sorted(set(skips)), skips.count(1)), (0.5, [0, 1], 2))
+        check('...counted down by the game (61 -> 57 after 4 ticks)', r32(pm, slots + 0x14 * 3), 57)
+        cmd('h_ttscale', [0, f(1.0), 0])
+        check('Target_Time_Scale(0, 1, 0): the slot back to normal (rate 1)', r32(pm, slots + 0x14 * 3 + 4), 1)
+        cmd('h_ttscale', [0, f(0.25), 0])
+        check('Target_Time_Scale(0, 0.25, 0): rate 4, no frame count (until changed)', (r32(pm, slots + 0x14 * 3),
+              r32(pm, slots + 0x14 * 3 + 4)), (0, 4))
+        cmd('h_ttscale', [0, f(2.0), 0])
+        check('Target_Time_Scale(0, 2, 0): above 1: back to normal (one fighter can only be slowed)',
+              r32(pm, slots + 0x14 * 3 + 4), 1)
+        w32(pm, me + 0xB8, 0)
+        check('no SlowModule: nothing, no crash', cmd('h_ttscale', [0, f(0.5), 0]), (2, 16))
+    finally:
+        for x, w in saved.items():
+            w32(pm, x, w)
+        pm.mem_write(C.TS_DATA, saved_data)
+
+
 def input_tests(pm, a):
     """Input_Compare / Input_Get / Input_Set / Hit_Reset with stubbed WorkModule (get: f1 = (ID & 0xFFFF) / 16,
     set: logs ID and f1), ControlModule wrapper (1 for one (op, button) pair) and AttackModule wrapper (logs)"""
@@ -1672,6 +1825,7 @@ def main():
     thread_tests(pm, om, a)
     fighter_thread_tests(pm, om, a)
     fighter_thread_tests(pm, om, a, stack_top=0x7F00F000)
+    ts_tests(pm, a)
     input_tests(pm, a)
     new_cmd_tests(pm, a)
     print('%d failures' % fails)

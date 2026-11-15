@@ -170,7 +170,14 @@ def main():
     # crash fix v1: in the region already run, nothing grown
     a, out = C.build()
     check('cave inside the proven code region', C.CAVE >= 0x04B00000 and a.pc <= C.LIMIT <= 0x04BD4000, True)
-    check('no section grew (addresses and sizes as the original\'s)', sections(new), sections(old))
+    # (exe_v46n: acmd_ext_cave.py grows the text section to its TS_LIMIT for Time_Scale & co.; that is its own growth,
+    # not this cave's: the text section may end there, nothing else)
+    import acmd_ext_cave as AE
+    grown = [(b0, n) if not (b0 == 0x02000020 and n == AE.TS_LIMIT - 0x02000020) else (b0, None) for b0, n in sections(new)]
+    want = [(b0, n) if not (b0 == 0x02000020) else (b0, None) for b0, n in sections(old)]
+    check('no section grew (addresses and sizes as the original\'s; the text section: as it or to acmd_ext_cave.py\'s '
+          'TS_LIMIT)', grown if sections(new)[1][1] != sections(old)[1][1] else sections(new),
+          want if sections(new)[1][1] != sections(old)[1][1] else sections(old))
     check('every patched word in place', [hex(k) for k, v in sorted(out.items()) if new.w(k) != v], [])
     lab = a.labels
     check('0x%08X bl name_item' % C.HOOK_ITEM, bl_target(C.HOOK_ITEM, new.w(C.HOOK_ITEM)), lab['name_item'])

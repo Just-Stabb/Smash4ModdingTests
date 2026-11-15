@@ -72,8 +72,9 @@ def main():
           got, want)
     diff = []
     for (b0, d0), (b1, d1) in zip(old.segs, new.segs):
-        assert b0 == b1 and len(d0) == len(d1)
-        for i in range(0, len(d0), 4):
+        # (exe_v46n: the text section grown to acmd_ext_cave.py's TS_LIMIT: the common part is compared)
+        assert b0 == b1 and (len(d0) == len(d1) or b0 == 0x02000020)
+        for i in range(0, min(len(d0), len(d1)), 4):
             if d0[i:i + 4] != d1[i:i + 4]:
                 diff.append(b0 + i)
     check('no other word changed', sorted(set(diff) - {A.MAIN_TABLE + 8 * A.SLOT[n] + k for n in A.SLOT for k in (0, 4)}),

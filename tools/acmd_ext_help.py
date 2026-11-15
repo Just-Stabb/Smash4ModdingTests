@@ -15,7 +15,7 @@ NEW_GROUP = 'New Commands'
 
 # subgroup of each new command (the command list shows them under "New Commands", in SUBGROUPS' order)
 SUBGROUPS = ['Hitboxes & hits', 'Fighter state', 'Inputs', 'Position & rotation', 'Animation', 'Targets & tracking',
-             'Threads', 'Variables']
+             'Threads', 'Time & stage', 'Variables']
 GROUP = {}
 for _g, _names in (
         ('Hitboxes & hits', ['Extra_Special_Hitbox', 'Extra_Extended_Special_Hitbox', 'Hit_Check', 'Hit_Get',
@@ -29,6 +29,7 @@ for _g, _names in (
         ('Animation', ['Motion_Get', 'Motion_Set', 'Animation_Rate_Set']),
         ('Targets & tracking', ['Track_Target', 'Last_Hit_Get', 'Target_Slot_Get']),
         ('Threads', ['Thread_Start', 'Thread_Stop']),
+        ('Time & stage', ['Time_Scale', 'Target_Time_Scale', 'Stage_Freeze']),
         ('Variables', ['New_Var'])):
     for _n in _names:
         GROUP[_n] = _g
@@ -114,6 +115,8 @@ GROUP_HELP = {
         '- Animation: which animation plays, its frame and rate; play another one; the fighter\'s overall speed.',
         '- Targets & tracking: homing (Track_Target), who was hit last / hit this one last, player slots.',
         '- Threads: a block that keeps running on its own after the animation ends or changes.',
+        '- Time & stage (exe_v46n): slow down or speed up the whole match (Time_Scale), slow down one fighter '
+        '(Target_Time_Scale), freeze the stage (Stage_Freeze).',
         '- Variables: New_Var declares your own named variables (int or float, a starting value), usable in every '
         'variable parameter.',
         '',
@@ -2236,4 +2239,172 @@ EXAMPLES['Buffer_Set'] = [
     '',
     '// Example 5: player 1 (Target 3) does a neutral special out of the move\'s freeze',
     'Buffer_Set(Target=3, Input=1, Direction=1, Frames=0)',
+]
+
+
+# --- exe_v46n: Time_Scale / Target_Time_Scale / Stage_Freeze --------------------------------------------------------
+GROUP_HELP[NEW_GROUP + ' / Time & stage'] = [
+    'Time_Scale slows down or speeds up the whole match; Target_Time_Scale slows down one fighter; Stage_Freeze stops '
+    'the stage. They use the game\'s own mechanisms: the global slow-motion (what Final Smashes and training\'s speed '
+    'use), the Timer item\'s per-fighter slow, and the stage manager\'s stop (what some Final Smashes freeze the '
+    'stage with). A speed-up runs extra game steps a frame (the game has no faster mode of its own).',
+    '',
+    '## When they end',
+    '- After their Frames (screen frames), at the same command with Rate 1 / On 0, or when the match ends: nothing '
+    'carries over to the next match.',
+    '- Target_Time_Scale also ends when the fighter is set up again (a respawn), as the Timer does.',
+    '- A KO doesn\'t end Time_Scale or Stage_Freeze: they belong to the match, not to the fighter that started them. '
+    'Give them Frames, or end them yourself.',
+    '',
+    '## Offline only',
+    'They change how fast the game runs: online, the other console doesn\'t know and the match desyncs.',
+    '',
+    'Needs exe_v46n (the patched cross_f.rpx, tools/acmd_ext_cave.py).',
+]
+HELP['Time_Scale'] = [
+    '## How it works',
+    'Time_Scale(Rate, Frames) changes how fast the whole match runs: every fighter, item and projectile, and the stage '
+    'and its background.',
+    '- Rate below 1: the game\'s own slow-motion (its global slow manager, as Final Smashes and training\'s speed use).',
+    '  - Fighters, items and projectiles move one frame in every N, at 1/N speed: 0.5 is half speed, 0.33 a third, '
+    '0.25 a quarter. Rates are rounded to 1/N, down to 1/20.',
+    '  - The stage and its background run smoothly at 1/N.',
+    '- Rate 2, 3 or 4: that many game steps every frame, so everything runs 2, 3 or 4 times as fast: fighters, items, '
+    'the stage, the match timer. Rounded; at most 4.',
+    '- Rate 1 (or 0): back to normal.',
+    '',
+    '## Parameters in practice',
+    '- Rate: 0.25-0.99 slower, 1 normal, 2-4 faster (a float: write 0.5, 2, ...).',
+    '- Frames: 0 lasts until the next Time_Scale or the end of the match. N goes back to normal by itself after N '
+    'frames. Frames are screen frames, so a 2x speed-up for 120 frames is 2 seconds of real time (240 game steps).',
+    '- Another Time_Scale replaces the one running.',
+    '',
+    '## How it stacks',
+    '- The game keeps the slowest of all slow-motion requests: a Final Smash\'s, training\'s speed and this one. '
+    'Time_Scale(0.5) during a slower slow-motion changes nothing until that one ends. Its own end frees only its '
+    'own request.',
+    '- A speed-up multiplies with a slow-motion in effect: 2 steps a frame at half speed is normal speed.',
+    '- The Timer item\'s per-fighter slow and Target_Time_Scale apply on top.',
+    '',
+    '## Gotchas',
+    '- A speed-up isn\'t applied while the match is paused or ending. The pause menu, the match end and the results '
+    'run at normal speed.',
+    '- In a speed-up the timer and every countdown run faster too: a timed match ends sooner.',
+    '- Effects and sounds play their own animation at normal speed. Those started by the fighters start as often as '
+    'the faster game asks.',
+    '- A KO doesn\'t end it: give it Frames, or end it with Time_Scale(1).',
+    '- Offline only: online, the other console doesn\'t know and the match desyncs.',
+    '',
+    NOT_VIEWER,
+    'Needs exe_v46n (the patched cross_f.rpx, tools/acmd_ext_cave.py).',
+]
+HELP['Target_Time_Scale'] = [
+    '## How it works',
+    'Target_Time_Scale(Target, Rate, Frames) slows down one fighter (or this article) the way the Timer item slows its '
+    'opponents.',
+    '- Rate below 1: the fighter runs at 1/N speed (0.5 half, 0.33 a third, 0.25 a quarter; rounded to 1/N, down to '
+    '1/20).',
+    '  - Slowed: its animation, its scripts\' frames, its movement, its status and hitstun counting, and its attacks\' '
+    'timing.',
+    '  - Not slowed: the rest of the match.',
+    '- Rate 1 or more: back to normal. One fighter can only be slowed: the game has no per-fighter speed-up. For an '
+    'animation-only speed-up use Animation_Rate_Set; for everything use Time_Scale.',
+    '',
+    '## Parameters in practice',
+    '- Target: as the other commands. 12 (the fighter this attack hit) and 2 (the last fighter hit) are the usual '
+    'ones; 1 the nearest opponent; 3-10 a player slot.',
+    '- Rate: a float (0.5, 0.25, ...).',
+    '- Frames: N of the fighter\'s own frames, counted down by the game. 0 lasts until Target_Time_Scale(Target, 1, 0) '
+    'or a respawn.',
+    '',
+    '## Gotchas',
+    '- It is the Timer item\'s own slow (its slot in the fighter\'s SlowModule): a Timer and this replace each other on '
+    'that fighter, and the last one set counts.',
+    '- A respawn ends it, as for the Timer.',
+    '- The match\'s global slow-motion (Time_Scale, a Final Smash) applies on top.',
+    '- Target 12 is nobody once the attack is over: use it while the hitbox is out, or Target 2 after.',
+    '- Offline only: online, the other console doesn\'t know and the match desyncs.',
+] + TARGETS + [
+    '',
+    NOT_VIEWER,
+    'Needs exe_v46n (the patched cross_f.rpx, tools/acmd_ext_cave.py).',
+]
+HELP['Stage_Freeze'] = [
+    '## How it works',
+    'Stage_Freeze(On, Frames) stops the stage. Its animations, moving platforms, hazards and background stand still; '
+    'the fighters, items and projectiles go on.',
+    '- It is the stage manager\'s own stop, the one some Final Smashes use: the stage\'s update is skipped while it\'s '
+    'on.',
+    '- On 1 freezes; On 0 lets the stage go on.',
+    '',
+    '## Parameters in practice',
+    '- On: 1 freeze, 0 resume.',
+    '- Frames (with On 1): 0 lasts until Stage_Freeze(0) or the end of the match. N goes on by itself after N screen '
+    'frames.',
+    '',
+    '## Gotchas',
+    '- Stage hazards that are objects of their own (enemies and items a stage spawns) aren\'t the stage: they keep '
+    'moving.',
+    '- A Final Smash that freezes and resumes the stage itself takes over: its resume lets the stage go on even with a '
+    'Stage_Freeze running. And Stage_Freeze(0), or the end of its Frames, resumes a stage a Final Smash froze.',
+    '- It ends with the match: the next match\'s stage runs. A KO doesn\'t end it: give it Frames, or end it '
+    'yourself.',
+    '- Offline only: online, the other console doesn\'t know and the match desyncs.',
+    '',
+    NOT_VIEWER,
+    'Needs exe_v46n (the patched cross_f.rpx, tools/acmd_ext_cave.py).',
+]
+EXAMPLES['Time_Scale'] = [
+    '// Example 1: everything at double speed for 2 seconds (120 screen frames)',
+    'Time_Scale(Rate=2, Frames=120)',
+    '',
+    '// Example 2: a dramatic slow-motion on a finishing blow: when the hitbox connects, half speed for 90 frames',
+    'FRAME(Frames=12)',
+    _hitbox('Hitbox', Damage=18, Angle=361, KBG=95, BKB=40, Size=7, Z=10),
+    'WAIT(Frames=2)',
+    'Hit_Check(Target=0, When=0, Kinds=2)',
+    'True(Offset=0){',
+    '    Time_Scale(Rate=0.5, Frames=90)',
+    '}',
+    'Remove_All_Hitboxes()',
+    '',
+    '// Example 3: back to normal now (ends a Time_Scale with no Frames)',
+    'Time_Scale(Rate=1, Frames=0)',
+    '',
+    '// Example 4: a quarter speed until the move ends it at its frame 60',
+    'Time_Scale(Rate=0.25, Frames=0)',
+    'FRAME(Frames=60)',
+    'Time_Scale(Rate=1, Frames=0)',
+]
+EXAMPLES['Target_Time_Scale'] = [
+    '// Example 1: the fighter this attack hits runs at half speed for 60 of its frames',
+    '// (Target 12 while the hitbox is out: nobody if it missed)',
+    'FRAME(Frames=8)',
+    _hitbox('Hitbox', Damage=8, Angle=361, KBG=60, BKB=50, Size=6, Z=9),
+    'FRAME(Frames=10)',
+    'Target_Time_Scale(Target=12, Rate=0.5, Frames=60)',
+    'Remove_All_Hitboxes()',
+    '',
+    '// Example 2: the nearest opponent at a quarter speed for 2 seconds',
+    'Target_Time_Scale(Target=1, Rate=0.25, Frames=120)',
+    '',
+    '// Example 3: the last fighter this one hit back to normal speed',
+    'Target_Time_Scale(Target=2, Rate=1, Frames=0)',
+    '',
+    '// Example 4: player 2 (Target 4) at a third of its speed until it\'s set back (or respawns)',
+    'Target_Time_Scale(Target=4, Rate=0.33, Frames=0)',
+]
+EXAMPLES['Stage_Freeze'] = [
+    '// Example 1: a cinematic hold: the stage stands still from the catch (frame 46) to the release (frame 94)',
+    'FRAME(Frames=46)',
+    'Stage_Freeze(On=1, Frames=0)',
+    'FRAME(Frames=94)',
+    'Stage_Freeze(On=0, Frames=0)',
+    '',
+    '// Example 2: the stage frozen for 3 seconds, whatever happens to the move',
+    'Stage_Freeze(On=1, Frames=180)',
+    '',
+    '// Example 3: a "time stop": the stage frozen and the nearest opponent at a quarter speed for 2 seconds',
+    'Stage_Freeze(On=1, Frames=120)',
+    'Target_Time_Scale(Target=1, Rate=0.25, Frames=120)',
 ]

@@ -41,6 +41,9 @@ variables (exe_v43: HV_* / hv_code, in the free space after ACC_CACHE): the Extr
 KBG / FKB / BKB / Size take a variable (handler table -> hv_extra, which wraps h_extra), FOLLOW re-reads them every frame
 (FRAME_HOOK -> hv_fhook before hk_frame, WM_RESET -> hv_wmreset before hk_wmreset), and user_entry's 0x3C0-0x3C8 (from
 gs_var's gv_zero) are the stick angles / lengths and the rotation.
+exe_v46n (TS_* / ts_code, the text region grown again to TS_LIMIT): Time_Scale / Target_Time_Scale / Stage_Freeze on the
+game's global slow manager, the Timer's SlowModule slot and the stage manager's stop; ts_scene (on the battle scene's
+call of the battle step, TS_SCENE) counts their Frames, ends them with the match and runs a speed-up's extra steps.
 """
 import os
 import re
@@ -99,6 +102,21 @@ STEP_HOOKS = [0x02E408B8, 0x02BAD64C, 0x03048064]   # object step entries (fight
 INTERP = 0x02BEE950              # (r3 script table, r4 accessor, r5 state, r6 exec, f1 frames, f2 target)
 STATE_RESET = 0x02BEE9B8         # (r3 state): clear it, free a nested CALL state
 THREAD_STOP_BIT = 0x80000000
+# exe_v46n: time and the stage (ts_code; docs/native-notes.md "Time: global slow, per-object slow, stage stop")
+TS_CODE = 0x04BD4000             # the text region grown again (0x04BD4000-0x04BD6000): ts_code, then its data
+TS_DATA = 0x04BD5F00             # ts_data (zero at load), up to TS_LIMIT
+TS_LIMIT = 0x04BD6000
+TS_SCENE = 0x0309BE54            # the battle scene's update (0x0309BE34): bl 0x029108D0 (the battle update), once a frame
+BATTLE = 0x102F732C              # [BATTLE] the battle (0 between matches): [+0] its state, +0x88 running, +0x8C / +0x8D
+BATTLE_UPD = 0x029108D0          # (battle) one game step: slow manager, objects, stage, ...
+BATTLE_POST = 0x0291100C         # (battle) the step's second half (the scene's next callback, when 0x0334CCE8 says so)
+BATTLE_PLAY = 0x0334CCE8         # () -> [0x10423DC8] != 0: the scene runs BATTLE_POST
+SLOW_MGR = 0x102F7004            # [SLOW_MGR] the global slow manager: 16 requests {active, rate} at +0x10, the
+SLOW_REQ = 0x02FB35AC            #   slowest wins (+0x31); (mgr, rate 1-100) -> request 0-15 (0xFF: full);
+SLOW_REL = 0x02FB3600            #   (mgr, request) frees it. Rate N: every object steps 1 frame in N, the stage 1/N
+STAGE_MGR = 0x102F7020           # [STAGE_MGR] the stage manager: +0 the stage, +0xD0 its stop flag
+STAGE_STOP = 0x0316505C          # (stage manager, on): the stage's update skipped while on (Final Smash freezes)
+SLOW_TIMER_SLOT = 3              # SlowModule ([acc +0xB8]) slot the Timer item uses (0x02E16A14)
 GROW = 0x04B9A000
 FRAME_HOOK = 0x02C5F430          # every object's motion step, right after its ACMD ran (not in hitlag): li r0, 1
 WM_RESET = 0x02BF5864            # object set-up (every class, 0x02BF57B0): lwz r3, 0x28(r31) before WorkModule
@@ -118,7 +136,8 @@ INPUT_RAW = 0x0F000260           # raw stick X: + 2 * target (+1 C-stick)
 HIT_CLEAR_ALL = 0x02C0ECDC       # (AttackModule + 8): every group's hit records cleared (AttackModule vt +0x34's)
 HIT_CLEAR_LIST = 0x02C10660      # (group, list, 0): that list's records of the group's current round (+0x16A) freed
 KINETIC_FW = 0x030B2A10          # KineticModuleF (vt +0x11C, float result in f1): (0xB, energy) = its Y speed
-OBJ_ORIG = {FRAME_HOOK: 0x38000001, WM_RESET: 0x807F0028, VAR_ENTRY: 0x548C05BE}
+OBJ_ORIG = {FRAME_HOOK: 0x38000001, WM_RESET: 0x807F0028, VAR_ENTRY: 0x548C05BE,
+            TS_SCENE: 0x48000000 | ((BATTLE_UPD - TS_SCENE) & 0x3FFFFFC) | 1}
 OBJ_ORIG.update({h: 0x9421FFC8 for h in STEP_HOOKS})
 
 SPECIAL_HITBOX = 0x02BDBB20      # handler, size 42
@@ -580,6 +599,29 @@ NEW_CMDS = [
      'Puts an input in a fighter\'s buffer as if it had pressed it (with a stick direction): the game makes its own '
      'commands of it at the fighter\'s next input read, and the fighter does it as soon as it can act (a jump at the '
      'end of a move, an attack out of hitstun, ...).'),
+    # exe_v46n: time and the stage (docs/acmd-extra-commands.md "Time and the stage"; ts_code)
+    ('Stage_Freeze', 'h_sfreeze', [
+        ('On', 0, '1 freezes the stage (its animations, moving platforms, hazards, background), as the game does for '
+                  'some Final Smashes; 0 lets it go on.'),
+        ('Frames', 0, 'With On 1: 0 until Stage_Freeze(0) or the match ends; N lets it go on by itself after N frames.')],
+     'Freezes or resumes the stage (the game\'s own stage stop: StageManager +0xD0), the fighters, items and projectiles '
+     'unaffected. Ends by itself after Frames, at Stage_Freeze(0) or when the match ends.'),
+    ('Time_Scale', 'h_tscale', [
+        ('Rate', 1, 'Game speed. Below 1 slows everything the way the game\'s own slow-motion does, at 1/N speed '
+                    '(rounded: 0.5 = 1/2, 0.33 = 1/3, 0.25 = 1/4; down to 1/20). 2, 3 or 4 speeds everything up (that many '
+                    'game steps a frame; rounded, at most 4). 1 (or 0) back to normal.'),
+        ('Frames', 0, '0: until the next Time_Scale or the end of the match; N: back to normal by itself after N frames '
+                      '(screen frames).')],
+     'Slows down or speeds up the whole match: every fighter, item and projectile and the stage. Ends by itself after '
+     'Frames, at Time_Scale(1) or when the match ends.'),
+    ('Target_Time_Scale', 'h_ttscale', [
+        ('Target', 0, _T + ' Any fighter (or this article).'),
+        ('Rate', 1, 'Its speed: below 1 slows it the way the Timer item does, at 1/N speed (rounded: 0.5 = 1/2, 0.33 = '
+                    '1/3, 0.25 = 1/4; down to 1/20). 1 (or more) back to normal: one fighter can only be slowed.'),
+        ('Frames', 0, '0: until Target_Time_Scale(Target, 1, 0), or it is set up again (a respawn); N: for N of its '
+                      'frames.')],
+     'Slows down one fighter (or article), as the Timer item slows the opponents: its animation, movement, status and '
+     'hitstun counting. Uses the Timer\'s own slow: a Timer and this replace each other.'),
 ]
 SM4SHCOMMAND_DESC.update({n: d + ' New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).'
                           for n, _l, _p, d in NEW_CMDS})
@@ -1492,6 +1534,335 @@ def buf_handlers(b, h):
         lwz r0, 12(r30)
         stw r0, 0x10(r3)
         b nc_out
+""")
+
+
+def ts_code(b, h):
+    """exe_v46n: Stage_Freeze / Time_Scale / Target_Time_Scale (at TS_CODE, the text region grown to TS_LIMIT): the
+    handlers, and ts_scene, which the battle scene's update calls instead of the battle update (TS_SCENE) once a
+    frame: it counts the Frames down, ends everything when the match changes or isn't running, and runs the extra
+    game steps of a speed-up. ts_data (TS_DATA, zero at load): +0 the battle last seen, +4 global slow on, +8 its
+    request, +0xC the manager it's in, +0x10 time frames left (0 = no limit), +0x14 extra steps a frame, +0x18 stage
+    frozen, +0x1C stage frames left, +0x20 the stage manager frozen."""
+    # (nc_out, in CODE2, is out of a conditional branch's reach from here: ts_nc, a b to it, stands in)
+    pro0, S, tgt0 = h['pro'], h['S'], h['tgt']
+    pro = lambda lab, n: pro0(lab, n).replace('nc_out', 'ts_nc')        # noqa: E731
+    tgt = tgt0.replace('nc_out', 'ts_nc')
+    D = dict(battle=BATTLE, upd=BATTLE_UPD, post=BATTLE_POST, play=BATTLE_PLAY, smgr=SLOW_MGR, sreq=SLOW_REQ,
+             srel=SLOW_REL, stmgr=STAGE_MGR, ststop=STAGE_STOP, slot=SLOW_TIMER_SLOT)
+    for k in list(D):
+        if k not in ('slot',):
+            D[k + 'h'], D[k + 'l'] = (D[k] >> 16) & 0xFFFF, D[k] & 0xFFFF
+    b.asm("""
+# --- ts_scene(r3 battle): instead of the scene's bl 0x%(upd)08X ----------------------------------------------------
+ts_scene:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r30, 0x18(r1)
+        stw r31, 0x1C(r1)
+        mr r31, r3
+        bl ts_tick
+        lis r12, ts_data@ha
+        addi r12, r12, ts_data@l
+        lwz r30, 0x14(r12)              # extra steps (Time_Scale above 1)
+        cmpwi r30, 0
+        beq ts_last
+        lwz r12, 0(r31)                 # only while the match runs as normal (not paused, not ending)
+        lbz r0, 0x88(r12)
+        cmpwi r0, 0
+        beq ts_last
+        lbz r0, 0x8C(r12)
+        cmpwi r0, 0
+        bne ts_last
+        lbz r0, 0x8D(r12)
+        cmpwi r0, 0
+        bne ts_last
+        bl 0x%(play)08X
+        cmpwi r3, 0
+        beq ts_last
+ts_more:
+        mr r3, r31
+        lis r12, 0x%(updh)X
+        ori r12, r12, 0x%(updl)X
+        mtctr r12
+        bctrl
+        mr r3, r31
+        lis r12, 0x%(posth)X
+        ori r12, r12, 0x%(postl)X
+        mtctr r12
+        bctrl
+        addi r30, r30, -1
+        cmpwi r30, 0
+        bne ts_more
+ts_last:
+        mr r3, r31
+        lis r12, 0x%(updh)X              # the frame's own step (its second half: the scene's next callback)
+        ori r12, r12, 0x%(updl)X
+        mtctr r12
+        bctrl
+        bl ts_count
+        lwz r30, 0x18(r1)
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+# --- ts_tick(r3 battle): a new match, or one not running: everything off --------------------------------------------
+ts_tick:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r31, 0x1C(r1)
+        lis r31, ts_data@ha
+        addi r31, r31, ts_data@l
+        lwz r0, 0(r31)
+        cmplw r0, r3
+        stw r3, 0(r31)
+        bne tt_off
+        lwz r12, 0(r3)""" % D + chk_t('r12', 'r0', 'tt_off') + """
+        lbz r0, 0x88(r12)
+        cmpwi r0, 0
+        bne tt_out
+tt_off:
+        bl ts_time_off
+        bl ts_stage_off
+tt_out:
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+# --- ts_count(): at the end of a frame, one of the Frames gone (the frame it ran in counts) ------------------------
+ts_count:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r31, 0x1C(r1)
+        lis r31, ts_data@ha
+        addi r31, r31, ts_data@l
+        lwz r0, 4(r31)                  # time: slowed or sped up, with frames
+        lwz r11, 0x14(r31)
+        or. r0, r0, r11
+        beq tc_stage
+        lwz r11, 0x10(r31)
+        cmpwi r11, 0
+        ble tc_stage
+        addi r11, r11, -1
+        cmpwi r11, 0
+        stw r11, 0x10(r31)
+        bne tc_stage
+        bl ts_time_off
+tc_stage:
+        lwz r0, 0x18(r31)
+        cmpwi r0, 0
+        beq tc_out
+        lwz r11, 0x1C(r31)
+        cmpwi r11, 0
+        ble tc_out
+        addi r11, r11, -1
+        cmpwi r11, 0
+        stw r11, 0x1C(r31)
+        bne tc_out
+        bl ts_stage_off
+tc_out:
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+# --- ts_time_off(): our global slow request freed (in the manager it was made in), no extra steps ----------------
+ts_time_off:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r31, 0x1C(r1)
+        lis r31, ts_data@ha
+        addi r31, r31, ts_data@l
+        lwz r0, 4(r31)
+        cmpwi r0, 0
+        beq tto_clear
+        lis r3, 0x%(smgrh)X
+        lwz r3, 0x%(smgrl)X(r3)
+        lwz r0, 0xC(r31)
+        cmplw r3, r0
+        bne tto_clear
+        cmpwi r3, 0
+        beq tto_clear
+        lwz r4, 8(r31)
+        bl 0x%(srel)08X
+tto_clear:
+        li r0, 0
+        stw r0, 4(r31)
+        stw r0, 0x10(r31)
+        stw r0, 0x14(r31)
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+# --- ts_stage_off(): the stage we froze goes on (if it's still the same stage manager) ------------------------------
+ts_stage_off:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r31, 0x1C(r1)
+        lis r31, ts_data@ha
+        addi r31, r31, ts_data@l
+        lwz r0, 0x18(r31)
+        cmpwi r0, 0
+        beq tso_clear
+        lis r3, 0x%(stmgrh)X
+        lwz r3, 0x%(stmgrl)X(r3)
+        lwz r0, 0x20(r31)
+        cmplw r3, r0
+        bne tso_clear
+        cmpwi r3, 0
+        beq tso_clear
+        li r4, 0
+        bl 0x%(ststop)08X
+tso_clear:
+        li r0, 0
+        stw r0, 0x18(r31)
+        stw r0, 0x1C(r31)
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+# --- ts_round(f1 x) -> r3 = (int)(x + 0.5), clamped to [r4, r5]; leaf ---------------------------------------------
+ts_round:
+        lis r12, ts_half@ha
+        lfs f0, ts_half@l(r12)
+        fadds f1, f1, f0
+        fctiwz f1, f1
+        stfd f1, -8(r1)
+        lwz r3, -4(r1)
+        cmpw r3, r4
+        bge tr2_lo
+        mr r3, r4
+tr2_lo:
+        cmpw r3, r5
+        ble tr2_out
+        mr r3, r5
+tr2_out:
+        blr
+
+# --- Stage_Freeze(On, Frames) ---------------------------------------------------------------------------------------
+""" % D + pro('h_sfreeze', S('Stage_Freeze')) + """
+        bl ts_stage_off
+        lwz r0, 0(r30)
+        cmpwi r0, 0
+        beq ts_nc
+        lis r3, 0x%(stmgrh)X
+        lwz r3, 0x%(stmgrl)X(r3)""" % D + chk_t('r3', 'r0', 'ts_nc') + """
+        mr r26, r3
+        li r4, 1
+        bl 0x%(ststop)08X
+        lis r12, ts_data@ha
+        addi r12, r12, ts_data@l
+        li r0, 1
+        stw r0, 0x18(r12)
+        lwz r0, 4(r30)
+        stw r0, 0x1C(r12)
+        stw r26, 0x20(r12)
+        b ts_nc
+
+# --- Time_Scale(Rate, Frames) ---------------------------------------------------------------------------------------
+""" % D + pro('h_tscale', S('Time_Scale')) + """
+        bl ts_time_off
+        lis r12, ts_data@ha
+        addi r12, r12, ts_data@l
+        mr r27, r12
+        lfs f1, 0(r30)
+        lis r11, ts_lo@ha
+        lfs f0, ts_lo@l(r11)
+        fcmpu cr0, f1, f0
+        blt tsc_slow
+        lfs f0, ts_hi@l(r11)
+        fcmpu cr0, f1, f0
+        ble ts_nc                      # 0.99-1.01 (and 0, NaN: unordered): normal
+        li r4, 2                        # faster: that many steps a frame
+        li r5, 4
+        bl ts_round
+        addi r3, r3, -1
+        stw r3, 0x14(r27)
+        lwz r0, 4(r30)
+        stw r0, 0x10(r27)
+        b ts_nc
+tsc_slow:
+        lis r11, ts_zero@ha
+        lfs f0, ts_zero@l(r11)
+        fcmpu cr0, f1, f0
+        ble ts_nc                      # 0 or less: normal
+        lis r11, ts_one@ha
+        lfs f0, ts_one@l(r11)
+        fdivs f1, f0, f1                # N = 1 / Rate, 2-20
+        li r4, 2
+        li r5, 20
+        bl ts_round
+        mr r26, r3
+        lis r3, 0x%(smgrh)X
+        lwz r3, 0x%(smgrl)X(r3)""" % D + chk_t('r3', 'r0', 'ts_nc') + """
+        stw r3, 0xC(r27)
+        mr r4, r26
+        bl 0x%(sreq)08X
+        cmplwi r3, 15
+        bgt ts_nc                      # (0xFF: the manager's 16 requests are taken)
+        stw r3, 8(r27)
+        li r0, 1
+        stw r0, 4(r27)
+        lwz r0, 4(r30)
+        stw r0, 0x10(r27)
+        b ts_nc
+
+# --- Target_Time_Scale(Target, Rate, Frames): SlowModule slot %(slot)d (the Timer's) ---------------------------------
+""" % D + pro('h_ttscale', S('Target_Time_Scale')) + tgt + """
+        lwz r26, 0xB8(r27)              # its SlowModule""" + chk_t('r26', 'r0', 'ts_nc') + """
+        lfs f1, 4(r30)
+        lis r11, ts_lo@ha
+        lfs f0, ts_lo@l(r11)
+        fcmpu cr0, f1, f0
+        bge tts_clear
+        lis r11, ts_zero@ha
+        lfs f0, ts_zero@l(r11)
+        fcmpu cr0, f1, f0
+        ble tts_clear
+        lis r11, ts_one@ha
+        lfs f0, ts_one@l(r11)
+        fdivs f1, f0, f1
+        li r4, 2
+        li r5, 20
+        bl ts_round
+        mr r5, r3                       # vt +0x44 (0x0200CC14): (slot, rate, frames, 0, owner none)
+        mr r3, r26
+        li r4, %(slot)d
+        lwz r6, 8(r30)
+        li r7, 0
+        lis r8, 0x5000""" % D + vcall(0x44) + """
+        b ts_nc
+tts_clear:
+        mr r3, r26
+        li r4, %(slot)d""" % D + vcall(0x6C) + """
+        b ts_nc
+
+ts_nc:
+        b nc_out
+ts_half:
+        .float 0.5
+ts_one:
+        .float 1.0
+ts_zero:
+        .float 0.0
+ts_lo:
+        .float 0.99
+ts_hi:
+        .float 1.01
 """)
 
 
@@ -3718,6 +4089,11 @@ next_entry:
     b7 = Asm(APC_CODE)                  # exe_v46k: Position_Place / Position_Offset_Get, target 12 (position_vars' space)
     apc_code(b7, helpers)
     buf_code(b7)                         # exe_v46l: Buffer_Clear / Buffer_Set (their handlers in CODE2)
+    b9 = Asm(TS_CODE)                    # exe_v46n: Stage_Freeze / Time_Scale / Target_Time_Scale (the text grown again)
+    ts_code(b9, helpers)
+    assert not set(b9.labels) & (set(a.labels) | set(b2.labels) | set(b7.labels)), \
+        set(b9.labels) & (set(a.labels) | set(b2.labels) | set(b7.labels))
+    a.labels.update(b9.labels)
     b8 = Asm(BUF_DATA)                   # exe_v46l: their tables (free after Gravity_Set's code)
     buf_data(b8)
     assert not set(b8.labels) & set(a.labels), set(b8.labels) & set(a.labels)
@@ -3791,6 +4167,12 @@ ue_nv_far:                              # user_entry's New_Var IDs (exe_v40): ue
     assert GS_CODE + 4 * len(words5) <= BUF_DATA and BUF_DATA + 4 * len(words8) <= BUF_TAB, hex(BUF_DATA + 4 * len(words8))
     assert BUF_TAB + BUF_N * BUF_SIZE <= GS
     a.part8 = (BUF_DATA, words8)
+    b9.labels.update(a.labels)
+    b9.labels['ts_data'] = TS_DATA
+    a.labels['ts_data'] = TS_DATA
+    words9 = b9.words()
+    assert TS_CODE + 4 * len(words9) <= TS_DATA and TS_DATA + 0x40 <= TS_LIMIT, hex(TS_CODE + 4 * len(words9))
+    a.part9 = (TS_CODE, words9)
     assert ACC_CACHE + 64 * 8 <= THREADS and THREADS + THREAD_N * THREAD_SIZE <= GROW <= LIMIT
     hooks = {LOOKUP: b(LOOKUP, a.addr('lookup')), SIZE1: b(SIZE1, a.addr('size1')),
              SIZE2: b(SIZE2, a.addr('size2')), FETCH: b(FETCH, a.addr('fetch')),
@@ -3805,7 +4187,8 @@ ue_nv_far:                              # user_entry's New_Var IDs (exe_v40): ue
              FRAME_HOOK: b(FRAME_HOOK, a.addr('apc_fhook')), WM_RESET: b(WM_RESET, a.addr('apc_wmreset')),
              VAR_ENTRY: b(VAR_ENTRY, a.addr('user_gate')),
              GS_UPD: b(GS_UPD, a.addr('gs_upd')), GS_UPD_END: b(GS_UPD_END, a.addr('gs_end')),
-             GS_HIT: b(GS_HIT, a.addr('gs_hit')), BUF_HOOK: b(BUF_HOOK, a.addr('buf_build')) | 1}
+             GS_HIT: b(GS_HIT, a.addr('gs_hit')), BUF_HOOK: b(BUF_HOOK, a.addr('buf_build')) | 1,
+             TS_SCENE: b(TS_SCENE, a.addr('ts_scene')) | 1}
     for k, h in enumerate(STEP_HOOKS):
         hooks[h] = b(h, a.addr('hk_step%d' % k))
     for vt in WM_VTABLES:               # New_Var: the WorkModule int ops (absolute addresses: no branch range)
@@ -5511,7 +5894,7 @@ def main():
         labels(sys.argv[sys.argv.index('--labels') + 1])
         return
     a, words, hooks = build()
-    out = ['grow:0x%08X' % LIMIT, 'textregion:0x%X' % (NV_LIMIT - 0x02000000), 'grow:0x%08X' % NV_LIMIT]
+    out = ['grow:0x%08X' % LIMIT, 'textregion:0x%X' % (TS_LIMIT - 0x02000000), 'grow:0x%08X' % TS_LIMIT]
     out += ['0x%08X=0x%08X' % (CAVE + 4 * i, w) for i, w in enumerate(words)]
     out += ['0x%08X=0x%08X' % (a.part2[0] + 4 * i, w) for i, w in enumerate(a.part2[1])]
     out += ['0x%08X=0x%08X' % (a.part3[0] + 4 * i, w) for i, w in enumerate(a.part3[1])]
@@ -5520,6 +5903,7 @@ def main():
     out += ['0x%08X=0x%08X' % (a.part6[0] + 4 * i, w) for i, w in enumerate(a.part6[1])]
     out += ['0x%08X=0x%08X' % (a.part7[0] + 4 * i, w) for i, w in enumerate(a.part7[1])]
     out += ['0x%08X=0x%08X' % (a.part8[0] + 4 * i, w) for i, w in enumerate(a.part8[1])]
+    out += ['0x%08X=0x%08X' % (a.part9[0] + 4 * i, w) for i, w in enumerate(a.part9[1])]
     out += ['0x%08X=0x%08X' % kv for kv in sorted(hooks.items())]
     # the vtable words have ADDR32 relocations to the classes' own functions: moved to a dead word, or the loader
     # would write those back over ours

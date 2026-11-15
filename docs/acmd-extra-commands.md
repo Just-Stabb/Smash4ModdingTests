@@ -4,7 +4,7 @@ These are new commands for game, effect, sound and expression scripts. They need
 `cross_f.rpx` (`tools/acmd_ext_cave.py`, part of the standard build). Without it, a script that uses
 them won't load properly, so ship the executable with any script that uses them.
 
-Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12, Buffer_Clear / Buffer_Set from v1.4.13) lists all of them in one
+Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12, Buffer_Clear / Buffer_Set from v1.4.13, Time_Scale / Target_Time_Scale / Stage_Freeze from v1.7.0) lists all of them in one
 group, **New Commands**, at the top of the list (vanilla commands stay in their own groups), in subgroups:
 
 | Subgroup | Commands |
@@ -16,6 +16,7 @@ group, **New Commands**, at the top of the list (vanilla commands stay in their 
 | Animation | Motion_Get / _Set, Animation_Rate_Set |
 | Targets & tracking | Track_Target, Last_Hit_Get, Target_Slot_Get |
 | Threads | Thread_Start, Thread_Stop |
+| Time & stage | Time_Scale, Target_Time_Scale, Stage_Freeze |
 | Variables | New_Var |
 
 Each command there has in-depth help after its parameters (how it works, the values, gotchas) and several complete
@@ -41,6 +42,7 @@ them too.
 | `Status_*`, `Hitstun_*`, `Hitstop_Set`, `Damage_*`, `Body_State_Set`, `Armor_Set`, `Item_State_Set`, `Stage_Collision_Set`, `Joint_Position_Get` | the variable-based features (docs/position-variables.md) as commands with parameters |
 | `Leave_Ground_Cancel` | whether a grounded move is cut into Fall when the fighter leaves the ground (exe_v41; exe_v39 / v40's didn't work: below) |
 | `Gravity_Set` | a fighter's gravity and max fall speed for the rest of the move (exe_v42, Sm4shCommand v1.4.10) |
+| `Time_Scale` / `Target_Time_Scale` / `Stage_Freeze` | the whole match slower (the game's slow-motion) or faster (extra game steps a frame); one fighter slower (the Timer's slow); the stage frozen (exe_v46n, Sm4shCommand v1.7.0: below) |
 | `New_Var` | declares a variable with your own name (int or float, a starting value, per object or per move): 64 more per object, usable in every variable parameter (exe_v40, Sm4shCommand v1.4.9) |
 
 ## Extra_Special_Hitbox / Extra_Extended_Special_Hitbox
@@ -436,6 +438,102 @@ Code: `tools/acmd_ext_cave.py` `buf_code` (APC_CODE, after the position commands
 at `0x04BD3B00` and the requests at `0x04BD3D00` (12 x 0x14); the control update's builder call `0x02E72B9C` ->
 `buf_build`. Tested in unicorn (`tools/acmd_ext_test.py` `buf_tests`). Super God Fist clears its victim's buffer at
 the catch and the hand-off (fighters/supamario/README.md).
+
+## Time_Scale / Target_Time_Scale / Stage_Freeze (exe_v46n, Sm4shCommand v1.7.0)
+
+User: "a command to start and stop stage bg / objects like training mode's pause menu, a time manipulation command to
+speed up time for all characters / stage / bg, and one more to specify time manipulation to a specific / hit
+opponent". Each uses the game's own mechanism; docs/native-notes.md "Time: global slow, per-object slow, stage stop"
+has the addresses.
+
+| Command | Parameters | Does |
+|---|---|---|
+| `Time_Scale(Rate, Frames)` | Rate float; Frames int | Below 1: the game's global slow-motion at 1/N (Rate rounded to 1/N, N 2-20). 2-4: that many game steps a frame. 1 (or 0): normal. Frames: 0 until changed / the match ends, else that many screen frames. |
+| `Target_Time_Scale(Target, Rate, Frames)` | Target int; Rate float; Frames int | One fighter (or this article) at 1/N speed, the Timer item's own slow (SlowModule slot 3); 1 or more: normal. Frames: its own frames, counted by the game; 0 until changed or it's set up again (a respawn). |
+| `Stage_Freeze(On, Frames)` | On int; Frames int | 1: the stage stopped (the stage manager's own stop flag); 0: it goes on. Frames: 0 until resumed / the match ends, else that many screen frames. |
+
+**How the game does it (and what each one therefore affects):**
+
+- **Global slow-motion** (`Time_Scale` below 1). The global slow manager `[0x102F7004]` holds 16 requests {active,
+  rate} (`0x02FB35AC` makes one, `0x02FB3600` frees it). Its per-frame update (`0x02FB34C0`, in the battle step) gives
+  the slowest to the speed controller (`0x02FFA140`: an integer rate 1-100). Each battle frame `0x02BFB97C` then fills
+  the frame state at `[0x102F6C04]`:
+  - `+8` set while the rate isn't 1;
+  - `+4` 1/N;
+  - `+0` a phase 0 / 1 / 2.
+
+  Every object's step entry (fighters `0x02E40B90`, weapons, items, ...) runs only when `+8` is clear or the phase
+  is 2, so fighters, items and projectiles move one frame in N. The stage's step is multiplied by 1/N (`0x03022994`
+  in the stage manager's update `0x03164B80`), so the stage runs smoothly at 1/N. The game's own users are Final
+  Smashes and SlowModule's "slow everything" (MSC SlowModule op 0); training's speed probably too.
+  - The game's speed controller has no rate above 1 (`0x02FFA140` clamps it to 1-100).
+- **Speed-up** (`Time_Scale` 2-4). The battle scene's update (`0x0309BE34`) runs the battle step `0x029108D0` once a
+  frame, and its next callback (`0x0309BEF4`) runs the step's second half `0x0291100C` when `0x0334CCE8` says so.
+  exe_v46n's hook on that call (`0x0309BE54`) runs (step, second half) Rate - 1 extra times first, then the frame's
+  own step. That is everything at Rate times the speed, the match timer included.
+  - Not while the match is paused or ending (battle state `+0x88` / `+0x8C` / `+0x8D`), nor when the scene's check
+    says no.
+- **Per-fighter slow** (`Target_Time_Scale`). Every object has a SlowModule (`[accessor +0xB8]`, vtable `0x101211D4`):
+  - slots of `0x14` bytes at `+0x24`, each {frames, integer rate, 1/rate, owner, byte}, set by `0x0200CC14` (vt
+    `+0x44`) and cleared by vt `+0x6C`;
+  - its tick `0x0200CFC8` counts the frames and works out the object's rate `+8` (1/N, read by its motion step
+    `0x02C5F3BC`: the animation and the scripts' frames) and a skip flag `+0xC` (its status, movement and the rest
+    skip that frame).
+
+  The Timer item uses slot 3 (`0x02E16A14(fighter, on, rate 2, 450 frames, owner)`); the game itself uses 0-3.
+  The module's own reset (vt `+0x24`, from the object set-up `0x02BF57B0`) clears every slot, so a respawn ends
+  it. The module has no rate above 1: one fighter can't be sped up. Animation_Rate_Set speeds up only the
+  animation and scripts.
+- **Stage stop** (`Stage_Freeze`). The stage manager `[0x102F7020]` skips the stage's update (vtable `+0x2C` /
+  `+0x4C`, and `+0x34` in its second half `0x03164EA4`) while its byte `+0xD0` is set. `0x0316505C(manager, on)`
+  sets it, and tells the stage (`0x031427D0`). The game's own callers are some Final Smashes' code (`0x02772694`,
+  `0x027C4ECC`, ...) and `0x029C6BE0` / `0x029C6790`. Objects a stage spawns (its enemies, items) are objects of their
+  own: they keep moving.
+
+**exe_v46n.** The handlers and `ts_scene` are in the text region grown again (`0x04BD4000`-`0x04BD6000`), with
+`ts_data` (`0x04BD5F00`) holding:
+- our slow request and the manager it's in;
+- the speed-up's extra steps;
+- the stage frozen and its manager;
+- each one's Frames left.
+
+`ts_scene` replaces the scene's `bl 0x029108D0`. Each frame it:
+1. ends everything when the battle (`[0x102F732C]`) changed (a new match) or isn't running (`+0x88` 0);
+2. runs the extra steps;
+3. after the frame's step, counts the Frames down.
+
+Time_Scale frees only its own request, so a Final Smash's slow-motion is untouched. Stage_Freeze resumes only the stage
+manager it froze.
+
+**Tested** (`acmd_ext_test.py` `ts_tests`, unicorn on exe_v46n). The handlers run as the interpreter calls them, on the
+game's own functions:
+- **The slow manager's request / free.** Requests of rate 2 / 3 / 20 for 0.5 / 0.3 / 0.01; the game's own request
+  kept when ours is freed.
+- **The scene's call** (step and second half stubbed, counting calls): 1 step a frame normally, 2 / 4 with Rate 2 /
+  3.6, none extra while paused, back to 1 after Frames.
+- **Frames and match changes.** The slow freed after its Frames, when the match isn't running, and at a new match.
+- **The stage manager's stop.** Set; let go after Frames, at `Stage_Freeze(0)` and at a new match.
+- **A SlowModule on the game's own vtable.** Slot 3 = {61 frames, rate 2, 0.5, no owner}. The game's tick then gives
+  rate 0.5, skips 1 frame in 2 and counts down. Rate 1 or 2 clears it; Rate 0.25 with Frames 0 has no count.
+
+Not provable offline, in the in-game test (`time_stage_commands_v1`):
+- what the global slow / speed-up does to effects and sounds;
+- how training's speed setting interacts;
+- the stage look while stopped.
+
+Examples:
+
+```
+// everything at double speed for 2 seconds
+Time_Scale(Rate=2, Frames=120)
+// the fighter this attack hits at half speed for 60 of its frames (while the hitbox is out)
+Target_Time_Scale(Target=12, Rate=0.5, Frames=60)
+// a cinematic hold: the stage stands still from the catch to the release
+FRAME(Frames=46)
+Stage_Freeze(On=1, Frames=0)
+FRAME(Frames=94)
+Stage_Freeze(On=0, Frames=0)
+```
 
 ## Hit_Reset
 

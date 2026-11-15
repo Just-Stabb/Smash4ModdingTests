@@ -3529,6 +3529,79 @@
    "confidence": "low"
   }
  },
+ "27A8E82C": {
+  "_command": "Time_Scale",
+  "_new": true,
+  "_name": "Time_Scale",
+  "_size": 3,
+  "_desc": "Slows down or speeds up the whole match: every fighter, item and projectile and the stage. Ends by itself after Frames, at Time_Scale(1) or when the match ends. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   1,
+   0
+  ],
+  "0": {
+   "name": "Rate",
+   "desc": "Game speed. Below 1 slows everything the way the game's own slow-motion does, at 1/N speed (rounded: 0.5 = 1/2, 0.33 = 1/3, 0.25 = 1/4; down to 1/20). 2, 3 or 4 speeds everything up (that many game steps a frame; rounded, at most 4). 1 (or 0) back to normal.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Frames",
+   "desc": "0: until the next Time_Scale or the end of the match; N: back to normal by itself after N frames (screen frames).",
+   "confidence": "high"
+  },
+  "_example": [
+   "// Example 1: everything at double speed for 2 seconds (120 screen frames)",
+   "Time_Scale(Rate=2, Frames=120)",
+   "",
+   "// Example 2: a dramatic slow-motion on a finishing blow: when the hitbox connects, half speed for 90 frames",
+   "FRAME(Frames=12)",
+   "Hitbox(ID=0, Part=0, Bone=0, Damage=18, Angle=361, KBG=95, FKB=0, BKB=40, Size=7, X=0, Y=8, Z=10, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1)",
+   "WAIT(Frames=2)",
+   "Hit_Check(Target=0, When=0, Kinds=2)",
+   "True(Offset=0){",
+   "    Time_Scale(Rate=0.5, Frames=90)",
+   "}",
+   "Remove_All_Hitboxes()",
+   "",
+   "// Example 3: back to normal now (ends a Time_Scale with no Frames)",
+   "Time_Scale(Rate=1, Frames=0)",
+   "",
+   "// Example 4: a quarter speed until the move ends it at its frame 60",
+   "Time_Scale(Rate=0.25, Frames=0)",
+   "FRAME(Frames=60)",
+   "Time_Scale(Rate=1, Frames=0)"
+  ],
+  "_group": "Time & stage",
+  "_help": [
+   "## How it works",
+   "Time_Scale(Rate, Frames) changes how fast the whole match runs: every fighter, item and projectile, and the stage and its background.",
+   "- Rate below 1: the game's own slow-motion (its global slow manager, as Final Smashes and training's speed use).",
+   "  - Fighters, items and projectiles move one frame in every N, at 1/N speed: 0.5 is half speed, 0.33 a third, 0.25 a quarter. Rates are rounded to 1/N, down to 1/20.",
+   "  - The stage and its background run smoothly at 1/N.",
+   "- Rate 2, 3 or 4: that many game steps every frame, so everything runs 2, 3 or 4 times as fast: fighters, items, the stage, the match timer. Rounded; at most 4.",
+   "- Rate 1 (or 0): back to normal.",
+   "",
+   "## Parameters in practice",
+   "- Rate: 0.25-0.99 slower, 1 normal, 2-4 faster (a float: write 0.5, 2, ...).",
+   "- Frames: 0 lasts until the next Time_Scale or the end of the match. N goes back to normal by itself after N frames. Frames are screen frames, so a 2x speed-up for 120 frames is 2 seconds of real time (240 game steps).",
+   "- Another Time_Scale replaces the one running.",
+   "",
+   "## How it stacks",
+   "- The game keeps the slowest of all slow-motion requests: a Final Smash's, training's speed and this one. Time_Scale(0.5) during a slower slow-motion changes nothing until that one ends. Its own end frees only its own request.",
+   "- A speed-up multiplies with a slow-motion in effect: 2 steps a frame at half speed is normal speed.",
+   "- The Timer item's per-fighter slow and Target_Time_Scale apply on top.",
+   "",
+   "## Gotchas",
+   "- A speed-up isn't applied while the match is paused or ending. The pause menu, the match end and the results run at normal speed.",
+   "- In a speed-up the timer and every countdown run faster too: a timed match ends sooner.",
+   "- Effects and sounds play their own animation at normal speed. Those started by the fighters start as often as the faster game asks.",
+   "- A KO doesn't end it: give it Frames, or end it with Time_Scale(1).",
+   "- Offline only: online, the other console doesn't know and the match desyncs.",
+   "",
+   "The Hitbox Viewer doesn't simulate this command (it only acts in game).",
+   "Needs exe_v46n (the patched cross_f.rpx, tools/acmd_ext_cave.py)."
+  ]
+ },
  "2953BFDE": {
   "_command": "unk_2953BFDE",
   "0": {
@@ -5545,6 +5618,84 @@
    "evidence": "lwz p1 -> r5",
    "confidence": "low"
   }
+ },
+ "3BE70247": {
+  "_command": "Target_Time_Scale",
+  "_new": true,
+  "_name": "Target_Time_Scale",
+  "_size": 4,
+  "_desc": "Slows down one fighter (or article), as the Timer item slows the opponents: its animation, movement, status and hitstun counting. Uses the Timer's own slow: a Timer and this replace each other. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   1,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one, 12 the fighter this attack hit (exe_v46k: its newest hit, nobody once the attack is over: no fallback). 1, 2, 11 and 12 are found from a fighter's own script. Any fighter (or this article).",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Rate",
+   "desc": "Its speed: below 1 slows it the way the Timer item does, at 1/N speed (rounded: 0.5 = 1/2, 0.33 = 1/3, 0.25 = 1/4; down to 1/20). 1 (or more) back to normal: one fighter can only be slowed.",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Frames",
+   "desc": "0: until Target_Time_Scale(Target, 1, 0), or it is set up again (a respawn); N: for N of its frames.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// Example 1: the fighter this attack hits runs at half speed for 60 of its frames",
+   "// (Target 12 while the hitbox is out: nobody if it missed)",
+   "FRAME(Frames=8)",
+   "Hitbox(ID=0, Part=0, Bone=0, Damage=8, Angle=361, KBG=60, FKB=0, BKB=50, Size=6, X=0, Y=8, Z=9, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1)",
+   "FRAME(Frames=10)",
+   "Target_Time_Scale(Target=12, Rate=0.5, Frames=60)",
+   "Remove_All_Hitboxes()",
+   "",
+   "// Example 2: the nearest opponent at a quarter speed for 2 seconds",
+   "Target_Time_Scale(Target=1, Rate=0.25, Frames=120)",
+   "",
+   "// Example 3: the last fighter this one hit back to normal speed",
+   "Target_Time_Scale(Target=2, Rate=1, Frames=0)",
+   "",
+   "// Example 4: player 2 (Target 4) at a third of its speed until it's set back (or respawns)",
+   "Target_Time_Scale(Target=4, Rate=0.33, Frames=0)"
+  ],
+  "_group": "Time & stage",
+  "_help": [
+   "## How it works",
+   "Target_Time_Scale(Target, Rate, Frames) slows down one fighter (or this article) the way the Timer item slows its opponents.",
+   "- Rate below 1: the fighter runs at 1/N speed (0.5 half, 0.33 a third, 0.25 a quarter; rounded to 1/N, down to 1/20).",
+   "  - Slowed: its animation, its scripts' frames, its movement, its status and hitstun counting, and its attacks' timing.",
+   "  - Not slowed: the rest of the match.",
+   "- Rate 1 or more: back to normal. One fighter can only be slowed: the game has no per-fighter speed-up. For an animation-only speed-up use Animation_Rate_Set; for everything use Time_Scale.",
+   "",
+   "## Parameters in practice",
+   "- Target: as the other commands. 12 (the fighter this attack hit) and 2 (the last fighter hit) are the usual ones; 1 the nearest opponent; 3-10 a player slot.",
+   "- Rate: a float (0.5, 0.25, ...).",
+   "- Frames: N of the fighter's own frames, counted down by the game. 0 lasts until Target_Time_Scale(Target, 1, 0) or a respawn.",
+   "",
+   "## Gotchas",
+   "- It is the Timer item's own slow (its slot in the fighter's SlowModule): a Timer and this replace each other on that fighter, and the last one set counts.",
+   "- A respawn ends it, as for the Timer.",
+   "- The match's global slow-motion (Time_Scale, a Final Smash) applies on top.",
+   "- Target 12 is nobody once the attack is over: use it while the hitbox is out, or Target 2 after.",
+   "- Offline only: online, the other console doesn't know and the match desyncs.",
+   "## Target",
+   "- 0: this object: the fighter, or the article (projectile) whose script it is.",
+   "- 1: the nearest opponent (by X/Y distance; teams aren't considered).",
+   "- 2: the last fighter this one hit (its current attack's newest hit; once the attack is over, a fighter whose last attacker is this one).",
+   "- 3-10: player slots 1-8 (Target = 2 + slot: player 1 is 3, player 2 is 4, ...).",
+   "- 11: the last fighter that hit this one (the game's own record, its projectiles included).",
+   "- 12: the fighter this attack hit (new in exe_v46k): the current attack's newest hit only, with NO fallback: before the attack hits and once it is over, it is nobody (the command does nothing, reads give 0). Target 2 goes on meaning someone after the attack (the fighter whose last attacker is this one, which the game keeps for KO credit and can't be cleared); use 12 when acting on a fighter this attack didn't hit would be wrong.",
+   "Targets 1, 2, 11 and 12 are worked out from a fighter's own script; from an article's script they find nobody. A target that isn't there (empty slot, nobody hit yet): the command does nothing and reads give 0.",
+   "Changed in exe_v46k: Target 12 works in every command that takes a Target (the input commands too) and has its own variables, ATKHIT_... (0x0F0002C8-0x0F0002FF; docs/position-variables.md). Targets 0-11 are unchanged.",
+   "",
+   "The Hitbox Viewer doesn't simulate this command (it only acts in game).",
+   "Needs exe_v46n (the patched cross_f.rpx, tools/acmd_ext_cave.py)."
+  ]
  },
  "3C95CD87": {
   "_command": "Aesthetic_Wind_Effect2",
@@ -17498,6 +17649,61 @@
    1,
    1,
    0
+  ]
+ },
+ "C5858BCF": {
+  "_command": "Stage_Freeze",
+  "_new": true,
+  "_name": "Stage_Freeze",
+  "_size": 3,
+  "_desc": "Freezes or resumes the stage (the game's own stage stop: StageManager +0xD0), the fighters, items and projectiles unaffected. Ends by itself after Frames, at Stage_Freeze(0) or when the match ends. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_format": [
+   0,
+   0
+  ],
+  "0": {
+   "name": "On",
+   "desc": "1 freezes the stage (its animations, moving platforms, hazards, background), as the game does for some Final Smashes; 0 lets it go on.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Frames",
+   "desc": "With On 1: 0 until Stage_Freeze(0) or the match ends; N lets it go on by itself after N frames.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// Example 1: a cinematic hold: the stage stands still from the catch (frame 46) to the release (frame 94)",
+   "FRAME(Frames=46)",
+   "Stage_Freeze(On=1, Frames=0)",
+   "FRAME(Frames=94)",
+   "Stage_Freeze(On=0, Frames=0)",
+   "",
+   "// Example 2: the stage frozen for 3 seconds, whatever happens to the move",
+   "Stage_Freeze(On=1, Frames=180)",
+   "",
+   "// Example 3: a \"time stop\": the stage frozen and the nearest opponent at a quarter speed for 2 seconds",
+   "Stage_Freeze(On=1, Frames=120)",
+   "Target_Time_Scale(Target=1, Rate=0.25, Frames=120)"
+  ],
+  "_group": "Time & stage",
+  "_help": [
+   "## How it works",
+   "Stage_Freeze(On, Frames) stops the stage. Its animations, moving platforms, hazards and background stand still; the fighters, items and projectiles go on.",
+   "- It is the stage manager's own stop, the one some Final Smashes use: the stage's update is skipped while it's on.",
+   "- On 1 freezes; On 0 lets the stage go on.",
+   "",
+   "## Parameters in practice",
+   "- On: 1 freeze, 0 resume.",
+   "- Frames (with On 1): 0 lasts until Stage_Freeze(0) or the end of the match. N goes on by itself after N screen frames.",
+   "",
+   "## Gotchas",
+   "- Stage hazards that are objects of their own (enemies and items a stage spawns) aren't the stage: they keep moving.",
+   "- A Final Smash that freezes and resumes the stage itself takes over: its resume lets the stage go on even with a Stage_Freeze running. And Stage_Freeze(0), or the end of its Frames, resumes a stage a Final Smash froze.",
+   "- It ends with the match: the next match's stage runs. A KO doesn't end it: give it Frames, or end it yourself.",
+   "- Offline only: online, the other console doesn't know and the match desyncs.",
+   "",
+   "The Hitbox Viewer doesn't simulate this command (it only acts in game).",
+   "Needs exe_v46n (the patched cross_f.rpx, tools/acmd_ext_cave.py)."
   ]
  },
  "C6C035C6": {

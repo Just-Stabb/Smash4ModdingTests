@@ -1653,6 +1653,49 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
   - The clank check `0x02C0F180` compares team ids, unless TeamDamage is set (hitbox data `+0x51`).
   - Not found: the team-attack rule global, where fighters' teams are set at match start, and the
     attack-versus-hurt filter.
+- **Time: global slow, per-object slow, stage stop** (exe_v46n's Time_Scale / Target_Time_Scale / Stage_Freeze,
+  docs/acmd-extra-commands.md):
+  - **The battle frame.** The battle scene's update `0x0309BE34` calls the battle step `0x029108D0(battle)`, with
+    `battle = [0x102F732C]`: `[battle]` is its state, `+0x88` running, `+0x8C` / `+0x8D` paused paths. The scene's
+    next callback `0x0309BEF4` calls the step's second half `0x0291100C(battle)` when `0x0334CCE8()`
+    (`[0x10423DC8] != 0`). The step runs the global slow manager's update, the battle object world's phases
+    (`[0x102F6C30]`: `0x02BF2544`, `0x02BF29F0`, ...), the stage manager (`[0x102F7020]`: `0x031649D4`, ...,
+    `0x03164B80`), and the rest.
+  - **Global slow manager** `[0x102F7004]`. 16 requests {active, rate} at `+0x10` and a dirty byte `+0x30`.
+    `0x02FB35AC(mgr, rate)` makes one (0xFF when full); `0x02FB3600(mgr, i)` frees it; `0x02FB3694(mgr, i)` reads its
+    rate; `0x02FB3498` clears them all. `0x02FB34C0`, in the battle step, gives the slowest (`+0x31`) to the speed
+    controller.
+  - **Speed controller** (`0x02FFFB4C(0x104D162C)`).
+    - Fields: `+0x18` the rate N, `+0x19` the rate asked for (`0x02FFA140` clamps it to 1-100: no faster than
+      normal), `+0x1A` the phase, `+0x1C` 1/N (`0x02FFA104`), `+0x14` / `+0x20` counters.
+    - `0x02FFA168` is its tick. `0x02FFA10C` / `0x02FFA11C` read the phase.
+  - **Frame state** `[0x102F6C04]`, filled each frame by `0x02BFB97C` (from `0x02BF2568`): `+8` 1 while N isn't 1,
+    `+4` 1/N, `+0` 0 / 1 / 2 the phase. Every object step wrapper (`0x02E40B90` fighters, `0x02BAD9xx` weapons,
+    `0x030483xx` items, ...) runs the step only when `+8` is 0 or `+0` is 2: one frame in N; otherwise the fighter's
+    `0x02E40B24` runs only its status agent's vt `+0x44`. MSC SlowModule op 0 ("slow all fighters": the module's vt
+    `+0x8C`, `0x0200CCE0`) asks this manager.
+  - **SlowModule** `[accessor +0xB8]` (fighter object `+0x7534`; vtable `0x101211D4`, MSC handler vt `+0xC4`
+    `0x0200CDC0`):
+    - Slots: `+0x20` the count, `+0x24` the slots, `0x14` bytes each {frames, integer rate, 1/rate, owner
+      (`0x50000000` none), byte}.
+    - Module fields: `+0x18` the product of the rates, `+8` the object's rate this frame, `+0xC` skip this frame,
+      `+0x10` an accumulator.
+    - Methods: vt `+0x44` `0x0200CC14(slot, rate, frames, byte, owner)` sets a slot (frames + 1 when frames > 0 and
+      rate > 1; frames <= 0: no count); vt `+0x6C` clears one (`0x02DA6BDC`); vt `+0x64` / `+0x24` clear them all;
+      the tick `0x0200CFC8` counts each slot's frames down and works out `+8` / `+0xC`.
+    - Readers: the motion step `0x02C5F3BC` multiplies its rate by vt `+0x7C` (`+8`), so the animation and the ACMD
+      frame run at 1/N; vt `+0x84` (`+0xC`) skips the MSC status agent (`0x02E408F4`) and other per-frame work.
+    - Slot users: the Timer item slot 3 (`0x02E16A14`), the game slots 0-3. The object set-up `0x02BF57B0` calls vt
+      `+0x24` (all cleared).
+  - **Stage manager** `[0x102F7020]`.
+    - `0x03164B80` (the stage's update) returns at once when byte `+0xD0` is set. Otherwise its step is
+      `+0xF8 = 1/N (0x03022994) x two eased factors (+0xD4-+0xF0, kept in 0x104D162C's +0x1910 / +0x1914) x +0xFC`;
+      it calls the stage's vtable (`[stage +0x111C]`) `+0x2C(stage, f1)` and `+0x4C(f1)`.
+    - `0x03164EA4` (the second half) skips the same way, then calls `+0x34(f1)`.
+    - `0x0316505C(manager, on)` stores `+0xD0` and calls `0x031427D0(stage, !on)`, only when a stage is loaded
+      (`+0` non-zero).
+    - The game's callers: Final Smash code `0x02772694`, `0x02783B94`, `0x027C4ECC`, `0x027D115C`, ...; and
+      `0x029C6BE0` (on) / `0x029C6790` (off).
 - **ACMD threads:** the object step entries (fighters `0x02E408B8`, weapons `0x02BAD64C`, items?
   `0x03048064`) start with `stwu r1, -0x38(r1)` and get `[r4]` = accessor. They run every unpaused
   frame: the hitlag check is inside, and nothing checks status, so they run in KO statuses too.
