@@ -976,6 +976,18 @@ HELP = {
         '- Hitbox Viewer: the block runs on its own from the frame after Thread_Start, alongside the script.',
         '- Untested in game: whether a respawn counts as "set up again" and ends the threads.',
         '',
+        '## What changed in exe_v46m (threads run on fighters)',
+        '- Before exe_v46m no thread ever ran in game: Thread_Start registered it, but the per-frame runner skipped '
+        'every object. The runner checked where the game keeps the object it was handed, and the game keeps it on '
+        'its update thread\'s stack, which in Cemu lies outside the range the check allowed. Only the emulated tests '
+        'ever ran a thread. exe_v46m takes that stack slot: fighters\', projectiles\' and items\' threads run.',
+        '- Nothing else changed: same timing (from the frame after Thread_Start, once per frame the object is '
+        'updated, before that frame\'s status change and script), same hitlag rule (Flags 1), same ends.',
+        '- On a frame the game skips for every fighter (the whole fighter update is skipped: its script doesn\'t '
+        'run either), the thread waits too.',
+        '- A thread a fighter started before exe_v46m was never run; scripts written around that (God Fist v5+: no '
+        'threads) don\'t change.',
+        '',
         NEEDS,
     ],
     'Thread_Stop': [
@@ -1833,6 +1845,17 @@ EXAMPLES = {
         'WAIT(Frames=3)',
         'Remove_All_Hitboxes()',
         'Hit_Get(Target=0, When=0, Variable=VAR_0)',
+        '',
+        '// Example 4 (exe_v46m: a fighter\'s thread runs; before it, this block never did): an up taunt whose',
+        '// thread puts a star over the fighter every 10 frames for a second, past the taunt\'s end',
+        'Thread_Start(Offset=0, ID=0x7E, Flags=0){',
+        '    Set_Loop(Iterations=6){',
+        '        Graphic_Effect(Graphic=0x100000F, Bone=0, X=0, Y=18, Z=0, XRot=0, YRot=0, ZRot=0, Size=0.6, RandomX=0, '
+        'RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=0)',
+        '        WAIT(Frames=10)',
+        '        Goto(Offset=0)',
+        '    }',
+        '}',
     ],
     'Thread_Stop': [
         '// Example 1: stop thread 1 (started by Thread_Start(ID=1)) if it\'s still running',

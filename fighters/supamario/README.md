@@ -541,7 +541,10 @@ everything the game script itself did (the hold's placement and lean, through th
 worked. The threads (`acmd_ext_cave.py`'s Thread_Start / thread_run) were only ever run in unicorn on a weapon's step
 entry (`acmd_ext_test.py`), never confirmed in game; the fighters' step entry the cave hooks (`0x02E408B8`) is only
 called from `0x02E40B90` when the global at `[0x102F6C04]` allows it (byte `+8` 0, or mode `+0` 2), otherwise
-`0x02E40B24` runs instead, so a fighter's threads may well never run. Not proven which; v5 doesn't depend on it:
+`0x02E40B24` runs instead, so a fighter's threads may well never run. Not proven which; v5 doesn't depend on it
+(**found later, exe_v46m**: the gate only skips whole fighter frames; the real cause was the thread runner's check on
+its r4, a stack slot outside the heap range in Cemu, which skipped every object's threads; fixed in exe_v46m,
+docs/acmd-extra-commands.md "Thread_Start"):
 - **The flight is in the game script** (frames 97-140 = flight frames 1-44, his motion running 1:1 after the
   strike's freeze), through target 2 as the hold. DownWait is asked at flight frame 42 (no hitstop / hitstun from
   then, so the status change isn't held up), the victim upright from 43 (DownWait's own animation lies it down: a
@@ -690,7 +693,9 @@ ran in the air and fell. The 1% end hit then launched a free fighter: that is th
 4th run (`k=11 v=146`, `k=13 v=76`) he acted at frame 146 and the victim, launched, was still tumbling (DamageFall
 0x4C) after gf_tick's 60 frames: released by time. **No `k=8` line in any run**: the watchdog thread never ran
 once, a fighter's ACMD threads don't run in game (v4's finding confirmed); v7 drops the watchdog (each God Fist
-left a never-running thread registered: 32 slots in all).
+left a never-running thread registered: 32 slots in all). **Cause found and fixed in exe_v46m** (no thread of any
+object ran up to exe_v46l: the runner's check on its stack-slot argument failed in Cemu; docs/acmd-extra-commands.md
+"Thread_Start"); the God Fist keeps its thread-free design, which works with or without threads.
 
 ### "Didn't hit correctly unless the diagnostic build"
 Not found in the files: the normal and diag game scripts differ only by the log commands (SET_FLOAT / SUB_FLOAT_2
@@ -1811,7 +1816,8 @@ Nothing else ends it:
   vanilla's loops (Mario's game.bin: `Goto` minus the block's words). 180 frames is past any blast zone (830 units
   down at the dive's slowest, 4.6 a frame). Once cb isn't 2 (a catch, a refusal, the motion jumping through) the rest
   of the loop runs at once with no waits and the script goes on to the later blocks. Threads were not used: the God
-  Fist's in-game test showed a fighter's `Thread_Start` block doing nothing.
+  Fist's in-game test showed a fighter's `Thread_Start` block doing nothing (the runner's bug, fixed in exe_v46m: a
+  thread would work now, the loop stays).
 - The dive's wind streaks (effect 7) play at their frames on the first pass only; the fist's fire loops until the
   dive ends.
 

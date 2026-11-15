@@ -1656,6 +1656,17 @@ GamePad's is `dmg_drc/dmg_drc.flx` (its own class, 0x02668000-0x02676000).
 - **ACMD threads:** the object step entries (fighters `0x02E408B8`, weapons `0x02BAD64C`, items?
   `0x03048064`) start with `stwu r1, -0x38(r1)` and get `[r4]` = accessor. They run every unpaused
   frame: the hitlag check is inside, and nothing checks status, so they run in KO statuses too.
+  - **r4 is a slot on the caller's stack** (`0x02E40B90` / `0x02BAD8xx` / `0x030483xx`: `addi r4, r1, 0xC;
+    stw r31, 0xC(r1)`; the vtable entry `0x02E40C4C` passes a heap holder, `[r3 +0x28]`). The game's update thread's
+    stack is outside `0x10000000`-`0x8FFFFFFF` in Cemu, so a heap-pointer check on r4 fails every frame: up to
+    exe_v46l the thread runner did that and no thread ever ran in game (exe_v46m: fixed, docs/acmd-extra-commands.md
+    "Thread_Start").
+  - The fighter's frame: the fighter update `0x02E24270` calls `0x02E40B90` once. It skips the whole frame (only
+    `0x02E40B24`, the status agent's vt `+0x44`) when the global `[0x102F6C04]` has byte `+8` set and mode `+0` not 2;
+    otherwise `0x02E408B8`: (not in hitlag) `[acc +0x60]` `0x02E6D1F0`, `[acc +0x64]` `0x02C44FFC`, the motion step
+    `[acc +0x44]` `0x02E87428` -> `0x02C5F3BC` (the game script), the status change queue (`[acc +0x20]` `+8` count,
+    vt `+0x16C`), the second agent `[acc +0xA0]` -> `0x02C2986C`, the MSC status agent (`+0x8C` vt `+0x34` / `+0x3C`),
+    `[acc +0xBC]` `0x0275E720`.
   - Interpreter wrapper: `0x02BEE950(table, accessor, state, exec, f1 frames, f2 target)`. The
     MotionAnimcmd agent's per-frame call `0x02C2986C` uses `(agent +0x4C, agent +4, agent +0x48, 1,
     1.0, 0.0)`.

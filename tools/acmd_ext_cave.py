@@ -153,7 +153,8 @@ SM4SHCOMMAND_DESC['Thread_Start'] = (
     'Thread_Start(ID, Flags){ ... }: the commands in the block run on their own, frame by frame, from the next frame on, '
     'while the script goes on past the block. The thread keeps running after the animation ends or changes and while the '
     'character is KO\'d, until the block ends, Thread_Stop(ID), or the object is set up again. FRAME inside counts from '
-    'the thread\'s start. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).')
+    'the thread\'s start. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md); exe_v46m or later '
+    'for it to run in game (before it, no thread ever ran).')
 SM4SHCOMMAND_DESC['Thread_Stop'] = 'Stops this object\'s thread ID (-1 = all of them). New command: needs the patched cross_f.rpx.'
 SM4SHCOMMAND_DESC['Input_Compare'] = (
     'Compares a fighter\'s input (a button held / pressed, a stick) with Value; True / Else after it run on the result, '
@@ -4857,6 +4858,11 @@ tr_next:
         blr
 """ % D)
     for k, h in enumerate(STEP_HOOKS):
+        # exe_v46m: r4 is the caller's stack slot holding the accessor (0x02E40B90 / 0x02BAD8xx / 0x030483xx:
+        # addi r4, r1, 0xC; stw r31, 0xC(r1)), and the game's update thread runs on a stack outside
+        # 0x10000000-0x8FFFFFFF (Cemu: the default threads' stacks are in its own area below MEM2), so the
+        # heap-pointer check on r4 (exe_v46l and before) skipped every frame: no thread ever ran in game. A
+        # pointer just above this frame (into the caller's) is taken; anything else must be a heap pointer.
         a.asm("""
 hk_step%(k)d:                            # object step entry: r4 -> accessor; save everything, run its threads
         stwu r1, -0xA0(r1)
@@ -4866,8 +4872,15 @@ hk_step%(k)d:                            # object step entry: r4 -> accessor; sa
         mfcr r0
         stw r0, 0x88(r1)
         stfd f1, 0x90(r1)
-        stfd f2, 0x98(r1)""" % dict(k=k) + fl('r4', 'hs%d_out' % k) + """
-        lwz r3, 0(r4)""" + fl('r3', 'hs%d_out' % k) + """
+        stfd f2, 0x98(r1)
+        subf r0, r1, r4                 # r4 in the stack, just above this frame (the caller's slot)?
+        cmplwi r0, 0x1000
+        bge hs%(k)d_heap
+        andi. r0, r4, 3
+        beq hs%(k)d_ok
+hs%(k)d_heap:""" % dict(k=k) + fl('r4', 'hs%d_out' % k) + """
+hs%(k)d_ok:
+        lwz r3, 0(r4)""" % dict(k=k) + fl('r3', 'hs%d_out' % k) + """
         bl thread_run
 hs%(k)d_out:
         lfd f1, 0x90(r1)

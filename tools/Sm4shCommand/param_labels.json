@@ -7368,7 +7368,7 @@
   "_new": true,
   "_name": "Thread_Start",
   "_size": 4,
-  "_desc": "Thread_Start(ID, Flags){ ... }: the commands in the block run on their own, frame by frame, from the next frame on, while the script goes on past the block. The thread keeps running after the animation ends or changes and while the character is KO'd, until the block ends, Thread_Stop(ID), or the object is set up again. FRAME inside counts from the thread's start. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md).",
+  "_desc": "Thread_Start(ID, Flags){ ... }: the commands in the block run on their own, frame by frame, from the next frame on, while the script goes on past the block. The thread keeps running after the animation ends or changes and while the character is KO'd, until the block ends, Thread_Stop(ID), or the object is set up again. FRAME inside counts from the thread's start. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md); exe_v46m or later for it to run in game (before it, no thread ever ran).",
   "_format": [
    0,
    0,
@@ -7426,7 +7426,17 @@
    "Hitbox(ID=0, Part=0, Bone=0, Damage=9, Angle=361, KBG=100, FKB=0, BKB=40, Size=6, X=0, Y=8, Z=8, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1)",
    "WAIT(Frames=3)",
    "Remove_All_Hitboxes()",
-   "Hit_Get(Target=0, When=0, Variable=VAR_0)"
+   "Hit_Get(Target=0, When=0, Variable=VAR_0)",
+   "",
+   "// Example 4 (exe_v46m: a fighter's thread runs; before it, this block never did): an up taunt whose",
+   "// thread puts a star over the fighter every 10 frames for a second, past the taunt's end",
+   "Thread_Start(Offset=0, ID=0x7E, Flags=0){",
+   "    Set_Loop(Iterations=6){",
+   "        Graphic_Effect(Graphic=0x100000F, Bone=0, X=0, Y=18, Z=0, XRot=0, YRot=0, ZRot=0, Size=0.6, RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=0)",
+   "        WAIT(Frames=10)",
+   "        Goto(Offset=0)",
+   "    }",
+   "}"
   ],
   "_group": "Threads",
   "_help": [
@@ -7449,6 +7459,12 @@
    "- Sm4shCommand ends the block with a Script_End when it compiles (and hides it when it decompiles); older versions (before v1.4.6) cut the script at that Script_End when the file was opened again.",
    "- Hitbox Viewer: the block runs on its own from the frame after Thread_Start, alongside the script.",
    "- Untested in game: whether a respawn counts as \"set up again\" and ends the threads.",
+   "",
+   "## What changed in exe_v46m (threads run on fighters)",
+   "- Before exe_v46m no thread ever ran in game: Thread_Start registered it, but the per-frame runner skipped every object. The runner checked where the game keeps the object it was handed, and the game keeps it on its update thread's stack, which in Cemu lies outside the range the check allowed. Only the emulated tests ever ran a thread. exe_v46m takes that stack slot: fighters', projectiles' and items' threads run.",
+   "- Nothing else changed: same timing (from the frame after Thread_Start, once per frame the object is updated, before that frame's status change and script), same hitlag rule (Flags 1), same ends.",
+   "- On a frame the game skips for every fighter (the whole fighter update is skipped: its script doesn't run either), the thread waits too.",
+   "- A thread a fighter started before exe_v46m was never run; scripts written around that (God Fist v5+: no threads) don't change.",
    "",
    "Needs the patched cross_f.rpx (tools/acmd_ext_cave.py, part of the standard build). Without it a script that uses this command won't load properly: ship the executable with any script that uses it."
   ]

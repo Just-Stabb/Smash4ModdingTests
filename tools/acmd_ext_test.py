@@ -584,6 +584,150 @@ def thread_tests(pm, om, a):
     run(pm, C.WM_RESET, C.WM_RESET + 4, {UC_PPC_REG_3 + 31 - 3: me})
     check('fast-forward (not executed): still jumps over the block', start(exe=0), (2, 60))
     check('fast-forward: no thread started', slots(), [])
+    # exe_v46m: as the game calls the weapon / item steps (0x02BAD928 / 0x03048360: addi r4, r1, 0xC; stw r31,
+    # 0xC(r1)), r4 a slot on the caller's stack, the stack where Cemu has the game's update thread's (below MEM2)
+    try:
+        pm.mem_map(0x0E000000, 0x10000)
+    except Exception:
+        pass
+    for k in (1, 2):
+        start()
+        before = struct.unpack('>f', pm.mem_read(C.THREADS + C.THREAD_SIZE * slots()[0][0] + 0x28, 4))[0]
+        top = 0x0E00F000
+        w32(pm, top + 0xC, me)
+        run(pm, C.STEP_HOOKS[k], C.STEP_HOOKS[k] + 4, {UC_PPC_REG_1: top, UC_PPC_REG_4: top + 0xC})
+        run(pm, C.STEP_HOOKS[k], C.STEP_HOOKS[k] + 4, {UC_PPC_REG_1: top, UC_PPC_REG_4: top + 0xC})
+        after = struct.unpack('>f', pm.mem_read(C.THREADS + C.THREAD_SIZE * slots()[0][0] + 0x28, 4))[0]
+        check('exe_v46m: %s step with r4 a slot on a stack below 0x10000000 (as in game): the thread runs'
+              % ('weapon', 'item')[k - 1], (before, after, pm.reg_read(UC_PPC_REG_1)), (0.0, 1.0, top - 0x38))
+        run(pm, C.WM_RESET, C.WM_RESET + 4, {UC_PPC_REG_3 + 31 - 3: me})
+
+
+def fighter_thread_tests(pm, om, a, stack_top=0x0E00F000, quiet=False):
+    """exe_v46m: a fighter's threads on the game's own fighter step. 0x02E40B90 (the fighter's per-frame step: the
+    global [0x102F6C04] gate, then 0x02E408B8 -> its motion step [acc +0x44] -> the animcmd agent runner 0x02C2986C
+    -> the interpreter on the game script; the hitlag byte, the status module's queue / MSC agent, the second agent
+    [acc +0xA0]) runs as it is; its leaf calls (0x02E6D1F0, 0x02C44FFC, 0x0275E720, 0x02E3D468, 0x02010524) return
+    at once and the motion step 0x02E87428 tail-calls 0x02C2986C on a fake agent holding the script. The stack is
+    where Cemu has the game's update thread's (stack_top: below 0x10000000), the step entry's r4 a slot on it, as
+    the game passes it. The game script: Thread_Start(ID 9, Flags){ FRAME(2) FRAME(4) } FRAME(200).
+    Returns {name: result} (quiet: no checks, for running it on another executable)."""
+    from unicorn.ppc_const import UC_PPC_REG_PC  # noqa: F401
+    out = {}
+
+    def chk(what, got, want):
+        out[what] = got
+        if not quiet:
+            check(what, got, want)
+    idx = {r32(om, CRC_TABLE + 8 * i): r32(om, CRC_TABLE + 8 * i + 4) for i in range(COUNT)}
+    new = {c[0]: C.NEW_BASE + k for k, c in enumerate(C.COMMANDS)}
+    FRAME, END = idx[0x42ACFE7D], idx[0x5766F889]
+    f = lambda v: struct.unpack('>I', struct.pack('>f', v))[0]        # noqa: E731
+    B = 0x103B0000
+    acc, stop, status, agent, agent2, mod, script, state, table, gate = (B + 0x1000 * i for i in range(10))
+    for x in range(10):
+        pm.mem_write(B + 0x1000 * x, b'\0' * 0x1000)
+    lo = stack_top & ~0xFFFF
+    try:
+        pm.mem_map(lo, 0x10000)
+    except Exception:                                       # (mapped by an earlier run)
+        pass
+    stubs = {0x02E6D1F0: 0x4E800020, 0x02C44FFC: 0x4E800020, 0x0275E720: 0x4E800020, 0x02E3D468: 0x4E800020,
+             0x02010524: 0x4E800020, 0x02E87428: 0x48000000 | ((0x02C2986C - 0x02E87428) & 0x3FFFFFC)}
+    saved = {at: r32(pm, at) for at in stubs}
+    saved_gate = r32(pm, 0x102F6C04)
+    for at, w in stubs.items():
+        w32(pm, at, w)
+    w32(pm, 0x102F6C04, gate)                               # +0 mode 0, +8 0: the frame runs
+    w32(pm, acc + 0x48, stop)                               # StopModule: +0x10 the hitlag byte
+    w32(pm, acc + 0x60, mod)
+    w32(pm, acc + 0x64, mod)
+    w32(pm, acc + 0xB8, mod)                                # +0xC 0
+    w32(pm, acc + 0x44, agent)                              # the motion step's agent: the game script
+    w32(pm, acc + 0x20, status)                             # +0x95 0, queue +8 0, +0x92 1, +0x54 -1, MSC agent 0
+    pm.mem_write(status + 0x92, b'\1')
+    w32(pm, status + 0x54, -1)
+    w32(pm, acc + 0xA0, agent2)                             # +0x5C 0: nothing to run
+    for o in (0xBC, 0xB0, 0x40):
+        w32(pm, acc + o, mod)
+    w32(pm, agent + 4, acc)
+    w32(pm, agent + 0x48, state)
+    w32(pm, agent + 0x4C, table)
+    w32(pm, agent + 0x58, 0)
+    w32(pm, agent + 0x5C, 1)
+
+    def load(flags):
+        words = [new['Thread_Start'], 9, 9, flags, FRAME, f(2.0), FRAME, f(4.0), END, FRAME, f(200.0), END]
+        for i, w in enumerate(words):
+            w32(pm, script + 4 * i, w)
+        pm.mem_write(state, b'\0' * 0x38)
+        w32(pm, state, script)
+        w32(pm, state + 4, script)
+        w32(pm, state + 8, -1)
+        w32(pm, state + 0x1C, f(1.0))
+
+    def slot():
+        for k in range(C.THREAD_N):
+            if r32(pm, C.THREADS + C.THREAD_SIZE * k) == acc:
+                return k
+        return None
+
+    def tframe():                                           # the thread's runs so far (None: not registered)
+        k = slot()
+        if k is None:
+            return None
+        fr, adv = struct.unpack('>ff', pm.mem_read(C.THREADS + C.THREAD_SIZE * k + 0x28, 8))
+        return int(round(fr)) + 1 if adv else 0             # (frame after run n: n - 1; the step word set at run 1)
+
+    def sframe():
+        return round(struct.unpack('>f', pm.mem_read(state + 0x18, 4))[0], 3)
+
+    def frame(hitlag=0, gate_open=True):
+        pm.mem_write(stop + 0x10, bytes([hitlag]))
+        pm.mem_write(gate + 8, b'\0' if gate_open else b'\1')
+        run(pm, 0x02E40B90, RET, {UC_PPC_REG_1: stack_top, UC_PPC_REG_3: 0x10390000, UC_PPC_REG_4: acc},
+            count=2000000)
+        return pm.reg_read(UC_PPC_REG_1) == stack_top
+    try:
+        run(pm, C.WM_RESET, C.WM_RESET + 4, {UC_PPC_REG_3 + 31 - 3: acc})        # (no threads of this object)
+        load(0)
+        seen = []
+        ok = frame()
+        seen.append((sframe(), tframe()))
+        for _ in range(5):
+            ok &= frame()
+            seen.append((sframe(), tframe()))
+        chk('fighter step (0x02E40B90, stack at 0x%08X): the script (its frame) starts the thread on frame 1; the '
+            'thread (its runs) runs once a step from the next, its block (FRAME(2) FRAME(4)) ends it on its 5th run'
+            % stack_top, seen, [(1.0, 0), (2.0, 1), (3.0, 2), (4.0, 3), (5.0, 4), (6.0, None)])
+        chk('fighter step: stack and registers back', ok, True)
+        run(pm, C.WM_RESET, C.WM_RESET + 4, {UC_PPC_REG_3 + 31 - 3: acc})
+        load(0)
+        frame()
+        a1 = (sframe(), tframe())
+        frame(hitlag=1)
+        frame(hitlag=1)
+        a2 = (sframe(), tframe())
+        frame()
+        a3 = (sframe(), tframe())
+        chk('fighter in hitlag: neither the script nor the thread (Flags 0) moves; both go on after', (a1, a2, a3),
+            ((1.0, 0), (1.0, 0), (2.0, 1)))
+        run(pm, C.WM_RESET, C.WM_RESET + 4, {UC_PPC_REG_3 + 31 - 3: acc})
+        load(1)
+        frame()
+        frame(hitlag=1)
+        frame(hitlag=1)
+        chk('fighter in hitlag, Flags 1: the thread runs (2 frames), the script waits', (sframe(), tframe()), (1.0, 2))
+        frame(gate_open=False)
+        chk('a frame the game skips for every fighter ([0x102F6C04] +8 set, mode not 2: 0x02E40B24 instead): '
+            'neither runs', (sframe(), tframe()), (1.0, 2))
+        run(pm, C.WM_RESET, C.WM_RESET + 4, {UC_PPC_REG_3 + 31 - 3: acc})
+        chk('the fighter set up again: its thread dropped', slot(), None)
+    finally:
+        for at, w in saved.items():
+            w32(pm, at, w)
+        w32(pm, 0x102F6C04, saved_gate)
+    return out
 
 
 def input_tests(pm, a):
@@ -1526,6 +1670,8 @@ def main():
     check('debug: last victim hitstop before / after (frames 20 replace 7)', (d[3], d[4]), (7, 20))
     obj_tests(pm, om, a)
     thread_tests(pm, om, a)
+    fighter_thread_tests(pm, om, a)
+    fighter_thread_tests(pm, om, a, stack_top=0x7F00F000)
     input_tests(pm, a)
     new_cmd_tests(pm, a)
     print('%d failures' % fails)

@@ -299,6 +299,52 @@ Thread_Start(Offset=0, ID=1, Flags=0){
   The script it runs may be unloaded with the copy, and the game would crash.
 - **Untested in game:** whether a respawn counts as "set up again" and ends the threads.
 
+**Fixed in exe_v46m: threads now run in game** (user: "Can you fix Threads?"). Before exe_v46m no thread ever ran in
+game. The God Fist's watchdog thread never logged once, and each God Fist left a registered, never-running thread.
+`Thread_Start` registered the thread, but the per-frame runner never reached it:
+
+- **The cause.** The runner sits at the entry of each object's step:
+  - fighters `0x02E408B8`, called from `0x02E40B90`;
+  - weapons `0x02BAD64C`;
+  - items `0x03048064`.
+  Its caller hands it r4, a slot on the caller's stack that holds the accessor (`addi r4, r1, 0xC; stw r31, 0xC(r1)`).
+  The runner first checked r4 as a heap pointer (`0x10000000`-`0x8FFFFFFF`). The game's update thread runs on a stack
+  outside that range (Cemu keeps the default threads' stacks in its own area below MEM2), so the check failed on
+  every frame for every object.
+- **Why the tests passed.** Unicorn had its stack at `0x7F00F000` and passed a heap holder, so the tests never saw it.
+- **The fix.** exe_v46m takes a slot just above the runner's own frame (the caller's stack), else a heap pointer as
+  before.
+
+`acmd_ext_test.py`'s `fighter_thread_tests` runs the game's own fighter step (`0x02E40B90` -> `0x02E408B8` -> the
+motion step -> the agent runner `0x02C2986C` -> the interpreter) with the stack where Cemu has it. On exe_v46l the
+thread is registered and never runs (the in-game symptom). On exe_v46m it runs once a frame.
+
+**The fighter's frame, as the game runs it.** The fighter update `0x02E24270` calls `0x02E40B90` once per frame:
+
+- It is gated by the global at `[0x102F6C04]`. With its byte `+8` set and its mode `+0` not 2, the whole fighter
+  frame is skipped, and `0x02E40B24` runs only the status agent. A thread waits on those frames, as the script does.
+- Otherwise `0x02E408B8` runs, and the thread runner comes first, at its entry. Then, in order:
+  1. if not in hitlag (StopModule `+0x10`), the motion modules;
+  2. the queued status changes (StatusModule vt `+0x16C`);
+  3. the game script, through the motion step `[acc +0x44]` -> `0x02E87428` -> `0x02C5F3BC`;
+  4. the second agent `[acc +0xA0]` -> `0x02C2986C`;
+  5. the MSC status agent.
+- A second entry, `0x02E40C4C` (a vtable slot, `r4 = [r3 +0x28]`, a heap holder), reaches the same step.
+
+So a thread runs exactly when the script's frame comes round:
+- once per fighter update, before that frame's status change and script;
+- during hitlag only with Flags 1;
+- not on skipped frames.
+
+Its documented behaviour is unchanged.
+
+**In-game check** (`threads_fix_v1`):
+- `tools/thread_ingame_test_build.py` adds an up-taunt game script to Supamario. A thread logs every frame for 60
+  frames and puts a star over his head every 10 frames.
+- The diag executable (`tools/diag_godfist_cave.py` + `tools/diag_threads_cave.py`, built on exe_v46m) prints the
+  thread's `S4GF k=8` lines. It also prints the first fighter steps' `S4TH ... r1=... old=0` lines, which show the
+  stack and that exe_v46l's check would have skipped them.
+
 ## Input_Compare / Input_Get / Input_Set
 
 Commands for a fighter's controller: check an input, copy it into a variable, or force it.
