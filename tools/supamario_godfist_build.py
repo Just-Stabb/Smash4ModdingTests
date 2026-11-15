@@ -150,7 +150,8 @@ DIAG = False
 DIAG_BASE = 0x0F0003F0
 D_CATCH_KINDS, D_SLOT, D_HOLD_FRAME, D_HOLD_ROT, D_STRIKE_KINDS, D_FLIGHT, D_WD_RELEASE, D_ROT_AFTER, \
     D_WD_ALIVE, D_MSC_JUMP, D_MSC_RATE1, D_MSC_EXIT, D_PHASE, D_WD_STATUS = range(14)
-# 14 (v12, MSC gf_track): the edge check while tracking on the ground: 1000 x (opponent past his ground's edge) + its
+# 15 (v17, MSC gf_tick): the hand-off's decision: 1000 + its status (on the stage: put down, DownWait) or its status
+# (off the stage: falls); 14 (v12, MSC gf_track): the edge check while tracking on the ground: 1000 x (opponent past his ground's edge) + its
 # distance
 # 8: the watchdog thread's every frame (does a thread run in game at all?); MSC (supamario.c, //GFD lines): 9 / 10 /
 # 11 the jump / rate 1 / status left, 12 gf_tick's phase 3 or a release (99), 13 the status that released it
@@ -198,7 +199,13 @@ HANDOFF = STRIKE + FLY_N + 1            # 91
 DROP_Y = 0.3                            # the feet's height at the last flight frame (it lands at once)
 DAMAGE_FALL = 0x4C
 EASE_SPEED = 1.0                        # its travel a frame while easing down (units)
-GF_FALL_WAIT = 30                       # frames the MSC waits for the down after the hand-off
+# v17 (user: "The hitstun when hitting an opponent offstage is 10 frames too long"): off the stage the victim falls
+# in DamageFall with its controller off until gf_tick's wait for a down runs out (v16: HANDOFF + 30 = 121) and its
+# hitstun (FLIGHT_HITSTUN, written every flight frame to DOWNFALL_K: 88 + 40 = 128) is over: it acted at 128 (the
+# strike + 62). Both 10 less: hitstun 30 (88 + 30 = 118) and the wait 27 (91 + 27 = 118): it acts at 118 (the strike
+# + 52). On the stage it is down at the hand-off (gf_phase 5), neither counts
+GF_FALL_WAIT = 27                       # frames the MSC waits for the down after the hand-off (v16 30)
+FLIGHT_HITSTUN = 30                     # the victim's hitstun, written every flight frame to DOWNFALL_K (v16 40)
 SLIDE_DIST = 9.44 * GF_DIST / 20.0      # XV2 #96's travel (9.44 m) at the flight's scale (60 units for 20 m): 28.3
 SLIDE_DECAY = 0.92                      # its speed x this a frame
 SLIDE_MIN = 0.05                        # stops below this
@@ -652,7 +659,7 @@ def game_script():
             s.append(cmd('frame', float(STRIKE + k)))
         f = [setf(x, LH_OFFX), setf(y, LH_OFFY), setf(0, LH_GROUND)]
         if k <= DOWNFALL_K:
-            f += [cmd('hitstop_set', 2, 2, 0), cmd('hitstun_set', 2, 40)]
+            f += [cmd('hitstop_set', 2, 2, 0), cmd('hitstun_set', 2, FLIGHT_HITSTUN)]
         f.append(cmd('rotation_set', 2, float(a), 0.0, 0.0))
         if k == DOWNFALL_K:
             f.append(cmd('status_set', 2, DAMAGE_FALL))
@@ -669,8 +676,11 @@ def game_script():
     # v13: Leave_Ground_Cancel on again at the hand-off on the ground only (in the air the move plays to its end)
     s += [cmd('frame', float(HANDOFF)), cmd('input_get', 0, SITUATION_VAR, V_TMP2)]
     s += if_(V_TMP2, 1, 2, [cmd('leave_ground_cancel', LGC_ON)]) + if_(GF_VAR, 0, 2, [
-        setf(x, LH_OFFX), setf(0.0, LH_OFFY), setf(5, LH_GROUND), cmd('rotation_set', 2, 0.0, 0.0, 0.0),
-        setf(0, V_SPIN), setf(GF_FALL_WAIT, V_CNT), setf(4, V_PHASE)] + dlog(D_PHASE, value=4))
+        setf(x, LH_OFFX), setf(0.0, LH_OFFY), setf(0, LH_GROUND), cmd('rotation_set', 2, 0.0, 0.0, 0.0),
+        setf(0, V_SPIN), setf(GF_FALL_WAIT, V_CNT), setf(5, V_PHASE)] + dlog(D_PHASE, value=5))
+    # v17: gf_phase 5: the MSC decides (gf_tick): on the stage it puts the victim down itself (DownWait, no tech
+    # possible), off it the victim's stage collision comes back and it falls (DamageFall, gf_phase 4); its stage
+    # collision stays off here, so it doesn't land (and tech) on its own first
     # v16 (user: "transition into his normal gravity and falling after being actionable", "specifically after hitting
     # Super God Fist in the air"): an air catch's Gravity_Set off at GF_IASA (both below 0, Mode 0: his own again); the
     # MSC stops holding him there

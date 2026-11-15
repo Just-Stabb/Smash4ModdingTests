@@ -1265,3 +1265,76 @@ For a catch made in the air:
 **Not confirmed in game:**
 - that set_pos-based travel on the ground follows slopes as the TransN did;
 - the game's landing catch-up mechanism itself.
+
+## Super God Fist v17 (`supamario_god_fist_v17.zip`): no tech on the landing, a shorter off-stage hitstun
+
+v17 goes over v16 and still uses exe B (`exe_v46i`). The user's reports:
+- "Opponents are able to tech Super God Fist".
+- "The hitstun when hitting an opponent offstage is 10 frames too long".
+
+### Why opponents could tech (the common MSC every fighter's `.mscsb` carries)
+v7-v16 put the victim in DamageFall at the flight's end and let it land on its own. DamageFall's loop (`func_816`)
+on landing, with the down term (`0x1e00000d`) on, goes to:
+- **EscapeAir (`0x22`)** when the fighter asks to tech (`BattleObject(0x86, 0)`: the CPUs' tech request, which the
+  controller-off doesn't stop) and its air dodge term (`0x1e00003d`) is on;
+- **DownBound** otherwise.
+
+The CPU's landing air dodge is the "tech" in the user's clips (training mode, a CPU).
+
+DamageFall's own Passive (`0x64` / `0x65`) needs the flag `0x20000054`, which only Ganondorf's ground Flame Choke sets
+(the end of status `0xBC`, `func_1630`). The tech paths of Damage / DamageFly (`func_810` / `func_811`, the buffered
+`0x2100001a`) and the wall / ceiling techs (`func_806` / `func_807`) need the passive terms (`0x1e000013`-`18`, on in
+those statuses' mains unless `0x21000018`) and a shield press or the CPU request.
+
+The transition-term ops: WorkModule `0x16` turns a term on and `0x17` turns it off. The evidence:
+- `func_272` / `func_271` (the dash attack's catch window);
+- `func_797`'s passive set-up by `0x21000018`;
+- DamageFall's main turning the down term on with `0x16`.
+
+v13 / v14 had them the other way round: v14's `gf_air_act` turned its air terms with `0x17`, which turns them off,
+so in game only its direct fallback acted. v17 turns them on with `0x16`, so `func_41` (the game's own air actions,
+every rule of theirs) acts first; the fallback stays.
+
+None of these can be turned off on another fighter from Supamario's scripts. The ACMD / position variables reach a
+target's status, hitstun, hitstop, input, stage collision, position and so on, not its work flags or terms.
+
+### The fix: no DamageFall landing on the stage
+- **At the hand-off (91):** the game script keeps the victim's stage collision off and sets gf_phase 5.
+- **On the stage:** gf_tick decides. When he is on the ground and his ground goes on to where the victim is (the
+  teeter check `GroundModule(0x2726, its distance)`), it puts the victim down itself:
+  - offset Y 0 (his height: the floor);
+  - SITUATION 0;
+  - stage collision 2 (ground);
+  - status DownWait (`0x50`; DownWaitU / D from its own flag);
+  - then the held-down phase and the slide as before.
+  
+  DownWait's loop (`func_934` / `func_963`) has no tech of any kind, and the victim never lands in DamageFall. The
+  difference you can see: no DownBound bounce, it lies down at once.
+- **Off the stage** (no ground there, or he is in the air): its stage collision comes back (air) and it falls in
+  DamageFall as before (gf_phase 4). DamageFall in the air has no wall / ceiling tech.
+- **Diag log:** the diag build logs the decision (k 15: 1000 + its status on the stage, else its status).
+
+### The off-stage hitstun: 10 frames shorter
+An off-stage victim falls in DamageFall. It can act once its controller is back (gf_tick's wait for a down that never
+comes) and its hitstun is over (`Hitstun_Set` on every flight frame to DOWNFALL_K, motion 88):
+
+| | Hitstun | Wait | Hitstun ends | Controller back | Acts at |
+|---|---|---|---|---|---|
+| v16 | 40 | 30 | 128 | 121 | the strike + 62 |
+| v17 | 30 (`FLIGHT_HITSTUN`) | 27 (`GF_FALL_WAIT`) | 118 | 118 | the strike + 52 |
+
+The "acts at" frames are motion frames; add the strike's 8-frame freeze for game frames. The on-stage knockdown, the
+flight and Supamario's own timing are unchanged.
+
+### Tests
+`--all-models`: 0 problems. New checks:
+- **Knockdown:** DamageFall, then put down at the hand-off (DownWait on the ground).
+- **No tech:** a CPU asking to tech and a human pressing shield both stay down (DownWait), never EscapeAir or Passive.
+- **Air actions:** the 13 air actions' terms are turned on with `0x16` at 92.
+- **The model reproduces the report:** v16's hand-off (a DamageFall landing) with a CPU asking to tech gives EscapeAir.
+  On v16's build the new checks fail with exactly that.
+- **Off stage:** not put down, it falls (stage collision 5), controller back, upright; it acts at the strike + 52
+  (v16 + 62).
+
+**Not confirmed in game:** that SITUATION 0 with stage collision 2 holds a victim put at floor height through
+DownWait's first frame.

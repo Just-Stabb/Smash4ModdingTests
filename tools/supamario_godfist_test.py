@@ -72,7 +72,7 @@ class MscGame:
         self.edge_x = None             # his ground's edge in front (GroundModule(0x2726, d): 1 when x + d is past it)
         self.ottotto = []              # the distances it was asked with
         self.landed = []               # game frames he landed on (startup_sim)
-        self.terms_on = []             # (frame, term) WorkModule(0x17, term): transition terms turned on
+        self.terms_on = []             # (frame, term) WorkModule(0x16, term): transition terms turned on (v17)
         self.groups_on = []            # (frame, group) WorkModule(0x19, group): transition groups turned on (v14)
         self.jumps = (1, 2)            # jumps used / max (ints 0x10000001 / 0x10000002)
 
@@ -113,8 +113,10 @@ class MscGame:
                     self.x += v * self.face
                 else:
                     self.y += v
-            if a[0] == 0x17 and len(a) == 2:
+            if a[0] == 0x16 and len(a) == 2 and a[1] >> 24 == 0x1E:       # v17: 0x16 turns a term on (0x17 off)
                 self.terms_on.append((self.frame, a[1]))
+            if a[0] == 0x15 and len(a) == 2 and a[1] >> 24 == 0x1E:
+                return int(any(t == a[1] for _f, t in self.terms_on))
             if a[0] == 0x19 and len(a) == 2:
                 self.groups_on.append((self.frame, a[1]))
             if a[0] == 0x6 and len(a) == 2 and a[1] in (0x10000001, 0x10000002, 0x1300010c):
@@ -485,6 +487,10 @@ def msc_v12_tests(path):
     check('an off-stage catch: the air transition groups turned on at GF_IASA (func_40: 0x1f000008, 0a - 11)',
           sorted({gr for f, gr in g.groups_on if f == B.IASA}),
           [0x1f000008] + list(range(0x1f00000a, 0x1f000012)))
+    air_terms = {0x1e000061, 0x1e00008a, 0x1e000062, 0x1e000063, 0x1e000064, 0x1e000065, 0x1e000094, 0x1e00003d,
+                 0x1e00003e, 0x1e00003f, 0x1e000043, 0x1e000044, 0x1e000045}
+    check('an off-stage catch: the 13 air actions\' terms turned ON (WorkModule 0x16; v14 - v16 used 0x17, off) at'
+          ' GF_IASA', sorted({t for f, t in g.terms_on if f == B.IASA and t in air_terms}), sorted(air_terms))
     for name, cmd, want in (('an aerial', 0x1, 0x34), ('air dodge', 0x400000, 0x22), ('up special', 0x4000, 0x154),
                             ('down special', 0x8000, 0x155), ('side special', 0x2000, 0x153),
                             ('neutral special', 0x1000, 0x152), ('a jump (button)', 0x200000, 0xC)):
@@ -538,6 +544,9 @@ class Victim:
         self.push_log = []            # (game frame, its status, value)
         self.hits_taken = []          # (game frame, part)
         self.body = 0                 # v10: body state (0 normal, 1 invincible: collides, no damage; 2 intangible)
+        self.off_stage = False        # v17: over no ground at the hand-off (his teeter check says so; it never lands)
+        self.cpu_tech = False         # v17: asks to tech on landing (a CPU's BattleObject(0x86, 0)), from any status
+        self.shield = False           # v17: a human's shield press (a tech from Damage / DamageFly only: func_801)
         self.shielding = False        # v10: its shield up (a collision with it: Hit_Check's 4)
 
     def frame(self, n):
@@ -572,11 +581,17 @@ class Victim:
             self.bound -= 1
             if self.bound <= 0:
                 self.status = 0x50        # DownBound's motion over: DownWait
-        if self.ground == 5 and self.situation != 0 and not self.never_lands:
+        if self.ground == 5 and self.situation != 0 and not self.never_lands and not self.off_stage:
             self.fall += 1
             if self.fall >= 3:
                 self.situation = 0
-                if self.status in (0x47, 0x4C):   # tumbling onto the ground, no tech: DownBound
+                # v17: the game's landings (the common MSC): DamageFall (func_816) with the down term: EscapeAir when
+                # it asks to tech (a CPU), else DownBound; Damage / DamageFly (func_810 / 811): Passive on a tech ask
+                if self.status == 0x4C and self.cpu_tech:
+                    self.status = 0x22
+                elif self.status in (0x45, 0x46, 0x47) and (self.cpu_tech or self.shield):
+                    self.status = 0x64
+                elif self.status in (0x47, 0x4C):   # tumbling onto the ground, no tech: DownBound
                     self.status, self.bound = 0x4D, 12
         elif self.ground == 0:
             self.situation, self.fall = 2, 0
@@ -650,6 +665,7 @@ class Acmd:
         self.diag = []             # (k, value) written to the diag IDs
         self.lgc_log = []          # (motion frame, Leave_Ground_Cancel's Enabled)
         self.my_situation = 0      # v12: his own SITUATION (Input_Get 0, 22)
+        self.my_air = False        # v17: his situation for the MSC (global18)
         self.gravity_log = []      # (motion frame, Gravity_Set's parameters)
 
     def target(self, t, thread=False):
@@ -878,6 +894,8 @@ class MscTick:
             return R.f2i(self.var(args[1]))
         if sid == 0x16 and len(args) == 2 and args[0] == 6:
             return int(self.var(args[1]))
+        if sid == 0x1A and len(args) == 2 and args[0] == 0x2726:       # his teeter check: the victim over no ground
+            return int(v.off_stage)
         if sid == 0x16 and len(args) == 3 and args[0] == 0:
             val, i = R.i2f(args[1]), args[2]
             tq = a.slot_var(i)
@@ -888,12 +906,17 @@ class MscTick:
                 if (i - 0x0F000100) // 0x20 - 2 == v.slot:
                     v.input_off = val
                     v.log.append(('input_off', val))
+            elif 0x0F000100 <= i < 0x0F000260 and (i - 0x0F000100) % 0x20 == 0x16:
+                if (i - 0x0F000100) // 0x20 - 2 == v.slot:      # v17: SITUATION
+                    v.situation = int(val)
+                    v.log.append(('situation', int(val)))
             else:
                 a.setvar(i, val)
             return 0
         return 0
 
     def tick(self):
+        self.vm.g[18] = 2 if self.a.my_air else 0
         self.vm.call(self.fn)
 
 
@@ -1034,9 +1057,10 @@ def acmd_tests(game_bin):
           (round(want[-1][1], 3), max(abs(want[k + 1][1] - want[k][1]) for k in range(B.GF_LAUNCH - 1, len(want) - 1))
            < 1.5), (B.DROP_Y, True))
     drop = tr[n_hold + B.FLY_N:n_hold + B.FLY_N + 1]
-    check('the hand-off: on the ground, upright (a whole turn from -720: no pop), no hit, no PUSH in the air',
+    check('the hand-off: on the ground, upright (a whole turn from -720: no pop), no hit, no PUSH in the air (v17: the'
+          ' slide pushes it in DownWait, put down by the MSC)',
           (drop[:1] and (drop[0][1], drop[0][2]), len(v.hits_taken), v.push_log[:1] and v.push_log[0][1]),
-          ((0.0, 0.0), 2, 0x4D))
+          ((0.0, 0.0), 2, 0x50))
     slide = [val for _st, s_, val in [(x[1], x[1], x[2]) for x in v.push_log]]
     check('the knockdown\'s slide: %.1f units in all along his facing (XV2 #96\'s 9.44 m), decaying, then 0'
           % B.SLIDE_DIST, (abs(sum(slide) - B.SLIDE_DIST) < 1.0, all(b <= a for a, b in zip(slide, slide[1:])),
@@ -1045,9 +1069,27 @@ def acmd_tests(game_bin):
     for r in rec:
         if r[5] in (0x4C, 0x4D, 0x50, FALL) and (not seq or seq[-1] != r[5]):
             seq.append(r[5])
-    check('the game\'s own knockdown: DamageFall (asked while frozen, never Fall) -> DownBound -> DownWait',
-          (seq[:3], [x for x in v.log if x[0] == 'status' and x[1] in (0x4C, 0x4D, 0x50)]),
-          ([0x4C, 0x4D, 0x50], [('status', 0x4C)]))
+    check('the knockdown (v17): DamageFall (asked while frozen, never Fall), then at the hand-off on the stage put'
+          ' down by the MSC (DownWait, on the ground: no DamageFall landing, so no tech)',
+          (seq[:2], [x for x in v.log if x[0] in ('status', 'situation')]),
+          ([0x4C, 0x50], [('status', 0x4C), ('situation', 0), ('status', 0x50)]))
+    # v17: no tech: a CPU asking to tech on landing, a human pressing shield; v16's hand-off (DamageFall landing)
+    for who in ('cpu', 'shield'):
+        vt = Victim()
+        setattr(vt, 'cpu_tech' if who == 'cpu' else 'shield', True)
+        _a, rect = run_move(script, vt, frames=B.HANDOFF + 30)
+        check('no tech (%s): put down at the hand-off, DownWait, never EscapeAir / Passive' % (
+            'a CPU asking to tech' if who == 'cpu' else 'a human pressing shield'),
+            (any(r[5] in (0x22, 0x64, 0x65, 0x66, 0x67, 0x68) for r in rect), any(r[5] == 0x50 for r in rect)),
+            (False, True))
+    vt = Victim()
+    vt.cpu_tech = True
+    vt.status = 0x4C
+    vt.situation, vt.ground, vt.fall, vt.hitstun = 2, 5, 0, 30
+    for n in range(4):
+        vt.frame(n)
+    check('the model: v16\'s hand-off (a DamageFall landing) with a CPU asking to tech: EscapeAir (the in-game report)',
+          vt.status, 0x22)
     check('rotation back to 0 at the end', v.rot[0], 0.0)
     Acmd.FACING = -1.0
     vl = Victim()
@@ -1092,10 +1134,24 @@ def acmd_tests(game_bin):
     check('launching hit: never stood up by the move', ('status', 0x54) in v.log, False)
     # never lands (off the stage): still tumbling when the MSC's wait for the down runs out: controller back
     v = Victim()
-    v.never_lands = True
+    v.never_lands = v.off_stage = True
     a, rec = run_move(script, v)
-    check('never lands (no down within %d frames of the drop): controller back, upright' % B.GF_FALL_WAIT,
-          (v.input_off, v.rot[0], v.status in range(0x4D, 0x54)), (0.0, 0.0, False))
+    check('off the stage (never lands): not put down, falls (stage collision 5), controller back, upright',
+          (any(r[5] == 0x50 for r in rec), v.ground, v.input_off, v.rot[0], v.status in range(0x4D, 0x54)),
+          (False, 5, 0.0, 0.0, False))
+    # v17 (user: "The hitstun when hitting an opponent offstage is 10 frames too long"): it can act once its controller
+    # is back and its hitstun is over: v16 the strike + 62, v17 + 52
+    g_hand = next(r[0] for r in rec if r[1] > B.HANDOFF)          # the game frame his motion did the hand-off
+    back = next(r[0] for r in rec if r[0] > g_hand and r[6] == 0.0)
+    hs = [x for x in v.log if x[0] == 'Hitstun_Set']
+    g_strike = next(r[0] for r in rec if r[1] > B.STRIKE) - 1
+    g_downfall = next(r[0] for r in rec if r[1] > B.STRIKE + B.DOWNFALL_K) - 1
+    act = max(back, g_downfall + int(hs[-1][1]))
+    check('off the stage: hitstun %d (v16 40), controller back %d frames after the hand-off (v16 30): it acts at the'
+          ' strike + %d (+ its %d-frame freeze; v16 + 62)' % (B.FLIGHT_HITSTUN, B.GF_FALL_WAIT, act - g_strike
+                                                             - B.STRIKE_FREEZE, B.STRIKE_FREEZE),
+          (hs[-1][1], abs(back - g_hand - B.GF_FALL_WAIT) <= 2, act - g_strike - B.STRIKE_FREEZE),
+          (B.FLIGHT_HITSTUN, True, 52))
     # the dash punch on a shield / no catch: strike never happens
     v = Victim()
     a, rec = run_move(script, v, hit=False, frames=120)

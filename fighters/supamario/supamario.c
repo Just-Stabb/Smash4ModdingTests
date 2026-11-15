@@ -37913,8 +37913,8 @@ void gf_track(float fr)
     gf_ey = vy;
 }
 
-// v14: his air actions from a ground status (AttackDash). v13 turned the air actions' transition terms on (WorkModule
-// 0x17) and called func_41, and in game he still couldn't act: a term is only read while its transition GROUP is on,
+// v14: his air actions from a ground status (AttackDash). v13 turned the air actions' transition terms with WorkModule
+// 0x17 (v17: that turns a term OFF; 0x16 turns it on: func_272 / func_271, func_797, DamageFall's main) and called func_41, and in game he still couldn't act: a term is only read while its transition GROUP is on,
 // and a ground status has the air groups off. The game's own air statuses turn them on with func_40 (WorkModule 0x19:
 // 0x1f000008 landing, 0x0a air specials, 0x0b light throw, 0x0c air catch, 0x0d air dodge, 0x0e aerials, 0x0f
 // footstool, 0x10 wall jump, 0x11 air jump: reference/msc-note-sheet/STransGroup_ID.csv; e.g. func_175 turns them on
@@ -37929,19 +37929,19 @@ int gf_air_act()
     {
         gf_terms = 0x1;
         func_40();
-        WorkModule(0x17, 0x1e000061);
-        WorkModule(0x17, 0x1e00008a);
-        WorkModule(0x17, 0x1e000062);
-        WorkModule(0x17, 0x1e000063);
-        WorkModule(0x17, 0x1e000064);
-        WorkModule(0x17, 0x1e000065);
-        WorkModule(0x17, 0x1e000094);
-        WorkModule(0x17, 0x1e00003d);
-        WorkModule(0x17, 0x1e00003e);
-        WorkModule(0x17, 0x1e00003f);
-        WorkModule(0x17, 0x1e000043);
-        WorkModule(0x17, 0x1e000044);
-        WorkModule(0x17, 0x1e000045);
+        WorkModule(0x16, 0x1e000061);
+        WorkModule(0x16, 0x1e00008a);
+        WorkModule(0x16, 0x1e000062);
+        WorkModule(0x16, 0x1e000063);
+        WorkModule(0x16, 0x1e000064);
+        WorkModule(0x16, 0x1e000065);
+        WorkModule(0x16, 0x1e000094);
+        WorkModule(0x16, 0x1e00003d);
+        WorkModule(0x16, 0x1e00003e);
+        WorkModule(0x16, 0x1e00003f);
+        WorkModule(0x16, 0x1e000043);
+        WorkModule(0x16, 0x1e000044);
+        WorkModule(0x16, 0x1e000045);
     }
     if (func_41() != 0)
     {
@@ -38226,6 +38226,34 @@ void gf_tick()
     st = WorkModuleF(0, 0x0F0000A2 + 8 * t);
     cnt = WorkModuleF(0, GF_V_CNT) - 1.0f;
     WorkModule(0, cnt, GF_V_CNT);
+    if (ph > 4.5f)
+    {
+        // v17 (user: "Opponents are able to tech Super God Fist"): the hand-off (the game script: gf_phase 5, its stage
+        // collision still off). Its DamageFall landing isn't safe: DamageFall's loop (func_816) on the ground with the
+        // down term on goes to EscapeAir (0x22) when the fighter asks to tech (BattleObject(0x86, 0): the CPUs' tech,
+        // and the air dodge term on), else DownBound; Damage / DamageFly landings tech through func_810 / func_811.
+        // DownWait's loop (func_934 / func_963) has no tech at all. So on the stage (he is on the ground and his ground
+        // goes on to where it is: GroundModule(0x2726, its distance), the teeter check) it is put down here: at his
+        // height (the floor), on the ground (SITUATION 0, stage collision 2), DownWait (DownWaitU / D from its own
+        // flag), held as before; off the stage (no ground there, or he is in the air) its stage collision comes back
+        // (air) and it falls in DamageFall as before (gf_phase 4)
+        if (global18 == 0 && GroundModule(0x2726, WorkModuleF(0, 0x0F000045 + 8 * t)) == 0)
+        {
+            WorkModule(0, 0.0f, 0x0F000046 + 8 * t);
+            WorkModule(0, 0.0f, 0x0F000116 + 0x20 * t);
+            WorkModule(0, 2.0f, 0x0F0000A6 + 8 * t);
+            WorkModule(0, GF_DOWN_WAIT, 0x0F0000A2 + 8 * t);
+            WorkModule(0, 2.0f, GF_V_PHASE);
+            WorkModule(0, GF_DOWN_FRAMES, GF_V_CNT);
+            WorkModule(0, GF_SLIDE_V0, GF_V_SLIDE);
+            //GFD WorkModule(0, 1000.0f + st, 0x0F0003FF);
+            return;
+        }
+        WorkModule(0, 5.0f, 0x0F0000A6 + 8 * t);
+        WorkModule(0, 4.0f, GF_V_PHASE);
+        //GFD WorkModule(0, st, 0x0F0003FF);
+        return;
+    }
     if (ph > 3.5f)
     {
         // v6: launched (a real tumbling hit, DamageFly) at the flight's end: the game's own knockdown (DownBound ->
