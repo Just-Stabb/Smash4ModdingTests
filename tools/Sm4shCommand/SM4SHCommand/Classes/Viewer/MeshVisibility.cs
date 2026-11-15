@@ -253,6 +253,8 @@ namespace Sm4shCommand.Viewer
     /// </summary>
     public static class ModelParts
     {
+        // (v1.6.3: Apply's order: your choice now; a group hiding the mesh; the motion's visibility animation; a group
+        // showing it; the fighter's defaults, yours (VisUser.txt) over VisGroups.txt's; the name rule)
         /// <summary>Sets every mesh's Visible and Why for this frame. user: mesh name -> shown (the parts tab's
         /// overrides).</summary>
         public static void Apply(FighterAssets a, string animFile, float frame, VisState vis, VisGroups groups,
@@ -282,6 +284,42 @@ namespace Sm4shCommand.Viewer
                 m.Visible = v;
                 m.Why = why;
             }
+        }
+    }
+}
+
+namespace Sm4shCommand.Viewer
+{
+    /// <summary>
+    /// v1.6.3: the Model parts tab's right-click menu. "Show / Hide now": this session's choice (gone when the program
+    /// closes). "Hidden / Visible by default for this fighter": saved in VisUser.txt (next to the program) as the
+    /// fighter's default, so the script's groups still show / hide it on their frames; it clears the "now" choice.
+    /// "Follow the script / default": takes both away. "Isolate": shows only the picked meshes now.
+    /// Held-model meshes ("held: ...") take the "now" choices only.
+    /// </summary>
+    public static class PartsMenu
+    {
+        public static void Now(IDictionary<string, bool> user, IEnumerable<string> meshes, bool shown)
+        {
+            foreach (var m in meshes) user[m] = shown;
+        }
+
+        /// <summary>Returns false when VisUser.txt couldn't be written (the choice still holds this session).</summary>
+        public static bool Default(VisGroups groups, IDictionary<string, bool> user, string fighter, IEnumerable<string> meshes, bool? shown)
+        {
+            bool ok = true;
+            foreach (var m in meshes)
+            {
+                user.Remove(m);
+                if (m.StartsWith("held: ", StringComparison.Ordinal) || fighter == null) continue;
+                ok &= groups.SetUserDefault(fighter, m, shown);
+            }
+            return ok;
+        }
+
+        public static void Isolate(IDictionary<string, bool> user, IEnumerable<string> all, IList<string> keep)
+        {
+            foreach (var m in all) user[m] = keep.Contains(m);
         }
     }
 }

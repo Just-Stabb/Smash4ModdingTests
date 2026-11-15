@@ -29,12 +29,25 @@ namespace Sm4shCommand.GUI
         List<EffectData> allEffects = new List<EffectData>();
         List<TrailData> allTrails = new List<TrailData>();
         string effectError;
-        readonly CheckBox showEffects = new CheckBox { Text = "Markers", AutoSize = true, Checked = Runtime.GetSetting("ViewerEffects", true) };
+        // v1.6.3: Markers and Labels off, HQ on by default; the three are reset to these once (an ini written by an
+        // older version keeps the user's later choices after that)
+        static readonly bool defaults163 = ResetDefaultsOnce();
+        static HitboxViewer() { }   // (a static constructor: the reset runs before the first viewer's boxes read the settings)
+        static bool ResetDefaultsOnce()
+        {
+            if (Runtime.GetSetting("ViewerDefaults163", false)) return false;
+            Runtime.SetSetting("ViewerEffects", false);
+            Runtime.SetSetting("ViewerEffectLabels", false);
+            Runtime.SetSetting("ViewerFxQuality", true);
+            Runtime.SetSetting("ViewerDefaults163", true);
+            return true;
+        }
+        readonly CheckBox showEffects = new CheckBox { Text = "Markers", AutoSize = true, Checked = Runtime.GetSetting("ViewerEffects", false) };
         // v1.6.0 (Level 2): the effects drawn (particles, effect models, textured trails), their quality, a dark background
         readonly CheckBox showParticles = new CheckBox { Text = "Effects", AutoSize = true, Checked = Runtime.GetSetting("ViewerParticles", true) };
-        readonly CheckBox fxQuality = new CheckBox { Text = "HQ", AutoSize = true, Checked = Runtime.GetSetting("ViewerFxQuality", false) };
+        readonly CheckBox fxQuality = new CheckBox { Text = "HQ", AutoSize = true, Checked = Runtime.GetSetting("ViewerFxQuality", true) };
         readonly CheckBox darkBg = new CheckBox { Text = "Dark bg", AutoSize = true, Checked = Runtime.GetSetting("ViewerDarkBg", true) };
-        readonly CheckBox showLabels = new CheckBox { Text = "Labels", AutoSize = true, Checked = Runtime.GetSetting("ViewerEffectLabels", true) };
+        readonly CheckBox showLabels = new CheckBox { Text = "Labels", AutoSize = true, Checked = Runtime.GetSetting("ViewerEffectLabels", false) };
         readonly CheckBox showTrails = new CheckBox { Text = "Trails", AutoSize = true, Checked = Runtime.GetSetting("ViewerTrails", true) };
         readonly CheckBox flip = new CheckBox { Text = "Flip facing", AutoSize = true };
         // v1.6.2: hitboxes drawn or not, the body overlays; the model parts (meshes) tab; the expression script (its
@@ -477,9 +490,36 @@ namespace Sm4shCommand.GUI
             var none = new Button { Text = "Hide all", AutoSize = true };
             none.Click += (o, e) => { foreach (var m in AllMeshes()) UserParts[m] = false; ShowFrame(); };
             buttons.Controls.AddRange(new Control[] { reset, all, none });
+            // v1.6.3: the right-click menu (the selected rows, or the one clicked)
+            var menu = new ContextMenuStrip();
+            Func<List<string>> picked = () => partsGrid.SelectedRows.Cast<DataGridViewRow>().Select(r => (string)r.Tag).Where(t => t != null).ToList();
+            Action<string, Action<List<string>>> item = (text, act) =>
+                menu.Items.Add(text, null, (o, e) => { var l = picked(); if (l.Count > 0) { act(l); ShowFrame(); } });
+            item("Show now", l => PartsMenu.Now(UserParts, l, true));
+            item("Hide now", l => PartsMenu.Now(UserParts, l, false));
+            menu.Items.Add(new ToolStripSeparator());
+            item("Hidden by default for this fighter", l => PartsWarn(PartsMenu.Default(visGroups, UserParts, assets.Name, l, false)));
+            item("Visible by default", l => PartsWarn(PartsMenu.Default(visGroups, UserParts, assets.Name, l, true)));
+            item("Follow the script / default", l => PartsWarn(PartsMenu.Default(visGroups, UserParts, assets.Name, l, null)));
+            menu.Items.Add(new ToolStripSeparator());
+            item("Isolate", l => PartsMenu.Isolate(UserParts, AllMeshes(), l));
+            menu.Items.Add("Show all", null, (o, e) => { PartsMenu.Isolate(UserParts, AllMeshes(), AllMeshes().ToList()); ShowFrame(); });
+            partsGrid.ContextMenuStrip = menu;
+            partsGrid.CellMouseDown += (o, e) =>
+            {
+                // a right click on a row outside the selection picks that row
+                if (e.Button != MouseButtons.Right || e.RowIndex < 0) return;
+                if (!partsGrid.Rows[e.RowIndex].Selected) { partsGrid.ClearSelection(); partsGrid.Rows[e.RowIndex].Selected = true; }
+            };
             page.Controls.Add(partsGrid);
             page.Controls.Add(partsInfo);
             page.Controls.Add(buttons);
+        }
+
+        void PartsWarn(bool saved)
+        {
+            if (!saved) MessageBox.Show(this, "Couldn't write " + (visGroups.UserPath ?? "VisUser.txt") +
+                                        ": the choice holds until the program closes.", "Model parts");
         }
 
         IEnumerable<string> AllMeshes()
@@ -672,6 +712,8 @@ namespace Sm4shCommand.GUI
             getExpression = saved;
             expressionEditor = open;
             if (expressionEditor != null) expressionEditor.TextChanged += Editor_TextChanged;
+            // v1.6.3: run again with it (set after the viewer was made, its visibility commands waited for an edit)
+            if (probe != null) Rerun();
         }
 
         void RunEffects()

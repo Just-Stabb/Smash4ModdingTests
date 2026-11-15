@@ -958,6 +958,15 @@ namespace Sm4shCommand.Viewer
         /// scale (u v) and offset (u v).</summary>
         public void Material(NudModel.Poly p, float frame, out float[] gain, out float[] scaleUV, out float[] transUV)
         {
+            float[] rot, c0, c1;
+            Material(p, frame, out gain, out scaleUV, out transUV, out rot, out c0, out c1);
+        }
+
+        /// <summary>v1.6.3: also the UV turn (NU_effRotUV x, radians) and the combiner colours (NU_effCombinerColor0 /
+        /// 1, null when the material has none).</summary>
+        public void Material(NudModel.Poly p, float frame, out float[] gain, out float[] scaleUV, out float[] transUV,
+                             out float[] rotUV, out float[] comb0, out float[] comb1)
+        {
             float[] h;
             uint hash = p.Props.TryGetValue("NU_materialHash", out h) && h.Length > 0 ? BitConverter.ToUInt32(BitConverter.GetBytes(h[0]), 0) : 0;
             Func<string, float[], float[]> val = (name, def) =>
@@ -969,6 +978,28 @@ namespace Sm4shCommand.Viewer
             gain = val("NU_effColorGain", new[] { 1f, 1f, 1f, 1f });
             scaleUV = val("NU_effScaleUV", new[] { 1f, 1f, 0, 0 });
             transUV = val("NU_effTransUV", new[] { 0f, 0, 0, 0 });
+            rotUV = val("NU_effRotUV", new[] { 0f, 0, 0, 0 });
+            comb0 = val("NU_effCombinerColor0", null);
+            comb1 = val("NU_effCombinerColor1", null);
+        }
+
+        /// <summary>
+        /// v1.6.3: a vertex's UV as the game's effect shader works it out (texas_cross.nsh's MC_EFFECT vertex program,
+        /// docs/smash-run-port.md "UV transforms"): turned by r about the texture's centre, then U = (u + t.x) s.x,
+        /// V = 1 - s.y (1 - (v + t.y)). v1.6.2 took u s + t: a scrolled swoosh texture (an arc's sweep, a trail's
+        /// gradient, scale under 1) showed another part of its texture than the game (the arc's head where its tail is).
+        /// </summary>
+        public static void EffectUV(float u, float v, float[] s, float[] t, float r, out float U, out float V)
+        {
+            if (r != 0)
+            {
+                float c = (float)Math.Cos(r), sn = (float)Math.Sin(r), du = u - 0.5f, dv = v - 0.5f;
+                u = c * du + sn * dv + 0.5f;
+                v = -sn * du + c * dv + 0.5f;
+            }
+            float sx = s.Length > 0 ? s[0] : 1, sy = s.Length > 1 ? s[1] : 1, tx = t.Length > 0 ? t[0] : 0, ty = t.Length > 1 ? t[1] : 0;
+            U = (u + tx) * sx;
+            V = 1 - sy * (1 - (v + ty));
         }
     }
 

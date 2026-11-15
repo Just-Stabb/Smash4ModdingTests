@@ -112,8 +112,9 @@ namespace Sm4shCommand.Viewer
                         (st[0] != 1 || st[1] != 1 || st[2] != 0 || st[3] != 0))
                         for (int i = 0; i + 1 < p.UV.Length; i += 2)
                         {
-                            p.UV[i] = p.UV[i] * st[0] + st[2];
-                            p.UV[i + 1] = p.UV[i + 1] * st[1] + st[3];
+                            // (v1.6.3: the body shaders' colorSamplerUV, texas_cross.nsh: s (uv + t), the offset scaled too)
+                            p.UV[i] = (p.UV[i] + st[2]) * st[0];
+                            p.UV[i + 1] = (p.UV[i + 1] + st[3]) * st[1];
                         }
                 }
         }

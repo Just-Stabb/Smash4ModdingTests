@@ -140,13 +140,49 @@ namespace Sm4shCommand.Viewer
             float cr, cg, cb, ca;
             CallColour(e, out cr, out cg, out cb, out ca);
             foreach (var es in sim.Emitters)
+            {
+                if (es.D.Distortion || es.D.Tex == null) continue;       // (as drawn: v1.6.3)
+                if (es.D.PType == 6)
+                {
+                    var it6 = StripeItem(sim, es, es.Live.AsEnumerable().Reverse().ToList(), null, sim.NextK - 1, r, u, f, cx, cy, cr, cg, cb, 1);
+                    if (it6 != null) o.Add(Tuple.Create(it6.S, it6.UV));
+                    continue;
+                }
                 foreach (var q in es.Live)
                 {
-                    var it = ParticleItem(sim, es, q, sim.NextK - 1, r, u, f, cx, cy, cr, cg, cb, 1);
+                    var it = es.D.PType == 5 ? StripeItem(sim, es, null, q, sim.NextK - 1, r, u, f, cx, cy, cr, cg, cb, 1)
+                                             : ParticleItem(sim, es, q, sim.NextK - 1, r, u, f, cx, cy, cr, cg, cb, 1);
                     if (it != null) o.Add(Tuple.Create(it.S, it.UV));
                 }
+            }
             return o;
         }
+
+        /// <summary>v1.6.3 (tests): a mesh's vertices as drawn on this frame (skinned, billboard sprites turned to the
+        /// camera), in model space; null when the mesh isn't found.</summary>
+        public float[] MeshVertices(string mesh)
+        {
+            if (Assets == null) return null;
+            float[] r, u, f;
+            Axes(out r, out u, out f);
+            var s = Skin(Assets, Assets.Skeleton.World(Animation, AnimFrame), 0, 0, false);
+            FaceCamera(s, r, u, f);
+            int k = 0;
+            foreach (var m in Assets.Model.Meshes)
+            {
+                var o = new List<float>();
+                foreach (var p in m.Polys)
+                {
+                    int b = s.PolyStart[k++];
+                    for (int i = 0; i < p.Pos.Length; i++) o.Add(s.Pos[b + i]);
+                }
+                if (m.Name.StartsWith(mesh, StringComparison.OrdinalIgnoreCase)) return o.ToArray();
+            }
+            return null;
+        }
+
+        /// <summary>v1.6.3 (tests): the camera's axes (right, up, into the screen).</summary>
+        public void CameraAxes(out float[] r, out float[] u, out float[] f) { Axes(out r, out u, out f); }
 
         /// <summary>v1.6.2 (tests): a model-space point on screen (x, y).</summary>
         public float[] ScreenOf(float[] p)
@@ -550,8 +586,8 @@ namespace Sm4shCommand.Viewer
                 {
                     var v = pose[k++];
                     if (!mesh.Visible) continue;
-                    float[] gain, scaleUV, transUV;
-                    m.Material(p, frame, out gain, out scaleUV, out transUV);
+                    float[] gain, scaleUV, transUV, rotUV, comb0, comb1;
+                    m.Material(p, frame, out gain, out scaleUV, out transUV, out rotUV, out comb0, out comb1);
                     float a = (gain.Length > 3 ? gain[3] : 1) * ca;
                     if (a <= 0.002f) continue;
                     int nv = v.Length / 3;
@@ -570,15 +606,26 @@ namespace Sm4shCommand.Viewer
                     if (p.UV != null)
                         for (int i = 0; i < nv; i++)
                         {
-                            uv[i * 2] = p.UV[i * 2] * scaleUV[0] + transUV[0];
-                            uv[i * 2 + 1] = p.UV[i * 2 + 1] * (scaleUV.Length > 1 ? scaleUV[1] : 1) + (transUV.Length > 1 ? transUV[1] : 0);
+                            float U, V;
+                            EffectModel.EffectUV(p.UV[i * 2], p.UV[i * 2 + 1], scaleUV, transUV, rotUV.Length > 0 ? rotUV[0] : 0, out U, out V);
+                            uv[i * 2] = U; uv[i * 2 + 1] = V;
                         }
+                    float gr = gain[0] * cr, gg = (gain.Length > 1 ? gain[1] : 1) * cg, gb = (gain.Length > 2 ? gain[2] : 1) * cb;
                     var item = new FxItem
                     {
                         S = S, UV = uv, Idx = p.Tris, VCol = p.Color, Tex = p.Texture,
-                        R = gain[0] * cr, G = (gain.Length > 1 ? gain[1] : 1) * cg, B = (gain.Length > 2 ? gain[2] : 1) * cb, A = Math.Min(4, a),
+                        R = gr, G = gg, B = gb, A = Math.Min(4, a),
                         Blend = p.Dst == 2 ? FxRaster.Add : p.Dst == 3 ? FxRaster.Sub : FxRaster.Alpha,
                     };
+                    // v1.6.3: the combiner colours (NU_effCombinerColor0 / 1): colour 1 + (colour 0 - colour 1) x the
+                    // texture, as eft's interpolating combiner (inferred: the effect pixel program isn't read yet)
+                    if (comb0 != null && comb0.Length >= 3)
+                    {
+                        var c1 = comb1 != null && comb1.Length >= 3 ? comb1 : new[] { 0f, 0f, 0f };
+                        item.R = comb0[0] * gr; item.G = comb0[1] * gg; item.B = comb0[2] * gb;
+                        item.Col1 = new[] { c1[0] * gr, c1[1] * gg, c1[2] * gb };
+                        item.Combiner = 4;
+                    }
                     float d = 0;
                     for (int i = 0; i < nv; i++) d += S[i * 3 + 2];
                     item.Depth = d / Math.Max(1, nv);

@@ -283,6 +283,79 @@ axes; **Labels** their names), **Trails**.
   Dr. Mario's files and the game's common effect bank (the forward-air arc and the attack streak are common effects),
   so the two reported cases weren't drawn; Mario's own swoosh (the same make) was.
 
+## Model parts menu, part animations, stripes, blocks (v1.6.3)
+
+Tested with the user's own Pac-Man, Dr. Mario and Link folders (game files: not in this repository).
+
+- **Model parts right-click menu** (the selected rows, or the one clicked): **Show now** / **Hide now** (this session,
+  as the Show box), **Hidden by default for this fighter** / **Visible by default** (saved in **`VisUser.txt`** next
+  to the exe as `fighter hide: mesh` / `fighter show: mesh`, read on every start), **Follow the script / default**
+  (takes your choice and your saved default away), **Isolate** (only these meshes now), **Show all**. A default is the
+  fighter's neutral state: a script's visibility group still shows / hides the mesh on its frames. The order a mesh is
+  decided in: your choice now; a group whose state doesn't list it (hidden); the motion's visibility animation; a group
+  whose state lists it (shown); the fighter's defaults (yours over `VisGroups.txt`'s); the name rule. (v1.6.2 let a
+  group's current state show a mesh over the visibility animation; now the animation decides those, so a group can
+  list a body together with its face meshes.)
+- **`VisGroups.txt` entries for Pac-Man**, read from his expression scripts (`Model_Changer` calls) and model:
+  group 0, the 3D body / the 2D Pac-Man `PizaM` (state 1: neutral air, dash attack and others through subroutine
+  `0x669E43CF`); group 1, the ghosts (forward smash 1: Blinky `Aaka`; up smash 2; down smash 3; down taunt 4; win 2: 5);
+  group 2, the Final Smash power pellets `FinalpoweresaA` / `B` (the "ball", state 1 in `finalstart` only); group 3,
+  the up taunt's 18 signs (`boardA`-`R`, one a state). Every group defaults to 0: in Wait only the body shows. Which
+  ghost sprite the up / down smash and down taunt raise on bone `GhostA1N` (`Aaka`, `Aosuke`, `Guzuta`, `Ijike` and
+  the signs all sit on it; `Pinkey` alone on `GhostB1N`) is inferred: correct the lines if the game shows another.
+  The file also takes `fighter hide:` / `fighter show:` defaults now.
+- **Part animations.** A fighter's `motion/body` holds more than `main.pac`: `lhand.pac` / `rhand.pac` (the hands'
+  poses: fists, open hands), `NAMEpt1.pac`, `NAMEsw1.pac` ... (props, swords, Pac-Man's ghosts, signs and pellets),
+  each with the same motions (`FitPacmanBodyPacmanpt1C03AttackS4S.omo` beside `FitPacmanBodyMainC03AttackS4S.omo`) on
+  bones `main.pac` doesn't animate. The viewer played only `main.pac` (open hands everywhere, Pac-Man's ghosts never
+  moved); it now layers the parts on the main motion.
+- **Billboard bones.** A bone named `..._BILLBOARD_...` turns its meshes to the camera (`BILLBOARDY`: about the
+  vertical only): Pac-Man's ghosts and signs are flat sprites on such bones, drawn edge-on (invisible) before.
+- **The expression script ran late.** `SetExpression` (the main window passes the expression scripts after making the
+  viewer) didn't run the scripts again, so their visibility commands waited for the first edit. It does now.
+- **Emitter blocks (the translucent squares, Pac-Man's neutral air).** Two causes, both fixed:
+  - A combiner that takes the alpha from the texture (0x314 = 1, or a selector naming its own alpha) on a texture that
+    has none (every texel opaque: a one-channel BC4 whose selector names a missing alpha channel) covered its whole
+    quad. Such a texture's shape is in its red channel: the viewer now reads the alpha from red there. Reproduced with
+    Dr. Mario's real Cyclone (`PtcMariodCyclone` ring1 / impact2, `PtcMariodSmashAura`), squares before, ring after.
+  - A texture with no native surface (TexRes native size 0) wasn't decoded, and its quad was drawn untextured, a
+    solid block. Its original image (+0x20 format 2, RGBA8, row by row) is decoded now, with its component selector
+    (Pac-Man's Final Smash eyes and scores: B G R A); an emitter whose texture still can't be read isn't drawn (the
+    status line counts them). Pac-Man's neutral-air blocks come from common effects (0x1000072 / 0x1000052 /
+    0x1000023): the same rules apply to them once the common bank is set.
+- **Stripes** (particle types 5 / 6: eft's ribbons, the sword trails `kiseki*` and streak / beam emitters) are drawn as
+  ribbons: type 5 through each particle's history of places (as many as the stripe block's history length, the
+  divisions between each two smoothed), type 6 through the emitter's particles; width the particle's scale, across
+  facing the camera (stripe type 0) or along the emitter's Y (1 / 2); alpha from the block's start to end alpha;
+  texture U across, V along. v1.6.2 drew one quad per particle in the emitter's frame, a block or bar pointing
+  wherever the emitter did. Link's up special (`PtcLinkKaitengiriSword` kiseki1) now trails the blade, both facings.
+- **Effect models' UVs and colours** as the effect shader (`texas_cross.nsh` MC_EFFECT, docs/smash-run-port.md "UV
+  transforms") works them out: turned by `NU_effRotUV`, `U = (u + t.x) s.x`, `V = 1 - s.y (1 - (v + t.y))` (v1.6.2:
+  `u s + t`, another part of a scaled / scrolled texture); `NU_effCombinerColor0 / 1` (colour 1 + (colour 0 - colour 1)
+  x the texture, by analogy with eft's interpolating combiner: the effect pixel program isn't read yet). The body
+  shaders' `NU_colorSamplerUV` likewise as `s (uv + t)`.
+- **Defaults**: Markers off, Labels off, HQ on. An `Sm4shCommand.ini` from an older version is reset to these three
+  **once** (the `ViewerDefaults163` entry records it); what you choose after that is kept.
+- **Arc / streak / beam colours and sides (open).** Dr. Mario's forward air plays one effect, the common arc
+  `0x1000090` (`EFFECT_FOLLOW_FLIP` on bone 0, (-3, 5.5, 1), turned (-24, -11, -60), size 0.95), with no colour command
+  and no trail command (`Sword_Glow` has no colour fields: a trail's colour is its two textures and shader), so its
+  light yellow is the common bank's own (the arc's emitter colour keys / combiner, or its effect model's vertex
+  colours, colour gain and combiner colours). Pac-Man's jab streak (`0x100008D`), Link's air grab beam (`0x10000A5`, at
+  rate 4) are common effects too. The game's common bank (`data/effect/common`) wasn't among the files sent, so these
+  three weren't drawn here; the viewer's billboards, polygons and directional particles were checked against Smash 4's
+  own vertex programs run on real emitters (tools/latte_exec.py: the same corners, U toward the screen's right, V
+  down / back along the velocity), and stripes, untextured blocks and missing-alpha blocks (the likely causes of the
+  bars and blocks) are fixed above.
+- **Tested** (`effect_viewer_test.py --pacman DIR --mariod DIR --link DIR`, the folders read where they are; 113
+  checks, 0 failures; without the folders the 22 real-file checks are skipped): Pac-Man in Wait (body only), finalstart
+  (pellets), forward smash frames 20 / 40 (Blinky on, then off), neutral air (the 2D Pac-Man through the CALLed
+  subroutine, on the slowed timeline), the up taunt (one sign); the menu's defaults written to and read back from a
+  VisUser.txt, a mesh hidden by default still shown by its group, and taken out again; forward smash's ghost bones
+  animated by `pacmanpt1.pac` only; the ghost sprite facing the camera both facings; FinPacman's original-format
+  textures (16 x 16, pupils blue); all 184 emitters of the three fighters' banks textured and none reading alpha from
+  a texture without it; Dr. Mario's Cyclone ring and forward-air script; the effect UV formula; Link's up special
+  stripes as ribbons both facings, mirrored. `new_var_test` 186 / 0 and `hitbox_var_test` 169 / 0 unchanged.
+
 ## Events.cfg format
 
 One block per command, blocks separated by a blank line; lines starting with `//` are comments:

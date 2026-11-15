@@ -3,7 +3,12 @@
 and the names / lifetimes it expects (independently, from tools/efc.py and tools/ptcl.py), compiles and runs it.
 
   python3 tools/Sm4shCommand/effect_viewer_test.py BUILT_DIR WORK_DIR --supamario-base DIR --supamario-build DIR
-      --kirby DIR --kirby-pac MAIN.pac --kirby-acmd DIR --brave DIR
+      --kirby DIR --kirby-pac MAIN.pac --kirby-acmd DIR --brave DIR [--pacman DIR] [--mariod DIR] [--link DIR]
+
+v1.6.3: --pacman / --mariod / --link: real fighter folders (fighter/pacman etc., a full or partial copy; read in place,
+never copied into the repository): Pac-Man's visibility groups (VisGroups.txt), part animations and billboard sprites,
+his Final Smash bank's original-format textures; every emitter of the given banks drawn without blocks; Dr. Mario's
+Cyclone ring and forward air; Link's up special's stripes as ribbons, both facings.
 
 BUILT_DIR: the built Sm4shCommand (SM4SHCommand.exe, SALT.dll, Events.cfg, Tooltips). Supamario: the base folder (Mario's
 model, Mario's scripts) and a build (tools/supamario_*_build.py: motion, scripts, effect); Kirby: a folder with model /
@@ -211,6 +216,11 @@ def main():
     subprocess.check_call(CSC + ['-nologo', '-out:EvTest.exe', '-nostdlib'] + refs + [src], cwd=test)
     # (Runtime and the Viewport are WinForms: an X display, xvfb-run when there's none)
     cmd = ['mono', 'EvTest.exe', 'Events.cfg', fighters, exp, exp_fx]
+    # v1.6.3: the user's own fighter folders (game files: never copied into the repository; read where they are)
+    for k in ('pacman', 'mariod', 'link'):
+        if '--' + k in a:
+            cmd.append('%s=%s' % (k, os.path.abspath(arg(a, '--' + k))))
+    cmd.append('visgroups=%s' % os.path.join(HERE, 'SM4SHCommand', 'VisGroups.txt'))
     if not os.environ.get('DISPLAY') and shutil.which('xvfb-run'):
         cmd = ['xvfb-run', '-a'] + cmd
     r = subprocess.run(cmd, cwd=test)

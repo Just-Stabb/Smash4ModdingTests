@@ -37,10 +37,12 @@ class EvTest
 
     static Dictionary<uint, Tuple<string, int>> expect = new Dictionary<uint, Tuple<string, int>>();
 
+    static readonly Dictionary<string, ACMDFile> files = new Dictionary<string, ACMDFile>();
     static IList<ICommand> Script(string path, uint crc)
     {
         if (!File.Exists(path)) return null;
-        var f = new ACMDFile(path);
+        ACMDFile f;
+        if (!files.TryGetValue(path, out f)) files[path] = f = new ACMDFile(path);   // (SALT maps a file once)
         IScript s;
         return f.Scripts.TryGetValue(crc, out s) ? ((ACMDScript)s).Commands : null;
     }
@@ -401,11 +403,13 @@ class EvTest
               st("Mario_Hathead") + " " + st("Mario_Nohat") + " " + st("Mario_Ouch_"), "on/group 0 default 1 off/group 0 default 1 on/visibility animation (material_anime)");
         vis.Groups[0] = 2;
         ModelParts.Apply(a, "FitMarioBodyMainF00DamageHi1.omo", 3, vis, groups, user);
-        Check("v1.6.2: Model_Changer(0, 2) switches the group's meshes", st("Mario_Hathead") + " " + st("Mario_Nohat"),
-              "off/group 0 state 2 (script) on/group 0 state 2 (script)");
+        // (v1.6.3: a group's current state leaves its meshes to the motion's visibility animation where it has a track:
+        // Pac-Man's group lists his face meshes with the body; Mario's DamageHi1 animates Mario_Nohat off)
+        Check("v1.6.2: Model_Changer(0, 2) switches the group's meshes (v1.6.3: Mario_Nohat then as its visibility animation)",
+              st("Mario_Hathead") + " " + st("Mario_Nohat"), "off/group 0 state 2 (script) off/visibility animation (material_anime)");
         user[a.Model.Meshes.First(x => x.Name.StartsWith("Mario_Nohat")).Name] = false;
         ModelParts.Apply(a, "FitMarioBodyMainF00DamageHi1.omo", 3, vis, groups, user);
-        Check("v1.6.2: the parts tab's choice wins", st("Mario_Nohat"), "off/your choice");
+        Check("v1.6.2: the parts tab's choice wins", st("Mario_Nohat"), "off/your choice (now)");
         ModelParts.Apply(a, "FitMarioBodyMainF00DamageHi1.omo", 3, new VisState(), null, null);
         // the script's visibility commands on the timeline (the game / expression scripts)
         var g = Compile("FRAME(Frames=1)\n");
@@ -502,6 +506,164 @@ class EvTest
         string dr = dir(false), dl = dir(true);
         Check("v1.6.2: camera billboards (0x341002C's sprites): the texture isn't mirrored on screen (u 0 -> 1 then v 0 -> 1 clockwise), facing right and left",
               dr.Split('/')[1] != "0" && dr.Split('/')[0] == dr.Split('/')[1] && dl == dr, true);
+    }
+
+    // ---- v1.6.3: the user's real fighter folders (given on the command line, not in the repository) --------------------
+
+    /// <summary>The game and expression scripts of a move on one timeline (as HitboxViewer.Rerun / RunExpression).</summary>
+    static List<FrameState> Expression(string root, uint crc, int frames)
+    {
+        string body = Path.Combine(root, "script", "animcmd", "body");
+        var game = new HitboxRunner().Run(Script(Path.Combine(body, "game.bin"), crc) ?? new List<ICommand>(), frames);
+        var ex = Script(Path.Combine(body, "expression.bin"), crc);
+        var r = new HitboxRunner { GetScript = id => Script(Path.Combine(body, "expression.bin"), id), SpeedSchedule = game.Select(x => x.Speed).ToArray() };
+        return r.Run(ex ?? new List<ICommand>(), frames);
+    }
+
+    static void RealPacman(string pm, string visGroupsPath)
+    {
+        var a = FighterAssets.Load(pm);
+        var groups = VisGroups.Load(visGroupsPath);
+        Func<string, string> st = n => { var m = a.Model.Meshes.First(x => x.Name.StartsWith(n)); return n + (m.Visible ? " on" : " off"); };
+        Func<uint, int, string, string> at = (crc, fr, meshes) =>
+        {
+            var fs = crc == 0 ? null : Expression(pm, crc, 300);
+            var vis = fs != null ? fs[fr - 1].Vis : new VisState();
+            string anim = crc == 0 ? "FitPacmanBodyMainA00Wait1.omo" : a.AnimationFor(crc);
+            ModelParts.Apply(a, anim, fr, vis, groups, null);
+            return string.Join(", ", meshes.Split(',').Select(st).ToArray());
+        };
+        const string all = "FinalpoweresaA,FinalpoweresaB,Aaka,Aosuke,Pinkey,PizaM,Pacman_VIS,boardA";
+        Check("v1.6.3 Pac-Man (VisGroups.txt): Wait: the body only (power pellets, ghosts, 2D Pac-Man, signs hidden)", at(0, 1, all),
+              "FinalpoweresaA off, FinalpoweresaB off, Aaka off, Aosuke off, Pinkey off, PizaM off, Pacman_VIS on, boardA off");
+        Check("v1.6.3 Pac-Man: finalstart frame 30 (Model_Changer(2, 1)): the power pellets shown", at(0x017EB3D5, 30, all),
+              "FinalpoweresaA on, FinalpoweresaB on, Aaka off, Aosuke off, Pinkey off, PizaM off, Pacman_VIS on, boardA off");
+        Check("v1.6.3 Pac-Man: forward smash frame 20 (Model_Changer(1, 1) on frame 18): Blinky (Aaka)", at(0x1D1238F2, 20, all),
+              "FinalpoweresaA off, FinalpoweresaB off, Aaka on, Aosuke off, Pinkey off, PizaM off, Pacman_VIS on, boardA off");
+        Check("v1.6.3 Pac-Man: forward smash frame 40 (Model_Changer(1, 0) on frame 38): Blinky gone", at(0x1D1238F2, 40, "Aaka"), "Aaka off");
+        Check("v1.6.3 Pac-Man: neutral air game frame 15 (CALL 0x669E43CF: Model_Changer(0, 1) at FRAME 3 = game frame 10, the motion slowed): the 2D Pac-Man, not the body", at(0x66264190, 15, "PizaM,Pacman_VIS,colorparts"),
+              "PizaM on, Pacman_VIS off, colorparts off");
+        Check("v1.6.3 Pac-Man: up taunt frame 60: one sign (group 3)", at(0x2C42123B, 60, "boardA,boardB,boardR").Split(',').Count(x => x.EndsWith(" on")), 1);
+        // the user's defaults (VisUser.txt): hidden by default, the script's group still shows it on its frames
+        string tmp = Path.Combine(Path.GetTempPath(), "evtest_visuser_" + Guid.NewGuid().ToString("N") + ".txt");
+        try
+        {
+            var g2 = VisGroups.Load(visGroupsPath, tmp);
+            bool saved = PartsMenu.Default(g2, new Dictionary<string, bool>(), "pacman", new[] { "Pacman_HanaMayu_VIS_O_OBJ", "Aaka_VIS_O_OBJ_NSC" }, false);
+            var g3 = VisGroups.Load(visGroupsPath, tmp);
+            string why;
+            Check("v1.6.3 parts menu: \"Hidden by default for this fighter\" saved in VisUser.txt and read back",
+                  saved + " " + g3.DefaultFor("pacman", "Pacman_HanaMayu_VIS_O_OBJ", out why) + " " + File.ReadAllLines(tmp).Last(), "True False pacman hide: Aaka_VIS_O_OBJ_NSC, Pacman_HanaMayu_VIS_O_OBJ");
+            var fs = Expression(pm, 0x1D1238F2, 21);
+            ModelParts.Apply(a, a.AnimationFor(0x1D1238F2), 20, fs[19].Vis, g3, null);
+            Check("v1.6.3 parts menu: a mesh hidden by default still shows when the script's group switches it on (Blinky, forward smash)",
+                  st("Aaka"), "Aaka on");
+            PartsMenu.Default(g3, new Dictionary<string, bool>(), "pacman", new[] { "Aaka_VIS_O_OBJ_NSC" }, null);
+            var g4 = VisGroups.Load(visGroupsPath, tmp);
+            Check("v1.6.3 parts menu: \"Follow the script / default\" takes it out again", g4.DefaultFor("pacman", "Aaka_VIS_O_OBJ_NSC", out why).HasValue, false);
+        }
+        finally { try { File.Delete(tmp); } catch (Exception) { } }
+        // part animations (pacmanpt1.pac) and billboard sprites
+        string fsm = a.AnimationFor(0x1D1238F2);
+        var anim = a.GetAnimation(fsm);
+        var main = new Omo(a.Animations[fsm]);
+        var ghosts = a.Skeleton.Bones.Where(b => b.Name.StartsWith("Ghost")).ToList();
+        Check("v1.6.3: forward smash plays pacmanpt1.pac's part animation with main.pac's (the ghost bones: main.pac has none of them)",
+              ghosts.Count(b => main.Has(b.Hash)) + " " + (anim != null && ghosts.Any(b => anim.Has(b.Hash))), "0 True");
+        var vp = new Viewport { Assets = a, Animation = anim, AnimFrame = 20 };
+        for (int flip = 0; flip < 2; flip++)
+        {
+            vp.Flip = flip == 1;
+            var v = vp.MeshVertices("Aaka");
+            float[] r, u, f;
+            vp.CameraAxes(out r, out u, out f);
+            // the sprite's plane: two edges' cross product along the view direction
+            var e1 = new[] { v[3] - v[0], v[4] - v[1], v[5] - v[2] };
+            int k = 2;
+            while (k * 3 + 2 < v.Length && Math.Abs(Fx.Len(Fx.Cross(e1, new[] { v[k * 3] - v[0], v[k * 3 + 1] - v[1], v[k * 3 + 2] - v[2] }))) < 1e-4f) k++;
+            var n = Fx.Norm(Fx.Cross(e1, new[] { v[k * 3] - v[0], v[k * 3 + 1] - v[1], v[k * 3 + 2] - v[2] }));
+            float d = Math.Abs(n[0] * f[0] + n[1] * f[1] + n[2] * f[2]);
+            Check("v1.6.3: Pac-Man's ghost sprite (a billboard bone) faces the camera, facing " + (flip == 1 ? "left" : "right"), d > 0.999f, true);
+        }
+        // the Final Smash bank's textures with only an original image (RGBA8): decoded, the component selector applied
+        var fin = new PtclFile(File.ReadAllBytes(Path.Combine(pm, "effect", "FinPacman", "FinPacman.010d0000.ptcl")));
+        var eye = fin.Sets.First(x => x.Name == "PtcFinPacmanEyeLeft").Emitters[0].Def.Tex;
+        Check("v1.6.3: FinPacman's eyes (native size 0, original RGBA8) decode, 16 x 16", eye != null ? eye.Width + "x" + eye.Height : "null", "16x16");
+        int blue = eye != null ? eye.Argb.Count(c => (c >> 24 & 255) > 128 && (c & 255) > 150 && (c >> 16 & 255) < 100) : 0;
+        Check("v1.6.3: ...with their selector (B G R A): the pupils blue, as the arcade's", blue > 0, true);
+    }
+
+    static void RealBanks(IEnumerable<string> roots)
+    {
+        int n = 0, bad = 0, untex = 0;
+        var names = new List<string>();
+        foreach (var root in roots)
+            foreach (var path in Directory.GetFiles(Path.Combine(root, "effect"), "*.ptcl", SearchOption.AllDirectories))
+            {
+                var p = new PtclFile(File.ReadAllBytes(path));
+                foreach (var set in p.Sets)
+                    foreach (var e in set.Emitters)
+                    {
+                        var d = e.Def;
+                        n++;
+                        if (d.Tex == null) { untex++; names.Add(set.Name + "/" + e.Name); continue; }
+                        // a combiner that takes the alpha from the texture (1, 4, 5) on a texture without alpha: a block
+                        if ((d.Combiner == 1 || d.Combiner == 4 || d.Combiner == 5) && PtclData.Opaque(d.Tex)) { bad++; names.Add(set.Name + "/" + e.Name); }
+                    }
+            }
+        Check("v1.6.3: the real banks' " + n + " emitters: every texture decoded, none drawn as a block (alpha read from a texture "
+              + "with none)", untex + " " + bad + (names.Count > 0 ? " " + string.Join(", ", names.Take(5).ToArray()) : ""), "0 0");
+    }
+
+    static void RealMariod(string md)
+    {
+        var p = new PtclFile(File.ReadAllBytes(Path.Combine(md, "effect", "mariod", "mariod.010d0000.ptcl")));
+        var ring = p.Sets.First(x => x.Name == "PtcMariodCyclone").Emitters.First(x => x.Name == "ring1").Def;
+        Check("v1.6.3: Dr. Mario's Cyclone ring1 (combiner 2, BC4 texture whose selector names a missing alpha: drew squares) "
+              + "takes its shape from red", ring.Combiner + " " + ring.Note.Contains("alpha from red"), "2 True");
+        // forward air: the arc is the common 0x1000090 with no colour command (its colour is the common bank's)
+        var fair = Script(Path.Combine(md, "script", "animcmd", "body", "effect.bin"), 0x68FDC9A2);
+        Check("v1.6.3: Dr. Mario's forward air effect script: one EFFECT_FOLLOW_FLIP 0x1000090, no colour command",
+              string.Join(";", fair.Select(c => c.ToString()).Where(t => t.Contains("0x1000090") || t.Contains("COLOR") || t.Contains("Color")).Select(t => t.Split('(')[0]).ToArray()),
+              "EFFECT_FOLLOW_FLIP");
+        float U, V;
+        EffectModel.EffectUV(0.25f, 0.25f, new[] { 0.5f, 0.5f }, new[] { 0.5f, 0.5f }, 0, out U, out V);
+        Check("v1.6.3: effect models' UVs as the effect shader works them out (U = (u + t) s, V = 1 - s (1 - (v + t)))",
+              U.ToString("0.###", IC) + " " + V.ToString("0.###", IC), "0.375 0.875");
+    }
+
+    static void RealLink(string lk)
+    {
+        var a = FighterAssets.Load(lk);
+        var lib = new EffectLibrary(lk);
+        string body = Path.Combine(lk, "script", "animcmd", "body");
+        uint spin = 0x1BA6EBD5;
+        var run = RunPair(Script(Path.Combine(body, "game.bin"), spin), Script(Path.Combine(body, "effect.bin"), spin), lib);
+        var e = run.FxRunner.AllEffects.FirstOrDefault(x => x.Id == 0x3050006);
+        Check("v1.6.3 Link: up special's sword effect 0x3050006 (its stripes kiseki1)", e != null, true);
+        if (e == null) return;
+        var anim = a.GetAnimation(a.AnimationFor(spin));
+        var heads = new List<string>();
+        for (int flip = 0; flip < 2; flip++)
+        {
+            var vp = new Viewport { Assets = a, Animation = anim, Width = 800, Height = 600, Flip = flip == 1 };
+            vp.GetEffectAssets = lib.AssetsFor;
+            vp.History = run.Fx;
+            int g = e.StartFrame + 8;
+            vp.Frame = run.Fx[g - 1];
+            vp.AnimFrame = run.Fx[g - 1].AnimFrame;
+            var quads = vp.EffectScreenQuads(e, g);
+            var stripes = quads.Where(q => q.Item1.Length > 12).ToList();
+            Check("v1.6.3 Link: kiseki1 (particle type 5) drawn as ribbons through its history, not quads, facing " + (flip == 1 ? "left" : "right"),
+                  stripes.Count > 0 && stripes.All(q => q.Item1.Length >= 3 * 2 * 3), true);
+            if (stripes.Count > 0)
+            {
+                var s0 = stripes[0].Item1;
+                heads.Add(((s0[0] + s0[3]) / 2 - 400).ToString("0", IC));
+            }
+        }
+        Check("v1.6.3 Link: the ribbons' heads mirror between the two facings (screen x about the centre)",
+              heads.Count == 2 && Math.Abs(float.Parse(heads[0], IC) + float.Parse(heads[1], IC)) <= Math.Max(4, 0.1f * Math.Abs(float.Parse(heads[0], IC))), true);
     }
 
     static int Main(string[] args)
@@ -618,15 +780,25 @@ class EvTest
               expect.ContainsKey(0x3450078) ? expect[0x3450078].Item1 : "?");
 
         // ---- v1.6.0 (Level 2): particles, textures, effect models, trail textures ------------------------------------
-        if (args.Length > 3) Level2(args[3], smLib, kbLib, ks);
+        bool fxFile = args.Length > 3 && !args[3].Contains("=");
+        if (fxFile) Level2(args[3], smLib, kbLib, ks);
         // ---- v1.6.1: effect rates, common effects, the scripts' sources -------------------------------------------------
         Rates(smLib, common);
         Common(root, sm, common);
         Sources(smAssets, smBody, dash);
         // ---- v1.6.2: colours, overlays, visibility, model parts, the arcs' direction --------------------------------
-        if (args.Length > 3) Visibility(args[3], smAssets);
+        if (fxFile) Visibility(args[3], smAssets);
         Colours();
         Arcs(smAssets, smLib, smBody);
+        // ---- v1.6.3: the user's fighter folders, when given (pacman=DIR mariod=DIR link=DIR visgroups=FILE) --------
+        Func<string, string> opt = k => args.Skip(3).Where(x => x.StartsWith(k + "=")).Select(x => x.Substring(k.Length + 1)).FirstOrDefault();
+        string pmDir = opt("pacman"), mdDir = opt("mariod"), lkDir = opt("link");
+        var reals = new[] { pmDir, mdDir, lkDir }.Where(x => x != null && Directory.Exists(x)).ToList();
+        if (pmDir != null) RealPacman(pmDir, opt("visgroups") ?? "VisGroups.txt");
+        if (mdDir != null) RealMariod(mdDir);
+        if (lkDir != null) RealLink(lkDir);
+        if (reals.Count > 0) RealBanks(reals);
+        else Console.WriteLine("(v1.6.3's real-folder checks skipped: give pacman= / mariod= / link= folders)");
 
         // ---- the timeline: the game script's speed, threads, effect commands -----------------------------------------
         var g2 = Compile("FRAME(Frames=5)\nSet_Frame_Duration(Speed=2)\n");
