@@ -63,6 +63,7 @@ namespace Sm4shCommand.Viewer
         public string Name;
         public int Start, Interval, IntervalRandom, Duration, Life, LifeRandom, VolumeType, PType, Blend, Follow;
         public float Rate, SweepStart, SweepParam, SurfaceRandom, AllDir, DirSpeed, Dispersion, VelRandom, Air, CameraOffset;
+        public float[] RotBasis = { 0f, 0f };
         public bool SweepRandom, WorldGravity, Distortion, Universal;
         public int Combiner;                // 0x314: 0 colour 0 (alpha = tex red), 1 colour 0 x tex (alpha = tex alpha), 2 colour 1 + (0 - 1) x tex
                                             // (alpha = tex red); the alpha source then fixed up by the texture (Read): 3, 4, 5
@@ -78,6 +79,7 @@ namespace Sm4shCommand.Viewer
         public float[] EmColor0, EmColor1, ShapeScale;   // the emitter's colour / alpha / shape-scale multipliers (0x378-0x3A7)
         public float EmAlpha;
         public float UScale = 1, VScale = 1;
+        public int Wrap0 = 0x11, Wrap1 = 0x11;     // (v1.7.1) slots 0 / 1: U wrap | V wrap << 4 (0 mirror, 1 repeat, 2 clamp)
         // v1.6.3: stripes (particle types 5 stripe / 6 complex stripe, eft's ribbons): the complex emitter's stripe block
         // (+0x8CE, 13 words: type 0 billboard / 1 emitter matrix / 2 emitter up-down, option, connect (2: to the emitter),
         // texture coordinates, history length, divisions, start / end alpha, UV scroll, ...)
@@ -130,6 +132,17 @@ namespace Sm4shCommand.Viewer
             d.WorldGravity = e.U8(0x2F8) != 0;
             d.PType = e.I(0x4BC);
             d.CameraOffset = e.F(0x4D0);
+            // (v1.7.1) rotBasis (the static uniforms' vec4 36 .xy, docs/ptcl-format.md): every vertex program takes the
+            // corner as S (pos + rotBasis), then turns it: the quad off its particle along its own X / Y (Pac-Man's streaks,
+            // PtcCommonAttackLine: -0.15 / 0.35 of their length, drawn in front of his fist, not centred on it)
+            d.RotBasis = new[] { e.F(0x4C4), e.F(0x4C8) };
+            // (v1.7.1) the samplers' wraps (TexRes +0x0C: U bits 24-27, V 28-31)
+            for (int slot = 0; slot < 2; slot++)
+            {
+                uint sw = (uint)e.I(0x40 + 0xD8 * slot + 0xC);
+                int wrap = (int)(sw >> 24 & 0xF) | (int)(sw >> 28 & 0xF) << 4;
+                if (slot == 0) d.Wrap0 = wrap; else d.Wrap1 = wrap;
+            }
             d.UScale = e.F(0x508); d.VScale = e.F(0x50C);
             if (d.UScale == 0) d.UScale = 1;
             if (d.VScale == 0) d.VScale = 1;
@@ -588,6 +601,20 @@ namespace Sm4shCommand.Viewer
                 float a = (float)(U() * 2 * Math.PI), k = (float)Math.Sqrt(U());
                 return new[] { (float)Math.Cos(a) * rx * k, 0f, (float)Math.Sin(a) * rz * k };
             }
+            if (vt == 10 || vt == 11)
+            {
+                // (v1.7.1) a box (eft's volume 10, cross_f 0x04A503C4): three U(-1, 1) for x, y, z; the first draw's third
+                // picks the face whose axis is set to + or - its radius (the second draw's half), the other two x their
+                // radii (Pac-Man's streak lines, PtcCommonAttackLine's line2_add: a 3 x 3 x 0.1 box). 11 (filled): not read,
+                // taken as the box's inside
+                float bx = U() * 2 - 1, by = U() * 2 - 1, bz = U() * 2 - 1;
+                if (vt == 10)
+                {
+                    float face = U(), sign = U() < 0.5f ? 1 : -1;
+                    if (face < 1 / 3f) bz = sign; else if (face < 2 / 3f) by = sign; else bx = sign;
+                }
+                return new[] { bx * rx, by * ry, bz * rz };
+            }
             // a direction from three normal draws (Box-Muller)
             var g = new float[3];
             for (int i = 0; i < 3; i++)
@@ -1012,7 +1039,21 @@ namespace Sm4shCommand.Viewer
     {
         public const int Alpha = 0, Add = 1, Sub = 2;
 
-        static void Sample(Texture t, float u, float v, bool bilinear, out float r, out float g, out float b, out float a)
+        /// <summary>(v1.7.1) A texture coordinate by the sampler's wrap (TexRes +0x0C, docs/ptcl-format.md): 0 mirror (every
+        /// vanilla 2 x 2 repeat: a quarter texture mirrored into a whole, Pac-Man's streak head, drawn as four corners of
+        /// light when repeated), 1 repeat (Sample's own), 2 clamp.</summary>
+        public static float Wrap(float t, int mode)
+        {
+            if (mode == 0)
+            {
+                float m = t - 2 * (float)Math.Floor(t / 2);
+                return Math.Min(0.99999f, m > 1 ? 2 - m : m);
+            }
+            if (mode == 2) return Math.Max(0, Math.Min(0.99999f, t));
+            return t;
+        }
+
+        static void Sample(Texture t, float u, float v, bool bilinear, out float r, out float g, out float b, out float a, int wrap = 0x11)
         {
             int w = t.Width, h = t.Height;
             var px = t.Argb;
@@ -1032,6 +1073,19 @@ namespace Sm4shCommand.Viewer
             if (x0 < 0) x0 += w;
             if (y0 < 0) y0 += h;
             int x1 = x0 + 1 == w ? 0 : x0 + 1, y1 = y0 + 1 == h ? 0 : y0 + 1;
+            // (v1.7.1) a mirrored or clamped axis (its coordinate already folded into 0 - 1 by Wrap) doesn't blend with the
+            // texture's other edge: the edge texel's own neighbour is itself (the Genesis beam's long quads drew a thin
+            // line along each edge, the far edge's texels blended in)
+            if ((wrap & 0xF) != 1)
+            {
+                if (x < 0) { x0 = 0; x1 = 0; }
+                else if ((int)fxf + 1 >= w) { x0 = w - 1; x1 = w - 1; }
+            }
+            if ((wrap >> 4) != 1)
+            {
+                if (y < 0) { y0 = 0; y1 = 0; }
+                else if ((int)fyf + 1 >= h) { y0 = h - 1; y1 = h - 1; }
+            }
             int c00 = px[y0 * w + x0], c10 = px[y0 * w + x1], c01 = px[y1 * w + x0], c11 = px[y1 * w + x1];
             float w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
             const float k = 1 / 255f;
@@ -1051,7 +1105,8 @@ namespace Sm4shCommand.Viewer
         /// </summary>
         public static int Tri(int[] pix, float[] zb, int w, int h, float ax, float ay, float az, float bx, float by, float bz,
                               float cx, float cy, float cz, float[] uv, Texture tex, bool bilinear, float cr, float cg, float cb,
-                              float ca, float[] col1, float[] vcol, int blend, int combiner = 1, Texture mask = null, float mu = 1, float mv = 1)
+                              float ca, float[] col1, float[] vcol, int blend, int combiner = 1, Texture mask = null, float mu = 1, float mv = 1,
+                              int wrap = 0x11, int maskWrap = 0x11)
         {
             int minX = Math.Max(0, (int)Math.Floor(Math.Min(ax, Math.Min(bx, cx))));
             int maxX = Math.Min(w - 1, (int)Math.Ceiling(Math.Max(ax, Math.Max(bx, cx))));
@@ -1079,7 +1134,8 @@ namespace Sm4shCommand.Viewer
                     if (z >= zb[i]) continue;
                     float tr = 1, tg = 1, tb = 1, ta = 1;
                     if (tex != null && uv != null)
-                        Sample(tex, w0 * uv[0] + w1 * uv[2] + w2 * uv[4], w0 * uv[1] + w1 * uv[3] + w2 * uv[5], bilinear, out tr, out tg, out tb, out ta);
+                        Sample(tex, Wrap(w0 * uv[0] + w1 * uv[2] + w2 * uv[4], wrap & 0xF), Wrap(w0 * uv[1] + w1 * uv[3] + w2 * uv[5], wrap >> 4),
+                               bilinear, out tr, out tg, out tb, out ta, wrap);
                     float r, g, b, a;
                     if (combiner == 0 || combiner == 5) { r = cr; g = cg; b = cb; a = ca * (combiner == 5 ? ta : tr); }
                     else if (combiner == 2 || combiner == 4)
@@ -1091,7 +1147,8 @@ namespace Sm4shCommand.Viewer
                     if (mask != null)
                     {
                         float mr, mg, mb, ma;
-                        Sample(mask, (w0 * uv[0] + w1 * uv[2] + w2 * uv[4]) * mu, (w0 * uv[1] + w1 * uv[3] + w2 * uv[5]) * mv, bilinear, out mr, out mg, out mb, out ma);
+                        Sample(mask, Wrap((w0 * uv[0] + w1 * uv[2] + w2 * uv[4]) * mu, maskWrap & 0xF),
+                               Wrap((w0 * uv[1] + w1 * uv[3] + w2 * uv[5]) * mv, maskWrap >> 4), bilinear, out mr, out mg, out mb, out ma, maskWrap);
                         r *= mr; g *= mg; b *= mb; a *= ma;
                     }
                     if (vcol != null)

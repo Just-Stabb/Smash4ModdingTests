@@ -136,6 +136,13 @@ def shape_point(rng, vt, radius, sweep=None, sh=None, number=0, eft=None, count=
         a = rng.uniform(0, 2 * math.pi)
         k = 1.0 if vt in (1, 2) else math.sqrt(rng.uniform())
         return np.array([math.cos(a) * r[0] * k, 0.0, math.sin(a) * r[2] * k])
+    if eft is not None and vt in (10, 11):
+        # eft's box (cross_f 0x04A503C4): U(-1, 1) x / y / z, one face's axis at + or - its radius (10; 11, filled:
+        # not read, taken as the inside)
+        b = rng.uniform(-1, 1, 3)
+        if vt == 10:
+            b[2 - min(2, int(rng.uniform() * 3))] = 1.0 if rng.uniform() < 0.5 else -1.0
+        return b * r
     d = rng.normal(size=3)
     d /= np.linalg.norm(d) or 1
     k = 1.0 if vt in (5, 6) else rng.uniform() ** (1 / 3)
@@ -504,7 +511,8 @@ def basis(em, vel, cm, lin=None):
     if em.ptype == 2:                 # XZ plate: the quad's Y along the emitter's Z
         return frame @ XZ_PLATE
     s = np.linalg.norm(vel)
-    if em.ptype == 4 and s > 1e-4:
+    if em.ptype == 4 and s > 1e-12:
+        # (any motion, however small: the program normalizes it; the common arcs set 1e-6 on purpose)
         # eft's type 4 (directional polygon), from its vertex program (cross_f; Squirtle's shader 112 before
         # test 14): Y along the particle's world motion (v_inWldPosDf), X = normalize(emitter Y x motion),
         # Z = X x motion. Not the emitter's frame: a sheet lying along its own motion stands on end

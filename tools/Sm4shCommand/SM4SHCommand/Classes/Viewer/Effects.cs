@@ -201,6 +201,153 @@ namespace Sm4shCommand.Viewer
             return null;
         }
 
+        // ---- v1.7.1: the fighter's colours for the common attack effects -------------------------------------------------
+        /// <summary>The common effects a fighter colours (fighter_param_etc g14: 141, 146, 142, 144): the arcs and streaks of
+        /// its attacks (0x8D PtcCommonAttackLineB, 0x8E PtcCommonAttackArc, 0x90 PtcCommonAttackArcB, 0x92).</summary>
+        public static readonly int[] FighterColourIds = { 0x8D, 0x92, 0x8E, 0x90 };
+
+        /// <summary>Vanilla fighter_param.bin words 0x13C-0x147 (an r, g, b for each of FighterColourIds), by kind; kinds not
+        /// listed are 1, 1, 1 (no tint). Read from the game's own file (tools/fighter_param.py); a fighter_param.bin in the
+        /// game folder (data/param/fighter, above the fighter's) is read instead when there is one.</summary>
+        static readonly Dictionary<int, float[]> VanillaFighterColours = new Dictionary<int, float[]>
+        {
+            { 1, new[] { 0.9f, 1.1f, 1.8f, 0.9f, 1.1f, 1.8f, 0.8f, 1f, 1.7f, 0.8f, 1f, 1.7f } },   // miiswordsman
+            { 2, new[] { 1f, 1.9f, 1f, 1f, 1.4f, 1f, 1f, 1.7f, 1f, 1f, 1.7f, 1f } },   // miigunner
+            { 3, new[] { 2f, 0.8f, 0.35f, 2f, 0.8f, 0.35f, 3f, 0.7f, 0.2f, 3f, 0.7f, 0.25f } },   // mario
+            { 6, new[] { 0.4f, 1.5f, 0.55f, 0.5f, 1.5f, 0.55f, 0.6f, 1.4f, 0.65f, 0.6f, 1.4f, 0.65f } },   // samus
+            { 8, new[] { 0.5f, 0.7f, 2f, 0.55f, 0.75f, 2f, 0.5f, 0.7f, 2f, 0.5f, 0.7f, 2f } },   // kirby
+            { 9, new[] { 0.7f, 0.5f, 3f, 0.7f, 0.5f, 3f, 0.65f, 0.4f, 3f, 0.65f, 0.4f, 3f } },   // fox
+            { 10, new[] { 0.45f, 0.55f, 3f, 0.45f, 0.55f, 3f, 0.35f, 0.45f, 2f, 0.35f, 0.45f, 2f } },   // pikachu
+            { 11, new[] { 2f, 0.8f, 0.35f, 2f, 0.8f, 0.35f, 3f, 0.7f, 0.2f, 3f, 0.7f, 0.25f } },   // luigi
+            { 13, new[] { 0.4f, 1.5f, 0.55f, 0.5f, 1.5f, 0.55f, 0.6f, 1.4f, 0.65f, 0.6f, 1.4f, 0.65f } },   // ness
+            { 14, new[] { 0.5f, 0.7f, 2f, 0.55f, 0.75f, 2f, 0.5f, 0.7f, 2f, 0.5f, 0.7f, 2f } },   // peach
+            { 15, new[] { 1f, 0.7f, 0.7f, 1f, 0.7f, 0.7f, 1f, 0.7f, 0.7f, 1f, 0.7f, 0.7f } },   // koopa
+            { 16, new[] { 1f, 0.95f, 0.4f, 1f, 0.95f, 0.4f, 1f, 0.95f, 0.35f, 1f, 0.95f, 0.35f } },   // zelda
+            { 21, new[] { 2f, 0.35f, 0.35f, 2f, 0.35f, 0.35f, 2f, 0.4f, 0.4f, 2f, 0.4f, 0.4f } },   // falco
+            { 22, new[] { 1f, 0.95f, 0.4f, 1f, 0.95f, 0.4f, 1f, 0.95f, 0.35f, 1f, 0.95f, 0.35f } },   // wario
+            { 25, new[] { 1.2f, 1.1f, 0.35f, 1.2f, 1.1f, 0.35f, 1.2f, 1.1f, 0.35f, 1.2f, 1.1f, 0.35f } },   // szerosuit
+            { 27, new[] { 0.9f, 1.1f, 1.8f, 0.9f, 1.1f, 1.8f, 0.8f, 1f, 1.7f, 0.8f, 1f, 1.7f } },   // diddy
+            { 30, new[] { 0.7f, 0.5f, 3f, 0.7f, 0.5f, 3f, 0.65f, 0.4f, 3f, 0.65f, 0.4f, 3f } },   // lucario
+            { 31, new[] { 0.22f, 0.06f, 0.04f, 0.22f, 0.06f, 0.04f, 0.13f, 0.04f, 0.02f, 0.13f, 0.04f, 0.02f } },   // robot
+            { 32, new[] { 0.5f, 0.7f, 2f, 0.55f, 0.75f, 2f, 0.5f, 0.7f, 2f, 0.5f, 0.7f, 2f } },   // toonlink
+            { 33, new[] { 0.5f, 0.7f, 2f, 0.55f, 0.75f, 2f, 0.5f, 0.7f, 2f, 0.5f, 0.7f, 2f } },   // lizardon
+            { 34, new[] { 2f, 0.8f, 0.35f, 2f, 0.8f, 0.35f, 3f, 0.7f, 0.2f, 3f, 0.7f, 0.25f } },   // sonic
+            { 36, new[] { 2f, 0.8f, 0.35f, 2f, 0.8f, 0.35f, 3f, 0.7f, 0.2f, 3f, 0.7f, 0.25f } },   // mariod
+            { 40, new[] { 1f, 0.8f, 0.75f, 1f, 0.8f, 0.75f, 1f, 0.8f, 0.75f, 1f, 0.8f, 0.75f } },   // wiifit
+            { 41, new[] { 1f, 0.8f, 0.8f, 1f, 0.8f, 0.8f, 1f, 0.8f, 0.8f, 1f, 0.8f, 0.8f } },   // littlemac
+            { 42, new[] { 0.4f, 1.5f, 0.55f, 0.5f, 1.5f, 0.55f, 0.6f, 1.4f, 0.65f, 0.6f, 1.4f, 0.65f } },   // murabito
+            { 46, new[] { 1f, 0.5f, 0.5f, 1f, 0.5f, 0.5f, 1f, 0.5f, 0.5f, 1f, 0.5f, 0.5f } },   // koopajr
+            { 48, new[] { 0.45f, 1f, 2f, 0.45f, 1f, 2f, 0.3f, 0.9f, 2f, 0.3f, 0.9f, 2f } },   // gekkouga
+            { 49, new[] { 2f, 0.65f, 0.55f, 2f, 0.65f, 0.55f, 2f, 0.6f, 0.5f, 2f, 0.6f, 0.5f } },   // pacman
+            { 50, new[] { 1f, 0.95f, 0.4f, 1f, 0.95f, 0.4f, 1f, 0.95f, 0.35f, 1f, 0.95f, 0.35f } },   // rockman
+            { 51, new[] { 2f, 0.65f, 0.55f, 2f, 0.65f, 0.55f, 2f, 0.6f, 0.5f, 2f, 0.6f, 0.5f } },   // mewtwo
+            { 53, new[] { 0.4f, 1.5f, 0.55f, 0.5f, 1.5f, 0.55f, 0.6f, 1.4f, 0.65f, 0.6f, 1.4f, 0.65f } },   // lucas
+            { 55, new[] { 0.7f, 0.8f, 1.5f, 0.7f, 0.8f, 1.5f, 0.7f, 0.8f, 1.5f, 0.7f, 0.8f, 1.5f } },   // cloud
+            { 56, new[] { 0.8f, 0.8f, 1.2f, 0.8f, 0.8f, 1.2f, 0.8f, 0.8f, 1.2f, 0.8f, 0.8f, 1.2f } },   // bayonetta
+            { 58, new[] { 1f, 0.95f, 0.4f, 1f, 0.95f, 0.4f, 1f, 0.95f, 0.35f, 1f, 0.95f, 0.35f } },   // koopag
+            { 59, new[] { 1f, 0.95f, 0.4f, 1f, 0.95f, 0.4f, 1f, 0.95f, 0.35f, 1f, 0.95f, 0.35f } },   // warioman
+            { 60, new[] { 1f, 0.8f, 0.8f, 1f, 0.8f, 0.8f, 1f, 0.8f, 0.8f, 1f, 0.8f, 0.8f } },   // littlemacg
+            { 61, new[] { 0.7f, 0.5f, 3f, 0.7f, 0.5f, 3f, 0.65f, 0.4f, 3f, 0.65f, 0.4f, 3f } },   // lucariom
+            { 63, new[] { 0.9f, 1.1f, 1.8f, 0.9f, 1.1f, 1.8f, 0.8f, 1f, 1.7f, 0.8f, 1f, 1.7f } },   // miienemys
+            { 64, new[] { 1f, 1.9f, 1f, 1f, 1.4f, 1f, 1f, 1.7f, 1f, 1f, 1.7f, 1f } },   // miienemyg
+        };
+
+        Dictionary<int, float[]> fighterColours;
+        bool fighterColoursRead;
+
+        /// <summary>fighter_param.bin's words 0x13C-0x147 by kind (word 0), or null: a generic param file (FF FF 00 00,
+        /// then typed values; 0x20 a group with its entry count): one group of 354-word entries.</summary>
+        public static Dictionary<int, float[]> ReadFighterColours(byte[] d)
+        {
+            if (d == null || d.Length < 13 || d[0] != 0xFF || d[1] != 0xFF || d[2] != 0 || d[3] != 0 || d[8] != 0x20) return null;
+            int i = 9, count = (d[i] << 24) | (d[i + 1] << 16) | (d[i + 2] << 8) | d[i + 3];
+            i += 4;
+            var o = new Dictionary<int, float[]>();
+            int[] size = { 0, 1, 1, 2, 2, 4, 4, 4 };
+            for (int e = 0; e < count && i < d.Length; e++)
+            {
+                var w = new float[12];
+                int kind = -1;
+                for (int k = 0; k < 354; k++)
+                {
+                    if (i >= d.Length) return o;
+                    int t = d[i++];
+                    if (t == 8) { int ln = (d[i] << 24) | (d[i + 1] << 16) | (d[i + 2] << 8) | d[i + 3]; i += 4 + ln; continue; }
+                    if (t < 1 || t > 7) return o;
+                    uint v = 0;
+                    for (int b = 0; b < size[t]; b++) v = (v << 8) | d[i + b];
+                    i += size[t];
+                    if (k == 0) kind = (int)v;
+                    if (k >= 0x13C && k < 0x148) w[k - 0x13C] = t == 7 ? BitConverter.ToSingle(BitConverter.GetBytes(v), 0) : v;
+                }
+                if (kind >= 0) o[kind] = w;
+            }
+            return o;
+        }
+
+        /// <summary>The game folder's fighter_param.bin for a fighter folder: data/param/fighter next to data/fighter, looked
+        /// for in every folder above the fighter's; null when none has it.</summary>
+        public static string FindFighterParam(string fighterRoot)
+        {
+            string d = fighterRoot;
+            for (int up = 0; up < 8 && !string.IsNullOrEmpty(d); up++)
+            {
+                d = Path.GetDirectoryName(d);
+                if (string.IsNullOrEmpty(d)) break;
+                foreach (var p in new[] { Path.Combine(d, "param", "fighter", "fighter_param.bin"),
+                                          Path.Combine(d, "data", "param", "fighter", "fighter_param.bin") })
+                    try { if (File.Exists(p)) return p; } catch (Exception) { }
+            }
+            return null;
+        }
+
+        /// <summary>The fighter's kind (Kinds): its folder's name, else the name before a copy's suffix ("mariod - Copy"), else
+        /// its effect folder's bank (fighter/NAME/effect/NAME); -1 when none is a known fighter.</summary>
+        public int FighterKind()
+        {
+            if (fighterName == null) return -1;
+            string n = fighterName.ToLowerInvariant();
+            int k = Array.IndexOf(Kinds, n);
+            if (k >= 0) return k;
+            k = Array.IndexOf(Kinds, n.Split(' ', '-', '_', '.', '(')[0]);
+            if (k >= 0) return k;
+            try
+            {
+                string fx = Path.Combine(fighterRoot, "effect");
+                if (Directory.Exists(fx))
+                    foreach (var d in Directory.GetDirectories(fx))
+                    {
+                        k = Array.IndexOf(Kinds, Path.GetFileName(d).ToLowerInvariant());
+                        if (k >= 0) return k;
+                    }
+            }
+            catch (Exception) { }
+            return -1;
+        }
+
+        /// <summary>The fighter's colour for an effect id (a common one its EffectModule tints: FighterColourIds), as the game
+        /// sets it on the request (docs/native-notes.md, "Fighter colours for the common attack effects"); null for any
+        /// other id, a fighter not known, or 1, 1, 1.</summary>
+        public float[] FighterColour(uint id)
+        {
+            if ((int)(id >> 16) != 0x100 || fighterName == null) return null;
+            int at = Array.IndexOf(FighterColourIds, (int)(id & 0xFFFF));
+            if (at < 0) return null;
+            int kind = FighterKind();
+            if (kind < 0) return null;
+            if (!fighterColoursRead)
+            {
+                fighterColoursRead = true;
+                try { var p = FindFighterParam(fighterRoot); if (p != null) fighterColours = ReadFighterColours(File.ReadAllBytes(p)); }
+                catch (Exception) { fighterColours = null; }
+            }
+            float[] w;
+            if (!(fighterColours != null && fighterColours.TryGetValue(kind, out w)) && !VanillaFighterColours.TryGetValue(kind, out w))
+                return null;
+            var c = new[] { w[at * 3], w[at * 3 + 1], w[at * 3 + 2] };
+            return c[0] == 1 && c[1] == 1 && c[2] == 1 ? null : c;
+        }
+
         static Bank LoadBank(int id, string dir, string name)
         {
             if (string.IsNullOrEmpty(dir)) return null;

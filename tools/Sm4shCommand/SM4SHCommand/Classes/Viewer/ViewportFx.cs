@@ -100,6 +100,24 @@ namespace Sm4shCommand.Viewer
             a = e.HasAlpha ? Math.Max(0, e.CA) : 1;
         }
 
+        /// <summary>(v1.7.1) The fighter's own colour for an effect (common attack arcs / streaks), or null: the viewer sets it
+        /// (EffectLibrary.FighterColour).</summary>
+        public Func<uint, float[]> GetFighterColour;
+
+        /// <summary>(v1.7.1) The fighter's colour for the call's effect, when the call sets none of its own: the game's
+        /// EffectModule colours a request whose id is in its table (fighter_param 0x13C-0x147 for the common effects
+        /// fighter_param_etc g14 lists, 0x8D / 0x92 / 0x8E / 0x90; set at 0x02E136EC, applied at 0x02C29F00 / 0x02C2AC44 /
+        /// 0x02C2B524 as LAST_EFFECT_SET_COLOR's emitter-set colour, which a colour command after it replaces): Dr. Mario's
+        /// and Mario's arcs (3, 0.7, 0.25), Pac-Man's streaks (2, 0.65, 0.55). Kept as the call's colour times the
+        /// LAST_PARTICLE_SET_COLOR multipliers.</summary>
+        void FighterColour(EffectData e, ref float r, ref float g, ref float b)
+        {
+            if (e.HasColor || GetFighterColour == null) return;
+            var c = GetFighterColour(e.IdFor(Flip));
+            if (c == null) return;
+            r *= c[0]; g *= c[1]; b *= c[2];
+        }
+
         /// <summary>A triangle list to draw: screen corners (x, y, depth), UVs, texture, colour, blend.</summary>
         class FxItem
         {
@@ -118,6 +136,7 @@ namespace Sm4shCommand.Viewer
             public Texture Tex1;        // a trail's second texture
             public int Shader;          // a trail's shader (> 0: drawn by FxRaster.TrailTri)
             public float Fade = 1;
+            public int Wrap = 0x11, MaskWrap = 0x11;    // (v1.7.1) U wrap | V wrap << 4: 0 mirror, 1 repeat, 2 clamp
         }
 
         static readonly float[] QuadPos = { -0.5f, 0.5f, 0, 0.5f, 0.5f, 0, 0.5f, -0.5f, 0, -0.5f, -0.5f, 0 };
@@ -139,6 +158,7 @@ namespace Sm4shCommand.Viewer
             if (sim == null || sim.Call == null) return o;
             float cr, cg, cb, ca;
             CallColour(e, out cr, out cg, out cb, out ca);
+            FighterColour(e, ref cr, ref cg, ref cb);
             foreach (var es in sim.Emitters)
             {
                 if (es.D.Distortion || es.D.Tex == null) continue;       // (as drawn: v1.6.3)
@@ -210,6 +230,7 @@ namespace Sm4shCommand.Viewer
                     if (sim == null || sim.Call == null) { markerOnly++; continue; }
                     float cr, cg, cb, ca;
                     CallColour(e, out cr, out cg, out cb, out ca);
+                    FighterColour(e, ref cr, ref cg, ref cb);
                     if (sim.Assets.Model != null)
                     {
                         AddModel(sim, sim.ModelFrame(g), items, r, u, f, cx, cy, cr, cg, cb, ca);
@@ -313,7 +334,7 @@ namespace Sm4shCommand.Viewer
                         for (int c = 0; c < 4; c++) { vc[c] = it.VCol[i0 * 4 + c]; vc[4 + c] = it.VCol[i1 * 4 + c]; vc[8 + c] = it.VCol[i2 * 4 + c]; }
                     FxRaster.Tri(tp, tz, tw, th, S[i0 * 3], S[i0 * 3 + 1], S[i0 * 3 + 2], S[i1 * 3], S[i1 * 3 + 1], S[i1 * 3 + 2],
                                  S[i2 * 3], S[i2 * 3 + 1], S[i2 * 3 + 2], uv, it.Tex, bil, it.R, it.G, it.B, it.A, it.Col1, vc, it.Blend, it.Combiner,
-                                 it.Mask, it.MaskU, it.MaskV);
+                                 it.Mask, it.MaskU, it.MaskV, it.Wrap, it.MaskWrap);
                 }
             }
             if (half) Upsample(pix, w, h, tp, basePix, tw, th);
@@ -428,14 +449,16 @@ namespace Sm4shCommand.Viewer
                 R = c0[0] * D.A(11, D.EmColor0[0], k) * cr, G = c0[1] * D.A(12, D.EmColor0[1], k) * cg,
                 B = c0[2] * D.A(13, D.EmColor0[2], k) * cb, A = alpha, Tex = D.Tex,
                 Blend = D.Blend == 1 ? FxRaster.Add : D.Blend == 2 ? FxRaster.Sub : FxRaster.Alpha, Combiner = D.Combiner,
-                Mask = D.Tex1, MaskU = D.U1Scale / D.UScale, MaskV = D.V1Scale / D.VScale,
+                Mask = D.Tex1, MaskU = D.U1Scale / D.UScale, MaskV = D.V1Scale / D.VScale, Wrap = D.Wrap0, MaskWrap = D.Wrap1,
                 S = new float[n * 2 * 3], UV = new float[n * 2 * 2], VCol = new float[n * 2 * 4],
             };
-            if (D.Combiner == 2)
+            if (D.Combiner == 2 || D.Combiner == 4)      // (v1.7.1: 4 too, 2 with the texture's own alpha: its colour 1 was black)
             {
                 var c1 = new float[3];
                 D.Colour(1, Math.Min(1, t0), c1);
-                it.Col1 = new[] { c1[0] * D.A(19, D.EmColor1[0], k), c1[1] * D.A(20, D.EmColor1[1], k), c1[2] * D.A(21, D.EmColor1[2], k) };
+                // (v1.7.1) the call's colour multiplies colour 1 too: eft's dynamic block takes the emitter set's colour x the
+                // colour scale x each of the emitter's two colours (cross_f 0x04A65B2C: [0-2] x +0x218, [4-6] x +0x238)
+                it.Col1 = new[] { c1[0] * D.A(19, D.EmColor1[0], k) * cr, c1[1] * D.A(20, D.EmColor1[1], k) * cg, c1[2] * D.A(21, D.EmColor1[2], k) * cb };
             }
             var toCam = new[] { -f[0], -f[1], -f[2] };
             float depth = 0;
@@ -495,13 +518,15 @@ namespace Sm4shCommand.Viewer
                 R = c0[0] * D.A(11, D.EmColor0[0], k) * cr, G = c0[1] * D.A(12, D.EmColor0[1], k) * cg,
                 B = c0[2] * D.A(13, D.EmColor0[2], k) * cb, A = alpha, Tex = D.Tex,
                 Blend = D.Blend == 1 ? FxRaster.Add : D.Blend == 2 ? FxRaster.Sub : FxRaster.Alpha, Combiner = D.Combiner,
-                Mask = D.Tex1, MaskU = D.U1Scale / D.UScale, MaskV = D.V1Scale / D.VScale,
+                Mask = D.Tex1, MaskU = D.U1Scale / D.UScale, MaskV = D.V1Scale / D.VScale, Wrap = D.Wrap0, MaskWrap = D.Wrap1,
             };
-            if (D.Combiner == 2)
+            if (D.Combiner == 2 || D.Combiner == 4)      // (v1.7.1: 4 too, 2 with the texture's own alpha: its colour 1 was black)
             {
                 var c1 = new float[3];
                 D.Colour(1, t, c1);
-                it.Col1 = new[] { c1[0] * D.A(19, D.EmColor1[0], k), c1[1] * D.A(20, D.EmColor1[1], k), c1[2] * D.A(21, D.EmColor1[2], k) };
+                // (v1.7.1) the call's colour multiplies colour 1 too: eft's dynamic block takes the emitter set's colour x the
+                // colour scale x each of the emitter's two colours (cross_f 0x04A65B2C: [0-2] x +0x218, [4-6] x +0x238)
+                it.Col1 = new[] { c1[0] * D.A(19, D.EmColor1[0], k) * cr, c1[1] * D.A(20, D.EmColor1[1], k) * cg, c1[2] * D.A(21, D.EmColor1[2], k) * cb };
             }
             var call = es.LastM ?? sim.Call;       // a following particle: the live call x emitter matrix
             var callLin = Fx.Lin(call);
@@ -528,7 +553,11 @@ namespace Sm4shCommand.Viewer
             {
                 float s = Fx.Len(v);
                 b = frame;
-                if (pt == 4 && s > 1e-4f)
+                // (v1.7.1) type 4 takes any motion, however small: eft's program normalizes it whatever its size, and
+                // effects set a tiny one on purpose to turn the sheet (the common arcs, PtcCommonAttackArcB: 1e-6 along
+                // the emitter's Y and 1e-8 out of a circle along -Z give X = -emitter X, the arc in front of Dr. Mario;
+                // v1.7.0 took them as at rest, the emitter's frame, and drew it mirrored behind him)
+                if (pt == 4 && s > 1e-12f)
                 {
                     var y = new[] { v[0] / s, v[1] / s, v[2] / s };
                     var x = Fx.Cross(new[] { frame[1], frame[4], frame[7] }, y);
@@ -548,7 +577,11 @@ namespace Sm4shCommand.Viewer
             var rot = new float[3];
             for (int i = 0; i < 3; i++) rot[i] = q.Rot[i] + D.RotAdd[i] * age;
             var R = Fx.Rot(rot, "xzy");
-            b = pt == 2 ? Fx.Mul(Fx.Mul(Fx.Mul(b, XZT), R), XZ) : Fx.Mul(b, R);
+            // an XZ plate: turned in the emitter's frame, then laid flat with its Y onto the emitter's -Z (v1.7.1: eft's
+            // own programs, fitted over two camera pitches on the common bank's plates (PtcCommonBombB ring1, the Genesis
+            // beam's shoot1 meshes): frame x R x XZT; v1.7.0's XZ had the plate's Y and Z reversed, the Genesis beam's
+            // head meshes pointing forward from their particle instead of back along the beam)
+            b = pt == 2 ? Fx.Mul(Fx.Mul(Fx.Mul(b, XZT), R), XZT) : Fx.Mul(b, R);
             float[] pos = D.Mesh != null ? D.Mesh.Pos : QuadPos;
             int nv = pos.Length / 3;
             it.S = new float[nv * 3];
@@ -559,7 +592,7 @@ namespace Sm4shCommand.Viewer
             float depth = 0;
             for (int i = 0; i < nv; i++)
             {
-                float lx = pos[i * 3] * sx, ly = pos[i * 3 + 1] * sy, lz = pos[i * 3 + 2] * sx;
+                float lx = (pos[i * 3] + D.RotBasis[0]) * sx, ly = (pos[i * 3 + 1] + D.RotBasis[1]) * sy, lz = pos[i * 3 + 2] * sx;
                 float wx = b[0] * lx + b[1] * ly + b[2] * lz + p[0], wy = b[3] * lx + b[4] * ly + b[5] * lz + p[1],
                       wz = b[6] * lx + b[7] * ly + b[8] * lz + p[2];
                 float x = wx * r[0] + wy * r[1] + wz * r[2], y = wx * u[0] + wy * u[1] + wz * u[2], z = wx * f[0] + wy * f[1] + wz * f[2];

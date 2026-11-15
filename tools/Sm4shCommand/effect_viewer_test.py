@@ -4,11 +4,19 @@ and the names / lifetimes it expects (independently, from tools/efc.py and tools
 
   python3 tools/Sm4shCommand/effect_viewer_test.py BUILT_DIR WORK_DIR --supamario-base DIR --supamario-build DIR
       --kirby DIR --kirby-pac MAIN.pac --kirby-acmd DIR --brave DIR [--pacman DIR] [--mariod DIR] [--link DIR]
+      [--common DIR]
 
 v1.6.3: --pacman / --mariod / --link: real fighter folders (fighter/pacman etc., a full or partial copy; read in place,
 never copied into the repository): Pac-Man's visibility groups (VisGroups.txt), part animations and billboard sprites,
 his Final Smash bank's original-format textures; every emitter of the given banks drawn without blocks; Dr. Mario's
 Cyclone ring and forward air; Link's up special's stripes as ribbons, both facings.
+
+v1.7.1: --common DIR: the game's own common bank (data/effect/common: common.010d0000.efc / .ptcl, model/, trail/; or a
+folder above it), read in place (linked, else copied, at WORK/effect/common, outside the repository) instead of the
+stand-in (Supamario's bank under the common name): its entries against tools/efc.py + ptcl.py, the fighters' colours
+for the common attack arcs / streaks, Dr. Mario's forward-air arc and Pac-Man's jab streak in front of them in both
+facings, the texture wraps, rotBasis, the box volume, the XZ plates (the Genesis beam on Link), every emitter drawn
+without blocks.
 
 BUILT_DIR: the built Sm4shCommand (SM4SHCommand.exe, SALT.dll, Events.cfg, Tooltips). Supamario: the base folder (Mario's
 model, Mario's scripts) and a build (tools/supamario_*_build.py: motion, scripts, effect); Kirby: a folder with model /
@@ -32,6 +40,20 @@ import ptcl as PTCL  # noqa: E402
 MONO = '/usr/lib/mono/4.5'
 SUPERJUMP = 0x5     # Mario's PtcMarioSuperjumppunch entry: an emitter with a deterministic path (speed 4, gravity, air)
 CSC = ['dotnet', '/usr/lib/dotnet/sdk/8.0.134/Roslyn/bincore/csc.dll']
+
+
+# v1.7.1: common entries the real-bank run names (hit spark, landing / dash smoke, whirlwind, fire puff, spin wind,
+# the Gekikara aura, the soccer ball, the attack streak / arcs / impact, the Genesis beam)
+COMMON_IDS = [0x1000001, 0x1000006, 0x1000009, 0x100000D, 0x1000011, 0x1000023, 0x1000052, 0x1000072, 0x100008D,
+              0x100008E, 0x100008F, 0x1000090, 0x10000A5]
+
+
+def common_folder(d):
+    """the folder with common.010d0000.efc: d itself, d/effect/common, d/common or d/data/effect/common"""
+    for c in (d, os.path.join(d, 'effect', 'common'), os.path.join(d, 'common'), os.path.join(d, 'data', 'effect', 'common')):
+        if os.path.exists(os.path.join(c, 'common.010d0000.efc')):
+            return os.path.abspath(c)
+    sys.exit('--common: no common.010d0000.efc in %s' % d)
 
 
 def arg(a, name):
@@ -197,10 +219,22 @@ def main():
     # (the lookup, loading and drawing are what's tested; ids 0x0100nnnn then mean his entries nnnn)
     smfx = os.path.join(sm, 'effect', 'supamario')
     common = os.path.join(work, 'effect', 'common')
-    os.makedirs(common, exist_ok=True)
-    for ext in ('efc', 'ptcl'):
-        shutil.copy(os.path.join(smfx, 'supamario.010d0000.' + ext), os.path.join(common, 'common.010d0000.' + ext))
-    copy(os.path.join(smfx, 'model'), os.path.join(common, 'model'))
+    real_common = None
+    if '--common' in a:
+        # v1.7.1: the game's own bank (game files: never in the repository), linked where the game keeps it, else copied
+        real_common = common_folder(arg(a, '--common'))
+        os.makedirs(os.path.dirname(common), exist_ok=True)
+        try:
+            os.symlink(real_common, common, target_is_directory=True)
+        except OSError:
+            copy(real_common, common)
+        exp_common = os.path.join(work, 'expect_common.txt')
+        open(exp_common, 'w').write('\n'.join(expect(real_common, 'common', COMMON_IDS)) + '\n')
+    else:
+        os.makedirs(common, exist_ok=True)
+        for ext in ('efc', 'ptcl'):
+            shutil.copy(os.path.join(smfx, 'supamario.010d0000.' + ext), os.path.join(common, 'common.010d0000.' + ext))
+        copy(os.path.join(smfx, 'model'), os.path.join(common, 'model'))
     fx += visibility(os.path.join(sm, 'model', 'body', 'c00'), 'FitMarioBodyMainF00DamageHi1', (0, 3, 11))
     exp_fx = os.path.join(work, 'expect_fx.txt')
     open(exp_fx, 'w').write('\n'.join(fx) + '\n')
@@ -220,6 +254,8 @@ def main():
     for k in ('pacman', 'mariod', 'link'):
         if '--' + k in a:
             cmd.append('%s=%s' % (k, os.path.abspath(arg(a, '--' + k))))
+    if real_common:
+        cmd += ['common=%s' % common, 'commonexp=%s' % exp_common]
     cmd.append('visgroups=%s' % os.path.join(HERE, 'SM4SHCommand', 'VisGroups.txt'))
     if not os.environ.get('DISPLAY') and shutil.which('xvfb-run'):
         cmd = ['xvfb-run', '-a'] + cmd

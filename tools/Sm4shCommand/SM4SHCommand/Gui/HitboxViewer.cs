@@ -163,6 +163,7 @@ namespace Sm4shCommand.GUI
                                    EffectLibrary.FindCommonFolder(assets.Root);
             view.EffectLabel = EffectLabel;
             view.GetEffectAssets = library.AssetsFor;
+            view.GetFighterColour = library.FighterColour;      // (v1.7.1)
             view.GetTrailTexture = library.TrailTexture;
             Size = new Size(1150, 720);
             StartPosition = FormStartPosition.CenterParent;

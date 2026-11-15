@@ -161,7 +161,7 @@ everyone ("keep default"), 8 are derived (leave 0), word 0 = kind.
 | 0xD0-0x105 | power-up categories, attack-kind damage multipliers, item / heal / shield / dodge / ledge / respawn / status multipliers (1.0 in the file), Speed Crasher hitbox |
 | 0x106-0x126 | move-set flags: jab type and count, rapid jab, # of f-tilts/f-smashes, jump type, glide, walk/run animation frame thresholds, heavy walk frames, crawl, wall jump/cling, tether, thrown / grabbed types, model mirroring |
 | 0x127-0x13B | upper-body nodes, KO / screen-KO placement, item body sizes, hip/head nodes |
-| 0x13C-0x147 | 4 x 3 floats paired with etc g14 |
+| 0x13C-0x147 | the fighter's colours for the common attack effects etc g14 lists (0x8D streak, 0x92, 0x8E / 0x90 arcs: an r, g, b each), set as the effect's colour on every request for one (docs/native-notes.md "Fighter colours for the common attack effects") |
 | 0x148-0x157 | Find Mii colours (unreferenced on Wii U) |
 | 0x158-0x161 | derived jump speeds (+ two multipliers) |
 

@@ -2194,6 +2194,32 @@ Manifold by Fitz Null (zlib License), https://gitlab.com/fitz.lol/manifold, targ
   `EffectModule(0x26, v)` sets `+0x9B` (vt `+0x21C`; `0x27` reads it, vt `+0x224`), `EffectModule(0x1C, v)` is
   set_visible; the native hide paths (`0x0275DF1C`, `0x027F4xxx`-`0x027F7xxx`) call vt `+0x17C` themselves.
 
+## Fighter colours for the common attack effects (Sm4shCommand v1.7.1)
+
+Why Dr. Mario's forward-air arc is orange-yellow in game while the common bank's `PtcCommonAttackArcB` (entry 0x90) is
+white / grey (colour 0 white, colour 1 grey 0.32-0.83, a greyscale BC4 texture, emitter colours and colour scale 1)
+and his effect script sets no colour (one `EFFECT_FOLLOW_FLIP 0x1000090`):
+- **Each fighter's EffectModule keeps a colour table.** Fighter set-up `0x02E13048` (at `0x02E136C8`-`0x02E136EC`)
+  calls the module's vt `+0x254` (`0x02C2CA98`, fighter `+0x74D8`) with fighter_param_etc g14's count / list
+  (`etc + 0x130` / `+ 0x134`: 141, 146, 142, 144 = common 0x8D, 0x92, 0x8E, 0x90) and the fighter's fighter_param
+  entry `+0x4F0` (words 0x13C-0x147: an r, g, b per id, in that order). The module stores the ids `+0x34`, colours
+  `+0x38` (12 bytes each), count `+0x3C` and the smallest / largest id + 0x01000000 at `+0x40` / `+0x44`.
+- **Every request looks its id up** (`0x02C29EB0` in vt `+0x4C`/`+0x54`'s path, `0x02C2ABF0`, `0x02C2B4D0` in vt `+0x64`'s,
+  the following one): an id in range and in the table gets `0x0334C938(handle, r, g, b)`, the emitter set's colour
+  (`0x032F0CB0` -> `0x0334F834`: set `+0x278`-`+0x280`), the same call `LAST_EFFECT_SET_COLOR` makes (vt `+0x27C` =
+  `0x02C2CB40`), so a colour command after the request replaces it.
+- **The set's colour multiplies both emitter colours**: eft's emitter calc (`0x04A65B2C`) writes the dynamic uniform
+  block's colour 0 as set colour x colour scale (`0x778`) x the emitter's colour 0 (`+0x218`), and colour 1 likewise
+  with `+0x238`. Values over 1 brighten (an additive core saturates to white, the edges keep the hue).
+- Vanilla values (fighter_param.bin; `reference/params/fighter_param.csv` `attack_effect_colour_*`, mislabelled
+  "motion_blend" before): Mario, Luigi, Dr. Mario, Sonic 0x8D / 0x92 (2, 0.8, 0.35), 0x8E (3, 0.7, 0.2), 0x90
+  (3, 0.7, 0.25); Pac-Man and Mewtwo (2, 0.65, 0.55) / (2, 0.6, 0.5); Fox, Lucario (0.7, 0.5, 3) blue; Samus, Ness,
+  Lucas, Villager green; Falco red; R.O.B. dark (0.22, 0.06, 0.04); Link, Marth, Ike and 24 others 1, 1, 1 (white).
+  A kind past 0x40 needs an entry of its own (the table is filled from the fighter's own fighter_param entry).
+- The Hitbox Viewer (v1.7.1) applies it: `EffectLibrary.FighterColour` (the game folder's
+  `data/param/fighter/fighter_param.bin` when found above the fighter's, else the vanilla table), on the call's colour
+  unless the call sets one.
+
 ## The eft runtime (particles: cross_f.rpx 0x04A40000-0x04A90000)
 
 - Emitter set-up `0x04A5BDCC` (buffer sizing), GPU uniforms `0x04A5AA30` (per texture slot

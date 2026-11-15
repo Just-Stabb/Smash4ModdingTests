@@ -298,7 +298,7 @@ class EvTest
 
     /// <summary>v1.6.1: the common bank (0x0100nnnn) from the game's data/effect/common above the fighter's folder
     /// (effect_viewer_test.py puts a stand-in there: Supamario's bank under the common name).</summary>
-    static void Common(string fighters, string sm, Func<uint, string> common)
+    static void Common(string fighters, string sm, Func<uint, string> common, bool standIn = true)
     {
         string want = Path.Combine(Path.Combine(Path.GetDirectoryName(fighters), "effect"), "common");
         string found = EffectLibrary.FindCommonFolder(sm);
@@ -308,14 +308,16 @@ class EvTest
               "|" + EffectLibrary.CommonFolderIn(want) + "|" + (EffectLibrary.CommonFolderIn(sm) ?? "null"), want + "|" + want + "|" + want + "|null");
         var lib = new EffectLibrary(sm) { CommonName = common, CommonFolder = found };
         var plain = new EffectLibrary(sm) { CommonName = common };
+        Check("v1.6.1: without the bank, common effects stay markers (no assets) and their tooltip names",
+              (plain.AssetsFor(0x1000031) == null) + " " + plain.Name(0x1000011), "True " + (common(0x1000011) ?? ""));
+        // (v1.7.1: with the game's own bank given, its entries are checked by RealCommon; these need the stand-in's)
+        if (!standIn) return;
         var a = lib.AssetsFor(0x1000031);
         var b = lib.AssetsFor(0x3410031);
         Check("v1.6.1: common 0x1000031's emitters / model from the common bank (the stand-in: Supamario's entry 0x31)",
               a != null ? a.SetName + " " + a.Emitters.Count : "none", b != null ? b.SetName + " " + b.Emitters.Count : "?");
         var am = lib.AssetsFor(0x1000034);
         Check("v1.6.1: common 0x1000034's effect model from the common bank's model folder", am != null && am.Model != null ? am.Model.Name : "none", "EffSupamarioGfCsgBas");
-        Check("v1.6.1: without the bank, common effects stay markers (no assets) and their tooltip names",
-              (plain.AssetsFor(0x1000031) == null) + " " + plain.Name(0x1000011), "True " + (common(0x1000011) ?? ""));
         string tip = common(0x1000031);
         Check("v1.6.1: a common effect's name: its tooltip name (the bank's set after it)", lib.Name(0x1000031),
               tip != null ? tip + " (PtcSupamarioGfCsg_Circle)" : "PtcSupamarioGfCsg_Circle");
@@ -666,6 +668,168 @@ class EvTest
               heads.Count == 2 && Math.Abs(float.Parse(heads[0], IC) + float.Parse(heads[1], IC)) <= Math.Max(4, 0.1f * Math.Abs(float.Parse(heads[0], IC))), true);
     }
 
+    // ---- v1.7.1: the game's own common bank (given on the command line: never copied into the repository) -------------
+
+    /// <summary>The screen-space centre (x) of one emitter's quads of an effect on game frame g, less the model origin's,
+    /// or NaN: what side of the fighter it is drawn on.</summary>
+    static float EmitterX(Viewport vp, EffectData e, int g, Func<EmitterSim, bool> which)
+    {
+        var sim = vp.SimFor(e, g);
+        if (sim == null) return float.NaN;
+        var all = sim.Emitters.ToList();
+        sim.Emitters.Clear();
+        sim.Emitters.AddRange(all.Where(which));
+        var q = vp.EffectScreenQuads(e, g);
+        sim.Emitters.Clear();
+        sim.Emitters.AddRange(all);
+        var xs = q.SelectMany(t => Enumerable.Range(0, t.Item1.Length / 3).Select(i => t.Item1[i * 3])).ToList();
+        return xs.Count == 0 ? float.NaN : xs.Average() - vp.ScreenOf(new[] { 0f, 0f, 0f })[0];
+    }
+
+    /// <summary>A fighter_param.bin of the generic param format with one entry: kind, then 353 floats (0x13C-0x147 given).</summary>
+    static byte[] ParamFile(int kind, float[] colours)
+    {
+        var o = new List<byte> { 0xFF, 0xFF, 0, 0, 0, 0, 0, 0, 0x20, 0, 0, 0, 1 };
+        Action<byte, byte[]> put = (t, v) => { o.Add(t); o.AddRange(v.Reverse()); };
+        put(6, BitConverter.GetBytes(kind));
+        for (int k = 1; k < 354; k++)
+            put(7, BitConverter.GetBytes(k >= 0x13C && k < 0x148 ? colours[k - 0x13C] : 0.5f));
+        return o.ToArray();
+    }
+
+    static string C(float[] c) { return c == null ? "null" : string.Join(" ", c.Select(x => x.ToString("0.###", IC)).ToArray()); }
+
+    static void RealCommon(string commonDir, string work, string expPath, Func<uint, string> common, string md, string pm, string lk)
+    {
+        // the entries the test names, against tools/efc.py + ptcl.py (effect_viewer_test.py: expect_common.txt)
+        var lib0 = new EffectLibrary(Path.Combine(Path.Combine(work, "fighter"), "supamario")) { CommonName = common, CommonFolder = commonDir };
+        foreach (var line in File.ReadAllLines(expPath))
+        {
+            var p = line.Split('\t');
+            if (p.Length < 3) continue;
+            uint id = Convert.ToUInt32(p[0], 16);
+            var a = lib0.AssetsFor(id);
+            string got = a == null ? "none" : string.Join(" + ", new[] { a.SetName, a.Model != null ? "model " + a.Model.Name : null }.Where(x => !string.IsNullOrEmpty(x)).ToArray());
+            var life = lib0.Lifetime(id);
+            Check(string.Format("v1.7.1: the game's common bank: 0x{0:X} is {1} (tools/efc.py + ptcl.py), life {2}", id, p[1], p[2]),
+                  got + " " + (life.HasValue ? Math.Max(1, life.Value) : -1), p[1] + " " + p[2]);
+        }
+        // the fighters' colours for the common attack effects (fighter_param 0x13C-0x147 by fighter_param_etc g14)
+        if (md != null)
+            Check("v1.7.1: Dr. Mario's colour for 0x1000090 (his forward-air arc, fighter_param 0x145-0x147: the game's orange-yellow; "
+                  + "0x100008D 0x13C-0x13E; a fighter bank's id none)",
+                  C(new EffectLibrary(md).FighterColour(0x1000090)) + " | " + C(new EffectLibrary(md).FighterColour(0x100008D)) + " | " +
+                  C(new EffectLibrary(md).FighterColour(0x3240090)), "3 0.7 0.25 | 2 0.8 0.35 | null");
+        if (pm != null)
+            Check("v1.7.1: Pac-Man's colour for his streak 0x100008D", C(new EffectLibrary(pm).FighterColour(0x100008D)), "2 0.65 0.55");
+        if (lk != null)
+            Check("v1.7.1: Link's colours are white (no tint: null)", C(new EffectLibrary(lk).FighterColour(0x1000090)), "null");
+        string tmp = Path.Combine(Path.GetTempPath(), "evtest_param_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            string fd = Path.Combine(Path.Combine(Path.Combine(tmp, "data"), "fighter"), "mariod");
+            string pd = Path.Combine(Path.Combine(Path.Combine(tmp, "data"), "param"), "fighter");
+            Directory.CreateDirectory(fd);
+            Directory.CreateDirectory(pd);
+            File.WriteAllBytes(Path.Combine(pd, "fighter_param.bin"),
+                               ParamFile(36, new[] { 1f, 2, 3, 4, 5, 6, 7, 8, 9, 0.1f, 0.2f, 0.3f }));
+            var ml = new EffectLibrary(fd);
+            Check("v1.7.1: a fighter_param.bin in the game folder (data/param/fighter above data/fighter/mariod) is read instead of "
+                  + "the vanilla table: entry 36's words 0x145-0x147 for 0x1000090, 0x13F-0x141 for 0x1000092",
+                  EffectLibrary.FindFighterParam(fd) != null ? C(ml.FighterColour(0x1000090)) + " | " + C(ml.FighterColour(0x1000092)) : "not found",
+                  "0.1 0.2 0.3 | 4 5 6");
+        }
+        finally { try { Directory.Delete(tmp, true); } catch (Exception) { } }
+
+        // the texture wraps (TexRes +0x0C): Pac-Man's streak head flare1 is a mirrored 2 x 2 repeat
+        var lp = lib0.AssetsFor(0x100008D);
+        if (lp != null)
+        {
+            var flare = lp.Emitters.First(x => x.Name == "flare1");
+            var line = lp.Emitters.First(x => x.Name == "line_main1_add");
+            Check("v1.7.1: wraps: 0x100008D flare1 mirrored on both axes (0x00); Wrap mirror 1.25 -> 0.75, -0.25 -> 0.25, repeat keeps 1.25, clamp 1.25 -> 1",
+                  flare.Wrap0.ToString("X2") + " " + FxRaster.Wrap(1.25f, 0).ToString("0.###", IC) + " " + FxRaster.Wrap(-0.25f, 0).ToString("0.###", IC) + " " +
+                  FxRaster.Wrap(1.25f, 1).ToString("0.###", IC) + " " + FxRaster.Wrap(1.25f, 2).ToString("0.###", IC), "00 0.75 0.25 1.25 1");
+            Check("v1.7.1: rotBasis read (0x4C4): 0x100008D line_main1_add's quad off its particle by -0.15 of its length",
+                  line.RotBasis[0].ToString("0.###", IC) + " " + line.RotBasis[1].ToString("0.###", IC), "0 -0.15");
+            // the box volume (10): line2_add's particles on the faces of its 3 x 3 x 0.1 box
+            var box = lp.Emitters.First(x => x.Name == "line2_add");
+            var sb = new EffectSim(new EffectData { Index = 0, Id = 0x100008D, StartFrame = 1, Size = 1f }, lp, 100000);
+            sb.StepTo(2, k => Mat4.TRS(new[] { 0f, 0f, 0f }, Mat4.EulerToQuat(0, 0, 0), new[] { 1f, 1f, 1f }));
+            var es = sb.Emitters.First(x => x.D == box);
+            var r = box.Radius;
+            bool onFace = es.Live.Count > 0 && es.Live.All(q => Math.Abs(Math.Max(Math.Abs(q.P[0]) / r[0], Math.Max(Math.Abs(q.P[1]) / r[1], Math.Abs(q.P[2]) / r[2])) - 1) < 0.05f);
+            Check("v1.7.1: volume 10 (a box, cross_f 0x04A503C4): 0x100008D line2_add's particles each on a face (one axis at its radius)",
+                  box.VolumeType + " " + es.Live.Count + " " + onFace, "10 3 True");
+        }
+
+        // Dr. Mario's forward-air arc (0x1000090, type 4 polygons with a 1e-6 motion): in front of him, both facings
+        if (md != null)
+        {
+            var a = FighterAssets.Load(md);
+            var lib = new EffectLibrary(md) { CommonFolder = commonDir };
+            string body = Path.Combine(md, "script", "animcmd", "body");
+            uint fair = 0x68FDC9A2;
+            var run = RunPair(Script(Path.Combine(body, "game.bin"), fair), Script(Path.Combine(body, "effect.bin"), fair), lib);
+            var arc = run.FxRunner.AllEffects.FirstOrDefault(x => x.Id == 0x1000090);
+            if (arc == null) { Check("v1.7.1: Dr. Mario's forward air starts 0x1000090", false, true); }
+            else
+            {
+                var anim = a.GetAnimation(a.AnimationFor(fair));
+                var side = new List<float>();
+                foreach (bool flip in new[] { false, true })
+                {
+                    var vp = new Viewport { Assets = a, Animation = anim, Width = 800, Height = 600, Flip = flip, GetEffectAssets = lib.AssetsFor, History = run.Fx };
+                    int g = arc.StartFrame + 2;
+                    vp.Frame = run.Fx[g - 1];
+                    vp.AnimFrame = run.Fx[g - 1].AnimFrame;
+                    side.Add(EmitterX(vp, run.Fx[g - 1].Effects.First(x => x.Index == arc.Index), g, x => x.D.Name.StartsWith("line1")));
+                }
+                Check(string.Format(IC, "v1.7.1: Dr. Mario's forward-air arc drawn in front of him: {0:0} px facing right, {1:0} facing left (v1.7.0: behind)", side[0], side[1]),
+                      side[0] > 10 && side[1] < -10 && Math.Abs(side[0] + side[1]) < 0.25f * Math.Abs(side[0]), true);
+            }
+        }
+        // Pac-Man's jab streak (0x100008D): its quads off their particles by rotBasis, in front of him, both facings
+        if (pm != null)
+        {
+            var a = FighterAssets.Load(pm);
+            var lib = new EffectLibrary(pm) { CommonFolder = commonDir };
+            string body = Path.Combine(pm, "script", "animcmd", "body");
+            uint jab = 0xAF37E1FA;
+            var run = RunPair(Script(Path.Combine(body, "game.bin"), jab), Script(Path.Combine(body, "effect.bin"), jab), lib);
+            var st = run.FxRunner.AllEffects.FirstOrDefault(x => x.Id == 0x100008D);
+            if (st != null)
+            {
+                var anim = a.GetAnimation(a.AnimationFor(jab));
+                var side = new List<float>();
+                foreach (bool flip in new[] { false, true })
+                {
+                    var vp = new Viewport { Assets = a, Animation = anim, Width = 800, Height = 600, Flip = flip, GetEffectAssets = lib.AssetsFor, History = run.Fx };
+                    int g = st.StartFrame + 1;
+                    vp.Frame = run.Fx[g - 1];
+                    vp.AnimFrame = run.Fx[g - 1].AnimFrame;
+                    side.Add(EmitterX(vp, run.Fx[g - 1].Effects.First(x => x.Index == st.Index), g, x => x.D.Name.StartsWith("line_main1")));
+                }
+                Check(string.Format(IC, "v1.7.1: Pac-Man's jab streak centred in front of him: {0:0} px facing right, {1:0} facing left", side[0], side[1]),
+                      side[0] > 10 && side[1] < -10, true);
+            }
+        }
+        // an XZ plate (type 2) laid with its Y onto the emitter's -Z: the Genesis beam's head meshes trail their particles
+        if (lk != null)
+        {
+            var a = FighterAssets.Load(lk);
+            var lib = new EffectLibrary(lk) { CommonFolder = commonDir };
+            var e = new EffectData { Index = 0, Id = 0x10000A5, StartFrame = 1, X = 0, Y = 8, Z = 0, Size = 0.4f, Rate = 4, Follow = true, World = true };
+            var vp = new Viewport { Assets = a, Width = 800, Height = 600, GetEffectAssets = lib.AssetsFor, Frame = new FrameState() };
+            int g = 4;
+            float mesh = EmitterX(vp, e, g, x => x.D.Name == "beam_shoot1_front");
+            var es = vp.SimFor(e, g).Emitters.First(x => x.D.Name == "beam_shoot1_front");
+            float at = es.Live.Count == 0 ? float.NaN : es.Live.Average(q => vp.ScreenOf(es.World(q))[0]) - vp.ScreenOf(new[] { 0f, 0f, 0f })[0];
+            Check(string.Format(IC, "v1.7.1: 0x10000A5 beam_shoot1_front (type 2 meshes): drawn behind their particles along the beam ({0:0} px vs {1:0}; eft's programs)", mesh, at),
+                  mesh < at, true);
+        }
+    }
+
     static int Main(string[] args)
     {
         var errors = new List<string>();
@@ -784,7 +948,7 @@ class EvTest
         if (fxFile) Level2(args[3], smLib, kbLib, ks);
         // ---- v1.6.1: effect rates, common effects, the scripts' sources -------------------------------------------------
         Rates(smLib, common);
-        Common(root, sm, common);
+        Common(root, sm, common, !args.Skip(3).Any(x => x.StartsWith("common=")));
         Sources(smAssets, smBody, dash);
         // ---- v1.6.2: colours, overlays, visibility, model parts, the arcs' direction --------------------------------
         if (fxFile) Visibility(args[3], smAssets);
@@ -797,6 +961,10 @@ class EvTest
         if (pmDir != null) RealPacman(pmDir, opt("visgroups") ?? "VisGroups.txt");
         if (mdDir != null) RealMariod(mdDir);
         if (lkDir != null) RealLink(lkDir);
+        // v1.7.1: the game's common bank (common=DIR, linked at WORK/effect/common; expect_common.txt from tools/efc.py + ptcl.py)
+        string cmDir = opt("common");
+        if (cmDir != null) RealCommon(cmDir, Path.GetDirectoryName(root), opt("commonexp"), common, mdDir, pmDir, lkDir);
+        if (cmDir != null) reals.Add(Path.GetDirectoryName(root));
         if (reals.Count > 0) RealBanks(reals);
         else Console.WriteLine("(v1.6.3's real-folder checks skipped: give pacman= / mariod= / link= folders)");
 
