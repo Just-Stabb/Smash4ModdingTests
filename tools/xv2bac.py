@@ -192,7 +192,7 @@ def line(it):
     if ty == 7:
         return '%s %s: flags 0x%X' % (t, name, it['bcm_flags'])
     if ty == 8:
-        src = EEPK_TYPES.get(it['eepk_type'], it['eepk_type'])
+        src = str(EEPK_TYPES.get(it['eepk_type'], 'EEPK type %d' % it['eepk_type']))
         if it['skill_id'] != 0xFFFF:
             src += ' %d' % it['skill_id']
         return '%s %s: %s effect %d bone %d%s' % (t, name, src, it['effect_id'], it['bone'],
