@@ -1863,7 +1863,7 @@ HELP['Position_Place'] = [
     '- 2: the target itself. It moves by Fwd along its own facing, Up, Depth from where it is (as POS_SELF_MOVE_FWD / '
     'UP / Z, and Position_Set Mode 1).',
     '- 3: this object goes next to the target: the target\'s position + Fwd along this object\'s facing, Up, Depth '
-    '(Fwd below 0 = on this side of it: "teleport behind" is Fwd -15 when facing it). (As POS_SELF_OFFSET_.)',
+    '(facing it, Fwd 15 = past it, "teleport behind"; Fwd -15 = on this side of it). (As POS_SELF_OFFSET_.)',
     'Axes picks which coordinates change (bits: 1 X, 2 Y, 4 Z; 0 = all three); the others keep the placed one\'s own '
     'value: Axes=1 moves only sideways (it keeps its height), Axes=2 only up / down.',
     '',

@@ -528,7 +528,8 @@ NEW_CMDS = [
         ('Relative', 0, 'Where Fwd / Up / Depth are measured from. 0 the stage (world X / Y / Z: Fwd is X, right +); 1 '
                         'this object: the target goes to this object + Fwd along this object\'s facing (in front +), '
                         'Up, Depth; 2 the target itself: it moves by Fwd along its own facing, Up, Depth; 3 this object '
-                        'goes to the target + Fwd along this object\'s facing, Up, Depth (behind it: Fwd below 0).'),
+                        'goes to the target + Fwd along this object\'s facing, Up, Depth (facing it: Fwd 15 is past it, behind '
+                        'it; -15 on this side).'),
         ('Fwd', 1, 'Forward distance (Relative 0: world X).'),
         ('Up', 1, 'Up distance (Relative 0: world Y).'),
         ('Depth', 1, 'Z distance (toward the camera +; Relative 0: world Z). 0 for most uses.'),
