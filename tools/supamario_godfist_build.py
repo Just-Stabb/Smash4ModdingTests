@@ -148,6 +148,7 @@ STRIKE_PART = 1                         # v4: the strike's hitboxes on Part 1, a
 # (tools/diag_godfist_cave.py: `S4GF k=.. v=.. n=..`); the normal executables ignore these writes (0x3C9-0x3FF
 # read 0, writes do nothing: acmd_ext_cave.py hv_var), so the diag scripts are harmless without it
 DIAG = False
+CB_DIAG = False                         # Core Breaker v10 diag build (supamario.c //CBD lines)
 DIAG_BASE = 0x0F0003F0
 D_CATCH_KINDS, D_SLOT, D_HOLD_FRAME, D_HOLD_ROT, D_STRIKE_KINDS, D_FLIGHT, D_WD_RELEASE, D_ROT_AFTER, \
     D_WD_ALIVE, D_MSC_JUMP, D_MSC_RATE1, D_MSC_EXIT, D_PHASE, D_WD_STATUS = range(14)
@@ -915,6 +916,8 @@ def msc(out_path):
     src = kb.substitute(os.path.join(HERE, '..', 'fighters/supamario/supamario.c'), vals)
     if DIAG:
         src = src.replace('//GFD ', '')
+    if CB_DIAG:                         # Core Breaker v10's diag lines (supamario.c //CBD; supamario_corebreaker_build)
+        src = src.replace('//CBD ', '')
     code = '\n'.join(line.split('//')[0] for line in src.split('\n'))
     assert 'GF_' not in code.replace('gf_', ''), [w for w in code.split() if 'GF_' in w][:5]
     with tempfile.TemporaryDirectory(dir=os.path.dirname(os.path.abspath(out_path))) as tmp:

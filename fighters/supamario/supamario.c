@@ -38414,6 +38414,7 @@ int cb_inv;             // v5: the hold's invincibility set (cleared at every en
 
 void cb_set_ph(int ph)
 {
+    //CBD WorkModule(0, (float)ph + 10.0f * MotionModuleF(0x1), 0x0F0003FE);
     cb_ph = ph;
     cb_n = 0;
     WorkModule(0, (float)ph, CB_VAR);
@@ -38497,6 +38498,9 @@ int cb_can_up()
 void cb_reset_tick()
 {
     float st;
+    // v10 diag (supamario_godfist_build.CB_DIAG: these //CBD lines on; k = the ID - 0x0F0003F0): k 13, every
+    // frame he is invincible / intangible: his status x 100 + intangible state x 10 + invincible
+    //CBD if (WorkModuleF(0, 0x0F00011C) != 0.0f || WorkModuleF(0, 0x0F00011B) != 0.0f) { WorkModule(0, WorkModuleF(0, 0x0F0000A2) * 100.0f + WorkModuleF(0, 0x0F00011B) * 10.0f + WorkModuleF(0, 0x0F00011C), 0x0F0003FD); }
     if (global18 == 0)
     {
         cb_my_gy = WorkModuleF(0, 0x0f000001);
@@ -38557,6 +38561,7 @@ void cb_init()
     {
         used = 0.0f;
     }
+    //CBD WorkModule(0, used + 10.0f * (float)global18, 0x0F0003FC);
     WorkModule(0, 0.0f, CB_VAR);
     if (global18 == 0)
     {
@@ -39342,6 +39347,7 @@ void cb_catch()
     cb_floor = cb_floor_at(WorkModuleF(0, 0x0f000001));
     cb_inv = 0x1;
     WorkModule(0, CB_INV_STEP, 0x0F00011C);     // v9: the only first write, here, on a catch with a victim
+    //CBD WorkModule(0, 1.0f, 0x0F0003FF);
     cb_burns = 0;
     // v7 (user: "If the move hits an opponent at a ledge / near a ledge with Supamario under them, it drags both
     // characters under the ledge"): a fighter more than CB_UNDER above his feet, or on a ledge (its situation 1 / a
@@ -39652,6 +39658,7 @@ int cb_update()
     if (cb_ph >= 0x3 && cb_ph != 0x5 && cb_handed == 0 && cb_slot != 0 && cb_inv != 0)
     {
         WorkModule(0, CB_INV_STEP, 0x0F00011C);
+        //CBD WorkModule(0, 2.0f, 0x0F0003FF);
     }
     if (cb_ph == 0)
     {
@@ -39694,6 +39701,7 @@ int cb_update()
 
 void cb_end()
 {
+    //CBD WorkModule(0, 99.0f, 0x0F0003FE);
     if (cb_ph >= 0x3 && cb_ph != 0x5)
     {
         cb_release();
@@ -39705,6 +39713,7 @@ void cb_end()
     if (cb_inv != 0)
     {
         WorkModule(0, 1.0f, 0x0F00011C);    // v7: a 1-frame value (if the game ignores 0, this still ends it)
+        //CBD WorkModule(0, 3.0f, 0x0F0003FF);
         cb_inv = 0;
     }
     SoundModule(0x2714, CB_SND_RUSH);
