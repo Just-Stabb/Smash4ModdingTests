@@ -13,6 +13,7 @@ namespace Sm4shCommand.Viewer
         public float Damage, Size, X, Y, Z, X2, Y2, Z2, Hitlag = 1, SDI = 1;
         public bool Extended, Windbox, Special;
         public string Command;
+        public string Script = "game";      // (v1.7.2) the script that made it: game, effect, sound or expression
         // Extra_Special_Hitbox / Extra_Extended_Special_Hitbox's six extras (docs/acmd-extra-commands.md):
         // multipliers of 0 or less are x1, frames of 0 are "computed"
         public bool HasExtras;
@@ -158,6 +159,34 @@ namespace Sm4shCommand.Viewer
         /// itself (on until terminated).</summary>
         public Func<uint, int> OneShotLife;
         public int DefaultLife = 20;
+        /// <summary>(v1.7.2) The script this runner runs ("game" for the one Run is given): the hitboxes / effects it makes
+        /// carry it.</summary>
+        public string Kind = "game";
+
+        /// <summary>(v1.7.2) One of the move's other scripts: its kind (effect, sound, expression), its commands and where
+        /// its CALL / JUMP targets come from (its own file).</summary>
+        public class ScriptSource
+        {
+            public string Kind;
+            public IList<ICommand> Commands;
+            public Func<uint, IList<ICommand>> GetScript;
+        }
+
+        /// <summary>
+        /// (v1.7.2) The move's other scripts, run with the one Run is given, as the game runs them: every frame each of the
+        /// motion's four ACMD scripts (game, effect, sound, expression, in that order) goes on from where it stopped, each
+        /// with its own frame cursor (FRAME / WAIT timers, loops, If / Else blocks, CALLs, Thread_Start), all on the
+        /// motion's frame rate (Set_Frame_Duration / Frame_Speed_Multiplier / the rate variable, from whichever script sets
+        /// it); any command works in any of them, so a hitbox, a body state, an effect, a trail, an overlay or a
+        /// visibility command in the effect / sound / expression script is the move's as much as one in game.bin (they share
+        /// the hitboxes, the variables, the effects and the body state). Up to v1.7.1 the viewer took hitboxes from the game
+        /// script only and effects from the effect script only (the game script's were dropped when the move had an effect
+        /// script, the sound script's never run).
+        /// </summary>
+        public List<ScriptSource> Others = new List<ScriptSource>();
+        readonly List<HitboxRunner> parallel = new List<HitboxRunner>();
+        bool isParallel;
+        double frameSpeedNow = 1;       // the motion's rate this game frame (the parallel scripts' step)
 
         const uint ASYNC = 0x42ACFE7D, SYNC = 0x4B7B6E51, FRAME_DURATION = 0x7172A764, FRAME_DURATION2 = 0xB2E91D0C,
             FRAME_MUL = 0xA546845C, CALL1 = 0x9126EBA2, CALL2 = 0xFA1BC28A, HITBOX = 0xB738EABD,
@@ -185,6 +214,7 @@ namespace Sm4shCommand.Viewer
         {
             get
             {
+                if (isParallel) return root.frameSpeedNow;      // (v1.7.2) the motion's rate this frame, as the game script's
                 var sched = (root ?? this).SpeedSchedule;
                 int g = (root ?? this).gameFrame - 1;
                 if (sched != null && !isThread && g >= 0 && g < sched.Length) return sched[g];
@@ -212,7 +242,7 @@ namespace Sm4shCommand.Viewer
         {
             var r = root ?? this;
             r.threads.RemoveAll(x => x.Id == id);
-            var th = new HitboxRunner { ConditionsTrue = ConditionsTrue, UseFrameSpeed = false, GetScript = GetScript };
+            var th = new HitboxRunner { ConditionsTrue = ConditionsTrue, UseFrameSpeed = false, GetScript = GetScript, Kind = Kind };
             th.isThread = true;
             th.root = r;
             th.hitboxes = r.hitboxes;
@@ -277,6 +307,24 @@ namespace Sm4shCommand.Viewer
             currentFrame = 0; animFrame = 0; frameSpeed = 1; syncFrames = -1; rate = 1;
             incrementFrame = true;
             intangible = invincible = armor = false;
+            // (v1.7.2) the other scripts: their own cursors, the shared state
+            parallel.Clear();
+            foreach (var o in Others)
+            {
+                if (o == null || o.Commands == null) continue;
+                var pr = new HitboxRunner { ConditionsTrue = ConditionsTrue, UseFrameSpeed = UseFrameSpeed, GetScript = o.GetScript, Kind = o.Kind };
+                pr.isParallel = true;
+                pr.root = this;
+                pr.hitboxes = hitboxes;
+                pr.varValues = varValues;
+                pr.overlay = overlay;
+                pr.vis = vis;
+                pr.fx = fx;
+                pr.script = o.Commands;
+                pr.frameSpeed = 1; pr.rate = 1; pr.syncFrames = -1;
+                pr.incrementFrame = true;
+                parallel.Add(pr);
+            }
             var outList = new List<FrameState>();
             int guard = 0;
             for (int game = 0; game < frames; game++)
@@ -285,6 +333,7 @@ namespace Sm4shCommand.Viewer
                 writes = new List<VarWrite>();
                 fx.Screen = new List<ScreenEvent>();
                 double speedNow = Speed;
+                frameSpeedNow = speedNow;
                 if (incrementFrame)
                     currentFrame += Speed;
                 animFrame += Speed;
@@ -307,6 +356,8 @@ namespace Sm4shCommand.Viewer
                     else
                         incrementFrame = true;
                 }
+                foreach (var pr in parallel)
+                    StepParallel(pr, ref guard);
                 StepThreads();
                 var st = new FrameState
                 {
@@ -328,6 +379,42 @@ namespace Sm4shCommand.Viewer
                 outList.Add(st);
             }
             return outList;
+        }
+
+        /// <summary>(v1.7.2) One game frame of another of the move's scripts: its cursor moved on by the motion's rate
+        /// (the game script's frame start rate, frameSpeedNow) and its commands run up to its next timer, with the game's
+        /// first-frame handling (as Run does for the game script); its body state changes become the move's.</summary>
+        void StepParallel(HitboxRunner pr, ref int guard)
+        {
+            pr.gameFrame = gameFrame;
+            pr.writes = writes;
+            pr.intangible = intangible; pr.invincible = invincible; pr.armor = armor;     // the move's body state so far
+            bool ib = pr.intangible, vb = pr.invincible, ab = pr.armor;
+            if (pr.incrementFrame)
+                pr.currentFrame += frameSpeedNow;
+            pr.animFrame = animFrame;
+            bool keep = true;
+            while (keep && guard++ < 100000)
+            {
+                keep = false;
+                pr.ProcessFrame();
+                if (pr.currentFrame < 1)
+                {
+                    pr.currentFrame += frameSpeedNow;
+                    if (pr.currentFrame > 1)
+                        pr.incrementFrame = false;
+                    else
+                    {
+                        pr.incrementFrame = true;
+                        keep = true;
+                    }
+                }
+                else
+                    pr.incrementFrame = true;
+            }
+            if (pr.intangible != ib) intangible = pr.intangible;
+            if (pr.invincible != vb) invincible = pr.invincible;
+            if (pr.armor != ab) armor = pr.armor;
         }
 
         IList<ICommand> Current { get { return subscripts.Count > 0 ? subscripts[subscripts.Count - 1] : script; } }
@@ -443,10 +530,12 @@ namespace Sm4shCommand.Viewer
                     }
                 case FRAME_DURATION:
                 case FRAME_DURATION2:
-                    if (UseFrameSpeed && F(p[0]) != 0) frameSpeed = 1 / F(p[0]);
+                    // (v1.7.2) from any of the move's scripts: the motion's rate, which every script follows (from the
+                    // next frame on)
+                    if (UseFrameSpeed && F(p[0]) != 0) (isParallel ? root : this).frameSpeed = 1 / F(p[0]);
                     break;
                 case FRAME_MUL:
-                    if (UseFrameSpeed) frameSpeed = F(p[0]);
+                    if (UseFrameSpeed) (isParallel ? root : this).frameSpeed = F(p[0]);
                     break;
                 case CALL1:
                 case CALL2:
@@ -470,7 +559,7 @@ namespace Sm4shCommand.Viewer
                                         cmd.Ident == EXTRA_EXT_SPECIAL;
                         var h = new HitboxData
                         {
-                            Command = cmd.Name, Id = I(p[0]), Part = I(p[1]), Bone = I(p[2]), Damage = F(p[3]),
+                            Command = cmd.Name, Script = Kind, Id = I(p[0]), Part = I(p[1]), Bone = I(p[2]), Damage = F(p[3]),
                             Angle = I(p[4]), KBG = I(p[5]), WBKB = I(p[6]), BKB = I(p[7]), Size = F(p[8]),
                             X = F(p[9]), Y = F(p[10]), Z = F(p[11]), Special = special,
                         };
@@ -583,7 +672,7 @@ namespace Sm4shCommand.Viewer
                         float val = F(p[0]);
                         writes.Add(new VarWrite { GameFrame = gameFrame, Variable = v, Value = val });
                         varValues[v & 0x0FFFFFFF] = val;
-                        if (v == ANIM_RATE && UseFrameSpeed && val > 0) rate = val;
+                        if (v == ANIM_RATE && UseFrameSpeed && val > 0) (isParallel ? root : this).rate = val;
                     }
                     break;
                 case THREAD_START:
@@ -733,7 +822,8 @@ namespace Sm4shCommand.Viewer
                 d.Bone = at(new[] { "Bone" });
                 d.BoneHash = at(new[] { "BoneNameHash" });
                 bool world = up.StartsWith("EFFECT_GLOBAL") || up.StartsWith("EM_EFFECT");
-                bool named = up.Contains("EFFECT") || up.Contains("GRAPHIC");
+                // (v1.7.2) sound commands (Sound_Effect, Stop_Sound_Effect, ...: the sound script runs now) aren't effects
+                bool named = (up.Contains("EFFECT") || up.Contains("GRAPHIC")) && !up.Contains("SOUND");
                 if (named && (d.G == 0 || d.Work == 0) && (d.Bone >= 0 || d.BoneHash >= 0 || world))
                 {
                     d.Kind = FxKind.Spawn;
@@ -776,7 +866,7 @@ namespace Sm4shCommand.Viewer
                     {
                         var e = new EffectData
                         {
-                            Index = fs.All.Count, Command = cmd.Name, Line = Text(cmd), World = d.World, Follow = d.Follow,
+                            Index = fs.All.Count, Command = cmd.Name, Line = Text(cmd), Script = Kind, World = d.World, Follow = d.Follow,
                             Id = d.G >= 0 ? (uint)it(d.G) : 0, WorkVar = d.Work >= 0 ? (uint)it(d.Work) : 0,
                             Bone = d.Bone >= 0 ? it(d.Bone) : 0,
                             X = fl(d.X, 0), Y = fl(d.Y, 0), Z = fl(d.Z, 0), RX = fl(d.RX, 0), RY = fl(d.RY, 0), RZ = fl(d.RZ, 0),
@@ -836,7 +926,7 @@ namespace Sm4shCommand.Viewer
                     {
                         var t = new TrailData
                         {
-                            Index = fs.AllTrails.Count, Command = cmd.Name, Line = Text(cmd),
+                            Index = fs.AllTrails.Count, Command = cmd.Name, Line = Text(cmd), Script = Kind,
                             Bone1 = it(d.B1), X1 = fl(d.B1 + 1, 0), Y1 = fl(d.B1 + 2, 0), Z1 = fl(d.B1 + 3, 0),
                             Bone2 = it(d.B2), X2 = fl(d.B2 + 1, 0), Y2 = fl(d.B2 + 2, 0), Z2 = fl(d.B2 + 3, 0),
                             Blur = it(d.Blur), Graphic = d.G >= 0 ? (uint)it(d.G) : 0, StartFrame = r.gameFrame,

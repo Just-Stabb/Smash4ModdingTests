@@ -115,7 +115,8 @@ def build(orig):
     h = handlers()
     assert orig(STATUS_AT) == STATUS_WORD, 'status hook 0x%08X: 0x%08X' % (STATUS_AT, orig(STATUS_AT))
     assert orig(BIND_AT) == bl(BIND_AT, BIND_FN), 'bind hook 0x%08X: 0x%08X' % (BIND_AT, orig(BIND_AT))
-    assert orig(SCENE_AT) == bl(SCENE_AT, h['ts_scene']), 'scene hook 0x%08X: 0x%08X' % (SCENE_AT, orig(SCENE_AT))
+    on_scenes = orig(SCENE_AT) == bl(SCENE_AT, h['ts_scene'])     # exe_v46u_threads: the scenes are tsu_scene*, and
+                                                                    # S4TS comes from tools/diag_tick_cave.py instead
     for k in ('h_tscale', 'h_ttscale', 'h_sfreeze'):
         assert orig(h[k]) == 0x9421FFC0, '%s 0x%08X: 0x%08X' % (k, h[k], orig(h[k]))
     assert orig(h['h_thread']) == 0x9421FFD0, 'h_thread 0x%08X: 0x%08X' % (h['h_thread'], orig(h['h_thread']))
@@ -230,11 +231,11 @@ tc_out_%(name)s:
         .word 0x%(first)08X
         b 0x%(back)08X
 """ % dict(first=first, back=h[name] + 4)
-    scenes = [(3, None)]                                     # (site, hooked how): C at its bl (ts_scene)
+    scenes = [(3, None)] if on_scenes else []                # (site, hooked how): C at its bl (ts_scene)
     try:
         import ts_scene_sites_cave as X
         xl = None
-        for k in ('a', 'b'):
+        for k in (('a', 'b') if on_scenes else ()):
             site = X.SITES[k][0]
             w = orig(site)
             if w >> 26 == 18 and w & 1:                          # exe_v46t_threads: the site's bl goes to ts_site<k>

@@ -747,16 +747,36 @@ def ts_tests(pm, a):
                                      C.BATTLE_POST + 8, C.BATTLE_POST + 12, C.BATTLE_PLAY + 4)}
     saved_data = bytes(pm.mem_read(C.TS_DATA, 0x40))
     from ppcasm import Asm
+    # exe_v46u_threads (tools/ts_tick_cave.py): the Frames are counted by the battle object world's first phase
+    # (0x02BF2544's bl at 0x02BF2568, inside the step): the step stub calls that hooked target as the step does
+    tick_at, w = 0x02BF2568, r32(pm, 0x02BF2568)
+    tick = tick_at + ((w & 0x3FFFFFC) - (0x4000000 if w & 0x2000000 else 0)) if w >> 26 == 18 else 0
+    tick = tick if tick != 0x02BFB97C else 0
+    saved.update({x: r32(pm, x) for x in range(C.BATTLE_UPD, C.BATTLE_UPD + 0x40, 4)})
+    saved.update({x: r32(pm, x) for x in (0x02BFB97C, 0x02BFB980)})
     for fn, k in ((C.BATTLE_UPD, 0), (C.BATTLE_POST, 4)):       # stubs: [cnt + k] += 1
         st = Asm(fn)
+        call = ("""
+        stwu r1, -0x10(r1)
+        mflr r0
+        stw r0, 0x14(r1)
+        lis r12, 0x%X
+        ori r12, r12, 0x%X
+        mtctr r12
+        bctrl
+        lwz r0, 0x14(r1)
+        mtlr r0
+        addi r1, r1, 0x10""" % (tick >> 16, tick & 0xFFFF)) if tick and fn == C.BATTLE_UPD else ''
         st.asm("""
         lis r12, 0x%X
         lwz r11, 0x%X(r12)
         addi r11, r11, 1
-        stw r11, 0x%X(r12)
-        blr""" % (cnt >> 16, (cnt & 0xFFFF) + k, (cnt & 0xFFFF) + k))
+        stw r11, 0x%X(r12)%s
+        blr""" % (cnt >> 16, (cnt & 0xFFFF) + k, (cnt & 0xFFFF) + k, call))
         for i, w in enumerate(st.words()):
             w32(pm, fn + 4 * i, w)
+    if tick:
+        w32(pm, 0x02BFB97C, 0x4E800020)                 # the frame state fill: nothing (blr)
     w32(pm, C.BATTLE_PLAY, 0x38600001)                          # li r3, 1
     w32(pm, C.BATTLE_PLAY + 4, 0x4E800020)
     w32(pm, C.SLOW_MGR, mgr)
@@ -1688,7 +1708,11 @@ def main():
     for at, ws in want.items():
         check('original words at 0x%08X' % at, [r32(om, at + 4 * i) for i in range(len(ws))], ws)
     check('cave words in place', all(r32(pm, C.CAVE + 4 * i) == w for i, w in enumerate(words)), True)
-    check('hooks in place', all(r32(pm, k) == v for k, v in hooks.items()), True)
+    def moved(k):                       # exe_v46u_threads: TS_SCENE goes to ts_tick_cave.py's tsu_scenec instead
+        w = r32(pm, k)
+        dst = k + ((w & 0x3FFFFFC) - (0x4000000 if w & 0x2000000 else 0))
+        return k == C.TS_SCENE and w >> 26 == 18 and 0x04BD4A00 <= dst < 0x04BD5F00
+    check('hooks in place', all(r32(pm, k) == v or moved(k) for k, v in hooks.items()), True)
 
     pairs = [(r32(om, CRC_TABLE + 8 * i), r32(om, CRC_TABLE + 8 * i + 4)) for i in range(COUNT)]
     new = [(zlib.crc32(c[0].encode()) & 0xFFFFFFFF, C.NEW_BASE + k) for k, c in enumerate(C.COMMANDS)]

@@ -65,6 +65,10 @@ namespace Sm4shCommand.GUI
         bool partsFilling;
         Func<uint, IList<ICommand>> getExpression;
         ITS_EDITOR expressionEditor;
+        // v1.7.2: the sound script (its commands run like the other three: the game reads every script's code)
+        Func<uint, IList<ICommand>> getSound;
+        ITS_EDITOR soundEditor;
+        string otherErrors;
         static VisGroups visGroups = VisGroups.Load(Path.Combine(Application.StartupPath, "VisGroups.txt"),
                                                    Path.Combine(Application.StartupPath, "VisUser.txt"));
         // the parts tab's choices, per fighter, while the program runs
@@ -188,6 +192,8 @@ namespace Sm4shCommand.GUI
                 timer.Stop();
                 if (this.editor != null) this.editor.TextChanged -= Editor_TextChanged;
                 if (this.effectEditor != null) this.effectEditor.TextChanged -= Editor_TextChanged;
+                if (expressionEditor != null) expressionEditor.TextChanged -= Editor_TextChanged;
+                if (soundEditor != null) soundEditor.TextChanged -= Editor_TextChanged;
             };
             ShowScript(scriptCrc, editor, title, effectEditor);
         }
@@ -246,7 +252,8 @@ namespace Sm4shCommand.GUI
             var list = assets.ScriptsFor(anim);
             if (list.Contains(scriptCrc) || anim == assets.AnimationFor(scriptCrc)) return scriptCrc;
             foreach (var crc in list)
-                if (getScript(crc) != null || (getEffect != null && getEffect(crc) != null)) return crc;
+                if (getScript(crc) != null || (getEffect != null && getEffect(crc) != null) ||
+                    (getSound != null && getSound(crc) != null) || (getExpression != null && getExpression(crc) != null)) return crc;
             return 0;
         }
 
@@ -611,9 +618,18 @@ namespace Sm4shCommand.GUI
             var cmds = CurrentCommands(out error);
             anim = assets.GetAnimation(animName);
             int length = anim != null ? anim.Frames : 0;
-            var runner = new HitboxRunner { ConditionsTrue = ifTrue.Checked, UseFrameSpeed = frameSpeed.Checked, GetScript = getScript };
+            // v1.7.2: the move's four scripts run together, as the game runs them (HitboxRunner.Others): the hitboxes,
+            // body states, effects, trails, overlays and visibility commands of every one of them, each script with its own
+            // frame cursor on the motion's rate
+            var runner = new HitboxRunner
+            {
+                ConditionsTrue = ifTrue.Checked, UseFrameSpeed = frameSpeed.Checked, GetScript = getScript, OneShotLife = LifeOf,
+                Others = OtherScripts(),
+            };
             // enough game frames for the whole animation (slowed down by Set_Frame_Duration), or 120
             probe = runner.Run(cmds ?? new List<ICommand>(), 600);
+            allEffects = runner.AllEffects;
+            allTrails = runner.AllTrails;
             int n = probe.Count;
             if (length > 0)
             {
@@ -626,8 +642,6 @@ namespace Sm4shCommand.GUI
                 n = Math.Max(60, last + 20);
             }
             animCount = Math.Max(1, n);
-            RunEffects();
-            RunExpression();
             frames = probe.Take(animCount).ToList();
             view.History = probe;
             view.ResetEffects();
@@ -640,8 +654,9 @@ namespace Sm4shCommand.GUI
                    (currentCrc != scriptCrc && currentCrc != 0 ? " (saved game.bin; edits follow the open script only)" : "");
             status.Text = (error != null ? "Doesn't compile (showing the last saved script): " + error + "   " : "") +
                           (effectError != null ? "Effect script doesn't compile (showing the saved one): " + effectError + "   " : "") +
+                          (otherErrors != null ? otherErrors + "   " : "") +
                           (animName != null ? animName + ", " + length + " frames" : "No animation found for this script: pick one above") +
-                          (cmds == null ? "   (no game script for this animation: no hitboxes)" : "");
+                          (cmds == null ? "   (no game script for this animation: hitboxes from its other scripts only)" : "");
             ShowFrame();
         }
 
@@ -668,7 +683,8 @@ namespace Sm4shCommand.GUI
                     grid.Columns.Add(c, c);
             foreach (var h in f.Hitboxes)
             {
-                int r = grid.Rows.Add(h.Id, h.Damage, h.Angle, h.KBG, h.WBKB, h.BKB, h.Size, "0x" + h.Bone.ToString("X"), h.Hitlag, h.SDI, h.Effect, h.ExtrasText, h.Command);
+                int r = grid.Rows.Add(h.Id, h.Damage, h.Angle, h.KBG, h.WBKB, h.BKB, h.Size, "0x" + h.Bone.ToString("X"), h.Hitlag, h.SDI, h.Effect, h.ExtrasText,
+                                     h.Script != "game" ? h.Command + " (" + h.Script + " script)" : h.Command);   // v1.7.2
                 var hc = Viewport.HitboxColors[((h.Id % 8) + 8) % 8];   // a light tint (cells can't be see-through)
                 grid.Rows[r].DefaultCellStyle.BackColor = Color.FromArgb(255 - (255 - hc.R) * 3 / 10, 255 - (255 - hc.G) * 3 / 10, 255 - (255 - hc.B) * 3 / 10);
             }
@@ -688,22 +704,25 @@ namespace Sm4shCommand.GUI
         /// <summary>The effect script for the shown script: the same rule as the game script's (ScriptCommands).</summary>
         IList<ICommand> EffectCommands(out string error) { return ScriptCommands(getEffect, effectEditor, out error); }
 
-        /// <summary>Runs the effect script on the game script's timeline (its per-frame speeds) and puts its effects,
-        /// trails and screen events on the probe's frames.</summary>
-        /// <summary>v1.6.2: the expression script on the same timeline (the same rule as the game / effect scripts): its
-        /// visibility commands (Model_Changer & co.) and overlays join the frames'.</summary>
-        void RunExpression()
+        /// <summary>v1.7.2: the move's effect, sound and expression scripts, each by the one rule (ScriptCommands: the open
+        /// tab's editor while its animation is shown, else the saved file's script), for HitboxRunner.Others (run on the
+        /// game script's frames, in the game's order). A script that doesn't compile is run as saved and said so
+        /// (effectError for the effect script, otherErrors for the others).</summary>
+        List<HitboxRunner.ScriptSource> OtherScripts()
         {
-            string err;
-            var cmds = ScriptCommands(getExpression, expressionEditor, out err);
-            if (cmds == null || probe.Count == 0) return;
-            var r = new HitboxRunner { ConditionsTrue = ifTrue.Checked, GetScript = getExpression, SpeedSchedule = probe.Select(x => x.Speed).ToArray() };
-            var ex = r.Run(cmds, probe.Count);
-            for (int i = 0; i < probe.Count && i < ex.Count; i++)
+            var o = new List<HitboxRunner.ScriptSource>();
+            otherErrors = null;
+            var fx = EffectCommands(out effectError);
+            if (fx != null) o.Add(new HitboxRunner.ScriptSource { Kind = "effect", Commands = fx, GetScript = getEffect });
+            foreach (var k in new[] { Tuple.Create("sound", getSound, soundEditor), Tuple.Create("expression", getExpression, expressionEditor) })
             {
-                if (probe[i].Overlay == null && ex[i].Overlay != null) { probe[i].Overlay = ex[i].Overlay; probe[i].OverlayLight = ex[i].OverlayLight; }
-                probe[i].Vis = VisState.Merge(ex[i].Vis, probe[i].Vis);
+                if (k.Item2 == null) continue;
+                string err;
+                var cmds = ScriptCommands(k.Item2, k.Item3, out err);
+                if (err != null) otherErrors = (otherErrors != null ? otherErrors + "; " : "") + k.Item1 + " script doesn't compile (showing the saved one): " + err;
+                if (cmds != null) o.Add(new HitboxRunner.ScriptSource { Kind = k.Item1, Commands = cmds, GetScript = k.Item2 });
             }
+            return o;
         }
 
         /// <summary>v1.6.2: the expression scripts (expression.bin's, and the open tab's expression editor while it shows).</summary>
@@ -717,29 +736,28 @@ namespace Sm4shCommand.GUI
             if (probe != null) Rerun();
         }
 
-        void RunEffects()
+        /// <summary>v1.7.2: the sound scripts (sound.bin's, and the open tab's sound editor while it shows): any command in
+        /// them (a hitbox, an effect, ...) runs as in the game.</summary>
+        public void SetSound(Func<uint, IList<ICommand>> saved, ITS_EDITOR open)
         {
-            var cmds = EffectCommands(out effectError);
-            allEffects = new List<EffectData>();
-            allTrails = new List<TrailData>();
-            if (cmds == null || probe.Count == 0) return;
-            var r = new HitboxRunner
-            {
-                ConditionsTrue = ifTrue.Checked, GetScript = getEffect, SpeedSchedule = probe.Select(x => x.Speed).ToArray(),
-                OneShotLife = LifeOf,
-            };
-            var fx = r.Run(cmds, probe.Count);
-            for (int i = 0; i < probe.Count && i < fx.Count; i++)
-            {
-                probe[i].Effects = fx[i].Effects;
-                probe[i].Trails = fx[i].Trails;
-                probe[i].Screen = fx[i].Screen;
-                // v1.6.2: an overlay / visibility command in the effect script too
-                if (fx[i].Overlay != null) { probe[i].Overlay = fx[i].Overlay; probe[i].OverlayLight = fx[i].OverlayLight; }
-                probe[i].Vis = VisState.Merge(probe[i].Vis, fx[i].Vis);
-            }
-            allEffects = r.AllEffects;
-            allTrails = r.AllTrails;
+            if (soundEditor != null) soundEditor.TextChanged -= Editor_TextChanged;
+            getSound = saved;
+            soundEditor = open;
+            if (soundEditor != null) soundEditor.TextChanged += Editor_TextChanged;
+            if (probe != null) Rerun();
+        }
+
+        /// <summary>v1.7.2: the expression and sound sources at once (one run again instead of two).</summary>
+        public void SetOtherScripts(Func<uint, IList<ICommand>> expression, ITS_EDITOR expressionOpen,
+                                    Func<uint, IList<ICommand>> sound, ITS_EDITOR soundOpen)
+        {
+            if (expressionEditor != null) expressionEditor.TextChanged -= Editor_TextChanged;
+            if (soundEditor != null) soundEditor.TextChanged -= Editor_TextChanged;
+            getExpression = expression; expressionEditor = expressionOpen;
+            getSound = sound; soundEditor = soundOpen;
+            if (expressionEditor != null) expressionEditor.TextChanged += Editor_TextChanged;
+            if (soundEditor != null) soundEditor.TextChanged += Editor_TextChanged;
+            if (probe != null) Rerun();
         }
 
         int LifeOf(uint id)
@@ -797,7 +815,8 @@ namespace Sm4shCommand.GUI
                     e.World ? "-" : e.Bone < 0 ? "(by name)" : "0x" + e.Bone.ToString("X"),
                     string.Format(ic, "{0:0.##}, {1:0.##}, {2:0.##}", e.X, e.Y, e.Z),
                     string.Format(ic, "{0:0.##}, {1:0.##}, {2:0.##}", e.RX, e.RY, e.RZ),
-                    e.Size.ToString("0.###", ic), col, kind, frames, facing.Length > 0 ? "! " + facing : "ok", e.Command);
+                    e.Size.ToString("0.###", ic), col, kind, frames, facing.Length > 0 ? "! " + facing : "ok",
+                    e.Script != "effect" ? e.Command + " (" + e.Script + " script)" : e.Command);     // v1.7.2
                 fxGrid.Rows[row].Tag = e;
                 var c0 = Viewport.EffectColor(e);
                 fxGrid.Rows[row].DefaultCellStyle.BackColor = Color.FromArgb(255 - (255 - c0.R) * 2 / 10, 255 - (255 - c0.G) * 2 / 10, 255 - (255 - c0.B) * 2 / 10);
@@ -808,7 +827,8 @@ namespace Sm4shCommand.GUI
                     "0x" + t.Bone1.ToString("X") + " / 0x" + t.Bone2.ToString("X"),
                     string.Format(ic, "{0:0.##}, {1:0.##}, {2:0.##} / {3:0.##}, {4:0.##}, {5:0.##}", t.X1, t.Y1, t.Z1, t.X2, t.Y2, t.Z2),
                     "", "", "", "trail (blur " + t.Blur + ")",
-                    t.StartFrame + "-" + (t.EndFrame >= 0 ? (t.EndFrame - 1).ToString() : "end") + (t.Fade > 0 ? " + fade " + t.Fade : ""), "", t.Command);
+                    t.StartFrame + "-" + (t.EndFrame >= 0 ? (t.EndFrame - 1).ToString() : "end") + (t.Fade > 0 ? " + fade " + t.Fade : ""), "",
+                    t.Script != "effect" ? t.Command + " (" + t.Script + " script)" : t.Command);
             foreach (var ev in f.Screen ?? new List<ScreenEvent>())
                 fxGrid.Rows.Add("screen", "", "", "", "", "", "", "", "listed only", ev.Frame.ToString(), "", ev.Text);
             fxGrid.ClearSelection();

@@ -18,6 +18,7 @@ namespace Sm4shCommand.Viewer
         public bool HasLeft;
         public uint WorkVar;                // a _WORK call's ID comes from this variable (Id 0: not known here)
         public string Command, Line;
+        public string Script = "effect";    // (v1.7.2) the script that started it: game, effect, sound or expression
         public int Bone;
         public bool World;                  // EFFECT_GLOBAL / EM_EFFECT_*: no bone (the viewer puts it at the model's origin)
         public float X, Y, Z, RX, RY, RZ, Size = 1;
@@ -47,6 +48,7 @@ namespace Sm4shCommand.Viewer
     {
         public int Index;
         public string Command, Line;
+        public string Script = "effect";    // (v1.7.2) the script that started it
         public int Bone1, Bone2, Blur, Fade;
         public float X1, Y1, Z1, X2, Y2, Z2;
         public uint Graphic;
