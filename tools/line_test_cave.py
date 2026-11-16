@@ -130,7 +130,7 @@ def find(orig):
     s['f'] = bcdecode(at + 8, bge)
     s['f_back'] = FETCH + 8
     # the hooked words: the instruction acmd_ext_cave.py wrote there, or a later cave's `b`
-    want = {'lk_none': 0x3860FFFF, 's1': 0x7C0A202E, 's2': 0x7D8BF02E, 'f': 0x54C6103A}
+    want = {'lk_none': 0x3860FFFF, 's1': 0x7C0A202E, 's2': 0x7D8BF02E, 'f': 0x54E6103A}
     for k, w in want.items():
         got = orig(s[k])
         assert got == w or got >> 26 == 18, '%s 0x%08X: 0x%08X (want 0x%08X or a b)' % (k, s[k], got, w)
@@ -175,10 +175,17 @@ def build(orig):
         assert orig(POSTURE_FW + 4 * i) == w, 'PostureModuleF wrapper word %d' % i
     s = find(orig)
     n = len(NEW_CMDS)
-    a = Asm(CAVE)
     sizes = ''.join('        .word %d\n' % (1 + len(p)) for _n, _h, p, _d in NEW_CMDS)
     crcs = ''.join('        .word 0x%08X\n' % crc(c[0]) for c in NEW_CMDS)
-    hands = ''.join('        .word %s\n' % c[1] for c in NEW_CMDS)
+    hands = ''.join('        .word 0\n' for c in NEW_CMDS)
+    for _pass in range(2):      # pass 1 finds the handlers' addresses for their table
+        a = Asm(CAVE)
+        a_src(a, s, n, crcs, sizes, hands)
+        hands = ''.join('        .word 0x%08X\n' % a.addr(c[1]) for c in NEW_CMDS)
+    return finish(orig, a, s)
+
+
+def a_src(a, s, n, crcs, sizes, hands):
     a.asm("""
 # --- the command tables' fallbacks: our CRCs / indices ---------------------------------------------------------------
 lt_lookup:                              # r3 = a CRC neither table has (yet)
@@ -576,6 +583,9 @@ lt_tab:
 """ % dict(pfh=POSTURE_FW >> 16, pfl=POSTURE_FW & 0xFFFF, rh=RAY_N >> 16, rl=RAY_N & 0xFFFF, bytes=4 * (1 + len(NEW_CMDS[0][2])),
            vlo=VAR_LO, vhi=VAR_HI, acc_of=s['acc_of'], ue_out=s['ue_out'], ue_zero=s['ue_zero'], next=s['hvv_next'],
            ltn=LT_N, lts=LT_SIZE, crcs=crcs, sizes=sizes, hands=hands))
+
+
+def finish(orig, a, s):
     words = a.words()
     tab = a.addr('lt_tab')
     assert tab + LT_N * LT_SIZE <= LIMIT, 'cave too big: 0x%08X' % (tab + LT_N * LT_SIZE)
