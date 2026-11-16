@@ -40,7 +40,14 @@ sys.path.insert(0, HERE)
 import acmd  # noqa: E402
 
 MDIR = os.path.join(ROOT, 'fighters', 'master')
-WEAPONS = {'SPEAR': 'master_spear', 'AXE': 'master_axe', 'BOW': 'master_bow'}
+WEAPONS = {'SPEAR': 'master_spear', 'AXE': 'master_axe', 'BOW': 'master_bow',
+           # the Sword of the Creator's whip (the `sword` article): Ultimate hides his body's sword while it is out; until
+           # the whip is built the body's sword stands in for it (ultimate_fighter VIS_ALSO: master_sword shows with it).
+           # v1-v4 followed the body track alone: down tilt's weapon vanished for frames 0-57 (user, v4)
+           'SWORD': 'master_sword_article'}
+# articles whose own motion folder plays a body motion its game script doesn't generate / remove them in: out from
+# the motion before (Failnaught's turn: v1-v4 hid the bow in SpecialNTurn while Ultimate's bow plays d00specialnturn)
+ARTICLE_MOTIONS = {'bow': 'master_bow', 'axe': 'master_axe', 'spear': 'master_spear', 'sword': 'master_sword_article'}
 
 
 # ---------------------------------------------------------------- the held weapons' visibility
@@ -66,7 +73,7 @@ def weapon_frames(body):
     seen = set()
     for m in re.finditer(r'frame\(agent\.lua_state_agent, ([\d.]+)\)|wait\(agent\.lua_state_agent, ([\d.]+)\)|'
                          r'(generate_article|remove_exist|change_motion|IS_EXIST_ARTICLE|set_flag|shoot_exist)'
-                         r'[^;]*?GENERATE_ARTICLE_(SPEAR|AXE|BOW)\b', body):
+                         r'[^;]*?GENERATE_ARTICLE_(SPEAR|AXE|BOW|SWORD)\b', body):
         if m.group(1):
             frame = max(frame, float(m.group(1)))
             continue
@@ -102,7 +109,16 @@ def cmd_vis(a):
             if keys and anim:
                 cur = out.setdefault(anim, {})
                 for k, v in keys.items():
-                    cur[k] = sorted(cur.get(k, []) + v)
+                    # by frame, a frame's keys in script order (sorted pairs put [f, 0] before [f, 1])
+                    cur[k] = sorted(cur.get(k, []) + v, key=lambda kv: kv[0])
+    for art, vname in ARTICLE_MOTIONS.items():
+        mdir = os.path.join(a.ult, 'motion', art, 'c00')
+        if not os.path.isdir(mdir):
+            continue
+        for f in sorted(os.listdir(mdir)):
+            anim = f[:-7]
+            if f.endswith('.nuanmb') and vname not in out.get(anim, {}) and not anim.startswith(('d04', 'j02')):
+                out.setdefault(anim, {})[vname] = [[0, 1]]
     json.dump(dict(_about='tools/master_build.py vis: Ultimate animation -> {weapon visibility: [[frame, shown]]} '
                           '(ultimate_fighter.py motions --extra-vis)', **out), open(a.out, 'w'), indent=1, sort_keys=True)
     print('%d motions show a held weapon: %s' % (len(out), ', '.join(

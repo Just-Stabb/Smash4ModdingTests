@@ -1114,7 +1114,8 @@ VIS_SLOTS = {'edge_swordL': 'skirt_VIS_O_OBJ16', 'edge_swordR': 'polySurface5817
 # sword for its bright (or dark) copy during swings (forward smash: 45 of 106 frames); those copies
 # aren't converted, so with the plain sword's track alone the sword vanished in attacks (test 22)
 VIS_ALSO = {'edge_swordL': ('edge_brightswordL', 'edge_darkswordL'),
-            'edge_swordR': ('edge_brightswordR', 'edge_darkswordR')}
+            'edge_swordR': ('edge_brightswordR', 'edge_darkswordR'),
+            'master_sword': ('master_sword_article',)}
 HIDDEN_SLOTS = ('Zelda_DamageFlyFront_VIS_O_OBJ',)       # the wing (its own form, later)
 
 # Bowser's mesh slots for Incineroar: Bowser's faces are whole-face meshes, so the open eyelids go
@@ -1836,7 +1837,7 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
                 tracks = add_layers(tracks, frames, prof['layers'][ult], motion_dir, have)
             for uname, keys in (extra_vis or {}).get(ult, {}).items():
                 st = np.zeros(frames, bool)
-                for f, on in sorted(keys):
+                for f, on in sorted(keys, key=lambda kv: kv[0]):     # a frame's keys in their order
                     st[min(int(f), frames - 1):] = bool(on)
                 vis[uname] = st
             locs = pose(sk, tracks, frames, constraints)
