@@ -40867,6 +40867,9 @@ void sh_tick()
         else if ((n > 1.5f && (st < SH_ST_DOWN_LO || st > SH_ST_DOWN_HI)) || n > SH_BOUNCE_MAX + 0.5f)
         {
             sh_put(s);
+            WorkModule(0, 2.0f, SH_V_GP);
+            WorkModule(0, 1.0f, SH_V_GN);
+            return;
         }
         else
         {

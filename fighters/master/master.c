@@ -39263,25 +39263,25 @@ void master_fx_sweep(int from, int to)
     if (from == 0x155)
     {
         EffectModule(0x2723, 0x3470035, 0x1, 0x1); // master_axe_aura
-        EffectModule(0x2723, 0x347009B, 0x1, 0x1); // master_axe_aura@90,-89.97,0
+        EffectModule(0x2723, 0x347009C, 0x1, 0x1); // master_axe_aura@90,-89.97,0
         EffectModule(0x2723, 0x3470036, 0x1, 0x1); // master_axe_hold
         EffectModule(0x2723, 0x3470043, 0x1, 0x1); // master_axeflare_sp1
         EffectModule(0x2723, 0x3470045, 0x1, 0x1); // master_axeflare_sp2
         EffectModule(0x2723, 0x3470047, 0x1, 0x1); // master_axeflare_sp2flare
         EffectModule(0x2723, 0x3470048, 0x1, 0x1); // master_axeflare_sp3
-        EffectModule(0x2723, 0x3470098, 0x1, 0x1); // master_axeflare_sp1@0,-40,90
-        EffectModule(0x2723, 0x3470099, 0x1, 0x1); // master_axeflare_sp2@90,-89.97,0
-        EffectModule(0x2723, 0x347009A, 0x1, 0x1); // master_axeflare_sp3@-90,90,0
-        EffectModule(0x2723, 0x34700A7, 0x1, 0x1); // master_axeflare_sp2flare@90,-89.97,0
+        EffectModule(0x2723, 0x3470099, 0x1, 0x1); // master_axeflare_sp1@0,-40,90
+        EffectModule(0x2723, 0x347009A, 0x1, 0x1); // master_axeflare_sp2@90,-89.97,0
+        EffectModule(0x2723, 0x347009B, 0x1, 0x1); // master_axeflare_sp3@-90,90,0
+        EffectModule(0x2723, 0x34700A8, 0x1, 0x1); // master_axeflare_sp2flare@90,-89.97,0
     }
     if (to != 0x26)
     {
         EffectModule(0x2723, 0x3470027, 0x1, 0x1); // master_atk_100
     }
     EffectModule(0x2723, 0x3470031, 0x1, 0x1); // master_atk_air_n
-    EffectModule(0x2723, 0x34700A6, 0x1, 0x1); // master_atk_air_n@-90,90,0
+    EffectModule(0x2723, 0x34700A7, 0x1, 0x1); // master_atk_air_n@-90,90,0
     EffectModule(0x2723, 0x3470066, 0x1, 0x1); // master_swordflare
-    EffectModule(0x2723, 0x34700A1, 0x1, 0x1); // master_swordflare@0,0,-90
+    EffectModule(0x2723, 0x34700A2, 0x1, 0x1); // master_swordflare@0,0,-90
 }
 
 // zair (ZSS's grab in the air, status 0xF1 from func_61 / func_xx): off for him, his air up special is the only way

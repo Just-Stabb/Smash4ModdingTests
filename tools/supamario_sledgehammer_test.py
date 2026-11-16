@@ -798,18 +798,24 @@ def script_tests(out, base):
           [c.params[0] for c in hold if nm(c) == 'FRAME'], [float(x) for x in (B.HIT_FROM_CH, B.HIT_FROM, B.HIT_TO_CH,
                                                                                 B.HIT_TO)])
     keys = ('Damage', 'Angle', 'BKB', 'KBG', 'FKB', 'Size', 'Z', 'Y', 'X', 'Bone', 'HitstunMul', 'HitstopFrames',
-            'SelfHitstopFrames', 'NoGFX', 'Ground/Air', 'Shieldable', 'ShieldDamage')
+            'SelfHitstopFrames', 'NoGFX', 'Ground/Air', 'Shieldable', 'ShieldDamage', 'Clang', 'Rebound', 'HitBits',
+            'Reflectable', 'Absorbable')
     want_ch = (B.HIT_CH['Damage'], 270, B.HIT_CH['BKB'], B.HIT_CH['KBG'], 0, B.HIT_SIZE, B.HIT_Z, B.HIT_Y, 0.0, 0, 0.0,
-               B.HITSTOP_CH, B.HITSTOP_CH, 1, 2, 1, 0)
+               B.HITSTOP_CH, B.HITSTOP_CH, 1, 2, 1, 0, 0, 0, 0x3F, 0, 0)
     want_chg = (B.HIT_CH_GROUND['Damage'], 0, 1, 0, 0, B.HIT_SIZE, B.HIT_Z, B.HIT_Y, 0.0, 0, 0.0,
-                B.HITSTOP_CH, B.HITSTOP_CH, 1, 1, 1, 0)
+                B.HITSTOP_CH, B.HITSTOP_CH, 1, 1, 1, 0, 0, 0, 0x3F, 0, 0)
     want_un = (B.HIT['Damage'], 270, B.HIT['BKB'], B.HIT['KBG'], 0, B.HIT_SIZE, B.HIT_Z, B.HIT_Y, 0.0, 0,
-               -float(B.HITSTUN_ADD), B.HITSTOP, B.HITSTOP, 1, 3, 1, 0)
-    check('the hitboxes (charged: v3 ID 0 the spike aerial only, ID 1 grounded only knockback 1; uncharged): %s' % (keys,),
+               -float(B.HITSTUN_ADD), B.HITSTOP, B.HITSTOP, 1, 3, 1, 0, 0, 0, 0x3F, 0, 0)
+    want_cl = (B.CLANK_DMG, 0, 0, 0, 0, B.HIT_SIZE, B.HIT_Z, B.HIT_Y, 0.0, 0, 0.0, 0, 0, 1, 3, 0, 0, 1, 0, 0, 0, 0)
+    check('the hitboxes (charged: v3 ID 0 the spike aerial only, ID 1 grounded only knockback 1, v4 ID 2 the clank '
+          'box; uncharged: ID 0, v4 ID 2 the clank box; v4: the real ones Clang 0, every one Rebound 0): %s' % (keys,),
           [tuple(round(h[k], 3) if isinstance(h[k], float) else h[k] for k in keys) for h in hb],
-          [tuple(round(x, 3) if isinstance(x, float) else x for x in w) for w in (want_ch, want_chg, want_un)])
-    check('v3: the charged pair: IDs 0 / 1, Part 0 (one hit a target)', [(h['ID'], h['Part']) for h in hb[:2]],
-          [(0, 0), (1, 0)])
+          [tuple(round(x, 3) if isinstance(x, float) else x for x in w) for w in (want_ch, want_chg, want_cl, want_un,
+                                                                                    want_cl)])
+    check('v3: the charged pair: IDs 0 / 1, Part 0 (one hit a target); v4: the clank boxes ID 2, Hitlag x%g, they hit '
+          'nothing (HitBits 0, not shieldable)' % B.CLANK_HITLAG,
+          ([(h['ID'], h['Part']) for h in hb], [round(h['Hitlag'], 3) for h in hb if h['ID'] == 2]),
+          ([(0, 0), (1, 0), (2, 0), (0, 0), (2, 0)], [B.CLANK_HITLAG, B.CLANK_HITLAG]))
     conds = [(c.params[0], c.params[1], c.params[2]) for c in hold if nm(c) == 'Float_Var_Compare']
     check('each read sh_chg (>= %d charged / < %d not)' % (B.CHARGE_FRAMES, B.CHARGE_FRAMES), conds,
           [(B.V_CHG, 3, float(B.CHARGE_FRAMES)), (B.V_CHG, 4, float(B.CHARGE_FRAMES)),

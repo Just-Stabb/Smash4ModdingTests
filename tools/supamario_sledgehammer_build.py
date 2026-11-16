@@ -267,17 +267,40 @@ def hitbox(**kw):
 
 
 def hit_uncharged():
-    """ID 0: the weak spike. NoGFX 1: XV2's own hit effect (BTL_CMN 0) comes from the MSC at the contact point"""
-    return hitbox(ID=0, Size=HIT_SIZE, Y=HIT_Y, Z=HIT_Z, HitstunMul=-float(HITSTUN_ADD), HitstopFrames=HITSTOP,
-                  SelfHitstopFrames=HITSTOP, SFXLevel=1, **HIT)
+    """ID 0: the weak spike. NoGFX 1: XV2's own hit effect (BTL_CMN 0) comes from the MSC at the contact point. v4:
+    Clang 0 (it meets no other hitbox; hit_clank does the clanking) and the clank box"""
+    return [hitbox(ID=0, Size=HIT_SIZE, Y=HIT_Y, Z=HIT_Z, HitstunMul=-float(HITSTUN_ADD), HitstopFrames=HITSTOP,
+                   SelfHitstopFrames=HITSTOP, SFXLevel=1, Clang=0, **HIT), hit_clank()]
+
+
+# v4 (user: "make it so Sledgehammer wins any clanks"). Smash 4's clank (exe_v46u, docs/native-notes.md "Clanks"): the
+# attack-vs-attack pass (0x02C0F6F0) records each pair of overlapping hitboxes whose collision masks take each other
+# (a hitbox's mask, 0x02C0E77C: HitBits | Clang << 6 | ...: Clang 0 meets no hitbox); each side then resolves its own
+# record (0x02C0A708): it wins when its damage - battle_object param 55 (9.0, at [0x102FDC70] + 0xDC) >= the other's
+# (x the other's attack multipliers): its record is dropped and it goes on untouched; else it loses: Rebound 1 rebounds
+# (the duration and pushback from the larger of the two damages), Rebound 0 has its attack cancelled (+0x120). One
+# losing record is enough to lose. So the real hitboxes are Clang 0 (they never meet another hitbox, never lose one)
+# and ID 2 is a clank-only box on the same place, size and frames: Clang 1, CLANK_DMG damage, HitBits 0 (no fighter,
+# item, enemy or floor category: it hits nobody), Shieldable / Reflectable / Absorbable 0, no knockback, NoGFX, Rebound
+# 0: it beats any hitbox doing up to CLANK_DMG - 9 = 41% (after its owner's multipliers). The loser's clank hitlag is
+# from the larger damage x the larger one's Hitlag multiplier: CLANK_HITLAG keeps it near a 15% clank's
+CLANK_DMG = 50.0
+CLANK_HITLAG = 0.3
+
+
+def hit_clank():
+    return hitbox(ID=2, Size=HIT_SIZE, Y=HIT_Y, Z=HIT_Z, Damage=CLANK_DMG, Angle=0, KBG=0, FKB=0, BKB=0,
+                  Hitlag=CLANK_HITLAG, SDI=0.0, Clang=1, Rebound=0, HitBits=0, Shieldable=0, Reflectable=0,
+                  Absorbable=0, NoGFX=1, SFXLevel=0, SFXType=0, Flinchless=1)
 
 
 def hit_charged():
     """v3: ID 0 the spike (aerial targets), ID 1 grounded targets: knockback 1, put down by the MSC"""
     return [hitbox(ID=0, Size=HIT_SIZE, Y=HIT_Y, Z=HIT_Z, HitstopFrames=HITSTOP_CH, SelfHitstopFrames=HITSTOP_CH,
-                   SFXLevel=2, **{'Ground/Air': 2}, **HIT_CH),
+                   SFXLevel=2, Clang=0, **{'Ground/Air': 2}, **HIT_CH),
             hitbox(ID=1, Size=HIT_SIZE, Y=HIT_Y, Z=HIT_Z, HitstopFrames=HITSTOP_CH, SelfHitstopFrames=HITSTOP_CH,
-                   SFXLevel=2, SDI=0.0, **{'Ground/Air': 1}, **HIT_CH_GROUND)]
+                   SFXLevel=2, SDI=0.0, Clang=0, **{'Ground/Air': 1}, **HIT_CH_GROUND),
+            hit_clank()]
 
 
 CH, NCH = 3, 4                        # Float_Var_Compare methods: >= / <
@@ -293,7 +316,7 @@ def game_scripts():
     start = new_vars()
     hold = new_vars() + [
         cmd('frame', float(HIT_FROM_CH))] + if_(V_CHG, CH, CHARGE_FRAMES, hit_charged()) + [
-        cmd('frame', float(HIT_FROM))] + if_(V_CHG, NCH, CHARGE_FRAMES, [hit_uncharged()]) + [
+        cmd('frame', float(HIT_FROM))] + if_(V_CHG, NCH, CHARGE_FRAMES, hit_uncharged()) + [
         cmd('frame', float(HIT_TO_CH))] + if_(V_CHG, CH, CHARGE_FRAMES, [cmd('remove_all_hitboxes')]) + [
         cmd('frame', float(HIT_TO)), cmd('remove_all_hitboxes')]
     return start, hold

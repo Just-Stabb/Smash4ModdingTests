@@ -2585,3 +2585,23 @@ hit info, r28 the attack's collision slot, its angle at +0x64):
   0x03111AC8 (a motion folder resource), `get_fighter_model_name_from_fighter_kind` 0x030ED508 (0x0275DB24's name).
   The script loads `motion/camera/result/<model name>/<n>/` for the winner ("NOT FOUND CAMERA!" -> `default/1/`; teams
   `team/%d/`, no contest `nocontest/%d/`). `param/ui/result_param.bin` (bound at 0x030D37C4) is its other framing.
+
+## Clanks (Supamario's Sledgehammer v4)
+
+Read from cross_f.rpx (exe_v46u; not yet confirmed in game):
+- **Hitbox data:** the packed-hitbox prefix `0x02C0A96C` puts Damage at `+0x18`, the Hitlag multiplier at `+0x34`,
+  **Clang at `+0x46`** and **Rebound at `+0x47`** (args 3, 14, 16, 17).
+- **The collision masks** (`0x02C0E77C`, a hitbox's two category words): its target mask is HitBits (`+0x3F`, bits 0-5)
+  | 0x22-or-0x23 << 6, where Clang sets bit 6, the constant 0x22 sets bits 7 and 11, Shieldable `+0x49` | 4, Reflectable
+  `+0x4A` | 8, Absorbable `+0x4B` | 0x10 (each << 6). So **Clang 0: the hitbox meets no other hitbox**, and HitBits 0
+  with Clang 1 and Shieldable / Reflectable / Absorbable 0 gives a box that meets only other hitboxes.
+- **Detection:** the attack-vs-attack pass `0x02C0F6F0` (its team filter `0x02C0F180`, a facing / position check `0x02C0F2E8` (not traced further),
+  the bounding boxes and shapes `0x02D42C44` / `0x02D42CEC` / `0x02D430D8`) records each overlapping pair on both sides
+  (`0x02C10F40`).
+- **Resolution, each side on its own record** (`0x02C0A708`, f1 = its own damage): the other's damage is its hitbox's
+  (AttackModule vt `+0x104`) x two multipliers of its owner (vt `+0x344`, `+0x234`); **battle_object param 55** (9.0, the
+  table at `[0x102FDC70]`, param n at `+4n`, read at `0x02C0A7C4`) is the margin: own - 9 >= other's -> the record is
+  dropped (`0x02C10B54`), that side goes on untouched; else it loses: Rebound 1 -> the rebound (its duration and pushback
+  from the larger of the two damages, stored with the larger one's Hitlag multiplier), Rebound 0 -> its module's
+  `+0x120` set (the attack cancelled). A side loses if any of its records loses.
+- Not traced: where the aerial / grounded clank rule lives (no situation test in the pass above).

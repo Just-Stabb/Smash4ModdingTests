@@ -392,7 +392,10 @@ def merge_tail(U, flat, script):
         if fr > last:
             cut = i
             break
-    return m[:cut] + [c for c in script[k:] if c.ident != acmd.END] + m[cut:] + end()
+    head = m[:cut]
+    if max([float(c.params[0]) for c in head if c.name == 'FRAME'] or [0.0]) < last:
+        head.append(U.cmd('FRAME', last))       # merge_flat drops a trailing FRAME: the branches wait for it
+    return head + [c for c in script[k:] if c.ident != acmd.END] + m[cut:] + end()
 
 
 def no_release(script):
