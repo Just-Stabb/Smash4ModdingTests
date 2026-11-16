@@ -260,7 +260,12 @@
         "0x232": {"anim": "FitSZerosuitBodyMainD01SpecialAirSF", "flags": "0x0", "motion": "specialairsf"},
         "0x23A": {"anim": "FitSZerosuitBodyMainD02SpecialAirHiHit", "flags": "0x0", "motion": "specialairhihit (Sword of the Creator's pull)"},
         "0x23B": {"anim": "FitSZerosuitBodyMainD02SpecialAirHiOvertake", "flags": "0x0", "motion": "specialairhiovertake"},
-        "0x23C": {"anim": "FitSZerosuitBodyMainD02SpecialAirHiWallJump", "flags": "0x0", "motion": "specialairhiwalljump"}
+        "0x23C": {"anim": "FitSZerosuitBodyMainD02SpecialAirHiWallJump", "flags": "0x0", "motion": "specialairhiwalljump"},
+        "0x53": {"anim": "FitSZerosuitBodyMainC00Attack100Start", "flags": "0x0", "motion": "attack100start (his rapid jab: ZSS has none; Ultimate's motion_list flags 0x80)"},
+        "0x54": {"anim": "FitSZerosuitBodyMainC00Attack100", "flags": "0x2", "motion": "attack100 (the loop: Ultimate's loop flag 0x2)"},
+        "0x55": {"anim": "FitSZerosuitBodyMainC00Attack100End", "flags": "0x0", "motion": "attack100end (Ultimate's attack_100_end: c00attackend)"},
+        "0x5E": {"anim": "FitSZerosuitBodyMainC03AttackS4Hi", "flags": "0x4", "motion": "attacks4hi (angled up forward smash: Ultimate's move flag 0x4)"},
+        "0x61": {"anim": "FitSZerosuitBodyMainC03AttackS4Lw", "flags": "0x4", "motion": "attacks4lw (angled down forward smash)"}
       },
       "weapons": {
         "arrow1": {"kind": "0x19E", "base": "paralyzer_bullet", "max": 2},

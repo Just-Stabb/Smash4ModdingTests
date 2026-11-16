@@ -199,6 +199,25 @@ def cmd_stats(a):
     sys.exit(r.returncode)
 
 
+# common moves whose slot the base may not have (ultimate_acmd.SLOT_MOVES): the Smash 4 animation name's tail
+SLOT_MOVE_ANIMS = {'Attack100Start': 'c00attack100start', 'Attack100': 'c00attack100', 'Attack100End': 'c00attack100end',
+                   'AttackS4Hi': 'c03attacks4hi', 'AttackS4Lw': 'c03attacks4lw'}
+
+
+def slot_moves_for(add, base_dir):
+    """the SLOT_MOVES the port has animations for: given by port.json motions.add (Byleth on ZSS: the rapid jab, the
+    angled forward smashes; their slots in extra_kinds.json "motions") or the base's own main.pac"""
+    have = {a.lower() for a in add}
+    pac = os.path.join(base_dir, 'motion/body/main.pac')
+    if os.path.exists(pac):
+        import omo
+        for n, _d in omo.pac_read(pac):
+            i = n.find('Main')
+            if i >= 0:
+                have.add(n[i + 4:-4].lower())
+    return [k for k, v in SLOT_MOVE_ANIMS.items() if v in have]
+
+
 def plan(name, out):
     """[(step, description, argv)] with paths resolved; '?' where an input is missing"""
     src = port_sources.load()
@@ -237,10 +256,16 @@ def plan(name, out):
                   + (['--extra-vis', os.path.join('fighters', name, cfg['motions']['extra_vis'])]
                      if cfg.get('motions', {}).get('extra_vis') else [])))
     # the low models (model/body/l00-l07): the off-screen magnifier and 8-player Smash draw them, not cXX; a port
-    # without them was invisible in the magnifier (Squirtle v6, user). Copies of cXX (docs/params/fighter_files.md:
-    # Hero's are), after the motions step, which adds the face packs to the model folders
-    steps.append(('low-models', 'the low models (l00-l07, magnifier / 8-player Smash): copies of c00-c07',
+    # without them was invisible in the magnifier (Squirtle v6, user). Ultimate's own low model where the costume has a
+    # lod.xmb (its lowest level of detail: Byleth's body_low / hair_low / coat / skirt), else copies of cXX
+    # (docs/params/fighter_files.md: Hero's are); after the motions step, which adds the face packs to the model folders
+    steps.append(('low-models', 'the low models (l00-l07, magnifier / 8-player Smash): Ultimate\'s LOD (lod.xmb), else copies',
                   [py, t('ultimate_port.py'), 'low-models', name, '--out', out]))
+    # Ultimate's victory cameras (camera/fighter/<ult>/c00/j02win1-3): Smash 4 camera motions in Corrin's final-camera
+    # form (tools/ultimate_camera.py: fighter/NAME/camera/result/winN); port_check R1. Smash 4's result screen frames
+    # the winner from param/ui/result_param.bin and plays no camera motion yet (an executable hook to come)
+    steps.append(('camera', 'the win cameras (Ultimate\'s j02win1-3 -> camera/result/winN camera_motion.omo / .vbn)',
+                  [py, t('ultimate_camera.py'), 'convert', name, '--out', out]))
     eff = src.eff(ult) or '?EFF/ef_%s.eff' % ult
     e = cfg.get('effects', {})
     ids = os.path.join(ROOT, 'fighters', name, '%s_effects.json' % name)
@@ -270,6 +295,7 @@ def plan(name, out):
                    src.get('kind_folders', {}).get(name) or '?KIND_FOLDER/fighter/' + name, src.get('soundlabeltable', '?LABELS'),
                    os.path.join(work, 'sound'), '--name', name.capitalize(), '--ult-name', ult, '--dump', dump]))
     snd_ids = os.path.join(work, 'sound', 'sound_ids.json')
+    slot_moves = slot_moves_for(add, base_dir)
     steps.append(('scripts', 'Ultimate\'s scripts into the base\'s slots (game / effect / sound / expression, vl frames)',
                   [py, t('ultimate_acmd.py'), os.path.join(dump, ult), os.path.join(body, 'game.bin'),
                    os.path.join(fighter, 'script/animcmd/body/game.bin'), os.path.join(fighter, 'model/body/c00'),
@@ -281,6 +307,7 @@ def plan(name, out):
                    '--effects', 'reference/ultimate_sys_effects.json,' + ids, os.path.join(U, 'model/body/c00/model.nusktb')]
                   + (['--translate', os.path.join('fighters', name, e2)] if (e2 := cfg.get('specials', {}).get('acmd'))
                      and os.path.exists(os.path.join(ROOT, 'fighters', name, e2)) else [])
+                  + (['--slot-moves', ','.join(slot_moves)] if slot_moves else [])
                   + ['--sound-ids', snd_ids, '--expressions', '--vec-targets', os.path.join(work, 'vec_targets.json')]))
     # Ultimate's "carry the hit fighter to a point" (angle 368 + set_vec_target_pos): no Smash 4 hitbox field, so an MSC
     # pull per move (tools/vec_target.py, Sephiroth's up tilt's method): paste it into fighters/NAME/NAME.c and call
@@ -409,10 +436,19 @@ def cmd_unpack_body(a):
 
 
 def cmd_low_models(a):
-    """model/body/cXX -> lXX (the whole folder), for each costume the port has"""
+    """model/body/lNN for each costume: Ultimate's own low model where the costume has one (its lod.xmb: the lowest
+    level of detail, body_low for body_high ...; tools/ultimate_fighter.py model --lod-low), else a copy of cNN.
+    The lNN folder is cNN's (the face / eyelid packs, model.nut and the rest) with the low build's model.nud /
+    metal.nud, their textures named by cNN's ids (each picture matched by content): lNN keeps cNN's ids and .nut
+    (fighter_texture_ids: "the same ids as cNN when its .nut holds the same textures")"""
     import shutil
+    import tempfile
+    import fighter_texture_ids as T
     cfg = load_cfg(a.name)
     body = os.path.join(a.out, a.name, 'fighter', a.name, 'model/body')
+    src = port_sources.load()
+    U = src.ult_dir(cfg['ult'])
+    steps = {k: v for k, _d, v in plan(a.name, a.out)} if U else {}
     done = []
     for c in cfg.get('costumes', ['c00']):
         src_dir = os.path.join(body, c)
@@ -421,7 +457,31 @@ def cmd_low_models(a):
         dst = os.path.join(body, 'l' + c[1:])
         shutil.rmtree(dst, ignore_errors=True)
         shutil.copytree(src_dir, dst)
-        done.append(os.path.basename(dst))
+        lod = U and os.path.exists(os.path.join(U, 'model/body', c, 'lod.xmb')) and not a.copies
+        if not lod or 'model-' + c not in steps:
+            done.append('l%s (copy)' % c[1:])
+            continue
+        argv = list(steps['model-' + c])
+        tmp = tempfile.mkdtemp(prefix='lod_')
+        argv[argv.index(os.path.join(body, c))] = tmp
+        r = subprocess.run([sys.executable] + [os.path.join(ROOT, x) if x.startswith('tools/') else x for x in argv[1:]]
+                           + ['--lod-low'], cwd=ROOT, capture_output=True, text=True)
+        if r.returncode:
+            sys.exit('low-models %s: %s' % (c, r.stderr[-2000:]))
+        by_pic = {h: tid for _hp, _at, tid, h in T.nut_textures(open(os.path.join(src_dir, 'model.nut'), 'rb').read())}
+        own = {tid: h for _hp, _at, tid, h in T.nut_textures(open(os.path.join(tmp, 'model.nut'), 'rb').read())}
+        missing = [hex(t) for t, h in own.items() if h not in by_pic]
+        if missing:
+            sys.exit('low-models %s: the low model uses pictures %s not in %s/model.nut' % (c, missing, c))
+        mapping = {t: by_pic[h] for t, h in own.items()}
+        for f in ('model.nud', 'metal.nud'):
+            if os.path.exists(os.path.join(tmp, f)):
+                open(os.path.join(dst, f), 'wb').write(T.nud_set_ids(open(os.path.join(tmp, f), 'rb').read(), mapping))
+        for f in ('model.vbn', 'model.jtb'):              # the same skeleton (needed_bones reads every mesh): checked
+            if open(os.path.join(tmp, f), 'rb').read() != open(os.path.join(src_dir, f), 'rb').read():
+                sys.exit('low-models %s: %s differs from %s\'s' % (c, f, c))
+        shutil.rmtree(tmp)
+        done.append('l%s (Ultimate\'s LOD)' % c[1:])
     print('low models: %s' % ', '.join(done))
 
 
@@ -471,6 +531,7 @@ def main():
     p = sub.add_parser('low-models')
     p.add_argument('name')
     p.add_argument('--out', default=os.path.join(ROOT, 'build', 'port'))
+    p.add_argument('--copies', action='store_true', help='copies of cNN even where Ultimate has a low model')
     p.set_defaults(fn=cmd_low_models)
     p = sub.add_parser('check')
     p.add_argument('name')

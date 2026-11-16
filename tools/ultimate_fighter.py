@@ -563,6 +563,64 @@ MESH_SLOTS = [
 SLOT_OF = {u: s for s, us in MESH_SLOTS for u in us}
 
 
+LOD_LOW = False             # --lod-low: the model of Ultimate's lowest level of detail (lod.xmb), for model/body/lNN
+
+
+def _xmb_le(d):
+    """Ultimate's little-endian XMB (model/body/cNN/lod.xmb): [{name, props, parent}]"""
+    def cstr(o):
+        return d[o:d.index(b'\0', o)].decode('latin1')
+    ne, _np = struct.unpack_from('<II', d, 4)
+    eo, po, no = struct.unpack_from('<III', d, 0x18)
+    vo = struct.unpack_from('<I', d, 0x28)[0]
+    out = []
+    for i in range(ne):
+        nameo, nprop, _nch, fp, _u1, par, _u2 = struct.unpack_from('<IHHHHHH', d, eo + 16 * i)
+        props = {}
+        for k in range(fp, fp + nprop):
+            pn, pv = struct.unpack_from('<II', d, po + 8 * k)
+            props[cstr(no + pn)] = cstr(vo + pv)
+        out.append(dict(name=cstr(no + nameo), props=props, parent=None if par == 0xFFFF else par))
+    return out
+
+
+def lod_swaps(src, shapes=()):
+    """Ultimate's level-of-detail meshes (lod.xmb: a MeshArray of mesh names, LodArrays of Lods, each a Ratio and a
+    Visibility per mesh; Byleth c00: body_high -> body_low, c01 also coat / skirt / hair): ({mesh shown at full detail
+    but not at the lowest}, {low mesh: the full-detail mesh it stands in for}), shape names (numshb objects). The
+    lowest level is the Lod showing the most meshes that full detail hides. ({}, {}) without a lod.xmb"""
+    path = os.path.join(src, 'lod.xmb')
+    if not os.path.exists(path):
+        return set(), {}
+    e = _xmb_le(open(path, 'rb').read())
+    meshes = [x for x in e if x['name'] == 'Mesh']
+    lods = [i for i, x in enumerate(e) if x['name'] == 'Lod']
+    vis = {i: [x['props'].get('value') == 'true' for x in e if x['parent'] == i and x['name'] == 'Visibility']
+           for i in lods}
+    if not lods:
+        return set(), {}
+    full = vis[lods[0]]
+    low = max((vis[i] for i in lods), key=lambda v: sum(1 for a, b in zip(v, full) if a and not b))
+
+    def shape(v):
+        for cand in (v + 'Shape', v + '_VIS_O_OBJShape'):
+            if not shapes or cand in shapes:
+                return cand
+        return next((n for n in shapes if n.startswith(v)), v + 'Shape')
+    names = [m['props']['value'] for m in meshes]
+    hidden = {names[k] for k in range(len(names)) if full[k] and not low[k]}
+    shown = [k for k in range(len(names)) if low[k] and not full[k]]
+    swap = {}
+    for k in shown:
+        m = meshes[k]['props']
+        stem = m.get('parent') or names[k].replace('_low', '_high')
+        pair = stem if stem in hidden else next((h for h in hidden if h.replace('_high', '') == stem.replace('_high', '')),
+                                                None)
+        if pair:
+            swap[shape(names[k])] = shape(pair)
+    return {shape(h) for h in hidden}, swap
+
+
 def mesh_parts(src):
     import ssbh_data_py as s
     mesh = s.mesh_data.read_mesh(src + '/model.numshb')
@@ -583,6 +641,13 @@ def mesh_parts(src):
                        for b in o.bone_influences],
                  mat=matl[label[(o.name, o.subindex)]])
         out.setdefault(o.name, []).append(p)
+    if LOD_LOW:                 # the lowest level of detail: each low mesh in its full-detail mesh's place (slot)
+        hidden, swap = lod_swaps(src, set(out))
+        for h in hidden:
+            out.pop(h, None)
+        for lo, hi in swap.items():
+            if lo in out:
+                out[hi] = [dict(p, name=hi) for p in out.pop(lo)]
     return out
 
 
@@ -1760,6 +1825,8 @@ def main():
     m.add_argument('--snake', nargs='?', const='default', help='add the extending sword (tools/snake_sword.py; '
                    'a JSON spec, default its SPEC): its bones after --joints in joint table 1')
     m.add_argument('--motions', help='with --max-bones: the motion folder (the bones no motion moves merge first)')
+    m.add_argument('--lod-low', action='store_true', help='the low model (model/body/lNN: the magnifier, 8-player '
+                   'Smash): Ultimate\'s lowest level of detail from the costume\'s lod.xmb (body_low for body_high ...)')
     a = ap.parse_args()
     joints = [j for j in a.joints.split(',') if j]
     global OWN_JOINTS
@@ -1777,8 +1844,9 @@ def main():
                       max_bones=a.max_bones, animated=animated, joints=joints,
                       extra_vis=json.load(open(a.extra_vis)) if a.extra_vis else None)
     if a.cmd == 'model':
-        global PIXEL_ART
+        global PIXEL_ART, LOD_LOW
         PIXEL_ART = a.pixel_art
+        LOD_LOW = a.lod_low
         snake = None
         if a.snake:
             import snake_sword

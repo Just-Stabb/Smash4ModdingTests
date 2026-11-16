@@ -36,7 +36,12 @@
    "D01SpecialSLanding",
    "D02SpecialAirHiHit",
    "D02SpecialAirHiOvertake",
-   "D02SpecialAirHiWallJump"
+   "D02SpecialAirHiWallJump",
+   "C00Attack100Start",
+   "C00Attack100",
+   "C00Attack100End",
+   "C03AttackS4Hi",
+   "C03AttackS4Lw"
   ],
   "extra_vis": "weapon_vis.json"
  },

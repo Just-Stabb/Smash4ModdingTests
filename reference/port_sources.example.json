@@ -24,6 +24,10 @@
  "ult_ui": [
   "/path/to/ultui_dl/ui-SSBU.zip"
  ],
+ "ult_camera": [
+  "/path/to/camera-SSBU (the folder holding camera/fighter/<name>/cNN/j02win1-3.nuanmb)"
+ ],
+ "camera_template": "/path/to/vanilla/fighter/kamui/camera/final/2/camera_motion.vbn",
  "vbn": [
   "/path/to/vbnscan/fighter"
  ],

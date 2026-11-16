@@ -493,3 +493,11 @@ SpecialSLanding
 SpecialAirHiHit
 SpecialAirHiOvertake
 SpecialAirHiWallJump
+// v2: the common slots ZSS's motion table leaves empty, given his Ultimate animations (extra_kinds.json "motions":
+// FitSZerosuitBodyMainC00Attack100Start ...; ultimate_acmd.py --slot-moves): the rapid jab 0x53 - 0x55 and the
+// angled forward smashes 0x5E / 0x61 (common names: listed so Sm4shCommand shows them for him)
+Attack100Start
+Attack100
+Attack100End
+AttackS4Hi
+AttackS4Lw

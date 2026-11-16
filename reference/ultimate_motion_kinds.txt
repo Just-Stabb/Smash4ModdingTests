@@ -11,6 +11,10 @@ appeal_s_r
 attack_11
 attack_12
 attack_13
+attack_100_start
+attack_100
+attack_100_end
+attack_100_sub
 attack_air_b
 attack_air_b_arm
 attack_air_b_upper
@@ -46,6 +50,8 @@ attack_s3_slow
 attack_s4_hold
 attack_s4_s
 attack_s4_s_arm
+attack_s4_hi
+attack_s4_lw
 bitten_wario_air_end_girl
 bitten_wario_air_end_taro
 bitten_wario_air_start_big

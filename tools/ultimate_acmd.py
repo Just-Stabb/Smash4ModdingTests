@@ -75,6 +75,12 @@ TRANSLATE = {
     'Dash': 'dash',
 }
 GAME_ONLY = {'dash'}
+# common moves whose motion slots the base may lack (ZSS has no rapid jab and no angled forward smash): translated
+# only with --slot-moves (ultimate_port.py passes the ones whose animations port.json motions.add gives the
+# kind: C00Attack100* / C03AttackS4Hi / Lw, with their slots in extra_kinds.json "motions"); a script in a slot
+# with no animation would never play, and the common MSC picks 0x5E / 0x61 only when the motion is there
+SLOT_MOVES = {'Attack100Start': 'attack100start', 'Attack100': 'attack100', 'Attack100End': 'attack100end',
+              'AttackS4Hi': 'attacks4hi', 'AttackS4Lw': 'attacks4lw'}
 # their vl cancel frame (group 1 byte 2) from Ultimate's motion_list, the scripts left as they are
 CANCEL_ONLY = ('appealhil', 'appealhir', 'appeallwl', 'appeallwr', 'appealsl', 'appealsr')
 # Ultimate transition term -> Smash 4 STRANS id (vanilla dash scripts: STRANS_ON(0x1E00000A) at the run frame)
@@ -129,6 +135,12 @@ CAPTURE_STATUS = {'FIGHTER_STATUS_KIND_CAPTURE_PULLED': 0x3F}
 # aerials, catches; Mario's up smash for the smash hold)
 FLAGS = {'FIGHTER_STATUS_ATTACK_FLAG_ENABLE_COMBO': 0x2100000D,
          'FIGHTER_STATUS_ATTACK_FLAG_ENABLE_NO_HIT_COMBO': 0x21000013,
+         # the jab's restart (hold A: jab 1 again; Link's attack11 / 12 turn it on at 16), the rapid jab's way in
+         # (the common jab status 0x25 goes to Attack100 0x26 with it on: Kirby's attack12) and the loop's
+         # continue check (the common Attack100 loop reads it each hit: Kirby's attack100, every 4 frames)
+         'FIGHTER_STATUS_ATTACK_FLAG_ENABLE_RESTART': 0x2100000E,
+         'FIGHTER_STATUS_ATTACK_FLAG_ENABLE_100': 0x21000011,
+         'FIGHTER_STATUS_ATTACK_FLAG_100_CONTINUE_CHECK': 0x21000016,
          'FIGHTER_STATUS_ATTACK_FLAG_START_SMASH_HOLD': 0x2100001B,
          'FIGHTER_STATUS_ATTACK_AIR_FLAG_ENABLE_LANDING': 0x2100000D,
          'FIGHTER_STATUS_CATCH_FLAG_CATCH_WAIT': 0x2100000D,
@@ -203,6 +215,17 @@ def functions(text):
     return out
 
 
+LOOP_UNROLL = 12           # an endless loop after other statements: its body this many times
+
+
+def self_jump(cmds, name):
+    """a translated endless loop's jump back (JUMP 0, from __loop_jump__) aimed at the script itself"""
+    for c in cmds:
+        if c.name == 'JUMP' and c.params and c.params[0] == 0:
+            c.params[0] = acmd.crc(name)
+    return cmds
+
+
 def statements(body):
     """a flat list of ('call', name, args) / ('if', cond) / ('else',) / ('end',)"""
     out = []
@@ -248,6 +271,23 @@ def statements(body):
                 cond = '__decompiler_stub__'
             out.append(('if', cond))
             i = k + 1
+            continue
+        if re.match(r'loop\s*\{', body[i:]):
+            # an endless loop (the rapid jab's Attack100: every script of it). The whole body -> its statements,
+            # then the jump back to the start (Smash 4's form: Kirby's attack100 ends WAIT_LOOP_CLR, JUMP(itself));
+            # after other statements (effect_attack100: two effects, then the foot smoke every 8 frames) -> unrolled
+            # LOOP_UNROLL times, so what comes before it doesn't play again
+            k = body.index('{', i) + 1
+            s0, depth = k, 1
+            while depth:
+                depth += {'{': 1, '}': -1}.get(body[k], 0)
+                k += 1
+            inner = statements(body[s0:k - 1])
+            if not out and not body[k:].strip(' \n\t;'):
+                out += [('call', '__loop_begin__', [])] + inner + [('call', '__loop_jump__', [])]
+            else:
+                out += inner * LOOP_UNROLL
+            i = k
             continue
         m = re.match(r'for _ in (\d+)\.\.(\d+) \{', body[i:])
         if m:       # a counted loop (the charge's dust puffs, SpecialNStart): unrolled
@@ -553,6 +593,7 @@ class Translator:
         live = [True]              # a stack of "this block runs"
         taken = [False]
         dyn = []                   # dynamic ifs open: [where its compare goes, where its Else goes or None]
+        loop_at = 0                # where an endless loop's body starts (__loop_begin__)
         sts = fix_split_flag_branch(fix_misplaced_else(statements(body)))
         for fix in getattr(self, 'extra_fixes', ()):
             sts = fix(sts)
@@ -612,6 +653,22 @@ class Translator:
                 continue
             if kind == 'other':
                 self.skip(st[1].split('(')[0][:40])
+                continue
+            if st[1] == 'wait_loop_clear':          # the loop's frame count back to 0 (Smash 4's WAIT_LOOP_CLR)
+                cmds.append(cmd('WAIT_LOOP_CLR'))
+                self.frame = 0.0
+                continue
+            if st[1] == '__loop_begin__':
+                loop_at = len(cmds)
+                continue
+            if st[1] == '__loop_jump__':            # statements(): an endless loop's end, aimed by self_jump()
+                # the jump back must come after a wait, or the script spins in one frame (a hang): Ultimate's
+                # wait_loop_sync_mot (the run / walk effects: wait for the motion's loop) is Smash 4's Loop_Rest,
+                # as the vanilla looping scripts end; a body with no wait at all gets one too
+                body_names = {c.name for c in cmds[loop_at:]}
+                if getattr(self, 'loop', False) or not body_names & {'WAIT', 'WAIT_LOOP_CLR', 'Loop_Rest'}:
+                    cmds.append(cmd('Loop_Rest'))
+                cmds.append(cmd('JUMP', 0))
                 continue
             got = self.call(st[1], [value(a) for a in st[2]], st[2])
             self.made += got
@@ -1180,10 +1237,10 @@ def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('spec
             tr.last, tr.last_name = False, None
             tr.anim = anims.get(hash40(fn)) or anims.get(hash40('game_' + fn[len('effect_'):]))
             tr.turned_off = set(re.findall(r'EFFECT_OFF_KIND\(agent, Hash40::new\("([^"]+)"', body))
-            cmds = tr.script(body)
+            cmds = self_jump(tr.script(body), name)
             # looping motions: the base's script ends Loop_Rest, JUMP(itself); Ultimate re-runs its own
             base = [c.name for c in effect_bin.scripts.get(acmd.crc(name), [])]
-            if 'Loop_Rest' in base:
+            if 'Loop_Rest' in base and not any(c.name == 'JUMP' for c in cmds):
                 cmds = cmds[:-1] + [cmd('Loop_Rest'), cmd('JUMP', acmd.crc(name)), acmd.Command(acmd.END)]
             out[name] = cmds
     EFFECT_CONDS = ()
@@ -1213,6 +1270,10 @@ class SoundTranslator(Translator):
 
     def sid(self, name):
         v = self.ids.get(name.lower()) if isinstance(name, str) else None
+        if v is None and isinstance(name, str):
+            # a random container of numbered tones (Byleth's se_master_attack100: _01 - _03, one picked each hit): its
+            # tones take turns in Ultimate; Smash 4's ACMD has no pick, so its first tone (as ultimate_sound.py's aliases)
+            v = self.ids.get(name.lower() + '_01')
         if v is None:
             self.missing[name] = self.missing.get(name, 0) + 1
         return v
@@ -1397,8 +1458,8 @@ def translate_others(kind, scripts_dir, base_bin, tr, skip=('special', 'final'),
             tr.loop = False
             tr.has_rumble = 'set_rumble' in body
             tr.drop = set(n for k, v in getattr(tr, 'fail', {}).items() if k in body for n in v)
-            cmds = tr.script(fold_tests(first_voice_region(body)) if kind == 'sound' else body)
-            if tr.loop:
+            cmds = self_jump(tr.script(fold_tests(first_voice_region(body)) if kind == 'sound' else body), name)
+            if tr.loop and not any(c.name == 'JUMP' for c in cmds):
                 cmds = cmds[:-1] + [cmd('Loop_Rest'), cmd('JUMP', acmd.crc(name)), acmd.Command(acmd.END)]
             out[name] = cmds
     if kind == 'sound':
@@ -1608,7 +1669,12 @@ def main():
     ap.add_argument('--vec-targets', metavar='OUT_JSON', help='write the translated scripts\' set_vec_target_pos '
                     '(Ultimate\'s "carry the hit fighter to a point": no Smash 4 hitbox field) for the MSC pull, '
                     'tools/vec_target.py msc')
+    ap.add_argument('--slot-moves', default='', help='comma-separated SLOT_MOVES (Ultimate file names, e.g. '
+                    'Attack100Start,Attack100,Attack100End,AttackS4Hi,AttackS4Lw) to translate: common moves the '
+                    'port gave motion slots of their own (port.json motions.add, extra_kinds.json "motions")')
     a = ap.parse_args()
+    for src in filter(None, a.slot_moves.split(',')):
+        TRANSLATE[src] = SLOT_MOVES[src]
     TRUE_CONDS[:] = a.cond
     for d in a.dyn_cond:
         k, v = d.split('=')
@@ -1645,7 +1711,7 @@ def main():
         tr.skipped = {}
         # a slot of ours with no game script in the dump (SpecialNCancel): empty scripts, so the
         # slot's base move (a custom-move variant) doesn't run on it
-        cmds = tr.script(body) if body is not None else [acmd.Command(acmd.END)]
+        cmds = self_jump(tr.script(body), name) if body is not None else [acmd.Command(acmd.END)]
         f.scripts[acmd.crc(name)] = cmds
         done.append((src, name))
         if tr.vec_targets:
@@ -1654,7 +1720,8 @@ def main():
             print('%s -> %s: %d commands; left out %s' % (src, name, len(cmds), tr.skipped))
             print(acmd.fmt_script(cmds))
     for name in EMPTY if not a.only else ():    # --only: those scripts alone (a fighter on its base's moves keeps them)
-        f.scripts[acmd.crc(name)] = [acmd.Command(acmd.END)]
+        if name not in {n for _s, n in done}:   # a --slot-moves move (attacks4hi / lw) keeps its translation
+            f.scripts[acmd.crc(name)] = [acmd.Command(acmd.END)]
     f.save(a.out)
     if vec:
         print('set_vec_target_pos (carried to a point: the MSC pull, tools/vec_target.py): %s' % ', '.join(

@@ -14,6 +14,7 @@ in docs/ultimate-fighter-port.md; this page is the procedure.
 | `tools/ultimate_stats.py` | fighter_param stats from Ultimate's `fighter_param.prc`, by name |
 | `tools/port_check.py` | the finished package against every bug class so far |
 | `tools/vec_target.py` | Ultimate's "carry the hit fighter to a point" hits (set_vec_target_pos) as an MSC pull |
+| `tools/ultimate_camera.py` | Ultimate's win cameras (camera/fighter/NAME/c00/j02win1-3) as Smash 4 camera motions |
 
 ## What the user provides
 
@@ -36,7 +37,7 @@ python3 tools/ultimate_port.py init NAME --base BASE --kind 0x47 --ui-name "Name
 python3 tools/ultimate_port.py status NAME            # sources + the base's known traps
 python3 tools/ultimate_port.py effects NAME           # his effects; Ultimate's common ones -> ef_common sets
 python3 tools/ultimate_port.py plan NAME --out DIR    # every command, in order; '?' = an input missing
-python3 tools/ultimate_port.py run NAME body model-c00 ... motions effects sound scripts specials variants shapes stats portraits --out DIR
+python3 tools/ultimate_port.py run NAME body model-c00 ... motions low-models camera effects sound scripts specials variants shapes stats portraits --out DIR
    (specials: the fighter's MSC / articles: fighters/NAME/NAME.c, weapons/, specials_acmd.json, its build script
     with port.json specials.build_args)
 python3 tools/ultimate_port.py check NAME PKG [later packages ...]
@@ -69,6 +70,42 @@ its own pictures). `init` registers the fighter (`reference/port_bases.json` `_t
 an article's `model.nut` takes `article_id(name, article)` (registering the article first). A copy of a base's
 model with the base's pictures (Supamario's articles) keeps the base's ids. `port_check` T1 / T2 check it over
 the whole install (other fighters' folders and the base's vanilla models too).
+
+**Moves the base has no slot for.** Ultimate's rapid jab (Attack100Start / Attack100 / Attack100End) and angled
+forward smashes (AttackS4Hi / Lw) go in common slots (0x53 - 0x55, 0x5E / 0x61) that some bases' motion tables leave
+empty (ZSS: Byleth v1 had neither). Give the kind the animations (`tools/extra_kinds.json` "motions": the slot, the
+anim name, Ultimate's motion_list flags: loop 0x2, move 0x4; `port.json` motions.add: `C00Attack100Start`,
+`C00Attack100`, `C00Attack100End`, `C03AttackS4Hi`, `C03AttackS4Lw`), rebuild the executable's motion table
+(`kind_expand_incremental.py`), and the scripts step translates them (`ultimate_acmd.py --slot-moves`, which
+`ultimate_port.py` passes for every such move motions.add or the base's main.pac has). The common MSC does the rest
+(Attack100 0x26 from the jab when the script turns ENABLE_100 on, the loop's continue check each hit; 0x5E / 0x61 from
+the stick when the motion is there). `port_check` S11.
+
+**Low models (LOD).** The off-screen magnifier and 8-player Smash draw `model/body/lNN`. Ultimate keeps a
+lowest level of detail in each costume (`model/body/cNN/lod.xmb`: Byleth's `body_low` for `body_high`, his female
+costumes' `hair_low`, `coatG_low`, `skirtG_low`); the `low-models` step builds lNN from it (`ultimate_fighter.py model
+--lod-low`: each low mesh in its full mesh's slot, the full one left out; the same skeleton) with cNN's `.nut` and
+face / eyelid packs (the low build's textures named by cNN's ids, matched by picture), and copies cNN where Ultimate
+has none (Steve, Squirtle). `port_check` M6 (ERROR: no lNN), M10 (WARN: a copy where Ultimate has its own).
+
+**Win cameras.** Ultimate animates the result-screen camera per win pose (`camera/fighter/NAME/cNN/j02win1-3.nuanmb`,
+camera-SSBU.zip: one `gya_camera` node and its field of view). The `camera` step converts them into Smash 4 camera
+motions, Corrin's final-camera form (`fighter/NAME/camera/result/winN/camera_motion.omo` / `.vbn`, the field of view
+in `camera.json`). **Smash 4's result screen plays no camera motion:** it frames the winner from
+`param/ui/result_param.bin` (a record per fighter with eye / to / win1-5 / mvp-camera fields, names stored encoded,
+plus a per-win table of (name, win, two floats) that doesn't follow Ultimate's framing), so the converted cameras
+show only once an executable hook plays them (fighters/master/README.md "Win cameras": what is known of the result
+scene). `port_check` R1 (WARN without them; an ERROR once the hook exists).
+
+**The earlier ports (audit, Byleth v2; not rebuilt):** none has its win cameras (the step is new); their low models:
+
+| port | Ultimate low model (lod.xmb) | its lNN now | fix (OUT: the port's build folder) |
+|---|---|---|---|
+| Sephiroth (`edge`) | c00 - c05 (c06 / c07 none) | v3's, stale (port_check M1 / M3 / M4) | `ultimate_port.py run edge low-models camera --out OUT` |
+| Hero (`brave`) | c00 - c07 | copies of cNN | `ultimate_port.py run brave low-models camera --out OUT` |
+| Squirtle (`pzenigame`) | none | copies of cNN (right) | `ultimate_port.py run pzenigame camera --out OUT` |
+| Incineroar (`gaogaen`, no port.json) | c00 - c07 | **none** (M6 ERROR: invisible in the magnifier) | `ultimate_port.py init gaogaen --base koopa --kind 0x43 --ui-name Incineroar --trait TRAIT` (its README's), then `run gaogaen model-c00 ... model-c07 low-models camera --out OUT`; or per costume `ultimate_fighter.py model ULT/gaogaen/model/body/cNN VANILLA/koopa/model/body/cNN OUT/gaogaen/fighter/gaogaen/model/body/lNN --lod-low` and `ultimate_camera.py convert-dir CAM/gaogaen/c00 OUT/gaogaen/fighter/gaogaen --template VBN` |
+| Steve (`pickel`, no port.json) | none | copies older than fix 12's costumes (own ids, + 0x2000) | recopy cNN -> lNN (`ultimate_port.py low-models` once it has a port.json); `ultimate_camera.py convert-dir CAM/pickel/c00 OUT/pickel/fighter/pickel --template VBN` |
 
 **Delivering:** `port_check.py` over the install as the user will have it: the full package plus every
 fix package after it, in order. No ERROR goes out. A fix package that ships a file ships its partners
@@ -278,6 +315,11 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | a port's sound banks keeping its base's BINF ids (and costume banks the main id): nus3 loads one bank an id (a second is refused, 0x80000021), so with the base, another port on those ids, or a second him in another costume in the match, the later player had no sound effects or voice | Hero (user: "players other than player 1 don't get sound effects or voice lines"; native: tools/sound_alias_cave_test.py --pairs) | every bank of a new kind gets its own id (`sound_bank_ids.own_id`: `ultimate_sound.py` does it; `sound_bank_ids.py renumber` / `copy-base` for installed folders), the rows keep the base's ids and `sound_alias_cave.py` (v2, table from `reference/port_sound_ids.json`) gives the kind's banks those ids as aliases: **rebuild the executable's sound_alias_cave.py after a port's sound step**; `port_check` A6 bank-ids (ERROR: a vanilla id, shared ids, no v2 hooks / aliases) |
 | the base's vanilla scripts left in slots the port plays: its hitboxes / intangibility / effects / sounds on the port's animation (a TRANSLATE slot with no Ultimate file of its own kept the base's: ZSS's angled forward tilts on Byleth's one forward tilt; her specials' and custom-move (_c2 / _c3) scripts), the base's per-kind executable data the port's moves reach (ZSS's x152C tether set: 0 for a new kind), the base's vl bytes (Supamario's Mario intangible window, Core Breaker v11) | user, Byleth phase 2 ("ZSS's statuses don't override Byleth's, like Sephiroth and Supamario") | translator `FALLBACK` (a stand-in slot takes the stand-in's script); `kind_expand.py` record `"tail_vector": true` (the base's x1324 / x152C block for the new kind, `kind_expand_test`); `port_check` B1 base-leftovers (ERROR: game scripts still the base's vanilla ones that act; WARN: effect / sound / expression; port.json `base_scripts_kept` for intended ones), with C1 (vl cancel bytes) and S7; Byleth v1: `port_check` **V1 vl-leftovers** (ERROR: bytes 3 - 5, the intangible window, of every own slot (0x211 on) the port plays = Ultimate's; bytes 2 - 5 of one whose scripts are empty = 0: ZSS's Flip Jump window 3 - 13 sat on his Aymr slots), B1 `base_scripts_kept` by crc too (names the vocabulary lacks), the base's orphaned scripts (custom-move slots now the port's) removed (`master_build.py`) |
 | a new fighter's weapon kinds on an executable whose weapon cave is full and was built from a base no longer kept: weapon_expand.py would rebuild (and move) every word other caves call into | Byleth v1 | `tools/weapon_expand_append.py` (the new kinds' table entries, descriptors, cases, kind compares and the fighter's list in free space, nothing moved; `test`: weapon_expand_test over every kind), `kind_expand_incremental.py --list` |
+
+| a port's low models copies of its full models (cXX) though Ultimate has a low model of its own (`lod.xmb`): full detail drawn in the magnifier and in 8-player Smash | Squirtle v6 (copies, the guard below), Byleth v1; Hero's, Sephiroth's and Incineroar's Ultimate costumes have one too (Sephiroth c06 / c07 none) | `low-models` builds Ultimate's lowest level of detail (`ultimate_fighter.py --lod-low`), lNN with cNN's ids and .nut; `port_check` M10 low-lod (WARN) |
+| Ultimate's win cameras never ported (every port's result screen framed by Smash 4's default) | user, Byleth v2 ("port over their Ultimate camera angles") | `camera` step (`tools/ultimate_camera.py`); `port_check` R1 win-camera (WARN until the result scene plays them: an executable hook) |
+| Ultimate moves whose common slot the base's motion table leaves empty (the rapid jab, the angled forward smashes) silently missing; their game scripts (`loop { ... wait_loop_clear }`) dropped whole by the translator, and their random sound containers (`se_master_attack100`: _01 - _03) left without a sound | Byleth v1 (no rapid jab, one forward smash) | `extra_kinds.json` "motions" + motions.add + `--slot-moves`; the translator turns a whole-script `loop` into WAIT_LOOP_CLR + JUMP(itself) (vanilla Kirby's attack100), unrolls a loop after other statements, maps ENABLE_100 / 100_CONTINUE_CHECK / ENABLE_RESTART, and a container to its first tone; `port_check` S11 slot-moves (WARN) |
+| a translated endless loop jumping back to its script's start with nothing waiting in it (Ultimate's run / walk effect loops end `wait_loop_sync_mot`, which the first loop translation left out): the script runs again in the same frame for ever, a hang as soon as he runs | Byleth v2's first build (caught offline, never shipped) | the translator puts Loop_Rest before the jump when the loop waits for the motion's loop, or has no wait at all; `port_check` S12 loop-spin (ERROR) |
 
 ## Open
 

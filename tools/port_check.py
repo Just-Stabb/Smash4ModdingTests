@@ -375,7 +375,9 @@ def check_scripts(inst, name, kind, base, joints, vanilla, rep):
     for h, cmds in game.items():
         applier = any(c.name == 'Throw_Applier' for c in cmds)
         for c in cmds:
-            if c.name in hb and len(c.params) > 4 and c.params[4] > 366:
+            # 367 is Smash 4's too (the victim follows the hitbox's motion, grounded ones as well: user decision
+            # 2026-11-16, ultimate_acmd.py keeps Ultimate's 367); 368 (to a set point) has none: vec_target.py
+            if c.name in hb and len(c.params) > 4 and c.params[4] > 367:
                 bad_angle.add('%08X' % h)
             if c.name == 'Throw_Applier':
                 applier = False
@@ -384,7 +386,7 @@ def check_scripts(inst, name, kind, base, joints, vanilla, rep):
                 if 'NoGrabRelease' not in syn or not c.params[syn.index('NoGrabRelease')]:
                     freeing.add(names[h])
     if bad_angle:
-        rep.add('ERROR', 'S4 angle', 'angles past 366 (Ultimate\'s 367 / 368: no such angle in Smash 4, the multi-hits let '
+        rep.add('ERROR', 'S4 angle', 'angles past 367 (Ultimate\'s 368: no such angle in Smash 4, the multi-hits let '
                 'go: Squirtle\'s Waterfall) in %d scripts' % len(bad_angle))
     if freeing:
         rep.add('ERROR', 'S5 throw-release', 'hitboxes before the throw\'s release without NoGrabRelease (they free the '
@@ -1590,6 +1592,54 @@ def check_motions(inst, name, rec, rep):
                 'moves T-pose: %s' % (len(miss), inst.where('fighter/%s/motion/body/main.pac' % name), ', '.join(miss)))
 
 
+def check_slot_moves(inst, name, src, ult, rep):
+    """S11 slot-moves: Ultimate has a rapid jab / angled forward smash (game_attack100 / attacks4hi / lw in the dump) but
+    the installed motion.mtable has no script for its common slot (0x53 - 0x55, 0x5E, 0x61): the move is missing (Byleth
+    v1 on ZSS, whose table leaves them empty: extra_kinds.json "motions" + port.json motions.add, the scripts step's
+    --slot-moves) [WARN]"""
+    import struct
+    import zlib
+    mt = inst.get('fighter/%s/script/animcmd/body/motion.mtable' % name)
+    dump = src.dump(ult) if ult else None
+    if mt is None or not dump:
+        return
+    crcs = set(struct.unpack('>%dI' % (len(mt) // 4), mt))
+    have = set()
+    for root, _d, files in os.walk(dump):
+        for f in files:
+            if f.endswith('.txt') and os.path.basename(root) == ult:
+                have.add(f[:-4].lower())
+    want = {'attack100': 'the rapid jab', 'attack100end': 'the rapid jab\'s finisher', 'attacks4hi': 'forward smash up',
+            'attacks4lw': 'forward smash down'}
+    miss = ['%s (%s)' % (k, v) for k, v in want.items() if k in have and (zlib.crc32(k.encode()) & 0xFFFFFFFF) not in crcs]
+    if miss:
+        rep.add('WARN', 'S11 slot-moves', 'Ultimate has these moves, the port\'s motion table doesn\'t: %s (motion slots: '
+                'extra_kinds.json "motions" + port.json motions.add, then the scripts step)' % ', '.join(miss))
+
+
+def check_loop_spin(inst, name, rep):
+    """S12 loop-spin: a script that jumps back to itself (JUMP to its own hash: Ultimate's endless `loop {}`, the
+    translator's form) with nothing that waits before it (WAIT, a FRAME past the first, WAIT_LOOP_CLR, Loop_Rest): it
+    runs again in the same frame, for ever (a hang). Byleth v2's first build: the run / walk effect loops (Ultimate's
+    wait_loop_sync_mot) jumped back with no Loop_Rest [ERROR]"""
+    bad = []
+    for fn in ('game', 'effect', 'sound', 'expression'):
+        sc = scripts(inst, 'fighter/%s/script/animcmd/body/%s.bin' % (name, fn))
+        for h, cmds in (sc or {}).items():
+            names = [c.name for c in cmds]
+            if 'JUMP' not in names:
+                continue
+            j = names.index('JUMP')
+            if cmds[j].params and int(cmds[j].params[0]) & 0xFFFFFFFF == h:
+                waits = [c for c in cmds[:j] if c.name in ('WAIT', 'WAIT_LOOP_CLR', 'Loop_Rest')
+                         or (c.name == 'FRAME' and c.params and float(c.params[0]) > 0)]
+                if not any(c.name in ('WAIT', 'WAIT_LOOP_CLR', 'Loop_Rest') for c in waits):
+                    bad.append('%s %08X' % (fn, h))
+    if bad:
+        rep.add('ERROR', 'S12 loop-spin', 'scripts jumping back to themselves without a wait (they spin in one frame: '
+                'a hang): %s' % ', '.join(bad))
+
+
 def check_assets(inst, name, base, rep):
     ui = (base.get('ui') or {}).get('name') or base.get('cap') or name.capitalize()
     for s in ('chr_00', 'chr_11', 'chr_12', 'chr_13', 'stock_90'):
@@ -1599,6 +1649,39 @@ def check_assets(inst, name, base, rep):
         rep.add('INFO', 'A1 sounds', 'no fighter/%s/sound in the packages (the base\'s banks play)' % name)
     elif not inst.get('sound/config/soundlabeltable.bin'):
         rep.add('WARN', 'A1 labels', 'sound banks without sound/config/soundlabeltable.bin (Hero fix 71)')
+
+
+def check_lod_and_camera(inst, name, src, ult, rep):
+    """M10 low-lod: a costume whose Ultimate model has its own low model (model/body/cNN/lod.xmb: body_low ...) shipped
+    with lNN a copy of cNN (ultimate_port.py low-models builds Ultimate's: `--lod-low`) [WARN: the copy still shows].
+    R1 win-camera: Ultimate's victory cameras (camera/fighter/<ult>/c00/j02win1-3) not converted into the package
+    (fighter/NAME/camera/result/winN/camera_motion.omo, tools/ultimate_camera.py) [WARN: Smash 4's result screen
+    plays no camera motion yet (an executable hook to come), so they don't show in game either way; an ERROR once
+    it does]"""
+    udir = src.ult_dir(ult) if ult else None
+    for d in sorted({os.path.dirname(f) for f in inst.glob(r'fighter/%s/model/body/l\d\d/model\.nud' % name)}):
+        nn = d[-2:]
+        if udir and os.path.exists(os.path.join(udir, 'model/body/c%s/lod.xmb' % nn)):
+            c, l = inst.get('fighter/%s/model/body/c%s/model.nud' % (name, nn)), inst.get(d + '/model.nud')
+            if c is not None and c == l:
+                rep.add('WARN', 'M10 low-lod', 'l%s is a copy of c%s but Ultimate has a low model for it (lod.xmb): '
+                        'ultimate_port.py run %s low-models' % (nn, nn, name))
+    try:
+        import ultimate_camera
+        cam = ultimate_camera.cam_source(src, ult) if ult else None
+    except Exception:
+        cam = None
+    wins = [w for w in (1, 2, 3) if cam and os.path.exists(os.path.join(cam, 'j02win%d.nuanmb' % w))]
+    have = [w for w in wins if inst.get('fighter/%s/camera/result/win%d/camera_motion.omo' % (name, w)) is not None]
+    if cam is None:
+        rep.add('INFO', 'R1 win-camera', 'no Ultimate camera folder for %s (port_sources "ult_camera": camera-SSBU.zip)'
+                % ult)
+    elif len(have) < len(wins):
+        rep.add('WARN', 'R1 win-camera', 'Ultimate\'s win cameras %s not in the package (fighter/%s/camera/result/winN: '
+                'ultimate_port.py run %s camera)' % (', '.join('j02win%d' % w for w in wins if w not in have), name, name))
+    else:
+        rep.add('INFO', 'R1 win-camera', 'win cameras converted (%d); Smash 4\'s result screen doesn\'t play camera '
+                'motions yet: an executable hook to come' % len(have))
 
 
 def check_sound_tables(inst, name, kind, rep):
@@ -2159,6 +2242,9 @@ def main():
     check_motions(inst, a.name, rec, rep)
     check_loop_slots(inst, a.name, rec, base, vanilla, rep)
     check_assets(inst, a.name, base, rep)
+    check_lod_and_camera(inst, a.name, src, base['ult'], rep)
+    check_slot_moves(inst, a.name, src, base['ult'], rep)
+    check_loop_spin(inst, a.name, rep)
     check_sound_tables(inst, a.name, kind, rep)
     check_sound_ids(inst, a.name, rep)
     check_sound_bank_ids(inst, a.name, kind, vanilla, rep)

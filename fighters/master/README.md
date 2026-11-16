@@ -9,6 +9,100 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: v2 (`scratchpad/byleth_v2.zip`, over v1: the rapid jab, the angled forward smashes, Ultimate's low models, exe_v46r)
+
+v2 (user: "Add the rapid jab and angled forward smashes to Byleth, as well as port over their Ultimate camera angles
+(for victory animations) and ensure all future ports also port their camera and LOD models"; then "please add the
+female animations"):
+
+| part | state |
+|---|---|
+| rapid jab, angled forward smashes | **done** ("v2: the rapid jab and the angled forward smashes" below) |
+| low models (magnifier, 8-player Smash) | **done**: Ultimate's own low model (lod.xmb) in l00-l07 |
+| win cameras | **converted, not shown**: Smash 4's result screen plays no camera motion ("v2: win cameras") |
+| female animations per costume | **not done**: the executable side is mapped, not built ("v2: female animations") |
+| framework | `low-models` builds Ultimate's LOD, new `camera` step, `--slot-moves`; port_check M10 / R1 / S11 |
+| exe | **exe_v46r** = exe_v46q + his 5 new motion slots |
+| port_check | `port_check master byleth_v1.zip byleth_v2.zip`: 0 ERROR, 22 WARN (v1's B1 / E3 / E7 / M5 + R1: the win cameras aren't shipped) |
+| translator fixes (all ports) | Ultimate's endless `loop {}` scripts were dropped whole: now translated (his run / walk dust, dizzy / swim / ladder sounds now play as Ultimate's), random sound containers -> their first tone (forward throw's frame-11 swing) |
+
+### v2: the rapid jab and the angled forward smashes
+
+ZSS's motion table has no animation in the common slots 0x53 - 0x55 (rapid jab start / loop / end) and 0x5E / 0x61
+(forward smash up / down), so v1 had no rapid jab and one forward smash. Now:
+- **slots**: `tools/extra_kinds.json` "motions" 0x53 `FitSZerosuitBodyMainC00Attack100Start` (flags 0), 0x54
+  `...C00Attack100` (0x2: Ultimate's loop flag), 0x55 `...C00Attack100End` (0), 0x5E `...C03AttackS4Hi` / 0x61
+  `...C03AttackS4Lw` (0x4, the move flag: Ultimate's motion_list 0x84); `port.json` motions.add; Ultimate's
+  `c00attack100start` / `c00attack100` / `c00attackend` (attack_100_end) / `c03attacks4hi` / `lw` in main.pac (322
+  motions); the held Areadbhar shows in the angled smashes as in the straight one (`weapon_vis.json` had them).
+- **scripts** (`ultimate_acmd.py --slot-moves`, passed by `ultimate_port.py` from motions.add): Ultimate's game /
+  effect / sound / expression scripts. The loop is Ultimate's: hits at 2 / 5 / 8 / 11 / 14 / 17 of an 18-frame loop
+  (0.4 %, angle 361 (Ultimate's: not 367), 6.0 hitboxes at 9 / 18 forward, +3 hitstun frames), the continue check
+  (`100_CONTINUE_CHECK` -> 0x21000016) after each, `WAIT_LOOP_CLR` + `JUMP(attack100)` (vanilla Kirby's form);
+  the finisher 3.5 % at 54 degrees, 162 / 60, on frame 6 (cancel 51); jab 2 turns ENABLE_100 (0x21000011) on 6 - 10
+  and jab 1 ENABLE_RESTART (0x2100000E) at 16 (both dropped before: the translator didn't know them). The angled
+  smashes: Ultimate's hits (13 / 19.5 % up, 11.5 / 17.25 % down: the tipper on Sword1), charge flag at 14, cancel 66.
+  Effects `master_atk_100` / `_finish` (in the bank since v1) with Ultimate's calls; the foot smoke loop unrolled;
+  the rapid jab's sound `se_master_attack100` (a random container) -> its first tone `_01`.
+- **MSC**: none needed: ZSS's MSC holds the common statuses. The jab (0x25) goes to Attack100 (0x26) when ENABLE_100
+  is on and A is mashed (the mash count against the common param) or held after a hit at the last jab; the loop
+  (`func_337` / `func_338`) continues while A is pressed or held at each check, then plays 0x55; the forward smash
+  status picks 0x5E / 0x61 from the stick's angle once the motions exist (`MotionModule(0xc, k)`). Ultimate's rapid
+  jab has the same structure (ENABLE_100 on jab 2, the continue check per hit, the finisher).
+- **vl**: group 1 bytes from Ultimate's motion_list: 0x53 / 0x54 cancel 0 (byte 0 = 0 on the loop), 0x55 cancel 51,
+  0x5E / 0x61 cancel 66.
+- Not done: Ultimate's `ATK_SET_SHIELD_SETOFF_MUL` (x9 shield push on the loop hits: no Smash 4 hitbox field), the
+  whip sword's model (the loop shows the hilt only, as v1's up smash).
+
+### v2: low models (`model/body/l00`-`l07`)
+
+v1's were copies of c00-c07. Ultimate has its own low model in every costume (`model/body/cNN/lod.xmb`: c00 / c02 /
+c04 / c06 `body_low` (7701 triangles) for `body_high` (11641); the female costumes also `hair_low`, `coatG_low`,
+`skirtG_low`). `ultimate_port.py run master low-models` now builds them (`ultimate_fighter.py model --lod-low`): the
+same 34 mesh slots, skeleton (model.vbn / jtb byte-identical to cNN's), `model.nut` and face / eyelid packs as cNN
+(the low build's textures named by cNN's ids: every picture is in cNN's .nut), model.nud ~7 % (male) / ~10 %
+(female) smaller. The magnifier and 8-player Smash load lNN (Squirtle v6: no lNN = invisible there).
+
+### v2: win cameras
+
+Ultimate: `camera/fighter/master/c00/j02win1-3.nuanmb` (camera-SSBU.zip; c01's differ for the female poses): one
+`gya_camera` node animated 131 / 171 / 181 frames, field of view 0.28 - 0.68 rad. Converted (`tools/ultimate_camera.py`,
+the pipeline's `camera` step) into Smash 4 camera motions in Corrin's final-camera form: `fighter/master/camera/
+result/win1-3/camera_motion.omo` (+ `.vbn`, `camera.json` with the field of view), round trip within 0.0002.
+**Not shown in game, not shipped**: Smash 4's result screen plays no camera motion. What is known:
+- vanilla fighters have no result camera files (their `camera/` folders are Final Smash cameras only, `camera/final/N`:
+  eye + aim locators (Captain Falcon) or one `gya_camera` (Corrin));
+- the result framing is in `param/ui/result_param.bin`: a 61-record group (a `default` record, then the 58 vanilla
+  fighters + 2 in the per-win table's order; names stored as type-0x0A encoded strings) whose fields the executable
+  binds by name (`0x030D37C4`: `name`, `win1`-`win5`, `eyex/y/z`, `tox/y/z`, `team_motion*`, `mvp_motion*`,
+  `mvp_camera_x/y/z`, `rot`, `x_rot`, `offset_x/y/z`), and a 153-row table (name, win 1-3, two floats; plain
+  names) whose two floats don't follow Ultimate's framing (correlation < 0.25 over all 153 rows with every vanilla
+  fighter's Ultimate camera: they are not a zoom / height of the camera);
+- the names reach the result logic through script bindings (`0x030ED508` / `0x030ED5C0` return a kind's lower / cap
+  name to a script VM), so the record lookup is in a script, not found yet.
+Next step: find where the result scene sets its camera (eye / to) per frame and hook it to play
+`camera/result/winN` for a kind that has them (kind_expand's name, the win number), as the Final Smash camera player
+does (`fighter/%s/camera/final/` 0x10158C08). port_check R1 warns until then.
+
+### v2: female animations (costumes c01 / c03 / c05 / c07)
+
+Not built in v2: the executable change needs every per-costume resource site, and none of it can be tested offline.
+What vanilla does for Bayonetta (0x38), her Bayonetta 2 costumes (4 - 7 but 2) using `body2` / `bodyentry2` /
+`bodyresult2`, is the model to copy (10 sites, every one a `cmpwi rK, 0x38` with the costume test):
+- path builder `0x030BAE08` (types 0 body, 1 entry, 2 result, 3 routemap: `0x030BAE90`, `0x030BAF54`, `0x030BB028`,
+  `0x030BB0F8`), reached from `0x030BB18C` for kind 0x38;
+- entry / result packs: separate resource ids per costume group in the kind x 9 space (`0x1F9` = 0x38 x 9 + 1,
+  `0x1FA` = + 2): load `0x030C199C` (entry), `0x030C1BE0` / `0x030C1C30` (result), unload `0x030C1ADC`, `0x030C1E90`,
+  getter `0x030C20C4` (+2 for the second group, +5 / +6 alike);
+- the in-battle body pack (kind x 0x11 + 0 / + 1): the fighter's construction `0x02E130E4` takes +1 when the
+  player's record byte `+0x23` is 1 (mode 3), else +0: where that byte is set (the costume group) is the open
+  piece; the registration side of +0 / +1 not found yet.
+So two Bayonettas of both groups already coexist in one match for entry / result packs; for 0x47 the same stubs
+(kind 0x47 and costume & 1 -> the second group, folder `bodyf` ...), then `ultimate_fighter.py motions` from
+Ultimate's `motion/body/c01` into `motion/bodyf/` (+ entry / result), the face pacs per costume, the effect scripts'
+costume-parity branches (v1 takes the male branch), and the female's win cameras (camera c01). Memory: one more
+main.pac (10.4 MB for 322 motions) only while a female Byleth is in the match.
+
 ## Status: v1 (`scratchpad/byleth_v1.zip`: playable, first in-game test)
 
 v1 is the first package: his model, animations, normals, grabs, throws and specials, his sounds, his effects (the Final
@@ -88,6 +182,21 @@ Audit (all fixed in v1; port_check B1 / C1 / V1 pass):
   ids), his arrows after it. Has Tether stays 1 (fighter_param 0x1300011F): her native whip needs it; zair is off in his
   MSC. Not checked yet: her native per-kind code in the Paralyzer / Gunship paths (only her Final Smash reaches them).
 - **Model**: her Paralyzer slot (her code shows it) empty; her face skin slot (her eyelid pac keys it) empty (F1).
+
+## Executable: exe_v46r (v2)
+
+exe_v46r (`scratchpad/byleth/exe/exe_v46r.rpx`, sha1 59025fa1a0931ed4cf4b2b6250fd60ef33b4a570) = exe_v46q + his 5
+motion-table entries (0x53 / 0x54 / 0x55 / 0x5E / 0x61: 8 words in his table at 0x04BA8738, `extra_kinds.json` "motions"):
+```
+python3 tools/kind_expand_incremental.py build EXE_V46Q KINDS_V46Q.json tools/extra_kinds.json KE_ARGS --list 0x47=0x04B9C728
+    (KINDS_V46Q.json: extra_kinds.json as committed for v1; drop 0x04BA9B24 / 0x04BA9BE4, kirby_copy_pool_cave.py's hooks:
+     the cases didn't move, its hooks stay)
+python3 tools/rpx_patch.py EXE_V46Q EXE_V46R $(cat KE_ARGS)
+```
+Tests (exe_v46p as the original, as for exe_v46q): the same results as exe_v46q's: kind_expand_test 21 (the
+original's expanded layout), weapon_expand_append test 3 (by design), sound_alias_cave_test 6, acmd_ext_test 18,
+kirby_copy_new_test 123, kirby_copy_pool_test 151 (with stage_q as the original), position_vars_test 0,
+vec_target_test 0.
 
 ## Executable: exe_v46q
 
@@ -173,6 +282,11 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
+0. **v2** (this list's 5 is done): in-game test of v2's list (`scratchpad/byleth/INSTALL_README_v2.txt`); then the
+   female animations (the Bayonetta-style costume-group sites in "v2: female animations": the stubs for 0x47 / odd
+   costumes, the body pack's +0 / +1 id and where its byte +0x23 is set, `motion/bodyf` + entry / result, face pacs,
+   the effect scripts' parity branches, camera c01) and the win cameras' executable hook ("v2: win cameras"). Both need
+   in-game testing: give the user a test exe with each.
 1. **In-game test of v1** (the tether ledge grab for kind 0x47, the arrows' spawn / speed, Aymr's armor, the Final
    Smash).
 2. **Female animations per costume** (user: approved executable change). Found so far: the motion path builder
@@ -188,9 +302,7 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
    Robin's copy 0x2C, marker 4) + his arrow 0x19E as the copy's article; `kirby.c` (the marker's Failnaught: the Robin
    copy's N slots); `kirby_copy_hats.py`, `kirby_copy_motions.py`, `kirby_copy_sound.py` (vc_kirby_copy_master).
 4. **Aymr's KO zoom** (decision 8): a native hook on the finish camera (Smash 4 zooms on a match's last KO only).
-5. **The rapid jab and the angled forward smashes** (missing in v1: ZSS's motion table has no animation for the common
-   slots 0x53-0x55 / 0x5E / 0x61; give them his Ultimate animations through extra_kinds.json "motions" and port.json
-   motions.add, then the scripts step translates them). The whip sword's segments (the rapid jab, up smash, down tilt, up air, throws, the tether: a model on her whip
+5. ~~The rapid jab and the angled forward smashes~~ (v2). The whip sword's segments (the rapid jab, up smash, down tilt, up air, throws, the tether: a model on her whip
    chain, 8 segments), Failnaught's damage by charge and the max arrow's piercing, SpecialAirNJumpCancel,
    SpecialLwTurn / SpecialLwHit, the item swings retimed (BatSwing4 kept as hers: `base_scripts_kept`).
 6. The normals' effect colours (fx_render over every move), then the user's own files (below).
@@ -471,6 +583,10 @@ python3 tools/master_build.py vis DUMP ULT fighters/master/weapon_vis.json      
 python3 tools/ultimate_port.py run master effects model-c00 .. model-c07 motions low-models scripts specials variants \
     shapes portraits --out OUT                                                    # specials = master_build.py build
 bash scratchpad/byleth/make_pkg.sh                                                # -> scratchpad/byleth_v1.zip
+# v2: the new slots' animations and scripts, Ultimate's low models, the win cameras (built, not shipped), the package
+python3 tools/ultimate_port.py run master motions low-models camera scripts specials variants shapes --out OUT
+bash scratchpad/byleth/make_pkg_v2.sh                                             # -> scratchpad/byleth_v2.zip (files changed since v1)
+python3 tools/port_check.py master scratchpad/byleth_v1.zip scratchpad/byleth_v2.zip
 ```
 Body: `rolloff_acmd.py VANILLA/.../game.bin game.bin --plain --add 2.2 EscapeF EscapeB`; `mscdec.py -x tools/mscinfo.xml
 szerosuit.mscsb` (round trip: 2 of 2393 functions differ, both equivalent: a folded negative constant, an empty else),
