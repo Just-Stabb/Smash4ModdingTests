@@ -2627,3 +2627,56 @@ temporary diag caves' `0x04BCC000`); variables `0x0F0003D0`-`0x0F0003DA`; comman
   +0x1C distance, +0x20 / +0x24 the point, +0x28 kind, +0x2C / +0x30 the normal. The accessor from acmd_ext's cache
   (`acc_of`, filled by its per-frame hook).
 - **Diag on top:** tools/diag_godfist_cave.py chains on `hvv_zero` too (its stub then goes on to `lt_var`).
+
+## Variable resets (exe_v46w_vars: New_Var's Reset, Var_Reset_Set)
+
+`tools/var_reset_cave.py` (on exe_v46v_threads), test `tools/var_reset_test.py` (unicorn, 81 checks), user docs
+`docs/acmd-extra-commands.md` "Variable resets". **Claimed region: `0x04BD8000`-`0x04BE0000`** (code `0x04BD8000`-
+`0x04BD88C4`, data `0x04BD9F00`, the reset lists `0x04BDA000`; `textregion:0x2BE0000 grow:0x04BE0000`).
+`0x04BD6000`-`0x04BD8000` (between ts_data's end and this) is still free. The combined exe the user runs:
+exe_v46v_threads -> var_reset_cave.py (exe_v46w_vars) -> tools/line_test_cave.py (exe_v46w_vars_line, which chains on
+four of these hooks).
+
+- **Lists:** 48 blocks of 0x200 keyed by the owner's WorkModule (`+0`; round robin past 48), 31 items of 0x10 from
+  `+0x10`: {ID (0 free), value (float), mask, 0}. IDs compare without their top nibble (`0x1F000380` = `0x0F000380`).
+  `vr_event(WorkModule, bit)` writes each item with the bit through the WorkModule's own set_float (vt `+0x4C`, the
+  path SET_FLOAT / MSC take, position_vars' and acmd_ext's hooks included); a KO write drops the item's KO bit, an item
+  left with no bits is freed. A busy count (data `+0`) makes the MSC selection IDs ignore writes while an event writes.
+  Counters at data `+0x20`: KO / landing / ledge / hit events, items written, items set, refused (list full), set-up
+  KO fires.
+- **Owner's WorkModule from a fighter's StatusModule:** `[sm +0x9C]` the fighter, `[fighter +0x28]` its module accessor
+  (the step wrapper `0x02E40C4C` passes it), checked by `[acc +0x20] == sm`, then `[acc +0x28]`.
+- **The events, found where the game handles them:**
+  - **KO / ledge** - `0x02E88D00` (`stw r28, 0x48(r30)`: the status change `0x02E88B28` storing the new kind, after the
+    old status's end scripts; every status change of every fighter, MSC requests and native ones alike; r0 r3-r12 and
+    LR free there) -> `vr_chg`: the old kind read first; new == old: nothing; Dead `0xB1` (reference/msc-note-sheet:
+    "KO'd"; position_vars' input reset uses the same status) -> KO; CliffCatchMove / CliffCatch `0x72` / `0x73`,
+    AirCatchHit / AirCatchHang `0xF3` / `0xF4` from a status outside those four -> ledge. (`0x02E88B40`, earlier in the
+    same function, is acmd_ext's hk_lgc_chg.)
+  - **landing** - `0x02E890EC` (`stw r28, 0x84(r29)`: the fighters' StatusModule set_situation, vt `+0xEC` =
+    `0x02E88FFC`, which every situation change goes through: MSC `StatusModule(2)` and op 5's init settings call it,
+    the native leave-the-ground code too; it has already copied the old one to `+0x88`; the only other `+0x84` stores,
+    `0x02E88774` / `0x02E887F0`, are the module's reset / constructor) -> `vr_sit`: old 2 (air) and new 0 (ground).
+  - **hit** - acmd_ext's `gs_hit` (`0x04BD3990`, the DamageModule owner vt `+0x14C` hook Gravity_Set added: the
+    damage reaction decision `0x02E76BB4`, called from DamageModule vt `+0x94` `0x02C22EF0` after the armor check
+    `0x02C24C88`): its word at `+0x20` (`lwz r3, 0x10(r1)`, reached only when the decision returned 0, the hit takes
+    effect) -> `vr_hit`: the accessor gs_hit saved at `0x10(r1)`, its WorkModule, bit 8; back to `+0x24`. Armor with
+    no override and knockback under work float `0x2A` return non-zero (no reaction): no event. Shield hits never reach
+    the DamageModule; an invincible / intangible hurtbox gives no damage call.
+  - **set-up** - `0x02BF5864` (the object set-up's WorkModule reset, already a `b` to the hv_wmreset chain, kept: the
+    cave ends with a `b` to whatever the word held) -> `vr_wmreset`: everything saved (only r0 r10 ctr are free there);
+    a fighter's (StatusModule vtable `0x1012D42C`) unfired KO items fire (the Dead status may come first or not: once
+    per KO either way), then the block is freed.
+- **New_Var:** `cmd_handlers[34]` (New_Var's, `0x04B99EB0`) -> `vr_newvar`: Scope's word put to `& 0xFF` in place,
+  `h_newvar` called with the same registers, the word put back; executed, for a New_Var ID: `vr_put(ID, Initial,
+  (word >> 8) & 0xF)` on this object (Reset 0 removes an item, creates nothing). Old scripts: the same h_newvar call
+  with the same words; the test compares the variables' memory after the same New_Vars with exe_v46v's handler.
+- **Var_Reset_Set** (CRC `0x048FC81B`, index 2000, 5 words: Variable, Reset, Value, Owner): `nc_target(accessor,
+  Owner)`, that object's WorkModule, `vr_put`. The command tables: acmd_ext's `lk_none` (`li r3, -1`) -> `vr_lookup`,
+  `s1_orig` / `s2_orig` (the game's size reads) -> `vr_size1` / `vr_size2`, `f_orig` (`slwi r6, r7, 2`; the next word
+  replayed) -> `vr_fetch` (r12 kept). A later cave adds its command the same way after these (line_test_cave.py does).
+- **MSC IDs** `0x0F0003CA`-`3CD`: buf_var's `bv_zero` (`b ue_zero`, `0x04B7BF4C`) -> `vr_var` (user_entry's frame);
+  others go on to ue_zero. Selection kept globally (write the four together).
+- **Not confirmed in game:** that every landing passes set_situation (static reading says so); the order of Dead and
+  the respawn's set-up; the KO / ledge / hit events' timing against the MSC (the test runs each hook site with the
+  game's code around it, not a match).

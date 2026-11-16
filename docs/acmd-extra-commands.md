@@ -4,7 +4,7 @@ These are new commands for game, effect, sound and expression scripts. They need
 `cross_f.rpx` (`tools/acmd_ext_cave.py`, part of the standard build). Without it, a script that uses
 them won't load properly, so ship the executable with any script that uses them.
 
-Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12, Buffer_Clear / Buffer_Set from v1.4.13, Time_Scale / Target_Time_Scale / Stage_Freeze from v1.7.0) lists all of them in one
+Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12, Buffer_Clear / Buffer_Set from v1.4.13, Time_Scale / Target_Time_Scale / Stage_Freeze from v1.7.0, Var_Reset_Set and New_Var's Reset from v1.7.4) lists all of them in one
 group, **New Commands**, at the top of the list (vanilla commands stay in their own groups), in subgroups:
 
 | Subgroup | Commands |
@@ -17,7 +17,7 @@ group, **New Commands**, at the top of the list (vanilla commands stay in their 
 | Targets & tracking | Track_Target, Last_Hit_Get, Target_Slot_Get |
 | Threads | Thread_Start, Thread_Stop |
 | Time & stage | Time_Scale, Target_Time_Scale, Stage_Freeze |
-| Variables | New_Var |
+| Variables | New_Var, Var_Reset_Set |
 
 Each command there has in-depth help after its parameters (how it works, the values, gotchas) and several complete
 examples (Insert Example / Copy Example), and clicking New Commands shows an overview (targets, compare methods,
@@ -44,7 +44,8 @@ them too.
 | `Gravity_Set` | a fighter's gravity and max fall speed for the rest of the move (exe_v42, Sm4shCommand v1.4.10) |
 | `Time_Scale` / `Target_Time_Scale` / `Stage_Freeze` | the whole match slower (the game's slow-motion) or faster (extra game steps a frame); one fighter slower (the Timer's slow); the stage frozen (exe_v46n, Sm4shCommand v1.7.0: below) |
 | `Line_Test` | the stage between two points: where a segment first meets a floor / wall / ceiling, how far, which kind (the game's own GroundModule ray check); also from the `LINE_*` variables for MSC (exe_v46v_line: `tools/line_test_cave.py`, below) |
-| `New_Var` | declares a variable with your own name (int or float, a starting value, per object or per move): 64 more per object, usable in every variable parameter (exe_v40, Sm4shCommand v1.4.9) |
+| `New_Var` | declares a variable with your own name (int or float, a starting value, per object or per move): 64 more per object, usable in every variable parameter (exe_v40, Sm4shCommand v1.4.9); `Reset`: back to its starting value on a KO / landing / ledge grab / hit (exe_v46w, Sm4shCommand v1.7.4: "Variable resets" below) |
+| `Var_Reset_Set` | any variable (`VAR_n`, `TIMER_n`, a New_Var name, the input / state variables) put back to a value when its owner is KO'd, lands, grabs a ledge or is hit (exe_v46w, Sm4shCommand v1.7.4: "Variable resets" below) |
 
 ## Extra_Special_Hitbox / Extra_Extended_Special_Hitbox
 
@@ -941,6 +942,7 @@ with a name of your own. The name then works in every variable parameter of ever
 | `Initial` | the starting value (default 0). |
 | `Scope` | `object` (default, or 0): `Initial` is set the first time a New_Var for it runs for this object; later New_Vars leave it alone, and the value stays (between moves) until the object is set up again (a fighter's KO, a projectile's next shot), as `VAR_n`'s. `move` (or 1): `Initial` is set every time this New_Var runs, so at the top of a move's script it starts fresh at every use of the move. |
 | `Slot` | optional, 0–63: the variable is `0x0F000380 + Slot`. Left out (or `auto`): the slot the name already has in the open scripts, else the lowest free one. Sm4shCommand writes it back (`Slot=0`) when it shows the script again. |
+| `Reset` | optional (exe_v46w, Sm4shCommand v1.7.4): the events that put the variable back to `Initial`, bits: 1 KO, 2 landing, 4 ledge grab, 8 hit (a number 0–15, or names joined by `\|`: `Reset=landing\|ledge`). Left out or 0: New_Var exactly as before. Kept in bits 8–11 of the Scope word; shown only when not 0. "Variable resets" below. |
 
 - **Storage:** each object (fighter or article) has 64 of them, apart from its `VAR_0`–`VAR_31` / `TIMER_0`–`TIMER_15`
   (which work as before) and from every other object's. They live with the object's `VAR_n` (the same 48-object
@@ -952,7 +954,7 @@ with a name of your own. The name then works in every variable parameter of ever
   `WorkModule(0 / 7, value, ID)` write it. Give the variable a fixed `Slot` for this. MSC needs no `New_Var`: an
   undeclared slot reads 0 until written and keeps what is written (Kirby's Hero copy keeps its state in slots
   0x39B-0x3BF this way); `New_Var` only sets the starting value and the int type.
-- **IDs:** `0x0F000380`–`0x0F0003BF`. `0x0F0003C0`–`0x0F0003C8` are the stick angles and rotation (exe_v43, "Variables in Extra hitboxes"); `0x0F0003C9`–`0x0F0003FF` still read 0.
+- **IDs:** `0x0F000380`–`0x0F0003BF`. `0x0F0003C0`–`0x0F0003C8` are the stick angles and rotation (exe_v43, "Variables in Extra hitboxes"); `0x0F0003C9` `BUFFER_CLEAR` (exe_v46l); `0x0F0003CA`–`3CD` the resets' MSC selection (exe_v46w, "Variable resets"); `0x0F0003D0`–`3DA` Line_Test's (exe_v46v_line); the rest still read 0.
 
 ### Names in Sm4shCommand
 
@@ -1019,6 +1021,59 @@ Remove_All_Hitboxes()
 More examples (float variables with the target commands, a counter shared by two scripts, a fixed slot for MSC)
 are in Sm4shCommand's View > Commands.
 
+## Variable resets (exe_v46w_vars, Sm4shCommand v1.7.4)
+
+A variable can go back to a value by itself when something happens to the object that owns it: `New_Var`'s `Reset`
+(back to its `Initial`) and `Var_Reset_Set(Variable, Reset, Value, Owner)` (any variable, any value). The game does it
+where it handles the event, whatever status or move the fighter is in, so a script doesn't have to watch for it.
+(`tools/var_reset_cave.py`; `New_Var(... Reset=0)` and every old script compile to the same words as before and do the
+same in game.)
+
+| Bit | Event | When (the game's own place, docs/native-notes.md "Variable resets") |
+|---|---|---|
+| 1 | KO | its Dead status starts (any KO: blast zone, star, stamina); if that never came, the respawn's set-up. Once per KO: the reset keeps its other bits |
+| 2 | landing | its situation goes from air to ground (every landing: a normal one, a landing in hitstun, a tech, the special-fall landing) |
+| 4 | ledge grab | it enters CliffCatchMove / CliffCatch, or a tether's AirCatchHit / AirCatchHang (once per grab) |
+| 8 | hit | a hit takes effect on it: a reaction (flinch, hitstun, launch). Not a shielded hit, not one its armor (super / heavy armor, knockback under its threshold) absorbs, not one while it's invincible / intangible, not a counter: the damage reaction decision Gravity_Set already uses ("no reaction" = not a hit here) |
+
+- **Owner:** the events are a fighter's. An article's (projectile's) resets are kept but never fire.
+- **The reset** is a write of the value through the owner's WorkModule: exactly `SET_FLOAT(Value, Variable)` in the
+  owner's script at that moment (an int New_Var gets a whole number; an input / state variable acts on its target).
+- **`Var_Reset_Set(Variable, Reset, Value, Owner)`:** Owner 0 this object, or a target as the other commands' (1 the
+  nearest opponent, 2 the last fighter hit, 3–10 player slots 1–8, 11 the last attacker, 12 the fighter this attack
+  hit): the reset goes on that fighter, its Variable as that fighter sees it (Owner 4 + `VAR_24`: player 2's own
+  `VAR_24`; Owner 12 + `SELF_INPUT_OFF`: the hit fighter's controller). `Reset=0` removes it.
+- **New_Var:** every run sets (or with Reset 0 removes) its variable's reset, Scope object or move: put it at the top of
+  a script that runs.
+- **Lifetime:** a reset stays until changed / removed, or until the owner is set up again (a respawn, a projectile's
+  next shot), as the variables themselves. 31 per object, 48 objects (round robin past that).
+- **MSC:** `WorkModule(0, index, 0x0F0003CA)` (`VAR_RESET_ID`: the variable `0x0F000000 + index`, e.g. `0x300` for
+  `VAR_0`, `0x115` `SELF_INPUT_OFF`: an index keeps the float exact), `0x0F0003CB` (`VAR_RESET_VALUE`), `0x0F0003CC`
+  (`VAR_RESET_OWNER`, a target), then `WorkModule(0, mask, 0x0F0003CD)` (`VAR_RESET`) sets it; reading `VAR_RESET` gives
+  the picked variable's mask. On an older exe these read 0 and writes do nothing.
+- **Needs** exe_v46w (exe_v46w_vars, or exe_v46w_vars_line with Byleth v9's Line_Test). An older exe can't load a
+  script with `Var_Reset_Set`; it reads a New_Var with `Reset` as Scope object (no resets).
+
+Examples (Sm4shCommand's View > Commands has them, every one compiled and round-tripped):
+
+```
+// a combo counter back to 0 whenever the fighter lands
+New_Var(Name=combo, Type=int, Initial=0, Scope=object, Reset=landing)
+// a once-per-airtime move: the flag back to 0 on landing or a ledge grab
+New_Var(Name=air_used, Type=int, Initial=0, Scope=object, Reset=landing|ledge)
+// a power-up for the stock, gone with a KO
+New_Var(Name=buff, Type=float, Initial=1, Scope=object, Reset=KO)
+// a stored charge lost when hit
+New_Var(Name=stored, Type=int, Initial=0, Scope=object, Reset=hit)
+// any variable: VAR_0 back to 0 on landing; the hit fighter's controller back on when it is hit or KO'd, and when
+// this fighter is KO'd (its own reset on the hit fighter's input-off as it sees it)
+Var_Reset_Set(Variable=VAR_0, Reset=2, Value=0, Owner=0)
+Var_Reset_Set(Variable=SELF_INPUT_OFF, Reset=9, Value=0, Owner=12)
+Var_Reset_Set(Variable=LASTHIT_INPUT_OFF, Reset=1, Value=0, Owner=0)
+```
+
+Supamario's Sledgehammer / Super God Fist lockouts use these from MSC (fighters/supamario/README.md "Sledgehammer v5").
+
 ## Debug counters
 
 Words at `0x04B93900` (Cemu: Debug > Memory, go to the address), all 0 at boot, counting up across
@@ -1064,6 +1119,7 @@ nothing in this game: its handler is empty. Add by `SUB_FLOAT_2` of a variable h
 | `0x0F0003C6`–`3C8` | `ROT_X`, `ROT_Y`, `ROT_Z` | the object's rotation in degrees (as `Rotation_Get`; exe_v43) | — |
 | `0x0F000340`–`37F` | `SLOT1_SHARED_0`–`SLOT8_SHARED_7` | `VAR_24`–`VAR_31` of the fighter in that player slot (below) | set it |
 | `0x0F000380`–`3BF` | your `New_Var` names (slots 0–63; exe_v40) | the value (int or float commands) | set it (an int one keeps whole numbers) |
+| `0x0F0003CA`–`3CD` | `VAR_RESET_ID`, `VAR_RESET_VALUE`, `VAR_RESET_OWNER`, `VAR_RESET` (exe_v46w) | the selection; `VAR_RESET`: the picked variable's reset mask | pick a variable (its index), its value, its owner; `VAR_RESET` sets its reset ("Variable resets") |
 
 ### Shared variables (another fighter's)
 
@@ -1175,6 +1231,10 @@ doesn't load on an older one (port_check X6).
 - **Leave_Ground_Cancel:** a 16-entry table keyed by the fighter's StatusModule (`0x04B93A00`, its code from
   `0x04B93B10`) and three hooks on the game's StatusModule: the MSC situation read, the MSC status request and the
   status change. Details: `docs/native-notes.md`, "Leave_Ground_Cancel".
+- **Variable resets (exe_v46w):** `tools/var_reset_cave.py`, its own region (`0x04BD8000`-`0x04BE0000`): per-owner
+  lists keyed by the WorkModule; hooks on the status change (KO, ledge), the fighters' set_situation (landing), the
+  damage reaction decision (hit), the object set-up, New_Var's handler and the command tables' fallbacks. Details:
+  `docs/native-notes.md`, "Variable resets".
 - **Gravity_Set:** a 16-entry table keyed by the fighter's module accessor (`0x04BD3E00`, its code from
   `0x04BD3600`, in New_Var's grown region) and three hooks: the gravity energy's update (entry: its values swapped
   in; exit: the energy's own put back), the damage reaction decision (a hit that takes effect ends it) and, through

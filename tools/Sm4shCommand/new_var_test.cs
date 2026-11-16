@@ -1,4 +1,4 @@
-// New_Var in SALT / Sm4shCommand v1.4.9 - v1.4.10 (Mono): compile / decompile round trips, names surviving a saved file,
+﻿// New_Var in SALT / Sm4shCommand v1.4.9 - v1.4.10 (Mono): compile / decompile round trips, names surviving a saved file,
 // errors, and every new command's examples. Run: mono NvTest.exe Events.cfg Aliases BODY_DIR TMP_DIR
 using System;
 using System.Collections.Generic;
@@ -85,10 +85,10 @@ class NvTest
         var errors = new List<string>();
         int n = ACMD_INFO.OverrideInfo(args[0], errors);
         Check("Events.cfg loads with no errors", string.Join("; ", errors), "");
-        Check("commands", ACMD_INFO.CMD_NAMES.Count, 628);   // v1.4.12: + Position_Place, Position_Offset_Get; v1.4.13: + Buffer_Clear, Buffer_Set; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test
+        Check("commands", ACMD_INFO.CMD_NAMES.Count, 629);   // v1.4.12: + Position_Place, Position_Offset_Get; v1.4.13: + Buffer_Clear, Buffer_Set; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set
         Check("New_Var known: size 11, group", ACMD_INFO.CMD_SIZES[FighterVariable.NewVarIdent] + " " +
               ACMD_INFO.GetCategory(FighterVariable.NewVarIdent), "11 New Commands / Variables");
-        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 44);       // v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test
+        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 45);       // v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set
         Check("group help blocks", ACMD_INFO.GROUP_HELP.Count, 10);      // v1.7.0: + New Commands / Time & stage
         LoadAliases(args[1]);
         Check("aliases loaded", FighterVariable.AliasCount > 500, true);
@@ -135,6 +135,30 @@ class NvTest
         Check("raw form (10 parameters) still compiles", Hex(Bytes(Compile(
               "New_Var(Name=0x0F000385, Type=0, Initial=0, Scope=0, Text1=0x6162, Text2=0, Text3=0, Text4=0, Text5=0, Text6=0)")).Take(28).ToArray()),
               "A321746C0F0003850000000000000000000000000000616200000000");
+
+        // ---- v1.7.4: New_Var's Reset (bits 8-11 of the Scope word; 0: the words as before)
+        FighterVariable.ClearNewVars();
+        s = Compile("New_Var(Name=combo, Type=int, Initial=0, Scope=object, Reset=2)");
+        Check("Reset=2: Scope's word 0x200", Hex(Bytes(s).Skip(16).Take(4).ToArray()), "00000200");
+        Check("Reset=2 shown (before Slot)", s.Deserialize().Split('\n')[0].Trim(),
+              "New_Var(Name=combo, Type=int, Initial=0, Scope=object, Reset=2, Slot=0)");
+        Check("... round-trips", Hex(Bytes(Compile(s.Deserialize()))), Hex(Bytes(s)));
+        s = Compile("New_Var(Name=flag, Type=int, Scope=move, Reset=landing|ledge)");
+        Check("Reset by names (landing|ledge = 6) with Scope move: 0x601", Hex(Bytes(s).Skip(16).Take(4).ToArray()), "00000601");
+        Check("... shown as the number", s.Deserialize().Split('\n')[0].Trim(),
+              "New_Var(Name=flag, Type=int, Initial=0, Scope=move, Reset=6, Slot=1)");
+        s = Compile("New_Var(Name=buff, Initial=1, Reset=KO+hit)");
+        Check("KO+hit = 9", Hex(Bytes(s).Skip(16).Take(4).ToArray()), "00000900");
+        s = Compile("New_Var(Name=plain, Type=int, Initial=0, Scope=move, Reset=0)");
+        Check("Reset=0: the old word (1), not shown", Hex(Bytes(s).Skip(16).Take(4).ToArray()) + " " +
+              s.Deserialize().Split('\n')[0].Trim(), "00000001 New_Var(Name=plain, Type=int, Initial=0, Scope=move, Slot=3)");
+        Check("Reset 16: an error", Error("New_Var(Name=bad, Reset=16)").Contains("Reset"), true);
+        Check("Reset=jump: an error", Error("New_Var(Name=bad2, Reset=jump)").Contains("Reset"), true);
+        s = Compile("Var_Reset_Set(Variable=VAR_0, Reset=2, Value=0, Owner=0)\nVar_Reset_Set(Variable=combo, Reset=9, Value=1.5, Owner=4)");
+        Check("Var_Reset_Set: 5 words, its CRC, the variable by name", Hex(Bytes(s).Take(20).ToArray()),
+              "048FC81B0F000300000000020000000000000000");
+        Check("Var_Reset_Set round-trips (a New_Var name too)", Hex(Bytes(Compile(s.Deserialize()))), Hex(Bytes(s)));
+        Check("... shown", s.Deserialize().Split('\n')[1].Trim(), "Var_Reset_Set(Variable=combo, Reset=0x9, Value=1.5, Owner=0x4)");
 
         // ---- errors
         Check("unknown name", Error("INC_INT(Variable=nothing_here)"),

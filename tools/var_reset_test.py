@@ -110,7 +110,15 @@ def main():
     E = V.ext_labels()
 
     # ---- words
-    check('patched: every word the cave writes', [hex(a) for a, w in sorted(out.items()) if r32(pm, a) != w], [])
+    # a later cave chained on a hook (tools/line_test_cave.py on exe_v46w_vars -> exe_v46w_vars_line: lk_none, the size
+    # / fetch fallbacks): the word is then its `b`; the functional checks below go through the whole chain
+    later = {a: r32(pm, a) for a, w in out.items() if r32(pm, a) != w and r32(pm, a) >> 26 == 18 and
+             not (V.VR_CODE <= V.b_target(a, r32(pm, a)) < V.VR_END)}
+    if later:
+        print('note: %d hook word(s) chained by a later cave: %s' % (len(later), ', '.join('0x%08X -> 0x%08X' % (
+            a, V.b_target(a, w)) for a, w in sorted(later.items()))))
+    check('patched: every word the cave writes (or a later cave\'s chain on it)',
+          [hex(a) for a, w in sorted(out.items()) if r32(pm, a) != w and a not in later], [])
     check('base: the region was free (code, data, lists)',
           [hex(a) for a in range(V.VR_CODE, V.VR_END, 4) if orig(a) != 0][:3], [])
     check('base: hook words', {a: orig(a) for a in (V.STATUS_AT, V.SIT_AT, L['gs_hit_site'], L['nv_slot'],

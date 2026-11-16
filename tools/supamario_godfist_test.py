@@ -973,6 +973,8 @@ class MscTick:
         tq = a.slot_var(i)
         if tq and tq[0] - 2 == v.slot and tq[1] == 8 + 2:
             return float(v.status)
+        if 0x0F000100 <= i < 0x0F000260 and (i - 0x0F000100) % 0x20 == 21 and (i - 0x0F000100) // 0x20 - 2 == v.slot:
+            return float(v.input_off)                   # v5: its INPUT_OFF (gf_tick lets go once it reads 0)
         return a.getvar(i)
 
     def sys(self, sid, args):

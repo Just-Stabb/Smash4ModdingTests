@@ -10746,6 +10746,22 @@
 "HitY",
 "Kind"
 ]
+},
+"048FC81B": {
+"size": 5,
+"name": "Var_Reset_Set",
+"format": [
+3,
+0,
+1,
+0
+],
+"syntax": [
+"Variable",
+"Reset",
+"Value",
+"Owner"
+]
 }
 }
 }

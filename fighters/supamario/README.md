@@ -3067,3 +3067,103 @@ and speed-up range by 5 units". MSC only (`gf_pick`, `gf_track`; `supamario_godf
   85 not; past an edge in the air, 74.9 below aimed down (at most 3 a frame), 85 not; `gf_pick` at 54.9 / 55.1 (picked /
   not) and 74.9 / 75.1 up and down (picked / not); the 2x startup at 54.9 / 55.1, 74 / 80 degrees up; rising at 74
   degrees never above the opponent. `--all-models` 566 ok.
+
+## Sledgehammer v5 (in `vars_reset_v1.zip`, exe `exe_v46w_vars_line`): the lockout's release, real hits only, armor, 28 frames, v3's pose, the glow in front
+
+Install over Sledgehammer v4 with the package's executable (exe_v46w_vars_line = exe_v46v_threads + tools/var_reset_cave.py
++ tools/line_test_cave.py: it replaces Byleth v9's exe_v46v_line / exe_v46w_vars_line). Changed: the MSC, main.pac
+(the two Sledgehammer motions back to v1-v3's), effect.bin (the glow's offset), the ptcl (the arcs' gain).
+
+### 1. The 40-frame lockout bug (user: "The resetting on KO should be helpful to fix the 40-frame control lockout bug")
+**Cause:** the charged grounded hold turns the victim's controller off (its INPUT_OFF, position_vars' per-slot input
+state) and only Supamario's `sh_tick` turns it back on, from his own variables (VAR_4 / VAR_5 / VAR_17). If he is KO'd
+in the hold, his respawn's set-up clears them: the victim's controller stayed off until its own KO (position_vars
+clears a fighter's inputs in Dead / Rebirth / Entry / Win / Lose). Also, a victim KO'd in the hold could be put down
+again by his tick at the old place (it left the down statuses: `sh_put`).
+**Fix (exe_v46w's variable resets, docs/acmd-extra-commands.md "Variable resets"):** at the hold's start
+(`sh_down_start`) `lock_resets(s, 9)` registers, through MSC's selection IDs (`sh_reset_item`, `0x0F0003CA`-`3CD`):
+- on the **victim**, its own `SELF_INPUT_OFF` (`0x115`) back to 0 on its **KO** or **a hit on it** (mask 9): its
+  controller comes back whoever hits it, and at its KO even before position_vars' own clear;
+- on **him**, the victim's INPUT_OFF as he sees it (`0x115 + 0x20 x (slot + 2)`) back to 0 on **his KO** (mask 1):
+  the exe writes it at his Dead status (or his set-up, whichever comes first), whatever his variables are then.
+`sh_let_go` removes both. Every frame of the hold `sh_tick` lets go (and writes nothing more to the victim) when its
+controller is already back (`SELF_INPUT_OFF` reads 0: a reset fired, or anything else turned it on) or the victim is
+KO'd / respawning / entering / in the results (`sh_gone`: Dead `0xB1`, Rebirth `0xB2`, Entry .. Lose `0x14F`-`0x151`).
+Release paths and what gives the controller back: his KO (his reset), the victim's KO (its reset; the game's own clear),
+the victim hit by anyone (its reset), the match ending (Win / Lose: the game's clear; his tick lets go), the 28 frames
+(his tick), on an older exe (resets ignored) the last three as v4.
+**The Super God Fist's knockdown** (`gf_tick`) gets the same: while the victim is held (phase 1, the flight: its KO
+and his KO only, since the God Fist's own hits are still to land; phase 2 on: its KO or a hit on it too), released when
+its controller is back. **Core Breaker's hold** (`cb_hold`): his KO lets the held victim go (its burn hits would fire a
+hit reset, so the victim's own isn't set).
+
+### 2. No bounce / hold on hits that don't really land (user: invincible, intangible, shield, counter; armored)
+`sh_hit` starts the grounded bounce (uncharged) or the hold (charged) only when `sh_struck(s)`: the victim's body state
+at the hit is 0 (`INTANGIBLE` 1 invincible, 2-4 intangible: no), it isn't shielding (GuardOn .. GuardDamage, a shield
+break, now or before the hit's freeze), and it **took damage** (its DAMAGE now over what `sh_rec` noted on its last
+unfrozen frame: v5 keeps the damage with each slot's status, `status + 1024 x round(damage x 4)` in VAR_6-13): a counter
+or invincibility takes none. Then at the end of its hitstop `sh_tick` asks for a **reaction** (`sh_reacted`: Damage ..
+DamageFall `0x45`-`0x4C`, DownDamage `0x57`): super / heavy armor (and anything else the hit left in its own status)
+gets no bounce, and the charged hold lets go there.
+### 3. The charged hit ignores armor (user: "Charged Sledgehammer should bypass armor though")
+Smash 4 has no hitbox flag that ignores armor (reference/spreadsheets: none; the armor check `0x02C24C88` reads the
+victim's DamageModule only), so `sh_unarmor` lifts it: on the charged hitbox's active frames (and the one before, while
+it hasn't hit) the MSC, which runs after the game script made the hitbox and before the frame's collision, sets
+`ARMOR = 0` (`DamageModule(0xB, 0)`) on every fighter whose body (feet to +10, 3.5 either side) the hitbox overlaps,
+keeping its type and threshold in VAR_18-21 (`slot x 1e6 + type x 1e5 + threshold x 10`, up to 4 fighters). The hit
+then takes effect as on an unarmored fighter: in the air the spike's own knockback, hitstun and DI; on the ground the
+bounce and the hold. After the active frames (and at the status's end) `sh_rearmor` gives the armor back (threshold,
+then type) to those it didn't hit (not frozen, not in a reaction / down status). Invincibility, intangibility,
+shields and counters still stop it (section 2). The uncharged hit leaves armor alone.
+
+### 4. 28 frames (user: "28 frames instead of 40")
+`DOWN_HOLD` 28, still counted from the first frame it lies after the bounce. Sledgehammer's own: the God Fist's knockdown
+is `GF_DOWN_FRAMES` (unchanged).
+
+### 5. v3's pose, the charge glow in front of his head (user: undo v4's animation change; draw the glow closer to the camera)
+- `supamario_sledgehammer_anim.py` `OVERHEAD = False`: XV2's pose as retargeted (no arm stretch, head tilt, shoulder
+  raise, IK fists or push); the code stays for the record. The built main.pac's two Sledgehammer motions are byte for
+  byte v1's (the last package that shipped them before v4: v2 / v3 didn't), and lhand / rhand / mariopt1's too
+  (`supamario_sledgehammer_test.py OUT BASE supamario_sledgehammer_v1.zip`).
+- The charge glow (Hmr_Crg) and the charged fist flash (Hmr_Crg02) on LHandN with External_Graphic's last word **0**
+  (the request's flag, docs/native-notes.md "EffectModule requests": the bone's position only, X x the facing, **Z =
+  world depth**) and **Z = 4.64** toward the camera: his head's half-depth beside the left hand at the charge pose
+  (3.64: the largest |head mesh point X - LHandN X| at start frame 12, which covers either facing) + 1.0. It follows
+  the hand's place; the depth is world space whichever way he faces (a bone-space offset turned with the hand).
+  `sledgehammer_frames.json` `glow_depth` has the measure.
+
+### 6. Brighter arcs (user, screenshot 27: "make the Sledgehammer's arcs slightly brighter")
+`ARC_GAIN` (R, G, B) **(0.27, 0.19, 0.27)** (v4 0.2 / 0.14 / 0.2, +35%, the yellow-orange hue kept). The charged fist
+flash cap (`FLASH_PEAK` 1.0) stays. `supamario_fx_glow.py` (the whole swing, every effect):
+
+| brightest frame | grass (0.5, 0.65, 0.3): over 1.0 / energy | grey (0.5): over 1.0 | black: peak / over 1.0 / energy |
+|---|---|---|---|
+| v4 uncharged swing | 0 / 68 | 0 | 0.37 / 0 / 68 |
+| **v5 uncharged swing** | **1.0** / 92 | **0.7** | 0.51 / 0 / 92 |
+| v4 charged swing | 0 (3.5 at most in a frame) / 133 | 0 (3.2) | 1.12 / 0 / 133 |
+| **v5 charged swing** | **3.6** (4.0 at most in a frame) / 174 | **3.3** (3.5) | 2.46 / 1.7 / 185 |
+
+v3's dome was 107 / 198 square units over 1.0 on grass: v5's few units are the arcs' hottest overlap and the fist's
+sparks / flash.
+
+### State, tests
+VAR_6-13 now status + damage (sh_rec), VAR_18-21 the lifted armor; no globals (127 of 128). New functions
+`sh_reset_item`, `lock_resets`, `sh_struck`, `sh_reacted`, `sh_gone`, `sh_rec_st`, `sh_rec_dmg`, `sh_unarmor`,
+`sh_rearmor`; `sh_hit`, `sh_let_go`, `sh_down_start`, `sh_tick`, `sh_loop`, `sh_end`, `sh_rec`, `sh_getup`, `gf_release`,
+`gf_tick`, `cb_hold`, `cb_release` changed. `supamario_sledgehammer_test.py` **131 ok** (the model now has exe_v46w's
+reset lists, body states, counters, armor): the resets registered / removed; Supamario KO'd in the hold (controller back
+at his KO; on an older exe the bug as reported); the victim KO'd / the match over (let go, nothing written after); the
+victim hit by someone else (controller back at the hit); invincible / intangible / countering / shielding victims,
+charged and uncharged (nothing written); super / heavy armor uncharged (no bounce, armor kept), charged on the ground
+(lifted the frame before, bounced, held 28) and in the air (spiked), near but not hit (armor given back); the 28 frames
+(the v4 cases); the pose off, the glow's depth, the four pacs' motions byte for byte v1's (third argument
+supamario_sledgehammer_v1.zip). `supamario_fakedeath_test` 47, `supamario_corebreaker_test` 104,
+`supamario_godfist_test --all-models` 566 ok (its model now reads the victim's INPUT_OFF); `msc_stack_check` 0 of 2413.
+The Sledgehammer and Core Breaker scripts round-trip through Sm4shCommand v1.7.4. Compared with v4's package: main.pac (=
+v1's), the ptcl, effect.bin and the MSC differ; game.bin / expression.bin are the same.
+
+### Not confirmed in game
+External_Graphic's flag 0 giving the world-depth offset on a following effect (read for Graphic_Effect's request; if
+it is a bone-space offset there, the glow sits 4.64 along LHandN's Z instead); the armor lift landing before the
+collision for every victim (a victim whose own MSC sets its armor every frame after his would keep it); the reset
+events' timing in a match (each hook was run in unicorn with the game's code around it, not a match).

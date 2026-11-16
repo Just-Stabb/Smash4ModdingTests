@@ -38,6 +38,8 @@ Hooks (each asserts the exe_v46v_threads word it replaces; the ones that were a 
           after these (docs/native-notes.md "Variable resets").
 
   python3 tools/rpx_patch.py exe_v46v_threads.rpx exe_v46w_vars.rpx $(python3 tools/var_reset_cave.py --rpx exe_v46v_threads.rpx)
+  python3 tools/var_reset_cave.py --labels tools/Sm4shCommand/param_labels.json     (Sm4shCommand's entry)
+Then tools/line_test_cave.py on the result (it chains on these hooks): exe_v46w_vars_line.
 """
 import argparse
 import os
@@ -818,10 +820,36 @@ def rpx_reader(path):
     return orig
 
 
+def write_labels(path):
+    """Var_Reset_Set's entry in tools/Sm4shCommand/param_labels.json (apply_param_labels.py then puts it in Events.cfg
+    and tools/acmd_info.json; its group, help and examples come from acmd_ext_help.py, New_Var's Reset there too)"""
+    import json
+    from acmd_ext_help import GROUP, HELP, EXAMPLES
+    d = json.load(open(path))
+    for name, _h, params, desc in EXT_CMDS:
+        e = {'_command': name, '_new': True, '_name': name, '_size': 1 + len(params), '_desc': desc,
+             '_format': [t for _n, t, _d in params]}
+        for k, (pname, _t, pdesc) in enumerate(params):
+            e[str(k)] = {'name': pname, 'desc': pdesc, 'confidence': 'high'}
+        e['_example'] = EXAMPLES.get(name, [])
+        e['_group'], e['_help'] = GROUP.get(name), HELP.get(name, [])
+        d['%08X' % CMD_CRC] = e
+    nv = d.get('%08X' % (zlib.crc32(b'New_Var') & 0xFFFFFFFF))           # New_Var's changed help / examples
+    if nv is not None:
+        nv['_example'], nv['_help'] = EXAMPLES['New_Var'], HELP['New_Var']
+    json.dump(dict(sorted(d.items())), open(path, 'w'), indent=1)
+
+
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('--rpx', required=True, help='the executable to patch (exe_v46v_threads)')
+    p.add_argument('--rpx', help='the executable to patch (exe_v46v_threads)')
+    p.add_argument('--labels', help='update this param_labels.json with Var_Reset_Set (and New_Var\'s new help)')
     args = p.parse_args()
+    if args.labels:
+        write_labels(args.labels)
+        return
+    if not args.rpx:
+        p.error('--rpx or --labels')
     out, labels = build(rpx_reader(args.rpx))
     print(' '.join(['textregion:0x%X' % TEXT_REGION, 'grow:0x%08X' % VR_END] +
                    ['0x%08X=0x%08X' % kv for kv in sorted(out.items())]))
