@@ -41,7 +41,10 @@
       "C00Attack100",
       "C00Attack100End",
       "C03AttackS4Hi",
-      "C03AttackS4Lw"
+      "C03AttackS4Lw",
+      "D03SpecialLwHit",
+      "D03SpecialLwTurn",
+      "D03SpecialAirLwTurn"
     ],
     "extra_vis": "weapon_vis.json",
     "group2": {
@@ -134,7 +137,15 @@
       "master_wire_slash",
       "master_wire_wind",
       "master_wire_wind2",
-      "master_wire_wind3"
+      "master_wire_wind3",
+      "master_axe_ground",
+      "master_axe_impact",
+      "master_bow_arrow2",
+      "master_bow_arrow2_abs",
+      "master_bow_arrow2_bullet",
+      "master_bow_arrow2_end",
+      "master_bow_arrow2_end2",
+      "master_bow_arrow2_hit"
     ],
     "common": [
       "sys_action_smoke_v",

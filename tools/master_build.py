@@ -194,7 +194,8 @@ PLAYED = {0x211: 'SpecialNStart', 0x212: 'SpecialNTurn', 0x215: 'SpecialN', 0x21
           0x22D: 'SpecialSStart', 0x22E: 'SpecialSF', 0x22F: 'SpecialSLanding', 0x231: 'SpecialAirSStart',
           0x232: 'SpecialAirSF',
           0x239: 'SpecialHi', 0x23A: 'SpecialAirHiHit', 0x23B: 'SpecialAirHiOvertake', 0x23C: 'SpecialAirHiWallJump',
-          0x241: 'SpecialLw', 0x245: 'SpecialAirLw', 0x255: 'SpecialLwLanding1', 0x259: 'SpecialLwLanding2'}
+          0x241: 'SpecialLw', 0x245: 'SpecialAirLw', 0x255: 'SpecialLwLanding1', 0x259: 'SpecialLwLanding2',
+          0x242: 'SpecialLwHit', 0x243: 'SpecialLwTurn', 0x247: 'SpecialAirLwTurn'}
 FIRST_OWN, FINAL = 0x211, (0x25D, 0x25E)
 ZSS_SE_BANK = 0x1B                                 # her se ids 0x1B0000 + n           # ZSS's Final Smash slots: hers, kept (user)
 END = None
@@ -315,7 +316,9 @@ def body_fix(a, fighter):
     keep = [c for c in g[ov] if c.name not in ('Throw_Specifier', 'Throw_Applier', 'Throw_Specifier2')]
     g[ov] = U.merge_flat(keep, hit)
     # Aymr: the axe's hitbox (Ultimate's master_axe SpecialLw / SpecialAirLw: on the axe's haver, which follows his)
-    for src, name in (('SpecialLw', 'speciallwstart'), ('SpecialAirLw', 'specialairlwstart')):
+    # (v7) and SpecialLwHit's: the axe stuck in the floor, its four ground shock hits at frame 2 (8 %, Ultimate's
+    # MOVE_ATTACK slides them out natively: here they stay on the axe)
+    for src, name in (('SpecialLw', 'speciallwstart'), ('SpecialAirLw', 'specialairlwstart'), ('SpecialLwHit', 'speciallwhit')):
         body = ult_script(U, os.path.join(a.dump, 'master_axe', src + '.txt'), 'game_' + src.lower())
         if body is None:
             continue
@@ -526,10 +529,23 @@ SHOT_MOTIONS = ('7044fcbe', '18de2129', '6fd911bf', 'f1bd841c', 'e4e481dd', '1e0
 ARROWS = {'arrow1': ('master_arrow1', 'Fly', 'game_fly', 'effect_fly'), 'arrow2': ('master_arrow2', 'Search', 'game_search',
                                                                                     'effect_search')}
 # the shot's params in his vl (its block, read by both copies' getters: speed / life, uncharged and charged): Ultimate's
-# param_arrow1 speed_x 9 / life 17; the max arrow's distance 300 (param_arrow2) at speed 10 (mine: its speed isn't in
-# vl.prc) over 30 frames
-SHOT_PARAMS = {'paralyzer_bullet:0x02000000': 9.0, 'paralyzer_bullet:0x02000001': 10.0,
-               'paralyzer_bullet:0x12000002': 17, 'paralyzer_bullet:0x12000003': 30}
+# param_arrow1 speed_x 9 / life 17. The max arrow (v7): Ultimate's arrow2 doesn't fly, its Search status calls the
+# ExeFS's WeaponSpecializer_MasterArrow1::set_search (main.bin 0x03443100): param_arrow2 distance (300) x scale along
+# its facing, cut at the first ground (a GroundModule line test), and ONE attack line from the bow to that end on the
+# shot's frame: it crosses the stage at once. v1-v6 flew it at 10 a frame for 30 frames (mine; user v6: "hits
+# opponents far too slow"). Here: 300 in 4 frames (75 a frame; Smash 4 hitboxes are swept between frames)
+ARROW2_LIFE = 4
+SHOT_PARAMS = {'paralyzer_bullet:0x02000000': 9.0, 'paralyzer_bullet:0x02000001': 300.0 / ARROW2_LIFE,
+               'paralyzer_bullet:0x12000002': 17, 'paralyzer_bullet:0x12000003': ARROW2_LIFE}
+# the max arrow's own effects (Ultimate requests them from its status code / set_arrow_max_effect, not its ACMD, so
+# v1-v6 had none of them: no beam, no bullet): the bullet on the arrow, the beam (master_bow_arrow2) left at each
+# frame's point of the path (Ultimate stretches one beam from the bow to the arrow: APPROXIMATED by segments), the
+# end flash where it stops (set_arrow_max_end_effect), its hit flash (master_bow_arrow2_hit) on its hitbox's frame
+ARROW2_FX = ('macros::EFFECT_FOLLOW(agent, Hash40::new("master_bow_arrow2_bullet"), Hash40::new("top"), 0, 0, 0, 0, 0, 0, 1, true);'
+             + ''.join('frame(agent.lua_state_agent, %d.0); macros::EFFECT(agent, Hash40::new("master_bow_arrow2"), '
+                       'Hash40::new("top"), 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, true);' % f for f in range(1, ARROW2_LIFE + 1))
+             + 'macros::EFFECT(agent, Hash40::new("master_bow_arrow2_end"), Hash40::new("top"), 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, '
+               '0, 0, 0, true);')
 
 
 def weapons(a, fighter, effect_ids):
@@ -542,9 +558,13 @@ def weapons(a, fighter, effect_ids):
         etr = U.EffectTranslator({}, effect_ids, {})
         eff = etr.script(fns[ename]) if ename in fns else end()
         # its effects end with its flight (the shot's life, SHOT_PARAMS; a hit removes it earlier): port_check E10
-        life = 17 if art == 'arrow1' else 30
+        life = 17 if art == 'arrow1' else ARROW2_LIFE
+        if art == 'arrow2':
+            extra = etr.script('if macros::is_excute(agent) { ' + ARROW2_FX + ' }')
+            eff = U.merge_flat(eff, extra) or eff
         made = sorted({c.params[0] for c in eff if c.name.startswith(('Graphic_Effect', 'External_Graphic',
-                                                                      'EFFECT_FOLLOW'))})
+                                                                      'EFFECT_FOLLOW'))
+                       and c.params[0] not in (effect_ids.get('master_bow_arrow2'), effect_ids.get('master_bow_arrow2_end'))})
         if made:
             eff = U.merge_flat(eff, [U.cmd('FRAME', life)] + [U.cmd('Terminate_Graphic_Effect', m, 0, 0) for m in made]
                                + end()) or eff

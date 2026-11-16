@@ -20,6 +20,7 @@ once it is hit.
 """
 import math
 import os
+import struct
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -43,6 +44,7 @@ def check(name, got, want):
 
 
 GRAVITY, MAX_FALL = 0.09, 1.5
+FF, FF_SPEED, FF_STICK, FF_WINDOW = 0x21000001, 2.4, -0.66, 4      # v2: the fast fall (flag, speed, stick, flick age)
 LEN = {0x239: A.START_FRAMES, 0x23D: A.HOLD_FRAMES}
 UP, SIDE, NEUTRAL, DOWN = 0x4000, 0x2000, 0x1000, 0x8000
 
@@ -62,6 +64,9 @@ class Game(FT.Game):
         self.rates = []                 # (n, rate)
         self.hit = None                 # the fighter his attack hit
         self.floor = None               # a floor's height under him (landing)
+        self.flags = set()              # v2: WorkModule flags (0x21000001: fast falling)
+        self.stick = None               # v2: n -> (stick Y, frames since its flick) for func_77's globals 32 / 47
+        self.ff_log = []                # v2: (n, on) the fast-fall flag's changes
 
     def fvar(self, v):
         if v in (0x0F0002CD, 0x0F0002CE):              # Target 12 (ATKHIT_OFFSET_X / _Y): the fighter hit, if any
@@ -72,10 +77,29 @@ class Game(FT.Game):
             return 0.0
         if v == 0x3000018:                              # his fighter_param Gravity
             return GRAVITY
+        if v == 0x3000019:
+            return MAX_FALL
+        if v == 0x300001b:                              # v2: his fast-fall speed (Mario's 2.4)
+            return FF_SPEED
+        if v == 0x2000046:                              # v2: the stick's fast-fall threshold
+            return FF_STICK
         return FT.Game.fvar(self, v)
 
     def sys(self, sid, a):
         f = R.i2f
+        if sid == 0x16 and a and a[0] in (0x2710, 0x2711) and len(a) == 2:      # v2: flags on / off
+            if a[1] == FF and ((a[0] == 0x2710) != (FF in self.flags)):
+                self.ff_log.append((self.n, a[0] == 0x2710))
+            (self.flags.add if a[0] == 0x2710 else self.flags.discard)(a[1])
+            return 0
+        if sid == 0x16 and a and a[0] == 0x10 and len(a) == 2:
+            return 1 if a[1] in self.flags else 0
+        if sid == 0x16 and a and a[0] == 0x6 and len(a) == 2 and a[1] == 0x12000047:
+            return FF_WINDOW
+        if sid == 0x11 and len(a) == 2 and a[1] == 1 and a[0] in (0x1, 0xB):      # his gravity energy's speed
+            return R.f2i(self.vy)
+        if sid == 0x10 and a and a[0] in (0x4, 0x5) and len(a) == 2 and a[1] == 2:
+            return 1 if a[0] == 0x4 else 0                                       # energy 2 (air control) on
         if sid == 0x10 and a and a[0] == 0xF and a[1] == 1:
             self.acc = f(a[2])
             self.acc_log.append((self.n, round(self.acc, 4)))
@@ -136,9 +160,12 @@ class Game(FT.Game):
         if self.hitstop > 0:
             self.hitstop -= 1
             return
-        self.vy += self.acc
-        if self.acc != 0.0 and self.vy < -MAX_FALL:
-            self.vy = -MAX_FALL
+        if FF in self.flags:                            # v2: the gravity energy's fast fall
+            self.vy = -FF_SPEED
+        else:
+            self.vy += self.acc
+            if self.acc != 0.0 and self.vy < -MAX_FALL:
+                self.vy = -MAX_FALL
         self.y += self.vy
         if self.floor is not None and self.y <= self.floor:
             self.y, self.air = self.floor, False
@@ -159,6 +186,11 @@ def run(path, g, frames=200, cut_at=None):
         g.n = k
         vm.g[18] = 2 if g.air else 0
         vm.g[24] = g.press.get(k, 0)
+        if g.stick is not None:                         # v2: func_77's stick Y / flick age
+            sy, age = g.stick(k)
+            vm.g[32], vm.g[47] = R.f2i(sy), age
+        else:
+            vm.g[32], vm.g[47] = R.f2i(0.0), 0xFE
         if cut_at is not None and k == cut_at:
             vm.call(fn(vm, 'func_2282'))
             g.status = 'cut'
@@ -357,6 +389,47 @@ def msc_tests(path):
     tr, _vm = run(path, g)
     check('a shield: no effect, no follow, no on-hit cancel (Fall at the end)',
           (g.fx, g.vy_log, g.hitflag, tr[-1][5]), ([], [], 4, 0xE))
+    # 11. v2: fast fall (the game's own check, func_553): a flick made in the move, while falling
+    def stick_from(k0):
+        return lambda k: (-1.0, k - k0) if k >= k0 else (0.0, 0xFE)
+    g = Game(held=lambda n: n <= 2)
+    g.stick = stick_from(20)
+    tr, _vm = run(path, g)
+    check('fast fall: a down flick on game frame 20 (falling): the flag on 20, his fall at his fast-fall speed after',
+          (g.ff_log[:1], tr[22][4]), ([(20, True)], -FF_SPEED))
+    g = Game(held=lambda n: n <= 2)
+    g.stick = stick_from(0)                            # the down special's own down input, held
+    tr, _vm = run(path, g)
+    check('fast fall: the stick down from the move\'s first frame (its input): never a fast fall', g.ff_log, [])
+    g = Game(held=lambda n: True)
+    g.stick = stick_from(swing_k + 10)
+    tr, _vm = run(path, g)
+    check('fast fall while charging (game frame %d)' % (swing_k + 10), g.ff_log[:1], [(swing_k + 10, True)])
+    g = Game(held=lambda n: n <= 2, vy=-FF_SPEED)
+    g.flags.add(FF)
+    tr, _vm = run(path, g, frames=3)
+    check('fast fall carried in: ended at the start, his fall at most his max fall (%.1f)' % MAX_FALL,
+          (g.ff_log[:1], tr[0][4] >= -MAX_FALL - 0.1), ([(0, False)], True))
+    gf = Game(fighters=[victim_below(k=hit_k)], held=lambda n: n <= 2)
+    gf.stick = stick_from(hit_k + B.HITSTOP + 4)
+    trf, _vm = run(path, gf, frames=200)
+    fol_end = gf.vy_log[-1][0]
+    check('fast fall during the uncharged follow: ignored while it runs (flicked at %d; the follow to %d), its speed the '
+          'victim\'s' % (hit_k + B.HITSTOP + 4, fol_end), [n for n, on in gf.ff_log if on and n <= fol_end], [])
+    gf = Game(fighters=[victim_below(k=hit_k)], held=lambda n: n <= 2)
+    gf.stick = stick_from(fol_end + 2)
+    trf, _vm = run(path, gf, frames=200)
+    check('fast fall after the follow ended (flicked at %d): on' % (fol_end + 2), gf.ff_log[:1], [(fol_end + 2, True)])
+    for sh, want in ((1.0, True), (0.0, False)):
+        g = Game()
+        vm = FT.vm_for(path, g)
+        g.flags.add(FF)
+        g.vars[B.V_SH] = sh
+        vm.g[6], vm.g[50] = 0x155, R.f2i(1.0)
+        vm.call(fn(vm, 'func_81'))
+        check('func_81 (a special cancels a fresh fast fall): %s while Sledgehammer runs' % ('kept' if want else
+                                                                                           'cancelled as before'),
+              FF in g.flags, want)
     # 10. on the ground the down special stays Fake Death
     g = Game(held=lambda n: False)
     g.air = False
@@ -448,8 +521,10 @@ def effect_tests(out):
             t, r = p.field(d, 'emitter_translation'), p.field(d, 'emitter_rotation')
             ring = p.field(d, 'particle_type') == 1
             flat = ring and k in ('fire', 'fire_l')
+            if k in ('crg', 'crg02', 'fire', 'fire_l') and struct.unpack_from('>I', bytes(d), 0x310)[0] != 0:
+                bad.append((k, p.emitter_name(d), 'not following (0x310)'))
             rings += flat
-            want_r = (math.pi / 2, 0.0, 0.0) if flat else (0.0, 0.0, 0.0)
+            want_r = tuple(B.arc_turn()) if flat else (0.0, 0.0, 0.0)
             if max(abs(v) for v in t) > 1e-6 or max(abs(a - b_) for a, b_ in zip(r, want_r)) > 1e-5:
                 bad.append((k, p.emitter_name(d), t, r))
             if (p.field(d, 'particle_type') in (1, 3) or p.field(d, 'emitter_velocity') or
@@ -458,8 +533,8 @@ def effect_tests(out):
             rgb = [c * p.field(d, 'color_scale') for c in p.color_keys(d, 0)[0][:3]]
             if max(rgb) > 2.0 + 1e-3:
                 bad.append((k, p.emitter_name(d), 'HDR', rgb))
-    check('every emitter at the effect\'s origin, unturned but Hmr_Fire\'s rings (X 90: flat, symmetric), a full-sphere '
-          'spread when directional, HDR within 2.0', bad, [])
+    check('every emitter at the effect\'s origin, unturned but Hmr_Fire\'s arcs (v2: in his YZ plane, facing the camera), '
+          'a full-sphere spread when directional, HDR within 2.0, the skill\'s emitters following (v2)', bad, [])
     check('the falling rings converted flat (ShapeDraw -> polygons): %d' % rings, rings > 0, True)
     import json
     rep = json.load(open(os.path.join(out, 'sledgehammer_fx.json')))

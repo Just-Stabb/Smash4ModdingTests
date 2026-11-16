@@ -50,5 +50,17 @@
   "SpecialLw": "speciallwstart",
   "SpecialAirLw": "specialairlwstart",
   "SpecialLwLanding1": "speciallwlanding",
-  "SpecialLwLanding2": "speciallwkicklanding"
+  "SpecialLwLanding2": "speciallwkicklanding",
+  "SpecialLwHit": {
+    "name": "speciallwhit",
+    "slot": "0x242"
+  },
+  "SpecialLwTurn": {
+    "name": "speciallwturn",
+    "slot": "0x243"
+  },
+  "SpecialAirLwTurn": {
+    "name": "specialairlwturn",
+    "slot": "0x247"
+  }
 }
