@@ -38253,8 +38253,37 @@ int gf_update()
 // (target 2 + slot). (MSC can't reach another fighter's rotation: the game script turns it upright before the
 // hand-off.)
 // ===================================================================
+// v5 (exe_v46w_vars: docs/acmd-extra-commands.md "Variable resets"): a reset item through MSC's selection IDs: the
+// variable 0x0F000000 + index on the owner (a target: 0 him, a player slot s as s + 2), put back to 0 when the mask's
+// events happen to the owner (1 its KO, 8 a hit taking effect on it); mask 0 removes it. On an older exe these IDs read
+// 0 and a write does nothing (everything below then works as before)
+void sh_reset_item(float index, float owner, float mask)
+{
+    WorkModule(0, index, 0x0F0003CA);
+    WorkModule(0, 0.0f, 0x0F0003CB);
+    WorkModule(0, owner, 0x0F0003CC);
+    WorkModule(0, mask, 0x0F0003CD);
+}
+
+// v5 (the user's 40-frame lockout bug: "if Supamario is KO'd during the hold ... the victim's controls can stay off"):
+// the resets of a held fighter's controller (slot s, its INPUT_OFF): on the victim, its own SELF_INPUT_OFF (0x115) back
+// on with vmask (1 its KO; 9 its KO or a hit on it); on him, its INPUT_OFF as he sees it (0x115 + 0x20 x (s + 2)) back
+// on with his KO. vmask 0: both removed
+void lock_resets(int s, float vmask)
+{
+    float m;
+    m = 0.0f;
+    if (vmask > 0.5f)
+    {
+        m = 1.0f;
+    }
+    sh_reset_item(277.0f, (float)(s + 0x2), vmask);
+    sh_reset_item(277.0f + 32.0f * (float)(s + 0x2), 0.0f, m);
+}
+
 void gf_release(int t)
 {
+    lock_resets(t - 0x2, 0.0f);                 // v5
     WorkModule(0, 0.0f, 0x0F000115 + 0x20 * t);
     WorkModule(0, 0.0f, GF_V_PHASE);
     WorkModule(0, 0.0f, GF_V_LOCK);
@@ -38278,6 +38307,22 @@ void gf_tick()
     {
         WorkModule(0, 0.0f, GF_V_PHASE);
         return;
+    }
+    // v5: the lockout's resets (lock_resets): his KO lets it go; from the knockdown on (phase 2 up: the God Fist's own
+    // hits are over) its own KO or a hit on it too; anything that gave its controller back (those resets, its KO)
+    // ends the hold here
+    if (ph < 1.5f)
+    {
+        lock_resets(t - 0x2, 1.0f);
+    }
+    else
+    {
+        if (WorkModuleF(0, 0x0F000115 + 0x20 * t) < 0.5f)
+        {
+            gf_release(t);
+            return;
+        }
+        lock_resets(t - 0x2, 9.0f);
     }
     if (ph < 1.5f)
     {
@@ -39367,6 +39412,7 @@ void cb_hold(float ox, float oy)
     WorkModule(0, 2.0f, 0x0F000044 + 8 * t);
     WorkModule(0, 0.0f, 0x0F0000A6 + 8 * t);
     WorkModule(0, 1.0f, 0x0F000115 + 0x20 * t);
+    sh_reset_item(277.0f + 32.0f * (float)t, 0.0f, 1.0f);      // v5: his KO lets it go (lock_resets)
 }
 
 void cb_release()
@@ -39379,6 +39425,7 @@ void cb_release()
     t = cb_t();
     WorkModule(0, 5.0f, 0x0F0000A6 + 8 * t);
     WorkModule(0, 0.0f, 0x0F000115 + 0x20 * t);
+    sh_reset_item(277.0f + 32.0f * (float)t, 0.0f, 0.0f);      // v5
     cb_handed = 0x1;
 }
 
@@ -40374,7 +40421,9 @@ void sh_hit()
         // over); v3: charged straight down lying (sh_down_start: DownWait, held SH_DOWN_HOLD frames, the Super God
         // Fist's knockdown way), and an uncharged hit on a fighter in its neutral getup (DownStand) as in the air (the
         // user: no bounce -> jab lock -> getup -> Sledgehammer loop)
-        if (WorkModuleF(0, 0x0F000116 + 0x20 * (s + 0x2)) < 0.5f)
+        // v5 (user: no bounce / hold on invincible, intangible, shielding or countering opponents): only a hit on its
+        // body (sh_struck); a counter / armor (no reaction) is told at the end of its hitstop (sh_tick)
+        if (WorkModuleF(0, 0x0F000116 + 0x20 * (s + 0x2)) < 0.5f && sh_struck(s) != 0)
         {
             if (WorkModuleF(0, SH_V_CHG) > SH_CHARGE - 0.5f)
             {
@@ -40591,6 +40640,18 @@ void sh_loop()
         return;
     }
     WorkModule(0, fr, SH_V_LASTFR);
+    // v5: the charged swing's armor lift on its active frames (and one before), back after them (sh_unarmor)
+    if (WorkModuleF(0, SH_V_CHG) > SH_CHARGE - 0.5f)
+    {
+        if (fr > SH_HIT_FROM_CH - 1.5f && fr < SH_HIT_TO_CH && WorkModuleF(0, SH_V_VIC) == 0.0f)
+        {
+            sh_unarmor();
+        }
+        else if (fr > SH_HIT_TO_CH + 0.5f)
+        {
+            sh_rearmor();
+        }
+    }
     if (fr > SH_HIT_FROM - 0.5f && fr < SH_HIT_TO)
     {
         sh_hit();
@@ -40624,6 +40685,7 @@ void sh_end()
     SoundModule(0x2714, SH_SND_CHARGE);
     EffectModule(0x2723, SH_FX_CRG, 0x1, 0x1);
     sh_grav();
+    sh_rearmor();                               // v5
     WorkModule(0, 0.0f, SH_V);
     WorkModule(0, 0.0f, SH_V_VIC);
 }
@@ -40711,12 +40773,24 @@ void sh_shield()
 void sh_rec()
 {
     int s;
+    float d;
     s = 1;
     while (s <= 8)
     {
         if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f && WorkModuleF(0, 0x0F000043 + 0x8 * (s + 0x2)) < 0.5f)
         {
-            WorkModule(0, WorkModuleF(0, 0x0F0000A2 + 0x8 * (s + 0x2)), SH_V_ST + s - 1);
+            // v5: its damage too (x 4, whole: the status + 1024 x that), for sh_took
+            d = WorkModuleF(0, 0x0F000117 + 0x20 * (s + 0x2));
+            if (d > 999.0f)
+            {
+                d = 999.0f;
+            }
+            if (d < 0.0f)
+            {
+                d = 0.0f;
+            }
+            WorkModule(0, (float)(int)(d * 4.0f + 0.5f) * 1024.0f + WorkModuleF(0, 0x0F0000A2 + 0x8 * (s + 0x2)),
+                       SH_V_ST + s - 1);
         }
         s = s + 1;
     }
@@ -40727,7 +40801,7 @@ void sh_rec()
 // hit (its status before the hit's freeze, or now)
 int sh_getup(int s)
 {
-    if (WorkModuleF(0, SH_V_ST + s - 1) == SH_ST_DOWNSTAND ||
+    if (sh_rec_st(s) == SH_ST_DOWNSTAND ||
         WorkModuleF(0, 0x0F0000A2 + 0x8 * (s + 0x2)) == SH_ST_DOWNSTAND)
     {
         return 0x1;
@@ -40743,10 +40817,195 @@ void sh_let_go()
     if (s < 0)
     {
         s = -s;
+        lock_resets(s, 0.0f);                   // v5
         WorkModule(0, 0.0f, 0x0F000115 + 0x20 * (s + 0x2));
         WorkModule(0, (float)s, 0x0F0003C9);
     }
     WorkModule(0, 0.0f, SH_V_GS);
+}
+
+// v5: the hit on slot s reached its body: not invincible / intangible at the hit (its body state 0: INTANGIBLE reads 1
+// invincible, 2-4 intangible), not shielding (GuardOn .. GuardDamage, a shield break) now or before the hit's freeze,
+// and it took damage (a counter, invincibility take none)
+int sh_struck(int s)
+{
+    int t;
+    float st;
+    t = s + 0x2;
+    if (WorkModuleF(0, 0x0F00011B + 0x20 * t) != 0.0f)
+    {
+        return 0;
+    }
+    st = WorkModuleF(0, 0x0F0000A2 + 8 * t);
+    if ((st >= SH_ST_GUARD_LO && st <= SH_ST_GUARD_HI) || st == SH_ST_SHIELD_BREAK || st == SH_ST_SHIELD_BREAK + 1.0f)
+    {
+        return 0;
+    }
+    st = sh_rec_st(s);
+    if (st >= SH_ST_GUARD_LO && st <= SH_ST_GUARD_HI)
+    {
+        return 0;
+    }
+    // a counter (and anything else that takes the hit without damage): no damage since its last frame unfrozen
+    if (WorkModuleF(0, 0x0F000117 + 0x20 * t) < sh_rec_dmg(s) + 0.2f)
+    {
+        return 0;
+    }
+    return 0x1;
+}
+
+// v5: slot s's status / damage on its last frame not frozen (sh_rec: status + 1024 x the damage x 4)
+float sh_rec_st(int s)
+{
+    float v;
+    int q;
+    v = WorkModuleF(0, SH_V_ST + s - 1);
+    q = (int)(v / 1024.0f);
+    return v - (float)q * 1024.0f;
+}
+
+float sh_rec_dmg(int s)
+{
+    int q;
+    q = (int)(WorkModuleF(0, SH_V_ST + s - 1) / 1024.0f);
+    return (float)q / 4.0f;
+}
+
+// v5: status st is a hit's reaction (Damage .. DamageFall, DownDamage): the hit took effect. Armor (super / heavy),
+// a counter, invincibility leave the fighter in its own status: no reaction
+int sh_reacted(float st)
+{
+    if ((st >= SH_ST_DAMAGE_LO && st <= SH_ST_DAMAGE_HI) || st == SH_ST_DOWNDAMAGE)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// v5: slot s is KO'd, respawning, entering or in the results (Dead, Rebirth, Entry .. Lose): a hold on it ends
+int sh_gone(int s)
+{
+    float st;
+    st = WorkModuleF(0, 0x0F0000A2 + 8 * (s + 0x2));
+    if (st == SH_ST_DEAD || st == SH_ST_REBIRTH || (st >= SH_ST_ENTRY && st <= SH_ST_LOSE))
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// v5 (user: "Charged Sledgehammer should bypass armor"): on the charged hitbox's active frames, before the collision
+// (the MSC runs after the game script made the hitbox and before the frame's collision pass), every fighter whose body
+// (its feet to SH_BODY_H up, SH_BODY_W either side) the hitbox (bone 0 + SH_HIT_Z ahead, SH_HIT_Y up, SH_HIT_SIZE)
+// overlaps loses its armor (ARMOR = 0: DamageModule(0xB, 0)): the hit then takes effect as on a fighter with none (the
+// game's own knockback, hitstun, DI; on the ground the bounce and the hold). Its armor (type, threshold) is kept in
+// SH_V_ARM (up to SH_ARM_N fighters) for sh_rearmor. Invincibility, intangibility, shields and counters aren't armor:
+// they still stop it (sh_struck / sh_reacted)
+void sh_unarmor()
+{
+    int s;
+    int k;
+    int t;
+    float face;
+    float hx;
+    float hy;
+    float x;
+    float y;
+    float dx;
+    float dy;
+    float ty;
+    float thr;
+    face = WorkModuleF(0, 0x0f000003);
+    hx = WorkModuleF(0, 0x0f000000) + SH_HIT_Z * face;
+    hy = WorkModuleF(0, 0x0f000001) + SH_HIT_Y;
+    s = 1;
+    while (s <= 8)
+    {
+        t = s + 0x2;
+        x = WorkModuleF(0, 0x0f000020 + 4 * (s - 1));
+        y = WorkModuleF(0, 0x0f000021 + 4 * (s - 1));
+        ty = WorkModuleF(0, 0x0F00011D + 0x20 * t);
+        if (ty > 0.5f && WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f &&
+            (x != WorkModuleF(0, 0x0f000000) || y != WorkModuleF(0, 0x0f000001)))
+        {
+            dx = x - hx;
+            if (dx < 0.0f)
+            {
+                dx = -dx;
+            }
+            dx = dx - SH_BODY_W;
+            if (dx < 0.0f)
+            {
+                dx = 0.0f;
+            }
+            dy = 0.0f;
+            if (hy < y)
+            {
+                dy = y - hy;
+            }
+            if (hy > y + SH_BODY_H)
+            {
+                dy = hy - y - SH_BODY_H;
+            }
+            if (dx * dx + dy * dy < SH_HIT_SIZE * SH_HIT_SIZE)
+            {
+                k = 0;
+                while (k < SH_ARM_N && WorkModuleF(0, SH_V_ARM + k) != 0.0f)
+                {
+                    k = k + 1;
+                }
+                if (k < SH_ARM_N)
+                {
+                    thr = WorkModuleF(0, 0x0F00011E + 0x20 * t);
+                    if (thr > 9999.0f)
+                    {
+                        thr = 9999.0f;
+                    }
+                    if (thr < 0.0f)
+                    {
+                        thr = 0.0f;
+                    }
+                    WorkModule(0, (float)s * 1000000.0f + ty * 100000.0f + (float)(int)(thr * 10.0f + 0.5f), SH_V_ARM + k);
+                }
+                WorkModule(0, 0.0f, 0x0F00011D + 0x20 * t);
+            }
+        }
+        s = s + 1;
+    }
+}
+
+// v5: sh_unarmor's lifted armor back on the fighters the swing didn't hit (not frozen in a hit's freeze, not in a
+// reaction or down status), then forgotten (once its active frames are over, and at the status's end)
+void sh_rearmor()
+{
+    int k;
+    int s;
+    int t;
+    float v;
+    float ty;
+    float st;
+    k = 0;
+    while (k < SH_ARM_N)
+    {
+        v = WorkModuleF(0, SH_V_ARM + k);
+        if (v > 0.5f)
+        {
+            s = (int)(v / 1000000.0f);
+            v = v - (float)s * 1000000.0f;
+            ty = (float)(int)(v / 100000.0f);
+            v = v - ty * 100000.0f;
+            t = s + 0x2;
+            st = WorkModuleF(0, 0x0F0000A2 + 8 * t);
+            if (s >= 1 && s <= 8 && WorkModuleF(0, 0x0F000043 + 8 * t) < 0.5f && sh_reacted(st) == 0 &&
+                (st < SH_ST_DOWN_LO || st > SH_ST_DOWN_HI))
+            {
+                WorkModule(0, v / 10.0f, 0x0F00011E + 0x20 * t);
+                WorkModule(0, ty, 0x0F00011D + 0x20 * t);
+            }
+            WorkModule(0, 0.0f, SH_V_ARM + k);
+        }
+        k = k + 1;
+    }
 }
 
 // v3: lying where it was hit (the Super God Fist v17's put-down, gf_tick phase 5): at its place at the hit (SH_V_GX /
@@ -40794,6 +41053,7 @@ void sh_down_start(int s)
     WorkModule(0, WorkModuleF(0, 0x0f000021 + 4 * (s - 1)), SH_V_GY);
     WorkModule(0, 1.0f, 0x0F000115 + 0x20 * (s + 0x2));
     WorkModule(0, (float)s, 0x0F0003C9);
+    lock_resets(s, 9.0f);                       // v5: its KO / a hit on it / his KO give its controller back
 }
 
 // every frame (func_82). v2 (user): a fighter the uncharged Sledgehammer hit on the ground (SH_V_GS: + its slot), once
@@ -40832,7 +41092,11 @@ void sh_tick()
         {
             return;
         }
-        WorkModule(0, SH_ST_DOWNBOUND, 0x0F0000A2 + 8 * t);
+        // v5: only a hit that took effect (a reaction): armor, a counter, invincibility: no bounce
+        if (sh_reacted(WorkModuleF(0, 0x0F0000A2 + 8 * t)) != 0 && sh_gone(s) == 0)
+        {
+            WorkModule(0, SH_ST_DOWNBOUND, 0x0F0000A2 + 8 * t);
+        }
         WorkModule(0, 0.0f, SH_V_GS);
         return;
     }
@@ -40849,12 +41113,25 @@ void sh_tick()
         WorkModule(0, 0.0f, SH_V_GN);
         return;
     }
+    // v5: KO'd / respawning / the match over, or its controller already back (exe_v46w's resets: its KO, a hit on it,
+    // his KO; anything else that turned it on): let go, nothing more written to it
+    if (sh_gone(s) != 0 || WorkModuleF(0, 0x0F000115 + 0x20 * t) < 0.5f)
+    {
+        sh_let_go();
+        return;
+    }
     ph = WorkModuleF(0, SH_V_GP);
     st = WorkModuleF(0, 0x0F0000A2 + 8 * t);
     if (ph < 0.5f)
     {
         if (WorkModuleF(0, 0x0F000043 + 8 * t) > 0.5f)
         {
+            return;
+        }
+        // v5: a hit that took no effect (a counter; armor the charged swing didn't lift): no bounce, no hold
+        if (sh_reacted(st) == 0)
+        {
+            sh_let_go();
             return;
         }
         WorkModule(0, SH_ST_DOWNBOUND, 0x0F0000A2 + 8 * t);

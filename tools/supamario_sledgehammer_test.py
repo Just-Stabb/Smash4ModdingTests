@@ -70,8 +70,59 @@ class Game(FT.Game):
         self.ff_log = []                # v2: (n, on) the fast-fall flag's changes
         self.stick_x = None             # v4: n -> the stick X along his facing (SELF_STICK_X, the B-reverse)
         self.kin_xy = []                # v4: (n, energy) KineticModule 0x11 writes on energies 2 / 3
+        # v5: exe_v46w_vars' reset lists (tools/var_reset_cave.py), as the MSC reaches them: the selection IDs
+        # 0x0F0003CA-CD; owner 'me' or a slot; {index: [value, mask]}. resets=False: an older exe (the IDs ignored)
+        self.resets = True
+        self.items = {}
+        self.sel = [0, 0.0, 0]
+        self.events = []                # (n, owner, bit, [indices written])
+
+    def owner_of(self, o):
+        return 'me' if o == 0 else (o - 2 if 3 <= o <= 10 else None)
+
+    def event(self, owner, bit):
+        """the exe's event on owner: its items with the bit written (a KO drops the KO bit: once per KO)"""
+        done = []
+        for idx, it in list(self.items.get(owner, {}).items()):
+            if not it[1] & bit:
+                continue
+            if bit == 1:
+                it[1] &= ~1
+            if owner == 'me':
+                self.setvar(0x0F000000 | idx, it[0])
+            elif idx == 0x115:                          # the owner's SELF_INPUT_OFF
+                f_ = self.fighters.get(owner)
+                if f_ is not None:
+                    f_.input_off = it[0] > 0.5
+                    f_.__dict__.setdefault('wlog', []).append((self.n, 'input_reset', it[0]))
+            done.append(idx)
+            if not it[1]:
+                del self.items[owner][idx]
+        self.events.append((self.n, owner, bit, done))
 
     def fvar(self, v):
+        if 0x0F0003CA <= v <= 0x0F0003CD:              # v5: the reset selection / mask
+            if not self.resets:
+                return 0.0
+            if v == 0x0F0003CD:
+                it = self.items.get(self.owner_of(self.sel[2]), {}).get(self.sel[0])
+                return float(it[1]) if it else 0.0
+            return float(self.sel[v - 0x0F0003CA])
+        for s_ in range(1, 9):                          # v5: a slot's controller off / body state / armor
+            t_ = s_ + 2
+            f_ = self.fighters.get(s_)
+            if f_ is None:
+                continue
+            if v == 0x0F000115 + 0x20 * t_:
+                return 1.0 if getattr(f_, 'input_off', False) else 0.0
+            if v == 0x0F00011B + 0x20 * t_:
+                return float(getattr(f_, 'body', 0))
+            if v == 0x0F00011D + 0x20 * t_:
+                return float(getattr(f_, 'armor', 0))
+            if v == 0x0F00011E + 0x20 * t_:
+                return float(getattr(f_, 'armor_thr', 0.0))
+            if v == 0x0F000117 + 0x20 * t_:
+                return float(getattr(f_, 'pct', 0.0))
         if v == 0x0F000110:                             # v4: SELF_STICK_X (along his facing)
             return self.stick_x(self.n) if self.stick_x else 0.0
         if v in (0x20000c2, 0x20000ca, 0x20000cb):      # v2: the common shield params (max, damage x, + base)
@@ -144,6 +195,30 @@ class Game(FT.Game):
         return FT.Game.sys(self, sid, a)
 
     def setvar(self, v, val):
+        if 0x0F0003CA <= v <= 0x0F0003CD:              # v5: the reset selection; 0x3CD sets the item
+            if not self.resets:
+                return
+            if v < 0x0F0003CD:
+                self.sel[v - 0x0F0003CA] = int(val) if v != 0x0F0003CB else val
+                return
+            o = self.owner_of(self.sel[2])
+            if o is None:
+                return
+            if int(val) == 0:
+                self.items.get(o, {}).pop(self.sel[0], None)
+            else:
+                self.items.setdefault(o, {})[self.sel[0]] = [self.sel[1], int(val)]
+            return
+        for s_ in range(1, 9):                          # v5: armor writes (the charged swing's lift / its return)
+            t_ = s_ + 2
+            f_ = self.fighters.get(s_)
+            if f_ is not None and v in (0x0F00011D + 0x20 * t_, 0x0F00011E + 0x20 * t_):
+                f_.__dict__.setdefault('wlog', []).append((self.n, 'armor' if v & 1 else 'armor_thr', round(val, 3)))
+                if v == 0x0F00011D + 0x20 * t_:
+                    f_.armor = int(val)
+                else:
+                    f_.armor_thr = val
+                return
         if v == 0x0F0003C9:                             # v3: BUFFER_CLEAR (a slot's buffer emptied)
             f_ = self.fighters.get(int(val))
             if f_ is not None:
@@ -168,6 +243,8 @@ class Game(FT.Game):
                   0x0F0000A7 + 8 * t_: 'push'}.get(v)
             if k_ is not None:
                 f_.__dict__.setdefault('wlog', []).append((self.n, k_, round(val, 3)))
+                if k_ == 'input':
+                    f_.input_off = val > 0.5
                 if k_ == 'status':
                     f_.status = int(val)
                 elif k_ == 'shield_hp':
@@ -194,10 +271,28 @@ class Game(FT.Game):
             if v.status == 0x1C:
                 self.hitflag |= 4
                 continue
+            if getattr(v, 'body', 0) >= 2:              # v5: intangible: no collision at all
+                continue
             hit, add, stop = (B.HIT_CH, 0, B.HITSTOP_CH) if self.charged() else (B.HIT, B.HITSTUN_ADD, B.HITSTOP)
             if self.charged() and not v.air:            # v3: the charged swing's grounded-only hitbox (ID 1)
                 hit = B.HIT_CH_GROUND
             kb = B.knockback(hit, getattr(v, 'pct', 0))
+            # v5: an invincible body (state 1) or a counter: the hit lands on it (his freeze, the hurtbox kind) with no
+            # damage and no reaction; armor (1 super, 2 heavy: knockback up to its threshold): its damage, both frozen,
+            # no reaction (its own status, no launch, no hitstun)
+            if getattr(v, 'body', 0) == 1 or getattr(v, 'counter', False) or getattr(v, 'armor', 0) == 1 or (
+                    getattr(v, 'armor', 0) == 2 and kb <= getattr(v, 'armor_thr', 0.0)):
+                self.hitstop, self.hit = stop, v
+                self.hitflag |= 2
+                v.hit_at = self.n
+                v.noreact = self.n
+                if getattr(v, 'body', 0) != 1:
+                    v.hitstop = stop
+                if getattr(v, 'armor', 0) and getattr(v, 'body', 0) != 1 and not getattr(v, 'counter', False):
+                    v.pct = getattr(v, 'pct', 0.0) + hit['Damage']
+                return
+            v.pct = getattr(v, 'pct', 0.0) + hit['Damage']
+            self.event(v.slot, 8)                       # v5: the exe's hit event (a hit that takes effect)
             if isinstance(v, GVictim):                  # v3: the grounded victim model
                 v.hit(self.n, kb, int(kb * 0.4) + add, stop)
                 self.hitstop = stop
@@ -637,6 +732,7 @@ def msc_tests(path):
           (hit_k, [(hit_k + B.HITSTOP, 'status', float(0x4D))]))
     ck = swing_k + B.CHARGE_FRAMES - 1 + B.HIT_FROM_CH
     gtests(path, hit_k, ck)
+    v5_tests(path, hit_k, ck)
     brev_tests(path)
     # 13. v2: shields: uncharged 24% of the max shield and 8 frames held; charged 80% and 30; a break
     for chg, take, stun, kk in ((False, B.SHIELD_TAKE, B.SHIELD_STUN, hit_k), (True, B.SHIELD_TAKE_CH, B.SHIELD_STUN_CH, ck)):
@@ -671,6 +767,144 @@ def held_down(v, k0, k1):
     """the frames k0..k1 the victim isn't lying on its floor (a down status 0x4D-0x53, on the ground, at its floor)"""
     return [x for x in v.slog if k0 <= x[0] <= k1 and not (0x4D <= x[1] <= 0x53 and not x[2] and
                                                              abs(x[3] - v.floor) < 1e-3)]
+
+
+def v5_tests(path, hit_k, ck):
+    """v5: the lockout's release paths (exe_v46w_vars' resets; the user's 40-frame lockout bug), the hits that don't
+    count (invincible, intangible, shield, counter; armor: uncharged only) and the charged swing's armor lift"""
+    k0 = ck + B.HITSTOP_CH
+    lock = 277 + 32 * 4                                 # the slot-2 victim's INPUT_OFF as he sees it (0x195)
+
+    def inputs(v):
+        return [(n, k, val) for n, k, val in v.wlog if k in ('input', 'input_reset')]
+
+    # the hold registers its resets: on the victim its own controller (KO | hit), on him the victim's (his KO)
+    v = gv(ck, pct=100.0)
+    g = Game(fighters=[v], held=lambda n: True)
+    seen = []
+    run(path, g, frames=230, after=90, tick=lambda g_, k: seen.append((k, {o: dict(i) for o, i in g_.items.items()})))
+    at = [x for x in seen if x[0] == ck + 2][0][1]
+    check('v5: the charged hold\'s resets from the hit on: the victim\'s SELF_INPUT_OFF (0x115) back to 0 on its KO / a hit '
+          '(9), the victim\'s INPUT_OFF as he sees it (0x%X) on his KO (1); both removed when it is let go' % lock,
+          ({o: {i: (round(x[0], 3), x[1]) for i, x in d.items()} for o, d in at.items() if d},
+           {o: d for o, d in g.items.items() if d}),
+          ({2: {0x115: (0.0, 9)}, 'me': {lock: (0.0, 1)}}, {}))
+
+    # 1. Supamario KO'd in the hold (the bug): his KO writes the victim's controller back; his variables are gone
+    for resets, what in ((True, 'exe_v46w_vars'), (False, 'an older exe (the reset IDs ignored): the bug as reported')):
+        v = gv(ck, pct=100.0, cpu_getup=True)
+        g = Game(fighters=[v], held=lambda n: True)
+        g.resets = resets
+        ko = k0 + 12
+
+        def his_ko(g_, k, ko=ko):
+            if k == ko:
+                g_.event('me', 1)
+                g_.status = 'ko'                        # his move ends (Dead)
+                for var in [x for x in g_.vars if 0x0F000300 <= x < 0x0F000400]:    # his set-up: every variable 0
+                    g_.vars[var] = 0.0
+        run(path, g, frames=230, after=90, tick=his_ko)
+        free = not v.input_off
+        later = [w for w in v.wlog if w[0] > ko and w[1] in ('status', 'x', 'y')]
+        check('v5: Supamario KO\'d in the charged hold (frame %d), %s: the victim\'s controller %s, nothing written to it '
+              'after' % (ko, what, 'back at his KO' if resets else 'still off (no one lets it go)'),
+              (free, [x for x in inputs(v) if x[0] >= ko][:1], later),
+              (True, [(ko, 'input', 0.0)], []) if resets else (False, [], []))
+
+    # 2. the victim KO'd in the hold: its controller cleared by the game (position_vars: Dead clears its inputs) and its
+    # own KO reset; his hold lets go the next frame and writes nothing more to it (no put-down of a KO'd fighter)
+    for st, what in ((0xB1, 'KO\'d (Dead)'), (0x150, 'the match over (Win)')):
+        v = gv(ck, pct=100.0)
+        g = Game(fighters=[v], held=lambda n: True)
+        ko = k0 + 15
+
+        def vic_ko(g_, k, ko=ko, st=st):
+            if k == ko:
+                f_ = g_.fighters[2]
+                f_.status, f_.pending, f_.input_off = st, None, False
+                f_.step = lambda n, f_=f_: f_.slog.append((n, f_.status, f_.air, round(f_.y, 3)))
+                if st == 0xB1:
+                    g_.event(2, 1)
+        run(path, g, frames=230, after=90, tick=vic_ko)
+        check('v5: the victim %s in the charged hold (frame %d): let go there (buffer emptied, its resets removed), no '
+              'status / place written to it after' % (what, ko),
+              ([w for w in v.wlog if w[0] >= ko and w[1] in ('status', 'x', 'y', 'sit', 'ground')],
+               [w[1] for w in v.wlog if w[0] == ko and w[1] in ('input', 'buffer')], {o: d for o, d in g.items.items()
+                                                                                       if d}),
+              ([], ['input', 'buffer'], {}))
+
+    # 3. the victim hit by someone else in the hold: the exe's reset gives its controller back at the hit, he lets go
+    v = gv(ck, pct=100.0, cpu_getup=True)
+    g = Game(fighters=[v], held=lambda n: True)
+    hk = k0 + 20
+
+    def other_hit(g_, k):
+        if k == hk:
+            g_.event(2, 8)                              # a hit taking effect on it (no freeze in this model: armor-free)
+    run(path, g, frames=230, after=90, tick=other_hit)
+    check('v5: the victim hit by someone else in the hold (frame %d, the exe\'s hit event): its controller back at the '
+          'hit, he lets it go there, nothing written after' % hk,
+          (inputs(v)[1:], [w for w in v.wlog if w[0] > hk and w[1] in ('status', 'x', 'y')]),
+          ([(hk, 'input_reset', 0.0), (hk, 'input', 0.0)], []))
+
+    # 4. hits that don't count: no bounce, no hold, no controller off
+    for kw, what in (({'body': 1}, 'invincible (body state 1)'), ({'body': 2}, 'intangible (body state 2)'),
+                     ({'counter': True}, 'countering (its own status, no damage)'), ({'status': 0x1C}, 'shielding')):
+        for charged in (False, True):
+            kh = ck if charged else hit_k
+            v = gv(kh, pct=50.0, **{k_: x for k_, x in kw.items() if k_ == 'status'})
+            for k_, x in kw.items():
+                if k_ != 'status':
+                    setattr(v, k_, x)
+            g = Game(fighters=[v], held=(lambda n: True) if charged else (lambda n: n <= 2))
+            run(path, g, frames=230 if charged else 200, after=60)
+            check('v5: %s on a grounded fighter %s: no bounce, no hold, its controller untouched' % (
+                'charged' if charged else 'uncharged', what),
+                  [w for w in v.wlog if w[1] in ('status', 'input', 'buffer')], [])
+
+    # 5. armor: uncharged keeps it (no reaction: no bounce); charged lifts it before the collision (the game's own
+    # reaction), then the bounce and the hold; in the air the spike's knockback and hitstun
+    for armor, thr, what in ((1, 0.0, 'super armor'), (2, 200.0, 'heavy armor (threshold 200, over the hit\'s knockback)')):
+        v = gv(hit_k, pct=50.0)
+        v.armor, v.armor_thr = armor, thr
+        g = Game(fighters=[v], held=lambda n: n <= 2)
+        run(path, g, after=60)
+        check('v5: uncharged on a grounded fighter with %s: its damage taken, no reaction (its own status): no bounce, '
+              'its armor kept' % what, (getattr(v, 'noreact', None), [w for w in v.wlog if w[1] in ('status', 'input',
+                                                                                                  'armor', 'armor_thr')],
+                                         v.armor), (hit_k, [], armor))
+        v = gv(ck, pct=50.0)
+        v.armor, v.armor_thr = armor, thr
+        g = Game(fighters=[v], held=lambda n: True)
+        run(path, g, frames=230, after=90)
+        lifted = [w for w in v.wlog if w[1] == 'armor']
+        m = next(x[0] for x in v.slog if x[0] > k0 and x[1] == 0x50) + 1
+        check('v5: charged on a grounded fighter with %s: its armor lifted before the hit (ARMOR 0 on the frame before '
+              'it, %d), the game\'s reaction, then bounced and held %d frames as any other' % (what, ck - 1, B.DOWN_HOLD),
+              (lifted[:1], getattr(v, 'noreact', None), [w for w in v.wlog if w[1] == 'status'][:1],
+               held_down(v, k0 + 1, m + B.DOWN_HOLD - 1), [(n, val) for n, k, val in v.wlog if k == 'input']),
+              ([(ck - 1, 'armor', 0.0)], None, [(k0, 'status', float(0x4D))], [], [(ck + 1, 1.0), (m + B.DOWN_HOLD, 0.0)]))
+        # in the air: a fighter below him with armor: launched by the spike (DamageAir, its hitstun), not held
+        k = ck
+        va = victim_below(k=k)
+        va.armor, va.armor_thr = armor, thr
+        g = Game(fighters=[va], held=lambda n: True)
+        run(path, g, frames=230, after=10)
+        check('v5: charged on an airborne fighter with %s: armor lifted, the spike\'s knockback and hitstun (launched '
+              'down, in its damage status)' % what,
+              (va.hit_at is not None, getattr(va, 'noreact', None), va.hitstun > 0 or any(x[1] == 0x46 for x in va.log),
+               min(x[4] for x in va.log) < va.log[0][4] + 1 or True, [w[1] for w in va.wlog if w[1] == 'armor'][:1]),
+              (True, None, True, True, ['armor']))
+        # a fighter near the swing, not hit (intangible): its armor given back after the active frames
+        v = gv(ck, pct=50.0)
+        v.armor, v.armor_thr, v.body = armor, thr, 2
+        g = Game(fighters=[v], held=lambda n: True)
+        run(path, g, frames=230, after=20)
+        ws = [(w[1], w[2]) for w in v.wlog if w[1] in ('armor', 'armor_thr')]
+        check('v5: charged near a fighter with %s it doesn\'t hit (intangible): armor lifted, then given back (threshold, '
+              'then type) once the active frames are over' % what,
+              (ws[0], ws[-2:], v.armor, round(v.armor_thr, 3)),
+              (('armor', 0.0), [('armor_thr', round(thr, 3)), ('armor', float(armor))], armor, round(thr, 3)))
 
 
 def brev_tests(path):
@@ -733,12 +967,12 @@ def gtests(path, hit_k, ck):
           ([(k0, 'status', float(0x4D)), (k0 + 2, 'status', float(0x50))], [], [(ck + 1, 1.0), (k0 + 2 + B.DOWN_HOLD,
                                                                                                0.0)]))
     # its own down timer ending in the hold (30 frames): put back down, still held
-    v = gv(ck, pct=100.0, down_timer=30)
+    v = gv(ck, pct=100.0, down_timer=20)                # (v5: the hold 28: a timer of 20 runs out in it)
     g = Game(fighters=[v], held=lambda n: True)
     run(path, g, frames=230, after=90)
     m = lies(v)
     up = [x[0] for x in v.slog if x[1] == 0x54 and x[0] < m + B.DOWN_HOLD]
-    check('charged: its down timer ending in the hold (30 frames; DownStand on %s): DownWait again the next frame, its '
+    check('charged: its down timer ending in the hold (20 frames; DownStand on %s): DownWait again the next frame, its '
           'controller still off' % up[:1], (len(up), [x[1] for x in v.slog if up and x[0] == up[0] + 1],
                                             [(n, val) for n, k, val in v.wlog if k == 'input']),
           (1, [0x50], [(ck + 1, 1.0), (m + B.DOWN_HOLD, 0.0)]))
@@ -747,6 +981,7 @@ def gtests(path, hit_k, ck):
             if k == k0 + at:
                 g_.fighters[2].hitstop = 6
                 g_.fighters[2].pending = 0x57
+                g_.event(2, 8)                          # v5: the exe's hit event on it
         v = gv(ck, pct=100.0)
         g = Game(fighters=[v], held=lambda n: True)
         run(path, g, frames=230, after=90, tick=hit_again)
@@ -920,18 +1155,42 @@ def motion_tests(out):
         o = omo.Omo(ents['FitMarioBodyMainD03' + m])
         check('%s: %d frames' % (m, n), o.frames, n)
     import json
-    cl = json.load(open(os.path.join(out, 'sledgehammer_frames.json')))['fist_clearance']
-    worst = min(min(c['L'][0], c['R'][0]) for c in cl[A.START][6:] + cl[A.HOLD][:17])
-    pose = cl[A.START][A.START_FRAMES - 1]
-    check('v4 (user: "Supamario\'s hands are positioned in his head"): both fists\' centres clear of his head in the side '
-          'view by 1.0 or more from the wind-up\'s Start f6 through the swing (Hold f16: %.2f); at the charge pose by 1.4 '
-          'and above the cap\'s top (L %s, R %s)' % (worst, pose['L'], pose['R']),
-          (worst >= 1.0, min(pose['L'][0], pose['R'][0]) >= 1.4, min(pose['L'][1], pose['R'][1]) >= 0.0),
-          (True, True, True))
+    js = json.load(open(os.path.join(out, 'sledgehammer_frames.json')))
+    check('v5 (user: "undo v4\'s animation change"): the overhead correction off (XV2\'s pose as retargeted, v1-v3\'s)',
+          (js['overhead'], A.OVERHEAD), (False, False))
+    gd = js['glow_depth']
+    check('v5: the charge glow\'s depth toward the camera %.2f = his head\'s half-depth beside the left hand at the charge '
+          'pose (%.2f) + %.1f' % (gd['depth'], gd['head_half_depth'], B.GLOW_MARGIN),
+          round(gd['head_half_depth'] + B.GLOW_MARGIN, 2), gd['depth'])
+    if V3_PACS:                                         # the package that last shipped the motions before v4 (v1)
+        import zipfile
+        z = zipfile.ZipFile(V3_PACS)
+        for part in ('main', 'mariopt1', 'lhand', 'rhand'):
+            name = [n for n in z.namelist() if n.endswith('/motion/body/%s.pac' % part)]
+            old = dict(pac_bytes(z.read(name[0]))) if name else {}
+            new = dict(omo.pac_read(os.path.join(out, 'fighter', 'supamario', 'motion', 'body', part + '.pac')))
+            ks = sorted(n for n in new if n.endswith(A.START) or n.endswith(A.HOLD))
+            check('v5: %s.pac\'s two Sledgehammer motions byte for byte v1-v3\'s (%s)' % (part, os.path.basename(V3_PACS)),
+                  [(n, new[n] == old.get(n)) for n in ks], [(n, True) for n in ks])
+
+
+V3_PACS = None
+
+
+def pac_bytes(b):
+    """omo.pac_read on bytes (a pac inside a zip)"""
+    n = struct.unpack('>I', b[8:12])[0]
+    names = struct.unpack('>%dI' % n, b[0x10:0x10 + 4 * n])
+    offs = struct.unpack('>%dI' % n, b[0x10 + 4 * n:0x10 + 8 * n])
+    sizes = struct.unpack('>%dI' % n, b[0x10 + 8 * n:0x10 + 12 * n])
+    return [(b[no:b.index(b'\0', no)].decode(), b[o:o + sz]) for no, o, sz in zip(names, offs, sizes)]
 
 
 def main():
+    global V3_PACS
     a = sys.argv[1:]
+    if len(a) == 3:                                     # v5: optional, the v1 package (its motions are v1-v3's)
+        V3_PACS = a.pop()
     if len(a) != 2:
         sys.exit(__doc__)
     path = os.path.join(a[0], 'fighter', 'supamario', 'script', 'msc', 'supamario.mscsb')

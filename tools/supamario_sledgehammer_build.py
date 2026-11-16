@@ -106,6 +106,17 @@ SHIELD_TAKE, SHIELD_STUN = 0.24, 8
 SHIELD_TAKE_CH, SHIELD_STUN_CH = 0.80, 30
 DOWN_HOLD = 40                       # v2 (user): a charged hit on the ground: lying 40 frames, untechable (v4: counted
                                      # from the first frame it lies after the bounce)
+DOWN_HOLD = 28                       # v5 (user: "28 frames instead of 40"): still from the first frame it lies after the
+                                     # bounce. Sledgehammer's own: the Super God Fist's knockdown is GF_DOWN_FRAMES
+# v5 (user: no bounce / hold on invincible, intangible, shielding, countering or armored opponents; then: "Charged
+# Sledgehammer should bypass armor though"): ST_DAMAGE_LO-HI / ST_DOWNDAMAGE are the reactions that count (a hit that
+# took effect); ST_GUARD_LO-HI and the break are shields; ST_DEAD / ST_REBIRTH / ST_ENTRY-ST_LOSE (KO, respawn, entry,
+# results) let a held victim go. The charged swing lifts the armor (ARMOR = 0) of every fighter its hitbox overlaps on
+# its active frames, before the collision (sh_unarmor), and gives it back to those it didn't hit (sh_rearmor)
+ST_DAMAGE_LO, ST_DAMAGE_HI = 0x45, 0x4C
+ST_GUARD_LO, ST_GUARD_HI = 0x1B, 0x1E
+ST_DEAD, ST_REBIRTH, ST_ENTRY, ST_LOSE = 0xB1, 0xB2, 0x14F, 0x151
+BODY_W, BODY_H = 3.5, 10.0          # a fighter's body for sh_unarmor's overlap (the test model's: feet to +10, 3.5 wide)
 BOUNCE_MAX = 30                      # v4: the charged hit's bounce: put down if it is still bouncing after this
 TURN_STICK = 0.5                     # v4: the B-reverse (Core Breaker's TURN_STICK / TURN_WINDOW): the stick back
 TURN_WINDOW = 4                      # past this along his facing on the move's first 4 frames
@@ -134,6 +145,8 @@ V_GX = 0x0F00030E                    # VAR_14 (v3): the held-down victim's X at 
 V_GY = 0x0F00030F                    # VAR_15 (v3): its Y at the hit (the floor it stood on); v4: where it lies
 V_BREV = 0x0F000310                  # VAR_16 (v4): the B-reverse done this move
 V_GP = 0x0F000311                    # VAR_17 (v4): the charged grounded victim's phase (0 hitstop, 1 bounce, 2 lying)
+V_ARM = 0x0F000312                   # VAR_18-21 (v5): armor the charged swing lifted (slot x 1e6 + type x 1e5 + thr x 10)
+ARM_N = 4
 VARS = [('sh', V_SH), ('sh_chg', V_CHG), ('sh_vic', V_VIC)]
 
 # ---------------------------------------------------------------- effects / sounds
@@ -159,9 +172,20 @@ ARC_WIDTH = 3.0                      # v2 (user: "the release arc is drawn flat 
 # green, under 1.0 on that grass (its green 0.65), and the hue goes from XV2's yellow (1.4, 1.4, 0) to a yellow-orange
 # (1.4, 0.98, 0) that reads as fire on green or grey instead of turning lime / white
 ARC_GAIN = (0.2, 0.14, 0.2)
+# v5 (user, screenshot 27: "make the Sledgehammer's arcs slightly brighter", v4's a faint yellow streak): +35%, the hue
+# kept (R : G 1 : 0.7)
+ARC_GAIN = (0.27, 0.19, 0.27)
 # v4: the charged fist flash (Hmr_Crg02, at the arcs' frame): its white core drawn at 2.0 (alpha blend: it replaces
 # the stage with 2.0, the bloom's white); its colour capped at FLASH_PEAK (its halo copy follows: halved too)
 FLASH_PEAK = 1.0
+# v5 (user: "draw the charge glow closer to the camera, so it shows in front of his head rather than inside it"): the
+# charge glow (Hmr_Crg) and the charged fist flash (Hmr_Crg02) on LHandN with External_Graphic's last word 0 (the
+# request's flag, docs/native-notes.md "EffectModule requests": 1 the bone's full matrix, 0 its position only, X x the
+# facing, Z = world depth) and Z = GLOW_DEPTH toward the camera: the hand's place, a world-space depth whichever way he
+# faces. GLOW_DEPTH: his head's half-depth beside the left hand at the charge pose (the head's mesh points, start frame
+# 12) + GLOW_MARGIN (build(): sledgehammer_frames.json 'glow_depth')
+GLOW_MARGIN = 1.0
+GLOW_DEPTH = None                    # set by build() from the model
 FOLLOW_EMPS = ('Hmr_Crg.emp', 'Hmr_Crg02.emp', 'Hmr_Fire.emp', 'Hmr_Fire_L.emp')   # v2: particles follow him
 LHAND = 0x10                         # LHandN (XV2's b_L_Hand: Hmr_Crg / Hmr_Crg02)
 SKILL_EMPS = ['Hmr_Crg.emp', 'Hmr_Crg02.emp', 'Hmr_Fire.emp', 'Hmr_Fire_L.emp']
@@ -219,6 +243,13 @@ def msc_values():
             'SH_ST_DOWNDAMAGE': fl(ST_DOWNDAMAGE), 'SH_V_BREV': '0x%X' % V_BREV, 'SH_V_GP': '0x%X' % V_GP,
             'SH_BOUNCE_MAX': fl(BOUNCE_MAX), 'SH_TURN_STICK': fl(TURN_STICK), 'SH_TURN_WINDOW': fl(TURN_WINDOW),
             'SH_FX_CRG': '0x%X' % FX_IDS['crg'],
+            # v5: the reactions, shields and ends that count; the charged swing's armor lift (VAR_18-21: up to 4
+            # fighters' armor, slot x 1e6 + type x 1e5 + threshold x 10)
+            'SH_ST_DAMAGE_LO': fl(ST_DAMAGE_LO), 'SH_ST_DAMAGE_HI': fl(ST_DAMAGE_HI), 'SH_ST_GUARD_LO': fl(ST_GUARD_LO),
+            'SH_ST_GUARD_HI': fl(ST_GUARD_HI), 'SH_ST_DEAD': fl(ST_DEAD), 'SH_ST_REBIRTH': fl(ST_REBIRTH),
+            'SH_ST_ENTRY': fl(ST_ENTRY), 'SH_ST_LOSE': fl(ST_LOSE), 'SH_V_ARM': '0x%X' % V_ARM,
+            'SH_ARM_N': str(ARM_N), 'SH_BODY_W': fl(BODY_W), 'SH_BODY_H': fl(BODY_H), 'SH_HIT_SIZE': fl(HIT_SIZE),
+            'SH_HIT_FROM_CH': fl(HIT_FROM_CH), 'SH_HIT_TO_CH': fl(HIT_TO_CH),
             'SH_FX_HITLOD': '0x%X' % FX_IDS['hitlod'], 'SH_FX_HITS': '0x%X' % FX_IDS['hits'],
             'SH_FX_SWEAT': '0x%X' % FX_IDS['sweat'],
             'SH_FX_HITLOD_SIZE': fl(EEPK_SCALE['Btl_HitLOD.emp'] * SH_FX_SCALE),
@@ -337,14 +368,16 @@ def effect_scripts(fire_y):
     fist's effects on LHandN (no offset, no turn)"""
     ids = FX_IDS
     sc = SH_FX_SCALE
+    dz = float(GLOW_DEPTH or 0.0)                       # v5: world depth toward the camera, the request's flag 0
     start = [cmd('frame', float(FX_AT['crg_on'])),
-             gfx('external_graphic', ids['crg'], LHAND, 0.0, 0.0, 0.0, EEPK_SCALE['Hmr_Crg.emp'] * sc)]
+             gfx('external_graphic', ids['crg'], LHAND, 0.0, 0.0, dz, EEPK_SCALE['Hmr_Crg.emp'] * sc, terminate=0)]
     hold = new_vars() + [
         cmd('frame', float(FX_AT['crg_off']))] + if_(V_CHG, NCH, CHARGE_FRAMES, [
             cmd('terminate_graphic_effect', ids['crg'], 1, 0)]) + [
         cmd('frame', float(FX_AT['fire']))] + if_(V_CHG, CH, CHARGE_FRAMES, [
             gfx('external_graphic', ids['fire_l'], 0, 0.0, float(fire_y), 0.0, EEPK_SCALE['Hmr_Fire_L.emp'] * sc),
-            gfx('external_graphic', ids['crg02'], LHAND, 0.0, 0.0, 0.0, EEPK_SCALE['Hmr_Crg02.emp'] * sc)], [
+            gfx('external_graphic', ids['crg02'], LHAND, 0.0, 0.0, dz, EEPK_SCALE['Hmr_Crg02.emp'] * sc,
+                terminate=0)], [
             gfx('external_graphic', ids['fire'], 0, 0.0, float(fire_y), 0.0, EEPK_SCALE['Hmr_Fire.emp'] * sc)]) + [
         cmd('frame', float(FX_AT['crg_off_ch']))] + if_(V_CHG, CH, CHARGE_FRAMES, [
             cmd('terminate_graphic_effect', ids['crg'], 1, 0)])
@@ -619,6 +652,28 @@ def preview(out_png, outs, bones, fire_y, p, rep):
     sh.save(out_png)
 
 
+# ---------------------------------------------------------------- v5: the charge glow's depth
+def glow_depth(info, f=None):
+    """his head's half-depth (model X, the side camera's axis: Smash's world depth once he faces either way) beside the
+    left hand at the charge pose (start frame 12): max |head point X - LHandN X| over the head's mesh points; and the
+    hand's / head's centres for the record"""
+    import numpy as np
+    frames, smash = info['frames'][anim.START], info['smash']
+    f = anim.START_FRAMES - 1 if f is None else f
+    rest = anim.world([{b[0]: (b[3], b[4], b[5]) for b in smash}], smash, 0)
+    w = anim.world(frames, smash, f)
+    pts = []
+    for bn, v in anim.HEAD:
+        m = np.array(w[bn]) @ np.linalg.inv(np.array(rest[bn]))
+        pts.append((m @ np.array([v[0], v[1], v[2], 1.0]))[:3])
+    pts = np.array(pts)
+    hand = anim._pos(w, 'LHandN')
+    half = float(np.max(np.abs(pts[:, 0] - hand[0])))
+    return {'head_half_depth': round(half, 3), 'hand': [round(float(c), 3) for c in hand],
+            'head_centre': [round(float(c), 3) for c in pts.mean(axis=0)], 'margin': GLOW_MARGIN,
+            'depth': round(half + GLOW_MARGIN, 2)}
+
+
 # ---------------------------------------------------------------- build
 def build(sm_dir, out_dir, sh_skill, sh_se_wav, fd_args, png=None, halo=True):
     import omo
@@ -637,10 +692,14 @@ def build(sm_dir, out_dir, sh_skill, sh_se_wav, fd_args, png=None, halo=True):
         assert all(max(abs(v) for v in o.sample(trans, f)[0]) < 1e-6 for f in range(o.frames)), 'TransN moves'
     js = {m: anim.joints(info['frames'][m], info['smash']) for m in anim.MOTIONS}
     fire_y = round(js[anim.HOLD][FX_AT['fire']]['HipN'][1], 2)
+    global GLOW_DEPTH
+    glow = glow_depth(info)
+    GLOW_DEPTH = glow['depth']
     with open(os.path.join(out_dir, 'sledgehammer_frames.json'), 'w') as fh:
         json.dump({'start_frames': anim.START_FRAMES, 'hold_frames': anim.HOLD_FRAMES, 'rate_segments': rate_segments(),
                    'hit': [HIT_FROM, HIT_TO], 'hit_charged': [HIT_FROM_CH, HIT_TO_CH], 'cancel_hit': CANCEL_HIT,
-                   'iasa': IASA, 'joints': js, 'fire_y': fire_y, 'info': info['info'],
+                   'iasa': IASA, 'joints': js, 'fire_y': fire_y, 'info': info['info'], 'glow_depth': glow,
+                   'overhead': anim.OVERHEAD,
                    # v4: each fist's side-view distance to his head and height over its top (anim.fist_clearance)
                    'fist_clearance': {m: [anim.fist_clearance(info['frames'][m], info['smash'], f, anim.HEAD)
                                           for f in range(anim.frames_of(m))] for m in anim.MOTIONS}}, fh)

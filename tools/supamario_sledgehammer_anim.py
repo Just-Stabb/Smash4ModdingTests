@@ -135,6 +135,9 @@ def body_frames(ean, smash, motion):
 # points): ARM_STRETCH 1.6, HEAD_TILT 40, SHOULDER_RAISE 20, FIST_AT (2, 4): clear by 2.2 at the charge pose, the fists'
 # centres 0.3 above the cap's top (v3: 0.0, inside)
 OVERHEAD = True                     # False: v1-v3's pose (the test's before)
+# v5 (user: "undo v4's animation change", the charge glow drawn toward the camera instead: supamario_sledgehammer_build.py
+# GLOW_DEPTH): off, XV2's pose as retargeted (v3's motions); the correction stays here for the record / the pose sheet
+OVERHEAD = False
 HEAD = None                         # head_points(): set by build() (the push needs the head's mesh)
 ARM_STRETCH = 1.6
 HEAD_TILT = 20.0                    # degrees about world X, back (his face up)

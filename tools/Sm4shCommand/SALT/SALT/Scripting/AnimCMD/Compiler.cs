@@ -230,12 +230,14 @@ namespace SALT.Moveset.AnimCMD
         /// New_Var(Name=charge, Type=int, Initial=0, Scope=object, Slot=0): every parameter but Name may be left out
         /// (Type float, Initial 0, Scope object, Slot: the slot this name already has, else the lowest free one), named
         /// ones in any order, unnamed ones in that order. Declares the name (it then compiles in every variable
-        /// parameter, in every open script).
+        /// parameter, in every open script). v1.7.3: Reset (exe_v46w): when the variable goes back to Initial, bits
+        /// 1 KO, 2 landing, 4 ledge grab, 8 a hit (a number, or the names joined by | or +); kept in Scope's word,
+        /// bits 8-11 (0: the word as before).
         /// </summary>
         static ACMDCommand CompileNewVar(string line, string inner)
         {
             var inv = CultureInfo.InvariantCulture;
-            string[] keys = { "Name", "Type", "Initial", "Scope", "Slot" };
+            string[] keys = { "Name", "Type", "Initial", "Scope", "Slot", "Reset" };
             var vals = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var parts = inner.Trim().Length == 0 ? new string[0] : inner.Split(',');
             for (int i = 0; i < parts.Length; i++)
@@ -246,7 +248,7 @@ namespace SALT.Moveset.AnimCMD
                 string val = eq >= 0 ? part.Substring(eq + 1).Trim() : part;
                 key = keys.FirstOrDefault(k => k.Equals(key, StringComparison.OrdinalIgnoreCase));
                 if (key == null)
-                    throw new ACMDCompileException(line, "New_Var takes Name, Type, Initial, Scope and Slot (e.g. New_Var(Name=charge, Type=int, Initial=0, Scope=object))");
+                    throw new ACMDCompileException(line, "New_Var takes Name, Type, Initial, Scope, Slot and Reset (e.g. New_Var(Name=charge, Type=int, Initial=0, Scope=object, Reset=2))");
                 if (vals.ContainsKey(key))
                     throw new ACMDCompileException(line, $"New_Var: {key} is given twice");
                 vals[key] = val;
@@ -264,6 +266,7 @@ namespace SALT.Moveset.AnimCMD
             if (ACMD_INFO.TryGetIdent(name, out cmdIdent))
                 throw new ACMDCompileException(line, $"New_Var: {name} is a command's name: pick another");
 
+            string sv0;
             Func<string, string, string, int> word = (key, zero, one) =>
             {
                 string v;
@@ -278,6 +281,14 @@ namespace SALT.Moveset.AnimCMD
             };
             int type = word("Type", "float", "int");
             int scope = word("Scope", "object", "move");
+            int reset = 0;
+            if (vals.TryGetValue("Reset", out sv0) && sv0.Length > 0)
+            {
+                try { reset = ACMDCommand.ParseResetMask(sv0); }
+                catch (Exception) { throw new ACMDCompileException(line, $"New_Var: Reset is a sum of 1 (KO), 2 (landing), 4 (ledge grab) and 8 (hit), 0-15, or those names joined by | (KO|landing), not \"{sv0}\""); }
+            }
+            if (scope < 0 || scope > 0xFF)
+                throw new ACMDCompileException(line, $"New_Var: Scope is object (0) or move (1), not {scope}");
             float initial = 0;
             string sv;
             if (vals.TryGetValue("Initial", out sv) && sv.Length > 0)
@@ -318,7 +329,7 @@ namespace SALT.Moveset.AnimCMD
             cmd.Parameters.Add(new FighterVariable(raw));
             cmd.Parameters.Add(type);
             cmd.Parameters.Add(initial);
-            cmd.Parameters.Add(scope);
+            cmd.Parameters.Add(scope | (reset << 8));
             foreach (int w in ACMDCommand.NewVarNameWordsOf(name))
                 cmd.Parameters.Add(w);
             return cmd;

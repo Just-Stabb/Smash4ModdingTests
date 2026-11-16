@@ -292,8 +292,9 @@ namespace SALT.Moveset.AnimCMD
 
         // ------------------------------------------------- New_Var (tools/acmd_ext_cave.py)
         // Binary: Name (the variable ID 0x0F000380 + slot), Type (0 float, 1 int), Initial (float), Scope (0 object,
-        // 1 move), then the name's ASCII in 6 words (4 characters each, zero-padded). Text:
-        //     New_Var(Name=charge, Type=int, Initial=0, Scope=object, Slot=0)
+        // 1 move; v1.7.3, exe_v46w: bits 8-11 Reset, 1 KO / 2 landing / 4 ledge / 8 hit), then the name's ASCII in 6
+        // words (4 characters each, zero-padded). Text:
+        //     New_Var(Name=charge, Type=int, Initial=0, Scope=object, Slot=0)   (Reset=... shown only when not 0)
         // (Slot is shown; when compiling it can be left out: the name's slot, else the lowest free one.)
 
         public const int NewVarParams = 4 + NewVarNameWords;
@@ -344,7 +345,7 @@ namespace SALT.Moveset.AnimCMD
             if (name == null)
                 return false;
             return FighterVariable.DeclareNewVar(name, NewVarRaw(c), Convert.ToInt32(c.Parameters[1]),
-                Convert.ToInt32(c.Parameters[3]), Convert.ToSingle(c.Parameters[2]));
+                Convert.ToInt32(c.Parameters[3]) & 0xFF, Convert.ToSingle(c.Parameters[2]));
         }
 
         /// <summary>"New_Var(Name=charge, Type=int, Initial=0, Scope=object, Slot=0)", or null when the command can't be
@@ -357,7 +358,11 @@ namespace SALT.Moveset.AnimCMD
             var inv = System.Globalization.CultureInfo.InvariantCulture;
             uint raw = NewVarRaw(c);
             int type = Convert.ToInt32(c.Parameters[1]);
-            int scope = Convert.ToInt32(c.Parameters[3]);
+            int sword = Convert.ToInt32(c.Parameters[3]);
+            int scope = sword & 0xFF;
+            int reset = (sword >> 8) & 0xF;
+            if ((sword & ~0xFFF) != 0)
+                return null;     // other bits: shown raw (round-trips as written)
             float init = Convert.ToSingle(c.Parameters[2]);
             string t = type == 0 ? "float" : type == 1 ? "int" : type.ToString(inv);
             string sc = scope == 0 ? "object" : scope == 1 ? "move" : scope.ToString(inv);
@@ -365,7 +370,37 @@ namespace SALT.Moveset.AnimCMD
                 : init.ToString("R", inv);
             string slot = FighterVariable.IsNewVarSlot(raw) ? (raw - FighterVariable.NewVarBase).ToString(inv)
                 : "0x" + raw.ToString("X8");
-            return $"New_Var(Name={name}, Type={t}, Initial={iv}, Scope={sc}, Slot={slot})";
+            string rs = reset != 0 ? $", Reset={reset.ToString(inv)}" : "";
+            return $"New_Var(Name={name}, Type={t}, Initial={iv}, Scope={sc}{rs}, Slot={slot})";
+        }
+
+        /// <summary>(v1.7.3) a variable reset mask (New_Var's / Var_Reset_Set's Reset): a number 0-15, or the event names
+        /// joined by | or +: KO 1, landing 2, ledge 4, hit 8.</summary>
+        public static int ParseResetMask(string v)
+        {
+            v = v.Trim();
+            int n;
+            if (v.Length > 0 && (char.IsDigit(v[0]) || v[0] == '-'))
+            {
+                n = ParseInt(v);
+                if (n < 0 || n > 15)
+                    throw new FormatException("Reset 0-15");
+                return n;
+            }
+            n = 0;
+            foreach (string part in v.Split('|', '+'))
+            {
+                switch (part.Trim().ToLowerInvariant())
+                {
+                    case "ko": n |= 1; break;
+                    case "landing": case "land": n |= 2; break;
+                    case "ledge": n |= 4; break;
+                    case "hit": n |= 8; break;
+                    case "none": break;
+                    default: throw new FormatException("unknown reset event " + part);
+                }
+            }
+            return n;
         }
 
         public virtual byte[] GetBytes(Endianness endian)
