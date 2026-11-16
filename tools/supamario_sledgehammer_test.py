@@ -70,6 +70,8 @@ class Game(FT.Game):
             return (self.hit.x - self.x) * self.face if v == 0x0F0002CD else self.hit.y - self.y
         if v == 0x0F000002:
             return 0.0
+        if v == 0x3000018:                              # his fighter_param Gravity
+            return GRAVITY
         return FT.Game.fvar(self, v)
 
     def sys(self, sid, a):
@@ -164,7 +166,8 @@ def run(path, g, frames=200, cut_at=None):
             vm.call(fn(vm, 'func_2265'))
         elif g.status is None:
             vm.call(fn(vm, 'sh_loop'))
-        tr.append((k, g.kind, round(g.frame, 3), round(g.y, 3), round(g.vy, 3), g.status))
+        tr.append((k, g.kind, round(g.frame, 3), round(g.y, 3), round(g.vy, 3), g.status,
+                   round(g.fighters[2].y, 3) if 2 in g.fighters else None))
         if g.status is not None:
             if g.status != 'cut':
                 vm.call(fn(vm, 'func_2282'))
