@@ -68,8 +68,12 @@ class Game(FT.Game):
         self.flags = set()              # v2: WorkModule flags (0x21000001: fast falling)
         self.stick = None               # v2: n -> (stick Y, frames since its flick) for func_77's globals 32 / 47
         self.ff_log = []                # v2: (n, on) the fast-fall flag's changes
+        self.stick_x = None             # v4: n -> the stick X along his facing (SELF_STICK_X, the B-reverse)
+        self.kin_xy = []                # v4: (n, energy) KineticModule 0x11 writes on energies 2 / 3
 
     def fvar(self, v):
+        if v == 0x0F000110:                             # v4: SELF_STICK_X (along his facing)
+            return self.stick_x(self.n) if self.stick_x else 0.0
         if v in (0x20000c2, 0x20000ca, 0x20000cb):      # v2: the common shield params (max, damage x, + base)
             return {0x20000c2: 50.0, 0x20000ca: 1.19, 0x20000cb: 0.0}[v]
         for s_ in range(1, 9):
@@ -111,6 +115,9 @@ class Game(FT.Game):
         if sid == 0x10 and a and a[0] == 0xF and a[1] == 1:
             self.acc = f(a[2])
             self.acc_log.append((self.n, round(self.acc, 4)))
+            return 0
+        if sid == 0x10 and a and a[0] == 0x11 and a[1] in (2, 3):  # v4: his horizontal energies (none written)
+            self.kin_xy.append((self.n, a[1]))
             return 0
         if sid == 0x10 and a and a[0] == 0x11 and a[1] == 1:
             self.vy = f(a[2])
@@ -239,8 +246,9 @@ class GVictim(FT.Fighter):
       after 10 frames; DownStand / DownStandFb / DownStandAttack -> Wait after 30; Damage / DamageFly -> Wait / Fall at
       the end of their hitstun; DownDamage -> DownWait after 12
     """
-    def __init__(self, slot, x, y, status=0x0, pct=0.0, down_timer=60, cpu_getup=False):
+    def __init__(self, slot, x, y, status=0x0, pct=0.0, down_timer=60, cpu_getup=False, no_bound=False):
         FT.Fighter.__init__(self, slot, x, y, air=False)
+        self.no_bound = no_bound                        # v4: a DownBound write that doesn't take
         self.floor = y
         self.status = status
         self.pct = pct
@@ -254,7 +262,7 @@ class GVictim(FT.Fighter):
 
     def write(self, n, k, val):
         self.wlog.append((n, k, round(val, 3)))
-        if k == 'status':
+        if k == 'status' and not (self.no_bound and int(val) == 0x4D):
             self.pending = int(val)
         elif k == 'input':
             self.input_off = val > 0.5
@@ -629,6 +637,7 @@ def msc_tests(path):
           (hit_k, [(hit_k + B.HITSTOP, 'status', float(0x4D))]))
     ck = swing_k + B.CHARGE_FRAMES - 1 + B.HIT_FROM_CH
     gtests(path, hit_k, ck)
+    brev_tests(path)
     # 13. v2: shields: uncharged 24% of the max shield and 8 frames held; charged 80% and 30; a break
     for chg, take, stun, kk in ((False, B.SHIELD_TAKE, B.SHIELD_STUN, hit_k), (True, B.SHIELD_TAKE_CH, B.SHIELD_STUN_CH, ck)):
         v = FT.Fighter(2, 4.0, fall_y(100.0, kk) - 6.0, air=True, shield=True)
@@ -664,58 +673,95 @@ def held_down(v, k0, k1):
                                                              abs(x[3] - v.floor) < 1e-3)]
 
 
+def brev_tests(path):
+    """v4: the B-reverse: the stick back (below -TURN_STICK along his facing) on the move's first TURN_WINDOW frames
+    turns him once (ReverseLr), his air speed untouched (the user: only his facing); later, forward or neutral: no turn"""
+    for frm, x, want in ((0, -1.0, [0]), (2, -1.0, [2]), (B.TURN_WINDOW - 1, -0.6, [B.TURN_WINDOW - 1]),
+                         (B.TURN_WINDOW, -1.0, []), (0, 1.0, []), (0, -0.4, [])):
+        g = Game(held=lambda n: n <= 2)
+        g.stick_x = lambda n, frm=frm, x=x: x if n >= frm else 0.0
+        tr, _vm = run(path, g)
+        check('B-reverse: the stick at %.1f from frame %d: %s' % (x, frm, 'turned on %s, once' % want if want else
+                                                                    'not turned'),
+              (g.turns, g.kin_xy, g.face), (want, [], -1.0 if want else 1.0))
+
+
 def gtests(path, hit_k, ck):
-    """v3: grounded victims (GVictim): the charged hit lying straight down (the user's item 2), the uncharged hit on a
-    neutral getup as in the air (item 3)"""
+    """grounded victims (GVictim). v4: the charged hit bounces it (DownBound once its hitstop is over, as the uncharged
+    hit), then holds it lying DOWN_HOLD frames from the first frame the MSC sees it lying; v3: the uncharged hit on a
+    neutral getup as in the air"""
     k0 = ck + B.HITSTOP_CH                               # the first frame after its hitstop
+
+    def lies(v):
+        """the first frame the MSC sees it lying after the bounce (its step put it in DownWait the frame before)"""
+        m = next(x[0] for x in v.slog if x[0] > k0 and x[1] == 0x50)
+        return m + 1
     for pct, cpu in ((0.0, False), (100.0, False), (100.0, True), (150.0, True)):
         v = gv(ck, pct=pct, cpu_getup=cpu)
         g = Game(fighters=[v], held=lambda n: True)
-        run(path, g, frames=230, after=80)
+        run(path, g, frames=230, after=90)
         kb = B.knockback(B.HIT_CH, pct)
         inp = [(n, val) for n, k, val in v.wlog if k == 'input']
         what = 'charged, on the ground at %d%% (the grounded box: knockback %.1f; the spike would give %.0f%s)%s' % (
             pct, B.knockback(B.HIT_CH_GROUND, pct), kb, ', the ground spike\'s bounce' if kb >= 80 else '',
             ', a CPU pressing to get up every frame' if cpu else '')
-        check('%s: hit on %d; DownWait (0x50) asked in its hitstop (the next frame), its controller off and its buffer '
-              'emptied there' % (what, ck), (v.hit_at, [w for w in v.wlog if w[0] == ck + 1 and
-                                                         w[1] in ('status', 'input', 'buffer')]),
-              (ck, [(ck + 1, 'input', 1.0), (ck + 1, 'buffer', 2.0), (ck + 1, 'status', float(0x50))]))
-        check('%s: lying on its floor (a down status, on the ground) every frame from %d to the end of the hold (%d), '
-              'never bounced' % (what, ck + 2, k0 + B.DOWN_HOLD - 1), held_down(v, ck + 2, k0 + B.DOWN_HOLD - 1), [])
-        check('%s: its controller back after %d frames held (on %d), nothing else' % (what, B.DOWN_HOLD,
-                                                                                     k0 + B.DOWN_HOLD),
-              inp, [(ck + 1, 1.0), (k0 + B.DOWN_HOLD, 0.0)])
+        check('%s: hit on %d; its controller off and its buffer emptied on the next frame (in its hitstop), no status '
+              'written there' % (what, ck), (v.hit_at, [w for w in v.wlog if w[0] == ck + 1]),
+              (ck, [(ck + 1, 'input', 1.0), (ck + 1, 'buffer', 2.0)]))
+        m = lies(v)
+        check('%s: the bounce: DownBound (0x4D) written once, on %d (its hitstop over), as the uncharged hit\'s; it '
+              'bounces (DownBound), then lies (DownWait, seen on %d)' % (what, k0, m),
+              ([w for w in v.wlog if w[1] == 'status'], sorted({x[1] for x in v.slog if k0 <= x[0] < m - 1})),
+              ([(k0, 'status', float(0x4D))], [0x4D]))
+        check('%s: on its floor in a down status every frame from the bounce (%d) to the end of the hold (%d)' % (
+            what, k0 + 1, m + B.DOWN_HOLD - 1), held_down(v, k0 + 1, m + B.DOWN_HOLD - 1), [])
+        check('%s: its controller off from the hit through the bounce and %d frames lying (back on %d), nothing else'
+              % (what, B.DOWN_HOLD, m + B.DOWN_HOLD), inp, [(ck + 1, 1.0), (m + B.DOWN_HOLD, 0.0)])
         if cpu:
-            st = [x[1] for x in v.slog if x[0] == k0 + B.DOWN_HOLD]
+            st = [x[1] for x in v.slog if x[0] == m + B.DOWN_HOLD]
             check('%s: free after the hold: it gets up (DownStand 0x54) on the frame its controller is back' % what,
                   st, [0x54])
+    # the bounce asked but not taken (the status write lost): put down 2 frames later, then held as lying
+    v = gv(ck, pct=100.0, no_bound=True)
+    g = Game(fighters=[v], held=lambda n: True)
+    run(path, g, frames=230, after=90)
+    ws = [w for w in v.wlog if w[1] == 'status']
+    check('charged, the bounce not taken (DownBound ignored): DownWait asked 2 frames after it (%d), held %d frames from '
+          'there, on its floor' % (k0 + 2, B.DOWN_HOLD),
+          (ws, held_down(v, k0 + 3, k0 + 2 + B.DOWN_HOLD - 1),
+           [(n, val) for n, k, val in v.wlog if k == 'input']),
+          ([(k0, 'status', float(0x4D)), (k0 + 2, 'status', float(0x50))], [], [(ck + 1, 1.0), (k0 + 2 + B.DOWN_HOLD,
+                                                                                               0.0)]))
     # its own down timer ending in the hold (30 frames): put back down, still held
     v = gv(ck, pct=100.0, down_timer=30)
     g = Game(fighters=[v], held=lambda n: True)
-    run(path, g, frames=230, after=80)
-    up = [x[0] for x in v.slog if x[1] == 0x54 and x[0] < k0 + B.DOWN_HOLD]
+    run(path, g, frames=230, after=90)
+    m = lies(v)
+    up = [x[0] for x in v.slog if x[1] == 0x54 and x[0] < m + B.DOWN_HOLD]
     check('charged: its down timer ending in the hold (30 frames; DownStand on %s): DownWait again the next frame, its '
           'controller still off' % up[:1], (len(up), [x[1] for x in v.slog if up and x[0] == up[0] + 1],
                                             [(n, val) for n, k, val in v.wlog if k == 'input']),
-          (1, [0x50], [(ck + 1, 1.0), (k0 + B.DOWN_HOLD, 0.0)]))
-
-    def hit_again(g_, k):                               # another attack hits it 15 frames into the hold
-        if k == k0 + 15:
-            g_.fighters[2].hitstop = 6
-            g_.fighters[2].pending = 0x57
-    v = gv(ck, pct=100.0)
-    g = Game(fighters=[v], held=lambda n: True)
-    run(path, g, frames=230, after=80, tick=hit_again)
-    check('charged: let go (controller on, buffer emptied) when it is hit again in the hold (frozen again)',
-          [w for w in v.wlog if w[1] in ('input', 'buffer')],
-          [(ck + 1, 'input', 1.0), (ck + 1, 'buffer', 2.0), (k0 + 15, 'input', 0.0), (k0 + 15, 'buffer', 2.0)])
-    # the charged hit on a fighter in its neutral getup: still put down (the user's getup rule is the uncharged hit's)
+          (1, [0x50], [(ck + 1, 1.0), (m + B.DOWN_HOLD, 0.0)]))
+    for at, when in ((5, 'in the bounce'), (25, 'lying, in the hold')):
+        def hit_again(g_, k, at=at):                    # another attack hits it
+            if k == k0 + at:
+                g_.fighters[2].hitstop = 6
+                g_.fighters[2].pending = 0x57
+        v = gv(ck, pct=100.0)
+        g = Game(fighters=[v], held=lambda n: True)
+        run(path, g, frames=230, after=90, tick=hit_again)
+        check('charged: let go (controller on, buffer emptied) when it is hit again %s (frozen again, %d)' % (
+            when, k0 + at), [w for w in v.wlog if w[1] in ('input', 'buffer')],
+              [(ck + 1, 'input', 1.0), (ck + 1, 'buffer', 2.0), (k0 + at, 'input', 0.0), (k0 + at, 'buffer', 2.0)])
+    # the charged hit on a fighter in its neutral getup: bounced and held as any grounded fighter (the user's getup
+    # rule is the uncharged hit's)
     v = gv(ck, pct=100.0, status=0x54)
     g = Game(fighters=[v], held=lambda n: True)
-    run(path, g, frames=230, after=80)
-    check('charged on DownStand (the neutral getup): put down as any grounded fighter',
-          held_down(v, ck + 2, k0 + B.DOWN_HOLD - 1), [])
+    run(path, g, frames=230, after=90)
+    m = lies(v)
+    check('charged on DownStand (the neutral getup): bounced, then held as any grounded fighter',
+          ([w for w in v.wlog if w[1] == 'status'][:1], held_down(v, k0 + 1, m + B.DOWN_HOLD - 1)),
+          ([(k0, 'status', float(0x4D))], []))
     # the uncharged hit (item 3; the user: the neutral getup only): DownStand -> as in the air (no DownBound, nothing
     # written); standing, lying (DownWait), the roll getup, the getup attack -> the bounce (DownBound after its
     # hitstop) as before
@@ -840,11 +886,18 @@ def effect_tests(out):
                 bad.append((k, p.emitter_name(d), 'HDR', rgb))
             if flat and p.field(d, 'alpha_init') > 0.05:
                 arcs.append(round(B.arc_peak(p, d), 3))
+                k0_ = p.color_keys(d, 0)[0]
+                if not k0_[0] > k0_[1] > k0_[2]:
+                    bad.append((k, p.emitter_name(d), 'v4: the arc yellow-orange (R > G > B)', k0_[:3]))
+            if k == 'crg02' and B.arc_peak(p, d) > B.FLASH_PEAK + 1e-3:
+                bad.append((k, p.emitter_name(d), 'v4: the fist flash over FLASH_PEAK', B.arc_peak(p, d)))
     check('every emitter at the effect\'s origin, unturned but Hmr_Fire\'s arcs (v2: in his YZ plane, facing the camera), '
-          'a full-sphere spread when directional, HDR within 2.0, the skill\'s emitters following (v2)', bad, [])
+          'a full-sphere spread when directional, HDR within 2.0, the skill\'s emitters following (v2), v4: the arcs '
+          'yellow-orange, the fist flash within FLASH_PEAK', bad, [])
     check('the falling rings converted flat (ShapeDraw -> polygons): %d' % rings, rings > 0, True)
-    check('v3 (the glow): the swing arcs drawn at most %.2f (x%g of the 2.0 cap: two overlapping stay under the bloom)'
-          % (2.0 * B.ARC_GAIN, B.ARC_GAIN), (len(arcs) > 0, max(arcs) <= 2.0 * B.ARC_GAIN + 1e-3), (True, True))
+    check('v4 (the glow): the swing arcs drawn at most %.2f (x%s of the 2.0 cap per channel: their overlap stays under 1.0 '
+          'on a grass stage)' % (2.0 * max(B.ARC_GAIN), B.ARC_GAIN),
+          (len(arcs) > 0, max(arcs) <= 2.0 * max(B.ARC_GAIN) + 1e-3), (True, True))
     import json
     rep = json.load(open(os.path.join(out, 'sledgehammer_fx.json')))
     for k, i in B.FX_IDS.items():

@@ -102,7 +102,11 @@ HIT_CH_GROUND = dict(Damage=20.0, Angle=0, KBG=0, FKB=0, BKB=1)
 # Breaker's cb_shield_tick): charged 80% / 30 frames; uncharged 24% / 8 (Smash's own for an 8% hit: INT(8 x 0.58 + 4))
 SHIELD_TAKE, SHIELD_STUN = 0.24, 8
 SHIELD_TAKE_CH, SHIELD_STUN_CH = 0.80, 30
-DOWN_HOLD = 40                       # v2 (user): a charged hit on the ground: lying 40 frames, untechable
+DOWN_HOLD = 40                       # v2 (user): a charged hit on the ground: lying 40 frames, untechable (v4: counted
+                                     # from the first frame it lies after the bounce)
+BOUNCE_MAX = 30                      # v4: the charged hit's bounce: put down if it is still bouncing after this
+TURN_STICK = 0.5                     # v4: the B-reverse (Core Breaker's TURN_STICK / TURN_WINDOW): the stick back
+TURN_WINDOW = 4                      # past this along his facing on the move's first 4 frames
 ST_DOWNBOUND, ST_DOWNWAIT, ST_SHIELD_BREAK = 0x4D, 0x50, 0x59
 # v3: the down statuses (DownBound 0x4D .. 0x53: lying), DownStand (0x54, the neutral getup: an uncharged hit on it
 # isn't a bounce: the user's jab-lock loop), DownDamage (0x57: hit while lying)
@@ -125,7 +129,9 @@ V_GN = 0x0F000305                    # VAR_5 (v2): 0 its hitstop not over yet, t
 V_T = 0x0F000302                     # VAR_2 (v2): the move's frames (sh_fastfall: a flick younger than the move)
 V_ST = 0x0F000306                    # VAR_6-13 (v3): each slot's status the last frame it wasn't frozen (sh_rec)
 V_GX = 0x0F00030E                    # VAR_14 (v3): the held-down victim's X at the hit
-V_GY = 0x0F00030F                    # VAR_15 (v3): its Y at the hit (the floor it stood on)
+V_GY = 0x0F00030F                    # VAR_15 (v3): its Y at the hit (the floor it stood on); v4: where it lies
+V_BREV = 0x0F000310                  # VAR_16 (v4): the B-reverse done this move
+V_GP = 0x0F000311                    # VAR_17 (v4): the charged grounded victim's phase (0 hitstop, 1 bounce, 2 lying)
 VARS = [('sh', V_SH), ('sh_chg', V_CHG), ('sh_vic', V_VIC)]
 
 # ---------------------------------------------------------------- effects / sounds
@@ -144,7 +150,16 @@ ARC_WIDTH = 3.0                      # v2 (user: "the release arc is drawn flat 
 # arcs' colour keys x ARC_GAIN: each arc's drawn colour 2.0 -> 0.9 (XV2's yellow kept); where two arcs overlap they
 # reach 0.85, under Smash 4's bloom: charged 0 over 1.0 from the arcs (4.4 is the fist's flash), energy 345;
 # uncharged 0 over 1.0, energy 180 (v2 73 / 399)
-ARC_GAIN = 0.45
+# v4 (user, screenshot 26: "the arc is still too bright", a yellow-white glow round him on a grass stage): x0.45 kept
+# them under 1.0 on black, but they add onto the stage. tools/supamario_fx_glow.py --bg 0.5,0.65,0.3 (a grass stage),
+# v3: the arcs push 107 (uncharged) / 193 (charged) square units past 1.0, everything else 8 (the fist's flash 6.5,
+# the sparks 1.6). Now per channel (R, G, B) x0.2 / x0.14 / x0.2 (B is 0): the overlap adds at most ~0.38 red, 0.27
+# green, under 1.0 on that grass (its green 0.65), and the hue goes from XV2's yellow (1.4, 1.4, 0) to a yellow-orange
+# (1.4, 0.98, 0) that reads as fire on green or grey instead of turning lime / white
+ARC_GAIN = (0.2, 0.14, 0.2)
+# v4: the charged fist flash (Hmr_Crg02, at the arcs' frame): its white core drawn at 2.0 (alpha blend: it replaces
+# the stage with 2.0, the bloom's white); its colour capped at FLASH_PEAK (its halo copy follows: halved too)
+FLASH_PEAK = 1.0
 FOLLOW_EMPS = ('Hmr_Crg.emp', 'Hmr_Crg02.emp', 'Hmr_Fire.emp', 'Hmr_Fire_L.emp')   # v2: particles follow him
 LHAND = 0x10                         # LHandN (XV2's b_L_Hand: Hmr_Crg / Hmr_Crg02)
 SKILL_EMPS = ['Hmr_Crg.emp', 'Hmr_Crg02.emp', 'Hmr_Fire.emp', 'Hmr_Fire_L.emp']
@@ -199,7 +214,8 @@ def msc_values():
             'SH_ST_DOWNWAIT': fl(ST_DOWNWAIT), 'SH_ST_SHIELD_BREAK': fl(ST_SHIELD_BREAK),
             'SH_V_ST': '0x%X' % V_ST, 'SH_V_GX': '0x%X' % V_GX, 'SH_V_GY': '0x%X' % V_GY,
             'SH_ST_DOWN_LO': fl(ST_DOWN_LO), 'SH_ST_DOWN_HI': fl(ST_DOWN_HI), 'SH_ST_DOWNSTAND': fl(ST_DOWNSTAND),
-            'SH_ST_DOWNDAMAGE': fl(ST_DOWNDAMAGE),
+            'SH_ST_DOWNDAMAGE': fl(ST_DOWNDAMAGE), 'SH_V_BREV': '0x%X' % V_BREV, 'SH_V_GP': '0x%X' % V_GP,
+            'SH_BOUNCE_MAX': fl(BOUNCE_MAX), 'SH_TURN_STICK': fl(TURN_STICK), 'SH_TURN_WINDOW': fl(TURN_WINDOW),
             'SH_FX_CRG': '0x%X' % FX_IDS['crg'],
             'SH_FX_HITLOD': '0x%X' % FX_IDS['hitlod'], 'SH_FX_HITS': '0x%X' % FX_IDS['hits'],
             'SH_FX_SWEAT': '0x%X' % FX_IDS['sweat'],
@@ -375,11 +391,19 @@ def flat_ring(p, d, arc=True):
         p.set_field(d, 'rotation_velocity', [-v for v in p.field(d, 'rotation_velocity')])
 
 
-def arc_dim(p, d):
-    """v3: a swing arc's colour keys (both tracks) x ARC_GAIN (the glow: ARC_GAIN's note)"""
+def arc_dim(p, d, gain=None):
+    """v3: a swing arc's colour keys (both tracks) x ARC_GAIN (v4: per channel; the glow: ARC_GAIN's note)"""
+    g = gain or ARC_GAIN
     for track in (0, 1):
-        p.set_color_keys(d, track, [(k[0] * ARC_GAIN, k[1] * ARC_GAIN, k[2] * ARC_GAIN, k[3])
-                                    for k in p.color_keys(d, track)])
+        p.set_color_keys(d, track, [(k[0] * g[0], k[1] * g[1], k[2] * g[2], k[3]) for k in p.color_keys(d, track)])
+
+
+def flash_cap(p, d):
+    """v4: an emitter's colour keys scaled so its brightest drawn channel is at most FLASH_PEAK"""
+    pk = arc_peak(p, d)
+    if pk > FLASH_PEAK:
+        f = FLASH_PEAK / pk
+        arc_dim(p, d, (f, f, f))
 
 
 def arc_peak(p, d):
@@ -449,7 +473,10 @@ def convert_fx(skill_dir, cmn_dir, fx_dir, halo=True):
             flat_ring(p, d, emp in ARC_EMPS)
             if emp in ARC_EMPS and p.field(d, 'particle_type') == 1:
                 arc_dim(p, d)
-                notes[-1] += '; v3: the arc x%g (drawn peak %.2f)' % (ARC_GAIN, arc_peak(p, d))
+                notes[-1] += '; v4: the arc x%s (drawn peak %.2f)' % (ARC_GAIN, arc_peak(p, d))
+            if emp == 'Hmr_Crg02.emp':
+                flash_cap(p, d)
+                notes[-1] += '; v4: the flash capped at %.2f' % arc_peak(p, d)
         sets[emp] = {'set': name, 'set_index': si, 'efc': idx, 'id': '0x%08X' % (0x03410000 | idx), 'emitters': names}
     assert got == FX_IDS, ('FX_IDS is out of date', {k: hex(v) for k, v in got.items()})
     halos = {}

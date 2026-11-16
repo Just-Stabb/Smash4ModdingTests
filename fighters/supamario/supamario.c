@@ -40183,6 +40183,7 @@ void sh_init()
     WorkModule(0, 0.0f, SH_V_LASTFR);
     WorkModule(0, 0.0f, SH_V_T);
     WorkModule(0, 0.0f, SH_V_SHD);
+    WorkModule(0, 0.0f, SH_V_BREV);
     KineticModule(0, 0);
     GroundModule(0x2710, 0x5);
     // v2: the move starts at his normal fall (a fast fall carried in ends, as a special's start does: func_81)
@@ -40192,6 +40193,26 @@ void sh_init()
         KineticModule(0x11, 0x1, -WorkModuleF(0, 0x3000019));
     }
     func_22(0x239, 0, 1.0f);
+    sh_brev(0.0f);
+}
+
+// v4 (user: "make Sledgehammer B-reversible", then: only his facing): the stick held back along his facing (below
+// -SH_TURN_STICK) on the move's first SH_TURN_WINDOW frames (Core Breaker's rise: vanilla Super Jump Punch's turn
+// check at frame 4) turns him round once (PostureModule(1) ReverseLr, then (2), as cb_rise_brev); his air speed is
+// left as it is (Core Breaker's turn of energies 2 / 3 is not copied: the user's correction)
+void sh_brev(float fr)
+{
+    if (WorkModuleF(0, SH_V_BREV) != 0.0f || fr > SH_TURN_WINDOW - 0.5f)
+    {
+        return;
+    }
+    if (WorkModuleF(0, 0x0f000110) >= -SH_TURN_STICK)
+    {
+        return;
+    }
+    WorkModule(0, 1.0f, SH_V_BREV);
+    PostureModule(0x1);
+    PostureModule(0x2);
 }
 
 // v2 (user: "Supamario can fast-fall during Sledgehammer", as in his aerials): the game's own fast-fall check (func_553:
@@ -40522,6 +40543,7 @@ void sh_loop()
     sh_fastfall();
     if (ph < 1.5f)
     {
+        sh_brev(fr);
         if (fr < SH_START_LAST - 0.5f)
         {
             return;
@@ -40745,33 +40767,42 @@ void sh_put(int s)
 }
 
 // v3 (user: "the grounded charged hit bounces just like the uncharged hit rather than forcing the opponent down into
-// the laying-down hurt state"): a charged hit on a fighter on the ground puts it straight down at the hit, in its
-// hitstop (v2 wrote DownBound after the hitstop: the hit's own launch / damage status then ended the hold, it released
-// on the damage statuses 0x45-0x4C). Its controller off (Input_Set 21's variable) and its buffer emptied, its place
-// noted, put down (sh_put); sh_tick holds it SH_DOWN_HOLD frames from the end of its hitstop. The charged swing's
-// grounded-only hitbox (ID 1, knockback 1: supamario_sledgehammer_build.py HIT_CH_GROUND) never launches it
+// the laying-down hurt state"): a charged hit on a fighter on the ground, from the charged swing's grounded-only hitbox
+// (ID 1, knockback 1: supamario_sledgehammer_build.py HIT_CH_GROUND: it is never launched). v4 (user: "the same
+// untechable low ground bounce as the uncharged one, then the 40-frame lying-down hold"): on the frame the MSC sees the
+// hit, its controller off (Input_Set 21's variable) and its buffer emptied, its place noted; sh_tick then bounces it
+// as the uncharged hit does (DownBound once its hitstop is over) and holds it lying SH_DOWN_HOLD frames from the first
+// frame it lies (DownWait), the Super God Fist's put-down (sh_put) keeping it there
 void sh_down_start(int s)
 {
     sh_let_go();
     WorkModule(0, -(float)s, SH_V_GS);
-    WorkModule(0, -1.0f, SH_V_GN);              // sh_tick: nothing more this frame (the put-down is on its way)
+    WorkModule(0, -1.0f, SH_V_GN);              // sh_tick: nothing more on the hit's own frame
+    WorkModule(0, 0.0f, SH_V_GP);
     WorkModule(0, WorkModuleF(0, 0x0f000020 + 4 * (s - 1)), SH_V_GX);
     WorkModule(0, WorkModuleF(0, 0x0f000021 + 4 * (s - 1)), SH_V_GY);
     WorkModule(0, 1.0f, 0x0F000115 + 0x20 * (s + 0x2));
     WorkModule(0, (float)s, 0x0F0003C9);
-    sh_put(s);
 }
 
 // every frame (func_82). v2 (user): a fighter the uncharged Sledgehammer hit on the ground (SH_V_GS: + its slot), once
 // its hitstop is over: DownBound (0x4D: the floor bounce of a missed tech: a low bounce, no tech, then lying).
-// v3: the charged hit's (SH_V_GS: - its slot): put down again every frame of its hitstop and its hold if it is out of
-// lying (sh_put); SH_DOWN_HOLD frames from the end of the hitstop (SH_V_GN), then its controller back; let go early
-// when it is hit again (frozen again after its hitstop had ended, or DownDamage 0x57) or gone
+// The charged hit's (SH_V_GS: - its slot), v4, in phases (SH_V_GP):
+//   0 its hitstop: nothing; at its end DownBound, as the uncharged hit's
+//   1 the bounce (DownBound 0x4D-0x4F, its controller still off: no getup, roll or attack at its end, no tech in it):
+//     lying (DownWait 0x50-0x53) -> 2, from its place then; not in a down status 2 frames after the bounce was asked
+//     (it didn't take) or still bouncing after SH_BOUNCE_MAX frames -> put down at its place at the hit (sh_put), 2
+//   2 lying: SH_DOWN_HOLD frames counted from the first frame of 2 (SH_V_GN), put down again if it leaves lying
+//     (sh_put), then its controller back
+// In 1 and 2 it is let go early when it is hit again (frozen again after its hitstop had ended, or DownDamage 0x57),
+// never on the bounce's own status; gone: forgotten
 void sh_tick()
 {
     int s;
     int t;
     float n;
+    float ph;
+    float st;
     sh_rec();
     s = (int)WorkModuleF(0, SH_V_GS);
     if (s == 0)
@@ -40807,20 +40838,44 @@ void sh_tick()
         WorkModule(0, 0.0f, SH_V_GN);
         return;
     }
-    if (n < 0.5f)
+    ph = WorkModuleF(0, SH_V_GP);
+    st = WorkModuleF(0, 0x0F0000A2 + 8 * t);
+    if (ph < 0.5f)
     {
         if (WorkModuleF(0, 0x0F000043 + 8 * t) > 0.5f)
         {
-            sh_put(s);
             return;
         }
+        WorkModule(0, SH_ST_DOWNBOUND, 0x0F0000A2 + 8 * t);
+        WorkModule(0, 1.0f, SH_V_GP);
+        WorkModule(0, 0.0f, SH_V_GN);
+        return;
     }
-    else if (WorkModuleF(0, 0x0F000043 + 8 * t) > 0.5f || WorkModuleF(0, 0x0F0000A2 + 8 * t) == SH_ST_DOWNDAMAGE)
+    if (WorkModuleF(0, 0x0F000043 + 8 * t) > 0.5f || st == SH_ST_DOWNDAMAGE)
     {
         sh_let_go();
         return;
     }
     n = n + 1.0f;
+    if (ph < 1.5f)
+    {
+        if (st >= SH_ST_DOWNWAIT && st <= SH_ST_DOWN_HI && WorkModuleF(0, 0x0F000116 + 0x20 * t) < 0.5f)
+        {
+            WorkModule(0, WorkModuleF(0, 0x0f000020 + 4 * (s - 1)), SH_V_GX);
+            WorkModule(0, WorkModuleF(0, 0x0f000021 + 4 * (s - 1)), SH_V_GY);
+        }
+        else if ((n > 1.5f && (st < SH_ST_DOWN_LO || st > SH_ST_DOWN_HI)) || n > SH_BOUNCE_MAX + 0.5f)
+        {
+            sh_put(s);
+        }
+        else
+        {
+            WorkModule(0, n, SH_V_GN);
+            return;
+        }
+        WorkModule(0, 2.0f, SH_V_GP);
+        n = 1.0f;
+    }
     if (n > SH_DOWN_HOLD + 0.5f)
     {
         sh_let_go();
