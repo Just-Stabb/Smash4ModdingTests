@@ -2821,3 +2821,33 @@ hitlag (Fake Death's assumption too); the follow's one-frame lag (the victim may
 rings' look (flat, ~11 units round at x1.75: Fake Death's screenshot scale); XV2's lunge, tracking, stage effects
 (Stage BG 60 / 220), the Fly_WindS trace, the CBIND fade and the charged hit's camera shake / BPE are left out; BAC 1
 unused (a middle charge level could use it).
+
+## Sledgehammer v2 (`supamario_sledgehammer_v2.zip`): the user's v1 test (screenshot 24) and requests
+
+Install over Sledgehammer v1, exe `exe_v46u_threads` (no exe change). Changed: the ptcl, game.bin, effect.bin, the MSC.
+
+| # | User | v2 |
+|---|---|---|
+| 1 | "The charge effects don't follow Supamario" | Every emitter of Hmr_Crg / Hmr_Crg02 / Hmr_Fire / Hmr_Fire_L (and their halos) gets ptcl follow type 0 (+0x310: the particles on the emitter's live matrix; v1's templates gave the charge glow 1, none). The hit effect (world-placed, `EffectModule(3)`) stays where it hit, as XV2's |
+| 2 | "The release arc is drawn flat" (a thin yellow streak along his body) | Hmr_Fire's are open ShapeDraw arcs (~110-130 degrees) spinning 15 a frame. v1 laid them flat (X 90), so the side camera saw them edge-on. Now they are in bone 0's YZ plane (`arc_turn`: Y -90, X along his facing), facing the camera, and spin forward and down with the swing (their spin negated; Hitbox Viewer: frames 13 / 15 / 17 sweep front -> below). Their strip is **x3** (`xv2_to_ptcl.RING_WIDTH_MUL`, default 1: XV2's 0.15 m over a 1.15 m radius). No halo on them (a soft full disc behind him) |
+| 3 | Effects and hitbox x1.2 | **Hitbox size 6.05** (5.04; centre unchanged, 3.78 ahead at his feet, the fists 2.3 from it). **Effects x2.1** (1.75): Hmr_Fire_L / Crg02 2.52, Btl_HitLOD 3.15, Btl_HitS 1.68, sweat 2.1 |
+| 4 | Uncharged "slightly more base knockback and slightly more growth", 8% | **8%, BKB 50, KBG 20** (+6 hitstun, 270, hitlag 10): knockback **54.7 / 61.7 / 68.7** at 0 / 50 / 100% (v1 42.0 / 44.5 / 46.9), hitstun 27 / 30 / 33. The follow keeps within one frame's fall of the faster victim (it falls 26.1 in the test, the gap 6.0-7.6); the on-hit window is still 10 frames after the hitlag |
+| 5 | Charged 20%, the same launch | **20%, BKB 23, KBG 61** (hitlag 20): **52.8 / 99.7 / 146.7** (v1 53.3 / 99.8 / 146.4) |
+| 6 | Fast fall in the move | `sh_fastfall` runs the game's own check (`func_553`: a stick flick down while falling sets 0x21000001) every frame, the charge too. It only counts a flick made on the move's 2nd frame or later (its age `global47` under the move's frames, VAR_2), so the down special's own input never fast-falls. `sh_init` ends a fast fall carried in (as `func_81` does for specials). `func_81` keeps a fast fall started in Sledgehammer. **During the uncharged follow it is ignored** (the follow clears the flag and doesn't run the check), and allowed again once the follow ends |
+| 7 | "standardize Sledgehammer's landing lag to 10 frames", light landing animation | Before the free frame: LandingFallSpecial **10 frames** (work float 0). `func_586` plays **LandingLight (0x3A, 16 frames) at rate 1.6** over them when it is entered from 0x155 (only Sledgehammer lands from it). After the free frame: a normal landing (0x16) |
+| 8 | Grounded opponents | `sh_hit` notes a victim on the ground (its situation in the hitlag); `sh_tick` (func_82) waits for its hitstop to end, then: **uncharged** writes **DownBound (0x4D)**, the missed tech's floor bounce (no tech), and lets go. **Charged** writes DownBound, turns its **input off**, holds it **40 frames** (back to DownWait 0x50 if it leaves 0x4D-0x53), lets go when it is hit (0x45-0x4C, DownDamage 0x57) or at 40. Airborne victims: the spike, unchanged |
+| 9 | Shield damage by the charge | `sh_shield` (Core Breaker's cb_dive_shield way): **uncharged 24%** of the max shield (50), **8 frames** (Smash's own for 8%: INT(8 x 0.58 + 4)); **charged 80%, 30 frames**. Shieldstun held by `cb_shield_tick` (its globals reused; the dive and Sledgehammer never overlap); a shield left below the take breaks (0x59). XV2 has two charge levels (0 or 30 frames), so these are the only two values. A level between them could come from the frames held (0-29), but there isn't one |
+
+State: VAR_2-5 (the move's frames, the shield hit handled, the grounded victim's slot and frames); New_Vars unchanged;
+globals 127. `msc_fingerprint` v1 -> v2: func_81, func_82, func_586, func_2282 and the sh_* functions.
+
+Tests: `supamario_sledgehammer_test.py` 69 ok: the new values, follow types, the arcs' turn and spin, the fast falls,
+the 10-frame light landing, grounded victims, shields. `supamario_fakedeath_test.py` 47, `supamario_corebreaker_test.py`
+104 and `supamario_godfist_test.py --all-models` 546 ok; `msc_stack_check.py` 0 of 2400. The first 70 ptcl sets are
+unchanged byte for byte. The 8 scripts round-trip through Sm4shCommand v1.7.2; Hitbox Viewer:
+preview/viewer_v2.png.
+
+**Not confirmed in game:** that a DownBound written over a spike's launch plays a low bounce without the launch's
+speed; that input-off and DownWait keep a CPU down for 40 frames (the God Fist's way); the arcs' look facing left (the
+viewer warns that the facing turn differs); that `global47` is the flick's age (`ControlModule(3)`) on the move's
+first frames; that LandingFallSpecial plays 0x3A cleanly.

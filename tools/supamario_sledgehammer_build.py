@@ -91,6 +91,12 @@ HIT_CH_V1 = dict(Damage=12.0, Angle=270, KBG=95, FKB=0, BKB=25)
 # 99.8 / 146.4; within 1 from 0 to 150%)
 HIT_CH = dict(Damage=20.0, Angle=270, KBG=61, FKB=0, BKB=23)
 HITSTOP_CH = 20
+# v2 (user): shield damage by the charge (fractions of the common max shield health) and held shieldstun (Core
+# Breaker's cb_shield_tick): charged 80% / 30 frames; uncharged 24% / 8 (Smash's own for an 8% hit: INT(8 x 0.58 + 4))
+SHIELD_TAKE, SHIELD_STUN = 0.24, 8
+SHIELD_TAKE_CH, SHIELD_STUN_CH = 0.80, 30
+DOWN_HOLD = 40                       # v2 (user): a charged hit on the ground: lying 40 frames, untechable
+ST_DOWNBOUND, ST_DOWNWAIT, ST_SHIELD_BREAK = 0x4D, 0x50, 0x59
 LAND_LAG = 10                        # v2 (user: "standardize Sledgehammer's landing lag to 10 frames"), his light
                                      # landing's animation over them (v1: 18, 10 after a hit, LandingFallSpecial's pose)
 VICTIM_MID = 5.0                     # a fighter's middle above its feet (the contact point)
@@ -103,6 +109,9 @@ V_CHG = 0x0F000380 + 0x3F            # sh_chg: frames charged; >= CHARGE_FRAMES 
 V_VIC = 0x0F000380 + 0x2F            # sh_vic: the hit fighter's player slot (+), -1 a hit, no follow / its follow over
 V_VY = 0x0F000300                    # VAR_0: the followed fighter's Y last frame (MSC only; VAR_n unused by him)
 V_LASTFR = 0x0F000301                # VAR_1: the swing's motion frame last frame (the slot loops: the end is the wrap)
+V_SHD = 0x0F000303                   # VAR_3 (v2): his shield hit handled this move
+V_GS = 0x0F000304                    # VAR_4 (v2): a grounded victim's slot (+ uncharged bounce, - charged held down)
+V_GN = 0x0F000305                    # VAR_5 (v2): 0 its hitstop not over yet, then the frames held down
 V_T = 0x0F000302                     # VAR_2 (v2): the move's frames (sh_fastfall: a flick younger than the move)
 VARS = [('sh', V_SH), ('sh_chg', V_CHG), ('sh_vic', V_VIC)]
 
@@ -158,7 +167,11 @@ def msc_values():
             'SH_HIT_FROM': fl(HIT_FROM_CH), 'SH_HIT_TO': fl(HIT_TO + HIT_LATE), 'SH_CANCEL_HIT': fl(CANCEL_HIT),
             'SH_IASA': fl(IASA), 'SH_HOLD_END': fl(HOLD_END), 'SH_RATE_CODE': rate_code(),
             'SH_HIT_Z': fl(HIT_Z), 'SH_HIT_Y': fl(HIT_Y), 'SH_VICTIM_MID': fl(VICTIM_MID),
-            'SH_VICTIM_HEAD': fl(VICTIM_HEAD), 'SH_VICTIM_R2': fl(VICTIM_R2), 'SH_LAND_LAG': fl(LAND_LAG),
+            'SH_VICTIM_HEAD': fl(VICTIM_HEAD), 'SH_VICTIM_R2': fl(VICTIM_R2), 'SH_LAND_LAG': fl(LAND_LAG), 'SH_V_SHD': '0x%X' % V_SHD,
+            'SH_V_GS': '0x%X' % V_GS, 'SH_V_GN': '0x%X' % V_GN, 'SH_DMG': fl(HIT['Damage']), 'SH_DMG_CH': fl(HIT_CH['Damage']),
+            'SH_SHIELD_TAKE': fl(SHIELD_TAKE), 'SH_SHIELD_STUN': fl(SHIELD_STUN), 'SH_SHIELD_TAKE_CH': fl(SHIELD_TAKE_CH),
+            'SH_SHIELD_STUN_CH': fl(SHIELD_STUN_CH), 'SH_DOWN_HOLD': fl(DOWN_HOLD), 'SH_ST_DOWNBOUND': fl(ST_DOWNBOUND),
+            'SH_ST_DOWNWAIT': fl(ST_DOWNWAIT), 'SH_ST_SHIELD_BREAK': fl(ST_SHIELD_BREAK),
             'SH_FX_CRG': '0x%X' % FX_IDS['crg'],
             'SH_FX_HITLOD': '0x%X' % FX_IDS['hitlod'], 'SH_FX_HITS': '0x%X' % FX_IDS['hits'],
             'SH_FX_SWEAT': '0x%X' % FX_IDS['sweat'],
@@ -327,6 +340,8 @@ def flat_ring(p, d, arc=True):
     FX.facing_safe(p, d)
     if arc and p.field(d, 'particle_type') == 1:
         p.set_emitter_srt(d, tuple(p.field(d, 'emitter_scale')), arc_turn(), (0.0, 0.0, 0.0))
+        # its spin the swing's way (forward and down; XV2's +15 a frame turned it up and back in this plane: the viewer)
+        p.set_field(d, 'rotation_velocity', [-v for v in p.field(d, 'rotation_velocity')])
 
 
 def follow(p, d):
@@ -414,11 +429,7 @@ def convert_fx(skill_dir, cmn_dir, fx_dir, halo=True):
         assert not comp, 'a set needs a companion halo set: its calls / kills would need it too'
         halos = {'glowing': sum(len(v) for v in glow.values()), 'alpha': FX.HALO_ALPHA,
                  'by_set': {p.set_name(si): len(v) for si, v in glow.items()}, 'no_room': dropped}
-        flat_sets = {s['set_index'] for emp, s in sets.items() if emp in ARC_EMPS}
-        for si in glow:                                 # the halo copies as their emitters (flat_ring)
-            for em in p.sets[si]['emitters']:
-                if em['data'] is not None:
-                    flat_ring(p, em['data'], si in flat_sets)
+        # (the halo copies keep their emitters' transform: no arc has one, v2)
     for emp in FOLLOW_EMPS:                             # v2: the charge glow / flash and the arcs (+ halos) follow him
         for em in p.sets[sets[emp]['set_index']]['emitters']:
             if em['data'] is not None:

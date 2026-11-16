@@ -70,6 +70,13 @@ class Game(FT.Game):
         self.ff_log = []                # v2: (n, on) the fast-fall flag's changes
 
     def fvar(self, v):
+        if v in (0x20000c2, 0x20000ca, 0x20000cb):      # v2: the common shield params (max, damage x, + base)
+            return {0x20000c2: 50.0, 0x20000ca: 1.19, 0x20000cb: 0.0}[v]
+        for s_ in range(1, 9):
+            t_ = s_ + 2
+            f_ = self.fighters.get(s_)
+            if f_ is not None and v == 0x0F00011A + 0x20 * t_:
+                return getattr(f_, 'shield_hp', 50.0)
         if v in (0x0F0002CD, 0x0F0002CE):              # Target 12 (ATKHIT_OFFSET_X / _Y): the fighter hit, if any
             if self.hit is None:
                 return 0.0
@@ -129,6 +136,23 @@ class Game(FT.Game):
             return 0
         return FT.Game.sys(self, sid, a)
 
+    def setvar(self, v, val):
+        for s_ in range(1, 9):                          # v2: a slot's status / input / shield / push writes
+            t_ = s_ + 2
+            f_ = self.fighters.get(s_)
+            if f_ is None:
+                continue
+            k_ = {0x0F0000A2 + 8 * t_: 'status', 0x0F000115 + 0x20 * t_: 'input', 0x0F00011A + 0x20 * t_: 'shield_hp',
+                  0x0F0000A7 + 8 * t_: 'push'}.get(v)
+            if k_ is not None:
+                f_.__dict__.setdefault('wlog', []).append((self.n, k_, round(val, 3)))
+                if k_ == 'status':
+                    f_.status = int(val)
+                elif k_ == 'shield_hp':
+                    f_.shield_hp = val
+                return
+        FT.Game.setvar(self, v, val)
+
     def charged(self):
         return self.vars.get(B.V_CHG, 0.0) >= B.CHARGE_FRAMES - 0.5
 
@@ -181,11 +205,27 @@ def fn(vm, name):
     return vm.func(FT.func_index(vm, name))
 
 
-def run(path, g, frames=200, cut_at=None):
-    """the air down special from its main; the trace [(k, kind, frame, y, vy, status)] (k 0 = the first frame)"""
+def run(path, g, frames=200, cut_at=None, after=0, tick=None):
+    """the air down special from its main; the trace [(k, kind, frame, y, vy, status)] (k 0 = the first frame);
+    after: frames of the per-frame hooks (sh_tick, cb_shield_tick) and the fighters after the status ends (v2);
+    tick(g, k): the test's own changes before each frame's hooks"""
     vm = FT.vm_for(path, g)
     tr = []
-    for k in range(frames):
+    end = None
+    for k in range(frames + after):
+        if end is not None:
+            if k > end + after:
+                break
+            g.n = k
+            if tick:
+                tick(g, k)
+            vm.call(fn(vm, 'sh_tick'))
+            vm.call(fn(vm, 'cb_shield_tick'))
+            for v in g.fighters.values():
+                v.step(k)
+            continue
+        if k >= frames:
+            break
         g.n = k
         vm.g[18] = 2 if g.air else 0
         vm.g[24] = g.press.get(k, 0)
@@ -203,10 +243,17 @@ def run(path, g, frames=200, cut_at=None):
             vm.call(fn(vm, 'sh_loop'))
         tr.append((k, g.kind, round(g.frame, 3), round(g.y, 3), round(g.vy, 3), g.status,
                    round(g.fighters[2].y, 3) if 2 in g.fighters else None))
+        if tick:
+            tick(g, k)
+        vm.call(fn(vm, 'sh_tick'))                      # v2: func_82's hooks, every frame
+        vm.call(fn(vm, 'cb_shield_tick'))
         if g.status is not None:
             if g.status != 'cut':
                 vm.call(fn(vm, 'func_2282'))
-            break
+            if not after:
+                break
+            end = k
+            continue
         g.collide()
         for v in g.fighters.values():
             v.step(k)
@@ -449,6 +496,55 @@ def msc_tests(path):
         check('func_81 (a special cancels a fresh fast fall): %s' % ('kept while Sledgehammer runs' if want else
                                                                    'cancelled as before outside it'),
               FF in g.flags, want)
+    # 12. v2: a grounded victim: uncharged DownBound (a low bounce, no tech) once its hitstop is over; charged lying 40
+    # frames (input off, put back down, let go when hit)
+    def grounded(k_hit):
+        return FT.Fighter(2, 4.0, fall_y(100.0, k_hit) - 4.0, air=False)
+    g = Game(fighters=[grounded(hit_k)], held=lambda n: n <= 2)
+    tr, _vm = run(path, g, after=20)
+    v = g.fighters[2]
+    check('grounded, uncharged: hit on %d; DownBound (0x4D) written once, on the first frame after its %d frames of hitstop; no '
+          'input change' % (hit_k, B.HITSTOP), (v.hit_at, [w for w in v.wlog if w[1] in ('status', 'input')]),
+          (hit_k, [(hit_k + B.HITSTOP, 'status', float(0x4D))]))
+    ck = swing_k + B.CHARGE_FRAMES - 1 + B.HIT_FROM_CH
+
+    def getup(g_, k):                                   # the victim tries to get up 10 frames into the hold
+        if k == ck + B.HITSTOP_CH + 11:
+            g_.fighters[2].status = 0x54
+    g = Game(fighters=[grounded(ck)], held=lambda n: True)
+    tr, _vm = run(path, g, frames=230, after=60, tick=getup)
+    v = g.fighters[2]
+    k0 = ck + B.HITSTOP_CH
+    w = [x for x in v.wlog if x[1] in ('status', 'input')]
+    check('grounded, charged: DownBound and its input off on %d (after the hitstop), back in DownWait (0x50) when it '
+          'got up on %d, its input on after %d frames held (%d)' % (k0, ck + B.HITSTOP_CH + 11, B.DOWN_HOLD,
+                                                                    k0 + B.DOWN_HOLD),
+          w, [(k0, 'status', float(0x4D)), (k0, 'input', 1.0), (ck + B.HITSTOP_CH + 11, 'status', float(0x50)),
+              (k0 + B.DOWN_HOLD, 'input', 0.0)])
+
+    def hit_down(g_, k):
+        if k == ck + B.HITSTOP_CH + 15:
+            g_.fighters[2].status = 0x57
+    g = Game(fighters=[grounded(ck)], held=lambda n: True)
+    tr, _vm = run(path, g, frames=230, after=60, tick=hit_down)
+    w = [x for x in g.fighters[2].wlog if x[1] == 'input']
+    check('grounded, charged: let go (input on) when it is hit while down (DownDamage 0x57)',
+          w, [(k0, 'input', 1.0), (ck + B.HITSTOP_CH + 15, 'input', 0.0)])
+    # 13. v2: shields: uncharged 24% of the max shield and 8 frames held; charged 80% and 30; a break
+    for chg, take, stun, kk in ((False, B.SHIELD_TAKE, B.SHIELD_STUN, hit_k), (True, B.SHIELD_TAKE_CH, B.SHIELD_STUN_CH, ck)):
+        v = FT.Fighter(2, 4.0, fall_y(100.0, kk) - 6.0, air=True, shield=True)
+        g = Game(fighters=[v], held=(lambda n: True) if chg else (lambda n: n <= 2))
+        tr, _vm = run(path, g, frames=230)
+        dmg = (B.HIT_CH if chg else B.HIT)['Damage']
+        hp = round(50.0 + dmg * 1.19 - 50.0 * take, 3)
+        check('shield, %s: its health %.2f (50 + the hit\'s %g x 1.19 back, less %d%% of 50), PUSH 1000 + %d' % (
+            'charged' if chg else 'uncharged', hp, dmg, take * 100, stun),
+              [x[1:] for x in v.wlog], [('shield_hp', hp), ('push', 1000.0 + stun)])
+    v = FT.Fighter(2, 4.0, fall_y(100.0, ck) - 6.0, air=True, shield=True)
+    v.shield_hp = 10.0
+    g = Game(fighters=[v], held=lambda n: True)
+    tr, _vm = run(path, g, frames=230)
+    check('shield, charged, 10 health left: a shield break (0x59)', [x[1:] for x in v.wlog], [('status', float(0x59))])
     # 10. on the ground the down special stays Fake Death
     g = Game(held=lambda n: False)
     g.air = False
@@ -544,6 +640,8 @@ def effect_tests(out):
                 bad.append((k, p.emitter_name(d), 'not following (0x310)'))
             rings += flat
             want_r = tuple(B.arc_turn()) if flat else (0.0, 0.0, 0.0)
+            if flat and p.field(d, 'rotation_velocity')[2] >= 0:
+                bad.append((k, p.emitter_name(d), 'v2: the arc must spin the swing\'s way (negative)'))
             if max(abs(v) for v in t) > 1e-6 or max(abs(a - b_) for a, b_ in zip(r, want_r)) > 1e-5:
                 bad.append((k, p.emitter_name(d), t, r))
             if (p.field(d, 'particle_type') in (1, 3) or p.field(d, 'emitter_velocity') or

@@ -1786,6 +1786,7 @@ void func_82()
     gf_tick(); // Super God Fist: the downed victim (fighters/supamario/README.md "Super God Fist v5")
     cb_reset_tick(); // Core Breaker v3: its once-per-airtime uses back on landing, a hit, a ledge, a grab, a KO
     fd_tick(); // Fake Death: the grounded victim's hitstun and place, the repeats' clock
+    sh_tick(); // Sledgehammer v2: a grounded victim's bounce / its 40 frames lying (charged)
 }
 
 float func_83()
@@ -40181,6 +40182,7 @@ void sh_init()
     WorkModule(0, 0.0f, SH_V_VIC);
     WorkModule(0, 0.0f, SH_V_LASTFR);
     WorkModule(0, 0.0f, SH_V_T);
+    WorkModule(0, 0.0f, SH_V_SHD);
     KineticModule(0, 0);
     GroundModule(0x2710, 0x5);
     // v2: the move starts at his normal fall (a fast fall carried in ends, as a special's start does: func_81)
@@ -40336,6 +40338,20 @@ void sh_hit()
         x = (hx + vx) * 0.5f;
         y = (hy + vy + SH_VICTIM_MID) * 0.5f;
         EffectModule(0x3, SH_FX_SWEAT, vx, vy + SH_VICTIM_HEAD, z, 0, 0, 0, SH_FX_SWEAT_SIZE, 0, 0xffffffff);
+        // v2 (user): a grounded victim: uncharged an untechable low bounce (DownBound), charged lying 40 frames
+        // (sh_tick, from the end of its hitstop)
+        if (WorkModuleF(0, 0x0F000116 + 0x20 * (s + 0x2)) < 0.5f)
+        {
+            WorkModule(0, 0.0f, SH_V_GN);
+            if (WorkModuleF(0, SH_V_CHG) < SH_CHARGE - 0.5f)
+            {
+                WorkModule(0, (float)s, SH_V_GS);
+            }
+            else
+            {
+                WorkModule(0, -(float)s, SH_V_GS);
+            }
+        }
         if (WorkModuleF(0, SH_V_CHG) < SH_CHARGE - 0.5f)
         {
             WorkModule(0, (float)s, SH_V_VIC);
@@ -40542,6 +40558,7 @@ void sh_loop()
     if (fr > SH_HIT_FROM - 0.5f && fr < SH_HIT_TO)
     {
         sh_hit();
+        sh_shield();
     }
     hit = 0;
     if (WorkModuleF(0, SH_V_VIC) != 0.0f)
@@ -40573,4 +40590,143 @@ void sh_end()
     sh_grav();
     WorkModule(0, 0.0f, SH_V);
     WorkModule(0, 0.0f, SH_V_VIC);
+}
+
+// v2 (user: "shield damage scales with the charge"): his attack's shield hit (AttackModule kind 4), once a move: the
+// shielding fighter nearest the hitbox (Core Breaker's cb_dive_shield's way): its shield the health before the hit
+// (now + the hit's own: its damage x the common shield damage multiplier 0x020000ca + the base 0x020000cb) less
+// SH_SHIELD_TAKE (uncharged) / SH_SHIELD_TAKE_CH (charged) of the common max shield health (0x020000c2); nothing left:
+// a shield break (0x59); else SH_SHIELD_STUN / SH_SHIELD_STUN_CH frames of shieldstun, held by Core Breaker's
+// cb_shield_tick (every frame from func_82: GuardDamage's count rewritten)
+void sh_shield()
+{
+    int s;
+    int best;
+    int t;
+    float bd;
+    float d;
+    float dx;
+    float dy;
+    float hx;
+    float hy;
+    float hp;
+    float dmg;
+    float take;
+    float stun;
+    if (WorkModuleF(0, SH_V_SHD) != 0.0f)
+    {
+        return;
+    }
+    if (AttackModule(0x2726, 0x4) == 0 && AttackModule(0x2727, 0x4) == 0)
+    {
+        return;
+    }
+    hx = WorkModuleF(0, 0x0f000000) + SH_HIT_Z * WorkModuleF(0, 0x0f000003);
+    hy = WorkModuleF(0, 0x0f000001) + SH_HIT_Y;
+    best = 0;
+    bd = SH_VICTIM_R2;
+    s = 1;
+    while (s <= 8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f && cb_guarding(s) == 0x1)
+        {
+            dx = WorkModuleF(0, 0x0f000020 + 4 * (s - 1)) - hx;
+            dy = WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) + SH_VICTIM_MID - hy;
+            d = dx * dx + dy * dy;
+            if (d < bd)
+            {
+                bd = d;
+                best = s;
+            }
+        }
+        s = s + 1;
+    }
+    if (best == 0)
+    {
+        return;
+    }
+    WorkModule(0, 1.0f, SH_V_SHD);
+    dmg = SH_DMG;
+    take = SH_SHIELD_TAKE;
+    stun = SH_SHIELD_STUN;
+    if (WorkModuleF(0, SH_V_CHG) > SH_CHARGE - 0.5f)
+    {
+        dmg = SH_DMG_CH;
+        take = SH_SHIELD_TAKE_CH;
+        stun = SH_SHIELD_STUN_CH;
+    }
+    t = best + 0x2;
+    hp = WorkModuleF(0, 0x0F00011A + 0x20 * t) + dmg * WorkModuleF(0, 0x20000ca) + WorkModuleF(0, 0x20000cb);
+    hp = hp - WorkModuleF(0, 0x20000c2) * take;
+    if (hp <= 0.0f)
+    {
+        WorkModule(0, SH_ST_SHIELD_BREAK, 0x0F0000A2 + 8 * t);
+        return;
+    }
+    WorkModule(0, hp, 0x0F00011A + 0x20 * t);
+    WorkModule(0, 1000.0f + stun, 0x0F0000A7 + 8 * t);
+    cb_sh_slot = best;
+    cb_sh_left = (int)stun;
+    cb_sh_wait = 0;
+}
+
+// v2 (user), every frame (func_82): a fighter Sledgehammer hit on the ground (SH_V_GS: + its slot uncharged, - charged),
+// once its hitstop is over: DownBound (0x4D: the floor bounce of a missed tech: a low bounce, no tech, then lying);
+// charged: lying held SH_DOWN_HOLD frames from there (the Super God Fist's knockdown way: its input off, put back in
+// DownWait 0x50 if it leaves the down statuses 0x4D-0x53), let go early when it is hit (Damage 0x45-0x4C, DownDamage
+// 0x57) or gone
+void sh_tick()
+{
+    int s;
+    int t;
+    int hold;
+    float n;
+    float st;
+    s = (int)WorkModuleF(0, SH_V_GS);
+    if (s == 0)
+    {
+        return;
+    }
+    hold = 0;
+    if (s < 0)
+    {
+        s = -s;
+        hold = 0x1;
+    }
+    t = s + 0x2;
+    n = WorkModuleF(0, SH_V_GN);
+    st = WorkModuleF(0, 0x0F0000A2 + 8 * t);
+    if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) == 0.0f)
+    {
+        WorkModule(0, 0.0f, SH_V_GS);
+        return;
+    }
+    if (n < 0.5f)
+    {
+        if (WorkModuleF(0, 0x0F000043 + 8 * t) > 0.5f)
+        {
+            return;
+        }
+        WorkModule(0, SH_ST_DOWNBOUND, 0x0F0000A2 + 8 * t);
+        if (hold == 0)
+        {
+            WorkModule(0, 0.0f, SH_V_GS);
+            return;
+        }
+        WorkModule(0, 1.0f, 0x0F000115 + 0x20 * t);
+        WorkModule(0, 1.0f, SH_V_GN);
+        return;
+    }
+    n = n + 1.0f;
+    if (n > SH_DOWN_HOLD + 0.5f || (st >= 69.0f && st <= 76.0f) || st == 87.0f)
+    {
+        WorkModule(0, 0.0f, 0x0F000115 + 0x20 * t);
+        WorkModule(0, 0.0f, SH_V_GS);
+        return;
+    }
+    if (st < 77.0f || st > 83.0f)
+    {
+        WorkModule(0, SH_ST_DOWNWAIT, 0x0F0000A2 + 8 * t);
+    }
+    WorkModule(0, n, SH_V_GN);
 }
