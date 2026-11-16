@@ -2941,3 +2941,129 @@ behind them: on a bright background they still go past 1 there); the CPU staying
 open: the charged hit can put a fighter down again in its neutral getup (40 frames lying, then a getup: the charge
 takes 57 frames from the move's start), and the uncharged bounce on a lying fighter can repeat (bounce -> lying ->
 Sledgehammer): both left as the user asked.
+
+## Sledgehammer v4 (`supamario_sledgehammer_v4.zip`, with Super God Fist v18 below)
+
+Install over Sledgehammer v3, exe `exe_v46u_threads` (no exe change). Changed: the ptcl, main.pac (the two
+Sledgehammer motions), game / effect / expression.bin (specialairlwhold), the MSC.
+
+### 1. The charged hit on the ground: the bounce, then 40 frames lying (user: "the same untechable low ground bounce as the uncharged one, then the 40-frame lying-down hold")
+v3's grounded box (knockback 1: no launch) stays. `sh_down_start` (the hit's frame, in the hitlag): controller off,
+buffer emptied, its place noted; no status. `sh_tick`, phases in VAR_17 (`SH_V_GP`):
+- **0, its hitstop:** at its end **DownBound (0x4D)**, the uncharged hit's own write (the bounce the user has seen work).
+- **1, the bounce:** waits while it is in DownBound (0x4D-0x4F); never lets go on the bounce's status. Lying
+  (DownWait 0x50-0x53, on the ground) -> 2, from its place then. Not in a down status 2 frames after DownBound was
+  asked (it didn't take), or still bouncing after `BOUNCE_MAX` 30 frames -> put down (`sh_put`: DownWait at its place
+  at the hit) -> 2.
+- **2, lying:** `DOWN_HOLD` **40 frames counted from the first frame the MSC sees it lying** after the bounce, put back
+  down if it leaves lying (its down timer, anything), then its controller back and its buffer emptied.
+- Hit again (frozen again after its hitstop, or DownDamage) in 1 or 2: let go at once.
+- Untechable: DownBound's loop (`func_961`) has no tech, and with the controller off its getup / roll / attack at the
+  bounce's end can't fire; DownWait has no tech either.
+
+### 2. B-reverse (user: "make Sledgehammer B-reversible", then: only his facing)
+`sh_brev`, from `sh_init` (frame 0) and the wind-up's loop: the stick held back along his facing past 0.5 on the
+move's first 4 frames (Core Breaker's rise: `TURN_STICK` / `TURN_WINDOW`) turns him once (`PostureModule(1)` then
+`(2)`, as `cb_rise_brev`). **His air speed is left alone** (the user's correction: Core Breaker's turn of energies 2 / 3
+isn't copied). VAR_16 (`SH_V_BREV`), reset in `sh_init`.
+
+### 3. The arc still too bright (user, screenshot 26: a yellow-white glow round him on a grass stage)
+x0.45 kept the arcs under 1.0 on black, but they add onto the stage: `tools/supamario_fx_glow.py --bg` (new: a
+background colour, the areas then count what the effects push past 1.0; `--only` a part of the emitters' names) on a
+grass colour (0.5, 0.65, 0.3), v3: the arcs pushed **107** (uncharged) / **193** (charged) square units past 1.0;
+everything else 8 (the fist's flash 6.5, the sparks 1.6). v4:
+- `ARC_GAIN` per channel **(R 0.2, G 0.14, B 0.2)** (v3 0.45 flat; B is 0): the overlap adds at most ~0.38 red,
+  0.27 green. The hue is now a yellow-orange (1.4, 0.98, 0), not XV2's (1.4, 1.4, 0): on green it stays yellow, on grey
+  orange, never lime or white. The test checks R > G > B and the peak.
+- `FLASH_PEAK` **1.0**: the charged fist flash (Hmr_Crg02, at the arcs' frame; alpha-blended white at 2.0, the bloom's
+  white) capped; its halo copy follows (halved).
+
+| brightest frame | grass: over 1.0 | grey (0.5): over 1.0 | black: peak / over 1.0 / energy |
+|---|---|---|---|
+| v3 uncharged swing | 106.7 | 60.2 | 0.85 / 0 / 180 |
+| v3 charged swing | 197.9 | 118.4 | 1.55 / 4.4 / 345 |
+| **v4 uncharged swing** | **0** | **0** | 0.37 / 0 / 68 |
+| **v4 charged swing** | **0** (3.5 at most in a frame: the sparks / flash) | **0** (3.2) | 1.12 / 0 / 133 |
+| charge glow (unchanged) | 3.1 | 3.0 | 2.41 / 2.6 / 12 |
+| hit burst (unchanged) | 0.4 (10.8 at most) | 0.4 | 1.83 / 0.1 / 87 |
+
+### 4. Winning clanks (user: "make it so Sledgehammer wins any clanks")
+Smash 4's clank, read from the exe (docs/native-notes.md "Clanks"): a hitbox with Clang 0 meets no other hitbox;
+each side of a clank resolves its own record: it wins when its damage - battle_object param 55 (9.0) >= the other's
+(x the other's multipliers) and goes on untouched; else it loses (Rebound 1: a rebound whose length and pushback come
+from the larger damage; Rebound 0: its attack cancelled). One losing record loses.
+- The real hitboxes (charged IDs 0 / 1, uncharged ID 0) are **Clang 0**: they never meet a hitbox, never lose.
+- **ID 2, a clank-only box** on the same place, size and frames (both swings): **Clang 1, `CLANK_DMG` 50**, HitBits 0
+  (no fighter / item / enemy / floor category: it hits no one), Shieldable / Reflectable / Absorbable 0, no knockback,
+  Flinchless, NoGFX, no SFX, **Rebound 0**, Hitlag x`CLANK_HITLAG` 0.3 (the loser's clank hitlag comes from the larger
+  damage x the larger one's multiplier: ~7 frames). It beats any attack or projectile up to 41% (after its owner's
+  multipliers).
+- The MSC's hit checks (AttackModule kinds 2 / 4) never see it (it hits no body or shield); the air spike / ground box
+  pair is unchanged.
+- **Not traced:** where Smash 4 decides that an aerial and a grounded attack don't clank (nothing in the
+  attack-vs-attack pass tests the situation): where no clank happens, both hit as before. A losing attack with Rebound 1
+  rebounds longer than in a normal clank (from 50 + 3 instead of its own damage + 3).
+
+### 5. The fists out of his head (user, clip `MedalTVCemuWiiUEmulator20261116121746352`: "The charge glow is almost invisible ... Supamario's hands are positioned in his head rather than above his head")
+The clip (2.2 s): the charge pose with his hands at his cap. Measured (`anim.fist_clearance`: each fist's centre,
+HandN + 1.0 along the forearm, its side-view distance to his head's mesh points, model.nud's meshes under HeadN): v3
+0.0-0.6 from the wind-up through the swing, 2.8-3.2 under the cap's top. **His arms can't do it**: 3.47 from shoulder
+to wrist, his shoulders 10.1 up in the pose, his cap's top 16.3 (the head 6.7 tall); a search over head tilts, shoulder
+raises and IK targets with his own arm lengths found no fist centre higher than his eyes 1.4 clear of the head.
+`tools/supamario_sledgehammer_anim.py` (`overhead`, blended in over Start f2-6, out over Hold f11-13):
+- the arms stretched: ArmJ / HandN's local positions x **1.6** (`ARM_STRETCH`: the sleeve and forearm lengthen; the
+  gloves don't scale);
+- the head tilted back **20** more (`HEAD_TILT`: he looks up at his fists), the shoulders raised **40** (`SHOULDER_RAISE`);
+- both fists put by two-bone IK (`_ik`: ShoulderJ / ArmJ turned, the elbow kept in its plane, the hand's turn from the
+  forearm) at HeadN + **(1.5 forward, 4.5 up)** (`FIST_AT`), clasped (x +-0.6);
+- `push_clear` (Start f5-12, Hold f0-16): a fist nearer the head than 1.2 is moved straight away from the nearest head
+  point by IK: the swing's fast first frames (Hold 12-14) go round in front of his face instead of through it.
+- The hit frames (Hold 15-19: the hitbox is on bone 0, unchanged) and everything after are XV2's as before.
+
+Result: the charge pose's fists 1.75 / 1.82 clear, their centres 0.59 / 0.67 above the cap's top; at least 1.0 clear
+from Start f6 through Hold f16. Before / after: `preview/sledgehammer_pose_v3_v4.png` (also built by
+`anim.pose_sheet`). The charge glow (on LHandN) and the charged flash follow the fists out of the head. Not done: Start
+f0-4 (the hands rising past his cheeks, 0.1-0.6) are XV2's.
+
+### 6. A shorter charge (user: "make Sledgehammer's charge time slightly shorter")
+`CHARGE_FRAMES` **24** (XV2's ChargeTime 30), counted from the pose (start frame 12): **the charged swing on game frame
+35** (v1-v3 41), the charged hit on 50 (56). The scripts' `sh_chg >= 24` tests follow; the Charge sound stops at the
+full charge as before; the charge glow (one particle, 40 frames from frame 10) lasts past the swing's frame 13 off; the
+release flash is timed from the swing.
+
+### State, tests
+VAR_16 (the B-reverse), VAR_17 (the charged victim's phase); no globals. `supamario_sledgehammer_test.py` **104 ok**:
+the charged grounded hit at 0 / 100 / 150% with and without a CPU pressing to get up (DownBound once after the hitstop,
+lying every frame of the bounce and the 40, the controller from the hit to 40 frames after it first lies, getting up on
+the release frame), a bounce that doesn't take (put down 2 frames later, held 40 from there), its down timer in the
+hold, hit again in the bounce / the hold, charged on DownStand; the B-reverse (frames 0 / 2 / 3 turned once, 4 not,
+forward / weak stick not, no air speed written); the five hitboxes (Clang, Rebound, HitBits, the clank box's damage /
+hitlag); the arcs' peaks and hue, the flash cap; the fists' clearance; the charged swing on 35. `supamario_fakedeath_test`
+47, `supamario_corebreaker_test` 104, `supamario_godfist_test --all-models` 566 ok; `msc_stack_check` 0 of 2406
+(globals 127 of 128). The 8 scripts round-trip through Sm4shCommand v1.7.2. Compared with v3's build: the ptcl's arc
+and Crg02 emitters, the two motions in main.pac, specialairlwhold in the three ACMD files, the MSC.
+
+**Not confirmed in game:** the clank box (that HitBits 0 still clanks; the aerial / grounded rule); the arcs' look on
+other stages; the stretched arms' look (Smash's skinning of a lengthened ArmJ / HandN); DownBound written at the end of
+the grounded box's hitstop playing the bounce as the uncharged one does.
+
+## Super God Fist v18 (in `supamario_sledgehammer_v4.zip`): tracking to 75 degrees, range 55
+
+User: "allow Super God Fist to track up to 75 degrees above or below Supamario", "increase Super God Fist's tracking
+and speed-up range by 5 units". MSC only (`gf_pick`, `gf_track`; `supamario_godfist_build.py` `TRACK_ANGLE`,
+`HOMING_RANGE`).
+- **75 degrees:** `gf_pick` takes an opponent in front within 75 degrees of level (`dy^2 <= GF_TRACK_TAN2 dx^2`,
+  tan^2 75 = 13.93; v12-v17 60: `dy^2 <= 3 dx^2`). One steeper **isn't tracked**, as at 60 before (no clamp to the
+  limit). The same pick decides the 2x startup.
+- **Range 55** (v15-v17 50): `HOMING_RANGE`, still one constant for the tracking and the 2x startup (`GF_TRACK_D2`
+  3025).
+- **Kept:** the burst's first frames (motion 9-11), the k cap 1.5, down at most `TRACK_DOWN` 3 a frame in the air, and
+  the v12 rule (older than this request): **started on the ground over the stage it never aims down** at a lower
+  opponent; down-tracking happens only past the edge / in the air. So "75 below" works off the stage.
+- **New guard:** at 75 degrees the aim's climb a frame (k x the burst's way x tan) is up to 3.7 x the way; a steep near
+  opponent was overshot. The vertical step is now never past the opponent's own height (`vy` at most its `dy`).
+- Tests (`msc_v18_tests`; the earlier cases moved to the new limits): from the ground over the stage, 20 away, at 0 /
+  45 / 74.9 / 85 degrees above and below: tracked up to 74.9 (he rises above, never aims down below: the v12 rule),
+  85 not; past an edge in the air, 74.9 below aimed down (at most 3 a frame), 85 not; `gf_pick` at 54.9 / 55.1 (picked /
+  not) and 74.9 / 75.1 up and down (picked / not); the 2x startup at 54.9 / 55.1, 74 / 80 degrees up; rising at 74
+  degrees never above the opponent. `--all-models` 566 ok.
