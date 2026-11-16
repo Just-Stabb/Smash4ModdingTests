@@ -243,8 +243,9 @@ def msc_tests(path):
           ([(n, m) for n, m, _f in g.motions], g.vars.get(B.V_CHG)), ([(0, 0x239), (swing_k + 10, 0x23D)], 0.0))
     # 4. an uncharged hit on a fighter below: XV2's hit effect at the contact point, Hit_L, the follow, the rates,
     # the special cancel from the on-hit window (not the down special)
-    v = victim_below()
     hit_k = swing_k + B.HIT_FROM
+    vy0 = fall_y(100.0, hit_k) - 6.0
+    v = victim_below(k=hit_k)
     presses = {hit_k + 2: UP, hit_k + B.HITSTOP + 8: DOWN}
     g = Game(fighters=[v], held=lambda n: n <= 2, press=presses)
     tr, _vm = run(path, g, frames=200)
@@ -252,67 +253,65 @@ def msc_tests(path):
     fx = [(n, i) for n, i, *_r in g.fx]
     check('the hit (the next frame, in its hitstop): BTL_CMN 0\'s three sets once (HitLOD, HitS, the sweat)',
           sorted(fx), sorted([(hit_k + 1, B.FX_IDS[k]) for k in ('hitlod', 'hits', 'sweat')]))
-    hx, hy = B.HIT_Z, 100.0 + B.HIT_Y
-    cx, cy = (hx + 4.0) / 2, (hy + 94.0 + B.VICTIM_MID) / 2
-    got = {i: (x, y, s) for _n, i, x, y, s in g.fx}
+    me = [t for t in tr if t[0] == hit_k + 1][0]
+    hx, hy = B.HIT_Z, me[3] + B.HIT_Y
+    cx, cy = (hx + 4.0) / 2, (hy + vy0 + B.VICTIM_MID) / 2
+    got = {i: (x, y, s_) for _n, i, x, y, s_ in g.fx}
     check('the hit effects halfway between the hitbox\'s centre and the fighter\'s middle, XV2\'s sizes x%.2f' %
-          B.SH_FX_SCALE, (got[B.FX_IDS['hitlod']], got[B.FX_IDS['hits']], got[B.FX_IDS['sweat']]),
+          B.SH_FX_SCALE, (got.get(B.FX_IDS['hitlod']), got.get(B.FX_IDS['hits']), got.get(B.FX_IDS['sweat'])),
           ((round(cx, 3), round(cy, 3), round(1.5 * B.SH_FX_SCALE, 3)),
            (round(cx, 3), round(cy, 3), round(0.8 * B.SH_FX_SCALE, 3)),
-           (4.0, round(94.0 + B.VICTIM_HEAD, 3), round(1.0 * B.SH_FX_SCALE, 3))))
+           (4.0, round(vy0 + B.VICTIM_HEAD, 3), round(1.0 * B.SH_FX_SCALE, 3))))
     check('the hit: Hit_L (BDM #0\'s cue 52), the Charge SE stopped (entry 3)',
           [(n, w, i) for n, w, i in g.sounds if n == hit_k + 1], [(hit_k + 1, 'stop', B.SE_IDS['sh_charge']),
                                                                    (hit_k + 1, 'play', B.SND_HIT)])
-    check('the follow: his gravity 0 from the hit, the hit fighter in slot 2', (g.acc_log[:1], g.vars.get(B.V_VIC)),
-          ([(hit_k + 1, 0.0)], 2.0) if tr[-1][5] != 0x154 else ([(hit_k + 1, 0.0)], g.vars.get(B.V_VIC)))
-    st = [s for k, *_r, s in tr]
-    check('an up special pressed 2 frames after the hit (before the on-hit window): nothing', 0x154 in st[:hit_k + 3],
-          False)
+    check('the follow: his gravity 0 from the hit', g.acc_log[:1], [(hit_k + 1, 0.0)])
+    st = [t[5] for t in tr]
+    check('an up special pressed 2 frames after the hit (before the on-hit window), a down special in it: nothing',
+          (0x154 in st, 0x155 in st), (False, False))
     # the follow: his speed each frame = the fighter's Y change (frozen in the hitstop: 0)
-    g2 = Game(fighters=[victim_below()], held=lambda n: n <= 2)
+    g2 = Game(fighters=[victim_below(k=hit_k)], held=lambda n: n <= 2)
     tr2, _vm = run(path, g2, frames=200)
+    check('follow: his vertical speed written from the frame after the hit, the fighter in slot 2 followed',
+          (g2.vy_log[:1], sorted({n for n, _v in g2.vy_log}) == list(range(hit_k + 1, g2.vy_log[-1][0] + 1))),
+          ([(hit_k + 1, 0.0)], True))
+    gap = [round(t[3] - t[6], 2) for t in tr2 if hit_k <= t[0] <= g2.vy_log[-1][0]]
+    fall = max(abs(a_ - b_) for (a_, b_) in zip([t[6] for t in tr2], [t[6] for t in tr2][1:]))
+    check('follow: he keeps his height over the fighter (gap %.2f .. %.2f) within its fastest frame (%.2f) while it '
+          'falls %.1f' % (min(gap), max(gap), fall, gap and (tr2[hit_k][6] - tr2[g2.vy_log[-1][0]][6])),
+          max(gap) - min(gap) <= fall + 1e-6, True)
     vv = g2.fighters[2]
-    ys = {n: y for n, _st, _hs, _hp, _x in vv.log}
-    check('follow: his vertical speed written every frame from the hit while the fighter is in hitstun',
-          bool(g2.vy_log) and g2.vy_log[0][0] == hit_k + 1, True)
-    dys = [(n, w) for n, w in g2.vy_log]
-    vlog = {n: f for n, f in [(x[0], x) for x in vv.log]}
-    del vlog, ys
-    # the fighter's Y each frame (its step logs x only): rebuild from its speed in the model
-    gap = [round(t[3] - (94.0), 2) for t in tr2 if hit_k <= t[0] <= hit_k + B.HITSTOP + 15]
-    check('follow: he keeps his height over the fighter within one frame\'s fall (gap %.2f .. %.2f)' % (
-        min(gap), max(gap)), max(gap) - min(gap) < 3.0, True)
-    end = [n for n, a in g2.acc_log if a < 0]
-    check('follow: his own gravity back when its hitstun is over', bool(end), True)
-    del dys
-    # the rates after a hit: entry 3 (BAC 22-26 x%.3f, 26-32 x2, 37-44 x0.5)
+    stun_end = max(n for n, st_, hs, hp, _x in vv.log if hs > 0 or hp > 0)
+    back = [n for n, a_ in g2.acc_log if a_ < 0]
+    check('follow: his own gravity back the frame its hitstun is over (game frame %d)' % (stun_end + 1),
+          back[:1], [stun_end + 1])
     rates = sorted({r for _n, r in g2.rates})
     check('hit: the swing at entry 3\'s speed (BAC 22-26 x3.333, 26-32 x2, 32-37 x1, 37-44 x0.5)', rates,
           sorted({1.0, round(1 / 0.3, 4), 2.0, 0.5}))
-    # the cancel: up special pressed on the window's first frame
+    k_end = [t for t in tr2 if t[5] is not None][0][0]
+    check('hit: the move ends %d frames after the hit\'s hitstop (XV2 entry 3: BAC 16 -> 44 = 40 frames)' % (
+        k_end - hit_k - B.HITSTOP), k_end - hit_k - B.HITSTOP, 40)
+    # the cancel on the on-hit window's first frame (and not the frame before)
+    kw = first(tr2, lambda t: t[1] == 0x23D and t[2] >= B.CANCEL_HIT - 0.01)[0]
+    check('on-hit window: swing frame %.2f (BAC 26) on game frame %d = %d after the hit\'s hitstop (XV2: 10)' % (
+        B.CANCEL_HIT, kw, kw - hit_k - B.HITSTOP), kw - hit_k - B.HITSTOP, 10)
     for when, what in ((UP, 0x154), (SIDE, 0x153), (NEUTRAL, 0x152), (DOWN, None)):
-        gw = Game(fighters=[victim_below()], held=lambda n: n <= 2)
-        trw, _vm = run(path, gw, frames=200)
-        kw = first(trw, lambda t: t[1] == 0x23D and t[2] >= B.CANCEL_HIT - 0.01)[0]
-        gc = Game(fighters=[victim_below()], held=lambda n: n <= 2, press={kw: when, kw - 1: when})
+        gc = Game(fighters=[victim_below(k=hit_k)], held=lambda n: n <= 2, press={kw: when, kw - 1: when})
         trc, _vm = run(path, gc, frames=200)
-        fr_at = [t for t in trc if t[0] == kw - 1][0][2]
-        check('on-hit window (swing frame %.2f = BAC 26, game frame %d): %s -> %s; the frame before (%.2f): nothing' %
-              (B.CANCEL_HIT, kw, {UP: 'up', SIDE: 'side', NEUTRAL: 'neutral', DOWN: 'down'}[when],
-               hex(what) if what else 'nothing (not the down special)', fr_at),
-              (trc[-1][0], trc[-1][5]) if what else trc[-1][5] != 0x155 and trc[-1][0] != kw,
-              (kw, what) if what else True)
+        check('on-hit window (game frame %d): %s -> %s, the frame before: nothing' % (
+            kw, {UP: 'up', SIDE: 'side', NEUTRAL: 'neutral', DOWN: 'down'}[when],
+            hex(what) if what else 'nothing (never the down special)'), (trc[-1][0], trc[-1][5]),
+              (kw, what) if what else (k_end, 0xE))
     # 5. a charged hit: Hit_LL, no follow, the cancel kept
-    g = Game(fighters=[victim_below()], held=lambda n: True)
-    tr, _vm = run(path, g, frames=220)
-    v = g.fighters[2]
     ck = swing_k + B.CHARGE_FRAMES - 1 + B.HIT_FROM_CH
-    check('charged hit on game frame %d (swing %d)' % (ck, B.HIT_FROM_CH), v.hit_at, ck)
-    check('charged hit: Hit_LL (BDM #1\'s cue 53), the hit effects, no follow (his gravity untouched)',
+    g = Game(fighters=[victim_below(k=ck)], held=lambda n: True)
+    tr, _vm = run(path, g, frames=220)
+    check('charged hit on game frame %d (swing %d)' % (ck, B.HIT_FROM_CH), g.fighters[2].hit_at, ck)
+    check('charged hit: Hit_LL (BDM #1\'s cue 53), the three hit effects, no follow (his gravity untouched)',
           ([(w, i) for n, w, i in g.sounds if n == ck + 1 and w == 'play'], len(g.fx), g.vy_log,
            g.vars.get(B.V_VIC)), ([('play', B.SND_HIT_CH)], 3, [], -1.0))
     kw = first(tr, lambda t: t[1] == 0x23D and t[2] >= B.CANCEL_HIT - 0.01)[0]
-    gc = Game(fighters=[victim_below()], held=lambda n: True, press={kw: UP})
+    gc = Game(fighters=[victim_below(k=ck)], held=lambda n: True, press={kw: UP})
     trc, _vm = run(path, gc, frames=220)
     check('charged hit: the on-hit cancel kept (up special at game frame %d)' % kw, (trc[-1][0], trc[-1][5]),
           (kw, 0x154))
@@ -320,7 +319,7 @@ def msc_tests(path):
     kia = first(run(path, Game(held=lambda n: n <= 2))[0], lambda t: t[1] == 0x23D and t[2] >= B.IASA - 0.01)[0]
     g = Game(held=lambda n: n <= 2, press={k: UP for k in range(swing_k + 30, kia)})
     tr, _vm = run(path, g)
-    check('whiff: up special held from swing 30 to IASA (BAC 37, swing %.2f, game frame %d): nothing before' % (
+    check('whiff: up special held from swing 30 to before IASA (BAC 37, swing %.2f, game frame %d): nothing' % (
         B.IASA, kia), (tr[-1][5], tr[-1][0]), (0xE, swing_k + A.HOLD_FRAMES))
     g = Game(held=lambda n: n <= 2, press={kia: UP})
     tr, _vm = run(path, g)
@@ -335,18 +334,15 @@ def msc_tests(path):
     tr, _vm = run(path, g)
     check('a landing before IASA: LandingFallSpecial (0x19), %d frames (work float 0)' % B.LAND_LAG,
           (tr[-1][5], g.vars.get(0)), (0x19, float(B.LAND_LAG)))
-    g = Game(fighters=[victim_below(y=200.0)], held=lambda n: n <= 2, y=200.0)
-    g.floor = 130.0
+    g = Game(fighters=[victim_below(y=200.0, k=hit_k)], held=lambda n: n <= 2, y=200.0)
+    g.floor = fall_y(200.0, hit_k) - 15.0
     tr, _vm = run(path, g, frames=300)
     check('a landing after a hit, before IASA: LandingFallSpecial, %d frames' % B.LAND_LAG_HIT,
           (tr[-1][5], g.vars.get(0), g.fighters[2].hit_at is not None), (0x19, float(B.LAND_LAG_HIT), True))
-    kland = kia + 2
     g = Game(held=lambda n: n <= 2, y=300.0)
-    tr, vm = run(path, g, frames=kland)
-    g.floor = g.y - 0.01
+    tr, vm = run(path, g, frames=kia + 2)
     g.air = False
     vm.g[18] = 0
-    g.n = kland
     vm.call(fn(vm, 'sh_loop'))
     check('a landing past IASA: a normal landing (0x16)', g.status, 0x16)
     # 8. the status cut while charging: the Charge SE stopped, the charge glow killed, the state cleared
@@ -356,11 +352,11 @@ def msc_tests(path):
           ([(w, i) for n, w, i in g.sounds if n == swing_k + 5], [e for _n, e in g.kills], g.vars.get(B.V_SH),
            g.acc_log[-1][1]), ([('stop', B.SE_IDS['sh_charge'])], [B.FX_IDS['crg']], 0.0, -GRAVITY))
     # 9. a shield: no hit effect, no cancel, no follow
-    v = FT.Fighter(2, 4.0, 94.0, air=True, shield=True)
+    v = FT.Fighter(2, 4.0, fall_y(100.0, hit_k) - 6.0, air=True, shield=True)
     g = Game(fighters=[v], held=lambda n: n <= 2, press={k: UP for k in range(swing_k + 36, swing_k + 50)})
     tr, _vm = run(path, g)
-    check('a shield: no effect, no follow, no on-hit cancel (Fall at the end)', (g.fx, g.vy_log, tr[-1][5]),
-          ([], [], 0xE))
+    check('a shield: no effect, no follow, no on-hit cancel (Fall at the end)',
+          (g.fx, g.vy_log, g.hitflag, tr[-1][5]), ([], [], 4, 0xE))
     # 10. on the ground the down special stays Fake Death
     g = Game(held=lambda n: False)
     g.air = False
