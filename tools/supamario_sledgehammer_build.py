@@ -102,6 +102,7 @@ V_CHG = 0x0F000380 + 0x3F            # sh_chg: frames charged; >= CHARGE_FRAMES 
 V_VIC = 0x0F000380 + 0x2F            # sh_vic: the hit fighter's player slot (+), -1 a hit, no follow / its follow over
 V_VY = 0x0F000300                    # VAR_0: the followed fighter's Y last frame (MSC only; VAR_n unused by him)
 V_LASTFR = 0x0F000301                # VAR_1: the swing's motion frame last frame (the slot loops: the end is the wrap)
+V_T = 0x0F000302                     # VAR_2 (v2): the move's frames (sh_fastfall: a flick younger than the move)
 VARS = [('sh', V_SH), ('sh_chg', V_CHG), ('sh_vic', V_VIC)]
 
 # ---------------------------------------------------------------- effects / sounds
@@ -152,7 +153,7 @@ def rate_code():
 def msc_values():
     """the SH_* names in fighters/supamario/supamario.c"""
     return {'SH_V': '0x%X' % V_SH, 'SH_V_CHG': '0x%X' % V_CHG, 'SH_V_VIC': '0x%X' % V_VIC, 'SH_V_VY': '0x%X' % V_VY,
-            'SH_V_LASTFR': '0x%X' % V_LASTFR, 'SH_START_LAST': fl(START_LAST), 'SH_CHARGE': fl(CHARGE_FRAMES),
+            'SH_V_LASTFR': '0x%X' % V_LASTFR, 'SH_V_T': '0x%X' % V_T, 'SH_START_LAST': fl(START_LAST), 'SH_CHARGE': fl(CHARGE_FRAMES),
             'SH_HIT_FROM': fl(HIT_FROM_CH), 'SH_HIT_TO': fl(HIT_TO + HIT_LATE), 'SH_CANCEL_HIT': fl(CANCEL_HIT),
             'SH_IASA': fl(IASA), 'SH_HOLD_END': fl(HOLD_END), 'SH_RATE_CODE': rate_code(),
             'SH_HIT_Z': fl(HIT_Z), 'SH_HIT_Y': fl(HIT_Y), 'SH_VICTIM_MID': fl(VICTIM_MID),

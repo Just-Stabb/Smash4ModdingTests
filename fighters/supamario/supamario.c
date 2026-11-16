@@ -1749,7 +1749,10 @@ void func_81()
     {
         if (global50 <= 2.0f)
         {
-            if (FighterUtil(0x23, global6) || global6 == 0x152 || global6 == 0x153 || global6 == 0x154 || global6 == 0x155)
+            // Sledgehammer v2 (user: "Supamario can fast-fall during Sledgehammer"): the air down special keeps a fast
+            // fall started in it (sh_loop runs the game's own check, func_553; sh_init cancels one carried in)
+            if (FighterUtil(0x23, global6) || global6 == 0x152 || global6 == 0x153 || global6 == 0x154 ||
+                global6 == 0x155 && WorkModuleF(0, SH_V) == 0.0f)
             {
                 var0 = -WorkModuleF(0, 0x3000019);
                 KineticModule(0x11, 0x1, var0);
@@ -40154,8 +40157,10 @@ void fd_tick()
 // - SH_IASA (BAC 37, the BcmCallback Movement / Guard): anything; landing before: LandingFallSpecial (SH_LAND_LAG,
 //   SH_LAND_LAG_HIT after a hit), after: a normal landing; Fall after the swing's end
 // State: New_Var slots SH_V (the phase: 1 the wind-up, 2 charging, 3 the swing, 4 the swing past IASA), SH_V_CHG (the
-// charge's frames), SH_V_VIC (the hit fighter's slot; -1 a hit with no follow) and VAR_0 / VAR_1 (SH_V_VY, the
-// followed fighter's Y last frame; SH_V_LASTFR, the swing's frame last frame): no new globals (127 of 128 used).
+// charge's frames), SH_V_VIC (the hit fighter's slot; -1 a hit with no follow) and VAR_0 / VAR_1 / VAR_2 (SH_V_VY,
+// the followed fighter's Y last frame; SH_V_LASTFR, the swing's frame last frame; SH_V_T, v2: the move's frames, for
+// the fast fall): no new globals (127 of 128 used).
+// v2: fast fall in the move (sh_fastfall; func_81 lets it be), the follow wins over it.
 // ===================================================================
 void sh_init()
 {
@@ -40163,9 +40168,33 @@ void sh_init()
     WorkModule(0, 0.0f, SH_V_CHG);
     WorkModule(0, 0.0f, SH_V_VIC);
     WorkModule(0, 0.0f, SH_V_LASTFR);
+    WorkModule(0, 0.0f, SH_V_T);
     KineticModule(0, 0);
     GroundModule(0x2710, 0x5);
+    // v2: the move starts at his normal fall (a fast fall carried in ends, as a special's start does: func_81)
+    WorkModule(0x2711, 0x21000001);
+    if (KineticModuleF(0xb, 0x1) < -WorkModuleF(0, 0x3000019))
+    {
+        KineticModule(0x11, 0x1, -WorkModuleF(0, 0x3000019));
+    }
     func_22(0x239, 0, 1.0f);
+}
+
+// v2 (user: "Supamario can fast-fall during Sledgehammer", as in his aerials): the game's own fast-fall check (func_553:
+// the stick flicked down while falling sets the fast-fall flag 0x21000001; the gravity energy then falls at his
+// fast-fall speed), every frame of the move but the follow, and only for a flick made after the move started (its age
+// global47 under the move's frames SH_V_T: the down special's own down input is never taken for one)
+void sh_fastfall()
+{
+    WorkModule(0, WorkModuleF(0, SH_V_T) + 1.0f, SH_V_T);
+    if (WorkModuleF(0, SH_V_VIC) > 0.5f)
+    {
+        return;
+    }
+    if ((float)global47 < WorkModuleF(0, SH_V_T) - 0.5f)
+    {
+        func_553();
+    }
 }
 
 // his own gravity back (sh_follow sets it to 0 while it follows)
@@ -40299,6 +40328,7 @@ void sh_hit()
         {
             WorkModule(0, (float)s, SH_V_VIC);
             WorkModule(0, vy, SH_V_VY);
+            WorkModule(0x2711, 0x21000001);          // v2: the follow wins over a fast fall (none while it runs)
         }
     }
     EffectModule(0x3, SH_FX_HITLOD, x, y, z, 0, 0, 0, SH_FX_HITLOD_SIZE, 0, 0xffffffff);
@@ -40461,6 +40491,7 @@ void sh_loop()
         sh_land(fr);
         return;
     }
+    sh_fastfall();
     if (ph < 1.5f)
     {
         if (fr < SH_START_LAST - 0.5f)
