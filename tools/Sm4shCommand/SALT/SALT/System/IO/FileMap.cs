@@ -61,7 +61,9 @@ namespace System.IO
         public static FileMap FromTempFile(int length)
         {
             FileStream stream = new FileStream(Path.GetTempFileName(), FileMode.Open, FileAccess.ReadWrite, FileShare.Read, 8, FileOptions.RandomAccess | FileOptions.DeleteOnClose);
-            try { FileMap m = FromStreamInternal(stream, FileMapProtect.ReadWrite, 0, length); stream.Dispose(); return m; }
+            // (Sm4shCommand v1.7.2) the empty temp file made as long as the map first: Mono's memory map (Linux / macOS)
+            // refuses a capacity past the file's end ("capacity"), so nothing could be saved there; Windows grows it itself
+            try { if (stream.Length < length) stream.SetLength(length); FileMap m = FromStreamInternal(stream, FileMapProtect.ReadWrite, 0, length); stream.Dispose(); return m; }
             catch { stream.Dispose(); throw; }
         }
 

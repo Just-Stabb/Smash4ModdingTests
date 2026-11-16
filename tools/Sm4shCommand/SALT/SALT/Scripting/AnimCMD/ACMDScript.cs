@@ -80,11 +80,11 @@ namespace SALT.Moveset.AnimCMD
             for (int x = 0; x < this._commands.Count; x++)
             {
                 byte[] a = this._commands[x].GetBytes(endian);
-                byte* tmp = stackalloc byte[a.Length];
+                // (Sm4shCommand v1.7.2) copied byte by byte, not through kernel32's RtlMoveMemory: the same bytes, and a
+                // save works on Mono too (Linux / macOS: no kernel32)
+                byte* dst = (byte*)(void*)addr;
                 for (int i = 0; i < a.Length; i++)
-                    tmp[i] = a[i];
-
-                Win32.MoveMemory(addr, tmp, (uint)a.Length);
+                    dst[i] = a[i];
                 addr += this._commands[x].Size;
             }
         }
