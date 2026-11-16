@@ -304,7 +304,23 @@ def _position_lines():
     return out
 
 
-POSITION_LINES = _position_lines()
+# the costume variables (exe_v46s, tools/costume_group_cave.py): read only floats, 0 for an article / no fighter
+COSTUME_VARS = [
+    (0x0F000500, "COSTUME", "Costume", "this fighter's costume, 0-15 (read only; exe_v46s)",
+     "Read only: this fighter's costume (colour), 0 for c00 ... 7 for c07 (Little Mac up to 15), as its player loaded "
+     "it. 0 for an article or anything that isn't a fighter. Test it with Float_Var_Compare, e.g. "
+     "Float_Var_Compare(Variable=COSTUME, Method=0, Value=3). Needs exe_v46s (tools/costume_group_cave.py)."),
+    (0x0F000501, "COSTUME_PARITY", "Costume parity", "costume & 1: 1 for c01 / c03 / c05 / c07 (Ultimate's COLOR % 2)",
+     "Read only: 1 for an odd costume (c01, c03, c05, c07), 0 for an even one: Ultimate's "
+     "FIGHTER_INSTANCE_WORK_ID_INT_COLOR % 2 (Byleth's female costumes, whose effect / sound timings differ). 0 for an "
+     "article. Needs exe_v46s (tools/costume_group_cave.py); an older executable reads 0."),
+    (0x0F000502, "MOTION_GROUP", "Motion group", "1 when this fighter plays its second motion set (body2/)",
+     "Read only: 1 when this fighter plays its second motion set (fighter/NAME/motion/body2/ ...: Bayonetta's "
+     "Bayonetta 2 costumes 4-7 but 2, a new kind's extra_kinds.json motion_group2 costumes, e.g. Byleth's female "
+     "c01 / c03 / c05 / c07), else 0. Needs exe_v46s (tools/costume_group_cave.py)."),
+]
+
+POSITION_LINES = _position_lines() + [(vid, title, desc) for vid, _name, title, _note, desc in COSTUME_VARS]
 
 ALIAS_OUT = os.path.join(HERE, "SM4SHCommand", "Aliases")
 COMBAT_TARGETS = ["SELF", "OPP", "LASTHIT"] + ["SLOT%d" % k for k in range(1, 9)]
@@ -374,6 +390,7 @@ def alias_lines():
     out += [("SLOT%d_SHARED_%d" % (slot + 1, k), 0x0F000340 + 8 * slot + k,
              "VAR_24-VAR_31 of the fighter in that player slot (any object may use them)" if slot == k == 0 else "")
             for slot in range(8) for k in range(8)]
+    out += [(name, vid, note) for vid, name, _title, note, _desc in COSTUME_VARS]
     return out
 
 

@@ -2508,3 +2508,24 @@ hit info, r28 the attack's collision slot, its angle at +0x64):
   need an executable hook (e.g. 0x02E6CF24 in the fighter area update; Smash 4 statuses Walk 1, Dash 3, Run 4, Turn 6,
   TurnDash 7, SquatF 0x13, AttackDash 0x27, AttackS3 0x28, LightGet 0x8A, HeavyGet 0x8B; status kind
   [StatusModule + 0x48], stick x [[ControlModule + 0xA0] + 0], negated when [ControlModule + 0xA8]).
+
+## Costume groups and the result scene's cameras (Byleth v3)
+
+- **Motion folders per costume** (`tools/costume_group_cave.py`): the path builder 0x030BB18C(r3, out, kind, type,
+  costume) (types 0 body, 1 entry, 2 result, 3 route map; >3 empty) sends Bayonetta (0x38) to 0x030BAE08, whose
+  costumes 4-7 but 2 take `body2` / `bodyentry2` / `bodyresult2` / `bodyroutemap2` (rodata 0x101587A4 / 0x10158860 /
+  0x1015882C / 0x10158850; format 0x10158838 `fighter/%s/motion/%s/`). In battle each player's resource loader
+  (`[[0x102F9028] + 0x58 + 4 entry]`, 0x030C3368; +0x20 mode, +0x24 kind, +0x28 costume) registers id -> path
+  (0x030BEEE0: an id already there only gains a reference, whatever the path; 0x030BF0FC reads it): kind x 0x11 + 0
+  the model (+1 c01's in mode 3, picked by the player record's byte +0x23 at 0x02E130E4), + 3 the body motions (mode 1;
+  the route map otherwise), + 4 / + 5 / + 0xD / + 0x10 other packs. The entry / result packs are in shared loaders
+  (`[[0x102F9028] + 0x30]` / `+ 0x34`) under kind x 9 + 1, Bayonetta's second group + 2. The fighter's MotionModule
+  binds by path (0x02C5BFB8 -> 0x03306AC0). The record's +0x23 is also Kirby's copy resources' category
+  (`+0x23 << 28 | id`, 0x030C5240).
+- **The result scene** is an Xtal script (`data/script/xscene_result.xtal`, compiled; `script/%s.xtal` 0x101660A0).
+  Its bindings are registered at 0x030D.... (function, signature 0x033C1A94, name 0x033C5050): a scene camera class
+  (`start_motion` 0x0310861C: mode +0x470 = 2, its motion player +0x38 = 0x02D38734, the one stage / Final Smash
+  cameras use; `look_at` 0x031089C8, `start_spline`, `set_projection_param` 0x03108854, `switch_camera`), `load_motion`
+  0x03111AC8 (a motion folder resource), `get_fighter_model_name_from_fighter_kind` 0x030ED508 (0x0275DB24's name).
+  The script loads `motion/camera/result/<model name>/<n>/` for the winner ("NOT FOUND CAMERA!" -> `default/1/`; teams
+  `team/%d/`, no contest `nocontest/%d/`). `param/ui/result_param.bin` (bound at 0x030D37C4) is its other framing.

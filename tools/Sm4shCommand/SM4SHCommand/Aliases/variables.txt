@@ -834,3 +834,6 @@ SLOT8_SHARED_4         = 0x0F00037C
 SLOT8_SHARED_5         = 0x0F00037D
 SLOT8_SHARED_6         = 0x0F00037E
 SLOT8_SHARED_7         = 0x0F00037F
+COSTUME                = 0x0F000500   # this fighter's costume, 0-15 (read only; exe_v46s)
+COSTUME_PARITY         = 0x0F000501   # costume & 1: 1 for c01 / c03 / c05 / c07 (Ultimate's COLOR % 2)
+MOTION_GROUP           = 0x0F000502   # 1 when this fighter plays its second motion set (body2/)

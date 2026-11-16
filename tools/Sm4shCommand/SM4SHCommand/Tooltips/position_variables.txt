@@ -899,3 +899,6 @@
 0x0F00003D = Slot 8 Y | Player slot 8 (fighter table entry 7). Read / write.
 0x0F00003E = Slot 8 Z | Player slot 8 (fighter table entry 7). Read / write.
 0x0F00003F = Slot 8 facing | Player slot 8 (fighter table entry 7). Read only (1 right, -1 left).
+0x0F000500 = Costume | Read only: this fighter's costume (colour), 0 for c00 ... 7 for c07 (Little Mac up to 15), as its player loaded it. 0 for an article or anything that isn't a fighter. Test it with Float_Var_Compare, e.g. Float_Var_Compare(Variable=COSTUME, Method=0, Value=3). Needs exe_v46s (tools/costume_group_cave.py).
+0x0F000501 = Costume parity | Read only: 1 for an odd costume (c01, c03, c05, c07), 0 for an even one: Ultimate's FIGHTER_INSTANCE_WORK_ID_INT_COLOR % 2 (Byleth's female costumes, whose effect / sound timings differ). 0 for an article. Needs exe_v46s (tools/costume_group_cave.py); an older executable reads 0.
+0x0F000502 = Motion group | Read only: 1 when this fighter plays its second motion set (fighter/NAME/motion/body2/ ...: Bayonetta's Bayonetta 2 costumes 4-7 but 2, a new kind's extra_kinds.json motion_group2 costumes, e.g. Byleth's female c01 / c03 / c05 / c07), else 0. Needs exe_v46s (tools/costume_group_cave.py).

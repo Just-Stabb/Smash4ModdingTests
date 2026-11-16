@@ -1654,10 +1654,9 @@ def check_assets(inst, name, base, rep):
 def check_lod_and_camera(inst, name, src, ult, rep):
     """M10 low-lod: a costume whose Ultimate model has its own low model (model/body/cNN/lod.xmb: body_low ...) shipped
     with lNN a copy of cNN (ultimate_port.py low-models builds Ultimate's: `--lod-low`) [WARN: the copy still shows].
-    R1 win-camera: Ultimate's victory cameras (camera/fighter/<ult>/c00/j02win1-3) not converted into the package
-    (fighter/NAME/camera/result/winN/camera_motion.omo, tools/ultimate_camera.py) [WARN: Smash 4's result screen
-    plays no camera motion yet (an executable hook to come), so they don't show in game either way; an ERROR once
-    it does]"""
+    R1 win-camera: Ultimate's victory cameras (camera/fighter/<ult>/c00/j02win1-3) not in the package where the
+    result scene's script loads a winner's camera (motion/camera/result/NAME/N/camera_motion.omo + .vbn,
+    data/script/xscene_result.xtal; tools/ultimate_camera.py) [ERROR: the scene plays its default camera]"""
     udir = src.ult_dir(ult) if ult else None
     for d in sorted({os.path.dirname(f) for f in inst.glob(r'fighter/%s/model/body/l\d\d/model\.nud' % name)}):
         nn = d[-2:]
@@ -1672,16 +1671,82 @@ def check_lod_and_camera(inst, name, src, ult, rep):
     except Exception:
         cam = None
     wins = [w for w in (1, 2, 3) if cam and os.path.exists(os.path.join(cam, 'j02win%d.nuanmb' % w))]
-    have = [w for w in wins if inst.get('fighter/%s/camera/result/win%d/camera_motion.omo' % (name, w)) is not None]
+    have = [w for w in wins if inst.get('motion/camera/result/%s/%d/camera_motion.omo' % (name, w)) is not None
+            and inst.get('motion/camera/result/%s/%d/camera_motion.vbn' % (name, w)) is not None]
+    old = [w for w in wins if inst.get('fighter/%s/camera/result/win%d/camera_motion.omo' % (name, w)) is not None]
     if cam is None:
         rep.add('INFO', 'R1 win-camera', 'no Ultimate camera folder for %s (port_sources "ult_camera": camera-SSBU.zip)'
                 % ult)
     elif len(have) < len(wins):
-        rep.add('WARN', 'R1 win-camera', 'Ultimate\'s win cameras %s not in the package (fighter/%s/camera/result/winN: '
-                'ultimate_port.py run %s camera)' % (', '.join('j02win%d' % w for w in wins if w not in have), name, name))
+        rep.add('ERROR', 'R1 win-camera', 'Ultimate\'s win cameras %s not where the result scene loads them '
+                '(motion/camera/result/%s/N/camera_motion.omo / .vbn: data/script/xscene_result.xtal; without them the '
+                'scene plays motion/camera/result/default/1/)%s: ultimate_port.py run %s camera' % (
+                    ', '.join('j02win%d' % w for w in wins if w not in have), name,
+                    ' (fighter/%s/camera/result/winN is the old, unread place)' % name if old else '', name))
     else:
-        rep.add('INFO', 'R1 win-camera', 'win cameras converted (%d); Smash 4\'s result screen doesn\'t play camera '
-                'motions yet: an executable hook to come' % len(have))
+        rep.add('INFO', 'R1 win-camera', 'win cameras %d in motion/camera/result/%s/ (the field of view is not in the '
+                'motion: the scene\'s own is used)' % (len(have), name))
+
+
+def check_motion_groups(inst, name, src, ult, kind, rep):
+    """M11 motion-groups: Ultimate's costumes with motions of their own (Byleth: motion/body/c01 = the female set for
+    c01 / c03 / c05 / c07) played as another costume's [WARN: port.json motions.group2 not set]; with group2 set, the
+    package's fighter/NAME/motion/body2 (+ bodyentry2, bodyresult2) missing, extra_kinds.json "motion_group2" not the
+    same costumes, or the executable's costume groups (tools/costume_group_cave.py: the path hook at 0x030BB1AC and the
+    kind's mask byte) missing / different [ERROR: those costumes would load no motions, or the other group's]"""
+    import hashlib
+    cfg_path = os.path.join(ROOT, 'fighters', name, 'port.json')
+    cfg = json.load(open(cfg_path)) if os.path.exists(cfg_path) else {}
+    g2 = (cfg.get('motions') or {}).get('group2') or {}
+    costumes = g2.get('costumes') or []
+    udir = src.ult_dir(ult) if ult else None
+    if not costumes:
+        if udir and os.path.isdir(os.path.join(udir, 'motion/body/c00')):
+            digest = {}
+            for c in sorted(os.listdir(os.path.join(udir, 'motion/body'))):
+                f = os.path.join(udir, 'motion/body', c, 'a00wait1.nuanmb')
+                if os.path.exists(f):
+                    digest[c] = hashlib.sha1(open(f, 'rb').read()).hexdigest()
+            own = sorted(c for c, d in digest.items() if d != digest.get('c00'))
+            if own:
+                rep.add('WARN', 'M11 motion-groups', 'Ultimate\'s %s have motions of their own (a00wait1 differs from '
+                        'c00\'s), played as c00\'s: port.json motions.group2 (docs/ultimate-port-guide.md "Costume '
+                        'groups")' % ', '.join(own))
+        return
+    for folder in ('body2', 'bodyentry2', 'bodyresult2'):
+        if inst.get('fighter/%s/motion/%s/main.pac' % (name, folder)) is None:
+            rep.add('ERROR', 'M11 motion-groups', 'fighter/%s/motion/%s/main.pac missing: %s would load no %s motions '
+                    '(ultimate_port.py run %s motions-group2)' % (name, folder, ', '.join(costumes), folder, name))
+    try:
+        spec = json.load(open(os.path.join(HERE, 'extra_kinds.json')))
+        rec = next((k for k in spec['kinds'] if k['name'] == name), {})
+    except Exception:                         # noqa: BLE001
+        rec = {}
+    want = sorted(int(c[1:]) for c in costumes)
+    if sorted(rec.get('motion_group2') or []) != want:
+        rep.add('ERROR', 'M11 motion-groups', 'tools/extra_kinds.json %s "motion_group2" %s is not port.json\'s group2 '
+                'costumes %s' % (name, rec.get('motion_group2'), want))
+    if 'code/cross_f.rpx' not in inst.files or not kind:
+        rep.add('INFO', 'M11 motion-groups', 'no code/cross_f.rpx in the packages: the costume groups aren\'t checked')
+        return
+    import tempfile
+    import kind_expand as K
+    import costume_group_cave as CG
+    with tempfile.NamedTemporaryFile(suffix='.rpx') as f:
+        f.write(inst.get('code/cross_f.rpx'))
+        f.flush()
+        img = K.Image(f.name)
+        hook = img.w(CG.SITES['path'][0])
+        if hook == CG.SITES['path'][1]:
+            rep.add('ERROR', 'M11 motion-groups', 'code/cross_f.rpx has no costume groups (tools/costume_group_cave.py): '
+                    'every costume plays motion/body')
+            return
+        _w, info = CG.build(spec)
+        k = int(kind, 0) if isinstance(kind, str) else kind
+        mask = img.b(info['tab'] + k - CG.FIRST)
+    if mask != sum(1 << c for c in want):
+        rep.add('ERROR', 'M11 motion-groups', 'code/cross_f.rpx: kind 0x%X\'s costume mask 0x%02X, want 0x%02X (%s): '
+                'rebuild costume_group_cave.py' % (k, mask, sum(1 << c for c in want), ', '.join(costumes)))
 
 
 def check_sound_tables(inst, name, kind, rep):
@@ -2243,6 +2308,7 @@ def main():
     check_loop_slots(inst, a.name, rec, base, vanilla, rep)
     check_assets(inst, a.name, base, rep)
     check_lod_and_camera(inst, a.name, src, base['ult'], rep)
+    check_motion_groups(inst, a.name, src, base['ult'], kind, rep)
     check_slot_moves(inst, a.name, src, base['ult'], rep)
     check_loop_spin(inst, a.name, rep)
     check_sound_tables(inst, a.name, kind, rep)

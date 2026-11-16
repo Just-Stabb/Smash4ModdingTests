@@ -139,6 +139,32 @@ GROUP_HELP = {
         'More, with your own names: New_Var(Name=charge, Type=int, Initial=0) gives up to 64 more per object (Variables '
         'group), and those work with SET_INT / ADD_INT / INC_INT / Int_Var_Compare too.',
         '',
+        '## Costume variables (exe_v46s)',
+        'Read-only floats a fighter\'s scripts test with Float_Var_Compare (new in exe_v46s, tools/costume_group_cave.py; '
+        'Float_Var_Compare itself is unchanged, it just accepts these IDs): COSTUME (0x0F000500: the fighter\'s costume '
+        'as its player loaded it, 0 for c00 ... 7 for c07, Little Mac up to 15), COSTUME_PARITY (0x0F000501: 1 for '
+        'c01 / c03 / c05 / c07, 0 for the even ones: Ultimate\'s FIGHTER_INSTANCE_WORK_ID_INT_COLOR % 2) and '
+        'MOTION_GROUP (0x0F000502: 1 when the fighter plays its second motion set, motion/body2/: Bayonetta 2\'s '
+        'costumes, a new kind\'s extra_kinds.json motion_group2 costumes such as Byleth\'s female c01 / c03 / c05 / '
+        'c07). In an article\'s (projectile\'s) script, or anything that isn\'t a fighter, they read 0; writes are '
+        'ignored; an executable older than exe_v46s reads 0 (the even / first branch). The tool that ports Ultimate '
+        'scripts (tools/ultimate_acmd.py) turns Ultimate\'s costume tests into them. Example, a flash only the female '
+        'Byleth plays on frame 10 of a taunt and the male on frame 19:',
+        '  FRAME(Frames=10)',
+        '  Float_Var_Compare(Variable=COSTUME_PARITY, Method=0, Value=1)',
+        '  True(Offset=0){',
+        '    Graphic_Effect2(Graphic=0x3470087, Bone=0x3E9, X=14.5, Y=0, Z=0, XRot=0, YRot=0, ZRot=0, Size=0.3, '
+        'RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=1)',
+        '  }',
+        '  FRAME(Frames=19)',
+        '  Float_Var_Compare(Variable=COSTUME_PARITY, Method=0, Value=0)',
+        '  True(Offset=0){',
+        '    Graphic_Effect2(Graphic=0x3470087, Bone=0x3E9, X=14.5, Y=0, Z=0, XRot=0, YRot=0, ZRot=0, Size=0.3, '
+        'RandomX=0, RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=1)',
+        '  }',
+        'A per-costume value: Float_Var_Compare(Variable=COSTUME, Method=0, Value=3) is true for c03 only; '
+        'Float_Var_Compare(Variable=COSTUME, Method=3, Value=4) for c04 and up.',
+        '',
         '## More',
         'ACMD-new-commands.md next to Sm4shCommand.exe (the repository\'s docs/acmd-extra-commands.md) has the '
         'details; docs/position-variables.md the variables these commands are built on.',

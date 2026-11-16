@@ -9,6 +9,90 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: v3 (`scratchpad/byleth_v3.zip`, over v2: the female animations, the win cameras, exe_v46s; in-game TEST)
+
+User (v2 handover): "build the per-costume motion selection in the exe ... then her side" and "keep looking for a way
+to play Ultimate's converted win cameras", both approved as in-game test builds.
+
+| part | state |
+|---|---|
+| female animations (c01 / c03 / c05 / c07) | **built, tested offline**: exe costume groups (exe_v46s), `motion/body2` + entry / result / route map, her face / eyelid pacs, low models; not tested in game |
+| costume tests in the scripts | `INT_COLOR % 2` and the `GET_VOICE_VARIATION` chains -> Float_Var_Compare on COSTUME_PARITY (new variable); the taunt / win sound scripts, empty in v1 / v2, play |
+| win cameras | **the result scene does play camera motions** (its script loads `motion/camera/result/<name>/<n>/`): his three shipped there, no exe change; format to confirm in game |
+| exe | **exe_v46s** = exe_v46r + `tools/costume_group_cave.py` |
+| port_check | R1 (ERROR now) / new M11 motion-groups; `port_check master byleth_v1.zip byleth_v2.zip byleth_v3.zip` below |
+
+### v3: female animations (the executable side)
+
+Traced in exe_v46r (`tools/costume_group_cave.py`'s docstring has the addresses):
+- **In battle** every player has its own resource loader (`[[0x102F9028] + 0x58 + 4 entry]`, 0x030C3368; per-costume
+  models prove it: the model id kind x 0x11 + 0 holds each player's own cNN). The loader (0x030C0828) registers the body
+  motion folder as id kind x 0x11 + 3 with the path from 0x030BB18C(kind, type 0, costume), and the fighter's
+  construction (0x02E130E4) reads its own player's id + 3 (0x030BF0FC) and binds the MotionModule to that path
+  (0x02C5BFB8 -> 0x03306AC0: a motion resource by path). So the only per-costume piece in battle is the path: two
+  Byleths of both groups load both packs. The v2 handover's "open piece" (the player record's byte +0x23, picking
+  kind x 0x11 + 0 / + 1 in mode 3) is the **model** pack (mode 3 loads c00 and c01 models) and Kirby's copy resources'
+  category (`+0x23 << 28`, 0x030C5240): not a motion selector. Its writers (0x028190F8 from a settings copy,
+  0x029C7558 / 0x029C75F4) were left alone.
+- **Entry / result packs** live in shared loaders under kind x 9 + 1; Bayonetta's second group uses kind x 9 + 2 (no
+  other kind uses + 2: every `mulli rX, kind, 9` checked).
+- **The patch**: the path builder's Bayonetta test (0x030BB1AC) -> a cave: kind 0x47 (any kind with a mask byte) and a
+  masked costume builds `fighter/master/motion/body2/` (`bodyentry2/`, `bodyresult2/`, `bodyroutemap2/`: vanilla's own
+  strings) with the game's own string calls; the default paths of the entry load / unload, result load (two words) /
+  unload and the getter (0x030C1A40, 0x030C1B10, 0x030C1C24, 0x030C1CDC, 0x030C1ECC, 0x030C20E8) take kind x 9 + 1 +
+  group. Masks from `tools/extra_kinds.json` "motion_group2" (Byleth `[1, 3, 5, 7]` = 0xAA). Plus three read-only
+  variables (get_float, chained on position_vars' get_other `b` at 0x037EDC94): COSTUME 0x0F000500, COSTUME_PARITY
+  0x0F000501, MOTION_GROUP 0x0F000502 (the fighter found as position_vars finds self; its player loader's +0x28).
+- **Tests** (`tools/costume_group_test.py exe_v46s exe_v46r`, unicorn, real code): 131 ok, 0 failed: the path builder for
+  every type / costume of 0x47 (c00 `body`, c01 `body2`, ... `bodyroutemap2`), Bayonetta c00 / c05 / c02 as vanilla,
+  ZSS / Hero / Squirtle untouched; every id site run from its word to its call (kind x 9 + 1 / + 2); the getter whole;
+  the variables through a fighter WorkModule's get_float with a fake fighter table and loaders (two Byleths c00 / c03,
+  Bayonetta c05, ZSS c06), an unknown WorkModule 0, other IDs passed on; the original exe_v46r gives the old answers.
+
+### v3: female animations (her side)
+
+- `port.json` motions.group2 (`c01 c03 c05 c07`, source `c01`: Ultimate's c01 / c03 / c05 / c07 motion folders are
+  byte-identical; 348 of 368 files differ from c00's): `ultimate_port.py run master motions motions-group2 low-models`.
+  The male step now writes c00 / c02 / c04 / c06's face pacs only (its main.pac / pacs byte-identical to v2's); the new
+  `motions-group2` step converts c01's motions on her skeleton (130 bones: her hair S_Hair*, KnifeholderF1,
+  S_StringF1, H_Armtwist animated; Wait1 361 frames) into `motion/body2` (322), `bodyentry2` (2), `bodyresult2` (7),
+  `bodyroutemap2` (4) (+ lhand / rhand) and her costumes' material_anime face / eyelid pacs from her motions' mouth /
+  eye / weapon visibility (weapon_vis.json as the male's: the same scripts). Stand-ins as the male's (7 on Wait1).
+- Her models: rebuilding c01 with her motions' animated bones gives the same 129 + joint skeleton as v1's (no bone was
+  merged: under budget), so cNN / lNN models are unchanged; lNN take the new face pacs.
+- Her skirt bones (S_Skirt*) have no tracks in Ultimate's motions either (physics there): they hold their bind pose.
+- Scripts: `ultimate_acmd.py` turns `FIGHTER_INSTANCE_WORK_ID_INT_COLOR % 2` into Float_Var_Compare(COSTUME_PARITY)
+  True / Else (AppealHiL / R's flash on 10 (female) / 19 (male), Win3's flashes, smoke, slash, aura) and folds the sound
+  scripts' `GET_VOICE_VARIATION == 0 ... 7` chains (even / odd identical) into the same test (`fold_voice_variation`):
+  those sound scripts (taunts, wins) were empty in v1 / v2.
+- Not done: her win cameras (the result scene's camera path has no costume: hers play his); the female cheer bank.
+
+### v3: win cameras
+
+**Smash 4's result screen does play per-fighter camera motions.** The result scene is an Xtal script,
+`data/script/xscene_result.xtal` (script-smash4-vanilla.zip, compiled; its strings read): it loads
+`motion/camera/result/%s/%d/` (else prints "NOT FOUND CAMERA!" and loads `motion/camera/result/default/1/`; teams
+`motion/camera/result/team/%d/`, no contest `nocontest/%d/`) and calls its camera's `start_motion` (binding 0x0310861C:
+the camera's motion player at +0x38, 0x02D38734, the player stage and Final Smash cameras use; modes 0 look-at, 1 spline,
+2 motion at +0x470). The bindings it uses are in the executable's registration code (0x030D....: `load_motion`
+0x03111AC8 (a motion folder resource: its .omo / .pac files), `create_camera`, `set_projection_param`, `look_at`,
+`get_fighter_model_name_from_fighter_kind` 0x030ED508 -> 0x0275DB24, kind_expand's name table: `master`).
+v2's reading ("plays no camera motion", result_param.bin only) missed the script. So no executable hook: the `camera`
+step writes `motion/camera/result/master/1-3/camera_motion.omo` + `.vbn` (the Final Smash camera form: Corrin's one
+`gya_camera` bone, frames 131 / 171 / 181). To confirm in game (INSTALL README test 4): the vanilla folders' own file
+names / node form (not in any archive here: the user's `data/motion/camera/result/`), that `%d` is the win pose, the
+units / origin and the field of view (Ultimate's 0.28-0.68 rad is not in the motion). Not decoded: the Xtal bytecode
+(Smash 4's serializer differs from xtal-language's public one: u8 string lengths).
+
+### v3: executable exe_v46s
+
+`scratchpad/byleth/exe/exe_v46s.rpx` (sha1 7fd810c03a8b66a2420a402af4c2503504e49bef) = exe_v46r +
+`python3 tools/costume_group_cave.py --rpx exe_v46r.rpx` (cave 0x04BAD800-0x04BADCD0, 8 hooks; checks every replaced
+word). Suites (exe_v46p as the original, as for exe_v46r): the same results as exe_v46r's: kind_expand_test 21, the same
+lines; weapon_expand_append test 3; sound_alias_cave_test 6 (its "no other word changed" lists the new hooks too);
+acmd_ext_test 18; kirby_copy_new_test 123; kirby_copy_pool_test 151 (stage_q); position_vars_test 0; vec_target_test 0;
+costume_group_test 0 failed (131 ok).
+
 ## Status: v2 (`scratchpad/byleth_v2.zip`, over v1: the rapid jab, the angled forward smashes, Ultimate's low models, exe_v46r)
 
 v2 (user: "Add the rapid jab and angled forward smashes to Byleth, as well as port over their Ultimate camera angles
@@ -63,7 +147,7 @@ same 34 mesh slots, skeleton (model.vbn / jtb byte-identical to cNN's), `model.n
 (the low build's textures named by cNN's ids: every picture is in cNN's .nut), model.nud ~7 % (male) / ~10 %
 (female) smaller. The magnifier and 8-player Smash load lNN (Squirtle v6: no lNN = invisible there).
 
-### v2: win cameras
+### v2: win cameras (superseded: "v3: win cameras")
 
 Ultimate: `camera/fighter/master/c00/j02win1-3.nuanmb` (camera-SSBU.zip; c01's differ for the female poses): one
 `gya_camera` node animated 131 / 171 / 181 frames, field of view 0.28 - 0.68 rad. Converted (`tools/ultimate_camera.py`,
@@ -84,7 +168,7 @@ Next step: find where the result scene sets its camera (eye / to) per frame and 
 `camera/result/winN` for a kind that has them (kind_expand's name, the win number), as the Final Smash camera player
 does (`fighter/%s/camera/final/` 0x10158C08). port_check R1 warns until then.
 
-### v2: female animations (costumes c01 / c03 / c05 / c07)
+### v2: female animations (costumes c01 / c03 / c05 / c07; built in v3)
 
 Not built in v2: the executable change needs every per-costume resource site, and none of it can be tested offline.
 What vanilla does for Bayonetta (0x38), her Bayonetta 2 costumes (4 - 7 but 2) using `body2` / `bodyentry2` /
@@ -282,11 +366,15 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
-0. **v2** (this list's 5 is done): in-game test of v2's list (`scratchpad/byleth/INSTALL_README_v2.txt`); then the
-   female animations (the Bayonetta-style costume-group sites in "v2: female animations": the stubs for 0x47 / odd
-   costumes, the body pack's +0 / +1 id and where its byte +0x23 is set, `motion/bodyf` + entry / result, face pacs,
-   the effect scripts' parity branches, camera c01) and the win cameras' executable hook ("v2: win cameras"). Both need
-   in-game testing: give the user a test exe with each.
+0. **v3** (sent: `scratchpad/byleth_v3.zip`, `scratchpad/byleth/INSTALL_README_v3.txt`): the user's in-game test of the
+   female animations (a male and female Byleth in one match, entry / result poses) and the win cameras (do they
+   move as Ultimate's; the vanilla `data/motion/camera/result/<fighter>/<n>/` file names from the user's dump). If the
+   cameras show nothing / wrong: fix the format from the vanilla files (`ultimate_camera.py camera_omo`: node form,
+   units, maybe a field-of-view track), keep the path. If the female motions fail: a diag build logging
+   0x030BB18C's paths per player (tools/diag_sound_cave.py's OSReport veneer pattern). Then: her win cameras (needs a
+   costume in the result scene's camera path: the scene's `winner_color` / a name variant; not found), v2's list below.
+   (v2's list: done in v3; its "+0x23" piece turned out to be the model pack, "v3: female animations (the executable
+   side)".)
 1. **In-game test of v1** (the tether ledge grab for kind 0x47, the arrows' spawn / speed, Aymr's armor, the Final
    Smash).
 2. **Female animations per costume** (user: approved executable change). Found so far: the motion path builder
