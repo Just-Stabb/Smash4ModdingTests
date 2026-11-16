@@ -274,7 +274,14 @@ def check_model(inst, name, rep):
             data = inst.get(d + '/' + pac)
             if data is None and nd:
                 rep.add('WARN', 'M7 material-anime', '%s: no %s (the face / visibility keys)' % (tag, pac))
-            elif nd and tag in ('c00', 'c01'):
+            if data is not None:
+                redirected = lst_redirects(data)
+                if redirected:
+                    rep.add('ERROR', 'F2 face-lst', '%s %s: material_anime.lst sends %d motions that have an entry of '
+                            'their own to another motion\'s (the base\'s shared entries; the game takes the list: Byleth '
+                            'v3 showed SpecialNStart\'s bow and no sword in Wait1; ultimate_fighter.lst_without): %s' % (
+                                tag, pac, len(redirected), ', '.join(redirected[:6])))
+            if data is not None and nd and tag in ('c00', 'c01'):
                 gaps = face_gaps(data, nd)
                 if gaps:
                     rep.add('ERROR', 'F1 face-hidden', '%s %s: %d motions show none of its meshes on some frames (a '
@@ -1205,6 +1212,40 @@ def check_weapon_parts(inst, name, rec, rep):
 # the weapon module set-up (0x02BCB5C0): a kind's row of 28 constructors (weapon_expand.MODULE_TABLE); slot 7 makes the
 # MotionModule (accessor +0x44), and a kind without one ("li r3, 0; blr") never runs its ACMD (scripts follow the motion)
 MOTION_SLOT = 7
+
+
+def lst_redirects(pac):
+    """the motions a material_anime pac's material_anime.lst sends elsewhere though the pac has their own entry"""
+    import tempfile
+    import omo
+    from ultimate_fighter import lst_hash, lst_read
+    with tempfile.NamedTemporaryFile(suffix='.pac') as f:
+        f.write(pac)
+        f.flush()
+        ents = dict(omo.pac_read(f.name))
+    lst = ents.get('material_anime.lst')
+    if not lst or lst[:4] != b'MTAL':
+        return []
+    own = {lst_hash(n[:-4]): n[:-4] for n in ents if n.endswith('.mta')}
+    return [own[e[0]] for e in lst_read(lst) if e[0] in own]
+
+
+def check_weapon_msc(inst, name, rec, vanilla, rep):
+    """W14: a new article copied from a base weapon whose behaviour is in an MSC of its own (vanilla
+    fighter/<base>/script/msc/<weapon>/<weapon>.mscsb: ZSS's Paralyzer shot flies, times out and picks its motion
+    there) shipped without one: made with no status, it never moves, hits or draws (Byleth v1-v3: "Neutral special
+    also never fires its projectile")"""
+    if not vanilla:
+        return
+    for art, w in sorted(rec.get('weapons', {}).items()):
+        if not isinstance(w, dict) or 'base' not in w:
+            continue
+        src = os.path.join(vanilla, 'fighter', rec['base'], 'script/msc', w['base'], w['base'] + '.mscsb')
+        if not os.path.exists(src):
+            continue
+        if not inst.get('fighter/%s/script/msc/%s/%s.mscsb' % (name, art, art)):
+            rep.add('ERROR', 'W14 weapon-msc', '%s (copy of %s): no script/msc/%s/%s.mscsb, and its base\'s behaviour '
+                    'is in its MSC: the article never acts' % (art, w['base'], art, art))
 
 
 def check_weapon_motion(inst, name, rec, rep):
@@ -2292,6 +2333,7 @@ def main():
     check_weapon_shield(rec, rep)
     check_weapon_parts(inst, a.name, rec, rep)
     check_weapon_motion(inst, a.name, rec, rep)
+    check_weapon_msc(inst, a.name, rec, vanilla, rep)
     check_weapon_facing(a.name, rep)
     check_weapon_joint_facing(a.name, rep)
     check_grab_status(a.name, rep)

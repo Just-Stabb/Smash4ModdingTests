@@ -825,10 +825,70 @@ def held_parts(src, prof, parts):
             if not os.path.exists(adir + '/model.numshb'):
                 continue
             extra.append(adir)
+            link = article_link_space(adir)
             for part in mesh_parts(adir).get(mname, []):
+                # into the space of the article's root bone (the one Ultimate's link constraint puts on the fighter's
+                # bone): a parent-bound mesh by its bone's bind, a skinned one out of the article's bind (its root's
+                # own transform is replaced by the link). Byleth v3 drew Areadbhar / Aymr along the hand's Z, without
+                # the Spear / root bones' turn: Ultimate's hitboxes on haver run along its +Y (fighters/master/README.md v4)
+                m = link(part['parent'] if not part['infl'] else None)
+                part['pos'] = (np.c_[part['pos'], np.ones(len(part['pos']))] @ m.T)[:, :3]
+                part['nrm'] = part['nrm'] @ m[:3, :3].T
+                if part['tan'] is not None:
+                    part['tan'] = np.c_[part['tan'][:, :3] @ m[:3, :3].T, part['tan'][:, 3:]]
                 part['parent'], part['infl'] = bone, []
                 parts.setdefault(u, []).append(part)
     return extra
+
+
+def lst_hash(name):
+    """material_anime.lst's name hash: CRC-32 with a 0 start (the executable's loop at 0x03357004: the table CRC,
+    r3 = 0, ~ at the end), i.e. zlib.crc32(name, 0xFFFFFFFF)"""
+    return zlib.crc32(name.encode(), 0xFFFFFFFF)
+
+
+def lst_read(d):
+    """a material_anime.lst ('MTAL', 1, 1, 1, count, then (motion hash, shared entry hash, u32) x count)"""
+    n = struct.unpack('>I', d[12:16])[0]
+    return [struct.unpack('>III', d[16 + 12 * i:28 + 12 * i]) for i in range(n)]
+
+
+def lst_without(d, own):
+    """the base's material_anime.lst without the motions that have an entry of their own (own: entry names
+    without .mta). The list sends a motion to ANOTHER motion's entry (the base's motions whose material animations
+    were the same: ZSS's Wait1, WaitItem, WalkFast, the aerial landings, Passive ... -> D00SpecialNStart); kept, it
+    played the port's other motion there (Byleth v3: his bow and no sword in Wait1, from SpecialNStart's)"""
+    if d[:4] != b'MTAL':
+        return d
+    hs = {lst_hash(n) for n in own}
+    keep = [e for e in lst_read(d) if e[0] not in hs]
+    out = d[:12] + struct.pack('>I', len(keep)) + b''.join(struct.pack('>III', *e) for e in keep)
+    return out + b'\0' * (-len(out) % 16)
+
+
+def article_link_space(adir):
+    """f(bone or None) -> 4x4: an article mesh's vertices into its root bone's space (bind pose): a parent-bound
+    mesh's (in its bone's space) by inv(root bind) @ bone bind, a skinned one's (in the article's model space) by
+    inv(root bind)"""
+    import ssbh_data_py as s
+    sk = s.skel_data.read_skel(adir + '/model.nusktb')
+    names = [b.name for b in sk.bones]
+    loc = [np.array(b.transform, dtype=np.float64).T for b in sk.bones]
+    par = [b.parent_index for b in sk.bones]
+    wb = {}
+
+    def world(i):
+        if i not in wb:
+            wb[i] = loc[i] if par[i] is None else world(par[i]) @ loc[i]
+        return wb[i]
+    root = next(i for i in range(len(names)) if par[i] is None)
+    inv_root = np.linalg.inv(world(root))
+
+    def f(bone):
+        if bone is None or bone not in names:
+            return inv_root
+        return inv_root @ world(names.index(bone))
+    return f
 
 
 def polygon_labels(src, base, low=False):
@@ -1846,9 +1906,12 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
             # the base's other entries (default / default_temporarily / display.mta, material_anime.lst:
             # its own hash of the motion names, which are the base's): kept, the defaults with the swords'
             # (and the wing's) keys too. Left out up to test 20 (the sword didn't show in attacks)
+            own = {n[:-4] for n, _d in ents}
             for name, d in omo.pac_read(src):
                 if name[:-4] in frames_of:
                     continue
+                if name == 'material_anime.lst':
+                    d = lst_without(d, own)
                 if name.endswith('.mta') and d[:4] == b'MTA4' and pac == 'material_anime_face.pac':
                     m = mta.read(d)
                     vis = [(v['name'], sorted(set((min(k[0], m['frames'] - 1), k[1]) for k in v['keys'])))

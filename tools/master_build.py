@@ -295,9 +295,110 @@ def body_fix(a, fighter):
         m = U.merge_flat(g[acmd.crc(name)], axe)
         assert m is not None
         g[acmd.crc(name)] = m
+    for line in article_effects(a, fighter, files['effect'], joints):
+        log.append(line)
     for fn, f in files.items():
         f.save(os.path.join(d, fn + '.bin'))
     log.append('aircatch: the whip at 0 / 17 / 27 / 35; overtake: a hitbox for the throw; Aymr: the axe\'s hitbox merged')
+    return log
+
+
+# the held weapons' own effect scripts (Ultimate plays them on the articles, which are baked into his body here):
+# article -> (the fighter bone its root is linked to, {bone renamed in its scripts: new name}). The bow's top is the
+# fighter's (its shot effects at (0, 9.8, 15) are his chest); the held arrow (arrow1's Haved / Haved2, on the string
+# while Failnaught draws) is put on his right hand, which holds it
+ARTICLE_FX = {'master_bow': ('havel', {}), 'master_axe': ('haver', {'top': 'axe'}),
+              'master_arrow1': ('haver', {'top': 'arrow'})}
+# article script -> the Ultimate body animations (their slots get it merged into their effect script)
+ARTICLE_FX_SCRIPTS = {
+    ('master_bow', 'SpecialNStart'): ('d00specialnstart', 'd00specialairnstart'),
+    ('master_bow', 'SpecialN'): ('d00specialn', 'd00specialairn'),
+    ('master_arrow1', 'Haved'): ('d00specialnstart', 'd00specialairnstart'),
+    ('master_arrow1', 'Haved2'): ('d00specialnstart', 'd00specialairnstart'),
+    ('master_axe', 'AttackLw4'): ('c04attacklw4',), ('master_axe', 'AttackAirLw'): ('c05attackairlw',),
+    ('master_axe', 'LandingAirLw'): ('c05landingairlw',), ('master_axe', 'SpecialLw'): ('d03speciallw',),
+    ('master_axe', 'SpecialAirLw'): ('d03specialairlw',), ('master_axe', 'SpecialLwHit'): ('d03speciallwhit',),
+    ('master_axe', 'SpecialAirLwHit'): ('d03specialairlwhit',),
+    ('master_axe', 'SpecialLwLanding1'): ('d03speciallwlanding1',)}
+
+
+def slot_scripts(fighter):
+    """{Ultimate body animation: [the Smash 4 script names of the slots that play it]} from his main.pac's names"""
+    import omo
+    import ultimate_fighter as UF
+    prof = UF.PROFILES['szerosuit']
+    out = {}
+    for n, _d in omo.pac_read(os.path.join(fighter, 'motion/body/main.pac')):
+        key = n[len('FitSZerosuitBodyMain'):-4].lower()
+        ult = prof.get('motion_overrides', {}).get(key) or prof['motions'].get(key) or key
+        out.setdefault(ult, []).append(key[3:])
+    return out
+
+
+def article_effects(a, fighter, effect, joints):
+    """Ultimate's held-weapon article effect scripts (Failnaught's glow / drawn arrow / shot flash, Aymr's blade flares)
+    merged into the body effect scripts of the moves (Byleth v3 played none: e.g. Failnaught's charge showed only the
+    foot dust). Their bones: the article root on the fighter bone it is linked to (ARTICLE_FX), the others by the
+    article's bind (EffectTranslator's parents / locals: an offset and turn along the blade)"""
+    import numpy as np
+    import ssbh_data_py as s
+    import ultimate_acmd as U
+    import ultimate_tints
+    ids = {}
+    for p in (os.path.join(ROOT, 'reference/ultimate_sys_effects.json'), os.path.join(MDIR, 'master_effects.json')):
+        ids.update({k: int(v, 0) for k, v in json.load(open(p)).items() if not k.startswith('_')})
+    parents, locals_ = {}, {}
+    rename = {}
+    for art, (link, extra) in ARTICLE_FX.items():
+        mdir = os.path.join(a.ult, 'model', art.split('_', 1)[1], 'c00')
+        if not os.path.exists(mdir + '/model.nusktb'):
+            mdir = None
+        names = {}
+        if mdir:
+            sk = s.skel_data.read_skel(mdir + '/model.nusktb')
+            for b in sk.bones:
+                new = 'art_%s_%s' % (art[7:], b.name.lower())
+                names[b.name.lower()] = new
+                if b.parent_index is None:
+                    parents[new] = link                      # the root: replaced by the link
+                else:
+                    parents[new] = 'art_%s_%s' % (art[7:], sk.bones[b.parent_index].name.lower())
+                    locals_[new] = np.array(b.transform, float)
+        for old, new in extra.items():                  # the article's own top (not the fighter's)
+            names[old] = 'art_%s_%s' % (art[7:], new)
+            parents.setdefault(names[old], link)
+        rename[art] = names
+    tr = U.EffectTranslator(joints, ids, parents, locals_, ultimate_tints.tints('master')
+                            if ultimate_tints.fighter_tint('master') else {}, ultimate_tints.script_colours(
+                                os.path.join(a.dump, 'master')))
+    slots = slot_scripts(fighter)
+    log, done = [], []
+    for (art, src), anims in ARTICLE_FX_SCRIPTS.items():
+        path = os.path.join(a.dump, art, src + '.txt')
+        if not os.path.exists(path):
+            continue
+        body = U.functions(open(path).read()).get('effect_' + src.lower())
+        if body is None:
+            continue
+        for old, new in rename[art].items():
+            body = re.sub(r'Hash40::new\("%s"\)(?=, *-?[\d.])' % re.escape(old), 'Hash40::new("%s")' % new, body)
+        U.EFFECT_CONDS = (U.LR_LEFT,)
+        tr.last, tr.last_name = False, None
+        tr.turned_off = set(re.findall(r'EFFECT_OFF_KIND\(agent, Hash40::new\("([^"]+)"', body))
+        cmds = tr.script(body)
+        U.EFFECT_CONDS = ()
+        for anim in anims:
+            for name in slots.get(anim, ()):
+                k = acmd.crc(name)
+                m = U.merge_flat(effect.scripts.get(k, end()), cmds)
+                if m is None:
+                    log.append('article effects: %s %s -> %s: a branching script, left out' % (art, src, name))
+                    continue
+                effect.scripts[k] = m
+                done.append('%s/%s -> %s' % (art[7:], src, name))
+    log.append('article effects merged (%d): %s' % (len(done), ', '.join(done)))
+    if tr.missing:
+        log.append('article effects without an id: %s' % ', '.join(sorted(tr.missing)))
     return log
 
 
@@ -347,6 +448,17 @@ def weapons(a, fighter, effect_ids):
                 os.path.join(wdir, fn + '.bin'))
         open(os.path.join(wdir, 'motion.mtable'), 'wb').write(mt)
         log.append('%s: %s' % (art, '; '.join(str(c) for c in game)[:160]))
+        # its MSC: the shot's (its statuses: the flight, the motion its scripts run off, its life). Byleth v1-v3
+        # shipped none: the arrows were made with no status and never flew, hit or drew (user: "Neutral special also
+        # never fires its projectile"). The max arrow takes the shot's charged branch always (its flag 0x21000000 is
+        # ZSS's charge, which his Failnaught doesn't set): motion 4, life 0x12000003
+        mdir = os.path.join(fighter, 'script/msc', art)
+        os.makedirs(mdir, exist_ok=True)
+        src = os.path.join(a.base, 'script/msc/paralyzer_bullet/paralyzer_bullet.mscsb')
+        if art == 'arrow1':
+            shutil.copy(src, os.path.join(mdir, art + '.mscsb'))
+        else:
+            log.append(arrow2_msc(src, os.path.join(mdir, art + '.mscsb')))
     # the whip: her model hidden, her motion, her MSC (the tether's native-side logic), no scripts
     wsrc = a.base
     for sub in ('model/whip/c00', 'motion/whip'):
@@ -366,6 +478,21 @@ def weapons(a, fighter, effect_ids):
     shutil.copy(os.path.join(wsrc, 'script/msc/whip/whip.mscsb'), os.path.join(fighter, 'script/msc/whip/whip.mscsb'))
     log.append('whip: her model hidden, %d empty scripts, her MSC' % len(wh))
     return log
+
+
+def arrow2_msc(src, out):
+    """the max arrow's MSC: ZSS's shot decompiled (tools/mscdec), its Shoot status's charge test made always true,
+    recompiled (msclang)"""
+    with tempfile.TemporaryDirectory() as t:
+        c = os.path.join(t, 'arrow2.c')
+        run(os.path.join(HERE, 'mscdec/mscdec.py'), '-x', os.path.join(HERE, 'mscinfo.xml'), src, '-o', c)
+        text = open(c).read()
+        old = 'if (WorkModule(0x10, 0x21000000))'
+        assert text.count(old) == 1, 'arrow2: the shot\'s charge test not found once'
+        text = text.replace(old, 'if (0x1) // Byleth: the max arrow is always the charged shot (was ' + old[4:-1] + ')')
+        open(c, 'w').write(text)
+        compile_msc(c, out)
+    return 'arrow2: the shot\'s MSC, always charged (%d bytes)' % os.path.getsize(out)
 
 
 # ---------------------------------------------------------------- the vl file
