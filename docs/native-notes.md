@@ -2613,3 +2613,10 @@ Claimed (exe_v46v_threads + this cave; in progress, details below when done): **
 `0x0F0003D0`-`0x0F0003DF`** (user_entry IDs that read 0 / ignore writes in acmd_ext_cave.py's hv_var: reached from its
 `hvv_zero` branch, which the cave chains: whatever that `b` aims at (buf_var, or a later cave's stub) still gets every
 other ID). Apply after acmd_ext_cave.py's output; it asserts the words it replaces.
+
+## Variable resets (exe_v46w_vars: New_Var's Reset, Var_Reset_Set)
+
+`tools/var_reset_cave.py` (on exe_v46v_threads), test `tools/var_reset_test.py`, user docs
+`docs/acmd-extra-commands.md` "Variable resets". **Claimed region: `0x04BD8000`-`0x04BE0000`** (code `0x04BD8000`,
+data `0x04BD9F00`, the reset lists `0x04BDA000`; `textregion:0x2BE0000 grow:0x04BE0000`). `0x04BD6000`-`0x04BD8000`
+(between ts_data's end and this) is left free for the next cave. Details below (written with the tests).
