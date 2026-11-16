@@ -78,18 +78,19 @@ class VsTest
             r.Others = new List<HitboxRunner.ScriptSource> { Src("effect", effect), Src("sound", sound), Src("expression", expr) };
             var fs = r.Run(Compile(game), 20);
             string tag = cond ? " (if true)" : " (if false)";
-            // motion frames: game frame 1 -> 0 .. 1 (first frame), then +2 a frame: 3, 5, 7, 9, 11, 13 on frames 2-7
+            // the script cursor: 1 on game frame 1, then + 2 a frame: 3, 5, 7, 9, 11, 13 on frames 2-7 (the frame's
+            // AnimFrame is the animation frame shown, cursor - 1, as v1.7.1's runner)
             Check("anim frames" + tag, string.Join(",", fs.Take(8).Select(f => f.AnimFrame.ToString("0.#")).ToArray()), "0,2,4,6,8,10,12,14");
-            Check("game hitbox 0 on (motion 9-12)" + tag, Frames(fs, f => f.Hitboxes.Any(h => h.Id == 0)), "6,7");
-            Check("effect-script hitbox 1 on (motion 5 + 4 = 9)" + tag, Frames(fs, f => f.Hitboxes.Any(h => h.Id == 1)), "4,5");
-            Check("hitbox 1 says its script" + tag, fs[3].Hitboxes.First(h => h.Id == 1).Script, "effect");
-            Check("hitbox 0 says its script" + tag, fs[5].Hitboxes.First(h => h.Id == 0).Script, "game");
+            Check("game hitbox 0 on (motion 9-12)" + tag, Frames(fs, f => f.Hitboxes.Any(h => h.Id == 0)), "5,6");
+            Check("effect-script hitbox 1 on (motion 5 + 4 = 9)" + tag, Frames(fs, f => f.Hitboxes.Any(h => h.Id == 1)), "3,4");
+            Check("hitbox 1 says its script" + tag, fs[2].Hitboxes.First(h => h.Id == 1).Script, "effect");
+            Check("hitbox 0 says its script" + tag, fs[4].Hitboxes.First(h => h.Id == 0).Script, "game");
             var all = r.AllEffects;
-            Check("effect-script effect: one, on motion 5" + tag, string.Join(",", all.Where(e => e.Id == 0x1000002).Select(e => e.StartFrame + "/" + e.Script).ToArray()), "4/effect");
+            Check("effect-script effect: one, on motion 5" + tag, string.Join(",", all.Where(e => e.Id == 0x1000002).Select(e => e.StartFrame + "/" + e.Script).ToArray()), "3/effect");
             // the sound script's loop: WAIT 2 three times, on its own cursor (2 motion frames a game frame from frame 2)
             Check("sound-script loop effects (its own WAIT cursor)" + tag,
                   string.Join(",", all.Where(e => e.Id == 0x1000003).Select(e => e.StartFrame + "/" + e.Script).ToArray()), "2/sound,3/sound,4/sound");
-            Check("sound-script body state: intangible from its frame" + tag, Frames(fs.Take(8).ToList(), f => f.Intangible), "4,5,6,7");
+            Check("sound-script body state: intangible from its frame on" + tag, Frames(fs.Take(8).ToList(), f => f.Intangible), "4,5,6,7,8");
             uint want = cond ? 0x1000004u : 0x1000005u, not = cond ? 0x1000005u : 0x1000004u;
             Check("expression If / Else: the branch taken" + tag,
                   all.Count(e => e.Id == want && e.Script == "expression") + " " + all.Count(e => e.Id == not), "1 0");
@@ -99,9 +100,9 @@ class VsTest
         var r2 = new HitboxRunner { GetScript = c => null };
         r2.Others = new List<HitboxRunner.ScriptSource> { Src("effect", "FRAME(Frames=2)\nSet_Frame_Duration(Speed=2)\nFRAME(Frames=4)\n" + HB(2)) };
         var f2 = r2.Run(Compile("FRAME(Frames=3)\n" + HB(3)), 10);
-        Check("effect script's Set_Frame_Duration slows the motion", string.Join(",", f2.Take(6).Select(f => f.AnimFrame.ToString("0.#")).ToArray()), "0,1,2,2.5,3,3.5");
-        Check("game hitbox at motion 3 (slowed)", Frames(f2, f => f.Hitboxes.Any(h => h.Id == 3)).Split(',')[0], "5");
-        Check("effect hitbox at motion 4 (slowed)", Frames(f2, f => f.Hitboxes.Any(h => h.Id == 2)).Split(',')[0], "7");
+        Check("effect script's Set_Frame_Duration slows the motion", string.Join(",", f2.Take(6).Select(f => f.AnimFrame.ToString("0.#")).ToArray()), "0,1,1.5,2,2.5,3");
+        Check("game hitbox at motion 3 (slowed)", Frames(f2, f => f.Hitboxes.Any(h => h.Id == 3)).Split(',')[0], "4");
+        Check("effect hitbox at motion 4 (slowed)", Frames(f2, f => f.Hitboxes.Any(h => h.Id == 2)).Split(',')[0], "6");
         // sound commands aren't effects or notes
         var r3 = new HitboxRunner { GetScript = c => null };
         r3.Others = new List<HitboxRunner.ScriptSource> { Src("sound", "FRAME(Frames=2)\nSound_Effect(SFX=0x51)\nStop_Sound_Effect(SFX=0x51)") };
@@ -111,19 +112,37 @@ class VsTest
         var r4 = new HitboxRunner { GetScript = c => null };
         r4.Others = new List<HitboxRunner.ScriptSource> { Src("expression", "FRAME(Frames=3)\n" + HB(4)) };
         var f4 = r4.Run(new List<ICommand>(), 6);
-        Check("no game script: expression hitbox", Frames(f4, f => f.Hitboxes.Any(h => h.Id == 4)), "4,5,6");
+        Check("no game script: expression hitbox", Frames(f4, f => f.Hitboxes.Any(h => h.Id == 4)), "3,4,5,6");
+    }
+
+    static readonly Dictionary<string, ACMDFile> files = new Dictionary<string, ACMDFile>();
+
+    /// <summary>An ACMD file read once, from a copy (SALT maps the file it reads; mapping it twice fails).</summary>
+    static ACMDFile Load(string path)
+    {
+        ACMDFile f;
+        if (files.TryGetValue(path, out f)) return f;
+        f = null;
+        if (File.Exists(path))
+        {
+            string copy = Path.GetTempFileName();
+            File.Copy(path, copy, true);
+            f = new ACMDFile(copy);
+        }
+        files[path] = f;
+        return f;
     }
 
     static Func<uint, IList<ICommand>> Get(string path)
     {
-        var f = File.Exists(path) ? new ACMDFile(path) : null;
+        var f = Load(path);
         return id => { IScript s; return f != null && f.Scripts.TryGetValue(id, out s) && s is ACMDScript ? ((ACMDScript)s).Commands : null; };
     }
 
     static IEnumerable<uint> Crcs(string path)
     {
-        if (!File.Exists(path)) return new uint[0];
-        return new ACMDFile(path).Scripts.Keys;
+        var f = Load(path);
+        return f != null ? (IEnumerable<uint>)f.Scripts.Keys : new uint[0];
     }
 
     static string Key(EffectData e) { return e.Id.ToString("X") + "@" + e.StartFrame + "-" + e.EndFrame + "/" + e.SpawnAnimFrame.ToString("0.##") + "/" + e.Bone; }
@@ -142,6 +161,7 @@ class VsTest
         foreach (var k in new[] { "game", "effect", "sound", "expression" }) foreach (var c in Crcs(Path.Combine(body, k + ".bin"))) all.Add(c);
         int same = 0, moreHb = 0, moreFx = 0, total = 0;
         var bad = new List<string>();
+        var rateScripts = new List<string>();
         foreach (var crc in all.OrderBy(c => c))
         {
             total++;
@@ -158,17 +178,24 @@ class VsTest
             if (x(crc) != null) nr.Others.Add(new HitboxRunner.ScriptSource { Kind = "expression", Commands = x(crc), GetScript = x });
             var nw = nr.Run(g(crc) ?? new List<ICommand>(), N);
             bool otherHb = nw.Any(f => f.Hitboxes.Any(h => h.Script != "game"));
+            // a frame-speed command in another script (Set_Frame_Duration, Frame_Speed_Multiplier, the rate variable) now
+            // changes the motion's rate as in the game (Pac-Man's 0x2BB1E8A1 has its Set_Frame_Duration(7) in its effect
+            // script, no game script): the timeline differs from v1.7.1's there, on purpose
+            bool otherRate = nr.Others.Any(o => o.Commands.OfType<ACMDCommand>().Any(c => c.Ident == 0x7172A764 || c.Ident == 0xB2E91D0C ||
+                c.Ident == 0xA546845C || (c.Ident == 0x1E3AB92A && c.Parameters.Count >= 2 && Convert.ToUInt32(c.Parameters[1] is FighterVariable ? ((FighterVariable)c.Parameters[1]).Raw : Convert.ToUInt32(c.Parameters[1])) == 0x0F000098)));
+            if (otherRate) rateScripts.Add(string.Format("0x{0:X8}", crc));
             bool hbSame = true;
             for (int i = 0; i < N; i++)
             {
                 string a = string.Join(";", old[i].Hitboxes.Select(h => h.Id + ":" + h.Bone + ":" + h.Damage).ToArray()) + old[i].Intangible + old[i].Invincible;
                 string b = string.Join(";", nw[i].Hitboxes.Where(h => h.Script == "game").Select(h => h.Id + ":" + h.Bone + ":" + h.Damage).ToArray()) + nw[i].Intangible + nw[i].Invincible;
+                if (old[i].AnimFrame != nw[i].AnimFrame && otherRate) break;
                 if (old[i].AnimFrame != nw[i].AnimFrame) { hbSame = false; bad.Add(string.Format("0x{0:X8} frame {1}: anim {2} vs {3}", crc, i + 1, old[i].AnimFrame, nw[i].AnimFrame)); break; }
                 if (a != b && !otherHb) { hbSame = false; bad.Add(string.Format("0x{0:X8} frame {1}: {2} vs {3}", crc, i + 1, a, b)); break; }
             }
             var oldKeys = oldFx.AllEffects.Select(Key).ToList();
             var newKeys = nw.Count > 0 ? nr.AllEffects.Where(q => q.Script == "effect").Select(Key).ToList() : new List<string>();
-            bool fxSame = oldKeys.SequenceEqual(newKeys);
+            bool fxSame = oldKeys.SequenceEqual(newKeys) || otherRate;
             if (!fxSame) bad.Add(string.Format("0x{0:X8} effects: [{1}] vs [{2}]", crc, string.Join(" ", oldKeys.ToArray()), string.Join(" ", newKeys.ToArray())));
             if (hbSame && fxSame) same++;
             if (otherHb) moreHb++;
@@ -177,6 +204,8 @@ class VsTest
         True(name + ": " + same + " of " + total + " scripts keep the game script's hitboxes / body states and the effect script's effects " +
              "exactly (" + moreHb + " with hitboxes from another script, " + moreFx + " with effects from another script)", bad.Count == 0,
              string.Join("\n      ", bad.Take(8).ToArray()));
+        if (rateScripts.Count > 0)
+            Console.WriteLine("     (the motion's rate set by another script, timeline as the game's: " + string.Join(" ", rateScripts.ToArray()) + ")");
         if (name.StartsWith("pacman"))
         {
             // Pac-Man's hitboxes in other scripts: 0xE8410CDF's two in its expression script (frames 18-20), 0x2BB1E8A1's
@@ -244,7 +273,7 @@ class VsTest
         Check("scroll 0.1 a frame, age 3: U - 0.3", U.ToString("0.###") + " " + V.ToString("0.###"), "-0.3 0");
         a = new EmitterDef.UvAnim(); a.Scl[2] = a.Scl[3] = 1; a.Rot[1] = (float)(Math.PI / 2);
         a.At(1, 0.5f, 1, 1, false, 0, null, out U, out V);
-        Check("turned a quarter: (1, 0.5) to (0.5, 0)", U.ToString("0.###") + " " + V.ToString("0.###"), "0.5 0");
+        Check("turned a quarter (a = -turn, eft's): (1, 0.5) to (0.5, 1)", U.ToString("0.###") + " " + V.ToString("0.###"), "0.5 1");
     }
 
     static void Main(string[] args)

@@ -231,6 +231,16 @@ namespace Sm4shCommand
             var treeMenu = new ContextMenuStrip();
             treeMenu.Items.Add(new ToolStripMenuItem("Open", null, (o, e) => { if (FileTree.SelectedNode != null) OpenNode(FileTree.SelectedNode); }));
             treeMenu.Items.Add(new ToolStripMenuItem("Add Script..", null, addScript_Click));
+            // v1.7.2: a motion's script in one more of the four files (or out of one), the file made on save if missing
+            var addTo = new ToolStripMenuItem("Add Script File");
+            var removeFrom = new ToolStripMenuItem("Remove Script File");
+            treeMenu.Items.Add(addTo);
+            treeMenu.Items.Add(removeFrom);
+            treeMenu.Opening += (o, e) =>
+            {
+                var sn = FileTree.SelectedNode as ScriptNode;
+                FillKindMenus(addTo, removeFrom, sn != null && IsAcmdNode(sn) ? sn.Identifier : (uint?)null);
+            };
             treeMenu.Items.Add(new ToolStripMenuItem("Set Name..", null, setName_Click));
             treeMenu.Items.Add(new ToolStripMenuItem("Copy Hash", null, (o, e) =>
             {
@@ -443,6 +453,7 @@ namespace Sm4shCommand
 
                 var acmdnode = new TreeNode("ACMD") { Name = "nACMD" };
                 FileTree.Nodes.Add(acmdnode);
+                FighterFolder = folder;
                 PopulateFighterScripts();
                 IDEMode = IDE_MODE.Fighter;
                 this.Text += folder;
@@ -649,7 +660,21 @@ namespace Sm4shCommand
                     root = root.Parent;
 
                 if (root?.Name == "nACMD")
+                {
                     p = new CodeEditor(node as ScriptNode, ACMD_INFO.CMD_NAMES.Values.ToArray());
+                    // v1.7.2: right-click the script tabs to add the motion's script to another file (or remove one)
+                    if (IDEMode == IDE_MODE.Fighter)
+                    {
+                        uint crc = ((ScriptNode)node).Identifier;
+                        var menu = new ContextMenuStrip();
+                        var addTo = new ToolStripMenuItem("Add Script File");
+                        var removeFrom = new ToolStripMenuItem("Remove Script File");
+                        menu.Items.Add(addTo);
+                        menu.Items.Add(removeFrom);
+                        menu.Opening += (o, e) => FillKindMenus(addTo, removeFrom, crc);
+                        ((CodeEditor)p).Tabs.ContextMenuStrip = menu;
+                    }
+                }
                 else if (root?.Name == "nMSC")
                     p = new CodeEditor(node as ScriptNode, MSC_INFO.NAMES.Values.ToArray());
                 else
@@ -951,6 +976,110 @@ namespace Sm4shCommand
             OpenScriptByHash(crc);
         }
 
+        // ---------------------------------------------- v1.7.2: a motion's scripts in the four files
+
+        /// <summary>The fighter (or article) folder open in fighter mode: its animcmd folder with game / effect / sound /
+        /// expression.bin.</summary>
+        string FighterFolder;
+
+        /// <summary>The open fighter folder's file of a kind (folder/KIND.bin), or null when it isn't open (missing: it is
+        /// made when a script is added to it).</summary>
+        ACMDFile KindFile(string kind, out string path) { return ScriptFileSet.Find(ScriptFiles, FighterFolder, kind, out path); }
+
+        /// <summary>The tree's / script tabs' "Add Script File" and "Remove Script File" menus for a motion's hash: one entry
+        /// per file that hasn't its script (add) or has it (remove); greyed out outside fighter mode.</summary>
+        void FillKindMenus(ToolStripMenuItem addTo, ToolStripMenuItem removeFrom, uint? crc)
+        {
+            addTo.DropDownItems.Clear();
+            removeFrom.DropDownItems.Clear();
+            bool ok = IDEMode == IDE_MODE.Fighter && crc.HasValue;
+            addTo.Enabled = removeFrom.Enabled = ok;
+            if (!ok)
+            {
+                addTo.ToolTipText = removeFrom.ToolTipText = "Open a fighter's (or an article's) animcmd folder with File > Open > Fighter.. first.";
+                return;
+            }
+            foreach (var kind in ScriptFileSet.Kinds)
+            {
+                string path;
+                var f = KindFile(kind, out path);
+                bool has = f != null && f.Scripts.ContainsKey(crc.Value);
+                string k = kind;
+                if (!has)
+                    addTo.DropDownItems.Add(new ToolStripMenuItem(kind + " script" + (f == null ? " (new " + kind + ".bin)" : ""), null,
+                        (o, e) => AddKindScript(crc.Value, k)));
+                else
+                    removeFrom.DropDownItems.Add(new ToolStripMenuItem(kind + " script", null, (o, e) => RemoveKindScript(crc.Value, k)));
+            }
+            addTo.Enabled = addTo.DropDownItems.Count > 0;
+            removeFrom.Enabled = removeFrom.DropDownItems.Count > 0;
+        }
+
+        /// <summary>
+        /// v1.7.2: gives a motion a script in one more file (game / effect / sound / expression.bin): a new empty script
+        /// (Script_End) under the motion's hash (the CRC32 of its lower-case name, as every script is keyed), editable in
+        /// its own tab at once. When the folder has no such file it is made (an ACMD file in the endianness of the folder's
+        /// other files) and written on save. Public for tests; returns the file's path.
+        /// </summary>
+        public string AddKindScript(uint crc, string kind)
+        {
+            if (IDEMode != IDE_MODE.Fighter || FighterFolder == null) return null;
+            if (!ApplyTab(crc)) return null;
+            bool made;
+            string path = ScriptFileSet.Add(ScriptFiles, FighterFolder, crc, kind, ScriptFileSet.EndianOf(ScriptFiles, Runtime.WorkingEndian), out made);
+            if (made)
+                LogMessage($"{kind}.bin isn't in {FighterFolder}: it will be made when you save.");
+            RefreshMotion(crc, kind);
+            LogMessage($"Added a {kind} script for 0x{crc:X8} ({Runtime.ScriptLabel(crc)}). Save to write it to {Path.GetFileName(path)}.");
+            return path;
+        }
+
+        /// <summary>v1.7.2: takes a motion's script out of one of its files (asked first; the file stays, without it).</summary>
+        public bool RemoveKindScript(uint crc, string kind, bool ask = true)
+        {
+            string path;
+            var f = KindFile(kind, out path);
+            if (f == null || !f.Scripts.ContainsKey(crc)) return false;
+            if (ask && MessageBox.Show(this, $"Remove the {kind} script of 0x{crc:X8} ({Runtime.ScriptLabel(crc)}) from {Path.GetFileName(path)}?\n\n" +
+                    "It is gone from the file when you save.", "Remove script", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                return false;
+            if (!ApplyTab(crc)) return false;
+            ScriptFileSet.Remove(ScriptFiles, FighterFolder, crc, kind);
+            RefreshMotion(crc, null);
+            LogMessage($"Removed the {kind} script of 0x{crc:X8} ({Runtime.ScriptLabel(crc)}). Save to write {Path.GetFileName(path)}.");
+            return true;
+        }
+
+        /// <summary>The motion's open tab compiled into its scripts (so reopening it loses nothing); false on an error.</summary>
+        bool ApplyTab(uint crc)
+        {
+            var page = Viewport.TabPages[$"script_{crc:X8}"] as CodeEditor;
+            if (page == null) return true;
+            foreach (var box in page.Editors)
+            {
+                string error;
+                if (!box.TryApplyChanges(out error))
+                {
+                    Viewport.SelectTab(page);
+                    MessageBox.Show(this, $"{page.Text} doesn't compile:\n\n{error}\n\nFix it first.", "Script error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /// <summary>The tree again and the motion's tab opened again with its scripts now (showing kind's).</summary>
+        void RefreshMotion(uint crc, string kind)
+        {
+            var old = Viewport.TabPages[$"script_{crc:X8}"];
+            if (old != null) Viewport.TabPages.Remove(old);
+            if (textBox1.Text.Length > 0) textBox1.Text = "";
+            PopulateFighterScripts();
+            OpenScriptByHash(crc);
+            var page = Viewport.TabPages[$"script_{crc:X8}"] as CodeEditor;
+            if (page != null && kind != null) page.SelectTab(kind);
+        }
+
         /// <summary>
         /// {script hash: animation ID (first motion.mtable index)} from the motion.mtable in a file's
         /// folder, or null when there isn't one.
@@ -1218,6 +1347,7 @@ namespace Sm4shCommand
             Manager = new WorkspaceManager();
             MotionTable = null;
             IDEMode = IDE_MODE.NONE;
+            FighterFolder = null;
             _nodeCache = null;
             FighterVariable.ClearNewVars();     // New_Var names come from the files opened next
 

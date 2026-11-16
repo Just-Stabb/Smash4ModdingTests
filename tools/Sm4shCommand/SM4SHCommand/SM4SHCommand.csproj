@@ -123,6 +123,7 @@
     </Compile>
     <Compile Include="Classes\VariableAliases.cs" />
     <Compile Include="Classes\ScriptComments.cs" />
+    <Compile Include="Classes\ScriptFileSet.cs" />
     <Compile Include="GUI\Rename.cs">
       <SubType>Form</SubType>
     </Compile>

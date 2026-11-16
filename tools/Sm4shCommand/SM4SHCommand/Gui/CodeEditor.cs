@@ -50,6 +50,16 @@ namespace Sm4shCommand.GUI
             }
         }
 
+        /// <summary>v1.7.2: the script files' tab strip (its right-click menu adds / removes a file's script).</summary>
+        public TabControl Tabs { get { return tabControl1; } }
+
+        /// <summary>v1.7.2: shows the tab of a script file ("effect", ...) when it has one.</summary>
+        public void SelectTab(string key)
+        {
+            foreach (TabPage p in tabControl1.TabPages)
+                if (p.Text == key) { tabControl1.SelectedTab = p; return; }
+        }
+
         /// <summary>The editor on the tab for the given script file ("game", "effect", ..), or null.</summary>
         public ITS_EDITOR EditorFor(string key)
         {
