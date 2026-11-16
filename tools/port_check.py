@@ -48,6 +48,12 @@ class Install:
     @staticmethod
     def _norm(path):
         path = path.replace('\\', '/')
+        if 'not_for_install/' in path:
+            return None
+        # the packaging convention's install roots (docs/ultimate-port-guide.md "Packages"): INSTALL_TO_code/X is code/X
+        i = path.find('INSTALL_TO_code/')
+        if i >= 0:
+            return 'code/' + path[i + len('INSTALL_TO_code/'):]
         for i in range(len(path)):
             if (i == 0 or path[i - 1] == '/') and path.startswith(TOPS, i):
                 return path[i:]

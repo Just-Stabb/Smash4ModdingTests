@@ -335,6 +335,67 @@ def slot_scripts(fighter):
     return out
 
 
+def merge_timed(a, b):
+    """merge_flat for a body script with short condition blocks (Float / Int_Var_Compare, True(skip), ..., Else(skip),
+    ...: the facing tests the translator writes) holding no FRAME / WAIT: each block is kept whole at its frame, b's
+    (flat) commands go in by frame. None if a block waits or b branches"""
+    import ultimate_acmd as U
+    cmds = [c for c in a if c.ident != acmd.END]
+    pos, w = [], 0
+    for c in cmds:
+        pos.append(w)
+        w += 1 + len(c.params)
+    at = {p: i for i, p in enumerate(pos)}
+    items, t, i = [], 0, 0
+    while i < len(cmds):
+        c = cmds[i]
+        if c.name == 'FRAME':
+            t = max(t, int(c.params[0]))
+            i += 1
+            continue
+        if c.name == 'WAIT':
+            t += int(c.params[0])
+            i += 1
+            continue
+        if c.name in ('Float_Var_Compare', 'Int_Var_Compare') and i + 1 < len(cmds) and cmds[i + 1].name == 'True':
+            j = at.get(pos[i + 1] + int(cmds[i + 1].params[0]))
+            if j is None:
+                return None
+            if cmds[j - 1].name == 'Else':
+                j = at.get(pos[j - 1] + int(cmds[j - 1].params[0]), len(cmds) if pos[j - 1] + int(
+                    cmds[j - 1].params[0]) == w else None)
+                if j is None:
+                    return None
+            block = cmds[i:j]
+            if any(x.name in ('FRAME', 'WAIT', 'JUMP', 'Loop_Rest', 'Goto') for x in block):
+                return None
+            items.append((t, block))
+            i = j
+            continue
+        if c.name in ('True', 'Else', 'Loop_Rest', 'JUMP', 'Goto', 'IS_RANDOM', 'Float_Var_Compare', 'Int_Var_Compare'):
+            return None
+        items.append((t, [c]))
+        i += 1
+    tb = U.merge_flat(b, end())
+    if tb is None:
+        return None
+    t = 0
+    for c in tb:
+        if c.ident == acmd.END:
+            break
+        if c.name == 'FRAME':
+            t = int(c.params[0])
+        else:
+            items.append((t, [c]))
+    out, t = [], 0
+    for when, blk in sorted(items, key=lambda x: x[0]):
+        if when > t:
+            out.append(U.cmd('FRAME', when))
+            t = when
+        out += blk
+    return out + end()
+
+
 def article_effects(a, fighter, effect, joints):
     """Ultimate's held-weapon article effect scripts (Failnaught's glow / drawn arrow / shot flash, Aymr's blade flares)
     merged into the body effect scripts of the moves (Byleth v3 played none: e.g. Failnaught's charge showed only the
@@ -390,7 +451,7 @@ def article_effects(a, fighter, effect, joints):
         for anim in anims:
             for name in slots.get(anim, ()):
                 k = acmd.crc(name)
-                m = U.merge_flat(effect.scripts.get(k, end()), cmds)
+                m = U.merge_flat(effect.scripts.get(k, end()), cmds) or merge_timed(effect.scripts.get(k, end()), cmds)
                 if m is None:
                     log.append('article effects: %s %s -> %s: a branching script, left out' % (art, src, name))
                     continue
