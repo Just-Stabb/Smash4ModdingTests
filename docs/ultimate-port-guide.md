@@ -151,7 +151,7 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | body scripts from vanilla: no roll-off, the user's edits lost | Hero fix 57, Bowser jabs v3 | `unpack-body` (universal mechanics) [S1] |
 | a hitbox on a joint the table hasn't | | [S2] |
 | effects from another bank | | [S3] |
-| Ultimate's angles 367 / 368: multi-hits let go | Squirtle's Waterfall, Hero's Swoosh | translator -> 366 [S4] |
+| Ultimate's angles 367 / 368: multi-hits let go | Squirtle's Waterfall, Hero's Swoosh | translator: 367 kept as Smash 4's 367 (also pulls grounded victims; user decision 2026-11-16, earlier ports keep 366 until rebuilt), 368 -> 366 + the point in MSC (vec_target.py, S10) [S4] |
 | throw hitboxes free the held fighter | Squirtle's throws | translator: catch-only -> NoGrabRelease [S5] |
 | the base's moves left in (its landing hit, its specials) | Squirtle, Hero | [S7] |
 | motions that loop in Ultimate playing once | Hero fix 63 | translator [V1] |

@@ -106,10 +106,13 @@ REGIONS = ['NONE', 'HEAD', 'BODY', 'HIP', 'PUNCH', 'ELBOW', 'KICK', 'KNEE', 'THR
 REGION = {'ATTACK_REGION_' + r: i for i, r in enumerate(REGIONS)}
 FACING = {'ATTACK_LR_CHECK_F': 3, 'ATTACK_LR_CHECK_B': 4, 'ATTACK_LR_CHECK_POS': 0, 'ATTACK_LR_CHECK_SPEED': 0,
           'ATTACK_LR_CHECK_LR': 3}
-# Ultimate's special angles past Smash 4's: 367 (to the hitbox's centre, with the attacker's motion) and
-# 368 (to a set point) don't exist in Smash 4, whose last is 366 (to the hitbox's centre: Supamario's
-# Kamehameha holds targets with it). As they were, the multi-hits let go (Squirtle's Waterfall, 367)
-ANGLE = {367: 366, 368: 366}
+# Ultimate's special angles: 367 is kept (Smash 4's exe has a 367 too: like 366, the victim follows the
+# hitbox's own motion, but it also pulls a grounded victim, where 366 pulls only one off the ground:
+# docs/native-notes.md "Special angles 365 - 367"). User decision (2026-11-16): use 367 from now on; ports
+# converted earlier (Squirtle's Waterfall, Hero's Swoosh, Byleth's nair / uair, Incineroar's Final Smash) keep
+# their 366 until they are next rebuilt. 368 (to a set point) has no Smash 4 equivalent: written as 366, with
+# the point done in MSC (tools/vec_target.py).
+ANGLE = {368: 366}
 
 SETOFF = {'ATTACK_SETOFF_KIND_ON': (1, 1), 'ATTACK_SETOFF_KIND_OFF': (1, 0), 'ATTACK_SETOFF_KIND_THRU': (0, 0)}
 # _d: lying fighters too (Byleth's Sword of the Creator); Smash 4's Ground/Air has no such bit
