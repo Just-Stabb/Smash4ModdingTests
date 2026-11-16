@@ -40748,12 +40748,13 @@ void sh_put(int s)
 // the laying-down hurt state"): a charged hit on a fighter on the ground puts it straight down at the hit, in its
 // hitstop (v2 wrote DownBound after the hitstop: the hit's own launch / damage status then ended the hold, it released
 // on the damage statuses 0x45-0x4C). Its controller off (Input_Set 21's variable) and its buffer emptied, its place
-// noted, put down (sh_put); sh_tick holds it SH_DOWN_HOLD frames from the end of its hitstop
+// noted, put down (sh_put); sh_tick holds it SH_DOWN_HOLD frames from the end of its hitstop. The charged swing's
+// grounded-only hitbox (ID 1, knockback 1: supamario_sledgehammer_build.py HIT_CH_GROUND) never launches it
 void sh_down_start(int s)
 {
     sh_let_go();
     WorkModule(0, -(float)s, SH_V_GS);
-    WorkModule(0, 0.0f, SH_V_GN);
+    WorkModule(0, -1.0f, SH_V_GN);              // sh_tick: nothing more this frame (the put-down is on its way)
     WorkModule(0, WorkModuleF(0, 0x0f000020 + 4 * (s - 1)), SH_V_GX);
     WorkModule(0, WorkModuleF(0, 0x0f000021 + 4 * (s - 1)), SH_V_GY);
     WorkModule(0, 1.0f, 0x0F000115 + 0x20 * (s + 0x2));
@@ -40801,6 +40802,11 @@ void sh_tick()
         return;
     }
     n = WorkModuleF(0, SH_V_GN);
+    if (n < -0.5f)
+    {
+        WorkModule(0, 0.0f, SH_V_GN);
+        return;
+    }
     if (n < 0.5f)
     {
         if (WorkModuleF(0, 0x0F000043 + 8 * t) > 0.5f)

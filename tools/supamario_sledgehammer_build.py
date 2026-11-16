@@ -91,6 +91,13 @@ HIT_CH_V1 = dict(Damage=12.0, Angle=270, KBG=95, FKB=0, BKB=25)
 # 99.8 / 146.4; within 1 from 0 to 150%)
 HIT_CH = dict(Damage=20.0, Angle=270, KBG=61, FKB=0, BKB=23)
 HITSTOP_CH = 20
+# v3 (user: the charged hit on a grounded opponent "bounces just like the uncharged hit rather than forcing the opponent
+# down into the laying-down hurt state"): the charged swing is two hitboxes on the same frames and place, one hit a
+# target (Part 0): ID 0 the spike above, aerial only (Ground/Air 2); ID 1 grounded only (Ground/Air 1), the same 20%
+# and hitlag but knockback 1 (BKB 1, KBG 0, angle 0: Fake Death's grounded hit, fine in game since its v1), so a
+# fighter on the ground is never launched (v2's 99.7 / 146.7 at 50 / 100% bounced it off the floor as Smash's ground
+# spike does: DamageFly, which ended v2's hold) and the MSC puts it straight down (sh_down_start)
+HIT_CH_GROUND = dict(Damage=20.0, Angle=0, KBG=0, FKB=0, BKB=1)
 # v2 (user): shield damage by the charge (fractions of the common max shield health) and held shieldstun (Core
 # Breaker's cb_shield_tick): charged 80% / 30 frames; uncharged 24% / 8 (Smash's own for an 8% hit: INT(8 x 0.58 + 4))
 SHIELD_TAKE, SHIELD_STUN = 0.24, 8
@@ -249,8 +256,11 @@ def hit_uncharged():
 
 
 def hit_charged():
-    return hitbox(ID=0, Size=HIT_SIZE, Y=HIT_Y, Z=HIT_Z, HitstopFrames=HITSTOP_CH, SelfHitstopFrames=HITSTOP_CH,
-                  SFXLevel=2, **HIT_CH)
+    """v3: ID 0 the spike (aerial targets), ID 1 grounded targets: knockback 1, put down by the MSC"""
+    return [hitbox(ID=0, Size=HIT_SIZE, Y=HIT_Y, Z=HIT_Z, HitstopFrames=HITSTOP_CH, SelfHitstopFrames=HITSTOP_CH,
+                   SFXLevel=2, **{'Ground/Air': 2}, **HIT_CH),
+            hitbox(ID=1, Size=HIT_SIZE, Y=HIT_Y, Z=HIT_Z, HitstopFrames=HITSTOP_CH, SelfHitstopFrames=HITSTOP_CH,
+                   SFXLevel=2, SDI=0.0, **{'Ground/Air': 1}, **HIT_CH_GROUND)]
 
 
 CH, NCH = 3, 4                        # Float_Var_Compare methods: >= / <
@@ -265,7 +275,7 @@ def game_scripts():
     16-19 (sh_chg read when it comes out)"""
     start = new_vars()
     hold = new_vars() + [
-        cmd('frame', float(HIT_FROM_CH))] + if_(V_CHG, CH, CHARGE_FRAMES, [hit_charged()]) + [
+        cmd('frame', float(HIT_FROM_CH))] + if_(V_CHG, CH, CHARGE_FRAMES, hit_charged()) + [
         cmd('frame', float(HIT_FROM))] + if_(V_CHG, NCH, CHARGE_FRAMES, [hit_uncharged()]) + [
         cmd('frame', float(HIT_TO_CH))] + if_(V_CHG, CH, CHARGE_FRAMES, [cmd('remove_all_hitboxes')]) + [
         cmd('frame', float(HIT_TO)), cmd('remove_all_hitboxes')]

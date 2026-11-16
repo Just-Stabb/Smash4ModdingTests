@@ -188,6 +188,8 @@ class Game(FT.Game):
                 self.hitflag |= 4
                 continue
             hit, add, stop = (B.HIT_CH, 0, B.HITSTOP_CH) if self.charged() else (B.HIT, B.HITSTUN_ADD, B.HITSTOP)
+            if self.charged() and not v.air:            # v3: the charged swing's grounded-only hitbox (ID 1)
+                hit = B.HIT_CH_GROUND
             kb = B.knockback(hit, getattr(v, 'pct', 0))
             if isinstance(v, GVictim):                  # v3: the grounded victim model
                 v.hit(self.n, kb, int(kb * 0.4) + add, stop)
@@ -751,12 +753,16 @@ def script_tests(out, base):
     keys = ('Damage', 'Angle', 'BKB', 'KBG', 'FKB', 'Size', 'Z', 'Y', 'X', 'Bone', 'HitstunMul', 'HitstopFrames',
             'SelfHitstopFrames', 'NoGFX', 'Ground/Air', 'Shieldable', 'ShieldDamage')
     want_ch = (B.HIT_CH['Damage'], 270, B.HIT_CH['BKB'], B.HIT_CH['KBG'], 0, B.HIT_SIZE, B.HIT_Z, B.HIT_Y, 0.0, 0, 0.0,
-               B.HITSTOP_CH, B.HITSTOP_CH, 1, 3, 1, 0)
+               B.HITSTOP_CH, B.HITSTOP_CH, 1, 2, 1, 0)
+    want_chg = (B.HIT_CH_GROUND['Damage'], 0, 1, 0, 0, B.HIT_SIZE, B.HIT_Z, B.HIT_Y, 0.0, 0, 0.0,
+                B.HITSTOP_CH, B.HITSTOP_CH, 1, 1, 1, 0)
     want_un = (B.HIT['Damage'], 270, B.HIT['BKB'], B.HIT['KBG'], 0, B.HIT_SIZE, B.HIT_Z, B.HIT_Y, 0.0, 0,
                -float(B.HITSTUN_ADD), B.HITSTOP, B.HITSTOP, 1, 3, 1, 0)
-    check('the hitboxes (charged, uncharged): %s' % (keys,),
+    check('the hitboxes (charged: v3 ID 0 the spike aerial only, ID 1 grounded only knockback 1; uncharged): %s' % (keys,),
           [tuple(round(h[k], 3) if isinstance(h[k], float) else h[k] for k in keys) for h in hb],
-          [tuple(round(x, 3) if isinstance(x, float) else x for x in w) for w in (want_ch, want_un)])
+          [tuple(round(x, 3) if isinstance(x, float) else x for x in w) for w in (want_ch, want_chg, want_un)])
+    check('v3: the charged pair: IDs 0 / 1, Part 0 (one hit a target)', [(h['ID'], h['Part']) for h in hb[:2]],
+          [(0, 0), (1, 0)])
     conds = [(c.params[0], c.params[1], c.params[2]) for c in hold if nm(c) == 'Float_Var_Compare']
     check('each read sh_chg (>= %d charged / < %d not)' % (B.CHARGE_FRAMES, B.CHARGE_FRAMES), conds,
           [(B.V_CHG, 3, float(B.CHARGE_FRAMES)), (B.V_CHG, 4, float(B.CHARGE_FRAMES)),
