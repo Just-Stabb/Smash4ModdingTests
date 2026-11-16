@@ -9,6 +9,77 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: v6 (`scratchpad/byleth_v6_fix.zip`: a FIX package over v4 + byleth_userdata_v2 + v5_fix; in-game TEST)
+
+User, v4 / v5 tests: up special "not appearing / functioning" (twice), the whip moves without their blade, "etc".
+
+| point | cause (evidence) | fix |
+|---|---|---|
+| up special hits nothing at the whip | Ultimate's SpecialHi / SpecialAirHi put every hitbox on `throw` (frame 17 (2, -1, -1), 19 - 21 capsules down the blade), a joint its status code keeps on the sword's tip: his body animations hold Throw at the origin (d02specialhi frames 0 - 27: (0, 0, 0)). Translated as they were, the hitboxes sat at his feet (the Hitbox Viewer and port_check S12 on v5: ERROR) | `master_whip.bake_throw`: D02SpecialHi / G04AirCatch (body and body2) get a ThrowN track on the sword's tip (sword_null) on Ultimate's timeline (special_hi(_air)_start from 1, EXTEND at 17, BACK at 27: his game scripts), its rotation kept: frame 17 (z 6.9, y 17.5), 21 (17.7, 52.5), 25 (22.5, 64.9). **port_check S12 throw-joint** (ERROR: hitboxes on ThrowN in a move whose animation keeps it at the root) |
+| no whip anywhere (v1 - v5: ZSS's whip copy, model hidden) | the `sword` article was never built | **`tools/master_whip.py`** (below): Ultimate's sword article on his whip article (ZSS's copy, kind 0x1A0, article 2) |
+| the air hit's pull | v1 - v5 pulled 1.15 / 2.85 a frame for 14 frames whatever the hit | `master.c` `master_hi_pull`: toward where the tip was on the hit's frame, from his hand, at Ultimate's `rewind_speed` 4.1 a frame (`object_dist_max` 55): `master_whip.py tips` |
+| v5's stand-in (body sword shown with the whip moves) | `master_build.WEAPONS['SWORD']`, `ultimate_fighter.VIS_ALSO['master_sword']` | removed: his sword follows Ultimate's own `master_sword` track (hidden while the article is out); `master_build.SWORD_VIS` keeps it where the whip has no slot or another timeline (the air tether: shown 0 - 17 and from 35; Win3 and his Final Smash animations: shown, approximated) |
+| a whip left out after an interrupted move | an article outlives its status (ZSS's own ends removed hers: func_2275 - 2277) | `master.c` `master_whip_sweep` (per frame): article 2 removed on entering any status but the whip moves' (0x2A, 0x26, 0x31 - 0x34, 0x18, 0x3E, 0x14D, 0x154, 0xF1 - 0xF5, 0x15B) |
+| "etc" sweep: neutral air's landing hit missing | `LandingAirN` (1 %, 30 degrees, frame 2) not in the translator's list: the base's emptied slot | `ultimate_acmd.TRANSLATE` += LandingAirN / F / B / Hi (no vl bytes for landings) |
+| "etc": no step dust (walks, dash 21, turn) | Ultimate's `FOOT_EFFECT("null", foot)` = the ground's own footstep effect, dropped as an effect without an id; Smash 4 writes it `Graphic_Effect(0, LFootJ ...)` (vanilla ZSS's walks) | `ultimate_acmd.EffectTranslator`: FOOT_EFFECT "null" -> effect 0 |
+| "etc": sounds missing (dash attack swing, down smash's second swing, double jump, run brake / dash turn) | Ultimate tones that are containers with one `_ft` variant (se_master_dash_stop -> _dash_stop_ft, _jump02, _attackdash01, _dash_turn, _smash_L02): the "first variant" rule took numbered children only | `ultimate_sound.ult_tones`: a container with no numbered child maps to its `_ft` one (sound_ids.json only: the banks and the label table are byte-identical to the installed ones) |
+| charged neutral special "late" (open) | no cause found in the scripts (FT_MOTION_RATE and Smash 4's Set_Frame_Duration are both frame-length multipliers: the Hitbox Viewer plays SpecialHi's 0.3 as fast, 72 frames in 65); the article / arrow MSC unchanged | still waiting for the user's clip |
+
+### v6: the whip sword (`tools/master_whip.py`, called by `master_build.py build`)
+
+What Smash 4's whip gives (ZSS's files and the executable): its descriptor (kind 0x38, copied for 0x1A0) links its joint
+2000 (HaveN) to the owner's joint 0x19 (RHaveN = Ultimate's HaveR: his converted RHaveN equals it, 0.0 difference); its
+motion info names 15 animations (x4 custom moves) by the material_anime-list CRC of `FitSZerosuitWhipMain<name>` (C03AttackS4S,
+C04AttackHi4, ..., WhipShoot, WhipReverse): fixed in the executable, so his sword's motions go in under those names.
+`Set_Anchored_Article_Action(2, motion)` (ZSS's up smash, grab, down taunt) plays one of them in the fighter's model
+space from the frame it runs (her E00Catch whip's HaveN track IS her RHaveN's world matrix, 0.0002); her tether's
+`Set_Remote_Article_Action(2, 1)` / `2(2, 3)` (statuses 1 shoot / 3 back: WhipShoot / WhipReverse at her params'
+rate, the ledge check between joints 2000 - 2001, HaveN - AttachN) play in the hand's space (her HaveN track 0).
+
+| slot (ZSS name) | his move | how |
+|---|---|---|
+| 0 C03AttackS4S | down tilt | anchored, Ultimate's attack_lw3 (frame = body frame), removed 59 |
+| 4 C04AttackHi4 / 20 E00Catch | up smash | 20: frames 0 - 6 then the sword's charge loop (the body holds at 7 for the charge); 4 from body frame 7 (FRAME 8: after the charge, Ultimate's restart frame) |
+| 8 C05AttackAirN / 12 D01SpecialS | up air / its landing | anchored; the landing changes it (Ultimate's IS_EXIST + change_motion) |
+| 16 D01SpecialAirS | up special (ground) | anchored, Ultimate's timeline: special_hi start (1 - 16), extend (17 - 26), special_hi_end (27 on); the body's 0.3 rate (1 - 10) in its own script |
+| 24 / 28 / 32 E00CatchDash / Turn / Pulled | rapid jab start / loop / finisher | anchored, the loop restarted each loop (its script's JUMP) |
+| 36 E01ThrowF / 40 J01AppealS / 48 J02Win1 | forward / back / down throw | anchored |
+| 44 J01AppealLw | down taunt (L and R: one animation, ZSS's) | anchored |
+| 52 WhipShoot / 56 WhipReverse | up special (air: ZSS's tether) | hand space: `extend` at the frame whose tip is as far from the hand as her AttachN at that frame, capped at Ultimate's full reach 48 (AttachN = the tip: the ledge check, the hang's frame-from-distance and the blade agree); the back motion folds into the sword's wait pose under 18 |
+
+Model: ZSS's 18 whip bones first (names, hashes, order: model.jtb / nhb kept; HaveN's bind the identity, Ultimate's
+root), the sword's 57 after (sword01 under HaveN, Ultimate's binds, CRC32 hashes); her chain bones ride the sword's
+(PlasmaWhip01H - 08H on sword05 / 10 / ... / 35 / 37, AttachN / PlasmaWhipEndN on sword_null): effects on joints
+0x7D1 - 0x7D9 and the ledge check follow the blade. Meshes: Ultimate's sword / sword2 / stone in her
+Whip_VIS_O_OBJ_NSC slot (Cylinder empty), his body's materials (`ultimate_fighter.templates` / `material_for`),
+textures in his article block 0x40C74800 (`fighter_texture_ids` 'whip'). The whip's own scripts: game = visibility
+(drawn while Ultimate's body sword is hidden: e.g. SpecialHi 2 - 51) and the up special's rate; effect = the sword
+article's Extend (master_wire_flash on sword37 = joint 0x7D9, master_wire_wind on sword35 = 0x7D8) at 17 (ground) or on
+WhipShoot where the tip is as far (air). Its MSC: ZSS's (the tether). W11: 75 bone-instances (1 instance).
+
+Checked offline: `scratchpad/byleth/v6/bin/render_whip.py` (our body NUD / OMO / face pac + the whip NUD / VBN / OMO
+against Ultimate's body + sword article on his timeline, side and front views): every slot at 3 - 7 frames
+(`scratchpad/byleth/v6/r1/`, sheets `v6/sheet1-5.png`, `v6/sheet_final.png`) draws the same blade in the same place;
+WhipShoot's AttachN = the tip at every frame (distance 4.5 -> 48, capped). Sm4shCommand's Hitbox Viewer (Shot.exe,
+`scratchpad/byleth/v6/shots/`): SpecialHi / AirCatch's hitboxes at the whip's tip (game frame 14 = motion 21: the
+capsule ~50 above him). port_check `byleth_v4.zip byleth_userdata_v2.zip byleth_v5_fix.zip byleth_v6_fix.zip`:
+**0 ERROR**, 29 WARN (v5's); S12 on v5's install: ERROR (the bug), on v6's: INFO.
+
+Not checked (in game only): that an anchored motion follows the owner's hitlag (the rapid jab's hits) and a mid-move
+turn (back throw's Reverse_Direction at 25); that Set_Anchored_Article_Action on an article that's gone (the up air's
+landing after its frame 65) does nothing; ZSS's native ledge check on the new joints. Approximated: the air up
+special's start / back motions (the body sword shows until 17, the whip folds back in ZSS's 6-frame retract rather
+than Ultimate's 46-frame special_air_hi_end); the female down taunt's whip on the male hand; Win3 and the Final
+Smash keep the body sword (no slot left); the sword's physics frames (Ultimate's PHYSICS flag in the article's
+scripts: the canned motion plays instead); its SpecialHiHit catch effect (wire_catch) not shown.
+
+Package `scratchpad/byleth_v6_fix.zip` (`scratchpad/byleth/make_pkg_v6_fix.sh`: the fighter files that differ from
+v4 + v5_fix as installed; 28 files: the whip model / motions / scripts, body / body2 main.pac, the 16 face pacs, body
+game / effect / sound, master.mscsb), INSTALL README `scratchpad/byleth/INSTALL_README_v6.txt`. No exe.
+Build: `master_build.py vis` (weapon_vis.json without the stand-in), then `ultimate_port.py run master motions
+motions-group2 low-models sound scripts specials variants shapes --out OUT` (`scratchpad/byleth/pipeline_v6.log`,
+`pipeline_v6b.log`).
+
 ## Status: v5 (`scratchpad/byleth_v5_fix.zip`: a FIX package over v4 + byleth_userdata_v2; in-game TEST)
 
 User, v4 test: the select-screen icon too large and off its hexagon (screenshot), down tilt "not visible for most of
@@ -441,7 +512,16 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
-0000. **v6: the whip sword** (requested; not started: this session's context ran out). Facts gathered for it:
+00000. **v6 fix** (sent: `scratchpad/byleth_v6_fix.zip`, `scratchpad/byleth/INSTALL_README_v6.txt`): the user's test
+   of the whip (up special on the ground / air, a ledge tether, the hit's pull; down tilt, rapid jab, up smash tap /
+   charge, up air + landing, throws (back throw facing left), down taunt; no whip left after a hit). Then: if an
+   anchored whip drifts from the hand (hitlag in the rapid jab, the back throw's turn), the anchored motions'
+   frame / facing rule (a diag build or the clip). Still open: the charged Failnaught timing (a clip), Areadbhar's
+   dash version (SpecialSFDash / AirSFDash: Ultimate's longer lunge, 11.5 / 17.25 %; no slot / status yet), Aymr's
+   SpecialLwHit / Turn / Cancel, SpecialHiDispSword's effects, the sounds with no id left (se_common_sword_swing_s,
+   se_common_ladderstep_m, other fighters' / raw hashes, the female-only se_master_win01_02 / 03 in the male bank's
+   scripts), Win3's whip (a 16th whip motion needs the executable's motion info grown: weapon_expand "motions").
+0000. **v6: the whip sword** (done in v6, "Status: v6" above; the plan below is what was found before it). Facts gathered for it:
    ZSS's whip article (his copy, kind 0x1A0, `model/whip/c00`, now hidden by `nud.hidden` in `master_build.weapons`)
    has 18 bones: HaveN, PlasmaWhip01H-08H (a straight chain in bind, ~4.99 apart along (-0.5, 0, 0.866) from
    (-1.35, 0, 2.46) to AttachN (-19.74, 0, 34.31) and PlasmaWhipEndN), and billboard copies 02H-08H; its meshes
@@ -810,6 +890,12 @@ python3 tools/ultimate_port.py run master model-c00 .. model-c07 motions motions
     variants shapes --out OUT
 bash scratchpad/byleth/make_pkg_v4.sh                                             # -> scratchpad/byleth_v4.zip (complete)
 python3 tools/port_check.py master scratchpad/byleth_v4.zip scratchpad/byleth_userdata_v2.zip   # 0 ERROR, 21 WARN
+# v6: the whip sword (tools/master_whip.py, run by the specials step), the throw joint on its tip, the "etc" sweep
+python3 tools/master_build.py vis DUMP ULT fighters/master/weapon_vis.json
+python3 tools/ultimate_port.py run master motions motions-group2 low-models sound scripts specials variants shapes --out OUT
+python3 tools/master_whip.py tips ULT                                             # the air hit's pull table (master.c)
+bash scratchpad/byleth/make_pkg_v6_fix.sh                                         # -> scratchpad/byleth_v6_fix.zip (fix)
+python3 tools/port_check.py master byleth_v4.zip byleth_userdata_v2.zip byleth_v5_fix.zip byleth_v6_fix.zip   # 0 ERROR
 ```
 Body: `rolloff_acmd.py VANILLA/.../game.bin game.bin --plain --add 2.2 EscapeF EscapeB`; `mscdec.py -x tools/mscinfo.xml
 szerosuit.mscsb` (round trip: 2 of 2393 functions differ, both equivalent: a folded negative constant, an empty else),

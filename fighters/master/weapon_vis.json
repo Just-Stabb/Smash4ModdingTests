@@ -1,45 +1,5 @@
 {
  "_about": "tools/master_build.py vis: Ultimate animation -> {weapon visibility: [[frame, shown]]} (ultimate_fighter.py motions --extra-vis)",
- "c00attack100": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ]
-  ]
- },
- "c00attack100start": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ]
-  ]
- },
- "c00attackend": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ],
-   [
-    85,
-    0
-   ]
-  ]
- },
- "c02attacklw3": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ],
-   [
-    59,
-    0
-   ]
-  ]
- },
  "c03attacks4hi": {
   "master_spear": [
    [
@@ -73,26 +33,6 @@
    [
     85,
     0
-   ]
-  ]
- },
- "c04attackhi4": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ],
-   [
-    79,
-    0
-   ]
-  ]
- },
- "c04attackhi4charge": {
-  "master_sword_article": [
-   [
-    0,
-    1
    ]
   ]
  },
@@ -136,18 +76,6 @@
    ],
    [
     53,
-    0
-   ]
-  ]
- },
- "c05attackairhi": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ],
-   [
-    65,
     0
    ]
   ]
@@ -196,18 +124,6 @@
    ],
    [
     41,
-    0
-   ]
-  ]
- },
- "c05landingairhi": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ],
-   [
-    61,
     0
    ]
   ]
@@ -417,81 +333,17 @@
   ]
  },
  "d02specialairhi": {
-  "master_sword_article": [
-   [
-    1,
-    1
-   ]
-  ]
- },
- "d02specialairhiend": {
-  "master_sword_article": [
+  "master_sword": [
    [
     0,
     1
-   ]
-  ]
- },
- "d02specialairhihit": {
-  "master_sword_article": [
+   ],
    [
-    0,
-    1
-   ]
-  ]
- },
- "d02specialairhiovertake": {
-  "master_sword_article": [
+    17,
+    0
+   ],
    [
-    0,
-    1
-   ]
-  ]
- },
- "d02specialairhistart": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ]
-  ]
- },
- "d02specialhi": {
-  "master_sword_article": [
-   [
-    1,
-    1
-   ]
-  ]
- },
- "d02specialhiend": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ]
-  ]
- },
- "d02specialhihit": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ]
-  ]
- },
- "d02specialhipull": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ]
-  ]
- },
- "d02specialhistart": {
-  "master_sword_article": [
-   [
-    0,
+    35,
     1
    ]
   ]
@@ -597,130 +449,34 @@
   ]
  },
  "d04finalairend": {
-  "master_sword_article": [
+  "master_sword": [
    [
     0,
     1
-   ],
-   [
-    120,
-    0
    ]
   ]
  },
  "d04finalairstart": {
-  "master_sword_article": [
+  "master_sword": [
    [
     0,
     1
-   ],
-   [
-    120,
-    0
    ]
   ]
  },
  "d04finalend": {
-  "master_sword_article": [
+  "master_sword": [
    [
     0,
     1
-   ],
-   [
-    120,
-    0
    ]
   ]
  },
  "d04finalstart": {
-  "master_sword_article": [
+  "master_sword": [
    [
     0,
     1
-   ],
-   [
-    120,
-    0
-   ]
-  ]
- },
- "d04visualscene01": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ],
-   [
-    0,
-    0
-   ]
-  ]
- },
- "e01throwb": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ],
-   [
-    55,
-    0
-   ]
-  ]
- },
- "e01throwf": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ],
-   [
-    71,
-    0
-   ]
-  ]
- },
- "e01throwlw": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ],
-   [
-    52,
-    0
-   ]
-  ]
- },
- "extend": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ]
-  ]
- },
- "j01appeallwl": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ],
-   [
-    179,
-    0
-   ]
-  ]
- },
- "j01appeallwr": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ],
-   [
-    120,
-    0
    ]
   ]
  },
@@ -789,27 +545,7 @@
   ]
  },
  "j02win3": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ]
-  ]
- },
- "j02win3wait": {
-  "master_sword_article": [
-   [
-    0,
-    1
-   ],
-   [
-    0,
-    0
-   ]
-  ]
- },
- "wait": {
-  "master_sword_article": [
+  "master_sword": [
    [
     0,
     1

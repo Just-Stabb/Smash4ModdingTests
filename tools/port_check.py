@@ -21,6 +21,7 @@ import argparse
 import io
 import glob
 import json
+import math
 import os
 import re
 import struct
@@ -1673,6 +1674,69 @@ def check_motions(inst, name, rec, rep):
                 'moves T-pose: %s' % (len(miss), inst.where('fighter/%s/motion/body/main.pac' % name), ', '.join(miss)))
 
 
+def check_throw_joint_hitboxes(inst, name, rep):
+    """S12 throw-joint: a move's hitboxes on the throw joint (ThrowN) while its animation keeps ThrowN at the root:
+    Ultimate's status code moves `throw` to where the move reaches (Byleth's up special: the Sword of the Creator's tip,
+    his `throw` held at the origin in every body animation), so translated as they are the hitboxes sit at his feet
+    (Byleth v1 - v5: the up special hit nothing at the whip; user: "not functioning"). The throws, pummel and grabs use it
+    for the held fighter: left out. ERROR when every frame a throw hitbox is out has ThrowN within 3 units of the
+    root; a motion not found by its script's name: NOTE"""
+    import tempfile
+    import omo
+    import ultimate_acmd as UA
+    body = 'fighter/%s/script/animcmd/body/' % name
+    game = scripts(inst, body + 'game.bin')
+    pac = inst.get('fighter/%s/motion/body/main.pac' % name)
+    mdir = 'fighter/%s/model/body/c00/' % name
+    vbn, jt = inst.get(mdir + 'model.vbn'), inst.get(mdir + 'model.jtb')
+    if game is None or pac is None or vbn is None or jt is None:
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        for fn, d in (('model.vbn', vbn), ('model.jtb', jt)):
+            open(os.path.join(tmp, fn), 'wb').write(d)
+        open(os.path.join(tmp, 'main.pac'), 'wb').write(pac)
+        jid = UA.joint_ids(tmp).get('throw')
+        bones = omo.vbn_read(os.path.join(tmp, 'model.vbn'))
+        motions = {}
+        for n, d in omo.pac_read(os.path.join(tmp, 'main.pac')):
+            key = n[:-4]
+            key = key[key.index('Main') + 4:] if 'Main' in key else key
+            motions[key[3:].lower()] = d
+    if jid is None:
+        return
+    names = {acmd.crc(k): k for k in motions}
+    bad, odd = [], []
+    for crc, sc in game.items():
+        sname = names.get(crc)
+        if sname is None or sname.startswith(('throw', 'catch')):
+            continue
+        frame, frames = 0, []
+        for c in sc:
+            if c.name == 'FRAME':
+                frame = max(frame, int(float(c.params[0])))
+            elif c.name == 'WAIT':
+                frame += int(float(c.params[0]))
+            elif 'Hitbox' in c.name and jid in bone_params(c):
+                frames.append(frame)
+        if not frames:
+            continue
+        o = omo.Omo(motions[sname])
+        near = True
+        for f in frames:
+            w = omo.world(o, bones, min(f, o.frames - 1))
+            t, r = w['ThrowN'], w[bones[0][0]]
+            if math.hypot(*(t[i][3] - r[i][3] for i in range(3))) > 3.0:
+                near = False
+                break
+        (bad if near else odd).append('%s (frames %s)' % (sname, ','.join(str(f) for f in sorted(set(frames)))))
+    if bad:
+        rep.add('ERROR', 'S12 throw-joint', 'hitboxes on the throw joint (%d) with ThrowN at the root in the move\'s '
+                'animation: they hit at the fighter\'s feet (Ultimate\'s status code moves `throw`; give the motion a '
+                'ThrowN track where it reaches, e.g. tools/master_whip.py bake_throw): %s' % (jid, '; '.join(bad)))
+    if odd:
+        rep.add('INFO', 'S12 throw-joint', 'hitboxes on the throw joint, ThrowN moved by the animation: %s' % '; '.join(odd))
+
+
 def check_slot_moves(inst, name, src, ult, rep):
     """S11 slot-moves: Ultimate has a rapid jab / angled forward smash (game_attack100 / attacks4hi / lw in the dump) but
     the installed motion.mtable has no script for its common slot (0x53 - 0x55, 0x5E, 0x61): the move is missing (Byleth
@@ -2393,6 +2457,7 @@ def main():
     check_lod_and_camera(inst, a.name, src, base['ult'], rep)
     check_motion_groups(inst, a.name, src, base['ult'], kind, rep)
     check_slot_moves(inst, a.name, src, base['ult'], rep)
+    check_throw_joint_hitboxes(inst, a.name, rep)
     check_loop_spin(inst, a.name, rep)
     check_sound_tables(inst, a.name, kind, rep)
     check_sound_ids(inst, a.name, rep)

@@ -114,6 +114,9 @@ def ult_tones(path):
     for n, b, _v in out:
         if not b:
             kids = sorted(k for k in have if k.startswith(n) and k[len(n):].isdigit())
+            # a container whose one variant is <name>_ft (Byleth's se_master_dash_stop / _dash_turn / _jump02 /
+            # _attackdash01: no numbered children; v1 - v5 left those sounds out of his scripts)
+            kids = kids or sorted(k for k in have if k.startswith(n + '_') and k[len(n) + 1:] in ('ft',))
             if kids:
                 first[n] = kids[0]
     return out, first

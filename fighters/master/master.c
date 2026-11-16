@@ -1787,6 +1787,7 @@ void func_82()
     }
     master_vt_attackhi4();             // up smash: Ultimate's set_vec_target_pos (tools/vec_target.py)
     master_vt_specialhi();             // Sword of the Creator (ground): the same
+    master_whip_sweep();               // the whip sword (article 2) away once out of the moves that hold it
     rolloff_hold_update(); // roll-off: the air speed cap off while the stick holds the way he moves (universal mechanics)
 }
 
@@ -38293,7 +38294,7 @@ void rolloff_hold_update()
 //                   SpecialNMax (max arrow, article 7)
 //   side     0x153  Areadbhar: SpecialSStart, SpecialSF (the lunge), SpecialSLanding
 //   up       0x154  Sword of the Creator on the ground; in the air her tether status 0xF1 (AirCatch, his SpecialAirHi
-//                   animation; her whip, article 2, a hidden copy of his own, finds the ledge: 0xF5 / 0xF3 / 0xF4 her
+//                   animation; her whip, article 2, his copy carrying the whip sword (v6), finds the ledge: 0xF5 / 0xF3 / 0xF4 her
 //                   ledge hang) with a hit (0x15B: pulled in, then the overtake) and a wall jump (0x15C)
 //   down     0x155  Aymr: super armor below MASTER_LW_ARMOR damage from frame 34 to 64, the landings
 // ===================================================================
@@ -38302,6 +38303,9 @@ int master_flag;        // N: special let go early / turned once; Hi: the hit se
 float master_speed;     // S / Hi: the speed along his facing (kinetic energy 3)
 float master_frame;     // N: the draw's frame kept over the turn
 int master_wall_jumps;  // Sword of the Creator wall jumps this time in the air (reset on landing)
+float master_pull_y;    // Hi: the pull's speed up (and master_speed along the facing) ...
+int master_pull_n;      // ... for this many frames
+int master_whip_last;   // the status master_whip_sweep saw last
 
 // a motion of the status's part: from frame 0, or (keep 1) at the frame the last one had (a ground / air change)
 void master_motion(int m, int keep)
@@ -38613,10 +38617,10 @@ void master_s_loop()
 
 // ---- up special: Sword of the Creator. On the ground (0x154): SpecialHi (0x239), its hits (Ultimate's script: the
 // pull toward the point above him, angle 368 -> 366); then Wait. In the air the up special goes into her tether status
-// 0xF1 (master_hi_pre: AirCatch, 0x091 playing his SpecialAirHi): her whip (article 2, his hidden copy) goes out at the
+// 0xF1 (master_hi_pre: AirCatch, 0x091 playing his SpecialAirHi): her whip (article 2, his copy: the whip sword, tools/master_whip.py) goes out at the
 // sword's frame (tools/master_build.py: aircatch's script) and her native tether takes a ledge in reach (0xF5 / 0xF3,
 // then her hang 0xF4: his AirCatchHit / Hang animations). A hit on a fighter (frames MASTER_HI_HIT_START - END) ->
-// 0x15B: SpecialAirHiHit (pulled toward the sword's tip, MASTER_HI_PULL_X / _Y a frame), then SpecialAirHiOvertake
+// 0x15B: SpecialAirHiHit (pulled toward where the sword's tip hit, master_hi_pull: Ultimate's rewind_speed), then SpecialAirHiOvertake
 // (its hit), then special fall. A wall touched while the sword is out (up to MASTER_HI_WALL_MAX a time in the air) ->
 // 0x15C: SpecialAirHiWallJump (MASTER_HI_JUMP_X off the wall, MASTER_HI_JUMP_Y up). Else special fall at its end;
 // landing: LandingFallSpecial
@@ -38721,6 +38725,7 @@ void master_hi_air_loop()
     f = MotionModuleF(0x1);
     if (f >= MASTER_HI_HIT_START && f <= MASTER_HI_HIT_END && AttackModule(0x2727))
     {
+        master_frame = f;                   // the hit's frame: where the tip was (master_hi_pull)
         func_16(0x15b, 0);
         return;
     }
@@ -38744,10 +38749,65 @@ int master_hi2_pre()
 }
 
 // 0x15B: SpecialAirHiHit (0x23A: pulled up toward the sword's tip), then SpecialAirHiOvertake (0x23B, its hit)
+// the pull (v6): toward where the sword's tip was on the hit's frame, from his hand, at Ultimate's rewind speed
+// (param_special_hi rewind_speed 4.1 a frame, object_dist_max 55): `python3 tools/master_whip.py tips ULT` (the tip on
+// Ultimate's timeline: special_air_hi_start, EXTEND at 17, the hitboxes on the tip from 17 to 25). v1-v5 pulled him
+// 1.15 / 2.85 a frame for 14 frames whatever the hit
+void master_hi_pull()
+{
+    float f;
+    f = master_frame;
+    master_speed = 1.495f;
+    master_pull_y = 3.818f;
+    if (f < 17.0f)
+    {
+        master_speed = -2.936f;
+        master_pull_y = 2.862f;
+        master_pull_n = 0x1;
+    }
+    else if (f < 18.0f)
+    {
+        master_speed = 1.524f;
+        master_pull_y = -3.806f;
+        master_pull_n = 0x1;
+    }
+    else if (f < 19.0f)
+    {
+        master_speed = 2.957f;
+        master_pull_y = 2.84f;
+        master_pull_n = 0x1;
+    }
+    else if (f < 20.0f)
+    {
+        master_pull_n = 0x4;
+    }
+    else if (f < 21.0f)
+    {
+        master_pull_n = 0x7;
+    }
+    else if (f < 22.0f)
+    {
+        master_pull_n = 0x9;
+    }
+    else if (f < 23.0f)
+    {
+        master_pull_n = 0xa;
+    }
+    else if (f < 24.0f)
+    {
+        master_pull_n = 0xb;
+    }
+    else
+    {
+        master_pull_n = 0xc;
+    }
+}
+
 void master_hi_hit_main()
 {
     printf("Byleth status_SpecialHiHit");
     master_phase = 0;
+    master_hi_pull();
     GroundModule(0x2710, 0x5);
     KineticModule(0, 0xa);
     master_motion(0x23a, 0);
@@ -38762,8 +38822,16 @@ void master_hi_hit_loop()
     }
     if (master_phase == 0)
     {
-        master_speed = MASTER_HI_PULL_X;
-        master_move(MASTER_HI_PULL_Y);
+        if (master_pull_n > 0)
+        {
+            master_pull_n -= 0x1;
+            master_move(master_pull_y);
+        }
+        else
+        {
+            master_speed = 0;
+            master_move(0);
+        }
         if (MotionModule(0x2712))
         {
             master_phase = 0x1;
@@ -38918,6 +38986,29 @@ void master_end()
 int master_zair()
 {
     return 0;
+}
+
+// the whip sword (article 2: tools/master_whip.py) is made and moved by his body scripts (generate / anchored
+// motion / remove at Ultimate's frames). A move cut short (a hit, a grab, a cancel) never reaches its Remove_Article,
+// and an article outlives its status: on any status but the ones whose scripts hold it, it is taken away (ZSS's own
+// ends did this for her whip: her func_2275 - func_2277). Kept: down tilt 0x2A, the rapid jab 0x26, the up smash
+// 0x31 - 0x33, the aerial 0x34 and its landing 0x18 (up air), the throw 0x3E, the taunt 0x14D, the up special 0x154,
+// its tether 0xF1 - 0xF5 (ZSS's lasso and hang), its hit 0x15B
+void master_whip_sweep()
+{
+    int s;
+    s = global4;
+    if (s == master_whip_last)
+    {
+        return;
+    }
+    master_whip_last = s;
+    if (s == 0x2a || s == 0x26 || s == 0x31 || s == 0x32 || s == 0x33 || s == 0x34 || s == 0x18 || s == 0x3e
+        || s == 0x14d || s == 0x154 || s == 0x15b || (s >= 0xf1 && s <= 0xf5))
+    {
+        return;
+    }
+    ArticleModule(0x2712, 0x2);
 }
 
 // his per-frame hook (global35, was her func_2242 / Flip Jump's once-per-air limit): the wall jump count back on landing

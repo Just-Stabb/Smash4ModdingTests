@@ -1114,8 +1114,9 @@ VIS_SLOTS = {'edge_swordL': 'skirt_VIS_O_OBJ16', 'edge_swordR': 'polySurface5817
 # sword for its bright (or dark) copy during swings (forward smash: 45 of 106 frames); those copies
 # aren't converted, so with the plain sword's track alone the sword vanished in attacks (test 22)
 VIS_ALSO = {'edge_swordL': ('edge_brightswordL', 'edge_darkswordL'),
-            'edge_swordR': ('edge_brightswordR', 'edge_darkswordR'),
-            'master_sword': ('master_sword_article',)}
+            'edge_swordR': ('edge_brightswordR', 'edge_darkswordR')}
+# (Byleth v5 had 'master_sword': ('master_sword_article',) here: his body sword stood in for the whip article; since v6
+# the article exists (tools/master_whip.py) and his sword hides as Ultimate's does)
 HIDDEN_SLOTS = ('Zelda_DamageFlyFront_VIS_O_OBJ',)       # the wing (its own form, later)
 
 # Bowser's mesh slots for Incineroar: Bowser's faces are whole-face meshes, so the open eyelids go

@@ -40,14 +40,22 @@ sys.path.insert(0, HERE)
 import acmd  # noqa: E402
 
 MDIR = os.path.join(ROOT, 'fighters', 'master')
-WEAPONS = {'SPEAR': 'master_spear', 'AXE': 'master_axe', 'BOW': 'master_bow',
-           # the Sword of the Creator's whip (the `sword` article): Ultimate hides his body's sword while it is out; until
-           # the whip is built the body's sword stands in for it (ultimate_fighter VIS_ALSO: master_sword shows with it).
-           # v1-v4 followed the body track alone: down tilt's weapon vanished for frames 0-57 (user, v4)
-           'SWORD': 'master_sword_article'}
+WEAPONS = {'SPEAR': 'master_spear', 'AXE': 'master_axe', 'BOW': 'master_bow'}
+# the Sword of the Creator's whip (the `sword` article) is an article of its own since v6 (tools/master_whip.py: his copy
+# of ZSS's whip, article 2): his body's sword follows Ultimate's own master_sword track, hidden while the article is out.
+# (v5 stood the body's sword in for the missing article: WEAPONS 'SWORD' / ultimate_fighter.VIS_ALSO 'master_sword'.)
 # articles whose own motion folder plays a body motion its game script doesn't generate / remove them in: out from
 # the motion before (Failnaught's turn: v1-v4 hid the bow in SpecialNTurn while Ultimate's bow plays d00specialnturn)
-ARTICLE_MOTIONS = {'bow': 'master_bow', 'axe': 'master_axe', 'spear': 'master_spear', 'sword': 'master_sword_article'}
+ARTICLE_MOTIONS = {'bow': 'master_bow', 'axe': 'master_axe', 'spear': 'master_spear'}
+# the body sword's own track where the whip shows on another timeline than Ultimate's article: the air up special's
+# tether (ZSS's native whip, statuses 1 / 3: master_whip.py) is drawn from 17 (EXTEND) and taken away at 35, so the body
+# sword shows before and after it (Ultimate: hidden 2 - 51, its article's start / back motions in the hand)
+SWORD_VIS = {'d02specialairhi': [[0, 1], [17, 0], [35, 1]],
+             # no whip slot left for these (ZSS's whip has 15 motion names, all his: master_whip.SLOTS): Win3 (the
+             # result screen) and his Final Smash animations (the Final Smash is ZSS's: no sword article) keep the body
+             # sword in hand where Ultimate whips the article (approximated)
+             'j02win3': [[0, 1]], 'd04finalstart': [[0, 1]], 'd04finalairstart': [[0, 1]], 'd04finalend': [[0, 1]],
+             'd04finalairend': [[0, 1]]}
 
 
 # ---------------------------------------------------------------- the held weapons' visibility
@@ -73,7 +81,7 @@ def weapon_frames(body):
     seen = set()
     for m in re.finditer(r'frame\(agent\.lua_state_agent, ([\d.]+)\)|wait\(agent\.lua_state_agent, ([\d.]+)\)|'
                          r'(generate_article|remove_exist|change_motion|IS_EXIST_ARTICLE|set_flag|shoot_exist)'
-                         r'[^;]*?GENERATE_ARTICLE_(SPEAR|AXE|BOW|SWORD)\b', body):
+                         r'[^;]*?GENERATE_ARTICLE_(SPEAR|AXE|BOW)\b', body):
         if m.group(1):
             frame = max(frame, float(m.group(1)))
             continue
@@ -111,6 +119,8 @@ def cmd_vis(a):
                 for k, v in keys.items():
                     # by frame, a frame's keys in script order (sorted pairs put [f, 0] before [f, 1])
                     cur[k] = sorted(cur.get(k, []) + v, key=lambda kv: kv[0])
+    for anim, keys in SWORD_VIS.items():
+        out.setdefault(anim, {})['master_sword'] = keys
     for art, vname in ARTICLE_MOTIONS.items():
         mdir = os.path.join(a.ult, 'motion', art, 'c00')
         if not os.path.isdir(mdir):
@@ -140,10 +150,10 @@ CONSTS = dict(
     MASTER_S_SPEED_FRAME='2.0f', MASTER_S_END_FRAME='14.0f', MASTER_S_END_MUL='1.0f', MASTER_S_END_BRAKE='0.07f',
     MASTER_S_END_BRAKE_AIR='0.008f', MASTER_S_LANDING_MUL='0.9f', MASTER_S_LANDING_BRAKE='0.03f',
     # Sword of the Creator: param_special_hi start_speed_y_air, wall_hit_max, jump_speed_x / _y; SpecialAirHi's hits
-    # (16 - 25) and the sword back (27); the pull (mine: SpecialHi's target point x 16 / y 40 over SpecialAirHiHit's 14
-    # frames)
+    # (16 - 25) and the sword back (27); the hit's pull: master.c master_hi_pull (rewind_speed 4.1 toward the tip,
+    # tools/master_whip.py tips)
     MASTER_HI_START_Y='1.4f', MASTER_HI_HIT_START='16.0f', MASTER_HI_HIT_END='25.0f', MASTER_HI_WALL_END='27.0f',
-    MASTER_HI_WALL_MAX='3', MASTER_HI_PULL_X='1.15f', MASTER_HI_PULL_Y='2.85f', MASTER_HI_JUMP_X='0.9f',
+    MASTER_HI_WALL_MAX='3', MASTER_HI_JUMP_X='0.9f',
     MASTER_HI_JUMP_Y='2.6f',
     # Aymr: param_special_lw super_armor_damage_max; SpecialLw's START / END_SUPER_ARMOR (34 / 64), INHERIT_LANDING_1's
     # end (51), INHERIT_LANDING_2 (65 - 117)
@@ -271,13 +281,15 @@ def body_fix(a, fighter):
             if vh[i] in vfiles[fn].scripts:
                 f.scripts[vh[i]] = [acmd.Command(c.ident, list(c.params)) for c in vfiles[fn].scripts[vh[i]]]
     g = files['game'].scripts
-    # the air Sword of the Creator: her whip (article 2: his hidden copy, weapon kind 0x1A0) out as her AirCatch does,
+    # the air Sword of the Creator: her whip (article 2: his copy, weapon kind 0x1A0, the sword since v6) out as her AirCatch does,
     # at the sword's frames (Ultimate's sword article EXTEND at 17, BACK at 27); her frame-0 flag (0x2100000D, 5 frames:
     # the common AirCatch's ground check, func_124)
     ac = acmd.crc('aircatch')
+    # the whip hidden until it goes out (status 0 plays no motion of ours: her aircatch hides it so too); his body sword
+    # shows until then (SWORD_VIS)
     whip = [U.cmd('GENERATE_ARTICLE', 2), U.cmd('Article_Visibility', 2, 0), U.cmd('ON_FLAG', 0x2100000D),
             U.cmd('FRAME', 5), U.cmd('OFF_FLAG', 0x2100000D),
-            U.cmd('FRAME', 17), U.cmd('Set_Remote_Article_Action', 2, 1),
+            U.cmd('FRAME', 17), U.cmd('Article_Visibility', 2, 1), U.cmd('Set_Remote_Article_Action', 2, 1),
             U.cmd('FRAME', 27), U.cmd('Set_Remote_Article_Action2', 2, 3),
             U.cmd('FRAME', 35), U.cmd('Remove_Article', 2)] + end()
     if any(c.name == 'GENERATE_ARTICLE' for c in g[ac]):
@@ -313,6 +325,8 @@ def body_fix(a, fighter):
         g[acmd.crc(name)] = m
     for line in article_effects(a, fighter, files['effect'], joints, files['game']):
         log.append(line)
+    import master_whip
+    master_whip.body_scripts(files['game'], log.append)
     for fn, f in files.items():
         f.save(os.path.join(d, fn + '.bin'))
     log.append('aircatch: the whip at 0 / 17 / 27 / 35; overtake: a hitbox for the throw; Aymr: the axe\'s hitbox merged')
@@ -324,9 +338,9 @@ def body_fix(a, fighter):
 # fighter's (its shot effects at (0, 9.8, 15) are his chest); the held arrow (arrow1's Haved / Haved2, on the string
 # while Failnaught draws) is put on his right hand, which holds it
 ARTICLE_FX = {'master_bow': ('havel', {}), 'master_axe': ('haver', {'top': 'axe'}),
-              'master_arrow1': ('haver', {'top': 'arrow'}),
-              # the whip sword (not built: its body sword stands in): every segment collapsed onto his Sword1 (approximated)
-              'master_sword': ('sword1', None)}
+              'master_arrow1': ('haver', {'top': 'arrow'})}
+# (the whip sword's own effect scripts (Extend: master_wire_flash / _wind) are on the whip article since v6:
+# tools/master_whip.py; v5 merged them onto his Sword1, collapsed)
 # article script -> the Ultimate body animations (their slots get it merged into their effect script)
 ARTICLE_FX_SCRIPTS = {
     ('master_bow', 'SpecialNStart'): ('d00specialnstart', 'd00specialairnstart'),
@@ -337,11 +351,7 @@ ARTICLE_FX_SCRIPTS = {
     ('master_axe', 'LandingAirLw'): ('c05landingairlw',), ('master_axe', 'SpecialLw'): ('d03speciallw',),
     ('master_axe', 'SpecialAirLw'): ('d03specialairlw',), ('master_axe', 'SpecialLwHit'): ('d03speciallwhit',),
     ('master_axe', 'SpecialAirLwHit'): ('d03specialairlwhit',),
-    ('master_axe', 'SpecialLwLanding1'): ('d03speciallwlanding1',),
-    # the sword article's EXTEND status from the up special's frame 17 (SpecialHi / SpecialAirHi's change_status),
-    # its catch on a hit, its down throw
-    ('master_sword', 'Extend'): (('d02specialhi', 'd02specialairhi'), 17),
-    ('master_sword', 'SpecialHiHit'): ('d02specialairhihit',), ('master_sword', 'ThrowLw'): ('e01throwlw',)}
+    ('master_axe', 'SpecialLwLanding1'): ('d03speciallwlanding1',)}
 
 
 def slot_scripts(fighter):
@@ -511,7 +521,7 @@ def Translator_script(U, joints, body):
 # Failnaught's arrows: copies of ZSS's Paralyzer shot (paralyzer_bullet: native, straight, removed on a hit), his
 # articles 6 (arrow1, Ultimate's arrow1 Fly: 12 damage) and 7 (arrow2, the max arrow: Ultimate's arrow2 Search, 29);
 # every one of the shot's eight motions plays it (the native shot picks its motion by charge / custom move). The whip:
-# a copy of hers (article 2, the tether's ledge reach) drawing nothing: no scripts of its own, her model hidden
+# a copy of hers (article 2, the tether's ledge reach) carrying the Sword of the Creator's whip since v6 (tools/master_whip.py)
 SHOT_MOTIONS = ('7044fcbe', '18de2129', '6fd911bf', 'f1bd841c', 'e4e481dd', '1e08f097', '690fc001', 'f76b55a2')
 ARROWS = {'arrow1': ('master_arrow1', 'Fly', 'game_fly', 'effect_fly'), 'arrow2': ('master_arrow2', 'Search', 'game_search',
                                                                                     'effect_search')}
@@ -524,7 +534,6 @@ SHOT_PARAMS = {'paralyzer_bullet:0x02000000': 9.0, 'paralyzer_bullet:0x02000001'
 
 def weapons(a, fighter, effect_ids):
     import ultimate_acmd as U
-    import nud
     log = []
     mt = b''.join(bytes.fromhex(x) for x in SHOT_MOTIONS)
     for art, (folder, src, gname, ename) in ARROWS.items():
@@ -558,24 +567,21 @@ def weapons(a, fighter, effect_ids):
             shutil.copy(src, os.path.join(mdir, art + '.mscsb'))
         else:
             log.append(arrow2_msc(src, os.path.join(mdir, art + '.mscsb')))
-    # the whip: her model hidden, her motion, her MSC (the tether's native-side logic), no scripts
-    wsrc = a.base
-    for sub in ('model/whip/c00', 'motion/whip'):
-        shutil.copytree(os.path.join(wsrc, sub), os.path.join(fighter, sub), dirs_exist_ok=True)
-    mdl = os.path.join(fighter, 'model/whip/c00/model.nud')
-    data = nud.hidden(mdl)
-    open(mdl, 'wb').write(data)
-    vw = os.path.join(wsrc, 'script/animcmd/weapon/whip')
-    ww = os.path.join(fighter, 'script/animcmd/weapon/whip')
-    os.makedirs(ww, exist_ok=True)
-    wmt = open(os.path.join(vw, 'motion.mtable'), 'rb').read()
-    wh = struct.unpack('>%dI' % (len(wmt) // 4), wmt)
-    for fn in ('game', 'effect', 'sound', 'expression'):
-        acmd.ACMDFile({x: end() for x in wh if x}).save(os.path.join(ww, fn + '.bin'))
-    open(os.path.join(ww, 'motion.mtable'), 'wb').write(wmt)
+    # the whip: the Sword of the Creator's (tools/master_whip.py: Ultimate's sword article on her whip's skeleton, its
+    # motions under her whip's motion names, its scripts), her MSC (the tether's native-side logic)
+    import master_whip
+    master_whip.build_model(a.ult, a.base, os.path.join(fighter, 'model/body/c00'), os.path.join(fighter, 'model/whip/c00'),
+                            log.append)
+    table = master_whip.build_motions(a.ult, a.base, os.path.join(fighter, 'motion/whip/main.pac'), log.append)
+    master_whip.build_scripts(a.dump, a.ult, a.base, fighter, effect_ids, table, log.append)
     os.makedirs(os.path.join(fighter, 'script/msc/whip'), exist_ok=True)
-    shutil.copy(os.path.join(wsrc, 'script/msc/whip/whip.mscsb'), os.path.join(fighter, 'script/msc/whip/whip.mscsb'))
-    log.append('whip: her model hidden, %d empty scripts, her MSC' % len(wh))
+    shutil.copy(os.path.join(a.base, 'script/msc/whip/whip.mscsb'), os.path.join(fighter, 'script/msc/whip/whip.mscsb'))
+    # Ultimate's up-special hitboxes on `throw`, which his status code keeps on the sword's tip: the converted body
+    # motions get a ThrowN track there (male body / female body2)
+    for folder, cdir in (('body', 'c00'), ('body2', 'c01')):
+        pac = os.path.join(fighter, 'motion', folder, 'main.pac')
+        if os.path.exists(pac):
+            master_whip.bake_throw(a.ult, pac, os.path.join(fighter, 'model/body', cdir, 'model.vbn'), log.append)
     return log
 
 

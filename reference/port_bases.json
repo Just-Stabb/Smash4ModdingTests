@@ -74,6 +74,6 @@
   "pickel": {"kind": "0x44", "base": "0x40C40000", "articles": []},
   "brave": {"kind": "0x45", "base": "0x40C50000", "articles": []},
   "pzenigame": {"kind": "0x46", "base": "0x40C60000", "articles": []},
-  "master": {"kind": "0x47", "base": "0x40C70000", "articles": []}
+  "master": {"kind": "0x47", "base": "0x40C70000", "articles": ["whip"]}
  }
 }

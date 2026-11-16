@@ -67,6 +67,11 @@ TRANSLATE = {
     'ThrowF': 'throwf', 'ThrowB': 'throwb', 'ThrowHi': 'throwhi', 'ThrowLw': 'throwlw',
     'CliffAttack': 'cliffattackquick', 'DownAttackU': 'downattacku', 'DownAttackD': 'downattackd',
     'SlipAttack': 'slipattack',
+    # the aerials' landings (EMPTY: the base's emptied): Ultimate's own game scripts where it has them (Byleth's neutral
+    # air landing hit, 1 % at 30 degrees on frame 2: missing up to v5); no vl bytes for landings (fighter_param's landing
+    # frames)
+    'LandingAirN': 'landingairn', 'LandingAirF': 'landingairf', 'LandingAirB': 'landingairb',
+    'LandingAirHi': 'landingairhi',
     # the dash's run transition (Ultimate's frame: 11 for the four ported so far; the base's was for its
     # own animation, Robin 17 / Zelda 16 / Pit 13 / Bowser 14, so the run cut in mid-stride; Smash 4 has
     # no TurnDash motion, its turn dash plays Dash). Game script only: the base's sound / expression
@@ -1074,6 +1079,11 @@ class EffectTranslator(Translator):
             # endless emitter on for good (Graphic_Effect4: EffectModule 0x271A, no 0x8000 flag)
             target = 'External_Graphic'
         eid = self.ids.get(a[1])
+        if eid is None and a[1] == 'null' and target == 'Graphic_Effect':
+            # FOOT_EFFECT("null"): the ground's own footstep effect (dust, grass, water by the stage's material); Smash 4
+            # writes it as effect 0 on the foot (vanilla ZSS's walks: Graphic_Effect(0, LFootJ / RFootJ)). Left out up to
+            # Byleth v5 (no step dust in his walks, turn, dash, run)
+            eid = 0
         self.last = eid is not None
         self.last_name = a[1]
         if eid is None:
