@@ -373,6 +373,7 @@ def body_fix(a, fighter):
     import master_whip
     master_whip.body_scripts(files['game'], log.append)
     g[acmd.crc('specialairhihit')] = hi_hit_script()       # v9: the sword stays on what it met during the stop
+    files['effect'].scripts[acmd.crc('specialairhihit')] = hi_hit_effect(U, files['effect'])     # v11: the catch's
     for line in smash_hold_fx(a, files['effect'], joints):
         log.append(line)
     g[ov] = merge_tail(U, g[ov], overtake_soft(U, overtake_throw(U, a.dump, joints)))
@@ -405,7 +406,42 @@ def hi_hit_script():
     out = if_var(HI_HIT_MODE_VAR, 0, 0, back())
     for mode, fr in sorted(HI_STOP.items(), key=lambda kv: kv[1]):
         out += [U.cmd('FRAME', fr)] + if_var(HI_HIT_MODE_VAR, 0, mode, back())
-    return out + end()
+    # v11: a catch without a capture (VAR_11 1 - 3): Ultimate's catching hit (SpecialAirHi's ATTACK 0 from 20: 3 %,
+    # sting, cut-up sound) lands on the held fighter at frame 1, its spark, sound and hitlag, no knockback (it stays
+    # held); the capsule covers the tip's path over the catch frames (20 - 26: (15, 45) - (23, 65) from him)
+    hit = U.cmd('Extended_Special_Hitbox', 0)
+    f = dict(ID=0, Part=0, Bone=0, Damage=HI_CATCH_HIT, Angle=361, KBG=0, FKB=0, BKB=0, Size=8.0, X=0.0, Y=40.0,
+             Z=12.0, Effect=2, Trip=0.0, Hitlag=1.0, SDI=0.0, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=0, SFXType=3,
+             **{'Ground/Air': 3, 'Direct/Indirect': 1}, Type=10, HitBits=0x3F, Unk41=0, CollisionPart=0xF, NoScale=0,
+             Shieldable=0, Reflectable=0, Absorbable=0, Rehit=0, IgnoreInvuln=0, HitAllStates=0, FacingRestrict=0,
+             NoGrabRelease=1, TeamDamage=0, DisableHitlag=0, NoGFX=0, Flinchless=0, X2=0.0, Y2=68.0, Z2=24.0)
+    hit.params = [f[n] for n in hit.info['syntax']]
+    soft = [U.cmd('FRAME', 1)] + if_var(HI_SOFT_VAR, 5, 0, [hit]) + [U.cmd('FRAME', 2), U.cmd('Remove_All_Hitboxes')]
+    k = next(i for i, c in enumerate(out) if c.name == 'FRAME')       # after the frame-0 branch (absolute FRAMEs)
+    return out[:k] + soft + out[k:] + end()
+
+
+HI_CATCH_HIT = 3.0
+HI_CATCH_FX = ((0x347006E, 'master_wire_catch'), (0x3470073, 'master_wire_wind2'))
+
+
+def hi_hit_effect(U, effect):
+    """v11 SpecialAirHiHit's effect script: Ultimate's sword SpecialHiHit (master_wire_catch + master_wire_wind2 on the
+    tip, sword35, at frame 0) where the tip held the fighter (VAR_15 2; the tip's path's middle, (18, 52) from him:
+    the body has no tip bone in this motion)"""
+    tmpl = next(c for sc in effect.scripts.values() for c in sc if c.name == 'Graphic_Effect')
+    out = []
+    for gid, _n in HI_CATCH_FX:
+        c = acmd.Command(tmpl.ident, list(tmpl.params))
+        syn = c.info['syntax']
+        v = dict(zip(syn, c.params))
+        v.update(Graphic=gid, Bone=0, X=0.0, Y=52.0, Z=18.0, XRot=0.0, YRot=0.0, ZRot=0.0, Size=1.0)
+        for k in syn:
+            if k.startswith('Random'):
+                v[k] = 0.0
+        c.params = [v[k] for k in syn]
+        out.append(c)
+    return if_var(HI_HIT_MODE_VAR, 0, 2, out) + end()
 HI_CAPTURE_STATUS = 0xBD         # the Falcon Dive capture (docs/acmd-params/throws-grabs-other.md TargetStatus 189)
 HI_TARGET_VARS = ('FIGHTER_MASTER_STATUS_SPECIAL_HI_FLAG_TARGET_AIR', 0x0F00030C,      # VAR_12, VAR_13: master.c
                   'FIGHTER_MASTER_STATUS_SPECIAL_HI_FLAG_TARGET_HI_DAMAGE', 0x0F00030D)  # master_hi_catch sets them

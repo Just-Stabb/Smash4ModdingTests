@@ -38,6 +38,8 @@ v10 (README "Status: v10"):
 11. the ledge box per frame (12 - 14 the normal one, 15 - 16 the tether box);
 12. Aymr's landings by frame (INHERIT_1, Landing2 before the hop, the air motion from the hop to the hit's end,
     INHERIT_2, Landing1) and the hop at 53.
+v11: the reel moves him by the self-move position variables (0x0F000004 / 5), energy 3 kept 0; the wall jump's jump
+     from 0x15C's main entered again; the catch without a capture leaves its 3 % to SpecialAirHiHit's hit.
 """
 import os
 import re
@@ -92,6 +94,15 @@ class Game:
         self.ceil_y = None         # ... or a ceiling at this world y, for the line test
         self.line_asks = []        # (x0, y0, x1, y1, mode) of each line test
         self.lasso = False         # v10: flag 0x2100000D on
+        self.step = [0.0, 0.0]     # v11: self moves (forward, up) since the last take()
+
+    def take(self):
+        """the self moves since the last call, applied to the position: (forward, up)"""
+        f, u = self.step
+        self.step = [0.0, 0.0]
+        self.x += f * self.lr
+        self.y += u
+        return f, u
 
     def sys(self, sid, a):
         self.calls.append((sid, list(a)))
@@ -122,6 +133,8 @@ class Game:
             return f2i(self.fvar(a[1]))
         if sid == 0x16 and len(a) == 3 and a[0] == 0:        # WorkModule(0, value, var): a float set
             self.vars[a[2]] = i2f(a[1])
+            if a[2] in (0x0F000004, 0x0F000005):         # v11: the self moves (forward / up), position_vars_cave
+                self.step[a[2] - 0x0F000004] += i2f(a[1])
             if a[2] == 0x0F0003D4:
                 self.line_test(i2f(a[1]))
             return 0
@@ -301,21 +314,16 @@ def up_special(path):
     for n in range(1, 40):
         gm.frame = float(n)
         b.call('master_hi_hit_loop')
-        ks = [a for s, a in gm.calls if s == 0x10 and a and a[0] == 0x11 and a[1] == 3]
-        if ks:
-            vx, vy = i2f(ks[-1][2]), i2f(ks[-1][3])
-            gm.x += vx
-            gm.y += vy
-            if vx or vy:
-                moved.append((round(vx, 2), round(vy, 2)))
-            elif not moved:
-                held = n
+        vx, vy = gm.take()                          # v11: moved by his position, not energy 3
+        if vx or vy:
+            moved.append((round(vx, 2), round(vy, 2)))
+        elif not moved:
+            held = n
         gm.calls = [c for c in gm.calls if c[0] != 0x10]
         if b.g('master_phase') == 1:
             gm.frame = 1.0
             b.call('master_hi_hit_loop')            # the next frame stops him
-            ks = [a for s, a in gm.calls if s == 0x10 and a and a[0] == 0x11 and a[1] == 3]
-            stopped = bool(ks) and i2f(ks[-1][2]) == 0.0 and i2f(ks[-1][3]) == 0.0
+            stopped = gm.take() == (0.0, 0.0)
             break
     links = [a for s, a in gm.calls if s == 0x2A and a and a[0] == 0x271B]
     sets = [a for s, a in gm.calls if s == 0x16 and a and a[0] == 7 and a[2] == 0x11000005]
@@ -371,15 +379,11 @@ def v9(path):
     for n in range(1, 60):
         gm.calls.clear()
         b.call('master_hi_hit_loop')
-        ks = [a for s, a in gm.calls if s == 0x10 and a and a[0] == 0x11 and a[1] == 3]
-        if ks:
-            vx, vy = i2f(ks[-1][2]), i2f(ks[-1][3])
-            if vx or vy:
-                moved += 1
-                gm.x += vx * gm.lr
-                gm.y += vy
-            elif not moved:
-                held = n
+        vx, vy = gm.take()
+        if vx or vy:
+            moved += 1
+        elif not moved:
+            held = n
         if 0x15C in gm.status:
             break
     check('v9 latched: still 12 frames (hit_stop_frame_wall), pulled until his hand (v10: the line test\'s start, 5.5 '
@@ -505,10 +509,7 @@ def v10(path):
           kin(gm, 0x11, 1) and i2f(kin(gm, 0x11, 1)[-1][2]) == 0.0 and kin(gm, 0x2717, 1), str(kin(gm, 0x11, 1)))
     for n in range(60):
         b.call('master_hi_hit_loop')
-        ks = kin(gm, 0x11, 3)
-        if ks:
-            gm.x += i2f(ks[-1][2]) * gm.lr
-            gm.y += i2f(ks[-1][3])
+        gm.take()
         gm.calls = [c for c in gm.calls if c[0] != 0x10]
         if 0x15C in gm.status:
             break
@@ -535,6 +536,16 @@ def v10(path):
     check('v10 the cling: 13 frames (wall_jump_stop_frame), then 2.6 up on the gravity energy and 0.9 on air control, '
           'the fall back (0x2718)', jumped == 13 and abs(jy - 2.6) < 1e-5 and jx and abs(abs(i2f(jx[-1][2])) - 0.9) < 1e-5
           and fell, 'jumped at %s' % jumped)
+    check('v11 the jump: 0x15C entered again (its main sets the speeds), flagged', 0x15C in gm.status
+          and b.g('master_hi_wj_jump') == 1, str([hex(x) for x in gm.status]))
+    gm.calls.clear()
+    jumps0 = b.g('master_wall_jumps')
+    b.call('master_hi_wall_end')
+    b.call('master_hi_wall_main')
+    check('v11 the re-entered main: the jump (gravity 2.6, air control 0.9), no turn, no extra wall jump counted, the '
+          'motion kept at its frame', kin(gm, 0x11, 1) and abs(i2f(kin(gm, 0x11, 1)[-1][2]) - 2.6) < 1e-5
+          and not [a for s, a in gm.calls if s == 0x14 and a == [0x2710]] and b.g('master_wall_jumps') == jumps0
+          and [a for s, a in gm.calls if s == 0x12 and a and a[0] == 3], str(kin(gm, 0x11, 1)))
     # 2. the catch without a capture
     def tipped(frame, dx=0.0, dy=0.0, intangible=False):
         b, gm = setup(frame)
@@ -553,8 +564,9 @@ def v10(path):
     b.call('master_hi_air_loop')
     check('v10 no capture: the tip on a fighter two frames running -> caught (0x15B), not on the first (the grab box\'s)',
           not first and 0x15B in gm.status and b.g('master_target') == 1)
-    check('v10 held without a capture: VAR_11 = 2 (CATCH: an air target), its 3 %, a hitstop each frame',
-          gm.vars.get(0x0F00030B) == 2.0 and gm.vars.get(0x0F000100 + 0x20 * 4 + 0x17) == 23.0
+    check('v10 held without a capture: VAR_11 = 2 (CATCH: an air target), a hitstop each frame; v11 its 3 % left to '
+          'the hit in SpecialAirHiHit\'s script (not added here)',
+          gm.vars.get(0x0F00030B) == 2.0 and gm.vars.get(0x0F000100 + 0x20 * 4 + 0x17) is None
           and gm.vars.get(0x0F00005C + 8) == 3.0, str((gm.vars.get(0x0F00030B), gm.vars.get(0x0F00005C + 8))))
     # the hold, the reel, the overtake's hitbox frame
     gm.status.clear()
@@ -562,10 +574,7 @@ def v10(path):
     b.call('master_hi_hit_main')
     for n in range(60):
         b.call('master_hi_hit_loop')
-        ks = kin(gm, 0x11, 3)
-        if ks:
-            gm.x += i2f(ks[-1][2]) * gm.lr
-            gm.y += i2f(ks[-1][3])
+        gm.take()
         gm.calls = [c for c in gm.calls if c[0] != 0x10] if b.g('master_phase') == 0 else gm.calls
         if b.g('master_phase') == 1:
             break

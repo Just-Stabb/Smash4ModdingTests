@@ -2809,6 +2809,32 @@ def check_pull_gravity(name, rep):
                 'the gravity energy running: he sinks under the pull: %s' % (name, ', '.join(bad)))
 
 
+def check_loop_speed(name, rep):
+    """S21 loop-speed (WARN): a status whose per-frame loop (func_78) moves the fighter by setting kinetic energy 3's
+    speed with a y that isn't 0. In game this didn't move Byleth at all (v10's SpecialAirHiHit reel: the diag log's
+    height under the target the same for 20 frames, v9's trim: he sank under it), while speeds set in a status's main
+    did (v9's wall jump). Move him by the self-move position variables (0x0F000004 / 5) or set the speed in a main"""
+    funcs = _c_funcs(name)
+    if not funcs:
+        return
+    pull_fn = [f for f, b in funcs.items() if re.search(r'KineticModule\(0x11, 0x3, [^;]*, y\);', b)]
+    bad = []
+    for f, b in funcs.items():
+        for loop in re.findall(r'func_78\((\w+)\)', b):
+            if loop not in funcs or re.fullmatch(r'func_\d+', loop):
+                continue
+            reach = _reach(funcs, loop, 3)
+            direct = [y for g in [loop] + re.findall(r'\b(\w+)\(', reach) if g in funcs and g not in pull_fn
+                      for st in re.findall(r'KineticModule\(0x11, 0x3, [^;]*\);', funcs[g]) if 'KineticModuleF(' not in st
+                      for y in re.findall(r', ([^,]+)\);$', st)]
+            via = [v for g in pull_fn for v in re.findall(r'\b%s\(([^;]*)\);' % g, reach)]
+            if any(v.strip() not in ('0', '0.0f', 'y') and 'KineticModuleF(' not in v for v in direct + via):
+                bad.append(loop)      # (a y read back from the energy keeps its speed: not a move)
+    if bad:
+        rep.add('WARN', 'S21 loop-speed', '%s.c: loops that move the fighter by energy 3 speeds (they didn\'t move '
+                'Byleth in game): %s' % (name, ', '.join(sorted(set(bad)))))
+
+
 def check_vec_pull_angle(inst, src, name, ult, rep):
     """S19 vec-pull-angle: a hit Ultimate writes at 368 with set_vec_target_pos (the fighter carried to a point) on its
     body (`top`, bone 0 here) left at the translator's 366: Smash 4's 366 takes the hitbox's own motion over the frame,
@@ -2947,6 +2973,7 @@ def main():
     check_vec_targets(src, a.name, base['ult'], rep)
     check_tether_latch(a.name, rep)
     check_pull_gravity(a.name, rep)
+    check_loop_speed(a.name, rep)
     check_vec_pull_angle(inst, src, a.name, base['ult'], rep)
     check_add_speed(src, a.name, base['ult'], rep)
     n = rep.show()

@@ -38318,6 +38318,7 @@ int master_soft;        // v10 Hi: the caught fighter held without a capture (ma
                         // overtake's throw as a hitbox (VAR_11: 1 THROW, 2 CATCH, 3 THROW_MEWTWO), 0 a real capture
 int master_soft_seen;   // v10 Hi: the slot + 1 the tip reached on the last frame (the fallback waits one frame)
 int master_hi_latched;  // v10 Hi: 0x15B -> 0x15C from a wall latch (the wall jump turns away and clings)
+int master_hi_wj_jump;  // v11 Hi: 0x15C entered again for its jump (the speeds set in its main)
 float master_hi_wj;     // v10 Hi: the wall jump's frames so far
 
 // a motion of the status's part: from frame 0, or (keep 1) at the frame the last one had (a ground / air change)
@@ -38811,7 +38812,8 @@ void master_hi_air_loop()
 }
 
 // v9 diag build only (MASTER_DIAG 1: tools/master_build.py --diag; exe with tools/diag_godfist_cave.py): one Cemu log
-// line "S4GF k=<k> v=<value> c=<value x 100>" per write. k 0 the up special's frame, 1 another fighter in reach: slot x
+// line "S4GF k=<k> v=<value> c=<value x 100>" per write. v11: 10 the reel's distance left each frame, 11 the wall
+// jump's jump (0x15C entered again). k 0 the up special's frame, 1 another fighter in reach: slot x
 // 1000 + its status (0xBD = 189: caught), 2 a line test: 1 + 10 x its kind (0 nothing met), 3 its distance x 1,
 // 4 SpecialAirHiHit's mode (1 wall, 2 stopped, 3 a fighter), 5 CatchModule(0x2712) (holding someone).
 // v10: 6 the nearest fighter's distance from the tip (frames 20 - 26: the catch's test), 7 the catch taken: 1 a real
@@ -39024,8 +39026,13 @@ int master_hi_catch()
     // v9: the catch is the grab box alone (frames 20 - 25: the hits there no longer touch fighters, a hit on the same
     // frame took the victim before the grab and it was never caught: README "Status: v9"); Ultimate's catching hit's
     // 3 % (the ATTACK on `throw` from 20) is added to the caught fighter here
-    WorkModule(0, WorkModuleF(0, 0x0f000100 + 0x20 * (best + 0x3) + 0x17) + MASTER_HI_CATCH_DAMAGE,
-               0x0f000100 + 0x20 * (best + 0x3) + 0x17);
+    if (!master_soft)
+    {
+        // a real capture: Ultimate's catching hit's 3 % added here (no hitbox touches a captured fighter); without
+        // one (v11) SpecialAirHiHit's game script lands it as a hit (its spark, sound and hitlag: VAR_11)
+        WorkModule(0, WorkModuleF(0, 0x0f000100 + 0x20 * (best + 0x3) + 0x17) + MASTER_HI_CATCH_DAMAGE,
+                   0x0f000100 + 0x20 * (best + 0x3) + 0x17);
+    }
     // Ultimate's TARGET_AIR / TARGET_HI_DAMAGE (the overtake's throw: THROW on the ground, CATCH in the air,
     // THROW_MEWTWO in the air at high damage): read by its game script (VAR_12 / VAR_13)
     WorkModule(0, 0.0f, 0x0f00030c);
@@ -39312,7 +39319,10 @@ void master_hi_hit_loop()
         if (master_pull_n > 0)
         {
             master_pull_n -= 0x1;
-            master_move(master_pull_y);
+            WorkModule(0, master_speed, 0x0f000004);   // v11: by his position (energy 3 speeds set here never moved him)
+            WorkModule(0, master_pull_y, 0x0f000005);
+            master_speed = 0;
+            master_move(0);
         }
         else
         {
@@ -39429,14 +39439,20 @@ int master_hi_pull_to(float x, float y, float hand)
     dy = y - PostureModuleF(0x2);
     n = master_len(dx, dy);                 // v8: the distance (v7 |dx| + |dy|: 4.1 a frame only straight up / across)
     master_pull_n -= 0x1;
+    master_diag(10, n);
+    // v11: moved by his position (the position variables' self moves 0x0F000004 forward / 0x0F000005 up), no longer by
+    // kinetic energy 3: speeds the status's loop sets there never moved him (user's v10 log: k8 the same 33 / 42 for
+    // the reel's 20 frames, attempts 2 - 4; v9's trim: he sank under the reel). Energy 3 stays 0
+    master_speed = 0;
+    master_move(0);
     if (n <= MASTER_HI_REWIND || master_pull_n <= 0)
     {
-        master_speed = dx * lr;
-        master_move(dy);
+        WorkModule(0, dx * lr, 0x0f000004);
+        WorkModule(0, dy, 0x0f000005);
         return 0x1;
     }
-    master_speed = dx / n * MASTER_HI_REWIND * lr;
-    master_move(dy / n * MASTER_HI_REWIND);
+    WorkModule(0, dx / n * MASTER_HI_REWIND * lr, 0x0f000004);
+    WorkModule(0, dy / n * MASTER_HI_REWIND, 0x0f000005);
     return 0;
 }
 
@@ -39506,9 +39522,22 @@ void master_hi_wall_main()
 {
     float side;
     printf("Byleth status_SpecialHiWallJump");
+    GroundModule(0x2710, 0x5);
+    if (master_hi_wj_jump)
+    {
+        // v11: the jump after the cling, in this status's main again: speeds set from its loop never moved him
+        // (user's v10 clip: after the cling he dropped below the stage and was KO'd at the bottom; log k9 1114, the
+        // jump taken, no rise). The motion goes on from its frame
+        master_hi_wj_jump = 0;
+        master_hi_wj = MASTER_HI_WJ_STOP + 1.0f;
+        master_hi_wall_jump();
+        master_motion(0x23c, 0x1);
+        master_diag(11, 1.0f);
+        func_78(master_hi_wall_loop);
+        return;
+    }
     master_wall_jumps += 0x1;
     master_hi_wj = 0;
-    GroundModule(0x2710, 0x5);
     KineticModule(0, 0xa);
     if (master_hi_latched)
     {
@@ -39556,7 +39585,10 @@ void master_hi_wall_loop()
         master_hi_wj += 1.0f;
         if (master_hi_wj > MASTER_HI_WJ_STOP)
         {
-            master_hi_wall_jump();          // Ultimate's wall_jump_stop_frame: the jump
+            master_hi_wj_jump = 0x1;        // Ultimate's wall_jump_stop_frame: the jump (v11: in the main, entered again)
+            master_hi_wall_jump();          // (and here, in case the game doesn't enter a status it is in)
+            func_16(0x15c, 0);
+            return;
         }
         else
         {

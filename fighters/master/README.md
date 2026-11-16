@@ -9,6 +9,23 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: v11 (`scratchpad/byleth_v11_fix.zip`: a FIX package over v10; exe unchanged (exe_v46w_vars_line); in-game TEST)
+
+User, v10 test with the TEST_ONLY diag (log `613f0faa-log.txt`, clip `6fac5f8c-...16164730639.mp4`, sheets
+`scratchpad/byleth/v10/clips/d_o.png`, `d_w.png`): "the grab seems to catch but with no effect and doesn't pull Byleth;
+the wall jump works better but is buggy".
+
+| point | cause (evidence) | fix |
+|---|---|---|
+| catch: no pull, no effect | log attempts 2 / 3: k6 0.7 / 2.3 at frame 20, k7 3 / k4 3 at 21 (the MSC catch), k8 19033 -> 1033 (the 19-frame stop), then **k8 = 33 for the reel's 20 frames**: his height under the target never changes. The reel set kinetic energy 3's speed from the status loop every frame; it never moved him (v9's trim: he sank under it too), while speeds set in a status's main did (v9's wall jump flew off the top). After the 20-frame cap the overtake's hitbox swung 33 below the target. No catch effect: the catch had none (Ultimate's sword SpecialHiHit: master_wire_catch + master_wire_wind2 on the tip; the 3 % was added silently) | the reel moves him by his position (position_vars' self moves 0x0F000004 forward / 0x0F000005 up, 4.1 a frame; energy 3 kept 0); SpecialAirHiHit's effect script: master_wire_catch / master_wire_wind2 where the tip held the fighter (VAR_15 2); its game script: Ultimate's catching hit (3 %, no knockback) on the held fighter at frame 1 when there is no capture (VAR_11 > 0: its spark, sound, hitlag; MSC no longer adds the 3 % then). **port_check S21 loop-speed** (WARN: a loop moving the fighter by energy 3 speeds; v10's master.c: master_hi_hit_loop) |
+| wall jump buggy | log attempt 4: k8 42 for 20 frames (the same reel), then k9 1001 - 1013 (the cling) and 1114 (the jump taken) to the motion's end; clip frames 529 - 676: after the cling he drops under the stage and is KO'd at the bottom: the jump's speeds, set from the loop, did nothing | the jump in 0x15C's main: the loop requests 0x15C again at the cling's end (master_hi_wj_jump), the main sets the fall kinetics, 2.6 up (gravity energy) and 0.9 away (air control), the motion kept at its frame, no extra wall jump counted (the loop also sets them, in case the game ignores a change to the status it is in); diag k10 the reel's distance left each frame, k11 the jump's re-entry |
+
+Checks: `tools/master_specials_test.py` 67 checks, 0 problems (the model applies the self moves; the jump's re-entry);
+port_check (v4 ... v9_fix, vars_reset_v1, v10_fix, v11_fix): **0 ERROR**, 30 WARN (`scratchpad/byleth/pc_v11.log`).
+Package `scratchpad/byleth/make_pkg_v11_fix.py` (game.bin, effect.bin (the installed one + SpecialAirHiHit's), master.mscsb;
+the TEST_ONLY diag as v10's with k10 / k11). Not proven: why loop-set speeds don't move him (the evidence is the two logs
+and clips); that re-entering 0x15C from itself runs its main (if not, the loop's own speeds apply, as v10).
+
 ## Status: v10 (`scratchpad/byleth_v10_fix.zip`: a FIX package over v4 + byleth_userdata_v2 + v5_fix ... v9_fix + vars_reset_v1; exe unchanged (the user's **exe_v46w_vars_line**, sha1 bfd3b5b4...); in-game TEST)
 
 User, v9 test (3 clips + a trim of clip 1, framed at 60 fps in `scratchpad/byleth/v10/clips/`; the TEST_ONLY diag log,
@@ -679,6 +696,10 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
+0000000000. **v11 fix** (sent: `scratchpad/byleth_v11_fix.zip`): test list in `scratchpad/byleth/INSTALL_README_v11.txt`.
+   With the diag: k10 should fall about 4 a frame during the reel; k11 1 at the wall jump's jump (else the game didn't
+   re-enter 0x15C: then the jump needs another route, e.g. the speeds from a slot-6 function as Captain Falcon's
+   func_2288). Then v10's open list below.
 000000000. **v10 fix** (sent: `scratchpad/byleth_v10_fix.zip`, no exe: the user's exe_v46w_vars_line): the user's test list in
    `scratchpad/byleth/INSTALL_README_v10.txt`. If the catch still fails: the TEST_ONLY diag (exe_v46w_vars_line_diag
    + the diag master.mscsb: k6 the tip's distance to the opponent each frame of 20 - 26, k7 which catch, k8 / k9 the
