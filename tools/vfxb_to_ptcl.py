@@ -180,6 +180,8 @@ FADE_EMIT = 0x2F9
 # common effects both games share match so (FliesUp: 0x1B, 0.5 / 0x1B, 0.5; SpecialSpeedUp's radius
 # 15 x 1.3 / 0.5 x 30), Smash 4 without the flag bits from 0x20 up. Templates' own lights are cleared
 USER_DATA, USER_FLOATS, USER_CALLBACK = 0x0C, 0x14, 0x34
+# an emitter Ultimate doesn't draw (is_particle_draw 0) but that carries a light: kept for the light (Byleth v8)
+LIGHTS_UNDRAWN = True
 LIGHT_CALLBACK, LIGHT_FLAGS = 1, 0x1F
 # flag 0x10: the radius a multiple of the particle's scale (vanilla's: x scale at most 108, median 20, of
 # 330 non-Final lights; without it the radius stands alone, 100s - 2100). Ultimate's go further
@@ -1664,11 +1666,21 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
     for child_block to take its drawing from: one texture, the CPU's particles, nothing complex"""
     e = gate_uv_anim(e)
     pt = e['particle']
+    light_only = False
     if not e['info']['is_particle_draw']:
-        # Ultimate doesn't draw it (eft2's is_particle_draw; none of Hero's 5 has child emitters):
-        # F-smash's impact2_frontL, a solid yellow zigzag over the ground spikes in fix 27
-        notes.append('not drawn in Ultimate (is_particle_draw 0): skipped')
-        return None
+        if LIGHTS_UNDRAWN and e['action_index'] == 1 and len(bytes.fromhex(e['subsections'].get('CADP', ''))) >= 20 \
+                and not as_child and not templates.test_no_light:
+            # an undrawn emitter that carries a light (eft2's custom action 1): Ultimate shines it on the fighters and
+            # the stage all the same (Byleth's pointlight1 / pointLight: Areadbhar's red light on him, Failnaught's
+            # draw, Aymr's aura; user v7 clip: "the glows are noticeably weaker"). Kept as a particle drawn black and
+            # added (nothing on screen) that carries the light: Smash 4's lights ride drawn particles (vanilla's
+            # pointlight* emitters, user callback 1)
+            light_only = True
+        else:
+            # Ultimate doesn't draw it (eft2's is_particle_draw; none of Hero's 5 has child emitters):
+            # F-smash's impact2_frontL, a solid yellow zigzag over the ground spikes in fix 27
+            notes.append('not drawn in Ultimate (is_particle_draw 0): skipped')
+            return None
     # a refraction piece (it bends the picture behind it: Squirtle's water, Hero's back throw indirect1):
     # drawn by a vanilla distortion-pass template (Templates.refraction), its own program kept, a
     # mesh's only (every vanilla one is a mesh); drawn plain, its map was a tinted blob
@@ -2500,6 +2512,13 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         struct.pack_into('>I', em, USER_CALLBACK, LIGHT_CALLBACK)
         left.discard('CADP')
         notes.append('light (flags 0x%X, radius %.3g, colour %.2f %.2f %.2f)' % (flags & LIGHT_FLAGS, radius, r, g, b))
+    if light_only:
+        # nothing drawn: black, added (the light's colour is its own, written above)
+        p.set_field(em, 'blend_type', 1)
+        for tr in (0, 1):
+            p.set_field(em, 'color%d_type' % tr, 0)
+            p.set_color_keys(em, tr, [(0.0, 0.0, 0.0, 1.0)])
+        notes.append('not drawn in Ultimate (is_particle_draw 0): kept for its light only (black, added)')
     if left:
         notes.append('not converted: ' + ', '.join(sorted(left)))
     n = buffer_count(p, em)

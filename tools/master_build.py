@@ -159,6 +159,10 @@ CONSTS = dict(
     # of the caught point); the catch's reach: object_dist_max 55 + param_sword reach_length_max 70 (as |dx| + |dy|);
     # the pull's frame cap (mine: 70 / 4.1 = 17, rounded up)
     MASTER_HI_REWIND='4.1f', MASTER_HI_HAND_X='8.0f', MASTER_HI_FIND_DIST='125.0f', MASTER_HI_PULL_MAX='0x14',
+    # (v8) the catch: the grab box's TargetStatus (HI_CAPTURE_STATUS, 0xBD the Falcon Dive capture) as the status variable
+    # reads it; Ultimate's TARGET_HI_DAMAGE (the overtake's THROW_MEWTWO): the caught fighter at param_special_hi
+    # overtake_attack_damage (50) % or more (APPROXIMATED: the flag's test is in the ExeFS, not read)
+    MASTER_HI_CAPTURE='189.0f', MASTER_HI_HI_DAMAGE='50.0f', MASTER_HI_CATCH_START='20.0f', MASTER_HI_CATCH_END='26.0f',
     # Aymr: param_special_lw super_armor_damage_max; SpecialLw's START / END_SUPER_ARMOR (34 / 64), INHERIT_LANDING_1's
     # end (51), INHERIT_LANDING_2 (65 - 117)
     MASTER_LW_ARMOR='30.0f', MASTER_LW_ARMOR_START='34.0f', MASTER_LW_ARMOR_END='64.0f', MASTER_LW_INHERIT1_END='51.0f',
@@ -311,16 +315,15 @@ def body_fix(a, fighter):
     # the overtake: Ultimate throws the caught fighter (ATTACK_ABS CATCH / THROW / THROW_MEWTWO, ATK_HIT_ABS at frame 11);
     # here nothing is caught (the hit pulls, 0x15B): its CATCH numbers (the air target's: 6.5, 114 degrees, 65 / 65) as
     # a hitbox around him on frames 9 - 11
-    tr = U.Translator(joints)
-    hit = tr.script('frame(agent.lua_state_agent, 9.0); macros::ATTACK(agent, 0, 0, Hash40::new("top"), 6.5, 114, 65, 0, '
-                    '65, 8.0, 0.0, 10.0, 3.0, None, None, None, 1.0, 1.0, *ATTACK_SETOFF_KIND_ON, *ATTACK_LR_CHECK_F, '
-                    'false, 0, 0.0, 0, false, false, false, false, true, *COLLISION_SITUATION_MASK_GA, '
-                    '*COLLISION_CATEGORY_MASK_ALL, *COLLISION_PART_MASK_ALL, false, '
-                    'Hash40::new("collision_attr_normal"), *ATTACK_SOUND_LEVEL_M, *COLLISION_SOUND_ATTR_CUTUP, '
-                    '*ATTACK_REGION_SWORD); frame(agent.lua_state_agent, 12.0); AttackModule::clear_all(agent.module_accessor);')
+    # v8: a real throw (the caught fighter, master.c master_hi_throw: the thrown link event and the throw work ints)
     ov = acmd.crc('specialairhiovertake')
-    keep = [c for c in g[ov] if c.name not in ('Throw_Specifier', 'Throw_Applier', 'Throw_Specifier2')]
-    g[ov] = U.merge_flat(keep, hit)
+    g[ov] = [c for c in g[ov] if c.name not in ('Throw_Specifier', 'Throw_Applier', 'Throw_Specifier2')]
+    # v8: the sword tip's catch (Ultimate's ENABLE_CATCH from 20 to the clear at 25): a grab box over the hit's (ID 0)
+    for name in ('aircatch', 'specialhi'):
+        no_release(g[acmd.crc(name)])
+        m = U.merge_flat(g[acmd.crc(name)], tip_catch(U, g[acmd.crc(name)]))
+        assert m is not None, name
+        g[acmd.crc(name)] = m
     # Aymr: the axe's hitbox (Ultimate's master_axe SpecialLw / SpecialAirLw: on the axe's haver, which follows his)
     # (v7) and SpecialLwHit's: the axe stuck in the floor, its four ground shock hits at frame 2 (8 %, Ultimate's
     # MOVE_ATTACK slides them out natively: here they stay on the axe)
@@ -336,10 +339,104 @@ def body_fix(a, fighter):
         log.append(line)
     import master_whip
     master_whip.body_scripts(files['game'], log.append)
+    g[ov] = merge_tail(U, g[ov], overtake_throw(U, a.dump, joints))
     for fn, f in files.items():
         f.save(os.path.join(d, fn + '.bin'))
-    log.append('aircatch: the whip at 0 / 17 / 27 / 35; overtake: a hitbox for the throw; Aymr: the axe\'s hitbox merged')
+    log.append('aircatch: the whip at 0 / 17 / 27 / 35, the tip\'s catch 20 - 25; specialhi: the catch; overtake: the '
+               'throw (THROW / CATCH / THROW_MEWTWO by VAR_12 / 13); Aymr: the axe\'s hitbox merged')
     return log
+
+
+# v8 the up special's catch (Ultimate: ENABLE_CATCH at 20, AttackModule::clear_all at 25: the hit on `throw` catches)
+HI_CATCH_START, HI_CATCH_END = 20, 25
+HI_CAPTURE_STATUS = 0xBD         # the Falcon Dive capture (docs/acmd-params/throws-grabs-other.md TargetStatus 189)
+HI_TARGET_VARS = ('FIGHTER_MASTER_STATUS_SPECIAL_HI_FLAG_TARGET_AIR', 0x0F00030C,      # VAR_12, VAR_13: master.c
+                  'FIGHTER_MASTER_STATUS_SPECIAL_HI_FLAG_TARGET_HI_DAMAGE', 0x0F00030D)  # master_hi_catch sets them
+
+
+def tip_catch(U, script):
+    """grab boxes where the up special's hitbox ID 0 is, from HI_CATCH_START until the clear (HI_CATCH_END): Extended_Grab_
+    Collision (its capsule, bone, size), TargetStatus HI_CAPTURE_STATUS, both situations"""
+    frame, out, seen = 0.0, [], False
+    for c in script:
+        if c.name == 'FRAME':
+            frame = float(c.params[0])
+        elif c.name == 'WAIT':
+            frame += float(c.params[0])
+        elif c.name in ('Special_Hitbox', 'Extended_Special_Hitbox') and c.params[0] == 0 and frame >= HI_CATCH_START:
+            syn = c.info['syntax']
+            v = {k: c.params[syn.index(k)] for k in syn}
+            x2 = [v.get(k, v[k[0]]) for k in ('X2', 'Y2', 'Z2')]
+            out += [U.cmd('FRAME', frame), U.cmd('Extended_Grab_Collision', 0, v['Bone'], v['Size'], v['X'], v['Y'], v['Z'],
+                                                  HI_CAPTURE_STATUS, 3, *x2)]
+            seen = True
+    assert seen, 'no hitbox ID 0 from frame %d' % HI_CATCH_START
+    return out + [U.cmd('FRAME', HI_CATCH_END), U.cmd('Remove_All_Grab_Collisions')] + end()
+
+
+def merge_tail(U, flat, script):
+    """a flat script merged with one whose branches all come at its last frame command (the overtake's throw at frame
+    11): the flat part up to that frame merged with the script's head, then the branches, then the flat part's later
+    frames (their FRAME commands are absolute: the branches wait for nothing)"""
+    k = next(i for i, c in enumerate(script) if c.name in ('Float_Var_Compare', 'Int_Var_Compare'))
+    last = max([float(c.params[0]) for c in script[:k] if c.name == 'FRAME'] or [0.0])
+    m = U.merge_flat(flat, script[:k] + end())
+    assert m is not None, 'merge_tail: a branching script'
+    m = [c for c in m if c.ident != acmd.END]
+    fr, cut = 0.0, len(m)
+    for i, c in enumerate(m):
+        if c.name == 'FRAME':
+            fr = float(c.params[0])
+        elif c.name == 'WAIT':
+            raise AssertionError('merge_tail: a WAIT in the merged script')
+        if fr > last:
+            cut = i
+            break
+    return m[:cut] + [c for c in script[k:] if c.ident != acmd.END] + m[cut:] + end()
+
+
+def no_release(script):
+    """the catch frames' hitboxes (Ultimate's 3 % on the tip, the hit that catches) with NoGrabRelease: hitting the
+    fighter the tip's grab box holds doesn't let it go (port_check S5's rule for throws)"""
+    frame = 0.0
+    for c in script:
+        if c.name == 'FRAME':
+            frame = float(c.params[0])
+        elif c.name == 'WAIT':
+            frame += float(c.params[0])
+        elif c.name in ('Special_Hitbox', 'Extended_Special_Hitbox') and frame >= HI_CATCH_START:
+            c.params[c.info['syntax'].index('NoGrabRelease')] = 1
+
+
+def overtake_throw(U, dump, joints):
+    """Ultimate's SpecialAirHiOvertake throw: ATTACK_ABS THROW (the ground target's) and CATCH (the air one's) set at
+    frame 0, THROW_MEWTWO (an air target at high damage) set where it is thrown (Smash 4 has two absolute slots; the
+    translator's frame-0 THROW_MEWTWO took the THROW slot for every case), ATK_HIT_ABS at frame 11 by Ultimate's flags
+    (VAR_12 / VAR_13, set by master.c)"""
+    text = open(os.path.join(dump, 'master', 'SpecialAirHiOvertake.txt')).read()
+    abs_ = {k: re.search(r'macros::ATTACK_ABS\(agent, \*FIGHTER_ATTACK_ABSOLUTE_KIND_%s, [^;]*;' % k, text).group(0)
+            for k in ('THROW', 'CATCH', 'THROW_MEWTWO')}
+    hit = lambda k: ('macros::ATK_HIT_ABS(agent, *FIGHTER_ATTACK_ABSOLUTE_KIND_%s, Hash40::new("throw"), 0, 0, 0);' % k)  # noqa
+    mew = abs_['THROW_MEWTWO'].replace('KIND_THROW_MEWTWO, 2,', 'KIND_THROW, 0,')
+    src = ('if macros::is_excute(agent) { %s %s } frame(agent.lua_state_agent, 11.0); '
+           'if WorkModule::is_flag(agent.module_accessor, *%s) { '
+           'if WorkModule::is_flag(agent.module_accessor, *%s) { if macros::is_excute(agent) { %s %s } } '
+           'else { if macros::is_excute(agent) { %s } } } else { if macros::is_excute(agent) { %s } }'
+           % (abs_['THROW'], abs_['CATCH'].replace('KIND_CATCH, 1,', 'KIND_CATCH, 0,'), HI_TARGET_VARS[0], HI_TARGET_VARS[2],
+              mew, hit('THROW'), hit('CATCH'), hit('THROW')))
+    old = dict(U.DYNAMIC_CONDS)
+    U.DYNAMIC_CONDS[HI_TARGET_VARS[0]] = ('float', HI_TARGET_VARS[1], 0, 1.0)
+    U.DYNAMIC_CONDS[HI_TARGET_VARS[2]] = ('float', HI_TARGET_VARS[3], 0, 1.0)
+    try:
+        fn = U.functions('unsafe extern "C" fn game_x(agent: &mut L2CAgentBase) {\n%s\n}\n'
+                         % src.replace('{ ', '{\n').replace('; ', ';\n').replace(' }', '\n}'))['game_x']
+        out = U.Translator(joints).script(fn)
+    finally:
+        U.DYNAMIC_CONDS.clear()
+        U.DYNAMIC_CONDS.update(old)
+    names = [c.name for c in out]
+    assert names.count('Throw_Applier') == 3 and names.count('Float_Var_Compare') == 2, names
+    return out
 
 
 # the held weapons' own effect scripts (Ultimate plays them on the articles, which are baked into his body here):

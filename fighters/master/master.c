@@ -3134,7 +3134,7 @@ void func_115()
     sv_set_mem(0x1, 0x2, 0xef, func_1919);
     sv_set_mem(0x1, 0x2, 0xf0, func_1923);
     sv_set_mem(0x1, 0x2, 0xee, func_1915);
-    sv_set_mem(0x1, 0x2, 0xf1, func_127);
+    sv_set_mem(0x1, 0x2, 0xf1, master_hi_air_end); // v8: + a catch let go (was func_127)
     sv_set_mem(0x1, 0x2, 0xf2, func_131);
     sv_set_mem(0x1, 0x2, 0xf3, func_137);
     sv_set_mem(0x1, 0x2, 0xf4, func_141);
@@ -36396,12 +36396,12 @@ void func_2246()
 void func_2247()
 {
     // (her 0x2D / 0x33 / 0x34 / 0x39 ends removed her whip after the smashes, aerials and pivot grab: the common ones)
-    sv_set_mem(0x1, 0x2, 0x152, master_end);
+    sv_set_mem(0x1, 0x2, 0x152, master_n_end);
     sv_set_mem(0x1, 0x2, 0x153, master_end);
-    sv_set_mem(0x1, 0x2, 0x154, master_end);
+    sv_set_mem(0x1, 0x2, 0x154, master_hi_end);
     sv_set_mem(0x1, 0x2, 0x155, master_lw_end);
     sv_set_mem(0x1, 0x2, 0x156, func_2255);
-    sv_set_mem(0x1, 0x2, 0x15b, master_end);
+    sv_set_mem(0x1, 0x2, 0x15b, master_hi_hit_end);
     sv_set_mem(0x1, 0x2, 0x15c, master_end);
     sv_set_mem(0x1, 0x2, 0x161, func_2259);
     sv_set_mem(0x1, 0x2, 0x162, func_2264);
@@ -38399,10 +38399,29 @@ int master_n_motion()
     return g;
 }
 
+// v8: the draw's charge effects end with it (user v7: "the charging effect continues into other actions if the special
+// button is held"). Ultimate's are on the held arrow (arrow1 Haved / Haved2: master_bow_hold1 / hold2, particles living
+// up to 100 frames) and the bow (master_bowflare2, 120): they go when those articles change or are removed (the shot,
+// the cancel, the status's end); here they follow his hand bones, so they are killed (particles too) at the shot / the
+// cancel, and every way out of the status (master_n_end, and master_fx_sweep on any status change)
+void master_n_fx_off(int bow)
+{
+    EffectModule(0x2723, 0x347004E, 0x1, 0x1); // master_bow_hold1
+    EffectModule(0x2723, 0x347004F, 0x1, 0x1); // master_bow_hold2
+    if (bow)
+    {
+        EffectModule(0x2723, 0x3470051, 0x1, 0x1); // master_bowflare2
+    }
+}
+
 void master_n_set(int phase)
 {
     master_phase = phase;
     master_motion(master_n_motion(), 0);
+    if (phase >= 0x2)
+    {
+        master_n_fx_off(phase == 0x2);
+    }
     if (phase == 0x3)
     {
         ArticleModule(0x2710, MASTER_ARROW1);
@@ -38655,6 +38674,10 @@ void master_hi_loop()
     {
         return;
     }
+    if (master_hi_catch())                  // v8: the sword's tip caught a fighter (Ultimate's SpecialHiHit)
+    {
+        return;
+    }
     if (MotionModule(0x2712))
     {
         if (global18 == 0)
@@ -38735,11 +38758,8 @@ void master_hi_air_loop()
         return;
     }
     f = MotionModuleF(0x1);
-    if (f >= MASTER_HI_HIT_START && f <= MASTER_HI_HIT_END && AttackModule(0x2727))
+    if (master_hi_catch())                  // v8: a real catch on the sword's tip (v7: any hit, the nearest fighter held)
     {
-        master_frame = f;                   // the hit's frame: where the tip was (master_hi_pull)
-        master_target = master_hi_find();   // v7: the fighter the sword caught
-        func_16(0x15b, 0);
         return;
     }
     if (f >= MASTER_HI_HIT_START && f <= MASTER_HI_WALL_END && master_wall_jumps < MASTER_HI_WALL_MAX
@@ -38754,9 +38774,15 @@ void master_hi_air_loop()
     }
 }
 
-// v7: the fighter the sword caught: the other fighter in hitstop (tools/position_vars_cave.py: 0x0F000020 + 4s position,
-// 0x0F00005B + 8s hitstop) nearest to him within Ultimate's object_dist_max (param_special_hi) + the sword's reach
-int master_hi_find()
+// v8: Ultimate's sword tip CATCHES (SpecialAirHi / SpecialHi: ENABLE_CATCH from frame 20, the hit on `throw` then the
+// status code holds the fighter: FIGHTER_STATUS_THROW_WORK_INT_TARGET_OBJECT, thrown by the overtake's ATK_HIT_ABS).
+// Here a real grab: the game scripts put a grab box on the tip (ThrowN, baked on the sword's tip) over the catch frames,
+// its TargetStatus 0xBD (the Falcon Dive capture: Smash 4's own command-grab status, the victim held where it is caught
+// as long as the capturer never calls CatchModule(0x2710), as Captain Falcon's / Ganondorf's dives). The game leaves
+// the capturer's status alone outside the common Catch statuses (0x02E31F68: only 0x35 / 0x37 / 0x39 go to CatchPull),
+// so this asks every frame: holding someone (CatchModule 0x2712), or a fighter in that capture status near him (its
+// status, position variable 0x0F0000A2 + 8 x (slot + 3)). Then SpecialAirHiHit (0x15B): he is pulled to it. 1: changed
+int master_hi_catch()
 {
     int s;
     int best;
@@ -38765,14 +38791,17 @@ int master_hi_find()
     float d;
     float bd;
     best = -1;
+    if (MotionModuleF(0x1) < MASTER_HI_CATCH_START || MotionModuleF(0x1) > MASTER_HI_CATCH_END)
+    {
+        return 0;                           // the grab box's frames (and the one after: the capture's own frame)
+    }
     bd = MASTER_HI_FIND_DIST;
     s = 0;
     while (s < 0x8)
     {
         x = WorkModuleF(0, 0x0f000020 + 0x4 * s);
         y = WorkModuleF(0, 0x0f000021 + 0x4 * s);
-        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0.0f && (x != PostureModuleF(0x1) || y != PostureModuleF(0x2))
-            && WorkModuleF(0, 0x0f00005b + 0x8 * s) > 0.0f)
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0.0f && WorkModuleF(0, 0x0f0000a2 + 0x8 * (s + 0x3)) == MASTER_HI_CAPTURE)
         {
             d = func_13(x - PostureModuleF(0x1)) + func_13(y - PostureModuleF(0x2));
             if (d < bd)
@@ -38785,7 +38814,25 @@ int master_hi_find()
         }
         s = s + 1;
     }
-    return best;
+    if (best < 0)
+    {
+        return 0;
+    }
+    master_target = best;
+    // Ultimate's TARGET_AIR / TARGET_HI_DAMAGE (the overtake's throw: THROW on the ground, CATCH in the air,
+    // THROW_MEWTWO in the air at high damage): read by its game script (VAR_12 / VAR_13)
+    WorkModule(0, 0.0f, 0x0f00030c);
+    if (WorkModuleF(0, 0x0f000100 + 0x20 * (best + 0x3) + 0x16) != 0.0f)
+    {
+        WorkModule(0, 1.0f, 0x0f00030c);
+    }
+    WorkModule(0, 0.0f, 0x0f00030d);
+    if (WorkModuleF(0, 0x0f000100 + 0x20 * (best + 0x3) + 0x17) >= MASTER_HI_HI_DAMAGE)
+    {
+        WorkModule(0, 1.0f, 0x0f00030d);
+    }
+    func_16(0x15b, 0);
+    return 0x1;
 }
 
 int master_hi2_pre()
@@ -38857,8 +38904,9 @@ void master_hi_hit_main()
     master_hi_pull();
     if (master_target >= 0)
     {
-        master_pull_n = MASTER_HI_PULL_MAX; // v7: a caught fighter: pulled to it (master_hi_rewind), at most this long
+        master_pull_n = MASTER_HI_PULL_MAX; // a caught fighter: pulled to it (master_hi_rewind), at most this long
     }
+    master_flag = 0;                        // v8: 1 once the caught fighter is thrown (the overtake's link event)
     GroundModule(0x2710, 0x5);
     KineticModule(0, 0xa);
     master_motion(0x23a, 0);
@@ -38877,11 +38925,11 @@ void master_hi_hit_loop()
         {
             if (master_hi_rewind())
             {
-                master_phase = 0x1;
+                master_phase = 0x1;             // this frame's speed is the last step to it (stopped next frame)
                 master_target = -1;
-                master_speed = 0;
-                master_move(0);
+                master_pull_n = -1;
                 master_motion(0x23b, 0);
+                master_hi_throw();
             }
             return;
         }
@@ -38904,6 +38952,12 @@ void master_hi_hit_loop()
         }
         return;
     }
+    if (master_pull_n < 0)
+    {
+        master_pull_n = 0;                  // v8: the pull's last step taken: stop
+        master_speed = 0;
+        master_move(0);
+    }
     if (global18 == 0)
     {
         func_16(0x16, 0);                   // v7: a plain landing, then Fall at the end (Ultimate: no special fall)
@@ -38913,6 +38967,27 @@ void master_hi_hit_loop()
     {
         func_16(0xe, 0);
     }
+}
+
+// the length of (x, y): Newton's square root from |x| + |y| (no square root in MSC here)
+float master_len(float x, float y)
+{
+    float r;
+    float q;
+    int i;
+    r = func_13(x) + func_13(y);
+    if (r <= 0.0f)
+    {
+        return 0.0f;
+    }
+    q = x * x + y * y;
+    i = 0;
+    while (i < 0x6)
+    {
+        r = 0.5f * (r + q / r);
+        i = i + 1;
+    }
+    return r;
 }
 
 // v7: Ultimate's SpecialAirHiHit: the sword holds what it caught (CATCH) and rewinds, pulling him to it at
@@ -38933,7 +39008,7 @@ int master_hi_rewind()
     lr = PostureModuleF(0);
     dx = master_tx - MASTER_HI_HAND_X * lr - PostureModuleF(0x1);
     dy = master_ty - PostureModuleF(0x2);
-    n = func_13(dx) + func_13(dy);
+    n = master_len(dx, dy);                 // v8: the distance (v7 |dx| + |dy|: 4.1 a frame only straight up / across)
     master_pull_n -= 0x1;
     if (n <= MASTER_HI_REWIND || master_pull_n <= 0)
     {
@@ -38944,6 +39019,45 @@ int master_hi_rewind()
     master_speed = dx / n * MASTER_HI_REWIND * lr;
     master_move(dy / n * MASTER_HI_REWIND);
     return 0;
+}
+
+// v8: the overtake throws the caught fighter as every grab's throw does (the common Throw's init, func_1081): the
+// thrown link event (ThrownF 0x7C plays; the victim stays where it was caught: no CatchModule(0x2710)), the throw
+// work ints 0x11000005 - 7 for its game script's Throw_Applier at frame 11 (Ultimate's ATK_HIT_ABS)
+void master_hi_throw()
+{
+    if (CatchModule(0x2712) == 0)
+    {
+        return;
+    }
+    LinkModule(0x271b, 0xb, 0x7c, 0x1, 0x11000006, 0x11000007, 0x1000006);
+    WorkModule(0x7, LinkModule(0x1, 0), 0x11000005);
+    master_flag = 0x1;
+}
+
+// 0x15B's end: a fighter still held (he was hit before the throw's Throw_Applier, which ends the hold) is let go, as
+// the common Throw's end does (func_1085)
+void master_hi_hit_end()
+{
+    if (CatchModule(0x2712) != 0)
+    {
+        CatchModule(0x2711);
+    }
+}
+
+// 0xF1 / 0x154 left with a catch not taken up (a hit on the frame it caught): let go
+void master_hi_end()
+{
+    if (global6 != 0x15b && CatchModule(0x2712) != 0)
+    {
+        CatchModule(0x2711);
+    }
+}
+
+void master_hi_air_end()
+{
+    func_127();                             // the common AirCatch end (her whip away unless it holds a ledge)
+    master_hi_end();
 }
 
 // 0x15C: SpecialAirHiWallJump (0x23C)
@@ -39117,10 +39231,57 @@ void master_lw_loop()
 void master_lw_end()
 {
     DamageModule(0xb, 0, 0);                 // the armor never outlives the status (a hit, a grab)
+    // v8: SpecialLwHit's rocks follow the axe until its frame 60 detaches them (Ultimate's EFFECT_DETACH_KIND): left
+    // earlier, they'd stay on his hand
+    if (MotionModule(0x7) == 0x242 && MotionModuleF(0x1) < 60.0f)
+    {
+        EffectModule(0x2723, 0x3470039, 0x1, 0x1); // master_axe_rock
+    }
 }
 
 void master_end()
 {
+}
+
+void master_n_end()
+{
+    master_n_fx_off(0x1);
+}
+
+// v8: effects that outlive the move they belong to: following effects whose emitters never stop (Aymr's / the sword's
+// flares, the rapid jab's lines, neutral air's) or whose particles live far longer than the move (Failnaught's draw),
+// stopped by their script at a frame a hit, a grab or a cancel never reaches. Ultimate removes them with the article
+// that carries them or its status's end; here a status change kills them, particles too (port_check E12 effect-leak).
+// This runs after the new status's first frame: an effect its scripts start on frame 0 (Failnaught's bow glow, the axe
+// flares of SpecialLwHit) is only killed leaving that status; the others start later in their moves
+void master_fx_sweep(int from, int to)
+{
+    if (from == 0x152)
+    {
+        master_n_fx_off(0x1);
+    }
+    if (from == 0x155)
+    {
+        EffectModule(0x2723, 0x3470035, 0x1, 0x1); // master_axe_aura
+        EffectModule(0x2723, 0x347009B, 0x1, 0x1); // master_axe_aura@90,-89.97,0
+        EffectModule(0x2723, 0x3470036, 0x1, 0x1); // master_axe_hold
+        EffectModule(0x2723, 0x3470043, 0x1, 0x1); // master_axeflare_sp1
+        EffectModule(0x2723, 0x3470045, 0x1, 0x1); // master_axeflare_sp2
+        EffectModule(0x2723, 0x3470047, 0x1, 0x1); // master_axeflare_sp2flare
+        EffectModule(0x2723, 0x3470048, 0x1, 0x1); // master_axeflare_sp3
+        EffectModule(0x2723, 0x3470098, 0x1, 0x1); // master_axeflare_sp1@0,-40,90
+        EffectModule(0x2723, 0x3470099, 0x1, 0x1); // master_axeflare_sp2@90,-89.97,0
+        EffectModule(0x2723, 0x347009A, 0x1, 0x1); // master_axeflare_sp3@-90,90,0
+        EffectModule(0x2723, 0x34700A7, 0x1, 0x1); // master_axeflare_sp2flare@90,-89.97,0
+    }
+    if (to != 0x26)
+    {
+        EffectModule(0x2723, 0x3470027, 0x1, 0x1); // master_atk_100
+    }
+    EffectModule(0x2723, 0x3470031, 0x1, 0x1); // master_atk_air_n
+    EffectModule(0x2723, 0x34700A6, 0x1, 0x1); // master_atk_air_n@-90,90,0
+    EffectModule(0x2723, 0x3470066, 0x1, 0x1); // master_swordflare
+    EffectModule(0x2723, 0x34700A1, 0x1, 0x1); // master_swordflare@0,0,-90
 }
 
 // zair (ZSS's grab in the air, status 0xF1 from func_61 / func_xx): off for him, his air up special is the only way
@@ -39144,6 +39305,7 @@ void master_whip_sweep()
     {
         return;
     }
+    master_fx_sweep(master_whip_last, s);   // v8: effects that would outlive their move
     master_whip_last = s;
     if (s == 0x2a || s == 0x26 || s == 0x31 || s == 0x32 || s == 0x33 || s == 0x34 || s == 0x18 || s == 0x3e
         || s == 0x14d || s == 0x154 || s == 0x15b || (s >= 0xf1 && s <= 0xf5))

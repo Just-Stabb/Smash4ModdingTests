@@ -1506,6 +1506,119 @@ def check_weapon_custom_source(name, rep):
                 'way (find the caster in the article: weapons/shot.c, placed.c pl_marked_hero)' % (name, name, '; '.join(hits[:4])))
 
 
+LEAK_SPAN = 60      # E12: a following effect whose particles last this long after it starts outlives a cut-short move
+
+
+def check_body_effect_leaks(inst, name, rec, rep):
+    """E12: a following effect of the port's own bank started by a body effect script that outlives the move: its
+    emitters never stop (end frame / life 0x7FFFFFFF) or its particles last LEAK_SPAN frames or more (start + emission
+    + life), and the fighter's MSC (fighters/NAME/NAME.c) never kills it (EffectModule(0x2723, id)). Smash 4 doesn't
+    end a following effect at a motion or status change (Byleth v7, user: Failnaught's charge glow master_bow_hold2,
+    100-frame particles, "continues into other actions if the special button is held"; its Terminate at the draw's
+    frame 118 never ran when he shot earlier): Ultimate removes the article carrying it or its status's end does.
+    ERROR when no script ends it either, WARN when only its script does (a hit, a grab or a cancel skips that frame)"""
+    import efc
+    import ptcl
+    kind = int(rec['kind'], 0)
+    p = sorted(inst.glob(r'fighter/%s/effect/%s/[^/]+\.ptcl' % (name, name)))
+    e = sorted(inst.glob(r'fighter/%s/effect/%s/[^/]+\.efc' % (name, name)))
+    eff = scripts(inst, 'fighter/%s/script/animcmd/body/effect.bin' % name)
+    if not (p and e and eff):
+        return
+    pt, ef = ptcl.Ptcl(inst.get(p[0])), efc.Efc(inst.get(e[0]))
+
+    def span(fx):
+        i = fx & 0xFFFF
+        if fx >> 16 != 0x300 + kind or i >= len(ef.entries) or not ef.entries[i][1]:
+            return 0
+        best = 0
+        for em in pt.sets[ef.entries[i][1] - 1]['emitters']:
+            d = em['data']
+            if d is None:
+                continue
+            end_, life = pt.field(d, 'end_frame'), pt.field(d, 'ptcl_life')
+            if end_ >= 0x7FFFFFFF or life >= 0x7FFFFFFF:
+                return 1 << 30
+            best = max(best, pt.field(d, 'start_frame') + end_ + life)
+        return best
+    msc = os.path.join(ROOT, 'fighters', name, name + '.c')
+    killed = set()
+    if os.path.exists(msc):
+        killed = {int(x, 16) for x in re.findall(r'EffectModule\(0x2723, (0x[0-9a-fA-F]+)', open(msc).read())}
+    follow = ('External_Graphic', 'EFFECT_FLW_POS')
+    bad, soft = {}, {}
+    for h, cmds in eff.items():
+        started, ended = set(), set()
+        for c in cmds:
+            if not c.params or not isinstance(c.params[0], int):
+                continue
+            if c.name in follow or c.name.startswith('EFFECT_FOLLOW'):
+                started.add(c.params[0])
+            elif c.name in ('Terminate_Graphic_Effect', 'EFFECT_DETACH_KIND'):
+                ended.add(c.params[0])            # (detached: it no longer follows)
+        for fx in started - killed:
+            if span(fx) >= LEAK_SPAN:
+                (soft if fx in ended else bad).setdefault(fx, set()).add(h)
+    fmt = lambda d: ', '.join('0x%07X (%d scripts)' % (fx, len(hs)) for fx, hs in sorted(d.items()))  # noqa: E731
+    if bad:
+        rep.add('ERROR', 'E12 effect-leak', 'following effects that outlive their move and nothing ends (no script, no '
+                'EffectModule(0x2723) in %s.c): %s' % (name, fmt(bad)))
+    if soft:
+        rep.add('WARN', 'E12 effect-leak', 'following effects that outlive their move, ended only at a frame of their '
+                'script (a hit, a grab or a cancel skips it; kill them in the MSC at the status change): %s' % fmt(soft))
+
+
+# W15: a new weapon's hitbox stepping farther a frame than this many of its radii skips fighters between frames
+STEP_RADII = 15
+# its speed params in the port's vl, by the base weapon (fighter_param_vl names): the paralyzer shot's uncharged /
+# charged speed
+WEAPON_SPEED = {'paralyzer_bullet': ('0x02000000', '0x02000001')}
+
+
+def check_weapon_step(inst, name, rec, rep):
+    """W15: a new article copied from a moving base weapon (WEAPON_SPEED) whose speed in the port's vl is more than
+    STEP_RADII radii of its smallest plain hitbox (a capsule covers the step when it is at least that long): it jumps
+    over fighters between frames (Byleth v7's max arrow: 75 a frame, radius 1.2, user: "no hitbox"). The base's speeds
+    are one param block its copies share (which one a copy flies at is the base's native code's choice): all checked"""
+    import fighter_param_vl as V
+    vl = inst.get('param/fighter/fighter_param_vl_%s.bin' % name)
+    if not vl:
+        return
+    import tempfile
+    with tempfile.NamedTemporaryFile(suffix='.bin') as f:
+        f.write(vl)
+        f.flush()
+        try:
+            vf = V.load(f.name, rec['base'])
+        except Exception:                       # noqa: BLE001
+            return
+    for art, w in sorted(rec.get('weapons', {}).items()):
+        if not isinstance(w, dict) or w.get('base') not in WEAPON_SPEED:
+            continue
+        speeds = []
+        for key in WEAPON_SPEED[w['base']]:
+            speeds += [abs(t.value) for _p, t in V.find(vf, '%s:%s' % (w['base'], key), 'all', {})]
+        g = scripts(inst, 'fighter/%s/script/animcmd/weapon/%s/game.bin' % (name, art))
+        if not g or not speeds:
+            continue
+        worst = None
+        for cmds in g.values():
+            for c in cmds:
+                if c.name not in ('Special_Hitbox', 'Extended_Special_Hitbox'):
+                    continue
+                syn = c.info['syntax']
+                v = {k: c.params[i] for i, k in enumerate(syn) if i < len(c.params)}
+                reach = 2 * v['Size']
+                if 'X2' in v:
+                    reach += math.dist((v['X'], v['Y'], v['Z']), (v['X2'], v['Y2'], v['Z2']))
+                if worst is None or reach < worst[0]:
+                    worst = (reach, v['Size'])
+        if worst and max(speeds) > max(STEP_RADII * worst[1], worst[0]):
+            rep.add('ERROR', 'W15 hitbox-step', '%s: %g units a frame (its vl speeds %s) against a hitbox of radius %g '
+                    '(reach %.1f): it skips fighters between frames; make the hit one line over the path (a capsule as '
+                    'long as the step, Extended_Special_Hitbox) or slow it' % (art, max(speeds), speeds, worst[1], worst[0]))
+
+
 def check_weapon_endless_effects(inst, name, rec, vanilla, rep):
     """E10: an article's script starting an effect with endless emitters (one_time 0) or never-dying particles
     (life 0x7FFFFFFF) that no script of that article ends (Terminate_Graphic_Effect) and its MSC doesn't kill
@@ -2542,6 +2655,8 @@ def main():
     check_weapon_kind_compares(inst, a.name, rep)
     check_weapon_custom_source(a.name, rep)
     check_weapon_endless_effects(inst, a.name, rec, vanilla, rep)
+    check_body_effect_leaks(inst, a.name, rec, rep)
+    check_weapon_step(inst, a.name, rec, rep)
     check_shield_damage(inst, a.name, rep)
     check_motions(inst, a.name, rec, rep)
     check_loop_slots(inst, a.name, rec, base, vanilla, rep)
