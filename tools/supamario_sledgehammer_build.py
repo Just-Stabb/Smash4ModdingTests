@@ -138,8 +138,9 @@ ARC_WIDTH = 3.0                      # v2 (user: "the release arc is drawn flat 
 # their strip x3, the effects x1.2 and following him (the 3 arcs each emitter lays over 3 frames stay on him and stack),
 # all still at the HDR gain (x2, capped at 2.0) meant for small glowing points. fx_render's Smash 4 side (black
 # background, his body left out): v2's charged swing 144 square units over 1.0 (bloom), 296 over 0.5, energy 738; the
-# God Fist's brightest frame 2-3 over 1.0, 33 over 0.5, energy 95; Core Breaker's charge aura under 0.3 over 1.0,
-# energy 450-690; Sledgehammer's charge glow (2.6 / 12) and hit burst (3.1 / 87) are within the God Fist's. So the
+# God Fist's brightest frame 2 over 1.0 (6.4 at most), 33 over 0.5, energy 95; Core Breaker's charge aura 0.1 over 1.0
+# at its brightest (one burst frame 62), energy 690; Sledgehammer's charge glow (2.6 / 12) and hit burst (3.1 / 87) are
+# within the God Fist's (tools/supamario_fx_glow.py). So the
 # arcs' colour keys x ARC_GAIN: each arc's drawn colour 2.0 -> 0.9 (XV2's yellow kept); where two arcs overlap they
 # reach 0.85, under Smash 4's bloom: charged 0 over 1.0 from the arcs (4.4 is the fist's flash), energy 345;
 # uncharged 0 over 1.0, energy 180 (v2 73 / 399)
