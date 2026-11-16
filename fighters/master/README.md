@@ -35,6 +35,24 @@ its `_sub` emitters, a subtractive layer in Ultimate too: to compare with an Ult
 (SpecialSFDash: no slot); SpecialLwCancel / SpecialAirLwHit (the air axe meeting the floor: no ray test); the hair's
 skin-path material (CustomVector30) still lighter / greener than Ultimate's.
 
+Executable **exe_v46v_threads** (`scratchpad/byleth/v7/exe/exe_v46v_threads.rpx`, sha1
+ce5edb1df6c17a4da4c64d8bc1e285a991972575) = the user's exe_v46u_threads (sha1 c131ea41...) + 9 motion-table words
+(`kind_expand_incremental.py build exe_v46u_threads.rpx EXTRA_KINDS_V6.json tools/extra_kinds.json ARGS --list
+0x47=0x04B9C728`, ARGS without kirby_copy_pool_cave's 0x04BA9B24 / 0x04BA9BE4): flags 0x4 on 0x22E / 0x232 / 0x23C, anim
+hashes FitSZerosuitBodyMainD03SpecialLwHit / SpecialLwTurn / SpecialAirLwTurn on 0x242 / 0x243 / 0x247 (flags 0).
+
+Build: `ultimate_port.py run master model-c00 .. model-c07 motions motions-group2 low-models effects scripts specials
+variants shapes --out OUT` (`scratchpad/byleth/pipeline_v7.log`). Package `scratchpad/byleth_v7_fix.zip`
+(`scratchpad/byleth/make_pkg_v7_fix.sh`: the install rebuilt from the four zips, every file of the build that differs, a
+changed model.nud with its model.nut (M5), the vl into data and data(us_en), cross_f.rpx; 61 fighter files + vl + exe),
+INSTALL README `scratchpad/byleth/INSTALL_README_v7.txt`. port_check `byleth_v4.zip byleth_userdata_v2.zip
+byleth_v5_fix.zip byleth_v6_fix.zip byleth_v7_fix.zip`: **0 ERROR**, 29 WARN (v6's), `scratchpad/byleth/pc_v7.log`; on
+v6's install the new checks give M12 x3 (0x22E 11.0, 0x232 14.0, 0x23C 24.7) and S13 (v6's master.c). Hitbox Viewer
+(Sm4shCommand v1.7.2 rebuilt with the new names, Shot.exe: `scratchpad/byleth/v7/shots/`): SpecialLw 62 the axe's 30 %,
+SpecialLwHit 3 the floor shock hit (8 %, 88 degrees) with the axe flares, 56 master_axe_rock. Not run: the new MSC in
+a unicorn / game test (compiles; C1 stack check passes); the material change was checked by its parameters only (no
+Smash 4 shader render here).
+
 ## Status: v6 (`scratchpad/byleth_v6_fix.zip`: a FIX package over v4 + byleth_userdata_v2 + v5_fix; in-game TEST)
 
 User, v4 / v5 tests: up special "not appearing / functioning" (twice), the whip moves without their blade, "etc".
@@ -538,6 +556,13 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
+000000. **v7 fix** (sent: `scratchpad/byleth_v7_fix.zip`, exe_v46v_threads): the user's test list in
+   `scratchpad/byleth/INSTALL_README_v7.txt` (brightness vs `images/23.png`, side special end position, up-special ledge /
+   catch / no special fall, Aymr's floor hit / landing / turn, the max arrow). If the side special now moves too far
+   (Smash 4 adding the root's motion on top of the MSC's lunge speed), drop the MSC speed for 0x22E / 0x232 and keep the
+   root's; if the model is still dark, the hair (skin path) and an in-game A/B of `rim_from_body`'s values. Open: the
+   wall tether (the sword tip's wall test), SpecialSFDash, SpecialLwCancel / SpecialAirLwHit, the effects' in-game
+   darkness (fx_render draws them bright: compare against an Ultimate clip move by move), master_swordaura.
 00000. **v6 fix** (sent: `scratchpad/byleth_v6_fix.zip`, `scratchpad/byleth/INSTALL_README_v6.txt`): the user's test
    of the whip (up special on the ground / air, a ledge tether, the hit's pull; down tilt, rapid jab, up smash tap /
    charge, up air + landing, throws (back throw facing left), down taunt; no whip left after a hit). Then: if an
