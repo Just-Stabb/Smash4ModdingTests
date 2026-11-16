@@ -38330,6 +38330,8 @@ float master_rx;        // ... the reel's end (his root), its steps (MASTER_HI_R
 float master_ry;
 int master_reel_n;
 int master_reel_k;
+int master_hi_real;     // v14 Hi: SpecialAirHiHit's frames so far out of his own hitstop (the stop's clock)
+int master_hi_loops;    // v14 Hi: its frames so far, all (the stop's hard cap)
 
 // a motion of the status's part: from frame 0, or (keep 1) at the frame the last one had (a ground / air change)
 void master_motion(int m, int keep)
@@ -39262,6 +39264,8 @@ void master_hi_hit_main()
     master_hi_ovt = 0;
     master_reel_n = 0;
     master_reel_k = 0;
+    master_hi_real = 0;
+    master_hi_loops = 0;
     master_hx = PostureModuleF(0x1);        // v13: held exactly here through the stop
     master_hy = PostureModuleF(0x2);
     if (master_target >= 0)
@@ -39319,6 +39323,17 @@ void master_hi_hit_main()
 // moved by his position alone in 0x15B (master_hi_place); resumed at its end / the overtake's throw
 void master_hold_energies()
 {
+    int e;
+    // v14: their speeds read (diag k15: 100 x energy + its y speed; the v13 log's leftover 2 / 2.5 a frame) and zeroed,
+    // so none comes back when they are resumed
+    e = 0;
+    while (e < 0x4)
+    {
+        master_diag(15, 100.0f * (float)e + KineticModuleF(0x1, e));
+        e = e + 0x1;
+    }
+    KineticModule(0x11, 0, 0, 0);
+    KineticModule(0x11, 0x2, 0, 0);
     KineticModule(0x11, 0x3, 0, 0);
     KineticModule(0x2717, 0);
     KineticModule(0x2717, 0x2);
@@ -39421,8 +39436,17 @@ void master_hi_hit_loop()
         if (master_hi_hold > 0)            // v9: the hit's stop (Ultimate's hit_stop_frame_fighter / _wall)
         {
             // v13: on the motion's frame (its game script sends the sword back on the same frame: v12's counter ran
-            // through the catching hit's hitlag, the motion didn't), held exactly where it began
-            if (MotionModuleF(0x1) < (float)master_hi_hold)
+            // through the catching hit's hitlag, the motion didn't), held exactly where it began. v14: the motion is
+            // 60 frames now (v13's ended at 14 and held: frame 19 never came, everything froze for good: the user's
+            // v13 test, log k8 5021 for 35 s), and the stop also ends after as many frames of his own out of hitstop
+            // (SELF hitstop 0x0F000043), or MASTER_HI_STOP_CAP frames in all, whatever the motion does
+            master_hi_loops += 0x1;
+            if (WorkModuleF(0, 0x0f000043) == 0.0f)
+            {
+                master_hi_real += 0x1;
+            }
+            if (MotionModuleF(0x1) < (float)master_hi_hold && master_hi_real <= master_hi_hold
+                && master_hi_loops <= master_hi_hold + MASTER_HI_STOP_CAP)
             {
                 master_diag(8, 1000.0f * ((float)master_hi_hold - MotionModuleF(0x1)) + master_ty - PostureModuleF(0x2));
                 master_diag(14, WorkModuleF(0, 0x0f000333));
@@ -39478,7 +39502,7 @@ void master_hi_hit_loop()
             master_speed = 0;
             master_move(0);
         }
-        if (MotionModule(0x2712) && master_hi_wall == 0x2)
+        if (MotionModuleF(0x1) >= MASTER_HI_HIT_LAST && master_hi_wall == 0x2)    // v14: its own end (60 frames now)
         {
             if (global18 == 0)
             {
@@ -39488,7 +39512,7 @@ void master_hi_hit_loop()
             func_16(0xe, 0);                // v9: the tip stopped by a floor / ceiling: no overtake, Fall
             return;
         }
-        if (MotionModule(0x2712))
+        if (MotionModuleF(0x1) >= MASTER_HI_HIT_LAST)
         {
             master_phase = 0x1;
             master_speed = 0;

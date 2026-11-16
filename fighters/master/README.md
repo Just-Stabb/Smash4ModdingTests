@@ -9,6 +9,49 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: v14 (`scratchpad/byleth_v14_fix.zip`: a FIX package over v13: master.mscsb, motion/body + body2 main.pac; exe unchanged (exe_v46w_vars_line); in-game TEST)
+
+User, v13 test with the TEST_ONLY diag (log `0622cb9c-log.txt`, RPX 553479bb = v11's diag exe; clip
+`6c3659c3-...182426865.mp4`, frames `scratchpad/byleth/v14/`): "Up special freezes Byleth, the whip and the opponent
+forever now, with no movement after hitting an opponent."
+
+| point | cause (evidence) | fix |
+|---|---|---|
+| the freeze | v13 ended SpecialAirHiHit's stop on its motion frame 19, but slot 0x23A plays D02SpecialAirHiHit, **15 frames** (Ultimate's special_air_hi_hit; Ultimate times its stop in status code): the motion stands on frame 14, 19 never comes. Log, first catch (k7 2: a soft catch, VAR_11 1, a ground target): k8 = 1000 x (19 - frame) + height: 19024, 18982, 18940 ... (frame + 0.042 a frame for 6 frames: his hitlag), then 18022 ... 6021 (1 a frame), then **5021 for 35 s** (frame 14 = 19 - 5). The k7 3 catches at 18:21:25 / :33 stand at k8 ~5031 the same; the wall attempt (stop 12 < 14) runs (k10 23 -> 0, k11 1). Clip (60 fps): two catches (DK 0 -> 3 % at frames 71 - 81 and 606 - 612, the catching hit's spark at 609), then nothing of Byleth / the sword / DK moves (621 - 883: Byleth below-left in the hit pose, the sword a straight line from his hand to DK, DK in its hit pose, held; only the stage's background and a slight camera drift change). The same cause had kept the game script's FRAME 19 (the sword back) from ever running in v9 - v12: the sword stayed full length through every reel | D02SpecialAirHiHit held on its last pose to 60 frames (`master_build.hi_hit_motion`, body and body2; `master_build.py hi DIR --fighter F`): its clock and script run through the stop and the reel (the sword goes back on 19 / 12 with the reel's start); the stop also ends after `hold` frames of his own out of his hitstop (SELF 0x0F000043) and at the latest hold + 30 frames (MASTER_HI_STOP_CAP), whatever the motion does; the floor / ceiling stop's Fall on frame 14 (MASTER_HI_HIT_LAST), not the motion's end. **port_check S23 frame-past-end** (ERROR: a declared MSC wait, port.json `frame_waits`, past its motion's end; WARN: script FRAMEs past it; v13's install: 0x23A waits for 19 of 15) |
+| k14's 2 / 2.5 | SPEED_Y (0x0F000333) sums every energy, held ones too: v13 suspended the energies (he stayed put: k8's height part constant) but their speeds stayed, 2 - 2.5 up (the v12 drift's size). Which energy: not read yet | the energies' speeds zeroed when held (0, 2, 3; gravity was); diag k15 at the catch: 100 x energy + its y speed (KineticModuleF(1, e)) for 0 - 3, to name it |
+
+Test model: `tools/master_specials_test.py` 80 checks, 0 problems, with a motion standing at 14 (v13's freeze: the stop
+ends on loop 19, the reel and the overtake follow) and a 6-frame hitlag first (ends on loop 25). port_check (v4 ...
+v13_fix, v14_fix): **0 ERROR**, 31 WARN (`scratchpad/byleth/pc_v14b.log`; the new one S23's script WARN: the overtake's
+FRAME 12 on its 12-frame motion, attack100end's FRAME 85 on 52: their Remove_Article never run, the whip sweep removes
+it); on v13's install S23 ERROR (0x23A waits for 19). The two pacs differ from the installed ones in that one motion only
+(compared entry by entry). Package `scratchpad/byleth/make_pkg_v14_fix.py`, INSTALL README
+`scratchpad/byleth/INSTALL_README_v14.txt`.
+
+**Not done (handover, next agent): the sword's own motions** (user: Ultimate's sideways bend on the hit, the sword's
+overtake animation, the retraction tied to the reel's distance). Facts gathered:
+- Ultimate's sword motions (`ult/master/motion/sword/c00`, read with `master_whip.Ult.sword_locals` / `.rel`):
+  d02specialairhihit 16 frames (the tip (0, 65) at 0, swung to (22, 59, 11) at 2, back to (-1, 64) by 4, still after);
+  d02specialhihit the same (67 long); d02specialairhiovertake 12 frames (short: tip (15, 6) at 0, (-12, 19) at 2, (0, 16)
+  from 8); d02specialhipull 101 frames, a straight blade shrinking ~1 a frame (length 115 at 0 ... 18 at 96): the status
+  code picks its frame from the length (the sword rewinds at rewind_speed 4.1 while he is reeled). SpecialHiHit's
+  status code (lua2cpp f_7208a2b7d0) changes the sword's status and gives it tip_angle_object / rewind_speed; the
+  overtake (f_7208a1f1d0) generates a new sword with `special_air_hi_overtake`.
+- Our whip (article 2, ZSS's whip copy, weapon kind 0x1A0): 15 motion names, all used (`master_whip.SLOTS`); ACMD
+  `Set_Anchored_Article_Action(2, slot)` plays a slot (index into the 60-entry motion info, 4 x custom move; only
+  multiples of 4 are used) from frame 0 at rate 1 in fighter space. A raw CRC search of the exe for
+  crc32('FitSZerosuitWhipMainC03AttackS4S') found nothing: the motion info for 0x1A0 is built at run time
+  (`tools/weapon_expand.py`, "motions"; `docs/weapon-expansion-ram.md`), so the new slots need weapon_expand's motion
+  table grown for 0x1A0, built as its own cave script over exe_v46w_vars_line (`scratchpad/vr/exe/exe_v46w_vars_line.rpx`)
+  asserting the words it replaces, shipped under INSTALL_TO_code with a matching TEST_ONLY diag exe
+  (`tools/diag_godfist_cave.py` over it).
+- Then (master_whip.SLOTS + body_scripts): 60 = SpecialAirHiHit (the hit motion, its 65 length scaled to the whip's
+  48 reach or the catch's distance: APPROXIMATE either way), 64 = the overtake, 68+ = the pull: Ultimate's
+  d02specialhipull resampled to 4.1 a frame from 48, either one motion started when the length matches (a delay in the
+  game script: the stop's frames + (48 - D) / 4.1 cannot be scripted per catch) or several pull slots by starting
+  length (e.g. 48 / 40 / 32 / 24, MSC picks one into a VAR, the hit script branches on it); the hit script's
+  Set_Remote_Article_Action2(2, 3) (the native reverse) replaced by those anchored actions at frame 19 / 12.
+
 ## Status: v13 (`scratchpad/byleth_v13_fix.zip`: a FIX package over v12, master.mscsb only; exe unchanged (exe_v46w_vars_line); in-game TEST)
 
 User, v12 test with the TEST_ONLY diag (log `e50a37a0-log.txt`, clips `42cb0c57-...175946571.mp4`,
@@ -753,6 +796,9 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
+0000000000000. **v14 fix** (sent: `scratchpad/byleth_v14_fix.zip`): test list in `scratchpad/byleth/INSTALL_README_v14.txt`
+   (no freeze; the sword retracting through the pull; k15 names the energy that carried 2.5 up). **Next: the sword's
+   own motions** (hit bend, overtake, distance-tied pull): the plan and the facts are under "Status: v14" ("Not done").
 000000000000. **v13 fix** (sent: `scratchpad/byleth_v13_fix.zip`): test list in `scratchpad/byleth/INSTALL_README_v13.txt`.
    With the diag: k14 0 (nothing else moving him), k8 constant through the stop, k10 equal steps. Open: the sword's hit
    flex and overtake motions (a whip motion slot: weapon_expand "motions", exe), the reverse's rate vs the reel.

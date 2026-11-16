@@ -2907,6 +2907,47 @@ def check_foot_effects(inst, name, rep):
                 % '; '.join(other))
 
 
+def check_frame_waits(inst, name, rec, rep):
+    """S23 frame-past-end: a game script command (or an MSC wait, port.json "frame_waits": {slot: [frames]}) on a frame
+    past its motion's last one (the own slots' animations, extra_kinds.json "motions"). A non-looping motion stands on
+    its last frame: script time stops there (the command never runs) and an MSC test of MotionModuleF(1) never comes
+    true. Byleth v13: SpecialAirHiHit's motion is Ultimate's 15 frames, its stop waited for frame 19 and its script sent
+    the sword back at 19: everything froze for good after a catch (user's v13 test, log k8 5021 for 35 s; the script's
+    19 had never run in v9 - v12 either: the sword stayed full length through the reel). ERROR for a declared wait,
+    WARN for a script command"""
+    import tempfile
+    import omo
+    pac = inst.get('fighter/%s/motion/body/main.pac' % name)
+    game = scripts(inst, 'fighter/%s/script/animcmd/body/game.bin' % name)
+    if pac is None or not game:
+        return
+    with tempfile.TemporaryDirectory() as td:
+        pp = os.path.join(td, 'main.pac')
+        open(pp, 'wb').write(pac)
+        frames = {n[:-4]: omo.Omo(d).frames for n, d in omo.pac_read(pp)}
+    waits = load_port_cfg(name).get('frame_waits') or {}
+    bad, soft = [], []
+    for slot, v in sorted((rec.get('motions') or {}).items()):
+        if not isinstance(v, dict) or v.get('anim') not in frames:
+            continue
+        n = frames[v['anim']]
+        key = re.sub(r'^Fit\w+?Main[A-Z]\d\d', '', v['anim']).lower()
+        sc = game.get(acmd.crc(key)) or []
+        fr = [float(c.params[0]) for c in sc if c.name == 'FRAME']
+        late = sorted({f for f in fr if f > n - 1})
+        if late:
+            soft.append('%s %s (%d frames): FRAME %s' % (slot, key, n, ', '.join('%g' % f for f in late)))
+        w = [f for f in waits.get(slot, []) if not str(f).startswith('_')]
+        if w and max(w) > n - 1:
+            bad.append('%s %s (%d frames): waits for %g' % (slot, key, n, max(w)))
+    if bad:
+        rep.add('ERROR', 'S23 frame-past-end', 'MSC waits for a motion frame past its motion\'s end (it stands on its '
+                'last frame: the wait never ends): %s' % '; '.join(bad))
+    if soft:
+        rep.add('WARN', 'S23 frame-past-end', 'script commands past their motion\'s last frame (never run if the motion '
+                'doesn\'t loop): %s' % '; '.join(soft))
+
+
 HIT_CMDS = ('Hitbox', 'Special_Hitbox', 'Extended_Hitbox', 'Extended_Special_Hitbox', 'Extra_Special_Hitbox')
 
 
@@ -3089,6 +3130,7 @@ def main():
     check_foot_effects(inst, a.name, rep)
     check_msc_effect_leaks(inst, a.name, rec, rep)
     check_status_hit_log(inst, a.name, rep)
+    check_frame_waits(inst, a.name, rec, rep)
     n = rep.show()
     sys.exit(1 if n['ERROR'] or (a.strict and n['WARN']) else 0)
 

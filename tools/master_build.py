@@ -167,6 +167,10 @@ CONSTS = dict(
     # REQ_EFFECT (its effect script's frame 6: sys_cling)
     MASTER_HI_OVT_DX='7.8f', MASTER_HI_OVT_DY='14.2f', MASTER_HI_OVT_Y='10.0f', MASTER_HI_OVT_HIT='11.0f',
     MASTER_HI_WJ_FX='6.0f',
+    # (v14) SpecialAirHiHit's motion: Ultimate's 15 frames (its last, 14, ends it where MSC used MotionModule end),
+    # stretched to HI_HIT_FRAMES (master_build.hi_hit_motion) so its clock and game script run through the stop and the
+    # reel; the stop's hard cap past its own frames (mine)
+    MASTER_HI_HIT_LAST='14.0f', MASTER_HI_STOP_CAP='0x1e',
     # (v8) the catch: the grab box's TargetStatus (HI_CAPTURE_STATUS, 0xBD the Falcon Dive capture) as the status variable
     # reads it; Ultimate's TARGET_HI_DAMAGE (the overtake's THROW_MEWTWO): the caught fighter at param_special_hi
     # overtake_attack_damage (50) % or more (APPROXIMATED: the flag's test is in the ExeFS, not read)
@@ -1035,7 +1039,38 @@ def weapons(a, fighter, effect_ids):
         pac = os.path.join(fighter, 'motion', folder, 'main.pac')
         if os.path.exists(pac):
             master_whip.bake_throw(a.ult, pac, os.path.join(fighter, 'model/body', cdir, 'model.vbn'), log.append)
+            log.append(hi_hit_motion(pac))
     return log
+
+
+HI_HIT_FRAMES = 60   # v14: SpecialAirHiHit's motion length (Ultimate's 15: stop 19 + reel <= 20 + the cap ran past it)
+
+
+def hi_hit_motion(pac):
+    """v14: SpecialAirHiHit's motion (slot 0x23A, D02SpecialAirHiHit: Ultimate's 15 frames, a still pose from 4) held on
+    its last frame to HI_HIT_FRAMES: its clock (master.c's stop ends on its frame 19 / 12) and its game script (the
+    sword back at 19 / 12) ran out at 14 and stood (user's v13 test: everything frozen, log k8 5021 = frame 14 for good).
+    Ultimate times the stop in its status code (ShakeModule) over special_air_hi_hit_pose. Idempotent"""
+    import omo
+    name = 'FitSZerosuitBodyMainD02SpecialAirHiHit.omo'
+    ents = omo.pac_read(pac)
+    out, said = [], 'hi_hit_motion: no %s in %s' % (name, pac)
+    for n, d in ents:
+        if n == name:
+            o = omo.Omo(d)
+            if o.frames < HI_HIT_FRAMES:
+                last = o.frames - 1
+                for node in o.nodes:
+                    node[3] = node[3] + [node[3][last]] * (HI_HIT_FRAMES - o.frames)
+                said = '%s: %s %d -> %d frames (its last pose held)' % (os.path.basename(os.path.dirname(pac)), name,
+                                                                        o.frames, HI_HIT_FRAMES)
+                o.frames = HI_HIT_FRAMES
+                d = o.encode()
+            else:
+                said = '%s: %s already %d frames' % (os.path.basename(os.path.dirname(pac)), name, o.frames)
+        out.append((n, d))
+    omo.pac_write(pac, out)
+    return said
 
 
 def arrow2_msc(src, out):
@@ -1135,6 +1170,7 @@ def main():
     h = sub.add_parser('hi', help='v12: the up special\'s hit / overtake scripts (hi_fix) on DIR\'s game / effect / '
                                   'sound .bin (an installed body script folder)')
     h.add_argument('dir')
+    h.add_argument('--fighter', help='v14: also SpecialAirHiHit\'s motion (hi_hit_motion) in FIGHTER/motion/body*/main.pac')
     a = ap.parse_args()
     if a.cmd == 'vis':
         cmd_vis(a)
@@ -1144,6 +1180,10 @@ def main():
         hi_fix(files, log)
         for fn, f in files.items():
             f.save(os.path.join(a.dir, fn + '.bin'))
+        for folder in ('body', 'body2'):
+            pac = os.path.join(a.fighter or '', 'motion', folder, 'main.pac')
+            if a.fighter and os.path.exists(pac):
+                log.append(hi_hit_motion(pac))
         print('\n'.join(log))
     else:
         cmd_build(a)

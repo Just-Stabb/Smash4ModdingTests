@@ -233,6 +233,10 @@
     "finalair": "ZSS's Final Smash, air",
     "batswing4": "ZSS's home-run bat smash timing (armor at 41, the common bat hit at 51): Ultimate's BatSwing4 calls its common item functions (game_BatSwing4Common1 / 2, not in the dump); to retime to his animation"
   },
+  "frame_waits": {
+    "_comment": "motion frames master.c's statuses wait for (port_check S23 frame-past-end): SpecialAirHiHit's stop (19 a fighter, 12 a wall) and its end (14)",
+    "0x23A": [19, 12, 14]
+  },
   "status_scripts": {
     "_comment": "scripts one status plays in turn (port_check S22 status-hit-log: their hitboxes' Parts share one hit record for the whole status)",
     "0x15B": ["specialairhihit", "specialairhiovertake"]

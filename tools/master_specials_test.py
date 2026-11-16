@@ -245,14 +245,21 @@ class Byleth:
         return self.vm.call(self.vm.func(self.names.index(name)), args)
 
 
-def run_hit(b, gm, stop_at=None, n=60):
+def run_hit(b, gm, stop_at=None, n=60, clock=None):
     """v13: 0x15B from its main (motion frame 0), its loop on frames 1, 2, ...: [(frame, phase, x, y)] after each, until
-    phase 1 (the overtake) or a status change (stop_at)"""
+    phase 1 (the overtake) or a status change (stop_at). v14 clock(f) -> (motion frame, in hitstop) for loop f (a frozen
+    motion, a hitlag)"""
     gm.frame = 0.0
+    if clock:
+        gm.frame, hs = clock(0)
+        gm.vars[0x0F000043] = 1.0 if hs else 0.0
     b.call('master_hi_hit_main')
     out = [(0, 0, gm.x, gm.y)]
     for f in range(1, n):
         gm.frame = float(f)
+        if clock:
+            gm.frame, hs = clock(f)
+            gm.vars[0x0F000043] = 1.0 if hs else 0.0
         b.call('master_hi_hit_loop')
         out.append((f, b.g('master_phase'), gm.x, gm.y))
         if b.g('master_phase') == 1 or (stop_at is not None and stop_at in gm.status):
@@ -383,6 +390,18 @@ def up_special(path):
           and abs(gm.x - 20.0) < 0.01 and abs(gm.y - 100.0) < 0.01,
           '%s, reel end %s, at (%.2f, %.2f)' % (why, reel_end, gm.x, gm.y))
     susp = sorted({a[1] for s, a in gm.calls if s == 0x10 and len(a) == 2 and a[0] == 0x2717})
+    # v14: the stop can't freeze: a motion that stands at 14 (v13's 15-frame motion), a hitlag at the start
+    for what, clock, want in (
+            ('the motion standing at 14 (v13 in game: frozen for good)', lambda f: (float(min(f, 14)), False), 19),
+            ('6 frames of his own hitstop first (the motion at 0.04 a frame)',
+             lambda f: ((0.04 * f, True) if f < 6 else (f - 6 + 0.24, False)), 25)):
+        b2, g2 = setup(22.0, near)
+        b2.call('master_hi_air_loop')
+        g2.catching = True
+        hp2 = run_hit(b2, g2, clock=clock)
+        first = next((p[0] for p in hp2 if (p[2], p[3]) != (hp2[0][2], hp2[0][3])), None)
+        check('v14 the stop, %s: ends, the reel starts on loop %s (want %d) and reaches the overtake' % (what, first, want),
+              first == want and b2.g('master_phase') == 1, str(hp2[-3:]))
     check('v13 SpecialAirHiHit holds every energy (0x2717 on 0 - 3): only his written position moves him',
           susp == [0, 1, 2, 3], str(susp))
     wind_off = [a for s, a in gm.calls if s == 0x1C and a and a[0] == 0x2723 and a[1] == 0x3470073]
@@ -459,8 +478,9 @@ def v9(path):
     check('v9 a ceiling 40 above at frame 23 -> SpecialAirHiHit, stopped (no latch)',
           0x15B in gm.status and b.g('master_hi_wall') == 2)
     gm.status.clear()
+    gm.frame = 0.0
     b.call('master_hi_hit_main')
-    gm.end = True
+    gm.frame = 14.0                                 # v14: its own end (Ultimate's last frame; the motion is 60 now)
     b.call('master_hi_hit_loop')
     check('v9 stopped: VAR_15 0 (the sword back at once), Fall at the motion\'s end, no overtake',
           gm.vars.get(0x0F00030F) == 0.0 and gm.status == [0xE], str([hex(x) for x in gm.status]))
