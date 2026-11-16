@@ -506,17 +506,31 @@ exe_v46p added the tether vector and his sound aliases, exe_v46q his motion slot
 
 ## Re-run on the user's files
 
-When their files arrive (port_sources.json: `fighter_param`, `soundlabeltable`, `s4_chr`, `templates.master`, and
-add_fighter's `--param` / `--ui` on theirs):
+Done on the user's own files (2026-11-16: their fighter_param, soundlabeltable, melee.msbt, ui/replace/chr, then their
+whole param folder and sound/config): **`scratchpad/byleth_userdata_v2.zip`** (replaces userdata_v1; install after v3;
+the v1 / v3 `not_for_install/` stand-ins are no longer needed). port_sources.json: `fighter_param` (theirs + his row),
+`soundlabeltable`, `s4_chr`, `templates.master`, `user_param`, `user_sound_config`, `user_ui`. Again on newer files:
 ```
 python3 tools/add_fighter.py --param THEIRS/param --param VANILLA/param --ui THEIRS/ui --kinds tools/extra_kinds.json --only master --out DATA
-python3 tools/ultimate_port.py run master sound scripts specials variants stats portraits --out OUT
-python3 tools/fighter_extras.py common THEIRS/sound/config/commonsoundtable.csb OUT
+python3 tools/ultimate_port.py run master sound stats portraits --out OUT
+python3 tools/fighter_extras.py common THEIRS/sound/config/commonsoundtable.csb OUT --only master
 python3 tools/fighter_extras.py fanfare THEIRS/sound/config/bgm_fighter.fbb OUT --set 0x47=0x12
 ```
-(scripts / specials / variants again after sound: the scripts take the sound ids.)
-Until then the outputs on vanilla files (`port/master/sound/config/soundlabeltable.bin`, `param/fighter/fighter_param.bin`,
-the add_fighter data) are **not for install**: they would overwrite the user's own rows.
+(`fighter_extras.py common` with the exe that has kind_expand's tables (`kind_expand.RPX`, exe_v46s); scripts /
+specials / variants again only if `sound_ids.json` changes: on the user's table it didn't, ZSS's rows 27 / 78 are
+vanilla there.) Every output was checked: with his entries taken out, each file is the user's byte for byte
+(`ui_character_db` id 65, `ui_layout_db` / `ui_skill_db` / `ui_sound_call_voice_db` id 65, the ai / amiibo / Classic /
+cheer params kind 0x47, fighter_param kind 0x47 (Ultimate's stats), soundlabeltable rows 27 / 78 grown (lists appended),
+commonsoundtable record 0x44 (ZSS's), bgm_fighter entry 0x47 (Marth's), melee.msbt his 4 labels, 47 portraits with ids
+0x28010600-0x2801062E). His series is Fire Emblem (11, extra_kinds.json `ui.series`); chr_10 on the user's hexagon art
+needs port.json `portraits.set_fits` (their chr_10 is their chr_00's art, not a crop of chr_90).
+
+- `fighter_extras.py common` used to rewrite every extra kind's record from its base: on the user's file it would have
+  replaced Squirtle's own KO-voice record (0x43) with Mario's. It now only adds missing records (an existing one is
+  kept), `--only` limits it to kinds, `--replace` (with `--only`) rewrites (`tools/fighter_extras_test.py --rpx`).
+- Open: his announcer call is ZSS's (0x380017, "Zero Suit Samus") until the user sends
+  `sound/se/snd_se_narration_characall.nus3bank` (Sephiroth's / Squirtle's calls are in it, soundlabeltable row 0x38):
+  then `fighter_extras.py narration ... --ult-tone master --name Master --id 65`.
 
 ## Model and motions
 

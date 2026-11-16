@@ -32,7 +32,16 @@ common: sound/config/commonsoundtable.csb ('CSB\0', u32 1, u16 4 values, u16 cou
 (u16 label, u16 soundlabeltable row) pairs (Mario: MissFoot01, MissFoot02, Damage_hoshikie, the KO screams),
 then the crowd's chant bank's row (u16 0, u16 row). Every new kind of tools/extra_kinds.json gets a copy of its
 base's record (the port's voice and chant banks keep the base's bank ids, so the base's labels name the port's
-own tones: Squirtle's MissFoot01 is his Ultimate missfoot01); --set CAP=LIKE_CAP takes another fighter's."""
+own tones: Squirtle's MissFoot01 is his Ultimate missfoot01); --set CAP=LIKE_CAP takes another fighter's.
+A record the file already holds for a new kind (anything but the empty placeholder this tool pads with) is an
+earlier port's and is KEPT: only missing records are added (Squirtle's own KO-voice record, 0x43, was overwritten
+with Mario's by the old every-kind rewrite). --only NAME (repeatable: name, Capitalised name or kind) limits the run
+to those kinds; --replace rewrites their existing records too (never without --only).
+
+  python3 tools/fighter_extras.py common COMMONSOUNDTABLE_CSB OUT [--only master] [--set Pzenigame=Mario ...] [--replace]
+
+fanfare writes only the kinds given with --set (and appends Mario's entry for missing kinds below them); it says
+when a --set kind's entry already existed and what it was. Tests: tools/fighter_extras_test.py."""
 import argparse
 import os
 import struct
@@ -86,7 +95,10 @@ def fanfare(a):
     top = max(sets) + 1
     while len(rows) < top:
         rows.append(list(rows[0x3]))
+    replaced = []
     for k, like in sets.items():
+        if k < n and rows[k] != rows[like]:
+            replaced.append('kind 0x%X had BGM 0x%X' % (k, rows[k][4]))
         rows[k] = list(rows[like])
     out = d[:8] + struct.pack('<I', len(rows)) + b''.join(struct.pack('<5I', *r) for r in rows)
     p = os.path.join(a.out, 'sound/config/bgm_fighter.fbb')
@@ -94,15 +106,71 @@ def fanfare(a):
     open(p, 'wb').write(out)
     print('bgm_fighter.fbb: %d -> %d entries; %s' % (n, len(rows), ', '.join(
         'kind 0x%X = 0x%X\'s (0x%X)' % (k, v, rows[k][4]) for k, v in sorted(sets.items()))))
+    if replaced:
+        print('  replaced (asked with --set): ' + ', '.join(replaced))
+
+
+def csb_parse(d):
+    """(nval, records): commonsoundtable.csb's records as bytearrays"""
+    assert d[:4] == b'CSB\0'
+    nval, n = struct.unpack_from('<HH', d, 8)
+    size = 0x10 + 4 * nval
+    assert len(d) == 0xC + size * n, 'commonsoundtable.csb: %d bytes for %d records' % (len(d), n)
+    return nval, [bytearray(d[0xC + size * i:0xC + size * (i + 1)]) for i in range(n)]
+
+
+def csb_build(head, nval, recs):
+    return head[:8] + struct.pack('<HH', nval, len(recs)) + b''.join(bytes(x) for x in recs)
+
+
+def csb_placeholder(nval):
+    """the empty record padding the file up to a new kind's index (no name, no voices, no chant)"""
+    return bytearray(b'\0' * 16 + b'\xff' * (4 * (nval - 1)) + b'\0' * 4)
+
+
+def csb_merge(recs, nval, want, replace=False):
+    """recs: the file's records; want: {index: record} to give new kinds. A record already in the file (not the
+    placeholder) is an earlier port's: kept unless replace. Returns (records, [(index, 'added' / 'kept' /
+    'replaced')])."""
+    recs = [bytearray(x) for x in recs]
+    none = csb_placeholder(nval)
+    while len(recs) < max(want, default=-1) + 1:
+        recs.append(bytearray(none))
+    done = []
+    for i, rec in sorted(want.items()):
+        if recs[i] == none:
+            recs[i] = bytearray(rec)
+            done.append((i, 'added'))
+        elif recs[i] == rec:
+            done.append((i, 'kept (already this record)'))
+        elif replace:
+            recs[i] = bytearray(rec)
+            done.append((i, 'replaced'))
+        else:
+            done.append((i, 'kept (the file\'s own)'))
+    return recs, done
+
+
+def pick_kinds(kinds, only):
+    """the extra_kinds.json records named by --only (name, Capitalised name or kind)"""
+    if not only:
+        return kinds
+    out = []
+    for o in only:
+        hit = [r for r in kinds if o in (r['name'], r['cap']) or (o.lower().startswith('0x') and int(o, 16) == r['kind'])]
+        if not hit:
+            sys.exit('--only %s: no such kind in the extra kinds' % o)
+        out += [r for r in hit if r not in out]
+    return out
 
 
 def common(a):
     import kind_expand as K
+    if a.replace and not a.only:
+        sys.exit('--replace needs --only: it would overwrite every earlier port\'s own record')
     d = open(a.csb, 'rb').read()
-    assert d[:4] == b'CSB\0'
-    nval, n = struct.unpack_from('<HH', d, 8)
-    size = 0x10 + 4 * nval
-    recs = [bytearray(d[0xC + size * i:0xC + size * (i + 1)]) for i in range(n)]
+    nval, recs = csb_parse(d)
+    n = len(recs)
     img = K.Image(K.RPX)
     addr, _hi, _lo, _cmp, old = K.SOUND_NAME_TABLES['csb']
     names = [img.cstr(img.w(addr + 4 * i)) for i in range(old)]
@@ -111,25 +179,23 @@ def common(a):
     like = {r['cap']: caps[r['bkind']] if 'bkind' in r else caps[K.kind_index(
         [img.cstr(img.w(K.TABLES['lower'][0] + 4 * k)) for k in range(K.OLD_N)], r['base'])] for r in kinds}
     like.update(dict(s.split('=') for s in a.set or []))
-    top = max(K.sound_record('csb', r['kind']) for r in kinds) + 1
-    none = bytearray(b'\0' * 16 + b'\xff' * (4 * (nval - 1)) + b'\0' * 4)
-    while len(recs) < top:
-        recs.append(bytearray(none))
-    out = []
-    for r in kinds:
+    want, src_of = {}, {}
+    for r in pick_kinds(kinds, a.only):
         src = like[r['cap']]
         i = K.sound_record('csb', r['kind'])
-        recs[i] = bytearray(recs[names.index(src) if src in names else caps.index(src)])
-        v = struct.unpack_from('<%dH' % (2 * nval), recs[i], 0x10)
-        out.append('%s (record %d) = %s\'s: %s' % (r['cap'], i, src, ' '.join('%X/%X' % (v[2 * k], v[2 * k + 1])
-                                                                           for k in range(nval))))
-    blob = d[:8] + struct.pack('<HH', nval, len(recs)) + b''.join(bytes(x) for x in recs)
+        want[i] = recs[names.index(src) if src in names else caps.index(src)]
+        src_of[i] = (r['cap'], src)
+    new, done = csb_merge(recs, nval, want, a.replace)
+    blob = csb_build(d, nval, new)
     p = os.path.join(a.out, 'sound/config/commonsoundtable.csb')
     os.makedirs(os.path.dirname(p), exist_ok=True)
     open(p, 'wb').write(blob)
-    print('commonsoundtable.csb: %d -> %d records (label/row x3, 0/chant row)' % (n, len(recs)))
-    for x in out:
-        print('  ' + x)
+    print('commonsoundtable.csb: %d -> %d records (label/row x3, 0/chant row)' % (n, len(new)))
+    for i, what in done:
+        v = struct.unpack_from('<%dH' % (2 * nval), new[i], 0x10)
+        print('  %s (record 0x%X) %s%s: %s' % (src_of[i][0], i, what,
+                                              ' = %s\'s' % src_of[i][1] if what in ('added', 'replaced') else '',
+                                              ' '.join('%X/%X' % (v[2 * k], v[2 * k + 1]) for k in range(nval))))
 
 
 def main():
@@ -155,6 +221,9 @@ def main():
     p.add_argument('out')
     p.add_argument('--kinds', default=os.path.join(HERE, 'extra_kinds.json'))
     p.add_argument('--set', action='append', help='CAP=LIKE_CAP (Capitalised names; default: the base)')
+    p.add_argument('--only', action='append', help='only this kind (name, Capitalised name or 0xKIND); repeatable')
+    p.add_argument('--replace', action='store_true', help='with --only: rewrite those kinds\' existing records '
+                   '(default: an existing record is an earlier port\'s own and is kept)')
     p.set_defaults(fn=common)
     a = ap.parse_args()
     a.fn(a)

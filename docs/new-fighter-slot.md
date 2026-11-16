@@ -567,7 +567,8 @@ Ours has items Manifold's lacks:
   records of a 16-byte name and 4 u32, LE) holds per fighter the voices the game plays for it itself: three
   (u16 label, u16 soundlabeltable row) (Mario: MissFoot01, MissFoot02, Damage_hoshikie on his voice bank's row
   0x5E: the KO screams) and (0, the chant bank's row) (Mario: 0x89F, `snd_vc_Mario_ouen` 6086).
-  `fighter_extras.py common` gives every new kind its base's record: a port's voice and chant banks keep the
+  `fighter_extras.py common` gives every new kind without a record its base's (a record already in the file is an
+  earlier port's own and is kept: Squirtle's; `--only KIND`, `--replace` with it): a port's voice and chant banks keep the
   base's bank ids (`ultimate_sound.py` default), so the base's labels name the port's own tones (Squirtle's
   MissFoot01 is his Ultimate `missfoot01`, `VOICE_ALIASES` for the rest).
   The chant bank itself, `fighter/%s/sound/snd_vc_%s_ouen.nus3bank`, is loaded by the kind's name tables
