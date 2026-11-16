@@ -1305,8 +1305,10 @@ def main():
                 # Squirtle's chara_4 cut (--stock-whole) was his select-screen art shrunk (user)
                 c2 = f.c2
                 x0, y0, x1, y1 = box_of(c2[..., 3])
-                ux0, uy0 = max(1.0, stock_box[0] - 3), max(1.0, stock_box[1] - 3)
-                ux1, uy1 = min(ref.w - 1.0, stock_box[2] + 3), min(ref.h - 1.0, stock_box[3] + 3)
+                # into the base icon's whole box (its own outline included, as chara_2's): the matched head box
+                # isn't one where the base's icon isn't a crop of its chr_90 render (the user's ZSS: 42 px of
+                # Byleth's v1-v4 icon were left, at 9 chara_2 px a pixel)
+                ux0, uy0, ux1, uy1 = box_of(ref.O[..., 3])
                 sc = max((x1 - x0) / (ux1 - ux0), (y1 - y0) / (uy1 - uy0))
                 bx = (x0 + x1) / 2 - sc * (ux0 + ux1) / 2
                 by = (y0 + y1) / 2 - sc * (uy0 + uy1) / 2

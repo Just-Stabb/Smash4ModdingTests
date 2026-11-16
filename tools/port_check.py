@@ -41,8 +41,11 @@ class Install:
     """packages overlaid: {path from the game root: (bytes loader, package)}"""
     def __init__(self, pkgs):
         self.files = {}
+        self.earlier = {}            # rel: [(loader, package)] the later packages replaced
         for p in pkgs:
             for rel, load in self._list(p):
+                if rel in self.files:
+                    self.earlier.setdefault(rel, []).append(self.files[rel])
                 self.files[rel] = (load, os.path.basename(p))
 
     @staticmethod
@@ -1254,6 +1257,39 @@ def check_weapon_msc(inst, name, rec, vanilla, rep):
                     'is in its MSC: the article never acts' % (art, w['base'], art, art))
 
 
+def check_portraits(inst, name, rep):
+    """U1: a later package replacing a portrait an earlier one shipped with different art (Byleth v3 / v4 shipped
+    chr_00 / chr_10 made on the vanilla stand-in templates over the user-file build's: his select-screen icon was a
+    rectangular close-up spilling out of its hexagon, user v4). U2: a stock icon with almost nothing drawn (v1-v4's
+    stock_90: 42 of 4096 pixels, Ultimate's chara_2 fitted into a 6 px head box)"""
+    import tempfile
+    sys.path.insert(0, HERE)
+    import nut
+    for rel, olds in sorted(inst.earlier.items()):
+        if not rel.startswith('ui/replace/'):
+            continue
+        new = inst.get(rel)
+        for load, pkg in olds:
+            if load() != new:
+                rep.add('WARN', 'U1 portrait-replaced', '%s: %s\'s replaced by %s\'s (different art: is the later one '
+                        'built on the user\'s templates?)' % (rel, pkg, inst.where(rel)))
+                break
+    for rel in inst.glob(r'ui/replace/chr/stock_90/stock_90_[^/]+\.nut'):
+        data = inst.get(rel)
+        with tempfile.NamedTemporaryFile(suffix='.nut') as f:
+            f.write(data)
+            f.flush()
+            try:
+                d, ts = nut.load(f.name)
+                a = nut.decode(d, ts[0])
+            except Exception:
+                continue
+        drawn = float((a[..., 3] > 127).mean())
+        if drawn < 0.15:
+            rep.add('ERROR', 'U2 stock-icon', '%s: only %.1f %% of the icon drawn (a shrunk icon: '
+                    'ultimate_portraits.py\'s stock fit)' % (rel, 100 * drawn))
+
+
 def check_weapon_motion(inst, name, rec, rep):
     """W5: a new article whose base weapon kind has no MotionModule (its module row's slot 7 a null constructor: Zelda's
     light arrow) and no "modules" giving it one, with commands in its ACMD: its scripts never run, so no hitbox, no
@@ -2355,6 +2391,7 @@ def main():
     check_motions(inst, a.name, rec, rep)
     check_loop_slots(inst, a.name, rec, base, vanilla, rep)
     check_assets(inst, a.name, base, rep)
+    check_portraits(inst, a.name, rep)
     check_lod_and_camera(inst, a.name, src, base['ult'], rep)
     check_motion_groups(inst, a.name, src, base['ult'], kind, rep)
     check_slot_moves(inst, a.name, src, base['ult'], rep)
