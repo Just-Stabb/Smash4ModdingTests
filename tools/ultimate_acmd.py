@@ -563,6 +563,10 @@ def cond_true(cond):
         return not cond_true(cond[1:].strip())
     if any(c in cond for c in TRUE_CONDS):
         return True
+    # the voice region (Byleth's win sounds: `if GET_VOICE_REGION(agent) == *VOICE_US_EN { ... } else { ... }`): the
+    # English block, as first_voice_region takes (v1 / v2 took neither: his win sound scripts were empty)
+    if re.search(r'GET_VOICE_REGION\(agent\) == \*VOICE_US_EN\b', cond):
+        return True
     # the costume's parity (Byleth: even male, odd female, whose animations' timings differ): the male branch, every
     # costume playing the male animations (one motion folder: fighters/master/README.md, female motions to come)
     if re.search(r'FIGHTER_INSTANCE_WORK_ID_INT_COLOR\) % 2 == 0', cond):

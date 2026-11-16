@@ -328,3 +328,18 @@ variables as `TARGET_QUANTITY` (`SELF` / `OPP` / `LASTHIT` / `SLOT1`-`SLOT8` / `
     SET_FLOAT(Value=1.5, Variable=LASTHIT_HITSTUN_MUL)
     SET_FLOAT(Value=12, Variable=POS_OPP_OFFSET_X)
 
+
+## Costume variables (exe_v46s)
+
+Read-only floats (`tools/costume_group_cave.py`, chained before these position variables' other-ID path): writes are
+ignored, an article or anything that isn't a fighter reads 0. Test them with `Float_Var_Compare` (ACMD) or read them
+with `WorkModuleF(0, id)` (MSC).
+
+| ID | name | read |
+|---|---|---|
+| `0x0F000500` | COSTUME | the fighter's costume as its player loaded it (0 = c00 ... 7 = c07; Little Mac up to 15) |
+| `0x0F000501` | COSTUME_PARITY | costume & 1 (Ultimate's `FIGHTER_INSTANCE_WORK_ID_INT_COLOR % 2`) |
+| `0x0F000502` | MOTION_GROUP | 1 when the fighter plays its second motion set (`motion/body2/`: Bayonetta 2's costumes, a new kind's `motion_group2` costumes), else 0 |
+
+Example (a flash only on Byleth's odd, female costumes): `Float_Var_Compare(Variable=COSTUME_PARITY, Method=0,
+Value=1)` then `True(Offset=0){ Graphic_Effect2(...) }`.
