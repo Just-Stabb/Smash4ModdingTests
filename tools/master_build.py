@@ -181,6 +181,17 @@ CONSTS = dict(
     # (v9) Aymr's critical: param_special_lw critical_slow_rate 4, critical_frame 40; the KO test's stand-in (mine: the
     # hit's hitstun 56 = knockback 140, about a KO from mid-stage on a diagonal)
     MASTER_LW_CRIT_SLOW='0x4', MASTER_LW_CRIT_FRAME='0x28', MASTER_LW_CRIT_HITSTUN='56.0f',
+    # (v10) the catch without a capture (master_hi_catch's fallback: Ultimate's hit on the tip catches what it touches,
+    # the status holds it): the tip within MASTER_HI_SOFT_REACH of the fighter's body (its feet + 4 to + 18; mine: the
+    # catching hit's 5.5 + a body's half width) on two frames running (the grab box gets the first); the wall jump:
+    # param_special_hi wall_jump_stop_frame 13 (he clings, then jumps); the tether box: the normal box (vl entry 0) on
+    # AIR_LASSO_FLAG_CHECK's frames before SpecialAirHi's select_cliff_hangdata (15), the AIR_LASSO box (entry 2) from
+    # there to the flag's end (17)
+    MASTER_HI_SOFT_REACH='10.5f', MASTER_HI_WJ_STOP='13.0f', MASTER_HI_LASSO_BOX='15.0f',
+    # (v10) Aymr: SpecialAirLw's KineticModule::add_speed (0, 1) at 53 (the translator drops it: no hop, he landed
+    # inside 53 - 60 and lost the hit) and the end of its hitbox (67): a landing from the hop to there keeps the air
+    # motion and its hit (Ultimate: the hop, then FORBID_LANDING 60 - 65)
+    MASTER_LW_HOP='53.0f', MASTER_LW_HOP_Y='1.0f', MASTER_LW_HIT_END='67.0f',
     # (v9) the diag build's log lines (master.c master_diag): 0 normally; compile_msc(..., diag=True) for the test build
     MASTER_DIAG='0')
 
@@ -344,6 +355,8 @@ def body_fix(a, fighter):
         m = U.merge_flat(g[acmd.crc(name)], tip_catch(U, g[acmd.crc(name)]))
         assert m is not None, name
         g[acmd.crc(name)] = m
+    for name, ult in VEC_SCRIPTS:                        # v10: 368 -> a plain angle (port_check S19)
+        log.append('%s: the vec-target hits\' angles %s' % (name, pull_angles(g[acmd.crc(name)], a.dump, ult)))
     # Aymr: the axe's hitbox (Ultimate's master_axe SpecialLw / SpecialAirLw: on the axe's haver, which follows his)
     # (v7) and SpecialLwHit's: the axe stuck in the floor, its four ground shock hits at frame 2 (8 %, Ultimate's
     # MOVE_ATTACK slides them out natively: here they stay on the axe)
@@ -362,7 +375,7 @@ def body_fix(a, fighter):
     g[acmd.crc('specialairhihit')] = hi_hit_script()       # v9: the sword stays on what it met during the stop
     for line in smash_hold_fx(a, files['effect'], joints):
         log.append(line)
-    g[ov] = merge_tail(U, g[ov], overtake_throw(U, a.dump, joints))
+    g[ov] = merge_tail(U, g[ov], overtake_soft(U, overtake_throw(U, a.dump, joints)))
     for fn, f in files.items():
         f.save(os.path.join(d, fn + '.bin'))
     log.append('aircatch: the whip at 0 / 17 / 27 / 35, the tip\'s catch 20 - 25; specialhi: the catch; overtake: the '
@@ -459,6 +472,76 @@ def no_release(script):
             syn = c.info['syntax']
             c.params[syn.index('NoGrabRelease')] = 1
             c.params[syn.index('HitBits')] = int(c.params[syn.index('HitBits')]) & ~1
+
+
+# v10: Ultimate's angle-368 pulls (set_vec_target_pos: the hit fighter carried to a point): the translator writes 368
+# as 366, which in Smash 4 takes the hitbox's own per-frame motion; on a body hit (bone 0, `top`: the ground up special
+# at 16) that launched the fighter far out of the sword's way (user's v9 clip 2: DK 0 -> 1 %, gone off the top in 3
+# frames; log attempt 1: the fighter in Damage 0x46 from frame 15, never in reach). The MSC pull (master_vt_specialhi /
+# _attackhi4) carries them; the hit takes a plain angle toward the point (the ground up special's 16: 74; the up smash's
+# 13 / 14: 110 / 67; the tip's 0.01 % pulls 90). port_check S19 vec-pull-angle
+PULL_ANGLE_TIP = 90
+VEC_SCRIPTS = (('specialhi', 'SpecialHi'), ('aircatch', 'SpecialAirHi'), ('attackhi4', 'AttackHi4'))
+
+
+def pull_angles(script, dump, ult):
+    """the hits Ultimate writes at 368 with set_vec_target_pos (tools/vec_target.py scan): a body hit (`top`) points at
+    its target (from the hitbox's centre, forward / up), a hit on the sword's tip (`throw`) straight up (90); the MSC
+    pull carries the fighter the rest of the way. Returns [(frame, id, angle)]"""
+    import math
+    import vec_target as VT
+    t = VT.scan(os.path.join(dump, 'master')).get(ult, {}).get('targets', [])
+    want = {}
+    for e in t:
+        hb = e['hitbox']
+        if hb['bone'] == 'top':
+            want[(e['frame'], e['id'])] = int(round(math.degrees(math.atan2(e['y'] - hb['y'], e['x'] - hb['z'])))) % 360
+        else:
+            want[(e['frame'], e['id'])] = PULL_ANGLE_TIP
+    frame, done = 0.0, []
+    for c in script:
+        if c.name == 'FRAME':
+            frame = float(c.params[0])
+        elif c.name == 'WAIT':
+            frame += float(c.params[0])
+        elif c.name in ('Special_Hitbox', 'Extended_Special_Hitbox'):
+            syn = c.info['syntax']
+            k = (frame, c.params[0])
+            if k in want and int(c.params[syn.index('Angle')]) == 366:
+                c.params[syn.index('Angle')] = want[k]
+                done.append((frame, c.params[0], want[k]))
+    return done
+
+
+HI_SOFT_VAR = 0x0F00030B          # v10: VAR_11, master.c's catch without a capture: 0 none, 1 THROW, 2 CATCH, 3 MEWTWO
+
+
+def overtake_soft(U, script):
+    """v10: the overtake's throw when the catch had no capture (master_hi_catch's fallback, VAR_11 1 - 3): Ultimate's
+    ATTACK_ABS numbers (the Throw_Specifiers this script sets) as a hitbox on the held fighter at the throw's frame (11:
+    ATK_HIT_ABS); the Throw_Applier branches only when VAR_11 is 0 (a real capture)"""
+    k = next(i for i, c in enumerate(script) if c.name in ('Float_Var_Compare', 'Int_Var_Compare'))
+    head, branch = script[:k], [c for c in script[k:] if c.ident != acmd.END]
+    spec = {}
+    for c in script:
+        if c.name == 'Throw_Specifier':
+            syn = c.info['syntax']
+            v = {n: c.params[syn.index(n)] for n in ('Kind', 'Damage', 'Angle', 'KBG', 'BKB')}
+            spec.setdefault(('mew' if spec.get(0) and v['Kind'] == 0 and int(v['KBG']) != int(spec[0]['KBG']) else
+                             int(v['Kind'])), v)
+    out = head + if_var(HI_SOFT_VAR, 0, 0, branch)
+    for val, key in ((1, 0), (2, 1), (3, 'mew')):
+        v = spec[key]
+        f = dict(ID=0, Part=0, Bone=0, Damage=float(v['Damage']), Angle=int(v['Angle']), KBG=int(v['KBG']), FKB=0,
+                 BKB=int(v['BKB']), Size=9.0, X=0.0, Y=10.0, Z=8.0, Effect=0, Trip=0.0, Hitlag=1.0, SDI=1.0, Clang=1,
+                 Rebound=0, ShieldDamage=0, SFXLevel=1, SFXType=3, **{'Ground/Air': 3, 'Direct/Indirect': 1}, Type=10,
+                 HitBits=0x3F, Unk41=0, CollisionPart=0xF, NoScale=0, Shieldable=1, Reflectable=0, Absorbable=0,
+                 Rehit=0, IgnoreInvuln=0, HitAllStates=0, FacingRestrict=0, NoGrabRelease=0, TeamDamage=0,
+                 DisableHitlag=0, NoGFX=0, Flinchless=0, Shape=0)
+        hb = U.cmd('Special_Hitbox', 0)
+        hb.params = [f[n] for n in hb.info['syntax']]
+        out += if_var(HI_SOFT_VAR, 0, val, [hb])
+    return out + [U.cmd('FRAME', 12), U.cmd('Remove_All_Hitboxes')] + end()
 
 
 def overtake_throw(U, dump, joints):

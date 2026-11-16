@@ -2680,3 +2680,24 @@ four of these hooks).
 - **Not confirmed in game:** that every landing passes set_situation (static reading says so); the order of Dead and
   the respawn's set-up; the KO / ledge / hit events' timing against the MSC (the test runs each hook site with the
   game's code around it, not a match).
+
+## Ledge boxes, energy suspend, the catch record (Byleth v10)
+
+- **The ledge box as the game checks it** (`0x02D62D74(out, ground collision, pos)`, from GroundModule's use-box
+  `0x02C36A34`, which stores vl group 7 entry n at the ground collision's `+0x204` x, `+0x208` y (x scale), `+0x20C` w,
+  `+0x210` h (x scale x the size factor), `+0x214` 0.6 w, `+0x218` h): the anchor = the collision's position `+0x1D0`
+  (the fighter's, set by `0x02D6493C`) + (x along the facing `+0x1F4`, y); mode `+0x1FC` 0: front only [anchor,
+  anchor + w] x [y, y + h]; 1: behind only (0.6 w, h `+0x218`); 2: both (height max(h, h2)). The mode comes from the
+  status's cliff check kind (StatusModule(0x5, situation, kinetic, correct, **kind**, ...), StatusModule `+0x7C`) through
+  GroundModule `0x02C368B0`: kind 0 -> mode 3 (none), 1 -> 0, 2 / 4 -> 2, 3 -> 0 only while falling. ZSS's AirCatch
+  (func_123) uses kind 1: a tether's box is checked in front only. `ultimate_vl_shapes.tether_box` maps Ultimate's
+  cliff_hang_data rectangle to it exactly.
+- **KineticModule 0x2715 - 0x2718** (kinetic_module_impl `0x02C510C4`, from `0x02C528FC`): 0x2715 / 0x2716 set / clear an
+  energy's `+0x18` (enabled), 0x2717 / 0x2718 set / clear its `+0x19` (suspended: the update `0x02C50058` skips it; its
+  speed stays). Captain Falcon's MSC pairs 0x2717 / 0x2718 on energy 1 (gravity); Byleth's SpecialAirHiHit and wall jump
+  do too (`tools/kinetic_suspend_test.py`, unicorn).
+- **The catch**: the capturer's CatchModule (vtable `0x10104410`, constructor `0x02C17F80`, 0x60 bytes) applies a catch in
+  vt +0x8C `0x02C18DC8` from a record at `+0x1C` (the victim's object id `+0x34`, the grab box index `+0x43`; the
+  victim's CaptureModule vt +0xBC with the box's TargetStatus / flag); no direct store to the record was found (a struct
+  copy from the collision pass, not traced). The victim's catchability each frame: `0x02E2528C` (status data `& 0x800`;
+  Damage 0x46 leaves it catchable).

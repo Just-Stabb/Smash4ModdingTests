@@ -2738,6 +2738,134 @@ def check_vec_targets(src, name, ult, rep):
             '%s (%s)' % (m, 'hand-made' if m in hand else 'generated') for m in moves))
 
 
+def _c_funcs(name):
+    """{function name: body} of a fighter's MSC C source (fighters/NAME/NAME.c), {} without one"""
+    c = os.path.join(ROOT, 'fighters', name, name + '.c')
+    if not os.path.exists(c):
+        return {}
+    text = open(c, encoding='utf-8', errors='replace').read()
+    return {m.group(1): m.group(2) for m in re.finditer(r'\n(?:int|void|float|bool)\s+(\w+)\s*\([^)]*\)\s*\{(.*?)\n\}', text,
+                                                          re.S)}
+
+
+def _reach(funcs, start, depth=3):
+    """start's body and the bodies of the functions it calls (and func_78 loops), `depth` calls deep"""
+    seen, todo, out = set(), [(start, 0)], []
+    while todo:
+        f, d = todo.pop()
+        if f in seen or f not in funcs:
+            continue
+        seen.add(f)
+        out.append(funcs[f])
+        if d < depth:
+            todo += [(g, d + 1) for g in re.findall(r'\b(\w+)\(', funcs[f]) + re.findall(r'func_78\((\w+)\)', funcs[f])
+                     if g in funcs]
+    return '\n'.join(out)
+
+
+def check_tether_latch(name, rep):
+    """S17 tether-latch: the base's tether status (0xF1 AirCatch) hands over to the port's own hit / latch status
+    (registered for 0x15B), but its end still runs the common AirCatch end (func_127: the whip article removed unless the
+    next status is the ledge's 0xF2 / 0xF3) on that change too: the sword vanishes the moment it meets the wall or the
+    fighter it holds (Byleth v9, user's trim frame 128). ERROR"""
+    funcs = _c_funcs(name)
+    if not funcs:
+        return
+    src = open(os.path.join(ROOT, 'fighters', name, name + '.c'), encoding='utf-8', errors='replace').read()
+    own_hit = re.search(r'sv_set_mem\(0x1, 0x1, 0x15b, (\w+)\)', src)
+    ends = [m.group(1) for m in re.finditer(r'sv_set_mem\(0x1, 0x2, 0xf1, (\w+)\)', src)]
+    if not own_hit or not ends or re.fullmatch(r'func_\d+', own_hit.group(1)):
+        return
+    body = funcs.get(ends[-1], '')
+    if re.search(r'^\s*func_127\(\);', body, re.M) and not re.search(r'global6\s*!=\s*0x15b', body):
+        rep.add('ERROR', 'S17 tether-latch', '%s.c: the tether status 0xF1\'s end %s removes the tether (func_127) also '
+                'when it hands over to the port\'s latch / hit status 0x15B (%s): the sword is gone while it holds'
+                % (name, ends[-1], own_hit.group(1)))
+
+
+def check_pull_gravity(name, rep):
+    """S18 pull-gravity: a status that pulls the fighter with kinetic energy 3 (KineticModule(0x11, 3, x, y) with a y
+    that isn't 0) under kinetic type 0xA (AIR_STOP: the gravity energy 1 still runs) without stopping the gravity energy
+    (KineticModule(0x2717, 1) or its speed set to 0 each frame): he sinks under the pull, which loses to his fall speed
+    (Byleth v9's SpecialAirHiHit: pulled up at 4.1 a frame, fell for 30 frames under the wall). ERROR per status"""
+    funcs = _c_funcs(name)
+    if not funcs:
+        return
+    src = open(os.path.join(ROOT, 'fighters', name, name + '.c'), encoding='utf-8', errors='replace').read()
+    bad = []
+    for st, main in re.findall(r'sv_set_mem\(0x1, 0x1, (0x[0-9a-f]+), (\w+)\)', src):
+        if re.fullmatch(r'func_\d+', main) or main not in funcs or 'KineticModule(0, 0xa)' not in funcs[main]:
+            continue
+        reach = _reach(funcs, main, 4)
+        pull_fn = [f for f, b in funcs.items() if re.search(r'KineticModule\(0x11, 0x3, [^;]*, y\);', b)]
+        direct = [y for f in [main] + re.findall(r'\b(\w+)\(', reach) if f in funcs and f not in pull_fn
+                  for y in re.findall(r'KineticModule\(0x11, 0x3, [^;]*?, ([^;,]+)\);', funcs[f])]
+        via = [a for f in pull_fn for a in re.findall(r'\b%s\(([^;]*)\);' % f, reach)]
+        moving = any(v.strip() not in ('0', '0.0f', 'y') for v in direct + via)
+        if moving and 'KineticModule(0x2717, 0x1)' not in reach and 'KineticModule(0x11, 0x1, 0)' not in reach:
+            bad.append('%s (%s)' % (st, main))
+    if bad:
+        rep.add('ERROR', 'S18 pull-gravity', '%s.c: statuses that pull him on kinetic energy 3 under AIR_STOP (0xA) with '
+                'the gravity energy running: he sinks under the pull: %s' % (name, ', '.join(bad)))
+
+
+def check_vec_pull_angle(inst, src, name, ult, rep):
+    """S19 vec-pull-angle: a hit Ultimate writes at 368 with set_vec_target_pos (the fighter carried to a point) on its
+    body (`top`, bone 0 here) left at the translator's 366: Smash 4's 366 takes the hitbox's own motion over the frame,
+    which for bone 0 is the fighter's, its y raised to the common minimum: the fighter is launched up instead of carried
+    (Byleth v9's ground up special at 16, user's clip 2: DK 0 -> 1 %, off the top in 3 frames, never in the sword's
+    reach). The MSC pull (S10) carries it; the hit wants a plain angle (master_build.pull_angles). ERROR per script"""
+    import vec_target as VT
+    dump = src.dump(ult)
+    d = os.path.join(dump, ult) if dump else None
+    game = scripts(inst, 'fighter/%s/script/animcmd/body/game.bin' % name)
+    if not d or not os.path.isdir(d) or not game:
+        return
+    import acmd
+    bad = []
+    for script, v in VT.scan(d).items():
+        tops = {(e['frame'], e['id']) for e in v['targets'] if e['hitbox']['bone'] == 'top'}
+        sc = game.get(acmd.crc(script.lower())) or (game.get(acmd.crc('aircatch')) if script == 'SpecialAirHi' else None)
+        if not tops or not sc:
+            continue
+        left = sorted({fr for fr, c in _frames(sc) if c.name in ('Special_Hitbox', 'Extended_Special_Hitbox')
+                       and (fr, c.params[0]) in tops and int(c.params[c.info['syntax'].index('Angle')]) == 366
+                       and int(c.params[c.info['syntax'].index('Bone')]) == 0})
+        if left:
+            bad.append('%s (frames %s)' % (script, ', '.join('%g' % f for f in left)))
+    if bad:
+        rep.add('ERROR', 'S19 vec-pull-angle', 'Ultimate\'s 368 body hits (set_vec_target_pos) left at 366 on bone 0 (its '
+                'motion is the body\'s: the fighter is launched up, not carried): %s' % '; '.join(bad))
+
+
+def check_add_speed(src, name, ult, rep):
+    """S20 add-speed: an Ultimate game script that moves the fighter itself (KineticModule::add_speed / set_speed /
+    add_speed_outside) has no ACMD equivalent in the translation (dropped): the port's MSC must do it, its source naming
+    the script with the call (a comment `SCRIPT's KineticModule::add_speed`). Byleth v1 - v9: SpecialAirLw's hop at 53
+    (0, 1) was missing, so a landing at 53 - 60 cancelled Aymr before its hit (user: "landing around the hitbox frame
+    gives no hitbox"). ERROR"""
+    dump = src.dump(ult)
+    d = os.path.join(dump, ult) if dump else None
+    if not d or not os.path.isdir(d):
+        return
+    c = os.path.join(ROOT, 'fighters', name, name + '.c')
+    text = open(c, encoding='utf-8', errors='replace').read() if os.path.exists(c) else ''
+    missing = []
+    for f in sorted(os.listdir(d)):
+        if not f.endswith('.txt'):
+            continue
+        body = open(os.path.join(d, f), errors='replace').read()
+        m = re.search(r'fn game_\w+\(agent[^{]*\{(.*?)\n\}', body, re.S)
+        if m and re.search(r'KineticModule::(add_speed|set_speed|add_speed_outside)\(', m.group(1)):
+            script = f[:-4]
+            if not re.search(r"%s's KineticModule::" % re.escape(script), text):
+                missing.append(script)
+    if missing:
+        rep.add('ERROR', 'S20 add-speed', 'Ultimate game scripts that move the fighter (KineticModule::add_speed / '
+                'set_speed): not done in fighters/%s/%s.c (a comment "SCRIPT\'s KineticModule::..." where it is): %s'
+                % (name, name, ', '.join(missing)))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('name')
@@ -2817,6 +2945,10 @@ def main():
     check_cave_hooks(inst, rep)
     check_effect_scripts(src, base['ult'], rep)
     check_vec_targets(src, a.name, base['ult'], rep)
+    check_tether_latch(a.name, rep)
+    check_pull_gravity(a.name, rep)
+    check_vec_pull_angle(inst, src, a.name, base['ult'], rep)
+    check_add_speed(src, a.name, base['ult'], rep)
     n = rep.show()
     sys.exit(1 if n['ERROR'] or (a.strict and n['WARN']) else 0)
 

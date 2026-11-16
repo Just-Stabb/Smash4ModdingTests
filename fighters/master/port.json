@@ -244,5 +244,5 @@
     }
   },
   "tether_ledge_box": 3,
-  "_tether_ledge_box": "v9: Ultimate's cliff_hang_data[3] (FIGHTER_MASTER_CLIFF_HANG_DATA_AIR_LASSO, p1 (44, 85) / p2 (-44, 20): SpecialAirHi selects it at 15) as ZSS's tether box (vl group 7 entry 2, the one her AirCatch selects): (0, 20, 44, 65)"
+  "_tether_ledge_box": "Ultimate's cliff_hang_data[3] (FIGHTER_MASTER_CLIFF_HANG_DATA_AIR_LASSO, p1 (44, 85) / p2 (-44, 20): SpecialAirHi selects it at 15) as ZSS's tether box (vl group 7 entry 2): v10 the same rectangle in world units for AirCatch's front-only check, (-44, 20, 88, 65) (ultimate_vl_shapes.tether_box; v9 (0, 20, 44, 65) was its front half); master.c uses it on frames 15 - 16 only, the normal box on 12 - 14 (Ultimate's timing)"
 }

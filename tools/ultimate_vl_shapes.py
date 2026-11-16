@@ -100,6 +100,19 @@ def ledge_box(vl_prc, i):
     return dict(x=0.0, y=c['p2_y'], w=c['p1_x'], h=c['p1_y'] - c['p2_y'])
 
 
+def tether_box(vl_prc, i):
+    """Ultimate cliff_hang_data[i] as the Smash 4 TETHER box (vl group 7 entry 2), the same rectangle in world units.
+    The executable's box (0x02D62D74, from GroundModule's use-box 0x02C36A34: x, y x scale, w, h x scale; the anchor is
+    the ground collision's position +0x1D0 = the fighter's): anchor = position + (x along the facing, y); mode 0 (front
+    only) [anchor, anchor + w] x [anchor y, + h], mode 2 (both sides) adds 0.6 w behind the anchor, mode 1 that alone.
+    The mode is the status's cliff check kind (StatusModule(0x5, ..., kind): 0x02C368B0, kind 1 -> 0, 2 / 4 -> 2): the
+    tether status AirCatch (0xF1, func_123: kind 1) checks in front only, so Ultimate's p2 - p1 rectangle is x = p2_x,
+    w = p1_x - p2_x (Byleth v9 mapped it as the normal box, (0, bottom, front, height): only its front half)"""
+    labels = {hash40(k): k for k in KEYS}
+    c = prc.Prc(open(vl_prc, 'rb').read(), labels).root['cliff_hang_data'][i]
+    return dict(x=c['p2_x'], y=c['p2_y'], w=c['p1_x'] - c['p2_x'], h=c['p1_y'] - c['p2_y'])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('vl_in')
@@ -116,7 +129,7 @@ def main():
     new['ledge_boxes'] += old['ledge_boxes'][2:]          # tether boxes stay
     if a.tether is not None:
         assert len(new['ledge_boxes']) > 2, 'the base has no tether box (vl group 7 entry 2)'
-        new['ledge_boxes'][2] = ledge_box(a.vl_prc, a.tether)
+        new['ledge_boxes'][2] = tether_box(a.vl_prc, a.tether)
     strip = {k: [{kk: vv for kk, vv in e.items() if kk != 'ult_node'} for e in v] for k, v in new.items()}
     old_points = vl_shapes.entries(groups[HITPOINTS]) or []
     if strip['hit_points']:

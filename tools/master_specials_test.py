@@ -29,6 +29,15 @@ v9 (README "Status: v9"):
     frames turns him and flips his air momentum; nothing with the stick forward;
  8. Aymr's critical: the move's first hit in a 1-on-1 with a KO-strength hitstun slows the game (SlowModule 4, 40)
     and zooms (ITEM 8, then 9 after 40 frames); not with three fighters or a weak hit.
+v10 (README "Status: v10"):
+ 9. the wall latch keeps the sword (no func_127 into 0x15B), holds the fall (gravity 0, energy 1 suspended), reels
+    his hand (5.5 / 20.5) to the point; the wall jump turns away, clings 13 frames, then 2.6 / 0.9 on gravity / air
+    control with the fall back;
+10. the catch without a capture: the tip on a fighter's body two frames running in 20 - 26 (not intangible, not far)
+    -> 0x15B with VAR_11 (the overtake's hitbox), its 3 %, a hitstop each frame; reeled in, held to the throw's frame;
+11. the ledge box per frame (12 - 14 the normal one, 15 - 16 the tether box);
+12. Aymr's landings by frame (INHERIT_1, Landing2 before the hop, the air motion from the hop to the hit's end,
+    INHERIT_2, Landing1) and the hop at 53.
 """
 import os
 import re
@@ -82,6 +91,7 @@ class Game:
         self.wall_x = None         # v9: a wall at this world x (its normal facing him) ...
         self.ceil_y = None         # ... or a ceiling at this world y, for the line test
         self.line_asks = []        # (x0, y0, x1, y1, mode) of each line test
+        self.lasso = False         # v10: flag 0x2100000D on
 
     def sys(self, sid, a):
         self.calls.append((sid, list(a)))
@@ -97,6 +107,8 @@ class Game:
             return int(self.shield)
         if sid == 0x18 and a == [1]:
             return self.situation
+        if sid == 0x16 and a == [0x2712, 0x2100000D]:           # v10: AIR_LASSO_FLAG_CHECK (the aircatch script's)
+            return int(self.lasso)
         if sid == 0x18 and a and a[0] == 3:                  # StatusModule(3, status, ..): the change (func_79)
             self.status.append(a[1])
             return 0
@@ -162,6 +174,8 @@ class Game:
                 return 2.0 if f['air'] else 0.0
             if f and q == 0x17:
                 return f['damage']
+            if f and q == 0x1B:
+                return f.get('intangible', 0.0)
             return 0.0
         return self.vars.get(v, 0.0)
 
@@ -368,8 +382,9 @@ def v9(path):
                 held = n
         if 0x15C in gm.status:
             break
-    check('v9 latched: still 12 frames (hit_stop_frame_wall), pulled until his hand is at the point, then the wall jump',
-          held + 1 == 12 and 0x15C in gm.status and abs(gm.x + 8.0 - tx) < 0.01 and abs(gm.y + 20.5 - ty) < 0.01,
+    check('v9 latched: still 12 frames (hit_stop_frame_wall), pulled until his hand (v10: the line test\'s start, 5.5 '
+          'ahead) is at the point, then the wall jump',
+          held + 1 == 12 and 0x15C in gm.status and abs(gm.x + 5.5 - tx) < 0.01 and abs(gm.y + 20.5 - ty) < 0.01,
           'held %d, moved %d, at (%.2f, %.2f), point (%.2f, %.2f), statuses %s' % (held, moved, gm.x, gm.y, tx, ty,
                                                                                   [hex(x) for x in gm.status]))
     b, gm = setup(22.0, lr=-1.0)
@@ -457,11 +472,163 @@ def v9(path):
               'slow %s, cam %s' % (slow, gm.vars.get(0x0F000099)))
 
 
+def kin(gm, op, energy):
+    return [a for s, a in gm.calls if s == 0x10 and a and a[0] == op and len(a) > 1 and a[1] == energy]
+
+
+def v10(path):
+    """v10 (README "Status: v10")"""
+    def setup(frame, lr=1.0):
+        b, gm = Byleth(path), Game()
+        b.vm.game = gm
+        b.g('global18', 2)
+        b.g('global19', 2)
+        b.g('master_wall_jumps', 0)
+        gm.frame, gm.lr = frame, lr
+        return b, gm
+    # 1. the wall latch: the sword kept, no fall, the wall jump turns away, clings 13 frames, then jumps
+    b, gm = setup(19.0)
+    gm.wall_x = 14.0
+    b.call('master_hi_air_loop')
+    b.g('global6', 0x15B)
+    b.call('master_hi_air_end')
+    check('v10 the latch (0xF1 -> 0x15B) keeps the sword: no func_127 (its ArticleModule 0x2712 remove)',
+          not [a for s, a in gm.calls if s == 0x20 and a and a[0] == 0x2712])
+    b.g('global6', 0x0)
+    gm.calls.clear()
+    b.call('master_hi_air_end')
+    check('v10 leaving 0xF1 for anything else still removes it', bool([a for s, a in gm.calls if s == 0x20 and a and a[0] == 0x2712]))
+    gm.calls.clear()
+    gm.status.clear()
+    b.call('master_hi_hit_main')
+    check('v10 SpecialAirHiHit: gravity speed 0 and its energy suspended (0x2717, 1)',
+          kin(gm, 0x11, 1) and i2f(kin(gm, 0x11, 1)[-1][2]) == 0.0 and kin(gm, 0x2717, 1), str(kin(gm, 0x11, 1)))
+    for n in range(60):
+        b.call('master_hi_hit_loop')
+        ks = kin(gm, 0x11, 3)
+        if ks:
+            gm.x += i2f(ks[-1][2]) * gm.lr
+            gm.y += i2f(ks[-1][3])
+        gm.calls = [c for c in gm.calls if c[0] != 0x10]
+        if 0x15C in gm.status:
+            break
+    check('v10 at the wall: 0x15B -> 0x15C latched', 0x15C in gm.status and b.g('master_hi_latched') == 1)
+    b.g('global6', 0x15C)
+    gm.calls.clear()
+    b.call('master_hi_hit_end')
+    check('v10 0x15B -> 0x15C keeps the fall off (no 0x2718)', not kin(gm, 0x2718, 1))
+    gm.calls.clear()
+    lr0 = gm.lr
+    b.call('master_hi_wall_main')
+    turned = [a for s, a in gm.calls if s == 0x14 and a == [0x2710]]
+    check('v10 the wall jump turns away from the wall (reverse_lr) and holds the fall', bool(turned) and kin(gm, 0x2717, 1),
+          'calls %s' % [a for s, a in gm.calls if s == 0x14])
+    jumped = None
+    for n in range(1, 20):
+        gm.calls.clear()
+        b.call('master_hi_wall_loop')
+        if kin(gm, 0x11, 1) and jumped is None:
+            jumped = n
+            jy = i2f(kin(gm, 0x11, 1)[-1][2])
+            jx = kin(gm, 0x11, 2)
+            fell = kin(gm, 0x2718, 1)
+    check('v10 the cling: 13 frames (wall_jump_stop_frame), then 2.6 up on the gravity energy and 0.9 on air control, '
+          'the fall back (0x2718)', jumped == 13 and abs(jy - 2.6) < 1e-5 and jx and abs(abs(i2f(jx[-1][2])) - 0.9) < 1e-5
+          and fell, 'jumped at %s' % jumped)
+    # 2. the catch without a capture
+    def tipped(frame, dx=0.0, dy=0.0, intangible=False):
+        b, gm = setup(frame)
+        tx = b.call('master_tip_x', int(frame - 18.0))
+        ty = b.call('master_tip_y', int(frame - 18.0))
+        gm.slots[1] = dict(x=i2f(tx) + dx, y=gm.y + i2f(ty) - 10.0 + dy, status=0x46, air=True, damage=20.0)
+        if intangible:
+            gm.slots[1]['intangible'] = 2.0
+        return b, gm
+    b, gm = tipped(21.0)
+    b.call('master_hi_air_loop')
+    first = 0x15B in gm.status
+    gm.frame = 22.0
+    gm.slots[1]['x'] = i2f(b.call('master_tip_x', 4))
+    gm.slots[1]['y'] = gm.y + i2f(b.call('master_tip_y', 4)) - 10.0
+    b.call('master_hi_air_loop')
+    check('v10 no capture: the tip on a fighter two frames running -> caught (0x15B), not on the first (the grab box\'s)',
+          not first and 0x15B in gm.status and b.g('master_target') == 1)
+    check('v10 held without a capture: VAR_11 = 2 (CATCH: an air target), its 3 %, a hitstop each frame',
+          gm.vars.get(0x0F00030B) == 2.0 and gm.vars.get(0x0F000100 + 0x20 * 4 + 0x17) == 23.0
+          and gm.vars.get(0x0F00005C + 8) == 3.0, str((gm.vars.get(0x0F00030B), gm.vars.get(0x0F00005C + 8))))
+    # the hold, the reel, the overtake's hitbox frame
+    gm.status.clear()
+    gm.calls.clear()
+    b.call('master_hi_hit_main')
+    for n in range(60):
+        b.call('master_hi_hit_loop')
+        ks = kin(gm, 0x11, 3)
+        if ks:
+            gm.x += i2f(ks[-1][2]) * gm.lr
+            gm.y += i2f(ks[-1][3])
+        gm.calls = [c for c in gm.calls if c[0] != 0x10] if b.g('master_phase') == 0 else gm.calls
+        if b.g('master_phase') == 1:
+            break
+    gm.calls.clear()
+    gm.frame = 5.0
+    b.call('master_hi_hit_loop')
+    kept = [a for s, a in gm.calls if s == 0x16 and len(a) == 3 and a[2] == 0x0F000024]
+    gm.calls.clear()
+    gm.frame = 11.0
+    b.call('master_hi_hit_loop')
+    check('v10 held without a capture: reeled in (phase 1), still held at the overtake\'s frame 5, let go and the fall '
+          'back at 11 (its hitbox frame)', b.g('master_phase') == 1 and kept and kin(gm, 0x2718, 1)
+          and b.g('master_target') & 0xFFFFFFFF == 0xFFFFFFFF, 'kept %s' % kept)
+    for what, kw in (('20 away', dict(dx=20.0)), ('intangible', dict(intangible=True)), ('shielding', dict(status=0x1C))):
+        b, gm = tipped(21.0, **{k: v for k, v in kw.items() if k != 'status'})
+        if 'status' in kw:
+            gm.slots[1]['status'] = kw['status']
+        b.call('master_hi_air_loop')
+        gm.frame = 22.0
+        b.call('master_hi_air_loop')
+        check('v10 no capture, a fighter %s: not caught' % what, 0x15B not in gm.status)
+    b, gm = tipped(30.0)
+    b.call('master_hi_air_loop')
+    b.call('master_hi_air_loop')
+    check('v10 after the window (30): not caught', 0x15B not in gm.status)
+    # 3. the ledge boxes by frame
+    for f, box in ((13.0, 0), (15.0, 2)):
+        b, gm = setup(f)
+        gm.lasso = True
+        b.call('master_hi_air_loop')
+        sel = [a for s, a in gm.calls if s == 0x1A and a and a[0] == 0x2712]
+        check('v10 the ledge box at frame %g: entry %d' % (f, box), (not sel and box is None) or (sel and sel[-1][1] == box),
+              str(sel))
+    # 4. Aymr's landings: (frame, landed?) -> what
+    for f, want, what in ((40.0, 'ground', 'INHERIT_LANDING_1: the ground motion'), (52.0, 0x259, 'before the hop: Landing2'),
+                          (56.0, 'air', 'after the hop (53): the air motion goes on'),
+                          (62.0, 'air', 'FORBID_LANDING (60 - 65): the air motion and its hit'),
+                          (70.0, 'ground', 'INHERIT_LANDING_2: the ground motion'), (120.0, 0x255, 'Landing1')):
+        b, gm = setup(f)
+        b.g('global4', 0x155)
+        b.g('master_phase', 0)
+        b.g('global19', 2)
+        b.g('global18', 0)
+        gm.situation = 0
+        b.call('master_lw_loop')
+        sets = [a[1] for s, a in gm.calls if s == 0x12 and a and a[0] in (1, 3) and len(a) > 1]
+        got = 'air' if not sets else ('ground' if sets[-1] == 0x241 else sets[-1])
+        check('v10 Aymr landing at %g (%s)' % (f, what), got == want, 'motions %s' % [hex(x) for x in sets])
+    b, gm = setup(53.0)
+    b.g('global4', 0x155)
+    b.g('master_phase', 0)
+    b.call('master_lw_loop')
+    b.call('master_lw_loop')
+    hops = kin(gm, 0x11, 1)
+    check('v10 Aymr in the air at 53: the hop (gravity y + 1), once', len(hops) == 1 and i2f(hops[0][2]) == 1.0, str(hops))
+
+
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else compiled()
     failnaught(path)
     up_special(path)
     v9(path)
+    v10(path)
     print('\n%d problem(s)' % len(PROBLEMS))
     sys.exit(1 if PROBLEMS else 0)
 

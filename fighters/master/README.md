@@ -9,6 +9,42 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: v10 (`scratchpad/byleth_v10_fix.zip`: a FIX package over v4 + byleth_userdata_v2 + v5_fix ... v9_fix + vars_reset_v1; exe unchanged (the user's **exe_v46w_vars_line**, sha1 bfd3b5b4...); in-game TEST)
+
+User, v9 test (3 clips + a trim of clip 1, framed at 60 fps in `scratchpad/byleth/v10/clips/`; the TEST_ONLY diag log,
+Cemu RPX hash 5838c778 = v9's exe_v46v_line_diag): up special still grabs nobody; its ledge box too large; the wall
+cling broken; landing during the air down special near its hit still cancels it with no hit.
+
+| point | cause (evidence) | fix |
+|---|---|---|
+| up special: nothing caught | **Log, attempt 1** (13:51:51, ground: frame-16 hit): the opponent goes 0 -> Damage (0x46) at the second line of frame 15 while Byleth's frame stays 15.0 - 15.21 for 7 lines (the hit's 7 hitlag frames: Ultimate's frame-16 1 % `top` hit, hitlag 1.4), then stays in 0x46 to frame 29; k5 (CatchModule 0x2712) 0 throughout. **Clip 2** (`v10/clips/c2a.png`, frames 52 - 62): the same hit (DK 0 -> 1 %) then DK leaves the top of the screen in 3 frames while the sword goes up empty. The cause: Ultimate's 368 + set_vec_target_pos (carry to (18, 44)) written as Smash 4's 366, which takes the hitbox's own per-frame motion; on bone 0 that is the body's (~0), its y raised to the common minimum (docs/native-notes.md "Special angles"): launched up, never in the tip's reach. **Clip 3** (`c3c.png`, frames 82 - 88): the ground up special under an airborne DK: the sword reaches his legs, nothing happens (no hitlag, no capture). **Log, attempt 2**: the tip met the stage at frame 18 (k2 31: kind 3, 6.3 from his hand, latched as a wall: k4 1) before the catch window: no catch test. The log "stopping" at n=98 is not a cap (`diag_godfist_cave.py` has none): v9's diag only logged in 0x154 / 0xF1, not in 0x15B. Exe side, read further: the catch is applied by the capturer's CatchModule vt +0x8C (`0x02C18DC8`) from a record inside the module (+0x1C: the victim's id at +0x34, the grab box index +0x43, built by the module's constructor `0x02C17F80`, 0x60 bytes) that the collision pass fills by a struct copy (no direct store found: the per-frame pass not traced); the victim's side: catchable = !(its status data & 0x800) every frame (`0x02E2528C`); Damage 0x46's pre (`func_788`: StatusModule(0x2713, 0, 0, 0, 0, ...)) leaves it catchable. So no exe reason was found to refuse; no capture ever came in game either (v8, v9) | (1) **the hits Ultimate writes at 368** take a plain angle toward their target (`master_build.pull_angles`: SpecialHi 16 -> 74, the tip's 0.01 % pulls -> 90; the up smash's 13 / 14 -> 110 / 67, the same bug class), the MSC pull carries them, now also in the air (0xF1, frames 17 / 19); **port_check S19 vec-pull-angle**. (2) **The catch without a capture** (`master_hi_soft`): Ultimate's catch is its tip hit (ENABLE_CATCH 20 - 25, the status code's set_catch); the grab box (0xBD) is tried first; a fighter whose body (feet + 4 to + 18) is within 10.5 of the tip (Ultimate's tip on his timeline, `master_tip_x / _y`) on two frames running (the grab box had the first), not intangible, not on a ledge, is caught by MSC: held where it is (position + collision 5 + a 3-frame hitstop rewritten each frame: it can't act), Ultimate's 3 %, SpecialAirHiHit (19 frames still, the rewind), the overtake's throw as a hitbox on it at frame 11 (Ultimate's ATTACK_ABS numbers: THROW 6.5 % 260 / 40 / 85 ground, CATCH 114 / 65 / 65 air, THROW_MEWTWO 260 / 110 / 14 air at 50 %+; VAR_11 1 / 2 / 3; the Throw_Applier branch only with a real capture). (3) The diag logs the catch's decision (k6 the tip's distance, k7 1 capture / 2 - 4 MSC catch) and 0x15B / 0x15C each frame (k8, k9) |
+| up special: ledge box too large | the exe's ledge box (`0x02D62D74`, from GroundModule's use-box `0x02C36A34`): anchor = his position (the ground collision's +0x1D0) + (x along the facing, y); mode 0 front only [anchor, + w] x [y, y + h], mode 2 adds 0.6 w behind, mode 1 that alone; the mode is the status's cliff check kind (StatusModule(0x5) 4th value, `0x02C368B0`: kind 1 -> 0, 2 / 4 -> 2): AirCatch (func_123) checks in front only. Units: world units x the fighter's scale (ZSS's 1.0). ZSS's own (10, -10, 70, 60) = 10 - 80 in front, -10 - 50 up. v9's (0, 20, 44, 65) = 0 - 44 in front, 20 - 85 up: Ultimate's AIR_LASSO box (p1 (44, 85), p2 (-44, 20)) mapped like the normal box (only its front half), but **on all of 12 - 16**, while Ultimate's SpecialAirHi selects the AIR_LASSO box only at 15 (12 - 14: the normal box with HANG_IMMIDIATE: a ledge at his hands) | the box by frame in MSC (`master_hi_air_loop`): 12 - 14 vl entry 0 (Ultimate's cliff_hang_data[0], his normal ledge box), 15 - 16 entry 2; entry 2 = Ultimate's AIR_LASSO rectangle in world units for the front-only check: (-44, 20, 88, 65) (`ultimate_vl_shapes.tether_box`). Diagram: `scratchpad/byleth/v10/ledge/ledge_boxes_v9_v10.png` (five positions under / beside a ledge: A caught in both; C, the ledge 20 behind him, now caught on 15 - 16 as in Ultimate; B / D / E in neither). NOTE: Ultimate's box is wider than v9's (44 behind too); v10 matches it in world units and in time, the 3 extra frames of v9 gone |
+| up special: wall cling broken | the user's trim (`v10/clips/t1d.png` .. `t1f.png`, 60 fps): 114 - 122 the start (facing left, the sword back-left), 123 turned right (TURN_CHECK); 126 - 127 the tip meets the underside of Battlefield's left overhang (log attempt 2: frame 18, kind 3, 6.3 from his hand, |ny| <= 0.934: latched); **128 the sword is gone** (the common AirCatch end func_127 removed the whip leaving 0xF1 for 0x15B); **128 - 159 he sinks** instead of being held and reeled up: kinetic type 0xA (AIR_STOP) keeps the gravity energy (1) running and the pull sets energy 3 only: the 12-frame stop drifts down, the 4.1 rewind loses to his fall speed until its 20-frame cap; **160 the wall jump from mid-air**, 30 frames late and far below the point, **not turned** (v9 asked the body's wall contact: none, so he kept facing the wall), its 2.6 up on energy 3, which nothing slows: clip 1 frames 380 - 390, off the top of the screen. Ultimate (f_7208a2b7d0 SpecialHiHit, f_7208a1fa60 / f_7208a1c840 / f_7208a2a8a0 / f_7208a2ac80 the wall jump): the sword stays on the point, 12 frames still, he is reeled at 4.1 until his hand is there; the wall jump turns him away (reverse_lr when the wall's angle is within wall_angle_min / max), clings 13 frames (wall_jump_stop_frame; its sounds: landing 5, jump 15), then jump_speed_x / _y 0.9 / 2.6 | the sword kept into 0x15B (`master_hi_air_end` skips func_127 there; **port_check S17 tether-latch**); no fall while held (gravity speed 0 + the energy suspended: KineticModule 0x2717 / 0x2718, Captain Falcon's own pair, kinetic_module_impl `0x02C52CEC` / `0x02C52F0C`; resumed at 0x15B's end, after the overtake's throw, the wall jump's jump; **port_check S18 pull-gravity**); the reel puts his hand (the line test's start, 5.5 / 20.5) on the point; the wall jump from a latch: reverse_lr, 13 frames' cling (his motion's root: 24 up, back to the wall), then 2.6 on the gravity energy and 0.9 on air control (both slow as a jump's do) |
+| down special: landing near the hit | Ultimate's SpecialAirLw: INHERIT_LANDING_1 0 - 51, **KineticModule::add_speed (0, 1, 0) at 53** (a hop), FORBID_LANDING 60 - 65 (the axe hit 61 - 67 with him in the air), INHERIT_LANDING_2 65 - 117. The translator drops add_speed (no ACMD for it): no hop, so he landed inside 53 - 60 -> SpecialLwLanding2 (no hit); 60 - 65 went to the ground motion at its frame (a new script started there: whether it still gives the hit it starts past is not shown; the air one keeps it for sure) | the hop in MSC (gravity y + 1 at 53, once); landed from 53 to the hit's end (67): the air motion and its script go on (the hit comes out), the axe meets the floor at 64 -> SpecialLwHit as before; 51 - 53 Landing2, < 51 / 67 - 117 the ground motion, 117+ Landing1. **port_check S20 add-speed** (an Ultimate game script's own movement not done in MSC) |
+
+Not proven offline: that the game's grab pass ever captures from his statuses (no capture in any test so far); the MSC
+catch does the move without it. The MSC catch's reach (10.5 from the tip to the body line) is mine (Ultimate's catching
+hit's 5.5 + about half a body). Ultimate's wall_offset (-0.6, -0.8) and tip_angle_wall 70 (the sword's pose on the wall)
+and the sword's length (canned extend: on a short latch it keeps growing through the wall during the stop, then goes
+back while he is reeled) not reproduced. The normal ledge box on 12 - 14 is checked in front only here (AirCatch's kind 1;
+Ultimate's is both sides: 9.6 behind).
+
+Built: `ultimate_port.py run master scripts specials variants shapes --out OUT` (`scratchpad/byleth/pipeline_v10.log`);
+master.mscsb `master_build.compile_msc`; body effect.bin kept as installed (the run's variants step now folds the bone
+rotations of Aymr's flares into variant ids 0x34700A4 - A6, which v9's shipped effect.bin doesn't: not in v10's scope,
+`scratchpad/byleth/v10/effect_pipeline_v10.bin` kept to compare; the bank is unchanged). Package
+`scratchpad/byleth/make_pkg_v10_fix.py` (game.bin, master.mscsb, the vl; TEST_ONLY exe_v46w_vars_line_diag
+(diag_godfist_cave over the user's exe, sha1 719e23d1...) + the diag master.mscsb); INSTALL README
+`scratchpad/byleth/INSTALL_README_v10.txt`. Checks: `tools/master_specials_test.py` 65 checks, 0 problems (v10: the
+latch keeps the sword, the held fall, the reel to the hand, the wall jump's turn / 13-frame cling / jump, the catch
+without a capture and its hold to frame 11, not a far / intangible / shielding fighter, the ledge box by frame, Aymr's
+landings and hop); `tools/kinetic_suspend_test.py` (unicorn on exe_v46w_vars_line: 0x2717 / 0x2718 set / clear energy
+1's +0x19); `tools/diag_godfist_test.py exe_v46w_vars_line.rpx exe_v46w_vars_line_diag.rpx` (0 failed); Hitbox Viewer
+(Shot.exe v1.7.2, `scratchpad/byleth/v10/view/`): SpecialHi 16 the 1 % hit at 74 degrees (launch 1.2 a frame, 15 hitstun
+frames: the pull's 7 frames hold it), the overtake's frame 11 hitbox (THROW_MEWTWO 260 / 110 / 14, 9 around his hand).
+port_check (`byleth_v4 ... byleth_v9_fix, vars_reset_v1, byleth_v10_fix`): **0 ERROR**, 30 WARN (`scratchpad/byleth/pc_v10.log`);
+on v9's install S19 (AttackHi4 13 / 14, SpecialHi 16); on v9's master.c S17, S18 (0x15B, 0x15C), S20 (SpecialAirLw).
+
 ## Status: v9 (`scratchpad/byleth_v9_fix.zip`: a FIX package over v4 + byleth_userdata_v2 + v5_fix ... v8_fix; exe **exe_v46v_line** (exe_v46v_threads + `tools/line_test_cave.py`); in-game TEST)
 
 User, v8 test (3 clips, framed at 60 fps in `scratchpad/byleth/v9/clips/`): up special grabs nobody and doesn't pull him;
@@ -643,6 +679,15 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
+000000000. **v10 fix** (sent: `scratchpad/byleth_v10_fix.zip`, no exe: the user's exe_v46w_vars_line): the user's test list in
+   `scratchpad/byleth/INSTALL_README_v10.txt`. If the catch still fails: the TEST_ONLY diag (exe_v46w_vars_line_diag
+   + the diag master.mscsb: k6 the tip's distance to the opponent each frame of 20 - 26, k7 which catch, k8 / k9 the
+   hang and the wall jump): k6 never under 10.5 = the opponent isn't brought to the tip (the pulls); k7 2 - 4 but no
+   hold in the clip = the hitstop / position writes (position_vars) don't hold it. Open: (1) the game's grab pass (who
+   fills CatchModule `+0x1C`: README "Status: v10"); (2) the sword's length on a wall latch (canned motions: the tip
+   grows through the wall during the 12-frame stop) and Ultimate's tip_angle_wall / wall_offset; (3) the ledge box's
+   size against an Ultimate clip (v10 = Ultimate's data in world units on Ultimate's frames: wider than v9's, see the
+   diagram `scratchpad/byleth/v10/ledge/ledge_boxes_v9_v10.png`); (4) v9's list below.
 00000000. **v9 fix** (sent: `scratchpad/byleth_v9_fix.zip`, exe_v46v_line): the user's test list in
    `scratchpad/byleth/INSTALL_README_v9.txt`. If the catch still fails: the TEST_ONLY diag (exe_v46v_line_diag +
    the diag master.mscsb: S4GF lines k 1 = an opponent's status near him (189 caught), k 5 holding) settles whether
@@ -1060,6 +1105,13 @@ python3 tools/ultimate_port.py run master motions motions-group2 low-models soun
 python3 tools/master_whip.py tips ULT                                             # the air hit's pull table (master.c)
 bash scratchpad/byleth/make_pkg_v6_fix.sh                                         # -> scratchpad/byleth_v6_fix.zip (fix)
 python3 tools/port_check.py master byleth_v4.zip byleth_userdata_v2.zip byleth_v5_fix.zip byleth_v6_fix.zip   # 0 ERROR
+# v10: the catch / ledge box / wall cling / Aymr's landing (master.c, master_build.pull_angles / overtake_soft,
+# ultimate_vl_shapes.tether_box), no exe; the TEST_ONLY diag exe on the user's exe_v46w_vars_line
+python3 tools/ultimate_port.py run master scripts specials variants shapes --out OUT
+python3 tools/rpx_patch.py exe_v46w_vars_line.rpx exe_v46w_vars_line_diag.rpx $(python3 tools/diag_godfist_cave.py --rpx exe_v46w_vars_line.rpx)
+python3 -I tools/master_specials_test.py; python3 tools/kinetic_suspend_test.py exe_v46w_vars_line.rpx
+python3 scratchpad/byleth/make_pkg_v10_fix.py
+python3 tools/port_check.py master byleth_v4.zip byleth_userdata_v2.zip byleth_v5_fix.zip ... byleth_v9_fix.zip vars_reset_v1.zip byleth_v10_fix.zip
 ```
 Body: `rolloff_acmd.py VANILLA/.../game.bin game.bin --plain --add 2.2 EscapeF EscapeB`; `mscdec.py -x tools/mscinfo.xml
 szerosuit.mscsb` (round trip: 2 of 2393 functions differ, both equivalent: a folded negative constant, an empty else),
