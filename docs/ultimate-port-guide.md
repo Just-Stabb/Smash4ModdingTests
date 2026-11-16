@@ -145,6 +145,16 @@ CAM/NAME/c00 OUT/NAME NAME --template VBN` without a port.json): `motion/camera/
 fix package after it, in order. No ERROR goes out. A fix package that ships a file ships its partners
 (`model.nud` with `model.nut`; a `game.bin` built on the current one, not vanilla's).
 
+**Packages (every package, ports, fixes and tests alike): install roots named for what they are.** Files to install go
+under `INSTALL_TO_data/` (its contents copied into the user's data folder: `INSTALL_TO_data/fighter/NAME/...`) and
+`INSTALL_TO_code/` (into code/: the executable); test-only or optional files under a root saying so
+(`TEST_ONLY_INSTALL_TO_data/`, `OPTIONAL_...`). Never wrap install files in a folder named like a fighter or a game
+folder (`supamario/fighter/supamario/...`, `test/supamario/...`, `fighter/...` at a zip's top level next to other
+things): the user copied a `supamario/` folder holding `fighter/supamario/script/...` INTO their fighter/supamario, the
+files landed at fighter/supamario/fighter/supamario/... and the game kept loading the old ones (threads / time tests v1
+and v2: two rounds lost). The README says, for each root, "copy the CONTENTS of X into your Y folder", with one full
+example path.
+
 ## port.json
 
 | field | |

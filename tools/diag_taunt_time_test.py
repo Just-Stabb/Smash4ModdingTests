@@ -124,10 +124,22 @@ def main():
             'Target_Time_Scale 2: 5)', (cmds.count(1), cmds.count(3), cmds.count(2)), (10, 4, 5))
     T.check('S4TC Time_Scale(0.5, 0): p0 = 0.5\'s bits, p1 0, run 1', tuple(tc[0][1][:5]) if tc else None,
             (1, 0x3F000000, 0, tc[0][1][3] if tc else 0, 1))
-    T.check('S4TS: the scene\'s first call prints, then only changes (slow / extra / stage)',
-            ts[0][1][0] if ts else None, 1)
+    T.check('S4TS: scene C\'s first frame prints (site 3, n 1), then only changes (slow / extra / stage)',
+            tuple(ts[0][1][:2]) if ts else None, (3, 1))
     T.check('S4TS: a Time_Scale(2) frame shows extra 1, a Stage_Freeze shows stage 1',
-            (any(x[1][4] == 1 for x in ts), any(x[1][5] == 1 for x in ts)), (True, True))
+            (any(x[1][5] == 1 for x in ts), any(x[1][6] == 1 for x in ts)), (True, True))
+    try:
+        import ts_scene_sites_test as TS
+        n0 = len(calls)
+        fails0 = T.fails
+        res = TS.scenario(pm, a_ext)
+        T.check('exe_v46t_threads: scenes A / B as tools/ts_scene_sites_test.py expects, with the S4TS hooks in place',
+                {k: (v[0], v[1]) for k, v in res.items()},
+                {k: ([(1, 0, True), (2, 1, True), (2, 1, True), (2, 1, True), (1, 0, True)], [1, 1, 0]) for k in res})
+        sites = sorted(set(x[1][0] for x in calls[n0:] if x[0] == 'S4TS'))
+        T.check('S4TS: scenes A (site 1) and B (site 2) print their lines', sites, [1, 2])
+    except AssertionError:
+        T.check('ts_scene_sites_cave.py not in this executable (exe_v46s-based diag): scenes A / B not hooked', True, True)
     fails0 = T.fails
     n0 = len(calls)
     cave, _w2, _h2 = C.build()

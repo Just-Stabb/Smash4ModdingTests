@@ -2227,13 +2227,27 @@ and his effect script sets no colour (one `EFFECT_FOLLOW_FLIP 0x1000090`):
   {crc, offset} pairs, compared **unsigned**: tools/acmd.py sorts them so) for the hash; found: `agent +4` = the
   script, r3 0; not found: `+4` = 0, r3 -1 (the agent runs nothing). Run on a game.bin with taunt scripts added (new
   crcs: vanilla Mario's game.bin has no `appeal*`): they are found like any other (tools/diag_taunt_time_test.py).
-- The motion change `0x027606C0` calls it at `0x02760860` for sets r29 .. r28 (0 game, 1 effect, 2 sound) with
-  r30 = the fighter kind and the hash from the kind's motion table (`0x02E42518`).
+- The motion change `0x027606C0` calls it at `0x02760860` for sets r29 .. r28 with r30 = the fighter kind and the
+  hash from the kind's motion table (`0x02E42518`). The sets (in game, the user's v2 log against the files' contents):
+  **0 game, 1 expression, 2 sound, 3 effect** (the user's effect.bin lacks AppealSR / SL: set 3 found 0 for those two
+  only; vanilla game.bins lack most motions' game scripts: set 0 found 0 for them, DK's included). In that test the
+  game held the user's own game.bin / effect.bin (set 0 found 0 for every taunt, set 3 the old file's pattern): the
+  package's `supamario/fighter/supamario/...` had been copied inside fighter/supamario, so the test files never
+  loaded. Packages now put install files under `INSTALL_TO_data/` (docs/ultimate-port-guide.md "Packages").
 - The fighter status set-up (MSC `StatusModule(0x2713)`, `0x02E882AC`) takes the new status kind from vt `+0x8C`
   (`0x02E88354`; r3 the kind, r31 the StatusModule): Appeal is `0x14D`, the smash taunt `0x14E`
   (reference/msc-note-sheet/Actions_Fighters.csv).
 - `tools/diag_taunt_time_cave.py` logs both (`S4ST`, `S4MO`), the new commands' handler entries (`S4TC`) and the time
   state the battle scene sees (`S4TS`).
+- **Three battle scenes step a battle** (`bl 0x029108D0`, each gated by `0x02910164(battle)`): A update `0x020AFD1C`
+  (sets up `[0x102F732C]` itself; call `0x020AFE18`, next callback `0x020B02C4`: stage `0x03164FE0`, `0x0290E428` /
+  `0x02D88C18`), B update `0x020E84D4` (call `0x020E8504`, next `0x020E851C`, the same calls), C update `0x0309BE34`
+  (call `0x0309BE54`, next `0x0309BEF4` -> the step's second half `0x0291100C`). exe_v46n's ts_scene was on C only; the
+  user's training match never ran C (the v2 diag's S4TS, printed on ts_scene's first call, never came), so Time_Scale's
+  speed-up and every Frames countdown never ran there. **exe_v46t_threads** (`tools/ts_scene_sites_cave.py` on
+  exe_v46s) puts A's and B's calls through the same work (ts_sitea / ts_siteb at `0x04BD4800`, trampolines at
+  `0x037EE550` / `0x037EE560`: the sites can't branch that far): `tools/ts_scene_sites_test.py`. Which scene VS /
+  training actually use is for the v2 test's log (`S4TS site=`).
 
 ## The eft runtime (particles: cross_f.rpx 0x04A40000-0x04A90000)
 

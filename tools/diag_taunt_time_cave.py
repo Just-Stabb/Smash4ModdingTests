@@ -11,15 +11,16 @@ tools/diag_threads_cave.py (S4TH), it adds OSReport lines:
       an animcmd agent bound to a script (0x02BEE560's lookup 0x02BEE404 at 0x02BEE580) for one of the six taunt
       motions (AppealHiR / L, AppealSR / L, AppealLwR / L), and the first FIRST_N binds of the session (to show the
       hook runs): found 0 = no script of that hash in the set's files (the agent is cleared). from = 0x02BEE560's
-      caller (0x02760864: the motion change 0x027606C0, r30 = the fighter kind, r29 = the set: 0 game, 1 effect,
-      2 sound; other callers: r29 / r30 are theirs).
+      caller (0x02760864: the motion change 0x027606C0, r30 = the fighter kind, r29 = the set: 0 game, 1 expression,
+      2 sound, 3 effect (the user's v2 log); other callers: r29 / r30 are theirs).
   `S4TC cmd=<n> p0=<hex> p1=<hex> p2=<hex> run=<0 / 1> acc=<hex> n=<n>`
       a new command's handler entered (1 Time_Scale, 2 Target_Time_Scale, 3 Stage_Freeze, 4 Thread_Start; p0-p2
       its parameter words as the script holds them, floats as bits; run 0 = the interpreter's skip pass); at most
       CMD_N lines.
-  `S4TS scene=<n> slow=<0 / 1> req=<n> left=<n> extra=<n> stage=<0 / 1> sleft=<n>`
-      the time commands' state (acmd_ext_cave.py ts_data), printed by the battle scene's frame (instead of its
-      `bl ts_scene` at 0x0309BE54, then ts_scene as before) on its first call and whenever slow / extra / stage changes.
+  `S4TS site=<1 A / 2 B / 3 C> n=<n> slow=<0 / 1> req=<n> left=<n> extra=<n> stage=<0 / 1>`
+      the time commands' state (acmd_ext_cave.py ts_data) as a battle scene's frame sees it (tools/ts_scene_sites_cave.py:
+      scene C at its `bl ts_scene` 0x0309BE54; on exe_v46t_threads scenes A / B at ts_sitea / ts_siteb's entry), on each
+      scene's first frame and whenever slow / extra / stage changes: which scene the match runs.
 
 Cemu: Debug > Logging > "Coreinit Logging" checked; the lines go to log.txt. Not for the normal chain build.
 
@@ -54,7 +55,7 @@ FMTS = {
     'st': b'S4ST status=%X mod=%08X m4=%08X n=%d\n\0',
     'mo': b'S4MO hash=%08X found=%d script=%08X from=%08X r30=%X r29=%X n=%d\n\0',
     'tc': b'S4TC cmd=%d p0=%08X p1=%08X p2=%08X run=%d acc=%08X n=%d\n\0',
-    'ts': b'S4TS scene=%d slow=%d req=%d left=%d extra=%d stage=%d sleft=%d\n\0',
+    'ts': b'S4TS site=%d n=%d slow=%d req=%d left=%d extra=%d stage=%d\n\0',
 }
 
 
@@ -143,6 +144,8 @@ def build(orig):
         cmplw r10, r0
         beq mo_log""" % (t >> 16, t & 0xFFFF) for t in TAUNTS)
     a = Asm(CAVE)
+    scene_entries = []
+    orig_before = {}
     src = """
 # --- S4ST: b from 0x%(status_back)08X - 4: r3 the new status kind, r31 the StatusModule ---------------------------
 dtt_status:
@@ -227,49 +230,73 @@ tc_out_%(name)s:
         .word 0x%(first)08X
         b 0x%(back)08X
 """ % dict(first=first, back=h[name] + 4)
-    src += """
-# --- S4TS: bl from 0x0309BE54 instead of bl ts_scene; then ts_scene as before (LR the scene's) ----------------------
-dtt_scene:
-""" + SAVE + """
+    scenes = [(3, None)]                                     # (site, hooked how): C at its bl (ts_scene)
+    try:
+        import ts_scene_sites_cave as X
+        xl = None
+        for k in ('a', 'b'):
+            site = X.SITES[k][0]
+            w = orig(site)
+            if w >> 26 == 18 and w & 1:                          # exe_v46t_threads: the site's bl goes to ts_site<k>
+                if xl is None:
+                    fake = {s0: X.bl(s0, X.BATTLE_UPD) for s0, _n in X.SITES.values()}
+                    _w, xl = X.build(lambda x: fake[x] if x in fake else
+                                     (0 if X.CAVE <= x < X.LIMIT or X.TRAMP <= x < X.TRAMP + 0x20 else orig(x)))
+                scenes.append((1 if k == 'a' else 2, xl['ts_site' + k]))
+    except Exception:
+        pass
+    for sid, entry in scenes:
+        D2 = dict(D, sid=sid)
+        src += """
+# --- S4TS (scene %(sid)d) ---------------------------------------------------------------------------------------------
+dtt_scene%(sid)d:
+""" % D2 + SAVE + """
         lis r12, 0x%(ch)X
         ori r12, r12, 0x%(cl)X
         lis r11, 0x%(tdh)X
         ori r11, r11, 0x%(tdl)X
-        lwz r4, 0xC(r12)
-        addi r4, r4, 1
-        stw r4, 0xC(r12)
-        cmpwi r4, 1
-        beq ts_log
-        lwz r5, 4(r11)
+        lwz r5, 0xC(r12)
+        addi r5, r5, 1
+        stw r5, 0xC(r12)
+        lwz r0, 0x%(fo)X(r12)
+        cmpwi r0, 0
+        beq ts_log%(sid)d
+        lwz r6, 4(r11)
         lwz r0, 0x10(r12)
-        cmpw r5, r0
-        bne ts_log
-        lwz r5, 0x14(r11)
+        cmpw r6, r0
+        bne ts_log%(sid)d
+        lwz r6, 0x14(r11)
         lwz r0, 0x14(r12)
-        cmpw r5, r0
-        bne ts_log
-        lwz r5, 0x18(r11)
+        cmpw r6, r0
+        bne ts_log%(sid)d
+        lwz r6, 0x18(r11)
         lwz r0, 0x18(r12)
-        cmpw r5, r0
-        beq ts_out
-ts_log:
-        lwz r5, 4(r11)
-        stw r5, 0x10(r12)
+        cmpw r6, r0
+        beq ts_out%(sid)d
+ts_log%(sid)d:
+        li r0, 1
+        stw r0, 0x%(fo)X(r12)
+        lwz r6, 4(r11)
+        stw r6, 0x10(r12)
         lwz r0, 0x14(r11)
         stw r0, 0x14(r12)
         lwz r0, 0x18(r11)
         stw r0, 0x18(r12)
-        lwz r6, 8(r11)
-        lwz r7, 0x10(r11)
-        lwz r8, 0x14(r11)
-        lwz r9, 0x18(r11)
-        lwz r10, 0x1C(r11)
+        li r4, %(sid)d
+        lwz r7, 8(r11)
+        lwz r8, 0x10(r11)
+        lwz r9, 0x14(r11)
+        lwz r10, 0x18(r11)
         lis r3, 0x%(ftsh)X
-        ori r3, r3, 0x%(ftsl)X""" % D + print_call + """
-ts_out:
-""" + RESTORE + """
+        ori r3, r3, 0x%(ftsl)X""" % dict(D2, fo=0x20 + 4 * sid) + print_call + """
+ts_out%(sid)d:
+""" % D2 + RESTORE + ("""
         b 0x%(ts)08X
-""" % D
+""" % D if entry is None else """
+        .word 0x9421FFE0                # ts_site's own first word (stwu r1, -0x20(r1))
+        b 0x%08X
+""" % (entry + 4))
+        scene_entries.append((sid, entry))
     a.asm(src)
     words = a.words()
     assert CAVE + 4 * len(words) <= DATA, 'code 0x%X words' % len(words)
@@ -282,7 +309,12 @@ ts_out:
         assert orig(x) == 0, 'cave word 0x%08X not free' % x
     out[STATUS_AT] = bl(STATUS_AT, a.addr('dtt_status'), link=False)
     out[BIND_AT] = bl(BIND_AT, a.addr('dtt_bind'))
-    out[SCENE_AT] = bl(SCENE_AT, a.addr('dtt_scene'))
+    for sid, entry in scene_entries:
+        if entry is None:
+            out[SCENE_AT] = bl(SCENE_AT, a.addr('dtt_scene%d' % sid))
+        else:
+            assert orig(entry) == 0x9421FFE0, 'ts_site entry 0x%08X: 0x%08X' % (entry, orig(entry))
+            out[entry] = bl(entry, a.addr('dtt_scene%d' % sid), link=False)
     for name in ('h_tscale', 'h_ttscale', 'h_sfreeze', 'h_thread'):
         out[h[name]] = bl(h[name], a.addr('dtt_' + name), link=False)
     return out, a.labels
