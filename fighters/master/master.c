@@ -38320,6 +38320,10 @@ int master_soft_seen;   // v10 Hi: the slot + 1 the tip reached on the last fram
 int master_hi_latched;  // v10 Hi: 0x15B -> 0x15C from a wall latch (the wall jump turns away and clings)
 int master_hi_wj_jump;  // v11 Hi: 0x15C entered again for its jump (the speeds set in its main)
 float master_hi_wj;     // v10 Hi: the wall jump's frames so far
+float master_ovt_y;     // v12 Hi: the caught fighter's throw point's height (Ultimate's overtake puts his root there)
+int master_hi_ovt;      // v12 Hi: the overtake holds him on the caught fighter (until its hit's frame)
+int master_ovt_slot;    // v12 Hi: the caught fighter's slot (the diag's k13 after master_target is let go)
+int master_hi_wj_fx;    // v12 Hi: the wall jump's cling effect played
 
 // a motion of the status's part: from frame 0, or (keep 1) at the frame the last one had (a ground / air change)
 void master_motion(int m, int keep)
@@ -38813,7 +38817,9 @@ void master_hi_air_loop()
 
 // v9 diag build only (MASTER_DIAG 1: tools/master_build.py --diag; exe with tools/diag_godfist_cave.py): one Cemu log
 // line "S4GF k=<k> v=<value> c=<value x 100>" per write. v11: 10 the reel's distance left each frame, 11 the wall
-// jump's jump (0x15C entered again). k 0 the up special's frame, 1 another fighter in reach: slot x
+// jump's jump (0x15C entered again). v12: 12 his height over the caught fighter's feet as the overtake starts (on
+// its throw point: about 10), 13 its damage on the overtake's frames 11 - 13 (up by 6.5 = the throw's hit landed).
+// k 0 the up special's frame, 1 another fighter in reach: slot x
 // 1000 + its status (0xBD = 189: caught), 2 a line test: 1 + 10 x its kind (0 nothing met), 3 its distance x 1,
 // 4 SpecialAirHiHit's mode (1 wall, 2 stopped, 3 a fighter), 5 CatchModule(0x2712) (holding someone).
 // v10: 6 the nearest fighter's distance from the tip (frames 20 - 26: the catch's test), 7 the catch taken: 1 a real
@@ -39077,24 +39083,52 @@ float master_tip_wy(float f)
     return PostureModuleF(0x2) + master_tip_y((int)(f - 18.0f));
 }
 
-// v10: the distance from the sword's tip to slot s's body (a vertical segment from its feet + 4 to + 18)
-float master_tip_dist(int s, float f)
+// v10: the distance from a world point to slot s's body (a vertical segment from its feet + 4 to + 18)
+float master_body_dist(int s, float px, float py)
 {
     float dx;
     float dy;
     float y;
-    dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - master_tip_wx(f);
+    dx = WorkModuleF(0, 0x0f000020 + 0x4 * s) - px;
     y = WorkModuleF(0, 0x0f000021 + 0x4 * s);
-    dy = master_tip_wy(f) - (y + 18.0f);
+    dy = py - (y + 18.0f);
     if (dy < 0)
     {
-        dy = master_tip_wy(f) - (y + 4.0f);
+        dy = py - (y + 4.0f);
         if (dy > 0)
         {
             dy = 0;
         }
     }
     return master_len(dx, dy);
+}
+
+// v10: the sword's tip to slot s's body. v12: the blade too (four points from his hand, MASTER_HI_LINE_X / _Y, to the
+// tip): Ultimate's sword has a variable length, its tip stops on the first thing it meets as it extends (and the tip's
+// 0.01 % hits at 17 / 19 carry a fighter it passes into the catch point: set_vec_target_pos), so a fighter at point-blank
+// is caught; here the canned blade passed through it and the tip, far out by 20, never came near (user's v11 clip 1,
+// frames 140 - 184 and 300 - 360: Donkey Kong beside him, hit at 0 %, nothing caught, both fell)
+float master_tip_dist(int s, float f)
+{
+    float hx;
+    float hy;
+    float t;
+    float d;
+    float bd;
+    hx = PostureModuleF(0x1) + MASTER_HI_LINE_X * PostureModuleF(0);
+    hy = PostureModuleF(0x2) + MASTER_HI_LINE_Y;
+    bd = master_body_dist(s, master_tip_wx(f), master_tip_wy(f));
+    t = 0.25f;
+    while (t < 0.9f)
+    {
+        d = master_body_dist(s, hx + (master_tip_wx(f) - hx) * t, hy + (master_tip_wy(f) - hy) * t);
+        if (d < bd)
+        {
+            bd = d;
+        }
+        t = t + 0.25f;
+    }
+    return bd;
 }
 
 // v10: Ultimate's catch is its hit on the tip (ENABLE_CATCH from 20: the status code catches the fighter the
@@ -39217,11 +39251,19 @@ void master_hi_hit_main()
     master_phase = 0;
     master_hi_pull();
     master_hi_hold = 0;
+    master_hi_ovt = 0;
     if (master_target >= 0)
     {
         master_pull_n = MASTER_HI_PULL_MAX; // a caught fighter: pulled to it (master_hi_rewind), at most this long
         master_hi_hold = MASTER_HI_STOP_FIGHTER;    // v9: param_special_hi hit_stop_frame_fighter, then the rewind
         WorkModule(0, 2.0f, 0x0f00030f);
+        master_ovt_slot = master_target;
+        master_ovt_y = master_hi_throw_y(master_target);
+        // v12: Ultimate's sword SpecialHiHit (master_wire_catch + master_wire_wind2 on the tip, sword35, which holds
+        // what it caught): at the caught fighter (v11's FOOT_EFFECT in the effect script never played: the game
+        // plays foot effects on the ground only, he is in the air here)
+        master_hi_fx_at(0x347006E, master_tx, master_ovt_y);   // master_wire_catch
+        master_hi_fx_at(0x3470073, master_tx, master_ovt_y);   // master_wire_wind2
     }
     else if (master_hi_wall != 0)
     {
@@ -39232,6 +39274,9 @@ void master_hi_hit_main()
         {
             master_hi_hold = MASTER_HI_STOP_WALL;
             WorkModule(0, 1.0f, 0x0f00030f);
+            // v12: the sword's SpecialHiHit (its hit status, wall or fighter: the same catch / wind) on the point met
+            master_hi_fx_at(0x347006E, master_tx, master_ty);   // master_wire_catch
+            master_hi_fx_at(0x3470073, master_tx, master_ty);   // master_wire_wind2
         }
         else
         {
@@ -39313,6 +39358,9 @@ void master_hi_hit_loop()
                 master_pull_n = -1;
                 master_motion(0x23b, 0);
                 master_hi_throw();
+                master_hi_ovt = 0x1;            // v12: on the caught fighter (Ultimate's overtake), from its first frame
+                master_hi_ovt_place();
+                master_diag(12, PostureModuleF(0x2) - master_ty);
             }
             return;
         }
@@ -39354,6 +39402,21 @@ void master_hi_hit_loop()
         master_speed = 0;
         master_move(0);
     }
+    if (master_hi_ovt)
+    {
+        if (MotionModuleF(0x1) <= MASTER_HI_OVT_HIT)
+        {
+            master_hi_ovt_place();          // v12: held on the caught fighter through the throw's frame
+        }
+        else
+        {
+            master_hi_ovt = 0;
+        }
+    }
+    if (MASTER_DIAG && MotionModuleF(0x1) >= MASTER_HI_OVT_HIT && MotionModuleF(0x1) < MASTER_HI_OVT_HIT + 3.0f)
+    {
+        master_diag(13, WorkModuleF(0, 0x0f000100 + 0x20 * (master_ovt_slot + 0x3) + 0x17));    // its damage: the hit
+    }
     if (master_soft && master_target >= 0)
     {
         if (MotionModuleF(0x1) < 11.0f)
@@ -39363,10 +39426,13 @@ void master_hi_hit_loop()
         else
         {
             master_target = -1;
-            master_free_gravity();          // v10: Ultimate's overtake falls after the throw
+            if (!master_hi_ovt)
+            {
+                master_free_gravity();      // v10: Ultimate's overtake falls after the throw (v12: once let off it)
+            }
         }
     }
-    else if (master_target < 0 && MotionModuleF(0x1) >= 11.0f)
+    else if (master_target < 0 && MotionModuleF(0x1) >= 11.0f && !master_hi_ovt)
     {
         master_free_gravity();
     }
@@ -39406,10 +39472,55 @@ float master_len(float x, float y)
 // rewind_speed (param_special_hi 4.1 a frame) until his hand is at it (param_sword fighter_offset 8 short of it along
 // his facing); the caught fighter is held where it was caught (its position written each frame, as the
 // set_vec_target_pos pulls do: tools/vec_target.py). 1 when he is there (or the pull ran MASTER_HI_PULL_MAX frames)
+// v12: Ultimate's reel ends with the caught fighter at his raised hand: the overtake then puts his root on its throw
+// joint (f_7208a1f1d0: LinkModule set_model_constraint_joint `top` to the target's `throw`) while its motion draws his
+// body MASTER_HI_OVT_DX behind / MASTER_HI_OVT_DY below the root on frame 0 (special_air_hi_overtake: hip (-8.1, -6.2);
+// the hit pose's hip (-0.3, 8.0): the root moves 7.8 forward / 14.2 up between them), flipping over it to stand on it
+// by frame 10. v7 - v11 reeled his root to 8 behind its feet at its feet's height: the overtake's hitbox (9 around
+// (8, 10)) swung beside it, and never above it (user's v11 test). A fighter on the ground: not reeled under its feet
+// (the floor)
 int master_hi_rewind()
 {
+    float y;
     master_hi_keep();
-    return master_hi_pull_to(master_tx, master_ty, MASTER_HI_HAND_X);
+    y = master_ovt_y - MASTER_HI_OVT_DY;
+    if (y < master_ty && WorkModuleF(0, 0x0f000100 + 0x20 * (master_ovt_slot + 0x3) + 0x16) == 0.0f)
+    {
+        y = master_ty;
+    }
+    return master_hi_pull_to(master_tx, y, MASTER_HI_OVT_DX);
+}
+
+// v12: the caught fighter's throw joint's height (Ultimate's overtake constrains his root to it): its waist joint
+// (jtb 11, read through the joint position variables at its rest pose), else its feet + MASTER_HI_OVT_Y
+float master_hi_throw_y(int s)
+{
+    float w;
+    float y;
+    y = WorkModuleF(0, 0x0f000021 + 0x4 * s);
+    WorkModule(0, 11.0f, 0x0f000290 + 0x4 * (s + 0x3));
+    w = WorkModuleF(0, 0x0f000292 + 0x4 * (s + 0x3)) - y;
+    if (w < 4.0f || w > 25.0f)
+    {
+        w = MASTER_HI_OVT_Y;
+    }
+    return y + w;
+}
+
+// v12: him on the caught fighter's throw point (the overtake, to its throw's frame): his position written, no speed
+void master_hi_ovt_place()
+{
+    WorkModule(0, master_tx, 0x0f000000);
+    WorkModule(0, master_ovt_y, 0x0f000001);
+    master_speed = 0;
+    master_move(0);
+}
+
+// v12: an effect at a world point (MSC EffectModule 0x2710 on bone 0, flag 0: X along the facing, Y up)
+void master_hi_fx_at(int id, float x, float y)
+{
+    EffectModule(0x2710, id, 0, (x - PostureModuleF(0x1)) * PostureModuleF(0), y - PostureModuleF(0x2), 0, 0, 0, 0, 1.0f,
+                 0, 0, 0, 0, 0, 0, 0);
 }
 
 // v9: the caught fighter held where it was caught (its position written; master_hi_rewind's, also during the stop)
@@ -39426,7 +39537,7 @@ void master_hi_keep()
     }
 }
 
-// the rewind (v7, v9 its own function): him pulled at rewind_speed toward (x, y) until his hand (MASTER_HI_HAND_X ahead
+// the rewind (v7, v9 its own function): him pulled at rewind_speed toward (x, y) until his hand (`hand` ahead
 // of him) is there, or MASTER_HI_PULL_MAX frames; 1 there
 int master_hi_pull_to(float x, float y, float hand)
 {
@@ -39538,6 +39649,7 @@ void master_hi_wall_main()
     }
     master_wall_jumps += 0x1;
     master_hi_wj = 0;
+    master_hi_wj_fx = 0;
     KineticModule(0, 0xa);
     if (master_hi_latched)
     {
@@ -39578,6 +39690,14 @@ void master_hi_wall_loop()
     if (master_cancel())
     {
         return;
+    }
+    // v12: Ultimate's SpecialAirHiWallJump effect script turns REQ_EFFECT on at 6, its status (f_7208a2ac80) then plays
+    // sys_cling at a joint on the wall: here where the sword met it (his hand is there: the reel). Smash 4 has no
+    // sys_cling: its ledge catch flash (sys_cliff_catch, the common 0x100001E) stands in (APPROXIMATED)
+    if (master_hi_latched && !master_hi_wj_fx && MotionModuleF(0x1) >= MASTER_HI_WJ_FX)
+    {
+        master_hi_wj_fx = 0x1;
+        master_hi_fx_at(0x100001E, master_tx, master_ty);
     }
     // the status's frame + 1 (its loop runs on the main's frame too): still on frames 0 - 12, the jump on 13
     if (master_hi_wj <= MASTER_HI_WJ_STOP)
@@ -40018,6 +40138,9 @@ void master_vt_attackhi4()
 //   frame 16: ID 0 top (18, 44) 7 frames -> feet (18, 36) by frame 23; box 8 +- 14 forward, -12 to 22 up
 //   frame 17: ID 0 top (16, 40) 4 frames -> feet (16, 32) by frame 21; box 16 +- 15 forward, -10 to 42 up; hitboxes on throw: the box is around the target (APPROXIMATED)
 //   frame 19: ID 0 top (16, 41) 2 frames -> feet (16, 33) by frame 21; box 16 +- 15 forward, -10 to 43 up; hitboxes on throw: the box is around the target (APPROXIMATED)
+// v12: the tip's two boxes from 8 behind his front (-8 to 31 ahead): Ultimate carries whatever the tip's 0.01 % hit
+// touches (the sword starts at his hand); a fighter overlapping him was left out and never brought to the catch point
+// (user's v11 clip 1, frames 140 - 184: Donkey Kong on him, hit at 0 %, not carried, not caught)
 void master_vt_specialhi()
 {
     float f;
@@ -40054,8 +40177,8 @@ void master_vt_specialhi()
         tx = 16.0f;
         ty = 33.0f;
         mark = 21.0f;
-        bx = 16.0f;
-        bw = 15.0f;
+        bx = 11.5f;                 // v12: from 8 behind his front (-8 - 31; v10 1 - 31)
+        bw = 19.5f;
         blo = -10.0f;
         bhi = 43.0f;
     }
@@ -40065,8 +40188,8 @@ void master_vt_specialhi()
         tx = 16.0f;
         ty = 32.0f;
         mark = 19.0f;
-        bx = 16.0f;
-        bw = 15.0f;
+        bx = 11.5f;                 // v12: from 8 behind his front (-8 - 31; v10 1 - 31)
+        bw = 19.5f;
         blo = -10.0f;
         bhi = 42.0f;
     }

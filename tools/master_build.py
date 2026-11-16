@@ -4,6 +4,7 @@ his arrows (the copied Paralyzer shot, weapon kind 0x19E) and the vl motion byte
 
   python3 tools/master_build.py vis DUMP ULT OUT.json
   python3 tools/master_build.py build DUMP ULT BODY MODEL BASE PKG [--sound DIR]
+  python3 tools/master_build.py hi BODY_SCRIPT_DIR      v12: the up special's hit / overtake scripts on an installed script/animcmd/body
 
 vis: fighters/master/weapon_vis.json for `ultimate_fighter.py motions --extra-vis` (port.json motions.extra_vis): for
 every Ultimate body motion whose game script generates / removes / uses Areadbhar (SPEAR), Aymr (AXE) or Failnaught
@@ -158,7 +159,14 @@ CONSTS = dict(
     # (v7) the caught fighter's pull: param_special_hi rewind_speed 4.1, param_sword fighter_offset 8 (his hand short
     # of the caught point); the catch's reach: object_dist_max 55 + param_sword reach_length_max 70 (as |dx| + |dy|);
     # the pull's frame cap (mine: 70 / 4.1 = 17, rounded up)
-    MASTER_HI_REWIND='4.1f', MASTER_HI_HAND_X='8.0f', MASTER_HI_FIND_DIST='125.0f', MASTER_HI_PULL_MAX='0x14',
+    MASTER_HI_REWIND='4.1f', MASTER_HI_FIND_DIST='125.0f', MASTER_HI_PULL_MAX='0x14',
+    # (v12) the overtake (Ultimate's f_7208a1f1d0: his root constrained to the caught fighter's `throw` joint; the
+    # motions' hips: special_air_hi_hit_pose (-0.3 fwd, 8.0 up), special_air_hi_overtake frame 0 (-8.1, -6.2)): the reel
+    # ends 7.8 behind / 14.2 below that point, the overtake puts him on it; the throw joint's height when the target's
+    # waist can't be read (mine: about a body's middle); the throw's frame (ATK_HIT_ABS at 11); the wall jump's
+    # REQ_EFFECT (its effect script's frame 6: sys_cling)
+    MASTER_HI_OVT_DX='7.8f', MASTER_HI_OVT_DY='14.2f', MASTER_HI_OVT_Y='10.0f', MASTER_HI_OVT_HIT='11.0f',
+    MASTER_HI_WJ_FX='6.0f',
     # (v8) the catch: the grab box's TargetStatus (HI_CAPTURE_STATUS, 0xBD the Falcon Dive capture) as the status variable
     # reads it; Ultimate's TARGET_HI_DAMAGE (the overtake's THROW_MEWTWO): the caught fighter at param_special_hi
     # overtake_attack_damage (50) % or more (APPROXIMATED: the flag's test is in the ExeFS, not read)
@@ -336,6 +344,7 @@ def body_fix(a, fighter):
             U.cmd('FRAME', 35), U.cmd('Remove_Article', 2)] + end()
     if any(c.name == 'GENERATE_ARTICLE' for c in g[ac]):
         # this step's output already (the step run again on its build): the merges below are done
+        hi_fix(files, log)
         for fn, f in files.items():
             f.save(os.path.join(d, fn + '.bin'))
         log.append('aircatch / overtake / Aymr: done already (this step ran on this build before)')
@@ -377,6 +386,7 @@ def body_fix(a, fighter):
     for line in smash_hold_fx(a, files['effect'], joints):
         log.append(line)
     g[ov] = merge_tail(U, g[ov], overtake_soft(U, overtake_throw(U, a.dump, joints)))
+    hi_fix(files, log)
     for fn, f in files.items():
         f.save(os.path.join(d, fn + '.bin'))
     log.append('aircatch: the whip at 0 / 17 / 27 / 35, the tip\'s catch 20 - 25; specialhi: the catch; overtake: the '
@@ -408,10 +418,11 @@ def hi_hit_script():
         out += [U.cmd('FRAME', fr)] + if_var(HI_HIT_MODE_VAR, 0, mode, back())
     # v11: a catch without a capture (VAR_11 1 - 3): Ultimate's catching hit (SpecialAirHi's ATTACK 0 from 20: 3 %,
     # sting, cut-up sound) lands on the held fighter at frame 1, its spark, sound and hitlag, no knockback (it stays
-    # held); the capsule covers the tip's path over the catch frames (20 - 26: (15, 45) - (23, 65) from him)
+    # held); the capsule covers the tip's path over the catch frames (20 - 26: (15, 45) - (23, 65) from him); v12 the
+    # blade's too, from his hand (5.5, 20.5): master.c catches a fighter the blade reaches (point-blank)
     hit = U.cmd('Extended_Special_Hitbox', 0)
-    f = dict(ID=0, Part=0, Bone=0, Damage=HI_CATCH_HIT, Angle=361, KBG=0, FKB=0, BKB=0, Size=8.0, X=0.0, Y=40.0,
-             Z=12.0, Effect=2, Trip=0.0, Hitlag=1.0, SDI=0.0, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=0, SFXType=3,
+    f = dict(ID=0, Part=0, Bone=0, Damage=HI_CATCH_HIT, Angle=361, KBG=0, FKB=0, BKB=0, Size=8.0, X=0.0, Y=HI_CATCH_Y0,
+             Z=HI_CATCH_Z0, Effect=2, Trip=0.0, Hitlag=1.0, SDI=0.0, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=0, SFXType=3,
              **{'Ground/Air': 3, 'Direct/Indirect': 1}, Type=10, HitBits=0x3F, Unk41=0, CollisionPart=0xF, NoScale=0,
              Shieldable=0, Reflectable=0, Absorbable=0, Rehit=0, IgnoreInvuln=0, HitAllStates=0, FacingRestrict=0,
              NoGrabRelease=1, TeamDamage=0, DisableHitlag=0, NoGFX=0, Flinchless=0, X2=0.0, Y2=68.0, Z2=24.0)
@@ -422,26 +433,59 @@ def hi_hit_script():
 
 
 HI_CATCH_HIT = 3.0
-HI_CATCH_FX = ((0x347006E, 'master_wire_catch'), (0x3470073, 'master_wire_wind2'))
+HI_CATCH_Y0, HI_CATCH_Z0 = 20.0, 6.0     # v12: the catching hit's capsule from his hand (v11: 40, 12, the tip's path only)
+HI_CATCH_FX = ((0x347006E, 'master_wire_catch'), (0x3470073, 'master_wire_wind2'))   # master.c master_hi_hit_main
+HI_HIT_SE = 0x1B00FB             # v12: se_master_special_h04 (Ultimate's SpecialHiHit status code plays it: every hit)
+OVT_SOFT_PART = 1                # v12: the overtake's hitbox Part (the catching hit's is 0, in the same status)
+OVT_SOFT_HB = dict(X=0.0, Y=-3.0, Z=0.0, Size=9.0)   # v12: on the caught fighter (his root on its throw point)
 
 
 def hi_hit_effect(U, effect):
-    """v11 SpecialAirHiHit's effect script: Ultimate's sword SpecialHiHit (master_wire_catch + master_wire_wind2 on the
-    tip, sword35, at frame 0) where the tip held the fighter (VAR_15 2; the tip's path's middle, (18, 52) from him:
-    the body has no tip bone in this motion)"""
-    tmpl = next(c for sc in effect.scripts.values() for c in sc if c.name == 'Graphic_Effect')
-    out = []
-    for gid, _n in HI_CATCH_FX:
-        c = acmd.Command(tmpl.ident, list(tmpl.params))
-        syn = c.info['syntax']
-        v = dict(zip(syn, c.params))
-        v.update(Graphic=gid, Bone=0, X=0.0, Y=52.0, Z=18.0, XRot=0.0, YRot=0.0, ZRot=0.0, Size=1.0)
-        for k in syn:
-            if k.startswith('Random'):
-                v[k] = 0.0
-        c.params = [v[k] for k in syn]
-        out.append(c)
-    return if_var(HI_HIT_MODE_VAR, 0, 2, out) + end()
+    """SpecialAirHiHit's effect script: none of its own (v12). Ultimate's catch effects are the sword article's
+    (SpecialHiHit: master_wire_catch / master_wire_wind2 on the tip, sword35): master.c plays them at the point the tip
+    holds (master_hi_fx_at). v11 put them here as Graphic_Effect, the game's FOOT_EFFECT, which it plays only while the
+    fighter's foot effects are on (on the ground; EffectModule vt +0x32C, the ACMD handler 0x02BE1444): he is in the
+    air in 0x15B, so they never showed (user's v11 test). port_check E14 foot-effect"""
+    return end()
+
+
+def hi_hit_sound(U):
+    """v12 SpecialAirHiHit's sound script: Ultimate's SpecialHiHit status plays se_master_special_h04 on every hit (a
+    fighter or a wall: VAR_15 1 / 2; not the floor / ceiling stop, 0), its sound script se_master_special_h03 at 2"""
+    return if_var(HI_HIT_MODE_VAR, 1, 0, [U.cmd('Sound_Effect', HI_HIT_SE)]) + [
+        U.cmd('FRAME', 2), U.cmd('Sound_Effect', 0x1B00FA)] + end()
+
+
+def overtake_part(script):
+    """v12: the overtake's soft-catch hitboxes (VAR_11 1 - 3) on Part OVT_SOFT_PART, on the caught fighter: the catching
+    hit (SpecialAirHiHit's frame 1, Part 0) is in the same status (0x15B), and a Part's hit record lasts the status
+    (docs/acmd-extra-commands.md "Hit_Log_Clear"): v11's overtake hitbox (Part 0) could never hit the fighter the
+    catching hit had (user's v11 test: "the follow-up never hits"). port_check S22 status-hit-log. Returns the count"""
+    n, frame = 0, 0.0
+    for c in script:
+        if c.name == 'FRAME':
+            frame = float(c.params[0])
+        elif c.name == 'Special_Hitbox' and frame >= 11.0:
+            syn = c.info['syntax']
+            c.params[syn.index('Part')] = OVT_SOFT_PART
+            for k, v in OVT_SOFT_HB.items():
+                c.params[syn.index(k)] = v
+            n += 1
+    return n
+
+
+def hi_fix(files, log):
+    """v12: the up special's hit / overtake scripts as v12 has them (also on a build the specials step ran on before)"""
+    import ultimate_acmd as U
+    files['effect'].scripts[acmd.crc('specialairhihit')] = hi_hit_effect(U, files['effect'])
+    files['sound'].scripts[acmd.crc('specialairhihit')] = hi_hit_sound(U)
+    files['game'].scripts[acmd.crc('specialairhihit')] = hi_hit_script()
+    n = overtake_part(files['game'].scripts[acmd.crc('specialairhiovertake')])
+    assert n == 3, 'the overtake: %d soft hitboxes' % n
+    log.append('v12 specialairhihit: no FOOT_EFFECT (the catch effects from MSC), se_master_special_h04; the overtake\'s '
+               'soft hitboxes on Part %d, on the caught fighter' % OVT_SOFT_PART)
+
+
 HI_CAPTURE_STATUS = 0xBD         # the Falcon Dive capture (docs/acmd-params/throws-grabs-other.md TargetStatus 189)
 HI_TARGET_VARS = ('FIGHTER_MASTER_STATUS_SPECIAL_HI_FLAG_TARGET_AIR', 0x0F00030C,      # VAR_12, VAR_13: master.c
                   'FIGHTER_MASTER_STATUS_SPECIAL_HI_FLAG_TARGET_HI_DAMAGE', 0x0F00030D)  # master_hi_catch sets them
@@ -568,8 +612,8 @@ def overtake_soft(U, script):
     out = head + if_var(HI_SOFT_VAR, 0, 0, branch)
     for val, key in ((1, 0), (2, 1), (3, 'mew')):
         v = spec[key]
-        f = dict(ID=0, Part=0, Bone=0, Damage=float(v['Damage']), Angle=int(v['Angle']), KBG=int(v['KBG']), FKB=0,
-                 BKB=int(v['BKB']), Size=9.0, X=0.0, Y=10.0, Z=8.0, Effect=0, Trip=0.0, Hitlag=1.0, SDI=1.0, Clang=1,
+        f = dict(ID=0, Part=OVT_SOFT_PART, Bone=0, Damage=float(v['Damage']), Angle=int(v['Angle']), KBG=int(v['KBG']),
+                 FKB=0, BKB=int(v['BKB']), **OVT_SOFT_HB, Effect=0, Trip=0.0, Hitlag=1.0, SDI=1.0, Clang=1,
                  Rebound=0, ShieldDamage=0, SFXLevel=1, SFXType=3, **{'Ground/Air': 3, 'Direct/Indirect': 1}, Type=10,
                  HitBits=0x3F, Unk41=0, CollisionPart=0xF, NoScale=0, Shieldable=1, Reflectable=0, Absorbable=0,
                  Rehit=0, IgnoreInvuln=0, HitAllStates=0, FacingRestrict=0, NoGrabRelease=0, TeamDamage=0,
@@ -1088,9 +1132,19 @@ def main():
     for x in ('dump', 'ult', 'body', 'model', 'base', 'pkg'):
         b.add_argument(x)
     b.add_argument('--sound')
+    h = sub.add_parser('hi', help='v12: the up special\'s hit / overtake scripts (hi_fix) on DIR\'s game / effect / '
+                                  'sound .bin (an installed body script folder)')
+    h.add_argument('dir')
     a = ap.parse_args()
     if a.cmd == 'vis':
         cmd_vis(a)
+    elif a.cmd == 'hi':
+        files = {fn: acmd.ACMDFile.load(os.path.join(a.dir, fn + '.bin')) for fn in ('game', 'effect', 'sound')}
+        log = []
+        hi_fix(files, log)
+        for fn, f in files.items():
+            f.save(os.path.join(a.dir, fn + '.bin'))
+        print('\n'.join(log))
     else:
         cmd_build(a)
 

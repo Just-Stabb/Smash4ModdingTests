@@ -9,6 +9,36 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: v12 (`scratchpad/byleth_v12_fix.zip`: a FIX package over v11; exe unchanged (exe_v46w_vars_line); in-game TEST)
+
+User, v11 test with the TEST_ONLY diag (log `a4361367-log.txt`, clips `bbed1d82-...170241085.mp4`,
+`800871dd-...170250758.mp4`): "Up special pulls Byleth, but doesn't pull him above the opponent, so the follow-up never
+hits. The effects for catching the opponent and off of the wall never play. The wall jump seems to work well now."
+
+| point | cause (evidence) | fix |
+|---|---|---|
+| the follow-up never hits | (1) **the hit record**: v11's catching hit (SpecialAirHiHit's game script, frame 1, `Extended_Special_Hitbox` Part 0) and the overtake's soft hitbox (frame 11, Part 0) are in one status (0x15B plays 0x23A then 0x23B: `master_motion`); a Part's "already hit" record lasts the status (docs/acmd-extra-commands.md "Hit_Log_Clear"), so the overtake could never hit the fighter the catch had hit. (2) **the place**: the reel took his root to 8 behind the target's feet at their height (log: k8 33 -> 1, k10 34 -> 1: the reel works, it ends level with the feet) and the overtake's hitbox (9 around (8 fwd, 10 up)) swung beside the target; Ultimate's overtake (f_7208a1f1d0) sets his `top` constrained to the target's `throw` joint (LinkModule set_model_constraint_joint / _target_joint, then GroundModule set_shape_safe_pos at its centre), so he is ON the target: special_air_hi_overtake draws his hip 8.1 behind / 6.2 below the root on frame 0 and flips over it to stand on it by 10 (hip 9.5 up), the throw (ATK_HIT_ABS, no hitbox) at 11. The reel's end: the hit pose's hip is (-0.3 fwd, 8.0 up), the overtake's frame 0 (-8.1, -6.2): his root moves 7.8 forward / 14.2 up into the overtake, so the reel ends with the target's throw point 7.8 ahead / 14.2 above him (his raised hand; Ultimate's rewind is the sword article's, native) | the overtake's soft hitboxes on **Part 1**, centred on the target ((0, -3, 0), size 9: his root on its throw point; `master_build.overtake_part` / `hi_fix`; **port_check S22 status-hit-log**, port.json `status_scripts`); the reel to (target throw point - (7.8, 14.2)) (`master_hi_rewind`; a target on the ground: not under its feet), then his root on the throw point through the throw's frame 11 (`master_hi_ovt_place`, gravity held, the fall back at 12); the throw point = the target's waist joint (jtb 11, the joint position variables: its rest place) or its feet + 10 (MASTER_HI_OVT_Y, APPROXIMATED: its `throw` joint isn't readable). Real captures (0xBD) get the same placement |
+| catch effects never show | v11 put master_wire_catch / master_wire_wind2 in SpecialAirHiHit's effect script as `Graphic_Effect`: that is the game's **FOOT_EFFECT** (Sm4sh_params ACMD events: 0xC84B610E FOOT_EFFECT; every vanilla use is ground dust). Its handler (0x02BE1444) first asks EffectModule vt +0x32C (0x02C31610: on only while the module's +0x9F / +0xA0 bytes are clear, the foot-effect switch) and plays nothing otherwise; he is in the air in 0x15B. The ids are right (efc 0x6E -> set 104 PtcMasterMasterWireCatch, 0x73 -> set 109 ...WireWind2 in the shipped bank, unchanged since v8); the script is bound (motion.mtable 0x23A = crc("specialairhihit")); the Hitbox Viewer draws foot effects regardless (`v12/view/v12_view.png`) | Ultimate's are the sword article's (SpecialHiHit: EFFECT_FOLLOW(_NO_STOP) on the tip, sword35, which holds the target): played from MSC at the target's throw point (`master_hi_fx_at`: EffectModule 0x2710, bone 0, flag 0); the effect script left empty. **port_check E14 foot-effect** (ERROR: own effects as FOOT_EFFECT in an air move) |
+| wall effects never play | none were there: Ultimate's sword hit status plays the same catch / wind on a wall; its SpecialAirHiWallJump effect script turns REQ_EFFECT on at 6 and the status (f_7208a2ac80) plays `sys_cling` at a joint (EffectModule::req) | master_wire_catch / wind2 at the point the sword met (0x15B's main, a wall latch); at the cling's frame 6 a flash on that point: Smash 4 has no sys_cling, the common ledge-catch flash (sys_cliff_catch, 0x100001E) stands in (APPROXIMATED) |
+| sounds | Ultimate's SpecialHiHit status plays se_master_special_h04 on every hit (after hit_disable_landing_frame / rewind_frame) | SpecialAirHiHit's sound script: se_master_special_h04 (0x1B00FB) at 0 when VAR_15 != 0 (a fighter or a wall), h03 at 2 as before |
+| point-blank: no catch (clips) | clip 1 frames 140 - 184 and 300 - 360 (60 fps): Donkey Kong overlapping him, the tip's 0.01 % hit lands (training panel "Damage 0"), nothing caught, both fall to the floor. The tip pulls (master_vt_specialhi, 17 / 19) only took fighters 1 - 31 ahead of him; the soft catch measured the tip alone, far out by frame 20 | the tip pulls' box from 8 behind his front (-8 - 31); the soft catch measures the blade (four points from his hand to the tip) as well as the tip (Ultimate's sword stops on the first thing it meets); the catching hit's capsule from his hand ((0, 20, 6) - (0, 68, 24)) |
+
+Checks: `tools/master_specials_test.py` 75 checks, 0 problems (v12: the reel's end and the overtake's place with and
+without a waist read, a target on the ground, the catch / wall / cling effects and their places, point-blank catches,
+the tip pull of an overlapping fighter, the hold through 11); port_check (v4 ... v9_fix, vars_reset_v1, v10_fix,
+v11_fix, v12_fix): **0 ERROR**, 30 WARN (`scratchpad/byleth/pc_v12.log`); on v11's install the new rules give E14
+(specialairhihit 0x347006E / 0x3470073) and S22 (0x15B Part 0). Hitbox Viewer (Shot.exe v1.7.2,
+`scratchpad/byleth/v12/view/`): the catch effects' ids (a test copy of the effect script), the overtake on frames 1 / 4 /
+11 (his body under the root, then over it; the hitbox under his feet, on the target). Built: the installed body scripts
+= the port build's (compared), `python3 tools/master_build.py hi DIR` on them (idempotent; the specials step runs it
+too), master.mscsb `master_build.compile_msc`. Package `scratchpad/byleth/make_pkg_v12_fix.py` (game.bin, effect.bin,
+sound.bin, master.mscsb; TEST_ONLY: the diag master.mscsb only, with v11's TEST_ONLY exe: k12 his height over the
+target's feet as the overtake starts, k13 its damage on the overtake's 11 - 13), INSTALL README
+`scratchpad/byleth/INSTALL_README_v12.txt`. Not proven in game: the overtake's look with the target's own pose
+(Ultimate's target is in a capture pose on his `throw`; here it is held in its hit pose), the waist joint read's
+height per fighter, the cling flash's look; that the game shows no effect for a FOOT_EFFECT in the air is read from
+the handler and the vanilla scripts (not traced who sets the +0x9F switch).
+
 ## Status: v11 (`scratchpad/byleth_v11_fix.zip`: a FIX package over v10; exe unchanged (exe_v46w_vars_line); in-game TEST)
 
 User, v10 test with the TEST_ONLY diag (log `613f0faa-log.txt`, clip `6fac5f8c-...16164730639.mp4`, sheets
@@ -696,6 +726,10 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
+00000000000. **v12 fix** (sent: `scratchpad/byleth_v12_fix.zip`): test list in `scratchpad/byleth/INSTALL_README_v12.txt`.
+   With the diag (v11's TEST_ONLY exe + v12's diag master.mscsb): k12 about 10 (on the target), k13 up by 6.5 at the
+   overtake (its hit). If the hit lands but looks wrong: the target's pose (Ultimate holds it in a capture pose on his
+   `throw`; a capture status of ours for the soft catch), MASTER_HI_OVT_Y per fighter. Then v11's / v10's open lists.
 0000000000. **v11 fix** (sent: `scratchpad/byleth_v11_fix.zip`): test list in `scratchpad/byleth/INSTALL_README_v11.txt`.
    With the diag: k10 should fall about 4 a frame during the reel; k11 1 at the wall jump's jump (else the game didn't
    re-enter 0x15C: then the jump needs another route, e.g. the speeds from a slot-6 function as Captain Falcon's

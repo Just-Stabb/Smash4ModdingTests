@@ -233,6 +233,10 @@
     "finalair": "ZSS's Final Smash, air",
     "batswing4": "ZSS's home-run bat smash timing (armor at 41, the common bat hit at 51): Ultimate's BatSwing4 calls its common item functions (game_BatSwing4Common1 / 2, not in the dump); to retime to his animation"
   },
+  "status_scripts": {
+    "_comment": "scripts one status plays in turn (port_check S22 status-hit-log: their hitboxes' Parts share one hit record for the whole status)",
+    "0x15B": ["specialairhihit", "specialairhiovertake"]
+  },
   "vec_target": {
     "_comment": "Ultimate's set_vec_target_pos moves (tools/vec_target.py, port_check S10)",
     "status": {

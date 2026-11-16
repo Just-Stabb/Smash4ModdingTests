@@ -2835,6 +2835,80 @@ def check_loop_speed(name, rep):
                 'Byleth in game): %s' % (name, ', '.join(sorted(set(bad)))))
 
 
+FOOT_EFFECT = 0xC84B610E       # ACMD Graphic_Effect: Ultimate's FOOT_EFFECT (reference/spreadsheets Sm4sh_params ACMD events)
+
+
+def check_foot_effects(inst, name, rep):
+    """E14 foot-effect: an effect of the fighter's own bank (not the common 0x100 dust) requested with Graphic_Effect,
+    the game's FOOT_EFFECT: its handler (0x02BE1444) asks EffectModule vt +0x32C (foot effects on: +0x9F / +0xA0 clear)
+    and plays nothing when they're off, as in the air (every vanilla use is the common run / dash / turn dust and
+    footsteps on the ground). Byleth v11 put Ultimate's catch effects (the sword's EFFECT_FOLLOW) in SpecialAirHiHit's
+    effect script so: they never showed (user's v11 test). ERROR in a script named for an air move ('air' in the name),
+    WARN elsewhere; the port's own copies of the common dust (its effects json's sys_* ids) are left out"""
+    eff = scripts(inst, 'fighter/%s/script/animcmd/body/effect.bin' % name)
+    if not eff:
+        return
+    names = {acmd.crc(n): n for n in vocabulary()}
+    dust = set()                 # the port's own copies of the common dust (fighters/NAME/NAME_effects.json sys_*)
+    for f in glob.glob(os.path.join(ROOT, 'fighters', name, '*_effects.json')):
+        for k, v in json.load(open(f)).items():
+            if k.startswith('sys_') and isinstance(v, str) and v.startswith('0x'):
+                dust.add(int(v, 16))
+    air, other = [], []
+    for k, sc in eff.items():
+        ids = sorted({int(c.params[0]) for c in sc if c.ident == FOOT_EFFECT and c.params
+                      and int(c.params[0]) >> 16 not in (0, 0x100) and int(c.params[0]) not in dust})
+        if not ids:
+            continue
+        n = names.get(k, '%08X' % k)
+        (air if 'air' in n else other).append('%s (%s)' % (n, ', '.join('0x%X' % i for i in ids)))
+    if air:
+        rep.add('ERROR', 'E14 foot-effect', 'own effects requested as FOOT_EFFECT (Graphic_Effect: played only while '
+                'foot effects are on, never in the air) in air moves: %s; use Graphic_Effect2 (EFFECT) / a following '
+                'one, or MSC' % '; '.join(air))
+    if other:
+        rep.add('WARN', 'E14 foot-effect', 'own effects requested as FOOT_EFFECT (Graphic_Effect: ground only): %s'
+                % '; '.join(other))
+
+
+HIT_CMDS = ('Hitbox', 'Special_Hitbox', 'Extended_Hitbox', 'Extended_Special_Hitbox', 'Extra_Special_Hitbox')
+
+
+def check_status_hit_log(inst, name, rep):
+    """S22 status-hit-log: scripts one status plays in turn (port.json "status_scripts": {status: [script, ...]}, e.g.
+    Byleth's 0x15B: SpecialAirHiHit then SpecialAirHiOvertake) whose hitboxes share a Part: a Part's "already hit"
+    record lasts the whole status (docs/acmd-extra-commands.md "Hit_Log_Clear"), so the later script's hit can't land on
+    a fighter the earlier one hit. Byleth v11: the catching hit (Part 0) then the overtake's hit (Part 0) on the same
+    fighter: "the follow-up never hits". ERROR, unless a Hit_Log_Clear of that Part comes first"""
+    cfg = load_port_cfg(name).get('status_scripts') or {}
+    game = scripts(inst, 'fighter/%s/script/animcmd/body/game.bin' % name)
+    if not cfg or not game:
+        return
+    bad = []
+    for st, seq in cfg.items():
+        if st.startswith('_'):
+            continue
+        seen = {}
+        for sname in seq:
+            sc = game.get(acmd.crc(sname)) or []
+            cleared, parts = set(), set()
+            for c in sc:
+                if c.name == 'Hit_Log_Clear' and c.params:
+                    cleared |= set(seen) if int(c.params[0]) == -1 else {int(c.params[0])}
+                elif c.name in HIT_CMDS:
+                    part = int(c.params[c.info['syntax'].index('Part')])
+                    if part in seen and part not in cleared:
+                        bad.append('%s %s after %s (Part %d)' % (st, sname, seen[part], part))
+                        cleared.add(part)            # one report a Part
+                    parts.add(part)
+            for part in parts:
+                seen.setdefault(part, sname)
+    if bad:
+        rep.add('ERROR', 'S22 status-hit-log', 'a later script of one status hits on a Part an earlier one already '
+                'hit with (its hit record lasts the status: the later hit can\'t land on the same fighter): %s; give it '
+                'another Part or Hit_Log_Clear first' % '; '.join(bad))
+
+
 def check_vec_pull_angle(inst, src, name, ult, rep):
     """S19 vec-pull-angle: a hit Ultimate writes at 368 with set_vec_target_pos (the fighter carried to a point) on its
     body (`top`, bone 0 here) left at the translator's 366: Smash 4's 366 takes the hitbox's own motion over the frame,
@@ -2976,6 +3050,8 @@ def main():
     check_loop_speed(a.name, rep)
     check_vec_pull_angle(inst, src, a.name, base['ult'], rep)
     check_add_speed(src, a.name, base['ult'], rep)
+    check_foot_effects(inst, a.name, rep)
+    check_status_hit_log(inst, a.name, rep)
     n = rep.show()
     sys.exit(1 if n['ERROR'] or (a.strict and n['WARN']) else 0)
 

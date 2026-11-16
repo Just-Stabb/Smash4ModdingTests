@@ -40,6 +40,10 @@ v10 (README "Status: v10"):
     INHERIT_2, Landing1) and the hop at 53.
 v11: the reel moves him by the self-move position variables (0x0F000004 / 5), energy 3 kept 0; the wall jump's jump
      from 0x15C's main entered again; the catch without a capture leaves its 3 % to SpecialAirHiHit's hit.
+v12: the reel ends with the target's throw point 7.8 ahead / 14.2 above him (not under a grounded target's feet), the
+     overtake puts him on that point (its waist read, else feet + 10) through 11; the catch's effects at the target and
+     the wall latch's at the point met (MSC, not FOOT_EFFECT), the cling's at 6; point-blank catches (the blade) and the
+     tip pull of a fighter overlapping him.
 """
 import os
 import re
@@ -95,13 +99,13 @@ class Game:
         self.line_asks = []        # (x0, y0, x1, y1, mode) of each line test
         self.lasso = False         # v10: flag 0x2100000D on
         self.step = [0.0, 0.0]     # v11: self moves (forward, up) since the last take()
+        self.placed = []           # v12: (x, y) before each write of his X / Y (0x0F000000 / 1), and after
+        self.fx = []               # v12: EffectModule(0x2710, id, bone, x, y, ...) requests: (id, world x, world y)
 
     def take(self):
-        """the self moves since the last call, applied to the position: (forward, up)"""
+        """the self moves since the last call (applied as they were written): (forward, up)"""
         f, u = self.step
         self.step = [0.0, 0.0]
-        self.x += f * self.lr
-        self.y += u
         return f, u
 
     def sys(self, sid, a):
@@ -135,8 +139,26 @@ class Game:
             self.vars[a[2]] = i2f(a[1])
             if a[2] in (0x0F000004, 0x0F000005):         # v11: the self moves (forward / up), position_vars_cave
                 self.step[a[2] - 0x0F000004] += i2f(a[1])
+                if a[2] == 0x0F000004:
+                    self.x += i2f(a[1]) * self.lr
+                else:
+                    self.y += i2f(a[1])
+            if a[2] in (0x0F000000, 0x0F000001):         # v12: set his X / Y
+                before = (self.x, self.y)
+                if a[2] == 0x0F000000:
+                    self.x = i2f(a[1])
+                else:
+                    self.y = i2f(a[1])
+                self.placed.append((before, (self.x, self.y)))
+            if 0x0F000020 <= a[2] < 0x0F000040 and (a[2] - 0x0F000020) % 4 < 2:    # v12: a slot's X / Y set
+                sl, q = divmod(a[2] - 0x0F000020, 4)
+                if sl in self.slots:
+                    self.slots[sl]['xy'[q]] = i2f(a[1])
             if a[2] == 0x0F0003D4:
                 self.line_test(i2f(a[1]))
+            return 0
+        if sid == 0x1C and a and a[0] == 0x2710:             # v12: EffectModule(0x2710, id, bone 0, x (fwd), y, ...)
+            self.fx.append((a[1], self.x + i2f(a[3]) * self.lr, self.y + i2f(a[4])))
             return 0
         if sid == 0x14 and a in ([1], [2]):                 # PostureModule(1): reverse_lr (then 2: its rotation)
             if a == [1]:
@@ -180,6 +202,9 @@ class Game:
             t, q = divmod(v - 0x0F0000A0, 8)
             f = self.slots.get(t - 3)
             return float(f['status']) if f and q == 2 else 0.0
+        if 0x0F000290 <= v < 0x0F0002BC and (v - 0x0F000290) % 4 == 2:   # v12: a joint's Y (the slot's 'waist')
+            f = self.slots.get((v - 0x0F000290) // 4 - 3)
+            return f['y'] + f['waist'] if f and 'waist' in f else 0.0
         if 0x0F000100 <= v < 0x0F000260:
             t, q = divmod(v - 0x0F000100, 0x20)
             f = self.slots.get(t - 3)
@@ -329,9 +354,18 @@ def up_special(path):
     sets = [a for s, a in gm.calls if s == 0x16 and a and a[0] == 7 and a[2] == 0x11000005]
     # (the status's first frame is the main's: its loop runs there too, so 18 loops + it)
     check('v9 SpecialAirHiHit: still for hit_stop_frame_fighter (19 frames) before the rewind', held + 1 == 19, 'held %d' % held)
-    check('SpecialAirHiHit: pulled at rewind_speed 4.1 a frame to the caught fighter (his hand 8 short), then stopped',
-          moved and stopped and abs((moved[0][0] ** 2 + moved[0][1] ** 2) ** 0.5 - 4.1) < 0.01 and abs(gm.x - (20.0 - 8.0)) < 0.01
-          and abs(gm.y - 90.0) < 0.01, 'steps %s, at (%.2f, %.2f) after %d frames' % (moved[:3], gm.x, gm.y, n))
+    reel_end = gm.placed[0][0] if gm.placed else None
+    check('v12 SpecialAirHiHit: reeled at rewind_speed 4.1 a frame until the caught fighter\'s throw point (its feet + 10: no '
+          'waist read) is 7.8 ahead / 14.2 above him (Ultimate\'s hit pose -> overtake), then put on that point (the '
+          'overtake: his root on its throw joint) and stopped',
+          moved and stopped and abs((moved[0][0] ** 2 + moved[0][1] ** 2) ** 0.5 - 4.1) < 0.01 and reel_end
+          and abs(reel_end[0] - (20.0 - 7.8)) < 0.01 and abs(reel_end[1] - (100.0 - 14.2)) < 0.01
+          and abs(gm.x - 20.0) < 0.01 and abs(gm.y - 100.0) < 0.01,
+          'steps %s, reel end %s, at (%.2f, %.2f) after %d frames' % (moved[:3], reel_end, gm.x, gm.y, n))
+    cat = [(hex(i), round(x, 1), round(y, 1)) for i, x, y in gm.fx]
+    check('v12 the catch\'s effects (master_wire_catch 0x347006E, master_wire_wind2 0x3470073) at the caught fighter\'s '
+          'throw point (20, 100), from MSC (not the effect script\'s ground-only FOOT_EFFECT)',
+          cat[:2] == [('0x347006e', 20.0, 100.0), ('0x3470073', 20.0, 100.0)], str(cat))
     check('the overtake: the thrown link event (0xB, ThrownF 0x7C, the throw work ints) once',
           len(links) == 1 and links[0][:3] == [0x271B, 0xB, 0x7C] and len(sets) == 1 and sets[0][1] == 0x1234,
           'links %s, sets %s' % (links, sets))
@@ -504,7 +538,13 @@ def v10(path):
     check('v10 leaving 0xF1 for anything else still removes it', bool([a for s, a in gm.calls if s == 0x20 and a and a[0] == 0x2712]))
     gm.calls.clear()
     gm.status.clear()
+    gm.fx.clear()
     b.call('master_hi_hit_main')
+    latch = (b.g('master_tx'), b.g('master_ty'))
+    check('v12 the latch: the sword\'s hit effects (master_wire_catch, master_wire_wind2) on the point the tip met',
+          [(i, round(x, 2), round(y, 2)) for i, x, y in gm.fx] == [(0x347006E, round(i2f(latch[0]), 2), round(i2f(latch[1]), 2)),
+                                                                 (0x3470073, round(i2f(latch[0]), 2), round(i2f(latch[1]), 2))],
+          str(gm.fx))
     check('v10 SpecialAirHiHit: gravity speed 0 and its energy suspended (0x2717, 1)',
           kin(gm, 0x11, 1) and i2f(kin(gm, 0x11, 1)[-1][2]) == 0.0 and kin(gm, 0x2717, 1), str(kin(gm, 0x11, 1)))
     for n in range(60):
@@ -520,14 +560,20 @@ def v10(path):
     check('v10 0x15B -> 0x15C keeps the fall off (no 0x2718)', not kin(gm, 0x2718, 1))
     gm.calls.clear()
     lr0 = gm.lr
+    gm.frame = 0.0
+    gm.fx.clear()
     b.call('master_hi_wall_main')
     turned = [a for s, a in gm.calls if s == 0x14 and a == [0x2710]]
     check('v10 the wall jump turns away from the wall (reverse_lr) and holds the fall', bool(turned) and kin(gm, 0x2717, 1),
           'calls %s' % [a for s, a in gm.calls if s == 0x14])
     jumped = None
+    cling_fx = (0, list(gm.fx)) if gm.fx else None
     for n in range(1, 20):
         gm.calls.clear()
+        gm.frame = float(n - 1)
         b.call('master_hi_wall_loop')
+        if gm.fx and cling_fx is None:
+            cling_fx = (n - 1, list(gm.fx))
         if kin(gm, 0x11, 1) and jumped is None:
             jumped = n
             jy = i2f(kin(gm, 0x11, 1)[-1][2])
@@ -536,6 +582,10 @@ def v10(path):
     check('v10 the cling: 13 frames (wall_jump_stop_frame), then 2.6 up on the gravity energy and 0.9 on air control, '
           'the fall back (0x2718)', jumped == 13 and abs(jy - 2.6) < 1e-5 and jx and abs(abs(i2f(jx[-1][2])) - 0.9) < 1e-5
           and fell, 'jumped at %s' % jumped)
+    check('v12 the cling\'s effect (Ultimate\'s REQ_EFFECT at 6: sys_cling; the common ledge catch flash 0x100001E) once, '
+          'at frame 6, on the point the sword met', cling_fx and cling_fx[0] == 6 and len(cling_fx[1]) == 1
+          and cling_fx[1][0][0] == 0x100001E and abs(cling_fx[1][0][1] - i2f(latch[0])) < 0.01
+          and abs(cling_fx[1][0][2] - i2f(latch[1])) < 0.01 and len(gm.fx) == 1, str(cling_fx))
     check('v11 the jump: 0x15C entered again (its main sets the speeds), flagged', 0x15C in gm.status
           and b.g('master_hi_wj_jump') == 1, str([hex(x) for x in gm.status]))
     gm.calls.clear()
@@ -585,9 +635,14 @@ def v10(path):
     gm.calls.clear()
     gm.frame = 11.0
     b.call('master_hi_hit_loop')
-    check('v10 held without a capture: reeled in (phase 1), still held at the overtake\'s frame 5, let go and the fall '
-          'back at 11 (its hitbox frame)', b.g('master_phase') == 1 and kept and kin(gm, 0x2718, 1)
-          and b.g('master_target') & 0xFFFFFFFF == 0xFFFFFFFF, 'kept %s' % kept)
+    at11 = (not kin(gm, 0x2718, 1), [a for s, a in gm.calls if s == 0x16 and len(a) == 3 and a[2] == 0x0F000001])
+    gm.calls.clear()
+    gm.frame = 12.0
+    b.call('master_hi_hit_loop')
+    check('v10 held without a capture: reeled in (phase 1), still held at the overtake\'s frame 5, let go at 11 (its '
+          'hitbox frame); v12 he stays on it through 11 (no fall), the fall back at 12', b.g('master_phase') == 1 and kept
+          and at11[0] and at11[1] and kin(gm, 0x2718, 1) and b.g('master_target') & 0xFFFFFFFF == 0xFFFFFFFF,
+          'kept %s, frame 11 %s' % (kept, at11))
     for what, kw in (('20 away', dict(dx=20.0)), ('intangible', dict(intangible=True)), ('shielding', dict(status=0x1C))):
         b, gm = tipped(21.0, **{k: v for k, v in kw.items() if k != 'status'})
         if 'status' in kw:
@@ -600,6 +655,47 @@ def v10(path):
     b.call('master_hi_air_loop')
     b.call('master_hi_air_loop')
     check('v10 after the window (30): not caught', 0x15B not in gm.status)
+    # v12: point-blank (the blade, not only the tip: Ultimate's sword stops on what it meets), behind him not
+    for what, dx, dy, want in (('at his hand (8 ahead, 6 up: the blade)', 8.0, 6.0, True), ('10 behind him', -10.0, 0.0, False)):
+        b, gm = setup(21.0)
+        gm.slots[1] = dict(x=gm.x + dx, y=gm.y + dy, status=0x46, air=True, damage=20.0)
+        b.call('master_hi_air_loop')
+        gm.frame = 22.0
+        b.call('master_hi_air_loop')
+        check('v12 no capture, a fighter %s: caught %s' % (what, 'yes' if want else 'no'), (0x15B in gm.status) == want)
+    # v12: the tip's pulls (17 / 19) carry a fighter overlapping him (in hitstun) toward the catch point
+    b, gm = setup(17.0)
+    b.g('global4', 0xF1)
+    gm.slots[1] = dict(x=gm.x - 2.0, y=gm.y + 4.0, status=0x46, air=True, damage=20.0)
+    gm.vars[0x0F000058 + 8 * 1] = 12.0
+    real_fvar = gm.fvar
+    gm.fvar = lambda v: 12.0 if v == 0x0F000058 + 8 else real_fvar(v)
+    b.call('master_vt_specialhi')
+    check('v12 the tip\'s pull at 17 takes a fighter 2 behind his front (in hitstun) toward (16, 32) by 21',
+          abs(gm.slots[1]['x'] - (-2.0 + (16.0 + 2.0) / 4.0)) < 0.01 and abs(gm.slots[1]['y'] - (54.0 + (82.0 - 54.0) / 4.0)) < 0.01,
+          str(gm.slots[1]))
+    # v12: the overtake's point from the caught fighter's waist (its joint read), a fighter on the ground: not reeled
+    # under its feet
+    for air, waist, want_end, want_on in ((True, 9.0, (30.0 - 7.8, 59.0 - 14.2), (30.0, 59.0)),
+                                          (False, 9.0, (30.0 - 7.8, 50.0), (30.0, 59.0))):
+        b, gm = setup(22.0)
+        gm.y = 20.0
+        gm.slots[1] = dict(x=30.0, y=50.0, status=0x46, air=air, damage=20.0, waist=waist)
+        b.g('master_target', 1)
+        b.g('master_soft', 1)
+        b.g('master_tx', 30.0)
+        b.g('master_ty', 50.0)
+        b.call('master_hi_hit_main')
+        for n in range(60):
+            b.call('master_hi_hit_loop')
+            gm.take()
+            if b.g('master_phase') == 1:
+                break
+        end = gm.placed[0][0] if gm.placed else None
+        check('v12 the caught fighter %s, its waist 9 up: reeled to %s, then on (%g, %g)' % (
+            'in the air' if air else 'on the ground', tuple(round(v, 1) for v in want_end), *want_on),
+            end and abs(end[0] - want_end[0]) < 0.01 and abs(end[1] - want_end[1]) < 0.01
+            and abs(gm.x - want_on[0]) < 0.01 and abs(gm.y - want_on[1]) < 0.01, 'end %s, on (%g, %g)' % (end, gm.x, gm.y))
     # 3. the ledge boxes by frame
     for f, box in ((13.0, 0), (15.0, 2)):
         b, gm = setup(f)
