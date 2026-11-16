@@ -9,6 +9,49 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: v4 (`scratchpad/byleth_v4.zip`: fixes from v3's first in-game test; complete fresh install; in-game TEST)
+
+User, v3 test (two clips, male c00 only; a female clip still to come): "Many of female byleth's effects don't appear,
+and both male and female byleth snap in their animations, weapons don't align correctly or appear at all, up special
+doesn't appear, many effects in general aren't appearing (ex. neutral special), constantly holding the bow when not
+doing neutral special"; then "Neutral special also never fires its projectile".
+
+The clips framed (60 fps, every frame; `scratchpad/byleth/clips4/`): clip 1 (13.4 s) wait with the bow and no sword
+(0.0-0.3 s, 1.5-2.1, 2.5-2.7, 12.0-13.4: Wait1, static from 1.55 to 2.08 s, entered with a one-frame swap of sword /
+bow at 1.48 s), dash attack 0.4-0.9 (into a turn at its cancel frame 45: a one-frame pose change, no blend), Failnaught
+2.75-3.9 and 4.25-5.4 (the draw: only foot dust; the shot: no arrow, nothing flies), forward smash 8.4-9.1 (Areadbhar
+in hand but along the wrong axis), down smash 7.0-8.3 (Aymr: blades sideways), grab / throw 11.4-11.9; clip 2 (6.1 s)
+aerials with Areadbhar (fair / bair 0.6-2.2: the spear pointing down / backwards out of the fist, its flame and hits
+elsewhere), double jump, nair / Failnaught in the air (4.1-4.3), landing into the bow wait (5.6 s). Also seen (not in
+the user's list): the win-pose `_lang` face entries are ZSS's (results only). Every cause below is proven offline
+with renders (`scratchpad/byleth/bin/pose.py`: our NUD + VBN + OMO + face pac against Ultimate's numshb + nusktb +
+nuanmb + articles; `scratchpad/byleth/renders/`).
+
+| user's point | cause (evidence) | fix |
+|---|---|---|
+| bow always held / sword gone in the wait; weapons "appear at all" wrong | **the base's `material_anime.lst`** (in every face pac, kept since v1) sends 73 motions to ANOTHER motion's face entry: ZSS's Wait1, WaitItem, WalkFast, the five aerial landings, Passive*, ... -> `D00SpecialNStart` (her shared ones). Decoded: entries (CRC-32 with start 0 of the motion name, of the shared entry's name, u32), the hash from the executable's loop at 0x03357004. Vanilla lists only motions without an entry of their own (0 of its 74 have one); ours have, but the game takes the list: Wait1 played SpecialNStart's keys (bow on, sword off), the landings too | `ultimate_fighter.lst_without`: the list without the motions that have their own entry (1 entry left, an unknown motion -> TurnRunBrake). **port_check F2 face-lst** (ERROR: v3 fails it on all 16 costumes) |
+| weapons don't align | the held articles' meshes were put on HaveR / HaveL in their raw coordinates: Areadbhar is bound to its `Spear` bone (turned from the article root) and Aymr is skinned in the article's model space (under its rotated root `HaveR`); Ultimate's link puts the article ROOT on the fighter's bone. Proof: Ultimate's hitboxes on `haver` run along its +Y (forward smash (0, 3) -> (0, 26.5)), the converted spear ran along the hand's Z | `ultimate_fighter.article_link_space`: a parent-bound mesh by inv(root bind) @ bone bind, a skinned one by inv(root bind) (the bow's root is identity: unchanged). Renders: spear (forward smash, forward air), axe (down smash) and bow match Ultimate's pose with the articles linked |
+| neutral special never fires | **the arrows had no MSC**: ZSS's Paralyzer shot (their base) flies, picks its motion and times out in its own `script/msc/paralyzer_bullet/paralyzer_bullet.mscsb`; v1-v3 shipped none for `arrow1` / `arrow2`, so the arrows were made with no status: no motion, so no ACMD (hitbox, effect), no movement (article list checked: 6 / 7 are 0x19E / 0x19F, max 2 / 1, the shot's spawner) | `master_build.py weapons`: arrow1 = the shot's MSC; arrow2 = the shot's MSC with its charge test (`WorkModule(0x10, 0x21000000)`, ZSS's charge flag, which his Failnaught doesn't set) always true (motion 4, life 0x12000003 = 30), decompiled / recompiled (the shot's own round trip decompiles identically). **port_check W14 weapon-msc** (ERROR: v3 fails it) |
+| effects missing (neutral special ...) | Ultimate draws Failnaught's glow (`master_bowflare2`), the drawn arrow's charge (`master_bow_hold1` / `hold2`, `master_bow_flash` at full charge: the held arrow1's Haved / Haved2), the shot (`master_bow_arrow1_shot`) and Aymr's blade flares (`master_axeflare1-3`) from the ARTICLES' effect scripts; the articles are baked into his body, so none played | `master_build.py article_effects`: those scripts merged into the body effect scripts of the slots that play their animations (bow -> SpecialNStart / SpecialN + air; arrow1 Haved / Haved2 -> SpecialNStart + air; axe -> down smash, down air, its landing, SpecialLw / air / hit / landing), their bones: the article root on the bone it is linked to (bow `have` -> havel; axe root -> haver; the held arrow's top -> haver: approximated), the others by the article's bind (Aymr's blades: an offset and turn along the blade, EffectTranslator's parents / locals). `merge_timed` keeps the body script's facing tests whole. 16 merges |
+| snapping | the converted motions are Ultimate's exactly (world positions of hands / head / hip / feet / sword over every frame of AttackDash, Wait1, AttackAirF, Turn, Attack11: <= 0.07); frame counts equal; the vl blend bytes as Ultimate's motion_list (wait 6, run 3, ...; attacks 0 in both games); OMO hemisphere flips at vanilla's rate (0.18 % / 0.16 %). What snapped in the clips: the bow / sword swaps between Wait1 (SpecialNStart's keys) and every move (above), and Wait1 itself played in the wrong-weapon pose; cancels into another status (dash attack -> turn at 45) change pose in one frame as in Ultimate (blend 0 there too) | the face list (above). If a female clip still shows snaps: send it (her motions were checked the same way in v3) |
+| up special doesn't appear | the move plays (ground 0x154 / air 0xF1 with SpecialAirHi, Ultimate's slash at 16 and flash at 17), but its visible part is the Sword of the Creator's whip (the `sword` article, 58 bones) and its own Extend effects (`master_wire_flash` / `_wind` at its tip): neither is built (v1's known gap: "the whip sword not shown") | **not done in v4**: Handover 1 |
+| female effects | no female clip yet; her group shares every script, effect bank and joint table with the male (joint tables 0 / 1 identical, FaceN / Sword1), so the fixes above apply to her too | to check with a clip |
+
+Package `scratchpad/byleth_v4.zip` (`scratchpad/byleth/make_pkg_v4.sh`, INSTALL README `scratchpad/byleth/INSTALL_README_v4.txt`):
+the packaging convention's roots (`INSTALL_TO_data/`, `INSTALL_TO_code/`, `OPTIONAL_INSTALL_TO_data/` for Sephiroth's
+flare1), exe **exe_v46t_threads** (= exe_v46s + `tools/ts_scene_sites_cave.py`, the time commands' scene fix: no Byleth
+exe change in v4). The user's data files: `byleth_userdata_v2.zip`, unchanged; the param / ui files go into both `data`
+and `data(us_en)` where the game reads regional copies. port_check: Install now maps `INSTALL_TO_code/` to `code/` and
+skips `not_for_install/`.
+
+Build: `python3 tools/ultimate_port.py run master model-c00 .. model-c07 motions motions-group2 low-models scripts
+specials variants shapes --out OUT` (`scratchpad/byleth/pipeline_v4.log`, `pipeline_v4b.log`).
+port_check: `port_check master scratchpad/byleth_v4.zip scratchpad/byleth_userdata_v2.zip` (the install as the user
+has it): **0 ERROR**, 21 WARN (v3's B1 / E3 / E7 / M5); the new checks over v3: F2 x16 (every costume), W14 x2.
+Suites: brave_mark_test, fighter_texture_ids_test 0 failures; ts_scene_sites_test on exe_v46t_threads 0 failures.
+Offline renders kept: `scratchpad/byleth/renders/weapons_v4.png` (ours v4 vs Ultimate's with the articles linked:
+forward smash 28, down smash 20, SpecialNStart 60, forward air 12), `cmp_wait1.png`, `dash.png`.
+
 ## Status: v3 (`scratchpad/byleth_v3.zip`, over v2: the female animations, the win cameras, exe_v46s; in-game TEST)
 
 User (v2 handover): "build the per-costume motion selection in the exe ... then her side" and "keep looking for a way
@@ -372,6 +415,23 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
+00. **v4** (sent: `scratchpad/byleth_v4.zip`, `scratchpad/byleth/INSTALL_README_v4.txt`): the user's test of the face
+   list fix (no bow in the wait, weapons per move), the held weapons' axes, the arrows (MSC), the article effects; a
+   female clip (her missing effects: none found offline). Then, in order:
+   1. **The Sword of the Creator's whip** (user: "up special doesn't appear"; also the rapid jab, up smash, down tilt, up
+      air, throws, down taunt, Win3 show the hilt only). Plan: Ultimate's `sword` article (58 bones; `extend` /
+      `special_hi_*` / per-move motions) on the whip article ZSS's tether already makes for the air up special (article
+      2, kind 0x1A0, her 8-segment chain PlasmaWhip01H-08H driven by her native code; its model is hidden now): its
+      mesh posed at `extend`'s last frame, re-skinned along the 8 segments by distance from the hilt, `nud.hidden`
+      dropped and the `Article_Visibility(2, 0)` in aircatch removed; the sword article's Extend / SpecialHiHit
+      effects (`master_wire_flash` / `_wind` / `_catch` on sword35 / 37) on the last segment. The ground up special and
+      the normals need a whip of their own (a dein-copy model article with MotionModule playing the sword's motions,
+      catalogue W5 / W8: 58 bones, resample to ~16) or a baked chain (no bone budget left: 132 / 136).
+   2. If snaps remain (a clip): which move / transition; the converted motions are exact (README v4), so a status
+      change without blend (the vl byte 1 of the target motion) or a frame jump in game (a diag on MotionModule frames).
+   3. The held arrow's top is on his right hand (approximated) and `master_bow_hold1` isn't turned off when hold2
+      starts (Ultimate's Haved / Haved2 split not read); the bow's string / body bones and Aymr's opening blades are
+      still rigid (their article motions not baked: no bone budget).
 0. **v3** (sent: `scratchpad/byleth_v3.zip`, `scratchpad/byleth/INSTALL_README_v3.txt`): the user's in-game test of the
    female animations (a male and female Byleth in one match, entry / result poses) and the win cameras (do they
    move as Ultimate's; the vanilla `data/motion/camera/result/<fighter>/<n>/` file names from the user's dump). If the
@@ -701,6 +761,11 @@ python3 tools/costume_group_test.py exe_v46s.rpx exe_v46r.rpx
 python3 tools/ultimate_port.py run master motions motions-group2 low-models camera scripts specials variants shapes --out OUT
 bash scratchpad/byleth/make_pkg_v3.sh                                             # -> scratchpad/byleth_v3.zip (complete)
 python3 tools/port_check.py master scratchpad/byleth_v3.zip
+# v4: the face list, the held weapons' link space, the arrows' MSC, the article effects; a complete package
+python3 tools/ultimate_port.py run master model-c00 .. model-c07 motions motions-group2 low-models scripts specials \
+    variants shapes --out OUT
+bash scratchpad/byleth/make_pkg_v4.sh                                             # -> scratchpad/byleth_v4.zip (complete)
+python3 tools/port_check.py master scratchpad/byleth_v4.zip scratchpad/byleth_userdata_v2.zip   # 0 ERROR, 21 WARN
 ```
 Body: `rolloff_acmd.py VANILLA/.../game.bin game.bin --plain --add 2.2 EscapeF EscapeB`; `mscdec.py -x tools/mscinfo.xml
 szerosuit.mscsb` (round trip: 2 of 2393 functions differ, both equivalent: a folded negative constant, an empty else),
