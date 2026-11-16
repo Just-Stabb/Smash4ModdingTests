@@ -1785,6 +1785,8 @@ void func_82()
         global29 = ControlModule(0xa, 0x2);
         global45 = ControlModule(0xa, 0x3);
     }
+    master_vt_attackhi4();             // up smash: Ultimate's set_vec_target_pos (tools/vec_target.py)
+    master_vt_specialhi();             // Sword of the Creator (ground): the same
     rolloff_hold_update(); // roll-off: the air speed cap off while the stick holds the way he moves (universal mechanics)
 }
 
@@ -38926,4 +38928,198 @@ int master_frame_hook()
         master_wall_jumps = 0;
     }
     return 0;
+}
+
+// master: Ultimate's set_vec_target_pos moves (tools/vec_target.py msc; call each from the per-frame hook, as edge_hi3_pull)
+
+// vec_target: AttackHi4 (status 0x33). Ultimate's set_vec_target_pos (tools/vec_target.py, generated):
+//   frame 13: ID 0 top (3, 27) 8 frames -> feet (3, 19) by frame 21; box 10 +- 15 forward, -12 to 23 up
+//   frame 14: ID 0 top (3, 27) 8 frames -> feet (3, 19) by frame 22; box 2 +- 15 forward, 2 to 38 up
+void master_vt_attackhi4()
+{
+    float f;
+    float x;
+    float y;
+    float tx;
+    float ty;
+    float k;
+    float lr;
+    float end;
+    float bx;
+    float bw;
+    float blo;
+    float bhi;
+    float mark;
+    int s;
+    int bit;
+    int mask;
+    if (global4 != 0x33)
+    {
+        return;
+    }
+    f = MotionModuleF(0x1);
+    if (f < 13.0f)
+    {
+        WorkModule(0, 0.0f, 0x0f00030e);
+        return;
+    }
+    if (f >= 14.0f)
+    {
+        end = 22.0f;
+        tx = 3.0f;
+        ty = 19.0f;
+        mark = 16.0f;
+        bx = 2.0f;
+        bw = 15.0f;
+        blo = 2.0f;
+        bhi = 38.0f;
+    }
+    else
+    {
+        end = 21.0f;
+        tx = 3.0f;
+        ty = 19.0f;
+        mark = 15.0f;
+        bx = 10.0f;
+        bw = 15.0f;
+        blo = -12.0f;
+        bhi = 23.0f;
+    }
+    if (f >= end)
+    {
+        return;
+    }
+    mask = (int)WorkModuleF(0, 0x0f00030e);
+    lr = PostureModuleF(0);
+    tx = PostureModuleF(0x1) + tx * lr;
+    ty = PostureModuleF(0x2) + ty;
+    k = 1.0f / (end - f);
+    s = 0;
+    bit = 0x1;
+    while (s < 0x8)
+    {
+        x = WorkModuleF(0, 0x0f000020 + 0x4 * s);
+        y = WorkModuleF(0, 0x0f000021 + 0x4 * s);
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0.0f && (x != PostureModuleF(0x1) || y != PostureModuleF(0x2)))
+        {
+            if (f < mark && (mask / bit) - (mask / bit / 0x2) * 0x2 == 0
+                && (WorkModuleF(0, 0x0f00005b + 0x8 * s) > 0.0f || WorkModuleF(0, 0x0f000058 + 0x8 * s) > 0.0f)
+                && func_13(x - PostureModuleF(0x1) - bx * lr) < bw && y - PostureModuleF(0x2) > blo
+                && y - PostureModuleF(0x2) < bhi)
+            {
+                mask = mask + bit;
+            }
+            if ((mask / bit) - (mask / bit / 0x2) * 0x2 == 0x1 && WorkModuleF(0, 0x0f000043) == 0.0f)
+            {
+                WorkModule(0, x + (tx - x) * k, 0x0f000020 + 0x4 * s);
+                WorkModule(0, y + (ty - y) * k, 0x0f000021 + 0x4 * s);
+                WorkModule(0, 5.0f, 0x0f0000a0 + 0x8 * (s + 0x3) + 0x6);
+            }
+        }
+        s = s + 1;
+        bit = bit * 0x2;
+    }
+    WorkModule(0, (float)mask, 0x0f00030e);
+}
+
+// vec_target: SpecialHi (status 0x154). Ultimate's set_vec_target_pos (tools/vec_target.py, generated):
+//   frame 16: ID 0 top (18, 44) 7 frames -> feet (18, 36) by frame 23; box 8 +- 14 forward, -12 to 22 up
+//   frame 17: ID 0 top (16, 40) 4 frames -> feet (16, 32) by frame 21; box 16 +- 15 forward, -10 to 42 up; hitboxes on throw: the box is around the target (APPROXIMATED)
+//   frame 19: ID 0 top (16, 41) 2 frames -> feet (16, 33) by frame 21; box 16 +- 15 forward, -10 to 43 up; hitboxes on throw: the box is around the target (APPROXIMATED)
+void master_vt_specialhi()
+{
+    float f;
+    float x;
+    float y;
+    float tx;
+    float ty;
+    float k;
+    float lr;
+    float end;
+    float bx;
+    float bw;
+    float blo;
+    float bhi;
+    float mark;
+    int s;
+    int bit;
+    int mask;
+    if (global4 != 0x154)
+    {
+        return;
+    }
+    f = MotionModuleF(0x1);
+    if (f < 16.0f)
+    {
+        WorkModule(0, 0.0f, 0x0f00030e);
+        return;
+    }
+    if (f >= 19.0f)
+    {
+        end = 21.0f;
+        tx = 16.0f;
+        ty = 33.0f;
+        mark = 21.0f;
+        bx = 16.0f;
+        bw = 15.0f;
+        blo = -10.0f;
+        bhi = 43.0f;
+    }
+    else if (f >= 17.0f)
+    {
+        end = 21.0f;
+        tx = 16.0f;
+        ty = 32.0f;
+        mark = 19.0f;
+        bx = 16.0f;
+        bw = 15.0f;
+        blo = -10.0f;
+        bhi = 42.0f;
+    }
+    else
+    {
+        end = 23.0f;
+        tx = 18.0f;
+        ty = 36.0f;
+        mark = 18.0f;
+        bx = 8.0f;
+        bw = 14.0f;
+        blo = -12.0f;
+        bhi = 22.0f;
+    }
+    if (f >= end)
+    {
+        return;
+    }
+    mask = (int)WorkModuleF(0, 0x0f00030e);
+    lr = PostureModuleF(0);
+    tx = PostureModuleF(0x1) + tx * lr;
+    ty = PostureModuleF(0x2) + ty;
+    k = 1.0f / (end - f);
+    s = 0;
+    bit = 0x1;
+    while (s < 0x8)
+    {
+        x = WorkModuleF(0, 0x0f000020 + 0x4 * s);
+        y = WorkModuleF(0, 0x0f000021 + 0x4 * s);
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0.0f && (x != PostureModuleF(0x1) || y != PostureModuleF(0x2)))
+        {
+            if (f < mark && (mask / bit) - (mask / bit / 0x2) * 0x2 == 0
+                && (WorkModuleF(0, 0x0f00005b + 0x8 * s) > 0.0f || WorkModuleF(0, 0x0f000058 + 0x8 * s) > 0.0f)
+                && func_13(x - PostureModuleF(0x1) - bx * lr) < bw && y - PostureModuleF(0x2) > blo
+                && y - PostureModuleF(0x2) < bhi)
+            {
+                mask = mask + bit;
+            }
+            if ((mask / bit) - (mask / bit / 0x2) * 0x2 == 0x1 && WorkModuleF(0, 0x0f000043) == 0.0f)
+            {
+                WorkModule(0, x + (tx - x) * k, 0x0f000020 + 0x4 * s);
+                WorkModule(0, y + (ty - y) * k, 0x0f000021 + 0x4 * s);
+                WorkModule(0, 5.0f, 0x0f0000a0 + 0x8 * (s + 0x3) + 0x6);
+            }
+        }
+        s = s + 1;
+        bit = bit * 0x2;
+    }
+    WorkModule(0, (float)mask, 0x0f00030e);
 }

@@ -42,6 +42,12 @@ one's source is beside it); "mine" marks the few with no Ultimate value.
 | 0x155 | Aymr | SpecialLw 0x241 / 0x245, SpecialLwLanding1 0x255, SpecialLwLanding2 0x259 | super armor below 30 % damage (DamageModule 0xB type 3; super_armor_damage_max) from frame 34 to 64; the axe's hitbox (Ultimate's `master_axe` 30 %, on his haver) merged into his script; landing before 51 or within 65 - 117 goes on as the ground one at its frame, 51 - 65 SpecialLwLanding2, after 117 SpecialLwLanding1 |
 | 0x156 / 0x161 / 0x162 | ZSS's Final Smash (Gunship) | her slots and scripts | kept (user); her final scripts restored by `master_build.py` (port.json `base_scripts_kept`) |
 
+**Position-setting hits** (Ultimate's `set_vec_target_pos`, `tools/vec_target.py`, port.json `vec_target`, port_check
+S10): the up smash (frames 13 / 14, (3, 27) over 8 frames) and the ground Sword of the Creator (frame 16 (18, 44) over 7,
+17 / 19 (16, 40) / (16, 41) over 4 / 2) pull the fighters they hit to the point in MSC (`master_vt_attackhi4` /
+`master_vt_specialhi`, generated, called from the per-frame hook; VAR_14 0x0F00030E); the air one is his status 0x15B's
+pull. Not tested in game.
+
 **The arrows** (Failnaught): his copies of ZSS's Paralyzer shot (`paralyzer_bullet`: native, straight, removed on a
 hit), brand-new articles `arrow1` (6) / `arrow2` (7), files in `fighter/master/script/animcmd/weapon/arrow1|2`. Every
 one of the shot's eight motions plays Ultimate's `master_arrow1` Fly (12 %, 35 degrees) / `master_arrow2` Search (29 %,
@@ -161,7 +167,7 @@ failed.
   files made on vanilla stand-ins (soundlabeltable, commonsoundtable / bgm_fighter from `fighter_extras.py common` /
   `fanfare --set 0x47=0x12`, fighter_param with his stats, the ui / ai param databases, melee.msbt). Sm4shCommand rebuilt with his script names: `scratchpad/sm4shcommand_v1.7.1_byleth.zip`.
 
-`port_check master scratchpad/byleth_v1.zip`: 0 ERROR (21 WARN). WARN: B1 effect / sound / expression (her common dust, common tones, slopes and
+`port_check master scratchpad/byleth_v1.zip` (v1b: the colour fixes, the position-setting hits): 0 ERROR (21 WARN; S10 INFO). WARN: B1 effect / sound / expression (her common dust, common tones, slopes and
 damage rumbles on common motions Ultimate's scripts have nothing for; her own tones taken out of 16 of them), E3
 (one Smash 4 common effect), E7 (FLASH / BURN_COLOR macros), M5 (two empty ZSS slots).
 

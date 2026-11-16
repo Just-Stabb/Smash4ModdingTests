@@ -200,5 +200,15 @@
   "final": "ZSS's Final Smash (the Gunship) kept for now (user): her final scripts with his animation",
   "finalair": "ZSS's Final Smash, air",
   "batswing4": "ZSS's home-run bat smash timing (armor at 41, the common bat hit at 51): Ultimate's BatSwing4 calls its common item functions (game_BatSwing4Common1 / 2, not in the dump); to retime to his animation"
+ },
+ "vec_target": {
+  "_comment": "Ultimate's set_vec_target_pos moves (tools/vec_target.py, port_check S10)",
+  "status": {
+   "SpecialHi": "0x154"
+  },
+  "mask_var": "0x0F00030E",
+  "hand_made": {
+   "SpecialAirHi": "master.c status 0x15B (SpecialAirHiHit): the latched fighter pulled toward the sword's tip, 1.15 / 2.85 a frame for 14 frames (Ultimate's point 16 / 40)"
+  }
  }
 }
