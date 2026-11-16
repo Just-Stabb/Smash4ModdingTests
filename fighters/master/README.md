@@ -578,6 +578,20 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
+0000000. **v8 fix** (sent: `scratchpad/byleth_v8_fix.zip`, no exe): the user's test list in
+   `scratchpad/byleth/INSTALL_README_v8.txt` (the max arrow's line and hit, the charge glow gone with the move, the up
+   special's catch / pull / throw on ground and air targets, the lights). Open, in order: (1) **the effects' bloom**:
+   Ultimate's HDR emitters (master_smash_hi at colour scale 2 - 6, the spear / axe flares) bloom into wide soft glows
+   that Smash 4's own pixel programs clamp away (`v8/fxcmp/side_special_ours_vs_ult.png`, the up smash in the user's
+   clips `v8/fxcmp/s4.png` / `ult.png`): fake halos as `tools/xv2_smash_fx.py`'s (an additive soft copy of each
+   emitter whose Ultimate peak is over ~2, HALO_ALPHA tuned in game; meshes need their own falloff), in
+   `vfxb_to_ptcl.py` behind a port.json switch, then an A/B package; the `_sub` (subtractive) layers' strength against
+   Ultimate's clip; (2) **the wall tether**: a line test from his hand to the sword's tip (an exe cave over the Wii U's
+   GroundModule ray_check 0x02C39F18 as a position variable, as `smashrun_walker_cave.py`'s pk_ray calls it), then
+   Ultimate's SpecialAirHiHit on a wall (wall_offset (-0.6, -0.8), tip_angle_wall 70, hit_stop_frame_wall 12) and the
+   wall jump; the same test would cut the max arrow at the first ground (param_arrow2: "cut at the first ground");
+   (3) if the caught fighter's capture pose (0xBD, Falcon Dive's) looks wrong, another capture status (0xB8 Dark Dive)
+   or a custom thrown motion; TARGET_HI_DAMAGE's real test (ExeFS); (4) v7's list below.
 000000. **v7 fix** (sent: `scratchpad/byleth_v7_fix.zip`, exe_v46v_threads): the user's test list in
    `scratchpad/byleth/INSTALL_README_v7.txt` (brightness vs `images/23.png`, side special end position, up-special ledge /
    catch / no special fall, Aymr's floor hit / landing / turn, the max arrow). If the side special now moves too far
