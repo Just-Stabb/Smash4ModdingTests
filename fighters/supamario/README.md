@@ -2727,3 +2727,97 @@ To make it feel like they want (not built; for the user to choose):
 - The diag executable is exe_v46l + `diag_godfist_cave.py` + `diag_hitstate_cave.py` (the same words as v10's on
   exe_v46k: the caves `0x04BAC000`-`0x04BAE000`, free in exe_v46l, and the setters' first words);
   `diag_hitstate_test.py` / `diag_godfist_test.py` on it: 0 failed.
+
+## Sledgehammer v1 (`supamario_sledgehammer_v1.zip`): the air down special
+
+User: put Xenoverse 2's **Sledgehammer** (Vegeta's Super skill, skill folder `164_VGT_HMR`) on his **air** down
+special (F.L.U.D.D. leaves the air; the grounded down special stays Fake Death). Files given: the skill's BAC / BCM /
+BAS / BDM / EAN (`_C`, `_F`, `_BDK`, `_CL3`, `_SLG`), its EEPK / pbind / ptcl, and its SE bank `CAR_BTL_S164_HMR_SE.acb`
+(cues 0 Charge, 1 Furi; the older ACB layout, as Fake Death's). Install over Core Breaker v11 / buffer commands v1 /
+Fake Death v3, exe `exe_v46u_threads` (no exe change: Extra hitboxes, New_Var, Target 12's variables are all in it).
+
+### What the files say (`tools/supamario_sledgehammer_xv2.py report` -> `reference/xv2/sledgehammer_skill.json`)
+- **BCM:** #1 (SuperSkill button, HoldDownConditions 0x2) plays **BAC 0**, **BacEntryCharge 2**; its child #2
+  (OnAttackHit, no button, ReceiverLinkID Supers) plays **BAC 3**, reached through BAC 0 / 2's BcmCallback "Supers"
+  on the hit frames. BAC 1 (100 damage, a 0.25 TimeScale) is in the file but no BCM entry plays it.
+- **BAC 0 (uncharged)**, skill EAN #0 VGT_SPA_HMR_C (45 frames, speed 1: the animation frame is the BAC frame):
+  TimeScale **0-12 x0.5, 22-26 x0.3, 26-37 x0.5** (so 44 BAC frames = 76.3 real frames); Tracking 0-10 (no backwards
+  flag); Movement 2-10 (0.075 up, 0.55 forward a frame, drag 0.04: a lunge); **ChargeControl 6-8, ChargeTime 30**;
+  skill effect 0 (Hmr_Crg, the left fist's glow) 5-8, effect 1 (Hmr_Fire, rings round the pelvis) at 12; sounds CMN
+  cue 42 swing_42 at 1, skill cue 0 Charge at 6 (flags 0x28: it stops with its entry), cue 1 Furi at 9, voice 49 at 0
+  (left out: no voices); **hitbox 16-20**, skill BDM #0, **60 damage** (6 blocked), b_C_Base + 0.75 m ahead, 1.0 m;
+  BcmCallback Supers 16-20, Movement / Guard / FlyingAndStepDash **37-44**.
+- **BAC 2 (charged):** the same but TimeScale 22-26 **x0.23**, Movement 0.65 forward, **hitbox 15-19**, BDM #1,
+  **145 damage**, effect 3 (Hmr_Fire_L x1.2 + Hmr_Crg02 x1.2 on the fist) at 12, effect 0 off at 13.
+- **BAC 3 (on hit):** BAC 0's items without the hitboxes / effects / sounds, TimeScale **0-12 x0.5, 32-44 x0.5 only**,
+  BcmCallback **Combos 26-44**: XV2's on-hit cancel window. Its items line up with BAC 0's frames (the face / eye
+  items at 0, 1, 7, 26 as BAC 0's), so it is read as played on from the hit on the same clock: on a hit BAC 22-32 is
+  no longer slowed and the window opens at **BAC 26, 10 real frames after BAC 16** (the hit's hitlag aside).
+- **Skill BDM:** #0 DamageType 27, stun **10 / 10**, a knock (0, -0.35, 0.05) for 70 frames, hit effect **Effect1 0 /
+  EEPK type 0 (BTL_CMN.eepk effect 0)**, hit sound CMN cue **52 Hit_L**; #1 stun **30 / 30**, (0, -1.5, 0.05) for 100,
+  camera shake 60, a BPE 14 (a screen post-effect: no Smash equivalent), the same hit effect, CMN cue **53 Hit_LL**.
+  A second hitbox on the same frames (CMN.bdm #0, 0 damage, flags 0x8) is XV2 bookkeeping: left out.
+- **BTL_CMN effect 0** (the hit effect, in the user's vfx/cmn): Btl_HitLOD (x1.5) + Btl_HitS (x0.8) at the hit (Camera
+  orientation), Btl_Sweat00 on the victim's b_C_Head, and a CBIND colour fade on the victim (no Smash equivalent).
+  `xv2vfx.py` couldn't read Btl_HitS / Btl_HitLOD (a (Parameter 3, Component 1) keyframed value on a sphere emitter it
+  has no name for); `xv2vfx.LENIENT_TARGETS` (off by default, set only by this build) keeps it as `Unknown_P3_C1`.
+
+### The move (what was chosen; `tools/supamario_sledgehammer_build.py`)
+| | |
+|---|---|
+| Motions | **0x239 SpecialAirLwStart** = BAC 0-6 at x0.5 (13 frames, its last the overhead charge pose); **0x23D SpecialAirLwHold** = BAC 6-44 baked at BAC 0's real timing (65 frames). `tools/supamario_sledgehammer_anim.py` (retarget as the earlier ports, 5.04 units a metre, no TransN: XV2's root lunge dropped, the pelvis height moves RotN). These were the air F.L.U.D.D.'s start / hold, now unused |
+| Physics | FALL kinetics (type 0) all move: his own gravity, full drift, no stall (XV2's Movement lunge left out: the user's "full drift with his normal gravity") |
+| Charge | the special button still held at the pose (frame 12): held there; after **30** frames (ChargeTime) the charged swing; let go earlier: uncharged (XV2's partial charge is entry 0). A tap swings on frame 12 |
+| Hit frames | uncharged swing 16-19 (game 28-31 on a tap); charged 15-18. The hitbox is XV2's: bone 0, **3.78 ahead, 0 up, size 5.04** (round his fists, at his feet) |
+| Uncharged | **5%** (XV2 60 : 145 against the charged 12), **270**, **BKB 40, KBG 10**, **+6 frames of hitstun** (HitstunMul -6), **hitstop 10 / 10** (BDM #0). Mario weight: knockback 42 / 44.5 / 46.9 / 49.4 at 0 / 50 / 100 / 150%, hitstun 22 / 23 / 24 / 25 (16-19 without the +6) |
+| Charged | **12%** (2.4x, XV2's ratio), **270**, **BKB 25, KBG 95**, the game's hitstun, **hitstop 20 / 20** (XV2 30; 20 keeps it under Smash's 30-frame cap feel). Knockback 53 / 100 / 146 / 193 at 0 / 50 / 100 / 150%, hitstun 21 / 39 / 58 / 77 |
+| Both | Clang 1, Rebound 0, SDI 1, Shieldable, Ground/Air 3, **NoGFX 1** (XV2's hit effect instead), punch SFX (level 1 / 2) under XV2's hit sound. Compare: Fake Death 6% (air: BKB 99, KBG 15), God Fist 4 + 11%, Core Breaker 26% |
+| On a hit (entry 3) | the swing's rate from the hit on: BAC 22-26 x3.33, 26-32 x2, 32-37 x1, 37-44 x0.5 (entry 3 over entry 0); a charged whiff: 22-26 x0.77 (entry 2's 0.23). **From swing frame 35.33 (BAC 26): up / side / neutral special** (Final Smash with the ball), **never the down special** (`sh_specials`), charged or not: 10 frames after the hitlag |
+| Follow | after an **uncharged** hit: his gravity energy's acceleration 0 and its speed the victim's Y change since last frame, every frame while the victim is airborne and in hitstun (or its hitstop); then his gravity back. Not after a charged hit |
+| Free | **swing frame 57.33 (BAC 37**, XV2's Movement / Guard window): every air action (gf_air_act's terms, the down special too); a whiff is actionable on game frame 70 of a tap, Fall on 77 |
+| Landing | before the free frame: **LandingFallSpecial 18 frames** (work float 0, as the up special's), **10 after a hit**; after it a normal landing (0x16) |
+| Hit effect | the frame the MSC first sees the hit (in the hitlag): Btl_HitLOD (x2.63) and Btl_HitS (x1.4) halfway between the hitbox's centre and the victim's middle (5 up), Btl_Sweat00 (x1.75) at its head (9 up), `EffectModule(3)` at world positions, unturned; Hit_L / Hit_LL (`cb_hit_l` 0x0CB10097, `gf_hit_ll` 0x0CB1008F, already in his bank) |
+| Effects | **x1.75** (`xv2_smash_fx.SIZE`): Hmr_Crg on LHandN from frame 10 (BAC 5; off at swing 4 / charged 13, at the status's end); at swing 12 Hmr_Fire (x1.75) or Hmr_Fire_L (x2.1) + Hmr_Crg02 (x2.1, LHandN); the rings on bone 0 at his hips' height (5.54 up), **flat (X 90)**, XV2's pelvis being upright at BAC 12. Vibrant (glare tint x2, capped at 2.0), fake-glow halos (0.16) on 11 glowing emitters (4 in each of HitLOD / HitS had no room in their 16-emitter sets: no companion sets, the MSC calls them) |
+| Sounds | `sh_swing` 0x0CB1009C (CMN swing_42) at 2, `sh_charge` 0x0CB1009A at the pose (MSC; stopped at a full charge, a hit or the end), `sh_furi` 0x0CB1009B at swing 6, levelled to -0.5 dBFS peak |
+| Staling | the status's attack log is Fake Death's (0: none) |
+
+### How (files)
+- `tools/supamario_sledgehammer_xv2.py` (report, SE), `tools/supamario_sledgehammer_anim.py`,
+  `tools/supamario_sledgehammer_build.py` (runs Fake Death's build, then the motions, effects, scripts, sounds, MSC),
+  `tools/supamario_sledgehammer_test.py`. `SH_*` from `msc_values()` (also in `supamario_kame_build.py`).
+- **MSC** (`supamario.c`, end of the file): `sh_*`; `func_2265` (the main) takes it in the air, `func_2282` (the end)
+  `sh_end`. **No new globals** (127 of 128): New_Var slots **0x3E `sh`** (the phase), **0x3F `sh_chg`** (the charge's
+  frames; the game / effect / expression scripts read it), **0x2F `sh_vic`** (the hit fighter's slot) and **VAR_0 /
+  VAR_1** (the followed Y, the swing's last frame; Supamario used no VAR_n). New_Var slots are now all taken
+  (0x00-0x3F); VAR_2-31 are free. The victim: Target 12's `ATKHIT_OFFSET_X / _Y` matched against the slots (exe_v46k),
+  else the nearest fighter in hitstop near the hitbox. `msc_fingerprint` vs Core Breaker v11: func_2265 / func_2282 and
+  12 new functions.
+- **Scripts:** specialairlwstart / specialairlwhold replaced in all four files (F.L.U.D.D.'s had no hitboxes). Both
+  names are vanilla (AnimNames.txt), no new slot: ModAnimNames.txt unchanged.
+- **soundlabeltable:** the package's is byleth_userdata_v2's (the user's installed one: rows 27 / 78 Byleth's) with
+  row 3249 grown by the three labels (the build's own is based on the God Fist's table).
+
+### Tests
+- `supamario_sledgehammer_test.py`: 52 checks, 0 problems: a tap (the motions, Fall on 77, free fall as with no move,
+  the Charge SE), a full charge (the pose held 30 frames, the charged swing, the SE stopped, the 0.77 rate), a release
+  mid-charge (uncharged); an uncharged hit (on 28; the three hit effects the next frame at the contact point and sizes;
+  Hit_L; the follow: speed written every frame, within one frame's fall of the victim while it falls 15.8, gravity
+  back the frame after its hitstun; entry 3's rates; the move ending 40 frames after the hitlag as XV2's BAC 16 -> 44;
+  the window 10 frames after the hitlag: up / side / neutral cancel there and not a frame before, down never); a
+  charged hit (Hit_LL, no follow, the cancel kept); a whiff (nothing before 70, up / down special at 70); landings
+  (18, 10 after a hit, a normal one after 70); a cut while charging; a shield (nothing); the ground still Fake Death;
+  the scripts' hitboxes / conditions / New_Vars / effect calls / sounds, every other script unchanged; the seven
+  effect sets at their ids, facing-safe (only Hmr_Fire's rings flat), HDR <= 2.0, the halos; the motions' lengths.
+- `supamario_fakedeath_test.py` (47: its air F.L.U.D.D. checks now check Sledgehammer's start),
+  `supamario_corebreaker_test.py` (104), `supamario_godfist_test.py --all-models` (546), `msc_stack_check.py` (0 of
+  2397, globals 127 of 128): 0 problems. Compared with Core Breaker v11's build: the first 70 ptcl sets and 88 .efc
+  entries byte for byte, only the two motions in each pac, only the two scripts in each ACMD file.
+- Sm4shCommand v1.7.2: the 8 scripts round-trip through its text (decompile, compile, the same words); the Hitbox
+  Viewer plays them (preview/viewer_grid.png: the charge glow, the swing, the hitbox on the fists, its 270 line).
+
+**Approximated / not confirmed in game:** BAC 3 played on from the hit's frame (not from 0); the hit effect's place
+(halfway to the victim's middle; Smash's own spark sits at the collision point) and that the MSC runs during the
+hitlag (Fake Death's assumption too); the follow's one-frame lag (the victim may move after him in a frame); the
+rings' look (flat, ~11 units round at x1.75: Fake Death's screenshot scale); XV2's lunge, tracking, stage effects
+(Stage BG 60 / 220), the Fly_WindS trace, the CBIND fade and the charged hit's camera shake / BPE are left out; BAC 1
+unused (a middle charge level could use it).

@@ -98,7 +98,7 @@ class Game(FT.Game):
             self.sounds.append((self.n, {0x2710: 'play', 0x2714: 'stop'}.get(a[0], a[0]), a[1] if len(a) > 1 else None))
             return 0
         if sid == 0x1C and a and a[0] == 0x3:
-            self.fx.append((self.n, a[1], round(f(a[2]), 3), round(f(a[3]), 3), round(f(a[9]), 3)))
+            self.fx.append((self.n, a[1], round(f(a[2]), 3), round(f(a[3]), 3), round(f(a[8]), 3)))
             return 0
         return FT.Game.sys(self, sid, a)
 
@@ -281,10 +281,10 @@ def msc_tests(path):
           'falls %.1f' % (min(gap), max(gap), fall, gap and (tr2[hit_k][6] - tr2[g2.vy_log[-1][0]][6])),
           max(gap) - min(gap) <= fall + 1e-6, True)
     vv = g2.fighters[2]
-    stun_end = max(n for n, st_, hs, hp, _x in vv.log if hs > 0 or hp > 0)
+    over = min(n for n, st_, hs, hp, _x in vv.log if n > hit_k and hs <= 0 and hp <= 0)
     back = [n for n, a_ in g2.acc_log if a_ < 0]
-    check('follow: his own gravity back the frame its hitstun is over (game frame %d)' % (stun_end + 1),
-          back[:1], [stun_end + 1])
+    check('follow: his own gravity back on the frame after its hitstun ran out (game frame %d)' % (over + 1),
+          back[:1], [over + 1])
     rates = sorted({r for _n, r in g2.rates})
     check('hit: the swing at entry 3\'s speed (BAC 22-26 x3.333, 26-32 x2, 32-37 x1, 37-44 x0.5)', rates,
           sorted({1.0, round(1 / 0.3, 4), 2.0, 0.5}))
@@ -309,7 +309,7 @@ def msc_tests(path):
     check('charged hit on game frame %d (swing %d)' % (ck, B.HIT_FROM_CH), g.fighters[2].hit_at, ck)
     check('charged hit: Hit_LL (BDM #1\'s cue 53), the three hit effects, no follow (his gravity untouched)',
           ([(w, i) for n, w, i in g.sounds if n == ck + 1 and w == 'play'], len(g.fx), g.vy_log,
-           g.vars.get(B.V_VIC)), ([('play', B.SND_HIT_CH)], 3, [], -1.0))
+           sorted({a_ for _n, a_ in g.acc_log})), ([('play', B.SND_HIT_CH)], 3, [], [-GRAVITY]))
     kw = first(tr, lambda t: t[1] == 0x23D and t[2] >= B.CANCEL_HIT - 0.01)[0]
     gc = Game(fighters=[victim_below(k=ck)], held=lambda n: True, press={kw: UP})
     trc, _vm = run(path, gc, frames=220)
@@ -398,7 +398,8 @@ def script_tests(out, base):
                   for c, n in f['game'].new_vars() if n.startswith('sh')}),
           sorted({('sh', 0x3E, 0), ('sh_chg', 0x3F, 0), ('sh_vic', 0x2F, 0)}) if names else [])
     eff_s, eff_h = f['effect'].script('specialairlwstart'), f['effect'].script('specialairlwhold')
-    calls = [(nm(c), c.params[0], c.params[1], round(c.params[3], 2), round(c.params[4], 2), round(c.params[8], 3))
+    calls = [(nm(c), c.params[0], c.params[1]) + ((round(c.params[3], 2), round(c.params[4], 2),
+                                                   round(c.params[8], 3)) if len(c.params) > 8 else (0, 0, 0))
              for c in eff_s + eff_h if nm(c) in ('External_Graphic', 'Terminate_Graphic_Effect')]
     print('     effect calls:', [(n, hex(i), b_, y, z, s) for n, i, b_, y, z, s in calls])
     ids = B.FX_IDS
@@ -457,11 +458,16 @@ def effect_tests(out):
             rgb = [c * p.field(d, 'color_scale') for c in p.color_keys(d, 0)[0][:3]]
             if max(rgb) > 2.0 + 1e-3:
                 bad.append((k, p.emitter_name(d), 'HDR', rgb))
-            halos += p.field(d, 'blend_type') == 1 and p.emitter_name(d).endswith('H')
     check('every emitter at the effect\'s origin, unturned but Hmr_Fire\'s rings (X 90: flat, symmetric), a full-sphere '
           'spread when directional, HDR within 2.0', bad, [])
     check('the falling rings converted flat (ShapeDraw -> polygons): %d' % rings, rings > 0, True)
-    print('     halo emitters: %d' % halos)
+    import json
+    rep = json.load(open(os.path.join(out, 'sledgehammer_fx.json')))
+    for k, i in B.FX_IDS.items():
+        si = e.entries[i & 0xFFFF][1] - 1
+        halos += len(p.sets[si]['emitters']) - len(rep['sets'][{v: q for q, v in B.EMP_KEY.items()}[k]]['emitters'])
+    check('the fake-glow halos (HALO_ALPHA %g) in their own sets: %d (the glowing emitters with room; no companion '
+          'sets)' % (rep['halos']['alpha'], halos), halos, rep['halos']['glowing'])
 
 
 def motion_tests(out):
