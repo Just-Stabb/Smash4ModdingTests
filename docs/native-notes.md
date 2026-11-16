@@ -2605,3 +2605,11 @@ Read from cross_f.rpx (exe_v46u; not yet confirmed in game):
   from the larger of the two damages, stored with the larger one's Hitlag multiplier), Rebound 0 -> its module's
   `+0x120` set (the attack cancelled). A side loses if any of its records loses.
 - Not traced: where the aerial / grounded clank rule lives (no situation test in the pass above).
+
+## Stage line test (Byleth v9: `tools/line_test_cave.py`) — space claimed
+
+Claimed (exe_v46v_threads + this cave; in progress, details below when done): **code `0x04BCA000`-`0x04BCB800`**
+(zero in exe_v46v: the free end of Smash Run's region H, before the temporary diag caves' `0x04BCC000`), **variables
+`0x0F0003D0`-`0x0F0003DF`** (user_entry IDs that read 0 / ignore writes in acmd_ext_cave.py's hv_var: reached from its
+`hvv_zero` branch, which the cave chains: whatever that `b` aims at (buf_var, or a later cave's stub) still gets every
+other ID). Apply after acmd_ext_cave.py's output; it asserts the words it replaces.
