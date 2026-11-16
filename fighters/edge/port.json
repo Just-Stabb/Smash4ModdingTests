@@ -233,5 +233,12 @@
   ],
   "_build_args": "DUMP EDGE ZELDA ZELDA_UM VL MODEL OUT: {base} = vanilla fighter/zelda (port_sources base_fighter_dirs.zelda); add --rpx / --bank / --motions for those parts"
  },
- "_note": "Sephiroth predates the framework: his slot, model, motions, effects and specials were built by hand (fighters/edge/README.md); this file records his settings and runs the later steps (sound, portraits) through tools/ultimate_port.py"
+ "_note": "Sephiroth predates the framework: his slot, model, motions, effects and specials were built by hand (fighters/edge/README.md); this file records his settings and runs the later steps (sound, portraits) through tools/ultimate_port.py",
+ "vec_target": {
+  "_comment": "Ultimate's set_vec_target_pos moves (tools/vec_target.py, port_check S10), done by hand",
+  "hand_made": {
+   "AttackHi3": "edge.c edge_hi3_pull (test 151; the user's reference): tools/vec_target.py msc gives the same numbers ((2, 37) by frame 22, box 7 +- 15, -10 to 20); the hand-made one also stops while the snake sword is held (VAR_23)",
+   "SpecialHi2": "edge.c Octaslash's autolink (the last fighter hit pulled each frame to 10 in front along the rush, test 113); Ultimate's per-hitbox points on rot (20 - 30 ahead, 5 below / 1 up, 2 - 4 frames) not used"
+  }
+ }
 }

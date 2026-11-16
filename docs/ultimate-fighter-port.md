@@ -451,9 +451,15 @@ python3 tools/ultimate_acmd.py DUMP/edge BASE/script/animcmd/body/game.bin OUT/g
   number the first active frame the same way (Mario's jab: `FRAME 2`, active on frame 2).
 - Smash 4 has one script name per side tilt / smash (`attacks3`, `attacks4`; `attacks3hi` / `lw`
   are the angled tilts), not `attacks3s`.
-- Angles: Ultimate's 367 / 368 (to the hitbox's centre with the attacker's motion / to a set point) don't
-  exist in Smash 4 (its last is 366, to the hitbox's centre): written as 366 (`ANGLE`); as they were,
-  Squirtle's Waterfall and Hero's Swoosh let their targets go.
+- Angles: Ultimate's 367 / 368 (to the hitbox's centre with the attacker's motion / to a set point) are written
+  as 366 (`ANGLE`); as they were, Squirtle's Waterfall and Hero's Swoosh let their targets go. (Smash 4's own
+  365 - 367, read in the executable: the victim takes the attacker's speed (365) or the hitbox's per-frame motion (366,
+  367); 366 only when the victim is off the ground, 367 always: docs/native-notes.md "Special angles 365 - 367".)
+- `AttackModule::set_vec_target_pos` (angle 368: the victim carried to a point from a bone over N frames; Sephiroth's
+  up tilt, Byleth's up smash / Sword of the Creator) has no Smash 4 hitbox field: the converter records it
+  (`--vec-targets`) and `tools/vec_target.py msc` writes the MSC pull (Sephiroth's up tilt's method, test 151: the
+  fighters in hitstun near the hitboxes moved a 1 / (frames left) part of the way to the point every frame); the
+  pull goes into the fighter's MSC (port_check S10).
 - `AttackModule::set_catch_only_all` (throw hitboxes that hit only the held fighter) -> NoGrabRelease 1 on
   the script's hitboxes, as Smash 4's own throw hitboxes (Pikachu's ThrowF); with 0 Squirtle's throws freed
   the opponent before the release.

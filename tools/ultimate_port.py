@@ -281,7 +281,17 @@ def plan(name, out):
                    '--effects', 'reference/ultimate_sys_effects.json,' + ids, os.path.join(U, 'model/body/c00/model.nusktb')]
                   + (['--translate', os.path.join('fighters', name, e2)] if (e2 := cfg.get('specials', {}).get('acmd'))
                      and os.path.exists(os.path.join(ROOT, 'fighters', name, e2)) else [])
-                  + ['--sound-ids', snd_ids, '--expressions']))
+                  + ['--sound-ids', snd_ids, '--expressions', '--vec-targets', os.path.join(work, 'vec_targets.json')]))
+    # Ultimate's "carry the hit fighter to a point" (angle 368 + set_vec_target_pos): no Smash 4 hitbox field, so an MSC
+    # pull per move (tools/vec_target.py, Sephiroth's up tilt's method): paste it into fighters/NAME/NAME.c and call
+    # it from the per-frame hook (port_check S10); port.json vec_target: status {script: kind} for specials,
+    # hand_made {script: how}, mask_var (a free VAR_n)
+    vt = cfg.get('vec_target', {})
+    steps.append(('vec-target', 'the MSC pull for set_vec_target_pos moves (paste into %s.c, call per frame)' % name,
+                  [py, t('vec_target.py'), 'msc', name, os.path.join(dump, ult), '--out', os.path.join(work, name + '_vec_target.c'),
+                   '--mask-var', vt.get('mask_var', '0x0F00030E')]
+                  + sum((['--status', '%s=%s' % kv] for kv in sorted(vt.get('status', {}).items())), [])
+                  + sum((['--skip', k] for k in sorted(vt.get('hand_made', {}))), [])))
     # the fighter's own build (MSC, articles, special slots): port.json specials.build + build_args, with
     # {dump} {ult} {body} {vl} {model} {base} {pkg} {work} {fx} {sound}
     sp = cfg.get('specials', {})

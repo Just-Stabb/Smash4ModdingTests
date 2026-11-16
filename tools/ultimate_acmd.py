@@ -513,6 +513,10 @@ def cond_true(cond):
         return not cond_true(cond[1:].strip())
     if any(c in cond for c in TRUE_CONDS):
         return True
+    # the costume's parity (Byleth: even male, odd female, whose animations' timings differ): the male branch, every
+    # costume playing the male animations (one motion folder: fighters/master/README.md, female motions to come)
+    if re.search(r'FIGHTER_INSTANCE_WORK_ID_INT_COLOR\) % 2 == 0', cond):
+        return True
     return False
 
 
@@ -523,6 +527,8 @@ class Translator:
         self.skipped = {}
         self.frame = 0.0                # the script's frame at the current statement
         self.events = []                # (frame, call, args) of the WorkModule sets (Steve's tool requests)
+        self.vec_targets = []           # this script's set_vec_target_pos (tools/vec_target.py: the MSC pull)
+        self.raw_hitboxes = {}          # hitbox ID -> its Ultimate ATTACK values (the last made, this script)
 
     def bone(self, name):
         if name == 'top':
@@ -540,6 +546,7 @@ class Translator:
         cmds = []
         self.made = []             # the commands made so far (the same objects as in cmds)
         self.frame, self.events = 0.0, []
+        self.vec_targets, self.raw_hitboxes = [], {}
         live = [True]              # a stack of "this block runs"
         taken = [False]
         dyn = []                   # dynamic ifs open: [where its compare goes, where its Else goes or None]
@@ -632,6 +639,8 @@ class Translator:
             return [cmd('Set_Frame_Duration', float(a[1]))]
         if short == 'ATTACK':
             return self.attack(a)
+        if short == 'set_vec_target_pos':
+            return self.vec_target(a, raw)
         if name == 'AttackModule::set_add_reaction_frame':
             # frames more hitstun for hitbox ID (Magic Burst's 2, so its hits hold): that hitbox (the last
             # made with the ID, in this script so far) as its Extra_ form, HitstunMul = -frames (tools/
@@ -690,11 +699,30 @@ class Translator:
         self.skip(name)
         return []
 
+    def vec_target(self, a, raw):
+        """AttackModule::set_vec_target_pos(id, bone, Vector2f{x, y}, frames[, false]) (FighterSpecializer_Edge's
+        too): the hitbox's victims are carried to the bone + (x forward, y up) over `frames` (Ultimate's angle 368).
+        Smash 4 has no such hitbox field (its 366 / 367 take the victim along with the hitbox's own motion, 366
+        only off the ground: 0x02C25CD8); nothing goes in the script: it is recorded (self.vec_targets) for the
+        fighter's MSC pull (tools/vec_target.py, the method of Sephiroth's up tilt, test 151), which --vec-targets
+        writes out and port_check S10 checks"""
+        m = re.search(r'x:\s*([-\d.e]+)\s*,\s*y:\s*([-\d.e]+)', raw[3] if len(raw) > 3 else '')
+        if not m:
+            self.skip('set_vec_target_pos (unparsed)')
+            return []
+        hid = int(a[1])
+        self.vec_targets.append({'frame': self.frame, 'id': hid, 'bone': a[2], 'x': float(m.group(1)),
+                                 'y': float(m.group(2)), 'frames': int(a[4]), 'hitbox': self.raw_hitboxes.get(hid)})
+        return []
+
     def attack(self, a):
         (_ag, hid, part, bone, dmg, angle, kbg, fkb, bkb, size, x, y, z, x2, y2, z2, hitlag, sdi, setoff, lr,
          set_weight, shield_dmg, trip, rehit, reflect, absorb, flinchless, no_hitlag, direct, situation, category,
          partmask, friendly, effect, lvl, attr, region) = a[:37]
         clang, rebound = SETOFF[setoff]
+        self.raw_hitboxes[int(hid)] = {'bone': bone, 'angle': int(angle), 'size': float(size), 'x': float(x),
+                                       'y': float(y), 'z': float(z), 'x2': x2, 'y2': y2, 'z2': z2,
+                                       'situation': SITUATION.get(situation, 3)}
         if not isinstance(shield_dmg, (int, float)) or shield_dmg != shield_dmg:
             shield_dmg = 0              # f32::NAN (Kamikazee's blast): none
         # never below 0 (the user's rule for Ultimate ports, CLAUDE.md): Smash 4 reads ShieldDamage unsigned, so
@@ -1574,6 +1602,9 @@ def main():
     ap.add_argument('--dyn-cond', action='append', default=[], metavar='SUBSTRING=VAR',
                     help="a condition decided in game: the if / else kept as Int_Var_Compare(VAR != 0) True / Else "
                          "(e.g. FLAG_CRITICAL_HIT=0x1000009A, Hero's critical hit); repeatable")
+    ap.add_argument('--vec-targets', metavar='OUT_JSON', help='write the translated scripts\' set_vec_target_pos '
+                    '(Ultimate\'s "carry the hit fighter to a point": no Smash 4 hitbox field) for the MSC pull, '
+                    'tools/vec_target.py msc')
     a = ap.parse_args()
     TRUE_CONDS[:] = a.cond
     for d in a.dyn_cond:
@@ -1593,6 +1624,7 @@ def main():
         U.set_have(*a.have.split(','))
     tr = Translator(joint_ids(a.model_dir))
     done = []
+    vec = {}
     for src, name in TRANSLATE.items():
         if a.only and src not in a.only:
             continue
@@ -1613,12 +1645,19 @@ def main():
         cmds = tr.script(body) if body is not None else [acmd.Command(acmd.END)]
         f.scripts[acmd.crc(name)] = cmds
         done.append((src, name))
+        if tr.vec_targets:
+            vec[src] = {'name': name, 'targets': tr.vec_targets}
         if a.list:
             print('%s -> %s: %d commands; left out %s' % (src, name, len(cmds), tr.skipped))
             print(acmd.fmt_script(cmds))
     for name in EMPTY if not a.only else ():    # --only: those scripts alone (a fighter on its base's moves keeps them)
         f.scripts[acmd.crc(name)] = [acmd.Command(acmd.END)]
     f.save(a.out)
+    if vec:
+        print('set_vec_target_pos (carried to a point: the MSC pull, tools/vec_target.py): %s' % ', '.join(
+            '%s (%d)' % (k, len(v['targets'])) for k, v in vec.items()))
+    if a.vec_targets:
+        json.dump(vec, open(a.vec_targets, 'w'), indent=1)
     print('%d scripts translated (%s), %d emptied' % (len(done), ', '.join(n for _s, n in done),
                                                      0 if a.only else len(EMPTY)))
     if a.others:

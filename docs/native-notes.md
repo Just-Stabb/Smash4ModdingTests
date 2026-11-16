@@ -2475,3 +2475,36 @@ past 64 they overwrite `+0x110` / `+0x114`; the next lookup by article id (`0x02
 would mean a bigger holder and moving its `+0x110` / `+0x114` / `+0x118` everywhere they're read. Per fighter today
 (the base's + the new articles'): Sephiroth 9 + 39, Hero 13 + 18, Squirtle 9 + 6, Supamario 9 + 1. `port_check` W8.
 
+## Special angles 365 - 367 (the pull hitboxes)
+
+Read from cross_f.rpx (exe_v46q; not yet confirmed in game). The hit info a hit builds (AttackModule, 0x02C25xxx; r30 the
+hit info, r28 the attack's collision slot, its angle at +0x64):
+- `+0x5F` = angle 365; `+0x61` = angle 367, or 366 when the victim's situation (its StatusModule vt +0xDC, +0x84) is
+  not 0 (on the ground): 0x02C25CB4 - 0x02C25D0C. So **366 pulls only a victim off the ground; 367 pulls a grounded one
+  too**. The game knows the special angles 361 - 368 (0x02EF7F14: 361 + 0..8 skip the fighter's angle handling).
+- `+0x20` / `+0x24` = the slot's `+0xBC` / `+0xC0` (0x02C25C24): the hitbox's own movement over the frame (its
+  position now - last frame's, per frame: 0x02C17B60 - 0x02C17BDC).
+- The victim (fighter kinetic code): 365 sets its damage energy's `+0x54` (0x02E7BFC0 -> `+0x55`: its speed scaled,
+  0x02E84558); 366 / 367 copy the vector to the damage energy's `+0x44` / `+0x48` (clamped by 0x02C26B18: y at least
+  the common param struct's `+0x6C`, length at most its `+0x68`) with `+0x56` set (0x02E7C030); the energy then eases
+  its speed toward it over common int 0x12000103 frames (`+0x57` the count, 0x02E845B0 - 0x02E84640).
+- There is **no target point** (Ultimate's 368 + `set_vec_target_pos`): ports do it in MSC (`tools/vec_target.py`).
+
+## Item pick-up boxes (fighter_param 0x8F - 0x96; research, not yet used by the port tools)
+
+- Smash 4: fighter_param 0x8F - 0x92 the ground pick-up box (centre x, centre y, width, height), 0x93 - 0x96 the air
+  catch box, copied (0x02E6ED58, from the fighter set-up 0x02E12C54) into the fighter AreaModule's 11-area template
+  (0x10353984, 0x20 bytes each: area 4 ground item, flags 0x0484, area 5 air item, 0x0504). An area's box
+  (0x02BFCC30, type 0): centre (x x facing when flag 4, y), full width / height, all x the PostureModule scale (unless
+  flag 0x40): min = position + centre - size / 2. The fighter's area update 0x02E6CD34 changes only area 1 (area 0 +
+  fighter_param 0x32 / 0x33): **no running extension** in Smash 4.
+- Ultimate (main.bin 0x6B5160 - 0x6B54F8, areas 4 / 5 at [x9 + 0x1E8] / [+0x258]): fighter_param.prc
+  `item_range_front / back / h / offset_y` (air: `item_range_air_*`): x from -back to front + ext along the facing, y
+  offset_y +- h / 2, x PostureModule scale. ext = r x (`item_range_front_max` - front): r = the stick forward (stick x
+  x facing, >= 0) in WALK / DASH / RUN / TURN / TURN_DASH / SQUAT_F, 1 in ATTACK_DASH / ATTACK_S3, kept through
+  ITEM_HEAVY_PICKUP (and ITEM_LIGHT_PICKUP on a condition, 0x6B55DC), else 0.
+- The units are the same (Bowser: Smash 4 front 19.5 / back 5.5 / height 15, Ultimate 19 / 10.1 / 15.75, both x
+  scale 0.82): x = (front - back) / 2, width = front + back, y = offset_y, height = h. The running extension would
+  need an executable hook (e.g. 0x02E6CF24 in the fighter area update; Smash 4 statuses Walk 1, Dash 3, Run 4, Turn 6,
+  TurnDash 7, SquatF 0x13, AttackDash 0x27, AttackS3 0x28, LightGet 0x8A, HeavyGet 0x8B; status kind
+  [StatusModule + 0x48], stick x [[ControlModule + 0xA0] + 0], negated when [ControlModule + 0xA8]).

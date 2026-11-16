@@ -2074,6 +2074,36 @@ def check_effects(inst, name, rep):
                     'while it stands still: %s' % (len(follow), ', '.join(follow[:8])))
 
 
+def check_vec_targets(src, name, ult, rep):
+    """S10: every move whose Ultimate game script carries the hit fighter to a point (angle 368 +
+    AttackModule::set_vec_target_pos) has its MSC pull. Smash 4 has no such hitbox field (366 / 367 only take the victim
+    along with the hitbox's motion, 366 only off the ground): written as 366 alone, Sephiroth's up tilt left grounded
+    fighters on the floor under the sword (test 151's fix, edge_hi3_pull, is the method). Done when the fighter's MSC
+    source has the generated function (tools/vec_target.py msc: its comment `vec_target: SCRIPT`) or port.json
+    `vec_target.hand_made` names the script (with how it is done)"""
+    import vec_target as VT
+    dump = src.dump(ult)
+    d = os.path.join(dump, ult) if dump else None
+    if not d or not os.path.isdir(d):
+        rep.add('NOTE', 'S10 vec-target', 'no script dump for %s: set_vec_target_pos moves not checked' % ult)
+        return
+    moves = [k for k, v in VT.scan(d).items() if v['targets']]
+    if not moves:
+        return
+    c = os.path.join(ROOT, 'fighters', name, name + '.c')
+    text = open(c, encoding='utf-8', errors='replace').read() if os.path.exists(c) else ''
+    hand = load_port_cfg(name).get('vec_target', {}).get('hand_made', {})
+    missing = [m for m in moves if 'vec_target: %s ' % m not in text and m not in hand]
+    if missing:
+        rep.add('ERROR', 'S10 vec-target', 'Ultimate carries the hit fighter to a point (set_vec_target_pos) in %s: no MSC '
+                'pull in fighters/%s/%s.c (tools/vec_target.py msc, called from the per-frame hook; or port.json '
+                'vec_target.hand_made): the converted 366 leaves grounded fighters where they were hit'
+                % (', '.join(missing), name, name))
+    else:
+        rep.add('INFO', 'S10 vec-target', 'set_vec_target_pos moves pulled in MSC: %s' % ', '.join(
+            '%s (%s)' % (m, 'hand-made' if m in hand else 'generated') for m in moves))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('name')
@@ -2136,6 +2166,7 @@ def main():
     check_effect_heap(inst, a.name, rep)
     check_cave_hooks(inst, rep)
     check_effect_scripts(src, base['ult'], rep)
+    check_vec_targets(src, a.name, base['ult'], rep)
     n = rep.show()
     sys.exit(1 if n['ERROR'] or (a.strict and n['WARN']) else 0)
 

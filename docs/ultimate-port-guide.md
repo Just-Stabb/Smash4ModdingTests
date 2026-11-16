@@ -13,6 +13,7 @@ in docs/ultimate-fighter-port.md; this page is the procedure.
 | `reference/port_bases.json` | what each base fighter's own code does to a port built on it |
 | `tools/ultimate_stats.py` | fighter_param stats from Ultimate's `fighter_param.prc`, by name |
 | `tools/port_check.py` | the finished package against every bug class so far |
+| `tools/vec_target.py` | Ultimate's "carry the hit fighter to a point" hits (set_vec_target_pos) as an MSC pull |
 
 ## What the user provides
 
@@ -86,6 +87,7 @@ fix package after it, in order. No ERROR goes out. A fix package that ships a fi
 | `stats.jump_scale` | full / short hop factors (below) |
 | `portraits.cross` / `set_fits` / `stock_icon` | ultimate_portraits.py (`--cross`, `--set-fit SET=...`: fits set by hand where matching fails; check the contact sheet's fit column) |
 | `specials.msc` / `acmd` / `build` | the fighter's own specials code and build script |
+| `vec_target.status` / `hand_made` / `mask_var` | set_vec_target_pos moves (`tools/vec_target.py`): a special's Smash 4 status, the moves pulled by hand (and how), the VAR_n for the marked fighters (default VAR_14) |
 
 ## Stats
 
@@ -153,6 +155,7 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | throw hitboxes free the held fighter | Squirtle's throws | translator: catch-only -> NoGrabRelease [S5] |
 | the base's moves left in (its landing hit, its specials) | Squirtle, Hero | [S7] |
 | motions that loop in Ultimate playing once | Hero fix 63 | translator [V1] |
+| Ultimate's set_vec_target_pos (angle 368: the hit fighter carried to a point from a bone over N frames) written as 366 alone: Smash 4's 366 only takes an airborne victim along with the hitbox's own motion, so a grounded one stayed where it was hit | Sephiroth's up tilt (test 151, fixed by hand: edge_hi3_pull); Byleth's up smash / ground Sword of the Creator | the converter records each (`--vec-targets`), `tools/vec_target.py msc` (pipeline step `vec-target`) writes the MSC pull with Sephiroth's numbers' method (`vec_target_test.py`: the up tilt's (2, 37) / frame 22 / box reproduced), pasted into the fighter's MSC and called per frame; port.json `vec_target` (status for specials, hand_made) [S10 vec-target] |
 | stats left as the base's / regressed by an older param file | Hero (fighters_latest has Robin's) | `ultimate_stats.py` [P1, P2] |
 | msclang nested calls: the stack off by one | Hero fix 11 | patched compiler [C1] |
 | `PostureModuleF(0x7)` (scale) taken as the facing | Hero fix 68 | [C2] |
