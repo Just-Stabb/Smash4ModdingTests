@@ -250,7 +250,8 @@
       "ui": {
         "id": 65,
         "name": "Byleth",
-        "subtitle": "A Heroic Legacy"
+        "subtitle": "A Heroic Legacy",
+        "series": 11
       },
       "motions": {
         "0x212": {"anim": "FitSZerosuitBodyMainD00SpecialNTurn", "flags": "0x0", "motion": "specialnturn (Failnaught's turn; ZSS's custom-move slot reused)"},
