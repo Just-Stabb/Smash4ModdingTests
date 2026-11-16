@@ -128,11 +128,33 @@ failed.
   (`ultimate_trails.py --shader 3`, run by `master_build.py`), ids 270 / 271 in `master_effects.json`; trail shader 3
   as Sephiroth's (needs its `effect_trail.nsh`, already installed with Sephiroth).
 - **Effects**: 78 of his + 26 of Ultimate's common sets (104 ids), his Final Smash's 13 kept out (`port.json`
-  `effects.kept_out`; their stale ids dropped from `master_effects.json`). Colours compared with Ultimate's
-  (`fx_render.py`, now through the port's translate map: Aymr, Areadbhar's lunge, Failnaught's draw, the air Sword of
-  the Creator): the same reds / whites / gold; one stray magenta line on the converted side of Aymr's and Areadbhar's
-  slashes (a refraction / distortion emitter drawn without its pass: check in game). The normals' colours not compared
-  in this session.
+  `effects.kept_out`; their stale ids dropped from `master_effects.json`).
+- **Effect colours, every move** (`fx_render.py` over the taunts, jabs, tilts, smashes, aerials and landings, dash
+  attack, pummel, throws, ledge / get-up / trip attacks, wins and the specials, every 3rd frame to 90; an automatic
+  pass (`scratchpad/byleth/bin/fxcmp.py`: each frame's effect pixels, Ultimate's column against ours, mean colour and
+  coverage) and the flagged frames looked at). Fixed (v1b):
+  - **the magenta line over Areadbhar's and Aymr's slashes**: their lightning meshes (`master_spear_slash` /
+    `master_axe_slash` lightning1-3, lightning2_bk and 18 more emitters of 11 sets) have a fresnel alpha whose mean over
+    the mesh from the side is 0 (Ultimate draws them edge-on: nothing); through the universal path the lowered program's
+    view-angle term came out whole. `vfxb_to_ptcl.py`: such an emitter (fresnel mean x 0.00) takes the converted shader,
+    which keeps it at 0;
+  - **taunt / win effects missing**: the translator only gave a slot an effect script when the base's effect file had
+    one (ZSS has none on her taunts); now also when the motion table names it (`translate_effects(motions=)`, as sound).
+    And Ultimate's costume-parity branches (`FIGHTER_INSTANCE_WORK_ID_INT_COLOR % 2`: male / female timings, the up taunt's
+    and Win3's flashes and smoke) were both dropped: the male branch is taken (every costume plays the male animations);
+  - `fx_render.py`: the port's translate map for a move's Smash 4 script, a sampler that isn't the emitter's skipped, an
+    emitter with no particle alive skipped (it crashed).
+
+  Left (Handover 6): the forward / back air's Areadbhar flame (`master_spearflare` spearflare3_fresnel, fresnel 0.90 -
+  0.00) draws as a rim on our side where fx_render's Ultimate column draws the whole mesh at its mean (0.69): our
+  per-pixel rim may well be Ultimate's own look (check against footage); up air's arcs (`master_atk_air_hi_l / _r`)
+  show more yellow and fewer red sheets (their XZ meshes turned about Y and Z: "eft's order differs (approximate)");
+  `sys_smash_flash_s` (Ultimate's common set, the side taunt's sword flash) violet where Ultimate's core is white; Aymr's
+  hold aura a little darker. Call-count differences in the comparison are the facing branches (Ultimate's column draws
+  both) and Failnaught's smoke loop (ours unrolled), not missing effects. **Missing moves**: the rapid jab (Attack100 /
+  End: ZSS's motion table has no rapid-jab slots, neither did v1's) and the angled forward smashes (AttackS4Hi / Lw)
+  need slots of their own (extra_kinds.json "motions" on the common slots 0x53-0x55 / 0x5E / 0x61, motions.add,
+  exe_v46q's kind_expand words): Handover 5.
 - **Package** `scratchpad/byleth_v1.zip` (`scratchpad/byleth/make_pkg.sh`): the build (`ultimate_port.py run master
   effects model-c00 .. c07 motions low-models scripts specials variants shapes portraits --out $B/port`), the kind
   folder's AI / Kirby-copy bank / FinMaster, his sound banks, exe_v46q, the install README; `not_for_install/` the
@@ -160,7 +182,9 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
    Robin's copy 0x2C, marker 4) + his arrow 0x19E as the copy's article; `kirby.c` (the marker's Failnaught: the Robin
    copy's N slots); `kirby_copy_hats.py`, `kirby_copy_motions.py`, `kirby_copy_sound.py` (vc_kirby_copy_master).
 4. **Aymr's KO zoom** (decision 8): a native hook on the finish camera (Smash 4 zooms on a match's last KO only).
-5. The whip sword's segments (the rapid jab, up smash, down tilt, up air, throws, the tether: a model on her whip
+5. **The rapid jab and the angled forward smashes** (missing in v1: ZSS's motion table has no animation for the common
+   slots 0x53-0x55 / 0x5E / 0x61; give them his Ultimate animations through extra_kinds.json "motions" and port.json
+   motions.add, then the scripts step translates them). The whip sword's segments (the rapid jab, up smash, down tilt, up air, throws, the tether: a model on her whip
    chain, 8 segments), Failnaught's damage by charge and the max arrow's piercing, SpecialAirNJumpCancel,
    SpecialLwTurn / SpecialLwHit, the item swings retimed (BatSwing4 kept as hers: `base_scripts_kept`).
 6. The normals' effect colours (fx_render over every move), then the user's own files (below).
