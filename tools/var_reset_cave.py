@@ -111,17 +111,27 @@ def b_target(at, w):
     return (at + off) & 0xFFFFFFFF
 
 
+# acmd_ext_cave.py's labels in exe_v46v_threads (pinned: that file may grow commands later, which moves its labels; the
+# words at these addresses are checked against the executable before anything is written)
+EXT_V46V = {'lk_none': 0x04B90034, 's1_orig': 0x04B90064, 's2_orig': 0x04B90090, 'f_orig': 0x04B900B4,
+            'bv_zero': 0x04B7BF4C, 'h_newvar': 0x04BD30A0, 'cmd_handlers': 0x04B99E28, 'gs_hit': 0x04BD3990,
+            'ue_zero': 0x04B90C68, 'ue_out': 0x04B90C70, 'f2i': 0x04B90918, 'i2f': 0x04B908EC, 'acc_of': 0x04B90850,
+            'nc_target': 0x04B98A00}
+EXT_V46V_COMMANDS = [       # acmd_ext_cave.py's COMMANDS in exe_v46v_threads (index 584 + k)
+    'Extra_Special_Hitbox', 'Extra_Extended_Special_Hitbox', 'Track_Target', 'Thread_Start', 'Thread_Stop',
+    'Input_Compare', 'Input_Get', 'Input_Set', 'Hit_Reset', 'Hit_Log_Clear', 'Hit_Check', 'Hit_Get', 'Rotation_Get',
+    'Rotation_Set', 'Position_Get', 'Position_Set', 'Motion_Get', 'Motion_Set', 'Last_Hit_Get', 'Target_Slot_Get',
+    'Status_Get', 'Status_Set', 'Hitstun_Get', 'Hitstun_Set', 'Hitstop_Set', 'Damage_Get', 'Damage_Set',
+    'Body_State_Set', 'Armor_Set', 'Item_State_Set', 'Stage_Collision_Set', 'Joint_Position_Get', 'Animation_Rate_Set',
+    'Leave_Ground_Cancel', 'New_Var', 'Gravity_Set', 'Position_Place', 'Position_Offset_Get', 'Buffer_Clear',
+    'Buffer_Set', 'Stage_Freeze', 'Time_Scale', 'Target_Time_Scale']
+EXT_NEW_BASE = 584
+
+
 def ext_labels():
-    import acmd_ext_cave as C
-    a, _w, _h = C.build()
-    out = {}
-    for p in [a] + [getattr(a, 'part%d' % i) for i in range(2, 10) if hasattr(a, 'part%d' % i)]:
-        try:
-            out.update(p.labels)
-        except Exception:
-            pass
-    out['_newvar_index'] = [c[0] for c in C.COMMANDS].index('New_Var')
-    out['_n'] = len(C.COMMANDS)
+    out = dict(EXT_V46V)
+    out['_newvar_index'] = EXT_V46V_COMMANDS.index('New_Var')
+    out['_n'] = len(EXT_V46V_COMMANDS)
     return out
 
 
@@ -266,9 +276,9 @@ vp_set:
         stw r30, 8(r3)
         lis r12, 0x%(data)X@ha
         addi r12, r12, 0x%(data)X@l
-        lwz r0, %(c14)d(r12)
-        addi r0, r0, 1
-        stw r0, %(c14)d(r12)
+        lwz r11, %(c14)d(r12)
+        addi r11, r11, 1
+        stw r11, %(c14)d(r12)
 vp_ok:
         li r3, 1
         b vp_ret
@@ -278,9 +288,9 @@ vp_noblk:
 vp_full:
         lis r12, 0x%(data)X@ha
         addi r12, r12, 0x%(data)X@l
-        lwz r0, %(c18)d(r12)
-        addi r0, r0, 1
-        stw r0, %(c18)d(r12)
+        lwz r11, %(c18)d(r12)
+        addi r11, r11, 1
+        stw r11, %(c18)d(r12)
 vp_no:
         li r3, 0
 vp_ret:
@@ -305,9 +315,9 @@ vr_event:
         beq ve_ret
         lis r27, 0x%(data)X@ha
         addi r27, r27, 0x%(data)X@l
-        lwz r0, %(busy)d(r27)
-        addi r0, r0, 1
-        stw r0, %(busy)d(r27)
+        lwz r11, %(busy)d(r27)
+        addi r11, r11, 1
+        stw r11, %(busy)d(r27)
         addi r29, r29, 0x10
         li r28, %(items)d
 ve_loop:
@@ -330,9 +340,9 @@ ve_write:
         lwz r12, %(setf)d(r12)
         mtctr r12
         bctrl
-        lwz r0, %(c10)d(r27)
-        addi r0, r0, 1
-        stw r0, %(c10)d(r27)
+        lwz r11, %(c10)d(r27)
+        addi r11, r11, 1
+        stw r11, %(c10)d(r27)
         lwz r0, 8(r29)
         cmpwi r0, 0
         bne ve_next
@@ -342,9 +352,9 @@ ve_next:
         addi r28, r28, -1
         cmpwi r28, 0
         bne ve_loop
-        lwz r0, %(busy)d(r27)
-        addi r0, r0, -1
-        stw r0, %(busy)d(r27)
+        lwz r11, %(busy)d(r27)
+        addi r11, r11, -1
+        stw r11, %(busy)d(r27)
 ve_ret:
         lmw r27, 0x1C(r1)
         lwz r0, 0x34(r1)
@@ -509,9 +519,9 @@ vr_wmreset:
         bne vw_free                     # not a fighter
         lis r12, 0x%(data)X@ha
         addi r12, r12, 0x%(data)X@l
-        lwz r0, %(c1C)d(r12)
-        addi r0, r0, 1
-        stw r0, %(c1C)d(r12)
+        lwz r11, %(c1C)d(r12)
+        addi r11, r11, 1
+        stw r11, %(c1C)d(r12)
         mr r3, r30
         li r4, 1
         bl vr_event

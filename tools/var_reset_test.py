@@ -31,7 +31,6 @@ import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-import acmd_ext_cave as C  # noqa: E402
 import rpx_patch as R  # noqa: E402
 import var_reset_cave as V  # noqa: E402
 from stage_slot_test import machine, RET  # noqa: E402
@@ -40,7 +39,17 @@ from unicorn.ppc_const import (UC_PPC_REG_1, UC_PPC_REG_3, UC_PPC_REG_4, UC_PPC_
                                UC_PPC_REG_LR, UC_PPC_REG_MSR)
 
 fails = 0
-MEM = 0x7E000000
+
+
+class C:        # acmd_ext_cave.py's state in exe_v46v_threads (not imported: that file may grow commands later)
+    OBJS, OBJ_N, OBJ_SIZE, NV_POOL, ACC_CACHE = 0x04B94000, 48, 0x100, 0x04BD0000, 0x04B97000
+    NV_OFF = NV_POOL - OBJS
+    FIGHTERS, FIGHTER_ENTRY = 0x1035184C, 0x76B0
+    NEW_BASE = V.EXT_NEW_BASE
+    COMMANDS = [(n, 11 if n == 'New_Var' else None) for n in V.EXT_V46V_COMMANDS]
+
+
+MEM = 0x30000000                                # (position_vars checks pointers to 0x10000000-0x4FFFFFFF)
 FGET, FSET = 0x02F1DBE4, 0x02F1DC04              # the fighters' WorkModule get_float / set_float
 CRC_TABLE, COUNT, SIZES, HANDLERS = 0x100FAAB8, 584, 0x100FA198, 0x10350ED8
 NV = lambda k: 0x0F000380 + k                    # noqa: E731
@@ -172,6 +181,7 @@ def main():
         w32(mu, sm, V.FIGHTER_SM_VT if fighter else 0x10002854)
         w32(mu, sm + 0x9C, fo)
         w32(mu, fo + 0x28, acc)
+        w32(mu, acc + 0x18, at + 0x500)                     # a PostureModule (position_vars' slot lookup needs one)
         return acc, wm, sm
     me, me_wm, me_sm = obj(pm, MEM + 0x10000)
     foe, foe_wm, foe_sm = obj(pm, MEM + 0x11000)
@@ -234,9 +244,13 @@ def main():
         run(pm, V.SIT_AT, V.SIT_AT + 4, {REG(28): new, REG(29): sm})
         return r32(pm, sm + 0x84)
 
+    DECISION = MEM + 0x70000                                # the damage reaction decision, stubbed: its result
+    w32(pm, 0x02E76BB8, 0x3C600000 | (DECISION >> 16))      # lis r3, DECISION@h
+    w32(pm, 0x02E76BBC, 0x80630000 | (DECISION & 0xFFFF))   # lwz r3, DECISION@l(r3)
+    w32(pm, 0x02E76BC0, 0x4E800020)                         # blr (written once: unicorn keeps translated code)
+
     def hit(acc, result):
-        w32(pm, 0x02E76BB8, 0x38600000 | result)           # the damage reaction decision, stubbed: li r3, result
-        w32(pm, 0x02E76BBC, 0x4E800020)
+        w32(pm, DECISION, result)
         return call(pm, E['gs_hit'], 0, acc)[0]
 
     def setup(acc):
@@ -443,6 +457,7 @@ def main():
     check('busy back to 0', r32(pm, V.VR_DATA + V.D_BUSY), 0)
 
     # ---- the list full
+    setup(foe)                                              # (its list emptied first)
     for k in range(V.VR_ITEMS):
         put(foe_wm, NV(k), V.LANDING, float(k))
     r0 = cnt(6)
