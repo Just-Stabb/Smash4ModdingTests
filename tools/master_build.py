@@ -539,19 +539,55 @@ ARROWS = {'arrow1': ('master_arrow1', 'Fly', 'game_fly', 'effect_fly'), 'arrow2'
 # ExeFS's WeaponSpecializer_MasterArrow1::set_search (main.bin 0x03443100): param_arrow2 distance (300) x scale along
 # its facing, cut at the first ground (a GroundModule line test), and ONE attack line from the bow to that end on the
 # shot's frame: it crosses the stage at once. v1-v6 flew it at 10 a frame for 30 frames (mine; user v6: "hits
-# opponents far too slow"). Here: 300 in 4 frames (75 a frame; Smash 4 hitboxes are swept between frames)
-ARROW2_LIFE = 4
-SHOT_PARAMS = {'paralyzer_bullet:0x02000000': 9.0, 'paralyzer_bullet:0x02000001': 300.0 / ARROW2_LIFE,
+# opponents far too slow"). v7 flew it 300 in 4 frames (75 a frame): user v7 "doesn't spawn its line and doesn't have
+# a hitbox" - its speed is the shot's NATIVE speed (ZSS's specializer moves the shot, the charged speed only for her
+# charge flag, which arrow2 never has: 9 a frame for 4 frames = 36 units, the 1.2-unit hitbox and the beams buried in
+# the shot flash), and a hitbox that jumps 75 a frame (60x its size) can't be relied on to meet anyone between frames.
+# v8: the arrow stands where it is made (the charged speed 0; the uncharged one is arrow1's, shared block) and its
+# game script is ONE line: Ultimate's three ATTACKs (29 %, 361, 56 / 53, size 1.2, lateral -2 / 0 / 2) as capsules
+# from the arrow along its facing to ARROW2_DIST (param_arrow2 distance 300), on its first two frames (the native shot
+# is removed on its first hit: everyone in the line that frame is hit). Not cut at the ground (no line test reachable
+# from MSC / ACMD: APPROXIMATED, fighters/master/README.md "Status v8")
+ARROW2_DIST = 300.0         # param_arrow2 distance
+ARROW2_SEG = 10.0           # param_arrow2 0x1ef274cc23 (10): the beam pieces' spacing (the beam set is 9.5 long x 1.055)
+ARROW2_FX_SCALE = 1.055     # param_arrow2 effect_max_scale
+ARROW2_FX_OFFSET = 8.0      # param_arrow2 effect_max_offset_x: the first piece's start ahead of the arrow
+ARROW2_LIFE = 10            # the arrow (its beam, its bullet) lasts as the beam set does (~10 frames, fx_render)
+ARROW2_HIT_FRAMES = 2
+SHOT_PARAMS = {'paralyzer_bullet:0x02000000': 9.0, 'paralyzer_bullet:0x02000001': 0.0,
                'paralyzer_bullet:0x12000002': 17, 'paralyzer_bullet:0x12000003': ARROW2_LIFE}
 # the max arrow's own effects (Ultimate requests them from its status code / set_arrow_max_effect, not its ACMD, so
-# v1-v6 had none of them: no beam, no bullet): the bullet on the arrow, the beam (master_bow_arrow2) left at each
-# frame's point of the path (Ultimate stretches one beam from the bow to the arrow: APPROXIMATED by segments), the
-# end flash where it stops (set_arrow_max_end_effect), its hit flash (master_bow_arrow2_hit) on its hitbox's frame
-ARROW2_FX = ('macros::EFFECT_FOLLOW(agent, Hash40::new("master_bow_arrow2_bullet"), Hash40::new("top"), 0, 0, 0, 0, 0, 0, 1, true);'
-             + ''.join('frame(agent.lua_state_agent, %d.0); macros::EFFECT(agent, Hash40::new("master_bow_arrow2"), '
-                       'Hash40::new("top"), 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, true);' % f for f in range(1, ARROW2_LIFE + 1))
-             + 'macros::EFFECT(agent, Hash40::new("master_bow_arrow2_end"), Hash40::new("top"), 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, '
-               '0, 0, 0, true);')
+# v1-v6 had none of them): the beam (master_bow_arrow2, Ultimate stretches it from the bow to the end: here its pieces
+# every ARROW2_SEG along the line, x effect_max_scale, from effect_max_offset_x), the bullet (the arrow head) and the
+# end flash (set_arrow_max_end_effect) at the line's end. Non-following: they outlive the arrow (a hit removes it)
+ARROW2_PIECES = int((ARROW2_DIST - ARROW2_FX_OFFSET) // ARROW2_SEG) + 1
+ARROW2_FX = (''.join('macros::EFFECT(agent, Hash40::new("master_bow_arrow2"), Hash40::new("top"), 0, 0, %g, 0, 0, 0, %g, '
+                     '0, 0, 0, 0, 0, 0, true);' % (ARROW2_FX_OFFSET + ARROW2_SEG * k, ARROW2_FX_SCALE)
+                     for k in range(ARROW2_PIECES))
+             + 'macros::EFFECT(agent, Hash40::new("master_bow_arrow2_bullet"), Hash40::new("top"), 0, 0, %g, 0, 0, 0, 1, '
+               '0, 0, 0, 0, 0, 0, true);' % ARROW2_DIST
+             + 'macros::EFFECT(agent, Hash40::new("master_bow_arrow2_end"), Hash40::new("top"), 0, 0, %g, 0, 0, 0, 1, '
+               '0, 0, 0, 0, 0, 0, true);' % ARROW2_DIST)
+
+
+def arrow2_line(game):
+    """the max arrow's game script: its ATTACKs (Ultimate's, translated) as capsules from the arrow to ARROW2_DIST along
+    its facing (each at its own lateral offset), cleared after ARROW2_HIT_FRAMES"""
+    import ultimate_acmd as U
+    out = []
+    for c in game:
+        if c.name == 'Extended_Special_Hitbox':
+            syn = c.info['syntax']
+            p = list(c.params)
+            for k, v in (('Y', 0.0), ('Z', 0.0), ('X2', p[syn.index('X')]), ('Y2', 0.0), ('Z2', ARROW2_DIST)):
+                p[syn.index(k)] = v
+            c = acmd.Command(c.ident, p)
+        elif c.name == 'Special_Hitbox':
+            raise AssertionError('arrow2: a plain hitbox in its game script (expected Ultimate\'s capsules)')
+        if c.ident == acmd.END:
+            break
+        out.append(c)
+    return out + [U.cmd('FRAME', ARROW2_HIT_FRAMES), U.cmd('Remove_All_Hitboxes')] + end()
 
 
 def weapons(a, fighter, effect_ids):
@@ -561,6 +597,8 @@ def weapons(a, fighter, effect_ids):
     for art, (folder, src, gname, ename) in ARROWS.items():
         fns = U.functions(open(os.path.join(a.dump, folder, src + '.txt')).read())
         game = U.Translator({}).script(fns[gname])
+        if art == 'arrow2':
+            game = arrow2_line(game)
         etr = U.EffectTranslator({}, effect_ids, {})
         eff = etr.script(fns[ename]) if ename in fns else end()
         # its effects end with its flight (the shot's life, SHOT_PARAMS; a hit removes it earlier): port_check E10
@@ -570,7 +608,8 @@ def weapons(a, fighter, effect_ids):
             eff = U.merge_flat(eff, extra) or eff
         made = sorted({c.params[0] for c in eff if c.name.startswith(('Graphic_Effect', 'External_Graphic',
                                                                       'EFFECT_FOLLOW'))
-                       and c.params[0] not in (effect_ids.get('master_bow_arrow2'), effect_ids.get('master_bow_arrow2_end'))})
+                       and c.params[0] not in (effect_ids.get('master_bow_arrow2'), effect_ids.get('master_bow_arrow2_end'),
+                                               effect_ids.get('master_bow_arrow2_bullet'))})
         if made:
             eff = U.merge_flat(eff, [U.cmd('FRAME', life)] + [U.cmd('Terminate_Graphic_Effect', m, 0, 0) for m in made]
                                + end()) or eff
