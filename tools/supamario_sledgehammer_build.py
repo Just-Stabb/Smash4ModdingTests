@@ -71,16 +71,25 @@ def rate_segments():
 # knock down-forward (0, -0.35, 0.05) for 70 frames), entry 2 145 (BDM #1: stun 30 / 30, (0, -1.5, 0.05) for 100,
 # camera shake 60); both BDMs' hit effect BTL_CMN 0, sounds CMN Hit_L (52) / Hit_LL (53). A second hitbox on the same
 # frames (CMN.bdm #0, 0 damage, flags 0x8) is left out (no damage, XV2's own bookkeeping)
-HIT_Z, HIT_Y, HIT_SIZE = round(0.75 * anim.SCALE, 2), 0.0, round(1.0 * anim.SCALE, 2)    # 3.78 ahead, 5.04
+HIT_Z, HIT_Y = round(0.75 * anim.SCALE, 2), 0.0                  # XV2's 0.75 m ahead (3.78), at his feet
+HIT_SIZE_V1 = round(1.0 * anim.SCALE, 2)                          # v1: XV2's 1.0 m (5.04)
+SIZE_V2 = 1.2                       # v2 (user: "increase the size of the effects and the hitbox slightly")
+HIT_SIZE = round(HIT_SIZE_V1 * SIZE_V2, 2)   # 6.05; its centre stays (the fists, 1.5 ahead, are 2.3 from it)
 # uncharged: "a weak, low knockback spiking hit that barely has any knockback growth and slightly above average
 # hitstun": 5% (XV2 60 : 145 = the charged one's 12 x 0.41), 270 (straight down), BKB 40, KBG 10 (knockback 42 at 0%,
 # 47 at 100%: Mario weight; 16-18 frames of hitstun from it) + HITSTUN_ADD (22-24), XV2's 10 frames of hitstop
-HIT = dict(Damage=5.0, Angle=270, KBG=10, FKB=0, BKB=40)
+HIT_V1 = dict(Damage=5.0, Angle=270, KBG=10, FKB=0, BKB=40)
+# v2 (user: "slightly more base knockback and slightly more growth, it barely sends the opponent down at all", and 8%):
+# 8%, BKB 50, KBG 20: knockback 54.7 / 61.7 / 68.7 at 0 / 50 / 100% (v1 42.0 / 44.5 / 46.9), hitstun 27-33 with +6
+HIT = dict(Damage=8.0, Angle=270, KBG=20, FKB=0, BKB=50)
 HITSTUN_ADD = 6
 HITSTOP = 10                         # XV2 BDM #0 UserStun / VictimStun 10
 # charged: "a strong spike with increased damage that has good knockback growth": 12% (XV2 145 / 60 = 2.4x), 270,
 # BKB 25, KBG 95 (53 at 0%, 146 at 100%), the game's hitstun; 20 frames of hitstop (XV2 30: past Smash's 30 cap feel)
-HIT_CH = dict(Damage=12.0, Angle=270, KBG=95, FKB=0, BKB=25)
+HIT_CH_V1 = dict(Damage=12.0, Angle=270, KBG=95, FKB=0, BKB=25)
+# v2 (user: 20%, the launch about v1's): BKB 23, KBG 61: knockback 52.8 / 99.7 / 146.7 at 0 / 50 / 100% (v1 53.3 /
+# 99.8 / 146.4; within 1 from 0 to 150%)
+HIT_CH = dict(Damage=20.0, Angle=270, KBG=61, FKB=0, BKB=23)
 HITSTOP_CH = 20
 LAND_LAG, LAND_LAG_HIT = 18, 10      # landing before IASA: LandingFallSpecial this long (after a hit: shorter)
 VICTIM_MID = 5.0                     # a fighter's middle above its feet (the contact point)
@@ -96,7 +105,11 @@ V_LASTFR = 0x0F000301                # VAR_1: the swing's motion frame last fram
 VARS = [('sh', V_SH), ('sh_chg', V_CHG), ('sh_vic', V_VIC)]
 
 # ---------------------------------------------------------------- effects / sounds
-SH_FX_SCALE = 1.75                   # xv2_smash_fx.SIZE: the God Fist's settled size over XV2's (Core Breaker 2.25)
+SH_FX_SCALE_V1 = 1.75                # xv2_smash_fx.SIZE: the God Fist's settled size over XV2's (Core Breaker 2.25)
+SH_FX_SCALE = round(SH_FX_SCALE_V1 * SIZE_V2, 3)   # v2: 2.1
+ARC_WIDTH = 3.0                      # v2 (user: "the release arc is drawn flat ... instead of a thick yellow trail"):
+                                     # Hmr_Fire's arcs' strip x3 (XV2: 0.15 m over a 1.15 m radius, 13%; glared)
+FOLLOW_EMPS = ('Hmr_Crg.emp', 'Hmr_Crg02.emp', 'Hmr_Fire.emp', 'Hmr_Fire_L.emp')   # v2: particles follow him
 LHAND = 0x10                         # LHandN (XV2's b_L_Hand: Hmr_Crg / Hmr_Crg02)
 SKILL_EMPS = ['Hmr_Crg.emp', 'Hmr_Crg02.emp', 'Hmr_Fire.emp', 'Hmr_Fire_L.emp']
 HIT_EMPS = ['Btl_HitLOD.emp', 'Btl_HitS.emp', 'Btl_Sweat00.emp']          # BTL_CMN effect 0 (its CBIND left out)
@@ -286,20 +299,40 @@ def _cmn_pkg(cmn_dir, tmp):
     return tmp
 
 
-FLAT_RING_EMPS = ('Hmr_Fire.emp', 'Hmr_Fire_L.emp')
+ARC_EMPS = ('Hmr_Fire.emp', 'Hmr_Fire_L.emp')
 
 
-def flat_ring(p, d, flat=True):
-    """flat: a ShapeDraw ring (polygon, type 1: drawn in its emitter's XY plane) laid flat round him (X 90): XV2 draws
-    Hmr_Fire's rings in the node's XZ plane round his pelvis's up axis (UseBoneDirection at BAC 12, the pelvis upright:
-    level); a flat ring looks the same both facings; its tiny drift (XV2's -1 a second) any way (a full-sphere spread).
-    Everything else (and every emitter of the hit effects, which the MSC puts at a world position unturned: their
-    polygons in the world's XY plane, facing the camera as XV2's Camera-oriented hit effect): the God Fist's
-    facing_safe (unturned, a full-sphere spread)"""
+def arc_turn():
+    """v2: the emitter turn putting a polygon (eft type 1: drawn in its emitter's XY plane) in bone 0's YZ plane, its
+    X along his facing (bone 0 +Z) and its Y up: facing the side camera (bone 0's X is the screen's depth). XV2's
+    Hmr_Fire arcs are open ShapeDraw outlines (~110-130 degrees, 40 down to -70 / -90 round their X) spinning 15
+    degrees a frame: the swing's trail, sweeping round in front of him. v1 laid them flat (X 90): seen edge-on from
+    the side camera they were the user's "thin, flat yellow streak along his body" (screenshot 24)"""
+    import numpy as np
+    import xv2_to_ptcl as XP
+    m = np.array([[0.0, 0.0, -1.0], [0.0, 1.0, 0.0], [1.0, 0.0, 0.0]])
+    e = XP.matrix_euler(m)
+    assert np.allclose(XP.euler_matrix([math.degrees(v) for v in e]), m, atol=1e-6)
+    return e
+
+
+def flat_ring(p, d, arc=True):
+    """arc (Hmr_Fire / Hmr_Fire_L's ShapeDraw arcs): the polygon turned by arc_turn() (v1: X 90, flat); everything else
+    (and every emitter of the hit effects, which the MSC puts at a world position unturned: their polygons in the
+    world's XY plane, facing the camera as XV2's Camera-oriented hit effect): the God Fist's facing_safe (unturned,
+    a full-sphere spread). A spinning arc in the screen's plane reads the same both facings but for its sweep's way"""
     import xv2_smash_fx as FX
     FX.facing_safe(p, d)
-    if flat and p.field(d, 'particle_type') == 1:
-        p.set_emitter_srt(d, tuple(p.field(d, 'emitter_scale')), (math.pi / 2, 0.0, 0.0), (0.0, 0.0, 0.0))
+    if arc and p.field(d, 'particle_type') == 1:
+        p.set_emitter_srt(d, tuple(p.field(d, 'emitter_scale')), arc_turn(), (0.0, 0.0, 0.0))
+
+
+def follow(p, d):
+    """v2 (user: "the charge effects don't follow Supamario"): the emitter's particles on its live matrix (ptcl +0x310
+    follow type 0; v1's templates gave the charge glow 1, none: emitted particles stayed where they were born while he
+    drifted / fell). XV2's EEPK flags for them: PositionUpdate (+ RotateUpdate / InstantUpdate on the charge)"""
+    import struct
+    struct.pack_into('>I', d, 0x310, 0)
 
 
 def convert_fx(skill_dir, cmn_dir, fx_dir, halo=True):
@@ -321,8 +354,10 @@ def convert_fx(skill_dir, cmn_dir, fx_dir, halo=True):
     old = xv2_to_ptcl.TEX_MAX
     try:
         xv2_to_ptcl.TEX_MAX = 128
+        xv2_to_ptcl.RING_WIDTH_MUL = ARC_WIDTH          # v2: the swing arcs' strip x3
         m1, log1 = xv2_to_ptcl.convert_package(p, skill_dir, 'PtcSupamarioSh', unit=FX.UNIT, emps=SKILL_EMPS,
                                                strict=False)
+        xv2_to_ptcl.RING_WIDTH_MUL = 1.0
         # Btl_HitS / Btl_HitLOD animate a (Parameter 3, Component 1) on their sphere emitters that xv2vfx has no name
         # for: read leniently (only here: the earlier moves' conversions read vfx/cmn as before)
         xv2vfx.LENIENT_TARGETS = True
@@ -333,6 +368,7 @@ def convert_fx(skill_dir, cmn_dir, fx_dir, halo=True):
             m2, log2 = xv2_to_ptcl.convert_package(p, pkg, 'PtcSupamarioSh', unit=FX.UNIT, emps=HIT_EMPS, strict=False)
     finally:
         xv2_to_ptcl.TEX_MAX = old
+        xv2_to_ptcl.RING_WIDTH_MUL = 1.0
         xv2vfx.LENIENT_TARGETS = False
     made = m1 + m2
     sets, notes, got = {}, [], {}
@@ -350,7 +386,7 @@ def convert_fx(skill_dir, cmn_dir, fx_dir, halo=True):
             en = names[k] if k < len(names) else None
             k += 1
             notes.append('%s %s: %s' % (name, en, FX.hdr_emitter(p, d, mats.get(emp, {}).get(en))))
-            flat_ring(p, d, emp in FLAT_RING_EMPS)
+            flat_ring(p, d, emp in ARC_EMPS)
         sets[emp] = {'set': name, 'set_index': si, 'efc': idx, 'id': '0x%08X' % (0x03410000 | idx), 'emitters': names}
     assert got == FX_IDS, ('FX_IDS is out of date', {k: hex(v) for k, v in got.items()})
     halos = {}
@@ -373,17 +409,23 @@ def convert_fx(skill_dir, cmn_dir, fx_dir, halo=True):
         assert not comp, 'a set needs a companion halo set: its calls / kills would need it too'
         halos = {'glowing': sum(len(v) for v in glow.values()), 'alpha': FX.HALO_ALPHA,
                  'by_set': {p.set_name(si): len(v) for si, v in glow.items()}, 'no_room': dropped}
-        flat_sets = {s['set_index'] for emp, s in sets.items() if emp in FLAT_RING_EMPS}
+        flat_sets = {s['set_index'] for emp, s in sets.items() if emp in ARC_EMPS}
         for si in glow:                                 # the halo copies as their emitters (flat_ring)
             for em in p.sets[si]['emitters']:
                 if em['data'] is not None:
                     flat_ring(p, em['data'], si in flat_sets)
+    for emp in FOLLOW_EMPS:                             # v2: the charge glow / flash and the arcs (+ halos) follow him
+        for em in p.sets[sets[emp]['set_index']]['emitters']:
+            if em['data'] is not None:
+                follow(p, em['data'])
     out = p.build()
     assert ptcl.Ptcl(out).validate() == []
     open(os.path.join(fx_dir, base + '.ptcl'), 'wb').write(out)
     open(os.path.join(fx_dir, base + '.efc'), 'wb').write(e.build())
-    bad = FX.facing_emitters(p, [s['set_index'] for s in sets.values()])
-    bad = [b for b in bad if 'turned / offset (1.5707' not in b]        # the flat rings' X 90 (symmetric: allowed)
+    arc_sets = [s['set_index'] for emp, s in sets.items() if emp in ARC_EMPS]
+    bad = FX.facing_emitters(p, [s['set_index'] for s in sets.values() if s['set_index'] not in arc_sets])
+    # the arcs' own turn is arc_turn() (allowed); their spread is still checked
+    bad += [b for b in FX.facing_emitters(p, arc_sets) if 'turned / offset' not in b]
     return {'sets': sets, 'skipped': log1 + log2, 'notes': notes, 'halos': halos, 'ptcl_bytes': [before, len(out)],
             'facing_problems': bad}, p
 

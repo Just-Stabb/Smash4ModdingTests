@@ -138,6 +138,7 @@ def _repeat_index(n, size, mode):
     return i % size
 
 
+RING_WIDTH_MUL = 1.0               # a ShapeDraw ring's strip width x this (Sledgehammer v2: its swing arc thicker)
 REPEAT_UV = False                  # Core Breaker v2: a UV range past the texture repeated by the sampler's mode
                                    # (first_cell); off by default so earlier builds (the God Fist's) stay as they are
 
@@ -349,7 +350,7 @@ def convert_emission(p, pkg, images, chain, unit, name, spawn_times):
     if kind == 1:
         pts = node['EmissionNode']['ShapeDraw']['Points']
         rc = curve(node, 'ScaleBase', tex['ScaleBase'])
-        wc = curve(node, 'ScaleXY.Y', tex['ScaleXY'][1])
+        wc = curve(node, 'ScaleXY.Y', tex['ScaleXY'][1]) * RING_WIDTH_MUL
         k = int(np.argmax(rc))
         shape = ring_texture(shape, rc[k], wc[k], pts)
         sx = sy = 2 * rc + wc
