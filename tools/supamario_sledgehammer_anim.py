@@ -137,9 +137,9 @@ def body_frames(ean, smash, motion):
 OVERHEAD = True                     # False: v1-v3's pose (the test's before)
 HEAD = None                         # head_points(): set by build() (the push needs the head's mesh)
 ARM_STRETCH = 1.6
-HEAD_TILT = 40.0                    # degrees about world X, back (his face up)
-SHOULDER_RAISE = 20.0
-FIST_AT = (2.0, 4.0)                # (forward, up) from HeadN
+HEAD_TILT = 20.0                    # degrees about world X, back (his face up)
+SHOULDER_RAISE = 40.0
+FIST_AT = (1.5, 4.5)                # (forward, up) from HeadN
 OVERHEAD_IN = {START: [(2, 0.0), (6, 1.0)]}
 OVERHEAD_OUT = {HOLD: [(11, 1.0), (13, 0.0)]}
 
