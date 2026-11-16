@@ -37774,7 +37774,8 @@ float gf_ex;            // what gf_track moved him the frame before (forward, up
 float gf_ey;
 
 // the opponent the God Fist tracks: the nearest fighter in hitstun (hitstun left > 0 and a damage status,
-// GF_DAMAGE_LO .. GF_DAMAGE_HI) in front of him (along his facing) and within 60 degrees of level (dy^2 <= 3 dx^2),
+// GF_DAMAGE_LO .. GF_DAMAGE_HI) in front of him (along his facing) and within 75 degrees of level (v18; v12-v17 60:
+// dy^2 <= GF_TRACK_TAN2 dx^2, tan^2 75),
 // and, with maxd2 > 0, within sqrt(maxd2); player slots 1-8 through the position / hitstun / status variables
 // (docs/position-variables.md); he himself is never in front of himself. 0: none
 int gf_pick(float maxd2)
@@ -37803,7 +37804,7 @@ int gf_pick(float maxd2)
             dx = (WorkModuleF(0, 0x0f000020 + 4 * (s - 1)) - sx) * face;
             dy = WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) - sy;
             d2 = dx * dx + dy * dy;
-            if (st >= GF_DAMAGE_LO && st <= GF_DAMAGE_HI && dx > 0.0f && dy * dy <= 3.0f * dx * dx)
+            if (st >= GF_DAMAGE_LO && st <= GF_DAMAGE_HI && dx > 0.0f && dy * dy <= GF_TRACK_TAN2 * dx * dx)
             {
                 if ((maxd2 <= 0.0f || d2 <= maxd2) && (best == 0 || d2 < bd))
                 {
@@ -37924,6 +37925,16 @@ void gf_track(float fr)
         k = GF_TRACK_MAX;
     }
     vy = k * d * dy / dx;
+    // v18: at up to 75 degrees the aim's climb a frame (k x d x tan) reaches 3.7 x the burst's way: never past the
+    // opponent's own height (a steep near one was overshot)
+    if (dy > 0.0f && vy > dy)
+    {
+        vy = dy;
+    }
+    if (dy < 0.0f && vy < dy)
+    {
+        vy = dy;
+    }
     level = 0;
     if (gf_ground0 == 0x1 && gf_offedge == 0)
     {

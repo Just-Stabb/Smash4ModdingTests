@@ -35,6 +35,8 @@ import supamario_sledgehammer_anim as anim  # noqa: E402
 # 32-44 x0.5 only, its BcmCallback "Combos" 26-44 the on-hit cancel window)
 BAC_CHARGE = 6                      # ChargeControl 6-8, ChargeTime 30
 CHARGE_FRAMES = 30                  # held this long at the charge pose: charged (entry 2)
+CHARGE_FRAMES = 24                  # v4 (user: "make Sledgehammer's charge time slightly shorter"): XV2's ChargeTime 30
+                                    # -> 24, from the pose (start frame 12): the charged swing on game frame 35 (v1-v3 41)
 BAC_HIT = (16, 20)                  # entry 0's hitbox (frames 16-19); entry 2's 15-19
 BAC_HIT_CH = (15, 19)
 BAC_CANCEL_HIT = 26                 # entry 3's BcmCallback (Combos) 26-44: the on-hit cancel window
@@ -638,7 +640,13 @@ def build(sm_dir, out_dir, sh_skill, sh_se_wav, fd_args, png=None, halo=True):
     with open(os.path.join(out_dir, 'sledgehammer_frames.json'), 'w') as fh:
         json.dump({'start_frames': anim.START_FRAMES, 'hold_frames': anim.HOLD_FRAMES, 'rate_segments': rate_segments(),
                    'hit': [HIT_FROM, HIT_TO], 'hit_charged': [HIT_FROM_CH, HIT_TO_CH], 'cancel_hit': CANCEL_HIT,
-                   'iasa': IASA, 'joints': js, 'fire_y': fire_y, 'info': info['info']}, fh)
+                   'iasa': IASA, 'joints': js, 'fire_y': fire_y, 'info': info['info'],
+                   # v4: each fist's side-view distance to his head and height over its top (anim.fist_clearance)
+                   'fist_clearance': {m: [anim.fist_clearance(info['frames'][m], info['smash'], f, anim.HEAD)
+                                          for f in range(anim.frames_of(m))] for m in anim.MOTIONS}}, fh)
+    os.makedirs(os.path.join(out_dir, 'preview'), exist_ok=True)
+    anim.pose_sheet(os.path.join(sh_skill, '164_VGT_HMR.ean'), vbn, os.path.join(out_dir, 'preview',
+                                                                              'sledgehammer_pose_v3_v4.png'))
     if png:
         anim.sheet(outs, bones, png, hitbox=(HIT_Z, HIT_Y, HIT_SIZE), hit_frames=range(HIT_FROM_CH, HIT_TO))
     rep, p = convert_fx(sh_skill, fd_args['cb']['gf']['cmn_vfx'], os.path.join(fdir, 'effect', 'supamario'), halo)

@@ -104,7 +104,14 @@ TRACK_END = 12
 # v15 (user: "make the tracking and double startup range the same and increase them to 50"): one range for both
 # (the MSC's GF_TRACK_D2: gf_pick's rules, in hitstun, in front, within 60 degrees); v14 35 / 40, v13 20 / 40
 HOMING_RANGE = 50.0
+# v18 (user: "increase Super God Fist's tracking and speed-up range by 5 units"): 50 -> 55, still one range for both
+HOMING_RANGE = 55.0
 TRACK_RANGE = COMBO_RANGE = HOMING_RANGE
+# v18 (user: "allow Super God Fist to track up to 75 degrees above or below Supamario"): gf_pick takes an opponent in
+# front within TRACK_ANGLE of level (dy^2 <= tan^2 x dx^2; v12-v17 60: dy^2 <= 3 dx^2); one further up or down isn't
+# tracked (as at 60 before: no clamp to the limit). The other rules stay: the burst's first frames, the range, down
+# never over the stage when started on the ground (v12), down at most TRACK_DOWN a frame in the air
+TRACK_ANGLE = 75.0
 GRAVITY_OWN = (-1.0, -1.0, 0)          # v16: Gravity_Set off (his own gravity and max fall again)
 OFFSTAGE_GRAVITY = (-1.0, 0.0, 2)      # Gravity_Set: his own gravity (a rise slows), max fall 0, a fall cut at once
 SITUATION_VAR = 22                      # Input_Get's SITUATION (0 ground, 1 ledge, 2 air)
@@ -426,7 +433,8 @@ def msc_values():
             'GF_BURST_FROM': '%sf' % float(BURST[0]), 'GF_BURST_END': '%sf' % float(BURST[1]),
             'GF_BURST_SPEED': '%sf' % BURST_SPEED, 'GF_TRACK_MAX': '%sf' % TRACK_MAX,
             'GF_TRACK_DOWN': '%sf' % TRACK_DOWN, 'GF_TRACK_END': '%sf' % float(TRACK_END),
-            'GF_TRACK_D2': '%sf' % (TRACK_RANGE ** 2), 'GF_ROOT_CODE': root_code(), 'GF_HOLD_X': '%sf' % HOLD_X}
+            'GF_TRACK_D2': '%sf' % (TRACK_RANGE ** 2),
+            'GF_TRACK_TAN2': '%sf' % round(math.tan(math.radians(TRACK_ANGLE)) ** 2, 5), 'GF_ROOT_CODE': root_code(), 'GF_HOLD_X': '%sf' % HOLD_X}
 
 
 def burst_speed():

@@ -919,6 +919,15 @@ def motion_tests(out):
     for m, n in ((A.START, A.START_FRAMES), (A.HOLD, A.HOLD_FRAMES)):
         o = omo.Omo(ents['FitMarioBodyMainD03' + m])
         check('%s: %d frames' % (m, n), o.frames, n)
+    import json
+    cl = json.load(open(os.path.join(out, 'sledgehammer_frames.json')))['fist_clearance']
+    worst = min(min(c['L'][0], c['R'][0]) for c in cl[A.START][6:] + cl[A.HOLD][:17])
+    pose = cl[A.START][A.START_FRAMES - 1]
+    check('v4 (user: "Supamario\'s hands are positioned in his head"): both fists\' centres clear of his head in the side '
+          'view by 1.0 or more from the wind-up\'s Start f6 through the swing (Hold f16: %.2f); at the charge pose by 1.4 '
+          'and above the cap\'s top (L %s, R %s)' % (worst, pose['L'], pose['R']),
+          (worst >= 1.0, min(pose['L'][0], pose['R'][0]) >= 1.4, min(pose['L'][1], pose['R'][1]) >= 0.0),
+          (True, True, True))
 
 
 def main():

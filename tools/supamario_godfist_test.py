@@ -29,6 +29,7 @@ motion frame, WAIT for that many frames; True(n) skips to n words from itself wh
 was false; Set_Loop(n) ... Goto runs the block n times; Thread_Start's block runs from the next game frame, one
 frame a game frame, during the attacker's hitstop too (Flags 1); a status set takes effect the next frame.
 """
+import math
 import os
 import sys
 
@@ -261,6 +262,7 @@ def msc_tests(path):
         check('MSC hit, in the air from %d (the vl cancel window open from 39): the God Fist plays to its end in the'
               ' air (v13: no Fall at GF_IASA), Fall at the animation\'s end' % air_from, ended, (last, 0xE))
     msc_v12_tests(path)
+    msc_v18_tests(path)
     # v12: the startup sound -6 dB, cut at START_SE_END frames with a fade
     import numpy as np
     e = B.CMN_SE['gf_start']
@@ -285,11 +287,13 @@ def startup_sim(path, slots=None, face=1.0, frames=24, ledge_at=None, edge_x=Non
     init, loop = vm.func(272), vm.func(273)
     vm.call(init)
     fr, vy, out = 0.0, 0.0, []
+    g.pre = []                                          # v18: (motion frame, his x, y, {slot: (x, y)}) as the loop sees
     for gf in range(frames):
         if ledge_at is not None and gf >= ledge_at or edge_x is not None and g.x * face > edge_x:
             g.air = True
         g.frame = fr
         vm.g[18] = 2 if g.air else 0
+        g.pre.append((fr, g.x, g.y, {k_: (v_[0], v_[1]) for k_, v_ in g.slots.items()}))
         vm.call(loop)
         out.append((fr, g.x, g.y, g.rate))
         if g.sit_set and g.sit_set[-1] == fr and not g.air:     # SITUATION 2 written this frame: off the ground
@@ -325,20 +329,86 @@ def extras(g, out):
     return res
 
 
+def msc_v18_tests(path):
+    """v18 (user): tracking up to 75 degrees above / below (v12-v17 60), the tracking / 2x startup range 55 (50).
+    Tracked = picked: on the ground the edge check is asked with its distance (GroundModule 0x2726, gf_track) for a
+    picked opponent only"""
+    hit = 0x45
+    for deg in (0.0, 45.0, 74.9, 85.0):
+        for sg, way in ((1.0, 'above'), (-1.0, 'below')):
+            r = 20.0
+            x, y = r * math.cos(math.radians(deg)), sg * r * math.sin(math.radians(deg))
+            _vm, g, out = startup_sim(path, {4: [x, y, 30.0, hit, 2]})
+            want = deg <= B.TRACK_ANGLE
+            downs = [v for _f, var, v in g.moves if var == 0x0F000005 and v < -1e-6]
+            ups = [v for _f, var, v in g.moves if var == 0x0F000005 and v > 1e-6]
+            check('v18 tracking, an opponent %g degrees %s him (20 away, from the ground over the stage): %s' % (
+                deg, way, ('tracked' + (', he rises' if sg > 0 and deg > 0 else
+                                        ', never aimed down (the grounded rule, v12)' if sg < 0 and deg > 0 else ''))
+                if want else 'not tracked'),
+                (bool(g.ottotto), bool(ups) if sg > 0 and deg > 0 else None, downs),
+                (want, want if sg > 0 and deg > 0 else None, []))
+    # below past an edge (he runs off it at 2): an opponent coming in from out of range (3 a frame toward him: the
+    # startup stays 1x, he is in the air on the last tracking frame, motion 11), placed 74.9 / 85 degrees below where
+    # he is on that frame (12 away): aimed down at 74.9 (at most TRACK_DOWN a frame), not at 85
+    for deg, want in ((74.9, True), (85.0, False)):
+        slot = [60.0, -14.0, 30.0, hit, 2]
+        for _ in range(5):
+            _vm, g, out = startup_sim(path, {4: slot}, edge_x=2.0, slot_v={4: -5.0})
+            fr_, hx, hy, ts = next(p_ for p_ in g.pre if p_[0] >= 11.0 - 1e-6)
+            want_at = (hx + 12.0 * math.cos(math.radians(deg)), hy - 12.0 * math.sin(math.radians(deg)))
+            slot = [slot[0] + want_at[0] - ts[4][0], slot[1] + want_at[1] - ts[4][1], 30.0, hit, 2]
+        _vm, g, out = startup_sim(path, {4: slot}, edge_x=2.0, slot_v={4: -5.0})
+        fr_, hx, hy, ts = next(p_ for p_ in g.pre if p_[0] >= 11.0 - 1e-6)
+        rel = (ts[4][0] - hx, ts[4][1] - hy)
+        downs = [v for f_, var, v in g.moves if var == 0x0F000005 and v < -1e-6 and f_ >= 11.0 - 1e-6]
+        check('v18 tracking past the edge (edge 2), an opponent %g degrees below him on the tracking frame (%.1f): %s' % (
+            deg, math.degrees(math.atan2(-rel[1], rel[0])), 'aimed down, at most %g a frame' % B.TRACK_DOWN if want
+            else 'not aimed down (not tracked)'),
+              (out[0][3], bool(downs), all(-v <= B.TRACK_DOWN + 1e-6 for v in downs)), (1.0, want, True))
+    # the range's boundary (gf_pick itself, him at 0, 0 facing right, the opponent level ahead): 54.9 picked, 55.1 not;
+    # and at 74.9 / 75.1 degrees (40 away)
+    vm = msc_vm(path)
+    pick = vm.func(gf_index(vm, 'gf_pick'))
+    for name, x, y, want in (('at 54.9', 54.9, 0.0, True), ('at 55.1', 55.1, 0.0, False),
+                             ('74.9 degrees up', 40 * math.cos(math.radians(74.9)), 40 * math.sin(math.radians(74.9)),
+                              True),
+                             ('75.1 degrees up', 40 * math.cos(math.radians(75.1)), 40 * math.sin(math.radians(75.1)),
+                              False),
+                             ('74.9 degrees down', 40 * math.cos(math.radians(74.9)),
+                              -40 * math.sin(math.radians(74.9)), True),
+                             ('75.1 degrees down', 40 * math.cos(math.radians(75.1)),
+                              -40 * math.sin(math.radians(75.1)), False)):
+        vm.game.slots = {4: [x, y, 30.0, hit, 2]}
+        vm.game.x, vm.game.y, vm.game.face = 0.0, 0.0, 1.0
+        got = vm.call(pick, [R.f2i(B.TRACK_RANGE ** 2)])
+        check('v18 gf_pick(range %g, %g degrees): an opponent %s %s' % (B.TRACK_RANGE, B.TRACK_ANGLE, name,
+                                                                     'picked' if want else 'not picked'),
+              got == 4, want)
+
+
+def gf_index(vm, name):
+    """a function added after the decompiled func_N: its script index counted from the file's end"""
+    import re
+    src = open(os.path.join(HERE, '..', 'fighters', 'supamario', 'supamario.c')).read()
+    names = [m.group(2) for m in re.finditer(r'^(int|void|float|bool)\s+(\w+)\s*\([^;]*$', src, re.M)]
+    return len(vm.m.scripts) - 1 - (len(names) - 1 - names.index(name))
+
+
 def msc_v12_tests(path):
     """v12 - v16: tracking (the burst's first frames) and the 2x startup (one range: 50 since v15), the off-stage catch"""
     hit = 0x45
     _vm, g0, base = startup_sim(path, {})
     tr = (float(B.BURST[0]), float(B.TRACK_END))
     most = (B.TRACK_END - B.BURST[0]) * (B.TRACK_MAX - 1) * B.BURST_SPEED
-    # no target: behind him, more than 60 degrees up / down, not in hitstun, facing away, out of range (20)
+    # no target: behind him, more than 75 degrees up / down (v18; v12-v17 60), not in hitstun, facing away, out of range
     for name, slots, face, sv in (('behind him', {2: [-15.0, 0.0, 30.0, hit]}, 1.0, None),
-                                  ('above 60 degrees', {2: [6.0, 16.0, 30.0, hit]}, 1.0, None),
-                                  ('below 60 degrees', {2: [6.0, -16.0, 30.0, hit]}, 1.0, None),
+                                  ('above 75 degrees (80)', {2: [4.0, 22.7, 30.0, hit]}, 1.0, None),
+                                  ('below 75 degrees (80)', {2: [4.0, -22.7, 30.0, hit]}, 1.0, None),
                                   ('not in hitstun', {2: [15.0, 0.0, 0.0, 0x0]}, 1.0, None),
                                   ('hitstun over, still in a damage status', {2: [15.0, 0.0, 0.0, hit]}, 1.0, None),
                                   ('in front but he faces away', {2: [15.0, 0.0, 30.0, hit]}, -1.0, None),
-                                  ('out of range (more than 50 on the tracking frames)', {2: [61.0, 6.0, 30.0, hit]}, 1.0, None)):
+                                  ('out of range (more than 55 on the tracking frames)', {2: [61.0, 6.0, 30.0, hit]}, 1.0, None)):
         _vm, g, out = startup_sim(path, slots, face, slot_v=sv)
         check('tracking: none with an opponent %s (no extra move: his travel only)' % name,
               (extras(g, out), [m for m in g.moves if m[1] != 0x0F000004], g.sit_set), ([], [], []))
@@ -365,16 +435,19 @@ def msc_v12_tests(path):
     more = out[-1][1] - base[-1][1]
     check('tracking, an opponent flying away (4.2 a frame): a little more way (0 < %.2f < %.1f)' % (more, most),
           0.0 < more < most - 0.1, True)
-    # up: he leaves the ground on the burst's first frame and rises, never steeper than 60 degrees
+    # up: he leaves the ground on the burst's first frame and rises, never steeper than 75 degrees (v18; 60 before)
     # (within range at the start: the startup at 2x, its one tracking frame 10)
-    for name, slot in (('50 degrees up', [10.0, 12.0, 30.0, hit, 2]), ('59 degrees up', [12.5, 16.0, 30.0, hit, 2])):
+    tan = math.tan(math.radians(B.TRACK_ANGLE))
+    for name, slot in (('50 degrees up', [10.0, 12.0, 30.0, hit, 2]), ('59 degrees up', [12.5, 16.0, 30.0, hit, 2]),
+                       ('74 degrees up', [6.0, 20.9, 30.0, hit, 2])):
         _vm, g, out = startup_sim(path, {4: slot})
         ups = [(f, v) for f, var, v in g.moves if var == 0x0F000005 and v > 1e-6]
         fw = {f: v for f, var, v in g.moves if var == 0x0F000004}
         check('tracking %s: he leaves the ground on frame 10 (2x) and rises, on the first frames only, never steeper'
-              ' than 60 degrees' % name, (g.sit_set[:1], bool(ups), all(tr[0] <= f < tr[1] for f, _v in ups),
-                                         all(v <= 3 ** 0.5 * (2 * B.BURST_SPEED + fw.get(f, 0.0)) + 1e-3
-                                             for f, v in ups)), ([10.0], True, True, True))
+              ' than %g degrees, never above its height' % (name, B.TRACK_ANGLE),
+              (g.sit_set[:1], bool(ups), all(tr[0] <= f < tr[1] for f, _v in ups),
+               all(v <= tan * (2 * B.BURST_SPEED + fw.get(f, 0.0)) + 1e-3 for f, v in ups),
+               max(y for _f, _x, y, _r in out) <= slot[1] + 1e-3), ([10.0], True, True, True, True))
     # down: over the stage never; past the edge (he runs off it inside the first frames) down
     for name, slot, edge, ledge in (('a little below on the stage (a slope)', [14.0, -3.0, 30.0, hit, 0], None, None),
                                     ('8 below, over the stage, he off a ledge mid-burst', [16.0, -8.0, 30.0, hit, 2],
@@ -420,11 +493,14 @@ def msc_v12_tests(path):
     ups = [f for f, var, v in g.moves if var == 0x0F000005 and v > 1e-6]
     check('startup at 2x with an opponent in front and up: tracked on the one first-burst frame it plays (10) and he'
           ' rises', (g.sit_set[:1], ups, out[6][2] > 1.0), ([10.0], [10.0], True))
-    # the startup at 2x: an opponent in hitstun within 50 (in front, within 60 degrees: the tracking's range, v15)
-    for name, slots, fast in (('within 50', {2: [48.0, 0.0, 20.0, hit]}, True),
-                              ('at 52', {2: [52.0, 0.0, 20.0, hit]}, False),
-                              ('within 50 but behind', {2: [-30.0, 0.0, 20.0, hit]}, False),
-                              ('within 50, not in hitstun', {2: [30.0, 0.0, 0.0, 0x0]}, False)):
+    # the startup at 2x: an opponent in hitstun within 55 (v18; v15-v17 50; in front, within 75 degrees: the tracking's
+    # range, v15)
+    for name, slots, fast in (('within 55 (54.9)', {2: [54.9, 0.0, 20.0, hit]}, True),
+                              ('at 55.1', {2: [55.1, 0.0, 20.0, hit]}, False),
+                              ('within 55 but behind', {2: [-30.0, 0.0, 20.0, hit]}, False),
+                              ('within 55, not in hitstun', {2: [30.0, 0.0, 0.0, 0x0]}, False),
+                              ('within 55, 74 degrees up', {2: [10.0, 34.8, 20.0, hit]}, True),
+                              ('within 55, 80 degrees up', {2: [6.0, 34.0, 20.0, hit]}, False)):
         _vm, g, out = startup_sim(path, slots)
         punch = next(i for i, (f, _x, _y, _r) in enumerate(out) if f >= B.PUNCH)
         check('startup %s: the punch (motion frame %d) on game frame %d' % (name, B.PUNCH, B.PUNCH // 2 if fast
