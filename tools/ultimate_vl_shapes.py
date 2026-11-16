@@ -93,6 +93,13 @@ def ultimate_shapes(vl_prc, model_dir):
     return dict(hurtboxes=hurt, ecb_bones=ecb, ledge_boxes=ledge, hit_points=points)
 
 
+def ledge_box(vl_prc, i):
+    """Ultimate cliff_hang_data[i] as a Smash 4 ledge box (x, y, w, h): (0, bottom, front reach, height), as entry 0"""
+    labels = {hash40(k): k for k in KEYS}
+    c = prc.Prc(open(vl_prc, 'rb').read(), labels).root['cliff_hang_data'][i]
+    return dict(x=0.0, y=c['p2_y'], w=c['p1_x'], h=c['p1_y'] - c['p2_y'])
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('vl_in')
@@ -100,11 +107,16 @@ def main():
     ap.add_argument('vl_prc')
     ap.add_argument('model_dir')
     ap.add_argument('--json', help='write the shapes as vl_shapes.py --json does')
+    ap.add_argument('--tether', type=int, help='Ultimate cliff_hang_data entry -> the tether box (entry 2), the same '
+                    'mapping as the ledge box (Byleth v9: his up special\'s AIR_LASSO box, 3)')
     a = ap.parse_args()
     header, groups = vl_shapes.parse(open(a.vl_in, 'rb').read())
     old = vl_shapes.shapes(groups)
     new = ultimate_shapes(a.vl_prc, a.model_dir)
     new['ledge_boxes'] += old['ledge_boxes'][2:]          # tether boxes stay
+    if a.tether is not None:
+        assert len(new['ledge_boxes']) > 2, 'the base has no tether box (vl group 7 entry 2)'
+        new['ledge_boxes'][2] = ledge_box(a.vl_prc, a.tether)
     strip = {k: [{kk: vv for kk, vv in e.items() if kk != 'ult_node'} for e in v] for k, v in new.items()}
     old_points = vl_shapes.entries(groups[HITPOINTS]) or []
     if strip['hit_points']:

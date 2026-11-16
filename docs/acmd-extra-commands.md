@@ -12,7 +12,7 @@ group, **New Commands**, at the top of the list (vanilla commands stay in their 
 | Hitboxes & hits | Extra_Special_Hitbox, Extra_Extended_Special_Hitbox, Hit_Check, Hit_Get, Hit_Reset, Hit_Log_Clear |
 | Fighter state | Status_Get / _Set, Hitstun_Get / _Set, Hitstop_Set, Damage_Get / _Set, Body_State_Set, Armor_Set, Item_State_Set, Stage_Collision_Set, Leave_Ground_Cancel, Gravity_Set |
 | Inputs | Input_Compare, Input_Get, Input_Set, Buffer_Clear, Buffer_Set |
-| Position & rotation | Position_Get / _Set, Position_Place, Position_Offset_Get, Rotation_Get / _Set, Joint_Position_Get |
+| Position & rotation | Position_Get / _Set, Position_Place, Position_Offset_Get, Rotation_Get / _Set, Joint_Position_Get, Line_Test |
 | Animation | Motion_Get / _Set, Animation_Rate_Set |
 | Targets & tracking | Track_Target, Last_Hit_Get, Target_Slot_Get |
 | Threads | Thread_Start, Thread_Stop |
@@ -43,6 +43,7 @@ them too.
 | `Leave_Ground_Cancel` | whether a grounded move is cut into Fall when the fighter leaves the ground (exe_v41; exe_v39 / v40's didn't work: below) |
 | `Gravity_Set` | a fighter's gravity and max fall speed for the rest of the move (exe_v42, Sm4shCommand v1.4.10) |
 | `Time_Scale` / `Target_Time_Scale` / `Stage_Freeze` | the whole match slower (the game's slow-motion) or faster (extra game steps a frame); one fighter slower (the Timer's slow); the stage frozen (exe_v46n, Sm4shCommand v1.7.0: below) |
+| `Line_Test` | the stage between two points: where a segment first meets a floor / wall / ceiling, how far, which kind (the game's own GroundModule ray check); also from the `LINE_*` variables for MSC (exe_v46v_line: `tools/line_test_cave.py`, below) |
 | `New_Var` | declares a variable with your own name (int or float, a starting value, per object or per move): 64 more per object, usable in every variable parameter (exe_v40, Sm4shCommand v1.4.9) |
 
 ## Extra_Special_Hitbox / Extra_Extended_Special_Hitbox
@@ -1112,6 +1113,39 @@ SET_FLOAT(Value=120, Variable=TIMER_0)
 Sm4shCommand works out `True`'s offset from the braces. The variables only hold numbers, so a
 script can't stop a move from starting. MSC (`WorkModuleF(0, 0x0F000320)`) can read the same timer
 to do that.
+
+## Line_Test (exe_v46v_line: `tools/line_test_cave.py`)
+
+`Line_Test(Space, X0, Y0, X1, Y1, Floors, Distance, HitX, HitY, Kind)` follows the segment (X0, Y0) -> (X1, Y1) and
+stores what it first meets of the stage: `Distance` (from the start; the whole length when nothing), `HitX` / `HitY`
+(the point; the end when nothing), `Kind` (0 nothing, 1 floor: the line's normal Y >= 0.6, 3 ceiling: <= -0.6, 2 a
+wall: anything between). `Space` 0: relative to this object (X forward along its facing, Y up, from its position; the
+results the same way), 1: world. `Floors` 1 leaves the passable (drop-through) platforms out. A variable parameter of 0
+stores nothing. Any object: a fighter, an article, a projectile.
+
+The game's own test: GroundModule (accessor `+0x2C`) ray_check with a normal, `0x02C39FB4(GM, from, dir, out, normal,
+all)` (the first line the segment meets: `0x02D4CD68` over every line, `0x02D4E724` with mask `0x102000` for `all` 0),
+the one its ledge / ground checks use (six GroundModule vtables).
+
+**MSC (and scripts with points from variables):** `LINE_X0` / `LINE_Y0` / `LINE_X1` / `LINE_Y1` (`0x0F0003D0`-`3D3`,
+write), then `LINE_TEST` (`0x0F0003D4`) = Space + 2 x Floors runs it; read `LINE_TEST` (1 met / 0), `LINE_DIST`
+(`3D5`), `LINE_HIT_X` / `_Y` (`3D6` / `3D7`), `LINE_KIND` (`3D8`), `LINE_NX` / `LINE_NY` (`3D9` / `3DA`: the line's
+normal, X along the facing in Space 0). Per object (32 objects at a time), kept until its next test.
+
+```
+// MSC: from the hand to a point 60 up, 20 ahead, platforms left out
+WorkModule(0, 5.5f, 0x0f0003d0); WorkModule(0, 20.5f, 0x0f0003d1);
+WorkModule(0, 25.0f, 0x0f0003d2); WorkModule(0, 80.0f, 0x0f0003d3);
+WorkModule(0, 2.0f, 0x0f0003d4);
+if (WorkModuleF(0, 0x0f0003d4) != 0.0f && WorkModuleF(0, 0x0f0003d8) == 2.0f) { /* a wall at LINE_HIT_X / _Y */ }
+```
+
+Used by Byleth's up special (the sword's tip stops at the first wall / ground and latches on a wall) and his max arrow
+(its line hitbox and beam cut at the first ground: `Line_Test(0, 0, 0, 300, 0, 1, VAR_0, 0, 0, 0)` then the hitbox /
+beam in 10-unit steps by VAR_0). Tested by `tools/line_test_test.py` (unicorn: the command tables, both loaders, the
+handler, the variables through the game's WorkModule; the ray check stubbed with a wall and a floor). Not in the Hitbox
+Viewer (the stage isn't there). The game script's command and its variables need the executable: a script with it
+doesn't load on an older one (port_check X6).
 
 ## How it works
 

@@ -85,10 +85,10 @@ class NvTest
         var errors = new List<string>();
         int n = ACMD_INFO.OverrideInfo(args[0], errors);
         Check("Events.cfg loads with no errors", string.Join("; ", errors), "");
-        Check("commands", ACMD_INFO.CMD_NAMES.Count, 627);   // v1.4.12: + Position_Place, Position_Offset_Get; v1.4.13: + Buffer_Clear, Buffer_Set; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze
+        Check("commands", ACMD_INFO.CMD_NAMES.Count, 628);   // v1.4.12: + Position_Place, Position_Offset_Get; v1.4.13: + Buffer_Clear, Buffer_Set; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test
         Check("New_Var known: size 11, group", ACMD_INFO.CMD_SIZES[FighterVariable.NewVarIdent] + " " +
               ACMD_INFO.GetCategory(FighterVariable.NewVarIdent), "11 New Commands / Variables");
-        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 43);       // v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze
+        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 44);       // v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test
         Check("group help blocks", ACMD_INFO.GROUP_HELP.Count, 10);      // v1.7.0: + New Commands / Time & stage
         LoadAliases(args[1]);
         Check("aliases loaded", FighterVariable.AliasCount > 500, true);

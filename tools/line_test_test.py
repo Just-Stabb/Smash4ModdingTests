@@ -138,6 +138,10 @@ def main():
     check('acmd_ext CRCs keep theirs', [lookup(pm, C.crc(c[0])) for c in C.COMMANDS],
           [C.NEW_BASE + k for k in range(len(C.COMMANDS))])
     check('Line_Test -> its index', lookup(pm, lt), L.LT_BASE)
+    # another cave chained before this one (var_reset_cave.py, exe_v46w_vars): its command still found, sized, fetched
+    vr = zlib.crc32(b'Var_Reset_Set') & 0xFFFFFFFF
+    if lookup(om, vr) != 0xFFFFFFFF:
+        check('an earlier cave\'s command (Var_Reset_Set) still found', lookup(pm, vr), lookup(om, vr))
     check('unknown CRC -> -1', lookup(pm, 0x12345678), 0xFFFFFFFF)
 
     # both loaders over: Hitbox, Line_Test, FRAME, Joint_Position_Get
@@ -169,6 +173,8 @@ def main():
     check('vanilla handlers unchanged', [i for _, i in pairs[::23] if fetch(pm, i) != r32(om, HANDLERS + 4 * i)], [])
     check('acmd_ext handler kept', fetch(pm, want_idx[3]), fetch(om, want_idx[3]))
     check('Line_Test handler', fetch(pm, L.LT_BASE), lab['h_line'])
+    if lookup(om, vr) != 0xFFFFFFFF:
+        check('... and its handler', fetch(pm, lookup(om, vr)), fetch(om, lookup(om, vr)))
 
     # the object: facing left at (20, 5)
     px, py, lr = 20.0, 5.0, -1.0

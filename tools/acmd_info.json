@@ -10718,6 +10718,34 @@
 "On",
 "Frames"
 ]
+},
+"71F1A048": {
+"size": 11,
+"name": "Line_Test",
+"format": [
+0,
+1,
+1,
+1,
+1,
+0,
+3,
+3,
+3,
+3
+],
+"syntax": [
+"Space",
+"X0",
+"Y0",
+"X1",
+"Y1",
+"Floors",
+"Distance",
+"HitX",
+"HitY",
+"Kind"
+]
 }
 }
 }

@@ -1788,6 +1788,7 @@ void func_82()
     master_vt_attackhi4();             // up smash: Ultimate's set_vec_target_pos (tools/vec_target.py)
     master_vt_specialhi();             // Sword of the Creator (ground): the same
     master_whip_sweep();               // the whip sword (article 2) away once out of the moves that hold it
+    master_lw_crit();                  // v9: Aymr's critical zoom
     rolloff_hold_update(); // roll-off: the air speed cap off while the stick holds the way he moves (universal mechanics)
 }
 
@@ -38309,6 +38310,10 @@ int master_whip_last;   // the status master_whip_sweep saw last
 int master_target;      // Hi (v7): the player slot the sword caught (-1 none)
 float master_tx;        // ... and where it was caught (held there while he is pulled to it)
 float master_ty;
+int master_hi_turned;   // v9 Hi: Ultimate's TURN_CHECK done (once, at MASTER_HI_TURN_CHECK)
+int master_hi_brev;     // v9 Hi: the B-reverse taken (once, in its first frames)
+int master_hi_wall;     // v9 Hi: the sword's tip met the stage (0 no, 1 a wall: latched, 2 a floor / ceiling: stopped)
+int master_hi_hold;     // v9 Hi: SpecialAirHiHit's stop frames left before the rewind
 
 // a motion of the status's part: from frame 0, or (keep 1) at the frame the last one had (a ground / air change)
 void master_motion(int m, int keep)
@@ -38662,6 +38667,7 @@ int master_hi_pre()
 void master_hi_main()
 {
     printf("Byleth status_SpecialHi (Sword of the Creator, ground)");
+    master_hi_init();
     GroundModule(0x2710, 0x2);
     KineticModule(0, 0x6);
     master_motion(0x239, 0);
@@ -38670,11 +38676,19 @@ void master_hi_main()
 
 void master_hi_loop()
 {
+    float f;
     if (master_cancel())
     {
         return;
     }
+    f = MotionModuleF(0x1);
+    master_hi_turn(f);                      // v9: Ultimate's TURN_CHECK and the B-reverse
+    master_hi_diag(f);
     if (master_hi_catch())                  // v8: the sword's tip caught a fighter (Ultimate's SpecialHiHit)
+    {
+        return;
+    }
+    if (master_hi_line(f))                  // v9: the sword's tip met a wall / the ground (the stage line test)
     {
         return;
     }
@@ -38707,6 +38721,7 @@ void master_hi_air_main()
     WorkModule(0x7, var0, 0x10000076);
     WorkModule(0x17, 0x1e00001c);
     master_flag = 0;
+    master_hi_init();
     MotionModule(0x1, 0x91, 0, 1.0f);
     if (!StopModule(0x1))
     {
@@ -38758,20 +38773,169 @@ void master_hi_air_loop()
         return;
     }
     f = MotionModuleF(0x1);
+    master_hi_turn(f);                      // v9: Ultimate's TURN_CHECK and the B-reverse
+    master_hi_diag(f);
     if (master_hi_catch())                  // v8: a real catch on the sword's tip (v7: any hit, the nearest fighter held)
     {
         return;
     }
-    if (f >= MASTER_HI_HIT_START && f <= MASTER_HI_WALL_END && master_wall_jumps < MASTER_HI_WALL_MAX
-        && master_wall() != 0)
+    // v9: the sword's tip meeting the stage (the line test from his hand to the tip), not his body touching a wall
+    if (master_hi_line(f))
     {
-        func_16(0x15c, 0);
         return;
     }
     if (MotionModule(0x2712))
     {
         func_16(0xe, 0);                    // v7: Fall (v1-v6: FallSpecial)
     }
+}
+
+// v9 diag build only (MASTER_DIAG 1: tools/master_build.py --diag; exe with tools/diag_godfist_cave.py): one Cemu log
+// line "S4GF k=<k> v=<value> c=<value x 100>" per write. k 0 the up special's frame, 1 another fighter in reach: slot x
+// 1000 + its status (0xBD = 189: caught), 2 a line test: 1 + 10 x its kind (0 nothing met), 3 its distance x 1,
+// 4 SpecialAirHiHit's mode (1 wall, 2 stopped, 3 a fighter), 5 CatchModule(0x2712) (holding someone)
+void master_diag(int k, float v)
+{
+    if (MASTER_DIAG)
+    {
+        WorkModule(0, v, 0x0f0003f0 + k);
+    }
+}
+
+void master_hi_diag(float f)
+{
+    int s;
+    if (!MASTER_DIAG || f < 15.0f || f > 30.0f)
+    {
+        return;
+    }
+    master_diag(0, f);
+    master_diag(5, (float)CatchModule(0x2712));
+    s = 0;
+    while (s < 0x8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0.0f && WorkModuleF(0, 0x0f000020 + 0x4 * s) != PostureModuleF(0x1)
+            && func_13(WorkModuleF(0, 0x0f000020 + 0x4 * s) - PostureModuleF(0x1)) < 80.0f)
+        {
+            master_diag(1, 1000.0f * (float)s + WorkModuleF(0, 0x0f0000a2 + 0x8 * (s + 0x3)));
+        }
+        s = s + 1;
+    }
+}
+
+// v9: the up special's state at its start (ground 0x154 and air 0xF1)
+void master_hi_init()
+{
+    master_hi_turned = 0;
+    master_hi_brev = 0;
+    master_hi_wall = 0;
+    master_hi_hold = 0;
+    master_target = -1;
+    WorkModule(0, 0.0f, 0x0f00030f);        // VAR_15: SpecialAirHiHit's mode for its script (1 wall, 2 fighter, 0 stop)
+}
+
+// v9: Ultimate's turn rules (its SpecialHi / SpecialAirHi main loop, lua2cpp f_7208a2f5e0; README "Ultimate's up
+// special"): once, on the first frame of its TURN_CHECK flag (the scripts' frame 8), the stick held back past the
+// common param status_start_turn_stick_x (0.3: stick x x lr <= -0.3) turns him (reverse_lr + update_rot_y_lr), his
+// momentum kept. B-reverse (the common special start's; here in the move's first MASTER_HI_BREV_END frames): the stick
+// back turns him and, in the air, his horizontal momentum with him (energies 2 / 3 x), as Smash's B-reverse; once
+void master_hi_turn(float f)
+{
+    float x;
+    if (master_hi_brev == 0 && f < MASTER_HI_BREV_END)
+    {
+        if (WorkModuleF(0, 0x0f000110) <= -MASTER_HI_TURN_STICK)
+        {
+            master_hi_brev = 0x1;
+            PostureModule(0x1);
+            PostureModule(0x2);
+            if (global18 != 0)
+            {
+                x = KineticModuleF(0xa, 0x2);
+                KineticModule(0x11, 0x2, -x, KineticModuleF(0xb, 0x2));
+                x = KineticModuleF(0xa, 0x3);
+                KineticModule(0x11, 0x3, -x, KineticModuleF(0xb, 0x3));
+            }
+        }
+    }
+    if (master_hi_turned == 0 && f >= MASTER_HI_TURN_CHECK)
+    {
+        master_hi_turned = 0x1;
+        if (WorkModuleF(0, 0x0f000110) <= -MASTER_HI_TURN_STICK)
+        {
+            PostureModule(0x1);
+            PostureModule(0x2);
+        }
+    }
+}
+
+// v9: the sword's tip relative to him (forward along his facing, up) on frame i of the extension (0 = frame 18 ...
+// 7 = frame 25, held after): Ultimate's special_air_hi / special_hi on its own timeline (tools/master_whip.py tips:
+// the sword article's tip on his body's motion; ground and air agree within a unit)
+float master_tip_x(int i)
+{
+    if (i <= 0) { return 7.5f; }
+    if (i == 1) { return 12.4f; }
+    if (i == 2) { return 15.3f; }
+    if (i == 3) { return 18.0f; }
+    if (i == 4) { return 20.2f; }
+    if (i == 5) { return 21.7f; }
+    if (i == 6) { return 22.5f; }
+    return 22.6f;
+}
+
+float master_tip_y(int i)
+{
+    if (i <= 0) { return 22.4f; }
+    if (i == 1) { return 37.7f; }
+    if (i == 2) { return 45.3f; }
+    if (i == 3) { return 52.8f; }
+    if (i == 4) { return 58.6f; }
+    if (i == 5) { return 62.6f; }
+    if (i == 6) { return 64.5f; }
+    return 64.9f;
+}
+
+// v9: the stage line test (tools/line_test_cave.py, exe_v46v_line: LINE_* variables 0x0F0003D0 - 3DA) from his hand
+// (Ultimate's map collision point: hip + map_coll_offset (0, 8, 8), here the hand MASTER_HI_LINE_X / _Y) to where the
+// tip will be next frame (so it stops at the line, not past it), frames MASTER_HI_LINE_START - MASTER_HI_LINE_END.
+// Met: a wall (its normal within Ultimate's wall_angle_min / max, +-69 degrees of level: |ny| <= MASTER_HI_WALL_NY)
+// while he has wall hits left (param_special_hi wall_hit_max 3 an airtime) -> latched (1): SpecialAirHiHit holds
+// (hit_stop_frame_wall), rewinds him to it, then the wall jump; anything else (a floor, a ceiling, no wall hits
+// left) -> stopped (2): the sword goes back, no pull. 1: the status changed
+int master_hi_line(float f)
+{
+    int i;
+    float lr;
+    float ny;
+    if (master_hi_wall != 0 || f < MASTER_HI_LINE_START || f > MASTER_HI_LINE_END)
+    {
+        return 0;
+    }
+    i = (int)(f - 17.0f);                   // look ahead: the tip of the next frame (i + 1 - 1)
+    WorkModule(0, MASTER_HI_LINE_X, 0x0f0003d0);
+    WorkModule(0, MASTER_HI_LINE_Y, 0x0f0003d1);
+    WorkModule(0, master_tip_x(i), 0x0f0003d2);
+    WorkModule(0, master_tip_y(i), 0x0f0003d3);
+    WorkModule(0, 2.0f, 0x0f0003d4);        // Space 0 (relative to him), Floors 1 (passable platforms left out)
+    master_diag(2, 1.0f + 10.0f * WorkModuleF(0, 0x0f0003d8));
+    master_diag(3, WorkModuleF(0, 0x0f0003d5));
+    if (WorkModuleF(0, 0x0f0003d4) == 0.0f)
+    {
+        return 0;
+    }
+    lr = PostureModuleF(0);
+    master_tx = PostureModuleF(0x1) + WorkModuleF(0, 0x0f0003d6) * lr;
+    master_ty = PostureModuleF(0x2) + WorkModuleF(0, 0x0f0003d7);
+    ny = WorkModuleF(0, 0x0f0003da);
+    master_target = -1;
+    master_hi_wall = 0x2;
+    if (func_13(ny) <= MASTER_HI_WALL_NY && master_wall_jumps < MASTER_HI_WALL_MAX)
+    {
+        master_hi_wall = 0x1;
+    }
+    func_16(0x15b, 0);
+    return 0x1;
 }
 
 // v8: Ultimate's sword tip CATCHES (SpecialAirHi / SpecialHi: ENABLE_CATCH from frame 20, the hit on `throw` then the
@@ -38819,6 +38983,12 @@ int master_hi_catch()
         return 0;
     }
     master_target = best;
+    master_hi_wall = 0;
+    // v9: the catch is the grab box alone (frames 20 - 25: the hits there no longer touch fighters, a hit on the same
+    // frame took the victim before the grab and it was never caught: README "Status: v9"); Ultimate's catching hit's
+    // 3 % (the ATTACK on `throw` from 20) is added to the caught fighter here
+    WorkModule(0, WorkModuleF(0, 0x0f000100 + 0x20 * (best + 0x3) + 0x17) + MASTER_HI_CATCH_DAMAGE,
+               0x0f000100 + 0x20 * (best + 0x3) + 0x17);
     // Ultimate's TARGET_AIR / TARGET_HI_DAMAGE (the overtake's throw: THROW on the ground, CATCH in the air,
     // THROW_MEWTWO in the air at high damage): read by its game script (VAR_12 / VAR_13)
     WorkModule(0, 0.0f, 0x0f00030c);
@@ -38902,11 +39072,38 @@ void master_hi_hit_main()
     printf("Byleth status_SpecialHiHit");
     master_phase = 0;
     master_hi_pull();
+    master_hi_hold = 0;
     if (master_target >= 0)
     {
         master_pull_n = MASTER_HI_PULL_MAX; // a caught fighter: pulled to it (master_hi_rewind), at most this long
+        master_hi_hold = MASTER_HI_STOP_FIGHTER;    // v9: param_special_hi hit_stop_frame_fighter, then the rewind
+        WorkModule(0, 2.0f, 0x0f00030f);
+    }
+    else if (master_hi_wall != 0)
+    {
+        // v9: the tip met the stage (master_hi_line): a wall holds hit_stop_frame_wall frames, then rewinds him to it
+        // (his hand at the point met); a floor / ceiling: the sword goes back at once, no pull
+        master_pull_n = MASTER_HI_PULL_MAX;
+        if (master_hi_wall == 0x1)
+        {
+            master_hi_hold = MASTER_HI_STOP_WALL;
+            WorkModule(0, 1.0f, 0x0f00030f);
+        }
+        else
+        {
+            master_pull_n = 0;
+            WorkModule(0, 0.0f, 0x0f00030f);
+        }
     }
     master_flag = 0;                        // v8: 1 once the caught fighter is thrown (the overtake's link event)
+    if (master_target >= 0)
+    {
+        master_diag(4, 3.0f);
+    }
+    else
+    {
+        master_diag(4, (float)master_hi_wall);
+    }
     GroundModule(0x2710, 0x5);
     KineticModule(0, 0xa);
     master_motion(0x23a, 0);
@@ -38921,6 +39118,25 @@ void master_hi_hit_loop()
     }
     if (master_phase == 0)
     {
+        if (master_hi_hold > 0)            // v9: the hit's stop (Ultimate's hit_stop_frame_fighter / _wall)
+        {
+            master_hi_hold -= 0x1;
+            master_speed = 0;
+            master_move(0);
+            if (master_target >= 0)
+            {
+                master_hi_keep();
+            }
+            return;
+        }
+        if (master_hi_wall == 0x1)
+        {
+            if (master_hi_pull_to(master_tx, master_ty - MASTER_HI_LINE_Y))
+            {
+                func_16(0x15c, 0);          // at the wall: Ultimate's SpecialAirHiWallJump
+            }
+            return;
+        }
         if (master_target >= 0)
         {
             if (master_hi_rewind())
@@ -38942,6 +39158,16 @@ void master_hi_hit_loop()
         {
             master_speed = 0;
             master_move(0);
+        }
+        if (MotionModule(0x2712) && master_hi_wall == 0x2)
+        {
+            if (global18 == 0)
+            {
+                func_16(0x16, 0);
+                return;
+            }
+            func_16(0xe, 0);                // v9: the tip stopped by a floor / ceiling: no overtake, Fall
+            return;
         }
         if (MotionModule(0x2712))
         {
@@ -38996,18 +39222,31 @@ float master_len(float x, float y)
 // set_vec_target_pos pulls do: tools/vec_target.py). 1 when he is there (or the pull ran MASTER_HI_PULL_MAX frames)
 int master_hi_rewind()
 {
+    master_hi_keep();
+    return master_hi_pull_to(master_tx, master_ty);
+}
+
+// v9: the caught fighter held where it was caught (its position written; master_hi_rewind's, also during the stop)
+void master_hi_keep()
+{
     int s;
-    float dx;
-    float dy;
-    float n;
-    float lr;
     s = master_target;
     WorkModule(0, master_tx, 0x0f000020 + 0x4 * s);
     WorkModule(0, master_ty, 0x0f000021 + 0x4 * s);
     WorkModule(0, 5.0f, 0x0f0000a0 + 0x8 * (s + 0x3) + 0x6);
+}
+
+// the rewind (v7, v9 its own function): him pulled at rewind_speed toward (x, y) until his hand (MASTER_HI_HAND_X ahead
+// of him) is there, or MASTER_HI_PULL_MAX frames; 1 there
+int master_hi_pull_to(float x, float y)
+{
+    float dx;
+    float dy;
+    float n;
+    float lr;
     lr = PostureModuleF(0);
-    dx = master_tx - MASTER_HI_HAND_X * lr - PostureModuleF(0x1);
-    dy = master_ty - PostureModuleF(0x2);
+    dx = x - MASTER_HI_HAND_X * lr - PostureModuleF(0x1);
+    dy = y - PostureModuleF(0x2);
     n = master_len(dx, dy);                 // v8: the distance (v7 |dx| + |dy|: 4.1 a frame only straight up / across)
     master_pull_n -= 0x1;
     if (n <= MASTER_HI_REWIND || master_pull_n <= 0)
@@ -39316,6 +39555,59 @@ void master_whip_sweep()
 }
 
 // his per-frame hook (global35, was her func_2242 / Flip Jump's once-per-air limit): the wall jump count back on landing
+// v9: Aymr's critical (user: "Down special also doesn't give its camera zoom on a successful hit"). Ultimate's
+// param_special_lw critical_frame 40, critical_slow_rate 4, critical_zoom_in_frame 3, critical_zoom_rate 4.6,
+// critical_camera_offset (3, 1.5), critical_bg_only_frame 30, critical_1_on_1 1: read by the ExeFS's common critical
+// cut-in (the same critical_* params in many fighters' specializers, main.bin), not by his status scripts. Here, as
+// Hero's critical hits (brave.c brave_crit_show): on the move's first hit (SELF_HIT_NOW) in a 1-on-1 (two fighters in
+// the match) whose knockback would KO (APPROXIMATED: the hit's hitstun, ATKHIT_HITSTUN_DEALT = 0.4 x knockback, at
+// MASTER_LW_CRIT_HITSTUN or more; Ultimate's own test is the cut-in's KO check), the game slowed to 1 / critical_slow_rate
+// for critical_frame frames (SlowModule, ACMD Time_Manipulation_Whole's) and the camera in on him (ITEM variable 8 / 9:
+// Camera_Closeup / Normal_Camera's calls; the zoom's rate / offset and the darkened background not reproduced)
+int master_crit_cam;
+int master_crit_seen;
+
+void master_lw_crit()
+{
+    int s;
+    int n;
+    if (master_crit_cam > 0)
+    {
+        master_crit_cam -= 0x1;
+        if (master_crit_cam == 0)
+        {
+            WorkModule(0, 9.0f, 0x0f000099);
+        }
+    }
+    if (global4 != 0x155)
+    {
+        master_crit_seen = 0;
+        return;
+    }
+    if (master_crit_seen != 0 || WorkModuleF(0, 0x0f0000a1) < 0.5f)
+    {
+        return;
+    }
+    master_crit_seen = 0x1;                 // the move's first hit decides
+    n = 0;
+    s = 0;
+    while (s < 0x8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0.0f)
+        {
+            n = n + 0x1;
+        }
+        s = s + 0x1;
+    }
+    if (n != 0x2 || WorkModuleF(0, 0x0f0002c9) < MASTER_LW_CRIT_HITSTUN)
+    {
+        return;
+    }
+    SlowModule(0, MASTER_LW_CRIT_SLOW, MASTER_LW_CRIT_FRAME);
+    WorkModule(0, 8.0f, 0x0f000099);
+    master_crit_cam = MASTER_LW_CRIT_FRAME;
+}
+
 int master_frame_hook()
 {
     if (global18 != 0x2)

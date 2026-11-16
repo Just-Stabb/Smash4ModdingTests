@@ -2606,17 +2606,24 @@ Read from cross_f.rpx (exe_v46u; not yet confirmed in game):
   `+0x120` set (the attack cancelled). A side loses if any of its records loses.
 - Not traced: where the aerial / grounded clank rule lives (no situation test in the pass above).
 
-## Stage line test (Byleth v9: `tools/line_test_cave.py`) — space claimed
+## Stage line test (Byleth v9: `tools/line_test_cave.py`, exe_v46v_line)
 
-Claimed (exe_v46v_threads + this cave; in progress, details below when done): **code `0x04BCA000`-`0x04BCB800`**
-(zero in exe_v46v: the free end of Smash Run's region H, before the temporary diag caves' `0x04BCC000`), **variables
-`0x0F0003D0`-`0x0F0003DF`** (user_entry IDs that read 0 / ignore writes in acmd_ext_cave.py's hv_var: reached from its
-`hvv_zero` branch, which the cave chains: whatever that `b` aims at (buf_var, or a later cave's stub) still gets every
-other ID). Apply after acmd_ext_cave.py's output; it asserts the words it replaces.
+**Space:** code + data `0x04BCA000`-`0x04BCB800` (zero in exe_v46v: the free end of Smash Run's region H, before the
+temporary diag caves' `0x04BCC000`); variables `0x0F0003D0`-`0x0F0003DA`; command index `584 + 0x200` (1096,
+`Line_Test`, CRC `0x71F1A048`).
 
-## Variable resets (exe_v46w_vars: New_Var's Reset, Var_Reset_Set)
-
-`tools/var_reset_cave.py` (on exe_v46v_threads), test `tools/var_reset_test.py`, user docs
-`docs/acmd-extra-commands.md` "Variable resets". **Claimed region: `0x04BD8000`-`0x04BE0000`** (code `0x04BD8000`,
-data `0x04BD9F00`, the reset lists `0x04BDA000`; `textregion:0x2BE0000 grow:0x04BE0000`). `0x04BD6000`-`0x04BD8000`
-(between ts_data's end and this) is left free for the next cave. Details below (written with the tests).
+- **The game's test:** GroundModule (accessor `+0x2C`) vt entries `0x02C39F18` ray_check(GM, V2 *from, V2 *dir, V2 *out,
+  bool all) and `0x02C39FB4` the same with V2 *normal before the bool (the hit line's `+0x48` / `+0x4C`): from + dir is
+  the end; `all` 1 -> `0x02D4CD68(stage [0x102F7DB4], out, GM+0x18 -> +0x244, from, &end)`, 0 -> `0x02D4E724` with mask
+  `0x102000` (the passable platforms left out); r3 the line (non-zero: met). In six GroundModule vtables (`0x100D35EC`,
+  ...). Posture: the MSC PostureModuleF wrapper `0x030B2AF0` (accessor `+0x18`, vt `+0x154`: 0 lr, 1 x, 2 y).
+- **Hooks, all chaining** (each word asserted as acmd_ext_cave.py wrote it, or a `b` an earlier cave put there, which is
+  then replayed): acmd_ext's `lk_none` (`li r3, -1`), `s1_orig` / `s2_orig` (the game's size-table reads), `f_orig`
+  (its handler-table read), and hv_var's `hvv_zero` (`b buf_var`: the user_entry IDs nothing answers). **Order with
+  tools/var_reset_cave.py (exe_v46w_vars):** var_reset first (it asserts the original words there), then this one
+  (it chains on var_reset's branches): exe_v46v_threads -> var_reset_cave -> line_test_cave; tested both ways round
+  this one allows (`tools/line_test_test.py` on exe_v46v_threads and on exe_v46w_vars: 29 / 31 checks).
+- **Per object:** 32 entries of 0x40 (round robin): +0 WorkModule, +4..+0x10 the points, +0x14 the mode, +0x18 hit,
+  +0x1C distance, +0x20 / +0x24 the point, +0x28 kind, +0x2C / +0x30 the normal. The accessor from acmd_ext's cache
+  (`acc_of`, filled by its per-frame hook).
+- **Diag on top:** tools/diag_godfist_cave.py chains on `hvv_zero` too (its stub then goes on to `lt_var`).

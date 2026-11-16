@@ -172,7 +172,8 @@ namespace SALT.Moveset.AnimCMD
             {0x544E610E,5},
             {0x27A8E82C,3},
             {0x3BE70247,4},
-            {0xC5858BCF,3}
+            {0xC5858BCF,3},
+            {0x71F1A048,11}
         };
         #endregion
         #region Names
@@ -805,6 +806,7 @@ namespace SALT.Moveset.AnimCMD
             {0x27A8E82C,"Time_Scale"},
             {0x3BE70247,"Target_Time_Scale"},
             {0xC5858BCF,"Stage_Freeze"},
+            {0x71F1A048,"Line_Test"},
         };
         #endregion
         #region Params
@@ -1439,6 +1441,7 @@ namespace SALT.Moveset.AnimCMD
             {0x27A8E82C,"1,0"},
             {0x3BE70247,"0,1,0"},
             {0xC5858BCF,"0,0"},
+            {0x71F1A048,"0,1,1,1,1,0,3,3,3,3"},
         };
         #endregion
         #region syntax
@@ -2071,6 +2074,7 @@ namespace SALT.Moveset.AnimCMD
             {0x27A8E82C,"Rate,Frames"},
             {0x3BE70247,"Target,Rate,Frames"},
             {0xC5858BCF,"On,Frames"},
+            {0x71F1A048,"Space,X0,Y0,X1,Y1,Floors,Distance,HitX,HitY,Kind"},
         };
         #endregion
 
@@ -2705,6 +2709,7 @@ namespace SALT.Moveset.AnimCMD
             {0x27A8E82C,"Slows down or speeds up the whole match: every fighter, item and projectile and the stage. Ends by itself after Frames, at Time_Scale(1) or when the match ends. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x3BE70247,"Slows down one fighter (or article), as the Timer item slows the opponents: its animation, movement, status and hitstun counting. Uses the Timer's own slow: a Timer and this replace each other. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0xC5858BCF,"Freezes or resumes the stage (the game's own stage stop: StageManager +0xD0), the fighters, items and projectiles unaffected. Ends by itself after Frames, at Stage_Freeze(0) or when the match ends. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
+            {0x71F1A048,"Tests the stage between two points (the game's own GroundModule ray check): where the segment first meets a floor, wall or ceiling. New command: needs the patched cross_f.rpx (tools/line_test_cave.py)."},
         };
         #endregion
         /// <summary>

@@ -29,7 +29,6 @@ Space: code + data 0x04BCA000-0x04BCB800 (zero in exe_v46v; docs/native-notes.md
 """
 import argparse
 import os
-import struct
 import sys
 import zlib
 
@@ -61,11 +60,11 @@ NEW_CMDS = [
         ('X0', 1, 'Start X.'), ('Y0', 1, 'Start Y.'), ('X1', 1, 'End X.'), ('Y1', 1, 'End Y.'),
         ('Floors', 0, '0: every stage line (passable platforms too); 1: passable (drop-through) platforms left out, '
                       'as the game\'s own ground checks do.'),
-        ('Distance', 3, 'Gets the distance from the start to the first line met (the whole length when none). 0: '
+        ('Distance', 3, 'Gets the distance from the start to the first line met (the whole length when none). 0x0: '
                         'not stored.'),
-        ('HitX', 3, 'Gets the point met, X (X1 when none). 0: not stored.'),
-        ('HitY', 3, 'Gets the point met, Y (Y1 when none). 0: not stored.'),
-        ('Kind', 3, 'Gets what was met: 0 nothing, 1 floor (its normal points up), 2 wall, 3 ceiling. 0: not '
+        ('HitX', 3, 'Gets the point met, X (X1 when none). 0x0: not stored.'),
+        ('HitY', 3, 'Gets the point met, Y (Y1 when none). 0x0: not stored.'),
+        ('Kind', 3, 'Gets what was met: 0 nothing, 1 floor (its normal points up), 2 wall, 3 ceiling. 0x0: not '
                     'stored.')],
      'Tests the stage between two points (the game\'s own GroundModule ray check): where the segment first meets a '
      'floor, wall or ceiling. New command: needs the patched cross_f.rpx (tools/line_test_cave.py).'),

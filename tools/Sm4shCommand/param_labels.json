@@ -11500,6 +11500,136 @@
    0
   ]
  },
+ "71F1A048": {
+  "_command": "Line_Test",
+  "_new": true,
+  "_name": "Line_Test",
+  "_size": 11,
+  "_desc": "Tests the stage between two points (the game's own GroundModule ray check): where the segment first meets a floor, wall or ceiling. New command: needs the patched cross_f.rpx (tools/line_test_cave.py).",
+  "_format": [
+   0,
+   1,
+   1,
+   1,
+   1,
+   0,
+   3,
+   3,
+   3,
+   3
+  ],
+  "0": {
+   "name": "Space",
+   "desc": "0: the points are relative to this object (X forward along its facing, Y up, from its position (TransN)); 1: world coordinates. The results come back in the same space.",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "X0",
+   "desc": "Start X.",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Y0",
+   "desc": "Start Y.",
+   "confidence": "high"
+  },
+  "3": {
+   "name": "X1",
+   "desc": "End X.",
+   "confidence": "high"
+  },
+  "4": {
+   "name": "Y1",
+   "desc": "End Y.",
+   "confidence": "high"
+  },
+  "5": {
+   "name": "Floors",
+   "desc": "0: every stage line (passable platforms too); 1: passable (drop-through) platforms left out, as the game's own ground checks do.",
+   "confidence": "high"
+  },
+  "6": {
+   "name": "Distance",
+   "desc": "Gets the distance from the start to the first line met (the whole length when none). 0x0: not stored.",
+   "confidence": "high"
+  },
+  "7": {
+   "name": "HitX",
+   "desc": "Gets the point met, X (X1 when none). 0x0: not stored.",
+   "confidence": "high"
+  },
+  "8": {
+   "name": "HitY",
+   "desc": "Gets the point met, Y (Y1 when none). 0x0: not stored.",
+   "confidence": "high"
+  },
+  "9": {
+   "name": "Kind",
+   "desc": "Gets what was met: 0 nothing, 1 floor (its normal points up), 2 wall, 3 ceiling. 0x0: not stored.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// a beam 200 units long cut at the first wall in front: its hitbox ends there",
+   "Line_Test(Space=0, X0=0, Y0=8, X1=200, Y1=8, Floors=1, Distance=VAR_0, HitX=0x0, HitY=0x0, Kind=VAR_1)",
+   "Float_Var_Compare(Variable=VAR_0, Method=3, Value=100)",
+   "True(Offset=0){",
+   "    Extended_Special_Hitbox(ID=0, Part=0, Bone=0, Damage=12, Angle=361, KBG=80, FKB=0, BKB=40, Size=3, X=0, Y=8, Z=0, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=1, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1, HitBits=63, Unk41=0, CollisionPart=15, NoScale=0, Shieldable=1, Reflectable=1, Absorbable=1, Rehit=0, IgnoreInvuln=0, HitAllStates=0, FacingRestrict=0, NoGrabRelease=0, TeamDamage=0, DisableHitlag=0, NoGFX=0, Flinchless=0, X2=0, Y2=8, Z2=200)",
+   "}",
+   "Else(Offset=0){",
+   "    // a wall within 100: the short beam only",
+   "    Extended_Special_Hitbox(ID=0, Part=0, Bone=0, Damage=12, Angle=361, KBG=80, FKB=0, BKB=40, Size=3, X=0, Y=8, Z=0, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=1, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1, HitBits=63, Unk41=0, CollisionPart=15, NoScale=0, Shieldable=1, Reflectable=1, Absorbable=1, Rehit=0, IgnoreInvuln=0, HitAllStates=0, FacingRestrict=0, NoGrabRelease=0, TeamDamage=0, DisableHitlag=0, NoGFX=0, Flinchless=0, X2=0, Y2=8, Z2=50)",
+   "}",
+   "",
+   "// is there floor under this fighter within 40 (a ledge ahead check: 20 in front, straight down)?",
+   "Line_Test(Space=0, X0=20, Y0=5, X1=20, Y1=-40, Floors=0, Distance=VAR_2, HitX=0x0, HitY=0x0, Kind=VAR_3)",
+   "Float_Var_Compare(Variable=VAR_3, Method=0, Value=0)",
+   "True(Offset=0){",
+   "    // nothing below: stop here",
+   "    SET_FLOAT(Value=0, Variable=VAR_4)",
+   "}",
+   "",
+   "// the same test from variables (MSC writes the same IDs): from the hand to a point 60 up and 20 ahead",
+   "SET_FLOAT(Value=5, Variable=LINE_X0)",
+   "SET_FLOAT(Value=20, Variable=LINE_Y0)",
+   "SET_FLOAT(Value=25, Variable=LINE_X1)",
+   "SET_FLOAT(Value=80, Variable=LINE_Y1)",
+   "SET_FLOAT(Value=2, Variable=LINE_TEST)",
+   "Float_Var_Compare(Variable=LINE_KIND, Method=0, Value=2)",
+   "True(Offset=0){",
+   "    // a wall within 10 ahead of the start: hold still (VAR_5 = 1)",
+   "    Float_Var_Compare(Variable=LINE_DIST, Method=4, Value=10)",
+   "    True(Offset=0){",
+   "        SET_FLOAT(Value=1, Variable=VAR_5)",
+   "    }",
+   "}",
+   "",
+   "// world space: a line across the stage at height 30 (from x -100 to 100)",
+   "Line_Test(Space=1, X0=-100, Y0=30, X1=100, Y1=30, Floors=0, Distance=VAR_6, HitX=VAR_7, HitY=0x0, Kind=0x0)"
+  ],
+  "_group": "Position & rotation",
+  "_help": [
+   "## How it works",
+   "Tests the stage between two points with the game's own line check (GroundModule ray_check, the one its ledge and ground checks use): the segment from (X0, Y0) to (X1, Y1) is followed from its start, and the first stage line it meets (floor, wall, ceiling, platform) is the result. Any object can use it: a fighter, an article, a projectile.",
+   "- Space 0: the points are relative to this object: X forward along its facing (so the same script works facing left or right), Y up, from its position (TransN). The results come back the same way. Space 1: world coordinates (as Position_Get gives them).",
+   "- Floors 0: every line, passable (drop-through) platforms too. Floors 1: those platforms left out (what the game does for things that should pass up through them).",
+   "- Distance: how far from the start the first line is met; the whole length (|end - start|) when nothing is met. Compare it with Float_Var_Compare to cut a hitbox or an effect at the wall.",
+   "- HitX / HitY: the point met (the end when nothing is met).",
+   "- Kind: 0 nothing met, 1 a floor (the line's normal points up: its Y 0.6 or more), 3 a ceiling (-0.6 or less), 2 a wall (anything between: steep slopes count as walls).",
+   "A variable parameter of 0x0 stores nothing. The test runs once, where the command is: put it in a loop or on every frame it should be repeated.",
+   "",
+   "## Variables (MSC, or a test with numbers from variables)",
+   "The same test from variables, for MSC (WorkModule(0, value, id) / WorkModuleF(0, id)) and for scripts whose points change: write LINE_X0 / LINE_Y0 / LINE_X1 / LINE_Y1 (0x0F0003D0-3D3), then LINE_TEST (0x0F0003D4) = Space + 2 x Floors runs it; then read LINE_TEST (1 met, 0 not), LINE_DIST (3D5), LINE_HIT_X / _Y (3D6 / 3D7), LINE_KIND (3D8) and the line's normal LINE_NX / LINE_NY (3D9 / 3DA; NX along the facing in Space 0: negative for a wall in front). They are per object and keep their values until the next test.",
+   "",
+   "## Gotchas",
+   "- The test is a line, not a box: a wall a few units above or below the line isn't met. Test two lines (or the line a weapon's hitbox spans) for a thick object.",
+   "- The start inside a wall or the floor meets that line at once (distance 0).",
+   "- Stage lines only: fighters, items and moving hitboxes aren't met.",
+   "- Byleth's up special (the whip stops at the first wall and latches) and his max arrow (its line cut at the first ground) use it.",
+   "",
+   "The Hitbox Viewer doesn't simulate this command (it only acts in game).",
+   "Needs the patched cross_f.rpx with tools/line_test_cave.py (exe_v46v_line or later). Without it a script that uses this command won't load properly and the variables read 0."
+  ]
+ },
  "72D266EA": {
   "_command": "Hitstun_Set",
   "_new": true,

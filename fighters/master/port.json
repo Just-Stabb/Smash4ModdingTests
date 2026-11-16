@@ -242,5 +242,7 @@
     "hand_made": {
       "SpecialAirHi": "master.c status 0x15B (SpecialAirHiHit): the latched fighter pulled toward the sword's tip, 1.15 / 2.85 a frame for 14 frames (Ultimate's point 16 / 40)"
     }
-  }
+  },
+  "tether_ledge_box": 3,
+  "_tether_ledge_box": "v9: Ultimate's cliff_hang_data[3] (FIGHTER_MASTER_CLIFF_HANG_DATA_AIR_LASSO, p1 (44, 85) / p2 (-44, 20): SpecialAirHi selects it at 15) as ZSS's tether box (vl group 7 entry 2, the one her AirCatch selects): (0, 20, 44, 65)"
 }

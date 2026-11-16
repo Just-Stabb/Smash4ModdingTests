@@ -387,6 +387,11 @@ def alias_lines():
             ("CSTICK_LEN", 0x0F0003C5, ""),
             ("ROT_X", 0x0F0003C6, "this object's rotation, degrees (PostureModuleF(4-6), as Rotation_Get; read only)"),
             ("ROT_Y", 0x0F0003C7, ""), ("ROT_Z", 0x0F0003C8, "")]
+    import sys
+    sys.path.insert(0, os.path.join(REPO, "tools"))
+    import line_test_cave                                     # Byleth v9: the stage line test (Line_Test's variables)
+    out += [(name, 0x0F000000 + vid, note + (" (exe_v46v_line)" if vid == line_test_cave.VAR_LO else ""))
+            for vid, name, note in line_test_cave.VARS]
     out += [("SLOT%d_SHARED_%d" % (slot + 1, k), 0x0F000340 + 8 * slot + k,
              "VAR_24-VAR_31 of the fighter in that player slot (any object may use them)" if slot == k == 0 else "")
             for slot in range(8) for k in range(8)]

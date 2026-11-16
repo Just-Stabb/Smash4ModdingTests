@@ -52,7 +52,7 @@ class Install:
     @staticmethod
     def _norm(path):
         path = path.replace('\\', '/')
-        if 'not_for_install/' in path:
+        if 'not_for_install/' in path or 'TEST_ONLY_' in path:     # test-only builds (a diag exe / MSC) aren't the install
             return None
         # the packaging convention's install roots (docs/ultimate-port-guide.md "Packages"): INSTALL_TO_code/X is code/X
         i = path.find('INSTALL_TO_code/')
@@ -1878,6 +1878,143 @@ def check_motions(inst, name, rec, rep):
                 'moves T-pose: %s' % (len(miss), inst.where('fighter/%s/motion/body/main.pac' % name), ', '.join(miss)))
 
 
+def _frames(script):
+    """(frame, command) along a script, branches walked as if taken (the timers FRAME / WAIT)"""
+    fr = 0.0
+    for c in script:
+        if c.name == 'FRAME':
+            fr = float(c.params[0])
+        elif c.name == 'WAIT':
+            fr += float(c.params[0])
+        yield fr, c
+
+
+def check_grab_vs_hit(inst, name, rep):
+    """S14 grab-vs-hit: a grab box out on a frame where a hitbox that hits fighters (HitBits bit 0) is out too: the hit
+    takes the fighter first (its knockback; both in hitlag) and the grab box never catches it. Byleth v8's up special
+    tip (Extended_Grab_Collision 0xBD with Ultimate's 3 % hits on frames 20 - 25): nothing ever caught (user's v8 clips:
+    DK hit 120 -> 123 %, launched). ERROR per script; the hits there need HitBits without bit 0 (or no hitbox)"""
+    game = scripts(inst, 'fighter/%s/script/animcmd/body/game.bin' % name)
+    if not game:
+        return
+    import acmd
+    names = {}
+    for n in ('specialhi', 'aircatch', 'specialairhi', 'speciallw', 'specials', 'specialairs', 'specialn', 'catch',
+              'catchdash', 'catchturn'):
+        names[acmd.crc(n)] = n
+    bad = []
+    for h, sc in game.items():
+        hits, grab, frames = {}, False, set()
+        for fr, c in _frames(sc):
+            if c.name in ('Special_Hitbox', 'Extended_Special_Hitbox', 'Hitbox', 'Extended_Hitbox'):
+                syn = c.info['syntax']
+                bits = int(c.params[syn.index('HitBits')]) if 'HitBits' in syn else 0x3F
+                hits[c.params[0]] = bool(bits & 1)
+            elif c.name in ('Remove_All_Hitboxes',):
+                hits = {}
+            elif c.name in ('Grab_Collision', 'Grab_Collision2', 'Extended_Grab_Collision', 'Extended_Grab_Collision2'):
+                grab = True
+            elif c.name in ('Remove_All_Grab_Collisions',):
+                grab = False
+            if grab and any(hits.values()):
+                frames.add(fr)
+        if frames:
+            bad.append('%s (frames %s)' % (names.get(h, '0x%08X' % h), ', '.join('%g' % f for f in sorted(frames))))
+    if bad:
+        rep.add('ERROR', 'S14 grab-vs-hit', 'a grab box out with a fighter-hitting hitbox: the hit takes the fighter, the '
+                'grab never catches: %s' % '; '.join(bad))
+
+
+def check_line_tests(inst, name, rec, rep):
+    """S15 line-cut / X6 line-test-exe. S15 (WARN): an article's game script with a capsule hitbox 100 units long or more
+    and no Line_Test before it: Ultimate's long search lines (set_search, Byleth's max arrow: 300) stop at the first
+    ground / wall; uncut, it hits through walls (Byleth v8). X6 (ERROR): a script using Line_Test
+    (tools/line_test_cave.py) with no executable in the install carrying it (its CRC in the cave's table)"""
+    import zlib
+    lt = zlib.crc32(b'Line_Test') & 0xFFFFFFFF
+    uses, long_ = [], []
+    for rel in inst.glob(r'fighter/%s/script/animcmd/.*/game\.bin|fighter/%s/script/animcmd/.*/effect\.bin' % (name, name)):
+        sc = scripts(inst, rel) or {}
+        for h, body in sc.items():
+            tested = False
+            for c in body:
+                if c.name == 'Line_Test':
+                    tested = True
+                    uses.append(rel)
+                elif c.name == 'Extended_Special_Hitbox' and '/weapon/' in rel and rel.endswith('game.bin'):
+                    syn = c.info['syntax']
+                    v = {k: float(c.params[syn.index(k)]) for k in ('X', 'Y', 'Z', 'X2', 'Y2', 'Z2')}
+                    ln = ((v['X2'] - v['X']) ** 2 + (v['Y2'] - v['Y']) ** 2 + (v['Z2'] - v['Z']) ** 2) ** 0.5
+                    if ln >= 100 and not tested:
+                        long_.append('%s 0x%08X (%.0f units)' % (rel.split('/animcmd/')[1], h, ln))
+    if long_:
+        rep.add('WARN', 'S15 line-cut', 'long line hitboxes not cut at the stage (no Line_Test before them): %s'
+                % '; '.join(sorted(set(long_))))
+    if not uses:
+        return
+    import tempfile
+    import kind_expand as K
+    import line_test_cave as LT
+    ok = False
+    if 'code/cross_f.rpx' in inst.files:
+        with tempfile.NamedTemporaryFile(suffix='.rpx') as f:
+            f.write(inst.get('code/cross_f.rpx'))
+            f.flush()
+            img = K.Image(f.name)
+            try:
+                ok = any(img.w(x) == lt for x in range(LT.CAVE, LT.LIMIT, 4))
+            except Exception:                 # noqa: BLE001
+                ok = False
+    if not ok:
+        rep.add('ERROR', 'X6 line-test-exe', 'Line_Test in %s but the install\'s code/cross_f.rpx has no line test '
+                '(tools/line_test_cave.py: exe_v46v_line or later): the script won\'t load' % ', '.join(sorted(set(uses))))
+
+
+def check_tether_window(inst, name, rep):
+    """S16 tether-window: the tether status's ledge box check (the common AirCatch's func_99 while flag 0x2100000D is on,
+    set by the aircatch script) closes before the tether goes out (Set_Remote_Article_Action(2, 1)): only the tether
+    tip's own latch can take a ledge. Byleth v1 - v8 kept ZSS's zair window 0 - 5 with his whip out at 17 (user v8: the
+    ledge grab "very specific"; Ultimate's AIR_LASSO_FLAG_CHECK is 12 - 17 with its big AIR_LASSO box). ERROR"""
+    import acmd
+    game = scripts(inst, 'fighter/%s/script/animcmd/body/game.bin' % name)
+    sc = (game or {}).get(acmd.crc('aircatch'))
+    if not sc:
+        return
+    on = off = out = None
+    for fr, c in _frames(sc):
+        if c.name == 'ON_FLAG' and c.params[0] == 0x2100000D and on is None:
+            on = fr
+        elif c.name == 'OFF_FLAG' and c.params[0] == 0x2100000D and off is None:
+            off = fr
+        elif c.name == 'Set_Remote_Article_Action' and out is None:
+            out = fr
+    if on is not None and out is not None and off is not None and off < out - 6:
+        rep.add('ERROR', 'S16 tether-window', 'aircatch: the ledge box check (0x2100000D, frames %g - %g) closes %g '
+                'frames before the tether goes out (frame %g)' % (on, off, out - off, out))
+
+
+def check_smash_holds(inst, name, base, vanilla, rep):
+    """E13 smash-hold: the smash attacks' hold effect scripts (attacks4hold / attackhi4hold / attacklw4hold) still the
+    base fighter's (the translator has no Ultimate Charge -> Hold names): the base's charge flash on the base's hand
+    (Byleth v1 - v8: ZSS's on RHaveN (0, 1.5, 2) in all three, Ultimate's sys_smash_flash_s on the weapons' heads).
+    ERROR per script identical to the base's"""
+    import acmd
+    eff = scripts(inst, 'fighter/%s/script/animcmd/body/effect.bin' % name)
+    vp = os.path.join(vanilla or '', 'fighter', base.get('base', ''), 'script', 'animcmd', 'body', 'effect.bin')
+    if not eff or not vanilla or not os.path.exists(vp):
+        return
+    van = acmd.ACMDFile.load(vp).scripts
+
+    def shape(sc):               # the effect ids aside (the port maps the base's common ones to its own bank)
+        return [(c.name, tuple(c.params[1:]) if 'Graphic' in c.name or 'EFFECT' in c.name else tuple(c.params))
+                for c in sc]
+    same = [n for n in ('attacks4hold', 'attackhi4hold', 'attacklw4hold')
+            if acmd.crc(n) in eff and acmd.crc(n) in van and shape(eff[acmd.crc(n)]) == shape(van[acmd.crc(n)])]
+    if same:
+        rep.add('ERROR', 'E13 smash-hold', 'the smash holds\' effects still the base\'s (its charge flash on its hand): %s'
+                % ', '.join(same))
+
+
 def check_throw_joint_hitboxes(inst, name, rep):
     """S12 throw-joint: a move's hitboxes on the throw joint (ThrowN) while its animation keeps ThrowN at the root:
     Ultimate's status code moves `throw` to where the move reaches (Byleth's up special: the Sword of the Creator's tip,
@@ -2667,6 +2804,10 @@ def main():
     check_motion_groups(inst, a.name, src, base['ult'], kind, rep)
     check_slot_moves(inst, a.name, src, base['ult'], rep)
     check_throw_joint_hitboxes(inst, a.name, rep)
+    check_grab_vs_hit(inst, a.name, rep)
+    check_line_tests(inst, a.name, rec, rep)
+    check_tether_window(inst, a.name, rep)
+    check_smash_holds(inst, a.name, base, vanilla, rep)
     check_loop_spin(inst, a.name, rep)
     check_sound_tables(inst, a.name, kind, rep)
     check_sound_ids(inst, a.name, rep)

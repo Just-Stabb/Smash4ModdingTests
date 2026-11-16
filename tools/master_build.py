@@ -163,12 +163,26 @@ CONSTS = dict(
     # reads it; Ultimate's TARGET_HI_DAMAGE (the overtake's THROW_MEWTWO): the caught fighter at param_special_hi
     # overtake_attack_damage (50) % or more (APPROXIMATED: the flag's test is in the ExeFS, not read)
     MASTER_HI_CAPTURE='189.0f', MASTER_HI_HI_DAMAGE='50.0f', MASTER_HI_CATCH_START='20.0f', MASTER_HI_CATCH_END='26.0f',
+    # (v9) Ultimate's SpecialHi main loop (lua2cpp f_7208a2f5e0): TURN_CHECK (the scripts' frame 8) once, the stick back
+    # past the common param status_start_turn_stick_x (0.3); the B-reverse window (mine: the move's first 4 frames);
+    # the stage line test from his hand (Ultimate's map collision point: hip + map_coll_offset (0, 8, 8): here his hand
+    # on Ultimate's timeline, master_whip.py tips) to the tip, frames 17 (EXTEND) - 26 (BACK at 27); a wall: its normal
+    # within wall_angle_min / max (+-69 degrees: |ny| <= sin 69); the stops: hit_stop_frame_wall 12 /
+    # hit_stop_frame_fighter 19; the catching hit's damage (SpecialAirHi's ATTACK 0 from frame 20: 3 %)
+    MASTER_HI_TURN_CHECK='8.0f', MASTER_HI_TURN_STICK='0.3f', MASTER_HI_BREV_END='4.0f', MASTER_HI_LINE_START='17.0f',
+    MASTER_HI_LINE_END='26.0f', MASTER_HI_LINE_X='5.5f', MASTER_HI_LINE_Y='20.5f', MASTER_HI_WALL_NY='0.934f',
+    MASTER_HI_STOP_WALL='0xc', MASTER_HI_STOP_FIGHTER='0x13', MASTER_HI_CATCH_DAMAGE='3.0f',
     # Aymr: param_special_lw super_armor_damage_max; SpecialLw's START / END_SUPER_ARMOR (34 / 64), INHERIT_LANDING_1's
     # end (51), INHERIT_LANDING_2 (65 - 117)
     MASTER_LW_ARMOR='30.0f', MASTER_LW_ARMOR_START='34.0f', MASTER_LW_ARMOR_END='64.0f', MASTER_LW_INHERIT1_END='51.0f',
     MASTER_LW_INHERIT2_START='65.0f', MASTER_LW_INHERIT2_END='117.0f',
     # (v7) SpecialLw's FORBID_LANDING (60), the axe's PIERCE_GROUND (64 - 65), TURN_CHECK (12 - 42)
-    MASTER_LW_FORBID_START='60.0f', MASTER_LW_PIERCE='64.0f', MASTER_LW_TURN_START='12.0f', MASTER_LW_TURN_END='42.0f')
+    MASTER_LW_FORBID_START='60.0f', MASTER_LW_PIERCE='64.0f', MASTER_LW_TURN_START='12.0f', MASTER_LW_TURN_END='42.0f',
+    # (v9) Aymr's critical: param_special_lw critical_slow_rate 4, critical_frame 40; the KO test's stand-in (mine: the
+    # hit's hitstun 56 = knockback 140, about a KO from mid-stage on a diagonal)
+    MASTER_LW_CRIT_SLOW='0x4', MASTER_LW_CRIT_FRAME='0x28', MASTER_LW_CRIT_HITSTUN='56.0f',
+    # (v9) the diag build's log lines (master.c master_diag): 0 normally; compile_msc(..., diag=True) for the test build
+    MASTER_DIAG='0')
 
 
 def run(*argv):
@@ -178,11 +192,12 @@ def run(*argv):
     return r.stdout
 
 
-def compile_msc(src, out_path):
+def compile_msc(src, out_path, diag=False):
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     text = open(src).read()
-    for k in sorted(CONSTS, key=len, reverse=True):
-        text = text.replace(k, CONSTS[k])
+    consts = dict(CONSTS, MASTER_DIAG='1' if diag else '0')
+    for k in sorted(consts, key=len, reverse=True):
+        text = text.replace(k, consts[k])
     left = sorted(set(re.findall(r'\bMASTER_[A-Z0-9_]+\b', text)))
     assert not left, 'master.c: constants without a value: %s' % left
     with tempfile.NamedTemporaryFile('w', suffix='.c', delete=False) as f:
@@ -296,11 +311,16 @@ def body_fix(a, fighter):
     # at the sword's frames (Ultimate's sword article EXTEND at 17, BACK at 27); her frame-0 flag (0x2100000D, 5 frames:
     # the common AirCatch's ground check, func_124)
     ac = acmd.crc('aircatch')
+    assert HI_LEDGE_CHECK[1] == 17, 'the whip goes out at 17, with the flag off'
     # the whip hidden until it goes out (status 0 plays no motion of ours: her aircatch hides it so too); his body sword
     # shows until then (SWORD_VIS)
-    whip = [U.cmd('GENERATE_ARTICLE', 2), U.cmd('Article_Visibility', 2, 0), U.cmd('ON_FLAG', 0x2100000D),
-            U.cmd('FRAME', 5), U.cmd('OFF_FLAG', 0x2100000D),
-            U.cmd('FRAME', 17), U.cmd('Article_Visibility', 2, 1), U.cmd('Set_Remote_Article_Action', 2, 1),
+    # v9: the ledge box check (the common AirCatch's: func_99 with flag 0x2100000D, the tether box, vl group 7 entry 2)
+    # on Ultimate's AIR_LASSO_FLAG_CHECK frames (12 - 17), not her zair's 0 - 5 (gone before his sword is out: only
+    # the whip tip's own latch caught a ledge, user: "very specific")
+    whip = [U.cmd('GENERATE_ARTICLE', 2), U.cmd('Article_Visibility', 2, 0),
+            U.cmd('FRAME', HI_LEDGE_CHECK[0]), U.cmd('ON_FLAG', 0x2100000D),
+            U.cmd('FRAME', HI_LEDGE_CHECK[1]), U.cmd('OFF_FLAG', 0x2100000D),
+            U.cmd('Article_Visibility', 2, 1), U.cmd('Set_Remote_Article_Action', 2, 1),
             U.cmd('FRAME', 27), U.cmd('Set_Remote_Article_Action2', 2, 3),
             U.cmd('FRAME', 35), U.cmd('Remove_Article', 2)] + end()
     if any(c.name == 'GENERATE_ARTICLE' for c in g[ac]):
@@ -339,6 +359,9 @@ def body_fix(a, fighter):
         log.append(line)
     import master_whip
     master_whip.body_scripts(files['game'], log.append)
+    g[acmd.crc('specialairhihit')] = hi_hit_script()       # v9: the sword stays on what it met during the stop
+    for line in smash_hold_fx(a, files['effect'], joints):
+        log.append(line)
     g[ov] = merge_tail(U, g[ov], overtake_throw(U, a.dump, joints))
     for fn, f in files.items():
         f.save(os.path.join(d, fn + '.bin'))
@@ -349,6 +372,27 @@ def body_fix(a, fighter):
 
 # v8 the up special's catch (Ultimate: ENABLE_CATCH at 20, AttackModule::clear_all at 25: the hit on `throw` catches)
 HI_CATCH_START, HI_CATCH_END = 20, 25
+HI_LEDGE_CHECK = (12, 17)        # v9: SpecialAirHi's AIR_LASSO_FLAG_CHECK (on 12, off 17)
+HI_HIT_MODE_VAR = 0x0F00030F     # v9: VAR_15, master.c's SpecialAirHiHit mode (1 a wall, 2 a fighter, 0 stopped)
+HI_STOP = {1: 12, 2: 19}         # v9: param_special_hi hit_stop_frame_wall / _fighter: the sword back after the stop
+
+
+def if_var(var, method, value, body):
+    """Float_Var_Compare(var, method, value) True { body } (methods 0 ==, 1 !=, 2 <=, 3 >=, 4 <, 5 >)"""
+    import ultimate_acmd as U
+    return [U.cmd('Float_Var_Compare', var, method, float(value)), U.cmd('True', 2 + U.words(body))] + body
+
+
+def hi_hit_script():
+    """v9 SpecialAirHiHit's game script: the sword goes back (her whip's back status, 3) when master.c's stop ends:
+    at 12 for a wall, 19 for a fighter (Ultimate's hit_stop_frame_wall / _fighter: the sword stays on what it met),
+    at once when the tip was stopped by a floor / ceiling (VAR_15, set before the motion starts)"""
+    import ultimate_acmd as U
+    back = lambda: [U.cmd('Set_Remote_Article_Action2', 2, 3)]        # noqa: E731
+    out = if_var(HI_HIT_MODE_VAR, 0, 0, back())
+    for mode, fr in sorted(HI_STOP.items(), key=lambda kv: kv[1]):
+        out += [U.cmd('FRAME', fr)] + if_var(HI_HIT_MODE_VAR, 0, mode, back())
+    return out + end()
 HI_CAPTURE_STATUS = 0xBD         # the Falcon Dive capture (docs/acmd-params/throws-grabs-other.md TargetStatus 189)
 HI_TARGET_VARS = ('FIGHTER_MASTER_STATUS_SPECIAL_HI_FLAG_TARGET_AIR', 0x0F00030C,      # VAR_12, VAR_13: master.c
                   'FIGHTER_MASTER_STATUS_SPECIAL_HI_FLAG_TARGET_HI_DAMAGE', 0x0F00030D)  # master_hi_catch sets them
@@ -400,7 +444,11 @@ def merge_tail(U, flat, script):
 
 def no_release(script):
     """the catch frames' hitboxes (Ultimate's 3 % on the tip, the hit that catches) with NoGrabRelease: hitting the
-    fighter the tip's grab box holds doesn't let it go (port_check S5's rule for throws)"""
+    fighter the tip's grab box holds doesn't let it go (port_check S5's rule for throws).
+    v9: and they don't touch fighters at all (HitBits bit 0 off: items / stage gimmicks still): v8's grab box shared
+    frame 20 with them, the hit took the fighter (its knockback, 3 %; the catcher and it in hitlag) and the grab never
+    caught (user's v8 clips: DK hit at 120 -> 123 %, launched, never held). The catch is the grab box alone; master.c
+    adds the 3 % to the caught fighter (master_hi_catch). port_check S14 grab-vs-hit"""
     frame = 0.0
     for c in script:
         if c.name == 'FRAME':
@@ -408,7 +456,9 @@ def no_release(script):
         elif c.name == 'WAIT':
             frame += float(c.params[0])
         elif c.name in ('Special_Hitbox', 'Extended_Special_Hitbox') and frame >= HI_CATCH_START:
-            c.params[c.info['syntax'].index('NoGrabRelease')] = 1
+            syn = c.info['syntax']
+            c.params[syn.index('NoGrabRelease')] = 1
+            c.params[syn.index('HitBits')] = int(c.params[syn.index('HitBits')]) & ~1
 
 
 def overtake_throw(U, dump, joints):
@@ -535,6 +585,30 @@ def merge_timed(a, b):
             t = when
         out += blk
     return out + end()
+
+
+# v9 (user: "please fix Byleth's orb glows when charging Smash attacks"): the smash holds' effect scripts were still
+# Zero Suit Samus's (the translator has no Charge -> Hold names): her flash on the hand (RHaveN, (0, 1.5, 2)) in all
+# three. Ultimate's AttackS4Charge / AttackHi4Charge / AttackLw4Charge: the dust every 10 frames and sys_smash_flash_s
+# on haver (the held weapon's grip = RHaveN) at the weapon's charge point: Areadbhar's head (0, 24, 0), the sword
+# (0, 6, 1), Aymr's head (0, 16, 1), random 3; port_check E13 smash-hold
+HOLD_FX = (('AttackS4Charge', 'attacks4hold'), ('AttackHi4Charge', 'attackhi4hold'), ('AttackLw4Charge', 'attacklw4hold'))
+
+
+def smash_hold_fx(a, effect, joints):
+    import ultimate_acmd as U
+    ids = {}
+    for p in (os.path.join(ROOT, 'reference/ultimate_sys_effects.json'), os.path.join(MDIR, 'master_effects.json')):
+        ids.update({k: int(v, 0) for k, v in json.load(open(p)).items() if not k.startswith('_')})
+    out = []
+    for src, dst in HOLD_FX:
+        fns = U.functions(open(os.path.join(a.dump, 'master', src + '.txt')).read())
+        etr = U.EffectTranslator(joints, ids, {})
+        sc = etr.script(fns['effect_' + src.lower()])
+        assert any(c.name.startswith('Graphic_Effect') for c in sc), '%s: no effect translated (%s)' % (src, etr.missing)
+        effect.scripts[acmd.crc(dst)] = sc
+        out.append('%s -> %s: %s' % (src, dst, '; '.join(str(c) for c in sc if c.name.startswith('Graphic'))[:200]))
+    return out
 
 
 def article_effects(a, fighter, effect, joints, game=None):
@@ -670,24 +744,76 @@ ARROW2_FX = (''.join('macros::EFFECT(agent, Hash40::new("master_bow_arrow2"), Ha
                '0, 0, 0, 0, 0, 0, true);' % ARROW2_DIST)
 
 
-def arrow2_line(game):
-    """the max arrow's game script: its ATTACKs (Ultimate's, translated) as capsules from the arrow to ARROW2_DIST along
-    its facing (each at its own lateral offset), cleared after ARROW2_HIT_FRAMES"""
+# v9: Ultimate's set_search cuts the max arrow's line at the first ground / wall (a GroundModule line test from the
+# arrow along distance 300): here Line_Test (tools/line_test_cave.py, exe_v46v_line) from the arrow along its facing,
+# the distance in the arrow's VAR_0; its hitbox capsules and beam stop there, the head and end flash sit there (to
+# ARROW2_CUT: the buckets; nothing met = the whole 300). port_check S15 line-cut
+ARROW2_CUT = 10.0
+ARROW2_CUT_VAR = 0x0F000300
+
+
+def arrow2_test():
+    """Line_Test(Space 0, (0, 0) -> (ARROW2_DIST, 0), Floors 1 (passable platforms left out), Distance -> VAR_0)"""
     import ultimate_acmd as U
-    out = []
+    return [U.cmd('Line_Test', 0, 0.0, 0.0, ARROW2_DIST, 0.0, 1, ARROW2_CUT_VAR, 0, 0, 0)]
+
+
+def arrow2_buckets(make):
+    """make(L) for the line cut at L: one block per ARROW2_CUT step, the distance in (L - step, L]; the last one has no
+    top (nothing met: the whole length, maybe a hair over it)"""
+    out, n = [], int(round(ARROW2_DIST / ARROW2_CUT))
+    for k in range(1, n + 1):
+        L = ARROW2_CUT * k
+        body = make(L)
+        if k < n:
+            body = if_var(ARROW2_CUT_VAR, 2, L, body)
+        out += if_var(ARROW2_CUT_VAR, 5, L - ARROW2_CUT, body)
+    return out
+
+
+def arrow2_line(game):
+    """the max arrow's game script: its ATTACKs (Ultimate's, translated) as capsules from the arrow along its facing
+    (each at its own lateral offset) to the first stage line within ARROW2_DIST (v9: Line_Test), cleared after
+    ARROW2_HIT_FRAMES"""
+    import ultimate_acmd as U
+    hits = []
     for c in game:
         if c.name == 'Extended_Special_Hitbox':
             syn = c.info['syntax']
             p = list(c.params)
             for k, v in (('Y', 0.0), ('Z', 0.0), ('X2', p[syn.index('X')]), ('Y2', 0.0), ('Z2', ARROW2_DIST)):
                 p[syn.index(k)] = v
-            c = acmd.Command(c.ident, p)
+            hits.append(acmd.Command(c.ident, p))
         elif c.name == 'Special_Hitbox':
             raise AssertionError('arrow2: a plain hitbox in its game script (expected Ultimate\'s capsules)')
-        if c.ident == acmd.END:
+        elif c.ident == acmd.END:
             break
-        out.append(c)
-    return out + [U.cmd('FRAME', ARROW2_HIT_FRAMES), U.cmd('Remove_All_Hitboxes')] + end()
+        else:
+            raise AssertionError('arrow2: %s in its game script (expected its frame-0 capsules only)' % c.name)
+
+    def cut(L):
+        out = []
+        for h in hits:
+            p = list(h.params)
+            p[h.info['syntax'].index('Z2')] = L
+            out.append(acmd.Command(h.ident, p))
+        return out
+    return arrow2_test() + arrow2_buckets(cut) + [U.cmd('FRAME', ARROW2_HIT_FRAMES), U.cmd('Remove_All_Hitboxes')] + end()
+
+
+def arrow2_fx(etr):
+    """v9: the beam's pieces up to the cut (a piece where the line goes on past its middle), the head and end flash at
+    the cut (ARROW2_FX's effects, cut by the arrow's Line_Test)"""
+    one = lambda src: [c for c in etr.script('if macros::is_excute(agent) { %s }' % src) if c.ident != acmd.END]  # noqa: E731
+    piece = ('macros::EFFECT(agent, Hash40::new("master_bow_arrow2"), Hash40::new("top"), 0, 0, %g, 0, 0, 0, %g, 0, 0, 0, '
+             '0, 0, 0, true);')
+    tip = ('macros::EFFECT(agent, Hash40::new("master_bow_arrow2_%s"), Hash40::new("top"), 0, 0, %g, 0, 0, 0, 1, 0, 0, 0, '
+           '0, 0, 0, true);')
+    out = arrow2_test()
+    for k in range(ARROW2_PIECES):
+        z = ARROW2_FX_OFFSET + ARROW2_SEG * k
+        out += if_var(ARROW2_CUT_VAR, 3, z + ARROW2_SEG / 2, one(piece % (z, ARROW2_FX_SCALE)))
+    return out + arrow2_buckets(lambda L: one(tip % ('bullet', L)) + one(tip % ('end', L)))
 
 
 def weapons(a, fighter, effect_ids):
@@ -703,9 +829,6 @@ def weapons(a, fighter, effect_ids):
         eff = etr.script(fns[ename]) if ename in fns else end()
         # its effects end with its flight (the shot's life, SHOT_PARAMS; a hit removes it earlier): port_check E10
         life = 17 if art == 'arrow1' else ARROW2_LIFE
-        if art == 'arrow2':
-            extra = etr.script('if macros::is_excute(agent) { ' + ARROW2_FX + ' }')
-            eff = U.merge_flat(eff, extra) or eff
         made = sorted({c.params[0] for c in eff if c.name.startswith(('Graphic_Effect', 'External_Graphic',
                                                                       'EFFECT_FOLLOW'))
                        and c.params[0] not in (effect_ids.get('master_bow_arrow2'), effect_ids.get('master_bow_arrow2_end'),
@@ -713,6 +836,8 @@ def weapons(a, fighter, effect_ids):
         if made:
             eff = U.merge_flat(eff, [U.cmd('FRAME', life)] + [U.cmd('Terminate_Graphic_Effect', m, 0, 0) for m in made]
                                + end()) or eff
+        if art == 'arrow2':
+            eff = arrow2_fx(etr) + eff          # v9: frame 0, ahead of Ultimate's own (the beam cut at the wall)
         snd = end()
         wdir = os.path.join(fighter, 'script/animcmd/weapon', art)
         os.makedirs(wdir, exist_ok=True)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Byleth (master) v8 MSC checks: his compiled master.mscsb run in rolloff_hold_test's MSC interpreter against a small
+"""Byleth (master) v8 / v9 MSC checks: his compiled master.mscsb run in rolloff_hold_test's MSC interpreter against a small
 model of the game (fighters/master/README.md "Status: v8").
 
   python3 -I tools/master_specials_test.py [MASTER.mscsb]     (default: compiled now from fighters/master/master.c)
@@ -18,6 +18,17 @@ Checked:
     (0x15B), Ultimate's TARGET_AIR / TARGET_HI_DAMAGE into VAR_12 / VAR_13; none outside those frames or far away;
  4. 0x15B pulls him to it, then the overtake sends the thrown link event (0xB, ThrownF 0x7C) and the throw work int
     0x11000005, once; its end lets go of a fighter it still holds only when it wasn't thrown.
+v9 (README "Status: v9"):
+ 5. the catch adds Ultimate's catching hit's 3 % to the caught fighter; 0x15B holds hit_stop_frame_fighter (19) before
+    the rewind;
+ 6. the stage line test (LINE_* variables, tools/line_test_cave.py; the model answers it with one wall / ceiling): the
+    tip meeting a wall during 17 - 26 -> 0x15B latched (VAR_15 1): 12 frames' stop, the rewind to the point (his hand
+    there), then the wall jump 0x15C; a ceiling or no wall jumps left -> stopped (VAR_15 0), no pull, Fall at the end;
+    nothing met -> no change; the test asked with Ultimate's points (from the hand to the next frame's tip);
+ 7. the turn rules: TURN_CHECK at 8 turns him once with the stick back (no momentum flip); the B-reverse in the first
+    frames turns him and flips his air momentum; nothing with the stick forward;
+ 8. Aymr's critical: the move's first hit in a 1-on-1 with a KO-strength hitstun slows the game (SlowModule 4, 40)
+    and zooms (ITEM 8, then 9 after 40 frames); not with three fighters or a weak hit.
 """
 import os
 import re
@@ -66,6 +77,11 @@ class Game:
         self.calls = []            # (sys, args)
         self.status = []           # status changes asked
         self.vars = {}             # float variables written
+        self.stick = 0.0           # STICK_X along the facing
+        self.hit_now = 0.0         # SELF_HIT_NOW
+        self.wall_x = None         # v9: a wall at this world x (its normal facing him) ...
+        self.ceil_y = None         # ... or a ceiling at this world y, for the line test
+        self.line_asks = []        # (x0, y0, x1, y1, mode) of each line test
 
     def sys(self, sid, a):
         self.calls.append((sid, list(a)))
@@ -94,10 +110,43 @@ class Game:
             return f2i(self.fvar(a[1]))
         if sid == 0x16 and len(a) == 3 and a[0] == 0:        # WorkModule(0, value, var): a float set
             self.vars[a[2]] = i2f(a[1])
+            if a[2] == 0x0F0003D4:
+                self.line_test(i2f(a[1]))
+            return 0
+        if sid == 0x14 and a in ([1], [2]):                 # PostureModule(1): reverse_lr (then 2: its rotation)
+            if a == [1]:
+                self.lr = -self.lr
             return 0
         return 0
 
+    def line_test(self, mode):
+        """tools/line_test_cave.py's LINE_* answer (Space 0: X along his facing from his position), one wall / ceiling"""
+        x0, y0, x1, y1 = (self.vars.get(0x0F0003D0 + i, 0.0) for i in range(4))
+        self.line_asks.append((x0, y0, x1, y1, mode))
+        wx0, wy0 = self.x + self.lr * x0, self.y + y0
+        wx1, wy1 = self.x + self.lr * x1, self.y + y1
+        hit = None
+        if self.wall_x is not None and wx1 != wx0:
+            t = (self.wall_x - wx0) / (wx1 - wx0)
+            if 0 <= t <= 1:
+                hit = (t, self.wall_x, wy0 + t * (wy1 - wy0), -1.0 if (wx1 - wx0) * self.lr > 0 else 1.0, 0.0, 2.0)
+        if hit is None and self.ceil_y is not None and wy1 != wy0:
+            t = (self.ceil_y - wy0) / (wy1 - wy0)
+            if 0 <= t <= 1:
+                hit = (t, wx0 + t * (wx1 - wx0), self.ceil_y, 0.0, -1.0, 3.0)
+        if hit is None:
+            out = [0.0, ((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5, x1, y1, 0.0, 0.0, 0.0]
+        else:
+            t, hx, hy, nx, ny, kind = hit
+            out = [1.0, t * ((x1 - x0) ** 2 + (y1 - y0) ** 2) ** 0.5, (hx - self.x) * self.lr, hy - self.y, kind, nx, ny]
+        for i, v in enumerate(out):
+            self.vars[0x0F0003D4 + i] = v
+
     def fvar(self, v):
+        if v == 0x0F000110:
+            return self.stick
+        if v == 0x0F0000A1:
+            return self.hit_now
         if 0x0F000020 <= v < 0x0F000040:
             s, q = divmod(v - 0x0F000020, 4)
             f = self.slots.get(s)
@@ -229,10 +278,12 @@ def up_special(path):
     # the pull and the throw
     b, gm = setup(22.0, near)
     b.call('master_hi_air_loop')
+    dvar = 0x0F000100 + 0x20 * (1 + 3) + 0x17
+    check('v9 the catch adds the catching hit\'s 3 %% (30 -> 33)', gm.vars.get(dvar) == 33.0, str(gm.vars.get(dvar)))
     gm.catching = True
     gm.status.clear()
     b.call('master_hi_hit_main')
-    moved, n = [], 0
+    moved, n, held = [], 0, 0
     for n in range(1, 40):
         gm.frame = float(n)
         b.call('master_hi_hit_loop')
@@ -241,7 +292,10 @@ def up_special(path):
             vx, vy = i2f(ks[-1][2]), i2f(ks[-1][3])
             gm.x += vx
             gm.y += vy
-            moved.append((round(vx, 2), round(vy, 2)))
+            if vx or vy:
+                moved.append((round(vx, 2), round(vy, 2)))
+            elif not moved:
+                held = n
         gm.calls = [c for c in gm.calls if c[0] != 0x10]
         if b.g('master_phase') == 1:
             gm.frame = 1.0
@@ -251,6 +305,8 @@ def up_special(path):
             break
     links = [a for s, a in gm.calls if s == 0x2A and a and a[0] == 0x271B]
     sets = [a for s, a in gm.calls if s == 0x16 and a and a[0] == 7 and a[2] == 0x11000005]
+    # (the status's first frame is the main's: its loop runs there too, so 18 loops + it)
+    check('v9 SpecialAirHiHit: still for hit_stop_frame_fighter (19 frames) before the rewind', held + 1 == 19, 'held %d' % held)
     check('SpecialAirHiHit: pulled at rewind_speed 4.1 a frame to the caught fighter (his hand 8 short), then stopped',
           moved and stopped and abs((moved[0][0] ** 2 + moved[0][1] ** 2) ** 0.5 - 4.1) < 0.01 and abs(gm.x - (20.0 - 8.0)) < 0.01
           and abs(gm.y - 90.0) < 0.01, 'steps %s, at (%.2f, %.2f) after %d frames' % (moved[:3], gm.x, gm.y, n))
@@ -272,10 +328,140 @@ def up_special(path):
           [a for s, a in gm.calls if s == 0x3B and a == [0x2711]] != [])
 
 
+def v9(path):
+    def setup(frame, x=0.0, lr=1.0):
+        b, gm = Byleth(path), Game()
+        b.vm.game = gm
+        b.g('global18', 2)
+        b.g('global19', 2)
+        b.g('master_wall_jumps', 0)
+        b.g('master_hi_turned', 1)
+        b.g('master_hi_brev', 1)
+        b.g('master_hi_wall', 0)
+        gm.frame, gm.x, gm.lr = frame, x, lr
+        return b, gm
+    # 6. the line test
+    b, gm = setup(19.0)
+    gm.wall_x = 14.0
+    b.call('master_hi_air_loop')
+    ask = gm.line_asks[-1] if gm.line_asks else None
+    check('v9 line test asked from his hand (5.5, 20.5) to the next frame\'s tip (frame 20: 15.3, 45.3), mode 2',
+          ask is not None and all(abs(p - q) < 1e-4 for p, q in zip(ask, (5.5, 20.5, 15.3, 45.3, 2.0))), str(ask))
+    check('v9 the tip meets a wall at frame 19 -> SpecialAirHiHit, latched', 0x15B in gm.status and b.g('master_hi_wall') == 1,
+          'statuses %s, wall %d' % ([hex(x) for x in gm.status], b.g('master_hi_wall')))
+    tx, ty = i2f(b.g('master_tx')), i2f(b.g('master_ty'))
+    gm.status.clear()
+    b.call('master_hi_hit_main')
+    check('v9 latched: VAR_15 = 1 (the sword stays 12 frames)', gm.vars.get(0x0F00030F) == 1.0)
+    held, moved, n = 0, 0, 0
+    for n in range(1, 60):
+        gm.calls.clear()
+        b.call('master_hi_hit_loop')
+        ks = [a for s, a in gm.calls if s == 0x10 and a and a[0] == 0x11 and a[1] == 3]
+        if ks:
+            vx, vy = i2f(ks[-1][2]), i2f(ks[-1][3])
+            if vx or vy:
+                moved += 1
+                gm.x += vx * gm.lr
+                gm.y += vy
+            elif not moved:
+                held = n
+        if 0x15C in gm.status:
+            break
+    check('v9 latched: still 12 frames (hit_stop_frame_wall), pulled until his hand is at the point, then the wall jump',
+          held + 1 == 12 and 0x15C in gm.status and abs(gm.x + 8.0 - tx) < 0.01 and abs(gm.y + 20.5 - ty) < 0.01,
+          'held %d, moved %d, at (%.2f, %.2f), point (%.2f, %.2f), statuses %s' % (held, moved, gm.x, gm.y, tx, ty,
+                                                                                  [hex(x) for x in gm.status]))
+    b, gm = setup(22.0, lr=-1.0)
+    gm.wall_x = -15.0
+    b.call('master_hi_air_loop')
+    check('v9 facing left: the wall 15 to his left met', 0x15B in gm.status and b.g('master_hi_wall') == 1)
+    b, gm = setup(23.0)
+    gm.ceil_y = 50.0 + 40.0
+    b.call('master_hi_air_loop')
+    check('v9 a ceiling 40 above at frame 23 -> SpecialAirHiHit, stopped (no latch)',
+          0x15B in gm.status and b.g('master_hi_wall') == 2)
+    gm.status.clear()
+    b.call('master_hi_hit_main')
+    gm.end = True
+    b.call('master_hi_hit_loop')
+    check('v9 stopped: VAR_15 0 (the sword back at once), Fall at the motion\'s end, no overtake',
+          gm.vars.get(0x0F00030F) == 0.0 and gm.status == [0xE], str([hex(x) for x in gm.status]))
+    b, gm = setup(19.0)
+    gm.wall_x = 14.0
+    b.g('master_wall_jumps', 3)
+    b.call('master_hi_air_loop')
+    check('v9 no wall hits left (wall_hit_max 3): stopped, not latched', b.g('master_hi_wall') == 2)
+    b, gm = setup(19.0)
+    gm.wall_x = 400.0
+    b.call('master_hi_air_loop')
+    check('v9 nothing met -> no change', 0x15B not in gm.status and b.g('master_hi_wall') == 0)
+    b, gm = setup(14.0)
+    gm.wall_x = 14.0
+    b.call('master_hi_air_loop')
+    check('v9 no test before 17 (the sword out)', not gm.line_asks)
+    b, gm = setup(19.0)
+    b.g('global18', 0)
+    gm.wall_x = 14.0
+    b.call('master_hi_loop')
+    check('v9 the ground up special latches too', 0x15B in gm.status and b.g('master_hi_wall') == 1)
+    # 7. the turn rules
+    for f, stick, want, what in ((8.0, -0.5, -1.0, 'TURN_CHECK (frame 8), stick back'),
+                                 (8.0, 0.5, 1.0, 'TURN_CHECK, stick forward'),
+                                 (8.0, -0.2, 1.0, 'TURN_CHECK, stick back under 0.3')):
+        b, gm = setup(f)
+        b.g('master_hi_turned', 0)
+        gm.stick = stick
+        b.call('master_hi_air_loop')
+        flips = [a for s, a in gm.calls if s == 0x10 and a and a[0] == 0x11 and a[1] in (2, 3)]
+        check('v9 %s -> facing %g, momentum kept' % (what, want), gm.lr == want and not flips, 'lr %g' % gm.lr)
+    b, gm = setup(9.0)
+    b.g('master_hi_turned', 0)
+    gm.stick = -0.5
+    b.call('master_hi_air_loop')
+    gm.lr = -gm.lr if False else gm.lr
+    b.call('master_hi_air_loop')
+    check('v9 TURN_CHECK once (two loops with the stick back: one turn)', gm.lr == -1.0)
+    b, gm = setup(1.0)
+    b.g('master_hi_brev', 0)
+    gm.stick = -0.6
+    b.call('master_hi_air_loop')
+    flips = [a for s, a in gm.calls if s == 0x10 and a and a[0] == 0x11 and a[1] in (2, 3)]
+    check('v9 B-reverse at frame 1 in the air: turned, energies 2 / 3 x flipped', gm.lr == -1.0 and len(flips) == 2,
+          'lr %g, flips %d' % (gm.lr, len(flips)))
+    b, gm = setup(5.0)
+    b.g('master_hi_brev', 0)
+    gm.stick = -0.6
+    b.call('master_hi_air_loop')
+    check('v9 no B-reverse after its window (frame 5)', gm.lr == 1.0)
+    # 8. Aymr's critical
+    for slots, hitstun, want, what in ((2, 60.0, True, 'a 1-on-1, hitstun 60'), (3, 60.0, False, 'three fighters'),
+                                       (2, 30.0, False, 'a weak hit (hitstun 30)')):
+        b, gm = Byleth(path), Game()
+        b.vm.game = gm
+        b.g('global4', 0x155)
+        for k in range(slots):
+            gm.slots[k] = dict(x=0.0, y=0.0, status=0, air=False, damage=0.0)
+        gm.vars[0x0F0002C9] = hitstun
+        gm.hit_now = 1.0
+        b.call('master_lw_crit')
+        slow = [a for s, a in gm.calls if s == 0x49]
+        cam = gm.vars.get(0x0F000099)
+        ok = (slow == [[0, 4, 40]] and cam == 8.0) if want else (not slow and cam is None)
+        if want:
+            gm.hit_now = 0.0
+            for _ in range(40):
+                b.call('master_lw_crit')
+            ok = ok and gm.vars.get(0x0F000099) == 9.0 and len([a for s, a in gm.calls if s == 0x49]) == 1
+        check('v9 Aymr\'s critical: %s -> %s' % (what, 'slowed and zoomed, back after 40' if want else 'nothing'), ok,
+              'slow %s, cam %s' % (slow, gm.vars.get(0x0F000099)))
+
+
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else compiled()
     failnaught(path)
     up_special(path)
+    v9(path)
     print('\n%d problem(s)' % len(PROBLEMS))
     sys.exit(1 if PROBLEMS else 0)
 

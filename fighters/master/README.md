@@ -9,6 +9,63 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: v9 (`scratchpad/byleth_v9_fix.zip`: a FIX package over v4 + byleth_userdata_v2 + v5_fix ... v8_fix; exe **exe_v46v_line** (exe_v46v_threads + `tools/line_test_cave.py`); in-game TEST)
+
+User, v8 test (3 clips, framed at 60 fps in `scratchpad/byleth/v9/clips/`): up special grabs nobody and doesn't pull him;
+the ledge grab "very specific" (not Ultimate's wide area); no pull to walls, the whip passes through them; "check
+Ultimate's code for how up special works"; no turn into the held direction, no B-reverse; down special's camera zoom
+missing on a hit; the smash-charge orbs wrong.
+
+| point | cause (evidence) | fix |
+|---|---|---|
+| up special: nothing caught | clip 1 (`v9/clips/c1_z1.png`, `c1_z2.png`, `c1_hud.png`: clip frames 86 - 117): the tip reaches DK at clip frame 90, DK's percent goes 120 -> 123 at 93 (one 3 % hit, `c1_hud.png`), the hit sparks 94 - 98 (hitlag) and DK is launched with the smoke trail; clip 2 (ground, `c2_sheet1.png`): DK 0 -> 1 -> 4 %, launched. v8's grab box (frames 20 - 25) shared frame 20 with Ultimate's 3 % hits on the tip (ID 0 / 1, HitBits 0x1F / 0x3F: they hit fighters): the hit took DK first and the grab box never caught it, also not through DK's 6 hitlag frames inside it. The exe side read: a catch goes through the capturer's CatchModule (vtable `0x10104410`, vt +0x8C `0x02C18DC8`: the victim's CaptureModule vt +0xBC gets the grab box's TargetStatus `+0x1E` and flag `+0x26`); the capturer's status isn't asked there (Falcon's / Ganondorf's dives catch from their 0x154, same status data as ours); the fighter's catch event (event 8, `0x02E31F68`) only moves Catch / CatchDash / CatchTurn to CatchPull. Not traced: the per-frame pass that orders hits and grabs (the hit-first reading is from the clips; the diag build logs it if it still fails) | `master_build.no_release`: the hits over the catch frames (20 - 25) keep NoGrabRelease and lose HitBits bit 0 (items / gimmicks only), so the grab box is the only thing touching fighters there; `master_hi_catch` adds Ultimate's catching hit's 3 % to the caught fighter (its damage variable); 0x15B now holds `hit_stop_frame_fighter` 19 frames before the rewind (Ultimate's ShakeModule stop), the sword going back at 19 (`hi_hit_script`, VAR_15). **port_check S14 grab-vs-hit** (ERROR: a grab box out with a fighter-hitting hitbox; v8's install: aircatch / specialhi frames 20 - 24) |
+| up special: the ledge "very specific" | the box check (the common AirCatch's func_99 with flag 0x2100000D) ran on ZSS's zair frames 0 - 5 (aircatch: ON 0, OFF 5), before his sword is out (17): only the whip tip's native latch could take a ledge; the box was ZSS's tether box (vl group 7 entry 2: (10, -10, 70, 60)) | the flag on Ultimate's AIR_LASSO_FLAG_CHECK (12 - 17); the tether box Ultimate's cliff_hang_data[3] (FIGHTER_MASTER_CLIFF_HANG_DATA_AIR_LASSO, selected at SpecialAirHi frame 15: p1 (44, 85), p2 (-44, 20)) -> (0, 20, 44, 65) (port.json `tether_ledge_box`, `ultimate_vl_shapes.py --tether`; Smash 4 takes the reach behind as 0.6 x 44 = 26: APPROXIMATED against Ultimate's 44). **port_check S16 tether-window** (ERROR on v8's install: 0 - 5 vs the whip at 17) |
+| up special: walls | no stage test from the sword (v8: "the wall check is still his body's") | **a line test in the executable** (`tools/line_test_cave.py`: the game's GroundModule ray_check `0x02C39FB4`, as a new ACMD command `Line_Test` and the MSC variables `LINE_*`, `docs/acmd-extra-commands.md` "Line_Test"); `master_hi_line`: frames 17 - 26 (EXTEND to BACK), from his hand (5.5 forward, 20.5 up) to the next frame's tip (Ultimate's sword tip on his timeline, `master_whip.py tips`: (7.5, 22.4) at 18 ... (22.6, 64.9) at 25), passable platforms left out. A wall (its normal within Ultimate's wall_angle_min / max, +-69 degrees) with wall hits left (wall_hit_max 3) -> 0x15B latched: the sword stays (hit_stop_frame_wall 12), then he is rewound at rewind_speed 4.1 until his hand is at the point, then the wall jump 0x15C (jump 0.9 / 2.6); a floor / ceiling (or no wall hits left) -> stopped: the sword goes back at once, Fall at the motion's end. The body-touching-a-wall jump is gone (Ultimate's only comes from the sword). Ground and air |
+| max arrow through walls | the line hitbox and beam always 300 long (v8: "not cut at the first ground") | its game / effect scripts start with `Line_Test(0, 0, 0, 300, 0, Floors 1, VAR_0)`: the three capsules end at the distance (10-unit steps, `master_build.arrow2_buckets`), the beam's pieces only where the line goes, the head and end flash at the cut. **port_check S15 line-cut** (WARN: a long article line hitbox with no Line_Test), **X6 line-test-exe** (ERROR: Line_Test with no executable carrying it) |
+| no turn / B-reverse | his loops had no turn code | Ultimate's (lua2cpp f_7208a2f5e0, read below): on TURN_CHECK (frame 8) once, the stick back past status_start_turn_stick_x 0.3 turns him (momentum kept); B-reverse (mine: frames 0 - 3, Ultimate's is the common special start's): the stick back turns him and flips his air momentum (energies 2 / 3), once. Ground and air (`master_hi_turn`) |
+| down special: no zoom | not done (README v1: "Aymr's KO zoom") | `master_lw_crit` (every frame from func_82): Ultimate's param_special_lw critical_* (critical_frame 40, slow 4, 1-on-1 only), as Hero's critical hits: the move's first hit in a 1-on-1 with a KO-strength hit slows the game to 1/4 for 40 frames (SlowModule) and closes the camera in (ITEM variable 8, back with 9). The KO test APPROXIMATED: the hit's hitstun >= 56 (knockback 140); Ultimate's own is its cut-in's KO check (ExeFS, not read); its zoom rate 4.6 / offset (3, 1.5) / darkened background (bg_only_frame 30) not reproduced (Camera_Closeup's fixed call) |
+| smash-charge orbs | the hold effect scripts were still ZSS's (the translator has no Charge -> Hold names): her flash (his bank's sys_smash_flash_s copy, 0x3470091) on RHaveN at (0, 1.5, 2), the same in all three smashes, size 1 random 4 | Ultimate's AttackS4Charge / AttackHi4Charge / AttackLw4Charge translated into attacks4hold / attackhi4hold / attacklw4hold (`master_build.smash_hold_fx`): sys_smash_flash_s on haver (RHaveN) at Areadbhar's head (0, 24, 0), the sword (0, 6, 1), Aymr's head (0, 16, 1), random 3, every 10 frames with the dust. Colour: the same emitter set as Ultimate's (his bank's copy of sys_smash_flash_s, no script colour in Ultimate's). Brightness: no halo added (the bloom clip of v8's cause 2 applies; xv2_smash_fx's HALO_ALPHA / HDR_CAP halos to tune in game: Handover). The orbs are non-following, short (no leak: E12 clean). **port_check E13 smash-hold** (ERROR: holds identical to the base's; v8's install: all three) |
+
+### Ultimate's up special (status code: lua2cpp_master, read with `tools/recomp_annotate.py` / `recomp_hashes.py`)
+
+- **Scripts** (SpecialHi / SpecialAirHi): rate 0.3 over 1 - 10; TURN_CHECK on at 8; (air) AIR_LASSO_FLAG_CHECK on 12 - 17,
+  HANG_IMMIDIATE 12 - 15, the AIR_LASSO cliff box selected at 15; a search box at 15 (air fighters above-ahead,
+  cleared at 16); the sword EXTEND at 17; hits on `throw` (the sword tip) 17 - 21: ID 0 0.01 % angle 368 to (16, 40)
+  above him (the pull), ID 1 3 %; ENABLE_CATCH at 20 with ID 0 3 % (the catching hit); clear at 25; BACK at 27.
+- **Main loop** (f_7208a2f5e0): the cancel / wait / fall checks, the cliff catch (GroundModule is_status_cliff /
+  can_entry_cliff / hang_cliff_dir, set_rhombus_modify_air_lasso, select_cliff_hangdata, set_cliff_check), the turn:
+  `if TURN_CHECK and not TURN_DONE: if stick_x x lr <= -common.status_start_turn_stick_x (0.3): reverse_lr,
+  update_rot_y_lr; TURN_DONE on` (once), the start speeds (sub_exec_special_start_common_kinetic_setting
+  param_special_hi: start_speed_x_mul_air 0.7, start_speed_y_air 1.4, start_brake_x_air 0.01, ...).
+- **Init** (f_7208a1e220): start_speed_y_air_dec, the map collision point: map_coll_joint `hip` + map_coll_offset
+  (0, 8, 8) into the ground shape (set_shape_data_rhombus_modify_node_offset), the air lasso's rhombus.
+- **SpecialHiHit** (f_7208a2b7d0): a caught fighter: CatchModule::set_catch (Smash 4: the grab box's capture),
+  the hit pose (special_(air_)hi_hit_pose), the stop (ShakeModule req_time_scale: hit_stop_frame_fighter 19 /
+  _wall 12 / _item 12), the sword told rewind_speed (4.1) and the angle (tip_angle_object -15 / tip_angle_wall 70);
+  a wall: GroundModule get_touch_normal, wall_offset (-0.6, -0.8); then the overtake (overtake_stop_frame 3, its
+  throw by TARGET_AIR / TARGET_HI_DAMAGE: overtake_attack_damage 50) or the wall jump (f_7208a1fa60 / f_7208a1c840 /
+  f_7208a2a8a0 / f_7208a2ac80: the wall within wall_angle_min / max -69 / 69, wall_jump_stop_frame 13, jump_speed_x /
+  _y 0.9 / 2.6, wall_jump_speed_x_mul 0.9, sys_cling; wall_hit_max 3 an airtime). The wall / ground contact itself is
+  the sword article's (its own statuses' map test from its tip, not read in detail): here the line test from his hand.
+- **Not reproduced:** the sword's variable length (Smash 4 plays canned extend / back motions: it stops by the status
+  change on the frame before the tip would cross the line), tip_angle_*, the search box's use, HANG_IMMIDIATE's box.
+
+Built: `ultimate_port.py run master scripts specials variants shapes --out OUT` (`scratchpad/byleth/pipeline_v9.log`),
+master.mscsb `master_build.compile_msc`. Exe: `python3 tools/rpx_patch.py exe_v46v_threads.rpx exe_v46v_line.rpx
+$(python3 tools/line_test_cave.py --rpx exe_v46v_threads.rpx)` (sha1 in INSTALL README); with exe_v46w_vars
+(tools/var_reset_cave.py) the order is var_reset first, then line_test (docs/native-notes.md "Stage line test").
+Checks: `tools/master_specials_test.py` (42 checks, 0 problems: the catch's 3 %, the 19 / 12 stops, the line test's
+latch / stop / nothing / facing left / ground, the turn rules, the B-reverse, Aymr's critical); `tools/line_test_test.py`
+(unicorn on exe_v46v_threads 29 checks, on exe_v46w_vars 31, 0 failures); Sm4shCommand v1.7.3 (`new_var_test.cs`: 205
+checks, Line_Test's 4 examples compile and round-trip). Diag: `TEST_ONLY_INSTALL_TO_code` exe_v46v_line_diag (+
+`tools/diag_godfist_cave.py`: S4GF lines) with a diag master.mscsb (`compile_msc(..., diag=True)`, master.c
+master_diag: k 0 frame, 1 a fighter near (slot x 1000 + status), 2 / 3 the line test, 4 the hit mode, 5 holding).
+Package `scratchpad/byleth/make_pkg_v9_fix.py` (5 fighter files + the vl + the exe + the TEST_ONLY diag), INSTALL
+README `scratchpad/byleth/INSTALL_README_v9.txt`. port_check (all seven packages): **0 ERROR**, 30 WARN
+(`scratchpad/byleth/pc_v9.log`); on v8's install the new rules give S14 (aircatch / specialhi 20, 21, 25), S16
+(0 - 5 vs 17), E13 (all three holds) and S15 (the max arrow's 300-unit capsules). Hitbox Viewer (v1.7.3, Shot.exe):
+the smash holds' orbs before / after (`scratchpad/byleth/v9/view/`).
+
 ## Status: v8 (`scratchpad/byleth_v8_fix.zip`: a FIX package over v4 + byleth_userdata_v2 + v5_fix + v6_fix + v7_fix; exe unchanged (exe_v46v_threads); in-game TEST)
 
 User, v7 test (3 clips + an effects comparison, framed at 60 fps in `scratchpad/byleth/v8/clips/`, `v8/fxcmp/`): the
@@ -586,6 +643,18 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
+00000000. **v9 fix** (sent: `scratchpad/byleth_v9_fix.zip`, exe_v46v_line): the user's test list in
+   `scratchpad/byleth/INSTALL_README_v9.txt`. If the catch still fails: the TEST_ONLY diag (exe_v46v_line_diag +
+   the diag master.mscsb: S4GF lines k 1 = an opponent's status near him (189 caught), k 5 holding) settles whether
+   the grab box catches at all (then trace the per-frame pass that applies grabs: the CatchModule vt +0x8C
+   `0x02C18DC8` caller) or the MSC misses it. Open: (1) the exe for the other agent's variable resets: apply
+   `tools/var_reset_cave.py` first, then `tools/line_test_cave.py` (`scratchpad/byleth/v9/exe/exe_v46w_vars_line.rpx`
+   built that way: sha1 bfd3b5b4...); (2) Ultimate's "would KO" test for Aymr's critical (the ExeFS cut-in: main.bin
+   reads critical_* in the common critical code at ~0x869F10 / 0xAD7xxx, not read) and its zoom rate / offset / the
+   darkened background; (3) the smash orbs' and effects' bloom (halos as xv2_smash_fx.py's, an A/B in game:
+   `scratchpad/byleth/v9/view/smash_holds_v8_left_v9_right.png` is the Hitbox Viewer's before / after of the orb
+   placement); (4) the up special's sword length (canned motions: it stops by the status change, Ultimate's sword
+   shortens to the point), HANG_IMMIDIATE's box, the search box at 15; (5) v8's list below.
 0000000. **v8 fix** (sent: `scratchpad/byleth_v8_fix.zip`, no exe): the user's test list in
    `scratchpad/byleth/INSTALL_README_v8.txt` (the max arrow's line and hit, the charge glow gone with the move, the up
    special's catch / pull / throw on ground and air targets, the lights). Open, in order: (1) **the effects' bloom**:

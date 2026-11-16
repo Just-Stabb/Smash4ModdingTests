@@ -361,7 +361,10 @@ def plan(name, out):
     steps.append(('shapes', 'hurtboxes, ECB, ledge box from Ultimate\'s vl.prc',
                   [py, t('ultimate_vl_shapes.py'), os.path.join(pkg, 'param/fighter/fighter_param_vl_%s.bin' % name),
                    os.path.join(pkg, 'param/fighter/fighter_param_vl_%s.bin' % name), os.path.join(U, 'param/vl.prc'),
-                   os.path.join(fighter, 'model/body/c00')]))
+                   os.path.join(fighter, 'model/body/c00')]
+                  # port.json "tether_ledge_box": Ultimate's cliff_hang_data entry a tether status selects (Byleth: 3,
+                  # FIGHTER_MASTER_CLIFF_HANG_DATA_AIR_LASSO) -> the base's tether box (vl group 7 entry 2)
+                  + (['--tether', str(cfg['tether_ledge_box'])] if 'tether_ledge_box' in cfg else [])))
     steps.append(('stats', 'stats from Ultimate\'s fighter_param.prc',
                   [py, t('ultimate_port.py'), 'stats', name, src.get('fighter_param', '?CURRENT/fighter_param.bin'),
                    os.path.join(pkg, 'param/fighter/fighter_param.bin')]))
