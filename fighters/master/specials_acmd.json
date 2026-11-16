@@ -1,0 +1,54 @@
+{
+  "_about": "Byleth's special scripts for tools/ultimate_acmd.py --translate: Ultimate file -> Smash 4 script name, in ZSS's special motion slots (a \"slot\" names the slot whose motion.mtable entry gets the script: her custom-move slots take his extra phases, their animations named by extra_kinds.json \"motions\"). Neutral: Failnaught (her Paralyzer statuses 0x152 / 0x157 / 0x158); side: Areadbhar (0x153); up: Sword of the Creator (ground 0x154; air: her tether status 0xF1, AirCatch); down: Aymr (0x155). fighters/master/README.md, fighters/master/master.c",
+  "SpecialNStart": "specialnstart",
+  "SpecialN": "specialnshoot",
+  "SpecialNMax": "specialnshooth",
+  "SpecialAirNStart": "specialairnstart",
+  "SpecialAirN": "specialairnshoot",
+  "SpecialAirNMax": "specialairnshooth",
+  "SpecialNCancel": "specialnlanding",
+  "SpecialNTurn": {
+    "name": "specialnturn",
+    "slot": "0x212"
+  },
+  "SpecialAirNTurn": {
+    "name": "specialairnturn",
+    "slot": "0x21E"
+  },
+  "SpecialAirNCancel": {
+    "name": "specialairncancel",
+    "slot": "0x22A"
+  },
+  "SpecialSStart": "specials",
+  "SpecialAirSStart": "specialairs",
+  "SpecialSF": {
+    "name": "specialsf",
+    "slot": "0x22E"
+  },
+  "SpecialAirSF": {
+    "name": "specialairsf",
+    "slot": "0x232"
+  },
+  "SpecialSLanding": {
+    "name": "specialslanding",
+    "slot": "0x22F"
+  },
+  "SpecialHi": "specialhi",
+  "SpecialAirHi": "aircatch",
+  "SpecialAirHiHit": {
+    "name": "specialairhihit",
+    "slot": "0x23A"
+  },
+  "SpecialAirHiOvertake": {
+    "name": "specialairhiovertake",
+    "slot": "0x23B"
+  },
+  "SpecialAirHiWallJump": {
+    "name": "specialairhiwalljump",
+    "slot": "0x23C"
+  },
+  "SpecialLw": "speciallwstart",
+  "SpecialAirLw": "specialairlwstart",
+  "SpecialLwLanding1": "speciallwlanding",
+  "SpecialLwLanding2": "speciallwkicklanding"
+}

@@ -477,3 +477,19 @@ Water0
 Water1
 Water2
 WaterNone
+
+// ---- Byleth (master)
+// his specials' extra motions in ZSS's custom-move slots (extra_kinds.json "motions", body/main.pac
+// FitSZerosuitBodyMainD00SpecialNTurn ...), scripts from Ultimate's: tools/master_build.py
+// (fighters/master/specials_acmd.json): Failnaught's turn 0x212 (air 0x21E) and air shield cancel 0x22A,
+// Areadbhar's lunge 0x22E (air 0x232) and landing 0x22F, Sword of the Creator's pull 0x23A, overtake 0x23B and
+// wall jump 0x23C (his air up special plays AirCatch, 0x091: ZSS's tether status)
+SpecialNTurn
+SpecialAirNTurn
+SpecialAirNCancel
+SpecialSF
+SpecialAirSF
+SpecialSLanding
+SpecialAirHiHit
+SpecialAirHiOvertake
+SpecialAirHiWallJump

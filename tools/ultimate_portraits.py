@@ -1042,6 +1042,12 @@ class GlyphLib:
         pieces = []
         for c, b in zip(chars, bigs):
             opts = self.glyphs.get((c.upper(), b))
+            if not opts and self.glyphs.get((c.upper(), not b)):
+                # no plate has it at this size (chrn_11's big B: Bowser's only one touches its O): the other size's,
+                # the composition scaling it to the line (Byleth)
+                log('%s: letter %r (%s) from its %s form' % (self.st, c, 'big' if b else 'small', 'small' if b else 'big'))
+                opts = self.glyphs[(c.upper(), not b)]
+                b = not b
             if not opts:
                 raise SystemExit('%s: no plate has the letter %r (%s)' % (self.st, c, 'big' if b else 'small'))
             # the least condensed; of those, the one nearest the letter's usual width
@@ -1255,6 +1261,21 @@ def main():
         base_img = load_s4(base_file(st))
         if kind == 'plate':
             lib = GlyphLib(st, a.s4_chr, log)
+            # a letter none of this set's plates has (chrn_11's B: Bowser's touches its O): another plate set's glyph,
+            # fitted to this one's style like the rest (Byleth)
+            for c in set(text.replace(' ', '').upper()):
+                if any(k[0] == c for k in lib.glyphs):
+                    continue
+                for other in ('chrn_12', 'chrn_40', 'chrn_11'):
+                    if other == st or not os.path.isdir(os.path.join(a.s4_chr, other)):
+                        continue
+                    olib = GlyphLib(other, a.s4_chr, [])
+                    got = {k: v for k, v in olib.glyphs.items() if k[0] == c}
+                    if got:
+                        lib.glyphs.update(got)
+                        lib.nat.update({k: v for k, v in olib.nat.items() if k[0] == c})
+                        log.append('%s: letter %r from %s\'s plates' % (st, c, other))
+                        break
             plate = make_plate(st, base_img, lib, text, log)
             nns = [1]
         else:

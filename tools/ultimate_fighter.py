@@ -1231,6 +1231,7 @@ MARIO_MOTIONS = {
 # holstered Paralyzer and ZSS's back mark: empty. Hair in OMOTE (sorted, never keyed). Not used: low / final meshes.
 _MS = 'master_%s_VIS_O_OBJShape'
 _ZS = 'SZerosuit_%s_VIS_O_OBJ_O_NOSORT_FAR'
+MASTER_SPEAR = ('spear06Shape', 'spear01Shape5', 'spear04Shape', 'spear01Shape3', 'spear02Shape', 'spear01Shape1')
 SZEROSUIT_SLOTS = [
     ('Mark_back1_O_OBJ_O_NOSORT_FAR', []),
     ('SZerosuit_Face_Main_VIS_O_OBJ', []),
@@ -1255,9 +1256,12 @@ SZEROSUIT_SLOTS = [
     ('SZerosuit_Mouth_Ouch_VIS_O_OBJ', [_MS % 'Mouth_Ouch']),
     ('SZerosuit_Mouth_Down_VIS_O_OBJ', [_MS % 'Mouth_Down']),
     ('SZerosuit_Mouth_HeavyAttack_VIS_O_OBJ', [_MS % 'Mouth_Heavyattack']),
-    ('SZerosuit_Mouth_Escape_VIS_O_OBJ', [_MS % 'Mouth_Escape']),
-    ('SZerosuit_Mouth_HeavyOuch_VIS_O_OBJ', [_MS % 'Mouth_HeavyHit']),
-    ('SZerosuit_Moutn_Furafura_VIS_O_OBJ', [_MS % 'Mouth_Furafura']),
+    # three of her mouth slots hold his held weapons (Ultimate's articles, rigid on his hand bone: the spear and
+    # the axe on HaveR, the bow on HaveL), shown by the moves that generate them (SZEROSUIT_VIS, fighters/master/
+    # weapon_vis.json from tools/master_build.py vis); their mouths go to the nearest (MASTER_MOUTHS)
+    ('SZerosuit_Mouth_Escape_VIS_O_OBJ', ['spear/%s@HaveR' % m for m in MASTER_SPEAR]),
+    ('SZerosuit_Mouth_HeavyOuch_VIS_O_OBJ', ['axe/GamemodelShape@HaveR']),
+    ('SZerosuit_Moutn_Furafura_VIS_O_OBJ', ['bow/GamemodelShape@HaveL']),
     ('SZerosuit_Mouth_VoiceA_VIS_O_OBJ', [_MS % 'Mouth_VoiceA']),
     (_ZS % 'Eye_Result', []),
     ('SZerosuit_Mouth_Result_VIS_O_OBJ', [_MS % 'sword']),
@@ -1268,19 +1272,19 @@ SZEROSUIT_SLOTS = [
     ('Gamemodel', ['body_highShape', 'body_high2Shape', 'GamemodelShape', 'faceShape', 'coatG_highShape',
                    'skirtG_highShape', 'knifeShape', 'matsubokkuriShape']),
 ]
-SZEROSUIT_VIS = {'master_sword': 'SZerosuit_Mouth_Result_VIS_O_OBJ'}
+SZEROSUIT_VIS = {'master_sword': 'SZerosuit_Mouth_Result_VIS_O_OBJ', 'master_spear': 'SZerosuit_Mouth_Escape_VIS_O_OBJ',
+                 'master_axe': 'SZerosuit_Mouth_HeavyOuch_VIS_O_OBJ', 'master_bow': 'SZerosuit_Moutn_Furafura_VIS_O_OBJ'}
 # his mouths per frame (Ultimate's visibility node names); one with no slot of its own goes to the nearest
 MASTER_MOUTHS = {
     'SZerosuit_MouthN_VIS_O_OBJ': ['master_Mouth_FaceN', 'master_Mouth_PatternA', 'master_Mouth_Capture',
                                    'master_Mouth_Cliff', 'master_Mouth_Result'],
     'SZerosuit_Mouth_Talk_VIS_O_OBJ': ['master_Mouth_Talk'],
-    'SZerosuit_Mouth_Ouch_VIS_O_OBJ': ['master_Mouth_Ouch'],
-    'SZerosuit_Mouth_Down_VIS_O_OBJ': ['master_Mouth_Down'],
+    # Escape / HeavyOuch / Furafura hold his weapons (SZEROSUIT_SLOTS): their mouths join the nearest
+    'SZerosuit_Mouth_Ouch_VIS_O_OBJ': ['master_Mouth_Ouch', 'master_Mouth_HeavyHit', 'master_Mouth_Ottotto'],
+    'SZerosuit_Mouth_Down_VIS_O_OBJ': ['master_Mouth_Down', 'master_Mouth_Furafura'],
     'SZerosuit_Mouth_HeavyAttack_VIS_O_OBJ': ['master_Mouth_Heavyattack', 'master_Mouth_Attack'],
-    'SZerosuit_Mouth_Escape_VIS_O_OBJ': ['master_Mouth_Escape', 'master_Mouth_VoiceB'],
-    'SZerosuit_Mouth_HeavyOuch_VIS_O_OBJ': ['master_Mouth_HeavyHit', 'master_Mouth_Ottotto'],
-    'SZerosuit_Moutn_Furafura_VIS_O_OBJ': ['master_Mouth_Furafura'],
-    'SZerosuit_Mouth_VoiceA_VIS_O_OBJ': ['master_Mouth_VoiceA', 'master_Mouth_Final'],
+    'SZerosuit_Mouth_VoiceA_VIS_O_OBJ': ['master_Mouth_VoiceA', 'master_Mouth_Final', 'master_Mouth_Escape',
+                                         'master_Mouth_VoiceB'],
 }
 # ZSS's specials -> Byleth's (Phase 1: the animations in her slots; the moves, their extra phases (motions.add) and
 # the statuses come with the specials step: fighters/master/README.md "Plan"). Paralyzer -> Failnaught (start, the
@@ -1302,6 +1306,10 @@ SZEROSUIT_MOTIONS = {
     'c01attacks3hi': 'c01attacks3s', 'c01attacks3lw': 'c01attacks3s', 'a00wait3': 'a00wait2',
     'f04downspotd': 'f03downspotu',
 }
+# slots whose own Ultimate animation of the same name isn't the one he plays there: AirCatch (status 0xF1) is his
+# air Sword of the Creator (fighters/master/master.c: the air up special goes into her tether status), so it plays
+# SpecialAirHi (he has no zair: g04aircatch is unused in Ultimate)
+SZEROSUIT_MOTION_OVERRIDES = {'g04aircatch': 'd02specialairhi'}
 
 PROFILES = {
     'zelda': dict(slots=MESH_SLOTS, joints=JOINT_STANDINS, motions=MOTION_STANDINS, vis=VIS_SLOTS,
@@ -1319,11 +1327,11 @@ PROFILES = {
                   vis_default={}, hidden=()),
     'reflet_f': dict(slots=REFLET_F_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **REFLET_MOTIONS),
                      vis=REFLET_F_VIS, vis_default={REFLET_F_VIS['brave_shield']: 1}, hidden=()),
-    'szerosuit': dict(slots=SZEROSUIT_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **SZEROSUIT_MOTIONS),
+    'szerosuit': dict(motion_overrides=SZEROSUIT_MOTION_OVERRIDES, slots=SZEROSUIT_SLOTS, joints={}, motions=dict(MOTION_STANDINS, **SZEROSUIT_MOTIONS),
                       vis=SZEROSUIT_VIS, vis_default={SZEROSUIT_VIS['master_sword']: 1},
                       drive={'material_anime_face.pac': (MASTER_MOUTHS, 'SZerosuit_MouthN_VIS_O_OBJ')}, hidden=()),
     # her costumes 6 / 7 have no back mark (33 meshes)
-    'szerosuit_nomark': dict(slots=SZEROSUIT_SLOTS[1:], joints={}, motions=dict(MOTION_STANDINS, **SZEROSUIT_MOTIONS),
+    'szerosuit_nomark': dict(motion_overrides=SZEROSUIT_MOTION_OVERRIDES, slots=SZEROSUIT_SLOTS[1:], joints={}, motions=dict(MOTION_STANDINS, **SZEROSUIT_MOTIONS),
                              vis=SZEROSUIT_VIS, vis_default={SZEROSUIT_VIS['master_sword']: 1},
                              drive={'material_anime_face.pac': (MASTER_MOUTHS, 'SZerosuit_MouthN_VIS_O_OBJ')},
                              hidden=()),
@@ -1621,7 +1629,7 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
             main = main + [(prefix + n + '.omo', None) for n in add if prefix + n + '.omo' not in dict(main)]
         for name, data in main:
             key = name[len(prefix):-4].lower()
-            ult = key if key in have else prof['motions'].get(key)
+            ult = prof.get('motion_overrides', {}).get(key) or (key if key in have else prof['motions'].get(key))
             if ult not in have:
                 ult = aliases.get(key[3:])          # a motion kind playing another's animation
             if ult not in have:

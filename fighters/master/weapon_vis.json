@@ -1,0 +1,451 @@
+{
+ "_about": "tools/master_build.py vis: Ultimate animation -> {weapon visibility: [[frame, shown]]} (ultimate_fighter.py motions --extra-vis)",
+ "c03attacks4hi": {
+  "master_spear": [
+   [
+    0,
+    1
+   ],
+   [
+    85,
+    0
+   ]
+  ]
+ },
+ "c03attacks4lw": {
+  "master_spear": [
+   [
+    0,
+    1
+   ],
+   [
+    85,
+    0
+   ]
+  ]
+ },
+ "c03attacks4s": {
+  "master_spear": [
+   [
+    0,
+    1
+   ],
+   [
+    85,
+    0
+   ]
+  ]
+ },
+ "c04attacklw4": {
+  "master_axe": [
+   [
+    0,
+    1
+   ],
+   [
+    78,
+    0
+   ]
+  ]
+ },
+ "c04attacklw4charge": {
+  "master_axe": [
+   [
+    0,
+    1
+   ]
+  ]
+ },
+ "c05attackairb": {
+  "master_spear": [
+   [
+    0,
+    1
+   ],
+   [
+    54,
+    0
+   ]
+  ]
+ },
+ "c05attackairf": {
+  "master_spear": [
+   [
+    0,
+    1
+   ],
+   [
+    53,
+    0
+   ]
+  ]
+ },
+ "c05attackairlw": {
+  "master_axe": [
+   [
+    0,
+    1
+   ],
+   [
+    60,
+    0
+   ]
+  ]
+ },
+ "c05attackairn": {
+  "master_bow": [
+   [
+    0,
+    1
+   ],
+   [
+    53,
+    0
+   ]
+  ]
+ },
+ "c05landingairb": {
+  "master_spear": [
+   [
+    0,
+    1
+   ],
+   [
+    32,
+    0
+   ]
+  ]
+ },
+ "c05landingairf": {
+  "master_spear": [
+   [
+    0,
+    1
+   ],
+   [
+    41,
+    0
+   ]
+  ]
+ },
+ "c05landingairlw": {
+  "master_axe": [
+   [
+    0,
+    1
+   ],
+   [
+    34,
+    0
+   ]
+  ]
+ },
+ "c05landingairn": {
+  "master_bow": [
+   [
+    0,
+    1
+   ],
+   [
+    25,
+    0
+   ]
+  ]
+ },
+ "d00specialairn": {
+  "master_bow": [
+   [
+    0,
+    1
+   ],
+   [
+    35,
+    0
+   ]
+  ]
+ },
+ "d00specialairncancel": {
+  "master_bow": [
+   [
+    0,
+    1
+   ],
+   [
+    6,
+    0
+   ]
+  ]
+ },
+ "d00specialairnjumpcancel": {
+  "master_bow": [
+   [
+    0,
+    1
+   ],
+   [
+    6,
+    0
+   ]
+  ]
+ },
+ "d00specialairnmax": {
+  "master_bow": [
+   [
+    0,
+    1
+   ],
+   [
+    48,
+    0
+   ]
+  ]
+ },
+ "d00specialairnstart": {
+  "master_bow": [
+   [
+    0,
+    0
+   ],
+   [
+    0,
+    1
+   ],
+   [
+    0,
+    1
+   ]
+  ]
+ },
+ "d00specialn": {
+  "master_bow": [
+   [
+    0,
+    1
+   ],
+   [
+    35,
+    0
+   ]
+  ]
+ },
+ "d00specialncancel": {
+  "master_bow": [
+   [
+    0,
+    1
+   ],
+   [
+    6,
+    0
+   ]
+  ]
+ },
+ "d00specialnmax": {
+  "master_bow": [
+   [
+    0,
+    1
+   ],
+   [
+    48,
+    0
+   ]
+  ]
+ },
+ "d00specialnstart": {
+  "master_bow": [
+   [
+    0,
+    0
+   ],
+   [
+    0,
+    1
+   ],
+   [
+    0,
+    1
+   ]
+  ]
+ },
+ "d01specialairsf": {
+  "master_spear": [
+   [
+    0,
+    1
+   ],
+   [
+    0,
+    1
+   ],
+   [
+    53,
+    0
+   ],
+   [
+    53,
+    0
+   ]
+  ]
+ },
+ "d01specialairsstart": {
+  "master_spear": [
+   [
+    0,
+    1
+   ]
+  ]
+ },
+ "d01specialsf": {
+  "master_spear": [
+   [
+    0,
+    1
+   ],
+   [
+    0,
+    1
+   ],
+   [
+    53,
+    0
+   ],
+   [
+    53,
+    0
+   ]
+  ]
+ },
+ "d01specialsstart": {
+  "master_spear": [
+   [
+    0,
+    1
+   ]
+  ]
+ },
+ "d03specialairlw": {
+  "master_axe": [
+   [
+    0,
+    1
+   ],
+   [
+    118,
+    0
+   ]
+  ]
+ },
+ "d03specialairlwhit": {
+  "master_axe": [
+   [
+    0,
+    1
+   ],
+   [
+    78,
+    0
+   ]
+  ]
+ },
+ "d03speciallw": {
+  "master_axe": [
+   [
+    0,
+    1
+   ],
+   [
+    118,
+    0
+   ]
+  ]
+ },
+ "d03speciallwhit": {
+  "master_axe": [
+   [
+    0,
+    1
+   ],
+   [
+    78,
+    0
+   ]
+  ]
+ },
+ "d03speciallwlanding2": {
+  "master_axe": [
+   [
+    0,
+    1
+   ],
+   [
+    43,
+    0
+   ]
+  ]
+ },
+ "j02win2": {
+  "master_axe": [
+   [
+    0,
+    0
+   ],
+   [
+    0,
+    1
+   ],
+   [
+    0,
+    1
+   ]
+  ],
+  "master_bow": [
+   [
+    0,
+    0
+   ],
+   [
+    0,
+    1
+   ],
+   [
+    0,
+    1
+   ]
+  ],
+  "master_spear": [
+   [
+    0,
+    0
+   ],
+   [
+    0,
+    1
+   ],
+   [
+    0,
+    1
+   ]
+  ]
+ },
+ "j02win2wait": {
+  "master_axe": [
+   [
+    0,
+    1
+   ]
+  ],
+  "master_bow": [
+   [
+    0,
+    1
+   ]
+  ],
+  "master_spear": [
+   [
+    0,
+    1
+   ]
+  ]
+ }
+}

@@ -179,3 +179,12 @@ cmp copy; ...; b back` (eq for K and every copy). 2 stubs, 0x28 bytes; the cave 
 `weapon_expand_test.py` runs each compare on both executables with K, its copies and others (unpatched: only K).
 `port_check` X5 lists any still plain in an install's executable. Not covered: compares without the weapon-category
 test before them (other fighters' reflect / absorb lists naming 0x22 / 0x26: they treat the copies as other kinds).
+
+## Adding kinds to a built executable (`tools/weapon_expand_append.py`, Byleth / exe_v46q)
+
+weapon_expand.py builds its cave from an un-grown base RPX in one pass, and its cave is full (exe_v46p: 0x04BB7EB8 of
+0x04BB8000). `weapon_expand_append.py EXE OLD_SPEC NEW_SPEC ARGS` adds the NEW spec's new kinds into what is there: their
+entries in the 7 per-kind tables (each found by its first 0x185 entries), descriptor copies / cases / getter copies,
+base-kinds entries, kind-compare stubs (bases with no copies before), the new fighter's article list and kind_expand's
+descriptor +8 (with `kind_expand_incremental.py build ... --list KIND=ADDR`), in 0x04B9C000-0x04B9D000. `test PATCHED
+EXE OLD NEW` runs weapon_expand_test.py over every kind with the layout read from the executable.

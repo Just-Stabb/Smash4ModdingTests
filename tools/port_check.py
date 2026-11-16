@@ -438,6 +438,7 @@ def check_scripts(inst, name, kind, base, joints, vanilla, rep):
     # sound / expression ones; port.json "base_scripts_kept" {script name: reason} lists the ones kept on purpose
     if vanilla:
         kept = {k.lower() for k in (load_port_cfg(name).get('base_scripts_kept') or {})}
+        kept_crc = {acmd.crc(k) for k in kept}       # (names the vocabulary lacks: Byleth's batswing4)
         vocab = {acmd.crc(n): n for n in vocabulary()}
         acts = {'game': ('Hitbox', 'Special_Hitbox', 'Extended', 'Grab', 'Body_Collision', 'Set_Body_State',
                          'Intangib', 'Invincib', 'Super_Armor', 'Armor', 'Reflect', 'Absorb', 'Search', 'Shield',
@@ -454,7 +455,7 @@ def check_scripts(inst, name, kind, base, joints, vanilla, rep):
             left = sorted(vocab.get(h, '%08X' % h) for h, cmds in mine.items()
                           if h in van and [str(c) for c in cmds] == [str(c) for c in van[h]]
                           and any(str(c).startswith(words) for c in cmds)
-                          and vocab.get(h, '%08X' % h).lower() not in kept)
+                          and vocab.get(h, '%08X' % h).lower() not in kept and h not in kept_crc)
             if left:
                 rep.add('ERROR' if fn == 'game' else 'WARN', 'B1 base-leftovers', '%s.bin: %d scripts still the base\'s '
                         'vanilla ones (its move / effects / sounds on the port\'s animation; replace, empty, or list '
@@ -627,6 +628,56 @@ CANCEL_MOVES = ('attack', 'special', 'throw', 'catchattack', 'catchwait', 'appea
                 'slipattack')
 
 
+FIRST_OWN_MOTION = 0x211          # the fighter's own motion kinds (specials, final, ...): docs/params/fighter_files.md
+
+
+def check_vl_leftovers(inst, name, vf, hashes, ml, ult_of, rep):
+    """V1: the base's vl motion bytes on the port's own slots (0x211 on): bytes 3 / 4 (the intangible window: the
+    motion's xlu start / end) and 5 where the port plays an Ultimate move must be Ultimate's motion_list window (5:
+    none in Ultimate); where its four scripts are empty (a base slot the port doesn't play) bytes 2-5 are 0. Supamario
+    Core Breaker v11 kept Mario's intangible window; Byleth phase 2 found ZSS's Flip Jump window (3-13) on his Aymr
+    slots and her Boost Kick's byte 5. Slots whose scripts port.json base_scripts_kept lists are skipped"""
+    import ultimate_acmd as UA
+    sc = {fn: scripts(inst, 'fighter/%s/script/animcmd/body/%s.bin' % (name, fn)) for fn in ('game', 'effect', 'sound',
+                                                                                          'expression')}
+    if any(v is None for v in sc.values()):
+        return
+    kept = {acmd.crc(k.lower()) for k in (load_port_cfg(name).get('base_scripts_kept') or {})}
+    by_crc = {acmd.crc(n): n for n in vocabulary() | set(ult_of)}
+    bad = []
+    for i in range(FIRST_OWN_MOTION, len(hashes)):
+        h = hashes[i]
+        if not h or h in kept:
+            continue
+        try:
+            b = [V_byte(vf, i, k) for k in range(6)]
+        except Exception:                 # noqa: BLE001
+            continue
+        live = any(len([c for c in x.get(h, []) if c.ident != acmd.END]) for x in sc.values())
+        n = by_crc.get(h)
+        want = None
+        if n is not None and live:
+            uh = UA.hash40('game_' + ult_of.get(n, n).lower())
+            ent = [e for e in ml if uh == e['game'] or uh in e['scripts']]
+            if ent and len(ent[0]['extra']) >= 3:
+                xs, xe = ent[0]['extra'][:2]
+                if (b[3], b[4], b[5]) != (xs, xe, 0):
+                    want = 'intangible %d-%d, byte 5 %d (Ultimate %d-%d, 0)' % (b[3], b[4], b[5], xs, xe)
+        elif not live and any(b[2:]):
+            want = 'not played (scripts empty) but bytes 2-5 %s' % b[2:]
+        if want:
+            bad.append('0x%X %s: %s' % (i, n or '%08X' % h, want))
+    if bad:
+        rep.add('ERROR', 'V1 vl-leftovers', 'the base\'s vl motion bytes on the port\'s own slots (Supamario Core '
+                'Breaker v11, Byleth): %s' % '; '.join(bad[:16]))
+
+
+def V_byte(vf, i, k):
+    import fighter_param_vl as V
+    (_p, t), = V.find(vf, 'm0[%d].%d' % (i, k), '0', {})
+    return t.value
+
+
 def check_cancel(inst, name, base, motion_list, rep):
     """C1: the cancel windows are Ultimate's (user rule, Sephiroth test 72: "down special and side special have
     different recovery than in Ultimate"; Shadow Flare's shot played to its end, Ultimate cancels it at 31).
@@ -652,8 +703,16 @@ def check_cancel(inst, name, base, motion_list, rep):
     ult_of = translate_map(name)
     cancel_at = {}                       # slot: Ultimate's cancel frame
     wrong = []
+    # a slot whose four scripts are empty isn't played (a base special slot the port's MSC never enters: Byleth's
+    # SpecialAirHi, his air up special being AirCatch): its byte 2 is V1's (0)
+    body = {fn: scripts(inst, 'fighter/%s/script/animcmd/body/%s.bin' % (name, fn)) or {}
+            for fn in ('game', 'effect', 'sound', 'expression')}
+    unplayed = {h for h in hashes if h and not any(len([c for c in x.get(h, []) if c.ident != acmd.END])
+                                                   for x in body.values())}
     for n in sorted(vocabulary() | set(ult_of)):
         if not n.startswith(CANCEL_MOVES) or n.startswith('landing') or n in UA.GAME_ONLY or acmd.crc(n) not in hashes:
+            continue
+        if acmd.crc(n) in unplayed and n not in ult_of:
             continue
         i = hashes.index(acmd.crc(n))
         h = UA.hash40('game_' + ult_of.get(n, n).lower())
@@ -671,6 +730,7 @@ def check_cancel(inst, name, base, motion_list, rep):
             wrong.append('0x%X %s %d (Ultimate %d)' % (i, n, t.value, want))
     if wrong:
         rep.add('ERROR', 'C1 cancel-window', 'vl byte 2 (the cancel frame) is not Ultimate\'s: %s' % ', '.join(wrong))
+    check_vl_leftovers(inst, name, vf, hashes, ml, ult_of, rep)
     try:
         cfg = json.load(open(os.path.join(ROOT, 'fighters', name, 'port.json')))
         src = os.path.join(ROOT, 'fighters', name, cfg['specials']['msc'])

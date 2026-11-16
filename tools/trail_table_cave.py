@@ -34,7 +34,9 @@ RELOC_DUMMY = 0x037EE73C        # dead word for moved relocations (kind_expand.p
 NEW_TRAILS = ['TexEdgeSwordTrace', 'TexEdgeSwordTraceAdd', 'TexEdgeSwordTrace2', 'TexEdgeSwordTrace2Add',
               # Hero (brave): his trails all take tex_brave_sword2 as the mask (one Add)
               'TexBraveSwordTrace', 'TexBraveSwordTraceAdd', 'TexBraveFireSwordTrace', 'TexBraveLightningSwordTrace',
-              'TexBraveFinalSwordTrace', 'TexBraveSwordTrace3']
+              'TexBraveFinalSwordTrace', 'TexBraveSwordTrace3',
+              # Byleth (master): Ultimate's tex_master_sword1 (colour) / tex_master_sword2 (mask), ids 270 / 271
+              'TexMasterSwordTrace', 'TexMasterSwordTraceAdd']
 FIRST_NEW = OLD_N + 1
 
 

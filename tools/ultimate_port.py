@@ -231,7 +231,11 @@ def plan(name, out):
     add = cfg.get('motions', {}).get('add', [])
     steps.append(('motions', 'motions + the material_anime pacs (these ship, not the model step\'s)',
                   [py, t('ultimate_fighter.py'), 'motions', os.path.join(U, 'motion/body/c00'), os.path.join(U, 'model/body/c00'),
-                   base_dir, fighter, *mb, *joints, *have, *cache] + (['--add', ','.join(add)] if add else [])))
+                   base_dir, fighter, *mb, *joints, *have, *cache] + (['--add', ','.join(add)] if add else [])
+                  # port.json motions.extra_vis: visibility the motions don't carry (held article models: Steve's tools,
+                  # Byleth's weapons), a JSON in the fighter's folder
+                  + (['--extra-vis', os.path.join('fighters', name, cfg['motions']['extra_vis'])]
+                     if cfg.get('motions', {}).get('extra_vis') else [])))
     # the low models (model/body/l00-l07): the off-screen magnifier and 8-player Smash draw them, not cXX; a port
     # without them was invisible in the magnifier (Squirtle v6, user). Copies of cXX (docs/params/fighter_files.md:
     # Hero's are), after the motions step, which adds the face packs to the model folders

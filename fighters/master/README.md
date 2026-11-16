@@ -9,7 +9,163 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
-## Status: phase 1 (inputs, slot, plan; nothing shipped)
+## Status: v1 (`scratchpad/byleth_v1.zip`: playable, first in-game test)
+
+v1 is the first package: his model, animations, normals, grabs, throws and specials, his sounds, his effects (the Final
+Smash's kept out), his held weapons, sword trails, arrows, the ZSS leftovers audit, and executable **exe_v46q**. Not in
+v1 (next steps, "Handover" below): the female costumes' own animations (they play the male's), Kirby's Failnaught copy,
+Aymr's KO zoom, the whip-sword models (the tether and the whip moves show the hilt only), the effect-colour check of
+every move (done for the specials only).
+
+| part | state |
+|---|---|
+| specials | `fighters/master/master.c` (his statuses at its end), `specials_acmd.json`, `tools/master_build.py` (the plan's `specials` step) |
+| exe | **exe_v46q** = exe_v46p + his 9 motion slots + his weapon kinds 0x19E / 0x19F / 0x1A0 (`tools/weapon_expand_append.py`) + trail ids 270 / 271 |
+| held weapons | Areadbhar / Aymr / Failnaught: Ultimate's article meshes rigid on his hands, in three of ZSS's mouth slots, shown by the moves that hold them (`weapon_vis.json`) |
+| effects | 78 sets of his own + ZSS's, the Final Smash's 13 kept out (`port.json` `effects.kept_out`: port_check E5) |
+| port_check | 0 ERROR over v1 as installed (WARNs below) |
+
+## v1: his specials (`fighters/master/master.c`, `tools/master_build.py`)
+
+Ultimate's order (user): neutral Failnaught, side Areadbhar, up Sword of the Creator, down Aymr. Every value from
+Ultimate's `vl.prc` (`param_special_*`, ParamLabels' names) or his scripts' frames (`master_build.py CONSTS`: each
+one's source is beside it); "mine" marks the few with no Ultimate value.
+
+| status | move | motions (slot) | what |
+|---|---|---|---|
+| 0x152 | Failnaught | SpecialNStart 0x211 / air 0x21D, SpecialNTurn 0x212 / 0x21E, SpecialNCancel 0x229 / 0x22A, SpecialN 0x215 / 0x221, SpecialNMax 0x219 / 0x225 | the draw charges the whole motion (119 frames); let go once CAN_SHOOT (45; earlier: it fires at 45) -> the arrow (article 6); the draw's end -> the max arrow (article 7); stick back during ENABLE_TURN (28 - 44; threshold 0.5, mine) -> the turn, once; shield during cancel_start - cancel_end (20 - 65) -> the cancel |
+| 0x153 | Areadbhar | SpecialSStart 0x22D / 0x231, SpecialSF 0x22E / 0x232, SpecialSLanding 0x22F | the lunge 3.0 (air x0.6) from its frame 2, braking 0.34 (air 0.22) a frame, from frame 14 0.07 (air 0.008); an air lunge landing: x0.9, braking 0.03 |
+| 0x154 | Sword of the Creator (ground) | SpecialHi 0x239 | Ultimate's hits (the pull to the point above him: angle 368 -> 366) |
+| 0xF1 | Sword of the Creator (air) | AirCatch 0x091 = his SpecialAirHi | ZSS's tether status (user): her whip (article 2, his hidden copy 0x1A0) goes out at the sword's frame 17, back at 27; a ledge in reach -> her native 0xF5 / 0xF3 / 0xF4 (his AirCatchHit / Hang animations); start speed up 1.4 |
+| 0x15B | its hit | SpecialAirHiHit 0x23A, SpecialAirHiOvertake 0x23B | a hit on frames 16 - 25: pulled toward the sword's tip (1.15 / 2.85 a frame for 14 frames: Ultimate's target point 16 / 40, mine), then the overtake's hit (Ultimate's CATCH numbers 6.5, 114 degrees, 65 / 65 as a hitbox: nothing is caught), special fall |
+| 0x15C | its wall jump | SpecialAirHiWallJump 0x23C | a wall touched while the sword is out (16 - 27), up to 3 a time in the air (wall_hit_max): 0.9 off it, 2.6 up |
+| 0x155 | Aymr | SpecialLw 0x241 / 0x245, SpecialLwLanding1 0x255, SpecialLwLanding2 0x259 | super armor below 30 % damage (DamageModule 0xB type 3; super_armor_damage_max) from frame 34 to 64; the axe's hitbox (Ultimate's `master_axe` 30 %, on his haver) merged into his script; landing before 51 or within 65 - 117 goes on as the ground one at its frame, 51 - 65 SpecialLwLanding2, after 117 SpecialLwLanding1 |
+| 0x156 / 0x161 / 0x162 | ZSS's Final Smash (Gunship) | her slots and scripts | kept (user); her final scripts restored by `master_build.py` (port.json `base_scripts_kept`) |
+
+**The arrows** (Failnaught): his copies of ZSS's Paralyzer shot (`paralyzer_bullet`: native, straight, removed on a
+hit), brand-new articles `arrow1` (6) / `arrow2` (7), files in `fighter/master/script/animcmd/weapon/arrow1|2`. Every
+one of the shot's eight motions plays Ultimate's `master_arrow1` Fly (12 %, 35 degrees) / `master_arrow2` Search (29 %,
+361, piercing not done) with their effects. Speed / life in his vl (the shot's block, both copies read it): uncharged
+9 / 17 frames (Ultimate's `param_arrow1`), charged 10 / 30 (the max arrow's distance 300 at speed 10, mine; if the
+native shot fires the max arrow uncharged it flies 153 units). Approximated: the arrow's damage doesn't grow with the
+charge (Ultimate's status code scales it), no arrow model (the effect draws it), its spawn point is the shot's.
+
+**Not done in v1**: Failnaught's air jump cancel (SpecialAirNJumpCancel), Aymr's turn (SpecialLwTurn) and SpecialLwHit
+(the axe stuck in the ground), the air physics multipliers of the specials' starts (start_speed_*_mul_air: ZSS's
+kinetic types 0x6 / 0xA as hers), Sword of the Creator's SpecialHiFailure / wall failure, the KO zoom (Aymr's
+critical_zoom in 1-on-1: needs a native KO test, Smash 4 zooms only on a match's last KO).
+
+## v1: ZSS leftovers ("ZSS's statuses / leftovers must not override Byleth's")
+
+Audit (all fixed in v1; port_check B1 / C1 / V1 pass):
+- **Status table** (`master.c` func_2245 - func_2248): only his functions for his statuses. Gone: her 0x157 - 0x15A
+  (Paralyzer shot / charged / landing), 0x15D - 0x15F (Flip Jump's flip / kick landing), her LandingHeavy pre (0x16: to
+  0x19 after a Flip Jump), her CatchPull / CatchDashPull mains (0x36 / 0x38: her whip's pull) and her ends of 0x2D /
+  0x33 / 0x34 / 0x39 (removing her whip after the smashes, aerials, pivot grab): the common ones again. Kept on purpose:
+  her tether 0xF2 - 0xF5 (the base the user chose for Sword of the Creator), her Final Smash 0x156 / 0x161 / 0x162.
+- **Transitions into her specials**: her zair (func_61 / func_378: air grab -> 0xF1) off (`master_zair()`); her
+  Flip Jump once-per-air hook (global35 = func_2242: down special off in the air) replaced by his (the wall jump
+  count); her own special mains (which made her whip, Paralyzer, Boost Kick) are no longer registered; the plain grab:
+  his Ultimate Catch scripts (no GENERATE_ARTICLE), the common CatchPull.
+- **vl motion bytes** (group 1, `master_build.py vl_fix`): ZSS's Flip Jump intangible window 3 - 13 (2 - 7) on all
+  eight of 0x241 - 0x248 (his Aymr slots: Supamario Core Breaker v11's bug class), her Boost Kick's byte 5 (0x239 -
+  0x240), her Paralyzer / whip / Flip Jump cancel frames on the custom-move slots (0x216 - 0x258): 42 bytes; every slot
+  he plays has Ultimate's cancel / window, every other fighter-specific slot 0. New check **port_check V1
+  vl-leftovers** (ERROR): bytes 3 - 5 of every own slot (0x211 on) the port plays = Ultimate's window, bytes 2 - 5 of one
+  it doesn't = 0.
+- **Scripts**: 116 of her scripts left in special slots he doesn't play (her custom moves, her Boost Kick's air copy,
+  ...) emptied (`body_fix`), her SpecialLwLanding (Reverse_Direction) in his Landing1 slot (Ultimate's has no game
+  script). B1: 0 game, 0 effect / sound / expression besides her kept Final Smash.
+- **Per-kind native code on 0x47**: her tether vector (x152C, exe_v46p `tail_vector`); her whip's kind compare in her
+  specializer (0x02F81010, `cmplwi r3, 0x38`: the whip) also takes his copy 0x1A0 (weapon_expand_append's kind compare
+  stub); her article list kept in order (0 paralyzer, 1 shot, 2 whip, 3 cockpit, 4 gunship, 5 laser: her Final Smash's
+  ids), his arrows after it. Has Tether stays 1 (fighter_param 0x1300011F): her native whip needs it; zair is off in his
+  MSC. Not checked yet: her native per-kind code in the Paralyzer / Gunship paths (only her Final Smash reaches them).
+- **Model**: her Paralyzer slot (her code shows it) empty; her face skin slot (her eyelid pac keys it) empty (F1).
+
+## Executable: exe_v46q
+
+exe_v46q (`scratchpad/byleth/exe/exe_v46q.rpx`, sha1 39d77b31cbe821ffc4dbd8ad9b2270158d3f673a) = exe_v46p (the kind, tether vector, sound aliases) +:
+- **his motion slots** (`extra_kinds.json` "motions": 9 of ZSS's custom-move slots get his extra phases' animations,
+  FitSZerosuitBodyMainD00SpecialNTurn ...): `kind_expand_incremental.py build EXE_V46P OLD NEW ARGS --list
+  0x47=0x04B9C728` (15 motion-table words + his descriptor's +8; its two kirby_copy_pool hooks left as they are);
+- **his weapon kinds** (`extra_kinds.json` "weapons": arrow1 0x19E / arrow2 0x19F (brand-new, copies of her Paralyzer
+  shot), whip 0x1A0 (her whip, his own files)): new tool **`tools/weapon_expand_append.py`**: weapon_expand.py's cave
+  is full (exe_v46p: 0x04BB7EB8 of 0x04BB8000) and can't be rebuilt from an un-grown base (none kept), and a new
+  fighter's article list at its start would move every word other caves call into; so the new kinds go into what's there:
+  their entries in the 7 per-kind tables (found by their first 0x185 entries), descriptor copies, cases and getter copies,
+  the base-kinds table, the whip's kind-compare stub, his article list (8 entries) and kind_expand's descriptor +8, all
+  in 0x04B9C000-0x04B9C7B0 (trail_table_cave.py's space past its GROW, below 0x04BD4000). 516 words;
+- **trail ids** 270 / 271 (`trail_table_cave.py` NEW_TRAILS TexMasterSwordTrace / Add; his trails on trail shader 3 as
+  Sephiroth's).
+
+```
+python3 tools/weapon_expand_append.py EXE_V46P KINDS_V46P.json tools/extra_kinds.json WE_ARGS
+python3 tools/kind_expand_incremental.py build EXE_V46P KINDS_V46P.json tools/extra_kinds.json KE_ARGS --list 0x47=0x04B9C728
+    (drop 0x04BA9B24 / 0x04BA9BE4 from KE_ARGS: kirby_copy_pool_cave.py's hooks)
+python3 tools/trail_table_cave.py EXE_V46P > TRAIL_ARGS
+python3 tools/rpx_patch.py EXE_V46P EXE_V46Q $(cat WE_ARGS KE_ARGS) $(cat TRAIL_ARGS)
+```
+KINDS_V46P.json: extra_kinds.json without his "motions" / "weapons". Tests (exe_v46p as the original): `weapon_expand_append.py
+test` (weapon_expand_test.py over every weapon kind 0-0x1C0: switches, descriptors, getters reading his vl slot,
+accessors, path builders `fighter/master/.../arrow1`, module rows, article lists, kind compares): 321 ok, 3 fail by design
+(the motion-info copies' "inside 0x04BB0000-0x04BB8000" check); kind_expand_test (incremental): his new checks ok, the
++8 check expects weapon_expand's own layout (by design); sound_alias / acmd_ext / kirby_copy_new / kirby_hero_sword /
+kirby_copy_pool: the same failures as exe_v46p over exe_v46n (the originals already have the caves); position_vars_test 0
+failed.
+
+## v1: weapons, trails, effects, package
+
+- **Held weapons**: Ultimate's `spear` (6 meshes), `axe`, `bow` article models (c00-c07 their own costume folders)
+  rigid on HaveR / HaveR / HaveL (`ultimate_fighter.py` SZEROSUIT_SLOTS: ZSS's Mouth_Escape / Mouth_HeavyOuch /
+  Moutn_Furafura slots; their mouths go to VoiceA / Ouch / Down: MASTER_MOUTHS), shown by `material_anime_face.pac`
+  from the frames his scripts generate / remove them (`master_build.py vis` -> `weapon_vis.json`, port.json
+  `motions.extra_vis` -> `ultimate_fighter.py motions --extra-vis`: 33 motions). Approximated: rigid (the bow's string
+  doesn't draw, the axe's blades don't open), the whip sword (`sword`, 58 bones) not shown: the rapid jab, up smash,
+  down tilt, up air, throws and the tether show the Sword of the Creator's hilt only (Ultimate hides it and shows the
+  article: its track is followed, so the hilt is hidden where Ultimate hides it).
+- **Sword trails**: `tex_master_sword1` / `2` -> `effect/master/trail/TexMasterSwordTrace(Add).nut`
+  (`ultimate_trails.py --shader 3`, run by `master_build.py`), ids 270 / 271 in `master_effects.json`; trail shader 3
+  as Sephiroth's (needs its `effect_trail.nsh`, already installed with Sephiroth).
+- **Effects**: 78 of his + 26 of Ultimate's common sets (104 ids), his Final Smash's 13 kept out (`port.json`
+  `effects.kept_out`; their stale ids dropped from `master_effects.json`). Colours compared with Ultimate's
+  (`fx_render.py`, now through the port's translate map: Aymr, Areadbhar's lunge, Failnaught's draw, the air Sword of
+  the Creator): the same reds / whites / gold; one stray magenta line on the converted side of Aymr's and Areadbhar's
+  slashes (a refraction / distortion emitter drawn without its pass: check in game). The normals' colours not compared
+  in this session.
+- **Package** `scratchpad/byleth_v1.zip` (`scratchpad/byleth/make_pkg.sh`): the build (`ultimate_port.py run master
+  effects model-c00 .. c07 motions low-models scripts specials variants shapes portraits --out $B/port`), the kind
+  folder's AI / Kirby-copy bank / FinMaster, his sound banks, exe_v46q, the install README; `not_for_install/` the
+  files made on vanilla stand-ins (soundlabeltable, commonsoundtable / bgm_fighter from `fighter_extras.py common` /
+  `fanfare --set 0x47=0x12`, fighter_param with his stats, the ui / ai param databases, melee.msbt). Sm4shCommand rebuilt with his script names: `scratchpad/sm4shcommand_v1.7.1_byleth.zip`.
+
+`port_check master scratchpad/byleth_v1.zip`: 0 ERROR (21 WARN). WARN: B1 effect / sound / expression (her common dust, common tones, slopes and
+damage rumbles on common motions Ultimate's scripts have nothing for; her own tones taken out of 16 of them), E3
+(one Smash 4 common effect), E7 (FLASH / BURN_COLOR macros), M5 (two empty ZSS slots).
+
+## Handover: next steps (in order)
+
+1. **In-game test of v1** (the tether ledge grab for kind 0x47, the arrows' spawn / speed, Aymr's armor, the Final
+   Smash).
+2. **Female animations per costume** (user: approved executable change). Found so far: the motion path builder
+   `0x030BB18C(r3, buf, kind, type, costume)` (type 0 body, 1 entry, 2 result, 3 routemap) already sends Bayonetta
+   (0x38) to `0x030BAE08`, which takes another sub-folder (`0x101587A4`, "body2"-style) for costumes >= 4 but 2: the
+   hook point for 0x47's odd costumes (a cave: kind 0x47 and costume & 1 -> `bodyf`, `bodyentryf`, ...). Open: the
+   fighter loader (`0x030C0880`-`0x030C09D0`) registers the packs under `kind * 0x11 + n` without the costume, so a
+   male and a female Byleth in one match would share one pack: find how two Bayonettas of both sets coexist (the
+   resource ids), and give 0x47 the same. Then `ultimate_fighter.py motions` from Ultimate's `motion/body/c01` into
+   `motion/bodyf/` (+ entry / result), the face pacs per costume.
+3. **Kirby's Failnaught copy** (decision 7): `kirby-ssbu-partial.zip` (Drive id 10D7B1Za9lW7cFEtkopIfapMF-em5yIoY) ->
+   `kirby/model/copy_master_cap`, `kirby/motion/masterbody`; `kirby_copy_new_cave.py` MAP 0x47 (as Hero / Sephiroth:
+   Robin's copy 0x2C, marker 4) + his arrow 0x19E as the copy's article; `kirby.c` (the marker's Failnaught: the Robin
+   copy's N slots); `kirby_copy_hats.py`, `kirby_copy_motions.py`, `kirby_copy_sound.py` (vc_kirby_copy_master).
+4. **Aymr's KO zoom** (decision 8): a native hook on the finish camera (Smash 4 zooms on a match's last KO only).
+5. The whip sword's segments (the rapid jab, up smash, down tilt, up air, throws, the tether: a model on her whip
+   chain, 8 segments), Failnaught's damage by charge and the max arrow's piercing, SpecialAirNJumpCancel,
+   SpecialLwTurn / SpecialLwHit, the item swings retimed (BatSwing4 kept as hers: `base_scripts_kept`).
+6. The normals' effect colours (fx_render over every move), then the user's own files (below).
+
+## Phase 1 (inputs, slot, plan)
 
 Nothing has been packaged or sent: the port isn't playable yet (ZSS's moves under his animations, no scripts, no
 specials) and `port_check` has an ERROR (E5, the Final Smash ripple: "Effects"). Done so far:
@@ -52,7 +208,7 @@ no bone and Ultimate's trailing bool is dropped). M5 warnings (two empty ZSS mes
 
 Executable: the user's B `exe_v46n` (`time_stage_commands_v1.zip`).
 
-## Executable: exe_v46o (kind 0x47 only)
+## Executable: exe_v46o (kind 0x47 only; exe_v46p, exe_v46q above)
 
 exe_v46o = exe_v46n + the new kind (built, not shipped: it goes with the first playable package). The kind caves are
 generated for an un-grown base, so they were run **incrementally** on exe_v46n: each generator's reads of exe_v46n see
@@ -87,18 +243,12 @@ python3 tools/kind_expand_incremental.py test kind_expand_test EXE_V46O.rpx EXE_
 ```
 exe_v46o sha1 bd818233d2c55b8b16fe7a104bd030fc95dbe587.
 
-**Still to come in the executable:** his weapon kinds (articles, below), the sound aliases (after the sound step),
-motion slots (`extra_kinds.json` "motions": the kind's motion table is in the cave), the x152C tether vector (Risks 1),
-the female voice / per-costume motions if wanted (Open questions).
+exe_v46p added the tether vector and his sound aliases, exe_v46q his motion slots, weapon kinds and trail ids
+("Executable: exe_v46q" above). Still to come: the female per-costume motion folders, Kirby's copy grant, the KO zoom
+(Handover).
 
-## Phase 2 (in progress; nothing packaged)
+## Phase 2 (exe_v46p, sound, scripts)
 
-The user's answers (coordinator): Ultimate's specials order; the up special on ZSS's tether as the base with his own
-Sword of the Creator on top; female costumes with their own animations and voice; the Final Smash stays ZSS's for now
-(no crash); subtitle from Ultimate's files; Kirby's Failnaught copy with his hat; Aymr's KO zoom in 1-on-1; their
-install files later (everything that needs them re-runs on them with one command; vanilla stand-ins until then).
-
-Done so far:
 - **exe_v46p** (`scratchpad/byleth/exe/exe_v46p.rpx`, sha1 e4fe65797487e5aa7f859cb5c9c0c2107ee3a1c5) = exe_v46n + the
   kind (as exe_v46o) + **his tether set** + **his sound aliases**:
   - `kind_expand.py`: a record's `"tail_vector": true` runs its base's vl-tail block for the new kind in hook A (ZSS's:
@@ -116,39 +266,19 @@ Done so far:
 - **Scripts** (`ultimate_acmd.py`): 30 game scripts (normals, grabs, throws, ledge / get-up attacks, the dash) with
   Ultimate's cancel / intangible frames into the vl file, 75 effect, 159 sound, 191 expression scripts. Every normal's
   hitboxes are in his body scripts (on `haver` / `top`): the weapon articles carry none, so the normals hit as
-  Ultimate's without the article models. Left out: the sword trails (`tex_master_sword1/2`: trail_table_cave ids to
-  add), 9 sounds without an id (containers / other fighters' / raw hashes), rumble kinds with no Smash 4 match.
+  Ultimate's without the article models. Left out: the sword trails (done in v1), 9 sounds without an id (containers / other fighters' / raw hashes), rumble kinds with no Smash 4 match.
 
-### ZSS leftovers ("ZSS's statuses don't override Byleth's")
-
-Found and fixed / guarded so far:
-- **Her angled forward tilts' hitboxes** (`AttackS3Hi` / `Lw`) stayed on his one forward tilt's animation: the
-  translator's new `FALLBACK` gives a stand-in slot the stand-in's script.
-- **Her per-kind tether vector** (x152C): 0 for a new kind; given to 0x47 (`tail_vector`, above).
-- **`port_check` B1 base-leftovers** (new; guide catalogue row): every script of the four body files still byte for
-  byte the base's vanilla one that acts. On the current build: game 16 (her specials, custom-move variants, item
-  and other ZSS-only slots), effect 28, sound 72, expression 66: the specials step replaces / empties them (none may
-  stay unless listed in `port.json` `base_scripts_kept`).
-- **vl bytes:** C1 flags her specials' cancel frames (0x239 / 0x23D: 0, Ultimate 54); to do: every motion byte of
-  group 1 (cancel, intangibility, armor) set from Ultimate's motion_list for every slot he plays and cleared on the
-  others (Supamario Core Breaker v11's leftover intangible window).
-- **Still to audit:** her MSC status functions (0x152-0x162, her tether 0xF3 / 0xF4, Catch's whip) each replaced or
-  kept on purpose; her status transitions into her specials; her native per-kind code on kind 0x47 (the Paralyzer /
-  whip articles and their special params, the jetpack / Boost Kick, the Gunship); item swing timings (her
-  `*Swing4` scripts: item timings, not hitboxes; Ultimate's item scripts to translate).
-
-Not started yet: the specials (MSC, articles: Failnaught's arrows, Areadbhar, the sword on her tether, Aymr's armor and
-zoom), the plain grab / zair off, held-weapon models, per-costume (female) motion folders in the executable, Kirby's
-Failnaught copy (hat, motions, the copy grant), the effect-colour comparison, portraits, the package.
-
-### Re-run on the user's files
+## Re-run on the user's files
 
 When their files arrive (port_sources.json: `fighter_param`, `soundlabeltable`, `s4_chr`, `templates.master`, and
 add_fighter's `--param` / `--ui` on theirs):
 ```
 python3 tools/add_fighter.py --param THEIRS/param --param VANILLA/param --ui THEIRS/ui --kinds tools/extra_kinds.json --only master --out DATA
-python3 tools/ultimate_port.py run master sound stats portraits --out OUT
+python3 tools/ultimate_port.py run master sound scripts specials variants stats portraits --out OUT
+python3 tools/fighter_extras.py common THEIRS/sound/config/commonsoundtable.csb OUT
+python3 tools/fighter_extras.py fanfare THEIRS/sound/config/bgm_fighter.fbb OUT --set 0x47=0x12
 ```
+(scripts / specials / variants again after sound: the scripts take the sound ids.)
 Until then the outputs on vanilla files (`port/master/sound/config/soundlabeltable.bin`, `param/fighter/fighter_param.bin`,
 the add_fighter data) are **not for install**: they would overwrite the user's own rows.
 
@@ -188,10 +318,11 @@ dropped; the bank file 25.4 MB, ~12.4 MiB of the 44 MiB effect heap (`port_check
 (the scripts' `LAST_EFFECT_SET_COLOR` etc., his `common_effect_0` tint) are applied by the scripts / variants steps:
 not compared with Ultimate's yet (CLAUDE.md: before any package).
 
-`port_check`: E4 clear; E5 1 ERROR left, `PtcMasterMasterFinalGround/ripple1_rif` (the Final Smash's ground ripple,
-a refraction mesh: eft2 type 6 moving along its emitter's Y, converted as type 4, whose X is then zero): a converter case
-to settle with the Final Smash. E5 now looks at the port's converted sets only (ZSS's vanilla
-`PtcSzerosuitSmashArc` emitters were flagged: eft art the game draws as it is).
+`port_check`: E4 clear; E5 was 1 ERROR (`PtcMasterMasterFinalGround/ripple1_rif`, the Final Smash's ground ripple, a
+refraction mesh: eft2 type 6 moving along its emitter's Y, converted as type 4, whose X is then zero): v1 keeps his Final
+Smash's 13 effects out of the bank (the Final Smash is ZSS's for now: port.json `effects.kept_out`), E5 clear. E5 looks
+at the port's converted sets only (ZSS's vanilla `PtcSzerosuitSmashArc` emitters were flagged: eft art the game draws as
+it is). To do with his own Final Smash: convert eft2 type 6 refraction meshes.
 
 ## Stats (Ultimate's `fighter_param.prc`, `tools/ultimate_stats.py`)
 
@@ -280,25 +411,20 @@ hat: male / female textures) and `kirby/motion/masterbody/c00` (12 motions: Fail
 6. Female costumes: male motions (exact for attacks), female hair / skirt / knife static until their tracks are
    merged in; female idles / taunts / wins are the male's; female voice needs per-costume voice support.
 
-## Open questions (for the user)
+## Decisions (user)
 
-1. **Your current install files**: `param/fighter/fighter_param.bin` (with the six ports' stats), the other edited
-   param / ui files (`ui_character_db`, layout, skill, sound-call dbs, `melee.msbt`, `ui/replace/chr`), and
-   `sound/config/soundlabeltable.bin`: the data rows and the sound step go on yours (they aren't on the Drive; the
-   Drive's `param - modified` predates the ports).
-2. **Specials numbering**: your message has side special = Aymr and down special = Areadbhar; Ultimate's Byleth has
-   **side = Areadbhar (lance), down = Aymr (axe)**. Keep Ultimate's (planned) or swap as written?
-3. **Up special**: on ZSS's native tether (ledge reach / hang free, needs the x152C fix in the executable), or all
-   in his own MSC / articles (no native tether: Has Tether 0, her grab / zair switched off)?
-4. **Female Byleth** (c01 / 03 / 05 / 07): (a) one shared animation set (male's, with the female hair / skirt tracks
-   merged in: attacks identical, idles / taunts / wins the male's), or (b) her own animations and voice per costume
-   (an executable change: a second motion folder and voice bank per costume)?
-5. **Final Smash**: Progenitor God Kindled as a cinematic (big: the sword2 / background articles, camera), a simpler
-   version, or keep ZSS's Gunship for now?
-6. **Subtitle** under his name (Smash 4's MmelCharaA): "Ashen Demon" for now, or another?
-7. **Kirby's Failnaught copy**: build it in this port (granted as Pit's copy for its bow / arrows, or Robin's as Hero /
-   Sephiroth), with the hat?
-8. **Aymr's critical zoom** (Ultimate: a cinematic zoom on a KO in 1-on-1): wanted?
+1. Their install files (fighter_param with the other ports' stats, the param / ui databases, melee.msbt, ui/replace/chr,
+   soundlabeltable) come later: everything that depends on them re-runs on theirs with one command ("Re-run on the
+   user's files"); vanilla stand-ins until then, shipped as not_for_install.
+2. Ultimate's specials order: side Areadbhar, down Aymr, neutral Failnaught, up Sword of the Creator.
+3. Up special on ZSS's native tether / ledge hang with his own Sword of the Creator on top.
+4. Female costumes: her own animations and voice per costume (voice done: her banks load by costume; animations: the
+   executable change is approved, Handover 2).
+5. Final Smash: ZSS's for now, no crash; his Final Smash effects kept out of the bank (E5).
+6. Subtitle "A Heroic Legacy".
+7. Kirby's Failnaught copy with his hat (Handover 3); Kirby's trait for him: Strike.
+8. Aymr's KO zoom in 1-on-1: yes (Handover 4).
+9. ZSS's statuses / leftovers must not override his (v1 audit above).
 
 ## Commands
 
@@ -310,6 +436,11 @@ python3 tools/ultimate_port.py run master body model-c00 model-c01 model-c02 mod
 python3 tools/ultimate_port.py stats master FIGHTER_PARAM_BIN OUT/master/param/fighter/fighter_param.bin
 python3 tools/add_fighter.py --kinds tools/extra_kinds.json --only master --folder VANILLA/fighter/szerosuit KINDDIR
 python3 tools/port_check.py master OUT/master
+# v1: the specials, held weapons, trails and the package
+python3 tools/master_build.py vis DUMP ULT fighters/master/weapon_vis.json        # before the motions step
+python3 tools/ultimate_port.py run master effects model-c00 .. model-c07 motions low-models scripts specials variants \
+    shapes portraits --out OUT                                                    # specials = master_build.py build
+bash scratchpad/byleth/make_pkg.sh                                                # -> scratchpad/byleth_v1.zip
 ```
 Body: `rolloff_acmd.py VANILLA/.../game.bin game.bin --plain --add 2.2 EscapeF EscapeB`; `mscdec.py -x tools/mscinfo.xml
 szerosuit.mscsb` (round trip: 2 of 2393 functions differ, both equivalent: a folded negative constant, an empty else),

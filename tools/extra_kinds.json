@@ -250,6 +250,22 @@
         "id": 65,
         "name": "Byleth",
         "subtitle": "A Heroic Legacy"
+      },
+      "motions": {
+        "0x212": {"anim": "FitSZerosuitBodyMainD00SpecialNTurn", "flags": "0x0", "motion": "specialnturn (Failnaught's turn; ZSS's custom-move slot reused)"},
+        "0x21E": {"anim": "FitSZerosuitBodyMainD00SpecialAirNTurn", "flags": "0x0", "motion": "specialairnturn"},
+        "0x22A": {"anim": "FitSZerosuitBodyMainD00SpecialAirNCancel", "flags": "0x0", "motion": "specialairncancel (Failnaught's shield cancel, air)"},
+        "0x22E": {"anim": "FitSZerosuitBodyMainD01SpecialSF", "flags": "0x0", "motion": "specialsf (Areadbhar's lunge)"},
+        "0x22F": {"anim": "FitSZerosuitBodyMainD01SpecialSLanding", "flags": "0x0", "motion": "specialslanding"},
+        "0x232": {"anim": "FitSZerosuitBodyMainD01SpecialAirSF", "flags": "0x0", "motion": "specialairsf"},
+        "0x23A": {"anim": "FitSZerosuitBodyMainD02SpecialAirHiHit", "flags": "0x0", "motion": "specialairhihit (Sword of the Creator's pull)"},
+        "0x23B": {"anim": "FitSZerosuitBodyMainD02SpecialAirHiOvertake", "flags": "0x0", "motion": "specialairhiovertake"},
+        "0x23C": {"anim": "FitSZerosuitBodyMainD02SpecialAirHiWallJump", "flags": "0x0", "motion": "specialairhiwalljump"}
+      },
+      "weapons": {
+        "arrow1": {"kind": "0x19E", "base": "paralyzer_bullet", "max": 2},
+        "arrow2": {"kind": "0x19F", "base": "paralyzer_bullet", "max": 1},
+        "whip": "0x1A0"
       }
     }
   ],

@@ -928,6 +928,8 @@ def draw_ult(canvas, em, parts, mnow, time, csize):
     wrap = {0: 1, 1: 0, 2: 2}                     # eft2 0 mirror, 1 repeat, 2 clamp -> mx_exec's
     tex = {}
     for name, unit in ps.samplers.items():
+        if not name[-1:].isdigit():               # a sampler that isn't one of the emitter's (Byleth's: a cube / depth one)
+            continue
         k = int(name[-1])
         smp = e['sampler'][k]
         img = em.ult['images'].get(smp['texture_id'])
@@ -1333,6 +1335,16 @@ def call_matrix(xyz, rot_deg, size):
 
 
 # ------------------------------------------------------------------ main
+def s4_script_name(args, move):
+    """the Smash 4 script an Ultimate move was translated into: the port's --translate map (specials_acmd.json:
+    Byleth's SpecialLw -> speciallwstart), else the same name"""
+    try:
+        import port_check
+        return {u.lower(): s for s, u in port_check.translate_map(args.name).items()}.get(move.lower(), move)
+    except Exception:            # noqa: BLE001
+        return move
+
+
 def render_move(args, move, ult, s4, out_png):
     if getattr(args, 'effect', None):
         # one effect on its own (an effect the status code plays, not a script: Sephiroth's aim arrow), at --call
@@ -1341,7 +1353,7 @@ def render_move(args, move, ult, s4, out_png):
         scalls = [(0, int(args.effect_id, 0), 0, tuple(c[:3]), tuple(c[3:6]), c[6], None)]
     else:
         ucalls = ult_calls(os.path.join(args.dump, move + '.txt'), move)
-        scalls = s4_calls(args.effect_bin, move)
+        scalls = s4_calls(args.effect_bin, s4_script_name(args, move))
     frames = list(range(args.first, args.last + 1, args.every))
     cols = []
     log = []

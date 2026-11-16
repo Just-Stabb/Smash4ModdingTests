@@ -13,6 +13,7 @@ text-end check is skipped.
       differ, which must be only those other caves re-hooked); the words the NEW spec changes are written to
       ARGS_OUT as rpx_patch.py arguments. Then re-run tools/kirby_copy_pool_cave.py on the result (it hooks the
       load / unload cases of kinds granted as another kind, which move with the cave) and apply its words.
+      --list KIND=ADDR ...: those fighters' article lists at ADDR (tools/weapon_expand_append.py's, exe_v46q)
   python3 tools/kind_expand_incremental.py test TEST PATCHED ORIGINAL [args]
       runs tools/TEST.py (kind_expand_test, base_effects_test, base_customs_test) with ORIGINAL read the same way; a
       call the test makes on the original that faults (its unexpanded layout assumptions) returns 0xDEAD and the run
@@ -139,8 +140,25 @@ def cmd_test(test, patched, orig, rest):
     T.main()
 
 
+def override_lists(pairs):
+    """--list KIND=ADDR: a fighter's article list where tools/weapon_expand_append.py put it (weapon_expand.py's own
+    layout would put a new fighter's list at its cave's start, moving everything after it)"""
+    import weapon_expand as W
+    over = {K.num(k): K.num(v) for k, v in (p.split('=') for p in pairs)}
+    _lists = W.article_lists
+
+    def lists(*a, **k):
+        out = dict(_lists(*a, **k))
+        out.update({kk: v for kk, v in over.items() if kk in out})
+        return out
+    W.article_lists = lists
+
+
 def main():
     if len(sys.argv) >= 6 and sys.argv[1] == 'build':
+        rest = sys.argv[6:]
+        if rest[:1] == ['--list']:
+            override_lists(rest[1:])
         cmd_build(*sys.argv[2:6])
     elif len(sys.argv) >= 5 and sys.argv[1] == 'test':
         cmd_test(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5:])
