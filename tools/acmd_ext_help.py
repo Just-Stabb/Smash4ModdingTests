@@ -2554,3 +2554,156 @@ EXAMPLES['Line_Test'] = [
         '// world space: a line across the stage at height 30 (from x -100 to 100)',
         'Line_Test(Space=1, X0=-100, Y0=30, X1=100, Y1=30, Floors=0, Distance=VAR_6, HitX=VAR_7, HitY=0x0, Kind=0x0)',
     ]
+
+# --- exe_v46w_vars: variable resets (tools/var_reset_cave.py): New_Var's Reset, Var_Reset_Set ------------------------
+GROUP['Var_Reset_Set'] = GROUP['New_Var']
+_RESETS = [
+    '## Resets: when a variable goes back by itself (exe_v46w, Sm4shCommand v1.7.4)',
+    'A variable can be put back to a value whenever something happens to the object that owns it, by the game itself, '
+    'whatever status or move it is in then:',
+    '- 1 KO: its KO (the Dead status starting; or, if that never came, the object being set up for its respawn). Once '
+    'per KO.',
+    '- 2 landing: it touches the ground from the air (its situation goes from air to ground: a landing of any kind, '
+    'a landing in hitstun or a tech too).',
+    '- 4 ledge grab: it catches a ledge (CliffCatch, a tether\'s catch).',
+    '- 8 hit: a hit takes effect on it (it gets a reaction: hitstun, a flinch). Not a hit on its shield, not a hit its '
+    'armor (super / heavy armor) absorbs, not a hit while it is invincible or intangible, not a counter.',
+    'Add them for several (2 + 4 = 6: landing or ledge). The events are a fighter\'s: an article\'s (projectile\'s) '
+    'variables never reset this way.',
+    'The reset is a write of the value, exactly what SET_FLOAT(Value, Variable) in that object\'s script would do at that '
+    'moment (an int variable gets a whole number).',
+]
+HELP['New_Var'][-2:-2] = [
+    '## Reset (v1.7.4: what changed)',
+    'New_Var has an optional parameter, Reset: the events that put the variable back to Initial. Left out (or 0) '
+    'New_Var is exactly as before (old scripts compile to the same words and do the same in game).',
+    '- Reset=2 (landing): a combo counter that starts again whenever the fighter lands; Reset=1 (KO), 4 (ledge grab), '
+    '8 (hit), or a sum (6 = landing or ledge). The names work too: Reset=landing|ledge.',
+    '- It is kept in the command (bits 8-11 of the Scope word); Sm4shCommand shows Reset=... only when it isn\'t 0.',
+    '- Every time New_Var runs it sets the reset again (Scope object or move): put it at the top of the move\'s script, '
+    'or of a script that always runs. A later New_Var for the same name with Reset 0 takes the reset away.',
+    '- Needs exe_v46w (exe_v46w_vars or later). An older exe reads a New_Var with Reset as Scope object: the variable '
+    'works, it just never resets.',
+    '',
+] + _RESETS + ['']
+HELP['Var_Reset_Set'] = [
+    '## How it works',
+    'Gives any variable a reset: when Reset\'s events happen to the Owner, the Variable is set to Value (as SET_FLOAT '
+    'would do it in the Owner\'s script). New_Var(..., Reset=...) does this for its own variable with its Initial; '
+    'this command does it for any variable: VAR_0-VAR_31, TIMER_0-TIMER_15, a New_Var name (with a value of your own), '
+    'and the position / input / state variables (SELF_INPUT_OFF, ...: then the write acts on their target as SET_FLOAT '
+    'does). It runs once where it is: the reset stays until it is changed or removed, or the Owner is set up again (its '
+    'respawn, a projectile\'s next shot).',
+    '',
+    '## Parameters',
+    '- Variable: the variable, as the Owner sees it (Owner 3 and VAR_24: player 1\'s own VAR_24).',
+    '- Reset: the events (bits, add them): 1 KO, 2 landing, 4 ledge grab, 8 hit. 0 removes the variable\'s reset.',
+    '- Value: what it is set to.',
+    '- Owner: whose events, and whose variable: 0 this object, 1 the nearest opponent, 2 the last fighter this one hit, '
+    '3-10 player slots 1-8, 11 the last fighter that hit this one, 12 the fighter this attack hit (as the other '
+    'commands\' Target).',
+    '',
+] + _RESETS + [
+    '',
+    '## Gotchas',
+    '- Up to 31 resets per object (a 32nd is refused; changing or removing one always works), up to 48 objects with '
+    'resets (past that the oldest object\'s go).',
+    '- A variable written through another fighter (SLOT2_SHARED_0 from Owner 0) changes when THIS object has the event; '
+    'to follow the other fighter\'s events give its slot as Owner.',
+    '- A KO reset happens once per KO: after it the reset keeps its other events.',
+    '',
+    'MSC (no ACMD command there): WorkModule(0, index, 0x0F0003CA) (VAR_RESET_ID) picks the variable 0x0F000000 + index '
+    '(VAR_0 is 0x300, a New_Var slot 0x380 + slot, SELF_INPUT_OFF 0x115: an index, so the float holds it exactly), '
+    '0x0F0003CB (VAR_RESET_VALUE) its value, 0x0F0003CC (VAR_RESET_OWNER) the Owner, then WorkModule(0, mask, '
+    '0x0F0003CD) (VAR_RESET) sets it (0 removes it); reading VAR_RESET gives the picked variable\'s mask. Write the '
+    'four together, in that order.',
+    '',
+    NOT_VIEWER,
+    'Needs exe_v46w (exe_v46w_vars or later: tools/var_reset_cave.py). Without it a script that uses this command '
+    'won\'t load properly: ship the executable with any script that uses it.',
+]
+_k = sum(1 for _l in EXAMPLES['New_Var'] if _l.startswith('// Example'))
+EXAMPLES['New_Var'] = EXAMPLES['New_Var'] + [
+    '',
+    '// Example %d (v1.7.4, exe_v46w: Reset): a combo counter that starts again when the fighter lands. Every hit of' % (
+        _k + 1),
+    '// this aerial adds 1 (Reset=2: back to 0 on landing); from the third hit in the same airtime the hit is stronger',
+    'New_Var(Name=combo, Type=int, Initial=0, Scope=object, Reset=2)',
+    'FRAME(Frames=6)',
+    'Int_Var_Compare(Variable=combo, Method=3, Value=2)',
+    'True(Offset=0){',
+    '    ' + _hitbox('Hitbox', Damage=11, BKB=50, Size=6, Z=8),
+    '}',
+    'Else(Offset=0){',
+    '    ' + _hitbox('Hitbox', Damage=6, Size=5, Z=8),
+    '}',
+    'FRAME(Frames=8)',
+    'Hit_Check(Target=0, When=0, Kinds=2)',
+    'True(Offset=0){',
+    '    INC_INT(Variable=combo)',
+    '}',
+    'Remove_All_Hitboxes()',
+    '',
+    '// Example %d (v1.7.4, exe_v46w: Reset): a move usable once per airtime, given back on landing or a ledge grab' % (
+        _k + 2),
+    '// (Reset=6 = 2 + 4). The flag is set when the move is used; the move\'s MSC (or a check in its first frames)',
+    '// reads it, e.g. Float_Var_Compare(Variable=air_used, Method=0, Value=1) at frame 1 to cut it short',
+    'New_Var(Name=air_used, Type=int, Initial=0, Scope=object, Reset=landing|ledge)',
+    'Float_Var_Compare(Variable=air_used, Method=0, Value=1)',
+    'True(Offset=0){',
+    '    // used already this airtime: no hitbox this time',
+    '    SET_FLOAT(Value=1, Variable=VAR_9)',
+    '}',
+    'Else(Offset=0){',
+    '    SET_INT(Value=1, Variable=air_used)',
+    '    SET_FLOAT(Value=0, Variable=VAR_9)',
+    '}',
+    '',
+    '// Example %d (v1.7.4, exe_v46w: Reset): a power-up for the rest of the stock, cleared by a KO (Reset=1): the taunt' % (
+        _k + 3),
+    '// sets it to 1.3, the attacks multiply their damage by it (Damage=buff in an Extra hitbox would read it too)',
+    'New_Var(Name=buff, Type=float, Initial=1, Scope=object, Reset=KO)',
+    'FRAME(Frames=20)',
+    'SET_FLOAT(Value=1.3, Variable=buff)',
+    '',
+    '// Example %d (v1.7.4, exe_v46w: Reset): a charge kept between uses, lost when the fighter is hit (Reset=8)' % (
+        _k + 4),
+    'New_Var(Name=stored, Type=int, Initial=0, Scope=object, Reset=hit)',
+    'Input_Compare(Target=0, Input=1, Method=0, Value=1)',
+    'True(Offset=0){',
+    '    INC_INT(Variable=stored)',
+    '}',
+    'Int_Var_Compare(Variable=stored, Method=3, Value=60)',
+    'True(Offset=0){',
+    '    ' + _hitbox('Hitbox', Damage=20, BKB=70, Size=8, Z=10),
+    '    SET_INT(Value=0, Variable=stored)',
+    '}',
+]
+EXAMPLES['Var_Reset_Set'] = [
+    '// Example 1: VAR_0 (a combo counter kept in a plain variable) back to 0 when this fighter lands',
+    'Var_Reset_Set(Variable=VAR_0, Reset=2, Value=0, Owner=0)',
+    '',
+    '// Example 2: TIMER_3 (a cooldown) ended at once by a KO or a ledge grab (1 + 4)',
+    'Var_Reset_Set(Variable=TIMER_3, Reset=5, Value=0, Owner=0)',
+    '',
+    '// Example 3: a lockout on the fighter this attack hit (Target 12): its controller off now, and back on when',
+    '// it is hit by anyone or KO\'d (Owner 12, its own SELF_INPUT_OFF, Reset 1 + 8); if THIS fighter is KO\'d first,',
+    '// its own reset turns the hit fighter\'s controller back on too (Owner 0, ATKHIT_INPUT_OFF as this one sees it)',
+    'Input_Set(Target=12, Input=21, Value=1)',
+    'Var_Reset_Set(Variable=SELF_INPUT_OFF, Reset=9, Value=0, Owner=12)',
+    'Var_Reset_Set(Variable=ATKHIT_INPUT_OFF, Reset=1, Value=0, Owner=0)',
+    'WAIT(Frames=40)',
+    'Input_Set(Target=12, Input=21, Value=0)',
+    'Var_Reset_Set(Variable=SELF_INPUT_OFF, Reset=0, Value=0, Owner=12)',
+    'Var_Reset_Set(Variable=ATKHIT_INPUT_OFF, Reset=0, Value=0, Owner=0)',
+    '',
+    '// Example 4: a New_Var name with a value of its own (not its Initial): heat back to 50 on landing',
+    'New_Var(Name=heat, Type=float, Initial=0, Scope=object)',
+    'Var_Reset_Set(Variable=heat, Reset=2, Value=50, Owner=0)',
+    '',
+    '// Example 5: the same as MSC would set it, from variables (VAR_RESET_ID = the index, 0x301 for VAR_1)',
+    'SET_FLOAT(Value=769, Variable=VAR_RESET_ID)',
+    'SET_FLOAT(Value=0, Variable=VAR_RESET_VALUE)',
+    'SET_FLOAT(Value=0, Variable=VAR_RESET_OWNER)',
+    'SET_FLOAT(Value=8, Variable=VAR_RESET)',
+]
