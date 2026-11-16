@@ -185,9 +185,18 @@ def first(tr, pred):
     return next((t for t in tr if pred(t)), None)
 
 
-def victim_below(y=100.0, dy=-6.0, dx=4.0):
-    """an airborne fighter (slot 2) below and ahead of him"""
-    v = FT.Fighter(2, dx, y + dy, air=True)
+def fall_y(y0, k):
+    """his height after k frames of his own fall from rest at y0 (the model's physics)"""
+    y, v = y0, 0.0
+    for _ in range(k):
+        v = max(-MAX_FALL, v - GRAVITY)
+        y += v
+    return y
+
+
+def victim_below(y=100.0, dy=-6.0, dx=4.0, k=None):
+    """an airborne fighter (slot 2) below and ahead of him (k: where he will be on game frame k: it waits there)"""
+    v = FT.Fighter(2, dx, (fall_y(y, k) if k is not None else y) + dy, air=True)
     return v
 
 

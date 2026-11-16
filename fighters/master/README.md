@@ -441,6 +441,21 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
+0000. **v6: the whip sword** (requested; not started: this session's context ran out). Facts gathered for it:
+   ZSS's whip article (his copy, kind 0x1A0, `model/whip/c00`, now hidden by `nud.hidden` in `master_build.weapons`)
+   has 18 bones: HaveN, PlasmaWhip01H-08H (a straight chain in bind, ~4.99 apart along (-0.5, 0, 0.866) from
+   (-1.35, 0, 2.46) to AttachN (-19.74, 0, 34.31) and PlasmaWhipEndN), and billboard copies 02H-08H; its meshes
+   Whip_VIS_O_OBJ_NSC / Cylinder_VIS_O_OBJ_NSC (bind 4, rigged); motions `motion/whip/main.pac` (15: AttackS4S,
+   Catch*, WhipShoot / WhipReverse ...). Ultimate's `sword` article: 58 bones (HaveR root, sword01-sword37 + _B
+   helpers), motions in `motion/sword/c00` (extend, wait, c02attacklw3, c04attackhi4, c05attackairhi, e01throw*,
+   d02special*hi*, c00attack100*, j01appeallw*). Plan: (1) the up special: the sword's mesh posed at `extend`'s last
+   frame (scratchpad/byleth/bin/pose.py `ult` renders it with the root on haver), re-skinned to the 8 whip segments
+   by distance from the hilt along the chain, written as the whip's model.nud (its own nut), `nud.hidden` and the
+   aircatch script's `Article_Visibility(2, 0)` dropped; check the whip's native reach (ZSS's tether) against
+   Ultimate's 70 and move the hitboxes to the whip's tip if its ACMD can carry them. (2) the other whip moves: a model
+   article with a MotionModule (dein copy, catalogue W5 / W8) playing the sword's motions resampled to <= 16 bones, or
+   the whip article generated with a motion of ours; then the stand-in (`master_build.WEAPONS['SWORD']` +
+   `VIS_ALSO['master_sword']`) removed. Then the "etc" sweep (hitbox timing, effects, sounds per move vs Ultimate).
 000. **v5 fix** (sent: `scratchpad/byleth_v5_fix.zip`): the user's test of the icons, the sword stand-in, the bow; their
    clip of the charged Failnaught timing and of any move still showing the bow. Then the whip sword (the plan below,
    item 1), which also replaces the stand-in in the down tilt / rapid jab / up smash / up air / throws / taunt.
