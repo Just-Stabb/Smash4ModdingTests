@@ -38324,6 +38324,12 @@ float master_ovt_y;     // v12 Hi: the caught fighter's throw point's height (Ul
 int master_hi_ovt;      // v12 Hi: the overtake holds him on the caught fighter (until its hit's frame)
 int master_ovt_slot;    // v12 Hi: the caught fighter's slot (the diag's k13 after master_target is let go)
 int master_hi_wj_fx;    // v12 Hi: the wall jump's cling effect played
+float master_hx;        // v13 Hi: his place through SpecialAirHiHit's stop (held there), the reel's start ...
+float master_hy;
+float master_rx;        // ... the reel's end (his root), its steps (MASTER_HI_REWIND each) and the one taken
+float master_ry;
+int master_reel_n;
+int master_reel_k;
 
 // a motion of the status's part: from frame 0, or (keep 1) at the frame the last one had (a ground / air change)
 void master_motion(int m, int keep)
@@ -38661,7 +38667,7 @@ void master_s_loop()
 // (its hit), then Fall (v7: never special fall, as Ultimate). A wall touched while the sword is out (up to MASTER_HI_WALL_MAX a time in the air) ->
 // 0x15C: SpecialAirHiWallJump (MASTER_HI_JUMP_X off the wall, MASTER_HI_JUMP_Y up). Else Fall at its end (v7; v1-v6
 // special fall); landing: LandingHeavy (v1-v6 LandingFallSpecial). v7: a ledge in front during the catch window -> 0xF2
-// (the common AirCatch's func_99 test); a caught fighter is held while he is pulled to it (master_hi_rewind)
+// (the common AirCatch's func_99 test); a caught fighter is held while he is pulled to it (master_hi_reel)
 int master_hi_pre()
 {
     if (global18 == 0x2)
@@ -38819,6 +38825,8 @@ void master_hi_air_loop()
 // line "S4GF k=<k> v=<value> c=<value x 100>" per write. v11: 10 the reel's distance left each frame, 11 the wall
 // jump's jump (0x15C entered again). v12: 12 his height over the caught fighter's feet as the overtake starts (on
 // its throw point: about 10), 13 its damage on the overtake's frames 11 - 13 (up by 6.5 = the throw's hit landed).
+// v13: 14 the speed something else gives him (SPEED_Y, 0x0F000333) through the stop and reel (0: held); k8's stop part
+// is now the stop frames left by the motion's frame, k10 the reel's distance left along its path.
 // k 0 the up special's frame, 1 another fighter in reach: slot x
 // 1000 + its status (0xBD = 189: caught), 2 a line test: 1 + 10 x its kind (0 nothing met), 3 its distance x 1,
 // 4 SpecialAirHiHit's mode (1 wall, 2 stopped, 3 a fighter), 5 CatchModule(0x2712) (holding someone).
@@ -39252,9 +39260,13 @@ void master_hi_hit_main()
     master_hi_pull();
     master_hi_hold = 0;
     master_hi_ovt = 0;
+    master_reel_n = 0;
+    master_reel_k = 0;
+    master_hx = PostureModuleF(0x1);        // v13: held exactly here through the stop
+    master_hy = PostureModuleF(0x2);
     if (master_target >= 0)
     {
-        master_pull_n = MASTER_HI_PULL_MAX; // a caught fighter: pulled to it (master_hi_rewind), at most this long
+        master_pull_n = MASTER_HI_PULL_MAX; // a caught fighter: pulled to it (master_hi_reel), at most this long
         master_hi_hold = MASTER_HI_STOP_FIGHTER;    // v9: param_special_hi hit_stop_frame_fighter, then the rewind
         WorkModule(0, 2.0f, 0x0f00030f);
         master_ovt_slot = master_target;
@@ -39296,8 +39308,89 @@ void master_hi_hit_main()
     GroundModule(0x2710, 0x5);
     KineticModule(0, 0xa);
     master_hold_gravity();
+    master_hold_energies();
     master_motion(0x23a, 0);
     func_78(master_hi_hit_loop);
+}
+
+// v13: every other energy held too (motion 0, air control 2, stop 3: suspended, as gravity): the v12 diag log's stop
+// drifted up 2.5 a frame once his catching hit's hitlag ended (k8 33 -> -1 over 13 frames: something kept a speed),
+// and the reel (4.1 a frame) lost about 2 a frame to it (k10 9, 7, 5, 3): the jitter in the user's v12 clips. He is
+// moved by his position alone in 0x15B (master_hi_place); resumed at its end / the overtake's throw
+void master_hold_energies()
+{
+    KineticModule(0x11, 0x3, 0, 0);
+    KineticModule(0x2717, 0);
+    KineticModule(0x2717, 0x2);
+    KineticModule(0x2717, 0x3);
+}
+
+void master_free_energies()
+{
+    KineticModule(0x2718, 0);
+    KineticModule(0x2718, 0x2);
+    KineticModule(0x2718, 0x3);
+}
+
+// v13: his position written (both axes, absolute): no speed, no step from where something else put him
+void master_hi_place(float x, float y)
+{
+    WorkModule(0, x, 0x0f000000);
+    WorkModule(0, y, 0x0f000001);
+    master_speed = 0;
+    master_move(0);
+}
+
+// v13: the reel's path, once, when the stop ends: from where he was held to his end point (a wall: his hand on the point
+// met; a fighter: its throw point MASTER_HI_OVT_DX ahead / _DY above him), at Ultimate's rewind_speed (4.1) a frame,
+// at most MASTER_HI_PULL_MAX frames. Each frame then puts him on the path (master_hi_reel): a steady speed, nothing
+// measured back from where he is (v12 reeled from his current place: anything else moving him fought it)
+void master_hi_reel_begin()
+{
+    float lr;
+    float y;
+    float d;
+    lr = PostureModuleF(0);
+    if (master_hi_wall == 0x1)
+    {
+        master_rx = master_tx - MASTER_HI_LINE_X * lr;
+        master_ry = master_ty - MASTER_HI_LINE_Y;
+    }
+    else
+    {
+        y = master_ovt_y - MASTER_HI_OVT_DY;
+        if (y < master_ty && WorkModuleF(0, 0x0f000100 + 0x20 * (master_ovt_slot + 0x3) + 0x16) == 0.0f)
+        {
+            y = master_ty;                  // a fighter on the ground: not reeled under its feet
+        }
+        master_rx = master_tx - MASTER_HI_OVT_DX * lr;
+        master_ry = y;
+    }
+    d = master_len(master_rx - master_hx, master_ry - master_hy);
+    master_reel_n = 0x1;
+    while ((float)master_reel_n * MASTER_HI_REWIND < d && master_reel_n < MASTER_HI_PULL_MAX)
+    {
+        master_reel_n += 0x1;
+    }
+    master_reel_k = 0;
+    // Ultimate's sword leaves its hit motion here (the rewind): its wind (an endless emitter) ends with it
+    EffectModule(0x2723, 0x3470073, 0, 0);  // master_wire_wind2
+}
+
+// v13: one step along the reel's path; 1 when he is at its end
+int master_hi_reel()
+{
+    float t;
+    master_reel_k += 0x1;
+    t = (float)master_reel_k / (float)master_reel_n;
+    if (t > 1.0f)
+    {
+        t = 1.0f;
+    }
+    master_hi_place(master_hx + (master_rx - master_hx) * t, master_hy + (master_ry - master_hy) * t);
+    master_diag(10, (1.0f - t) * master_len(master_rx - master_hx, master_ry - master_hy));
+    master_diag(14, WorkModuleF(0, 0x0f000333));    // the speed something else still gives him (0 if held)
+    return master_reel_k >= master_reel_n;
 }
 
 // v10: no fall while the sword holds him (0x15B's stop and rewind, the wall jump's cling): the kinetic type 0xA
@@ -39314,6 +39407,7 @@ void master_hold_gravity()
 void master_free_gravity()
 {
     KineticModule(0x2718, 0x1);
+    master_free_energies();                 // v13: the others too (held in 0x15B)
 }
 
 void master_hi_hit_loop()
@@ -39324,22 +39418,28 @@ void master_hi_hit_loop()
     }
     if (master_phase == 0)
     {
-        master_diag(8, 1000.0f * (float)master_hi_hold + master_ty - PostureModuleF(0x2));
         if (master_hi_hold > 0)            // v9: the hit's stop (Ultimate's hit_stop_frame_fighter / _wall)
         {
-            master_hi_hold -= 0x1;
-            master_speed = 0;
-            master_move(0);
-            if (master_target >= 0)
+            // v13: on the motion's frame (its game script sends the sword back on the same frame: v12's counter ran
+            // through the catching hit's hitlag, the motion didn't), held exactly where it began
+            if (MotionModuleF(0x1) < (float)master_hi_hold)
             {
-                master_hi_keep();
+                master_diag(8, 1000.0f * ((float)master_hi_hold - MotionModuleF(0x1)) + master_ty - PostureModuleF(0x2));
+                master_diag(14, WorkModuleF(0, 0x0f000333));
+                master_hi_place(master_hx, master_hy);
+                if (master_target >= 0)
+                {
+                    master_hi_keep();
+                }
+                return;
             }
-            return;
+            master_hi_hold = 0;
+            master_hi_reel_begin();
         }
         if (master_hi_wall == 0x1)
         {
             // v10: his hand (the line test's start, MASTER_HI_LINE_X / _Y) to the point the tip met (v9: 8 ahead)
-            if (master_hi_pull_to(master_tx, master_ty - MASTER_HI_LINE_Y, MASTER_HI_LINE_X))
+            if (master_hi_reel())
             {
                 master_hi_latched = 0x1;
                 func_16(0x15c, 0);          // at the wall: Ultimate's SpecialAirHiWallJump
@@ -39348,7 +39448,8 @@ void master_hi_hit_loop()
         }
         if (master_target >= 0)
         {
-            if (master_hi_rewind())
+            master_hi_keep();
+            if (master_hi_reel())
             {
                 master_phase = 0x1;             // this frame's speed is the last step to it (stopped next frame)
                 if (!master_soft)
@@ -39468,29 +39569,13 @@ float master_len(float x, float y)
     return r;
 }
 
-// v7: Ultimate's SpecialAirHiHit: the sword holds what it caught (CATCH) and rewinds, pulling him to it at
-// rewind_speed (param_special_hi 4.1 a frame) until his hand is at it (param_sword fighter_offset 8 short of it along
-// his facing); the caught fighter is held where it was caught (its position written each frame, as the
-// set_vec_target_pos pulls do: tools/vec_target.py). 1 when he is there (or the pull ran MASTER_HI_PULL_MAX frames)
-// v12: Ultimate's reel ends with the caught fighter at his raised hand: the overtake then puts his root on its throw
-// joint (f_7208a1f1d0: LinkModule set_model_constraint_joint `top` to the target's `throw`) while its motion draws his
+// v12: Ultimate's reel (v13: master_hi_reel_begin) ends with the caught fighter at his raised hand: the overtake then
+// puts his root on its throw joint (f_7208a1f1d0: LinkModule set_model_constraint_joint `top` to the target's `throw`) while its motion draws his
 // body MASTER_HI_OVT_DX behind / MASTER_HI_OVT_DY below the root on frame 0 (special_air_hi_overtake: hip (-8.1, -6.2);
 // the hit pose's hip (-0.3, 8.0): the root moves 7.8 forward / 14.2 up between them), flipping over it to stand on it
 // by frame 10. v7 - v11 reeled his root to 8 behind its feet at its feet's height: the overtake's hitbox (9 around
 // (8, 10)) swung beside it, and never above it (user's v11 test). A fighter on the ground: not reeled under its feet
 // (the floor)
-int master_hi_rewind()
-{
-    float y;
-    master_hi_keep();
-    y = master_ovt_y - MASTER_HI_OVT_DY;
-    if (y < master_ty && WorkModuleF(0, 0x0f000100 + 0x20 * (master_ovt_slot + 0x3) + 0x16) == 0.0f)
-    {
-        y = master_ty;
-    }
-    return master_hi_pull_to(master_tx, y, MASTER_HI_OVT_DX);
-}
-
 // v12: the caught fighter's throw joint's height (Ultimate's overtake constrains his root to it): its waist joint
 // (jtb 11, read through the joint position variables at its rest pose), else its feet + MASTER_HI_OVT_Y
 float master_hi_throw_y(int s)
@@ -39523,7 +39608,7 @@ void master_hi_fx_at(int id, float x, float y)
                  0, 0, 0, 0, 0, 0, 0);
 }
 
-// v9: the caught fighter held where it was caught (its position written; master_hi_rewind's, also during the stop)
+// v9: the caught fighter held where it was caught (its position written; master_hi_reel's, also during the stop)
 void master_hi_keep()
 {
     int s;
@@ -39537,35 +39622,6 @@ void master_hi_keep()
     }
 }
 
-// the rewind (v7, v9 its own function): him pulled at rewind_speed toward (x, y) until his hand (`hand` ahead
-// of him) is there, or MASTER_HI_PULL_MAX frames; 1 there
-int master_hi_pull_to(float x, float y, float hand)
-{
-    float dx;
-    float dy;
-    float n;
-    float lr;
-    lr = PostureModuleF(0);
-    dx = x - hand * lr - PostureModuleF(0x1);
-    dy = y - PostureModuleF(0x2);
-    n = master_len(dx, dy);                 // v8: the distance (v7 |dx| + |dy|: 4.1 a frame only straight up / across)
-    master_pull_n -= 0x1;
-    master_diag(10, n);
-    // v11: moved by his position (the position variables' self moves 0x0F000004 forward / 0x0F000005 up), no longer by
-    // kinetic energy 3: speeds the status's loop sets there never moved him (user's v10 log: k8 the same 33 / 42 for
-    // the reel's 20 frames, attempts 2 - 4; v9's trim: he sank under the reel). Energy 3 stays 0
-    master_speed = 0;
-    master_move(0);
-    if (n <= MASTER_HI_REWIND || master_pull_n <= 0)
-    {
-        WorkModule(0, dx * lr, 0x0f000004);
-        WorkModule(0, dy, 0x0f000005);
-        return 0x1;
-    }
-    WorkModule(0, dx / n * MASTER_HI_REWIND * lr, 0x0f000004);
-    WorkModule(0, dy / n * MASTER_HI_REWIND, 0x0f000005);
-    return 0;
-}
 
 // v8: the overtake throws the caught fighter as every grab's throw does (the common Throw's init, func_1081): the
 // thrown link event (ThrownF 0x7C plays; the victim stays where it was caught: no CatchModule(0x2710)), the throw
@@ -39593,6 +39649,11 @@ void master_hi_hit_end()
     {
         master_free_gravity();              // v10: the fall back (the wall jump keeps it held for its cling)
     }
+    else
+    {
+        master_free_energies();             // v13: the cling's root motion (energy 0) moves him again
+    }
+    EffectModule(0x2723, 0x3470073, 0x1, 0x1);  // v13: master_wire_wind2 (endless) gone with the status, however it ends
     if (master_soft && master_target >= 0)
     {
         WorkModule(0, 5.0f, 0x0f0000a0 + 0x8 * (master_target + 0x3) + 0x6);   // v10: let go: its own collision back
@@ -39940,6 +40001,10 @@ void master_fx_sweep(int from, int to)
     if (to != 0x26)
     {
         EffectModule(0x2723, 0x3470027, 0x1, 0x1); // master_atk_100
+    }
+    if (from == 0x15b)
+    {
+        EffectModule(0x2723, 0x3470073, 0x1, 0x1); // v13: master_wire_wind2 (SpecialAirHiHit's catch: an endless emitter)
     }
     EffectModule(0x2723, 0x3470031, 0x1, 0x1); // master_atk_air_n
     EffectModule(0x2723, 0x34700A7, 0x1, 0x1); // master_atk_air_n@-90,90,0

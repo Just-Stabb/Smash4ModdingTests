@@ -9,6 +9,33 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: v13 (`scratchpad/byleth_v13_fix.zip`: a FIX package over v12, master.mscsb only; exe unchanged (exe_v46w_vars_line); in-game TEST)
+
+User, v12 test with the TEST_ONLY diag (log `e50a37a0-log.txt`, clips `42cb0c57-...175946571.mp4`,
+`f08f4b8b-...180404608.mp4`; frames in `scratchpad/byleth/v13/`): "Up special works now, but the pulling is jittery and
+odd instead of the grab and pull being seamless and smooth. Also an effect persists through the move and never
+disappears. The sword is also stiff during the pull." The follow-up now lands: k12 10 / 11 / 10 (on the target), k13
+9.5 / 29 / 48.5 (its damage up by the throw's 6.5).
+
+| point | cause (evidence) | fix |
+|---|---|---|
+| jittery pull | the log's stop: k8's height part constant for the first 6 frames (33: the catching hit's hitlag), then falling 2 - 2.5 a frame to -1 by the stop's end (all three catches): he drifted UP through the stop, past the reel's end point (the target's throw point - 14.2); the reel then went back against the drift (k10 9, 7, 5, 3: 2 a frame, not 4.1). Something still gave him a speed once the hitlag ended (only gravity (1) and energy 3 were held; not identified: energy 0 / 2 or a kept speed); v12 also measured each reel step from where he was | 0x15B holds every energy (KineticModule 0x2717 on 0 - 3; resumed by 0x2718 at the throw / its end; into the wall jump 0 / 2 / 3 resumed for the cling's root motion), writes his position each frame (`master_hi_place`): exactly where the stop began, then one straight path computed once when the stop ends (`master_hi_reel_begin` / `master_hi_reel`: n = ceil(distance / 4.1) equal steps), then the overtake's point. Diag k14 = SPEED_Y (0x0F000333) through the stop / reel |
+| an effect never disappears | clip 42cb0c57 at 3.3 - 4.3 s (`v13/s.png`): a red wisp hangs in the air where the catch was, long after the move. master_wire_wind2 (efc 0x73, set PtcMasterMasterWireWind2): its 3 emitters' end frame is 0x7FFFFFFF (endless); v12 played it from MSC (non-following) and never ended it. In Ultimate it is an EFFECT_FOLLOW of the sword's hit motion, gone when the sword rewinds | stopped when the reel starts (EffectModule 0x2723, 0, 0: its particles fade), killed with its particles on any way out (0x15B's end, the status sweep leaving 0x15B). **port_check E15 msc-effect-leak** (ERROR: an endless own effect started from the MSC with no 0x2723 kill; v12's master.c: 0x3470073) |
+| stiff sword during the pull | the sword goes back (her whip's status 3, WhipReverse: the extend backwards, a straight blade shortening, as Ultimate's d02specialhipull) by SpecialAirHiHit's game script at the motion's frame 19 (12 a wall); the stop was counted by the MSC loop, which ran through the catching hit's hitlag while the motion stood (log: 19 entries, the first 6 unmoved): the reel began ~6 frames before the sword pulled back, so he was pulled along a full-length rigid blade (inferred from the log's timing; Ultimate's pull shortens the blade with the distance) | the stop ends on the motion's frame (`MotionModuleF(1) < 19 / 12`): the reel and the sword's pull-back start together |
+
+Not done: Ultimate's sword hit motion (d02specialairhihit: the blade whips 22 sideways over frames 0 - 4, then holds)
+and its overtake motion: no whip motion slot is free (15, all used: master_whip.SLOTS) and Set_Anchored_Article_Action
+starts a slot at frame 0; WhipShoot / WhipReverse are her native statuses' (status 5's frame-from-distance needs their
+lengths). Needs the whip's motion info grown (weapon_expand "motions", an exe change). The reverse's speed is her native
+rate (not tied to the reel's distance as Ultimate's length-indexed pull). If the overtake's start pops: the root moves
+7.8 / 14.2 there by design (the pose compensates); a motion blend on 0x23B (vl byte 1) would show it.
+
+Checks: `tools/master_specials_test.py` 78 checks, 0 problems (v13: held exactly through the stop's motion frames, one
+straight path of equal steps <= 4.1 for a fighter and a wall, all energies held / resumed, wind2 stopped at the reel and
+killed on a cut-short exit and by the sweep); port_check (v4 ... v12_fix, v13_fix): **0 ERROR**, 30 WARN
+(`scratchpad/byleth/pc_v13.log`); E15 on v12's master.c: 0x3470073. Package `scratchpad/byleth/make_pkg_v13_fix.py`,
+INSTALL README `scratchpad/byleth/INSTALL_README_v13.txt` (TEST_ONLY: the v13 diag master.mscsb with v11's diag exe).
+
 ## Status: v12 (`scratchpad/byleth_v12_fix.zip`: a FIX package over v11; exe unchanged (exe_v46w_vars_line); in-game TEST)
 
 User, v11 test with the TEST_ONLY diag (log `a4361367-log.txt`, clips `bbed1d82-...170241085.mp4`,
@@ -726,6 +753,9 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
+000000000000. **v13 fix** (sent: `scratchpad/byleth_v13_fix.zip`): test list in `scratchpad/byleth/INSTALL_README_v13.txt`.
+   With the diag: k14 0 (nothing else moving him), k8 constant through the stop, k10 equal steps. Open: the sword's hit
+   flex and overtake motions (a whip motion slot: weapon_expand "motions", exe), the reverse's rate vs the reel.
 00000000000. **v12 fix** (sent: `scratchpad/byleth_v12_fix.zip`): test list in `scratchpad/byleth/INSTALL_README_v12.txt`.
    With the diag (v11's TEST_ONLY exe + v12's diag master.mscsb): k12 about 10 (on the target), k13 up by 6.5 at the
    overtake (its hit). If the hit lands but looks wrong: the target's pose (Ultimate holds it in a capture pose on his

@@ -1568,6 +1568,42 @@ def check_body_effect_leaks(inst, name, rec, rep):
                 'script (a hit, a grab or a cancel skips it; kill them in the MSC at the status change): %s' % fmt(soft))
 
 
+def check_msc_effect_leaks(inst, name, rec, rep):
+    """E15 msc-effect-leak: an effect of the port's own bank started from the fighter's MSC (EffectModule 0x2710 /
+    0x2711 / 0x2717, or a helper called with the id) whose emitters never stop (end frame or life 0x7FFFFFFF), with no
+    EffectModule(0x2723, id) anywhere in the MSC: a non-following effect from MSC isn't ended by any motion or status
+    change, it stays where it was put for good. Byleth v12: master_wire_wind2 (Ultimate's sword wind on the tip, its
+    3 emitters endless) placed at the caught fighter: user v12 "an effect persists through the move and never
+    disappears" (a red wisp left in the air, clip 42cb0c57 at 3.3 - 4.3 s). ERROR"""
+    import efc
+    import ptcl
+    kind = int(rec['kind'], 0)
+    msc = os.path.join(ROOT, 'fighters', name, name + '.c')
+    p = sorted(inst.glob(r'fighter/%s/effect/%s/[^/]+\.ptcl' % (name, name)))
+    e = sorted(inst.glob(r'fighter/%s/effect/%s/[^/]+\.efc' % (name, name)))
+    if not (p and e and os.path.exists(msc)):
+        return
+    pt, ef = ptcl.Ptcl(inst.get(p[0])), efc.Efc(inst.get(e[0]))
+    src = re.sub(r'//[^\n]*', '', open(msc, errors='replace').read())
+    own = r'0x%X[0-9a-fA-F]{4}' % (0x300 + kind)
+    killed = {int(x, 16) for x in re.findall(r'EffectModule\(0x2723, (%s)' % own, src)}
+    started = {int(x, 16) for x in re.findall(r'EffectModule\(0x27(?:10|11|17), (%s)' % own, src)}
+    started |= {int(x, 16) for f, x in re.findall(r'\b(\w+)\((%s)\b' % own, src) if f != 'EffectModule'}
+    bad = []
+    for fx in sorted(started - killed):
+        i = fx & 0xFFFF
+        if i >= len(ef.entries) or not ef.entries[i][1]:
+            continue
+        for em in pt.sets[ef.entries[i][1] - 1]['emitters']:
+            d = em['data']
+            if d is not None and (pt.field(d, 'end_frame') >= 0x7FFFFFFF or pt.field(d, 'ptcl_life') >= 0x7FFFFFFF):
+                bad.append('0x%07X' % fx)
+                break
+    if bad:
+        rep.add('ERROR', 'E15 msc-effect-leak', '%s.c starts effects whose emitters never stop and never kills them '
+                '(EffectModule(0x2723, id) at the move\'s end and on every way out): %s' % (name, ', '.join(bad)))
+
+
 # W15: a new weapon's hitbox stepping farther a frame than this many of its radii skips fighters between frames
 STEP_RADII = 15
 # its speed params in the port's vl, by the base weapon (fighter_param_vl names): the paralyzer shot's uncharged /
@@ -3051,6 +3087,7 @@ def main():
     check_vec_pull_angle(inst, src, a.name, base['ult'], rep)
     check_add_speed(src, a.name, base['ult'], rep)
     check_foot_effects(inst, a.name, rep)
+    check_msc_effect_leaks(inst, a.name, rec, rep)
     check_status_hit_log(inst, a.name, rep)
     n = rep.show()
     sys.exit(1 if n['ERROR'] or (a.strict and n['WARN']) else 0)

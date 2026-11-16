@@ -44,6 +44,9 @@ v12: the reel ends with the target's throw point 7.8 ahead / 14.2 above him (not
      overtake puts him on that point (its waist read, else feet + 10) through 11; the catch's effects at the target and
      the wall latch's at the point met (MSC, not FOOT_EFFECT), the cling's at 6; point-blank catches (the blade) and the
      tip pull of a fighter overlapping him.
+v13: 0x15B holds every energy and puts him by position: exactly still through the stop's motion frames, then one
+     straight path of equal steps (<= 4.1) to the reel's end; master_wire_wind2 stopped at the reel, killed on a cut-short
+     exit and by the sweep.
 """
 import os
 import re
@@ -242,6 +245,35 @@ class Byleth:
         return self.vm.call(self.vm.func(self.names.index(name)), args)
 
 
+def run_hit(b, gm, stop_at=None, n=60):
+    """v13: 0x15B from its main (motion frame 0), its loop on frames 1, 2, ...: [(frame, phase, x, y)] after each, until
+    phase 1 (the overtake) or a status change (stop_at)"""
+    gm.frame = 0.0
+    b.call('master_hi_hit_main')
+    out = [(0, 0, gm.x, gm.y)]
+    for f in range(1, n):
+        gm.frame = float(f)
+        b.call('master_hi_hit_loop')
+        out.append((f, b.g('master_phase'), gm.x, gm.y))
+        if b.g('master_phase') == 1 or (stop_at is not None and stop_at in gm.status):
+            break
+    return out
+
+
+def reel_ok(path, start, end, stop):
+    """held exactly at start through the stop's frames, then steady 4.1 steps on the line to end (the last shorter)"""
+    held = [p for p in path if p[0] < stop]
+    moving = [p for p in path if p[0] >= stop]
+    if any(abs(p[2] - start[0]) > 1e-3 or abs(p[3] - start[1]) > 1e-3 for p in held) or not moving:
+        return False, 'held %s' % held[:3]
+    pts = [start] + [(p[2], p[3]) for p in moving]
+    steps = [((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5 for a, b in zip(pts, pts[1:])]
+    d = ((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2) ** 0.5
+    n = max(1, -(-d // 4.1))
+    ok = len(steps) >= 1 and all(abs(x - d / n) < 0.01 for x in steps) and d / n <= 4.1 + 1e-4
+    return ok, 'steps %s, d %.2f' % ([round(x, 2) for x in steps], d)
+
+
 def compiled():
     import master_build as M
     out = os.path.join(tempfile.mkdtemp(), 'master.mscsb')
@@ -334,34 +366,28 @@ def up_special(path):
     check('v9 the catch adds the catching hit\'s 3 %% (30 -> 33)', gm.vars.get(dvar) == 33.0, str(gm.vars.get(dvar)))
     gm.catching = True
     gm.status.clear()
-    b.call('master_hi_hit_main')
-    moved, n, held = [], 0, 0
-    for n in range(1, 40):
-        gm.frame = float(n)
-        b.call('master_hi_hit_loop')
-        vx, vy = gm.take()                          # v11: moved by his position, not energy 3
-        if vx or vy:
-            moved.append((round(vx, 2), round(vy, 2)))
-        elif not moved:
-            held = n
-        gm.calls = [c for c in gm.calls if c[0] != 0x10]
-        if b.g('master_phase') == 1:
-            gm.frame = 1.0
-            b.call('master_hi_hit_loop')            # the next frame stops him
-            stopped = gm.take() == (0.0, 0.0)
-            break
+    start = (gm.x, gm.y)
+    hp = run_hit(b, gm)
+    reel_end = gm.placed[-2][0]                     # where the reel's last step put him (the overtake then moves him)
+    gm.frame = 1.0
+    b.call('master_hi_hit_loop')                    # the overtake's next frame: still on the throw point
+    stopped = (gm.x, gm.y) == (hp[-1][2], hp[-1][3])
     links = [a for s, a in gm.calls if s == 0x2A and a and a[0] == 0x271B]
     sets = [a for s, a in gm.calls if s == 0x16 and a and a[0] == 7 and a[2] == 0x11000005]
-    # (the status's first frame is the main's: its loop runs there too, so 18 loops + it)
-    check('v9 SpecialAirHiHit: still for hit_stop_frame_fighter (19 frames) before the rewind', held + 1 == 19, 'held %d' % held)
-    reel_end = gm.placed[0][0] if gm.placed else None
-    check('v12 SpecialAirHiHit: reeled at rewind_speed 4.1 a frame until the caught fighter\'s throw point (its feet + 10: no '
-          'waist read) is 7.8 ahead / 14.2 above him (Ultimate\'s hit pose -> overtake), then put on that point (the '
-          'overtake: his root on its throw joint) and stopped',
-          moved and stopped and abs((moved[0][0] ** 2 + moved[0][1] ** 2) ** 0.5 - 4.1) < 0.01 and reel_end
+    ok, why = reel_ok(hp[:-1] + [(hp[-1][0], 0, reel_end[0], reel_end[1])], start, (20.0 - 7.8, 100.0 - 14.2), 19)
+    check('v13 SpecialAirHiHit: held exactly still for hit_stop_frame_fighter (motion frames 0 - 18), then reeled along '
+          'one straight path at a steady speed (<= rewind_speed 4.1) until the caught fighter\'s throw point (its feet + '
+          '10: no waist read) is 7.8 ahead / 14.2 above him (Ultimate\'s hit pose -> overtake), then put on that point '
+          '(v12: the overtake, his root on its throw joint) and kept there', ok and stopped and reel_end
           and abs(reel_end[0] - (20.0 - 7.8)) < 0.01 and abs(reel_end[1] - (100.0 - 14.2)) < 0.01
           and abs(gm.x - 20.0) < 0.01 and abs(gm.y - 100.0) < 0.01,
-          'steps %s, reel end %s, at (%.2f, %.2f) after %d frames' % (moved[:3], reel_end, gm.x, gm.y, n))
+          '%s, reel end %s, at (%.2f, %.2f)' % (why, reel_end, gm.x, gm.y))
+    susp = sorted({a[1] for s, a in gm.calls if s == 0x10 and len(a) == 2 and a[0] == 0x2717})
+    check('v13 SpecialAirHiHit holds every energy (0x2717 on 0 - 3): only his written position moves him',
+          susp == [0, 1, 2, 3], str(susp))
+    wind_off = [a for s, a in gm.calls if s == 0x1C and a and a[0] == 0x2723 and a[1] == 0x3470073]
+    check('v13 master_wire_wind2 (endless) stopped once as the reel starts (EffectModule 0x2723, 0, 0: its particles '
+          'fade)', wind_off == [[0x2723, 0x3470073, 0, 0]], str(wind_off))
     cat = [(hex(i), round(x, 1), round(y, 1)) for i, x, y in gm.fx]
     check('v12 the catch\'s effects (master_wire_catch 0x347006E, master_wire_wind2 0x3470073) at the caught fighter\'s '
           'throw point (20, 100), from MSC (not the effect script\'s ground-only FOOT_EFFECT)',
@@ -382,6 +408,14 @@ def up_special(path):
     b.call('master_hi_hit_end')
     check('0x15B cut short (a hit) while holding: let go (CatchModule 0x2711)',
           [a for s, a in gm.calls if s == 0x3B and a == [0x2711]] != [])
+    check('v13 0x15B cut short: master_wire_wind2 killed with its particles, the energies resumed (0x2718 on 0 - 3)',
+          [0x2723, 0x3470073, 1, 1] in [a for s, a in gm.calls if s == 0x1C]
+          and sorted({a[1] for s, a in gm.calls if s == 0x10 and len(a) == 2 and a[0] == 0x2718}) == [0, 1, 2, 3])
+    b, gm = Byleth(path), Game()
+    b.vm.game = gm
+    b.call('master_fx_sweep', 0x15B, 0x45)
+    check('v13 the status sweep leaving 0x15B kills master_wire_wind2', [0x2723, 0x3470073, 1, 1] in
+          [a for s, a in gm.calls if s == 0x1C])
 
 
 def v9(path):
@@ -407,24 +441,14 @@ def v9(path):
           'statuses %s, wall %d' % ([hex(x) for x in gm.status], b.g('master_hi_wall')))
     tx, ty = i2f(b.g('master_tx')), i2f(b.g('master_ty'))
     gm.status.clear()
-    b.call('master_hi_hit_main')
+    start = (gm.x, gm.y)
+    hp = run_hit(b, gm, stop_at=0x15C)
     check('v9 latched: VAR_15 = 1 (the sword stays 12 frames)', gm.vars.get(0x0F00030F) == 1.0)
-    held, moved, n = 0, 0, 0
-    for n in range(1, 60):
-        gm.calls.clear()
-        b.call('master_hi_hit_loop')
-        vx, vy = gm.take()
-        if vx or vy:
-            moved += 1
-        elif not moved:
-            held = n
-        if 0x15C in gm.status:
-            break
-    check('v9 latched: still 12 frames (hit_stop_frame_wall), pulled until his hand (v10: the line test\'s start, 5.5 '
-          'ahead) is at the point, then the wall jump',
-          held + 1 == 12 and 0x15C in gm.status and abs(gm.x + 5.5 - tx) < 0.01 and abs(gm.y + 20.5 - ty) < 0.01,
-          'held %d, moved %d, at (%.2f, %.2f), point (%.2f, %.2f), statuses %s' % (held, moved, gm.x, gm.y, tx, ty,
-                                                                                  [hex(x) for x in gm.status]))
+    ok, why = reel_ok(hp, start, (tx - 5.5, ty - 20.5), 12)
+    check('v9 latched: still 12 frames (hit_stop_frame_wall; v13 held exactly, on the motion\'s frame), reeled on one '
+          'path until his hand (v10: the line test\'s start, 5.5 ahead) is at the point, then the wall jump',
+          ok and 0x15C in gm.status and abs(gm.x + 5.5 - tx) < 0.01 and abs(gm.y + 20.5 - ty) < 0.01,
+          '%s, at (%.2f, %.2f), point (%.2f, %.2f), statuses %s' % (why, gm.x, gm.y, tx, ty, [hex(x) for x in gm.status]))
     b, gm = setup(22.0, lr=-1.0)
     gm.wall_x = -15.0
     b.call('master_hi_air_loop')
@@ -685,13 +709,8 @@ def v10(path):
         b.g('master_soft', 1)
         b.g('master_tx', 30.0)
         b.g('master_ty', 50.0)
-        b.call('master_hi_hit_main')
-        for n in range(60):
-            b.call('master_hi_hit_loop')
-            gm.take()
-            if b.g('master_phase') == 1:
-                break
-        end = gm.placed[0][0] if gm.placed else None
+        run_hit(b, gm)
+        end = gm.placed[-2][0]
         check('v12 the caught fighter %s, its waist 9 up: reeled to %s, then on (%g, %g)' % (
             'in the air' if air else 'on the ground', tuple(round(v, 1) for v in want_end), *want_on),
             end and abs(end[0] - want_end[0]) < 0.01 and abs(end[1] - want_end[1]) < 0.01
