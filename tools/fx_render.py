@@ -1108,6 +1108,8 @@ def draw_s4(canvas, em, parts, mnow, time):
     rt = full.copy()
     rt[:3, :3] /= np.maximum(np.linalg.norm(rt[:3, :3], axis=0), 1e-9)
     cb3[32:48] = rt.ravel()
+    if not A.size:
+        return False                        # no particle alive (between bursts)
     gp, par = vs.run(A.reshape(-1, len(vs.attributes), 4), {1: s4_view_block(), 2: cb2, 3: cb3},
                      np.tile(np.arange(nv), len(born)))
     gp, par = gp.reshape(len(born), nv, 4), par.reshape(len(born), nv, -1, 4)

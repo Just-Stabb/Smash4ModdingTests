@@ -3204,7 +3204,14 @@ def main():
                     notes.append('glow (draw path 21): alpha x %g (--test-glow-alpha)' % a.test_glow_alpha)
                 em = convert_emitter(p, e, names, images, notes, templates, prims, prim_index)
                 key = '%s/%s' % (name, e['name'])
-                if em is not None and UNIVERSAL and name not in no_universal and key not in no_universal:
+                # a mesh whose fresnel alpha is 0 over what of it shows (fresnel_mean's x 0.00: Byleth's lightning on
+                # Areadbhar's / Aymr's slashes, edge-on from the side) is drawn by the converted shader, which keeps it
+                # at 0 as Ultimate shows it: through the universal path the lowered program's view-angle term came
+                # out whole (a magenta line over the slash, fx_render, Byleth v1)
+                unseen = any(re.match(r'fresnel alpha [\d.]+ - [\d.]+: x 0\.0[01]\b', n) for n in notes)
+                if unseen:
+                    notes.append('fresnel alpha ~0 over the mesh: converted shader, not the universal one')
+                if em is not None and UNIVERSAL and not unseen and name not in no_universal and key not in no_universal:
                     lin = tint_lin.get(key) or tint_lin.get(name)
                     eu = e if lin is None else dict(e, info=dict(e['info'], **{
                         c: [float(v) * t for v, t in zip(e['info'][c][:3], lin)] + [float(e['info'][c][3])]

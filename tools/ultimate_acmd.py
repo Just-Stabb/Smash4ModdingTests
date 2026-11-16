@@ -1110,7 +1110,7 @@ def script_anims(motion_list):
 
 
 def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('special', 'final'), locals_=None,
-                      tints=None, baked=None, nusktb=None, motion_list=None):
+                      tints=None, baked=None, nusktb=None, motion_list=None, motions=()):
     """every effect_* function of the dump -> the effect script of the same Smash 4 name (TRANSLATE's
     for the translated moves), replacing the base's (its own effects, e.g. Zelda's sparkles); not the
     moves still the base's (specials, Final Smash). Returns {Smash 4 name: commands}, {missing name:
@@ -1141,7 +1141,10 @@ def translate_effects(scripts_dir, effect_bin, joints, ids, parents, skip=('spec
             name = fn[len('effect_'):]
             if name == src.lower():
                 name = TRANSLATE.get(src, name)
-            if name not in TRANSLATE.values() and (name.startswith(skip) or acmd.crc(name) not in effect_bin.scripts):
+            # (motions: the motion table's crcs, as for sound: a slot the base's effect file has no script for still
+            # gets Ultimate's: Byleth's taunts, ZSS having no taunt effects)
+            if name not in TRANSLATE.values() and (name.startswith(skip) or (acmd.crc(name) not in effect_bin.scripts
+                                                                          and acmd.crc(name) not in motions)):
                 continue
             tr.last, tr.last_name = False, None
             tr.anim = anims.get(hash40(fn)) or anims.get(hash40('game_' + fn[len('effect_'):]))
@@ -1637,7 +1640,8 @@ def main():
                                                 locals_=skeleton_locals(a.effects[1]),
                                                 tints=ultimate_tints.tints(ult) if ultimate_tints.fighter_tint(ult)
                                                 else {}, baked=ultimate_tints.script_colours(a.scripts),
-                                                nusktb=a.effects[1], motion_list=a.motion_list)
+                                                nusktb=a.effects[1], motion_list=a.motion_list,
+                                                motions=mtable_crcs(a.mtable[0]) if a.mtable else ())
                 for name, cmds in fx.items():
                     o.scripts[acmd.crc(name)] = cmds
                 print('%d effect scripts translated; effects without an id (left out): %s' % (
