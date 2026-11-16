@@ -33,7 +33,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
 import acmd  # noqa: E402
 
-TOPS = ('fighter/', 'param/', 'ui/', 'sound/', 'code/', 'effect/', 'shader/')
+TOPS = ('fighter/', 'param/', 'ui/', 'sound/', 'code/', 'effect/', 'shader/', 'motion/')
 JOINTS0 = 26                  # every vanilla fighter's joint table 0
 
 

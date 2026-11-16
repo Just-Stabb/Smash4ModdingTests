@@ -20,7 +20,9 @@ to play Ultimate's converted win cameras", both approved as in-game test builds.
 | costume tests in the scripts | `INT_COLOR % 2` and the `GET_VOICE_VARIATION` chains -> Float_Var_Compare on COSTUME_PARITY (new variable); the taunt / win sound scripts, empty in v1 / v2, play |
 | win cameras | **the result scene does play camera motions** (its script loads `motion/camera/result/<name>/<n>/`): his three shipped there, no exe change; format to confirm in game |
 | exe | **exe_v46s** = exe_v46r + `tools/costume_group_cave.py` |
-| port_check | R1 (ERROR now) / new M11 motion-groups; `port_check master byleth_v1.zip byleth_v2.zip byleth_v3.zip` below |
+| package | **a complete fresh install** (the user installed neither v1 nor v2): `scratchpad/byleth/make_pkg_v3.sh` -> `scratchpad/byleth_v3.zip` (457 files): exe_v46s, the whole fighter/master (+ the kind folder's AI / Kirby-copy bank / FinMaster, his sound banks), `motion/camera/result/master`, his vl file, his portraits, `shader/effect_trail.nsh` (vanilla + trail shader 3, `trail_shader.py nsh`), Kirby's kirby.mscsb (his trait), `optional_sephiroth/` flare1.mscsb (0x47's orbit row), Sm4shCommand data; the user's own data files come from `byleth_userdata_v1.zip` (another build), `not_for_install/` the vanilla stand-ins. INSTALL / TEST README: `scratchpad/byleth/INSTALL_README_v3.txt` |
+| port_check | `port_check master scratchpad/byleth_v3.zip`: **0 ERROR**, 21 WARN (v1's B1 / E3 / E7 / M5); R1 now ERROR when missing, new M11 motion-groups (v1 + v2: 5 ERROR, as expected); `motion/` is now an install root |
+| translator | also: the win sound scripts' `GET_VOICE_REGION == VOICE_US_EN` wrapper taken (English), as `first_voice_region` |
 
 ### v3: female animations (the executable side)
 
@@ -65,7 +67,11 @@ Traced in exe_v46r (`tools/costume_group_cave.py`'s docstring has the addresses)
   True / Else (AppealHiL / R's flash on 10 (female) / 19 (male), Win3's flashes, smoke, slash, aura) and folds the sound
   scripts' `GET_VOICE_VARIATION == 0 ... 7` chains (even / odd identical) into the same test (`fold_voice_variation`):
   those sound scripts (taunts, wins) were empty in v1 / v2.
-- Not done: her win cameras (the result scene's camera path has no costume: hers play his); the female cheer bank.
+- Not verified: the result scene's fighters in the fighter table the costume variables search (if they aren't, a
+  female winner's Win3 flashes / win sounds take the male branch; her result poses come from bodyresult2 either way).
+- Not done: her win cameras (the result scene's camera path has no costume: hers play his); the female cheer bank;
+  Sm4shCommand's data files (Events.cfg / Aliases / Tooltips, regenerated) ship in the package, the program itself
+  is unchanged (no rebuild needed: no code changed).
 
 ### v3: win cameras
 
@@ -675,6 +681,12 @@ bash scratchpad/byleth/make_pkg.sh                                              
 python3 tools/ultimate_port.py run master motions low-models camera scripts specials variants shapes --out OUT
 bash scratchpad/byleth/make_pkg_v2.sh                                             # -> scratchpad/byleth_v2.zip (files changed since v1)
 python3 tools/port_check.py master scratchpad/byleth_v1.zip scratchpad/byleth_v2.zip
+# v3: the costume groups (exe_v46s), the female motions, the costume tests, the win cameras; a complete package
+python3 tools/rpx_patch.py exe_v46r.rpx exe_v46s.rpx $(python3 tools/costume_group_cave.py --rpx exe_v46r.rpx)
+python3 tools/costume_group_test.py exe_v46s.rpx exe_v46r.rpx
+python3 tools/ultimate_port.py run master motions motions-group2 low-models camera scripts specials variants shapes --out OUT
+bash scratchpad/byleth/make_pkg_v3.sh                                             # -> scratchpad/byleth_v3.zip (complete)
+python3 tools/port_check.py master scratchpad/byleth_v3.zip
 ```
 Body: `rolloff_acmd.py VANILLA/.../game.bin game.bin --plain --add 2.2 EscapeF EscapeB`; `mscdec.py -x tools/mscinfo.xml
 szerosuit.mscsb` (round trip: 2 of 2393 functions differ, both equivalent: a folded negative constant, an empty else),
