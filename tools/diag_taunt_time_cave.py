@@ -214,15 +214,12 @@ dtt_%(name)s:
         bge tc_out_%(name)s
         addi r10, r10, 1
         stw r10, 8(r12)
-        li r4, %(n)d
+        lbz r8, 8(r6)                   # run (the handlers' own skip test)
+        mr r9, r3                       # the accessor
         lwz r5, 0(r7)
         lwz r6, 4(r7)
-        lwz r9, 0x20(r1)                # r3 (the accessor)
-        lbz r8, 8(r6)
-        lwz r6, 0x2C(r1)                # (r6 back: the condition block)
-        lbz r8, 8(r6)
-        lwz r6, 4(r7)
         lwz r7, 8(r7)
+        li r4, %(n)d
         lis r3, 0x%(ftch)X
         ori r3, r3, 0x%(ftcl)X""" % dict(D, name=name, n=cmd_n) + print_call + """
 tc_out_%(name)s:
