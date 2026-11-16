@@ -285,6 +285,10 @@ namespace Sm4shCommand.Viewer
             public Dictionary<string, float[]> Props = new Dictionary<string, float[]>();   // NU_ material values
             public int Src, Dst;    // v1.6.0: the material's blend factors (effect models: dst 1 alpha, 2 add, 3 subtract)
             public float[] Color;   // v1.6.0: r g b a per vertex (127 = 1.0), or null
+            /// <summary>(v1.7.2) No per-vertex bone weights: the whole polygon bound to its mesh's one bone (Bones[0]).
+            /// A fighter's are in model space (bind pose: skinned by world x inverse bind, as before); an effect model's
+            /// are in the bone's own space (EffectModel.Pose).</summary>
+            public bool SingleBound;
         }
         public class Mesh
         {
@@ -396,6 +400,7 @@ namespace Sm4shCommand.Viewer
                     poly.Bones[k * 4] = Math.Max(0, single);
                     poly.Weights[k * 4] = 1;
                 }
+                poly.SingleBound = true;
             }
             var idx = new int[fc];
             for (int i = 0; i < fc; i++) idx[i] = BE.U16(d, ps + 2 * i);

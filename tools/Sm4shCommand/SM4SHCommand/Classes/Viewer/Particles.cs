@@ -79,6 +79,71 @@ namespace Sm4shCommand.Viewer
         public float[] EmColor0, EmColor1, ShapeScale;   // the emitter's colour / alpha / shape-scale multipliers (0x378-0x3A7)
         public float EmAlpha;
         public float UScale = 1, VScale = 1;
+        /// <summary>(v1.7.2) A texture slot's UV animation (the emitter's 0x4D4 + 0x7C x slot block, docs/ptcl-format.md):
+        /// scroll a frame / initial / random (u v each, 0x514 / 0x51C / 0x524 for slot 0), scale a frame / initial / random
+        /// (0x52C / 0x534 / 0x53C), turn a frame / initial / random (radians, 0x544 / 0x548 / 0x54C), the inverse-random
+        /// bytes (0x4DA / 0x4DB) and the random channel (the slot). Drawn by every vertex program that reads it, as eft's
+        /// own code does it (tools/eft_vertex.py uv1_lines, fitted against the game's programs within 2e-5).</summary>
+        public class UvAnim
+        {
+            public float[] Scroll = new float[6], Scl = new float[6], Rot = new float[3];
+            public bool InvU, InvV;
+            public int Chan;
+            /// <summary>Anything other than the still UVs (no scroll, scale 1, no turn, no flips).</summary>
+            public bool Active;
+
+            public static UvAnim Read(PtclFile.Emitter e, int slot)
+            {
+                int b = 0x4D4 + 0x7C * slot;
+                var a = new UvAnim { Chan = slot };
+                for (int i = 0; i < 6; i++) { a.Scroll[i] = e.F(b + 0x40 + 4 * i); a.Scl[i] = e.F(b + 0x58 + 4 * i); }
+                for (int i = 0; i < 3; i++) a.Rot[i] = e.F(b + 0x70 + 4 * i);
+                // an initial scale of 0 (not seen in the vanilla banks) taken as 1, not as one texel stretched over the quad
+                if (a.Scl[2] == 0) a.Scl[2] = 1;
+                if (a.Scl[3] == 0) a.Scl[3] = 1;
+                a.InvU = e.U8(b + 6) != 0; a.InvV = e.U8(b + 7) != 0;
+                a.Active = a.Scroll.Any(x => x != 0) || a.Scl[0] != 0 || a.Scl[1] != 0 || a.Scl[2] != 1 || a.Scl[3] != 1 ||
+                           a.Scl[4] != 0 || a.Scl[5] != 0 || a.Rot.Any(x => x != 0) || a.InvU || a.InvV;
+                return a;
+            }
+
+            static readonly int[][] Channels = { new[] { 0, 1, 2 }, new[] { 1, 2, 0 }, new[] { 0, 1, 0 }, new[] { 1, 2, 1 }, new[] { 2, 0, 1 } };
+
+            /// <summary>
+            /// A corner's texture coordinates (cu, cv: the quad's 0-1 corner, or a mesh's UV) for a particle of this age
+            /// with its three randoms (0-1), repeat (rU, rV: 0x508 / 0x50C, the cells of a flipbook). eft: shift = age x
+            /// rate + initial + random x (1 - 2 r), scale likewise, turn a = -(age x rate + initial + random x (1 - 2 r)),
+            /// r the particle's random the slot's channel picks for each value. A quad's corner (x, y) = (cu - 0.5, 0.5 -
+            /// cv) turned to (Ru, Rv): U = Ru (rU - 1 + scaleU) + rU / 2 - shiftU, V = Rv (1 - scaleV - rV) + rV / 2 -
+            /// shiftV; a mesh's (u', v') = (cu rU - 0.5, cv rV - 0.5) turned: U = scaleU Ru - shiftU + 0.5, V = scaleV Rv
+            /// - shiftV + 0.5 (both give cu rU, cv rV when still). Inverse random: the corner flipped on half the particles
+            /// (which random decides: an approximation).
+            /// </summary>
+            public void At(float cu, float cv, float rU, float rV, bool mesh, float age, float[] rnd, out float U, out float V)
+            {
+                Func<int, float> rv = k => rnd != null ? 1 - 2 * rnd[Channels[k][Math.Max(0, Math.Min(2, Chan))]] : 0;
+                if (InvU && rnd != null && rnd[0] >= 0.5f) cu = 1 - cu;
+                if (InvV && rnd != null && rnd[1] >= 0.5f) cv = 1 - cv;
+                float shU = age * Scroll[0] + Scroll[2] + Scroll[4] * rv(0), shV = age * Scroll[1] + Scroll[3] + Scroll[5] * rv(1);
+                float scU = age * Scl[0] + Scl[2] + Scl[4] * rv(2), scV = age * Scl[1] + Scl[3] + Scl[5] * rv(3);
+                float a = -(age * Rot[0] + Rot[1] + Rot[2] * rv(4));
+                float c = (float)Math.Cos(a), sn = (float)Math.Sin(a);
+                if (mesh)
+                {
+                    float u1 = cu * rU - 0.5f, v1 = cv * rV - 0.5f;
+                    U = scU * (c * u1 - sn * v1) - shU + 0.5f;
+                    V = scV * (c * v1 + sn * u1) - shV + 0.5f;
+                }
+                else
+                {
+                    float x = cu - 0.5f, y = 0.5f - cv;
+                    float ru = c * x - sn * y, rv2 = c * y + sn * x;
+                    U = ru * (rU - 1 + scU) + rU / 2 - shU;
+                    V = rv2 * (1 - scV - rV) + rV / 2 - shV;
+                }
+            }
+        }
+        public UvAnim Uv0, Uv1;
         public int Wrap0 = 0x11, Wrap1 = 0x11;     // (v1.7.1) slots 0 / 1: U wrap | V wrap << 4 (0 mirror, 1 repeat, 2 clamp)
         // v1.6.3: stripes (particle types 5 stripe / 6 complex stripe, eft's ribbons): the complex emitter's stripe block
         // (+0x8CE, 13 words: type 0 billboard / 1 emitter matrix / 2 emitter up-down, option, connect (2: to the emitter),
@@ -203,6 +268,8 @@ namespace Sm4shCommand.Viewer
             }
             try { d.Tex1 = PtclData.DecodeTexture(e, 1); } catch (Exception) { d.Tex1 = null; }
             d.U1Scale = e.F(0x584); d.V1Scale = e.F(0x588);
+            d.Uv0 = UvAnim.Read(e, 0);
+            d.Uv1 = UvAnim.Read(e, 1);
             if (d.U1Scale == 0) d.U1Scale = 1;
             if (d.V1Scale == 0) d.V1Scale = 1;
             int prim = e.I(0x2DC);
@@ -540,6 +607,8 @@ namespace Sm4shCommand.Viewer
         public List<float[]> Hist, HistAxis;
         public int Age, Life;
         public float Sr, Sry, SaX, SaY;
+        /// <summary>(v1.7.2) The particle's three randoms (0-1; eft's v_inRandom): its UV animation's random parts.</summary>
+        public float[] Rnd;
         public bool Local;      // v1.6.2: in the emitter's own space, placed by its live matrix each frame (0x310 = 0)
     }
 
@@ -549,6 +618,9 @@ namespace Sm4shCommand.Viewer
     {
         public EmitterDef D;
         public Random Rng;
+        /// <summary>(v1.7.2) the particles' own randoms (Particle.Rnd), a generator of their own: Rng's sequence (and so
+        /// every particle's path) stays as before.</summary>
+        public Random Rng2;
         public double Carry;
         public int NextEmit;
         public List<Particle> Live = new List<Particle>();
@@ -727,7 +799,9 @@ namespace Sm4shCommand.Viewer
                 int life = Math.Max(1, (int)D.A(1, D.Life, k) - (D.LifeRandom > 0 ? (int)(U() * D.LifeRandom) : 0));
                 Born++;
                 if (Live.Count >= cap) continue;            // the cap (the viewer's quality setting)
-                var q = new Particle { Age = 0, Life = life, Sr = sr, Sry = sry, SaX = D.A(17, 1, k), SaY = D.A(18, 1, k), Rot = rot };
+                if (Rng2 == null) Rng2 = new Random(0x5EED + 31 * Born);
+                var q = new Particle { Age = 0, Life = life, Sr = sr, Sry = sry, SaX = D.A(17, 1, k), SaY = D.A(18, 1, k), Rot = rot,
+                                       Rnd = new[] { (float)Rng2.NextDouble(), (float)Rng2.NextDouble(), (float)Rng2.NextDouble() } };
                 if (D.Follow == 0)
                 {
                     // follows the emitter (docs/ptcl-format.md 0x310: the particle points at the emitter's live matrices):
@@ -794,7 +868,8 @@ namespace Sm4shCommand.Viewer
             Emitters.Clear();
             if (Assets != null)
                 for (int i = 0; i < Assets.Emitters.Count; i++)
-                    Emitters.Add(new EmitterSim { D = Assets.Emitters[i], Rng = new Random(1 + 7919 * i + 104729 * (Effect.Index + 1)) });
+                    Emitters.Add(new EmitterSim { D = Assets.Emitters[i], Rng = new Random(1 + 7919 * i + 104729 * (Effect.Index + 1)),
+                                                  Rng2 = new Random(2 + 7919 * i + 104729 * (Effect.Index + 1)) });
             At = Effect.StartFrame - 1;
             Time = 0;
             NextK = 0;
@@ -940,33 +1015,40 @@ namespace Sm4shCommand.Viewer
             return m;
         }
 
-        /// <summary>The vertices on this animation frame in the model's own space (skinned as the fighters are:
-        /// Viewport.Skin), one array per polygon (x y z).</summary>
+        /// <summary>The vertices on this animation frame in the model's own space, one array per polygon (x y z). Rigged
+        /// polygons are skinned as the fighters are (Viewport.Skin: world x inverse bind). (v1.7.2) A single-bound polygon
+        /// (no weights, the mesh's one bone) is in that bone's own space, placed by the bone's world matrix alone: the
+        /// effect models are built that way (EffCommonCrossBomb's fire on a bone 250 up has its vertices from -253 to -44,
+        /// a column from the ground up to its flares' top at 206; EffCommonDead's shockwaves on bones 50 / 80 / 140 up are
+        /// at 0 in their own), where a fighter's single-bound meshes are in model space (Link's face on HeadN). Up to
+        /// v1.7.1 they were skinned as a fighter's, which takes the bone's bind transform off again: every effect model
+        /// part on a bone away from the origin was drawn that far off (a flame pillar under the stage).</summary>
         public List<float[]> Pose(float frame)
         {
             var o = new List<float[]>();
-            Mat4[] skin = null;
+            Mat4[] skin = null, world = null;
             if (Skeleton != null)
             {
-                var w = Skeleton.World(Anim, frame);
-                skin = new Mat4[w.Length];
-                for (int i = 0; i < w.Length; i++) skin[i] = w[i] * Skeleton.InverseBind[i];
+                world = Skeleton.World(Anim, frame);
+                skin = new Mat4[world.Length];
+                for (int i = 0; i < world.Length; i++) skin[i] = world[i] * Skeleton.InverseBind[i];
             }
             foreach (var mesh in Model.Meshes)
                 foreach (var p in mesh.Polys)
                 {
                     int vc = p.Pos.Length / 3;
                     var v = new float[vc * 3];
+                    var mats = p.SingleBound ? world : skin;
                     for (int k = 0; k < vc; k++)
                     {
                         float x = p.Pos[k * 3], y = p.Pos[k * 3 + 1], z = p.Pos[k * 3 + 2], ox = 0, oy = 0, oz = 0, ws = 0;
-                        if (skin != null)
+                        if (mats != null)
                             for (int j = 0; j < 4; j++)
                             {
                                 float wt = p.Weights[k * 4 + j];
                                 int bi = p.Bones[k * 4 + j];
-                                if (wt <= 0 || bi < 0 || bi >= skin.Length) continue;
-                                var M = skin[bi].M;
+                                if (wt <= 0 || bi < 0 || bi >= mats.Length) continue;
+                                var M = mats[bi].M;
                                 ox += wt * (M[0] * x + M[1] * y + M[2] * z + M[3]);
                                 oy += wt * (M[4] * x + M[5] * y + M[6] * z + M[7]);
                                 oz += wt * (M[8] * x + M[9] * y + M[10] * z + M[11]);
@@ -1106,7 +1188,7 @@ namespace Sm4shCommand.Viewer
         public static int Tri(int[] pix, float[] zb, int w, int h, float ax, float ay, float az, float bx, float by, float bz,
                               float cx, float cy, float cz, float[] uv, Texture tex, bool bilinear, float cr, float cg, float cb,
                               float ca, float[] col1, float[] vcol, int blend, int combiner = 1, Texture mask = null, float mu = 1, float mv = 1,
-                              int wrap = 0x11, int maskWrap = 0x11)
+                              int wrap = 0x11, int maskWrap = 0x11, float[] uv1 = null)
         {
             int minX = Math.Max(0, (int)Math.Floor(Math.Min(ax, Math.Min(bx, cx))));
             int maxX = Math.Min(w - 1, (int)Math.Ceiling(Math.Max(ax, Math.Max(bx, cx))));
@@ -1147,8 +1229,13 @@ namespace Sm4shCommand.Viewer
                     if (mask != null)
                     {
                         float mr, mg, mb, ma;
-                        Sample(mask, Wrap((w0 * uv[0] + w1 * uv[2] + w2 * uv[4]) * mu, maskWrap & 0xF),
-                               Wrap((w0 * uv[1] + w1 * uv[3] + w2 * uv[5]) * mv, maskWrap >> 4), bilinear, out mr, out mg, out mb, out ma, maskWrap);
+                        // (v1.7.2) uv1: the mask's own coordinates (slot 1's, when either slot's UVs are animated)
+                        if (uv1 != null)
+                            Sample(mask, Wrap(w0 * uv1[0] + w1 * uv1[2] + w2 * uv1[4], maskWrap & 0xF),
+                                   Wrap(w0 * uv1[1] + w1 * uv1[3] + w2 * uv1[5], maskWrap >> 4), bilinear, out mr, out mg, out mb, out ma, maskWrap);
+                        else
+                            Sample(mask, Wrap((w0 * uv[0] + w1 * uv[2] + w2 * uv[4]) * mu, maskWrap & 0xF),
+                                   Wrap((w0 * uv[1] + w1 * uv[3] + w2 * uv[5]) * mv, maskWrap >> 4), bilinear, out mr, out mg, out mb, out ma, maskWrap);
                         r *= mr; g *= mg; b *= mb; a *= ma;
                     }
                     if (vcol != null)

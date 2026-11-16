@@ -137,6 +137,7 @@ namespace Sm4shCommand.Viewer
             public int Shader;          // a trail's shader (> 0: drawn by FxRaster.TrailTri)
             public float Fade = 1;
             public int Wrap = 0x11, MaskWrap = 0x11;    // (v1.7.1) U wrap | V wrap << 4: 0 mirror, 1 repeat, 2 clamp
+            public float[] UV1;         // (v1.7.2) the mask's own u v per vertex (an animated slot), or null: UV x MaskU / V
         }
 
         static readonly float[] QuadPos = { -0.5f, 0.5f, 0, 0.5f, 0.5f, 0, 0.5f, -0.5f, 0, -0.5f, -0.5f, 0 };
@@ -332,9 +333,11 @@ namespace Sm4shCommand.Viewer
                     uv[4] = it.UV[i2 * 2]; uv[5] = it.UV[i2 * 2 + 1];
                     if (vc != null)
                         for (int c = 0; c < 4; c++) { vc[c] = it.VCol[i0 * 4 + c]; vc[4 + c] = it.VCol[i1 * 4 + c]; vc[8 + c] = it.VCol[i2 * 4 + c]; }
+                    float[] uv1 = it.UV1 != null ? new[] { it.UV1[i0 * 2], it.UV1[i0 * 2 + 1], it.UV1[i1 * 2], it.UV1[i1 * 2 + 1],
+                                                          it.UV1[i2 * 2], it.UV1[i2 * 2 + 1] } : null;
                     FxRaster.Tri(tp, tz, tw, th, S[i0 * 3], S[i0 * 3 + 1], S[i0 * 3 + 2], S[i1 * 3], S[i1 * 3 + 1], S[i1 * 3 + 2],
                                  S[i2 * 3], S[i2 * 3 + 1], S[i2 * 3 + 2], uv, it.Tex, bil, it.R, it.G, it.B, it.A, it.Col1, vc, it.Blend, it.Combiner,
-                                 it.Mask, it.MaskU, it.MaskV, it.Wrap, it.MaskWrap);
+                                 it.Mask, it.MaskU, it.MaskV, it.Wrap, it.MaskWrap, uv1);
                 }
             }
             if (half) Upsample(pix, w, h, tp, basePix, tw, th);
@@ -586,6 +589,8 @@ namespace Sm4shCommand.Viewer
             int nv = pos.Length / 3;
             it.S = new float[nv * 3];
             it.UV = new float[nv * 2];
+            var anim0 = D.Uv0 != null && D.Uv0.Active ? D.Uv0 : null;
+            if (it.Mask != null && (anim0 != null || (D.Uv1 != null && D.Uv1.Active))) it.UV1 = new float[nv * 2];
             it.Idx = D.Mesh != null ? D.Mesh.Idx : QuadIdx;
             var muv = D.Mesh != null ? D.Mesh.UV : QuadUV;
             if (D.Mesh != null && D.Mesh.Col != null) it.VCol = D.Mesh.Col;
@@ -599,7 +604,22 @@ namespace Sm4shCommand.Viewer
                 z -= D.CameraOffset;
                 it.S[i * 3] = cx + x * zoom; it.S[i * 3 + 1] = cy - y * zoom; it.S[i * 3 + 2] = z;
                 depth += z;
-                it.UV[i * 2] = muv[i * 2] * D.UScale; it.UV[i * 2 + 1] = muv[i * 2 + 1] * D.VScale;
+                if (anim0 != null)
+                {
+                    // (v1.7.2) the slot's UV animation (scroll / scale / turn: the common flash's ring, a quarter ring
+                    // shifted by one so its 2 x 2 mirror makes a whole one; v1.7.1 drew four arcs bowing in)
+                    float U, V;
+                    anim0.At(muv[i * 2], muv[i * 2 + 1], D.UScale, D.VScale, D.Mesh != null, age, q.Rnd, out U, out V);
+                    it.UV[i * 2] = U; it.UV[i * 2 + 1] = V;
+                }
+                else { it.UV[i * 2] = muv[i * 2] * D.UScale; it.UV[i * 2 + 1] = muv[i * 2 + 1] * D.VScale; }
+                if (it.UV1 != null)
+                {
+                    float U, V;
+                    if (D.Uv1 != null && D.Uv1.Active) D.Uv1.At(muv[i * 2], muv[i * 2 + 1], D.U1Scale, D.V1Scale, D.Mesh != null, age, q.Rnd, out U, out V);
+                    else { U = muv[i * 2] * D.U1Scale; V = muv[i * 2 + 1] * D.V1Scale; }
+                    it.UV1[i * 2] = U; it.UV1[i * 2 + 1] = V;
+                }
             }
             it.Depth = depth / Math.Max(1, nv);
             return it;
