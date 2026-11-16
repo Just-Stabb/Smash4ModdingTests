@@ -2248,6 +2248,29 @@ and his effect script sets no colour (one `EFFECT_FOLLOW_FLIP 0x1000090`):
   exe_v46s) puts A's and B's calls through the same work (ts_sitea / ts_siteb at `0x04BD4800`, trampolines at
   `0x037EE550` / `0x037EE560`: the sites can't branch that far): `tools/ts_scene_sites_test.py`. Which scene VS /
   training actually use is for the v2 test's log (`S4TS site=`).
+- **Training runs none of A / B / C** (threads / time test v2 on exe_v46t_threads_diag, log 0a921016: every command ran,
+  not one S4TS from any of the three sites). Every fighter step (0x02E40B90, the fighter vtable 0x10126E7C's update)
+  comes from the battle object world's phases; the first, `0x02BF2544` (frame state fill `0x02BFB97C`, then the
+  objects), has exactly three callers: the battle step `0x029108D0` (scenes A / B / C, at `0x02910F28`), `0x02913310`
+  (`0x02913E04`) and `0x02FF4DF8` (`0x02FF4F4C`), the per-frame virtual of the battle sequence classes (24 vtables,
+  `0x100A1A44` ... `0x1014E67C`), whose start / restart / end virtuals (`0x02FF1F18`, `0x02FF5E7C`, `0x02FF8D64`) clear
+  every slow-motion request (`0x02FB3498`), as the battle set-up `0x029104D0` does.
+  **exe_v46u_threads** (`tools/ts_tick_cave.py` on exe_v46t_threads, `tools/ts_tick_test.py`): the Frames countdown in
+  `0x02BF2544` (its `bl` at `0x02BF2568` -> tsu_frame: the fill, then ts_count unless a speed-up's extra step runs:
+  ts_data `+0x30`); the clear-all `0x02FB3498` -> tsu_clear (our state off, the stage going on: a training reset,
+  restart, match end); `0x02FF4DF8`'s first word -> tsu_seq (a speed-up there: the sequence's frame 1 + extra times);
+  scenes A / B / C -> tsu_scenea / b / c (ts_tick, the extra steps with `busy`, no count of their own). The diag
+  (`tools/diag_tick_cave.py`) prints S4TS from the tick with the battle step it came from.
+- **Graphic_Effect can be refused** (the v2 test: its frame-0 star and flash never showed, a thread's Graphic_Effect
+  stars showed during the taunt and not after it, the taunt's own External_Graphic always did). Of every effect
+  command, only Graphic_Effect's handler (`0x02BE1444`) asks EffectModule vt `+0x32C` (`0x02C31610`: 1 when bytes
+  `+0x9F` and `+0xA0` are both 0) and skips the request otherwise. `+0xA0` is only cleared (constructor / reset);
+  `+0x9F` is EffectModule vt `+0x324` (`0x02C31604`: `+0x9F` = !enable), called every frame by the fighter's update
+  (`0x02E261A8`, at `0x02E26338` / `0x02E263F8`) with the answer of `0x02C15EB8` on another of its modules (a list of
+  0x14-byte entries checked against a global's current one; an empty list = enabled). Graphic_Effect2 (the same
+  vt `+0x4C` request), External_Graphic and the EFFECT_* family don't check it. Not changed in the exe (the game's
+  rule for every script); tests and thread examples use Graphic_Effect2. The v3 diag's S4GE line shows the bytes at
+  each Graphic_Effect.
 
 ## The eft runtime (particles: cross_f.rpx 0x04A40000-0x04A90000)
 

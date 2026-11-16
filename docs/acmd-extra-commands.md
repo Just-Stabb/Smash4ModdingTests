@@ -441,6 +441,14 @@ the catch and the hand-off (fighters/supamario/README.md).
 
 ## Time_Scale / Target_Time_Scale / Stage_Freeze (exe_v46n, Sm4shCommand v1.7.0)
 
+**exe_v46u_threads (in game, training):** exe_v46n counted Frames, ran a speed-up's extra steps and cleaned up only
+on one battle screen's frame (scene C, `0x0309BE54`), which training doesn't use: in training Time_Scale(0.5, 120)
+never ended and Stage_Freeze(1, 180) never let go, not even after a training reset (threads / time tests v2). Now the
+Frames are counted in the battle object world's first phase (`0x02BF2544`, run by every battle step), a speed-up also
+repeats the battle sequence's frame (`0x02FF4DF8`), and the game's own "clear every slow-motion" (training reset,
+restart, match start / end) ends Time_Scale and Stage_Freeze. docs/native-notes.md "Script binding on a motion change"
+has the paths; tests `tools/ts_tick_test.py`, `tools/acmd_ext_test.py` ts_tests.
+
 User: "a command to start and stop stage bg / objects like training mode's pause menu, a time manipulation command to
 speed up time for all characters / stage / bg, and one more to specify time manipulation to a specific / hit
 opponent". Each uses the game's own mechanism; docs/native-notes.md "Time: global slow, per-object slow, stage stop"

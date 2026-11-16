@@ -1004,6 +1004,11 @@ HELP = {
         'versions (before v1.4.6) cut the script at that Script_End when the file was opened again.',
         '- Hitbox Viewer: the block runs on its own from the frame after Thread_Start, alongside the script.',
         '- Untested in game: whether a respawn counts as "set up again" and ends the threads.',
+        '- Effects: Graphic_Effect is the one effect command the game can refuse, when the fighter\'s EffectModule '
+        'has its requests switched off (bytes +0x9F / +0xA0, which the fighter\'s own update sets: in game it refused '
+        'them on a taunt\'s first frame and after the taunt, while the thread ran on). Graphic_Effect2, External_Graphic '
+        'and the other EFFECT_ commands don\'t check it: use them for a thread\'s effects that must show after its '
+        'move (Example 4).',
         '',
         '## What changed in exe_v46m (threads run on fighters)',
         '- Before exe_v46m no thread ever ran in game: Thread_Start registered it, but the per-frame runner skipped '
@@ -1868,6 +1873,17 @@ EXAMPLES = {
         '        SUB_FLOAT_2(Variable=SELF_DAMAGE, SourceVariable=VAR_1)',
         '    }',
         '}',
+        '',
+        '// Example 4: a star over the head every 10 frames for a second, still drawn after the move has ended',
+        '// (Graphic_Effect2: Graphic_Effect can be refused once the fighter is back to its idle)',
+        'Thread_Start(Offset=0, ID=4, Flags=0){',
+        '    Set_Loop(Iterations=6){',
+        '        Graphic_Effect2(Graphic=0x100000F, Bone=0, X=0, Y=18, Z=0, XRot=0, YRot=0, ZRot=0, Size=0.6, RandomX=0, '
+        'RandomY=0, RandomZ=0, RandomXRot=0, RandomYRot=0, RandomZRot=0, Terminate=0)',
+        '        WAIT(Frames=10)',
+        '        Goto(Offset=0)',
+        '    }',
+        '}',
         '// ... the move\'s hitbox, then remember whether it hit (the thread reads VAR_0 on its frame 40)',
         'FRAME(Frames=10)',
         _hitbox('Hitbox', Damage=9, Size=6, Z=8),
@@ -2321,8 +2337,19 @@ HELP['Time_Scale'] = [
     '- A KO doesn\'t end it: give it Frames, or end it with Time_Scale(1).',
     '- Offline only: online, the other console doesn\'t know and the match desyncs.',
     '',
+    '## What changed in exe_v46u_threads (training, Frames, resets)',
+    '- Before exe_v46u_threads the per-frame part (the Frames countdown, the speed-up\'s extra steps, the clean-up) '
+    'only ran on one of the game\'s battle screens, not the one training uses: in training a Time_Scale(0.5, 120) '
+    'never ended, and a speed-up did nothing.',
+    '- Now the Frames are counted in the battle\'s object update, which every battle mode runs, training included, '
+    'once a frame (a slowed frame counts too: Frames are screen frames).',
+    '- A training reset, a restart and the end of a match end it (the game clears every slow-motion then, and '
+    'Time_Scale goes with them). So does a Final Smash that clears the slow-motion when it ends.',
+    '- A speed-up in training runs the battle\'s whole frame 2-4 times (Example 5).',
+    '',
     NOT_VIEWER,
-    'Needs exe_v46n (the patched cross_f.rpx, tools/acmd_ext_cave.py).',
+    'Needs exe_v46n (the patched cross_f.rpx, tools/acmd_ext_cave.py); training, Frames and resets: exe_v46u_threads '
+    '(tools/ts_tick_cave.py).',
 ]
 HELP['Target_Time_Scale'] = [
     '## How it works',
@@ -2375,10 +2402,18 @@ HELP['Stage_Freeze'] = [
     'Stage_Freeze running. And Stage_Freeze(0), or the end of its Frames, resumes a stage a Final Smash froze.',
     '- It ends with the match: the next match\'s stage runs. A KO doesn\'t end it: give it Frames, or end it '
     'yourself.',
+    '- Effects freeze with the stage (the game\'s own stop holds them too) and go on when it lets go.',
     '- Offline only: online, the other console doesn\'t know and the match desyncs.',
     '',
+    '## What changed in exe_v46u_threads (training, Frames, resets)',
+    '- Before exe_v46u_threads the Frames countdown and the clean-up only ran on one of the game\'s battle screens, '
+    'not training\'s: in training a Stage_Freeze(1, 180) never let go, not even after a training reset.',
+    '- Now the Frames are counted in the battle\'s object update, which every battle mode runs, once a frame; a '
+    'training reset, a restart and the end of a match let the stage go on (Example 4).',
+    '',
     NOT_VIEWER,
-    'Needs exe_v46n (the patched cross_f.rpx, tools/acmd_ext_cave.py).',
+    'Needs exe_v46n (the patched cross_f.rpx, tools/acmd_ext_cave.py); training, Frames and resets: exe_v46u_threads '
+    '(tools/ts_tick_cave.py).',
 ]
 EXAMPLES['Time_Scale'] = [
     '// Example 1: everything at double speed for 2 seconds (120 screen frames)',
@@ -2401,6 +2436,10 @@ EXAMPLES['Time_Scale'] = [
     'Time_Scale(Rate=0.25, Frames=0)',
     'FRAME(Frames=60)',
     'Time_Scale(Rate=1, Frames=0)',
+    '',
+    '// Example 5 (exe_v46u_threads): a taunt that speeds the match up 2x for 2 seconds, in training too;',
+    '// a training reset ends it at once',
+    'Time_Scale(Rate=2, Frames=120)',
 ]
 EXAMPLES['Target_Time_Scale'] = [
     '// Example 1: the fighter this attack hits runs at half speed for 60 of its frames',
@@ -2433,4 +2472,7 @@ EXAMPLES['Stage_Freeze'] = [
     '// Example 3: a "time stop": the stage frozen and the nearest opponent at a quarter speed for 2 seconds',
     'Stage_Freeze(On=1, Frames=120)',
     'Target_Time_Scale(Target=1, Rate=0.25, Frames=120)',
+    '',
+    '// Example 4 (exe_v46u_threads): frozen until the match (or a training reset) ends it',
+    'Stage_Freeze(On=1, Frames=0)',
 ]
