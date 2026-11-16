@@ -246,6 +246,7 @@
       "base": "szerosuit",
       "ai": "base",
       "tail_vector": true,
+      "motion_group2": [1, 3, 5, 7],
       "ui": {
         "id": 65,
         "name": "Byleth",

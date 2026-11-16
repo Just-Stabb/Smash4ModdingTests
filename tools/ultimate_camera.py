@@ -3,23 +3,25 @@
 
 Ultimate keeps a fighter's result-screen cameras in camera/fighter/<name>/cNN/j02win1-3.nuanmb (camera-SSBU.zip):
 one animated `gya_camera` node (translation + rotation a frame, looking down its -Z) and a Camera group with its
-FieldOfView (radians), NearClip, FarClip. Smash 4 plays camera motions in the same shape: fighter/<name>/camera/
-final/N/camera_motion.omo + camera_motion.vbn, Corrin's being one `gya_camera` bone (the game's hash 0x1AC0648C,
-not crc32) animated the same way (Captain Falcon's use an eye and an aim locator instead). This writes each win's
-camera in Corrin's form:
+FieldOfView (radians), NearClip, FarClip. Smash 4's result scene plays camera motions too: its script
+(data/script/xscene_result.xtal, script-smash4-vanilla.zip) loads `motion/camera/result/<model name>/<n>/` for the
+winner (the model name from get_fighter_model_name_from_fighter_kind, 0x030ED508: the kind's folder name, "master" for
+kind 0x47 through kind_expand.py's name table; "NOT FOUND CAMERA!" -> `motion/camera/result/default/1/`) and starts it
+on its scene camera (`start_motion`, 0x0310861C: the camera's motion player at +0x38, 0x02D38734, the same player stage
+and Final Smash cameras use). A motion folder resource loads its .omo / .pac files (as fighter/<name>/camera/final/N/,
+the Final Smash cameras: camera_motion.omo + camera_motion.vbn, Corrin's one `gya_camera` bone, the game's hash
+0x1AC0648C, animated the same way). This writes each win's camera in that form, at the data root:
 
-  fighter/<name>/camera/result/winN/camera_motion.omo   gya_camera: position (interpolated), rotation (type 5)
-  fighter/<name>/camera/result/winN/camera_motion.vbn   the template's one bone (Corrin's)
-  fighter/<name>/camera/result/camera.json              per win: frames, field of view a frame, near / far clip
+  motion/camera/result/<name>/<n>/camera_motion.omo   gya_camera: position (interpolated), rotation (type 5)
+  motion/camera/result/<name>/<n>/camera_motion.vbn   the template's one bone (Corrin's)
+  motion/camera/result/<name>/camera.json             per win: frames, field of view a frame, near / far clip (not
+                                                      read by the game: the field of view isn't in the motion)
 
-Smash 4's own result screen does NOT play camera motions: its framing comes from param/ui/result_param.bin (a
-record per fighter: eye / to / win1-5 / team / mvp camera fields, its names stored encoded, and a per-win table of
-(fighter name, win number, two floats) whose meaning isn't known: they don't follow Ultimate's framing,
-correlation < 0.25 over the 153 vanilla rows). Playing these files needs an executable hook in the result scene
-(fighters/master/README.md "Win cameras"); until then they are converted and checked (port_check R1), not shown.
+Not confirmed in game yet (Byleth v3's test): the vanilla folders' own file names / node form (the user's
+data/motion/camera/result/), what <n> counts (the win pose 1-3 is assumed) and the field of view the scene uses.
 
   python3 tools/ultimate_camera.py convert NAME --out OUT [--costume c00]      (the pipeline's `camera` step)
-  python3 tools/ultimate_camera.py convert-dir ULT_CAM_DIR OUT_FIGHTER_DIR --template VBN
+  python3 tools/ultimate_camera.py convert-dir ULT_CAM_DIR OUT_ROOT NAME --template VBN   (OUT_ROOT: the data root)
   python3 tools/ultimate_camera.py info NUANMB...                               eye / target / field of view
 Sources (port_sources.json): "ult_camera" (folders holding camera/fighter/<name>/), "camera_template" (a
 gya_camera camera_motion.vbn: vanilla fighter/kamui/camera/final/2/camera_motion.vbn).
@@ -90,22 +92,28 @@ def camera_omo(c):
     return o.encode()
 
 
-def convert_dir(cam_dir, out_fighter, template):
-    """cam_dir: Ultimate's camera/fighter/<name>/cNN; out_fighter: the package's fighter/<name>"""
-    out = os.path.join(out_fighter, 'camera', 'result')
+def result_dir(out_root, name):
+    """the result scene's camera folder of a fighter (xscene_result.xtal: motion/camera/result/<model name>/<n>/)"""
+    return os.path.join(out_root, 'motion', 'camera', 'result', name)
+
+
+def convert_dir(cam_dir, out_root, name, template):
+    """cam_dir: Ultimate's camera/fighter/<name>/cNN; out_root: the package's data root (OUT/NAME); name: the kind's
+    folder name"""
+    out = result_dir(out_root, name)
     info = {}
     for w in WINS:
         src = os.path.join(cam_dir, 'j02win%d.nuanmb' % w)
         if not os.path.exists(src):
             continue
         c = read_camera(src)
-        d = os.path.join(out, 'win%d' % w)
+        d = os.path.join(out, '%d' % w)
         os.makedirs(d, exist_ok=True)
         open(os.path.join(d, 'camera_motion.omo'), 'wb').write(camera_omo(c))
         shutil.copy(template, os.path.join(d, 'camera_motion.vbn'))
         e0, t0, _d0, h0 = framing(c, 0)
         e1, t1, _d1, h1 = framing(c, c['frames'] - 1)
-        info['win%d' % w] = dict(frames=c['frames'], fov=[round(x, 5) for x in c['fov']], near=c['near'], far=c['far'],
+        info['%d' % w] = dict(frames=c['frames'], fov=[round(x, 5) for x in c['fov']], near=c['near'], far=c['far'],
                                  first=dict(eye=[round(x, 2) for x in e0], target=[round(x, 2) for x in t0],
                                             view_height=round(h0, 2)),
                                  last=dict(eye=[round(x, 2) for x in e1], target=[round(x, 2) for x in t1],
@@ -130,12 +138,13 @@ def main():
     sub = ap.add_subparsers(dest='cmd', required=True)
     p = sub.add_parser('convert')
     p.add_argument('name')
-    p.add_argument('--out', required=True, help='the pipeline\'s OUT (OUT/NAME/fighter/NAME)')
+    p.add_argument('--out', required=True, help='the pipeline\'s OUT (OUT/NAME: the data root)')
     p.add_argument('--costume', default='c00', help='Ultimate\'s cameras are the same in every costume (Byleth c00 / '
                    'c01 differ: the female poses; the male\'s until per-costume result motions)')
     p = sub.add_parser('convert-dir')
     p.add_argument('cam_dir')
-    p.add_argument('out_fighter')
+    p.add_argument('out_root')
+    p.add_argument('name')
     p.add_argument('--template', required=True)
     p = sub.add_parser('info')
     p.add_argument('files', nargs='+')
@@ -149,7 +158,7 @@ def main():
                       'height %.1f' % (os.path.basename(f), fr, *e, *t, d, c['fov'][fr], h))
         return
     if a.cmd == 'convert-dir':
-        print('win cameras: %s' % ', '.join(convert_dir(a.cam_dir, a.out_fighter, a.template)))
+        print('win cameras: %s' % ', '.join(convert_dir(a.cam_dir, a.out_root, a.name, a.template)))
         return
     import port_sources
     src = port_sources.load()
@@ -162,7 +171,7 @@ def main():
         sys.exit('camera: no %s (port_sources "ult_camera": camera-SSBU.zip\'s folder) or no "camera_template" '
                  '(vanilla fighter/kamui/camera/final/2/camera_motion.vbn)' % ('camera/fighter/%s/%s' % (cfg['ult'], a.costume)
                                                                                if not cam else 'template'))
-    done = convert_dir(cam, os.path.join(a.out, a.name, 'fighter', a.name), tmpl)
+    done = convert_dir(cam, os.path.join(a.out, a.name), a.name, tmpl)
     print('win cameras (%s): %s' % (cam, ', '.join(done) or 'none'))
 
 

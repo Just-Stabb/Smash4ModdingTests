@@ -530,6 +530,13 @@ TRUE_CONDS = []
 # recharge; 0x02F635F0), so the MSC writes a big value and a tick can't clear it (fix 62)
 DYNAMIC_CONDS = {}
 
+# Ultimate's costume tests, decided in game (exe_v46s, tools/costume_group_cave.py): FIGHTER_INSTANCE_WORK_ID_INT_COLOR
+# % 2 -> the variable COSTUME_PARITY (0x0F000501: costume & 1), Float_Var_Compare == 1 / == 0 (Byleth: odd costumes
+# female, whose timings differ). An older executable reads 0 there: the even (male) branch, as before
+COLOR_PARITY = 0x0F000501
+DYNAMIC_CONDS.update({'FIGHTER_INSTANCE_WORK_ID_INT_COLOR) % 2 != 0': ('float', COLOR_PARITY, 0, 1.0),
+                      'FIGHTER_INSTANCE_WORK_ID_INT_COLOR) % 2 == 0': ('float', COLOR_PARITY, 0, 0.0)})
+
 
 def dynamic_var(cond):
     """an int variable (tested != 0), ('float', variable, method, value) (Float_Var_Compare) or ('random', N)
@@ -1388,6 +1395,62 @@ FLAG_TEST_RE = re.compile(r'WorkModule::is_flag\(agent\.module_accessor, \*(\w+)
 RANDOM_TEST_RE = re.compile(r'macros::IS_RANDOM\(agent, (\d+)\);(\s*)' + _EQ)
 
 
+def _block_end(s, i):
+    """the index of the '}' closing the '{' at s[i]"""
+    depth = 0
+    for j in range(i, len(s)):
+        if s[j] == '{':
+            depth += 1
+        elif s[j] == '}':
+            depth -= 1
+            if depth == 0:
+                return j
+    return -1
+
+
+VOICE_IF = re.compile(r'if macros::GET_VOICE_VARIATION\(agent\) == (\d+) \{')
+VOICE_ELIF = re.compile(r'\s*else if macros::GET_VOICE_VARIATION\(agent\) == (\d+) \{')
+
+
+def fold_voice_variation(body):
+    """Ultimate's per-costume chains (`if GET_VOICE_VARIATION(agent) == 0 {..} else if .. == 1 {..} ... == 7`: Byleth's
+    taunts / wins, the male and female timings alternating) -> one costume-parity test (the even costumes' block, else
+    the odd ones'), which the translator decides in game (COLOR_PARITY); a chain whose even (or odd) blocks differ
+    keeps costume 0's block (and is counted). Before: every branch was false, so those scripts were empty"""
+    out, i = '', 0
+    while True:
+        m = VOICE_IF.search(body, i)
+        if not m:
+            return out + body[i:]
+        blocks, j = {}, m.end() - 1
+        k = int(m.group(1))
+        while True:
+            e = _block_end(body, j)
+            if e < 0:
+                return out + body[i:]
+            blocks[k] = body[j + 1:e]
+            n = VOICE_ELIF.match(body, e + 1)
+            if not n:
+                break
+            k, j = int(n.group(1)), n.end() - 1
+        norm = {k: re.sub(r'\s+', ' ', v).strip() for k, v in blocks.items()}
+        even = [norm[k] for k in sorted(norm) if k % 2 == 0]
+        odd = [norm[k] for k in sorted(norm) if k % 2]
+        if even and odd and len(set(even)) == 1 and len(set(odd)) == 1:
+            ev, od = blocks[min(k for k in blocks if k % 2 == 0)], blocks[min(k for k in blocks if k % 2)]
+            rep = ('{%s}' % ev if norm[min(blocks)] == odd[0] and even[0] == odd[0] else
+                   'if WorkModule::get_int(agent.module_accessor, *FIGHTER_INSTANCE_WORK_ID_INT_COLOR) %% 2 == 0 {%s}'
+                   ' else {%s}' % (ev, od))
+        else:
+            rep = '{%s}' % blocks.get(0, blocks[min(blocks)])
+            VOICE_KEPT.append(len(blocks))
+        out += body[i:m.start()] + rep
+        i = e + 1
+
+
+VOICE_KEPT = []     # chains that couldn't be folded into a parity test (costume 0's block kept)
+
+
 def fold_tests(body):
     body = FLAG_TEST_RE.sub(lambda m: '%sif %sWorkModule::is_flag(boma, *%s) {' % (
         m.group(2), '' if m.group(3) == 'true' else '!', m.group(1)), body)
@@ -1458,7 +1521,8 @@ def translate_others(kind, scripts_dir, base_bin, tr, skip=('special', 'final'),
             tr.loop = False
             tr.has_rumble = 'set_rumble' in body
             tr.drop = set(n for k, v in getattr(tr, 'fail', {}).items() if k in body for n in v)
-            cmds = self_jump(tr.script(fold_tests(first_voice_region(body)) if kind == 'sound' else body), name)
+            cmds = self_jump(tr.script(fold_voice_variation(fold_tests(first_voice_region(body)) if kind == 'sound'
+                                                            else body)), name)
             if tr.loop and not any(c.name == 'JUMP' for c in cmds):
                 cmds = cmds[:-1] + [cmd('Loop_Rest'), cmd('JUMP', acmd.crc(name)), acmd.Command(acmd.END)]
             out[name] = cmds

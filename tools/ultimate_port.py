@@ -235,18 +235,34 @@ def plan(name, out):
     m = cfg.get('model', {})
     joints = ['--joints', ','.join(m['joints'])] if m.get('joints') else []
     have = ['--have', m['have']] if m.get('have') else []
+    # model.snake: Sephiroth's EdgeBladeL (tools/snake_sword.py), table 1 after the joints; a JSON spec or true
+    snake = (['--snake'] + ([os.path.join(ROOT, 'fighters', name, m['snake'])] if isinstance(m['snake'], str) else [])
+             if m.get('snake') else [])
     mb = ['--max-bones', str(m.get('max_bones', 136))]
     cache = ['--anim-cache', os.path.join(work, 'anim_cache.json')]
     steps = [('body', 'the base\'s body scripts with the universal mechanics (roll-off): build/universal_mechanics_all.zip',
               [py, t('ultimate_port.py'), 'unpack-body', name, body])]
     import fighter_texture_ids
+    # port.json motions.group2: a costume group with its own motions (Byleth's female costumes: Ultimate's
+    # motion/body/c01 for c01 / c03 / c05 / c07), played from motion/body2 ... by the executable's costume groups
+    # (tools/costume_group_cave.py, extra_kinds.json "motion_group2" with the same costumes); port_check M11
+    g2 = cfg.get('motions', {}).get('group2') or {}
+    g2_costumes = g2.get('costumes', [])
+    g2_src = g2.get('source', g2_costumes[0] if g2_costumes else None)
+
+    def anim_src(c):            # the motions a costume plays (its bones' merging follows them)
+        return g2_src if c in g2_costumes else 'c00'
+
+    def cache_for(c):
+        return ['--anim-cache', os.path.join(work, 'anim_cache.json' if anim_src(c) == 'c00' else
+                                             'anim_cache_%s.json' % anim_src(c))]
     for c in cfg.get('costumes', ['c00']):
         steps.append(('model-' + c, 'model %s (table-1 joints, NUD + NUT together, its own texture ids)' % c,
                       [py, t('ultimate_fighter.py'), 'model', os.path.join(U, 'model/body', c),
                        os.path.join(base_dir, 'model/body', c), os.path.join(fighter, 'model/body', c),
                        '--tex-id', '0x%08X' % fighter_texture_ids.body_id(name, c),
-                       '--empty', src.get('empty_dir', '?EMPTY'), *mb, *joints, *have,
-                       '--motions', os.path.join(U, 'motion/body/c00'), *cache]))
+                       '--empty', src.get('empty_dir', '?EMPTY'), *mb, *joints, *have, *snake,
+                       '--motions', os.path.join(U, 'motion/body', anim_src(c)), *cache_for(c)]))
     add = cfg.get('motions', {}).get('add', [])
     steps.append(('motions', 'motions + the material_anime pacs (these ship, not the model step\'s)',
                   [py, t('ultimate_fighter.py'), 'motions', os.path.join(U, 'motion/body/c00'), os.path.join(U, 'model/body/c00'),
@@ -254,7 +270,18 @@ def plan(name, out):
                   # port.json motions.extra_vis: visibility the motions don't carry (held article models: Steve's tools,
                   # Byleth's weapons), a JSON in the fighter's folder
                   + (['--extra-vis', os.path.join('fighters', name, cfg['motions']['extra_vis'])]
-                     if cfg.get('motions', {}).get('extra_vis') else [])))
+                     if cfg.get('motions', {}).get('extra_vis') else [])
+                  + (['--costumes', ','.join(c for c in cfg.get('costumes', ['c00']) if c not in g2_costumes)]
+                     if g2_costumes else [])))
+    if g2_costumes:
+        steps.append(('motions-group2', 'the second costume group\'s motions (motion/body2, bodyentry2, bodyresult2, '
+                      'bodyroutemap2) and its costumes\' material_anime pacs',
+                      [py, t('ultimate_fighter.py'), 'motions', os.path.join(U, 'motion/body', g2_src),
+                       os.path.join(U, 'model/body', g2_src), base_dir, fighter, *mb, *joints, *have,
+                       *cache_for(g2_costumes[0])] + (['--add', ','.join(add)] if add else [])
+                      + (['--extra-vis', os.path.join('fighters', name, cfg['motions']['extra_vis'])]
+                         if cfg.get('motions', {}).get('extra_vis') else [])
+                      + ['--folder-suffix', '2', '--costumes', ','.join(g2_costumes)]))
     # the low models (model/body/l00-l07): the off-screen magnifier and 8-player Smash draw them, not cXX; a port
     # without them was invisible in the magnifier (Squirtle v6, user). Ultimate's own low model where the costume has a
     # lod.xmb (its lowest level of detail: Byleth's body_low / hair_low / coat / skirt), else copies of cXX
@@ -262,9 +289,9 @@ def plan(name, out):
     steps.append(('low-models', 'the low models (l00-l07, magnifier / 8-player Smash): Ultimate\'s LOD (lod.xmb), else copies',
                   [py, t('ultimate_port.py'), 'low-models', name, '--out', out]))
     # Ultimate's victory cameras (camera/fighter/<ult>/c00/j02win1-3): Smash 4 camera motions in Corrin's final-camera
-    # form (tools/ultimate_camera.py: fighter/NAME/camera/result/winN); port_check R1. Smash 4's result screen frames
-    # the winner from param/ui/result_param.bin and plays no camera motion yet (an executable hook to come)
-    steps.append(('camera', 'the win cameras (Ultimate\'s j02win1-3 -> camera/result/winN camera_motion.omo / .vbn)',
+    # form where the result scene's script loads a winner's camera (data/script/xscene_result.xtal:
+    # motion/camera/result/<name>/<n>/; tools/ultimate_camera.py); port_check R1
+    steps.append(('camera', 'the win cameras (Ultimate\'s j02win1-3 -> motion/camera/result/NAME/1-3/camera_motion.omo / .vbn)',
                   [py, t('ultimate_camera.py'), 'convert', name, '--out', out]))
     eff = src.eff(ult) or '?EFF/ef_%s.eff' % ult
     e = cfg.get('effects', {})
@@ -368,6 +395,7 @@ def cmd_plan(a):
 
 def cmd_run(a):
     steps = {s: argv for s, _d, argv in plan(a.name, a.out)}
+    os.makedirs(os.path.join(a.out, 'work'), exist_ok=True)    # the model steps' anim cache, without the body step
     for s in a.steps:
         argv = steps.get(s)
         if argv is None:
@@ -449,6 +477,7 @@ def cmd_low_models(a):
     src = port_sources.load()
     U = src.ult_dir(cfg['ult'])
     steps = {k: v for k, _d, v in plan(a.name, a.out)} if U else {}
+    os.makedirs(os.path.join(a.out, 'work'), exist_ok=True)    # the model steps' anim cache (run on its own: no work/)
     done = []
     for c in cfg.get('costumes', ['c00']):
         src_dir = os.path.join(body, c)
@@ -464,24 +493,62 @@ def cmd_low_models(a):
         argv = list(steps['model-' + c])
         tmp = tempfile.mkdtemp(prefix='lod_')
         argv[argv.index(os.path.join(body, c))] = tmp
-        r = subprocess.run([sys.executable] + [os.path.join(ROOT, x) if x.startswith('tools/') else x for x in argv[1:]]
-                           + ['--lod-low'], cwd=ROOT, capture_output=True, text=True)
+        run = lambda extra: subprocess.run(                                           # noqa: E731
+            [sys.executable] + [os.path.join(ROOT, x) if x.startswith('tools/') else x for x in argv[1:]]
+            + ['--lod-low'] + extra, cwd=ROOT, capture_output=True, text=True)
+        # cNN's own materials on the low polygons, by Ultimate material label (ultimate_fighter.materials_of_c): lNN
+        # looks as the cNN installed and names only its texture ids, even when that cNN came from an older converter
+        # (Hero's: one skin ramp where today's build makes two, other skin specular). Else (cNN's polygons aren't
+        # this build's) the low build's own materials, their pictures matched to cNN's ids
+        r = run(['--materials-from-c', src_dir])
+        how = 'cNN\'s materials'
+        if r.returncode and 'not the same model' in r.stderr:
+            print('low-models %s: %s; its pictures matched instead' % (c, r.stderr.strip().splitlines()[-1]))
+            r, how = run([]), 'pictures matched'
         if r.returncode:
             sys.exit('low-models %s: %s' % (c, r.stderr[-2000:]))
-        by_pic = {h: tid for _hp, _at, tid, h in T.nut_textures(open(os.path.join(src_dir, 'model.nut'), 'rb').read())}
-        own = {tid: h for _hp, _at, tid, h in T.nut_textures(open(os.path.join(tmp, 'model.nut'), 'rb').read())}
-        missing = [hex(t) for t, h in own.items() if h not in by_pic]
-        if missing:
-            sys.exit('low-models %s: the low model uses pictures %s not in %s/model.nut' % (c, missing, c))
-        mapping = {t: by_pic[h] for t, h in own.items()}
+        have = {tid for _hp, _at, tid, _h in T.nut_textures(open(os.path.join(src_dir, 'model.nut'), 'rb').read())}
+        if how == 'pictures matched':
+            by_pic = {h: tid for _hp, _at, tid, h in T.nut_textures(open(os.path.join(src_dir, 'model.nut'), 'rb').read())}
+            own = {tid: h for _hp, _at, tid, h in T.nut_textures(open(os.path.join(tmp, 'model.nut'), 'rb').read())}
+            missing = [hex(t) for t, h in own.items() if h not in by_pic]
+            if missing:
+                sys.exit('low-models %s: the low model uses pictures %s not in %s/model.nut' % (c, missing, c))
+            mapping = {t: by_pic[h] for t, h in own.items()}
+        else:
+            mapping = {}
         for f in ('model.nud', 'metal.nud'):
             if os.path.exists(os.path.join(tmp, f)):
-                open(os.path.join(dst, f), 'wb').write(T.nud_set_ids(open(os.path.join(tmp, f), 'rb').read(), mapping))
+                data = T.nud_set_ids(open(os.path.join(tmp, f), 'rb').read(), mapping)
+                miss = sorted({t for _at, t, _m, dr in T.nud_refs(data) if dr and t >> 24 != T.COMMON_TOP and t not in have})
+                if miss:
+                    sys.exit('low-models %s: %s names textures not in %s/model.nut: %s' % (
+                        c, f, c, ', '.join('%08X' % t for t in miss)))
+                open(os.path.join(dst, f), 'wb').write(data)
         for f in ('model.vbn', 'model.jtb'):              # the same skeleton (needed_bones reads every mesh): checked
             if open(os.path.join(tmp, f), 'rb').read() != open(os.path.join(src_dir, f), 'rb').read():
                 sys.exit('low-models %s: %s differs from %s\'s' % (c, f, c))
         shutil.rmtree(tmp)
-        done.append('l%s (Ultimate\'s LOD)' % c[1:])
+        done.append('l%s (Ultimate\'s LOD, %s)' % (c[1:], how))
+    if a.own_ids:
+        # lNN's textures under ids of its own (fighter_texture_ids: + 0x2000 + 0x400 x NN), its .nut, .nud / metal.nud
+        # and texture patterns re-id'd: for a cNN that is a rebuild, not the install's (its pictures / ids unknown),
+        # so no lNN id can name another picture than the installed cNN's (port_check T1). More texture memory when
+        # the game loads both cNN and lNN of a costume
+        for c in cfg.get('costumes', ['c00']):
+            dst = os.path.join(body, 'l' + c[1:])
+            files = {f: (lambda p=os.path.join(dst, f): open(p, 'rb').read())
+                     for f in os.listdir(dst) if os.path.isfile(os.path.join(dst, f))}
+            ids = sorted({t for _hp, _at, t, _h in T.nut_textures(files['model.nut']())})
+            start = T.body_id(a.name, c) + T.LOW_OFFSET
+            if len(ids) > T.BODY_STRIDE:
+                sys.exit('low-models l%s: %d textures, room for %d' % (c[1:], len(ids), T.BODY_STRIDE))
+            new = T.rewrite_folder(files, {old: start + k for k, old in enumerate(ids)})
+            for f, data in new.items():
+                open(os.path.join(dst, f), 'wb').write(data)
+        print('own ids: l00-l%02d at body + 0x%X (%s)' % (len(cfg.get('costumes', ['c00'])) - 1, T.LOW_OFFSET,
+                                                         ', '.join('0x%08X' % (T.body_id(a.name, c) + T.LOW_OFFSET)
+                                                                   for c in cfg.get('costumes', ['c00']))))
     print('low models: %s' % ', '.join(done))
 
 
@@ -532,6 +599,8 @@ def main():
     p.add_argument('name')
     p.add_argument('--out', default=os.path.join(ROOT, 'build', 'port'))
     p.add_argument('--copies', action='store_true', help='copies of cNN even where Ultimate has a low model')
+    p.add_argument('--own-ids', action='store_true', help='lNN\'s textures under ids of its own (+ 0x2000): when cNN '
+                   'here is a rebuild, not the installed one (its pictures may differ under the same ids)')
     p.set_defaults(fn=cmd_low_models)
     p = sub.add_parser('check')
     p.add_argument('name')

@@ -810,8 +810,83 @@ def tex_id_for(out):
     return fighter_texture_ids.body_id(m.group(1), int(m.group(2)))
 
 
+def held_parts(src, prof, parts):
+    """"<article>/<mesh>@<bone>": an article model's mesh held rigidly on a fighter bone (Steve's tools: Ultimate
+    links the article's root bone to the hand's, so the mesh's own positions are relative to that bone), from the
+    article's folder of the same costume, added to PARTS; its textures from there too (the folders returned)"""
+    extra = []
+    for slot, ults in prof['slots']:
+        for u in ults:
+            if '/' not in u or u in parts:
+                continue
+            art, rest = u.split('/', 1)
+            mname, bone = rest.split('@')
+            adir = os.path.join(src, '..', '..', art, os.path.basename(os.path.normpath(src)))
+            if not os.path.exists(adir + '/model.numshb'):
+                continue
+            extra.append(adir)
+            for part in mesh_parts(adir).get(mname, []):
+                part['parent'], part['infl'] = bone, []
+                parts.setdefault(u, []).append(part)
+    return extra
+
+
+def polygon_labels(src, base, low=False):
+    """{slot: [the Ultimate material label of each polygon build_model writes there]} (an empty slot: []); low: the
+    low model's (LOD_LOW)"""
+    global LOD_LOW
+    was, LOD_LOW = LOD_LOW, low
+    try:
+        _pn, prof = profile_for(m.name for m in nud.read(base + '/model.nud'))
+        parts = mesh_parts(src)
+        held_parts(src, prof, parts)
+    finally:
+        LOD_LOW = was
+    return {slot: [p['mat'].material_label for u in ults for p in parts.get(u, [])] for slot, ults in prof['slots']}
+
+
+def materials_of_c(meshes, src, base, c_dir, log=print):
+    """the low model's polygons (LOD_LOW) given the installed cNN's materials (C_DIR's model.nud / metal.nud), each by
+    its Ultimate material label (body_low takes body_high's labels): the same look, the same texture ids as the cNN
+    the user has, whatever the converter's version then. cNN's polygons are matched to labels by this build's own
+    full-detail order (checked: the same polygon count in every slot). A label cNN doesn't draw: an error"""
+    full = polygon_labels(src, base)
+    cm = {m.name: m for m in nud.read(os.path.join(c_dir, 'model.nud'))}
+    cmetal = {m.name: m for m in nud.read(os.path.join(c_dir, 'metal.nud'))}
+    by_label = {}
+    for slot, labs in full.items():
+        m = cm.get(slot)
+        n = len(m.polygons) if m is not None else -1
+        if n == max(len(labs), 1):
+            pairs = list(enumerate(labs))
+        elif labs and n > len(labs) and len(set(labs)) == 1:
+            pairs = [(j, labs[0]) for j in range(n)]       # one mesh split in pieces (--snake: the hilt, the blade)
+        else:
+            raise SystemExit('materials from %s: slot %s has %d polygons there, %d in this build: not the same model'
+                             % (c_dir, slot, n, max(len(labs), 1)))
+        for j, lab in pairs:
+            by_label.setdefault(lab, []).append((slot, j))
+    low = polygon_labels(src, base, low=True)
+    for m in meshes:
+        labs = low.get(m.name, [])
+        for j, p in enumerate(m.polygons):
+            if not labs:                        # an empty slot's one-triangle polygon: cNN's (empty too)
+                where = (m.name, 0)
+            else:
+                lab = labs[min(j, len(labs) - 1)]   # a split mesh's later pieces: its label
+                cands = by_label.get(lab)
+                if not cands:
+                    raise SystemExit('materials from %s: material %s (%s) is drawn by no cNN polygon' % (
+                        c_dir, lab, m.name))
+                where = next((w for w in cands if w[0] == m.name and w[1] == j), None) or \
+                    next((w for w in cands if w[0] == m.name), cands[0])
+            p.materials = [cm[where[0]].polygons[where[1]].materials[0].copy()]
+            p.metal = [cmetal[where[0]].polygons[where[1]].materials[0].copy()]
+    log('materials: cNN\'s (%s), by Ultimate material label' % c_dir)
+
+
 def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=None, animated=None, snake=None,
-                materials_from=None):
+                materials_from=None, materials_c=None):
     import ssbh_data_py as s
     base_vbn = read_vbn(base + '/model.vbn')
     base_nud = nud.read(base + '/model.nud')
@@ -837,22 +912,7 @@ def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=N
     if tex_id is None:
         tex_id = tex_id_for(out)
     tex = Textures(src, tex_id)
-    # "<article>/<mesh>@<bone>": an article model's mesh held rigidly on a fighter bone (Steve's tools:
-    # Ultimate links the article's root bone to the hand's, so the mesh's own positions are relative
-    # to that bone), from the article's folder of the same costume; its textures from there too
-    for slot, ults in prof['slots']:
-        for u in ults:
-            if '/' not in u or u in parts:
-                continue
-            art, rest = u.split('/', 1)
-            mname, bone = rest.split('@')
-            adir = os.path.join(src, '..', '..', art, os.path.basename(os.path.normpath(src)))
-            if not os.path.exists(adir + '/model.numshb'):
-                continue
-            tex.extra.append(adir)
-            for part in mesh_parts(adir).get(mname, []):
-                part['parent'], part['infl'] = bone, []
-                parts.setdefault(u, []).append(part)
+    tex.extra += held_parts(src, prof, parts)
     meshes = []
     used = set()
     for slot, ults in prof['slots']:
@@ -889,6 +949,8 @@ def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=N
             for j, p in enumerate(m.polygons):
                 p.materials = [r.polygons[min(j, len(r.polygons) - 1)].materials[0].copy()]
         log('materials: from %s' % materials_from)
+    if materials_c:
+        materials_of_c(meshes, src, base, materials_c, log)
     left = sorted(set(parts) - used)
     log('profile %s; skeleton: %d bones (of %d Ultimate, %s folded; joint table bones of their own: %s); meshes: %d slots, '
         '%d Ultimate meshes used, left out: %s' % (pname, len(sk.bones), len(sk.ult_names), '/'.join(FOLD), ', '.join(own) or '-',
@@ -910,6 +972,8 @@ def build_model(src, base, out, tex_id=TEX_ID, log=print, joints=(), max_bones=N
     metal_tex = tex.add(('metal',), base_texture(base + '/model.nut', mm.textures[0]['hash']), 256)
     for m in meshes:
         for p in m.polygons:
+            if materials_c:                     # cNN's metal materials (materials_of_c)
+                continue
             q = p.materials[0]
             mt = mm.copy()
             mt.textures[0]['hash'] = metal_tex
@@ -1654,21 +1718,26 @@ def drive_slots(vis, drive, ult_vis, frames):
 
 
 def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones=None, animated=None, joints=(),
-                  extra_vis=None):
+                  extra_vis=None, folder_suffix='', only_costumes=None):
     """the base's motion/body pacs with Ultimate's motions on our skeleton (main.pac), its hand-pose
     layers emptied (they turn the base's HandN / HaveN), and the material_anime face / eyelid pacs
     of every costume with the swords' (and the wing's) visibility added. add: motions the base has
     no animation for (e.g. C00Attack12), added to body/main.pac as <prefix><name>.omo (the kind's
     motion table must point at them: extra_kinds.json "motions"). extra_vis: {Ultimate animation:
     {visibility name: [[frame, 0 / 1], ...]}}, visibility the motions don't carry themselves (Steve's
-    tools, which his scripts ask for: tools/pickel_build.py), for the profile's "vis" slots"""
+    tools, which his scripts ask for: tools/pickel_build.py), for the profile's "vis" slots. folder_suffix /
+    only_costumes: a costume group's own motion set (Byleth's female costumes c01 / c03 / c05 / c07 from Ultimate's
+    motion/body/c01: motion/body2, bodyentry2, bodyresult2, bodyroutemap2, which the executable's costume groups load
+    for those costumes, tools/costume_group_cave.py), the skeleton from those costumes and only their face / eyelid
+    pacs written (the other group's are another run's)"""
     import omo
     import mta
     import ssbh_data_py as s
     base_vbn = read_vbn(base + '/model/body/c00/model.vbn')
     _pn, prof = profile_for(m.name for m in nud.read(base + '/model/body/c00/model.nud'))
     costumes = [os.path.join(os.path.dirname(src_model), c) for c in sorted(os.listdir(os.path.dirname(src_model)))
-                if os.path.exists(os.path.join(os.path.dirname(src_model), c, 'model.numshb'))]
+                if os.path.exists(os.path.join(os.path.dirname(src_model), c, 'model.numshb'))
+                and (only_costumes is None or c in only_costumes)]
     base_jtb = open(base + '/model/body/c00/model.jtb', 'rb').read()
     keep = set()
     for c in costumes:
@@ -1715,9 +1784,9 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
             if folder == 'body':
                 frames_of[name[:-4]] = frames
                 vis_of[name[:-4]] = vis
-        os.makedirs(out + '/motion/' + folder, exist_ok=True)
-        omo.pac_write(out + '/motion/%s/main.pac' % folder, entries)
-        log('%s/main.pac: %d motions, %d stood in by a00wait1: %s' % (folder, len(entries), len(missing),
+        os.makedirs(out + '/motion/' + folder + folder_suffix, exist_ok=True)
+        omo.pac_write(out + '/motion/%s%s/main.pac' % (folder, folder_suffix), entries)
+        log('%s%s/main.pac: %d motions, %d stood in by a00wait1: %s' % (folder, folder_suffix, len(entries), len(missing),
                                                                        ', '.join(missing)))
         # hand-pose layers: one constant node on a bone we don't have, so they turn nothing
         for layer in ('lhand', 'rhand'):
@@ -1730,11 +1799,11 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
                 o = omo.Omo(data)
                 o.nodes = [[omo.ROT | (7 << 12), dummy, struct.pack('>3f', 0, 0, 0), [b''] * o.frames]]
                 ents.append((name, o.encode()))
-            omo.pac_write(out + '/motion/%s/%s.pac' % (folder, layer), ents)
+            omo.pac_write(out + '/motion/%s%s/%s.pac' % (folder, folder_suffix, layer), ents)
     # visibility: the base's eyelid / face material animations, plus the swords and the wing
     for cdir in sorted(os.listdir(base + '/model/body')):
         cpath = base + '/model/body/' + cdir
-        if not cdir.startswith('c') or not os.path.isdir(cpath):
+        if not cdir.startswith('c') or not os.path.isdir(cpath) or (only_costumes is not None and cdir not in only_costumes):
             continue
         # each costume's own slot names (female Robin's: reflet_f)
         cprof = profile_for(m.name for m in nud.read(cpath + '/model.nud'))[1] \
@@ -1812,6 +1881,9 @@ def main():
     mo.add_argument('out')
     mo.add_argument('--add', default='', help='motions to add to body/main.pac (comma separated, e.g. C00Attack12)')
     mo.add_argument('--extra-vis', help='JSON {Ultimate animation: {visibility: [[frame, 0/1], ...]}} (Steve\'s tools)')
+    mo.add_argument('--folder-suffix', default='', help='a costume group\'s motion set: motion/body<SUFFIX> ... '
+                    '(Byleth\'s female costumes: 2, tools/costume_group_cave.py)')
+    mo.add_argument('--costumes', help='only these costumes (comma separated: cNN): their bones, their face / eyelid pacs')
     for q in (m, mo):
         q.add_argument('--joints', default='', help='Ultimate bones to add to the joint table, table 1 (ACMD joint '
                                                        'IDs 1000 + its base length + k; comma separated)')
@@ -1825,6 +1897,9 @@ def main():
     m.add_argument('--snake', nargs='?', const='default', help='add the extending sword (tools/snake_sword.py; '
                    'a JSON spec, default its SPEC): its bones after --joints in joint table 1')
     m.add_argument('--motions', help='with --max-bones: the motion folder (the bones no motion moves merge first)')
+    m.add_argument('--materials-from-c', metavar='CNN_DIR', help='with --lod-low: the installed cNN folder whose '
+                   'materials (model.nud / metal.nud) the low model\'s polygons take, by Ultimate material label: lNN '
+                   'with cNN\'s look and texture ids (ultimate_port.py low-models)')
     m.add_argument('--lod-low', action='store_true', help='the low model (model/body/lNN: the magnifier, 8-player '
                    'Smash): Ultimate\'s lowest level of detail from the costume\'s lod.xmb (body_low for body_high ...)')
     a = ap.parse_args()
@@ -1842,7 +1917,8 @@ def main():
     if a.cmd == 'motions':
         build_motions(a.motion_dir, a.src_model, a.base, a.out, add=[n for n in a.add.split(',') if n],
                       max_bones=a.max_bones, animated=animated, joints=joints,
-                      extra_vis=json.load(open(a.extra_vis)) if a.extra_vis else None)
+                      extra_vis=json.load(open(a.extra_vis)) if a.extra_vis else None, folder_suffix=a.folder_suffix,
+                      only_costumes=a.costumes.split(',') if a.costumes else None)
     if a.cmd == 'model':
         global PIXEL_ART, LOD_LOW
         PIXEL_ART = a.pixel_art
@@ -1852,7 +1928,7 @@ def main():
             import snake_sword
             snake = snake_sword.SPEC if a.snake == 'default' else dict(snake_sword.SPEC, **json.load(open(a.snake)))
         build_model(a.src, a.base, a.out, a.tex_id, joints=joints, max_bones=a.max_bones, animated=animated,
-                    snake=snake, materials_from=a.materials_from)
+                    snake=snake, materials_from=a.materials_from, materials_c=a.materials_from_c)
         if a.empty:
             for f in ('model.sb', 'model.nhb'):
                 shutil.copy(os.path.join(a.empty, f), os.path.join(a.out, f))

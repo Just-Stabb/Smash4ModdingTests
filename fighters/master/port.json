@@ -43,7 +43,12 @@
    "C03AttackS4Hi",
    "C03AttackS4Lw"
   ],
-  "extra_vis": "weapon_vis.json"
+  "extra_vis": "weapon_vis.json",
+  "group2": {
+   "_comment": "the female costumes' own motions (Ultimate's motion/body/c01: c01 / c03 / c05 / c07 identical), motion/body2 ... played by the executable's costume groups (tools/costume_group_cave.py, extra_kinds.json motion_group2)",
+   "costumes": ["c01", "c03", "c05", "c07"],
+   "source": "c01"
+  }
  },
  "effects": {
   "own": [
