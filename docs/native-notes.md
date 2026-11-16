@@ -2271,6 +2271,10 @@ and his effect script sets no colour (one `EFFECT_FOLLOW_FLIP 0x1000090`):
   vt `+0x4C` request), External_Graphic and the EFFECT_* family don't check it. Not changed in the exe (the game's
   rule for every script); tests and thread examples use Graphic_Effect2. The v3 diag's S4GE line shows the bytes at
   each Graphic_Effect.
+  - **v3 test (exe_v46u_threads_diag, training): the switch never closed.** Every S4GE line had `+0x9F` = `+0xA0` = 0,
+    the thread's Graphic_Effect stars (0x100000F) were accepted every 10 frames for all 60 frames (Supamario's up
+    taunt outlasts them, so effects after the move's end are still untested). So the switch is not what hid v2's markers; that cause is unconfirmed (v2 still ran the old tick-less
+    exe). Graphic_Effect2 stays the recommended marker as it has no switch at all.
 
 ## The eft runtime (particles: cross_f.rpx 0x04A40000-0x04A90000)
 
