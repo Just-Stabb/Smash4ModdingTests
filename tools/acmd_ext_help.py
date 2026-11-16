@@ -1044,8 +1044,9 @@ HELP = {
         '- Untested in game: whether a respawn counts as "set up again" and ends the threads.',
         '- Effects: in-game test v3, a thread\'s Graphic_Effect stars were drawn for all its 60 frames (the taunt '
         'outlasted them, so whether they show after the move has ended is untested). Graphic_Effect is the one effect command with a '
-        'switch that can refuse it (the fighter\'s EffectModule bytes +0x9F / +0xA0); it was never seen switched off '
-        'in that test. Graphic_Effect2, External_Graphic and the EFFECT_ commands have no such switch, so they are the '
+        'switch that can refuse it (the fighter\'s EffectModule bytes +0x9F / +0xA0): it is the game\'s FOOT_EFFECT, '
+        'meant for ground dust, and in game it is refused while the fighter is in the air (Byleth v11: his catch '
+        'effects in an air status never showed). Graphic_Effect2, External_Graphic and the EFFECT_ commands have no such switch, so they are the '
         'safest choice for effects that must show (Example 4).',
         '',
         '## What changed in exe_v46m (threads run on fighters)',

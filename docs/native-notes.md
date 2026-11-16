@@ -2275,6 +2275,10 @@ and his effect script sets no colour (one `EFFECT_FOLLOW_FLIP 0x1000090`):
     the thread's Graphic_Effect stars (0x100000F) were accepted every 10 frames for all 60 frames (Supamario's up
     taunt outlasts them, so effects after the move's end are still untested). So the switch is not what hid v2's markers; that cause is unconfirmed (v2 still ran the old tick-less
     exe). Graphic_Effect2 stays the recommended marker as it has no switch at all.
+  - **Byleth v11 / v12: refused in the air.** Graphic_Effect is the game's FOOT_EFFECT (0xC84B610E in
+    reference/spreadsheets' ACMD events sheet; every vanilla use is ground dust). Byleth's catch effects requested with
+    it in an air status (0x15B) never showed, the grounded taunts' always did. port_check E14 flags a fighter's own
+    effects requested this way in an air move.
 
 ## The eft runtime (particles: cross_f.rpx 0x04A40000-0x04A90000)
 
