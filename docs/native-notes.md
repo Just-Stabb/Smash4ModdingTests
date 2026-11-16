@@ -2220,6 +2220,21 @@ and his effect script sets no colour (one `EFFECT_FOLLOW_FLIP 0x1000090`):
   `data/param/fighter/fighter_param.bin` when found above the fighter's, else the vanilla table), on the call's colour
   unless the call sets one.
 
+## Script binding on a motion change (threads / time test v2)
+
+- `0x02BEE560(files, accessor, agent, hash)` binds an animcmd agent: `0x02BEE404(files, agent, hash, 0)` walks the set's
+  list of ACMD files (`[files]` -> nodes {file, next}) and binary-searches each file's header table (`+8` count, `+0x10`
+  {crc, offset} pairs, compared **unsigned**: tools/acmd.py sorts them so) for the hash; found: `agent +4` = the
+  script, r3 0; not found: `+4` = 0, r3 -1 (the agent runs nothing). Run on a game.bin with taunt scripts added (new
+  crcs: vanilla Mario's game.bin has no `appeal*`): they are found like any other (tools/diag_taunt_time_test.py).
+- The motion change `0x027606C0` calls it at `0x02760860` for sets r29 .. r28 (0 game, 1 effect, 2 sound) with
+  r30 = the fighter kind and the hash from the kind's motion table (`0x02E42518`).
+- The fighter status set-up (MSC `StatusModule(0x2713)`, `0x02E882AC`) takes the new status kind from vt `+0x8C`
+  (`0x02E88354`; r3 the kind, r31 the StatusModule): Appeal is `0x14D`, the smash taunt `0x14E`
+  (reference/msc-note-sheet/Actions_Fighters.csv).
+- `tools/diag_taunt_time_cave.py` logs both (`S4ST`, `S4MO`), the new commands' handler entries (`S4TC`) and the time
+  state the battle scene sees (`S4TS`).
+
 ## The eft runtime (particles: cross_f.rpx 0x04A40000-0x04A90000)
 
 - Emitter set-up `0x04A5BDCC` (buffer sizing), GPU uniforms `0x04A5AA30` (per texture slot
