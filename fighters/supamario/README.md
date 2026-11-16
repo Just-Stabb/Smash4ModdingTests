@@ -2851,3 +2851,91 @@ preview/viewer_v2.png.
 speed; that input-off and DownWait keep a CPU down for 40 frames (the God Fist's way); the arcs' look facing left (the
 viewer warns that the facing turn differs); that `global47` is the flick's age (`ControlModule(3)`) on the move's
 first frames; that LandingFallSpecial plays 0x3A cleanly.
+
+## Sledgehammer v3 (`supamario_sledgehammer_v3.zip`): the glow, the charged knockdown, the neutral getup
+
+Install over Sledgehammer v2, exe `exe_v46u_threads` (no exe change). Changed: the ptcl, game.bin, the MSC.
+
+### 1. The glow (user: "Sledgehammer's glow is extremely bright", screenshot 25: a white-yellow dome over him)
+**Cause: the swing arcs** (Hmr_Fire / Hmr_Fire_L's ShapeDraw arcs, called at swing frame 12), not the charge glow, the
+fist flash or the hit burst. v1 drew them flat, edge-on to the side camera (a thin streak). v2 stood them up facing
+the camera, made their strip x3, the effects x1.2, and made them follow him, so the 3 arcs each emitter lays over 3
+frames stack on him; all still at the HDR gain meant for small glowing points (`xv2_smash_fx.hdr_emitter`: XV2's
+glare tint, colour scale x2, capped at 2.0). Additive yellow at 2.0 over a large face-on area is what Smash 4 blooms
+into the dome.
+
+Measured with `tools/supamario_fx_glow.py` (fx_render's Smash 4 side, the converted emitters through their own
+programs, black background; square units drawn over 1.0, Smash 4's bloom, and over 0.5; energy = the summed colour):
+
+| | brightest frame: peak / over 1.0 / over 0.5 / energy |
+|---|---|
+| v2 uncharged swing | 1.88 / **73.0** / 165.9 / 399 |
+| v2 charged swing | 1.94 / **144.4** / 296.2 / 738 |
+| v2 charge (fist glow) | 2.41 / 2.6 / 2.9 / 12 |
+| v2 hit burst | 1.83 / 0.1 / 0.4 / 87 (at most 3.1 over 1.0 in a frame) |
+| Super God Fist (attackdash) | 2.00 / 2.0 / 33.3 / 95 (at most 6.4 over 1.0) |
+| Core Breaker's charge (specialhi < 55) | 1.67 / 0.1 / 0.7 / 691 (a soft, wide aura) |
+| **v3 uncharged swing** | V3_UN |
+| **v3 charged swing** | V3_CH |
+
+Fix (`supamario_sledgehammer_build.py` `ARC_GAIN` 0.45, `arc_dim`): the arcs' colour keys x0.45, so each arc draws
+at most 0.9 (2.0 before) in XV2's yellow, and where two overlap they stay under 1.0: nothing from the arcs blooms. The
+size, the x3 strip, the follow and the spin stay; the charge glow, the fist flash and the hit burst (already at the God
+Fist's level) are unchanged. The charged swing's remaining 4.4 over 1.0 is the fist's flash (Crg02), as the God Fist's
+fist. The test checks every arc's drawn peak <= 2.0 x ARC_GAIN.
+
+### 2. The charged hit on the ground (user: "The grounded charged hit bounces just like the uncharged hit rather than forcing the opponent down into the laying-down hurt state")
+**Cause:** v2 hit grounded fighters with the spike (20%, 270, knockback 52.8 / 99.7 / 146.7 at 0 / 50 / 100%). From
+80 up Smash's ground spike bounces the fighter off the floor (DamageFly); v2 then wrote DownBound after the hitstop
+(the bounce the user saw) and its hold let go as soon as it saw a damage status (0x45-0x4C), the launch's own. On the
+test's model of the game v2's MSC does exactly that (status 0x47, let go, Fall at the hold's end).
+
+**v3, the Super God Fist v17's put-down** (`gf_tick` phase 5):
+- The charged swing is two hitboxes on the same frames, place and size, Part 0 (one hit a target): **ID 0 the spike,
+  aerial only (Ground/Air 2)**, unchanged; **ID 1 grounded only (Ground/Air 1): 20%, angle 0, BKB 1, KBG 0, no SDI**,
+  the same hitlag (20) and SFX: Fake Death's grounded hit, which has never launched anyone in game. A fighter on the
+  ground is no longer launched at any percent.
+- `sh_down_start`, on the frame the MSC sees the hit (in the hitlag): its controller off (`INPUT_OFF`, the God Fist's
+  Input_Set 21), its buffer emptied (`BUFFER_CLEAR`), its place noted (VAR_14 / 15), then `sh_put`: at that place, on
+  the ground (SITUATION 0, stage collision 2), **DownWait (0x50)** (its own DownWaitU / D) unless it is already lying.
+  No DownBound, no bounce: it lies down at once.
+- `sh_tick` (every frame): through its hitstop and **40 frames** after it, put down again if it is out of the down
+  statuses (0x4D-0x53) or in the air (its down timer running out, anything that moved it); then its controller back
+  and its buffer emptied. Let go early when it is hit again (frozen again after its hitstop ended, or DownDamage 0x57)
+  or gone. DownWait's loop (`func_963`) has no tech; with the controller off a CPU can't get up (the God Fist in game).
+- A new charged hold lets go of an earlier one first (v2 left that one's controller off).
+
+### 3. The neutral getup (user: uncharged Sledgehammer on a fighter in its neutral getup "hits the same way it would in the air"; then: the neutral getup only)
+The loop: bounce -> jab lock -> getup -> Sledgehammer -> bounce. An **uncharged** hit on a fighter in **DownStand (0x54,
+the neutral getup)** gets no bounce: nothing is written, the hit is the spike's own (as on an airborne fighter; its
+knockback 54.7-68.7 keeps a grounded fighter on the ground in its flinch). Every other state keeps v2's bounce
+(the user): standing, lying (DownWait / after a bounce), the roll getup (DownStandFb 0x55), the getup attack
+(DownStandAttack 0x56). The charged hit puts a fighter in DownStand down like any other (the rule is the uncharged
+hit's).
+
+Its status at the hit: `sh_rec` (every frame) keeps each slot's status from the last frame it wasn't frozen in a
+hitstop (VAR_6-13); `sh_getup` looks at that and at its status now. On the hit's frame the MSC may already see the
+hit's damage status (the model does: 0x45), so the status before the freeze is what tells.
+
+### State, tests
+VAR_6-13 (statuses), VAR_14 / 15 (the held victim's place); VAR_4 / 5 as v2 (VAR_5 -1 on the put-down's frame). New
+functions `sh_rec`, `sh_getup`, `sh_let_go`, `sh_put`, `sh_down_start`; `sh_hit` / `sh_tick` changed. No globals.
+
+`supamario_sledgehammer_test.py`: SH_TESTS ok, 0 problems. New model of a fighter on the ground (`GVictim`: its
+damage status from the hit, Smash's ground spike bounce from 80, a launch speed kept through any status change, status
+writes taking effect the next frame, DownWait -> Fall in the air, its down timer, a CPU pressing to get up every
+frame). Checks: the charged hit at 0 / 100 / 150% (with and without the CPU) lying on its floor every frame from the
+hit to the end of the 40 frames, never in the air, the controller off from the hit to 40 frames after the hitstop and
+nothing else, getting up on the release frame; its down timer ending in the hold (put back down); hit again in the
+hold (let go); a charged hit on DownStand (put down); the uncharged hit on DownStand (nothing written) and on Wait /
+DownWait / DownStandFb / DownStandAttack (DownBound after the hitstop); the three hitboxes; the arcs' peak. The same
+grounded checks on v2's MSC (`fighters/supamario` at 858e190): 18 fail (launched, let go). `supamario_fakedeath_test.py`
+FD_TESTS, `supamario_corebreaker_test.py` CB_TESTS, `supamario_godfist_test.py --all-models` GF_TESTS: 0 problems;
+`msc_stack_check.py` STACK. The 8 scripts round-trip through Sm4shCommand v1.7.2 (RT).
+
+**Not confirmed in game:** that DownWait asked in the hitlag of the grounded box's hit plays straight away (the God
+Fist's was asked out of a hitstop); that the arcs at 0.9 read as vibrant on the stage (they are added to what is
+behind them: on a bright background they still go past 1 there); the CPU staying down (the God Fist's evidence). Still
+open: the charged hit can put a fighter down again in its neutral getup (40 frames lying, then a getup: the charge
+takes 57 frames from the move's start), and the uncharged bounce on a lying fighter can repeat (bounce -> lying ->
+Sledgehammer): both left as the user asked.

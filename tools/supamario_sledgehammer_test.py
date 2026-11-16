@@ -674,8 +674,8 @@ def gtests(path, hit_k, ck):
         run(path, g, frames=230, after=80)
         kb = B.knockback(B.HIT_CH, pct)
         inp = [(n, val) for n, k, val in v.wlog if k == 'input']
-        what = 'charged, on the ground at %d%% (knockback %.0f: %s)%s' % (
-            pct, kb, 'the ground spike\'s bounce, DamageFly' if kb >= 80 else 'Damage on the ground',
+        what = 'charged, on the ground at %d%% (the grounded box: knockback %.1f; the spike would give %.0f%s)%s' % (
+            pct, B.knockback(B.HIT_CH_GROUND, pct), kb, ', the ground spike\'s bounce' if kb >= 80 else '',
             ', a CPU pressing to get up every frame' if cpu else '')
         check('%s: hit on %d; DownWait (0x50) asked in its hitstop (the next frame), its controller off and its buffer '
               'emptied there' % (what, ck), (v.hit_at, [w for w in v.wlog if w[0] == ck + 1 and
@@ -687,14 +687,15 @@ def gtests(path, hit_k, ck):
                                                                                      k0 + B.DOWN_HOLD),
               inp, [(ck + 1, 1.0), (k0 + B.DOWN_HOLD, 0.0)])
         if cpu:
-            st = [x[1] for x in v.slog if x[0] == k0 + B.DOWN_HOLD + 1]
-            check('%s: free after the hold: it gets up (DownStand 0x54) on its next frame' % what, st, [0x54])
-    # its own down timer ending in the hold (20 frames): put back down, still held
-    v = gv(ck, pct=100.0, down_timer=20)
+            st = [x[1] for x in v.slog if x[0] == k0 + B.DOWN_HOLD]
+            check('%s: free after the hold: it gets up (DownStand 0x54) on the frame its controller is back' % what,
+                  st, [0x54])
+    # its own down timer ending in the hold (30 frames): put back down, still held
+    v = gv(ck, pct=100.0, down_timer=30)
     g = Game(fighters=[v], held=lambda n: True)
     run(path, g, frames=230, after=80)
     up = [x[0] for x in v.slog if x[1] == 0x54 and x[0] < k0 + B.DOWN_HOLD]
-    check('charged: its down timer ending in the hold (20 frames; DownStand on %s): DownWait again the next frame, its '
+    check('charged: its down timer ending in the hold (30 frames; DownStand on %s): DownWait again the next frame, its '
           'controller still off' % up[:1], (len(up), [x[1] for x in v.slog if up and x[0] == up[0] + 1],
                                             [(n, val) for n, k, val in v.wlog if k == 'input']),
           (1, [0x50], [(ck + 1, 1.0), (k0 + B.DOWN_HOLD, 0.0)]))
