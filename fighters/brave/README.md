@@ -1643,3 +1643,22 @@ and the executable (`tools/sound_alias_cave.py` v2) gives his banks those ids as
   46136 + NN, vc _cNN 46144 + NN), from fix 71's (the Drive package) with only the id changed; v1's costume ids
   (40409 ... / 44473 ...) superseded. Aliases (Robin's): se 2051, vc 6059, cheer 6131, se_common 2052.
 - Check: Hero vs Robin (both heard, either player first), Hero vs Hero, Final Smash next to Robin's.
+
+## Low models v1 (`$S/lowmodels_v1.zip`, with Sephiroth's and Incineroar's): Ultimate's LOD in l00-l07
+
+His l00-l07 were copies of c00-c07 (port_check M10): full detail in the off-screen magnifier and in 8-player Smash,
+where Ultimate draws its lowest level of detail. Every Ultimate costume of his has one (`model/body/cNN/lod.xmb`:
+`body_low`, `hand_L1_low` and low sword / shield / scabbard / hilt meshes; c01 / c05 also the cape's `Mantle_low`,
+`mant_emblam_low`, `mant_shadow_low`). Now l00-l07 are that model:
+- built on **his installed c00-c07** (`brave_smash4_current.zip`, the Drive upload, post fighters_texid_fix_v1:
+  ids 0x40C5NNxx), copied into the build folder: `ultimate_port.py low-models brave` (the step rebuilds each costume
+  with `ultimate_fighter.py model ... --lod-low --materials-from-c cNN`);
+- the same skeleton / joint table as each installed cNN (model.vbn / model.jtb byte for byte, checked), its .nut,
+  face / eyelid / eye packs, and **cNN's own materials** on the low polygons by Ultimate material label: today's
+  converter makes his skin with two ramps and other specular / fresnel than his shipped build (one ramp, 0x40C5NN17),
+  so the low build's own materials would have named pictures his .nut doesn't have;
+- 5 - 20 % fewer triangles (c00 42021 -> 36390, c01 39932 -> 35691, c02 42706 -> 40037, c03 38814 -> 30898; c04-c07
+  as c00-c03): Ultimate's own reduction.
+- port_check brave over brave_smash4_current.zip + lowmodels_v1: M10 gone, the same 10 errors as without it (none of
+  them model / texture ones: A3, A6, C1, E4, E5, E7, E8, S8, S9 of that Nov 13 package, fixed by later packages).
+  Renders (bind pose, cNN beside lNN, c00 / c01): `scratchpad/lowmodels/render/brave_c00_c01.png`.

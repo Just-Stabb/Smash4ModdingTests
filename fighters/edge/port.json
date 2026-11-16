@@ -21,14 +21,10 @@
  ],
  "model": {
   "max_bones": 136,
-  "joints": [
-   "H_ShoulderpadR",
-   "H_ShoulderpadL",
-   "BustN",
-   "EdgeBladeL"
-  ],
+  "joints": [],
   "have": "SwordL1,SwordR1",
-  "_joints": "table 1 of his built c00 model.jtb (test 82's); the sword SwordL1 rides LHaveN (--have SwordL1,SwordR1), as built since v3"
+  "snake": true,
+  "_joints": "his model.jtb table 1 (test 82's): Zelda's own three (Larmor / Rarmor / Bustarmor -> H_ShoulderpadL / R, Bust: the profile's stand-ins), then EdgeBladeL (joint 1003, bone 26) from --snake (tools/snake_sword.py); no --joints. The sword SwordL1 rides LHaveN (--have SwordL1,SwordR1), as built since v3. Test 82 also took test 58's materials (--materials-from, not in the plan: that file isn't kept)"
  },
  "motions": {
   "add": [

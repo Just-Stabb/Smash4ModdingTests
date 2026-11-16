@@ -84,9 +84,16 @@ the stick when the motion is there). `port_check` S11.
 **Low models (LOD).** The off-screen magnifier and 8-player Smash draw `model/body/lNN`. Ultimate keeps a
 lowest level of detail in each costume (`model/body/cNN/lod.xmb`: Byleth's `body_low` for `body_high`, his female
 costumes' `hair_low`, `coatG_low`, `skirtG_low`); the `low-models` step builds lNN from it (`ultimate_fighter.py model
---lod-low`: each low mesh in its full mesh's slot, the full one left out; the same skeleton) with cNN's `.nut` and
-face / eyelid packs (the low build's textures named by cNN's ids, matched by picture), and copies cNN where Ultimate
-has none (Steve, Squirtle). `port_check` M6 (ERROR: no lNN), M10 (WARN: a copy where Ultimate has its own).
+--lod-low`: each low mesh in its full mesh's slot, the full one left out; the same skeleton, checked byte for byte
+against cNN's model.vbn / model.jtb) with cNN's `.nut` and face / eyelid packs, and copies cNN where Ultimate has none
+(Steve, Squirtle). The low polygons take **cNN's own materials** (model.nud / metal.nud), each by its Ultimate material
+label (`--materials-from-c`: body_low draws with body_high's labels), so lNN looks as the cNN installed and names only
+its texture ids even when that cNN came from an older converter (Hero's: one skin ramp where today's build makes two);
+where cNN's polygons aren't this build's, the low build's own materials with their pictures matched to cNN's ids. cNN in
+OUT must be the installed one (copy the user's model/body/cNN in, as for Hero), or a rebuild: then `--own-ids` gives
+lNN ids of its own (+ 0x2000 + 0x400 x NN), so no lNN id names another picture than the installed cNN's whatever that
+cNN holds (Sephiroth's, Incineroar's in lowmodels_v1). `port_check` M6 (ERROR: no lNN), M10 (WARN: a copy where
+Ultimate has its own).
 
 **Win cameras.** Ultimate animates the result-screen camera per win pose (`camera/fighter/NAME/cNN/j02win1-3.nuanmb`,
 camera-SSBU.zip: one `gya_camera` node and its field of view). The `camera` step converts them into Smash 4 camera
@@ -97,15 +104,19 @@ plus a per-win table of (name, win, two floats) that doesn't follow Ultimate's f
 show only once an executable hook plays them (fighters/master/README.md "Win cameras": what is known of the result
 scene). `port_check` R1 (WARN without them; an ERROR once the hook exists).
 
-**The earlier ports (audit, Byleth v2; not rebuilt):** none has its win cameras (the step is new); their low models:
+**The earlier ports (audit, Byleth v2) and `lowmodels_v1`:** none has its win cameras (the step is new); their low
+models, fixed by `lowmodels_v1.zip` (fighter/NAME/model/body/l00-l07 only, over everything):
 
-| port | Ultimate low model (lod.xmb) | its lNN now | fix (OUT: the port's build folder) |
+| port | Ultimate low model (lod.xmb) | lNN before | lowmodels_v1 (OUT: scratchpad/lowmodels/out/NAME) |
 |---|---|---|---|
-| Sephiroth (`edge`) | c00 - c05 (c06 / c07 none) | v3's, stale (port_check M1 / M3 / M4) | `ultimate_port.py run edge low-models camera --out OUT` |
-| Hero (`brave`) | c00 - c07 | copies of cNN | `ultimate_port.py run brave low-models camera --out OUT` |
-| Squirtle (`pzenigame`) | none | copies of cNN (right) | `ultimate_port.py run pzenigame camera --out OUT` |
-| Incineroar (`gaogaen`, no port.json) | c00 - c07 | **none** (M6 ERROR: invisible in the magnifier) | `ultimate_port.py init gaogaen --base koopa --kind 0x43 --ui-name Incineroar --trait TRAIT` (its README's), then `run gaogaen model-c00 ... model-c07 low-models camera --out OUT`; or per costume `ultimate_fighter.py model ULT/gaogaen/model/body/cNN VANILLA/koopa/model/body/cNN OUT/gaogaen/fighter/gaogaen/model/body/lNN --lod-low` and `ultimate_camera.py convert-dir CAM/gaogaen/c00 OUT/gaogaen/fighter/gaogaen --template VBN` |
-| Steve (`pickel`, no port.json) | none | copies older than fix 12's costumes (own ids, + 0x2000) | recopy cNN -> lNN (`ultimate_port.py low-models` once it has a port.json); `ultimate_camera.py convert-dir CAM/pickel/c00 OUT/pickel/fighter/pickel --template VBN` |
+| Sephiroth (`edge`) | c00 - c05 (c06 / c07 none) | v3's, stale (port_check M1 / M3 / M4) | l00-l05 Ultimate's LOD, l06 / l07 copies of c06 / c07; cNN rebuilt (test 82's skeleton: port.json `model.snake`, no `joints`), lNN own ids 0x40C22000 + 0x400 x NN: `run edge model-c00 ... model-c07 motions` then `low-models edge --own-ids` |
+| Hero (`brave`) | c00 - c07 | copies of cNN | l00-l07 Ultimate's LOD on the installed c00-c07 (`brave_smash4_current.zip`, copied into OUT), cNN's materials and ids: `low-models brave` |
+| Squirtle (`pzenigame`) | none | copies of cNN (right) | not in it |
+| Incineroar (`gaogaen`) | c00 - c07 | **none** (M6 ERROR) | `init gaogaen --base koopa --kind 0x43 --ui-name Incineroar --trait juggernaut` (port.json `model.max_bones` 143: v1's count), cNN rebuilt, lNN own ids 0x40C32000 + 0x400 x NN: `run gaogaen model-c00 ... model-c07 motions` then `low-models gaogaen --own-ids` |
+| Steve (`pickel`, no port.json) | none | copies older than fix 12's costumes (own ids, + 0x2000) | not in it: recopy cNN -> lNN (`ultimate_port.py low-models` once it has a port.json) |
+
+Win cameras still to do for each: `ultimate_port.py run NAME camera --out OUT` (`ultimate_camera.py convert-dir
+CAM/NAME/c00 OUT/NAME/fighter/NAME --template VBN` without a port.json).
 
 **Delivering:** `port_check.py` over the install as the user will have it: the full package plus every
 fix package after it, in order. No ERROR goes out. A fix package that ships a file ships its partners
@@ -118,7 +129,7 @@ fix package after it, in order. No ERROR goes out. A fix package that ships a fi
 | `ult`, `kind`, `base`, `ui_name`, `trait` | identity; trait: CLAUDE.md |
 | `rolloff` | speed / air multiplier (defaults 2.2 / 1.0) |
 | `costumes` | the Ultimate costumes converted |
-| `model.max_bones` / `joints` / `have` | bone budget; bones his hitboxes use beyond the 26 (`init` finds them: table 1); `have` for a weapon / shield that rides LHaveN / RHaveN (Hero's `Shield,Sword1`, Sephiroth's swords) |
+| `model.max_bones` / `joints` / `have` / `snake` | bone budget; bones his hitboxes use beyond the 26 and beyond the base's own table 1, which the model step keeps by its stand-ins (`init` finds them: table 1); `have` for a weapon / shield that rides LHaveN / RHaveN (Hero's `Shield,Sword1`, Sephiroth's swords); `snake` (true or a JSON spec) passes `--snake` (Sephiroth's EdgeBladeL, `tools/snake_sword.py`) |
 | `motions.add` | Ultimate motions the base has no slot for (jab 2 / 3, special phases) |
 | `effects.own` / `common` | from `init` (the scripts' effects); `tint_for`, `hdr_white_for`, `bone_path` as vfxb_to_ptcl.py |
 | `stats.jump_scale` | full / short hop factors (below) |
@@ -317,6 +328,8 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | a new fighter's weapon kinds on an executable whose weapon cave is full and was built from a base no longer kept: weapon_expand.py would rebuild (and move) every word other caves call into | Byleth v1 | `tools/weapon_expand_append.py` (the new kinds' table entries, descriptors, cases, kind compares and the fighter's list in free space, nothing moved; `test`: weapon_expand_test over every kind), `kind_expand_incremental.py --list` |
 
 | a port's low models copies of its full models (cXX) though Ultimate has a low model of its own (`lod.xmb`): full detail drawn in the magnifier and in 8-player Smash | Squirtle v6 (copies, the guard below), Byleth v1; Hero's, Sephiroth's and Incineroar's Ultimate costumes have one too (Sephiroth c06 / c07 none) | `low-models` builds Ultimate's lowest level of detail (`ultimate_fighter.py --lod-low`), lNN with cNN's ids and .nut; `port_check` M10 low-lod (WARN) |
+| low models built for a port shipped long ago: today's converter no longer makes that cNN (Hero's installed c00: one skin ramp and other skin specular / fresnel where today's build makes two ramps), so the low build's pictures weren't all in cNN's .nut and `low-models` stopped; the cNN packages themselves no longer on disk (Sephiroth's, Incineroar's) | lowmodels_v1 | the low polygons take cNN's materials by Ultimate material label (`ultimate_fighter.py --materials-from-c`); cNN rebuilt where the install isn't at hand, lNN under ids of its own (`low-models --own-ids`) |
+| `port.json` `model.joints` naming the base's own table-1 joints (Sephiroth's `H_ShoulderpadR`, `H_ShoulderpadL`, `BustN`: Zelda's three, which the model step keeps by its stand-ins) and missing his `--snake`: the model step failed (`KeyError: 'BustN'`) and couldn't rebuild his test-82 skeleton | lowmodels_v1 | `joints` lists only bones beyond the base's table 1; `model.snake`; checked: the rebuild's table 1 is test 82's (124 / 123 / 12 / 26, c06 105 / 100 / 12 / 26), 136 / 123 bones, no UplipL1 |
 | Ultimate's win cameras never ported (every port's result screen framed by Smash 4's default) | user, Byleth v2 ("port over their Ultimate camera angles") | `camera` step (`tools/ultimate_camera.py`); `port_check` R1 win-camera (WARN until the result scene plays them: an executable hook) |
 | Ultimate moves whose common slot the base's motion table leaves empty (the rapid jab, the angled forward smashes) silently missing; their game scripts (`loop { ... wait_loop_clear }`) dropped whole by the translator, and their random sound containers (`se_master_attack100`: _01 - _03) left without a sound | Byleth v1 (no rapid jab, one forward smash) | `extra_kinds.json` "motions" + motions.add + `--slot-moves`; the translator turns a whole-script `loop` into WAIT_LOOP_CLR + JUMP(itself) (vanilla Kirby's attack100), unrolls a loop after other statements, maps ENABLE_100 / 100_CONTINUE_CHECK / ENABLE_RESTART, and a container to its first tone; `port_check` S11 slot-moves (WARN) |
 | a translated endless loop jumping back to its script's start with nothing waiting in it (Ultimate's run / walk effect loops end `wait_loop_sync_mot`, which the first loop translation left out): the script runs again in the same frame for ever, a hang as soon as he runs | Byleth v2's first build (caught offline, never shipped) | the translator puts Loop_Rest before the jump when the loop waits for the motion's loop, or has no wait at all; `port_check` S12 loop-spin (ERROR) |

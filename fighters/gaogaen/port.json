@@ -1,0 +1,120 @@
+{
+ "_comment": "tools/ultimate_port.py; fields: docs/ultimate-port-guide.md \"port.json\"",
+ "ult": "gaogaen",
+ "kind": "0x43",
+ "base": "koopa",
+ "ui_name": "Incineroar",
+ "trait": "juggernaut",
+ "rolloff": {
+  "speed": 2.2,
+  "air_mult": 1.0
+ },
+ "costumes": [
+  "c00",
+  "c01",
+  "c02",
+  "c03",
+  "c04",
+  "c05",
+  "c06",
+  "c07"
+ ],
+ "model": {
+  "max_bones": 143,
+  "joints": [],
+  "have": null,
+  "_max_bones": "v1's count (README v1: 143 bones on Bowser's koopa profile, no table-1 joints); v1's own skeleton isn't kept, so this is today's converter at that count (Bowser's horn stand-ins HornBRa / HornFL / HornFR / HornR folded)"
+ },
+ "motions": {
+  "add": []
+ },
+ "effects": {
+  "own": [
+   "gaogaen_air_n",
+   "gaogaen_belt_fire2",
+   "gaogaen_belt_fire3",
+   "gaogaen_belt_fire_appeal",
+   "gaogaen_chop_arc",
+   "gaogaen_chop_arm",
+   "gaogaen_chop_hand",
+   "gaogaen_chop_line",
+   "gaogaen_chop_line_start",
+   "gaogaen_final_belt",
+   "gaogaen_final_bomb",
+   "gaogaen_final_chatch",
+   "gaogaen_final_dash",
+   "gaogaen_final_echo",
+   "gaogaen_final_fall",
+   "gaogaen_final_ground",
+   "gaogaen_final_impact",
+   "gaogaen_final_line",
+   "gaogaen_final_start",
+   "gaogaen_final_symbol",
+   "gaogaen_final_white",
+   "gaogaen_lariat",
+   "gaogaen_lariat_start",
+   "gaogaen_revenge_aura",
+   "gaogaen_revenge_pose",
+   "gaogaen_revenge_start",
+   "gaogaen_rope_ax",
+   "gaogaen_rope_ax_hit",
+   "gaogaen_rope_launch",
+   "gaogaen_smash_arc",
+   "gaogaen_smash_lw_ground",
+   "gaogaen_smash_s4",
+   "gaogaen_throw_hi",
+   "gaogaen_thrust"
+  ],
+  "common": [
+   "sys_atk_smoke",
+   "sys_attack_arc",
+   "sys_attack_arc_d",
+   "sys_attack_impact",
+   "sys_attack_line",
+   "sys_attack_speedline",
+   "sys_bomb_b",
+   "sys_catch",
+   "sys_cliff_catch",
+   "sys_crown",
+   "sys_dash_smoke",
+   "sys_down_smoke",
+   "sys_erace_smoke",
+   "sys_jump_aerial",
+   "sys_jump_smoke",
+   "sys_landing_smoke",
+   "sys_landing_smoke_s",
+   "sys_mball",
+   "sys_piyo",
+   "sys_piyopiyo",
+   "sys_run_smoke",
+   "sys_screw",
+   "sys_sleep",
+   "sys_sliding_smoke",
+   "sys_smash_flash",
+   "sys_smash_flash_s",
+   "sys_spin_wind",
+   "sys_step_jump",
+   "sys_turn_smoke",
+   "sys_whirlwind_l",
+   "sys_whirlwind_r"
+  ],
+  "tint_for": {},
+  "hdr_white_for": [],
+  "bone_path": {}
+ },
+ "stats": {
+  "jump_scale": [
+   1.0,
+   1.0
+  ]
+ },
+ "portraits": {
+  "cross": null,
+  "stock_icon": true
+ },
+ "specials": {
+  "msc": "gaogaen.c",
+  "acmd": "specials_acmd.json",
+  "build": null
+ }
+}

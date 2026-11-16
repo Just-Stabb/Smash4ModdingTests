@@ -2649,3 +2649,21 @@ and the executable (`tools/sound_alias_cave.py` v2) gives his banks those ids as
   tools/sound_bank_ids.py renumber <install>/fighter/edge/sound --name edge --out OUT`. The executable already has his
   aliases (se 2018, vc 6014, cheer 6110), so the renumbered se plays now; his voice / cheer next to Zelda stay
   refused for the later player until those banks are renumbered.
+
+## Low models v1 (`$S/lowmodels_v1.zip`, with Hero's and Incineroar's): Ultimate's LOD in l00-l07
+
+His l00-l07 were still v3's (port_check M1 / M3 / M4: the old skeleton). Ultimate has a low model for c00-c05
+(`lod.xmb`: `def_low` for `def_high`, `leg_low` for `leg_high`), none for c06 / c07. Now:
+- l00-l05 Ultimate's LOD, l06 / l07 copies of c06 / c07 (37138 triangles for c00's 43039; c06 39063);
+- **his c00-c07 rebuilt** from Ultimate's files (the shipped ones aren't on disk any more): `ultimate_port.py run
+  edge model-c00 ... model-c07 motions` (the face / eyelid packs) then `low-models edge --own-ids`. The rebuild is
+  test 82's skeleton: port.json had `joints` H_ShoulderpadR / H_ShoulderpadL / BustN / EdgeBladeL (table 1 read
+  whole: Zelda's own three are kept by the profile's stand-ins) and no `--snake`, so the model step failed (`KeyError:
+  'BustN'`); now `joints` [] and `model.snake` true. Checked against test 82's numbers: 136 bones (c06 / c07 123), no
+  UplipL1, EdgeBladeL bone 26, table 1 (124, 123, 12, 26) / c06 (105, 100, 12, 26) as `edge_snake_msc.py` states;
+- **textures under ids of their own** (`--own-ids`: 0x40C22000 + 0x400 x NN, below his articles' 0x40C24800): the
+  installed c00-c07 .nut is test 43's pictures re-id'd, which a rebuild can't be shown to match, so lNN shares no id
+  with it (port_check T1 can't clash). Materials: today's converter's (test 58's reflectance scaling is in it; his
+  installed cNN has test 58's own, `--materials-from`, not kept);
+- port_check edge over the rebuilt c00-c07 + lowmodels_v1: 0 errors (M6 gone; M2 / M5 warnings as his cNN's).
+  Renders: `scratchpad/lowmodels/render/edge_c00_c03.png`.
