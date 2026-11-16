@@ -38306,6 +38306,9 @@ int master_wall_jumps;  // Sword of the Creator wall jumps this time in the air 
 float master_pull_y;    // Hi: the pull's speed up (and master_speed along the facing) ...
 int master_pull_n;      // ... for this many frames
 int master_whip_last;   // the status master_whip_sweep saw last
+int master_target;      // Hi (v7): the player slot the sword caught (-1 none)
+float master_tx;        // ... and where it was caught (held there while he is pulled to it)
+float master_ty;
 
 // a motion of the status's part: from frame 0, or (keep 1) at the frame the last one had (a ground / air change)
 void master_motion(int m, int keep)
@@ -38658,7 +38661,7 @@ void master_hi_loop()
             func_16(0, 0);
             return;
         }
-        func_16(0x10, 0);
+        func_16(0xe, 0);                    // v7: Fall, never FallSpecial (Ultimate's up special has none)
     }
 }
 
@@ -38719,13 +38722,22 @@ void master_hi_air_loop()
     }
     if (global18 == 0)
     {
-        func_16(0x19, 0);                   // landing: LandingFallSpecial
+        func_16(0x16, 0);                   // v7: a plain landing (v1-v6: LandingFallSpecial 0x19)
+        return;
+    }
+    // v7: the common AirCatch's ledge catch (her func_126), which his loop had dropped: a ledge in front within
+    // the catch window (0x2100000D, the aircatch script's) -> 0xF2; the whip's own ledge latch (her native code,
+    // WhipShoot) changes the status itself
+    if (func_99() == 0x1 && WorkModule(0x2712, 0x2100000d))
+    {
+        func_16(0xf2, 0);
         return;
     }
     f = MotionModuleF(0x1);
     if (f >= MASTER_HI_HIT_START && f <= MASTER_HI_HIT_END && AttackModule(0x2727))
     {
         master_frame = f;                   // the hit's frame: where the tip was (master_hi_pull)
+        master_target = master_hi_find();   // v7: the fighter the sword caught
         func_16(0x15b, 0);
         return;
     }
@@ -38737,8 +38749,42 @@ void master_hi_air_loop()
     }
     if (MotionModule(0x2712))
     {
-        func_16(0x10, 0);
+        func_16(0xe, 0);                    // v7: Fall (v1-v6: FallSpecial)
     }
+}
+
+// v7: the fighter the sword caught: the other fighter in hitstop (tools/position_vars_cave.py: 0x0F000020 + 4s position,
+// 0x0F00005B + 8s hitstop) nearest to him within Ultimate's object_dist_max (param_special_hi) + the sword's reach
+int master_hi_find()
+{
+    int s;
+    int best;
+    float x;
+    float y;
+    float d;
+    float bd;
+    best = -1;
+    bd = MASTER_HI_FIND_DIST;
+    s = 0;
+    while (s < 0x8)
+    {
+        x = WorkModuleF(0, 0x0f000020 + 0x4 * s);
+        y = WorkModuleF(0, 0x0f000021 + 0x4 * s);
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0.0f && (x != PostureModuleF(0x1) || y != PostureModuleF(0x2))
+            && WorkModuleF(0, 0x0f00005b + 0x8 * s) > 0.0f)
+        {
+            d = func_13(x - PostureModuleF(0x1)) + func_13(y - PostureModuleF(0x2));
+            if (d < bd)
+            {
+                bd = d;
+                best = s;
+                master_tx = x;
+                master_ty = y;
+            }
+        }
+        s = s + 1;
+    }
+    return best;
 }
 
 int master_hi2_pre()
@@ -38808,6 +38854,10 @@ void master_hi_hit_main()
     printf("Byleth status_SpecialHiHit");
     master_phase = 0;
     master_hi_pull();
+    if (master_target >= 0)
+    {
+        master_pull_n = MASTER_HI_PULL_MAX; // v7: a caught fighter: pulled to it (master_hi_rewind), at most this long
+    }
     GroundModule(0x2710, 0x5);
     KineticModule(0, 0xa);
     master_motion(0x23a, 0);
@@ -38822,6 +38872,18 @@ void master_hi_hit_loop()
     }
     if (master_phase == 0)
     {
+        if (master_target >= 0)
+        {
+            if (master_hi_rewind())
+            {
+                master_phase = 0x1;
+                master_target = -1;
+                master_speed = 0;
+                master_move(0);
+                master_motion(0x23b, 0);
+            }
+            return;
+        }
         if (master_pull_n > 0)
         {
             master_pull_n -= 0x1;
@@ -38843,13 +38905,44 @@ void master_hi_hit_loop()
     }
     if (global18 == 0)
     {
-        func_16(0x19, 0);
+        func_16(0x16, 0);                   // v7: a plain landing, then Fall at the end (Ultimate: no special fall)
         return;
     }
     if (MotionModule(0x2712))
     {
-        func_16(0x10, 0);
+        func_16(0xe, 0);
     }
+}
+
+// v7: Ultimate's SpecialAirHiHit: the sword holds what it caught (CATCH) and rewinds, pulling him to it at
+// rewind_speed (param_special_hi 4.1 a frame) until his hand is at it (param_sword fighter_offset 8 short of it along
+// his facing); the caught fighter is held where it was caught (its position written each frame, as the
+// set_vec_target_pos pulls do: tools/vec_target.py). 1 when he is there (or the pull ran MASTER_HI_PULL_MAX frames)
+int master_hi_rewind()
+{
+    int s;
+    float dx;
+    float dy;
+    float n;
+    float lr;
+    s = master_target;
+    WorkModule(0, master_tx, 0x0f000020 + 0x4 * s);
+    WorkModule(0, master_ty, 0x0f000021 + 0x4 * s);
+    WorkModule(0, 5.0f, 0x0f0000a0 + 0x8 * (s + 0x3) + 0x6);
+    lr = PostureModuleF(0);
+    dx = master_tx - MASTER_HI_HAND_X * lr - PostureModuleF(0x1);
+    dy = master_ty - PostureModuleF(0x2);
+    n = func_13(dx) + func_13(dy);
+    master_pull_n -= 0x1;
+    if (n <= MASTER_HI_REWIND || master_pull_n <= 0)
+    {
+        master_speed = dx * lr;
+        master_move(dy);
+        return 0x1;
+    }
+    master_speed = dx / n * MASTER_HI_REWIND * lr;
+    master_move(dy / n * MASTER_HI_REWIND);
+    return 0;
 }
 
 // 0x15C: SpecialAirHiWallJump (0x23C)
@@ -38908,6 +39001,18 @@ int master_lw_motion()
     {
         return 0x259;
     }
+    if (master_phase == 0x3)
+    {
+        return 0x242;                       // v7: SpecialLwHit
+    }
+    if (master_phase == 0x4)
+    {
+        if (global18 == 0x2)
+        {
+            return 0x247;                   // v7: SpecialAirLwTurn
+        }
+        return 0x243;                       // v7: SpecialLwTurn
+    }
     if (master_phase == 0x2)
     {
         return 0x255;
@@ -38923,6 +39028,7 @@ void master_lw_main()
 {
     printf("Byleth status_SpecialLw (Aymr)");
     master_phase = 0;
+    master_flag = 0;
     master_situation();
     master_motion(master_lw_motion(), 0);
     func_78(master_lw_loop);
@@ -38932,9 +39038,14 @@ void master_lw_loop()
 {
     float f;
     f = MotionModuleF(0x1);
+    if (master_phase == 0x4 && master_situation_changed())
+    {
+        master_situation();                 // v7: the turn goes on in the other situation's turn motion
+        master_motion(master_lw_motion(), 0x1);
+    }
     if (master_phase == 0 && master_situation_changed())
     {
-        if (global18 == 0 && f >= MASTER_LW_INHERIT1_END && f < MASTER_LW_INHERIT2_START)
+        if (global18 == 0 && f >= MASTER_LW_INHERIT1_END && f < MASTER_LW_FORBID_START)
         {
             master_phase = 0x1;                 // SpecialLwLanding2 (FORBID_LANDING's frames too)
         }
@@ -38965,6 +39076,35 @@ void master_lw_loop()
         {
             DamageModule(0xb, 0, 0);
         }
+        // v7: Ultimate's PIERCE_GROUND (frames 64 - 65): the axe meets the floor under him -> SpecialLwHit (the axe
+        // stuck, its shock hits and the floor impact); APPROXIMATED: "the floor under him" = he is on the ground
+        // (Ultimate's ray from the axe: ray_check_start / finish_offset)
+        if (global18 == 0 && f >= MASTER_LW_PIERCE && f < MASTER_LW_PIERCE + 2.0f)
+        {
+            master_phase = 0x3;
+            DamageModule(0xb, 0, 0);
+            master_motion(0x242, 0);
+            return;
+        }
+        // v7: Ultimate's TURN_CHECK (12 - 42): the stick back past the common turn threshold -> SpecialLwTurn, once
+        if (!(master_flag & 0x2) && f >= MASTER_LW_TURN_START && f < MASTER_LW_TURN_END
+            && ControlModuleF(0) * PostureModuleF(0) < -MASTER_N_TURN_STICK)
+        {
+            master_flag = master_flag | 0x2;
+            master_frame = f;
+            master_phase = 0x4;
+            master_motion(master_lw_motion(), 0);
+            return;
+        }
+    }
+    if (master_phase == 0x4)
+    {
+        if (MotionModule(0x2712))
+        {
+            master_phase = 0;
+            MotionModule(0x1, master_lw_motion(), master_frame, 1.0f);
+        }
+        return;
     }
     if (MotionModule(0x2712))
     {

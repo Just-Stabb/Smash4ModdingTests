@@ -40154,8 +40154,8 @@ void fd_tick()
 // - a hit (XV2's entry 3): the rest plays at entry 3's speed (sh_rate); from SH_CANCEL_HIT (entry 3's BcmCallback 26)
 //   the other specials, not the down special (sh_specials); an uncharged hit: his vertical speed is the victim's
 //   (sh_follow) while it is airborne in hitstun
-// - SH_IASA (BAC 37, the BcmCallback Movement / Guard): anything; landing before: LandingFallSpecial (SH_LAND_LAG,
-//   SH_LAND_LAG_HIT after a hit), after: a normal landing; Fall after the swing's end
+// - SH_IASA (BAC 37, the BcmCallback Movement / Guard): anything; landing at any point: his light landing (v2); Fall
+//   after the swing's end
 // State: New_Var slots SH_V (the phase: 1 the wind-up, 2 charging, 3 the swing, 4 the swing past IASA), SH_V_CHG (the
 // charge's frames), SH_V_VIC (the hit fighter's slot; -1 a hit with no follow) and VAR_0 / VAR_1 / VAR_2 (SH_V_VY,
 // the followed fighter's Y last frame; SH_V_LASTFR, the swing's frame last frame; SH_V_T, v2: the move's frames, for
@@ -40458,24 +40458,13 @@ int sh_air_act()
     return 0;
 }
 
-// landed: past SH_IASA a normal landing, else LandingFallSpecial (its length from work float 0, as the up special's)
+// landed (v2, the user: "make his landing animation for Sledgehammer simply his light landing", its lag too): his own
+// light landing (LandingLight, status 0x17: motion 0x3A, the lag his fighter_param's soft landing lag) at any point
+// of the move (v1: LandingFallSpecial 18 frames, 10 after a hit; a normal landing once free)
 void sh_land(float fr)
 {
     sh_grav();
-    if (WorkModuleF(0, SH_V) > 2.5f && fr > SH_IASA - 0.01f)
-    {
-        func_16(0x16, 0);
-        return;
-    }
-    if (WorkModuleF(0, SH_V_VIC) != 0.0f)
-    {
-        WorkModule(0, SH_LAND_LAG_HIT, 0);
-    }
-    else
-    {
-        WorkModule(0, SH_LAND_LAG, 0);
-    }
-    func_16(0x19, 0);
+    func_16(0x17, 0);
 }
 
 void sh_loop()

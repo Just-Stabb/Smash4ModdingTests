@@ -91,7 +91,7 @@ HIT_CH_V1 = dict(Damage=12.0, Angle=270, KBG=95, FKB=0, BKB=25)
 # 99.8 / 146.4; within 1 from 0 to 150%)
 HIT_CH = dict(Damage=20.0, Angle=270, KBG=61, FKB=0, BKB=23)
 HITSTOP_CH = 20
-LAND_LAG, LAND_LAG_HIT = 18, 10      # landing before IASA: LandingFallSpecial this long (after a hit: shorter)
+# v2 (user): a landing at any point is his light landing (LandingLight 0x17, its own lag); v1: LandingFallSpecial 18 / 10
 VICTIM_MID = 5.0                     # a fighter's middle above its feet (the contact point)
 VICTIM_HEAD = 9.0                    # its head (the sweat)
 VICTIM_R2 = (HIT_SIZE + 12.0) ** 2   # the fallback victim search: within this of the hitbox centre
@@ -157,8 +157,8 @@ def msc_values():
             'SH_HIT_FROM': fl(HIT_FROM_CH), 'SH_HIT_TO': fl(HIT_TO + HIT_LATE), 'SH_CANCEL_HIT': fl(CANCEL_HIT),
             'SH_IASA': fl(IASA), 'SH_HOLD_END': fl(HOLD_END), 'SH_RATE_CODE': rate_code(),
             'SH_HIT_Z': fl(HIT_Z), 'SH_HIT_Y': fl(HIT_Y), 'SH_VICTIM_MID': fl(VICTIM_MID),
-            'SH_VICTIM_HEAD': fl(VICTIM_HEAD), 'SH_VICTIM_R2': fl(VICTIM_R2), 'SH_LAND_LAG': fl(LAND_LAG),
-            'SH_LAND_LAG_HIT': fl(LAND_LAG_HIT), 'SH_FX_CRG': '0x%X' % FX_IDS['crg'],
+            'SH_VICTIM_HEAD': fl(VICTIM_HEAD), 'SH_VICTIM_R2': fl(VICTIM_R2),
+            'SH_FX_CRG': '0x%X' % FX_IDS['crg'],
             'SH_FX_HITLOD': '0x%X' % FX_IDS['hitlod'], 'SH_FX_HITS': '0x%X' % FX_IDS['hits'],
             'SH_FX_SWEAT': '0x%X' % FX_IDS['sweat'],
             'SH_FX_HITLOD_SIZE': fl(EEPK_SCALE['Btl_HitLOD.emp'] * SH_FX_SCALE),
