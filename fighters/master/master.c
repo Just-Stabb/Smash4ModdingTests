@@ -38624,9 +38624,10 @@ void master_s_loop()
 // sword's frame (tools/master_build.py: aircatch's script) and her native tether takes a ledge in reach (0xF5 / 0xF3,
 // then her hang 0xF4: his AirCatchHit / Hang animations). A hit on a fighter (frames MASTER_HI_HIT_START - END) ->
 // 0x15B: SpecialAirHiHit (pulled toward where the sword's tip hit, master_hi_pull: Ultimate's rewind_speed), then SpecialAirHiOvertake
-// (its hit), then special fall. A wall touched while the sword is out (up to MASTER_HI_WALL_MAX a time in the air) ->
-// 0x15C: SpecialAirHiWallJump (MASTER_HI_JUMP_X off the wall, MASTER_HI_JUMP_Y up). Else special fall at its end;
-// landing: LandingFallSpecial
+// (its hit), then Fall (v7: never special fall, as Ultimate). A wall touched while the sword is out (up to MASTER_HI_WALL_MAX a time in the air) ->
+// 0x15C: SpecialAirHiWallJump (MASTER_HI_JUMP_X off the wall, MASTER_HI_JUMP_Y up). Else Fall at its end (v7; v1-v6
+// special fall); landing: LandingHeavy (v1-v6 LandingFallSpecial). v7: a ledge in front during the catch window -> 0xF2
+// (the common AirCatch's func_99 test); a caught fighter is held while he is pulled to it (master_hi_rewind)
 int master_hi_pre()
 {
     if (global18 == 0x2)
@@ -39047,7 +39048,8 @@ void master_lw_loop()
     {
         if (global18 == 0 && f >= MASTER_LW_INHERIT1_END && f < MASTER_LW_FORBID_START)
         {
-            master_phase = 0x1;                 // SpecialLwLanding2 (FORBID_LANDING's frames too)
+            master_phase = 0x1;                 // SpecialLwLanding2 (51 - 60; v7: from FORBID_LANDING (60 - 65) on he lands
+                                                // into the ground motion at its frame: its hit and the floor hit come out)
         }
         else if (global18 == 0 && f >= MASTER_LW_INHERIT2_END)
         {

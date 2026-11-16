@@ -456,12 +456,20 @@ class Textures:
             img = bleed(img)
         return self.add(key, np.clip(np.round(img), 0, 255).astype(np.uint8))
 
-    def reflectance(self, prm):
-        """the PRM's mean F0 (0.16 spec^2, alpha) against a plain dielectric's 0.04, at most 1"""
-        key = ('refl', prm)
+    def reflectance(self, prm, col=None):
+        """the PRM's mean F0 against a plain dielectric's 0.04, at most 1: 0.16 spec^2 (alpha) for a dielectric, the
+        colour itself for a metal (PRM red, metalness: Ultimate's PBR takes F0 = albedo there). v1 - Byleth v6 left
+        the metalness out: metal parts (his armour, F0 ~0.5) took a dielectric's 0.16 spec^2 and lost their sheen"""
+        key = ('refl', prm, col)
         if key not in self.cache:
-            spec = self.load(prm)[..., 3].astype(np.float64) / 255
-            self.cache[key] = float(min(1.0, (0.16 * spec * spec).mean() / 0.04))
+            p = self.load(prm).astype(np.float64) / 255
+            spec, metal = p[..., 3], p[..., 0]
+            f0 = 0.16 * spec * spec
+            if col is not None:
+                c = resized(self.load(col), p.shape[1], p.shape[0]).astype(np.float64) / 255
+                alb = (0.2126 * c[..., 0] + 0.7152 * c[..., 1] + 0.0722 * c[..., 2]) ** 2.2   # linear albedo
+                f0 = f0 * (1 - metal) + alb * metal
+            self.cache[key] = float(min(1.0, f0.mean() / 0.04))
         return self.cache[key]
 
     def normal(self, nor, prm=None):
@@ -753,7 +761,7 @@ def material_for(tex, mat, tmpl, part):
         # lobe, rim 0.91) scaled by Ultimate's reflectance, F0 = 0.16 spec^2 (PRM alpha), against a
         # plain surface's 0.04 (spec 0.5): Sephiroth's coat (spec 0.08: 1/40) was a light grey sheen.
         # Floors keep some of both (the rim outlines him on dark stages); the eyes keep their glint
-        k = tex.reflectance(tx['Texture6'])
+        k = tex.reflectance(tx['Texture6'], tx.get('Texture0'))
         scale = {'NU_specularColor': max(k, 0.1), 'NU_fresnelColor': max(k ** 0.5, 0.35)}
         m.props = [(n, ([x * scale[n] for x in v[:3]] + list(v[3:]) if n in scale else v)) for n, v in m.props]
     return m
@@ -780,7 +788,50 @@ def templates(base_nud):
                     out['skin'] = mt.copy()
     if 'opaque' not in out:
         raise SystemExit('no 0x9A011063 material in the base')
+    rim_from_body(base_nud, out)
     return out
+
+
+RIM_PROPS = ('NU_fresnelColor', 'NU_fresnelParams', 'NU_specularColor', 'NU_aoMinGain')
+
+
+def rim_from_body(base_nud, out):
+    """a base whose 0x9A011063 material is a face part with no rim light (ZSS's: Mouth_Ouch, fresnel 0, AO floor 0,
+    specular exponent 1; her suit is 0x9801106b, a reflective one): the port's every body part drew with no rim, its
+    AO darkening to black and a flat specular (Byleth v1 - v6, user: "colours too dark", flatter than Ultimate's).
+    Its rim / specular / AO floor (and the specular exponent) from the base's main body material instead (the one with
+    a rim that the most vertices use: ZSS's suit, fresnel 1 x2, specular 3 x2, exponent 10, AO floor 0.5); the
+    converter then scales the specular and rim by Ultimate's reflectance (material_for). Bases with a rim on their
+    0x9A011063 body (Zelda, Bowser, ...) are left as they are"""
+    tm = out['opaque']
+    props = dict(tm.props)
+    if any(props.get('NU_fresnelColor', [0.0])[:3]):
+        return
+    count, mats = {}, {}
+    for m in base_nud:
+        if '_VIS_' in m.name:                   # shown / hidden parts (ZSS's Paralyzer, eyes): not the body
+            continue
+        for p in m.polygons:
+            for mt in p.materials:
+                fr = dict(mt.props).get('NU_fresnelColor')
+                if mt.src == 0 and fr and any(fr[:3]) and not mt.flags & 0x00200000:      # not a skin (warm tints)
+                    key = (mt.flags, str([(nm, list(v)) for nm, v in mt.props if nm != 'NU_materialHash']))
+                    count[key] = count.get(key, 0) + (getattr(p, 'nv', None) or (len(p.pos) if p.pos is not None else 0))
+                    mats[key] = mt
+    if not count:
+        return
+    best = mats[max(count, key=count.get)]
+    bp = dict(best.props)
+    for key in ('opaque', 'blend'):
+        mt = out[key]
+        new = []
+        for name, v in mt.props:
+            if name in RIM_PROPS and name in bp:
+                v = list(bp[name][:len(v)]) + list(v[len(bp[name]):])
+            elif name == 'NU_specularParams' and name in bp:
+                v = [v[0], bp[name][1]] + list(v[2:])
+            new.append((name, v))
+        mt.props = new
 
 
 def empty_polygon(tmpl):

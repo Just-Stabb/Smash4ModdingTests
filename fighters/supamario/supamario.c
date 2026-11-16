@@ -11763,6 +11763,18 @@ void func_586()
         var4 = 0x6d + var3;
         func_587(var4, 0x300001c + var3);
     }
+    else if (global4 == 0x19 && global5 == 0x155)
+    {
+        // Sledgehammer v2: its landing (sh_land) plays his light landing (0x3A) over the landing lag
+        var0 = 1.0f;
+        var1 = WorkModuleF(0, 0);
+        if (var1 != (float)0)
+        {
+            var2 = MotionModule(0, 0x3a);
+            var0 = (float)var2 / var1;
+        }
+        func_22(0x3a, 0, var0);
+    }
     else if (global4 == 0x19)
     {
         var0 = 1.0f;
@@ -40191,7 +40203,7 @@ void sh_fastfall()
     {
         return;
     }
-    if ((float)global47 < WorkModuleF(0, SH_V_T) - 0.5f)
+    if ((float)global47 < WorkModuleF(0, SH_V_T) - 1.5f)       // flicked on the move's 2nd frame or later
     {
         func_553();
     }
@@ -40458,13 +40470,21 @@ int sh_air_act()
     return 0;
 }
 
-// landed (v2, the user: "make his landing animation for Sledgehammer simply his light landing", its lag too): his own
-// light landing (LandingLight, status 0x17: motion 0x3A, the lag his fighter_param's soft landing lag) at any point
-// of the move (v1: LandingFallSpecial 18 frames, 10 after a hit; a normal landing once free)
+// landed (v2, the user: "just standardize Sledgehammer's landing lag to 10 frames", "make his landing animation for
+// Sledgehammer simply his light landing"): before SH_IASA, LandingFallSpecial (0x19) SH_LAND_LAG frames long (its
+// length from work float 0, as the up special's), playing his light landing (motion 0x3A) fitted to them: func_586
+// picks it for a LandingFallSpecial entered from the down special (0x155: only Sledgehammer lands from it). After
+// SH_IASA a normal landing (v1: 18 frames, 10 after a hit, in LandingFallSpecial's pose)
 void sh_land(float fr)
 {
     sh_grav();
-    func_16(0x17, 0);
+    if (WorkModuleF(0, SH_V) > 2.5f && fr > SH_IASA - 0.01f)
+    {
+        func_16(0x16, 0);
+        return;
+    }
+    WorkModule(0, SH_LAND_LAG, 0);
+    func_16(0x19, 0);
 }
 
 void sh_loop()

@@ -193,7 +193,9 @@
       "master_final_sword_charge2": "the Final Smash stays ZSS's for now (user): his Final Smash effects aren't in the bank (port_check E5: ripple1_rif, a refraction mesh the converter can't place yet)",
       "master_final_sword_front": "the Final Smash stays ZSS's for now (user): his Final Smash effects aren't in the bank (port_check E5: ripple1_rif, a refraction mesh the converter can't place yet)",
       "master_final_sword_spark": "the Final Smash stays ZSS's for now (user): his Final Smash effects aren't in the bank (port_check E5: ripple1_rif, a refraction mesh the converter can't place yet)",
-      "master_final_whip1": "the Final Smash stays ZSS's for now (user): his Final Smash effects aren't in the bank (port_check E5: ripple1_rif, a refraction mesh the converter can't place yet)"
+      "master_final_whip1": "the Final Smash stays ZSS's for now (user): his Final Smash effects aren't in the bank (port_check E5: ripple1_rif, a refraction mesh the converter can't place yet)",
+      "master_final_bg_end": "the Final Smash stays ZSS's for now (user): his Final Smash effects aren't in the bank (port_check E5: ripple1_rif, a refraction mesh the converter can't place yet)",
+      "master_swordaura": "(v7, port_check E11) the Sword of the Creator's aura: no script of his calls it (Ultimate's status code turns it off with FLAG_SWORD_OFF_EFFECT_AURA; not ported)"
     }
   },
   "stats": {

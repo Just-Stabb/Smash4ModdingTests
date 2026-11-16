@@ -1623,6 +1623,97 @@ def check_loop_slots(inst, name, rec, base, vanilla, rep):
                 'loops): %s' % (len(bad), ', '.join(bad)))
 
 
+def check_root_motion(inst, name, rec, rep):
+    """M12 root-motion: a motion slot the record gives an animation of its own (extra_kinds.json "motions") whose root
+    (TransN) moves (Ultimate's motion_list move flag 0x4: the root's movement is the fighter's), without the move flag
+    in the slot's flags: Smash 4 draws the root's translation as an offset from where the fighter is, and at the
+    motion's end the model snaps back to it (Byleth v1 - v6: side special's lunge drawn 11 / 14 forward, user v6: "Side
+    special teleports them back to their origin"; the wall jump 25 up). The flag 0x4 in "flags" (rebuild the executable's
+    motion table: tools/kind_expand_incremental.py)"""
+    import tempfile
+    import omo
+    pac = inst.get('fighter/%s/motion/body/main.pac' % name)
+    vbn = inst.get('fighter/%s/model/body/c00/model.vbn' % name)
+    if pac is None or vbn is None:
+        return
+    with tempfile.TemporaryDirectory() as td:
+        pp, vp = os.path.join(td, 'main.pac'), os.path.join(td, 'model.vbn')
+        open(pp, 'wb').write(pac)
+        open(vp, 'wb').write(vbn)
+        anims = dict(omo.pac_read(pp))
+        bones = omo.vbn_read(vp)
+    trans = [h for n, _p, h in bones if n == 'TransN']
+    if not trans:
+        return
+    bad = []
+    for slot, v in sorted((rec.get('motions') or {}).items()):
+        if not isinstance(v, dict) or 'anim' not in v:
+            continue
+        data = anims.get(v['anim'] + '.omo')
+        if data is None:
+            continue
+        o = omo.Omo(data)
+        first = o.sample(trans[0], 0)
+        if first is None:
+            continue
+        p0 = first[0]
+        move = max(sum((a - b) ** 2 for a, b in zip((o.sample(trans[0], f) or first)[0], p0)) ** 0.5
+                   for f in range(o.frames))
+        if move > 1.0 and not int(v.get('flags', '0x0'), 0) & 4:
+            bad.append('%s %s (the root moves %.1f)' % (slot, v['anim'], move))
+    if bad:
+        rep.add('ERROR', 'M12 root-motion', '%d motion slots whose root (TransN) moves have no move flag (0x4): the '
+                'model is drawn away from the fighter and snaps back at the motion\'s end: %s' % (len(bad), '; '.join(bad)))
+
+
+def check_tether_ledge(name, rep):
+    """S13 tether-ledge: a port that registers its own main for the base's tether status 0xF1 (AirCatch: ZSS's, Byleth's
+    air up special) must keep the common AirCatch loop's ledge catch (func_126: `func_99() == 1 &&
+    WorkModule(0x2712, 0x2100000D)` -> 0xF2). Byleth v1 - v6's loop dropped it: the up special never caught a ledge
+    in front of him (user v6: "doesn't grab ledges")"""
+    src = os.path.join(ROOT, 'fighters', name, name + '.c')
+    if not os.path.exists(src):
+        return
+    text = open(src, errors='replace').read()
+    own = [m for m in re.finditer(r'sv_set_mem\(0x1, 0x1, 0xf1, (\w+)\)', text) if not re.fullmatch(r'func_\d+', m.group(1))]
+    if not own:
+        return
+    m = own[-1]
+    loops = re.findall(r'func_78\((\w+)\)', re.search(r'\n\w[\w ]*\b%s\([^)]*\)\s*\{(.*?)\n\}' % m.group(1), text, re.S).group(1))
+    body = ''.join(re.search(r'\n\w[\w ]*\b%s\([^)]*\)\s*\{(.*?)\n\}' % lp, text, re.S).group(1) for lp in loops
+                   if re.search(r'\b%s\(' % lp, text))
+    if not (re.search(r'func_99\(\)', body) and '0xf2' in body.lower()):
+        rep.add('ERROR', 'S13 tether-ledge', '%s: its 0xF1 main %s runs a loop (%s) without the common AirCatch ledge '
+                'catch (func_99() and 0x2100000D -> status 0xF2: func_126)' % (os.path.basename(src), m.group(1),
+                                                                             ', '.join(loops) or 'none'))
+
+
+def check_status_effects(name, src, rec, rep):
+    """E11 status-effects: the fighter's own effect sets (its .eff) that the port leaves out of its bank though nothing
+    keeps them out: Ultimate requests some from its status code or native specializers only (Byleth's max arrow beam
+    master_bow_arrow2 / _bullet / _end / _hit, Aymr's floor impact master_axe_impact / _ground), so init's list (the
+    sets its ACMD calls) missed them and those moves drew without them (Byleth v1 - v6). WARN with the names: add them
+    to port.json effects.own, or to effects.kept_out with the reason"""
+    import port_sources  # noqa: F401
+    try:
+        eff = src.eff(port_sources.ult_name(name))
+    except Exception:
+        eff = None
+    cfg = os.path.join(ROOT, 'fighters', name, 'port.json')
+    if not eff or not os.path.exists(eff) or not os.path.exists(cfg):
+        return
+    pj = json.load(open(cfg))
+    fx = pj.get('effects') or {}
+    have = {n.lower() for n in fx.get('own', [])} | {n.lower() for n in fx.get('kept_out', [])}
+    ult = port_sources.ult_name(name).lower()
+    sets = set(re.findall(rb'\b(%s_[A-Z0-9_]+)\x00' % ult.upper().encode(), open(eff, 'rb').read()))
+    miss = sorted(s.decode().lower() for s in sets if s.decode().lower() not in have)
+    if miss:
+        rep.add('WARN', 'E11 status-effects', '%d of the %d effect sets in ef_%s.eff are neither in the bank nor kept '
+                'out (port.json effects.own / kept_out): if the status code or the ExeFS plays them, the move draws '
+                'without them: %s' % (len(miss), len(sets), ult, ', '.join(miss)))
+
+
 # the --have bones of ports from before port.json recorded them (ultimate_fighter.py --have LEFT,RIGHT)
 HAVE_BONES = {'edge': 'SwordL1,SwordR1'}
 
@@ -2429,6 +2520,8 @@ def main():
     check_vl(inst, a.name, base, motion_list, rep)
     check_cancel(inst, a.name, base, motion_list, rep)
     check_msc(inst, a.name, rep)
+    check_tether_ledge(a.name, rep)
+    check_status_effects(a.name, src, rec, rep)
     check_have_bones(inst, a.name, rep)
     check_repo(a.name, kind, rep)
     check_weapons(a.name, rec, rep)
@@ -2452,6 +2545,7 @@ def main():
     check_shield_damage(inst, a.name, rep)
     check_motions(inst, a.name, rec, rep)
     check_loop_slots(inst, a.name, rec, base, vanilla, rep)
+    check_root_motion(inst, a.name, rec, rep)
     check_assets(inst, a.name, base, rep)
     check_portraits(inst, a.name, rep)
     check_lod_and_camera(inst, a.name, src, base['ult'], rep)

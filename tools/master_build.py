@@ -155,10 +155,16 @@ CONSTS = dict(
     MASTER_HI_START_Y='1.4f', MASTER_HI_HIT_START='16.0f', MASTER_HI_HIT_END='25.0f', MASTER_HI_WALL_END='27.0f',
     MASTER_HI_WALL_MAX='3', MASTER_HI_JUMP_X='0.9f',
     MASTER_HI_JUMP_Y='2.6f',
+    # (v7) the caught fighter's pull: param_special_hi rewind_speed 4.1, param_sword fighter_offset 8 (his hand short
+    # of the caught point); the catch's reach: object_dist_max 55 + param_sword reach_length_max 70 (as |dx| + |dy|);
+    # the pull's frame cap (mine: 70 / 4.1 = 17, rounded up)
+    MASTER_HI_REWIND='4.1f', MASTER_HI_HAND_X='8.0f', MASTER_HI_FIND_DIST='125.0f', MASTER_HI_PULL_MAX='0x14',
     # Aymr: param_special_lw super_armor_damage_max; SpecialLw's START / END_SUPER_ARMOR (34 / 64), INHERIT_LANDING_1's
     # end (51), INHERIT_LANDING_2 (65 - 117)
     MASTER_LW_ARMOR='30.0f', MASTER_LW_ARMOR_START='34.0f', MASTER_LW_ARMOR_END='64.0f', MASTER_LW_INHERIT1_END='51.0f',
-    MASTER_LW_INHERIT2_START='65.0f', MASTER_LW_INHERIT2_END='117.0f')
+    MASTER_LW_INHERIT2_START='65.0f', MASTER_LW_INHERIT2_END='117.0f',
+    # (v7) SpecialLw's FORBID_LANDING (60), the axe's PIERCE_GROUND (64 - 65), TURN_CHECK (12 - 42)
+    MASTER_LW_FORBID_START='60.0f', MASTER_LW_PIERCE='64.0f', MASTER_LW_TURN_START='12.0f', MASTER_LW_TURN_END='42.0f')
 
 
 def run(*argv):

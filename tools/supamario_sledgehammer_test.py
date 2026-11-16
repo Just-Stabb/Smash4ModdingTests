@@ -47,6 +47,7 @@ GRAVITY, MAX_FALL = 0.09, 1.5
 FF, FF_SPEED, FF_STICK, FF_WINDOW = 0x21000001, 2.4, -0.66, 4      # v2: the fast fall (flag, speed, stick, flick age)
 LEN = {0x239: A.START_FRAMES, 0x23D: A.HOLD_FRAMES}
 UP, SIDE, NEUTRAL, DOWN = 0x4000, 0x2000, 0x1000, 0x8000
+MOTION_FRAMES = {0x3A: 16, 0x2D: 31}    # v2: LandingLight / LandingFallSpecial (his main.pac)
 
 
 class Game(FT.Game):
@@ -118,6 +119,8 @@ class Game(FT.Game):
             return 0
         if sid == 0x12 and a and a[0] == 0x1:
             self.rate = f(a[3]) if len(a) > 3 else 1.0
+        if sid == 0x12 and a and a[0] == 0x0 and len(a) == 2:                    # a motion's length
+            return MOTION_FRAMES.get(a[1], 1)
         if sid == 0x1E:
             self.sounds.append((self.n, {0x2710: 'play', 0x2714: 'stop'}.get(a[0], a[0]), a[1] if len(a) > 1 else None))
             return 0
@@ -360,7 +363,8 @@ def msc_tests(path):
     tr, _vm = run(path, g)
     check('whiff: the down special again at IASA -> 0x155 (allowed once free)', (tr[-1][0], tr[-1][5]),
           (kia, 0x155))
-    # 7. landing: before IASA LandingFallSpecial (18 frames; 10 after a hit), after it a normal landing
+    # 7. landing (v2): before IASA LandingFallSpecial, 10 frames, his light landing's animation fitted to them; after it a
+    # normal landing
     g = Game(held=lambda n: n <= 2, y=6.0)
     g.floor = 0.0
     tr, _vm = run(path, g)
@@ -369,8 +373,23 @@ def msc_tests(path):
     g = Game(fighters=[victim_below(y=200.0, k=hit_k)], held=lambda n: n <= 2, y=200.0)
     g.floor = fall_y(200.0, hit_k) - 15.0
     tr, _vm = run(path, g, frames=300)
-    check('a landing after a hit, before IASA: LandingFallSpecial, %d frames' % B.LAND_LAG_HIT,
-          (tr[-1][5], g.vars.get(0), g.fighters[2].hit_at is not None), (0x19, float(B.LAND_LAG_HIT), True))
+    check('a landing after a hit, before IASA: the same %d frames' % B.LAND_LAG,
+          (tr[-1][5], g.vars.get(0), g.fighters[2].hit_at is not None), (0x19, float(B.LAND_LAG), True))
+    g = Game(held=lambda n: True, y=8.0)
+    g.floor = 0.0
+    tr, _vm = run(path, g)
+    check('a landing while charging: the same %d frames' % B.LAND_LAG, (tr[-1][5], g.vars.get(0)),
+          (0x19, float(B.LAND_LAG)))
+    for prev, mot in ((0x155, 0x3A), (0x154, 0x2D)):
+        g = Game()
+        vm = FT.vm_for(path, g)
+        g.vars[0] = float(B.LAND_LAG)
+        vm.g[4], vm.g[5] = 0x19, prev
+        vm.call(fn(vm, 'func_586'))
+        want_rate = round(MOTION_FRAMES[mot] / float(B.LAND_LAG), 3)
+        check('LandingFallSpecial entered from 0x%X: motion 0x%X at rate %.2f (%d frames over %d)' % (
+            prev, mot, want_rate, MOTION_FRAMES[mot], B.LAND_LAG),
+              [(m, round(g.rate, 3)) for _n, m, _f in g.motions], [(mot, want_rate)])
     g = Game(held=lambda n: n <= 2, y=300.0)
     tr, vm = run(path, g, frames=kia + 2)
     g.air = False
@@ -427,8 +446,8 @@ def msc_tests(path):
         g.vars[B.V_SH] = sh
         vm.g[6], vm.g[50] = 0x155, R.f2i(1.0)
         vm.call(fn(vm, 'func_81'))
-        check('func_81 (a special cancels a fresh fast fall): %s while Sledgehammer runs' % ('kept' if want else
-                                                                                           'cancelled as before'),
+        check('func_81 (a special cancels a fresh fast fall): %s' % ('kept while Sledgehammer runs' if want else
+                                                                   'cancelled as before outside it'),
               FF in g.flags, want)
     # 10. on the ground the down special stays Fake Death
     g = Game(held=lambda n: False)

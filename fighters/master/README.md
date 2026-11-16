@@ -9,6 +9,32 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: v7 (`scratchpad/byleth_v7_fix.zip`: a FIX package over v4 + byleth_userdata_v2 + v5_fix + v6_fix; exe_v46v_threads; in-game TEST)
+
+User, v6 test (4 clips, 3 screenshots; framed at 60 fps in `scratchpad/byleth/v7/clips/`): colours / effects / trails too
+dark; side special snaps back to where it started; up special grabs no ledge / wall / fighter, pulls him to the wrong
+place, ends in special fall; grounded down special has no floor impact and acts as the air one, landing during the air
+one near its hit frame cancels it; the charged arrow far too slow, most of its emitters and its beam missing, no hit
+effect. Their Ultimate reference: `images/23.png` (training, idle) against `images/20.webp`.
+
+| point | cause (evidence) | fix |
+|---|---|---|
+| side special snaps back | Ultimate's special_s_front / air: motion_list flags 0x84 (move), its Trans 11 (air 14) forward over frames 0 - 18 (d01specialsf.nuanmb); extra_kinds.json gave slots 0x22E / 0x232 flags 0x0 (ZSS's 0x22E had 0x4): Smash 4 drew the root's translation as an offset and dropped it at the end. Same in the wall jump 0x23C (Trans 25 up / 8 back, Ultimate 0x84) | flags 0x4 on 0x22E / 0x232 / 0x23C (exe_v46v). **port_check M12 root-motion** (ERROR; v6's install: 3) |
+| up special: no ledge | his 0xF1 loop (master_hi_air_loop) replaced the common AirCatch loop (func_126) without its ledge catch (`func_99() == 1 && 0x2100000D -> 0xF2`) | the test back in his loop; **port_check S13 tether-ledge** (ERROR on v6's master.c) |
+| up special: special fall | master.c sent every end to 0x10 (FallSpecial) and landings to 0x19 | Fall (0xE) and LandingHeavy (0x16) everywhere (ground, air, hit, overtake) |
+| up special: the hit / pull | v6 pulled him toward where the tip was on the hit frame (a table), the fighter left to fly | `master_hi_find` (the other fighter in hitstop nearest him, within object_dist_max 55 + reach 70), `master_hi_rewind`: the caught fighter held where it was caught (position_vars, as the vec_target pulls), him pulled at Ultimate's rewind_speed 4.1 a frame until his hand (param_sword fighter_offset 8) is at it, then the overtake hit (cap 20 frames, mine) |
+| down special on the ground | Ultimate's SpecialLw sets the axe's PIERCE_GROUND at 64 - 65: the axe meets the floor -> SpecialLwHit (the axe stuck, 4 ground shock hits 8 % at its frame 2, the ground's landing effect, master_axe_rock); v1 - v6 had no SpecialLwHit (no slot): the ground one played on as the air one | new slots 0x242 SpecialLwHit, 0x243 / 0x247 SpecialLwTurn / air (exe_v46v; Ultimate's scripts, the axe's merged); master.c: grounded at 64 -> 0x242; TURN_CHECK 12 - 42 with the stick back -> the turn, once |
+| down special: landing near the hit | master.c sent landings at 51 - 65 to SpecialLwLanding2 (no hit); Ultimate's FORBID_LANDING (60 - 65) keeps the move going | 60 - 65: the ground motion at its frame (its hit, then the floor hit); 51 - 60 still Landing2 (Ultimate's INHERIT_LANDING_1 ends at 51) |
+| charged arrow: speed | Ultimate's arrow2 doesn't fly: its Search status calls the ExeFS's `WeaponSpecializer_MasterArrow1::set_search` (main.bin 0x03443100: param_arrow2 distance 300 x scale, cut at the first ground by a GroundModule line test, one attack line over the whole path); v1 - v6 flew it at 10 a frame for 30 frames (mine) | 300 in 4 frames (75 a frame, `master_build.ARROW2_LIFE`) |
+| charged arrow: beam / emitters / hit | master_bow_arrow2 (the beam), _bullet, _end, _end2, _abs, _hit and Aymr's master_axe_impact / _ground are requested by status / native code only (`recomp_hashes`: f_7208a04340 set_arrow_max_effect, f_7208a050e0, f_7208a052f0): init took the ACMD's sets, so none was in the bank | the 8 sets in port.json effects.own (bank rebuilt); the arrow's effect script: the bullet on it, the beam left at each frame's point (Ultimate stretches one beam: APPROXIMATED), the end flash. **port_check E11 status-effects** (WARN) |
+| colours too dark (model) | `ultimate_fighter.templates` takes the base's first 0x9A011063 material: on ZSS that is Mouth_Ouch (fresnel 0, AO floor 0, specular exponent 1; her suit is a reflective 0x9801106b): every Byleth part drew with no rim, its AO down to black, one flat lobe; and the reflectance ignored PRM metalness (his armour, F0 ~ albedo, took 0.16 spec^2) | `rim_from_body`: rim / specular / AO floor / exponent from the base's main body material (ZSS's suit Gamemodel: rim 0.75, specular 1.5, AO floor 0.05, exponent 10), scaled by Ultimate's reflectance as before; `reflectance` takes metalness. Other ports: only a base whose 0x9A011063 template has no rim changes (Zelda's has rim 0.91: Sephiroth unchanged) |
+
+Not done / approximated (v7): the effects' darkness in game (fx_render draws master_axe_slash bright; the dark streaks are
+its `_sub` emitters, a subtractive layer in Ultimate too: to compare with an Ultimate clip of the move); the wall tether
+(Ultimate's sword tip meeting a wall: the wall check is still his body's, no line test in MSC); the dash Areadbhar
+(SpecialSFDash: no slot); SpecialLwCancel / SpecialAirLwHit (the air axe meeting the floor: no ray test); the hair's
+skin-path material (CustomVector30) still lighter / greener than Ultimate's.
+
 ## Status: v6 (`scratchpad/byleth_v6_fix.zip`: a FIX package over v4 + byleth_userdata_v2 + v5_fix; in-game TEST)
 
 User, v4 / v5 tests: up special "not appearing / functioning" (twice), the whip moves without their blade, "etc".

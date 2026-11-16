@@ -91,7 +91,8 @@ HIT_CH_V1 = dict(Damage=12.0, Angle=270, KBG=95, FKB=0, BKB=25)
 # 99.8 / 146.4; within 1 from 0 to 150%)
 HIT_CH = dict(Damage=20.0, Angle=270, KBG=61, FKB=0, BKB=23)
 HITSTOP_CH = 20
-# v2 (user): a landing at any point is his light landing (LandingLight 0x17, its own lag); v1: LandingFallSpecial 18 / 10
+LAND_LAG = 10                        # v2 (user: "standardize Sledgehammer's landing lag to 10 frames"), his light
+                                     # landing's animation over them (v1: 18, 10 after a hit, LandingFallSpecial's pose)
 VICTIM_MID = 5.0                     # a fighter's middle above its feet (the contact point)
 VICTIM_HEAD = 9.0                    # its head (the sweat)
 VICTIM_R2 = (HIT_SIZE + 12.0) ** 2   # the fallback victim search: within this of the hitbox centre
@@ -157,7 +158,7 @@ def msc_values():
             'SH_HIT_FROM': fl(HIT_FROM_CH), 'SH_HIT_TO': fl(HIT_TO + HIT_LATE), 'SH_CANCEL_HIT': fl(CANCEL_HIT),
             'SH_IASA': fl(IASA), 'SH_HOLD_END': fl(HOLD_END), 'SH_RATE_CODE': rate_code(),
             'SH_HIT_Z': fl(HIT_Z), 'SH_HIT_Y': fl(HIT_Y), 'SH_VICTIM_MID': fl(VICTIM_MID),
-            'SH_VICTIM_HEAD': fl(VICTIM_HEAD), 'SH_VICTIM_R2': fl(VICTIM_R2),
+            'SH_VICTIM_HEAD': fl(VICTIM_HEAD), 'SH_VICTIM_R2': fl(VICTIM_R2), 'SH_LAND_LAG': fl(LAND_LAG),
             'SH_FX_CRG': '0x%X' % FX_IDS['crg'],
             'SH_FX_HITLOD': '0x%X' % FX_IDS['hitlod'], 'SH_FX_HITS': '0x%X' % FX_IDS['hits'],
             'SH_FX_SWEAT': '0x%X' % FX_IDS['sweat'],
@@ -400,6 +401,9 @@ def convert_fx(skill_dir, cmn_dir, fx_dir, halo=True):
                   (mats.get(emp, {}).get(p.emitter_name(em['data'])) or (0, 0, {}))[2].get('Glare') and
                   not FX.is_refraction(mats[emp][p.emitter_name(em['data'])][1],
                                        mats[emp][p.emitter_name(em['data'])][0])]
+            if emp in ARC_EMPS:     # v2: no halo on the swing arcs (a halo copy of an open arc is a soft full disc:
+                ks = [k for k in ks if p.field(p.sets[si]['emitters'][k]['data'], 'particle_type') != 1]   # facing
+                # the camera now, a big glowing circle behind him)
             room = 16 - len(p.sets[si]['emitters'])
             if len(ks) > room:              # a set's halos stay in it (no companion set for the MSC / Else calls):
                 dropped[emp] = len(ks) - room      # the first glowing emitters get one, as many as fit
