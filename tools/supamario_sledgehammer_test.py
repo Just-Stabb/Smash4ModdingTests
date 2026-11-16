@@ -137,6 +137,21 @@ class Game(FT.Game):
         return FT.Game.sys(self, sid, a)
 
     def setvar(self, v, val):
+        if v == 0x0F0003C9:                             # v3: BUFFER_CLEAR (a slot's buffer emptied)
+            f_ = self.fighters.get(int(val))
+            if f_ is not None:
+                f_.__dict__.setdefault('wlog', []).append((self.n, 'buffer', round(val, 3)))
+            return
+        for s_ in range(1, 9):
+            f_ = self.fighters.get(s_)
+            if isinstance(f_, GVictim):                 # v3: the grounded victim model's own writes
+                t_ = s_ + 2
+                k_ = {0x0F0000A2 + 8 * t_: 'status', 0x0F000115 + 0x20 * t_: 'input', 0x0F000116 + 0x20 * t_: 'sit',
+                      0x0F0000A6 + 8 * t_: 'ground', 0x0f000020 + 4 * (s_ - 1): 'x',
+                      0x0f000021 + 4 * (s_ - 1): 'y'}.get(v)
+                if k_ is not None:
+                    f_.write(self.n, k_, val)
+                    return
         for s_ in range(1, 9):                          # v2: a slot's status / input / shield / push writes
             t_ = s_ + 2
             f_ = self.fighters.get(s_)
@@ -173,7 +188,13 @@ class Game(FT.Game):
                 self.hitflag |= 4
                 continue
             hit, add, stop = (B.HIT_CH, 0, B.HITSTOP_CH) if self.charged() else (B.HIT, B.HITSTUN_ADD, B.HITSTOP)
-            kb = B.knockback(hit, 0)
+            kb = B.knockback(hit, getattr(v, 'pct', 0))
+            if isinstance(v, GVictim):                  # v3: the grounded victim model
+                v.hit(self.n, kb, int(kb * 0.4) + add, stop)
+                self.hitstop = stop
+                self.hit = v
+                self.hitflag |= 2
+                return
             v.hitstop, self.hitstop = stop, stop
             v.hitstun = int(kb * 0.4) + add
             v.vx, v.vy = 0.0, -kb * 0.03
@@ -199,6 +220,104 @@ class Game(FT.Game):
         self.frame += self.rate
         if self.kind in LEN and self.frame > LEN[self.kind] - 1 + 1e-6:
             self.frame = self.frame - LEN[self.kind] if self.kind == 0x23D else float(LEN[self.kind] - 1)
+
+
+class GVictim(FT.Fighter):
+    """v3: a fighter on the ground, the game's side as far as the MSC sees it (the model's assumptions; the worst case
+    where the game isn't known):
+    - a hit (Sledgehammer's 270): frozen its hitstop; its damage status asked (taking effect next frame): lying
+      (0x4D-0x53) and knockback under 80 DownDamage (0x57), else under 80 Damage on the ground (0x45), 80 or more the
+      ground spike's bounce (DamageFly 0x47, launched up at knockback x 0.8 x 0.03 a frame). The launch speed is kept
+      through any status (a status change isn't assumed to clear it), less 0.051 a frame, gravity 0.09 in the air;
+      landing ends it (a DamageFly landing: DownBound)
+    - a status write takes effect on its next frame (docs/position-variables.md), over its own pending one; a position
+      or SITUATION write at once
+    - DownWait (0x50): in the air -> Fall (func_963); a getup press (cpu_getup: a CPU's, which the controller-off
+      stops, as the God Fist's in game) or its timer (down_timer frames) -> DownStand; DownBound (0x4D) -> DownWait
+      after 10 frames; DownStand / DownStandFb / DownStandAttack -> Wait after 30; Damage / DamageFly -> Wait / Fall at
+      the end of their hitstun; DownDamage -> DownWait after 12
+    """
+    def __init__(self, slot, x, y, status=0x0, pct=0.0, down_timer=60, cpu_getup=False):
+        FT.Fighter.__init__(self, slot, x, y, air=False)
+        self.floor = y
+        self.status = status
+        self.pct = pct
+        self.down_timer, self.cpu_getup = down_timer, cpu_getup
+        self.timer = down_timer
+        self.age = 0                                    # frames in its status
+        self.input_off = False
+        self.kvy = 0.0
+        self.wlog = []
+        self.slog = []                                  # (n, status, air, y) after each step
+
+    def write(self, n, k, val):
+        self.wlog.append((n, k, round(val, 3)))
+        if k == 'status':
+            self.pending = int(val)
+        elif k == 'input':
+            self.input_off = val > 0.5
+        elif k == 'sit':
+            self.air = val > 1.5
+        elif k == 'x':
+            self.x = val
+        elif k == 'y':
+            self.y = val
+
+    def hit(self, n, kb, hitstun, stop):
+        self.hit_at = n
+        self.hitstop, self.hitstun = stop, hitstun
+        lying = 0x4D <= self.status <= 0x53
+        if kb < 80.0:
+            self.pending = 0x57 if lying else 0x45
+            self.kvy = 0.0
+        else:
+            self.pending = 0x47
+            self.kvy = kb * 0.8 * 0.03
+
+    def set_status(self, st):
+        if st != self.status:
+            self.status, self.age = st, 0
+            if st == 0x50:
+                self.timer = self.down_timer
+
+    def step(self, n):
+        if self.pending is not None:
+            self.set_status(self.pending)
+            self.pending = None
+        if self.hitstop > 0:
+            self.hitstop -= 1
+            self.slog.append((n, self.status, self.air, round(self.y, 3)))
+            return
+        self.age += 1
+        if self.kvy or self.air:                        # the launch, whatever its status
+            self.air = True
+            self.y += self.kvy
+            sp = abs(self.kvy)
+            self.kvy = (self.kvy / sp) * max(0.0, sp - 0.051) if sp else 0.0
+            self.kvy -= 0.09
+            if self.y <= self.floor:
+                self.y, self.kvy, self.air = self.floor, 0.0, False
+                if self.status in (0x47, 0x4C):
+                    self.set_status(0x4D)               # an un-teched tumble landing
+        st = self.status
+        if st == 0x50:
+            if self.air:
+                self.set_status(0xE)
+            else:
+                self.timer -= 1
+                if (self.cpu_getup and not self.input_off) or self.timer <= 0:
+                    self.set_status(0x54)
+        elif st == 0x4D and self.age >= 10:
+            self.set_status(0x50)
+        elif st in (0x54, 0x55, 0x56) and self.age >= 30:
+            self.set_status(0x0)
+        elif st == 0x57 and self.age >= 12:
+            self.set_status(0x50)
+        elif st in (0x45, 0x46, 0x47):
+            self.hitstun -= 1
+            if self.hitstun <= 0:
+                self.set_status(0xE if self.air else 0x0)
+        self.slog.append((n, self.status, self.air, round(self.y, 3)))
 
 
 def fn(vm, name):
@@ -507,29 +626,7 @@ def msc_tests(path):
           'input change' % (hit_k, B.HITSTOP), (v.hit_at, [w for w in v.wlog if w[1] in ('status', 'input')]),
           (hit_k, [(hit_k + B.HITSTOP, 'status', float(0x4D))]))
     ck = swing_k + B.CHARGE_FRAMES - 1 + B.HIT_FROM_CH
-
-    def getup(g_, k):                                   # the victim tries to get up 10 frames into the hold
-        if k == ck + B.HITSTOP_CH + 11:
-            g_.fighters[2].status = 0x54
-    g = Game(fighters=[grounded(ck)], held=lambda n: True)
-    tr, _vm = run(path, g, frames=230, after=60, tick=getup)
-    v = g.fighters[2]
-    k0 = ck + B.HITSTOP_CH
-    w = [x for x in v.wlog if x[1] in ('status', 'input')]
-    check('grounded, charged: DownBound and its input off on %d (after the hitstop), back in DownWait (0x50) when it '
-          'got up on %d, its input on after %d frames held (%d)' % (k0, ck + B.HITSTOP_CH + 11, B.DOWN_HOLD,
-                                                                    k0 + B.DOWN_HOLD),
-          w, [(k0, 'status', float(0x4D)), (k0, 'input', 1.0), (ck + B.HITSTOP_CH + 11, 'status', float(0x50)),
-              (k0 + B.DOWN_HOLD, 'input', 0.0)])
-
-    def hit_down(g_, k):
-        if k == ck + B.HITSTOP_CH + 15:
-            g_.fighters[2].status = 0x57
-    g = Game(fighters=[grounded(ck)], held=lambda n: True)
-    tr, _vm = run(path, g, frames=230, after=60, tick=hit_down)
-    w = [x for x in g.fighters[2].wlog if x[1] == 'input']
-    check('grounded, charged: let go (input on) when it is hit while down (DownDamage 0x57)',
-          w, [(k0, 'input', 1.0), (ck + B.HITSTOP_CH + 15, 'input', 0.0)])
+    gtests(path, hit_k, ck)
     # 13. v2: shields: uncharged 24% of the max shield and 8 frames held; charged 80% and 30; a break
     for chg, take, stun, kk in ((False, B.SHIELD_TAKE, B.SHIELD_STUN, hit_k), (True, B.SHIELD_TAKE_CH, B.SHIELD_STUN_CH, ck)):
         v = FT.Fighter(2, 4.0, fall_y(100.0, kk) - 6.0, air=True, shield=True)
@@ -552,6 +649,90 @@ def msc_tests(path):
     vm.g[18] = 0
     vm.call(fn(vm, 'func_2265'))
     check('on the ground: Fake Death (0x229), not Sledgehammer', [m[1] for m in g.motions][:1], [0x229])
+
+
+def gv(k_hit, **kw):
+    """a GVictim (slot 2) on the ground where the hitbox reaches on game frame k_hit (4 below his feet)"""
+    return GVictim(2, 4.0, fall_y(100.0, k_hit) - 4.0, **kw)
+
+
+def held_down(v, k0, k1):
+    """the frames k0..k1 the victim isn't lying on its floor (a down status 0x4D-0x53, on the ground, at its floor)"""
+    return [x for x in v.slog if k0 <= x[0] <= k1 and not (0x4D <= x[1] <= 0x53 and not x[2] and
+                                                             abs(x[3] - v.floor) < 1e-3)]
+
+
+def gtests(path, hit_k, ck):
+    """v3: grounded victims (GVictim): the charged hit lying straight down (the user's item 2), the uncharged hit on a
+    neutral getup as in the air (item 3)"""
+    k0 = ck + B.HITSTOP_CH                               # the first frame after its hitstop
+    for pct, cpu in ((0.0, False), (100.0, False), (100.0, True), (150.0, True)):
+        v = gv(ck, pct=pct, cpu_getup=cpu)
+        g = Game(fighters=[v], held=lambda n: True)
+        run(path, g, frames=230, after=80)
+        kb = B.knockback(B.HIT_CH, pct)
+        inp = [(n, val) for n, k, val in v.wlog if k == 'input']
+        what = 'charged, on the ground at %d%% (knockback %.0f: %s)%s' % (
+            pct, kb, 'the ground spike\'s bounce, DamageFly' if kb >= 80 else 'Damage on the ground',
+            ', a CPU pressing to get up every frame' if cpu else '')
+        check('%s: hit on %d; DownWait (0x50) asked in its hitstop (the next frame), its controller off and its buffer '
+              'emptied there' % (what, ck), (v.hit_at, [w for w in v.wlog if w[0] == ck + 1 and
+                                                         w[1] in ('status', 'input', 'buffer')]),
+              (ck, [(ck + 1, 'input', 1.0), (ck + 1, 'buffer', 2.0), (ck + 1, 'status', float(0x50))]))
+        check('%s: lying on its floor (a down status, on the ground) every frame from %d to the end of the hold (%d), '
+              'never bounced' % (what, ck + 2, k0 + B.DOWN_HOLD - 1), held_down(v, ck + 2, k0 + B.DOWN_HOLD - 1), [])
+        check('%s: its controller back after %d frames held (on %d), nothing else' % (what, B.DOWN_HOLD,
+                                                                                     k0 + B.DOWN_HOLD),
+              inp, [(ck + 1, 1.0), (k0 + B.DOWN_HOLD, 0.0)])
+        if cpu:
+            st = [x[1] for x in v.slog if x[0] == k0 + B.DOWN_HOLD + 1]
+            check('%s: free after the hold: it gets up (DownStand 0x54) on its next frame' % what, st, [0x54])
+    # its own down timer ending in the hold (20 frames): put back down, still held
+    v = gv(ck, pct=100.0, down_timer=20)
+    g = Game(fighters=[v], held=lambda n: True)
+    run(path, g, frames=230, after=80)
+    up = [x[0] for x in v.slog if x[1] == 0x54 and x[0] < k0 + B.DOWN_HOLD]
+    check('charged: its down timer ending in the hold (20 frames; DownStand on %s): DownWait again the next frame, its '
+          'controller still off' % up[:1], (len(up), [x[1] for x in v.slog if up and x[0] == up[0] + 1],
+                                            [(n, val) for n, k, val in v.wlog if k == 'input']),
+          (1, [0x50], [(ck + 1, 1.0), (k0 + B.DOWN_HOLD, 0.0)]))
+
+    def hit_again(g_, k):                               # another attack hits it 15 frames into the hold
+        if k == k0 + 15:
+            g_.fighters[2].hitstop = 6
+            g_.fighters[2].pending = 0x57
+    v = gv(ck, pct=100.0)
+    g = Game(fighters=[v], held=lambda n: True)
+    run(path, g, frames=230, after=80, tick=hit_again)
+    check('charged: let go (controller on, buffer emptied) when it is hit again in the hold (frozen again)',
+          [w for w in v.wlog if w[1] in ('input', 'buffer')],
+          [(ck + 1, 'input', 1.0), (ck + 1, 'buffer', 2.0), (k0 + 15, 'input', 0.0), (k0 + 15, 'buffer', 2.0)])
+    # the charged hit on a fighter in its neutral getup: still put down (the user's getup rule is the uncharged hit's)
+    v = gv(ck, pct=100.0, status=0x54)
+    g = Game(fighters=[v], held=lambda n: True)
+    run(path, g, frames=230, after=80)
+    check('charged on DownStand (the neutral getup): put down as any grounded fighter',
+          held_down(v, ck + 2, k0 + B.DOWN_HOLD - 1), [])
+    # the uncharged hit (item 3; the user: the neutral getup only): DownStand -> as in the air (no DownBound, nothing
+    # written); standing, lying (DownWait), the roll getup, the getup attack -> the bounce (DownBound after its
+    # hitstop) as before
+    for st, bounce in ((0x54, False), (0x0, True), (0x50, True), (0x55, True), (0x56, True)):
+        v = gv(hit_k, status=st)
+        g = Game(fighters=[v], held=lambda n: n <= 2)
+        seen = []
+
+        def show(g_, k, seen=seen):
+            if k == hit_k + 1:
+                seen.append(g_.fighters[2].status)
+        run(path, g, after=30, tick=show)
+        w = [x for x in v.wlog if x[1] in ('status', 'input')]
+        check('uncharged on a fighter on the ground in 0x%X (%s; the MSC sees 0x%X on the hit\'s frame): %s' % (
+            st, {0x54: 'DownStand, the neutral getup', 0x0: 'Wait', 0x50: 'DownWait, lying',
+                 0x55: 'DownStandFb, the roll getup', 0x56: 'DownStandAttack, the getup attack'}[st],
+            seen[0] if seen else -1,
+            'DownBound after its hitstop' if bounce else 'no bounce: the hit as in the air (nothing written; its status '
+                                                         'before the freeze, sh_rec)'),
+              (v.hit_at, w), (hit_k, [(hit_k + B.HITSTOP, 'status', float(0x4D))] if bounce else []))
 
 
 def script_tests(out, base):
@@ -626,7 +807,7 @@ def effect_tests(out):
     names = {k: p.set_name(e.entries[i & 0xFFFF][1] - 1) for k, i in B.FX_IDS.items()}
     want = {k: 'PtcSupamarioSh' + emp[:-4] for emp, k in B.EMP_KEY.items()}
     check('the seven effect ids name their sets', names, want)
-    bad, halos, rings = [], 0, 0
+    bad, halos, rings, arcs = [], 0, 0, []
     for k, i in B.FX_IDS.items():
         si = e.entries[i & 0xFFFF][1] - 1
         for em in p.sets[si]['emitters']:
@@ -650,9 +831,13 @@ def effect_tests(out):
             rgb = [c * p.field(d, 'color_scale') for c in p.color_keys(d, 0)[0][:3]]
             if max(rgb) > 2.0 + 1e-3:
                 bad.append((k, p.emitter_name(d), 'HDR', rgb))
+            if flat and p.field(d, 'alpha_init') > 0.05:
+                arcs.append(round(B.arc_peak(p, d), 3))
     check('every emitter at the effect\'s origin, unturned but Hmr_Fire\'s arcs (v2: in his YZ plane, facing the camera), '
           'a full-sphere spread when directional, HDR within 2.0, the skill\'s emitters following (v2)', bad, [])
     check('the falling rings converted flat (ShapeDraw -> polygons): %d' % rings, rings > 0, True)
+    check('v3 (the glow): the swing arcs drawn at most %.2f (x%g of the 2.0 cap: two overlapping stay under the bloom)'
+          % (2.0 * B.ARC_GAIN, B.ARC_GAIN), (len(arcs) > 0, max(arcs) <= 2.0 * B.ARC_GAIN + 1e-3), (True, True))
     import json
     rep = json.load(open(os.path.join(out, 'sledgehammer_fx.json')))
     for k, i in B.FX_IDS.items():

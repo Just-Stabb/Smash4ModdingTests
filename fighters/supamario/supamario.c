@@ -40338,18 +40338,21 @@ void sh_hit()
         x = (hx + vx) * 0.5f;
         y = (hy + vy + SH_VICTIM_MID) * 0.5f;
         EffectModule(0x3, SH_FX_SWEAT, vx, vy + SH_VICTIM_HEAD, z, 0, 0, 0, SH_FX_SWEAT_SIZE, 0, 0xffffffff);
-        // v2 (user): a grounded victim: uncharged an untechable low bounce (DownBound), charged lying 40 frames
-        // (sh_tick, from the end of its hitstop)
+        // v2 (user): a grounded victim: uncharged an untechable low bounce (DownBound, sh_tick once its hitstop is
+        // over); v3: charged straight down lying (sh_down_start: DownWait, held SH_DOWN_HOLD frames, the Super God
+        // Fist's knockdown way), and an uncharged hit on a fighter in its neutral getup (DownStand) as in the air (the
+        // user: no bounce -> jab lock -> getup -> Sledgehammer loop)
         if (WorkModuleF(0, 0x0F000116 + 0x20 * (s + 0x2)) < 0.5f)
         {
-            WorkModule(0, 0.0f, SH_V_GN);
-            if (WorkModuleF(0, SH_V_CHG) < SH_CHARGE - 0.5f)
+            if (WorkModuleF(0, SH_V_CHG) > SH_CHARGE - 0.5f)
             {
-                WorkModule(0, (float)s, SH_V_GS);
+                sh_down_start(s);
             }
-            else
+            else if (sh_getup(s) == 0)
             {
-                WorkModule(0, -(float)s, SH_V_GS);
+                sh_let_go();
+                WorkModule(0, 0.0f, SH_V_GN);
+                WorkModule(0, (float)s, SH_V_GS);
             }
         }
         if (WorkModuleF(0, SH_V_CHG) < SH_CHARGE - 0.5f)
@@ -40670,63 +40673,153 @@ void sh_shield()
     cb_sh_wait = 0;
 }
 
-// v2 (user), every frame (func_82): a fighter Sledgehammer hit on the ground (SH_V_GS: + its slot uncharged, - charged),
-// once its hitstop is over: DownBound (0x4D: the floor bounce of a missed tech: a low bounce, no tech, then lying);
-// charged: lying held SH_DOWN_HOLD frames from there (the Super God Fist's knockdown way: its input off, put back in
-// DownWait 0x50 if it leaves the down statuses 0x4D-0x53), let go early when it is hit (Damage 0x45-0x4C, DownDamage
-// 0x57) or gone
+// v3: each fighter's status on the last frame it wasn't frozen in a hitstop (VAR SH_V_ST + its slot - 1): its status
+// before the hit that froze it, whichever of the two the MSC sees on the hit's frame (sh_getup)
+void sh_rec()
+{
+    int s;
+    s = 1;
+    while (s <= 8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f && WorkModuleF(0, 0x0F000043 + 0x8 * (s + 0x2)) < 0.5f)
+        {
+            WorkModule(0, WorkModuleF(0, 0x0F0000A2 + 0x8 * (s + 0x2)), SH_V_ST + s - 1);
+        }
+        s = s + 1;
+    }
+}
+
+// v3 (user: "when uncharged Sledgehammer hits a grounded opponent during their neutral getup ... uncharged Sledgehammer
+// hits the same way it would in the air"): the fighter in slot s was in its neutral getup (DownStand 0x54) when it was
+// hit (its status before the hit's freeze, or now)
+int sh_getup(int s)
+{
+    if (WorkModuleF(0, SH_V_ST + s - 1) == SH_ST_DOWNSTAND ||
+        WorkModuleF(0, 0x0F0000A2 + 0x8 * (s + 0x2)) == SH_ST_DOWNSTAND)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// v3: a held-down victim (SH_V_GS < 0) let go: its controller back, its buffer emptied (what it pressed while held)
+void sh_let_go()
+{
+    int s;
+    s = (int)WorkModuleF(0, SH_V_GS);
+    if (s < 0)
+    {
+        s = -s;
+        WorkModule(0, 0.0f, 0x0F000115 + 0x20 * (s + 0x2));
+        WorkModule(0, (float)s, 0x0F0003C9);
+    }
+    WorkModule(0, 0.0f, SH_V_GS);
+}
+
+// v3: lying where it was hit (the Super God Fist v17's put-down, gf_tick phase 5): at its place at the hit (SH_V_GX /
+// SH_V_GY: the floor it stood on), on the ground (SITUATION 0, stage collision 2), DownWait (0x50; DownWaitU / D from
+// its own flag) unless it is already in a down status (0x4D-0x53) on the ground. Written only when it differs
+void sh_put(int s)
+{
+    int t;
+    float d;
+    float st;
+    t = s + 0x2;
+    d = WorkModuleF(0, 0x0f000020 + 4 * (s - 1)) - WorkModuleF(0, SH_V_GX);
+    if (d * d > 0.0001f)
+    {
+        WorkModule(0, WorkModuleF(0, SH_V_GX), 0x0f000020 + 4 * (s - 1));
+    }
+    d = WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) - WorkModuleF(0, SH_V_GY);
+    if (d * d > 0.0001f)
+    {
+        WorkModule(0, WorkModuleF(0, SH_V_GY), 0x0f000021 + 4 * (s - 1));
+    }
+    st = WorkModuleF(0, 0x0F0000A2 + 8 * t);
+    if (st < SH_ST_DOWN_LO || st > SH_ST_DOWN_HI || WorkModuleF(0, 0x0F000116 + 0x20 * t) > 0.5f)
+    {
+        WorkModule(0, 0.0f, 0x0F000116 + 0x20 * t);
+        WorkModule(0, 2.0f, 0x0F0000A6 + 8 * t);
+        WorkModule(0, SH_ST_DOWNWAIT, 0x0F0000A2 + 8 * t);
+    }
+}
+
+// v3 (user: "the grounded charged hit bounces just like the uncharged hit rather than forcing the opponent down into
+// the laying-down hurt state"): a charged hit on a fighter on the ground puts it straight down at the hit, in its
+// hitstop (v2 wrote DownBound after the hitstop: the hit's own launch / damage status then ended the hold, it released
+// on the damage statuses 0x45-0x4C). Its controller off (Input_Set 21's variable) and its buffer emptied, its place
+// noted, put down (sh_put); sh_tick holds it SH_DOWN_HOLD frames from the end of its hitstop
+void sh_down_start(int s)
+{
+    sh_let_go();
+    WorkModule(0, -(float)s, SH_V_GS);
+    WorkModule(0, 0.0f, SH_V_GN);
+    WorkModule(0, WorkModuleF(0, 0x0f000020 + 4 * (s - 1)), SH_V_GX);
+    WorkModule(0, WorkModuleF(0, 0x0f000021 + 4 * (s - 1)), SH_V_GY);
+    WorkModule(0, 1.0f, 0x0F000115 + 0x20 * (s + 0x2));
+    WorkModule(0, (float)s, 0x0F0003C9);
+    sh_put(s);
+}
+
+// every frame (func_82). v2 (user): a fighter the uncharged Sledgehammer hit on the ground (SH_V_GS: + its slot), once
+// its hitstop is over: DownBound (0x4D: the floor bounce of a missed tech: a low bounce, no tech, then lying).
+// v3: the charged hit's (SH_V_GS: - its slot): put down again every frame of its hitstop and its hold if it is out of
+// lying (sh_put); SH_DOWN_HOLD frames from the end of the hitstop (SH_V_GN), then its controller back; let go early
+// when it is hit again (frozen again after its hitstop had ended, or DownDamage 0x57) or gone
 void sh_tick()
 {
     int s;
     int t;
-    int hold;
     float n;
-    float st;
+    sh_rec();
     s = (int)WorkModuleF(0, SH_V_GS);
     if (s == 0)
     {
         return;
     }
-    hold = 0;
-    if (s < 0)
+    if (s > 0)
     {
-        s = -s;
-        hold = 0x1;
-    }
-    t = s + 0x2;
-    n = WorkModuleF(0, SH_V_GN);
-    st = WorkModuleF(0, 0x0F0000A2 + 8 * t);
-    if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) == 0.0f)
-    {
-        WorkModule(0, 0.0f, SH_V_GS);
-        return;
-    }
-    if (n < 0.5f)
-    {
+        t = s + 0x2;
+        if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) == 0.0f)
+        {
+            WorkModule(0, 0.0f, SH_V_GS);
+            return;
+        }
         if (WorkModuleF(0, 0x0F000043 + 8 * t) > 0.5f)
         {
             return;
         }
         WorkModule(0, SH_ST_DOWNBOUND, 0x0F0000A2 + 8 * t);
-        if (hold == 0)
-        {
-            WorkModule(0, 0.0f, SH_V_GS);
-            return;
-        }
-        WorkModule(0, 1.0f, 0x0F000115 + 0x20 * t);
-        WorkModule(0, 1.0f, SH_V_GN);
-        return;
-    }
-    n = n + 1.0f;
-    if (n > SH_DOWN_HOLD + 0.5f || (st >= 69.0f && st <= 76.0f) || st == 87.0f)
-    {
-        WorkModule(0, 0.0f, 0x0F000115 + 0x20 * t);
         WorkModule(0, 0.0f, SH_V_GS);
         return;
     }
-    if (st < 77.0f || st > 83.0f)
+    s = -s;
+    t = s + 0x2;
+    if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) == 0.0f)
     {
-        WorkModule(0, SH_ST_DOWNWAIT, 0x0F0000A2 + 8 * t);
+        WorkModule(0, 0.0f, SH_V_GS);
+        return;
     }
+    n = WorkModuleF(0, SH_V_GN);
+    if (n < 0.5f)
+    {
+        if (WorkModuleF(0, 0x0F000043 + 8 * t) > 0.5f)
+        {
+            sh_put(s);
+            return;
+        }
+    }
+    else if (WorkModuleF(0, 0x0F000043 + 8 * t) > 0.5f || WorkModuleF(0, 0x0F0000A2 + 8 * t) == SH_ST_DOWNDAMAGE)
+    {
+        sh_let_go();
+        return;
+    }
+    n = n + 1.0f;
+    if (n > SH_DOWN_HOLD + 0.5f)
+    {
+        sh_let_go();
+        return;
+    }
+    sh_put(s);
     WorkModule(0, n, SH_V_GN);
 }

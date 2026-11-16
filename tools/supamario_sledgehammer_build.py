@@ -97,6 +97,9 @@ SHIELD_TAKE, SHIELD_STUN = 0.24, 8
 SHIELD_TAKE_CH, SHIELD_STUN_CH = 0.80, 30
 DOWN_HOLD = 40                       # v2 (user): a charged hit on the ground: lying 40 frames, untechable
 ST_DOWNBOUND, ST_DOWNWAIT, ST_SHIELD_BREAK = 0x4D, 0x50, 0x59
+# v3: the down statuses (DownBound 0x4D .. 0x53: lying), DownStand (0x54, the neutral getup: an uncharged hit on it
+# isn't a bounce: the user's jab-lock loop), DownDamage (0x57: hit while lying)
+ST_DOWN_LO, ST_DOWN_HI, ST_DOWNSTAND, ST_DOWNDAMAGE = 0x4D, 0x53, 0x54, 0x57
 LAND_LAG = 10                        # v2 (user: "standardize Sledgehammer's landing lag to 10 frames"), his light
                                      # landing's animation over them (v1: 18, 10 after a hit, LandingFallSpecial's pose)
 VICTIM_MID = 5.0                     # a fighter's middle above its feet (the contact point)
@@ -113,6 +116,9 @@ V_SHD = 0x0F000303                   # VAR_3 (v2): his shield hit handled this m
 V_GS = 0x0F000304                    # VAR_4 (v2): a grounded victim's slot (+ uncharged bounce, - charged held down)
 V_GN = 0x0F000305                    # VAR_5 (v2): 0 its hitstop not over yet, then the frames held down
 V_T = 0x0F000302                     # VAR_2 (v2): the move's frames (sh_fastfall: a flick younger than the move)
+V_ST = 0x0F000306                    # VAR_6-13 (v3): each slot's status the last frame it wasn't frozen (sh_rec)
+V_GX = 0x0F00030E                    # VAR_14 (v3): the held-down victim's X at the hit
+V_GY = 0x0F00030F                    # VAR_15 (v3): its Y at the hit (the floor it stood on)
 VARS = [('sh', V_SH), ('sh_chg', V_CHG), ('sh_vic', V_VIC)]
 
 # ---------------------------------------------------------------- effects / sounds
@@ -120,6 +126,17 @@ SH_FX_SCALE_V1 = 1.75                # xv2_smash_fx.SIZE: the God Fist's settled
 SH_FX_SCALE = round(SH_FX_SCALE_V1 * SIZE_V2, 3)   # v2: 2.1
 ARC_WIDTH = 3.0                      # v2 (user: "the release arc is drawn flat ... instead of a thick yellow trail"):
                                      # Hmr_Fire's arcs' strip x3 (XV2: 0.15 m over a 1.15 m radius, 13%; glared)
+# v3 (user: "Sledgehammer's glow is extremely bright", screenshot 25: a white-yellow dome over him at the swing): the
+# swing arcs. v1 drew them flat (edge-on to the camera: a thin streak); v2 stood them in his YZ plane facing the camera,
+# their strip x3, the effects x1.2 and following him (the 3 arcs each emitter lays over 3 frames stay on him and stack),
+# all still at the HDR gain (x2, capped at 2.0) meant for small glowing points. fx_render's Smash 4 side (black
+# background, his body left out): v2's charged swing 144 square units over 1.0 (bloom), 296 over 0.5, energy 738; the
+# God Fist's brightest frame 2-3 over 1.0, 33 over 0.5, energy 95; Core Breaker's charge aura under 0.3 over 1.0,
+# energy 450-690; Sledgehammer's charge glow (2.6 / 12) and hit burst (3.1 / 87) are within the God Fist's. So the
+# arcs' colour keys x ARC_GAIN: each arc's drawn colour 2.0 -> 0.9 (XV2's yellow kept); where two arcs overlap they
+# reach 0.85, under Smash 4's bloom: charged 0 over 1.0 from the arcs (4.4 is the fist's flash), energy 345;
+# uncharged 0 over 1.0, energy 180 (v2 73 / 399)
+ARC_GAIN = 0.45
 FOLLOW_EMPS = ('Hmr_Crg.emp', 'Hmr_Crg02.emp', 'Hmr_Fire.emp', 'Hmr_Fire_L.emp')   # v2: particles follow him
 LHAND = 0x10                         # LHandN (XV2's b_L_Hand: Hmr_Crg / Hmr_Crg02)
 SKILL_EMPS = ['Hmr_Crg.emp', 'Hmr_Crg02.emp', 'Hmr_Fire.emp', 'Hmr_Fire_L.emp']
@@ -172,6 +189,9 @@ def msc_values():
             'SH_SHIELD_TAKE': fl(SHIELD_TAKE), 'SH_SHIELD_STUN': fl(SHIELD_STUN), 'SH_SHIELD_TAKE_CH': fl(SHIELD_TAKE_CH),
             'SH_SHIELD_STUN_CH': fl(SHIELD_STUN_CH), 'SH_DOWN_HOLD': fl(DOWN_HOLD), 'SH_ST_DOWNBOUND': fl(ST_DOWNBOUND),
             'SH_ST_DOWNWAIT': fl(ST_DOWNWAIT), 'SH_ST_SHIELD_BREAK': fl(ST_SHIELD_BREAK),
+            'SH_V_ST': '0x%X' % V_ST, 'SH_V_GX': '0x%X' % V_GX, 'SH_V_GY': '0x%X' % V_GY,
+            'SH_ST_DOWN_LO': fl(ST_DOWN_LO), 'SH_ST_DOWN_HI': fl(ST_DOWN_HI), 'SH_ST_DOWNSTAND': fl(ST_DOWNSTAND),
+            'SH_ST_DOWNDAMAGE': fl(ST_DOWNDAMAGE),
             'SH_FX_CRG': '0x%X' % FX_IDS['crg'],
             'SH_FX_HITLOD': '0x%X' % FX_IDS['hitlod'], 'SH_FX_HITS': '0x%X' % FX_IDS['hits'],
             'SH_FX_SWEAT': '0x%X' % FX_IDS['sweat'],
@@ -344,6 +364,18 @@ def flat_ring(p, d, arc=True):
         p.set_field(d, 'rotation_velocity', [-v for v in p.field(d, 'rotation_velocity')])
 
 
+def arc_dim(p, d):
+    """v3: a swing arc's colour keys (both tracks) x ARC_GAIN (the glow: ARC_GAIN's note)"""
+    for track in (0, 1):
+        p.set_color_keys(d, track, [(k[0] * ARC_GAIN, k[1] * ARC_GAIN, k[2] * ARC_GAIN, k[3])
+                                    for k in p.color_keys(d, track)])
+
+
+def arc_peak(p, d):
+    """the brightest channel an emitter's colour 0 keys draw (x its colour scale)"""
+    return max(max(k[:3]) for k in p.color_keys(d, 0)) * p.field(d, 'color_scale')
+
+
 def follow(p, d):
     """v2 (user: "the charge effects don't follow Supamario"): the emitter's particles on its live matrix (ptcl +0x310
     follow type 0; v1's templates gave the charge glow 1, none: emitted particles stayed where they were born while he
@@ -404,6 +436,9 @@ def convert_fx(skill_dir, cmn_dir, fx_dir, halo=True):
             k += 1
             notes.append('%s %s: %s' % (name, en, FX.hdr_emitter(p, d, mats.get(emp, {}).get(en))))
             flat_ring(p, d, emp in ARC_EMPS)
+            if emp in ARC_EMPS and p.field(d, 'particle_type') == 1:
+                arc_dim(p, d)
+                notes[-1] += '; v3: the arc x%g (drawn peak %.2f)' % (ARC_GAIN, arc_peak(p, d))
         sets[emp] = {'set': name, 'set_index': si, 'efc': idx, 'id': '0x%08X' % (0x03410000 | idx), 'emitters': names}
     assert got == FX_IDS, ('FX_IDS is out of date', {k: hex(v) for k, v in got.items()})
     halos = {}
