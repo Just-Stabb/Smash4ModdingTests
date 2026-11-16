@@ -502,20 +502,16 @@ def msc_tests(path):
     check('on a shield: not counted as a grounded victim (no hitstun written), shieldstun %d' % ss,
           (vs.writes, sum(1 for _n, st, *_r in vs.log if st == 0x1E) - B.HITSTOP), ([], ss - 1))
     del acts, adv, out_of_stun
-    # 11. the air F.L.U.D.D. unchanged: an air start goes the vanilla way, a landing plays the air motions
+    # 11. the air down special is Sledgehammer now (tools/supamario_sledgehammer_test.py): an air start plays its
+    # wind-up (0x239), never a Fake Death motion nor F.L.U.D.D.'s article
     g = Game(held=lambda n: False)
     g.air = True
     vm = vm_for(path, g)
     vm.g[18] = 2
     vm.call(vm.func(func_index(vm, 'func_2265')))
-    check('in the air: F.L.U.D.D. (its article calls, no Fake Death motion)',
-          (0x229 in [m[1] for m in g.motions], any(sid == 0x20 for sid, _a in g.calls)), (False, True))
-    g.motions = []
-    vm.g[18] = 0
-    vm.call(vm.func(func_index(vm, 'func_2267')))
-    vm.call(vm.func(func_index(vm, 'func_2270')))
-    check('an air F.L.U.D.D. landing: its air start / hold motions (0x239 / 0x23D) on the ground, never 0x229 / 0x22D',
-          sorted({m[1] for m in g.motions}), [0x239, 0x23D])
+    check('in the air: Sledgehammer\'s wind-up (0x239), no Fake Death motion, no F.L.U.D.D. article call',
+          ([m[1] for m in g.motions][:1], 0x229 in [m[1] for m in g.motions], any(sid == 0x20 for sid, _a in g.calls)),
+          ([0x239], False, False))
 
 
 def script_tests(out, base):
@@ -565,18 +561,13 @@ def script_tests(out, base):
     check('sound: FakeDown at 1, WakeUp at the wake-up\'s 3 (XV2 95)', snd,
           [('FRAME', [1.0]), ('Sound_Effect', [B.SE_IDS['fd_fakedown']]), ('FRAME', [3.0]),
            ('Sound_Effect', [B.SE_IDS['fd_wakeup']])])
-    # the air F.L.U.D.D.'s scripts: as vanilla (the hold's JUMPs to speciallwhold now aimed at itself)
+    # the air F.L.U.D.D.'s scripts (specialairlwstart / specialairlwhold) are Sledgehammer's now
+    # (tools/supamario_sledgehammer_test.py checks them)
     air_crc, hold_crc = acmd.crc('specialairlwhold'), acmd.crc('speciallwhold')
-    for p in ('sound', 'expression'):
-        a = f[p].script('specialairlwhold')
-        want = [acmd.Command(c.ident, [air_crc]) if nm(c) == 'JUMP' and c.params == [hold_crc] else c
-                for c in b[p].script('speciallwhold')]
-        check('%s specialairlwhold: vanilla speciallwhold\'s, its JUMPs aimed at itself' % p,
-              [(nm(c), c.params) for c in a], [(nm(c), c.params) for c in want])
     same = []
     for p in f:
         for h, s in b[p].scripts.items():
-            if h in (acmd.crc('speciallwstart'), hold_crc, air_crc):
+            if h in (acmd.crc('speciallwstart'), hold_crc, air_crc, acmd.crc('specialairlwstart')):
                 continue
             ns = f[p].scripts.get(h)
             if [(c.ident, c.params) for c in s] != [(c.ident, c.params) for c in (ns or [])] and \

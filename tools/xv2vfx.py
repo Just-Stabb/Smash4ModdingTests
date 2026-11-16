@@ -327,6 +327,9 @@ MODIFIER_FLAGS = {0x1: 'Unk1', 0x2: 'Unk2'}
 XYZ, RGBA = 'XYZ', 'RGBA'
 
 
+LENIENT_TARGETS = False         # see _emp_node: an unnamed keyframed value kept (non-strict reads only)
+
+
 def _emp_target(node, param, comp):
     """the KeyframedValueType a node keyframed value (Parameter, Component) animates, as
     "Name[.component]" (EMP File.cs KeyframedValueType comments / Parser.cs decompile)"""
@@ -632,6 +635,13 @@ def _emp_node(r, o, ctx):
         w = 'node %r keyframed value %d' % (n['Name'], a)
         kv = _emp_keyframed_value(r, kv_o + 16 * a, w)
         tgt = _emp_target(n, kv['Parameter'], kv['Component'])
+        if tgt is None and LENIENT_TARGETS and not ctx.get('strict', True):
+            # LENIENT_TARGETS with strict=False (Sledgehammer's build, for XV2's vfx/cmn, whose Btl_HitS / Btl_HitLOD
+            # animate (3, 1) on their SphericalDistribution emitters): kept, unnamed, and noted, instead of leaving
+            # the file out. Off by default, so the earlier builds read the same EMPs as before
+            tgt = 'Unknown_P%d_C%d' % (kv['Parameter'], kv['Component'])
+            ctx['notes'].append('%s: no name for (Parameter %d, Component %d) on a %s node (kept as %s)' % (
+                w, kv['Parameter'], kv['Component'], n['NodeSpecificType'], tgt))
         if tgt is None:
             r.err('%s: no name for (Parameter %d, Component %d) on a %s node' % (w, kv['Parameter'], kv['Component'],
                                                                            n['NodeSpecificType']))
@@ -679,7 +689,8 @@ def read_emp(data, strict=True):
     pad = r.raw(24, 8)                  # zero in most files; some tools leave junk there (002_GOK_CSG's
     vn = out['VersionName']             # Csg_Crg / Bas / Circle): XV2-Tools never reads these 8 bytes
     out['Textures'] = [_read_sampler(r, tex_off, i, vn) for i in range(ntex)]
-    ctx = {'samplers': out['Textures'], 'samplers_off': tex_off, 'version': vn, 'visited': set(), 'notes': []}
+    ctx = {'samplers': out['Textures'], 'samplers_off': tex_off, 'version': vn, 'visited': set(), 'notes': [],
+           'strict': strict}
     out['ParticleNodes'] = _emp_nodes(r, node_off, ctx) if roots > 0 else []
     if len(out['ParticleNodes']) != roots:
         r.err('root node count %d, chain has %d' % (roots, len(out['ParticleNodes'])))

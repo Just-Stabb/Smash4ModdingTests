@@ -1269,11 +1269,9 @@ def check_portraits(inst, name, rep):
         if not rel.startswith('ui/replace/'):
             continue
         new = inst.get(rel)
-        for load, pkg in olds:
-            if load() != new:
-                rep.add('WARN', 'U1 portrait-replaced', '%s: %s\'s replaced by %s\'s (different art: is the later one '
-                        'built on the user\'s templates?)' % (rel, pkg, inst.where(rel)))
-                break
+        if all(load() != new for load, _pkg in olds):     # art no earlier package had
+            rep.add('WARN', 'U1 portrait-replaced', '%s: %s\'s replaced by %s\'s (different art: is the later one '
+                    'built on the user\'s templates?)' % (rel, olds[-1][1], inst.where(rel)))
     for rel in inst.glob(r'ui/replace/chr/stock_90/stock_90_[^/]+\.nut'):
         data = inst.get(rel)
         with tempfile.NamedTemporaryFile(suffix='.nut') as f:

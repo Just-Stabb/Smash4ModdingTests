@@ -9,6 +9,32 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: v5 (`scratchpad/byleth_v5_fix.zip`: a FIX package over v4 + byleth_userdata_v2; in-game TEST)
+
+User, v4 test: the select-screen icon too large and off its hexagon (screenshot), down tilt "not visible for most of
+the move" (the weapon, user), the bow showing in moves where it shouldn't, up special doesn't appear / work, the
+charged neutral special's effects and arrow "extremely late", "etc".
+
+| point | cause (evidence) | fix |
+|---|---|---|
+| select icon | v3 / v4 shipped `ui/replace/chr` from the build made on the vanilla stand-in templates (`port/master/ui`), not the user-file build (byleth_userdata_v2): installed after userdata, its `chr_10_Byleth_01` (a rectangular close-up) and 8 `chr_00` replaced the hexagon ones (byte diff v4 vs userdata_v2: exactly those 9; the screenshot's icon is the rectangular art) | the fix package ships the user-template build's (= userdata_v2's) chr_00 / chr_10, for data and data(us_en). **port_check U1 portrait-replaced** (WARN: a later package's different portrait over an earlier one's) |
+| stock icons | `ultimate_portraits.py --stock-icon` fitted Ultimate's chara_2 into the base icon's MATCHED head box, which on the user's ZSS icon (not a crop of her chr_90) was ~6 px: 42 of 4096 pixels drawn (9 chara_2 px a pixel) | fitted into the base icon's whole drawn box (1.07 px a pixel); **port_check U2 stock-icon** (ERROR: < 15 % drawn) |
+| down tilt's weapon (and rapid jab, up smash, up air, throws, down taunt, up special) | Ultimate hides his body's sword (`master_sword` vis, down tilt 0-57) while the `sword` article (the whip form) is out, and v1-v4 followed that track with no whip built: nothing in hand | `master_build.py vis`: the sword article's generate / remove frames (`master_sword_article`) and `ultimate_fighter.VIS_ALSO` (the body sword shows with it): the body sword stands in for the whip. The sword article's Extend (from the up special's frame 17), SpecialHiHit and ThrowLw effects merged onto Sword1 (`ARTICLE_FX` collapsed: approximated) |
+| bow in other moves | every motion's weapon keys checked against Ultimate's scripts (generate / remove / exist per game script, 13 scripts touch the bow, all with it) and the face pacs of every costume (only the 10 Failnaught / neutral-air motions key it on). Found: (a) same-frame keys were applied sorted ([f, 0] before [f, 1]: a script's "remove a leftover, then generate" or "exist then remove" order lost); (b) the bow hidden in SpecialNTurn although Ultimate's bow plays `d00specialnturn` (also Aymr's turn / cancel / landing 1) | (a) keys by frame in script order (`master_build` vis, `build_motions`); (b) an article's own motion of a body motion its script doesn't touch: out from the motion before (`ARTICLE_MOTIONS`). Still to find with the user's clip / move names if it persists |
+| up special | the whip blade (`sword` article, 58 bones) is still not built | the body sword now shows through it, with its effects. **Not done**: Handover |
+| charged neutral special late | not reproduced offline: the draw is Ultimate's (SpecialNStart 120 frames, rate 0.9 from 45 = Ultimate's FT_MOTION_RATE; CAN_SHOOT 45; max at the motion's end, ~112 frames; the arrow made on the shot's first frame as Ultimate's shoot_exist; the arrow's MSC moves it natively, no wait); the merged glows at Ultimate's frames (arrow Haved 23, Haved2 49 / 105) | asked the user for a clip (hold length, when the glow / arrow appear) |
+
+Built: `master_build.py vis`, `ultimate_port.py run master motions motions-group2 low-models scripts specials variants
+shapes`, `portraits` (to `scratchpad/byleth/port_ui5`, the user's templates); package `scratchpad/byleth/make_pkg_v5_fix.sh`
+(the fighter files that differ from v4's: the 16 face pacs, effect.bin, the effect bank (the variants step's turned
+copies for the new merges); + the 17 portraits), INSTALL README `scratchpad/byleth/INSTALL_README_v5.txt`. No exe.
+Article effects merged: 17 (the sword's SpecialHiHit catch effect left out: its slot's scripts are empty; merges skip
+slots he doesn't play, which put the Extend effects in ZSS's emptied D02SpecialAirHi slot on the first run (C1)).
+port_check `byleth_v4.zip byleth_userdata_v2.zip byleth_v5_fix.zip`: **0 ERROR**, 29 WARN (v4's 21 + U1 x8: the
+remade stock icons, expected). Suites: fighter_texture_ids_test ALL OK, brave_mark_test 0 failures. Not done: the
+whip blade (up special), the charged-Failnaught timing (no cause found offline: needs the user's clip), the "etc"
+pass over the rest of the moveset (only weapon visibility / article effects were gone through).
+
 ## Status: v4 (`scratchpad/byleth_v4.zip`: fixes from v3's first in-game test; complete fresh install; in-game TEST)
 
 User, v3 test (two clips, male c00 only; a female clip still to come): "Many of female byleth's effects don't appear,
@@ -415,6 +441,9 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
+000. **v5 fix** (sent: `scratchpad/byleth_v5_fix.zip`): the user's test of the icons, the sword stand-in, the bow; their
+   clip of the charged Failnaught timing and of any move still showing the bow. Then the whip sword (the plan below,
+   item 1), which also replaces the stand-in in the down tilt / rapid jab / up smash / up air / throws / taunt.
 00. **v4** (sent: `scratchpad/byleth_v4.zip`, `scratchpad/byleth/INSTALL_README_v4.txt`): the user's test of the face
    list fix (no bow in the wait, weapons per move), the held weapons' axes, the arrows (MSC), the article effects; a
    female clip (her missing effects: none found offline). Then, in order:

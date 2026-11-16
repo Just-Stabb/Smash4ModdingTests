@@ -36668,7 +36668,8 @@ void func_2264()
 void func_2265()
 {
     int var0;
-    // Fake Death (fighters/supamario/README.md "Fake Death"): the GROUNDED down special; in the air F.L.U.D.D. as before
+    // Fake Death (fighters/supamario/README.md "Fake Death"): the GROUNDED down special; in the air Sledgehammer
+    // (README "Sledgehammer": sh_*). The F.L.U.D.D. path below (and its statuses 0x157 / 0x158) is no longer reached
     if (global18 == 0)
     {
         fd_init();
@@ -36676,6 +36677,9 @@ void func_2265()
         return;
     }
     fd_on = 0;
+    sh_init();
+    func_78(sh_loop);
+    return;
     if (ArticleModule(0, 0x2) == 0)
     {
         ArticleModule(0x2710, 0x2);
@@ -37072,6 +37076,11 @@ void func_2282()
     if (fd_on != 0)
     {
         fd_end();
+        return;
+    }
+    if (WorkModuleF(0, SH_V) != 0.0f)
+    {
+        sh_end();
         return;
     }
     var0 = global6;
@@ -40125,4 +40134,403 @@ void fd_tick()
         }
         s = s + 1;
     }
+}
+
+
+// ===================================================================
+// Sledgehammer (the AIR down special, status 0x155 in the air; Dragon Ball Xenoverse 2's Super skill 164_VGT_HMR,
+// Vegeta's; fighters/supamario/README.md "Sledgehammer"). On the ground the down special is Fake Death (above).
+// Two motions (tools/supamario_sledgehammer_anim.py, XV2's real timing of its BAC entry 0): 0x239 (SpecialAirLwStart)
+// the wind-up to the charge pose (frames 0-12 = BAC 0-6), 0x23D (SpecialAirLwHold) the swing and the recovery (0-64 =
+// BAC 6-44), a motion change between them so the swing's scripts start fresh however long the charge lasted.
+// - FALL kinetics the whole move: his own gravity, full air drift, no stall
+// - the charge pose (frame 12, XV2's ChargeControl): the special button still held, held there up to SH_CHARGE frames
+//   (XV2's ChargeTime 30); held that long: charged (sh_chg = SH_CHARGE, XV2's entry 2), let go earlier: uncharged
+// - the swing: the game script's hitbox (uncharged 16-19, charged 15-18) reads sh_chg; NoGFX: the MSC puts XV2's own
+//   hit effect (BTL_CMN 0: Btl_HitLOD / Btl_HitS, the sweat on the victim's head) at the contact point (sh_hit)
+// - a hit (XV2's entry 3): the rest plays at entry 3's speed (sh_rate); from SH_CANCEL_HIT (entry 3's BcmCallback 26)
+//   the other specials, not the down special (sh_specials); an uncharged hit: his vertical speed is the victim's
+//   (sh_follow) while it is airborne in hitstun
+// - SH_IASA (BAC 37, the BcmCallback Movement / Guard): anything; landing before: LandingFallSpecial (SH_LAND_LAG,
+//   SH_LAND_LAG_HIT after a hit), after: a normal landing; Fall after the swing's end
+// State: New_Var slots SH_V (the phase: 1 the wind-up, 2 charging, 3 the swing, 4 the swing past IASA), SH_V_CHG (the
+// charge's frames), SH_V_VIC (the hit fighter's slot; -1 a hit with no follow) and VAR_0 / VAR_1 (SH_V_VY, the
+// followed fighter's Y last frame; SH_V_LASTFR, the swing's frame last frame): no new globals (127 of 128 used).
+// ===================================================================
+void sh_init()
+{
+    WorkModule(0, 1.0f, SH_V);
+    WorkModule(0, 0.0f, SH_V_CHG);
+    WorkModule(0, 0.0f, SH_V_VIC);
+    WorkModule(0, 0.0f, SH_V_LASTFR);
+    KineticModule(0, 0);
+    GroundModule(0x2710, 0x5);
+    func_22(0x239, 0, 1.0f);
+}
+
+// his own gravity back (sh_follow sets it to 0 while it follows)
+void sh_grav()
+{
+    KineticModule(0xf, 0x1, -WorkModuleF(0, 0x3000018));
+}
+
+// the swing: uncharged unless the charge ran its whole SH_CHARGE frames (XV2: a release before is entry 0); the charged
+// entry ends entry 0's Charge sound (its flags 0x28: it stops with its entry)
+void sh_swing()
+{
+    WorkModule(0, 3.0f, SH_V);
+    if (WorkModuleF(0, SH_V_CHG) < SH_CHARGE - 0.5f)
+    {
+        WorkModule(0, 0.0f, SH_V_CHG);
+    }
+    else
+    {
+        SoundModule(0x2714, SH_SND_CHARGE);
+    }
+    func_22(0x23d, 0, 1.0f);
+    WorkModule(0, 0.0f, SH_V_LASTFR);
+}
+
+// the swing's speed at its frame fr: XV2's entry 3 (a hit) or 2 (charged) over entry 0 (the motion's own timing)
+float sh_rate(float fr, int hit, int ch)
+{
+    SH_RATE_CODE
+    return 1.0f;
+}
+
+// the fighter this attack hit: the slot at Target 12's offset from him (ATKHIT_OFFSET_X / _Y, exe_v46k), else the
+// nearest one in hitstop near the hitbox; 0 none
+int sh_find()
+{
+    int s;
+    int found;
+    float x;
+    float y;
+    float face;
+    float dx;
+    float dy;
+    float hx;
+    float hy;
+    float best;
+    face = WorkModuleF(0, 0x0f000003);
+    found = 0;
+    s = 1;
+    while (s <= 8 && found == 0)
+    {
+        x = WorkModuleF(0, 0x0f000020 + 4 * (s - 1));
+        y = WorkModuleF(0, 0x0f000021 + 4 * (s - 1));
+        if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f &&
+            (x != WorkModuleF(0, 0x0f000000) || y != WorkModuleF(0, 0x0f000001)))
+        {
+            dx = (x - WorkModuleF(0, 0x0f000000)) * face - WorkModuleF(0, 0x0F0002CD);
+            dy = y - WorkModuleF(0, 0x0f000001) - WorkModuleF(0, 0x0F0002CE);
+            if (dx * dx + dy * dy < 0.01f)
+            {
+                found = s;
+            }
+        }
+        s = s + 1;
+    }
+    if (found != 0)
+    {
+        return found;
+    }
+    hx = WorkModuleF(0, 0x0f000000) + SH_HIT_Z * face;
+    hy = WorkModuleF(0, 0x0f000001) + SH_HIT_Y;
+    best = SH_VICTIM_R2;
+    s = 1;
+    while (s <= 8)
+    {
+        x = WorkModuleF(0, 0x0f000020 + 4 * (s - 1));
+        y = WorkModuleF(0, 0x0f000021 + 4 * (s - 1));
+        dx = x - hx;
+        dy = y + SH_VICTIM_MID - hy;
+        if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f &&
+            (x != WorkModuleF(0, 0x0f000000) || y != WorkModuleF(0, 0x0f000001)) &&
+            WorkModuleF(0, 0x0F000043 + 0x8 * (s + 0x2)) > 0.5f && dx * dx + dy * dy < best)
+        {
+            best = dx * dx + dy * dy;
+            found = s;
+        }
+        s = s + 1;
+    }
+    return found;
+}
+
+// the first frame his attack shows a hit on a body (in its hitstop): XV2's hit effect (BTL_CMN 0: both BDM entries'
+// Effect1) halfway between the hitbox's centre and the victim's middle, the sweat on its head, the BDM's hit sound
+// (Hit_L / charged Hit_LL); the Charge sound ends (entry 0 ends: entry 3 plays on); an uncharged hit starts the follow
+void sh_hit()
+{
+    int s;
+    float face;
+    float hx;
+    float hy;
+    float x;
+    float y;
+    float z;
+    float vx;
+    float vy;
+    if (WorkModuleF(0, SH_V_VIC) != 0.0f)
+    {
+        return;
+    }
+    if (AttackModule(0x2726, 0x2) == 0 && AttackModule(0x2727, 0x2) == 0)
+    {
+        return;
+    }
+    SoundModule(0x2714, SH_SND_CHARGE);
+    s = sh_find();
+    face = WorkModuleF(0, 0x0f000003);
+    hx = WorkModuleF(0, 0x0f000000) + SH_HIT_Z * face;
+    hy = WorkModuleF(0, 0x0f000001) + SH_HIT_Y;
+    z = WorkModuleF(0, 0x0f000002);
+    x = hx;
+    y = hy;
+    WorkModule(0, -1.0f, SH_V_VIC);
+    if (s != 0)
+    {
+        vx = WorkModuleF(0, 0x0f000020 + 4 * (s - 1));
+        vy = WorkModuleF(0, 0x0f000021 + 4 * (s - 1));
+        x = (hx + vx) * 0.5f;
+        y = (hy + vy + SH_VICTIM_MID) * 0.5f;
+        EffectModule(0x3, SH_FX_SWEAT, vx, vy + SH_VICTIM_HEAD, z, 0, 0, 0, SH_FX_SWEAT_SIZE, 0, 0xffffffff);
+        if (WorkModuleF(0, SH_V_CHG) < SH_CHARGE - 0.5f)
+        {
+            WorkModule(0, (float)s, SH_V_VIC);
+            WorkModule(0, vy, SH_V_VY);
+        }
+    }
+    EffectModule(0x3, SH_FX_HITLOD, x, y, z, 0, 0, 0, SH_FX_HITLOD_SIZE, 0, 0xffffffff);
+    EffectModule(0x3, SH_FX_HITS, x, y, z, 0, 0, 0, SH_FX_HITS_SIZE, 0, 0xffffffff);
+    if (WorkModuleF(0, SH_V_CHG) < SH_CHARGE - 0.5f)
+    {
+        SoundModule(0x2710, SH_SND_HIT);
+    }
+    else
+    {
+        SoundModule(0x2710, SH_SND_HIT_CH);
+    }
+}
+
+// after an uncharged hit: his vertical speed the followed fighter's (its Y change since last frame), gravity off,
+// while it is in the air in hitstun (or frozen in hitstop); then his gravity back and no more following
+void sh_follow()
+{
+    int s;
+    int t;
+    float y;
+    s = (int)WorkModuleF(0, SH_V_VIC);
+    if (s <= 0)
+    {
+        return;
+    }
+    t = s + 0x2;
+    y = WorkModuleF(0, 0x0f000021 + 4 * (s - 1));
+    if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) == 0.0f || WorkModuleF(0, 0x0F000116 + 0x20 * t) < 0.5f ||
+        (WorkModuleF(0, 0x0F000040 + 0x8 * t) < 0.5f && WorkModuleF(0, 0x0F000043 + 0x8 * t) < 0.5f))
+    {
+        WorkModule(0, -1.0f, SH_V_VIC);
+        sh_grav();
+        return;
+    }
+    KineticModule(0xf, 0x1, 0.0f);
+    KineticModule(0x11, 0x1, y - WorkModuleF(0, SH_V_VY));
+    WorkModule(0, y, SH_V_VY);
+}
+
+// the on-hit cancel (XV2's entry 3 window): his other specials, never the down special (the user)
+int sh_specials()
+{
+    if (global24 & 0x4000 && func_72(global26))
+    {
+        func_16(0x154, 0x1);
+        return 0x1;
+    }
+    if (global24 & 0x2000 && func_72(global25))
+    {
+        func_16(0x153, 0x1);
+        return 0x1;
+    }
+    if (global24 & 0x1000)
+    {
+        if (BattleObject(0x61))
+        {
+            func_16(0x156, 0x1);
+            return 0x1;
+        }
+        if (func_72(global28))
+        {
+            func_16(0x152, 0x1);
+            return 0x1;
+        }
+    }
+    return 0;
+}
+
+// from SH_IASA: every air action (the God Fist's gf_air_act: the air transition terms on once, then func_41 and the
+// specials, air dodge, aerials, jumps)
+int sh_air_act()
+{
+    if (WorkModuleF(0, SH_V) < 3.5f)
+    {
+        WorkModule(0, 4.0f, SH_V);
+        func_40();
+        WorkModule(0x16, 0x1e000061);
+        WorkModule(0x16, 0x1e00008a);
+        WorkModule(0x16, 0x1e000062);
+        WorkModule(0x16, 0x1e000063);
+        WorkModule(0x16, 0x1e000064);
+        WorkModule(0x16, 0x1e000065);
+        WorkModule(0x16, 0x1e000094);
+        WorkModule(0x16, 0x1e00003d);
+        WorkModule(0x16, 0x1e00003e);
+        WorkModule(0x16, 0x1e00003f);
+        WorkModule(0x16, 0x1e000043);
+        WorkModule(0x16, 0x1e000044);
+        WorkModule(0x16, 0x1e000045);
+    }
+    if (func_41() != 0)
+    {
+        return 0x1;
+    }
+    if (global24 & 0x8000 && func_72(global27))
+    {
+        func_16(0x155, 0x1);
+        return 0x1;
+    }
+    if (sh_specials() != 0)
+    {
+        return 0x1;
+    }
+    if (global24 & 0x400000)
+    {
+        func_16(0x22, 0x1);
+        return 0x1;
+    }
+    if (global24 & 0x1)
+    {
+        func_16(0x34, 0x1);
+        return 0x1;
+    }
+    if ((global24 & 0x200000 || global24 & 0x100000 && ControlModule(0x271c)) && WorkModule(0x6, 0x10000001) < WorkModule(0x6, 0x10000002))
+    {
+        if (WorkModule(0x6, 0x1300010c) == 0x1)
+        {
+            func_16(0xc, 0x1);
+        }
+        else
+        {
+            func_16(0xd, 0x1);
+        }
+        return 0x1;
+    }
+    return 0;
+}
+
+// landed: past SH_IASA a normal landing, else LandingFallSpecial (its length from work float 0, as the up special's)
+void sh_land(float fr)
+{
+    sh_grav();
+    if (WorkModuleF(0, SH_V) > 2.5f && fr > SH_IASA - 0.01f)
+    {
+        func_16(0x16, 0);
+        return;
+    }
+    if (WorkModuleF(0, SH_V_VIC) != 0.0f)
+    {
+        WorkModule(0, SH_LAND_LAG_HIT, 0);
+    }
+    else
+    {
+        WorkModule(0, SH_LAND_LAG, 0);
+    }
+    func_16(0x19, 0);
+}
+
+void sh_loop()
+{
+    float fr;
+    float ph;
+    int hit;
+    int ch;
+    fr = MotionModuleF(0x1);
+    ph = WorkModuleF(0, SH_V);
+    if (global18 != 0x2)
+    {
+        sh_land(fr);
+        return;
+    }
+    if (ph < 1.5f)
+    {
+        if (fr < SH_START_LAST - 0.5f)
+        {
+            return;
+        }
+        SoundModule(0x2710, SH_SND_CHARGE);           // XV2: skill SE cue 0 at BAC 6, held or not
+        if (ControlModule(0x2712, 0x1) == 0)
+        {
+            sh_swing();
+            return;
+        }
+        WorkModule(0, 2.0f, SH_V);
+        ph = 2.0f;
+    }
+    if (ph < 2.5f)
+    {
+        MotionModule(0x2713, SH_START_LAST);
+        if (ControlModule(0x2712, 0x1) == 0)
+        {
+            sh_swing();
+            return;
+        }
+        WorkModule(0, WorkModuleF(0, SH_V_CHG) + 1.0f, SH_V_CHG);
+        if (WorkModuleF(0, SH_V_CHG) > SH_CHARGE - 0.5f)
+        {
+            sh_swing();
+        }
+        return;
+    }
+    // the swing; 0x23D is a looping slot (the air F.L.U.D.D.'s hold): its wrap is the end too
+    if (fr > SH_HOLD_END + 0.5f || fr < WorkModuleF(0, SH_V_LASTFR) - 0.5f)
+    {
+        sh_grav();
+        func_16(0xe, 0);
+        return;
+    }
+    WorkModule(0, fr, SH_V_LASTFR);
+    if (fr > SH_HIT_FROM - 0.5f && fr < SH_HIT_TO)
+    {
+        sh_hit();
+    }
+    hit = 0;
+    if (WorkModuleF(0, SH_V_VIC) != 0.0f)
+    {
+        hit = 0x1;
+    }
+    ch = 0;
+    if (WorkModuleF(0, SH_V_CHG) > SH_CHARGE - 0.5f)
+    {
+        ch = 0x1;
+    }
+    MotionModule(0x4, sh_rate(fr, hit, ch));
+    sh_follow();
+    if (hit != 0 && fr > SH_CANCEL_HIT - 0.01f && sh_specials() != 0)
+    {
+        return;
+    }
+    if (fr > SH_IASA - 0.01f && sh_air_act() != 0)
+    {
+        return;
+    }
+}
+
+// the status's end (func_2282): the charge glow / sound off, his gravity back, the state cleared
+void sh_end()
+{
+    SoundModule(0x2714, SH_SND_CHARGE);
+    EffectModule(0x2723, SH_FX_CRG, 0x1, 0x1);
+    sh_grav();
+    WorkModule(0, 0.0f, SH_V);
+    WorkModule(0, 0.0f, SH_V_VIC);
 }

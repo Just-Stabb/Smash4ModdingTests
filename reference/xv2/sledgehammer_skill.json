@@ -1,0 +1,2546 @@
+{
+ "source": "XV2 164_VGT_HMR (Sledgehammer, Vegeta) via tools/supamario_sledgehammer_xv2.py; names: XV2-Tools",
+ "bcm": [
+  {
+   "index": 0,
+   "sibling": null,
+   "child": 1,
+   "parent": null,
+   "root": null,
+   "DirectionalInput": 0,
+   "ButtonInput": "0x0 []",
+   "HoldDownConditions": "0x0",
+   "OpponentSizeConditions": "0x0",
+   "MinimumLoopDuration": 0,
+   "MaximumLoopDuration": 0,
+   "PrimaryActivatorConditions": "0x0 []",
+   "ActivatorState": "0x0 []",
+   "BacEntryPrimary": -1,
+   "BacEntryCharge": 0,
+   "BacEntryUserConnect": 0,
+   "BacEntryVictimConnect": 0,
+   "BacEntryAirborne": -1,
+   "RandomFlag": 0,
+   "KiCost": 0,
+   "ReceiverLinkID": "0x0 []",
+   "StaminaCost": 0,
+   "KiRequired": 0,
+   "HealthRequired": 0.0
+  },
+  {
+   "index": 1,
+   "sibling": null,
+   "child": 2,
+   "parent": null,
+   "root": 1,
+   "DirectionalInput": 0,
+   "ButtonInput": "0x400 ['SuperSkill3']",
+   "HoldDownConditions": "0x2",
+   "OpponentSizeConditions": "0x0",
+   "MinimumLoopDuration": 0,
+   "MaximumLoopDuration": 0,
+   "PrimaryActivatorConditions": "0xC00 ['Unk11', 'Idle']",
+   "ActivatorState": "0x3 ['Idle', 'Attacking']",
+   "BacEntryPrimary": 0,
+   "BacEntryCharge": 2,
+   "BacEntryUserConnect": 0,
+   "BacEntryVictimConnect": 0,
+   "BacEntryAirborne": -1,
+   "RandomFlag": 0,
+   "KiCost": 100,
+   "ReceiverLinkID": "0x2 ['Supers']",
+   "StaminaCost": 0,
+   "KiRequired": 0,
+   "HealthRequired": 0.0
+  },
+  {
+   "index": 2,
+   "sibling": null,
+   "child": null,
+   "parent": 1,
+   "root": 1,
+   "DirectionalInput": 0,
+   "ButtonInput": "0x0 []",
+   "HoldDownConditions": "0x0",
+   "OpponentSizeConditions": "0x0",
+   "MinimumLoopDuration": 0,
+   "MaximumLoopDuration": 0,
+   "PrimaryActivatorConditions": "0x40000C08 ['OnAttackHit', 'Unk11', 'Idle', '0x40000000']",
+   "ActivatorState": "0x0 []",
+   "BacEntryPrimary": 3,
+   "BacEntryCharge": 0,
+   "BacEntryUserConnect": 0,
+   "BacEntryVictimConnect": 0,
+   "BacEntryAirborne": -1,
+   "RandomFlag": 0,
+   "KiCost": 0,
+   "ReceiverLinkID": "0x2 ['Supers']",
+   "StaminaCost": 0,
+   "KiRequired": 0,
+   "HealthRequired": 0.0
+  }
+ ],
+ "entries": {
+  "0": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     12
+    ],
+    "ean": 10,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     1
+    ],
+    "ean": "skill",
+    "index": 0,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Y",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     12
+    ],
+    "ean": 11,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     0,
+     12
+    ],
+    "scale": 0.5
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     0,
+     10
+    ],
+    "strength": 1.0,
+    "flags": []
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     0,
+     1
+    ],
+    "eepk": "Stage BG (the stage's own)",
+    "id": 220,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     0,
+     1
+    ],
+    "acb": "character voice",
+    "cue": 49,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "TargetingAssistance",
+    "frames": [
+     0,
+     44
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     0,
+     1
+    ],
+    "eye_movement": [
+     0,
+     0,
+     4,
+     4,
+     1,
+     0,
+     1,
+     0,
+     0,
+     16256,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     1,
+     2
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 41,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     1,
+     2
+    ],
+    "eepk": "Stage BG (the stage's own)",
+    "id": 60,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     1,
+     2
+    ],
+    "acb": "common SE",
+    "cue": 42,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     1,
+     2
+    ],
+    "eye_movement": [
+     0,
+     0,
+     4,
+     1,
+     5,
+     0,
+     20,
+     0,
+     0,
+     16256,
+     0,
+     16192
+    ]
+   },
+   {
+    "type": "Movement",
+    "frames": [
+     2,
+     10
+    ],
+    "flags": "0x1",
+    "per_frame_m": [
+     0.0,
+     0.075,
+     -0.55
+    ],
+    "drag": [
+     0.0,
+     0.0,
+     0.04
+    ],
+    "note": "-Z is forward (XV2 faces -Z; Core Breaker's dive (0, -1, -1.1) is forward)"
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     3,
+     4
+    ],
+    "eepk": "Stage BG (the stage's own)",
+    "id": 220,
+    "bone": "b_C_Base",
+    "off": true
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     4,
+     5
+    ],
+    "eepk": "Stage BG (the stage's own)",
+    "id": 60,
+    "bone": "b_C_Base",
+    "off": true
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     5,
+     6
+    ],
+    "eepk": "Any skill",
+    "id": 0,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     5,
+     6
+    ],
+    "eye_movement": [
+     0,
+     0,
+     1,
+     7,
+     3,
+     0,
+     70,
+     0,
+     0,
+     16192,
+     0,
+     16128
+    ]
+   },
+   {
+    "type": "ChargeControl",
+    "frames": [
+     6,
+     8
+    ],
+    "charge_time": 30,
+    "raw": "0600020000000000000000001e000000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     6,
+     7
+    ],
+    "acb": "skill SE",
+    "cue": 0,
+    "sound_flags": "0x28"
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     8,
+     9
+    ],
+    "eepk": "Any skill",
+    "id": 0,
+    "bone": "b_C_Base",
+    "off": true
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     9,
+     10
+    ],
+    "acb": "skill SE",
+    "cue": 1,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     12,
+     26
+    ],
+    "ean": 10,
+    "index": 15,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     12,
+     26
+    ],
+    "ean": 11,
+    "index": 15,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     12,
+     13
+    ],
+    "eepk": "Any skill",
+    "id": 1,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     16,
+     20
+    ],
+    "bdm": 0,
+    "bdm_file": "Skill",
+    "hitbox_flags": "0x0",
+    "damage": 60,
+    "damage_when_blocked": 6,
+    "stamina_taken_when_blocked": 60,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     0.0,
+     -0.75
+    ],
+    "size_m": 1.0
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     16,
+     20
+    ],
+    "bdm": 0,
+    "bdm_file": "Common (CMN.bdm)",
+    "hitbox_flags": "0x8",
+    "damage": 0,
+    "damage_when_blocked": 0,
+    "stamina_taken_when_blocked": 0,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     0.0,
+     -0.75
+    ],
+    "size_m": 1.0
+   },
+   {
+    "type": "BcmCallback",
+    "frames": [
+     16,
+     20
+    ],
+    "link": [
+     "DisableKiBlastLink",
+     "Supers"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     22,
+     26
+    ],
+    "scale": 0.3
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     26,
+     40
+    ],
+    "ean": 11,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     26,
+     40
+    ],
+    "ean": 10,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     26,
+     37
+    ],
+    "scale": 0.5
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     26,
+     27
+    ],
+    "eye_movement": [
+     0,
+     0,
+     7,
+     4,
+     10,
+     0,
+     25,
+     0,
+     0,
+     16128,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "BcmCallback",
+    "frames": [
+     37,
+     44
+    ],
+    "link": [
+     "Movement",
+     "Guard",
+     "FlyingAndStepDash"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     40,
+     44
+    ],
+    "ean": 11,
+    "index": 0,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     40,
+     44
+    ],
+    "ean": 10,
+    "index": 0,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   }
+  ],
+  "1": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     12
+    ],
+    "ean": 10,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     1
+    ],
+    "ean": "skill",
+    "index": 0,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Y",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     12
+    ],
+    "ean": 11,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     0,
+     12
+    ],
+    "scale": 0.5
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     0,
+     10
+    ],
+    "strength": 1.0,
+    "flags": []
+   },
+   {
+    "type": "TargetingAssistance",
+    "frames": [
+     0,
+     44
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     0,
+     1
+    ],
+    "eye_movement": [
+     0,
+     0,
+     4,
+     4,
+     1,
+     0,
+     1,
+     0,
+     0,
+     16256,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     1,
+     2
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 41,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     1,
+     2
+    ],
+    "eye_movement": [
+     0,
+     0,
+     4,
+     1,
+     5,
+     0,
+     20,
+     0,
+     0,
+     16256,
+     0,
+     16192
+    ]
+   },
+   {
+    "type": "Movement",
+    "frames": [
+     2,
+     10
+    ],
+    "flags": "0x1",
+    "per_frame_m": [
+     0.0,
+     0.075,
+     -0.65
+    ],
+    "drag": [
+     0.0,
+     0.0,
+     0.04
+    ],
+    "note": "-Z is forward (XV2 faces -Z; Core Breaker's dive (0, -1, -1.1) is forward)"
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     7,
+     8
+    ],
+    "eye_movement": [
+     0,
+     0,
+     1,
+     7,
+     3,
+     0,
+     20,
+     0,
+     0,
+     16192,
+     0,
+     16128
+    ]
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     9,
+     10
+    ],
+    "acb": "skill SE",
+    "cue": 1,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     12,
+     26
+    ],
+    "ean": 10,
+    "index": 15,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     12,
+     26
+    ],
+    "ean": 11,
+    "index": 15,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     12,
+     13
+    ],
+    "eepk": "Any skill",
+    "id": 2,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     13,
+     14
+    ],
+    "eepk": "Any skill",
+    "id": 0,
+    "bone": "b_C_Base",
+    "off": true
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     16,
+     20
+    ],
+    "bdm": 0,
+    "bdm_file": "Skill",
+    "hitbox_flags": "0x0",
+    "damage": 100,
+    "damage_when_blocked": 10,
+    "stamina_taken_when_blocked": 100,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     0.0,
+     -0.75
+    ],
+    "size_m": 1.0
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     16,
+     20
+    ],
+    "bdm": 0,
+    "bdm_file": "Common (CMN.bdm)",
+    "hitbox_flags": "0x8",
+    "damage": 0,
+    "damage_when_blocked": 0,
+    "stamina_taken_when_blocked": 0,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     0.0,
+     -0.75
+    ],
+    "size_m": 1.0
+   },
+   {
+    "type": "BcmCallback",
+    "frames": [
+     16,
+     20
+    ],
+    "link": [
+     "DisableKiBlastLink",
+     "Supers"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     22,
+     26
+    ],
+    "scale": 0.25
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     26,
+     40
+    ],
+    "ean": 11,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     26,
+     40
+    ],
+    "ean": 10,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     26,
+     37
+    ],
+    "scale": 0.5
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     26,
+     27
+    ],
+    "eye_movement": [
+     0,
+     0,
+     7,
+     4,
+     10,
+     0,
+     25,
+     0,
+     0,
+     16128,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "BcmCallback",
+    "frames": [
+     37,
+     44
+    ],
+    "link": [
+     "Movement",
+     "Guard",
+     "FlyingAndStepDash"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     40,
+     44
+    ],
+    "ean": 11,
+    "index": 0,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     40,
+     44
+    ],
+    "ean": 10,
+    "index": 0,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   }
+  ],
+  "2": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     12
+    ],
+    "ean": 10,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     1
+    ],
+    "ean": "skill",
+    "index": 0,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Y",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     12
+    ],
+    "ean": 11,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     0,
+     12
+    ],
+    "scale": 0.5
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     0,
+     10
+    ],
+    "strength": 1.0,
+    "flags": []
+   },
+   {
+    "type": "TargetingAssistance",
+    "frames": [
+     0,
+     44
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     0,
+     1
+    ],
+    "eye_movement": [
+     0,
+     0,
+     4,
+     4,
+     1,
+     0,
+     1,
+     0,
+     0,
+     16256,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     1,
+     2
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 41,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     1,
+     2
+    ],
+    "eye_movement": [
+     0,
+     0,
+     4,
+     1,
+     5,
+     0,
+     20,
+     0,
+     0,
+     16256,
+     0,
+     16192
+    ]
+   },
+   {
+    "type": "Movement",
+    "frames": [
+     2,
+     10
+    ],
+    "flags": "0x1",
+    "per_frame_m": [
+     0.0,
+     0.075,
+     -0.65
+    ],
+    "drag": [
+     0.0,
+     0.0,
+     0.04
+    ],
+    "note": "-Z is forward (XV2 faces -Z; Core Breaker's dive (0, -1, -1.1) is forward)"
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     7,
+     8
+    ],
+    "eye_movement": [
+     0,
+     0,
+     1,
+     7,
+     3,
+     0,
+     20,
+     0,
+     0,
+     16192,
+     0,
+     16128
+    ]
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     9,
+     10
+    ],
+    "acb": "skill SE",
+    "cue": 1,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     12,
+     26
+    ],
+    "ean": 10,
+    "index": 15,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     12,
+     26
+    ],
+    "ean": 11,
+    "index": 15,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     12,
+     13
+    ],
+    "eepk": "Any skill",
+    "id": 3,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     13,
+     14
+    ],
+    "eepk": "Any skill",
+    "id": 0,
+    "bone": "b_C_Base",
+    "off": true
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     15,
+     19
+    ],
+    "bdm": 0,
+    "bdm_file": "Common (CMN.bdm)",
+    "hitbox_flags": "0x8",
+    "damage": 0,
+    "damage_when_blocked": 0,
+    "stamina_taken_when_blocked": 0,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     0.0,
+     -0.75
+    ],
+    "size_m": 1.0
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     15,
+     19
+    ],
+    "bdm": 1,
+    "bdm_file": "Skill",
+    "hitbox_flags": "0x2000",
+    "damage": 145,
+    "damage_when_blocked": 14,
+    "stamina_taken_when_blocked": 145,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     0.0,
+     -0.75
+    ],
+    "size_m": 1.0
+   },
+   {
+    "type": "BcmCallback",
+    "frames": [
+     15,
+     19
+    ],
+    "link": [
+     "DisableKiBlastLink",
+     "Supers"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     22,
+     26
+    ],
+    "scale": 0.23
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     26,
+     40
+    ],
+    "ean": 11,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     26,
+     40
+    ],
+    "ean": 10,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     26,
+     37
+    ],
+    "scale": 0.5
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     26,
+     27
+    ],
+    "eye_movement": [
+     0,
+     0,
+     7,
+     4,
+     10,
+     0,
+     25,
+     0,
+     0,
+     16128,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "BcmCallback",
+    "frames": [
+     37,
+     44
+    ],
+    "link": [
+     "Movement",
+     "Guard",
+     "FlyingAndStepDash"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     40,
+     44
+    ],
+    "ean": 11,
+    "index": 0,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     40,
+     44
+    ],
+    "ean": 10,
+    "index": 0,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   }
+  ],
+  "3": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     12
+    ],
+    "ean": 10,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     1
+    ],
+    "ean": "skill",
+    "index": 0,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Y",
+     "MoveWithAxis_Z",
+     "ContinueFromLast"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     12
+    ],
+    "ean": 11,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     0,
+     12
+    ],
+    "scale": 0.5
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     0,
+     10
+    ],
+    "strength": 1.0,
+    "flags": []
+   },
+   {
+    "type": "TargetingAssistance",
+    "frames": [
+     0,
+     44
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     0,
+     1
+    ],
+    "eye_movement": [
+     0,
+     0,
+     4,
+     4,
+     1,
+     0,
+     1,
+     0,
+     0,
+     16256,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     1,
+     2
+    ],
+    "eye_movement": [
+     0,
+     0,
+     4,
+     1,
+     5,
+     0,
+     20,
+     0,
+     0,
+     16256,
+     0,
+     16192
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     7,
+     8
+    ],
+    "eye_movement": [
+     0,
+     0,
+     1,
+     7,
+     3,
+     0,
+     20,
+     0,
+     0,
+     16192,
+     0,
+     16128
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     12,
+     26
+    ],
+    "ean": 10,
+    "index": 15,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     12,
+     26
+    ],
+    "ean": 11,
+    "index": 15,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     26,
+     40
+    ],
+    "ean": 11,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     26,
+     40
+    ],
+    "ean": 10,
+    "index": 14,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "BcmCallback",
+    "frames": [
+     26,
+     44
+    ],
+    "link": [
+     "Combos"
+    ]
+   },
+   {
+    "type": "EyeMovement",
+    "frames": [
+     26,
+     27
+    ],
+    "eye_movement": [
+     0,
+     0,
+     7,
+     4,
+     10,
+     0,
+     25,
+     0,
+     0,
+     16128,
+     0,
+     16256
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     32,
+     44
+    ],
+    "scale": 0.5
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     40,
+     44
+    ],
+    "ean": 11,
+    "index": 0,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     40,
+     44
+    ],
+    "ean": 10,
+    "index": 0,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   }
+  ],
+  "4": [],
+  "5": []
+ },
+ "timescale": {
+  "0": [
+   [
+    0,
+    12,
+    0.5
+   ],
+   [
+    22,
+    26,
+    0.3
+   ],
+   [
+    26,
+    37,
+    0.5
+   ]
+  ],
+  "1": [
+   [
+    0,
+    12,
+    0.5
+   ],
+   [
+    22,
+    26,
+    0.25
+   ],
+   [
+    26,
+    37,
+    0.5
+   ]
+  ],
+  "2": [
+   [
+    0,
+    12,
+    0.5
+   ],
+   [
+    22,
+    26,
+    0.23
+   ],
+   [
+    26,
+    37,
+    0.5
+   ]
+  ],
+  "3": [
+   [
+    0,
+    12,
+    0.5
+   ],
+   [
+    32,
+    44,
+    0.5
+   ]
+  ]
+ },
+ "real_frame_of_bac": {
+  "0": [
+   0.0,
+   2.0,
+   4.0,
+   6.0,
+   8.0,
+   10.0,
+   12.0,
+   14.0,
+   16.0,
+   18.0,
+   20.0,
+   22.0,
+   24.0,
+   25.0,
+   26.0,
+   27.0,
+   28.0,
+   29.0,
+   30.0,
+   31.0,
+   32.0,
+   33.0,
+   34.0,
+   37.33,
+   40.67,
+   44.0,
+   47.33,
+   49.33,
+   51.33,
+   53.33,
+   55.33,
+   57.33,
+   59.33,
+   61.33,
+   63.33,
+   65.33,
+   67.33,
+   69.33,
+   70.33,
+   71.33,
+   72.33,
+   73.33,
+   74.33,
+   75.33,
+   76.33
+  ],
+  "1": [
+   0.0,
+   2.0,
+   4.0,
+   6.0,
+   8.0,
+   10.0,
+   12.0,
+   14.0,
+   16.0,
+   18.0,
+   20.0,
+   22.0,
+   24.0,
+   25.0,
+   26.0,
+   27.0,
+   28.0,
+   29.0,
+   30.0,
+   31.0,
+   32.0,
+   33.0,
+   34.0,
+   38.0,
+   42.0,
+   46.0,
+   50.0,
+   52.0,
+   54.0,
+   56.0,
+   58.0,
+   60.0,
+   62.0,
+   64.0,
+   66.0,
+   68.0,
+   70.0,
+   72.0,
+   73.0,
+   74.0,
+   75.0,
+   76.0,
+   77.0,
+   78.0,
+   79.0
+  ],
+  "2": [
+   0.0,
+   2.0,
+   4.0,
+   6.0,
+   8.0,
+   10.0,
+   12.0,
+   14.0,
+   16.0,
+   18.0,
+   20.0,
+   22.0,
+   24.0,
+   25.0,
+   26.0,
+   27.0,
+   28.0,
+   29.0,
+   30.0,
+   31.0,
+   32.0,
+   33.0,
+   34.0,
+   38.35,
+   42.7,
+   47.04,
+   51.39,
+   53.39,
+   55.39,
+   57.39,
+   59.39,
+   61.39,
+   63.39,
+   65.39,
+   67.39,
+   69.39,
+   71.39,
+   73.39,
+   74.39,
+   75.39,
+   76.39,
+   77.39,
+   78.39,
+   79.39,
+   80.39
+  ],
+  "3": [
+   0.0,
+   2.0,
+   4.0,
+   6.0,
+   8.0,
+   10.0,
+   12.0,
+   14.0,
+   16.0,
+   18.0,
+   20.0,
+   22.0,
+   24.0,
+   25.0,
+   26.0,
+   27.0,
+   28.0,
+   29.0,
+   30.0,
+   31.0,
+   32.0,
+   33.0,
+   34.0,
+   35.0,
+   36.0,
+   37.0,
+   38.0,
+   39.0,
+   40.0,
+   41.0,
+   42.0,
+   43.0,
+   44.0,
+   46.0,
+   48.0,
+   50.0,
+   52.0,
+   54.0,
+   56.0,
+   58.0,
+   60.0,
+   62.0,
+   64.0,
+   66.0,
+   68.0
+  ]
+ },
+ "bdm_skill": {
+  "0": {
+   "id": 0,
+   "sub0": {
+    "DamageType": 27,
+    "DamageAmount": 0,
+    "AcbType": 0,
+    "CueId": 52,
+    "Effect1_ID": 0,
+    "Effect1_EepkType": 0,
+    "Effect2_ID": -1,
+    "Effect2_EepkType": 0,
+    "Effect3_ID": -1,
+    "Effect3_EepkType": 0,
+    "PushbackStrength": 0.2,
+    "PushbackAcceleration": 0.7,
+    "UserStun": 10,
+    "VictimStun": 10,
+    "KnockbackDuration": 70,
+    "KnockbackRecoveryAfterImpactTime": 80,
+    "KnockbackGroundImpactTime": 0,
+    "KnockbackStrengthX": 0.0,
+    "KnockbackStrengthY": -0.35,
+    "KnockbackStrengthZ": 0.05,
+    "KnockbackDragY": 0.0,
+    "KnockbackGravityTime": 0,
+    "VictimInvincibilityTime": 4,
+    "AlimentType": 0,
+    "DamageSpecial": 0,
+    "StumbleType": 136,
+    "DamageSecondaryType": 0,
+    "CameraShakeTime": 0,
+    "UserBpeID": -1,
+    "VictimBpeID": -1,
+    "StaminaBrokenOverrideBdmId": -1,
+    "ZVanishEnableTime": 30,
+    "UserAnimationTime": 0,
+    "VictimAnimationTime": 0,
+    "UserAnimationSpeed": 0.0,
+    "VictimAnimationSpeed": 0.0
+   },
+   "other_subs_differ": {
+    "4": {
+     "KnockbackDuration": 50,
+     "KnockbackRecoveryAfterImpactTime": 50,
+     "KnockbackGravityTime": 20,
+     "StumbleType": 0,
+     "ZVanishEnableTime": 40
+    },
+    "5": {
+     "DamageType": 1,
+     "CueId": -1,
+     "Effect1_ID": 20,
+     "KnockbackDuration": 0,
+     "KnockbackRecoveryAfterImpactTime": 0,
+     "KnockbackStrengthY": 0.0,
+     "KnockbackStrengthZ": 0.0,
+     "StumbleType": 0,
+     "ZVanishEnableTime": 0
+    },
+    "9": {
+     "KnockbackDuration": 50,
+     "KnockbackRecoveryAfterImpactTime": 50,
+     "KnockbackGravityTime": 20,
+     "StumbleType": 0,
+     "ZVanishEnableTime": 40
+    }
+   }
+  },
+  "1": {
+   "id": 1,
+   "sub0": {
+    "DamageType": 27,
+    "DamageAmount": 0,
+    "AcbType": 0,
+    "CueId": 53,
+    "Effect1_ID": 0,
+    "Effect1_EepkType": 0,
+    "Effect2_ID": -1,
+    "Effect2_EepkType": 0,
+    "Effect3_ID": -1,
+    "Effect3_EepkType": 0,
+    "PushbackStrength": 0.0,
+    "PushbackAcceleration": 0.0,
+    "UserStun": 30,
+    "VictimStun": 30,
+    "KnockbackDuration": 100,
+    "KnockbackRecoveryAfterImpactTime": 100,
+    "KnockbackGroundImpactTime": 0,
+    "KnockbackStrengthX": 0.0,
+    "KnockbackStrengthY": -1.5,
+    "KnockbackStrengthZ": 0.05,
+    "KnockbackDragY": 0.0,
+    "KnockbackGravityTime": 100,
+    "VictimInvincibilityTime": 10,
+    "AlimentType": 0,
+    "DamageSpecial": 0,
+    "StumbleType": 162,
+    "DamageSecondaryType": 0,
+    "CameraShakeTime": 60,
+    "UserBpeID": 14,
+    "VictimBpeID": 14,
+    "StaminaBrokenOverrideBdmId": -1,
+    "ZVanishEnableTime": 40,
+    "UserAnimationTime": 0,
+    "VictimAnimationTime": 0,
+    "UserAnimationSpeed": 0.0,
+    "VictimAnimationSpeed": 0.0
+   },
+   "other_subs_differ": {
+    "4": {
+     "CueId": 52,
+     "KnockbackDuration": 50,
+     "KnockbackRecoveryAfterImpactTime": 50,
+     "KnockbackGravityTime": 20,
+     "VictimInvincibilityTime": 8,
+     "StumbleType": 0,
+     "CameraShakeTime": 0,
+     "UserBpeID": -1,
+     "VictimBpeID": -1
+    },
+    "5": {
+     "DamageType": 2,
+     "CueId": -1,
+     "Effect1_ID": 20,
+     "UserStun": 0,
+     "VictimStun": 0,
+     "KnockbackDuration": 0,
+     "KnockbackRecoveryAfterImpactTime": 0,
+     "KnockbackStrengthY": 0.0,
+     "KnockbackStrengthZ": 0.0,
+     "KnockbackGravityTime": 0,
+     "VictimInvincibilityTime": 64,
+     "StumbleType": 0,
+     "ZVanishEnableTime": 0
+    },
+    "9": {
+     "CueId": 52,
+     "KnockbackDuration": 50,
+     "KnockbackRecoveryAfterImpactTime": 50,
+     "KnockbackGravityTime": 20,
+     "VictimInvincibilityTime": 8,
+     "StumbleType": 0,
+     "CameraShakeTime": 0,
+     "UserBpeID": -1,
+     "VictimBpeID": -1
+    }
+   }
+  }
+ },
+ "bdm_cmn_0": {
+  "id": 0,
+  "sub0": {
+   "DamageType": 3,
+   "DamageAmount": 0,
+   "AcbType": 0,
+   "CueId": -1,
+   "Effect1_ID": 0,
+   "Effect1_EepkType": 0,
+   "Effect2_ID": -1,
+   "Effect2_EepkType": 0,
+   "Effect3_ID": -1,
+   "Effect3_EepkType": 0,
+   "PushbackStrength": 0.2,
+   "PushbackAcceleration": 0.7,
+   "UserStun": 5,
+   "VictimStun": 5,
+   "KnockbackDuration": 30,
+   "KnockbackRecoveryAfterImpactTime": 0,
+   "KnockbackGroundImpactTime": 0,
+   "KnockbackStrengthX": 0.0,
+   "KnockbackStrengthY": 0.1,
+   "KnockbackStrengthZ": 0.04,
+   "KnockbackDragY": 0.0,
+   "KnockbackGravityTime": 0,
+   "VictimInvincibilityTime": 4,
+   "AlimentType": 0,
+   "DamageSpecial": 0,
+   "StumbleType": 136,
+   "DamageSecondaryType": 0,
+   "CameraShakeTime": 0,
+   "UserBpeID": -1,
+   "VictimBpeID": -1,
+   "StaminaBrokenOverrideBdmId": -1,
+   "ZVanishEnableTime": 0,
+   "UserAnimationTime": 0,
+   "VictimAnimationTime": 0,
+   "UserAnimationSpeed": 0.0,
+   "VictimAnimationSpeed": 0.0
+  },
+  "other_subs_differ": {
+   "2": {
+    "DamageType": 7,
+    "KnockbackDuration": 32,
+    "KnockbackRecoveryAfterImpactTime": 32,
+    "KnockbackGroundImpactTime": 32,
+    "KnockbackStrengthY": 0.0,
+    "KnockbackStrengthZ": 0.048,
+    "KnockbackGravityTime": 32,
+    "ZVanishEnableTime": 4
+   },
+   "4": {
+    "DamageType": 7,
+    "KnockbackDuration": 32,
+    "KnockbackRecoveryAfterImpactTime": 32,
+    "KnockbackGroundImpactTime": 32,
+    "KnockbackStrengthY": 0.0,
+    "KnockbackStrengthZ": 0.048,
+    "KnockbackGravityTime": 32,
+    "ZVanishEnableTime": 4
+   },
+   "5": {
+    "DamageType": 1,
+    "Effect1_ID": 20,
+    "KnockbackDuration": 0,
+    "KnockbackStrengthY": 0.0,
+    "KnockbackStrengthZ": 0.0,
+    "StumbleType": 0
+   },
+   "8": {
+    "DamageType": 7,
+    "KnockbackDuration": 32,
+    "KnockbackRecoveryAfterImpactTime": 32,
+    "KnockbackGroundImpactTime": 32,
+    "KnockbackStrengthY": 0.0,
+    "KnockbackStrengthZ": 0.048,
+    "KnockbackGravityTime": 32,
+    "ZVanishEnableTime": 4
+   }
+  }
+ },
+ "skill_eepk": {
+  "0": [
+   {
+    "AssetType": "PBIND",
+    "AttachementType": "Bone",
+    "Orientation": "Camera",
+    "Deactivation": "Immediate",
+    "ESK": "b_L_Hand",
+    "ScaleMin": 1.0,
+    "ScaleMax": 1.0,
+    "Position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "StartTime": 0,
+    "Files": [
+     "Hmr_Crg.emp"
+    ],
+    "Flags1_names": [
+     "PositionUpdate",
+     "RotateUpdate",
+     "InstantUpdate"
+    ]
+   }
+  ],
+  "1": [
+   {
+    "AssetType": "PBIND",
+    "AttachementType": "Bone",
+    "Orientation": "AttachmentBone",
+    "Deactivation": "Never",
+    "ESK": "b_C_Pelvis",
+    "ScaleMin": 1.0,
+    "ScaleMax": 1.0,
+    "Position": [
+     0.15,
+     0.0,
+     0.0
+    ],
+    "StartTime": 0,
+    "Files": [
+     "Hmr_Fire.emp"
+    ],
+    "Flags1_names": [
+     "PositionUpdate",
+     "UseBoneDirection"
+    ]
+   }
+  ],
+  "2": [
+   {
+    "AssetType": "PBIND",
+    "AttachementType": "Bone",
+    "Orientation": "AttachmentBone",
+    "Deactivation": "Never",
+    "ESK": "b_C_Pelvis",
+    "ScaleMin": 1.0,
+    "ScaleMax": 1.0,
+    "Position": [
+     0.15,
+     0.0,
+     0.0
+    ],
+    "StartTime": 0,
+    "Files": [
+     "Hmr_Fire_L.emp"
+    ],
+    "Flags1_names": [
+     "PositionUpdate",
+     "UseBoneDirection"
+    ]
+   },
+   {
+    "AssetType": "PBIND",
+    "AttachementType": "Bone",
+    "Orientation": "None",
+    "Deactivation": "Immediate",
+    "ESK": "b_L_Hand",
+    "ScaleMin": 1.0,
+    "ScaleMax": 1.0,
+    "Position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "StartTime": 0,
+    "Files": [
+     "Hmr_Crg02.emp"
+    ],
+    "Flags1_names": [
+     "PositionUpdate",
+     "InstantUpdate"
+    ]
+   }
+  ],
+  "3": [
+   {
+    "AssetType": "PBIND",
+    "AttachementType": "Bone",
+    "Orientation": "AttachmentBone",
+    "Deactivation": "Never",
+    "ESK": "b_C_Pelvis",
+    "ScaleMin": 1.2,
+    "ScaleMax": 1.2,
+    "Position": [
+     0.15,
+     0.0,
+     0.0
+    ],
+    "StartTime": 0,
+    "Files": [
+     "Hmr_Fire_L.emp"
+    ],
+    "Flags1_names": [
+     "PositionUpdate",
+     "UseBoneDirection"
+    ]
+   },
+   {
+    "AssetType": "PBIND",
+    "AttachementType": "Bone",
+    "Orientation": "None",
+    "Deactivation": "Immediate",
+    "ESK": "b_L_Hand",
+    "ScaleMin": 1.2,
+    "ScaleMax": 1.2,
+    "Position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "StartTime": 0,
+    "Files": [
+     "Hmr_Crg02.emp"
+    ],
+    "Flags1_names": [
+     "PositionUpdate",
+     "InstantUpdate"
+    ]
+   }
+  ]
+ },
+ "btl_cmn_0": [
+  {
+   "AssetType": "PBIND",
+   "AttachementType": "External",
+   "Orientation": "Camera",
+   "Deactivation": "Never",
+   "ESK": null,
+   "ScaleMin": 1.5,
+   "ScaleMax": 1.5,
+   "Position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "StartTime": 0,
+   "Files": [
+    "Btl_HitLOD.emp"
+   ],
+   "Flags1_names": [
+    "RotateUpdate",
+    "InstantUpdate"
+   ]
+  },
+  {
+   "AssetType": "PBIND",
+   "AttachementType": "External",
+   "Orientation": "Camera",
+   "Deactivation": "Never",
+   "ESK": null,
+   "ScaleMin": 0.8,
+   "ScaleMax": 0.8,
+   "Position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "StartTime": 0,
+   "Files": [
+    "Btl_HitS.emp"
+   ],
+   "Flags1_names": [
+    "RotateUpdate",
+    "InstantUpdate"
+   ]
+  },
+  {
+   "AssetType": "CBIND",
+   "AttachementType": "External",
+   "Orientation": "None",
+   "Deactivation": "Never",
+   "ESK": null,
+   "ScaleMin": 1.0,
+   "ScaleMax": 1.0,
+   "Position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "StartTime": 0,
+   "Files": [
+    "Nml_Dmg00.ecf"
+   ],
+   "Flags1_names": []
+  },
+  {
+   "AssetType": "PBIND",
+   "AttachementType": "Bone",
+   "Orientation": "AttachmentBone",
+   "Deactivation": "Never",
+   "ESK": "b_C_Head",
+   "ScaleMin": 1.0,
+   "ScaleMax": 1.0,
+   "Position": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "StartTime": 0,
+   "Files": [
+    "Btl_Sweat00.emp"
+   ],
+   "Flags1_names": []
+  }
+ ],
+ "animations": [
+  {
+   "index": 0,
+   "name": "VGT_SPA_HMR_C",
+   "frames": 45
+  }
+ ],
+ "user_root": {
+  "note": "b_C_Base, metres, smash axes (+Z his facing, +Y up)",
+  "#0": [
+   [
+    0,
+    -0.0,
+    0.0,
+    0.0
+   ],
+   [
+    2,
+    -0.015,
+    0.0,
+    0.094
+   ],
+   [
+    4,
+    -0.022,
+    0.0,
+    0.22
+   ],
+   [
+    6,
+    -0.022,
+    0.0,
+    0.254
+   ],
+   [
+    8,
+    -0.021,
+    0.0,
+    0.332
+   ],
+   [
+    10,
+    -0.019,
+    0.0,
+    0.457
+   ],
+   [
+    12,
+    -0.014,
+    0.0,
+    0.462
+   ],
+   [
+    14,
+    0.0,
+    0.0,
+    0.308
+   ],
+   [
+    16,
+    -0.011,
+    0.0,
+    0.321
+   ],
+   [
+    18,
+    -0.015,
+    0.0,
+    0.314
+   ],
+   [
+    20,
+    -0.017,
+    0.0,
+    0.308
+   ],
+   [
+    22,
+    -0.018,
+    0.0,
+    0.303
+   ],
+   [
+    24,
+    -0.018,
+    0.0,
+    0.3
+   ],
+   [
+    26,
+    -0.013,
+    0.0,
+    0.301
+   ],
+   [
+    28,
+    -0.001,
+    0.0,
+    0.306
+   ],
+   [
+    30,
+    0.013,
+    0.0,
+    0.315
+   ],
+   [
+    32,
+    0.026,
+    0.0,
+    0.326
+   ],
+   [
+    34,
+    0.032,
+    0.0,
+    0.337
+   ],
+   [
+    36,
+    0.031,
+    0.0,
+    0.352
+   ],
+   [
+    38,
+    0.024,
+    0.0,
+    0.37
+   ],
+   [
+    40,
+    0.013,
+    0.0,
+    0.388
+   ],
+   [
+    42,
+    0.004,
+    0.0,
+    0.402
+   ],
+   [
+    44,
+    0.0,
+    0.0,
+    0.407
+   ]
+  ]
+ }
+}

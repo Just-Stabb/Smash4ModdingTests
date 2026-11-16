@@ -516,7 +516,9 @@ def supamario_values(fx):
         # Core Breaker's (up special, tools/supamario_corebreaker_build.py)
         **corebreaker_values(),
         # Fake Death's (the grounded down special, tools/supamario_fakedeath_build.py)
-        **fakedeath_values()}
+        **fakedeath_values(),
+        # Sledgehammer's (the air down special, tools/supamario_sledgehammer_build.py)
+        **sledgehammer_values()}
 
 
 def godfist_values():
@@ -532,6 +534,11 @@ def corebreaker_values():
 def fakedeath_values():
     import supamario_fakedeath_build
     return supamario_fakedeath_build.msc_values()
+
+
+def sledgehammer_values():
+    import supamario_sledgehammer_build
+    return supamario_sledgehammer_build.msc_values()
 
 
 def msc_only(out_path):

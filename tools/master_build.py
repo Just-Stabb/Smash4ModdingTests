@@ -311,7 +311,7 @@ def body_fix(a, fighter):
         m = U.merge_flat(g[acmd.crc(name)], axe)
         assert m is not None
         g[acmd.crc(name)] = m
-    for line in article_effects(a, fighter, files['effect'], joints):
+    for line in article_effects(a, fighter, files['effect'], joints, files['game']):
         log.append(line)
     for fn, f in files.items():
         f.save(os.path.join(d, fn + '.bin'))
@@ -324,7 +324,9 @@ def body_fix(a, fighter):
 # fighter's (its shot effects at (0, 9.8, 15) are his chest); the held arrow (arrow1's Haved / Haved2, on the string
 # while Failnaught draws) is put on his right hand, which holds it
 ARTICLE_FX = {'master_bow': ('havel', {}), 'master_axe': ('haver', {'top': 'axe'}),
-              'master_arrow1': ('haver', {'top': 'arrow'})}
+              'master_arrow1': ('haver', {'top': 'arrow'}),
+              # the whip sword (not built: its body sword stands in): every segment collapsed onto his Sword1 (approximated)
+              'master_sword': ('sword1', None)}
 # article script -> the Ultimate body animations (their slots get it merged into their effect script)
 ARTICLE_FX_SCRIPTS = {
     ('master_bow', 'SpecialNStart'): ('d00specialnstart', 'd00specialairnstart'),
@@ -335,7 +337,11 @@ ARTICLE_FX_SCRIPTS = {
     ('master_axe', 'LandingAirLw'): ('c05landingairlw',), ('master_axe', 'SpecialLw'): ('d03speciallw',),
     ('master_axe', 'SpecialAirLw'): ('d03specialairlw',), ('master_axe', 'SpecialLwHit'): ('d03speciallwhit',),
     ('master_axe', 'SpecialAirLwHit'): ('d03specialairlwhit',),
-    ('master_axe', 'SpecialLwLanding1'): ('d03speciallwlanding1',)}
+    ('master_axe', 'SpecialLwLanding1'): ('d03speciallwlanding1',),
+    # the sword article's EXTEND status from the up special's frame 17 (SpecialHi / SpecialAirHi's change_status),
+    # its catch on a hit, its down throw
+    ('master_sword', 'Extend'): (('d02specialhi', 'd02specialairhi'), 17),
+    ('master_sword', 'SpecialHiHit'): ('d02specialairhihit',), ('master_sword', 'ThrowLw'): ('e01throwlw',)}
 
 
 def slot_scripts(fighter):
@@ -412,7 +418,7 @@ def merge_timed(a, b):
     return out + end()
 
 
-def article_effects(a, fighter, effect, joints):
+def article_effects(a, fighter, effect, joints, game=None):
     """Ultimate's held-weapon article effect scripts (Failnaught's glow / drawn arrow / shot flash, Aymr's blade flares)
     merged into the body effect scripts of the moves (Byleth v3 played none: e.g. Failnaught's charge showed only the
     foot dust). Their bones: the article root on the fighter bone it is linked to (ARTICLE_FX), the others by the
@@ -436,12 +442,14 @@ def article_effects(a, fighter, effect, joints):
             for b in sk.bones:
                 new = 'art_%s_%s' % (art[7:], b.name.lower())
                 names[b.name.lower()] = new
-                if b.parent_index is None:
+                if extra is None:                       # collapsed onto the link bone
+                    parents[new] = link
+                elif b.parent_index is None:
                     parents[new] = link                      # the root: replaced by the link
                 else:
                     parents[new] = 'art_%s_%s' % (art[7:], sk.bones[b.parent_index].name.lower())
                     locals_[new] = np.array(b.transform, float)
-        for old, new in extra.items():                  # the article's own top (not the fighter's)
+        for old, new in (extra or {}).items():          # the article's own top (not the fighter's)
             names[old] = 'art_%s_%s' % (art[7:], new)
             parents.setdefault(names[old], link)
         rename[art] = names
@@ -464,9 +472,23 @@ def article_effects(a, fighter, effect, joints):
         tr.turned_off = set(re.findall(r'EFFECT_OFF_KIND\(agent, Hash40::new\("([^"]+)"', body))
         cmds = tr.script(body)
         U.EFFECT_CONDS = ()
+        off = 0
+        if anims and isinstance(anims[0], tuple):
+            anims, off = anims
+        if off:                                         # the article's script starts at the body's frame off
+            t, shifted = 0, [U.cmd('FRAME', off)]
+            for c in cmds:
+                if c.name == 'FRAME':
+                    shifted.append(U.cmd('FRAME', int(c.params[0]) + off))
+                else:
+                    shifted.append(c)
+            cmds = shifted
         for anim in anims:
             for name in slots.get(anim, ()):
                 k = acmd.crc(name)
+                if game is not None and not [c for sc in (effect.scripts.get(k, []), game.scripts.get(k, []))
+                                             for c in sc if c.ident != acmd.END]:
+                    continue                            # a slot he doesn't play (ZSS's D02SpecialAirHi: emptied)
                 m = U.merge_flat(effect.scripts.get(k, end()), cmds) or merge_timed(effect.scripts.get(k, end()), cmds)
                 if m is None:
                     log.append('article effects: %s %s -> %s: a branching script, left out' % (art, src, name))
