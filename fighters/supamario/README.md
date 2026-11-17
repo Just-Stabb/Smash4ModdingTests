@@ -3342,3 +3342,70 @@ walls / slopes at 4.2 a frame (the God Fist's travel does the same); Screen_Tint
 (Sonic's FS darkens the stage behind them) and staying on if the connect were cut before the punch (he is invincible
 there); the glass model world-placed (XV2's is on the camera); the purple lines and shards are stand-ins: the skill's
 own effects 0 / 11 need the EEPK `system/custom_skill.cus` names for skill 1352.
+
+## Time Skip v3 (`supamario_timeskip_v3.zip`): the user's list, the .cus / .aur, the time stop's release
+Over v2 on exe_v46y_hold (no exe change in the default build). Changed: the MSC, game.bin, effect.bin, the ptcl / efc.
+
+### XV2's files (`custom_skill.cus`, `aura_setting.aur`, read with `tools/xv2cus.py` / `tools/xv2aur.py`)
+- **CUS:** super skills at 0x3688, 0x5C bytes each; entry 378 = `DSH`, ID1 / ID2 1352, race lock 0xFF, type 0xF1, files
+  flags 0x0C35. Its path fields (EAN, camera EAN, **EEPK**, SE ACB, VOX ACB, after-BAC, after-BCM) are all empty but the
+  EEPK: **`SPA/1350_HIK_FRT`**. So the skill's effects (BAC EEPK type 5, skill 1352, effects 0 and 11) come from
+  `data/skill/SPA/1350_HIK_FRT/1350_HIK_FRT.eepk` (1351 `BAK` uses it too); its EAN, BAC, BCM, BDM and BSA are its own
+  folder's, its SE ACB its own (`CAR_BTL_S1352_DSH_SE.acb`, whose cues carry 1350's names), no voice ACB. PUP and CUS aura
+  0xFFFF (none).
+- **AUR:** 72 auras (7 effect types: BoostStart, BoostLoop, BoostEnd, KiaiCharge, KiryokuMax, HenshinStart, HenshinEnd),
+  348 character rows. Hit (CMS 135, costumes 0 and 50) has **aura 1**: BTL_AURA.eepk effects 40-44 (BoostV_Start,
+  **BoostV_Loop** on g_C_Pelvis with AuraLoop_V's model / trace / light, BoostV_End, KTN_V_Loop), glare off. The skill's BAC
+  has no Aura entry (no type 19 item) and the CUS no aura, so the skill doesn't turn the aura system on; the user's
+  "purple aura at the start" (the clip, 8-30: purple streaks rising round him, left behind as he dashes) is drawn here with
+  Hit's own aura data: `aura_set` converts BTL_AURA's **BoostV_Loop.emp** (7 emitters; its ConeExtrude stripe can't be
+  converted), every emitter emitting 20 frames, its particles staying where they were born, placed by the MSC at his middle
+  (world) at frame 4 and every 20 frames of a held charge (`ts_aura`); it replaces v2's lavender shards stand-in. Its
+  colours are XV2's (violet: (0.2, 0.15, 0.4) x2), peaks capped at 0.8.
+- **Still needed** for the skill's own effects 0 (the start) and 11 (the punch's purple lines; v2's stand-in kept):
+  `data/skill/SPA/1350_HIK_FRT/1350_HIK_FRT.eepk` and every file it lists (`.emp`, `.etr`, `.ecf`, `.emo` / `.emm` /
+  `.emb` / `.ema`, the `.ptcl.emb` / `.ptcl.emm` / `.light.emb` of that folder): the whole folder.
+
+### The user's list
+| | v3 |
+|---|---|
+| ground = air | the per-frame speeds were already the same; the difference was the ending: the ground played the stop (XV2's 85-120, the root's 8.5-unit slide) and the air cut to Fall at the moving part's end. Now both play the stop and end at the motion's end (Wait / Fall): the same travel (test) |
+| speeds | `VMIN, VMAX` **1.5 / 3.36** (run 1.6; v2 2.1 / 4.2), linear by the frames held (20: 2.43). Straight travel (ground = air): uncharged **58.4**, half 86.4, full **112.9** (v2 77.0 / 107.0 / 136.9 on the ground) |
+| air whiff end lag | the stop (phase 4) in the air too, to the motion's end (95), then Fall with no speed handed on |
+| tracking | the first **3** moving frames straight at the target (strong), then the aim turns toward it at most **1.5 degrees a frame** (`TRACK_STRONG`, `TRACK_SOFT`); 80 / 65 degrees as before. ts_track now works in angles (MathF atan2 / sin) |
+| knockback | KBG 70 -> **40**, BKB 70 -> **82** (an int field): from 0 / 50 / 100 / 150% (with the detection's 2%) **98.3 / 123.5 / 148.7 / 173.9** (v2 98.5 / 142.6 / 186.7 / 230.8) |
+| first-frame hit | the catch read (Target 12, sh_struck's damage / state) can see the frame before on the hit's first frame; v2 then cleared the attack flags at once, so the fighter (whose Part 0 record then keeps the box off it) was never caught. Now a refusal while the hit fighter is still in the hit's freeze keeps the flags and looks again next frame (up to 3 times: VAR_31 `TS_V_RETRY`); a lasting refusal (invincible, countering, armored) clears them as before |
+| charge drift | while the charge is held only: the stick moves him **0.3 a frame** at full tilt (forward / back; up / down in the air too, along the floor on the ground) |
+| shield poke | a body hit on a fighter in a shield status is the shield case (caught shielding); fully charged still ignores the shield |
+| air fall after | his gravity eased in over **45 frames** (v2 20), a faster fall brought down **0.02 a frame** (v2 0.05) |
+| no punch drift | the air drift (energy 2) off from the catch (`KineticModule(0xC, 2)`), held at 0 every frame of the connect, back on at its end / any exit |
+| white outline | XV2's BPE 85 ("Flashing White Body Outline 3", BAC entry 0 at 20 and 100, entry 4 at the punch); the clip: on him all through. Smash 4's rim light: `Flash_Light_Effect(255, 255, 255, 0, 75, -10)` + `Change_Flash_Light_Color(4, ..., 110)` at frame 0 of both motions (faint: 110 of 255), faded out over 10 frames at their ends |
+| purple aura at the start | Hit's aura, left behind (above) |
+
+### The time stop's release (the v2 bug) and the camera build
+- **Default build** (`CAMERA_FX = False`): the darkening is the MSC's screen tint (`ts_tint`: MSC `EffectModule(0, slot,
+  frames, R, G, B, A, layer, priority)` = Screen_Tint's EffectModule vt +0x19C, `EffectModule(1, slot, frames)` =
+  End_Screen_Tint's vt +0x1B4, read in the MSC handler `0x02C2CEC8` -> `0x02004530`; Meta Knight's Final Smash uses both),
+  on at the catch, off at the punch; the glass is v2's model in front of the victim. Any exit before the punch (a status
+  change: Supamario hit / KO'd, the match ending, a cut) goes through `ts_end` -> `ts_stop_look_off`: the tint off, the
+  glass terminated (`EffectModule(0x2723)`); the victim let go (v2); the other fighters' freeze isn't renewed (gone within 2
+  frames); the stage's: the connect's game script renews `Stage_Freeze(1, 4)` every frame (a 16-pass loop; v2 set 30 frames
+  once), so it lapses within 4 frames when the script stops.
+- **Camera build** (`CAMERA_FX = True`, needs exe_v46z_camfx: Effect_Camera): the darkening an alpha-blended black-blue
+  quad (`PtcSupamarioTsDark` 0x03410065, (0.08, 0.09, 0.17) at 70%) fixed to the screen (Mode 1, Size 2.2, Z 20, faded at
+  the punch), the glass in front of the camera (Mode 0, Z 25, x0.1), both unslowed; the same exits terminate them. Off
+  until camera_effects is confirmed in game (its v1 test drew a screen-filling white flash).
+
+### Tests
+`tools/supamario_timeskip_test.py`: **144 ok**. New: air travel = ground travel, the air stop to 95, no speed into Fall,
+the 0.02 fall step; the exits (a cut, Damage, Dead, Win at the hold's 5th frame: tint off at once, the glass terminated,
+the victim let go, the bystander's freeze not renewed, the drift back on; the victim escaping; a miss: nothing);
+the aura (frame 4, his middle, left behind > 50 units; every 20 charge frames); the drift (ground / air, none outside the
+charge); no drift in the punch; the shield poke (both charges); soft tracking (1.5 degrees a frame after 3 strong frames);
+the camera switch; the freeze loop, BKB / KBG, the outline in the scripts; the aura set (emission <= 20, follow none,
+peaks). On the v3 build: `supamario_sledgehammer_test` 127 ok, `supamario_fakedeath_test` 47, `supamario_corebreaker_test`
+104, `supamario_godfist_test --all-models` 566 (0 problems each); `msc_stack_check` 0 of 2453 (globals 127 of 128).
+
+### Not confirmed in game
+The rim light's look (LIGHT_SHINE's source angles are Mario's) and whether a status change resets it; the MSC screen
+tint's slot 0 (Sonic's / Meta Knight's use); the first-frame cause (the retry covers a stale read; not reproduced offline).

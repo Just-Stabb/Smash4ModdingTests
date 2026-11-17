@@ -988,19 +988,20 @@ def script_tests(out, sh_out):
     check('specialairs: the stopped time (v3: Stage_Freeze(1, %d) renewed every frame by a %d-pass loop, so a cut lets '
           'the stage go; off at the punch %d), no Screen_Tint in the scripts (the MSC\'s now), the punch\'s Part 1 record '
           'cleared, off at %d; the three punches (uncharged shieldable 16; fully charged unblockable, 22 on a fighter caught '
-          'shielding, 16 else)' % (B.STAGE_FREEZE_RENEW, B.STRIKE, B.STRIKE, B.STRIKE + 2),
+          'shielding, 16 else; v3: BKB %d, KBG %d)' % (B.STAGE_FREEZE_RENEW, B.STRIKE, B.STRIKE, B.STRIKE + 2,
+                                                  B.STRIKE_HIT['BKB'], B.STRIKE_HIT['KBG']),
           ([(nm(c), c.params) for c in conn if nm(c) in ('FRAME', 'Hit_Log_Clear', 'Remove_All_Hitboxes', 'Stage_Freeze',
                                                          'Float_Var_Compare', 'Set_Loop', 'Goto', 'WAIT',
                                                          'Screen_Tint', 'End_Screen_Tint')], hb(conn)),
-          ([('Set_Loop', [B.STRIKE]), ('Stage_Freeze', [1, B.STAGE_FREEZE_RENEW]), ('WAIT', [1.0]), ('Goto', [-5]),
+          ([('Set_Loop', [B.STRIKE]), ('Stage_Freeze', [1, B.STAGE_FREEZE_RENEW]), ('WAIT', [1.0]), ('Goto', [-5 & 0xFFFFFFFF]),
             ('FRAME', [float(B.STRIKE)]), ('Stage_Freeze', [0, 0]),
             ('Hit_Log_Clear', [1]), ('Float_Var_Compare', [B.V_CHG, 4, B.FULL]), ('Float_Var_Compare', [B.V_CHG, 5, B.FULL]),
             ('Float_Var_Compare', [B.V_SHV, 5, 0.5]), ('Float_Var_Compare', [B.V_SHV, 4, 0.5]),
             ('FRAME', [float(B.STRIKE + 2)]), ('Remove_All_Hitboxes', [])],
-           [(0, 1, 16.0, 10, 70, 70, B.STRIKE_SIZE, B.STRIKE_Z, B.STRIKE_Y, B.STRIKE_FREEZE, B.STRIKE_FREEZE, 0.0, 0, 0,
-             1, 3, 1), (0, 1, 22.0, 10, 70, 70, B.STRIKE_SIZE, B.STRIKE_Z, B.STRIKE_Y, B.STRIKE_FREEZE, B.STRIKE_FREEZE,
+           [(0, 1, 16.0, 10, B.STRIKE_HIT['BKB'], B.STRIKE_HIT['KBG'], B.STRIKE_SIZE, B.STRIKE_Z, B.STRIKE_Y, B.STRIKE_FREEZE, B.STRIKE_FREEZE, 0.0, 0, 0,
+             1, 3, 1), (0, 1, 22.0, 10, B.STRIKE_HIT['BKB'], B.STRIKE_HIT['KBG'], B.STRIKE_SIZE, B.STRIKE_Z, B.STRIKE_Y, B.STRIKE_FREEZE, B.STRIKE_FREEZE,
                         0.0, 0, 0, 1, 3, 0),
-            (0, 1, 16.0, 10, 70, 70, B.STRIKE_SIZE, B.STRIKE_Z, B.STRIKE_Y, B.STRIKE_FREEZE, B.STRIKE_FREEZE, 0.0, 0, 0,
+            (0, 1, 16.0, 10, B.STRIKE_HIT['BKB'], B.STRIKE_HIT['KBG'], B.STRIKE_SIZE, B.STRIKE_Z, B.STRIKE_Y, B.STRIKE_FREEZE, B.STRIKE_FREEZE, 0.0, 0, 0,
              1, 3, 0)]))
     snd = [(nm(c), c.params) for s in ('specials', 'specialairs') for c in f['sound'].script(s)
            if nm(c) in ('FRAME', 'Sound_Effect', 'Float_Var_Compare')]
