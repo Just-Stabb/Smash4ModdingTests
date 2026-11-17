@@ -21,6 +21,10 @@ namespace Sm4shCommand.Viewer
         public string Script = "effect";    // (v1.7.2) the script that started it: game, effect, sound or expression
         public int Bone;
         public bool World;                  // EFFECT_GLOBAL / EM_EFFECT_*: no bone (the viewer puts it at the model's origin)
+        // v1.7.6: Effect_Camera (exe_v46z_camfx): attached to the camera (the viewer's own view), its Mode (0 follow,
+        // 1 fixed to the screen, 2 position only) and Frames (0: until it ends / is killed)
+        public bool Camera;
+        public int CamMode, CamFrames;
         public float X, Y, Z, RX, RY, RZ, Size = 1;
         public float R = 1, G = 1, B = 1, A = 1, Rate = 1, SX = 1, SY = 1, SZ = 1;
         public bool HasColor, HasAlpha, HasScale;

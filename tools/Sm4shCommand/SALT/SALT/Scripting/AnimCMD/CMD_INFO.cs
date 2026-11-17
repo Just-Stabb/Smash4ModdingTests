@@ -175,7 +175,8 @@ namespace SALT.Moveset.AnimCMD
             {0xC5858BCF,3},
             {0x71F1A048,11},
             {0x048FC81B,5},
-            {0xAB0FC57C,3}
+            {0xAB0FC57C,3},
+            {0xF20DCF58,12}
         };
         #endregion
         #region Names
@@ -811,6 +812,7 @@ namespace SALT.Moveset.AnimCMD
             {0x71F1A048,"Line_Test"},
             {0x048FC81B,"Var_Reset_Set"},
             {0xAB0FC57C,"Hitbox_Hold"},
+            {0xF20DCF58,"Effect_Camera"},
         };
         #endregion
         #region Params
@@ -1448,6 +1450,7 @@ namespace SALT.Moveset.AnimCMD
             {0x71F1A048,"0,1,1,1,1,0,3,3,3,3"},
             {0x048FC81B,"3,0,1,0"},
             {0xAB0FC57C,"0,0"},
+            {0xF20DCF58,"0,1,1,1,1,1,1,1,0,0,0"},
         };
         #endregion
         #region syntax
@@ -2083,6 +2086,7 @@ namespace SALT.Moveset.AnimCMD
             {0x71F1A048,"Space,X0,Y0,X1,Y1,Floors,Distance,HitX,HitY,Kind"},
             {0x048FC81B,"Variable,Reset,Value,Owner"},
             {0xAB0FC57C,"ID,Mode"},
+            {0xF20DCF58,"Graphic,X,Y,Z,XRot,YRot,ZRot,Size,Mode,Frames,Flags"},
         };
         #endregion
 
@@ -2720,6 +2724,7 @@ namespace SALT.Moveset.AnimCMD
             {0x71F1A048,"Tests the stage between two points (the game's own GroundModule ray check): where the segment first meets a floor, wall or ceiling. New command: needs the patched cross_f.rpx (tools/line_test_cave.py)."},
             {0x048FC81B,"Puts a variable back to a value when its owner is KO'd, lands, grabs a ledge or is hit (exe_v46w)."},
             {0xAB0FC57C,"Marks a hitbox so its hits keep the victim in place: no knockback travel, the damage / hitstun / hitlag / SDI kept (the setting the port pipeline gives Ultimate's rapid-jab hits). Cleared when the hitbox is replaced. New command: needs the patched cross_f.rpx (tools/hitbox_hold_cave.py, exe_v46y_hold)."},
+            {0xF20DCF58,"Starts an effect attached to the camera: placed in front of it every frame (X right, Y up, Z forward from the eye), facing it, following its moves and zooms; Mode 1 keeps it on the same part of the screen (full-screen overlays). EFFECT_OFF_KIND / LAST_EFFECT_SET_* work on it. New command: needs the patched cross_f.rpx (tools/camera_effect_cave.py, exe_v46z_camfx)."},
         };
         #endregion
         /// <summary>

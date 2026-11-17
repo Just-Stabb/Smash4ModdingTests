@@ -22508,6 +22508,159 @@
    0
   ]
  },
+ "F20DCF58": {
+  "_command": "Effect_Camera",
+  "_new": true,
+  "_name": "Effect_Camera",
+  "_size": 12,
+  "_desc": "Starts an effect attached to the camera: placed in front of it every frame (X right, Y up, Z forward from the eye), facing it, following its moves and zooms; Mode 1 keeps it on the same part of the screen (full-screen overlays). EFFECT_OFF_KIND / LAST_EFFECT_SET_* work on it. New command: needs the patched cross_f.rpx (tools/camera_effect_cave.py, exe_v46z_camfx).",
+  "_format": [
+   0,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   1,
+   0,
+   0,
+   0
+  ],
+  "0": {
+   "name": "Graphic",
+   "desc": "The effect's ID, as EFFECT / EFFECT_FOLLOW take it: 0x1000000 + n a common effect, 0x3KK0000 + n one of the fighter's bank (KK its kind).",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "X",
+   "desc": "Right of the screen's centre. Mode 0 / 2: in units; Mode 1: in half the screen's height (1 = the top / right edge at the height's scale; the sides are at +-1.78 on a 16:9 screen).",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Y",
+   "desc": "Up from the screen's centre (units; Mode 1: half screen heights, 1 = the top edge).",
+   "confidence": "high"
+  },
+  "3": {
+   "name": "Z",
+   "desc": "Distance in front of the camera (units, from the eye). At least the camera's near clip + 1 (3): closer is put there. Mode 1: 0 or less is 20.",
+   "confidence": "high"
+  },
+  "4": {
+   "name": "XRot",
+   "desc": "The effect's turn about X, degrees (camera space; Mode 2: world space).",
+   "confidence": "high"
+  },
+  "5": {
+   "name": "YRot",
+   "desc": "The effect's turn about Y, degrees.",
+   "confidence": "high"
+  },
+  "6": {
+   "name": "ZRot",
+   "desc": "The effect's turn about Z, degrees (Rz Ry Rx, as the EFFECT commands).",
+   "confidence": "high"
+  },
+  "7": {
+   "name": "Size",
+   "desc": "Its scale. Mode 1: in half screen heights (an effect 1 unit across at Size 1 covers the screen's height).",
+   "confidence": "high"
+  },
+  "8": {
+   "name": "Mode",
+   "desc": "0: follows the camera (position and turn). 1: fixed to the screen (as 0, and X / Y / Size scaled with the distance x tan(FOV / 2), so it covers the same part of the screen when the camera zooms or moves). 2: position only (moves with the camera, keeps the world's turn). Other values: 0.",
+   "confidence": "high"
+  },
+  "9": {
+   "name": "Frames",
+   "desc": "0: until it ends by itself or is killed (EFFECT_OFF_KIND...). N > 0: fades out after N frames.",
+   "confidence": "high"
+  },
+  "10": {
+   "name": "Flags",
+   "desc": "Bit 1: unslowed (Time_Scale's slow-motion and the owner's hitlag / Target_Time_Scale don't slow its animation). Other bits: 0.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// Example 1: a time stop. The stage freezes for 90 frames and the screen darkens: the fighter's own darkening",
+   "// effect (here 0x3410012: an alpha-blended unit quad, -1 to 1, its emitter following: ptcl 0x310 = 0) fixed to",
+   "// the screen (Mode 1) at Size 1.9 (a 16:9 screen is 1.78 half heights wide), black at 55% alpha, unslowed",
+   "FRAME(Frames=12)",
+   "Stage_Freeze(On=1, Frames=90)",
+   "Effect_Camera(Graphic=0x3410012, X=0, Y=0, Z=20, XRot=0, YRot=0, ZRot=0, Size=1.9, Mode=1, Frames=90, Flags=1)",
+   "LAST_EFFECT_SET_COLOR(Red=0, Green=0, Blue=0)",
+   "LAST_EFFECT_SET_ALPHA(Alpha=55)",
+   "",
+   "// Example 2: glass shattering in front of the camera as the time stop ends: a one-shot burst 25 units in front",
+   "// of the eye (Mode 0), turned 15 degrees on the screen, over the darkening; the darkening is ended at the same",
+   "// time (its emitters stop, its particles fade)",
+   "FRAME(Frames=100)",
+   "Effect_Camera(Graphic=0x3410013, X=0, Y=0, Z=25, XRot=0, YRot=0, ZRot=15, Size=1.2, Mode=0, Frames=0, Flags=1)",
+   "Terminate_Graphic_Effect(Graphic=0x3410012, KillParticles=0, KillImmediately=0)",
+   "",
+   "// Example 3: a vignette while a smash attack charges: a ring that darkens the screen's edges (Mode 1, the same",
+   "// part of the screen however the camera zooms), at 70% alpha, ended when the attack comes out",
+   "FRAME(Frames=4)",
+   "Effect_Camera(Graphic=0x3410014, X=0, Y=0, Z=15, XRot=0, YRot=0, ZRot=0, Size=1.9, Mode=1, Frames=0, Flags=0)",
+   "LAST_EFFECT_SET_ALPHA(Alpha=70)",
+   "FRAME(Frames=10)",
+   "Terminate_Graphic_Effect(Graphic=0x3410014, KillParticles=1, KillImmediately=1)",
+   "",
+   "// Example 4: a common effect pinned to the screen's top-right corner for a second (Mode 1: X 1.5, Y 0.8 half",
+   "// screen heights), small (Size 0.1 half heights)",
+   "Effect_Camera(Graphic=0x1000042, X=1.5, Y=0.8, Z=20, XRot=0, YRot=0, ZRot=0, Size=0.1, Mode=1, Frames=60, Flags=0)",
+   "",
+   "// Example 5: Mode 2: falling particles that move with the camera but keep the world's up (they fall straight",
+   "// down however the camera tilts), 40 units ahead and 10 above the view's centre, for 2 seconds",
+   "Effect_Camera(Graphic=0x3410015, X=0, Y=10, Z=40, XRot=0, YRot=0, ZRot=0, Size=1, Mode=2, Frames=120, Flags=0)"
+  ],
+  "_group": "Effects",
+  "_help": [
+   "## What it does",
+   "Starts an effect (as EFFECT / EFFECT_FOLLOW do: the fighter's bank or the common one, by its ID) and keeps it attached to the camera: every frame, before the effects are drawn, its place, turn and size are set from the camera the game is drawing with (the same eye / target / up / FOV the renderer gets, the camera shake included). So it stays over the screen whatever the camera does: zooming in and out as fighters spread, panning, a Final Smash or a close-up camera.",
+   "Camera space: X to the screen's right, Y up, Z forward (into the screen) from the eye. The effect's own axes are the screen's: its X right, its Y up, its Z toward you, so a flat effect authored in its XY plane (a quad, a billboard) faces the camera as it is.",
+   "",
+   "## Parameters",
+   "- Graphic: the effect's ID, as the EFFECT commands take it: 0x1000000 + n a common effect (0x1000013 ...), 0x3KK0000 + n one of the fighter's bank (KK its kind: 0x341 Supamario, 0x30C Ganondorf). A projectile's script uses its owner's bank as usual.",
+   "- X, Y: where on the screen, from its centre: X right, Y up. Mode 0 / 2: in units (at distance Z). Mode 1: in half the screen's height: Y 1 is the top edge, -1 the bottom; X 1 is a half height right (the sides of a 16:9 screen are at X -1.78 and 1.78).",
+   "- Z: the distance in front of the camera (units, from the eye along the view). It has to be past the camera's near clip (2 in battle): anything closer is put at near + 1 (3). Mode 1: 0 (or less) is 20. Fighters and the stage are 80-300 units away in a normal match, so an effect at 10-30 is in front of all of them.",
+   "- XRot, YRot, ZRot: the effect's own turn in degrees, applied Rz Ry Rx as the EFFECT commands do, in camera space (ZRot 90 turns it a quarter round on the screen; XRot 90 lays an XZ plate, eft's particle type 2, flat to the screen). Mode 2: in world space.",
+   "- Size: its scale. Mode 0 / 2: as EFFECT's Size. Mode 1: in half screen heights: an effect 1 unit across (-1 to 1, a \"unit quad\") at Size 1 covers the screen's height exactly; Size 1.78 covers a 16:9 screen's width (use a little more, 1.9, so its edges never show).",
+   "- Mode:",
+   "  - 0: follow the camera: place and turn, Size as given. As the camera zooms its FOV, the effect covers more or less of the screen (as anything at a fixed distance would).",
+   "  - 1: fixed to the screen: as 0, and X, Y and Size are scaled with the distance x tan(FOV / 2) (the half height the screen shows at that distance), so it covers the same part of the screen however the camera zooms or moves. For full-screen overlays, vignettes, anything that belongs to the screen.",
+   "  - 2: position only: it moves with the camera, its turn stays the world's (XRot / YRot / ZRot in world space, no turning as the camera tilts): weather and particles that should fall straight down in front of the camera.",
+   "  - Any other value: 0.",
+   "- Frames: 0: it lasts until it ends by itself (a one-shot effect, when its particles are gone) or is killed (Terminate_Graphic_Effect with its Graphic). N > 0: it is faded out after N frames (the emitters stop, live particles die out, still attached to the camera until they are gone).",
+   "- Flags: bit 1 (Flags=1): unslowed: the game's slow-motion (Time_Scale, Final Smashes' slow) and the owner's own effect rate (its hitlag, Target_Time_Scale) don't slow the effect's animation (the game's LAST_EFFECT_SET_DISABLE_SYSTEM_SLOW and a rate of 1 together). Other bits: 0 (reserved).",
+   "",
+   "## Ending it, and the other effect commands",
+   "- Terminate_Graphic_Effect(Graphic=the same ID, ...) ends it like any of the object's effects (KillParticles=1: at once; 0: the emitters stop and the particles die out). Frames does the same by itself.",
+   "- LAST_EFFECT_SET_COLOR / _ALPHA / _RATE / _SCALE_W right after it apply to it (it is the object's last effect). A darkening is an alpha-blended effect (blend 0, normal) set to black with an alpha: an additive effect (blend 1) can only brighten, black adds nothing.",
+   "- A status change doesn't end it (as for EFFECT): a looping effect goes on until Frames or Terminate_Graphic_Effect ends it, so give a looping one either.",
+   "- It is hidden while its owner is hidden (VisibilityModule, Kirby's Stone): the game switches every effect of the module with the model's visibility.",
+   "",
+   "## Time (Stage_Freeze, Time_Scale)",
+   "- It keeps drawing and following the camera during Stage_Freeze, Time_Scale and Target_Time_Scale: the matrix is set in the effects' own frame pass, which runs every displayed frame (Stage_Freeze stops only the stage; the effects go on).",
+   "- Its animation: during Time_Scale's slow-motion (1/N) the game's effects play at 1/N; so does this one unless Flags=1. A time-stop overlay wants Flags=1 (it plays at full speed while the match is slowed).",
+   "- Frames counts displayed frames (slow-motion included): Frames=90 is 1.5 seconds on screen whatever the time scale. Pausing the game stops it.",
+   "",
+   "## Gotchas",
+   "- Draw order: it is a 3D effect, drawn with the other effects: under the HUD (damage panels, timer, the pause screen: they are drawn after the 3D scene and stay on top). At distance 10-30 it covers the stage and the fighters (they are farther); another effect drawn later in the same pass can still show over it (particles don't write depth), as can effects closer to the camera than it.",
+   "- Depth: keep Z past the near clip (3 or more) and in front of whatever it should cover. Its own depth bias (the emitter's camera offset, ptcl 0x4D0) still applies.",
+   "- Emitters that don't follow: an emitter with follow type 1 or 2 (ptcl 0x310) leaves its particles where they were emitted, in the world: when the camera moves, those particles stay behind (the effect itself follows). Bursts during a still camera (a time stop) look right; for an overlay that has to stay put while the camera moves, use emitters with follow type 0 (tools/ptcl.py sets 0x310).",
+   "- Billboard particles (type 0) face the camera anyway; plates and meshes face it through the effect's turn above.",
+   "- Size: the effect's own size in its bank is what Size scales: measure it (Sm4shCommand's Hitbox Viewer, or try Size 1 and look) before working out a full-screen Size. FOV: the battle camera's is about 41 degrees (0.716 rad) at rest and changes as it zooms; Mode 1 follows it, Mode 0 doesn't.",
+   "- Several cameras: it follows the camera of the TV image (the effect camera table's first entry, the one the battle is drawn with). A second view (the GamePad's, Cemu's second window when it shows the battle from elsewhere) draws the same effect at the same place in the world: it can be off screen or out of place there.",
+   "- 16 camera effects at once (all objects together): a 17th fades the oldest out (it stops following).",
+   "- It needs a match (a camera): in menus / the results it starts nothing.",
+   "- Unlike Graphic_Effect (FOOT_EFFECT, refused in the air) it is never refused: it uses the module's world request (the one MSC's EffectModule uses), which has no ground check.",
+   "",
+   "The Hitbox Viewer draws it in front of its own view (it has no game camera: X / Y from the view's centre, Mode 1 in half the view's height; Z changes nothing in that flat view) and lists it with the effects; Frames ends it there too.",
+   "Needs exe_v46z_camfx (tools/camera_effect_cave.py; exe_v46y_hold + it). Without it a script that uses this command won't load properly: ship the executable with any script that uses it."
+  ]
+ },
  "F2C328A7": {
   "_command": "unk_F2C328A7",
   "_note": "ItemModule MSC op 0xB = SHOOT_ITEM_BULLET's op (965E035A, CRC-verified) with an argument",

@@ -55,6 +55,7 @@ namespace Sm4shCommand.Viewer
         /// follows, on its spawn frame for a one-shot, on its detach frame once detached.</summary>
         public Mat4 EffectMatrixAt(EffectData e, int g)
         {
+            if (e.Camera) return CameraEffectMatrix(e);       // v1.7.6: Effect_Camera
             var local = Mat4.TRS(new[] { e.X, e.Y, e.Z },
                 Mat4.EulerToQuat(e.RX * (float)Math.PI / 180, e.RY * (float)Math.PI / 180, e.RZ * (float)Math.PI / 180),
                 new[] { 1f, 1f, 1f });

@@ -30,7 +30,7 @@ namespace Sm4shCommand
         static readonly string[] SubgroupOrder =
         {
             "Hitboxes & hits", "Fighter state", "Inputs", "Position & rotation", "Animation", "Targets & tracking", "Threads",
-            "Variables",
+            "Time & stage", "Effects", "Variables",
         };
         const string GroupSeparator = " / ";
         static readonly string[] TypeNames = { "int", "float", "decimal", "variable" };

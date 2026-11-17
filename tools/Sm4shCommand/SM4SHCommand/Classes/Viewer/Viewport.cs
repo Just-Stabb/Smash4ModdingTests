@@ -478,6 +478,7 @@ namespace Sm4shCommand.Viewer
         /// VBN's; the game's order for effects isn't confirmed). Null when its bone isn't known.</summary>
         public Mat4 EffectMatrix(EffectData e)
         {
+            if (e.Camera) return CameraEffectMatrix(e);
             var local = Mat4.TRS(new[] { e.X, e.Y, e.Z },
                 Mat4.EulerToQuat(e.RX * (float)Math.PI / 180, e.RY * (float)Math.PI / 180, e.RZ * (float)Math.PI / 180),
                 new[] { 1f, 1f, 1f });
@@ -488,6 +489,34 @@ namespace Sm4shCommand.Viewer
             int bi = Assets.Skeleton.ScriptBone(e.Bone);
             if (bi < 0 || bi >= w.Length) return null;
             return w[bi].ClearScale() * local;
+        }
+
+        /// <summary>v1.7.6: where an Effect_Camera effect is drawn: in front of the viewer's own view (the game puts it in
+        /// front of its camera), its X / Y from the view's centre along the screen's right / up (Mode 1: in half the
+        /// view's height, its size too), its axes the screen's right, up and toward you (Mode 2: the model's own axes,
+        /// the turn in world space). Z (the distance) changes nothing in this flat view: it is drawn in front of
+        /// everything. The particles keep their Size (the matrix carries Mode 1's scale for the marker and the
+        /// placement).</summary>
+        public Mat4 CameraEffectMatrix(EffectData e)
+        {
+            float[] r, u, f;
+            Axes(out r, out u, out f);
+            float z = zoom > 0 ? zoom : 1;
+            int h = Math.Max(1, Height);
+            // the model point at the view's centre (Project: x = W/2 + panX + p.r zoom, y = 0.72 H + panY - p.u zoom)
+            float cr = -panX / z, cu = (h * 0.72f + panY - h / 2f) / z;
+            float k = e.CamMode == 1 ? h / 2f / z : 1f;
+            float x = cr + e.X * k, y = cu + e.Y * k, depth = -500f;
+            var cam = Mat4.Identity();
+            for (int i = 0; i < 3; i++)
+            {
+                if (e.CamMode != 2) { cam[i, 0] = r[i]; cam[i, 1] = u[i]; cam[i, 2] = -f[i]; }
+                cam[i, 3] = r[i] * x + u[i] * y + f[i] * depth;
+            }
+            var local = Mat4.TRS(new[] { 0f, 0f, 0f },
+                Mat4.EulerToQuat(e.RX * (float)Math.PI / 180, e.RY * (float)Math.PI / 180, e.RZ * (float)Math.PI / 180),
+                new[] { k, k, k });
+            return cam * local;
         }
 
         /// <summary>The colour an effect is drawn with: its set colour (scaled into 0-255 when over 1), else grey-blue.</summary>

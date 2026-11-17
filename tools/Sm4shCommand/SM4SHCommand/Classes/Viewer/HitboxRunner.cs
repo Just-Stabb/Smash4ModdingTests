@@ -726,6 +726,8 @@ namespace Sm4shCommand.Viewer
         {
             public FxKind Kind;
             public bool Follow, World, Flip, Light, Particle;
+            public bool Camera;         // v1.7.6: Effect_Camera
+            public int Mode = -1, Frames = -1;
             public string Op;           // v1.6.2: an overlay / visibility command's operation
             public int G = -1, GL = -1, Work = -1, Bone = -1, BoneHash = -1, X = -1, Y = -1, Z = -1, RX = -1, RY = -1,
                 RZ = -1, Size = -1, Term = -1, R = -1, Gr = -1, B = -1, Alpha = -1, Rate = -1, Fade = -1,
@@ -775,6 +777,18 @@ namespace Sm4shCommand.Viewer
                 d.Kind = FxKind.Vis;
                 d.Op = n;
                 d.X = at(new[] { "ChangerID", "Group" }); d.Y = at(new[] { "ChangerState", "State" });
+            }
+            else if (n == "Effect_Camera")
+            {
+                // v1.7.6 (exe_v46z_camfx): an effect attached to the camera: drawn in front of the viewer's view
+                d.Kind = FxKind.Spawn;
+                d.Camera = true;
+                d.World = true;
+                d.G = at(new[] { "Graphic" });
+                d.X = at(new[] { "X" }); d.Y = at(new[] { "Y" }); d.Z = at(new[] { "Z" });
+                d.RX = at(new[] { "XRot" }); d.RY = at(new[] { "YRot" }); d.RZ = at(new[] { "ZRot" });
+                d.Size = at(new[] { "Size" });
+                d.Mode = at(new[] { "Mode" }); d.Frames = at(new[] { "Frames" });
             }
             else if (screenNames.Contains(n))
                 d.Kind = FxKind.Screen;
@@ -873,6 +887,13 @@ namespace Sm4shCommand.Viewer
                             Size = fl(d.Size, 1), Terminate = it(d.Term),
                             StartFrame = r.gameFrame, SpawnAnimFrame = (float)(r.animFrame - 1),
                         };
+                        if (d.Camera)
+                        {
+                            e.Camera = true;
+                            e.CamMode = d.Mode >= 0 ? it(d.Mode) : 0;
+                            if (e.CamMode < 0 || e.CamMode > 2) e.CamMode = 0;
+                            e.CamFrames = d.Frames >= 0 ? Math.Max(0, it(d.Frames)) : 0;
+                        }
                         if (d.Work >= 0) e.Id = 0;
                         if (d.BoneHash >= 0) e.Bone = -1;
                         if (d.Flip) { e.HasLeft = true; e.IdLeft = (uint)it(d.GL); }
@@ -1014,6 +1035,14 @@ namespace Sm4shCommand.Viewer
         {
             foreach (var e in fx.Live.ToList())
             {
+                // v1.7.6: Effect_Camera's Frames (the game fades it out after them)
+                if (e.Camera && e.CamFrames > 0 && gameFrame >= e.StartFrame + e.CamFrames - 1)
+                {
+                    fx.Live.Remove(e);
+                    e.EndFrame = gameFrame + 1;
+                    e.EndReason = "Effect_Camera's Frames (" + e.CamFrames + ")";
+                    continue;
+                }
                 if (e.Follow && e.DetachFrame < 0) continue;
                 int life = OneShotLife != null ? OneShotLife(e.Id) : 0;
                 if (life < 0) continue;

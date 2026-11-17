@@ -10774,6 +10774,36 @@
 "ID",
 "Mode"
 ]
+},
+"F20DCF58": {
+"size": 12,
+"name": "Effect_Camera",
+"format": [
+0,
+1,
+1,
+1,
+1,
+1,
+1,
+1,
+0,
+0,
+0
+],
+"syntax": [
+"Graphic",
+"X",
+"Y",
+"Z",
+"XRot",
+"YRot",
+"ZRot",
+"Size",
+"Mode",
+"Frames",
+"Flags"
+]
 }
 }
 }
