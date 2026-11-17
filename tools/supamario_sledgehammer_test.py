@@ -734,6 +734,7 @@ def msc_tests(path):
     gtests(path, hit_k, ck)
     v5_tests(path, hit_k, ck)
     brev_tests(path)
+    spike_tests(path, ck)
     # 13. v2: shields: uncharged 24% of the max shield and 8 frames held; charged 80% and 30; a break
     for chg, take, stun, kk in ((False, B.SHIELD_TAKE, B.SHIELD_STUN, hit_k), (True, B.SHIELD_TAKE_CH, B.SHIELD_STUN_CH, ck)):
         v = FT.Fighter(2, 4.0, fall_y(100.0, kk) - 6.0, air=True, shield=True)
@@ -905,6 +906,63 @@ def v5_tests(path, hit_k, ck):
               'then type) once the active frames are over' % what,
               (ws[0], ws[-2:], v.armor, round(v.armor_thr, 3)),
               (('armor', 0.0), [('armor_thr', round(thr, 3)), ('armor', float(armor))], armor, round(thr, 3)))
+
+
+def spike_tests(path, ck):
+    """v6 (user: "the fully charged Sledgehammer must be untechable for opponents hit in the air"): a charged real hit on
+    an airborne fighter: its controller off and the lockout's resets from the hit on; a tech it takes in its hitstun
+    replaced by the missed tech's bounce (the CPU's tech request doesn't go through the controller); let go when its
+    hitstun ends, on its KO, a hit on it by anyone, his KO; uncharged: techable as before"""
+    t = 2 + 2
+
+    def spiked(tech=None, at=None, air=True, ev=None, ev_at=None, charged=True):
+        v = victim_below(k=ck if charged else A.START_FRAMES - 1 + B.HIT_FROM)
+        g = Game(fighters=[v], held=(lambda n: True) if charged else (lambda n: n <= 2))
+
+        def tick(g_, k):
+            if at is not None and k == at:
+                v.status = tech
+                v.air = air
+            if ev is not None and k == ev_at:
+                g_.event(*ev)
+        run(path, g, frames=230 if charged else 200, after=60, tick=tick)
+        return v, g
+    v, g = spiked()
+    k1 = v.hit_at
+    ins = [(n, val) for n, k_, val in getattr(v, 'wlog', []) if k_ == 'input']
+    stun_end = next((n for n, st, hs, hp, _x in v.log if n > k1 and hp == 0 and hs == 0), None)
+    check('v6 charged air spike: its controller off the frame after the hit (%d), its buffer emptied, the resets '
+          'registered (its KO / a hit on it: mask 9; his KO); back when its hitstun ends (%s)' % (k1 + 1, stun_end),
+          (ins[:1], [n for n, k_, _v in v.wlog if k_ == 'buffer'][:1], g.items.get(2, {}).get(0x115),
+           ins[-1][1] if ins else None, g.vars.get(B.V_GS, 0.0)),
+          ([(k1 + 1, 1.0)], [k1 + 1], [0.0, 9], 0.0, 0.0))
+    check('v6 charged air spike: let go (controller back) on the frame its hitstun reads 0, not before',
+          (ins[-1][0] >= stun_end if ins and stun_end else None, len(ins)), (True, 2))
+    tk = k1 + B.HITSTOP_CH + 3                           # in its hitstun, after its hitstop
+    for name, st, air, want in (('a tech in place (0x64) on the ground', 0x64, False, 0x4D),
+                                ('a tech roll (0x65)', 0x65, False, 0x4D),
+                                ('a wall tech (0x66)', 0x66, True, 0x49),
+                                ('a wall-jump tech (0x67)', 0x67, True, 0x49),
+                                ('a ceiling tech (0x68)', 0x68, True, 0x4A),
+                                ('EscapeAir on the ground (the CPU\'s landing dodge)', 0x22, False, 0x4D),
+                                ('EscapeAir in the air', 0x22, True, 0x4C)):
+        v, g = spiked(st, tk, air)
+        sw = [(n, val) for n, k_, val in v.wlog if k_ == 'status']
+        check('v6 charged air spike, %s in its hitstun (frame %d): replaced the same frame by %s (the missed tech\'s)' % (
+            name, tk, hex(want)), sw[:1], [(tk, float(want))])
+    for name, ev in (('its KO (its own reset)', (2, 1)), ('a hit on it by another fighter', (2, 8)),
+                     ('Supamario KO\'d (his reset)', ('me', 1))):
+        v, g = spiked(ev=ev, ev_at=k1 + B.HITSTOP_CH + 2)
+        k2 = k1 + B.HITSTOP_CH + 2
+        check('v6 charged air spike, %s at %d: its controller back, let go (nothing written to it after)' % (name, k2),
+              (v.input_off, g.vars.get(B.V_GS, 0.0),
+               [x for x in v.wlog if x[0] > k2 + 1 and x[1] in ('input', 'status')]), (False, 0.0, []))
+    v, g = spiked(charged=False)
+    check('v6 uncharged air hit: techable as before (hit; no controller off, no spike hold)',
+          (v.hit_at is not None, [x for x in getattr(v, 'wlog', []) if x[1] == 'input'], g.vars.get(B.V_GS, 0.0)),
+          (True, [], 0.0))
+    v2, g2 = spiked(0x64, A.START_FRAMES - 1 + B.HIT_FROM + B.HITSTOP + 3, False, charged=False)
+    check('v6 uncharged: a tech it takes stays a tech', [x for x in getattr(v2, 'wlog', []) if x[1] == 'status'], [])
 
 
 def brev_tests(path):
