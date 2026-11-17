@@ -62,6 +62,10 @@ Hooks (each word asserted):
                                            from eft's SetMtx before and after the game's update (the game gives them one
                                            only when its update rebuilt it, which flag 0x8000 skips: v1-v3's particles
                                            stayed where they started), its model too
+  (v5) the game's 2.5D depth squash off for camera effects: cf_flags clears the instance's +0x1A3 (the game's eft
+       particle callback 0x033508C0 moved every CPU particle's Z to 0 + Z x 0.07: v4's dizzy stars, 20 units in front
+       of the camera, were drawn near the stage, around the screen's centre) and cf_eftset gives each emitter set
+       emp1.z 1.0 (+0x2CC, eft's default: the vertex programs' billboard on, not the squash's 0.07)
   SFZ     0x04BD4334 / 0x04BD4268          (v3) Stage_Freeze's stop / resume: On 1 the update only (no white
                                            screen, confirmed in game), 2 the game's full stop, 3 the Final Smash stop
   --diag: TEST ONLY OSReport lines (S4CS / S4CF / S4CM / S4CE per effect, S4CC / S4CV / S4CN the camera, S4SF).
@@ -118,11 +122,26 @@ UPDATE = 0x0334E0C8
 SETMTX = 0x032FF744             # (inst + 0x20, &3x4): the emitter set's matrix (eft set +0x350, its scale +0x7AC)
 SETMTX_SIG = (0x7C0802A6, 0x7C2B0B78, 0x9421FF60)
 VALID = 0x032FF640              # (inst + 0x20) -> 1 while its model is there (efc entries with a model)
-EFT_SETMTX = 0x04A4AFB8         # (v4) eft EmitterSet::SetMtx(set, &3x4): set +0x1E4 SRT, +0x214 RT, +0x248 scales
+EFT_SETMTX = 0x04A4AFB8         # (v4) eft EmitterSet::SetMtx(set, &3x4): set +0x1E8 SRT, +0x218 RT, +0x248 scales
 EFT_SETMTX_SIG = (0x9421FF90, 0xDB610020, 0x7C0802A6)
 GATE_SIG = {0x0334EEB0: 0x2C1A0000, 0x0334EEB4: 0x41820010, 0x0334EEBC: 0x38810010, 0x0334EEC0: 0x496FC0F9,
             0x0334E264: 0x55260421, 0x0334E268: 0x40820024, 0x0334E284: 0x3B400001}   # the game's r26 gate
 VALID_SIG = (0x81830000, 0x2C0CFFFF)
+# (v5) the game's 2.5D depth squash ("depth flatten"): an instance whose request passed r9 = 1 (the world request
+# does) gets byte +0x1A3 (0x0334DBAC). Then: its emitter set's +0x2CC = 0.07 at creation (0x0334DC70: eft's emp1.z,
+# below 1 the vertex programs skip the billboard matrix), the plane +0x11C = 0 (0x0334F2D4), its model's depth x 0.07
+# (0x0334EAAC), and the game's eft particle callbacks (registered at 0x032EF93C-0x032EF9B0 into the system's +0xA68
+# table, run by eft's CPU particle calc 0x04A65480 on every CPU particle after its place: 0x04A65624 / 0x04A65680)
+# move each CPU particle's world Z (p + 0x40) to plane + (z - plane) x 0.07. Harmless at the stage (z about 0); a
+# camera effect 20 units in front of a camera at z 200 had its CPU particles (the dizzy stars) squashed onto the stage,
+# near the screen's centre (camera_effects v4's clips). GPU particles (flag 0x00800000) never run the callback.
+FLAT = 0x1A3                    # instance byte: the squash on
+SET_EMP1Z = 0x2CC               # eft emitter set: emp1.z (1.0 eft's default, 0x04A55D84; 0.07 squashed)
+FLAT_SIG = {0x0334DBAC: 0x9BD701A3, 0x0334DC6C: 0xC0046028, 0x0334DC70: 0xD01002CC,
+            0x033508CC: 0x880B01A3, 0x033508DC: 0xC1AB011C, 0x033508E0: 0xC18C0040, 0x033508EC: 0xC00B6028,
+            0x033508F4: 0xD00C0040, 0x10196028: 0x3D8F5C29,
+            0x032EF9A8: 0x38A508C0, 0x032EF9AC: 0x38800000, 0x04A5856C: 0x90AC0A68,
+            0x04A65DF0: 0xC16702CC}
 CAMMGR = 0x10352470             # [CAMMGR] the camera manager; +0x780 its snapshot block (entry 0 slot 0's source)
 CAMMGR_SIG = {0x02D29634: 0x3C601035, 0x02D29638: 0x80632470}
 CAMBLK = 0x780
@@ -200,7 +219,8 @@ def find(orig):
                             (EFT_SETMTX, EFT_SETMTX_SIG, 'eft SetMtx')):
         for i, want in enumerate(sig):
             assert orig(base + 4 * i) == want, '%s 0x%08X: 0x%08X' % (what, base + 4 * i, orig(base + 4 * i))
-    for at, want in list(CAMMGR_SIG.items()) + list(SFZ_SIG.items()) + list(FX_SIG.items()) + list(GATE_SIG.items()):
+    for at, want in list(CAMMGR_SIG.items()) + list(SFZ_SIG.items()) + list(FX_SIG.items()) + list(GATE_SIG.items()) + \
+            list(FLAT_SIG.items()):
         assert orig(at) == want, '0x%08X: 0x%08X, not 0x%08X' % (at, orig(at), want)
     for at in (SFZ_ON_AT, SFZ_OFF_AT):
         w = orig(at)
@@ -293,7 +313,7 @@ DIAG_FMTS = [
     ('s_cf', 'S4CN fov=%08X near=%08X far=%08X up=%08X %08X %08X\n'),
     ('s_ef', 'S4CF k=%d h=%08X i=%08X fl=%08X set=%08X fo=%08X b=%08X\n'),
     ('s_em', 'S4CM t=%08X %08X %08X x=%08X %08X %08X\n'),
-    ('s_ee', 'S4CE em=%d t=%08X %08X %08X x=%08X %08X %08X\n'),
+    ('s_ee', 'S4CE em=%d d=%08X t=%08X %08X %08X x=%08X s=%08X\n'),
     ('s_cs', 'S4CS id=%08X h=%08X i=%08X why=%03X x=%08X y=%08X z=%08X\n'),
     ('s_sf', 'S4SF n=%d on=%d mode=%d mgr=%08X d0=%d\n'),
 ]
@@ -317,8 +337,8 @@ def _v3_src(diag):
     """camera_effects v3: cf_upd (eft gets the camera matrix after the game's instance update), Stage_Freeze's modes
     (cf_sfz_on / cf_sfz_off) and, with diag, the OSReport lines (cf_dcam, cf_dlog, cf_dsfz)"""
     import diag_godfist_cave as G
-    D = dict(update=UPDATE, setmtx=SETMTX, valid=VALID, eftset=EFT_SETMTX, ntab=NTAB, entry=ENTRY, stop=STAGE_STOP, vis=FX_VIS,
-             pause=FX_PAUSE, kh=FS_KEY >> 16, mh=FS_MASK >> 16, full=SFZ_FULL, fs=SFZ_FS, every=DIAG_EVERY,
+    D = dict(update=UPDATE, setmtx=SETMTX, valid=VALID, eftset=EFT_SETMTX, emp1z=SET_EMP1Z, flat=FLAT, ntab=NTAB,
+             entry=ENTRY, stop=STAGE_STOP, vis=FX_VIS, pause=FX_PAUSE, kh=FS_KEY >> 16, mh=FS_MASK >> 16, full=SFZ_FULL, fs=SFZ_FS, every=DIAG_EVERY,
              vh=G.OSREPORT_VENEER >> 16, vl=G.OSREPORT_VENEER & 0xFFFF, crclr=G.CRCLR_CR1EQ,
              cmh=(CAMMGR + 0x8000) >> 16, cml=CAMMGR & 0xFFFF, cblk=CAMBLK, tbl_h=CAMTBL >> 16, tbl_l=CAMTBL & 0xFFFF)
     rep = """
@@ -464,6 +484,8 @@ ces_one:                                # (r3 set, r4 its id; r31 the instance) 
         lwz r11, 0x1C(r12)              # matrices given to eft's sets
         addi r11, r11, 1
         stw r11, 0x1C(r12)
+        lis r0, 0x3F80                  # (v5) emp1.z 1.0: eft's own billboards (the squash's 0.07 off)
+        stw r0, %(emp1z)d(r3)
         addi r4, r31, 0x50
         b 0x%(eftset)08X
 
@@ -660,7 +682,7 @@ cdc_out:
         blr
 
 # --- diag: S4CF / S4CM / S4CE (r3 the instance, r4 the calc passes it has been through: its first %(every)d, then
-#     every %(every)dth): the instance, the matrix it holds (+0x50) and the one eft's emitter set holds (+0x12C: +0x1E4,
+#     every %(every)dth): the instance, the matrix it holds (+0x50) and the one eft's emitter set holds (+0x12C: +0x1E8,
 #     rows, translation in column 3) after cf_upd ---------------------------------------------------------------------
 cf_dlog:
         stwu r1, -0x30(r1)
@@ -713,12 +735,12 @@ cdl_go:
         lis r3, s_ee@ha
         addi r3, r3, s_ee@l
         lwz r4, 0x1DC(r28)
-        lwz r5, 0x1F0(r28)
-        lwz r6, 0x200(r28)
-        lwz r7, 0x210(r28)
-        lwz r8, 0x1E4(r28)
-        lwz r9, 0x1F4(r28)
-        lwz r10, 0x204(r28)
+        lwz r5, 0x2CC(r28)              # (v5) emp1.z: 1.0, or the squash's 0.07
+        lwz r6, 0x1F4(r28)              # (v5) its SRT is at +0x1E8 (v4 read one word early): translation
+        lwz r7, 0x204(r28)
+        lwz r8, 0x214(r28)
+        lwz r9, 0x1E8(r28)              # m00
+        lwz r10, 0x248(r28)             # the X axis' length (SetMtx's scale)
 """ + rep + """
 cdl_out:
         lmw r28, 0x20(r1)
@@ -786,7 +808,7 @@ def src(s, hand, diag=False):
              req=WORLD_REQ, req_h=WORLD_REQ >> 16, req_l=WORLD_REQ & 0xFFFF, em=EM_ACC, keep=FLAG_KEEP,
              unslow=FLAG_UNSLOWED, rate1=REQ_RATE1, ntab=NTAB, entry=ENTRY, calc_back=CALC_AT + 4,
              cmh=(CAMMGR + 0x8000) >> 16, cml=CAMMGR & 0xFFFF if CAMMGR & 0x8000 == 0 else (CAMMGR & 0xFFFF) - 0x10000,
-             cblk=CAMBLK)
+             cblk=CAMBLK, flat=FLAT, emp1z=SET_EMP1Z)
     out = """
 # --- the command tables' fallbacks --------------------------------------------------------------------------------
 cf_lookup:                              # r3 = a CRC no table before has
@@ -996,8 +1018,11 @@ cf_ret:
         blr
 
 # cf_flags(r3 entry, r4 instance): +0x144 |= keep (| unslowed); (v3) its position / scale fields mirror the matrix
-# (+0xC8 = the translation, +0xB0 = the scale: what the game reads of an instance besides +0x50). r0 r12 f0
+# (+0xC8 = the translation, +0xB0 = the scale: what the game reads of an instance besides +0x50); (v5) the game's
+# 2.5D depth squash off (+0x1A3 = 0: its CPU particles' Z was squashed x 0.07 toward z 0). r0 r12 f0
 cf_flags:
+        li r0, 0
+        stb r0, %(flat)d(r4)
         lfs f0, 0x5C(r4)
         stfs f0, 0xC8(r4)
         lfs f0, 0x6C(r4)

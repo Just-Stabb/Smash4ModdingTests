@@ -26,6 +26,16 @@ the stars not in their corner; the "square" a circle that stays in the world whe
   AppealSL   effect: the black square over the whole screen (Mode 1, Size 2, black 60 %), 120 frames
   AppealLwR  effect: the ice smoke (Mode 0, Z 30, Size 0.25), a one-shot
   AppealLwL  effect: the dark square in camera units (Mode 0, X 6, Y 3, Z 40, Size 3: 6 units wide, black 70 %)
+v5 (camera_effects v5; v4's test: everything follows the camera but the dizzy stars, drawn near the stage around the
+screen's centre: the game's 2.5D depth squash of CPU particles, which exe_v46z_camfx5 turns off for camera effects):
+the offset maths and the emitter types apart, the squash's regressions (billboards now on: emp1.z 1.0)
+  AppealHiL  effect: Mode 1 squares at the four corners (X +-1.4, Y +-0.7, Size 0.1, blue): the offsets alone
+  AppealHiR  effect: the same corner squares, each with the dizzy stars on it (Mode 1, Size 0.05): CPU particles
+  AppealSR   effect: the stars, top-right only (Mode 1, X 1.4, Y 0.7, Size 0.05), 90 frames
+  AppealSL   effect: Mode 0 at Z 40: the square at X 6, Y 3 and the stars at X -6, Y 3 (Size 0.5)
+  AppealLwR  effect: the ice smoke (Mode 0, Z 30, Size 0.25), a one-shot (regression)
+  AppealLwL  effect: the black square over the whole screen (Mode 1, Size 2, black 60 %) (regression)
+  game.bin is the user's own (v4's Stage_Freeze test on AppealHiR put back).
 The square (DARK_QUAD, CamFxDarkQuad): one alpha-blended billboard 2 units wide, the common RayGunShotFlash2_Copy1's
 emitter and shader with (v4) a solid white texture, one particle living until the set fades (fade 1/8).
 """
@@ -46,8 +56,8 @@ QUAD_SRC = ('PtcCommonSuperscopeBullet', 'RayGunShotFlash2_Copy1')
 QUAD_SET = 'CamFxDarkQuad'
 QUAD_WIDTH = 2.0
 STARS, SMOKE = 0x100002C, 0x100003F
-FREEZE_FRAMES = 120
 CORNERS = ((-1.4, 0.7), (1.4, 0.7), (-1.4, -0.7), (1.4, -0.7))    # Mode 1: half screen heights
+STAR_SIZE = 0.05               # v5: unsquashed, the 4-unit stars are 0.1 screen heights, the ring 0.2 across
 
 
 def cmd(name, **kw):
@@ -66,23 +76,28 @@ def camfx(graphic, x, y, z, size, mode, frames, flags=0):
 
 
 def scripts(quad_id):
-    """v4: the four corners and a centre square on one taunt (placement and camera-follow at a glance), each case alone
-    on its own taunt, one Stage_Freeze(1) (confirmed flash-free by v3's test)"""
+    """v5: the corner squares alone (the Mode 1 offsets), the same squares with the stars on them (CPU particles),
+    the stars alone, Mode 0 squares / stars side by side, and the two regressions (smoke, full-screen square); the
+    game scripts are the user's own (v4's Stage_Freeze test taken back out)"""
     end = cmd('Script_End')
+    wait = cmd('FRAME', Frames=2.0)
 
-    def dark(x, y, z, size, mode, alpha, frames=120):
-        return [camfx(quad_id, x, y, z, size, mode, frames, 1), cmd('LAST_EFFECT_SET_COLOR', Red=0.0, Green=0.0, Blue=0.0),
+    def quad(x, y, z, size, mode, rgb, alpha, frames=120):
+        return [camfx(quad_id, x, y, z, size, mode, frames, 1),
+                cmd('LAST_EFFECT_SET_COLOR', Red=rgb[0], Green=rgb[1], Blue=rgb[2]),
                 cmd('LAST_EFFECT_SET_ALPHA', Alpha=float(alpha))]
-    freeze = [cmd('FRAME', Frames=2.0), cmd('Stage_Freeze', On=1, Frames=FREEZE_FRAMES), end]
-    corners = [cmd('FRAME', Frames=2.0)] + [camfx(STARS, x, y, 20.0, 0.08, 1, 120) for x, y in CORNERS] + \
-        dark(0.0, 0.0, 20.0, 0.3, 1, 70) + [end]
-    stars = [cmd('FRAME', Frames=2.0), camfx(STARS, 1.4, 0.7, 20.0, 0.08, 1, 90), end]
-    square = [cmd('FRAME', Frames=2.0)] + dark(0.0, 0.0, 20.0, 2.0, 1, 60) + [end]
-    smoke = [cmd('FRAME', Frames=2.0), camfx(SMOKE, 0.0, 0.0, 30.0, 0.25, 0, 0), end]
-    mode0 = [cmd('FRAME', Frames=2.0)] + dark(6.0, 3.0, 40.0, 3.0, 0, 70) + [end]
-    game = {'AppealHiR': freeze}
-    effect = {'AppealHiR': [end], 'AppealHiL': corners, 'AppealSR': stars, 'AppealSL': square, 'AppealLwR': smoke,
-              'AppealLwL': mode0}
+    blue, black = (0.0, 0.35, 1.0), (0.0, 0.0, 0.0)
+    squares = sum((quad(x, y, 20.0, 0.1, 1, blue, 80) for x, y in CORNERS), [])
+    stars4 = [camfx(STARS, x, y, 20.0, STAR_SIZE, 1, 120) for x, y in CORNERS]
+    corners = [wait] + squares + [end]
+    both = [wait] + squares + stars4 + [end]
+    stars = [wait, camfx(STARS, 1.4, 0.7, 20.0, STAR_SIZE, 1, 90), end]
+    mode0 = [wait] + quad(6.0, 3.0, 40.0, 3.0, 0, black, 70) + [camfx(STARS, -6.0, 3.0, 40.0, 0.5, 0, 120), end]
+    smoke = [wait, camfx(SMOKE, 0.0, 0.0, 30.0, 0.25, 0, 0), end]
+    square = [wait] + quad(0.0, 0.0, 20.0, 2.0, 1, black, 60) + [end]
+    game = {}
+    effect = {'AppealHiL': corners, 'AppealHiR': both, 'AppealSR': stars, 'AppealSL': mode0, 'AppealLwR': smoke,
+              'AppealLwL': square}
     return game, effect
 
 

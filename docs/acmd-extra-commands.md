@@ -4,7 +4,7 @@ These are new commands for game, effect, sound and expression scripts. They need
 `cross_f.rpx` (`tools/acmd_ext_cave.py`, part of the standard build). Without it, a script that uses
 them won't load properly, so ship the executable with any script that uses them.
 
-Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12, Buffer_Clear / Buffer_Set from v1.4.13, Time_Scale / Target_Time_Scale / Stage_Freeze from v1.7.0 (Stage_Freeze's On 2 / 3 and the flash-free On 1 from v1.7.8), Var_Reset_Set and New_Var's Reset from v1.7.4, Hitbox_Hold from v1.7.5, Effect_Camera from v1.7.6) lists all of them in one
+Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12, Buffer_Clear / Buffer_Set from v1.4.13, Time_Scale / Target_Time_Scale / Stage_Freeze from v1.7.0 (Stage_Freeze's On 2 / 3 and the flash-free On 1 from v1.7.8), Var_Reset_Set and New_Var's Reset from v1.7.4, Hitbox_Hold from v1.7.5, Effect_Camera from v1.7.6, its v5 squash fix from v1.7.10) lists all of them in one
 group, **New Commands**, at the top of the list (vanilla commands stay in their own groups), in subgroups:
 
 | Subgroup | Commands |
@@ -1385,8 +1385,35 @@ Effect_Camera(Graphic=0x3410013, X=0, Y=0, Z=25, XRot=0, YRot=0, ZRot=15, Size=1
   update (the frame's emission) and after it, then to the model if there is one. The diag prints every Effect_Camera
   (S4CS: id, handle, instance, started or not, X / Y / Z) and each camera effect's first 30 frames then every 30th
   (S4CF / S4CM / S4CE: the emitter set's own matrix, `+0x1E4`), whatever its model.
-- Sm4shCommand (New Commands / Effects) has six complete examples (the time-stop darkening, the glass-shatter burst, a
-charge vignette, the common dizzy stars pinned to a corner (v1.7.7: was 0x1000042, the thunder), Mode 2 falling particles) and the full help. The Hitbox Viewer
+- **camera_effects v5 (exe_v46z_camfx5, Sm4shCommand v1.7.10): the game's 2.5D depth squash.** v4's test (clips
+  9a9b6ead / 200b18be, log bb4113b4): the squares (centre, full screen, the Mode 0 one at X 6, Y 3), the smoke followed
+  the camera; the four corner stars (Mode 1, X +-1.4, Y +-0.7, Size 0.08) showed as two clusters of 8-14 px stars in a
+  line about 0.25 half heights above the centre, about 100 px apart (where the corners are 1020 px apart and the stars,
+  at 20 units, would be about 110 px each), staying put while the camera was still and drifting with the stage (a
+  third of its motion) when it panned; the top-right-only stars likewise near the centre. Yet the log shows the stars'
+  emitter sets holding the right corner matrices (S4CE's translation = S4CM's) and S4CF's last byte (`+0x1A3`) 1. The
+  cause, in the game's code: the world request (and so Effect_Camera) sets the instance's byte `+0x1A3`, Smash's 2.5D
+  mode, and the game's eft particle callback (`0x033508C0`, registered in the system's `+0xA68` table, run by eft's CPU
+  particle calc `0x04A65480` on every CPU particle after it is placed) then moves each **CPU particle's** world Z to the
+  plane `+0x11C` (0) + (Z - plane) x 0.07: harmless near the stage, but a particle 185 units out (20 in front of a camera
+  at 205) lands at 13, on the stage, near the screen's centre and ten times smaller. The dizzy stars' emitters are CPU
+  ones (complex emitters, flags without `0x00800000`); the square and the smoke are GPU emitters (flag `0x00800000`,
+  moved by their vertex programs), which never run the callback: that is why only the stars were wrong. The same flag
+  gives the emitter set emp1.z 0.07 (`+0x2CC`, `0x0334DC70`: the vertex programs skip the billboard matrix below 1) and
+  squashes an effect model's depth (`0x0334EAAC`). v5 turns the squash off for camera effects: the instance's `+0x1A3`
+  is cleared at the request and every frame, and each emitter set's emp1.z is eft's own 1.0 (billboards face the
+  camera). **Every emitter type now works** (CPU and GPU particles, complex emitters, models); what still matters is
+  the follow type (below) and the size. Unicorn: the game's callback run on a particle with and without `+0x1A3`, and on
+  an Effect_Camera effect after the cave (`tools/camera_effect_test.py`, 92 checks). The diag's S4CE now prints the set's
+  emp1.z and its translation from the right words (the SetMtx copy is at `+0x1E8`; v4 read one word early, which put
+  m02 / m12 / m22 under "t"). Parameters unchanged; example 7 is the case v4 got wrong (CPU-particle stars in a corner).
+- **Which effects work (v5):** any bank effect, CPU or GPU particles, with emitters that follow their set (ptcl `0x310` =
+  0; `tools/ptcl.py` prints it). Follow types 1 / 2 still leave particles where they were emitted (a trail behind the
+  camera's moves; fine for one-frame bursts). Size it for the screen: a particle of scale W is W x Size / 2 screen
+  heights in Mode 1 (the common dizzy stars, scale 2.4-4, ring 8.6 units: Size 0.05 for stars 0.1 screen heights).
+- Sm4shCommand (New Commands / Effects) has seven complete examples (the time-stop darkening, the glass-shatter burst, a
+charge vignette, the common dizzy stars pinned to a corner (v1.7.7: was 0x1000042, the thunder), Mode 2 falling particles,
+v1.7.10's four corners with CPU-particle stars) and the full help. The Hitbox Viewer
 draws it in front of its own view (X / Y from the view's centre, Mode 1 in half the view's height; it has no game camera,
 so Z changes nothing there) and lists it with the effects; Frames ends it there too. `port_check` X9 (ERROR): a script
 using it with no executable carrying the cave. How it works: docs/native-notes.md "Camera effects"; tests

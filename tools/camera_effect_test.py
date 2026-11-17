@@ -433,6 +433,7 @@ kill:
     check('debug counters: commands run, started, matrices set, ended by Frames, ended, refused',
           (dbg[0] > 20, dbg[1] > 20, dbg[2] > 5, dbg[3], dbg[4], dbg[5]), (True, True, True, 1, 2, 4))
     gate_tests(pm, pool)
+    flat_tests(pm, orig, lab, camfx, entry_of)
     v3_tests(pm, lab, pool, camfx, camera, ref, inst_matrix, calc, entry_of)
     diag_tests(exe, orig)
     sys.exit(1 if acmd_ext_test.fails else 0)
@@ -531,6 +532,53 @@ fxrec:
     return st
 
 
+def flat_tests(pm, orig, lab, camfx, entry_of):
+    """(v5) why v4's dizzy stars were drawn near the stage: the game's own eft particle callback (0x033508C0, run by
+    eft's CPU particle calc on every CPU particle after its place) squashes a world effect's particle Z toward the
+    plane +0x11C (0) by 0.07 while the instance's +0x1A3 is set, which the world request sets; run here on a particle
+    20 units in front of a camera at z 205, then on the same effect started by Effect_Camera (+0x1A3 cleared)"""
+    base = 0x7F007000
+    ensure(pm, base, base + 0x800)
+    ems, eset, inst, part, arg = base, base + 0x100, base + 0x200, base + 0x400, base + 0x500
+
+    def squash(flag, z, plane=0.0):
+        pm.mem_write(base, b'\0' * 0x600)
+        w32(pm, ems + 0x7C, eset)
+        w32(pm, eset + 0x1D8, inst)
+        pm.mem_write(inst + CF.FLAT, bytes([flag]))
+        wf(pm, inst + 0x11C, [plane])
+        wf(pm, part + 0x38, [3.67, 20.54, z])
+        w32(pm, arg, ems)
+        w32(pm, arg + 4, part)
+        run(pm, 0x033508C0, RET, {UC_PPC_REG_3: arg})
+        return [round(v, 4) for v in rf(pm, part + 0x38, 3)]
+    check('(v5) the game\'s particle callback, +0x1A3 set: world Z 184.63 -> 0 + 184.63 x 0.07 (12.92): 20 units in '
+          'front of a camera at z 205 becomes 192 away, near the stage (v4\'s stars)', squash(1, 184.63),
+          [3.67, 20.54, round(184.63 * 0.07, 4)])
+    check('(v5) ... toward its plane (+0x11C): 10 + (110 - 10) x 0.07', squash(1, 110.0, 10.0)[2], 17.0)
+    check('(v5) ... +0x1A3 0: the particle left where eft put it', squash(0, 184.63)[2], 184.63)
+    check('(v5) the squash is the game\'s (the words FLAT_SIG asserts: the world request\'s +0x1A3, emp1.z 0.07 at '
+          'creation, the callback, its 0.07, its registration in slot 0 of the system\'s +0xA68 table)',
+          all(orig(a) == w for a, w in CF.FLAT_SIG.items()), True)
+    calls_a68 = [a for a in range(0x04A65480, 0x04A65A08, 4) if CF._bl_target(a, orig(a)) == 0x04A58678]
+    calls_gpu = [a for a in range(0x04A65FC0, 0x04A66A6C, 4) if CF._bl_target(a, orig(a)) == 0x04A58678]
+    check('(v5) eft\'s CPU particle calc (0x04A65480) fetches that callback for each particle, the GPU emitter calc '
+          '(0x04A65FC0) never: GPU particles (the square, the smoke) were never squashed',
+          (calls_a68, calls_gpu), ([0x04A65624, 0x04A65680], []))
+    r = camfx(0x100002C, 1.4, 0.7, 20.0, 0.0, 0.0, 0.0, 0.08, 1)
+    pm.mem_write(r['inst'] + CF.FLAT, b'\1')
+    w32(pm, eset + 0x1D8, r['inst'])
+    run(pm, lab['cf_flags'], RET, {UC_PPC_REG_3: entry_of(r['h']), UC_PPC_REG_4: r['inst']})
+    pm.mem_write(base, b'\0' * 0x100)
+    w32(pm, ems + 0x7C, eset)
+    wf(pm, part + 0x38, [3.67, 20.54, 184.63])
+    w32(pm, arg, ems)
+    w32(pm, arg + 4, part)
+    run(pm, 0x033508C0, RET, {UC_PPC_REG_3: arg})
+    check('(v5) an Effect_Camera effect after cf_flags: +0x1A3 0, and the game\'s callback leaves its particle at '
+          'z 184.63', (pm.mem_read(r['inst'] + CF.FLAT, 1)[0], round(rf(pm, part + 0x40, 1)[0], 2)), (0, 184.63))
+
+
 def stop_log(mu):
     n = r32(mu, XREC)
     return [tuple(r32(mu, XREC + 0x14 * (i + 1) + 4 * k) for k in range(5)) for i in range(n)]
@@ -613,7 +661,12 @@ def v3_tests(pm, lab, pool, camfx, camera, ref, inst_matrix, calc, entry_of):
     w32(pm, ai + 0x15C, 0x88)
     w32(pm, ai + 0x160, set3)
     w32(pm, ai + 0x164, 0x12345)         # its id changed: a set that ended (the slot reused)
+    for st_ in (set1, set2, set3):
+        wf(pm, st_ + CF.SET_EMP1Z, [0.07])  # (v5) the squash's emp1.z (0x0334DC70)
     n, last, calls, kept = upd(ai)
+    check('(v5) cf_upd: the live emitter sets get emp1.z 1.0 (+0x2CC: eft\'s default, the billboard on), the ended '
+          'one is left alone', [round(rf(pm, st_ + CF.SET_EMP1Z, 1)[0], 4) for st_ in (set1, set2, set3)],
+          [1.0, 1.0, 0.07])
     check('(v4) cf_upd on a camera effect: its emitter sets (+0x12C and the extra ones alive) get +0x50 through eft\'s '
           'SetMtx before the game\'s update and after it, then its model (+0x20) gets it again: the camera wins',
           (n, last, calls, kept),
@@ -647,7 +700,11 @@ def v3_tests(pm, lab, pool, camfx, camera, ref, inst_matrix, calc, entry_of):
     wf(pm, blk, [0.6, 16 / 9, 2.0, 100000.0, -20.0, 40.0, 180.0, -20.0, 25.0, 0.0, 0.0, 1.0, 0.0])
     w32(pm, CF.CAMMGR, MGR_CAM)
     w32(pm, CF.CAMTBL + 0xC, 0xFFFFFFFF)
+    for r_ in (a, b):
+        pm.mem_write(r_['inst'] + CF.FLAT, b'\1')
     calc()
+    check('(v5) each frame cf_flags turns the game\'s depth squash off (+0x1A3 0) on every camera effect',
+          [pm.mem_read(r_['inst'] + CF.FLAT, 1)[0] for r_ in (a, b)], [0, 0])
     cm = dict(eye=(-20.0, 40.0, 180.0), target=(-20.0, 25.0, 0.0), up=(0.0, 1.0, 0.0), fov=0.6, near=2.0)
     check('(v3) the effect camera table with no source: the camera manager\'s snapshot (+0x780) is used',
           (close(inst_matrix(a['inst']), ref(cm, 1, 1.4, 0.7, 20, (0, 0, 0), 0.08)),
@@ -755,9 +812,13 @@ def diag_tests(exe, orig):
     wf(mu, tab + 0x20, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0])
     w32(mu, inst, 0x05000123)
     mu.mem_write(inst + 0x199, b'\1')
+    mu.mem_write(inst + CF.FLAT, b'\1')          # (v5) as the world request leaves it: the squash on
     eft = 0x7F001800
     w32(mu, inst + 0x12C, eft)
     w32(mu, eft + 0x1DC, 3)
+    wf(mu, eft + 0x1E8, [0.5, 0, 0, 7.0, 0, 0.5, 0, 8.0, 0, 0, 0.5, 9.0])    # (v5) SetMtx's copy: SRT at +0x1E8
+    wf(mu, eft + 0x248, [0.5])
+    wf(mu, eft + CF.SET_EMP1Z, [0.07])
     w32(mu, lab['cf_dbg'] + 4, 1)
     mu.reg_write(UC_PPC_REG_1, 0x7F00F000)
     mu.reg_write(UC_PPC_REG_LR, 0x0123ABC0)
@@ -777,6 +838,10 @@ def diag_tests(exe, orig):
     check('diag: S4CM has the instance\'s matrix (translation, X axis)',
           close(got, [want[0][3], want[1][3], want[2][3], want[0][0], want[1][0], want[2][0]]), True)
     check('diag: S4CE reads eft\'s emitter set ([inst + 0x12C]: its emitter count +0x1DC)', lines[5][1], 3)
+    ee = [struct.unpack('>f', struct.pack('>I', v))[0] for v in lines[5][2:8]]
+    check('(v5) diag: S4CE has the set\'s emp1.z (+0x2CC), its translation (+0x1F4 / +0x204 / +0x214: the SRT at '
+          '+0x1E8, v4 read one word early), m00 and the scale (+0x248)', close(ee, [0.07, 7, 8, 9, 0.5, 0.5]), True)
+    check('(v5) diag: S4CF\'s bytes show the squash off (+0x1A3 0) after the frame', ef[7] & 0xFF, 0)
     cc = lines[0]
     check('diag: S4CC has the table\'s current source, the source read and the camera manager\'s block',
           (cc[2], cc[4], cc[5]), (0, SRC, 1))

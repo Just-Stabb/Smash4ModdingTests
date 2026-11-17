@@ -2945,7 +2945,7 @@ were run in unicorn for the parts the test needs (the instance update up to its 
   instance, 0 when not reached; why = started 0 / not 1 << 8 | Mode), and per camera effect (its first 30 calc passes,
   then every 30th) `S4CF k h i fl set fo b` (passes, handle, instance, `+0x144`, its emitter set `+0x12C`, follow
   target `+0x34`, bytes `+0x199` `+0x19A` `+0x19E` `+0x1A3`), `S4CM t x` (its `+0x50`: translation, X axis) and `S4CE
-  em t x` (the emitter set's emitter count `+0x1DC` and its own matrix `+0x1E4`); `S4SF n on mode mgr d0` (each
+  em t x` (the emitter set's emitter count `+0x1DC` and its own matrix, read from `+0x1E4`: one word early, v5 fixes it); `S4SF n on mode mgr d0` (each
   Stage_Freeze stop / resume). Floats are printed as their hex words.
 
 **camera_effects v4 (exe_v46z_camfx4): why the particles never followed (v3's log a5622166 and clips f0b4803a /
@@ -2953,8 +2953,8 @@ were run in unicorn for the parts the test needs (the instance update up to its 
 the table's source = the camera manager's block) and no per-effect line: cf_upd's work depended on `0x032FF640(inst +
 0x20)`, and `inst + 0x20` is the effect's **model** handle (the instance init `0x0334DD64`-`0x0334DDEC`: only when the
 efc entry has a model, `0x033050BC` instantiates it; `0x032FF744` sets the model's matrix). The particles are eft's
-emitter set `inst + 0x12C` (created by `0x04A55BF0` with a copy of `+0x50`: eft keeps its own, `set + 0x1E4` SRT,
-`+0x214` RT, `+0x248` scales, written by `SetMtx` `0x04A4AFB8`). The instance update calls that `SetMtx` only at
+emitter set `inst + 0x12C` (created by `0x04A55BF0` with a copy of `+0x50`: eft keeps its own, `set + 0x1E8` SRT,
+`+0x218` RT (v5: v4 wrote 0x1E4 / 0x214), `+0x248` scales, written by `SetMtx` `0x04A4AFB8`). The instance update calls that `SetMtx` only at
 `0x0334EEB0`, and only when r26 is set: by the rebuild from position / turn / scale (`0x0334E284`, which flag `0x8000`
 skips: `0x0334E264`), the billboard paths (`0x0334E734` / `0x0334E760`) or the `+0x150` move (`0x0334EA10`). So every
 camera effect since v1 drew its particles with the matrix it was created with (the request's place, turn 0), in the
@@ -2967,6 +2967,43 @@ for every tracked effect (its own frame count in the entry, `+0x50`; entries now
 Effect_Camera. `tools/camera_effect_test.py` (82 checks) runs the game's own update to the gate (r26 1 without
 `0x8000`, 0 with it: the cause, in the game's code) and cf_upd against a stubbed update and eft setter (both sets before
 and after, dead / emitterless sets skipped, others untouched).
+
+**camera_effects v5 (exe_v46z_camfx5): the game's 2.5D depth squash (v4's clips 9a9b6ead / 200b18be, log
+bb4113b4).** v4's test: the squares and the smoke followed the camera; the corner dizzy stars (Mode 1, X +-1.4, Y +-0.7,
+Size 0.08) were drawn as two clusters of 8-14 px stars about 0.25 half heights above the centre, ~100 px apart (the
+corners are 1020 px apart, the stars at 20 units would be ~110 px), still while the camera was still, drifting with the
+stage (a third of its motion) when it panned. The log: each star set's own matrix (S4CE) = the corner matrix (S4CM),
+so the hand-off worked; S4CF's last byte (`+0x1A3`) 1.
+- **`+0x1A3` is Smash's 2.5D mode.** The instance init stores the request's r9 there (`0x0334DBAC`; the world request
+  `0x02C29D10`, and so Effect_Camera, passes 1). With it: the emitter set's `+0x2CC` (eft's emp1.z, default 1.0 at
+  `0x04A55D84`) = 0.07 at creation (`0x0334DC70`, unless instance flag `0x00400000`; the vertex programs skip the
+  billboard matrix while emp1.z < 1: `SETGT R0.y, 1.0, emp1.z`); the plane `+0x11C` (and `+0x114` / `+0x118`) = 0
+  (`0x0334F2D4`); the model's depth x 0.07 (`0x0334EAAC` -> `0x032FF920`); and the **particle callbacks** the game
+  registers in eft's system (`0x032EF93C`-`0x032EF9B0`: `+0xA68` slot 0 `0x033508C0`, slot 2 `0x0335086C`, slot 1's
+  `0x033504F4` ending at `0x03350814`; the slot is the emitter's user-callback byte `0x034`) move the particle's world Z
+  (`p + 0x40`) to plane + (Z - plane) x 0.07 (`[0x10196028]` = 0.07).
+- **Only CPU particles run it.** eft's CPU emitter class (vtable `0x102C8C28`: emitter calc `0x04A64CE8`, particle
+  calc `0x04A65480`) fetches the `+0xA68` callback for each particle after placing it (`0x04A65624` / `0x04A65680` ->
+  `0x04A58678`: system `+0x9D4` override, else the emitter's `+0x34` slot) and calls it with {emitter instance,
+  particle}; the GPU class (`0x102C8C7C`: `0x04A65FC0`) never does. A CPU particle's place: `p + 0x38`-`0x40` = its
+  matrix `[p + 0x108]` x its local place `p + 0x14` (`0x04A629CC`); follow type 0 points `p + 0x104` / `+0x108` at the
+  emitter's live RT / SRT (`+0x84` = set `+0x218` x local `+0x2A8`, `+0xB4` = set `+0x1E8` x local `+0x2D8`, every
+  frame in the emitter calc), 1 / 2 at copies made at emission (`0x04A5C984`); the vertex program adds the quad to
+  `v_inWldPos` (= `p + 0x38`) and projects with vpm (CB1 8-11; programs 506 / 507 read no emm). So a camera effect's
+  CPU particles 185 units out (20 in front of a camera at 205) were drawn at Z 13, on the stage, near the screen's
+  centre and ~10 x smaller; GPU particles (emitter flag `0x00800000`: the square, the smoke) were right. The common
+  dizzy stars (efc 0x2C, PtcCommonPiyopiyo) are complex CPU emitters (flags `0x00380000`): `PiyopiyoStar` /
+  `PiyopiyoStar02` (follow 0, a 4.3-unit circle 3 up, 5 stars every 30 frames, the emitter's Y rotation keyed 0 ->
+  72 degrees over 30 frames, scale 2.4 / 4) and four flash / ring emitters (follow 1, 0.4 a frame).
+- **eft's emitter set matrix** (`SetMtx` `0x04A4AFB8`): the 3x4 copied to `+0x1E8`-`+0x214` (not `+0x1E4`: v4's notes
+  and diag read one word early), the RT (columns normalised) at `+0x218`-`+0x244`, the column lengths at `+0x248`
+  (and x `+0x254` / `+0x258` at `+0x264` / `+0x268`).
+- **v5's cave:** cf_flags (at the request and every frame) clears `+0x1A3`; cf_eftset writes `+0x2CC` = 1.0 on each
+  live set before its SetMtx. `FLAT_SIG` asserts the game words. Draw path (emitter `0x31C`, 1 << it tested in the draw:
+  the stars 5, the square / smoke 2) only picks the render state callback (`0x032EEBA0`, blend), not the view.
+  `tools/camera_effect_test.py` (92 checks): the game's callback run on a particle with and without `+0x1A3` (Z 184.63
+  -> 12.92 / kept), on an Effect_Camera effect after cf_flags (kept), the CPU / GPU calc's calls, emp1.z on live sets
+  only, the diag's S4CE (emp1.z, the translation from `+0x1F4` / `+0x204` / `+0x214`, m00, the scale).
 
 **Not confirmed in game:** that the TV's entry 0 is the camera every battle view draws with (Final Smash cameras register
 their own sources? they would be read the same way, through the current source); the vertical FOV's use by the renderer

@@ -2931,7 +2931,8 @@ HELP['Effect_Camera'] = [
     'emitted, in the world: when the camera moves, those particles stay behind (the effect itself follows). Bursts '
     'during a still camera (a time stop) look right; for an overlay that has to stay put while the camera moves, use '
     'emitters with follow type 0 (tools/ptcl.py sets 0x310).',
-    '- Billboard particles (type 0) face the camera anyway; plates and meshes face it through the effect\'s turn above.',
+    '- Billboard particles (type 0) face the camera anyway (since v5 exactly: the game\'s 2.5D mode used to draw them '
+    'in the world\'s XY plane); plates and meshes face it through the effect\'s turn above.',
     '- Shape: a darkening overlay needs a square texture. A flash or glow texture (round) makes a disc, however the quad '
     'is placed: camera_effects v3\'s test square (the common RayGunShotFlash2_Copy1, black) drew as a circle; v4\'s '
     'has a solid white texture (tools/ptcl.py set_texture).',
@@ -2968,10 +2969,25 @@ HELP['Effect_Camera'] = [
     '(eft\'s own setter) before and after the game\'s update, every frame.',
     '- Nothing to change in scripts.',
     '',
+    '## What changed in camera_effects v5 (exe_v46z_camfx5): CPU particles (the dizzy stars) in their place',
+    '- v4\'s test: the squares and the smoke followed the camera, but the corner dizzy stars were drawn as small stars '
+    'near the screen\'s centre, drifting with the stage when the camera panned. The world request this command uses '
+    'switches on Smash\'s 2.5D mode for the effect (instance byte +0x1A3), and in that mode the game\'s particle '
+    'callback (0x033508C0) squashes every CPU particle\'s depth toward the stage plane: world Z x 0.07. Near the stage '
+    'nobody sees it; 20 units in front of the camera it put the stars on the stage, ten times smaller and near the '
+    'centre. GPU particles (emitter flag 0x00800000: the square, the smoke) were never squashed.',
+    '- v5 turns the 2.5D mode off for camera effects (at the request and every frame), with its other two parts: the '
+    'emitter set\'s billboard switch (eft\'s emp1.z back to 1.0: billboards face the camera exactly) and the model\'s '
+    'depth squash.',
+    '- Which effects work now: any bank effect, CPU or GPU particles, simple or complex emitters, with a model or not. '
+    'What still matters: the emitters\' follow type (0 follows; 1 / 2 leave particles where they were emitted, see '
+    'Gotchas) and Size (bank effects are big: see Sizing). Scripts need no change; an effect that relied on v4\'s '
+    'squashed (10 x smaller) CPU particles is now its real size: lower its Size.',
+    '',
     'The Hitbox Viewer draws it in front of its own view (it has no game camera: X / Y from the view\'s centre, Mode 1 in '
     'half the view\'s height; Z changes nothing in that flat view) and lists it with the effects; Frames ends it there '
     'too.',
-    'Needs exe_v46z_camfx (tools/camera_effect_cave.py; exe_v46y_hold + it; v4: exe_v46z_camfx4). Without it a script '
+    'Needs exe_v46z_camfx (tools/camera_effect_cave.py; exe_v46y_hold + it; v5: exe_v46z_camfx5). Without it a script '
     'that uses this command won\'t load properly: ship the executable with any script that uses it.',
 ]
 EXAMPLES['Effect_Camera'] = [
@@ -2999,10 +3015,10 @@ EXAMPLES['Effect_Camera'] = [
     'FRAME(Frames=10)',
     'Terminate_Graphic_Effect(Graphic=0x3410014, KillParticles=1, KillImmediately=1)',
     '',
-    '// Example 4: the common dizzy stars (0x100002C: alpha-blended, particles 1.5-6 units wide) pinned to the screen\'s',
-    '// top-right for 1.5 seconds (Mode 1: X 1.4, Y 0.7 half screen heights). Size 0.08: a 6-unit particle is',
-    '// 6 x 0.08 / 2 = 0.24 screen heights (bank effects are big: Mode 1 sizes 0.02-0.2; see Sizing)',
-    'Effect_Camera(Graphic=0x100002C, X=1.4, Y=0.7, Z=20, XRot=0, YRot=0, ZRot=0, Size=0.08, Mode=1, Frames=90, Flags=0)',
+    '// Example 4: the common dizzy stars (0x100002C: alpha-blended stars 2.4-4 units wide on a ring 8.6 units across)',
+    '// pinned to the screen\'s top-right for 1.5 seconds (Mode 1: X 1.4, Y 0.7 half screen heights). Size 0.05: a',
+    '// 4-unit star is 4 x 0.05 / 2 = 0.1 screen heights (bank effects are big: Mode 1 sizes 0.02-0.2; see Sizing)',
+    'Effect_Camera(Graphic=0x100002C, X=1.4, Y=0.7, Z=20, XRot=0, YRot=0, ZRot=0, Size=0.05, Mode=1, Frames=90, Flags=0)',
     '',
     '// Example 5: Mode 2: falling particles that move with the camera but keep the world\'s up (they fall straight',
     '// down however the camera tilts), 40 units ahead and 10 above the view\'s centre, for 2 seconds',
@@ -3015,4 +3031,15 @@ EXAMPLES['Effect_Camera'] = [
     'Effect_Camera(Graphic=0x3410012, X=0, Y=0, Z=20, XRot=0, YRot=0, ZRot=0, Size=1.9, Mode=1, Frames=120, Flags=1)',
     'LAST_EFFECT_SET_COLOR(Red=0, Green=0, Blue=0)',
     'LAST_EFFECT_SET_ALPHA(Alpha=60)',
+    '',
+    '// Example 7 (v5): what v4 got wrong in game: the dizzy stars are CPU particles (complex emitters), which the',
+    '// game\'s 2.5D mode squashed onto the stage (small, near the centre). Since v5 each corner\'s stars sit on',
+    '// their corner\'s blue square (the fighter\'s square quad, 2 units across: Size 0.1 = 0.1 screen heights) and',
+    '// both stay in the corners while the camera zooms and pans',
+    'Effect_Camera(Graphic=0x3410012, X=-1.4, Y=0.7, Z=20, XRot=0, YRot=0, ZRot=0, Size=0.1, Mode=1, Frames=120, Flags=1)',
+    'LAST_EFFECT_SET_COLOR(Red=0, Green=0.35, Blue=1)',
+    'Effect_Camera(Graphic=0x3410012, X=1.4, Y=-0.7, Z=20, XRot=0, YRot=0, ZRot=0, Size=0.1, Mode=1, Frames=120, Flags=1)',
+    'LAST_EFFECT_SET_COLOR(Red=0, Green=0.35, Blue=1)',
+    'Effect_Camera(Graphic=0x100002C, X=-1.4, Y=0.7, Z=20, XRot=0, YRot=0, ZRot=0, Size=0.05, Mode=1, Frames=120, Flags=0)',
+    'Effect_Camera(Graphic=0x100002C, X=1.4, Y=-0.7, Z=20, XRot=0, YRot=0, ZRot=0, Size=0.05, Mode=1, Frames=120, Flags=0)',
 ]
