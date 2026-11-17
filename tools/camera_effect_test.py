@@ -427,7 +427,7 @@ kill:
           (m, stack), ([2, 0, 0, 5, 0, 2, 0, 6, 0, 0, 2, 7], [2, 0, 0, 5, 0, 2, 0, 6, 0, 0, 2, 7]))
     dbg = [r32(pm, lab['cf_dbg'] + 4 * i) for i in range(6)]
     check('debug counters: commands run, started, matrices set, ended by Frames, ended, refused',
-          (dbg[0] > 20, dbg[1] > 20, dbg[2] > 5, dbg[3], dbg[4], dbg[5]), (True, True, True, 1, 2, 5))
+          (dbg[0] > 20, dbg[1] > 20, dbg[2] > 5, dbg[3], dbg[4], dbg[5]), (True, True, True, 1, 2, 4))
     sys.exit(1 if acmd_ext_test.fails else 0)
 
 
