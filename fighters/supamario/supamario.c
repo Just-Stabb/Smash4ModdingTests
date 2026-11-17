@@ -11765,6 +11765,20 @@ void func_586()
         var4 = 0x6d + var3;
         func_587(var4, 0x300001c + var3);
     }
+    else if (global4 == 0x19 && WorkModuleF(0, TS_V_RETRY) > TS_LAG_ANIM - 0.5f)
+    {
+        // Time Skip v6 (user: "use Mario's normal landing lag animation after Time Skip falls from the air"): its
+        // landing (ts_land_lag: LandingFallSpecial TS_LAND_LAG frames) plays LandingHeavy fitted to them
+        WorkModule(0, 0.0f, TS_V_RETRY);
+        var0 = 1.0f;
+        var1 = WorkModuleF(0, 0);
+        if (var1 != (float)0)
+        {
+            var2 = MotionModule(0, TS_MOT_LANDING_HEAVY);
+            var0 = (float)var2 / var1;
+        }
+        func_22(TS_MOT_LANDING_HEAVY, 0, var0);
+    }
     else if (global4 == 0x19 && global5 == 0x155)
     {
         // Sledgehammer v2: its landing (sh_land) plays his light landing (0x3A) over the landing lag
@@ -41557,6 +41571,16 @@ void ts_stop_look_off()
 }
 
 
+// v6: the move's camera / body effects ended (ts_end, any exit: a hit, a KO, a ledge, the match's end, its own end):
+// the outline's rings (the effect scripts' External_Graphic on his bones), the punch's white wash and the glass
+// (Effect_Camera; the glass already off by then at its own end)
+void ts_fx_off()
+{
+    EffectModule(0x2723, TS_FX_OUTLINE, 0x1, 0x1);
+    EffectModule(0x2723, TS_FX_WASH, 0x1, 0x1);
+    EffectModule(0x2723, TS_FX_GLASS, 0x1, 0x1);
+}
+
 void ts_air_kinetics()
 {
     KineticModule(0, 0);
@@ -42271,13 +42295,16 @@ void ts_loop()
             return;
         }
         WorkModule(0, WorkModuleF(0, TS_V_CHG) + 1.0f, TS_V_CHG);
-        if (WorkModuleF(0, TS_V_CHG) - TS_AURA_EVERY * (float)(int)(WorkModuleF(0, TS_V_CHG) / TS_AURA_EVERY) < 0.5f)
-        {
-            ts_aura();
-        }
         if (ts_charged() != 0)
         {
             ts_dash_start(0x1);
+            return;
+        }
+        // v6: again as the last one's emission ends (each lasts 40 frames: one aura at a time, XV2's), not as the dash
+        // starts (v4 / v5 played one more there, left behind on top of the last)
+        if (WorkModuleF(0, TS_V_CHG) - TS_AURA_EVERY * (float)(int)(WorkModuleF(0, TS_V_CHG) / TS_AURA_EVERY) < 0.5f)
+        {
+            ts_aura();
         }
         return;
     }
@@ -42313,6 +42340,7 @@ void ts_end()
         ts_stop_look_off();         // v3: cut in the stopped time (before the punch): the darkening and the glass off
     }
     ts_tint(0);
+    ts_fx_off();                    // v6: the outline, the wash, the glass: off on any exit
     KineticModule(0xb, 0x2);        // v3: the air drift back (turned off through the connect)
     if (WorkModuleF(0, TS_V_SLOT) > 0.5f)
     {
@@ -42353,9 +42381,19 @@ void ts_land_lag()
         return;
     }
     st = WorkModuleF(0, 0x0F0000A2);
+    if (WorkModuleF(0, TS_V_RETRY) > TS_LAG_ANIM - 0.5f)
+    {
+        // v6: the landing's mark for func_586 (LandingHeavy over the lag): kept while LandingFallSpecial starts, then
+        // cleared (func_586 clears it itself as the status starts)
+        if (st != TS_ST_LANDING + 3.0f)
+        {
+            WorkModule(0, 0.0f, TS_V_RETRY);
+        }
+        return;
+    }
     if (st == TS_ST_LANDING || st == TS_ST_LANDING + 1.0f || st == TS_ST_LANDING + 2.0f || st == TS_ST_LANDING + 4.0f)
     {
-        WorkModule(0, 0.0f, TS_V_RETRY);
+        WorkModule(0, TS_LAG_ANIM, TS_V_RETRY);    // v6: func_586 plays LandingHeavy over it, then clears the mark
         WorkModule(0, TS_LAND_LAG, 0);
         func_16(TS_ST_LANDFALL, 0);
         return;

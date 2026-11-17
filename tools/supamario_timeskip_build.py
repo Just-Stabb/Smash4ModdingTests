@@ -20,6 +20,7 @@ preview/.
 The move: fighters/supamario/README.md "Time Skip".
 """
 import json
+import math
 import os
 import sys
 
@@ -231,6 +232,52 @@ OUTLINE_A, OUTLINE_IN, OUTLINE_OUT = 110.0, 4, 10   # v3: the white outline; v4:
 # overlay much fainter and light blue-white
 OUTLINE_A = 40.0
 OUTLINE_RGB = (215.0, 230.0, 255.0)
+# v6 (user: "the outline still turns Supamario into a glow instead of outlining him"; his v5 clip d8c96e8e 44-94: from
+# the charge's first held frame his whole body goes light blue-white, opaque white by ~64, blooming to 94). The overlay
+# is gone (OVERLAY_OUTLINE False): Smash 4's overlays tint the whole body, and Change_Overlay's fade ran on past its 40
+# while the charge holds the motion's frame (MotionModule 0x2713 every frame), ~10 a frame (40 / 4) to 255. The
+# outline is an effect now: XV2's BPE 85 draws a soft white glow just outside his silhouette (clip b66e8a38 8-41),
+# so a soft white ring billboard on each body part's bone (OUTLINE_BONES: Mario's rest-pose part radii + OUTLINE_PAD),
+# drawn at the bone's centre: the part's own front half hides the ring's inside, only the glow past his edge shows
+OVERLAY_OUTLINE = False
+FX_OUTLINE_ID = 0x0341006A
+OUTLINE_BONES = ((64, 3.0), (22, 2.6), (12, 2.4), (11, 2.7), (14, 1.3), (18, 1.3), (15, 1.0), (19, 1.0), (16, 1.4),
+                 (20, 1.4), (3, 1.3), (7, 1.3), (4, 1.1), (8, 1.1), (5, 1.6), (9, 1.6))   # (vbn bone, part radius):
+# HatN, HeadN, BustN, WaistN, L / R ShoulderJ, ArmJ (elbows), HandN, LegJ, KneeJ, FootJ (c00's T pose: 15.6 tall,
+# the head 10.2-15.6, the arms at 8.7, the hands at +-5.35)
+OUTLINE_PAD = 0.6                   # the ring's disc reaches this far past the part (units)
+OUTLINE_EDGE = 0.78                 # the ring texture's peak (a fraction of the disc's radius; the part's edge)
+OUTLINE_RGB6, OUTLINE_ALPHA = (0.85, 0.92, 1.0), 0.42
+# v6 (user: "add XV2's photo-negative look after the punch"). XV2's BAC: BPE 78 "Invert World Colors" on at the connect's
+# 0 (the dark blue-grey world of the stop, clip 44-58, the fighters not inverted), its second entry (flag word 2, BPE
+# 85's off form) at 17: off again; BPE 2 "Weak White Flash" at 16. Measured on the clip's stage: during the charge
+# (30-42) the ground (177, 193, 206), the stop (48-54) (72, 83, 100), after the punch (60-100) (220, 228, 235), back
+# to (175, 193, 202) by 120: the "negative" after the punch is the stage's own pale colours washed ~55% white, not an
+# inversion. Here: a white wash on the camera (Effect_Camera Mode 1) at the punch: WASH_FLASH over WASH_FLASH_N
+# frames (BPE 2) on WASH_A held to the slow motion's end, faded out over WASH_OUT; INVERT_FX (the exe's Screen_Invert,
+# another package) replaces the stop's tint by a real inversion once its command is known
+INVERT_FX = False
+FX_WASH_ID = 0x0341006B
+WASH_RGB, WASH_A, WASH_IN, WASH_LIFE, WASH_OUT = (0.94, 0.97, 1.0), 0.42, 2, 58, 18
+WASH_FLASH, WASH_FLASH_N = 0.35, 8
+WASH_Z, WASH_SIZE = 20.0, 2.2
+# v6 (user: "use the real XV2 glass break / make it look less 2D"): the shards (HIT_DmgGrs2's 3D meshes and their .ema
+# animation: flat to its frame 10, breaking apart from 12) kept on the screen past the punch, GLASS_BREAK frames of his
+# script (his 30-frame hit freeze between: ~36 real frames of the shards flying apart, unslowed); each shard's pane
+# lit by its own sheen (XV2 refracts each shard by its own offset: pale wedges over the stopped world), the cracks
+# thinner with a highlight along one side
+GLASS_BREAK = 6
+GLASS_SHEEN = (0.03, 0.2)           # a shard's pane: low .. high (the narrow wedges brightest, as the clip's)
+GLASS_LINE_W6, GLASS_HI = 1.5, 0.55
+# v6 (user: "use Mario's normal landing lag animation after Time Skip falls from the air"): the 30 frames of
+# LandingFallSpecial kept, LandingHeavy (motion 0x3B) played over them (func_586, Sledgehammer's LandingLight way)
+LAG_ANIM = 300.0                    # TS_V_RETRY's mark while that landing starts
+MOT_LANDING_HEAVY = 0x3B
+# v6 (user: "fix the purple aura during the charging"): effect 0's streaks were capped at 0.32 (all but invisible in
+# game under the overlay's white) and CrgAuraB took v5's Frt_Hit secondary lift (cyan-white). XV2 (clip 8-29): thin
+# lavender streaks with white cores rising round him: E0_RGB / E0_CAP6; not replayed as the dash starts
+E0_RGB = {'Frt_CrgAura.emp': (0.82, 0.7, 1.0), 'Frt_CrgAuraB.emp': (0.55, 0.45, 1.0), 'Frt_CrgAuraH.emp': (0.82, 0.7, 1.0)}
+E0_CAP6 = 0.6
 TS_SE = {'ts_basa': ('CAR_S1352_DSH_Basa', 0.0),          # skill SE cue 0, BAC 6
          'ts_dash': ('CAR_S1352_DSH_Dash', 0.0),          # cue 1, BAC 56
          'ts_hazure': ('CAR_S1350_FRT_Hazure', 0.0),      # cue 2, BAC 86 (the whiff)
@@ -278,6 +325,8 @@ def msc_values(root_speed=None):
             'TS_EASE_FRAMES': fl(EASE_FRAMES), 'TS_FALL_EASE': fl(FALL_EASE), 'TS_USED_INDEX': fl(USED_INDEX),
             'TS_STRIKE_DMG': fl(STRIKE_HIT['Damage']), 'TS_SH_TAKE': fl(SH_TAKE), 'TS_SH_STUN': fl(SH_STUN),
             'TS_SH_IASA': fl(SH_IASA), 'TS_FX_DARK': '0x%X' % FX_DARK_ID,
+            'TS_FX_OUTLINE': '0x%X' % FX_OUTLINE_ID, 'TS_FX_WASH': '0x%X' % FX_WASH_ID, 'TS_LAG_ANIM': fl(LAG_ANIM),
+            'TS_MOT_LANDING_HEAVY': '0x%X' % MOT_LANDING_HEAVY,
             'TS_CAMFX': '1' if CAMERA_FX else '0', 'TS_TINT_SLOT': str(TINT[0]), 'TS_TINT_IN': str(TINT[1]),
             'TS_TINT_R': '0x%X' % TINT[2], 'TS_TINT_G': '0x%X' % TINT[3], 'TS_TINT_B': '0x%X' % TINT[4],
             'TS_TINT_A': '0x%X' % TINT[5], 'TS_TINT_OUT': str(TINT_OUT), 'TS_GLASS_SIZE': fl(GLASS_SIZE),
@@ -402,17 +451,37 @@ def game_scripts():
 def effect_scripts():
     """XV2's Stage BG 60 (the stage's dust, at the dash's start BAC 56) as Smash's dash cloud on the ground. v4: skill
     effect 0's following part (Frt_CrgAuraH on the left elbow, x0.5) at frame 0; its world parts and effect 11 are the
-    MSC's (ts_aura / ts_e11), as the strike's hit look and BTL_CMN 108 (the glass)"""
+    MSC's (ts_aura / ts_e11), as the strike's hit look and BTL_CMN 108 (the glass). v6: the outline the ring effects
+    (outline_on) from frame 0 through the connect, off at each motion's end (and the MSC's ts_end on any exit); the
+    white wash at the punch (wash_on); the glass on GLASS_BREAK frames past the punch (its shards breaking apart)"""
     dash = outline_on() + [cmd('external_graphic', FX_E0H_ID, E0_FOLLOW[1], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                                E0_FOLLOW[2] * AURA_SIZE, 0)] + [cmd('frame', float(MOVE_FROM))] + if_(0x0F000116, 0, 0, if_(V_PH, 5, DASHING, [
-        cmd('graphic_effect', FX_DUST, 0, 0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1)])) + [
-        cmd('frame', float(DASH_END - OUTLINE_OUT))] + outline_off() + [cmd('frame', float(DASH_END)),
-                                                                         cmd('terminate_overlays')]
-    connect = ((time_stop_look() if CAMERA_FX else []) + glass_on_screen() + outline_on() + [
-        cmd('frame', float(STRIKE)), cmd('terminate_graphic_effect', FX_GLASS_ID, 1, 1),
-        cmd('frame', float(CONNECT_END - OUTLINE_OUT))] +
-               outline_off() + [cmd('frame', float(CONNECT_END)), cmd('terminate_overlays')])
+        cmd('graphic_effect', FX_DUST, 0, 0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1)])) + (
+        [cmd('frame', float(DASH_END - OUTLINE_OUT))] + outline_off() if OVERLAY_OUTLINE else []) + [
+        cmd('frame', float(DASH_END))] + outline_end()
+    connect = ((time_stop_look() if CAMERA_FX else []) + invert_on() + glass_on_screen() + outline_on() + [
+        cmd('frame', float(STRIKE))] + wash_on() + invert_off() + [cmd('frame', float(STRIKE + GLASS_BREAK)),
+                                                                   cmd('terminate_graphic_effect', FX_GLASS_ID, 1, 1)] +
+               ([cmd('frame', float(CONNECT_END - OUTLINE_OUT))] + outline_off() if OVERLAY_OUTLINE else []) +
+               [cmd('frame', float(CONNECT_END))] + outline_end())
     return dash, connect
+
+
+def invert_on():
+    """v6: INVERT_FX (the exe's Screen_Invert, built in another package): XV2's BPE 78 at the connect's 0"""
+    if INVERT_FX:
+        raise NotImplementedError('INVERT_FX: Screen_Invert\'s syntax is not known here yet (the MSC\'s tint is used)')
+    return []
+
+
+def invert_off():
+    """v6: XV2's BPE 78 off at the punch (its flag word 2 at 17)"""
+    return []
+
+
+def wash_on():
+    """v6: the white wash at the punch (wash_set), on the screen, unslowed (its own fade: WASH_LIFE real frames)"""
+    return [cmd('effect_camera', FX_WASH_ID, 0.0, 0.0, WASH_Z, 0.0, 0.0, 0.0, WASH_SIZE, 1, 0, 1)]
 
 
 def time_stop_look():
@@ -429,19 +498,29 @@ def glass_on_screen():
 
 def outline_on():
     """v3 (user: "Time Skip wraps the user in a faint white translucent glowing outline"; XV2's BPE 85 "Flashing White
-    Body Outline 3", BAC entry 0 at 20 and 100, entry 4 at the punch; the clip: on him through the whole move). v4 (user:
-    "no outline" in game): v3's LIGHT_SHINE (Flash_Light_Effect) is a light source, Mario's fireball's warm light on
-    him (its vanilla use: (255, 230, 180, 160, 75, -10) faded out by LIGHT_COL_FRM over 5 frames): white at 110 it
-    lit nothing visibly on him (and in the user's point-blank clip the opponent beside him looked washed). Now Smash 4's
-    colour overlay, FLASH (Color_Overlay: the smash charge's glow; Mario's own scripts use FLASH (200, 255, 255, 110)),
-    white at OUTLINE_A, faded in over OUTLINE_IN (FLASH_FRM)"""
-    return [cmd('color_overlay', *OUTLINE_RGB, 0.0),
-            cmd('change_overlay', float(OUTLINE_IN), *OUTLINE_RGB, OUTLINE_A)]
+    Body Outline 3", BAC entry 0 at 20 and 100, entry 4 at the punch; the clip: on him through the whole move). v3: a
+    light (LIGHT_SHINE), v4 / v5 the colour overlay (FLASH: white 110, then light blue-white 40): both tint the whole
+    body, and the overlay's fade ran on to opaque white while the charge held the motion's frame (v5's clip). v6: the
+    ring effect (outline_set) on each OUTLINE_BONES bone, following its place (External_Graphic's last word 0, the
+    elbow aura's way); any earlier ones ended first (a motion restart can't stack them)"""
+    if OVERLAY_OUTLINE:
+        return [cmd('color_overlay', *OUTLINE_RGB, 0.0),
+                cmd('change_overlay', float(OUTLINE_IN), *OUTLINE_RGB, OUTLINE_A)]
+    return [cmd('terminate_graphic_effect', FX_OUTLINE_ID, 1, 1)] + [
+        cmd('external_graphic', FX_OUTLINE_ID, b, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, outline_size(r), 0)
+        for b, r in OUTLINE_BONES]
 
 
 def outline_off():
-    """faded out over OUTLINE_OUT, then COL_NORMAL (Terminate_Overlays) at the motion's end"""
+    """(OVERLAY_OUTLINE) faded out over OUTLINE_OUT, then COL_NORMAL (Terminate_Overlays) at the motion's end"""
     return [cmd('change_overlay', float(OUTLINE_OUT), *OUTLINE_RGB, 0.0)]
+
+
+def outline_end():
+    """the motion's end: the overlay's COL_NORMAL (OVERLAY_OUTLINE), else the rings ended"""
+    if OVERLAY_OUTLINE:
+        return [cmd('terminate_overlays')]
+    return [cmd('terminate_graphic_effect', FX_OUTLINE_ID, 1, 1)]
 
 
 def sound_scripts():
@@ -561,6 +640,8 @@ def convert_fx(cmn_dir, fx_dir, halo=True, frt_dir=None, joints0=None):
         dark = dark_set(p, e, sets['hitl']['set_index'])         # 0x65
         e11 = e11_rest(p, e, e11)                                # 0x66 - 0x68
         e0h = e0_follow_set(p, e, frt_dir, halo)                 # 0x69
+        outline = outline_set(p, e, sets['hitl']['set_index'])   # 0x6A (v6)
+        wash = wash_set(p, e, sets['hitl']['set_index'])         # 0x6B (v6)
     finally:
         xv2_to_ptcl.TEX_MAX, xv2_to_ptcl.CONE_STREAKS = old
         xv2vfx.LENIENT_TARGETS = False
@@ -571,7 +652,7 @@ def convert_fx(cmn_dir, fx_dir, halo=True, frt_dir=None, joints0=None):
     bad = FX.facing_emitters(p, [s['set_index'] for s in sets.values()] + [lod['set_index']])
     return {'sets': sets, 'skipped': log, 'notes': notes, 'halos': halos, 'ptcl_bytes': [before, len(out)],
             'facing_problems': bad, 'lod': lod, 'e11': e11, 'aura': e0,
-            'e0_follow': e0h, 'glass': glass, 'dark': dark}
+            'e0_follow': e0h, 'glass': glass, 'dark': dark, 'outline': outline, 'wash': wash}
 
 
 def lod_copy(p, e):
@@ -699,6 +780,17 @@ def _cone_alpha(p, d, pkg, emp, name):
     return '; streak alpha 0 -> %.2f (5-15%%) -> 0' % a
 
 
+def _e0_colour(p, d, emp):
+    """v6: effect 0's streaks lavender (E0_RGB: XV2's clip, its glare's violet over white cores) at E0_CAP6 (v4 / v5:
+    the glare tint capped at 0.32, CrgAuraB v5's secondary lift: pale cyan, all but invisible in game)"""
+    rgb = E0_RGB[emp]
+    f = E0_CAP6 / max(rgb)
+    for track in (0, 1):
+        p.set_color_keys(d, track, [tuple(c * f for c in rgb) + (1.0,)])
+    p.set_field(d, 'color_scale', 1.0)
+    return '; v6 colour (%.2f, %.2f, %.2f)' % tuple(c * f for c in rgb)
+
+
 def _glowing(p, mats, emp, k_names):
     """the indices of a set's emitters XV2 draws with glare (EMM Glare on), not refraction, visible: halo candidates"""
     import xv2_smash_fx as FX
@@ -801,9 +893,9 @@ def e0_world_set(p, e, frt_dir, joints0, halo=True):
             t = list(p.field(d, 'emitter_translation'))
             t = [t[0] + (z + off[2] * SCALE) / AURA_SIZE, t[1] + (y + off[1] * SCALE) / AURA_SIZE, t[2]]
             p.set_emitter_srt(d, tuple(p.field(d, 'emitter_scale')), tuple(p.field(d, 'emitter_rotation')), t)
-            notes.append('%s %s at %s: %s; %s%s' % (emp, name, bone, '; '.join(n0),
-                                                    _vibrant(p, d, mats, emp, name, E0_CAP),
-                                                    _cone_alpha(p, d, pkg, emp, name)))
+            notes.append('%s %s at %s: %s; %s%s%s' % (emp, name, bone, '; '.join(n0),
+                                                      _vibrant(p, d, mats, emp, name, E0_CAP),
+                                                      _cone_alpha(p, d, pkg, emp, name), _e0_colour(p, d, emp)))
             kn.append((len(ems), d, name, emp))
             ems.append((bytes(d), '%s_%s' % (emp[4:-4], bone)))
     if halo:
@@ -829,8 +921,8 @@ def e0_follow_set(p, e, frt_dir, halo=True):
     ems, notes = [], []
     for d, name, n0 in made:
         d = bytearray(d)
-        notes.append('%s: %s; %s%s' % (name, '; '.join(n0), _vibrant(p, d, mats, emp, name, E0_CAP, world=False),
-                                       _cone_alpha(p, d, pkg, emp, name)))
+        notes.append('%s: %s; %s%s%s' % (name, '; '.join(n0), _vibrant(p, d, mats, emp, name, E0_CAP, world=False),
+                                         _cone_alpha(p, d, pkg, emp, name), _e0_colour(p, d, emp)))
         SB.follow(p, d)
         ems.append((bytes(d), name))
     if halo:
@@ -875,6 +967,92 @@ def dark_set(p, e, hitl_si):
     return {'set': 'PtcSupamarioTsDark', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_DARK_ID, 'rgba': DARK_RGBA}
 
 
+def _quad(p, hitl_si, rgb, a, life):
+    """v6: an alpha-blended (or additive) billboard from Btl_HitL's flash_1 (dark_set's way): one particle, `life`
+    frames (0: forever), scale 1 (2 units across at size 1), colour rgb, constant alpha a, follow type 0"""
+    import struct
+    src = next(em['data'] for em in p.sets[hitl_si]['emitters'] if em['data'] is not None and
+               p.emitter_name(em['data']) == 'flash_1')
+    d = bytearray(src)
+    for name, v in (('one_time', 1), ('end_frame', 1), ('emit_rate', 1.0), ('emit_interval', 0), ('start_frame', 0),
+                    ('emit_start', 0), ('volume_type', 0), ('volume_radius', [0.0, 0.0, 0.0]), ('figure_velocity', 0.0),
+                    ('init_velocity_random', 0.0), ('emitter_velocity', 0.0), ('dispersion_angle', 0.0),
+                    ('gravity', [0.0, 0.0, 0.0]), ('ptcl_life', life or 0x7FFFFFFF), ('ptcl_life_random', 0),
+                    ('scale', [1.0, 1.0]), ('scale_random', [0.0, 0.0]), ('scale_init_ratio', [1.0, 1.0]),
+                    ('scale_diff21', [0.0, 0.0]), ('scale_diff32', [0.0, 0.0]), ('rotation_init', [0.0, 0.0, 0.0]),
+                    ('rotation_random', [0.0, 0.0, 0.0]), ('rotation_velocity', [0.0, 0.0, 0.0]),
+                    ('alpha_init', a), ('alpha_diff21', 0.0), ('alpha_diff32', 0.0), ('color_scale', 1.0)):
+        p.set_field(d, name, v)
+    p.set_key_anims(d, [])
+    p.set_emitter_srt(d)
+    for track in (0, 1):
+        p.set_color_keys(d, track, [tuple(rgb) + (1.0,)], 0)
+    struct.pack_into('>I', d, 0x310, 0)
+    return d
+
+
+def _ramp(p, d, a, t_in, t_out, life):
+    """alpha 0 -> a over t_in frames, held, -> 0 over the last t_out of `life` (eft's 3 keys)"""
+    for k, v in (('alpha_init', 0.0), ('alpha_diff21', a), ('alpha_diff32', -a),
+                 ('alpha_section1', t_in / float(life)), ('alpha_section2', (life - t_out) / float(life))):
+        p.set_field(d, k, v)
+
+
+def wash_set(p, e, hitl_si):
+    """v6: the white wash after the punch (WASH_*): a white quad on the camera (Effect_Camera Mode 1, unslowed), alpha
+    0 -> WASH_A over WASH_IN, held, out over the last WASH_OUT of WASH_LIFE real frames; a second quad the punch's flash
+    (XV2's BPE 2: WASH_FLASH, out over WASH_FLASH_N). Alpha blended: it whitens, never past white (no bloom)"""
+    import numpy as np
+    wash = _quad(p, hitl_si, WASH_RGB, WASH_A, WASH_LIFE)
+    _ramp(p, wash, WASH_A, WASH_IN, WASH_OUT, WASH_LIFE)
+    flash = _quad(p, hitl_si, WASH_RGB, WASH_FLASH, WASH_FLASH_N)
+    _ramp(p, flash, WASH_FLASH, 1, WASH_FLASH_N - 1, WASH_FLASH_N)
+    for d in (wash, flash):
+        assert p.field(d, 'blend_type') == 0
+        p.set_texture(d, 0, np.full((16, 16, 4), 255, np.uint8))
+    si = p.new_set('PtcSupamarioTsWash', [bytes(wash), bytes(flash)], ['wash', 'flash'])
+    idx = e.add(si + 1)
+    assert 0x03410000 | idx == FX_WASH_ID, ('FX_WASH_ID is out of date', hex(0x03410000 | idx))
+    return {'set': 'PtcSupamarioTsWash', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_WASH_ID,
+            'rgb': WASH_RGB, 'alpha': WASH_A, 'flash': WASH_FLASH, 'life': WASH_LIFE}
+
+
+def ring_rgba(n=64, edge=None):
+    """v6: the outline's ring (its shape in RGB, alpha 255: a BC4 texture): a soft fill inside (half), rising to 1 at `edge` of the radius (the body
+    part's edge), falling to 0 at the disc's rim"""
+    import numpy as np
+    edge = OUTLINE_EDGE if edge is None else edge
+    yy, xx = np.mgrid[0:n, 0:n]
+    r = np.hypot((xx + 0.5) / n * 2 - 1, (yy + 0.5) / n * 2 - 1)
+    a = np.where(r < edge, 0.5 + 0.5 * (r / edge) ** 4, np.clip(1.0 - (r - edge) / (1.0 - edge), 0.0, 1.0) ** 1.5)
+    v = (a * 255 + 0.5).astype(np.uint8)
+    return np.stack([v, v, v, np.full_like(v, 255)], 2)     # the shape in RGB (BC4: xv2_smash_fx.soft_glow_rgba's way)
+
+
+def outline_set(p, e, hitl_si):
+    """v6: the outline (OUTLINE_*): one additive ring billboard, forever (ended by Terminate_Graphic_Effect), following
+    its emitter; the effect script puts one on each OUTLINE_BONES bone (External_Graphic, size: the part's radius +
+    OUTLINE_PAD over OUTLINE_EDGE). Drawn through the bone's centre, the part's own front half hides the ring inside his
+    silhouette: only the glow past his edge shows (a soft white rim as XV2's BPE 85)"""
+    import struct
+    d = _quad(p, hitl_si, OUTLINE_RGB6, OUTLINE_ALPHA, 0)
+    p.set_field(d, 'blend_type', 1)
+    p.set_texture(d, 0, ring_rgba(), 0x34)
+    import ptcl
+    struct.pack_into('>I', d, ptcl.TEXRES + 0x0C, 0x22000100)     # clamped (xv2_smash_fx's halo texture)
+    si = p.new_set('PtcSupamarioTsOutline', [bytes(d)], ['ring'])
+    idx = e.add(si + 1)
+    assert 0x03410000 | idx == FX_OUTLINE_ID, ('FX_OUTLINE_ID is out of date', hex(0x03410000 | idx))
+    return {'set': 'PtcSupamarioTsOutline', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_OUTLINE_ID,
+            'bones': [[b, r, outline_size(r)] for b, r in OUTLINE_BONES], 'rgb': OUTLINE_RGB6, 'alpha': OUTLINE_ALPHA}
+
+
+def outline_size(r):
+    """the ring's External_Graphic size for a part of radius r: the ring's peak (OUTLINE_EDGE of the disc) at the part's
+    edge + a little, the disc out to r + OUTLINE_PAD"""
+    return round(max(r + OUTLINE_PAD, r / OUTLINE_EDGE), 3)
+
+
 def glass_model(cmn_dir, fx_dir, e, preview=None):
     """v2: BTL_CMN effect 108 (BAC entry 4 item 7 at the connect, frame 0; turned off at 16): HIT_DmgGrs2.emo, the
     glass that shatters as time stops (XV2: on the camera, scale 0.36, LoopCancel). Smash 4 can't attach an effect to
@@ -894,44 +1072,64 @@ def glass_model(cmn_dir, fx_dir, e, preview=None):
     cracks = glass_cracks(os.path.join(fx_dir, 'model', folder))
     idx = e.add(0, folder)
     assert 0x03410000 | idx == FX_GLASS_ID, ('FX_GLASS_ID is out of date', hex(0x03410000 | idx))
-    return {'folder': folder, 'efc': idx, 'id': '0x%08X' % FX_GLASS_ID, 'cracks': cracks}
+    return {'folder': folder, 'efc': idx, 'id': '0x%08X' % FX_GLASS_ID, 'cracks': cracks,
+            'sheens': getattr(glass_cracks, 'sheens', [])}
 
 
 def glass_cracks(folder):
     """v5: the glass's texture made of its shards' outlines (GLASS_*): each mesh's border edges (edges of one triangle
-    only), drawn in UV space (the UVs are a planar projection of the pane, wrapped: frac), GLASS_LINE_W texels wide, in
-    GLASS_LINE_RGB; the rest GLASS_PANE of it (a faint sheen). model.nut rewritten (BC1); returns the line count"""
+    only), drawn in UV space (the UVs are a planar projection of the pane, wrapped: frac), in GLASS_LINE_RGB; the rest
+    GLASS_PANE (a faint sheen). v6 (user: "less 2D"): each shard's pane its own sheen (GLASS_SHEEN: the narrow wedges
+    brightest, XV2's refraction showing them as pale wedges), the cracks GLASS_LINE_W6 wide, lit on the side facing the
+    upper left (full) and GLASS_HI on the others (a bevel). model.nut rewritten (BC1); returns the line count"""
     import numpy as np
     import nud
     import nut
     from PIL import Image, ImageDraw
     n = GLASS_TEX_N
-    im = Image.new('L', (n, n), int(255 * GLASS_PANE))
-    dr = ImageDraw.Draw(im)
+    fill = Image.new('L', (n, n), int(255 * GLASS_PANE))
+    lines_im = Image.new('L', (n, n), 0)
+    df, dl = ImageDraw.Draw(fill), ImageDraw.Draw(lines_im)
     lines = 0
+    rng = np.random.RandomState(1352)
+    sheens = []
     for m in nud.read(os.path.join(folder, 'model.nud')):
         for pg in m.polygons:
-            uv = np.array(pg.uvs, float).reshape(len(pg.pos), -1)[:, :2]
+            uv = np.array(pg.uvs, float).reshape(len(pg.pos), -1)[:, :2] * [n, n] + [0.0, n]   # V -1 .. 0 -> 0 .. n
             idx = list(pg.idx)
             cnt = {}
+            area = 0.0
             for k in range(0, len(idx) - 2, 3):
                 tri = idx[k:k + 3]
-                for a, b in ((tri[0], tri[1]), (tri[1], tri[2]), (tri[2], tri[0])):
-                    key = (min(a, b), max(a, b))
+                pa, pb, pc = uv[tri[0]], uv[tri[1]], uv[tri[2]]
+                area += abs((pb[0] - pa[0]) * (pc[1] - pa[1]) - (pc[0] - pa[0]) * (pb[1] - pa[1])) / 2.0
+                for a_, b_ in ((tri[0], tri[1]), (tri[1], tri[2]), (tri[2], tri[0])):
+                    key = (min(a_, b_), max(a_, b_))
                     cnt[key] = cnt.get(key, 0) + 1
-            for (a, b), c in cnt.items():
-                if c != 1:
-                    continue
-                pa, pb = uv[a], uv[b]
-                # V runs -1 .. 0 over the pane (wrapped: + 1)
-                dr.line([(pa[0] * n, (pa[1] + 1.0) * n), (pb[0] * n, (pb[1] + 1.0) * n)], fill=255,
-                        width=int(GLASS_LINE_W))
+            border = [k for k, c in cnt.items() if c == 1]
+            per = sum(float(np.hypot(*(uv[a_] - uv[b_]))) for a_, b_ in border)
+            thin = per * per / (4.0 * math.pi * max(area, 1e-6))          # 1 a disc; the slivers 5-20
+            t = min(1.0, max(0.0, (thin - 2.0) / 8.0)) * 0.75 + 0.25 * rng.rand()
+            v = GLASS_SHEEN[0] + (GLASS_SHEEN[1] - GLASS_SHEEN[0]) * t
+            sheens.append(round(v, 3))
+            for k in range(0, len(idx) - 2, 3):
+                df.polygon([tuple(uv[j]) for j in idx[k:k + 3]], fill=int(255 * v))
+            cen = uv[list({j for e_ in border for j in e_})].mean(0) if border else uv.mean(0)
+            for a_, b_ in border:
+                pa, pb = uv[a_], uv[b_]
+                nrm = np.array([pb[1] - pa[1], -(pb[0] - pa[0])])          # the edge's normal, turned outward
+                if np.dot(nrm, (pa + pb) / 2 - cen) < 0:
+                    nrm = -nrm
+                lit = np.dot(nrm / (np.linalg.norm(nrm) + 1e-9), [-0.7071, -0.7071]) > 0   # faces the upper left
+                dl.line([tuple(pa), tuple(pb)], fill=255 if lit else int(255 * GLASS_HI),
+                        width=max(1, int(round(GLASS_LINE_W6))))
                 lines += 1
-    a = np.asarray(im, np.float32) / 255.0
+    a = np.maximum(np.asarray(fill, np.float32), np.asarray(lines_im, np.float32)) / 255.0
     rgb = (a[..., None] * np.array(GLASS_LINE_RGB, np.float32) * 255 + 0.5).astype(np.uint8)
     img = np.concatenate([rgb, np.full((n, n, 1), 255, np.uint8)], 2)
     tid = nut.load(os.path.join(folder, 'model.nut'))[1][0].tex_id     # the converter's own texture ID
     open(os.path.join(folder, 'model.nut'), 'wb').write(nut.write_ntwu([(tid, 0x31, img)]))
+    glass_cracks.sheens = sheens
     return lines
 
 
