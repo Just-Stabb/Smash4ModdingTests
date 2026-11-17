@@ -1300,7 +1300,7 @@ shattering) need it; Smash 4 had no way to place an effect on the screen.
 | X, Y | from the screen's centre, right / up. Mode 0 / 2: units; Mode 1: half the screen's height (Y 1 the top edge, X 1.78 the right edge of a 16:9 screen) |
 | Z | distance in front of the eye (units). At least near + 1 (3; closer is put there). Mode 1: 0 or less is 20 |
 | XRot, YRot, ZRot | its turn in degrees, Rz Ry Rx as the EFFECT commands, in camera space (Mode 2: world space). At 0 its X is the screen's right, its Y up, its Z toward the viewer: a flat XY effect faces the camera |
-| Size | its scale; Mode 1: in half screen heights (an effect 1 unit across at Size 1 covers the screen's height; 1.78 its width) |
+| Size | its scale; Mode 1: one effect unit = Size half screen heights (a quad 2 units across, -1 to 1, at Size 1 covers the screen's height, at 1.78 its width). A bank particle of scale W (its full width) is W x Size / 2 screen heights wide in Mode 1, W x Size units in Mode 0 / 2 (the screen is ~0.75 x Z units tall). Bank effects are 10-40 units wide: Mode 1 sizes 0.02-0.2 |
 | Mode | 0 follow the camera (place and turn); 1 fixed to the screen (as 0, and X / Y / Size scaled with the distance x tan(FOV / 2): the same part of the screen when the camera zooms or moves); 2 position only (moves with the camera, keeps the world's turn). Other values: 0 |
 | Frames | 0: until it ends by itself or Terminate_Graphic_Effect; N > 0: faded out after N frames (it stays attached while it fades) |
 | Flags | 1: unslowed (Time_Scale's slow-motion and the owner's hitlag / Target_Time_Scale don't slow its animation); other bits reserved |
@@ -1314,6 +1314,10 @@ shattering) need it; Smash 4 had no way to place an effect on the screen.
 - **Draw order / depth:** a 3D effect: under the HUD (damage panels, timer). At 10-30 units it is in front of the
   fighters and the stage (80-300 away); other effects drawn after it, or closer to the camera, can show over it.
 - **Darkening:** an alpha-blended effect (ptcl blend 0) coloured black with an alpha. An additive one can't darken.
+- **Sizes (camera_effects v2, Sm4shCommand v1.7.7's help):** v1's in-game test blew the screen out to white: it used
+  common 0x1000042 as "stars" (the tooltip's label), which is PtcCommonThunder, additive flashes up to 40 units wide,
+  looping, at Mode 1 Size 0.08 = 1.6 screen heights. The command's maths was right; bank effects are simply big. Check an
+  ID's emitters (blend, scale) and size it with W x Size / 2 screen heights (Mode 1). Nothing in the command changed.
 - **Emitters that don't follow** (ptcl 0x310 = 1 / 2) leave their particles in the world where they were emitted: they
   stay behind when the camera moves. Overlays want follow type 0 (`tools/ptcl.py` sets it).
 - **Several views:** it follows the TV view's camera (the effect camera table's first entry). A GamePad / second Cemu
@@ -1334,7 +1338,7 @@ Effect_Camera(Graphic=0x3410013, X=0, Y=0, Z=25, XRot=0, YRot=0, ZRot=15, Size=1
 ```
 
 Sm4shCommand (New Commands / Effects) has five complete examples (the time-stop darkening, the glass-shatter burst, a
-charge vignette, a common effect pinned to a corner, Mode 2 falling particles) and the full help. The Hitbox Viewer
+charge vignette, the common dizzy stars pinned to a corner (v1.7.7: was 0x1000042, the thunder), Mode 2 falling particles) and the full help. The Hitbox Viewer
 draws it in front of its own view (X / Y from the view's centre, Mode 1 in half the view's height; it has no game camera,
 so Z changes nothing there) and lists it with the effects; Frames ends it there too. `port_check` X9 (ERROR): a script
 using it with no executable carrying the cave. How it works: docs/native-notes.md "Camera effects"; tests

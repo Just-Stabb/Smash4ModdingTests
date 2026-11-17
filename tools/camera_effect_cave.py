@@ -45,7 +45,8 @@ Command: Effect_Camera(Graphic, X, Y, Z, XRot, YRot, ZRot, Size, Mode, Frames, F
            Mode 1: 0 or less is 20.
   XRot, YRot, ZRot   the effect's own turn in degrees (Rz Ry Rx, the EFFECT commands' order), in camera space (Mode 2:
            in world space).
-  Size     its scale (Mode 1: in half screen heights: an effect 1 unit across at Size 1 covers the screen's height).
+  Size     its scale (Mode 1: one effect unit = Size half screen heights: a quad 2 units across (-1 to 1) at Size 1
+           covers the screen's height; a bank particle of scale W is W x Size / 2 screen heights wide).
   Mode     0 follow the camera (position and turn); 1 fixed to the screen (as 0, and X / Y / Size scaled with the
            distance x tan(FOV / 2): the same part of the screen when the camera zooms or moves); 2 position only (it
            moves with the camera, its turn stays the world's). Other values: 0.
@@ -117,8 +118,9 @@ NEW_CMDS = [
         ('XRot', 1, 'The effect\'s turn about X, degrees (camera space; Mode 2: world space).'),
         ('YRot', 1, 'The effect\'s turn about Y, degrees.'),
         ('ZRot', 1, 'The effect\'s turn about Z, degrees (Rz Ry Rx, as the EFFECT commands).'),
-        ('Size', 1, 'Its scale. Mode 1: in half screen heights (an effect 1 unit across at Size 1 covers the screen\'s '
-                    'height).'),
+        ('Size', 1, 'Its scale. Mode 1: one effect unit = Size half screen heights (a quad 2 units across at Size 1 covers '
+                    'the screen\'s height; a bank particle of scale W is W x Size / 2 screen heights wide: bank effects '
+                    'are 10-40 units, so Mode 1 sizes of 0.02-0.2).'),
         ('Mode', 0, '0: follows the camera (position and turn). 1: fixed to the screen (as 0, and X / Y / Size scaled '
                     'with the distance x tan(FOV / 2), so it covers the same part of the screen when the camera zooms '
                     'or moves). 2: position only (moves with the camera, keeps the world\'s turn). Other values: 0.'),

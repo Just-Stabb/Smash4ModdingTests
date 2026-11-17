@@ -2844,9 +2844,9 @@ HELP['Effect_Camera'] = [
     '- XRot, YRot, ZRot: the effect\'s own turn in degrees, applied Rz Ry Rx as the EFFECT commands do, in camera '
     'space (ZRot 90 turns it a quarter round on the screen; XRot 90 lays an XZ plate, eft\'s particle type 2, flat to the '
     'screen). Mode 2: in world space.',
-    '- Size: its scale. Mode 0 / 2: as EFFECT\'s Size. Mode 1: in half screen heights: an effect 1 unit across (-1 to 1, '
-    'a "unit quad") at Size 1 covers the screen\'s height exactly; Size 1.78 covers a 16:9 screen\'s width (use a little '
-    'more, 1.9, so its edges never show).',
+    '- Size: its scale. Mode 0 / 2: as EFFECT\'s Size. Mode 1: each of the effect\'s units is Size half screen heights: '
+    'a quad 2 units across (-1 to 1) at Size 1 covers the screen\'s height exactly, at Size 1.78 a 16:9 screen\'s width '
+    '(use a little more, 1.9, so its edges never show). Bank effects are much bigger than 2 units: see Sizing below.',
     '- Mode:',
     '  - 0: follow the camera: place and turn, Size as given. As the camera zooms its FOV, the effect covers more or '
     'less of the screen (as anything at a fixed distance would).',
@@ -2862,6 +2862,22 @@ HELP['Effect_Camera'] = [
     '- Flags: bit 1 (Flags=1): unslowed: the game\'s slow-motion (Time_Scale, Final Smashes\' slow) and the owner\'s own '
     'effect rate (its hitlag, Target_Time_Scale) don\'t slow the effect\'s animation (the game\'s '
     'LAST_EFFECT_SET_DISABLE_SYSTEM_SLOW and a rate of 1 together). Other bits: 0 (reserved).',
+    '',
+    '## Sizing (read this before picking Size)',
+    '- An effect\'s particles are sized in units by its bank: a billboard\'s "scale" is its quad\'s full width (the quad '
+    'runs -0.5 to 0.5). Common and fighter effects are big: their flares and smokes are 10-40 units wide, made for a '
+    'fighter 15 units tall.',
+    '- Mode 1: on screen, a particle of scale W at Size S is W x S / 2 screen heights wide. A 20-unit flare at Size 0.1 is '
+    'a whole screen height; at Size 1 it is 10 screen heights (everything covered). Typical Mode 1 sizes for bank effects: '
+    '0.02-0.2. Size 1-2 is for effects authored as a unit quad (-1 to 1 or 2 units wide).',
+    '- Mode 0 / 2: a particle of scale W at Size S is W x S units wide at distance Z, where the screen is about 0.75 x Z '
+    'units tall (2 x Z x tan(20.5 degrees) at the battle camera\'s rest FOV): a 22-unit smoke at Z 30 and Size 1 fills '
+    'the screen, at Size 0.25 a quarter of it.',
+    '- Check what an ID really is (its emitters, blend, sizes) before using it: some common IDs\' names in the tooltips '
+    'are wrong. 0x1000042, labelled "Multiple white stars flashing", is PtcCommonThunder: additive white / orange '
+    'flashes 8-40 units wide, looping; as a camera effect at Mode 1 Size 0.08 it blows the screen out to white '
+    '(camera_effects v1\'s test). Additive effects (ptcl blend 1) can\'t be darkened by LAST_EFFECT_SET_COLOR: black '
+    'makes them invisible, white ones stay white.',
     '',
     '## Ending it, and the other effect commands',
     '- Terminate_Graphic_Effect(Graphic=the same ID, ...) ends it like any of the object\'s effects (KillParticles=1: at '
@@ -2937,9 +2953,10 @@ EXAMPLES['Effect_Camera'] = [
     'FRAME(Frames=10)',
     'Terminate_Graphic_Effect(Graphic=0x3410014, KillParticles=1, KillImmediately=1)',
     '',
-    '// Example 4: a common effect pinned to the screen\'s top-right corner for a second (Mode 1: X 1.5, Y 0.8 half',
-    '// screen heights), small (Size 0.1 half heights)',
-    'Effect_Camera(Graphic=0x1000042, X=1.5, Y=0.8, Z=20, XRot=0, YRot=0, ZRot=0, Size=0.1, Mode=1, Frames=60, Flags=0)',
+    '// Example 4: the common dizzy stars (0x100002C: alpha-blended, particles 1.5-6 units wide) pinned to the screen\'s',
+    '// top-right for 1.5 seconds (Mode 1: X 1.4, Y 0.7 half screen heights). Size 0.08: a 6-unit particle is',
+    '// 6 x 0.08 / 2 = 0.24 screen heights (bank effects are big: Mode 1 sizes 0.02-0.2; see Sizing)',
+    'Effect_Camera(Graphic=0x100002C, X=1.4, Y=0.7, Z=20, XRot=0, YRot=0, ZRot=0, Size=0.08, Mode=1, Frames=90, Flags=0)',
     '',
     '// Example 5: Mode 2: falling particles that move with the camera but keep the world\'s up (they fall straight',
     '// down however the camera tilts), 40 units ahead and 10 above the view\'s centre, for 2 seconds',
