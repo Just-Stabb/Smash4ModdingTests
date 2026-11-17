@@ -41222,8 +41222,8 @@ void sh_tick()
 // the air and the dash goes on, Time Skip's own tracking without v1's ground rule (ts_track: up off the ground, down
 // past an edge), the use's reset also from the MSC (ts_reset), a point-blank detection box (the script's ID 1), the
 // purple lines at the punch (ts_lines), XV2's hit look from its own dimmer sets. v3: Hit's aura at the start (ts_aura),
-// the darkened time stop and the glass on the camera (the script's Effect_Camera), ended on any exit before the punch
-// (ts_stop_look_off); the stop in the air too, soft tracking after the release, the charge's drift, shield pokes.
+// the darkened time stop (ts_tint) and the glass (ts_glass), or both on the camera (the CAMERA_FX build), ended on
+// any exit before the punch (ts_stop_look_off); the stop in the air too, soft tracking after the release, the charge's drift, shield pokes.
 // ===================================================================
 
 // XV2's root travel of SpecialS (units a frame along his facing, by the motion frame): the wind-up's step and the stop
@@ -41404,15 +41404,52 @@ void ts_aura()
                  WorkModuleF(0, 0x0f000002), 0, 0, 0, TS_AURA_SIZE, 0, 0xffffffff);
 }
 
-// v3 (the user: the darkening and the glass must end if the move is cut before the punch): XV2's darkened time stop and
-// its glass (BTL_CMN 108) are camera effects now (the connect's effect script: Effect_Camera, exe_v46z_camfx), which a
-// status change doesn't end: any exit before the punch (a hit, a KO, the match's end, any status change) takes them off
-// here (EffectModule 0x2723 = Terminate_Graphic_Effect's request). The stage's freeze lapses by itself (the script renews
-// it every frame), the other fighters' too (ts_connect renews theirs)
+// v3 (the user: the darkening and the glass must end if the move is cut before the punch). Two builds
+// (tools/supamario_timeskip_build.py CAMERA_FX, TS_CAMFX): 0 (the default) the darkening is a screen tint from the MSC
+// (ts_tint: EffectModule op 0 = Screen_Tint's EffectModule vt +0x19C: slot, frames in, R, G, B, A, layer, priority;
+// op 1 = End_Screen_Tint's vt +0x1B4: slot, frames out; the handler 0x02004530, Meta Knight's Final Smash uses both) and
+// the glass a world-placed model in front of the victim (ts_glass); 1 both on the camera (the connect's effect script's
+// Effect_Camera, exe_v46z_camfx). Either way any exit before the punch (a hit, a KO, the match's end, any status
+// change) takes them off here; the stage's freeze lapses by itself (the script renews it every frame), the other
+// fighters' too (ts_connect renews theirs). VAR_31 (TS_V_RETRY) + 10 while the tint is on
+void ts_tint(int on)
+{
+    float r;
+    r = WorkModuleF(0, TS_V_RETRY);
+    if (r > 9.5f)
+    {
+        r = r - 10.0f;
+    }
+    if (on != 0)
+    {
+        EffectModule(0, TS_TINT_SLOT, TS_TINT_IN, TS_TINT_R, TS_TINT_G, TS_TINT_B, TS_TINT_A, 0, 0xff);
+        WorkModule(0, r + 10.0f, TS_V_RETRY);
+        return;
+    }
+    if (WorkModuleF(0, TS_V_RETRY) > 9.5f)
+    {
+        EffectModule(0x1, TS_TINT_SLOT, TS_TINT_OUT);
+        WorkModule(0, r, TS_V_RETRY);
+    }
+}
+
+// v2 (item 11): BTL_CMN effect 108 (HIT_DmgGrs2, XV2's glass that shatters as time stops; on XV2's camera) as a model in
+// front of the victim, TS_GLASS_Z toward the camera (TS_CAMFX 0)
+void ts_glass(int s)
+{
+    EffectModule(0x3, TS_FX_GLASS, WorkModuleF(0, 0x0f000020 + 4 * (s - 1)),
+                 WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) + TS_VICTIM_MID, WorkModuleF(0, 0x0f000002) + TS_GLASS_Z, 0, 0, 0,
+                 TS_GLASS_SIZE, 0, 0xffffffff);
+}
+
 void ts_stop_look_off()
 {
-    EffectModule(0x2723, TS_FX_DARK, 0x1, 0x1);
+    ts_tint(0);
     EffectModule(0x2723, TS_FX_GLASS, 0x1, 0x1);
+    if (TS_CAMFX != 0)
+    {
+        EffectModule(0x2723, TS_FX_DARK, 0x1, 0x1);
+    }
 }
 
 
@@ -41628,7 +41665,8 @@ int ts_try_catch()
         // v3 (user: "no freeze on the detection box's first frame"): not refused for good while the fighter is still
         // in the hit's freeze: its damage / state can read the frame before on the hit's first frame; the flags are
         // kept and it is looked at again next frame (v2 cleared them at once, so a first-frame hit was never caught)
-        if (WorkModuleF(0, 0x0F000043 + 0x8 * (s + 0x2)) > 0.5f && WorkModuleF(0, TS_V_RETRY) < TS_RETRY_N - 0.5f)
+        if (WorkModuleF(0, 0x0F000043 + 0x8 * (s + 0x2)) > 0.5f && WorkModuleF(0, TS_V_RETRY) < TS_RETRY_N - 0.5f &&
+            WorkModuleF(0, TS_V_RETRY) < 9.5f)
         {
             WorkModule(0, WorkModuleF(0, TS_V_RETRY) + 1.0f, TS_V_RETRY);
             return 0;
@@ -41732,6 +41770,11 @@ void ts_catch(int s, int sh)
     ts_freeze_others();
     WorkModule(0, TS_INV_STEP, 0x0F00011C);
     ts_still();
+    if (TS_CAMFX == 0)
+    {
+        ts_glass(s);
+        ts_tint(0x1);
+    }
     if (global18 != 0)
     {
         KineticModule(0xc, 0x2);                    // v3: no air drift through the connect (the punch)
@@ -41968,6 +42011,7 @@ void ts_connect(float fr)
         ts_still();
         return;
     }
+    ts_tint(0);                                     // the darkening off at the punch (once: its flag)
     if (s > 0)
     {
         WorkModule(0, (float)s, TS_V_K);         // the victim's slot kept for the punch's look (TS_V_K is free now)
@@ -42115,6 +42159,7 @@ void ts_end()
     {
         ts_stop_look_off();         // v3: cut in the stopped time (before the punch): the darkening and the glass off
     }
+    ts_tint(0);
     KineticModule(0xb, 0x2);        // v3: the air drift back (turned off through the connect)
     if (WorkModuleF(0, TS_V_SLOT) > 0.5f)
     {

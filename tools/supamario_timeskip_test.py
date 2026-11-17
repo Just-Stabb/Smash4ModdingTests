@@ -743,15 +743,22 @@ def brightness_tests(out):
 def exit_tests(path):
     """v3 (the known v2 bug): the time stop's look (the camera's darkening and glass: the connect's effect script), the
     stage and the frozen fighters let go on every exit before the punch; nothing taken off on the normal path"""
-    look = (B.FX_DARK_ID, B.FX_GLASS_ID)
+    look = (B.FX_DARK_ID, B.FX_GLASS_ID) if B.CAMERA_FX else (B.FX_GLASS_ID,)
     v = V(2, 30.0)
     by = V(3, -60.0)
     g = Game(fighters=[v, by])
     tr, vm = run(path, g, frames=200)
     ck = first(tr, lambda t: t[1] == 0x21D)[0]
-    check('v3 normal: no screen tint from the MSC (the darkening is the script\'s camera effect), nothing killed (the '
-          'darkening fades by its Frames at the punch, the glass plays out)', (g.tints, [k_ for k_ in g.kills if
-                                                                                      k_[1] in look]), ([], []))
+    sk = ck - 1 + B.CATCH_FREEZE + B.STRIKE
+    slot = B.TINT[0]
+    want_t = [] if B.CAMERA_FX else [(ck, 'on', slot), (sk, 'off', slot)]
+    check('v3 normal (%s): %s, nothing killed (the glass plays out)' % (
+        'camera build' if B.CAMERA_FX else 'default build',
+        'the darkening the script\'s camera effect' if B.CAMERA_FX else
+        'the MSC\'s screen tint on at the catch (%d), off at the punch (%d, %d frames out), once each; the glass at the '
+        'victim at the catch' % (ck, sk, B.TINT_OUT)),
+          (g.tints, [k_ for k_ in g.kills if k_[1] in look],
+           [n for n, i, _x, _y, _s in g.fx if i == B.FX_GLASS_ID]), (want_t, [], [] if B.CAMERA_FX else [ck]))
     for name, st in (('cut (a status change)', 'cut'), ('Supamario hit (Damage)', 0x45), ('Supamario KO\'d (Dead)', 0xB1),
                      ('the match ending (Win)', 0x14F)):
         v = V(2, 30.0)
@@ -760,12 +767,13 @@ def exit_tests(path):
         cut = ck + 5
         tr, vm = run(path, g, cut_at=cut, after=12, cut_status=st)
         froze = sorted({n for n, st_, hs, hp, _x in by.log if hp > 0})
-        check('v3 exit before the punch, %s at %d: the darkening and the glass taken off at once (Terminate), the victim '
-              'let go (controller, stage collision), the others no longer frozen (none renewed after the cut: free '
-              'within 2 frames), the air drift back on' % (name, cut),
-              (sorted(k_ for k_ in g.kills if k_[1] in look), v.input_off, v.ground[-1][1] if v.ground else None,
-               max(froze) <= cut + 2 if froze else None, g.e2_on[-1:]),
-              (sorted((cut, i) for i in look), False, 5.0, True, [(cut, True)]))
+        check('v3 exit before the punch, %s at %d: the darkening (End_Screen_Tint / its camera effect) and the glass '
+              'taken off at once, the victim let go (controller, stage collision), the others no longer frozen (none '
+              'renewed after the cut: free within 2 frames), the air drift back on' % (name, cut),
+              (g.tints, sorted(k_ for k_ in g.kills if k_[1] in look), v.input_off,
+               v.ground[-1][1] if v.ground else None, max(froze) <= cut + 2 if froze else None, g.e2_on[-1:]),
+              ([] if B.CAMERA_FX else [(ck, 'on', slot), (cut, 'off', slot)], sorted((cut, i) for i in look), False,
+               5.0, True, [(cut, True)]))
     v = V(2, 30.0)
     g = Game(fighters=[v])
 
@@ -773,11 +781,13 @@ def exit_tests(path):
         if k == ck + 4:
             v.status = 0xB1
     tr, vm = run(path, g, tick=esc)
-    check('v3 the victim escapes (KO\'d in the hold): let go, the move goes on to its end, nothing killed',
-          (v.input_off, [k_ for k_ in g.kills if k_[1] in look], tr[-1][5]), (False, [], 0))
+    check('v3 the victim escapes (KO\'d in the hold): let go, the move goes on to its end, nothing killed, the darkening '
+          'still to the punch', (v.input_off, [k_ for k_ in g.kills if k_[1] in look], tr[-1][5], g.tints), (False, [], 0, want_t))
     g = Game()
     tr, vm = run(path, g)
-    check('v3 a miss: nothing killed', [k_ for k_ in g.kills if k_[1] in look], [])
+    check('v3 a miss: no darkening, no glass, nothing killed', (g.tints, [k_ for k_ in g.kills if k_[1] in look],
+                                                               [i for _n, i, _x, _y, _s in g.fx if i == B.FX_GLASS_ID]),
+          ([], [], []))
 
 
 def v3_tests(path):
@@ -1012,6 +1022,12 @@ def script_tests(out, sh_out):
           'move\'s start, faded out over %d at each motion\'s end' % (B.OUTLINE_A, B.OUTLINE_IN, B.OUTLINE_OUT), lt,
           {'specials': on + [('FRAME', [float(B.MOVE_FROM)]), ('FRAME', [float(B.DASH_END - B.OUTLINE_OUT)]), off],
            'specialairs': on + [('FRAME', [float(B.CONNECT_END - B.OUTLINE_OUT)]), off]})
+    cam = [(nm(c), c.params) for c in f['effect'].script('specialairs') if nm(c) == 'Effect_Camera']
+    check('v3: the camera build switch (CAMERA_FX %s): %s' % (B.CAMERA_FX, 'the darkening (Mode 1, to the punch) and the '
+          'glass (Mode 0) on the camera, unslowed' if B.CAMERA_FX else 'no Effect_Camera (no exe_v46z_camfx needed)'),
+          cam, [('Effect_Camera', [B.FX_DARK_ID, 0.0, 0.0, B.DARK_Z, 0.0, 0.0, 0.0, B.DARK_SIZE, 1, B.STRIKE, 1]),
+                ('Effect_Camera', [B.FX_GLASS_ID, 0.0, 0.0, B.GLASS_CAM_Z, 0.0, 0.0, 0.0, B.GLASS_CAM_SIZE, 0, 0, 1])]
+          if B.CAMERA_FX else [])
     gen = [nm(c) for p in f for s in ('specials', 'specialairs') for c in f[p].script(s)
            if 'article' in nm(c).lower() or 'reflect' in nm(c).lower()]
     check('no Cape left (no article, no reflector) in the side special\'s scripts', gen, [])

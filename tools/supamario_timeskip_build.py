@@ -168,7 +168,13 @@ AURA_Y = 4.0                        # his middle (g_C_Pelvis)
 # quad fixed to the screen (Mode 1, DARK_SIZE half heights: wider than a 16:9 screen), DARK_RGBA, unslowed, faded out
 # after STRIKE frames (the punch); the glass in front of the camera (Mode 0, GLASS_CAM_Z, x GLASS_CAM_SIZE), unslowed.
 # v2's Screen_Tint / world-placed glass are gone; any exit before the punch kills both (ts_stop_look_off)
+CAMERA_FX = False                   # v3: the camera build (Effect_Camera, needs exe_v46z_camfx): off until camera_effects is
+                                    # confirmed in game (its v1 test drew a screen-filling white flash); the default is the
+                                    # MSC's Screen_Tint (TINT) and the glass model in front of the victim (GLASS_*)
 FX_DARK_ID = 0x03410065
+TINT = (0, 4, 0x14, 0x16, 0x2C, 0xB4, 0, 0xFF)  # slot 0, 4 frames in, R G B, A 0xB4, layer 0, priority (Sonic's FS's form)
+TINT_OUT = 15
+GLASS_SIZE, GLASS_Z = 0.36, 15.0    # the default glass: in front of the victim, toward the camera, XV2's scale
 DARK_RGBA = (0.08, 0.09, 0.17, 0.7)  # the clip's dark blue-grey at 70%
 DARK_Z, DARK_SIZE = 20.0, 2.2
 GLASS_CAM_Z, GLASS_CAM_SIZE = 25.0, 0.1   # the shards (~140 x 100 units at x1 by their frame 49) over the screen at 25
@@ -220,6 +226,10 @@ def msc_values(root_speed=None):
             'TS_EASE_FRAMES': fl(EASE_FRAMES), 'TS_FALL_EASE': fl(FALL_EASE), 'TS_USED_INDEX': fl(USED_INDEX),
             'TS_STRIKE_DMG': fl(STRIKE_HIT['Damage']), 'TS_SH_TAKE': fl(SH_TAKE), 'TS_SH_STUN': fl(SH_STUN),
             'TS_SH_IASA': fl(SH_IASA), 'TS_FX_DARK': '0x%X' % FX_DARK_ID,
+            'TS_CAMFX': '1' if CAMERA_FX else '0', 'TS_TINT_SLOT': str(TINT[0]), 'TS_TINT_IN': str(TINT[1]),
+            'TS_TINT_R': '0x%X' % TINT[2], 'TS_TINT_G': '0x%X' % TINT[3], 'TS_TINT_B': '0x%X' % TINT[4],
+            'TS_TINT_A': '0x%X' % TINT[5], 'TS_TINT_OUT': str(TINT_OUT), 'TS_GLASS_SIZE': fl(GLASS_SIZE),
+            'TS_GLASS_Z': fl(GLASS_Z),
             'TS_TRACK_STRONG': fl(TRACK_STRONG), 'TS_TRACK_SOFT': fl(round(math.radians(TRACK_SOFT), 6)),
             'TS_DRIFT': fl(DRIFT), 'TS_RETRY_N': fl(RETRY_N)}
     for n, v in (('PH', V_PH), ('CHG', V_CHG), ('SLOT', V_SLOT), ('K', V_K), ('USED', V_USED), ('BREV', V_BREV),
@@ -343,7 +353,8 @@ def effect_scripts():
     dash = outline_on() + [cmd('frame', float(MOVE_FROM))] + if_(0x0F000116, 0, 0, if_(V_PH, 5, DASHING, [
         cmd('graphic_effect', FX_DUST, 0, 0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1)])) + [
         cmd('frame', float(DASH_END - OUTLINE_OUT)), outline_off()]
-    connect = time_stop_look() + outline_on() + [cmd('frame', float(CONNECT_END - OUTLINE_OUT)), outline_off()]
+    connect = (time_stop_look() if CAMERA_FX else []) + outline_on() + [cmd('frame', float(CONNECT_END - OUTLINE_OUT)),
+                                                                         outline_off()]
     return dash, connect
 
 
