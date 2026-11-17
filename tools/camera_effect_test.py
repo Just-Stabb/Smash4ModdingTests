@@ -520,7 +520,8 @@ fxrec:
                    x=XREC >> 16, xl=XREC & 0xFFFF, setm=CF.SETMTX))
     for i, w in enumerate(st.words()):
         w32(mu, V3STUB + 4 * i, w)
-    for at, lab_ in ((CF.UPDATE, 'upd'), (CF.SETMTX, 'setm'), (CF.VALID, 'valid'), (CF.STAGE_STOP, 'stop'),
+    for at, lab_ in ((CF.UPDATE, 'upd'), (CF.SETMTX, 'setm'), (CF.EFT_SETMTX, 'setm'), (CF.VALID, 'valid'),
+                     (CF.STAGE_STOP, 'stop'),
                      (CF.FX_VIS, 'vis'), (CF.FX_PAUSE, 'pause')):
         w32(mu, at, LT.branch(at, st.addr(lab_)))
         mu.ctl_remove_cache(at, at + 4)      # (code the earlier tests ran: drop unicorn's translation)
@@ -559,25 +560,46 @@ def v3_tests(pm, lab, pool, camfx, camera, ref, inst_matrix, calc, entry_of):
         kept = all(pm.reg_read(REG(rr)) == 0x3000 + rr for rr in range(14, 32))
         calls = [(r32(pm, SREC + 8 * (i + 1)), r32(pm, SREC + 8 * (i + 1) + 4)) for i in range(r32(pm, SREC))]
         return r32(pm, UREC), r32(pm, UREC + 4), calls, kept
-    n, last, calls, kept = upd(a['inst'])
-    check('(v3) cf_upd on a camera effect: the game\'s update runs, then eft gets the instance\'s +0x50 (after the '
-          'update\'s own matrix): the camera wins', (n, last, calls, kept),
-          (1, a['inst'], [(a['inst'] + 0x20, GAMEM), (a['inst'] + 0x20, a['inst'] + 0x50)], True))
+    set1, set2, set3 = 0x7F005800, 0x7F005A00, 0x7F005C00
+    for st_, id_ in ((set1, 0x77), (set2, 0x88), (set3, 0x99)):
+        pm.mem_write(st_, b'\0' * 0x200)
+        w32(pm, st_ + 0x1D0, id_)
+        w32(pm, st_ + 0x1DC, 2)
+    ai = a['inst']
+    w32(pm, ai + 0x12C, set1)
+    w32(pm, ai + 0x130, 0x77)
+    pm.mem_write(ai + 0x19A, b'\1')
+    w32(pm, ai + 0x170, 2)
+    w32(pm, ai + 0x158, set2)
+    w32(pm, ai + 0x15C, 0x88)
+    w32(pm, ai + 0x160, set3)
+    w32(pm, ai + 0x164, 0x12345)         # its id changed: a set that ended (the slot reused)
+    n, last, calls, kept = upd(ai)
+    check('(v4) cf_upd on a camera effect: its emitter sets (+0x12C and the extra ones alive) get +0x50 through eft\'s '
+          'SetMtx before the game\'s update and after it, then its model (+0x20) gets it again: the camera wins',
+          (n, last, calls, kept),
+          (1, ai, [(set1, ai + 0x50), (set2, ai + 0x50), (ai + 0x20, GAMEM), (set1, ai + 0x50), (set2, ai + 0x50),
+                   (ai + 0x20, ai + 0x50)], True))
+    pm.mem_write(ai + 0x199, b'\0')
+    w32(pm, set2 + 0x1DC, 0)
+    n, last, calls, kept = upd(ai)
+    check('(v4) ... no model (+0x199 0: a particle-only effect) and an extra set with no emitters: the main set only',
+          calls, [(set1, ai + 0x50), (ai + 0x20, GAMEM), (set1, ai + 0x50)])
+    pm.mem_write(ai + 0x199, b'\1')
+    w32(pm, set2 + 0x1DC, 2)
     other = pool(70)
     pm.mem_write(other, b'\0' * CF.INST)
     w32(pm, other, 0x46000077)
     w32(pm, other + 0x144, 0x8000)
-    pm.mem_write(other + 0x199, b'\1')
+    w32(pm, other + 0x12C, set1)
+    w32(pm, other + 0x130, 0x77)
+    pm.mem_write(other + 0x199, b'\1\1')
     n, last, calls, kept = upd(other)
-    check('(v3) ... any other effect (even one with flag 0x8000): only the game\'s update',
+    check('(v4) ... any other effect (even one with flag 0x8000 and a live set): only the game\'s update',
           (n, last, calls, kept), (1, other, [(other + 0x20, GAMEM)], True))
-    pm.mem_write(b['inst'] + 0x199, b'\0')
-    n, last, calls, _k = upd(b['inst'])
-    check('(v3) ... a camera effect whose emitter set is gone (+0x199 0): nothing given again', len(calls), 1)
-    pm.mem_write(b['inst'] + 0x199, b'\1')
     w32(pm, b['inst'], 0)
     n, last, calls, _k = upd(b['inst'])
-    check('(v3) ... one the update ended (handle 0): nothing given again', len(calls), 1)
+    check('(v4) ... an ended one (handle 0): only the game\'s update', len(calls), 1)
     w32(pm, b['inst'], b['h'])
     # the camera manager's snapshot when the table has no source
     ensure(pm, CF.CAMMGR, CF.CAMMGR + 4)
@@ -631,7 +653,7 @@ def v3_tests(pm, lab, pool, camfx, camera, ref, inst_matrix, calc, entry_of):
     check('(v3) Stage_Freeze(7) (any other non-zero On): as 1', (on_log, d0, mode, off_log),
           ([], 1, 1, [(1, mgr, 0, 0, 0)]))
     dbg = r32(pm, lab['cf_dbg'] + 0x1C)
-    check('(v3) debug counter: matrices given to eft after the update', dbg, 1)
+    check('(v4) debug counter: matrices given to eft\'s emitter sets', dbg, 6)
 
 
 def diag_tests(exe, orig):

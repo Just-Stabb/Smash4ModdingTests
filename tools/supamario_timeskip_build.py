@@ -182,7 +182,7 @@ E11_CAP = (('sprite_2', 0.12), ('sprite_BG', 0.5), ('line_add', 0.15), ('wave_ad
            ('sprite_1', 0.25), ('sprite', 0.5), ('line_BG', 0.9), ('BG', 0.9), ('ring', 0.5))   # v4: from 2.0 each (the
            # vibrant gain): uncapped the set drew 155 square units over 1.0 at its first frame on grass (12.4 peak: the burst's
            # white sparkle sprite_2, the opaque disc sprite_BG, the stacked lines / waves)
-E0_CAP = ()
+E0_CAP = (('stripe', 0.9),)        # v4: the streaks from 2.0 (uncapped: 2.2 / 7.9 square units over 1.0 on grass / grey)
 FX_E11_IDS = {'hit': 0x03410062, 'hit_2': 0x03410066, 'hit_h': 0x03410067, 'hit_2h': 0x03410068}
 FX_AURA_ID, FX_GLASS_ID, FX_E0H_ID = 0x03410063, 0x03410064, 0x03410069
 # v2 / v3 (item 11, the clip's time stop, frames 44-58): XV2 inverts the world (BPE 78) under BTL_CMN effect 108's glass
@@ -633,6 +633,24 @@ def _vibrant(p, d, mats, emp, name, caps, world=True):
     return note
 
 
+def _cone_alpha(p, d, pkg, emp, name):
+    """v4: a ConeExtrude streak's alpha (effect 0's stripes: 0 -> 0.6 at 5% of the head's life -> 0 at 40%, the ribbon
+    staying on after its head): eft's 3-key ramp can't fall by 40%, and the converter's least-squares fit (0 -> 0.3 at
+    5% -> 0 at 100%) drew it at half; and hdr_emitter's alpha x2 (xv2_smash_fx.ALPHA, XV2's glare) only reaches
+    alpha_init (0 here). Now 0 -> the peak x ALPHA (at most 1) at 5%, held to 15%, -> 0 at 100%"""
+    import xv2_smash_fx as FX
+    import xv2vfx
+    node = next(n for _d, n in xv2vfx.emp_nodes(pkg['emp'][emp]) if n.get('Name') == name and n['NodeType'] == 'Emission')
+    if node['NodeSpecificType'] != 'ConeExtrude':
+        return ''
+    ks = [k['Value'] for kv in node['KeyframedValues'] if kv['Target'] == 'Color1_Transparency' for k in kv['Keyframes']]
+    a = min(1.0, max(ks or [node['EmissionNode']['Texture']['Color1_Transparency']]) * FX.ALPHA)
+    for k, v in (('alpha_init', 0.0), ('alpha_diff21', a), ('alpha_diff32', -a), ('alpha_section1', 0.05),
+                 ('alpha_section2', 0.15)):
+        p.set_field(d, k, v)
+    return '; streak alpha 0 -> %.2f (5-15%%) -> 0' % a
+
+
 def _glowing(p, mats, emp, k_names):
     """the indices of a set's emitters XV2 draws with glare (EMM Glare on), not refraction, visible: halo candidates"""
     import xv2_smash_fx as FX
@@ -727,8 +745,9 @@ def e0_world_set(p, e, frt_dir, joints0, halo=True):
             t = list(p.field(d, 'emitter_translation'))
             t = [t[0] + (z + off[2] * SCALE) / AURA_SIZE, t[1] + (y + off[1] * SCALE) / AURA_SIZE, t[2]]
             p.set_emitter_srt(d, tuple(p.field(d, 'emitter_scale')), tuple(p.field(d, 'emitter_rotation')), t)
-            notes.append('%s %s at %s: %s; %s' % (emp, name, bone, '; '.join(n0),
-                                                  _vibrant(p, d, mats, emp, name, E0_CAP)))
+            notes.append('%s %s at %s: %s; %s%s' % (emp, name, bone, '; '.join(n0),
+                                                    _vibrant(p, d, mats, emp, name, E0_CAP),
+                                                    _cone_alpha(p, d, pkg, emp, name)))
             kn.append((len(ems), d, name, emp))
             ems.append((bytes(d), '%s_%s' % (emp[4:-4], bone)))
     if halo:
@@ -754,7 +773,8 @@ def e0_follow_set(p, e, frt_dir, halo=True):
     ems, notes = [], []
     for d, name, n0 in made:
         d = bytearray(d)
-        notes.append('%s: %s; %s' % (name, '; '.join(n0), _vibrant(p, d, mats, emp, name, E0_CAP, world=False)))
+        notes.append('%s: %s; %s%s' % (name, '; '.join(n0), _vibrant(p, d, mats, emp, name, E0_CAP, world=False),
+                                       _cone_alpha(p, d, pkg, emp, name)))
         SB.follow(p, d)
         ems.append((bytes(d), name))
     if halo:
