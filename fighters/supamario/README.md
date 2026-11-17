@@ -3494,3 +3494,45 @@ Tests (`tools/supamario_sledgehammer_test.py` spike_tests): **141 ok** (127 + 14
 buffer, the resets registered; back when the hitstun ends; each tech replaced; let go on its KO, a hit on it, his KO;
 uncharged untouched. The test's model now keeps a shield the swing hit out of the swing (its hit record).
 Not confirmed in game: that a status written over a tech on its first frame takes (Passive's own invincibility frames).
+
+## Time Skip v5 (`supamario_timeskip_v5.zip`): the point-blank arming, the punch's burst, the glass on the screen, the outline, the landing lag
+Over v4. **Needs exe_v46z_camfx5 or later** (camera_effects_v5.zip: Effect_Camera, confirmed in game; its flash-free
+Stage_Freeze). Changed: the MSC, effect.bin, the ptcl / efc, the glass model's texture (`model/EffSupamarioTsDmgGrs2/model.nut`).
+CAMERA_FX (the darkening on the camera) still off: the MSC's tint stays until the user answers.
+
+### The user's v4 test (clips 6e213949, aaf3050c; XV2's screenshots 30 / 31 and clip b66e8a38 = fc8b90ed)
+| | cause | fix |
+|---|---|---|
+| point blank: "the hit detection hit activates before the moving hitbox ... unable to hit if it hits on the frame it activates" (aaf3050c: a training DK touching him, 124 -> 126%, the dash on through it) | v1-v4 looked for the catch only from the motion frame TS_HIT_FROM (26) on, and v4's `ts_rec` noted the damage on every dash frame without a pending hit. When the game script makes the box a frame before the MSC reads that frame (an ACMD FRAME 26 run as the motion reaches 25) and it hits at once, the MSC read the box's frame as 25 through the hit's freeze: no catch looked for, while `ts_rec` noted the hit's damage; after the freeze `ts_took` saw none and the hit was dropped. Replayed on v4's build (the model's `script_lead=1`): 2%, no catch, no hold, no freeze (the clip) | the catch looked for on **every frame of the dash** (no frame guard: the flags appear only once the box exists); `ts_rec` never while the box's hit flags are set (`ts_flags`); the armor lift a frame earlier. The model test (an opponent touching him at activation, hit on the box's first frame, with and without func_82 first / Target 12 empty / the freeze unseen): caught, held, the bystander frozen, punched (18%) |
+| "the punch effect looks much weaker and compressed" | v4: x1.75, every emitter capped for "over 1.0" (the purple lines 0.15, the magenta slashes 0.07), the navy flames (Color1 / Color2 mean) drawn opaque dark blue, the sparkle dots 0.01 m (under a pixel at Smash's camera). XV2 (screenshots): large translucent violet flames from the victim's back, white-pink sparkle streams, a wide cone of horizontal purple lines far past it | **x2.6** (x1.5); the normal-blend flames / backing lines (EnableSecondaryColor) Color2 x the texture tint lifted 60% to white (lilac), alpha x0.55 (translucent, after hdr's x2); wave_nml_4's black pair x0.35; the sparkle dots x6; caps (`E11_CAP`) raised: lines 0.38, slashes 0.25, sprites 0.4 / 0.45, rings 0.5, flames 1.0. The check is now the **white** area (purple past 1.0 blooms purple, the user's rule) |
+| "the glass ... supposed to be clear and apply to the screen" | v2-v4: HIT_DmgGrs2 world-placed in front of the victim; XV2 draws it with T1_VFX_MTN_REFRACT and its DATA0.dds is a refraction offset map (R / G about 0.5, B low): drawn as colour, additive, it was the yellow panes | on the screen: `Effect_Camera(Mode 1, Z 20, Size 0.095, unslowed)` at the connect's frame 0 (its pane 38.6 x 28.8 units = 3.67 x 2.74 half screen heights: over a 16:9 screen), `Terminate_Graphic_Effect(1, 1)` at the punch (XV2 turns BTL_CMN 108 off at 16; the clip: the cracks over the stopped world 44-58, gone at 59); every exit before the punch: `ts_stop_look_off` (unchanged). Clear: `glass_cracks` bakes each shard mesh's border edges (1381, the UVs a planar projection of the pane) into a 512 texture, light blue-white (0.75, 0.9, 1.0), the panes 3%: additive (the material's own blend), only the cracks show; the shards still fly apart after the punch in the model's animation (hidden there) |
+| "the outline made Supamario glow harshly" | v4's FLASH white at 110 overlays the whole body. Smash 4 has no rim-only colour command (the ACMD events list: FLASH / FLASH_FRM / FLASH_NO_STOP / COL_NORMAL tint the body; LIGHT_SHINE / LIGHT_AXIS are lights) | FLASH light blue-white (215, 230, 255) at **40** of 255 |
+| landing lag (user: "high landing lag after using Time Skip if it ended in the air ... even after doing other moves", Bayonetta's up special) | (no Bayonetta files in the repo: the rule as the user states it) | `ts_end` marks an air end (VAR_31 = 100, free outside the move); `ts_land_lag` (func_82, before ts_reset): his first landing status (0x16 / 0x17 / 0x18 / 0x1A) becomes **LandingFallSpecial 30 frames** (work float 0, sh_land's way), whatever he did in the air before; a LandingFallSpecial landing keeps its own; cleared on a ledge, a hit / grab, Dead / Rebirth / Entry; not tied to TS_V_USED (the exe's landing reset could clear it first) |
+
+### XV2's time stop look (for the user's decision)
+The clip: catch at 44 (one white frame), **44-58 the world dark blue-grey and desaturated** (fighters normal) with the
+glass's white cracks and pale wedges over the screen; at the punch (59) the cracks are gone and **the world turns white**
+(a negative: the stage washed white with sketch-like dark lines, BPE 78 Invert World Colors at the punch again) through
+the slow-motion to ~130, the fighters and the purple burst drawn normally on it. Ours: the dark tint from the catch to the
+punch (matches 44-58), faded out over 15 frames after; nothing for the white negative at the punch.
+
+### Brightness (`supamario_fx_glow.py`, square units, most in any frame)
+| | grass: over 1.0 / white | grey: over 1.0 / white | the most it changes the picture |
+|---|---|---|---|
+| effect 11 v4 (x1.75) | 0.2 / 0.0 | 0.6 / 0.0 | 143 / 154 |
+| effect 11 v5 (x2.6) | 61.3 (purple) / **0.2** | 74.2 (purple) / **0.0** | 88 / 79 (the flames now translucent lilac, not opaque navy) |
+| effect 0 (unchanged) | 0.1 / 0.2 | 0.7 / 0.0 | 9.7 / 9.1 |
+
+### Tests
+`tools/supamario_timeskip_test.py`: **164 ok**, 0 problems. New: the point-blank cases with the script a frame ahead
+(v4's build fails them exactly as the clip; v5 catches); the landing lag (an air end then Landing / an air dodge and an
+aerial then its landing / a light landing: LandingFallSpecial 30; a ground end, a hit, a ledge, a special-fall landing:
+nothing); the glass on the screen (Effect_Camera Mode 1, terminated at the punch; none from the MSC); its texture clear
+(blue-white lines, 80%+ of it dark, no yellow); FLASH (215, 230, 255) at 40; effect 11's white area. On the v5 build:
+`supamario_sledgehammer_test` 141 ok, `supamario_fakedeath_test` 47, `supamario_corebreaker_test` 104,
+`supamario_godfist_test --all-models` 566 (0 problems each); `msc_stack_check` 0 of 2458 (globals 127 of 128).
+
+### Not confirmed in game
+FLASH at 40 as an outline; the crack texture's line width on the screen (2 texels of 512: about 5 pixels at 720p);
+func_16 from func_82 (ts_land_lag) changing a landing to LandingFallSpecial on its first frame; effect 11's flames fan
+horizontally in fx_render (XV2's lean upward).

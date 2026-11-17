@@ -41389,6 +41389,7 @@ void ts_tick()
 {
     float n;
     float st;
+    ts_land_lag();                  // v5: before ts_reset (its landing)
     ts_reset();
     n = WorkModuleF(0, TS_V_EASE);
     if (n < 0.5f || WorkModuleF(0, TS_V_PH) != 0.0f)
@@ -42329,4 +42330,39 @@ void ts_end()
         WorkModule(0, 1.0f, TS_V_EASE);
     }
     WorkModule(0, 0.0f, TS_V_PH);
+    WorkModule(0, 0.0f, TS_V_RETRY);
+    if (global18 == 0x2)
+    {
+        WorkModule(0, TS_LAG_FLAG, TS_V_RETRY);     // v5: ended in the air: the next landing's high lag (ts_land_lag)
+    }
+}
+
+// v5 (user: "make it so Supamario has high landing lag after using Time Skip if it ended in the air, similarly to how
+// Bayonetta gets more landing lag after using her up special, even after doing other moves"): after the move ends in the
+// air (ts_end: VAR_31 TS_V_RETRY = TS_LAG_FLAG; free outside the move: the catch's retry count / the tint's flag are the
+// move's own), every frame (func_82): his first landing status (Landing 0x16, LandingLight 0x17, an aerial's landing
+// 0x18, 0x1A) becomes LandingFallSpecial (0x19) TS_LAND_LAG frames long (work float 0: its length, the up special's
+// way, sh_land's); whatever he did in the air before it (aerials, an air dodge, other specials). A landing already in
+// LandingFallSpecial keeps its own. Cleared then, or on a ledge (situation 1 / a cliff status), a hit / grab (0x3F-0x4C),
+// Dead / Rebirth / Entry; not by the exe's variable resets (TS_V_USED's), which may clear on the landing first
+void ts_land_lag()
+{
+    float st;
+    if (WorkModuleF(0, TS_V_RETRY) < TS_LAG_FLAG - 0.5f || WorkModuleF(0, TS_V_PH) != 0.0f)
+    {
+        return;
+    }
+    st = WorkModuleF(0, 0x0F0000A2);
+    if (st == TS_ST_LANDING || st == TS_ST_LANDING + 1.0f || st == TS_ST_LANDING + 2.0f || st == TS_ST_LANDING + 4.0f)
+    {
+        WorkModule(0, 0.0f, TS_V_RETRY);
+        WorkModule(0, TS_LAND_LAG, 0);
+        func_16(TS_ST_LANDFALL, 0);
+        return;
+    }
+    if (st == TS_ST_LANDING + 3.0f || global18 == 0x1 || (st >= CB_RESET_LO && st <= CB_RESET_HI) ||
+        (st >= CB_CLIFF_LO && st <= CB_CLIFF_HI) || st == CB_DEAD || st == CB_REBIRTH || st == CB_ENTRY)
+    {
+        WorkModule(0, 0.0f, TS_V_RETRY);
+    }
 }

@@ -73,6 +73,10 @@ TRACK_DEG = 65.0
 TRACK_STRONG, TRACK_SOFT = 3, 1.5
 DRIFT = 0.3                         # v3 (user): the charge hold's drift, units a frame at full tilt (his walk ~1.1)
 RETRY_N = 3                         # v3: the catch looked at again while the hit fighter is frozen (the first-frame hit)
+# v5 (user: "high landing lag after using Time Skip if it ended in the air, similarly to how Bayonetta ... even after doing
+# other moves"): his next landing after an air end is LandingFallSpecial (0x19) this long (frames: a Bayonetta-like high
+# special landing; Sledgehammer's is 10); VAR_31 = TS_LAG_FLAG marks it outside the move
+LAND_LAG, LAG_FLAG, ST_LANDING = 30, 100.0, 0x16
 # after the move in the air (the user): his gravity eased back in over EASE_FRAMES; a faster fall clamped down to his
 # normal one by FALL_EASE a frame
 EASE_FRAMES = 45.0                  # v3 (user: a slower fall after an air punch; v2 20 / 0.05)
@@ -279,7 +283,8 @@ def msc_values(root_speed=None):
             'TS_TINT_A': '0x%X' % TINT[5], 'TS_TINT_OUT': str(TINT_OUT), 'TS_GLASS_SIZE': fl(GLASS_SIZE),
             'TS_GLASS_Z': fl(GLASS_Z),
             'TS_TRACK_STRONG': fl(TRACK_STRONG), 'TS_TRACK_SOFT': fl(round(math.radians(TRACK_SOFT), 6)),
-            'TS_DRIFT': fl(DRIFT), 'TS_RETRY_N': fl(RETRY_N)}
+            'TS_DRIFT': fl(DRIFT), 'TS_RETRY_N': fl(RETRY_N), 'TS_LAND_LAG': fl(LAND_LAG), 'TS_LAG_FLAG': fl(LAG_FLAG),
+            'TS_ST_LANDING': fl(ST_LANDING), 'TS_ST_LANDFALL': '0x%X' % (ST_LANDING + 3)}
     for n, v in (('PH', V_PH), ('CHG', V_CHG), ('SLOT', V_SLOT), ('K', V_K), ('USED', V_USED), ('BREV', V_BREV),
                  ('EASE', V_EASE), ('AIM', V_AIM), ('SHV', V_SHV), ('RETRY', V_RETRY)):
         vals['TS_V_' + n] = '0x%X' % v

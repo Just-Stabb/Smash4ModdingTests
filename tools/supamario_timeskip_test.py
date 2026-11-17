@@ -580,6 +580,7 @@ def msc_tests(path, root):
     reset_tests(path)
     exit_tests(path)
     aura_tests(path)
+    lag_tests(path)
     v3_tests(path)
 
 
@@ -935,6 +936,45 @@ def aura_tests(path):
     au = [n for n, i, _x, _y, _s in g.fx if i == B.FX_AURA_ID]
     check('v4 effect 0 in a full charge: at 0, then every %d charge frames' % B.AURA_EVERY,
           au, [0] + [B.WIND_END + k for k in range(B.AURA_EVERY - 1, B.CHARGE, B.AURA_EVERY)])
+
+
+def lag_tests(path):
+    """v5 (user: "high landing lag after using Time Skip if it ended in the air, similarly to how Bayonetta ... even after
+    doing other moves"): his next landing after an air end is LandingFallSpecial LAND_LAG frames long, whatever he did in
+    the air before it; nothing after a ground end; cleared by a hit, a ledge, a special-fall landing"""
+    def after(air, events):
+        g = Game(air=air, y=200.0 if air else 0.0, floor=-1e4 if air else 0.0)
+        end = []
+
+        def tick(g_, k):
+            if not end and g_.status is not None:
+                end.append(k)
+            if end:
+                ev = events.get(k - end[0])
+                if ev is not None:
+                    g_.status, land = ev
+                    if land:
+                        g_.air = False
+        tr, vm = run(path, g, after=30, tick=tick)
+        k0 = end[0] if end else None
+        return [(n - k0, st) for n, st in g.statuses if k0 is not None and n > k0], g.vars.get(0), g.vars.get(B.V_RETRY)
+    for name, air, ev, want in (
+            ('ended in the air, then a landing (Landing 0x16)', True, {5: (0x16, True)}, [(5, 0x19)]),
+            ('ended in the air, an air dodge, an aerial, then its landing (0x18)', True,
+             {2: (0x22, False), 4: (0x35, False), 8: (0x18, True)}, [(8, 0x19)]),
+            ('ended in the air, a light landing (0x17)', True, {3: (0x17, True)}, [(3, 0x19)]),
+            ('ended on the ground, then a landing (0x16)', False, {5: (0x16, True)}, []),
+            ('ended in the air, hit (Damage 0x45), then a landing', True, {2: (0x45, False), 6: (0x16, True)},
+             []),
+            ('ended in the air, a ledge (CliffCatch 0x72), then a landing', True, {2: (0x72, False), 6: (0x16, True)},
+             []),
+            ('ended in the air, a special-fall landing (0x19: its own), then a landing', True,
+             {3: (0x19, True), 8: (0x16, True)}, [])):
+        st, lag, flag = after(air, ev)
+        got = (st, lag if any(x[1] == 0x19 for x in st) else None, flag)
+        check('v5 landing lag, %s: %s' % (name, 'LandingFallSpecial %d frames (work float 0) at that landing, the mark '
+                                          'cleared' % B.LAND_LAG if (0x19 in [x[1] for x in want]) else 'nothing'),
+              got, (want, float(B.LAND_LAG) if any(x[1] == 0x19 for x in want) else None, 0.0))
 
 
 def shield_tests(path):
