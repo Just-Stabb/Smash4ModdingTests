@@ -4,7 +4,7 @@ These are new commands for game, effect, sound and expression scripts. They need
 `cross_f.rpx` (`tools/acmd_ext_cave.py`, part of the standard build). Without it, a script that uses
 them won't load properly, so ship the executable with any script that uses them.
 
-Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12, Buffer_Clear / Buffer_Set from v1.4.13, Time_Scale / Target_Time_Scale / Stage_Freeze from v1.7.0, Var_Reset_Set and New_Var's Reset from v1.7.4, Hitbox_Hold from v1.7.5, Effect_Camera from v1.7.6) lists all of them in one
+Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12, Buffer_Clear / Buffer_Set from v1.4.13, Time_Scale / Target_Time_Scale / Stage_Freeze from v1.7.0 (Stage_Freeze's On 2 / 3 and the flash-free On 1 from v1.7.8), Var_Reset_Set and New_Var's Reset from v1.7.4, Hitbox_Hold from v1.7.5, Effect_Camera from v1.7.6) lists all of them in one
 group, **New Commands**, at the top of the list (vanilla commands stay in their own groups), in subgroups:
 
 | Subgroup | Commands |
@@ -463,7 +463,7 @@ has the addresses.
 |---|---|---|
 | `Time_Scale(Rate, Frames)` | Rate float; Frames int | Below 1: the game's global slow-motion at 1/N (Rate rounded to 1/N, N 2-20). 2-4: that many game steps a frame. 1 (or 0): normal. Frames: 0 until changed / the match ends, else that many screen frames. |
 | `Target_Time_Scale(Target, Rate, Frames)` | Target int; Rate float; Frames int | One fighter (or this article) at 1/N speed, the Timer item's own slow (SlowModule slot 3); 1 or more: normal. Frames: its own frames, counted by the game; 0 until changed or it's set up again (a respawn). |
-| `Stage_Freeze(On, Frames)` | On int; Frames int | 1: the stage stopped (the stage manager's own stop flag); 0: it goes on. Frames: 0 until resumed / the match ends, else that many screen frames. |
+| `Stage_Freeze(On, Frames)` | On int; Frames int | 1: the stage stopped, no flash (camera_effects v3: the stage manager's update flag only); 2: the game's full stop (the stage told too: the screen goes white while it lasts; v2's On 1); 3: the Final Smash stop (2 + the effects the Final Smashes hide and pause); 0: it goes on. Frames: 0 until resumed / the match ends, else that many screen frames. |
 
 **How the game does it (and what each one therefore affects):**
 
@@ -497,6 +497,24 @@ has the addresses.
   The module's own reset (vt `+0x24`, from the object set-up `0x02BF57B0`) clears every slot, so a respawn ends
   it. The module has no rate above 1: one fighter can't be sped up. Animation_Rate_Set speeds up only the
   animation and scripts.
+- **The white screen (camera_effects v3).** v2's Dr. Mario test (clip 1f7de3cf): Stage_Freeze(1, 120) on the up
+  taunt's frame 2 turned the whole 3D picture white (the HUD intact) from clip frame 20 to 139, exactly its 120
+  frames, and the picture came back in one frame when it let go; the black overlay started with it (killed at the
+  same frame) was a small dark blob fading out over frames 140-144, so the white wasn't the overlay. The first white
+  frame shows the stage washed out with the fighters still drawn, then everything. The earlier threads / time test v2
+  (Stage_Freeze(1, 180) in training, where the freeze then never ended) had "a flash that didn't disappear";
+  Supamario's Time Skip shows it too. What v2's Stage_Freeze did was the game's full stop `0x0316505C(manager, 1)`:
+  `+0xD0` set **and** the stage told, `0x031427D0(stage, 0)`: for each stage object (stage vt `+0x284`'s list) its
+  `+0x118` bit `0x40000` cleared, its model / effect handle (`+0xDC`) paused through the render managers
+  (`0x03158994` -> `0x033534A4`) and its visibility set off (`0x032FF68C`), then stage vt `+0x214`. The game uses
+  that stop for the Final Smashes (`0x02772658` and its copies: the stop, then `0x0334CA64(0x01080000, 0xFF080000,
+  0, 0)` hiding and `0x0334CA30(..., 1)` pausing the effects of that key class) and the pause (`0x029C6C54` with
+  stage vt `+0x28C` / `+0x294`), where a white stage never shows. **v3** (`tools/camera_effect_cave.py`, hooks on
+  h_sfreeze's `bl 0x0316505C` at `0x04BD4334` and ts_stage_off's at `0x04BD4268`): On 1 sets `+0xD0` only (the
+  update skipped, nothing told; resumed by the game's own call, whose `0x031427D0` sees the stage still active and
+  does nothing but clear `+0xD0`); On 2 is the full stop; On 3 the full stop plus the Final Smashes' two effect calls
+  (undone on resume). Which part of the full stop whites the screen out (the stage's objects paused / hidden, or
+  something the stage does in vt `+0x214`) is what the v3 test's three freeze taunts tell apart.
 - **Stage stop** (`Stage_Freeze`). The stage manager `[0x102F7020]` skips the stage's update (vtable `+0x2C` /
   `+0x4C`, and `+0x34` in its second half `0x03164EA4`) while its byte `+0xD0` is set. `0x0316505C(manager, on)`
   sets it, and tells the stage (`0x031427D0`). The game's own callers are some Final Smashes' code (`0x02772694`,
@@ -1337,7 +1355,22 @@ FRAME(Frames=100)
 Effect_Camera(Graphic=0x3410013, X=0, Y=0, Z=25, XRot=0, YRot=0, ZRot=15, Size=1.2, Mode=0, Frames=0, Flags=1)
 ```
 
-Sm4shCommand (New Commands / Effects) has five complete examples (the time-stop darkening, the glass-shatter burst, a
+- **camera_effects v3 (exe_v46z_camfx3, Sm4shCommand v1.7.8).** v2's in-game test (clip 1f7de3cf, Dr. Mario): the
+  corner stars (Mode 1, X 1.4, Y 0.7) appeared 8-14 px each, up and right of the fighter, fixed in the world at about
+  the stage's depth (they moved with the stage's platforms when the camera panned, about 30 px over 80 frames, where
+  a screen-fixed effect moves 0), nothing at the corner; the black overlay showed only after the white freeze, as a
+  small dark blob left of the centre fading out (frames 140-144); the ice smoke (Mode 0, Z 30) was centred and about
+  0.75 screen heights across, as wanted. So the camera matrix wasn't what eft drew in Mode 1. v3 makes it win: eft is
+  given the instance's matrix again right after the game's update of it (the calc pass's `bl 0x0334E0C8` at
+  `0x032EFD7C` -> cf_upd, then `0x032FF744(inst + 0x20, inst + 0x50)`), the instance's position (`+0xC8`) and scale
+  (`+0xB0`) hold the same place, and the camera manager's own snapshot is used when the effect camera table has no
+  camera. The battle camera's near / far clips are fitted to the stage every frame (`0x02D27D74`, from the camera
+  update `0x02D28B74`): a Z inside the near clip goes to near + 1 (Mode 1 keeps its screen place and size). The
+  test-only diag executable logs, for each camera effect each frame (its first 30, then every 30th), the camera read
+  (S4CC / S4CV / S4CN), the instance (S4CF: handle, flags, key, follow target, its bytes), its matrix (S4CM) and eft's
+  emitter set's (S4CE: `+0x350`): docs/native-notes.md "Camera effects". Parameters unchanged; example 6 is the case
+  v2 got wrong (a time stop's darkening staying on the screen while the camera pans).
+- Sm4shCommand (New Commands / Effects) has six complete examples (the time-stop darkening, the glass-shatter burst, a
 charge vignette, the common dizzy stars pinned to a corner (v1.7.7: was 0x1000042, the thunder), Mode 2 falling particles) and the full help. The Hitbox Viewer
 draws it in front of its own view (X / Y from the view's centre, Mode 1 in half the view's height; it has no game camera,
 so Z changes nothing there) and lists it with the effects; Frames ends it there too. `port_check` X9 (ERROR): a script

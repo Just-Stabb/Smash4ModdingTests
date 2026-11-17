@@ -17,17 +17,18 @@ the top-right corner for 120 frames: the screen blown out to white. The command'
 (its additive parts black, its alpha parts a dark swirl) and the ice smoke at Size 1 / Z 30 a whole screen of faint
 white smoke.
 
-v2, one effect per taunt (both L / R of each):
-  up    (AppealHiR / L: no up-taunt game / AppealHiR effect script in vanilla, both added): game Stage_Freeze(1, 120) on
-        frame 2; effect frame 2: the black quad DARK_QUAD_ID (a new set CamFxDarkQuad in Dr. Mario's bank: one
-        alpha-blended billboard 2 units wide, opaque (the common RayGunShotFlash2_Copy1's shader: colour 0 x the texture,
-        alpha from the texture's alpha: its BC4 texture selects R R R 1), one particle that lives until the set is
-        faded, fade 1/8), Mode 1 Size 2 (2 screen heights: the whole 16:9 screen), black, alpha 60, Frames 120, unslowed.
-  side  (AppealSR / SL effect scripts; their game scripts kept): the common dizzy stars 0x100002C (alpha-blended,
-        particles 1.5 - 6 units) pinned at the top-right, Mode 1 X 1.4 Y 0.7, Size 0.08 (0.06 - 0.24 screen heights),
-        Frames 90.
-  down  (AppealLwR / LwL effect scripts): the common ice shock-wave smoke 0x100003F (alpha 0.24, 22 units), Mode 0,
-        Z 30, Size 0.25 (5.5 units: a quarter of the screen's height at 30), a one-shot (Frames 0).
+v2's test (user, Dr. Mario): up "a massive white flash during the freeze", side "stars relative to Dr. Mario
+instead of the top right corner", down "seems to work". The clip: the white is Stage_Freeze's (frames 20-139 exactly its
+120 frames, cut in one frame; the black quad, killed then, faded out as a small dark blob over frames 140-144), the
+stars world-fixed far from the camera. v3 splits every case (camera_effects v3, both facings marked):
+  AppealHiR  game: Stage_Freeze(1, 120)   the new default (the update stopped, the stage not told): no white expected
+  AppealHiL  game: Stage_Freeze(2, 120)   the game's full stop (v2's): the white expected
+  AppealLwL  game: Stage_Freeze(3, 120)   the Final Smashes' stop (full stop + their effect class hidden / paused)
+  AppealSR   effect: the dizzy stars 0x100002C, Mode 1 X 1.4 Y 0.7 Z 20 Size 0.08, Frames 90 (top-right corner)
+  AppealSL   effect: the black quad DARK_QUAD (CamFxDarkQuad, alpha-blended, one 2-unit particle), Mode 1 Size 2,
+             black 60 %, Frames 120, unslowed (the whole screen darker)
+  AppealLwR  effect: the ice smoke 0x100003F, Mode 0 Z 30 Size 0.25 (a quarter of the screen, centred, fades by itself)
+No effect taunt has a Stage_Freeze; no freeze taunt an effect.
 """
 import os
 import struct
@@ -44,6 +45,7 @@ QUAD_SRC = ('PtcCommonSuperscopeBullet', 'RayGunShotFlash2_Copy1')
 QUAD_SET = 'CamFxDarkQuad'
 QUAD_WIDTH = 2.0
 STARS, SMOKE = 0x100002C, 0x100003F
+FREEZE_FRAMES = 120
 
 
 def cmd(name, **kw):
@@ -62,15 +64,18 @@ def camfx(graphic, x, y, z, size, mode, frames, flags=0):
 
 
 def scripts(quad_id):
+    """v3: each case alone on its own taunt (no Stage_Freeze with any effect); three Stage_Freeze taunts alone"""
     end = cmd('Script_End')
-    up_game = [cmd('FRAME', Frames=2.0), cmd('Stage_Freeze', On=1, Frames=120), end]
-    up_fx = [cmd('FRAME', Frames=2.0), camfx(quad_id, 0.0, 0.0, 20.0, 2.0, 1, 120, 1),
-             cmd('LAST_EFFECT_SET_COLOR', Red=0.0, Green=0.0, Blue=0.0), cmd('LAST_EFFECT_SET_ALPHA', Alpha=60.0), end]
-    side_fx = [cmd('FRAME', Frames=2.0), camfx(STARS, 1.4, 0.7, 20.0, 0.08, 1, 90), end]
-    down_fx = [cmd('FRAME', Frames=2.0), camfx(SMOKE, 0.0, 0.0, 30.0, 0.25, 0, 0), end]
-    game = {'AppealHiR': up_game, 'AppealHiL': up_game}
-    effect = {'AppealHiR': up_fx, 'AppealHiL': up_fx, 'AppealSR': side_fx, 'AppealSL': side_fx,
-              'AppealLwR': down_fx, 'AppealLwL': down_fx}
+
+    def freeze(on):
+        return [cmd('FRAME', Frames=2.0), cmd('Stage_Freeze', On=on, Frames=FREEZE_FRAMES), end]
+    stars = [cmd('FRAME', Frames=2.0), camfx(STARS, 1.4, 0.7, 20.0, 0.08, 1, 90), end]
+    quad = [cmd('FRAME', Frames=2.0), camfx(quad_id, 0.0, 0.0, 20.0, 2.0, 1, 120, 1),
+            cmd('LAST_EFFECT_SET_COLOR', Red=0.0, Green=0.0, Blue=0.0), cmd('LAST_EFFECT_SET_ALPHA', Alpha=60.0), end]
+    smoke = [cmd('FRAME', Frames=2.0), camfx(SMOKE, 0.0, 0.0, 30.0, 0.25, 0, 0), end]
+    game = {'AppealHiR': freeze(1), 'AppealHiL': freeze(2), 'AppealLwL': freeze(3)}
+    effect = {'AppealSR': stars, 'AppealSL': quad, 'AppealLwR': smoke,      # the freeze taunts: no effect at all
+              'AppealHiR': [end], 'AppealHiL': [end], 'AppealLwL': [end]}
     return game, effect
 
 
@@ -153,9 +158,8 @@ def main():
         for name, sc in add.items():
             assert [str(c) for c in b.scripts[acmd.crc(name)]] == [str(c) for c in sc]
         print('%s: %d scripts (+%d new), set: %s' % (fn, len(b.scripts), len(b.scripts) - n, ', '.join(add)))
-        for name in sorted(set(map(str, add.values())) and add):
-            if name.endswith('R'):
-                print('  %s:\n%s' % (name, acmd.fmt_script(b.scripts[acmd.crc(name)], '    ')))
+        for name in sorted(add):
+            print('  %s:\n%s' % (name, acmd.fmt_script(b.scripts[acmd.crc(name)], '    ')))
 
 
 if __name__ == '__main__':

@@ -2905,6 +2905,47 @@ were run in unicorn for the parts the test needs (the instance update up to its 
   k = dist x tan(FOV / 2) in Mode 1, else 1; P = eye + right X k + up Y k - back dist; W = [right up back] x L x Size k
   (Mode 2: L x Size k), rows of W with P as the 4th column.
 
+**camera_effects v3 (exe_v46z_camfx3; clip 1f7de3cf, the user's Dr. Mario on v2's split test).**
+- **What the clip shows** (60 fps, frame by frame): the up taunt's Stage_Freeze(1, 120) whites the 3D picture out
+  from frame 20 to 139 (mean luma 123 -> 219 -> 123), the HUD intact; frame 20 has the stage washed out and the
+  fighters still drawn. The black quad (Frames 120, fade 1/8) was killed at frame 140 and shows over 140-144 as a
+  small dark blob left of the centre, fading: it is black, alpha-blended and not over the screen. The side taunt's
+  dizzy stars (Mode 1, X 1.4, Y 0.7, Size 0.08) appear at frame 238 under the top platform's left end, up and right of
+  Dr. Mario, 8-14 px each, and stay with the platform (frames 244 -> 337: stars (-25, -5) px, the platform's end
+  (-22, -13), the far arch (-5, +7)): fixed in the world near the stage's depth; nothing at the top-right corner.
+  The down taunt's ice smoke (Mode 0, Z 30, Size 0.25) is centred both times (the camera elsewhere the second time),
+  about 0.75 screen heights across: what Z 30 gives.
+- **Traced** (beyond v1's notes): the calc pass `0x032EFD04` skips everything while the manager's byte `+0xB1` is set
+  and eft's calc while `+0xB0`; the instance update `0x0334E0C8` (only caller `0x032EFD7C`) gives eft the matrix
+  through `0x032FF744(inst + 0x20, &m)`: `[inst + 0x28]` (the emitter set) `+0x350` = the 3x4, then `0x03425100` with
+  the column-major 4x4 (translation `+0x320`, the X axis' length as the set's scale `+0x7AC`, `+0x340` = M x `+0x330`).
+  An instance whose request had `r9` set (the world request passes 1; MSC's too) gets `+0x1A3`, so its emitter set's
+  `+0x2CC` = 0.07 at creation (`0x0334DC70`) and its `+0x7C4` = 0.07 every frame (`0x0334EAC8`): eft's emitter calc
+  puts `+0x2CC` in the dynamic uniform block's emp1.z (`0x04A65DF0`), and every eft vertex program tests it
+  (`SETGT 1.0, emp1.z`): below 1 the particle skips the billboard matrix bm (it stays in the world's XY plane);
+  `+0x7C4` flattens an effect *model*'s depth (`0x034243B0`). Flag `0x8000` is also the game's own "keep the follow
+  target's scale out" in the follow path (`0x0334E30C`). The detach `0x0334F540` keeps a lost target's last matrix
+  (`+0x1A1` 1, `+0x34` 0). The instance list `[0x10439088]` (by `+0x18`) is what the key-matched calls walk
+  (`0x032F0F10`: `+0x19E` paused; `0x032F0F88` -> `0x0334FD60`: `+0x1A0` visible, applied by `0x0334FBFC` through eft
+  vt `+0x64`). The battle camera fits its near / far clips to the stage's box every frame (`0x02D27D74(cam + 0x12C,
+  cam, &near, &far)` from the camera update at `0x02D28B74`, after `+0xE8` / `+0xF0` = `+0xEC` / `+0xF4`): the
+  snapshot's near (`+8`) is that fitted value, not the default 2.
+- **v3's cave** (same region, `0x04BE0000`-`0x04BE2000`; `tools/camera_effect_cave.py`, 79 unicorn checks on
+  exe_v46y_hold): cf_upd replaces the calc pass's `bl 0x0334E0C8` (`0x032EFD7C`): the game's update, then, for a tracked
+  instance with `0x8000`, its emitter set alive (`+0x199`) and valid (`0x032FF640`), `0x032FF744(inst + 0x20,
+  inst + 0x50)` again (the test runs it against an update that gives eft a matrix of its own: the camera's is the last
+  eft gets); cf_flags also writes the matrix's translation to `+0xC8` and its scale to `+0xB0`-`+0xB8`; cf_camera falls
+  back to `[0x10352470] + 0x780` (the camera manager's snapshot) when the table has no current source; Stage_Freeze's
+  stop calls are hooked (`0x04BD4334` -> cf_sfz_on, `0x04BD4268` -> cf_sfz_off: On 1 `+0xD0` only, 2 the game's
+  stop, 3 the Final Smash stop; docs/acmd-extra-commands.md "Time_Scale / Target_Time_Scale / Stage_Freeze").
+- **The diag build** (`camera_effect_cave.py --diag`, TEST ONLY, exe_v46z_camfx3_diag): OSReport lines, an effect's
+  first 30 calc passes then every 30th: `S4CC n cur nxt src cam mgrblk tan` (the effect camera table's current / next
+  source, the block read, whether a camera was found, the camera manager's block, tan(fov / 2) as hex float), `S4CV
+  eye tgt` and `S4CN fov near far up` (that block), `S4CF n h i fl key fo b` (handle, instance, `+0x144`, the owner key
+  `+8`, follow target `+0x34`, bytes `+0x199` `+0x19E` `+0x1A1` `+0x1A3`), `S4CM t x` (its `+0x50`: translation, X axis)
+  and `S4CE set t x` (the emitter set's `+0x350`: what eft holds after cf_upd), `S4SF n on mode mgr d0` (each
+  Stage_Freeze stop / resume). Floats are printed as their hex words.
+
 **Not confirmed in game:** that the TV's entry 0 is the camera every battle view draws with (Final Smash cameras register
 their own sources? they would be read the same way, through the current source); the vertical FOV's use by the renderer
 (Mode 1's scale follows the source's FOV as the projection gets it); the overlay's draw order against other effects.

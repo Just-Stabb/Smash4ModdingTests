@@ -91,8 +91,12 @@ def main():
     check('the cave inside its region, the rest of it zero', (min(words) >= 0x02000000,
           max(a for a in words if a >= CF.CAVE) < CF.LIMIT), (True, True))
     others = [a for a in words if not CF.CAVE <= a < CF.LIMIT]
-    check('words outside the cave: the calc hook and the 4 command-table fallbacks',
-          sorted(others) == sorted([CF.CALC_AT, s['lk_none'], s['s1'], s['s2'], s['f']]), True)
+    check('words outside the cave: the calc hook, (v3) the update call and Stage_Freeze\'s two stop calls, and the 4 '
+          'command-table fallbacks', sorted(others) == sorted([CF.CALC_AT, CF.UPD_AT, CF.SFZ_ON_AT, CF.SFZ_OFF_AT,
+                                                                s['lk_none'], s['s1'], s['s2'], s['f']]), True)
+    check('(v3) the update call and the stop calls stay bl (to the cave)',
+          [words[a] & 3 == 1 and CF.CAVE <= CF._bl_target(a, words[a]) < CF.LIMIT
+           for a in (CF.UPD_AT, CF.SFZ_ON_AT, CF.SFZ_OFF_AT)], [True] * 3)
 
     # ---- command tables
     pairs = [(r32(om, CRC_TABLE + 8 * i), r32(om, CRC_TABLE + 8 * i + 4)) for i in range(COUNT)]
@@ -428,7 +432,300 @@ kill:
     dbg = [r32(pm, lab['cf_dbg'] + 4 * i) for i in range(6)]
     check('debug counters: commands run, started, matrices set, ended by Frames, ended, refused',
           (dbg[0] > 20, dbg[1] > 20, dbg[2] > 5, dbg[3], dbg[4], dbg[5]), (True, True, True, 1, 2, 4))
+    v3_tests(pm, lab, pool, camfx, camera, ref, inst_matrix, calc, entry_of)
+    diag_tests(exe, orig)
     sys.exit(1 if acmd_ext_test.fails else 0)
+
+
+V3STUB = 0x04BE3400                     # (v3) stubs past the first ones
+UREC, SREC, XREC = 0x7F003000, 0x7F003100, 0x7F003300
+GAMEM = 0x7F003500                       # the matrix the stubbed game update gives eft (its own pass)
+MGR_CAM = 0x7F200000                     # a fake camera manager (snapshot block at +0x780)
+
+
+def v3_stubs(mu):
+    """the game's update (records it, then gives eft a matrix of its own, as its billboard / follow paths do), eft's
+    matrix setter, the set-valid check, the stage stop, the Final Smash effect calls: recording stubs"""
+    st = Asm(V3STUB)
+    st.asm("""
+upd:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r31, 0x1C(r1)
+        mr r31, r3
+        lis r12, 0x%(u)04X
+        ori r12, r12, 0x%(ul)04X
+        lwz r11, 0(r12)
+        addi r11, r11, 1
+        stw r11, 0(r12)
+        stw r3, 4(r12)
+        addi r3, r31, 0x20
+        lis r4, 0x%(g)04X
+        ori r4, r4, 0x%(gl)04X
+        bl 0x%(setm)08X
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+setm:
+        lis r12, 0x%(s)04X
+        ori r12, r12, 0x%(sl)04X
+        lwz r11, 0(r12)
+        addi r11, r11, 1
+        stw r11, 0(r12)
+        slwi r11, r11, 3
+        add r11, r11, r12
+        stw r3, 0(r11)
+        stw r4, 4(r11)
+        blr
+valid:
+        li r3, 1
+        blr
+stop:
+        lis r12, 0x%(x)04X
+        ori r12, r12, 0x%(xl)04X
+        lwz r11, 0(r12)
+        addi r11, r11, 1
+        stw r11, 0(r12)
+        mulli r11, r11, 0x14
+        add r11, r11, r12
+        li r0, 1
+        stw r0, 0(r11)
+        stw r3, 4(r11)
+        stw r4, 8(r11)
+        stb r4, 0xD0(r3)
+        blr
+vis:
+        li r0, 2
+        b fxrec
+pause:
+        li r0, 3
+fxrec:
+        lis r12, 0x%(x)04X
+        ori r12, r12, 0x%(xl)04X
+        lwz r11, 0(r12)
+        addi r11, r11, 1
+        stw r11, 0(r12)
+        mulli r11, r11, 0x14
+        add r11, r11, r12
+        stw r0, 0(r11)
+        stw r3, 4(r11)
+        stw r4, 8(r11)
+        stw r5, 0xC(r11)
+        stw r6, 0x10(r11)
+        blr
+""" % dict(u=UREC >> 16, ul=UREC & 0xFFFF, g=GAMEM >> 16, gl=GAMEM & 0xFFFF, s=SREC >> 16, sl=SREC & 0xFFFF,
+                   x=XREC >> 16, xl=XREC & 0xFFFF, setm=CF.SETMTX))
+    for i, w in enumerate(st.words()):
+        w32(mu, V3STUB + 4 * i, w)
+    for at, lab_ in ((CF.UPDATE, 'upd'), (CF.SETMTX, 'setm'), (CF.VALID, 'valid'), (CF.STAGE_STOP, 'stop'),
+                     (CF.FX_VIS, 'vis'), (CF.FX_PAUSE, 'pause')):
+        w32(mu, at, LT.branch(at, st.addr(lab_)))
+        mu.ctl_remove_cache(at, at + 4)      # (code the earlier tests ran: drop unicorn's translation)
+    ensure(mu, UREC, 0x7F006000)
+    mu.mem_write(UREC, b'\0' * 0x700)
+    return st
+
+
+def stop_log(mu):
+    n = r32(mu, XREC)
+    return [tuple(r32(mu, XREC + 0x14 * (i + 1) + 4 * k) for k in range(5)) for i in range(n)]
+
+
+def v3_tests(pm, lab, pool, camfx, camera, ref, inst_matrix, calc, entry_of):
+    """camera_effects v3: eft gets the camera matrix after the game's instance update (cf_upd), the instance's
+    position / scale mirror it, the camera manager's snapshot when the effect camera table has no source, and
+    Stage_Freeze's modes (cf_sfz_on / cf_sfz_off)"""
+    v3_stubs(pm)
+    pm.mem_write(lab['cf_tab'], b'\0' * CF.NTAB * CF.ENTRY)
+    w32(pm, CF.CAMTBL + 0xC, 0)
+    cam = camera((10.0, 30.0, 150.0), (10.0, 20.0, 0.0))
+    a = camfx(0x100002C, 1.4, 0.7, 20.0, 0.0, 0.0, 0.0, 0.08, 1, slot=60)
+    b = camfx(0x100003F, 0.0, 0.0, 30.0, 0.0, 0.0, 0.0, 0.25, 0, slot=61)
+    for r_ in (a, b):
+        pm.mem_write(r_['inst'] + 0x199, b'\1')
+    m_a = inst_matrix(a['inst'])
+    check('(v3) the handler mirrors the matrix into the instance\'s position (+0xC8) and scale (+0xB0)',
+          (close(rf(pm, a['inst'] + 0xC8, 3), [m_a[i][3] for i in range(3)]),
+           close(rf(pm, a['inst'] + 0xB0, 3), [math.sqrt(sum(m_a[i][0] ** 2 for i in range(3)))] * 3)), (True, True))
+
+    def upd(inst):
+        pm.mem_write(UREC, b'\0' * 0x300)
+        for rr in range(14, 32):
+            pm.reg_write(REG(rr), 0x3000 + rr)
+        run(pm, lab['cf_upd'], RET, {UC_PPC_REG_3: inst})
+        kept = all(pm.reg_read(REG(rr)) == 0x3000 + rr for rr in range(14, 32))
+        calls = [(r32(pm, SREC + 8 * (i + 1)), r32(pm, SREC + 8 * (i + 1) + 4)) for i in range(r32(pm, SREC))]
+        return r32(pm, UREC), r32(pm, UREC + 4), calls, kept
+    n, last, calls, kept = upd(a['inst'])
+    check('(v3) cf_upd on a camera effect: the game\'s update runs, then eft gets the instance\'s +0x50 (after the '
+          'update\'s own matrix): the camera wins', (n, last, calls, kept),
+          (1, a['inst'], [(a['inst'] + 0x20, GAMEM), (a['inst'] + 0x20, a['inst'] + 0x50)], True))
+    other = pool(70)
+    pm.mem_write(other, b'\0' * CF.INST)
+    w32(pm, other, 0x46000077)
+    w32(pm, other + 0x144, 0x8000)
+    pm.mem_write(other + 0x199, b'\1')
+    n, last, calls, kept = upd(other)
+    check('(v3) ... any other effect (even one with flag 0x8000): only the game\'s update',
+          (n, last, calls, kept), (1, other, [(other + 0x20, GAMEM)], True))
+    pm.mem_write(b['inst'] + 0x199, b'\0')
+    n, last, calls, _k = upd(b['inst'])
+    check('(v3) ... a camera effect whose emitter set is gone (+0x199 0): nothing given again', len(calls), 1)
+    pm.mem_write(b['inst'] + 0x199, b'\1')
+    w32(pm, b['inst'], 0)
+    n, last, calls, _k = upd(b['inst'])
+    check('(v3) ... one the update ended (handle 0): nothing given again', len(calls), 1)
+    w32(pm, b['inst'], b['h'])
+    # the camera manager's snapshot when the table has no source
+    ensure(pm, CF.CAMMGR, CF.CAMMGR + 4)
+    pm.mem_map(MGR_CAM, 0x1000)
+    blk = MGR_CAM + CF.CAMBLK
+    wf(pm, blk, [0.6, 16 / 9, 2.0, 100000.0, -20.0, 40.0, 180.0, -20.0, 25.0, 0.0, 0.0, 1.0, 0.0])
+    w32(pm, CF.CAMMGR, MGR_CAM)
+    w32(pm, CF.CAMTBL + 0xC, 0xFFFFFFFF)
+    calc()
+    cm = dict(eye=(-20.0, 40.0, 180.0), target=(-20.0, 25.0, 0.0), up=(0.0, 1.0, 0.0), fov=0.6, near=2.0)
+    check('(v3) the effect camera table with no source: the camera manager\'s snapshot (+0x780) is used',
+          (close(inst_matrix(a['inst']), ref(cm, 1, 1.4, 0.7, 20, (0, 0, 0), 0.08)),
+           close(inst_matrix(b['inst']), ref(cm, 0, 0, 0, 30, (0, 0, 0), 0.25)),
+           r32(pm, lab['cf_state'] + 0x10)), (True, True, blk))
+    m_b = inst_matrix(b['inst'])
+    check('(v3) ... and each frame the position / scale fields follow the matrix',
+          close(rf(pm, b['inst'] + 0xC8, 3), [m_b[i][3] for i in range(3)]), True)
+    w32(pm, CF.CAMMGR, 0)
+    w32(pm, CF.CAMTBL + 0xC, 0)
+    # Stage_Freeze's modes
+    mgr = 0x7F004000
+    pm.mem_write(mgr, b'\0' * 0x100)
+    prm = 0x7F004200
+
+    def sfz(on):
+        pm.mem_write(XREC, b'\0' * 0x200)
+        w32(pm, prm, on)
+        for rr in range(14, 32):
+            pm.reg_write(REG(rr), 0x4000 + rr)
+        pm.reg_write(REG(30), prm)
+        run(pm, lab['cf_sfz_on'], RET, {UC_PPC_REG_3: mgr, UC_PPC_REG_4: 1})
+        kept = all(pm.reg_read(REG(rr)) == (prm if rr == 30 else 0x4000 + rr) for rr in range(14, 32))
+        on_log, d0, mode = stop_log(pm), pm.mem_read(mgr + 0xD0, 1)[0], r32(pm, lab['cf_sfz'])
+        pm.mem_write(XREC, b'\0' * 0x200)
+        run(pm, lab['cf_sfz_off'], RET, {UC_PPC_REG_3: mgr, UC_PPC_REG_4: 0})
+        return on_log, d0, mode, kept, stop_log(pm), pm.mem_read(mgr + 0xD0, 1)[0], r32(pm, lab['cf_sfz'])
+    K, M = CF.FS_KEY, CF.FS_MASK
+    on_log, d0, mode, kept, off_log, d0b, mode_b = sfz(1)
+    check('(v3) Stage_Freeze(1): the stage manager\'s +0xD0 only, the stage not told (no stop call); its resume is '
+          'the game\'s (+0xD0 0)', (on_log, d0, mode, kept, off_log, d0b, mode_b),
+          ([], 1, 1, True, [(1, mgr, 0, 0, 0)], 0, 0))
+    on_log, d0, mode, kept, off_log, d0b, _m = sfz(2)
+    check('(v3) Stage_Freeze(2): the game\'s stop as before (0x0316505C(manager, 1)), resumed by it',
+          (on_log, d0, mode, kept, off_log, d0b), ([(1, mgr, 1, 0, 0)], 1, 2, True, [(1, mgr, 0, 0, 0)], 0))
+    on_log, d0, mode, kept, off_log, d0b, _m = sfz(3)
+    check('(v3) Stage_Freeze(3): the game\'s stop and the Final Smashes\' effect calls (0x01080000 / 0xFF080000 '
+          'hidden, paused), undone on resume', (on_log, mode, kept, off_log),
+          ([(1, mgr, 1, 0, 0), (2, K, M, 0, 0), (3, K, M, 1, 0)], 3, True,
+           [(1, mgr, 0, 0, 0), (2, K, M, 1, 0), (3, K, M, 0, 0)]))
+    on_log, d0, mode, _k, off_log, _d, _m = sfz(7)
+    check('(v3) Stage_Freeze(7) (any other non-zero On): as 1', (on_log, d0, mode, off_log),
+          ([], 1, 1, [(1, mgr, 0, 0, 0)]))
+    dbg = r32(pm, lab['cf_dbg'] + 0x1C)
+    check('(v3) debug counter: matrices given to eft after the update', dbg, 1)
+
+
+def diag_tests(exe, orig):
+    """the diag build: its S4 lines (the OSReport veneer replaced by a recorder)"""
+    words, lab, _s = CF.build(orig, diag=True)
+    mu = machine(exe)
+    for at, w in words.items():
+        w32(mu, at, w)
+    check('diag build: in the region', max(a for a in words if a >= CF.CAVE) < CF.LIMIT, True)
+    for lo_, n_ in ((0x033496A0, 0x200), (CF.LOOKAT_INV, 0x60), (CF.TANF, 0x80), (0x04ADEAB8, 0x40),
+                    (0x04ADF434, 0x80), (0x04ADEB48, 0x80), (0x04AE1000, 0x400)):
+        for at in range(lo_, lo_ + 4 * n_, 4):
+            if r32(mu, at) >> 26 == 4:
+                w32(mu, at, 0x60000000)
+    from unicorn.ppc_const import UC_PPC_REG_MSR
+    mu.reg_write(UC_PPC_REG_MSR, mu.reg_read(UC_PPC_REG_MSR) | 0x2000)
+    import diag_godfist_cave as G
+    rec = 0x7F006000
+    ensure(mu, rec, rec + 0x4000)
+    st = Asm(0x04BE3800)
+    st.asm("""
+        lis r12, 0x%04X
+        ori r12, r12, 0x%04X
+        lwz r11, 0(r12)
+        addi r11, r11, 1
+        stw r11, 0(r12)
+        slwi r11, r11, 5
+        add r11, r11, r12
+        stw r3, 0(r11)
+        stw r4, 4(r11)
+        stw r5, 8(r11)
+        stw r6, 0xC(r11)
+        stw r7, 0x10(r11)
+        stw r8, 0x14(r11)
+        stw r9, 0x18(r11)
+        stw r10, 0x1C(r11)
+        blr
+""" % (rec >> 16, rec & 0xFFFF))
+    for i, w in enumerate(st.words()):
+        w32(mu, 0x04BE3800 + 4 * i, w)
+    for i, w in enumerate((0x3D800000 | 0x04BE, 0x618C3800, 0x7D8903A6, 0x4E800420)):   # lis / ori r12; mtctr; bctr
+        w32(mu, G.OSREPORT_VENEER + 4 * i, w)
+    v3_stubs(mu)
+    fmts = {}
+    for name, f in CF.DIAG_FMTS:
+        fmts[lab[name]] = f.split()[0]
+    inst = MGR_FAKE + CF.POOL + CF.INST * 5
+    ensure(mu, CF.MGR, CF.MGR + 4)
+    ensure(mu, CF.CAMTBL, CF.CAMTBL + 0x200)
+    ensure(mu, MGR_FAKE, MGR_FAKE + 0x10000)
+    w32(mu, CF.MGR, MGR_FAKE)
+    ensure(mu, 0x7F001000, 0x7F003000)
+    wf(mu, SRC, [0.7, 16 / 9, 2.0, 100000.0, 0.0, 30.0, 160.0, 0.0, 20.0, 0.0, 0.0, 1.0, 0.0])
+    w32(mu, CF.CAMTBL + 0xC, 0)
+    w32(mu, CF.CAMTBL + 0x14, SRC)
+    tab = lab['cf_tab']
+    w32(mu, tab, 0x05000123)
+    w32(mu, tab + 4, 1)
+    wf(mu, tab + 0x10, [0.0, 0.0, 20.0, 1.0])
+    wf(mu, tab + 0x20, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0])
+    w32(mu, inst, 0x05000123)
+    mu.mem_write(inst + 0x199, b'\1')
+    eft = 0x7F001800
+    w32(mu, inst + 0x28, eft)
+    w32(mu, lab['cf_dbg'] + 4, 1)
+    mu.reg_write(UC_PPC_REG_1, 0x7F00F000)
+    mu.reg_write(UC_PPC_REG_LR, 0x0123ABC0)
+    mu.emu_start(CF.CALC_AT, CF.CALC_AT + 4, count=400000)
+    run(mu, lab['cf_upd'], RET, {UC_PPC_REG_3: inst})
+    n = r32(mu, rec)
+    lines = [[r32(mu, rec + 32 * (i + 1) + 4 * k) for k in range(8)] for i in range(n)]
+    kinds = [fmts.get(l_[0], '?') for l_ in lines]
+    check('diag: one calc pass and update log S4CC, S4CV, S4CN, S4CF, S4CM, S4CE', kinds,
+          ['S4CC', 'S4CV', 'S4CN', 'S4CF', 'S4CM', 'S4CE'])
+    ef = lines[3]
+    check('diag: S4CF has the handle, the instance, the flags (0x8000) and the bytes (+0x199 1)',
+          (ef[2], ef[3], ef[4] & 0x8000, ef[7] >> 24), (0x05000123, inst, 0x8000, 1))
+    em = lines[4]
+    want = CF.matrix((0, 30, 160), (0, 20, 0), (0, 1, 0), 0.7, 2.0, 1, 0, 0, 20, (0, 0, 0), 1)
+    got = [struct.unpack('>f', struct.pack('>I', v))[0] for v in em[1:7]]
+    check('diag: S4CM has the instance\'s matrix (translation, X axis)',
+          close(got, [want[0][3], want[1][3], want[2][3], want[0][0], want[1][0], want[2][0]]), True)
+    check('diag: S4CE reads eft\'s emitter set ([inst + 0x28])', lines[5][1], eft)
+    cc = lines[0]
+    check('diag: S4CC has the table\'s current source, the source read and the camera manager\'s block',
+          (cc[2], cc[4], cc[5]), (0, SRC, 1))
+    mu.mem_write(rec, b'\0' * 4)
+    mgr = 0x7F004000
+    w32(mu, 0x7F004200, 1)
+    mu.reg_write(REG(30), 0x7F004200)
+    run(mu, lab['cf_sfz_on'], RET, {UC_PPC_REG_3: mgr, UC_PPC_REG_4: 1})
+    sf = [r32(mu, rec + 32 + 4 * k) for k in range(6)]
+    check('diag: S4SF on a light Stage_Freeze (on 1, mode 1, the manager, +0xD0 1)',
+          (fmts.get(sf[0]), sf[2], sf[3], sf[4], sf[5]), ('S4SF', 1, 1, mgr, 1))
 
 
 if __name__ == '__main__':

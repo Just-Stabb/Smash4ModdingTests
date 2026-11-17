@@ -105,6 +105,26 @@ FLAG_KEEP = 0x8000              # instance +0x144: keep +0x50 (no rebuild from p
 FLAG_UNSLOWED = 0x0100          # (oris) 0x01000000: not slowed by the global slow-motion
 REQ_RATE1 = 0x0080              # (lis) 0x00800000: vt +0x44's "rate 1" (not the owner's)
 MODES = (0, 1, 2)
+# camera_effects v3 ---------------------------------------------------------------------------------------------------
+UPD_AT = 0x032EFD7C             # the calc pass's bl 0x0334E0C8 (the instance update, then eft's matrix): -> cf_upd
+UPDATE = 0x0334E0C8
+SETMTX = 0x032FF744             # (inst + 0x20, &3x4): the emitter set's matrix (eft set +0x350, its scale +0x7AC)
+SETMTX_SIG = (0x7C0802A6, 0x7C2B0B78, 0x9421FF60)
+VALID = 0x032FF640              # (inst + 0x20) -> 1 while the emitter set is there
+VALID_SIG = (0x81830000, 0x2C0CFFFF)
+CAMMGR = 0x10352470             # [CAMMGR] the camera manager; +0x780 its snapshot block (entry 0 slot 0's source)
+CAMMGR_SIG = {0x02D29634: 0x3C601035, 0x02D29638: 0x80632470}
+CAMBLK = 0x780
+# Stage_Freeze (exe_v46n's ts code in exe_v46y_hold): its two calls of the stage manager's stop
+STAGE_STOP = 0x0316505C         # (manager, on): +0xD0 = on, and the stage told (0x031427D0: its objects' models and
+                                # effects paused / hidden, stage vt +0x214): the Final Smash / pause stop
+SFZ_ON_AT, SFZ_OFF_AT = 0x04BD4334, 0x04BD4268    # h_sfreeze's bl STAGE_STOP (r4 1), ts_stage_off's (r4 0)
+SFZ_SIG = {0x04BD4304: 0x801E0000, 0x04BD4330: 0x38800001, 0x04BD4264: 0x38800000}
+FX_VIS, FX_PAUSE = 0x0334CA64, 0x0334CA30   # (key, mask, on[, 0]): what the Final Smashes' stop (0x02772658) also does
+FS_KEY, FS_MASK = 0x01080000, 0xFF080000
+FX_SIG = {FX_VIS: 0x7C6B1B78, FX_PAUSE: 0x7C6C1B78, 0x027726A0: 0x3C600108, 0x0277269C: 0x3C80FF08}
+SFZ_LIGHT, SFZ_FULL, SFZ_FS = 1, 2, 3
+DIAG_EVERY = 30                 # the diag logs an effect's first 30 frames, then every 30th
 
 NEW_CMDS = [
     (CMD_NAME, 'h_camfx', [
@@ -134,6 +154,14 @@ NEW_CMDS = [
 ]
 
 
+def _bl_target(at, w):
+    """the target of a relative bl at at (None if w isn't one)"""
+    if w >> 26 != 18 or w & 3 != 1:
+        return None
+    off = w & 0x3FFFFFC
+    return at + (off - 0x4000000 if off & 0x2000000 else off)
+
+
 def find(orig):
     s = LT.find(orig)
     w = orig(CALC_AT)
@@ -155,6 +183,17 @@ def find(orig):
     for k in ('lk_none', 's1', 's2', 'f'):
         if s[k + '_word'] >> 26 == 18:
             assert not CAVE <= LT.bdecode(s[k], s[k + '_word']) < LIMIT, 'already patched (%s)' % k
+    # v3: the instance update's call, eft's matrix setter, the camera manager, Stage_Freeze's stop calls
+    assert _bl_target(UPD_AT, orig(UPD_AT)) == UPDATE, 'update call 0x%08X: 0x%08X' % (UPD_AT, orig(UPD_AT))
+    for base, sig, what in ((SETMTX, SETMTX_SIG, 'eft matrix'), (VALID, VALID_SIG, 'set valid')):
+        for i, want in enumerate(sig):
+            assert orig(base + 4 * i) == want, '%s 0x%08X: 0x%08X' % (what, base + 4 * i, orig(base + 4 * i))
+    for at, want in list(CAMMGR_SIG.items()) + list(SFZ_SIG.items()) + list(FX_SIG.items()):
+        assert orig(at) == want, '0x%08X: 0x%08X, not 0x%08X' % (at, orig(at), want)
+    for at in (SFZ_ON_AT, SFZ_OFF_AT):
+        w = orig(at)
+        assert _bl_target(at, w) == STAGE_STOP, \
+            'Stage_Freeze stop call 0x%08X: 0x%08X (want bl 0x%08X: exe_v46n\'s ts code)' % (at, w, STAGE_STOP)
     return s
 
 
@@ -236,13 +275,393 @@ cfm_world:                              # Mode 2: W = L s (the world's turn)
     return out
 
 
-def src(s, hand):
+DIAG_FMTS = [
+    ('s_cc', 'S4CC n=%d cur=%d nxt=%d src=%08X cam=%d mgrblk=%08X tan=%08X\n'),
+    ('s_cv', 'S4CV eye=%08X %08X %08X tgt=%08X %08X %08X\n'),
+    ('s_cf', 'S4CN fov=%08X near=%08X far=%08X up=%08X %08X %08X\n'),
+    ('s_ef', 'S4CF n=%d h=%08X i=%08X fl=%08X key=%08X fo=%08X b=%08X\n'),
+    ('s_em', 'S4CM t=%08X %08X %08X x=%08X %08X %08X\n'),
+    ('s_ee', 'S4CE set=%08X t=%08X %08X %08X x=%08X %08X %08X\n'),
+    ('s_sf', 'S4SF n=%d on=%d mode=%d mgr=%08X d0=%d\n'),
+]
+
+
+def _words(s):
+    b = s.encode() + b'\0'
+    b += b'\0' * (-len(b) % 4)
+    return ''.join('        .word 0x%08X\n' % struct.unpack_from('>I', b, i)[0] for i in range(0, len(b), 4))
+
+
+def _diag_data():
+    out = 'cf_dg:                                  # diag: effects started seen, frames since, log now\n' + \
+          '        .word 0\n' * 3
+    for lab, fmt in DIAG_FMTS:
+        out += '%s:\n' % lab + _words(fmt)
+    return out
+
+
+def _v3_src(diag):
+    """camera_effects v3: cf_upd (eft gets the camera matrix after the game's instance update), Stage_Freeze's modes
+    (cf_sfz_on / cf_sfz_off) and, with diag, the OSReport lines (cf_dcam, cf_dlog, cf_dsfz)"""
+    import diag_godfist_cave as G
+    D = dict(update=UPDATE, setmtx=SETMTX, valid=VALID, ntab=NTAB, entry=ENTRY, stop=STAGE_STOP, vis=FX_VIS,
+             pause=FX_PAUSE, kh=FS_KEY >> 16, mh=FS_MASK >> 16, full=SFZ_FULL, fs=SFZ_FS, every=DIAG_EVERY,
+             vh=G.OSREPORT_VENEER >> 16, vl=G.OSREPORT_VENEER & 0xFFFF, crclr=G.CRCLR_CR1EQ,
+             cmh=(CAMMGR + 0x8000) >> 16, cml=CAMMGR & 0xFFFF, cblk=CAMBLK, tbl_h=CAMTBL >> 16, tbl_l=CAMTBL & 0xFFFF)
+    rep = """
+        lis r12, 0x%(vh)X
+        ori r12, r12, 0x%(vl)X
+        mtctr r12
+        .word 0x%(crclr)08X
+        bctrl""" % D
+    out = """
+# --- (v3) the calc pass's instance update: the game's (0x0334E0C8), then a camera effect's matrix (+0x50) given to
+#     eft again, so nothing the update does (follow targets, billboard flags, +0x150, a rebuild) can move it -----------
+cf_upd:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r31, 0x1C(r1)
+        stw r30, 0x18(r1)
+        stw r29, 0x14(r1)
+        mr r31, r3
+        bl 0x%(update)08X
+        lwz r30, 0(r31)                 # its handle (0: it ended)
+        cmpwi r30, 0
+        beq cfd_out
+        lis r29, cf_tab@ha
+        addi r29, r29, cf_tab@l
+        li r0, %(ntab)d
+        mtctr r0
+cfd_find:
+        lwz r11, 0(r29)
+        cmplw r11, r30
+        beq cfd_ours
+        addi r29, r29, %(entry)d
+        bdnz cfd_find
+        b cfd_out
+cfd_ours:
+        lwz r0, 0x144(r31)
+        andi. r0, r0, 0x8000            # its matrix is the camera's (set by cf_calc / the handler)
+        beq cfd_out
+        lbz r0, 0x199(r31)              # its emitter set is there
+        cmpwi r0, 0
+        beq cfd_out
+        addi r3, r31, 0x20
+        bl 0x%(valid)08X
+        cmpwi r3, 0
+        beq cfd_out
+        addi r3, r31, 0x20
+        addi r4, r31, 0x50
+        bl 0x%(setmtx)08X
+        lis r12, cf_dbg@ha
+        addi r12, r12, cf_dbg@l
+        lwz r11, 0x1C(r12)              # matrices given to eft after the update
+        addi r11, r11, 1
+        stw r11, 0x1C(r12)
+        mr r3, r31
+        bl cf_dlog                      # (diag build: the instance, its matrix and eft's; else a blr)
+cfd_out:
+        lwz r29, 0x14(r1)
+        lwz r30, 0x18(r1)
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+# --- (v3) Stage_Freeze's stop (h_sfreeze's bl, r3 the stage manager, r4 1, r30 its parameters): On 1 (and anything
+#     but 2 / 3) only the stage's update (+0xD0), the stage not told (no 0x031427D0: the Final Smash / pause stop that
+#     brought the white screen); 2 the game's stop as before; 3 the game's stop and what the Final Smashes do with it
+#     (0x02772658: the effects of key 0x01080000 / mask 0xFF080000 hidden and paused) ----------------------------------
+cf_sfz_on:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r31, 0x1C(r1)
+        stw r30, 0x18(r1)
+        mr r31, r3
+        lwz r30, 0(r30)                 # On
+        cmpwi r30, %(full)d
+        beq cfz_mode
+        cmpwi r30, %(fs)d
+        beq cfz_mode
+        li r30, 1
+cfz_mode:
+        lis r12, cf_sfz@ha
+        stw r30, cf_sfz@l(r12)
+        cmpwi r30, 1
+        bne cfz_game
+        li r0, 1
+        stb r0, 0xD0(r31)               # the update skipped (the stage manager's own flag), nothing else
+        b cfz_done
+cfz_game:
+        mr r3, r31
+        li r4, 1
+        bl 0x%(stop)08X
+        cmpwi r30, %(fs)d
+        bne cfz_done
+        lis r3, 0x%(kh)X
+        lis r4, 0x%(mh)X
+        li r5, 0                        # hidden
+        li r6, 0
+        bl 0x%(vis)08X
+        lis r3, 0x%(kh)X
+        lis r4, 0x%(mh)X
+        li r5, 1                        # paused
+        bl 0x%(pause)08X
+cfz_done:
+        li r4, 1
+        mr r5, r30
+        mr r6, r31
+        bl cf_dsfz
+        lwz r30, 0x18(r1)
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+# --- (v3) Stage_Freeze's resume (ts_stage_off's bl, r3 the manager, r4 0): the game's resume (after a light stop the
+#     stage was never told: 0x031427D0 sees it active and does nothing; +0xD0 cleared); mode 3 shows the effects again
+cf_sfz_off:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r31, 0x1C(r1)
+        stw r30, 0x18(r1)
+        mr r31, r3
+        lis r12, cf_sfz@ha
+        lwz r30, cf_sfz@l(r12)
+        li r0, 0
+        stw r0, cf_sfz@l(r12)
+        li r4, 0
+        bl 0x%(stop)08X
+        cmpwi r30, %(fs)d
+        bne cfo_done
+        lis r3, 0x%(kh)X
+        lis r4, 0x%(mh)X
+        li r5, 1
+        li r6, 0
+        bl 0x%(vis)08X
+        lis r3, 0x%(kh)X
+        lis r4, 0x%(mh)X
+        li r5, 0
+        bl 0x%(pause)08X
+cfo_done:
+        li r4, 0
+        mr r5, r30
+        mr r6, r31
+        bl cf_dsfz
+        lwz r30, 0x18(r1)
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+""" % D
+    if not diag:
+        return out + """
+cf_dcam:
+cf_dlog:
+cf_dsfz:
+        blr
+"""
+    out += """
+# --- diag: S4CC / S4CV / S4CN, the camera of this calc pass (an effect's first %(every)d frames, then every %(every)dth) --
+cf_dcam:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r28, 0x20(r1)
+        lis r31, cf_dg@ha
+        addi r31, r31, cf_dg@l
+        li r0, 0
+        stw r0, 8(r31)
+        lis r12, cf_dbg@ha
+        addi r12, r12, cf_dbg@l
+        lwz r11, 4(r12)                 # effects started
+        lwz r10, 0(r31)
+        cmpw r11, r10
+        beq cdc_any
+        stw r11, 0(r31)
+        li r0, 0
+        stw r0, 4(r31)
+cdc_any:
+        lis r9, cf_tab@ha
+        addi r9, r9, cf_tab@l
+        li r0, %(ntab)d
+        mtctr r0
+cdc_scan:
+        lwz r0, 0(r9)
+        cmpwi r0, 0
+        bne cdc_some
+        addi r9, r9, %(entry)d
+        bdnz cdc_scan
+        b cdc_out
+cdc_some:
+        lwz r10, 4(r31)
+        addi r0, r10, 1
+        stw r0, 4(r31)
+        cmpwi r10, %(every)d
+        blt cdc_log
+        li r9, %(every)d
+        divwu r8, r10, r9
+        mullw r8, r8, r9
+        cmpw r8, r10
+        bne cdc_out
+cdc_log:
+        li r0, 1
+        stw r0, 8(r31)
+        lis r30, cf_state@ha
+        addi r30, r30, cf_state@l
+        lis r29, %(tbl_h)d
+        ori r29, r29, %(tbl_l)d
+        lis r3, s_cc@ha
+        addi r3, r3, s_cc@l
+        lis r12, cf_dbg@ha
+        addi r12, r12, cf_dbg@l
+        lwz r4, 0x18(r12)
+        lwz r5, 0xC(r29)
+        lwz r6, 0x10(r29)
+        lwz r7, 0x10(r30)
+        lwz r8, 0(r30)
+        lis r9, %(cmh)d
+        lwz r9, %(cml)d(r9)
+        addi r9, r9, %(cblk)d
+        lwz r10, 4(r30)
+""" % D + rep + """
+        lwz r28, 0x10(r30)              # the source read
+        mr r3, r28
+        bl cf_ptr
+        cmpwi r0, 0
+        bne cdc_out
+        lis r3, s_cv@ha
+        addi r3, r3, s_cv@l
+        lwz r4, 0x10(r28)
+        lwz r5, 0x14(r28)
+        lwz r6, 0x18(r28)
+        lwz r7, 0x1C(r28)
+        lwz r8, 0x20(r28)
+        lwz r9, 0x24(r28)
+""" + rep + """
+        lis r3, s_cf@ha
+        addi r3, r3, s_cf@l
+        lwz r4, 0(r28)
+        lwz r5, 8(r28)
+        lwz r6, 0xC(r28)
+        lwz r7, 0x28(r28)
+        lwz r8, 0x2C(r28)
+        lwz r9, 0x30(r28)
+""" + rep + """
+cdc_out:
+        lmw r28, 0x20(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+
+# --- diag: S4CF / S4CM / S4CE (r3 the instance, after eft got +0x50 again): the instance, the matrix it holds, the
+#     matrix eft's emitter set holds (+0x350, rows, translation in column 3) -----------------------------------------
+cf_dlog:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stmw r28, 0x20(r1)
+        mr r31, r3
+        lis r12, cf_dg@ha
+        addi r12, r12, cf_dg@l
+        lwz r0, 8(r12)
+        cmpwi r0, 0
+        beq cdl_out
+        lbz r10, 0x199(r31)
+        slwi r10, r10, 8
+        lbz r0, 0x19E(r31)
+        or r10, r10, r0
+        slwi r10, r10, 8
+        lbz r0, 0x1A1(r31)
+        or r10, r10, r0
+        slwi r10, r10, 8
+        lbz r0, 0x1A3(r31)
+        or r10, r10, r0
+        lis r3, s_ef@ha
+        addi r3, r3, s_ef@l
+        lis r12, cf_dbg@ha
+        addi r12, r12, cf_dbg@l
+        lwz r4, 0x18(r12)
+        lwz r5, 0(r31)
+        mr r6, r31
+        lwz r7, 0x144(r31)
+        lwz r8, 8(r31)
+        lwz r9, 0x34(r31)
+""" % D + rep + """
+        lis r3, s_em@ha
+        addi r3, r3, s_em@l
+        lwz r4, 0x5C(r31)
+        lwz r5, 0x6C(r31)
+        lwz r6, 0x7C(r31)
+        lwz r7, 0x50(r31)
+        lwz r8, 0x60(r31)
+        lwz r9, 0x70(r31)
+""" + rep + """
+        lwz r28, 0x28(r31)              # eft's emitter set
+        mr r3, r28
+        bl cf_ptr
+        cmpwi r0, 0
+        bne cdl_out
+        lis r3, s_ee@ha
+        addi r3, r3, s_ee@l
+        mr r4, r28
+        lwz r5, 0x35C(r28)
+        lwz r6, 0x36C(r28)
+        lwz r7, 0x37C(r28)
+        lwz r8, 0x350(r28)
+        lwz r9, 0x360(r28)
+        lwz r10, 0x370(r28)
+""" + rep + """
+cdl_out:
+        lmw r28, 0x20(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+
+# --- diag: S4SF (r4 on, r5 mode, r6 the stage manager) -----------------------------------------------------------
+cf_dsfz:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        mr r7, r6
+        mr r6, r5
+        mr r5, r4
+        li r8, -1
+        cmpwi r7, 0
+        beq cds_go
+        lbz r8, 0xD0(r7)
+cds_go:
+        lis r3, s_sf@ha
+        addi r3, r3, s_sf@l
+        lis r12, cf_dbg@ha
+        addi r12, r12, cf_dbg@l
+        lwz r4, 0x18(r12)
+""" + rep + """
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+"""
+    return out
+
+
+def src(s, hand, diag=False):
     D = dict(base=CF_INDEX, crc_h=CMD_CRC >> 16, crc_l=CMD_CRC & 0xFFFF, s1b=s['s1_back'], s2b=s['s2_back'],
              fb=s['f_back'], hand_h=hand >> 16, hand_l=hand & 0xFFFF, size=1 + NPARAMS, step=4 * (1 + NPARAMS),
              mgr_ha=(MGR + 0x8000) >> 16, mgr_l=MGR & 0xFFFF, pool=POOL, pool_n=POOL_N, inst=INST,
              tbl_h=CAMTBL >> 16, tbl_l=CAMTBL & 0xFFFF, lookat=LOOKAT_INV, tanf=TANF, rot=ROT, kill=KILL,
              req=WORLD_REQ, req_h=WORLD_REQ >> 16, req_l=WORLD_REQ & 0xFFFF, em=EM_ACC, keep=FLAG_KEEP,
-             unslow=FLAG_UNSLOWED, rate1=REQ_RATE1, ntab=NTAB, entry=ENTRY, calc_back=CALC_AT + 4)
+             unslow=FLAG_UNSLOWED, rate1=REQ_RATE1, ntab=NTAB, entry=ENTRY, calc_back=CALC_AT + 4,
+             cmh=(CAMMGR + 0x8000) >> 16, cml=CAMMGR & 0xFFFF if CAMMGR & 0x8000 == 0 else (CAMMGR & 0xFFFF) - 0x10000,
+             cblk=CAMBLK)
     out = """
 # --- the command tables' fallbacks --------------------------------------------------------------------------------
 cf_lookup:                              # r3 = a CRC no table before has
@@ -437,8 +856,21 @@ cf_ret:
         addi r1, r1, 0x90
         blr
 
-# cf_flags(r3 entry, r4 instance): +0x144 |= keep (| unslowed). r0
+# cf_flags(r3 entry, r4 instance): +0x144 |= keep (| unslowed); (v3) its position / scale fields mirror the matrix
+# (+0xC8 = the translation, +0xB0 = the scale: what the game reads of an instance besides +0x50). r0 r12 f0
 cf_flags:
+        lfs f0, 0x5C(r4)
+        stfs f0, 0xC8(r4)
+        lfs f0, 0x6C(r4)
+        stfs f0, 0xCC(r4)
+        lfs f0, 0x7C(r4)
+        stfs f0, 0xD0(r4)
+        lis r12, cf_state@ha
+        addi r12, r12, cf_state@l
+        lfs f0, 0xC(r12)
+        stfs f0, 0xB0(r4)
+        stfs f0, 0xB4(r4)
+        stfs f0, 0xB8(r4)
         lwz r0, 0x144(r4)
         ori r0, r0, %(keep)d
         stw r0, 0x144(r4)
@@ -536,14 +968,23 @@ cf_camera:
         ori r3, r3, %(tbl_l)d
         lwz r4, 0xC(r3)                 # entry 0's current source (0 - 2; -1 none)
         cmplwi r4, 2
-        bgt cfc_no
+        bgt cfc_mgr
         slwi r4, r4, 2
         add r4, r4, r3
         lwz r30, 0x14(r4)
         mr r3, r30
         bl cf_ptr
         cmpwi r0, 0
+        beq cfc_src
+cfc_mgr:                                # (v3) none: the camera manager's own snapshot block
+        lis r3, %(cmh)d
+        lwz r3, %(cml)d(r3)
+        bl cf_ptr
+        cmpwi r0, 0
         bne cfc_no
+        addi r30, r3, %(cblk)d
+cfc_src:
+        stw r30, 0x10(r31)              # (the source read, for the diag)
         lfs f0, 8(r30)                  # near
         stfs f0, 8(r31)
         lis r3, cf_view@ha
@@ -580,6 +1021,11 @@ cf_calc:
         stw r0, 0x44(r1)
         stmw r26, 0x28(r1)
         mr r31, r3
+        lis r12, cf_dbg@ha
+        addi r12, r12, cf_dbg@l
+        lwz r11, 0x18(r12)              # (v3) calc passes (the diag's frame number)
+        addi r11, r11, 1
+        stw r11, 0x18(r12)
         lis r30, cf_tab@ha
         addi r30, r30, cf_tab@l
         li r29, %(ntab)d
@@ -644,6 +1090,7 @@ cfu_next:
         addi r29, r29, -1
         cmpwi r29, 0
         bne cfu_loop
+        bl cf_dcam                      # (v3 diag build: the camera this frame; else a blr)
         mr r3, r31
         lmw r26, 0x28(r1)
         lwz r0, 0x44(r1)
@@ -657,6 +1104,7 @@ cfu_next:
         out += """        .word 0x%08X
         b 0x%08X
 """ % (s['calc_word'], CALC_AT + 4)
+    out += _v3_src(diag)
     out += _mat_src()
     out += """
 cf_k:                                   # 0, 1, 20, pi / 180, 0.5
@@ -666,7 +1114,9 @@ cf_k:                                   # 0, 1, 20, pi / 180, 0.5
         .float 0.017453292519943295
         .float 0.5
 cf_dbg:                                 # commands run, effects started, matrices set, ended by Frames, ended on
-        .word 0                         # their own, refused
+        .word 0                         # their own, refused, (v3) calc passes, matrices given to eft after the update
+        .word 0
+        .word 0
         .word 0
         .word 0
         .word 0
@@ -674,11 +1124,15 @@ cf_dbg:                                 # commands run, effects started, matrice
         .word 0
 cf_rr:
         .word 0
-cf_state:                               # camera there, tan(fov / 2), near, the last matrix's scale
+cf_sfz:                                 # (v3) the Stage_Freeze mode in force (0 none, 1 light, 2 full, 3 Final Smash)
+        .word 0
+cf_state:                               # camera there, tan(fov / 2), near, the last matrix's scale, the source read
         .word 0
         .word 0
         .word 0
         .word 0
+        .word 0
+""" + (_diag_data() if diag else '') + """
 cf_view:
 """ + '        .word 0\n' * 16 + """cf_inv:
 """ + '        .word 0\n' * 16 + """cf_tab:
@@ -686,12 +1140,12 @@ cf_view:
     return out
 
 
-def build(orig):
+def build(orig, diag=False):
     s = find(orig)
     hand = 0
     for _p in range(2):
         a = Asm(CAVE)
-        a.asm(src(s, hand))
+        a.asm(src(s, hand, diag))
         hand = a.addr('h_camfx')
     words = a.words()
     tab = a.addr('cf_tab')
@@ -705,6 +1159,9 @@ def build(orig):
     out[s['s2']] = LT.branch(s['s2'], a.addr('cf_size2'))
     out[s['f']] = LT.branch(s['f'], a.addr('cf_fetch'))
     out[CALC_AT] = LT.branch(CALC_AT, a.addr('cf_calc'))
+    out[UPD_AT] = LT.branch(UPD_AT, a.addr('cf_upd')) | 1
+    out[SFZ_ON_AT] = LT.branch(SFZ_ON_AT, a.addr('cf_sfz_on')) | 1
+    out[SFZ_OFF_AT] = LT.branch(SFZ_OFF_AT, a.addr('cf_sfz_off')) | 1
     return out, a.labels, s
 
 
@@ -791,13 +1248,15 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('--rpx', help='the executable to patch (exe_v46y_hold or later)')
     p.add_argument('--labels', help='update this param_labels.json with Effect_Camera')
+    p.add_argument('--diag', action='store_true', help='TEST ONLY: the OSReport build (S4CC / S4CV / S4CN / S4CF / '
+                   'S4CM / S4CE / S4SF lines, docs/native-notes.md "Camera effects")')
     args = p.parse_args()
     if args.labels:
         labels(args.labels)
         return
     if not args.rpx:
         p.error('--rpx or --labels')
-    words, lab, _s = build(rpx_reader(args.rpx))
+    words, lab, _s = build(rpx_reader(args.rpx), args.diag)
     print(' '.join(['textregion:0x%X' % TEXT_REGION, 'grow:0x%08X' % LIMIT] +
                    ['0x%08X=0x%08X' % kv for kv in sorted(words.items())]))
     sys.stderr.write('camera effects: %d words, Effect_Camera index %d (0x%08X), h_camfx 0x%08X, cf_calc 0x%08X, '

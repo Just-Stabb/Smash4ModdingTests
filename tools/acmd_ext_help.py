@@ -2426,12 +2426,17 @@ HELP['Stage_Freeze'] = [
     '## How it works',
     'Stage_Freeze(On, Frames) stops the stage. Its animations, moving platforms, hazards and background stand still; '
     'the fighters, items and projectiles go on.',
-    '- It is the stage manager\'s own stop, the one some Final Smashes use: the stage\'s update is skipped while it\'s '
-    'on.',
-    '- On 1 freezes; On 0 lets the stage go on.',
+    '- On 1 (camera_effects v3) skips the stage\'s update (the stage manager\'s own flag): platforms, hazards and the '
+    'stage\'s scripts and timers stand still, and nothing else happens: no white screen.',
+    '- On 2 is the game\'s full stop, the one the Final Smashes and the pause use: the update skipped and the stage '
+    'told (its objects\' animations and effects paused or hidden). In game it whites the screen out for as long as it '
+    'lasts (it was On 1 before v3).',
+    '- On 3 is the full stop with what the Final Smashes do along with it: the effects of the class they pause '
+    '(key 0x01080000 / mask 0xFF080000) are hidden and paused too, and shown again on resume.',
+    '- On 0 lets the stage go on (any of them). Other non-zero values: as 1.',
     '',
     '## Parameters in practice',
-    '- On: 1 freeze, 0 resume.',
+    '- On: 1 freeze (no flash), 2 the game\'s full stop (with the white screen), 3 the Final Smash stop, 0 resume.',
     '- Frames (with On 1): 0 lasts until Stage_Freeze(0) or the end of the match. N goes on by itself after N screen '
     'frames.',
     '',
@@ -2442,8 +2447,16 @@ HELP['Stage_Freeze'] = [
     'Stage_Freeze running. And Stage_Freeze(0), or the end of its Frames, resumes a stage a Final Smash froze.',
     '- It ends with the match: the next match\'s stage runs. A KO doesn\'t end it: give it Frames, or end it '
     'yourself.',
-    '- Effects freeze with the stage (the game\'s own stop holds them too) and go on when it lets go.',
+    '- On 2 / 3: the stage\'s objects and their effects are held with it (the stage is told). On 1 stops the stage\'s '
+    'update only: an object that animates by itself (a background model) may go on.',
     '- Offline only: online, the other console doesn\'t know and the match desyncs.',
+    '',
+    '## What changed in camera_effects v3 (exe_v46z_camfx3): no white screen',
+    '- Stage_Freeze(1, ...) used the game\'s full stop, which also tells the stage to stop (0x031427D0: its objects\' '
+    'animations and effects paused or hidden, the stage\'s own pause): in game the screen went white for the whole '
+    'freeze (the user\'s Dr. Mario test: 120 frames of white, cut off at the freeze\'s end; Supamario\'s Time Skip '
+    'too). On 1 now only skips the stage\'s update; the old stop is On 2 (Example 5), the Final Smash stop On 3.',
+    '- Scripts with On 1 keep working and lose the flash; to keep it, write On 2.',
     '',
     '## What changed in exe_v46u_threads (training, Frames, resets)',
     '- Before exe_v46u_threads the Frames countdown and the clean-up only ran on one of the game\'s battle screens, '
@@ -2453,7 +2466,7 @@ HELP['Stage_Freeze'] = [
     '',
     NOT_VIEWER,
     'Needs exe_v46n (the patched cross_f.rpx, tools/acmd_ext_cave.py); training, Frames and resets: exe_v46u_threads '
-    '(tools/ts_tick_cave.py).',
+    '(tools/ts_tick_cave.py); On 1 without the flash, On 2 / 3: exe_v46z_camfx3 (tools/camera_effect_cave.py).',
 ]
 EXAMPLES['Time_Scale'] = [
     '// Example 1: everything at double speed for 2 seconds (120 screen frames)',
@@ -2515,6 +2528,12 @@ EXAMPLES['Stage_Freeze'] = [
     '',
     '// Example 4 (exe_v46u_threads): frozen until the match (or a training reset) ends it',
     'Stage_Freeze(On=1, Frames=0)',
+    '',
+    '// Example 5 (camera_effects v3): On 1 freezes with no flash; On 2 is the old full stop, white screen included',
+    '// (a time stop that flashes white while it lasts), On 3 the Final Smash stop',
+    'Stage_Freeze(On=2, Frames=60)',
+    'FRAME(Frames=80)',
+    'Stage_Freeze(On=3, Frames=60)',
 ]
 
 # --- Byleth v9: Line_Test (tools/line_test_cave.py) ---------------------------------------------------------------
@@ -2922,11 +2941,24 @@ HELP['Effect_Camera'] = [
     '- Unlike Graphic_Effect (FOOT_EFFECT, refused in the air) it is never refused: it uses the module\'s world request '
     '(the one MSC\'s EffectModule uses), which has no ground check.',
     '',
+    '## What changed in camera_effects v3 (exe_v46z_camfx3)',
+    '- v2\'s in-game test placed the effects far from the camera, fixed in the world (the corner stars sat on the '
+    'stage, up and right of the fighter, and stayed there while the camera moved). v3 makes the camera matrix win '
+    'wherever the game could replace it: eft is given it again right after the game\'s own update of the effect '
+    '(0x0334E0C8: its follow, billboard and offset passes can no longer move it), the effect\'s position and scale '
+    'fields hold the same place, and when the effect camera table has no camera the camera manager\'s own one is '
+    'used. Parameters and maths are unchanged; scripts need no change.',
+    '- The battle camera\'s near and far clips are fitted to the stage every frame (0x02D27D74): the near clip can be '
+    'well past 3. A Z closer than the near clip is drawn at the near clip + 1 (Mode 1 keeps its place and size on the '
+    'screen; in Mode 0 / 2 it then looks smaller).',
+    '- Stage_Freeze(1) no longer whites the screen out (its own v3 change): a time stop with a darkening overlay now '
+    'shows the overlay (Example 1).',
+    '',
     'The Hitbox Viewer draws it in front of its own view (it has no game camera: X / Y from the view\'s centre, Mode 1 in '
     'half the view\'s height; Z changes nothing in that flat view) and lists it with the effects; Frames ends it there '
     'too.',
-    'Needs exe_v46z_camfx (tools/camera_effect_cave.py; exe_v46y_hold + it). Without it a script that uses this command '
-    'won\'t load properly: ship the executable with any script that uses it.',
+    'Needs exe_v46z_camfx (tools/camera_effect_cave.py; exe_v46y_hold + it; v3: exe_v46z_camfx3). Without it a script '
+    'that uses this command won\'t load properly: ship the executable with any script that uses it.',
 ]
 EXAMPLES['Effect_Camera'] = [
     '// Example 1: a time stop. The stage freezes for 90 frames and the screen darkens: the fighter\'s own darkening',
@@ -2961,4 +2993,12 @@ EXAMPLES['Effect_Camera'] = [
     '// Example 5: Mode 2: falling particles that move with the camera but keep the world\'s up (they fall straight',
     '// down however the camera tilts), 40 units ahead and 10 above the view\'s centre, for 2 seconds',
     'Effect_Camera(Graphic=0x3410015, X=0, Y=10, Z=40, XRot=0, YRot=0, ZRot=0, Size=1, Mode=2, Frames=120, Flags=0)',
+    '',
+    '// Example 6 (v3): what v2 got wrong in game: a time stop whose darkening stays over the whole screen while the',
+    '// camera pans to a moving opponent, with no white flash (Stage_Freeze 1 is the flash-free freeze since v3; v2\'s',
+    '// effects stayed where they started in the world)',
+    'Stage_Freeze(On=1, Frames=120)',
+    'Effect_Camera(Graphic=0x3410012, X=0, Y=0, Z=20, XRot=0, YRot=0, ZRot=0, Size=1.9, Mode=1, Frames=120, Flags=1)',
+    'LAST_EFFECT_SET_COLOR(Red=0, Green=0, Blue=0)',
+    'LAST_EFFECT_SET_ALPHA(Alpha=60)',
 ]

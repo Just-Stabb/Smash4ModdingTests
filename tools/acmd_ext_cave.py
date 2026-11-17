@@ -601,8 +601,10 @@ NEW_CMDS = [
      'end of a move, an attack out of hitstun, ...).'),
     # exe_v46n: time and the stage (docs/acmd-extra-commands.md "Time and the stage"; ts_code)
     ('Stage_Freeze', 'h_sfreeze', [
-        ('On', 0, '1 freezes the stage (its animations, moving platforms, hazards, background), as the game does for '
-                  'some Final Smashes; 0 lets it go on.'),
+        ('On', 0, '1 freezes the stage (its moving platforms, hazards, scripts) with no flash (camera_effects v3: the '
+                  'stage\'s update skipped); 2 the game\'s full stop (the stage told too: the screen goes white while it '
+                  'lasts, the old On 1); 3 the Final Smash stop (2 + the effects the Final Smashes hide); 0 lets it go '
+                  'on.'),
         ('Frames', 0, 'With On 1: 0 until Stage_Freeze(0) or the match ends; N lets it go on by itself after N frames.')],
      'Freezes or resumes the stage (the game\'s own stage stop: StageManager +0xD0), the fighters, items and projectiles '
      'unaffected. Ends by itself after Frames, at Stage_Freeze(0) or when the match ends.'),
