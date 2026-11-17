@@ -40915,7 +40915,9 @@ int sh_gone(int s)
 // game's own knockback, hitstun, DI; on the ground the bounce and the hold). Its armor (type, threshold) is kept in
 // SH_V_ARM (up to SH_ARM_N fighters) for sh_rearmor. Invincibility, intangibility, shields and counters aren't armor:
 // they still stop it (sh_struck / sh_reacted)
-void sh_unarmor()
+// Time Skip: the lift for any box (bone 0 + z ahead, y up, radius r): Sledgehammer's charged swing and Time Skip's
+// detection box (the user: it beats armor)
+void armor_lift(float hz, float hy0, float hr)
 {
     int s;
     int k;
@@ -40930,8 +40932,8 @@ void sh_unarmor()
     float ty;
     float thr;
     face = WorkModuleF(0, 0x0f000003);
-    hx = WorkModuleF(0, 0x0f000000) + SH_HIT_Z * face;
-    hy = WorkModuleF(0, 0x0f000001) + SH_HIT_Y;
+    hx = WorkModuleF(0, 0x0f000000) + hz * face;
+    hy = WorkModuleF(0, 0x0f000001) + hy0;
     s = 1;
     while (s <= 8)
     {
@@ -40961,7 +40963,7 @@ void sh_unarmor()
             {
                 dy = hy - y - SH_BODY_H;
             }
-            if (dx * dx + dy * dy < SH_HIT_SIZE * SH_HIT_SIZE)
+            if (dx * dx + dy * dy < hr * hr)
             {
                 k = 0;
                 while (k < SH_ARM_N && WorkModuleF(0, SH_V_ARM + k) != 0.0f)
@@ -40986,6 +40988,11 @@ void sh_unarmor()
         }
         s = s + 1;
     }
+}
+
+void sh_unarmor()
+{
+    armor_lift(SH_HIT_Z, SH_HIT_Y, SH_HIT_SIZE);
 }
 
 // v5: sh_unarmor's lifted armor back on the fighters the swing didn't hit (not frozen in a hit's freeze, not in a

@@ -46,8 +46,8 @@
   cancel frame: vl group 1 byte 2 (`ultimate_acmd.py` writes it; ship the vl file whenever the build writes it), and every
   status the port writes in MSC tests it in its loop (`CancelModule(0x2713)` or the frame, then `func_39` / `func_41`).
   `port_check` C1 checks both.
-- **Ultimate ports: rapid jabs, loser panels and victory cameras are part of every port.** Ultimate's setoff-off
-  hits (rapid jab loops etc.) use the setoff setting the exe recreates, with Ultimate's own angle; every port gets its
+- **Ultimate ports: rapid jabs, loser panels and victory cameras are part of every port.** Ultimate's rapid-jab
+  loop hits (setoff off, 361, no set knockback) get `Hitbox_Hold` (exe_v46y_hold and later) with Ultimate's own angle; every port gets its
   `param/ui/result_param.bin` entry (else its results-screen loser panel is empty) and its Ultimate win cameras
   (`motion/camera/result/<model>/`). The pipeline does all three by default and `port_check` errors when one is missing.
 - **Ultimate ports: shield damage is never negative.** Ultimate gives some hitboxes negative shield damage (magic:
