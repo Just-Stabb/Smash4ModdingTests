@@ -3370,6 +3370,49 @@ def check_article_status_reuse(inst, name, rep):
                 '(not made anew): %s' % ', '.join(sorted(bad)))
 
 
+def check_result_param(inst, name, src, rep):
+    """R2 result-param (Byleth v17, user: "Byleth doesn't appear in the loss character windows"): the results scene
+    frames a loser in its panel with param/ui/result_param.bin's entry for the fighter's model name (eye / to, the win
+    poses' frames: tools/result_param.py); a name with no entry gets "missing" (all 0: the camera on its target, the
+    panel empty). ERROR when the install's (or the vanilla) result_param.bin has no entry for the port's model name.
+    F4 display-face (the same test, v17: "the mouth still missing in victory animations"): the face pac's display.mta,
+    the state the results scene draws, hides every mouth slot (the base's: ZSS shows only Mouth_Result, his sword)"""
+    import result_param as RP
+    data = inst.get('param/ui/result_param.bin')
+    where = inst.where('param/ui/result_param.bin')
+    if data is None and src.get('vanilla'):
+        p = os.path.join(src['vanilla'], 'param/ui/result_param.bin')
+        if os.path.exists(p):
+            data, where = open(p, 'rb').read(), 'vanilla'
+    if data is not None:
+        names = [e[0] for e in RP.entries(data)[1]]
+        if name not in names:
+            rep.add('ERROR', 'R2 result-param', 'param/ui/result_param.bin (%s) has no entry for "%s": its loser panel is '
+                    'drawn empty (tools/result_param.py add ... --like BASE)' % (where, name))
+    cfg = load_port_cfg(name).get('weapon_article')
+    import mta
+    import omo
+    import tempfile
+    bad = []
+    for d in sorted({k.rsplit('/', 1)[0] for k in inst.glob(r'fighter/%s/model/body/[cl]\d\d/material_anime_face\.pac' % name)}):
+        data = inst.get(d + '/material_anime_face.pac')
+        with tempfile.NamedTemporaryFile(suffix='.pac', delete=False) as f:
+            f.write(data)
+        try:
+            ents = dict(omo.pac_read(f.name))
+        finally:
+            os.unlink(f.name)
+        if 'display.mta' not in ents:
+            continue
+        m = mta.read(ents['display.mta'])
+        mouths = [v for v in m['vis'] if re.search(r'Mout[hn]', v['name']) and (not cfg or v['name'] != cfg['vis'])]
+        if mouths and not any(v['keys'] and v['keys'][0][1] for v in mouths):
+            bad.append(d.rsplit('/', 1)[1])
+    if bad:
+        rep.add('ERROR', 'F4 display-face', 'display.mta hides every mouth slot (the results scene\'s face: a hole where '
+                'the mouth is; ultimate_fighter.display_entry): %s' % ', '.join(bad))
+
+
 def check_turn_rot(src, name, ult, rep):
     """S26 turn-rot: an Ultimate *Turn status whose game script turns the fighter (REVERSE_LR) and then goes back to the
     move it came from (Byleth's SpecialLwTurn -> SpecialLw at the frame it left). Smash 4's Reverse_Direction (ACMD
@@ -3494,6 +3537,7 @@ def main():
     check_hit_sound(inst, a.name, src, base['ult'], rep)
     check_turn_rot(src, a.name, base['ult'], rep)
     check_weapon_twice(inst, a.name, rep)
+    check_result_param(inst, a.name, src, rep)
     check_rapid_slide(inst, a.name, rep)
     check_article_status_reuse(inst, a.name, rep)
     check_result_faces(inst, a.name, base, vanilla, rep)

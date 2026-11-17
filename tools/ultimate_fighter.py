@@ -1870,6 +1870,35 @@ def face_vis(pac, old, mname, frames, vis_m, cprof, default=None):
 RESULT_FACE_PACS = ('material_anime_face.pac', 'material_anime_face_lang.pac')
 
 
+def display_entry(old, prof):
+    """(Byleth v17, user: the mouth still missing in every victory pose, male and female, after v16's per-motion
+    entries) the face pac's display.mta: the results scene draws the poses in this state (the per-motion entries did not
+    change it in game; display.mta is the only entry of his that hides every mouth). The base's (ZSS) shows only
+    Mouth_Result, her results smile, which is Byleth's sword slot: no mouth, the face's mouth hole drawn black. Now the
+    drive's neutral mouth slot shown, its other mouth slots hidden, the weapon slots at the profile's vis_default (the
+    sword shown: every Ultimate win pose holds it). None when there is no drive / no display entry"""
+    import mta
+    drive = (prof.get('drive') or {}).get('material_anime_face.pac')
+    if not old or not drive:
+        return None
+    m = mta.read(old)
+    slots, neutral = drive
+    mouths = set(slots) | {neutral}
+    wanted = {}
+    for v in m['vis']:
+        n = v['name']
+        if n in mouths:
+            wanted[n] = 1 if n == neutral else 0
+        elif n in prof.get('vis_default', {}):
+            wanted[n] = prof['vis_default'][n]
+        elif n in set((prof.get('vis') or {}).values()):
+            wanted[n] = 0
+        else:
+            wanted[n] = v['keys'][0][1] if v['keys'] else 1
+    vis = [(v['name'], [(0, wanted[v['name']])]) for v in m['vis']]
+    return mta.write(m['frames'], [], m['rate'], m['unk'], vis)
+
+
 def result_faces(motion_dir, base, cdirs, folder='bodyresult', log=print):
     """(Byleth v16) the result motions' (Win1 - 3, their waits, Lose) face entries from Ultimate's visibility, in each
     costume's material_anime_face.pac AND material_anime_face_lang.pac (the results scene's per-language lip-sync pac:
@@ -1919,6 +1948,9 @@ def result_faces(motion_dir, base, cdirs, folder='bodyresult', log=print):
                                cprof, default=face.get('default.mta'))
                 if vis:
                     ents.append((mname + '.mta', mta.write(frames, [], 60, 21, vis)))
+            disp = display_entry(face.get('display.mta'), cprof)
+            if disp is not None:
+                ents.append(('display.mta', disp))
             own = {n[:-4] for n, _d in ents}
             for name, d in omo.pac_read(src):
                 if name[:-4] in own:

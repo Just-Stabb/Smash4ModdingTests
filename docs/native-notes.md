@@ -2698,7 +2698,8 @@ also goes on v11's TEST_ONLY diag exe (exe_v46w_vars_line + diag_godfist_cave) u
   (the pack loader's key, `tools/mtable.py` anim_hash: `FitSZerosuitWhipMainC03AttackS4S` = `0xBB5DDD33`; a raw
   `crc32(name)` search finds nothing, which the v14 handover took for a run-time table). The article set-up copies the
   pointer into the init block (`0x02BCBB20`: `lwz r9, 8(r28)` -> `+0x58`); the motion number the article is given
-  (ACMD Set_Anchored_Article_Action: ArticleModule MSC call `0x271B` (article, motion), handler `0x02BD8AF8`; its own MSC
+  (ACMD Set_Anchored_Article_Action: ArticleModule MSC op `0x2715` (article, motion), handler `0x02BD62A0` (v17 reading; v15
+  wrote `0x271B` / `0x02BD8AF8`): below, "Article ops (Byleth v17)"; its own MSC
   MotionModule) plus its custom number (whip.mscsb func_40: int `0x10000005`) indexes it. ZSS's whip: 15 animations x 4
   (custom moves 0 - 3).
 - **Byleth's whip (0x1A0)**: weapon_expand_append.py's descriptor copy `0x04B9C680`, motion info `0x04B9C438` ->
@@ -2750,3 +2751,26 @@ also goes on v11's TEST_ONLY diag exe (exe_v46w_vars_line + diag_godfist_cave) u
   vanilla's 11 Reverse_Direction (ZSS: escapef at 16, throwb at 9, ...) end their status soon after, with an animation
   authored for it. Byleth's SpecialLwTurn (Ultimate's turn motion turns his hip 157 degrees over 12 frames and ends on
   SpecialLw's pose turned 180): master.c turns the model where SpecialLw resumes (port_check S26 turn-rot).
+
+## Article ops and the results scene's params (Byleth v17)
+
+- **ArticleModule's MSC dispatcher** `0x02C05FB0` (ArticleModule vtable `0x10102D08` `+0x17C`; 8-byte entries, the
+  function at `+4`): `op - 0x2710` indexes a jump table at `0x02C06058`. `0x2713` (ACMD Set_Remote_Article_Action,
+  STATUS_CHANGE_ARTICLE, handler `0x02BD7A74`) and `0x2714` (Set_Remote_Article_Action2, STATUS_CHANGE_EXIST_ARTICLE,
+  `0x02BD7B24`) share one case (`0x02C06B44`; 0x2714 first asks vt `+0xFC` "exists"): vt `+0x8C` (`0x02C045B0`) ->
+  every instance of the article, `0x02BEED10` = the weapon's StatusModule (accessor `+0x20`) vt `+0x2C(status)`: a status
+  request, applied at the weapon's next status shift (its MSC line). `0x2715` (Set_Anchored_Article_Action,
+  MOT_CHANGE_ARTICLE, `0x02BD62A0`) -> vt `+0x74` (`0x02C04340`) -> `0x02BEEC18`: MotionModule (accessor `+0x44`) vt
+  `+0x64` change_motion(motion, frame 0, rate 1) at once; nothing about the link or the space. `0x2712` Remove_Article
+  -> vt `+0xEC` (`0x02C05594`) -> vt `+0xE4`. `0x271C` Article_Visibility (`0x02BD661C`) -> case `0x02C06960`.
+- **The whip's generation callback** (Byleth's article table entry `0x04B9C750`: `{0x1A0, max 1, 0x02F8172C, 0}`, ZSS's
+  the same callback): reads the owner's status (`+0x7264` -> `+0x48`) into the init data: byte `+0x68` = status
+  0x153 / 0x154, `+0x69` = 0x35 / 0x37 / 0x39 / 0xF1 (her grabs and AirCatch). Kind 0x38 / 0x1A0 has its own native
+  handlers in the weapon switches `0x02B651AC` (case `0x02B65D20`), `0x02B6B7A8` (`0x02B6C468`), `0x02B73AA4`
+  (`0x02B74374`) and shares 0x29 / 0x42's in `0x02B75A88`, `0x02B77FAC`, `0x02B7A4DC` (not read further).
+- **`param/ui/result_param.bin`**: a generic param file whose fighter group (61 entries in 1.1.7: "missing", the 58
+  fighters' model names, ...) has 22 values an entry, named by the Xtal bindings registered at `0x030D37C4`: `name`
+  (type byte 0x0A: a u32 length and the model name reversed, XOR "Smash" repeated), win1 - win5, mvp_motion,
+  mvp_motion_x / _z, team_motion, team_motion_x / _z, mvp_camera_x / _y / _z, team_pos_scale_factor, eyex / eyey / eyez,
+  tox / toy / toz (a loser panel's camera). "missing" is all 0: a kind without an entry gets a loser panel with its camera
+  on its target (empty). `tools/result_param.py`; port_check R2.
