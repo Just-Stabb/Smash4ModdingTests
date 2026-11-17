@@ -1037,10 +1037,12 @@ def v18(path):
     b, gm = setup(0.0)
     b.call('master_hi_air_main')
     sel = [a[1] for s, a in gm.calls if s == 0x1A and a and a[0] == 0x2712]
-    check('v18 the air up special starts with the box Ultimate\'s init selects (entry 4)', sel and sel[-1] == 4, str(sel))
+    # (v19: the normal box until the check window; entry 4 only on 12 - 14, with the reach test: v19())
+    check('v19 the air up special starts with the normal box (entry 0), not v18\'s entry 4', sel and sel[-1] == 0, str(sel))
     # 2. the clip's attempt (user v17, clip 75dbb69e frames 186 - 191): the ledge 16 ahead, 43 up during the check window
     for f, ledge, want, what in ((12.0, (16.0, 43.0), True, 'the clip\'s ledge (16 ahead, 43 up) at 12'),
-                                 (13.0, (60.0, 70.0), True, 'a ledge 60 ahead, 70 up at 13 (the common AIR_LASSO reach)'),
+                                 (13.0, (60.0, 70.0), False, 'a ledge 60 ahead, 70 up at 13 (in entry 4, but 74 from his '
+                                  'hand: v19 out of the sword\'s reach)'),
                                  (13.0, (16.0, -20.0), True, 'a ledge 16 ahead, 20 below at 13'),
                                  (13.0, (90.0, 40.0), False, 'a ledge 90 ahead at 13 (past 75)'),
                                  (15.0, (16.0, 43.0), True, 'the clip\'s ledge at 15 (the tether box)'),
@@ -1125,6 +1127,93 @@ def v18(path):
     v18_rapid()
 
 
+def v19(path):
+    """v19 (README "Status: v19"; user v18 clip 066bddbd: "the tether will attempt to happen out of Byleth's range instead
+    of just whiffing"): a ledge in the box is caught only within the sword's reach (MASTER_HI_REACH from his hand,
+    MASTER_HI_LINE_X / _Y), in the check window and at a wall; the box Ultimate's init selects only on 12 - 14;
+    0xF2 gives up (Fall) when her whip never gets there"""
+    import math
+    reach = float(_MB.CONSTS['MASTER_HI_REACH'].rstrip('f'))
+    hx, hy = (float(_MB.CONSTS[k].rstrip('f')) for k in ('MASTER_HI_LINE_X', 'MASTER_HI_LINE_Y'))
+    f2max = float(_MB.CONSTS['MASTER_HI_F2_MAX'].rstrip('f'))
+
+    def setup(frame, lr=1.0):
+        b, gm = Byleth(path), Game()
+        b.vm.game = gm
+        b.g('global18', 2)
+        b.g('global19', 2)
+        b.g('master_wall_jumps', 0)
+        gm.frame, gm.lr = frame, lr
+        return b, gm
+
+    def along(d, ux=0.6, uy=0.8):
+        return (hx + d * ux, hy + d * uy)
+    edge_in, edge_out = along(reach - 1.0), along(reach + 2.0)
+    clip = (70.0, 75.0)          # the clip (frames 139 - 140): the ledge ~65 - 78 ahead, ~70 - 79 up (3.4 - 3.8 px a unit)
+    for f, lr, ledge, want, what in (
+            (12.0, 1.0, clip, False, 'the clip\'s ledge (70 ahead, 75 up: in entry 4, %.0f from his hand)' %
+             math.hypot(clip[0] - hx, clip[1] - hy)),
+            (12.0, 1.0, edge_out, False, 'a ledge just out of reach (%.1f ahead, %.1f up: %g from the hand)' %
+             (edge_out + (reach + 2.0,))),
+            (12.0, 1.0, edge_in, True, 'a ledge at the edge of reach (%.1f ahead, %.1f up: %g from the hand)' %
+             (edge_in + (reach - 1.0,))),
+            (14.0, -1.0, edge_in, True, 'the same facing left'),
+            (14.0, -1.0, edge_out, False, 'just out of reach facing left'),
+            (15.0, 1.0, (40.0, 70.0), True, 'a ledge 40 ahead, 70 up at 15 (entry 2, 60 from the hand)'),
+            (13.0, 1.0, (16.0, 43.0), True, 'v18\'s clip ledge (16 ahead, 43 up) at 13 (25 from the hand)'),
+            (13.0, 1.0, (16.0, -20.0), True, 'a ledge 16 ahead, 20 below at 13 (42 from the hand)')):
+        b, gm = setup(f, lr)
+        gm.lasso = True
+        gm.ledge = (gm.x + lr * ledge[0], gm.y + ledge[1], -lr)
+        b.call('master_hi_air_loop')
+        inbox = gm.ledge_in_box()
+        check('v19 up special at %g: %s -> %s' % (f, what, 'the ledge (0xF2)' if want else 'a whiff (no 0xF2)'),
+              (0xF2 in gm.status) == want and inbox, 'statuses %s, box %s, in the box %s' % (
+                  [hex(s) for s in gm.status], gm.box, inbox))
+    # the clip's attempt goes on as a whiff: nothing at 12 - 16, the motion's end -> Fall
+    b, gm = setup(12.0)
+    gm.ledge = (gm.x + clip[0], gm.y + clip[1], -1.0)
+    for f in range(12, 17):
+        gm.frame, gm.lasso = float(f), True
+        b.call('master_hi_air_loop')
+    gm.lasso, gm.frame, gm.end = False, 40.0, True
+    b.call('master_hi_air_loop')
+    check('v19 the clip\'s attempt (the ledge out of reach on every check frame 12 - 16): a normal whiff, Fall at the end',
+          gm.status == [0xE], str([hex(s) for s in gm.status]))
+    # before the check window: no ledge box past the normal one, no catch even with a ledge in reach
+    b, gm = setup(5.0)
+    gm.ledge = (gm.x + 16.0, gm.y + 43.0, -1.0)
+    b.call('master_hi_air_loop')
+    sel = [a[1] for s, a in gm.calls if s == 0x1A and a and a[0] == 0x2712]
+    check('v19 frame 5 (no AIR_LASSO_FLAG_CHECK): no box chosen, no catch', not sel and 0xF2 not in gm.status,
+          'boxes %s, statuses %s' % (sel, [hex(s) for s in gm.status]))
+    # a wall met under a ledge: the ledge only when the sword reaches it; else the latch
+    for ledge, want in ((edge_in, 0xF2), (edge_out, 0x15B)):
+        b, gm = setup(19.0)
+        gm.wall_x, gm.box = 14.0, 4                      # the widest box, to test the reach alone
+        gm.ledge = (gm.x + ledge[0], gm.y + ledge[1], -1.0)
+        b.call('master_hi_air_loop')
+        check('v19 the tip meets a wall at 19 under a ledge %s reach -> %s' % ('within' if want == 0xF2 else 'out of',
+              'the ledge' if want == 0xF2 else 'the wall latch'), want in gm.status and len(gm.status) == 1,
+              str([hex(s) for s in gm.status]))
+    # 0xF2: her whip thrown (status 7); her loop's landing kept; Fall after MASTER_HI_F2_MAX frames without the ledge
+    b, gm = setup(0.0)
+    b.call('master_hi_f2_main')
+    ws = [a for s, a in gm.calls if s == 0x16 and a and a[0] == 7]
+    arts = [i for i, (s, a) in enumerate(gm.calls) if s == 0x20 and a and a[0] == 0x2713]
+    check('v19 0xF2\'s main throws her whip at the ledge (article 2, status 7: ArticleModule(0x2713)), as her '
+          'func_2269 / func_129', [2, 0x11000002] in [w[1:] for w in ws] and [7, 0x11000004] in [w[1:] for w in ws]
+          and len(arts) == 1, 'work ints %s, article calls %d' % (ws, len(arts)))
+    for t, want in ((f2max - 1.0, []), (f2max, [0xE])):
+        b, gm = setup(0.0)
+        b.g('global9', t)
+        b.call('master_hi_f2_loop')
+        check('v19 0xF2 at its frame %g: %s' % (t, 'Fall (the whip never got there)' if want else 'still waiting'),
+              gm.status == want, str([hex(s) for s in gm.status]))
+    src = open(SRC).read()
+    check('v19 0xF2\'s main is master_hi_f2_main', 'sv_set_mem(0x1, 0x1, 0xf2, master_hi_f2_main)' in src)
+
+
 def v18_rapid():
     """v18: the rapid-jab loop as ultimate_acmd translates Ultimate's Attack100 (HOLD_WAVE_CLEAR) and master_build.rapid_v18
     makes the installed one: 6 waves a loop at Ultimate's frames 2 / 5 / ... / 17, each Hit_Log_Clear(0) first, its two
@@ -1183,6 +1272,7 @@ def main():
     v16(path)
     v17_static()
     v18(path)
+    v19(path)
     print('\n%d problem(s)' % len(PROBLEMS))
     sys.exit(1 if PROBLEMS else 0)
 
