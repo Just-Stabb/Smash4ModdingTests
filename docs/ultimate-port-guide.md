@@ -15,6 +15,7 @@ in docs/ultimate-fighter-port.md; this page is the procedure.
 | `tools/port_check.py` | the finished package against every bug class so far |
 | `tools/vec_target.py` | Ultimate's "carry the hit fighter to a point" hits (set_vec_target_pos) as an MSC pull |
 | `tools/ultimate_camera.py` | Ultimate's win cameras (camera/fighter/NAME/c00/j02win1-3) as Smash 4 result-scene camera motions (motion/camera/result/NAME/N) |
+| `tools/result_param.py` | the loser panel's framing and win frames (`param/ui/result_param.bin`, by model name): `port` scales the base's entry to the fighter |
 | `tools/costume_group_cave.py` | per-costume motion sets (`motion/body2` ...) for new kinds and the costume variables (exe_v46s) |
 
 ## What the user provides
@@ -38,7 +39,7 @@ python3 tools/ultimate_port.py init NAME --base BASE --kind 0x47 --ui-name "Name
 python3 tools/ultimate_port.py status NAME            # sources + the base's known traps
 python3 tools/ultimate_port.py effects NAME           # his effects; Ultimate's common ones -> ef_common sets
 python3 tools/ultimate_port.py plan NAME --out DIR    # every command, in order; '?' = an input missing
-python3 tools/ultimate_port.py run NAME body model-c00 ... motions [motions-group2] low-models camera effects sound scripts specials variants shapes stats portraits --out DIR
+python3 tools/ultimate_port.py run NAME body model-c00 ... motions [motions-group2] low-models camera result-param effects sound scripts specials variants shapes stats portraits --out DIR
    (specials: the fighter's MSC / articles: fighters/NAME/NAME.c, weapons/, specials_acmd.json, its build script
     with port.json specials.build_args)
 python3 tools/ultimate_port.py check NAME PKG [later packages ...]
@@ -109,6 +110,25 @@ file names and node form, what `<n>` counts and the field of view (not in the mo
 (fighters/master/README.md "v3: win cameras"). `port_check` R1 (ERROR when Ultimate has them and the package doesn't).
 (v2 wrote them to `fighter/NAME/camera/result/winN/`, which nothing reads.)
 
+**The results screen, both halves are default steps.** The winner's side is the `camera` step above; the losers' side
+is `result-param`: `param/ui/result_param.bin` frames every fighter's loser panel (eyex / eyey / eyez, tox / toy / toz),
+holds the win frames (win1 - 5) and the MVP / team offsets, one entry a model name (the kind's folder name, the same
+lookup: 0x0275DB24's kind-indexed table). A kind without an entry gets "missing" (all 0): the camera on its target,
+the panel drawn empty (Byleth v1 - v16; Hero, Sephiroth, Incineroar, Steve, Squirtle and Supamario until
+results_panels_v1). The step (`tools/result_param.py port`) copies the base's entry and fits it to the port:
+- **framing** (eye / to and the MVP / team offsets) x the head's height in Ultimate's j02lose over the head's height in
+  the base's J02Lose (the panel shows the lose pose: Bowser's hunched head is at 15.5, not his bind pose's 21.5); the
+  same picture scaled about the floor. Without the base's result motions, the bind poses' head joints;
+- **win1 - 3** the base's x the port's j02winN length / the base's J02WinN (vanilla's win N is 80 - 100 % of its
+  motion: mean 0.93); without the base's motions, the length x 0.957 (the vanilla median); win4 / 5 0 unless the
+  port has those motions; mvp_motion / team_motion / team_pos_scale_factor the base's;
+- **built on the newest shipped file** (`port_sources.json` `"result_param"`, else the user's param/ui, else vanilla):
+  the file replaces the whole table, so it has to carry every earlier port's entry; `--replace` rewrites the port's
+  own entry in place on a re-run, every other entry byte for byte. Ship it in `INSTALL_TO_data_and_data_us_en/`.
+Byleth's (v17, by hand: ZSS's framing, the same win rule) gives the same win frames through the step (125 / 169 /
+156). `port_check` R1 (every win pose the package plays has its camera, ERROR) and R2 (the entry, a non-degenerate
+camera, the other added kinds kept: ERROR; win frames past the port's motions: WARN).
+
 **Costume groups (per-costume motion sets).** Some Ultimate fighters have a second motion set for some costumes
 (Byleth: `motion/body/c01` is the female set, the same for c01 / c03 / c05 / c07; port_check M11 finds them: a costume
 whose `a00wait1` differs from c00's). Smash 4 already does this for Bayonetta (costumes 4-7 but 2 play `motion/body2/`,
@@ -127,7 +147,8 @@ whose `a00wait1` differs from c00's). Smash 4 already does this for Bayonetta (c
 In battle every player has its own resource loader, so two players of one kind in different groups each load their
 own set; the shared entry / result packs take kind x 9 + 1 (first group) / + 2 (second), as Bayonetta's do.
 
-**The earlier ports (audit, Byleth v2) and `lowmodels_v1`:** none has its win cameras (the step is new); their low
+**The earlier ports (audit, Byleth v2) and `lowmodels_v1`:** none had its win cameras (the step is new; results_panels_v1
+adds them, below); their low
 models, fixed by `lowmodels_v1.zip` (fighter/NAME/model/body/l00-l07 only, over everything):
 
 | port | Ultimate low model (lod.xmb) | lNN before | lowmodels_v1 (OUT: scratchpad/lowmodels/out/NAME) |
@@ -138,8 +159,25 @@ models, fixed by `lowmodels_v1.zip` (fighter/NAME/model/body/l00-l07 only, over 
 | Incineroar (`gaogaen`) | c00 - c07 | **none** (M6 ERROR) | `init gaogaen --base koopa --kind 0x43 --ui-name Incineroar --trait juggernaut` (port.json `model.max_bones` 143: v1's count), cNN rebuilt, lNN own ids 0x40C32000 + 0x400 x NN: `run gaogaen model-c00 ... model-c07 motions` then `low-models gaogaen --own-ids` |
 | Steve (`pickel`, no port.json) | none | copies older than fix 12's costumes (own ids, + 0x2000) | not in it: recopy cNN -> lNN (`ultimate_port.py low-models` once it has a port.json) |
 
-Win cameras still to do for each: `ultimate_port.py run NAME camera --out OUT` (`ultimate_camera.py convert-dir
-CAM/NAME/c00 OUT/NAME NAME --template VBN` without a port.json): `motion/camera/result/NAME/1-3/` at the data root.
+**`results_panels_v1`** (scratchpad/results_panels_v1.zip, over Byleth v17): the earlier ports' results screens. Their
+win cameras (no package had `motion/camera/result/<name>/`: Hero, Sephiroth, Incineroar, Steve, Squirtle), converted
+from camera-SSBU's c00 j02win1-3 (`ultimate_camera.py convert-dir CAM/NAME/c00 OUT NAME --template VBN`), and
+result_param.bin with an entry for each added kind (`result_param.py port`, built on v17's, which has Byleth's):
+
+| port (base) | framing scale (head in the lose poses) | win1 - 3 (motions) |
+|---|---|---|
+| Sephiroth `edge` (zelda) | 1.177 (18.55 / 15.76) | 744 / 179 / 159 (750 / 180 / 160) |
+| Incineroar `gaogaen` (koopa) | 1.016 (15.74 / 15.49) | 122 / 108 / 125 (130 / 131 / 130) |
+| Steve `pickel` (pit) | 0.779 (bind heads 12.00 / 15.40: Pit's result motions not at hand) | 172 / 124 / 191 (180 / 130 / 200, x 0.957) |
+| Hero `brave` (reflet) | 1.073 (16.41 / 15.30) | 114 / 118 / 136 (135 / 131 / 138); Robin's win4 dropped |
+| Squirtle `pzenigame` (mario) | 0.680 (6.75 / 9.93) | 113 / 105 / 108 (131 / 131 / 131) |
+| Supamario `supamario` (mario; not an Ultimate port) | 1 (Mario's model and result motions) | Mario's 130 / 145 / 108: his entry byte for byte |
+
+All framing APPROXIMATED, not yet seen in game. Offline (the head's angle from the panel camera's axis through the
+lose motion, the fighter facing as in its motion): Sephiroth -2.6 deg against Zelda's -2.4, Hero -2.1 / Robin -1.8,
+Squirtle -5.1 to -6.8 / Mario -4.5 to -6.0, Incineroar +5.8 / Bowser +6 to +11 (his head bobs; Incineroar's 20 %
+farther from the camera than Bowser's forward-leaning one: drawn smaller); Steve unchecked (Pit's lose motion not at
+hand). The scene's own facing / field of view for the panels aren't known.
 
 **Delivering:** `port_check.py` over the install as the user will have it: the full package plus every
 fix package after it, in order. No ERROR goes out. A fix package that ships a file ships its partners
@@ -364,6 +402,7 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | low models built for a port shipped long ago: today's converter no longer makes that cNN (Hero's installed c00: one skin ramp and other skin specular / fresnel where today's build makes two ramps), so the low build's pictures weren't all in cNN's .nut and `low-models` stopped; the cNN packages themselves no longer on disk (Sephiroth's, Incineroar's) | lowmodels_v1 | the low polygons take cNN's materials by Ultimate material label (`ultimate_fighter.py --materials-from-c`); cNN rebuilt where the install isn't at hand, lNN under ids of its own (`low-models --own-ids`) |
 | `port.json` `model.joints` naming the base's own table-1 joints (Sephiroth's `H_ShoulderpadR`, `H_ShoulderpadL`, `BustN`: Zelda's three, which the model step keeps by its stand-ins) and missing his `--snake`: the model step failed (`KeyError: 'BustN'`) and couldn't rebuild his test-82 skeleton | lowmodels_v1 | `joints` lists only bones beyond the base's table 1; `model.snake`; checked: the rebuild's table 1 is test 82's (124 / 123 / 12 / 26, c06 105 / 100 / 12 / 26), 136 / 123 bones, no UplipL1 |
 | Ultimate's win cameras never ported (every port's result screen framed by Smash 4's default camera) | user, Byleth v2 ("port over their Ultimate camera angles") | `camera` step (`tools/ultimate_camera.py`) into `motion/camera/result/NAME/N/`, where the result scene's script loads a winner's camera (v3; v2 wrote them where nothing reads them); `port_check` R1 win-camera (ERROR) |
+| the win cameras made only for the port the step was written for: the five earlier ports never got theirs, and R1 only looked when Ultimate's camera folder was configured on the checking machine | results_panels_v1 (user: "victory cameras must be done automatically for all future Ultimate ports") | `camera` a default step of every plan; R1 now wants a camera for every win pose the install plays (bodyresult J02Win1-3) of every added kind but Supamario, sources or not (ERROR); results_panels_v1 ships the five |
 | a costume group's own motions (Byleth's female costumes) played as the first group's, and Ultimate's costume tests (`INT_COLOR % 2`, `GET_VOICE_VARIATION` chains) taken as the male branch or dropped: the taunt / win sound scripts were empty | Byleth v1 / v2 (README "v3") | `costume_group_cave.py` (exe_v46s), `extra_kinds.json` motion_group2, port.json `motions.group2` + `motions-group2`, the translator's COSTUME_PARITY tests; `port_check` M11 motion-groups (WARN unset, ERROR incomplete) |
 | Ultimate moves whose common slot the base's motion table leaves empty (the rapid jab, the angled forward smashes) silently missing; their game scripts (`loop { ... wait_loop_clear }`) dropped whole by the translator, and their random sound containers (`se_master_attack100`: _01 - _03) left without a sound | Byleth v1 (no rapid jab, one forward smash) | `extra_kinds.json` "motions" + motions.add + `--slot-moves`; the translator turns a whole-script `loop` into WAIT_LOOP_CLR + JUMP(itself) (vanilla Kirby's attack100), unrolls a loop after other statements, maps ENABLE_100 / 100_CONTINUE_CHECK / ENABLE_RESTART, and a container to its first tone; `port_check` S11 slot-moves (WARN) |
 | a translated endless loop jumping back to its script's start with nothing waiting in it (Ultimate's run / walk effect loops end `wait_loop_sync_mot`, which the first loop translation left out): the script runs again in the same frame for ever, a hang as soon as he runs | Byleth v2's first build (caught offline, never shipped) | the translator puts Loop_Rest before the jump when the loop waits for the motion's loop, or has no wait at all; `port_check` S12 loop-spin (ERROR) |
@@ -413,7 +452,8 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | the base's own article commands left in scripts the port doesn't rewrite (Ultimate has no game script there or its own makes no article): ZSS's side taunt and Win1 made her whip (now playing his back / down throw's sword) beside his body sword | Byleth v6 - v16 (user: "the sword will appear twice in taunts") | `master_whip.strip_base_whip`: the article's commands out of every script the whip plan doesn't write; port.json `weapon_article` names the body's weapon slot [S27 weapon-twice: the article drawn on a frame the body weapon shows, or made where Ultimate's script makes none] |
 | a jab chain's stats kept from the base: fighter_param 86 (the rapid jab's press count) 0 from a base without a rapid jab, with Ultimate's rapid jab on (264 = 1): the common Attack status tests presses >= 86 as soon as ENABLE_100 opens, so jab 2 always went into the rapid jab and jab 3 never came | Byleth v1 - v16 (user: "jab 3 is inaccessible") | `ultimate_stats`: 86 = Ultimate's attack_100_enable_cnt + 1 (0 without a rapid jab), 81 / 82 = combo_attack_12_end / 13_end, 262 = attack_combo_type (none / hit / succeed / uniq_dance = 0 - 3) [P3 rapid-count] |
 | a holding multi-hit (Ultimate's ATTACK_SETOFF_KIND_OFF, angle 361, small knockback: the rapid jab) converted as it is: Smash 4 has no setoff field and its 361 sends a grounded victim under 32 knockback at 0 degrees, so each hit slides it out of the next one's reach | Byleth v2 - v16 (user: "the rapid jab's hits don't connect properly") | `ultimate_acmd.hold_angle`: such hits at HOLD_ANGLE 80 (Smash 4's own rapid jabs hold with 50 - 90) [S28 rapid-slide] |
-| a new kind with no entry in `param/ui/result_param.bin` (keyed by model name: reversed, XOR "Smash"): the results scene uses "missing" (all 0) for its loser panel's camera, the panel is drawn empty | Byleth v1 - v16 (user: "Byleth doesn't appear in the loss character windows"); every new-kind port | `tools/result_param.py add FILE OUT NAME --like BASE` (eye / to, the win poses' frames), shipped with the port [R2 result-param] |
+| a new kind with no entry in `param/ui/result_param.bin` (keyed by model name: reversed, XOR "Smash"): the results scene uses "missing" (all 0) for its loser panel's camera, the panel is drawn empty | Byleth v1 - v16 (user: "Byleth doesn't appear in the loss character windows"); every new-kind port (Hero, Sephiroth, Incineroar, Steve, Squirtle, Supamario: results_panels_v1) | the `result-param` step, a default of every plan (`tools/result_param.py port`: the base's entry scaled by the head in the lose poses, win frames by the win motions' lengths), shipped with the port in `INSTALL_TO_data_and_data_us_en/` [R2 result-param: ERROR] |
+| a port's result_param.bin built from an older copy than the user's: the one file holds every kind's entry, so it silently drops the entries of the ports since (their panels empty again) | results_panels_v1 (the seven added kinds now share it) | the step reads port_sources `"result_param"` (the newest shipped file) and rewrites only its own entry [R2: ERROR when the shipped file lacks another added kind's entry] |
 | the face pac's `display.mta` left as the base's: the results scene draws the poses in that state (v16's per-motion result entries changed nothing in game); ZSS's shows only Mouth_Result, Byleth's sword slot: no mouth, the face's mouth hole drawn black | Byleth v1 - v16 (user, v16: the mouth still missing, male and female winners) | `ultimate_fighter.display_entry` (run by result_faces): the drive's neutral mouth shown, the other mouth slots hidden, the weapon slots at the profile default [F4 display-face] |
 
 ## Open

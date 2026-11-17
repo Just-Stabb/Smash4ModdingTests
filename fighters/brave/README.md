@@ -1662,3 +1662,11 @@ where Ultimate draws its lowest level of detail. Every Ultimate costume of his h
 - port_check brave over brave_smash4_current.zip + lowmodels_v1: M10 gone, the same 10 errors as without it (none of
   them model / texture ones: A3, A6, C1, E4, E5, E7, E8, S8, S9 of that Nov 13 package, fixed by later packages).
   Renders (bind pose, cNN beside lNN, c00 / c01): `scratchpad/lowmodels/render/brave_c00_c01.png`.
+
+## Results panels v1 (`$S/results_panels_v1.zip`, every added fighter; over Byleth v17)
+
+His loser panel on the results screen was empty: `param/ui/result_param.bin` frames each fighter's loser panel by model name (`brave`, the kind's folder name: the executable's kind-indexed name table) and had no entry for him, so the scene used "missing" (all 0: the camera on its target). Now an entry, from Robin's (the base):
+- framing (APPROXIMATED, no Ultimate equivalent of the file): Robin's eye (3, 13.5, 8) / to (0, 15.5, 0) x 1.073 = eye (3.217, 14.478, 8.58), to (0, 16.623, 0) (MVP camera y 3.217): his head in j02lose (16.41) over Robin's in her J02Lose (15.30);
+- win1 - 3 (APPROXIMATED: what the scene does at that frame isn't known, vanilla's are 80 - 100 % of each motion): 114 / 118 / 136: Robin's 140 / 140 / 163 x his win motions (135 / 131 / 138, the installed bodyresult = Ultimate's) over hers (166 / 156 / 166); her win4 (140) dropped: he has no fourth pose;
+- his win cameras, which no package had: Ultimate's `camera/fighter/brave/c00/j02win1-3` (camera-SSBU) converted to `motion/camera/result/brave/1-3/camera_motion.omo` + `.vbn` (`ultimate_camera.py convert-dir`), where the result scene loads the winner's camera; the field of view isn't in the motion (the scene's own is used) and the format is Byleth v3's, not yet confirmed in game.
+Built with `tools/result_param.py port` on Byleth v17's file (it keeps every vanilla entry and Byleth's byte for byte); every added kind's entry is in the one file. `port_check` R1 / R2: 0 errors over it. Not yet seen in game.

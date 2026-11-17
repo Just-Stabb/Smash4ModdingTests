@@ -2251,12 +2251,34 @@ def check_assets(inst, name, base, rep):
         rep.add('WARN', 'A1 labels', 'sound banks without sound/config/soundlabeltable.bin (Hero fix 71)')
 
 
+# added kinds that aren't Ultimate ports (no Ultimate win cameras to want): Supamario is a Mario variant
+NON_ULTIMATE = ('supamario',)
+
+
+def win_motions(inst, name):
+    """{N: frames} of the win poses the install plays (fighter/NAME/motion/bodyresult/main.pac: J02WinN)"""
+    import tempfile
+    data = inst.get('fighter/%s/motion/bodyresult/main.pac' % name)
+    if data is None:
+        return {}
+    import result_param as RP
+    with tempfile.NamedTemporaryFile(suffix='.pac', delete=False) as f:
+        f.write(data)
+    try:
+        return RP.win_lengths(f.name)
+    finally:
+        os.unlink(f.name)
+
+
 def check_lod_and_camera(inst, name, src, ult, rep):
     """M10 low-lod: a costume whose Ultimate model has its own low model (model/body/cNN/lod.xmb: body_low ...) shipped
     with lNN a copy of cNN (ultimate_port.py low-models builds Ultimate's: `--lod-low`) [WARN: the copy still shows].
     R1 win-camera: Ultimate's victory cameras (camera/fighter/<ult>/c00/j02win1-3) not in the package where the
     result scene's script loads a winner's camera (motion/camera/result/NAME/N/camera_motion.omo + .vbn,
-    data/script/xscene_result.xtal; tools/ultimate_camera.py) [ERROR: the scene plays its default camera]"""
+    data/script/xscene_result.xtal; tools/ultimate_camera.py) [ERROR: the scene plays its default camera]; also, for
+    every added kind but NON_ULTIMATE, each win pose the install plays (fighter/NAME/motion/bodyresult/main.pac:
+    J02Win1-3) without its camera, whether or not Ultimate's camera folder is configured (results_panels_v1: the five
+    earlier ports had none) [ERROR]"""
     udir = src.ult_dir(ult) if ult else None
     for d in sorted({os.path.dirname(f) for f in inst.glob(r'fighter/%s/model/body/l\d\d/model\.nud' % name)}):
         nn = d[-2:]
@@ -2270,19 +2292,25 @@ def check_lod_and_camera(inst, name, src, ult, rep):
         cam = ultimate_camera.cam_source(src, ult) if ult else None
     except Exception:
         cam = None
+    # the win poses the package plays (its bodyresult): each needs its camera, whether or not Ultimate's camera folder
+    # is configured here (results_panels_v1: none of Hero / Sephiroth / Incineroar / Steve / Squirtle had them)
+    played = sorted(win_motions(inst, name))
     wins = [w for w in (1, 2, 3) if cam and os.path.exists(os.path.join(cam, 'j02win%d.nuanmb' % w))]
+    if name not in NON_ULTIMATE:
+        wins = sorted(set(wins) | {w for w in played if w <= 3})
     have = [w for w in wins if inst.get('motion/camera/result/%s/%d/camera_motion.omo' % (name, w)) is not None
             and inst.get('motion/camera/result/%s/%d/camera_motion.vbn' % (name, w)) is not None]
     old = [w for w in wins if inst.get('fighter/%s/camera/result/win%d/camera_motion.omo' % (name, w)) is not None]
-    if cam is None:
+    if cam is None and not wins:
         rep.add('INFO', 'R1 win-camera', 'no Ultimate camera folder for %s (port_sources "ult_camera": camera-SSBU.zip)'
                 % ult)
     elif len(have) < len(wins):
-        rep.add('ERROR', 'R1 win-camera', 'Ultimate\'s win cameras %s not where the result scene loads them '
+        rep.add('ERROR', 'R1 win-camera', 'win poses %s without their Ultimate camera where the result scene loads it '
                 '(motion/camera/result/%s/N/camera_motion.omo / .vbn: data/script/xscene_result.xtal; without them the '
-                'scene plays motion/camera/result/default/1/)%s: ultimate_port.py run %s camera' % (
+                'scene plays motion/camera/result/default/1/)%s: ultimate_port.py run %s camera (ultimate_camera.py '
+                'convert-dir CAM/%s/c00 OUT %s --template VBN without a port.json)' % (
                     ', '.join('j02win%d' % w for w in wins if w not in have), name,
-                    ' (fighter/%s/camera/result/winN is the old, unread place)' % name if old else '', name))
+                    ' (fighter/%s/camera/result/winN is the old, unread place)' % name if old else '', name, ult, name))
     else:
         rep.add('INFO', 'R1 win-camera', 'win cameras %d in motion/camera/result/%s/ (the field of view is not in the '
                 'motion: the scene\'s own is used)' % (len(have), name))
@@ -3374,7 +3402,10 @@ def check_result_param(inst, name, src, rep):
     """R2 result-param (Byleth v17, user: "Byleth doesn't appear in the loss character windows"): the results scene
     frames a loser in its panel with param/ui/result_param.bin's entry for the fighter's model name (eye / to, the win
     poses' frames: tools/result_param.py); a name with no entry gets "missing" (all 0: the camera on its target, the
-    panel empty). ERROR when the install's (or the vanilla) result_param.bin has no entry for the port's model name.
+    panel empty). ERROR when the install's (or the vanilla) result_param.bin has no entry for the port's model name, when
+    its entry's eye is its target (all 0), or when the shipped file lacks another added kind's entry (extra_kinds.json:
+    the file replaces the whole table); WARN when a win frame is past the port's own J02WinN (or 0 for a win pose it
+    has). ultimate_port.py's `result-param` step writes the entry (results_panels_v1).
     F4 display-face (the same test, v17: "the mouth still missing in victory animations"): the face pac's display.mta,
     the state the results scene draws, hides every mouth slot (the base's: ZSS shows only Mouth_Result, his sword)"""
     import result_param as RP
@@ -3385,10 +3416,32 @@ def check_result_param(inst, name, src, rep):
         if os.path.exists(p):
             data, where = open(p, 'rb').read(), 'vanilla'
     if data is not None:
-        names = [e[0] for e in RP.entries(data)[1]]
-        if name not in names:
+        ents = {e[0]: e[3] for e in RP.entries(data)[1]}
+        if name not in ents:
             rep.add('ERROR', 'R2 result-param', 'param/ui/result_param.bin (%s) has no entry for "%s": its loser panel is '
-                    'drawn empty (tools/result_param.py add ... --like BASE)' % (where, name))
+                    'drawn empty (ultimate_port.py run %s result-param; tools/result_param.py port ... --like BASE)'
+                    % (where, name, name))
+        else:
+            v = ents[name]
+            eye, to = (v['eyex'], v['eyey'], v['eyez']), (v['tox'], v['toy'], v['toz'])
+            if eye == to:
+                rep.add('ERROR', 'R2 result-param', '"%s"\'s loser camera sits on its target (eye = to %s, "missing"\'s '
+                        'all-0 framing): the panel is drawn empty' % (name, eye))
+            played = win_motions(inst, name)
+            bad = ['win%d %g (J02Win%d %s frames)' % (n, v['win%d' % n], n, played.get(n, 'none'))
+                   for n in range(1, 6) if played and (v['win%d' % n] > played.get(n, 0) or
+                                                       (n in played and n <= 3 and not v['win%d' % n]))]
+            if bad:
+                rep.add('WARN', 'R2 result-param', '"%s"\'s win frames don\'t fit its win motions: %s (result_param.py '
+                        'port: the base\'s scaled by the lengths)' % (name, ', '.join(bad)))
+        # the file replaces the whole table: one built from an older file drops the other added fighters' entries
+        if inst.get('param/ui/result_param.bin') is not None:
+            kinds = json.load(open(os.path.join(HERE, 'extra_kinds.json')))['kinds']
+            gone = [r['name'] for r in kinds if r['name'] != name and r['name'] not in ents]
+            if gone:
+                rep.add('ERROR', 'R2 result-param', 'the shipped param/ui/result_param.bin (%s) has no entry for the other '
+                        'added fighters %s: their loser panels go empty (build it on the newest one: port_sources '
+                        '"result_param")' % (where, ', '.join(gone)))
     cfg = load_port_cfg(name).get('weapon_article')
     import mta
     import omo

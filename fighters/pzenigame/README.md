@@ -855,3 +855,11 @@ and the executable (`tools/sound_alias_cave.py` v2) gives his banks those ids as
   <install>/fighter/pzenigame/sound --name pzenigame --out OUT` (se 46160, vc 46161, cheer 46162). The executable
   already has his aliases (Mario's 2004 / 6001 / 6086). Until then, with Mario or Supamario in the match his later
   player's voice (and with Mario his SE) is refused. Rebuilt sound steps (ultimate_sound.py) give him the ids.
+
+## Results panels v1 (`$S/results_panels_v1.zip`, every added fighter; over Byleth v17)
+
+His loser panel on the results screen was empty: `param/ui/result_param.bin` frames each fighter's loser panel by model name (`pzenigame`, the kind's folder name: the executable's kind-indexed name table) and had no entry for him, so the scene used "missing" (all 0: the camera on its target). Now an entry, from Mario's (the base):
+- framing (APPROXIMATED, no Ultimate equivalent of the file): Mario's eye (3, 9, 11) / to (0, 11, 0) x 0.680 = eye (2.039, 6.118, 7.477), to (0, 7.477, 0): his head in j02lose (6.75: he slumps; 8.15 in the bind pose) over Mario's in his J02Lose (9.93);
+- win1 - 3 (APPROXIMATED: what the scene does at that frame isn't known, vanilla's are 80 - 100 % of each motion): 113 / 105 / 108: Mario's 130 / 145 / 108 x his j02win1-3 (Ultimate's; his installed bodyresult isn't at hand here, the motions step converts them frame for frame as it did Hero's / Sephiroth's / Incineroar's: 131 / 131 / 131) over Mario's (151 / 181 / 131);
+- his win cameras, which no package had: Ultimate's `camera/fighter/pzenigame/c00/j02win1-3` (camera-SSBU) converted to `motion/camera/result/pzenigame/1-3/camera_motion.omo` + `.vbn` (`ultimate_camera.py convert-dir`), where the result scene loads the winner's camera; the field of view isn't in the motion (the scene's own is used) and the format is Byleth v3's, not yet confirmed in game.
+Built with `tools/result_param.py port` on Byleth v17's file (it keeps every vanilla entry and Byleth's byte for byte); every added kind's entry is in the one file. `port_check` R1 / R2: 0 errors over it. Not yet seen in game.

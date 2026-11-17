@@ -165,6 +165,13 @@ Path builder `0x030BB464` (type 0-14) uses the lowercase / Cap names:
 Weapons: `fighter/%s/script/animcmd/weapon/%s/` with the weapon's owner name. Params:
 `param/fighter/fighter_param_vl_<name>.bin`.
 
+The results screen also goes by the model name (`get_fighter_model_name_from_fighter_kind` 0x030ED508 -> 0x0275DB24:
+`lwzx` from the kind-indexed lowercase table, 0x04BA0148 in the expanded executables: `supamario` ... `master` for
+0x41 - 0x47): `motion/camera/result/<name>/<n>/` (the winner's camera) and `param/ui/result_param.bin` (the loser
+panel's eye / to and the win frames; a name with no entry gets "missing", all 0, and its loser panel is drawn empty).
+A new kind needs an entry there (`tools/result_param.py port`, the Ultimate pipeline's `result-param` step; one file
+holds every kind, so each package's copy must carry the earlier kinds' entries: results_panels_v1 has all seven).
+
 ## Data files keyed by kind (one entry per kind already)
 
 - `fighter/fighter_param.bin`: 65 entries x 354 values. The first value is the kind; the manager

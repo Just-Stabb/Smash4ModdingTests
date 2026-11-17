@@ -2773,4 +2773,7 @@ also goes on v11's TEST_ONLY diag exe (exe_v46w_vars_line + diag_godfist_cave) u
   (type byte 0x0A: a u32 length and the model name reversed, XOR "Smash" repeated), win1 - win5, mvp_motion,
   mvp_motion_x / _z, team_motion, team_motion_x / _z, mvp_camera_x / _y / _z, team_pos_scale_factor, eyex / eyey / eyez,
   tox / toy / toz (a loser panel's camera). "missing" is all 0: a kind without an entry gets a loser panel with its camera
-  on its target (empty). `tools/result_param.py`; port_check R2.
+  on its target (empty). `tools/result_param.py`; port_check R2. The name is 0x0275DB24's: `lis r0, 0x04BA; slwi
+  r12, r3, 2; addic r0, r0, 0x148; lwzx r3, r12, r0`, the kind-indexed lowercase name table at 0x04BA0148 in the expanded
+  executables (exe_v46x: 0x41 - 0x47 `supamario`, `edge`, `gaogaen`, `pickel`, `brave`, `pzenigame`, `master`), the
+  folder names. Vanilla's win N is 80 - 100 % of the fighter's J02WinN length (24 poses of 8 fighters, median 0.957).

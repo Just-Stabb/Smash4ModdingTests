@@ -20,6 +20,8 @@ list is searched in order:
   opensmash      an OpenSmash-Ultimate (ssbu-recomp) checkout: its shader translator (ult_shader_glsl.py)
   ult_exefs      Ultimate 13.0.4's exefs main.bin (decompressed NSO, flat image): eft2_resolve.py runs its code
   s4_rpx         Smash 4's cross_f.rpx (1.1.7): eft_static.py runs eft's uniform-block builder from it
+  result_param   the newest shipped param/ui/result_param.bin (every added kind's loser-panel entry): the pipeline's
+                 result-param step builds on it (else user_param's ui/result_param.bin, else vanilla's)
 """
 import json
 import os

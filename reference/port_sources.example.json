@@ -28,6 +28,7 @@
   "/path/to/camera-SSBU (the folder holding camera/fighter/<name>/cNN/j02win1-3.nuanmb)"
  ],
  "camera_template": "/path/to/vanilla/fighter/kamui/camera/final/2/camera_motion.vbn",
+ "result_param": "/path/to/the newest shipped param/ui/result_param.bin (results_panels_v1 or later)",
  "vbn": [
   "/path/to/vbnscan/fighter"
  ],

@@ -65,3 +65,11 @@ Squirtle was invisible in the magnifier without them). Every Ultimate costume of
 - Vanilla Bowser has no low models (34 vanilla fighters have l00-l07, Bowser, Mario, Kirby ... none), so how the game
   picks lNN for a kind isn't by the base alone (Mario-based Squirtle / Supamario were invisible without them): with
   lNN present he shows either way.
+
+## Results panels v1 (`$S/results_panels_v1.zip`, every added fighter; over Byleth v17)
+
+His loser panel on the results screen was empty: `param/ui/result_param.bin` frames each fighter's loser panel by model name (`gaogaen`, the kind's folder name: the executable's kind-indexed name table) and had no entry for him, so the scene used "missing" (all 0: the camera on its target). Now an entry, from Bowser's (the base):
+- framing (APPROXIMATED, no Ultimate equivalent of the file): Bowser's eye (1, 10.5, 18) / to (-2, 13.5, 0) x 1.016 = eye (1.016, 10.67, 18.291), to (-2.032, 13.718, 0) (MVP / team offsets too; team_pos_scale_factor Bowser's 1.25): his head in j02lose (15.74) over Bowser's hunched J02Lose head (15.49; Bowser's bind-pose head is 21.46). His head sits upright, 20 % farther from the camera than Bowser's forward-leaning one: he may look smaller in his panel;
+- win1 - 3 (APPROXIMATED: what the scene does at that frame isn't known, vanilla's are 80 - 100 % of each motion): 122 / 108 / 125: Bowser's 132 / 100 / 145 x his j02win1-3 (130 / 131 / 130) over Bowser's (141 / 121 / 151);
+- his win cameras, which no package had: Ultimate's `camera/fighter/gaogaen/c00/j02win1-3` (camera-SSBU) converted to `motion/camera/result/gaogaen/1-3/camera_motion.omo` + `.vbn` (`ultimate_camera.py convert-dir`), where the result scene loads the winner's camera; the field of view isn't in the motion (the scene's own is used) and the format is Byleth v3's, not yet confirmed in game.
+Built with `tools/result_param.py port` on Byleth v17's file (it keeps every vanilla entry and Byleth's byte for byte); every added kind's entry is in the one file. `port_check` R1 / R2: 0 errors over it. Not yet seen in game.

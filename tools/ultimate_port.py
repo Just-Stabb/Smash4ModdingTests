@@ -33,6 +33,9 @@ Rules built in (each one a bug a port shipped with):
 - stock icons from Ultimate's stock icon art (--stock-icon), not the select render shrunk (Squirtle);
 - the translator maps Ultimate-only angles (367 / 368 -> 366) and catch-only throw hitboxes
   (NoGrabRelease) itself (tools/ultimate_acmd.py);
+- the results screen: the win cameras (`camera`: Ultimate's j02win1-3 at motion/camera/result/NAME/N) and the loser
+  panel's entry in param/ui/result_param.bin (`result-param`): without them the scene plays its default camera and draws
+  an empty loser panel (Byleth v1 - v16; every earlier port until results_panels_v1);
 - port_check.py runs on the finished package: a port isn't sent with an ERROR.
 """
 import argparse
@@ -293,6 +296,28 @@ def plan(name, out):
     # motion/camera/result/<name>/<n>/; tools/ultimate_camera.py); port_check R1
     steps.append(('camera', 'the win cameras (Ultimate\'s j02win1-3 -> motion/camera/result/NAME/1-3/camera_motion.omo / .vbn)',
                   [py, t('ultimate_camera.py'), 'convert', name, '--out', out]))
+    # the loser panels' framing: param/ui/result_param.bin keys each fighter's results-screen camera (eye / to) and win
+    # frames by model name; a kind with no entry gets "missing" (all 0) and its loser panel is drawn empty (Byleth v1 -
+    # v16, every new kind until results_panels_v1). The base's entry scaled by the head's height in the lose motions,
+    # the win frames by the win motions' lengths (tools/result_param.py port); built on the newest shipped file
+    # (port_sources "result_param": the file replaces the whole table, so it must hold every earlier port's entry);
+    # port_check R2
+    rp_in = (src.get('result_param') or src.find('user_param', 'ui/result_param.bin')
+             or os.path.join(src.get('vanilla', '?VANILLA'), 'param/ui/result_param.bin'))
+    base_vbn = os.path.join(base_dir, 'model/body/c00/model.vbn')
+    if not os.path.exists(base_vbn):
+        base_vbn = src.find('vbn', '%s/model/body/c00/model.vbn' % base) or os.path.join(
+            src.get('vanilla', '?VANILLA'), 'fighter', base, 'model/body/c00/model.vbn')
+    base_res = os.path.join(base_dir, 'motion/bodyresult/main.pac')
+    if not os.path.exists(base_res):
+        base_res = os.path.join(src.get('vanilla', '?VANILLA'), 'fighter', base, 'motion/bodyresult/main.pac')
+    steps.append(('result-param', 'the loser panel\'s framing and win frames (param/ui/result_param.bin: the base\'s '
+                  'entry scaled to him)',
+                  [py, t('result_param.py'), 'port', rp_in, os.path.join(pkg, 'param/ui/result_param.bin'), name,
+                   '--like', base, '--base-skel', base_vbn, '--skel', os.path.join(U, 'model/body/c00/model.nusktb'),
+                   '--wins', os.path.join(U, 'motion/body/c00'),
+                   '--lose', os.path.join(U, 'motion/body/c00/j02lose.nuanmb'), '--replace']
+                  + (['--base-result', base_res] if os.path.exists(base_res) else [])))
     eff = src.eff(ult) or '?EFF/ef_%s.eff' % ult
     e = cfg.get('effects', {})
     ids = os.path.join(ROOT, 'fighters', name, '%s_effects.json' % name)

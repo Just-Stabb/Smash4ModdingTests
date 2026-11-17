@@ -125,3 +125,11 @@ and the executable (`tools/sound_alias_cave.py` v2) gives his banks those ids as
 (soundlabeltable, scripts, MSC, sequences: the same).
 - **Banks:** Pit's vanilla banks under his names (unchanged copies: tools/add_fighter.py) with his ids: se 46096,
   vc 46097, cheer 46098; aliases Pit's 2027 / 6022 / 6101. Check: Steve vs Pit.
+
+## Results panels v1 (`$S/results_panels_v1.zip`, every added fighter; over Byleth v17)
+
+His loser panel on the results screen was empty: `param/ui/result_param.bin` frames each fighter's loser panel by model name (`pickel`, the kind's folder name: the executable's kind-indexed name table) and had no entry for him, so the scene used "missing" (all 0: the camera on its target). Now an entry, from Pit's (the base):
+- framing (APPROXIMATED, no Ultimate equivalent of the file): Pit's eye (2, 12.25, 9.5) / to (-1, 14.75, 0) x 0.779 = eye (1.558, 9.543, 7.401), to (-0.779, 11.491, 0) (MVP camera (0, 1.558, 4.674); team_pos_scale_factor Pit's 1.25): the head joints' bind-pose heights (12.00 Ultimate's / Pit's 15.40); Pit's result motions aren't at hand, so not his lose pose;
+- win1 - 3 (APPROXIMATED: what the scene does at that frame isn't known, vanilla's are 80 - 100 % of each motion): 172 / 124 / 191: his j02win1-3 (Ultimate's; his installed bodyresult isn't at hand here, the motions step converts them frame for frame as it did Hero's / Sephiroth's / Incineroar's: 180 / 130 / 200) x 0.957, the vanilla median of win N over J02WinN (Pit's own lengths not at hand);
+- his win cameras, which no package had: Ultimate's `camera/fighter/pickel/c00/j02win1-3` (camera-SSBU) converted to `motion/camera/result/pickel/1-3/camera_motion.omo` + `.vbn` (`ultimate_camera.py convert-dir`), where the result scene loads the winner's camera; the field of view isn't in the motion (the scene's own is used) and the format is Byleth v3's, not yet confirmed in game.
+Built with `tools/result_param.py port` on Byleth v17's file (it keeps every vanilla entry and Byleth's byte for byte); every added kind's entry is in the one file. `port_check` R1 / R2: 0 errors over it. Not yet seen in game.

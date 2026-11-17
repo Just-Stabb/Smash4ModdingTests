@@ -3167,3 +3167,10 @@ External_Graphic's flag 0 giving the world-depth offset on a following effect (r
 it is a bone-space offset there, the glow sits 4.64 along LHandN's Z instead); the armor lift landing before the
 collision for every victim (a victim whose own MSC sets its armor every frame after his would keep it); the reset
 events' timing in a match (each hook was run in unicorn with the game's code around it, not a match).
+
+## Results panels v1 (`$S/results_panels_v1.zip`, every added fighter; over Byleth v17)
+
+His loser panel on the results screen was empty: `param/ui/result_param.bin` frames each fighter's loser panel by model name (`supamario`, the kind's folder name: the executable's kind-indexed name table) and had no entry for him, so the scene used "missing" (all 0: the camera on its target). Now an entry, from Mario's (the base):
+- framing (APPROXIMATED, no Ultimate equivalent of the file): Mario's entry byte for byte (eye (3, 9, 11), to (0, 11, 0), win 130 / 145 / 108, MVP / team Mario's): his model (HeadN 10.24) and result motions (151 / 181 / 131, lose 109; the Nov 14 upload) are Mario's;
+- no win cameras: not an Ultimate port (port_check R1 skips it: `NON_ULTIMATE`).
+Built with `tools/result_param.py port` on Byleth v17's file (it keeps every vanilla entry and Byleth's byte for byte); every added kind's entry is in the one file. `port_check` R1 / R2: 0 errors over it. Not yet seen in game.
