@@ -17,22 +17,23 @@ the top-right corner for 120 frames: the screen blown out to white. The command'
 (its additive parts black, its alpha parts a dark swirl) and the ice smoke at Size 1 / Z 30 a whole screen of faint
 white smoke.
 
-v2's test (user, Dr. Mario): up "a massive white flash during the freeze", side "stars relative to Dr. Mario
-instead of the top right corner", down "seems to work". The clip: the white is Stage_Freeze's (frames 20-139 exactly its
-120 frames, cut in one frame; the black quad, killed then, faded out as a small dark blob over frames 140-144), the
-stars world-fixed far from the camera. v3 splits every case (camera_effects v3, both facings marked):
-  AppealHiR  game: Stage_Freeze(1, 120)   the new default (the update stopped, the stage not told): no white expected
-  AppealHiL  game: Stage_Freeze(2, 120)   the game's full stop (v2's): the white expected
-  AppealLwL  game: Stage_Freeze(3, 120)   the Final Smashes' stop (full stop + their effect class hidden / paused)
-  AppealSR   effect: the dizzy stars 0x100002C, Mode 1 X 1.4 Y 0.7 Z 20 Size 0.08, Frames 90 (top-right corner)
-  AppealSL   effect: the black quad DARK_QUAD (CamFxDarkQuad, alpha-blended, one 2-unit particle), Mode 1 Size 2,
-             black 60 %, Frames 120, unslowed (the whole screen darker)
-  AppealLwR  effect: the ice smoke 0x100003F, Mode 0 Z 30 Size 0.25 (a quarter of the screen, centred, fades by itself)
-No effect taunt has a Stage_Freeze; no freeze taunt an effect.
+v4 (camera_effects v4; v3's test: Stage_Freeze(1) has no flash, modes 2 / 3 flash; the square and the smoke centred,
+the stars not in their corner; the "square" a circle that stays in the world when the camera pans):
+  AppealHiR  game: Stage_Freeze(1, 120) alone (the regression check: no flash)
+  AppealHiL  effect: the dizzy stars at the four corners (Mode 1, X +-1.4, Y +-0.7, Size 0.08, 120 frames) and a dark
+             square at the centre (Mode 1, Size 0.3: 0.3 screen heights, black 70 %): placement and camera-follow
+  AppealSR   effect: the stars, top-right only (Mode 1, X 1.4, Y 0.7), 90 frames
+  AppealSL   effect: the black square over the whole screen (Mode 1, Size 2, black 60 %), 120 frames
+  AppealLwR  effect: the ice smoke (Mode 0, Z 30, Size 0.25), a one-shot
+  AppealLwL  effect: the dark square in camera units (Mode 0, X 6, Y 3, Z 40, Size 3: 6 units wide, black 70 %)
+The square (DARK_QUAD, CamFxDarkQuad): one alpha-blended billboard 2 units wide, the common RayGunShotFlash2_Copy1's
+emitter and shader with (v4) a solid white texture, one particle living until the set fades (fade 1/8).
 """
 import os
 import struct
 import sys
+
+import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -46,6 +47,7 @@ QUAD_SET = 'CamFxDarkQuad'
 QUAD_WIDTH = 2.0
 STARS, SMOKE = 0x100002C, 0x100003F
 FREEZE_FRAMES = 120
+CORNERS = ((-1.4, 0.7), (1.4, 0.7), (-1.4, -0.7), (1.4, -0.7))    # Mode 1: half screen heights
 
 
 def cmd(name, **kw):
@@ -64,18 +66,23 @@ def camfx(graphic, x, y, z, size, mode, frames, flags=0):
 
 
 def scripts(quad_id):
-    """v3: each case alone on its own taunt (no Stage_Freeze with any effect); three Stage_Freeze taunts alone"""
+    """v4: the four corners and a centre square on one taunt (placement and camera-follow at a glance), each case alone
+    on its own taunt, one Stage_Freeze(1) (confirmed flash-free by v3's test)"""
     end = cmd('Script_End')
 
-    def freeze(on):
-        return [cmd('FRAME', Frames=2.0), cmd('Stage_Freeze', On=on, Frames=FREEZE_FRAMES), end]
+    def dark(x, y, z, size, mode, alpha, frames=120):
+        return [camfx(quad_id, x, y, z, size, mode, frames, 1), cmd('LAST_EFFECT_SET_COLOR', Red=0.0, Green=0.0, Blue=0.0),
+                cmd('LAST_EFFECT_SET_ALPHA', Alpha=float(alpha))]
+    freeze = [cmd('FRAME', Frames=2.0), cmd('Stage_Freeze', On=1, Frames=FREEZE_FRAMES), end]
+    corners = [cmd('FRAME', Frames=2.0)] + [camfx(STARS, x, y, 20.0, 0.08, 1, 120) for x, y in CORNERS] + \
+        dark(0.0, 0.0, 20.0, 0.3, 1, 70) + [end]
     stars = [cmd('FRAME', Frames=2.0), camfx(STARS, 1.4, 0.7, 20.0, 0.08, 1, 90), end]
-    quad = [cmd('FRAME', Frames=2.0), camfx(quad_id, 0.0, 0.0, 20.0, 2.0, 1, 120, 1),
-            cmd('LAST_EFFECT_SET_COLOR', Red=0.0, Green=0.0, Blue=0.0), cmd('LAST_EFFECT_SET_ALPHA', Alpha=60.0), end]
+    square = [cmd('FRAME', Frames=2.0)] + dark(0.0, 0.0, 20.0, 2.0, 1, 60) + [end]
     smoke = [cmd('FRAME', Frames=2.0), camfx(SMOKE, 0.0, 0.0, 30.0, 0.25, 0, 0), end]
-    game = {'AppealHiR': freeze(1), 'AppealHiL': freeze(2), 'AppealLwL': freeze(3)}
-    effect = {'AppealSR': stars, 'AppealSL': quad, 'AppealLwR': smoke,      # the freeze taunts: no effect at all
-              'AppealHiR': [end], 'AppealHiL': [end], 'AppealLwL': [end]}
+    mode0 = [cmd('FRAME', Frames=2.0)] + dark(6.0, 3.0, 40.0, 3.0, 0, 70) + [end]
+    game = {'AppealHiR': freeze}
+    effect = {'AppealHiR': [end], 'AppealHiL': corners, 'AppealSR': stars, 'AppealSL': square, 'AppealLwR': smoke,
+              'AppealLwL': mode0}
     return game, effect
 
 
@@ -118,6 +125,9 @@ def dark_quad(bank, common):
     sf(em, 'color0_keys', [1.0] * 32)
     sf(em, 'color_scale', 1.0)
     sf(em, 'camera_offset', 0.0)
+    # v4: a solid white texture (v3's test: "the black square is actually a circle": the flash's round texture is
+    # what its shader takes the shape / alpha from): the quad is a square, opaque but for the call's alpha
+    bank.set_texture(em, 0, np.full((8, 8, 4), 255, np.uint8))
     struct.pack_into('>I', em, 0x310, 0)                          # follows the set
     bank.set_emitter_srt(em)
     return em

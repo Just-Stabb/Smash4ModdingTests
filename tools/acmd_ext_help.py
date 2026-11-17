@@ -2457,6 +2457,8 @@ HELP['Stage_Freeze'] = [
     'freeze (the user\'s Dr. Mario test: 120 frames of white, cut off at the freeze\'s end; Supamario\'s Time Skip '
     'too). On 1 now only skips the stage\'s update; the old stop is On 2 (Example 5), the Final Smash stop On 3.',
     '- Scripts with On 1 keep working and lose the flash; to keep it, write On 2.',
+    '- Confirmed in game (camera_effects v3\'s test, Dr. Mario in training): On 1 freezes with no flash; On 2 and On 3 '
+    'flash, as the Final Smash stop does.',
     '',
     '## What changed in exe_v46u_threads (training, Frames, resets)',
     '- Before exe_v46u_threads the Frames countdown and the clean-up only ran on one of the game\'s battle screens, '
@@ -2466,7 +2468,7 @@ HELP['Stage_Freeze'] = [
     '',
     NOT_VIEWER,
     'Needs exe_v46n (the patched cross_f.rpx, tools/acmd_ext_cave.py); training, Frames and resets: exe_v46u_threads '
-    '(tools/ts_tick_cave.py); On 1 without the flash, On 2 / 3: exe_v46z_camfx3 (tools/camera_effect_cave.py).',
+    '(tools/ts_tick_cave.py); On 1 without the flash, On 2 / 3: exe_v46z_camfx3 or later (tools/camera_effect_cave.py).',
 ]
 EXAMPLES['Time_Scale'] = [
     '// Example 1: everything at double speed for 2 seconds (120 screen frames)',
@@ -2930,9 +2932,12 @@ HELP['Effect_Camera'] = [
     'during a still camera (a time stop) look right; for an overlay that has to stay put while the camera moves, use '
     'emitters with follow type 0 (tools/ptcl.py sets 0x310).',
     '- Billboard particles (type 0) face the camera anyway; plates and meshes face it through the effect\'s turn above.',
+    '- Shape: a darkening overlay needs a square texture. A flash or glow texture (round) makes a disc, however the quad '
+    'is placed: camera_effects v3\'s test square (the common RayGunShotFlash2_Copy1, black) drew as a circle; v4\'s '
+    'has a solid white texture (tools/ptcl.py set_texture).',
     '- Size: the effect\'s own size in its bank is what Size scales: measure it (Sm4shCommand\'s Hitbox Viewer, or try '
-    'Size 1 and look) before working out a full-screen Size. FOV: the battle camera\'s is about 41 degrees (0.716 rad) '
-    'at rest and changes as it zooms; Mode 1 follows it, Mode 0 doesn\'t.',
+    'Size 1 and look) before working out a full-screen Size. FOV: the battle camera\'s was 30 degrees (0.524 rad) '
+    'in v3\'s log (training; the default camera\'s is 41) and changes as it zooms; Mode 1 follows it, Mode 0 doesn\'t.',
     '- Several cameras: it follows the camera of the TV image (the effect camera table\'s first entry, the one the battle '
     'is drawn with). A second view (the GamePad\'s, Cemu\'s second window when it shows the battle from elsewhere) '
     'draws the same effect at the same place in the world: it can be off screen or out of place there.',
@@ -2951,13 +2956,22 @@ HELP['Effect_Camera'] = [
     '- The battle camera\'s near and far clips are fitted to the stage every frame (0x02D27D74): the near clip can be '
     'well past 3. A Z closer than the near clip is drawn at the near clip + 1 (Mode 1 keeps its place and size on the '
     'screen; in Mode 0 / 2 it then looks smaller).',
-    '- Stage_Freeze(1) no longer whites the screen out (its own v3 change): a time stop with a darkening overlay now '
-    'shows the overlay (Example 1).',
+    '- Stage_Freeze(1) no longer whites the screen out (its own v3 change, confirmed in game): a time stop with a '
+    'darkening overlay now shows the overlay (Example 1).',
+    '',
+    '## What changed in camera_effects v4 (exe_v46z_camfx4): the particles follow the camera',
+    '- v1-v3\'s particles never followed the camera: they stayed where the effect started, in the world (a centred '
+    'effect looked right until the camera moved; the corner stars were never in their corner). The game gives an '
+    'effect\'s particle emitter set a new matrix only when its own update rebuilt or turned it that frame '
+    '(0x0334EEB0), and the flag that keeps the camera matrix skips that rebuild. v3 re-gave the matrix to the '
+    'effect\'s model (+0x20), which particle effects don\'t have. v4 gives it to the particle emitter sets themselves '
+    '(eft\'s own setter) before and after the game\'s update, every frame.',
+    '- Nothing to change in scripts.',
     '',
     'The Hitbox Viewer draws it in front of its own view (it has no game camera: X / Y from the view\'s centre, Mode 1 in '
     'half the view\'s height; Z changes nothing in that flat view) and lists it with the effects; Frames ends it there '
     'too.',
-    'Needs exe_v46z_camfx (tools/camera_effect_cave.py; exe_v46y_hold + it; v3: exe_v46z_camfx3). Without it a script '
+    'Needs exe_v46z_camfx (tools/camera_effect_cave.py; exe_v46y_hold + it; v4: exe_v46z_camfx4). Without it a script '
     'that uses this command won\'t load properly: ship the executable with any script that uses it.',
 ]
 EXAMPLES['Effect_Camera'] = [
@@ -2994,9 +3008,9 @@ EXAMPLES['Effect_Camera'] = [
     '// down however the camera tilts), 40 units ahead and 10 above the view\'s centre, for 2 seconds',
     'Effect_Camera(Graphic=0x3410015, X=0, Y=10, Z=40, XRot=0, YRot=0, ZRot=0, Size=1, Mode=2, Frames=120, Flags=0)',
     '',
-    '// Example 6 (v3): what v2 got wrong in game: a time stop whose darkening stays over the whole screen while the',
-    '// camera pans to a moving opponent, with no white flash (Stage_Freeze 1 is the flash-free freeze since v3; v2\'s',
-    '// effects stayed where they started in the world)',
+    '// Example 6 (v3 / v4): what v1-v3 got wrong in game: a time stop whose darkening (a square effect: a round flash',
+    '// texture makes a disc) stays over the whole screen while the camera pans to a moving opponent, with no white',
+    '// flash (Stage_Freeze 1 is the flash-free freeze since v3; the particles follow the camera since v4)',
     'Stage_Freeze(On=1, Frames=120)',
     'Effect_Camera(Graphic=0x3410012, X=0, Y=0, Z=20, XRot=0, YRot=0, ZRot=0, Size=1.9, Mode=1, Frames=120, Flags=1)',
     'LAST_EFFECT_SET_COLOR(Red=0, Green=0, Blue=0)',

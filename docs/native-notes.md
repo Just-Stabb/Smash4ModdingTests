@@ -2941,10 +2941,32 @@ were run in unicorn for the parts the test needs (the instance update up to its 
 - **The diag build** (`camera_effect_cave.py --diag`, TEST ONLY, exe_v46z_camfx3_diag): OSReport lines, an effect's
   first 30 calc passes then every 30th: `S4CC n cur nxt src cam mgrblk tan` (the effect camera table's current / next
   source, the block read, whether a camera was found, the camera manager's block, tan(fov / 2) as hex float), `S4CV
-  eye tgt` and `S4CN fov near far up` (that block), `S4CF n h i fl key fo b` (handle, instance, `+0x144`, the owner key
-  `+8`, follow target `+0x34`, bytes `+0x199` `+0x19E` `+0x1A1` `+0x1A3`), `S4CM t x` (its `+0x50`: translation, X axis)
-  and `S4CE set t x` (the emitter set's `+0x350`: what eft holds after cf_upd), `S4SF n on mode mgr d0` (each
+  eye tgt` and `S4CN fov near far up` (that block); (v4) `S4CS id h i why x y z` at every Effect_Camera (the handle and
+  instance, 0 when not reached; why = started 0 / not 1 << 8 | Mode), and per camera effect (its first 30 calc passes,
+  then every 30th) `S4CF k h i fl set fo b` (passes, handle, instance, `+0x144`, its emitter set `+0x12C`, follow
+  target `+0x34`, bytes `+0x199` `+0x19A` `+0x19E` `+0x1A3`), `S4CM t x` (its `+0x50`: translation, X axis) and `S4CE
+  em t x` (the emitter set's emitter count `+0x1DC` and its own matrix `+0x1E4`); `S4SF n on mode mgr d0` (each
   Stage_Freeze stop / resume). Floats are printed as their hex words.
+
+**camera_effects v4 (exe_v46z_camfx4): why the particles never followed (v3's log a5622166 and clips f0b4803a /
+4b5545bf).** v3's diag printed the camera every frame (eye about (9.5, 26, 97), target (19, 14, 0), FOV 0.524, near 2,
+the table's source = the camera manager's block) and no per-effect line: cf_upd's work depended on `0x032FF640(inst +
+0x20)`, and `inst + 0x20` is the effect's **model** handle (the instance init `0x0334DD64`-`0x0334DDEC`: only when the
+efc entry has a model, `0x033050BC` instantiates it; `0x032FF744` sets the model's matrix). The particles are eft's
+emitter set `inst + 0x12C` (created by `0x04A55BF0` with a copy of `+0x50`: eft keeps its own, `set + 0x1E4` SRT,
+`+0x214` RT, `+0x248` scales, written by `SetMtx` `0x04A4AFB8`). The instance update calls that `SetMtx` only at
+`0x0334EEB0`, and only when r26 is set: by the rebuild from position / turn / scale (`0x0334E284`, which flag `0x8000`
+skips: `0x0334E264`), the billboard paths (`0x0334E734` / `0x0334E760`) or the `+0x150` move (`0x0334EA10`). So every
+camera effect since v1 drew its particles with the matrix it was created with (the request's place, turn 0), in the
+world: the smoke and the square started at the screen's centre looked right, the stars were never in their corner,
+and v3's clips show the square (a disc: the RayGunShotFlash2 texture is round) staying in the world as the camera
+pans. Extra emitter sets: `+0x158` {set, id} x `+0x170` (three at most), the same check (`0x0334EF6C`). v4's cf_upd
+(`tools/camera_effect_cave.py`) calls `SetMtx(set, inst + 0x50)` on each live set before the game's update and after
+it (cf_eftset; the game's own gate words are asserted), then the model's `0x032FF744` if there is one; cf_dlog prints
+for every tracked effect (its own frame count in the entry, `+0x50`; entries now `0x60`), S4CS at every
+Effect_Camera. `tools/camera_effect_test.py` (82 checks) runs the game's own update to the gate (r26 1 without
+`0x8000`, 0 with it: the cause, in the game's code) and cf_upd against a stubbed update and eft setter (both sets before
+and after, dead / emitterless sets skipped, others untouched).
 
 **Not confirmed in game:** that the TV's entry 0 is the camera every battle view draws with (Final Smash cameras register
 their own sources? they would be read the same way, through the current source); the vertical FOV's use by the renderer

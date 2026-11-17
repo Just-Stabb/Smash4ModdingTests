@@ -515,6 +515,8 @@ has the addresses.
   does nothing but clear `+0xD0`); On 2 is the full stop; On 3 the full stop plus the Final Smashes' two effect calls
   (undone on resume). Which part of the full stop whites the screen out (the stage's objects paused / hidden, or
   something the stage does in vt `+0x214`) is what the v3 test's three freeze taunts tell apart.
+  **Confirmed in game (v3's test, log a5622166):** On 1 freezes with no flash, On 2 and On 3 flash; the S4SF lines show
+  each stop and resume (`+0xD0` 1 then 0) for all three modes.
 - **Stage stop** (`Stage_Freeze`). The stage manager `[0x102F7020]` skips the stage's update (vtable `+0x2C` /
   `+0x4C`, and `+0x34` in its second half `0x03164EA4`) while its byte `+0xD0` is set. `0x0316505C(manager, on)`
   sets it, and tells the stage (`0x031427D0`). The game's own callers are some Final Smashes' code (`0x02772694`,
@@ -1370,6 +1372,19 @@ Effect_Camera(Graphic=0x3410013, X=0, Y=0, Z=25, XRot=0, YRot=0, ZRot=15, Size=1
   (S4CC / S4CV / S4CN), the instance (S4CF: handle, flags, key, follow target, its bytes), its matrix (S4CM) and eft's
   emitter set's (S4CE: `+0x350`): docs/native-notes.md "Camera effects". Parameters unchanged; example 6 is the case
   v2 got wrong (a time stop's darkening staying on the screen while the camera pans).
+- **camera_effects v4 (exe_v46z_camfx4, Sm4shCommand v1.7.9): the real cause.** v3's diag log had camera lines
+  only, not one per-effect line: v3's re-give went to `inst + 0x20`, the effect's *model* (efc entries with a model:
+  `0x0334DDA4`), which particle-only effects don't have (`0x032FF640` false). The particles' emitter set
+  (`inst + 0x12C`) gets a matrix from the game only through `0x0334EEB0`: `cmpwi r26, 0` -> eft's `SetMtx`
+  `0x04A4AFB8`, and r26 is set only when the update rebuilt the matrix from position / turn / scale (`0x0334E284`),
+  turned it (billboard flags) or moved it (`+0x150`); the cave's flag `0x8000` skips the rebuild, so from v1 on the
+  particles kept the matrix they were created with (the request's place, turn 0): fixed in the world, the centred
+  ones looking right until the camera moved (v3's clips: the "square", a circle as its flash texture is round, stays
+  in the world while the camera pans). v4: cf_upd gives `inst + 0x50` to the emitter set (`+0x12C`, alive: `+0x19A`,
+  `+0x1D0` = `+0x130`, `+0x1DC` > 0) and its extra sets (`+0x158`, three at most) with eft's `SetMtx` before the game's
+  update (the frame's emission) and after it, then to the model if there is one. The diag prints every Effect_Camera
+  (S4CS: id, handle, instance, started or not, X / Y / Z) and each camera effect's first 30 frames then every 30th
+  (S4CF / S4CM / S4CE: the emitter set's own matrix, `+0x1E4`), whatever its model.
 - Sm4shCommand (New Commands / Effects) has six complete examples (the time-stop darkening, the glass-shatter burst, a
 charge vignette, the common dizzy stars pinned to a corner (v1.7.7: was 0x1000042, the thunder), Mode 2 falling particles) and the full help. The Hitbox Viewer
 draws it in front of its own view (X / Y from the view's centre, Mode 1 in half the view's height; it has no game camera,

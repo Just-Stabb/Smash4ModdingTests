@@ -432,6 +432,7 @@ kill:
     dbg = [r32(pm, lab['cf_dbg'] + 4 * i) for i in range(6)]
     check('debug counters: commands run, started, matrices set, ended by Frames, ended, refused',
           (dbg[0] > 20, dbg[1] > 20, dbg[2] > 5, dbg[3], dbg[4], dbg[5]), (True, True, True, 1, 2, 4))
+    gate_tests(pm, pool)
     v3_tests(pm, lab, pool, camfx, camera, ref, inst_matrix, calc, entry_of)
     diag_tests(exe, orig)
     sys.exit(1 if acmd_ext_test.fails else 0)
@@ -533,6 +534,44 @@ fxrec:
 def stop_log(mu):
     n = r32(mu, XREC)
     return [tuple(r32(mu, XREC + 0x14 * (i + 1) + 4 * k) for k in range(5)) for i in range(n)]
+
+
+def gate_tests(pm, pool):
+    """(v4) the pass v1-v3 missed, run in the game's own code: the instance update gives a particle emitter set
+    (+0x12C) a new matrix (eft's SetMtx, at 0x0334EEB0) only when r26 is set, and only its rebuild of +0x50 (skipped
+    with flag 0x8000) sets it for a plain world effect"""
+    inst = pool(80)
+    eset = 0x7F005E00
+    ensure(pm, 0x7F003000, 0x7F006000)
+
+    def r26_at_gate(flags):
+        pm.mem_write(inst, b'\0' * CF.INST)
+        pm.mem_write(eset, b'\0' * 0x200)
+        w32(pm, inst, 0x50000042)
+        wf(pm, inst + 0xB0, [1, 1, 1])
+        wf(pm, inst + 0x138, [1, 1, 0])
+        w32(pm, inst + 0x144, flags)
+        pm.mem_write(inst + 0x19A, b'\1')
+        w32(pm, inst + 0x12C, eset)
+        w32(pm, inst + 0x130, 0x1234)
+        w32(pm, eset + 0x1D0, 0x1234)
+        w32(pm, eset + 0x1DC, 1)
+        wf(pm, 0x10439078, [1])
+        pm.reg_write(UC_PPC_REG_LR, RET)
+        pm.reg_write(UC_PPC_REG_1, 0x7F00F000)
+        pm.reg_write(UC_PPC_REG_3, inst)
+        pm.reg_write(REG(26), 0x5555)
+        try:
+            pm.emu_start(CF.UPDATE, 0x0334EEB0, count=400000)
+        except UcError as ex:
+            return 'error %s at 0x%08X' % (ex, pm.reg_read(UC_PPC_REG_PC))
+        return pm.reg_read(REG(26)), pm.reg_read(UC_PPC_REG_PC)
+    check('(v4) the game\'s update of a world effect without flag 0x8000: at its emitter-set gate (0x0334EEB0) r26 = 1 '
+          '(eft\'s SetMtx runs)', r26_at_gate(0), (1, 0x0334EEB0))
+    check('(v4) ... with the cave\'s flag 0x8000: r26 = 0, the emitter set never gets a new matrix (v1-v3\'s particles '
+          'stayed where they started)', r26_at_gate(0x8000), (0, 0x0334EEB0))
+    check('(v4) the gate is the game\'s: cmpwi r26, 0 / beq / bl 0x04A4AFB8 (eft\'s SetMtx)',
+          [r32(pm, a) for a in (0x0334EEB0, 0x0334EEB4, 0x0334EEC0)], [0x2C1A0000, 0x41820010, 0x496FC0F9])
 
 
 def v3_tests(pm, lab, pool, camfx, camera, ref, inst_matrix, calc, entry_of):
@@ -717,7 +756,8 @@ def diag_tests(exe, orig):
     w32(mu, inst, 0x05000123)
     mu.mem_write(inst + 0x199, b'\1')
     eft = 0x7F001800
-    w32(mu, inst + 0x28, eft)
+    w32(mu, inst + 0x12C, eft)
+    w32(mu, eft + 0x1DC, 3)
     w32(mu, lab['cf_dbg'] + 4, 1)
     mu.reg_write(UC_PPC_REG_1, 0x7F00F000)
     mu.reg_write(UC_PPC_REG_LR, 0x0123ABC0)
@@ -736,7 +776,7 @@ def diag_tests(exe, orig):
     got = [struct.unpack('>f', struct.pack('>I', v))[0] for v in em[1:7]]
     check('diag: S4CM has the instance\'s matrix (translation, X axis)',
           close(got, [want[0][3], want[1][3], want[2][3], want[0][0], want[1][0], want[2][0]]), True)
-    check('diag: S4CE reads eft\'s emitter set ([inst + 0x28])', lines[5][1], eft)
+    check('diag: S4CE reads eft\'s emitter set ([inst + 0x12C]: its emitter count +0x1DC)', lines[5][1], 3)
     cc = lines[0]
     check('diag: S4CC has the table\'s current source, the source read and the camera manager\'s block',
           (cc[2], cc[4], cc[5]), (0, SRC, 1))

@@ -58,6 +58,13 @@ Hooks (each word asserted):
   CALC    0x032EFD04  stwu r1, -0x28(r1)   the effect manager's calc pass (instance matrices -> eft, then eft's calc)
                                            -> cf_calc: every tracked effect's matrix from the camera, then the pass
   LOOKUP / SIZE1 / SIZE2 / FETCH: as tools/hitbox_hold_cave.py (chained in front of the earlier caves' fallbacks).
+  UPDATE  0x032EFD7C  bl 0x0334E0C8        (v3 / v4) -> cf_upd: a camera effect's particle emitter sets get its matrix
+                                           from eft's SetMtx before and after the game's update (the game gives them one
+                                           only when its update rebuilt it, which flag 0x8000 skips: v1-v3's particles
+                                           stayed where they started), its model too
+  SFZ     0x04BD4334 / 0x04BD4268          (v3) Stage_Freeze's stop / resume: On 1 the update only (no white
+                                           screen, confirmed in game), 2 the game's full stop, 3 the Final Smash stop
+  --diag: TEST ONLY OSReport lines (S4CS / S4CF / S4CM / S4CE per effect, S4CC / S4CV / S4CN the camera, S4SF).
 Space: 0x04BE0000-0x04BE2000 (docs/native-notes.md "Camera effects": past var_reset's region, the text region grown).
 Test: tools/camera_effect_test.py (unicorn).
 """
