@@ -27,7 +27,6 @@ The model of the game (its assumptions):
 """
 import math
 import os
-import struct
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -85,12 +84,15 @@ class Game(SHT.Game):
         self.holds = []              # (n, slot offset x) the hold's writes
         self.removed = []            # n of AttackModule 0x2719
         self.statuses = []
+        self.vlim = MAX_FALL         # energy 1's limit (KineticModule 0x14)
+        self.vlims = []
+        self.vel = []                # (n, vx, vy) each frame he moves
 
     def fvar(self, v):
         if v == 0x0F000043:
             return 1.0 if self.hitstop > 0 else 0.0
         if v == 0x0F0000A2:
-            return float(B.ST_SIDE) if self.status is None else 0.0
+            return float(B.ST_SIDE) if self.status is None else float(self.status if self.status != 'cut' else 0)
         return SHT.Game.fvar(self, v)
 
     def setvar(self, v, val):
@@ -115,10 +117,25 @@ class Game(SHT.Game):
             if v == 0x0F0000A6 + 8 * t_:
                 f_.ground.append((self.n, val))
                 return
+            if v == 0x0F0000A7 + 8 * t_ and val >= 1000.0:     # a held shieldstun (cb_shield_tick / ts_shield)
+                f_.shieldstun = int(val - 1000.0)
+                f_.__dict__.setdefault('pushes', []).append((self.n, int(val - 1000.0)))
+                return
         SHT.Game.setvar(self, v, val)
 
     def sys(self, sid, a):
         f = R.i2f
+        if sid == 0xA:                                  # MathF (sqrt)
+            if a[0] == 0:
+                return R.f2i(math.sqrt(max(0.0, f(a[1]))))
+            return 0
+        if sid == 0x10 and a and a[0] == 0x14 and a[1] == 1:
+            self.vlim = f(a[2])
+            self.vlims.append((self.n, round(self.vlim, 4)))
+            return 0
+        if sid == 0x18 and a and a[0] == 0x2:           # the situation set (func_20)
+            self.air = a[1] == 2
+            return 0
         if sid == 0x10 and a and a[0] == 0x11 and a[1] == 3:
             self.vx = f(a[2])
             return 0
@@ -180,13 +197,22 @@ class Game(SHT.Game):
             if getattr(v, 'body', 0) >= 2:
                 continue
             v.rec = self.box
-            if v.status == 0x1C:
+            unblock = self.box == 'strike' and self.vars.get(B.V_CHG, 0.0) > B.FULL
+            if v.status in (0x1C, 0x1E) and not unblock:
                 self.hitflag |= 4
-                continue
+                self.hit = v
+                stop = B.CATCH_FREEZE if self.box == 'catch' else B.STRIKE_FREEZE
+                v.hitstop, self.hitstop = stop, stop
+                v.shield_hits = getattr(v, 'shield_hits', []) + [(self.n, self.box)]
+                if self.box == 'strike':
+                    v.status = 0x1E
+                return
             self.hit = v
             self.hitflag |= 2
             v.hit_at = self.n
             hit, stop = (B.CATCH, B.CATCH_FREEZE) if self.box == 'catch' else (B.STRIKE_HIT, B.STRIKE_FREEZE)
+            if self.box == 'strike' and unblock and self.vars.get(B.V_SHV, 0.0) > 0.5:
+                hit = dict(hit, Damage=hit['Damage'] + B.SH_BONUS)
             if getattr(v, 'body', 0) == 1 or getattr(v, 'counter', False):
                 self.hitstop = stop
                 return
@@ -204,6 +230,7 @@ class Game(SHT.Game):
                 v.vx, v.vy = kb * 0.03 * math.cos(a) * self.face, kb * 0.03 * math.sin(a)
                 v.pending = 0x47
                 v.air = True
+                v.launch = kb
             return
 
     def physics(self):
@@ -213,11 +240,15 @@ class Game(SHT.Game):
         self.x += self.vx
         if self.air:
             self.vy += self.acc
-            if self.acc != 0.0 and self.vy < -MAX_FALL:
-                self.vy = -MAX_FALL
+            if self.vy < -self.vlim:
+                self.vy = -self.vlim
             self.y += self.vy
+            self.vel.append((self.n, self.vx, self.vy))
             if self.floor is not None and self.y <= self.floor:
                 self.y, self.air, self.vy = self.floor, False, 0.0
+                self.event('me', 2)                     # the landing's variable reset
+        else:
+            self.vel.append((self.n, self.vx, 0.0))
         self.frame += self.rate
         self.clock += self.rate
         if self.kind in LEN and self.frame > LEN[self.kind] - 1:
@@ -240,11 +271,14 @@ def run(path, g, frames=260, cut_at=None, after=0, tick=None):
             if tick:
                 tick(g, k)
             vm.call(fn(vm, 'sh_tick'))
+            vm.call(fn(vm, 'cb_shield_tick'))
             vm.call(fn(vm, 'ts_tick'))
             for v in g.fighters.values():
                 v.step(k)
             g.physics()
             continue
+        if g.status is None and k > 0 and vm.g[18] == 2 and not g.air:
+            pass
         sit = 2 if g.air else 0
         vm.g[18], vm.g[19] = sit, prev_sit
         prev_sit = sit
@@ -260,6 +294,7 @@ def run(path, g, frames=260, cut_at=None, after=0, tick=None):
         tr.append((k, g.kind, round(g.frame, 3), round(g.x, 3), round(g.y, 3), g.status,
                    g.vars.get(B.V_PH, 0.0)))
         vm.call(fn(vm, 'sh_tick'))
+        vm.call(fn(vm, 'cb_shield_tick'))
         vm.call(fn(vm, 'ts_tick'))
         if g.status is not None:
             vm.call(fn(vm, 'func_2280'))
@@ -283,8 +318,13 @@ def ph_at(tr, k):
     return tr[k][6]
 
 
+def speeds(g, a, b):
+    """his speed's size on game frames a..b (the frames he moved)"""
+    return [round(math.hypot(vx, vy), 3) for n, vx, vy in g.vel if a <= n <= b]
+
+
 def msc_tests(path, root):
-    want_un, want_ch = B.travel(False, root), B.travel(True, root)
+    mf, mn = B.MOVE_FROM, B.MOVE_N
     # 1. a tap on the ground: the dash and the stop, no victim
     g = Game()
     tr, vm = run(path, g)
@@ -292,65 +332,86 @@ def msc_tests(path, root):
     check('ground tap: SpecialS from frame 0, never restarted (no charge held)', [m for m in g.motions if m[1] != 'set'],
           [(0, 0x219, 0.0)])
     check('ground tap: the dash at frame %d (phase 3), the stop (4) at %d, Wait (0) at %d' % (
-        B.WIND_END, B.MOVE_FROM + B.MOVE_N, B.DASH_END),
-          (ph_at(tr, B.WIND_END), ph_at(tr, B.MOVE_FROM + B.MOVE_N), end[0], end[5]), (3.0, 4.0, B.DASH_END, 0))
-    check('ground tap: the connect box out at %d (the script, phase 3), taken off at %d (2 before the movement ends)' % (
-        B.HIT_FROM, B.MOVE_FROM + B.MOVE_N - 2), ('catch' in g.fired, g.removed[0] if g.removed else None),
-          (True, B.MOVE_FROM + B.MOVE_N - 2))
-    near('ground tap: his travel = the root\'s + XV2\'s Movement (29 frames of 3.53 less 0.015 a frame)', end[3], want_un,
-         0.6)
-    check('ground tap: Hazure (the whiff) once, at the movement\'s end (%d)' % (B.MOVE_FROM + B.MOVE_N),
-          [(n, s) for n, w, s in g.sounds if w == 'play'], [(B.MOVE_FROM + B.MOVE_N, B.SE_IDS['ts_hazure'])])
+        B.WIND_END, mf + mn, B.DASH_END), (ph_at(tr, B.WIND_END), ph_at(tr, mf + mn), end[0], end[5]),
+          (3.0, 4.0, B.DASH_END, 0))
+    check('ground tap: the detection box out at %d (the script, phase 3), taken off at %d (2 before the moving part '
+          'ends)' % (B.HIT_FROM, mf + mn - 2), ('catch' in g.fired, g.removed[0] if g.removed else None),
+          (True, mf + mn - 2))
+    sp = speeds(g, mf, mf + mn - 1)
+    ease = [round(B.VMIN + (B.VSTOP - B.VMIN) * (k - (mn - B.MOVE_EASE - 1)) / B.MOVE_EASE, 3)
+            for k in range(mn - B.MOVE_EASE, mn)]
+    check('ground tap: the moving part %d-%d at %.2f a frame (uncharged), eased to %.2f over its last %d frames' % (
+        mf, mf + mn - 1, B.VMIN, B.VSTOP, B.MOVE_EASE), sp, [B.VMIN] * (mn - B.MOVE_EASE) + ease)
+    near('ground tap: his travel (the wind-up\'s step, the moving part, the stop\'s slide)', end[3], B.travel(0, root), 0.3)
+    check('ground tap: Hazure (the whiff) once, at the moving part\'s end (%d)' % (mf + mn),
+          [(n, s_) for n, w, s_ in g.sounds if w == 'play'], [(mf + mn, B.SE_IDS['ts_hazure'])])
     check('ground tap: no invincibility, the air use not taken', (g.inv, g.vars.get(B.V_USED, 0.0)), ([], 0.0))
-    # 2. in the air: no gravity through the dash, Fall at the movement's end, the use taken
-    g = Game(air=True, y=50.0)
-    tr, vm = run(path, g)
-    end = tr[-1]
-    check('air tap: Fall (0xE, not FallSpecial) at the movement\'s end (%d)' % (B.MOVE_FROM + B.MOVE_N),
-          (end[0], end[5]), (B.MOVE_FROM + B.MOVE_N, 0xE))
-    check('air tap: his height kept through the dash (no gravity, no drift)', max(abs(t[4] - 50.0) for t in tr) < 1e-3,
-          True)
-    want_air = round(B.travel(False) + sum(root[:B.MOVE_FROM + B.MOVE_N]), 1)
-    near('air tap: the root\'s travel to the movement\'s end + the Movement (no stop: Fall there)', end[3], want_air,
-         0.6)
-    check('air tap: his gravity back at the end, the air use taken; ts_can_side refuses a second in the air',
-          (round(g.acc, 4), g.vars.get(B.V_USED), vm.call(fn(vm, 'ts_can_side'))), (-GRAVITY, 1.0, 0))
-    vm.g[18] = 0
-    vm.call(fn(vm, 'ts_tick'))
-    check('air tap: landed (out of the move): the use back', (g.vars.get(B.V_USED), vm.call(fn(vm, 'ts_can_side'))),
-          (0.0, 1))
-    # 3. a short charge (10 frames): the motion restarted at the charge's frame, the uncharged dash
-    g = Game(held=lambda n: n < B.WIND_END + 10)
-    tr, vm = run(path, g)
-    check('short charge: held at %d, restarted there at %d (the scripts\' clock), uncharged' % (
-        B.WIND_END, B.WIND_END + 10), ([m for m in g.motions if m[1] != 'set'], g.vars.get(B.V_CHG)),
-          ([(0, 0x219, 0.0), (B.WIND_END + 10, 0x219, float(B.WIND_END))], 0.0))
-    near('short charge: the uncharged travel', tr[-1][3], want_un, 0.6)
-    check('short charge: the box from the restart\'s frame %d (%d after it)' % (
-        B.HIT_FROM, B.HIT_FROM - B.WIND_END), first(tr, lambda t: t[1] == 0x219 and 'catch' in g.fired) is not None and
-        g.removed[0], B.WIND_END + 10 + B.MOVE_FROM + B.MOVE_N - 2 - B.WIND_END)
-    # 4. a full charge: the long dash (the pose looped twice)
-    g = Game(held=lambda n: True)
-    tr, vm = run(path, g, frames=400)
-    loops = [n for n, m, fr in g.motions if m == 'set' and fr == float(B.LOOP_FROM)]
-    t0 = B.WIND_END + B.CHARGE
-    check('full charge: the charged dash after %d frames held (restart at %d), the pose looped back to %d twice' % (
-        B.CHARGE, t0, B.LOOP_FROM), (g.vars.get(B.V_CHG, 0.0) >= B.CHARGE - 0.5,
-                                     [m for m in g.motions if m[1] != 'set'][-1], len(loops)),
-          (True, (t0 - 1, 0x219, float(B.WIND_END)), 2))
-    s0 = t0 - 1 - B.WIND_END
-    check('full charge: the box off at movement frame %d, the stop at %d, Wait at %d' % (
-        B.MOVE_N_CH - 2, s0 + B.MOVE_FROM + B.MOVE_N_CH, s0 + B.DASH_END + 2 * B.LOOP_LEN),
-          (g.removed[0], first(tr, lambda t: t[6] == 4.0)[0], tr[-1][0], tr[-1][5]),
-          (s0 + B.MOVE_FROM + B.MOVE_N_CH - 2, s0 + B.MOVE_FROM + B.MOVE_N_CH, s0 + B.DASH_END + 2 * B.LOOP_LEN, 0))
-    near('full charge: the charged travel (79 movement frames)', tr[-1][3], want_ch, 0.6)
-    # 5. a fighter ahead on the ground: caught, held, struck, launched
+    # 2. in the air: no gravity, Fall at the moving part's end, the use taken, the gravity eased back in
+    g = Game(air=True, y=200.0, floor=-1e4)
+    tr, vm = run(path, g, after=40)
+    k_end = max(t[0] for t in tr if t[5] is None) + 1
+    check('air tap: Fall (0xE, not FallSpecial) at the moving part\'s end (%d)' % (mf + mn),
+          (tr[-1][0], g.statuses[:1]), (mf + mn, [(mf + mn, 0xE)]))
+    check('air tap: his height kept through the move (no gravity, no drift)',
+          max(abs(t[4] - 200.0) for t in tr if t[0] < k_end), 0.0)
+    near('air tap: his travel (no stop: Fall)', tr[-1][3], B.travel(0, root, True), 0.3)
+    accs = [a for n, a in g.acc_log if n > k_end]
+    want = [round(-GRAVITY * min(1.0, n / B.EASE_FRAMES), 4) for n in range(1, int(B.EASE_FRAMES) + 1)]
+    check('air tap: his gravity eased back in over %d frames (-%.4f a frame more each frame), then his own' % (
+        B.EASE_FRAMES, GRAVITY / B.EASE_FRAMES), accs[:len(want) + 1], [round(x, 4) for x in want] + [-GRAVITY])
+    check('air tap: the air use taken, its variable reset (KO | landing | ledge | hit -> 0) on him; a second refused',
+          (g.vars.get(B.V_USED), g.items.get('me', {}).get(B.USED_INDEX), ),
+          (1.0, [0.0, 15]))
+    g2 = Game(air=True, y=200.0, floor=0.0)
+    tr2, vm2 = run(path, g2, frames=5)
+    vm2.g[18] = 2
+    check('  ts_can_side in the air after the use: 0', vm2.call(fn(vm2, 'ts_can_side')), 0)
+    g2.event('me', 2)
+    check('  a landing (the exe\'s reset, bit 2): the use back (VAR_26 0), ts_can_side 1',
+          (g2.vars.get(B.V_USED), vm2.call(fn(vm2, 'ts_can_side'))), (0.0, 1))
+    g2.vars[B.V_USED] = 1.0
+    g2.event('me', 8)
+    check('  a hit (bit 8): back too', g2.vars.get(B.V_USED), 0.0)
+    # 3. a fast fall after an aim down: the fall limit lowered by FALL_EASE a frame
+    v = V(2, 60.0, y=150.0, air=True)
+    g = Game(fighters=[v], air=True, y=200.0, floor=0.0, held=lambda n: True)
+    v.x = 1e4                                           # out of reach until the dash: then put below-ahead (tracked)
+
+    def dive(g_, k):
+        if k == B.WIND_END + B.CHARGE:
+            v.x, v.y = g_.x + 45.0, g_.y - 70.0         # 57 degrees down, 83 away: out of range ...
+        if k == B.WIND_END + B.CHARGE + 2:
+            v.x, v.y = g_.x + 30.0, g_.y - 45.0         # ... then 56 degrees down within 54: tracked
+        if k == B.WIND_END + B.CHARGE + 12:
+            v.x = 1e4                                   # gone: the last aim kept
+    tr, vm = run(path, g, frames=300, after=60, tick=dive)
+    lims = [x for n, x in g.vlims if n > g.statuses[0][0]] if g.statuses else []
+    falls = [x for x in lims if x > MAX_FALL + 1e-3]
+    steps = sorted({round(a - b, 3) for a, b in zip(falls, falls[1:])})
+    check('fully charged dive (tracked down): Fall faster than his max fall, the limit lowered %.2f a frame to it' %
+          B.FALL_EASE, (len(falls) > 3, steps, lims[len(falls)] if len(lims) > len(falls) else None),
+          (True, [B.FALL_EASE], MAX_FALL))
+    # 4. charges: 20 frames (half), full
+    for held, v_ in ((20, B.speed(20)), (B.CHARGE + 5, B.VMAX)):
+        g = Game(held=lambda n, h=held: n < B.WIND_END + h)
+        tr, vm = run(path, g, frames=400)
+        c = min(held, B.CHARGE)
+        t0 = B.WIND_END + c
+        r0 = [m for m in g.motions if m[1] != 'set'][-1][0]       # the restart
+        sp = speeds(g, r0 - B.WIND_END + mf, r0 - B.WIND_END + mf + mn - B.MOVE_EASE - 1)
+        check('charge %d: restarted at %d (the scripts\' clock), the moving part at %.2f (%s), Wait at %d' % (
+            held, t0 - (0 if c < B.CHARGE else 1), v_, 'full' if c >= B.CHARGE else 'half', B.DASH_END + c - (c >= B.CHARGE)),
+              ([m for m in g.motions if m[1] != 'set'][-1][:2], set(sp), tr[-1][0]),
+              ((t0 - (0 if c < B.CHARGE else 1), 0x219), {round(v_, 3)}, B.DASH_END + c - (c >= B.CHARGE)))
+        near('charge %d: his travel' % held, tr[-1][3], B.travel(c, root), 0.3)
+    # 5. caught
     caught_tests(path, air=False)
     caught_tests(path, air=True)
-    # 6. refusals
-    for name, kw, catches in (('shielding', dict(shield=True), False), ('invincible', dict(body=1), False),
-                              ('countering', dict(counter=True), False), ('super armor', dict(armor=1), False),
-                              ('heavy armor', dict(armor=2, armor_thr=50.0), False), ('intangible', dict(body=2), False),
+    shield_tests(path)
+    # 6. refusals; armor beaten (the user: "shieldable but beats armor")
+    for name, kw, catches in (('invincible', dict(body=1), False), ('countering', dict(counter=True), False),
+                              ('intangible', dict(body=2), False), ('super armor', dict(armor=1), True),
+                              ('heavy armor', dict(armor=2, armor_thr=500.0), True),
                               ('lying (DownWait)', dict(status=0x50), True)):
         v = V(2, 30.0, **{k: x for k, x in kw.items() if k != 'status'})
         if 'status' in kw:
@@ -359,18 +420,54 @@ def msc_tests(path, root):
         tr, vm = run(path, g)
         got = any(t[1] == 0x21D for t in tr)
         check('%s fighter ahead: %s' % (name, 'caught' if catches else 'not caught, the dash goes on to its end'),
-              (got, tr[-1][5] if not catches else None, [w for w in v.__dict__.get('wlog', []) if w[1] == 'input'] == []
-               if not catches else True), (catches, 0 if not catches else None, True))
+              (got, tr[-1][5] if not catches else None), (catches, 0 if not catches else None))
+        if 'armor' in name:
+            ck_ = first(tr, lambda t: t[1] == 0x21D)[0]
+            check('  its armor lifted on the box\'s frame of contact, before the collision (ARMOR 0), not given back',
+                  [w for w in v.wlog if w[1] == 'armor'], [(ck_ - 1, 'armor', 0.0)])
         if name.startswith('lying'):
             check('lying: put into the hold\'s Damage (0x46) at the catch', [w for w in v.wlog if w[1] == 'status'][:1],
                   [(first(tr, lambda t: t[1] == 0x21D)[0], 'status', 70.0)])
+    v = V(2, -40.0, armor=1, armor_thr=0.0)             # behind him
+    g = Game(fighters=[v])
+    tr, vm = run(path, g)
+    check('an armored fighter the box never touches keeps its armor', [w for w in v.__dict__.get('wlog', [])
+                                                                       if w[1] == 'armor'], [])
     # an invincible fighter in front, another behind it: the second is caught
     v1, v2 = V(2, 20.0, body=1), V(3, 50.0)
     g = Game(fighters=[v1, v2])
     tr, vm = run(path, g)
     check('an invincible fighter, then another: the second caught (slot 3)', g.vars.get(B.V_SLOT), -1.0)
-    check('  (its hold written on slot 3 only)', sorted({s for _n, s, _x in g.holds}), [3])
-    # 7. B-reverse
+    check('  (its hold written on slot 3 only)', sorted({s_ for _n, s_, _x in g.holds}), [3])
+    # 7. tracking (the user): the nearest opponent in front within 80, up to 65 degrees; the direction only
+    for name, dx, dy, air, want_up in (('45 degrees up, 50 away (air)', 35.0, 35.0, True, True),
+                                       ('64 degrees up, 60 away (air)', 26.0, 54.0, True, True),
+                                       ('70 degrees up (air)', 15.0, 41.0, True, False),
+                                       ('behind (air)', -30.0, 20.0, True, False),
+                                       ('85 away (air)', 70.0, 48.0, True, False),
+                                       ('45 degrees down (air)', 35.0, -35.0, True, False),
+                                       ('above-ahead from the ground', 40.0, 30.0, False, True),
+                                       ('below-ahead from the ground', 40.0, -30.0, False, False)):
+        y0 = 100.0
+        v = V(3, 1e4, y=y0, air=True)
+        g = Game(fighters=[v], air=air, y=y0, floor=None if air else y0)
+
+        def put(g_, k, dx=dx, dy=dy):
+            if k == mf - 1:
+                v.x, v.y = g_.x + dx, g_.y + dy + B.HIT_Y - B.VICTIM_MID
+            if k == mf + 3:
+                v.x = 1e4
+        tr, vm = run(path, g, frames=mf + 6, tick=put)
+        vel = [(vx, vy) for n, vx, vy in g.vel if n == mf + 1]
+        vx, vy = vel[0]
+        aim = math.degrees(math.atan2(vy, vx))
+        want = math.degrees(math.atan2(dy, dx)) if want_up or (dy < 0 and air and abs(dy) <= abs(dx) * 2.14) else 0.0
+        if dx < 0 or math.hypot(dx, dy) > B.TRACK_RANGE or abs(math.degrees(math.atan2(dy, abs(dx)))) > B.TRACK_DEG:
+            want = 0.0
+        check('tracking %s: aimed %.0f degrees, speed %.2f, never turned' % (name, want, B.VMIN),
+              (round(aim, 0), round(math.hypot(vx, vy), 3), g.turns),
+              (round(want, 0), B.VMIN, []))
+    # 8. B-reverse
     for kk, want in ((0, 1), (3, 1), (4, 0)):
         g = Game(stick_x=lambda n, kk=kk: -1.0 if n == kk else 0.0)
         run(path, g, frames=10)
@@ -379,16 +476,12 @@ def msc_tests(path, root):
     g = Game(stick_x=lambda n: -0.4)
     run(path, g, frames=10)
     check('B-reverse: a weak stick back (0.4) doesn\'t', len(g.turns), 0)
-    # 8. cut in the hold / the victim KO'd
+    # 9. cut in the hold / the victim KO'd
+    ck = B.HIT_FROM + 1 + 4                             # the catch (k 34: the box hits on 33 at 30 ahead)
     v = V(2, 30.0)
     g = Game(fighters=[v])
-    catch_k = [None]
-
-    def cut_tick(g_, k):
-        if catch_k[0] is None and g_.kind == 0x21D:
-            catch_k[0] = k
-    tr, vm = run(path, g, frames=200, tick=cut_tick, cut_at=None)
-    ck = catch_k[0]
+    tr, vm = run(path, g, frames=200)
+    ck = first(tr, lambda t: t[1] == 0x21D)[0]
     v = V(2, 30.0)
     g = Game(fighters=[v])
     tr, vm = run(path, g, cut_at=ck + 5)
@@ -405,10 +498,48 @@ def msc_tests(path, root):
           (False, ck + 3))
 
 
+def shield_tests(path):
+    for charged in (False, True):
+        v = V(2, 30.0, shield=True, shield_hp=50.0)
+        g = Game(fighters=[v], held=(lambda n: True) if charged else None)
+        tr, vm = run(path, g, frames=300, after=60)
+        tag = 'fully charged' if charged else 'uncharged'
+        c = first(tr, lambda t: t[1] == 0x21D)
+        check('%s, a shielding fighter: the time stop all the same (caught shielding, TS_V_SHV 1)' % tag,
+              (c is not None, g.vars.get(B.V_SHV)), (True, 1.0))
+        if c is None:
+            continue
+        check('  kept where it is (no hold offset), frozen and its controller off until the punch, its stage collision '
+              'never touched', ([x for _n, s_, x in g.holds if s_ == 2], v.ground), ([], []))
+        hk = [h for h in v.shield_hits if h[1] == 'strike'] if hasattr(v, 'shield_hits') else []
+        if not charged:
+            sk = hk[0][0] if hk else None
+            want_hp = round(50.0 + B.STRIKE_HIT['Damage'] * 1.19 - 50.0 * B.SH_TAKE, 3)
+            check('  uncharged: the punch on the shield; its shield %.0f%% of the max less than before the hit '
+                  '(%.2f with the model\'s untouched 50), %d frames of shieldstun held' % (
+                      100 * B.SH_TAKE, want_hp, B.SH_STUN),
+                  (sk is not None, [w[2] for w in v.wlog if w[1] == 'shield_hp'], v.pushes[0][1] if
+                   getattr(v, 'pushes', None) else None), (True, [want_hp], B.SH_STUN))
+            mine = g.statuses[0][0] if g.statuses else None
+            free = first([(n, st, hs, hp) for n, st, hs, hp, _x in v.log if n > sk], lambda t: t[1] == 0x1C and t[3] == 0)
+            adv = (free[0] - mine) if (free and mine) else None
+            print('     shield: punch on %s, he acts on %s (connect frame %d), the shielder on %s: %+d' % (
+                sk, mine, B.SH_IASA, free and free[0], adv if adv is not None else 0))
+            check('  uncharged: he acts at the connect\'s frame %d, the shielder later: at an advantage (the model: +9; '
+                  'by the held count +%d)' % (B.SH_IASA, B.SH_STUN - (B.SH_IASA - B.STRIKE) + 1), (g.statuses[0][1], adv),
+                  (0, 9))
+        else:
+            check('  fully charged: the punch through the shield (unblockable): %g%% (16 + %g) to the body, launched' % (
+                B.STRIKE_HIT['Damage'] + B.SH_BONUS, B.SH_BONUS), (hk, round(v.pct, 3),
+                                                                   getattr(v, 'launch', 0) > 80),
+                  ([], B.STRIKE_HIT['Damage'] + B.SH_BONUS, True))
+
+
 def caught_tests(path, air):
     y = 40.0 if air else 0.0
     v = V(2, 30.0, y=y, air=air)
-    g = Game(fighters=[v], air=air, y=y)
+    by = V(3, -60.0, y=y, air=air)                      # a bystander behind him
+    g = Game(fighters=[v, by], air=air, y=y)
     tr, vm = run(path, g, frames=200)
     tag = 'air' if air else 'ground'
     c = first(tr, lambda t: t[1] == 0x21D)
@@ -417,36 +548,41 @@ def caught_tests(path, air):
           (True, True))
     if c is None:
         return
-    ck = c[0] - 1                                       # the connect box hit the frame before the catch
-    held = [x for n, s, x in g.holds if s == 2]
-    hk = sorted({n for n, s, x in g.holds if s == 2})
-    check('%s: held %.2f in front every frame from the catch to the strike\'s frame' % (tag, B.HOLD_X),
+    ck = c[0] - 1                                       # the detection box hit the frame before the catch
+    held = [x for n, s_, x in g.holds if s_ == 2]
+    hk = sorted({n for n, s_, x in g.holds if s_ == 2})
+    check('%s: held %.2f in front every frame from the catch to the punch\'s frame' % (tag, B.HOLD_X),
           (set(held), hk[0], hk[-1]), ({B.HOLD_X}, ck + 1, ck + B.CATCH_FREEZE + B.STRIKE - 1))
-    check('%s: the victim\'s controller off from the catch, back at the strike (and its stage collision)' % tag,
+    check('%s: the victim\'s controller off from the catch, back at the punch (and its stage collision)' % tag,
           ([w[0] for w in v.wlog if w[1] == 'input'][:1], [w[2] for w in v.wlog if w[1] == 'input'][-1],
            v.ground[-1][1]), ([ck + 1], 0.0, 5.0))
     sk = ck + B.CATCH_FREEZE + B.STRIKE
-    check('%s: struck at %d: 2 + 14%%, launched (DamageFly), XV2\'s hit look the next frame (Btl_HitLOD / Btl_HitL / the '
-          'sweat) and Hit_TmLck once' % (tag, sk),
+    by_stop = sorted({n for n, st, hs, hp, _x in by.log if hp > 0})
+    check('%s: the time stop: the bystander frozen (a hitstop renewed every frame) from the catch to the punch\'s frame, '
+          'free after' % tag, (by_stop[0] if by_stop else None, by_stop[-1] if by_stop else None, len(by_stop)),
+          (ck + 1, sk - 1, sk - 1 - ck))
+    check('%s: punched at %d: 2 + 16 = 18%%, launched (DamageFly), XV2\'s hit look the next frame (Btl_HitLOD / Btl_HitL '
+          'x2 sets / the sweat) and Hit_TmLck once' % (tag, sk),
           (round(v.pct, 3), v.hit_at, [(n, i) for n, i, _x, _y, _s in g.fx],
-           [(n, s) for n, w, s in g.sounds if w == 'play']),
-          (16.0, sk, [(sk + 1, B.SH_FX['hitlod']), (sk + 1, B.FX_IDS['hitl']), (sk + 1, B.FX_IDS['hitl_2']),
-                      (sk + 1, B.SH_FX['sweat'])],
-           [(sk + 1, B.SE_IDS['ts_hit'])]))
-    sizes = [s for _n, _i, _x, _y, s in g.fx]
+           [(n, s_) for n, w, s_ in g.sounds if w == 'play']),
+          (18.0, sk, [(sk + 1, B.SH_FX['hitlod']), (sk + 1, B.FX_IDS['hitl']), (sk + 1, B.FX_IDS['hitl_2']),
+                      (sk + 1, B.SH_FX['sweat'])], [(sk + 1, B.SE_IDS['ts_hit'])]))
+    sizes = [s_ for _n, _i, _x, _y, s_ in g.fx]
     check('%s: the hit look\'s sizes (x%.2f the EEPK\'s 1.5 / 0.8 / 2.0)' % (tag, B.FX_SCALE), sizes,
           [round(B.EEPK_SCALE[e] * B.FX_SCALE, 3) for e in ('Btl_HitLOD.emp', 'Btl_HitL.emp', 'Btl_HitL.emp',
                                                              'Btl_Sweat00.emp')])
     inv = sorted({n for n, _v in g.inv})
     fz = sk + B.STRIKE_FREEZE
-    check('%s: invincible from the catch through the strike\'s freeze (renewed by 2, 1 on the first frame after)' % tag,
-          (inv[0], inv[-1], [val for n, val in g.inv if n == inv[-1]]), (ck + 1, fz, [1.0]))
+    check('%s: invincible from the catch through the punch\'s freeze (renewed by 2, 1 on the first frame after)' % tag,
+          (inv[0], inv[-1], [val for n, val in g.inv if n == inv[-1]]), (ck + 1, fz + 1, [1.0]))
     end = tr[-1]
     check('%s: the connect ends at its last frame (%d), %s' % (tag, B.CONNECT_END, 'Fall' if air else 'Wait'),
           (end[0], end[5]), (fz + B.CONNECT_END - B.STRIKE, 0xE if air else 0))
     if air:
-        check('air: held in place through the hold and the freeze, his gravity from the motion\'s next frame',
-              (max(abs(t[4] - y) for t in tr if t[0] <= fz), round(g.acc, 4)), (0.0, -GRAVITY))
+        accs = [a for n, a in g.acc_log if n > fz]
+        check('air: held in place through the hold and the freeze; then his gravity eased in (-%.4f a frame more)' % (
+            GRAVITY / B.EASE_FRAMES), (max(abs(t[4] - c[4]) for t in tr if c[0] <= t[0] <= fz), accs[:3]),
+              (0.0, [round(-GRAVITY * k / B.EASE_FRAMES, 4) for k in (1, 2, 3)]))
 
 
 def script_tests(out, sh_out):
@@ -465,18 +601,26 @@ def script_tests(out, sh_out):
           ([c.params for c in dash if nm(c) in ('FRAME', 'Float_Var_Compare')], hb(dash)),
           ([[float(B.HIT_FROM)], [B.V_PH, 5, 2.5]],
            [(0, 0, 2.0, 0, 1, 0, B.HIT_SIZE, B.HIT_Z, B.HIT_Y, B.CATCH_FREEZE, B.CATCH_FREEZE, 0.0, 0, 0, 0, 3, 1)]))
-    check('specialairs: the strike at %d (its Part 1 record cleared first), off at %d' % (B.STRIKE, B.STRIKE + 2),
-          ([(nm(c), c.params) for c in conn if nm(c) in ('FRAME', 'Hit_Log_Clear', 'Remove_All_Hitboxes')], hb(conn)),
-          ([('FRAME', [float(B.STRIKE)]), ('Hit_Log_Clear', [1]), ('FRAME', [float(B.STRIKE + 2)]),
-            ('Remove_All_Hitboxes', [])],
-           [(0, 1, 14.0, 10, 60, 75, B.STRIKE_SIZE, B.STRIKE_Z, B.STRIKE_Y, B.STRIKE_FREEZE, B.STRIKE_FREEZE, 0.0, 0, 0,
-             1, 3, 1)]))
+    check('specialairs: the stopped time (Stage_Freeze on at 0, %d frames at most; off at the punch %d), the punch\'s '
+          'Part 1 record cleared, off at %d; the three punches (uncharged shieldable 16; fully charged unblockable, 22 on a '
+          'fighter caught shielding, 16 else)' % (B.STAGE_FREEZE_SAFETY, B.STRIKE, B.STRIKE + 2),
+          ([(nm(c), c.params) for c in conn if nm(c) in ('FRAME', 'Hit_Log_Clear', 'Remove_All_Hitboxes', 'Stage_Freeze',
+                                                         'Float_Var_Compare')], hb(conn)),
+          ([('Stage_Freeze', [1, B.STAGE_FREEZE_SAFETY]), ('FRAME', [float(B.STRIKE)]), ('Stage_Freeze', [0, 0]),
+            ('Hit_Log_Clear', [1]), ('Float_Var_Compare', [B.V_CHG, 4, B.FULL]), ('Float_Var_Compare', [B.V_CHG, 5, B.FULL]),
+            ('Float_Var_Compare', [B.V_SHV, 5, 0.5]), ('Float_Var_Compare', [B.V_SHV, 4, 0.5]),
+            ('FRAME', [float(B.STRIKE + 2)]), ('Remove_All_Hitboxes', [])],
+           [(0, 1, 16.0, 10, 70, 70, B.STRIKE_SIZE, B.STRIKE_Z, B.STRIKE_Y, B.STRIKE_FREEZE, B.STRIKE_FREEZE, 0.0, 0, 0,
+             1, 3, 1), (0, 1, 22.0, 10, 70, 70, B.STRIKE_SIZE, B.STRIKE_Z, B.STRIKE_Y, B.STRIKE_FREEZE, B.STRIKE_FREEZE,
+                        0.0, 0, 0, 1, 3, 0),
+            (0, 1, 16.0, 10, 70, 70, B.STRIKE_SIZE, B.STRIKE_Z, B.STRIKE_Y, B.STRIKE_FREEZE, B.STRIKE_FREEZE, 0.0, 0, 0,
+             1, 3, 0)]))
     snd = [(nm(c), c.params) for s in ('specials', 'specialairs') for c in f['sound'].script(s)
            if nm(c) in ('FRAME', 'Sound_Effect', 'Float_Var_Compare')]
     check('sounds: Basa at 6 (wind-up only), Dash at %d (dash only); TimeStop at 0, PumchiFuri at 8, CharaAway at %d' % (
-        B.MOVE_FROM, B.SND['away']), snd,
+        B.SND['dash'], B.SND['away']), snd,
           [('FRAME', [6.0]), ('Float_Var_Compare', [B.V_PH, 4, 1.5]), ('Sound_Effect', [B.SE_IDS['ts_basa']]),
-           ('FRAME', [float(B.MOVE_FROM)]), ('Float_Var_Compare', [B.V_PH, 5, 2.5]),
+           ('FRAME', [float(B.SND['dash'])]), ('Float_Var_Compare', [B.V_PH, 5, 2.5]),
            ('Sound_Effect', [B.SE_IDS['ts_dash']]), ('Sound_Effect', [B.SE_IDS['ts_timestop']]), ('FRAME', [8.0]),
            ('Sound_Effect', [B.SE_IDS['ts_punch']]), ('FRAME', [float(B.SND['away'])]),
            ('Sound_Effect', [B.SE_IDS['ts_away']])])
@@ -563,6 +707,11 @@ def main():
         sys.exit(__doc__)
     import json
     root = json.load(open(os.path.join(a[0], 'timeskip.json')))['root_speed']
+    import supamario_fakedeath_build as FD
+    for p_ in (0, 50, 100):
+        print('     knockback from %d%%: Time Skip %.1f, Sledgehammer charged %.1f, Core Breaker crash %.1f' % (
+            p_, B.knockback(B.STRIKE_HIT, p_ + B.CATCH['Damage']), FD.knockback(SHT.B.HIT_CH, p_),
+            FD.knockback(dict(Damage=17.0, Angle=42, KBG=75, FKB=0, BKB=45), p_)))
     path = os.path.join(a[0], 'fighter', 'supamario', 'script', 'msc', 'supamario.mscsb')
     msc_tests(path, root)
     script_tests(a[0], a[1])

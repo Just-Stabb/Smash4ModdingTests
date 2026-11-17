@@ -38,52 +38,68 @@ def real0(b):
 
 
 WIND_END = 20                       # BAC 20: ChargeControl 20-50 (the pose held while the button is), the BPE flash
-CHARGE = 40                         # ChargeTime 40: held this long -> BacEntryCharge 2 (the long dash)
-HIT_FROM = int(real0(54))           # 29: the connect box BAC 54-83 (skill BDM #0: no damage, type 10)
+CHARGE = 40                         # ChargeTime 40: the full charge (XV2: BacEntryCharge 2, the long dash)
+HIT_FROM = int(real0(54))           # 29: the detection box BAC 54-83 (skill BDM #0: no damage, type 10)
 HIT_LAST = int(real0(82))           # 57: its last active frame
-MOVE_FROM = int(real0(56))          # 31: Movement 56-85 (entry 2: 56-135)
-MOVE_N, MOVE_N_CH = 85 - 56, 135 - 56          # 29 / 79 movement frames
-MOVE_V = round(0.7 * SCALE, 4)      # 3.528 units a frame (XV2: 0.7 m a frame forward)
-MOVE_DRAG = round(0.003 * SCALE, 5)  # 0.01512 less each frame (XV2's drag 0.003)
-LOOP_FROM = int(real0(60))          # 35: entry 2 replays the dash pose (EAN 60-85) twice: motion 35-59, from 60 back
-LOOP_AT = int(real0(85))            # 60
-LOOP_LEN = LOOP_AT - LOOP_FROM      # 25
 DASH_END = int(real0(120))          # 95: the stop's last frame (entry 0 ends at 120)
-HAZURE_K = MOVE_N                   # Hazure (skill SE 2) at BAC 86: the frame after the movement (the MSC)
 HIT_LATE = 3.0                      # the MSC still looks for the hit 3 frames after a box's last frame
+# the moving part (the user's spec over XV2's: a constant speed by the charge, the direction tracked; XV2 moves him by
+# its root's launch from BAC 52 and Movement 0.7 m a frame 56-85, the charge lengthening it to 135): BAC 52-84
+MOVE_FROM = int(real0(52))          # 27
+MOVE_N = int(real0(85)) - MOVE_FROM  # 33 frames (27-59); the stop (the root's slide) from 60 on the ground
+MOVE_EASE = 8                       # a miss: the speed eased down to VSTOP over the moving part's last 8 frames
+# the user: "Uncharged: medium-slow. Fully charged: fast-medium", constant. His (Mario's fighter_param) dash initial
+# speed 1.6, run 1.6 a frame; the Super God Fist's burst 4.53 a frame (motion 9-15); XV2's own 0.7 m = 3.53
+VMIN, VMAX = 2.4, 4.2               # units a frame: 1.5x his run uncharged, a bit under the God Fist's burst charged
+VSTOP = 1.85                        # the stop's first root speed (SpecialS frame 60): the eased miss meets it
+SND = {'basa': 6, 'dash': int(real0(56)), 'timestop': 0, 'punch': 8, 'away': None}
 # entry 4 (the user on connect): SpecialAirS 1:1
 STRIKE = 16                         # BAC 16: Damage 140 (the victim's entry 5 function 0x2), TimeScale 16-22 x0.1
 CONNECT_END = 80                    # entry 4's last frame
-SND = {'basa': 6, 'dash': MOVE_FROM, 'timestop': 0, 'punch': 8, 'away': None}
 # the victim's entry 6 plays CMN cue 64 CharaAway_HKT at its frame 16: entry 5's 51 frames (16 + 4 at x0.1 + 31) =
 # 87 real frames, + 16 = 103 after the connect, 47 after the launch (entry 5's BAC 20 = real 56): the connect motion's
 # STRIKE + 47 (its freeze over, the motion runs 1:1 again)
 AWAY_AFTER = 103 - 56
 SND['away'] = STRIKE + AWAY_AFTER   # 63
+# tracking (the user): the nearest opponent in front within 80 units, up to 65 degrees above or below; direction only
+TRACK_RANGE = 80.0
+TRACK_DEG = 65.0
+# after the move in the air (the user): his gravity eased back in over EASE_FRAMES; a faster fall clamped down to his
+# normal one by FALL_EASE a frame
+EASE_FRAMES = 20.0
+FALL_EASE = 0.05
 
-# ---------------------------------------------------------------- the boxes (XV2's places; the user's earlier rules)
+# ---------------------------------------------------------------- the boxes
 HIT_Z, HIT_Y, HIT_SIZE = round(1.0 * SCALE, 2), round(0.5 * SCALE, 2), round(0.5 * SCALE, 2)   # b_C_Base + (0, 0.5,
                                     # -1.0 m), 0.5 m: 5.04 ahead, 2.52 up, 2.52
-CATCH = dict(Damage=2.0, Angle=0, KBG=0, FKB=0, BKB=1)        # a catch: knockback 1 (Fake Death's grounded hit: no
-                                    # launch), the MSC holds it; XV2's box does no damage (the 140 is the strike's)
+CATCH = dict(Damage=2.0, Angle=0, KBG=0, FKB=0, BKB=1)        # the detection: knockback 1 (Fake Death's grounded hit:
+                                    # no launch), the MSC holds it; XV2's box does no damage (the 140 is the punch's)
 CATCH_FREEZE = 3
 HOLD_X, HOLD_Y = round(1.5 * SCALE, 2), round(0.1 * SCALE, 2)  # ThrowHandler: 1.5 m in front of g_x_LND, 0.1 m up
 VICTIM_MID, VICTIM_HEAD = 5.0, 9.0
 VICTIM_R2 = (HIT_SIZE + 12.0) ** 2
-# the strike: 14% (with the catch's 2: 16%; XV2's 140 is the charged Sledgehammer's 145 (20%) level: 19% at its
-# ratio; God Fist 4 + 11, Core Breaker 26, Fake Death 6, Sledgehammer 8 / 20), angle 10 (XV2's blow-away: (0, 0.025,
-# 0.43) m a frame, ~3 degrees; 10 keeps a grounded victim off the floor), BKB 60 / KBG 75: Mario weight, no DI,
-# knockback 85 at 0% (~64 units away: XV2's 13.3 m x 5.04 = 67 of entry 5's blow), 127 at 50%, 169 at 100%, 211 at 150%
-STRIKE_HIT = dict(Damage=14.0, Angle=10, KBG=75, FKB=0, BKB=60)
+# the punch (the user: 18% with the detection's 2, "strong base knockback, good knockback growth"): 16%, angle 10
+# (XV2's blow-away is ~3 degrees: (0, 0.025, 0.43) m a frame), BKB 70, KBG 70. Mario weight, no DI, from 0 / 50 /
+# 100% before the move: knockback 98.5 / 142.6 / 186.7 (Sledgehammer charged 52.8 / 99.7 / 146.7, Core Breaker's
+# crash 75.5 / 125.3 / 175.2)
+STRIKE_HIT = dict(Damage=16.0, Angle=10, KBG=70, FKB=0, BKB=70)
 STRIKE_FREEZE = 30                  # XV2's time lock: the victim at x0.1 for 40 real frames, the user 60
 STRIKE_SIZE = round(1.0 * SCALE, 2)
 STRIKE_Z, STRIKE_Y = HOLD_X, round(HOLD_Y + VICTIM_MID, 2)
+# shields (the user): uncharged, high shield damage and shieldstun, Supamario at an advantage: SH_TAKE of the max
+# shield, SH_STUN frames held (cb_shield_tick), he acts from SH_IASA (STRIKE + 16): he acts on the 16th frame after the
+# shared freeze, the shielder on the 27th: +11. Fully charged: unblockable, SH_BONUS more on a shielding fighter
+SH_TAKE, SH_STUN = 0.5, 26
+SH_IASA = STRIKE + 16
+SH_BONUS = 6.0
+STAGE_FREEZE_SAFETY = 30            # Stage_Freeze's own Frames: it ends by itself if the move is cut before the punch
 INV_STEP = 2.0
 TURN_STICK, TURN_WINDOW = 0.5, 4    # the B-reverse (Sledgehammer's)
-ST_SIDE = 0x153
+ST_SIDE, ST_FALL = 0x153, 0xE
 
-# ---------------------------------------------------------------- variables (VAR_22-27: Sledgehammer uses VAR_0-21)
-V_PH, V_CHG, V_SLOT, V_K, V_USED, V_BREV = (0x0F000316 + i for i in range(6))
+# ---------------------------------------------------------------- variables (VAR_22-30: Sledgehammer uses VAR_0-21)
+V_PH, V_CHG, V_SLOT, V_K, V_USED, V_BREV, V_EASE, V_AIM, V_SHV = (0x0F000316 + i for i in range(9))
+USED_INDEX = V_USED - 0x0F000000     # the variable reset's index (VAR_26: 0x31A)
 
 # ---------------------------------------------------------------- effects / sounds
 FX_SCALE = 1.75                     # xv2_smash_fx.SIZE (the God Fist's settled size over XV2's)
@@ -116,23 +132,30 @@ def msc_values(root_speed=None):
     import supamario_fakedeath_build as FD
     if root_speed is None:
         root_speed = json.load(open(os.path.join(HERE, '..', 'reference', 'xv2', 'timeskip_root.json')))['speed']
-    return {'TS_VROOT_CODE': FD.vel_code(root_speed), 'TS_V_PH': '0x%X' % V_PH, 'TS_V_CHG': '0x%X' % V_CHG,
-            'TS_V_SLOT': '0x%X' % V_SLOT, 'TS_V_K': '0x%X' % V_K, 'TS_V_USED': '0x%X' % V_USED,
-            'TS_V_BREV': '0x%X' % V_BREV, 'TS_ST_SIDE': fl(ST_SIDE), 'TS_TURN_STICK': fl(TURN_STICK),
-            'TS_TURN_WINDOW': fl(TURN_WINDOW), 'TS_CHARGE': fl(CHARGE), 'TS_WIND_END': fl(WIND_END),
-            'TS_VICTIM_R2': fl(VICTIM_R2), 'TS_HIT_Z': fl(HIT_Z), 'TS_HIT_Y': fl(HIT_Y), 'TS_VICTIM_MID': fl(VICTIM_MID),
-            'TS_VICTIM_HEAD': fl(VICTIM_HEAD), 'TS_HOLD_X': fl(HOLD_X), 'TS_HOLD_Y': fl(HOLD_Y),
-            'TS_INV_STEP': fl(INV_STEP), 'TS_FX_HITLOD': '0x%X' % SH_FX['hitlod'], 'TS_FX_HITL': '0x%X' % FX_IDS['hitl'],
-            'TS_FX_SWEAT': '0x%X' % SH_FX['sweat'], 'TS_FX_HITL_2': '0x%X' % FX_IDS['hitl_2'],
+    import math
+    vals = {'TS_VROOT_CODE': FD.vel_code(root_speed), 'TS_ST_SIDE': fl(ST_SIDE), 'TS_ST_FALL': fl(ST_FALL),
+            'TS_TURN_STICK': fl(TURN_STICK), 'TS_TURN_WINDOW': fl(TURN_WINDOW), 'TS_CHARGE': fl(CHARGE),
+            'TS_WIND_END': fl(WIND_END), 'TS_VICTIM_R2': fl(VICTIM_R2), 'TS_HIT_Z': fl(HIT_Z), 'TS_HIT_Y': fl(HIT_Y),
+            'TS_HIT_SIZE': fl(HIT_SIZE), 'TS_VICTIM_MID': fl(VICTIM_MID), 'TS_VICTIM_HEAD': fl(VICTIM_HEAD),
+            'TS_HOLD_X': fl(HOLD_X), 'TS_HOLD_Y': fl(HOLD_Y), 'TS_INV_STEP': fl(INV_STEP),
+            'TS_FX_HITLOD': '0x%X' % SH_FX['hitlod'], 'TS_FX_HITL': '0x%X' % FX_IDS['hitl'],
+            'TS_FX_HITL_2': '0x%X' % FX_IDS['hitl_2'], 'TS_FX_SWEAT': '0x%X' % SH_FX['sweat'],
             'TS_FX_HITLOD_SIZE': fl(round(EEPK_SCALE['Btl_HitLOD.emp'] * FX_SCALE, 4)),
             'TS_FX_HITL_SIZE': fl(round(EEPK_SCALE['Btl_HitL.emp'] * FX_SCALE, 4)),
             'TS_FX_SWEAT_SIZE': fl(round(EEPK_SCALE['Btl_Sweat00.emp'] * FX_SCALE, 4)),
             'TS_SND_HIT': '0x%X' % SE_IDS['ts_hit'], 'TS_SND_HAZURE': '0x%X' % SE_IDS['ts_hazure'],
-            'TS_MOVE_N': fl(MOVE_N), 'TS_MOVE_N_CH': fl(MOVE_N_CH), 'TS_LOOP_AT': fl(LOOP_AT),
-            'TS_LOOP_LEN': fl(LOOP_LEN), 'TS_LOOP_FROM': fl(LOOP_FROM), 'TS_HIT_FROM': fl(HIT_FROM),
-            'TS_HIT_LATE': fl(HIT_LATE), 'TS_MOVE_FROM': fl(MOVE_FROM), 'TS_MOVE_V': fl(MOVE_V),
-            'TS_MOVE_DRAG': fl(MOVE_DRAG), 'TS_STRIKE': fl(STRIKE), 'TS_CONNECT_END': fl(CONNECT_END),
-            'TS_DASH_END': fl(DASH_END)}
+            'TS_MOVE_N': fl(MOVE_N), 'TS_MOVE_FROM': fl(MOVE_FROM), 'TS_MOVE_EASE': fl(MOVE_EASE),
+            'TS_VMIN': fl(VMIN), 'TS_VMAX': fl(VMAX), 'TS_VSTOP': fl(VSTOP), 'TS_HIT_FROM': fl(HIT_FROM),
+            'TS_HIT_LATE': fl(HIT_LATE), 'TS_STRIKE': fl(STRIKE), 'TS_CONNECT_END': fl(CONNECT_END),
+            'TS_DASH_END': fl(DASH_END), 'TS_TRACK_RANGE': fl(TRACK_RANGE),
+            'TS_TRACK_TAN2': fl(round(math.tan(math.radians(TRACK_DEG)) ** 2, 4)),
+            'TS_EASE_FRAMES': fl(EASE_FRAMES), 'TS_FALL_EASE': fl(FALL_EASE), 'TS_USED_INDEX': fl(USED_INDEX),
+            'TS_STRIKE_DMG': fl(STRIKE_HIT['Damage']), 'TS_SH_TAKE': fl(SH_TAKE), 'TS_SH_STUN': fl(SH_STUN),
+            'TS_SH_IASA': fl(SH_IASA)}
+    for n, v in (('PH', V_PH), ('CHG', V_CHG), ('SLOT', V_SLOT), ('K', V_K), ('USED', V_USED), ('BREV', V_BREV),
+                 ('EASE', V_EASE), ('AIM', V_AIM), ('SHV', V_SHV)):
+        vals['TS_V_' + n] = '0x%X' % v
+    return vals
 
 
 def knockback(hit, pct):
@@ -140,11 +163,25 @@ def knockback(hit, pct):
     return FD.knockback(hit, pct)
 
 
-def travel(charged=False, root=None):
-    """his travel over the dash (units): the root's plus XV2's Movement"""
-    n = MOVE_N_CH if charged else MOVE_N
-    mv = sum(MOVE_V - MOVE_DRAG * k for k in range(n))
-    return round(mv + (sum(root) if root else 0.0), 1)
+def speed(charge_frames):
+    """the dash's speed after a charge of that many frames (ts_vdash)"""
+    c = min(float(charge_frames), CHARGE)
+    return VMIN + (VMAX - VMIN) * c / CHARGE
+
+
+def travel(charge_frames=0, root=None, air=False):
+    """his travel on a straight miss (units): the root's step before the moving part, the moving part (the last
+    MOVE_EASE frames eased down to VSTOP), and on the ground the stop's root slide"""
+    v = speed(charge_frames)
+    mv = 0.0
+    for k in range(MOVE_N):
+        x = v
+        if k > MOVE_N - MOVE_EASE - 0.5 and v > VSTOP:
+            x = v + (VSTOP - v) * (k - (MOVE_N - MOVE_EASE - 1.0)) / MOVE_EASE
+        mv += x
+    if root:
+        mv += sum(root[:MOVE_FROM]) + (0.0 if air else sum(root[MOVE_FROM + MOVE_N:]))
+    return round(mv, 2)
 
 
 # ---------------------------------------------------------------- ACMD
@@ -173,23 +210,33 @@ def catch_box():
                   SFXType=1, HitstopFrames=CATCH_FREEZE, SelfHitstopFrames=CATCH_FREEZE, **CATCH)
 
 
-def strike_box():
-    """the strike (ID 0, Part 1: its own hit record, the catch's Part 0 record on the victim stays): on the held
-    victim's middle, the time lock's freeze both sides, no SDI, NoGFX (XV2's hit look from the MSC), Clang 0"""
+def strike_box(unblockable=False, bonus=0.0):
+    """the punch (ID 0, Part 1: its own hit record, the detection's Part 0 record on the victim stays): on the held
+    victim's middle, the time lock's freeze both sides, no SDI, NoGFX (XV2's hit look from the MSC), Clang 0. Fully
+    charged: unblockable (Shieldable 0), + bonus on a fighter caught shielding"""
+    hit = dict(STRIKE_HIT, Damage=STRIKE_HIT['Damage'] + bonus)
     return hitbox(ID=0, Part=1, Size=STRIKE_SIZE, Y=STRIKE_Y, Z=STRIKE_Z, SDI=0.0, Clang=0, Rebound=0, NoGFX=1,
-                  SFXLevel=2, SFXType=1, HitstopFrames=STRIKE_FREEZE, SelfHitstopFrames=STRIKE_FREEZE, **STRIKE_HIT)
+                  SFXLevel=2, SFXType=1, HitstopFrames=STRIKE_FREEZE, SelfHitstopFrames=STRIKE_FREEZE,
+                  Shieldable=0 if unblockable else 1, **hit)
 
 
 DASHING, CHARGING = 2.5, 1.5        # TS_V_PH > 2.5: the dash; < 1.5: the wind-up
+FULL = CHARGE - 0.5                 # TS_V_CHG > FULL: fully charged
 
 
 def game_scripts():
-    """specials: the connect box at HIT_FROM only in the dash (the script's clock runs on while the charge holds the
+    """specials: the detection box at HIT_FROM only in the dash (the script's clock runs on while the charge holds the
     pose; the MSC restarts the motion at WIND_END after a held charge, and removes the box: AttackModule 0x2719);
-    specialairs: the strike at STRIKE, off 2 frames later"""
+    specialairs: the stopped time (Stage_Freeze, the stage and background) from its frame 0 to the punch at STRIKE;
+    the punch (uncharged: shieldable; fully charged: unblockable, + SH_BONUS on a fighter caught shielding), off 2
+    frames later"""
     dash = [cmd('frame', float(HIT_FROM))] + if_(V_PH, 5, DASHING, [catch_box()])
-    connect = [cmd('frame', float(STRIKE)), cmd('hit_log_clear', 1), strike_box(),
-               cmd('frame', float(STRIKE + 2)), cmd('remove_all_hitboxes')]
+    connect = ([cmd('stage_freeze', 1, STAGE_FREEZE_SAFETY), cmd('frame', float(STRIKE)), cmd('stage_freeze', 0, 0),
+                cmd('hit_log_clear', 1)] +
+               if_(V_CHG, 4, FULL, [strike_box()]) +
+               if_(V_CHG, 5, FULL, if_(V_SHV, 5, 0.5, [strike_box(True, SH_BONUS)]) +
+                   if_(V_SHV, 4, 0.5, [strike_box(True)])) +
+               [cmd('frame', float(STRIKE + 2)), cmd('remove_all_hitboxes')])
     return dash, connect
 
 
@@ -346,18 +393,19 @@ def build(sm_dir, out_dir, ts_skill, ts_se_wav, sh_args, png=None, halo=True):
         o = outs[('main', m)]
         assert o.frames == anim.frames_of(m)
         assert all(max(abs(v) for v in o.sample(trans, f)[0]) < 1e-6 for f in range(o.frames)), 'TransN moves'
-    speed = info['info'][anim.DASH]['root_speed']
+    rs = info['info'][anim.DASH]['root_speed']
     ref = os.path.join(HERE, '..', 'reference', 'xv2', 'timeskip_root.json')
     want = {'source': '1352_HIK_DSH.ean #0 b_C_Base Z, SpecialS frames (tools/supamario_timeskip_anim.py root_speed): '
-                      'the MSC\'s ts_vroot', 'speed': speed}
+                      'the MSC\'s ts_vroot', 'speed': rs}
     if not os.path.exists(ref) or json.load(open(ref)) != want:
         with open(ref, 'w') as fh:
             json.dump(want, fh)
     js = {m: anim.joints(info['frames'][m], info['smash']) for m in anim.MOTIONS}
     doc = {'dash_frames': anim.frames_of(anim.DASH), 'connect_frames': anim.frames_of(anim.CONNECT),
-           'hit': [HIT_FROM, HIT_LAST], 'move': [MOVE_FROM, MOVE_N, MOVE_N_CH, MOVE_V, MOVE_DRAG],
-           'loop': [LOOP_FROM, LOOP_AT], 'strike': STRIKE, 'travel': [travel(False, speed), travel(True, speed)],
-           'root_speed': speed, 'joints': js, 'info': {m: {k: v for k, v in info['info'][m].items()}
+           'hit': [HIT_FROM, HIT_LAST], 'move': [MOVE_FROM, MOVE_N, MOVE_EASE, VMIN, VMAX, VSTOP], 'strike': STRIKE,
+           'travel': {'uncharged': travel(0, rs), 'charged': travel(CHARGE, rs), 'uncharged_air': travel(0, rs, True),
+                      'charged_air': travel(CHARGE, rs, True)},
+           'root_speed': rs, 'joints': js, 'info': {m: {k: v for k, v in info['info'][m].items()}
                                                          for m in anim.MOTIONS}}
     os.makedirs(os.path.join(out_dir, 'preview'), exist_ok=True)
     hb = {anim.DASH: {f: (HIT_Z, HIT_Y, HIT_SIZE) for f in (HIT_FROM, 40, HIT_LAST)},
@@ -398,10 +446,10 @@ def main():
     print(build(a[0], a[1], opts['--ts-skill'], opts['--ts-se-wav'], sh, opts.get('--png'), halo))
     print('sounds: ' + ', '.join('%s 0x%08X' % kv for kv in SE_IDS.items()))
     print('effects: ' + ', '.join('%s 0x%08X' % kv for kv in FX_IDS.items()))
+    import supamario_fakedeath_build as FD
     for pct in (0, 50, 100, 150):
-        import supamario_fakedeath_build as FD
         kb = knockback(STRIKE_HIT, pct + CATCH['Damage'])
-        print('at %d%% (+ the catch): strike knockback %.1f, hitstun %d, ~%.0f units away' % (
+        print('at %d%% (+ the detection): punch knockback %.1f, hitstun %d, ~%.0f units away' % (
             pct, kb, int(kb * 0.4), FD.flight(kb, STRIKE_HIT['Angle'])[0]))
 
 
