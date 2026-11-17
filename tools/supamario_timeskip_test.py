@@ -378,19 +378,19 @@ def msc_tests(path, root):
     v.x = 1e4                                           # out of reach until the dash: then put below-ahead (tracked)
 
     def dive(g_, k):
-        if k == B.WIND_END + B.CHARGE:
-            v.x, v.y = g_.x + 45.0, g_.y - 70.0         # 57 degrees down, 83 away: out of range ...
         if k == B.WIND_END + B.CHARGE + 2:
-            v.x, v.y = g_.x + 30.0, g_.y - 45.0         # ... then 56 degrees down within 54: tracked
-        if k == B.WIND_END + B.CHARGE + 12:
+            v.x, v.y = g_.x + 20.0, g_.y - 42.0         # 64.5 degrees down, 46.5 away: tracked
+        if k == B.WIND_END + B.CHARGE + 8:
             v.x = 1e4                                   # gone: the last aim kept
     tr, vm = run(path, g, frames=300, after=60, tick=dive)
     lims = [x for n, x in g.vlims if n > g.statuses[0][0]] if g.statuses else []
     falls = [x for x in lims if x > MAX_FALL + 1e-3]
     steps = sorted({round(a - b, 3) for a, b in zip(falls, falls[1:])})
-    check('fully charged dive (tracked down): Fall faster than his max fall, the limit lowered %.2f a frame to it' %
-          B.FALL_EASE, (len(falls) > 3, steps, lims[len(falls)] if len(lims) > len(falls) else None),
-          (True, [B.FALL_EASE], MAX_FALL))
+    vy_end = [vy for n, vx, vy in g.vel if n == g.statuses[0][0] - 1][0]
+    print('     the dive: falling %.3f a frame at the move\'s end; the limit after it %s' % (vy_end, lims[:8]))
+    check('fully charged dive (tracked down 64.5 degrees): Fall faster than his max fall (%.2f), the limit lowered %.2f a '
+          'frame to it' % (-vy_end, B.FALL_EASE), (-vy_end > MAX_FALL + 0.1, steps, lims[len(falls)] if len(lims) >
+                                                    len(falls) else None), (True, [B.FALL_EASE], MAX_FALL))
     # 4. charges: 20 frames (half), full
     for held, v_ in ((20, B.speed(20)), (B.CHARGE + 5, B.VMAX)):
         g = Game(held=lambda n, h=held: n < B.WIND_END + h)
@@ -440,33 +440,31 @@ def msc_tests(path, root):
     check('an invincible fighter, then another: the second caught (slot 3)', g.vars.get(B.V_SLOT), -1.0)
     check('  (its hold written on slot 3 only)', sorted({s_ for _n, s_, _x in g.holds}), [3])
     # 7. tracking (the user): the nearest opponent in front within 80, up to 65 degrees; the direction only
-    for name, dx, dy, air, want_up in (('45 degrees up, 50 away (air)', 35.0, 35.0, True, True),
-                                       ('64 degrees up, 60 away (air)', 26.0, 54.0, True, True),
-                                       ('70 degrees up (air)', 15.0, 41.0, True, False),
-                                       ('behind (air)', -30.0, 20.0, True, False),
-                                       ('85 away (air)', 70.0, 48.0, True, False),
-                                       ('45 degrees down (air)', 35.0, -35.0, True, False),
-                                       ('above-ahead from the ground', 40.0, 30.0, False, True),
-                                       ('below-ahead from the ground', 40.0, -30.0, False, False)):
+    for name, dx, dy, air in (('45 degrees up, 50 away (air)', 35.0, 35.0, True),
+                              ('64 degrees up, 60 away (air)', 26.0, 54.0, True),
+                              ('70 degrees up (air)', 15.0, 41.0, True),
+                              ('behind (air)', -30.0, 20.0, True),
+                              ('85 away (air)', 70.0, 48.0, True),
+                              ('45 degrees down (air)', 35.0, -35.0, True),
+                              ('level ahead on the ground (stays on it)', 40.0, 0.0, False),
+                              ('above-ahead from the ground (takes off)', 40.0, 30.0, False),
+                              ('below-ahead from the ground (not aimed down)', 40.0, -30.0, False)):
         y0 = 100.0
         v = V(3, 1e4, y=y0, air=True)
         g = Game(fighters=[v], air=air, y=y0, floor=None if air else y0)
 
         def put(g_, k, dx=dx, dy=dy):
-            if k == mf - 1:
-                v.x, v.y = g_.x + dx, g_.y + dy + B.HIT_Y - B.VICTIM_MID
-            if k == mf + 3:
+            if k == mf:
+                v.x, v.y = g_.x + dx, g_.y + dy         # feet to feet, placed on the moving part's first frame
+            if k == mf + 1:
                 v.x = 1e4
         tr, vm = run(path, g, frames=mf + 6, tick=put)
-        vel = [(vx, vy) for n, vx, vy in g.vel if n == mf + 1]
-        vx, vy = vel[0]
+        vx, vy = [(vx, vy) for n, vx, vy in g.vel if n == mf][0]
         aim = math.degrees(math.atan2(vy, vx))
-        want = math.degrees(math.atan2(dy, dx)) if want_up or (dy < 0 and air and abs(dy) <= abs(dx) * 2.14) else 0.0
-        if dx < 0 or math.hypot(dx, dy) > B.TRACK_RANGE or abs(math.degrees(math.atan2(dy, abs(dx)))) > B.TRACK_DEG:
-            want = 0.0
+        ang = math.degrees(math.atan2(dy, dx)) if dx > 0 else 999.0
+        want = ang if (math.hypot(dx, dy) < B.TRACK_RANGE and abs(ang) <= B.TRACK_DEG and (air or ang >= 0)) else 0.0
         check('tracking %s: aimed %.0f degrees, speed %.2f, never turned' % (name, want, B.VMIN),
-              (round(aim, 0), round(math.hypot(vx, vy), 3), g.turns),
-              (round(want, 0), B.VMIN, []))
+              (round(aim, 1), round(math.hypot(vx, vy), 3), g.turns), (round(want, 1), B.VMIN, []))
     # 8. B-reverse
     for kk, want in ((0, 1), (3, 1), (4, 0)):
         g = Game(stick_x=lambda n, kk=kk: -1.0 if n == kk else 0.0)

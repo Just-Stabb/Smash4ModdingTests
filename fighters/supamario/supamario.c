@@ -41266,7 +41266,7 @@ void ts_ease(float n)
     KineticModule(0xf, 0x1, -WorkModuleF(0, 0x3000018) * w);
     mx = WorkModuleF(0, 0x3000019);
     vy = KineticModuleF(0xb, 0x1);
-    if (vy < -mx - 0.001f)
+    if (vy < -mx - TS_FALL_EASE)
     {
         KineticModule(0x14, 0x1, -vy - TS_FALL_EASE);
     }
