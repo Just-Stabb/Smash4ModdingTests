@@ -73,3 +73,11 @@ His loser panel on the results screen was empty: `param/ui/result_param.bin` fra
 - win1 - 3 (APPROXIMATED: what the scene does at that frame isn't known, vanilla's are 80 - 100 % of each motion): 122 / 108 / 125: Bowser's 132 / 100 / 145 x his j02win1-3 (130 / 131 / 130) over Bowser's (141 / 121 / 151);
 - his win cameras, which no package had: Ultimate's `camera/fighter/gaogaen/c00/j02win1-3` (camera-SSBU) converted to `motion/camera/result/gaogaen/1-3/camera_motion.omo` + `.vbn` (`ultimate_camera.py convert-dir`), where the result scene loads the winner's camera; the field of view isn't in the motion (the scene's own is used) and the format is Byleth v3's, not yet confirmed in game.
 Built with `tools/result_param.py port` on Byleth v17's file (it keeps every vanilla entry and Byleth's byte for byte); every added kind's entry is in the one file. `port_check` R1 / R2: 0 errors over it. Not yet seen in game.
+
+## Size (fighter_sizes_v1)
+
+fighter_param (`tools/ultimate_stats.py` SIZE, from Ultimate's `fighter/common/param/fighter_param.prc`; until
+fighter_sizes_v1 these were Bowser's): 44 scale 0.82 -> 1.0 (Ultimate's `scale`: the model is Ultimate's skeleton 1:1, so the size
+in game is this x the model), 45 shield 16 -> 10.296 (Ultimate's shield_radius x 0.88: APPROXIMATED, the median Smash 4 /
+Ultimate ratio), 48 tumble hitbox 5.6 -> 3.6036 (= 45 x 0.35), 49 effect_scale 1.7 -> 1.0 and 185 freeze_size 15.3 -> 11.2 (Ultimate's
+effect_scale / ice_radius). docs/ultimate-port-guide.md "Stats"; `port_check` P4.

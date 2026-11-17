@@ -1670,3 +1670,11 @@ His loser panel on the results screen was empty: `param/ui/result_param.bin` fra
 - win1 - 3 (APPROXIMATED: what the scene does at that frame isn't known, vanilla's are 80 - 100 % of each motion): 114 / 118 / 136: Robin's 140 / 140 / 163 x his win motions (135 / 131 / 138, the installed bodyresult = Ultimate's) over hers (166 / 156 / 166); her win4 (140) dropped: he has no fourth pose;
 - his win cameras, which no package had: Ultimate's `camera/fighter/brave/c00/j02win1-3` (camera-SSBU) converted to `motion/camera/result/brave/1-3/camera_motion.omo` + `.vbn` (`ultimate_camera.py convert-dir`), where the result scene loads the winner's camera; the field of view isn't in the motion (the scene's own is used) and the format is Byleth v3's, not yet confirmed in game.
 Built with `tools/result_param.py port` on Byleth v17's file (it keeps every vanilla entry and Byleth's byte for byte); every added kind's entry is in the one file. `port_check` R1 / R2: 0 errors over it. Not yet seen in game.
+
+## Size (fighter_sizes_v1)
+
+fighter_param (`tools/ultimate_stats.py` SIZE, from Ultimate's `fighter/common/param/fighter_param.prc`; until
+fighter_sizes_v1 these were Robin's): 44 scale 1.0 -> 0.96 (Ultimate's `scale`: the model is Ultimate's skeleton 1:1, so the size
+in game is this x the model), 45 shield 10.7 -> 10.384 (Ultimate's shield_radius x 0.88: APPROXIMATED, the median Smash 4 /
+Ultimate ratio), 48 tumble hitbox 3.745 -> 3.6344 (= 45 x 0.35), 49 effect_scale 1.05 -> 0.95 and 185 freeze_size 8.6 -> 10 (Ultimate's
+effect_scale / ice_radius). docs/ultimate-port-guide.md "Stats"; `port_check` P4.
