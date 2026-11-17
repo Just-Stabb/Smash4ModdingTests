@@ -14,7 +14,8 @@ Mapping (docs/xv2-vfx-format.md for the EMP side, docs/ptcl-format.md for the ef
   its velocity) -> type 3, ShapeDraw (a ring / arc drawn as a strip) -> type 1 (a polygon in the
   emitter's XY plane, turned by the emitter transform: X -90 more, as XV2 draws it in the node's
   XZ plane) with the ring drawn into the texture.
-  ConeExtrude ribbons and Mesh emissions are skipped (listed). Normal-blend camera billboards use a
+  ConeExtrude ribbons and Mesh emissions are skipped (listed); with CONE_STREAKS set (opt-in: Supamario's Time Skip
+  v4) a ConeExtrude ribbon becomes a type 3 streak along its particle's velocity (cone_streak). Normal-blend camera billboards use a
   normal-blend template; everything else an additive one, blend set from the EMM material
   (normal blend on streaks / rings becomes additive: no normal template of those types in Mario's
   file);
@@ -55,6 +56,7 @@ UNIT = 8.5
 FOREVER = 0x7FFFFFFF
 TEX_MAX = 256                      # the largest texture side made (small, short sparks / smoke: 64 keeps a bank small)
 MAX_EMITTERS = 16                  # the most any vanilla set has
+CONE_STREAKS = False               # opt-in (default off: every earlier build byte for byte): ConeExtrude ribbons as streaks
 # (particle type, blend class) -> (set, emitter) in Mario's / Supamario's ptcl: simple emitters,
 # one BC4 texture, no flipbook, both colour tracks key-animated (the normal one: colour 0 only)
 TEMPLATES = {(0, 'add'): ('PtcMarioPumpMax', 'flare1'),
@@ -224,7 +226,27 @@ def emission_kind(node):
         return 3
     if t == 'ShapeDraw':
         return 1
+    if t == 'ConeExtrude' and CONE_STREAKS:
+        return 3
     return None
+
+
+def cone_streak(node, chain, sx):
+    """a ConeExtrude ribbon (XV2 draws the path its particle took over the last Duration frames, its width the node's
+    scale) as one type 3 streak along the velocity: (width curve, length curve, extra life). The length: the particle's
+    speed (the emitter above's Velocity, units a second) x the extrude duration (Duration + half its variance), grown
+    over that many frames from the particle's birth; the particle lives that much longer (the ribbon's tail outlives
+    its head). The width / alpha curves stay over the (longer) life. Vortex / Attract (the swirl) aren't converted"""
+    ce = node['EmissionNode'].get('ConeExtrude') or {}
+    dur = float(ce.get('Duration', 0)) + float(ce.get('Duration_Variance', 0)) / 2.0
+    src = next((n for n in reversed(chain[:-1]) if n['NodeType'] == 'Emitter'), None)
+    v = float(src['EmitterNode'].get('Velocity', 0.0)) if src is not None else 0.0
+    life = float(node['Lifetime']) + float(node['Lifetime_Variance']) / 2.0
+    length = max(v / 60.0 * dur, 1e-3)
+    grow = 100.0 * dur / max(life + dur, 1.0)
+    t = np.arange(101.0)
+    sy = length * np.clip(t / max(grow, 1e-3), 0.0, 1.0)
+    return sx, sy, int(round(dur))
 
 
 def blend_of(pkg, node):
@@ -359,6 +381,10 @@ def convert_emission(p, pkg, images, chain, unit, name, spawn_times):
             sx, sy = curve(node, 'ScaleXY.X', tex['ScaleXY'][0]), curve(node, 'ScaleXY.Y', tex['ScaleXY'][1])
         else:
             sx = sy = curve(node, 'ScaleBase', tex['ScaleBase'])
+    cone_extra = 0
+    if node['NodeSpecificType'] == 'ConeExtrude':
+        sx, sy, cone_extra = cone_streak(node, chain, sx)
+        notes.append('ConeExtrude as a streak (length %.3f, +%d life)' % (float(sy.max()), cone_extra))
     h, w = shape.shape
     tw, th = pow2(w, hi=TEX_MAX), pow2(h, hi=TEX_MAX)
     if (tw, th) != (w, h):
@@ -426,7 +452,7 @@ def convert_emission(p, pkg, images, chain, unit, name, spawn_times):
     p.set_field(em, 'emit_start', 0)
     p.set_field(em, 'emit_interval', int(interval))
     p.set_field(em, 'emit_rate', float(rate))
-    p.set_field(em, 'ptcl_life', max(1, int(node['Lifetime'])))
+    p.set_field(em, 'ptcl_life', max(1, int(node['Lifetime']) + cone_extra))
     p.set_field(em, 'ptcl_life_random', int(node['Lifetime_Variance']))
 
     # ---- shape and motion, from the nearest emitter node above
