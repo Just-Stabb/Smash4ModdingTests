@@ -36388,7 +36388,7 @@ void func_2246()
     // on the ledge: the base the user chose for Sword of the Creator). CatchPull / CatchDashPull (0x36 / 0x38, her
     // whip's pull): the common ones (his grab is a plain one)
     sv_set_mem(0x1, 0x1, 0xf1, master_hi_air_main);
-    sv_set_mem(0x1, 0x1, 0xf2, func_2269);
+    sv_set_mem(0x1, 0x1, 0xf2, master_hi_f2_main);   // v19: her 0xF2 with a give-up (was func_2269)
     sv_set_mem(0x1, 0x1, 0xf3, func_2270);
     sv_set_mem(0x1, 0x1, 0xf4, func_2271);
     sv_set_mem(0x1, 0x1, 0xf5, func_2273);
@@ -38755,9 +38755,61 @@ void master_hi_air_main()
     // v18: Ultimate's init (lua2cpp f_7208a1e220) selects the common AIR_LASSO hang data in the air (cliff_hang_data[1]:
     // -5 - 75 ahead, -35 - 85 up) before the loop runs: vl group 7 entry MASTER_HI_INIT_BOX (v10 - v17 checked the
     // normal box, entry 0, on 12 - 14: user v17 "the tether detection for ledges is too strict")
-    GroundModule(0x2712, MASTER_HI_INIT_BOX);
+    // v19: that box is selected by the loop only on the sword's check frames (AIR_LASSO_FLAG_CHECK, 12 - 14), and a
+    // ledge in it must be in the sword's reach (master_hi_reach); until then the normal box (v18 selected entry 4 here,
+    // from frame 0: user v18 "the tether will attempt to happen out of Byleth's range")
+    GroundModule(0x2712, 0);
     KineticModule(0x11, 0x1, MASTER_HI_START_Y);       // Ultimate's start_speed_y_air
     func_78(master_hi_air_loop);
+}
+
+// v19: the ledge func_99 found is in the sword's reach: its corner (GroundModuleF(1) / (2): the cliff's position, as the
+// common CliffCatch reads it) no farther than param_sword reach_length_max (MASTER_HI_REACH, 70) from his hand
+// (MASTER_HI_LINE_X / _Y, the line test's start). Ultimate catches a ledge only where the sword can stretch to it;
+// v18's box alone (the common AIR_LASSO, up to 75 ahead / 85 up: ~95 from the hand) let ZSS's tether throw her whip
+// at ledges it can't reach (0xF2: it falls short and she waits there for ever). 1: in reach
+int master_hi_reach()
+{
+    float dx;
+    float dy;
+    dx = (GroundModuleF(0x1) - PostureModuleF(0x1)) * PostureModuleF(0) - MASTER_HI_LINE_X;
+    dy = GroundModuleF(0x2) - PostureModuleF(0x2) - MASTER_HI_LINE_Y;
+    if (dx * dx + dy * dy <= MASTER_HI_REACH * MASTER_HI_REACH)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// v19: 0xF2 (her AirCatchPose: the whip, article 2 status 7, thrown at the ledge; her native code moves him to 0xF3 when
+// it gets there). Her loop (func_130) leaves only by landing: a whip that never gets there (v18: a ledge out of the
+// sword's reach) held him helpless to the blast line. Her main (func_2269 + func_129) with her loop plus a give-up: Fall
+// after MASTER_HI_F2_MAX frames (her end, func_131, removes the whip)
+void master_hi_f2_main()
+{
+    WorkModule(0x7, 0x2, 0x11000002);
+    WorkModule(0x7, 0x7, 0x11000004);
+    WorkModule(0x19, 0x1f000008);
+    WorkModule(0x7, 0x95, 0x11000005);
+    if (!WorkModule(0x10, 0x21000010))
+    {
+        func_22(0x92, 0, 1.0f);
+        MotionModule(0x4, 0);
+    }
+    ArticleModule(0x2713, WorkModule(0x6, 0x11000002), WorkModule(0x6, 0x11000004));
+    func_78(master_hi_f2_loop);
+}
+
+void master_hi_f2_loop()
+{
+    if (func_55())
+    {
+        return;
+    }
+    if (global9 >= MASTER_HI_F2_MAX)
+    {
+        func_16(0xe, 0);
+    }
 }
 
 // the wall he touches: 1 (right of him on screen), -1 (left), 0 none (the common wall jump's func_98 tests)
@@ -38806,7 +38858,9 @@ void master_hi_air_loop()
             GroundModule(0x2712, 0x2);
         }
     }
-    if (func_99() == 0x1 && WorkModule(0x2712, 0x2100000d))
+    // v19: and only a ledge the sword reaches (master_hi_reach: the clip's ledge, ~70 ahead / ~75 up, was in entry 4 at
+    // frame 12 but ~85 from his hand: her whip was thrown at it, fell short, and 0xF2 held him till the blast line)
+    if (func_99() == 0x1 && WorkModule(0x2712, 0x2100000d) && master_hi_reach())
     {
         func_16(0xf2, 0);
         return;
@@ -38979,7 +39033,8 @@ int master_hi_line(float f)
     // v18: a ledge first (user v17: "up special prioritizes walls over ledges"; Ultimate catches the ledge in its
     // AIR_LASSO window before the sword reaches anything): a wall met while a ledge is in the tether box (entry 2,
     // selected from 15 and kept) and catchable is the ledge's corner -> the ledge (her tether's 0xF2), not the latch
-    if (func_99() == 0x1 && global18 == 0x2)
+    // v19: a ledge the sword reaches (master_hi_reach), as in the check window
+    if (func_99() == 0x1 && global18 == 0x2 && master_hi_reach())
     {
         func_16(0xf2, 0);
         return 0x1;

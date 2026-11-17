@@ -200,6 +200,8 @@ class Game:
             return f2i(self.ledge[2] if self.ledge else 0.0)
         if sid == 0x1B and a == [1]:                         # v18: GroundModuleF(1): the ledge's x
             return f2i(self.ledge[0] if self.ledge else 0.0)
+        if sid == 0x1B and a == [2]:                         # v19: GroundModuleF(2): the ledge's y (master_hi_reach)
+            return f2i(self.ledge[1] if self.ledge else 0.0)
         return 0
 
     def ledge_in_box(self):

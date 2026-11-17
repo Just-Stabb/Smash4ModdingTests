@@ -212,6 +212,12 @@ CONSTS = dict(
     # entry 4 (ultimate_vl_shapes.tether_box(vl, 1), master_build.vl_v18; entry 3 is ZSS's, kept), on AIR_LASSO_FLAG_CHECK's frames
     # before 15 (v10 - v17 had the normal box, entry 0, there)
     MASTER_HI_INIT_BOX='0x4',
+    # (v19) the sword's reach for a ledge (user v18: "the tether will attempt to happen out of Byleth's range instead of
+    # just whiffing"): a ledge in the box is caught only when its corner (GroundModuleF(1) / (2)) is within
+    # param_sword reach_length_max (70, the sword's longest blade) of his hand (MASTER_HI_LINE_X / _Y); the box's far
+    # corner (75 ahead, 85 up) is ~95 from the hand. 0xF2 (her whip thrown at the ledge) gives up after
+    # MASTER_HI_F2_MAX frames without reaching it (mine: her whip takes ~10 for 70; vanilla 0xF2 waits for ever)
+    MASTER_HI_REACH='70.0f', MASTER_HI_F2_MAX='40.0f',
     # (v10) Aymr: SpecialAirLw's KineticModule::add_speed (0, 1) at 53 (the translator drops it: no hop, he landed
     # inside 53 - 60 and lost the hit) and the end of its hitbox (67): a landing from the hop to there keeps the air
     # motion and its hit (Ultimate: the hop, then FORBID_LANDING 60 - 65)

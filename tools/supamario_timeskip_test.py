@@ -501,7 +501,6 @@ def msc_tests(path, root):
     tr, vm = run(path, g)
     check('an invincible fighter, then another: the second caught (slot 3)', g.vars.get(B.V_SLOT), -1.0)
     check('  (its hold written on slot 3 only)', sorted({s_ for _n, s_, _x in g.holds}), [3])
-    tracking_tests(path)
     # 8. B-reverse
     for kk, want in ((0, 1), (3, 1), (4, 0)):
         g = Game(stick_x=lambda n, kk=kk: -1.0 if n == kk else 0.0)
@@ -531,6 +530,187 @@ def msc_tests(path, root):
     tr, vm = run(path, g, tick=ko_tick)
     check('the victim KO\'d in the hold: let go, nothing held after', (v.input_off, max(n for n, _s, _x in g.holds)),
           (False, ck + 3))
+    edge_tests(path, root)
+    pointblank_tests(path)
+    reset_tests(path)
+
+
+def tracking_tests(path):
+    """7. tracking (the user): the nearest opponent in front within 80, up to 65 degrees up or down, on the ground and in the
+    air alike (v2: no ground rule); the direction only (never turned, the speed unchanged). Placed on the moving part's
+    first frame (feet to feet) and gone the next: that frame's aim and travel"""
+    mf = B.MOVE_FROM
+    for name, dx, dy, air, want_air in (
+            ('45 degrees up, 50 away (air)', 35.0, 35.0, True, True),
+            ('64 degrees up, 60 away (air)', 26.0, 54.0, True, True),
+            ('70 degrees up (air): past 65, not tracked', 15.0, 41.0, True, True),
+            ('behind (air): not tracked', -30.0, 20.0, True, True),
+            ('85 away (air): past 80, not tracked', 70.0, 48.0, True, True),
+            ('45 degrees down (air)', 35.0, -35.0, True, True),
+            ('64 degrees down (air)', 30.0, -61.0, True, True),
+            ('70 away, 30 degrees up (air): tracked (past the God Fist\'s 55)', 60.6, 35.0, True, True),
+            ('level ahead on the ground (stays on it)', 40.0, 0.0, False, False),
+            ('v2: an airborne opponent 45 degrees up from the ground: tracked, he leaves the ground', 40.0, 40.0, False,
+             True),
+            ('v2: 60 degrees up from the ground: tracked, lifted off', 25.0, 43.3, False, True),
+            ('v2: below-ahead from the ground (off the stage): aimed down, the floor keeps him up while on it', 40.0,
+             -30.0, False, False)):
+        y0 = 100.0
+        v = V(3, 1e4, y=y0, air=True)
+        g = Game(fighters=[v], air=air, y=y0, floor=None if air else y0)
+        aims = {}
+
+        def put(g_, k, dx=dx, dy=dy):
+            if k == mf:
+                v.x, v.y = g_.x + dx, g_.y + dy         # feet to feet, placed on the moving part's first frame
+            if k == mf + 1:
+                v.x = 1e4
+        tr, vm = run(path, g, frames=mf + 6, tick=put)
+        sn = g.vars.get(B.V_AIM, 0.0)
+        ang = math.degrees(math.atan2(dy, dx)) if dx > 0 else 999.0
+        want = ang if (math.hypot(dx, dy) < B.TRACK_RANGE and abs(ang) <= B.TRACK_DEG) else 0.0
+        vx, vy = [(vx, vy) for n, vx, vy in g.vel if n == mf][0]
+        moved = math.degrees(math.atan2(vy, vx))
+        if not air and want < 0:                        # on the floor: its downward part taken by the floor
+            wmove, wspeed = 0.0, round(B.VMIN * math.cos(math.radians(want)), 3)
+        else:
+            wmove, wspeed = want, B.VMIN
+        check('tracking %s: aimed %.0f degrees (moved %.0f at %.2f), never turned, %s' % (
+            name, want, wmove, wspeed, 'in the air' if want_air else 'on the ground'),
+            (round(math.degrees(math.asin(max(-1.0, min(1.0, sn)))), 1), round(moved, 1),
+             round(math.hypot(vx, vy), 3), g.turns, g.air),
+            (round(want, 1), round(wmove, 1), wspeed, [], want_air))
+    # v2: the offstage opponent: the aim down kept while on the floor, then down at full speed past the edge
+    v = V(3, 40.0, y=-30.0, air=True)
+    g = Game(fighters=[v], y=0.0, edge=12.0)
+    tr, vm = run(path, g, frames=mf + 20)
+    off = first(tr, lambda t: t[0] >= mf and t[4] < -0.01)
+    vel = [(n, round(math.hypot(a, b), 3), round(math.degrees(math.atan2(b, a)), 1)) for n, a, b in g.vel
+           if off and n >= off[0] and n < mf + 12]
+    ang = round(math.degrees(math.atan2(-30.0, 40.0)), 1)
+    check('v2: an opponent below past the edge: level on the floor to the edge (12), then down along the aim at the full '
+          'speed, the move going on in the air (no Fall)', (off is not None, sorted({x for _n, x, _a in vel}),
+                                                            g.statuses), (True, [B.VMIN], []))
+    print('     past the edge: the aim %s (opponent at %.1f degrees, re-aimed as he goes)' % (
+        sorted({a_ for _n, _x, a_ in vel})[:3], ang))
+    # v2 (user: "the exact same tracking rules as Super God Fist"): Time Skip's picker isn't the God Fist's
+    src = open(os.path.join(HERE, '..', 'fighters', 'supamario', 'supamario.c')).read()
+    body = src[src.index('void ts_track()'):]
+    body = body[:body.index('\n}\n')]
+    import supamario_godfist_build as GB
+    check('v2: ts_track is Time Skip\'s own (no gf_* call, no ground rule), its range / angle (%g / %g) not the God '
+          'Fist\'s (%g / %g)' % (B.TRACK_RANGE, B.TRACK_DEG, GB.TRACK_RANGE, GB.TRACK_ANGLE),
+          ('gf_' in body, 'global18' in body, B.TRACK_RANGE != GB.TRACK_RANGE, B.TRACK_DEG != GB.TRACK_ANGLE),
+          (False, False, True, True))
+
+
+def edge_tests(path, root):
+    """v2 (user: "Can't leave edges"): the ground dash runs off the edge and goes on in the air at its speed"""
+    mf, mn = B.MOVE_FROM, B.MOVE_N
+    g0 = Game()
+    run(path, g0)
+    g = Game(edge=40.0, floor=0.0)
+    tr, vm = run(path, g, after=30)
+    off = first(tr, lambda t: t[3] > 40.0)
+    check('v2 edge: off the edge at x 40 in the moving part, the side special goes on (phase 3, SpecialS), no Fall '
+          'until its end (%d), then Fall' % (mf + mn), (off is not None and off[0] < mf + mn, [t[6] for t in tr if
+                                                                                              off and off[0] <= t[0] < mf + mn and t[5] is None][:1],
+                                                     g.statuses[:1]), (True, [3.0], [(mf + mn, 0xE)]))
+    check('v2 edge: the moving part\'s speeds on and off the edge the same as on flat ground, no height lost while the '
+          'move goes on', (speeds(g, mf, mf + mn - 1) == speeds(g0, mf, mf + mn - 1),
+                           max(abs(t[4]) for t in tr if t[0] < mf + mn and t[5] is None)), (True, 0.0))
+    check('v2 edge: air kinetics once off (correction 5), the air use taken', ([c for _n, c in g.correct][-1:],
+                                                                                 g.vars.get(B.V_USED)), ([5], 1.0))
+
+
+def pointblank_tests(path):
+    """v2 (user: "The 2% detection hit won't activate the punch on opponents touching Supamario at point blank")"""
+    for x0, tag in ((0.5, 'on top of him (0.5 ahead)'), (-1.0, 'overlapping his back half (1 behind)'),
+                    (3.0, 'touching his front (3 ahead)')):
+        res = []
+        for boxes in ((0,), (0, 1)):
+            v = V(2, x0)
+            v.w = 1.5
+            g = Game(fighters=[v], boxes=boxes)
+            tr, vm = run(path, g)
+            res.append(any(t[1] == 0x21D for t in tr))
+        check('v2 point blank, a slim fighter %s: v1\'s box alone %s; with the point-blank box (ID 1) caught' % (
+            tag, 'misses' if not res[0] else 'catches'), res[1], True)
+        print('     (v1\'s box alone: %s)' % ('caught' if res[0] else 'missed'))
+    v = V(2, 0.5, air=True, y=0.0)
+    v.w = 1.5
+    g = Game(fighters=[v], air=True, y=0.0, floor=-1e4)
+    tr, vm = run(path, g)
+    c = first(tr, lambda t: t[1] == 0x21D)
+    check('v2 point blank in the air: caught (the connect), the slim fighter held (slot 2)',
+          (c is not None, sorted({s_ for _n, s_, _x in g.holds})), (True, [2]))
+
+
+def reset_tests(path):
+    """v2 (user: "Never resets after being used in the air"): the use (VAR_26) back to 0 from the MSC (ts_reset) on each
+    event, with the exe's resets off (the model's older exe: the selection IDs ignored)"""
+    events = (('landing', None, None, True), ('ledge (CliffCatch, situation 1)', 0x73, 1, False),
+              ('hit (Damage)', 0x45, None, False), ('hit (DamageFlyRoll)', 0x4A, None, False),
+              ('grabbed (CapturePulled)', 0x3F, None, False), ('KO (Dead)', 0xB1, None, False),
+              ('respawn (Rebirth)', 0xB2, None, False))
+    mf, mn = B.MOVE_FROM, B.MOVE_N
+    for name, st, sit, land in events:
+        g = Game(air=True, y=60.0, floor=0.0 if land else -1e4)
+        g.resets = False
+        at = mf + mn + 10
+        seen = {}
+
+        def tick(g_, k, st=st, sit=sit):
+            if k == at - 1:
+                seen['before'] = g_.vars.get(B.V_USED)
+            if st is not None and k == at:
+                g_.status = st
+                if sit is not None:
+                    g_.sit_fn = lambda n, s_=sit: s_
+        tr, vm = run(path, g, frames=300, after=120, tick=tick)
+        check('v2 reset (the MSC, the exe\'s resets off): %s -> the air use back (VAR_26 1 -> 0)' % name,
+              (seen.get('before'), g.vars.get(B.V_USED)), (1.0, 0.0))
+    g = Game(air=True, y=200.0, floor=-1e4)
+    g.resets = False
+    tr, vm = run(path, g, frames=300, after=40)
+    check('v2 reset: still taken while he stays in the air (Fall, no event)', g.vars.get(B.V_USED), 1.0)
+    vm.g[18] = 2
+    check('  ... and refused (ts_can_side 0)', vm.call(fn(vm, 'ts_can_side')), 0)
+    g = Game(air=True, y=200.0, floor=-1e4)
+    g.resets = False
+    seen = {}
+
+    def tick2(g_, k):
+        if k == 3:
+            seen['ph'] = g_.vars.get(B.V_PH)
+            g_.status = 0x4C                              # a stale status read in the move's first frames
+    tr, vm = run(path, g, frames=6, tick=tick2)
+    check('v2 reset: not while he is in the move (a stale damage status in its first frames keeps the use taken)',
+          g.vars.get(B.V_USED), 1.0)
+
+
+def brightness_tests(out):
+    """v2 (user: "Does a massive white flash when it hits an opponent"): tools/supamario_fx_glow.py on a grass stage and a
+    grey one: the punch's look against v1's (the shared Btl_HitLOD) and the user's earlier tolerance (Sledgehammer v5's
+    arcs, 1.0 / 3.6 square units over 1.0 on grass); the trail"""
+    import supamario_fx_glow as G
+    res = {}
+    for bg_name, bg in (('grass', (0.5, 0.65, 0.3)), ('grey', (0.5, 0.5, 0.5))):
+        r = G.measure(out, ('ts_hit', 'ts_hit_v1', 'ts_trail'), None, bg)
+        res[bg_name] = r
+        h, h1, t = r['ts_hit'], r['ts_hit_v1'], r['ts_trail']
+        e0, e1 = h['frames'][0][4], h1['frames'][0][4]
+        print('     %s: ts_hit frame 0 energy %.1f (v1 %.1f), most over 1.0 in a frame %.1f (v1 %.1f), brightest frame %s; '
+              'trail most over 1.0 %.1f, energy %.1f' % (bg_name, e0, e1, h['max_over_1'], h1['max_over_1'],
+                                                          h['brightest'], t['max_over_1'], t['brightest'][4]))
+        check('v2 %s: the punch\'s look at most 1.0 square unit over 1.0 in any frame (Sledgehammer v5\'s uncharged arcs; '
+              'v1 %.1f), its first frame (the freeze\'s) at most a third of v1\'s energy, still vibrant (energy 10+)' % (
+                  bg_name, h1['max_over_1']), (h['max_over_1'] <= 1.0, e0 <= e1 / 3.0, h['brightest'][4] >= 10.0),
+              (True, True, True))
+        check('v2 %s: the trail at most 1.0 square unit over 1.0, visible (energy 5+)' % bg_name,
+              (t['max_over_1'] <= 1.0, t['brightest'][4] >= 5.0), (True, True))
+    return res
+
 
 
 def shield_tests(path):
@@ -632,10 +812,15 @@ def script_tests(out, sh_out):
             'SDI', 'Clang', 'Rebound', 'NoGFX', 'Ground/Air', 'Shieldable')
     hb = lambda s: [tuple(round(x, 3) if isinstance(x, float) else x for x in (dict(zip(syn, c.params))[k] for k in keys))  # noqa
                     for c in s if nm(c) == 'Extra_Special_Hitbox']
-    check('specials: the connect box at %d in the dash only (TS_V_PH > 2.5): %s' % (B.HIT_FROM, (keys,)),
+    check('specials: the connect box at %d in the dash only (TS_V_PH > 2.5), v2 with the point-blank box (ID 1, Part 0, '
+          'at his middle): %s' % (B.HIT_FROM, (keys,)),
           ([c.params for c in dash if nm(c) in ('FRAME', 'Float_Var_Compare')], hb(dash)),
           ([[float(B.HIT_FROM)], [B.V_PH, 5, 2.5]],
-           [(0, 0, 2.0, 0, 1, 0, B.HIT_SIZE, B.HIT_Z, B.HIT_Y, B.CATCH_FREEZE, B.CATCH_FREEZE, 0.0, 0, 0, 0, 3, 1)]))
+           [(0, 0, 2.0, 0, 1, 0, B.HIT_SIZE, B.HIT_Z, B.HIT_Y, B.CATCH_FREEZE, B.CATCH_FREEZE, 0.0, 0, 0, 0, 3, 1),
+            (1, 0, 2.0, 0, 1, 0, B.HIT2_SIZE, B.HIT2_Z, B.HIT2_Y, B.CATCH_FREEZE, B.CATCH_FREEZE, 0.0, 0, 0, 0, 3, 1)]))
+    r_ = B.HIT2_SIZE
+    check('v2: the point-blank box covers his body from behind his centre to XV2\'s box (%.2f to %.2f ahead, no gap)' % (
+        B.HIT2_Z - r_, B.HIT2_Z + r_), (B.HIT2_Z - r_ < 0.0, B.HIT2_Z + r_ >= B.HIT_Z - B.HIT_SIZE), (True, True))
     check('specialairs: the stopped time (Stage_Freeze on at 0, %d frames at most; off at the punch %d), the punch\'s '
           'Part 1 record cleared, off at %d; the three punches (uncharged shieldable 16; fully charged unblockable, 22 on a '
           'fighter caught shielding, 16 else)' % (B.STAGE_FREEZE_SAFETY, B.STRIKE, B.STRIKE + 2),
@@ -708,6 +893,49 @@ def effect_tests(out, sh_out):
             if max(rgb) > 2.0 + 1e-3:
                 bad.append((p.emitter_name(d), 'HDR', rgb))
     check('Btl_HitL\'s emitters unturned at its origin (facing-safe), HDR within 2.0', bad, [])
+    # v2 (item 9, user: "Sledgehammer seems less bright than before"): every set before Time Skip's (Sledgehammer's, the
+    # God Fist's, Core Breaker's, Fake Death's, the Kamehameha's...) byte for byte as the Sledgehammer build's: each
+    # emitter's bytes, its textures (decoded), the shaders, the efc entries
+    diff = []
+    for si in range(len(q.sets)):
+        for k, em in enumerate(q.sets[si]['emitters']):
+            if em['data'] is None:
+                continue
+            if p.emitter_bytes(si, k) != q.emitter_bytes(si, k):
+                diff.append((q.set_name(si), k, 'bytes'))
+                continue
+            for slot in range(3):
+                try:
+                    a_, b_ = p.decode_texture(p.sets[si]['emitters'][k]['data'], slot), q.decode_texture(em['data'], slot)
+                except Exception:
+                    a_ = b_ = None
+                if (a_ is None) != (b_ is None) or (a_ is not None and a_.tobytes() != b_.tobytes()):
+                    diff.append((q.set_name(si), k, 'texture %d' % slot))
+    sh_ = [i for i in range(q.shader_count()) if q.shader_binary(i) != p.shader_binary(i) or
+           q.shader_entry(i) != p.shader_entry(i)]
+    check('v2: every earlier set (Sledgehammer\'s %d, the God Fist\'s, Core Breaker\'s, Fake Death\'s, ...: %d sets) byte '
+          'for byte as the Sledgehammer build\'s (emitters, textures), its shaders, its efc entries' % (
+              sum(1 for i in range(len(q.sets)) if 'PtcSupamarioSh' in q.set_name(i)), len(q.sets)),
+          (diff[:5], sh_[:5], e.entries[:len(qe.entries)] == qe.entries), ([], [], True))
+    lod_si, tr_si = e.entries[B.FX_LOD_ID & 0xFFFF][1] - 1, e.entries[B.FX_TRAIL_ID & 0xFFFF][1] - 1
+    shl = e.entries[B.SH_FX['hitlod'] & 0xFFFF][1] - 1
+    import supamario_sledgehammer_build as SB
+    pk = [(p.emitter_name(em['data']), round(SB.arc_peak(p, em['data']), 3)) for em in p.sets[lod_si]['emitters']
+          if em['data'] is not None]
+    pk_sh = [(q.emitter_name(em['data']), round(SB.arc_peak(q, em['data']), 3)) for em in q.sets[shl]['emitters']
+             if em['data'] is not None]
+    check('v2: Time Skip\'s own Btl_HitLOD (0x%08X, a copy of Sledgehammer\'s), its flash disc capped (%g), the rest by '
+          'LOD_CAP; Sledgehammer\'s own unchanged' % (B.FX_LOD_ID, dict(B.LOD_CAP)['flash']),
+          (p.set_name(lod_si), [n for n, _v in pk] == [n for n, _v in pk_sh],
+           all(v_ <= dict(B.LOD_CAP)['flash'] + 1e-3 for n, v_ in pk if n.startswith('flash'))),
+          ('PtcSupamarioTsBtl_HitLOD', True, True))
+    td = p.sets[tr_si]['emitters'][0]['data']
+    check('v2: the trail set (0x%08X): one purple directional streak along +X, %d frames, peak under 1.0' % (
+        B.FX_TRAIL_ID, B.TRAIL_LIFE), (p.set_name(tr_si), p.field(td, 'particle_type'),
+                                        [round(x, 3) for x in p.field(td, 'emit_direction')],
+                                        p.field(td, 'ptcl_life'), [round(x, 3) for x in p.color_keys(td, 0)[0][:3]],
+                                        SB.arc_peak(p, td) < 1.0),
+          ('PtcSupamarioTsTrail', 3, [1.0, 0.0, 0.0], B.TRAIL_LIFE, [round(x, 3) for x in B.TRAIL_RGB], True))
     import json
     rep = json.load(open(os.path.join(out, 'timeskip.json')))['fx']
     conv = sum(len(v['emitters']) for v in rep['sets'].values())
@@ -749,8 +977,10 @@ def main():
             FD.knockback(dict(Damage=17.0, Angle=42, KBG=75, FKB=0, BKB=45), p_)))
     path = os.path.join(a[0], 'fighter', 'supamario', 'script', 'msc', 'supamario.mscsb')
     msc_tests(path, root)
+    tracking_tests(path)
     script_tests(a[0], a[1])
     effect_tests(a[0], a[1])
+    brightness_tests(a[0])
     motion_tests(a[0], a[1])
     sound_tests(a[0])
     print('%d problem(s)' % len(PROBLEMS))
