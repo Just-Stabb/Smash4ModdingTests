@@ -159,7 +159,9 @@ CONSTS = dict(
     # (v7) the caught fighter's pull: param_special_hi rewind_speed 4.1, param_sword fighter_offset 8 (his hand short
     # of the caught point); the catch's reach: object_dist_max 55 + param_sword reach_length_max 70 (as |dx| + |dy|);
     # the pull's frame cap (mine: 70 / 4.1 = 17, rounded up)
-    MASTER_HI_REWIND='4.1f', MASTER_HI_FIND_DIST='125.0f', MASTER_HI_PULL_MAX='0x14',
+    # v17: the reel at 5.0 a frame (user: "reduce Byleth's travel time slightly during the catch"; Ultimate's 4.1;
+    # master_whip.REWIND, the pull motions' blade, the same)
+    MASTER_HI_REWIND='5.0f', MASTER_HI_FIND_DIST='125.0f', MASTER_HI_PULL_MAX='0x14',
     # (v12) the overtake (Ultimate's f_7208a1f1d0: his root constrained to the caught fighter's `throw` joint; the
     # motions' hips: special_air_hi_hit_pose (-0.3 fwd, 8.0 up), special_air_hi_overtake frame 0 (-8.1, -6.2)): the reel
     # ends 7.8 behind / 14.2 below that point, the overtake puts him on it; the throw joint's height when the target's
@@ -426,21 +428,24 @@ def hi_hit_script():
     back = lambda: [U.cmd('Set_Remote_Article_Action2', 2, 3)]        # noqa: E731
     out = if_var(HI_HIT_MODE_VAR, 0, 0, back())
     # v15: a fighter / a wall (VAR_16 = 10 x VAR_15 + v, master.c master_hi_sword_len; -1 the floor / ceiling stop):
-    # the sword out of her tether's statuses (status 0: no MSC main, as a generated whip) into Ultimate's own hit motion
-    # (the bend at 65, then the blade at PULL_LENGTHS[v]); when the stop ends, its pull from that length (shortening
-    # with the reel). v9 - v14 sent it back with her native reverse (status 3: her rate, not the reel's)
-    out += if_var(HI_SWORD_VAR, 3, 0, [U.cmd('Set_Remote_Article_Action', 2, 0)])
+    # Ultimate's own hit motion (the bend at 65, then the blade at PULL_LENGTHS[v]); when the stop ends, its pull from
+    # that length (shortening with the reel). v9 - v14 sent it back with her native reverse (status 3: her rate).
+    # v17 (user: "the whip disappears when catching someone"): v15 / v16 took the tether's whip (made in AirCatch, in her
+    # shoot / hang status 1 / 2, hand space) into status 0 with Set_Remote_Article_Action and played the hit motion on
+    # it: no whip of hers is ever moved from the tether into an anchored motion, and every anchored whip that shows in
+    # game is made in its own move (port_check S29 article-status-reuse). Now the tether's whip is removed at 0 and a
+    # fresh one made at HIT_GEN (1: an article's removal may finish only at the frame's end; the whip has one
+    # instance), the hit motion on it from there (master_whip HIT slots start on the body's frame HIT_GEN)
+    out += if_var(HI_SWORD_VAR, 3, 0, [U.cmd('Remove_Article', 2)])
+    gen = [U.cmd('FRAME', float(MW.HIT_GEN))] + if_var(HI_SWORD_VAR, 3, 0, [U.cmd('GENERATE_ARTICLE', 2)])
     for mode in sorted(HI_STOP):
         for v in range(len(MW.PULL_LENGTHS)):
-            out += if_var(HI_SWORD_VAR, 0, 10 * mode + v, [U.cmd('Set_Anchored_Article_Action', 2, MW.HIT_SLOT(v))])
+            gen += if_var(HI_SWORD_VAR, 0, 10 * mode + v, [U.cmd('Set_Anchored_Article_Action', 2, MW.HIT_SLOT(v))])
+    pulls = []
     for mode, fr in sorted(HI_STOP.items(), key=lambda kv: kv[1]):
-        out += [U.cmd('FRAME', fr)]
+        pulls += [U.cmd('FRAME', fr)]
         for v in range(len(MW.PULL_LENGTHS)):
-            out += if_var(HI_SWORD_VAR, 0, 10 * mode + v, [U.cmd('Set_Anchored_Article_Action', 2, MW.PULL_SLOT(v))])
-    # v11: a catch without a capture (VAR_11 1 - 3): Ultimate's catching hit (SpecialAirHi's ATTACK 0 from 20: 3 %,
-    # sting, cut-up sound) lands on the held fighter at frame 1, its spark, sound and hitlag, no knockback (it stays
-    # held); the capsule covers the tip's path over the catch frames (20 - 26: (15, 45) - (23, 65) from him); v12 the
-    # blade's too, from his hand (5.5, 20.5): master.c catches a fighter the blade reaches (point-blank)
+            pulls += if_var(HI_SWORD_VAR, 0, 10 * mode + v, [U.cmd('Set_Anchored_Article_Action', 2, MW.PULL_SLOT(v))])
     hit = U.cmd('Extended_Special_Hitbox', 0)
     f = dict(ID=0, Part=0, Bone=0, Damage=HI_CATCH_HIT, Angle=361, KBG=0, FKB=0, BKB=0, Size=8.0, X=0.0, Y=HI_CATCH_Y0,
              Z=HI_CATCH_Z0, Effect=2, Trip=0.0, Hitlag=1.0, SDI=0.0, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=0, SFXType=3,
@@ -448,9 +453,9 @@ def hi_hit_script():
              Shieldable=0, Reflectable=0, Absorbable=0, Rehit=0, IgnoreInvuln=0, HitAllStates=0, FacingRestrict=0,
              NoGrabRelease=1, TeamDamage=0, DisableHitlag=0, NoGFX=0, Flinchless=0, X2=0.0, Y2=68.0, Z2=24.0)
     hit.params = [f[n] for n in hit.info['syntax']]
-    soft = [U.cmd('FRAME', 1)] + if_var(HI_SOFT_VAR, 5, 0, [hit]) + [U.cmd('FRAME', 2), U.cmd('Remove_All_Hitboxes')]
-    k = next(i for i, c in enumerate(out) if c.name == 'FRAME')       # after the frame-0 branch (absolute FRAMEs)
-    return out[:k] + soft + out[k:] + end()
+    assert MW.HIT_GEN == 1
+    soft = if_var(HI_SOFT_VAR, 5, 0, [hit]) + [U.cmd('FRAME', 2), U.cmd('Remove_All_Hitboxes')]
+    return out + gen + soft + pulls + end()
 
 
 HI_CATCH_HIT = 3.0

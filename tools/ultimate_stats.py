@@ -40,6 +40,8 @@ sys.path.insert(0, HERE)
 import prc  # noqa: E402
 
 GROUND_BRAKE = 0.45
+COMBO_TYPE = {'fighter_combo_type_none': 0, 'fighter_combo_type_hit': 1, 'fighter_combo_type_succeed': 2,
+              'fighter_combo_type_uniq_dance': 3}
 # Smash 4 index: (Ultimate name, rule); rule: 'same' / 'ult' / 'brake' / 'full' / 'short' / a function
 MAP = {
     1: ('walk_accel_mul', 'ult'), 2: ('walk_accel_add', 'ult'), 3: ('walk_speed_max', 'ult'),
@@ -53,6 +55,16 @@ MAP = {
     28: ('landing_attack_air_frame_n', 'ult'), 29: ('landing_attack_air_frame_f', 'ult'),
     30: ('landing_attack_air_frame_b', 'ult'), 31: ('landing_attack_air_frame_hi', 'ult'),
     32: ('landing_attack_air_frame_lw', 'ult'), 33: ('weight', 'same'), 34: ('jump_count_max', 'same'),
+    # v17 (Byleth: "jab 3 is inaccessible"): the jab chain's own values, all read by the common Attack status (ZSS's
+    # func_270): 86 the presses the rapid jab needs (0x13000056; tested `presses >= it` once ENABLE_100 is on: a 0 left
+    # from a base without a rapid jab sends jab 2 into the rapid jab at once, so the third jab never comes); Smash 4's
+    # count is Ultimate's attack_100_enable_cnt + 1 for most fighters with both (Bayonetta, Captain Falcon, Corrin, Pit,
+    # Greninja, Fox, Falco, Sheik, Mewtwo; +0 for Kirby, G&W, Little Mac, Palutena), 0 without a rapid jab; 81 / 82 the
+    # jab 2 / 3 input windows (combo_attack_12_end / 13_end: equal in both games for 47 of 51); 262 the combo kind
+    # (fighter_combo_type_none / hit / succeed / uniq_dance = 0 / 1 / 2 / 3: all 51 match)
+    81: ('combo_attack_12_end', 'same'), 82: ('combo_attack_13_end', 'same'),
+    86: ('attack_100_enable_cnt', 'rapid_count'),
+    262: ('attack_combo_type', lambda v: COMBO_TYPE[v[1]]),
     263: ('attack_combo_max', 'same'),
     264: ('attack100_type', lambda v: 1 if v else 0),
     268: ('aerial_type', lambda v: 2 if v[1].endswith('_fly') else 1),
@@ -83,6 +95,10 @@ def values(e, jump_scale=(1.0, 1.0)):
             val, how = round(v * GROUND_BRAKE, 5), 'Ultimate x %.2f' % GROUND_BRAKE
         elif rule == 'full':
             val, how = round(v * jump_scale[0], 3), 'Ultimate x %g' % jump_scale[0]
+        elif rule == 'rapid_count':
+            val = int(v) + 1 if e['attack100_type'] else 0
+            how = 'Ultimate + 1 (Smash 4\'s rapid jabs: one press more than Ultimate\'s for most)' if val else \
+                'no rapid jab: 0'
         elif rule == 'short':
             val, how = round(v * jump_scale[1], 3), 'Ultimate x %g' % jump_scale[1]
         else:

@@ -511,7 +511,7 @@ def fp_row(path_or_bytes, kind):
         path = f.name
     else:
         path = path_or_bytes
-    idx = list(range(1, 35)) + [263, 264, 268]
+    idx = list(range(1, 35)) + [81, 82, 86, 262, 263, 264, 268]
     r = subprocess.run([sys.executable, os.path.join(HERE, 'fighter_param.py'), 'get', path, str(kind)] + [str(i) for i in idx],
                        capture_output=True, text=True)
     if isinstance(path_or_bytes, bytes):
@@ -550,6 +550,14 @@ def check_params(inst, name, kind, base, vanilla, ult_param, labels, rep):
                 if i in row and abs(row[i] - float(w[0])) > 0.011 * max(1, abs(float(w[0])))]
         if diff:
             rep.add('WARN', 'P2 stats-ultimate', 'differ from Ultimate\'s (tools/ultimate_stats.py): ' + '; '.join(diff[:12]))
+    # P3 rapid-count (Byleth v17: "jab 3 is inaccessible"): the common Attack status (func_270) goes into the rapid jab
+    # when ENABLE_100 is on and the presses so far (0x11000003) >= fighter_param 86 (attack_100_input_count): a rapid jab
+    # (264 = 1) with 86 = 0 (left from a base without one: ZSS) goes in as soon as jab 2 turns ENABLE_100 on, pressed
+    # or not, so the third jab never comes. Meta Knight's own (262 = 3) has no jab chain before it
+    if row.get(264) and not row.get(86) and row.get(262) != 3:
+        rep.add('ERROR', 'P3 rapid-count', 'kind 0x%X has a rapid jab (fighter_param 264 = 1) needing 0 presses (86 = 0): '
+                'the jab chain goes into it the moment ENABLE_100 opens (its later jabs never come). 86 = Ultimate\'s '
+                'attack_100_enable_cnt + 1 (tools/ultimate_stats.py)' % kind)
 
 
 def load_port_cfg(name):
@@ -3176,6 +3184,192 @@ def check_result_faces(inst, name, base, vanilla, rep):
                                                                           for k, v in sorted(bad.items())))
 
 
+def _acmd_load(data):
+    import acmd
+    import tempfile
+    with tempfile.NamedTemporaryFile(delete=False) as f:
+        f.write(data)
+    try:
+        return acmd.ACMDFile.load(f.name)
+    finally:
+        os.unlink(f.name)
+
+
+def _script_frames(f, sc, seen=None):
+    """[(frame, command)] of a flat script (FRAME / WAIT followed; one JUMP followed); None with a condition block"""
+    out, t = [], 0.0
+    seen = seen or set()
+    for c in sc:
+        if c.name in ('True', 'False', 'Else', 'IS_FLAG', 'IS_NOT_FLAG', 'Float_Var_Compare', 'Var_Compare'):
+            return None
+        if c.name == 'FRAME':
+            t = max(t, float(c.params[0]))
+        elif c.name == 'WAIT':
+            t += float(c.params[0])
+        elif c.name == 'JUMP':
+            h = c.params[0]
+            if h in f.scripts and h not in seen:
+                seen.add(h)
+                rest = _script_frames(f, f.scripts[h], seen)
+                if rest is None:
+                    return None
+                out += [(t + ft, x) for ft, x in rest]
+            break
+        else:
+            out.append((t, c))
+    return out
+
+
+def check_weapon_twice(inst, name, rep):
+    """S27 weapon-twice (Byleth v17, user: "the sword will appear twice in taunts"): a port whose held weapon is both a
+    body mesh (its visibility in the face pac's keys) and an article (Byleth: the Sword of the Creator, master_sword in
+    the body and the whip article 2) must never draw both: on every frame of a body game script the article is out and
+    drawn (its own game script's Visibility for the slot it plays, Article_Visibility), the body's weapon mesh is hidden.
+    port.json "weapon_article": {"article", "vis" (the face pac's slot), "folder" (the article's script folder)}. Also an
+    ERROR: the article made in a script whose Ultimate game script never touches that article (the base's own whip left:
+    ZSS's side taunt and Win1 in Byleth v1 - v16)"""
+    cfg = load_port_cfg(name).get('weapon_article')
+    if not cfg:
+        return
+    import mta
+    import mtable
+    import omo
+    import tempfile
+    art, vis_name, folder = cfg['article'], cfg['vis'], cfg['folder']
+    g = inst.get('fighter/%s/script/animcmd/body/game.bin' % name)
+    face = inst.get('fighter/%s/model/body/c00/material_anime_face.pac' % name)
+    ag = inst.get('fighter/%s/script/animcmd/weapon/%s/game.bin' % (name, folder))
+    amt = inst.get('fighter/%s/script/animcmd/weapon/%s/motion.mtable' % (name, folder))
+    if not (g and face and ag and amt):
+        return
+    game, agame = _acmd_load(g), _acmd_load(ag)
+    slots = struct.unpack('>%dI' % (len(amt) // 4), amt)
+    with tempfile.NamedTemporaryFile(suffix='.pac', delete=False) as f:
+        f.write(face)
+    try:
+        ents = omo.pac_read(f.name)
+    finally:
+        os.unlink(f.name)
+    keys = {}
+    for n, d in ents:
+        if n.endswith('.mta') and d.startswith(b'MTA4'):
+            m = mta.read(d)
+            v = [x for x in m['vis'] if x['name'] == vis_name]
+            short = re.sub(r'^Fit\w+?(Body|Entry)Main[A-Z]\d\d', '', n[:-4]).lower()
+            keys[short] = (m['frames'], v[0]['keys'] if v else [(0, 1, 0)])
+    names = {mtable.crc(w): w for w in vocabulary()}
+
+    def art_vis(slot, t):
+        h = slots[slot] if 0 <= slot < len(slots) else None
+        on = 1
+        for ft, c in (_script_frames(agame, agame.scripts.get(h, [])) or []):
+            if c.name == 'Visibility' and ft <= t:
+                on = int(c.params[0])
+        return on
+
+    twice, left = [], []
+    dump = None
+    try:
+        import port_sources
+        d = port_sources.load().dump(port_sources.ult_name(name))
+        dump = os.path.join(d, port_sources.ult_name(name)) if d else None
+    except Exception:
+        dump = None
+    for h, sc in game.scripts.items():
+        if not any(c.name in ('GENERATE_ARTICLE', 'Set_Anchored_Article_Action') and c.params and c.params[0] == art
+                   for c in sc):
+            continue
+        sname = names.get(h, '0x%08X' % h)
+        if dump and sname in ('appealsr', 'appealsl', 'appealhir', 'appealhil', 'win1', 'win2', 'win3'):
+            uf = os.path.join(dump, {'appealsr': 'AppealSR', 'appealsl': 'AppealSL', 'appealhir': 'AppealHiR',
+                                     'appealhil': 'AppealHiL', 'win1': 'Win1', 'win2': 'Win2', 'win3': 'Win3'}[sname] + '.txt')
+            if os.path.exists(uf) and 'generate_article' not in open(uf, errors='replace').read():
+                left.append(sname)
+        fr = _script_frames(game, sc)
+        k = keys.get(sname) or keys.get(sname[:-1] if sname.endswith(('r', 'l')) else sname)
+        if fr is None or k is None:
+            continue
+        n, bkeys = k
+        out, avis, slot, start, both = False, 1, None, 0.0, []
+        evs = sorted(fr, key=lambda x: x[0])
+        for t in range(int(n) + 1):
+            for ft, c in evs:
+                if int(ft) != t or not c.params or c.params[0] != art:
+                    continue
+                if c.name == 'GENERATE_ARTICLE':
+                    out, slot = True, None
+                elif c.name == 'Remove_Article':
+                    out = False
+                elif c.name == 'Article_Visibility':
+                    avis = int(c.params[1])
+                elif c.name == 'Set_Anchored_Article_Action':
+                    slot, start = int(c.params[1]), float(t)
+            body = ([kv[1] for kv in bkeys if kv[0] <= t][-1:] or [1])[0]
+            drawn = out and avis and (slot is None or art_vis(slot, t - start))
+            if drawn and body:
+                both.append(t)
+        if both:
+            twice.append('%s frames %d-%d' % (sname, both[0], both[-1]))
+    if twice or left:
+        rep.add('ERROR', 'S27 weapon-twice', 'the body\'s %s and article %d both drawn: %s%s' % (
+            vis_name, art, '; '.join(sorted(twice)) or '-',
+            '; the article made where Ultimate\'s script makes none (the base\'s leftover): %s' % ', '.join(sorted(left))
+            if left else ''))
+
+
+def check_rapid_slide(inst, name, rep):
+    """S28 rapid-slide (Byleth v17: "the rapid jab's hits don't connect properly"): a rapid-jab loop hit (attack100)
+    at the Sakurai angle 361 (or under 20 degrees) with a small knockback: Smash 4 sends a grounded victim whose
+    knockback is under 32 at 0 degrees, so every hit slides it away, out of the next hits' reach (Ultimate holds it:
+    ATTACK_SETOFF_KIND_OFF, which Smash 4 has no field for; ultimate_acmd.hold_angle). ERROR"""
+    g = inst.get('fighter/%s/script/animcmd/body/game.bin' % name)
+    if not g:
+        return
+    import acmd
+    game = _acmd_load(g)
+    bad = []
+    for sname in ('attack100', 'attack100sub'):
+        for c in game.scripts.get(acmd.crc(sname), []):
+            if 'Hitbox' in c.name and 'Angle' in c.info['syntax']:
+                d = dict(zip(c.info['syntax'], c.params))
+                if (d['Angle'] == 361 or d['Angle'] <= 20) and d['Damage'] > 0 and d['FKB'] == 0 and d['KBG'] <= 30 \
+                        and d['BKB'] <= 30:
+                    bad.append('%s id %d angle %d' % (sname, d['ID'], d['Angle']))
+    if bad:
+        rep.add('ERROR', 'S28 rapid-slide', 'rapid-jab hits that slide a grounded victim out of reach (KB < 32 at 361 -> '
+                '0 degrees): %s; ultimate_acmd.HOLD_ANGLE' % ', '.join(sorted(set(bad))))
+
+
+def check_article_status_reuse(inst, name, rep):
+    """S29 article-status-reuse (Byleth v17, user: "the whip disappears when catching someone"): a body script that
+    changes an article's status (Set_Remote_Article_Action / 2: ZSS's tether whip into another status) and then plays an
+    anchored motion on that same article without making a new one (GENERATE_ARTICLE) between: the base never moves its
+    tether article into an anchored motion; Byleth v15 / v16 took the tether's whip into status 0 for the up special's
+    hit motion and the whip vanished at the catch. Remove it and generate a fresh one (a frame later). ERROR"""
+    g = inst.get('fighter/%s/script/animcmd/body/game.bin' % name)
+    if not g:
+        return
+    import mtable
+    game = _acmd_load(g)
+    names = {mtable.crc(w): w for w in vocabulary()}
+    bad = []
+    for h, sc in game.scripts.items():
+        moved = set()
+        for c in sc:
+            if not c.params:
+                continue
+            if c.name in ('Set_Remote_Article_Action', 'Set_Remote_Article_Action2'):
+                moved.add(c.params[0])
+            elif c.name in ('GENERATE_ARTICLE', 'Remove_Article'):
+                moved.discard(c.params[0])
+            elif c.name == 'Set_Anchored_Article_Action' and c.params[0] in moved:
+                bad.append(names.get(h, '0x%08X' % h))
+                break
+    if bad:
+        rep.add('ERROR', 'S29 article-status-reuse', 'an anchored motion on an article a remote status change moved '
+                '(not made anew): %s' % ', '.join(sorted(bad)))
+
+
 def check_turn_rot(src, name, ult, rep):
     """S26 turn-rot: an Ultimate *Turn status whose game script turns the fighter (REVERSE_LR) and then goes back to the
     move it came from (Byleth's SpecialLwTurn -> SpecialLw at the frame it left). Smash 4's Reverse_Direction (ACMD
@@ -3299,6 +3493,9 @@ def main():
     check_frame_waits(inst, a.name, rec, rep)
     check_hit_sound(inst, a.name, src, base['ult'], rep)
     check_turn_rot(src, a.name, base['ult'], rep)
+    check_weapon_twice(inst, a.name, rep)
+    check_rapid_slide(inst, a.name, rep)
+    check_article_status_reuse(inst, a.name, rep)
     check_result_faces(inst, a.name, base, vanilla, rep)
     n = rep.show()
     sys.exit(1 if n['ERROR'] or (a.strict and n['WARN']) else 0)

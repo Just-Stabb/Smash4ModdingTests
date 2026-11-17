@@ -68,7 +68,9 @@ ZSS_NAMES = {0: 'C03AttackS4S', 4: 'C04AttackHi4', 8: 'C05AttackAirN', 12: 'D01S
 # smash_restart_frame), the hold slot plays the sword's charge loop, the up smash slot restarts at 7.
 SLOTS = {
     0: dict(move='AttackLw3', body='c02attacklw3', start=0, tl=[(0, 'c02attacklw3', 0)]),
-    4: dict(move='AttackHi4', body='c04attackhi4', start=7, tl=[(7, 'c04attackhi4', 7)]),
+    # v17: from body frame 8, where attackhi4's script plays it (FRAME 8): v6 - v16 built it from 7, so the whip ran a frame
+    # behind the body and hid a frame after the body sword came back (port_check S27, frame 59)
+    4: dict(move='AttackHi4', body='c04attackhi4', start=8, tl=[(8, 'c04attackhi4', 8)]),
     8: dict(move='AttackAirHi', body='c05attackairhi', start=0, tl=[(0, 'c05attackairhi', 0)]),
     12: dict(move='LandingAirHi', body='c05landingairhi', start=0, tl=[(0, 'c05landingairhi', 0)]),
     16: dict(move='SpecialHi', body='d02specialhi', start=0,
@@ -97,11 +99,14 @@ SLOTS = {
 #   D02SpecialAirHiHit (0x23A from frame 0, its pose still from 4);
 # - PULL_SLOT(v): Ultimate's d02specialhipull (a straight blade, 115 long at 0, ~1 shorter a frame: Ultimate's sword
 #   rewind picks its frame from the length) at the length PULL_LENGTHS[v] - REWIND x t, down to PULL_MIN (the
-#   overtake's first frame), then held: the blade shortens as fast as he is reeled (rewind_speed 4.1), from the length
+#   overtake's first frame), then held: the blade shortens as fast as he is reeled (REWIND), from the length
 #   the catch was made at. master.c (master_hi_sword_len) picks v from his hand's distance to what the tip holds
 #   (VAR_16), SpecialAirHiHit's game script plays HIT_SLOT(v) at 0 and PULL_SLOT(v) when the stop ends (12 / 19)
 PULL_LENGTHS = (64.0, 56.0, 48.0, 40.0, 32.0, 24.0)
-REWIND = 4.1                     # param_special_hi rewind_speed
+REWIND = 5.0                     # = master_build.CONSTS MASTER_HI_REWIND: v17 5.0 a frame (user: "reduce the travel time
+#                                  slightly"); Ultimate's param_special_hi rewind_speed is 4.1 (v15 / v16)
+HIT_GEN = 1                      # v17: the hit motion's first frame on his body (master_build.hi_hit_script generates the
+#                                  whip at SpecialAirHiHit's frame 1: a fresh whip, not the tether's, README "Status: v17")
 PULL_MIN = 16.1                  # d02specialairhiovertake's frame-0 blade (tip 16.1 from the hand)
 HIT_EASE = (4, 9)                # the hit's blade from 65 to its pull length over these frames (mine)
 HIT_FRAMES = 60                  # = master_build.HI_HIT_FRAMES (his D02SpecialAirHiHit, held)
@@ -114,7 +119,7 @@ NEW_NAMES = {OVT_SLOT: 'D02SpecialAirHiOvertake'}
 for _v, _l in enumerate(PULL_LENGTHS):
     NEW_NAMES[HIT_SLOT(_v)] = 'D02SpecialAirHiHitL%d' % _l
     NEW_NAMES[PULL_SLOT(_v)] = 'D02SpecialAirHiPullL%d' % _l
-    SLOTS[HIT_SLOT(_v)] = dict(move='SpecialAirHiHit (v15, blade %d)' % _l, body='d02specialairhihit', start=0,
+    SLOTS[HIT_SLOT(_v)] = dict(move='SpecialAirHiHit (v15, blade %d)' % _l, body='d02specialairhihit', start=HIT_GEN,
                                frames=HIT_FRAMES, pose=('hit', _v))
     SLOTS[PULL_SLOT(_v)] = dict(move='SpecialAirHiHit pull (v15, from %d)' % _l, body='d02specialairhihit',
                                 start=HIT_POSE_FRAME, hold=HIT_POSE_FRAME, frames=PULL_FRAMES, pose=('pull', _v))
@@ -398,7 +403,8 @@ def anchored_pose(U, slot, f):
     hand_frame = min(b, s['hold']) if 'hold' in s else b
     hand = U.body_world(s['body'], hand_frame)['HaveR']
     if 'pose' in s:
-        return hand, up_pose(U, s['pose'][0], s['pose'][1], f)
+        # v17: the hit's sword on his body's frames (its bend at body 1 - 2 as Ultimate's), from the frame the whip is made
+        return hand, up_pose(U, s['pose'][0], s['pose'][1], f + (s['start'] if s['pose'][0] == 'hit' else 0))
     name, fr = timeline_at(s['tl'], b)
     if name is not None:
         n = U.anim('sword', name)[2]
@@ -696,6 +702,39 @@ def body_scripts(game, log=print):
         game.scripts[k] = first + merged
         done.append(name)
     log('whip in the body scripts: %s' % ', '.join(done))
+    left = strip_base_whip(game, set(plan) | {'aircatch'})
+    if left:
+        log('v17: the base\'s whip out of %s' % ', '.join(left))
+
+
+# v17 (user: "the sword will appear twice in taunts"): ZSS's own whip commands left in scripts the plan doesn't write:
+# her side taunt (appealsr, appealsl JUMPs to it: GENERATE_ARTICLE + her slot 40, now his back throw's sword) and her
+# Win1 (slot 48, his down throw's) kept the base's game scripts (Ultimate's AppealS / Win1 have no game script that
+# replaces them, and neither generates the sword article), so the whip played beside his body sword (shown there:
+# Ultimate's master_sword track). port_check S27 weapon-twice
+WHIP_CMDS = ('GENERATE_ARTICLE', 'Set_Anchored_Article_Action', 'Remove_Article', 'Set_Remote_Article_Action',
+             'Set_Remote_Article_Action2', 'Article_Visibility')
+
+
+def strip_base_whip(game, keep, article=2):
+    """article `article`'s commands removed from every body game script not named in `keep` (lower-case script
+    names); only at a script's top level (a script with a condition block holding one stops the build). Returns the
+    hashes / names changed"""
+    names = {acmd.crc(n): n for n in keep}
+    known = {acmd.crc(n): n for n in ('appealsr', 'appealsl', 'appealhir', 'appealhil', 'win1', 'win2', 'win3',
+                                      'win1wait', 'win2wait', 'win3wait', 'catch', 'catchdash', 'catchturn')}
+    out = []
+    for h, sc in game.scripts.items():
+        if h in names:
+            continue
+        hit = [c for c in sc if c.name in WHIP_CMDS and c.params and c.params[0] == article]
+        if not hit:
+            continue
+        if any(c.name in ('True', 'False', 'Else', 'IS_FLAG', 'IS_NOT_FLAG') for c in sc):
+            raise SystemExit('whip commands in a script with condition blocks (0x%08X): not stripped' % h)
+        game.scripts[h] = [c for c in sc if not (c.name in WHIP_CMDS and c.params and c.params[0] == article)]
+        out.append(known.get(h, '0x%08X' % h))
+    return sorted(out)
 
 
 # ---------------------------------------------------------------- the throw bone: Ultimate's up-special hitboxes

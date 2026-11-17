@@ -49,6 +49,11 @@ v13: 0x15B holds every energy and puts him by position: exactly still through th
      exit and by the sweep.
 v16: Aymr's turn: the model (update_rot_y_lr, PostureModule(2)) turns as SpecialLw resumes after the turn motion
      (its script's Reverse_Direction flips the facing only), at the frame it left, ground and air; not without a turn.
+v17: the reel at master_build's MASTER_HI_REWIND (5.0) a frame and the pull motions at the same rate (master_whip.REWIND);
+     SpecialAirHiHit's script removes the tether's whip at 0 and makes a fresh one with the hit motion at 1 (never the
+     tether's whip moved into an anchored motion); the base's whip out of the side taunt / Win1 (and only there);
+     the rapid jab's holding hits at HOLD_ANGLE (ultimate_acmd.hold_angle), nothing else; the jab chain's
+     fighter_param values from Ultimate's (ultimate_stats: 86 presses 5, 81 / 82 28, 262 1).
 """
 import os
 import re
@@ -64,6 +69,8 @@ sys.path.append(os.path.join(HERE, 'mscdec'))
 import rolloff_hold_test as R  # noqa: E402
 
 PROBLEMS = []
+import master_build as _MB  # noqa: E402
+REWIND = float(_MB.CONSTS['MASTER_HI_REWIND'].rstrip('f'))    # v17: 5.0 (Ultimate's rewind_speed 4.1)
 SRC = os.path.join(ROOT, 'fighters', 'master', 'master.c')
 HOLD1, HOLD2, BOWFLARE2 = 0x347004E, 0x347004F, 0x3470051
 CAPTURE = 0xBD
@@ -276,7 +283,7 @@ def run_hit(b, gm, stop_at=None, n=60, clock=None):
 
 
 def reel_ok(path, start, end, stop):
-    """held exactly at start through the stop's frames, then steady 4.1 steps on the line to end (the last shorter)"""
+    """held exactly at start through the stop's frames, then steady REWIND steps on the line to end (the last shorter)"""
     held = [p for p in path if p[0] < stop]
     moving = [p for p in path if p[0] >= stop]
     if any(abs(p[2] - start[0]) > 1e-3 or abs(p[3] - start[1]) > 1e-3 for p in held) or not moving:
@@ -284,8 +291,8 @@ def reel_ok(path, start, end, stop):
     pts = [start] + [(p[2], p[3]) for p in moving]
     steps = [((b[0] - a[0]) ** 2 + (b[1] - a[1]) ** 2) ** 0.5 for a, b in zip(pts, pts[1:])]
     d = ((end[0] - start[0]) ** 2 + (end[1] - start[1]) ** 2) ** 0.5
-    n = max(1, -(-d // 4.1))
-    ok = len(steps) >= 1 and all(abs(x - d / n) < 0.01 for x in steps) and d / n <= 4.1 + 1e-4
+    n = max(1, -(-d // REWIND))
+    ok = len(steps) >= 1 and all(abs(x - d / n) < 0.01 for x in steps) and d / n <= REWIND + 1e-4
     return ok, 'steps %s, d %.2f' % ([round(x, 2) for x in steps], d)
 
 
@@ -335,14 +342,18 @@ def v15_scripts():
     import master_build as M
     import master_whip as MW
     sc = M.hi_hit_script()
-    arts = lambda r: [(f, n, p) for f, n, p in r if 'Article' in n]                 # noqa: E731
+    arts = lambda r: [(f, n, p) for f, n, p in r if 'Article' in n or n == 'GENERATE_ARTICLE']   # noqa: E731
     for mode, stop in sorted(M.HI_STOP.items()):
         for v in range(len(MW.PULL_LENGTHS)):
             r = arts(script_run(sc, {0x0F00030F: float(mode), 0x0F000310: float(10 * mode + v)}))
-            want = [(0.0, 'Set_Remote_Article_Action', [2, 0]), (0.0, 'Set_Anchored_Article_Action', [2, MW.HIT_SLOT(v)]),
+            # v17: the tether's whip removed at 0, a fresh one made at 1 with the hit motion (v15 / v16: status 0)
+            want = [(0.0, 'Remove_Article', [2]), (1.0, 'GENERATE_ARTICLE', [2]),
+                    (1.0, 'Set_Anchored_Article_Action', [2, MW.HIT_SLOT(v)]),
                     (float(stop), 'Set_Anchored_Article_Action', [2, MW.PULL_SLOT(v)])]
-            check('v15 SpecialAirHiHit\'s script, VAR_15 %d, blade %g: status 0, the hit motion at 0, its pull at %d' %
-                  (mode, MW.PULL_LENGTHS[v], stop), r == want, str(r))
+            check('v17 SpecialAirHiHit\'s script, VAR_15 %d, blade %g: the tether\'s whip removed at 0, a new one with '
+                  'the hit motion at 1, its pull at %d' % (mode, MW.PULL_LENGTHS[v], stop), r == want, str(r))
+            check('v17 SpecialAirHiHit\'s script, VAR_15 %d, blade %g: no status change of the whip (port_check S29)' %
+                  (mode, MW.PULL_LENGTHS[v]), not [x for x in r if x[1].startswith('Set_Remote')], str(r))
     r = arts(script_run(sc, {0x0F00030F: 0.0, 0x0F000310: -1.0}))
     check('v15 SpecialAirHiHit\'s script, the floor / ceiling stop: her reverse at once, nothing else', r ==
           [(0.0, 'Set_Remote_Article_Action2', [2, 3])], str(r))
@@ -357,6 +368,61 @@ def v15_scripts():
     check('v15 the new slots: past her 60, multiples of 4, within the grown motion info (%d), one name each' %
           MW.MOTION_COUNT, used[0] == 60 and all(x % 4 == 0 and x + 3 < MW.MOTION_COUNT for x in used)
           and sorted(MW.NEW_NAMES) == used and len(set(MW.ALL_NAMES.values())) == len(MW.ALL_NAMES), str(used))
+
+
+def v17_static():
+    """v17: the reel's rate in the MSC and the pull motions; the hit slots' start; the base's whip stripped; the rapid
+    jab's holding angle; the jab chain's stats"""
+    import master_build as M
+    import master_whip as MW
+    import ultimate_acmd as U
+    import acmd
+    check('v17 the reel: MASTER_HI_REWIND %g = master_whip.REWIND %g (the pull motions shrink the blade as fast)' %
+          (REWIND, MW.REWIND), REWIND == MW.REWIND == 5.0)
+    check('v17 the hit slots start on the body\'s frame %d (the fresh whip\'s frame), the pulls on its pose frame' %
+          MW.HIT_GEN, all(MW.SLOTS[MW.HIT_SLOT(v)]['start'] == MW.HIT_GEN == 1 and
+                          MW.SLOTS[MW.PULL_SLOT(v)]['start'] == MW.HIT_POSE_FRAME for v in range(len(MW.PULL_LENGTHS))))
+    for v, l0 in enumerate(MW.PULL_LENGTHS):
+        n = next(t for t in range(100) if l0 - MW.REWIND * t <= MW.PULL_MIN)
+        check('v17 pull from %g: the blade reaches the overtake\'s %g in %d frames at %g (within PULL_FRAMES %d)' %
+              (l0, MW.PULL_MIN, n, MW.REWIND, MW.PULL_FRAMES), n <= MW.PULL_FRAMES)
+    check('v17 the up smash slot 4 starts where its body script plays it (FRAME 8)',
+          MW.SLOTS[4]['start'] == 8 and MW.SLOTS[4]['tl'][0][:3] == (8, 'c04attackhi4', 8))
+
+    class G:
+        scripts = {}
+    G.scripts = {acmd.crc('appealsr'): [U.cmd('GENERATE_ARTICLE', 2), U.cmd('Set_Anchored_Article_Action', 2, 40),
+                                        U.cmd('FRAME', 81.0), U.cmd('Remove_Article', 2), acmd.Command(acmd.END)],
+                 acmd.crc('win1'): [U.cmd('GENERATE_ARTICLE', 2), U.cmd('Set_Anchored_Article_Action', 2, 48),
+                                    acmd.Command(acmd.END)],
+                 acmd.crc('attackhi4'): [U.cmd('GENERATE_ARTICLE', 2), U.cmd('Set_Anchored_Article_Action', 2, 20),
+                                         acmd.Command(acmd.END)],
+                 acmd.crc('specialn'): [U.cmd('GENERATE_ARTICLE', 0), acmd.Command(acmd.END)]}
+    left = MW.strip_base_whip(G, {'attackhi4', 'aircatch'})
+    check('v17 the base\'s whip stripped from the side taunt and Win1 only (not a planned move, not another article)',
+          left == ['appealsr', 'win1'] and len(G.scripts[acmd.crc('attackhi4')]) == 3
+          and len(G.scripts[acmd.crc('specialn')]) == 2
+          and [c.name for c in G.scripts[acmd.crc('appealsr')]] == ['FRAME', 'Script_End'], str(left))
+    cases = [((361, 10, 0, 12, 'ATTACK_SETOFF_KIND_OFF', 0.4), U.HOLD_ANGLE),
+             ((361, 10, 0, 10, 'ATTACK_SETOFF_KIND_OFF', 0.4), U.HOLD_ANGLE),
+             ((361, 10, 0, 12, 'ATTACK_SETOFF_KIND_ON', 0.4), 361), ((361, 162, 0, 60, 'ATTACK_SETOFF_KIND_OFF', 3.5), 361),
+             ((361, 20, 0, 0, 'ATTACK_SETOFF_KIND_OFF', 0.0), 361), ((54, 10, 0, 12, 'ATTACK_SETOFF_KIND_OFF', 0.4), 54),
+             ((368, 10, 0, 12, 'ATTACK_SETOFF_KIND_OFF', 0.4), 366)]
+    got = [U.hold_angle(*a) for a, _w in cases]
+    check('v17 the holding angle: the rapid jab\'s 361 / setoff off / small knockback -> %d; not with setoff on, a '
+          'big knockback, no damage, another angle; 368 -> 366 as before' % U.HOLD_ANGLE,
+          got == [w for _a, w in cases], str(got))
+    try:
+        import port_sources
+        import ultimate_stats as US
+        src = port_sources.load()
+        e = US.entry(src.find('ult_common', 'param/fighter_param.prc'), src.get('labels'), 'master')
+        v = US.values(e)
+        got = {k: v[k][0] for k in (81, 82, 86, 262, 263, 264)}
+        check('v17 the jab chain from Ultimate\'s: 86 presses 5 (attack_100_enable_cnt 4 + 1), 81 / 82 28, 262 1 (hit), '
+              '263 3, 264 1', got == {81: 28.0, 82: 28.0, 86: 5, 262: 1, 263: 3, 264: 1}, str(got))
+    except Exception as ex:                         # no Ultimate files on this machine
+        print('  (v17 stats not checked: %s)' % ex)
 
 
 def compiled():
@@ -462,7 +528,7 @@ def up_special(path):
     sets = [a for s, a in gm.calls if s == 0x16 and a and a[0] == 7 and a[2] == 0x11000005]
     ok, why = reel_ok(hp[:-1] + [(hp[-1][0], 0, reel_end[0], reel_end[1])], start, (20.0 - 7.8, 100.0 - 14.2), 19)
     check('v13 SpecialAirHiHit: held exactly still for hit_stop_frame_fighter (motion frames 0 - 18), then reeled along '
-          'one straight path at a steady speed (<= rewind_speed 4.1) until the caught fighter\'s throw point (its feet + '
+          'one straight path at a steady speed (<= REWIND) until the caught fighter\'s throw point (its feet + '
           '10: no waist read) is 7.8 ahead / 14.2 above him (Ultimate\'s hit pose -> overtake), then put on that point '
           '(v12: the overtake, his root on its throw joint) and kept there', ok and stopped and reel_end
           and abs(reel_end[0] - (20.0 - 7.8)) < 0.01 and abs(reel_end[1] - (100.0 - 14.2)) < 0.01
@@ -911,6 +977,7 @@ def main():
     v10(path)
     v15_scripts()
     v16(path)
+    v17_static()
     print('\n%d problem(s)' % len(PROBLEMS))
     sys.exit(1 if PROBLEMS else 0)
 

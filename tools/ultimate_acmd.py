@@ -143,6 +143,24 @@ FACING = {'ATTACK_LR_CHECK_F': 3, 'ATTACK_LR_CHECK_B': 4, 'ATTACK_LR_CHECK_POS':
 # their 366 until they are next rebuilt. 368 (to a set point) has no Smash 4 equivalent: written as 366, with
 # the point done in MSC (tools/vec_target.py).
 ANGLE = {368: 366}
+# v17 (Byleth: "the rapid jab's hits don't connect properly"): a multi-hit's holding hit, Ultimate's ATTACK_SETOFF_KIND_OFF
+# with the Sakurai angle 361 and a small knockback (his rapid jab: 0.4 %, KBG 10, BKB 12). Ultimate holds the victim in
+# place (no setoff); Smash 4 has no setoff field (SETOFF only sets Clang / Rebound here) and its 361 sends a grounded
+# victim whose knockback is under 32 at 0 degrees: every hit slides it away until it leaves the hitboxes' reach.
+# Smash 4's own rapid jabs hold with a near-vertical angle (Fox 60 - 85, Captain Falcon 75 - 90, Sheik 50 - 70, Mewtwo
+# 70 - 89, Robin 80): HOLD_ANGLE (Robin's, the sword user's), APPROXIMATED (an airborne victim goes up a little where
+# Ultimate's 361 sends it at ~40 degrees). port_check S28 rapid-slide
+HOLD_ANGLE = 80
+HOLD_MAX_KB = 30
+
+
+def hold_angle(angle, kbg, fkb, bkb, setoff, dmg):
+    """the Smash 4 angle of an Ultimate hitbox (ANGLE, then HOLD_ANGLE for a holding multi-hit)"""
+    angle = ANGLE.get(int(angle), int(angle))
+    if (setoff == 'ATTACK_SETOFF_KIND_OFF' and angle == 361 and float(dmg) > 0 and int(fkb) == 0
+            and int(kbg) <= HOLD_MAX_KB and int(bkb) <= HOLD_MAX_KB):
+        return HOLD_ANGLE
+    return angle
 
 SETOFF = {'ATTACK_SETOFF_KIND_ON': (1, 1), 'ATTACK_SETOFF_KIND_OFF': (1, 0), 'ATTACK_SETOFF_KIND_THRU': (0, 0)}
 # _d: lying fighters too (Byleth's Sword of the Creator); Smash 4's Ground/Air has no such bit
@@ -823,7 +841,7 @@ class Translator:
         # never below 0 (the user's rule for Ultimate ports, CLAUDE.md): Smash 4 reads ShieldDamage unsigned, so
         # Ultimate's negative ones (Hero's spells, Sephiroth's flares / flash) were a shield break every hit
         shield_dmg = max(shield_dmg, 0)
-        common = [int(hid), int(part), self.bone(bone), float(dmg), ANGLE.get(int(angle), int(angle)), int(kbg), int(fkb), int(bkb), float(size),
+        common = [int(hid), int(part), self.bone(bone), float(dmg), hold_angle(angle, kbg, fkb, bkb, setoff, dmg), int(kbg), int(fkb), int(bkb), float(size),
                   float(x), float(y), float(z), EFFECT.get(effect, 0), float(trip), float(hitlag), float(sdi), clang,
                   rebound, int(round(shield_dmg)), SFX_LEVEL[lvl], sfx_type(attr), SITUATION[situation],
                   1 if direct else 0, REGION.get(region, 0), CATEGORY.get(category, 0x3F), 0, 0xF, 0, 1,

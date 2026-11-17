@@ -252,5 +252,11 @@
     }
   },
   "tether_ledge_box": 3,
-  "_tether_ledge_box": "Ultimate's cliff_hang_data[3] (FIGHTER_MASTER_CLIFF_HANG_DATA_AIR_LASSO, p1 (44, 85) / p2 (-44, 20): SpecialAirHi selects it at 15) as ZSS's tether box (vl group 7 entry 2): v10 the same rectangle in world units for AirCatch's front-only check, (-44, 20, 88, 65) (ultimate_vl_shapes.tether_box; v9 (0, 20, 44, 65) was its front half); master.c uses it on frames 15 - 16 only, the normal box on 12 - 14 (Ultimate's timing)"
+  "_tether_ledge_box": "Ultimate's cliff_hang_data[3] (FIGHTER_MASTER_CLIFF_HANG_DATA_AIR_LASSO, p1 (44, 85) / p2 (-44, 20): SpecialAirHi selects it at 15) as ZSS's tether box (vl group 7 entry 2): v10 the same rectangle in world units for AirCatch's front-only check, (-44, 20, 88, 65) (ultimate_vl_shapes.tether_box; v9 (0, 20, 44, 65) was its front half); master.c uses it on frames 15 - 16 only, the normal box on 12 - 14 (Ultimate's timing)",
+  "weapon_article": {
+    "_comment": "port_check S27 weapon-twice: the Sword of the Creator is the body's master_sword mesh (in ZSS's Mouth_Result slot) and the whip article 2 (tools/master_whip.py)",
+    "article": 2,
+    "vis": "SZerosuit_Mouth_Result_VIS_O_OBJ",
+    "folder": "whip"
+  }
 }
