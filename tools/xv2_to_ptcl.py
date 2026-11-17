@@ -234,18 +234,17 @@ def emission_kind(node):
 def cone_streak(node, chain, sx):
     """a ConeExtrude ribbon (XV2 draws the path its particle took over the last Duration frames, its width the node's
     scale) as one type 3 streak along the velocity: (width curve, length curve, extra life). The length: the particle's
-    speed (the emitter above's Velocity, units a second) x the extrude duration (Duration + half its variance), grown
-    over that many frames from the particle's birth; the particle lives that much longer (the ribbon's tail outlives
-    its head). The width / alpha curves stay over the (longer) life. Vortex / Attract (the swirl) aren't converted"""
+    speed (the emitter above's Velocity, units a second) x the extrude duration (Duration + half its variance), from the
+    particle's birth (the ribbon's whole length: its transparency keys fade it out early in the head's life, so a
+    streak grown from 0 would be gone before it is long); the particle lives that much longer (the ribbon's tail
+    outlives its head). The width / alpha curves stay over the (longer) life. Vortex / Attract (the swirl) aren't
+    converted"""
     ce = node['EmissionNode'].get('ConeExtrude') or {}
     dur = float(ce.get('Duration', 0)) + float(ce.get('Duration_Variance', 0)) / 2.0
     src = next((n for n in reversed(chain[:-1]) if n['NodeType'] == 'Emitter'), None)
     v = float(src['EmitterNode'].get('Velocity', 0.0)) if src is not None else 0.0
-    life = float(node['Lifetime']) + float(node['Lifetime_Variance']) / 2.0
     length = max(v / 60.0 * dur, 1e-3)
-    grow = 100.0 * dur / max(life + dur, 1.0)
-    t = np.arange(101.0)
-    sy = length * np.clip(t / max(grow, 1e-3), 0.0, 1.0)
+    sy = np.full(101, length)
     return sx, sy, int(round(dur))
 
 

@@ -159,22 +159,29 @@ FX_LOD_ID = 0x03410061
 E0_WORLD = (('Frt_CrgAura.emp', 'HipN', (0.0, -0.3, 0.0)),     # (EMP, the Smash bone for its ESK, the EEPK offset in m)
             ('Frt_CrgAuraB.emp', 'HipN', (0.0, 0.0, 0.0)),     # b_C_Pelvis -> HipN, b_R_Foot -> RFootJ: their places at
             ('Frt_CrgAura.emp', 'RFootJ', (0.0, 0.0, 0.0)))    # SpecialS frame 0 (tools/supamario_timeskip_anim.py)
-E0_FOLLOW = ('Frt_CrgAuraH.emp', 15, 0.5)   # b_L_Elbow -> LArmJ (bone 15, Mario's elbow joint), the EEPK's x0.5
+E0_FOLLOW = ('Frt_CrgAuraH.emp', 15, 0.5)   # b_L_Elbow -> LArmJ (bone 15, Mario's elbow joint), the EEPK's x0.5; XV2's
+                                    # Orientation User (his axes, not the bone's): External_Graphic's last word 0, the
+                                    # bone's place only (Sledgehammer's charge glow), its streaks rising as XV2's
 AURA_SIZE = 1.75                    # xv2_smash_fx.SIZE: XV2's x1.0
 AURA_EVERY = 20                     # again every 20 frames of a held charge (v3's; the EMP emits 40 frames)
 # effect 11 (the punch: the user's "purple speed lines" and "the long purple line along the victim's flight"):
 # Frt_Hit.emp on g_R_Hand, Orientation AttachmentBone (the hand's axes), RotateUpdate only (world-fixed), x1.0,
-# Deactivation Never. Its forward is the hand's -Z (the burst sprites at Z -0.4 / -1 / -1.8 / -2.5 born 0-3 frames
-# apart, the speed lines' emitters turned X -90): baked onto the set's +X (E11_TURN, Y -90), the MSC turns it to his
-# facing. Placed at his right fist at the punch (SpecialAirS frame 16, RHandN: E11_AT ahead / up; checked against the
-# motion at build time)
+# Deactivation Never. Its speed lines are emitted along the hand's -Z (their emitters turned X -90) and drawn as
+# streaks along their motion (VisibleOnSpeed; Smash's type 3: Line_Hit.dds's line runs from the particle back along
+# its motion, tools/fx_render.py): in the user's XV2 clip (fc8b90ed, 64-100) the lines run from the fist forward
+# through the victim and past it, so the hand's -Z is his back and +Z the punch: baked onto the set's -X / +X
+# (E11_TURN, Y +90); the burst sprites (Z -0.4) sit at his wrist. The MSC turns it to his facing. Placed at his right
+# fist at the punch (SpecialAirS frame 16, RHandN: E11_AT ahead / up; checked against the motion at build time)
 E11_EMP = 'Frt_Hit.emp'
 E11_AT = (6.85, 8.13)               # RHandN at SpecialAirS 16 (z ahead, y up)
 E11_SIZE = 1.75                     # xv2_smash_fx.SIZE: XV2's x1.0
-E11_TURN = (0.0, -90.0, 0.0)        # XV2's -Z (the punch) onto +X
+E11_TURN = (0.0, 90.0, 0.0)         # the hand's +Z (the punch) onto +X
 # brightness (supamario_fx_glow.py ts_e11 / ts_e0 on grass and grey; the user's tolerance: at most 1.0 square unit over
 # 1.0 in any frame): each emitter's brightest drawn channel capped by its name's start (Sledgehammer's arc_dim)
-E11_CAP = ()
+E11_CAP = (('sprite_2', 0.12), ('sprite_BG', 0.5), ('line_add', 0.15), ('wave_add', 0.07), ('wave_nml', 0.9),
+           ('sprite_1', 0.25), ('sprite', 0.5), ('line_BG', 0.9), ('BG', 0.9), ('ring', 0.5))   # v4: from 2.0 each (the
+           # vibrant gain): uncapped the set drew 155 square units over 1.0 at its first frame on grass (12.4 peak: the burst's
+           # white sparkle sprite_2, the opaque disc sprite_BG, the stacked lines / waves)
 E0_CAP = ()
 FX_E11_IDS = {'hit': 0x03410062, 'hit_2': 0x03410066, 'hit_h': 0x03410067, 'hit_2h': 0x03410068}
 FX_AURA_ID, FX_GLASS_ID, FX_E0H_ID = 0x03410063, 0x03410064, 0x03410069
@@ -367,7 +374,7 @@ def effect_scripts():
     effect 0's following part (Frt_CrgAuraH on the left elbow, x0.5) at frame 0; its world parts and effect 11 are the
     MSC's (ts_aura / ts_e11), as the strike's hit look and BTL_CMN 108 (the glass)"""
     dash = outline_on() + [cmd('external_graphic', FX_E0H_ID, E0_FOLLOW[1], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                               E0_FOLLOW[2] * AURA_SIZE, 1)] + [cmd('frame', float(MOVE_FROM))] + if_(0x0F000116, 0, 0, if_(V_PH, 5, DASHING, [
+                               E0_FOLLOW[2] * AURA_SIZE, 0)] + [cmd('frame', float(MOVE_FROM))] + if_(0x0F000116, 0, 0, if_(V_PH, 5, DASHING, [
         cmd('graphic_effect', FX_DUST, 0, 0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1)])) + [
         cmd('frame', float(DASH_END - OUTLINE_OUT))] + outline_off() + [cmd('frame', float(DASH_END)),
                                                                          cmd('terminate_overlays')]
@@ -525,7 +532,7 @@ def convert_fx(cmn_dir, fx_dir, halo=True, frt_dir=None, joints0=None):
     open(os.path.join(fx_dir, base + '.efc'), 'wb').write(e.build())
     bad = FX.facing_emitters(p, [s['set_index'] for s in sets.values()] + [lod['set_index']])
     return {'sets': sets, 'skipped': log, 'notes': notes, 'halos': halos, 'ptcl_bytes': [before, len(out)],
-            'facing_problems': bad + FX.facing_emitters(p, [e0h['set_index']]), 'lod': lod, 'e11': e11, 'aura': e0,
+            'facing_problems': bad, 'lod': lod, 'e11': e11, 'aura': e0,
             'e0_follow': e0h, 'glass': glass, 'dark': dark}
 
 
@@ -576,10 +583,30 @@ def frt_emissions(p, pkg, images, emp_name):
                 if X.emission_kind(n) is None or 'Hide' in n['NodeFlags_names']:
                     log.append('%s %s: %s skipped' % (emp_name, n['Name'], n['NodeSpecificType']))
                 else:
-                    out.append(X.convert_emission(p, pkg, images, c, FX.UNIT, n['Name'], spawn))
+                    em, name, notes = X.convert_emission(p, pkg, images, c, FX.UNIT, n['Name'], spawn)
+                    out.append((em, name, notes + _secondary(p, em, n, emp, images)))
             walk(n['ChildParticleNodes'], c)
     walk(emp['ParticleNodes'], [])
     return out, log
+
+
+def _secondary(p, em, node, emp, images):
+    """XV2's secondary colour (EnableSecondaryColor: Color2 over the texture's bright core, Color1 its edges; the
+    converter keeps Color1 alone) on the normal-blend emissions: Frt_Hit's dark navy waves / backing lines ((0, 0,
+    0.5) / (0, 0, 0.2) to white) would draw as dark smudges over the stage; the clip shows them blue-violet with light
+    cores. Their colour the mean of Color1 and Color2, x the texture's tint (the converter's way), both tracks"""
+    import xv2_to_ptcl as X
+    tex = node['EmissionNode'].get('Texture') or {}
+    if 'EnableSecondaryColor' not in node['NodeFlags_names'] or p.field(em, 'blend_type') != 0 or 'Color2' not in tex:
+        return []
+    refs = [r for r in tex.get('TextureEntryRef', []) if r is not None and r >= 0]
+    smp = emp['Textures'][refs[0]] if refs else None
+    img = images.get(smp['TextureRef']) if smp else None
+    tint = X.shape_texture(X.first_cell(img, smp))[1] if img is not None else (1.0, 1.0, 1.0)
+    rgb = tuple(float((a + b) / 2.0 * t) for a, b, t in zip(tex['Color1'], tex['Color2'], tint))
+    for track in (0, 1):
+        p.set_color_keys(em, track, [rgb + (1.0,)])
+    return ['secondary colour mixed: (%.2f, %.2f, %.2f)' % rgb]
 
 
 def _frt_pkg(frt_dir):
@@ -717,8 +744,8 @@ def e0_world_set(p, e, frt_dir, joints0, halo=True):
 
 def e0_follow_set(p, e, frt_dir, halo=True):
     """v4: XV2's skill effect 0's following part (E0_FOLLOW: Frt_CrgAuraH on the left elbow, x0.5): its own set, played
-    by the effect script on the bone (External_Graphic, no offset / turn), facing-safe (the God Fist's rule), its
-    particles on the bone's live matrix (XV2's PositionUpdate)"""
+    by the effect script at the bone's place (External_Graphic's last word 0: its place only, not its turn: XV2's
+    Orientation User), its particles following (XV2's PositionUpdate), rising as XV2's"""
     import supamario_sledgehammer_build as SB
     import xv2_smash_fx as FX
     pkg, images, mats = _frt_pkg(frt_dir)
@@ -728,7 +755,6 @@ def e0_follow_set(p, e, frt_dir, halo=True):
     for d, name, n0 in made:
         d = bytearray(d)
         notes.append('%s: %s; %s' % (name, '; '.join(n0), _vibrant(p, d, mats, emp, name, E0_CAP, world=False)))
-        FX.facing_safe(p, d)
         SB.follow(p, d)
         ems.append((bytes(d), name))
     if halo:
