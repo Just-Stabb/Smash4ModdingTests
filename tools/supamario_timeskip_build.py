@@ -50,7 +50,8 @@ MOVE_N = int(real0(85)) - MOVE_FROM  # 33 frames (27-59); the stop (the root's s
 MOVE_EASE = 8                       # a miss: the speed eased down to VSTOP over the moving part's last 8 frames
 # the user: "Uncharged: medium-slow. Fully charged: fast-medium", constant. His (Mario's fighter_param) dash initial
 # speed 1.6, run 1.6 a frame; the Super God Fist's burst 4.53 a frame (motion 9-15); XV2's own 0.7 m = 3.53
-VMIN, VMAX = 2.4, 4.2               # units a frame: 1.5x his run uncharged, a bit under the God Fist's burst charged
+VMIN, VMAX = 2.1, 4.2               # units a frame (v2, the user: "slightly slow down the uncharged speed", v1 2.4;
+                                    # the charged one as it was), a bit under the God Fist's burst charged
 VSTOP = 1.85                        # the stop's first root speed (SpecialS frame 60): the eased miss meets it
 SND = {'basa': 6, 'dash': int(real0(56)), 'timestop': 0, 'punch': 8, 'away': None}
 # entry 4 (the user on connect): SpecialAirS 1:1
@@ -72,6 +73,11 @@ FALL_EASE = 0.05
 # ---------------------------------------------------------------- the boxes
 HIT_Z, HIT_Y, HIT_SIZE = round(1.0 * SCALE, 2), round(0.5 * SCALE, 2), round(0.5 * SCALE, 2)   # b_C_Base + (0, 0.5,
                                     # -1.0 m), 0.5 m: 5.04 ahead, 2.52 up, 2.52
+# v2 (user: "The 2% detection hit won't activate the punch on opponents touching Supamario at point blank"): XV2's box
+# covers 2.52-7.56 ahead only; a fighter on top of him (its body from about his centre) never met it. ID 1 (Part 0: one
+# hit a fighter, the same record) at his middle: 1.5 ahead, 4.5 up, radius 4.0 (-2.5 to 5.5 ahead, 0.5 to 8.5 up),
+# overlapping XV2's box: from his body's centre forward without a gap
+HIT2_Z, HIT2_Y, HIT2_SIZE = 1.5, 4.5, 4.0
 CATCH = dict(Damage=2.0, Angle=0, KBG=0, FKB=0, BKB=1)        # the detection: knockback 1 (Fake Death's grounded hit:
                                     # no launch), the MSC holds it; XV2's box does no damage (the 140 is the punch's)
 CATCH_FREEZE = 3
@@ -114,8 +120,28 @@ SH_FX = {'hitlod': 0x0341005C, 'sweat': 0x0341005E}
 # XV2's glare 1.0 but drawn at the HDR cap 2.0) were 28.6 square units over 1.0 on a grass stage and its glaring streaks
 # (line / line_2 / line_1_1, glare 2.5) 8.9 (tools/supamario_fx_glow.py ts_hit --bg 0.5,0.65,0.3): each emitter's
 # brightest drawn channel capped (Sledgehammer's flash_cap way), by its name's start
-PEAK_CAP = (('flash', 0.35), ('line', 0.5), ('Line00', 1.0))
+PEAK_CAP = (('flash', 0.12), ('line', 0.3), ('Line00', 0.6), ('grd00', 0.6), ('LINE', 0.8), ('stripe', 0.8))   # v1: flash
+                                    # 0.35, line 0.5, Line00 1.0 (v2: the white flash, LOD_CAP)
 FX_DUST = 0x1000009                 # Smash's dash cloud: XV2's Stage BG 60 at BAC 56 (the stage's own, not in the files)
+# v2 (user: "Does a massive white flash when it hits an opponent"): BTL_CMN effect 2's Btl_HitLOD (v1: Sledgehammer's own
+# set 0x0341005C at x1.5 x 1.75) starts with a white flash disc (flash_1_1) that covers ~55 square units of a grass stage
+# on its first frame (supamario_fx_glow ts_hit: 54.6 of the 70.5 energy at frame 0), and the punch's 30-frame freeze is
+# when it plays. Time Skip now has its own copy (Sledgehammer's set untouched) with its emitters' brightest drawn
+# channel capped by name (LOD_CAP), and Btl_HitL's caps lowered (PEAK_CAP): every frame under the user's earlier
+# tolerance (Sledgehammer v5's arcs: 1.0 / 3.6 square units over 1.0 on grass, uncharged / charged), the colours kept
+LOD_CAP = (('flash', 0.1), ('grd01', 0.45), ('ptcl', 0.8), ('line', 0.8))
+FX_LOD_ID = 0x03410061
+# v2 (user: "There's no purple line being emitted over Supamario during the move"): XV2's skill effect 0 (BAC entry 0
+# item 9: EEPK type 5 = the super skill's own, skill id 1352, effect 0 on b_C_Base at frame 0) isn't in the files sent
+# (no EEPK for 1352_HIK_DSH; README "Time Skip v2"). Stand-in: a purple streak (Btl_HitL's Line00 glare line as a
+# template, one directional particle along the travel) the MSC leaves at his middle every moving frame (ts_trail):
+# world-placed, TRAIL_LIFE frames, fading: a line along his path. Hit's ki purple, peak under 1.0 (no bloom)
+FX_TRAIL_ID = 0x03410062
+TRAIL_Y = 5.0
+TRAIL_LIFE = 12
+TRAIL_SCALE = (0.9, 6.0)            # its width, its length along the travel (the call's size 1)
+TRAIL_RGB = (0.5, 0.18, 0.95)
+TRAIL_SIZE = 1.0
 TS_SE = {'ts_basa': ('CAR_S1352_DSH_Basa', 0.0),          # skill SE cue 0, BAC 6
          'ts_dash': ('CAR_S1352_DSH_Dash', 0.0),          # cue 1, BAC 56
          'ts_hazure': ('CAR_S1350_FRT_Hazure', 0.0),      # cue 2, BAC 86 (the whiff)
@@ -143,7 +169,9 @@ def msc_values(root_speed=None):
             'TS_WIND_END': fl(WIND_END), 'TS_VICTIM_R2': fl(VICTIM_R2), 'TS_HIT_Z': fl(HIT_Z), 'TS_HIT_Y': fl(HIT_Y),
             'TS_HIT_SIZE': fl(HIT_SIZE), 'TS_VICTIM_MID': fl(VICTIM_MID), 'TS_VICTIM_HEAD': fl(VICTIM_HEAD),
             'TS_HOLD_X': fl(HOLD_X), 'TS_HOLD_Y': fl(HOLD_Y), 'TS_INV_STEP': fl(INV_STEP),
-            'TS_FX_HITLOD': '0x%X' % SH_FX['hitlod'], 'TS_FX_HITL': '0x%X' % FX_IDS['hitl'],
+            'TS_FX_HITLOD': '0x%X' % FX_LOD_ID, 'TS_FX_HITL': '0x%X' % FX_IDS['hitl'],
+            'TS_HIT2_Z': fl(HIT2_Z), 'TS_HIT2_Y': fl(HIT2_Y), 'TS_HIT2_SIZE': fl(HIT2_SIZE),
+            'TS_FX_TRAIL': '0x%X' % FX_TRAIL_ID, 'TS_FX_TRAIL_SIZE': fl(TRAIL_SIZE), 'TS_TRAIL_Y': fl(TRAIL_Y),
             'TS_FX_HITL_2': '0x%X' % FX_IDS['hitl_2'], 'TS_FX_SWEAT': '0x%X' % SH_FX['sweat'],
             'TS_FX_HITLOD_SIZE': fl(round(EEPK_SCALE['Btl_HitLOD.emp'] * FX_SCALE, 4)),
             'TS_FX_HITL_SIZE': fl(round(EEPK_SCALE['Btl_HitL.emp'] * FX_SCALE, 4)),
@@ -208,10 +236,12 @@ def hitbox(**kw):
     return SB.hitbox(**kw)
 
 
-def catch_box():
+def catch_box(ident=0):
     """the connect box (ID 0, Part 0): XV2's place and size, 2%, knockback 1, no clank (Clang 0: a grab-like box never
-    loses a clank), shieldable, hits fighters lying down (Ground/Air 3), Smash's own small spark"""
-    return hitbox(ID=0, Part=0, Size=HIT_SIZE, Y=HIT_Y, Z=HIT_Z, SDI=0.0, Clang=0, Rebound=0, NoGFX=0, SFXLevel=0,
+    loses a clank), shieldable, hits fighters lying down (Ground/Air 3), Smash's own small spark. v2: ID 1 the same at
+    his middle (HIT2_*: point blank), Part 0 too (one hit a fighter)"""
+    z, y, r = (HIT_Z, HIT_Y, HIT_SIZE) if ident == 0 else (HIT2_Z, HIT2_Y, HIT2_SIZE)
+    return hitbox(ID=ident, Part=0, Size=r, Y=y, Z=z, SDI=0.0, Clang=0, Rebound=0, NoGFX=0, SFXLevel=0,
                   SFXType=1, HitstopFrames=CATCH_FREEZE, SelfHitstopFrames=CATCH_FREEZE, **CATCH)
 
 
@@ -235,7 +265,7 @@ def game_scripts():
     specialairs: the stopped time (Stage_Freeze, the stage and background) from its frame 0 to the punch at STRIKE;
     the punch (uncharged: shieldable; fully charged: unblockable, + SH_BONUS on a fighter caught shielding), off 2
     frames later"""
-    dash = [cmd('frame', float(HIT_FROM))] + if_(V_PH, 5, DASHING, [catch_box()])
+    dash = [cmd('frame', float(HIT_FROM))] + if_(V_PH, 5, DASHING, [catch_box(0), catch_box(1)])
     connect = ([cmd('stage_freeze', 1, STAGE_FREEZE_SAFETY), cmd('frame', float(STRIKE)), cmd('stage_freeze', 0, 0),
                 cmd('hit_log_clear', 1)] +
                if_(V_CHG, 4, FULL, [strike_box()]) +
@@ -358,13 +388,70 @@ def convert_fx(cmn_dir, fx_dir, halo=True):
         assert not comp, 'a set needs a companion halo set'
         halos = {'glowing': sum(len(v) for v in glow.values()), 'alpha': FX.HALO_ALPHA, 'no_room': dropped,
                  'by_set': {p.set_name(si): len(v) for si, v in glow.items()}}
+    lod = lod_copy(p, e)
+    trail = trail_set(p, e, sets['hitl']['set_index'])
     out = p.build()
     assert ptcl.Ptcl(out).validate() == []
     open(os.path.join(fx_dir, base + '.ptcl'), 'wb').write(out)
     open(os.path.join(fx_dir, base + '.efc'), 'wb').write(e.build())
-    bad = FX.facing_emitters(p, [s['set_index'] for s in sets.values()])
+    bad = FX.facing_emitters(p, [s['set_index'] for s in sets.values()] + [lod['set_index']])
     return {'sets': sets, 'skipped': log, 'notes': notes, 'halos': halos, 'ptcl_bytes': [before, len(out)],
-            'facing_problems': bad}
+            'facing_problems': bad, 'lod': lod, 'trail': trail}
+
+
+def lod_copy(p, e):
+    """v2: Time Skip's own Btl_HitLOD (Sledgehammer's set cloned, so Sledgehammer keeps its own byte for byte), each
+    emitter's brightest drawn channel capped by LOD_CAP (by its name's start: the white flash disc flash_1_1 first)"""
+    import supamario_sledgehammer_build as SB
+    src = e.entries[SH_FX['hitlod'] & 0xFFFF][1] - 1
+    si = p.clone_set(src, 'PtcSupamarioTsBtl_HitLOD')
+    idx = e.add(si + 1)
+    assert 0x03410000 | idx == FX_LOD_ID, ('FX_LOD_ID is out of date', hex(0x03410000 | idx))
+    notes = []
+    for em in p.sets[si]['emitters']:
+        d = em['data']
+        if d is None:
+            continue
+        en = p.emitter_name(d)
+        cap = next((c for pre, c in LOD_CAP if en.startswith(pre)), None)
+        pk = SB.arc_peak(p, d)
+        if cap is not None and p.field(d, 'blend_type') != 2 and pk > cap:
+            f = cap / pk
+            SB.arc_dim(p, d, (f, f, f))
+            notes.append('%s: peak %.2f -> %.2f' % (en, pk, cap))
+    return {'set': 'PtcSupamarioTsBtl_HitLOD', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_LOD_ID,
+            'from': '0x%08X' % SH_FX['hitlod'], 'capped': notes}
+
+
+def trail_set(p, e, hitl_si):
+    """v2: the purple streak (XV2's skill effect 0's stand-in): Btl_HitL's Line00 (a directional glare line) as one
+    particle along +X of the call (the MSC turns it to his travel), TRAIL_LIFE frames, fading in at once and out over its
+    last 70%, thinning; Hit's purple (TRAIL_RGB, colour scale 1: no bloom), additive"""
+    import supamario_sledgehammer_build as SB
+    src = next(em['data'] for em in p.sets[hitl_si]['emitters'] if em['data'] is not None and
+               p.emitter_name(em['data']) == 'Line00')
+    d = bytearray(src)
+    for name, v in (('one_time', 1), ('end_frame', 1), ('emit_rate', 1.0), ('emit_interval', 0), ('start_frame', 0),
+                    ('emit_start', 0), ('volume_type', 0), ('volume_radius', [0.0, 0.0, 0.0]),
+                    ('figure_velocity', 0.0), ('init_velocity_random', 0.0), ('emitter_velocity', 0.0001),
+                    ('emit_direction', [1.0, 0.0, 0.0]), ('dispersion_angle', 0.0), ('air_resistance', 1.0),
+                    ('gravity', [0.0, 0.0, 0.0]), ('ptcl_life', TRAIL_LIFE), ('ptcl_life_random', 0),
+                    ('scale', list(TRAIL_SCALE)), ('scale_random', [0.0, 0.0]), ('scale_init_ratio', [1.0, 1.0]),
+                    ('scale_sections', [30, 60]), ('scale_diff21', [0.0, 0.0]), ('scale_diff32', [-0.6, 0.0]),
+                    ('rotation_init', [0.0, 0.0, 0.0]), ('rotation_random', [0.0, 0.0, 0.0]),
+                    ('rotation_velocity', [0.0, 0.0, 0.0]), ('alpha_init', 0.0), ('alpha_diff21', 1.0),
+                    ('alpha_diff32', -1.0), ('alpha_section1', 0.05), ('alpha_section2', 0.3), ('color_scale', 1.0)):
+        p.set_field(d, name, v)
+    p.set_emitter_srt(d)
+    rgb = TRAIL_RGB + (1.0,)
+    for track in (0, 1):
+        p.set_color_keys(d, track, [rgb], 0)
+    SB.follow(p, d)
+    si = p.new_set('PtcSupamarioTsTrail', [bytes(d)], ['trail'])
+    idx = e.add(si + 1)
+    assert 0x03410000 | idx == FX_TRAIL_ID, ('FX_TRAIL_ID is out of date', hex(0x03410000 | idx))
+    return {'set': 'PtcSupamarioTsTrail', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_TRAIL_ID,
+            'peak': round(SB.arc_peak(p, d), 3), 'life': TRAIL_LIFE, 'scale': list(TRAIL_SCALE)}
 
 
 # ---------------------------------------------------------------- the sound bank

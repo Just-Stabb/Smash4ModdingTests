@@ -16,8 +16,12 @@ The model of the game (its assumptions):
   unless he is frozen in a hitstop; a motion change (MotionModule 1) restarts the clock at its start frame; holding the
   frame (MotionModule 0x2713) doesn't stop the clock (Core Breaker v4); then the scripts (the box at the clock's
   frame), the MSC, the collision;
-- his speed: energy 3 (world X, KineticModule 0x11) moves him each frame he isn't frozen; in the air energy 1's speed
-  plus its acceleration (gravity 0.09 when on), a fall at most 1.5; a floor ends the air (the situation changes);
+- his speed: energy 3 (world X, KineticModule 0x11) moves him each frame he isn't frozen, on the ground (kinetic type 6)
+  and in the air only while it is on (v2: KineticModule 0xB 3 since the last KineticModule(0, 0): FALL leaves it off, as
+  the game: the Cape's air code turns it on itself); energy 2 (the air drift, world X) in the air; in the air energy 1's
+  speed plus its acceleration (gravity 0.09 when on), a fall at most 1.5; a floor ends the air (the situation changes);
+  v2: his position writes (0x0F000004 forward, 0x0F000005 up) move him at once; a floor only up to `edge` (along his
+  facing) on the ground: past it he is in the air (ground correction 1: slides off);
 - the connect box (bone 0 + (HIT_Z, HIT_Y), HIT_SIZE) hits a fighter whose body (its feet to 10 above, 3.5 wide) it
   touches, once a fighter (its Part 0 record): a shield (0x1C) sets the shield bit only; intangible (body >= 2): no
   contact; invincible (1) or countering: the hurtbox bit, no damage, no reaction; armor: its damage, no reaction;
@@ -65,15 +69,24 @@ class V(FT.Fighter):
         self.pct = 0.0
         self.input_off = False
         self.ground = []
+        self.w = 3.5                 # its body's half width (v2: 1.5 for a slim hurtbox, the point-blank cases)
         for k, v in kw.items():
             setattr(self, k, v)
 
 
 class Game(SHT.Game):
-    def __init__(self, fighters=(), held=None, air=False, y=0.0, stick_x=None, floor=None):
+    def __init__(self, fighters=(), held=None, air=False, y=0.0, stick_x=None, floor=None, edge=None, boxes=(0, 1)):
         SHT.Game.__init__(self, fighters=fighters, held=held, y=y)
         self.air = air
         self.floor = floor if floor is not None else (None if air else y)
+        self.edge = edge             # v2: the floor ends this far along his facing (None: no end)
+        self.boxes = boxes           # v2: the detection boxes the script makes (v1: (0,))
+        self.e3 = not air            # v2: energy 3 on (the ground's kinetic type; off in FALL until KineticModule 0xB 3)
+        self.vx2 = 0.0               # v2: energy 2 (the air drift)
+        self.pdx = self.pdy = 0.0    # v2: this frame's position writes (world)
+        self.moves = []              # v2: (n, forward, up) position writes
+        self.correct = []            # v2: (n, GroundModule 0x2710 value)
+        self.sit_fn = None           # v2: n -> a situation to report (a ledge: 1)
         self.acc = 0.0 if not air else -GRAVITY
         self.vx = 0.0
         self.stick_x = stick_x
@@ -98,6 +111,16 @@ class Game(SHT.Game):
     def setvar(self, v, val):
         if v == 0x0F00011C:
             self.inv.append((self.n, val))
+            return
+        if v == 0x0F000004:                             # v2: move self forward
+            self.x += self.face * val
+            self.pdx += self.face * val
+            self.moves.append((self.n, round(val, 4), 0.0))
+            return
+        if v == 0x0F000005:                             # v2: move self up
+            self.y += val
+            self.pdy += val
+            self.moves.append((self.n, 0.0, round(val, 4)))
             return
         for s_ in range(1, 9):
             t_ = s_ + 2
@@ -140,6 +163,18 @@ class Game(SHT.Game):
             self.vx = f(a[2])
             return 0
         if sid == 0x10 and a and a[0] == 0x11 and a[1] == 2:
+            self.vx2 = f(a[2])
+            return 0
+        if sid == 0x10 and a and a[0] == 0xB and len(a) == 2 and a[1] == 3:
+            self.e3 = True
+            return 0
+        if sid == 0x10 and a and a[0] == 0 and len(a) == 2:   # a kinetic type: 0 FALL (energy 3 off), 6 ground
+            self.e3 = a[1] != 0
+            if a[1] == 0:
+                self.acc = -GRAVITY
+            return 0
+        if sid == 0x1A and a and a[0] == 0x2710:          # v2: GroundModule's correction
+            self.correct.append((self.n, a[1]))
             return 0
         if sid == 0x12 and a and a[0] == 0x1:
             self.kind, self.frame = a[1], f(a[2])
@@ -184,15 +219,19 @@ class Game(SHT.Game):
         if self.box is None or self.hitstop > 0:
             return
         if self.box == 'catch':
-            hx, hy, r = self.x + self.face * B.HIT_Z, self.y + B.HIT_Y, B.HIT_SIZE
+            spheres = [(self.x + self.face * z, self.y + y, r) for i, (z, y, r) in
+                       enumerate(((B.HIT_Z, B.HIT_Y, B.HIT_SIZE), (B.HIT2_Z, B.HIT2_Y, B.HIT2_SIZE))) if i in self.boxes]
         else:
-            hx, hy, r = self.x + self.face * B.STRIKE_Z, self.y + B.STRIKE_Y, B.STRIKE_SIZE
+            spheres = [(self.x + self.face * B.STRIKE_Z, self.y + B.STRIKE_Y, B.STRIKE_SIZE)]
         for v in self.fighters.values():
             if getattr(v, 'rec', None) == self.box:
                 continue
-            dx = max(0.0, abs(v.x - hx) - 3.5)
-            dy = max(0.0, max(v.y - hy, hy - (v.y + 10.0)))
-            if dx * dx + dy * dy > r * r:
+
+            def touch(hx, hy, r):
+                dx = max(0.0, abs(v.x - hx) - getattr(v, 'w', 3.5))
+                dy = max(0.0, max(v.y - hy, hy - (v.y + 10.0)))
+                return dx * dx + dy * dy <= r * r
+            if not any(touch(*sp) for sp in spheres):
                 continue
             if getattr(v, 'body', 0) >= 2:
                 continue
@@ -233,22 +272,32 @@ class Game(SHT.Game):
                 v.launch = kb
             return
 
+    def on_floor(self):
+        return self.floor is not None and (self.edge is None or (self.x - 0.0) * self.face <= self.edge)
+
     def physics(self):
+        pdx, pdy = self.pdx, self.pdy
+        self.pdx = self.pdy = 0.0
         if self.hitstop > 0:
             self.hitstop -= 1
             return
-        self.x += self.vx
+        ex = (self.vx if (self.e3 or not self.air) else 0.0) + (self.vx2 if self.air else 0.0)
+        self.x += ex
+        if not self.air and not self.on_floor():        # v2: slid off the edge (correction 1)
+            self.air = True
+            self.vy = 0.0
         if self.air:
             self.vy += self.acc
             if self.vy < -self.vlim:
                 self.vy = -self.vlim
             self.y += self.vy
-            self.vel.append((self.n, self.vx, self.vy))
-            if self.floor is not None and self.y <= self.floor:
+            self.vel.append((self.n, (ex + pdx) * self.face, self.vy + pdy))
+            if self.on_floor() and self.y <= self.floor:
                 self.y, self.air, self.vy = self.floor, False, 0.0
+                self.e3 = True
                 self.event('me', 2)                     # the landing's variable reset
         else:
-            self.vel.append((self.n, self.vx, 0.0))
+            self.vel.append((self.n, (ex + pdx) * self.face, pdy))
         self.frame += self.rate
         self.clock += self.rate
         if self.kind in LEN and self.frame > LEN[self.kind] - 1:
@@ -270,6 +319,8 @@ def run(path, g, frames=260, cut_at=None, after=0, tick=None):
             vm.g[18] = 2 if g.air else 0
             if tick:
                 tick(g, k)
+            if g.sit_fn and g.sit_fn(k) is not None:
+                vm.g[18] = g.sit_fn(k)
             vm.call(fn(vm, 'sh_tick'))
             vm.call(fn(vm, 'cb_shield_tick'))
             vm.call(fn(vm, 'ts_tick'))
@@ -284,6 +335,8 @@ def run(path, g, frames=260, cut_at=None, after=0, tick=None):
         prev_sit = sit
         if tick:
             tick(g, k)
+        if g.sit_fn and g.sit_fn(k) is not None:
+            vm.g[18] = g.sit_fn(k)
         g.scripts()
         if cut_at is not None and k == cut_at:
             g.status = 'cut'
@@ -346,6 +399,11 @@ def msc_tests(path, root):
     check('ground tap: Hazure (the whiff) once, at the moving part\'s end (%d)' % (mf + mn),
           [(n, s_) for n, w, s_ in g.sounds if w == 'play'], [(mf + mn, B.SE_IDS['ts_hazure'])])
     check('ground tap: no invincibility, the air use not taken', (g.inv, g.vars.get(B.V_USED, 0.0)), ([], 0.0))
+    fwd = sorted({n for n, a_, u_ in g.moves if a_ > 0 and mf <= n < mf + mn})
+    check('v2 ground tap: the travel is his position (one forward write a moving frame), his energy 3 held at 0, the '
+          'ground correction 1 (slides off edges) every frame', (fwd == list(range(mf, mf + mn)), round(g.vx, 6),
+                                                                  sorted({c for _n, c in g.correct})), (True, 0.0, [1]))
+    sp_ground = sp
     # 2. in the air: no gravity, Fall at the moving part's end, the use taken, the gravity eased back in
     g = Game(air=True, y=200.0, floor=-1e4)
     tr, vm = run(path, g, after=40)
@@ -355,6 +413,10 @@ def msc_tests(path, root):
     check('air tap: his height kept through the move (no gravity, no drift)',
           max(abs(t[4] - 200.0) for t in tr if t[0] < k_end), 0.0)
     near('air tap: his travel (no stop: Fall)', tr[-1][3], B.travel(0, root, True), 0.3)
+    check('v2 (user: "Doesn\'t move anywhere in the air"): the air dash moves exactly as the ground one (the moving '
+          'part\'s speeds frame by frame)', speeds(g, mf, mf + mn - 1), sp_ground)
+    near('v2 air tap: Fall carries the miss\'s last speed (%.2f, energy 2: the air drift)' % B.VSTOP, abs(g.vx2), B.VSTOP,
+         0.01)
     accs = [a for n, a in g.acc_log if n > k_end]
     want = [round(-GRAVITY * min(1.0, n / B.EASE_FRAMES), 4) for n in range(1, int(B.EASE_FRAMES) + 1)]
     check('air tap: his gravity eased back in over %d frames (-%.4f a frame more each frame), then his own' % (
@@ -439,32 +501,7 @@ def msc_tests(path, root):
     tr, vm = run(path, g)
     check('an invincible fighter, then another: the second caught (slot 3)', g.vars.get(B.V_SLOT), -1.0)
     check('  (its hold written on slot 3 only)', sorted({s_ for _n, s_, _x in g.holds}), [3])
-    # 7. tracking (the user): the nearest opponent in front within 80, up to 65 degrees; the direction only
-    for name, dx, dy, air in (('45 degrees up, 50 away (air)', 35.0, 35.0, True),
-                              ('64 degrees up, 60 away (air)', 26.0, 54.0, True),
-                              ('70 degrees up (air)', 15.0, 41.0, True),
-                              ('behind (air)', -30.0, 20.0, True),
-                              ('85 away (air)', 70.0, 48.0, True),
-                              ('45 degrees down (air)', 35.0, -35.0, True),
-                              ('level ahead on the ground (stays on it)', 40.0, 0.0, False),
-                              ('above-ahead from the ground (takes off)', 40.0, 30.0, False),
-                              ('below-ahead from the ground (not aimed down)', 40.0, -30.0, False)):
-        y0 = 100.0
-        v = V(3, 1e4, y=y0, air=True)
-        g = Game(fighters=[v], air=air, y=y0, floor=None if air else y0)
-
-        def put(g_, k, dx=dx, dy=dy):
-            if k == mf:
-                v.x, v.y = g_.x + dx, g_.y + dy         # feet to feet, placed on the moving part's first frame
-            if k == mf + 1:
-                v.x = 1e4
-        tr, vm = run(path, g, frames=mf + 6, tick=put)
-        vx, vy = [(vx, vy) for n, vx, vy in g.vel if n == mf][0]
-        aim = math.degrees(math.atan2(vy, vx))
-        ang = math.degrees(math.atan2(dy, dx)) if dx > 0 else 999.0
-        want = ang if (math.hypot(dx, dy) < B.TRACK_RANGE and abs(ang) <= B.TRACK_DEG and (air or ang >= 0)) else 0.0
-        check('tracking %s: aimed %.0f degrees, speed %.2f, never turned' % (name, want, B.VMIN),
-              (round(aim, 1), round(math.hypot(vx, vy), 3), g.turns), (round(want, 1), B.VMIN, []))
+    tracking_tests(path)
     # 8. B-reverse
     for kk, want in ((0, 1), (3, 1), (4, 0)):
         g = Game(stick_x=lambda n, kk=kk: -1.0 if n == kk else 0.0)
@@ -559,13 +596,13 @@ def caught_tests(path, air):
     check('%s: the time stop: the bystander frozen (a hitstop renewed every frame) from the catch to the punch\'s frame, '
           'free after' % tag, (by_stop[0] if by_stop else None, by_stop[-1] if by_stop else None, len(by_stop)),
           (ck + 1, sk - 1, sk - 1 - ck))
-    check('%s: punched at %d: 2 + 16 = 18%%, launched (DamageFly), XV2\'s hit look the next frame (Btl_HitLOD / Btl_HitL '
-          'x2 sets / the sweat) and Hit_TmLck once' % (tag, sk),
-          (round(v.pct, 3), v.hit_at, [(n, i) for n, i, _x, _y, _s in g.fx],
+    check('%s: punched at %d: 2 + 16 = 18%%, launched (DamageFly), XV2\'s hit look the next frame (v2: Time Skip\'s own '
+          'Btl_HitLOD / Btl_HitL x2 sets / the sweat) and Hit_TmLck once' % (tag, sk),
+          (round(v.pct, 3), v.hit_at, [(n, i) for n, i, _x, _y, _s in g.fx if i != B.FX_TRAIL_ID],
            [(n, s_) for n, w, s_ in g.sounds if w == 'play']),
-          (18.0, sk, [(sk + 1, B.SH_FX['hitlod']), (sk + 1, B.FX_IDS['hitl']), (sk + 1, B.FX_IDS['hitl_2']),
+          (18.0, sk, [(sk + 1, B.FX_LOD_ID), (sk + 1, B.FX_IDS['hitl']), (sk + 1, B.FX_IDS['hitl_2']),
                       (sk + 1, B.SH_FX['sweat'])], [(sk + 1, B.SE_IDS['ts_hit'])]))
-    sizes = [s_ for _n, _i, _x, _y, s_ in g.fx]
+    sizes = [s_ for _n, i_, _x, _y, s_ in g.fx if i_ != B.FX_TRAIL_ID]
     check('%s: the hit look\'s sizes (x%.2f the EEPK\'s 1.5 / 0.8 / 2.0)' % (tag, B.FX_SCALE), sizes,
           [round(B.EEPK_SCALE[e] * B.FX_SCALE, 3) for e in ('Btl_HitLOD.emp', 'Btl_HitL.emp', 'Btl_HitL.emp',
                                                              'Btl_Sweat00.emp')])

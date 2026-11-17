@@ -9,7 +9,8 @@ the Super God Fist (attackdash) and Core Breaker's charge (specialhi before its 
   python3 -I tools/supamario_fx_glow.py BUILD_OUT_DIR [MOVE ...] [--png DIR] [--bg R,G,B] [--only NAMES]
 
 BUILD_OUT_DIR: tools/supamario_sledgehammer_build.py's OUT_DIR (ts_hit: tools/supamario_timeskip_build.py's). MOVE:
-sh_charging, sh_uncharged, sh_charged, sh_hit, ts_hit (Time Skip's punch), attackdash, cb_charge (default all). --png DIR: each move's six brightest frames side by side. Bones other than top
+sh_charging, sh_uncharged, sh_charged, sh_hit, ts_hit (Time Skip's punch; ts_hit_v1 with v1's shared Btl_HitLOD),
+ts_trail (Time Skip v2's purple streaks along a dash), attackdash, cb_charge (default all). --png DIR: each move's six brightest frames side by side. Bones other than top
 are drawn at top (the fist's effects placed 8 up, 3 ahead); his body isn't drawn.
 --bg (v4): the background colour (default black): the effects are added onto it as in game (a bright stage pushes an
 additive effect past 1 sooner: the user's screenshot 26 on a grass stage); the areas then count only the pixels the
@@ -54,10 +55,15 @@ def moves(out_dir):
                       (0, fx['hits'], 0, (0.0, 5.0, 0.0), (0, 0, 0), B.EEPK_SCALE['Btl_HitS.emp'] * sc, None)],
                      list(range(0, 20)))
     import supamario_timeskip_build as TB     # Time Skip's punch: XV2's hit look (BTL_CMN effect 2) from the MSC
-    ts = [(0, TB.SH_FX['hitlod'], 0, (0.0, 5.0, 0.0), (0, 0, 0), TB.EEPK_SCALE['Btl_HitLOD.emp'] * TB.FX_SCALE, None)]
+    # (v2: its own Btl_HitLOD copy, TB.FX_LOD_ID; ts_hit_v1: v1's call of Sledgehammer's set, for the comparison)
+    ts = [(0, TB.FX_LOD_ID, 0, (0.0, 5.0, 0.0), (0, 0, 0), TB.EEPK_SCALE['Btl_HitLOD.emp'] * TB.FX_SCALE, None)]
     ts += [(0, TB.FX_IDS[k], 0, (0.0, 5.0, 0.0), (0, 0, 0), TB.EEPK_SCALE['Btl_HitL.emp'] * TB.FX_SCALE, None)
            for k in ('hitl', 'hitl_2')]
     out['ts_hit'] = (ts, list(range(0, 24)))
+    out['ts_hit_v1'] = ([(0, TB.SH_FX['hitlod']) + ts[0][2:]] + ts[1:], list(range(0, 24)))
+    # v2: Time Skip's trail: one streak a frame at his middle, along a level dash at the uncharged speed (MSC ts_trail)
+    out['ts_trail'] = ([(k, TB.FX_TRAIL_ID, 0, (-25.0 + TB.VMIN * k, TB.TRAIL_Y, 0.0), (0, 0, 0), TB.TRAIL_SIZE, None)
+                        for k in range(20)], list(range(0, 32)))
     c = [x for x in R.s4_calls(eb, 'attackdash') if (x[1] >> 16) == 0x341]
     out['attackdash'] = (c, list(range(min(x[0] for x in c), min(x[0] for x in c) + 90)))
     c = [x for x in R.s4_calls(eb, 'specialhi') if (x[1] >> 16) == 0x341 and x[0] < 55]
