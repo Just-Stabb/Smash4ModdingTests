@@ -4,7 +4,7 @@ These are new commands for game, effect, sound and expression scripts. They need
 `cross_f.rpx` (`tools/acmd_ext_cave.py`, part of the standard build). Without it, a script that uses
 them won't load properly, so ship the executable with any script that uses them.
 
-Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12, Buffer_Clear / Buffer_Set from v1.4.13, Time_Scale / Target_Time_Scale / Stage_Freeze from v1.7.0 (Stage_Freeze's On 2 / 3 and the flash-free On 1 from v1.7.8), Var_Reset_Set and New_Var's Reset from v1.7.4, Hitbox_Hold from v1.7.5, Effect_Camera from v1.7.6, its v5 squash fix from v1.7.10) lists all of them in one
+Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12, Buffer_Clear / Buffer_Set from v1.4.13, Time_Scale / Target_Time_Scale / Stage_Freeze from v1.7.0 (Stage_Freeze's On 2 / 3 and the flash-free On 1 from v1.7.8), Var_Reset_Set and New_Var's Reset from v1.7.4, Hitbox_Hold from v1.7.5, Effect_Camera from v1.7.6, its v5 squash fix from v1.7.10, Screen_Invert from v1.7.12) lists all of them in one
 group, **New Commands**, at the top of the list (vanilla commands stay in their own groups), in subgroups:
 
 | Subgroup | Commands |
@@ -17,7 +17,7 @@ group, **New Commands**, at the top of the list (vanilla commands stay in their 
 | Targets & tracking | Track_Target, Last_Hit_Get, Target_Slot_Get |
 | Threads | Thread_Start, Thread_Stop |
 | Time & stage | Time_Scale, Target_Time_Scale, Stage_Freeze |
-| Effects | Effect_Camera |
+| Effects | Effect_Camera, Screen_Invert |
 | Variables | New_Var, Var_Reset_Set |
 
 Each command there has in-depth help after its parameters (how it works, the values, gotchas) and several complete
@@ -49,6 +49,7 @@ them too.
 | `New_Var` | declares a variable with your own name (int or float, a starting value, per object or per move): 64 more per object, usable in every variable parameter (exe_v40, Sm4shCommand v1.4.9); `Reset`: back to its starting value on a KO / landing / ledge grab / hit (exe_v46w, Sm4shCommand v1.7.4: "Variable resets" below) |
 | `Var_Reset_Set` | any variable (`VAR_n`, `TIMER_n`, a New_Var name, the input / state variables) put back to a value when its owner is KO'd, lands, grabs a ledge or is hit (exe_v46w, Sm4shCommand v1.7.4: "Variable resets" below) |
 | `Effect_Camera` | an effect attached to the camera: in front of it, facing it, following its moves and zooms every frame (full-screen overlays, bursts in front of the camera, vignettes); Mode 1 keeps it on the same part of the screen (exe_v46z_camfx, Sm4shCommand v1.7.6: "Effect_Camera" below) |
+| `Screen_Invert` | the 3D picture (not the HUD) as a photo-negative at any strength, then greyed / darkened / lifted toward a colour, faded in and out; the game's own colour-correction pass (exe_v46z_inv, Sm4shCommand v1.7.12: "Screen_Invert" below) |
 
 ## Extra_Special_Hitbox / Extra_Extended_Special_Hitbox
 
@@ -1424,3 +1425,61 @@ draws it in front of its own view (X / Y from the view's centre, Mode 1 in half 
 so Z changes nothing there) and lists it with the effects; Frames ends it there too. `port_check` X9 (ERROR): a script
 using it with no executable carrying the cave. How it works: docs/native-notes.md "Camera effects"; tests
 `tools/camera_effect_test.py` (unicorn), `tools/Sm4shCommand/new_var_test.cs`, `viewer_scripts_test.cs`.
+
+## Screen_Invert (exe_v46z_inv, Sm4shCommand v1.7.12)
+
+`Screen_Invert(Mode, Strength, Frames, FadeIn, FadeOut, Saturation, Brightness, Red, Green, Blue)` turns the 3D picture
+into a photo-negative (Xenoverse 2's BPE 78 "Invert World Colors", Hit's Time Skip), then greys, darkens / brightens and
+lifts it toward a colour, faded in and out. User: "Can you make a way for Smash 4 to invert the colors?"
+
+| Parameter | |
+|---|---|
+| Mode | int: 1 start (or replace the one showing: one filter for the whole screen); 0 end it, over this command's FadeOut (0 at once) |
+| Strength | float: the negative. 1 full (out = 1 - in), 0 none, between a blend: **0.5 is an even mid-grey** (0.3 / 0.7 a low-contrast picture / negative) |
+| Frames | int: held this many frames once faded in, then out over FadeOut; 0 until Mode 0 / the match ends |
+| FadeIn / FadeOut | int: frames (0 at once). A filter already showing fades from where it is |
+| Saturation | float, after the negative: 1 kept, 0 grey (luma 0.299 / 0.587 / 0.114), above 1 stronger |
+| Brightness | float, then a multiply: 1 kept |
+| Red, Green, Blue | float, 0-255, then added (negative takes away). Brightness 1 - a with RGB = a x C mixes toward C by a |
+
+Per channel (0-1): f(x) = Brightness x Sat(Strength x (1 - x) + (1 - Strength) x x) + RGB / 255; shown as
+(1 - w) x + w f(x) while it fades (w 0 -> 1 over FadeIn, 1 -> 0 over FadeOut).
+
+- **How:** Smash 4 copies its finished 3D picture through a 3x4 colour matrix every frame (shader/copy_color.nsh's
+  colour-correct programs, uniform block `PostEffectSettings` / `correct_param[3]`), built each frame by the post-effect
+  object from the parameters Screen_Tint sets. The patched executable composes the filter after that matrix just
+  before it goes to the GPU, so nothing is drawn and a Screen_Tint showing at the same time is inverted with the rest
+  (docs/native-notes.md "Screen colour").
+- **Timing:** counted in the effects' frame, as Screen_Tint's own fades (runs through hitlag, Stage_Freeze, Time_Scale;
+  stops while paused). Ends with the match, a restart and a training reset (the clear-all Time_Scale / Stage_Freeze use).
+- **Whole picture:** the fighters are inverted too (XV2's stop keeps theirs: it inverts the world before drawing the
+  characters; Smash draws both into one picture). The HUD isn't touched (drawn after the colour pass). Effects in the 3D
+  picture, Effect_Camera overlays included, are inverted with it.
+- **XV2's looks** (values fit to the user's clip b66e8a38, the background before / during the stop): the dark blue-grey
+  stop = Strength 1, Saturation 0, Brightness 0.8, + (19, 37, 60) (the clip's sky (210, 228, 207) -> (47, 67, 91),
+  floor (189, 195, 203) -> (67, 87, 110), the top (169, 211, 185) -> (69, 80, 105): 0.8 x the negative's luma +
+  (19, 37, 60) gives each within 5 / 255); XV2's own shader
+  (`NegaposiFilter_PS`, adam_shader's shader_default_ps.emz) is a plain `1 - rgb`, alpha kept, so the grey / blue part
+  comes from what XV2 draws over and after it (the glass HIT_DmgGrs2, its fog / glare), which this folds into one
+  filter. The white negative after the punch: Strength 1, Saturation 0.15, Brightness 0.6, + (102, 104, 110).
+- **Not in the Hitbox Viewer.** `port_check` X10 (ERROR): a script using it with no executable carrying the cave.
+
+```
+// XV2's time stop: the stage freezes and the picture turns into a dark blue-grey negative until the punch
+FRAME(Frames=12)
+Stage_Freeze(On=1, Frames=0)
+Screen_Invert(Mode=1, Strength=1, Frames=0, FadeIn=0, FadeOut=0, Saturation=0, Brightness=0.8, Red=19, Green=37, Blue=60)
+FRAME(Frames=28)
+Screen_Invert(Mode=0, Strength=0, Frames=0, FadeIn=0, FadeOut=0, Saturation=1, Brightness=1, Red=0, Green=0, Blue=0)
+Stage_Freeze(On=0, Frames=0)
+// a negative flash on a strong hit: 4 frames, out over 6
+Screen_Invert(Mode=1, Strength=1, Frames=4, FadeIn=0, FadeOut=6, Saturation=1, Brightness=1, Red=0, Green=0, Blue=0)
+// half strength faded in / out (the picture greys out and comes back)
+Screen_Invert(Mode=1, Strength=0.5, Frames=60, FadeIn=20, FadeOut=20, Saturation=1, Brightness=1, Red=0, Green=0, Blue=0)
+```
+
+Tests: `tools/screen_invert_test.py` (unicorn: the command tables with every earlier cave's commands, the handler, the
+tick through the game's screen-effect update, the lock with the matrix the game's lock sees, the clear; the builder's
+paired-single matrix code run in a Python interpreter of its own words; the diag's lines), `new_var_test.cs` (the
+command's words, round trip, group, every example). In game: `tools/screen_invert_ingame_test_build.py` (Dr. Mario's
+taunts).

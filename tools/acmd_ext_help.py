@@ -3049,3 +3049,105 @@ EXAMPLES['Effect_Camera'] = [
     'Effect_Camera(Graphic=0x100002C, X=-1.4, Y=0.7, Z=20, XRot=0, YRot=0, ZRot=0, Size=0.05, Mode=1, Frames=120, Flags=0)',
     'Effect_Camera(Graphic=0x100002C, X=1.4, Y=-0.7, Z=20, XRot=0, YRot=0, ZRot=0, Size=0.05, Mode=1, Frames=120, Flags=0)',
 ]
+
+# --- screen_invert v1: Screen_Invert (tools/screen_invert_cave.py, exe_v46z_inv) -----------------------------------------
+GROUP['Screen_Invert'] = 'Effects'
+_ov = GROUP_HELP[NEW_GROUP]
+_ov.insert(next(i for i, x in enumerate(_ov) if x.startswith('- Effects (exe_v46z_camfx)')) + 1,
+           '- Effects (exe_v46z_inv): the 3D picture as a photo-negative, greyed, darkened or tinted, faded in and out '
+           '(Screen_Invert).')
+GROUP_HELP[NEW_GROUP + ' / Effects'] += [
+    '',
+    'Screen_Invert (exe_v46z_inv, tools/screen_invert_cave.py) changes the colours of the whole 3D picture: a photo-'
+    'negative at any strength, then saturation, brightness and a colour lift, faded in and out. It works on the game\'s '
+    'own colour-correction pass (the 3x4 colour matrix the 3D picture is copied through, the one Screen_Tint drives), '
+    'so it costs nothing to draw and the HUD isn\'t touched (docs/native-notes.md "Screen colour").',
+]
+HELP['Screen_Invert'] = [
+    '## What it does',
+    'Turns the 3D picture (stage, fighters, effects) into a photo-negative: white becomes black, blue becomes orange. '
+    'After the negative it can grey the picture (Saturation), darken or brighten it (Brightness) and lift it toward a '
+    'colour (Red / Green / Blue), so one command gives Xenoverse 2\'s time-stop look (an inverted, dark blue-grey '
+    'world) or a white negative. It fades in and out and ends by itself after Frames, with Mode 0, or when the match '
+    'ends / training resets.',
+    'It is the game\'s own colour pass: every frame Smash 4 copies the finished 3D picture through a colour matrix '
+    '(shader/copy_color.nsh, the PostEffectSettings block) that Screen_Tint and the Final Smash darkenings already '
+    'use. The patched executable puts the filter after the game\'s own matrix, so a Screen_Tint showing at the same '
+    'time is inverted with the rest of the picture. Nothing is drawn: no performance cost, no new effect.',
+    '',
+    '## Parameters',
+    '- Mode: 1 starts the filter (or replaces the one showing: one filter at a time, whoever started it). 0 ends it: '
+    'it fades out over this command\'s FadeOut (0: at once); the other parameters don\'t matter then.',
+    '- Strength (float): how much negative. 1 = full (out = 1 - in). 0 = none (only Saturation / Brightness / the '
+    'colour). In between is a blend of the picture and its negative, and **0.5 is an even mid-grey** (half of each: '
+    'every colour meets its opposite). 0.3 is the picture with its contrast squashed, 0.7 the negative with its '
+    'contrast squashed.',
+    '- Frames (int): once faded in, held this many frames, then it fades out over FadeOut. 0 = held until Mode 0 or the '
+    'match ends.',
+    '- FadeIn (int): frames to fade in (0: at once). A filter already showing fades from where it is (no jump).',
+    '- FadeOut (int): frames to fade out when Frames run out (0: off at once).',
+    '- Saturation (float), after the negative: 1 keeps the colours, 0 grey (the game\'s own luma weights 0.299 / '
+    '0.587 / 0.114), 0.3 washed out, 1.5 stronger.',
+    '- Brightness (float), then a multiply: 1 kept, 0.8 a fifth darker, 1.2 brighter.',
+    '- Red, Green, Blue (float, 0-255), then added: 0 nothing, 40 a clear lift, negative values take away. A mix '
+    'toward a colour C by a fraction a is Brightness = 1 - a and Red / Green / Blue = a x C (a 25 % mix toward (60, '
+    '80, 160): Brightness 0.75, 15 / 20 / 40).',
+    '',
+    '## The maths (per channel, 0-1)',
+    'f(x) = Brightness x Sat(Strength x (1 - x) + (1 - Strength) x x) + RGB / 255, Sat(y) = Saturation x y + (1 - '
+    'Saturation) x luma(y). While it fades, the picture is (1 - w) x + w f(x), w going 0 -> 1 over FadeIn and 1 -> 0 '
+    'over FadeOut. With Strength 1 a fade passes through grey half-way (that is what half a negative is); a quick fade '
+    '(0-6 frames) reads as a flash, a long one as the picture greying out and coming back inverted.',
+    '',
+    '## Timing',
+    '- Frames and fades are counted in the effects\' frame, as Screen_Tint\'s own fades: they run through hitlag, '
+    'Stage_Freeze and Time_Scale, and stop while the game is paused.',
+    '- One filter for the whole screen: a second Screen_Invert (from any fighter) replaces the first; Mode 0 from any '
+    'script ends it. Give a move that may be cut a Mode 0 in its exit, or a Frames, so it never stays on.',
+    '- Ends with the match, a restart and a training reset (the game\'s own "clear every slow-motion", as Time_Scale and '
+    'Stage_Freeze).',
+    '',
+    '## Gotchas',
+    '- **The fighters are inverted too.** It works on the finished 3D picture. Xenoverse 2\'s BPE 78 inverts the world '
+    'only (its stop keeps the fighters\' colours: its negative is drawn into the background before the characters); '
+    'Smash 4 draws the stage and the fighters into one picture, so a world-only negative isn\'t possible this way.',
+    '- **The HUD isn\'t touched** (damage panels, timer, names): it is drawn after the colour pass. Effects drawn into '
+    'the 3D picture (Effect_Camera overlays included) are inverted with it.',
+    '- **Strength 0.5 is grey**, not "half inverted": use 0.3 / 0.7 or a fade for something in between.',
+    '- **Black stays black only at Strength 0**: a full negative turns the dark background of a stage white. Lower '
+    'Brightness (0.6-0.8) keeps a negative from glaring.',
+    '- **Screen_Tint before it is inverted**: a black Screen_Tint under a full Screen_Invert shows white. Use the '
+    'Red / Green / Blue lift for the tint you want to see.',
+    '- **Not in the Hitbox Viewer**: Sm4shCommand\'s viewer doesn\'t change its colours for it.',
+    'Needs exe_v46z_inv (tools/screen_invert_cave.py; exe_v46z_camfx5 + it). Without it a script that uses this '
+    'command won\'t load properly: ship the executable with any script that uses it.',
+]
+EXAMPLES['Screen_Invert'] = [
+    '// Example 1: Xenoverse 2\'s time stop (Hit\'s Time Skip, BPE 78): at the catch the stage freezes and the picture',
+    '// turns into a dark blue-grey negative (full negative, grey, a fifth darker, lifted toward blue: the values fit',
+    '// to XV2\'s own frames), held until the punch, which ends it at once',
+    'FRAME(Frames=12)',
+    'Stage_Freeze(On=1, Frames=0)',
+    'Screen_Invert(Mode=1, Strength=1, Frames=0, FadeIn=0, FadeOut=0, Saturation=0, Brightness=0.8, Red=19, Green=37, Blue=60)',
+    'FRAME(Frames=28)',
+    'Screen_Invert(Mode=0, Strength=0, Frames=0, FadeIn=0, FadeOut=0, Saturation=1, Brightness=1, Red=0, Green=0, Blue=0)',
+    'Stage_Freeze(On=0, Frames=0)',
+    '',
+    '// Example 2: the white negative after the punch: a pale, almost colourless negative (greys squeezed toward',
+    '// white), held 30 frames and faded out over 20',
+    'Screen_Invert(Mode=1, Strength=1, Frames=30, FadeIn=0, FadeOut=20, Saturation=0.15, Brightness=0.6, Red=102, Green=104, Blue=110)',
+    '',
+    '// Example 3: a negative flash on a strong hit: full colour negative for 4 frames, out over 6',
+    'FRAME(Frames=14)',
+    _hitbox('Hitbox', ID=0, Damage=24, Angle=361, KBG=90, BKB=60, Size=6, Z=10),
+    'Screen_Invert(Mode=1, Strength=1, Frames=4, FadeIn=0, FadeOut=6, Saturation=1, Brightness=1, Red=0, Green=0, Blue=0)',
+    '',
+    '// Example 4: half strength, faded in over 20 frames, held 60, out over 20: half a negative is an even grey, so',
+    '// the 3D picture greys out and comes back (Strength 0.3 / 0.7 keep a low-contrast picture / negative instead)',
+    'Screen_Invert(Mode=1, Strength=0.5, Frames=60, FadeIn=20, FadeOut=20, Saturation=1, Brightness=1, Red=0, Green=0, Blue=0)',
+    '',
+    '// Example 5: no negative: a greyscale "memory" look (Strength 0, Saturation 0, a warm 15 % lift), until ended',
+    'Screen_Invert(Mode=1, Strength=0, Frames=0, FadeIn=30, FadeOut=0, Saturation=0, Brightness=0.85, Red=30, Green=20, Blue=5)',
+    'FRAME(Frames=120)',
+    'Screen_Invert(Mode=0, Strength=0, Frames=0, FadeIn=0, FadeOut=30, Saturation=1, Brightness=1, Red=0, Green=0, Blue=0)',
+]

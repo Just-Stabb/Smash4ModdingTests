@@ -2639,7 +2639,7 @@ temporary diag caves' `0x04BCC000`); variables `0x0F0003D0`-`0x0F0003DA`; comman
 `0x04BD88C4`, data `0x04BD9F00`, the reset lists `0x04BDA000`; `textregion:0x2BE0000 grow:0x04BE0000`).
 `0x04BD6000`-`0x04BD8000` (between ts_data's end and this) was free; `0x04BD6000`-`0x04BD7000` is now the whip motion
 table's (Byleth v15, below), `0x04BD7000`-`0x04BD8000` the hitbox hold's (rapid_setoff v1, below). `0x04BE0000`-`0x04BE2000`
-(past this region, the text region grown again) is the camera effects' (camera_effects v1, "Camera effects" below). The combined exe the user runs:
+(past this region, the text region grown again) is the camera effects' (camera_effects v1, "Camera effects" below). `0x04BE2000`-`0x04BE3000` (grown again) is the screen invert's (screen_invert v1, "Screen colour" below). The combined exe the user runs:
 exe_v46v_threads -> var_reset_cave.py (exe_v46w_vars) -> tools/line_test_cave.py (exe_v46w_vars_line, which chains on
 four of these hooks).
 
@@ -3009,3 +3009,76 @@ so the hand-off worked; S4CF's last byte (`+0x1A3`) 1.
 their own sources? they would be read the same way, through the current source); the vertical FOV's use by the renderer
 (Mode 1's scale follows the source's FOV as the projection gets it); the overlay's draw order against other effects.
 
+## Screen colour (screen_invert v1: `tools/screen_invert_cave.py`, exe_v46z_inv)
+
+**Claimed region: `0x04BE2000`-`0x04BE3000`** (past the camera effects' region, the end of exe_v46z_camfx5's text; the
+text region grown: `textregion:0x2BE3000 grow:0x04BE3000`; code and data `0x04BE2000`-`0x04BE2710`, the diag build to
+`0x04BE2A90`). Order: exe_v46z_camfx5 -> this (exe_v46z_inv); it chains on the earlier caves' command-table fallbacks
+(Effect_Camera's branches) and on ts_tick_cave.py's tsu_clear, and asserts every other word it replaces. Test
+`tools/screen_invert_test.py EXE` (61 checks on exe_v46z_camfx5). User docs: docs/acmd-extra-commands.md "Screen_Invert".
+
+**How the 3D picture gets its colour (read from cross_f.rpx and shader/copy_color.nsh):**
+- **The pass.** The 3D picture is copied at the end of the 3D passes with one of copy_color.nsh's programs, ids
+  `0x441xxxxx` from the table `0x10428344` (96 ids), picked by `0x0332E398(mgr, colour, ?, b4, b8, b16, b32+)`: bit 0 of
+  the index is r4, **colour correction**. The odd programs (`0x44100001` ...) read uniform block **PostEffectSettings**
+  (CB6: `correct_param[0..2]`) and do `out.rgb = dot4(correct_param[i], (rgb, 1))`, alpha kept: a 3x4 affine colour
+  matrix (rows R / G / B, column 3 an offset); the even ones are plain copies (`0x44100010` / `0x44100011` add an edge
+  blend: luma 0.299 / 0.587 / 0.114 differences x 5 - 0.1). The 3D copy's call (`0x033333F0`, in `0x03333064`) passes
+  r4 = 1 always; other callers (`0x0332E5FC`, `0x03336F60`, `0x03337038`, ...) pass 0 (captures, other copies).
+- **The matrix.** The post-effect object (`[0x10423DCC] + 0x1FF0`, made by `0x034332C0`: 0x400 bytes, vtable `0x101A0D40`,
+  ctor `0x03433068`; init `0x03433154`: a 0x100-byte uniform buffer at `+0x200` through the device's vt `+0x1C`, its
+  binding `+0x300` vt `+0x24`). `0x034333B0` (called once a frame by the render manager's frame prep, `0x0333616C`, its
+  only caller) builds the matrix from the parameters and writes it to `+0x100`-`+0x12C` (every word, paired-single
+  stores), then `[+0x200]` vt `+0x3C` (lock; the `bctrl` at `0x03433544`), `0x04B811C0` copies `+0x100` (0x100 bytes)
+  into the locked buffer, vt `+0x44` (unlock). Parameters (ctor defaults in brackets): `+0x304` luma scale [1], `+0x318`
+  luma offset [0] (vt `+0x24`'s levels: centre c, width d -> scale 1 / d, offset -(c - d / 2) / d), `+0x30C` / `+0x310`
+  chroma scale [1] (saturation) and `+0x320` / `+0x328` chroma offsets [0] (vt `+0x2C`), `+0x36C`-`+0x374` RGB gains
+  [1] (vt `+0x1C`), `+0x35C`-`+0x368` a tint RGBA [0] and `+0x378` = 1 - its alpha (vt `+0xC`, mode 0), `+0x354` /
+  `+0x358` [1]. Composed through RGB -> YCbCr (`0x105772B0`: 0.2989 / 0.5866 / 0.1145, -0.1687 / -0.3313 / 0.5, 0.5 /
+  -0.4187 / -0.0813) and back (`0x105772F0`: 1.402, -0.3441 / -0.7141, 1.772), written at static init by `0x034335A8`.
+  The constructor's values give the identity; a tint of colour C at alpha A gives `(1 - A) x + A C`.
+- **The screen-effect manager** `[0x102F6C38]` (Screen_Tint's: EffectModule vt `+0x19C` `0x02003F80` -> `0x0334B77C`
+  builds two 26-float parameter blocks, from (RGB, alpha 0) to (RGB, A), the rest neutral, -> `0x0334AD70`: an entry of
+  10 x 0x15C, layer `+0xC` < 9, priority `+8`, owner key `+0x1C`, transition frames `+0x14`, blocks `+0x20` (current),
+  `+0x84` (from), `+0xEC` (to); End_Screen_Tint vt `+0x1B4`). Its update `0x0334B250` (from the effect manager's frame,
+  `0x032EFB78`, its only caller) adds 1 to each entry's frame, picks the highest priority of layer != 0 (`+0xE6C`, lerped
+  into `+0xD98`) and of layer 0 (`+0xE70` -> `+0xE00`); the calc `0x0334B444` (`0x032EFE78`) gives the layer != 0 winner
+  to the post-effect through `0x0334AC8C` -> `0x03302660()` = `[0x10423DCC] + 0x200C` (wrapper objects of vtable
+  `0x101A20D0` around `+0x1FF0`): vt `+0xC` colour, `+0x1C` gains, `+0x24` levels, `+0x2C` chroma; with no winner it
+  puts the neutral values back once (`+0xE79`). The **layer 0** winner goes to the stage instead (`0x0334C150` /
+  `0x0334C158` read by the stage base method `0x02D1D308`, every stage's vtable: the stage's own colour `0x03301604`
+  and its effects' visibility, key `0x01800000`). `0x0334B5FC` clears every entry (`0x032EE8D4`, `0x030E9C48`).
+
+**The cave** (each word asserted):
+- **LOCK** `0x03433544` `bctrl` -> `bl si_lock`: r3 / r4 / CTR saved; when a filter shows, `M' = A M` in place on
+  `r30 + 0x100` (the 3x4 just written; A affine, its column 3 added to the offsets); then `bctr` into the lock with LR =
+  `0x03433548`. The game's own matrix (and so Screen_Tint) is kept and filtered.
+- **TICK** `0x032EFB78` `bl 0x0334B250` -> `bl si_tick`: the game's update, then the filter's frame (phase 1 fade in by
+  1 / FadeIn, 2 held with Frames counted, 3 fade out by 1 / FadeOut, 0 off) and A recomputed: A = (1 - w) [I | 0] +
+  w [F | f], F = Brightness (1 - 2 Strength) Sat, Sat[i][j] = k d_ij + (1 - k) luma_j, f_i = Brightness Strength +
+  add_i (`screen_invert_cave.filter_matrix()` is the Python reference).
+- **CLEAR** tsu_clear's last word (`b 0x02FB349C`, found from `0x02FB3498`'s `b`) -> `b si_clear`: phase 0, w 0, then
+  back (r3 / r10 kept): the game's clear-all of the slow-motions (training reset, restart, match start / end).
+- The command tables: line_test_cave.py's `find` sites, chained in front of Effect_Camera's branches. Screen_Invert
+  index 2300, CRC `0x370CA2AD`, 11 words.
+- **Tested** (`tools/screen_invert_test.py`, 61 checks): the command tables (vanilla, acmd_ext, Line_Test, Var_Reset_Set,
+  Hitbox_Hold, Effect_Camera, Screen_Invert; both loaders, the fetch); the handler; the tick through the game's
+  `0x0334B250` on an empty manager (fades frame by frame, Frames, Mode 0, replacing); the lock with a recording lock
+  stub in CTR (the matrix it sees = `compose(filter_matrix(...), M)`, r3 / r4 / LR / sp / callee-saved kept, nothing
+  done with no filter); the clear through the real tsu_clear; the builder `0x034333E4`-`0x03433540` run in a Python
+  interpreter of its own words (paired singles: unicorn can't), on the YCbCr constants `0x034335A8` writes: the
+  constructor's parameters -> identity, Screen_Tint's (0.08, 0.09, 0.17) at 70 % -> `0.3 x + 0.7 C`, chroma 0 -> the
+  luma rows; every word of `+0x100`-`+0x12C` written each call.
+- **The diag build** (`--diag`, TEST ONLY, exe_v46z_inv_diag): OSReport lines `S4IC mode s fr in out sat bri` and `S4ID
+  add(3) ph w` at each command; per locked frame (the first 30 after a command, then every 30th; with no filter every
+  600th lock, to show the builder runs) `S4IS n lock ph w left on` (frames ticked, locks seen, phase, w, Frames left,
+  matrices changed), `S4IG` / `S4IH` the game's 12 matrix words, `S4IO` / `S4IP` ours. Floats as hex words.
+
+**XV2 (adam_shader, read for this):** `NegaposiFilter_PS` (shader_default_ps.emz, DXBC) is `out = tex x (-1, -1, -1, 1)
++ (1, 1, 1, 0)`: a plain negative, alpha kept, no strength; `LerpFilter_PS` blends two pictures by `g_vLerp_PS.x`.
+The clip's stop (b66e8a38) fits 0.8 x luma(negative) + (19, 37, 60) on the background (the fighters keep their colours:
+XV2's negative is applied to the world before the characters).
+
+**Not confirmed in game:** that the 3D copy is the colour-correct program in every battle view (r4 = 1 at `0x033333F0`
+is read from the code; Screen_Tint's visible darkening says the matrix reaches the screen); that the HUD is drawn after
+it (Screen_Tint leaves it); the colour pass's place relative to the stage's own layer-0 colour; GamePad views.

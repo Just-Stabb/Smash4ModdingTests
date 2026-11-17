@@ -85,10 +85,10 @@ class NvTest
         var errors = new List<string>();
         int n = ACMD_INFO.OverrideInfo(args[0], errors);
         Check("Events.cfg loads with no errors", string.Join("; ", errors), "");
-        Check("commands", ACMD_INFO.CMD_NAMES.Count, 631);   // v1.4.12: + Position_Place, Position_Offset_Get; v1.4.13: + Buffer_Clear, Buffer_Set; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
+        Check("commands", ACMD_INFO.CMD_NAMES.Count, 632);   // v1.7.12: + Screen_Invert; v1.4.12: + Position_Place, Position_Offset_Get; v1.4.13: + Buffer_Clear, Buffer_Set; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
         Check("New_Var known: size 11, group", ACMD_INFO.CMD_SIZES[FighterVariable.NewVarIdent] + " " +
               ACMD_INFO.GetCategory(FighterVariable.NewVarIdent), "11 New Commands / Variables");
-        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 47);       // v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
+        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 48);       // v1.7.12: + Screen_Invert; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
         Check("group help blocks", ACMD_INFO.GROUP_HELP.Count, 11);      // v1.7.0: + New Commands / Time & stage; v1.7.6: + New Commands / Effects
         LoadAliases(args[1]);
         Check("aliases loaded", FighterVariable.AliasCount > 500, true);
@@ -173,6 +173,14 @@ class NvTest
         Check("Effect_Camera shown (ints in hex, the editor's default)", s.Deserialize().Split('\n')[0].Trim(),
               "Effect_Camera(Graphic=0x3410012, X=0, Y=0.5, Z=20, XRot=0, YRot=0, ZRot=90, Size=1.9, Mode=0x1, Frames=0x5A, Flags=0x1)");
         Check("Effect_Camera: New Commands / Effects", ACMD_INFO.GetCategory(0xF20DCF58), "New Commands / Effects");
+        // ---- v1.7.12: Screen_Invert(Mode, Strength, Frames, FadeIn, FadeOut, Saturation, Brightness, Red, Green, Blue) (exe_v46z_inv)
+        s = Compile("Screen_Invert(Mode=1, Strength=1, Frames=30, FadeIn=0, FadeOut=20, Saturation=0.15, Brightness=0.6, Red=102, Green=104, Blue=110)");
+        Check("Screen_Invert: 11 words, its CRC, Mode, Strength, Frames, FadeIn, FadeOut, 5 floats (then the end marker)", Hex(Bytes(s)),
+              "370CA2AD000000013F8000000000001E00000000000000143E19999A3F19999A42CC000042D0000042DC00005766F889");
+        Check("Screen_Invert round-trips", Hex(Bytes(Compile(s.Deserialize()))), Hex(Bytes(s)));
+        Check("Screen_Invert shown (ints in hex, the editor's default)", s.Deserialize().Split('\n')[0].Trim(),
+              "Screen_Invert(Mode=0x1, Strength=1, Frames=0x1E, FadeIn=0x0, FadeOut=0x14, Saturation=0.15, Brightness=0.6, Red=102, Green=104, Blue=110)");
+        Check("Screen_Invert: New Commands / Effects", ACMD_INFO.GetCategory(0x370CA2AD), "New Commands / Effects");
 
         // ---- errors
         Check("unknown name", Error("INC_INT(Variable=nothing_here)"),

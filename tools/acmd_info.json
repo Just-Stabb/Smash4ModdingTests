@@ -10804,6 +10804,34 @@
 "Frames",
 "Flags"
 ]
+},
+"370CA2AD": {
+"size": 11,
+"name": "Screen_Invert",
+"format": [
+0,
+1,
+0,
+0,
+0,
+1,
+1,
+1,
+1,
+1
+],
+"syntax": [
+"Mode",
+"Strength",
+"Frames",
+"FadeIn",
+"FadeOut",
+"Saturation",
+"Brightness",
+"Red",
+"Green",
+"Blue"
+]
 }
 }
 }

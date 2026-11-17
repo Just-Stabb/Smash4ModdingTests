@@ -3718,6 +3718,47 @@ def _exe_has_camfx(inst):
         return CF.present(w)
 
 
+def check_screen_invert_exe(inst, name, rep):
+    """X10 invert-exe (ERROR; screen_invert v1): a script of the fighter (game / effect / sound / expression, body or
+    article) using Screen_Invert with no executable in the install carrying tools/screen_invert_cave.py (exe_v46z_inv
+    or later): the script won't load"""
+    uses = []
+    for rel in inst.glob(r'fighter/%s/script/animcmd/(body|weapon/[^/]+)/(game|effect|sound|expression)\.bin' % name):
+        try:
+            f = _acmd_load(inst.get(rel))
+        except Exception:          # noqa: BLE001
+            continue
+        if any(c.name == 'Screen_Invert' for sc in f.scripts.values() for c in sc):
+            uses.append(rel)
+    if uses and not _exe_present(inst, 'screen_invert_cave'):
+        rep.add('ERROR', 'X10 invert-exe', 'Screen_Invert in %s but the install\'s code/cross_f.rpx has no screen invert '
+                '(tools/screen_invert_cave.py: exe_v46z_inv or later): the script won\'t load' % ', '.join(sorted(uses)))
+
+
+def _exe_present(inst, cave):
+    """the install's executable carries tools/<cave>.py (its present())"""
+    if 'code/cross_f.rpx' not in inst.files:
+        return False
+    import importlib
+    import tempfile
+    import kind_expand as K
+    mod = importlib.import_module(cave)
+    with tempfile.NamedTemporaryFile(suffix='.rpx') as f:
+        f.write(inst.get('code/cross_f.rpx'))
+        f.flush()
+        try:
+            img = K.Image(f.name)
+        except Exception:          # noqa: BLE001
+            return False
+
+        def w(x):
+            try:
+                return img.w(x)
+            except KeyError:
+                return 0
+        return mod.present(w)
+
+
 def check_article_status_reuse(inst, name, rep):
     """S29 article-status-reuse (Byleth v17, user: "the whip disappears when catching someone"): a body script that
     changes an article's status (Set_Remote_Article_Action / 2: ZSS's tether whip into another status) and then plays an
@@ -3943,6 +3984,7 @@ def main():
     check_result_param(inst, a.name, src, rep)
     check_rapid_slide(inst, a.name, rep)
     check_camera_effect_exe(inst, a.name, rep)
+    check_screen_invert_exe(inst, a.name, rep)
     check_rapid_cadence(inst, a.name, rep)
     check_armor(a.name, rep)
     check_ledge_before_wall(a.name, rep)
