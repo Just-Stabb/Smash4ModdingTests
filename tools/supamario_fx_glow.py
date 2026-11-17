@@ -8,8 +8,8 @@ the Super God Fist (attackdash) and Core Breaker's charge (specialhi before its 
 
   python3 -I tools/supamario_fx_glow.py BUILD_OUT_DIR [MOVE ...] [--png DIR] [--bg R,G,B] [--only NAMES]
 
-BUILD_OUT_DIR: tools/supamario_sledgehammer_build.py's OUT_DIR. MOVE: sh_charging, sh_uncharged, sh_charged, sh_hit,
-attackdash, cb_charge (default all). --png DIR: each move's six brightest frames side by side. Bones other than top
+BUILD_OUT_DIR: tools/supamario_sledgehammer_build.py's OUT_DIR (ts_hit: tools/supamario_timeskip_build.py's). MOVE:
+sh_charging, sh_uncharged, sh_charged, sh_hit, ts_hit (Time Skip's punch), attackdash, cb_charge (default all). --png DIR: each move's six brightest frames side by side. Bones other than top
 are drawn at top (the fist's effects placed 8 up, 3 ahead); his body isn't drawn.
 --bg (v4): the background colour (default black): the effects are added onto it as in game (a bright stage pushes an
 additive effect past 1 sooner: the user's screenshot 26 on a grass stage); the areas then count only the pixels the
@@ -53,6 +53,11 @@ def moves(out_dir):
     out['sh_hit'] = ([(0, fx['hitlod'], 0, (0.0, 5.0, 0.0), (0, 0, 0), B.EEPK_SCALE['Btl_HitLOD.emp'] * sc, None),
                       (0, fx['hits'], 0, (0.0, 5.0, 0.0), (0, 0, 0), B.EEPK_SCALE['Btl_HitS.emp'] * sc, None)],
                      list(range(0, 20)))
+    import supamario_timeskip_build as TB     # Time Skip's punch: XV2's hit look (BTL_CMN effect 2) from the MSC
+    ts = [(0, TB.SH_FX['hitlod'], 0, (0.0, 5.0, 0.0), (0, 0, 0), TB.EEPK_SCALE['Btl_HitLOD.emp'] * TB.FX_SCALE, None)]
+    ts += [(0, TB.FX_IDS[k], 0, (0.0, 5.0, 0.0), (0, 0, 0), TB.EEPK_SCALE['Btl_HitL.emp'] * TB.FX_SCALE, None)
+           for k in ('hitl', 'hitl_2')]
+    out['ts_hit'] = (ts, list(range(0, 24)))
     c = [x for x in R.s4_calls(eb, 'attackdash') if (x[1] >> 16) == 0x341]
     out['attackdash'] = (c, list(range(min(x[0] for x in c), min(x[0] for x in c) + 90)))
     c = [x for x in R.s4_calls(eb, 'specialhi') if (x[1] >> 16) == 0x341 and x[0] < 55]

@@ -110,6 +110,11 @@ EEPK_SCALE = {'Btl_HitLOD.emp': 1.5, 'Btl_HitL.emp': 0.8, 'Btl_Sweat00.emp': 2.0
 FX_IDS = {'hitl': 0x0341005F, 'hitl_2': 0x03410060}   # Btl_HitL has more than 16 emitters: the
                                     # converter splits it in two sets (both played together)
 SH_FX = {'hitlod': 0x0341005C, 'sweat': 0x0341005E}
+# the brightness (the user found Sledgehammer's arcs too bright twice): Btl_HitL's white flash discs (flash_1 / _1_1,
+# XV2's glare 1.0 but drawn at the HDR cap 2.0) were 28.6 square units over 1.0 on a grass stage and its glaring streaks
+# (line / line_2 / line_1_1, glare 2.5) 8.9 (tools/supamario_fx_glow.py ts_hit --bg 0.5,0.65,0.3): each emitter's
+# brightest drawn channel capped (Sledgehammer's flash_cap way), by its name's start
+PEAK_CAP = (('flash', 0.35), ('line', 0.9))
 FX_DUST = 0x1000009                 # Smash's dash cloud: XV2's Stage BG 60 at BAC 56 (the stage's own, not in the files)
 TS_SE = {'ts_basa': ('CAR_S1352_DSH_Basa', 0.0),          # skill SE cue 0, BAC 6
          'ts_dash': ('CAR_S1352_DSH_Dash', 0.0),          # cue 1, BAC 56
@@ -324,6 +329,11 @@ def convert_fx(cmn_dir, fx_dir, halo=True):
             k += 1
             notes.append('%s %s: %s' % (name, en, FX.hdr_emitter(p, d, mats.get(emp, {}).get(en))))
             SB.flat_ring(p, d, False)
+            cap = next((c for pre, c in PEAK_CAP if (en or '').startswith(pre)), None)
+            if cap is not None and SB.arc_peak(p, d) > cap:
+                f = cap / SB.arc_peak(p, d)
+                SB.arc_dim(p, d, (f, f, f))
+                notes[-1] += '; capped at %.2f' % cap
         sets[key] = {'set': name, 'set_index': si, 'efc': idx, 'id': '0x%08X' % (0x03410000 | idx), 'emitters': names}
     assert got == FX_IDS, ('FX_IDS is out of date', {k: hex(v) for k, v in got.items()})
     halos = {}
