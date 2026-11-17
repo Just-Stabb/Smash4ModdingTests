@@ -188,7 +188,7 @@ E11_CAP = (('sprite_2', 0.12), ('sprite_BG', 0.5), ('line_add', 0.15), ('wave_ad
 # v5 (user: "much weaker and compressed"; "keep brightness sane by limiting the white blow-out, not the size or the
 # purple"): the purple lines / slashes / glows brighter (the check is now the white area: purple past 1 blooms purple),
 # the sparkle dots (0.01 m: under a pixel at Smash's camera) x SPARK_GROW, the navy flames lilac and translucent
-E11_CAP = (('sprite_2', 0.12), ('sprite_BG', 0.5), ('line_add', 0.45), ('wave_add', 0.25), ('wave_nml', 1.0),
+E11_CAP = (('sprite_2', 0.12), ('sprite_BG', 0.5), ('line_add', 0.38), ('wave_add', 0.25), ('wave_nml', 1.0),
            ('sprite_1', 0.4), ('sprite', 0.6), ('line_BG', 1.0), ('BG', 1.0), ('ring', 0.5))
 SECONDARY_V5, SECONDARY_LIFT, SECONDARY_ALPHA, BLACK_ALPHA = True, 0.6, 0.55, 0.35
 SPARK_GROW, SPARKS = 6.0, ('sprite', 'sprite_3')

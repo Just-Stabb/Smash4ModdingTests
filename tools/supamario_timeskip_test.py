@@ -106,6 +106,8 @@ class Game(SHT.Game):
         self.vel = []                # (n, vx, vy) each frame he moves
         self.fx_rot = []             # v4: (n, id, rotation Y) EffectModule 3's turn
         self.t12_empty = False       # v4: Target 12 reads nothing (the hit's first frame, the user's point-blank clip)
+        self.script_lead = 0         # v5: the game script's events this many frames before the MSC's motion frame (an
+                                     # ACMD FRAME N run as the motion reaches N - 1: the user's v4 point-blank clip)
 
     def fvar(self, v):
         if v == 0x0F000111:
@@ -236,7 +238,7 @@ class Game(SHT.Game):
 
     def scripts(self):
         """the game scripts at the clock's frame (once each per motion)"""
-        if self.kind == 0x219 and self.clock >= B.HIT_FROM - 1e-6 and 'catch' not in self.fired:
+        if self.kind == 0x219 and self.clock >= B.HIT_FROM - self.script_lead - 1e-6 and 'catch' not in self.fired:
             self.fired.add('catch')
             if self.vars.get(B.V_PH, 0.0) > 2.5:
                 self.box = 'catch'
@@ -699,11 +701,16 @@ def pointblank_tests(path):
               dict(stop_lag=True), dict(tick_first=True, t12=True)),
              ('both, and Target 12 empty', dict(armor_at=B.HIT_FROM, status=0x30, stop_lag=True),
               dict(tick_first=True, t12=True)))
+    cases = cases + (('v5: the box made a frame before the MSC reads its frame (the user\'s v4 clip aaf3050c: hit on the '
+                      'box\'s first frame, at once)', {}, dict(lead=1)),
+                     ('v5: that and func_82 first, Target 12 empty, the freeze not seen at once', dict(stop_lag=True),
+                      dict(lead=1, tick_first=True, t12=True)))
     for name, vk, gk in cases:
         v = V(2, 1.0, **vk)
         by = V(3, -60.0)
         g = Game(fighters=[v, by])
         g.t12_empty = gk.get('t12', False)
+        g.script_lead = gk.get('lead', 0)
         tr, vm = run(path, g, frames=200, tick_first=gk.get('tick_first', False))
         c = first(tr, lambda t: t[1] == 0x21D)
         ck = c[0] - 1 if c else None
@@ -780,9 +787,11 @@ def brightness_tests(out):
               'brightest)' % (bg_name, h1['max_over_1']),
               (h['max_over_1'] <= 1.0, e0 <= e1 / 3.0, h['brightest'][4] >= 8.0), (True, True, True))
         for k, lo in (('ts_e11', 20.0), ('ts_e0', 3.0)):
-            check('v4 %s: %s (XV2\'s skill effect) at most 1.0 square unit over 1.0 in any frame (the user\'s tolerance), no '
-                  'white, visible (it changes the picture by %g+)' % (bg_name, k, lo),
-                  (r[k]['max_over_1'] <= 1.0, r[k]['max_white'] <= 1.0, max(abs(f_[4]) for f_ in r[k]['frames']) >= lo),
+            o1 = 1e9 if k == 'ts_e11' else 1.0      # v5 (user): the punch's burst limited by its white, not its purple
+            check('v5 %s: %s (XV2\'s skill effect) %s, at most 1.0 square unit white in any frame, visible (it changes the '
+                  'picture by %g+)' % (bg_name, k, 'purple past 1.0 allowed (%.1f square units: it blooms purple)' %
+                                       r[k]['max_over_1'] if k == 'ts_e11' else 'at most 1.0 square unit over 1.0', lo),
+                  (r[k]['max_over_1'] <= o1, r[k]['max_white'] <= 1.0, max(abs(f_[4]) for f_ in r[k]['frames']) >= lo),
                   (True, True, True))
     return res
 
@@ -802,10 +811,10 @@ def exit_tests(path):
     check('v3 normal (%s): %s, nothing killed (the glass plays out)' % (
         'camera build' if B.CAMERA_FX else 'default build',
         'the darkening the script\'s camera effect' if B.CAMERA_FX else
-        'the MSC\'s screen tint on at the catch (%d), off at the punch (%d, %d frames out), once each; the glass at the '
-        'victim at the catch' % (ck, sk, B.TINT_OUT)),
+        'the MSC\'s screen tint on at the catch (%d), off at the punch (%d, %d frames out), once each; v5: the glass the '
+        'script\'s (on the screen), none from the MSC' % (ck, sk, B.TINT_OUT)),
           (g.tints, [k_ for k_ in g.kills if k_[1] in look],
-           [n for n, i, _x, _y, _s in g.fx if i == B.FX_GLASS_ID]), (want_t, [], [] if B.CAMERA_FX else [ck]))
+           [n for n, i, _x, _y, _s in g.fx if i == B.FX_GLASS_ID]), (want_t, [], []))
     for name, st in (('cut (a status change)', 'cut'), ('Supamario hit (Damage)', 0x45), ('Supamario KO\'d (Dead)', 0xB1),
                      ('the match ending (Win)', 0x14F)):
         v = V(2, 30.0)
@@ -1084,24 +1093,27 @@ def script_tests(out, sh_out):
     lt = {sc: [(nm(c), [round(x, 2) if isinstance(x, float) else x for x in c.params]) for c in f['effect'].script(sc)
                if nm(c) in ('FRAME', 'Flash_Light_Effect', 'Change_Flash_Light_Color', 'Color_Overlay', 'Change_Overlay',
                             'Terminate_Overlays')] for sc in ('specials', 'specialairs')}
-    on = [('Color_Overlay', [255.0, 255.0, 255.0, 0.0]),
-          ('Change_Overlay', [float(B.OUTLINE_IN), 255.0, 255.0, 255.0, B.OUTLINE_A])]
-    off = [('Change_Overlay', [float(B.OUTLINE_OUT), 255.0, 255.0, 255.0, 0.0])]
+    on = [('Color_Overlay', list(B.OUTLINE_RGB) + [0.0]),
+          ('Change_Overlay', [float(B.OUTLINE_IN)] + list(B.OUTLINE_RGB) + [B.OUTLINE_A])]
+    off = [('Change_Overlay', [float(B.OUTLINE_OUT)] + list(B.OUTLINE_RGB) + [0.0])]
     check('v4: the white outline (XV2\'s BPE 85; user: "no outline" with v3\'s LIGHT_SHINE): FLASH (Color_Overlay) white '
           'at %g of 255, faded in over %d from each motion\'s start, out over %d at its end, COL_NORMAL at the end; no '
           'Flash_Light_Effect' % (B.OUTLINE_A, B.OUTLINE_IN, B.OUTLINE_OUT), lt,
           {'specials': on + [('FRAME', [float(B.MOVE_FROM)]), ('FRAME', [float(B.DASH_END - B.OUTLINE_OUT)])] + off +
            [('FRAME', [float(B.DASH_END)]), ('Terminate_Overlays', [])],
-           'specialairs': on + [('FRAME', [float(B.CONNECT_END - B.OUTLINE_OUT)])] + off +
+           'specialairs': on + [('FRAME', [float(B.STRIKE)]), ('FRAME', [float(B.CONNECT_END - B.OUTLINE_OUT)])] + off +
            [('FRAME', [float(B.CONNECT_END)]), ('Terminate_Overlays', [])]})
     print('     note: Stage_Freeze(1, ...) is the stage-only freeze with no flash from exe_v46z_camfx3 on (camera_effects_v3 /'
           ' v4); on exe_v46y_hold its On 1 also turned the scene white (the user\'s v3 clip ca068f15, 70-88)')
-    cam = [(nm(c), c.params) for c in f['effect'].script('specialairs') if nm(c) == 'Effect_Camera']
-    check('v3: the camera build switch (CAMERA_FX %s): %s' % (B.CAMERA_FX, 'the darkening (Mode 1, to the punch) and the '
-          'glass (Mode 0) on the camera, unslowed' if B.CAMERA_FX else 'no Effect_Camera (no exe_v46z_camfx needed)'),
-          cam, [('Effect_Camera', [B.FX_DARK_ID, 0.0, 0.0, B.DARK_Z, 0.0, 0.0, 0.0, B.DARK_SIZE, 1, B.STRIKE, 1]),
-                ('Effect_Camera', [B.FX_GLASS_ID, 0.0, 0.0, B.GLASS_CAM_Z, 0.0, 0.0, 0.0, B.GLASS_CAM_SIZE, 0, 0, 1])]
-          if B.CAMERA_FX else [])
+    cam = [(nm(c), c.params) for c in f['effect'].script('specialairs')
+           if nm(c) in ('Effect_Camera', 'Terminate_Graphic_Effect', 'FRAME')]
+    check('v5: the glass (its cracks) on the screen (Effect_Camera Mode 1, %g half heights a unit, Z %g, unslowed) from the '
+          'connect\'s frame 0, ended at once at the punch (%d); the darkening on the camera only in the camera build '
+          '(CAMERA_FX %s)' % (B.GLASS_SCREEN_SIZE, B.GLASS_SCREEN_Z, B.STRIKE, B.CAMERA_FX), cam[:3],
+          ([('Effect_Camera', [B.FX_DARK_ID, 0.0, 0.0, B.DARK_Z, 0.0, 0.0, 0.0, B.DARK_SIZE, 1, B.STRIKE, 1])]
+           if B.CAMERA_FX else []) +
+          [('Effect_Camera', [B.FX_GLASS_ID, 0.0, 0.0, B.GLASS_SCREEN_Z, 0.0, 0.0, 0.0, B.GLASS_SCREEN_SIZE, 1, 0, 1]),
+           ('FRAME', [float(B.STRIKE)]), ('Terminate_Graphic_Effect', [B.FX_GLASS_ID, 1, 1])][:3 - (1 if B.CAMERA_FX else 0)])
     gen = [nm(c) for p in f for s in ('specials', 'specialairs') for c in f[p].script(s)
            if 'article' in nm(c).lower() or 'reflect' in nm(c).lower()]
     check('no Cape left (no article, no reflector) in the side special\'s scripts', gen, [])
@@ -1230,6 +1242,15 @@ def effect_tests(out, sh_out):
           ('PtcSupamarioTsFrt_CrgAuraH', 2, {'00000000'}))
     gi = e.entries[B.FX_GLASS_ID & 0xFFFF]
     mdir = os.path.join(out, 'fighter', 'supamario', 'effect', 'supamario', 'model', 'EffSupamarioTsDmgGrs2')
+    import nut
+    nd_, tx_ = nut.load(os.path.join(mdir, 'model.nut'))
+    img_ = nut.decode(nd_, tx_[0]).astype(float) / 255.0
+    lum = img_[..., :3].max(axis=2)
+    check('v5: the glass clear: its texture the shards\' outlines (%d lines) in light blue-white (blue >= red), the panes '
+          'dark (additive: see-through; most of it under 0.1), no yellow (v2-v4: the refraction map drawn as colour)' %
+          json.load(open(os.path.join(out, 'timeskip.json')))['fx']['glass']['cracks'],
+          (bool((img_[..., 2] >= img_[..., 0] - 0.02).all()), float((lum < 0.1).mean()) > 0.8, float(lum.max()) > 0.8),
+          (True, True, True))
     check('v2: the glass (BTL_CMN 108, HIT_DmgGrs2) a model entry (0x%08X), its folder with model / texture / '
           'animation / material animation' % B.FX_GLASS_ID,
           (gi[1], sorted(f for f in os.listdir(mdir)) if os.path.isdir(mdir) else None),

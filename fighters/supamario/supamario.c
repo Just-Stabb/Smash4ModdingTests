@@ -41753,6 +41753,17 @@ void ts_rec()
     }
 }
 
+// v5: the detection box's hit flags (a body or a shield) set
+int ts_flags()
+{
+    if (AttackModule(0x2726, 0x2) != 0 || AttackModule(0x2727, 0x2) != 0 || AttackModule(0x2726, 0x4) != 0 ||
+        AttackModule(0x2727, 0x4) != 0)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
 // v4: slot s took damage since ts_rec's record (a hit that landed on its body: a counter or invincibility takes none)
 int ts_took(int s)
 {
@@ -42069,7 +42080,11 @@ void ts_dash(float fr)
     float sn;
     k = WorkModuleF(0, TS_V_K);
     n = TS_MOVE_N;
-    if (fr > TS_HIT_FROM - 0.5f && k < n - 2.0f + TS_HIT_LATE)
+    // v5 (user: "the hit detection hit activates before the moving hitbox, which makes the stop and punch unable to hit if
+    // it hits on the frame it activates"): the catch looked for on every frame of the dash, whatever the motion frame
+    // reads (v1-v4: from TS_HIT_FROM on; a box the script made the frame before, hit at once, was read only after its
+    // freeze, when ts_rec had already noted the hit's damage: ts_took then saw none and the hit was dropped)
+    if (k < n - 2.0f + TS_HIT_LATE)
     {
         if (ts_try_catch() != 0)
         {
@@ -42079,12 +42094,13 @@ void ts_dash(float fr)
     ts_dash_go(fr, k, n);
     // the armor lift where the box will be at this frame's collision: after his move (v2: the travel is his position,
     // written now; v1's speed moved him after the MSC)
-    if (WorkModuleF(0, TS_V_PH) == 3.0f && fr > TS_HIT_FROM - 0.5f && k < n - 2.5f)
+    if (WorkModuleF(0, TS_V_PH) == 3.0f && fr > TS_HIT_FROM - 1.5f && k < n - 2.5f)
     {
         armor_lift(TS_HIT_Z, TS_HIT_Y, TS_HIT_SIZE);
         armor_lift(TS_HIT2_Z, TS_HIT2_Y, TS_HIT2_SIZE);     // v2: the point-blank box (ID 1)
     }
-    if (WorkModuleF(0, TS_V_PH) == 3.0f && WorkModuleF(0, TS_V_RETRY) < 0.5f)
+    // v5: not while a hit is pending (its flags still set: v4 noted it here on the frames before its catch was looked for)
+    if (WorkModuleF(0, TS_V_PH) == 3.0f && WorkModuleF(0, TS_V_RETRY) < 0.5f && ts_flags() == 0)
     {
         ts_rec();                       // v4: the damage before this frame's collision (ts_try_catch's real hit)
     }
