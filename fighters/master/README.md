@@ -9,6 +9,26 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: rapid_setoff v1 (`scratchpad/rapid_setoff_v1.zip`, over v17: exe_v46y_hold, body game.bin, Sm4shCommand v1.7.5; in-game TEST)
+
+User: "can you recreate the Ultimate setting for rapid jabs?" (v17 held the loop with angle 80.)
+
+| point | finding (evidence) | change |
+|---|---|---|
+| what Ultimate's setoff is | ExeFS main.bin (docs/native-notes.md "Hitbox hold"): AttackData +0x62 `set_off_` (the store_l2c_table hash40 names), AttackModuleImpl vt +0x728 set_set_off, set_attack's collision word (0x22 / 0x23, Smash 4's Clang bit) and the clank resolution 0x3E0A50 (ON / THRU: the move cancelled, OFF / NO_STOP: goes on; NO_STOP: no clank hitlag): the CLANK kind, already Clang / Rebound in the port. It never touches the victim. What Ultimate does for a grounded 361 hit under 60 knockback: 0 degrees and the speed x0.8 (`damage_angle_ground_zero_speed_mul`, 0x403A20); Smash 4: 0 degrees, x1 | none needed for the field itself |
+| the hold | Smash 4's victim handler 0x02C25318 stores the launch vector (knockback x 0.03 along the angle) into the damage event's +0xC / +0x10 at 0x02C25BF4, which the fighter's damage energy takes | new ACMD command **Hitbox_Hold(ID, Mode)** (`tools/hitbox_hold_cave.py`, region 0x04BD7000-0x04BD8000, exe_v46y_hold = exe_v46x_whipmot + it): Mode 1 a grounded victim the hit doesn't lift gets no travel (damage, hitstun incl. HitstunMul, hitlag, SDI, the flinch kept), Mode 2 every victim; the mark goes with the hitbox. `tools/hitbox_hold_test.py`: 54 checks (the game's code around each hook) |
+| the rapid jab | v17's attack100: the 12 loop hits (IDs 0 / 1, frames 2 - 17) at HOLD_ANGLE 80 | back at Ultimate's **361**, each followed by `Hitbox_Hold(ID, 1)` (an airborne victim is carried at the Sakurai air angle as in Ultimate; the finisher launches). Only attack100 changed (12 angle words + 12 commands; `scratchpad/setoff/build_game.py` on v17's game.bin). attack100sub (Ultimate's Attack100Sub) has no Smash 4 script |
+| the pipeline | `ultimate_acmd.holding` (setoff off + 361 + FKB 0 + KBG / BKB <= 30 + damage) | HOLD_MODE 'hold' by default (Ultimate's angle + Hitbox_Hold); v17's angle with `--hold-angle` / port.json `rapid_hold: "angle"`. **port_check S28** (ERROR: a holding hit from the dumps without Hitbox_Hold; WARN: v17's angle) and **X8 hold-exe** (ERROR: Hitbox_Hold without the cave in the install's exe) |
+
+Checks: `tools/master_specials_test.py` 131 checks, 0 problems (+ the default mode, Attack100 translated with 12 holds).
+port_check over v4 ... v17_fix, rapid_setoff_v1: 0 ERROR apart from R2 result-param (v17's result_param.bin, the
+results-panels work's: with results_panels_v1 before this package, **0 ERROR**, 31 WARN). v17's install now: S28 WARN
+(the old angle). Other ports: no Ultimate hit in their dumps matches the hold rule with damage (Hero's Final Smash start
+7 % at 60, Incineroar's Cross Chop start 2.5 % at 5 / BKB 30, Squirtle's Final 0.5 % set knockback 20 at 30 / 330 are
+setoff off but not 361 / low-knockback-growth holds: they launch or carry by design; pummels are set knockback on a
+grabbed victim). Not done: Ultimate's x0.8 on other 361 grounded hits; ATK_SET_SHIELD_SETOFF_MUL (shield push, x9 on
+the loop hits).
+
 ## Status: v17 (`scratchpad/byleth_v17_fix.zip`: a FIX package over v16 + sound_v1: body / whip game.bin, the whip's pac, master.mscsb, the face pacs of c00 - c07 / l00 - l07, fighter_param.bin, result_param.bin; exe unchanged (exe_v46x_whipmot); in-game TEST)
 
 User, v16 test: (1) "the whip disappears when catching someone"; (2) "jab 3 is inaccessible"; (3) "the rapid jab's hits don't
