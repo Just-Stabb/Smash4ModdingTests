@@ -573,7 +573,12 @@ Ours has items Manifold's lacks:
   MissFoot01 is his Ultimate `missfoot01`, `VOICE_ALIASES` for the rest).
   The chant bank itself, `fighter/%s/sound/snd_vc_%s_ouen.nus3bank`, is loaded by the kind's name tables
   (`0x030BB9DC`; Miis, kinds 0-2, use `snd_vc_Mii_ouen`); `audience_ouen_param.bin` has a row for each new
-  kind (add_fighter.py).
+  kind (add_fighter.py). The chant is label 0 of the row (every vanilla chant bank: tone 50 `_ouen_L`, the stereo
+  chant, tone 51 `_R` an 801-sample stub). **Per costume:** for a costume != 0 the loader (`0x030C0E18`, path
+  type 8 of `0x030BB464`) takes `fighter/%s/sound/snd_vc_%s_c%02d_ouen.nus3bank` (`0x030BBA38`) when the file
+  exists, with the se bank's costume mapping (a new kind: the costume number as is), else the main file; such a
+  bank needs its own BINF id (nus3 loads one bank an id). Byleth needs none (Ultimate's female cheer is the same
+  recording: fighters/master/README.md "Sound v1").
 - `fightermodelbanktable.mtb` (costume banks: Bowser Jr., Robin...) is matched the same way (13 names,
   `0x10340CA4`, `0x02A6496C`; looked up with `Name` / `Name_ouen` by the fighter setup) and isn't grown: a
   port's costume banks load by file name (`ultimate_sound.py`).

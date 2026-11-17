@@ -1068,7 +1068,7 @@ exe_v46p added the tether vector and his sound aliases, exe_v46q his motion slot
   base's game-played voices given his), cheer, 14 sequences; **the female costumes' own banks**
   (`snd_se_Master_c01/03/05/07`, `snd_vc_Master_c01/03/05/07`, Ultimate's `se_ / vc_master_c01`): the game already
   loads `_cNN` banks by costume for a new kind, so the female voice needs no executable change. Own bank ids 46192-
-  46215. The female cheer (`vc_master_c01_cheer`) isn't used yet (one cheer bank).
+  46215. The female cheer (`vc_master_c01_cheer`) is the male's audio (only 0.3 dB louder): one cheer bank (Sound v1).
 - **Scripts** (`ultimate_acmd.py`): 30 game scripts (normals, grabs, throws, ledge / get-up attacks, the dash) with
   Ultimate's cancel / intangible frames into the vl file, 75 effect, 159 sound, 191 expression scripts. Every normal's
   hitboxes are in his body scripts (on `haver` / `top`): the weapon articles carry none, so the normals hit as
@@ -1098,9 +1098,51 @@ needs port.json `portraits.set_fits` (their chr_10 is their chr_00's art, not a 
 - `fighter_extras.py common` used to rewrite every extra kind's record from its base: on the user's file it would have
   replaced Squirtle's own KO-voice record (0x43) with Mario's. It now only adds missing records (an existing one is
   kept), `--only` limits it to kinds, `--replace` (with `--only`) rewrites (`tools/fighter_extras_test.py --rpx`).
-- Open: his announcer call is ZSS's (0x380017, "Zero Suit Samus") until the user sends
-  `sound/se/snd_se_narration_characall.nus3bank` (Sephiroth's / Squirtle's calls are in it, soundlabeltable row 0x38):
-  then `fighter_extras.py narration ... --ult-tone master --name Master --id 65`.
+- His announcer call was ZSS's (0x380017, "Zero Suit Samus") until the user sent their
+  `sound/se/snd_se_narration_characall.nus3bank`: done in "Sound v1" below.
+
+## Sound v1: announcer call and crowd cheer (`$S/byleth_sound_v1.zip`)
+
+Install after v15 (and supamario_sledgehammer_v1, whose soundlabeltable it builds on).
+
+**Announcer (character select).** `param/ui/ui_sound_call_voice_db.bin` gives character id 65 sixteen sound ids (one
+per costume); the vanilla roster's and the ports' calls are labels of `sound/se/snd_se_narration_characall.nus3bank`
+(BINF `snd_se_narration_characall` 6085, soundlabeltable row 0x38: ids `0x0038LLLL`; the DLC banks
+`snd_se_narration_characall_<Name>` are named one by one in the executable, no `%s` form). The user's bank: vanilla's
+86 calls + Squirtle (86, `_Pzenigame`) + Sephiroth (87, `_Edge`), row 0x38 88 labels. Byleth's call is Ultimate's
+`vc_narration_characall_master` (one mono IDSP, 1.07 s, +3.0 dB like every other call) as tone 88
+`snd_se_narration_characall_Master`; row 0x38 88 -> 89 labels; id 65's 16 ids 0x00380017 -> 0x00380058:
+```
+python3 tools/fighter_extras.py narration THEIR/sound/se/snd_se_narration_characall.nus3bank \
+    SLEDGEHAMMER_V1/sound/config/soundlabeltable.bin USERDATA_V2/param OUT \
+    --ult-bank ULT/sound/bank/narration/vc_narration_characall_master --ult-tone master --name Master --id 65
+python3 tools/fighter_extras_test.py --narration THEIR_BANK THEIR_TABLE THEIR_PARAM ULT_BANK master 65
+```
+Checked (`fighter_extras_test.py --narration`, new): the bank's 88 tones byte for byte (TONE entries, audio at the same
+PACK offsets, every other section), the new tone = Ultimate's audio and volume, only row 0x38 changed in the table
+(+1 label; the table is supamario_sledgehammer_v1's: userdata_v2's + Supamario's 3 labels), only id 65's 16 bytes in
+ui_sound_call_voice_db (userdata_v2's: no later package ships it). The same pipeline on vanilla's bank
+(`sound-Smash4.zip` on the Drive: `sound/se/`, `sound/config/`) gives tone 86 / 0x00380056, all checks ok.
+
+**Crowd cheer (in a match): already in since v4 / userdata_v2.** The parts, all in place:
+- the bank: `fighter/master/sound/snd_vc_Master_ouen.nus3bank`, loaded by the kind's name (`0x030BB464` type 8:
+  `fighter/%s/sound/snd_vc_%s_ouen.nus3bank`, Miis `snd_vc_Mii_ouen`), registered as the player's id kind x 0x11 + 9.
+  ZSS's chant bank (52 tones; label 0 = tone 50 `_ouen_L`, the stereo chant; tone 51 `_R` is an 801-sample stub as in
+  every vanilla chant bank) with tone 50 = Ultimate's `vc_master_cheer` (stereo, 1.48 s, -7.4 dB), own BINF id 46194
+  (`ultimate_sound.py`; rebuilt now: byte-identical to v4's). Shipped in v1 / v3 / v4.
+- the row: the exe's cheer alias for kind 0x47 = 6106 (ZSS's; `sound_alias_cave.py`, +0x5C8), so ZSS's row 0x8DD
+  plays from his bank (checked in v15's cross_f.rpx).
+- which label: `commonsoundtable.csb` record 0x44 (0x3E + kind - 0x41; named "Master" in v15's exe by kind_expand's
+  table) = ZSS's: KO screams 0x24 / 0x25 / 0x1A of row 0x4E, chant (0, 0x8DD) (userdata_v2).
+- the timing: `param/sound/audience_ouen_param.bin` row (0x47, 0) = ZSS's (3, 180, 58) (userdata_v2).
+- **Per costume:** the loader takes `fighter/%s/sound/snd_vc_%s_c%02d_ouen.nus3bank` for a costume != 0 when it exists
+  (`0x030C0E18`: type 8 with the se bank's costume, a new kind's costume number as is; else the main file). Ultimate's
+  female cheer (`vc_master_c01_cheer`, `vc_master_cheer_c01/03/05/07`) is the male's recording byte for byte, only
+  -7.1 dB instead of -7.4: one bank serves all 8 costumes (costume banks would need own ids outside
+  `sound_bank_ids.own_id`'s slots, which have none for `ouen_cNN`, for a 0.3 dB difference). Not built.
+- `port_check master` over v4, userdata_v2, v5-v9, vars_reset_v1, v10-v15 and this package: 0 errors (31 warnings,
+  6 notes: the same as without it).
+- Not tested in game.
 
 ## Model and motions
 

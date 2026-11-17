@@ -8,7 +8,16 @@ Without --rpx: the record merge (csb_merge / pick_kinds) on made-up records, and
 With --rpx (an executable with kind_expand's tables, e.g. exe_v46s): `common` end to end on a made-up
 commonsoundtable laid out as the game's (62 vanilla records + the six earlier ports', Squirtle's his own): the
 default run adds only Byleth's record (a copy of ZSS's) and keeps every other byte; --only master the same;
---replace without --only refuses; --only pzenigame --replace rewrites Squirtle's."""
+--replace without --only refuses; --only pzenigame --replace rewrites Squirtle's.
+
+  python3 tools/fighter_extras_test.py --narration BANK TABLE PARAM_DIR ULT_BANK TONE ID
+
+`narration` end to end on a real snd_se_narration_characall.nus3bank (the user's, or vanilla's from sound-Smash4.zip),
+its soundlabeltable.bin and a param/ folder holding ui/ui_sound_call_voice_db.bin: every tone the bank had is kept
+byte for byte (its TONE entry and its audio at the same PACK offset, every other section equal), the new tone is
+Ultimate's call (audio and volume), the label row grew by exactly that tone and no other row changed, and only the
+character id's 16 call ids changed in ui_sound_call_voice_db (all to the new id). Byleth on the user's bank:
+--narration THEIR_BANK THEIR_TABLE THEIR_PARAM ULT/sound/bank/narration/vc_narration_characall_master master 65."""
 import argparse
 import os
 import struct
@@ -119,9 +128,56 @@ def common(tmp, rpx):
     _ = mario
 
 
+def narration(tmp, bank, table, db_dir, ult, tone, cid):
+    import add_fighter as A
+    import fighter_own_bank as fb
+    import minecraft_music as mm
+    import minecraft_sound as ms
+    import ultimate_sound as us
+    out = os.path.join(tmp, 'narr')
+    r = subprocess.run([sys.executable, os.path.join(HERE, 'fighter_extras.py'), 'narration', bank, table, db_dir, out,
+                        '--ult-bank', ult, '--ult-tone', tone, '--name', tone.capitalize(), '--id', str(cid)],
+                       capture_output=True, text=True)
+    check(r.returncode == 0, 'narration ran: %s' % (r.stdout.strip() or r.stderr.strip()[-300:]))
+    if r.returncode:
+        return
+    o = open(bank, 'rb').read()
+    n = open(os.path.join(out, 'sound/se', os.path.basename(bank)), 'rb').read()
+    so, sn = mm.sections(o), mm.sections(n)
+    _a, to = ms.tones_of(o)
+    _b, tn = ms.tones_of(n)
+    po, pn = dict(so)[b'PACK'], dict(sn)[b'PACK']
+    check([x[0] for x in so] == [x[0] for x in sn] and fb.binf(o) == fb.binf(n) and
+          all(b == dict(sn)[nm] for nm, b in so if nm not in (b'TONE', b'PACK')),
+          'bank: same sections, BINF and every section but TONE / PACK')
+    check(len(tn) == len(to) + 1 and all(bytes(x) == bytes(y) for x, y in zip(to, tn)) and pn[:len(po)] == po,
+          'bank: its %d tones kept byte for byte (entries, audio at the same offsets)' % len(to))
+    _h, name, rest = ms.parse_entry(bytes(tn[-1]))
+    off, size = struct.unpack_from('<II', rest, 4)
+    (_un, ub, uv), = [t for t in us.ult_tones(ult)[0] if t[1]]
+    check(pn[off:off + size] == ub and abs(struct.unpack_from('<f', rest, 12)[0] - uv) < 1e-6,
+          'bank: tone %d %s is Ultimate\'s vc_narration_characall_%s (audio, %.1f dB)' % (len(to), name, tone, uv))
+    t0 = fb.Table(open(table, 'rb').read())
+    t1 = fb.Table(open(os.path.join(out, 'sound/config/soundlabeltable.bin'), 'rb').read())
+    row = t0.row_of(fb.binf(o)[1])
+    sid = row << 16 | len(to)
+    check(t1.tones(row) == t0.tones(row) + [len(to)] and t1.labels[:len(t0.labels)] == t0.labels and
+          all(t0.rows[i] == t1.rows[i] for i in range(len(t0.rows)) if i != row) and len(t0.rows) == len(t1.rows),
+          'soundlabeltable: row 0x%X grew by label %d (id 0x%08X), every other row unchanged' % (row, len(to), sid))
+    e0 = A.ParamEdit([db_dir], 'ui/ui_sound_call_voice_db.bin').entries()
+    e1 = A.ParamEdit([os.path.join(out, 'param')], 'ui/ui_sound_call_voice_db.bin').entries()
+    v0 = [[x[1] for x in e] for e in e0]
+    v1 = [[x[1] for x in e] for e in e1]
+    check(len(v0) == len(v1) and all(a == b for i, (a, b) in enumerate(zip(v0, v1)) if i != cid - 1) and
+          v1[cid - 1] == [cid] + [sid] * (len(v1[cid - 1]) - 1),
+          'ui_sound_call_voice_db: id %d\'s calls all 0x%08X, every other id unchanged' % (cid, sid))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--rpx', help='an executable with kind_expand\'s tables (exe_v46s): runs common end to end')
+    ap.add_argument('--narration', nargs=6, metavar=('BANK', 'TABLE', 'PARAM_DIR', 'ULT_BANK', 'TONE', 'ID'),
+                    help='narration end to end on a real bank (see above)')
     a = ap.parse_args()
     unit()
     with tempfile.TemporaryDirectory() as tmp:
@@ -130,6 +186,11 @@ def main():
             common(tmp, a.rpx)
         else:
             print('skip  common end to end (no --rpx)')
+        if a.narration:
+            b, t, d, u, tone, cid = a.narration
+            narration(tmp, b, t, d, u, tone, int(cid))
+        else:
+            print('skip  narration end to end (no --narration)')
     print('%d failed' % len(FAILS))
     sys.exit(1 if FAILS else 0)
 
