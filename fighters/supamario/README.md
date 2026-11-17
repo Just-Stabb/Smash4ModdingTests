@@ -3409,3 +3409,88 @@ peaks). On the v3 build: `supamario_sledgehammer_test` 127 ok, `supamario_fakede
 ### Not confirmed in game
 The rim light's look (LIGHT_SHINE's source angles are Mario's) and whether a status change resets it; the MSC screen
 tint's slot 0 (Sonic's / Meta Knight's use); the first-frame cause (the retry covers a stale read; not reproduced offline).
+
+## Time Skip v4 (`supamario_timeskip_v4.zip`): XV2's own effects, the point-blank catch, the user's v3 test
+Over v3. **Needs exe_v46z_camfx3 or later** (camera_effects_v3 / v4: Stage_Freeze On 1 is its stage-only freeze, no flash;
+on exe_v46y_hold it turned the whole scene white, below). No exe in the package; CAMERA_FX still off. Changed: the MSC,
+game.bin, effect.bin, the ptcl / efc. Also Sledgehammer v6 (below).
+
+### The skill's EEPK (`1350_HIK_FRT.eepk`, the folder the user sent; `reference/xv2/timeskip_eepk.json`)
+- **Containers:** EMO (`Frt_Bas.emo` / `.emm` / `.emb` / `.mat.ema` / `.obj.ema`: a refraction cone model) and PBIND
+  `1350_HIK_FRT.pbind.emb` (`Frt_Line`, `Frt_CrgAura`, `Frt_CrgAuraB`, `Frt_CrgAuraH`, `Frt_Sucses`, `Frt_Hit` .emp) with
+  `1350_HIK_FRT.ptcl.emm` (13 materials) / `.ptcl.emb` (11 textures). No ETR, ECF or light EMA. Effects 0-6 and 10-12
+  (1350 FRT's own: charges on the hands / elbow, Frt_Sucses, Frt_Bas + Frt_Line on the hands, Frt_Hit on either hand).
+  `xv2vfx.load_package` loads it with strict=False (three EMP blocks carry stray runtime words).
+- **What the 1352 BAC plays** (every other effect item is BTL_CMN's or the stage's): **effect 0** (entry 0 item 2,
+  frame 0) and **effect 11** (entries 4 / 9 / 10 / 11 item 16, frame 16). Their bones are the EEPK's (ESK), not the BAC's
+  b_C_Base (effect 0's parts name three bones; effects 3 / 4 differ only by bone).
+- **Effect 0 is the user's "purple aura left behind at the start"**: `Frt_CrgAura` on b_C_Pelvis at (0, -0.3, 0) m,
+  `Frt_CrgAuraB` on b_C_Pelvis, `Frt_CrgAura` on b_R_Foot, none with PositionUpdate (left where they were made: the
+  clip's streaks behind him at 32), x1.0; `Frt_CrgAuraH` on b_L_Elbow x0.5, following. Each EMP is one ConeExtrude
+  ribbon (a stripe behind a particle rising 5 m/s off a 0.3 m circle, Vortex-spun), every 2 frames for 40 (H: 20).
+  It replaces v3's Hit aura (BTL_AURA BoostV_Loop).
+- **Effect 11** (the punch's purple lines): `Frt_Hit.emp` (31 emissions: the burst sprites, 8 `line_add` speed lines,
+  navy `wave_nml` / magenta `wave_add` slashes, the backing lines, two rings, sparkles) on g_R_Hand, oriented by the
+  hand, RotateUpdate only (world-fixed), x1.0. It replaces v2 / v3's stand-in lines.
+
+### How they're converted and placed (`tools/supamario_timeskip_build.py` e0_* / e11_*)
+| | |
+|---|---|
+| Effect 0, world (0x03410063 `PtcSupamarioTsFrt_CrgAura`) | the three parts in one set, each at its bone's place at SpecialS frame 0 (HipN 4.05 up; RFootJ 2.6 behind, 1.6 up) + the EEPK offset (x 5.04 a metre, / the call's x1.75), the EMP's own node offset kept (the stripes start by his knees / feet and rise). Played by the MSC at his ground point, turned to his facing (Y 0 / pi), at the move's frame 0 (`ts_init`, XV2's BAC 0; v3 frame 4) and every 20 frames of a held charge (v3's); follow none |
+| Effect 0, elbow (0x03410069 `..._CrgAuraH`) | the effect script at SpecialS frame 0: External_Graphic on LArmJ (bone 15), x0.875, last word 0 (the bone's place only: XV2's Orientation User), its particles following |
+| Effect 11 (0x03410062 / 0x03410066, halos 0x03410067 / 0x03410068) | split in two sets (16 emitters at most), halos (0.16) on the 19 glaring emitters in a companion set each; turned so the punch is +X (E11_TURN, Y +90: Smash draws a streak back along its motion, and the clip has the lines from the fist forward through the victim, so the hand's +Z is the punch). Played by the MSC with the hit look (`ts_e11`, on the punch's first hit frame) at his right fist (RHandN at SpecialAirS 16: 6.85 ahead, 8.13 up; the build checks the motion), x1.75, turned to his facing |
+| ConeExtrude | `xv2_to_ptcl.CONE_STREAKS` (opt-in: every earlier build byte for byte): a ribbon as a type 3 streak along its velocity, the ribbon's length (5 m/s x 16 frames = 1.33 m) from birth, its particle living 16 frames longer; the alpha 0 -> the peak x2 (5-15% of its life) -> 0 (eft's 3 keys can't fall by 40%). The Vortex swirl isn't converted |
+| Secondary colour | the normal-blend emissions with EnableSecondaryColor (Frt_Hit's navy slashes and backing lines, CrgAuraB) take the mean of Color1 and Color2 x the texture tint: Color1 alone drew dark navy smudges; the clip has them blue-violet |
+| Vibrant | as the other XV2 moves: glare tint, colour x2 capped at 2.0, alpha x2 (`hdr_emitter`) |
+
+### Brightness (`supamario_fx_glow.py ts_e11 / ts_e0`, square units over 1.0, most in any frame; the user's tolerance 1.0)
+| | grass | grey | the most it changes the picture |
+|---|---|---|---|
+| effect 11, uncapped | 155 (peak 12.4, 22 white) | 165 | |
+| effect 11 (`E11_CAP`: sparkle 0.12, disc 0.5, lines 0.15, magenta slashes 0.07, sprites 0.25 / 0.5, rings 0.5; navy 0.9) | **0.2** (0 white) | **0.6** | 143 / 154 |
+| effect 0, alpha fixed, uncapped | 8.6 | 13.6 | |
+| effect 0 (`E0_CAP` 0.32) | **0.1** | **0.7** | 6.3 / 5.8 |
+| the punch's hit look (unchanged) | 0.3 | 0.0 | |
+`supamario_fx_glow.measure` now starts each call from fresh vertex programs (a cached one carried state from the previous
+call's emitters: the grey pass's punch drew 3.6 instead of 9.6).
+
+### The user's v3 test (clips c64f2a99, ca068f15, 7eb88ab3)
+| | cause (evidence) | fix |
+|---|---|---|
+| 1. the white flash during the punch | **Stage_Freeze** on exe_v46y_hold: ca068f15's whole screen is white on 70-73 (the connect's frame 0, its script held there by the catch's freeze), normal on 74-75 (the 4-frame renewal lapsed while the script waited), white 76-88 and gone at 89 exactly where `Stage_Freeze(0)` and the tint's end are (the tint fades out 89-103). The camera-effects test showed the same with Stage_Freeze alone | the exe: camfx3's On 1 freezes the stage update only, no flash (the user confirmed it in game). The renewal 4 -> **8** frames (the stage no longer lets go for 2 frames after the catch). Effect 11 measured flash-free (above); the hit look unchanged (0.3) |
+| 2. touching someone: the 2% lands, no freeze, no punch | c64f2a99 40-80: a CPU Donkey Kong overlapping him starts an attack at 67 as the box comes out, takes the 2% at 68 without flinching, the dash goes on through it. v1-v3 caught only on `sh_struck` (a real hit, no armor left) after finding the fighter (Target 12, else one frozen in a hitstop), and the damage test read Sledgehammer's record, which func_82 writes each frame a fighter isn't frozen. Replayed on v3's MSC (`supamario_timeskip_test` pointblank_tests, v3's source and build): when the victim's freeze isn't seen on the hit's first frame, func_82 runs before the status and Target 12 reads nothing, v3 gives exactly the clip: 2%, no catch, no hold, the bystander not frozen; and armor the victim's attack puts on after his MSC (armor_lift can't see it) was caught but left in its attack | **any detection hit on a body is caught**: `ts_rec` notes every slot's damage / status in the dash from the MSC (before the frame's collision; func_82's `sh_rec` paused in the dash); the fighter found by Target 12, else the nearest one frozen **or that took damage since that record**; caught when it took damage since then (`ts_took`), whatever its armor, freeze or status; one in no damage status (armor kept it in its attack) put in the hold's hitstun (0x46). Not yet clear (none found, no damage seen yet): the flags kept and looked at again (3 frames); then (a counter, invincibility: no damage) the dash goes on |
+| 3. charge drift: left / right only | | the vertical part removed (0.3 a frame along his facing, ground and air) |
+| 4. no aura, no outline | the aura: v3's BoostV_Loop set, capped at 0.8 and drawn small at his middle (7eb88ab3 ~35: a faint purple smudge); the outline: v3's `Flash_Light_Effect` is LIGHT_SHINE, a light source (Mario's fireball's warm light, vanilla (255, 230, 180, 160, 75, -10) faded by LIGHT_COL_FRM): white on him it changed nothing visible (and c64f2a99 71-73 shows the opponent beside him washed pale) | the aura: XV2's own effect 0 (above); the outline: **FLASH** (`Color_Overlay` 255, 255, 255 faded in to 110 over 4 frames, `Change_Overlay` out over 10 at each motion's end, `Terminate_Overlays` at its end; Mario's own scripts use FLASH (200, 255, 255, 110)) |
+
+### Tests
+`tools/supamario_timeskip_test.py`: **154 ok**, 0 problems. New / changed: the point-blank catch in the three game orders
+above (caught, held, the hold's hitstun, the bystander frozen, 18%); drift forward only (ground / air); effect 0 at frame
+0 at his ground point, turned to his facing both ways, left behind > 50 units, every 20 charge frames; effect 11's four
+calls at his fist at the punch, turned; the sets (names, 31 emissions, nothing skipped, follow none, caps, the speed lines
+toward -X, the streaks rising, the foot part behind, the elbow set following); the elbow's External_Graphic; FLASH in
+place of LIGHT_SHINE; brightness on grass / grey (at most 1.0 square unit over 1.0, no white, visible); every earlier set
+byte for byte (Sledgehammer / God Fist / Core Breaker / Fake Death: emitters, textures, shaders, efc). The model's
+`run(tick_first=True)` runs func_82's hooks before the status. On the v4 build: `supamario_sledgehammer_test` 141 ok,
+`supamario_fakedeath_test` 47, `supamario_corebreaker_test` 104, `supamario_godfist_test --all-models` 566 (0 problems
+each); `msc_stack_check` 0 of 2457 (globals 127 of 128).
+
+### Not confirmed in game
+FLASH through a status change (a hit in the move) and its look as an outline; the ConeExtrude streaks' look against
+XV2's ribbons (no swirl); effect 11's orientation (from the clip, not the hand bone's axes); the point-blank cause (the
+three orders are what the clip fits; any of them is now caught).
+
+## Sledgehammer v6 (in `supamario_timeskip_v4.zip`): the charged air spike can't be teched
+User: "the fully charged Sledgehammer must be untechable for opponents hit in the air". Smash 4 has no hitbox or damage flag
+that forbids a tech (the techs are the victim's own DamageFly / DamageFall landing and wall / ceiling paths, README "Super
+God Fist v17"), so the held-down hold's way: on a charged real hit (`sh_struck`) on an airborne fighter, `sh_spike_start`
+turns its controller off (Input_Set 21's variable: no shield press, a player can't tech), empties its buffer and registers
+the lockout's resets (its KO / a hit on it by anyone / his KO give its controller back: `lock_resets(s, 9)`), SH_V_GS -
+its slot, phase 3. `sh_spike_tick` (func_82): nothing in its hitstop; a tech it takes anyway (a CPU's tech request doesn't
+go through the controller) replaced the same frame by the missed tech's own status: in place / roll (0x64 / 0x65) ->
+DownBound 0x4D, wall / wall jump (0x66 / 0x67) -> WallDamage 0x49, ceiling (0x68) -> CeilingDamage 0x4A, EscapeAir (the
+CPU's landing dodge) -> DownBound on the ground, DamageFall in the air; let go (controller back) when its hitstun reads 0,
+when it lies or bounces (0x4D-0x53), or when it leaves every damage status. Uncharged hits stay techable.
+Tests (`tools/supamario_sledgehammer_test.py` spike_tests): **141 ok** (127 + 14): controller off the frame after the hit,
+buffer, the resets registered; back when the hitstun ends; each tech replaced; let go on its KO, a hit on it, his KO;
+uncharged untouched. The test's model now keeps a shield the swing hit out of the swing (its hit record).
+Not confirmed in game: that a status written over a tech on its first frame takes (Passive's own invincibility frames).

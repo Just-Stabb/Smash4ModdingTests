@@ -182,7 +182,7 @@ E11_CAP = (('sprite_2', 0.12), ('sprite_BG', 0.5), ('line_add', 0.15), ('wave_ad
            ('sprite_1', 0.25), ('sprite', 0.5), ('line_BG', 0.9), ('BG', 0.9), ('ring', 0.5))   # v4: from 2.0 each (the
            # vibrant gain): uncapped the set drew 155 square units over 1.0 at its first frame on grass (12.4 peak: the burst's
            # white sparkle sprite_2, the opaque disc sprite_BG, the stacked lines / waves)
-E0_CAP = (('stripe', 0.35),)       # v4: the streaks from 2.0 (uncapped, alpha 1: 8.6 / 13.6 square units over 1.0 on grass / grey)
+E0_CAP = (('stripe', 0.32),)       # v4: the streaks from 2.0 (uncapped, alpha 1: 8.6 / 13.6 square units over 1.0 on grass / grey)
 FX_E11_IDS = {'hit': 0x03410062, 'hit_2': 0x03410066, 'hit_h': 0x03410067, 'hit_2h': 0x03410068}
 FX_AURA_ID, FX_GLASS_ID, FX_E0H_ID = 0x03410063, 0x03410064, 0x03410069
 # v2 / v3 (item 11, the clip's time stop, frames 44-58): XV2 inverts the world (BPE 78) under BTL_CMN effect 108's glass

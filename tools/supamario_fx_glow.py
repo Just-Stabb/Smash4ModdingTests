@@ -80,6 +80,10 @@ def moves(out_dir):
 def measure(out_dir, which=(), png=None, bg=(0.0, 0.0, 0.0), only=''):
     R.BG = np.array(bg, float)
     R.ONLY = only
+    # v4 (Time Skip v4's test): each call from fresh vertex programs: a cached latte_exec program kept state from the
+    # previous call's emitters (the grey pass's ts_hit drew 3.6 after the grass pass's new sets, 9.6 alone)
+    R._s4_programs.clear()
+    R._s4_static.clear()
     edir = os.path.join(out_dir, 'fighter/supamario/effect/supamario')
     p = ptcl.Ptcl(open(os.path.join(edir, 'supamario.010d0000.ptcl'), 'rb').read())
     ef = efc.Efc(open(os.path.join(edir, 'supamario.010d0000.efc'), 'rb').read())

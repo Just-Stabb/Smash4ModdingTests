@@ -1,0 +1,580 @@
+{
+ "source": "data/skill/SPA/1350_HIK_FRT/1350_HIK_FRT.eepk (the user's folder; tools/xv2vfx.py load_package, strict=False: three of Frt_Hit / CrgAura's EMP blocks carry stray runtime words)",
+ "used_by_1352_bac": {
+  "0": "entry 0 item 2, frame 0 (EEPK type 5, skill 1352)",
+  "11": "entries 4 / 9 / 10 / 11 item 16, frame 16"
+ },
+ "containers": [
+  {
+   "type": "EMO",
+   "emb": null,
+   "emm": null,
+   "tex": null,
+   "assets": [
+    [
+     "Frt_Bas.emo",
+     "Frt_Bas.emm",
+     "Frt_Bas.emb",
+     "Frt_Bas.mat.ema",
+     "Frt_Bas.obj.ema"
+    ]
+   ]
+  },
+  {
+   "type": "PBIND",
+   "emb": "1350_HIK_FRT.pbind.emb",
+   "emm": "1350_HIK_FRT.ptcl.emm",
+   "tex": "1350_HIK_FRT.ptcl.emb",
+   "assets": [
+    [
+     "Frt_Line.emp"
+    ],
+    [
+     "Frt_CrgAura.emp"
+    ],
+    [
+     "Frt_CrgAuraB.emp"
+    ],
+    [
+     "Frt_CrgAuraH.emp"
+    ],
+    [
+     "Frt_Sucses.emp"
+    ],
+    [
+     "Frt_Hit.emp"
+    ]
+   ]
+  }
+ ],
+ "effects": {
+  "0": [
+   {
+    "asset": "PBIND 1",
+    "files": [
+     "Frt_CrgAura.emp"
+    ],
+    "bone": "b_C_Pelvis",
+    "orientation": "User",
+    "deactivation": "Immediate",
+    "flags": [
+     "UseBoneDirection"
+    ],
+    "position_m": [
+     0.0,
+     -0.3,
+     0.0
+    ],
+    "rotation_deg": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "scale": 1.0,
+    "start": 0
+   },
+   {
+    "asset": "PBIND 2",
+    "files": [
+     "Frt_CrgAuraB.emp"
+    ],
+    "bone": "b_C_Pelvis",
+    "orientation": "User",
+    "deactivation": "Immediate",
+    "flags": [
+     "UseBoneDirection"
+    ],
+    "position_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "rotation_deg": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "scale": 1.0,
+    "start": 0
+   },
+   {
+    "asset": "PBIND 1",
+    "files": [
+     "Frt_CrgAura.emp"
+    ],
+    "bone": "b_R_Foot",
+    "orientation": "User",
+    "deactivation": "Immediate",
+    "flags": [
+     "UseBoneDirection"
+    ],
+    "position_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "rotation_deg": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "scale": 1.0,
+    "start": 0
+   },
+   {
+    "asset": "PBIND 3",
+    "files": [
+     "Frt_CrgAuraH.emp"
+    ],
+    "bone": "b_L_Elbow",
+    "orientation": "User",
+    "deactivation": "Never",
+    "flags": [
+     "PositionUpdate",
+     "RotateUpdate",
+     "InstantUpdate"
+    ],
+    "position_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "rotation_deg": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "scale": 0.5,
+    "start": 0
+   }
+  ],
+  "1": [
+   {
+    "asset": "PBIND 3",
+    "files": [
+     "Frt_CrgAuraH.emp"
+    ],
+    "bone": "b_L_Arm2",
+    "orientation": "AttachmentBone",
+    "deactivation": "Immediate",
+    "flags": [
+     "PositionUpdate",
+     "RotateUpdate",
+     "InstantUpdate",
+     "UseBoneDirection",
+     "EnableRotationValues"
+    ],
+    "position_m": [
+     0.4,
+     0.0,
+     0.0
+    ],
+    "rotation_deg": [
+     0.0,
+     0.0,
+     89.99998
+    ],
+    "scale": 0.5,
+    "start": 0
+   }
+  ],
+  "2": [
+   {
+    "asset": "PBIND 3",
+    "files": [
+     "Frt_CrgAuraH.emp"
+    ],
+    "bone": "g_R_Hand",
+    "orientation": "User",
+    "deactivation": "Immediate",
+    "flags": [
+     "PositionUpdate",
+     "RotateUpdate",
+     "InstantUpdate",
+     "EnableRotationValues"
+    ],
+    "position_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "rotation_deg": [
+     180.0,
+     0.0,
+     0.0
+    ],
+    "scale": 0.5,
+    "start": 0
+   }
+  ],
+  "3": [
+   {
+    "asset": "PBIND 4",
+    "files": [
+     "Frt_Sucses.emp"
+    ],
+    "bone": "g_L_Hand",
+    "orientation": "User",
+    "deactivation": "Immediate",
+    "flags": [
+     "InstantUpdate"
+    ],
+    "position_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "rotation_deg": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "scale": 0.8,
+    "start": 0
+   }
+  ],
+  "4": [
+   {
+    "asset": "PBIND 4",
+    "files": [
+     "Frt_Sucses.emp"
+    ],
+    "bone": "g_C_Pelvis",
+    "orientation": "User",
+    "deactivation": "Immediate",
+    "flags": [
+     "InstantUpdate",
+     "EnableRotationValues"
+    ],
+    "position_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "rotation_deg": [
+     -180.0,
+     0.0,
+     0.0
+    ],
+    "scale": 0.8,
+    "start": 0
+   }
+  ],
+  "5": [
+   {
+    "asset": "EMO 0",
+    "files": [
+     "Frt_Bas.emo",
+     "Frt_Bas.emm",
+     "Frt_Bas.emb",
+     "Frt_Bas.mat.ema",
+     "Frt_Bas.obj.ema"
+    ],
+    "bone": "g_L_Hand",
+    "orientation": "AttachmentBone",
+    "deactivation": "Immediate",
+    "flags": [
+     "RotateUpdate",
+     "UseBoneDirection"
+    ],
+    "position_m": [
+     0.0,
+     0.0,
+     0.4
+    ],
+    "rotation_deg": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "scale": 0.2,
+    "start": 0
+   },
+   {
+    "asset": "EMO 0",
+    "files": [
+     "Frt_Bas.emo",
+     "Frt_Bas.emm",
+     "Frt_Bas.emb",
+     "Frt_Bas.mat.ema",
+     "Frt_Bas.obj.ema"
+    ],
+    "bone": "g_L_Hand",
+    "orientation": "AttachmentBone",
+    "deactivation": "Immediate",
+    "flags": [
+     "RotateUpdate",
+     "UseBoneDirection"
+    ],
+    "position_m": [
+     0.0,
+     0.0,
+     0.4
+    ],
+    "rotation_deg": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "scale": 0.2,
+    "start": 0
+   },
+   {
+    "asset": "PBIND 0",
+    "files": [
+     "Frt_Line.emp"
+    ],
+    "bone": "g_L_Hand",
+    "orientation": "AttachmentBone",
+    "deactivation": "LoopCancel",
+    "flags": [
+     "RotateUpdate",
+     "UseBoneDirection"
+    ],
+    "position_m": [
+     0.0,
+     0.0,
+     -0.5
+    ],
+    "rotation_deg": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "scale": 0.3,
+    "start": 0
+   }
+  ],
+  "6": [
+   {
+    "asset": "EMO 0",
+    "files": [
+     "Frt_Bas.emo",
+     "Frt_Bas.emm",
+     "Frt_Bas.emb",
+     "Frt_Bas.mat.ema",
+     "Frt_Bas.obj.ema"
+    ],
+    "bone": "g_R_Hand",
+    "orientation": "User",
+    "deactivation": "Immediate",
+    "flags": [
+     "RotateUpdate",
+     "UseBoneDirection"
+    ],
+    "position_m": [
+     0.0,
+     0.0,
+     0.4
+    ],
+    "rotation_deg": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "scale": 0.2,
+    "start": 0
+   },
+   {
+    "asset": "EMO 0",
+    "files": [
+     "Frt_Bas.emo",
+     "Frt_Bas.emm",
+     "Frt_Bas.emb",
+     "Frt_Bas.mat.ema",
+     "Frt_Bas.obj.ema"
+    ],
+    "bone": "g_R_Hand",
+    "orientation": "User",
+    "deactivation": "Immediate",
+    "flags": [
+     "RotateUpdate",
+     "UseBoneDirection"
+    ],
+    "position_m": [
+     0.0,
+     0.0,
+     0.4
+    ],
+    "rotation_deg": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "scale": 0.2,
+    "start": 0
+   },
+   {
+    "asset": "PBIND 0",
+    "files": [
+     "Frt_Line.emp"
+    ],
+    "bone": "g_R_Hand",
+    "orientation": "User",
+    "deactivation": "LoopCancel",
+    "flags": [
+     "RotateUpdate",
+     "UseBoneDirection"
+    ],
+    "position_m": [
+     0.0,
+     0.0,
+     -0.5
+    ],
+    "rotation_deg": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "scale": 0.3,
+    "start": 0
+   }
+  ],
+  "10": [
+   {
+    "asset": "PBIND 5",
+    "files": [
+     "Frt_Hit.emp"
+    ],
+    "bone": "g_L_Hand",
+    "orientation": "AttachmentBone",
+    "deactivation": "Never",
+    "flags": [
+     "RotateUpdate"
+    ],
+    "position_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "rotation_deg": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "scale": 1.0,
+    "start": 0
+   }
+  ],
+  "11": [
+   {
+    "asset": "PBIND 5",
+    "files": [
+     "Frt_Hit.emp"
+    ],
+    "bone": "g_R_Hand",
+    "orientation": "AttachmentBone",
+    "deactivation": "Never",
+    "flags": [
+     "RotateUpdate"
+    ],
+    "position_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "rotation_deg": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "scale": 1.0,
+    "start": 0
+   }
+  ],
+  "12": [
+   {
+    "asset": "PBIND 5",
+    "files": [
+     "Frt_Hit.emp"
+    ],
+    "bone": "g_L_Hand",
+    "orientation": "AttachmentBone",
+    "deactivation": "LoopCancel",
+    "flags": [
+     "RotateUpdate",
+     "EnableRotationValues"
+    ],
+    "position_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "rotation_deg": [
+     89.99998,
+     0.0,
+     0.0
+    ],
+    "scale": 1.0,
+    "start": 0
+   }
+  ]
+ },
+ "emp": {
+  "Frt_Line.emp": [
+   "Dot AutoOriented",
+   "ring_1 ShapeDraw",
+   "ring_1_1 ShapeDraw"
+  ],
+  "Frt_CrgAura.emp": [
+   "stripe ConeExtrude"
+  ],
+  "Frt_CrgAuraB.emp": [
+   "stripe ConeExtrude"
+  ],
+  "Frt_CrgAuraH.emp": [
+   "stripe ConeExtrude"
+  ],
+  "Frt_Sucses.emp": [
+   "slash_1 ShapeDraw",
+   "ref ShapeDraw",
+   "slash_2 ShapeDraw"
+  ],
+  "Frt_Hit.emp": [
+   "sprite_2 AutoOriented",
+   "sprite_BG AutoOriented",
+   "line_add_1 AutoOriented_VisibleOnSpeed",
+   "line_add_2 AutoOriented_VisibleOnSpeed",
+   "line_add_3 AutoOriented_VisibleOnSpeed",
+   "line_add_4 AutoOriented_VisibleOnSpeed",
+   "line_add_5 AutoOriented_VisibleOnSpeed",
+   "wave_nml_1 AutoOriented_VisibleOnSpeed",
+   "wave_nml_2 AutoOriented_VisibleOnSpeed",
+   "wave_nml_3 AutoOriented_VisibleOnSpeed",
+   "wave_nml_4 AutoOriented_VisibleOnSpeed",
+   "wave_add AutoOriented_VisibleOnSpeed",
+   "line_add_6 AutoOriented_VisibleOnSpeed",
+   "line_add_7 AutoOriented_VisibleOnSpeed",
+   "line_add_8 AutoOriented_VisibleOnSpeed",
+   "sprite_1 AutoOriented",
+   "sprite_1_1 AutoOriented",
+   "sprite_1_2 AutoOriented",
+   "sprite_1_3 AutoOriented",
+   "sprite_1_4_1 AutoOriented",
+   "sprite AutoOriented",
+   "sprite_3 AutoOriented",
+   "line_BG_L AutoOriented_VisibleOnSpeed",
+   "line_BG_S AutoOriented_VisibleOnSpeed",
+   "BG AutoOriented_VisibleOnSpeed",
+   "ring_1 ShapeDraw",
+   "ring ShapeDraw",
+   "wave_nml_5 AutoOriented_VisibleOnSpeed",
+   "wave_nml_5_1 AutoOriented_VisibleOnSpeed",
+   "wave_add_1 AutoOriented_VisibleOnSpeed",
+   "wave_nml_6 AutoOriented_VisibleOnSpeed"
+  ]
+ },
+ "textures": [
+  "4ptcl.dds",
+  "4ptcl02.dds",
+  "Dot06.dds",
+  "Line_BG.dds",
+  "Line_Hit.dds",
+  "ptcl00.dds",
+  "Ring00.dds",
+  "wave_slash02.dds",
+  "wave_slashref.dds",
+  "Wev00.dds",
+  "Wev01.dds"
+ ]
+}
