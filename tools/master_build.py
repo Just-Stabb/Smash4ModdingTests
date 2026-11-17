@@ -1159,6 +1159,9 @@ def vl_fix(a, pkg):
             t.set(v)
     open(path, 'wb').write(vf.build())
     log.append('vl motion bytes (0x211 - 0x25C): %d changed: %s' % (len(changed), ', '.join(changed)))
+    mt = os.path.join(pkg, 'fighter/master/script/animcmd/body/motion.mtable')
+    if os.path.exists(mt):                          # v18: the copies' / dodges' cancels, the up special's init box
+        log += vl_v18(path, path, a.ult, open(mt, 'rb').read())
     log.append('vl: the shot\'s params (his arrows): %s' % ', '.join('%s=%s' % kv for kv in SHOT_PARAMS.items()))
     return log
 
@@ -1294,7 +1297,24 @@ def main():
                                   'sound .bin (an installed body script folder)')
     h.add_argument('dir')
     h.add_argument('--fighter', help='v14: also SpecialAirHiHit\'s motion (hi_hit_motion) in FIGHTER/motion/body*/main.pac')
+    r = sub.add_parser('v18', help='v18 on installed files: the rapid-jab waves (rapid_v18) in GAME (body game.bin, in '
+                                   'place) and the vl (vl_v18: cancel bytes, the up special\'s init ledge box) VL_IN -> VL_OUT')
+    r.add_argument('game')
+    r.add_argument('mtable', help='the body motion.mtable')
+    r.add_argument('vl_in')
+    r.add_argument('vl_out')
+    r.add_argument('--ult', help='Ultimate\'s fighter folder (default: port_sources ult_fighters master)')
     a = ap.parse_args()
+    if a.cmd == 'v18':
+        g = acmd.ACMDFile.load(a.game)
+        log = rapid_v18(g)
+        g.save(a.game)
+        if not a.ult:
+            import port_sources
+            a.ult = port_sources.load().ult_dir('master')
+        log += vl_v18(a.vl_in, a.vl_out, a.ult, open(a.mtable, 'rb').read())
+        print('\n'.join(log))
+        return
     if a.cmd == 'vis':
         cmd_vis(a)
     elif a.cmd == 'hi':
