@@ -170,8 +170,8 @@ class NvTest
         Check("Effect_Camera: 12 words, its CRC, Graphic, 7 floats, Mode, Frames, Flags (then the end marker)", Hex(Bytes(s)),
               "F20DCF5803410012000000003F00000041A00000000000000000000042B400003FF33333000000010000005A000000015766F889");
         Check("Effect_Camera round-trips", Hex(Bytes(Compile(s.Deserialize()))), Hex(Bytes(s)));
-        Check("... shown", s.Deserialize().Split('\n')[1].Trim(),
-              "Effect_Camera(Graphic=0x3410012, X=0, Y=0.5, Z=20, XRot=0, YRot=0, ZRot=90, Size=1.9, Mode=1, Frames=90, Flags=1)");
+        Check("Effect_Camera shown (ints in hex, the editor's default)", s.Deserialize().Split('\n')[0].Trim(),
+              "Effect_Camera(Graphic=0x3410012, X=0, Y=0.5, Z=20, XRot=0, YRot=0, ZRot=90, Size=1.9, Mode=0x1, Frames=0x5A, Flags=0x1)");
         Check("Effect_Camera: New Commands / Effects", ACMD_INFO.GetCategory(0xF20DCF58), "New Commands / Effects");
 
         // ---- errors

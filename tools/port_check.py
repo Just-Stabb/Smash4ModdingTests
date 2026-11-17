@@ -3679,6 +3679,45 @@ def _exe_has_hold(inst):
             return False
 
 
+def check_camera_effect_exe(inst, name, rep):
+    """X9 camfx-exe (ERROR; camera_effects v1): a script of the fighter (game / effect / sound / expression, body or
+    article) using Effect_Camera with no executable in the install carrying tools/camera_effect_cave.py (exe_v46z_camfx
+    or later): the script won't load"""
+    uses = []
+    for rel in inst.glob(r'fighter/%s/script/animcmd/(body|weapon/[^/]+)/(game|effect|sound|expression)\.bin' % name):
+        try:
+            f = _acmd_load(inst.get(rel))
+        except Exception:          # noqa: BLE001
+            continue
+        if any(c.name == 'Effect_Camera' for sc in f.scripts.values() for c in sc):
+            uses.append(rel)
+    if uses and not _exe_has_camfx(inst):
+        rep.add('ERROR', 'X9 camfx-exe', 'Effect_Camera in %s but the install\'s code/cross_f.rpx has no camera effects '
+                '(tools/camera_effect_cave.py: exe_v46z_camfx or later): the script won\'t load' % ', '.join(sorted(uses)))
+
+
+def _exe_has_camfx(inst):
+    if 'code/cross_f.rpx' not in inst.files:
+        return False
+    import tempfile
+    import kind_expand as K
+    import camera_effect_cave as CF
+    with tempfile.NamedTemporaryFile(suffix='.rpx') as f:
+        f.write(inst.get('code/cross_f.rpx'))
+        f.flush()
+        try:
+            img = K.Image(f.name)
+        except Exception:          # noqa: BLE001
+            return False
+
+        def w(x):
+            try:
+                return img.w(x)
+            except KeyError:
+                return 0
+        return CF.present(w)
+
+
 def check_article_status_reuse(inst, name, rep):
     """S29 article-status-reuse (Byleth v17, user: "the whip disappears when catching someone"): a body script that
     changes an article's status (Set_Remote_Article_Action / 2: ZSS's tether whip into another status) and then plays an
@@ -3903,6 +3942,7 @@ def main():
     check_weapon_twice(inst, a.name, rep)
     check_result_param(inst, a.name, src, rep)
     check_rapid_slide(inst, a.name, rep)
+    check_camera_effect_exe(inst, a.name, rep)
     check_rapid_cadence(inst, a.name, rep)
     check_armor(a.name, rep)
     check_ledge_before_wall(a.name, rep)

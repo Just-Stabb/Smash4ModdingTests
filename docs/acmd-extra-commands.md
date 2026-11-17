@@ -4,7 +4,7 @@ These are new commands for game, effect, sound and expression scripts. They need
 `cross_f.rpx` (`tools/acmd_ext_cave.py`, part of the standard build). Without it, a script that uses
 them won't load properly, so ship the executable with any script that uses them.
 
-Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12, Buffer_Clear / Buffer_Set from v1.4.13, Time_Scale / Target_Time_Scale / Stage_Freeze from v1.7.0, Var_Reset_Set and New_Var's Reset from v1.7.4, Hitbox_Hold from v1.7.5) lists all of them in one
+Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12, Buffer_Clear / Buffer_Set from v1.4.13, Time_Scale / Target_Time_Scale / Stage_Freeze from v1.7.0, Var_Reset_Set and New_Var's Reset from v1.7.4, Hitbox_Hold from v1.7.5, Effect_Camera from v1.7.6) lists all of them in one
 group, **New Commands**, at the top of the list (vanilla commands stay in their own groups), in subgroups:
 
 | Subgroup | Commands |
@@ -17,6 +17,7 @@ group, **New Commands**, at the top of the list (vanilla commands stay in their 
 | Targets & tracking | Track_Target, Last_Hit_Get, Target_Slot_Get |
 | Threads | Thread_Start, Thread_Stop |
 | Time & stage | Time_Scale, Target_Time_Scale, Stage_Freeze |
+| Effects | Effect_Camera |
 | Variables | New_Var, Var_Reset_Set |
 
 Each command there has in-depth help after its parameters (how it works, the values, gotchas) and several complete
@@ -47,6 +48,7 @@ them too.
 | `Line_Test` | the stage between two points: where a segment first meets a floor / wall / ceiling, how far, which kind (the game's own GroundModule ray check); also from the `LINE_*` variables for MSC (exe_v46v_line: `tools/line_test_cave.py`, below) |
 | `New_Var` | declares a variable with your own name (int or float, a starting value, per object or per move): 64 more per object, usable in every variable parameter (exe_v40, Sm4shCommand v1.4.9); `Reset`: back to its starting value on a KO / landing / ledge grab / hit (exe_v46w, Sm4shCommand v1.7.4: "Variable resets" below) |
 | `Var_Reset_Set` | any variable (`VAR_n`, `TIMER_n`, a New_Var name, the input / state variables) put back to a value when its owner is KO'd, lands, grabs a ledge or is hit (exe_v46w, Sm4shCommand v1.7.4: "Variable resets" below) |
+| `Effect_Camera` | an effect attached to the camera: in front of it, facing it, following its moves and zooms every frame (full-screen overlays, bursts in front of the camera, vignettes); Mode 1 keeps it on the same part of the screen (exe_v46z_camfx, Sm4shCommand v1.7.6: "Effect_Camera" below) |
 
 ## Extra_Special_Hitbox / Extra_Extended_Special_Hitbox
 
@@ -1283,3 +1285,57 @@ Remove_All_Hitboxes()
 
 Sm4shCommand has four complete examples (a rapid-jab loop hit, a holding drill, the same hit without it, every hitbox
 at once). How it works in the executable: docs/native-notes.md "Hitbox hold"; test `tools/hitbox_hold_test.py`.
+
+## Effect_Camera (exe_v46z_camfx, Sm4shCommand v1.7.6)
+
+`Effect_Camera(Graphic, X, Y, Z, XRot, YRot, ZRot, Size, Mode, Frames, Flags)` starts an effect (the fighter's bank or
+the common one, by the EFFECT commands' ID) attached to the camera: every frame, just before the effects go to the
+particle system, its matrix is set from the camera the game is drawing with (eye, target, up, FOV; the camera shake
+included). Xenoverse 2's camera-attached screen effects (BTL_CMN 108 HIT_DmgGrs2, the time-stop darkening with glass
+shattering) need it; Smash 4 had no way to place an effect on the screen.
+
+| Parameter | |
+|---|---|
+| Graphic | the effect's ID (0x1000000 + n common, 0x3KK0000 + n the fighter's bank) |
+| X, Y | from the screen's centre, right / up. Mode 0 / 2: units; Mode 1: half the screen's height (Y 1 the top edge, X 1.78 the right edge of a 16:9 screen) |
+| Z | distance in front of the eye (units). At least near + 1 (3; closer is put there). Mode 1: 0 or less is 20 |
+| XRot, YRot, ZRot | its turn in degrees, Rz Ry Rx as the EFFECT commands, in camera space (Mode 2: world space). At 0 its X is the screen's right, its Y up, its Z toward the viewer: a flat XY effect faces the camera |
+| Size | its scale; Mode 1: in half screen heights (an effect 1 unit across at Size 1 covers the screen's height; 1.78 its width) |
+| Mode | 0 follow the camera (place and turn); 1 fixed to the screen (as 0, and X / Y / Size scaled with the distance x tan(FOV / 2): the same part of the screen when the camera zooms or moves); 2 position only (moves with the camera, keeps the world's turn). Other values: 0 |
+| Frames | 0: until it ends by itself or Terminate_Graphic_Effect; N > 0: faded out after N frames (it stays attached while it fades) |
+| Flags | 1: unslowed (Time_Scale's slow-motion and the owner's hitlag / Target_Time_Scale don't slow its animation); other bits reserved |
+
+- **It is the object's own effect** (requested through its EffectModule, as MSC's world-placed effects are):
+  `Terminate_Graphic_Effect(Graphic=...)` ends it, `LAST_EFFECT_SET_COLOR` / `_ALPHA` / `_RATE` right after it apply to
+  it, it hides with its owner's model. A status change doesn't end it: give a looping effect Frames or a Terminate.
+- **Time:** it keeps drawing and following the camera through Stage_Freeze, Time_Scale and Target_Time_Scale (its matrix
+  is set in the effects' own frame pass, every displayed frame; Stage_Freeze stops only the stage). Its animation plays at
+  the match's slow-motion rate unless Flags=1. Frames counts displayed frames.
+- **Draw order / depth:** a 3D effect: under the HUD (damage panels, timer). At 10-30 units it is in front of the
+  fighters and the stage (80-300 away); other effects drawn after it, or closer to the camera, can show over it.
+- **Darkening:** an alpha-blended effect (ptcl blend 0) coloured black with an alpha. An additive one can't darken.
+- **Emitters that don't follow** (ptcl 0x310 = 1 / 2) leave their particles in the world where they were emitted: they
+  stay behind when the camera moves. Overlays want follow type 0 (`tools/ptcl.py` sets it).
+- **Several views:** it follows the TV view's camera (the effect camera table's first entry). A GamePad / second Cemu
+  view of the battle draws it at the same place in the world.
+- **Limits:** 16 camera effects at once (a 17th fades the oldest out); nothing outside a match (no camera).
+
+```
+// a time stop: the stage freezes for 90 frames, the screen darkens (the fighter's darkening quad, -1 to 1, fixed
+// to the screen at Size 1.9: a 16:9 screen is 1.78 half heights wide), black at 55 %, unslowed
+FRAME(Frames=12)
+Stage_Freeze(On=1, Frames=90)
+Effect_Camera(Graphic=0x3410012, X=0, Y=0, Z=20, XRot=0, YRot=0, ZRot=0, Size=1.9, Mode=1, Frames=90, Flags=1)
+LAST_EFFECT_SET_COLOR(Red=0, Green=0, Blue=0)
+LAST_EFFECT_SET_ALPHA(Alpha=55)
+// glass shattering in front of the camera as it ends (a one-shot burst, Mode 0, 25 in front)
+FRAME(Frames=100)
+Effect_Camera(Graphic=0x3410013, X=0, Y=0, Z=25, XRot=0, YRot=0, ZRot=15, Size=1.2, Mode=0, Frames=0, Flags=1)
+```
+
+Sm4shCommand (New Commands / Effects) has five complete examples (the time-stop darkening, the glass-shatter burst, a
+charge vignette, a common effect pinned to a corner, Mode 2 falling particles) and the full help. The Hitbox Viewer
+draws it in front of its own view (X / Y from the view's centre, Mode 1 in half the view's height; it has no game camera,
+so Z changes nothing there) and lists it with the effects; Frames ends it there too. `port_check` X9 (ERROR): a script
+using it with no executable carrying the cave. How it works: docs/native-notes.md "Camera effects"; tests
+`tools/camera_effect_test.py` (unicorn), `tools/Sm4shCommand/new_var_test.cs`, `viewer_scripts_test.cs`.

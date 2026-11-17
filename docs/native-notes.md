@@ -2638,7 +2638,8 @@ temporary diag caves' `0x04BCC000`); variables `0x0F0003D0`-`0x0F0003DA`; comman
 `docs/acmd-extra-commands.md` "Variable resets". **Claimed region: `0x04BD8000`-`0x04BE0000`** (code `0x04BD8000`-
 `0x04BD88C4`, data `0x04BD9F00`, the reset lists `0x04BDA000`; `textregion:0x2BE0000 grow:0x04BE0000`).
 `0x04BD6000`-`0x04BD8000` (between ts_data's end and this) was free; `0x04BD6000`-`0x04BD7000` is now the whip motion
-table's (Byleth v15, below), `0x04BD7000`-`0x04BD8000` the hitbox hold's (rapid_setoff v1, below). The combined exe the user runs:
+table's (Byleth v15, below), `0x04BD7000`-`0x04BD8000` the hitbox hold's (rapid_setoff v1, below). `0x04BE0000`-`0x04BE2000`
+(past this region, the text region grown again) is the camera effects' (camera_effects v1, "Camera effects" below). The combined exe the user runs:
 exe_v46v_threads -> var_reset_cave.py (exe_v46w_vars) -> tools/line_test_cave.py (exe_v46w_vars_line, which chains on
 four of these hooks).
 
@@ -2828,3 +2829,83 @@ Mode 2 always; Mode 1 when r19 == 0 and the vector's y word as an int is <= 0 (0
 
 **Not confirmed in game:** that every reaction path of the fighter's event handler takes its speed from the event's
 +0xC / +0x10 (the ones read do); the tumble with a zero vector (Mode 2 on a big hit); items / projectiles as victims.
+
+## Camera effects (camera_effects v1: `tools/camera_effect_cave.py`, exe_v46z_camfx)
+
+**Claimed region: `0x04BE0000`-`0x04BE2000`** (past var_reset's region, the end of exe_v46y_hold's text; the text region
+grown: `textregion:0x2BE2000 grow:0x04BE2000`; code `0x04BE0000`-`0x04BE0928`, the table `cf_tab` `0x04BE0928`-`0x04BE0E28`
+(16 x 0x50)). Order: exe_v46y_hold -> this (exe_v46z_camfx); it chains on the earlier caves' command-table fallbacks
+(line_test_cave.py's `find`, now hitbox_hold's branches) and asserts every other word it replaces is the original.
+Test `tools/camera_effect_test.py EXE` (unicorn, the game's own code around every hook: 59 checks on exe_v46y_hold).
+User docs: docs/acmd-extra-commands.md "Effect_Camera".
+
+**No eft camera mode.** Checked first: Smash 4's eft (NW4F, docs/ptcl-format.md) has nothing that puts an emitter set in
+camera / screen space: an emitter's follow type (0x310: 0 follow the set's matrix, 1 none, 2 position only) is relative
+to its emitter set; the particle types (0x4BC) turn single particles (billboards, Y billboards), not the set; the camera
+offset (0x4D0) is a clip-space depth bias. The effect manager has two camera-aware instance modes, both still world
+placed: flag `0x20` / `0x40` (`0x0334E59C` / `0x0334E76C`: the set's matrix turned toward the eye, the look-at
+`0x033737E8` from the effect camera's eye) and `+0x150` (`0x0334E96C`: moved that far toward the eye). So the cave
+writes the instance's matrix from the camera every frame.
+
+**The camera the game draws with:**
+- **Camera manager** `[0x10352470]` (getter `0x02D29634`, 678 callers; made by `0x02D29018`, 0x7C0 bytes, vtable
+  `0x1011E1C8`): vt `+0x54(kind 0-12)` a camera controller (`+0x10`... `+0x3C`), vt `+0x5C` the render camera (`+0x4E0`,
+  102 callers), vt `+0x3C` the update (`0x02D2A584`: the controllers, then the render camera into the **snapshot block**
+  `+0x780`: `+0` FOV (the render camera's `+0xE4`), `+8` near (`+0xE8`), `+0xC` far (`+0xF0`), `+0x10` eye (`+0x8C`
+  + the shake `+0xBC`), `+0x1C` target (`+0x80` + shake), `+0x28` up (`+0xA4`); a matrix camera (flag `0x104 & 2`) gives
+  eye = its position `+0x70`, target = eye - its Z axis x `+0xE0`).
+- **Camera object** (the update `0x02D27F58`; Xtal's `set_camera_pos` `0x02914120` / `set_camera_look_at`
+  `0x02914254` write it): `+0x80` target, `+0x8C` eye, `+0xA4` up, `+0xE4` vertical FOV in radians (clamped 0.01 -
+  pi - 0.01), `+0xE8` / `+0xF0` near / far, `+0xF8` a zoom (`+0xFC` = 2 atan(tan(fov / 2) / zoom)), `+0x100` aspect
+  (16/9), `+0x10C` / `+0x110` tan of the half horizontal / vertical FOV, `+0x00` its view matrix, `+0x40` the inverse
+  (rows: right, up, back, eye). Defaults (`0x02D28CB8`): FOV 0.7156 (41 degrees), near 2, far 100000, aspect 16/9.
+- **Effect camera table** `0x10573CC0` (`0x0334A368()`; 2 entries of 0xE0: the TV, the GamePad; ctor `0x0334A0F0`):
+  entry `+0xC` the current source, `+0x10` the next, `+0x14` three source slots. The camera manager registers its
+  snapshot block as entry 0's slot 0 (`0x02D29FCC`: `0x0334A080(table, 0, 0, mgr + 0x780)`) and makes it current. The
+  update `0x0334A02C` (after the manager's, `0x02FC8940`) runs `0x03349D24` per entry: the source's vt `+0x14`, then
+  `0x03349A38(entry + 0x50, entry + 0x90, source + 0x10)` (the look-at `0x033496A0(view, &eye, &target, &up)`, a 4x4
+  with the translation in row 3; then its rigid inverse at `+0x90`: rows right, up, back (eye - target), eye), copies
+  eye / target / up to `+0x20`, and gives the renderer (`+0xD0`, the render manager `[0x10423DCC]`'s view) the source
+  (`0x0330043C`: projection from `+0` FOV, `+4`, `+8` near, `+0xC` far, `0x0332C518`) and the eye block (`0x033001E0`).
+  The effect manager's own camera-facing modes read entry 0's eye (`0x0334A0B8(table, 0, 0)` = `+0x20`).
+- **Frame order:** the battle sequence (`0x02FF4DF8`) runs the objects (`0x02BF2544`: ACMD scripts, effect requests), the
+  camera manager's update (`0x02FF51B8`), the effect frame (`0x02FF5368` -> `0x02D88A00`: the step rate, the manager's
+  update `0x032EFAE4`), then the effect calc (`0x02FF54A4` -> `0x02D88C18`, once a frame (byte `[0x10352569]`) ->
+  `0x032EFD04`); the battle step `0x029108D0` the same (`0x02910FC8`, `0x02911068`).
+
+**Effect instances** (manager `[0x10353CA4]`, pool `+0x4040` in the exe_v18+ layout, 100 x 0x1C0): `+0` handle, `+4` the
+effect id, `+8` the owner key (the module's `+0x10` | the request's flags), `+0x34` / `+0x1A1` follow target, `+0x50` the
+3x4 matrix (rows, translation in column 3), `+0xB0` scale, `+0xBC` rotation, `+0xC8` position, `+0x138` / `+0x13C` /
+`+0x140` the step, `+0x144` flags. The calc pass `0x032EFD04` (mutex `+0xEF44`) runs `0x0334E0C8` on each instance, then
+eft's calc (`0x04A56B18` per group): the matrix is rebuilt from scale / rotation / position (`0x03373478`, Rz Ry Rx;
+`0x033730A0` builds that rotation) unless **flag `0x8000`**; an instance with no follow target takes `+0x50` as it is
+(copied at `0x0334E28C`), applies the billboard modes and `+0x150`, and gives it to eft (`0x032FF744(inst + 0x20, &m)`,
+`0x0334EAA8`). Flag `0x01000000`: the step isn't multiplied by the global slow rate `[0x10439078]` (the effect frame's
+1 / N). The world request EffectModule vt `+0x44` `0x02C29D10(module, id, &pos, &rot, flags, mta -1, 1, 0, f1 size)`
+(MSC EffectModule's world op): its flags `0x00800000` = rate 1, not the owner's (else `0x00100000` / `0x00200000` with
+the module's rate `+0x70` / `+0x6C x +0x74`); the handle in module `+0x14`. Terminate_Graphic_Effect (MSC `0x2723`,
+vt `+0xC4` `0x02005AF0`) kills by id with the key masked `0x01003FFF` / `0xFF003FFF`: the request's flag bits (20-23) don't
+matter. Kill by handle: `0x0334C6A8(handle, 0)` (vt `+0xAC`'s: the emitter set fades). The manager and these calls
+were run in unicorn for the parts the test needs (the instance update up to its matrix, with and without `0x8000`).
+
+**Hooks:**
+- CALC `0x032EFD04` (`stwu r1, -0x28(r1)`, asserted) -> `cf_calc`: each tracked effect (its instance still has its handle,
+  else it is dropped): Frames counted down (at 0 the kill facade, it stays attached while it fades), the camera read once
+  a frame (`cf_camera`: table entry 0's current source, `0x03349A38` into the cave's own view / inverse, tanf `0x04ADE970`
+  of FOV / 2), its matrix (`cf_mat`) written to `+0x50` and `+0x144 |= 0x8000` (| `0x01000000` unslowed); then the
+  pass's own first word and `b 0x032EFD08`. No camera (no source): left where it was.
+- The command tables: line_test_cave.py's `find` (lk_none / s1 / s2 / f), chained in front of whatever is there (hitbox_hold's
+  branches in exe_v46y_hold). Effect_Camera index 2200, CRC `0xF20DCF58`, 12 words.
+- **Handler** `h_camfx`: the accessor's EffectModule (`+0xA0`), its vt `+0x44` must be `0x02C29D10` (the fighter and
+  weapon module classes `0x10105FE8` / `0x101228F8`); the local turn built once (`0x033730A0`), the camera read, the matrix
+  computed; the request at the matrix's translation, rotation 0, size = the matrix's scale; then the new instance's `+0x50`
+  and flags set at once (its first frame is already at the camera) and the handle tracked (16 entries; the 17th fades
+  the oldest out). Anything missing (no module, another vt, no camera, a refused request): nothing tracked.
+- **The matrix** (`camera_effect_cave.matrix()` is the Python reference): dist = Z (Mode 1: <= 0 -> 20), at least near + 1;
+  k = dist x tan(FOV / 2) in Mode 1, else 1; P = eye + right X k + up Y k - back dist; W = [right up back] x L x Size k
+  (Mode 2: L x Size k), rows of W with P as the 4th column.
+
+**Not confirmed in game:** that the TV's entry 0 is the camera every battle view draws with (Final Smash cameras register
+their own sources? they would be read the same way, through the current source); the vertical FOV's use by the renderer
+(Mode 1's scale follows the source's FOV as the projection gets it); the overlay's draw order against other effects.
+

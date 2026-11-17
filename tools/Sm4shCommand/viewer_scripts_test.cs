@@ -292,10 +292,10 @@ class VsTest
         var a = all[0];
         Check("the first: its id, Mode 1, Frames 4, offsets / turn / size", string.Format(System.Globalization.CultureInfo.InvariantCulture,
               "0x{0:X} {1} {2} {3} {4} {5} {6}", a.Id, a.CamMode, a.CamFrames, a.X, a.Y, a.RZ, a.Size), "0x3410012 1 4 0.5 -0.25 90 1.9");
-        Check("... ended by its Frames (started on 3, 4 frames: shown 3-6)", a.StartFrame + "-" + a.EndFrame + " " + a.EndReason,
-              "3-7 Effect_Camera's Frames (4)");
-        Check("the second ended by Terminate_Graphic_Effect on frame 10", all[1].EndFrame + " " + all[1].EndReason,
-              "10 terminated (Terminate_Graphic_Effect)");
+        Check("... ended by its Frames (started on FRAME 2's frame, 4 frames: shown 2-5)", a.StartFrame + "-" + a.EndFrame + " " + a.EndReason,
+              "2-6 Effect_Camera's Frames (4)");
+        Check("the second ended by Terminate_Graphic_Effect on FRAME 9's frame", all[1].EndFrame + " " + all[1].EndReason,
+              "9 terminated (Terminate_Graphic_Effect)");
         var vp = new Viewport { Width = 800, Height = 600 };
         float[] cr, cu, cf;
         vp.CameraAxes(out cr, out cu, out cf);
