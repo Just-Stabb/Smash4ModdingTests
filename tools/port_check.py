@@ -3609,6 +3609,43 @@ def check_ledge_before_wall(name, rep):
                     'v17: "too strict")')
 
 
+def check_tether_reach(name, rep):
+    """S34 tether-reach (Byleth v19, user: "the tether will attempt to happen out of Byleth's range instead of just
+    whiffing up special normally"): a port's own MSC function that sends the base's tether status 0xF2 (AirCatchPose:
+    her whip thrown at the ledge GroundModule found) on the ledge box test (func_99) must also test the ledge against
+    the weapon's real reach (a `*reach*()` call in the same condition: Byleth's master_hi_reach, the ledge corner
+    within param_sword reach_length_max of his hand). v18 widened the box to Ultimate's AIR_LASSO (75 ahead, 85 up)
+    with no reach test: the whip was thrown at a ledge ~85 from his hand, fell short, and her 0xF2 (which only ends by
+    landing or the whip arriving) held him to the blast line. ERROR without the reach test; WARN when such a port
+    leaves 0xF2's main to the base (no give-up when the whip never gets there)"""
+    src = os.path.join(ROOT, 'fighters', name, name + '.c')
+    if not os.path.exists(src):
+        return
+    text = open(src, errors='replace').read()
+    fns = c_functions(text)
+    bad, sends = [], False
+    for fn, body in fns.items():
+        if fn.startswith('func_'):
+            continue
+        for m in re.finditer(r"if \(([^{};]*?)\)\s*\{\s*func_16\(0xf2\b", body, re.I):
+            cond = m.group(1)
+            if 'func_99()' not in cond:
+                continue
+            sends = True
+            if not re.search(r'\b\w*reach\w*\(', cond):
+                bad.append(fn)
+    if bad:
+        rep.add('ERROR', 'S34 tether-reach', '%s: the ledge box test (func_99) sends the tether 0xF2 with no reach test: '
+                'a ledge in the box but out of the weapon\'s reach gets the whip thrown at it, it falls short and 0xF2 '
+                'holds the fighter till it lands or dies (Byleth v18)' % ', '.join(sorted(set(bad))))
+    if sends:
+        own = [m for m in re.finditer(r'sv_set_mem\(0x1, 0x1, 0xf2, (\w+)\)', text)]
+        if not own or re.fullmatch(r'func_\d+', own[-1].group(1)):
+            rep.add('WARN', 'S34 tether-reach', '0xF2\'s main is the base\'s: its loop leaves only by landing or the whip '
+                    'reaching the ledge, so a miss holds the fighter helpless (Byleth v19: master_hi_f2_main, a Fall after '
+                    'MASTER_HI_F2_MAX frames)')
+
+
 def _exe_has_hold(inst):
     if 'code/cross_f.rpx' not in inst.files:
         return False
@@ -3851,6 +3888,7 @@ def main():
     check_rapid_cadence(inst, a.name, rep)
     check_armor(a.name, rep)
     check_ledge_before_wall(a.name, rep)
+    check_tether_reach(a.name, rep)
     check_article_status_reuse(inst, a.name, rep)
     check_result_faces(inst, a.name, base, vanilla, rep)
     n = rep.show()
