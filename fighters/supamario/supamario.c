@@ -41217,6 +41217,11 @@ void sh_tick()
 // VAR_24 TS_V_SLOT (the caught fighter's slot; -1 let go), VAR_25 TS_V_K (the moving part's frames), VAR_26 TS_V_USED
 // (used in the air), VAR_27 TS_V_BREV, VAR_28 TS_V_EASE (frames since the move ended in the air: the gravity's ease),
 // VAR_29 TS_V_AIM (the dash's direction: its sine, + up), VAR_30 TS_V_SHV (1 the caught fighter was shielding).
+// v2 (the user's v1 test, README "Time Skip v2"): his travel is his position (ts_move: 0x0F000004 / 0x0F000005, the
+// same on the ground and in the air; v1's energy-3 speeds never moved him in the air), the ground slides off edges into
+// the air and the dash goes on, Time Skip's own tracking without v1's ground rule (ts_track: up off the ground, down
+// past an edge), the use's reset also from the MSC (ts_reset), a point-blank detection box (the script's ID 1), the
+// purple trail (ts_trail), XV2's hit look from its own dimmer sets.
 // ===================================================================
 
 // XV2's root travel of SpecialS (units a frame along his facing, by the motion frame): the wind-up's step and the stop
@@ -41292,6 +41297,7 @@ void ts_tick()
 {
     float n;
     float st;
+    ts_reset();
     n = WorkModuleF(0, TS_V_EASE);
     if (n < 0.5f || WorkModuleF(0, TS_V_PH) != 0.0f)
     {
@@ -41308,18 +41314,78 @@ void ts_tick()
     ts_ease(n);
 }
 
-// his speed: vx along his facing, vy up. On the ground energy 3 (as Fake Death's); in the air energy 3 and energy 1
-// with no gravity (Core Breaker's cb_speed) and the stick's air control held at 0 (energy 2: no drift)
-void ts_speed(float vx, float vy)
+// v2 (user: "Never resets after being used in the air"): the use (TS_V_USED) back to 0 from the MSC too, every frame
+// (func_82), whatever the exe's variable resets do: on the ground or a ledge (situation 0 / 1), in a damage / capture
+// status (0x3F-0x4C: hit, grabbed, thrown, tumbling), a cliff status (0x72-0x7A), Dead / Rebirth / Entry (a KO). Not
+// while he is in the move (TS_V_PH != 0: its first frame may still read the status before it; landing in the move is the
+// exe's, and the MSC's once the move is over)
+void ts_reset()
+{
+    float st;
+    if (WorkModuleF(0, TS_V_USED) < 0.5f || WorkModuleF(0, TS_V_PH) != 0.0f)
+    {
+        return;
+    }
+    st = WorkModuleF(0, 0x0F0000A2);
+    if (global18 == 0 || global18 == 0x1 || (st >= CB_RESET_LO && st <= CB_RESET_HI) ||
+        (st >= CB_CLIFF_LO && st <= CB_CLIFF_HI) || st == CB_DEAD || st == CB_REBIRTH || st == CB_ENTRY)
+    {
+        WorkModule(0, 0.0f, TS_V_USED);
+    }
+}
+
+// his kinetic energies held at 0 (v2: the travel is ts_move's): on the ground energy 3 and the ground correction that
+// slides off edges (1: the dash runs off into the air); in the air energies 1 / 3 and gravity 0 (Core Breaker's
+// cb_speed), the stick's air control 0 (energy 2: no drift)
+void ts_still()
 {
     if (global18 == 0)
     {
-        KineticModule(0x11, 0x3, vx * WorkModuleF(0, 0x0f000003), 0.0f);
+        KineticModule(0x11, 0x3, 0.0f, 0.0f);
+        GroundModule(0x2710, 0x1);
         return;
     }
-    cb_speed(vx, vy);
+    cb_speed(0.0f, 0.0f);
     KineticModule(0x14, 0x1, TS_VMAX + 1.0f);
     KineticModule(0x11, 0x2, 0.0f, 0.0f);
+}
+
+// v2 (user: "Doesn't move anywhere in the air"): his travel, vx along his facing and vy up, written to his position
+// (0x0F000004 / 0x0F000005: the Super God Fist's gf_travel, Byleth v11's reel), the same on the ground and in the air;
+// his energies held at 0 (ts_still). v1 set energy 3's speed: in the air (kinetic type 0, FALL) energy 3 isn't on (the
+// Cape's own air code makes it again and turns it on, func_2263: KineticModule(0xE / 0xB, 3)), so the air dash and
+// anything past an edge stood still. Nothing while he is frozen in a hitstop. On the ground the floor takes a downward
+// part (no pushing through it or a platform); the aim is kept, so past an edge he goes down
+void ts_move(float vx, float vy)
+{
+    ts_still();
+    if (WorkModuleF(0, 0x0F000043) > 0.5f)
+    {
+        return;
+    }
+    if (global18 == 0 && vy < 0.0f)
+    {
+        vy = 0.0f;
+    }
+    if (vx != 0.0f)
+    {
+        WorkModule(0, vx, 0x0f000004);
+    }
+    if (vy != 0.0f)
+    {
+        WorkModule(0, vy, 0x0f000005);
+    }
+}
+
+// v2 (user: "There's no purple line being emitted over Supamario during the move"): XV2's skill effect 0 (its EEPK isn't
+// in the files: the stand-in) as a purple streak left at his middle every moving frame, along his travel (rotation about
+// Z: the way he goes, either facing), world-placed (it stays where he was: a line behind him that fades)
+void ts_trail(float c, float sn)
+{
+    float face;
+    face = WorkModuleF(0, 0x0f000003);
+    EffectModule(0x3, TS_FX_TRAIL, WorkModuleF(0, 0x0f000000), WorkModuleF(0, 0x0f000001) + TS_TRAIL_Y,
+                 WorkModuleF(0, 0x0f000002), 0, 0, MathF(0x1, sn, c * face), TS_FX_TRAIL_SIZE, 0, 0xffffffff);
 }
 
 void ts_air_kinetics()
@@ -41368,7 +41434,7 @@ void ts_init()
         ts_used();
     }
     func_22(0x219, 0, 1.0f);
-    ts_speed(0.0f, 0.0f);
+    ts_still();
     ts_brev(0.0f);
 }
 
@@ -41434,6 +41500,7 @@ int ts_find()
     float face;
     float dx;
     float dy;
+    float d2;
     float best;
     face = WorkModuleF(0, 0x0f000003);
     found = 0;
@@ -41466,11 +41533,19 @@ int ts_find()
         y = WorkModuleF(0, 0x0f000021 + 4 * (s - 1));
         dx = x - (WorkModuleF(0, 0x0f000000) + TS_HIT_Z * face);
         dy = y + TS_VICTIM_MID - (WorkModuleF(0, 0x0f000001) + TS_HIT_Y);
+        d2 = dx * dx + dy * dy;
+        // v2: or the point-blank box (ID 1, at his middle)
+        dx = x - (WorkModuleF(0, 0x0f000000) + TS_HIT2_Z * face);
+        dy = y + TS_VICTIM_MID - (WorkModuleF(0, 0x0f000001) + TS_HIT2_Y);
+        if (dx * dx + dy * dy < d2)
+        {
+            d2 = dx * dx + dy * dy;
+        }
         if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f &&
             (x != WorkModuleF(0, 0x0f000000) || y != WorkModuleF(0, 0x0f000001)) &&
-            WorkModuleF(0, 0x0F000043 + 0x8 * (s + 0x2)) > 0.5f && dx * dx + dy * dy < best)
+            WorkModuleF(0, 0x0F000043 + 0x8 * (s + 0x2)) > 0.5f && d2 < best)
         {
-            best = dx * dx + dy * dy;
+            best = d2;
             found = s;
         }
         s = s + 1;
@@ -41609,7 +41684,7 @@ void ts_catch(int s, int sh)
     ts_hold(s);
     ts_freeze_others();
     WorkModule(0, TS_INV_STEP, 0x0F00011C);
-    ts_speed(0.0f, 0.0f);
+    ts_still();
     func_22(0x21d, 0, 1.0f);
 }
 
@@ -41653,10 +41728,12 @@ void ts_shield(int s)
     cb_sh_wait = 0;
 }
 
-// the end of the move: Wait on the ground; in the air Fall (no free fall), his speed kept, his gravity eased back in
-// (ts_tick)
-void ts_finish()
+// the end of the move: Wait on the ground; in the air Fall (no free fall), his gravity eased back in (ts_tick). v2: a
+// miss in the air hands its last speed (v speed along TS_V_AIM: the eased TS_VSTOP) to Fall's energies (2: the air
+// drift, world X; 1: vertical), since the travel itself was his position
+void ts_finish(float v)
 {
+    float sn;
     cb_aircap(0);
     sh_rearmor();
     if (global18 == 0)
@@ -41672,14 +41749,21 @@ void ts_finish()
             KineticModule(0xf, 0x1, 0.0f);
             WorkModule(0, 1.0f, TS_V_EASE);
         }
+        sn = WorkModuleF(0, TS_V_AIM);
+        KineticModule(0x11, 0x3, 0.0f, 0.0f);
+        KineticModule(0x11, 0x2, v * MathF(0, 1.0f - sn * sn) * WorkModuleF(0, 0x0f000003), 0.0f);
+        KineticModule(0x11, 0x1, v * sn);
         func_16(0xe, 0);
     }
 }
 
-// the tracking (the user's spec): the nearest opponent in front of him (along his facing) within TS_TRACK_RANGE at most
-// 65 degrees above or below him (feet to feet: dy^2 <= TS_TRACK_TAN2 dx^2; his box, 2.5 over his feet, then meets its
-// body, and one standing on his floor is level with him): the dash aimed at it (TS_V_AIM, the
-// direction's sine); none: the last aim kept. His facing and speed aren't touched. On the ground never aimed down
+// the tracking (the user's spec; v2: Time Skip's own rules, nothing of the God Fist's gf_pick / gf_track, its 55-unit
+// range, 75 degrees, burst-only window or ground rule): the nearest opponent in front of him (along his facing) within
+// TS_TRACK_RANGE, at most 65 degrees above or below him (feet to feet: dy^2 <= TS_TRACK_TAN2 dx^2; his box, 2.5 over his
+// feet, then meets its body, and one standing on his floor is level with him), on the ground and in the air alike: the
+// dash aimed at it (TS_V_AIM, the direction's sine); none: the last aim kept. His facing and speed aren't touched. v1
+// never aimed down on the ground (removed: an opponent below, off the stage, is aimed at; the floor takes the downward
+// part until he is past the edge, ts_move); aimed up, he leaves the ground (ts_dash)
 void ts_track()
 {
     int s;
@@ -41706,10 +41790,6 @@ void ts_track()
         }
         s = s + 1;
     }
-    if (global18 == 0 && aim < 0.0f)
-    {
-        aim = 0.0f;
-    }
     WorkModule(0, aim, TS_V_AIM);
 }
 
@@ -41729,6 +41809,7 @@ void ts_dash(float fr)
     if (fr > TS_HIT_FROM - 1.5f && k < n - 2.5f)
     {
         armor_lift(TS_HIT_Z, TS_HIT_Y, TS_HIT_SIZE);
+        armor_lift(TS_HIT2_Z, TS_HIT2_Y, TS_HIT2_SIZE);     // v2: the point-blank box (ID 1)
     }
     if (fr > TS_HIT_FROM - 0.5f && k < n - 2.0f + TS_HIT_LATE)
     {
@@ -41739,7 +41820,7 @@ void ts_dash(float fr)
     }
     if (fr < TS_MOVE_FROM - 0.5f)
     {
-        ts_speed(ts_vroot(fr), 0.0f);
+        ts_move(ts_vroot(fr), 0.0f);
         return;
     }
     if (k > n - 2.5f)
@@ -41752,11 +41833,11 @@ void ts_dash(float fr)
         SoundModule(0x2710, TS_SND_HAZURE);
         if (global18 != 0)
         {
-            ts_finish();
+            ts_finish(TS_VSTOP);
             return;
         }
         WorkModule(0, 4.0f, TS_V_PH);
-        ts_speed(ts_vroot(fr), 0.0f);
+        ts_move(ts_vroot(fr), 0.0f);
         return;
     }
     v = ts_vdash();
@@ -41769,14 +41850,16 @@ void ts_dash(float fr)
     c = MathF(0, 1.0f - sn * sn);
     if (global18 == 0 && sn > 0.05f)
     {
-        func_20(0x2);                 // aimed up off the ground: into the air
+        func_20(0x2);                 // aimed up off the ground: into the air (v2: the move goes on, moving up)
         ts_air_kinetics();
+        global18 = 0x2;
     }
     if (WorkModuleF(0, 0x0F000043) < 0.5f)
     {
         WorkModule(0, k + 1.0f, TS_V_K);
+        ts_trail(c, sn);
     }
-    ts_speed(v * c, v * sn);
+    ts_move(v * c, v * sn);
 }
 
 // the connect (phases 5 / 6): the stopped time to the punch's frame (the victim held, everyone else frozen), invincible
@@ -41801,7 +41884,7 @@ void ts_connect(float fr)
         }
         ts_freeze_others();
         WorkModule(0, TS_INV_STEP, 0x0F00011C);
-        ts_speed(0.0f, 0.0f);
+        ts_still();
         return;
     }
     if (s > 0)
@@ -41830,7 +41913,7 @@ void ts_connect(float fr)
     if (fr < TS_STRIKE + 0.5f || WorkModuleF(0, 0x0F000043) > 0.5f)
     {
         WorkModule(0, TS_INV_STEP, 0x0F00011C);
-        ts_speed(0.0f, 0.0f);
+        ts_still();
         return;
     }
     if (fr < TS_STRIKE + 1.5f)
@@ -41848,12 +41931,12 @@ void ts_connect(float fr)
     }
     else
     {
-        ts_speed(0.0f, 0.0f);
+        ts_still();
     }
     if (fr > TS_CONNECT_END - 0.5f || MotionModule(0x2712) ||
         (WorkModuleF(0, TS_V_SHV) > 0.5f && ts_charged() == 0 && fr > TS_SH_IASA - 0.5f))
     {
-        ts_finish();
+        ts_finish(0.0f);
     }
 }
 
@@ -41871,15 +41954,14 @@ void ts_loop()
     if (ph < 1.5f)
     {
         ts_brev(fr);
-        ts_speed(ts_vroot(fr), 0.0f);
+        ts_move(ts_vroot(fr), 0.0f);
         if (fr < TS_WIND_END - 0.5f)
         {
             return;
         }
         if (ControlModule(0x2712, 0x1) == 0)
         {
-            ts_dash_start(0);
-            ts_speed(ts_vroot(fr), 0.0f);
+            ts_dash_start(0);           // (this frame's root step already taken above)
             return;
         }
         WorkModule(0, 2.0f, TS_V_PH);
@@ -41890,7 +41972,7 @@ void ts_loop()
         // XV2's ChargeControl 20-50 (ChargeTime 40): the pose held while the button is; the dash's speed by the frames
         // held (ts_vdash), TS_CHARGE frames the full charge
         MotionModule(0x2713, TS_WIND_END);
-        ts_speed(0.0f, 0.0f);
+        ts_still();
         if (ControlModule(0x2712, 0x1) == 0)
         {
             ts_dash_start(0x1);
@@ -41913,13 +41995,13 @@ void ts_loop()
         // the stop on the ground (XV2's 85-120: the root's last 1.7 m, back to his stance); off the ground: Fall
         if (global18 != 0)
         {
-            ts_finish();
+            ts_finish(0.0f);
             return;
         }
-        ts_speed(ts_vroot(fr), 0.0f);
+        ts_move(ts_vroot(fr), 0.0f);
         if (fr > TS_DASH_END - 0.5f || MotionModule(0x2712))
         {
-            ts_finish();
+            ts_finish(0.0f);
         }
         return;
     }
