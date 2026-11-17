@@ -445,8 +445,9 @@ def msc_tests(path, root):
          end[3], tr[-1][3], end[3], 0.01)
     check('v2 (user: "Doesn\'t move anywhere in the air"): the air dash moves exactly as the ground one (the moving '
           'part\'s speeds frame by frame)', speeds(g, mf, mf + mn - 1), sp_ground)
-    check('v3 air tap: Fall from the stop: no speed handed on (energy 2 / 1: 0)', (round(abs(g.vx2), 4), round(g.vy, 4)),
-          (0.0, 0.0))
+    fall_at = g.statuses[0][0]
+    check('v3 air tap: Fall from the stop: no speed handed on (energy 2 / 1 set to 0 at the change)',
+          ([x for n, x in g.e2_log if n == fall_at][-1:], [x for n, x in g.vy_log if n == fall_at][-1:]), ([0.0], [0.0]))
     accs = [a for n, a in g.acc_log if n > k_end]
     want = [round(-GRAVITY * min(1.0, n / B.EASE_FRAMES), 4) for n in range(1, int(B.EASE_FRAMES) + 1)]
     check('air tap: his gravity eased back in over %d frames (-%.4f a frame more each frame), then his own' % (
@@ -621,7 +622,7 @@ def tracking_tests(path):
         sorted({a_ for _n, _x, a_ in vel})[:3], ang))
     # v2 (user: "the exact same tracking rules as Super God Fist"): Time Skip's picker isn't the God Fist's
     src = open(os.path.join(HERE, '..', 'fighters', 'supamario', 'supamario.c')).read()
-    body = src[src.index('void ts_track()'):]
+    body = src[src.index('void ts_track(float k)'):]
     body = body[:body.index('\n}\n')]
     import supamario_godfist_build as GB
     check('v2: ts_track is Time Skip\'s own (no gf_* call, no ground rule), its range / angle (%g / %g) not the God '
@@ -639,9 +640,9 @@ def edge_tests(path, root):
     tr, vm = run(path, g, after=30)
     off = first(tr, lambda t: t[3] > 40.0)
     check('v2 edge: off the edge at x 40 in the moving part, the side special goes on (phase 3, SpecialS), no Fall '
-          'until its end (%d), then Fall' % (mf + mn), (off is not None and off[0] < mf + mn, [t[6] for t in tr if
-                                                                                              off and off[0] <= t[0] < mf + mn and t[5] is None][:1],
-                                                     g.statuses[:1]), (True, [3.0], [(mf + mn, 0xE)]))
+          'until the motion\'s end (%d, v3: after the stop), then Fall' % B.DASH_END,
+          (off is not None and off[0] < mf + mn, [t[6] for t in tr if off and off[0] <= t[0] < mf + mn and
+                                                  t[5] is None][:1], g.statuses[:1]), (True, [3.0], [(B.DASH_END, 0xE)]))
     check('v2 edge: the moving part\'s speeds on and off the edge the same as on flat ground, no height lost while the '
           'move goes on', (speeds(g, mf, mf + mn - 1) == speeds(g0, mf, mf + mn - 1),
                            max(abs(t[4]) for t in tr if t[0] < mf + mn and t[5] is None)), (True, 0.0))
@@ -800,7 +801,7 @@ def v3_tests(path):
                  stick_x=lambda n: 1.0 if n >= B.WIND_END else 0.0)
         g.stick_y = lambda n: 1.0 if n >= B.WIND_END else 0.0
         tr, vm = run(path, g, frames=80)
-        drift = [(n, a_, u_) for n, a_, u_ in g.moves if B.WIND_END <= n < B.WIND_END + 19]
+        drift = [(n, a_, u_) for n, a_, u_ in g.moves if B.WIND_END < n < B.WIND_END + 19]
         fw = sorted({a_ for _n, a_, _u in drift if a_})
         up = sorted({u_ for _n, _a, u_ in drift if u_})
         check('v3 charge drift (%s): the stick held forward and up while charging: %.2f a frame forward%s' % (
