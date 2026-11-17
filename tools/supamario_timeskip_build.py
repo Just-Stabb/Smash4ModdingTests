@@ -5,6 +5,7 @@ skill 1352_HIK_DSH, Hit's "Time-Skip"; the user also calls it "Jump Spike"): the
 files stay theirs: only the side special's motions / scripts, one new effect set, seven new tones and the MSC change).
 
   python3 -I tools/supamario_timeskip_build.py SUPAMARIO_DIR OUT_DIR --ts-skill 1352_HIK_DSH_DIR --ts-se-wav WAV_DIR
+        --frt-skill 1350_HIK_FRT_DIR (v4: the skill's EEPK folder, data/skill/SPA/1350_HIK_FRT)
         [Sledgehammer's: --sh-skill ... --sh-se-wav ... --fd-skill ... --fd-se-wav ... --skill ... --se-wav ... --ean ...
         --cmn-vfx VFX_CMN_DIR --skill-vfx ... --cmn-se ... --stb ...] [--png SHEET.png]
 
@@ -106,9 +107,10 @@ STRIKE_Z, STRIKE_Y = HOLD_X, round(HOLD_Y + VICTIM_MID, 2)
 SH_TAKE, SH_STUN = 0.5, 26
 SH_IASA = STRIKE + 16
 SH_BONUS = 6.0
-STAGE_FREEZE_RENEW = 4              # v3: Stage_Freeze(1, 4) renewed every frame of the stopped time by the connect's game
+STAGE_FREEZE_RENEW = 8              # v3: Stage_Freeze(1, 4) renewed every frame of the stopped time by the connect's game
                                     # script (v2: once, 30 frames): a move cut before the punch lets the stage go within 4
-                                    # frames (the script stops); 4 > the catch's 3-frame freeze, when the script waits
+                                    # frames (the script stops). v4: 8: the user's clip shows the stage let go for 2 frames
+                                    # after the catch (its freeze holds the script on frame 0 for 4 frames, not 3)
 INV_STEP = 2.0
 TURN_STICK, TURN_WINDOW = 0.5, 4    # the B-reverse (Sledgehammer's)
 ST_SIDE, ST_FALL = 0x153, 0xE
@@ -142,27 +144,40 @@ FX_DUST = 0x1000009                 # Smash's dash cloud: XV2's Stage BG 60 at B
 # tolerance (Sledgehammer v5's arcs: 1.0 / 3.6 square units over 1.0 on grass, uncharged / charged), the colours kept
 LOD_CAP = (('flash', 0.22), ('grd01', 0.45), ('ptcl', 0.8), ('line', 0.8))
 FX_LOD_ID = 0x03410061
-# v2 (user: "There's no purple line being emitted over Supamario during the move"; the user's XV2 clip fc8b90ed): the
-# purple is XV2's skill effect 11 at the punch (BAC entry 4 item 8, frame 16: EEPK type 5, skill 1352, effect 11): purple
-# speed lines from the victim forward along the punch (clip frames 60-100), then a long purple line along the victim's
-# flight fading out (to ~130); and its effect 0 (entry 0 item 9, frame 0 on b_C_Base): pale purple streaks rising
-# round him in the wind-up, left behind as he dashes (clip 8-30): v3 Hit's own aura (aura_set). No EEPK for 1352_HIK_DSH in the files sent (README "Time Skip v2"): stand-ins
-# from Btl_HitL's flash_1_1 (a soft disc billboard) stretched into streaks. Nothing during the dash itself (the clip has none)
-FX_LINES_ID, FX_AURA_ID, FX_GLASS_ID = 0x03410062, 0x03410063, 0x03410064
-LINE_TEMPLATE = 'flash_1_1'         # Btl_HitL's soft flash disc, a billboard (particle type 0: always facing the camera,
-                                    # its scale X / Y the screen's), stretched into a streak: horizontal for the punch's
-                                    # lines (his facing, either way), vertical for the shards
-LINES_RGB = (0.15, 0.03, 0.21)     # Hit's purple (the flash shader draws its colour ~3x: peak ~1, no bloom), additive
-LINES_N, LINES_BAND, LINES_SPEED, LINES_LIFE = 8, 4.0, 0.25, 45
-LINES_SCALE = (24.0, 0.7)           # the billboard's X (the screen's horizontal: along the punch) and Y
-LONG_SCALE, LONG_LIFE = (60.0, 0.5), 85
-LINES_SIZE = 1.0
-AURA_EMP = 'BoostV_Loop.emp'        # v3: Hit's aura (aura_setting.aur: CMS 135 -> aura 1 -> BTL_AURA 41 BoostLoop)
-AURA_AT, AURA_EMIT, AURA_EVERY = 4, 20, 20   # its start (motion frame), its emission (frames: the clip's 8-28), again
-                                    # every 20 frames of a held charge
-AURA_CAP = 0.8                      # each emitter's brightest drawn channel (vibrant, not blown out on a bright stage)
-AURA_SIZE = 1.75                    # xv2_smash_fx.SIZE: XV2's x1.0 at g_C_Pelvis
-AURA_Y = 4.0                        # his middle (g_C_Pelvis)
+# v4: XV2's own skill effects. system/custom_skill.cus (tools/xv2cus.py): skill 1352's EEPK is SPA/1350_HIK_FRT's, so the
+# BAC's type 5 effects (skill 1352) are data/skill/SPA/1350_HIK_FRT/1350_HIK_FRT.eepk's (the user's folder: two containers,
+# EMO Frt_Bas (.emo / .emm / .emb / .mat.ema / .obj.ema) and PBIND 1350_HIK_FRT.pbind.emb (Frt_Line, Frt_CrgAura,
+# Frt_CrgAuraB, Frt_CrgAuraH, Frt_Sucses, Frt_Hit .emp) with its .ptcl.emm / .ptcl.emb; effects 0-6 and 10-12). The 1352 BAC
+# plays two of them (every other effect item is BTL_CMN's or the stage's): effect 0 (entry 0 item 2, frame 0) and
+# effect 11 (entries 4 / 9 / 10 / 11 item 16, frame 16). Each part's bone is the EEPK's (ESK), not the BAC's b_C_Base
+# (effect 0's four parts name three bones, effects 3 / 4 differ by their bone alone)
+# effect 0 (the user's "purple aura at the start ... left behind after the movement begins"): Frt_CrgAura on b_C_Pelvis
+# at (0, -0.3, 0) m, Frt_CrgAuraB on b_C_Pelvis, Frt_CrgAura on b_R_Foot, none with PositionUpdate (they stay where
+# they were made), x1.0; Frt_CrgAuraH on b_L_Elbow x0.5, following (PositionUpdate / RotateUpdate). Each EMP: one
+# ConeExtrude ribbon (a stripe extruded behind a particle rising off a 0.3-0.5 m circle, Vortex-spun) emitted every 2
+# frames for 40 (CrgAuraH 20): xv2_to_ptcl's CONE_STREAKS (a streak along the velocity, the ribbon's length)
+E0_WORLD = (('Frt_CrgAura.emp', 'HipN', (0.0, -0.3, 0.0)),     # (EMP, the Smash bone for its ESK, the EEPK offset in m)
+            ('Frt_CrgAuraB.emp', 'HipN', (0.0, 0.0, 0.0)),     # b_C_Pelvis -> HipN, b_R_Foot -> RFootJ: their places at
+            ('Frt_CrgAura.emp', 'RFootJ', (0.0, 0.0, 0.0)))    # SpecialS frame 0 (tools/supamario_timeskip_anim.py)
+E0_FOLLOW = ('Frt_CrgAuraH.emp', 15, 0.5)   # b_L_Elbow -> LArmJ (bone 15, Mario's elbow joint), the EEPK's x0.5
+AURA_SIZE = 1.75                    # xv2_smash_fx.SIZE: XV2's x1.0
+AURA_EVERY = 20                     # again every 20 frames of a held charge (v3's; the EMP emits 40 frames)
+# effect 11 (the punch: the user's "purple speed lines" and "the long purple line along the victim's flight"):
+# Frt_Hit.emp on g_R_Hand, Orientation AttachmentBone (the hand's axes), RotateUpdate only (world-fixed), x1.0,
+# Deactivation Never. Its forward is the hand's -Z (the burst sprites at Z -0.4 / -1 / -1.8 / -2.5 born 0-3 frames
+# apart, the speed lines' emitters turned X -90): baked onto the set's +X (E11_TURN, Y -90), the MSC turns it to his
+# facing. Placed at his right fist at the punch (SpecialAirS frame 16, RHandN: E11_AT ahead / up; checked against the
+# motion at build time)
+E11_EMP = 'Frt_Hit.emp'
+E11_AT = (6.85, 8.13)               # RHandN at SpecialAirS 16 (z ahead, y up)
+E11_SIZE = 1.75                     # xv2_smash_fx.SIZE: XV2's x1.0
+E11_TURN = (0.0, -90.0, 0.0)        # XV2's -Z (the punch) onto +X
+# brightness (supamario_fx_glow.py ts_e11 / ts_e0 on grass and grey; the user's tolerance: at most 1.0 square unit over
+# 1.0 in any frame): each emitter's brightest drawn channel capped by its name's start (Sledgehammer's arc_dim)
+E11_CAP = ()
+E0_CAP = ()
+FX_E11_IDS = {'hit': 0x03410062, 'hit_2': 0x03410066, 'hit_h': 0x03410067, 'hit_2h': 0x03410068}
+FX_AURA_ID, FX_GLASS_ID, FX_E0H_ID = 0x03410063, 0x03410064, 0x03410069
 # v2 / v3 (item 11, the clip's time stop, frames 44-58): XV2 inverts the world (BPE 78) under BTL_CMN effect 108's glass
 # (HIT_DmgGrs2, on the camera). v3: both on the camera (Effect_Camera, exe_v46z_camfx): the darkening an alpha-blended
 # quad fixed to the screen (Mode 1, DARK_SIZE half heights: wider than a 16:9 screen), DARK_RGBA, unslowed, faded out
@@ -179,7 +194,7 @@ DARK_RGBA = (0.08, 0.09, 0.17, 0.7)  # the clip's dark blue-grey at 70%
 DARK_Z, DARK_SIZE = 20.0, 2.2
 GLASS_CAM_Z, GLASS_CAM_SIZE = 25.0, 0.1   # the shards (~140 x 100 units at x1 by their frame 49) over the screen at 25
 GLASS_TEX = 0x15141F00
-OUTLINE_A, OUTLINE_IN, OUTLINE_OUT, OUTLINE_SRC = 110.0, 4, 10, (75.0, -10.0)   # v3: the white outline (rim light)
+OUTLINE_A, OUTLINE_IN, OUTLINE_OUT = 110.0, 4, 10   # v3: the white outline; v4: FLASH (Color_Overlay) white at 110 of 255
 TS_SE = {'ts_basa': ('CAR_S1352_DSH_Basa', 0.0),          # skill SE cue 0, BAC 6
          'ts_dash': ('CAR_S1352_DSH_Dash', 0.0),          # cue 1, BAC 56
          'ts_hazure': ('CAR_S1350_FRT_Hazure', 0.0),      # cue 2, BAC 86 (the whiff)
@@ -209,10 +224,11 @@ def msc_values(root_speed=None):
             'TS_HOLD_X': fl(HOLD_X), 'TS_HOLD_Y': fl(HOLD_Y), 'TS_INV_STEP': fl(INV_STEP),
             'TS_FX_HITLOD': '0x%X' % FX_LOD_ID, 'TS_FX_HITL': '0x%X' % FX_IDS['hitl'],
             'TS_HIT2_Z': fl(HIT2_Z), 'TS_HIT2_Y': fl(HIT2_Y), 'TS_HIT2_SIZE': fl(HIT2_SIZE),
-            'TS_FX_LINES': '0x%X' % FX_LINES_ID, 'TS_FX_LINES_SIZE': fl(LINES_SIZE), 'TS_FX_AURA': '0x%X' % FX_AURA_ID,
-            'TS_FX_GLASS': '0x%X' % FX_GLASS_ID,
-            'TS_AURA_AT': fl(AURA_AT), 'TS_AURA_EVERY': fl(AURA_EVERY), 'TS_AURA_SIZE': fl(AURA_SIZE),
-            'TS_AURA_Y': fl(AURA_Y),
+            'TS_FX_E11': '0x%X' % FX_E11_IDS['hit'], 'TS_FX_E11_2': '0x%X' % FX_E11_IDS['hit_2'],
+            'TS_FX_E11_H': '0x%X' % FX_E11_IDS['hit_h'], 'TS_FX_E11_2H': '0x%X' % FX_E11_IDS['hit_2h'],
+            'TS_E11_Z': fl(E11_AT[0]), 'TS_E11_Y': fl(E11_AT[1]), 'TS_E11_SIZE': fl(E11_SIZE),
+            'TS_FX_AURA': '0x%X' % FX_AURA_ID, 'TS_FX_GLASS': '0x%X' % FX_GLASS_ID,
+            'TS_AURA_EVERY': fl(AURA_EVERY), 'TS_AURA_SIZE': fl(AURA_SIZE),
             'TS_FX_HITL_2': '0x%X' % FX_IDS['hitl_2'], 'TS_FX_SWEAT': '0x%X' % SH_FX['sweat'],
             'TS_FX_HITLOD_SIZE': fl(round(EEPK_SCALE['Btl_HitLOD.emp'] * FX_SCALE, 4)),
             'TS_FX_HITL_SIZE': fl(round(EEPK_SCALE['Btl_HitL.emp'] * FX_SCALE, 4)),
@@ -347,14 +363,16 @@ def game_scripts():
 
 
 def effect_scripts():
-    """XV2's Stage BG 60 (the stage's dust, at the dash's start BAC 56) as Smash's dash cloud on the ground. The skill's
-    own effects (EEPK effects 0 at BAC 0 and 11 at the strike) and BTL_CMN 108 (HIT_DmgGrs2, a model on the camera
-    0-16 of the connect) aren't there / can't be: none; the strike's hit look is the MSC's"""
-    dash = outline_on() + [cmd('frame', float(MOVE_FROM))] + if_(0x0F000116, 0, 0, if_(V_PH, 5, DASHING, [
+    """XV2's Stage BG 60 (the stage's dust, at the dash's start BAC 56) as Smash's dash cloud on the ground. v4: skill
+    effect 0's following part (Frt_CrgAuraH on the left elbow, x0.5) at frame 0; its world parts and effect 11 are the
+    MSC's (ts_aura / ts_e11), as the strike's hit look and BTL_CMN 108 (the glass)"""
+    dash = outline_on() + [cmd('external_graphic', FX_E0H_ID, E0_FOLLOW[1], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                               E0_FOLLOW[2] * AURA_SIZE, 1)] + [cmd('frame', float(MOVE_FROM))] + if_(0x0F000116, 0, 0, if_(V_PH, 5, DASHING, [
         cmd('graphic_effect', FX_DUST, 0, 0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1)])) + [
-        cmd('frame', float(DASH_END - OUTLINE_OUT)), outline_off()]
-    connect = (time_stop_look() if CAMERA_FX else []) + outline_on() + [cmd('frame', float(CONNECT_END - OUTLINE_OUT)),
-                                                                         outline_off()]
+        cmd('frame', float(DASH_END - OUTLINE_OUT))] + outline_off() + [cmd('frame', float(DASH_END)),
+                                                                         cmd('terminate_overlays')]
+    connect = ((time_stop_look() if CAMERA_FX else []) + outline_on() + [cmd('frame', float(CONNECT_END - OUTLINE_OUT))] +
+               outline_off() + [cmd('frame', float(CONNECT_END)), cmd('terminate_overlays')])
     return dash, connect
 
 
@@ -366,14 +384,19 @@ def time_stop_look():
 
 def outline_on():
     """v3 (user: "Time Skip wraps the user in a faint white translucent glowing outline"; XV2's BPE 85 "Flashing White
-    Body Outline 3", BAC entry 0 at 20 and 100, entry 4 at the punch; the clip: on him through the whole move): Smash 4's
-    rim light (Flash_Light_Effect, LIGHT_SHINE: Mario's fireball's), white, faint (OUTLINE_A of 255), faded in"""
-    return [cmd('flash_light_effect', 255.0, 255.0, 255.0, 0.0, OUTLINE_SRC[0], OUTLINE_SRC[1]),
-            cmd('change_flash_light_color', float(OUTLINE_IN), 255.0, 255.0, 255.0, OUTLINE_A)]
+    Body Outline 3", BAC entry 0 at 20 and 100, entry 4 at the punch; the clip: on him through the whole move). v4 (user:
+    "no outline" in game): v3's LIGHT_SHINE (Flash_Light_Effect) is a light source, Mario's fireball's warm light on
+    him (its vanilla use: (255, 230, 180, 160, 75, -10) faded out by LIGHT_COL_FRM over 5 frames): white at 110 it
+    lit nothing visibly on him (and in the user's point-blank clip the opponent beside him looked washed). Now Smash 4's
+    colour overlay, FLASH (Color_Overlay: the smash charge's glow; Mario's own scripts use FLASH (200, 255, 255, 110)),
+    white at OUTLINE_A, faded in over OUTLINE_IN (FLASH_FRM)"""
+    return [cmd('color_overlay', 255.0, 255.0, 255.0, 0.0),
+            cmd('change_overlay', float(OUTLINE_IN), 255.0, 255.0, 255.0, OUTLINE_A)]
 
 
 def outline_off():
-    return cmd('change_flash_light_color', float(OUTLINE_OUT), 255.0, 255.0, 255.0, 0.0)
+    """faded out over OUTLINE_OUT, then COL_NORMAL (Terminate_Overlays) at the motion's end"""
+    return [cmd('change_overlay', float(OUTLINE_OUT), 255.0, 255.0, 255.0, 0.0)]
 
 
 def sound_scripts():
@@ -409,7 +432,7 @@ def scripts(body_dir):
 
 
 # ---------------------------------------------------------------- effects (BTL_CMN effect 2's Btl_HitL)
-def convert_fx(cmn_dir, fx_dir, halo=True):
+def convert_fx(cmn_dir, fx_dir, halo=True, frt_dir=None, joints0=None):
     """Btl_HitL into his bank (fx_dir: effect/supamario, changed in place), as Sledgehammer's hit effects: vibrant
     (xv2_smash_fx.hdr_emitter: XV2's glare tint, colour x2, capped at HDR_CAP 2.0), facing-safe (world-placed and
     unturned by the MSC), fake-glow halos (HALO_ALPHA) on its glowing emitters; FX_IDS checked"""
@@ -481,17 +504,29 @@ def convert_fx(cmn_dir, fx_dir, halo=True):
         halos = {'glowing': sum(len(v) for v in glow.values()), 'alpha': FX.HALO_ALPHA, 'no_room': dropped,
                  'by_set': {p.set_name(si): len(v) for si, v in glow.items()}}
     lod = lod_copy(p, e)
-    lines = lines_set(p, e, sets['hitl']['set_index'])
-    aura = aura_set(p, e, cmn_dir)
-    glass = glass_model(cmn_dir, fx_dir, e)
-    dark = dark_set(p, e, sets['hitl']['set_index'])
+    import xv2_to_ptcl
+    import xv2vfx
+    old = xv2_to_ptcl.TEX_MAX, xv2_to_ptcl.CONE_STREAKS
+    try:
+        xv2vfx.LENIENT_TARGETS = True
+        xv2_to_ptcl.TEX_MAX, xv2_to_ptcl.CONE_STREAKS = 64, True
+        e11 = e11_sets(p, e, frt_dir, halo)                     # 0x62 (v2 / v3: the stand-in lines)
+        e0 = e0_world_set(p, e, frt_dir, joints0, halo)          # 0x63 (v3: Hit's aura)
+        glass = glass_model(cmn_dir, fx_dir, e)                  # 0x64
+        dark = dark_set(p, e, sets['hitl']['set_index'])         # 0x65
+        e11 = e11_rest(p, e, e11)                                # 0x66 - 0x68
+        e0h = e0_follow_set(p, e, frt_dir, halo)                 # 0x69
+    finally:
+        xv2_to_ptcl.TEX_MAX, xv2_to_ptcl.CONE_STREAKS = old
+        xv2vfx.LENIENT_TARGETS = False
     out = p.build()
     assert ptcl.Ptcl(out).validate() == []
     open(os.path.join(fx_dir, base + '.ptcl'), 'wb').write(out)
     open(os.path.join(fx_dir, base + '.efc'), 'wb').write(e.build())
     bad = FX.facing_emitters(p, [s['set_index'] for s in sets.values()] + [lod['set_index']])
     return {'sets': sets, 'skipped': log, 'notes': notes, 'halos': halos, 'ptcl_bytes': [before, len(out)],
-            'facing_problems': bad, 'lod': lod, 'lines': lines, 'aura': aura, 'glass': glass, 'dark': dark}
+            'facing_problems': bad + FX.facing_emitters(p, [e0h['set_index']]), 'lod': lod, 'e11': e11, 'aura': e0,
+            'e0_follow': e0h, 'glass': glass, 'dark': dark}
 
 
 def lod_copy(p, e):
@@ -518,112 +553,193 @@ def lod_copy(p, e):
             'from': '0x%08X' % SH_FX['hitlod'], 'capped': notes}
 
 
-def _line_emitter(p, src, **kw):
-    """a copy of Btl_HitL's soft flash disc billboard (LINE_TEMPLATE) set up as a v2 streak (its scale x the width, y the length): kw are ptcl fields; colour RGB
-    (both tracks, constant), colour scale 1 (no bloom), particles that stay where they were born"""
-    import supamario_sledgehammer_build as SB
-    d = bytearray(src)
-    base = dict(one_time=1, end_frame=1, emit_interval=0, start_frame=0, emit_start=0, volume_type=0,
-                volume_radius=[0.0, 0.0, 0.0], figure_velocity=0.0, init_velocity_random=0.0, dispersion_angle=0.0,
-                air_resistance=1.0, gravity=[0.0, 0.0, 0.0], ptcl_life_random=0, scale_random=[0.0, 0.0],
-                scale_init_ratio=[1.0, 1.0], scale_sections=[30, 60], scale_diff21=[0.0, 0.0],
-                scale_diff32=[-0.5, 0.0], rotation_init=[0.0, 0.0, 0.0], rotation_random=[0.0, 0.0, 0.0],
-                rotation_velocity=[0.0, 0.0, 0.0], alpha_init=0.0, alpha_diff21=1.0, alpha_diff32=-1.0,
-                alpha_section1=0.08, alpha_section2=0.45, color_scale=1.0)
-    rgb = kw.pop('rgb')
-    srt = kw.pop('srt', None)
-    base.update(kw)
-    for name, v in base.items():
-        p.set_field(d, name, v)
-    p.set_key_anims(d, [])
-    p.set_emitter_srt(d, *(srt or ()))
-    for track in (0, 1):
-        p.set_color_keys(d, track, [tuple(rgb) + (1.0,)], 0)
-    struct_pack_follow_none(d)
-    return bytes(d)
-
-
 def struct_pack_follow_none(d):
     """the particles stay where they were born (ptcl +0x310 follow type 1): a world-placed burst, the fighters move on"""
     import struct
     struct.pack_into('>I', d, 0x310, 1)
 
 
-def lines_set(p, e, hitl_si):
-    """v2: XV2's skill effect 11 (BAC entry 4 item 8 at the punch, frame 16: EEPK type 5, skill 1352, effect 11; its
-    EEPK isn't in the files) as the user's clip shows it (fc8b90ed, frames 60-130 at 60 fps): purple speed lines
-    from the victim's back forward along the punch (his facing), then one long purple line along the victim's flight
-    that fades. Stand-in from Btl_HitL's flash_1_1 (a soft disc billboard) stretched: LINES_N streaks in a band the victim's height (a box volume, +X along
-    the call: the MSC turns it to his facing), LINES_LIFE frames; one long line, LONG_LIFE frames"""
-    src = next(em['data'] for em in p.sets[hitl_si]['emitters'] if em['data'] is not None and
-               p.emitter_name(em['data']) == LINE_TEMPLATE)
-    streaks = _line_emitter(p, src, rgb=LINES_RGB, emit_rate=float(LINES_N), volume_type=11,
-                            volume_radius=[1.0, LINES_BAND, 0.5], emitter_velocity=LINES_SPEED,
-                            emit_direction=[1.0, 0.0, 0.0], dispersion_angle=4.0, ptcl_life=LINES_LIFE,
-                            ptcl_life_random=10, scale=list(LINES_SCALE), scale_random=[0.5, 0.0],
-                            srt=((1, 1, 1), (0, 0, 0), (LINES_SCALE[0] * 0.6, 0.0, 0.0)))
-    long_ = _line_emitter(p, src, rgb=LINES_RGB, emit_rate=1.0, emitter_velocity=0.05, emit_direction=[1.0, 0.0, 0.0],
-                          ptcl_life=LONG_LIFE, scale=list(LONG_SCALE), alpha_section1=0.04, alpha_section2=0.55,
-                          srt=((1, 1, 1), (0, 0, 0), (LONG_SCALE[0] * 0.5, 0.0, 0.0)))
-    si = p.new_set('PtcSupamarioTsLines', [streaks, long_], ['speedline', 'longline'])
-    idx = e.add(si + 1)
-    assert 0x03410000 | idx == FX_LINES_ID, ('FX_LINES_ID is out of date', hex(0x03410000 | idx))
-    return {'set': 'PtcSupamarioTsLines', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_LINES_ID}
+def frt_emissions(p, pkg, images, emp_name):
+    """an EMP of 1350_HIK_FRT.eepk converted emission by emission (xv2_to_ptcl.convert_emission, as convert_emp, without
+    making sets): [(emitter bytes, emission name, notes)], skipped lines. ConeExtrude ribbons as streaks (CONE_STREAKS)"""
+    import xv2_smash_fx as FX
+    import xv2_to_ptcl as X
+    emp = pkg['emp'][emp_name]
+    spawn = X.simulate(emp)
+    out, log = [], []
+
+    def walk(nodes, chain):
+        for n in nodes:
+            n['_emp'] = emp
+            c = chain + [n]
+            if n['NodeType'] == 'Emission':
+                if X.emission_kind(n) is None or 'Hide' in n['NodeFlags_names']:
+                    log.append('%s %s: %s skipped' % (emp_name, n['Name'], n['NodeSpecificType']))
+                else:
+                    out.append(X.convert_emission(p, pkg, images, c, FX.UNIT, n['Name'], spawn))
+            walk(n['ChildParticleNodes'], c)
+    walk(emp['ParticleNodes'], [])
+    return out, log
 
 
-def aura_set(p, e, cmn_dir):
-    """v3 (user: "Time Skip ... creates a purple aura at the start", "the purple aura gets left behind after the movement
-    begins"; the clip, frames 8-30: pale purple streaks rising round him, left where they were as he dashes off, gone by
-    ~40): Hit's own aura. aura_setting.aur: Hit (CMS 135, every costume) has aura 1, whose BoostLoop is BTL_AURA.eepk
-    effect 41 (BoostV_Loop.emp on g_C_Pelvis, x1.0; with AuraLoop_V's model / trace / light, not converted). Its EMP
-    (in BTL_AURA.eepk) converted as the other XV2 effects (xv2_to_ptcl, vibrant glare, facing-safe); every emitter
-    emits for AURA_EMIT frames only and its particles stay where they were born (follow none): the MSC places it at his
-    middle (world, unturned) at AURA_AT and every AURA_EVERY frames of a held charge, so it is left behind as he dashes.
-    Each emitter's brightest drawn channel capped at AURA_CAP (bright stages). Replaces v2's lavender shards stand-in"""
-    import tempfile
+def _frt_pkg(frt_dir):
+    import xv2_smash_fx as FX
+    import xv2_to_ptcl as X
+    import xv2vfx
+    pkg = xv2vfx.load_package(frt_dir, strict=False)
+    return pkg, X.emb_images(pkg), FX.material_table(pkg)
+
+
+def _vibrant(p, d, mats, emp, name, caps, world=True):
+    """the God Fist / Sledgehammer way: XV2's glare tint, colour x2 capped at HDR_CAP, alpha x2 (hdr_emitter); world
+    sets' particles stay where they were born (follow none); the brightest drawn channel capped by caps (name prefix)"""
     import supamario_sledgehammer_build as SB
     import xv2_smash_fx as FX
-    import xv2_to_ptcl
-    import xv2vfx
-    old = xv2_to_ptcl.TEX_MAX
-    try:
-        xv2vfx.LENIENT_TARGETS = True
-        xv2_to_ptcl.TEX_MAX = 64
-        with tempfile.TemporaryDirectory() as tmp:
-            for fn in os.listdir(cmn_dir):
-                if not fn.lower().endswith('.eepk') or fn == 'BTL_AURA.eepk':
-                    os.symlink(os.path.abspath(os.path.join(cmn_dir, fn)), os.path.join(tmp, fn))
-            mats = FX.material_table(xv2vfx.load_package(tmp, strict=False))
-            made, log = xv2_to_ptcl.convert_package(p, tmp, 'PtcSupamarioTs', unit=FX.UNIT, emps=[AURA_EMP],
-                                                    strict=False)
-    finally:
-        xv2_to_ptcl.TEX_MAX = old
-        xv2vfx.LENIENT_TARGETS = False
-    assert len(made) == 1, [m[1] for m in made]
-    si, name, chunk = made[0]
+    note = FX.hdr_emitter(p, d, mats.get(emp, {}).get(name))
+    if world:
+        struct_pack_follow_none(d)
+    cap = next((c for pre, c in caps if name.startswith(pre)), None)
+    if cap is not None and p.field(d, 'blend_type') != 2 and SB.arc_peak(p, d) > cap:
+        f = cap / SB.arc_peak(p, d)
+        SB.arc_dim(p, d, (f, f, f))
+        note += '; capped at %.2f' % cap
+    return note
+
+
+def _glowing(p, mats, emp, k_names):
+    """the indices of a set's emitters XV2 draws with glare (EMM Glare on), not refraction, visible: halo candidates"""
+    import xv2_smash_fx as FX
+    out = []
+    for k, d, name in k_names:
+        m = mats.get(emp, {}).get(name)
+        if m and m[2].get('Glare') and not FX.is_refraction(m[1], m[0]) and p.field(d, 'alpha_init') + \
+                max(0.0, p.field(d, 'alpha_diff21')) > 0:
+            out.append(k)
+    return out
+
+
+def _turn(p, d, deg):
+    """the emitter's transform turned by deg (X, Y, Z degrees, Rz.Ry.Rx) about the set's origin, its offset too"""
+    import numpy as np
+    import xv2_to_ptcl as X
+    b = X.euler_matrix(deg)
+    m = X.euler_matrix([float(np.degrees(v)) for v in p.field(d, 'emitter_rotation')])
+    t = np.array(p.field(d, 'emitter_translation'), float)
+    p.set_emitter_srt(d, tuple(p.field(d, 'emitter_scale')), X.matrix_euler(b @ m), [float(v) for v in b @ t])
+
+
+def e11_sets(p, e, frt_dir, halo=True):
+    """v4: XV2's skill effect 11 (Frt_Hit.emp, 1350_HIK_FRT.eepk; README "Time Skip v4"): its emissions converted as the
+    other XV2 effects (vibrant, world-placed: follow none), turned so its forward (XV2's -Z) is +X (E11_TURN), capped by
+    E11_CAP, split in two sets (16 emitters at most: FX_E11_IDS hit / hit_2); fake-glow halos on its glaring emitters
+    in a companion set each (hit_h / hit_2h). The efc entries: hit here, hit_2 / the halos by e11_rest (FX_E11_IDS'
+    order, after the glass / dark entries v2 / v3 made)"""
+    pkg, images, mats = _frt_pkg(frt_dir)
+    made, log = frt_emissions(p, pkg, images, E11_EMP)
+    notes, ems = [], []
+    for d, name, n0 in made:
+        d = bytearray(d)
+        _turn(p, d, E11_TURN)
+        notes.append('%s: %s; %s' % (name, '; '.join(n0), _vibrant(p, d, mats, E11_EMP, name, E11_CAP)))
+        ems.append((bytes(d), name))
+    sets = []
+    for part in range(0, len(ems), 16):
+        chunk = ems[part:part + 16]
+        name = 'PtcSupamarioTsFrt_Hit' + ('' if part == 0 else '_%d' % (part // 16 + 1))
+        sets.append((p.new_set(name, [c[0] for c in chunk], [c[1] for c in chunk]), name, [c[1] for c in chunk]))
+    assert len(sets) == 2, [x[1] for x in sets]
+    idx = e.add(sets[0][0] + 1)
+    assert 0x03410000 | idx == FX_E11_IDS['hit'], ('FX_E11_IDS is out of date', hex(0x03410000 | idx))
+    return {'sets': [{'set': n, 'set_index': si, 'emitters': en} for si, n, en in sets], 'skipped': log,
+            'notes': notes, 'efc': {'hit': idx}, 'halo': halo, 'mats': mats}
+
+
+def e11_rest(p, e, rep):
+    """the second set's efc entry and the halo companions (FX_E11_IDS)"""
+    import xv2_smash_fx as FX
+    s0, s1 = rep['sets']
+    idx = e.add(s1['set_index'] + 1)
+    assert 0x03410000 | idx == FX_E11_IDS['hit_2'], ('FX_E11_IDS is out of date', hex(0x03410000 | idx))
+    rep['efc']['hit_2'] = idx
+    mats = rep.pop('mats')
+    glow = {}
+    for s_ in (s0, s1):
+        si = s_['set_index']
+        kn = [(k, em['data'], p.emitter_name(em['data'])) for k, em in enumerate(p.sets[si]['emitters'])
+              if em['data'] is not None]
+        ks = _glowing(p, mats, E11_EMP, kn)
+        if ks and rep['halo']:
+            glow[si] = ks
+    # every halo in a companion set (none in the sets themselves: one call list for the MSC whatever the room)
+    comp = {}
+    if glow:
+        for si, ks in sorted(glow.items()):
+            hs = [FX.halo_emitter(p, p.sets[si]['emitters'][k]['data'], FX.HALO_ALPHA, {}) for k in ks]
+            ns = p.new_set(p.set_name(si) + FX.HALO_SUFFIX, hs, [p.emitter_name(h) for h in hs])
+            comp[si] = (ns, e.add(ns + 1), len(hs))
+    got = [0x03410000 | comp[s_['set_index']][1] for s_ in (s0, s1) if s_['set_index'] in comp]
+    assert got == [FX_E11_IDS['hit_h'], FX_E11_IDS['hit_2h']], ('FX_E11_IDS is out of date', [hex(g) for g in got])
+    rep['halos'] = {'alpha': FX.HALO_ALPHA, 'by_set': {p.set_name(si): n for si, (_ns, _i, n) in comp.items()},
+                    'companions': [p.set_name(ns) for ns, _i, _n in comp.values()]}
+    return rep
+
+
+def e0_world_set(p, e, frt_dir, joints0, halo=True):
+    """v4: XV2's skill effect 0's three world parts (E0_WORLD; README "Time Skip v4") in one set: each EMP's ConeExtrude
+    stripe as a streak (CONE_STREAKS), vibrant, follow none (left where it was made), at its bone's place at SpecialS
+    frame 0 (joints0: {bone: (z ahead, y up)}) + the EEPK offset, in the set's space (+X his forward, / AURA_SIZE: the
+    call's size scales it); fake-glow halos on the glaring ones (in the set: room)"""
+    import xv2_smash_fx as FX
+    pkg, images, mats = _frt_pkg(frt_dir)
+    ems, notes, kn = [], [], []
+    for emp, bone, off in E0_WORLD:
+        made, _log = frt_emissions(p, pkg, images, emp)
+        for d, name, n0 in made:
+            d = bytearray(d)
+            z, y = joints0[bone]
+            t = list(p.field(d, 'emitter_translation'))
+            t = [t[0] + (z + off[2] * SCALE) / AURA_SIZE, t[1] + (y + off[1] * SCALE) / AURA_SIZE, t[2]]
+            p.set_emitter_srt(d, tuple(p.field(d, 'emitter_scale')), tuple(p.field(d, 'emitter_rotation')), t)
+            notes.append('%s %s at %s: %s; %s' % (emp, name, bone, '; '.join(n0),
+                                                  _vibrant(p, d, mats, emp, name, E0_CAP)))
+            kn.append((len(ems), d, name, emp))
+            ems.append((bytes(d), '%s_%s' % (emp[4:-4], bone)))
+    if halo:
+        for k, d, name, emp in kn:
+            if _glowing(p, mats, emp, [(k, d, name)]):
+                ems.append((bytes(FX.halo_emitter(p, d, FX.HALO_ALPHA, {})), ems[k][1] + FX.HALO_SUFFIX))
+    si = p.new_set('PtcSupamarioTsFrt_CrgAura', [x[0] for x in ems], [x[1] for x in ems])
     idx = e.add(si + 1)
     assert 0x03410000 | idx == FX_AURA_ID, ('FX_AURA_ID is out of date', hex(0x03410000 | idx))
-    notes, k = [], 0
-    names = [en for _b, en, _n in chunk]
-    for em in p.sets[si]['emitters']:
-        d = em['data']
-        if d is None:
-            continue
-        en = names[k] if k < len(names) else None
-        k += 1
-        note = FX.hdr_emitter(p, d, mats.get(AURA_EMP, {}).get(en))
+    return {'set': 'PtcSupamarioTsFrt_CrgAura', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_AURA_ID,
+            'emitters': [x[1] for x in ems], 'notes': notes}
+
+
+def e0_follow_set(p, e, frt_dir, halo=True):
+    """v4: XV2's skill effect 0's following part (E0_FOLLOW: Frt_CrgAuraH on the left elbow, x0.5): its own set, played
+    by the effect script on the bone (External_Graphic, no offset / turn), facing-safe (the God Fist's rule), its
+    particles on the bone's live matrix (XV2's PositionUpdate)"""
+    import supamario_sledgehammer_build as SB
+    import xv2_smash_fx as FX
+    pkg, images, mats = _frt_pkg(frt_dir)
+    emp = E0_FOLLOW[0]
+    made, _log = frt_emissions(p, pkg, images, emp)
+    ems, notes = [], []
+    for d, name, n0 in made:
+        d = bytearray(d)
+        notes.append('%s: %s; %s' % (name, '; '.join(n0), _vibrant(p, d, mats, emp, name, E0_CAP, world=False)))
         FX.facing_safe(p, d)
-        if not p.field(d, 'one_time') or p.field(d, 'end_frame') > AURA_EMIT:
-            p.set_field(d, 'one_time', 1)
-            p.set_field(d, 'end_frame', AURA_EMIT)
-        struct_pack_follow_none(d)
-        pk = SB.arc_peak(p, d)
-        if p.field(d, 'blend_type') != 2 and pk > AURA_CAP:
-            SB.arc_dim(p, d, (AURA_CAP / pk,) * 3)
-            note += '; capped at %.2f' % AURA_CAP
-        notes.append('%s: %s' % (en, note))
-    return {'set': name, 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_AURA_ID, 'emitters': names,
-            'skipped': log, 'notes': notes}
+        SB.follow(p, d)
+        ems.append((bytes(d), name))
+    if halo:
+        for k, (d, name) in enumerate(list(ems)):
+            if _glowing(p, mats, emp, [(k, d, name)]):
+                ems.append((bytes(FX.halo_emitter(p, bytearray(d), FX.HALO_ALPHA, {})), name + FX.HALO_SUFFIX))
+    si = p.new_set('PtcSupamarioTsFrt_CrgAuraH', [x[0] for x in ems], [x[1] for x in ems])
+    idx = e.add(si + 1)
+    assert 0x03410000 | idx == FX_E0H_ID, ('FX_E0H_ID is out of date', hex(0x03410000 | idx))
+    return {'set': 'PtcSupamarioTsFrt_CrgAuraH', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_E0H_ID,
+            'emitters': [x[1] for x in ems], 'notes': notes}
 
 
 def dark_set(p, e, hitl_si):
@@ -702,7 +818,7 @@ def sound_bank(fdir, out_dir, wav_dir):
 
 
 # ---------------------------------------------------------------- build
-def build(sm_dir, out_dir, ts_skill, ts_se_wav, sh_args, png=None, halo=True):
+def build(sm_dir, out_dir, ts_skill, ts_se_wav, sh_args, png=None, halo=True, frt_dir=None):
     import supamario_godfist_build as GB
     import supamario_sledgehammer_build as SB
     fdir = SB.build(sm_dir, out_dir, sh_args['sh_skill'], sh_args['sh_se_wav'], sh_args['fd'], sh_args.get('png'), halo)
@@ -733,7 +849,10 @@ def build(sm_dir, out_dir, ts_skill, ts_se_wav, sh_args, png=None, halo=True):
           anim.CONNECT: {STRIKE: (STRIKE_Z, STRIKE_Y, STRIKE_SIZE)}}
     anim.sheet(outs, bones, png or os.path.join(out_dir, 'preview', 'timeskip_anim.png'),
                {m: info['info'][m]['root_z'] for m in anim.MOTIONS}, hitboxes=hb)
-    rep = convert_fx(sh_args['fd']['cb']['gf']['cmn_vfx'], os.path.join(fdir, 'effect', 'supamario'), halo)
+    hand = js[anim.CONNECT][STRIKE]['RHandN']
+    assert abs(hand[0] - E11_AT[0]) < 0.01 and abs(hand[1] - E11_AT[1]) < 0.01, ('E11_AT is out of date', hand)
+    rep = convert_fx(sh_args['fd']['cb']['gf']['cmn_vfx'], os.path.join(fdir, 'effect', 'supamario'), halo, frt_dir,
+                     js[anim.DASH][0])
     assert not rep['facing_problems'], rep['facing_problems']
     doc['fx'] = rep
     with open(os.path.join(out_dir, 'timeskip.json'), 'w') as fh:
@@ -750,21 +869,21 @@ def main():
     halo = '--no-halo' not in a
     if not halo:
         a.remove('--no-halo')
-    keys = ('--ts-skill', '--ts-se-wav', '--sh-skill', '--sh-se-wav', '--fd-skill', '--fd-se-wav', '--skill', '--se-wav',
+    keys = ('--ts-skill', '--ts-se-wav', '--frt-skill', '--sh-skill', '--sh-se-wav', '--fd-skill', '--fd-se-wav', '--skill', '--se-wav',
             '--ean', '--cmn-vfx', '--skill-vfx', '--cmn-se', '--stb', '--png')
     for k in keys:
         if k in a:
             i = a.index(k)
             opts[k] = a[i + 1]
             del a[i:i + 2]
-    if len(a) != 2 or any(k not in opts for k in keys[:10]):
+    if len(a) != 2 or any(k not in opts for k in keys[:11]):
         sys.exit(__doc__)
     gf = {'ean': opts['--ean'], 'cmn_vfx': opts['--cmn-vfx'], 'skill_vfx': opts.get('--skill-vfx'),
           'cmn_se': opts.get('--cmn-se'), 'stb': opts.get('--stb')}
     cb = {'skill': opts['--skill'], 'se_wav': opts['--se-wav'], 'gf': gf}
     fd = {'fd_skill': opts['--fd-skill'], 'fd_se_wav': opts['--fd-se-wav'], 'cb': cb}
     sh = {'sh_skill': opts['--sh-skill'], 'sh_se_wav': opts['--sh-se-wav'], 'fd': fd}
-    print(build(a[0], a[1], opts['--ts-skill'], opts['--ts-se-wav'], sh, opts.get('--png'), halo))
+    print(build(a[0], a[1], opts['--ts-skill'], opts['--ts-se-wav'], sh, opts.get('--png'), halo, opts['--frt-skill']))
     print('sounds: ' + ', '.join('%s 0x%08X' % kv for kv in SE_IDS.items()))
     print('effects: ' + ', '.join('%s 0x%08X' % kv for kv in FX_IDS.items()))
     import supamario_fakedeath_build as FD

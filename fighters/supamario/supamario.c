@@ -40450,6 +40450,13 @@ void sh_hit()
                 WorkModule(0, (float)s, SH_V_GS);
             }
         }
+        // v6 (user: "the fully charged Sledgehammer must be untechable for opponents hit in the air"): a real hit of the
+        // charged swing on an airborne fighter: no tech until its hitstun is over (sh_spike_start / sh_spike_tick)
+        else if (WorkModuleF(0, 0x0F000116 + 0x20 * (s + 0x2)) > 0.5f && WorkModuleF(0, SH_V_CHG) > SH_CHARGE - 0.5f &&
+                 sh_struck(s) != 0)
+        {
+            sh_spike_start(s);
+        }
         if (WorkModuleF(0, SH_V_CHG) < SH_CHARGE - 0.5f)
         {
             WorkModule(0, (float)s, SH_V_VIC);
@@ -40788,6 +40795,12 @@ void sh_rec()
 {
     int s;
     float d;
+    // Time Skip v4: in its dash ts_rec keeps this record itself, every frame before the collision (the catch's real-hit
+    // test must see the damage from before the hit, whatever the victim's freeze reads on the hit's first frame)
+    if (WorkModuleF(0, TS_V_PH) > 2.5f && WorkModuleF(0, TS_V_PH) < 3.5f)
+    {
+        return;
+    }
     s = 1;
     while (s <= 8)
     {
@@ -41077,6 +41090,76 @@ void sh_down_start(int s)
     lock_resets(s, 9.0f);                       // v5: its KO / a hit on it / his KO give its controller back
 }
 
+// v6 (user: "the fully charged Sledgehammer must be untechable for opponents hit in the air"): Smash 4 has no hitbox or
+// damage flag that forbids a tech (reference/spreadsheets: none; the techs are the victim's own DamageFly / DamageFall
+// landing and wall / ceiling paths, their passive terms set by its own status code: README "Super God Fist v17"). So
+// the held-down hold's way (SH_V_GS - its slot, phase SH_V_GP 3): its controller off (Input_Set 21's variable: no
+// shield press, so a player can't tech), its buffer emptied, the lockout's resets registered (its KO, a hit on it by
+// anyone, his KO give its controller back: lock_resets 9); sh_spike_tick turns a tech the AI asks for (a CPU's tech
+// request doesn't go through the controller) into the missed tech's own status the next frame, and lets go when its
+// hitstun is over
+void sh_spike_start(int s)
+{
+    sh_let_go();
+    WorkModule(0, -(float)s, SH_V_GS);
+    WorkModule(0, -1.0f, SH_V_GN);              // sh_tick: nothing more on the hit's own frame
+    WorkModule(0, 3.0f, SH_V_GP);
+    WorkModule(0, 1.0f, 0x0F000115 + 0x20 * (s + 0x2));
+    WorkModule(0, (float)s, 0x0F0003C9);
+    lock_resets(s, 9.0f);
+}
+
+// v6: the charged air spike's victim (phase 3), every frame after the hit's own: nothing in its hitstop; a tech (in
+// place / roll 0x64 / 0x65 -> the floor bounce DownBound 0x4D; the wall 0x66 / wall jump 0x67 -> WallDamage 0x49, the
+// ceiling 0x68 -> CeilingDamage 0x4A: the bounces a missed tech takes; EscapeAir 0x22, the CPU's landing dodge ->
+// DownBound on the ground, DamageFall in the air) replaced; let go (its controller back) once its hitstun is over (its
+// hitstun left 0 out of its hitstop), when it lies or bounces (0x4D-0x53: the tech window is gone), or when it is out
+// of every damage status (it acts, or anything else took it). A hit on it by anyone / its KO / his KO: the resets
+// (sh_tick's controller check lets go)
+void sh_spike_tick(int s)
+{
+    int t;
+    float st;
+    t = s + 0x2;
+    if (WorkModuleF(0, 0x0F000043 + 8 * t) > 0.5f)
+    {
+        return;
+    }
+    st = WorkModuleF(0, 0x0F0000A2 + 8 * t);
+    if (st == SH_ST_TECH || st == SH_ST_TECH + 1.0f)
+    {
+        WorkModule(0, SH_ST_DOWNBOUND, 0x0F0000A2 + 8 * t);
+        return;
+    }
+    if (st == SH_ST_TECH_WALL || st == SH_ST_TECH_WALL + 1.0f)
+    {
+        WorkModule(0, SH_ST_WALLDAMAGE, 0x0F0000A2 + 8 * t);
+        return;
+    }
+    if (st == SH_ST_TECH_WALL + 2.0f)
+    {
+        WorkModule(0, SH_ST_WALLDAMAGE + 1.0f, 0x0F0000A2 + 8 * t);
+        return;
+    }
+    if (st == SH_ST_ESCAPEAIR)
+    {
+        if (WorkModuleF(0, 0x0F000116 + 0x20 * t) < 0.5f)
+        {
+            WorkModule(0, SH_ST_DOWNBOUND, 0x0F0000A2 + 8 * t);
+        }
+        else
+        {
+            WorkModule(0, SH_ST_DAMAGE_HI, 0x0F0000A2 + 8 * t);
+        }
+        return;
+    }
+    if ((st >= SH_ST_DOWN_LO && st <= SH_ST_DOWN_HI) || st < SH_ST_DAMAGE_LO || st > SH_ST_DAMAGE_HI ||
+        WorkModuleF(0, 0x0F000040 + 8 * t) < 0.5f)
+    {
+        sh_let_go();
+    }
+}
+
 // every frame (func_82). v2 (user): a fighter the uncharged Sledgehammer hit on the ground (SH_V_GS: + its slot), once
 // its hitstop is over: DownBound (0x4D: the floor bounce of a missed tech: a low bounce, no tech, then lying).
 // The charged hit's (SH_V_GS: - its slot), v4, in phases (SH_V_GP):
@@ -41143,6 +41226,11 @@ void sh_tick()
     }
     ph = WorkModuleF(0, SH_V_GP);
     st = WorkModuleF(0, 0x0F0000A2 + 8 * t);
+    if (ph > 2.5f)
+    {
+        sh_spike_tick(s);           // v6: the charged air spike, no tech
+        return;
+    }
     if (ph < 0.5f)
     {
         if (WorkModuleF(0, 0x0F000043 + 8 * t) > 0.5f)
@@ -41221,9 +41309,11 @@ void sh_tick()
 // same on the ground and in the air; v1's energy-3 speeds never moved him in the air), the ground slides off edges into
 // the air and the dash goes on, Time Skip's own tracking without v1's ground rule (ts_track: up off the ground, down
 // past an edge), the use's reset also from the MSC (ts_reset), a point-blank detection box (the script's ID 1), the
-// purple lines at the punch (ts_lines), XV2's hit look from its own dimmer sets. v3: Hit's aura at the start (ts_aura),
+// purple lines at the punch, XV2's hit look from its own dimmer sets. v3: Hit's aura at the start (ts_aura),
 // the darkened time stop (ts_tint) and the glass (ts_glass), or both on the camera (the CAMERA_FX build), ended on
 // any exit before the punch (ts_stop_look_off); the stop in the air too, soft tracking after the release, the charge's drift, shield pokes.
+// v4: XV2's own skill effects from 1350_HIK_FRT.eepk (effect 0 at the start: ts_aura; effect 11 at the punch: ts_e11), any
+// detection hit caught (ts_rec / ts_took: the point-blank bug), the charge's drift left / right only.
 // ===================================================================
 
 // XV2's root travel of SpecialS (units a frame along his facing, by the motion frame): the wind-up's step and the stop
@@ -41379,29 +41469,51 @@ void ts_move(float vx, float vy)
     }
 }
 
-// v2 (user: "There's no purple line being emitted over Supamario during the move"; the user's XV2 clip): XV2's skill
-// effect 11 at the punch, whose EEPK isn't in the files (the stand-in, tools/supamario_timeskip_build.py lines_set):
-// purple speed lines from the victim's back forward along the punch and one long purple line, world-placed at the
-// victim's middle, turned to his facing (+X of the set: rotation 0 facing right, pi facing left)
-void ts_lines(float x, float y, float z)
+// v4: XV2's skill effect 11 at the punch (BAC entry 4 item 8, frame 16; custom_skill.cus: skill 1352's effects are
+// 1350_HIK_FRT.eepk's: effect 11 = Frt_Hit.emp on g_R_Hand, oriented by the hand, world-fixed: its purple speed lines
+// and burst forward along the punch, the long line along the victim's flight; tools/supamario_timeskip_build.py
+// e11_sets) at his right fist (SpecialAirS frame 16: TS_E11_Z ahead, TS_E11_Y up), its forward (XV2's -Z, baked onto
+// +X) turned to his facing (about Y: 0 facing right, pi facing left); its sets and their halo companions. Replaces
+// v2 / v3's stand-in lines
+void ts_e11()
 {
-    float rz;
-    rz = 0.0f;
-    if (WorkModuleF(0, 0x0f000003) < 0.0f)
+    float f;
+    float ry;
+    float x;
+    float y;
+    float z;
+    f = WorkModuleF(0, 0x0f000003);
+    ry = 0.0f;
+    if (f < 0.0f)
     {
-        rz = M_PI;
+        ry = M_PI;
     }
-    EffectModule(0x3, TS_FX_LINES, x, y, z, 0, 0, rz, TS_FX_LINES_SIZE, 0, 0xffffffff);
+    x = WorkModuleF(0, 0x0f000000) + f * TS_E11_Z;
+    y = WorkModuleF(0, 0x0f000001) + TS_E11_Y;
+    z = WorkModuleF(0, 0x0f000002);
+    EffectModule(0x3, TS_FX_E11, x, y, z, 0, ry, 0, TS_E11_SIZE, 0, 0xffffffff);
+    EffectModule(0x3, TS_FX_E11_2, x, y, z, 0, ry, 0, TS_E11_SIZE, 0, 0xffffffff);
+    EffectModule(0x3, TS_FX_E11_H, x, y, z, 0, ry, 0, TS_E11_SIZE, 0, 0xffffffff);
+    EffectModule(0x3, TS_FX_E11_2H, x, y, z, 0, ry, 0, TS_E11_SIZE, 0, 0xffffffff);
 }
 
-// v3 (user: "creates a purple aura at the start", "the purple aura gets left behind after the movement begins"): Hit's own
-// aura (aura_setting.aur -> BTL_AURA's BoostV_Loop, tools/supamario_timeskip_build.py aura_set; v2's shards stand-in
-// replaced) at his middle, world-placed, its particles staying where they were born: left behind as he dashes. At
-// TS_AURA_AT and every TS_AURA_EVERY frames of a held charge
+// v4: XV2's skill effect 0 at the move's start (BAC entry 0 item 2, frame 0; 1350_HIK_FRT.eepk effect 0: Frt_CrgAura on
+// b_C_Pelvis 0.3 m down and on b_R_Foot, Frt_CrgAuraB on b_C_Pelvis, none following: their purple streaks rise where he
+// was and are left behind as he dashes, the user's "purple aura at the start"; its fourth part, Frt_CrgAuraH on
+// b_L_Elbow x0.5, follows: the effect script's) as one world-placed set (tools/supamario_timeskip_build.py e0_sets: the
+// parts at the bones' places of SpecialS frame 0, forward +X) at his ground point turned to his facing; at the move's
+// start (ts_init: XV2's frame 0) and every TS_AURA_EVERY frames of a held charge (its emission lasts 40 frames). v3's
+// Hit's aura (BTL_AURA's BoostV_Loop) replaced
 void ts_aura()
 {
-    EffectModule(0x3, TS_FX_AURA, WorkModuleF(0, 0x0f000000), WorkModuleF(0, 0x0f000001) + TS_AURA_Y,
-                 WorkModuleF(0, 0x0f000002), 0, 0, 0, TS_AURA_SIZE, 0, 0xffffffff);
+    float ry;
+    ry = 0.0f;
+    if (WorkModuleF(0, 0x0f000003) < 0.0f)
+    {
+        ry = M_PI;
+    }
+    EffectModule(0x3, TS_FX_AURA, WorkModuleF(0, 0x0f000000), WorkModuleF(0, 0x0f000001), WorkModuleF(0, 0x0f000002),
+                 0, ry, 0, TS_AURA_SIZE, 0, 0xffffffff);
 }
 
 // v3 (the user: the darkening and the glass must end if the move is cut before the punch). Two builds
@@ -41502,6 +41614,7 @@ void ts_init()
     func_22(0x219, 0, 1.0f);
     ts_still();
     ts_brev(0.0f);
+    ts_aura();                          // v4: XV2's skill effect 0 at frame 0 (after a frame-0 B-reverse)
 }
 
 // B-reverse (the user's choice for Sledgehammer: his facing only): the stick back along his facing past TS_TURN_STICK
@@ -41609,7 +41722,7 @@ int ts_find()
         }
         if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f &&
             (x != WorkModuleF(0, 0x0f000000) || y != WorkModuleF(0, 0x0f000001)) &&
-            WorkModuleF(0, 0x0F000043 + 0x8 * (s + 0x2)) > 0.5f && d2 < best)
+            (WorkModuleF(0, 0x0F000043 + 0x8 * (s + 0x2)) > 0.5f || ts_took(s) != 0) && d2 < best)
         {
             best = d2;
             found = s;
@@ -41619,10 +41732,58 @@ int ts_find()
     return found;
 }
 
-// the detection box hit a body (kind 2) or a shield (kind 4). A body: caught only on a real hit (sh_struck: not
-// invincible / intangible, it took damage, so no counter) with no armor left (armor_lift took it before the collision;
-// one it couldn't: refused). A shield (a fighter in GuardOn .. GuardDamage): caught too, kept shielding. Otherwise the
-// hit flags are cleared and the dash goes on (that fighter's hit record keeps the box off it)
+// v4: every slot's status and damage noted before this frame's collision (Sledgehammer's record, SH_V_ST: status + 1024
+// x round(damage x 4)), whatever its freeze: in the dash, from the MSC (which runs before the frame's collision), unless
+// a hit is still being looked at (TS_V_RETRY: the record from before it is kept)
+void ts_rec()
+{
+    int s;
+    float d;
+    s = 1;
+    while (s <= 8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f &&
+            (WorkModuleF(0, 0x0f000020 + 4 * (s - 1)) != WorkModuleF(0, 0x0f000000) ||
+             WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) != WorkModuleF(0, 0x0f000001)))
+        {
+            d = WorkModuleF(0, 0x0F000117 + 0x20 * (s + 0x2));
+            if (d > 999.0f)
+            {
+                d = 999.0f;
+            }
+            if (d < 0.0f)
+            {
+                d = 0.0f;
+            }
+            WorkModule(0, (float)(int)(d * 4.0f + 0.5f) * 1024.0f + WorkModuleF(0, 0x0F0000A2 + 0x8 * (s + 0x2)),
+                       SH_V_ST + s - 1);
+        }
+        s = s + 1;
+    }
+}
+
+// v4: slot s took damage since ts_rec's record (a hit that landed on its body: a counter or invincibility takes none)
+int ts_took(int s)
+{
+    if (WorkModuleF(0, 0x0F000117 + 0x20 * (s + 0x2)) > sh_rec_dmg(s) + 0.2f)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// the detection box hit a body (kind 2) or a shield (kind 4). v4 (user: "If the move is activated while touching
+// someone, the 2% hit goes off but doesn't do the freeze or punch"; the clip: a CPU Donkey Kong touching him started an
+// attack as the box came out, took the 2% and went on with its attack, the dash went through it): v1-v3 caught a body
+// only on sh_struck's real hit with no armor left, and its damage test read Sledgehammer's record, which func_82 can
+// write after the hit (on the hit's first frame the victim's freeze isn't always seen); armor a fighter put on that
+// same frame (its own status, after the MSC's armor_lift) refused it for good. Now any detection hit that landed on a
+// body is caught: the fighter it hit (Target 12, else the nearest frozen one or one that took damage since ts_rec's
+// record) took damage since that record (taken before the collision), whatever its armor, freeze or status (ts_catch
+// puts an armored one in the hold's hitstun). A shield (a fighter in GuardOn .. GuardDamage, a body hit on one too: the
+// shield poke): caught shielding. Not yet clear (no fighter found, no damage seen: the hit's first frame): the flags are
+// kept and it is looked at again (TS_RETRY_N frames); then (a counter, invincibility: no damage) the flags are cleared
+// and the dash goes on (that fighter's hit record keeps the box off it)
 int ts_try_catch()
 {
     int s;
@@ -41641,43 +41802,33 @@ int ts_try_catch()
         return 0;
     }
     s = ts_find();
-    if (s == 0)
+    if (s != 0)
     {
-        AttackModule(0x2724);
-        return 0;
-    }
-    // v3 (user: "shield poke"): a body hit on a fighter that is shielding (its hurtbox reached past a small shield) is
-    // the shield case: caught shielding
-    if (sh == 0 && cb_guarding(s) != 0)
-    {
-        sh = 0x1;
-    }
-    if (sh != 0)
-    {
-        if (cb_guarding(s) == 0)
+        // v3 (user: "shield poke"): a body hit on a fighter that is shielding is the shield case: caught shielding
+        if (cb_guarding(s) != 0)
         {
+            sh = 0x1;
+        }
+        else if (ts_took(s) != 0)
+        {
+            sh = 0;
+        }
+        if ((sh != 0 && cb_guarding(s) != 0) || (sh == 0 && ts_took(s) != 0))
+        {
+            WorkModule(0, 0.0f, TS_V_RETRY);
             AttackModule(0x2724);
-            return 0;
+            ts_catch(s, sh);
+            return 0x1;
         }
     }
-    else if (sh_struck(s) == 0 || WorkModuleF(0, 0x0F00011D + 0x20 * (s + 0x2)) != 0.0f)
+    if (WorkModuleF(0, TS_V_RETRY) < TS_RETRY_N - 0.5f)
     {
-        // v3 (user: "no freeze on the detection box's first frame"): not refused for good while the fighter is still
-        // in the hit's freeze: its damage / state can read the frame before on the hit's first frame; the flags are
-        // kept and it is looked at again next frame (v2 cleared them at once, so a first-frame hit was never caught)
-        if (WorkModuleF(0, 0x0F000043 + 0x8 * (s + 0x2)) > 0.5f && WorkModuleF(0, TS_V_RETRY) < TS_RETRY_N - 0.5f &&
-            WorkModuleF(0, TS_V_RETRY) < 9.5f)
-        {
-            WorkModule(0, WorkModuleF(0, TS_V_RETRY) + 1.0f, TS_V_RETRY);
-            return 0;
-        }
-        WorkModule(0, 0.0f, TS_V_RETRY);
-        AttackModule(0x2724);
+        WorkModule(0, WorkModuleF(0, TS_V_RETRY) + 1.0f, TS_V_RETRY);
         return 0;
     }
+    WorkModule(0, 0.0f, TS_V_RETRY);
     AttackModule(0x2724);
-    ts_catch(s, sh);
-    return 0x1;
+    return 0;
 }
 
 // the victim in the stopped time: a hit one held in front of him (XV2's ThrowHandler: 1.5 m ahead of his ground point,
@@ -41759,7 +41910,9 @@ void ts_catch(int s, int sh)
     WorkModule(0, (float)sh, TS_V_SHV);
     // a fighter lying down: into the hold's hitstun (Damage), as Core Breaker's catch
     vst = WorkModuleF(0, 0x0F0000A2 + 8 * (s + 0x2));
-    if (sh == 0 && ((vst >= CB_DOWN_LO && vst <= CB_DOWN_HI) || vst == CB_DOWN_FURAFURA))
+    // v4: one in no damage status (armor kept it in its own: the user's point-blank clip) too
+    if (sh == 0 && ((vst >= CB_DOWN_LO && vst <= CB_DOWN_HI) || vst == CB_DOWN_FURAFURA || vst < SH_ST_DAMAGE_LO ||
+                    vst > SH_ST_DAMAGE_HI))
     {
         WorkModule(0, CB_HOLD_STATUS, 0x0F0000A2 + 8 * (s + 0x2));
     }
@@ -41797,7 +41950,7 @@ void ts_strike_fx(int s)
     EffectModule(0x3, TS_FX_HITL, x, y, z, 0, 0, 0, TS_FX_HITL_SIZE, 0, 0xffffffff);
     EffectModule(0x3, TS_FX_HITL_2, x, y, z, 0, 0, 0, TS_FX_HITL_SIZE, 0, 0xffffffff);
     EffectModule(0x3, TS_FX_SWEAT, x, y + TS_VICTIM_HEAD - TS_VICTIM_MID, z, 0, 0, 0, TS_FX_SWEAT_SIZE, 0, 0xffffffff);
-    ts_lines(x, y, z);
+    ts_e11();
     SoundModule(0x2710, TS_SND_HIT);
 }
 
@@ -41941,6 +42094,10 @@ void ts_dash(float fr)
         armor_lift(TS_HIT_Z, TS_HIT_Y, TS_HIT_SIZE);
         armor_lift(TS_HIT2_Z, TS_HIT2_Y, TS_HIT2_SIZE);     // v2: the point-blank box (ID 1)
     }
+    if (WorkModuleF(0, TS_V_PH) == 3.0f && WorkModuleF(0, TS_V_RETRY) < 0.5f)
+    {
+        ts_rec();                       // v4: the damage before this frame's collision (ts_try_catch's real hit)
+    }
 }
 
 void ts_dash_go(float fr, float k, float n)
@@ -42080,10 +42237,6 @@ void ts_loop()
     if (ph < 1.5f)
     {
         ts_brev(fr);
-        if (fr > TS_AURA_AT - 0.5f && fr < TS_AURA_AT + 0.5f)
-        {
-            ts_aura();
-        }
         ts_move(ts_vroot(fr), 0.0f);
         if (fr < TS_WIND_END - 0.5f)
         {
@@ -42102,16 +42255,9 @@ void ts_loop()
         // XV2's ChargeControl 20-50 (ChargeTime 40): the pose held while the button is; the dash's speed by the frames
         // held (ts_vdash), TS_CHARGE frames the full charge
         MotionModule(0x2713, TS_WIND_END);
-        // v3 (user: while charging only, a small drift the way the stick is held): TS_DRIFT a frame at full tilt,
-        // up / down too in the air (on the ground along it only)
-        if (global18 == 0)
-        {
-            ts_move(WorkModuleF(0, 0x0F000110) * TS_DRIFT, 0.0f);
-        }
-        else
-        {
-            ts_move(WorkModuleF(0, 0x0F000110) * TS_DRIFT, WorkModuleF(0, 0x0F000111) * TS_DRIFT);
-        }
+        // v3 (user: while charging only, a small drift the way the stick is held): TS_DRIFT a frame at full tilt;
+        // v4 (user: "left / right only"): along his facing only, on the ground and in the air
+        ts_move(WorkModuleF(0, 0x0F000110) * TS_DRIFT, 0.0f);
         if (ControlModule(0x2712, 0x1) == 0)
         {
             ts_dash_start(0x1);

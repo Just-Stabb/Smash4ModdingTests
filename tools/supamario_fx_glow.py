@@ -10,7 +10,7 @@ the Super God Fist (attackdash) and Core Breaker's charge (specialhi before its 
 
 BUILD_OUT_DIR: tools/supamario_sledgehammer_build.py's OUT_DIR (ts_hit: tools/supamario_timeskip_build.py's). MOVE:
 sh_charging, sh_uncharged, sh_charged, sh_hit, ts_hit (Time Skip's punch; ts_hit_v1 with v1's shared Btl_HitLOD),
-ts_lines / ts_aura (Time Skip's purple lines at the punch; v3: Hit's aura at the start), attackdash, cb_charge (default all). --png DIR: each move's six brightest frames side by side. Bones other than top
+ts_e11 / ts_e0 (Time Skip v4: XV2's skill effects 11, the punch, and 0, the start), attackdash, cb_charge (default all). --png DIR: each move's six brightest frames side by side. Bones other than top
 are drawn at top (the fist's effects placed 8 up, 3 ahead); his body isn't drawn.
 --bg (v4): the background colour (default black): the effects are added onto it as in game (a bright stage pushes an
 additive effect past 1 sooner: the user's screenshot 26 on a grass stage); the areas then count only the pixels the
@@ -61,10 +61,15 @@ def moves(out_dir):
            for k in ('hitl', 'hitl_2')]
     out['ts_hit'] = (ts, list(range(0, 24)))
     out['ts_hit_v1'] = ([(0, TB.SH_FX['hitlod']) + ts[0][2:]] + ts[1:], list(range(0, 24)))
-    # v2: Time Skip's purple lines at the punch (the victim's middle, facing right) and (v3) Hit's aura at the start
-    # (world-placed: the world's X is fx_render's top-frame Z, the screen's horizontal: the call turned -90 about Y)
-    out['ts_lines'] = ([(0, TB.FX_LINES_ID, 0, (0.0, 5.0, -25.0), (0, -90, 0), TB.LINES_SIZE, None)], list(range(0, 90)))
-    out['ts_aura'] = ([(0, TB.FX_AURA_ID, 0, (0.0, TB.AURA_Y, 0.0), (0, -90, 0), TB.AURA_SIZE, None)], list(range(0, 46)))
+    # v4: Time Skip's XV2 skill effects (1350_HIK_FRT.eepk), as the MSC places them facing right (world-placed: the
+    # world's X is fx_render's top-frame Z, the screen's horizontal: the call turned -90 about Y): effect 11 at his fist
+    # at the punch (its four sets), effect 0's world parts at his ground point, its elbow part (followed: drawn at the
+    # elbow's height at frame 0, about 6 up)
+    e11 = [(0, i, 0, (0.0, TB.E11_AT[1], -TB.E11_AT[0]), (0, -90, 0), TB.E11_SIZE, None) for i in TB.FX_E11_IDS.values()]
+    out['ts_e11'] = (e11, list(range(0, 140)))
+    out['ts_e0'] = ([(0, TB.FX_AURA_ID, 0, (0.0, 0.0, 0.0), (0, -90, 0), TB.AURA_SIZE, None),
+                     (0, TB.FX_E0H_ID, 0, (0.0, 6.0, 0.0), (0, 0, 0), TB.E0_FOLLOW[2] * TB.AURA_SIZE, None)],
+                    list(range(0, 80)))
     c = [x for x in R.s4_calls(eb, 'attackdash') if (x[1] >> 16) == 0x341]
     out['attackdash'] = (c, list(range(min(x[0] for x in c), min(x[0] for x in c) + 90)))
     c = [x for x in R.s4_calls(eb, 'specialhi') if (x[1] >> 16) == 0x341 and x[0] < 55]

@@ -124,6 +124,11 @@ ST_DOWNBOUND, ST_DOWNWAIT, ST_SHIELD_BREAK = 0x4D, 0x50, 0x59
 # v3: the down statuses (DownBound 0x4D .. 0x53: lying), DownStand (0x54, the neutral getup: an uncharged hit on it
 # isn't a bounce: the user's jab-lock loop), DownDamage (0x57: hit while lying)
 ST_DOWN_LO, ST_DOWN_HI, ST_DOWNSTAND, ST_DOWNDAMAGE = 0x4D, 0x53, 0x54, 0x57
+# v6 (user: "the fully charged Sledgehammer must be untechable for opponents hit in the air"): the techs a spiked victim
+# could take in its hitstun (reference/msc-note-sheet/Actions_Fighters.csv: 0x64 in place / 0x65 roll, 0x66 wall /
+# 0x67 wall jump, 0x68 ceiling; EscapeAir 0x22 the CPU's landing dodge) and the missed techs' bounces put in their
+# place (DownBound 0x4D, WallDamage 0x49 / CeilingDamage 0x4A, DamageFall ST_DAMAGE_HI in the air): sh_spike_tick
+ST_TECH, ST_TECH_WALL, ST_WALLDAMAGE, ST_ESCAPEAIR = 0x64, 0x66, 0x49, 0x22
 LAND_LAG = 10                        # v2 (user: "standardize Sledgehammer's landing lag to 10 frames"), his light
                                      # landing's animation over them (v1: 18, 10 after a hit, LandingFallSpecial's pose)
 VICTIM_MID = 5.0                     # a fighter's middle above its feet (the contact point)
@@ -241,7 +246,8 @@ def msc_values():
             'SH_V_ST': '0x%X' % V_ST, 'SH_V_GX': '0x%X' % V_GX, 'SH_V_GY': '0x%X' % V_GY,
             'SH_ST_DOWN_LO': fl(ST_DOWN_LO), 'SH_ST_DOWN_HI': fl(ST_DOWN_HI), 'SH_ST_DOWNSTAND': fl(ST_DOWNSTAND),
             'SH_ST_DOWNDAMAGE': fl(ST_DOWNDAMAGE), 'SH_V_BREV': '0x%X' % V_BREV, 'SH_V_GP': '0x%X' % V_GP,
-            'SH_BOUNCE_MAX': fl(BOUNCE_MAX), 'SH_TURN_STICK': fl(TURN_STICK), 'SH_TURN_WINDOW': fl(TURN_WINDOW),
+            'SH_BOUNCE_MAX': fl(BOUNCE_MAX), 'SH_ST_TECH': fl(ST_TECH), 'SH_ST_TECH_WALL': fl(ST_TECH_WALL),
+            'SH_ST_WALLDAMAGE': fl(ST_WALLDAMAGE), 'SH_ST_ESCAPEAIR': fl(ST_ESCAPEAIR), 'SH_TURN_STICK': fl(TURN_STICK), 'SH_TURN_WINDOW': fl(TURN_WINDOW),
             'SH_FX_CRG': '0x%X' % FX_IDS['crg'],
             # v5: the reactions, shields and ends that count; the charged swing's armor lift (VAR_18-21: up to 4
             # fighters' armor, slot x 1e6 + type x 1e5 + threshold x 10)
