@@ -268,8 +268,11 @@ class Game(FT.Game):
             dy = max(0.0, max(v.y - hy, hy - (v.y + 10.0)))
             if dx * dx + dy * dy > B.HIT_SIZE ** 2:
                 continue
+            if getattr(v, 'shield_rec', False):         # v6: the swing's hit record: a shield it hit isn't hit again
+                continue                                # (its body after a break), as the game's
             if v.status == 0x1C:
                 self.hitflag |= 4
+                v.shield_rec = True
                 continue
             if getattr(v, 'body', 0) >= 2:              # v5: intangible: no collision at all
                 continue
@@ -913,13 +916,16 @@ def spike_tests(path, ck):
     an airborne fighter: its controller off and the lockout's resets from the hit on; a tech it takes in its hitstun
     replaced by the missed tech's bounce (the CPU's tech request doesn't go through the controller); let go when its
     hitstun ends, on its KO, a hit on it by anyone, his KO; uncharged: techable as before"""
-    t = 2 + 2
+    seen = []
 
     def spiked(tech=None, at=None, air=True, ev=None, ev_at=None, charged=True):
         v = victim_below(k=ck if charged else A.START_FRAMES - 1 + B.HIT_FROM)
+        seen.clear()
         g = Game(fighters=[v], held=(lambda n: True) if charged else (lambda n: n <= 2))
 
         def tick(g_, k):
+            if k == ck + 2:
+                seen.append(dict(g_.items.get(2, {})))
             if at is not None and k == at:
                 v.status = tech
                 v.air = air
@@ -933,7 +939,7 @@ def spike_tests(path, ck):
     stun_end = next((n for n, st, hs, hp, _x in v.log if n > k1 and hp == 0 and hs == 0), None)
     check('v6 charged air spike: its controller off the frame after the hit (%d), its buffer emptied, the resets '
           'registered (its KO / a hit on it: mask 9; his KO); back when its hitstun ends (%s)' % (k1 + 1, stun_end),
-          (ins[:1], [n for n, k_, _v in v.wlog if k_ == 'buffer'][:1], g.items.get(2, {}).get(0x115),
+          (ins[:1], [n for n, k_, _v in v.wlog if k_ == 'buffer'][:1], seen[0].get(0x115) if seen else None,
            ins[-1][1] if ins else None, g.vars.get(B.V_GS, 0.0)),
           ([(k1 + 1, 1.0)], [k1 + 1], [0.0, 9], 0.0, 0.0))
     check('v6 charged air spike: let go (controller back) on the frame its hitstun reads 0, not before',

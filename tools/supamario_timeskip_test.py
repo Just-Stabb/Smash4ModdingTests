@@ -104,10 +104,18 @@ class Game(SHT.Game):
         self.vlim = MAX_FALL         # energy 1's limit (KineticModule 0x14)
         self.vlims = []
         self.vel = []                # (n, vx, vy) each frame he moves
+        self.fx_rot = []             # v4: (n, id, rotation Y) EffectModule 3's turn
+        self.t12_empty = False       # v4: Target 12 reads nothing (the hit's first frame, the user's point-blank clip)
 
     def fvar(self, v):
         if v == 0x0F000111:
             return self.stick_y(self.n) if self.stick_y else 0.0
+        if self.t12_empty and v in (0x0F0002CD, 0x0F0002CE):
+            return 0.0
+        for s_, f_ in self.fighters.items():         # v4: a victim whose freeze isn't seen on the frame after the hit
+            if v == 0x0F000043 + 8 * (s_ + 2) and getattr(f_, 'stop_lag', False) and \
+                    getattr(f_, 'hit_at', None) == self.n - 1:
+                return 0.0
         if v == 0x0F000043:
             return 1.0 if self.hitstop > 0 else 0.0
         if v == 0x0F0000A2:
@@ -189,6 +197,8 @@ class Game(SHT.Game):
             if a[1] == 0:
                 self.acc = -GRAVITY
             return 0
+        if sid == 0x1C and a and a[0] == 3 and len(a) > 8:    # v4: EffectModule 3's turn (Y)
+            self.fx_rot.append((self.n, a[1], round(f(a[6]), 4)))
         if sid == 0x1C and a and a[0] == 0 and len(a) == 9:   # v3: Screen_Tint (EffectModule op 0)
             self.tints.append((self.n, 'on', a[1]))
             return 0
@@ -248,6 +258,8 @@ class Game(SHT.Game):
         for v in self.fighters.values():
             if getattr(v, 'rec', None) == self.box:
                 continue
+            if getattr(v, 'armor_at', None) is not None and self.n >= v.armor_at:
+                v.armor = 1             # v4: armor its own status put on after his MSC (the user's point-blank clip)
 
             def touch(hx, hy, r):
                 dx = max(0.0, abs(v.x - hx) - getattr(v, 'w', 3.5))
@@ -336,7 +348,9 @@ def fn(vm, name):
     return vm.func(FT.func_index(vm, name))
 
 
-def run(path, g, frames=260, cut_at=None, after=0, tick=None, cut_status='cut'):
+def run(path, g, frames=260, cut_at=None, after=0, tick=None, cut_status='cut', tick_first=False):
+    """tick_first (v4): func_82's hooks (sh_tick: Sledgehammer's slot records; ts_tick) before the status's main, not
+    after (the game's order isn't known: the user's point-blank clip fits this one)"""
     vm = FT.vm_for(path, g)
     tr = []
     prev_sit = 2 if g.air else 0
@@ -366,6 +380,10 @@ def run(path, g, frames=260, cut_at=None, after=0, tick=None, cut_status='cut'):
         if g.sit_fn and g.sit_fn(k) is not None:
             vm.g[18] = g.sit_fn(k)
         g.scripts()
+        if tick_first:
+            vm.call(fn(vm, 'sh_tick'))
+            vm.call(fn(vm, 'cb_shield_tick'))
+            vm.call(fn(vm, 'ts_tick'))
         if cut_at is not None and k == cut_at:
             g.status = cut_status
         elif k == 0:
@@ -374,9 +392,10 @@ def run(path, g, frames=260, cut_at=None, after=0, tick=None, cut_status='cut'):
             vm.call(fn(vm, 'ts_loop'))
         tr.append((k, g.kind, round(g.frame, 3), round(g.x, 3), round(g.y, 3), g.status,
                    g.vars.get(B.V_PH, 0.0)))
-        vm.call(fn(vm, 'sh_tick'))
-        vm.call(fn(vm, 'cb_shield_tick'))
-        vm.call(fn(vm, 'ts_tick'))
+        if not tick_first:
+            vm.call(fn(vm, 'sh_tick'))
+            vm.call(fn(vm, 'cb_shield_tick'))
+            vm.call(fn(vm, 'ts_tick'))
         if g.status is not None:
             vm.call(fn(vm, 'func_2280'))
             g.box = None
@@ -671,6 +690,29 @@ def pointblank_tests(path):
     c = first(tr, lambda t: t[1] == 0x21D)
     check('v2 point blank in the air: caught (the connect), the slim fighter held (slot 2)',
           (c is not None, sorted({s_ for _n, s_, _x in g.holds})), (True, [2]))
+    # v4 (the user's v3 clip c64f2a99, frames 40-80: a CPU Donkey Kong touching him; it starts an attack as the box comes
+    # out (frame 67), takes the 2% at 68 without flinching, the dash goes on through it: no freeze, no punch). Each of
+    # the game's possible orders that give that sequence, on v3's catch and v4's
+    cases = (('armor its own attack put on that frame (after his MSC: armor_lift can\'t see it)',
+              dict(armor_at=B.HIT_FROM, status=0x30), {}),
+             ('its freeze not seen on the hit\'s first frame, func_82 (the records) before the status, Target 12 empty',
+              dict(stop_lag=True), dict(tick_first=True, t12=True)),
+             ('both, and Target 12 empty', dict(armor_at=B.HIT_FROM, status=0x30, stop_lag=True),
+              dict(tick_first=True, t12=True)))
+    for name, vk, gk in cases:
+        v = V(2, 1.0, **vk)
+        by = V(3, -60.0)
+        g = Game(fighters=[v, by])
+        g.t12_empty = gk.get('t12', False)
+        tr, vm = run(path, g, frames=200, tick_first=gk.get('tick_first', False))
+        c = first(tr, lambda t: t[1] == 0x21D)
+        ck = c[0] - 1 if c else None
+        check('v4 point blank (the user\'s clip), %s: the 2%% lands (%s), caught (the connect), held, the hold\'s hitstun '
+              'status (0x46: its attack ended), the bystander frozen, punched (18%%)' % (name, v.hit_at),
+              (c is not None, sorted({s_ for _n, s_, _x in g.holds}),
+               [st_ for n_, st_, _hs, _hp, _x in v.log if c and n_ == c[0]][:1] in ([0x45], [0x46]),
+               any(hp > 0 for _n, _st, _hs, hp, _x in by.log), round(v.pct, 3)),
+              (True, [2], True, True, 18.0))
 
 
 def reset_tests(path):
@@ -723,21 +765,25 @@ def brightness_tests(out):
     import supamario_fx_glow as G
     res = {}
     for bg_name, bg in (('grass', (0.5, 0.65, 0.3)), ('grey', (0.5, 0.5, 0.5))):
-        r = G.measure(out, ('ts_hit', 'ts_hit_v1', 'ts_lines', 'ts_aura'), None, bg)
+        r = G.measure(out, ('ts_hit', 'ts_hit_v1', 'ts_e11', 'ts_e0'), None, bg)
         res[bg_name] = r
         h, h1 = r['ts_hit'], r['ts_hit_v1']
         e0, e1 = h['frames'][0][4], h1['frames'][0][4]
         print('     %s: ts_hit frame 0 energy %.1f (v1 %.1f), most over 1.0 in a frame %.1f (v1 %.1f), brightest frame %s' % (
             bg_name, e0, e1, h['max_over_1'], h1['max_over_1'], h['brightest']))
-        for k in ('ts_lines', 'ts_aura'):
-            print('     %s: %s most over 1.0 %.1f, brightest %s' % (bg_name, k, r[k]['max_over_1'], r[k]['brightest']))
+        for k in ('ts_e11', 'ts_e0'):
+            moved = max(abs(f_[4]) for f_ in r[k]['frames'])
+            print('     %s: %s most over 1.0 %.1f, most white %.1f, the most it changes the picture (|energy|) %.1f' % (
+                bg_name, k, r[k]['max_over_1'], r[k]['max_white'], moved))
         check('v2 %s: the punch\'s look at most 1.0 square unit over 1.0 in any frame (Sledgehammer v5\'s uncharged arcs; '
               'v1 %.1f), its first frame (the freeze\'s) at most a third of v1\'s energy, still vibrant (energy 8+ at its '
               'brightest)' % (bg_name, h1['max_over_1']),
               (h['max_over_1'] <= 1.0, e0 <= e1 / 3.0, h['brightest'][4] >= 8.0), (True, True, True))
-        for k, lo in (('ts_lines', 5.0), ('ts_aura', 5.0)):
-            check('v2 %s: %s at most 1.0 square unit over 1.0, visible (energy %g+)' % (bg_name, k, lo),
-                  (r[k]['max_over_1'] <= 1.0, r[k]['brightest'][4] >= lo), (True, True))
+        for k, lo in (('ts_e11', 20.0), ('ts_e0', 3.0)):
+            check('v4 %s: %s (XV2\'s skill effect) at most 1.0 square unit over 1.0 in any frame (the user\'s tolerance), no '
+                  'white, visible (it changes the picture by %g+)' % (bg_name, k, lo),
+                  (r[k]['max_over_1'] <= 1.0, r[k]['max_white'] <= 1.0, max(abs(f_[4]) for f_ in r[k]['frames']) >= lo),
+                  (True, True, True))
     return res
 
 
@@ -804,9 +850,8 @@ def v3_tests(path):
         drift = [(n, a_, u_) for n, a_, u_ in g.moves if B.WIND_END < n < B.WIND_END + 19]
         fw = sorted({a_ for _n, a_, _u in drift if a_})
         up = sorted({u_ for _n, _a, u_ in drift if u_})
-        check('v3 charge drift (%s): the stick held forward and up while charging: %.2f a frame forward%s' % (
-            'air' if air else 'ground', B.DRIFT, ', %.2f up' % B.DRIFT if air else ', nothing up (the floor)'),
-              (fw, up), ([round(B.DRIFT, 4)], [round(B.DRIFT, 4)] if air else []))
+        check('v4 charge drift (%s; user: "left / right only"): the stick held forward and up while charging: %.2f a '
+              'frame forward, nothing up' % ('air' if air else 'ground', B.DRIFT), (fw, up), ([round(B.DRIFT, 4)], []))
     g = Game(stick_x=lambda n: 1.0)
     g.stick_y = lambda n: 1.0
     tr, vm = run(path, g, frames=mf + 10)
@@ -861,20 +906,26 @@ def v3_tests(path):
 
 
 def aura_tests(path):
-    """v3: Hit's aura at the start (world-placed at his middle: left behind as he dashes), again every AURA_EVERY frames of a
-    held charge"""
-    g = Game()
-    tr, vm = run(path, g)
-    au = [(n, x, y) for n, i, x, y, _s in g.fx if i == B.FX_AURA_ID]
-    check('v3 aura: once at the wind-up\'s frame %d, at his middle (%g up), where he was (world)' % (B.AURA_AT, B.AURA_Y),
-          [(n, round(y, 2)) for n, _x, y in au], [(B.AURA_AT, round(B.AURA_Y, 2))])
-    check('  ... he dashes on from there: %.1f units past it by the move\'s end' % (tr[-1][3] - au[0][1]),
-          tr[-1][3] - au[0][1] > 50.0, True)
+    """v4: XV2's skill effect 0 (1350_HIK_FRT.eepk: the world parts as one set at his ground point, turned to his facing)
+    at the move's start (ts_init: XV2's frame 0), left behind as he dashes, again every AURA_EVERY frames of a held
+    charge"""
+    for face in (1.0, -1.0):
+        g = Game()
+        g.face = face
+        tr, vm = run(path, g)
+        au = [(n, x, y) for n, i, x, y, _s in g.fx if i == B.FX_AURA_ID]
+        rot = [r for n, i, r in g.fx_rot if i == B.FX_AURA_ID]
+        check('v4 effect 0 (facing %s): once at the move\'s frame 0 (XV2\'s BAC 0), at his ground point, x%.2f, turned to '
+              'his facing (Y %s)' % ('right' if face > 0 else 'left', B.AURA_SIZE, '0' if face > 0 else 'pi'),
+              ([(n, round(y, 2)) for n, _x, y in au], rot, [s_ for _n, i, _x, _y, s_ in g.fx if i == B.FX_AURA_ID]),
+              ([(0, 0.0)], [0.0 if face > 0 else round(math.pi, 4)], [round(B.AURA_SIZE, 3)]))
+        check('  ... he dashes on from there: %.1f units past it by the move\'s end' % abs(tr[-1][3] - au[0][1]),
+              abs(tr[-1][3] - au[0][1]) > 50.0, True)
     g = Game(held=lambda n: n < B.WIND_END + B.CHARGE + 5)
     tr, vm = run(path, g, frames=400)
     au = [n for n, i, _x, _y, _s in g.fx if i == B.FX_AURA_ID]
-    check('v3 aura in a full charge: at %d, then every %d charge frames' % (B.AURA_AT, B.AURA_EVERY),
-          au, [B.AURA_AT] + [B.WIND_END + k for k in range(B.AURA_EVERY - 1, B.CHARGE, B.AURA_EVERY)])
+    check('v4 effect 0 in a full charge: at 0, then every %d charge frames' % B.AURA_EVERY,
+          au, [0] + [B.WIND_END + k for k in range(B.AURA_EVERY - 1, B.CHARGE, B.AURA_EVERY)])
 
 
 def shield_tests(path):
@@ -942,10 +993,19 @@ def caught_tests(path, air):
           (ck + 1, sk - 1, sk - 1 - ck))
     check('%s: punched at %d: 2 + 16 = 18%%, launched (DamageFly), XV2\'s hit look the next frame (v2: Time Skip\'s own '
           'Btl_HitLOD / Btl_HitL x2 sets / the sweat) and Hit_TmLck once' % (tag, sk),
-          (round(v.pct, 3), v.hit_at, [(n, i) for n, i, _x, _y, _s in g.fx if i not in (B.FX_LINES_ID, B.FX_AURA_ID, B.FX_GLASS_ID)],
+          (round(v.pct, 3), v.hit_at, [(n, i) for n, i, _x, _y, _s in g.fx
+                                       if i not in tuple(B.FX_E11_IDS.values()) + (B.FX_AURA_ID, B.FX_GLASS_ID)],
            [(n, s_) for n, w, s_ in g.sounds if w == 'play']),
           (18.0, sk, [(sk + 1, B.FX_LOD_ID), (sk + 1, B.FX_IDS['hitl']), (sk + 1, B.FX_IDS['hitl_2']),
                       (sk + 1, B.SH_FX['sweat'])], [(sk + 1, B.SE_IDS['ts_hit'])]))
+    at = tr[sk + 1]
+    e11 = [(n, i_, round(x_ - at[3], 2), round(y_ - at[4], 2), s_) for n, i_, x_, y_, s_ in g.fx
+           if i_ in B.FX_E11_IDS.values()]
+    check('v4 %s: XV2\'s skill effect 11 with the hit look (its 4 sets: %s), at his right fist (%.2f ahead, %.2f up), '
+          'x%.2f, turned to his facing' % (tag, ', '.join('0x%08X' % i for i in B.FX_E11_IDS.values()), B.E11_AT[0],
+                                           B.E11_AT[1], B.E11_SIZE),
+          (e11, [r for n, i_, r in g.fx_rot if i_ in B.FX_E11_IDS.values()]),
+          ([(sk + 1, i, B.E11_AT[0], B.E11_AT[1], round(B.E11_SIZE, 3)) for i in B.FX_E11_IDS.values()], [0.0] * 4))
     sizes = [s_ for _n, i_, _x, _y, s_ in g.fx if i_ in (B.FX_LOD_ID, B.FX_IDS['hitl'], B.FX_IDS['hitl_2'], B.SH_FX['sweat'])]
     check('%s: the hit look\'s sizes (x%.2f the EEPK\'s 1.5 / 0.8 / 2.0)' % (tag, B.FX_SCALE), sizes,
           [round(B.EEPK_SCALE[e] * B.FX_SCALE, 3) for e in ('Btl_HitLOD.emp', 'Btl_HitL.emp', 'Btl_HitL.emp',
@@ -1015,15 +1075,27 @@ def script_tests(out, sh_out):
     eff = [(nm(c), c.params[:2]) for c in f['effect'].script('specials') if nm(c) == 'Graphic_Effect']
     check('effect: Smash\'s dash cloud at the dash on the ground (XV2\'s stage dust)', eff, [('Graphic_Effect',
                                                                                           [B.FX_DUST, 0])])
+    ext = [(nm(c), [round(x, 3) if isinstance(x, float) else x for x in c.params]) for c in f['effect'].script('specials')
+           if nm(c) == 'External_Graphic']
+    check('v4: effect 0\'s following part (Frt_CrgAuraH x%.1f) at frame 0 on the left elbow (bone %d), no offset / turn, '
+          'the bone\'s place only (last word 0)' % (B.E0_FOLLOW[2], B.E0_FOLLOW[1]), ext,
+          [('External_Graphic', [B.FX_E0H_ID, B.E0_FOLLOW[1], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                 round(B.E0_FOLLOW[2] * B.AURA_SIZE, 3), 0])])
     lt = {sc: [(nm(c), [round(x, 2) if isinstance(x, float) else x for x in c.params]) for c in f['effect'].script(sc)
-               if nm(c) in ('FRAME', 'Flash_Light_Effect', 'Change_Flash_Light_Color')] for sc in ('specials', 'specialairs')}
-    on = [('Flash_Light_Effect', [255.0, 255.0, 255.0, 0.0] + list(B.OUTLINE_SRC)),
-          ('Change_Flash_Light_Color', [float(B.OUTLINE_IN), 255.0, 255.0, 255.0, B.OUTLINE_A])]
-    off = ('Change_Flash_Light_Color', [float(B.OUTLINE_OUT), 255.0, 255.0, 255.0, 0.0])
-    check('v3: the white outline (XV2\'s BPE 85: Flash_Light_Effect white, faint %g of 255, faded in over %d) from the '
-          'move\'s start, faded out over %d at each motion\'s end' % (B.OUTLINE_A, B.OUTLINE_IN, B.OUTLINE_OUT), lt,
-          {'specials': on + [('FRAME', [float(B.MOVE_FROM)]), ('FRAME', [float(B.DASH_END - B.OUTLINE_OUT)]), off],
-           'specialairs': on + [('FRAME', [float(B.CONNECT_END - B.OUTLINE_OUT)]), off]})
+               if nm(c) in ('FRAME', 'Flash_Light_Effect', 'Change_Flash_Light_Color', 'Color_Overlay', 'Change_Overlay',
+                            'Terminate_Overlays')] for sc in ('specials', 'specialairs')}
+    on = [('Color_Overlay', [255.0, 255.0, 255.0, 0.0]),
+          ('Change_Overlay', [float(B.OUTLINE_IN), 255.0, 255.0, 255.0, B.OUTLINE_A])]
+    off = [('Change_Overlay', [float(B.OUTLINE_OUT), 255.0, 255.0, 255.0, 0.0])]
+    check('v4: the white outline (XV2\'s BPE 85; user: "no outline" with v3\'s LIGHT_SHINE): FLASH (Color_Overlay) white '
+          'at %g of 255, faded in over %d from each motion\'s start, out over %d at its end, COL_NORMAL at the end; no '
+          'Flash_Light_Effect' % (B.OUTLINE_A, B.OUTLINE_IN, B.OUTLINE_OUT), lt,
+          {'specials': on + [('FRAME', [float(B.MOVE_FROM)]), ('FRAME', [float(B.DASH_END - B.OUTLINE_OUT)])] + off +
+           [('FRAME', [float(B.DASH_END)]), ('Terminate_Overlays', [])],
+           'specialairs': on + [('FRAME', [float(B.CONNECT_END - B.OUTLINE_OUT)])] + off +
+           [('FRAME', [float(B.CONNECT_END)]), ('Terminate_Overlays', [])]})
+    print('     note: Stage_Freeze(1, ...) is the stage-only freeze with no flash from exe_v46z_camfx3 on (camera_effects_v3 /'
+          ' v4); on exe_v46y_hold its On 1 also turned the scene white (the user\'s v3 clip ca068f15, 70-88)')
     cam = [(nm(c), c.params) for c in f['effect'].script('specialairs') if nm(c) == 'Effect_Camera']
     check('v3: the camera build switch (CAMERA_FX %s): %s' % (B.CAMERA_FX, 'the darkening (Mode 1, to the punch) and the '
           'glass (Mode 0) on the camera, unslowed' if B.CAMERA_FX else 'no Effect_Camera (no exe_v46z_camfx needed)'),
@@ -1113,26 +1185,49 @@ def effect_tests(out, sh_out):
           (p.set_name(lod_si), [n for n, _v in pk] == [n for n, _v in pk_sh],
            all(v_ <= dict(B.LOD_CAP)['flash'] + 1e-3 for n, v_ in pk if n.startswith('flash'))),
           ('PtcSupamarioTsBtl_HitLOD', True, True))
-    si = e.entries[B.FX_LINES_ID & 0xFFFF][1] - 1
-    ds = [em['data'] for em in p.sets[si]['emitters'] if em['data'] is not None]
-    rgb = [round(x, 3) for x in B.LINES_RGB]
-    check('v2: the punch\'s purple lines (0x%08X: speed lines + the long line along +X, the punch): stretched soft '
-          'billboards, peaks under 1.0, world-placed (follow none)' % B.FX_LINES_ID,
-          (p.set_name(si), [p.field(d, 'particle_type') for d in ds], [[round(x, 3) for x in p.color_keys(d, 0)[0][:3]]
-                                                                        for d in ds],
-           all(SB.arc_peak(p, d) < 1.0 for d in ds), [bytes(d[0x310:0x314]).hex() for d in ds]),
-          ('PtcSupamarioTsLines', [0, 0], [rgb, rgb], True, ['00000001'] * 2))
+    # v4: XV2's skill effects 11 and 0 (1350_HIK_FRT.eepk)
+    rep4 = json.load(open(os.path.join(out, 'timeskip.json')))['fx']
+    sis = {k: e.entries[i & 0xFFFF][1] - 1 for k, i in B.FX_E11_IDS.items()}
+    ds = {k: [em['data'] for em in p.sets[si]['emitters'] if em['data'] is not None] for k, si in sis.items()}
+    names = [p.emitter_name(d) for k in ('hit', 'hit_2') for d in ds[k]]
+    pk = {p.emitter_name(d): round(SB.arc_peak(p, d), 3) for k in ('hit', 'hit_2') for d in ds[k]}
+    capped = all(pk[n] <= next(c for pre, c in B.E11_CAP if n.startswith(pre)) + 1e-3 for n in pk
+                 if any(n.startswith(pre) for pre, _c in B.E11_CAP))
+    check('v4: effect 11 (Frt_Hit.emp: %d emissions, every one converted) in %s / %s, its halos (HALO_ALPHA) in %s / %s; '
+          'world-placed (follow none), each capped by E11_CAP' % (
+              len(names), *('0x%08X' % B.FX_E11_IDS[k] for k in ('hit', 'hit_2', 'hit_h', 'hit_2h'))),
+          ({k: p.set_name(si) for k, si in sis.items()}, len(names), rep4['e11']['skipped'],
+           {bytes(d[0x310:0x314]).hex() for k in ds for d in ds[k]}, capped),
+          ({'hit': 'PtcSupamarioTsFrt_Hit', 'hit_2': 'PtcSupamarioTsFrt_Hit_2', 'hit_h': 'PtcSupamarioTsFrt_HitH',
+            'hit_2h': 'PtcSupamarioTsFrt_Hit_2H'}, 31, [], {'00000001'}, True))
+    import numpy as np
+    import xv2_to_ptcl as X
+    fwd = []
+    for d in ds['hit']:
+        if p.emitter_name(d).startswith('line_add') and p.field(d, 'volume_type') == 0:
+            m = X.euler_matrix([float(np.degrees(v_)) for v_ in p.field(d, 'emitter_rotation')])
+            fwd.append([round(float(x_), 3) for x_ in m @ np.array(p.field(d, 'emit_direction'), float)])
+    check('v4: effect 11 turned so the hand\'s +Z (the punch: its speed lines run from the fist forward, the clip) is the '
+          'set\'s +X: the speed lines emitted toward -X (Smash draws a streak back along its motion, Line_Hit\'s line '
+          'ahead of the fist)', fwd, [[-1.0, 0.0, 0.0]] * len(fwd))
     si = e.entries[B.FX_AURA_ID & 0xFFFF][1] - 1
-    ds = [em['data'] for em in p.sets[si]['emitters'] if em['data'] is not None]
-    rep_ = json.load(open(os.path.join(out, 'timeskip.json')))['fx']['aura']
-    check('v3: Hit\'s aura (0x%08X, BTL_AURA\'s %s: aura_setting.aur Hit -> aura 1 -> effect 41) converted, %d emitters: '
-          'each emits %d frames at most, its particles left where born (follow none), peaks within %.2f' % (
-              B.FX_AURA_ID, B.AURA_EMP, len(ds), B.AURA_EMIT, B.AURA_CAP),
-          (p.set_name(si), all(p.field(d, 'one_time') == 1 and p.field(d, 'end_frame') <= B.AURA_EMIT for d in ds),
-           {bytes(d[0x310:0x314]).hex() for d in ds},
-           all(SB.arc_peak(p, d) <= B.AURA_CAP + 1e-3 or p.field(d, 'blend_type') == 2 for d in ds),
-           len(ds) == len(rep_['emitters'])),
-          ('PtcSupamarioTsBoostV_Loop', True, {'00000001'}, True, True))
+    dw = [em['data'] for em in p.sets[si]['emitters'] if em['data'] is not None]
+    hip, foot = rep4['aura']['emitters'][:3:2]
+    tr_ = {p.emitter_name(d): [round(x_, 2) for x_ in p.field(d, 'emitter_translation')] for d in dw}
+    check('v4: effect 0\'s world parts (Frt_CrgAura at b_C_Pelvis 0.3 m down and at b_R_Foot, Frt_CrgAuraB at b_C_Pelvis: '
+          '0x%08X): ConeExtrude stripes as streaks (type 3), rising, follow none, capped at %g; + their halos; the foot\'s '
+          'part behind (SpecialS frame 0: RFootJ behind TransN)' % (B.FX_AURA_ID, dict(B.E0_CAP)['stripe']),
+          (p.set_name(si), [p.emitter_name(d) for d in dw][:3], {p.field(d, 'particle_type') for d in dw},
+           {tuple(p.field(d, 'emit_direction')) for d in dw}, {bytes(d[0x310:0x314]).hex() for d in dw},
+           all(SB.arc_peak(p, d) <= dict(B.E0_CAP)['stripe'] + 1e-3 for d in dw[:3]), len(dw), tr_[foot][0] < 0.0),
+          ('PtcSupamarioTsFrt_CrgAura', ['CrgAura_HipN', 'CrgAuraB_HipN', 'CrgAura_RFootJ'], {3}, {(0.0, 1.0, 0.0)},
+           {'00000001'}, True, 6, True))
+    si = e.entries[B.FX_E0H_ID & 0xFFFF][1] - 1
+    dh = [em['data'] for em in p.sets[si]['emitters'] if em['data'] is not None]
+    check('v4: effect 0\'s following part (Frt_CrgAuraH, 0x%08X): its streak + halo, following (follow 0: XV2\'s '
+          'PositionUpdate)' % B.FX_E0H_ID,
+          (p.set_name(si), len(dh), {bytes(d[0x310:0x314]).hex() for d in dh}),
+          ('PtcSupamarioTsFrt_CrgAuraH', 2, {'00000000'}))
     gi = e.entries[B.FX_GLASS_ID & 0xFFFF]
     mdir = os.path.join(out, 'fighter', 'supamario', 'effect', 'supamario', 'model', 'EffSupamarioTsDmgGrs2')
     check('v2: the glass (BTL_CMN 108, HIT_DmgGrs2) a model entry (0x%08X), its folder with model / texture / '
