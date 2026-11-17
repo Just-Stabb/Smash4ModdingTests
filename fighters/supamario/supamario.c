@@ -41545,15 +41545,6 @@ void ts_tint(int on)
     }
 }
 
-// v2 (item 11): BTL_CMN effect 108 (HIT_DmgGrs2, XV2's glass that shatters as time stops; on XV2's camera) as a model in
-// front of the victim, TS_GLASS_Z toward the camera (TS_CAMFX 0)
-void ts_glass(int s)
-{
-    EffectModule(0x3, TS_FX_GLASS, WorkModuleF(0, 0x0f000020 + 4 * (s - 1)),
-                 WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) + TS_VICTIM_MID, WorkModuleF(0, 0x0f000002) + TS_GLASS_Z, 0, 0, 0,
-                 TS_GLASS_SIZE, 0, 0xffffffff);
-}
-
 void ts_stop_look_off()
 {
     ts_tint(0);
@@ -41925,8 +41916,7 @@ void ts_catch(int s, int sh)
     ts_still();
     if (TS_CAMFX == 0)
     {
-        ts_glass(s);
-        ts_tint(0x1);
+        ts_tint(0x1);                   // v5: the glass is the connect's effect script's (Effect_Camera, every build)
     }
     if (global18 != 0)
     {

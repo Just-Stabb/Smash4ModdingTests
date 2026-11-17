@@ -175,6 +175,9 @@ AURA_EVERY = 20                     # again every 20 frames of a held charge (v3
 E11_EMP = 'Frt_Hit.emp'
 E11_AT = (6.85, 8.13)               # RHandN at SpecialAirS 16 (z ahead, y up)
 E11_SIZE = 1.75                     # xv2_smash_fx.SIZE: XV2's x1.0
+E11_SIZE = 2.6                      # v5 (user: "much weaker and compressed compared to the massive aura escaping the
+                                    # opponent"; XV2's screenshots: the burst as tall as the fighters, the lines far past
+                                    # the victim): x1.5
 E11_TURN = (0.0, 90.0, 0.0)         # the hand's +Z (the punch) onto +X
 # brightness (supamario_fx_glow.py ts_e11 / ts_e0 on grass and grey; the user's tolerance: at most 1.0 square unit over
 # 1.0 in any frame): each emitter's brightest drawn channel capped by its name's start (Sledgehammer's arc_dim)
@@ -182,6 +185,13 @@ E11_CAP = (('sprite_2', 0.12), ('sprite_BG', 0.5), ('line_add', 0.15), ('wave_ad
            ('sprite_1', 0.25), ('sprite', 0.5), ('line_BG', 0.9), ('BG', 0.9), ('ring', 0.5))   # v4: from 2.0 each (the
            # vibrant gain): uncapped the set drew 155 square units over 1.0 at its first frame on grass (12.4 peak: the burst's
            # white sparkle sprite_2, the opaque disc sprite_BG, the stacked lines / waves)
+# v5 (user: "much weaker and compressed"; "keep brightness sane by limiting the white blow-out, not the size or the
+# purple"): the purple lines / slashes / glows brighter (the check is now the white area: purple past 1 blooms purple),
+# the sparkle dots (0.01 m: under a pixel at Smash's camera) x SPARK_GROW, the navy flames lilac and translucent
+E11_CAP = (('sprite_2', 0.12), ('sprite_BG', 0.5), ('line_add', 0.45), ('wave_add', 0.25), ('wave_nml', 1.0),
+           ('sprite_1', 0.4), ('sprite', 0.6), ('line_BG', 1.0), ('BG', 1.0), ('ring', 0.5))
+SECONDARY_V5, SECONDARY_LIFT, SECONDARY_ALPHA, BLACK_ALPHA = True, 0.6, 0.55, 0.35
+SPARK_GROW, SPARKS = 6.0, ('sprite', 'sprite_3')
 E0_CAP = (('stripe', 0.32),)       # v4: the streaks from 2.0 (uncapped, alpha 1: 8.6 / 13.6 square units over 1.0 on grass / grey)
 FX_E11_IDS = {'hit': 0x03410062, 'hit_2': 0x03410066, 'hit_h': 0x03410067, 'hit_2h': 0x03410068}
 FX_AURA_ID, FX_GLASS_ID, FX_E0H_ID = 0x03410063, 0x03410064, 0x03410069
@@ -200,8 +210,23 @@ GLASS_SIZE, GLASS_Z = 0.36, 15.0    # the default glass: in front of the victim,
 DARK_RGBA = (0.08, 0.09, 0.17, 0.7)  # the clip's dark blue-grey at 70%
 DARK_Z, DARK_SIZE = 20.0, 2.2
 GLASS_CAM_Z, GLASS_CAM_SIZE = 25.0, 0.1   # the shards (~140 x 100 units at x1 by their frame 49) over the screen at 25
+# v5 (user: "the glass break effect on the punch is supposed to be clear and apply to the screen"; exe_v46z_camfx5's
+# Effect_Camera confirmed in game): the glass on the camera in every build, Mode 1 (fixed to the screen), from the
+# connect's frame 0 to the punch (XV2: BTL_CMN 108 at entry 4's 0, off at 16; the clip: the cracks over the stopped world
+# 44-58, gone at the punch 59). Its pane (frames 0-8) is 38.6 x 28.8 units: GLASS_SCREEN_SIZE half screen heights a unit
+# (3.67 x 2.74: over a 16:9 screen, 3.56 x 2). Clear: XV2 draws it with T1_VFX_MTN_REFRACT (DATA0.dds is a refraction
+# offset map: drawn as a colour it was the user's yellow panes); Smash 4 has no screen refraction, so the shards' own
+# outlines (each mesh's border edges, its UVs a planar projection of the pane) baked into its texture, light blue-white
+# (XV2's MatCol0 0.5 / 0.8 / 1.0 lifted), the panes black: additive (the material's own blend), only the cracks show
+GLASS_SCREEN_SIZE, GLASS_SCREEN_Z = 0.095, 20.0
+GLASS_LINE_RGB, GLASS_PANE, GLASS_TEX_N, GLASS_LINE_W = (0.75, 0.9, 1.0), 0.03, 512, 2.0
 GLASS_TEX = 0x15141F00
 OUTLINE_A, OUTLINE_IN, OUTLINE_OUT = 110.0, 4, 10   # v3: the white outline; v4: FLASH (Color_Overlay) white at 110 of 255
+# v5 (user: "the outline made Supamario glow harshly"): Smash 4 has no rim-only colour command (the ACMD events list: FLASH /
+# FLASH_FRM / FLASH_NO_STOP / COL_NORMAL overlay the whole body; LIGHT_SHINE / LIGHT_AXIS are light sources), so the
+# overlay much fainter and light blue-white
+OUTLINE_A = 40.0
+OUTLINE_RGB = (215.0, 230.0, 255.0)
 TS_SE = {'ts_basa': ('CAR_S1352_DSH_Basa', 0.0),          # skill SE cue 0, BAC 6
          'ts_dash': ('CAR_S1352_DSH_Dash', 0.0),          # cue 1, BAC 56
          'ts_hazure': ('CAR_S1350_FRT_Hazure', 0.0),      # cue 2, BAC 86 (the whiff)
@@ -378,15 +403,23 @@ def effect_scripts():
         cmd('graphic_effect', FX_DUST, 0, 0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1)])) + [
         cmd('frame', float(DASH_END - OUTLINE_OUT))] + outline_off() + [cmd('frame', float(DASH_END)),
                                                                          cmd('terminate_overlays')]
-    connect = ((time_stop_look() if CAMERA_FX else []) + outline_on() + [cmd('frame', float(CONNECT_END - OUTLINE_OUT))] +
+    connect = ((time_stop_look() if CAMERA_FX else []) + glass_on_screen() + outline_on() + [
+        cmd('frame', float(STRIKE)), cmd('terminate_graphic_effect', FX_GLASS_ID, 1, 1),
+        cmd('frame', float(CONNECT_END - OUTLINE_OUT))] +
                outline_off() + [cmd('frame', float(CONNECT_END)), cmd('terminate_overlays')])
     return dash, connect
 
 
 def time_stop_look():
-    """v3: the time stop on the camera at the connect's frame 0: the darkening (to the punch, then faded) and the glass"""
-    return [cmd('effect_camera', FX_DARK_ID, 0.0, 0.0, DARK_Z, 0.0, 0.0, 0.0, DARK_SIZE, 1, STRIKE, 1),
-            cmd('effect_camera', FX_GLASS_ID, 0.0, 0.0, GLASS_CAM_Z, 0.0, 0.0, 0.0, GLASS_CAM_SIZE, 0, 0, 1)]
+    """v3: the time stop on the camera at the connect's frame 0: the darkening (to the punch, then faded) and the glass.
+    v5: the darkening only in the camera build (CAMERA_FX); the glass is glass_on_screen's in every build"""
+    return [cmd('effect_camera', FX_DARK_ID, 0.0, 0.0, DARK_Z, 0.0, 0.0, 0.0, DARK_SIZE, 1, STRIKE, 1)]
+
+
+def glass_on_screen():
+    """v5: the glass (its cracks) fixed to the screen (Effect_Camera Mode 1, unslowed) from the connect's frame 0, ended
+    at the punch (XV2 turns BTL_CMN 108 off at 16; the clip: gone at the punch); every exit before it: ts_stop_look_off"""
+    return [cmd('effect_camera', FX_GLASS_ID, 0.0, 0.0, GLASS_SCREEN_Z, 0.0, 0.0, 0.0, GLASS_SCREEN_SIZE, 1, 0, 1)]
 
 
 def outline_on():
@@ -397,13 +430,13 @@ def outline_on():
     lit nothing visibly on him (and in the user's point-blank clip the opponent beside him looked washed). Now Smash 4's
     colour overlay, FLASH (Color_Overlay: the smash charge's glow; Mario's own scripts use FLASH (200, 255, 255, 110)),
     white at OUTLINE_A, faded in over OUTLINE_IN (FLASH_FRM)"""
-    return [cmd('color_overlay', 255.0, 255.0, 255.0, 0.0),
-            cmd('change_overlay', float(OUTLINE_IN), 255.0, 255.0, 255.0, OUTLINE_A)]
+    return [cmd('color_overlay', *OUTLINE_RGB, 0.0),
+            cmd('change_overlay', float(OUTLINE_IN), *OUTLINE_RGB, OUTLINE_A)]
 
 
 def outline_off():
     """faded out over OUTLINE_OUT, then COL_NORMAL (Terminate_Overlays) at the motion's end"""
-    return [cmd('change_overlay', float(OUTLINE_OUT), 255.0, 255.0, 255.0, 0.0)]
+    return [cmd('change_overlay', float(OUTLINE_OUT), *OUTLINE_RGB, 0.0)]
 
 
 def sound_scripts():
@@ -604,9 +637,19 @@ def _secondary(p, em, node, emp, images):
     img = images.get(smp['TextureRef']) if smp else None
     tint = X.shape_texture(X.first_cell(img, smp))[1] if img is not None else (1.0, 1.0, 1.0)
     rgb = tuple(float((a + b) / 2.0 * t) for a, b, t in zip(tex['Color1'], tex['Color2'], tint))
+    note = 'secondary colour mixed: (%.2f, %.2f, %.2f)' % rgb
+    if SECONDARY_V5:
+        # v5 (the user: XV2's burst is big translucent violet flames; v4's were deep blue and opaque in game): XV2 draws
+        # these on its white time-stop world as lilac at part alpha: Color2 x the tint lifted halfway to white, alpha x
+        # SECONDARY_ALPHA; a black pair (wave_nml_4's thin black spikes, not seen in the screenshots) at x BLACK_ALPHA
+        c2 = [float(b * t) for b, t in zip(tex['Color2'], tint)]
+        black = max(tex['Color2']) < 0.05 and max(tex['Color1']) < 0.05
+        rgb = tuple(c + (1.0 - c) * SECONDARY_LIFT for c in c2) if not black else (0.0, 0.0, 0.0)
+        f = BLACK_ALPHA if black else SECONDARY_ALPHA
+        note = 'secondary colour (v5): (%.2f, %.2f, %.2f), alpha x%.2f' % (rgb + (f,))
     for track in (0, 1):
         p.set_color_keys(em, track, [rgb + (1.0,)])
-    return ['secondary colour mixed: (%.2f, %.2f, %.2f)' % rgb]
+    return [note]
 
 
 def _frt_pkg(frt_dir):
@@ -685,7 +728,15 @@ def e11_sets(p, e, frt_dir, halo=True):
     for d, name, n0 in made:
         d = bytearray(d)
         _turn(p, d, E11_TURN)
+        if name in SPARKS:
+            p.set_field(d, 'scale', [v * SPARK_GROW for v in p.field(d, 'scale')])
+            n0 = n0 + ['v5: x%g (the sparkle dots visible at Smash\'s camera)' % SPARK_GROW]
         notes.append('%s: %s; %s' % (name, '; '.join(n0), _vibrant(p, d, mats, E11_EMP, name, E11_CAP)))
+        sec = [x for x in n0 if x.startswith('secondary colour (v5)')]
+        if sec:                         # v5: the translucent flames' alpha, after hdr_emitter's x2
+            f = float(sec[0].rsplit('x', 1)[1])
+            for k in ('alpha_init', 'alpha_diff21', 'alpha_diff32'):
+                p.set_field(d, k, p.field(d, k) * f)
         ems.append((bytes(d), name))
     sets = []
     for part in range(0, len(ems), 16):
@@ -835,9 +886,48 @@ def glass_model(cmn_dir, fx_dir, e, preview=None):
         args += ['--preview', preview]
     r = subprocess.run(args, capture_output=True, text=True)
     assert r.returncode == 0, (r.stdout + r.stderr)[-2000:]
+    cracks = glass_cracks(os.path.join(fx_dir, 'model', folder))
     idx = e.add(0, folder)
     assert 0x03410000 | idx == FX_GLASS_ID, ('FX_GLASS_ID is out of date', hex(0x03410000 | idx))
-    return {'folder': folder, 'efc': idx, 'id': '0x%08X' % FX_GLASS_ID}
+    return {'folder': folder, 'efc': idx, 'id': '0x%08X' % FX_GLASS_ID, 'cracks': cracks}
+
+
+def glass_cracks(folder):
+    """v5: the glass's texture made of its shards' outlines (GLASS_*): each mesh's border edges (edges of one triangle
+    only), drawn in UV space (the UVs are a planar projection of the pane, wrapped: frac), GLASS_LINE_W texels wide, in
+    GLASS_LINE_RGB; the rest GLASS_PANE of it (a faint sheen). model.nut rewritten (BC1); returns the line count"""
+    import numpy as np
+    import nud
+    import nut
+    from PIL import Image, ImageDraw
+    n = GLASS_TEX_N
+    im = Image.new('L', (n, n), int(255 * GLASS_PANE))
+    dr = ImageDraw.Draw(im)
+    lines = 0
+    for m in nud.read(os.path.join(folder, 'model.nud')):
+        for pg in m.polygons:
+            uv = np.array(pg.uvs, float).reshape(len(pg.pos), -1)[:, :2]
+            idx = list(pg.idx)
+            cnt = {}
+            for k in range(0, len(idx) - 2, 3):
+                tri = idx[k:k + 3]
+                for a, b in ((tri[0], tri[1]), (tri[1], tri[2]), (tri[2], tri[0])):
+                    key = (min(a, b), max(a, b))
+                    cnt[key] = cnt.get(key, 0) + 1
+            for (a, b), c in cnt.items():
+                if c != 1:
+                    continue
+                pa, pb = uv[a], uv[b]
+                # V runs -1 .. 0 over the pane (wrapped: + 1)
+                dr.line([(pa[0] * n, (pa[1] + 1.0) * n), (pb[0] * n, (pb[1] + 1.0) * n)], fill=255,
+                        width=int(GLASS_LINE_W))
+                lines += 1
+    a = np.asarray(im, np.float32) / 255.0
+    rgb = (a[..., None] * np.array(GLASS_LINE_RGB, np.float32) * 255 + 0.5).astype(np.uint8)
+    img = np.concatenate([rgb, np.full((n, n, 1), 255, np.uint8)], 2)
+    tid = nut.load(os.path.join(folder, 'model.nut'))[1][0].tex_id     # the converter's own texture ID
+    open(os.path.join(folder, 'model.nut'), 'wb').write(nut.write_ntwu([(tid, 0x31, img)]))
+    return lines
 
 
 # ---------------------------------------------------------------- the sound bank
