@@ -1105,7 +1105,7 @@ def script_tests(out, sh_out):
            [('FRAME', [float(B.CONNECT_END)]), ('Terminate_Overlays', [])]})
     print('     note: Stage_Freeze(1, ...) is the stage-only freeze with no flash from exe_v46z_camfx3 on (camera_effects_v3 /'
           ' v4); on exe_v46y_hold its On 1 also turned the scene white (the user\'s v3 clip ca068f15, 70-88)')
-    cam = [(nm(c), c.params) for c in f['effect'].script('specialairs')
+    cam = [(nm(c), [round(x, 4) if isinstance(x, float) else x for x in c.params]) for c in f['effect'].script('specialairs')
            if nm(c) in ('Effect_Camera', 'Terminate_Graphic_Effect', 'FRAME')]
     check('v5: the glass (its cracks) on the screen (Effect_Camera Mode 1, %g half heights a unit, Z %g, unslowed) from the '
           'connect\'s frame 0, ended at once at the punch (%d); the darkening on the camera only in the camera build '
