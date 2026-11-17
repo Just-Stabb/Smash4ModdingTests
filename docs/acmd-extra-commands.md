@@ -1334,6 +1334,12 @@ shattering) need it; Smash 4 had no way to place an effect on the screen.
 - **Draw order / depth:** a 3D effect: under the HUD (damage panels, timer). At 10-30 units it is in front of the
   fighters and the stage (80-300 away); other effects drawn after it, or closer to the camera, can show over it.
 - **Darkening:** an alpha-blended effect (ptcl blend 0) coloured black with an alpha. An additive one can't darken.
+- **Colour (camera_effects v6, Sm4shCommand v1.7.11):** `LAST_EFFECT_SET_COLOR`'s Red / Green / Blue are 0-255 (its
+  handler divides by 255, vt `+0x27C`; vanilla scripts pass 20-255, some over 255 to brighten) and multiply the
+  effect's own colours; `LAST_EFFECT_SET_ALPHA` is in percent. v5's test quad is white (colour 0 keys 1.0, a white
+  texture, combiner colour 0 x texture), so it shows the colour as given; v5's test passed (0, 0.35, 1) for blue,
+  i.e. under 1/255, black: the user's "the squares aren't blue". Black darkenings work at any scale (0 is 0). v6
+  passes (0, 90, 255); the command and the executable are unchanged (exe_v46z_camfx5).
 - **Sizes (camera_effects v2, Sm4shCommand v1.7.7's help):** v1's in-game test blew the screen out to white: it used
   common 0x1000042 as "stars" (the tooltip's label), which is PtcCommonThunder, additive flashes up to 40 units wide,
   looping, at Mode 1 Size 0.08 = 1.6 screen heights. The command's maths was right; bank effects are simply big. Check an
@@ -1413,7 +1419,7 @@ Effect_Camera(Graphic=0x3410013, X=0, Y=0, Z=25, XRot=0, YRot=0, ZRot=15, Size=1
   heights in Mode 1 (the common dizzy stars, scale 2.4-4, ring 8.6 units: Size 0.05 for stars 0.1 screen heights).
 - Sm4shCommand (New Commands / Effects) has seven complete examples (the time-stop darkening, the glass-shatter burst, a
 charge vignette, the common dizzy stars pinned to a corner (v1.7.7: was 0x1000042, the thunder), Mode 2 falling particles,
-v1.7.10's four corners with CPU-particle stars) and the full help. The Hitbox Viewer
+v1.7.10's four corners with CPU-particle stars, blue as 0-255 since v1.7.11) and the full help. The Hitbox Viewer
 draws it in front of its own view (X / Y from the view's centre, Mode 1 in half the view's height; it has no game camera,
 so Z changes nothing there) and lists it with the effects; Frames ends it there too. `port_check` X9 (ERROR): a script
 using it with no executable carrying the cave. How it works: docs/native-notes.md "Camera effects"; tests

@@ -36,6 +36,8 @@ the offset maths and the emitter types apart, the squash's regressions (billboar
   AppealLwR  effect: the ice smoke (Mode 0, Z 30, Size 0.25), a one-shot (regression)
   AppealLwL  effect: the black square over the whole screen (Mode 1, Size 2, black 60 %) (regression)
   game.bin is the user's own (v4's Stage_Freeze test on AppealHiR put back).
+v6: the same, the squares' blue given as LAST_EFFECT_SET_COLOR takes it, 0-255: (0, 90, 255) (v5's (0, 0.35, 1) was
+black: the user's test, "the up taunt's squares aren't blue").
 The square (DARK_QUAD, CamFxDarkQuad): one alpha-blended billboard 2 units wide, the common RayGunShotFlash2_Copy1's
 emitter and shader with (v4) a solid white texture, one particle living until the set fades (fade 1/8).
 """
@@ -86,7 +88,9 @@ def scripts(quad_id):
         return [camfx(quad_id, x, y, z, size, mode, frames, 1),
                 cmd('LAST_EFFECT_SET_COLOR', Red=rgb[0], Green=rgb[1], Blue=rgb[2]),
                 cmd('LAST_EFFECT_SET_ALPHA', Alpha=float(alpha))]
-    blue, black = (0.0, 0.35, 1.0), (0.0, 0.0, 0.0)
+    # LAST_EFFECT_SET_COLOR is 0-255 (the handler divides by 255; the quad is white, so it shows the colour as given).
+    # v5 passed (0, 0.35, 1): 1/255 at most, black, so its "blue" corner squares were black (v6 fix)
+    blue, black = (0.0, 90.0, 255.0), (0.0, 0.0, 0.0)
     squares = sum((quad(x, y, 20.0, 0.1, 1, blue, 80) for x, y in CORNERS), [])
     stars4 = [camfx(STARS, x, y, 20.0, STAR_SIZE, 1, 120) for x, y in CORNERS]
     corners = [wait] + squares + [end]
