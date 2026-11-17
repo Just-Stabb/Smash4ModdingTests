@@ -9,6 +9,40 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: v18 (`scratchpad/byleth_v18_fix.zip`, over rapid_setoff_v1 (+ fighter_params_v2): body game.bin, master.mscsb, the vl; exe unchanged (exe_v46y_hold); fighter_param.bin unchanged; in-game TEST)
+
+User, rapid_setoff v1 test (clips `626f767f-...213147327.mp4`: rapid jab on DK; `75dbb69e-...213159819.mp4`: up special under
+a ledge; 60 fps): (1) "the rapid jab still doesn't work ... how often the hitbox refreshes"; (2) "up special prioritizes
+walls over ledges now, and the tether detection for ledges is too strict". Coordinator, from the user: (3) "down special
+doesn't have its super armor from Ultimate"; (4) "many of Byleth's cancel frames seem to be incorrect (e.g. down tilt)".
+
+| point | cause (evidence) | fix |
+|---|---|---|
+| rapid jab: one hit a loop | clip 1: DK's percent flashes at frames 85, 102, 121, 140 ... 292 (every 19 frames, 3 % -> 8 %: 12 hits of 0.4 %); Ultimate's loop lands 6 (2 / 5 / 8 / 11 / 14 / 17, each a 1-frame ATTACK after clear_all, 18-frame loop; with its 2-frame hitlag ~41 hits in that time). DK stays put (Hitbox_Hold works: no slide). The loop keeps its 19 frames (the motion's length): Byleth had no hitstop on these hits. Ruled out offline: **the hit record** (`scratchpad/v18/bin/hitlog_sim.py`, unicorn on exe_v46y_hold, the game's handlers: Extra hitboxes, a record added, Remove_All_Hitboxes, the same IDs again -> the Part's record cleared by set_attack `0x02C08848`), **the script** (`interp_sim.py`: the game's ACMD interpreter runs all 6 waves, Hit_Log_Clear included now), the whip article (no hitboxes in its scripts), the root (no TransN motion in C00Attack100). Not proven in game which Smash 4 rule drops waves 2 - 6; the one left with evidence: a fighter in hitstop can't be hit (Sephiroth test 112), and here the attacker's hitstop was 0 while the victim's isn't | each wave starts with `Hit_Log_Clear(0)`, its hits carry Ultimate's hitlag as fixed frames on both sides (HitstopFrames / SelfHitstopFrames 2 = `ultimate_acmd.ult_hitlag(0.4, 0.4)`); 1-frame hits at Ultimate's frames kept; Hitbox_Hold(ID, 1) kept (`master_build.rapid_v18`; the pipeline default `ultimate_acmd` HOLD_WAVE_CLEAR). **port_check S30 rapid-cadence** (ERROR on rapid_setoff v1's install) |
+| up special: the ledge too strict | Ultimate's SpecialAirHi init (lua2cpp f_7208a1e220) selects a hang data in the air before the loop (CONST 0xcfd4; the frame-15 ACMD one is CONST 0xf23c = master's AIR_LASSO, cliff_hang_data[3]): the common AIR_LASSO, his cliff_hang_data[1] (p2 (-5, -35), p1 (75, 85)). v10 - v17 checked the normal box (entry 0: 16 ahead, 7.5 - 26 up) on 12 - 14. Clip 2 (frames 186 - 193): the up special from under the right ledge, the ledge ~16 ahead / ~43 above him at 12 - 16 (scale: his height ~125 px), not caught; the tip latched the wall under its corner (red catch flash 191, the cling flash 193), then the wall jump. Diagram `scratchpad/v18/ledge/ledge_boxes_v17_v18.png` | vl group 7 **entry 4** = cliff_hang_data[1] in the tether-box mapping (-5, -35, 80, 120) (entry 3 is ZSS's, kept), selected in the 0xF1 main and on 12 - 14; 15 - 16 entry 2 as before (`master_build.vl_v18`, master.c MASTER_HI_INIT_BOX). **port_check S13 tether-ledge-box** |
+| up special: wall before ledge | `master_hi_line` latched any wall the tip met (17 - 26) with no ledge test; the ledge check ran only in AIR_LASSO_FLAG_CHECK (12 - 16) | a wall met while a catchable ledge is in the tether box (func_99, entry 2 kept from 15) -> the ledge (0xF2), not the latch. **port_check S33 ledge-before-wall** |
+| Aymr: no armor | Ultimate: SpecialLw / SpecialAirLw START_SUPER_ARMOR 34, END 64; the status code (f_7208a11ba0) set_no_reaction_mode_status with param_special_lw super_armor_damage_max 30. Ours (since v1): `DamageModule(0xb, 3, 30)` once, in a one-frame window (`f >= 34 && f < 35`), cleared at 64: the MSC does call it (test model) but the user saw none in game; not proven why (the game resetting the status armor slot in between is the candidate: Sephiroth's working armor is put back every frame) | `master_lw_armor`: every frame of 34 - 63 (the turn keeps it on the move's own frame), off once after it and at every exit (master_lw_end). Not a translator gap (status code). **port_check S32 armor** (WARN for one-frame windows; ERROR with none) |
+| cancel frames | vl byte 2 of every move Ultimate has = its motion_list cancel (audit `scratchpad/v18/bin/cancel_audit.py`: down tilt 36 = Ultimate's 36, ZSS's also 36; motion 60 frames both; no FT_MOTION_RATE in it). The leftovers: his **angled forward tilts** (0x57 / 0x5B, copies of attack_s3's script; Ultimate has no motion of their own, so C1 skipped them) at ZSS's **29** (attack_s3: **36**), and the **dodges** at ZSS's 25 / 28 / 28 (Ultimate 27 / 30 / 34). Checked too: FT_MOTION_RATE -> Set_Frame_Duration is right (both a frame-length multiplier: Ultimate's ExeFS FT_MOTION_RATE `0x22AD9A0` and Smash 4's handler `0x02BE7EC4` both set the rate 1 / x) | 0x57 / 0x5B 29 -> 36, 0x4B / 0x4C / 0x4D 25 / 28 / 28 -> 27 / 30 / 34 (`master_build.vl_v18`). **port_check C1** now checks script copies and the dodges (ERROR on the old install) |
+
+Every move, vl byte 2 (Ultimate's motion_list cancel) before -> after: jab 1 / 2 / 3 23 / 25 / 33; rapid start / loop 0, end 51;
+dash attack 45; forward tilt 36, **angled 29 -> 36**; up tilt 35; down tilt 36; forward smash (all three) 66; up smash 58;
+down smash 72; aerials n / f / b / hi / lw 52 / 40 / 47 / 49 / 60; grab / dash / pivot 40 / 48 / 43; pummel 7; throws f / b /
+hi / lw 36 / 44 / 38 / 32; getup attacks 46; taunts 50; specials N 34 (max 48, cancel 5), S 54 (air 50, landing 30), Hi 54
+(wall jump 24), Lw 118 (hit 68, landings 8 / 38); **dodges spot / forward / back 25 / 28 / 28 -> 27 / 30 / 34**. Common
+motions (landings, ledge, item throws, air dodge) keep Smash 4's rules (C1's scope).
+
+Checks: `tools/master_specials_test.py` **156 checks, 0 problems** (v18: the ledge boxes by frame (entry 4 on 12 - 14), the
+main's init box, the clip's ledge caught at 12 / 15, far / below ledges, a wall under a catchable ledge -> the ledge, no
+ledge -> the latch, a ledge facing away -> the latch; Aymr's armor every frame 34 - 63 on ground / air, off after, kept
+through a turn past 34, none in a turn before 34, off at the end; the translator's Attack100 waves, ult_hitlag, the
+installed attack100 = the translator's, rapid_v18 idempotent). port_check (v4 ... v17_fix, results_panels_v1,
+rapid_setoff_v1, fighter_params_v2, v18): **0 ERROR**, 31 WARN (`scratchpad/v18/pc_v18.log`); without fighter_params_v2 a
+P4 size ERROR (v17's fighter_param.bin: the size agent's work). On rapid_setoff v1's install the new rules give C1 (copies,
+dodges) and S30; on v17's master.c S13 tether-ledge-box, S33 and S32 (WARN). Build: `python3 tools/master_build.py v18 GAME
+MTABLE VL_IN VL_OUT` (reproduces the shipped files byte for byte) and `compile_msc`. Not done: the Hitbox Viewer pass (no
+positions changed); the rapid jab's cause confirmed in game (the README test list asks for the debug counters if it still
+lands once a loop); Sm4shCommand's Hit_Log_Clear help still says the record survives Remove_All_Hitboxes (docs corrected).
+
 ## Status: rapid_setoff v1 (`scratchpad/rapid_setoff_v1.zip`, over v17: exe_v46y_hold, body game.bin, Sm4shCommand v1.7.5; in-game TEST)
 
 User: "can you recreate the Ultimate setting for rapid jabs?" (v17 held the loop with angle 80.)
@@ -930,6 +964,12 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
+00000000000000000. **v18 fix** (sent: `scratchpad/byleth_v18_fix.zip`, no exe): test list in `scratchpad/byleth/INSTALL_README_v18.txt`.
+   If the rapid jab still lands once a loop: the debug words at `0x04B93900` (+0x08 Extra hits found, +0x10 / +0x30 the
+   victim's / attacker's last hitstop, both should read 2) before / after 3 s of rapid jab, and a clip; then a diag on the
+   victim's hit rejection (the collision pass's checks after the Part record). If ledges are still missed: the diag build's
+   k lines on 12 - 16 (is_status_cliff, the box). If Aymr still flinches: which hit (its damage: over 30 breaks the armor,
+   as Ultimate's super_armor_damage_max) and the frame.
 0000000000000000. **v17 fix** (sent: `scratchpad/byleth_v17_fix.zip`, no exe): test list in
    `scratchpad/byleth/INSTALL_README_v17.txt`. If the whip still vanishes at the catch: a clip of frames 0 - 2 of the catch
    (a one-frame gap is expected), then read the whip kind's native handlers (docs/native-notes.md "Article ops") or move
