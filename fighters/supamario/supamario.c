@@ -41221,8 +41221,8 @@ void sh_tick()
 // same on the ground and in the air; v1's energy-3 speeds never moved him in the air), the ground slides off edges into
 // the air and the dash goes on, Time Skip's own tracking without v1's ground rule (ts_track: up off the ground, down
 // past an edge), the use's reset also from the MSC (ts_reset), a point-blank detection box (the script's ID 1), the
-// purple lines at the punch / shards in the wind-up / the glass (ts_lines, ts_shards, ts_glass), the darkened time
-// stop (the script's Screen_Tint), XV2's hit look from its own dimmer sets.
+// purple lines at the punch / the glass (ts_lines, ts_glass), XV2's hit look from its own dimmer sets. v3: Hit's aura at
+// the start (ts_aura), the darkened time stop from the MSC (ts_tint, VAR_31 TS_V_FX), ended on any exit before the punch.
 // ===================================================================
 
 // XV2's root travel of SpecialS (units a frame along his facing, by the motion frame): the wind-up's step and the stop
@@ -41393,12 +41393,34 @@ void ts_lines(float x, float y, float z)
     EffectModule(0x3, TS_FX_LINES, x, y, z, 0, 0, rz, TS_FX_LINES_SIZE, 0, 0xffffffff);
 }
 
-// v2: XV2's skill effect 0 (the same EEPK; shards_set): pale lavender light shards rising round him in the wind-up (at
-// TS_SHARDS_A / _B) and every TS_SHARDS_EVERY frames of a held charge; vertical, either facing
-void ts_shards()
+// v3 (user: "creates a purple aura at the start", "the purple aura gets left behind after the movement begins"): Hit's own
+// aura (aura_setting.aur -> BTL_AURA's BoostV_Loop, tools/supamario_timeskip_build.py aura_set; v2's shards stand-in
+// replaced) at his middle, world-placed, its particles staying where they were born: left behind as he dashes. At
+// TS_AURA_AT and every TS_AURA_EVERY frames of a held charge
+void ts_aura()
 {
-    EffectModule(0x3, TS_FX_SHARDS, WorkModuleF(0, 0x0f000000), WorkModuleF(0, 0x0f000001),
-                 WorkModuleF(0, 0x0f000002), 0, 0, 0, 1.0f, 0, 0xffffffff);
+    EffectModule(0x3, TS_FX_AURA, WorkModuleF(0, 0x0f000000), WorkModuleF(0, 0x0f000001) + TS_AURA_Y,
+                 WorkModuleF(0, 0x0f000002), 0, 0, 0, TS_AURA_SIZE, 0, 0xffffffff);
+}
+
+// v3 (the user: the darkening must end if the move is cut before the punch): XV2's darkened time stop as the MSC's
+// screen tint (EffectModule op 0 = Screen_Tint's EffectModule vt +0x19C: slot, frames in, R, G, B, A, layer, priority;
+// op 1 = End_Screen_Tint's vt +0x1B4: slot, frames out; the handler 0x02004530, Meta Knight's Final Smash uses both),
+// so the status's end can take it off: on at the catch, off at the punch or whenever the move ends before it.
+// TS_V_FX (VAR_31) 1 while it is on
+void ts_tint(int on)
+{
+    if (on != 0)
+    {
+        EffectModule(0, TS_TINT_SLOT, TS_TINT_IN, TS_TINT_R, TS_TINT_G, TS_TINT_B, TS_TINT_A, 0, 0xff);
+        WorkModule(0, 1.0f, TS_V_FX);
+        return;
+    }
+    if (WorkModuleF(0, TS_V_FX) > 0.5f)
+    {
+        EffectModule(0x1, TS_TINT_SLOT, TS_TINT_OUT);
+        WorkModule(0, 0.0f, TS_V_FX);
+    }
 }
 
 // v2 (item 11): BTL_CMN effect 108 (HIT_DmgGrs2, XV2's glass that shatters as time stops; on XV2's camera) as a model in
@@ -41708,6 +41730,7 @@ void ts_catch(int s, int sh)
     WorkModule(0, TS_INV_STEP, 0x0F00011C);
     ts_still();
     ts_glass(s);
+    ts_tint(0x1);
     func_22(0x21d, 0, 1.0f);
 }
 
@@ -41920,6 +41943,7 @@ void ts_connect(float fr)
         ts_still();
         return;
     }
+    ts_tint(0);                                     // v3: the time stop's darkening off at the punch (once)
     if (s > 0)
     {
         WorkModule(0, (float)s, TS_V_K);         // the victim's slot kept for the punch's look (TS_V_K is free now)
@@ -41987,9 +42011,9 @@ void ts_loop()
     if (ph < 1.5f)
     {
         ts_brev(fr);
-        if ((fr > TS_SHARDS_A - 0.5f && fr < TS_SHARDS_A + 0.5f) || (fr > TS_SHARDS_B - 0.5f && fr < TS_SHARDS_B + 0.5f))
+        if (fr > TS_AURA_AT - 0.5f && fr < TS_AURA_AT + 0.5f)
         {
-            ts_shards();
+            ts_aura();
         }
         ts_move(ts_vroot(fr), 0.0f);
         if (fr < TS_WIND_END - 0.5f)
@@ -42016,9 +42040,9 @@ void ts_loop()
             return;
         }
         WorkModule(0, WorkModuleF(0, TS_V_CHG) + 1.0f, TS_V_CHG);
-        if (WorkModuleF(0, TS_V_CHG) - TS_SHARDS_EVERY * (float)(int)(WorkModuleF(0, TS_V_CHG) / TS_SHARDS_EVERY) < 0.5f)
+        if (WorkModuleF(0, TS_V_CHG) - TS_AURA_EVERY * (float)(int)(WorkModuleF(0, TS_V_CHG) / TS_AURA_EVERY) < 0.5f)
         {
-            ts_shards();
+            ts_aura();
         }
         if (ts_charged() != 0)
         {
@@ -42053,9 +42077,16 @@ void ts_loop()
 // cleared (in the air his gravity's ease goes on: ts_tick)
 void ts_end()
 {
+    ts_tint(0);                     // v3: cut before the punch (a hit, a KO, the match's end...): the darkening off
     if (WorkModuleF(0, TS_V_PH) == 0.0f)
     {
         return;
+    }
+    if (WorkModuleF(0, TS_V_PH) > 4.5f && WorkModuleF(0, TS_V_PH) < 5.5f)
+    {
+        EffectModule(0x2723, TS_FX_GLASS, 0x1, 0x1);    // v3: cut in the stopped time: the glass taken off (the
+                                                        // others are let go by the script / ts_connect no longer
+                                                        // renewing their freeze: at most a few frames)
     }
     if (WorkModuleF(0, TS_V_SLOT) > 0.5f)
     {

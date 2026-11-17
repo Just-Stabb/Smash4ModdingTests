@@ -100,13 +100,16 @@ STRIKE_Z, STRIKE_Y = HOLD_X, round(HOLD_Y + VICTIM_MID, 2)
 SH_TAKE, SH_STUN = 0.5, 26
 SH_IASA = STRIKE + 16
 SH_BONUS = 6.0
-STAGE_FREEZE_SAFETY = 30            # Stage_Freeze's own Frames: it ends by itself if the move is cut before the punch
+STAGE_FREEZE_RENEW = 4              # v3: Stage_Freeze(1, 4) renewed every frame of the stopped time by the connect's game
+                                    # script (v2: once, 30 frames): a move cut before the punch lets the stage go within 4
+                                    # frames (the script stops); 4 > the catch's 3-frame freeze, when the script waits
 INV_STEP = 2.0
 TURN_STICK, TURN_WINDOW = 0.5, 4    # the B-reverse (Sledgehammer's)
 ST_SIDE, ST_FALL = 0x153, 0xE
 
 # ---------------------------------------------------------------- variables (VAR_22-30: Sledgehammer uses VAR_0-21)
-V_PH, V_CHG, V_SLOT, V_K, V_USED, V_BREV, V_EASE, V_AIM, V_SHV = (0x0F000316 + i for i in range(9))
+V_PH, V_CHG, V_SLOT, V_K, V_USED, V_BREV, V_EASE, V_AIM, V_SHV, V_FX = (0x0F000316 + i for i in range(10))   # v3: VAR_31
+                                    # TS_V_FX (1 while the time stop's darkening is on)
 USED_INDEX = V_USED - 0x0F000000     # the variable reset's index (VAR_26: 0x31A)
 
 # ---------------------------------------------------------------- effects / sounds
@@ -136,10 +139,10 @@ FX_LOD_ID = 0x03410061
 # v2 (user: "There's no purple line being emitted over Supamario during the move"; the user's XV2 clip fc8b90ed): the
 # purple is XV2's skill effect 11 at the punch (BAC entry 4 item 8, frame 16: EEPK type 5, skill 1352, effect 11): purple
 # speed lines from the victim forward along the punch (clip frames 60-100), then a long purple line along the victim's
-# flight fading out (to ~130); and its effect 0 (entry 0 item 9, frame 0 on b_C_Base): pale lavender light shards rising
-# round him in the wind-up (clip 8-30). No EEPK for 1352_HIK_DSH in the files sent (README "Time Skip v2"): stand-ins
+# flight fading out (to ~130); and its effect 0 (entry 0 item 9, frame 0 on b_C_Base): pale purple streaks rising
+# round him in the wind-up, left behind as he dashes (clip 8-30): v3 Hit's own aura (aura_set). No EEPK for 1352_HIK_DSH in the files sent (README "Time Skip v2"): stand-ins
 # from Btl_HitL's flash_1_1 (a soft disc billboard) stretched into streaks. Nothing during the dash itself (the clip has none)
-FX_LINES_ID, FX_SHARDS_ID, FX_GLASS_ID = 0x03410062, 0x03410063, 0x03410064
+FX_LINES_ID, FX_AURA_ID, FX_GLASS_ID = 0x03410062, 0x03410063, 0x03410064
 LINE_TEMPLATE = 'flash_1_1'         # Btl_HitL's soft flash disc, a billboard (particle type 0: always facing the camera,
                                     # its scale X / Y the screen's), stretched into a streak: horizontal for the punch's
                                     # lines (his facing, either way), vertical for the shards
@@ -148,17 +151,20 @@ LINES_N, LINES_BAND, LINES_SPEED, LINES_LIFE = 8, 4.0, 0.25, 45
 LINES_SCALE = (24.0, 0.7)           # the billboard's X (the screen's horizontal: along the punch) and Y
 LONG_SCALE, LONG_LIFE = (60.0, 0.5), 85
 LINES_SIZE = 1.0
-SHARDS_RGB = (0.16, 0.13, 0.26)     # the clip's pale lavender (the flash shader ~3x; additive)
-SHARDS_N, SHARDS_BAND, SHARDS_SPEED, SHARDS_LIFE, SHARDS_SCALE = 6, 4.0, 0.35, 16, (0.6, 7.0)
-SHARDS_AT = (6, 14)                 # wind-up frames (XV2's effect 0 from BAC 0, the shards rising to ~30); and every
-SHARDS_EVERY = 12                   # 12 frames of a held charge
+AURA_EMP = 'BoostV_Loop.emp'        # v3: Hit's aura (aura_setting.aur: CMS 135 -> aura 1 -> BTL_AURA 41 BoostLoop)
+AURA_AT, AURA_EMIT, AURA_EVERY = 4, 20, 20   # its start (motion frame), its emission (frames: the clip's 8-28), again
+                                    # every 20 frames of a held charge
+AURA_CAP = 0.8                      # each emitter's brightest drawn channel (vibrant, not blown out on a bright stage)
+AURA_SIZE = 1.75                    # xv2_smash_fx.SIZE: XV2's x1.0 at g_C_Pelvis
+AURA_Y = 4.0                        # his middle (g_C_Pelvis)
 # v2 (item 11, the clip's time stop, frames 44-58): XV2 inverts the world (BPE 78) under BTL_CMN effect 108's glass
 # (HIT_DmgGrs2, on the camera). Smash 4: Screen_Tint (Sonic's Final Smash's darkening: mode 0, frames in, R, G, B, A,
 # layer 0, priority 0xFF) from the connect to the punch, End_Screen_Tint fading it out over TINT_OUT frames; the glass
 # a world-placed model in front of the victim (GLASS_*). Its own pieces (time_stop_look / ts_glass) so the camera-attached
 # command (camera_effects_v1) can replace them later
-TINT = (0, 4, 0x14, 0x16, 0x2C, 0xB4, 0, 0xFF)
+TINT = (0, 4, 0x14, 0x16, 0x2C, 0xB4, 0, 0xFF)  # v3: the MSC's (ts_tint: EffectModule op 0 / 1), slot 0
 TINT_OUT = 15
+OUTLINE_A, OUTLINE_IN, OUTLINE_OUT, OUTLINE_SRC = 110.0, 4, 10, (75.0, -10.0)   # v3: the white outline (rim light)
 GLASS_SIZE, GLASS_Z, GLASS_TEX = 0.36, 15.0, 0x15141F00
 TS_SE = {'ts_basa': ('CAR_S1352_DSH_Basa', 0.0),          # skill SE cue 0, BAC 6
          'ts_dash': ('CAR_S1352_DSH_Dash', 0.0),          # cue 1, BAC 56
@@ -189,9 +195,10 @@ def msc_values(root_speed=None):
             'TS_HOLD_X': fl(HOLD_X), 'TS_HOLD_Y': fl(HOLD_Y), 'TS_INV_STEP': fl(INV_STEP),
             'TS_FX_HITLOD': '0x%X' % FX_LOD_ID, 'TS_FX_HITL': '0x%X' % FX_IDS['hitl'],
             'TS_HIT2_Z': fl(HIT2_Z), 'TS_HIT2_Y': fl(HIT2_Y), 'TS_HIT2_SIZE': fl(HIT2_SIZE),
-            'TS_FX_LINES': '0x%X' % FX_LINES_ID, 'TS_FX_LINES_SIZE': fl(LINES_SIZE), 'TS_FX_SHARDS': '0x%X' % FX_SHARDS_ID,
+            'TS_FX_LINES': '0x%X' % FX_LINES_ID, 'TS_FX_LINES_SIZE': fl(LINES_SIZE), 'TS_FX_AURA': '0x%X' % FX_AURA_ID,
             'TS_FX_GLASS': '0x%X' % FX_GLASS_ID, 'TS_GLASS_SIZE': fl(GLASS_SIZE), 'TS_GLASS_Z': fl(GLASS_Z),
-            'TS_SHARDS_A': fl(SHARDS_AT[0]), 'TS_SHARDS_B': fl(SHARDS_AT[1]), 'TS_SHARDS_EVERY': fl(SHARDS_EVERY),
+            'TS_AURA_AT': fl(AURA_AT), 'TS_AURA_EVERY': fl(AURA_EVERY), 'TS_AURA_SIZE': fl(AURA_SIZE),
+            'TS_AURA_Y': fl(AURA_Y),
             'TS_FX_HITL_2': '0x%X' % FX_IDS['hitl_2'], 'TS_FX_SWEAT': '0x%X' % SH_FX['sweat'],
             'TS_FX_HITLOD_SIZE': fl(round(EEPK_SCALE['Btl_HitLOD.emp'] * FX_SCALE, 4)),
             'TS_FX_HITL_SIZE': fl(round(EEPK_SCALE['Btl_HitL.emp'] * FX_SCALE, 4)),
@@ -204,9 +211,11 @@ def msc_values(root_speed=None):
             'TS_TRACK_TAN2': fl(round(math.tan(math.radians(TRACK_DEG)) ** 2, 4)),
             'TS_EASE_FRAMES': fl(EASE_FRAMES), 'TS_FALL_EASE': fl(FALL_EASE), 'TS_USED_INDEX': fl(USED_INDEX),
             'TS_STRIKE_DMG': fl(STRIKE_HIT['Damage']), 'TS_SH_TAKE': fl(SH_TAKE), 'TS_SH_STUN': fl(SH_STUN),
-            'TS_SH_IASA': fl(SH_IASA)}
+            'TS_SH_IASA': fl(SH_IASA), 'TS_TINT_SLOT': str(TINT[0]), 'TS_TINT_IN': str(TINT[1]),
+            'TS_TINT_R': '0x%X' % TINT[2], 'TS_TINT_G': '0x%X' % TINT[3], 'TS_TINT_B': '0x%X' % TINT[4],
+            'TS_TINT_A': '0x%X' % TINT[5], 'TS_TINT_OUT': str(TINT_OUT)}
     for n, v in (('PH', V_PH), ('CHG', V_CHG), ('SLOT', V_SLOT), ('K', V_K), ('USED', V_USED), ('BREV', V_BREV),
-                 ('EASE', V_EASE), ('AIM', V_AIM), ('SHV', V_SHV)):
+                 ('EASE', V_EASE), ('AIM', V_AIM), ('SHV', V_SHV), ('FX', V_FX)):
         vals['TS_V_' + n] = '0x%X' % v
     return vals
 
@@ -279,12 +288,15 @@ DASHING, CHARGING = 2.5, 1.5        # TS_V_PH > 2.5: the dash; < 1.5: the wind-u
 FULL = CHARGE - 0.5                 # TS_V_CHG > FULL: fully charged
 
 
-def time_stop_look(on):
-    """v2 (item 11): the darkened world of XV2's time stop: Screen_Tint at the connect, End_Screen_Tint at the punch
-    (TINT_OUT frames out). Kept apart so camera_effects_v1's command can take its place"""
-    if on:
-        return [cmd('screen_tint', *TINT)]
-    return [cmd('end_screen_tint', 0, TINT_OUT)]
+def freeze_loop():
+    """v3: the stage stopped for the stopped time, renewed every frame (Stage_Freeze(1, STAGE_FREEZE_RENEW) then WAIT 1,
+    STRIKE times): it lasts only while this script runs, so a move cut before the punch lets the stage go within
+    STAGE_FREEZE_RENEW frames. The darkening is the MSC's (ts_tint: v2 had Screen_Tint here, which nothing ended on a cut)"""
+    return GBloop(STRIKE, [cmd('stage_freeze', 1, STAGE_FREEZE_RENEW), cmd('wait', 1.0)])
+
+
+def GBloop(n, body):
+    return [cmd('set_loop', n)] + body + [cmd('goto', -size(body))]
 
 
 def game_scripts():
@@ -294,8 +306,7 @@ def game_scripts():
     the punch (uncharged: shieldable; fully charged: unblockable, + SH_BONUS on a fighter caught shielding), off 2
     frames later"""
     dash = [cmd('frame', float(HIT_FROM))] + if_(V_PH, 5, DASHING, [catch_box(0), catch_box(1)])
-    connect = ([cmd('stage_freeze', 1, STAGE_FREEZE_SAFETY)] + time_stop_look(True) +
-               [cmd('frame', float(STRIKE)), cmd('stage_freeze', 0, 0)] + time_stop_look(False) +
+    connect = (freeze_loop() + [cmd('frame', float(STRIKE)), cmd('stage_freeze', 0, 0)] +
                [cmd('hit_log_clear', 1)] +
                if_(V_CHG, 4, FULL, [strike_box()]) +
                if_(V_CHG, 5, FULL, if_(V_SHV, 5, 0.5, [strike_box(True, SH_BONUS)]) +
@@ -308,9 +319,23 @@ def effect_scripts():
     """XV2's Stage BG 60 (the stage's dust, at the dash's start BAC 56) as Smash's dash cloud on the ground. The skill's
     own effects (EEPK effects 0 at BAC 0 and 11 at the strike) and BTL_CMN 108 (HIT_DmgGrs2, a model on the camera
     0-16 of the connect) aren't there / can't be: none; the strike's hit look is the MSC's"""
-    dash = [cmd('frame', float(MOVE_FROM))] + if_(0x0F000116, 0, 0, if_(V_PH, 5, DASHING, [
-        cmd('graphic_effect', FX_DUST, 0, 0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1)]))
-    return dash, []
+    dash = outline_on() + [cmd('frame', float(MOVE_FROM))] + if_(0x0F000116, 0, 0, if_(V_PH, 5, DASHING, [
+        cmd('graphic_effect', FX_DUST, 0, 0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1)])) + [
+        cmd('frame', float(DASH_END - OUTLINE_OUT)), outline_off()]
+    connect = outline_on() + [cmd('frame', float(CONNECT_END - OUTLINE_OUT)), outline_off()]
+    return dash, connect
+
+
+def outline_on():
+    """v3 (user: "Time Skip wraps the user in a faint white translucent glowing outline"; XV2's BPE 85 "Flashing White
+    Body Outline 3", BAC entry 0 at 20 and 100, entry 4 at the punch; the clip: on him through the whole move): Smash 4's
+    rim light (Flash_Light_Effect, LIGHT_SHINE: Mario's fireball's), white, faint (OUTLINE_A of 255), faded in"""
+    return [cmd('flash_light_effect', 255.0, 255.0, 255.0, 0.0, OUTLINE_SRC[0], OUTLINE_SRC[1]),
+            cmd('change_flash_light_color', float(OUTLINE_IN), 255.0, 255.0, 255.0, OUTLINE_A)]
+
+
+def outline_off():
+    return cmd('change_flash_light_color', float(OUTLINE_OUT), 255.0, 255.0, 255.0, 0.0)
 
 
 def sound_scripts():
@@ -419,7 +444,7 @@ def convert_fx(cmn_dir, fx_dir, halo=True):
                  'by_set': {p.set_name(si): len(v) for si, v in glow.items()}}
     lod = lod_copy(p, e)
     lines = lines_set(p, e, sets['hitl']['set_index'])
-    shards = shards_set(p, e, sets['hitl']['set_index'])
+    aura = aura_set(p, e, cmn_dir)
     glass = glass_model(cmn_dir, fx_dir, e)
     out = p.build()
     assert ptcl.Ptcl(out).validate() == []
@@ -427,7 +452,7 @@ def convert_fx(cmn_dir, fx_dir, halo=True):
     open(os.path.join(fx_dir, base + '.efc'), 'wb').write(e.build())
     bad = FX.facing_emitters(p, [s['set_index'] for s in sets.values()] + [lod['set_index']])
     return {'sets': sets, 'skipped': log, 'notes': notes, 'halos': halos, 'ptcl_bytes': [before, len(out)],
-            'facing_problems': bad, 'lod': lod, 'lines': lines, 'shards': shards, 'glass': glass}
+            'facing_problems': bad, 'lod': lod, 'lines': lines, 'aura': aura, 'glass': glass}
 
 
 def lod_copy(p, e):
@@ -507,20 +532,59 @@ def lines_set(p, e, hitl_si):
     return {'set': 'PtcSupamarioTsLines', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_LINES_ID}
 
 
-def shards_set(p, e, hitl_si):
-    """v2: XV2's skill effect 0 (BAC entry 0 item 9 at frame 0 on b_C_Base, the same EEPK) as the clip shows it
-    (frames 8-30): pale lavender light shards rising round him in the wind-up. Stand-in: SHARDS_N vertical streaks (+Y,
-    no turn: either facing) in a band his width at his feet, rising, SHARDS_LIFE frames"""
-    src = next(em['data'] for em in p.sets[hitl_si]['emitters'] if em['data'] is not None and
-               p.emitter_name(em['data']) == LINE_TEMPLATE)
-    d = _line_emitter(p, src, rgb=SHARDS_RGB, emit_rate=float(SHARDS_N), volume_type=11,
-                      volume_radius=[SHARDS_BAND, 0.5, 1.0], emitter_velocity=SHARDS_SPEED, emit_direction=[0.0, 1.0, 0.0],
-                      dispersion_angle=6.0, ptcl_life=SHARDS_LIFE, ptcl_life_random=6, scale=list(SHARDS_SCALE),
-                      scale_random=[0.0, 0.5], srt=((1, 1, 1), (0, 0, 0), (0.0, SHARDS_SCALE[1] * 0.5, 0.0)))
-    si = p.new_set('PtcSupamarioTsShards', [d], ['shard'])
+def aura_set(p, e, cmn_dir):
+    """v3 (user: "Time Skip ... creates a purple aura at the start", "the purple aura gets left behind after the movement
+    begins"; the clip, frames 8-30: pale purple streaks rising round him, left where they were as he dashes off, gone by
+    ~40): Hit's own aura. aura_setting.aur: Hit (CMS 135, every costume) has aura 1, whose BoostLoop is BTL_AURA.eepk
+    effect 41 (BoostV_Loop.emp on g_C_Pelvis, x1.0; with AuraLoop_V's model / trace / light, not converted). Its EMP
+    (in BTL_AURA.eepk) converted as the other XV2 effects (xv2_to_ptcl, vibrant glare, facing-safe); every emitter
+    emits for AURA_EMIT frames only and its particles stay where they were born (follow none): the MSC places it at his
+    middle (world, unturned) at AURA_AT and every AURA_EVERY frames of a held charge, so it is left behind as he dashes.
+    Each emitter's brightest drawn channel capped at AURA_CAP (bright stages). Replaces v2's lavender shards stand-in"""
+    import tempfile
+    import supamario_sledgehammer_build as SB
+    import xv2_smash_fx as FX
+    import xv2_to_ptcl
+    import xv2vfx
+    old = xv2_to_ptcl.TEX_MAX
+    try:
+        xv2vfx.LENIENT_TARGETS = True
+        xv2_to_ptcl.TEX_MAX = 64
+        with tempfile.TemporaryDirectory() as tmp:
+            for fn in os.listdir(cmn_dir):
+                if not fn.lower().endswith('.eepk') or fn == 'BTL_AURA.eepk':
+                    os.symlink(os.path.abspath(os.path.join(cmn_dir, fn)), os.path.join(tmp, fn))
+            mats = FX.material_table(xv2vfx.load_package(tmp, strict=False))
+            made, log = xv2_to_ptcl.convert_package(p, tmp, 'PtcSupamarioTs', unit=FX.UNIT, emps=[AURA_EMP],
+                                                    strict=False)
+    finally:
+        xv2_to_ptcl.TEX_MAX = old
+        xv2vfx.LENIENT_TARGETS = False
+    assert len(made) == 1, [m[1] for m in made]
+    si, name, chunk = made[0]
     idx = e.add(si + 1)
-    assert 0x03410000 | idx == FX_SHARDS_ID, ('FX_SHARDS_ID is out of date', hex(0x03410000 | idx))
-    return {'set': 'PtcSupamarioTsShards', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_SHARDS_ID}
+    assert 0x03410000 | idx == FX_AURA_ID, ('FX_AURA_ID is out of date', hex(0x03410000 | idx))
+    notes, k = [], 0
+    names = [en for _b, en, _n in chunk]
+    for em in p.sets[si]['emitters']:
+        d = em['data']
+        if d is None:
+            continue
+        en = names[k] if k < len(names) else None
+        k += 1
+        note = FX.hdr_emitter(p, d, mats.get(AURA_EMP, {}).get(en))
+        FX.facing_safe(p, d)
+        if not p.field(d, 'one_time') or p.field(d, 'end_frame') > AURA_EMIT:
+            p.set_field(d, 'one_time', 1)
+            p.set_field(d, 'end_frame', AURA_EMIT)
+        struct_pack_follow_none(d)
+        pk = SB.arc_peak(p, d)
+        if p.field(d, 'blend_type') != 2 and pk > AURA_CAP:
+            SB.arc_dim(p, d, (AURA_CAP / pk,) * 3)
+            note += '; capped at %.2f' % AURA_CAP
+        notes.append('%s: %s' % (en, note))
+    return {'set': name, 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_AURA_ID, 'emitters': names,
+            'skipped': log, 'notes': notes}
 
 
 def glass_model(cmn_dir, fx_dir, e, preview=None):

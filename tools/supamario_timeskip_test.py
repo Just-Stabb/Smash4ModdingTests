@@ -87,6 +87,7 @@ class Game(SHT.Game):
         self.moves = []              # v2: (n, forward, up) position writes
         self.correct = []            # v2: (n, GroundModule 0x2710 value)
         self.sit_fn = None           # v2: n -> a situation to report (a ledge: 1)
+        self.tints = []              # v3: (n, 'on' / 'off', slot) the MSC's screen tint (EffectModule op 0 / 1)
         self.acc = 0.0 if not air else -GRAVITY
         self.vx = 0.0
         self.stick_x = stick_x
@@ -172,6 +173,12 @@ class Game(SHT.Game):
             self.e3 = a[1] != 0
             if a[1] == 0:
                 self.acc = -GRAVITY
+            return 0
+        if sid == 0x1C and a and a[0] == 0 and len(a) == 9:   # v3: Screen_Tint (EffectModule op 0)
+            self.tints.append((self.n, 'on', a[1]))
+            return 0
+        if sid == 0x1C and a and a[0] == 1 and len(a) == 3:   # v3: End_Screen_Tint (op 1)
+            self.tints.append((self.n, 'off', a[1]))
             return 0
         if sid == 0x1A and a and a[0] == 0x2710:          # v2: GroundModule's correction
             self.correct.append((self.n, a[1]))
@@ -308,7 +315,7 @@ def fn(vm, name):
     return vm.func(FT.func_index(vm, name))
 
 
-def run(path, g, frames=260, cut_at=None, after=0, tick=None):
+def run(path, g, frames=260, cut_at=None, after=0, tick=None, cut_status='cut'):
     vm = FT.vm_for(path, g)
     tr = []
     prev_sit = 2 if g.air else 0
@@ -339,7 +346,7 @@ def run(path, g, frames=260, cut_at=None, after=0, tick=None):
             vm.g[18] = g.sit_fn(k)
         g.scripts()
         if cut_at is not None and k == cut_at:
-            g.status = 'cut'
+            g.status = cut_status
         elif k == 0:
             vm.call(fn(vm, 'func_2259'))
         else:
@@ -534,6 +541,8 @@ def msc_tests(path, root):
     edge_tests(path, root)
     pointblank_tests(path)
     reset_tests(path)
+    exit_tests(path)
+    aura_tests(path)
 
 
 def tracking_tests(path):
@@ -697,22 +706,83 @@ def brightness_tests(out):
     import supamario_fx_glow as G
     res = {}
     for bg_name, bg in (('grass', (0.5, 0.65, 0.3)), ('grey', (0.5, 0.5, 0.5))):
-        r = G.measure(out, ('ts_hit', 'ts_hit_v1', 'ts_lines', 'ts_shards'), None, bg)
+        r = G.measure(out, ('ts_hit', 'ts_hit_v1', 'ts_lines', 'ts_aura'), None, bg)
         res[bg_name] = r
         h, h1 = r['ts_hit'], r['ts_hit_v1']
         e0, e1 = h['frames'][0][4], h1['frames'][0][4]
         print('     %s: ts_hit frame 0 energy %.1f (v1 %.1f), most over 1.0 in a frame %.1f (v1 %.1f), brightest frame %s' % (
             bg_name, e0, e1, h['max_over_1'], h1['max_over_1'], h['brightest']))
-        for k in ('ts_lines', 'ts_shards'):
+        for k in ('ts_lines', 'ts_aura'):
             print('     %s: %s most over 1.0 %.1f, brightest %s' % (bg_name, k, r[k]['max_over_1'], r[k]['brightest']))
         check('v2 %s: the punch\'s look at most 1.0 square unit over 1.0 in any frame (Sledgehammer v5\'s uncharged arcs; '
               'v1 %.1f), its first frame (the freeze\'s) at most a third of v1\'s energy, still vibrant (energy 8+ at its '
               'brightest)' % (bg_name, h1['max_over_1']),
               (h['max_over_1'] <= 1.0, e0 <= e1 / 3.0, h['brightest'][4] >= 8.0), (True, True, True))
-        for k, lo in (('ts_lines', 5.0), ('ts_shards', 2.0)):
+        for k, lo in (('ts_lines', 5.0), ('ts_aura', 5.0)):
             check('v2 %s: %s at most 1.0 square unit over 1.0, visible (energy %g+)' % (bg_name, k, lo),
                   (r[k]['max_over_1'] <= 1.0, r[k]['brightest'][4] >= lo), (True, True))
     return res
+
+
+def exit_tests(path):
+    """v3 (the known v2 bug): the time stop's darkening (the MSC's tint), the glass, the stage and the frozen fighters let
+    go on every exit before the punch; the normal path (on at the catch, off at the punch, once)"""
+    v = V(2, 30.0)
+    by = V(3, -60.0)
+    g = Game(fighters=[v, by])
+    tr, vm = run(path, g, frames=200)
+    c = first(tr, lambda t: t[1] == 0x21D)
+    ck = c[0]
+    sk = ck - 1 + B.CATCH_FREEZE + B.STRIKE
+    kills = [k_ for k_ in g.kills if k_[1] == B.FX_GLASS_ID]
+    check('v3 normal: the darkening on at the catch (%d), off at the punch (%d, %d frames out), once each; the glass at '
+          'the catch, never taken off; VAR_31 back to 0' % (ck, sk, B.TINT_OUT),
+          (g.tints, [(n, i) for n, i, _x, _y, _s in g.fx if i == B.FX_GLASS_ID], kills, g.vars.get(B.V_FX, 0.0)),
+          ([(ck, 'on', B.TINT[0]), (sk, 'off', B.TINT[0])], [(ck, B.FX_GLASS_ID)], [], 0.0))
+    for name, st in (('cut (a status change)', 'cut'), ('Supamario hit (Damage)', 0x45), ('Supamario KO\'d (Dead)', 0xB1),
+                     ('the match ending (Win)', 0x14F)):
+        v = V(2, 30.0)
+        by = V(3, -60.0)
+        g = Game(fighters=[v, by])
+        cut = ck + 5
+        tr, vm = run(path, g, cut_at=cut, after=12, cut_status=st)
+        froze = sorted({n for n, st_, hs, hp, _x in by.log if hp > 0})
+        check('v3 exit before the punch, %s at %d: the darkening off at once, the glass taken off, the victim let go '
+              '(controller, stage collision), the others no longer frozen (none renewed after the cut: free within 2 '
+              'frames)' % (name, cut),
+              (g.tints, [k_[0] for k_ in g.kills if k_[1] == B.FX_GLASS_ID], v.input_off,
+               v.ground[-1][1] if v.ground else None, max(froze) <= cut + 2 if froze else None, g.vars.get(B.V_FX, 0.0)),
+              ([(ck, 'on', B.TINT[0]), (cut, 'off', B.TINT[0])], [cut], False, 5.0, True, 0.0))
+    v = V(2, 30.0)
+    g = Game(fighters=[v])
+
+    def esc(g_, k):
+        if k == ck + 4:
+            v.status = 0xB1
+    tr, vm = run(path, g, tick=esc)
+    check('v3 the victim escapes (KO\'d in the hold): let go, the move goes on; the darkening still ends at the punch',
+          (v.input_off, g.tints), (False, [(ck, 'on', B.TINT[0]), (sk, 'off', B.TINT[0])]))
+    g = Game()
+    tr, vm = run(path, g)
+    check('v3 a miss: no darkening, no glass', (g.tints, [i for _n, i, _x, _y, _s in g.fx if i == B.FX_GLASS_ID]),
+          ([], []))
+
+
+def aura_tests(path):
+    """v3: Hit's aura at the start (world-placed at his middle: left behind as he dashes), again every AURA_EVERY frames of a
+    held charge"""
+    g = Game()
+    tr, vm = run(path, g)
+    au = [(n, x, y) for n, i, x, y, _s in g.fx if i == B.FX_AURA_ID]
+    check('v3 aura: once at the wind-up\'s frame %d, at his middle (%g up), where he was (world)' % (B.AURA_AT, B.AURA_Y),
+          [(n, round(y, 2)) for n, _x, y in au], [(B.AURA_AT, round(B.AURA_Y, 2))])
+    check('  ... he dashes on from there: %.1f units past it by the move\'s end' % (tr[-1][3] - au[0][1]),
+          tr[-1][3] - au[0][1] > 50.0, True)
+    g = Game(held=lambda n: n < B.WIND_END + B.CHARGE + 5)
+    tr, vm = run(path, g, frames=400)
+    au = [n for n, i, _x, _y, _s in g.fx if i == B.FX_AURA_ID]
+    check('v3 aura in a full charge: at %d, then every %d charge frames' % (B.AURA_AT, B.AURA_EVERY),
+          au, [B.AURA_AT] + [B.WIND_END + k for k in range(B.AURA_EVERY - 1, B.CHARGE, B.AURA_EVERY)])
 
 
 def shield_tests(path):
@@ -780,7 +850,7 @@ def caught_tests(path, air):
           (ck + 1, sk - 1, sk - 1 - ck))
     check('%s: punched at %d: 2 + 16 = 18%%, launched (DamageFly), XV2\'s hit look the next frame (v2: Time Skip\'s own '
           'Btl_HitLOD / Btl_HitL x2 sets / the sweat) and Hit_TmLck once' % (tag, sk),
-          (round(v.pct, 3), v.hit_at, [(n, i) for n, i, _x, _y, _s in g.fx if i not in (B.FX_LINES_ID, B.FX_SHARDS_ID, B.FX_GLASS_ID)],
+          (round(v.pct, 3), v.hit_at, [(n, i) for n, i, _x, _y, _s in g.fx if i not in (B.FX_LINES_ID, B.FX_AURA_ID, B.FX_GLASS_ID)],
            [(n, s_) for n, w, s_ in g.sounds if w == 'play']),
           (18.0, sk, [(sk + 1, B.FX_LOD_ID), (sk + 1, B.FX_IDS['hitl']), (sk + 1, B.FX_IDS['hitl_2']),
                       (sk + 1, B.SH_FX['sweat'])], [(sk + 1, B.SE_IDS['ts_hit'])]))
@@ -823,12 +893,15 @@ def script_tests(out, sh_out):
     r_ = B.HIT2_SIZE
     check('v2: the point-blank box covers his body from behind his centre to XV2\'s box (%.2f to %.2f ahead, no gap)' % (
         B.HIT2_Z - r_, B.HIT2_Z + r_), (B.HIT2_Z - r_ < 0.0, B.HIT2_Z + r_ >= B.HIT_Z - B.HIT_SIZE), (True, True))
-    check('specialairs: the stopped time (Stage_Freeze on at 0, %d frames at most; off at the punch %d), the punch\'s '
-          'Part 1 record cleared, off at %d; the three punches (uncharged shieldable 16; fully charged unblockable, 22 on a '
-          'fighter caught shielding, 16 else)' % (B.STAGE_FREEZE_SAFETY, B.STRIKE, B.STRIKE + 2),
+    check('specialairs: the stopped time (v3: Stage_Freeze(1, %d) renewed every frame by a %d-pass loop, so a cut lets '
+          'the stage go; off at the punch %d), no Screen_Tint in the scripts (the MSC\'s now), the punch\'s Part 1 record '
+          'cleared, off at %d; the three punches (uncharged shieldable 16; fully charged unblockable, 22 on a fighter caught '
+          'shielding, 16 else)' % (B.STAGE_FREEZE_RENEW, B.STRIKE, B.STRIKE, B.STRIKE + 2),
           ([(nm(c), c.params) for c in conn if nm(c) in ('FRAME', 'Hit_Log_Clear', 'Remove_All_Hitboxes', 'Stage_Freeze',
-                                                         'Float_Var_Compare')], hb(conn)),
-          ([('Stage_Freeze', [1, B.STAGE_FREEZE_SAFETY]), ('FRAME', [float(B.STRIKE)]), ('Stage_Freeze', [0, 0]),
+                                                         'Float_Var_Compare', 'Set_Loop', 'Goto', 'WAIT',
+                                                         'Screen_Tint', 'End_Screen_Tint')], hb(conn)),
+          ([('Set_Loop', [B.STRIKE]), ('Stage_Freeze', [1, B.STAGE_FREEZE_RENEW]), ('WAIT', [1.0]), ('Goto', [-5]),
+            ('FRAME', [float(B.STRIKE)]), ('Stage_Freeze', [0, 0]),
             ('Hit_Log_Clear', [1]), ('Float_Var_Compare', [B.V_CHG, 4, B.FULL]), ('Float_Var_Compare', [B.V_CHG, 5, B.FULL]),
             ('Float_Var_Compare', [B.V_SHV, 5, 0.5]), ('Float_Var_Compare', [B.V_SHV, 4, 0.5]),
             ('FRAME', [float(B.STRIKE + 2)]), ('Remove_All_Hitboxes', [])],
@@ -849,6 +922,15 @@ def script_tests(out, sh_out):
     eff = [(nm(c), c.params[:2]) for c in f['effect'].script('specials') if nm(c) == 'Graphic_Effect']
     check('effect: Smash\'s dash cloud at the dash on the ground (XV2\'s stage dust)', eff, [('Graphic_Effect',
                                                                                           [B.FX_DUST, 0])])
+    lt = {sc: [(nm(c), [round(x, 2) if isinstance(x, float) else x for x in c.params]) for c in f['effect'].script(sc)
+               if nm(c) in ('FRAME', 'Flash_Light_Effect', 'Change_Flash_Light_Color')] for sc in ('specials', 'specialairs')}
+    on = [('Flash_Light_Effect', [255.0, 255.0, 255.0, 0.0] + list(B.OUTLINE_SRC)),
+          ('Change_Flash_Light_Color', [float(B.OUTLINE_IN), 255.0, 255.0, 255.0, B.OUTLINE_A])]
+    off = ('Change_Flash_Light_Color', [float(B.OUTLINE_OUT), 255.0, 255.0, 255.0, 0.0])
+    check('v3: the white outline (XV2\'s BPE 85: Flash_Light_Effect white, faint %g of 255, faded in over %d) from the '
+          'move\'s start, faded out over %d at each motion\'s end' % (B.OUTLINE_A, B.OUTLINE_IN, B.OUTLINE_OUT), lt,
+          {'specials': on + [('FRAME', [float(B.MOVE_FROM)]), ('FRAME', [float(B.DASH_END - B.OUTLINE_OUT)]), off],
+           'specialairs': on + [('FRAME', [float(B.CONNECT_END - B.OUTLINE_OUT)]), off]})
     gen = [nm(c) for p in f for s in ('specials', 'specialairs') for c in f[p].script(s)
            if 'article' in nm(c).lower() or 'reflect' in nm(c).lower()]
     check('no Cape left (no article, no reflector) in the side special\'s scripts', gen, [])
@@ -865,6 +947,7 @@ def script_tests(out, sh_out):
 
 
 def effect_tests(out, sh_out):
+    import json
     import efc
     import ptcl
     fx = os.path.join(out, 'fighter', 'supamario', 'effect', 'supamario', 'supamario.010d0000')
@@ -931,27 +1014,32 @@ def effect_tests(out, sh_out):
           (p.set_name(lod_si), [n for n, _v in pk] == [n for n, _v in pk_sh],
            all(v_ <= dict(B.LOD_CAP)['flash'] + 1e-3 for n, v_ in pk if n.startswith('flash'))),
           ('PtcSupamarioTsBtl_HitLOD', True, True))
-    got = {}
-    for key, i in (('lines', B.FX_LINES_ID), ('shards', B.FX_SHARDS_ID)):
-        si = e.entries[i & 0xFFFF][1] - 1
-        ds = [em['data'] for em in p.sets[si]['emitters'] if em['data'] is not None]
-        got[key] = (p.set_name(si), [p.field(d, 'particle_type') for d in ds],
-                    [[round(x, 3) for x in p.field(d, 'emit_direction')] for d in ds],
-                    [[round(x, 3) for x in p.color_keys(d, 0)[0][:3]] for d in ds],
-                    all(SB.arc_peak(p, d) < 1.0 for d in ds), [bytes(d[0x310:0x314]).hex() for d in ds])
-    rgb, lav = [round(x, 3) for x in B.LINES_RGB], [round(x, 3) for x in B.SHARDS_RGB]
-    check('v2: the punch\'s purple lines (0x%08X: speed lines + the long line along +X, the punch) and the wind-up\'s '
-          'lavender shards (0x%08X: +Y), stretched soft billboards (type 0), peaks under 1.0, world-placed (follow none)' % (
-              B.FX_LINES_ID, B.FX_SHARDS_ID), got,
-          {'lines': ('PtcSupamarioTsLines', [0, 0], [[1.0, 0.0, 0.0]] * 2, [rgb, rgb], True, ['00000001'] * 2),
-           'shards': ('PtcSupamarioTsShards', [0], [[0.0, 1.0, 0.0]], [lav], True, ['00000001'])})
+    si = e.entries[B.FX_LINES_ID & 0xFFFF][1] - 1
+    ds = [em['data'] for em in p.sets[si]['emitters'] if em['data'] is not None]
+    rgb = [round(x, 3) for x in B.LINES_RGB]
+    check('v2: the punch\'s purple lines (0x%08X: speed lines + the long line along +X, the punch): stretched soft '
+          'billboards, peaks under 1.0, world-placed (follow none)' % B.FX_LINES_ID,
+          (p.set_name(si), [p.field(d, 'particle_type') for d in ds], [[round(x, 3) for x in p.color_keys(d, 0)[0][:3]]
+                                                                        for d in ds],
+           all(SB.arc_peak(p, d) < 1.0 for d in ds), [bytes(d[0x310:0x314]).hex() for d in ds]),
+          ('PtcSupamarioTsLines', [0, 0], [rgb, rgb], True, ['00000001'] * 2))
+    si = e.entries[B.FX_AURA_ID & 0xFFFF][1] - 1
+    ds = [em['data'] for em in p.sets[si]['emitters'] if em['data'] is not None]
+    rep_ = json.load(open(os.path.join(out, 'timeskip.json')))['fx']['aura']
+    check('v3: Hit\'s aura (0x%08X, BTL_AURA\'s %s: aura_setting.aur Hit -> aura 1 -> effect 41) converted, %d emitters: '
+          'each emits %d frames at most, its particles left where born (follow none), peaks within %.2f' % (
+              B.FX_AURA_ID, B.AURA_EMP, len(ds), B.AURA_EMIT, B.AURA_CAP),
+          (p.set_name(si), all(p.field(d, 'one_time') == 1 and p.field(d, 'end_frame') <= B.AURA_EMIT for d in ds),
+           {bytes(d[0x310:0x314]).hex() for d in ds},
+           all(SB.arc_peak(p, d) <= B.AURA_CAP + 1e-3 or p.field(d, 'blend_type') == 2 for d in ds),
+           len(ds) == len(rep_['emitters'])),
+          ('PtcSupamarioTsBoostV_Loop', True, {'00000001'}, True, True))
     gi = e.entries[B.FX_GLASS_ID & 0xFFFF]
     mdir = os.path.join(out, 'fighter', 'supamario', 'effect', 'supamario', 'model', 'EffSupamarioTsDmgGrs2')
     check('v2: the glass (BTL_CMN 108, HIT_DmgGrs2) a model entry (0x%08X), its folder with model / texture / '
           'animation / material animation' % B.FX_GLASS_ID,
           (gi[1], sorted(f for f in os.listdir(mdir)) if os.path.isdir(mdir) else None),
           (0, ['model.mta', 'model.nud', 'model.nut', 'model.omo', 'model.vbn', 'model.xmb']))
-    import json
     rep = json.load(open(os.path.join(out, 'timeskip.json')))['fx']
     conv = sum(len(v['emitters']) for v in rep['sets'].values())
     check('its fake-glow halos (HALO_ALPHA %g) in its own sets: %d (no room for %s)' % (
