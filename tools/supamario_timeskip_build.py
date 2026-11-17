@@ -330,7 +330,7 @@ def convert_fx(cmn_dir, fx_dir, halo=True):
             notes.append('%s %s: %s' % (name, en, FX.hdr_emitter(p, d, mats.get(emp, {}).get(en))))
             SB.flat_ring(p, d, False)
             cap = next((c for pre, c in PEAK_CAP if (en or '').startswith(pre)), None)
-            if cap is not None and SB.arc_peak(p, d) > cap:
+            if cap is not None and 'subtractive' not in notes[-1] and SB.arc_peak(p, d) > cap:
                 f = cap / SB.arc_peak(p, d)
                 SB.arc_dim(p, d, (f, f, f))
                 notes[-1] += '; capped at %.2f' % cap
