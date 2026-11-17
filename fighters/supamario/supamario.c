@@ -41221,8 +41221,9 @@ void sh_tick()
 // same on the ground and in the air; v1's energy-3 speeds never moved him in the air), the ground slides off edges into
 // the air and the dash goes on, Time Skip's own tracking without v1's ground rule (ts_track: up off the ground, down
 // past an edge), the use's reset also from the MSC (ts_reset), a point-blank detection box (the script's ID 1), the
-// purple lines at the punch / the glass (ts_lines, ts_glass), XV2's hit look from its own dimmer sets. v3: Hit's aura at
-// the start (ts_aura), the darkened time stop from the MSC (ts_tint, VAR_31 TS_V_FX), ended on any exit before the punch.
+// purple lines at the punch (ts_lines), XV2's hit look from its own dimmer sets. v3: Hit's aura at the start (ts_aura),
+// the darkened time stop and the glass on the camera (the script's Effect_Camera), ended on any exit before the punch
+// (ts_stop_look_off); the stop in the air too, soft tracking after the release, the charge's drift, shield pokes.
 // ===================================================================
 
 // XV2's root travel of SpecialS (units a frame along his facing, by the motion frame): the wind-up's step and the stop
@@ -41403,34 +41404,17 @@ void ts_aura()
                  WorkModuleF(0, 0x0f000002), 0, 0, 0, TS_AURA_SIZE, 0, 0xffffffff);
 }
 
-// v3 (the user: the darkening must end if the move is cut before the punch): XV2's darkened time stop as the MSC's
-// screen tint (EffectModule op 0 = Screen_Tint's EffectModule vt +0x19C: slot, frames in, R, G, B, A, layer, priority;
-// op 1 = End_Screen_Tint's vt +0x1B4: slot, frames out; the handler 0x02004530, Meta Knight's Final Smash uses both),
-// so the status's end can take it off: on at the catch, off at the punch or whenever the move ends before it.
-// TS_V_FX (VAR_31) 1 while it is on
-void ts_tint(int on)
+// v3 (the user: the darkening and the glass must end if the move is cut before the punch): XV2's darkened time stop and
+// its glass (BTL_CMN 108) are camera effects now (the connect's effect script: Effect_Camera, exe_v46z_camfx), which a
+// status change doesn't end: any exit before the punch (a hit, a KO, the match's end, any status change) takes them off
+// here (EffectModule 0x2723 = Terminate_Graphic_Effect's request). The stage's freeze lapses by itself (the script renews
+// it every frame), the other fighters' too (ts_connect renews theirs)
+void ts_stop_look_off()
 {
-    if (on != 0)
-    {
-        EffectModule(0, TS_TINT_SLOT, TS_TINT_IN, TS_TINT_R, TS_TINT_G, TS_TINT_B, TS_TINT_A, 0, 0xff);
-        WorkModule(0, 1.0f, TS_V_FX);
-        return;
-    }
-    if (WorkModuleF(0, TS_V_FX) > 0.5f)
-    {
-        EffectModule(0x1, TS_TINT_SLOT, TS_TINT_OUT);
-        WorkModule(0, 0.0f, TS_V_FX);
-    }
+    EffectModule(0x2723, TS_FX_DARK, 0x1, 0x1);
+    EffectModule(0x2723, TS_FX_GLASS, 0x1, 0x1);
 }
 
-// v2 (item 11): BTL_CMN effect 108 (HIT_DmgGrs2, XV2's glass that shatters as time stops; on XV2's camera) as a model in
-// front of the victim, TS_GLASS_Z toward the camera. Its own call so the camera-attached command can replace it
-void ts_glass(int s)
-{
-    EffectModule(0x3, TS_FX_GLASS, WorkModuleF(0, 0x0f000020 + 4 * (s - 1)),
-                 WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) + TS_VICTIM_MID, WorkModuleF(0, 0x0f000002) + TS_GLASS_Z, 0, 0, 0,
-                 TS_GLASS_SIZE, 0, 0xffffffff);
-}
 
 void ts_air_kinetics()
 {
@@ -41466,6 +41450,7 @@ void ts_init()
     WorkModule(0, 0.0f, TS_V_EASE);
     WorkModule(0, 0.0f, TS_V_AIM);
     WorkModule(0, 0.0f, TS_V_SHV);
+    WorkModule(0, 0.0f, TS_V_RETRY);
     cb_aircap(0x1);
     if (global18 == 0)
     {
@@ -41619,22 +41604,40 @@ int ts_try_catch()
         return 0;
     }
     s = ts_find();
-    AttackModule(0x2724);
     if (s == 0)
     {
+        AttackModule(0x2724);
         return 0;
+    }
+    // v3 (user: "shield poke"): a body hit on a fighter that is shielding (its hurtbox reached past a small shield) is
+    // the shield case: caught shielding
+    if (sh == 0 && cb_guarding(s) != 0)
+    {
+        sh = 0x1;
     }
     if (sh != 0)
     {
         if (cb_guarding(s) == 0)
         {
+            AttackModule(0x2724);
             return 0;
         }
     }
     else if (sh_struck(s) == 0 || WorkModuleF(0, 0x0F00011D + 0x20 * (s + 0x2)) != 0.0f)
     {
+        // v3 (user: "no freeze on the detection box's first frame"): not refused for good while the fighter is still
+        // in the hit's freeze: its damage / state can read the frame before on the hit's first frame; the flags are
+        // kept and it is looked at again next frame (v2 cleared them at once, so a first-frame hit was never caught)
+        if (WorkModuleF(0, 0x0F000043 + 0x8 * (s + 0x2)) > 0.5f && WorkModuleF(0, TS_V_RETRY) < TS_RETRY_N - 0.5f)
+        {
+            WorkModule(0, WorkModuleF(0, TS_V_RETRY) + 1.0f, TS_V_RETRY);
+            return 0;
+        }
+        WorkModule(0, 0.0f, TS_V_RETRY);
+        AttackModule(0x2724);
         return 0;
     }
+    AttackModule(0x2724);
     ts_catch(s, sh);
     return 0x1;
 }
@@ -41729,8 +41732,10 @@ void ts_catch(int s, int sh)
     ts_freeze_others();
     WorkModule(0, TS_INV_STEP, 0x0F00011C);
     ts_still();
-    ts_glass(s);
-    ts_tint(0x1);
+    if (global18 != 0)
+    {
+        KineticModule(0xc, 0x2);                    // v3: no air drift through the connect (the punch)
+    }
     func_22(0x21d, 0, 1.0f);
 }
 
@@ -41797,6 +41802,7 @@ void ts_finish(float v)
             WorkModule(0, 1.0f, TS_V_EASE);
         }
         sn = WorkModuleF(0, TS_V_AIM);
+        KineticModule(0xb, 0x2);
         KineticModule(0x11, 0x3, 0.0f, 0.0f);
         KineticModule(0x11, 0x2, v * MathF(0, 1.0f - sn * sn) * WorkModuleF(0, 0x0f000003), 0.0f);
         KineticModule(0x11, 0x1, v * sn);
@@ -41811,18 +41817,22 @@ void ts_finish(float v)
 // dash aimed at it (TS_V_AIM, the direction's sine); none: the last aim kept. His facing and speed aren't touched. v1
 // never aimed down on the ground (removed: an opponent below, off the stage, is aimed at; the floor takes the downward
 // part until he is past the edge, ts_move); aimed up, he leaves the ground (ts_dash)
-void ts_track()
+void ts_track(float k)
 {
     int s;
+    int got;
     float face;
     float dx;
     float dy;
     float d2;
     float bd;
-    float aim;
+    float a;
+    float t;
+    float sn;
     face = WorkModuleF(0, 0x0f000003);
     bd = TS_TRACK_RANGE * TS_TRACK_RANGE;
-    aim = WorkModuleF(0, TS_V_AIM);
+    got = 0;
+    t = 0.0f;
     s = 1;
     while (s <= 8)
     {
@@ -41833,11 +41843,31 @@ void ts_track()
             dy * dy <= TS_TRACK_TAN2 * dx * dx)
         {
             bd = d2;
-            aim = dy / MathF(0, d2);
+            t = MathF(0x1, dy, dx);
+            got = 0x1;
         }
         s = s + 1;
     }
-    WorkModule(0, aim, TS_V_AIM);
+    if (got == 0)
+    {
+        return;
+    }
+    // v3 (user: "strong at release, then soft"): the first TS_TRACK_STRONG moving frames the aim is the target's
+    // direction; after them it turns toward it at most TS_TRACK_SOFT radians a frame (a slight curve)
+    if (k > TS_TRACK_STRONG - 0.5f)
+    {
+        sn = WorkModuleF(0, TS_V_AIM);
+        a = MathF(0x1, sn, MathF(0, 1.0f - sn * sn));
+        if (t > a + TS_TRACK_SOFT)
+        {
+            t = a + TS_TRACK_SOFT;
+        }
+        if (t < a - TS_TRACK_SOFT)
+        {
+            t = a - TS_TRACK_SOFT;
+        }
+    }
+    WorkModule(0, MathF(0x5, t), TS_V_AIM);
 }
 
 // the dash (phase 3): from TS_MOVE_FROM the moving part, TS_MOVE_N frames at the charge's speed along TS_V_AIM, eased
@@ -41888,12 +41918,7 @@ void ts_dash_go(float fr, float k, float n)
     if (k > n - 0.5f)
     {
         SoundModule(0x2710, TS_SND_HAZURE);
-        if (global18 != 0)
-        {
-            ts_finish(TS_VSTOP);
-            return;
-        }
-        WorkModule(0, 4.0f, TS_V_PH);
+        WorkModule(0, 4.0f, TS_V_PH);       // v3: the stop (the motion's end lag) in the air too (v2: Fall at once)
         ts_move(ts_vroot(fr), 0.0f);
         return;
     }
@@ -41902,7 +41927,7 @@ void ts_dash_go(float fr, float k, float n)
     {
         v = v + (TS_VSTOP - v) * (k - (n - TS_MOVE_EASE - 1.0f)) / TS_MOVE_EASE;
     }
-    ts_track();
+    ts_track(k);
     sn = WorkModuleF(0, TS_V_AIM);
     c = MathF(0, 1.0f - sn * sn);
     if (global18 == 0 && sn > 0.05f)
@@ -41943,7 +41968,6 @@ void ts_connect(float fr)
         ts_still();
         return;
     }
-    ts_tint(0);                                     // v3: the time stop's darkening off at the punch (once)
     if (s > 0)
     {
         WorkModule(0, (float)s, TS_V_K);         // the victim's slot kept for the punch's look (TS_V_K is free now)
@@ -41979,6 +42003,7 @@ void ts_connect(float fr)
     }
     if (global18 != 0)
     {
+        KineticModule(0x11, 0x2, 0.0f, 0.0f);       // v3 (user: "no drift during the punch"): no air control
         if (WorkModuleF(0, TS_V_EASE) < 0.5f)
         {
             KineticModule(0x11, 0x3, 0.0f, 0.0f);
@@ -42033,7 +42058,16 @@ void ts_loop()
         // XV2's ChargeControl 20-50 (ChargeTime 40): the pose held while the button is; the dash's speed by the frames
         // held (ts_vdash), TS_CHARGE frames the full charge
         MotionModule(0x2713, TS_WIND_END);
-        ts_still();
+        // v3 (user: while charging only, a small drift the way the stick is held): TS_DRIFT a frame at full tilt,
+        // up / down too in the air (on the ground along it only)
+        if (global18 == 0)
+        {
+            ts_move(WorkModuleF(0, 0x0F000110) * TS_DRIFT, 0.0f);
+        }
+        else
+        {
+            ts_move(WorkModuleF(0, 0x0F000110) * TS_DRIFT, WorkModuleF(0, 0x0F000111) * TS_DRIFT);
+        }
         if (ControlModule(0x2712, 0x1) == 0)
         {
             ts_dash_start(0x1);
@@ -42057,12 +42091,8 @@ void ts_loop()
     }
     if (ph < 4.5f)
     {
-        // the stop on the ground (XV2's 85-120: the root's last 1.7 m, back to his stance); off the ground: Fall
-        if (global18 != 0)
-        {
-            ts_finish(0.0f);
-            return;
-        }
+        // the stop (XV2's 85-120: the root's last 1.7 m, back to his stance), v3 on the ground and in the air alike
+        // (user: "the air whiff snaps to its end"): Wait / Fall at the motion's end
         ts_move(ts_vroot(fr), 0.0f);
         if (fr > TS_DASH_END - 0.5f || MotionModule(0x2712))
         {
@@ -42077,17 +42107,15 @@ void ts_loop()
 // cleared (in the air his gravity's ease goes on: ts_tick)
 void ts_end()
 {
-    ts_tint(0);                     // v3: cut before the punch (a hit, a KO, the match's end...): the darkening off
     if (WorkModuleF(0, TS_V_PH) == 0.0f)
     {
         return;
     }
     if (WorkModuleF(0, TS_V_PH) > 4.5f && WorkModuleF(0, TS_V_PH) < 5.5f)
     {
-        EffectModule(0x2723, TS_FX_GLASS, 0x1, 0x1);    // v3: cut in the stopped time: the glass taken off (the
-                                                        // others are let go by the script / ts_connect no longer
-                                                        // renewing their freeze: at most a few frames)
+        ts_stop_look_off();         // v3: cut in the stopped time (before the punch): the darkening and the glass off
     }
+    KineticModule(0xb, 0x2);        // v3: the air drift back (turned off through the connect)
     if (WorkModuleF(0, TS_V_SLOT) > 0.5f)
     {
         ts_release();

@@ -87,7 +87,10 @@ class Game(SHT.Game):
         self.moves = []              # v2: (n, forward, up) position writes
         self.correct = []            # v2: (n, GroundModule 0x2710 value)
         self.sit_fn = None           # v2: n -> a situation to report (a ledge: 1)
-        self.tints = []              # v3: (n, 'on' / 'off', slot) the MSC's screen tint (EffectModule op 0 / 1)
+        self.tints = []              # v3: (n, 'on' / 'off', slot) a screen tint from the MSC (EffectModule op 0 / 1)
+        self.e2_log = []             # v3: (n, speed) energy 2 writes
+        self.e2_on = []              # v3: (n, on) energy 2 turned on / off
+        self.stick_y = None          # v3: n -> the stick's Y (SELF_STICK_Y)
         self.acc = 0.0 if not air else -GRAVITY
         self.vx = 0.0
         self.stick_x = stick_x
@@ -103,6 +106,8 @@ class Game(SHT.Game):
         self.vel = []                # (n, vx, vy) each frame he moves
 
     def fvar(self, v):
+        if v == 0x0F000111:
+            return self.stick_y(self.n) if self.stick_y else 0.0
         if v == 0x0F000043:
             return 1.0 if self.hitstop > 0 else 0.0
         if v == 0x0F0000A2:
@@ -149,9 +154,15 @@ class Game(SHT.Game):
 
     def sys(self, sid, a):
         f = R.i2f
-        if sid == 0xA:                                  # MathF (sqrt)
+        if sid == 0xA:                                  # MathF (0 sqrt; v3: 1 atan2(y, x), 4 cos, 5 sin)
             if a[0] == 0:
                 return R.f2i(math.sqrt(max(0.0, f(a[1]))))
+            if a[0] == 1:
+                return R.f2i(math.atan2(f(a[1]), f(a[2])))
+            if a[0] == 4:
+                return R.f2i(math.cos(f(a[1])))
+            if a[0] == 5:
+                return R.f2i(math.sin(f(a[1])))
             return 0
         if sid == 0x10 and a and a[0] == 0x14 and a[1] == 1:
             self.vlim = f(a[2])
@@ -165,6 +176,10 @@ class Game(SHT.Game):
             return 0
         if sid == 0x10 and a and a[0] == 0x11 and a[1] == 2:
             self.vx2 = f(a[2])
+            self.e2_log.append((self.n, round(self.vx2, 4)))
+            return 0
+        if sid == 0x10 and a and a[0] in (0xB, 0xC) and len(a) == 2 and a[1] == 2:   # v3: energy 2 on / off
+            self.e2_on.append((self.n, a[0] == 0xB))
             return 0
         if sid == 0x10 and a and a[0] == 0xB and len(a) == 2 and a[1] == 3:
             self.e3 = True
@@ -244,6 +259,12 @@ class Game(SHT.Game):
                 continue
             v.rec = self.box
             unblock = self.box == 'strike' and self.vars.get(B.V_CHG, 0.0) > B.FULL
+            if v.status in (0x1C, 0x1E) and getattr(v, 'poke', False) and self.box == 'catch':
+                self.hit = v                            # v3: a shield poke: its hurtbox hit, still shielding
+                self.hitflag |= 2
+                v.pct += B.CATCH['Damage']
+                v.hitstop, self.hitstop = B.CATCH_FREEZE, B.CATCH_FREEZE
+                return
             if v.status in (0x1C, 0x1E) and not unblock:
                 self.hitflag |= 4
                 self.hit = v
@@ -398,11 +419,9 @@ def msc_tests(path, root):
           'ends)' % (B.HIT_FROM, mf + mn - 2), ('catch' in g.fired, g.removed[0] if g.removed else None),
           (True, mf + mn - 2))
     sp = speeds(g, mf, mf + mn - 1)
-    ease = [round(B.VMIN + (B.VSTOP - B.VMIN) * (k - (mn - B.MOVE_EASE - 1)) / B.MOVE_EASE, 3)
-            for k in range(mn - B.MOVE_EASE, mn)]
-    check('ground tap: the moving part %d-%d at %.2f a frame (uncharged), eased to %.2f over its last %d frames' % (
-        mf, mf + mn - 1, B.VMIN, B.VSTOP, B.MOVE_EASE), [round(x, 2) for x in sp],
-          [round(x, 2) for x in [B.VMIN] * (mn - B.MOVE_EASE) + ease])
+    check('ground tap: the moving part %d-%d at %.2f a frame (uncharged; eased to %.2f over its last %d frames when '
+          'faster)' % (mf, mf + mn - 1, B.VMIN, B.VSTOP, B.MOVE_EASE), [round(x, 2) for x in sp],
+          [round(x, 2) for x in B.move_speeds(0)])
     near('ground tap: his travel (the wind-up\'s step, the moving part, the stop\'s slide)', end[3], B.travel(0, root), 0.3)
     check('ground tap: Hazure (the whiff) once, at the moving part\'s end (%d)' % (mf + mn),
           [(n, s_) for n, w, s_ in g.sounds if w == 'play'], [(mf + mn, B.SE_IDS['ts_hazure'])])
@@ -412,19 +431,22 @@ def msc_tests(path, root):
           'ground correction 1 (slides off edges) every frame', (fwd == list(range(mf, mf + mn)), round(g.vx, 6),
                                                                   sorted({c for _n, c in g.correct})), (True, 0.0, [1]))
     sp_ground = sp
-    # 2. in the air: no gravity, Fall at the moving part's end, the use taken, the gravity eased back in
+    # 2. in the air: no gravity, v3 the stop (the motion's end lag) as on the ground, then Fall; the use taken, the gravity
+    # eased back in
     g = Game(air=True, y=200.0, floor=-1e4)
-    tr, vm = run(path, g, after=40)
+    tr, vm = run(path, g, after=60)
     k_end = max(t[0] for t in tr if t[5] is None) + 1
-    check('air tap: Fall (0xE, not FallSpecial) at the moving part\'s end (%d)' % (mf + mn),
-          (tr[-1][0], g.statuses[:1]), (mf + mn, [(mf + mn, 0xE)]))
+    check('v3 air tap (user: "the air whiff snaps to its end"): the stop (phase 4) from %d, Fall (0xE, not FallSpecial) at '
+          'the motion\'s end (%d), as Wait on the ground' % (mf + mn, B.DASH_END),
+          (ph_at(tr, mf + mn), tr[-1][0], g.statuses[:1]), (4.0, B.DASH_END, [(B.DASH_END, 0xE)]))
     check('air tap: his height kept through the move (no gravity, no drift)',
           max(abs(t[4] - 200.0) for t in tr if t[0] < k_end), 0.0)
-    near('air tap: his travel (no stop: Fall)', tr[-1][3], B.travel(0, root, True), 0.3)
+    near('v3 (user: "the grounded one moves at the same speed as the air one"): the air travel = the ground\'s (%.1f)' %
+         end[3], tr[-1][3], end[3], 0.01)
     check('v2 (user: "Doesn\'t move anywhere in the air"): the air dash moves exactly as the ground one (the moving '
           'part\'s speeds frame by frame)', speeds(g, mf, mf + mn - 1), sp_ground)
-    near('v2 air tap: Fall carries the miss\'s last speed (%.2f, energy 2: the air drift)' % B.VSTOP, abs(g.vx2), B.VSTOP,
-         0.01)
+    check('v3 air tap: Fall from the stop: no speed handed on (energy 2 / 1: 0)', (round(abs(g.vx2), 4), round(g.vy, 4)),
+          (0.0, 0.0))
     accs = [a for n, a in g.acc_log if n > k_end]
     want = [round(-GRAVITY * min(1.0, n / B.EASE_FRAMES), 4) for n in range(1, int(B.EASE_FRAMES) + 1)]
     check('air tap: his gravity eased back in over %d frames (-%.4f a frame more each frame), then his own' % (
@@ -442,25 +464,18 @@ def msc_tests(path, root):
     g2.vars[B.V_USED] = 1.0
     g2.event('me', 8)
     check('  a hit (bit 8): back too', g2.vars.get(B.V_USED), 0.0)
-    # 3. a fast fall after an aim down: the fall limit lowered by FALL_EASE a frame
-    v = V(2, 60.0, y=150.0, air=True)
-    g = Game(fighters=[v], air=True, y=200.0, floor=0.0, held=lambda n: True)
-    v.x = 1e4                                           # out of reach until the dash: then put below-ahead (tracked)
+    # 3. a faster fall than his max (a hit's launch in Fall right after the move): the limit lowered by FALL_EASE a frame
+    g = Game(air=True, y=400.0, floor=-1e4)
 
-    def dive(g_, k):
-        if k == B.WIND_END + B.CHARGE + 2:
-            v.x, v.y = g_.x + 20.0, g_.y - 42.0         # 64.5 degrees down, 46.5 away: tracked
-        if k == B.WIND_END + B.CHARGE + 8:
-            v.x = 1e4                                   # gone: the last aim kept
-    tr, vm = run(path, g, frames=300, after=60, tick=dive)
-    lims = [x for n, x in g.vlims if n > g.statuses[0][0]] if g.statuses else []
+    def fast(g_, k):
+        if k == B.DASH_END + 2:
+            g_.vy = -2.2
+    tr, vm = run(path, g, frames=300, after=40, tick=fast)
+    lims = [x for n, x in g.vlims if n > B.DASH_END + 2]
     falls = [x for x in lims if x > MAX_FALL + 1e-3]
     steps = sorted({round(a - b, 3) for a, b in zip(falls, falls[1:])})
-    vy_end = [vy for n, vx, vy in g.vel if n == g.statuses[0][0] - 1][0]
-    print('     the dive: falling %.3f a frame at the move\'s end; the limit after it %s' % (vy_end, lims[:8]))
-    check('fully charged dive (tracked down 64.5 degrees): Fall faster than his max fall (%.2f), the limit lowered %.2f a '
-          'frame to it' % (-vy_end, B.FALL_EASE), (-vy_end > MAX_FALL + 0.1, steps, lims[len(falls)] if len(lims) >
-                                                    len(falls) else None), (True, [B.FALL_EASE], MAX_FALL))
+    check('v3 a fall faster than his max after the move: the limit lowered %.3f a frame to it (v2 0.05)' % B.FALL_EASE,
+          (steps, lims[len(falls)] if len(lims) > len(falls) else None), ([B.FALL_EASE], MAX_FALL))
     # 4. charges: 20 frames (half), full
     for held, v_ in ((20, B.speed(20)), (B.CHARGE + 5, B.VMAX)):
         g = Game(held=lambda n, h=held: n < B.WIND_END + h)
@@ -543,6 +558,7 @@ def msc_tests(path, root):
     reset_tests(path)
     exit_tests(path)
     aura_tests(path)
+    v3_tests(path)
 
 
 def tracking_tests(path):
@@ -725,20 +741,17 @@ def brightness_tests(out):
 
 
 def exit_tests(path):
-    """v3 (the known v2 bug): the time stop's darkening (the MSC's tint), the glass, the stage and the frozen fighters let
-    go on every exit before the punch; the normal path (on at the catch, off at the punch, once)"""
+    """v3 (the known v2 bug): the time stop's look (the camera's darkening and glass: the connect's effect script), the
+    stage and the frozen fighters let go on every exit before the punch; nothing taken off on the normal path"""
+    look = (B.FX_DARK_ID, B.FX_GLASS_ID)
     v = V(2, 30.0)
     by = V(3, -60.0)
     g = Game(fighters=[v, by])
     tr, vm = run(path, g, frames=200)
-    c = first(tr, lambda t: t[1] == 0x21D)
-    ck = c[0]
-    sk = ck - 1 + B.CATCH_FREEZE + B.STRIKE
-    kills = [k_ for k_ in g.kills if k_[1] == B.FX_GLASS_ID]
-    check('v3 normal: the darkening on at the catch (%d), off at the punch (%d, %d frames out), once each; the glass at '
-          'the catch, never taken off; VAR_31 back to 0' % (ck, sk, B.TINT_OUT),
-          (g.tints, [(n, i) for n, i, _x, _y, _s in g.fx if i == B.FX_GLASS_ID], kills, g.vars.get(B.V_FX, 0.0)),
-          ([(ck, 'on', B.TINT[0]), (sk, 'off', B.TINT[0])], [(ck, B.FX_GLASS_ID)], [], 0.0))
+    ck = first(tr, lambda t: t[1] == 0x21D)[0]
+    check('v3 normal: no screen tint from the MSC (the darkening is the script\'s camera effect), nothing killed (the '
+          'darkening fades by its Frames at the punch, the glass plays out)', (g.tints, [k_ for k_ in g.kills if
+                                                                                      k_[1] in look]), ([], []))
     for name, st in (('cut (a status change)', 'cut'), ('Supamario hit (Damage)', 0x45), ('Supamario KO\'d (Dead)', 0xB1),
                      ('the match ending (Win)', 0x14F)):
         v = V(2, 30.0)
@@ -747,12 +760,12 @@ def exit_tests(path):
         cut = ck + 5
         tr, vm = run(path, g, cut_at=cut, after=12, cut_status=st)
         froze = sorted({n for n, st_, hs, hp, _x in by.log if hp > 0})
-        check('v3 exit before the punch, %s at %d: the darkening off at once, the glass taken off, the victim let go '
-              '(controller, stage collision), the others no longer frozen (none renewed after the cut: free within 2 '
-              'frames)' % (name, cut),
-              (g.tints, [k_[0] for k_ in g.kills if k_[1] == B.FX_GLASS_ID], v.input_off,
-               v.ground[-1][1] if v.ground else None, max(froze) <= cut + 2 if froze else None, g.vars.get(B.V_FX, 0.0)),
-              ([(ck, 'on', B.TINT[0]), (cut, 'off', B.TINT[0])], [cut], False, 5.0, True, 0.0))
+        check('v3 exit before the punch, %s at %d: the darkening and the glass taken off at once (Terminate), the victim '
+              'let go (controller, stage collision), the others no longer frozen (none renewed after the cut: free '
+              'within 2 frames), the air drift back on' % (name, cut),
+              (sorted(k_ for k_ in g.kills if k_[1] in look), v.input_off, v.ground[-1][1] if v.ground else None,
+               max(froze) <= cut + 2 if froze else None, g.e2_on[-1:]),
+              (sorted((cut, i) for i in look), False, 5.0, True, [(cut, True)]))
     v = V(2, 30.0)
     g = Game(fighters=[v])
 
@@ -760,12 +773,80 @@ def exit_tests(path):
         if k == ck + 4:
             v.status = 0xB1
     tr, vm = run(path, g, tick=esc)
-    check('v3 the victim escapes (KO\'d in the hold): let go, the move goes on; the darkening still ends at the punch',
-          (v.input_off, g.tints), (False, [(ck, 'on', B.TINT[0]), (sk, 'off', B.TINT[0])]))
+    check('v3 the victim escapes (KO\'d in the hold): let go, the move goes on to its end, nothing killed',
+          (v.input_off, [k_ for k_ in g.kills if k_[1] in look], tr[-1][5]), (False, [], 0))
     g = Game()
     tr, vm = run(path, g)
-    check('v3 a miss: no darkening, no glass', (g.tints, [i for _n, i, _x, _y, _s in g.fx if i == B.FX_GLASS_ID]),
-          ([], []))
+    check('v3 a miss: nothing killed', [k_ for k_ in g.kills if k_[1] in look], [])
+
+
+def v3_tests(path):
+    """v3: the charge's drift, the punch without drift, the shield poke, the first-frame retry, soft tracking"""
+    mf = B.MOVE_FROM
+    # charge drift (only while the charge is held)
+    for air in (False, True):
+        y0 = 100.0
+        g = Game(held=lambda n: n < B.WIND_END + 20, air=air, y=y0, floor=None if air else y0,
+                 stick_x=lambda n: 1.0 if n >= B.WIND_END else 0.0)
+        g.stick_y = lambda n: 1.0 if n >= B.WIND_END else 0.0
+        tr, vm = run(path, g, frames=80)
+        drift = [(n, a_, u_) for n, a_, u_ in g.moves if B.WIND_END <= n < B.WIND_END + 19]
+        fw = sorted({a_ for _n, a_, _u in drift if a_})
+        up = sorted({u_ for _n, _a, u_ in drift if u_})
+        check('v3 charge drift (%s): the stick held forward and up while charging: %.2f a frame forward%s' % (
+            'air' if air else 'ground', B.DRIFT, ', %.2f up' % B.DRIFT if air else ', nothing up (the floor)'),
+              (fw, up), ([round(B.DRIFT, 4)], [round(B.DRIFT, 4)] if air else []))
+    g = Game(stick_x=lambda n: 1.0)
+    g.stick_y = lambda n: 1.0
+    tr, vm = run(path, g, frames=mf + 10)
+    gs = Game()
+    trs, vms = run(path, gs, frames=mf + 10)
+    check('v3 no drift outside the charge (a tap with the stick held: the same travel as without)',
+          round(tr[-1][3], 4), round(trs[-1][3], 4))
+    # no drift in the punch (air)
+    v = V(2, 30.0, y=40.0, air=True)
+    g = Game(fighters=[v], air=True, y=40.0)
+    tr, vm = run(path, g, frames=200)
+    ck = first(tr, lambda t: t[1] == 0x21D)[0]
+    sk = ck - 1 + B.CATCH_FREEZE + B.STRIKE
+    after = [x for n, x in g.e2_log if n > sk + B.STRIKE_FREEZE]
+    check('v3 air punch: the air drift off at the catch, held at 0 every frame after the freeze, back on at Fall',
+          (g.e2_on[:1], set(after), g.e2_on[-1:]), ([(ck, False)], {0.0}, [(g.statuses[0][0], True)]))
+    # shield poke: its body reached past a small shield
+    for charged in (False, True):
+        v = V(2, 30.0, shield=True, shield_hp=50.0)
+        v.poke = True
+        g = Game(fighters=[v], held=(lambda n: True) if charged else None)
+        tr, vm = run(path, g, frames=300, after=60)
+        check('v3 shield poke (%s): a body hit on a shielding fighter is the shield case: caught shielding (TS_V_SHV 1)'
+              % ('fully charged' if charged else 'uncharged'), (first(tr, lambda t: t[1] == 0x21D) is not None,
+                                                                 g.vars.get(B.V_SHV)), (True, 1.0))
+    # soft tracking after the strong frames
+    v = V(3, 1e4, y=100.0, air=True)
+    g = Game(fighters=[v], air=True, y=100.0)
+
+    def put(g_, k):
+        if k == mf + B.TRACK_STRONG + 1:
+            v.x, v.y = g_.x + 30.0, g_.y + 30.0       # 45 degrees up, placed after the strong frames
+    aims = []
+
+    def rec(g_, k):
+        put(g_, k)
+        aims.append((k, g_.vars.get(B.V_AIM, 0.0)))
+    tr, vm = run(path, g, frames=mf + 12, tick=rec)
+    ang = [round(math.degrees(math.asin(max(-1, min(1, a_)))), 2) for k, a_ in aims if k > mf + B.TRACK_STRONG + 1]
+    steps = sorted({round(b_ - a_, 2) for a_, b_ in zip(ang, ang[1:])})
+    check('v3 tracking: after its first %d frames (strong: straight at the target) it turns at most %.1f degrees a frame '
+          'toward a target appearing then (45 degrees up)' % (B.TRACK_STRONG, B.TRACK_SOFT), steps, [B.TRACK_SOFT])
+    v = V(3, 1e4, y=100.0, air=True)
+    g = Game(fighters=[v], air=True, y=100.0)
+
+    def put2(g_, k):
+        if k == mf:
+            v.x, v.y = g_.x + 30.0, g_.y + 30.0
+    tr, vm = run(path, g, frames=mf + 3, tick=put2)
+    check('v3 tracking: strong at release (the first moving frame aimed straight at a target 45 degrees up)',
+          round(math.degrees(math.asin(g.vars.get(B.V_AIM, 0.0))), 1), 45.0)
 
 
 def aura_tests(path):

@@ -52,8 +52,8 @@ MOVE_N = int(real0(85)) - MOVE_FROM  # 33 frames (27-59); the stop (the root's s
 MOVE_EASE = 8                       # a miss: the speed eased down to VSTOP over the moving part's last 8 frames
 # the user: "Uncharged: medium-slow. Fully charged: fast-medium", constant. His (Mario's fighter_param) dash initial
 # speed 1.6, run 1.6 a frame; the Super God Fist's burst 4.53 a frame (motion 9-15); XV2's own 0.7 m = 3.53
-VMIN, VMAX = 2.1, 4.2               # units a frame (v2, the user: "slightly slow down the uncharged speed", v1 2.4;
-                                    # the charged one as it was), a bit under the God Fist's burst charged
+VMIN, VMAX = 1.5, 3.36              # units a frame. v3 (user): uncharged a bit under his run (1.6), fully charged -20%
+                                    # (v2 2.1 / 4.2, v1 2.4 / 4.2); linear between by the frames held
 VSTOP = 1.85                        # the stop's first root speed (SpecialS frame 60): the eased miss meets it
 SND = {'basa': 6, 'dash': int(real0(56)), 'timestop': 0, 'punch': 8, 'away': None}
 # entry 4 (the user on connect): SpecialAirS 1:1
@@ -67,10 +67,15 @@ SND['away'] = STRIKE + AWAY_AFTER   # 63
 # tracking (the user): the nearest opponent in front within 80 units, up to 65 degrees above or below; direction only
 TRACK_RANGE = 80.0
 TRACK_DEG = 65.0
+# v3 (user: "strong at release, then soft"): the first TRACK_STRONG moving frames the aim is the target's direction,
+# then it turns toward it at most TRACK_SOFT degrees a frame
+TRACK_STRONG, TRACK_SOFT = 3, 1.5
+DRIFT = 0.3                         # v3 (user): the charge hold's drift, units a frame at full tilt (his walk ~1.1)
+RETRY_N = 3                         # v3: the catch looked at again while the hit fighter is frozen (the first-frame hit)
 # after the move in the air (the user): his gravity eased back in over EASE_FRAMES; a faster fall clamped down to his
 # normal one by FALL_EASE a frame
-EASE_FRAMES = 20.0
-FALL_EASE = 0.05
+EASE_FRAMES = 45.0                  # v3 (user: a slower fall after an air punch; v2 20 / 0.05)
+FALL_EASE = 0.02
 
 # ---------------------------------------------------------------- the boxes
 HIT_Z, HIT_Y, HIT_SIZE = round(1.0 * SCALE, 2), round(0.5 * SCALE, 2), round(0.5 * SCALE, 2)   # b_C_Base + (0, 0.5,
@@ -90,7 +95,8 @@ VICTIM_R2 = (HIT_SIZE + 12.0) ** 2
 # (XV2's blow-away is ~3 degrees: (0, 0.025, 0.43) m a frame), BKB 70, KBG 70. Mario weight, no DI, from 0 / 50 /
 # 100% before the move: knockback 98.5 / 142.6 / 186.7 (Sledgehammer charged 52.8 / 99.7 / 146.7, Core Breaker's
 # crash 75.5 / 125.3 / 175.2)
-STRIKE_HIT = dict(Damage=16.0, Angle=10, KBG=70, FKB=0, BKB=70)
+STRIKE_HIT = dict(Damage=16.0, Angle=10, KBG=40, FKB=0, BKB=82)   # v3 (user: the same knockback at 0%, KO much later):
+                                    # KBG 70 -> 40, BKB 70 -> 82 (an int field: 98.3 at 0% with the detection's 2, v2 98.5)
 STRIKE_FREEZE = 30                  # XV2's time lock: the victim at x0.1 for 40 real frames, the user 60
 STRIKE_SIZE = round(1.0 * SCALE, 2)
 STRIKE_Z, STRIKE_Y = HOLD_X, round(HOLD_Y + VICTIM_MID, 2)
@@ -108,8 +114,8 @@ TURN_STICK, TURN_WINDOW = 0.5, 4    # the B-reverse (Sledgehammer's)
 ST_SIDE, ST_FALL = 0x153, 0xE
 
 # ---------------------------------------------------------------- variables (VAR_22-30: Sledgehammer uses VAR_0-21)
-V_PH, V_CHG, V_SLOT, V_K, V_USED, V_BREV, V_EASE, V_AIM, V_SHV, V_FX = (0x0F000316 + i for i in range(10))   # v3: VAR_31
-                                    # TS_V_FX (1 while the time stop's darkening is on)
+V_PH, V_CHG, V_SLOT, V_K, V_USED, V_BREV, V_EASE, V_AIM, V_SHV, V_RETRY = (0x0F000316 + i for i in range(10))   # v3:
+                                    # VAR_31 TS_V_RETRY (the catch looked at again while the hit fighter is frozen)
 USED_INDEX = V_USED - 0x0F000000     # the variable reset's index (VAR_26: 0x31A)
 
 # ---------------------------------------------------------------- effects / sounds
@@ -157,15 +163,17 @@ AURA_AT, AURA_EMIT, AURA_EVERY = 4, 20, 20   # its start (motion frame), its emi
 AURA_CAP = 0.8                      # each emitter's brightest drawn channel (vibrant, not blown out on a bright stage)
 AURA_SIZE = 1.75                    # xv2_smash_fx.SIZE: XV2's x1.0 at g_C_Pelvis
 AURA_Y = 4.0                        # his middle (g_C_Pelvis)
-# v2 (item 11, the clip's time stop, frames 44-58): XV2 inverts the world (BPE 78) under BTL_CMN effect 108's glass
-# (HIT_DmgGrs2, on the camera). Smash 4: Screen_Tint (Sonic's Final Smash's darkening: mode 0, frames in, R, G, B, A,
-# layer 0, priority 0xFF) from the connect to the punch, End_Screen_Tint fading it out over TINT_OUT frames; the glass
-# a world-placed model in front of the victim (GLASS_*). Its own pieces (time_stop_look / ts_glass) so the camera-attached
-# command (camera_effects_v1) can replace them later
-TINT = (0, 4, 0x14, 0x16, 0x2C, 0xB4, 0, 0xFF)  # v3: the MSC's (ts_tint: EffectModule op 0 / 1), slot 0
-TINT_OUT = 15
+# v2 / v3 (item 11, the clip's time stop, frames 44-58): XV2 inverts the world (BPE 78) under BTL_CMN effect 108's glass
+# (HIT_DmgGrs2, on the camera). v3: both on the camera (Effect_Camera, exe_v46z_camfx): the darkening an alpha-blended
+# quad fixed to the screen (Mode 1, DARK_SIZE half heights: wider than a 16:9 screen), DARK_RGBA, unslowed, faded out
+# after STRIKE frames (the punch); the glass in front of the camera (Mode 0, GLASS_CAM_Z, x GLASS_CAM_SIZE), unslowed.
+# v2's Screen_Tint / world-placed glass are gone; any exit before the punch kills both (ts_stop_look_off)
+FX_DARK_ID = 0x03410065
+DARK_RGBA = (0.08, 0.09, 0.17, 0.7)  # the clip's dark blue-grey at 70%
+DARK_Z, DARK_SIZE = 20.0, 2.2
+GLASS_CAM_Z, GLASS_CAM_SIZE = 25.0, 0.1   # the shards (~140 x 100 units at x1 by their frame 49) over the screen at 25
+GLASS_TEX = 0x15141F00
 OUTLINE_A, OUTLINE_IN, OUTLINE_OUT, OUTLINE_SRC = 110.0, 4, 10, (75.0, -10.0)   # v3: the white outline (rim light)
-GLASS_SIZE, GLASS_Z, GLASS_TEX = 0.36, 15.0, 0x15141F00
 TS_SE = {'ts_basa': ('CAR_S1352_DSH_Basa', 0.0),          # skill SE cue 0, BAC 6
          'ts_dash': ('CAR_S1352_DSH_Dash', 0.0),          # cue 1, BAC 56
          'ts_hazure': ('CAR_S1350_FRT_Hazure', 0.0),      # cue 2, BAC 86 (the whiff)
@@ -196,7 +204,7 @@ def msc_values(root_speed=None):
             'TS_FX_HITLOD': '0x%X' % FX_LOD_ID, 'TS_FX_HITL': '0x%X' % FX_IDS['hitl'],
             'TS_HIT2_Z': fl(HIT2_Z), 'TS_HIT2_Y': fl(HIT2_Y), 'TS_HIT2_SIZE': fl(HIT2_SIZE),
             'TS_FX_LINES': '0x%X' % FX_LINES_ID, 'TS_FX_LINES_SIZE': fl(LINES_SIZE), 'TS_FX_AURA': '0x%X' % FX_AURA_ID,
-            'TS_FX_GLASS': '0x%X' % FX_GLASS_ID, 'TS_GLASS_SIZE': fl(GLASS_SIZE), 'TS_GLASS_Z': fl(GLASS_Z),
+            'TS_FX_GLASS': '0x%X' % FX_GLASS_ID,
             'TS_AURA_AT': fl(AURA_AT), 'TS_AURA_EVERY': fl(AURA_EVERY), 'TS_AURA_SIZE': fl(AURA_SIZE),
             'TS_AURA_Y': fl(AURA_Y),
             'TS_FX_HITL_2': '0x%X' % FX_IDS['hitl_2'], 'TS_FX_SWEAT': '0x%X' % SH_FX['sweat'],
@@ -211,11 +219,11 @@ def msc_values(root_speed=None):
             'TS_TRACK_TAN2': fl(round(math.tan(math.radians(TRACK_DEG)) ** 2, 4)),
             'TS_EASE_FRAMES': fl(EASE_FRAMES), 'TS_FALL_EASE': fl(FALL_EASE), 'TS_USED_INDEX': fl(USED_INDEX),
             'TS_STRIKE_DMG': fl(STRIKE_HIT['Damage']), 'TS_SH_TAKE': fl(SH_TAKE), 'TS_SH_STUN': fl(SH_STUN),
-            'TS_SH_IASA': fl(SH_IASA), 'TS_TINT_SLOT': str(TINT[0]), 'TS_TINT_IN': str(TINT[1]),
-            'TS_TINT_R': '0x%X' % TINT[2], 'TS_TINT_G': '0x%X' % TINT[3], 'TS_TINT_B': '0x%X' % TINT[4],
-            'TS_TINT_A': '0x%X' % TINT[5], 'TS_TINT_OUT': str(TINT_OUT)}
+            'TS_SH_IASA': fl(SH_IASA), 'TS_FX_DARK': '0x%X' % FX_DARK_ID,
+            'TS_TRACK_STRONG': fl(TRACK_STRONG), 'TS_TRACK_SOFT': fl(round(math.radians(TRACK_SOFT), 6)),
+            'TS_DRIFT': fl(DRIFT), 'TS_RETRY_N': fl(RETRY_N)}
     for n, v in (('PH', V_PH), ('CHG', V_CHG), ('SLOT', V_SLOT), ('K', V_K), ('USED', V_USED), ('BREV', V_BREV),
-                 ('EASE', V_EASE), ('AIM', V_AIM), ('SHV', V_SHV), ('FX', V_FX)):
+                 ('EASE', V_EASE), ('AIM', V_AIM), ('SHV', V_SHV), ('RETRY', V_RETRY)):
         vals['TS_V_' + n] = '0x%X' % v
     return vals
 
@@ -223,6 +231,18 @@ def msc_values(root_speed=None):
 def knockback(hit, pct):
     import supamario_fakedeath_build as FD
     return FD.knockback(hit, pct)
+
+
+def move_speeds(charge_frames=0):
+    """the moving part's speed frame by frame (ts_dash_go)"""
+    v = speed(charge_frames)
+    out = []
+    for k in range(MOVE_N):
+        x = v
+        if k > MOVE_N - MOVE_EASE - 0.5 and v > VSTOP:
+            x = v + (VSTOP - v) * (k - (MOVE_N - MOVE_EASE - 1.0)) / MOVE_EASE
+        out.append(x)
+    return out
 
 
 def speed(charge_frames):
@@ -233,7 +253,8 @@ def speed(charge_frames):
 
 def travel(charge_frames=0, root=None, air=False):
     """his travel on a straight miss (units): the root's step before the moving part, the moving part (the last
-    MOVE_EASE frames eased down to VSTOP), and on the ground the stop's root slide"""
+    MOVE_EASE frames eased down to VSTOP when faster), and the stop's root slide (v3: in the air too; `air` kept for the
+    callers)"""
     v = speed(charge_frames)
     mv = 0.0
     for k in range(MOVE_N):
@@ -242,7 +263,7 @@ def travel(charge_frames=0, root=None, air=False):
             x = v + (VSTOP - v) * (k - (MOVE_N - MOVE_EASE - 1.0)) / MOVE_EASE
         mv += x
     if root:
-        mv += sum(root[:MOVE_FROM]) + (0.0 if air else sum(root[MOVE_FROM + MOVE_N:]))
+        mv += sum(root[:MOVE_FROM]) + sum(root[MOVE_FROM + MOVE_N:])
     return round(mv, 2)
 
 
@@ -322,8 +343,14 @@ def effect_scripts():
     dash = outline_on() + [cmd('frame', float(MOVE_FROM))] + if_(0x0F000116, 0, 0, if_(V_PH, 5, DASHING, [
         cmd('graphic_effect', FX_DUST, 0, 0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1)])) + [
         cmd('frame', float(DASH_END - OUTLINE_OUT)), outline_off()]
-    connect = outline_on() + [cmd('frame', float(CONNECT_END - OUTLINE_OUT)), outline_off()]
+    connect = time_stop_look() + outline_on() + [cmd('frame', float(CONNECT_END - OUTLINE_OUT)), outline_off()]
     return dash, connect
+
+
+def time_stop_look():
+    """v3: the time stop on the camera at the connect's frame 0: the darkening (to the punch, then faded) and the glass"""
+    return [cmd('effect_camera', FX_DARK_ID, 0.0, 0.0, DARK_Z, 0.0, 0.0, 0.0, DARK_SIZE, 1, STRIKE, 1),
+            cmd('effect_camera', FX_GLASS_ID, 0.0, 0.0, GLASS_CAM_Z, 0.0, 0.0, 0.0, GLASS_CAM_SIZE, 0, 0, 1)]
 
 
 def outline_on():
@@ -446,13 +473,14 @@ def convert_fx(cmn_dir, fx_dir, halo=True):
     lines = lines_set(p, e, sets['hitl']['set_index'])
     aura = aura_set(p, e, cmn_dir)
     glass = glass_model(cmn_dir, fx_dir, e)
+    dark = dark_set(p, e, sets['hitl']['set_index'])
     out = p.build()
     assert ptcl.Ptcl(out).validate() == []
     open(os.path.join(fx_dir, base + '.ptcl'), 'wb').write(out)
     open(os.path.join(fx_dir, base + '.efc'), 'wb').write(e.build())
     bad = FX.facing_emitters(p, [s['set_index'] for s in sets.values()] + [lod['set_index']])
     return {'sets': sets, 'skipped': log, 'notes': notes, 'halos': halos, 'ptcl_bytes': [before, len(out)],
-            'facing_problems': bad, 'lod': lod, 'lines': lines, 'aura': aura, 'glass': glass}
+            'facing_problems': bad, 'lod': lod, 'lines': lines, 'aura': aura, 'glass': glass, 'dark': dark}
 
 
 def lod_copy(p, e):
@@ -587,11 +615,42 @@ def aura_set(p, e, cmn_dir):
             'skipped': log, 'notes': notes}
 
 
+def dark_set(p, e, hitl_si):
+    """v3: the time stop's darkening for Effect_Camera: one alpha-blended billboard (Btl_HitL's flash_1, blend 0, its
+    texture made solid white), 1 x 1 at size 1, DARK_RGBA, one particle that lives until the call's Frames fade it,
+    follow type 0 (it moves with the camera)"""
+    import struct
+    import numpy as np
+    src = next(em['data'] for em in p.sets[hitl_si]['emitters'] if em['data'] is not None and
+               p.emitter_name(em['data']) == 'flash_1')
+    d = bytearray(src)
+    assert p.field(d, 'blend_type') == 0
+    for name, v in (('one_time', 1), ('end_frame', 1), ('emit_rate', 1.0), ('emit_interval', 0), ('start_frame', 0),
+                    ('emit_start', 0), ('volume_type', 0), ('volume_radius', [0.0, 0.0, 0.0]), ('figure_velocity', 0.0),
+                    ('init_velocity_random', 0.0), ('emitter_velocity', 0.0), ('dispersion_angle', 0.0),
+                    ('gravity', [0.0, 0.0, 0.0]), ('ptcl_life', 0x7FFFFFFF), ('ptcl_life_random', 0),
+                    ('scale', [1.0, 1.0]), ('scale_random', [0.0, 0.0]), ('scale_init_ratio', [1.0, 1.0]),
+                    ('scale_diff21', [0.0, 0.0]), ('scale_diff32', [0.0, 0.0]), ('rotation_init', [0.0, 0.0, 0.0]),
+                    ('rotation_random', [0.0, 0.0, 0.0]), ('rotation_velocity', [0.0, 0.0, 0.0]),
+                    ('alpha_init', DARK_RGBA[3]), ('alpha_diff21', 0.0), ('alpha_diff32', 0.0), ('color_scale', 1.0)):
+        p.set_field(d, name, v)
+    p.set_key_anims(d, [])
+    p.set_emitter_srt(d)
+    for track in (0, 1):
+        p.set_color_keys(d, track, [DARK_RGBA[:3] + (1.0,)], 0)
+    p.set_texture(d, 0, np.full((16, 16, 4), 255, np.uint8))
+    struct.pack_into('>I', d, 0x310, 0)                 # follow: an overlay moving with the camera
+    si = p.new_set('PtcSupamarioTsDark', [bytes(d)], ['dark'])
+    idx = e.add(si + 1)
+    assert 0x03410000 | idx == FX_DARK_ID, ('FX_DARK_ID is out of date', hex(0x03410000 | idx))
+    return {'set': 'PtcSupamarioTsDark', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_DARK_ID, 'rgba': DARK_RGBA}
+
+
 def glass_model(cmn_dir, fx_dir, e, preview=None):
     """v2: BTL_CMN effect 108 (BAC entry 4 item 7 at the connect, frame 0; turned off at 16): HIT_DmgGrs2.emo, the
     glass that shatters as time stops (XV2: on the camera, scale 0.36, LoopCancel). Smash 4 can't attach an effect to
     the camera (until camera_effects_v1): its model (tools/xv2_to_nud.py) played by the MSC in front of the victim,
-    GLASS_Z toward the camera, x GLASS_SIZE"""
+    Effect_Camera (v3: on the camera as XV2, time_stop_look)"""
     import subprocess
     r = subprocess.run([sys.executable, '-I', os.path.join(HERE, 'xv2_to_nud.py'), cmn_dir, 'HIT_DmgGrs2',
                         os.path.join(fx_dir, 'model'), '--prefix', 'EffSupamarioTs', '--tex-base', hex(GLASS_TEX),
