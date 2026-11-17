@@ -261,7 +261,13 @@ OUTLINE_RGB6, OUTLINE_ALPHA = (0.85, 0.92, 1.0), 0.34   # fx_glow ts_outline (16
 # inversion. Here: a white wash on the camera (Effect_Camera Mode 1) at the punch: WASH_FLASH over WASH_FLASH_N
 # frames (BPE 2) on WASH_A held to the slow motion's end, faded out over WASH_OUT; INVERT_FX (the exe's Screen_Invert,
 # another package) replaces the stop's tint by a real inversion once its command is known
-INVERT_FX = False
+INVERT_FX = True                    # v6 (coordinator: the user asked for the negative): Screen_Invert (screen_invert_v1,
+                                    # exe_v46z_inv) for the stop and after the punch; False: the camera darkening + the wash
+INV_STOP = (1, 1.0, STRIKE, 2, 4, 0.0, 0.8, 19.0, 37.0, 60.0)   # XV2's dark blue-grey stop (its example 1)
+INV_WHITE = (1, 1.0, 34, 0, 14, 0.15, 0.35, 165.0, 170.0, 180.0)   # the white negative after the punch, held to +34, out
+                                    # by +48 (the clip's white to +36, normal by +50); screen_invert's preset (Bright 0.6,
+                                    # + (102, 104, 110)) brightened: the clip's world after the punch is (220, 228, 235),
+                                    # the preset drew Smashville mid-grey (cmp_invert6): 0.65-1.0, low contrast
 FX_WASH_ID = 0x0341006B
 WASH_RGB, WASH_A, WASH_IN, WASH_LIFE, WASH_OUT = (0.94, 0.97, 1.0), 0.48, 2, 48, 14   # the clip: white to +36, normal by +50
 WASH_FLASH, WASH_FLASH_N = 0.45, 8
@@ -466,7 +472,7 @@ def effect_scripts():
         cmd('graphic_effect', FX_DUST, 0, 0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1)])) + (
         [cmd('frame', float(DASH_END - OUTLINE_OUT))] + outline_off() if OVERLAY_OUTLINE else []) + [
         cmd('frame', float(DASH_END))] + outline_end()
-    connect = ((time_stop_look() if CAMERA_FX else []) + invert_on() + glass_on_screen() + outline_on() + [
+    connect = ((time_stop_look() if CAMERA_FX and not INVERT_FX else []) + invert_on() + glass_on_screen() + outline_on() + [
         cmd('frame', float(STRIKE))] + wash_on() + invert_off() + [cmd('frame', float(STRIKE + GLASS_BREAK)),
                                                                    cmd('terminate_graphic_effect', FX_GLASS_ID, 1, 1)] +
                ([cmd('frame', float(CONNECT_END - OUTLINE_OUT))] + outline_off() if OVERLAY_OUTLINE else []) +
@@ -475,19 +481,22 @@ def effect_scripts():
 
 
 def invert_on():
-    """v6: INVERT_FX (the exe's Screen_Invert, built in another package): XV2's BPE 78 at the connect's 0"""
-    if INVERT_FX:
-        raise NotImplementedError('INVERT_FX: Screen_Invert\'s syntax is not known here yet (the MSC\'s tint is used)')
-    return []
+    """v6 INVERT_FX: XV2's BPE 78 at the connect's 0: Screen_Invert's dark blue-grey negative (INV_STOP), held STRIKE
+    frames (+2 in): the punch replaces it; cut before the punch, it ends by itself (out over 4)"""
+    return [cmd('screen_invert', *INV_STOP)] if INVERT_FX else []
 
 
 def invert_off():
-    """v6: XV2's BPE 78 off at the punch (its flag word 2 at 17)"""
-    return []
+    """v6 INVERT_FX: at the punch the white negative (INV_WHITE) replaces the stop's, held to +34, out over 14, ending
+    by itself (Frames: no exit leaves it on)"""
+    return [cmd('screen_invert', *INV_WHITE)] if INVERT_FX else []
 
 
 def wash_on():
-    """v6: the white wash at the punch (wash_set), on the screen, unslowed (its own fade: WASH_LIFE real frames)"""
+    """v6: the white wash at the punch (wash_set), on the screen, unslowed (its own fade: WASH_LIFE real frames); not
+    with INVERT_FX (the filter would turn the white quad dark: the white negative is Screen_Invert's)"""
+    if INVERT_FX:
+        return []
     return [cmd('effect_camera', FX_WASH_ID, 0.0, 0.0, WASH_Z, 0.0, 0.0, 0.0, WASH_SIZE, 1, 0, 1)]
 
 
@@ -1084,10 +1093,15 @@ def glass_model(cmn_dir, fx_dir, e, preview=None):
     r = subprocess.run(args, capture_output=True, text=True)
     assert r.returncode == 0, (r.stdout + r.stderr)[-2000:]
     cracks = glass_cracks(os.path.join(fx_dir, 'model', folder))
+    inv = glass_invert(os.path.join(fx_dir, 'model', folder)) if INVERT_FX else None
+    if inv:
+        r = subprocess.run([sys.executable, '-I', os.path.join(HERE, 'xv2_to_nud.py'), 'verify',
+                            os.path.join(fx_dir, 'model', folder)], capture_output=True, text=True)
+        assert r.returncode == 0, (r.stdout + r.stderr)[-2000:]
     idx = e.add(0, folder)
     assert 0x03410000 | idx == FX_GLASS_ID, ('FX_GLASS_ID is out of date', hex(0x03410000 | idx))
     return {'folder': folder, 'efc': idx, 'id': '0x%08X' % FX_GLASS_ID, 'cracks': cracks,
-            'sheens': getattr(glass_cracks, 'sheens', [])}
+            'sheens': getattr(glass_cracks, 'sheens', []), 'inverted': inv}
 
 
 def glass_cracks(folder):
@@ -1148,7 +1162,35 @@ def glass_cracks(folder):
     tid = nut.load(os.path.join(folder, 'model.nut'))[1][0].tex_id     # the converter's own texture ID
     open(os.path.join(folder, 'model.nut'), 'wb').write(nut.write_ntwu([(tid, 0x31, img)]))
     glass_cracks.sheens = sheens
+    glass_cracks.alpha = a
     return lines
+
+
+def glass_invert(folder):
+    """v6, INVERT_FX: Screen_Invert turns the whole 3D picture, the glass in it, into a negative, so additive light
+    cracks would show dark. Drawn pre-inverted instead: alpha-blended (NUD src 5 / dst 1, the converter's normal
+    blend) black, the cracks / panes in the alpha (BC3): under the stop's filter (0.8 x the negative's luma + (19, 37,
+    60)) black comes out (0.87, 0.95, 1.0), the light blue-white of v5's cracks; the header's sphere kept"""
+    import struct
+    import numpy as np
+    import nud
+    import nut
+    path = os.path.join(folder, 'model.nud')
+    raw = open(path, 'rb').read()
+    meshes = nud.read(path)
+    for m in meshes:
+        for pg in m.polygons:
+            for mat in pg.materials:
+                mat.src, mat.dst = 5, 1
+    data = bytearray(nud.write(meshes))
+    data[0x20:0x30] = raw[0x20:0x30]
+    open(path, 'wb').write(bytes(data))
+    a = glass_cracks.alpha
+    img = np.zeros(a.shape + (4,), np.uint8)
+    img[..., 3] = (np.clip(a, 0.0, 1.0) * 255 + 0.5).astype(np.uint8)
+    tid = nut.load(os.path.join(folder, 'model.nut'))[1][0].tex_id
+    open(os.path.join(folder, 'model.nut'), 'wb').write(nut.write_ntwu([(tid, 0x33, img)]))
+    return {'blend': [5, 1], 'texture': 'BC3 black, the cracks in the alpha'}
 
 
 # ---------------------------------------------------------------- the sound bank

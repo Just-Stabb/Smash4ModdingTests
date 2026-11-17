@@ -1223,11 +1223,23 @@ def script_tests(out, sh_out):
                                                        B.WASH_SIZE, B.GLASS_BREAK, B.CAMERA_FX),
           [c for c in cam if c[0] != 'FRAME' or c[1][0] in (float(B.STRIKE), float(B.STRIKE + B.GLASS_BREAK))],
           ([('Effect_Camera', [B.FX_DARK_ID, 0.0, 0.0, B.DARK_Z, 0.0, 0.0, 0.0, B.DARK_SIZE, 1, B.STRIKE, 1])]
-           if B.CAMERA_FX else []) +
+           if B.CAMERA_FX and not B.INVERT_FX else []) +
           [('Effect_Camera', [B.FX_GLASS_ID, 0.0, 0.0, B.GLASS_SCREEN_Z, 0.0, 0.0, 0.0, B.GLASS_SCREEN_SIZE, 1, 0, 1]),
-           ('FRAME', [float(B.STRIKE)]),
-           ('Effect_Camera', [B.FX_WASH_ID, 0.0, 0.0, B.WASH_Z, 0.0, 0.0, 0.0, B.WASH_SIZE, 1, 0, 1]),
-           ('FRAME', [float(B.STRIKE + B.GLASS_BREAK)]), ('Terminate_Graphic_Effect', [B.FX_GLASS_ID, 1, 1])])
+           ('FRAME', [float(B.STRIKE)])] +
+          ([] if B.INVERT_FX else [('Effect_Camera', [B.FX_WASH_ID, 0.0, 0.0, B.WASH_Z, 0.0, 0.0, 0.0, B.WASH_SIZE, 1, 0,
+                                                      1])]) +
+          [('FRAME', [float(B.STRIKE + B.GLASS_BREAK)]), ('Terminate_Graphic_Effect', [B.FX_GLASS_ID, 1, 1])])
+    inv = [(nm(c), [round(x, 3) if isinstance(x, float) else x for x in c.params]) for c in f['effect'].script('specialairs')
+           if nm(c) in ('Screen_Invert',) or nm(c) == 'FRAME' and c.params[0] == float(B.STRIKE)]
+    allinv = [nm(c) for p_ in f for s_ in ('specials', 'specialairs') for c in f[p_].script(s_) if nm(c) == 'Screen_Invert']
+    check('v6 INVERT_FX %s: Screen_Invert (exe_v46z_inv) the stop\'s dark blue-grey negative at the connect\'s 0 (held '
+          '%d, ending by itself), the white negative at the punch (held %d, out over %d: ends by itself); only there' % (
+              B.INVERT_FX, B.INV_STOP[2], B.INV_WHITE[2], B.INV_WHITE[4]),
+          (inv, len(allinv)),
+          (([('Screen_Invert', [round(x, 3) if isinstance(x, float) else x for x in B.INV_STOP]),
+             ('FRAME', [float(B.STRIKE)]),
+             ('Screen_Invert', [round(x, 3) if isinstance(x, float) else x for x in B.INV_WHITE])], 2) if B.INVERT_FX else
+           ([('FRAME', [float(B.STRIKE)])], 0)))
     gen = [nm(c) for p in f for s in ('specials', 'specialairs') for c in f[p].script(s)
            if 'article' in nm(c).lower() or 'reflect' in nm(c).lower()]
     check('no Cape left (no article, no reflector) in the side special\'s scripts', gen, [])
@@ -1363,7 +1375,13 @@ def effect_tests(out, sh_out):
     import nut
     nd_, tx_ = nut.load(os.path.join(mdir, 'model.nut'))
     img_ = nut.decode(nd_, tx_[0]).astype(float) / 255.0
-    lum = img_[..., :3].max(axis=2)
+    lum = img_[..., 3] if B.INVERT_FX else img_[..., :3].max(axis=2)     # v6 INVERT_FX: drawn pre-inverted, black
+    if B.INVERT_FX:
+        import nud as nud_
+        check('v6 INVERT_FX: the glass drawn pre-inverted (Screen_Invert turns it negative): alpha-blended (src 5 / dst 1), '
+              'black, the cracks / panes in the alpha',
+              ({(mt.src, mt.dst) for m in nud_.read(os.path.join(mdir, 'model.nud')) for pg in m.polygons
+                for mt in pg.materials}, float(img_[..., :3].max())), ({(5, 1)}, 0.0))
     gl_ = json.load(open(os.path.join(out, 'timeskip.json')))['fx']['glass']
     sh_ = gl_.get('sheens') or [0.0]
     check('v5 / v6: the glass clear: its texture the shards\' outlines (%d lines) in light blue-white (blue >= red), no '
