@@ -39,7 +39,9 @@ def real0(b):
 
 WIND_END = 20                       # BAC 20: ChargeControl 20-50 (the pose held while the button is), the BPE flash
 CHARGE = 40                         # ChargeTime 40: the full charge (XV2: BacEntryCharge 2, the long dash)
-HIT_FROM = int(real0(54))           # 29: the detection box BAC 54-83 (skill BDM #0: no damage, type 10)
+HIT_FROM = int(real0(52)) - 1       # v2: 26, the frame before the dash (XV2's box BAC 54-83 is 29: from 29 a
+                                    # fighter on top of him was already behind him, user: "won't activate the punch on
+                                    # opponents touching Supamario at point blank")
 HIT_LAST = int(real0(82))           # 57: its last active frame
 DASH_END = int(real0(120))          # 95: the stop's last frame (entry 0 ends at 120)
 HIT_LATE = 3.0                      # the MSC still looks for the hit 3 frames after a box's last frame
@@ -120,7 +122,7 @@ SH_FX = {'hitlod': 0x0341005C, 'sweat': 0x0341005E}
 # XV2's glare 1.0 but drawn at the HDR cap 2.0) were 28.6 square units over 1.0 on a grass stage and its glaring streaks
 # (line / line_2 / line_1_1, glare 2.5) 8.9 (tools/supamario_fx_glow.py ts_hit --bg 0.5,0.65,0.3): each emitter's
 # brightest drawn channel capped (Sledgehammer's flash_cap way), by its name's start
-PEAK_CAP = (('flash', 0.12), ('line', 0.3), ('Line00', 0.6), ('grd00', 0.6), ('LINE', 0.8), ('stripe', 0.8))   # v1: flash
+PEAK_CAP = (('flash', 0.2), ('line', 0.25), ('Line00', 0.5), ('grd00', 0.6), ('LINE', 0.8), ('stripe', 0.8))   # v1: flash
                                     # 0.35, line 0.5, Line00 1.0 (v2: the white flash, LOD_CAP)
 FX_DUST = 0x1000009                 # Smash's dash cloud: XV2's Stage BG 60 at BAC 56 (the stage's own, not in the files)
 # v2 (user: "Does a massive white flash when it hits an opponent"): BTL_CMN effect 2's Btl_HitLOD (v1: Sledgehammer's own
@@ -129,19 +131,35 @@ FX_DUST = 0x1000009                 # Smash's dash cloud: XV2's Stage BG 60 at B
 # when it plays. Time Skip now has its own copy (Sledgehammer's set untouched) with its emitters' brightest drawn
 # channel capped by name (LOD_CAP), and Btl_HitL's caps lowered (PEAK_CAP): every frame under the user's earlier
 # tolerance (Sledgehammer v5's arcs: 1.0 / 3.6 square units over 1.0 on grass, uncharged / charged), the colours kept
-LOD_CAP = (('flash', 0.1), ('grd01', 0.45), ('ptcl', 0.8), ('line', 0.8))
+LOD_CAP = (('flash', 0.22), ('grd01', 0.45), ('ptcl', 0.8), ('line', 0.8))
 FX_LOD_ID = 0x03410061
-# v2 (user: "There's no purple line being emitted over Supamario during the move"): XV2's skill effect 0 (BAC entry 0
-# item 9: EEPK type 5 = the super skill's own, skill id 1352, effect 0 on b_C_Base at frame 0) isn't in the files sent
-# (no EEPK for 1352_HIK_DSH; README "Time Skip v2"). Stand-in: a purple streak (Btl_HitL's Line00 glare line as a
-# template, one directional particle along the travel) the MSC leaves at his middle every moving frame (ts_trail):
-# world-placed, TRAIL_LIFE frames, fading: a line along his path. Hit's ki purple, peak under 1.0 (no bloom)
-FX_TRAIL_ID = 0x03410062
-TRAIL_Y = 5.0
-TRAIL_LIFE = 12
-TRAIL_SCALE = (0.9, 6.0)            # its width, its length along the travel (the call's size 1)
-TRAIL_RGB = (0.5, 0.18, 0.95)
-TRAIL_SIZE = 1.0
+# v2 (user: "There's no purple line being emitted over Supamario during the move"; the user's XV2 clip fc8b90ed): the
+# purple is XV2's skill effect 11 at the punch (BAC entry 4 item 8, frame 16: EEPK type 5, skill 1352, effect 11): purple
+# speed lines from the victim forward along the punch (clip frames 60-100), then a long purple line along the victim's
+# flight fading out (to ~130); and its effect 0 (entry 0 item 9, frame 0 on b_C_Base): pale lavender light shards rising
+# round him in the wind-up (clip 8-30). No EEPK for 1352_HIK_DSH in the files sent (README "Time Skip v2"): stand-ins
+# from Btl_HitL's flash_1_1 (a soft disc billboard) stretched into streaks. Nothing during the dash itself (the clip has none)
+FX_LINES_ID, FX_SHARDS_ID, FX_GLASS_ID = 0x03410062, 0x03410063, 0x03410064
+LINE_TEMPLATE = 'flash_1_1'         # Btl_HitL's soft flash disc, a billboard (particle type 0: always facing the camera,
+                                    # its scale X / Y the screen's), stretched into a streak: horizontal for the punch's
+                                    # lines (his facing, either way), vertical for the shards
+LINES_RGB = (0.15, 0.03, 0.21)     # Hit's purple (the flash shader draws its colour ~3x: peak ~1, no bloom), additive
+LINES_N, LINES_BAND, LINES_SPEED, LINES_LIFE = 8, 4.0, 0.25, 45
+LINES_SCALE = (24.0, 0.7)           # the billboard's X (the screen's horizontal: along the punch) and Y
+LONG_SCALE, LONG_LIFE = (60.0, 0.5), 85
+LINES_SIZE = 1.0
+SHARDS_RGB = (0.16, 0.13, 0.26)     # the clip's pale lavender (the flash shader ~3x; additive)
+SHARDS_N, SHARDS_BAND, SHARDS_SPEED, SHARDS_LIFE, SHARDS_SCALE = 6, 4.0, 0.35, 16, (0.6, 7.0)
+SHARDS_AT = (6, 14)                 # wind-up frames (XV2's effect 0 from BAC 0, the shards rising to ~30); and every
+SHARDS_EVERY = 12                   # 12 frames of a held charge
+# v2 (item 11, the clip's time stop, frames 44-58): XV2 inverts the world (BPE 78) under BTL_CMN effect 108's glass
+# (HIT_DmgGrs2, on the camera). Smash 4: Screen_Tint (Sonic's Final Smash's darkening: mode 0, frames in, R, G, B, A,
+# layer 0, priority 0xFF) from the connect to the punch, End_Screen_Tint fading it out over TINT_OUT frames; the glass
+# a world-placed model in front of the victim (GLASS_*). Its own pieces (time_stop_look / ts_glass) so the camera-attached
+# command (camera_effects_v1) can replace them later
+TINT = (0, 4, 0x14, 0x16, 0x2C, 0xB4, 0, 0xFF)
+TINT_OUT = 15
+GLASS_SIZE, GLASS_Z, GLASS_TEX = 0.36, 15.0, 0x15141F00
 TS_SE = {'ts_basa': ('CAR_S1352_DSH_Basa', 0.0),          # skill SE cue 0, BAC 6
          'ts_dash': ('CAR_S1352_DSH_Dash', 0.0),          # cue 1, BAC 56
          'ts_hazure': ('CAR_S1350_FRT_Hazure', 0.0),      # cue 2, BAC 86 (the whiff)
@@ -171,7 +189,9 @@ def msc_values(root_speed=None):
             'TS_HOLD_X': fl(HOLD_X), 'TS_HOLD_Y': fl(HOLD_Y), 'TS_INV_STEP': fl(INV_STEP),
             'TS_FX_HITLOD': '0x%X' % FX_LOD_ID, 'TS_FX_HITL': '0x%X' % FX_IDS['hitl'],
             'TS_HIT2_Z': fl(HIT2_Z), 'TS_HIT2_Y': fl(HIT2_Y), 'TS_HIT2_SIZE': fl(HIT2_SIZE),
-            'TS_FX_TRAIL': '0x%X' % FX_TRAIL_ID, 'TS_FX_TRAIL_SIZE': fl(TRAIL_SIZE), 'TS_TRAIL_Y': fl(TRAIL_Y),
+            'TS_FX_LINES': '0x%X' % FX_LINES_ID, 'TS_FX_LINES_SIZE': fl(LINES_SIZE), 'TS_FX_SHARDS': '0x%X' % FX_SHARDS_ID,
+            'TS_FX_GLASS': '0x%X' % FX_GLASS_ID, 'TS_GLASS_SIZE': fl(GLASS_SIZE), 'TS_GLASS_Z': fl(GLASS_Z),
+            'TS_SHARDS_A': fl(SHARDS_AT[0]), 'TS_SHARDS_B': fl(SHARDS_AT[1]), 'TS_SHARDS_EVERY': fl(SHARDS_EVERY),
             'TS_FX_HITL_2': '0x%X' % FX_IDS['hitl_2'], 'TS_FX_SWEAT': '0x%X' % SH_FX['sweat'],
             'TS_FX_HITLOD_SIZE': fl(round(EEPK_SCALE['Btl_HitLOD.emp'] * FX_SCALE, 4)),
             'TS_FX_HITL_SIZE': fl(round(EEPK_SCALE['Btl_HitL.emp'] * FX_SCALE, 4)),
@@ -259,6 +279,14 @@ DASHING, CHARGING = 2.5, 1.5        # TS_V_PH > 2.5: the dash; < 1.5: the wind-u
 FULL = CHARGE - 0.5                 # TS_V_CHG > FULL: fully charged
 
 
+def time_stop_look(on):
+    """v2 (item 11): the darkened world of XV2's time stop: Screen_Tint at the connect, End_Screen_Tint at the punch
+    (TINT_OUT frames out). Kept apart so camera_effects_v1's command can take its place"""
+    if on:
+        return [cmd('screen_tint', *TINT)]
+    return [cmd('end_screen_tint', 0, TINT_OUT)]
+
+
 def game_scripts():
     """specials: the detection box at HIT_FROM only in the dash (the script's clock runs on while the charge holds the
     pose; the MSC restarts the motion at WIND_END after a held charge, and removes the box: AttackModule 0x2719);
@@ -266,8 +294,9 @@ def game_scripts():
     the punch (uncharged: shieldable; fully charged: unblockable, + SH_BONUS on a fighter caught shielding), off 2
     frames later"""
     dash = [cmd('frame', float(HIT_FROM))] + if_(V_PH, 5, DASHING, [catch_box(0), catch_box(1)])
-    connect = ([cmd('stage_freeze', 1, STAGE_FREEZE_SAFETY), cmd('frame', float(STRIKE)), cmd('stage_freeze', 0, 0),
-                cmd('hit_log_clear', 1)] +
+    connect = ([cmd('stage_freeze', 1, STAGE_FREEZE_SAFETY)] + time_stop_look(True) +
+               [cmd('frame', float(STRIKE)), cmd('stage_freeze', 0, 0)] + time_stop_look(False) +
+               [cmd('hit_log_clear', 1)] +
                if_(V_CHG, 4, FULL, [strike_box()]) +
                if_(V_CHG, 5, FULL, if_(V_SHV, 5, 0.5, [strike_box(True, SH_BONUS)]) +
                    if_(V_SHV, 4, 0.5, [strike_box(True)])) +
@@ -389,14 +418,16 @@ def convert_fx(cmn_dir, fx_dir, halo=True):
         halos = {'glowing': sum(len(v) for v in glow.values()), 'alpha': FX.HALO_ALPHA, 'no_room': dropped,
                  'by_set': {p.set_name(si): len(v) for si, v in glow.items()}}
     lod = lod_copy(p, e)
-    trail = trail_set(p, e, sets['hitl']['set_index'])
+    lines = lines_set(p, e, sets['hitl']['set_index'])
+    shards = shards_set(p, e, sets['hitl']['set_index'])
+    glass = glass_model(cmn_dir, fx_dir, e)
     out = p.build()
     assert ptcl.Ptcl(out).validate() == []
     open(os.path.join(fx_dir, base + '.ptcl'), 'wb').write(out)
     open(os.path.join(fx_dir, base + '.efc'), 'wb').write(e.build())
     bad = FX.facing_emitters(p, [s['set_index'] for s in sets.values()] + [lod['set_index']])
     return {'sets': sets, 'skipped': log, 'notes': notes, 'halos': halos, 'ptcl_bytes': [before, len(out)],
-            'facing_problems': bad, 'lod': lod, 'trail': trail}
+            'facing_problems': bad, 'lod': lod, 'lines': lines, 'shards': shards, 'glass': glass}
 
 
 def lod_copy(p, e):
@@ -423,35 +454,94 @@ def lod_copy(p, e):
             'from': '0x%08X' % SH_FX['hitlod'], 'capped': notes}
 
 
-def trail_set(p, e, hitl_si):
-    """v2: the purple streak (XV2's skill effect 0's stand-in): Btl_HitL's Line00 (a directional glare line) as one
-    particle along +X of the call (the MSC turns it to his travel), TRAIL_LIFE frames, fading in at once and out over its
-    last 70%, thinning; Hit's purple (TRAIL_RGB, colour scale 1: no bloom), additive"""
+def _line_emitter(p, src, **kw):
+    """a copy of Btl_HitL's soft flash disc billboard (LINE_TEMPLATE) set up as a v2 streak (its scale x the width, y the length): kw are ptcl fields; colour RGB
+    (both tracks, constant), colour scale 1 (no bloom), particles that stay where they were born"""
     import supamario_sledgehammer_build as SB
-    src = next(em['data'] for em in p.sets[hitl_si]['emitters'] if em['data'] is not None and
-               p.emitter_name(em['data']) == 'Line00')
     d = bytearray(src)
-    for name, v in (('one_time', 1), ('end_frame', 1), ('emit_rate', 1.0), ('emit_interval', 0), ('start_frame', 0),
-                    ('emit_start', 0), ('volume_type', 0), ('volume_radius', [0.0, 0.0, 0.0]),
-                    ('figure_velocity', 0.0), ('init_velocity_random', 0.0), ('emitter_velocity', 0.0001),
-                    ('emit_direction', [1.0, 0.0, 0.0]), ('dispersion_angle', 0.0), ('air_resistance', 1.0),
-                    ('gravity', [0.0, 0.0, 0.0]), ('ptcl_life', TRAIL_LIFE), ('ptcl_life_random', 0),
-                    ('scale', list(TRAIL_SCALE)), ('scale_random', [0.0, 0.0]), ('scale_init_ratio', [1.0, 1.0]),
-                    ('scale_sections', [30, 60]), ('scale_diff21', [0.0, 0.0]), ('scale_diff32', [-0.6, 0.0]),
-                    ('rotation_init', [0.0, 0.0, 0.0]), ('rotation_random', [0.0, 0.0, 0.0]),
-                    ('rotation_velocity', [0.0, 0.0, 0.0]), ('alpha_init', 0.0), ('alpha_diff21', 1.0),
-                    ('alpha_diff32', -1.0), ('alpha_section1', 0.05), ('alpha_section2', 0.3), ('color_scale', 1.0)):
+    base = dict(one_time=1, end_frame=1, emit_interval=0, start_frame=0, emit_start=0, volume_type=0,
+                volume_radius=[0.0, 0.0, 0.0], figure_velocity=0.0, init_velocity_random=0.0, dispersion_angle=0.0,
+                air_resistance=1.0, gravity=[0.0, 0.0, 0.0], ptcl_life_random=0, scale_random=[0.0, 0.0],
+                scale_init_ratio=[1.0, 1.0], scale_sections=[30, 60], scale_diff21=[0.0, 0.0],
+                scale_diff32=[-0.5, 0.0], rotation_init=[0.0, 0.0, 0.0], rotation_random=[0.0, 0.0, 0.0],
+                rotation_velocity=[0.0, 0.0, 0.0], alpha_init=0.0, alpha_diff21=1.0, alpha_diff32=-1.0,
+                alpha_section1=0.08, alpha_section2=0.45, color_scale=1.0)
+    rgb = kw.pop('rgb')
+    srt = kw.pop('srt', None)
+    base.update(kw)
+    for name, v in base.items():
         p.set_field(d, name, v)
-    p.set_emitter_srt(d)
-    rgb = TRAIL_RGB + (1.0,)
+    p.set_key_anims(d, [])
+    p.set_emitter_srt(d, *(srt or ()))
     for track in (0, 1):
-        p.set_color_keys(d, track, [rgb], 0)
-    SB.follow(p, d)
-    si = p.new_set('PtcSupamarioTsTrail', [bytes(d)], ['trail'])
+        p.set_color_keys(d, track, [tuple(rgb) + (1.0,)], 0)
+    struct_pack_follow_none(d)
+    return bytes(d)
+
+
+def struct_pack_follow_none(d):
+    """the particles stay where they were born (ptcl +0x310 follow type 1): a world-placed burst, the fighters move on"""
+    import struct
+    struct.pack_into('>I', d, 0x310, 1)
+
+
+def lines_set(p, e, hitl_si):
+    """v2: XV2's skill effect 11 (BAC entry 4 item 8 at the punch, frame 16: EEPK type 5, skill 1352, effect 11; its
+    EEPK isn't in the files) as the user's clip shows it (fc8b90ed, frames 60-130 at 60 fps): purple speed lines
+    from the victim's back forward along the punch (his facing), then one long purple line along the victim's flight
+    that fades. Stand-in from Btl_HitL's flash_1_1 (a soft disc billboard) stretched: LINES_N streaks in a band the victim's height (a box volume, +X along
+    the call: the MSC turns it to his facing), LINES_LIFE frames; one long line, LONG_LIFE frames"""
+    src = next(em['data'] for em in p.sets[hitl_si]['emitters'] if em['data'] is not None and
+               p.emitter_name(em['data']) == LINE_TEMPLATE)
+    streaks = _line_emitter(p, src, rgb=LINES_RGB, emit_rate=float(LINES_N), volume_type=11,
+                            volume_radius=[1.0, LINES_BAND, 0.5], emitter_velocity=LINES_SPEED,
+                            emit_direction=[1.0, 0.0, 0.0], dispersion_angle=4.0, ptcl_life=LINES_LIFE,
+                            ptcl_life_random=10, scale=list(LINES_SCALE), scale_random=[0.5, 0.0],
+                            srt=((1, 1, 1), (0, 0, 0), (LINES_SCALE[0] * 0.6, 0.0, 0.0)))
+    long_ = _line_emitter(p, src, rgb=LINES_RGB, emit_rate=1.0, emitter_velocity=0.05, emit_direction=[1.0, 0.0, 0.0],
+                          ptcl_life=LONG_LIFE, scale=list(LONG_SCALE), alpha_section1=0.04, alpha_section2=0.55,
+                          srt=((1, 1, 1), (0, 0, 0), (LONG_SCALE[0] * 0.5, 0.0, 0.0)))
+    si = p.new_set('PtcSupamarioTsLines', [streaks, long_], ['speedline', 'longline'])
     idx = e.add(si + 1)
-    assert 0x03410000 | idx == FX_TRAIL_ID, ('FX_TRAIL_ID is out of date', hex(0x03410000 | idx))
-    return {'set': 'PtcSupamarioTsTrail', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_TRAIL_ID,
-            'peak': round(SB.arc_peak(p, d), 3), 'life': TRAIL_LIFE, 'scale': list(TRAIL_SCALE)}
+    assert 0x03410000 | idx == FX_LINES_ID, ('FX_LINES_ID is out of date', hex(0x03410000 | idx))
+    return {'set': 'PtcSupamarioTsLines', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_LINES_ID}
+
+
+def shards_set(p, e, hitl_si):
+    """v2: XV2's skill effect 0 (BAC entry 0 item 9 at frame 0 on b_C_Base, the same EEPK) as the clip shows it
+    (frames 8-30): pale lavender light shards rising round him in the wind-up. Stand-in: SHARDS_N vertical streaks (+Y,
+    no turn: either facing) in a band his width at his feet, rising, SHARDS_LIFE frames"""
+    src = next(em['data'] for em in p.sets[hitl_si]['emitters'] if em['data'] is not None and
+               p.emitter_name(em['data']) == LINE_TEMPLATE)
+    d = _line_emitter(p, src, rgb=SHARDS_RGB, emit_rate=float(SHARDS_N), volume_type=11,
+                      volume_radius=[SHARDS_BAND, 0.5, 1.0], emitter_velocity=SHARDS_SPEED, emit_direction=[0.0, 1.0, 0.0],
+                      dispersion_angle=6.0, ptcl_life=SHARDS_LIFE, ptcl_life_random=6, scale=list(SHARDS_SCALE),
+                      scale_random=[0.0, 0.5], srt=((1, 1, 1), (0, 0, 0), (0.0, SHARDS_SCALE[1] * 0.5, 0.0)))
+    si = p.new_set('PtcSupamarioTsShards', [d], ['shard'])
+    idx = e.add(si + 1)
+    assert 0x03410000 | idx == FX_SHARDS_ID, ('FX_SHARDS_ID is out of date', hex(0x03410000 | idx))
+    return {'set': 'PtcSupamarioTsShards', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_SHARDS_ID}
+
+
+def glass_model(cmn_dir, fx_dir, e, preview=None):
+    """v2: BTL_CMN effect 108 (BAC entry 4 item 7 at the connect, frame 0; turned off at 16): HIT_DmgGrs2.emo, the
+    glass that shatters as time stops (XV2: on the camera, scale 0.36, LoopCancel). Smash 4 can't attach an effect to
+    the camera (until camera_effects_v1): its model (tools/xv2_to_nud.py) played by the MSC in front of the victim,
+    GLASS_Z toward the camera, x GLASS_SIZE"""
+    import subprocess
+    r = subprocess.run([sys.executable, '-I', os.path.join(HERE, 'xv2_to_nud.py'), cmn_dir, 'HIT_DmgGrs2',
+                        os.path.join(fx_dir, 'model'), '--prefix', 'EffSupamarioTs', '--tex-base', hex(GLASS_TEX),
+                        '--plain', '1', '--scale', str(SCALE)], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr[-2000:]
+    folder = 'EffSupamarioTsDmgGrs2'
+    args = [sys.executable, '-I', os.path.join(HERE, 'xv2_to_nud.py'), 'verify', os.path.join(fx_dir, 'model', folder)]
+    if preview:
+        args += ['--preview', preview]
+    r = subprocess.run(args, capture_output=True, text=True)
+    assert r.returncode == 0, (r.stdout + r.stderr)[-2000:]
+    idx = e.add(0, folder)
+    assert 0x03410000 | idx == FX_GLASS_ID, ('FX_GLASS_ID is out of date', hex(0x03410000 | idx))
+    return {'folder': folder, 'efc': idx, 'id': '0x%08X' % FX_GLASS_ID}
 
 
 # ---------------------------------------------------------------- the sound bank

@@ -41221,7 +41221,8 @@ void sh_tick()
 // same on the ground and in the air; v1's energy-3 speeds never moved him in the air), the ground slides off edges into
 // the air and the dash goes on, Time Skip's own tracking without v1's ground rule (ts_track: up off the ground, down
 // past an edge), the use's reset also from the MSC (ts_reset), a point-blank detection box (the script's ID 1), the
-// purple trail (ts_trail), XV2's hit look from its own dimmer sets.
+// purple lines at the punch / shards in the wind-up / the glass (ts_lines, ts_shards, ts_glass), the darkened time
+// stop (the script's Screen_Tint), XV2's hit look from its own dimmer sets.
 // ===================================================================
 
 // XV2's root travel of SpecialS (units a frame along his facing, by the motion frame): the wind-up's step and the stop
@@ -41377,15 +41378,36 @@ void ts_move(float vx, float vy)
     }
 }
 
-// v2 (user: "There's no purple line being emitted over Supamario during the move"): XV2's skill effect 0 (its EEPK isn't
-// in the files: the stand-in) as a purple streak left at his middle every moving frame, along his travel (rotation about
-// Z: the way he goes, either facing), world-placed (it stays where he was: a line behind him that fades)
-void ts_trail(float c, float sn)
+// v2 (user: "There's no purple line being emitted over Supamario during the move"; the user's XV2 clip): XV2's skill
+// effect 11 at the punch, whose EEPK isn't in the files (the stand-in, tools/supamario_timeskip_build.py lines_set):
+// purple speed lines from the victim's back forward along the punch and one long purple line, world-placed at the
+// victim's middle, turned to his facing (+X of the set: rotation 0 facing right, pi facing left)
+void ts_lines(float x, float y, float z)
 {
-    float face;
-    face = WorkModuleF(0, 0x0f000003);
-    EffectModule(0x3, TS_FX_TRAIL, WorkModuleF(0, 0x0f000000), WorkModuleF(0, 0x0f000001) + TS_TRAIL_Y,
-                 WorkModuleF(0, 0x0f000002), 0, 0, MathF(0x1, sn, c * face), TS_FX_TRAIL_SIZE, 0, 0xffffffff);
+    float rz;
+    rz = 0.0f;
+    if (WorkModuleF(0, 0x0f000003) < 0.0f)
+    {
+        rz = M_PI;
+    }
+    EffectModule(0x3, TS_FX_LINES, x, y, z, 0, 0, rz, TS_FX_LINES_SIZE, 0, 0xffffffff);
+}
+
+// v2: XV2's skill effect 0 (the same EEPK; shards_set): pale lavender light shards rising round him in the wind-up (at
+// TS_SHARDS_A / _B) and every TS_SHARDS_EVERY frames of a held charge; vertical, either facing
+void ts_shards()
+{
+    EffectModule(0x3, TS_FX_SHARDS, WorkModuleF(0, 0x0f000000), WorkModuleF(0, 0x0f000001),
+                 WorkModuleF(0, 0x0f000002), 0, 0, 0, 1.0f, 0, 0xffffffff);
+}
+
+// v2 (item 11): BTL_CMN effect 108 (HIT_DmgGrs2, XV2's glass that shatters as time stops; on XV2's camera) as a model in
+// front of the victim, TS_GLASS_Z toward the camera. Its own call so the camera-attached command can replace it
+void ts_glass(int s)
+{
+    EffectModule(0x3, TS_FX_GLASS, WorkModuleF(0, 0x0f000020 + 4 * (s - 1)),
+                 WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) + TS_VICTIM_MID, WorkModuleF(0, 0x0f000002) + TS_GLASS_Z, 0, 0, 0,
+                 TS_GLASS_SIZE, 0, 0xffffffff);
 }
 
 void ts_air_kinetics()
@@ -41685,6 +41707,7 @@ void ts_catch(int s, int sh)
     ts_freeze_others();
     WorkModule(0, TS_INV_STEP, 0x0F00011C);
     ts_still();
+    ts_glass(s);
     func_22(0x21d, 0, 1.0f);
 }
 
@@ -41703,6 +41726,7 @@ void ts_strike_fx(int s)
     EffectModule(0x3, TS_FX_HITL, x, y, z, 0, 0, 0, TS_FX_HITL_SIZE, 0, 0xffffffff);
     EffectModule(0x3, TS_FX_HITL_2, x, y, z, 0, 0, 0, TS_FX_HITL_SIZE, 0, 0xffffffff);
     EffectModule(0x3, TS_FX_SWEAT, x, y + TS_VICTIM_HEAD - TS_VICTIM_MID, z, 0, 0, 0, TS_FX_SWEAT_SIZE, 0, 0xffffffff);
+    ts_lines(x, y, z);
     SoundModule(0x2710, TS_SND_HIT);
 }
 
@@ -41806,11 +41830,6 @@ void ts_dash(float fr)
     float sn;
     k = WorkModuleF(0, TS_V_K);
     n = TS_MOVE_N;
-    if (fr > TS_HIT_FROM - 1.5f && k < n - 2.5f)
-    {
-        armor_lift(TS_HIT_Z, TS_HIT_Y, TS_HIT_SIZE);
-        armor_lift(TS_HIT2_Z, TS_HIT2_Y, TS_HIT2_SIZE);     // v2: the point-blank box (ID 1)
-    }
     if (fr > TS_HIT_FROM - 0.5f && k < n - 2.0f + TS_HIT_LATE)
     {
         if (ts_try_catch() != 0)
@@ -41818,6 +41837,21 @@ void ts_dash(float fr)
             return;
         }
     }
+    ts_dash_go(fr, k, n);
+    // the armor lift where the box will be at this frame's collision: after his move (v2: the travel is his position,
+    // written now; v1's speed moved him after the MSC)
+    if (WorkModuleF(0, TS_V_PH) == 3.0f && fr > TS_HIT_FROM - 0.5f && k < n - 2.5f)
+    {
+        armor_lift(TS_HIT_Z, TS_HIT_Y, TS_HIT_SIZE);
+        armor_lift(TS_HIT2_Z, TS_HIT2_Y, TS_HIT2_SIZE);     // v2: the point-blank box (ID 1)
+    }
+}
+
+void ts_dash_go(float fr, float k, float n)
+{
+    float v;
+    float c;
+    float sn;
     if (fr < TS_MOVE_FROM - 0.5f)
     {
         ts_move(ts_vroot(fr), 0.0f);
@@ -41857,7 +41891,6 @@ void ts_dash(float fr)
     if (WorkModuleF(0, 0x0F000043) < 0.5f)
     {
         WorkModule(0, k + 1.0f, TS_V_K);
-        ts_trail(c, sn);
     }
     ts_move(v * c, v * sn);
 }
@@ -41954,6 +41987,10 @@ void ts_loop()
     if (ph < 1.5f)
     {
         ts_brev(fr);
+        if ((fr > TS_SHARDS_A - 0.5f && fr < TS_SHARDS_A + 0.5f) || (fr > TS_SHARDS_B - 0.5f && fr < TS_SHARDS_B + 0.5f))
+        {
+            ts_shards();
+        }
         ts_move(ts_vroot(fr), 0.0f);
         if (fr < TS_WIND_END - 0.5f)
         {
@@ -41979,6 +42016,10 @@ void ts_loop()
             return;
         }
         WorkModule(0, WorkModuleF(0, TS_V_CHG) + 1.0f, TS_V_CHG);
+        if (WorkModuleF(0, TS_V_CHG) - TS_SHARDS_EVERY * (float)(int)(WorkModuleF(0, TS_V_CHG) / TS_SHARDS_EVERY) < 0.5f)
+        {
+            ts_shards();
+        }
         if (ts_charged() != 0)
         {
             ts_dash_start(0x1);

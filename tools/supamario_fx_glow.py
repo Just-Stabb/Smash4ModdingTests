@@ -10,7 +10,7 @@ the Super God Fist (attackdash) and Core Breaker's charge (specialhi before its 
 
 BUILD_OUT_DIR: tools/supamario_sledgehammer_build.py's OUT_DIR (ts_hit: tools/supamario_timeskip_build.py's). MOVE:
 sh_charging, sh_uncharged, sh_charged, sh_hit, ts_hit (Time Skip's punch; ts_hit_v1 with v1's shared Btl_HitLOD),
-ts_trail (Time Skip v2's purple streaks along a dash), attackdash, cb_charge (default all). --png DIR: each move's six brightest frames side by side. Bones other than top
+ts_lines / ts_shards (Time Skip v2's purple lines at the punch, the wind-up's shards), attackdash, cb_charge (default all). --png DIR: each move's six brightest frames side by side. Bones other than top
 are drawn at top (the fist's effects placed 8 up, 3 ahead); his body isn't drawn.
 --bg (v4): the background colour (default black): the effects are added onto it as in game (a bright stage pushes an
 additive effect past 1 sooner: the user's screenshot 26 on a grass stage); the areas then count only the pixels the
@@ -61,9 +61,10 @@ def moves(out_dir):
            for k in ('hitl', 'hitl_2')]
     out['ts_hit'] = (ts, list(range(0, 24)))
     out['ts_hit_v1'] = ([(0, TB.SH_FX['hitlod']) + ts[0][2:]] + ts[1:], list(range(0, 24)))
-    # v2: Time Skip's trail: one streak a frame at his middle, along a level dash at the uncharged speed (MSC ts_trail)
-    out['ts_trail'] = ([(k, TB.FX_TRAIL_ID, 0, (-25.0 + TB.VMIN * k, TB.TRAIL_Y, 0.0), (0, 0, 0), TB.TRAIL_SIZE, None)
-                        for k in range(20)], list(range(0, 32)))
+    # v2: Time Skip's purple lines at the punch (the victim's middle, facing right) and the wind-up's shards
+    # (world-placed: the world's X is fx_render's top-frame Z, the screen's horizontal: the call turned -90 about Y)
+    out['ts_lines'] = ([(0, TB.FX_LINES_ID, 0, (0.0, 5.0, -25.0), (0, -90, 0), TB.LINES_SIZE, None)], list(range(0, 90)))
+    out['ts_shards'] = ([(0, TB.FX_SHARDS_ID, 0, (0.0, 0.0, 0.0), (0, -90, 0), 1.0, None)], list(range(0, 24)))
     c = [x for x in R.s4_calls(eb, 'attackdash') if (x[1] >> 16) == 0x341]
     out['attackdash'] = (c, list(range(min(x[0] for x in c), min(x[0] for x in c) + 90)))
     c = [x for x in R.s4_calls(eb, 'specialhi') if (x[1] >> 16) == 0x341 and x[0] < 55]

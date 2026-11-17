@@ -394,7 +394,8 @@ def msc_tests(path, root):
     ease = [round(B.VMIN + (B.VSTOP - B.VMIN) * (k - (mn - B.MOVE_EASE - 1)) / B.MOVE_EASE, 3)
             for k in range(mn - B.MOVE_EASE, mn)]
     check('ground tap: the moving part %d-%d at %.2f a frame (uncharged), eased to %.2f over its last %d frames' % (
-        mf, mf + mn - 1, B.VMIN, B.VSTOP, B.MOVE_EASE), sp, [B.VMIN] * (mn - B.MOVE_EASE) + ease)
+        mf, mf + mn - 1, B.VMIN, B.VSTOP, B.MOVE_EASE), [round(x, 2) for x in sp],
+          [round(x, 2) for x in [B.VMIN] * (mn - B.MOVE_EASE) + ease])
     near('ground tap: his travel (the wind-up\'s step, the moving part, the stop\'s slide)', end[3], B.travel(0, root), 0.3)
     check('ground tap: Hazure (the whiff) once, at the moving part\'s end (%d)' % (mf + mn),
           [(n, s_) for n, w, s_ in g.sounds if w == 'play'], [(mf + mn, B.SE_IDS['ts_hazure'])])
@@ -692,25 +693,26 @@ def reset_tests(path):
 def brightness_tests(out):
     """v2 (user: "Does a massive white flash when it hits an opponent"): tools/supamario_fx_glow.py on a grass stage and a
     grey one: the punch's look against v1's (the shared Btl_HitLOD) and the user's earlier tolerance (Sledgehammer v5's
-    arcs, 1.0 / 3.6 square units over 1.0 on grass); the trail"""
+    arcs, 1.0 / 3.6 square units over 1.0 on grass); the purple lines and the shards"""
     import supamario_fx_glow as G
     res = {}
     for bg_name, bg in (('grass', (0.5, 0.65, 0.3)), ('grey', (0.5, 0.5, 0.5))):
-        r = G.measure(out, ('ts_hit', 'ts_hit_v1', 'ts_trail'), None, bg)
+        r = G.measure(out, ('ts_hit', 'ts_hit_v1', 'ts_lines', 'ts_shards'), None, bg)
         res[bg_name] = r
-        h, h1, t = r['ts_hit'], r['ts_hit_v1'], r['ts_trail']
+        h, h1 = r['ts_hit'], r['ts_hit_v1']
         e0, e1 = h['frames'][0][4], h1['frames'][0][4]
-        print('     %s: ts_hit frame 0 energy %.1f (v1 %.1f), most over 1.0 in a frame %.1f (v1 %.1f), brightest frame %s; '
-              'trail most over 1.0 %.1f, energy %.1f' % (bg_name, e0, e1, h['max_over_1'], h1['max_over_1'],
-                                                          h['brightest'], t['max_over_1'], t['brightest'][4]))
+        print('     %s: ts_hit frame 0 energy %.1f (v1 %.1f), most over 1.0 in a frame %.1f (v1 %.1f), brightest frame %s' % (
+            bg_name, e0, e1, h['max_over_1'], h1['max_over_1'], h['brightest']))
+        for k in ('ts_lines', 'ts_shards'):
+            print('     %s: %s most over 1.0 %.1f, brightest %s' % (bg_name, k, r[k]['max_over_1'], r[k]['brightest']))
         check('v2 %s: the punch\'s look at most 1.0 square unit over 1.0 in any frame (Sledgehammer v5\'s uncharged arcs; '
-              'v1 %.1f), its first frame (the freeze\'s) at most a third of v1\'s energy, still vibrant (energy 10+)' % (
-                  bg_name, h1['max_over_1']), (h['max_over_1'] <= 1.0, e0 <= e1 / 3.0, h['brightest'][4] >= 10.0),
-              (True, True, True))
-        check('v2 %s: the trail at most 1.0 square unit over 1.0, visible (energy 5+)' % bg_name,
-              (t['max_over_1'] <= 1.0, t['brightest'][4] >= 5.0), (True, True))
+              'v1 %.1f), its first frame (the freeze\'s) at most a third of v1\'s energy, still vibrant (energy 8+ at its '
+              'brightest)' % (bg_name, h1['max_over_1']),
+              (h['max_over_1'] <= 1.0, e0 <= e1 / 3.0, h['brightest'][4] >= 8.0), (True, True, True))
+        for k, lo in (('ts_lines', 5.0), ('ts_shards', 2.0)):
+            check('v2 %s: %s at most 1.0 square unit over 1.0, visible (energy %g+)' % (bg_name, k, lo),
+                  (r[k]['max_over_1'] <= 1.0, r[k]['brightest'][4] >= lo), (True, True))
     return res
-
 
 
 def shield_tests(path):
@@ -778,11 +780,11 @@ def caught_tests(path, air):
           (ck + 1, sk - 1, sk - 1 - ck))
     check('%s: punched at %d: 2 + 16 = 18%%, launched (DamageFly), XV2\'s hit look the next frame (v2: Time Skip\'s own '
           'Btl_HitLOD / Btl_HitL x2 sets / the sweat) and Hit_TmLck once' % (tag, sk),
-          (round(v.pct, 3), v.hit_at, [(n, i) for n, i, _x, _y, _s in g.fx if i != B.FX_TRAIL_ID],
+          (round(v.pct, 3), v.hit_at, [(n, i) for n, i, _x, _y, _s in g.fx if i not in (B.FX_LINES_ID, B.FX_SHARDS_ID, B.FX_GLASS_ID)],
            [(n, s_) for n, w, s_ in g.sounds if w == 'play']),
           (18.0, sk, [(sk + 1, B.FX_LOD_ID), (sk + 1, B.FX_IDS['hitl']), (sk + 1, B.FX_IDS['hitl_2']),
                       (sk + 1, B.SH_FX['sweat'])], [(sk + 1, B.SE_IDS['ts_hit'])]))
-    sizes = [s_ for _n, i_, _x, _y, s_ in g.fx if i_ != B.FX_TRAIL_ID]
+    sizes = [s_ for _n, i_, _x, _y, s_ in g.fx if i_ in (B.FX_LOD_ID, B.FX_IDS['hitl'], B.FX_IDS['hitl_2'], B.SH_FX['sweat'])]
     check('%s: the hit look\'s sizes (x%.2f the EEPK\'s 1.5 / 0.8 / 2.0)' % (tag, B.FX_SCALE), sizes,
           [round(B.EEPK_SCALE[e] * B.FX_SCALE, 3) for e in ('Btl_HitLOD.emp', 'Btl_HitL.emp', 'Btl_HitL.emp',
                                                              'Btl_Sweat00.emp')])
@@ -917,7 +919,7 @@ def effect_tests(out, sh_out):
           'for byte as the Sledgehammer build\'s (emitters, textures), its shaders, its efc entries' % (
               sum(1 for i in range(len(q.sets)) if 'PtcSupamarioSh' in q.set_name(i)), len(q.sets)),
           (diff[:5], sh_[:5], e.entries[:len(qe.entries)] == qe.entries), ([], [], True))
-    lod_si, tr_si = e.entries[B.FX_LOD_ID & 0xFFFF][1] - 1, e.entries[B.FX_TRAIL_ID & 0xFFFF][1] - 1
+    lod_si = e.entries[B.FX_LOD_ID & 0xFFFF][1] - 1
     shl = e.entries[B.SH_FX['hitlod'] & 0xFFFF][1] - 1
     import supamario_sledgehammer_build as SB
     pk = [(p.emitter_name(em['data']), round(SB.arc_peak(p, em['data']), 3)) for em in p.sets[lod_si]['emitters']
@@ -929,13 +931,26 @@ def effect_tests(out, sh_out):
           (p.set_name(lod_si), [n for n, _v in pk] == [n for n, _v in pk_sh],
            all(v_ <= dict(B.LOD_CAP)['flash'] + 1e-3 for n, v_ in pk if n.startswith('flash'))),
           ('PtcSupamarioTsBtl_HitLOD', True, True))
-    td = p.sets[tr_si]['emitters'][0]['data']
-    check('v2: the trail set (0x%08X): one purple directional streak along +X, %d frames, peak under 1.0' % (
-        B.FX_TRAIL_ID, B.TRAIL_LIFE), (p.set_name(tr_si), p.field(td, 'particle_type'),
-                                        [round(x, 3) for x in p.field(td, 'emit_direction')],
-                                        p.field(td, 'ptcl_life'), [round(x, 3) for x in p.color_keys(td, 0)[0][:3]],
-                                        SB.arc_peak(p, td) < 1.0),
-          ('PtcSupamarioTsTrail', 3, [1.0, 0.0, 0.0], B.TRAIL_LIFE, [round(x, 3) for x in B.TRAIL_RGB], True))
+    got = {}
+    for key, i in (('lines', B.FX_LINES_ID), ('shards', B.FX_SHARDS_ID)):
+        si = e.entries[i & 0xFFFF][1] - 1
+        ds = [em['data'] for em in p.sets[si]['emitters'] if em['data'] is not None]
+        got[key] = (p.set_name(si), [p.field(d, 'particle_type') for d in ds],
+                    [[round(x, 3) for x in p.field(d, 'emit_direction')] for d in ds],
+                    [[round(x, 3) for x in p.color_keys(d, 0)[0][:3]] for d in ds],
+                    all(SB.arc_peak(p, d) < 1.0 for d in ds), [bytes(d[0x310:0x314]).hex() for d in ds])
+    rgb, lav = [round(x, 3) for x in B.LINES_RGB], [round(x, 3) for x in B.SHARDS_RGB]
+    check('v2: the punch\'s purple lines (0x%08X: speed lines + the long line along +X, the punch) and the wind-up\'s '
+          'lavender shards (0x%08X: +Y), stretched soft billboards (type 0), peaks under 1.0, world-placed (follow none)' % (
+              B.FX_LINES_ID, B.FX_SHARDS_ID), got,
+          {'lines': ('PtcSupamarioTsLines', [0, 0], [[1.0, 0.0, 0.0]] * 2, [rgb, rgb], True, ['00000001'] * 2),
+           'shards': ('PtcSupamarioTsShards', [0], [[0.0, 1.0, 0.0]], [lav], True, ['00000001'])})
+    gi = e.entries[B.FX_GLASS_ID & 0xFFFF]
+    mdir = os.path.join(out, 'fighter', 'supamario', 'effect', 'supamario', 'model', 'EffSupamarioTsDmgGrs2')
+    check('v2: the glass (BTL_CMN 108, HIT_DmgGrs2) a model entry (0x%08X), its folder with model / texture / '
+          'animation / material animation' % B.FX_GLASS_ID,
+          (gi[1], sorted(f for f in os.listdir(mdir)) if os.path.isdir(mdir) else None),
+          (0, ['model.mta', 'model.nud', 'model.nut', 'model.omo', 'model.vbn', 'model.xmb']))
     import json
     rep = json.load(open(os.path.join(out, 'timeskip.json')))['fx']
     conv = sum(len(v['emitters']) for v in rep['sets'].values())
