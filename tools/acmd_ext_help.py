@@ -174,7 +174,8 @@ GROUP_HELP = {
         '(hitstun / hitstop / DI); their Damage, Angle, KBG, FKB, BKB and Size can be variables (exe_v43: '
         'Angle=STICK_ANGLE, Damage=VAR_0, |FOLLOW to follow them every frame). Hit_Check / Hit_Get tell what an attack connected with (a hurtbox, a shield, ...). '
         'Hit_Reset clears the "has hit" flag (SELF_HIT); Hit_Log_Clear the record of who a hitbox Part has hit, so '
-        'the same hitboxes can hit again.',
+        'the same hitboxes can hit again. Hitbox_Hold (exe_v46y_hold) makes a hitbox\'s hits keep the victim in place '
+        '(no knockback travel: rapid jabs, drills).',
     ],
     NEW_GROUP + ' / Fighter state': [
         'Read or change a fighter\'s status, hitstun, hitstop, damage, intangibility / invincibility, armor, item '
@@ -2708,4 +2709,95 @@ EXAMPLES['Var_Reset_Set'] = [
     'SET_FLOAT(Value=0, Variable=VAR_RESET_VALUE)',
     'SET_FLOAT(Value=0, Variable=VAR_RESET_OWNER)',
     'SET_FLOAT(Value=8, Variable=VAR_RESET)',
+]
+
+# --- rapid_setoff v1: Hitbox_Hold (tools/hitbox_hold_cave.py, exe_v46y_hold) ------------------------------------------
+GROUP['Hitbox_Hold'] = 'Hitboxes & hits'
+HELP['Hitbox_Hold'] = [
+    '## How it works',
+    'Marks a hitbox that is out (made earlier in the script by Hitbox / Special_Hitbox / Extended_Special_Hitbox / '
+    'Extra_... with the same ID) so that its hits don\'t move the victim: the launch speed the hit gives (knockback x '
+    '0.03 along the angle, what slides a grounded victim along the floor or sends an airborne one away) is 0. '
+    'Everything else is the hit\'s own, as without the mark: damage, hitstun (and an Extra hitbox\'s HitstunMul), '
+    'hitlag, SDI, the flinch / reaction animation, shield damage, the hit sound and effect. The hitbox itself is not '
+    'changed (its angle stays: keep the real one, 361 for a rapid jab).',
+    'Ultimate\'s rapid-jab loop hits (ATTACK_SETOFF_KIND_OFF, angle 361, a small knockback) keep the victim in the '
+    'hits\' reach; in Smash 4 the same 361 hit sends a grounded victim at 0 degrees and every hit slides it about 2 '
+    'units, out of reach after a few. The port pipeline (tools/ultimate_acmd.py) gives such hits Hitbox_Hold(ID, 1) '
+    'with Ultimate\'s own angle. (Ultimate\'s setoff kind itself is the clank behaviour, which Smash 4\'s Clang / '
+    'Rebound parameters already carry: ON = Clang 1 Rebound 1, OFF = Clang 1 Rebound 0, THRU = Clang 0.)',
+    '',
+    '## Parameters',
+    '- ID: the hitbox\'s ID (Part doesn\'t matter: Smash 4 keeps one hitbox per ID). -1: every hitbox ID of this '
+    'object at once (fighters have 10, a projectile its own count). An ID the object doesn\'t have: nothing.',
+    '- Mode:',
+    '  - 0: off (the game\'s knockback travel again).',
+    '  - 1: ground hold. A victim standing on the ground when hit, whose launch doesn\'t point upward, stays where it '
+    'is: 361 under 60 knockback (0 degrees), angles 0 / 180, downward angles. A hit that launches it upward (361 at 60 '
+    'knockback or more, any rising angle) and a victim in the air go as normal. The rapid-jab setting: the loop holds '
+    'a standing opponent, an airborne one is carried a little as in Ultimate, the finisher launches.',
+    '  - 2: always. No victim is moved, on the ground or in the air, whatever the knockback (an airborne one still '
+    'falls with gravity, a big hit still plays its tumble). For drills and multi-hits that should hold everything.',
+    '  - Any other value: as 0.',
+    '',
+    '## When it ends',
+    '- It belongs to that hitbox: the next hitbox command with the same ID (a new hitbox in that slot, plain or Extra) '
+    'starts without it; Remove_All_Hitboxes / Remove_Hitbox take it away with the hitbox. So in a loop that makes the '
+    'hitbox again, give Hitbox_Hold again after each hitbox command.',
+    '- Change_Hitbox_Damage / Change_Hitbox_Size keep it (the same hitbox).',
+    '',
+    '## Gotchas',
+    '- Order: the hitbox command first, then Hitbox_Hold, in the same frame (a Hitbox_Hold before its hitbox marks the '
+    'old one, which the new one then replaces).',
+    '- It only removes the knockback travel. The victim\'s own movement, SDI (the hitbox\'s SDI multiplier), a slope '
+    'and being pushed by other fighters still move it; the attacker\'s own movement (a rapid jab that walks) isn\'t '
+    'held either.',
+    '- Hits only: a hit on a shield keeps its shield push (Ultimate\'s ATK_SET_SHIELD_SETOFF_MUL has no Smash 4 '
+    'counterpart).',
+    '- Mode 1 decides by where the victim was when hit (on the ground or not) and the launch the hit gives: a grounded '
+    'victim a spike (downward angle) would bounce is held too.',
+    '- Projectiles (articles) can use it in their own scripts, on their own hitbox IDs.',
+    '',
+    NOT_VIEWER + ' (it draws the hitbox as usual.)',
+    'Needs exe_v46y_hold (tools/hitbox_hold_cave.py; exe_v46x_whipmot + it). Without it a script that uses this '
+    'command won\'t load properly: ship the executable with any script that uses it.',
+]
+EXAMPLES['Hitbox_Hold'] = [
+    '// Example 1: a rapid-jab loop hit (Byleth\'s, from Ultimate\'s Attack100: 0.4%, angle 361, KBG 10, BKB 12 / 10,',
+    '// +3 hitstun). Each loop makes the hitboxes again, so each gets Hitbox_Hold again; Mode 1: a standing opponent',
+    '// stays in reach, one in the air is carried a little',
+    'FRAME(Frames=2)',
+    _hitbox('Extra_Special_Hitbox', ID=0, Damage=0.4, Angle=361, KBG=10, BKB=12, Size=6, Y=7, Z=9, Hitlag=0.4,
+            SDI=0.7, Rebound=0, SFXLevel=0, SFXType=3, Type=10, Rehit=0, HitstunMul=-3),
+    _hitbox('Extra_Special_Hitbox', ID=1, Damage=0.4, Angle=361, KBG=10, BKB=10, Size=6, Y=7, Z=18, Hitlag=0.4,
+            SDI=0.7, Rebound=0, SFXLevel=0, SFXType=3, Type=10, Rehit=0, HitstunMul=-3),
+    'Hitbox_Hold(ID=0, Mode=1)',
+    'Hitbox_Hold(ID=1, Mode=1)',
+    'WAIT(Frames=1)',
+    'Remove_All_Hitboxes()',
+    '',
+    '// Example 2: a multi-hit drill that holds its victim wherever it is, ground or air (Mode 2), every 4 frames',
+    '// for 5 hits; the last hit (made without Hitbox_Hold) launches',
+    'FRAME(Frames=6)',
+    _hitbox('Special_Hitbox', ID=0, Damage=1.5, Angle=80, KBG=30, BKB=25, Size=5, Y=6, Z=10, Hitlag=0.5, SDI=0.5,
+            Rehit=4),
+    'Hitbox_Hold(ID=0, Mode=2)',
+    'FRAME(Frames=26)',
+    _hitbox('Special_Hitbox', ID=0, Damage=4, Angle=45, KBG=120, BKB=50, Size=7, Y=6, Z=10),
+    'FRAME(Frames=28)',
+    'Remove_All_Hitboxes()',
+    '',
+    '// Example 3: a normal hit, for comparison: the same 361 hit with no Hitbox_Hold. Under 60 knockback it slides',
+    '// a standing opponent back along the floor (0 degrees, knockback x 0.03 a frame), in the air it sends it at',
+    '// about 45 degrees: the game\'s own knockback',
+    'FRAME(Frames=2)',
+    _hitbox('Special_Hitbox', ID=0, Damage=0.4, Angle=361, KBG=10, BKB=12, Size=6, Y=7, Z=9, Hitlag=0.4, SDI=0.7),
+    '',
+    '// Example 4: every hitbox of this move held at once (ID -1), then let go for the last frames of the move',
+    'FRAME(Frames=4)',
+    _hitbox('Hitbox', ID=0, Damage=2, Angle=361, KBG=20, BKB=20, Size=4, Z=6),
+    _hitbox('Hitbox', ID=1, Damage=2, Angle=361, KBG=20, BKB=20, Size=4, Z=12),
+    'Hitbox_Hold(ID=-1, Mode=1)',
+    'FRAME(Frames=20)',
+    'Hitbox_Hold(ID=-1, Mode=0)',
 ]

@@ -518,7 +518,9 @@ def supamario_values(fx):
         # Fake Death's (the grounded down special, tools/supamario_fakedeath_build.py)
         **fakedeath_values(),
         # Sledgehammer's (the air down special, tools/supamario_sledgehammer_build.py)
-        **sledgehammer_values()}
+        **sledgehammer_values(),
+        # Time Skip's (the side special, tools/supamario_timeskip_build.py)
+        **timeskip_values()}
 
 
 def godfist_values():
@@ -539,6 +541,11 @@ def fakedeath_values():
 def sledgehammer_values():
     import supamario_sledgehammer_build
     return supamario_sledgehammer_build.msc_values()
+
+
+def timeskip_values():
+    import supamario_timeskip_build
+    return supamario_timeskip_build.msc_values()
 
 
 def msc_only(out_path):

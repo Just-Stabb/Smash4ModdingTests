@@ -360,6 +360,9 @@ def plan(name, out):
                   + (['--translate', os.path.join('fighters', name, e2)] if (e2 := cfg.get('specials', {}).get('acmd'))
                      and os.path.exists(os.path.join(ROOT, 'fighters', name, e2)) else [])
                   + (['--slot-moves', ','.join(slot_moves)] if slot_moves else [])
+                  # rapid-jab holds: Ultimate's angle + Hitbox_Hold (exe_v46y_hold) by default; port.json
+                  # "rapid_hold": "angle" only for an install whose executable lacks tools/hitbox_hold_cave.py
+                  + (['--hold-angle'] if cfg.get('rapid_hold') == 'angle' else [])
                   + ['--sound-ids', snd_ids, '--expressions', '--vec-targets', os.path.join(work, 'vec_targets.json')]))
     # Ultimate's "carry the hit fighter to a point" (angle 368 + set_vec_target_pos): no Smash 4 hitbox field, so an MSC
     # pull per move (tools/vec_target.py, Sephiroth's up tilt's method): paste it into fighters/NAME/NAME.c and call

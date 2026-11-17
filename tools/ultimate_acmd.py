@@ -143,24 +143,34 @@ FACING = {'ATTACK_LR_CHECK_F': 3, 'ATTACK_LR_CHECK_B': 4, 'ATTACK_LR_CHECK_POS':
 # their 366 until they are next rebuilt. 368 (to a set point) has no Smash 4 equivalent: written as 366, with
 # the point done in MSC (tools/vec_target.py).
 ANGLE = {368: 366}
-# v17 (Byleth: "the rapid jab's hits don't connect properly"): a multi-hit's holding hit, Ultimate's ATTACK_SETOFF_KIND_OFF
-# with the Sakurai angle 361 and a small knockback (his rapid jab: 0.4 %, KBG 10, BKB 12). Ultimate holds the victim in
-# place (no setoff); Smash 4 has no setoff field (SETOFF only sets Clang / Rebound here) and its 361 sends a grounded
-# victim whose knockback is under 32 at 0 degrees: every hit slides it away until it leaves the hitboxes' reach.
-# Smash 4's own rapid jabs hold with a near-vertical angle (Fox 60 - 85, Captain Falcon 75 - 90, Sheik 50 - 70, Mewtwo
-# 70 - 89, Robin 80): HOLD_ANGLE (Robin's, the sword user's), APPROXIMATED (an airborne victim goes up a little where
-# Ultimate's 361 sends it at ~40 degrees). port_check S28 rapid-slide
+# Holding multi-hits (Byleth v17: "the rapid jab's hits don't connect properly"; rapid_setoff v1: "can you recreate the
+# Ultimate setting for rapid jabs?"): Ultimate's ATTACK_SETOFF_KIND_OFF with the Sakurai angle 361 and a small knockback
+# (his rapid jab: 0.4 %, KBG 10, BKB 12). Smash 4's 361 sends a grounded victim whose knockback is under 60 at 0 degrees,
+# so every hit slides it away until it leaves the hitboxes' reach. (Ultimate's setoff kind itself is the clank kind,
+# read from its ExeFS: SETOFF below; Ultimate also scales that 0-degree slide by 0.8, damage_angle_ground_zero_speed_mul:
+# docs/native-notes.md "Hitbox hold".)
+# HOLD_MODE 'hold' (the default, exe_v46y_hold and later): Ultimate's own angle, and Hitbox_Hold(ID, HOLD_SETTING) after
+# the hitbox (tools/hitbox_hold_cave.py: no knockback travel for a grounded victim the hit doesn't lift).
+# HOLD_MODE 'angle' (--hold-angle, port.json "rapid_hold": "angle"; for an executable without the cave): v17's
+# workaround, HOLD_ANGLE (Smash 4's own rapid jabs hold with a near-vertical angle: Fox 60 - 85, Captain Falcon 75 - 90,
+# Sheik 50 - 70, Mewtwo 70 - 89, Robin 80), APPROXIMATED (an airborne victim goes up a little). port_check S28 / X8
+HOLD_MODE = 'hold'
+HOLD_SETTING = 1
 HOLD_ANGLE = 80
 HOLD_MAX_KB = 30
 
 
+def holding(angle, kbg, fkb, bkb, setoff, dmg):
+    """an Ultimate hitbox that holds its victim (setoff off, 361, a small knockback, damage)"""
+    return (setoff == 'ATTACK_SETOFF_KIND_OFF' and int(angle) == 361 and float(dmg) > 0 and int(fkb) == 0
+            and int(kbg) <= HOLD_MAX_KB and int(bkb) <= HOLD_MAX_KB)
+
+
 def hold_angle(angle, kbg, fkb, bkb, setoff, dmg):
-    """the Smash 4 angle of an Ultimate hitbox (ANGLE, then HOLD_ANGLE for a holding multi-hit)"""
-    angle = ANGLE.get(int(angle), int(angle))
-    if (setoff == 'ATTACK_SETOFF_KIND_OFF' and angle == 361 and float(dmg) > 0 and int(fkb) == 0
-            and int(kbg) <= HOLD_MAX_KB and int(bkb) <= HOLD_MAX_KB):
+    """the Smash 4 angle of an Ultimate hitbox (ANGLE; HOLD_ANGLE for a holding multi-hit when HOLD_MODE is 'angle')"""
+    if HOLD_MODE == 'angle' and holding(angle, kbg, fkb, bkb, setoff, dmg):
         return HOLD_ANGLE
-    return angle
+    return ANGLE.get(int(angle), int(angle))
 
 SETOFF = {'ATTACK_SETOFF_KIND_ON': (1, 1), 'ATTACK_SETOFF_KIND_OFF': (1, 0), 'ATTACK_SETOFF_KIND_THRU': (0, 0)}
 # _d: lying fighters too (Byleth's Sword of the Creator); Smash 4's Ground/Air has no such bit
@@ -855,6 +865,8 @@ class Translator:
             out = [cmd('Extended_Special_Hitbox', *common, *capsule_end(x, y, z, x2, y2, z2))]
         if set_weight:
             out.append(cmd('Set_Weight_Hitbox', int(hid), 1))
+        if HOLD_MODE == 'hold' and holding(angle, kbg, fkb, bkb, setoff, dmg):
+            out.append(cmd('Hitbox_Hold', int(hid), HOLD_SETTING))
         return out
 
     def catch(self, a):
@@ -1784,10 +1796,16 @@ def main():
     ap.add_argument('--vec-targets', metavar='OUT_JSON', help='write the translated scripts\' set_vec_target_pos '
                     '(Ultimate\'s "carry the hit fighter to a point": no Smash 4 hitbox field) for the MSC pull, '
                     'tools/vec_target.py msc')
+    ap.add_argument('--hold-angle', action='store_true', help='holding multi-hits (Ultimate\'s setoff off + 361 + a '
+                    'small knockback: rapid jabs) at HOLD_ANGLE, v17\'s workaround, for an executable without '
+                    'tools/hitbox_hold_cave.py; the default is Ultimate\'s angle + Hitbox_Hold (exe_v46y_hold)')
     ap.add_argument('--slot-moves', default='', help='comma-separated SLOT_MOVES (Ultimate file names, e.g. '
                     'Attack100Start,Attack100,Attack100End,AttackS4Hi,AttackS4Lw) to translate: common moves the '
                     'port gave motion slots of their own (port.json motions.add, extra_kinds.json "motions")')
     a = ap.parse_args()
+    global HOLD_MODE
+    if a.hold_angle:
+        HOLD_MODE = 'angle'
     for src in filter(None, a.slot_moves.split(',')):
         TRANSLATE[src] = SLOT_MOVES[src]
     TRUE_CONDS[:] = a.cond

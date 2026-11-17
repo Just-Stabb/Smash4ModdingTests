@@ -3345,27 +3345,103 @@ def check_weapon_twice(inst, name, rep):
             if left else ''))
 
 
+HOLD_SCRIPTS = ('attack100', 'attack100sub')
+
+
+def _ult_holding_ids(name):
+    """{Smash 4 script name (Ultimate's file name lowercased): {hitbox IDs Ultimate makes as holding multi-hits}} from
+    the port's Ultimate dumps (ultimate_acmd.holding: setoff off, 361, small knockback); None without dumps"""
+    try:
+        import port_sources
+        import ultimate_acmd as U
+        d = port_sources.load().dump(port_sources.ult_name(name))
+        dump = os.path.join(d, port_sources.ult_name(name)) if d else None
+    except Exception:              # noqa: BLE001
+        return None
+    if not dump or not os.path.isdir(dump):
+        return None
+    pat = re.compile(r'macros::ATTACK\(agent,\s*(\d+),\s*\d+,\s*Hash40::new\("[^"]*"\),\s*([-\d.]+),\s*(\d+),'
+                     r'\s*(\d+),\s*(\d+),\s*(\d+),(?:[^,]*,){9}\s*\*(ATTACK_SETOFF_KIND_\w+)')
+    out = {}
+    for f in glob.glob(os.path.join(dump, '*.txt')):
+        for m in pat.finditer(open(f, errors='replace').read()):
+            hid, dmg, ang, kbg, fkb, bkb, setoff = m.groups()
+            if U.holding(int(ang), int(kbg), int(fkb), int(bkb), setoff, float(dmg)):
+                out.setdefault(os.path.basename(f)[:-4].lower(), set()).add(int(hid))
+    return out
+
+
 def check_rapid_slide(inst, name, rep):
-    """S28 rapid-slide (Byleth v17: "the rapid jab's hits don't connect properly"): a rapid-jab loop hit (attack100)
-    at the Sakurai angle 361 (or under 20 degrees) with a small knockback: Smash 4 sends a grounded victim whose
-    knockback is under 32 at 0 degrees, so every hit slides it away, out of the next hits' reach (Ultimate holds it:
-    ATTACK_SETOFF_KIND_OFF, which Smash 4 has no field for; ultimate_acmd.hold_angle). ERROR"""
-    g = inst.get('fighter/%s/script/animcmd/body/game.bin' % name)
-    if not g:
-        return
+    """S28 rapid-slide (Byleth v17: "the rapid jab's hits don't connect properly"; rapid_setoff v1): a holding
+    multi-hit - an Ultimate hit with ATTACK_SETOFF_KIND_OFF, angle 361 and a small knockback (the port's dumps; without
+    them a rapid-jab loop hit at 361 / under 20 degrees with KBG / BKB 30 or less) - converted without the hold:
+    Smash 4 slides a grounded victim under 60 knockback at 0 degrees, out of the next hits' reach. The hold is
+    Hitbox_Hold(ID or -1, 1 / 2) after the hitbox (tools/hitbox_hold_cave.py, ultimate_acmd's default); ERROR without
+    it. v17's workaround (HOLD_ANGLE, ultimate_acmd --hold-angle) is a WARN (for an executable without the cave).
+    X8 hold-exe (ERROR): a script using Hitbox_Hold with no executable in the install carrying the cave"""
     import acmd
-    game = _acmd_load(g)
-    bad = []
-    for sname in ('attack100', 'attack100sub'):
-        for c in game.scripts.get(acmd.crc(sname), []):
-            if 'Hitbox' in c.name and 'Angle' in c.info['syntax']:
+    import ultimate_acmd as U
+    rels = list(inst.glob(r'fighter/%s/script/animcmd/(body|weapon/[^/]+)/game\.bin' % name))
+    ult = _ult_holding_ids(name)
+    bad, old, uses = [], [], []
+    for rel in rels:
+        game = _acmd_load(inst.get(rel))
+        names = {acmd.crc(n): n for n in list(HOLD_SCRIPTS) + list(ult or {})}
+        for h, sc in game.scripts.items():
+            if any(c.name == 'Hitbox_Hold' for c in sc):
+                uses.append(rel)
+            sname = names.get(h)
+            want = (ult or {}).get(sname) if ult is not None and '/body/' in rel else None
+            if want is None and not (ult is None and sname in HOLD_SCRIPTS and '/body/' in rel):
+                continue
+            for i, c in enumerate(sc):
+                if 'Hitbox' not in c.name or 'Angle' not in c.info['syntax'] or c.name == 'Hitbox_Hold':
+                    continue
                 d = dict(zip(c.info['syntax'], c.params))
-                if (d['Angle'] == 361 or d['Angle'] <= 20) and d['Damage'] > 0 and d['FKB'] == 0 and d['KBG'] <= 30 \
-                        and d['BKB'] <= 30:
-                    bad.append('%s id %d angle %d' % (sname, d['ID'], d['Angle']))
+                if want is not None:
+                    if d['ID'] not in want:
+                        continue
+                elif not ((d['Angle'] == 361 or d['Angle'] <= 20) and d['Damage'] > 0 and d['FKB'] == 0
+                          and d['KBG'] <= 30 and d['BKB'] <= 30):
+                    continue
+                held = False
+                for c2 in sc[i + 1:]:
+                    if c2.name == 'Hitbox_Hold' and c2.params[0] in (d['ID'], -1, 0xFFFFFFFF) and c2.params[1] in (1, 2):
+                        held = True
+                        break
+                    if c2.name == 'Remove_All_Hitboxes' or ('Hitbox' in c2.name and 'Angle' in c2.info['syntax']
+                                                            and dict(zip(c2.info['syntax'], c2.params))['ID'] == d['ID']):
+                        break
+                what = '%s %s id %d angle %d' % (rel.split('/animcmd/')[1], sname, d['ID'], d['Angle'])
+                if held:
+                    continue
+                (old if d['Angle'] == U.HOLD_ANGLE else bad).append(what)
     if bad:
-        rep.add('ERROR', 'S28 rapid-slide', 'rapid-jab hits that slide a grounded victim out of reach (KB < 32 at 361 -> '
-                '0 degrees): %s; ultimate_acmd.HOLD_ANGLE' % ', '.join(sorted(set(bad))))
+        rep.add('ERROR', 'S28 rapid-slide', 'holding multi-hits (Ultimate\'s setoff off + 361 + a small knockback) without '
+                'Hitbox_Hold: they slide a grounded victim out of reach: %s; tools/ultimate_acmd.py (default: Ultimate\'s '
+                'angle + Hitbox_Hold)' % ', '.join(sorted(set(bad))))
+    if old:
+        rep.add('WARN', 'S28 rapid-slide', 'holding multi-hits at v17\'s HOLD_ANGLE %d instead of Ultimate\'s angle + '
+                'Hitbox_Hold (ultimate_acmd --hold-angle: only for an executable without tools/hitbox_hold_cave.py): %s'
+                % (U.HOLD_ANGLE, ', '.join(sorted(set(old)))))
+    if uses and not _exe_has_hold(inst):
+        rep.add('ERROR', 'X8 hold-exe', 'Hitbox_Hold in %s but the install\'s code/cross_f.rpx has no hitbox hold '
+                '(tools/hitbox_hold_cave.py: exe_v46y_hold or later): the script won\'t load' % ', '.join(sorted(set(uses))))
+
+
+def _exe_has_hold(inst):
+    if 'code/cross_f.rpx' not in inst.files:
+        return False
+    import tempfile
+    import kind_expand as K
+    import hitbox_hold_cave as HH
+    with tempfile.NamedTemporaryFile(suffix='.rpx') as f:
+        f.write(inst.get('code/cross_f.rpx'))
+        f.flush()
+        try:
+            return HH.present(K.Image(f.name).w)
+        except Exception:          # noqa: BLE001
+            return False
 
 
 def check_article_status_reuse(inst, name, rep):

@@ -1,0 +1,4476 @@
+{
+ "source": "XV2 1352_HIK_DSH (Time-Skip, Hit) via tools/supamario_timeskip_xv2.py; names: XV2-Tools",
+ "bcm": [
+  {
+   "index": 0,
+   "sibling": null,
+   "child": 1,
+   "parent": null,
+   "root": null,
+   "DirectionalInput": 0,
+   "ButtonInput": "0x0 []",
+   "HoldDownConditions": "0x0",
+   "OpponentSizeConditions": "0x0",
+   "MinimumLoopDuration": 0,
+   "MaximumLoopDuration": 0,
+   "PrimaryActivatorConditions": "0x0 []",
+   "ActivatorState": "0x0 []",
+   "BacEntryPrimary": -1,
+   "BacEntryCharge": 0,
+   "BacEntryUserConnect": 0,
+   "BacEntryVictimConnect": 0,
+   "BacEntryAirborne": -1,
+   "RandomFlag": 0,
+   "KiCost": 0,
+   "ReceiverLinkID": "0x0 []",
+   "StaminaCost": 0,
+   "KiRequired": 0,
+   "HealthRequired": 0.0
+  },
+  {
+   "index": 1,
+   "sibling": 2,
+   "child": null,
+   "parent": null,
+   "root": 1,
+   "DirectionalInput": 0,
+   "ButtonInput": "0x100 ['SuperSkill1']",
+   "HoldDownConditions": "0x0",
+   "OpponentSizeConditions": "0x70000",
+   "MinimumLoopDuration": 0,
+   "MaximumLoopDuration": 0,
+   "PrimaryActivatorConditions": "0xC00 ['Unk11', 'Idle']",
+   "ActivatorState": "0x3 ['Idle', 'Attacking']",
+   "BacEntryPrimary": 0,
+   "BacEntryCharge": 2,
+   "BacEntryUserConnect": 9,
+   "BacEntryVictimConnect": 5,
+   "BacEntryAirborne": -1,
+   "RandomFlag": 0,
+   "KiCost": 100,
+   "ReceiverLinkID": "0x2 ['Supers']",
+   "StaminaCost": 0,
+   "KiRequired": 0,
+   "HealthRequired": 0.0
+  },
+  {
+   "index": 2,
+   "sibling": 3,
+   "child": null,
+   "parent": null,
+   "root": 2,
+   "DirectionalInput": 0,
+   "ButtonInput": "0x100 ['SuperSkill1']",
+   "HoldDownConditions": "0x0",
+   "OpponentSizeConditions": "0x60000",
+   "MinimumLoopDuration": 0,
+   "MaximumLoopDuration": 0,
+   "PrimaryActivatorConditions": "0xC00 ['Unk11', 'Idle']",
+   "ActivatorState": "0x3 ['Idle', 'Attacking']",
+   "BacEntryPrimary": 0,
+   "BacEntryCharge": 2,
+   "BacEntryUserConnect": 10,
+   "BacEntryVictimConnect": 5,
+   "BacEntryAirborne": -1,
+   "RandomFlag": 0,
+   "KiCost": 100,
+   "ReceiverLinkID": "0x2 ['Supers']",
+   "StaminaCost": 0,
+   "KiRequired": 0,
+   "HealthRequired": 0.0
+  },
+  {
+   "index": 3,
+   "sibling": 4,
+   "child": null,
+   "parent": null,
+   "root": 3,
+   "DirectionalInput": 0,
+   "ButtonInput": "0x100 ['SuperSkill1']",
+   "HoldDownConditions": "0x0",
+   "OpponentSizeConditions": "0x50000",
+   "MinimumLoopDuration": 0,
+   "MaximumLoopDuration": 0,
+   "PrimaryActivatorConditions": "0xC00 ['Unk11', 'Idle']",
+   "ActivatorState": "0x3 ['Idle', 'Attacking']",
+   "BacEntryPrimary": 0,
+   "BacEntryCharge": 2,
+   "BacEntryUserConnect": 10,
+   "BacEntryVictimConnect": 5,
+   "BacEntryAirborne": -1,
+   "RandomFlag": 0,
+   "KiCost": 100,
+   "ReceiverLinkID": "0x2 ['Supers']",
+   "StaminaCost": 0,
+   "KiRequired": 0,
+   "HealthRequired": 0.0
+  },
+  {
+   "index": 4,
+   "sibling": 5,
+   "child": null,
+   "parent": null,
+   "root": 4,
+   "DirectionalInput": 0,
+   "ButtonInput": "0x100 ['SuperSkill1']",
+   "HoldDownConditions": "0x0",
+   "OpponentSizeConditions": "0x40000",
+   "MinimumLoopDuration": 0,
+   "MaximumLoopDuration": 0,
+   "PrimaryActivatorConditions": "0xC00 ['Unk11', 'Idle']",
+   "ActivatorState": "0x3 ['Idle', 'Attacking']",
+   "BacEntryPrimary": 0,
+   "BacEntryCharge": 2,
+   "BacEntryUserConnect": 4,
+   "BacEntryVictimConnect": 5,
+   "BacEntryAirborne": -1,
+   "RandomFlag": 0,
+   "KiCost": 100,
+   "ReceiverLinkID": "0x2 ['Supers']",
+   "StaminaCost": 0,
+   "KiRequired": 0,
+   "HealthRequired": 0.0
+  },
+  {
+   "index": 5,
+   "sibling": 6,
+   "child": null,
+   "parent": null,
+   "root": 5,
+   "DirectionalInput": 0,
+   "ButtonInput": "0x100 ['SuperSkill1']",
+   "HoldDownConditions": "0x0",
+   "OpponentSizeConditions": "0x30000",
+   "MinimumLoopDuration": 0,
+   "MaximumLoopDuration": 0,
+   "PrimaryActivatorConditions": "0xC00 ['Unk11', 'Idle']",
+   "ActivatorState": "0x3 ['Idle', 'Attacking']",
+   "BacEntryPrimary": 0,
+   "BacEntryCharge": 2,
+   "BacEntryUserConnect": 11,
+   "BacEntryVictimConnect": 5,
+   "BacEntryAirborne": -1,
+   "RandomFlag": 0,
+   "KiCost": 100,
+   "ReceiverLinkID": "0x2 ['Supers']",
+   "StaminaCost": 0,
+   "KiRequired": 0,
+   "HealthRequired": 0.0
+  },
+  {
+   "index": 6,
+   "sibling": 7,
+   "child": null,
+   "parent": null,
+   "root": 6,
+   "DirectionalInput": 0,
+   "ButtonInput": "0x100 ['SuperSkill1']",
+   "HoldDownConditions": "0x0",
+   "OpponentSizeConditions": "0x20000",
+   "MinimumLoopDuration": 0,
+   "MaximumLoopDuration": 0,
+   "PrimaryActivatorConditions": "0xC00 ['Unk11', 'Idle']",
+   "ActivatorState": "0x3 ['Idle', 'Attacking']",
+   "BacEntryPrimary": 0,
+   "BacEntryCharge": 2,
+   "BacEntryUserConnect": 11,
+   "BacEntryVictimConnect": 5,
+   "BacEntryAirborne": -1,
+   "RandomFlag": 0,
+   "KiCost": 100,
+   "ReceiverLinkID": "0x2 ['Supers']",
+   "StaminaCost": 0,
+   "KiRequired": 0,
+   "HealthRequired": 0.0
+  },
+  {
+   "index": 7,
+   "sibling": 8,
+   "child": null,
+   "parent": null,
+   "root": 7,
+   "DirectionalInput": 0,
+   "ButtonInput": "0x100 ['SuperSkill1']",
+   "HoldDownConditions": "0x0",
+   "OpponentSizeConditions": "0x10000",
+   "MinimumLoopDuration": 0,
+   "MaximumLoopDuration": 0,
+   "PrimaryActivatorConditions": "0xC00 ['Unk11', 'Idle']",
+   "ActivatorState": "0x3 ['Idle', 'Attacking']",
+   "BacEntryPrimary": 0,
+   "BacEntryCharge": 2,
+   "BacEntryUserConnect": 11,
+   "BacEntryVictimConnect": 5,
+   "BacEntryAirborne": -1,
+   "RandomFlag": 0,
+   "KiCost": 100,
+   "ReceiverLinkID": "0x2 ['Supers']",
+   "StaminaCost": 0,
+   "KiRequired": 0,
+   "HealthRequired": 0.0
+  },
+  {
+   "index": 8,
+   "sibling": null,
+   "child": null,
+   "parent": null,
+   "root": 8,
+   "DirectionalInput": 0,
+   "ButtonInput": "0x100 ['SuperSkill1']",
+   "HoldDownConditions": "0x0",
+   "OpponentSizeConditions": "0x0",
+   "MinimumLoopDuration": 0,
+   "MaximumLoopDuration": 0,
+   "PrimaryActivatorConditions": "0xC00 ['Unk11', 'Idle']",
+   "ActivatorState": "0x3 ['Idle', 'Attacking']",
+   "BacEntryPrimary": 0,
+   "BacEntryCharge": 2,
+   "BacEntryUserConnect": 4,
+   "BacEntryVictimConnect": 5,
+   "BacEntryAirborne": -1,
+   "RandomFlag": 0,
+   "KiCost": 100,
+   "ReceiverLinkID": "0x2 ['Supers']",
+   "StaminaCost": 0,
+   "KiRequired": 0,
+   "HealthRequired": 0.0
+  }
+ ],
+ "entries": {
+  "0": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     120
+    ],
+    "ean": "skill",
+    "index": 0,
+    "src": [
+     0,
+     120
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Y",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     0,
+     20
+    ],
+    "strength": 0.25,
+    "flags": []
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     0,
+     1
+    ],
+    "eepk": "Super skill",
+    "id": 0,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     6,
+     7
+    ],
+    "acb": "skill SE",
+    "cue": 0,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     20,
+     50
+    ],
+    "scale": 6.0
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     20,
+     50
+    ],
+    "strength": 0.05,
+    "flags": []
+   },
+   {
+    "type": "ChargeControl",
+    "frames": [
+     20,
+     50
+    ],
+    "charge_time": 40
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     20,
+     21
+    ],
+    "bpe": 85,
+    "bpe_name": "Flashing White Body Outline 3",
+    "raw": "1400010000000000550000000000000000000000000000000000000000000000"
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     50,
+     60
+    ],
+    "strength": 1.0,
+    "flags": []
+   },
+   {
+    "type": "TargetingAssistance",
+    "frames": [
+     50,
+     83
+    ],
+    "axis": "Z"
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     54,
+     83
+    ],
+    "bdm": 0,
+    "bdm_file": "Skill",
+    "hitbox_flags": "0x2000 ['ImpactType_Single']",
+    "damage": 0,
+    "damage_when_blocked": 0,
+    "stamina_taken_when_blocked": 0,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     0.5,
+     -1.0
+    ],
+    "size_m": 0.5
+   },
+   {
+    "type": "BcmCallback",
+    "frames": [
+     54,
+     85
+    ],
+    "link": [
+     "DisableKiBlastLink",
+     "Supers"
+    ]
+   },
+   {
+    "type": "Movement",
+    "frames": [
+     56,
+     85
+    ],
+    "flags": "0x1",
+    "per_frame_m": [
+     0.0,
+     0.0,
+     -0.7
+    ],
+    "drag": [
+     0.0,
+     0.0,
+     0.003
+    ],
+    "note": "-Z is forward (XV2 faces -Z; Core Breaker's dive (0, -1, -1.1) is forward)"
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     56,
+     57
+    ],
+    "eepk": "Stage BG (the stage's own)",
+    "id": 60,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     56,
+     57
+    ],
+    "acb": "skill SE",
+    "cue": 1,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "TargetingAssistance",
+    "frames": [
+     83,
+     120
+    ],
+    "axis": "Y"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     86,
+     87
+    ],
+    "acb": "skill SE",
+    "cue": 2,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     100,
+     101
+    ],
+    "bpe": 85,
+    "bpe_name": "Flashing White Body Outline 3",
+    "raw": "6400010000000000550000000000020000000000000000000000000000000000"
+   }
+  ],
+  "1": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     85
+    ],
+    "ean": "skill",
+    "index": 0,
+    "src": [
+     0,
+     145
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Y",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     20,
+     50
+    ],
+    "scale": 6.0
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     50,
+     60
+    ],
+    "strength": 1.0,
+    "flags": []
+   },
+   {
+    "type": "TargetingAssistance",
+    "frames": [
+     50,
+     108
+    ],
+    "axis": "Z"
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     54,
+     108
+    ],
+    "bdm": 0,
+    "bdm_file": "Skill",
+    "hitbox_flags": "0x2000 ['ImpactType_Single']",
+    "damage": 0,
+    "damage_when_blocked": 0,
+    "stamina_taken_when_blocked": 0,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     0.5,
+     -1.0
+    ],
+    "size_m": 0.5
+   },
+   {
+    "type": "BcmCallback",
+    "frames": [
+     54,
+     110
+    ],
+    "link": [
+     "DisableKiBlastLink",
+     "Supers"
+    ]
+   },
+   {
+    "type": "Movement",
+    "frames": [
+     56,
+     110
+    ],
+    "flags": "0x1",
+    "per_frame_m": [
+     0.0,
+     0.0,
+     -0.7
+    ],
+    "drag": [
+     0.0,
+     0.0,
+     0.003
+    ],
+    "note": "-Z is forward (XV2 faces -Z; Core Breaker's dive (0, -1, -1.1) is forward)"
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     56,
+     57
+    ],
+    "eepk": "Stage BG (the stage's own)",
+    "id": 60,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     56,
+     57
+    ],
+    "acb": "skill SE",
+    "cue": 1,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     85,
+     145
+    ],
+    "ean": "skill",
+    "index": 0,
+    "src": [
+     60,
+     120
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Y",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "TargetingAssistance",
+    "frames": [
+     108,
+     145
+    ],
+    "axis": "Y"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     111,
+     112
+    ],
+    "acb": "skill SE",
+    "cue": 2,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     130,
+     131
+    ],
+    "bpe": 85,
+    "bpe_name": "Flashing White Body Outline 3",
+    "raw": "8200010000000000550000000000020000000000000000000000000000000000"
+   }
+  ],
+  "2": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     85
+    ],
+    "ean": "skill",
+    "index": 0,
+    "src": [
+     0,
+     170
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Y",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     20,
+     50
+    ],
+    "scale": 6.0
+   },
+   {
+    "type": "Tracking",
+    "frames": [
+     50,
+     60
+    ],
+    "strength": 1.0,
+    "flags": []
+   },
+   {
+    "type": "TargetingAssistance",
+    "frames": [
+     50,
+     108
+    ],
+    "axis": "Z"
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     54,
+     133
+    ],
+    "bdm": 0,
+    "bdm_file": "Skill",
+    "hitbox_flags": "0x2000 ['ImpactType_Single']",
+    "damage": 0,
+    "damage_when_blocked": 0,
+    "stamina_taken_when_blocked": 0,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     0.5,
+     -1.0
+    ],
+    "size_m": 0.5
+   },
+   {
+    "type": "BcmCallback",
+    "frames": [
+     54,
+     135
+    ],
+    "link": [
+     "DisableKiBlastLink",
+     "Supers"
+    ]
+   },
+   {
+    "type": "Movement",
+    "frames": [
+     56,
+     135
+    ],
+    "flags": "0x1",
+    "per_frame_m": [
+     0.0,
+     0.0,
+     -0.7
+    ],
+    "drag": [
+     0.0,
+     0.0,
+     0.003
+    ],
+    "note": "-Z is forward (XV2 faces -Z; Core Breaker's dive (0, -1, -1.1) is forward)"
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     56,
+     57
+    ],
+    "eepk": "Stage BG (the stage's own)",
+    "id": 60,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     56,
+     57
+    ],
+    "acb": "skill SE",
+    "cue": 1,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     85,
+     110
+    ],
+    "ean": "skill",
+    "index": 0,
+    "src": [
+     60,
+     85
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Y",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     100,
+     101
+    ],
+    "bpe": 85,
+    "bpe_name": "Flashing White Body Outline 3",
+    "raw": "6400010000000000550000000000000000000000000000000000000000000000"
+   },
+   {
+    "type": "TargetingAssistance",
+    "frames": [
+     108,
+     170
+    ],
+    "axis": "Y"
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     110,
+     170
+    ],
+    "ean": "skill",
+    "index": 0,
+    "src": [
+     60,
+     120
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Y",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     136,
+     137
+    ],
+    "acb": "skill SE",
+    "cue": 2,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     160,
+     161
+    ],
+    "bpe": 85,
+    "bpe_name": "Flashing White Body Outline 3",
+    "raw": "a000010000000000550000000000020000000000000000000000000000000000"
+   }
+  ],
+  "4": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     80
+    ],
+    "ean": "skill",
+    "index": 1,
+    "src": [
+     0,
+     80
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Y",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     10
+    ],
+    "ean": 10,
+    "index": 1,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Invulnerability",
+    "frames": [
+     0,
+     80
+    ],
+    "invulnerability": "All Attacks Miss"
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     0,
+     1
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 108,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Camera",
+    "frames": [
+     0,
+     2
+    ],
+    "raw": "00000200000000000b00000000000000ffff0000000000c000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     0,
+     1
+    ],
+    "acb": "character voice",
+    "cue": 51,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     0,
+     1
+    ],
+    "acb": "skill SE",
+    "cue": 3,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "TargetingAssistance",
+    "frames": [
+     0,
+     80
+    ],
+    "axis": "Y"
+   },
+   {
+    "type": "Functions",
+    "frames": [
+     0,
+     16
+    ],
+    "function": "0x2F (unnamed)",
+    "params": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     0,
+     1
+    ],
+    "bpe": 78,
+    "bpe_name": "Invert World Colors",
+    "raw": "00000100000000004e0000000000000000000000000000000000000000000000"
+   },
+   {
+    "type": "ThrowHandler",
+    "frames": [
+     0,
+     16
+    ],
+    "flags": "0x401 ['FixedDir_BoneEnabled', 'Unk11']",
+    "user_bone": "g_x_LND",
+    "victim_bone": 0,
+    "next_entry": null,
+    "i18": 0,
+    "displacement_m": [
+     0.0,
+     0.1,
+     -1.5
+    ],
+    "character_flags": 1
+   },
+   {
+    "type": "ThrowHandler",
+    "frames": [
+     0,
+     16
+    ],
+    "flags": "0x401 ['FixedDir_BoneEnabled', 'Unk11']",
+    "user_bone": "g_x_LND",
+    "victim_bone": 0,
+    "next_entry": null,
+    "i18": 0,
+    "displacement_m": [
+     0.0,
+     0.0,
+     -1.5
+    ],
+    "character_flags": 2
+   },
+   {
+    "type": "Camera",
+    "frames": [
+     2,
+     16
+    ],
+    "raw": "02000e00000000000700000000000000ffff0000000000c000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000008000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     8,
+     9
+    ],
+    "acb": "skill SE",
+    "cue": 4,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     10,
+     24
+    ],
+    "ean": 10,
+    "index": 5,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     16,
+     22
+    ],
+    "scale": 0.1
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     16,
+     17
+    ],
+    "eepk": "Super skill",
+    "id": 11,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     16,
+     17
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 108,
+    "bone": "b_C_Base",
+    "off": true
+   },
+   {
+    "type": "Camera",
+    "frames": [
+     16,
+     46
+    ],
+    "raw": "10001e00000000000000000000000000ffff0000000000c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     16,
+     17
+    ],
+    "acb": "skill SE",
+    "cue": 5,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     16,
+     17
+    ],
+    "bpe": 85,
+    "bpe_name": "Flashing White Body Outline 3",
+    "raw": "1000010000000000550000000000020000000000000000000000000000000000"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     16,
+     17
+    ],
+    "bpe": 2,
+    "bpe_name": "Weak White Flash",
+    "raw": "1000010000000000020000000800000000000000000000000000000000000000"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     17,
+     18
+    ],
+    "bpe": 78,
+    "bpe_name": "Invert World Colors",
+    "raw": "11000100000000004e0000000000020000000000000000000000000000000000"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     17,
+     18
+    ],
+    "bpe": 10,
+    "bpe_name": "Small Motion Blur/Shake",
+    "raw": "11000100000000000a0000000700000000000000000000000000000000000000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     19,
+     20
+    ],
+    "acb": "skill voice",
+    "cue": 0,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     24,
+     46
+    ],
+    "ean": 10,
+    "index": 21,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     46,
+     80
+    ],
+    "ean": 10,
+    "index": 0,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Camera",
+    "frames": [
+     46,
+     47
+    ],
+    "raw": "2e000100000000000b00000000000000ffff00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+   }
+  ],
+  "5": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     16
+    ],
+    "ean": "CMN",
+    "index": 76,
+    "src": [
+     0,
+     51
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Y",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Invulnerability",
+    "frames": [
+     0,
+     20
+    ],
+    "invulnerability": "All Attacks Miss"
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     0,
+     1
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 108,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "TargetingAssistance",
+    "frames": [
+     0,
+     51
+    ],
+    "axis": "Y"
+   },
+   {
+    "type": "Functions",
+    "frames": [
+     0,
+     1
+    ],
+    "function": "0x7 Bone Rotate (Y)",
+    "params": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "type": "Functions",
+    "frames": [
+     0,
+     1
+    ],
+    "function": "0x35 (unnamed)",
+    "params": [
+     1.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "type": "Functions",
+    "frames": [
+     0,
+     1
+    ],
+    "function": "0xB Override ThrowHandler Duration",
+    "params": [
+     120.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "type": "Functions",
+    "frames": [
+     0,
+     16
+    ],
+    "function": "0x2F (unnamed)",
+    "params": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     0,
+     1
+    ],
+    "bpe": 78,
+    "bpe_name": "Invert World Colors",
+    "raw": "00000100000000004e0000000000000000000000000000000000000000000000"
+   },
+   {
+    "type": "ThrowHandler",
+    "frames": [
+     0,
+     51
+    ],
+    "flags": "0x220 ['BacJump_AfterDuration', 'MoveVictimToUser_RelativeDir']",
+    "user_bone": "b_C_Base",
+    "victim_bone": 0,
+    "next_entry": 6,
+    "i18": 0,
+    "displacement_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "character_flags": 0
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     16,
+     51
+    ],
+    "ean": "CMN",
+    "index": 205,
+    "src": [
+     4,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Y",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     16,
+     20
+    ],
+    "scale": 0.1
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     16,
+     17
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 108,
+    "bone": "b_C_Base",
+    "off": true
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     16,
+     17
+    ],
+    "acb": "character voice",
+    "cue": 72,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Functions",
+    "frames": [
+     16,
+     17
+    ],
+    "function": "0x2 Damage",
+    "params": [
+     140.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     16,
+     17
+    ],
+    "bpe": 2,
+    "bpe_name": "Weak White Flash",
+    "raw": "1000010000000000020000000800000000000000000000000000000000000000"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     17,
+     18
+    ],
+    "bpe": 10,
+    "bpe_name": "Small Motion Blur/Shake",
+    "raw": "11000100000000000a0000000100000000000000000000000000000000000000"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     17,
+     18
+    ],
+    "bpe": 85,
+    "bpe_name": "Flashing White Body Outline 3",
+    "raw": "1100010000000000550000000000020000000000000000000000000000000000"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     18,
+     19
+    ],
+    "bpe": 78,
+    "bpe_name": "Invert World Colors",
+    "raw": "12000100000000004e0000000000020000000000000000000000000000000000"
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     20,
+     51
+    ],
+    "bdm": 0,
+    "bdm_file": "Common (CMN.bdm)",
+    "hitbox_flags": "0x8 ['Unk4']",
+    "damage": 0,
+    "damage_when_blocked": 0,
+    "stamina_taken_when_blocked": 0,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     1.0,
+     0.75
+    ],
+    "size_m": 1.0
+   },
+   {
+    "type": "Movement",
+    "frames": [
+     20,
+     51
+    ],
+    "flags": "0x1",
+    "per_frame_m": [
+     0.0,
+     0.025,
+     0.43
+    ],
+    "drag": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "note": "-Z is forward (XV2 faces -Z; Core Breaker's dive (0, -1, -1.1) is forward)"
+   }
+  ],
+  "6": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     35
+    ],
+    "ean": "CMN",
+    "index": 205,
+    "src": [
+     16,
+     54
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     16,
+     54
+    ],
+    "bdm": 0,
+    "bdm_file": "Common (CMN.bdm)",
+    "hitbox_flags": "0x8 ['Unk4']",
+    "damage": 0,
+    "damage_when_blocked": 0,
+    "stamina_taken_when_blocked": 0,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     1.0,
+     0.75
+    ],
+    "size_m": 1.0
+   },
+   {
+    "type": "Movement",
+    "frames": [
+     16,
+     54
+    ],
+    "flags": "0x1",
+    "per_frame_m": [
+     0.0,
+     0.025,
+     0.43
+    ],
+    "drag": [
+     0.0,
+     -0.0025,
+     -0.0015
+    ],
+    "note": "-Z is forward (XV2 faces -Z; Core Breaker's dive (0, -1, -1.1) is forward)"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     16,
+     17
+    ],
+    "acb": "common SE",
+    "cue": 64,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     35,
+     54
+    ],
+    "ean": "CMN",
+    "index": 205,
+    "src": [
+     16,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "ThrowHandler",
+    "frames": [
+     35,
+     54
+    ],
+    "flags": "0x120 ['BacJump_AfterDuration', 'MoveVictimToUser']",
+    "user_bone": "b_C_Base",
+    "victim_bone": 0,
+    "next_entry": 7,
+    "i18": 0,
+    "displacement_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "character_flags": 0
+   }
+  ],
+  "7": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     77
+    ],
+    "ean": "CMN",
+    "index": 96,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Hitbox",
+    "frames": [
+     0,
+     77
+    ],
+    "bdm": 0,
+    "bdm_file": "Common (CMN.bdm)",
+    "hitbox_flags": "0x8 ['Unk4']",
+    "damage": 0,
+    "damage_when_blocked": 0,
+    "stamina_taken_when_blocked": 0,
+    "bone": "b_C_Base",
+    "position_m": [
+     0.0,
+     1.0,
+     0.75
+    ],
+    "size_m": 1.0
+   },
+   {
+    "type": "ThrowHandler",
+    "frames": [
+     0,
+     77
+    ],
+    "flags": "0x210 ['Unk5', 'MoveVictimToUser_RelativeDir']",
+    "user_bone": "b_C_Base",
+    "victim_bone": 0,
+    "next_entry": null,
+    "i18": 2,
+    "displacement_m": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "character_flags": 0
+   }
+  ],
+  "9": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     80
+    ],
+    "ean": "skill",
+    "index": 1,
+    "src": [
+     0,
+     80
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Y",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     10
+    ],
+    "ean": 10,
+    "index": 1,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Invulnerability",
+    "frames": [
+     0,
+     80
+    ],
+    "invulnerability": "All Attacks Miss"
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     0,
+     1
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 108,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Camera",
+    "frames": [
+     0,
+     2
+    ],
+    "raw": "00000200000000000b00000000000000ffff0000000000c000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     0,
+     1
+    ],
+    "acb": "character voice",
+    "cue": 51,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     0,
+     1
+    ],
+    "acb": "skill SE",
+    "cue": 3,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "TargetingAssistance",
+    "frames": [
+     0,
+     80
+    ],
+    "axis": "Y"
+   },
+   {
+    "type": "Functions",
+    "frames": [
+     0,
+     16
+    ],
+    "function": "0x2F (unnamed)",
+    "params": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     0,
+     1
+    ],
+    "bpe": 78,
+    "bpe_name": "Invert World Colors",
+    "raw": "00000100000000004e0000000000000000000000000000000000000000000000"
+   },
+   {
+    "type": "ThrowHandler",
+    "frames": [
+     0,
+     16
+    ],
+    "flags": "0x401 ['FixedDir_BoneEnabled', 'Unk11']",
+    "user_bone": "g_x_LND",
+    "victim_bone": 0,
+    "next_entry": null,
+    "i18": 0,
+    "displacement_m": [
+     0.0,
+     0.1,
+     -1.8
+    ],
+    "character_flags": 1
+   },
+   {
+    "type": "ThrowHandler",
+    "frames": [
+     0,
+     16
+    ],
+    "flags": "0x401 ['FixedDir_BoneEnabled', 'Unk11']",
+    "user_bone": "g_x_LND",
+    "victim_bone": 0,
+    "next_entry": null,
+    "i18": 0,
+    "displacement_m": [
+     0.0,
+     0.0,
+     -1.5
+    ],
+    "character_flags": 2
+   },
+   {
+    "type": "Camera",
+    "frames": [
+     2,
+     16
+    ],
+    "raw": "02000e00000000000700000000000000ffff0000000000c000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000008000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     8,
+     9
+    ],
+    "acb": "skill SE",
+    "cue": 4,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     10,
+     24
+    ],
+    "ean": 10,
+    "index": 5,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     16,
+     22
+    ],
+    "scale": 0.1
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     16,
+     17
+    ],
+    "eepk": "Super skill",
+    "id": 11,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     16,
+     17
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 108,
+    "bone": "b_C_Base",
+    "off": true
+   },
+   {
+    "type": "Camera",
+    "frames": [
+     16,
+     46
+    ],
+    "raw": "10001e00000000000000000000000000ffff0000000000c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     16,
+     17
+    ],
+    "acb": "skill SE",
+    "cue": 5,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     16,
+     17
+    ],
+    "bpe": 85,
+    "bpe_name": "Flashing White Body Outline 3",
+    "raw": "1000010000000000550000000000020000000000000000000000000000000000"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     16,
+     17
+    ],
+    "bpe": 2,
+    "bpe_name": "Weak White Flash",
+    "raw": "1000010000000000020000000800000000000000000000000000000000000000"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     17,
+     18
+    ],
+    "bpe": 78,
+    "bpe_name": "Invert World Colors",
+    "raw": "11000100000000004e0000000000020000000000000000000000000000000000"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     17,
+     18
+    ],
+    "bpe": 10,
+    "bpe_name": "Small Motion Blur/Shake",
+    "raw": "11000100000000000a0000000700000000000000000000000000000000000000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     19,
+     20
+    ],
+    "acb": "skill voice",
+    "cue": 0,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     24,
+     46
+    ],
+    "ean": 10,
+    "index": 21,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     46,
+     80
+    ],
+    "ean": 10,
+    "index": 0,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Camera",
+    "frames": [
+     46,
+     47
+    ],
+    "raw": "2e000100000000000b00000000000000ffff00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+   }
+  ],
+  "10": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     80
+    ],
+    "ean": "skill",
+    "index": 1,
+    "src": [
+     0,
+     80
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Y",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     10
+    ],
+    "ean": 10,
+    "index": 1,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Invulnerability",
+    "frames": [
+     0,
+     80
+    ],
+    "invulnerability": "All Attacks Miss"
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     0,
+     1
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 108,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Camera",
+    "frames": [
+     0,
+     2
+    ],
+    "raw": "00000200000000000b00000000000000ffff0000000000c000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     0,
+     1
+    ],
+    "acb": "character voice",
+    "cue": 51,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     0,
+     1
+    ],
+    "acb": "skill SE",
+    "cue": 3,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "TargetingAssistance",
+    "frames": [
+     0,
+     80
+    ],
+    "axis": "Y"
+   },
+   {
+    "type": "Functions",
+    "frames": [
+     0,
+     16
+    ],
+    "function": "0x2F (unnamed)",
+    "params": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     0,
+     1
+    ],
+    "bpe": 78,
+    "bpe_name": "Invert World Colors",
+    "raw": "00000100000000004e0000000000000000000000000000000000000000000000"
+   },
+   {
+    "type": "ThrowHandler",
+    "frames": [
+     0,
+     16
+    ],
+    "flags": "0x401 ['FixedDir_BoneEnabled', 'Unk11']",
+    "user_bone": "g_x_LND",
+    "victim_bone": 0,
+    "next_entry": null,
+    "i18": 0,
+    "displacement_m": [
+     0.0,
+     0.1,
+     -1.5
+    ],
+    "character_flags": 1
+   },
+   {
+    "type": "ThrowHandler",
+    "frames": [
+     0,
+     16
+    ],
+    "flags": "0x401 ['FixedDir_BoneEnabled', 'Unk11']",
+    "user_bone": "g_x_LND",
+    "victim_bone": 0,
+    "next_entry": null,
+    "i18": 0,
+    "displacement_m": [
+     0.0,
+     0.0,
+     -1.5
+    ],
+    "character_flags": 2
+   },
+   {
+    "type": "Camera",
+    "frames": [
+     2,
+     16
+    ],
+    "raw": "02000e00000000000700000000000000ffff0000000000c000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000008000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     8,
+     9
+    ],
+    "acb": "skill SE",
+    "cue": 4,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     10,
+     24
+    ],
+    "ean": 10,
+    "index": 5,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     16,
+     22
+    ],
+    "scale": 0.1
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     16,
+     17
+    ],
+    "eepk": "Super skill",
+    "id": 11,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     16,
+     17
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 108,
+    "bone": "b_C_Base",
+    "off": true
+   },
+   {
+    "type": "Camera",
+    "frames": [
+     16,
+     46
+    ],
+    "raw": "10001e00000000000000000000000000ffff0000000000c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     16,
+     17
+    ],
+    "acb": "skill SE",
+    "cue": 5,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     16,
+     17
+    ],
+    "bpe": 85,
+    "bpe_name": "Flashing White Body Outline 3",
+    "raw": "1000010000000000550000000000020000000000000000000000000000000000"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     16,
+     17
+    ],
+    "bpe": 2,
+    "bpe_name": "Weak White Flash",
+    "raw": "1000010000000000020000000800000000000000000000000000000000000000"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     17,
+     18
+    ],
+    "bpe": 78,
+    "bpe_name": "Invert World Colors",
+    "raw": "11000100000000004e0000000000020000000000000000000000000000000000"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     17,
+     18
+    ],
+    "bpe": 10,
+    "bpe_name": "Small Motion Blur/Shake",
+    "raw": "11000100000000000a0000000700000000000000000000000000000000000000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     19,
+     20
+    ],
+    "acb": "skill voice",
+    "cue": 0,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     24,
+     46
+    ],
+    "ean": 10,
+    "index": 21,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     46,
+     80
+    ],
+    "ean": 10,
+    "index": 0,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Camera",
+    "frames": [
+     46,
+     47
+    ],
+    "raw": "2e000100000000000b00000000000000ffff00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+   }
+  ],
+  "11": [
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     80
+    ],
+    "ean": "skill",
+    "index": 1,
+    "src": [
+     0,
+     80
+    ],
+    "speed": 1.0,
+    "flags": [
+     "MoveWithAxis_X",
+     "MoveWithAxis_Y",
+     "MoveWithAxis_Z"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     0,
+     10
+    ],
+    "ean": 10,
+    "index": 1,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Invulnerability",
+    "frames": [
+     0,
+     80
+    ],
+    "invulnerability": "All Attacks Miss"
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     0,
+     1
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 108,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Camera",
+    "frames": [
+     0,
+     2
+    ],
+    "raw": "00000200000000000b00000000000000ffff0000000000c000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     0,
+     1
+    ],
+    "acb": "character voice",
+    "cue": 51,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     0,
+     1
+    ],
+    "acb": "skill SE",
+    "cue": 3,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "TargetingAssistance",
+    "frames": [
+     0,
+     80
+    ],
+    "axis": "Y"
+   },
+   {
+    "type": "Functions",
+    "frames": [
+     0,
+     16
+    ],
+    "function": "0x2F (unnamed)",
+    "params": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     0,
+     1
+    ],
+    "bpe": 78,
+    "bpe_name": "Invert World Colors",
+    "raw": "00000100000000004e0000000000000000000000000000000000000000000000"
+   },
+   {
+    "type": "ThrowHandler",
+    "frames": [
+     0,
+     16
+    ],
+    "flags": "0x401 ['FixedDir_BoneEnabled', 'Unk11']",
+    "user_bone": "g_x_LND",
+    "victim_bone": 0,
+    "next_entry": null,
+    "i18": 0,
+    "displacement_m": [
+     0.0,
+     0.5,
+     -1.5
+    ],
+    "character_flags": 1
+   },
+   {
+    "type": "ThrowHandler",
+    "frames": [
+     0,
+     16
+    ],
+    "flags": "0x401 ['FixedDir_BoneEnabled', 'Unk11']",
+    "user_bone": "g_x_LND",
+    "victim_bone": 0,
+    "next_entry": null,
+    "i18": 0,
+    "displacement_m": [
+     0.0,
+     0.0,
+     -1.5
+    ],
+    "character_flags": 2
+   },
+   {
+    "type": "Camera",
+    "frames": [
+     2,
+     16
+    ],
+    "raw": "02000e00000000000700000000000000ffff0000000000c000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000008000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     8,
+     9
+    ],
+    "acb": "skill SE",
+    "cue": 4,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     10,
+     24
+    ],
+    "ean": 10,
+    "index": 5,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "TimeScale",
+    "frames": [
+     16,
+     22
+    ],
+    "scale": 0.1
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     16,
+     17
+    ],
+    "eepk": "Super skill",
+    "id": 11,
+    "bone": "b_C_Base",
+    "off": false
+   },
+   {
+    "type": "Effect",
+    "frames": [
+     16,
+     17
+    ],
+    "eepk": "Common (BTL_CMN.eepk)",
+    "id": 108,
+    "bone": "b_C_Base",
+    "off": true
+   },
+   {
+    "type": "Camera",
+    "frames": [
+     16,
+     46
+    ],
+    "raw": "10001e00000000000000000000000000ffff0000000000c000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     16,
+     17
+    ],
+    "acb": "skill SE",
+    "cue": 5,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     16,
+     17
+    ],
+    "bpe": 85,
+    "bpe_name": "Flashing White Body Outline 3",
+    "raw": "1000010000000000550000000000020000000000000000000000000000000000"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     16,
+     17
+    ],
+    "bpe": 2,
+    "bpe_name": "Weak White Flash",
+    "raw": "1000010000000000020000000800000000000000000000000000000000000000"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     17,
+     18
+    ],
+    "bpe": 78,
+    "bpe_name": "Invert World Colors",
+    "raw": "11000100000000004e0000000000020000000000000000000000000000000000"
+   },
+   {
+    "type": "ScreenEffect",
+    "frames": [
+     17,
+     18
+    ],
+    "bpe": 10,
+    "bpe_name": "Small Motion Blur/Shake",
+    "raw": "11000100000000000a0000000700000000000000000000000000000000000000"
+   },
+   {
+    "type": "Sound",
+    "frames": [
+     19,
+     20
+    ],
+    "acb": "skill voice",
+    "cue": 0,
+    "sound_flags": "0x0"
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     24,
+     46
+    ],
+    "ean": 10,
+    "index": 21,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Animation",
+    "frames": [
+     46,
+     80
+    ],
+    "ean": 10,
+    "index": 0,
+    "src": [
+     0,
+     65535
+    ],
+    "speed": 1.0,
+    "flags": [
+     "0x2000"
+    ]
+   },
+   {
+    "type": "Camera",
+    "frames": [
+     46,
+     47
+    ],
+    "raw": "2e000100000000000b00000000000000ffff00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+   }
+  ]
+ },
+ "timescale": {
+  "0": [
+   [
+    20,
+    50,
+    6.0
+   ]
+  ],
+  "1": [
+   [
+    20,
+    50,
+    6.0
+   ]
+  ],
+  "2": [
+   [
+    20,
+    50,
+    6.0
+   ]
+  ],
+  "4": [
+   [
+    16,
+    22,
+    0.1
+   ]
+  ],
+  "5": [
+   [
+    16,
+    20,
+    0.1
+   ]
+  ],
+  "6": [],
+  "7": [],
+  "9": [
+   [
+    16,
+    22,
+    0.1
+   ]
+  ],
+  "10": [
+   [
+    16,
+    22,
+    0.1
+   ]
+  ],
+  "11": [
+   [
+    16,
+    22,
+    0.1
+   ]
+  ]
+ },
+ "real_frame_of_bac": {
+  "0": [
+   0.0,
+   1.0,
+   2.0,
+   3.0,
+   4.0,
+   5.0,
+   6.0,
+   7.0,
+   8.0,
+   9.0,
+   10.0,
+   11.0,
+   12.0,
+   13.0,
+   14.0,
+   15.0,
+   16.0,
+   17.0,
+   18.0,
+   19.0,
+   20.0,
+   20.17,
+   20.33,
+   20.5,
+   20.67,
+   20.83,
+   21.0,
+   21.17,
+   21.33,
+   21.5,
+   21.67,
+   21.83,
+   22.0,
+   22.17,
+   22.33,
+   22.5,
+   22.67,
+   22.83,
+   23.0,
+   23.17,
+   23.33,
+   23.5,
+   23.67,
+   23.83,
+   24.0,
+   24.17,
+   24.33,
+   24.5,
+   24.67,
+   24.83,
+   25.0,
+   26.0,
+   27.0,
+   28.0,
+   29.0,
+   30.0,
+   31.0,
+   32.0,
+   33.0,
+   34.0,
+   35.0,
+   36.0,
+   37.0,
+   38.0,
+   39.0,
+   40.0,
+   41.0,
+   42.0,
+   43.0,
+   44.0,
+   45.0,
+   46.0,
+   47.0,
+   48.0,
+   49.0,
+   50.0,
+   51.0,
+   52.0,
+   53.0,
+   54.0,
+   55.0,
+   56.0,
+   57.0,
+   58.0,
+   59.0,
+   60.0,
+   61.0,
+   62.0,
+   63.0,
+   64.0,
+   65.0,
+   66.0,
+   67.0,
+   68.0,
+   69.0,
+   70.0,
+   71.0,
+   72.0,
+   73.0,
+   74.0,
+   75.0,
+   76.0,
+   77.0,
+   78.0,
+   79.0,
+   80.0,
+   81.0,
+   82.0,
+   83.0,
+   84.0,
+   85.0,
+   86.0,
+   87.0,
+   88.0,
+   89.0,
+   90.0,
+   91.0,
+   92.0,
+   93.0,
+   94.0,
+   95.0
+  ],
+  "1": [
+   0.0,
+   1.0,
+   2.0,
+   3.0,
+   4.0,
+   5.0,
+   6.0,
+   7.0,
+   8.0,
+   9.0,
+   10.0,
+   11.0,
+   12.0,
+   13.0,
+   14.0,
+   15.0,
+   16.0,
+   17.0,
+   18.0,
+   19.0,
+   20.0,
+   20.17,
+   20.33,
+   20.5,
+   20.67,
+   20.83,
+   21.0,
+   21.17,
+   21.33,
+   21.5,
+   21.67,
+   21.83,
+   22.0,
+   22.17,
+   22.33,
+   22.5,
+   22.67,
+   22.83,
+   23.0,
+   23.17,
+   23.33,
+   23.5,
+   23.67,
+   23.83,
+   24.0,
+   24.17,
+   24.33,
+   24.5,
+   24.67,
+   24.83,
+   25.0,
+   26.0,
+   27.0,
+   28.0,
+   29.0,
+   30.0,
+   31.0,
+   32.0,
+   33.0,
+   34.0,
+   35.0,
+   36.0,
+   37.0,
+   38.0,
+   39.0,
+   40.0,
+   41.0,
+   42.0,
+   43.0,
+   44.0,
+   45.0,
+   46.0,
+   47.0,
+   48.0,
+   49.0,
+   50.0,
+   51.0,
+   52.0,
+   53.0,
+   54.0,
+   55.0,
+   56.0,
+   57.0,
+   58.0,
+   59.0,
+   60.0,
+   61.0,
+   62.0,
+   63.0,
+   64.0,
+   65.0,
+   66.0,
+   67.0,
+   68.0,
+   69.0,
+   70.0,
+   71.0,
+   72.0,
+   73.0,
+   74.0,
+   75.0,
+   76.0,
+   77.0,
+   78.0,
+   79.0,
+   80.0,
+   81.0,
+   82.0,
+   83.0,
+   84.0,
+   85.0,
+   86.0,
+   87.0,
+   88.0,
+   89.0,
+   90.0,
+   91.0,
+   92.0,
+   93.0,
+   94.0,
+   95.0,
+   96.0,
+   97.0,
+   98.0,
+   99.0,
+   100.0,
+   101.0,
+   102.0,
+   103.0,
+   104.0,
+   105.0,
+   106.0,
+   107.0,
+   108.0,
+   109.0,
+   110.0,
+   111.0,
+   112.0,
+   113.0,
+   114.0,
+   115.0,
+   116.0,
+   117.0,
+   118.0,
+   119.0,
+   120.0
+  ],
+  "2": [
+   0.0,
+   1.0,
+   2.0,
+   3.0,
+   4.0,
+   5.0,
+   6.0,
+   7.0,
+   8.0,
+   9.0,
+   10.0,
+   11.0,
+   12.0,
+   13.0,
+   14.0,
+   15.0,
+   16.0,
+   17.0,
+   18.0,
+   19.0,
+   20.0,
+   20.17,
+   20.33,
+   20.5,
+   20.67,
+   20.83,
+   21.0,
+   21.17,
+   21.33,
+   21.5,
+   21.67,
+   21.83,
+   22.0,
+   22.17,
+   22.33,
+   22.5,
+   22.67,
+   22.83,
+   23.0,
+   23.17,
+   23.33,
+   23.5,
+   23.67,
+   23.83,
+   24.0,
+   24.17,
+   24.33,
+   24.5,
+   24.67,
+   24.83,
+   25.0,
+   26.0,
+   27.0,
+   28.0,
+   29.0,
+   30.0,
+   31.0,
+   32.0,
+   33.0,
+   34.0,
+   35.0,
+   36.0,
+   37.0,
+   38.0,
+   39.0,
+   40.0,
+   41.0,
+   42.0,
+   43.0,
+   44.0,
+   45.0,
+   46.0,
+   47.0,
+   48.0,
+   49.0,
+   50.0,
+   51.0,
+   52.0,
+   53.0,
+   54.0,
+   55.0,
+   56.0,
+   57.0,
+   58.0,
+   59.0,
+   60.0,
+   61.0,
+   62.0,
+   63.0,
+   64.0,
+   65.0,
+   66.0,
+   67.0,
+   68.0,
+   69.0,
+   70.0,
+   71.0,
+   72.0,
+   73.0,
+   74.0,
+   75.0,
+   76.0,
+   77.0,
+   78.0,
+   79.0,
+   80.0,
+   81.0,
+   82.0,
+   83.0,
+   84.0,
+   85.0,
+   86.0,
+   87.0,
+   88.0,
+   89.0,
+   90.0,
+   91.0,
+   92.0,
+   93.0,
+   94.0,
+   95.0,
+   96.0,
+   97.0,
+   98.0,
+   99.0,
+   100.0,
+   101.0,
+   102.0,
+   103.0,
+   104.0,
+   105.0,
+   106.0,
+   107.0,
+   108.0,
+   109.0,
+   110.0,
+   111.0,
+   112.0,
+   113.0,
+   114.0,
+   115.0,
+   116.0,
+   117.0,
+   118.0,
+   119.0,
+   120.0,
+   121.0,
+   122.0,
+   123.0,
+   124.0,
+   125.0,
+   126.0,
+   127.0,
+   128.0,
+   129.0,
+   130.0,
+   131.0,
+   132.0,
+   133.0,
+   134.0,
+   135.0,
+   136.0,
+   137.0,
+   138.0,
+   139.0,
+   140.0,
+   141.0,
+   142.0,
+   143.0,
+   144.0,
+   145.0
+  ],
+  "4": [
+   0.0,
+   1.0,
+   2.0,
+   3.0,
+   4.0,
+   5.0,
+   6.0,
+   7.0,
+   8.0,
+   9.0,
+   10.0,
+   11.0,
+   12.0,
+   13.0,
+   14.0,
+   15.0,
+   16.0,
+   26.0,
+   36.0,
+   46.0,
+   56.0,
+   66.0,
+   76.0,
+   77.0,
+   78.0,
+   79.0,
+   80.0,
+   81.0,
+   82.0,
+   83.0,
+   84.0,
+   85.0,
+   86.0,
+   87.0,
+   88.0,
+   89.0,
+   90.0,
+   91.0,
+   92.0,
+   93.0,
+   94.0,
+   95.0,
+   96.0,
+   97.0,
+   98.0,
+   99.0,
+   100.0,
+   101.0,
+   102.0,
+   103.0,
+   104.0,
+   105.0,
+   106.0,
+   107.0,
+   108.0,
+   109.0,
+   110.0,
+   111.0,
+   112.0,
+   113.0,
+   114.0,
+   115.0,
+   116.0,
+   117.0,
+   118.0,
+   119.0,
+   120.0,
+   121.0,
+   122.0,
+   123.0,
+   124.0,
+   125.0,
+   126.0,
+   127.0,
+   128.0,
+   129.0,
+   130.0,
+   131.0,
+   132.0,
+   133.0,
+   134.0
+  ],
+  "5": [
+   0.0,
+   1.0,
+   2.0,
+   3.0,
+   4.0,
+   5.0,
+   6.0,
+   7.0,
+   8.0,
+   9.0,
+   10.0,
+   11.0,
+   12.0,
+   13.0,
+   14.0,
+   15.0,
+   16.0,
+   26.0,
+   36.0,
+   46.0,
+   56.0,
+   57.0,
+   58.0,
+   59.0,
+   60.0,
+   61.0,
+   62.0,
+   63.0,
+   64.0,
+   65.0,
+   66.0,
+   67.0,
+   68.0,
+   69.0,
+   70.0,
+   71.0,
+   72.0,
+   73.0,
+   74.0,
+   75.0,
+   76.0,
+   77.0,
+   78.0,
+   79.0,
+   80.0,
+   81.0,
+   82.0,
+   83.0,
+   84.0,
+   85.0,
+   86.0,
+   87.0
+  ],
+  "6": [
+   0.0,
+   1.0,
+   2.0,
+   3.0,
+   4.0,
+   5.0,
+   6.0,
+   7.0,
+   8.0,
+   9.0,
+   10.0,
+   11.0,
+   12.0,
+   13.0,
+   14.0,
+   15.0,
+   16.0,
+   17.0,
+   18.0,
+   19.0,
+   20.0,
+   21.0,
+   22.0,
+   23.0,
+   24.0,
+   25.0,
+   26.0,
+   27.0,
+   28.0,
+   29.0,
+   30.0,
+   31.0,
+   32.0,
+   33.0,
+   34.0,
+   35.0,
+   36.0,
+   37.0,
+   38.0,
+   39.0,
+   40.0,
+   41.0,
+   42.0,
+   43.0,
+   44.0,
+   45.0,
+   46.0,
+   47.0,
+   48.0,
+   49.0,
+   50.0,
+   51.0,
+   52.0,
+   53.0,
+   54.0
+  ],
+  "7": [
+   0.0,
+   1.0,
+   2.0,
+   3.0,
+   4.0,
+   5.0,
+   6.0,
+   7.0,
+   8.0,
+   9.0,
+   10.0,
+   11.0,
+   12.0,
+   13.0,
+   14.0,
+   15.0,
+   16.0,
+   17.0,
+   18.0,
+   19.0,
+   20.0,
+   21.0,
+   22.0,
+   23.0,
+   24.0,
+   25.0,
+   26.0,
+   27.0,
+   28.0,
+   29.0,
+   30.0,
+   31.0,
+   32.0,
+   33.0,
+   34.0,
+   35.0,
+   36.0,
+   37.0,
+   38.0,
+   39.0,
+   40.0,
+   41.0,
+   42.0,
+   43.0,
+   44.0,
+   45.0,
+   46.0,
+   47.0,
+   48.0,
+   49.0,
+   50.0,
+   51.0,
+   52.0,
+   53.0,
+   54.0,
+   55.0,
+   56.0,
+   57.0,
+   58.0,
+   59.0,
+   60.0,
+   61.0,
+   62.0,
+   63.0,
+   64.0,
+   65.0,
+   66.0,
+   67.0,
+   68.0,
+   69.0,
+   70.0,
+   71.0,
+   72.0,
+   73.0,
+   74.0,
+   75.0,
+   76.0,
+   77.0
+  ],
+  "9": [
+   0.0,
+   1.0,
+   2.0,
+   3.0,
+   4.0,
+   5.0,
+   6.0,
+   7.0,
+   8.0,
+   9.0,
+   10.0,
+   11.0,
+   12.0,
+   13.0,
+   14.0,
+   15.0,
+   16.0,
+   26.0,
+   36.0,
+   46.0,
+   56.0,
+   66.0,
+   76.0,
+   77.0,
+   78.0,
+   79.0,
+   80.0,
+   81.0,
+   82.0,
+   83.0,
+   84.0,
+   85.0,
+   86.0,
+   87.0,
+   88.0,
+   89.0,
+   90.0,
+   91.0,
+   92.0,
+   93.0,
+   94.0,
+   95.0,
+   96.0,
+   97.0,
+   98.0,
+   99.0,
+   100.0,
+   101.0,
+   102.0,
+   103.0,
+   104.0,
+   105.0,
+   106.0,
+   107.0,
+   108.0,
+   109.0,
+   110.0,
+   111.0,
+   112.0,
+   113.0,
+   114.0,
+   115.0,
+   116.0,
+   117.0,
+   118.0,
+   119.0,
+   120.0,
+   121.0,
+   122.0,
+   123.0,
+   124.0,
+   125.0,
+   126.0,
+   127.0,
+   128.0,
+   129.0,
+   130.0,
+   131.0,
+   132.0,
+   133.0,
+   134.0
+  ],
+  "10": [
+   0.0,
+   1.0,
+   2.0,
+   3.0,
+   4.0,
+   5.0,
+   6.0,
+   7.0,
+   8.0,
+   9.0,
+   10.0,
+   11.0,
+   12.0,
+   13.0,
+   14.0,
+   15.0,
+   16.0,
+   26.0,
+   36.0,
+   46.0,
+   56.0,
+   66.0,
+   76.0,
+   77.0,
+   78.0,
+   79.0,
+   80.0,
+   81.0,
+   82.0,
+   83.0,
+   84.0,
+   85.0,
+   86.0,
+   87.0,
+   88.0,
+   89.0,
+   90.0,
+   91.0,
+   92.0,
+   93.0,
+   94.0,
+   95.0,
+   96.0,
+   97.0,
+   98.0,
+   99.0,
+   100.0,
+   101.0,
+   102.0,
+   103.0,
+   104.0,
+   105.0,
+   106.0,
+   107.0,
+   108.0,
+   109.0,
+   110.0,
+   111.0,
+   112.0,
+   113.0,
+   114.0,
+   115.0,
+   116.0,
+   117.0,
+   118.0,
+   119.0,
+   120.0,
+   121.0,
+   122.0,
+   123.0,
+   124.0,
+   125.0,
+   126.0,
+   127.0,
+   128.0,
+   129.0,
+   130.0,
+   131.0,
+   132.0,
+   133.0,
+   134.0
+  ],
+  "11": [
+   0.0,
+   1.0,
+   2.0,
+   3.0,
+   4.0,
+   5.0,
+   6.0,
+   7.0,
+   8.0,
+   9.0,
+   10.0,
+   11.0,
+   12.0,
+   13.0,
+   14.0,
+   15.0,
+   16.0,
+   26.0,
+   36.0,
+   46.0,
+   56.0,
+   66.0,
+   76.0,
+   77.0,
+   78.0,
+   79.0,
+   80.0,
+   81.0,
+   82.0,
+   83.0,
+   84.0,
+   85.0,
+   86.0,
+   87.0,
+   88.0,
+   89.0,
+   90.0,
+   91.0,
+   92.0,
+   93.0,
+   94.0,
+   95.0,
+   96.0,
+   97.0,
+   98.0,
+   99.0,
+   100.0,
+   101.0,
+   102.0,
+   103.0,
+   104.0,
+   105.0,
+   106.0,
+   107.0,
+   108.0,
+   109.0,
+   110.0,
+   111.0,
+   112.0,
+   113.0,
+   114.0,
+   115.0,
+   116.0,
+   117.0,
+   118.0,
+   119.0,
+   120.0,
+   121.0,
+   122.0,
+   123.0,
+   124.0,
+   125.0,
+   126.0,
+   127.0,
+   128.0,
+   129.0,
+   130.0,
+   131.0,
+   132.0,
+   133.0,
+   134.0
+  ]
+ },
+ "bdm_skill": {
+  "0": {
+   "id": 0,
+   "sub0": {
+    "DamageType": 10,
+    "DamageAmount": 0,
+    "AcbType": 0,
+    "CueId": -1,
+    "Effect1_ID": -1,
+    "Effect1_EepkType": 0,
+    "Effect2_ID": -1,
+    "Effect2_EepkType": 0,
+    "Effect3_ID": -1,
+    "Effect3_EepkType": 0,
+    "PushbackStrength": 0.0,
+    "PushbackAcceleration": 0.0,
+    "UserStun": 0,
+    "VictimStun": 0,
+    "KnockbackDuration": 0,
+    "KnockbackRecoveryAfterImpactTime": 0,
+    "KnockbackGroundImpactTime": 0,
+    "KnockbackStrengthX": 0.0,
+    "KnockbackStrengthY": 0.0,
+    "KnockbackStrengthZ": 0.0,
+    "KnockbackDragY": 0.0,
+    "KnockbackGravityTime": 0,
+    "VictimInvincibilityTime": -1,
+    "AlimentType": 0,
+    "DamageSpecial": 0,
+    "StumbleType": 0,
+    "DamageSecondaryType": 0,
+    "CameraShakeTime": 0,
+    "UserBpeID": -1,
+    "VictimBpeID": 37,
+    "StaminaBrokenOverrideBdmId": -1,
+    "ZVanishEnableTime": 0,
+    "UserAnimationTime": 0,
+    "VictimAnimationTime": 0,
+    "UserAnimationSpeed": 0.0,
+    "VictimAnimationSpeed": 0.0
+   },
+   "other_subs_differ": {}
+  },
+  "1": {
+   "id": 1,
+   "sub0": {
+    "DamageType": 26,
+    "DamageAmount": 0,
+    "AcbType": 0,
+    "CueId": 53,
+    "Effect1_ID": 2,
+    "Effect1_EepkType": 0,
+    "Effect2_ID": -1,
+    "Effect2_EepkType": 0,
+    "Effect3_ID": -1,
+    "Effect3_EepkType": 0,
+    "PushbackStrength": 0.2,
+    "PushbackAcceleration": 0.7,
+    "UserStun": 15,
+    "VictimStun": 0,
+    "KnockbackDuration": 90,
+    "KnockbackRecoveryAfterImpactTime": 180,
+    "KnockbackGroundImpactTime": 110,
+    "KnockbackStrengthX": 0.0,
+    "KnockbackStrengthY": 0.02,
+    "KnockbackStrengthZ": 0.32,
+    "KnockbackDragY": 0.0,
+    "KnockbackGravityTime": 110,
+    "VictimInvincibilityTime": 64,
+    "AlimentType": 0,
+    "DamageSpecial": 0,
+    "StumbleType": 162,
+    "DamageSecondaryType": 0,
+    "CameraShakeTime": 60,
+    "UserBpeID": -1,
+    "VictimBpeID": -1,
+    "StaminaBrokenOverrideBdmId": -1,
+    "ZVanishEnableTime": 90,
+    "UserAnimationTime": 45,
+    "VictimAnimationTime": 60,
+    "UserAnimationSpeed": 0.02,
+    "VictimAnimationSpeed": 0.05
+   },
+   "other_subs_differ": {
+    "5": {
+     "DamageType": 1,
+     "CueId": -1,
+     "Effect1_ID": 21,
+     "UserStun": 30,
+     "VictimStun": 30,
+     "KnockbackDuration": 0,
+     "KnockbackRecoveryAfterImpactTime": 0,
+     "KnockbackGroundImpactTime": 0,
+     "KnockbackStrengthY": 0.0,
+     "KnockbackStrengthZ": 0.0,
+     "KnockbackGravityTime": 0,
+     "StumbleType": 0,
+     "ZVanishEnableTime": 0,
+     "UserAnimationTime": 30,
+     "VictimAnimationTime": 0,
+     "UserAnimationSpeed": 0.05,
+     "VictimAnimationSpeed": 1.0
+    }
+   }
+  }
+ },
+ "cmn_ean": {
+  "76": {
+   "name": "CMN_DMG_YOROKE_HEAD_F",
+   "frames": 43
+  },
+  "96": {
+   "name": "CMN_DMG_SUBERI_AOMUKE",
+   "frames": 78
+  },
+  "205": {
+   "name": "CMN_DMG_BLOW_H_F",
+   "frames": 36
+  }
+ },
+ "btl_cmn": {
+  "2": [
+   {
+    "AssetType": "PBIND",
+    "AttachementType": "External",
+    "Orientation": "Camera",
+    "Deactivation": "Never",
+    "ESK": null,
+    "ScaleMin": 1.5,
+    "ScaleMax": 1.5,
+    "Position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "Files": [
+     "Btl_HitLOD.emp"
+    ],
+    "Flags1_names": [
+     "RotateUpdate",
+     "InstantUpdate"
+    ]
+   },
+   {
+    "AssetType": "PBIND",
+    "AttachementType": "External",
+    "Orientation": "Camera",
+    "Deactivation": "Never",
+    "ESK": null,
+    "ScaleMin": 0.8,
+    "ScaleMax": 0.8,
+    "Position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "Files": [
+     "Btl_HitL.emp"
+    ],
+    "Flags1_names": [
+     "RotateUpdate",
+     "InstantUpdate"
+    ]
+   },
+   {
+    "AssetType": "PBIND",
+    "AttachementType": "External",
+    "Orientation": "Camera",
+    "Deactivation": "Never",
+    "ESK": null,
+    "ScaleMin": 0.05,
+    "ScaleMax": 0.05,
+    "Position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "Files": [
+     "Btl_HitL.emp"
+    ],
+    "Flags1_names": [
+     "RotateUpdate",
+     "InstantUpdate"
+    ]
+   },
+   {
+    "AssetType": "CBIND",
+    "AttachementType": "External",
+    "Orientation": "None",
+    "Deactivation": "Never",
+    "ESK": null,
+    "ScaleMin": 1.0,
+    "ScaleMax": 1.0,
+    "Position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "Files": [
+     "Nml_DmgL00.ecf"
+    ],
+    "Flags1_names": []
+   },
+   {
+    "AssetType": "PBIND",
+    "AttachementType": "Bone",
+    "Orientation": "AttachmentBone",
+    "Deactivation": "Never",
+    "ESK": "b_C_Head",
+    "ScaleMin": 2.0,
+    "ScaleMax": 2.0,
+    "Position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "Files": [
+     "Btl_Sweat00.emp"
+    ],
+    "Flags1_names": []
+   }
+  ],
+  "108": [
+   {
+    "AssetType": "EMO",
+    "AttachementType": "Camera",
+    "Orientation": "Camera",
+    "Deactivation": "LoopCancel",
+    "ESK": null,
+    "ScaleMin": 0.36,
+    "ScaleMax": 0.36,
+    "Position": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "Files": [
+     "HIT_DmgGrs2.emo",
+     "HIT_DmgGrs2.emm",
+     "HIT_DmgGrs2.emb",
+     "HIT_DmgGrs2.mat.ema",
+     "HIT_DmgGrs2.obj.ema"
+    ],
+    "Flags1_names": [
+     "PositionUpdate",
+     "RotateUpdate",
+     "InstantUpdate"
+    ]
+   }
+  ]
+ },
+ "animations": [
+  {
+   "index": 0,
+   "name": "HIK_SPA_DSH_00_C",
+   "frames": 121
+  },
+  {
+   "index": 1,
+   "name": "HIK_SPA_DSH_01_C",
+   "frames": 81
+  }
+ ],
+ "user_root": {
+  "note": "b_C_Base, metres, smash axes (+Z his facing, +Y up); MoveWithAxis X / Y / Z",
+  "#0": [
+   [
+    0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   [
+    2,
+    -0.002,
+    0.0,
+    -0.092
+   ],
+   [
+    4,
+    -0.007,
+    0.0,
+    -0.235
+   ],
+   [
+    6,
+    -0.013,
+    0.0,
+    -0.258
+   ],
+   [
+    8,
+    -0.021,
+    0.0,
+    -0.231
+   ],
+   [
+    10,
+    -0.029,
+    0.0,
+    -0.185
+   ],
+   [
+    12,
+    -0.038,
+    0.0,
+    -0.128
+   ],
+   [
+    14,
+    -0.047,
+    0.0,
+    -0.068
+   ],
+   [
+    16,
+    -0.054,
+    0.0,
+    -0.016
+   ],
+   [
+    18,
+    -0.059,
+    0.0,
+    0.022
+   ],
+   [
+    20,
+    -0.06,
+    0.0,
+    0.037
+   ],
+   [
+    22,
+    -0.06,
+    0.0,
+    0.037
+   ],
+   [
+    24,
+    -0.06,
+    0.0,
+    0.037
+   ],
+   [
+    26,
+    -0.06,
+    0.0,
+    0.037
+   ],
+   [
+    28,
+    -0.06,
+    0.0,
+    0.037
+   ],
+   [
+    30,
+    -0.06,
+    0.0,
+    0.037
+   ],
+   [
+    32,
+    -0.06,
+    0.0,
+    0.037
+   ],
+   [
+    34,
+    -0.06,
+    0.0,
+    0.037
+   ],
+   [
+    36,
+    -0.06,
+    0.0,
+    0.037
+   ],
+   [
+    38,
+    -0.06,
+    0.0,
+    0.037
+   ],
+   [
+    40,
+    -0.06,
+    0.0,
+    0.037
+   ],
+   [
+    42,
+    -0.06,
+    0.0,
+    0.037
+   ],
+   [
+    44,
+    -0.06,
+    0.0,
+    0.037
+   ],
+   [
+    46,
+    -0.06,
+    0.0,
+    0.037
+   ],
+   [
+    48,
+    -0.06,
+    0.0,
+    0.037
+   ],
+   [
+    50,
+    -0.06,
+    0.0,
+    0.037
+   ],
+   [
+    52,
+    -0.075,
+    0.0,
+    0.07
+   ],
+   [
+    54,
+    -0.102,
+    0.006,
+    0.19
+   ],
+   [
+    56,
+    -0.117,
+    0.039,
+    0.424
+   ],
+   [
+    58,
+    -0.089,
+    0.088,
+    0.919
+   ],
+   [
+    60,
+    -0.06,
+    0.123,
+    1.542
+   ],
+   [
+    62,
+    -0.06,
+    0.131,
+    1.542
+   ],
+   [
+    64,
+    -0.06,
+    0.137,
+    1.542
+   ],
+   [
+    66,
+    -0.06,
+    0.14,
+    1.542
+   ],
+   [
+    68,
+    -0.06,
+    0.142,
+    1.542
+   ],
+   [
+    70,
+    -0.06,
+    0.142,
+    1.542
+   ],
+   [
+    72,
+    -0.06,
+    0.143,
+    1.542
+   ],
+   [
+    74,
+    -0.06,
+    0.141,
+    1.542
+   ],
+   [
+    76,
+    -0.06,
+    0.138,
+    1.542
+   ],
+   [
+    78,
+    -0.06,
+    0.134,
+    1.542
+   ],
+   [
+    80,
+    -0.06,
+    0.13,
+    1.542
+   ],
+   [
+    82,
+    -0.06,
+    0.126,
+    1.542
+   ],
+   [
+    84,
+    -0.06,
+    0.124,
+    1.542
+   ],
+   [
+    86,
+    -0.059,
+    0.142,
+    1.908
+   ],
+   [
+    88,
+    -0.042,
+    0.227,
+    2.562
+   ],
+   [
+    90,
+    -0.012,
+    0.321,
+    2.85
+   ],
+   [
+    92,
+    -0.009,
+    0.369,
+    3.006
+   ],
+   [
+    94,
+    -0.019,
+    0.383,
+    3.092
+   ],
+   [
+    96,
+    -0.024,
+    0.387,
+    3.117
+   ],
+   [
+    98,
+    -0.026,
+    0.39,
+    3.135
+   ],
+   [
+    100,
+    -0.027,
+    0.392,
+    3.15
+   ],
+   [
+    102,
+    -0.027,
+    0.392,
+    3.166
+   ],
+   [
+    104,
+    -0.027,
+    0.391,
+    3.182
+   ],
+   [
+    106,
+    -0.028,
+    0.388,
+    3.193
+   ],
+   [
+    108,
+    -0.029,
+    0.381,
+    3.203
+   ],
+   [
+    110,
+    -0.029,
+    0.35,
+    3.209
+   ],
+   [
+    112,
+    -0.024,
+    0.299,
+    3.211
+   ],
+   [
+    114,
+    -0.015,
+    0.248,
+    3.215
+   ],
+   [
+    116,
+    -0.007,
+    0.214,
+    3.221
+   ],
+   [
+    118,
+    -0.002,
+    0.213,
+    3.227
+   ],
+   [
+    120,
+    -0.0,
+    0.224,
+    3.229
+   ]
+  ],
+  "#1": [
+   [
+    0,
+    -0.06,
+    0.123,
+    0.016
+   ],
+   [
+    2,
+    -0.055,
+    0.131,
+    0.015
+   ],
+   [
+    4,
+    -0.043,
+    0.149,
+    0.013
+   ],
+   [
+    6,
+    -0.028,
+    0.174,
+    0.009
+   ],
+   [
+    8,
+    -0.014,
+    0.198,
+    0.005
+   ],
+   [
+    10,
+    -0.004,
+    0.217,
+    0.001
+   ],
+   [
+    12,
+    0.0,
+    0.224,
+    0.0
+   ],
+   [
+    14,
+    0.0,
+    0.212,
+    0.051
+   ],
+   [
+    16,
+    0.0,
+    0.212,
+    0.05
+   ],
+   [
+    18,
+    0.0,
+    0.212,
+    0.049
+   ],
+   [
+    20,
+    0.0,
+    0.212,
+    0.047
+   ],
+   [
+    22,
+    0.0,
+    0.213,
+    0.044
+   ],
+   [
+    24,
+    0.0,
+    0.213,
+    0.04
+   ],
+   [
+    26,
+    0.0,
+    0.214,
+    0.037
+   ],
+   [
+    28,
+    0.0,
+    0.214,
+    0.033
+   ],
+   [
+    30,
+    0.0,
+    0.215,
+    0.029
+   ],
+   [
+    32,
+    0.0,
+    0.216,
+    0.025
+   ],
+   [
+    34,
+    0.0,
+    0.218,
+    0.021
+   ],
+   [
+    36,
+    0.0,
+    0.219,
+    0.018
+   ],
+   [
+    38,
+    0.0,
+    0.222,
+    0.014
+   ],
+   [
+    40,
+    0.0,
+    0.224,
+    0.012
+   ],
+   [
+    42,
+    0.0,
+    0.228,
+    0.009
+   ],
+   [
+    44,
+    0.0,
+    0.235,
+    0.007
+   ],
+   [
+    46,
+    0.0,
+    0.243,
+    0.005
+   ],
+   [
+    48,
+    0.0,
+    0.252,
+    0.003
+   ],
+   [
+    50,
+    0.0,
+    0.261,
+    0.001
+   ],
+   [
+    52,
+    0.0,
+    0.27,
+    0.0
+   ],
+   [
+    54,
+    0.0,
+    0.279,
+    -0.001
+   ],
+   [
+    56,
+    0.0,
+    0.285,
+    -0.002
+   ],
+   [
+    58,
+    0.0,
+    0.29,
+    -0.003
+   ],
+   [
+    60,
+    0.0,
+    0.291,
+    -0.003
+   ],
+   [
+    62,
+    0.0,
+    0.283,
+    -0.003
+   ],
+   [
+    64,
+    0.0,
+    0.261,
+    -0.003
+   ],
+   [
+    66,
+    0.0,
+    0.229,
+    -0.002
+   ],
+   [
+    68,
+    0.0,
+    0.189,
+    -0.002
+   ],
+   [
+    70,
+    0.0,
+    0.146,
+    -0.001
+   ],
+   [
+    72,
+    0.0,
+    0.103,
+    -0.001
+   ],
+   [
+    74,
+    0.0,
+    0.063,
+    -0.001
+   ],
+   [
+    76,
+    0.0,
+    0.03,
+    -0.0
+   ],
+   [
+    78,
+    0.0,
+    0.008,
+    -0.0
+   ],
+   [
+    80,
+    0.0,
+    0.0,
+    0.0
+   ]
+  ]
+ },
+ "se_cues": {
+  "0": "CAR_S1352_DSH_Basa",
+  "1": "CAR_S1352_DSH_Dash",
+  "2": "CAR_S1350_FRT_Hazure",
+  "3": "CAR_S1350_FRT_TimeStop",
+  "4": "CAR_S1350_FRT_PumchiFuri",
+  "5": "CAR_S1350_FRT_Hit_TmLck"
+ }
+}

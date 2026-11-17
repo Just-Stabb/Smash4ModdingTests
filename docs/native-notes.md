@@ -2638,7 +2638,7 @@ temporary diag caves' `0x04BCC000`); variables `0x0F0003D0`-`0x0F0003DA`; comman
 `docs/acmd-extra-commands.md` "Variable resets". **Claimed region: `0x04BD8000`-`0x04BE0000`** (code `0x04BD8000`-
 `0x04BD88C4`, data `0x04BD9F00`, the reset lists `0x04BDA000`; `textregion:0x2BE0000 grow:0x04BE0000`).
 `0x04BD6000`-`0x04BD8000` (between ts_data's end and this) was free; `0x04BD6000`-`0x04BD7000` is now the whip motion
-table's (Byleth v15, below), `0x04BD7000`-`0x04BD8000` still free. The combined exe the user runs:
+table's (Byleth v15, below), `0x04BD7000`-`0x04BD8000` the hitbox hold's (rapid_setoff v1, below). The combined exe the user runs:
 exe_v46v_threads -> var_reset_cave.py (exe_v46w_vars) -> tools/line_test_cave.py (exe_v46w_vars_line, which chains on
 four of these hooks).
 
@@ -2689,7 +2689,7 @@ four of these hooks).
 ## Whip motion table (Byleth v15: `tools/master_whip_motion_cave.py`, exe_v46x_whipmot)
 
 **Claimed region: `0x04BD6000`-`0x04BD7000`** (half of the gap left free above: zero in exe_v46w_vars_line; inside the
-text region since exe_v46w_vars, nothing grown). `0x04BD7000`-`0x04BD8000` is still free. Order: exe_v46v_threads ->
+text region since exe_v46w_vars, nothing grown). `0x04BD7000`-`0x04BD8000` is now the hitbox hold's (rapid_setoff v1, "Hitbox hold" below). Order: exe_v46v_threads ->
 var_reset_cave -> line_test_cave (exe_v46w_vars_line) -> this one (exe_v46x_whipmot); it touches none of their words, so it
 also goes on v11's TEST_ONLY diag exe (exe_v46w_vars_line + diag_godfist_cave) unchanged.
 
@@ -2777,3 +2777,54 @@ also goes on v11's TEST_ONLY diag exe (exe_v46w_vars_line + diag_godfist_cave) u
   r12, r3, 2; addic r0, r0, 0x148; lwzx r3, r12, r0`, the kind-indexed lowercase name table at 0x04BA0148 in the expanded
   executables (exe_v46x: 0x41 - 0x47 `supamario`, `edge`, `gaogaen`, `pickel`, `brave`, `pzenigame`, `master`), the
   folder names. Vanilla's win N is 80 - 100 % of the fighter's J02WinN length (24 poses of 8 fighters, median 0.957).
+
+## Hitbox hold (rapid_setoff v1: `tools/hitbox_hold_cave.py`, exe_v46y_hold)
+
+**Claimed region: `0x04BD7000`-`0x04BD8000`** (the last free part of the gap before var_reset's region; zero in
+exe_v46x_whipmot, inside the text region; code `0x04BD7000`-`0x04BD72F8`, HH_EXT `0x04BD72F8` (128 x 8)). Order:
+exe_v46x_whipmot -> this (exe_v46y_hold). Test `tools/hitbox_hold_test.py EXE` (unicorn, the game's code around every
+hook: 54 checks on exe_v46x_whipmot).
+
+**Ultimate's setoff (ExeFS main.bin, dynsym + .rela.dyn):** `AttackData__store_l2c_table_impl` (0x1FEECD0 -> 0x1FEEDA0)
+stores each field under its member's hash40: `set_off_` is the byte at **AttackData +0x62** (`power_` +0x20, `vector_`
++0x28, `r_eff_` / `r_fix_` / `r_add_` +0x2C-0x34, `slip_` +0x38, `stop_frame_` +0x3C, `target_category_` +0x50,
+`lr_check_` +0x6A, `no_stop_` +0x6D, ...). AttackModuleImpl's vtable is 0x4F695B8 (`set_attack` vt +0x68 = 0x3DC180,
+`set_set_off` vt +0x728 = 0x3E2DA0: it writes the kind into EVERY slot's data +0x62 and sets / clears bit 0 of the
+slot's collision word). set_attack (0x3DC398) builds the hitbox's collision word with 0x22 | (set_off != ON), the
+layout of Smash 4's (0x22 / 0x23 << 6 there, "Clanks" below). The clank resolution (0x3E0A50, battle_object
+`rebound_power_diff` 9 as Smash 4's param 55): the losing side with set_off ON (0) or THRU (2) gets its cancel flag
+(module +0x244: the rebound), OFF (1) / NO_STOP (3) go on, NO_STOP with no clank hitlag. So **the setoff kind is the
+clank kind** (ON / OFF / THRU = Smash 4's Clang + Rebound 1 + 1 / 1 + 0 / 0 + 0: `ultimate_acmd.SETOFF`); nothing of
+it reaches the victim's knockback. Ultimate's knockback speed (0x403A20, a DamageModule virtual): reaction x
+`damage_speed_mul` 0.03 (367: the hitbox's motion), and **for 361 with the resolved angle 0 (a grounded victim under
+`damage_angle_ground_reaction_min` 60): x `damage_angle_ground_zero_speed_mul` 0.8** (battle_object.prc); 60 - 88 ramp
+to `damage_angle_ground_max` 38 degrees. Smash 4 (battle_object params 18 - 21): the same 0 under 60, 40 at 88, no
+0.8. So an Ultimate rapid-jab victim slides 80 % of what Smash 4's does: Ultimate holds better, not completely.
+
+**Smash 4, where a hit moves its victim:** the victim handler `0x02C25318` (r27 the victim's accessor, r28 the hit info
+with the hitbox data's copy at +0x44, r19 = StatusModule vt +0xDC: the victim's situation, 0 ground) computes the speed
+with `0x02C25208` (reaction x param 21 0.03; 366 with the flag: the hitbox's motion), the vector on its stack 0xC /
+0x10 (0x02C25798 - 0x02C257C8: x = speed cos(angle) (-lr), y = speed sin; 365: the hitbox's motion), decides the
+reaction kind / ground bounce from it, and at **0x02C25BF4 - 0x02C25C00** stores it into the damage event's +0xC /
++0x10 (event +0 the knockback, +0x30 the hitstun at 0x02C25C88: acmd_ext's HIT_STUN). The fighter's event handler
+(`0x02E7A4DC`, a switch on the event kind) reads +0xC / +0x10 (e.g. 0x02E7BF50), adds work floats 0xF / 0x10 and gives
+it to the damage energy (`0x02C5474C`). DamageModule's add_damage (`0x02C21A1C`, from 0x02C22648 with its own copy of
+the data at sp+0x24) resolves 361 into that copy's angle (0x02C21DC0) and records the reaction at record +0x10: the
+hit info's copy keeps the hitbox's own angle.
+
+**Hooks:**
+- VEC `0x02C25BF4` (`lwz r8, 0xC(r1)`, asserted with the next three words) -> `hh_vec`: loads the vector into r8 /
+  r11 as the game does, 0 / 0 for a held hit, back to `0x02C25BFC` (its stores). Free there: r0 r5-r7 r9 r10 r12.
+- SLOTSET `0x02C0874C` (acmd_ext's `b slot_set`, asserted to be it) -> `hh_slotset`: clears the HH_EXT entries of the
+  slot set (r26), then `b slot_set` (which zeroes the tag).
+- The command tables: line_test_cave.py's `find` (lk_none / s1 / s2 / f), chained in front of whatever is there.
+  Hitbox_Hold index 2100, CRC 0xAB0FC57C, 3 words.
+
+**The mark:** the hitbox data's +0x66 halfword (acmd_ext's Extra tag; no game code reads it, the hit info carries the
+0x68 bytes): a plain hitbox gets 0xED00 | Mode (acmd_ext reads only a 0xECxx tag: find_copy / ext_find / hv see no Extra
+hitbox); an Extra hitbox (0xEC00 | n) keeps its tag and gets HH_EXT[n] = {slot, Mode}, valid at hit time while acmd_ext's
+entry n names that slot and the hit's data matches its check words (angle, KBG, FKB, BKB, bone: find_copy's). Hold:
+Mode 2 always; Mode 1 when r19 == 0 and the vector's y word as an int is <= 0 (0, -0, downward).
+
+**Not confirmed in game:** that every reaction path of the fighter's event handler takes its speed from the event's
++0xC / +0x10 (the ones read do); the tumble with a zero vector (Mode 2 on a big hit); items / projectiles as victims.

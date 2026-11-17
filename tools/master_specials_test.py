@@ -408,10 +408,33 @@ def v17_static():
              ((361, 10, 0, 12, 'ATTACK_SETOFF_KIND_ON', 0.4), 361), ((361, 162, 0, 60, 'ATTACK_SETOFF_KIND_OFF', 3.5), 361),
              ((361, 20, 0, 0, 'ATTACK_SETOFF_KIND_OFF', 0.0), 361), ((54, 10, 0, 12, 'ATTACK_SETOFF_KIND_OFF', 0.4), 54),
              ((368, 10, 0, 12, 'ATTACK_SETOFF_KIND_OFF', 0.4), 366)]
+    mode = U.HOLD_MODE
+    U.HOLD_MODE = 'angle'
     got = [U.hold_angle(*a) for a, _w in cases]
-    check('v17 the holding angle: the rapid jab\'s 361 / setoff off / small knockback -> %d; not with setoff on, a '
-          'big knockback, no damage, another angle; 368 -> 366 as before' % U.HOLD_ANGLE,
+    U.HOLD_MODE = mode
+    check('v17 the holding angle (--hold-angle): the rapid jab\'s 361 / setoff off / small knockback -> %d; not with '
+          'setoff on, a big knockback, no damage, another angle; 368 -> 366 as before' % U.HOLD_ANGLE,
           got == [w for _a, w in cases], str(got))
+    # rapid_setoff v1 (the default): Ultimate's angle kept, Hitbox_Hold(ID, 1) after the holding hit, none after others
+    got = [U.hold_angle(*a) for a, _w in cases]
+    held = [U.holding(*a) for a, _w in cases]
+    check('rapid_setoff v1: the default keeps Ultimate\'s angle (361; 368 -> 366) and marks only the holding hits',
+          (U.HOLD_MODE, got, held) == ('hold', [361, 361, 361, 361, 361, 54, 366], [True, True] + [False] * 5),
+          str((U.HOLD_MODE, got, held)))
+    try:                                # the translation of Ultimate's Attack100 itself (the port's dump)
+        import port_sources
+        d = port_sources.load().dump('master')
+        body = U.functions(open(os.path.join(d, 'master', 'Attack100.txt')).read())['game_attack100']
+    except Exception:                   # noqa: BLE001
+        body = None
+    if body is not None:
+        cmds = U.Translator({}).script(body)
+        hits = [(c.params[0], c.params[4]) for c in cmds if c.name.endswith('Special_Hitbox')]
+        after = [cmds[i + 1].name == 'Hitbox_Hold' and cmds[i + 1].params == [c.params[0], 1]
+                 for i, c in enumerate(cmds) if c.name.endswith('Special_Hitbox')]
+        check('rapid_setoff v1: Attack100 translated: its 12 loop hits (6 x IDs 0 / 1) at 361, each followed by '
+              'Hitbox_Hold(ID, 1)', (len(hits), set(a for _i, a in hits), all(after)) == (12, {361}, True),
+              str((hits, after)))
     try:
         import port_sources
         import ultimate_stats as US

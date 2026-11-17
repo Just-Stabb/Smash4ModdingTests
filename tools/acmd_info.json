@@ -10762,6 +10762,18 @@
 "Value",
 "Owner"
 ]
+},
+"AB0FC57C": {
+"size": 3,
+"name": "Hitbox_Hold",
+"format": [
+0,
+0
+],
+"syntax": [
+"ID",
+"Mode"
+]
 }
 }
 }

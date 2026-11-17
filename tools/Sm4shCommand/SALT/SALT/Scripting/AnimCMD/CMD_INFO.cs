@@ -174,7 +174,8 @@ namespace SALT.Moveset.AnimCMD
             {0x3BE70247,4},
             {0xC5858BCF,3},
             {0x71F1A048,11},
-            {0x048FC81B,5}
+            {0x048FC81B,5},
+            {0xAB0FC57C,3}
         };
         #endregion
         #region Names
@@ -809,6 +810,7 @@ namespace SALT.Moveset.AnimCMD
             {0xC5858BCF,"Stage_Freeze"},
             {0x71F1A048,"Line_Test"},
             {0x048FC81B,"Var_Reset_Set"},
+            {0xAB0FC57C,"Hitbox_Hold"},
         };
         #endregion
         #region Params
@@ -1445,6 +1447,7 @@ namespace SALT.Moveset.AnimCMD
             {0xC5858BCF,"0,0"},
             {0x71F1A048,"0,1,1,1,1,0,3,3,3,3"},
             {0x048FC81B,"3,0,1,0"},
+            {0xAB0FC57C,"0,0"},
         };
         #endregion
         #region syntax
@@ -2079,6 +2082,7 @@ namespace SALT.Moveset.AnimCMD
             {0xC5858BCF,"On,Frames"},
             {0x71F1A048,"Space,X0,Y0,X1,Y1,Floors,Distance,HitX,HitY,Kind"},
             {0x048FC81B,"Variable,Reset,Value,Owner"},
+            {0xAB0FC57C,"ID,Mode"},
         };
         #endregion
 
@@ -2715,6 +2719,7 @@ namespace SALT.Moveset.AnimCMD
             {0xC5858BCF,"Freezes or resumes the stage (the game's own stage stop: StageManager +0xD0), the fighters, items and projectiles unaffected. Ends by itself after Frames, at Stage_Freeze(0) or when the match ends. New command: needs the patched cross_f.rpx (docs/acmd-extra-commands.md)."},
             {0x71F1A048,"Tests the stage between two points (the game's own GroundModule ray check): where the segment first meets a floor, wall or ceiling. New command: needs the patched cross_f.rpx (tools/line_test_cave.py)."},
             {0x048FC81B,"Puts a variable back to a value when its owner is KO'd, lands, grabs a ledge or is hit (exe_v46w)."},
+            {0xAB0FC57C,"Marks a hitbox so its hits keep the victim in place: no knockback travel, the damage / hitstun / hitlag / SDI kept (the setting the port pipeline gives Ultimate's rapid-jab hits). Cleared when the hitbox is replaced. New command: needs the patched cross_f.rpx (tools/hitbox_hold_cave.py, exe_v46y_hold)."},
         };
         #endregion
         /// <summary>

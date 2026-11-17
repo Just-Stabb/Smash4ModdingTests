@@ -85,10 +85,10 @@ class NvTest
         var errors = new List<string>();
         int n = ACMD_INFO.OverrideInfo(args[0], errors);
         Check("Events.cfg loads with no errors", string.Join("; ", errors), "");
-        Check("commands", ACMD_INFO.CMD_NAMES.Count, 629);   // v1.4.12: + Position_Place, Position_Offset_Get; v1.4.13: + Buffer_Clear, Buffer_Set; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set
+        Check("commands", ACMD_INFO.CMD_NAMES.Count, 630);   // v1.4.12: + Position_Place, Position_Offset_Get; v1.4.13: + Buffer_Clear, Buffer_Set; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold
         Check("New_Var known: size 11, group", ACMD_INFO.CMD_SIZES[FighterVariable.NewVarIdent] + " " +
               ACMD_INFO.GetCategory(FighterVariable.NewVarIdent), "11 New Commands / Variables");
-        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 45);       // v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set
+        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 46);       // v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold
         Check("group help blocks", ACMD_INFO.GROUP_HELP.Count, 10);      // v1.7.0: + New Commands / Time & stage
         LoadAliases(args[1]);
         Check("aliases loaded", FighterVariable.AliasCount > 500, true);
@@ -159,6 +159,12 @@ class NvTest
               "048FC81B0F000300000000020000000000000000");
         Check("Var_Reset_Set round-trips (a New_Var name too)", Hex(Bytes(Compile(s.Deserialize()))), Hex(Bytes(s)));
         Check("... shown", s.Deserialize().Split('\n')[1].Trim(), "Var_Reset_Set(Variable=combo, Reset=0x9, Value=1.5, Owner=0x4)");
+        // ---- v1.7.5: Hitbox_Hold(ID, Mode) (exe_v46y_hold)
+        s = Compile("Hitbox_Hold(ID=1, Mode=1)\nHitbox_Hold(ID=-1, Mode=2)");
+        Check("Hitbox_Hold: 3 words, its CRC, ID, Mode; ID -1 (then the end marker)", Hex(Bytes(s)),
+              "AB0FC57C0000000100000001AB0FC57CFFFFFFFF000000025766F889");
+        Check("Hitbox_Hold round-trips", Hex(Bytes(Compile(s.Deserialize()))), Hex(Bytes(s)));
+        Check("Hitbox_Hold: New Commands / Hitboxes & hits", ACMD_INFO.GetCategory(0xAB0FC57C), "New Commands / Hitboxes & hits");
 
         // ---- errors
         Check("unknown name", Error("INC_INT(Variable=nothing_here)"),

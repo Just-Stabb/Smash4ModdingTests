@@ -4,12 +4,12 @@ These are new commands for game, effect, sound and expression scripts. They need
 `cross_f.rpx` (`tools/acmd_ext_cave.py`, part of the standard build). Without it, a script that uses
 them won't load properly, so ship the executable with any script that uses them.
 
-Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12, Buffer_Clear / Buffer_Set from v1.4.13, Time_Scale / Target_Time_Scale / Stage_Freeze from v1.7.0, Var_Reset_Set and New_Var's Reset from v1.7.4) lists all of them in one
+Sm4shCommand knows them, with tooltips for every parameter. View > Commands (v1.4.7; Leave_Ground_Cancel from v1.4.8, New_Var from v1.4.9, Gravity_Set from v1.4.10, variables in Extra hitboxes from v1.4.11, Position_Place / Position_Offset_Get and Target 12 from v1.4.12, Buffer_Clear / Buffer_Set from v1.4.13, Time_Scale / Target_Time_Scale / Stage_Freeze from v1.7.0, Var_Reset_Set and New_Var's Reset from v1.7.4, Hitbox_Hold from v1.7.5) lists all of them in one
 group, **New Commands**, at the top of the list (vanilla commands stay in their own groups), in subgroups:
 
 | Subgroup | Commands |
 |---|---|
-| Hitboxes & hits | Extra_Special_Hitbox, Extra_Extended_Special_Hitbox, Hit_Check, Hit_Get, Hit_Reset, Hit_Log_Clear |
+| Hitboxes & hits | Extra_Special_Hitbox, Extra_Extended_Special_Hitbox, Hit_Check, Hit_Get, Hit_Reset, Hit_Log_Clear, Hitbox_Hold |
 | Fighter state | Status_Get / _Set, Hitstun_Get / _Set, Hitstop_Set, Damage_Get / _Set, Body_State_Set, Armor_Set, Item_State_Set, Stage_Collision_Set, Leave_Ground_Cancel, Gravity_Set |
 | Inputs | Input_Compare, Input_Get, Input_Set, Buffer_Clear, Buffer_Set |
 | Position & rotation | Position_Get / _Set, Position_Place, Position_Offset_Get, Rotation_Get / _Set, Joint_Position_Get, Line_Test |
@@ -29,6 +29,7 @@ them too.
 | Command | Does |
 |---|---|
 | `Extra_Special_Hitbox` / `Extra_Extended_Special_Hitbox` | hitboxes with hitstun / hitstop / DI extras; Damage / Angle / KBG / FKB / BKB / Size from variables (exe_v43, Sm4shCommand v1.4.11: below) |
+| `Hitbox_Hold` | a hitbox whose hits keep the victim in place (no knockback travel; damage, hitstun, hitlag kept): the rapid-jab setting the port pipeline gives Ultimate's setoff-off rapid-jab hits (exe_v46y_hold, Sm4shCommand v1.7.5: "Hitbox_Hold" below) |
 | `Track_Target` | homing on the nearest fighter |
 | `Thread_Start` / `Thread_Stop` | a block that runs on its own |
 | `Input_Compare` / `Input_Get` / `Input_Set` | a fighter's buttons and sticks |
@@ -1240,3 +1241,39 @@ doesn't load on an older one (port_check X6).
   in; exit: the energy's own put back), the damage reaction decision (a hit that takes effect ends it) and, through
   Leave_Ground_Cancel's status change hook, the status change. Details: `docs/native-notes.md`, "Gravity_Set".
 - Addresses: `docs/native-notes.md`, "New ACMD commands".
+
+## Hitbox_Hold (exe_v46y_hold, Sm4shCommand v1.7.5)
+
+`Hitbox_Hold(ID, Mode)`, after a hitbox command (same frame), makes that hitbox's hits keep the victim where it is: the
+launch speed the hit gives (knockback x 0.03 along the angle) is 0. Damage, hitstun (an Extra hitbox's HitstunMul
+too), hitlag, SDI, the reaction animation, the sound and effect are the hit's own.
+
+| Mode | |
+|---|---|
+| 0 | off (the game's knockback travel) |
+| 1 | ground hold: a victim on the ground that the hit doesn't launch upward (361 under 60 knockback: 0 degrees; 0 / 180; downward) stays; upward launches and victims in the air go as normal. The rapid-jab setting. |
+| 2 | always: no victim moves, ground or air (gravity still acts; a big hit still tumbles in place) |
+
+- **ID**: the hitbox's ID (Smash 4 keeps one hitbox per ID; Part doesn't pick one). -1: every hitbox ID of the object.
+- **Lifetime**: it belongs to the hitbox. The next hitbox command with that ID starts without it; removing the hitboxes
+  takes it away. A loop that remakes its hitboxes gives Hitbox_Hold again after each. Change_Hitbox_Damage / _Size keep it.
+- **Not held**: the victim's own movement, SDI, slopes, pushing; shield pushback (a shielded hit is unchanged).
+- **The port pipeline** (`tools/ultimate_acmd.py`, the default since rapid_setoff v1): every Ultimate hit with
+  `ATTACK_SETOFF_KIND_OFF`, angle 361, no set knockback, KBG and BKB 30 or less and damage (a rapid-jab loop) keeps 361
+  and gets `Hitbox_Hold(ID, 1)`. v17's angle-80 workaround only with `--hold-angle` (port.json `"rapid_hold": "angle"`),
+  for an executable without the cave. `port_check` S28 / X8.
+- **What Ultimate's setoff is** (read from its ExeFS, docs/native-notes.md "Hitbox hold"): the clank kind (ON clanks
+  and rebounds, OFF clanks without being cancelled, THRU never clanks, NO_STOP clanks with no clank hitlag), which
+  Smash 4's Clang / Rebound already carry. It doesn't move or hold the victim; this command is the Smash 4 setting that
+  keeps a rapid jab's victim in reach.
+
+```
+FRAME(Frames=2)
+Extra_Special_Hitbox(ID=0, ..., Damage=0.4, Angle=361, KBG=10, FKB=0, BKB=12, ..., HitstunMul=-3, ...)
+Hitbox_Hold(ID=0, Mode=1)
+WAIT(Frames=1)
+Remove_All_Hitboxes()
+```
+
+Sm4shCommand has four complete examples (a rapid-jab loop hit, a holding drill, the same hit without it, every hitbox
+at once). How it works in the executable: docs/native-notes.md "Hitbox hold"; test `tools/hitbox_hold_test.py`.
