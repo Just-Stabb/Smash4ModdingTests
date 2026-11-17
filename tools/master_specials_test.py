@@ -76,6 +76,13 @@ HOLD1, HOLD2, BOWFLARE2 = 0x347004E, 0x347004F, 0x3470051
 CAPTURE = 0xBD
 
 
+# v18: vl group 7 (x, y, w, h along his facing from his position, world units): 0 the normal ledge box (Ultimate's
+# cliff_hang_data[0]: ultimate_vl_shapes.ledge_box), 2 the tether box (cliff_hang_data[3], master's AIR_LASSO), 3 the
+# ZSS's (kept), 4 the box his air up special starts with (cliff_hang_data[1], the common AIR_LASSO):
+# ultimate_vl_shapes.tether_box
+BOXES = {0: (0.0, 7.5, 16.0, 18.5), 2: (-44.0, 20.0, 88.0, 65.0), 3: (-15.0, 10.0, 65.0, 80.0), 4: (-5.0, -35.0, 80.0, 120.0)}
+
+
 def check(name, ok, detail=''):
     print('%s %s%s' % ('ok  ' if ok else 'FAIL', name, (': ' + detail) if detail and not ok else ''))
     if not ok:
@@ -115,6 +122,8 @@ class Game:
         self.fx = []               # v12: EffectModule(0x2710, id, bone, x, y, ...) requests: (id, world x, world y)
         self.rot = 1.0             # v16: the model's facing (PostureModule +0x64 / 90: update_rot_y_lr sets it to lr)
         self.stick_x = 0.0         # v16: ControlModuleF(0), the stick's X on screen
+        self.ledge = None          # v18: a ledge (world x, y, its hang direction: GroundModuleF(7))
+        self.box = None            # v18: the vl group 7 entry GroundModule(0x2712, n) chose last
 
     def take(self):
         """the self moves since the last call (applied as they were written): (forward, up)"""
@@ -182,7 +191,26 @@ class Game:
             return 0
         if sid == 0xF and a == [0]:                          # v16: ControlModuleF(0): the stick's X
             return f2i(self.stick_x)
+        if sid == 0x1A and a and a[0] == 0x2712:             # v18: GroundModule(0x2712, n): the ledge box used
+            self.box = a[1]
+            return 0
+        if sid == 0x1A and a in ([0x2724], [0x2725]):        # v18: is_status_cliff / can_entry_cliff (func_99)
+            return int(self.ledge_in_box())
+        if sid == 0x1B and a == [7]:                         # v18: GroundModuleF(7): the ledge's hang direction
+            return f2i(self.ledge[2] if self.ledge else 0.0)
+        if sid == 0x1B and a == [1]:                         # v18: GroundModuleF(1): the ledge's x
+            return f2i(self.ledge[0] if self.ledge else 0.0)
         return 0
+
+    def ledge_in_box(self):
+        """v18: a ledge (x, y, hang dir) inside vl group 7's entry self.box (x, y, w, h along the facing, from his
+        position: ultimate_vl_shapes.tether_box), the boxes as BOXES holds them"""
+        if not self.ledge or self.box not in BOXES:
+            return False
+        bx, by, bw, bh = BOXES[self.box]
+        fx = (self.ledge[0] - self.x) * self.lr
+        fy = self.ledge[1] - self.y
+        return bx <= fx <= bx + bw and by <= fy <= by + bh
 
     def line_test(self, mode):
         """tools/line_test_cave.py's LINE_* answer (Space 0: X along his facing from his position), one wall / ceiling"""
@@ -907,12 +935,13 @@ def v10(path):
             end and abs(end[0] - want_end[0]) < 0.01 and abs(end[1] - want_end[1]) < 0.01
             and abs(gm.x - want_on[0]) < 0.01 and abs(gm.y - want_on[1]) < 0.01, 'end %s, on (%g, %g)' % (end, gm.x, gm.y))
     # 3. the ledge boxes by frame
-    for f, box in ((13.0, 0), (15.0, 2)):
+    # (v18: before 15 the box Ultimate's init selects, the common AIR_LASSO (entry 4), not v10's normal box, entry 0)
+    for f, box in ((12.0, 4), (13.0, 4), (14.0, 4), (15.0, 2), (16.0, 2)):
         b, gm = setup(f)
         gm.lasso = True
         b.call('master_hi_air_loop')
         sel = [a for s, a in gm.calls if s == 0x1A and a and a[0] == 0x2712]
-        check('v10 the ledge box at frame %g: entry %d' % (f, box), (not sel and box is None) or (sel and sel[-1][1] == box),
+        check('v18 the ledge box at frame %g: entry %d' % (f, box), (not sel and box is None) or (sel and sel[-1][1] == box),
               str(sel))
     # 4. Aymr's landings: (frame, landed?) -> what
     for f, want, what in ((40.0, 'ground', 'INHERIT_LANDING_1: the ground motion'), (52.0, 0x259, 'before the hop: Landing2'),
@@ -992,6 +1021,156 @@ def v16(path):
           b.g('master_phase') == 0 and not [a for s, a in gm.calls if s == 0x14 and a == [2]])
 
 
+def v18(path):
+    """v18 (README "Status: v18"): the up special's ledge boxes and the ledge before the wall; Aymr's armor every frame"""
+    def setup(frame, lr=1.0):
+        b, gm = Byleth(path), Game()
+        b.vm.game = gm
+        b.g('global18', 2)
+        b.g('global19', 2)
+        b.g('master_wall_jumps', 0)
+        gm.frame, gm.lr = frame, lr
+        return b, gm
+    # 1. the air up special's main selects Ultimate's init box (the common AIR_LASSO, entry 3) before the loop
+    b, gm = setup(0.0)
+    b.call('master_hi_air_main')
+    sel = [a[1] for s, a in gm.calls if s == 0x1A and a and a[0] == 0x2712]
+    check('v18 the air up special starts with the box Ultimate\'s init selects (entry 4)', sel and sel[-1] == 4, str(sel))
+    # 2. the clip's attempt (user v17, clip 75dbb69e frames 186 - 191): the ledge 16 ahead, 43 up during the check window
+    for f, ledge, want, what in ((12.0, (16.0, 43.0), True, 'the clip\'s ledge (16 ahead, 43 up) at 12'),
+                                 (13.0, (60.0, 70.0), True, 'a ledge 60 ahead, 70 up at 13 (the common AIR_LASSO reach)'),
+                                 (13.0, (16.0, -20.0), True, 'a ledge 16 ahead, 20 below at 13'),
+                                 (13.0, (90.0, 40.0), False, 'a ledge 90 ahead at 13 (past 75)'),
+                                 (15.0, (16.0, 43.0), True, 'the clip\'s ledge at 15 (the tether box)'),
+                                 (15.0, (60.0, 70.0), False, 'a ledge 60 ahead at 15 (the tether box: 44)')):
+        b, gm = setup(f)
+        gm.lasso = True
+        gm.ledge = (gm.x + ledge[0], gm.y + ledge[1], -1.0)
+        b.call('master_hi_air_loop')
+        check('v18 up special: %s -> the ledge (0xF2) %s' % (what, 'yes' if want else 'no'), (0xF2 in gm.status) == want,
+              'statuses %s, box %s' % ([hex(s) for s in gm.status], gm.box))
+    # v17's box at 13 (entry 0) would have missed the clip's ledge
+    gm = Game()
+    gm.box, gm.ledge = 0, (16.0, gm.y + 43.0, -1.0)
+    check('v18 (v17\'s entry 0 at 12 - 14 misses the clip\'s ledge)', not gm.ledge_in_box())
+    # 3. a wall and a ledge both in reach: the ledge (the wall under its corner is not latched); no ledge: the latch
+    for ledge, want in (((14.0, 62.0), 0xF2), (None, 0x15B)):
+        b, gm = setup(19.0)
+        gm.wall_x = 14.0
+        gm.box = 2                                       # selected from 15 on and kept
+        gm.ledge = (gm.x + ledge[0], gm.y + ledge[1], -1.0) if ledge else None
+        b.call('master_hi_air_loop')
+        check('v18 the tip meets a wall at 19 %s -> %s' % ('under a catchable ledge' if ledge else 'with no ledge',
+              'the ledge (0xF2), no latch' if want == 0xF2 else 'the latch (0x15B)'),
+              want in gm.status and (0x15B not in gm.status if want == 0xF2 else True),
+              'statuses %s' % [hex(s) for s in gm.status])
+    # a ledge behind the wall's side but not catchable (its hang direction the wrong way) -> the latch
+    b, gm = setup(19.0)
+    gm.wall_x, gm.box = 14.0, 2
+    gm.ledge = (gm.x + 14.0, gm.y + 62.0, 1.0)
+    b.call('master_hi_air_loop')
+    check('v18 a ledge in the box facing away (not catchable) -> the wall latch', 0x15B in gm.status and 0xF2 not in gm.status,
+          str([hex(s) for s in gm.status]))
+    # 4. Aymr's armor every frame of 34 - 63 (mode 3, 30), off at 64, both situations; through a turn past 34; ends
+    for air in (False, True):
+        b, gm = Byleth(path), Game()
+        b.vm.game = gm
+        sit = 2 if air else 0
+        b.g('global18', sit)
+        b.g('global19', sit)
+        b.g('global4', 0x155)
+        gm.situation = sit
+        b.call('master_lw_main')
+        on, off = [], []
+        for f in range(0, 64 if not air else 100):
+            gm.frame = float(f)
+            gm.calls.clear()
+            b.call('master_lw_loop')
+            for s, a in gm.calls:
+                if s == 0x24 and a and a[0] == 0xB:
+                    (on if a[1] == 3 and abs(i2f(a[2]) - 30.0) < 1e-4 else off).append(f)
+        want_on = list(range(34, 64))
+        check('v18 Aymr %s: armor (damage-based, 30) put on every frame 34 - 63' % ('air' if air else 'ground'),
+              sorted(set(on)) == want_on, 'on %s' % on)
+        check('v18 Aymr %s: the armor taken off when the window ends, not before 34' % ('air' if air else 'ground'),
+              (64 in off or air is False) and not [f for f in off if f < 34], 'off %s' % off)
+    # a turn at 38 (in the window) keeps the armor through the turn motion; a turn at 20 has none in it, then on past 34
+    for turn_at, want_turn_armor in ((38.0, True), (20.0, False)):
+        b, gm = Byleth(path), Game()
+        b.vm.game = gm
+        b.g('global18', 0)
+        b.g('global19', 0)
+        b.g('global4', 0x155)
+        gm.situation = 0
+        b.call('master_lw_main')
+        b.g('master_flag', 0)
+        gm.frame, gm.stick_x = turn_at, -1.0
+        b.call('master_lw_loop')
+        gm.stick_x = 0.0
+        armored = []
+        for f in range(1, 12):
+            gm.frame = float(f)
+            gm.end = f == 11
+            gm.calls.clear()
+            b.call('master_lw_loop')
+            armored.append(any(s == 0x24 and a[:2] == [0xB, 3] for s, a in gm.calls))
+        check('v18 Aymr turned at %g: armor %s through the turn motion' % (turn_at, 'kept' if want_turn_armor else 'not on'),
+              all(armored[:-1]) if want_turn_armor else not any(armored[:-1]), str(armored))
+    b, gm = Byleth(path), Game()
+    b.vm.game = gm
+    b.call('master_lw_end')
+    check('v18 Aymr: the status end takes the armor off', [a[:2] for s, a in gm.calls if s == 0x24] == [[0xB, 0]])
+    v18_rapid()
+
+
+def v18_rapid():
+    """v18: the rapid-jab loop as ultimate_acmd translates Ultimate's Attack100 (HOLD_WAVE_CLEAR) and master_build.rapid_v18
+    makes the installed one: 6 waves a loop at Ultimate's frames 2 / 5 / ... / 17, each Hit_Log_Clear(0) first, its two
+    hits (IDs 0 / 1, Part 0, 0.4 %, 361) with Hitbox_Hold(ID, 1) and Ultimate's hitlag (2) as fixed hitstop frames on both
+    sides, removed the next frame (Ultimate's 1-frame hits); the hitlag rule; port_check S30 on both"""
+    import acmd
+    import ultimate_acmd as U
+    import master_build as MB
+    check('v18 ult_hitlag: the rapid jab\'s 0.4 % x 0.4 -> 2 frames; a 3 % hit x 1 -> 7', U.ult_hitlag(0.4, 0.4) == 2
+          and U.ult_hitlag(3.0, 1.0) == 7)
+    try:
+        import port_sources
+        dump = os.path.join(port_sources.load().dump('master'), 'master', 'Attack100.txt')
+        body = U.functions(open(dump).read())['game_attack100']
+    except Exception as e:             # noqa: BLE001
+        check('v18 rapid jab: Ultimate\'s Attack100 dump found', False, str(e))
+        return
+
+    def waves(cmds):
+        out, frame, cur = [], None, None
+        for k, c in enumerate(cmds):
+            if c.name == 'FRAME':
+                frame = float(c.params[0])
+            if c.name == 'Hit_Log_Clear':
+                cur = dict(frame=frame, clear=c.params[0], hits=[], removed=None)
+                out.append(cur)
+            if c.name in ('Extra_Special_Hitbox',) and cur is not None:
+                d = dict(zip(c.info['syntax'], c.params))
+                held = k + 1 < len(cmds) and cmds[k + 1].name == 'Hitbox_Hold' and cmds[k + 1].params == [d['ID'], 1]
+                cur['hits'].append((d['ID'], d['Part'], round(d['Damage'], 3), d['Angle'], d['HitstopFrames'],
+                                    d['SelfHitstopFrames'], round(d['HitstunMul'], 3), held))
+            if c.name == 'WAIT' and cur is not None and cur['removed'] is None:
+                cur['removed'] = c.params[0]
+        return out
+    want = [dict(frame=f, clear=0, hits=[(0, 0, 0.4, 361, 2, 2, -3.0, True), (1, 0, 0.4, 361, 2, 2, -3.0, True)], removed=1)
+            for f in (2.0, 5.0, 8.0, 11.0, 14.0, 17.0)]
+    tr = U.Translator({})
+    got = waves(tr.script(body))
+    check('v18 translator: Attack100 -> 6 waves (2 - 17), each Hit_Log_Clear(0) then IDs 0 / 1 held, hitstop 2 / 2, '
+          '+3 hitstun, removed after 1 frame', got == want, str(got[:2]))
+    S = os.environ.get('BYLETH_GAME_BIN')
+    if S and os.path.exists(S):
+        g = acmd.ACMDFile.load(S)
+        check('v18 the installed attack100 (BYLETH_GAME_BIN) has the same waves', waves(g.scripts[acmd.crc('attack100')])
+              == want, str(waves(g.scripts[acmd.crc('attack100')])[:2]))
+        check('v18 rapid_v18 is idempotent on it', MB.rapid_v18(g) == [])
+
+
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else compiled()
     failnaught(path)
@@ -1001,6 +1180,7 @@ def main():
     v15_scripts()
     v16(path)
     v17_static()
+    v18(path)
     print('\n%d problem(s)' % len(PROBLEMS))
     sys.exit(1 if PROBLEMS else 0)
 

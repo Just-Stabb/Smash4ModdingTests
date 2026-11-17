@@ -576,8 +576,12 @@ True(Offset=0){
 `Hit_Log_Clear(Part)` makes this object forget which fighters its hitboxes of that `Part` have hit, so
 the same hitboxes can hit them again, as a new attack would. `Part=-1` clears every part. Unlike
 `Hit_Reset`, this is the game's "already hit this fighter" record itself: each Part has one, shared
-by the hitboxes with that Part number, and it stays through `Remove_All_Hitboxes` and new hitboxes
-until the move (status) ends.
+by the hitboxes with that Part number. It stays while the Part's hitboxes stay (a hitbox command on an ID that is
+still out, same Part, keeps it), and the game's set_attack clears it when a hitbox ID that is not out is set again on
+that Part (`0x02C08848`; in unicorn on exe_v46y_hold, with the per-ID set-up `0x02C108C4` stubbed: `Remove_All_Hitboxes`
+then the same IDs -> the record gone; not confirmed in game, and Sm4shCommand's help still says it stays). A hitbox that stays out (a sweeping orb, a lingering box) needs this command to hit again; a loop that
+re-makes its hitboxes each wave gets it anyway, and uses it to be sure (the port pipeline's holding multi-hits, Byleth
+v18).
 
 A Part the object doesn't have does nothing. **Fighters have hitbox IDs 0-9 and Parts 0-19; Zelda's
 Din's Fire and the new articles copied from it (`tools/extra_kinds.json` `"base": "dein"`) only IDs
@@ -1260,7 +1264,9 @@ too), hitlag, SDI, the reaction animation, the sound and effect are the hit's ow
 - **Not held**: the victim's own movement, SDI, slopes, pushing; shield pushback (a shielded hit is unchanged).
 - **The port pipeline** (`tools/ultimate_acmd.py`, the default since rapid_setoff v1): every Ultimate hit with
   `ATTACK_SETOFF_KIND_OFF`, angle 361, no set knockback, KBG and BKB 30 or less and damage (a rapid-jab loop) keeps 361
-  and gets `Hitbox_Hold(ID, 1)`. v17's angle-80 workaround only with `--hold-angle` (port.json `"rapid_hold": "angle"`),
+  and gets `Hitbox_Hold(ID, 1)`. Since Byleth v18 (HOLD_WAVE_CLEAR) each such wave also starts with
+  `Hit_Log_Clear(Part)` and its hits are Extra hitboxes with Ultimate's hitlag as fixed frames for both sides
+  (HitstopFrames / SelfHitstopFrames = `ultimate_acmd.ult_hitlag`; `port_check` S30). v17's angle-80 workaround only with `--hold-angle` (port.json `"rapid_hold": "angle"`),
   for an executable without the cave. `port_check` S28 / X8.
 - **What Ultimate's setoff is** (read from its ExeFS, docs/native-notes.md "Hitbox hold"): the clank kind (ON clanks
   and rebounds, OFF clanks without being cancelled, THRU never clanks, NO_STOP clanks with no clank hitlag), which

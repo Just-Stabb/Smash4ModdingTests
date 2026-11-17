@@ -158,6 +158,21 @@ HOLD_MODE = 'hold'
 HOLD_SETTING = 1
 HOLD_ANGLE = 80
 HOLD_MAX_KB = 30
+# (Byleth v18: "the rapid jab still doesn't work ... how often the hitbox refreshes": one hit per 19-frame loop in the
+# user's clip, Ultimate's 6) every holding hit also (1) starts with Hit_Log_Clear of its Part, so each wave's hits
+# have a new hit record whatever the slot held before (Ultimate's clear_all + ATTACK makes a new attack each wave), and
+# (2) carries Ultimate's hitlag as fixed frames for both sides (Extra hitbox HitstopFrames / SelfHitstopFrames =
+# ult_hitlag: floor((damage x 0.65 + 6) x hitlag multiplier), 2 for the rapid jab's 0.4 % x 0.4), so the victim is never
+# still in its hitstop when the next wave (3 frames on, in the attacker's time) arrives: a hit on a fighter in hitstop
+# is lost (Sephiroth test 112), and the attacker's own hitstop was 0 in the clip (the loop kept its 19 frames).
+# port_check S30 rapid-cadence
+HOLD_WAVE_CLEAR = True
+
+
+def ult_hitlag(dmg, mul):
+    """Ultimate's hitlag frames for a hit: floor((damage x 0.65 + 6) x the hitbox's multiplier), at least 1"""
+    import math
+    return max(1, int(math.floor((float(dmg) * 0.65 + 6.0) * float(mul))))
 
 
 def holding(angle, kbg, fkb, bkb, setoff, dmg):
@@ -653,6 +668,7 @@ class Translator:
         self.made = []             # the commands made so far (the same objects as in cmds)
         self.frame, self.events = 0.0, []
         self.vec_targets, self.raw_hitboxes = [], {}
+        self._wave_cleared = set()  # v18: (frame, Part) already given Hit_Log_Clear before its holding hits
         live = [True]              # a stack of "this block runs"
         taken = [False]
         dyn = []                   # dynamic ifs open: [where its compare goes, where its Else goes or None]
@@ -744,6 +760,9 @@ class Translator:
             if c.name in extra and int(c.params[0]) == hid:
                 c.ident = acmd.BY_NAME[extra[c.name].lower()]
                 c.params = list(c.params) + [-frames, 0.0, 0, 0.0, 0, 0.0]
+                return []
+            if c.name in extra.values() and int(c.params[0]) == hid:     # v18: already Extra (a holding hit's hitlag)
+                c.params[c.info['syntax'].index('HitstunMul')] = -frames
                 return []
         self.skip('AttackModule::set_add_reaction_frame (no hitbox %d)' % hid)
         return []
@@ -866,6 +885,18 @@ class Translator:
         if set_weight:
             out.append(cmd('Set_Weight_Hitbox', int(hid), 1))
         if HOLD_MODE == 'hold' and holding(angle, kbg, fkb, bkb, setoff, dmg):
+            if HOLD_WAVE_CLEAR:
+                hf = ult_hitlag(dmg, hitlag)
+                extra = {'Special_Hitbox': 'Extra_Special_Hitbox', 'Extended_Special_Hitbox': 'Extra_Extended_Special_Hitbox'}
+                h = out[0]
+                h.ident = acmd.BY_NAME[extra[h.name].lower()]
+                h.params = list(h.params) + [0.0, 0.0, hf, 0.0, hf, 0.0]
+                key = (self.frame, int(part))
+                cleared = getattr(self, '_wave_cleared', set())
+                if key not in cleared:
+                    out.insert(0, cmd('Hit_Log_Clear', int(part)))
+                    cleared.add(key)
+                    self._wave_cleared = cleared
             out.append(cmd('Hitbox_Hold', int(hid), HOLD_SETTING))
         return out
 

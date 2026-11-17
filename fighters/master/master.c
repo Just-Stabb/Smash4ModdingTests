@@ -38752,6 +38752,10 @@ void master_hi_air_main()
         GroundModule(0x2712, var1);
         WorkModule(0x1a, 0x1f000009);
     }
+    // v18: Ultimate's init (lua2cpp f_7208a1e220) selects the common AIR_LASSO hang data in the air (cliff_hang_data[1]:
+    // -5 - 75 ahead, -35 - 85 up) before the loop runs: vl group 7 entry MASTER_HI_INIT_BOX (v10 - v17 checked the
+    // normal box, entry 0, on 12 - 14: user v17 "the tether detection for ledges is too strict")
+    GroundModule(0x2712, MASTER_HI_INIT_BOX);
     KineticModule(0x11, 0x1, MASTER_HI_START_Y);       // Ultimate's start_speed_y_air
     func_78(master_hi_air_loop);
 }
@@ -38789,11 +38793,13 @@ void master_hi_air_loop()
     // a ledge at his hands is taken at once); SpecialAirHi's select_cliff_hangdata(AIR_LASSO) at 15 changes it to the
     // tether box (vl group 7 entry 2: Ultimate's cliff_hang_data[3] in world units, README "v10: the ledge box") for
     // the check's last two frames (v9: the tether box on all of 12 - 16, user: "too large")
+    // v18: before 15 the box Ultimate's init selected (the common AIR_LASSO, entry MASTER_HI_INIT_BOX), not the normal
+    // one (v10 - v17's entry 0: 16 ahead, 7.5 - 26 up, "too strict")
     if (WorkModule(0x2712, 0x2100000d))
     {
         if (MotionModuleF(0x1) < MASTER_HI_LASSO_BOX)
         {
-            GroundModule(0x2712, 0);
+            GroundModule(0x2712, MASTER_HI_INIT_BOX);
         }
         else
         {
@@ -38969,6 +38975,14 @@ int master_hi_line(float f)
     if (WorkModuleF(0, 0x0f0003d4) == 0.0f)
     {
         return 0;
+    }
+    // v18: a ledge first (user v17: "up special prioritizes walls over ledges"; Ultimate catches the ledge in its
+    // AIR_LASSO window before the sword reaches anything): a wall met while a ledge is in the tether box (entry 2,
+    // selected from 15 and kept) and catchable is the ledge's corner -> the ledge (her tether's 0xF2), not the latch
+    if (func_99() == 0x1 && global18 == 0x2)
+    {
+        func_16(0xf2, 0);
+        return 0x1;
     }
     lr = PostureModuleF(0);
     master_tx = PostureModuleF(0x1) + WorkModuleF(0, 0x0f0003d6) * lr;
@@ -39973,16 +39987,9 @@ void master_lw_loop()
     {
         return;
     }
+    master_lw_armor(f);                     // v18: every frame (v1 - v17: once, on frame 34's window)
     if (master_phase == 0)
     {
-        if (f >= MASTER_LW_ARMOR_START && f < MASTER_LW_ARMOR_START + 1.0f)
-        {
-            DamageModule(0xb, 0x3, MASTER_LW_ARMOR);
-        }
-        if (f >= MASTER_LW_ARMOR_END && f < MASTER_LW_ARMOR_END + 1.0f)
-        {
-            DamageModule(0xb, 0, 0);
-        }
         // v7: Ultimate's PIERCE_GROUND (frames 64 - 65): the axe meets the floor under him -> SpecialLwHit (the axe
         // stuck, its shock hits and the floor impact); APPROXIMATED: "the floor under him" = he is on the ground
         // (Ultimate's ray from the axe: ray_check_start / finish_offset)
@@ -40023,6 +40030,33 @@ void master_lw_loop()
     if (MotionModule(0x2712))
     {
         master_finish();
+    }
+}
+
+// v18: Aymr's super armor (Ultimate: SpecialLw / SpecialAirLw's START_SUPER_ARMOR 34 - END_SUPER_ARMOR 64, its status
+// code's set_no_reaction_mode_status with param_special_lw super_armor_damage_max 30): put back every frame of the window
+// (as Sephiroth's held Octaslash, edge_hi_armor), on the move's own timeline (the turn keeps it: its frame is
+// master_frame), so nothing that resets the status's armor slot in between (a landing's motion change, a hit's
+// reaction path, the turn) leaves him without it; off outside it and in the floor hit / landings (master_lw_end on
+// every exit). User v17: "down special doesn't have its super armor from Ultimate"
+void master_lw_armor(float f)
+{
+    float t;
+    t = f;
+    if (master_phase == 0x4)
+    {
+        t = master_frame;
+    }
+    if ((master_phase == 0 || master_phase == 0x4) && t >= MASTER_LW_ARMOR_START && t < MASTER_LW_ARMOR_END)
+    {
+        DamageModule(0xb, 0x3, MASTER_LW_ARMOR);
+        master_flag = master_flag | 0x8;    // armored (Lw: 0x2 turned, 0x4 the hop)
+        return;
+    }
+    if (master_flag & 0x8)
+    {
+        DamageModule(0xb, 0, 0);
+        master_flag = master_flag - 0x8;
     }
 }
 

@@ -207,6 +207,11 @@ CONSTS = dict(
     # AIR_LASSO_FLAG_CHECK's frames before SpecialAirHi's select_cliff_hangdata (15), the AIR_LASSO box (entry 2) from
     # there to the flag's end (17)
     MASTER_HI_SOFT_REACH='10.5f', MASTER_HI_WJ_STOP='13.0f', MASTER_HI_LASSO_BOX='15.0f',
+    # (v18) the box Ultimate's SpecialAirHi init selects before the loop (lua2cpp f_7208a1e220: select_cliff_hangdata in
+    # the air, the common FIGHTER_CLIFF_HANG_DATA_AIR_LASSO = his cliff_hang_data[1], (-5, -35) - (75, 85)): vl group 7
+    # entry 4 (ultimate_vl_shapes.tether_box(vl, 1), master_build.vl_v18; entry 3 is ZSS's, kept), on AIR_LASSO_FLAG_CHECK's frames
+    # before 15 (v10 - v17 had the normal box, entry 0, there)
+    MASTER_HI_INIT_BOX='0x4',
     # (v10) Aymr: SpecialAirLw's KineticModule::add_speed (0, 1) at 53 (the translator drops it: no hop, he landed
     # inside 53 - 60 and lost the hit) and the end of its hitbox (67): a landing from the hop to there keeps the air
     # motion and its hit (Ultimate: the hop, then FORBID_LANDING 60 - 65)
@@ -1155,6 +1160,91 @@ def vl_fix(a, pkg):
     open(path, 'wb').write(vf.build())
     log.append('vl motion bytes (0x211 - 0x25C): %d changed: %s' % (len(changed), ', '.join(changed)))
     log.append('vl: the shot\'s params (his arrows): %s' % ', '.join('%s=%s' % kv for kv in SHOT_PARAMS.items()))
+    return log
+
+
+def rapid_v18(game):
+    """v18: the rapid-jab loop (attack100) as ultimate_acmd now translates a holding multi-hit (HOLD_WAVE_CLEAR): each
+    wave starts with Hit_Log_Clear of its hits' Part, and each holding hit carries Ultimate's hitlag as fixed frames
+    (HitstopFrames / SelfHitstopFrames = ultimate_acmd.ult_hitlag(damage, hitlag)); on the installed game.bin (the
+    rest of the script as shipped). Idempotent. -> log lines"""
+    import ultimate_acmd as U
+    h = acmd.crc('attack100')
+    out, log, cleared = [], [], set()
+    frame = None
+    cmds = game.scripts[h]
+    for k, c in enumerate(cmds):
+        if c.name == 'FRAME':
+            frame = c.params[0]
+        nxt = cmds[k + 1] if k + 1 < len(cmds) else None
+        if c.name in ('Extra_Special_Hitbox', 'Extra_Extended_Special_Hitbox') and nxt is not None \
+                and nxt.name == 'Hitbox_Hold':
+            syn = c.info['syntax']
+            d = dict(zip(syn, c.params))
+            part = int(d['Part'])
+            if (frame, part) not in cleared:
+                cleared.add((frame, part))
+                if not (out and out[-1].name == 'Hit_Log_Clear' and out[-1].params[0] == part):
+                    out.append(acmd.Command(acmd.BY_NAME['hit_log_clear'], [part]))
+                    log.append('attack100 frame %g: Hit_Log_Clear(%d)' % (frame, part))
+            hf = U.ult_hitlag(d['Damage'], d['Hitlag'])
+            for key in ('HitstopFrames', 'SelfHitstopFrames'):
+                if c.params[syn.index(key)] != hf:
+                    c.params[syn.index(key)] = hf
+                    log.append('attack100 frame %g ID %d: %s %d' % (frame, d['ID'], key, hf))
+        out.append(c)
+    game.scripts[h] = out
+    return log
+
+
+# v18: motion slots that play a copy of another Ultimate move's scripts (Ultimate has no motion of their own: no
+# motion_list cancel to read) take that move's cancel frame; v1 - v17 kept ZSS's there (her angled forward tilts: 29,
+# his attack_s3: 36). The dodges (spot dodge / rolls) take Ultimate's motion_list cancel frame too (ZSS's 25 / 28 / 28)
+CANCEL_COPIES = {0x57: 'attacks3', 0x5B: 'attacks3'}
+CANCEL_DODGES = (0x4B, 0x4C, 0x4D)                  # escapen / escapef / escapeb (escapeair: Ultimate's 0, status-driven)
+INIT_BOX = 4                                        # vl group 7 entry: master.c MASTER_HI_INIT_BOX
+
+
+def vl_v18(vl_in, vl_out, ult_dir, mtable):
+    """v18's vl: the cancel bytes of CANCEL_COPIES / CANCEL_DODGES from Ultimate's motion_list, and vl group 7 entry
+    INIT_BOX = Ultimate's cliff_hang_data[1] (the common AIR_LASSO box his air up special's init selects) in the tether
+    box's mapping (ultimate_vl_shapes.tether_box); every other byte kept. -> log lines"""
+    import fighter_param_vl as V
+    import ultimate_acmd as U
+    import ultimate_vl_shapes as UVS
+    import vl_shapes as VS
+    import struct as st
+    hashes = list(st.unpack('>%dI' % (len(mtable) // 4), mtable))
+    ml = U.read_motion_list(os.path.join(ult_dir, 'motion/body/c00/motion_list.bin'))
+
+    def ult_cancel(name):
+        ent = [e for e in ml if U.hash40('game_' + name) in (e['game'],) + tuple(e['scripts'])]
+        return ent[0]['extra'][2] if ent and len(ent[0]['extra']) >= 3 else None
+    vf = V.load(vl_in, 'szerosuit')
+    log = []
+    want = {i: ult_cancel(n) for i, n in CANCEL_COPIES.items()}
+    for i in CANCEL_DODGES:
+        n = [k for k in ('escapen', 'escapef', 'escapeb') if acmd.crc(k) == hashes[i]]
+        assert n, 'slot 0x%X is not a dodge in the motion table' % i
+        want[i] = ult_cancel(n[0])
+    for i, v in sorted(want.items()):
+        assert v, 'no Ultimate cancel for slot 0x%X' % i
+        (_p, tk), = V.find(vf, 'm0[%d].2' % i, '0', {})
+        if tk.value != v:
+            log.append('vl m0[0x%X].2 %d -> %d' % (i, tk.value, v))
+            tk.set(v)
+    data = vf.build()
+    header, groups = VS.parse(data)
+    sh = VS.shapes(groups)
+    boxes = sh['ledge_boxes']
+    box = UVS.tether_box(os.path.join(ult_dir, 'param/vl.prc'), 1)
+    while len(boxes) <= INIT_BOX:
+        boxes.append(dict(boxes[-1]))
+    if boxes[INIT_BOX] != box:
+        log.append('vl group 7 entry %d %s -> %s' % (INIT_BOX, boxes[INIT_BOX], box))
+        boxes[INIT_BOX] = box
+    VS.apply(groups, {'ledge_boxes': boxes})
+    open(vl_out, 'wb').write(VS.build(header, groups))
     return log
 
 

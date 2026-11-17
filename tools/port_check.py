@@ -788,6 +788,48 @@ def check_cancel(inst, name, base, motion_list, rep):
             cancel_at[i] = (n, want)
         if t.value != want:
             wrong.append('0x%X %s %d (Ultimate %d)' % (i, n, t.value, want))
+    # (Byleth v18, user: "many of Byleth's cancel frames seem to be incorrect ... leftovers from Zero Suit Samus"):
+    # (c) a slot that plays a copy of another move's game script (his angled forward tilts: attack_s3's, Ultimate has no
+    # motion of their own, so (a) skipped them and ZSS's 29 stayed) takes that move's cancel; (d) the dodges (spot
+    # dodge, rolls: Ultimate's motion_list has their cancel frames) are the fighter's own too
+    def enc(sc):
+        return [(c.ident, tuple(c.params)) for c in sc if c.ident != acmd.END]
+    games = body.get('game') or {}
+    by_script = {}
+    for i, want in cancel_at.items():
+        sc = games.get(hashes[i])
+        if sc and enc(sc):
+            by_script.setdefault(repr(enc(sc)), []).append((i, want[1]))
+    for i, h in enumerate(hashes):
+        if not h or i in cancel_at or i >= FIRST_OWN_MOTION:
+            continue
+        sc = games.get(h)
+        if not sc or not enc(sc) or not any('Hitbox' in c.name for c in sc):
+            continue
+        src_slots = by_script.get(repr(enc(sc)))
+        if not src_slots:
+            continue
+        w = src_slots[0][1]
+        try:
+            (_p, tk), = V.find(vf, 'm0[%d].2' % i, '0', {})
+        except Exception:
+            continue
+        if tk.value != w:
+            wrong.append('0x%X (plays 0x%X\'s script) %d (Ultimate %d)' % (i, src_slots[0][0], tk.value, w))
+    for n in ('escapen', 'escapef', 'escapeb'):
+        if acmd.crc(n) not in hashes:
+            continue
+        i = hashes.index(acmd.crc(n))
+        ent = [e for e in ml if UA.hash40('game_' + n) == e['game'] or UA.hash40('game_' + n) in e['scripts']]
+        w = ent[0]['extra'][2] if ent and len(ent[0]['extra']) >= 3 else 0
+        if not w:
+            continue
+        try:
+            (_p, tk), = V.find(vf, 'm0[%d].2' % i, '0', {})
+        except Exception:
+            continue
+        if tk.value != w:
+            wrong.append('0x%X %s %d (Ultimate %d)' % (i, n, tk.value, w))
     if wrong:
         rep.add('ERROR', 'C1 cancel-window', 'vl byte 2 (the cancel frame) is not Ultimate\'s: %s' % ', '.join(wrong))
     check_vl_leftovers(inst, name, vf, hashes, ml, ult_of, rep)
@@ -3462,6 +3504,111 @@ def check_rapid_slide(inst, name, rep):
                 '(tools/hitbox_hold_cave.py: exe_v46y_hold or later): the script won\'t load' % ', '.join(sorted(set(uses))))
 
 
+def check_rapid_cadence(inst, name, rep):
+    """S30 rapid-cadence (Byleth v18, user: "the rapid jab still doesn't work ... how often the hitbox refreshes"; the
+    clip: one 0.4 % hit per 19-frame loop where Ultimate lands 6): each wave of a holding multi-hit (the hits S28 finds:
+    Hitbox_Hold after them) must (1) start with Hit_Log_Clear of its Part (Ultimate's clear_all + ATTACK is a new
+    attack each wave) and (2) carry fixed hitstop frames for both sides (an Extra hitbox's HitstopFrames and
+    SelfHitstopFrames > 0: ultimate_acmd.ult_hitlag), so the victim is out of its hitstop when the next wave comes.
+    ERROR for a wave missing either (ultimate_acmd HOLD_WAVE_CLEAR, master_build.rapid_v18)"""
+    import acmd
+    bad = []
+    for rel in inst.glob(r'fighter/%s/script/animcmd/(body|weapon/[^/]+)/game\.bin' % name):
+        game = _acmd_load(inst.get(rel))
+        for h, sc in game.scripts.items():
+            cleared = set()
+            for i, c in enumerate(sc):
+                if c.name in ('FRAME', 'WAIT', 'Remove_All_Hitboxes'):
+                    cleared = set()
+                if c.name == 'Hit_Log_Clear':
+                    cleared.add(c.params[0])
+                if 'Hitbox' not in c.name or c.name == 'Hitbox_Hold' or 'Angle' not in c.info['syntax']:
+                    continue
+                if not (i + 1 < len(sc) and sc[i + 1].name == 'Hitbox_Hold'):
+                    continue
+                d = dict(zip(c.info['syntax'], c.params))
+                why = []
+                if d['Part'] not in cleared and -1 not in cleared and 0xFFFFFFFF not in cleared:
+                    why.append('no Hit_Log_Clear(%d) before it' % d['Part'])
+                if not (d.get('HitstopFrames') or 0) > 0 or not (d.get('SelfHitstopFrames') or 0) > 0:
+                    why.append('no fixed hitstop frames (%s)' % ('a plain hitbox' if 'HitstopFrames' not in d else
+                                                                  'HitstopFrames %s / SelfHitstopFrames %s' % (
+                                                                      d['HitstopFrames'], d['SelfHitstopFrames'])))
+                if why:
+                    bad.append('%s %08X id %d: %s' % (rel.split('/animcmd/')[1], h, d['ID'], ', '.join(why)))
+    if bad:
+        rep.add('ERROR', 'S30 rapid-cadence', 'holding multi-hit waves that may not connect each wave (Byleth v18: one '
+                'hit per loop): %s%s' % ('; '.join(bad[:8]), ' ... (%d)' % len(bad) if len(bad) > 8 else ''))
+
+
+def check_armor(name, rep):
+    """S32 armor (Byleth v18, user: "down special doesn't have its super armor from Ultimate"): Ultimate scripts that
+    turn armor on (a *_FLAG_START_SUPER_ARMOR / *_HEAVY_ARMOR flag, or DamageModule::set_no_reaction_mode_status) need
+    the port's MSC to set the status armor (DamageModule(0xb, 1 - 3, ...)): ERROR with none; WARN when the only sets
+    sit inside a one-frame window of the motion (`f < X + 1.0f`: v1 - v17's Aymr, set once on frame 34; set it every
+    frame of the window instead, as Sephiroth's held Octaslash)"""
+    try:
+        import port_sources
+        d = port_sources.load().dump(port_sources.ult_name(name))
+        dump = os.path.join(d, port_sources.ult_name(name)) if d else None
+    except Exception:              # noqa: BLE001
+        return
+    if not dump or not os.path.isdir(dump):
+        return
+    pat = re.compile(r'(\w*_FLAG_START_SUPER_ARMOR|\w*HEAVY_ARMOR\w*|set_no_reaction_mode_status)')
+    moves = sorted({os.path.basename(f)[:-4] for f in glob.glob(os.path.join(dump, '*.txt'))
+                    if pat.search(open(f, errors='replace').read())})
+    if not moves:
+        return
+    src = os.path.join(ROOT, 'fighters', name, name + '.c')
+    if not os.path.exists(src):
+        return
+    fns = c_functions(open(src, errors='replace').read())
+    sets = [(fn, body) for fn, body in fns.items() if re.search(r'DamageModule\(0xb, 0x[123],', body)
+            and not fn.startswith('func_')]
+    if not sets:
+        rep.add('ERROR', 'S32 armor', 'Ultimate gives armor in %s, but %s sets no status armor (DamageModule(0xb, 1 - 3, '
+                'value)) in the port\'s own functions' % (', '.join(moves), os.path.basename(src)))
+        return
+    windowed = [fn for fn, body in sets if re.search(r'<\s*\w+\s*\+\s*1\.0f\)\s*\n\s*\{\s*\n\s*DamageModule\(0xb, 0x[123],', body)]
+    if windowed and len(windowed) == len(sets):
+        rep.add('WARN', 'S32 armor', 'the armor for %s is only set inside one-frame windows (%s): set it every frame of '
+                'its window' % (', '.join(moves), ', '.join(windowed)))
+
+
+def check_ledge_before_wall(name, rep):
+    """S33 ledge-before-wall (Byleth v18, user: "up special prioritizes walls over ledges now"): an MSC function that
+    runs the stage line test (LINE_* 0x0F0003D4) and changes the status on what it meets (a wall latch) must test the
+    ledge (func_99, the common AirCatch ledge catch) first: Ultimate's tether catches the ledge in its AIR_LASSO window
+    before the sword can latch a wall under its corner. ERROR without it. Also (S13 box): the 0xF1 loop must not narrow
+    the ledge box to the normal one (GroundModule(0x2712, 0)) during the check window (v10 - v17: Ultimate's init
+    selects the AIR_LASSO box)"""
+    src = os.path.join(ROOT, 'fighters', name, name + '.c')
+    if not os.path.exists(src):
+        return
+    text = open(src, errors='replace').read()
+    fns = c_functions(text)
+    bad = []
+    for fn, body in fns.items():
+        if fn.startswith('func_') or '0x0f0003d4' not in body.lower() or 'func_16(' not in body:
+            continue
+        i = body.lower().index('0x0f0003d4')
+        rest = body[i:]
+        j = rest.find('func_16(')
+        if 'func_99()' not in rest[:j]:
+            bad.append(fn)
+    if bad:
+        rep.add('ERROR', 'S33 ledge-before-wall', '%s: the line test\'s status change (a wall latch) without the ledge '
+                'test first (func_99): a ledge in reach loses to the wall under its corner' % ', '.join(bad))
+    own = [m for m in re.finditer(r'sv_set_mem\(0x1, 0x1, 0xf1, (\w+)\)', text) if not re.fullmatch(r'func_\d+', m.group(1))]
+    if own:
+        loops = re.findall(r'func_78\((\w+)\)', fns.get(own[-1].group(1), ''))
+        if any(re.search(r'GroundModule\(0x2712, 0\)', fns.get(lp, '')) for lp in loops):
+            rep.add('ERROR', 'S13 tether-ledge-box', 'the 0xF1 loop selects the normal ledge box (GroundModule(0x2712, 0)) '
+                    'in the tether check window: Ultimate\'s tether status starts with its AIR_LASSO box (Byleth v10 - '
+                    'v17: "too strict")')
+
+
 def _exe_has_hold(inst):
     if 'code/cross_f.rpx' not in inst.files:
         return False
@@ -3701,6 +3848,9 @@ def main():
     check_weapon_twice(inst, a.name, rep)
     check_result_param(inst, a.name, src, rep)
     check_rapid_slide(inst, a.name, rep)
+    check_rapid_cadence(inst, a.name, rep)
+    check_armor(a.name, rep)
+    check_ledge_before_wall(a.name, rep)
     check_article_status_reuse(inst, a.name, rep)
     check_result_faces(inst, a.name, base, vanilla, rep)
     n = rep.show()
