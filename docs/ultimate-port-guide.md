@@ -230,6 +230,22 @@ over the 51 fighters both have:
 - **Jump heights:** Smash 4's full / short hops equal Ultimate's for 48 / 47 of 51 fighters, so the data
   says x1: the default (user's call). Hero / Steve / Squirtle / Sephiroth were made at x0.82 / x0.9 and keep it
   in their port.json (`stats.jump_scale`).
+- **Sizes** (`ultimate_stats.SIZE`, written by the stats step; fighter_sizes_v1). The size in game is fighter_param 44
+  `scale` (the model module's scale at creation, `0x02E53E98`) x the model's own skeleton. The model step carries
+  Ultimate's skeleton 1:1 (no scale in `ultimate_fighter.py`; every root bone, Ultimate's and the converted VBN's,
+  at scale 1: Hero's HeadN 16.89, Sephiroth's 19.04, Incineroar's 16.76 in both), so the port's 44 is Ultimate's
+  fighter_param.prc `scale`. Evidence that the two games' units are the same: of the 57 fighters both have (vanilla
+  fighter_param.bin against fighter_param.prc), scale is equal for 41 and within 4 % for 13 (Samus 1.0 / 0.96, Zelda
+  1.0 / 0.97, Lucina 0.92 / 0.95 ...: Ultimate's own retunes); the only outliers are the three Miis (1.0 / 1.15), whose
+  models differ (Smash 4's Mii body is sized by fighter_param_etc's body table, its c00 head at 10.6); the world-unit
+  stats (jump heights, gravity, camera_range_front) are the same numbers in both. The sizes that follow the fighter:
+  45 shield (drawn on a model joint, MSC func_456: so x 44 in game too) = Ultimate's shield_radius x 0.88 (the median
+  Smash 4 / Ultimate ratio, quartiles 0.84 - 0.95: APPROXIMATED; Ultimate changed shields per fighter), 48 tumble
+  hitbox = 45 x 0.35 (56 of 57), 49 effect_scale and 185 freeze_size = Ultimate's effect_scale / ice_radius (equal
+  for all 57). The vl file's hurtboxes, ECB and ledge boxes are in model units (x 44 in game: a new 44 moves the
+  ledge reach with the body). Not changed (camera framing, not size): the camera boxes 117 - 126, height 97, item boxes.
+  `python3 tools/ultimate_stats.py sizes PRC LABELS FP_IN FP_OUT [NAME ...]` re-applies the sizes alone to an
+  existing fighter_param.bin (every other byte kept: to merge with another change to the same rows). `port_check` P4.
 
 ## Checking effects offline: tools/fx_render.py
 
@@ -462,6 +478,7 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | v17's hold (HOLD_ANGLE 80) not Ultimate's: the loop hits lose Ultimate's own angle (an airborne victim goes up). The user: "can you recreate the Ultimate setting for rapid jabs?" Ultimate's setoff kind itself (AttackData +0x62, ExeFS) is the clank kind, already Clang / Rebound; what holds is the hit having no slide | Byleth v17 | the default since rapid_setoff v1: Ultimate's angle + `Hitbox_Hold(ID, 1)` (`tools/hitbox_hold_cave.py`, exe_v46y_hold: no knockback travel for a grounded victim the hit doesn't lift); v17's angle only with `--hold-angle` / port.json `rapid_hold: "angle"` [S28 rapid-slide: a holding hit without Hitbox_Hold or the old angle; X8 hold-exe: Hitbox_Hold with no executable carrying the cave] |
 | a new kind with no entry in `param/ui/result_param.bin` (keyed by model name: reversed, XOR "Smash"): the results scene uses "missing" (all 0) for its loser panel's camera, the panel is drawn empty | Byleth v1 - v16 (user: "Byleth doesn't appear in the loss character windows"); every new-kind port (Hero, Sephiroth, Incineroar, Steve, Squirtle, Supamario: results_panels_v1) | the `result-param` step, a default of every plan (`tools/result_param.py port`: the base's entry scaled by the head in the lose poses, win frames by the win motions' lengths), shipped with the port in `INSTALL_TO_data_and_data_us_en/` [R2 result-param: ERROR] |
 | a port's result_param.bin built from an older copy than the user's: the one file holds every kind's entry, so it silently drops the entries of the ports since (their panels empty again) | results_panels_v1 (the seven added kinds now share it) | the step reads port_sources `"result_param"` (the newest shipped file) and rewrites only its own entry [R2: ERROR when the shipped file lacks another added kind's entry] |
+| a port's size kept from the base: fighter_param 44 scale (and the shield 45 / 48, effect 49, ice block 185) were the base's, while the model is Ultimate's skeleton 1:1: Incineroar on Bowser's 0.82 (Ultimate 1.0: drawn 18 % small, a Bowser-sized shield / effects / ice block), Hero / Squirtle 1.0 (0.96 / 0.94: 4 / 6 % big), Byleth 1.0 (1.02) | every port up to fighter_sizes_v1 (user: "some of the character sizes for ported characters are incorrect") | `ultimate_stats` SIZE: 44 / 49 / 185 Ultimate's, 45 Ultimate's x 0.88, 48 = 45 x 0.35 (the stats step; `ultimate_stats.py sizes` alone) [P4 size: 44 / 49 / 185 ERROR, 45 / 48 WARN] |
 | the face pac's `display.mta` left as the base's: the results scene draws the poses in that state (v16's per-motion result entries changed nothing in game); ZSS's shows only Mouth_Result, Byleth's sword slot: no mouth, the face's mouth hole drawn black | Byleth v1 - v16 (user, v16: the mouth still missing, male and female winners) | `ultimate_fighter.display_entry` (run by result_faces): the drive's neutral mouth shown, the other mouth slots hidden, the weapon slots at the profile default [F4 display-face] |
 
 ## Open

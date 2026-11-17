@@ -511,7 +511,7 @@ def fp_row(path_or_bytes, kind):
         path = f.name
     else:
         path = path_or_bytes
-    idx = list(range(1, 35)) + [81, 82, 86, 262, 263, 264, 268]
+    idx = list(range(1, 35)) + [44, 45, 48, 49, 81, 82, 86, 185, 262, 263, 264, 268]
     r = subprocess.run([sys.executable, os.path.join(HERE, 'fighter_param.py'), 'get', path, str(kind)] + [str(i) for i in idx],
                        capture_output=True, text=True)
     if isinstance(path_or_bytes, bytes):
@@ -550,6 +550,27 @@ def check_params(inst, name, kind, base, vanilla, ult_param, labels, rep):
                 if i in row and abs(row[i] - float(w[0])) > 0.011 * max(1, abs(float(w[0])))]
         if diff:
             rep.add('WARN', 'P2 stats-ultimate', 'differ from Ultimate\'s (tools/ultimate_stats.py): ' + '; '.join(diff[:12]))
+    # P4 size (fighter_sizes_v1: "some of the character sizes for ported characters are incorrect"): every port up to
+    # then kept its base's fighter_param 44 scale (Incineroar Bowser's 0.82 for Ultimate's 1.0, Hero / Squirtle / Byleth
+    # 1.0 for 0.96 / 0.94 / 1.02) and the base's shield / effect / ice sizes. The model is Ultimate's skeleton 1:1, so the
+    # size in game is 44 x that model: 44 must be Ultimate's scale (ERROR), as must 49 effect_scale and 185 freeze_size
+    # (equal in both games for all 57 shared fighters); 45 shield (Ultimate's x 0.88) and 48 (45 x 0.35) are a fit:
+    # WARN. tools/ultimate_stats.py SIZE (the stats step; `ultimate_stats.py sizes` re-applies them alone)
+    if ult_param and labels:
+        import ultimate_stats as US
+        try:
+            sv = US.size_values(US.entry(ult_param, labels, base.get('ult', name)))
+        except SystemExit:
+            sv = {}
+        bad = {}
+        for i, (w, uname, _how) in sorted(sv.items()):
+            if i in row and abs(row[i] - w) > 0.005 * max(1.0, abs(w)):
+                bad.setdefault('ERROR' if i in (44, 49, 185) else 'WARN', []).append(
+                    '%d %s %g (Ultimate\'s %s -> %g)' % (i, US.SIZE_NAMES[i], row[i], uname, w))
+        for lvl, items in sorted(bad.items()):
+            rep.add(lvl, 'P4 size', 'kind 0x%X\'s size differs from Ultimate\'s in %s: %s. `python3 tools/ultimate_stats.py '
+                    'sizes PRC LABELS FP_IN FP_OUT %s` re-applies the sizes alone' % (
+                        kind, inst.where('param/fighter/fighter_param.bin'), '; '.join(items), name))
     # P3 rapid-count (Byleth v17: "jab 3 is inaccessible"): the common Attack status (func_270) goes into the rapid jab
     # when ENABLE_100 is on and the presses so far (0x11000003) >= fighter_param 86 (attack_100_input_count): a rapid jab
     # (264 = 1) with 86 = 0 (left from a base without one: ZSS) goes in as soon as jab 2 turns ENABLE_100 on, pressed
