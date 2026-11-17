@@ -10,7 +10,7 @@ the Super God Fist (attackdash) and Core Breaker's charge (specialhi before its 
 
 BUILD_OUT_DIR: tools/supamario_sledgehammer_build.py's OUT_DIR (ts_hit: tools/supamario_timeskip_build.py's). MOVE:
 sh_charging, sh_uncharged, sh_charged, sh_hit, ts_hit (Time Skip's punch; ts_hit_v1 with v1's shared Btl_HitLOD),
-ts_e11 / ts_e0 (Time Skip v4: XV2's skill effects 11, the punch, and 0, the start), attackdash, cb_charge (default all). --png DIR: each move's six brightest frames side by side. Bones other than top
+ts_e11 / ts_e0 (Time Skip v4: XV2's skill effects 11, the punch, and 0, the start), ts_outline (v6: the outline's rings), attackdash, cb_charge (default all). --png DIR: each move's six brightest frames side by side. Bones other than top
 are drawn at top (the fist's effects placed 8 up, 3 ahead); his body isn't drawn.
 --bg (v4): the background colour (default black): the effects are added onto it as in game (a bright stage pushes an
 additive effect past 1 sooner: the user's screenshot 26 on a grass stage); the areas then count only the pixels the
@@ -70,6 +70,13 @@ def moves(out_dir):
     out['ts_e0'] = ([(0, TB.FX_AURA_ID, 0, (0.0, 0.0, 0.0), (0, -90, 0), TB.AURA_SIZE, None),
                      (0, TB.FX_E0H_ID, 0, (0.0, 6.0, 0.0), (0, 0, 0), TB.E0_FOLLOW[2] * TB.AURA_SIZE, None)],
                     list(range(0, 80)))
+    # v6: the outline's rings on his bones at his T pose (c00's rest: (x, y)), whole (fx_render draws no body: the
+    # worst case, his body hides their insides in game)
+    tpose = {64: (0.0, 13.18), 22: (0.0, 10.24), 12: (0.0, 7.85), 11: (0.0, 6.57), 14: (1.88, 8.71), 18: (-1.88, 8.72),
+             15: (3.63, 8.71), 19: (-3.63, 8.72), 16: (5.35, 8.71), 20: (-5.36, 8.72), 3: (1.23, 5.5), 7: (-1.23, 5.5),
+             4: (1.25, 3.4), 8: (-1.25, 3.4), 5: (1.27, 1.56), 9: (-1.27, 1.56)}
+    out['ts_outline'] = ([(0, TB.FX_OUTLINE_ID, 0, (0.0, tpose[b][1], -tpose[b][0]), (0, 0, 0), TB.outline_size(r), None)
+                          for b, r in TB.OUTLINE_BONES], list(range(0, 6)))
     c = [x for x in R.s4_calls(eb, 'attackdash') if (x[1] >> 16) == 0x341]
     out['attackdash'] = (c, list(range(min(x[0] for x in c), min(x[0] for x in c) + 90)))
     c = [x for x in R.s4_calls(eb, 'specialhi') if (x[1] >> 16) == 0x341 and x[0] < 55]

@@ -208,6 +208,11 @@ FX_AURA_ID, FX_GLASS_ID, FX_E0H_ID = 0x03410063, 0x03410064, 0x03410069
 CAMERA_FX = False                   # v3: the camera build (Effect_Camera, needs exe_v46z_camfx): off until camera_effects is
                                     # confirmed in game (its v1 test drew a screen-filling white flash); the default is the
                                     # MSC's Screen_Tint (TINT) and the glass model in front of the victim (GLASS_*)
+# v6: on. The user's v5 clip (d8c96e8e): the glass over an undarkened stage (130-146), the MSC's Screen_Tint showing only
+# from the punch (148: the mean picture 146 -> 66, then fading to 160): the tint doesn't advance while the stage is
+# frozen (Stage_Freeze), so the stop wasn't dark and the punch was. Effect_Camera (confirmed in game, unslowed) draws
+# through the freeze: the darkening is the camera's quad now, from the connect's 0 to the punch (XV2's 44-58)
+CAMERA_FX = True
 FX_DARK_ID = 0x03410065
 TINT = (0, 4, 0x14, 0x16, 0x2C, 0xB4, 0, 0xFF)  # slot 0, 4 frames in, R G B, A 0xB4, layer 0, priority (Sonic's FS's form)
 TINT_OUT = 15
@@ -247,7 +252,7 @@ OUTLINE_BONES = ((64, 3.0), (22, 2.6), (12, 2.4), (11, 2.7), (14, 1.3), (18, 1.3
 # the head 10.2-15.6, the arms at 8.7, the hands at +-5.35)
 OUTLINE_PAD = 0.6                   # the ring's disc reaches this far past the part (units)
 OUTLINE_EDGE = 0.78                 # the ring texture's peak (a fraction of the disc's radius; the part's edge)
-OUTLINE_RGB6, OUTLINE_ALPHA = (0.85, 0.92, 1.0), 0.42
+OUTLINE_RGB6, OUTLINE_ALPHA = (0.85, 0.92, 1.0), 0.34   # fx_glow ts_outline (16 whole rings): 0.42 drew 1.4 white on grey, 0.34 0.5
 # v6 (user: "add XV2's photo-negative look after the punch"). XV2's BAC: BPE 78 "Invert World Colors" on at the connect's
 # 0 (the dark blue-grey world of the stop, clip 44-58, the fighters not inverted), its second entry (flag word 2, BPE
 # 85's off form) at 17: off again; BPE 2 "Weak White Flash" at 16. Measured on the clip's stage: during the charge
@@ -258,8 +263,8 @@ OUTLINE_RGB6, OUTLINE_ALPHA = (0.85, 0.92, 1.0), 0.42
 # another package) replaces the stop's tint by a real inversion once its command is known
 INVERT_FX = False
 FX_WASH_ID = 0x0341006B
-WASH_RGB, WASH_A, WASH_IN, WASH_LIFE, WASH_OUT = (0.94, 0.97, 1.0), 0.42, 2, 58, 18
-WASH_FLASH, WASH_FLASH_N = 0.35, 8
+WASH_RGB, WASH_A, WASH_IN, WASH_LIFE, WASH_OUT = (0.94, 0.97, 1.0), 0.48, 2, 48, 14   # the clip: white to +36, normal by +50
+WASH_FLASH, WASH_FLASH_N = 0.45, 8
 WASH_Z, WASH_SIZE = 20.0, 2.2
 # v6 (user: "use the real XV2 glass break / make it look less 2D"): the shards (HIT_DmgGrs2's 3D meshes and their .ema
 # animation: flat to its frame 10, breaking apart from 12) kept on the screen past the punch, GLASS_BREAK frames of his
@@ -276,8 +281,10 @@ MOT_LANDING_HEAVY = 0x3B
 # v6 (user: "fix the purple aura during the charging"): effect 0's streaks were capped at 0.32 (all but invisible in
 # game under the overlay's white) and CrgAuraB took v5's Frt_Hit secondary lift (cyan-white). XV2 (clip 8-29): thin
 # lavender streaks with white cores rising round him: E0_RGB / E0_CAP6; not replayed as the dash starts
-E0_RGB = {'Frt_CrgAura.emp': (0.82, 0.7, 1.0), 'Frt_CrgAuraB.emp': (0.55, 0.45, 1.0), 'Frt_CrgAuraH.emp': (0.82, 0.7, 1.0)}
-E0_CAP6 = 0.6
+E0_RGB = {'Frt_CrgAura.emp': (0.55, 0.33, 1.0), 'Frt_CrgAuraB.emp': (0.45, 0.28, 1.0), 'Frt_CrgAuraH.emp': (0.55, 0.33, 1.0)}
+E0_B_LIFT, E0_B_ALPHA = 0.3, 0.4      # the alpha-blended CrgAuraB: its violet lifted 30% to white, at 40% of its alpha
+E0_CAP6 = 0.34                      # supamario_fx_glow ts_e0: 0.6 lavender stacked to 8.6 square units of white on grass;
+                                    # at 0.34 violet 0.5 white (grass) / 0.0 (grey), the picture changed 15.8 (v5 9.7)
 TS_SE = {'ts_basa': ('CAR_S1352_DSH_Basa', 0.0),          # skill SE cue 0, BAC 6
          'ts_dash': ('CAR_S1352_DSH_Dash', 0.0),          # cue 1, BAC 56
          'ts_hazure': ('CAR_S1350_FRT_Hazure', 0.0),      # cue 2, BAC 86 (the whiff)
@@ -785,6 +792,13 @@ def _e0_colour(p, d, emp):
     the glare tint capped at 0.32, CrgAuraB v5's secondary lift: pale cyan, all but invisible in game)"""
     rgb = E0_RGB[emp]
     f = E0_CAP6 / max(rgb)
+    if p.field(d, 'blend_type') == 0:
+        # an alpha-blended streak (CrgAuraB: XV2's normal blend) can't be dimmed by its colour (it would draw dark):
+        # light violet, translucent
+        f = 1.0
+        rgb = tuple(c + (1.0 - c) * E0_B_LIFT for c in rgb)
+        for k in ('alpha_diff21', 'alpha_diff32'):
+            p.set_field(d, k, p.field(d, k) * E0_B_ALPHA)
     for track in (0, 1):
         p.set_color_keys(d, track, [tuple(c * f for c in rgb) + (1.0,)])
     p.set_field(d, 'color_scale', 1.0)
@@ -1092,7 +1106,7 @@ def glass_cracks(folder):
     df, dl = ImageDraw.Draw(fill), ImageDraw.Draw(lines_im)
     lines = 0
     rng = np.random.RandomState(1352)
-    sheens = []
+    sheens, shards = [], []
     for m in nud.read(os.path.join(folder, 'model.nud')):
         for pg in m.polygons:
             uv = np.array(pg.uvs, float).reshape(len(pg.pos), -1)[:, :2] * [n, n] + [0.0, n]   # V -1 .. 0 -> 0 .. n
@@ -1109,11 +1123,7 @@ def glass_cracks(folder):
             border = [k for k, c in cnt.items() if c == 1]
             per = sum(float(np.hypot(*(uv[a_] - uv[b_]))) for a_, b_ in border)
             thin = per * per / (4.0 * math.pi * max(area, 1e-6))          # 1 a disc; the slivers 5-20
-            t = min(1.0, max(0.0, (thin - 2.0) / 8.0)) * 0.75 + 0.25 * rng.rand()
-            v = GLASS_SHEEN[0] + (GLASS_SHEEN[1] - GLASS_SHEEN[0]) * t
-            sheens.append(round(v, 3))
-            for k in range(0, len(idx) - 2, 3):
-                df.polygon([tuple(uv[j]) for j in idx[k:k + 3]], fill=int(255 * v))
+            shards.append((thin + rng.rand(), uv, idx))
             cen = uv[list({j for e_ in border for j in e_})].mean(0) if border else uv.mean(0)
             for a_, b_ in border:
                 pa, pb = uv[a_], uv[b_]
@@ -1124,6 +1134,14 @@ def glass_cracks(folder):
                 dl.line([tuple(pa), tuple(pb)], fill=255 if lit else int(255 * GLASS_HI),
                         width=max(1, int(round(GLASS_LINE_W6))))
                 lines += 1
+    # the panes by rank of thinness (+ a random 0-1): the slivers brightest, spread over GLASS_SHEEN
+    order = sorted(range(len(shards)), key=lambda k: shards[k][0])
+    for rank, k in enumerate(order):
+        _t, uv, idx = shards[k]
+        v = GLASS_SHEEN[0] + (GLASS_SHEEN[1] - GLASS_SHEEN[0]) * (rank / max(1, len(shards) - 1)) ** 1.5
+        sheens.append(round(v, 3))
+        for j in range(0, len(idx) - 2, 3):
+            df.polygon([tuple(uv[i]) for i in idx[j:j + 3]], fill=int(255 * v))
     a = np.maximum(np.asarray(fill, np.float32), np.asarray(lines_im, np.float32)) / 255.0
     rgb = (a[..., None] * np.array(GLASS_LINE_RGB, np.float32) * 255 + 0.5).astype(np.uint8)
     img = np.concatenate([rgb, np.full((n, n, 1), 255, np.uint8)], 2)

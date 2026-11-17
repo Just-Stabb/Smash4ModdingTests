@@ -581,6 +581,7 @@ def msc_tests(path, root):
     exit_tests(path)
     aura_tests(path)
     lag_tests(path)
+    landanim_tests(path)
     v3_tests(path)
 
 
@@ -773,7 +774,7 @@ def brightness_tests(out):
     import supamario_fx_glow as G
     res = {}
     for bg_name, bg in (('grass', (0.5, 0.65, 0.3)), ('grey', (0.5, 0.5, 0.5))):
-        r = G.measure(out, ('ts_hit', 'ts_hit_v1', 'ts_e11', 'ts_e0'), None, bg)
+        r = G.measure(out, ('ts_hit', 'ts_hit_v1', 'ts_e11', 'ts_e0', 'ts_outline'), None, bg)
         res[bg_name] = r
         h, h1 = r['ts_hit'], r['ts_hit_v1']
         e0, e1 = h['frames'][0][4], h1['frames'][0][4]
@@ -788,12 +789,22 @@ def brightness_tests(out):
               'brightest)' % (bg_name, h1['max_over_1']),
               (h['max_over_1'] <= 1.0, e0 <= e1 / 3.0, h['brightest'][4] >= 8.0), (True, True, True))
         for k, lo in (('ts_e11', 20.0), ('ts_e0', 3.0)):
-            o1 = 1e9 if k == 'ts_e11' else 1.0      # v5 (user): the punch's burst limited by its white, not its purple
+            o1 = 1e9    # v5 (user): the punch's burst limited by its white, not its purple; v6: effect 0 too (violet)
             check('v5 %s: %s (XV2\'s skill effect) %s, at most 1.0 square unit white in any frame, visible (it changes the '
                   'picture by %g+)' % (bg_name, k, 'purple past 1.0 allowed (%.1f square units: it blooms purple)' %
-                                       r[k]['max_over_1'] if k == 'ts_e11' else 'at most 1.0 square unit over 1.0', lo),
+                                       r[k]['max_over_1'], lo),
                   (r[k]['max_over_1'] <= o1, r[k]['max_white'] <= 1.0, max(abs(f_[4]) for f_ in r[k]['frames']) >= lo),
                   (True, True, True))
+        o = r['ts_outline']
+        print('     %s: ts_outline (the 16 rings whole: no body in front) most over 1.0 %.1f, most white %.1f, energy %.1f' % (
+            bg_name, o['max_over_1'], o['max_white'], max(abs(f_[4]) for f_ in o['frames'])))
+        check('v6 %s: the outline\'s rings (all 16, whole: the worst case) at most 1.0 square unit white, visible' % bg_name,
+              (o['max_white'] <= 1.0, max(abs(f_[4]) for f_ in o['frames']) >= 3.0), (True, True))
+        # the wash: alpha-blended white at most WASH_A + the flash: the picture lifted toward white, never past it
+        a = 1 - (1 - B.WASH_A) * (1 - B.WASH_FLASH)
+        lifted = [round(c * (1 - a) + w * a, 3) for c, w in zip(bg, B.WASH_RGB)]
+        check('v6 %s: the wash at its brightest (alpha %.2f) lifts the picture to %s: under 1.0 (no white blow-out, no '
+              'bloom)' % (bg_name, a, lifted), max(lifted) < 1.0, True)
     return res
 
 
@@ -814,8 +825,11 @@ def exit_tests(path):
         'the darkening the script\'s camera effect' if B.CAMERA_FX else
         'the MSC\'s screen tint on at the catch (%d), off at the punch (%d, %d frames out), once each; v5: the glass the '
         'script\'s (on the screen), none from the MSC' % (ck, sk, B.TINT_OUT)),
-          (g.tints, [k_ for k_ in g.kills if k_[1] in look],
+          (g.tints, [k_ for k_ in g.kills if k_[1] in look and k_[0] < tr[-1][0]],
            [n for n, i, _x, _y, _s in g.fx if i == B.FX_GLASS_ID]), (want_t, [], []))
+    check('v6 normal: the move\'s end (ts_end) ends the outline\'s rings, the wash and the glass (ts_fx_off)',
+          sorted({i for n, i in g.kills if n == tr[-1][0]} & {B.FX_OUTLINE_ID, B.FX_WASH_ID, B.FX_GLASS_ID}),
+          sorted({B.FX_OUTLINE_ID, B.FX_WASH_ID, B.FX_GLASS_ID}))
     for name, st in (('cut (a status change)', 'cut'), ('Supamario hit (Damage)', 0x45), ('Supamario KO\'d (Dead)', 0xB1),
                      ('the match ending (Win)', 0x14F)):
         v = V(2, 30.0)
@@ -827,10 +841,13 @@ def exit_tests(path):
         check('v3 exit before the punch, %s at %d: the darkening (End_Screen_Tint / its camera effect) and the glass '
               'taken off at once, the victim let go (controller, stage collision), the others no longer frozen (none '
               'renewed after the cut: free within 2 frames), the air drift back on' % (name, cut),
-              (g.tints, sorted(k_ for k_ in g.kills if k_[1] in look), v.input_off,
+              (g.tints, sorted(set(k_ for k_ in g.kills if k_[1] in look)), v.input_off,
                v.ground[-1][1] if v.ground else None, max(froze) <= cut + 2 if froze else None, g.e2_on[-1:]),
               ([] if B.CAMERA_FX else [(ck, 'on', slot), (cut, 'off', slot)], sorted((cut, i) for i in look), False,
                5.0, True, [(cut, True)]))
+        check('  v6: ... and the outline\'s rings / the wash ended there too (ts_fx_off)',
+              sorted({i for n, i in g.kills if n == cut} & {B.FX_OUTLINE_ID, B.FX_WASH_ID}),
+              sorted({B.FX_OUTLINE_ID, B.FX_WASH_ID}))
     v = V(2, 30.0)
     g = Game(fighters=[v])
 
@@ -839,10 +856,12 @@ def exit_tests(path):
             v.status = 0xB1
     tr, vm = run(path, g, tick=esc)
     check('v3 the victim escapes (KO\'d in the hold): let go, the move goes on to its end, nothing killed, the darkening '
-          'still to the punch', (v.input_off, [k_ for k_ in g.kills if k_[1] in look], tr[-1][5], g.tints), (False, [], 0, want_t))
+          'still to the punch', (v.input_off, [k_ for k_ in g.kills if k_[1] in look and k_[0] < tr[-1][0]], tr[-1][5],
+                                 g.tints), (False, [], 0, want_t))
     g = Game()
     tr, vm = run(path, g)
-    check('v3 a miss: no darkening, no glass, nothing killed', (g.tints, [k_ for k_ in g.kills if k_[1] in look],
+    check('v3 a miss: no darkening, no glass, nothing killed', (g.tints, [k_ for k_ in g.kills if k_[1] in look and
+                                                                         k_[0] < tr[-1][0]],
                                                                [i for _n, i, _x, _y, _s in g.fx if i == B.FX_GLASS_ID]),
           ([], [], []))
 
@@ -934,8 +953,9 @@ def aura_tests(path):
     g = Game(held=lambda n: n < B.WIND_END + B.CHARGE + 5)
     tr, vm = run(path, g, frames=400)
     au = [n for n, i, _x, _y, _s in g.fx if i == B.FX_AURA_ID]
-    check('v4 effect 0 in a full charge: at 0, then every %d charge frames' % B.AURA_EVERY,
-          au, [0] + [B.WIND_END + k for k in range(B.AURA_EVERY - 1, B.CHARGE, B.AURA_EVERY)])
+    check('v4 effect 0 in a full charge: at 0, then every %d charge frames (as the last one\'s 40-frame emission ends: '
+          'one at a time); v6: none as the dash starts (v4 / v5 played one more there)' % B.AURA_EVERY,
+          au, [0] + [B.WIND_END + k for k in range(B.AURA_EVERY - 1, B.CHARGE - 1, B.AURA_EVERY)])
 
 
 def lag_tests(path):
@@ -972,9 +992,52 @@ def lag_tests(path):
              {3: (0x19, True), 8: (0x16, True)}, [])):
         st, lag, flag = after(air, ev)
         got = (st, lag if any(x[1] == 0x19 for x in st) else None, flag)
+        # v6: a lag landing keeps its mark (LAG_ANIM) into LandingFallSpecial: func_586 clears it (landanim_tests)
         check('v5 landing lag, %s: %s' % (name, 'LandingFallSpecial %d frames (work float 0) at that landing, the mark '
                                           'cleared' % B.LAND_LAG if (0x19 in [x[1] for x in want]) else 'nothing'),
-              got, (want, float(B.LAND_LAG) if any(x[1] == 0x19 for x in want) else None, 0.0))
+              got, (want, float(B.LAND_LAG) if any(x[1] == 0x19 for x in want) else None,
+                    B.LAG_ANIM if any(x[1] == 0x19 for x in want) else 0.0))
+
+
+def landanim_tests(path):
+    """v6 (user: "use Mario's normal landing lag animation after Time Skip falls from the air"): the air end's landing is
+    still LandingFallSpecial LAND_LAG frames, its mark (TS_V_RETRY = LAG_ANIM) kept into the status, and func_586 (the
+    landing statuses' start) plays LandingHeavy (0x3B) over the lag (rate: its length / LAND_LAG) and clears the mark;
+    any other LandingFallSpecial (the up special's: 0x2D) and Sledgehammer's (LandingLight 0x3A) unchanged"""
+    LENS = {B.MOT_LANDING_HEAVY: 31, 0x2D: 40, 0x3A: 16}
+
+    class G(Game):
+        def sys(self, sid, a):
+            if sid == 0x12 and a and a[0] == 0 and len(a) == 2:
+                return LENS.get(a[1], 20)
+            if sid == 0x12 and a and a[0] == 0x1:
+                self.__dict__.setdefault('rates', []).append((a[1], round(R.i2f(a[3]), 4) if len(a) > 3 else None))
+            return Game.sys(self, sid, a)
+    g = G(air=True, y=200.0, floor=-1e4)
+    end = []
+
+    def tick(g_, k):
+        if not end and g_.status is not None:
+            end.append(k)
+        if end and k - end[0] == 5:
+            g_.status, g_.air = 0x16, False
+    tr, vm = run(path, g, after=20, tick=tick)
+    mark = g.vars.get(B.V_RETRY)
+    g.rates = []
+    vm.g[4], vm.g[5] = 0x19, 0x16
+    vm.call(fn(vm, 'func_586'))
+    check('v6 landing after an air end: LandingFallSpecial %d frames, the mark %g kept into it; its start (func_586) plays '
+          'LandingHeavy (0x%X) at its length / %d (31 frames -> %.4f), the mark cleared' % (
+              B.LAND_LAG, B.LAG_ANIM, B.MOT_LANDING_HEAVY, B.LAND_LAG, 31.0 / B.LAND_LAG),
+          ([st for _n, st in g.statuses][-1:], g.vars.get(0), mark, g.rates, g.vars.get(B.V_RETRY)),
+          ([0x19], float(B.LAND_LAG), B.LAG_ANIM, [(B.MOT_LANDING_HEAVY, round(31.0 / B.LAND_LAG, 4))], 0.0))
+    for name, g5, want in (('the up special\'s special fall landing', 0x1B, (0x2D, round(40.0 / 20.0, 4))),
+                           ('Sledgehammer\'s landing (from 0x155)', 0x155, (0x3A, round(16.0 / 20.0, 4)))):
+        g.rates = []
+        g.vars[0] = 20.0
+        vm.g[4], vm.g[5] = 0x19, g5
+        vm.call(fn(vm, 'func_586'))
+        check('v6: %s (no mark) unchanged: %s' % (name, want), g.rates, [want])
 
 
 def shield_tests(path):
@@ -1125,35 +1188,46 @@ def script_tests(out, sh_out):
     check('effect: Smash\'s dash cloud at the dash on the ground (XV2\'s stage dust)', eff, [('Graphic_Effect',
                                                                                           [B.FX_DUST, 0])])
     ext = [(nm(c), [round(x, 3) if isinstance(x, float) else x for x in c.params]) for c in f['effect'].script('specials')
-           if nm(c) == 'External_Graphic']
+           if nm(c) == 'External_Graphic' and c.params[0] == B.FX_E0H_ID]
     check('v4: effect 0\'s following part (Frt_CrgAuraH x%.1f) at frame 0 on the left elbow (bone %d), no offset / turn, '
           'the bone\'s place only (last word 0)' % (B.E0_FOLLOW[2], B.E0_FOLLOW[1]), ext,
           [('External_Graphic', [B.FX_E0H_ID, B.E0_FOLLOW[1], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                                  round(B.E0_FOLLOW[2] * B.AURA_SIZE, 3), 0])])
     lt = {sc: [(nm(c), [round(x, 2) if isinstance(x, float) else x for x in c.params]) for c in f['effect'].script(sc)
-               if nm(c) in ('FRAME', 'Flash_Light_Effect', 'Change_Flash_Light_Color', 'Color_Overlay', 'Change_Overlay',
+               if nm(c) in ('Flash_Light_Effect', 'Change_Flash_Light_Color', 'Color_Overlay', 'Change_Overlay',
                             'Terminate_Overlays')] for sc in ('specials', 'specialairs')}
-    on = [('Color_Overlay', list(B.OUTLINE_RGB) + [0.0]),
-          ('Change_Overlay', [float(B.OUTLINE_IN)] + list(B.OUTLINE_RGB) + [B.OUTLINE_A])]
-    off = [('Change_Overlay', [float(B.OUTLINE_OUT)] + list(B.OUTLINE_RGB) + [0.0])]
-    check('v4: the white outline (XV2\'s BPE 85; user: "no outline" with v3\'s LIGHT_SHINE): FLASH (Color_Overlay) white '
-          'at %g of 255, faded in over %d from each motion\'s start, out over %d at its end, COL_NORMAL at the end; no '
-          'Flash_Light_Effect' % (B.OUTLINE_A, B.OUTLINE_IN, B.OUTLINE_OUT), lt,
-          {'specials': on + [('FRAME', [float(B.MOVE_FROM)]), ('FRAME', [float(B.DASH_END - B.OUTLINE_OUT)])] + off +
-           [('FRAME', [float(B.DASH_END)]), ('Terminate_Overlays', [])],
-           'specialairs': on + [('FRAME', [float(B.STRIKE)]), ('FRAME', [float(B.CONNECT_END - B.OUTLINE_OUT)])] + off +
-           [('FRAME', [float(B.CONNECT_END)]), ('Terminate_Overlays', [])]})
+    check('v6: no body overlay / light at all (v4 / v5\'s FLASH tinted his whole body; in the user\'s v5 clip d8c96e8e it '
+          'ran on to opaque white while the charge held the frame)', lt, {'specials': [], 'specialairs': []})
+    ring = [(b_, B.outline_size(r)) for b_, r in B.OUTLINE_BONES]
+    for sc, end in (('specials', B.DASH_END), ('specialairs', B.CONNECT_END)):
+        body = [(nm(c), [round(x, 3) if isinstance(x, float) else x for x in c.params]) for c in f['effect'].script(sc)]
+        rings = [(c[1][1], c[1][8]) for c in body if c[0] == 'External_Graphic' and c[1][0] == B.FX_OUTLINE_ID]
+        offs = [k for k, c in enumerate(body) if c[0] == 'Terminate_Graphic_Effect' and c[1][0] == B.FX_OUTLINE_ID]
+        first_ring = min(k for k, c in enumerate(body) if c[0] == 'External_Graphic' and c[1][0] == B.FX_OUTLINE_ID)
+        fr_end = max(k for k, c in enumerate(body) if c == ('FRAME', [float(end)]))
+        check('v6 outline (%s): the ring (0x%08X) on each of %d bones at frame 0 (size: the part\'s radius + %g past '
+              'its edge), no offset / turn, the bone\'s place (last word 0); earlier rings ended first; ended at its '
+              'last frame %d' % (sc, B.FX_OUTLINE_ID, len(ring), B.OUTLINE_PAD, end),
+              (rings, offs[0] < first_ring, offs[-1] > fr_end,
+               {tuple(c[1][2:8]) + (c[1][9],) for c in body if c[0] == 'External_Graphic' and c[1][0] == B.FX_OUTLINE_ID},
+               all(c[0] != 'FRAME' for c in body[:first_ring])),
+              (ring, True, True, {(0.0,) * 6 + (0,)}, True))
     print('     note: Stage_Freeze(1, ...) is the stage-only freeze with no flash from exe_v46z_camfx3 on (camera_effects_v3 /'
           ' v4); on exe_v46y_hold its On 1 also turned the scene white (the user\'s v3 clip ca068f15, 70-88)')
     cam = [(nm(c), [round(x, 4) if isinstance(x, float) else x for x in c.params]) for c in f['effect'].script('specialairs')
-           if nm(c) in ('Effect_Camera', 'Terminate_Graphic_Effect', 'FRAME')]
-    check('v5: the glass (its cracks) on the screen (Effect_Camera Mode 1, %g half heights a unit, Z %g, unslowed) from the '
-          'connect\'s frame 0, ended at once at the punch (%d); the darkening on the camera only in the camera build '
-          '(CAMERA_FX %s)' % (B.GLASS_SCREEN_SIZE, B.GLASS_SCREEN_Z, B.STRIKE, B.CAMERA_FX), cam[:3],
+           if nm(c) in ('Effect_Camera', 'FRAME') or nm(c) == 'Terminate_Graphic_Effect' and c.params[0] == B.FX_GLASS_ID]
+    check('v5 / v6: the glass (its shards) on the screen (Effect_Camera Mode 1, %g half heights a unit, Z %g, unslowed) '
+          'from the connect\'s frame 0; v6: the white wash at the punch (%d: Mode 1, Z %g, size %g, unslowed, its own '
+          'fade), the glass ended %d frames later (its shards breaking apart past the punch); the darkening on the camera '
+          'only in the camera build (CAMERA_FX %s)' % (B.GLASS_SCREEN_SIZE, B.GLASS_SCREEN_Z, B.STRIKE, B.WASH_Z,
+                                                       B.WASH_SIZE, B.GLASS_BREAK, B.CAMERA_FX),
+          [c for c in cam if c[0] != 'FRAME' or c[1][0] in (float(B.STRIKE), float(B.STRIKE + B.GLASS_BREAK))],
           ([('Effect_Camera', [B.FX_DARK_ID, 0.0, 0.0, B.DARK_Z, 0.0, 0.0, 0.0, B.DARK_SIZE, 1, B.STRIKE, 1])]
            if B.CAMERA_FX else []) +
           [('Effect_Camera', [B.FX_GLASS_ID, 0.0, 0.0, B.GLASS_SCREEN_Z, 0.0, 0.0, 0.0, B.GLASS_SCREEN_SIZE, 1, 0, 1]),
-           ('FRAME', [float(B.STRIKE)]), ('Terminate_Graphic_Effect', [B.FX_GLASS_ID, 1, 1])][:3 - (1 if B.CAMERA_FX else 0)])
+           ('FRAME', [float(B.STRIKE)]),
+           ('Effect_Camera', [B.FX_WASH_ID, 0.0, 0.0, B.WASH_Z, 0.0, 0.0, 0.0, B.WASH_SIZE, 1, 0, 1]),
+           ('FRAME', [float(B.STRIKE + B.GLASS_BREAK)]), ('Terminate_Graphic_Effect', [B.FX_GLASS_ID, 1, 1])])
     gen = [nm(c) for p in f for s in ('specials', 'specialairs') for c in f[p].script(s)
            if 'article' in nm(c).lower() or 'reflect' in nm(c).lower()]
     check('no Cape left (no article, no reflector) in the side special\'s scripts', gen, [])
@@ -1267,11 +1341,15 @@ def effect_tests(out, sh_out):
     hip, foot = rep4['aura']['emitters'][:3:2]
     tr_ = {p.emitter_name(d): [round(x_, 2) for x_ in p.field(d, 'emitter_translation')] for d in dw}
     check('v4: effect 0\'s world parts (Frt_CrgAura at b_C_Pelvis 0.3 m down and at b_R_Foot, Frt_CrgAuraB at b_C_Pelvis: '
-          '0x%08X): ConeExtrude stripes as streaks (type 3), rising, follow none, capped at %g; + their halos; the foot\'s '
-          'part behind (SpecialS frame 0: RFootJ behind TransN)' % (B.FX_AURA_ID, dict(B.E0_CAP)['stripe']),
+          '0x%08X): ConeExtrude stripes as streaks (type 3), rising, follow none; v6: lavender (blue > red > green) at %g '
+          '(v4 / v5: 0.32, CrgAuraB pale cyan); + their halos; the foot\'s part behind (SpecialS frame 0: RFootJ behind '
+          'TransN)' % (B.FX_AURA_ID, B.E0_CAP6),
           (p.set_name(si), [p.emitter_name(d) for d in dw][:3], {p.field(d, 'particle_type') for d in dw},
            {tuple(p.field(d, 'emit_direction')) for d in dw}, {bytes(d[0x310:0x314]).hex() for d in dw},
-           all(SB.arc_peak(p, d) <= dict(B.E0_CAP)['stripe'] + 1e-3 for d in dw[:3]), len(dw), tr_[foot][0] < 0.0),
+           all((abs(SB.arc_peak(p, d) - B.E0_CAP6) < 1e-3 if p.field(d, 'blend_type') == 1 else
+                p.field(d, 'alpha_diff21') <= B.E0_B_ALPHA + 1e-3 and min(p.color_keys(d, 0)[0][:3]) > 0.4) and
+               p.color_keys(d, 0)[0][2] > p.color_keys(d, 0)[0][0] > p.color_keys(d, 0)[0][1] for d in dw[:3]),
+           len(dw), tr_[foot][0] < 0.0),
           ('PtcSupamarioTsFrt_CrgAura', ['CrgAura_HipN', 'CrgAuraB_HipN', 'CrgAura_RFootJ'], {3}, {(0.0, 1.0, 0.0)},
            {'00000001'}, True, 6, True))
     si = e.entries[B.FX_E0H_ID & 0xFFFF][1] - 1
@@ -1286,11 +1364,41 @@ def effect_tests(out, sh_out):
     nd_, tx_ = nut.load(os.path.join(mdir, 'model.nut'))
     img_ = nut.decode(nd_, tx_[0]).astype(float) / 255.0
     lum = img_[..., :3].max(axis=2)
-    check('v5: the glass clear: its texture the shards\' outlines (%d lines) in light blue-white (blue >= red), the panes '
-          'dark (additive: see-through; most of it under 0.1), no yellow (v2-v4: the refraction map drawn as colour)' %
-          json.load(open(os.path.join(out, 'timeskip.json')))['fx']['glass']['cracks'],
-          (bool((img_[..., 2] >= img_[..., 0] - 0.02).all()), float((lum < 0.1).mean()) > 0.8, float(lum.max()) > 0.8),
-          (True, True, True))
+    gl_ = json.load(open(os.path.join(out, 'timeskip.json')))['fx']['glass']
+    sh_ = gl_.get('sheens') or [0.0]
+    check('v5 / v6: the glass clear: its texture the shards\' outlines (%d lines) in light blue-white (blue >= red), no '
+          'yellow (v2-v4: the refraction map drawn as colour); v6: each of the %d shards\' panes its own faint sheen '
+          '(%.2f-%.2f: see-through, additive; the texture\'s mean under 0.2), the cracks bright' % (
+              gl_['cracks'], len(sh_), min(sh_), max(sh_)),
+          (bool((img_[..., 2] >= img_[..., 0] - 0.02).all()), float(lum.mean()) < 0.2, float(lum.max()) > 0.8,
+           len(sh_) > 20, max(sh_) - min(sh_) > 0.08, max(sh_) <= B.GLASS_SHEEN[1] + 1e-6),
+          (True, True, True, True, True, True))
+    for key, fid in (('outline', B.FX_OUTLINE_ID), ('wash', B.FX_WASH_ID)):
+        si = e.entries[fid & 0xFFFF][1] - 1
+        ds = [em['data'] for em in p.sets[si]['emitters'] if em['data'] is not None]
+        if key == 'outline':
+            d = ds[0]
+            check('v6 the outline\'s ring (0x%08X): one additive billboard, forever, following (follow 0), white-blue at '
+                  '%g alpha, a soft ring texture' % (fid, B.OUTLINE_ALPHA),
+                  (p.set_name(si), len(ds), p.field(d, 'blend_type'), p.field(d, 'ptcl_life'), bytes(d[0x310:0x314]).hex(),
+                   round(p.field(d, 'alpha_init'), 3)),
+                  ('PtcSupamarioTsOutline', 1, 1, 0x7FFFFFFF, '00000000', B.OUTLINE_ALPHA))
+            rg = B.ring_rgba()[..., 0].astype(float) / 255.0
+            n_ = rg.shape[0]
+            check('  its ring: half inside, 1 at %g of the radius (the part\'s edge), 0 at the rim' % B.OUTLINE_EDGE,
+                  (round(rg[n_ // 2, n_ // 2], 1), round(rg[n_ // 2, n_ // 2 + int(B.OUTLINE_EDGE * n_ / 2)], 1),
+                   round(rg[n_ // 2, n_ - 1], 1)), (0.5, 1.0, 0.0))
+        else:
+            got = [(p.field(d, 'blend_type'), p.field(d, 'ptcl_life'), round(p.field(d, 'alpha_diff21'), 3),
+                    round(p.field(d, 'alpha_section1') * p.field(d, 'ptcl_life'), 2),
+                    round((1 - p.field(d, 'alpha_section2')) * p.field(d, 'ptcl_life'), 2)) for d in ds]
+            check('v6 the wash (0x%08X): alpha-blended white quads: the wash %g in %d, held, out over %d of %d real frames; '
+                  'the punch\'s flash %g out over %d' % (fid, B.WASH_A, B.WASH_IN, B.WASH_OUT, B.WASH_LIFE, B.WASH_FLASH,
+                                                         B.WASH_FLASH_N - 1),
+                  (p.set_name(si), got), ('PtcSupamarioTsWash', [(0, B.WASH_LIFE, B.WASH_A, float(B.WASH_IN),
+                                                                 float(B.WASH_OUT)),
+                                                                (0, B.WASH_FLASH_N, B.WASH_FLASH, 1.0,
+                                                                 float(B.WASH_FLASH_N - 1))]))
     check('v2: the glass (BTL_CMN 108, HIT_DmgGrs2) a model entry (0x%08X), its folder with model / texture / '
           'animation / material animation' % B.FX_GLASS_ID,
           (gi[1], sorted(f for f in os.listdir(mdir)) if os.path.isdir(mdir) else None),
