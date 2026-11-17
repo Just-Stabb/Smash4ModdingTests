@@ -3275,3 +3275,70 @@ Stage_Freeze for a cinematic hold in a real match (the commands' in-game test wa
 by hitstop (their projectiles and items keep moving); the take-off from the ground when aimed up (`func_20`); the energy-1
 limit write easing the fall (the Fall status doesn't reset it each frame); the punch's explicit 30-frame freeze on a
 shield; that `Shieldable 0` hits through a raised shield; the body stays horizontal whatever the aim (no rotation).
+
+## Time Skip v2 (`supamario_timeskip_v2.zip`): the user's v1 test, the XV2 clip, the time stop's look
+Over v1 on exe_v46y_hold (no exe change). Changed: the MSC, game.bin, the ptcl / efc (new sets after every earlier one),
+a new effect model folder `model/EffSupamarioTsDmgGrs2`. The user's XV2 clip (`fc8b90ed`, a screen recording of XV2 at
+60 fps) is the reference for the look; "Jump Spike" is only the move's title (no jump or spike).
+
+### The user's points: cause and fix
+| | cause (evidence) | fix |
+|---|---|---|
+| 1. never resets in the air | v1 cleared VAR_26 only through the exe's variable resets (`sh_reset_item(0x31A, owner 0, mask 15)`). Offline it is right: the ID (0x31A = VAR_26), owner 0 and mask are what the cave wants, `tools/var_reset_test.py` on the user's exe_v46y_hold passes all of its checks (MSC selection, landing / ledge / hit / KO events), and the MSC writes the item (timeskip test). The reset hooks were never confirmed in a match (docs/native-notes.md "Variable resets": the landing hook, the owner lookup `[sm+0x9C]+0x28`, the events' timing are static readings); in game the flag never cleared, so one of those doesn't hold in a match | `ts_reset` (func_82 via ts_tick, every frame, every status): VAR_26 back to 0 on the ground or a ledge (situation 0 / 1), in a damage / capture status (0x3F-0x4C), a cliff status (0x72-0x7A), Dead / Rebirth / Entry; not while he is in the move (a stale status read on its first frames). The exe reset stays registered (harmless) |
+| 2. no movement in the air | v1 moved him with energy 3's speed (`KineticModule(0x11, 3, ...)`) on the ground and in the air. In the air the status is on kinetic type 0 (FALL), where energy 3 isn't on: the Cape's own air code makes it again and turns it on (`func_2263`: `KineticModule(0xE, 3, ...)` / `(0xB, 3)`), v1 never did. Energy 2 was held at 0 and energy 1's speed is the aim's vertical part: 0 on a level dash. Byleth v11 saw the same (loop-set energy-3 speeds never moved her in the air; position writes did) | `ts_move`: his travel is his position, `0x0F000004` forward / `0x0F000005` up each frame he isn't frozen, on the ground and in the air alike (the God Fist's gf_travel); his energies held at 0 (`ts_still`). A miss in the air hands its last speed (the eased 1.85 along the aim) to Fall (energy 2 / 1) |
+| 3. can't leave edges | the same: the ground's correction 1 slides him off, and once in the air nothing moved him (he hovered at the edge) | the position travel goes on in the air; `ts_still` keeps correction 1 every ground frame; `ts_sit` gives the air kinetics; no Fall until the moving part's end |
+| 4. a massive white flash | v1 played Sledgehammer's own Btl_HitLOD set: its `flash_1_1` is a white disc covering ~55 square units of a grass stage on its first frame (54.6 of the 70.5 energy at frame 0), held by the punch's 30-frame freeze. XV2 has a white screen flash there too (clip frame 44, one frame) | Time Skip's own copy `PtcSupamarioTsBtl_HitLOD` (0x03410061; Sledgehammer's set untouched), each emitter's peak capped (`LOD_CAP`: flash 0.22, grd01 0.45, ptcl / line 0.8); Btl_HitL's caps lowered (`PEAK_CAP`: flash 0.2, line 0.25, Line00 0.5, grd00 0.6, LINE / stripe 0.8). `supamario_fx_glow.py ts_hit` (v1's call: `ts_hit_v1`): frame 0's energy 63.7 -> 9.6, the most over 1.0 in any frame 4.1 -> 0.3 on grass, 0.9 -> 0.0 on grey (Sledgehammer v5's uncharged arcs: 1.0) |
+| 5. the God Fist's tracking | v1's `ts_track` was its own code (no gf_* call), but on the ground it never aimed down, and an up aim took him into the air where nothing moved (2): in game only a level ground dash was left, like the God Fist's ground rule | `ts_track` without any ground rule: the nearest opponent in front within 80 (feet to feet), up to 65 degrees up or down, the direction only (never turned, the speed unchanged). Tested on its own: 70 away (past the God Fist's 55) tracked, 70 degrees (inside its 75) not |
+| 6. nothing off the ground | the ground rule and (2) | aimed up from the ground he leaves it (situation 2, air kinetics) and moves up; an opponent below (off stage): the aim down kept, the floor takes the downward part while he is on it (no pushing through it or a platform), past the edge he goes down along it at the full speed |
+| 7. point blank | XV2's box covers 2.52-7.56 ahead (radius 2.52 at 5.04), out from frame 29: a fighter on top of him was never in it, and by 29 he had already dashed 2 frames past it. The hit-confirm (Target 12's slot, else the nearest frozen fighter) was fine | the box from frame 26 (the frame before the dash) and a second one, ID 1 (Part 0: one hit a fighter), at his middle: 1.5 ahead, 4.5 up, radius 4 (-2.5 to 5.5 ahead, no gap to XV2's); armor lifted under both, after his move (the collision's place); the victim lookup measures from both |
+| 8. the purple line | the clip: no line during the dash. The purple is XV2's skill effect 11 at the punch (BAC entry 4 item 8, frame 16: EEPK type 5 = the super skill's own, skill 1352, effect 11): purple speed lines from the victim forward along the punch (clip 60-100), then a long purple line along its flight fading (to ~130); and effect 0 (entry 0 item 9, frame 0, b_C_Base): pale lavender light shards rising round him in the wind-up (clip 8-30). There is no EEPK for 1352_HIK_DSH (the user checked the cpk), so the skill's EEPK is another file named by `system/custom_skill.cus`; not in what was sent | stand-ins (`lines_set` / `shards_set`, Btl_HitL's soft flash disc billboard stretched): `PtcSupamarioTsLines` 0x03410062 (8 speed lines 24 long in a band the victim's height + one 60 long, 45 / 85 frames, purple) at the victim's middle turned to his facing (`ts_lines`, with the hit look); `PtcSupamarioTsShards` 0x03410063 (6 vertical lavender streaks rising) at wind-up frames 6 / 14 and every 12 frames of a held charge (`ts_shards`). Additive, peak ~1: on a bright stage they read faint |
+| 9. Sledgehammer dimmer (item 9) | nothing of Sledgehammer's changed: v1's ptcl against vars_reset_v1's, set by set, emitter by emitter (bytes), every texture decoded, every shader, the efc entries, effect.bin's other scripts, main.pac's other motions: all identical (`tools/supamario_timeskip_test.py` now checks it on every build). The one recent change to its look is v5's own (vars_reset_v1): the charge glow moved to External_Graphic flag 0 with Z 4.64 (if the flag is bone space in game, the glow sits along LHandN's Z, by or behind his head) and the arcs +35% | Time Skip's hit look no longer uses Sledgehammer's set (own copy) |
+| 10. uncharged speed (item 10) | | VMIN 2.4 -> **2.1** (charged 4.2, linear between): straight travel uncharged **77.0 ground / 68.5 air** (v1 85.6 / 77.1), half charge 3.15: 107.0 / 98.5, full 136.9 / 128.4 (unchanged) |
+
+### The time stop's look (item 11)
+- **XV2:** BPE 78 (Invert World Colors) and BTL_CMN effect 108 (`HIT_DmgGrs2.emo` / `.emm` / `.emb` / `.mat.ema` / `.obj.ema`
+  in `vfx/cmn`, scale 0.36, attached to the camera, LoopCancel) from the connect (entry 4 item 7, frame 0) to the punch
+  (item 9, frame 16, OFF). The clip: one white frame (44), then the world dark blue-grey with white crack lines to the punch (58).
+- **Darkened world:** `Screen_Tint(Mode 0, 4 frames in, R 0x14, G 0x16, B 0x2C, A 0xB4, layer 0, priority 0xFF)` (Sonic's Final
+  Smash darkening, docs/acmd-params/misc-a.md's real order) at the connect, `End_Screen_Tint(0, 15)` at the punch: in
+  `time_stop_look()`, its own commands so the camera-attached command (camera_effects_v1) can take their place.
+- **The glass:** HIT_DmgGrs2 converted by `tools/xv2_to_nud.py` (35 shard meshes, 99-frame animation: the shards fly out
+  from about frame 25, fade by 75) into `model/EffSupamarioTsDmgGrs2` (efc 0x03410064, texture 0x15142380), played by the
+  MSC at the catch (`ts_glass`): at the victim's middle, 15 toward the camera, x0.36 (XV2's scale). XV2 has it on the
+  camera; this is world-placed until the camera command exists.
+- **The hit look on the victim:** XV2's BDM #1 Effect1 (BTL_CMN 2) plays where the hit lands on the victim; ours is at
+  the held victim's middle (its position + 5 up: the punch box's own place, 7.56 ahead / 5.5 up), world-placed (the
+  victim is frozen for the 30-frame time lock, then launched).
+
+### Clip vs build (60 fps; clip frame : XV2 / build frame)
+| clip | XV2 | build |
+|---|---|---|
+| 0-28 | wind-up crouch, lavender shards rising round him (8-30) | motion 0-19 (+ charge hold), shards at 6 / 14 |
+| 30-42 | the dash, no trail (12 frames to the opponent here) | 27-59 moving part, 2.1-4.2 a frame |
+| 43-44 | catch; one full white frame | catch: SpecialAirS 0, Screen_Tint in, glass model |
+| 45-58 | dark world, crack lines, everyone stopped | the 16-frame hold, stage frozen, tint on |
+| 59-100 | the punch, the world washed white, purple speed lines forward from the victim (slow motion) | punch at 16, 30-frame freeze, tint out over 15, purple lines (45 frames) |
+| 100-130 | the victim flies, a long purple line along its path fades | launch at angle 10, the long line (85 frames) |
+
+### Tests
+`tools/supamario_timeskip_test.py OUT SLEDGEHAMMER_OUT`: **123 ok** (v1 87). Its model now moves him by his position writes,
+energy 3 only on the ground or when turned on (as the game: FALL leaves it off), energy 2 in the air, a floor ending at an
+edge, both detection boxes, a slim body for the point-blank cases. New: the travel is the position (energies 0,
+correction 1); the air dash's speeds frame by frame = the ground's; Fall carries 1.85; the edge run-off (the move goes on
+at the same speed and height, Fall at its end, air kinetics, the use taken); tracking (65 degrees down in the air, 70
+units, from the ground up 45 / 60 degrees: lifted off; below past an edge: level to the edge, then down at full speed;
+ts_track has no gf_* call and no ground rule, its range / angle aren't the God Fist's); point blank (a slim fighter
+0.5 ahead / 1 behind: XV2's box alone misses, with ID 1 caught; in the air too); the MSC resets with the exe's off
+(landing, ledge, Damage, DamageFlyRoll, CapturePulled, Dead, Rebirth; still taken in Fall; not reset in the move by a stale
+status); the brightness (`supamario_fx_glow.py` grass / grey: the punch at most 1.0 square unit over 1.0, frame 0 a third
+of v1's or less, energy 8+; the lines and shards at most 1.0); every earlier set byte for byte (emitters, textures,
+shaders, efc); Time Skip's own HitLOD copy; the lines / shards sets; the glass model folder. On the v2 build:
+`supamario_sledgehammer_test` 127 ok, `supamario_fakedeath_test` 47, `supamario_corebreaker_test` 104,
+`supamario_godfist_test --all-models` 566, 0 problems each; `msc_stack_check` 0 of 2451 (globals 127 of 128).
+
+### Not confirmed in game / approximated
+Why the exe's variable reset didn't clear VAR_26 in a match (the MSC now does it either way); the position travel through
+walls / slopes at 4.2 a frame (the God Fist's travel does the same); Screen_Tint's layer 0 darkening the fighters too
+(Sonic's FS darkens the stage behind them) and staying on if the connect were cut before the punch (he is invincible
+there); the glass model world-placed (XV2's is on the camera); the purple lines and shards are stand-ins: the skill's
+own effects 0 / 11 need the EEPK `system/custom_skill.cus` names for skill 1352.
