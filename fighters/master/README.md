@@ -9,6 +9,36 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: v19 (`scratchpad/byleth_v19_fix.zip`, over v18 (+ fighter_params_v2): master.mscsb, body expression.bin; exe unchanged (exe_v46y_hold); vl / game.bin / fighter_param.bin unchanged; in-game TEST)
+
+User, v18 test (clip `066bddbd-...20261116223741599.mp4`, 60 fps; frames `scratchpad/v19/clip/clip_v18_tether.png`): (1)
+"The tether will attempt to happen out of Byleth's range instead of just whiffing up special normally". Coordinator, from
+the user: (2) "Byleth's shield on/off don't cause rumble like every other character's".
+
+| point | cause (evidence) | fix |
+|---|---|---|
+| up special: a tether out of range | clip: off the right edge, falling; the up special at ~134 - 137 (sword drawn 137); **clip 140** her whip already ~46 long flying at the ledge with its head flash (her 0xF2, AirCatchPose: `func_129` sends the whip, article 2, to status 7), ~85 long at 142 and ~15 short of the corner, the tip parked there 142 - 152 while he falls in the pose; off screen 160, KO ~170. Status timeline: frame 0 + 1 + 9 x 0.3 (Set_Frame_Duration 0.3 over 1 - 10) + 2 = **motion frame 12 at ~6 game frames** = clip ~140: the first frame of AIR_LASSO_FLAG_CHECK (0x2100000D, aircatch's script 12 - 17), before the sword's own EXTEND (17), which never came. The check: `master_hi_air_loop` `func_99() == 1 && WorkModule(0x2712, 0x2100000D)` -> `func_16(0xF2)` with **vl entry 4** (v18's common AIR_LASSO box, -5 - 75 ahead, -35 - 85 up, selected in the main from frame 0 and on 12 - 14). The ledge at the trigger: ~65 - 78 ahead, ~70 - 79 above his feet (3.4 - 3.8 px a unit: his hand, ~20 up, ~70 px over his feet), i.e. **~80 - 90 from his hand**: in entry 4, out of the sword's reach (param_sword reach_length_max 70). Her whip (her native status 7, ZSS's tether built for her 10 - 80 ahead / -10 - 50 up box) never arrives, so her native code never sends 0xF3, and her 0xF2 loop (`func_130`) ends only by landing: helpless to the blast line. Not a native path from frame 0: nothing reads the box before 12 (the native whip latch runs from 17, entry 0 by then: func_124) | **`master_hi_reach`**: the ledge (func_99's: GroundModuleF(1) / (2), the cliff's corner as CliffCatch reads it) is caught only within **MASTER_HI_REACH 70** (param_sword reach_length_max) of his hand (MASTER_HI_LINE_X / _Y 5.5 / 20.5), in the check window (`master_hi_air_loop`) and at a wall (`master_hi_line`'s ledge-first); the main selects **entry 0** (v18: entry 4 from frame 0), entry 4 only on 12 - 14, entry 2 on 15 - 16 as before; **0xF2 gives up** after MASTER_HI_F2_MAX 40 frames -> Fall (`master_hi_f2_main` / `_loop`: her func_2269 + func_129 with her loop's landing kept; her end removes the whip). Out of reach the move whiffs normally (the sword out at 17, back at 27, Fall). Kept from v18: every ledge of v18's test (16 ahead / 43 up, 16 ahead / 20 below) is within reach; a wall under a ledge in reach -> the ledge. Diagram `scratchpad/v19/ledge/ledge_reach_v18_v19.png` (where a corner is caught on 12 - 14 / 15 - 16; red: v18 caught, v19 whiffs). APPROXIMATED: the reach is a circle from his hand (Ultimate's sword stretches toward the ledge up to reach_length_max; its own test not read); the clip's position from pixels. **port_check S34 tether-reach** (ERROR on v18's master.c: master_hi_air_loop, master_hi_line; WARN for the base's 0xF2 main) |
+| no shield rumble | his expression.bin (v18 install, `scratchpad/v19/expr/expression_v18.bin`) `guardon` = `SLOPE(6), FRAME 2, Slope_Full(0, 3)`, ZSS's vanilla `SLOPE(6), Rumble(4), FRAME 2, Slope_Full(0, 2)`; `guardoff` lost its `Rumble(4)` too. Ultimate's `expression_guardon` (lua2cpp) is slope only with `// TODO: expression_GuardOnRumble();`: Ultimate rumbles status motions from its common status code; the dump keeps the helper only as a comment, so `ultimate_acmd`'s helper mapping (rumble_helpers, for real calls) never ran and the translated script replaced the base's. Audit of every status motion (mtable.COMMON minus his moves) against ZSS's vanilla: **10 silent**: guardon, guardoff, landinglight, landingheavy, landingfallspecial, stepjump, steppose, stepposeair (0x3E, AD2064E4), downboundu (0xD5), downboundd (0xDF); every other status motion with a vanilla rumble (catch / dash / run / walk / slip / item swings ...) kept the base's script. His moves: Ultimate's own rumble (many of his kinds have no Smash 4 match, below) | `ultimate_acmd.keep_base_rumble` in translate_others (a status motion's, or a TODO-helper script's, translation that rumbles nowhere gets the base's rumble at its frames, else the helper's from rumble_helpers; a looping one at its start); `tools/rumble_fix.py DUMP PORT BASE --fix` on the install (the 10 scripts: the base's Rumble / Rumble_Loop added at its frames, Ultimate's slopes / quakes kept; the other 273 byte-identical). port_check B1 no longer lists status motions' scripts as base leftovers (20 -> 14). **port_check S35 status-rumble** (ERROR on v18's install: those 10) |
+
+Other ports (report only): every port translated with `--expressions` (Hero 284 scripts, Sephiroth 164, Squirtle 217,
+Incineroar, Steve) went through the same translator over dumps with the same TODO-only status motions (58 in each of
+lua2cpp_brave / edge / gaogaen / pickel / pzenigame): they lose their bases' status rumbles the same way wherever the base
+has a script for the motion (shield on / off at least). Not verified on their installs (not in the scratchpad; the
+`scratchpad/v8/brave` Hero build predates it and still rumbles): `port_check S35` on each install, `rumble_fix.py --fix`.
+Supamario not checked (another agent's). Ultimate rumble kinds with no Smash 4 match (move rumbles left out, all ports:
+rbkind_smashhold2, gene_charge, erase, furafura, sleep, warpstar, sp_flag; Byleth also slashs / slashss / slashll /
+slash_critical / pierces / piercel / beamm / drawhold / 75_*): open (reference/ultimate_sound_map.json "rumble").
+
+Checks: `tools/master_specials_test.py` **176 checks, 0 problems** (v19: the clip's ledge (70, 75) at 12 -> a whiff, then
+Fall at the end; a ledge just out of reach (72 from the hand) -> a whiff; at the edge (69) -> the ledge; both facings;
+(40, 70) at 15 in entry 2; v18's ledges still caught; no box before 12; a wall under a ledge in / out of reach -> the
+ledge / the latch; 0xF2 throws her whip, waits at 39, Fall at 40; keep_base_rumble (GuardOn, LandingHeavy at 3, own
+rumble untouched, the helper, a loop) and status_motion). port_check (v4 ... v18_fix, sound_v1, results_panels_v1,
+rapid_setoff_v1, fighter_params_v2, **v19**): **0 ERROR**, 31 WARN (`scratchpad/v19/pc_v19.log`); v18's install: S35
+(`pc_v18install.log`); v18's master.c: S34 ERROR + WARN. Build: `master_build.compile_msc` (master.mscsb sha1 8e93c867...),
+`python3 tools/rumble_fix.py <lua2cpp_master/master> <installed expression.bin> <ZSS vanilla expression.bin> --fix OUT`
+(sha1 a6cb9227...). Package `scratchpad/v19/pkg` (README there).
+
 ## Status: v18 (`scratchpad/byleth_v18_fix.zip`, over rapid_setoff_v1 (+ fighter_params_v2): body game.bin, master.mscsb, the vl; exe unchanged (exe_v46y_hold); fighter_param.bin unchanged; in-game TEST)
 
 User, rapid_setoff v1 test (clips `626f767f-...213147327.mp4`: rapid jab on DK; `75dbb69e-...213159819.mp4`: up special under
@@ -964,6 +994,11 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
+000000000000000000. **v19 fix** (sent: `scratchpad/byleth_v19_fix.zip`, no exe): test list in its README (`scratchpad/v19/pkg/README.txt`).
+   If a ledge he should catch is missed now: a clip with the ledge in view (MASTER_HI_REACH 70 may be short of Ultimate's
+   own test: read the sword article's ledge test / its reach_length_max use in lua2cpp_master's master_sword). If he still
+   hangs in the tether pose past 40 frames: a clip (0xF2's give-up is in master_hi_f2_loop). Open: the other ports' status rumble (S35 on their installs,
+   rumble_fix.py), the unmatched Ultimate rumble kinds of his moves.
 00000000000000000. **v18 fix** (sent: `scratchpad/byleth_v18_fix.zip`, no exe): test list in `scratchpad/byleth/INSTALL_README_v18.txt`.
    If the rapid jab still lands once a loop: the debug words at `0x04B93900` (+0x08 Extra hits found, +0x10 / +0x30 the
    victim's / attacker's last hitstop, both should read 2) before / after 3 s of rapid jab, and a clip; then a diag on the
@@ -1469,6 +1504,11 @@ python3 tools/ultimate_port.py run master motions motions-group2 low-models soun
 python3 tools/master_whip.py tips ULT                                             # the air hit's pull table (master.c)
 bash scratchpad/byleth/make_pkg_v6_fix.sh                                         # -> scratchpad/byleth_v6_fix.zip (fix)
 python3 tools/port_check.py master byleth_v4.zip byleth_userdata_v2.zip byleth_v5_fix.zip byleth_v6_fix.zip   # 0 ERROR
+# v19: the up special's ledge reach / 0xF2 give-up (master.c), the status motions' rumble (tools/rumble_fix.py on the install)
+python3 -c "import sys; sys.path.insert(0,'tools'); import master_build as M; M.compile_msc('fighters/master/master.c', 'OUT/master.mscsb')"
+python3 tools/rumble_fix.py DUMP/lua2cpp_master/master INST/.../body/expression.bin VANILLA/fighter/szerosuit/script/animcmd/body/expression.bin --fix OUT/expression.bin
+python3 -I tools/master_specials_test.py OUT/master.mscsb                         # 176 checks
+python3 tools/port_check.py master byleth_v4.zip ... byleth_v18_fix.zip byleth_v19_fix.zip   # 0 ERROR
 # v16: hit sounds (ultimate_acmd.sfx_type; the install fixed by tools/hit_sound_fix.py), Aymr's turn (master.c), the result faces
 python3 tools/hit_sound_fix.py DUMP/lua2cpp_master INST/.../body/game.bin INST/.../weapon/arrow2/game.bin --fix OUT
 python3 tools/ultimate_fighter.py result-faces ULT/motion/body/c00 BASE INST/c00=OUT/c00 ...   # c01 for c01/03/05/07

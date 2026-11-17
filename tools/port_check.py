@@ -459,6 +459,9 @@ def check_scripts(inst, name, kind, base, joints, vanilla, rep):
         kept = {k.lower() for k in (load_port_cfg(name).get('base_scripts_kept') or {})}
         kept_crc = {acmd.crc(k) for k in kept}       # (names the vocabulary lacks: Byleth's batswing4)
         vocab = {acmd.crc(n): n for n in vocabulary()}
+        import mtable
+        import ultimate_acmd as _UA
+        status_crcs = {acmd.crc(c.lower()) for c in mtable.COMMON if _UA.status_motion(c)}
         acts = {'game': ('Hitbox', 'Special_Hitbox', 'Extended', 'Grab', 'Body_Collision', 'Set_Body_State',
                          'Intangib', 'Invincib', 'Super_Armor', 'Armor', 'Reflect', 'Absorb', 'Search', 'Shield',
                          'Generate_Article', 'Article'),
@@ -471,10 +474,13 @@ def check_scripts(inst, name, kind, base, joints, vanilla, rep):
             if not os.path.exists(vp) or not mine:
                 continue
             van = acmd.ACMDFile.load(vp).scripts
+            # (v19: a status motion's expression script (guard, landings, footstools, downs: its rumble / slope) is the
+            # same for every fighter: the base's is right there, S35)
             left = sorted(vocab.get(h, '%08X' % h) for h, cmds in mine.items()
                           if h in van and [str(c) for c in cmds] == [str(c) for c in van[h]]
                           and any(str(c).startswith(words) for c in cmds)
-                          and vocab.get(h, '%08X' % h).lower() not in kept and h not in kept_crc)
+                          and vocab.get(h, '%08X' % h).lower() not in kept and h not in kept_crc
+                          and not (fn == 'expression' and h in status_crcs))
             if left:
                 rep.add('ERROR' if fn == 'game' else 'WARN', 'B1 base-leftovers', '%s.bin: %d scripts still the base\'s '
                         'vanilla ones (its move / effects / sounds on the port\'s animation; replace, empty, or list '
@@ -494,6 +500,18 @@ def check_scripts(inst, name, kind, base, joints, vanilla, rep):
             continue
         if any(c.name == 'Rumble' and c.params and int(c.params[0]) in ultimate_acmd.RUMBLE_ENDLESS for c in cmds):
             endless.add('%08X' % h)
+    # S35 status-rumble (Byleth v19, user: "Byleth's shield on/off don't cause rumble like every other character's"):
+    # a status motion's expression script (guard on / off, landings, footstools, down bounds ...: ultimate_acmd
+    # .status_motion) that rumbles nowhere while the base's vanilla one does. Ultimate rumbles those from its common
+    # status code (the dumps' `// TODO: expression_GuardOnRumble();`), so the translated script was silent; the
+    # translator keeps the base's now (ultimate_acmd.keep_base_rumble), tools/rumble_fix.py fixes an install
+    if vexpr and expr:
+        import rumble_fix
+        silent = rumble_fix.scan(expr, vexpr, names=vocabulary())
+        if silent:
+            rep.add('ERROR', 'S35 status-rumble', '%d status-motion expression scripts rumble nowhere while the base\'s '
+                    'do (Ultimate plays these from its common status code): %s; tools/rumble_fix.py --fix' % (
+                        len(silent), ', '.join('%s (%s)' % (n, r[0].split('@')[0]) for n, r in silent[:12])))
     if endless:
         rep.add('ERROR', 'S8 rumble-endless', 'plain Rumble on a kind that never stops (%s) in %d expression scripts: '
                 'it rumbles on for seconds; play it as Rumble_Loop: %s' % (', '.join(map(str, ultimate_acmd.RUMBLE_ENDLESS)),

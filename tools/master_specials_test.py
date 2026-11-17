@@ -54,6 +54,11 @@ v17: the reel at master_build's MASTER_HI_REWIND (5.0) a frame and the pull moti
      tether's whip moved into an anchored motion); the base's whip out of the side taunt / Win1 (and only there);
      the rapid jab's holding hits at HOLD_ANGLE (ultimate_acmd.hold_angle), nothing else; the jab chain's
      fighter_param values from Ultimate's (ultimate_stats: 86 presses 5, 81 / 82 28, 262 1).
+v18: the ledge boxes by frame, the ledge before the wall; Aymr's armor every frame 34 - 63; the rapid jab's waves.
+v19: a ledge caught only within the sword's reach (MASTER_HI_REACH from his hand) in the check window and at a wall:
+     the clip 066bddbd position (a whiff, then Fall), just out of reach (a whiff), the edge of reach (a catch), both
+     facings; no box before 12; 0xF2's give-up (Fall at MASTER_HI_F2_MAX); ultimate_acmd.keep_base_rumble (the
+     status motions' rumble: GuardOn / GuardOff, landings ...).
 """
 import os
 import re
@@ -1212,6 +1217,41 @@ def v19(path):
               gm.status == want, str([hex(s) for s in gm.status]))
     src = open(SRC).read()
     check('v19 0xF2\'s main is master_hi_f2_main', 'sv_set_mem(0x1, 0x1, 0xf2, master_hi_f2_main)' in src)
+    v19_rumble()
+
+
+def v19_rumble():
+    """v19 (user: "Byleth's shield on/off don't cause rumble like every other character's"): ultimate_acmd keeps the base's
+    rumble in a status motion's expression script that rumbles nowhere (Ultimate rumbles those from its common code)"""
+    import acmd
+    import ultimate_acmd as U
+    c = U.cmd
+    E = acmd.Command(acmd.END)
+    ult_on = [c('SLOPE', 6), c('FRAME', 2), c('Slope_Full', 0, 3), E]               # Ultimate's GuardOn: slope only
+    base_on = [c('SLOPE', 6), c('Rumble', 4, 0), c('FRAME', 2), c('Slope_Full', 0, 2), E]
+    got, kept = U.keep_base_rumble(ult_on, base_on)
+    want = ['SLOPE(SlopeStatus=6)', 'Rumble(Kind=4, StartFrame=0)', 'FRAME(Frames=2)', 'Slope_Full(SlopeStatus=0, Frames=3)']
+    check('v19 GuardOn: Ultimate\'s slope kept, the base\'s Rumble(4) at frame 0 added', kept and
+          [str(x) for x in got if x.ident != acmd.END] == want, str([str(x) for x in got]))
+    got, kept = U.keep_base_rumble([c('SLOPE', 6), E], [c('SLOPE', 6), c('FRAME', 3), c('Rumble_Loop', 0x17, 0), E])
+    check('v19 LandingHeavy: the base\'s Rumble_Loop(0x17) at its frame 3', kept and
+          [str(x) for x in got if x.ident != acmd.END] == ['SLOPE(SlopeStatus=6)', 'FRAME(Frames=3)',
+                                                             'Rumble_Loop(Kind=0x17, StartFrame=0)'], str([str(x) for x in got]))
+    mine = [c('Rumble', 0xC, 0), E]
+    got, kept = U.keep_base_rumble(mine, base_on)
+    check('v19 a script with its own rumble is left alone', not kept and got is mine)
+    got, kept = U.keep_base_rumble([c('SLOPE', 6), E], None, ['RUMBLE(Kind=4, 0)'])
+    check('v19 no base script: the dump helper\'s rumble (rumble_helpers)', kept and 'Rumble(Kind=4, StartFrame=0)' in
+          [str(x) for x in got], str([str(x) for x in got]))
+    loop = [c('Rumble_Loop', 0x22, 0), c('FRAME', 10), c('Loop_Rest'), c('JUMP', 0x1234), E]
+    got, kept = U.keep_base_rumble([c('Slope_Full', 0, 3), c('Loop_Rest'), c('JUMP', 0x1234), E], loop)
+    check('v19 a looping script: the base\'s frame-0 rumble put at its start', kept and got[0].name == 'Rumble_Loop',
+          str([str(x) for x in got]))
+    cls = {n: U.status_motion(n) for n in ('guardon', 'guardoff', 'landingheavy', 'steppose', 'downboundu', 'thrownf',
+                                           'attacks4', 'throwf', 'specialhi', 'landingairf', 'appealsr')}
+    check('v19 status motions: guard / landings / footstool / down / thrown yes; moves (attacks4, throwf, specialhi, '
+          'landingairf, appealsr) no', [k for k, v in cls.items() if v] == ['guardon', 'guardoff', 'landingheavy',
+                                                                              'steppose', 'downboundu', 'thrownf'], str(cls))
 
 
 def v18_rapid():

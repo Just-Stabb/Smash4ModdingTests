@@ -1409,6 +1409,67 @@ class SoundTranslator(Translator):
 RUMBLE_ENDLESS = (2, 3, 6, 8, 9, 26, 34, 35, 36)
 
 
+RUMBLE_CMDS = ('Rumble', 'Rumble_Loop')
+# the fighter's own moves (their rumble is Ultimate's script's: RUMBLE_HIT, set_rumble), not status motions
+MOVE_PREFIXES = ('attack', 'special', 'final', 'catchattack', 'appeal', 'win', 'entry', 'landingair', 'cliffattack',
+                 'downattack', 'slipattack')
+RUMBLE_HELPER = re.compile(r'expression_(\w+Rumble)\(\)')
+
+
+def status_motion(name):
+    """a common motion (mtable.COMMON) whose rumble belongs to the status, not to a move of the fighter: guard on / off,
+    landings, footstools, downs, damage, ledge, passives ... (Ultimate plays those from its common status code: the
+    dumps' expression scripts only carry a `// TODO: expression_<Motion>Rumble();` comment)"""
+    import mtable
+    n = name.lower()
+    if not hasattr(status_motion, 'common'):
+        status_motion.common = {c.lower() for c in mtable.COMMON}
+    if n.startswith('throw') and not n.startswith('thrown'):
+        return False
+    return n in status_motion.common and not n.startswith(MOVE_PREFIXES)
+
+
+def rumble_timed(sc):
+    """[(frame, command)] of a script's Rumble / Rumble_Loop commands (FRAME / WAIT followed; branches read through)"""
+    t, out = 0, []
+    for c in sc or []:
+        if c.ident == acmd.END:
+            break
+        if c.name == 'FRAME':
+            t = max(t, int(c.params[0]))
+        elif c.name == 'WAIT':
+            t += int(c.params[0])
+        elif c.name in RUMBLE_CMDS:
+            out.append((t, c))
+    return out
+
+
+def keep_base_rumble(cmds, base, helper=None):
+    """Byleth v19 (user: "Byleth's shield on / off don't cause rumble like every other character's"): an Ultimate
+    expression script that rumbles nowhere, for a motion whose base (vanilla) script rumbles, gets the base's rumble
+    commands at their frames (else `helper`'s, Ultimate's common helper as reference/ultimate_sound_map.json
+    rumble_helpers maps it). Ultimate's status motions rumble from its common status code (the dump's
+    `// TODO: expression_GuardOnRumble();`), so the translated script alone was silent: v1 - v18's GuardOn / GuardOff
+    / landings / footstools / down bounds. (the script, whether it changed)"""
+    if any(c.name in RUMBLE_CMDS for c in cmds):
+        return cmds, False
+    rb = rumble_timed(base)
+    if not rb and helper:
+        rb = [(0, cmd('Rumble_Loop' if k == 'RUMBLE_STATUS' else 'Rumble', int(kind), int(n)))
+              for k, kind, n in (re.match(r'(\w+)\(Kind=(\d+), (\d+)\)', h).groups() for h in helper)]
+    if not rb:
+        return cmds, False
+    flat = []
+    for t, c in rb:
+        flat += [cmd('FRAME', t), c] if t else [c]
+    merged = merge_flat(cmds, flat + [acmd.Command(acmd.END)])
+    if merged is None:
+        if any(t for t, _c in rb):
+            return cmds, False
+        merged = [c for _t, c in rb] + list(cmds)      # a looping script: the status's rumble at its start, as vanilla's
+    return merged, True
+
+
 class ExpressionTranslator(Translator):
     """expression_* functions -> Smash 4 expression scripts (rumble, camera quake, slope, item visibility),
     reference/ultimate_sound_map.json: ControlModule::set_rumble -> Rumble (RUMBLE) or Rumble_Loop
@@ -1422,6 +1483,7 @@ class ExpressionTranslator(Translator):
         self.t, self.missing = table, {}
         self.loop = False
         self.has_rumble = False
+        self.kept_rumble = []
 
     def rumble(self, kind, n, loop):
         k = self.t['rumble'].get(kind)
@@ -1619,6 +1681,14 @@ def translate_others(kind, scripts_dir, base_bin, tr, skip=('special', 'final'),
                                                             else body)), name)
             if tr.loop and not any(c.name == 'JUMP' for c in cmds):
                 cmds = cmds[:-1] + [cmd('Loop_Rest'), cmd('JUMP', acmd.crc(name)), acmd.Command(acmd.END)]
+            if kind == 'expression':
+                # v19: a status motion's rumble (Ultimate's common status code: the dump's TODO helper) -> the base's
+                hm = RUMBLE_HELPER.search(body)
+                if hm or status_motion(name):
+                    cmds, kept = keep_base_rumble(cmds, base_bin.scripts.get(acmd.crc(name)),
+                                                  tr.t.get('rumble_helpers', {}).get(hm.group(1)) if hm else None)
+                    if kept:
+                        tr.kept_rumble.append(name)
             out[name] = cmds
     if kind == 'sound':
         for src, dst in SOUND_MERGE.items():
@@ -1939,9 +2009,11 @@ def main():
                 et = ExpressionTranslator(smap)
                 sc = translate_others('expression', a.scripts, o, et)
                 o.scripts.update({acmd.crc(n): c for n, c in sc.items()})
-                print('%d expression scripts translated; rumble kinds without a match: %s; calls left out: %s' % (
-                    len(sc), ', '.join('%s x%d' % kv for kv in sorted(et.missing.items(), key=lambda kv: -kv[1])) or '-',
-                    ', '.join('%s x%d' % kv for kv in sorted(et.skipped.items(), key=lambda kv: -kv[1])) or '-'))
+                print('%d expression scripts translated; rumble kinds without a match: %s; calls left out: %s; the base\'s '
+                      'rumble kept (status motions: Ultimate\'s common code rumbles them): %s' % (
+                          len(sc), ', '.join('%s x%d' % kv for kv in sorted(et.missing.items(), key=lambda kv: -kv[1]))
+                          or '-', ', '.join('%s x%d' % kv for kv in sorted(et.skipped.items(), key=lambda kv: -kv[1]))
+                          or '-', ', '.join(et.kept_rumble) or '-'))
             o.save(os.path.join(a.others[1], fn))
     if a.motion_list:
         moves = motion_frames(a, done)
