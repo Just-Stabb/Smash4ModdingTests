@@ -3735,6 +3735,28 @@ def check_screen_invert_exe(inst, name, rep):
                 '(tools/screen_invert_cave.py: exe_v46z_inv or later): the script won\'t load' % ', '.join(sorted(uses)))
 
 
+def check_model_commands_exe(inst, name, rep):
+    """X11 outline-exe / X12 meshvis-exe (ERROR; model_commands v1): a script of the fighter (game / effect / sound /
+    expression, body or article) using Outline_Set / Mesh_Visibility with no executable in the install carrying
+    tools/outline_cave.py / tools/mesh_vis_cave.py (exe_v46z_outline or later): the script won't load"""
+    want = {'Outline_Set': ('outline_cave', 'X11 outline-exe', 'outline'),
+            'Mesh_Visibility': ('mesh_vis_cave', 'X12 meshvis-exe', 'mesh visibility')}
+    uses = {}
+    for rel in inst.glob(r'fighter/%s/script/animcmd/(body|weapon/[^/]+)/(game|effect|sound|expression)\.bin' % name):
+        try:
+            f = _acmd_load(inst.get(rel))
+        except Exception:          # noqa: BLE001
+            continue
+        for c in (c for sc in f.scripts.values() for c in sc):
+            if c.name in want:
+                uses.setdefault(c.name, set()).add(rel)
+    for cmd, rels in sorted(uses.items()):
+        cave, rule, what = want[cmd]
+        if not _exe_present(inst, cave):
+            rep.add('ERROR', rule, '%s in %s but the install\'s code/cross_f.rpx has no %s (tools/%s.py: exe_v46z_outline or '
+                    'later): the script won\'t load' % (cmd, ', '.join(sorted(rels)), what, cave))
+
+
 def _exe_present(inst, cave):
     """the install's executable carries tools/<cave>.py (its present())"""
     if 'code/cross_f.rpx' not in inst.files:
@@ -3985,6 +4007,7 @@ def main():
     check_rapid_slide(inst, a.name, rep)
     check_camera_effect_exe(inst, a.name, rep)
     check_screen_invert_exe(inst, a.name, rep)
+    check_model_commands_exe(inst, a.name, rep)
     check_rapid_cadence(inst, a.name, rep)
     check_armor(a.name, rep)
     check_ledge_before_wall(a.name, rep)

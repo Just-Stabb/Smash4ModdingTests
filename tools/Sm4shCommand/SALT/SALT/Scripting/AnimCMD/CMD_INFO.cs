@@ -177,7 +177,9 @@ namespace SALT.Moveset.AnimCMD
             {0x048FC81B,5},
             {0xAB0FC57C,3},
             {0xF20DCF58,12},
-            {0x370CA2AD,11}
+            {0x370CA2AD,11},
+            {0xD627E02A,5},
+            {0xDB280FCF,11}
         };
         #endregion
         #region Names
@@ -815,6 +817,8 @@ namespace SALT.Moveset.AnimCMD
             {0xAB0FC57C,"Hitbox_Hold"},
             {0xF20DCF58,"Effect_Camera"},
             {0x370CA2AD,"Screen_Invert"},
+            {0xD627E02A,"Mesh_Visibility"},
+            {0xDB280FCF,"Outline_Set"},
         };
         #endregion
         #region Params
@@ -1454,6 +1458,8 @@ namespace SALT.Moveset.AnimCMD
             {0xAB0FC57C,"0,0"},
             {0xF20DCF58,"0,1,1,1,1,1,1,1,0,0,0"},
             {0x370CA2AD,"0,1,0,0,0,1,1,1,1,1"},
+            {0xD627E02A,"0,0,0,0"},
+            {0xDB280FCF,"0,1,1,1,1,1,0,0,0,0"},
         };
         #endregion
         #region syntax
@@ -2091,6 +2097,8 @@ namespace SALT.Moveset.AnimCMD
             {0xAB0FC57C,"ID,Mode"},
             {0xF20DCF58,"Graphic,X,Y,Z,XRot,YRot,ZRot,Size,Mode,Frames,Flags"},
             {0x370CA2AD,"Mode,Strength,Frames,FadeIn,FadeOut,Saturation,Brightness,Red,Green,Blue"},
+            {0xD627E02A,"Target,Mesh,Visible,Persist"},
+            {0xDB280FCF,"Target,Red,Green,Blue,Alpha,Tint,Frames,FadeIn,FadeOut,Flash"},
         };
         #endregion
 
@@ -2730,6 +2738,8 @@ namespace SALT.Moveset.AnimCMD
             {0xAB0FC57C,"Marks a hitbox so its hits keep the victim in place: no knockback travel, the damage / hitstun / hitlag / SDI kept (the setting the port pipeline gives Ultimate's rapid-jab hits). Cleared when the hitbox is replaced. New command: needs the patched cross_f.rpx (tools/hitbox_hold_cave.py, exe_v46y_hold)."},
             {0xF20DCF58,"Starts an effect attached to the camera: placed in front of it every frame (X right, Y up, Z forward from the eye), facing it, following its moves and zooms; Mode 1 keeps it on the same part of the screen (full-screen overlays). EFFECT_OFF_KIND / LAST_EFFECT_SET_* work on it. New command: needs the patched cross_f.rpx (tools/camera_effect_cave.py, exe_v46z_camfx)."},
             {0x370CA2AD,"Turns the 3D picture (fighters, stage, effects; not the HUD) into a photo-negative, with a strength, saturation, brightness and colour lift, faded in and out: the game's own colour-correction pass (the one Screen_Tint uses). One at a time; ends with Mode 0, its Frames, or the match / a training reset. New command: needs the patched cross_f.rpx (tools/screen_invert_cave.py, exe_v46z_inv)."},
+            {0xD627E02A,"Hides or shows one of an object's meshes by name, for this animation or until changed, over the motion's visibility animation and the visibility groups. New command: needs the patched cross_f.rpx (tools/mesh_vis_cave.py, exe_v46z_outline)."},
+            {0xDB280FCF,"A coloured glow on an object's silhouette edges (a rim light), optionally with a body tint, faded in and out and pulsing: the fighter shaders' own fresnel rim, coloured per object. One per object; ends with Alpha 0, its Frames, a KO, the match end or a training reset. New command: needs the patched cross_f.rpx (tools/outline_cave.py, exe_v46z_outline)."},
         };
         #endregion
         /// <summary>

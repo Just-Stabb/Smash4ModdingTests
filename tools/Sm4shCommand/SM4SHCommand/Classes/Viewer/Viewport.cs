@@ -233,10 +233,12 @@ namespace Sm4shCommand.Viewer
                 // v1.6.2: the body overlay / flash on this frame (Color_Overlay & co.) tints the fighter and what it holds
                 var ov = ShowOverlays && Frame != null ? Frame.Overlay : null;
                 bool ovAdd = Frame != null && Frame.OverlayLight;
+                // v1.7.13: Outline_Set's glow (a rim on the edges seen edge-on, the tint over the overlay)
+                var ol = ShowOverlays && Frame != null ? Frame.Outline : null;
                 FaceCamera(attacker, r, u, f);
                 FaceCamera(held, r, u, f);
-                if (attacker != null && WholeVisible) Rasterize(attacker, pix, zbuf, w, h, r, u, f, ov, ovAdd);
-                if (held != null && WholeVisible) Rasterize(held, pix, zbuf, w, h, r, u, f, ov, ovAdd);
+                if (attacker != null && WholeVisible) Rasterize(attacker, pix, zbuf, w, h, r, u, f, ov, ovAdd, ol);
+                if (held != null && WholeVisible) Rasterize(held, pix, zbuf, w, h, r, u, f, ov, ovAdd, ol);
                 if (enemy != null) Rasterize(enemy, pix, zbuf, w, h, r, u, f);
                 texturedTrails.Clear();
                 try { DrawFx(pix, zbuf, w, h, r, u, f); }
@@ -259,8 +261,13 @@ namespace Sm4shCommand.Viewer
             }
         }
 
-        void Rasterize(Skinned s, int[] pix, float[] zbuf, int w, int h, float[] r, float[] u, float[] f, float[] ov = null, bool ovAdd = false)
+        void Rasterize(Skinned s, int[] pix, float[] zbuf, int w, int h, float[] r, float[] u, float[] f, float[] ov = null, bool ovAdd = false,
+                       float[] ol = null)
         {
+            // v1.7.13: the outline's tint as a second overlay; its rim added per triangle ((1 - |N.V|)^3: the fighters'
+            // rim exponent is the material's, about 2-4)
+            float[] olTint = ol != null && ol[4] > 0 ? new[] { ol[0], ol[1], ol[2], ol[4] } : null;
+            var add = ol != null ? new float[3] : null;
             float cx = w / 2f + panX, cy = h * 0.72f + panY;
             int k = 0;
             var tv = new float[6];
@@ -287,6 +294,11 @@ namespace Sm4shCommand.Viewer
                         float nl = (float)Math.Sqrt(nx * nx + ny * ny + nz * nz);
                         if (nl < 1e-9f) continue;
                         float light = Math.Abs(-0.3f * nx + 0.55f * ny - 0.78f * nz) / nl;
+                        if (add != null)
+                        {
+                            float rim = (float)Math.Pow(1 - Math.Min(1, Math.Abs(nz) / nl), 3) * ol[3] * 255;
+                            add[0] = ol[0] * rim; add[1] = ol[1] * rim; add[2] = ol[2] * rim;
+                        }
                         // brighter than plain diffuse: the game's lights and soft lighting lift the textures
                         float shade = 0.75f + 0.55f * light;
                         if (tex != null)
@@ -294,14 +306,14 @@ namespace Sm4shCommand.Viewer
                             int i0 = t[i] * 2, i1 = t[i + 1] * 2, i2 = t[i + 2] * 2;
                             tv[0] = p.UV[i0]; tv[1] = p.UV[i0 + 1]; tv[2] = p.UV[i1]; tv[3] = p.UV[i1 + 1]; tv[4] = p.UV[i2]; tv[5] = p.UV[i2 + 1];
                             Tri(pix, zbuf, w, h, cx + x0 * zoom, cy - y0 * zoom, z0, cx + x1 * zoom, cy - y1 * zoom, z1,
-                                cx + x2 * zoom, cy - y2 * zoom, z2, 0, shade, tex, tv, p.AlphaTest || tex.HasAlpha, ov, ovAdd);
+                                cx + x2 * zoom, cy - y2 * zoom, z2, 0, shade, tex, tv, p.AlphaTest || tex.HasAlpha, ov, ovAdd, olTint, add);
                         }
                         else
                         {
                             int cr = Clamp((int)((196 + tint) * shade)), cg = Clamp((int)((188 + tint / 2) * shade)), cb = Clamp((int)((178 - tint) * shade));
                             int col = unchecked((int)0xFF000000) | cr << 16 | cg << 8 | cb;
                             Tri(pix, zbuf, w, h, cx + x0 * zoom, cy - y0 * zoom, z0, cx + x1 * zoom, cy - y1 * zoom, z1,
-                                cx + x2 * zoom, cy - y2 * zoom, z2, col, 1, null, null, false, ov, ovAdd);
+                                cx + x2 * zoom, cy - y2 * zoom, z2, col, 1, null, null, false, ov, ovAdd, olTint, add);
                         }
                     }
                 }
@@ -325,7 +337,7 @@ namespace Sm4shCommand.Viewer
         /// is orthographic) times the shade. Texels with little alpha are left out (alpha test).</summary>
         static void Tri(int[] pix, float[] zb, int w, int h, float ax, float ay, float az, float bx, float by, float bz,
                         float cx, float cy, float cz, int col, float shade, Texture tex, float[] uv, bool alphaTest,
-                        float[] ov = null, bool ovAdd = false)
+                        float[] ov = null, bool ovAdd = false, float[] ov2 = null, float[] add = null)
         {
             int minX = Math.Max(0, (int)Math.Floor(Math.Min(ax, Math.Min(bx, cx))));
             int maxX = Math.Min(w - 1, (int)Math.Ceiling(Math.Max(ax, Math.Max(bx, cx))));
@@ -359,6 +371,13 @@ namespace Sm4shCommand.Viewer
                     else
                         pix[i] = col;
                     if (ov != null) pix[i] = Overlay(pix[i], ov, ovAdd);
+                    if (ov2 != null) pix[i] = Overlay(pix[i], ov2, false);
+                    if (add != null)
+                    {
+                        int c = pix[i];
+                        pix[i] = unchecked((int)0xFF000000) | Clamp((c >> 16 & 255) + (int)add[0]) << 16 |
+                                 Clamp((c >> 8 & 255) + (int)add[1]) << 8 | Clamp((c & 255) + (int)add[2]);
+                    }
                     zb[i] = z;
                 }
             }

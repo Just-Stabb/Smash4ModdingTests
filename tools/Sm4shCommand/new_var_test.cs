@@ -85,10 +85,10 @@ class NvTest
         var errors = new List<string>();
         int n = ACMD_INFO.OverrideInfo(args[0], errors);
         Check("Events.cfg loads with no errors", string.Join("; ", errors), "");
-        Check("commands", ACMD_INFO.CMD_NAMES.Count, 632);   // v1.7.12: + Screen_Invert; v1.4.12: + Position_Place, Position_Offset_Get; v1.4.13: + Buffer_Clear, Buffer_Set; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
+        Check("commands", ACMD_INFO.CMD_NAMES.Count, 634);   // v1.7.13: + Outline_Set, Mesh_Visibility; v1.7.12: + Screen_Invert; v1.4.12: + Position_Place, Position_Offset_Get; v1.4.13: + Buffer_Clear, Buffer_Set; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
         Check("New_Var known: size 11, group", ACMD_INFO.CMD_SIZES[FighterVariable.NewVarIdent] + " " +
               ACMD_INFO.GetCategory(FighterVariable.NewVarIdent), "11 New Commands / Variables");
-        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 48);       // v1.7.12: + Screen_Invert; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
+        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 50);       // v1.7.13: + Outline_Set, Mesh_Visibility; v1.7.12: + Screen_Invert; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
         Check("group help blocks", ACMD_INFO.GROUP_HELP.Count, 11);      // v1.7.0: + New Commands / Time & stage; v1.7.6: + New Commands / Effects
         LoadAliases(args[1]);
         Check("aliases loaded", FighterVariable.AliasCount > 500, true);
@@ -181,6 +181,23 @@ class NvTest
         Check("Screen_Invert shown (ints in hex, the editor's default)", s.Deserialize().Split('\n')[0].Trim(),
               "Screen_Invert(Mode=0x1, Strength=1, Frames=0x1E, FadeIn=0x0, FadeOut=0x14, Saturation=0.15, Brightness=0.6, Red=102, Green=104, Blue=110)");
         Check("Screen_Invert: New Commands / Effects", ACMD_INFO.GetCategory(0x370CA2AD), "New Commands / Effects");
+
+        // ---- v1.7.13: Outline_Set(Target, Red, Green, Blue, Alpha, Tint, Frames, FadeIn, FadeOut, Flash) and
+        //      Mesh_Visibility(Target, Mesh, Visible, Persist) (exe_v46z_outline); a name in quotes is its CRC32
+        s = Compile("Outline_Set(Target=0, Red=255, Green=255, Blue=255, Alpha=510, Tint=0, Frames=120, FadeIn=4, FadeOut=10, Flash=0)");
+        Check("Outline_Set: 11 words, its CRC, Target, 5 floats, Frames, FadeIn, FadeOut, Flash (then the end marker)", Hex(Bytes(s)),
+              "DB280FCF00000000437F0000437F0000437F000043FF00000000000000000078000000040000000A000000005766F889");
+        Check("Outline_Set round-trips", Hex(Bytes(Compile(s.Deserialize()))), Hex(Bytes(s)));
+        Check("Outline_Set: New Commands / Effects", ACMD_INFO.GetCategory(0xDB280FCF), "New Commands / Effects");
+        s = Compile("Mesh_Visibility(Target=0, Mesh=\"stethoscope_VIS_O_OBJ\", Visible=0, Persist=1)");
+        Check("Mesh_Visibility: 5 words, Mesh=\"name\" -> the name's CRC32 (exact case)", Hex(Bytes(s)),
+              "D627E02A000000001B9A6F8400000000000000015766F889");
+        Check("Mesh_Visibility round-trips (shown with the hash)", Hex(Bytes(Compile(s.Deserialize()))), Hex(Bytes(s)));
+        Check("Mesh_Visibility shown", s.Deserialize().Split('\n')[0].Trim(),
+              "Mesh_Visibility(Target=0x0, Mesh=0x1B9A6F84, Visible=0x0, Persist=0x1)");
+        Check("Mesh_Visibility(Mesh=-1): every override ends", Hex(Bytes(Compile("Mesh_Visibility(Target=0, Mesh=-1, Visible=0, Persist=0)"))),
+              "D627E02A00000000FFFFFFFF00000000000000005766F889");
+        Check("Mesh_Visibility: New Commands / Animation", ACMD_INFO.GetCategory(0xD627E02A), "New Commands / Animation");
 
         // ---- errors
         Check("unknown name", Error("INC_INT(Variable=nothing_here)"),

@@ -10832,6 +10832,50 @@
 "Green",
 "Blue"
 ]
+},
+"D627E02A": {
+"size": 5,
+"name": "Mesh_Visibility",
+"format": [
+0,
+0,
+0,
+0
+],
+"syntax": [
+"Target",
+"Mesh",
+"Visible",
+"Persist"
+]
+},
+"DB280FCF": {
+"size": 11,
+"name": "Outline_Set",
+"format": [
+0,
+1,
+1,
+1,
+1,
+1,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"Target",
+"Red",
+"Green",
+"Blue",
+"Alpha",
+"Tint",
+"Frames",
+"FadeIn",
+"FadeOut",
+"Flash"
+]
 }
 }
 }

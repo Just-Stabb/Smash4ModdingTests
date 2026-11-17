@@ -262,11 +262,15 @@ namespace Sm4shCommand.Viewer
         {
             if (a == null || a.Model == null) return;
             var anim = a.MaterialVis != null ? a.MaterialVis.At(animFile, frame) : new Dictionary<string, bool>();
+            int index = -1;
             foreach (var m in a.Model.Meshes)
             {
                 bool v;
                 string why = "";
+                index++;
+                bool? mv = vis != null ? vis.MeshOverride(m.Name, index) : null;
                 if (user != null && user.TryGetValue(m.Name, out v)) why = "your choice (now)";
+                else if (mv.HasValue) { v = mv.Value; why = (v ? "shown" : "hidden") + " by Mesh_Visibility (script)"; }
                 else
                 {
                     // v1.6.3: a group whose state lists the mesh lets the motion's visibility animation decide, then

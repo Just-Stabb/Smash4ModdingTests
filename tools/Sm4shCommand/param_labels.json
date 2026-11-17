@@ -19550,6 +19550,83 @@
    0
   ]
  },
+ "D627E02A": {
+  "_command": "Mesh_Visibility",
+  "_new": true,
+  "_name": "Mesh_Visibility",
+  "_size": 5,
+  "_desc": "Hides or shows one of an object's meshes by name, for this animation or until changed, over the motion's visibility animation and the visibility groups. New command: needs the patched cross_f.rpx (tools/mesh_vis_cave.py, exe_v46z_outline).",
+  "_format": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one, 12 the fighter this attack hit (as the other Target commands).",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Mesh",
+   "desc": "The mesh (model part): its name in quotes, e.g. Mesh=\"stethoscope_VIS_O_OBJ\" (Sm4shCommand stores its CRC32; the Hitbox Viewer's Model parts tab lists the names), or 0-255 a mesh index. -1: every Mesh_Visibility override of this object ends.",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Visible",
+   "desc": "0 hide it, 1 show it, 2 end this mesh's override (the motion's visibility animation and the visibility groups decide again).",
+   "confidence": "high"
+  },
+  "3": {
+   "name": "Persist",
+   "desc": "0: until the animation changes (as Model_Changer and the motion's own visibility); 1: until changed, a KO, the match end or a training reset.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// Example 1: hide a weapon mesh for one animation (a punch thrown without the sword): back by itself when the",
+   "// move ends",
+   "Mesh_Visibility(Target=0, Mesh=\"sword_VIS_O_OBJ\", Visible=0, Persist=0)",
+   "",
+   "// Example 2: hide it persistently (a sword that breaks), until shown again (example 3)",
+   "Mesh_Visibility(Target=0, Mesh=\"sword_VIS_O_OBJ\", Visible=0, Persist=1)",
+   "",
+   "// Example 3: ... and give it back: the motion's own visibility decides again",
+   "Mesh_Visibility(Target=0, Mesh=\"sword_VIS_O_OBJ\", Visible=2, Persist=0)",
+   "",
+   "// Example 4: show a hidden prop: Dr. Mario's results-screen mesh shown during a taunt, over the animation that",
+   "// hides it, for the taunt only",
+   "Mesh_Visibility(Target=0, Mesh=\"Mario_Result_VIS_O_OBJ\", Visible=1, Persist=0)",
+   "",
+   "// Example 5: Dr. Mario's stethoscope / head mirror hidden from frame 10 of a taunt to its end",
+   "FRAME(Frames=10)",
+   "Mesh_Visibility(Target=0, Mesh=\"stethoscope_VIS_O_OBJ\", Visible=0, Persist=0)",
+   "",
+   "// Example 6: a mesh by its index (0-255, the order in model.nud), and ending every override of this object",
+   "Mesh_Visibility(Target=0, Mesh=32, Visible=0, Persist=1)",
+   "FRAME(Frames=30)",
+   "Mesh_Visibility(Target=0, Mesh=-1, Visible=0, Persist=0)"
+  ],
+  "_group": "Animation",
+  "_help": [
+   "## What it does",
+   "Hides or shows one of an object's meshes (model parts: a weapon, a prop, a cape, a face) by its name. With Persist 0 it lasts until the animation changes, as the game's own visibility changes do; with Persist 1 it stays until changed (another Mesh_Visibility), a KO, the match end or a training reset. While it lasts it wins over the motion's visibility animation (the material_anime files that switch faces and props per motion) and over the visibility groups (Model_Changer / VIS_SET): the game's own changes to that mesh are kept aside and come back when the override ends.",
+   "How: every model keeps a visibility state per mesh (set state, the animation's value); the game draws a mesh when its set state says so, or, set to \"follow the animation\", when the animation says so. The patched executable forces the set state while the override lasts and puts the game's own back afterwards.",
+   "",
+   "## Parameters",
+   "- Target: whose model (0 this object, 1 nearest opponent, ... 12 the fighter this attack hit: see the group).",
+   "- Mesh: the mesh. Write its name in quotes, **Mesh=\"stethoscope_VIS_O_OBJ\"**: Sm4shCommand stores the name's CRC32 (exact case; the script shows it as a hex number after it is saved, which compiles the same). The Hitbox Viewer's Model parts tab lists a fighter's mesh names (also in the fighter's model.nud). A number 0-255 is a mesh index (the order in model.nud). **-1: every Mesh_Visibility override of this object ends** (Visible / Persist unused). Every mesh with that name is changed.",
+   "- Visible: 0 hide it, 1 show it (even if the animation hides it), 2 end this mesh's override (the motion's visibility and the groups decide again).",
+   "- Persist: 0 until the animation changes (the next motion: the end of the move, a hit, a jump); 1 until changed, a KO, the match end or a training reset.",
+   "",
+   "## Gotchas",
+   "- **Names, not groups**: a vanilla visibility group (Model_Changer's ChangerID) switches between sets of meshes; this command names the mesh itself. Both work together: a group change on an overridden mesh waits until the override ends.",
+   "- **\"The animation changes\"** means the motion kind: the same motion played again (a second jab of the same kind) keeps a Persist 0 override; end it with Visible 2 if needed.",
+   "- **Articles** (a projectile, a held item) have their own models: Target 0 in the article's script, or the fighter's Mesh_Visibility won't find the article's meshes.",
+   "- A name the model doesn't have does nothing (check the spelling and case: \"Gamemodel\" is not \"GameModel\").",
+   "- The Hitbox Viewer follows it (the Model parts tab shows the mesh hidden / shown \"by Mesh_Visibility\").",
+   "Needs exe_v46z_outline (tools/mesh_vis_cave.py; exe_v46z_inv + the outline + it). Without it a script that uses this command won't load properly: ship the executable with any script that uses it."
+  ]
+ },
  "D7645E49": {
   "_command": "ATK_HIT_ABS_WC",
   "0": {
@@ -20230,6 +20307,128 @@
    "values": "float | no vanilla fighter use",
    "confidence": "high"
   }
+ },
+ "DB280FCF": {
+  "_command": "Outline_Set",
+  "_new": true,
+  "_name": "Outline_Set",
+  "_size": 11,
+  "_desc": "A coloured glow on an object's silhouette edges (a rim light), optionally with a body tint, faded in and out and pulsing: the fighter shaders' own fresnel rim, coloured per object. One per object; ends with Alpha 0, its Frames, a KO, the match end or a training reset. New command: needs the patched cross_f.rpx (tools/outline_cave.py, exe_v46z_outline).",
+  "_format": [
+   0,
+   1,
+   1,
+   1,
+   1,
+   1,
+   0,
+   0,
+   0,
+   0
+  ],
+  "0": {
+   "name": "Target",
+   "desc": "Whose: 0 this object (fighter or article), 1 the nearest opponent, 2 the last fighter this one hit, 3-10 player slots 1-8, 11 the last fighter that hit this one, 12 the fighter this attack hit (as the other Target commands).",
+   "confidence": "high"
+  },
+  "1": {
+   "name": "Red",
+   "desc": "The glow's red, 0-255.",
+   "confidence": "high"
+  },
+  "2": {
+   "name": "Green",
+   "desc": "Its green, 0-255.",
+   "confidence": "high"
+  },
+  "3": {
+   "name": "Blue",
+   "desc": "Its blue, 0-255.",
+   "confidence": "high"
+  },
+  "4": {
+   "name": "Alpha",
+   "desc": "Its strength: 255 = the colour at full at the very edge, higher up to 1020 (4x) for a harder glow. 0 ends the outline (it fades out over this command's FadeOut; 0 at once).",
+   "confidence": "high"
+  },
+  "5": {
+   "name": "Tint",
+   "desc": "A tint of the whole body toward the colour too, 0-255 (0: the edges only; 255: the body all that colour). Edge-only glows use 0.",
+   "confidence": "high"
+  },
+  "6": {
+   "name": "Frames",
+   "desc": "Held this many frames once faded in, then it fades out over FadeOut. 0: until Alpha 0, a KO or the match end.",
+   "confidence": "high"
+  },
+  "7": {
+   "name": "FadeIn",
+   "desc": "Frames to fade in (0: at once). A new outline on an object already glowing fades from where that one is.",
+   "confidence": "high"
+  },
+  "8": {
+   "name": "FadeOut",
+   "desc": "Frames to fade out when Frames run out (with Alpha 0: over this many; 0 at once).",
+   "confidence": "high"
+  },
+  "9": {
+   "name": "Flash",
+   "desc": "A pulse: one cycle every Flash frames (full, off, full again, smoothly); 0 steady.",
+   "confidence": "high"
+  },
+  "_example": [
+   "// Example 1: a white edge glow for a time-stop move (Xenoverse 2's \"Flashing White Body Outline\"): edge only,",
+   "// strong, faded in over 4 frames and held 120 frames (2 seconds), out over 10",
+   "Outline_Set(Target=0, Red=255, Green=255, Blue=255, Alpha=510, Tint=0, Frames=120, FadeIn=4, FadeOut=10, Flash=0)",
+   "",
+   "// Example 2: a red pulsing outline for a power-up: a pulse every 20 frames (3 a second), a light red tint on the",
+   "// body too, until ended (example 3)",
+   "Outline_Set(Target=0, Red=255, Green=40, Blue=20, Alpha=400, Tint=40, Frames=0, FadeIn=6, FadeOut=0, Flash=20)",
+   "",
+   "// Example 3: ending it (from the move's end, or another script): fades out over 12 frames",
+   "Outline_Set(Target=0, Red=0, Green=0, Blue=0, Alpha=0, Tint=0, Frames=0, FadeIn=0, FadeOut=12, Flash=0)",
+   "",
+   "// Example 4: XV2's flashing outline on the start of Time Skip: white, flashing twice a second, for the dash",
+   "// (30 frames), then steady from the catch until the punch ends it",
+   "Outline_Set(Target=0, Red=230, Green=240, Blue=255, Alpha=600, Tint=0, Frames=0, FadeIn=0, FadeOut=0, Flash=30)",
+   "FRAME(Frames=30)",
+   "Outline_Set(Target=0, Red=230, Green=240, Blue=255, Alpha=600, Tint=0, Frames=0, FadeIn=0, FadeOut=0, Flash=0)",
+   "",
+   "// Example 5: the opponent this attack hit glows blue for a second (a mark / a curse); nothing if it missed",
+   "FRAME(Frames=12)",
+   "Hitbox(ID=0, Part=0, Bone=0, Damage=8, Angle=361, KBG=50, FKB=0, BKB=40, Size=5, X=0, Y=8, Z=8, Effect=0, Trip=0, Hitlag=1, SDI=1, Clang=1, Rebound=1, ShieldDamage=0, SFXLevel=2, SFXType=1, Ground/Air=3, Direct/Indirect=1, Type=1)",
+   "FRAME(Frames=14)",
+   "Outline_Set(Target=12, Red=40, Green=120, Blue=255, Alpha=700, Tint=0, Frames=60, FadeIn=0, FadeOut=20, Flash=0)"
+  ],
+  "_group": "Effects",
+  "_help": [
+   "## What it does",
+   "Puts a coloured glow on the edges of an object's silhouette: where the model turns away from the camera (the outline of the body, the arms' and legs' edges) it is lit in the colour, fading to nothing where the surface faces the camera. That is a rim (fresnel) light: Xenoverse 2's \"Flashing White Body Outline\" (BPE 85), a power-up aura's edge, a time-stop glow. It can pulse (Flash), tint the whole body as well (Tint), fade in and out, and it ends by itself after Frames, with Alpha 0, a KO, the match end or a training reset.",
+   "How: Smash 4's fighter shaders already have a rim term (the material's NU_fresnelColor / NU_fresnelParams, with the stage's fresnel light). The patched executable adds the outline's colour to that term's per-object part (g_fresnelOffset in the model's FB1 uniform block, which the game rebuilds for every model every frame), and for Tint mixes the overlay colour (the one Color_Overlay / FLASH set) toward it. No new draw, no extra cost.",
+   "",
+   "## Parameters",
+   "- Target: whose model: 0 this object (the fighter, or the article whose script it is), 1 the nearest opponent, 2 the last fighter hit, 3-10 player slots 1-8, 11 the last fighter that hit this one, 12 the fighter this attack hit (see the New Commands group). One outline per object: a new Outline_Set on it replaces the one showing.",
+   "- Red, Green, Blue (float, 0-255): the glow's colour. 255, 255, 255 is white.",
+   "- Alpha (float): the glow's strength. 255 = the colour at full at the very edge; it can go higher (up to 1020, 4x) for a hard, bright edge; 60-120 is a faint one. **0 ends the outline** (fading out over this command's FadeOut, or at once with FadeOut 0; the other parameters don't matter then).",
+   "- Tint (float, 0-255): a tint of the whole body toward the colour as well (the overlay's mix: 255 is the body all that colour, 64 a quarter). **0 = edge only**: the body keeps its own colours and only the edges glow.",
+   "- Frames (int): once faded in, held this many frames, then it fades out over FadeOut. 0 = held until Alpha 0, a KO or the match end.",
+   "- FadeIn (int): frames to fade in (0 at once). A new outline on an object already glowing fades from where that one is, so changing the colour mid-move doesn't blink.",
+   "- FadeOut (int): frames to fade out when Frames run out (0 off at once).",
+   "- Flash (int): a pulse, one cycle every Flash frames: full, smoothly down to nothing at half the cycle, back to full (20: three pulses a second; 60: one a second). 0 = steady.",
+   "",
+   "## How it looks",
+   "- The glow is strongest where the surface is seen edge-on and fades toward the middle of the body; how fast it fades is the material's own rim sharpness (NU_fresnelParams: (1 - N.V) to the power fresnelParams.x + 1, about 2-4 on the fighters' bodies). It is brighter on surfaces facing up than on the undersides (the game's rim is a sky light).",
+   "- It is added to the lit colour: on a dark costume a white outline reads as a white rim; on a white costume raise Alpha (500-1000) or use a coloured outline.",
+   "- Counted in the effects' frame (as Screen_Invert): runs through hitlag and Stage_Freeze, stops while paused.",
+   "",
+   "## Gotchas",
+   "- **Not every material has the rim**: the lit fighter shaders do (every Dr. Mario material, the common fighter body shaders); a few shader families (the second rim model, NUD flags 0x...3063 / 0x...5061, and unlit materials) ignore it, so those meshes don't glow (the Tint still shows on them). Check the fighter in game.",
+   "- **There is no separate \"sharpness\" setting**: the material decides how far in the glow reaches (see above). Lower Alpha for a thinner-looking edge; Tint 0 keeps the inside clean.",
+   "- **Tint uses the overlay**: with Tint above 0, a Color_Overlay / FLASH showing at the same time is mixed with it (the outline's tint over the overlay).",
+   "- **Articles**: Target 0 in an article's script outlines that article's model (a projectile's glow), if its materials have the rim.",
+   "- **The Hitbox Viewer** lists the outline (the Outline row of its effects list: colour, strength, frames) and tints the model's edges in its colour while it shows; the game's look is the reference.",
+   "Needs exe_v46z_outline (tools/outline_cave.py; exe_v46z_inv + it). Without it a script that uses this command won't load properly: ship the executable with any script that uses it."
+  ]
  },
  "DBDDC840": {
   "_command": "ATTACK_IND",

@@ -1483,3 +1483,75 @@ tick through the game's screen-effect update, the lock with the matrix the game'
 paired-single matrix code run in a Python interpreter of its own words; the diag's lines), `new_var_test.cs` (the
 command's words, round trip, group, every example). In game: `tools/screen_invert_ingame_test_build.py` (Dr. Mario's
 taunts).
+
+## Outline_Set (model_commands v1, exe_v46z_outline)
+
+`Outline_Set(Target, Red, Green, Blue, Alpha, Tint, Frames, FadeIn, FadeOut, Flash)` puts a coloured glow on an object's
+silhouette edges (a rim / fresnel light): Xenoverse 2's "Flashing White Body Outline" (BPE 85), a power-up's edge, a
+mark on a fighter. Index 2400, 11 words, needs exe_v46z_outline (`tools/outline_cave.py`).
+
+| Parameter | |
+|---|---|
+| Target | int: 0 this object, 1 nearest opponent, 2 last fighter hit, 3-10 slots 1-8, 11 last attacker, 12 the fighter this attack hit. One outline per object (a new one replaces it, fading from where it is) |
+| Red, Green, Blue | float, 0-255: the colour |
+| Alpha | float: strength, 255 = the colour at full at the very edge, up to 1020 (4x); **0 ends it** (over this command's FadeOut) |
+| Tint | float, 0-255: the body tinted toward the colour too (the overlay's mix); **0 = edge only** |
+| Frames | int: held once faded in, then out over FadeOut; 0 until Alpha 0, a KO, the match end or a training reset |
+| FadeIn / FadeOut | int: frames (0 at once) |
+| Flash | int: a pulse, one cycle every Flash frames (full, off, full; smooth); 0 steady |
+
+- **How:** the fighter shaders' rim term is `(1 - N.V)^(fresnelParams.x + 1) x (material rim + g_fresnelOffset)`;
+  g_fresnelOffset is in the model's own FB1 uniform block, which the game rebuilds for every model every frame. The
+  executable adds the outline's colour x strength x fade there (and mixes the overlay colour, blinkColor, for Tint) just
+  before the block goes to the GPU. No new draw (docs/native-notes.md "Outline").
+- **Sharpness** is the material's (its NU_fresnelParams, exponents 2-4 on the fighters): there is no per-command power.
+- Meshes whose shader has no g_fresnelOffset (the 0x...3063 / 0x...5061 rim family, unlit materials) don't glow; Dr.
+  Mario's materials all do.
+- Counted in the effects' frame (as Screen_Invert's): through hitlag and Stage_Freeze, not while paused.
+- The Hitbox Viewer draws it on the model (Target 0: a rim on the edges seen edge-on, the tint) and lists it.
+  `port_check` X11 (ERROR): a script using it with no executable carrying the cave.
+
+```
+// a white edge glow for a time-stop move: 2 seconds, faded in over 4 frames, out over 10
+Outline_Set(Target=0, Red=255, Green=255, Blue=255, Alpha=510, Tint=0, Frames=120, FadeIn=4, FadeOut=10, Flash=0)
+// a red pulsing outline for a power-up (3 pulses a second, a light red tint), until ended
+Outline_Set(Target=0, Red=255, Green=40, Blue=20, Alpha=400, Tint=40, Frames=0, FadeIn=6, FadeOut=0, Flash=20)
+// ending it over 12 frames
+Outline_Set(Target=0, Red=0, Green=0, Blue=0, Alpha=0, Tint=0, Frames=0, FadeIn=0, FadeOut=12, Flash=0)
+```
+
+## Mesh_Visibility (model_commands v1, exe_v46z_outline)
+
+`Mesh_Visibility(Target, Mesh, Visible, Persist)` hides or shows one of an object's meshes by name, over the motion's
+visibility animation and the visibility groups (Model_Changer). Index 2500, 5 words, needs exe_v46z_outline
+(`tools/mesh_vis_cave.py`).
+
+| Parameter | |
+|---|---|
+| Target | int: whose model (as Outline_Set's) |
+| Mesh | int: the mesh's name in quotes, `Mesh="stethoscope_VIS_O_OBJ"` (Sm4shCommand stores its CRC32, exact case), or 0-255 an index (model.nud's order); **-1 ends every override of this object** |
+| Visible | int: 0 hide, 1 show, 2 end this mesh's override |
+| Persist | int: 0 until the motion (kind) changes, as vanilla visibility; 1 until changed, a KO, the match end or a training reset |
+
+- **How:** each mesh's visibility byte (set state: hidden / shown / follow the animation; the animation's bit) is forced
+  while the override lasts; the game's own changes to the set state (visibility groups) are kept aside and come back when
+  it ends (docs/native-notes.md "Mesh visibility").
+- Sm4shCommand (v1.7.13) compiles any int parameter written as a quoted name to the name's CRC32; the script shows the
+  hex number afterwards, which compiles the same.
+- The Hitbox Viewer follows it (the Model parts tab: "hidden / shown by Mesh_Visibility"). `port_check` X12 (ERROR): a
+  script using it with no executable carrying the cave.
+
+```
+// a weapon hidden for one animation (back when the move ends)
+Mesh_Visibility(Target=0, Mesh="sword_VIS_O_OBJ", Visible=0, Persist=0)
+// hidden until shown again, then given back
+Mesh_Visibility(Target=0, Mesh="sword_VIS_O_OBJ", Visible=0, Persist=1)
+Mesh_Visibility(Target=0, Mesh="sword_VIS_O_OBJ", Visible=2, Persist=0)
+// a hidden prop shown for this animation
+Mesh_Visibility(Target=0, Mesh="Mario_Result_VIS_O_OBJ", Visible=1, Persist=0)
+```
+
+Tests: `tools/outline_test.py` / `tools/mesh_vis_test.py` (unicorn: the command tables with every earlier cave's
+commands, the handlers, the ticks, the FB1 unlocks / the game's mesh setter, by-name setter and per-frame visibility,
+the clear chain, the diag lines), `new_var_test.cs` (words, round trips, groups, every example), `hitbox_var_test.cs` (the
+viewer's outline and mesh overrides). In game: `tools/model_commands_ingame_test_build.py` (Dr. Mario's taunts).

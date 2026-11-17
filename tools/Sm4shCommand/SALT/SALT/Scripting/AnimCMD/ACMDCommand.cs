@@ -118,6 +118,10 @@ namespace SALT.Moveset.AnimCMD
         {
             var inv = System.Globalization.CultureInfo.InvariantCulture;
             p = p.Trim();
+            // v1.7.13: a name in quotes is its CRC32 (exact case, as the game hashes it): Mesh_Visibility's
+            // Mesh="stethoscope_VIS_O_OBJ" (tools/mesh_vis_cave.py), any int parameter that takes a name's hash
+            if (p.Length >= 2 && p.StartsWith("\"") && p.EndsWith("\""))
+                return unchecked((int)System.Security.Cryptography.Crc32.Compute(p.Substring(1, p.Length - 2)));
             if (p.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
                 return (int)uint.Parse(p.Substring(2), System.Globalization.NumberStyles.HexNumber, inv);
             if (p.StartsWith("-0x", StringComparison.OrdinalIgnoreCase))

@@ -2639,7 +2639,7 @@ temporary diag caves' `0x04BCC000`); variables `0x0F0003D0`-`0x0F0003DA`; comman
 `0x04BD88C4`, data `0x04BD9F00`, the reset lists `0x04BDA000`; `textregion:0x2BE0000 grow:0x04BE0000`).
 `0x04BD6000`-`0x04BD8000` (between ts_data's end and this) was free; `0x04BD6000`-`0x04BD7000` is now the whip motion
 table's (Byleth v15, below), `0x04BD7000`-`0x04BD8000` the hitbox hold's (rapid_setoff v1, below). `0x04BE0000`-`0x04BE2000`
-(past this region, the text region grown again) is the camera effects' (camera_effects v1, "Camera effects" below). `0x04BE2000`-`0x04BE3000` (grown again) is the screen invert's (screen_invert v1, "Screen colour" below). The combined exe the user runs:
+(past this region, the text region grown again) is the camera effects' (camera_effects v1, "Camera effects" below). `0x04BE2000`-`0x04BE3000` (grown again) is the screen invert's (screen_invert v1, "Screen colour" below). `0x04BE3000`-`0x04BE4000` (grown again) is the outline's and `0x04BE4000`-`0x04BE5000` (grown again) the mesh visibility's (model_commands v1, "Outline" / "Mesh visibility" below). The combined exe the user runs:
 exe_v46v_threads -> var_reset_cave.py (exe_v46w_vars) -> tools/line_test_cave.py (exe_v46w_vars_line, which chains on
 four of these hooks).
 
@@ -3082,3 +3082,98 @@ XV2's negative is applied to the world before the characters).
 **Not confirmed in game:** that the 3D copy is the colour-correct program in every battle view (r4 = 1 at `0x033333F0`
 is read from the code; Screen_Tint's visible darkening says the matrix reaches the screen); that the HUD is drawn after
 it (Screen_Tint leaves it); the colour pass's place relative to the stage's own layer-0 colour; GamePad views.
+
+## Outline (model_commands v1: `tools/outline_cave.py`, exe_v46z_ol -> exe_v46z_outline)
+
+**Claimed region: `0x04BE3000`-`0x04BE4000`** (past the screen invert's, the end of exe_v46z_inv's text; the text region
+grown: `textregion:0x2BE4000 grow:0x04BE4000`; code `0x04BE3000`-`0x04BE3D28`, the diag build to `0x04BE3FF8`; the table
+`ol_tab` 16 x 0x50). Order: exe_v46z_inv -> this (exe_v46z_ol) -> tools/mesh_vis_cave.py (exe_v46z_outline). It chains on
+Screen_Invert's command-table fallbacks, its tick (si_tick) and its clear (si_clear), and asserts every other word it
+replaces. Test `tools/outline_test.py EXE` (unicorn, 59 checks on exe_v46z_inv). User docs: docs/acmd-extra-commands.md
+"Outline_Set".
+
+**How a fighter's rim is drawn (shader/texas_cross.nsh, 620 NUD shaders; `nsh_dump.py`'s GX2 headers parsed for the
+uniform blocks):**
+- The NUD materials name their shader by their flags (Dr. Mario: 0x9601106B, 0x9A011063, 0x9A211067, 0x9AE11165). A lit
+  fighter pixel program (e.g. 0x9A011063) reads two uniform blocks: **MC** (CB4, 0x70 bytes: aoMinGain, specularColor,
+  **fresnelColor** +0x20, colorSamplerUV, specularParams, **fresnelParams** +0x50, alphaBlendParams: the material's NU_
+  properties) and **FB1** (CB7, 0x2A0 bytes: lightMapMatrix, **blinkColor +0x40**, g_constantVolume / Offset,
+  uvScrollCounter, spycloakParams +0x80, compressParam +0x90, **g_fresnelColor +0xA0**, depthOffset +0xB0, outlineColor
+  +0xC0 (read by no texas_cross pixel program), the model's lights (ceiling / ground / ambient / three directional),
+  fogColor, **g_fresnelOffset +0x1D0**, ShadowMapParam, charShadowColor, ..., g_constantMin +0x250, characterColor +0x290).
+- The rim: `rim = (1 - N.V)^(fresnelParams.x + 1) x (vsRim x sat + g_fresnelOffset.rgb) x clamp(N.y + 1)`; vsRim =
+  fresnelColor x g_fresnelColor (the vertex program, clause 05), sat = (c - max(c)) x fresnelColor.w + 1 (c the colour
+  texture); added to the lit colour, then the overlay: `out = lit x (1 - blink.a) + blink.rgb x blink.a` (the vertex
+  program computes both terms per vertex from blinkColor). Dr. Mario's materials: fresnelParams.x 1.02-3.08 (exponents
+  2-4), fresnelColor 0.18-3.0.
+- 120 of the 187 lit shaders with fresnelParams read g_fresnelOffset (families 0x94 / 0x95 / 0x96 / 0x98 / 0x9A / 0x9C /
+  0x9E / 0xD4-0xDA / 0xF4-0xFC); 67 (0x...3063 / 0x...5061, fresnelParams.y / z used) and the unlit 0x92 / 0xA0+ don't.
+- **FB1 is per model instance**: MI + 0x2A0 is its buffer object; MI vt +0x2C (0x0341E038 for the class of vtable
+  0x101A0128, 0x03423E78 for 0x101A0338) locks it (vt +0x3C), DCZeroRange's it (0x2A0 bytes), writes blinkColor from the
+  instance's colours (MI +0x40 / +0x60, the ColorBlendModule's), the lights (0x03423628), compressParam, characterColor
+  (MI +0x290) ..., and unlocks it (vt +0x44: the `bctrl`s at 0x0341E2C0 / 0x0341E2DC, 0x034247B0 / 0x0342484C; r30 / r31
+  the instance, r28 / r27 the locked data). A write before the unlock reaches that model's next draw only.
+- **The instance of an object**: accessor +0x3C is ModelModule (MSC sys 0x27; vtable 0x10001648, source path
+  "model_module_impl.cpp" at 0x10001596), +4 its model handle (0x032FF640 valid, 0x032FF668 / 0x032FF68C visible,
+  0x032FF744 matrix, 0x032FF944 / 0x0342633C a mesh's visibility by name), the handle's +8 the instance: MI =
+  [[acc + 0x3C] + 0xC]. MSC module offsets from the syscall table 0x104187A0 (entry = sys - 1): +0x38 ColorBlendModule
+  (0x42; vtable 0x10104618: vt +0x4C set the overlay of a priority slot, 0x4C bytes each; FLASH / Color_Overlay's handler
+  0x02BE3858), +0x44 MotionModule (0x12), +0xA8 VisibilityModule (0x39).
+- GX2 calls found from the rpx's import relocations (R_PPC_REL24 to the .fimport symbols): GX2SetVertex / PixelUniformBlock
+  in the device layer 0x036F3AC4 (a cached bind of buffer objects: +0xC size, +0x10 data), the material state's slot-4
+  (MC) binds 0x036DFE2C (from 0x036DFFBC: [state + 0x14 + stage x 4]); DCZeroRange at 0x0341E0E0.
+
+**The cave:** ol_fbA / ol_fbB (the four unlock `bctrl`s -> bl): the outline of the instance (if any) written into FB1:
+g_fresnelOffset += colour x Alpha / 255 x weight; Tint > 0: blinkColor = the overlay mixed toward the colour by t = Tint
+/ 255 x weight (A = a0 (1 - t) + t, rgb = (rgb0 a0 (1 - t) + colour t) / A); then the unlock with the game's r3 / CTR /
+return address. ol_tick (TICK 0x032EFB78, before it screen_invert's si_tick): fades, Frames, the pulse (tri = |2 (t mod
+F) / F - 1|, f = tri^2 (3 - 2 tri)), drops an outline whose object is KO'd (the fighters' StatusModule vtable 0x1012D42C,
+status 0xB1) or whose model changed. ol_clear on the clear-all chain (after si_clear). The handler resolves the Target with
+acmd_ext's nc_target (0x04B98A00). `outline_cave.apply_ref` / `pulse` are the Python references.
+
+**The diag build** (`--diag`, TEST ONLY, in exe_v46z_outline_diag): `S4OC tgt acc mi rgb a` / `S4OD tint fr in out flash
+k ph` at each command; `S4OT n k acc ph w eff left` per outline frame and `S4OF n mi off(3) blink.r blink.a` per FB1 write
+(the first 30 frames after a command, then every 30th). Floats as hex words.
+
+**Not confirmed in game:** that the fighters' draws bind MI + 0x2A0 as FB1 (CB7) (the layout matches field for field:
+blinkColor +0x40, compressParam +0x90, g_constantMin +0x250, characterColor +0x290); which of the two instance classes the
+fighters use (both hooked); how strong Alpha 255 looks against each stage's lights (g_fresnelOffset is added unscaled by
+the stage's fresnel light).
+
+## Mesh visibility (model_commands v1: `tools/mesh_vis_cave.py`, exe_v46z_outline)
+
+**Claimed region: `0x04BE4000`-`0x04BE5000`** (past the outline's; `textregion:0x2BE5000 grow:0x04BE5000`; code
+`0x04BE4000`-`0x04BE4C14`, the diag build to `0x04BE4D94`; the table `mv_tab` 32 x 0x20). Order: exe_v46z_ol -> this
+(exe_v46z_outline). It chains on the outline's tables, tick (ol_tick) and clear (ol_clear). Test `tools/mesh_vis_test.py
+EXE` (unicorn, 55 checks on exe_v46z_ol). User docs: docs/acmd-extra-commands.md "Mesh_Visibility".
+
+**How the game shows a model's meshes (cross_f.rpx):**
+- Per mesh a byte at `[[MI + 0x7DC] + 4] + index` (count `[[MI + 0x6E4] + 0x44]`): bits 0-1 the set state (0 hidden, 1
+  shown, 2 follow the animation), bit 2 the animation's value, bits 4-7 last frame's result. The only writer is
+  0x034232FC(MI, mesh, value, which) (44 callers): which 0 sets bits 0-1, which 1 bit 2.
+- The visibility groups (Model_Changer = VIS_SET -> VisibilityModule vt +0xCC op 0x2711 -> vt +0x4C 0x02C762C8: the
+  group's state byte, dirty flag +0x20, an event to the model) end in 0x03426140(MI, group) -> 0x034232FC(which 0) on the
+  group's meshes (MI + 0x734's table; MI + 0x738 the linked ones). The by-name setter 0x0342633C(MI, name, value, which)
+  walks the meshes ([MI + 0x6E4] + [+0x3C] x 0x14 the resource, its vt +0xA4(res, i, 0) the mesh, the mesh's vt +0x2C its
+  name, strcmp): the game's own code uses it with names such as "Masterhand_End_VIS_O_OBJ". The motion's visibility
+  animation writes bit 2 (which 1). Visibility(State) (VIS_WHOLE) is VisibilityModule +8 (vt +0x94), applied by its
+  update 0x02C76F70 through ModelModule vt +0x164 (the whole model).
+- What is drawn: the instance's vt +0x74 (0x03424E88, five vtables at 0x101A0128 ...): shown = bits 0-1 == 2 ? bit 2 :
+  bits 0-1; the result per mesh into the model data's array, the visible list to the listener [MI + 0x7EC] when anything
+  changed, then bits 4-7 = bits 0-3.
+
+**The cave:** an override forces bits 0-1 to 0 / 1 and keeps the game's bits 0-1 (taken when it starts) in its entry;
+mv_set (0x034232FC's first word -> b): a which-0 write to an overridden mesh goes into the entry instead (r3 1), so a
+group change during the override comes back when it ends; mv_tick (TICK, before it ol_tick): Persist 0 ends when the
+object's motion kind ([[acc + 0x44] + 0x38]) changes, a KO ends it, a changed model drops it, the others are written
+again; mv_clear (after ol_clear) ends every override, writing the byte back while the object still has that model (the
+accessor -> instance chain checked). The handler finds the mesh by the CRC32 of its name (the same walk as 0x0342633C,
+zlib's CRC32 in the cave: mv_crc) or an index 0-255; Mesh -1 ends the object's overrides; Visible 2 one.
+
+**The diag build** (`--diag`, TEST ONLY, exe_v46z_outline_diag): `S4MC tgt mesh vis per acc mi hit` at each command (hit:
+meshes changed) and `S4MF n k mesh byte forced per kind` per override and frame (the first 30 frames after a command,
+then every 30th).
+
+**Not confirmed in game:** that the fighters' MotionModule keeps its kind at +0x38 (read from motion_module_impl's code and
+earlier notes) and so that Persist 0 ends at the motion change; meshes drawn by another path than 0x03424E88's (none
+found: 0x03420300 reads the same bits); articles' models (the same classes).

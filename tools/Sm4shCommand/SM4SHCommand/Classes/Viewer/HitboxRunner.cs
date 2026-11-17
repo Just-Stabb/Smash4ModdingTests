@@ -81,6 +81,9 @@ namespace Sm4shCommand.Viewer
         public float[] Overlay;
         public bool OverlayLight;
         public VisState Vis = new VisState();
+        // v1.7.13: this object's Outline_Set glow on this frame (r g b 0-1, strength (Alpha / 255 x fade x pulse), tint
+        // (Tint / 255 x fade x pulse)); null: none
+        public float[] Outline;
     }
 
     /// <summary>v1.6.2: a script's visibility state: each group's state (Model_Changer / VIS_SET_DEFAULT ...), the defaults
@@ -90,10 +93,25 @@ namespace Sm4shCommand.Viewer
         public Dictionary<int, int> Groups = new Dictionary<int, int>(), Defaults = new Dictionary<int, int>(), Changed = new Dictionary<int, int>();
         public bool? Whole;
         public List<ScreenEvent> Events = new List<ScreenEvent>();
+        /// <summary>v1.7.13: Mesh_Visibility's overrides (exe_v46z_outline): the mesh (its name's CRC32, or 0-255 its
+        /// index) -> 0 hidden / 1 shown, over the groups and the visibility animation. The viewer plays one motion, so
+        /// Persist 0 and 1 look the same here.</summary>
+        public Dictionary<uint, int> Meshes = new Dictionary<uint, int>();
         public VisState Clone()
         {
             return new VisState { Groups = new Dictionary<int, int>(Groups), Defaults = new Dictionary<int, int>(Defaults),
-                                  Changed = new Dictionary<int, int>(Changed), Whole = Whole, Events = new List<ScreenEvent>(Events) };
+                                  Changed = new Dictionary<int, int>(Changed), Whole = Whole, Events = new List<ScreenEvent>(Events),
+                                  Meshes = new Dictionary<uint, int>(Meshes) };
+        }
+
+        /// <summary>v1.7.13: Mesh_Visibility's override of a mesh (its name, its index in the model), or null.</summary>
+        public bool? MeshOverride(string name, int index)
+        {
+            int v;
+            if (Meshes.Count == 0) return null;
+            if (Meshes.TryGetValue(System.Security.Cryptography.Crc32.Compute(name), out v)) return v != 0;
+            if (index >= 0 && index < 256 && Meshes.TryGetValue((uint)index, out v)) return v != 0;
+            return null;
         }
 
         /// <summary>Two scripts' states (the game script's and the expression script's) as one: per group the one changed
@@ -112,6 +130,7 @@ namespace Sm4shCommand.Viewer
                 else o.Groups.Remove(kv.Key);
             }
             foreach (var kv in b.Defaults) o.Defaults[kv.Key] = kv.Value;
+            foreach (var kv in b.Meshes) o.Meshes[kv.Key] = kv.Value;
             o.Events.AddRange(b.Events);
             return o;
         }
@@ -138,6 +157,53 @@ namespace Sm4shCommand.Viewer
             float t = Math.Max(0, Math.Min(1, (frame - start) / (float)frames));
             var a = from; var b = to ?? new[] { from[0], from[1], from[2], 0f };
             return new[] { a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t };
+        }
+    }
+
+    /// <summary>v1.7.13: Outline_Set's glow over time, as the game runs it (tools/outline_cave.py): a fade in, Frames held,
+    /// a fade out, the pulse (Flash: full -> off -> full every Flash frames, smooth), Alpha 0 ends it (FadeOut).</summary>
+    public class OutlineState
+    {
+        float r, g, b, alpha, tint, w0, wEnd;
+        int start = -1, frames, fin, fout, flash, endAt = -1;
+
+        public void Set(int frame, float red, float green, float blue, float a, float t, int fr, int fadeIn, int fadeOut, int fl)
+        {
+            float now = Weight(frame);
+            if (a <= 0)
+            {
+                if (start < 0 || now <= 0) { start = -1; return; }
+                endAt = frame; wEnd = now; fout = Math.Max(0, fadeOut);
+                return;
+            }
+            r = red / 255f; g = green / 255f; b = blue / 255f; alpha = a / 255f; tint = Math.Max(0, Math.Min(1, t / 255f));
+            frames = Math.Max(0, fr); fin = Math.Max(0, fadeIn); fout = Math.Max(0, fadeOut); flash = Math.Max(0, fl);
+            w0 = start >= 0 ? now : 0; start = frame; endAt = -1;
+        }
+
+        float Weight(int frame)
+        {
+            if (start < 0 || frame < start) return 0;
+            if (endAt >= 0)
+                return fout <= 0 ? 0 : Math.Max(0, wEnd - (frame - endAt) / (float)fout);
+            int t = frame - start;
+            float w = fin > 0 ? Math.Min(1, w0 + t / (float)fin) : 1;
+            int tin = fin > 0 ? (int)Math.Ceiling((1 - w0) * fin) : 0;
+            if (frames > 0 && t > tin + frames)
+                w = fout <= 0 ? 0 : Math.Max(0, 1 - (t - tin - frames) / (float)fout);
+            return w;
+        }
+
+        public float[] At(int frame)
+        {
+            float w = Weight(frame);
+            if (w <= 0) return null;
+            if (flash > 0)
+            {
+                float tri = Math.Abs(2f * ((frame - start) % flash) / flash - 1f);
+                w *= tri * tri * (3 - 2 * tri);
+            }
+            return new[] { r, g, b, alpha * w, tint * w };
         }
     }
 
@@ -207,6 +273,7 @@ namespace Sm4shCommand.Viewer
         Dictionary<uint, float> varValues = new Dictionary<uint, float>();   // SET_FLOATs so far (threads share them)
         // v1.6.2: the body overlay and the visibility groups as the script sets them (threads share the root's)
         OverlayState overlay = new OverlayState();
+        OutlineState outline = new OutlineState();
         VisState vis = new VisState();
         // what a variable in an Extra hitbox is drawn with when the script doesn't SET_FLOAT it first
         static readonly float[] VarStandIn = { 10, 0, 100, 0, 40, 4 };
@@ -248,6 +315,7 @@ namespace Sm4shCommand.Viewer
             th.hitboxes = r.hitboxes;
             th.varValues = r.varValues;
             th.overlay = r.overlay;
+            th.outline = r.outline;
             th.vis = r.vis;
             th.fx = r.fx;
             th.script = block;
@@ -302,6 +370,7 @@ namespace Sm4shCommand.Viewer
             subscripts.Clear(); states.Clear(); hitboxes.Clear(); threads.Clear(); varValues.Clear();
             fx = new EffectState();
             overlay = new OverlayState();
+            outline = new OutlineState();
             vis = new VisState();
             index = 0; loopStart = 0; loopIterations = 0; skipWords = 0;
             currentFrame = 0; animFrame = 0; frameSpeed = 1; syncFrames = -1; rate = 1;
@@ -318,6 +387,7 @@ namespace Sm4shCommand.Viewer
                 pr.hitboxes = hitboxes;
                 pr.varValues = varValues;
                 pr.overlay = overlay;
+                pr.outline = outline;
                 pr.vis = vis;
                 pr.fx = fx;
                 pr.script = o.Commands;
@@ -366,6 +436,7 @@ namespace Sm4shCommand.Viewer
                     Intangible = intangible, Invincible = invincible, SuperArmor = armor, Writes = writes,
                     Speed = speedNow, Screen = fx.Screen,
                     Overlay = overlay.At(game + 1), OverlayLight = overlay.Light, Vis = vis.Clone(),
+                    Outline = outline.At(game + 1),
                 };
                 foreach (var h in hitboxes.Values)
                     st.Hitboxes.Add(h.Clone());
@@ -718,7 +789,7 @@ namespace Sm4shCommand.Viewer
         public List<TrailData> AllTrails { get { return fx.AllTrails; } }
         public List<ScreenEvent> AllScreen { get { return fx.AllScreen; } }
 
-        enum FxKind { None, Spawn, Off, OffAll, OffLast, Detach, Last, Trail, TrailOff, Screen, Note, Overlay, Vis }
+        enum FxKind { None, Spawn, Off, OffAll, OffLast, Detach, Last, Trail, TrailOff, Screen, Note, Overlay, Vis, Outline }
 
         /// <summary>What an effect command does and where its parameters are, from its name and its parameters' names
         /// (Events.cfg's syntax, from the ACMD events sheet: no fixed positions guessed).</summary>
@@ -728,6 +799,7 @@ namespace Sm4shCommand.Viewer
             public bool Follow, World, Flip, Light, Particle;
             public bool Camera;         // v1.7.6: Effect_Camera
             public int Mode = -1, Frames = -1;
+            public int Target = -1, Tint = -1, FadeIn = -1, Flash = -1;     // v1.7.13: Outline_Set / Mesh_Visibility
             public string Op;           // v1.6.2: an overlay / visibility command's operation
             public int G = -1, GL = -1, Work = -1, Bone = -1, BoneHash = -1, X = -1, Y = -1, Z = -1, RX = -1, RY = -1,
                 RZ = -1, Size = -1, Term = -1, R = -1, Gr = -1, B = -1, Alpha = -1, Rate = -1, Fade = -1,
@@ -771,6 +843,23 @@ namespace Sm4shCommand.Viewer
                 d.Op = n;
                 d.R = at(new[] { "Red" }); d.Gr = at(new[] { "Green" }); d.B = at(new[] { "Blue" }); d.Alpha = at(new[] { "Alpha" });
                 d.Fade = at(new[] { "Transition", "TransitionFrames" });
+            }
+            else if (n == "Outline_Set")
+            {
+                // v1.7.13 (exe_v46z_outline): a glow on the silhouette's edges, drawn on the model (Target 0) and listed
+                d.Kind = FxKind.Outline;
+                d.Target = at(new[] { "Target" });
+                d.R = at(new[] { "Red" }); d.Gr = at(new[] { "Green" }); d.B = at(new[] { "Blue" }); d.Alpha = at(new[] { "Alpha" });
+                d.Tint = at(new[] { "Tint" }); d.Frames = at(new[] { "Frames" }); d.FadeIn = at(new[] { "FadeIn" });
+                d.Fade = at(new[] { "FadeOut" }); d.Flash = at(new[] { "Flash" });
+            }
+            else if (n == "Mesh_Visibility")
+            {
+                // v1.7.13 (exe_v46z_outline): a mesh hidden / shown by name over the groups and the animation
+                d.Kind = FxKind.Vis;
+                d.Op = n;
+                d.Target = at(new[] { "Target" });
+                d.X = at(new[] { "Mesh" }); d.Y = at(new[] { "Visible" });
             }
             else if (n == "Model_Changer" || n == "VIS_SET_DEFAULT" || n == "VIS_BACK_DEFAULT" || n == "VIS_RESET_DEFAULT" || n == "Visibility")
             {
@@ -985,7 +1074,32 @@ namespace Sm4shCommand.Viewer
                         fs.AllScreen.Add(ev);
                         break;
                     }
+                case FxKind.Outline:
+                    {
+                        if (it(d.Target) == 0)
+                            r.outline.Set(r.gameFrame, fl(d.R, 255), fl(d.Gr, 255), fl(d.B, 255), fl(d.Alpha, 0), fl(d.Tint, 0),
+                                          it(d.Frames), it(d.FadeIn), it(d.Fade), it(d.Flash));
+                        var ev = new ScreenEvent { Frame = r.gameFrame, Text = Text(cmd) + (it(d.Target) == 0 ? "" : "  (another object: listed only)") };
+                        fs.Screen.Add(ev);
+                        fs.AllScreen.Add(ev);
+                        break;
+                    }
                 case FxKind.Vis:
+                    if (d.Op == "Mesh_Visibility")
+                    {
+                        var vs = r.vis;
+                        if (it(d.Target) == 0)
+                        {
+                            uint mesh = unchecked((uint)it(d.X));
+                            int v = it(d.Y);
+                            if (mesh == 0xFFFFFFFF) vs.Meshes.Clear();
+                            else if (v == 2) vs.Meshes.Remove(mesh);
+                            else vs.Meshes[mesh] = v != 0 ? 1 : 0;
+                        }
+                        vs.Events.Add(new ScreenEvent { Frame = r.gameFrame, Text = Text(cmd) });
+                        break;
+                    }
+                    else
                     {
                         var vs = r.vis;
                         int g = it(d.X), st2 = d.Y >= 0 ? it(d.Y) : 0;

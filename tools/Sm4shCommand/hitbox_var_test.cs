@@ -206,6 +206,28 @@ class HvTest
         Check("viewer: Damage 7.5 (SET_FLOAT), Angle 330 (-30), KBG 100 (stand-in), Size 0 (stand-in 4, NEG)",
               vh.Damage + " " + vh.Angle + " " + vh.KBG + " " + vh.Size, "7.5 330 100 0");
         Check("viewer: Extras column", vh.ExtrasText, "Damage=charge|FOLLOW = 7.5, Angle=VAR_1 = 330, KBG=STICK_LEN drawn as 100, Size=VAR_9|NEG drawn as 0");
+        // ---- v1.7.13: the Hitbox Viewer follows Outline_Set (Target 0: drawn; fades, Frames, the pulse) and
+        //      Mesh_Visibility (Target 0: the mesh overridden by name or index; Visible 2 / Mesh -1 end it)
+        run = new Sm4shCommand.Viewer.HitboxRunner().Run(Compile(
+            "Outline_Set(Target=0, Red=255, Green=128, Blue=0, Alpha=510, Tint=64, Frames=3, FadeIn=2, FadeOut=2, Flash=0)\n" +
+            "Mesh_Visibility(Target=0, Mesh=\"stethoscope_VIS_O_OBJ\", Visible=0, Persist=0)\n" +
+            "Mesh_Visibility(Target=0, Mesh=4, Visible=1, Persist=1)\nFRAME(Frames=10)\n" +
+            "Mesh_Visibility(Target=0, Mesh=4, Visible=2, Persist=0)\nFRAME(Frames=20)\n" +
+            "Mesh_Visibility(Target=0, Mesh=-1, Visible=0, Persist=0)\n" +
+            "Outline_Set(Target=0, Red=255, Green=0, Blue=0, Alpha=255, Tint=0, Frames=0, FadeIn=0, FadeOut=0, Flash=20)").Commands, 60);
+        Func<int, string> olAt = f => run[f].Outline == null ? "none" : string.Join(" ", run[f].Outline.Select(x => x.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)));
+        Check("viewer: Outline_Set fades in over 2 frames from its frame (0, then strength 2 x 0.5 / tint 0.251 x 0.5, then full)",
+              olAt(0) + " / " + olAt(1) + " / " + olAt(2), "none / 1 0.502 0 1 0.125 / 1 0.502 0 2 0.251");
+        Check("viewer: held 3 frames once in, out over 2, gone", olAt(5) + " / " + olAt(6) + " / " + olAt(7), "1 0.502 0 2 0.251 / 1 0.502 0 1 0.125 / none");
+        int s2 = Enumerable.Range(8, 50).First(f => run[f].Outline != null);
+        Check("viewer: Flash 20 (from its frame): full, strength 0 half-way, full again", olAt(s2) + " / " + olAt(s2 + 10) + " / " + olAt(s2 + 20),
+              "1 0 0 1 0 / 1 0 0 0 0 / 1 0 0 1 0");
+        var vis0 = run[0].Vis;
+        Check("viewer: Mesh_Visibility by name (its CRC32) and by index; another mesh not overridden", vis0.MeshOverride("stethoscope_VIS_O_OBJ", 0) + " " +
+              vis0.MeshOverride("Gamemodel", 4) + " " + vis0.MeshOverride("MarioD_hair_O_OBJ", 1) + "|", "False True |");
+        Check("viewer: Visible 2 ends the index's override, the name's stays", run[s2 - 2].Vis.MeshOverride("Gamemodel", 4) + "|" +
+              run[s2 - 2].Vis.MeshOverride("stethoscope_VIS_O_OBJ", 0), "|False");
+        Check("viewer: Mesh -1 ends every override", run[s2].Vis.Meshes.Count, 0);
         Console.WriteLine($"{exampleBlocks} example blocks");
         Console.WriteLine($"{oks} ok, {fails} failures");
         return fails == 0 ? 0 : 1;
