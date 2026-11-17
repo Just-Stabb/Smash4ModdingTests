@@ -40009,6 +40009,13 @@ void master_lw_loop()
         if (MotionModule(0x2712))
         {
             master_phase = 0;
+            // v16: SpecialLwTurn's REVERSE_LR / SpecialAirLwTurn's REVERSE_LR (their game scripts' Reverse_Direction at
+            // 8) flip his facing only (PostureModule +0x60); the model turns with update_rot_y_lr (PostureModule(0x2):
+            // +0x64), which the game runs on a status change, and Aymr goes on in this status: v7 - v15 drew him the
+            // old way until the move ended (user: "it turns him after the move finishes"). Ultimate's turn motion ends
+            // on SpecialLw's pose turned 180 (the hip -35 -> 122 degrees) and its SpecialLw resumes at the kept frame in
+            // the new facing: the model turned here, as the move resumes. port_check S26 turn-rot
+            PostureModule(0x2);
             MotionModule(0x1, master_lw_motion(), master_frame, 1.0f);
         }
         return;

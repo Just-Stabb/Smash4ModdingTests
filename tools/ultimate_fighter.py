@@ -1830,6 +1830,108 @@ def drive_slots(vis, drive, ult_vis, frames):
     return vis + [(slot, vis_keys(st)) for slot, st in on.items()]
 
 
+def face_vis(pac, old, mname, frames, vis_m, cprof, default=None):
+    """one motion's face / eyelid entry (its visibility keys): the base's entry for it cut to its frames (else, for the
+    face, the default's first keys), the profile's driven slots from Ultimate's visibility vis_m. pac: the pac kind
+    ('material_anime_face.pac' / 'material_anime_eyelid.pac'; the face's _lang variant is a face pac); default: the
+    default.mta to start from when old has none (a _lang pac carries no default)"""
+    import mta
+    face = pac.startswith('material_anime_face')
+    vis = []
+    d = old.get(mname + '.mta')
+    if d is not None and d[:4] == b'MTA4':
+        m = mta.read(d)
+        for v in m['vis']:
+            ks = [(min(k[0], frames - 1), k[1]) for k in v['keys']]
+            vis.append((v['name'], sorted(set(ks))))
+    if face:
+        dflt = old.get('default.mta', default or b'')
+        if d is None and cprof['vis'] and dflt[:4] == b'MTA4':
+            # a motion the base has no entry for plays default.mta; an entry of ours (for the
+            # slots below) replaces it, so it starts from the default's keys (else no mouth)
+            vis = [(v['name'], [(0, v['keys'][0][1])]) for v in mta.read(dflt)['vis']]
+        # the base's own keys for the slots we drive go (Pit's mouths: they'd show the tools)
+        vis = [v for v in vis if v[0] not in cprof['vis'].values()]
+        for uname, slot in cprof['vis'].items():
+            st = vis_m.get(uname)
+            for other in VIS_ALSO.get(uname, ()):
+                o = vis_m.get(other)
+                if o is not None:
+                    st = o if st is None else (np.asarray(st) | np.asarray(o))
+            vis.append((slot, vis_keys(st) if st is not None else [(0, cprof['vis_default'].get(slot, 0))]))
+        for slot in cprof['hidden']:
+            vis = [v for v in vis if v[0] != slot] + [(slot, [(0, 0)])]
+    drive = cprof.get('drive', {}).get('material_anime_face.pac' if face else pac)
+    if drive and vis_m:
+        vis = drive_slots(vis, drive, vis_m, frames)
+    return vis
+
+
+RESULT_FACE_PACS = ('material_anime_face.pac', 'material_anime_face_lang.pac')
+
+
+def result_faces(motion_dir, base, cdirs, folder='bodyresult', log=print):
+    """(Byleth v16) the result motions' (Win1 - 3, their waits, Lose) face entries from Ultimate's visibility, in each
+    costume's material_anime_face.pac AND material_anime_face_lang.pac (the results scene's per-language lip-sync pac:
+    the base's entries there are what the result poses play). build_motions writes face entries for motion/body only,
+    so the result poses kept the base's: ZSS's _lang Win1Wait / Win2Wait / Win3 / Win3Wait hide every mouth slot and
+    show Mouth_Result (her results smile; Byleth's Sword of the Creator): user, Byleth v15: "their face is missing their
+    mouth in victory animations"; Win1 / Win2 / Lose played default.mta. cdirs: [(the costume folder holding its
+    model.nud and face pacs, its output folder)]. port_check F3 result-face"""
+    import omo
+    import mta
+    import ssbh_data_py as s
+    main = omo.pac_read(os.path.join(base, 'motion', folder, 'main.pac'))
+    prefix = os.path.commonprefix([n for n, _ in main])
+    prefix = prefix[:prefix.index('Main') + 4]
+    _pn, prof = profile_for(m.name for m in nud.read(base + '/model/body/c00/model.nud'))
+    have = {f[:-7]: f for f in os.listdir(motion_dir) if f.endswith('.nuanmb')}
+    aliases = motion_aliases(motion_dir)
+    frames_of, vis_of = {}, {}
+    for name, _d in main:
+        key = name[len(prefix):-4].lower()
+        ult = prof.get('motion_overrides', {}).get(key) or (key if key in have else prof['motions'].get(key))
+        if ult not in have:
+            ult = aliases.get(key[3:])
+        if ult not in have:
+            log('result_faces: %s has no Ultimate motion: left as it is' % key)
+            continue
+        anim = s.anim_data.read_anim(os.path.join(motion_dir, have[ult]))
+        frames = int(round(anim.final_frame_index)) + 1
+        _tr, vis = ult_tracks(anim, frames)
+        frames_of[name[:-4]], vis_of[name[:-4]] = frames, vis
+    for cd in cdirs:
+        cin, cout = cd[0], cd[1]
+        look = [c for c in cd[:1] + cd[2:]]          # (cin, cout[, fallback]): a file cin lacks from the fallback
+
+        def find(f):
+            return next((os.path.join(c, f) for c in look if os.path.exists(os.path.join(c, f))), None)
+        cprof = profile_for(m.name for m in nud.read(find('model.nud')))[1]
+        face = dict(omo.pac_read(find('material_anime_face.pac')))
+        for pac in RESULT_FACE_PACS:
+            src = find(pac)
+            if src is None:
+                continue
+            old = dict(omo.pac_read(src))
+            ents = []
+            for mname, frames in frames_of.items():
+                vis = face_vis(pac, old if pac == 'material_anime_face.pac' else {}, mname, frames, vis_of[mname],
+                               cprof, default=face.get('default.mta'))
+                if vis:
+                    ents.append((mname + '.mta', mta.write(frames, [], 60, 21, vis)))
+            own = {n[:-4] for n, _d in ents}
+            for name, d in omo.pac_read(src):
+                if name[:-4] in own:
+                    continue
+                if name == 'material_anime.lst':
+                    d = lst_without(d, own)
+                ents.append((name, d))
+            os.makedirs(cout, exist_ok=True)
+            omo.pac_write(os.path.join(cout, pac), ents)
+            log('%s/%s: %d result entries (%s)' % (os.path.basename(cout.rstrip('/')), pac, len(own), ', '.join(
+                sorted(n[len(prefix):] for n in own))))
+
+
 def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones=None, animated=None, joints=(),
                   extra_vis=None, folder_suffix='', only_costumes=None):
     """the base's motion/body pacs with Ultimate's motions on our skeleton (main.pac), its hand-pose
@@ -1914,6 +2016,7 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
                 ents.append((name, o.encode()))
             omo.pac_write(out + '/motion/%s%s/%s.pac' % (folder, folder_suffix, layer), ents)
     # visibility: the base's eyelid / face material animations, plus the swords and the wing
+    done = []
     for cdir in sorted(os.listdir(base + '/model/body')):
         cpath = base + '/model/body/' + cdir
         if not cdir.startswith('c') or not os.path.isdir(cpath) or (only_costumes is not None and cdir not in only_costumes):
@@ -1928,32 +2031,7 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
             old = {n: d for n, d in omo.pac_read(src)}
             ents = []
             for mname, frames in frames_of.items():
-                vis = []
-                d = old.get(mname + '.mta')
-                if d is not None and d[:4] == b'MTA4':
-                    m = mta.read(d)
-                    for v in m['vis']:
-                        ks = [(min(k[0], frames - 1), k[1]) for k in v['keys']]
-                        vis.append((v['name'], sorted(set(ks))))
-                if pac == 'material_anime_face.pac':
-                    if d is None and cprof['vis'] and old.get('default.mta', b'')[:4] == b'MTA4':
-                        # a motion the base has no entry for plays default.mta; an entry of ours (for the
-                        # slots below) replaces it, so it starts from the default's keys (else no mouth)
-                        vis = [(v['name'], [(0, v['keys'][0][1])]) for v in mta.read(old['default.mta'])['vis']]
-                    # the base's own keys for the slots we drive go (Pit's mouths: they'd show the tools)
-                    vis = [v for v in vis if v[0] not in cprof['vis'].values()]
-                    for uname, slot in cprof['vis'].items():
-                        st = vis_of[mname].get(uname)
-                        for other in VIS_ALSO.get(uname, ()):
-                            o = vis_of[mname].get(other)
-                            if o is not None:
-                                st = o if st is None else (np.asarray(st) | np.asarray(o))
-                        vis.append((slot, vis_keys(st) if st is not None else [(0, cprof['vis_default'].get(slot, 0))]))
-                    for slot in cprof['hidden']:
-                        vis = [v for v in vis if v[0] != slot] + [(slot, [(0, 0)])]
-                drive = cprof.get('drive', {}).get(pac)
-                if drive and vis_of.get(mname):
-                    vis = drive_slots(vis, drive, vis_of[mname], frames)
+                vis = face_vis(pac, old, mname, frames, vis_of[mname], cprof)
                 if vis:
                     ents.append((mname + '.mta', mta.write(frames, [], 60, 21, vis)))
             # the base's other entries (default / default_temporarily / display.mta, material_anime.lst:
@@ -1975,6 +2053,10 @@ def build_motions(motion_dir, src_model, base, out, log=print, add=(), max_bones
                 ents.append((name, d))
             os.makedirs(out + '/model/body/' + cdir, exist_ok=True)
             omo.pac_write(os.path.join(out, 'model/body', cdir, pac), ents)
+        done.append((os.path.join(out, 'model/body', cdir), os.path.join(out, 'model/body', cdir), cpath))
+    # (Byleth v16) the result poses' faces (face.pac and face_lang.pac): result_faces
+    if os.path.exists(os.path.join(base, 'motion', 'bodyresult', 'main.pac')) and done:
+        result_faces(motion_dir, base, done, log=log)
     return sk
 
 
@@ -2018,7 +2100,16 @@ def main():
                    'with cNN\'s look and texture ids (ultimate_port.py low-models)')
     m.add_argument('--lod-low', action='store_true', help='the low model (model/body/lNN: the magnifier, 8-player '
                    'Smash): Ultimate\'s lowest level of detail from the costume\'s lod.xmb (body_low for body_high ...)')
+    rf = sub.add_parser('result-faces', help='(Byleth v16) the result poses\' face entries (face.pac and face_lang.pac) '
+                        'from Ultimate\'s visibility on installed costume folders: result_faces')
+    rf.add_argument('motion_dir', help='Ultimate\'s motion/body/cNN (the costume group\'s source)')
+    rf.add_argument('base', help='the base fighter folder (its motion/bodyresult names, model/body/c00 profile)')
+    rf.add_argument('costumes', nargs='+', help='IN=OUT[=FALLBACK]: a costume folder (model.nud, the face pacs), where '
+                    'its rewritten pacs go, a folder for the files IN lacks')
     a = ap.parse_args()
+    if a.cmd == 'result-faces':
+        result_faces(a.motion_dir, a.base, [tuple(c.split('=')) for c in a.costumes])
+        return
     joints = [j for j in a.joints.split(',') if j]
     global OWN_JOINTS
     if a.own_joints:

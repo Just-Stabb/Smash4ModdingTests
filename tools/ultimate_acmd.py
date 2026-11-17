@@ -110,7 +110,26 @@ EFFECT = {'collision_attr_normal': 0, 'collision_attr_cutup': 2, 'collision_attr
 SFX_LEVEL = {'ATTACK_SOUND_LEVEL_S': 0, 'ATTACK_SOUND_LEVEL_M': 1, 'ATTACK_SOUND_LEVEL_L': 2, 'ATTACK_SOUND_LEVEL_LL': 3}
 SFX_TYPE = {'COLLISION_SOUND_ATTR_NONE': 0, 'COLLISION_SOUND_ATTR_PUNCH': 1, 'COLLISION_SOUND_ATTR_KICK': 2,
             'COLLISION_SOUND_ATTR_CUTUP': 3, 'COLLISION_SOUND_ATTR_ELEC': 7, 'COLLISION_SOUND_ATTR_FIRE': 8,
-            'COLLISION_SOUND_ATTR_MAGIC': 8, 'COLLISION_SOUND_ATTR_HEAVY': 8}
+            'COLLISION_SOUND_ATTR_MAGIC': 8, 'COLLISION_SOUND_ATTR_HEAVY': 8,
+            # (Byleth v16) the attributes v1 - v15 didn't list came out as 0, Smash 4's "Nothing": a silent hit (Aymr,
+            # COLLISION_SOUND_ATTR_MASTER_AXE, user: "down special has no hit sound"). Smash 4's types
+            # (reference/spreadsheets SFX_Type): 3 slash, 9 splash, 0xB explosion, 0x12 slap, 0x1C ice. A fighter's own
+            # attribute plays its own HitSE in Ultimate (se_master_hit_axe, se_master_hit_attack100end: Smash 4 has no
+            # per-fighter hit sound type for a new kind), so the nearest common one: Aymr's / the rapid jab's
+            # finisher / Hero's critical sword hits a slash, the max arrow's pierce a slash, Squirtle's shell a kick
+            'COLLISION_SOUND_ATTR_BOMB': 0xB, 'COLLISION_SOUND_ATTR_WATER': 0x9, 'COLLISION_SOUND_ATTR_FREEZE': 0x1C,
+            'COLLISION_SOUND_ATTR_SLAP': 0x12, 'COLLISION_SOUND_ATTR_MASTER_AXE': 3,
+            'COLLISION_SOUND_ATTR_MASTER_ATTACK100END': 3, 'COLLISION_SOUND_ATTR_MASTER_ARROW_MAX': 3,
+            'COLLISION_SOUND_ATTR_BRAVE_CRITICALHIT': 3, 'COLLISION_SOUND_ATTR_ZENIGAME_SHELLHIT': 2}
+
+
+def sfx_type(attr):
+    """Smash 4's SFX type for Ultimate's COLLISION_SOUND_ATTR_*: never a silent 0 for an attribute that sounds
+    (port_check S25 hit-sound): one not listed warns and takes a slash (a fighter's own: most are weapons) or a punch"""
+    if attr in SFX_TYPE:
+        return SFX_TYPE[attr]
+    sys.stderr.write('ultimate_acmd: COLLISION_SOUND_ATTR %s not in SFX_TYPE: a stand-in hit sound\n' % attr)
+    return 3 if attr.count('_') > 3 else 1
 REGIONS = ['NONE', 'HEAD', 'BODY', 'HIP', 'PUNCH', 'ELBOW', 'KICK', 'KNEE', 'THROW', 'OBJECT', 'SWORD', 'HAMMER',
            'BOMB', 'SPIN', 'BITE', 'MAGIC', 'PSI', 'PALUTENA', 'AURA', 'BAT', 'PARASOL', 'PIKMIN', 'WATER',
            'WHIP', 'TAIL', 'ENERGY']
@@ -806,7 +825,7 @@ class Translator:
         shield_dmg = max(shield_dmg, 0)
         common = [int(hid), int(part), self.bone(bone), float(dmg), ANGLE.get(int(angle), int(angle)), int(kbg), int(fkb), int(bkb), float(size),
                   float(x), float(y), float(z), EFFECT.get(effect, 0), float(trip), float(hitlag), float(sdi), clang,
-                  rebound, int(round(shield_dmg)), SFX_LEVEL[lvl], SFX_TYPE.get(attr, 0), SITUATION[situation],
+                  rebound, int(round(shield_dmg)), SFX_LEVEL[lvl], sfx_type(attr), SITUATION[situation],
                   1 if direct else 0, REGION.get(region, 0), CATEGORY.get(category, 0x3F), 0, 0xF, 0, 1,
                   1 if reflect else 0, 1 if absorb else 0, int(rehit), 0, 0, FACING.get(lr, 3), 0, 1 if friendly else 0,
                   1 if no_hitlag else 0, 0, 1 if flinchless else 0]
@@ -832,7 +851,7 @@ class Translator:
     def attack_abs(self, a):
         _ag, kind, part, dmg, angle, kbg, fkb, bkb, trip, hitlag, lr, _unk, no_reaction, effect, lvl, attr, region = a[:17]
         return [cmd('Throw_Specifier', ABS_KIND[kind], int(part), float(dmg), int(angle), int(kbg), int(fkb), int(bkb),
-                    EFFECT.get(effect, 0), float(trip), float(hitlag), 1.0, SFX_LEVEL[lvl], SFX_TYPE.get(attr, 0),
+                    EFFECT.get(effect, 0), float(trip), float(hitlag), 1.0, SFX_LEVEL[lvl], sfx_type(attr),
                     FACING.get(lr, 3), 1, 1 if no_reaction else 0, REGION.get(region, 8))]
 
 

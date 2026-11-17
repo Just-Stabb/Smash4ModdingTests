@@ -2735,3 +2735,18 @@ also goes on v11's TEST_ONLY diag exe (exe_v46w_vars_line + diag_godfist_cave) u
   victim's CaptureModule vt +0xBC with the box's TargetStatus / flag); no direct store to the record was found (a struct
   copy from the collision pass, not traced). The victim's catchability each frame: `0x02E2528C` (status data `& 0x800`;
   Damage 0x46 leaves it catchable).
+
+## Facing and the model's turn (Byleth v16)
+
+- The fighter PostureModule (accessor `+0x18`, vtable `0x10129264`) keeps the facing `lr` at `+0x60` and the model's
+  turn `rot_y` at `+0x64` (= lr x 90 when they agree). `vt+0x7C` set_lr(f) (`0x02E5CF18`) writes `+0x60` and posts a
+  facing event; `vt+0x84` reverse_lr (`0x02E5D020`) = set_lr(-lr); `vt+0xC4` update_rot_y_lr (`0x02E5D2AC`) writes
+  `+0x64` = lr x 90 and tells the model; `vt+0xCC` (`0x02E5D3E0`) negates `+0x64` (and tells the model).
+- ACMD: `Reverse_Direction` (0x63623560, handler `0x02BD42E0`, index 454) calls vt+0x84 only: the hits and the
+  movement face the new way, the model doesn't turn. `REVERSE_ROT` (0x1A019B6B, `0x02BD4A54`, index 455) calls vt+0xCC:
+  the model's turn alone. MSC `PostureModule(1)` / `(2)` (the int handler, vt+0x14C = `0x02009D0C`) are vt+0x84 /
+  vt+0xC4. The game updates the turn on a status change, so a turn inside one status needs `PostureModule(2)` (or
+  `REVERSE_ROT` in the script) where the model should face the new way. No vanilla game script uses REVERSE_ROT;
+  vanilla's 11 Reverse_Direction (ZSS: escapef at 16, throwb at 9, ...) end their status soon after, with an animation
+  authored for it. Byleth's SpecialLwTurn (Ultimate's turn motion turns his hip 157 degrees over 12 frames and ends on
+  SpecialLw's pose turned 180): master.c turns the model where SpecialLw resumes (port_check S26 turn-rot).

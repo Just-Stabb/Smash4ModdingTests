@@ -3113,6 +3113,101 @@ def check_add_speed(src, name, ult, rep):
                 % (name, name, ', '.join(missing)))
 
 
+def check_hit_sound(inst, name, src, ult, rep):
+    """S25 hit-sound: a hitbox whose SFXType is 0 (Smash 4's "Nothing") where Ultimate's hitbox sounds (its
+    COLLISION_SOUND_ATTR is not NONE; matched by damage / knockback / size: tools/hit_sound_fix.py). Byleth v1 - v15:
+    ultimate_acmd's SFX_TYPE didn't list COLLISION_SOUND_ATTR_MASTER_AXE / _MASTER_ATTACK100END / _MASTER_ARROW_MAX and
+    took 0 for them: Aymr (down special, down smash, down air), the rapid jab's finisher and the max arrow hit in
+    silence (user, v15: "down special has no hit sound"). ERROR. Also WARN: an attribute in the fighter's dump that
+    SFX_TYPE doesn't list (ultimate_acmd.sfx_type's stand-in)"""
+    import hit_sound_fix as H
+    import ultimate_acmd as U
+    dump = src.dump(ult)
+    if not dump or not os.path.isdir(dump):
+        return
+    table = H.attack_sounds(dump)
+    unlisted = sorted({a for attrs in table.values() for a in attrs if a not in U.SFX_TYPE})
+    if unlisted:
+        rep.add('WARN', 'S25 hit-sound', 'Ultimate hit sound attributes ultimate_acmd.SFX_TYPE doesn\'t list (a '
+                'stand-in sound): ' + ', '.join(unlisted))
+    bad = {}
+    for rel in sorted(inst.files):
+        if not (rel.startswith('fighter/%s/script/animcmd/' % name) and rel.endswith('/game.bin')):
+            continue
+        for h, c, attr in H.scan(table, scripts(inst, rel) or {}):
+            bad.setdefault(rel.split('/animcmd/')[1].rsplit('/', 1)[0], set()).add('%08X %s' % (h, attr[21:]))
+    if bad:
+        rep.add('ERROR', 'S25 hit-sound', 'silent hitboxes (SFXType 0; Ultimate\'s sound; fix: tools/hit_sound_fix.py '
+                '--fix): ' + '; '.join('%s: %s' % (k, ', '.join(sorted(v))) for k, v in sorted(bad.items())))
+
+
+def check_result_faces(inst, name, base, vanilla, rep):
+    """F3 result-face: a costume's result-pose face entries (J02Win* / J02Lose in material_anime_face.pac and
+    material_anime_face_lang.pac, the results scene's per-language pac) still the base fighter's own (byte for byte its
+    vanilla entry): the base's keys drive the base's mouth slots, which hold the port's mouths and weapons. Byleth v1 -
+    v15: ultimate_fighter's motions step wrote face entries for motion/body only; ZSS's _lang Win1Wait / Win2Wait /
+    Win3 / Win3Wait hide every mouth and show Mouth_Result (his sword): user, v15: "their face is missing their mouth in
+    victory animations" (fix: ultimate_fighter.result_faces, run by the motions step; `result-faces` on an install).
+    ERROR"""
+    import omo
+    bad = {}
+    for d in sorted({os.path.dirname(c) for c in inst.glob(
+            r'fighter/%s/model/body/[cl]\d\d/material_anime_face(_lang)?\.pac' % name)}):
+        tag = d.split('/')[-1]
+        for pac in ('material_anime_face.pac', 'material_anime_face_lang.pac'):
+            data = inst.get(d + '/' + pac)
+            vp = os.path.join(vanilla or '', 'fighter', base.get('base', ''), 'model', 'body', 'c00', pac)
+            if data is None or not vanilla or not os.path.exists(vp):
+                continue
+            van = dict(omo.pac_read(vp))
+            import tempfile
+            with tempfile.NamedTemporaryFile(delete=False) as f:
+                f.write(data)
+            try:
+                ents = omo.pac_read(f.name)
+            finally:
+                os.unlink(f.name)
+            same = [n[:-4] for n, x in ents if ('J02Win' in n or 'J02Lose' in n) and van.get(n) == x]
+            if same:
+                bad.setdefault(tag, []).append('%s: %s' % (pac, ', '.join(s[s.index('J02') + 3:] for s in same)))
+    if bad:
+        rep.add('ERROR', 'F3 result-face', 'result poses with the base\'s face entries (its mouth keys on the port\'s '
+                'slots; ultimate_fighter.py result-faces): ' + '; '.join('%s %s' % (k, ' / '.join(v))
+                                                                          for k, v in sorted(bad.items())))
+
+
+def check_turn_rot(src, name, ult, rep):
+    """S26 turn-rot: an Ultimate *Turn status whose game script turns the fighter (REVERSE_LR) and then goes back to the
+    move it came from (Byleth's SpecialLwTurn -> SpecialLw at the frame it left). Smash 4's Reverse_Direction (ACMD
+    0x63623560, handler 0x02BD42E0) flips the facing only (PostureModule vt+0x84 -> set_lr: +0x60); the model's turn
+    (+0x64 rot_y = lr x 90) waits for PostureModule vt+0xC4 (update_rot_y_lr, MSC PostureModule(0x2)), which the
+    game calls on a status change: a port that resumes the move in the same status (a motion change) draws him the
+    old way until the move ends (user, Byleth v15: "it turns him after the move finishes"). Ultimate's turn motion
+    (d03speciallwturn: the hip turns -35 -> 122 degrees) ends on the move's pose turned 180, so the model's facing
+    has to flip where the move resumes. The port's MSC must call PostureModule(0x2) there, its source naming the
+    script (a comment `SCRIPT's REVERSE_LR`). ERROR"""
+    dump = src.dump(ult)
+    d = os.path.join(dump, ult) if dump else None
+    if not d or not os.path.isdir(d):
+        return
+    c = os.path.join(ROOT, 'fighters', name, name + '.c')
+    text = open(c, encoding='utf-8', errors='replace').read() if os.path.exists(c) else ''
+    missing = []
+    for f in sorted(os.listdir(d)):
+        if not re.match(r'Special\w*Turn\.txt$', f):
+            continue
+        body = open(os.path.join(d, f), errors='replace').read()
+        m = re.search(r'fn game_\w+\(agent[^{]*\{(.*?)\n\}', body, re.S)
+        if m and 'REVERSE_LR' in m.group(1):
+            script = f[:-4]
+            if not re.search(r"%s's REVERSE_LR" % re.escape(script), text):
+                missing.append(script)
+    if missing:
+        rep.add('ERROR', 'S26 turn-rot', 'Ultimate turn statuses (REVERSE_LR, then the move resumed): no '
+                'PostureModule(0x2) where fighters/%s/%s.c resumes the move (a comment "SCRIPT\'s REVERSE_LR" there): %s'
+                % (name, name, ', '.join(missing)))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('name')
@@ -3202,6 +3297,9 @@ def main():
     check_msc_effect_leaks(inst, a.name, rec, rep)
     check_status_hit_log(inst, a.name, rep)
     check_frame_waits(inst, a.name, rec, rep)
+    check_hit_sound(inst, a.name, src, base['ult'], rep)
+    check_turn_rot(src, a.name, base['ult'], rep)
+    check_result_faces(inst, a.name, base, vanilla, rep)
     n = rep.show()
     sys.exit(1 if n['ERROR'] or (a.strict and n['WARN']) else 0)
 

@@ -9,6 +9,47 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: v16 (`scratchpad/byleth_v16_fix.zip`: a FIX package over v15: body / arrow2 game.bin, master.mscsb, the face pacs of c00 - c07 / l00 - l07; exe unchanged (exe_v46x_whipmot); in-game TEST)
+
+User, v15 test (clips `afdc9a1a-...191508681.mp4` (ours, Aymr with turns), `560378f7-...192510721.mp4` (ours, the ground
+up special on DK twice), `72aa49f5-...193014493.mp4` (Ultimate, the same up special), `838dcda7-...193139500.mp4`
+(Ultimate, Aymr with a turn); framed at 60 fps): Aymr has no hit sound; Aymr's turn only shows when the move ends; the
+up special's catch -> hit too slow. Coordinator, from the user: the mouth is missing in the victory poses.
+
+| point | cause (evidence) | fix |
+|---|---|---|
+| Aymr silent | Ultimate's axe ATTACK: `ATTACK_SOUND_LEVEL_L, COLLISION_SOUND_ATTR_MASTER_AXE` (Ultimate plays its own HitSE `se_master_hit_axe`; no PLAY_SE on hit in the scripts). `ultimate_acmd.SFX_TYPE.get(attr, 0)` had no MASTER_AXE: SFXType 0, Smash 4's "Nothing" (installed speciallwstart 0x6642CE2F / specialairlwstart: SFXLevel 2, SFXType 0). The same for _MASTER_ATTACK100END (the rapid jab's finisher) and _MASTER_ARROW_MAX (the max arrow), and Aymr's down smash / down air (MASTER_AXE): 13 body hitboxes, 720 in arrow2 | `ultimate_acmd.sfx_type`: every attribute the ports' dumps use mapped (the fighters' own -> 3 slash: Smash 4 has no per-fighter hit sound type for a new kind (Cloud's 0x3B - 0x3E are his), so `se_master_hit_axe` itself can't play: APPROXIMATED as the common heavy slash at level L; BOMB 0xB, WATER 9, FREEZE 0x1C, SLAP 0x12, ZENIGAME_SHELLHIT 2), an unlisted one warns, never 0. `tools/hit_sound_fix.py` (Ultimate's ATTACK / ATTACK_ABS matched by damage / KBG / BKB / size) fixed the installed files: only SFXType words changed. **port_check S25 hit-sound** (ERROR; v15's install: 5 body scripts, 8 arrow2). Other ports with the same silent hits (their dumps): Hero (AttackS4 / Hi4 / Lw4 critical, Kaboom / Kafrizz / Magic Burst (SpecialLw18 / 20), the explosions), Squirtle (Water Gun, Waterfall, AttackHi4, Final, its water), Incineroar (Attack11 slap, SpecialHiBound bomb), Steve (Final end): to fix with hit_sound_fix on their installs |
+| Aymr's turn at the end | Ultimate: SpecialLwTurn is its own status (lua2cpp f_7208a21800 main: special_lw_turn by situation, the axe told `fighter_master_axe_turn`; f_7208a289f0 loop: MotionModule::is_end -> back to SpecialLw, whose main (f_7208a21060) resumes special_lw at the kept frame and restarts the axe); its script's REVERSE_LR at 8. The turn motion d03speciallwturn (12 frames) turns his hip -35 -> 122 degrees and ends on SpecialLw's pose (-58) turned 180: the model faces the new way from where SpecialLw resumes. Ours (v7): the same flow inside one status (0x155 phase 4, Reverse_Direction at 8), but Smash 4's Reverse_Direction (handler 0x02BD42E0 -> PostureModule vt+0x84) flips the facing only (`+0x60`); the model's turn (`+0x64`, update_rot_y_lr vt+0xC4) waits for a status change: SpecialLw resumed drawn the old way (hitting the new way) until the move ended (docs/native-notes.md "Facing and the model's turn"). Clips: Ultimate turns at 89 - 97 of clip 4 and swings to the new side (108 - 120) | master.c: PostureModule(0x2) where SpecialLw resumes after the turn motion (both situations). **port_check S26 turn-rot** (ERROR on v15's master.c) |
+| up special too slow | measured (below): catch -> overtake hit 36 - 37 frames in our two attempts, 37 in Ultimate's; start -> hit 57 ours, 61 Ultimate's. Ultimate reels at param_special_hi rewind_speed x PostureModule::scale (f_7208a0a800: the sword's float = 4.1 x scale, a frame), as ours; its stop is hit_stop_frame_fighter 19 from the catch (measured 18), ours 19 - 20 | **not changed**: no difference from Ultimate found that would make it "much faster". Asked the user which part feels slow (the air version / a far catch are not in the clips) |
+| no mouth in the victory poses | `ultimate_fighter.build_motions` writes face entries for motion/body only; the result poses' (bodyresult: J02Win1 - 3, waits, Lose) stayed the base's: ZSS's `material_anime_face_lang.pac` (the results scene's) Win1Wait / Win2Wait / Win3 / Win3Wait key MouthN and every mouth slot 0 and Mouth_Result 1 (her result smile; his Sword of the Creator), in every costume and low model; Win1 / Win2 / Lose had no entry (default.mta) | `ultimate_fighter.result_faces` (also run by build_motions now; `ultimate_fighter.py result-faces` on the installed folders): every result motion's entry from Ultimate's visibility (MASTER_MOUTHS drive: e.g. j02win1's master_Mouth_Result -> MouthN, the sword where master_sword shows) in face.pac AND face_lang.pac, male (c00 motions) and female (c01) groups, c00 - c07 and l00 - l07. **port_check F3 result-face** (ERROR: v15's install, all 16 folders) |
+
+Up special, frames from the clips (60 fps; ours: Cemu at full speed, clip 1's timer 5:52.05 -> 5:47.05 over 300 frames;
+Ultimate's: unique frames, 2 repeats in 55):
+
+| | Ultimate (clip 72aa49f5) | ours, 1st (560378f7) | ours, 2nd |
+|---|---|---|---|
+| the catching hit (3 %) | 69 | 81 | 385 |
+| stop: he starts to move | 87 (18) | 101 (20) | 404 (19) |
+| travel: on the target | 93 (6) | 109 (8) | 412 (8) |
+| the overtake's hit | 106 (13) | 118 (9) | 421 (9) |
+| catch -> hit | **37** | **37** | **36** |
+
+Aymr's turn (Ultimate clip 838dcda7): the stick back at ~89 (the turn motion, whirlwind), facing the new way by 97, the
+swing to the new side 108 - 120; ours (afdc9a1a): the swing faced the old way and turned at the end (v15; v16 not
+filmed).
+
+Checks: `tools/master_specials_test.py` **105 checks, 0 problems** (v15's 98 + v16: the turn by situation, the model
+facing the old way through the turn motion and turned as SpecialLw resumes at its frame, none with the stick forward;
+on v15's master.mscsb the two model-turn checks fail); compiling v15's master.c reproduces the installed master.mscsb
+byte for byte. port_check (v4 ... v15_fix, v16_fix): **0 ERROR**, 31 WARN (`scratchpad/byleth/pc_v16.log`, as v15);
+on v15's install: S25 and F3 ERROR (`pc_v16_before.log`), S26 on v15's master.c. Package
+`scratchpad/byleth/make_pkg_v16_fix.py` (35 fighter files, the TEST_ONLY diag master.mscsb for v15's TEST_ONLY exe),
+INSTALL README `scratchpad/byleth/INSTALL_README_v16.txt`.
+
+Not done / approximated: Ultimate's own hit sounds (se_master_hit_axe ...: the common slash instead); the result poses'
+eyelid / eye keys (`material_anime_eyelid_lang.pac`, `eye_lang`) are still ZSS's blink timing (the eyes show); the up
+special unchanged (above).
+
 ## Status: v15 (`scratchpad/byleth_v15_fix.zip`: a FIX package over v14: the whip's motion pac / scripts, body game.bin, master.mscsb; **exe_v46x_whipmot**; in-game TEST)
 
 User, after v14: Ultimate's sideways bend of the sword on the hit, the sword's own overtake animation, and the
@@ -837,6 +878,11 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
+000000000000000. **v16 fix** (sent: `scratchpad/byleth_v16_fix.zip`, no exe): test list in
+   `scratchpad/byleth/INSTALL_README_v16.txt` (hit sounds on Aymr / down smash / down air / rapid jab end / max arrow,
+   Aymr's turn during the move, mouths in every victory pose). Open: the user's "up special too slow" (v16 measured
+   ours = Ultimate's from catch to hit: ask which part, a clip of the air / far case); the same silent-hit fix for Hero,
+   Squirtle, Incineroar and Steve (`tools/hit_sound_fix.py` on their installs, port_check S25); the result eyelids.
 00000000000000. **v15 fix** (sent: `scratchpad/byleth_v15_fix.zip`, exe_v46x_whipmot): test list in
    `scratchpad/byleth/INSTALL_README_v15.txt` (the hit's flick, the blade shortening with the pull, the overtake's
    sword, no freeze). If the sword stands still from the catch: the anchored action kept her status 2's rate 0 (README
@@ -1324,6 +1370,10 @@ python3 tools/ultimate_port.py run master motions motions-group2 low-models soun
 python3 tools/master_whip.py tips ULT                                             # the air hit's pull table (master.c)
 bash scratchpad/byleth/make_pkg_v6_fix.sh                                         # -> scratchpad/byleth_v6_fix.zip (fix)
 python3 tools/port_check.py master byleth_v4.zip byleth_userdata_v2.zip byleth_v5_fix.zip byleth_v6_fix.zip   # 0 ERROR
+# v16: hit sounds (ultimate_acmd.sfx_type; the install fixed by tools/hit_sound_fix.py), Aymr's turn (master.c), the result faces
+python3 tools/hit_sound_fix.py DUMP/lua2cpp_master INST/.../body/game.bin INST/.../weapon/arrow2/game.bin --fix OUT
+python3 tools/ultimate_fighter.py result-faces ULT/motion/body/c00 BASE INST/c00=OUT/c00 ...   # c01 for c01/03/05/07
+python3 scratchpad/byleth/make_pkg_v16_fix.py
 # v10: the catch / ledge box / wall cling / Aymr's landing (master.c, master_build.pull_angles / overtake_soft,
 # ultimate_vl_shapes.tether_box), no exe; the TEST_ONLY diag exe on the user's exe_v46w_vars_line
 python3 tools/ultimate_port.py run master scripts specials variants shapes --out OUT

@@ -47,6 +47,8 @@ v12: the reel ends with the target's throw point 7.8 ahead / 14.2 above him (not
 v13: 0x15B holds every energy and puts him by position: exactly still through the stop's motion frames, then one
      straight path of equal steps (<= 4.1) to the reel's end; master_wire_wind2 stopped at the reel, killed on a cut-short
      exit and by the sweep.
+v16: Aymr's turn: the model (update_rot_y_lr, PostureModule(2)) turns as SpecialLw resumes after the turn motion
+     (its script's Reverse_Direction flips the facing only), at the frame it left, ground and air; not without a turn.
 """
 import os
 import re
@@ -104,6 +106,8 @@ class Game:
         self.step = [0.0, 0.0]     # v11: self moves (forward, up) since the last take()
         self.placed = []           # v12: (x, y) before each write of his X / Y (0x0F000000 / 1), and after
         self.fx = []               # v12: EffectModule(0x2710, id, bone, x, y, ...) requests: (id, world x, world y)
+        self.rot = 1.0             # v16: the model's facing (PostureModule +0x64 / 90: update_rot_y_lr sets it to lr)
+        self.stick_x = 0.0         # v16: ControlModuleF(0), the stick's X on screen
 
     def take(self):
         """the self moves since the last call (applied as they were written): (forward, up)"""
@@ -166,7 +170,11 @@ class Game:
         if sid == 0x14 and a in ([1], [2]):                 # PostureModule(1): reverse_lr (then 2: its rotation)
             if a == [1]:
                 self.lr = -self.lr
+            else:
+                self.rot = self.lr                       # v16: update_rot_y_lr (vt+0xC4): the model turns
             return 0
+        if sid == 0xF and a == [0]:                          # v16: ControlModuleF(0): the stick's X
+            return f2i(self.stick_x)
         return 0
 
     def line_test(self, mode):
@@ -841,6 +849,60 @@ def v10(path):
     check('v10 Aymr in the air at 53: the hop (gravity y + 1), once', len(hops) == 1 and i2f(hops[0][2]) == 1.0, str(hops))
 
 
+def v16(path):
+    """v16 (README "Status: v16"): Aymr's turn. SpecialLwTurn's game script turns him at its frame 8 with Reverse_Direction,
+    which flips the facing only (the model test: gm.lr); the model turns (gm.rot) when the MSC calls update_rot_y_lr
+    (PostureModule(0x2)) as the move resumes after the turn motion, at the frame it left, in both situations; never
+    without the turn"""
+    for air in (False, True):
+        b, gm = Byleth(path), Game()
+        b.vm.game = gm
+        sit = 2 if air else 0
+        b.g('global18', sit)
+        b.g('global19', sit)
+        b.g('global4', 0x155)
+        gm.situation = sit
+        b.g('master_phase', 0)
+        b.g('master_flag', 0)
+        gm.frame, gm.lr, gm.rot = 20.0, 1.0, 1.0
+        gm.stick_x = -1.0                                # the stick back (he faces right)
+        b.call('master_lw_loop')
+        want_turn = 0x247 if air else 0x243
+        sets = [a for s, a in gm.calls if s == 0x12 and a and a[0] == 1]
+        check('v16 Aymr %s: the stick back at 20 -> the turn motion 0x%X' % ('air' if air else 'ground', want_turn),
+              b.g('master_phase') == 4 and sets and sets[-1][1] == want_turn, str(sets))
+        gm.stick_x = 0.0
+        rots = []
+        for f in range(1, 12):                           # the turn motion (12 frames); its script's Reverse_Direction at 8
+            gm.frame = float(f)
+            if f == 8:
+                gm.lr = -gm.lr
+            gm.end = f == 11
+            gm.calls.clear()
+            b.call('master_lw_loop')
+            rots.append(gm.rot)
+        sets = [a for s, a in gm.calls if s == 0x12 and a and a[0] == 1]
+        back = 0x245 if air else 0x241
+        check('v16 Aymr %s: the model faces the old way through the turn motion (its own 180), then turns as the move '
+              'resumes (update_rot_y_lr)' % ('air' if air else 'ground'),
+              rots[:-1] == [1.0] * 10 and rots[-1] == -1.0 and gm.lr == -1.0, 'rot %s lr %s' % (rots, gm.lr))
+        check('v16 Aymr %s: the move resumes at the frame it left (20)' % ('air' if air else 'ground'),
+              b.g('master_phase') == 0 and sets and sets[-1][1] == back and i2f(sets[-1][2]) == 20.0,
+              str(sets))
+    b, gm = Byleth(path), Game()
+    b.vm.game = gm
+    b.g('global18', 0)
+    b.g('global19', 0)
+    b.g('global4', 0x155)
+    gm.situation = 0
+    b.g('master_phase', 0)
+    b.g('master_flag', 0)
+    gm.frame, gm.stick_x = 20.0, 1.0
+    b.call('master_lw_loop')
+    check('v16 Aymr: no turn (and no model turn) with the stick forward',
+          b.g('master_phase') == 0 and not [a for s, a in gm.calls if s == 0x14 and a == [2]])
+
+
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else compiled()
     failnaught(path)
@@ -848,6 +910,7 @@ def main():
     v9(path)
     v10(path)
     v15_scripts()
+    v16(path)
     print('\n%d problem(s)' % len(PROBLEMS))
     sys.exit(1 if PROBLEMS else 0)
 
