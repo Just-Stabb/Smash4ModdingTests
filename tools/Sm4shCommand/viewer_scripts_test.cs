@@ -276,12 +276,57 @@ class VsTest
         Check("turned a quarter (a = -turn, eft's): (1, 0.5) to (0.5, 1)", U.ToString("0.###") + " " + V.ToString("0.###"), "0.5 1");
     }
 
+    // v1.7.6: Effect_Camera (exe_v46z_camfx): a spawn the viewer draws in front of its own view, ended by its Frames
+    static void CameraEffects()
+    {
+        Console.WriteLine("== Effect_Camera");
+        var r = new HitboxRunner { GetScript = c => null, OneShotLife = id => -1 };
+        r.Others = new List<HitboxRunner.ScriptSource> { Src("effect", "FRAME(Frames=2)\n" +
+            "Effect_Camera(Graphic=0x3410012, X=0.5, Y=-0.25, Z=20, XRot=0, YRot=0, ZRot=90, Size=1.9, Mode=1, Frames=4, Flags=1)\n" +
+            "Effect_Camera(Graphic=0x1000042, X=3, Y=2, Z=25, XRot=0, YRot=0, ZRot=0, Size=1, Mode=0, Frames=0, Flags=0)\n" +
+            "FRAME(Frames=9)\nTerminate_Graphic_Effect(Graphic=0x1000042, KillParticles=1, KillImmediately=1)") };
+        r.Run(Compile("FRAME(Frames=1)"), 14);
+        var all = r.AllEffects;
+        Check("two camera effects started (spawns, not screen notes)", all.Count + " " + all.Count(e => e.Camera) + " " +
+              r.AllScreen.Count, "2 2 0");
+        var a = all[0];
+        Check("the first: its id, Mode 1, Frames 4, offsets / turn / size", string.Format(System.Globalization.CultureInfo.InvariantCulture,
+              "0x{0:X} {1} {2} {3} {4} {5} {6}", a.Id, a.CamMode, a.CamFrames, a.X, a.Y, a.RZ, a.Size), "0x3410012 1 4 0.5 -0.25 90 1.9");
+        Check("... ended by its Frames (started on 3, 4 frames: shown 3-6)", a.StartFrame + "-" + a.EndFrame + " " + a.EndReason,
+              "3-7 Effect_Camera's Frames (4)");
+        Check("the second ended by Terminate_Graphic_Effect on frame 10", all[1].EndFrame + " " + all[1].EndReason,
+              "10 terminated (Terminate_Graphic_Effect)");
+        var vp = new Viewport { Width = 800, Height = 600 };
+        float[] cr, cu, cf;
+        vp.CameraAxes(out cr, out cu, out cf);
+        var m0 = vp.EffectMatrix(all[1]);
+        var p = m0.Transform(0, 0, 0);
+        var s = vp.ScreenOf(p);
+        // Mode 0 at (3, 2) units: 3 x zoom px right of the view's centre, 2 x zoom px above it
+        float zoom = (s[0] - 400) / 3;
+        Check("Mode 0: (3, 2) units right / up of the view's centre (in pixels: 3 : 2 x the zoom), in front of the model",
+              Math.Abs((300 - s[1]) - 2 * zoom) < 0.01 && zoom > 0 && Dot(p, cf) < -100, true);
+        var ax = m0.Transform(1, 0, 0);
+        var sx = vp.ScreenOf(ax);
+        Check("... its X axis along the screen's right", Math.Abs(sx[1] - s[1]) < 0.01 && sx[0] > s[0], true);
+        var m1 = vp.EffectMatrix(a);
+        var s1 = vp.ScreenOf(m1.Transform(0, 0, 0));
+        Check("Mode 1: X 0.5 / Y -0.25 half view heights (150 px right, 75 px down of the centre)",
+              Math.Abs(s1[0] - 550) < 0.05 && Math.Abs(s1[1] - 375) < 0.05, true);
+        var s1x = vp.ScreenOf(m1.Transform(1, 0, 0));
+        Check("... ZRot 90 and its scale (a half view height a unit): its X axis 300 px up the screen",
+              Math.Abs(s1x[0] - s1[0]) < 0.05 && Math.Abs((s1[1] - s1x[1]) - 300) < 0.05, true);
+    }
+
+    static float Dot(float[] a, float[] b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+
     static void Main(string[] args)
     {
         var errors = new List<string>();
         ACMD_INFO.OverrideInfo(args[0], errors);
         Synthetic();
         UvAnim();
+        CameraEffects();
         for (int i = 1; i < args.Length; i++)
         {
             if (args[i] == "--common") { Models(args[++i]); continue; }

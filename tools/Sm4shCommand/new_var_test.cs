@@ -85,11 +85,11 @@ class NvTest
         var errors = new List<string>();
         int n = ACMD_INFO.OverrideInfo(args[0], errors);
         Check("Events.cfg loads with no errors", string.Join("; ", errors), "");
-        Check("commands", ACMD_INFO.CMD_NAMES.Count, 630);   // v1.4.12: + Position_Place, Position_Offset_Get; v1.4.13: + Buffer_Clear, Buffer_Set; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold
+        Check("commands", ACMD_INFO.CMD_NAMES.Count, 631);   // v1.4.12: + Position_Place, Position_Offset_Get; v1.4.13: + Buffer_Clear, Buffer_Set; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
         Check("New_Var known: size 11, group", ACMD_INFO.CMD_SIZES[FighterVariable.NewVarIdent] + " " +
               ACMD_INFO.GetCategory(FighterVariable.NewVarIdent), "11 New Commands / Variables");
-        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 46);       // v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold
-        Check("group help blocks", ACMD_INFO.GROUP_HELP.Count, 10);      // v1.7.0: + New Commands / Time & stage
+        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 47);       // v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
+        Check("group help blocks", ACMD_INFO.GROUP_HELP.Count, 11);      // v1.7.0: + New Commands / Time & stage; v1.7.6: + New Commands / Effects
         LoadAliases(args[1]);
         Check("aliases loaded", FighterVariable.AliasCount > 500, true);
 
@@ -165,6 +165,14 @@ class NvTest
               "AB0FC57C0000000100000001AB0FC57CFFFFFFFF000000025766F889");
         Check("Hitbox_Hold round-trips", Hex(Bytes(Compile(s.Deserialize()))), Hex(Bytes(s)));
         Check("Hitbox_Hold: New Commands / Hitboxes & hits", ACMD_INFO.GetCategory(0xAB0FC57C), "New Commands / Hitboxes & hits");
+        // ---- v1.7.6: Effect_Camera(Graphic, X, Y, Z, XRot, YRot, ZRot, Size, Mode, Frames, Flags) (exe_v46z_camfx)
+        s = Compile("Effect_Camera(Graphic=0x3410012, X=0, Y=0.5, Z=20, XRot=0, YRot=0, ZRot=90, Size=1.9, Mode=1, Frames=90, Flags=1)");
+        Check("Effect_Camera: 12 words, its CRC, Graphic, 7 floats, Mode, Frames, Flags (then the end marker)", Hex(Bytes(s)),
+              "F20DCF5803410012000000003F00000041A00000000000000000000042B400003FF33333000000010000005A000000015766F889");
+        Check("Effect_Camera round-trips", Hex(Bytes(Compile(s.Deserialize()))), Hex(Bytes(s)));
+        Check("... shown", s.Deserialize().Split('\n')[1].Trim(),
+              "Effect_Camera(Graphic=0x3410012, X=0, Y=0.5, Z=20, XRot=0, YRot=0, ZRot=90, Size=1.9, Mode=1, Frames=90, Flags=1)");
+        Check("Effect_Camera: New Commands / Effects", ACMD_INFO.GetCategory(0xF20DCF58), "New Commands / Effects");
 
         // ---- errors
         Check("unknown name", Error("INC_INT(Variable=nothing_here)"),
