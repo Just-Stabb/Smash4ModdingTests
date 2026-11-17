@@ -3174,3 +3174,104 @@ His loser panel on the results screen was empty: `param/ui/result_param.bin` fra
 - framing (APPROXIMATED, no Ultimate equivalent of the file): Mario's entry byte for byte (eye (3, 9, 11), to (0, 11, 0), win 130 / 145 / 108, MVP / team Mario's): his model (HeadN 10.24) and result motions (151 / 181 / 131, lose 109; the Nov 14 upload) are Mario's;
 - no win cameras: not an Ultimate port (port_check R1 skips it: `NON_ULTIMATE`).
 Built with `tools/result_param.py port` on Byleth v17's file (it keeps every vanilla entry and Byleth's byte for byte); every added kind's entry is in the one file. `port_check` R1 / R2: 0 errors over it. Not yet seen in game.
+
+## Time Skip (side special): the XV2 skill read
+User: put Xenoverse 2's skill **1352_HIK_DSH** (Hit's "Time-Skip"; the user also calls it "Jump Spike") on his **side
+special**, ground and air (the Cape goes). Files given: the skill's BAC / BCM / BDM / EAN (`_C`, `_F`, `_HIK`, `_MAM`) and
+its SE bank `CAR_BTL_S1352_DSH_SE.acb` (6 cues, waveforms in the ACB). No EEPK (the skill's own effects 0 and 11), no
+BSA. `tools/supamario_timeskip_xv2.py report` -> `reference/xv2/timeskip_skill.json` (XV2-Tools' names; ThrowHandler /
+Functions / ScreenEffect / TargetingAssistance decoded).
+
+### What the files say
+- **BCM:** #1-#8 (SuperSkill1, by the opponent's size: OpponentSizeConditions 0x70000 ... 0) all play **BAC 0**, charge
+  **BAC 2**, victim on connect **BAC 5**, user on connect BAC 9 / 10 / 4 / 11 (the same entry but for the hold distance:
+  1.5 m, 1.8 m for the biggest, 1.5 m and 0.5 m up for #5-#7). No airborne entry (XV2 fights in the air: one move).
+- **BAC 0 (uncharged), skill EAN #0 (121 frames), real frames (TimeScale 20-50 x6):**
+  | BAC | real | what |
+  |---|---|---|
+  | 0-20 | 0-20 | the wind-up (a crouch, the root 0.24 m back and forward); weak tracking 0.25; skill effect 0 at 0 (no EEPK); skill SE 0 **Basa** at 6 |
+  | 20-50 | 20-25 | **ChargeControl 20-50, ChargeTime 40**: held, the entry pauses at 20 (the charge); BPE 85 (a white body outline flash) at 20; tracking 0.05 |
+  | 50-60 | 25-35 | **tracking 1.0** (turns to the target), TargetingAssistance Z 50-83; the root launches 1.5 m into the horizontal dash pose (52-60) |
+  | 54-83 | 29-58 | **the detection box**: b_C_Base + (0, 0.5, 1.0 m ahead), 0.5 m, skill BDM #0 (type 10, no damage, the victim's BPE 37 black screen), flags 0x2000 ImpactType_Single. BcmCallback Supers 54-85 |
+  | 56-85 | 31-60 | **Movement 0.7 m a frame forward, drag 0.003** (~19 m); stage BG effect 60 (the stage's dust) and skill SE 1 **Dash** at 56 |
+  | 84-120 | 59-95 | the stop (the root 1.7 m more), back to the stance; skill SE 2 **Hazure** (the whiff) at 86; BPE 85 at 100 |
+- **BAC 2 (charged):** the same, the dash pose (EAN 60-85) played three times: **Movement 56-135, the box 54-133**
+  (~46 m), Hazure at 136. BAC 1 (a middle length) no BCM entry plays.
+- **BAC 4 (the user on connect, skill EAN #1, 81 frames):** **invulnerable 0-80**; ThrowHandler 0-16 **the victim held
+  1.5 m in front of his ground point** (g_x_LND, 0.1 m up); BPE 78 **Invert World Colors** at 0 (the time stop) and BTL_CMN
+  108 (HIT_DmgGrs2, a model on the camera) 0-16; skill SE 3 **TimeStop** at 0, 4 **PumchiFuri** at 8; **the punch at 16**:
+  TimeScale 16-22 x0.1 (60 real frames: the time lock), skill effect 11 (no EEPK), SE 5 **Hit_TmLck**, BPE 85 / 2 / 78 /
+  10 (flash, invert, a small shake); skill voice 0 at 19 (left out); the recovery to 80. #1 is a straight right punch
+  from the dash pose (extended 12-36). Nothing in the files jumps or spikes: the move is a dash and a punch.
+- **BAC 5 / 6 / 7 (the victim):** CMN #76 YOROKE_HEAD_F held 0-16, invulnerable 0-20; at 16 **Damage 140** (function 0x2),
+  TimeScale 16-20 x0.1 (40 real frames), CMN #205 BLOW_H_F; from 20 (56 real frames after the connect) **blown away
+  (0, 0.025, 0.43) m a frame** (~3 degrees up) 31 frames, its body a hitbox; entry 6 (CMN cue 64 **CharaAway_HKT** at
+  its 16), entry 7 CMN #96 the face-up slide.
+- **Skill BDM #1** (no BAC item names it): DamageType 26, Hit_LL (CMN 53), **BTL_CMN effect 2** (Btl_HitLOD x1.5, Btl_HitL
+  x0.8 / x0.05, the sweat, a CBIND), knockback (0, 0.02, 0.32), 90 frames: the punch's look; its sub-entry 5 (guarding)
+  a 30-frame guard stun. XV2's 140 against Sledgehammer's 60 / 145.
+
+## Time Skip v1 (`supamario_timeskip_v1.zip`): the side special
+Install over Sledgehammer v5 (`vars_reset_v1.zip`), exe `exe_v46x_whipmot` (no exe change: Stage_Freeze, variable resets,
+Target 12, Extra hitboxes are in it). Built by `tools/supamario_timeskip_build.py` (it runs Sledgehammer's build, which
+runs the earlier moves'; their files are theirs byte for byte except the shared ones). The user's spec (relayed) wins over
+XV2 where they differ.
+
+### The move
+| | |
+|---|---|
+| Motions | **0x219 SpecialS** = the dash (XV2 #0 at entry 0's real timing: 96 frames; 0-19 = BAC 0-19, 20-24 = BAC 20-50 at x6, 25-95 = BAC 50-120), **0x21D SpecialAirS** = the connect (#1 1:1, 81 frames); both in either situation (XV2 has no air entry): they were the Cape's ground / air motions. `tools/supamario_timeskip_anim.py` (retarget as the earlier ports, 5.04 units a metre, no TransN, the pelvis's height on RotN). No new slot: ModAnimNames.txt unchanged |
+| Charge | special still held at frame 20: the pose held (XV2's ChargeControl), up to **40** frames; let go (or 40): the dash; the motion restarted at 20 so its scripts' clocks start again there |
+| Speed (the user) | **constant, by the charge: 2.4 a frame uncharged to 4.2 fully charged**, in proportion to the frames held (20 held: 3.3). His dash / run speed 1.6, the God Fist's burst 4.53 (XV2's own 0.7 m = 3.53). The moving part frames **27-59** (XV2's launch at BAC 52 to the movement's end 85: 33 frames); on a miss its last 8 frames eased down to 1.85 (the stop's first root speed); then on the ground the stop (the root's 8.5 units). Straight travel: uncharged **85.6** (ground) / 77.1 (air), half 111.2 / 102.7, full **136.9 / 128.4** |
+| Tracking (the user) | each moving frame: the nearest opponent **in front** (along his facing) **within 80**, **at most 65 degrees up or down** (feet to feet): the dash aimed at it, the same speed; none: the last aim kept. Never turns him. On the ground never aimed down; aimed up off the ground: into the air |
+| Gravity (the user) | none through the move (his speeds set every frame, the stick's drift held at 0). After it in the air (Fall, no free fall): **his gravity eased back in over 20 frames** (0.0045 a frame more each frame, Mario's 0.09 at 20) and a fall faster than his max (1.5) brought down **0.05 a frame** (the fall limit lowered step by step, not snapped). Anything but Fall (a jump, an attack, a landing, a hit) ends the ease with his normal gravity |
+| Use (the user) | **once per airtime**: VAR_26 set in the air, its variable reset (exe_v46w) **KO 1 / landing 2 / ledge 4 / hit 8** -> 0 registered on him from MSC (`sh_reset_item`); `ts_can_side` (global25, the side special's own check) refuses it in the air while set. On the ground always |
+| Detection | XV2's box: bone 0, **5.04 ahead, 2.52 up, 2.52** (frames 29-57; off 2 before the moving part ends), 2%, knockback 1, Clang 0, **shieldable**, Ground/Air 3 (fighters lying down too). **Beats armor**: Sledgehammer's armor lift (now `armor_lift(z, y, r)`, `sh_unarmor` its call) on every frame it is out, given back to fighters it didn't catch. Real hits only: invincible / intangible / countering fighters aren't caught (the dash goes on, another fighter can be) |
+| Time stop (the user) | a hit **or a shielding fighter**: the connect motion; the stage and background stopped (`Stage_Freeze(1, 30)` at its frame 0, `(0)` at the punch), **every other fighter frozen** (a 2-frame hitstop renewed every frame by the MSC) until the punch. The victim: a hit one held **7.56 in front, 0.5 up** (XV2's 1.5 m / 0.1 m) in its hitstun, no stage collision, controller off (the KO resets on it); a shielding one kept where it is, shielding, frozen, controller off. Supamario **invincible from the catch through the punch's freeze** (the user's Core Breaker rule) |
+| Punch | connect frame 16, Part 1, on the victim's middle (7.56 ahead, 5.5 up, 5.04), **16% (18 with the detection), angle 10 (XV2's blow ~3), BKB 70, KBG 70**, both frozen **30** frames (XV2's time lock), SDI 0, NoGFX (XV2's look from the MSC). Knockback from 0 / 50 / 100%: **98.5 / 142.6 / 186.7** (hitstun 39 / 57 / 74; Mario weight, no DI ~86 / 179 / 306 units) vs Sledgehammer charged 52.8 / 99.7 / 146.7, Core Breaker's crash 75.5 / 125.3 / 175.2 |
+| Shields | **uncharged**: the punch on the shield takes **50%** of the max shield (the hit's own taken back: Sledgehammer's way; a break if that empties it) and holds **26 frames of shieldstun** (`cb_shield_tick`); he acts at the connect's **frame 32**: the 16th frame after the shared freeze, the shielder on its 27th: **+11** (the offline model, whose shieldstun counts down a frame early: +9). **Fully charged**: the punch is **unblockable** (Shieldable 0) and does **22%** (+6) to a fighter caught shielding |
+| Ends | a miss: Wait at 95 on the ground (the stop), Fall at 60 in the air. A hit: Wait / Fall at the connect's 80 (64 frames after the freeze) |
+| B-reverse | the stick back past 0.5 on frames 0-3: his facing only (Sledgehammer's) |
+| Staling | none (the status's attack log 0; vanilla 0x1412 the Cape's) |
+
+### Effects and sounds
+- **The punch's look** (skill BDM #1's BTL_CMN effect 2), from the MSC where the punch lands (the victim's middle,
+  unturned): Btl_HitLOD x1.5 (Sledgehammer's set 0x0341005C), **Btl_HitL x0.8** (new: two sets, the converter splits its
+  19 emitters, 0x0341005F / 0x03410060), the sweat x2.0 on its head (0x0341005E), at x1.75. Vibrant (glare x2, capped at
+  2.0), halos 0.16 (2: the first set had no room). **Brightness** (`tools/supamario_fx_glow.py ts_hit`): its white flash
+  discs and glaring streaks drew 28.6 / 8.9 square units over 1.0 on grass; now capped (flash 0.35, line 0.5, Line00 1.0:
+  `PEAK_CAP`): over 1.0 at its brightest frame **0.3 black / 7.4 grass / 4.9 grey** (at most 8.4 in a frame on grass;
+  Sledgehammer's hit burst, unchanged since v3, reaches 10.8).
+- Smash's dash cloud on the ground at the launch (XV2's stage dust, BG 60). Not converted: the skill's own effects 0 / 11
+  (no EEPK), BTL_CMN 108 (a model on the camera), the BPE screen effects (no Smash equivalent).
+- **Sounds** (levelled to -0.5 dBFS peak, into his bank: ids **0x0CB1009D-0x0CB100A3**): Basa at 6 (wind-up only), Dash at
+  31, Hazure at a miss's end (MSC), TimeStop at the connect's 0, PumchiFuri at 8, Hit_TmLck at the punch (MSC, on a hit or
+  the shield), CMN CharaAway_HKT at the connect's 63 (the victim's entry 6: 47 frames after its launch). No voices.
+
+### How (files)
+- `supamario.c` (end): `ts_*`; `func_2259` (main) -> ts_init / `ts_loop`, `func_2280` (end) -> ts_end, `func_82` -> ts_tick,
+  `func_2249` global25 = ts_can_side, `func_2251` attack log 0, `func_2262` / `func_2264` (the Cape's init / exec) skipped.
+  **No new globals** (127 of 128); **VAR_22-30** (TS_V_PH, CHG, SLOT, K, USED, BREV, EASE, AIM, SHV); VAR_31 free.
+  `msc_fingerprint` vs Sledgehammer v5: those 7 functions, `sh_unarmor` (now `armor_lift`'s call) and the new ts_*.
+- Scripts: `specials` (the detection box at 29 when TS_V_PH > 2.5, Basa / Dash, the dust, a rumble), `specialairs`
+  (Stage_Freeze, the three punches by TS_V_CHG / TS_V_SHV, TimeStop / PumchiFuri / CharaAway, a rumble).
+- `tools/supamario_timeskip_xv2.py`, `_anim.py`, `_build.py`, `_test.py`; `reference/xv2/timeskip_skill.json`,
+  `timeskip_root.json` (the root's speed table the MSC's `ts_vroot` is built from).
+
+### Tests
+`tools/supamario_timeskip_test.py OUT SLEDGEHAMMER_OUT`: the MSC in the interpreter with a model of the game: ground /
+air taps (phases, the box's frames, the speeds and their ease, travel, Fall, no gravity, the gravity's ease after, the
+fall limit stepping 0.05 down after a steep dive), the use and its resets (landing / hit), charges (half 3.3, full 4.2,
+the restart), ground and air catches (held, the controller, the bystander frozen to the punch, 18%, the look and the
+sound once, invincibility, the ends), shields (uncharged +9 in the model, 50% / 26 frames; fully charged through it, 22%),
+refusals (invincible, countering, intangible), armor beaten (lifted on contact), a lying fighter caught, tracking (45 /
+64 degrees tracked, 70 / behind / 85 away not, down in the air, not on the ground, level on the ground stays grounded,
+never turned, the speed unchanged), B-reverse, a cut / a KO in the hold; the scripts, motions (only SpecialS /
+SpecialAirS differ from Sledgehammer v5's build), effect sets (Sledgehammer's untouched, facing-safe, HDR), the sound ids.
+The Sledgehammer, Fake Death, Core Breaker and God Fist (`--all-models`) suites, `msc_stack_check`.
+
+### Not confirmed in game / approximated
+Stage_Freeze for a cinematic hold in a real match (the commands' in-game test was training); the other fighters' freeze
+by hitstop (their projectiles and items keep moving); the take-off from the ground when aimed up (`func_20`); the energy-1
+limit write easing the fall (the Fall status doesn't reset it each frame); the punch's explicit 30-frame freeze on a
+shield; that `Shieldable 0` hits through a raised shield; the body stays horizontal whatever the aim (no rotation).

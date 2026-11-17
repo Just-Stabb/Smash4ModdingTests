@@ -114,7 +114,7 @@ SH_FX = {'hitlod': 0x0341005C, 'sweat': 0x0341005E}
 # XV2's glare 1.0 but drawn at the HDR cap 2.0) were 28.6 square units over 1.0 on a grass stage and its glaring streaks
 # (line / line_2 / line_1_1, glare 2.5) 8.9 (tools/supamario_fx_glow.py ts_hit --bg 0.5,0.65,0.3): each emitter's
 # brightest drawn channel capped (Sledgehammer's flash_cap way), by its name's start
-PEAK_CAP = (('flash', 0.35), ('line', 0.9))
+PEAK_CAP = (('flash', 0.35), ('line', 0.5), ('Line00', 1.0))
 FX_DUST = 0x1000009                 # Smash's dash cloud: XV2's Stage BG 60 at BAC 56 (the stage's own, not in the files)
 TS_SE = {'ts_basa': ('CAR_S1352_DSH_Basa', 0.0),          # skill SE cue 0, BAC 6
          'ts_dash': ('CAR_S1352_DSH_Dash', 0.0),          # cue 1, BAC 56

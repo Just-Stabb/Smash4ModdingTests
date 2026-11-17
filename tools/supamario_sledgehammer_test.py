@@ -1087,9 +1087,10 @@ def script_tests(out, base):
             ns = f[p].scripts.get(h)
             if [(c.ident, c.params) for c in s] != [(c.ident, c.params) for c in (ns or [])] and \
                     h not in {acmd.crc(n) for n in ('attackdash', 'specialhi', 'specialairhi', 'speciallwstart',
-                                                     'speciallwhold')}:
+                                                     'speciallwhold', 'specials', 'specialairs')}:
                 same.append((p, hex(h)))
-    check('every other script as the user\'s (but the God Fist\'s / Core Breaker\'s / Fake Death\'s)', same, [])
+    check('every other script as the user\'s (but the God Fist\'s / Core Breaker\'s / Fake Death\'s / Time Skip\'s)',
+          same, [])
 
 
 def effect_tests(out):
