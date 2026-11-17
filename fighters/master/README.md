@@ -9,6 +9,47 @@ choice; `docs/character-traits.md`, `kirby_copy_trait()`). Roll-off: the default
 The port goes through the framework (`docs/ultimate-port-guide.md`): `fighters/master/port.json`,
 `tools/ultimate_port.py` (init / plan / run), `reference/port_bases.json` `szerosuit` (her traps, new with this port).
 
+## Status: v15 (`scratchpad/byleth_v15_fix.zip`: a FIX package over v14: the whip's motion pac / scripts, body game.bin, master.mscsb; **exe_v46x_whipmot**; in-game TEST)
+
+User, after v14: Ultimate's sideways bend of the sword on the hit, the sword's own overtake animation, and the
+retraction tied to the pull's distance (v14's "Not done" below).
+
+| point | source (Ultimate's files) | built |
+|---|---|---|
+| no whip slot free | the whip (weapon 0x1A0) motion info is a **static** table (hashes `crc32(.omo name, 0xFFFFFFFF)`: the v14 handover's raw `crc32(name)` search missed it), weapon_expand_append.py's copy at `0x04B9C438` (60 entries: her 15 x 4 custom moves) | `tools/master_whip_motion_cave.py` (exe_v46x_whipmot = exe_v46w_vars_line + it; region `0x04BD6000`-`0x04BD7000`, docs/native-notes.md "Whip motion table"): 112 entries, 13 new motions (`master_whip.NEW_NAMES`, slots 60 - 108, 4 each); the whip's motion.mtable 112 (`master_whip.new_scripts`: the visibility game scripts), main.pac + 13 (`master_whip.py up`); `tools/master_whip_motion_test.py` (unicorn, 20 checks) |
+| the hit's bend | `motion/sword/c00/d02specialairhihit` (16 frames: frames 1 - 2 the tip 22 sideways (x), 65 long; still from 3 - 4) on his `d02specialairhihit` hand (HaveR) | HIT_SLOT(v): frames 0 - 4 exactly Ultimate's (renders: the same tip to 0.1), then the blade eased over 4 - 9 to PULL_LENGTHS[v] (its straight pose in d02specialhipull) and held (APPROXIMATED: Ultimate's status code aims the sword at what it holds, tip_angle_object, not read; ours keeps the hit pose's direction, his hand's 0.91 up / 0.40 forward, and the length) |
+| the pull | `d02specialhipull` (101 frames: a straight blade 115 long at 0, 1.01 shorter a frame; the sword's rewind picks its frame from the length; param_special_hi rewind_speed 4.1) | PULL_SLOT(v): the blade at PULL_LENGTHS[v] - 4.1 t (the reel's speed: master.c reels 4.1 a frame) down to 16.1 (the overtake's first frame), then held; 6 starting lengths 64 / 56 / 48 / 40 / 32 / 24 |
+| the length's pick | the catch's distance | master.c `master_hi_sword_len` (0x15B's main, before its motion): his hand in the hit pose (6.2 ahead, 18.5 up from where he is held) to the caught fighter's throw point / the wall point, the nearest length -> **VAR_16** = 10 x VAR_15 + v (-1: the floor / ceiling stop); diag: a second k4 line, 1000 x VAR_16 + the distance |
+| the overtake | `d02specialairhiovertake` (12 frames, the folded sword swung over) on his `d02specialairhiovertake` | OVT_SLOT 60, played by specialairhiovertake's game script at 0 (`master_build.overtake_sword`) |
+| playing them | Ultimate: the sword article's own statuses | SpecialAirHiHit's game script (`master_build.hi_hit_script`): VAR_16 >= 0: `Set_Remote_Article_Action(2, 0)` (the whip out of her tether status 1 / 2, whose MSC loop sets its motion rate, into status 0: no MSC main, as a generated whip) and `Set_Anchored_Article_Action(2, HIT_SLOT(v))` at 0; at 12 (wall) / 19 (fighter) `Set_Anchored_Article_Action(2, PULL_SLOT(v))` (replacing v9 - v14's `Set_Remote_Article_Action2(2, 3)`, her native reverse); the floor / ceiling stop keeps the reverse at 0 |
+
+Kept: v14's freeze protection (the stop's own-frame count and MASTER_HI_STOP_CAP; the 60-frame hit motion). Not
+proven in game: that ArticleModule 0x271B (the anchored action) restarts the motion at rate 1 after her status 2 (rate 0:
+whip.mscsb func_54) - status 0 is entered first; if the sword stands still on the catch, that is the cause (then the
+MSC sets the rate: the whip's MotionModule 0x4 through a link event, or status 4 / 6). Not reproduced: Ultimate's aim of
+the sword at the target (tip_angle_object -15 / tip_angle_wall 70), the ground up special's hit (SpecialHiHit: our
+ground up special has no catch).
+
+Renders (`scratchpad/v15/render_up.py`, the v6 whip renderer: ours = his converted body + the whip's new slots from the
+shipped pac / model, beside Ultimate's body + sword article at the same frames; `scratchpad/v15/renders/sheet_hit.png`,
+`sheet_pull.png`, `sheet_overtake.png`): the hit's frames 0 - 4 match Ultimate's (the bend at 1 - 2 in the front view),
+9 the 48 blade; the pull at 48 - 4.1 t against Ultimate's pull at the same length; the overtake frame for frame. The
+blade lengths read back from the built .omo (HaveN -> AttachN): hit 64.6, 64.0, 64.0, 64.6, 64.6, (6) 58.7, (9) 48.0;
+pull 48.0, 43.9, (3) 35.7, ... (8) 16.1. Hitbox Viewer (the whip as its own fighter root, Shot.exe:
+`scratchpad/v15/view/whip_view.png`): the shipped pac / model play HIT 48 frames 2 / 9, PULL 48 frame 4, the overtake 4
+(the viewer shows no articles on the body, as v12's views).
+
+Checks: `tools/master_specials_test.py` **98 checks, 0 problems** (v14's 80 + the length pick for a fighter / a wall /
+the stop, the hit script's commands for every mode x length, the overtake's, the slots); `tools/master_whip_motion_test.py`
+20 / 20 on exe_v46x_whipmot vs exe_v46w_vars_line and on the diag pair; port_check (v4 ... v14_fix, v15_fix): **0 ERROR**,
+31 WARN (`scratchpad/byleth/pc_v15.log`: as v14); new **X7 article-motion-slot** (ERROR: a body script's anchored article
+slot past the install executable's motion info, or naming no animation in the article's pac): v15's data without its exe
+-> X7 ERROR (the executable gives the whip 60 motions), without its pac -> X7 ERROR. A full `master_whip` motion build
+reproduces the installed 15 whip motions byte for byte and the 13 new ones. Package `scratchpad/byleth/make_pkg_v15_fix.py`
+(8 fighter files, the exe, the TEST_ONLY diag: v11's TEST_ONLY exe + the same cave (sha1 441117d7...), the v15 diag
+master.mscsb), INSTALL README `scratchpad/byleth/INSTALL_README_v15.txt`. Sm4shCommand rebuilt with the whip's new
+script names (ModAnimNames.txt).
+
 ## Status: v14 (`scratchpad/byleth_v14_fix.zip`: a FIX package over v13: master.mscsb, motion/body + body2 main.pac; exe unchanged (exe_v46w_vars_line); in-game TEST)
 
 User, v13 test with the TEST_ONLY diag (log `0622cb9c-log.txt`, RPX 553479bb = v11's diag exe; clip
@@ -28,7 +69,7 @@ it); on v13's install S23 ERROR (0x23A waits for 19). The two pacs differ from t
 (compared entry by entry). Package `scratchpad/byleth/make_pkg_v14_fix.py`, INSTALL README
 `scratchpad/byleth/INSTALL_README_v14.txt`.
 
-**Not done (handover, next agent): the sword's own motions** (user: Ultimate's sideways bend on the hit, the sword's
+**Not done (handover, next agent; done in v15: "Status: v15"): the sword's own motions** (user: Ultimate's sideways bend on the hit, the sword's
 overtake animation, the retraction tied to the reel's distance). Facts gathered:
 - Ultimate's sword motions (`ult/master/motion/sword/c00`, read with `master_whip.Ult.sword_locals` / `.rel`):
   d02specialairhihit 16 frames (the tip (0, 65) at 0, swung to (22, 59, 11) at 2, back to (-1, 64) by 4, still after);
@@ -796,6 +837,11 @@ damage rumbles on common motions Ultimate's scripts have nothing for; her own to
 
 ## Handover: next steps (in order)
 
+00000000000000. **v15 fix** (sent: `scratchpad/byleth_v15_fix.zip`, exe_v46x_whipmot): test list in
+   `scratchpad/byleth/INSTALL_README_v15.txt` (the hit's flick, the blade shortening with the pull, the overtake's
+   sword, no freeze). If the sword stands still from the catch: the anchored action kept her status 2's rate 0 (README
+   "Status: v15": set the rate from the whip's side). If the blade's length is off: the diag's second k4 (VAR_16, the
+   distance); PULL_LENGTHS / MASTER_HI_HAND_X / _Y. Open: Ultimate's aim of the sword at the target (tip_angle_object).
 0000000000000. **v14 fix** (sent: `scratchpad/byleth_v14_fix.zip`): test list in `scratchpad/byleth/INSTALL_README_v14.txt`
    (no freeze; the sword retracting through the pull; k15 names the energy that carried 2.5 up). **Next: the sword's
    own motions** (hit bend, overtake, distance-tied pull): the plan and the facts are under "Status: v14" ("Not done").

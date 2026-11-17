@@ -281,6 +281,76 @@ def reel_ok(path, start, end, stop):
     return ok, 'steps %s, d %.2f' % ([round(x, 2) for x in steps], d)
 
 
+def sword_len_check(what, gm, start, held, mode):
+    """v15: VAR_16 = 10 x mode + v, v the PULL_LENGTHS entry nearest his hand's (Ultimate's hit pose: 6.2 / 18.5 from
+    his root, held at start) distance to what the tip holds"""
+    import master_whip as MW
+    hand = (start[0] + 6.2 * gm.lr, start[1] + 18.5)
+    d = ((held[0] - hand[0]) ** 2 + (held[1] - hand[1]) ** 2) ** 0.5
+    v = min(range(len(MW.PULL_LENGTHS)), key=lambda k: (abs(MW.PULL_LENGTHS[k] - d), k))
+    got = gm.vars.get(0x0F000310)
+    check('v15 %s: VAR_16 = %d (10 x VAR_15 %d + the blade %g nearest the distance %.1f from his hand)'
+          % (what, 10 * mode + v, mode, MW.PULL_LENGTHS[v], d), got == float(10 * mode + v), str(got))
+
+
+def script_run(script, vars_):
+    """[(frame, command name, params)] a flat ACMD script with Float_Var_Compare / True blocks executes (== / != / >=)"""
+    import operator
+    ops = {0: operator.eq, 1: operator.ne, 2: operator.le, 3: operator.ge, 4: operator.lt, 5: operator.gt}
+    out, frame, i, skip_to = [], 0.0, 0, None
+    words = [1 + len(c.params) for c in script]
+    while i < len(script):
+        c = script[i]
+        if c.name == 'FRAME':
+            frame = float(c.params[0])
+        elif c.name == 'Float_Var_Compare':
+            ok = ops[int(c.params[1])](vars_.get(c.params[0], 0.0), float(c.params[2]))
+            t = script[i + 1]
+            assert t.name == 'True'
+            if not ok:
+                n, j = int(t.params[0]) - words[i + 1], i + 2      # the block's words after the True
+                while n > 0:
+                    n -= words[j]
+                    j += 1
+                i = j
+                continue
+            i += 2
+            continue
+        elif c.name not in ('True', 'END'):
+            out.append((frame, c.name, list(c.params)))
+        i += 1
+    return out
+
+
+def v15_scripts():
+    """v15: SpecialAirHiHit's game script by VAR_15 / VAR_16; the overtake's; the slots the executable must have"""
+    import master_build as M
+    import master_whip as MW
+    sc = M.hi_hit_script()
+    arts = lambda r: [(f, n, p) for f, n, p in r if 'Article' in n]                 # noqa: E731
+    for mode, stop in sorted(M.HI_STOP.items()):
+        for v in range(len(MW.PULL_LENGTHS)):
+            r = arts(script_run(sc, {0x0F00030F: float(mode), 0x0F000310: float(10 * mode + v)}))
+            want = [(0.0, 'Set_Remote_Article_Action', [2, 0]), (0.0, 'Set_Anchored_Article_Action', [2, MW.HIT_SLOT(v)]),
+                    (float(stop), 'Set_Anchored_Article_Action', [2, MW.PULL_SLOT(v)])]
+            check('v15 SpecialAirHiHit\'s script, VAR_15 %d, blade %g: status 0, the hit motion at 0, its pull at %d' %
+                  (mode, MW.PULL_LENGTHS[v], stop), r == want, str(r))
+    r = arts(script_run(sc, {0x0F00030F: 0.0, 0x0F000310: -1.0}))
+    check('v15 SpecialAirHiHit\'s script, the floor / ceiling stop: her reverse at once, nothing else', r ==
+          [(0.0, 'Set_Remote_Article_Action2', [2, 3])], str(r))
+    import ultimate_acmd as U
+    ovt = [U.cmd('FRAME', 12.0), U.cmd('Remove_Article', 2)]
+    M.overtake_sword(U, ovt)
+    M.overtake_sword(U, ovt)
+    r = arts(script_run(ovt, {}))
+    check('v15 the overtake plays the sword\'s overtake motion at 0 (once), removed at 12',
+          r == [(0.0, 'Set_Anchored_Article_Action', [2, MW.OVT_SLOT]), (12.0, 'Remove_Article', [2])], str(r))
+    used = sorted({MW.OVT_SLOT} | {MW.HIT_SLOT(v) for v in range(6)} | {MW.PULL_SLOT(v) for v in range(6)})
+    check('v15 the new slots: past her 60, multiples of 4, within the grown motion info (%d), one name each' %
+          MW.MOTION_COUNT, used[0] == 60 and all(x % 4 == 0 and x + 3 < MW.MOTION_COUNT for x in used)
+          and sorted(MW.NEW_NAMES) == used and len(set(MW.ALL_NAMES.values())) == len(MW.ALL_NAMES), str(used))
+
+
 def compiled():
     import master_build as M
     out = os.path.join(tempfile.mkdtemp(), 'master.mscsb')
@@ -375,6 +445,7 @@ def up_special(path):
     gm.status.clear()
     start = (gm.x, gm.y)
     hp = run_hit(b, gm)
+    sword_len_check('a fighter (its throw point (20, 100))', gm, start, (20.0, 100.0), 2)
     reel_end = gm.placed[-2][0]                     # where the reel's last step put him (the overtake then moves him)
     gm.frame = 1.0
     b.call('master_hi_hit_loop')                    # the overtake's next frame: still on the throw point
@@ -463,6 +534,7 @@ def v9(path):
     start = (gm.x, gm.y)
     hp = run_hit(b, gm, stop_at=0x15C)
     check('v9 latched: VAR_15 = 1 (the sword stays 12 frames)', gm.vars.get(0x0F00030F) == 1.0)
+    sword_len_check('a wall (the point met)', gm, start, (tx, ty), 1)
     ok, why = reel_ok(hp, start, (tx - 5.5, ty - 20.5), 12)
     check('v9 latched: still 12 frames (hit_stop_frame_wall; v13 held exactly, on the motion\'s frame), reeled on one '
           'path until his hand (v10: the line test\'s start, 5.5 ahead) is at the point, then the wall jump',
@@ -482,6 +554,8 @@ def v9(path):
     b.call('master_hi_hit_main')
     gm.frame = 14.0                                 # v14: its own end (Ultimate's last frame; the motion is 60 now)
     b.call('master_hi_hit_loop')
+    check('v15 stopped: VAR_16 -1 (no hit / pull motion: her reverse at once)', gm.vars.get(0x0F000310) == -1.0,
+          str(gm.vars.get(0x0F000310)))
     check('v9 stopped: VAR_15 0 (the sword back at once), Fall at the motion\'s end, no overtake',
           gm.vars.get(0x0F00030F) == 0.0 and gm.status == [0xE], str([hex(x) for x in gm.status]))
     b, gm = setup(19.0)
@@ -773,6 +847,7 @@ def main():
     up_special(path)
     v9(path)
     v10(path)
+    v15_scripts()
     print('\n%d problem(s)' % len(PROBLEMS))
     sys.exit(1 if PROBLEMS else 0)
 

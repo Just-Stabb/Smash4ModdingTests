@@ -506,3 +506,19 @@ AttackS4Lw
 SpecialLwHit
 SpecialLwTurn
 SpecialAirLwTurn
+// v15: his whip's (article 2, script/animcmd/weapon/whip) new motion slots past ZSS's 15 (motion.mtable 60 - 111, 4
+// entries each; the executable's motion info grown: tools/master_whip_motion_cave.py): the up special's sword
+// overtake, hit (bend, then the blade at 64 ... 24) and pull from that length (tools/master_whip.py NEW_NAMES)
+WhipD02SpecialAirHiOvertake
+WhipD02SpecialAirHiHitL64
+WhipD02SpecialAirHiHitL56
+WhipD02SpecialAirHiHitL48
+WhipD02SpecialAirHiHitL40
+WhipD02SpecialAirHiHitL32
+WhipD02SpecialAirHiHitL24
+WhipD02SpecialAirHiPullL64
+WhipD02SpecialAirHiPullL56
+WhipD02SpecialAirHiPullL48
+WhipD02SpecialAirHiPullL40
+WhipD02SpecialAirHiPullL32
+WhipD02SpecialAirHiPullL24

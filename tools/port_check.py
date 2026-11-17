@@ -2006,6 +2006,76 @@ def check_line_tests(inst, name, rec, rep):
                 '(tools/line_test_cave.py: exe_v46v_line or later): the script won\'t load' % ', '.join(sorted(set(uses))))
 
 
+def check_article_motions(inst, name, rec, rep):
+    """X7 article-motion-slot: a body script plays an article's motion slot (Set_Anchored_Article_Action(article, slot);
+    the weapon adds its custom number, 0 - 3) that the install's executable doesn't give that article's weapon kind
+    (its descriptor's motion info: tools/weapon_expand.py / master_whip_motion_cave.py), or whose motion-info entry
+    names no animation in the article's motion/<name>/main.pac: the article keeps its old motion. Byleth v15 grew his
+    whip's motion info (exe_v46x_whipmot) for the up special's sword motions: its scripts on an older executable would
+    play nothing. ERROR"""
+    import tempfile
+    import zlib
+    import kind_expand as K
+    import weapon_expand as W
+    import weapon_expand_append as WA
+    if 'code/cross_f.rpx' not in inst.files or not rec.get('weapons'):
+        return
+    game = scripts(inst, 'fighter/%s/script/animcmd/body/game.bin' % name) or {}
+    uses = {}
+    for k, sc in game.items():
+        for c in sc:
+            if c.name == 'Set_Anchored_Article_Action':
+                uses.setdefault((int(c.params[0]), int(c.params[1])), set()).add(k)
+    if not uses:
+        return
+    voc = {acmd.crc(w): w for w in vocabulary()}
+    kinds = {}
+    for art, v in rec['weapons'].items():
+        kinds[int(v['kind'] if isinstance(v, dict) else v, 0)] = art
+    bad = []
+    with tempfile.NamedTemporaryFile(suffix='.rpx') as f:
+        f.write(inst.get('code/cross_f.rpx'))
+        f.flush()
+        img = K.Image(f.name)
+        try:
+            d = WA.new_fighter_descriptor_any(img, int(rec['kind'], 0))
+            al = img.w(d + 8)
+            ents, n = img.w(al), img.w(al + 4)
+            dsw = WA.parse_patched_switch(img, W.DESC_SWITCH)
+            dt = WA.lis_addi_pairs(img, dsw['stub'], 32)[1]
+        except (AssertionError, KeyError, IndexError) as e:
+            rep.add('NOTE', 'X7 article-motion-slot', 'the executable\'s article list / descriptors not read (%s)' % e)
+            return
+        for (art, slot), where in sorted(uses.items()):
+            if art >= n:
+                continue
+            wk = img.w(ents + 16 * art) & 0x3FFFFFFF
+            if wk not in kinds or wk < W.OLD_N:
+                continue
+            case = img.w(dt + 4 * (wk - W.OLD_N))
+            desc = WA.lis_addi_pairs(img, case, 3)[0] if case else 0
+            mi = img.w(desc + 8) if desc else 0
+            cnt = img.w(mi + 4) if mi else 0
+            what = '%s (article %d, weapon 0x%X) slot %d in %s' % (kinds[wk], art, wk, slot, ', '.join(
+                sorted(voc.get(k, '%08X' % k) for k in where)))
+            if slot + 3 >= cnt:
+                bad.append('%s: the executable gives it %d motions' % (what, cnt))
+                continue
+            pac = inst.get('fighter/%s/motion/%s/main.pac' % (name, kinds[wk]))
+            if pac is None:
+                continue
+            import omo
+            with tempfile.NamedTemporaryFile(suffix='.pac') as g:
+                g.write(pac)
+                g.flush()
+                names = {zlib.crc32(nm[:-4].encode(), 0xFFFFFFFF) & 0xFFFFFFFF for nm, _d in omo.pac_read(g.name)}
+            h = img.w(img.w(mi) + 8 * slot)
+            if h not in names:
+                bad.append('%s: its motion 0x%08X is not in motion/%s/main.pac' % (what, h, kinds[wk]))
+    if bad:
+        rep.add('ERROR', 'X7 article-motion-slot', '; '.join(bad))
+
+
 def check_tether_window(inst, name, rep):
     """S16 tether-window: the tether status's ledge box check (the common AirCatch's func_99 while flag 0x2100000D is on,
     set by the aircatch script) closes before the tether goes out (Set_Remote_Article_Action(2, 1)): only the tether
@@ -3111,6 +3181,7 @@ def main():
     check_throw_joint_hitboxes(inst, a.name, rep)
     check_grab_vs_hit(inst, a.name, rep)
     check_line_tests(inst, a.name, rec, rep)
+    check_article_motions(inst, a.name, rec, rep)
     check_tether_window(inst, a.name, rep)
     check_smash_holds(inst, a.name, base, vanilla, rep)
     check_loop_spin(inst, a.name, rep)

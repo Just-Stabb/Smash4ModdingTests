@@ -171,6 +171,11 @@ CONSTS = dict(
     # stretched to HI_HIT_FRAMES (master_build.hi_hit_motion) so its clock and game script run through the stop and the
     # reel; the stop's hard cap past its own frames (mine)
     MASTER_HI_HIT_LAST='14.0f', MASTER_HI_STOP_CAP='0x1e',
+    # (v15) the sword's own motions (master_whip.PULL_LENGTHS: 64, 56, ... 24, each MASTER_HI_LEN_STEP shorter): his hand
+    # in Ultimate's special_air_hi_hit pose (HaveR at its frame 14: 6.2 forward, 18.5 up; still from 4), the length picked
+    # within half a step of his hand's distance to what the tip holds
+    MASTER_HI_HAND_X='6.2f', MASTER_HI_HAND_Y='18.5f', MASTER_HI_LEN_TOP='64.0f', MASTER_HI_LEN_STEP='8.0f',
+    MASTER_HI_LEN_LAST='0x5',
     # (v8) the catch: the grab box's TargetStatus (HI_CAPTURE_STATUS, 0xBD the Falcon Dive capture) as the status variable
     # reads it; Ultimate's TARGET_HI_DAMAGE (the overtake's THROW_MEWTWO): the caught fighter at param_special_hi
     # overtake_attack_damage (50) % or more (APPROXIMATED: the flag's test is in the ExeFS, not read)
@@ -402,6 +407,7 @@ def body_fix(a, fighter):
 HI_CATCH_START, HI_CATCH_END = 20, 25
 HI_LEDGE_CHECK = (12, 17)        # v9: SpecialAirHi's AIR_LASSO_FLAG_CHECK (on 12, off 17)
 HI_HIT_MODE_VAR = 0x0F00030F     # v9: VAR_15, master.c's SpecialAirHiHit mode (1 a wall, 2 a fighter, 0 stopped)
+HI_SWORD_VAR = 0x0F000310        # v15: VAR_16, master.c's 10 x VAR_15 + the sword's length (master_whip.PULL_LENGTHS index)
 HI_STOP = {1: 12, 2: 19}         # v9: param_special_hi hit_stop_frame_wall / _fighter: the sword back after the stop
 
 
@@ -416,10 +422,21 @@ def hi_hit_script():
     at 12 for a wall, 19 for a fighter (Ultimate's hit_stop_frame_wall / _fighter: the sword stays on what it met),
     at once when the tip was stopped by a floor / ceiling (VAR_15, set before the motion starts)"""
     import ultimate_acmd as U
+    import master_whip as MW
     back = lambda: [U.cmd('Set_Remote_Article_Action2', 2, 3)]        # noqa: E731
     out = if_var(HI_HIT_MODE_VAR, 0, 0, back())
+    # v15: a fighter / a wall (VAR_16 = 10 x VAR_15 + v, master.c master_hi_sword_len; -1 the floor / ceiling stop):
+    # the sword out of her tether's statuses (status 0: no MSC main, as a generated whip) into Ultimate's own hit motion
+    # (the bend at 65, then the blade at PULL_LENGTHS[v]); when the stop ends, its pull from that length (shortening
+    # with the reel). v9 - v14 sent it back with her native reverse (status 3: her rate, not the reel's)
+    out += if_var(HI_SWORD_VAR, 3, 0, [U.cmd('Set_Remote_Article_Action', 2, 0)])
+    for mode in sorted(HI_STOP):
+        for v in range(len(MW.PULL_LENGTHS)):
+            out += if_var(HI_SWORD_VAR, 0, 10 * mode + v, [U.cmd('Set_Anchored_Article_Action', 2, MW.HIT_SLOT(v))])
     for mode, fr in sorted(HI_STOP.items(), key=lambda kv: kv[1]):
-        out += [U.cmd('FRAME', fr)] + if_var(HI_HIT_MODE_VAR, 0, mode, back())
+        out += [U.cmd('FRAME', fr)]
+        for v in range(len(MW.PULL_LENGTHS)):
+            out += if_var(HI_SWORD_VAR, 0, 10 * mode + v, [U.cmd('Set_Anchored_Article_Action', 2, MW.PULL_SLOT(v))])
     # v11: a catch without a capture (VAR_11 1 - 3): Ultimate's catching hit (SpecialAirHi's ATTACK 0 from 20: 3 %,
     # sting, cut-up sound) lands on the held fighter at frame 1, its spark, sound and hitlag, no knockback (it stays
     # held); the capsule covers the tip's path over the catch frames (20 - 26: (15, 45) - (23, 65) from him); v12 the
@@ -478,6 +495,16 @@ def overtake_part(script):
     return n
 
 
+def overtake_sword(U, script):
+    """v15: the overtake plays the sword's own motion (master_whip.OVT_SLOT: Ultimate's d02specialairhiovertake) from its
+    frame 0 (Ultimate generates the sword with special_air_hi_overtake there). Idempotent"""
+    import master_whip as MW
+    if any(c.name == 'Set_Anchored_Article_Action' for c in script):
+        return 'v15 specialairhiovertake: the sword\'s overtake motion already there'
+    script.insert(0, U.cmd('Set_Anchored_Article_Action', 2, MW.OVT_SLOT))
+    return 'v15 specialairhiovertake: Set_Anchored_Article_Action(2, %d) at 0 (the sword\'s overtake motion)' % MW.OVT_SLOT
+
+
 def hi_fix(files, log):
     """v12: the up special's hit / overtake scripts as v12 has them (also on a build the specials step ran on before)"""
     import ultimate_acmd as U
@@ -486,6 +513,7 @@ def hi_fix(files, log):
     files['game'].scripts[acmd.crc('specialairhihit')] = hi_hit_script()
     n = overtake_part(files['game'].scripts[acmd.crc('specialairhiovertake')])
     assert n == 3, 'the overtake: %d soft hitboxes' % n
+    log.append(overtake_sword(U, files['game'].scripts[acmd.crc('specialairhiovertake')]))
     log.append('v12 specialairhihit: no FOOT_EFFECT (the catch effects from MSC), se_master_special_h04; the overtake\'s '
                'soft hitboxes on Part %d, on the caught fighter' % OVT_SOFT_PART)
 

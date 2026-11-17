@@ -39309,12 +39309,55 @@ void master_hi_hit_main()
     {
         master_diag(4, (float)master_hi_wall);
     }
+    master_hi_sword_len();
     GroundModule(0x2710, 0x5);
     KineticModule(0, 0xa);
     master_hold_gravity();
     master_hold_energies();
     master_motion(0x23a, 0);
     func_78(master_hi_hit_loop);
+}
+
+// v15: the sword's own motions (tools/master_whip.py HIT_SLOT / PULL_SLOT, the executable's whip motion info grown:
+// exe_v46x_whipmot). SpecialAirHiHit's game script plays Ultimate's hit motion (its sideways bend at 65) eased to a
+// blade of MASTER_HI_LEN_TOP - v x MASTER_HI_LEN_STEP, then, when the stop ends, Ultimate's pull from that length,
+// shortening at rewind_speed (4.1) a frame as he is reeled (Ultimate's sword rewind picks its pull frame from the
+// length). v: the length nearest his hand's distance (Ultimate's hit pose: MASTER_HI_HAND_X / _Y from his root, where
+// he is held) to what the tip holds (a fighter: its throw point, where the catch effects are; a wall: the point met).
+// VAR_16 = 10 x VAR_15 (1 a wall, 2 a fighter) + v, -1 for the floor / ceiling stop (the sword back at once).
+// Set here, before the motion (its script reads it on frame 0)
+void master_hi_sword_len()
+{
+    float lr;
+    float y;
+    float d;
+    int v;
+    int mode;
+    lr = PostureModuleF(0);
+    mode = 0;
+    if (master_target >= 0)
+    {
+        mode = 0x2;
+        y = master_ovt_y;
+    }
+    else if (master_hi_wall == 0x1)
+    {
+        mode = 0x1;
+        y = master_ty;
+    }
+    if (mode == 0)
+    {
+        WorkModule(0, -1.0f, 0x0f000310);
+        return;
+    }
+    d = master_len(master_tx - (master_hx + MASTER_HI_HAND_X * lr), y - (master_hy + MASTER_HI_HAND_Y));
+    v = 0;
+    while (v < MASTER_HI_LEN_LAST && d < MASTER_HI_LEN_TOP - MASTER_HI_LEN_STEP * ((float)v + 0.5f))
+    {
+        v = v + 0x1;
+    }
+    WorkModule(0, (float)(0xa * mode + v), 0x0f000310);
+    master_diag(4, 1000.0f * (float)(0xa * mode + v) + d);   // the diag: k4 again, VAR_16 x 1000 + the distance
 }
 
 // v13: every other energy held too (motion 0, air control 2, stop 3: suspended, as gravity): the v12 diag log's stop

@@ -5,6 +5,8 @@ article 2). fighters/master/README.md "v6: the whip sword".
   python3 tools/master_whip.py build ULT BASE FIGHTER DUMP     (master_build.py build calls it)
   python3 tools/master_whip.py tips ULT                         the up special's tip / pull table (master.c)
   python3 tools/master_whip.py render ULT FIGHTER SLOT FRAME OUT.png [--body PAC]
+  python3 tools/master_whip.py up ULT BASE INSTALLED OUT       v15: the up special's own sword motions (NEW_NAMES) added
+                                                                to INSTALLED's whip pac / scripts, written to OUT
 
 ULT: Ultimate's fighter/master (model/sword/c00, motion/sword/c00, motion/body/c00); BASE: ZSS's vanilla fighter folder
 (her whip: model/whip/c00, motion/whip, script/animcmd/weapon/whip); FIGHTER: the build's fighter/master; DUMP:
@@ -84,6 +86,44 @@ SLOTS = {
     52: dict(move='SpecialAirHi (shoot: status 1)', status='shoot'),
     56: dict(move='SpecialAirHi (back: status 3)', status='reverse'),
 }
+# v15: the air up special's own sword motions (fighters/master/README.md "Status: v15"), in slots past ZSS's 15 (her 60
+# entries): weapon kind 0x1A0's motion info grown to MOTION_COUNT in the executable (tools/master_whip_motion_cave.py,
+# exe_v46x_whipmot), 4 entries a motion as hers (the weapon's custom number is added to the slot: whip.mscsb func_40).
+# Anchored (Set_Anchored_Article_Action: fighter space, his hand's track from his body motion), so the whip leaves her
+# tether's hand-space statuses first (Set_Remote_Article_Action(2, 0): status 0, no MSC main, as a generated whip):
+# - OVT_SLOT: Ultimate's d02specialairhiovertake (12 frames) on his D02SpecialAirHiOvertake (0x23B's frame 0);
+# - HIT_SLOT(v): Ultimate's d02specialairhihit, frames 0 - 4 as they are (the blade's sideways bend, 65 long), then the
+#   blade eased over HIT_EASE to PULL_LENGTHS[v] (its straight pose in d02specialhipull) and held: on his
+#   D02SpecialAirHiHit (0x23A from frame 0, its pose still from 4);
+# - PULL_SLOT(v): Ultimate's d02specialhipull (a straight blade, 115 long at 0, ~1 shorter a frame: Ultimate's sword
+#   rewind picks its frame from the length) at the length PULL_LENGTHS[v] - REWIND x t, down to PULL_MIN (the
+#   overtake's first frame), then held: the blade shortens as fast as he is reeled (rewind_speed 4.1), from the length
+#   the catch was made at. master.c (master_hi_sword_len) picks v from his hand's distance to what the tip holds
+#   (VAR_16), SpecialAirHiHit's game script plays HIT_SLOT(v) at 0 and PULL_SLOT(v) when the stop ends (12 / 19)
+PULL_LENGTHS = (64.0, 56.0, 48.0, 40.0, 32.0, 24.0)
+REWIND = 4.1                     # param_special_hi rewind_speed
+PULL_MIN = 16.1                  # d02specialairhiovertake's frame-0 blade (tip 16.1 from the hand)
+HIT_EASE = (4, 9)                # the hit's blade from 65 to its pull length over these frames (mine)
+HIT_FRAMES = 60                  # = master_build.HI_HIT_FRAMES (his D02SpecialAirHiHit, held)
+PULL_FRAMES = 0x14 + 6           # MASTER_HI_PULL_MAX + a margin: the reel never outlasts it
+OVT_SLOT = 60
+HIT_SLOT = lambda v: 64 + 4 * v                                         # noqa: E731
+PULL_SLOT = lambda v: 64 + 4 * len(PULL_LENGTHS) + 4 * v                # noqa: E731
+HIT_POSE_FRAME = 14              # Ultimate's special_air_hi_hit body: still from 4, its last frame (ours holds it)
+NEW_NAMES = {OVT_SLOT: 'D02SpecialAirHiOvertake'}
+for _v, _l in enumerate(PULL_LENGTHS):
+    NEW_NAMES[HIT_SLOT(_v)] = 'D02SpecialAirHiHitL%d' % _l
+    NEW_NAMES[PULL_SLOT(_v)] = 'D02SpecialAirHiPullL%d' % _l
+    SLOTS[HIT_SLOT(_v)] = dict(move='SpecialAirHiHit (v15, blade %d)' % _l, body='d02specialairhihit', start=0,
+                               frames=HIT_FRAMES, pose=('hit', _v))
+    SLOTS[PULL_SLOT(_v)] = dict(move='SpecialAirHiHit pull (v15, from %d)' % _l, body='d02specialairhihit',
+                                start=HIT_POSE_FRAME, hold=HIT_POSE_FRAME, frames=PULL_FRAMES, pose=('pull', _v))
+SLOTS[OVT_SLOT] = dict(move='SpecialAirHiOvertake (v15)', body='d02specialairhiovertake', start=0,
+                       tl=[(0, 'd02specialairhiovertake', 0)])
+ALL_NAMES = {**ZSS_NAMES, **NEW_NAMES}
+MOTION_COUNT = 60 + 4 * len(NEW_NAMES)
+# the whip's motion.mtable past her 60: one script name per new motion (its 4 entries share it)
+NEW_SCRIPT = lambda slot: 'whip' + NEW_NAMES[slot - slot % 4].lower()    # noqa: E731
 SLOT_OF = {v['move']: k for k, v in SLOTS.items()}
 # the body sword's frames (Ultimate's master_sword track) decide when the whip shows: it is drawn while the body's sword
 # is hidden (Ultimate generates the article as the body hides its sword and shows the sword again when it folds back)
@@ -357,6 +397,8 @@ def anchored_pose(U, slot, f):
     b = s['start'] + f
     hand_frame = min(b, s['hold']) if 'hold' in s else b
     hand = U.body_world(s['body'], hand_frame)['HaveR']
+    if 'pose' in s:
+        return hand, up_pose(U, s['pose'][0], s['pose'][1], f)
     name, fr = timeline_at(s['tl'], b)
     if name is not None:
         n = U.anim('sword', name)[2]
@@ -364,6 +406,42 @@ def anchored_pose(U, slot, f):
         if len(e) > 3 and e[3]:
             fr = fr % n
     return hand, U.sword_locals(name, fr)
+
+
+def pull_frame(U, length):
+    """d02specialhipull's (fractional) frame whose blade is `length` long (its tip from the hand; 115 at 0, ~1 shorter a
+    frame), clamped to the motion"""
+    if not hasattr(U, '_pull_len'):
+        n = U.anim('sword', 'd02specialhipull')[2]
+        U._pull_len = [float(np.linalg.norm(U.rel(U.sword_locals('d02specialhipull', f))['sword_null'][:3, 3]))
+                       for f in range(n)]
+    ls = U._pull_len
+    if length >= ls[0]:
+        return 0.0
+    if length <= ls[-1]:
+        return float(len(ls) - 1)
+    return float(np.interp(-length, [-x for x in ls], range(len(ls))))
+
+
+def up_pose(U, kind, v, f):
+    """v15: the sword's locals at frame f of a HIT_SLOT(v) / PULL_SLOT(v) motion (see PULL_LENGTHS)"""
+    lv = PULL_LENGTHS[v]
+    if kind == 'pull':
+        return U.sword_locals('d02specialhipull', pull_frame(U, max(PULL_MIN, lv - REWIND * f)))
+    hit = U.sword_locals('d02specialairhihit', f)
+    a, b = HIT_EASE
+    if f <= a:
+        return hit
+    t = min(1.0, (f - a) / float(b - a))
+    t = t * t * (3 - 2 * t)
+    straight = U.sword_locals('d02specialhipull', pull_frame(U, lv))
+    return {k: blend(hit[k], straight[k], t) for k in hit}
+
+
+def blade_length(U, slot, f):
+    """the tip's distance from the hand at frame f of an anchored slot (renders / tests)"""
+    _h, loc = anchored_pose(U, slot, f)
+    return float(np.linalg.norm(U.rel(loc)['sword_null'][:3, 3]))
 
 
 def shoot_table(U, base):
@@ -406,42 +484,49 @@ def status_pose(U, kind, f, table):
     return np.eye(4), loc
 
 
-def build_motions(ult, base, out_pac, log=print):
+def slot_motion(U, sk, slot, head, table):
+    """(pac entry name, .omo bytes, frames) of one whip slot"""
+    s = SLOTS[slot]
+    n = len(table[0]) if 'status' in s else slot_frames(U, slot)
+    locs = [np.zeros((n, 4, 4)) for _ in sk.bones]
+    for f in range(n):
+        if 'status' in s:
+            hand, loc = status_pose(U, s['status'], f, table)
+        else:
+            hand, loc = anchored_pose(U, slot, f)
+        locs[0][f] = hand
+        for name, i in sk.ult_index.items():
+            if i:
+                locs[i][f] = loc[name]
+        rel = U.rel(loc)
+        for name, m in Skel.chain_locals(rel).items():
+            locs[sk.index[name]][f] = m
+        for i, b in enumerate(sk.bones[11:18], 11):     # her billboards: their bind
+            locs[i][f] = b[3]
+    bones = [(b[0], b[1], b[2], None) for b in sk.bones]
+
+    class _S:
+        pass
+    _S.bones = bones
+    return PREFIX + ALL_NAMES[slot] + '.omo', UF.omo_bytes(head, locs, _S, n), n
+
+
+def build_motions(ult, base, out_pac, log=print, slots=None, keep=None):
+    """the whip's main.pac: every slot (or `slots` only, the other entries kept from the pac `keep`)"""
     U = Ult(ult)
     sk = Skel(U, base)
     ents = dict(omo.pac_read(os.path.join(base, 'motion/whip/main.pac')))
     head = omo.Omo(ents[PREFIX + 'WhipShoot.omo']).head
     table = shoot_table(U, base)
-    out = []
+    out = [] if keep is None else [(n, d) for n, d in omo.pac_read(keep)]
     info = {}
-    for slot in sorted(SLOTS):
-        s = SLOTS[slot]
-        n = len(table[0]) if 'status' in s else slot_frames(U, slot)
-        locs = [np.zeros((n, 4, 4)) for _ in sk.bones]
-        for f in range(n):
-            if 'status' in s:
-                hand, loc = status_pose(U, s['status'], f, table)
-            else:
-                hand, loc = anchored_pose(U, slot, f)
-            locs[0][f] = hand
-            for name, i in sk.ult_index.items():
-                if i:
-                    locs[i][f] = loc[name]
-            rel = U.rel(loc)
-            for name, m in Skel.chain_locals(rel).items():
-                locs[sk.index[name]][f] = m
-            for i, b in enumerate(sk.bones[11:18], 11):     # her billboards: their bind
-                locs[i][f] = b[3]
-        bones = [(b[0], b[1], b[2], None) for b in sk.bones]
-
-        class _S:
-            pass
-        _S.bones = bones
-        out.append((PREFIX + ZSS_NAMES[slot] + '.omo', UF.omo_bytes(head, locs, _S, n)))
+    for slot in sorted(SLOTS if slots is None else slots):
+        name, data, n = slot_motion(U, sk, slot, head, table)
+        out = [(k, d) for k, d in out if k != name] + [(name, data)]
         info[slot] = n
     os.makedirs(os.path.dirname(out_pac), exist_ok=True)
-    omo.pac_write(out_pac, out)
-    log('whip motions: %s' % ', '.join('%d %s (%s, %d frames)' % (k, ZSS_NAMES[k], SLOTS[k]['move'], v)
+    omo.pac_write(out_pac, sorted(out))
+    log('whip motions: %s' % ', '.join('%d %s (%s, %d frames)' % (k, ALL_NAMES[k], SLOTS[k]['move'], v)
                                        for k, v in sorted(info.items())))
     return table
 
@@ -519,6 +604,7 @@ def build_scripts(dump, ult, base, fighter, ids, table, log=print):
               'effect': effect_script(dump, slot, ids, table) if slot in SLOTS else [acmd.Command(acmd.END)]}
         for fn in files:
             files[fn][h] = [acmd.Command(c.ident, list(c.params)) for c in sc.get(fn, [acmd.Command(acmd.END)])]
+    wmt = new_scripts(U, files, wmt)
     ww = os.path.join(fighter, 'script/animcmd/weapon/whip')
     os.makedirs(ww, exist_ok=True)
     for fn, scripts in files.items():
@@ -526,6 +612,37 @@ def build_scripts(dump, ult, base, fighter, ids, table, log=print):
     open(os.path.join(ww, 'motion.mtable'), 'wb').write(wmt)
     log('whip scripts: %d motions (game: visibility by his body sword\'s track; effect: the sword\'s Extend on the up '
         'special and the tether shot)' % len([h for h in wh if h]))
+
+
+def new_scripts(U, files, wmt):
+    """v15: the whip's motion.mtable grown from her 60 entries to MOTION_COUNT (each new motion's 4 entries name one
+    script, NEW_SCRIPT) and those scripts in {'game': {hash: script}, ...} (game: the visibility by his body sword's
+    track, as every anchored slot; the rest empty). Returns the new mtable. Idempotent"""
+    wh = list(struct.unpack('>%dI' % (len(wmt) // 4), wmt))[:60]
+    assert len(wh) == 60, 'the whip\'s motion.mtable: %d entries, not her 60' % len(wh)
+    for slot in sorted(NEW_NAMES):
+        h = acmd.crc(NEW_SCRIPT(slot))
+        assert h not in wh, 'script hash 0x%08X in use' % h
+        wh += [h] * 4
+        sc = {'game': game_script(U, slot)}
+        for fn in files:
+            files[fn][h] = [acmd.Command(c.ident, list(c.params)) for c in sc.get(fn, [acmd.Command(acmd.END)])]
+    assert len(wh) == MOTION_COUNT
+    return struct.pack('>%dI' % len(wh), *wh)
+
+
+def add_up_scripts(ult, whip_dir, out_dir):
+    """v15 on an installed whip script folder (script/animcmd/weapon/whip): its 4 files and motion.mtable with the new
+    slots' scripts (new_scripts), written to out_dir"""
+    U = Ult(ult)
+    files = {fn: acmd.ACMDFile.load(os.path.join(whip_dir, fn + '.bin')).scripts
+             for fn in ('game', 'effect', 'sound', 'expression')}
+    wmt = new_scripts(U, files, open(os.path.join(whip_dir, 'motion.mtable'), 'rb').read())
+    os.makedirs(out_dir, exist_ok=True)
+    for fn, scripts in files.items():
+        acmd.ACMDFile(scripts).save(os.path.join(out_dir, fn + '.bin'))
+    open(os.path.join(out_dir, 'motion.mtable'), 'wb').write(wmt)
+    return len(wmt) // 4
 
 
 # ---------------------------------------------------------------- the body's game scripts
@@ -555,7 +672,8 @@ def body_scripts(game, log=print):
         # the air one's hit: the tether pulled back (status 3: WhipReverse), the folded sword kept in his hand to the
         # overtake's end (Ultimate's body sword stays hidden through both); the wall jump: gone at once
         'specialairhihit': ([G('Set_Remote_Article_Action2', 2, 3)], []),
-        'specialairhiovertake': ([], [(12, [G('Remove_Article', 2)])]),
+        # v15: the overtake plays the sword's own (Ultimate's d02specialairhiovertake; the hit script put it in status 0)
+        'specialairhiovertake': ([G('Set_Anchored_Article_Action', 2, OVT_SLOT)], [(12, [G('Remove_Article', 2)])]),
         'specialairhiwalljump': ([G('Remove_Article', 2)], []),
     }
     done = []
@@ -657,7 +775,18 @@ def main():
         b.add_argument(x)
     t = sub.add_parser('tips')
     t.add_argument('ult')
+    u = sub.add_parser('up', help='v15: the up special\'s new whip motions (NEW_NAMES) added to an installed whip')
+    for x in ('ult', 'base', 'installed', 'out'):
+        u.add_argument(x)
     a = ap.parse_args()
+    if a.cmd == 'up':
+        # INSTALLED / OUT: fighter/master folders (motion/whip/main.pac, script/animcmd/weapon/whip/)
+        build_motions(a.ult, a.base, os.path.join(a.out, 'motion/whip/main.pac'), slots=sorted(NEW_NAMES),
+                      keep=os.path.join(a.installed, 'motion/whip/main.pac'))
+        n = add_up_scripts(a.ult, os.path.join(a.installed, 'script/animcmd/weapon/whip'),
+                           os.path.join(a.out, 'script/animcmd/weapon/whip'))
+        print('whip scripts: motion.mtable %d entries' % n)
+        return
     if a.cmd == 'tips':
         for r in tips(a.ult):
             print('frame %d: speed x %.3f y %.3f for %d frames (tip %s)' % r)

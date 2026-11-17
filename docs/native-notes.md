@@ -2637,7 +2637,8 @@ temporary diag caves' `0x04BCC000`); variables `0x0F0003D0`-`0x0F0003DA`; comman
 `tools/var_reset_cave.py` (on exe_v46v_threads), test `tools/var_reset_test.py` (unicorn, 81 checks), user docs
 `docs/acmd-extra-commands.md` "Variable resets". **Claimed region: `0x04BD8000`-`0x04BE0000`** (code `0x04BD8000`-
 `0x04BD88C4`, data `0x04BD9F00`, the reset lists `0x04BDA000`; `textregion:0x2BE0000 grow:0x04BE0000`).
-`0x04BD6000`-`0x04BD8000` (between ts_data's end and this) is still free. The combined exe the user runs:
+`0x04BD6000`-`0x04BD8000` (between ts_data's end and this) was free; `0x04BD6000`-`0x04BD7000` is now the whip motion
+table's (Byleth v15, below), `0x04BD7000`-`0x04BD8000` still free. The combined exe the user runs:
 exe_v46v_threads -> var_reset_cave.py (exe_v46w_vars) -> tools/line_test_cave.py (exe_v46w_vars_line, which chains on
 four of these hooks).
 
@@ -2684,6 +2685,35 @@ four of these hooks).
 - **Not confirmed in game:** that every landing passes set_situation (static reading says so); the order of Dead and
   the respawn's set-up; the KO / ledge / hit events' timing against the MSC (the test runs each hook site with the
   game's code around it, not a match).
+
+## Whip motion table (Byleth v15: `tools/master_whip_motion_cave.py`, exe_v46x_whipmot)
+
+**Claimed region: `0x04BD6000`-`0x04BD7000`** (half of the gap left free above: zero in exe_v46w_vars_line; inside the
+text region since exe_v46w_vars, nothing grown). `0x04BD7000`-`0x04BD8000` is still free. Order: exe_v46v_threads ->
+var_reset_cave -> line_test_cave (exe_v46w_vars_line) -> this one (exe_v46x_whipmot); it touches none of their words, so it
+also goes on v11's TEST_ONLY diag exe (exe_v46w_vars_line + diag_godfist_cave) unchanged.
+
+- **A weapon's motion info is a static table**, not built at run time: the descriptor (`0x0320D934(_, kind)`) `+8` ->
+  `{entries, count, 0, 0, 0, 0, -90.0f, 90.0f}`, an entry `{zlib.crc32(.omo name without the extension, 0xFFFFFFFF), 0}`
+  (the pack loader's key, `tools/mtable.py` anim_hash: `FitSZerosuitWhipMainC03AttackS4S` = `0xBB5DDD33`; a raw
+  `crc32(name)` search finds nothing, which the v14 handover took for a run-time table). The article set-up copies the
+  pointer into the init block (`0x02BCBB20`: `lwz r9, 8(r28)` -> `+0x58`); the motion number the article is given
+  (ACMD Set_Anchored_Article_Action: ArticleModule MSC call `0x271B` (article, motion), handler `0x02BD8AF8`; its own MSC
+  MotionModule) plus its custom number (whip.mscsb func_40: int `0x10000005`) indexes it. ZSS's whip: 15 animations x 4
+  (custom moves 0 - 3).
+- **Byleth's whip (0x1A0)**: weapon_expand_append.py's descriptor copy `0x04B9C680`, motion info `0x04B9C438` ->
+  `{0x04B9C458, 60}`. The cave writes a new entries table at `0x04BD6000` (her 60, then 4 per new motion, each the hash of
+  `FitSZerosuitWhipMain` + `master_whip.NEW_NAMES[slot]`: 112 entries) and the motion info's `+0` / `+4`: 2 words in place,
+  asserted (her copy's values or the cave's own), the region asserted zero. The whip's `motion.mtable` grows to the same
+  112 (its scripts by motion number) and its `main.pac` holds the new animations.
+- **Test** `tools/master_whip_motion_test.py PATCHED BASE [PAC]` (unicorn: the game's descriptor getter for every weapon
+  kind 0 - 0x1BF on both executables; only 0x1A0's motion info differs; her 60 entries kept; the new ones' hashes; every
+  entry has its animation in the pac; nothing else changed but the region and the 2 words; idempotent): 20 checks on
+  exe_v46x_whipmot vs exe_v46w_vars_line and on the diag pair. Not run: the weapon MotionModule's own change of motion
+  (slots past a base's count are used by Sephiroth's flash, dein's 8 -> 12, which plays them in game).
+- `port_check` X7 article-motion-slot (ERROR): a body script's Set_Anchored_Article_Action slot (+ 3) past the install
+  executable's motion info for that article's weapon kind, or whose entry names no animation in its `motion/<article>/
+  main.pac`.
 
 ## Ledge boxes, energy suspend, the catch record (Byleth v10)
 
