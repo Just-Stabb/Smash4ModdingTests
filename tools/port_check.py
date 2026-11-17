@@ -545,7 +545,11 @@ def check_params(inst, name, kind, base, vanilla, ult_param, labels, rep):
             js = tuple(json.load(open(os.path.join(ROOT, 'fighters', name, 'port.json')))['stats']['jump_scale'])
         except (OSError, KeyError, ValueError):
             js = (1.0, 1.0)
-        want = US.values(US.entry(ult_param, labels, base.get('ult', name)), js)
+        so = US.stats_override(name)     # port.json stats.override (Incineroar's 263, fighter_params_v2)
+        want = US.values(US.entry(ult_param, labels, base.get('ult', name)), js, so)
+        if so:
+            rep.add('INFO', 'P2 stats-ultimate', 'kind 0x%X: port.json stats.override keeps %s over Ultimate\'s' % (
+                kind, ', '.join('%d %s %s' % (i, US.MAP[i][0], v) for i, v in sorted(so.items()))))
         diff = ['%d %s %s->%s' % (i, w[1], row.get(i), w[0]) for i, w in sorted(want.items())
                 if i in row and abs(row[i] - float(w[0])) > 0.011 * max(1, abs(float(w[0])))]
         if diff:
@@ -555,22 +559,30 @@ def check_params(inst, name, kind, base, vanilla, ult_param, labels, rep):
     # 1.0 for 0.96 / 0.94 / 1.02) and the base's shield / effect / ice sizes. The model is Ultimate's skeleton 1:1, so the
     # size in game is 44 x that model: 44 must be Ultimate's scale (ERROR), as must 49 effect_scale and 185 freeze_size
     # (equal in both games for all 57 shared fighters); 45 shield (Ultimate's x 0.88) and 48 (45 x 0.35) are a fit:
-    # WARN. tools/ultimate_stats.py SIZE (the stats step; `ultimate_stats.py sizes` re-applies them alone)
+    # WARN. tools/ultimate_stats.py SIZE (the stats step; `ultimate_stats.py sizes` re-applies them alone). A port's
+    # port.json "stats": {"size": {...}} (the user's call: Hero's are his pre-fighter_sizes_v1 sizes, fighter_params_v2)
+    # is what's expected for those words instead of Ultimate's
     if ult_param and labels:
         import ultimate_stats as US
         try:
-            sv = US.size_values(US.entry(ult_param, labels, base.get('ult', name)))
+            ov = US.size_override(name)
+            sv = US.size_values(US.entry(ult_param, labels, base.get('ult', name)), ov)
         except SystemExit:
-            sv = {}
+            ov, sv = {}, {}
+        if ov:
+            rep.add('INFO', 'P4 size', 'kind 0x%X: port.json stats.size keeps %s over Ultimate\'s' % (
+                kind, ', '.join('%d %s %g' % (i, US.SIZE_NAMES[i], v) for i, v in sorted(ov.items()))))
         bad = {}
         for i, (w, uname, _how) in sorted(sv.items()):
             if i in row and abs(row[i] - w) > 0.005 * max(1.0, abs(w)):
-                bad.setdefault('ERROR' if i in (44, 49, 185) else 'WARN', []).append(
-                    '%d %s %g (Ultimate\'s %s -> %g)' % (i, US.SIZE_NAMES[i], row[i], uname, w))
+                bad.setdefault('ERROR' if i in (44, 49, 185) or i in ov else 'WARN', []).append(
+                    '%d %s %g (%s -> %g)' % (i, US.SIZE_NAMES[i], row[i], 'port.json stats.size' if i in ov else
+                                             'Ultimate\'s ' + uname, w))
         for lvl, items in sorted(bad.items()):
-            rep.add(lvl, 'P4 size', 'kind 0x%X\'s size differs from Ultimate\'s in %s: %s. `python3 tools/ultimate_stats.py '
+            rep.add(lvl, 'P4 size', 'kind 0x%X\'s size differs from Ultimate\'s%s in %s: %s. `python3 tools/ultimate_stats.py '
                     'sizes PRC LABELS FP_IN FP_OUT %s` re-applies the sizes alone' % (
-                        kind, inst.where('param/fighter/fighter_param.bin'), '; '.join(items), name))
+                        kind, ' (or port.json stats.size)' if ov else '', inst.where('param/fighter/fighter_param.bin'),
+                        '; '.join(items), name))
     # P3 rapid-count (Byleth v17: "jab 3 is inaccessible"): the common Attack status (func_270) goes into the rapid jab
     # when ENABLE_100 is on and the presses so far (0x11000003) >= fighter_param 86 (attack_100_input_count): a rapid jab
     # (264 = 1) with 86 = 0 (left from a base without one: ZSS) goes in as soon as jab 2 turns ENABLE_100 on, pressed

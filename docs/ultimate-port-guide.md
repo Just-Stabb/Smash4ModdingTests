@@ -246,6 +246,13 @@ over the 51 fighters both have:
   ledge reach with the body). Not changed (camera framing, not size): the camera boxes 117 - 126, height 97, item boxes.
   `python3 tools/ultimate_stats.py sizes PRC LABELS FP_IN FP_OUT [NAME ...]` re-applies the sizes alone to an
   existing fighter_param.bin (every other byte kept: to merge with another change to the same rows). `port_check` P4.
+- **Per-port overrides** (fighter_params_v2), in `port.json` `stats`: `"size": {"scale": 1.0, ...}` (keys
+  `ultimate_stats.SIZE_NAMES`: scale, shield_radius, tumble_attack_size, effect_scale, freeze_size) for a size the user
+  wants other than Ultimate's (Hero keeps all five of his pre-fighter_sizes_v1 sizes, Robin's row's: 1.0 / 10.7 / 3.745 /
+  1.05 / 8.6), and `"override": {"INDEX": value}` for a MAP word the port's moves can't take from Ultimate (Incineroar's
+  263 jab count stays 2 while his jab is Bowser's Attack11 / Attack12: no Attack13 slot). The stats step
+  (`ultimate_port.py stats` passes them as `--size` / `--set`), `ultimate_stats.py sizes` and `port_check` P2 / P4 all
+  take them in place of Ultimate's (P2 / P4 print an INFO naming them; a row that differs from an override is a P4 ERROR).
 
 ## Checking effects offline: tools/fx_render.py
 

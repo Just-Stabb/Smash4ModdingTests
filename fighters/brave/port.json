@@ -169,7 +169,15 @@
    0.82,
    0.9
   ],
-  "_jump_scale": "the ports made before the framework keep 0.82 / 0.9 (user: new ports use Ultimate's heights, 1 / 1)"
+  "_jump_scale": "the ports made before the framework keep 0.82 / 0.9 (user: new ports use Ultimate's heights, 1 / 1)",
+  "size": {
+   "scale": 1.0,
+   "shield_radius": 10.7,
+   "tumble_attack_size": 3.745,
+   "effect_scale": 1.05,
+   "freeze_size": 8.6
+  },
+  "_size": "user (fighter_params_v2): Hero keeps his sizes from before fighter_sizes_v1 (Robin's row's), not Ultimate's 0.96 / 10.384 / 3.6344 / 0.95 / 10; ultimate_stats.py and port_check P4 take these"
  },
  "portraits": {
   "cross": null,

@@ -192,13 +192,16 @@ def cmd_effects(a):
 
 
 def cmd_stats(a):
+    import ultimate_stats    # port.json stats.size / stats.override: the port's own values over Ultimate's (fighter_params_v2)
     src = port_sources.load()
     cfg = load_cfg(a.name)
     js = ','.join(str(x) for x in cfg.get('stats', {}).get('jump_scale', [1.0, 1.0]))
     prc = src.find('ult_common', 'param/fighter_param.prc')
     os.makedirs(os.path.dirname(os.path.abspath(a.out)), exist_ok=True)
     r = subprocess.run([sys.executable, os.path.join(HERE, 'ultimate_stats.py'), prc, src['labels'], cfg['ult'],
-                        a.fighter_param, a.out, cfg['kind'], '--jump-scale', js])
+                        a.fighter_param, a.out, cfg['kind'], '--jump-scale', js]
+                       + ['--size=%d=%r' % (i, v) for i, v in sorted(ultimate_stats.size_override(a.name).items())]
+                       + ['--set=%d=%s' % (i, json.dumps(v)) for i, v in sorted(ultimate_stats.stats_override(a.name).items())])
     sys.exit(r.returncode)
 
 

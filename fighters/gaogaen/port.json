@@ -106,7 +106,11 @@
   "jump_scale": [
    1.0,
    1.0
-  ]
+  ],
+  "override": {
+   "263": 2
+  },
+  "_override": "fighter_params_v2: 263 attack_combo_max stays 2 (Bowser's) while his jab is Bowser's moves: his motion pack and game scripts have Attack11 / Attack12 only, no Attack13 (Ultimate's 3 needs a jab-3 slot first)"
  },
  "portraits": {
   "cross": null,

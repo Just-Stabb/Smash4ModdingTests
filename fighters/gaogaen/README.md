@@ -81,3 +81,26 @@ fighter_sizes_v1 these were Bowser's): 44 scale 0.82 -> 1.0 (Ultimate's `scale`:
 in game is this x the model), 45 shield 16 -> 10.296 (Ultimate's shield_radius x 0.88: APPROXIMATED, the median Smash 4 /
 Ultimate ratio), 48 tumble hitbox 5.6 -> 3.6036 (= 45 x 0.35), 49 effect_scale 1.7 -> 1.0 and 185 freeze_size 15.3 -> 11.2 (Ultimate's
 effect_scale / ice_radius). docs/ultimate-port-guide.md "Stats"; `port_check` P4.
+
+## Stats (fighter_params_v2, `$S/fighter_params_v2.zip`): Ultimate's, no longer Bowser's
+
+His row still had all of Bowser's movement stats (`port_check` P1 ERROR). Now the pipeline's own mapping (`python3
+tools/ultimate_port.py stats gaogaen FP_IN FP_OUT`: `tools/ultimate_stats.py` MAP, from Ultimate's
+`fighter/common/param/fighter_param.prc` entry `fighter_kind_gaogaen`, jump scale 1 / 1), on fighter_sizes_v1's file;
+the size words (44 / 45 / 48 / 49 / 185) came out the same as fighter_sizes_v1 set them. Changed (word, Bowser's ->
+Ultimate's): 1 walk accel 0.03 -> 0.05, 2 walk base accel 0.05 -> 0.1, 3 walk speed 0.858 -> 0.62, 7 ground friction
+0.0577 -> 0.0513 (Ultimate's 0.114 x 0.45), 8 dash 1.0 -> 1.76, 9 run accel 0.0648 -> 0.09, 10 run base accel 0.04 -> 0.02,
+11 run speed 1.792 -> 1.18, 12 jump squat 8 -> 3, 14 ground-to-air momentum 0.9 -> 0.75, 15 jump x max 1.0 -> 1.8, 16
+air-jump x 0.9 -> 1.0, 17 full hop 33 -> 31.6, 18 short hop 15.7 -> 14.4, 19 double jump 32.61 -> 32.8, 20 air accel 0.04
+-> 0.06, 22 air speed 1.0 -> 0.88, 23 air friction 0.0075 -> 0.015, 24 gravity 0.11 -> 0.126, 25 fall 1.39 -> 1.76, 26 air
+brake y 0.0075 -> 0.015, 27 fast fall 2.224 -> 2.816, 28-32 landing lag n / f / b / hi / lw 20 / 24 / 40 / 28 / 40 -> 11 / 14
+/ 11 / 8 / 16, 33 weight 130 -> 116, 81 jab 2 window 30 -> 24, 82 jab 3 window 0 -> 32 (unused while 263 is 2). Already
+Ultimate's: 13 (0.9), 21 (0.01), 34 jumps (2), 86 / 264 (no rapid jab), 262 (combo kind hit), 268 (normal jumps).
+- **263 jab count kept at Bowser's 2** (`port.json` `stats.override`): Ultimate's is 3, but his jab is still Bowser's
+  moves: his motion pack has `Attack11` / `Attack12` only (no Attack13 motion, no Attack13 game script), so a third jab
+  would start a move he has nothing for. Give him Ultimate's 3 once he has a jab 3 (drop the override).
+- Not from Ultimate (no equal quantity, left as Bowser's): 39 / 40 soft / hard landing lag (1 / 5; Ultimate's
+  landing_frame_light 1, landing_frame 3, landing_heavy_frame 8: not the same quantity, `ultimate_stats.REPORT`), 46
+  shield break height 39.6 (Ultimate's shield_break_y 44: no fitted rule), 50 GFX size 2 (1.8), and every other word
+  outside MAP / SIZE (camera boxes, items, footstool ...). 4-6 walk thresholds 0.2 / 0.5 / 0.75 are already Ultimate's.
+- `port_check gaogaen` over the result: P1 - P4 clean (P2 INFO: the 263 override).

@@ -1677,4 +1677,12 @@ fighter_param (`tools/ultimate_stats.py` SIZE, from Ultimate's `fighter/common/p
 fighter_sizes_v1 these were Robin's): 44 scale 1.0 -> 0.96 (Ultimate's `scale`: the model is Ultimate's skeleton 1:1, so the size
 in game is this x the model), 45 shield 10.7 -> 10.384 (Ultimate's shield_radius x 0.88: APPROXIMATED, the median Smash 4 /
 Ultimate ratio), 48 tumble hitbox 3.745 -> 3.6344 (= 45 x 0.35), 49 effect_scale 1.05 -> 0.95 and 185 freeze_size 8.6 -> 10 (Ultimate's
-effect_scale / ice_radius). docs/ultimate-port-guide.md "Stats"; `port_check` P4.
+effect_scale / ice_radius). docs/ultimate-port-guide.md "Stats"; `port_check` P4. All five put back to his earlier values in fighter_params_v2 (below).
+
+## Sizes back (fighter_params_v2, `$S/fighter_params_v2.zip`)
+
+The user's call: Hero keeps the sizes he had before fighter_sizes_v1 (Robin's row's), not Ultimate's: 44 scale 0.96 ->
+1.0, 45 shield 10.384 -> 10.7, 48 tumble hitbox 3.6344 -> 3.745, 49 effect_scale 0.95 -> 1.05, 185 freeze_size 10 -> 8.6.
+His row is byte for byte the one before fighter_sizes_v1 (the user's 18a6b66e file, = Byleth v17's). Recorded in
+`port.json` `"stats": {"size": {...}}`, which `tools/ultimate_stats.py` (the stats step and `sizes`) and `port_check` P4
+take in place of Ultimate's (P4 INFO names them), so neither the pipeline nor the check puts Ultimate's back.

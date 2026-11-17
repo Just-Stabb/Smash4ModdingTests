@@ -39,6 +39,11 @@ The other per-fighter sizes that follow it: 45 shield (Ultimate's x 0.88, the me
 quartiles 0.84 - 0.95: APPROXIMATED), 48 tumble hitbox (= 45 x 0.35, 56 of 57 vanilla), 49 effect_scale and
 185 freeze_size (= Ultimate's effect_scale / ice_radius for all 57). The ports up to fighter_sizes_v1 kept their
 base's (Incineroar Bowser's scale 0.82 for Ultimate's 1.0).
+Per-port overrides, in fighters/NAME/port.json "stats" (the user's call, or a word the port's moves can't use):
+"override": {"INDEX": value} for MAP words (Incineroar, fighter_params_v2: 263 jab count 2, his moves are still
+Bowser's, no Attack13), "size": {SIZE_NAMES name: value} for SIZE (Hero, fighter_params_v2: all five back to his
+pre-fighter_sizes_v1 values). The stats step (--set / --size, passed by ultimate_port.py stats), `sizes` and
+port_check P2 / P4 take them in place of Ultimate's.
 """
 import argparse
 import json
@@ -92,6 +97,7 @@ SIZE = {
     185: ('ice_radius', 'same'),
 }
 SIZE_NAMES = {44: 'scale', 45: 'shield_radius', 48: 'tumble_attack_size', 49: 'effect_scale', 185: 'freeze_size'}
+SIZE_INDEX = {v: k for k, v in SIZE_NAMES.items()}
 # left as the base's, reported with Ultimate's value: not the same quantity in both games (median
 # Smash 4 / Ultimate ratio over 51 fighters in brackets) or not checked yet
 REPORT = {39: 'landing_frame', 40: 'landing_heavy_frame',
@@ -107,11 +113,33 @@ def entry(prc_path, labels_path, ult):
     sys.exit('no fighter_param entry for fighter_kind_%s' % ult)
 
 
-def values(e, jump_scale=(1.0, 1.0)):
-    """{index: (value, Ultimate name, rule text)}"""
+def stats_override(name):
+    """{index: value} of fighters/NAME/port.json "stats": {"override": {"INDEX": value}}: a MAP word the port can't take
+    from Ultimate (Incineroar, fighter_params_v2: 263 jab count 2, Bowser's moves have no Attack13), {} without one"""
+    p = os.path.join(os.path.dirname(HERE), 'fighters', name, 'port.json')
+    try:
+        d = json.load(open(p)).get('stats', {}).get('override', {})
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for k, v in d.items():
+        if k.startswith('_'):
+            continue
+        if not k.isdigit() or int(k) not in MAP:
+            sys.exit('%s: stats.override key %r is not a MAP index (%s)' % (p, k, ' '.join(map(str, sorted(MAP)))))
+        out[int(k)] = v
+    return out
+
+
+def values(e, jump_scale=(1.0, 1.0), override=None):
+    """{index: (value, Ultimate name, rule text)}; override: {index: value} (port.json stats.override,
+    stats_override) in place of the rule's"""
     out = {}
     for i, (name, rule) in MAP.items():
         v = e[name]
+        if override and i in override:
+            out[i] = (override[i], name, 'port.json stats.override (Ultimate\'s %s)' % (v[1] if isinstance(v, tuple) else v,))
+            continue
         if rule in ('same', 'ult'):
             val, how = v, 'Ultimate %s' % ('(same in both games)' if rule == 'same' else '(by design)')
         elif rule == 'brake':
@@ -132,11 +160,36 @@ def values(e, jump_scale=(1.0, 1.0)):
     return out
 
 
-def size_values(e):
-    """{index: (value, Ultimate name, rule text)} for the fighter's size (SIZE)"""
+def size_override(name):
+    """{index: value} of fighters/NAME/port.json "stats": {"size": {...}} (keys: SIZE_NAMES names or indices; the
+    user's per-port choice over Ultimate's: Hero's sizes are his pre-fighter_sizes_v1 ones), {} without one"""
+    p = os.path.join(os.path.dirname(HERE), 'fighters', name, 'port.json')
+    try:
+        d = json.load(open(p)).get('stats', {}).get('size', {})
+    except (OSError, ValueError):
+        return {}
     out = {}
+    for k, v in d.items():
+        if k.startswith('_'):
+            continue
+        i = SIZE_INDEX.get(k, None) if not k.isdigit() else int(k)
+        if i not in SIZE_NAMES:
+            sys.exit('%s: stats.size key %r is not one of %s' % (p, k, ', '.join(SIZE_INDEX)))
+        out[i] = float(v)
+    return out
+
+
+def size_values(e, override=None):
+    """{index: (value, Ultimate name, rule text)} for the fighter's size (SIZE); override: {index: value} (the port's
+    port.json stats.size, size_override) taken in place of Ultimate's"""
+    out = {}
+    override = override or {}
     for i, (name, rule) in SIZE.items():
         v = float(e[name])
+        if i in override:
+            ult = v * SHIELD_RATIO if rule == 'shield' else v * SHIELD_RATIO * TUMBLE_RATIO if rule == 'tumble' else v
+            out[i] = (round(override[i], 4), name, 'port.json stats.size override (Ultimate\'s would be %g)' % round(ult, 4))
+            continue
         if rule == 'same':
             val, how = v, 'Ultimate (same in both games)'
         elif rule == 'shield':
@@ -173,7 +226,7 @@ def apply_sizes(prc_path, labels_path, fp_in, fp_out, ports=None, log=print):
                                          'no row for kind 0x%X' % kind))
             continue
         row = rows[kind]
-        for i, (v, uname_, how) in sorted(size_values(e).items()):
+        for i, (v, uname_, how) in sorted(size_values(e, size_override(name)).items()):
             old = row[i].v
             new = struct.unpack('>f', struct.pack('>f', v))[0]
             if struct.pack('>f', old) != struct.pack('>f', new):
@@ -223,13 +276,21 @@ def main():
         ap.add_argument(n)
     ap.add_argument('--jump-scale', default='1,1')
     ap.add_argument('--json')
+    ap.add_argument('--set', action='append', default=[], metavar='INDEX=VALUE',
+                    help='a MAP word in place of Ultimate\'s (port.json stats.override; ultimate_port.py stats passes them)')
+    ap.add_argument('--size', action='append', default=[], metavar='INDEX=VALUE',
+                    help='a size word in place of Ultimate\'s (port.json stats.size; ultimate_port.py stats passes them)')
     a = ap.parse_args()
     e = entry(a.prc, a.labels, a.ult)
     js = tuple(float(x) for x in a.jump_scale.split(','))
-    vals = values(e, js)
+    vals = values(e, js, {int(t.split('=')[0]): json.loads(t.split('=')[1]) for t in a.set})
     for i, (v, name, how) in sorted(vals.items()):
         print('%4d = %-10s %-28s %s' % (i, v, name, how))
-    sizes = size_values(e)
+    ov = {}
+    for t in a.size:
+        k, v = t.split('=')
+        ov[SIZE_INDEX.get(k) or int(k)] = float(v)
+    sizes = size_values(e, ov)
     for i, (v, name, how) in sorted(sizes.items()):
         print('%4d = %-10s %-28s %s (size)' % (i, v, name, how))
     for i, name in sorted(REPORT.items()):
