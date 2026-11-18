@@ -3694,3 +3694,5 @@ bright", and in the stop it "is persisting, it's just hardly noticeable because 
   On a bright stage (whose negative is dark) this line is faint; the user had no preference between this, a thicker
   light band and a darker stop.
 - Only effect.bin changes. Needs exe_v46z_outline4.
+
+**Time Skip / Jump Spike accepted by the user as of v10** (with exe_v46z_outline4).
