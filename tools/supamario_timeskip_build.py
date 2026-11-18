@@ -274,7 +274,7 @@ OL_ALPHA, OL_TINT, OL_FLASH = 140.0, 0.0, 0
 OL_IN, OL_OUT, OL_PUNCH_OUT = 4, 4, 0
 OL_KEEP, OL_HOLD, OL_CUT_OUT = 4, 12, 4
 # v9 (user, v8: "looks good aside from the aura and lack of outline"; Outline_Set's rim is inside the silhouette and
-# barely shows): the outline is Outline_Shell now (exe_v46z_outline3: model_commands v3), a band OUTSIDE his silhouette.
+# barely shows): the outline is Outline_Shell now (exe_v46z_outline4: model_commands v3), a band OUTSIDE his silhouette.
 # Clip b66e8a38's rim is 2-3 px at 1080p plus a faint haze past it: OL_WIDTH 2.5 px of the 1280 x 720 picture (~3.75 at
 # 1080p), added as a glow (OL_BLEND 1: XV2's outline brightens what is behind it) at OL_SH_ALPHA. Same timing (OL_*).
 OL_WIDTH, OL_BLEND, OL_SH_ALPHA = 2.5, 1, 220.0
@@ -602,7 +602,7 @@ def outline_on(frames, inverted=False):
     (exe_v46z_outline): his own edges lit (the shaders' rim), edge only (Tint 0), OL_RGB at OL_ALPHA, steady (Flash 0),
     in over OL_IN (a renewal fades from where it is: none once on), held `frames`, then out over OL_CUT_OUT if not
     renewed (a cut move).
-    v9: Outline_Shell (exe_v46z_outline3): a band OL_WIDTH pixels wide outside his silhouette, OL_RGB added at
+    v9: Outline_Shell (exe_v46z_outline4): a band OL_WIDTH pixels wide outside his silhouette, OL_RGB added at
     OL_SH_ALPHA (Blend OL_BLEND), the same timing; `inverted` (the connect, under Screen_Invert's stop): OL_INV_RGB
     drawn over (Blend OL_INV_BLEND), which the negative turns into the light blue-white"""
     if OUTLINE_CMD == 'outline_shell' and inverted and INVERT_FX:

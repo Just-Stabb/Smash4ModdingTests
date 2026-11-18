@@ -2639,7 +2639,7 @@ temporary diag caves' `0x04BCC000`); variables `0x0F0003D0`-`0x0F0003DA`; comman
 `0x04BD88C4`, data `0x04BD9F00`, the reset lists `0x04BDA000`; `textregion:0x2BE0000 grow:0x04BE0000`).
 `0x04BD6000`-`0x04BD8000` (between ts_data's end and this) was free; `0x04BD6000`-`0x04BD7000` is now the whip motion
 table's (Byleth v15, below), `0x04BD7000`-`0x04BD8000` the hitbox hold's (rapid_setoff v1, below). `0x04BE0000`-`0x04BE2000`
-(past this region, the text region grown again) is the camera effects' (camera_effects v1, "Camera effects" below). `0x04BE2000`-`0x04BE3000` (grown again) is the screen invert's (screen_invert v1, "Screen colour" below). `0x04BE3000`-`0x04BE4000` (grown again) is the outline's and `0x04BE4000`-`0x04BE5000` (grown again) the mesh visibility's (model_commands v1, "Outline" / "Mesh visibility" below). `0x04BE5000`-`0x04BE7000` (grown again) is the outline shell's (model_commands v2, "Outline shell" below). The combined exe the user runs:
+(past this region, the text region grown again) is the camera effects' (camera_effects v1, "Camera effects" below). `0x04BE2000`-`0x04BE3000` (grown again) is the screen invert's (screen_invert v1, "Screen colour" below). `0x04BE3000`-`0x04BE4000` (grown again) is the outline's and `0x04BE4000`-`0x04BE5000` (grown again) the mesh visibility's (model_commands v1, "Outline" / "Mesh visibility" below). `0x04BE5000`-`0x04BE8000` (grown again; to `0x04BE7000` before exe_v46z_outline4) is the outline shell's (model_commands v2, "Outline shell" below). The combined exe the user runs:
 exe_v46v_threads -> var_reset_cave.py (exe_v46w_vars) -> tools/line_test_cave.py (exe_v46w_vars_line, which chains on
 four of these hooks).
 
@@ -3206,7 +3206,7 @@ one; the group write to a part kept aside and given back). Dr. Mario's own two-p
 stethoscope_VIS_O_OBJ (shaders 0x9601106B / 0x9A011063) and MarioD_hair_O_OBJ (a blended polygon, src 1 / dst 1, and
 an opaque one): the v2 in-game test hides both (tools/outline_shell_ingame_test_build.py, down taunt facing left).
 
-## Outline shell (model_commands v2: `tools/outline_shell_cave.py`, exe_v46z_outline2)
+## Outline shell (model_commands v2: `tools/outline_shell_cave.py`, exe_v46z_outline2; fixed in exe_v46z_outline4)
 
 **v3 (exe_v46z_outline3, the user's outline_v2 test): no band ever drew.** The diag log (Dr. Mario's taunts): S4ST
 `drawn=0 checked=~227 a frame refused=0`, S4SF writing the mark into the instance's FB1 (`fb=64F5C000`) every frame,
@@ -3241,6 +3241,24 @@ v5 diag build pauses 50 ms (OSSleepTicks, stub `0x04B80970`, 3107812 ticks) afte
 a draw's pixel-stage FB1 carries the mark (os_dmark, called before os_chk: the context, FB1, the vertex stage's FB1,
 the geometry shader, the pixel shader, its blocks), then S4SP's steps for the first 4 shells (DIAG_STEPS 4).
 Diag format strings shortened to fit below the programs.
+
+**v6 (exe_v46z_outline4): the crash was the GX2 calls.** The v5 log ended in Cemu's crash report: IP `0x04B80974`, in
+the NU::CommandManager thread, from os_dmark's pause (stack: os_dmark <- os_draw <- CommandDrawModel `0x037174EC`).
+`0x04B80970` is not OSSleepTicks: it is where the FILE's `bl OSSleepTicks` points. **Cemu resolves every import to an
+HLE entry of its own and rewrites the game's REL24 calls at load** (rpl.cpp: a relative `bl` when in reach, else an
+absolute `bla` (AA set) to a trampoline `addi / addis r11, mtctr, bctr`), so the file's targets mean nothing at run
+time; they lie in the grown text, i.e. other caves' code (`0x04B7BD08`, "GX2SetVertexShader", is in APC_CODE). The
+shell's 14 GX2 calls (v2-v5) and v4 / v5's OSGetCoreId / OSSleepTicks all went there: the first shell drawn jumped
+into other code. (diag_crumbs_cave.py v1 hit the same trap decoding a `bl OSReport` at run time; it missed the AA bit.)
+Now `os_resolve` reads the game's own call at a site per import (IMPORTS: the GX2 sites, OSSleepTicks `0x03335974`,
+OSGetCoreId `0x032EF0F8`) as Cemu left it, honouring AA, once, into `os_fn`; every call goes through CTR; a site that
+isn't a `bl` / `bla` leaves no shell drawn. The region grew to `0x04BE8000` (`textregion:0x2BE8000`), the programs at
+`0x04BE7400` / `0x04BE7800`. `tools/import_call_check.py` lists any cave word calling an import at a file target (0 in
+every other cave of the user's exe); outline_shell_test runs it on both builds and emulates Cemu's relocated sites
+(a relative bl, absolute blas to trampolines). port_check X13 errors on exe_v46z_outline2 and 3 (`draws()` wants the
+swapped mark and the os_site table).
+**Rule for every cave: never `bl` an import's file target.** Call imports through a site's run-time target
+(os_resolve) or a relocated veneer.
 
 **Claimed region: `0x04BE5000`-`0x04BE7000`** (past the mesh visibility's; `textregion:0x2BE7000 grow:0x04BE7000`; code
 and data `0x04BE5000`-`0x04BE6244`, the diag build to `0x04BE66FC`; the programs at `0x04BE6800` (vertex, 0x348 bytes)

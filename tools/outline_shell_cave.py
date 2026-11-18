@@ -63,8 +63,8 @@ Hooks (each word asserted):
   --diag: TEST ONLY OSReport lines (S4SC / S4SD per command; S4ST per shell frame with the counts of shells drawn, draws
   checked while a shell is in use and marked FB1s refused; S4SF per FB1 write, S4SR per shell drawn, S4SX a marked FB1
   refused (the pixel program's blocks): the first 30 frames after a command, then every 30th).
-Space: 0x04BE5000-0x04BE7000 (docs/native-notes.md "Outline shell": past the mesh visibility's, the text region grown),
-the programs at 0x04BE6A00 / 0x04BE6E00 (256-aligned).
+Space: 0x04BE5000-0x04BE8000 (docs/native-notes.md "Outline shell": past the mesh visibility's, the text region grown),
+the programs at 0x04BE7400 / 0x04BE7800 (256-aligned).
 Test: tools/outline_shell_test.py.
 """
 import argparse
@@ -80,9 +80,9 @@ import line_test_cave as LT  # noqa: E402
 import outline_cave as OL  # noqa: E402
 import mesh_vis_cave as MV  # noqa: E402
 
-CAVE, LIMIT = 0x04BE5000, 0x04BE7000
+CAVE, LIMIT = 0x04BE5000, 0x04BE8000   # (v6: grown to 0x04BE8000)
 TEXT_REGION = LIMIT - 0x02000000
-VS_PROG, PS_PROG = 0x04BE6A00, 0x04BE6E00   # (v4: up 0x200 for the diag build's S4SP)
+VS_PROG, PS_PROG = 0x04BE7400, 0x04BE7800   # (v6: the region grown; v4 0x04BE6A00 / 0x04BE6E00)
 OS_INDEX = 2600                 # (Mesh_Visibility 2500)
 CMD_NAME = 'Outline_Shell'
 CMD_CRC = zlib.crc32(CMD_NAME.encode()) & 0xFFFFFFFF
@@ -325,8 +325,8 @@ def find(orig):
         assert orig(at) == want, '0x%08X: 0x%08X, not 0x%08X' % (at, orig(at), want)
     for at, fn in ((DRAW_I, DRAW_FN_I), (DRAW_N, DRAW_FN_N)):
         assert _bl(at, orig(at)) == fn, 'draw 0x%08X: 0x%08X (want bl 0x%08X)' % (at, orig(at), fn)
-    for name, (stub, site) in GX2.items():
-        assert _bl(site, orig(site)) == stub, 'GX2%s: 0x%08X does not call 0x%08X' % (name, site, stub)
+    for name, site, stub in IMPORTS:
+        assert _bl(site, orig(site)) == stub, '%s: 0x%08X does not call 0x%08X' % (name, site, stub)
     for i, want in enumerate(OL.NC_TARGET_SIG):
         assert orig(OL.NC_TARGET + 4 * i) == want, 'nc_target 0x%08X' % (OL.NC_TARGET + 4 * i)
     s['tick_prev'] = OL.tick_prev(orig)
@@ -350,9 +350,27 @@ DIAG_FMTS = [
 ]
 DIAG_MARKS = 4                  # S4SM: the first 4 marked draws
 DIAG_PAUSE = 3107812            # 50 ms of the 62.15625 MHz timer (OSSleepTicks) after each S4SM / S4SP
-OS_SLEEP_TICKS = 0x04B80970     # OSSleepTicks' import stub
+OS_SLEEP_TICKS = (0x04B80970, 0x03335974)    # OSSleepTicks: the file's bl target, a game site calling it
 DIAG_STEPS = 4                  # S4SP: the first 4 shells drawn, every step (v5: 4, each line + a pause)
-OS_GET_CORE_ID = 0x04B80340     # OSGetCoreId's import stub (bl targets at 0x032EF0F8, 0x036F7564, ...)
+OS_GET_CORE_ID = (0x04B80340, 0x032EF0F8)    # OSGetCoreId: the same (also 0x036F7564, ...)
+# v6: imports are called through the address the game's own `bl` at a site reaches AT RUN TIME (os_resolve). The
+# file's bl target (the first number) is NOT the function: Cemu resolves each import to an HLE entry elsewhere and
+# rewrites the game's REL24 `bl` (rpl.cpp: relative if in reach, else an absolute `bla` to a trampoline); the file's
+# targets lie in other caves' space (0x04B7BD08 is in APC_CODE). v2-v5 called them directly: the first shell drawn
+# jumped into other code (the user's v5 crash log: IP 0x04B80974, in OSSleepTicks' file target).
+IMPORTS = [('GX2' + k, GX2[k][1], GX2[k][0]) for k in sorted(GX2)] + \
+    [('OSSleepTicks', OS_SLEEP_TICKS[1], OS_SLEEP_TICKS[0]), ('OSGetCoreId', OS_GET_CORE_ID[1], OS_GET_CORE_ID[0])]
+IMP = {nm: k for k, (nm, _s, _t) in enumerate(IMPORTS)}
+
+
+def call(name):
+    """asm: call import `name` through os_fn (r12, CTR; a trampoline may use r11)"""
+    return '''
+        lis r12, os_fn@ha
+        addi r12, r12, os_fn@l
+        lwz r12, %d(r12)               # %s
+        mtctr r12
+        bctrl''' % (4 * IMP[name], name)
 
 
 def src(s, hand, diag=False, pad=False, variant='full'):
@@ -368,15 +386,14 @@ def src(s, hand, diag=False, pad=False, variant='full'):
              vcb7=CTX['vcb'] + 8 * 7, pcb7=CTX['pcb'] + 8 * 7, pcb7s=CTX['pcb'] + 8 * 7 + 4,
              **{'c_' + k: v for k, v in CTX.items()}, **{'g_' + k: v[0] for k, v in GX2.items()})
     step = (lambda n: '\n        li r3, %d\n        mr r4, r31\n        bl os_dstep' % n) if diag else (lambda n: '')
+    D.update({'x_' + k: call('GX2' + k) for k in GX2})
     D.update(mark='\n        mr r3, r31\n        bl os_dmark' if diag else '')
     D.update(st1=step(1), st2=step(2), st3=step(3), st4=step(4), st5=step(5),
              setprog='' if variant == 'noprog' else '''
         lis r3, os_vs@ha                # the shell's programs
-        addi r3, r3, os_vs@l
-        bl 0x%08X
+        addi r3, r3, os_vs@l''' + call('GX2SetVertexShader') + '''
         lis r3, os_ps@ha
-        addi r3, r3, os_ps@l
-        bl 0x%08X''' % (GX2['SetVertexShader'][0], GX2['SetPixelShader'][0]),
+        addi r3, r3, os_ps@l''' + call('GX2SetPixelShader'),
              redraw='' if variant == 'nodraw' else '\n        bctrl')
     D.update(maxw=MAX_WIDTH, cc4=CTX['cc'] + 4, cc8=CTX['cc'] + 8, ccc=CTX['cc'] + 0xC, cc10=CTX['cc'] + 0x10)
     chk, mi_of = OL.chk, OL.mi_of
@@ -859,6 +876,9 @@ os_draw:
         mr r3, r31
         bl os_chk
         mr. r30, r3
+        beq osd_out
+        bl os_resolve                   # the imports' run-time addresses (once)
+        cmpwi r3, 0
         beq osd_out%(st1)s%(setprog)s%(st2)s
         lwz r0, %(c_rsreg)d(r31)         # the rasterizer's: front faces culled (back faces, if the game culls front)
         clrlwi r11, r0, 30
@@ -871,14 +891,14 @@ osd_cull:
         or r0, r0, r11
         stw r0, 0x30(r1)
         addi r3, r1, 0x30
-        bl 0x%(g_SetPolygonControlReg)08X
+%(x_SetPolygonControlReg)s
         lwz r0, %(c_dsreg)d(r31)         # the depth's: test and write on (its compare kept), stencil off
         li r11, %(dsoff)d
         andc r0, r0, r11
         ori r0, r0, %(dson)d
         stw r0, 0x34(r1)
         addi r3, r1, 0x34
-        bl 0x%(g_SetDepthStencilControlReg)08X
+%(x_SetDepthStencilControlReg)s
         li r0, 0                        # target 0's blend: the colour x alpha over (Blend 0) / onto (1) it
         stw r0, 0x38(r1)
         lis r0, %(bl0_h)d
@@ -891,18 +911,18 @@ osd_cull:
 osd_bl:
         stw r0, 0x3C(r1)
         addi r3, r1, 0x38
-        bl 0x%(g_SetBlendControlReg)08X
+%(x_SetBlendControlReg)s
         lwz r3, %(cc4)d(r31)             # blending on target 0 (the game's logic op, multi-write, colour buffer)
         lbz r4, %(cc8)d(r31)
         ori r4, r4, 1
         lwz r5, %(ccc)d(r31)
         lwz r6, %(cc10)d(r31)
-        bl 0x%(g_SetColorControl)08X
+%(x_SetColorControl)s
         li r0, 0                        # no alpha test
         stw r0, 0x40(r1)
         stw r0, 0x44(r1)
         addi r3, r1, 0x40
-        bl 0x%(g_SetAlphaTestReg)08X%(st3)s
+%(x_SetAlphaTestReg)s%(st3)s
         lwz r3, 0x10(r1)                # the same draw again
         lwz r4, 0x14(r1)
         lwz r5, 0x18(r1)
@@ -913,22 +933,22 @@ osd_bl:
         lwz r12, 0x2C(r1)
         mtctr r12%(redraw)s%(st4)s
         lwz r3, %(c_vs)d(r31)            # everything back as the device's caches have it
-        bl 0x%(g_SetVertexShader)08X
+%(x_SetVertexShader)s
         lwz r3, %(c_ps)d(r31)
-        bl 0x%(g_SetPixelShader)08X
+%(x_SetPixelShader)s
         addi r3, r31, %(c_rsreg)d
-        bl 0x%(g_SetPolygonControlReg)08X
+%(x_SetPolygonControlReg)s
         addi r3, r31, %(c_dsreg)d
-        bl 0x%(g_SetDepthStencilControlReg)08X
+%(x_SetDepthStencilControlReg)s
         addi r3, r31, %(c_blend0)d
-        bl 0x%(g_SetBlendControlReg)08X
+%(x_SetBlendControlReg)s
         lwz r3, %(cc4)d(r31)
         lbz r4, %(cc8)d(r31)
         lwz r5, %(ccc)d(r31)
         lwz r6, %(cc10)d(r31)
-        bl 0x%(g_SetColorControl)08X
+%(x_SetColorControl)s
         addi r3, r31, %(c_atest)d
-        bl 0x%(g_SetAlphaTestReg)08X%(st5)s
+%(x_SetAlphaTestReg)s%(st5)s
         lis r12, os_g@ha
         addi r12, r12, os_g@l
         lwz r11, 0x18(r12)              # shells drawn
@@ -1069,6 +1089,54 @@ os_dref:
         li r3, 0
         blr
 """
+    out += """
+# --- os_resolve() -> r3 1 when os_fn holds every import's run-time address, else 0: the first call reads the game's
+#     own call at each site in os_site as Cemu left it (rpl.cpp: a relative `bl`, or an absolute `bla` to a trampoline
+#     when out of reach) and stores its target; a site that isn't a `bl` / `bla` leaves os_fn unset (no shell drawn).
+#     A leaf: r0, r3, r7-r12 ----------------------------------------------------------------------------------------
+os_resolve:
+        lis r12, os_fnok@ha
+        lwz r3, os_fnok@l(r12)
+        cmpwi r3, 0
+        bnelr
+        lis r11, os_site@ha
+        addi r11, r11, os_site@l
+        lis r12, os_fn@ha
+        addi r12, r12, os_fn@l
+        li r10, %(n)d
+ors_loop:
+        lwz r9, 0(r11)                  # the site
+        lwz r8, 0(r9)                   # its instruction now
+        srwi r0, r8, 26
+        cmpwi r0, 18
+        bne ors_fail
+        andi. r0, r8, 1                 # LK
+        beq ors_fail
+        rlwinm r7, r8, 0, 6, 29         # LI
+        rlwinm. r0, r7, 0, 6, 6         # (bit 0x02000000: the sign)
+        beq ors_pos
+        addis r7, r7, -0x0400           # (sign)
+ors_pos:
+        andi. r0, r8, 2                 # AA: absolute
+        bne ors_abs
+        add r7, r7, r9
+ors_abs:
+        stw r7, 0(r12)
+        addi r11, r11, 4
+        addi r12, r12, 4
+        addi r10, r10, -1
+        cmpwi r10, 0
+        bne ors_loop
+        li r3, 1
+        lis r12, os_fnok@ha
+        stw r3, os_fnok@l(r12)
+        blr
+ors_fail:
+        li r3, 0
+        blr
+os_site:
+""" % dict(n=len(IMPORTS)) + ''.join('        .word 0x%08X                 # %s\n' % (site, nm) for nm, site, _t in IMPORTS) + \
+        'os_fn:\n' + '        .word 0\n' * len(IMPORTS) + 'os_fnok:\n        .word 0\n'
     out += ("        .word 0\n" if pad else "") + """
 os_k:                                   # +0 0, +4 1, +8 2, +0xC 3, +0x10 1/255, +0x18 2^52 + 2^31, +0x20 2^52,
         .float 0                        # +0x28 the widest width
@@ -1229,16 +1297,15 @@ os_dstep:""" + head + """
         stw r11, 0x28(r12)
 ods_chk:
         lwz r11, 0x28(r12)
-        cmpwi r11, %(n)d
-        bgt ods_out
-        bl 0x%(core)08X                 # OSGetCoreId
+        cmpwi r11, %d
+        bgt ods_out""" % DIAG_STEPS + call('OSGetCoreId') + """
         mr r6, r3
         li r7, 0
         li r8, 0
         li r9, 0
         li r10, 0
         lwz r29, 0(r1)                  # os_draw's frame
-        lwz r29, 0(r29)                 # its caller's (CommandDrawModel)""" % dict(n=DIAG_STEPS, core=OS_GET_CORE_ID) + \
+        lwz r29, 0(r29)                 # its caller's (CommandDrawModel)""" + \
         OL.chk('r29', 'ods_pr') + """
         lwz r7, 4(r29)                  # the return into CommandDrawModel
         lwz r29, 0(r29)""" + OL.chk('r29', 'ods_pr') + """
@@ -1306,14 +1373,18 @@ os_dsleep:
         stwu r1, -0x10(r1)
         mflr r0
         stw r0, 0x14(r1)
+        bl os_resolve
+        cmpwi r3, 0
+        beq ods_slept
         li r3, 0
         lis r4, %(ph)d
-        ori r4, r4, %(pl)d
-        bl 0x%(sleep)08X
+        ori r4, r4, %(pl)d""" % dict(ph=DIAG_PAUSE >> 16, pl=DIAG_PAUSE & 0xFFFF) + call('OSSleepTicks') + """
+ods_slept:
         lwz r0, 0x14(r1)
         mtlr r0
         addi r1, r1, 0x10
-        blr""" % dict(ph=DIAG_PAUSE >> 16, pl=DIAG_PAUSE & 0xFFFF, sleep=OS_SLEEP_TICKS) + """
+        blr
+""" + """
 # --- diag: S4SR at a shell drawn (r3 the device context, r4 FB1, r5 the states set: rasterizer, depth) ---------------
 os_ddraw:""" + head + """
         mr r31, r3
@@ -1408,13 +1479,17 @@ def present(img_w):
 
 
 def draws(img_w):
-    """v3 (exe_v46z_outline3): the executable's shell takes FB1's mark byte-swapped too (lis r11 / ori r11 of SMAGIC
-    in os_chk). exe_v46z_outline2's (present but not this) never draws: the game's unlock swaps the block in place"""
+    """an executable whose shell draws: v3's FB1 mark taken byte-swapped (lis r11 / ori r11 of SMAGIC in os_chk;
+    exe_v46z_outline2's never draws) and v6's imports resolved at run time (os_site; exe_v46z_outline3's crashes at
+    the first shell: its GX2 calls went to the file's bl targets). exe_v46z_outline4 or later"""
     hi, lo = 0x3D600000 | (SMAGIC >> 16), 0x616B0000 | (SMAGIC & 0xFFFF)
-    for a in range(CAVE, VS_PROG, 4):
+    swapped = resolved = False
+    for a in range(CAVE, LIMIT - 4, 4):
         if img_w(a) == hi and img_w(a + 4) == lo:
-            return True
-    return False
+            swapped = True
+        if img_w(a) == IMPORTS[0][1] and img_w(a + 4) == IMPORTS[1][1]:
+            resolved = True               # v6's os_site table (exe_v46z_outline4): imports resolved at run time
+    return swapped and resolved
 
 
 def apply_ref(entry, weight):

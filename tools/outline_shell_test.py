@@ -59,6 +59,13 @@ def main():
     om, pm = machine(exe), machine(exe)
     for at, w in words.items():
         w32(pm, at, w)
+    import import_call_check as ICC
+    check('v6: no cave word calls an import at the file\'s bl target (not the function at run time: Cemu resolves '
+          'imports elsewhere); the release and diag builds', (ICC.direct_import_calls(exe, words),
+                                                              ICC.direct_import_calls(exe, SC.build(orig, True)[0])),
+          ([], []))
+    check('v6: draws() (port_check X13): the patched words yes, the unpatched exe no',
+          (SC.draws(lambda x: words.get(x, orig(x))), SC.draws(orig)), (True, False))
     check('present() on the patched words / the unpatched exe',
           (SC.present(lambda x: words.get(x, orig(x))), SC.present(orig)), (True, False))
     check('... the mesh visibility and outline caves present in the exe it builds on',
@@ -69,7 +76,7 @@ def main():
     except AssertionError:
         check('building over itself refused', True, True)
     inside = [a for a in words if SC.CAVE <= a < SC.LIMIT]
-    check('the cave inside its region (0x04BE5000-0x04BE7000), the code below the programs',
+    check('the cave inside its region (0x04BE5000-0x04BE8000), the code below the programs',
           (min(inside), max(inside) < SC.LIMIT, max(a for a in inside if a < SC.VS_PROG) < SC.VS_PROG), (SC.CAVE, True,
                                                                                                          True))
     others = sorted(a for a in words if not SC.CAVE <= a < SC.LIMIT)
@@ -300,6 +307,16 @@ def main():
     c = d['calls']
     check('... the same draw both times (r3-r9), back at the call site, r14-r31 and r1 kept',
           (c[0][1], c[8][1], d['pc'], d['sp'], d['kept']), (d['args'], d['args'], SC.DRAW_I + 4, 0x7F00F000, []))
+    fn = [r32(pm, lab['os_fn'] + 4 * k) for k in range(len(SC.IMPORTS))]
+    want_fn = [env.stubs[nm[3:]] if nm == 'GX2SetVertexShader' else
+               (TRAMP + 0x10 * sorted(SC.GX2).index(nm[3:]) if nm.startswith('GX2Set') else None)
+               for nm, _s, _t in SC.IMPORTS]
+    check('v6: the imports resolved at run time from the game\'s own calls as Cemu leaves them (a relative bl to the '
+          'function; an absolute bla to a trampoline), not the file\'s bl targets',
+          ([f for f, w in zip(fn, want_fn) if w is not None], r32(pm, lab['os_fnok'])),
+          ([w for w in want_fn if w is not None], 1))
+    check('... the file\'s targets never called (the old stubs: other code at run time)',
+          any(f == t for f, (n_, _s, t) in zip(fn, SC.IMPORTS) if n_.startswith('GX2')), False)
     check('... the cave\'s GX2VertexShader / GX2PixelShader', (c[1][1][0], c[2][1][0]),
           (lab['os_vs'], lab['os_ps']))
     check('... rasterizer: the game\'s (cull back, face bit) with the front faces culled instead', c[3][2][0],
@@ -333,6 +350,15 @@ def main():
     check('... Width 0: the game\'s draw only', only_draw(draw()), True)
     fbset(3.0, 0, magic=0x12345678, swapped=True)
     check('... another mark: the game\'s draw only', only_draw(draw()), True)
+    site = SC.GX2['SetBlendControlReg'][1]
+    keep = r32(pm, site)
+    w32(pm, site, 0x60000000)
+    w32(pm, lab['os_fnok'], 0)
+    fbset(3.0, 0)
+    check('v6: a site that isn\'t a bl / bla at run time (an import unresolved): the game\'s draw only',
+          only_draw(draw()), True)
+    w32(pm, site, keep)
+    check('... resolved again once it is', [x[0] for x in draw()['calls']] == want_seq and r32(pm, lab['os_fnok']), 1)
     ctx(rs=0x00080005)
     fbset(3.0, 0)
     check('a material that culls front faces: the shell culls the back ones', draw()['calls'][3][2][0],
@@ -381,6 +407,19 @@ def main():
     diag_tests(exe, orig)
     sys.exit(1 if acmd_ext_test.fails else 0)
 
+
+
+TRAMP = 0x01F00000                        # Cemu-style trampolines (below the code)
+
+
+def trampoline(pm, at, dest):
+    """write a Cemu far-jump trampoline at `at` to dest; -> the `bla at` a relocated site holds"""
+    ensure(pm, at & ~0xFFF, (at & ~0xFFF) + 0x1000)
+    lo = dest & 0xFFFF
+    hi = ((dest >> 16) + ((dest >> 15) & 1)) & 0xFFFF
+    for i, w in enumerate((0x39600000 | lo, 0x3D6B0000 | hi, 0x7D6903A6, 0x4E800420)):
+        w32(pm, at + 4 * i, w)
+    return 0x48000003 | (at & 0x03FFFFFC)
 
 
 class DrawEnv:
@@ -433,8 +472,15 @@ class DrawEnv:
             w32(pm, STUB + 0x100 + 4 * i, x)
         for k, nm in enumerate(names):
             stubs[nm] = rec.addr('rec_%d' % k)
-        for nm, (stub, _site) in SC.GX2.items():
-            w32(pm, stub, LT.branch(stub, stubs[nm]))
+        # the GX2 calls as Cemu leaves the game's sites (rpl.cpp): SetVertexShader's a relative `bl` to the function,
+        # the others an absolute `bla` to a trampoline (addi / addis r11, mtctr, bctr) below 0x02000000; the file's
+        # bl targets (the old, wrong stubs) are not written: a call there runs whatever the image holds
+        for k, nm in enumerate(sorted(SC.GX2)):
+            site = SC.GX2[nm][1]
+            if nm == 'SetVertexShader':
+                w32(pm, site, LT.branch(site, stubs[nm]) | 1)
+            else:
+                w32(pm, site, trampoline(pm, TRAMP + 0x10 * k, stubs[nm]))
         w32(pm, SC.DRAW_FN_I, LT.branch(SC.DRAW_FN_I, stubs['draw']))
         ensure(pm, CTXA, CTXA + 0x3000)
         w32(pm, CTXA + 0x1800 + 0xB4, stubs['draw'])     # the device's vtable: +0xB4 DrawIndexed
@@ -508,6 +554,7 @@ class DrawEnv:
             return [c[0] for c in d['calls']] == ['draw'] and d['calls'][0][1] == d['args'] and d['pc'] == SC.DRAW_I + 4 \
                 and d['sp'] == 0x7F00F000 and d['kept'] == []
         self.ctx, self.draw, self.fbset, self.only_draw, self.fbd, self.names = ctx, draw, fbset, only_draw, fbd, names
+        self.stubs = stubs
 
 def progs_tests(pm, lab):
     import numpy as np
@@ -634,11 +681,14 @@ def diag_tests(exe, orig):
     env = DrawEnv(pm)
     env.ctx()
     env.fbset(1.5, 1)
-    stub = Asm(SC.OS_GET_CORE_ID)                     # OSGetCoreId: core 2
+    core_at, sleep_at = STUB + 0xC00, STUB + 0xC80
+    stub = Asm(core_at)                               # OSGetCoreId: core 2 (its game site a relative bl to it)
     stub.asm('\n        li r3, 2\n        blr\n')
     for i, x in enumerate(stub.words()):
-        w32(pm, SC.OS_GET_CORE_ID + 4 * i, x)
-    sleep = Asm(SC.OS_SLEEP_TICKS)                    # OSSleepTicks: records its ticks (r3:r4) at rec - 8, returns
+        w32(pm, core_at + 4 * i, x)
+    w32(pm, SC.OS_GET_CORE_ID[1], LT.branch(SC.OS_GET_CORE_ID[1], core_at) | 1)
+    sleep = Asm(sleep_at)                             # OSSleepTicks: records its ticks (r3:r4) at rec - 8, returns
+                                                      # (its site an absolute bla to a trampoline)
     sleep.asm('''
         lis r12, 0x%X
         ori r12, r12, 0x%X
@@ -649,7 +699,8 @@ def diag_tests(exe, orig):
         blr
 ''' % ((rec - 8) >> 16, (rec - 8) & 0xFFFF))
     for i, x in enumerate(sleep.words()):
-        w32(pm, SC.OS_SLEEP_TICKS + 4 * i, x)
+        w32(pm, sleep_at + 4 * i, x)
+    w32(pm, SC.OS_SLEEP_TICKS[1], trampoline(pm, TRAMP + 0x200, sleep_at))
     w32(pm, rec - 8, 0)
     chain = [(0x7F00F000, 0x7F00F100, 0x037174DC), (0x7F00F100, 0x7F00F200, 0x11111111),
              (0x7F00F200, 0x7F00F300, 0x22222222), (0x7F00F300, 0, 0x33333333)]

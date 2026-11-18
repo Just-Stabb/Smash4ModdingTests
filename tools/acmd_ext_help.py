@@ -3232,7 +3232,7 @@ HELP['Outline_Set'] = [
     '## v1.7.14 (exe_v46z_outline2): Outline_Shell',
     'Outline_Set itself is unchanged (same parameters, same look), but in game its glow is a rim light, so it stays '
     '**inside** the silhouette and reads as lighting. For a real outline, a band of colour **outside** the '
-    'silhouette, use **Outline_Shell** (New Commands / Effects, exe_v46z_outline3). The two work together on one '
+    'silhouette, use **Outline_Shell** (New Commands / Effects, exe_v46z_outline4). The two work together on one '
     'object: the shell round the body and the rim lighting its edges from inside (example 6).',
 ]
 EXAMPLES['Outline_Set'] = [
@@ -3349,11 +3349,11 @@ EXAMPLES['Mesh_Visibility'] = [
 # --- model_commands v2: Outline_Shell (tools/outline_shell_cave.py), exe_v46z_outline2
 GROUP['Outline_Shell'] = 'Effects'
 _ov.insert(next(i for i, x in enumerate(_ov) if x.startswith('- Effects (exe_v46z_outline)')) + 1,
-           '- Effects (exe_v46z_outline3): a real outline: a band of colour round an object\'s silhouette, outside '
+           '- Effects (exe_v46z_outline4): a real outline: a band of colour round an object\'s silhouette, outside '
            'it, solid or glowing, growing in and pulsing (Outline_Shell).')
 GROUP_HELP[NEW_GROUP + ' / Effects'] += [
     '',
-    'Outline_Shell (exe_v46z_outline3, tools/outline_shell_cave.py) draws a band of colour outside an object\'s '
+    'Outline_Shell (exe_v46z_outline4, tools/outline_shell_cave.py) draws a band of colour outside an object\'s '
     'silhouette: each of its meshes drawn a second time right after itself, pushed out along its normals with its '
     'front faces culled (only the fattened copy\'s back faces show, round the edges), in a flat colour behind the body '
     '(an inverted hull; docs/native-notes.md "Outline shell").',
@@ -3414,7 +3414,7 @@ HELP['Outline_Shell'] = [
     '- **Articles**: Target 0 in an article\'s script outlines that article\'s model.',
     '- **The Hitbox Viewer** draws the band round the model\'s silhouette (the outer edge only) and lists the command; '
     'the game\'s look is the reference.',
-    'Needs exe_v46z_outline3 (tools/outline_shell_cave.py: exe_v46z_outline + the mesh visibility v2 + it). Without it '
+    'Needs exe_v46z_outline4 (tools/outline_shell_cave.py: exe_v46z_outline + the mesh visibility v2 + it). Without it '
     'a script that uses this command won\'t load properly: ship the executable with any script that uses it.',
     '',
     '## What changed in v1.7.15 (exe_v46z_outline3)',
@@ -3422,10 +3422,18 @@ HELP['Outline_Shell'] = [
     'ever showed: the game byte-swaps each model\'s constant buffer in place for the GPU when it is unlocked '
     '(NU::ConstantBufferWiiU, 0x037291BC), so the mark the shell leaves in it was read back reversed at the draw and '
     'never matched. exe_v46z_outline3 recognises the mark both ways. Same parameters, same scripts: nothing to '
-    'change in a script, only the executable (exe_v46z_outline2 draws nothing).',
+    'change in a script, only the executable (exe_v46z_outline2 draws nothing; v1.7.16: use exe_v46z_outline4).',
     '- The diag build\'s S4SF lines add marked= (the draws that carried the mark so far): if a band still doesn\'t '
     'show, a log with marked=0 means no draw of the model got the mark, marked > 0 with S4ST drawn=0 that the draw '
     'was refused (S4SX lines say why).',
+    '',
+    '## What changed in v1.7.16 (exe_v46z_outline4)',
+    '- **No more crash when the band draws.** exe_v46z_outline3 found the mark but crashed the game at the first '
+    'outlined mesh: the shell called the GPU functions (GX2) at the addresses the executable file names for them, and '
+    'Cemu puts those functions elsewhere when it loads the game, so the calls jumped into other code. '
+    'exe_v46z_outline4 finds each function where the game\'s own calls to it lead at run time. Same parameters, same '
+    'scripts: only the executable changes (use exe_v46z_outline4; exe_v46z_outline2 draws nothing, exe_v46z_outline3 '
+    'crashes).',
     '- On a greyed negative (Screen_Invert with Saturation 0, Xenoverse 2\'s stop) the picture\'s darkest colour '
     'comes out brightest: draw the band black over (Blend 0) while it is on and it shows as the negative\'s light '
     'colour (example 7).',
@@ -3472,4 +3480,9 @@ EXAMPLES['Outline_Shell'] = [
     'Outline_Shell(Target=0, Red=0, Green=0, Blue=0, Alpha=220, Width=2.5, Frames=12, FadeIn=4, FadeOut=4, Flash=0, Blend=0)',
     'FRAME(Frames=69)',
     'Outline_Shell(Target=0, Red=0, Green=0, Blue=0, Alpha=0, Width=0, Frames=0, FadeIn=0, FadeOut=0, Flash=0, Blend=0)',
+    '',
+    '// Example 8 (v1.7.16, exe_v46z_outline4): the quickest check that the executable draws the band: a thick solid',
+    '// green outline for 3 seconds at a taunt\'s start (exe_v46z_outline3 crashed the game here; exe_v46z_outline2',
+    '// showed nothing)',
+    'Outline_Shell(Target=0, Red=0, Green=255, Blue=0, Alpha=255, Width=4, Frames=180, FadeIn=0, FadeOut=0, Flash=0, Blend=0)',
 ]

@@ -3743,7 +3743,7 @@ def check_model_commands_exe(inst, name, rep):
     (no byte-swapped mark: never draws) is an ERROR too (exe_v46z_outline3 or later)"""
     want = {'Outline_Set': ('outline_cave', 'X11 outline-exe', 'outline', 'exe_v46z_outline'),
             'Mesh_Visibility': ('mesh_vis_cave', 'X12 meshvis-exe', 'mesh visibility', 'exe_v46z_outline'),
-            'Outline_Shell': ('outline_shell_cave', 'X13 shell-exe', 'outline shell', 'exe_v46z_outline3')}
+            'Outline_Shell': ('outline_shell_cave', 'X13 shell-exe', 'outline shell', 'exe_v46z_outline4')}
     uses = {}
     for rel in inst.glob(r'fighter/%s/script/animcmd/(body|weapon/[^/]+)/(game|effect|sound|expression)\.bin' % name):
         try:
@@ -3759,9 +3759,10 @@ def check_model_commands_exe(inst, name, rep):
             rep.add('ERROR', rule, '%s in %s but the install\'s code/cross_f.rpx has no %s (tools/%s.py: %s or '
                     'later): the script won\'t load' % (cmd, ', '.join(sorted(rels)), what, cave, exe))
         elif cmd == 'Outline_Shell' and not _exe_present(inst, cave, 'draws'):
-            rep.add('ERROR', rule, 'Outline_Shell in %s but the install\'s code/cross_f.rpx is exe_v46z_outline2\'s '
-                    'shell, which never draws (it misses the FB1 mark the game byte-swaps at the unlock): ship '
-                    'exe_v46z_outline3 or later' % ', '.join(sorted(rels)))
+            rep.add('ERROR', rule, 'Outline_Shell in %s but the install\'s code/cross_f.rpx is an older shell: '
+                    'exe_v46z_outline2\'s never draws (the FB1 mark the game byte-swaps), exe_v46z_outline3\'s crashes '
+                    'the game at the first shell (GX2 called at the file\'s bl targets): ship exe_v46z_outline4 or '
+                    'later' % ', '.join(sorted(rels)))
 
 
 def _exe_present(inst, cave, fn='present'):
