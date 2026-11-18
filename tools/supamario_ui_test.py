@@ -79,6 +79,8 @@ class Game:
             self.x = val
         elif v == 0x0F000001:
             self.y = val
+        elif v == 0x0F000004:             # move forward (along his facing)
+            self.x += val * self.face
         elif v >> 24 == 1:
             self.sw[v] = val
         else:
@@ -276,35 +278,33 @@ def form_tests(r):
 
 
 def counter_tests(r):
-    for what, rec, air, want_x, want_y, want_dmg, turn in (
-            ('a fighter on the ground to his right', (10.0, 1.0, True, 40.0, 0.0, 0), False, 40.0 - B.GAP, 0.0,
-             12.0, True),
-            ('a fighter to his left', (5.0, -1.0, True, -20.0, 0.0, 0), False, -20.0 + B.GAP, 0.0,
-             8.0, False),
-            ('a fighter high up to the right', (20.0, 1.0, True, 60.0, 25.0, 0), False, 60.0 - B.GAP,
-             25.0, 24.0, True),
-            ('nobody found (the record without 0x21000012)', (7.0, 1.0, False, 0.0, 0.0, 0), False, 10.0, 0.0, 8.4,
-             True)):
-        g, vm = form_run(r, air=air, counter_at=20, record=rec, frames=B.FORM_N + B.STRIKE_N + 5)
+    """v2: XV2's rush (BAC 1): he stays, faces the attacker, closes a gap only on frames GAP_FROM-GAP_TO"""
+    for what, rec, want_x, turn in (
+            ('a fighter in melee range to his right', (10.0, 1.0, True, 17.0, 0.0, 0), 10.0, True),
+            ('a fighter 30 to his right (a gap closed to 9 short of it)', (10.0, 1.0, True, 40.0, 0.0, 0), 31.0, True),
+            ('a fighter far to his right (the gap closed by at most 6 x 12.6)', (10.0, 1.0, True, 200.0, 0.0, 0),
+             10.0 + 6 * B.GAP_V, True),
+            ('a fighter to his left in range', (5.0, -1.0, True, 3.0, 0.0, 0), 10.0, False),
+            ('nobody found (no 0x21000012)', (7.0, 1.0, False, 0.0, 0.0, 0), 10.0, True)):
+        g, vm = form_run(r, counter_at=40, record=rec, frames=B.FORM_N + B.STRIKE_N + 5)
         ms = [e[2] for e in g.ev('motion')]
-        check('counter, %s: the strike\'s motion (0x235) after the transformation\'s' % what, ms[:2],
+        check('counter, %s: the counter\'s motion (0x235) after the transformation\'s' % what, ms[:2],
               [B.MOT_FORM, B.MOT_STRIKE])
         at = [e for e in g.ev('motion') if e[2] == B.MOT_STRIKE][0][0]
-        check('  at once (the frame the record is read)', at, 22)
+        check('  at once (the frame the record is read)', at, 42)
         check('  turned to face it' if turn else '  not turned', len(g.ev('turn')), 1 if turn else 0)
-        check('  placed at X %.1f, Y %.1f' % (want_x, want_y), (round(g.x, 3), round(g.y, 3)), (want_x, want_y))
+        check('  stays where he is but for the gap: X %.1f, Y 0' % want_x, (round(g.x, 3), round(g.y, 3)),
+              (round(want_x, 3), 0.0))
+        moves = sorted({e[0] - at for e in g.ev('set') if e[2] == 0x0f000004})
+        check('  the gap closed only on frames %d-%d' % (B.GAP_FROM, B.GAP_TO), all(B.GAP_FROM <= m <= B.GAP_TO for m in moves),
+              True)
         check('  the shape off at once', [e[2] for e in g.ev('shield') if e[0] == at][:1], [(0, 2, 0, 0, 1)])
         check('  transformed from then on (TIMER_0 2000)',
               [e[3] for e in g.ev('set') if e[2] == C.V_FORM and e[0] == at][-1:], [2000.0])
-        check('  the vanish effect where he was', [e[3] for e in g.ev('effect') if e[0] == at and e[2] == 0x2710][:1],
-              [B.fx_id('vanish')])
         ints = sorted({e[0] for e in g.ev('set') if e[2] == 0x0F00011B and e[0] >= at})
-        check('  intangible through the strike (to its frame %d)' % B.STRIKE_SAFE,
-              ints[-1] - at if ints else None, B.STRIKE_SAFE)
-        if want_y > 0:
-            check('  in the air (the target off the ground)', g.air, True)
         end = [e for e in g.ev('status') if e[2] in (0, 0xE)]
-        check('  the end after the strike\'s %d frames' % B.STRIKE_N, end[0][0] - at if end else None, B.STRIKE_N - 1)
+        check('  intangible every frame of the counter', ints == list(range(at, end[0][0] + 1)) if end else False, True)
+        check('  the end after the counter\'s %d frames' % B.STRIKE_N, end[0][0] - at if end else None, B.STRIKE_N - 1)
 
 
 def dodge_run(r, status=0, timer=C.V_DODGE_R, form=2000.0, air=False, frames=30):
@@ -442,19 +442,33 @@ def script_tests(out, ts_out):
     nm = lambda c: c.name  # noqa: E731
     g = f['game'].script('speciallwheavy')
     hb = [c for c in g if nm(c).lower() == 'extra_special_hitbox']
-    check('the counter: two Extra hitboxes (XV2\'s BDM #0 freeze, BDM #2 finisher)', len(hb), 2)
-    if len(hb) == 2:
-        syn = acmd.INFO[hb[0].ident]['syntax']
-        fz, st = dict(zip(syn, hb[0].params)), dict(zip(syn, hb[1].params))
-        check('  the freeze at 0: ID 1 Part 1, no damage / knockback, the attacker held %d frames (to the finisher), '
-              'his own hitstop 0, a 3 m sphere' % B.STRIKE_AT,
+    syn = acmd.INFO[acmd.BY_NAME['extra_special_hitbox']]['syntax']
+    d = [dict(zip(syn, c.params)) for c in hb]
+    check('the counter (XV2\'s BAC 1): the freeze, 14 rush hits, the finisher', len(hb), 16)
+    if len(hb) == 16:
+        fz, ru, st = d[0], d[1:15], d[15]
+        check('  the freeze at 0: ID 1 Part 1, no damage / knockback, the attacker held to the first rush hit (%d), '
+              'a 3 m sphere' % B.RUSH_AT[0],
               (fz['ID'], fz['Part'], fz['Damage'], fz['KBG'], fz['BKB'], fz['HitstopFrames'], fz['SelfHitstopFrames'],
-               round(fz['Size'], 2)), (1, 1, 0.0, 0, 0, B.STRIKE_AT, 0, B.FREEZE_SIZE))
-        check('  the finisher: XV2\'s 10 (as %%), angle 35, BKB 80, KBG 75, no clank',
-              (st['Damage'], st['Angle'], st['BKB'], st['KBG'], st['Clang']), (10.0, 35, 80, 75, 0))
-    frames = [c.params[0] for c in g if nm(c).upper() == 'FRAME']
-    check('  the freeze off at 1, the finisher out at %d, removed at %d' % (B.STRIKE_AT, B.STRIKE_AT + 3), frames,
-          [1.0, float(B.STRIKE_AT), float(B.STRIKE_AT + 3)])
+               round(fz['Size'], 2)), (1, 1, 0.0, 0, 0, B.RUSH_AT[0], 0, B.FREEZE_SIZE))
+        check('  the rush: 14 x %.1f%%, angle 361, KBG 0, BKB 15' % B.RUSH_DMG,
+              {(round(x['Damage'], 3), x['Angle'], x['KBG'], x['BKB']) for x in ru}, {(B.RUSH_DMG, 361, 0, 15)})
+        check('  the finisher: %.1f%%, angle 35, BKB 80, KBG 75, no clank' % B.FINISH_DMG,
+              (st['Damage'], st['Angle'], st['BKB'], st['KBG'], st['Clang']), (B.FINISH_DMG, 35, 80, 75, 0))
+    holds = [c.params for c in g if nm(c).lower() == 'hitbox_hold']
+    check('  every rush hit held (Hitbox_Hold(0, 2))', holds, [[0, 2]] * 14)
+    clears = sum(1 for c in g if nm(c).lower() == 'hit_log_clear')
+    check('  the hit log cleared before each rush hit and the finisher (15)', clears, 15)
+    frames = [int(c.params[0]) for c in g if nm(c).upper() == 'FRAME']
+    want = [1] + [x for f in B.RUSH_AT for x in (f, f + 2)] + [B.STRIKE_AT, B.STRIKE_AT + 3]
+    check('  frames: freeze off 1, the rush at %s (2 frames each), the finisher %d' % (B.RUSH_AT, B.STRIKE_AT), frames,
+          want)
+    ov = [nm(c) for c in f['effect'].script('speciallwlight') if nm(c) in ('Color_Overlay', 'Terminate_Overlays',
+                                                                          'Outline_Shell')]
+    check('the transformation\'s white body: Color_Overlay + Outline_Shell at 10, Terminate_Overlays + the shell off at 220',
+          ov, ['Color_Overlay', 'Outline_Shell', 'Terminate_Overlays', 'Outline_Shell'])
+    cams = [nm(c) for p in f for sname in B.SCRIPT.values() for c in f[p].script(sname) if 'camera' in nm(c).lower()]
+    check('no camera command in any Ultra Instinct script (the user)', cams, [])
     check('the transformation / the dodge / Secret Sensation\'s stance: no hitbox',
           [nm(c) for s in ('speciallwlight', 'specialairlwlight', 'specialairlwheavy') for c in f['game'].script(s)],
           ['Script_End', 'Script_End', 'Script_End'])
@@ -468,9 +482,9 @@ def script_tests(out, ts_out):
           [('FRAME', [float(B.SND_START)]), ('Sound_Effect', [B.SE_IDS['ui_start']]), ('FRAME', [float(B.SND_SUCCESS)]),
            ('Sound_Effect', [B.SE_IDS['ui_success']]), ('Script_End', [])])
     for s in ('speciallwheavy', 'specialairlwlight'):
-        check('%s: the vanish sound / effect at 0' % s,
-              ([c.params[0] for c in f['sound'].script(s) if nm(c) == 'Sound_Effect'],
-               [c.params[0] for c in f['effect'].script(s) if 'graphic' in nm(c).lower()]),
+        check('%s: the vanish sound / effect first' % s,
+              ([c.params[0] for c in f['sound'].script(s) if nm(c) == 'Sound_Effect'][:1],
+               [c.params[0] for c in f['effect'].script(s) if 'graphic' in nm(c).lower()][:1]),
               ([B.SE_IDS['ui_vanish']], [B.fx_id('vanish')]))
     skip = {acmd.crc(n) for n in B.SCRIPT.values()}
     other = []
@@ -491,7 +505,7 @@ def motion_tests(out, ts_out):
         diff = sorted(n.split('D03')[-1] for n in new if new[n] != old.get(n))
         check('%s.pac: only the four slots changed' % part, diff, sorted([A.DODGE, A.STRIKE, A.FORM, A.SS]))
         fr = {m: omo.Omo(new[[n for n in new if n.endswith('D03' + m)][0]]).frames for m in A.MOTIONS}
-        check('%s.pac: 60 / 58 / 16 / 45 frames' % part, fr, {A.FORM: 60, A.STRIKE: 58, A.DODGE: 16, A.SS: 45})
+        check('%s.pac: 325 / 349 / 16 / 45 frames' % part, fr, {A.FORM: 325, A.STRIKE: 349, A.DODGE: 16, A.SS: 45})
 
 
 def effect_tests(out, ts_out):

@@ -39,22 +39,36 @@ import supamario_ui_cave as cave  # noqa: E402
 # ---------------------------------------------------------------- the rules (the user's spec)
 TRIGGER_PCT = 100.0                  # his first actionable frame at 100% or more
 FORM_N = anim.frames_of(anim.FORM)   # 60: the transformation (XV2 entry 0's 0-229, the user's "about 60 frames")
-STRIKE_N = anim.frames_of(anim.STRIKE)
-STRIKE_AT = anim.frame_of(anim.STRIKE, 1, 280)     # XV2's finisher (BDM #2) at entry 5's 280
-STRIKE_SAFE = STRIKE_AT + 3          # intangible to the strike's last active frame + 1 (XV2: invulnerable to the end)
-# XV2's counter (1510_GKS_MGT_PLAYER.bcm: the stance's children #2 / #3, PrimaryActivatorConditions CounterMelee, NOT
-# CounterProjectile, linked through BAC entry 0's BcmCallback "Counters / Supers" 30-152 -> BAC entries 5 / 6): its
-# window is entry 0's 30-151 (motion frames CW_ON-CW_OFF); BAC 5 at 151: BDM #0 (damage type 18, 0 damage, 150-frame
-# hold: the attacker frozen) in a 3 m sphere, invulnerable, the vanish (BTL_CMN 82, CMN SE 96), Movement to the target
-# (flags 0x80) and 2 frames at 2.5 m, the finisher at 280: BDM #2 (type 7, a launch, hitstop 7 / 7), damage 10.
-# Damage: XV2's 10 taken as 10% (XV2's numbers are its own scale: Fake Death's 20 / Core Breaker's 405 were the user's
-# own % in Smash; open to the user); the launch's angle / knockback (not in XV2's units): angle 35, BKB 80, KBG 75
+STRIKE_N = anim.frames_of(anim.STRIKE)          # 349: XV2's BAC 1 from 151 to 499, 1:1
+STRIKE_AT = anim.frame_of(anim.STRIKE, 1, 280)     # 129: the finisher (BDM #2)
+# v2 (the user's XV2 clip of the counter: the attacker held in front of him, 14 strike flashes, the finisher, 15 hits):
+# XV2's rush entry. The BCM: the five roots share their conditions; roots #1 / #4 / #7 play BAC 4 (counter children
+# BAC 5 / 6: the finisher alone), #10 BAC 8 (-> 9 / 10) and #13 BAC 0 (-> 1 / 2: the rush). The clip shows the rush, and
+# BAC 0 is the stance with entry 4's functions (0x5C / 0x21, as the player's), so BAC 1 (root #13's first child:
+# CounterMelee + 0x400000) is used; BAC 2 differs only by function 0x2B (100) at 151.
+# BAC 1, from 151 (motion frame = XV2 - 151): BDM #0 at 0 (the hold), the vanish (BTL_CMN 82, CMN SE 96), Movement to the
+# target 156-176 + 2.5 m a frame 159-161 (here: a gap closed only, ui_gap), 82 again at 170, the aura (848) at 176, the
+# rush BDM #1 (5 each, hitstop 0 / 2) at 210, 215 .. 275, the finisher BDM #2 (10, type 7 launch, hitstop 7 / 7) at 280,
+# skill SE cue 1 at 335, the end effects (850 / 849) at 350, invulnerable throughout.
+RUSH_AT = [anim.frame_of(anim.STRIKE, 1, f) for f in range(210, 280, 5)]   # 59, 64 .. 124
+# Damage (XV2's numbers are its own scale): Core Breaker's conversion (the user's, README "Core Breaker"): XV2's dive 10
+# -> 3%, its 9-damage hold hits -> 1.5% each, its 405 crash -> 17%. So the rush's 5s -> RUSH_DMG each (under the 9s'
+# 1.5) and the finisher's 10 -> FINISH_DMG (a launch, more than the dive's 3: it ends the combo): 14 x 1.2 + 8 = 24.8%
+RUSH_DMG, FINISH_DMG = 1.2, 8.0
+GAP_FROM, GAP_TO = anim.frame_of(anim.STRIKE, 1, 156), anim.frame_of(anim.STRIKE, 1, 161)
+GAP_V = round(2.5 * 5.04, 2)         # XV2's 2.5 m a frame
+RUSH_REACH = 9.0                     # the attacker this far in front of him at most after the gap's close
 CW_ON = anim.frame_of(anim.FORM, 0, 30)
 CW_OFF = anim.frame_of(anim.FORM, 0, 151)
-STRIKE_DMG = 10.0
 FREEZE_SIZE = round(3.0 * 5.04, 2)   # BDM #0's 3 m sphere
 STRIKE_HIT = dict(Angle=35, KBG=75, FKB=0, BKB=80)
 STRIKE_SIZE, STRIKE_Y, STRIKE_Z = 6.0, 7.0, 7.0
+RUSH_SIZE, RUSH_Y, RUSH_Z = 6.0, 7.0, 7.0
+# v2: the white body (XV2's ECF 846 / 847 / 849: the whole model bright white with a blue-white rim, from the gold burst
+# at 10 to the purple-white burst at 220; the counter keeps it to its 350): Color_Overlay white WHITE_A, Outline_Shell
+# RIM_RGB at RIM_A (added, RIM_WIDTH px), Terminate_Overlays / the shell's end at the burst
+WHITE_RGB, WHITE_A = (255.0, 255.0, 255.0), 200.0
+RIM_RGB, RIM_A, RIM_WIDTH = (190.0, 215.0, 255.0), 200.0, 2.5
 GAP = 9.0                            # beside the fighter to answer: this far on his side of it
 GROUND_DY = 6.0                      # its feet within this of his: on the ground, the X only
 DODGE_N = anim.frames_of(anim.DODGE)  # 16
@@ -107,6 +121,7 @@ SND_SUCCESS = anim.frame_of(anim.FORM, 0, 205)
 FX_START_AT = anim.frame_of(anim.FORM, 0, 10)
 FX_AURA_AT = anim.frame_of(anim.FORM, 0, 40)
 FX_BURST_AT = anim.frame_of(anim.FORM, 0, 220)
+CNT_END = anim.frame_of(anim.STRIKE, 1, 350)       # the counter's white body off (849 at 350)
 
 
 def fl(v):
@@ -124,9 +139,10 @@ def msc_values():
          'UI_V_FORM': '0x%X' % cave.V_FORM, 'UI_V_DODGE_R': '0x%X' % cave.V_DODGE_R,
          'UI_V_DODGE_L': '0x%X' % cave.V_DODGE_L, 'UI_V_AURA': '0x%X' % V_AURA,
          'UI_FORMING': fl(1000.0), 'UI_FORMED': fl(2000.0), 'UI_TRIGGER_PCT': fl(TRIGGER_PCT),
-         'UI_CW_ON': fl(CW_ON), 'UI_CW_OFF': fl(CW_OFF), 'UI_GAP': fl(GAP),
+         'UI_CW_ON': fl(CW_ON), 'UI_CW_OFF': fl(CW_OFF), 'UI_GAP_FROM': fl(GAP_FROM), 'UI_GAP_TO': fl(GAP_TO),
+         'UI_GAP_V': fl(GAP_V), 'UI_RUSH_REACH': fl(RUSH_REACH),
          'UI_GROUND_DY': fl(GROUND_DY), 'UI_FORM_N': fl(FORM_N), 'UI_STRIKE_N': fl(STRIKE_N),
-         'UI_STRIKE_SAFE': fl(STRIKE_SAFE), 'UI_DODGE_N': fl(DODGE_N), 'UI_DODGE_INV': fl(DODGE_INV),
+'UI_DODGE_N': fl(DODGE_N), 'UI_DODGE_INV': fl(DODGE_INV),
          'UI_DODGE_MOVE': fl(DODGE_MOVE), 'UI_DODGE_V': fl(DODGE_V), 'UI_AURA_EVERY': fl(AURA_EVERY),
          'UI_MOT_FORM': '0x%X' % MOT_FORM, 'UI_MOT_STRIKE': '0x%X' % MOT_STRIKE, 'UI_MOT_DODGE': '0x%X' % MOT_DODGE,
          'UI_FX_AURA1': '0x%X' % fx_id('aura_hip'), 'UI_FX_AURA2': '0x%X' % fx_id('aura_head'),
@@ -158,19 +174,35 @@ def timeline(events):
 
 
 def strike_box():
-    """XV2's finisher (BDM #2): STRIKE_DMG, a launch"""
+    """XV2's finisher (BDM #2): FINISH_DMG, a launch"""
     import supamario_sledgehammer_build as SB
-    return SB.hitbox(ID=0, Part=0, Bone=0, Damage=STRIKE_DMG, Size=STRIKE_SIZE, Y=STRIKE_Y, Z=STRIKE_Z,
+    return SB.hitbox(ID=0, Part=0, Bone=0, Damage=FINISH_DMG, Size=STRIKE_SIZE, Y=STRIKE_Y, Z=STRIKE_Z,
                      Hitlag=1.5, SDI=0.5, Clang=0, Rebound=0, SFXLevel=2, SFXType=1, NoGFX=0, **STRIKE_HIT)
 
 
+def rush_box():
+    """a rush hit (BDM #1): RUSH_DMG, held in place (angle 361, no growth, low base: the rapid-jab loops' way, with
+    Hitbox_Hold mode 2 after it), its own small hitstop (XV2's 0 / 2)"""
+    import supamario_sledgehammer_build as SB
+    return SB.hitbox(ID=0, Part=0, Bone=0, Damage=RUSH_DMG, Angle=361, KBG=0, FKB=0, BKB=15, Size=RUSH_SIZE, Y=RUSH_Y,
+                     Z=RUSH_Z, Hitlag=0.5, SDI=0.0, Clang=0, Rebound=0, SFXLevel=0, SFXType=1, NoGFX=0)
+
+
 def freeze_box():
-    """XV2's BDM #0 at the counter's start: no damage, the attacker held (its hitstop to the finisher), Part 1 (the
-    finisher's record stays its own)"""
+    """XV2's BDM #0 at the counter's start: no damage, the attacker held (its hitstop to the first rush hit), Part 1"""
     import supamario_sledgehammer_build as SB
     return SB.hitbox(ID=1, Part=1, Bone=0, Damage=0.0, Angle=0, KBG=0, FKB=0, BKB=0, Size=FREEZE_SIZE, Y=5.0, Z=0.0,
                      Hitlag=0.0, SDI=0.0, Clang=0, Rebound=0, SFXLevel=0, SFXType=0, NoGFX=1, Flinchless=1,
-                     HitstopFrames=STRIKE_AT, SelfHitstopFrames=0)
+                     HitstopFrames=RUSH_AT[0], SelfHitstopFrames=0)
+
+
+def white_on(frames):
+    return [cmd('color_overlay', *WHITE_RGB, WHITE_A),
+            cmd('outline_shell', 0, *RIM_RGB, RIM_A, RIM_WIDTH, int(frames), 4, 10, 0, 1)]
+
+
+def white_off():
+    return [cmd('terminate_overlays'), cmd('outline_shell', 0, 0.0, 0.0, 0.0, 0.0, RIM_WIDTH, 0, 0, 10, 0, 1)]
 
 
 def graphic(key, bone=None, follow=True, size=1.0):
@@ -187,17 +219,24 @@ def scripts_for():
     """{script name: {part: body}}"""
     aura = [graphic('aura_hip'), graphic('aura_chest'), graphic('aura_head'), graphic('aura_foot'),
             graphic('aura_foot', 'RFootJ'), graphic('aura_hand'), graphic('aura_hand', 'LHandN')]
-    game = {anim.FORM: [], anim.STRIKE: timeline([(0, [freeze_box()]), (1, [cmd('remove_all_hitboxes')]),
-                                                  (STRIKE_AT, [strike_box()]),
+    rush = []
+    for f in RUSH_AT:
+        rush += [(f, [cmd('hit_log_clear', 0), rush_box(), cmd('hitbox_hold', 0, 2)]), (f + 2, [cmd('remove_all_hitboxes')])]
+    game = {anim.FORM: [], anim.STRIKE: timeline([(0, [freeze_box()]), (1, [cmd('remove_all_hitboxes')])] + rush +
+                                                 [(STRIKE_AT, [cmd('hit_log_clear', 0), strike_box()]),
                                                   (STRIKE_AT + 3, [cmd('remove_all_hitboxes')])]),
             anim.DODGE: [], anim.SS: []}
-    effect = {anim.FORM: timeline([(FX_START_AT, [graphic('start')]), (FX_AURA_AT, aura),
-                                   (FX_BURST_AT, [graphic('burst', follow=False)])]),
-              anim.STRIKE: timeline([(0, [graphic('vanish', follow=False)])]),
+    effect = {anim.FORM: timeline([(FX_START_AT, [graphic('start')] + white_on(FX_BURST_AT - FX_START_AT)),
+                                   (FX_AURA_AT, aura), (FX_BURST_AT, [graphic('burst', follow=False)] + white_off())]),
+              anim.STRIKE: timeline([(0, [graphic('vanish', follow=False)] + white_on(CNT_END)),
+                                     (anim.frame_of(anim.STRIKE, 1, 170), [graphic('vanish', follow=False)]),
+                                     (anim.frame_of(anim.STRIKE, 1, 176), aura),
+                                     (CNT_END, white_off())]),
               anim.DODGE: timeline([(0, [graphic('vanish', follow=False)])]), anim.SS: []}
     sound = {anim.FORM: timeline([(SND_START, [cmd('sound_effect', se_id('ui_start'))]),
                                   (SND_SUCCESS, [cmd('sound_effect', se_id('ui_success'))])]),
-             anim.STRIKE: timeline([(0, [cmd('sound_effect', se_id('ui_vanish'))])]),
+             anim.STRIKE: timeline([(0, [cmd('sound_effect', se_id('ui_vanish'))]),
+                                    (anim.frame_of(anim.STRIKE, 1, 335), [cmd('sound_effect', se_id('ui_success'))])]),
              anim.DODGE: timeline([(0, [cmd('sound_effect', se_id('ui_vanish'))])]), anim.SS: []}
     expression = {anim.FORM: timeline([(FX_BURST_AT, [cmd('rumble', 0x12, 0)])]),
                   anim.STRIKE: timeline([(STRIKE_AT, [cmd('rumble', 0x12, 0)])]), anim.DODGE: [], anim.SS: []}
@@ -326,8 +365,8 @@ def main():
     print(build(a[0], a[1], opts['--ui-skill'], opts['--ui-se-wav'], ts))
     print('sounds: ' + ', '.join('%s 0x%08X' % kv for kv in SE_IDS.items()))
     print('effects: ' + ', '.join('%s 0x%08X' % kv for kv in FX_IDS.items()))
-    print('transformation %d frames, strike %d (hit at %d), dodge %d (intangible %d)' % (FORM_N, STRIKE_N, STRIKE_AT,
-                                                                                         DODGE_N, DODGE_INV))
+    print('transformation %d frames (window %d-%d), counter %d (rush %s, finisher %d), dodge %d (intangible %d)' % (
+        FORM_N, CW_ON, CW_OFF, STRIKE_N, RUSH_AT, STRIKE_AT, DODGE_N, DODGE_INV))
 
 
 if __name__ == '__main__':

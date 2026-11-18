@@ -12,11 +12,10 @@ The EAN (the default body "_C"; `_F` / `_MAM` the other builds) has two animatio
   #1 GKS_MET_MGT_01_C (500 frames), BAC entries 1 / 2 (the counter): #0's first 151 frames, then the vanish (151-176:
      the root 3.3 m forward at 159-161, invulnerable), the rush (176-282: hits every 5 frames, the finisher BDM #2 at
      280), the recovery to 350.
-The user's spec is about 60 frames for the transformation and one strike for the counter, so (motion, EAN animation,
-source frames, output frames):
-  SpecialLwLight (0x231, the transformation, 60 frames): #0 0-30 in 12, 30-151 in 18, 151-229 in 30 (the burst at 57).
-  SpecialLwHeavy (0x235, the counter's strike, 58 frames): #1 151-176 in 8 (the vanish / reappearance), 270-320 1:1
-     (the finisher: XV2's 280 at frame 18).
+v2 (the user's XV2 clips: XV2's own length, the rush counter):
+  SpecialLwLight (0x231, the transformation, 325 frames): #0 0-324 1:1 (the window 30-151, the burst at 220).
+  SpecialLwHeavy (0x235, the counter, 349 frames): #1 151-499 1:1 (the vanish, the rush 210-275, the finisher at 280:
+     motion frame 129, the end 350).
   SpecialAirLwLight (0x241, the autododge, 16 frames): #1 151-167 1:1 (the vanish's first frames).
   SpecialAirLwHeavy (0x245, Secret Sensation's stance, 45 frames): #0 0-40 in 18 (into the stance), 40-151 in 27 (the
      counter stance held: XV2's window). Its slide is Mario's own spot dodge (EscapeN), the user's.
@@ -38,11 +37,8 @@ MOTIONS = (FORM, STRIKE, DODGE, SS)
 PAC_TAG = {FORM: 'D03', STRIKE: 'D03', DODGE: 'D03', SS: 'D03'}
 # (name, motion, EAN animation, source start, source end (exclusive), output frames)
 SEGMENTS = [
-    ('stance', FORM, 0, 0, 30, 12),
-    ('window', FORM, 0, 30, 151, 18),
-    ('powerup', FORM, 0, 151, 229, 30),
-    ('vanish', STRIKE, 1, 151, 176, 8),
-    ('finisher', STRIKE, 1, 270, 320, 50),
+    ('form', FORM, 0, 0, 325, 325),          # v2 (the user's XV2 clip): entry 0's whole 325 frames, 1:1 at 60 fps
+    ('counter', STRIKE, 1, 151, 500, 349),   # v2: entry 1 (the rush) from 151 to its end 499, 1:1
     ('dodge', DODGE, 1, 151, 167, 16),
     ('ss_in', SS, 0, 0, 40, 18),
     ('ss_hold', SS, 0, 40, 151, 27),

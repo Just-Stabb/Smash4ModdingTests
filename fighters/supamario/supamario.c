@@ -42619,43 +42619,48 @@ void ui_init()
     WorkModule(0, 2.0f, 0x0F00011B);            // intangible (renewed every frame of the status)
 }
 
-// the counter (the cave's record, status flag 0x21000010: XV2's CounterMelee, a fighter's own attack in the window):
-// XV2's BAC entry 5 (BCM #2, the stance's child): the shape off, facing the attacker, moved beside it (XV2's vanish:
-// effect 82, the Vanish sound, Movement to the target), the counter's motion (its game script: the freeze box at 0,
-// XV2's BDM #0, the finisher at UI_STRIKE_N's hit frame, BDM #2)
+// the counter (the cave's record, status flag 0x21000010: XV2's CounterMelee, a fighter's own attack in the window).
+// v2 (the user's XV2 clip): XV2's rush entry (BAC 1): he stays where he is, facing the attacker; the counter's motion
+// (its game script: the freeze box at 0 (BDM #0), the 14-hit rush (BDM #1, held) and the finisher (BDM #2)); ui_gap
+// closes a gap only
 void ui_counter()
 {
     float side;
-    float tx;
-    float ty;
     ShieldModule(0, 0x2, 0, 0, 0x1);
     side = WorkModuleF(0, 0x01000007);
-    EffectModule(0x2710, UI_FX_VANISH, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_VANISH_SIZE, 0, 0, 0, 0, 0, 0, 0x1);   // where he was
     if (side * WorkModuleF(0, 0x0f000003) < 0.0f)
     {
         PostureModule(0x1);
         PostureModule(0x2);
-    }
-    if (WorkModule(0x10, 0x21000012))
-    {
-        tx = WorkModuleF(0, 0x01000008);
-        ty = WorkModuleF(0, 0x01000009);
-        WorkModule(0, tx - side * UI_GAP, 0x0f000000);
-        if (global18 != 0 || MathF(0, (ty - WorkModuleF(0, 0x0f000001)) * (ty - WorkModuleF(0, 0x0f000001))) > UI_GROUND_DY)
-        {
-            if (global18 == 0)
-            {
-                func_94();
-                ts_air_kinetics();
-            }
-            WorkModule(0, ty, 0x0f000001);
-        }
     }
     WorkModule(0, UI_FORMED, UI_V_FORM);
     WorkModule(0, 1.0f, 0x0100000B);
     WorkModule(0, 0.0f, 0x0100000C);
     func_22(UI_MOT_STRIKE, 0, 1.0f);
     ui_still();
+}
+
+// v2: XV2's Movement to the target (BAC 1's 156-161): only a gap closed, he stays where he is otherwise: on frames
+// UI_GAP_FROM-UI_GAP_TO, toward UI_RUSH_REACH short of the attacker (found: 0x21000012), at most UI_GAP_V a frame
+void ui_gap(float n)
+{
+    float face;
+    float dx;
+    if (n < UI_GAP_FROM - 0.5f || n > UI_GAP_TO + 0.5f || WorkModule(0x10, 0x21000012) == 0)
+    {
+        return;
+    }
+    face = WorkModuleF(0, 0x0f000003);
+    dx = (WorkModuleF(0, 0x01000008) - WorkModuleF(0, 0x0f000000)) * face - UI_RUSH_REACH;
+    if (dx <= 0.0f)
+    {
+        return;
+    }
+    if (dx > UI_GAP_V)
+    {
+        dx = UI_GAP_V;
+    }
+    WorkModule(0, dx, 0x0f000004);
 }
 
 // the end: Wait on the ground, Fall in the air (his gravity back)
@@ -42706,10 +42711,8 @@ void ui_loop()
         }
         return;
     }
-    if (n < UI_STRIKE_SAFE + 0.5f)
-    {
-        WorkModule(0, 2.0f, 0x0F00011B);    // intangible through the strike's active frames
-    }
+    WorkModule(0, 2.0f, 0x0F00011B);        // v2: intangible through the whole counter (XV2: invulnerable 151-499)
+    ui_gap(n);
     if (n > UI_STRIKE_N - 1.5f)
     {
         ui_finish();
