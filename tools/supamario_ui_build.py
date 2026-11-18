@@ -73,7 +73,8 @@ GAP = 9.0                            # beside the fighter to answer: this far on
 GROUND_DY = 6.0                      # its feet within this of his: on the ground, the X only
 DODGE_N = anim.frames_of(anim.DODGE)  # 16
 DODGE_INV = 12                       # the user: invincible ~12 frames, then actionable
-DODGE_MOVE, DODGE_V = 8, 2.0         # a sidestep of 16 units away, over the first 8 frames (energy 3)
+DODGE_MOVE, DODGE_V = 4, 1.0         # v2 (the user's XV2 clip: a sway almost in place): 4 units away over 4 frames (v1: 16
+                                     # over 8); XV2's own dodge motion / afterimage are not in the skill's files
 AURA_EVERY = 30.0                    # the aura made again every 30 frames
 SCALE = 1.75                         # xv2_smash_fx.SIZE (the earlier XV2 ports': XV2's x1.0)
 

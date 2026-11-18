@@ -3781,3 +3781,36 @@ suites (their "unchanged" checks now except the four slots), `msc_stack_check` 0
 - XV2's damage 10 taken as 10%; the launch's angle / knockback chosen; the freeze box's hitstop as XV2's hold; the
   transformation compressed to the user's 60 frames (XV2: 229 to the burst); BAC 5 (no rush) chosen over the rush roots;
   Mario's EscapeN for the slide (the user's); no hair / eye recolour (no BCS), no ECF / BPE / camera effects.
+
+## Ultra Instinct v2 (`supamario_ultrainstinct_v2.zip`, same exe_v46z_ui): XV2's length, the rush counter, the white body
+The user's XV2 clips (the transformation, its counter; 5 fps sheets): the transformation runs XV2's own length, the
+counter is XV2's rush, the body glows white while transforming, no camera change (the user), the autododge a sway.
+- **Timing 1:1 (60 fps):** SpecialLwLight = EAN #0 0-324 (**325 frames, 5.4 s**; the clip's gold burst -> white body ->
+  purple-white burst at 220 -> normal is ~3.7 s of it). The counter window is XV2's **30-151**; intangible throughout.
+  Effects: 846 at 10, the aura at 40, the burst at 220; sounds Start at 22, Success at 205.
+- **The counter = XV2's rush (BAC 1):** the BCM's five roots share their conditions; #1 / #4 / #7 play BAC 4 (children BAC
+  5 / 6: the finisher alone), #10 BAC 8 (-> 9 / 10), #13 BAC 0 (-> 1 / 2: the 14-hit rush). The clip shows the rush (the
+  hit counter to 15), and BAC 0 is the stance with entry 4's functions (0x5C / 0x21, the player's), so **BAC 1** (root
+  #13's first child; BAC 2 adds only function 0x2B (100)). SpecialLwHeavy = EAN #1 151-499 (**349 frames**). He **stays**
+  where he is, turned to the attacker; XV2's Movement to the target only **closes a gap** (frames 5-10, at most 12.6 a
+  frame, to 9 units short of it: `ui_gap`). Game script (motion frame = XV2 - 151): the **freeze** at 0 (BDM #0: no damage,
+  the attacker held to the first rush hit: hitstop 59, a 3 m sphere, Part 1); the **rush** at 59, 64 .. 124 (BDM #1 x 14:
+  **1.2%** each, angle 361, BKB 15, KBG 0, each followed by `Hitbox_Hold(0, 2)` and preceded by `Hit_Log_Clear(0)`, 2
+  frames each); the **finisher** at 129 (BDM #2: **8%**, angle 35, BKB 80, KBG 75). **Total 24.8%.** Effects: the vanish
+  at 0 and 19, the aura at 25; sounds Vanish at 0, Success at 184; the white body to 199 (XV2's 350).
+- **Damage rule:** Core Breaker's (the user's numbers against XV2's): its dive 10 -> 3%, its 9-damage hold hits -> 1.5%
+  each, its 405 crash -> 17%; so the rush's 5s -> 1.2% each and the 10-damage finisher (a launch) -> 8%. For the user.
+- **The white body** (XV2's ECF 846 / 847 / 849, not readable as data here: the clip's look): `Color_Overlay(255, 255,
+  255, 200)` + `Outline_Shell(0, 190, 215, 255, 200, 2.5, frames, 4, 10, 0, 1)` (a light blue-white band added) from
+  frame 10 to the burst at 220 (`Terminate_Overlays`, the shell's Alpha 0); the counter's from 0 to 199.
+- **No camera** (the user): XV2's cam.ean / camera items aren't used; the test checks no camera command is in any of
+  the scripts.
+- **The autododge:** 4 units away over 4 frames (v1 16 over 8: the clip's sway almost in place), still intangible 12,
+  the vanish lines. XV2's own dodge motion / afterimage and the dodge's manual counter are **not in the skill's files**
+  (its BCM has only the stance, its counters and #16 -> BAC 13: the awoken button again while transformed: character EAN
+  #0 0-10, skill SE cue 2 "BRD_GOK_UL2_SS1_End", function 0xE: the transformation's cancel).
+- **Not done / open:** the silver hair / eyes (HUM.bcs arrived; no BCS reader yet), the aura's colours not compared with
+  the clip's lavender (the converted emitters keep XV2's EMP colours; the ECF / aura_setting tint isn't applied), the
+  manual counter after a dodge (its files).
+- Tests: `supamario_ui_test.py` (v2: the 325 / 349 frames, the window, the counter staying / the gap, the 16 hitboxes,
+  the holds and log clears, the white body, no camera), the earlier suites, `msc_stack_check`; the exe is v1's.
