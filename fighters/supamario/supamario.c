@@ -42795,72 +42795,117 @@ void ui_dodge_end()
 // Secret Sensation (Ultra Instinct's grounded down special, the user's: Dragon Ball FighterZ's UI Goku "Secret
 // Sensation"; status 0x155 while transformed, func_2265 / func_2282): a stance (motion UI_SS_MOT) with the counter shape
 // on from UI_SS_ON to UI_SS_OFF, then its end lag to UI_SS_END (Wait). A hit on the shape (the cave's slot 42 record in
-// 0x155, any attacker: a projectile's owner answered) -> intangible, turned to the fighter to answer, a calm walk
-// (WalkFast, UI_SS_V a frame along the ground, ground correction 2: not off an edge) to UI_GAP from it, at most
-// UI_SS_MAX frames, then the counter's strike motion from its frame UI_SS_STRIKE_FROM (the finisher: its hitbox reads
-// 1.2x the hit, UI_MIN_DMG at least, from 0x0100000A), Wait at its end. No target found: the strike at once.
+// 0x155, any attacker: a projectile's / item's owner answered) -> NO attack (the user's): intangible, he slides in his
+// spot dodge (EscapeN, motion UI_SS_SLIDE_MOT) over UI_SS_SLIDE_N frames from where he is to BEHIND the fighter to
+// answer (its far side), a little into the background on the way (his Z eased out to -UI_SS_DEPTH and back to 0: his
+// position's Z, 0x0F000002), ending airborne: a grounded fighter -> UI_SS_BEHIND past it, UI_SS_UP_GROUND above its
+// feet; an airborne one -> UI_SS_BEHIND_AIR past it, UI_SS_UP_AIR above; facing it, then Fall (actionable, his gravity
+// back). No target found: he stays (the stance ends as a whiff).
 // TIMER_4 (0x0F000324, UI_V_SS) marks the move (renewed every frame: func_2282 tells it from Fake Death); status floats
-// 0x0100000B the phase (0 stance, 1 walk, 2 strike), 0x0100000C frames, 0x0100000D the stop's X
+// 0x0100000B the phase (0 stance, 1 the slide), 0x0100000C frames, 0x0100000D / 0x0100000E the slide's start X / Y,
+// 0x0100000F / 0x01000010 its end X / Y
 void ss_init()
 {
     WorkModule(0, 3.0f, UI_V_SS);
     WorkModule(0, 0.0f, 0x0100000B);
     WorkModule(0, 0.0f, 0x0100000C);
-    WorkModule(0, 0.0f, UI_F_DMG);
     KineticModule(0, 0x6);
     GroundModule(0x2710, 0x2);
     KineticModule(0x11, 0x3, 0.0f, 0.0f);
     func_22(UI_SS_MOT, 0, 1.0f);
 }
 
-void ss_strike()
-{
-    KineticModule(0x11, 0x3, 0.0f, 0.0f);
-    WorkModule(0, 2.0f, 0x0100000B);
-    WorkModule(0, 0.0f, 0x0100000C);
-    func_22(UI_MOT_STRIKE, UI_SS_STRIKE_FROM, 1.0f);
-}
-
-// the counter read: the strike's damage, facing the fighter to answer, the walk's stop
+// the counter read: where to end (behind the fighter to answer), airborne from now
 void ss_counter()
 {
-    float d;
     float side;
+    float tx;
+    float ty;
     ShieldModule(0, 0x2, 0, 0, 0x1);
-    d = WorkModuleF(0, 0x01000006) * UI_MUL;
-    if (d < UI_MIN_DMG)
+    WorkModule(0, 2.0f, 0x0F00011B);
+    if (WorkModule(0x10, 0x21000012) == 0)
     {
-        d = UI_MIN_DMG;
+        WorkModule(0, 3.0f, 0x0100000B);    // nobody to answer: the stance goes on (a whiff)
+        return;
     }
-    WorkModule(0, d, UI_F_DMG);
     side = WorkModuleF(0, 0x01000007);
-    if (side * WorkModuleF(0, 0x0f000003) < 0.0f)
+    tx = WorkModuleF(0, 0x01000008);
+    ty = WorkModuleF(0, 0x01000009);
+    WorkModule(0, WorkModuleF(0, 0x0f000000), 0x0100000D);
+    WorkModule(0, WorkModuleF(0, 0x0f000001), 0x0100000E);
+    if (ty - WorkModuleF(0, 0x0f000001) > UI_GROUND_DY)
+    {
+        WorkModule(0, tx + side * UI_SS_BEHIND_AIR, 0x0100000F);
+        WorkModule(0, ty + UI_SS_UP_AIR, 0x01000010);
+    }
+    else
+    {
+        WorkModule(0, tx + side * UI_SS_BEHIND, 0x0100000F);
+        WorkModule(0, ty + UI_SS_UP_GROUND, 0x01000010);
+    }
+    WorkModule(0, 1.0f, 0x0100000B);
+    WorkModule(0, 0.0f, 0x0100000C);
+    func_94();
+    ts_air_kinetics();
+    cb_speed(0.0f, 0.0f);
+    KineticModule(0x11, 0x2, 0.0f, 0.0f);
+    GroundModule(0x2710, 0);
+    func_22(UI_SS_SLIDE_MOT, 0, 1.0f);
+    EffectModule(0x2710, UI_FX_VANISH, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_VANISH_SIZE, 0, 0, 0, 0, 0, 0, 0x1);
+    SoundModule(0x2710, UI_SND_VANISH);
+}
+
+// the slide's frame k (1 .. UI_SS_SLIDE_N): eased (smoothstep) from the start to the end, Z out and back (a sine)
+void ss_slide(float k)
+{
+    float t;
+    float w;
+    t = k / UI_SS_SLIDE_N;
+    if (t > 1.0f)
+    {
+        t = 1.0f;
+    }
+    w = t * t * (3.0f - 2.0f * t);
+    WorkModule(0, WorkModuleF(0, 0x0100000D) + (WorkModuleF(0, 0x0100000F) - WorkModuleF(0, 0x0100000D)) * w, 0x0f000000);
+    WorkModule(0, WorkModuleF(0, 0x0100000E) + (WorkModuleF(0, 0x01000010) - WorkModuleF(0, 0x0100000E)) * w, 0x0f000001);
+    WorkModule(0, -UI_SS_DEPTH * 4.0f * t * (1.0f - t), 0x0f000002);
+    cb_speed(0.0f, 0.0f);
+    KineticModule(0x11, 0x2, 0.0f, 0.0f);
+}
+
+// the slide over: on the stage's plane, facing the fighter he passed, his gravity and the stage back, Fall
+void ss_land()
+{
+    WorkModule(0, 0.0f, 0x0f000002);
+    if (WorkModuleF(0, 0x01000007) * WorkModuleF(0, 0x0f000003) > 0.0f)
     {
         PostureModule(0x1);
         PostureModule(0x2);
     }
-    WorkModule(0, 2.0f, 0x0F00011B);
-    if (WorkModule(0x10, 0x21000012) == 0)
-    {
-        ss_strike();
-        return;
-    }
-    WorkModule(0, WorkModuleF(0, 0x01000008) - side * UI_GAP, 0x0100000D);
-    WorkModule(0, 1.0f, 0x0100000B);
-    WorkModule(0, 0.0f, 0x0100000C);
-    func_22(UI_SS_WALK_MOT, 0, 1.0f);
+    GroundModule(0x2710, 0x5);
+    sh_grav();
+    KineticModule(0xb, 0x2);
+    func_16(0xe, 0);
 }
 
 void ss_loop()
 {
     float ph;
     float n;
-    float dx;
-    float face;
     WorkModule(0, 3.0f, UI_V_SS);
     ph = WorkModuleF(0, 0x0100000B);
     n = WorkModuleF(0, 0x0100000C) + 1.0f;
     WorkModule(0, n, 0x0100000C);
+    if (ph > 0.5f && ph < 1.5f)
+    {
+        WorkModule(0, 2.0f, 0x0F00011B);    // intangible through the slide
+        ss_slide(n);
+        if (n > UI_SS_SLIDE_N - 0.5f)
+        {
+            ss_land();
+        }
+        return;
+    }
     if (global18 == 0x2)
     {
         ShieldModule(0, 0x2, 0, 0, 0x1);
@@ -42868,48 +42913,20 @@ void ss_loop()
         func_16(0xe, 0);
         return;
     }
-    if (ph < 0.5f)
+    if (ph < 0.5f && WorkModule(0x10, 0x21000010))
     {
-        if (WorkModule(0x10, 0x21000010))
-        {
-            ss_counter();
-            return;
-        }
-        if (n > UI_SS_ON - 0.5f && n < UI_SS_ON + 0.5f)
-        {
-            ShieldModule(0, 0x2, 0, 0x1, 0x1);
-        }
-        if (n > UI_SS_OFF - 0.5f && n < UI_SS_OFF + 0.5f)
-        {
-            ShieldModule(0, 0x2, 0, 0, 0x1);
-        }
-        if (n > UI_SS_END - 1.5f)
-        {
-            func_16(0, 0);
-        }
+        ss_counter();
         return;
     }
-    if (ph < 1.5f || n < UI_SS_STRIKE_SAFE + 0.5f)
+    if (n > UI_SS_ON - 0.5f && n < UI_SS_ON + 0.5f)
     {
-        WorkModule(0, 2.0f, 0x0F00011B);    // intangible through the walk and the strike's active frames
+        ShieldModule(0, 0x2, 0, 0x1, 0x1);
     }
-    if (ph < 1.5f)
+    if (n > UI_SS_OFF - 0.5f && n < UI_SS_OFF + 0.5f)
     {
-        face = WorkModuleF(0, 0x0f000003);
-        dx = (WorkModuleF(0, 0x0100000D) - WorkModuleF(0, 0x0f000000)) * face;
-        if (dx < UI_SS_V || n > UI_SS_MAX - 0.5f)
-        {
-            if (dx > 0.0f && dx < UI_SS_V)
-            {
-                WorkModule(0, dx, 0x0f000004);
-            }
-            ss_strike();
-            return;
-        }
-        KineticModule(0x11, 0x3, face * UI_SS_V, 0.0f);
-        return;
+        ShieldModule(0, 0x2, 0, 0, 0x1);
     }
-    if (n > UI_STRIKE_N - UI_SS_STRIKE_FROM - 1.5f)
+    if (n > UI_SS_END - 1.5f)
     {
         func_16(0, 0);
     }
@@ -42919,6 +42936,16 @@ void ss_end()
 {
     WorkModule(0, 0.0f, UI_V_SS);
     ShieldModule(0, 0x2, 0, 0, 0x1);
-    KineticModule(0x11, 0x3, 0.0f, 0.0f);
-    GroundModule(0x2710, 0x1);
+    WorkModule(0, 0.0f, 0x0f000002);
+    if (global18 == 0x2)
+    {
+        GroundModule(0x2710, 0x5);
+        sh_grav();
+        KineticModule(0xb, 0x2);
+    }
+    else
+    {
+        KineticModule(0x11, 0x3, 0.0f, 0.0f);
+        GroundModule(0x2710, 0x1);
+    }
 }
