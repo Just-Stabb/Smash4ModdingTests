@@ -245,14 +245,34 @@ OUTLINE_RGB = (215.0, 230.0, 255.0)
 # so a soft white ring billboard on each body part's bone (OUTLINE_BONES: Mario's rest-pose part radii + OUTLINE_PAD),
 # drawn at the bone's centre: the part's own front half hides the ring's inside, only the glow past his edge shows
 OVERLAY_OUTLINE = False
-FX_OUTLINE_ID = 0x0341006A
-OUTLINE_BONES = ((64, 3.0), (22, 2.6), (12, 2.4), (11, 2.7), (14, 1.3), (18, 1.3), (15, 1.0), (19, 1.0), (16, 1.4),
-                 (20, 1.4), (3, 1.3), (7, 1.3), (4, 1.1), (8, 1.1), (5, 1.6), (9, 1.6))   # (vbn bone, part radius):
-# HatN, HeadN, BustN, WaistN, L / R ShoulderJ, ArmJ (elbows), HandN, LegJ, KneeJ, FootJ (c00's T pose: 15.6 tall,
-# the head 10.2-15.6, the arms at 8.7, the hands at +-5.35)
-OUTLINE_PAD = 0.6                   # the ring's disc reaches this far past the part (units)
-OUTLINE_EDGE = 0.78                 # the ring texture's peak (a fraction of the disc's radius; the part's edge)
-OUTLINE_RGB6, OUTLINE_ALPHA = (0.85, 0.92, 1.0), 0.34   # fx_glow ts_outline (16 whole rings): 0.42 drew 1.4 white on grey, 0.34 0.5
+# v7 (exe_v46z_outline, model_commands_v1: Outline_Set confirmed in game): v6's 16 ring billboards (PtcSupamarioTsOutline
+# 0x0341006A) are gone. The outline is Outline_Set now: the fighter shaders' own rim term (g_fresnelOffset, per model
+# instance), edge only (Tint 0): XV2's BPE 85 "Flashing White Body Outline 3".
+#  - When (reference/xv2/timeskip_skill.json, flag word 2 = BPE 85's off form): BAC 0 on at 20 (the charge's start:
+#    WIND_END), off at 100 (real 75: OL_OFF, the whiff's stop); BAC 2 (charged) on again at 100, off at 160 (its stop:
+#    our charged dash is the same motion, so 75 too); BAC 4 (the connect) off at 16 (the punch). Clip b66e8a38: the rim
+#    from 15-21 (faint at 15, clear by 21) through the dash (32-41) and the whole stop (46-58), gone under the punch's
+#    white (59).
+#  - Look (clip b66e8a38, the stop 46-50 against the dark world): a thin rim, 2-3 px at 1080p on his edge (plus a faint
+#    +10-20 haze past it that Smash's rim can't draw), adding about (+55, +59, +58) / 255 to the background and taking
+#    his dark hair's edge from ~10 to 120-142 (~0.45-0.5 of white at the very edge): a neutral white, faint.
+#    OL_ALPHA 140 (0.55 of the colour at a fully edge-on pixel; the material's exponent 2-4 thins it inward).
+#    The colour kept light blue-white (v5's 215, 230, 255).
+#  - No pulse: the rim's peak is steady through the stop (46, 48, 50: +55-60 each frame) and the dash; the BAC holds no
+#    rate (BPE 85's own entry is in XV2's system BPE file, not in the user's files). Flash 0.
+#  - Ending it on every exit: Outline_Set is an ACMD command (the MSC can't send it), so the scripts renew it every
+#    OL_KEEP frames, each held OL_HOLD frames (the catch's 3-frame freeze and its retries between the dash's last renewal
+#    and the connect's first: up to ~10), then fading over OL_CUT_OUT: a cut move (a hit, a ledge, any status change)
+#    leaves it at most OL_HOLD + OL_CUT_OUT frames; a KO / the match's end / a training reset drop it at once (the cave).
+#    The first one at WIND_END is held OL_HOLD + CHARGE (covers a held charge should the script's clock stop while the
+#    MSC holds the pose; the renewals replace it otherwise). Normal ends: Alpha 0 at OL_OFF (out over OL_OUT) and at the
+#    punch (at once: XV2's off at 16, under the white negative / flash)
+OL_RGB = (215.0, 230.0, 255.0)
+OL_ALPHA, OL_TINT, OL_FLASH = 140.0, 0.0, 0
+OL_IN, OL_OUT, OL_PUNCH_OUT = 4, 4, 0
+OL_KEEP, OL_HOLD, OL_CUT_OUT = 4, 12, 4
+OL_ON = WIND_END
+OL_OFF = int(real0(100))            # 75
 # v6 (user: "add XV2's photo-negative look after the punch"). XV2's BAC: BPE 78 "Invert World Colors" on at the connect's
 # 0 (the dark blue-grey world of the stop, clip 44-58, the fighters not inverted), its second entry (flag word 2, BPE
 # 85's off form) at 17: off again; BPE 2 "Weak White Flash" at 16. Measured on the clip's stage: during the charge
@@ -268,7 +288,25 @@ INV_WHITE = (1, 1.0, 34, 0, 14, 0.15, 0.35, 165.0, 170.0, 180.0)   # the white n
                                     # by +48 (the clip's white to +36, normal by +50); screen_invert's preset (Bright 0.6,
                                     # + (102, 104, 110)) brightened: the clip's world after the punch is (220, 228, 235),
                                     # the preset drew Smashville mid-grey (cmp_invert6): 0.65-1.0, low contrast
-FX_WASH_ID = 0x0341006B
+# v7 (the user's Screen_Invert test: partial strengths show grey, by design: a picture half way to its negative is flat).
+# A fade shows (1 - w) x + w f(x): its contrast is 1 - w (1 + Brightness x Strength). v6's stop faded in over 2 (the
+# flat grey at w 0.5) and, cut, out over 4; the white negative (contrast -0.35) out over 14 went flat at w = 1 / 1.35 =
+# 0.74 (its 4th frame) and stayed a contrastless light grey (|contrast| < 0.3) for ~6 of the 14. Now every switch is
+# straight on / off: the stop at once at the connect's 0 (XV2's BPE 78 is a cut: the clip's 44 -> 45), held to the punch
+# (+ the catch's freeze and 2 frames: its own end if the move is cut, at once), replaced at once by the white negative,
+# which the script ends at once at the punch's frame + INV_END (the punch's 30 frozen frames + 4: v6's +34) under a white
+# quad on the camera fading out (FADE_*: alpha-blended white from FADE_A to 0 over FADE_N: the clip's white after the
+# punch fading back to the stage by +50): the picture goes from the pale negative to the pale stage (the same mean
+# brightness) and its contrast only rises (1 - alpha: 0.3 -> 1), never through grey. The white negative's own Frames
+# (INV_WHITE_SAFE) ends it should the script not get there
+INV_STOP = (1, 1.0, STRIKE + CATCH_FREEZE + 2, 0, 0, 0.0, 0.8, 19.0, 37.0, 60.0)
+INV_END = 4
+INV_WHITE_SAFE = STRIKE_FREEZE + INV_END + 4
+INV_WHITE = (1, 1.0, INV_WHITE_SAFE, 0, 0, 0.15, 0.35, 165.0, 170.0, 180.0)
+INV_OFF = (0, 0.0, 0, 0, 0, 1.0, 1.0, 0.0, 0.0, 0.0)
+FX_FADE_ID = 0x0341006B
+FADE_A, FADE_N = 0.7, 14            # the negative's mean ~0.84 (x 0.5) = 0.3 x 0.5 + 0.7 x 0.97: no step in brightness
+FX_WASH_ID = 0x0341006A             # v7: the outline's set gone, the wash (INVERT_FX off only) moved up one
 WASH_RGB, WASH_A, WASH_IN, WASH_LIFE, WASH_OUT = (0.94, 0.97, 1.0), 0.48, 2, 48, 14   # the clip: white to +36, normal by +50
 WASH_FLASH, WASH_FLASH_N = 0.45, 8
 WASH_Z, WASH_SIZE = 20.0, 2.2
@@ -338,7 +376,7 @@ def msc_values(root_speed=None):
             'TS_EASE_FRAMES': fl(EASE_FRAMES), 'TS_FALL_EASE': fl(FALL_EASE), 'TS_USED_INDEX': fl(USED_INDEX),
             'TS_STRIKE_DMG': fl(STRIKE_HIT['Damage']), 'TS_SH_TAKE': fl(SH_TAKE), 'TS_SH_STUN': fl(SH_STUN),
             'TS_SH_IASA': fl(SH_IASA), 'TS_FX_DARK': '0x%X' % FX_DARK_ID,
-            'TS_FX_OUTLINE': '0x%X' % FX_OUTLINE_ID, 'TS_FX_WASH': '0x%X' % FX_WASH_ID, 'TS_LAG_ANIM': fl(LAG_ANIM),
+            'TS_FX_FADE': '0x%X' % FX_FADE_ID, 'TS_FX_WASH': '0x%X' % FX_WASH_ID, 'TS_LAG_ANIM': fl(LAG_ANIM),
             'TS_MOT_LANDING_HEAVY': '0x%X' % MOT_LANDING_HEAVY,
             'TS_CAMFX': '1' if CAMERA_FX else '0', 'TS_TINT_SLOT': str(TINT[0]), 'TS_TINT_IN': str(TINT[1]),
             'TS_TINT_R': '0x%X' % TINT[2], 'TS_TINT_G': '0x%X' % TINT[3], 'TS_TINT_B': '0x%X' % TINT[4],
@@ -461,35 +499,62 @@ def game_scripts():
     return dash, connect
 
 
+def timeline(events):
+    """(frame, commands) pairs, in frame order (a stable sort: same-frame ones as given) -> one script: FRAME(f) before
+    each later frame's commands"""
+    out, at = [], 0
+    for f, cmds in sorted(events, key=lambda e: e[0]):
+        if f > at:
+            out.append(cmd('frame', float(f)))
+            at = f
+        out += cmds
+    return out
+
+
 def effect_scripts():
     """XV2's Stage BG 60 (the stage's dust, at the dash's start BAC 56) as Smash's dash cloud on the ground. v4: skill
     effect 0's following part (Frt_CrgAuraH on the left elbow, x0.5) at frame 0; its world parts and effect 11 are the
-    MSC's (ts_aura / ts_e11), as the strike's hit look and BTL_CMN 108 (the glass). v6: the outline the ring effects
-    (outline_on) from frame 0 through the connect, off at each motion's end (and the MSC's ts_end on any exit); the
-    white wash at the punch (wash_on); the glass on GLASS_BREAK frames past the punch (its shards breaking apart)"""
-    dash = outline_on() + [cmd('external_graphic', FX_E0H_ID, E0_FOLLOW[1], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                               E0_FOLLOW[2] * AURA_SIZE, 0)] + [cmd('frame', float(MOVE_FROM))] + if_(0x0F000116, 0, 0, if_(V_PH, 5, DASHING, [
-        cmd('graphic_effect', FX_DUST, 0, 0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1)])) + (
-        [cmd('frame', float(DASH_END - OUTLINE_OUT))] + outline_off() if OVERLAY_OUTLINE else []) + [
-        cmd('frame', float(DASH_END))] + outline_end()
-    connect = ((time_stop_look() if CAMERA_FX and not INVERT_FX else []) + invert_on() + glass_on_screen() + outline_on() + [
-        cmd('frame', float(STRIKE))] + wash_on() + invert_off() + [cmd('frame', float(STRIKE + GLASS_BREAK)),
-                                                                   cmd('terminate_graphic_effect', FX_GLASS_ID, 1, 1)] +
-               ([cmd('frame', float(CONNECT_END - OUTLINE_OUT))] + outline_off() if OVERLAY_OUTLINE else []) +
-               [cmd('frame', float(CONNECT_END))] + outline_end())
-    return dash, connect
+    MSC's (ts_aura / ts_e11), as the strike's hit look and BTL_CMN 108 (the glass). v6: the white wash at the punch
+    (wash_on: INVERT_FX off); the glass on GLASS_BREAK frames past the punch (its shards breaking apart). v7: the outline
+    Outline_Set (XV2's BPE 85: from the charge's start OL_ON through the dash, renewed every OL_KEEP frames, off at the
+    whiff's OL_OFF or at once at the punch); the white negative ended by the script at the punch + INV_END under the
+    fading white quad (invert_end)"""
+    dash = [(0, [cmd('external_graphic', FX_E0H_ID, E0_FOLLOW[1], 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                     E0_FOLLOW[2] * AURA_SIZE, 0)]),
+            (MOVE_FROM, if_(0x0F000116, 0, 0, if_(V_PH, 5, DASHING, [
+                cmd('graphic_effect', FX_DUST, 0, 0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1)])))]
+    dash += [(f, outline_on(OL_HOLD + (CHARGE if f == OL_ON else 0))) for f in range(OL_ON, OL_OFF, OL_KEEP)]
+    dash += [(OL_OFF, outline_off(OL_OUT))]
+    connect = [(0, (time_stop_look() if CAMERA_FX and not INVERT_FX else []) + invert_on() + glass_on_screen() +
+                outline_on(OL_HOLD))]
+    connect += [(f, outline_on(OL_HOLD)) for f in range(OL_KEEP, STRIKE, OL_KEEP)]
+    connect += [(STRIKE, outline_off(OL_PUNCH_OUT) + wash_on() + invert_off()),
+                (STRIKE + INV_END, invert_end()),
+                (STRIKE + GLASS_BREAK, [cmd('terminate_graphic_effect', FX_GLASS_ID, 1, 1)])]
+    return timeline(dash), timeline(connect)
 
 
 def invert_on():
-    """v6 INVERT_FX: XV2's BPE 78 at the connect's 0: Screen_Invert's dark blue-grey negative (INV_STOP), held STRIKE
-    frames (+2 in): the punch replaces it; cut before the punch, it ends by itself (out over 4)"""
+    """v6 INVERT_FX: XV2's BPE 78 at the connect's 0: Screen_Invert's dark blue-grey negative (INV_STOP). v7: at once,
+    held to the punch + the catch's freeze + 2 (the punch replaces it); cut before the punch, it ends by itself at once"""
     return [cmd('screen_invert', *INV_STOP)] if INVERT_FX else []
 
 
 def invert_off():
-    """v6 INVERT_FX: at the punch the white negative (INV_WHITE) replaces the stop's, held to +34, out over 14, ending
-    by itself (Frames: no exit leaves it on)"""
+    """v6 INVERT_FX: at the punch the white negative (INV_WHITE) replaces the stop's at once. v7: ended by invert_end;
+    its own Frames (INV_WHITE_SAFE, then at once) end it should the script not get there (no exit leaves it on)"""
     return [cmd('screen_invert', *INV_WHITE)] if INVERT_FX else []
+
+
+def invert_end():
+    """v7 INVERT_FX: the punch + INV_END (its frozen frames + 4: v6's +34 real frames): the white fade quad on the
+    screen first (FX_FADE_ID: Effect_Camera Mode 1 as the wash, unslowed, FADE_A -> 0 over FADE_N real frames), then
+    the white negative off at once (Mode 0, FadeOut 0): the cut from the negative to the stage under the white, which
+    fades back to the stage (no fade through grey)"""
+    if not INVERT_FX:
+        return []
+    return [cmd('effect_camera', FX_FADE_ID, 0.0, 0.0, WASH_Z, 0.0, 0.0, 0.0, WASH_SIZE, 1, 0, 1),
+            cmd('screen_invert', *INV_OFF)]
 
 
 def wash_on():
@@ -512,31 +577,19 @@ def glass_on_screen():
     return [cmd('effect_camera', FX_GLASS_ID, 0.0, 0.0, GLASS_SCREEN_Z, 0.0, 0.0, 0.0, GLASS_SCREEN_SIZE, 1, 0, 1)]
 
 
-def outline_on():
+def outline_on(frames):
     """v3 (user: "Time Skip wraps the user in a faint white translucent glowing outline"; XV2's BPE 85 "Flashing White
-    Body Outline 3", BAC entry 0 at 20 and 100, entry 4 at the punch; the clip: on him through the whole move). v3: a
-    light (LIGHT_SHINE), v4 / v5 the colour overlay (FLASH: white 110, then light blue-white 40): both tint the whole
-    body, and the overlay's fade ran on to opaque white while the charge held the motion's frame (v5's clip). v6: the
-    ring effect (outline_set) on each OUTLINE_BONES bone, following its place (External_Graphic's last word 0, the
-    elbow aura's way); any earlier ones ended first (a motion restart can't stack them)"""
-    if OVERLAY_OUTLINE:
-        return [cmd('color_overlay', *OUTLINE_RGB, 0.0),
-                cmd('change_overlay', float(OUTLINE_IN), *OUTLINE_RGB, OUTLINE_A)]
-    return [cmd('terminate_graphic_effect', FX_OUTLINE_ID, 1, 1)] + [
-        cmd('external_graphic', FX_OUTLINE_ID, b, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, outline_size(r), 0)
-        for b, r in OUTLINE_BONES]
+    Body Outline 3", BAC entry 0 at 20 and 100, entry 4 at the punch). v3: a light (LIGHT_SHINE), v4 / v5 the colour
+    overlay (FLASH): both tint the whole body; v6: 16 ring billboards on his bones (an effect-only rim). v7: Outline_Set
+    (exe_v46z_outline): his own edges lit (the shaders' rim), edge only (Tint 0), OL_RGB at OL_ALPHA, steady (Flash 0),
+    in over OL_IN (a renewal fades from where it is: none once on), held `frames`, then out over OL_CUT_OUT if not
+    renewed (a cut move)"""
+    return [cmd('outline_set', 0, *OL_RGB, OL_ALPHA, OL_TINT, int(frames), OL_IN, OL_CUT_OUT, OL_FLASH)]
 
 
-def outline_off():
-    """(OVERLAY_OUTLINE) faded out over OUTLINE_OUT, then COL_NORMAL (Terminate_Overlays) at the motion's end"""
-    return [cmd('change_overlay', float(OUTLINE_OUT), *OUTLINE_RGB, 0.0)]
-
-
-def outline_end():
-    """the motion's end: the overlay's COL_NORMAL (OVERLAY_OUTLINE), else the rings ended"""
-    if OVERLAY_OUTLINE:
-        return [cmd('terminate_overlays')]
-    return [cmd('terminate_graphic_effect', FX_OUTLINE_ID, 1, 1)]
+def outline_off(fade):
+    """v7: Outline_Set's end (Alpha 0) over `fade` frames"""
+    return [cmd('outline_set', 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, int(fade), 0)]
 
 
 def sound_scripts():
@@ -656,8 +709,8 @@ def convert_fx(cmn_dir, fx_dir, halo=True, frt_dir=None, joints0=None):
         dark = dark_set(p, e, sets['hitl']['set_index'])         # 0x65
         e11 = e11_rest(p, e, e11)                                # 0x66 - 0x68
         e0h = e0_follow_set(p, e, frt_dir, halo)                 # 0x69
-        outline = outline_set(p, e, sets['hitl']['set_index'])   # 0x6A (v6)
-        wash = wash_set(p, e, sets['hitl']['set_index'])         # 0x6B (v6)
+        wash = wash_set(p, e, sets['hitl']['set_index'])         # 0x6A (v6; v7: the outline's rings 0x6A gone)
+        fade = fade_set(p, e, sets['hitl']['set_index'])         # 0x6B (v7)
     finally:
         xv2_to_ptcl.TEX_MAX, xv2_to_ptcl.CONE_STREAKS = old
         xv2vfx.LENIENT_TARGETS = False
@@ -668,7 +721,10 @@ def convert_fx(cmn_dir, fx_dir, halo=True, frt_dir=None, joints0=None):
     bad = FX.facing_emitters(p, [s['set_index'] for s in sets.values()] + [lod['set_index']])
     return {'sets': sets, 'skipped': log, 'notes': notes, 'halos': halos, 'ptcl_bytes': [before, len(out)],
             'facing_problems': bad, 'lod': lod, 'e11': e11, 'aura': e0,
-            'e0_follow': e0h, 'glass': glass, 'dark': dark, 'outline': outline, 'wash': wash}
+            'e0_follow': e0h, 'glass': glass, 'dark': dark, 'wash': wash, 'fade': fade,
+            'outline': {'command': 'Outline_Set', 'rgb': OL_RGB, 'alpha': OL_ALPHA, 'tint': OL_TINT, 'flash': OL_FLASH,
+                        'on': OL_ON, 'off': OL_OFF, 'keep': OL_KEEP, 'hold': OL_HOLD, 'in': OL_IN, 'out': OL_OUT,
+                        'cut_out': OL_CUT_OUT, 'punch_out': OL_PUNCH_OUT}}
 
 
 def lod_copy(p, e):
@@ -1040,40 +1096,21 @@ def wash_set(p, e, hitl_si):
             'rgb': WASH_RGB, 'alpha': WASH_A, 'flash': WASH_FLASH, 'life': WASH_LIFE}
 
 
-def ring_rgba(n=64, edge=None):
-    """v6: the outline's ring (its shape in RGB, alpha 255: a BC4 texture): a soft fill inside (half), rising to 1 at `edge` of the radius (the body
-    part's edge), falling to 0 at the disc's rim"""
+def fade_set(p, e, hitl_si):
+    """v7 (INVERT_FX): the white quad that covers the white negative's cut (invert_end): alpha-blended (0.94, 0.97, 1)
+    from FADE_A straight down to 0 over FADE_N real frames (eft's 3 keys: FADE_A at 0, held to 0, -> 0 at the end)"""
     import numpy as np
-    edge = OUTLINE_EDGE if edge is None else edge
-    yy, xx = np.mgrid[0:n, 0:n]
-    r = np.hypot((xx + 0.5) / n * 2 - 1, (yy + 0.5) / n * 2 - 1)
-    a = np.where(r < edge, 0.5 + 0.5 * (r / edge) ** 4, np.clip(1.0 - (r - edge) / (1.0 - edge), 0.0, 1.0) ** 1.5)
-    v = (a * 255 + 0.5).astype(np.uint8)
-    return np.stack([v, v, v, np.full_like(v, 255)], 2)     # the shape in RGB (BC4: xv2_smash_fx.soft_glow_rgba's way)
-
-
-def outline_set(p, e, hitl_si):
-    """v6: the outline (OUTLINE_*): one additive ring billboard, forever (ended by Terminate_Graphic_Effect), following
-    its emitter; the effect script puts one on each OUTLINE_BONES bone (External_Graphic, size: the part's radius +
-    OUTLINE_PAD over OUTLINE_EDGE). Drawn through the bone's centre, the part's own front half hides the ring inside his
-    silhouette: only the glow past his edge shows (a soft white rim as XV2's BPE 85)"""
-    import struct
-    d = _quad(p, hitl_si, OUTLINE_RGB6, OUTLINE_ALPHA, 0)
-    p.set_field(d, 'blend_type', 1)
-    p.set_texture(d, 0, ring_rgba(), 0x34)
-    import ptcl
-    struct.pack_into('>I', d, ptcl.TEXRES + 0x0C, 0x22000100)     # clamped (xv2_smash_fx's halo texture)
-    si = p.new_set('PtcSupamarioTsOutline', [bytes(d)], ['ring'])
+    d = _quad(p, hitl_si, WASH_RGB, FADE_A, FADE_N)
+    for k, v in (('alpha_init', FADE_A), ('alpha_diff21', 0.0), ('alpha_diff32', -FADE_A), ('alpha_section1', 0.0),
+                 ('alpha_section2', 0.0)):
+        p.set_field(d, k, v)
+    assert p.field(d, 'blend_type') == 0
+    p.set_texture(d, 0, np.full((16, 16, 4), 255, np.uint8))
+    si = p.new_set('PtcSupamarioTsFade', [bytes(d)], ['fade'])
     idx = e.add(si + 1)
-    assert 0x03410000 | idx == FX_OUTLINE_ID, ('FX_OUTLINE_ID is out of date', hex(0x03410000 | idx))
-    return {'set': 'PtcSupamarioTsOutline', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_OUTLINE_ID,
-            'bones': [[b, r, outline_size(r)] for b, r in OUTLINE_BONES], 'rgb': OUTLINE_RGB6, 'alpha': OUTLINE_ALPHA}
-
-
-def outline_size(r):
-    """the ring's External_Graphic size for a part of radius r: the ring's peak (OUTLINE_EDGE of the disc) at the part's
-    edge + a little, the disc out to r + OUTLINE_PAD"""
-    return round(max(r + OUTLINE_PAD, r / OUTLINE_EDGE), 3)
+    assert 0x03410000 | idx == FX_FADE_ID, ('FX_FADE_ID is out of date', hex(0x03410000 | idx))
+    return {'set': 'PtcSupamarioTsFade', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_FADE_ID, 'rgb': WASH_RGB,
+            'alpha': FADE_A, 'life': FADE_N}
 
 
 def glass_model(cmn_dir, fx_dir, e, preview=None):

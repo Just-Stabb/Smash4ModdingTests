@@ -41571,12 +41571,14 @@ void ts_stop_look_off()
 }
 
 
-// v6: the move's camera / body effects ended (ts_end, any exit: a hit, a KO, a ledge, the match's end, its own end):
-// the outline's rings (the effect scripts' External_Graphic on his bones), the punch's white wash and the glass
-// (Effect_Camera; the glass already off by then at its own end)
+// v6: the move's camera effects ended (ts_end, any exit: a hit, a KO, a ledge, the match's end, its own end): the
+// punch's white wash and the glass (Effect_Camera; the glass already off by then at its own end). v7: the outline is
+// Outline_Set (an ACMD command: the effect scripts renew it every few frames, so it ends by itself within the
+// build's OL_HOLD + OL_CUT_OUT frames of a cut; a KO / the match's end drop it at once); the white fade quad after the
+// punch
 void ts_fx_off()
 {
-    EffectModule(0x2723, TS_FX_OUTLINE, 0x1, 0x1);
+    EffectModule(0x2723, TS_FX_FADE, 0x1, 0x1);
     EffectModule(0x2723, TS_FX_WASH, 0x1, 0x1);
     EffectModule(0x2723, TS_FX_GLASS, 0x1, 0x1);
 }
@@ -42340,7 +42342,7 @@ void ts_end()
         ts_stop_look_off();         // v3: cut in the stopped time (before the punch): the darkening and the glass off
     }
     ts_tint(0);
-    ts_fx_off();                    // v6: the outline, the wash, the glass: off on any exit
+    ts_fx_off();                    // v6: the wash, the glass (v7: the white fade quad): off on any exit
     KineticModule(0xb, 0x2);        // v3: the air drift back (turned off through the connect)
     if (WorkModuleF(0, TS_V_SLOT) > 0.5f)
     {

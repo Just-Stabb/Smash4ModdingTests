@@ -774,7 +774,7 @@ def brightness_tests(out):
     import supamario_fx_glow as G
     res = {}
     for bg_name, bg in (('grass', (0.5, 0.65, 0.3)), ('grey', (0.5, 0.5, 0.5))):
-        r = G.measure(out, ('ts_hit', 'ts_hit_v1', 'ts_e11', 'ts_e0', 'ts_outline'), None, bg)
+        r = G.measure(out, ('ts_hit', 'ts_hit_v1', 'ts_e11', 'ts_e0'), None, bg)
         res[bg_name] = r
         h, h1 = r['ts_hit'], r['ts_hit_v1']
         e0, e1 = h['frames'][0][4], h1['frames'][0][4]
@@ -795,16 +795,16 @@ def brightness_tests(out):
                                        r[k]['max_over_1'], lo),
                   (r[k]['max_over_1'] <= o1, r[k]['max_white'] <= 1.0, max(abs(f_[4]) for f_ in r[k]['frames']) >= lo),
                   (True, True, True))
-        o = r['ts_outline']
-        print('     %s: ts_outline (the 16 rings whole: no body in front) most over 1.0 %.1f, most white %.1f, energy %.1f' % (
-            bg_name, o['max_over_1'], o['max_white'], max(abs(f_[4]) for f_ in o['frames'])))
-        check('v6 %s: the outline\'s rings (all 16, whole: the worst case) at most 1.0 square unit white, visible' % bg_name,
-              (o['max_white'] <= 1.0, max(abs(f_[4]) for f_ in o['frames']) >= 3.0), (True, True))
+        # v7: the outline is Outline_Set (his own rim, no effect): nothing of it in the bank to measure (v6's rings went)
         # the wash: alpha-blended white at most WASH_A + the flash: the picture lifted toward white, never past it
         a = 1 - (1 - B.WASH_A) * (1 - B.WASH_FLASH)
         lifted = [round(c * (1 - a) + w * a, 3) for c, w in zip(bg, B.WASH_RGB)]
         check('v6 %s: the wash at its brightest (alpha %.2f) lifts the picture to %s: under 1.0 (no white blow-out, no '
               'bloom)' % (bg_name, a, lifted), max(lifted) < 1.0, True)
+        lifted = [round(c * (1 - B.FADE_A) + w * B.FADE_A, 3) for c, w in zip(bg, B.WASH_RGB)]
+        check('v7 %s: the white fade quad (the white negative\'s cut) at its brightest (alpha %.2f) lifts the picture to %s: '
+              'under 1.0, its contrast %.2f (positive: never the flat grey of a part-negative)' % (
+                  bg_name, B.FADE_A, lifted, 1 - B.FADE_A), (max(lifted) < 1.0, 1 - B.FADE_A > 0.2), (True, True))
     return res
 
 
@@ -827,9 +827,9 @@ def exit_tests(path):
         'script\'s (on the screen), none from the MSC' % (ck, sk, B.TINT_OUT)),
           (g.tints, [k_ for k_ in g.kills if k_[1] in look and k_[0] < tr[-1][0]],
            [n for n, i, _x, _y, _s in g.fx if i == B.FX_GLASS_ID]), (want_t, [], []))
-    check('v6 normal: the move\'s end (ts_end) ends the outline\'s rings, the wash and the glass (ts_fx_off)',
-          sorted({i for n, i in g.kills if n == tr[-1][0]} & {B.FX_OUTLINE_ID, B.FX_WASH_ID, B.FX_GLASS_ID}),
-          sorted({B.FX_OUTLINE_ID, B.FX_WASH_ID, B.FX_GLASS_ID}))
+    check('v6 / v7 normal: the move\'s end (ts_end) ends the white fade quad, the wash and the glass (ts_fx_off)',
+          sorted({i for n, i in g.kills if n == tr[-1][0]} & {B.FX_FADE_ID, B.FX_WASH_ID, B.FX_GLASS_ID}),
+          sorted({B.FX_FADE_ID, B.FX_WASH_ID, B.FX_GLASS_ID}))
     for name, st in (('cut (a status change)', 'cut'), ('Supamario hit (Damage)', 0x45), ('Supamario KO\'d (Dead)', 0xB1),
                      ('the match ending (Win)', 0x14F)):
         v = V(2, 30.0)
@@ -845,9 +845,9 @@ def exit_tests(path):
                v.ground[-1][1] if v.ground else None, max(froze) <= cut + 2 if froze else None, g.e2_on[-1:]),
               ([] if B.CAMERA_FX else [(ck, 'on', slot), (cut, 'off', slot)], sorted((cut, i) for i in look), False,
                5.0, True, [(cut, True)]))
-        check('  v6: ... and the outline\'s rings / the wash ended there too (ts_fx_off)',
-              sorted({i for n, i in g.kills if n == cut} & {B.FX_OUTLINE_ID, B.FX_WASH_ID}),
-              sorted({B.FX_OUTLINE_ID, B.FX_WASH_ID}))
+        check('  v6 / v7: ... and the white fade quad / the wash ended there too (ts_fx_off)',
+              sorted({i for n, i in g.kills if n == cut} & {B.FX_FADE_ID, B.FX_WASH_ID}),
+              sorted({B.FX_FADE_ID, B.FX_WASH_ID}))
     v = V(2, 30.0)
     g = Game(fighters=[v])
 
@@ -1136,6 +1136,137 @@ def caught_tests(path, air):
               (0.0, [round(-GRAVITY * k / B.EASE_FRAMES, 4) for k in (1, 2, 3)]))
 
 
+def timed(script):
+    """a script's commands with their FRAME (absolute frames; waits added)"""
+    at, out = 0.0, []
+    for c in script:
+        n_ = acmd.INFO[c.ident]['name'] if c.ident in acmd.INFO else hex(c.ident)
+        if n_ == 'FRAME':
+            at = c.params[0]
+        elif n_ == 'WAIT':
+            at += c.params[0]
+        else:
+            out.append((int(at), n_, list(c.params)))
+    return out
+
+
+def outline_sim(events, n):
+    """outline_cave's tick (Python): events {effect frame: [Outline_Set params]} -> the weight w each frame 0..n-1 (the
+    commands of a frame, then that frame's tick): a command with Alpha > 0 fades in from where it is (FadeIn 0: full at
+    once), held Frames once full (0: no count), then out over FadeOut (0: off at once); Alpha 0 fades out over its FadeOut"""
+    ph, w, left, rin, rout, ws = 0, 0.0, 0, 0.0, 0.0, []
+    for t in range(n):
+        for prm in events.get(t, []):
+            alpha, frames, fin, fout = prm[4], prm[6], prm[7], prm[8]
+            if alpha > 0:
+                rout = 1.0 / fout if fout > 0 else 0.0
+                left = max(frames, 0)
+                if fin > 0:
+                    rin, ph = 1.0 / fin, 1
+                else:
+                    w, ph = 1.0, 2
+            elif ph:
+                rout = 1.0 / fout if fout > 0 else 0.0
+                ph = 3 if rout else 0
+                w = w if rout else 0.0
+        if ph == 1:
+            w += rin
+            if w >= 1.0:
+                w, ph = 1.0, 2
+        elif ph == 2 and left:
+            left -= 1
+            if not left:
+                ph = 3 if rout else 0
+                w = w if rout else 0.0
+        elif ph == 3:
+            w -= rout
+            if w <= 0:
+                w, ph = 0.0, 0
+        ws.append(round(w, 3) if ph else 0.0)
+    return ws
+
+
+def outline_tests(f):
+    """v7: the outline is Outline_Set (exe_v46z_outline): XV2's BPE 85 from the charge's start (OL_ON) through the dash,
+    renewed every OL_KEEP frames, off at the whiff's OL_OFF or at once at the punch; checked as commands and through
+    outline_cave's tick (outline_sim) on the effect frames of a whiff, a held charge (the script's clock running, and
+    stopped), a catch at every frame of the box (+ its freeze and the retries) and a cut at any frame"""
+    dash, conn = timed(f['effect'].script('specials')), timed(f['effect'].script('specialairs'))
+    ol = {sc: [(t, p_) for t, n_, p_ in b_ if n_ == 'Outline_Set'] for sc, b_ in (('dash', dash), ('connect', conn))}
+    on = [B.OL_RGB[0], B.OL_RGB[1], B.OL_RGB[2], B.OL_ALPHA, B.OL_TINT]
+    want_d = [(t, [0] + on + [B.OL_HOLD + (B.CHARGE if t == B.OL_ON else 0), B.OL_IN, B.OL_CUT_OUT, B.OL_FLASH])
+              for t in range(B.OL_ON, B.OL_OFF, B.OL_KEEP)] + [(B.OL_OFF, [0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, B.OL_OUT, 0])]
+    want_c = [(t, [0] + on + [B.OL_HOLD, B.OL_IN, B.OL_CUT_OUT, B.OL_FLASH]) for t in range(0, B.STRIKE, B.OL_KEEP)] + [
+        (B.STRIKE, [0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, B.OL_PUNCH_OUT, 0])]
+    check('v7 outline (the dash): Outline_Set on him (Target 0) from the charge\'s start %d (XV2\'s BPE 85 at BAC 20), '
+          'white-blue %s at Alpha %g, edge only (Tint 0), steady (Flash 0), in over %d, renewed every %d frames (each held '
+          '%d, the first %d more for a held charge, then out over %d), off at %d (BAC 100) over %d' % (
+              B.OL_ON, B.OL_RGB, B.OL_ALPHA, B.OL_IN, B.OL_KEEP, B.OL_HOLD, B.CHARGE, B.OL_CUT_OUT, B.OL_OFF, B.OL_OUT),
+          ol['dash'], want_d)
+    check('v7 outline (the connect): renewed from its 0 every %d frames, off at once at the punch %d (BPE 85 off at '
+          'entry 4\'s 16); nothing after it' % (B.OL_KEEP, B.STRIKE), ol['connect'], want_c)
+    check('v7: no ring effect left (v6\'s External_Graphic / Terminate_Graphic_Effect of 0x0341006A, now the wash\'s id) '
+          'in either script, no PtcSupamarioTsOutline', [x for x in dash + conn if x[1] in ('External_Graphic',
+                                                                                         'Terminate_Graphic_Effect')
+                                                    and x[2][0] == 0x0341006A], [])
+
+    def evs(pairs):
+        d = {}
+        for e_, p_ in pairs:
+            d.setdefault(e_, []).append(p_)
+        return d
+    D = [(t, p_) for t, p_ in ol['dash']]
+    C = [(t, p_) for t, p_ in ol['connect']]
+    full = lambda ws, a, b_: all(x == 1.0 for x in ws[a:b_])     # noqa: E731
+    # the whiff: effect frame = script frame
+    ws = outline_sim(evs(D), 120)
+    check('v7 outline (whiff, sim): off before %d, full from %d (in over %d) to the off at %d, gone by %d' % (
+        B.OL_ON, B.OL_ON + B.OL_IN, B.OL_IN, B.OL_OFF, B.OL_OFF + B.OL_OUT),
+          (max(ws[:B.OL_ON]), full(ws, B.OL_ON + B.OL_IN - 1, B.OL_OFF), max(ws[B.OL_OFF + B.OL_OUT - 1:])),
+          (0.0, True, 0.0))
+    # a full charge: the clock running on through the hold (the model's: Core Breaker v4) or stopped at the pose's frame
+    for name, hold_clock in (('the script\'s clock running on', True), ('the script\'s clock stopped', False)):
+        ev, e_ = [], 0
+        for s_ in range(0, B.OL_ON + B.CHARGE + 1) if hold_clock else range(0, B.OL_ON + 1):
+            ev += [(e_, p_) for t, p_ in D if t == s_]
+            e_ += 1
+        if not hold_clock:
+            e_ += B.CHARGE
+        rs = e_
+        for s_ in range(B.OL_ON, B.OL_OFF + 1):       # the restart at WIND_END: its frame's commands again
+            ev += [(e_, p_) for t, p_ in D if t == s_]
+            e_ += 1
+        ws = outline_sim(evs(ev), e_ + 20)
+        off = rs + B.OL_OFF - B.OL_ON
+        check('v7 outline (a %d-frame charge, %s, sim): full from %d through the restart (%d) to the off (%d), gone %d '
+              'later' % (B.CHARGE, name, B.OL_ON + B.OL_IN, rs, off, B.OL_OUT),
+              (full(ws, B.OL_ON + B.OL_IN - 1, off), max(ws[off + B.OL_OUT - 1:])), (True, 0.0))
+    # a catch at each frame of the box: the dash's commands to it, the freeze + retries, then the connect's
+    bad = []
+    for ck in range(B.HIT_FROM, B.HIT_LAST + int(B.HIT_LATE) + 1):
+        for gap in (B.CATCH_FREEZE, B.CATCH_FREEZE + B.RETRY_N):
+            ev = [(t, p_) for t, p_ in D if t <= ck]
+            c0 = ck + gap + 1
+            ev += [(c0 + t, p_) for t, p_ in C]
+            ws = outline_sim(evs(ev), c0 + B.STRIKE + B.STRIKE_FREEZE + 10)
+            if not (full(ws, B.OL_ON + B.OL_IN - 1, c0 + B.STRIKE) and max(ws[c0 + B.STRIKE:]) == 0.0):
+                bad.append((ck, gap))
+    check('v7 outline (a catch at every frame %d-%d of the box, %d / %d frames before the connect starts, sim): full '
+          'without a dip to the punch, off at once there' % (B.HIT_FROM, B.HIT_LAST + int(B.HIT_LATE), B.CATCH_FREEZE,
+                                                             B.CATCH_FREEZE + B.RETRY_N), bad, [])
+    # a cut: the scripts stop at any frame (no more renewals): gone within OL_HOLD + OL_CUT_OUT
+    worst = 0
+    allev = D + [(B.OL_OFF + 10 + t, p_) for t, p_ in C]
+    for cut in range(B.OL_ON, B.OL_OFF + 10 + B.STRIKE):
+        ws = outline_sim(evs([(t, p_) for t, p_ in allev if t < cut]), cut + 80)
+        last = max([k for k in range(len(ws)) if ws[k] > 0] or [cut])
+        worst = max(worst, last - cut + 1)
+    check('v7 outline (the move cut at any frame, sim: a hit, a ledge, any status change; the MSC can\'t send it): '
+          'gone within %d frames (OL_HOLD + OL_CUT_OUT)' % (B.OL_HOLD + B.OL_CUT_OUT), worst <= B.OL_HOLD + B.OL_CUT_OUT,
+          True)
+    print('     outline: gone at most %d frames after a cut' % worst)
+
+
 def script_tests(out, sh_out):
     body = os.path.join(out, 'fighter', 'supamario', 'script', 'animcmd', 'body')
     sbody = os.path.join(sh_out, 'fighter', 'supamario', 'script', 'animcmd', 'body')
@@ -1198,48 +1329,55 @@ def script_tests(out, sh_out):
                             'Terminate_Overlays')] for sc in ('specials', 'specialairs')}
     check('v6: no body overlay / light at all (v4 / v5\'s FLASH tinted his whole body; in the user\'s v5 clip d8c96e8e it '
           'ran on to opaque white while the charge held the frame)', lt, {'specials': [], 'specialairs': []})
-    ring = [(b_, B.outline_size(r)) for b_, r in B.OUTLINE_BONES]
-    for sc, end in (('specials', B.DASH_END), ('specialairs', B.CONNECT_END)):
-        body = [(nm(c), [round(x, 3) if isinstance(x, float) else x for x in c.params]) for c in f['effect'].script(sc)]
-        rings = [(c[1][1], c[1][8]) for c in body if c[0] == 'External_Graphic' and c[1][0] == B.FX_OUTLINE_ID]
-        offs = [k for k, c in enumerate(body) if c[0] == 'Terminate_Graphic_Effect' and c[1][0] == B.FX_OUTLINE_ID]
-        first_ring = min(k for k, c in enumerate(body) if c[0] == 'External_Graphic' and c[1][0] == B.FX_OUTLINE_ID)
-        fr_end = max(k for k, c in enumerate(body) if c == ('FRAME', [float(end)]))
-        check('v6 outline (%s): the ring (0x%08X) on each of %d bones at frame 0 (size: the part\'s radius + %g past '
-              'its edge), no offset / turn, the bone\'s place (last word 0); earlier rings ended first; ended at its '
-              'last frame %d' % (sc, B.FX_OUTLINE_ID, len(ring), B.OUTLINE_PAD, end),
-              (rings, offs[0] < first_ring, offs[-1] > fr_end,
-               {tuple(c[1][2:8]) + (c[1][9],) for c in body if c[0] == 'External_Graphic' and c[1][0] == B.FX_OUTLINE_ID},
-               all(c[0] != 'FRAME' for c in body[:first_ring])),
-              (ring, True, True, {(0.0,) * 6 + (0,)}, True))
+    outline_tests(f)
     print('     note: Stage_Freeze(1, ...) is the stage-only freeze with no flash from exe_v46z_camfx3 on (camera_effects_v3 /'
           ' v4); on exe_v46y_hold its On 1 also turned the scene white (the user\'s v3 clip ca068f15, 70-88)')
     cam = [(nm(c), [round(x, 4) if isinstance(x, float) else x for x in c.params]) for c in f['effect'].script('specialairs')
            if nm(c) in ('Effect_Camera', 'FRAME') or nm(c) == 'Terminate_Graphic_Effect' and c.params[0] == B.FX_GLASS_ID]
     check('v5 / v6: the glass (its shards) on the screen (Effect_Camera Mode 1, %g half heights a unit, Z %g, unslowed) '
           'from the connect\'s frame 0; v6: the white wash at the punch (%d: Mode 1, Z %g, size %g, unslowed, its own '
-          'fade), the glass ended %d frames later (its shards breaking apart past the punch); the darkening on the camera '
-          'only in the camera build (CAMERA_FX %s)' % (B.GLASS_SCREEN_SIZE, B.GLASS_SCREEN_Z, B.STRIKE, B.WASH_Z,
-                                                       B.WASH_SIZE, B.GLASS_BREAK, B.CAMERA_FX),
+          'fade: INVERT_FX off; v7 INVERT_FX: the white fade quad at the punch + %d instead), the glass ended %d frames '
+          'later (its shards breaking apart past the punch); the darkening on the camera only in the camera build '
+          '(CAMERA_FX %s)' % (B.GLASS_SCREEN_SIZE, B.GLASS_SCREEN_Z, B.STRIKE, B.WASH_Z, B.WASH_SIZE, B.INV_END,
+                              B.GLASS_BREAK, B.CAMERA_FX),
           [c for c in cam if c[0] != 'FRAME' or c[1][0] in (float(B.STRIKE), float(B.STRIKE + B.GLASS_BREAK))],
           ([('Effect_Camera', [B.FX_DARK_ID, 0.0, 0.0, B.DARK_Z, 0.0, 0.0, 0.0, B.DARK_SIZE, 1, B.STRIKE, 1])]
            if B.CAMERA_FX and not B.INVERT_FX else []) +
           [('Effect_Camera', [B.FX_GLASS_ID, 0.0, 0.0, B.GLASS_SCREEN_Z, 0.0, 0.0, 0.0, B.GLASS_SCREEN_SIZE, 1, 0, 1]),
            ('FRAME', [float(B.STRIKE)])] +
-          ([] if B.INVERT_FX else [('Effect_Camera', [B.FX_WASH_ID, 0.0, 0.0, B.WASH_Z, 0.0, 0.0, 0.0, B.WASH_SIZE, 1, 0,
-                                                      1])]) +
+          ([('Effect_Camera', [B.FX_FADE_ID, 0.0, 0.0, B.WASH_Z, 0.0, 0.0, 0.0, B.WASH_SIZE, 1, 0, 1])] if B.INVERT_FX else
+           [('Effect_Camera', [B.FX_WASH_ID, 0.0, 0.0, B.WASH_Z, 0.0, 0.0, 0.0, B.WASH_SIZE, 1, 0, 1])]) +
           [('FRAME', [float(B.STRIKE + B.GLASS_BREAK)]), ('Terminate_Graphic_Effect', [B.FX_GLASS_ID, 1, 1])])
-    inv = [(nm(c), [round(x, 3) if isinstance(x, float) else x for x in c.params]) for c in f['effect'].script('specialairs')
-           if nm(c) in ('Screen_Invert',) or nm(c) == 'FRAME' and c.params[0] == float(B.STRIKE)]
-    allinv = [nm(c) for p_ in f for s_ in ('specials', 'specialairs') for c in f[p_].script(s_) if nm(c) == 'Screen_Invert']
-    check('v6 INVERT_FX %s: Screen_Invert (exe_v46z_inv) the stop\'s dark blue-grey negative at the connect\'s 0 (held '
-          '%d, ending by itself), the white negative at the punch (held %d, out over %d: ends by itself); only there' % (
-              B.INVERT_FX, B.INV_STOP[2], B.INV_WHITE[2], B.INV_WHITE[4]),
+    rr = lambda xs: [round(x, 3) if isinstance(x, float) else x for x in xs]     # noqa: E731
+    inv = [(nm(c), rr(c.params)) for c in f['effect'].script('specialairs')
+           if nm(c) in ('Screen_Invert',) or nm(c) == 'FRAME' and c.params[0] in (float(B.STRIKE),
+                                                                                float(B.STRIKE + B.INV_END))]
+    allinv = [c for p_ in f for s_ in ('specials', 'specialairs') for c in f[p_].script(s_) if nm(c) == 'Screen_Invert']
+    check('v6 / v7 INVERT_FX %s: Screen_Invert (exe_v46z_inv) the stop\'s dark blue-grey negative at the connect\'s 0 '
+          '(held %d, then its own end), the white negative at the punch (held %d at most), ended by the script at the '
+          'punch + %d; only there' % (B.INVERT_FX, B.INV_STOP[2], B.INV_WHITE[2], B.INV_END),
           (inv, len(allinv)),
-          (([('Screen_Invert', [round(x, 3) if isinstance(x, float) else x for x in B.INV_STOP]),
-             ('FRAME', [float(B.STRIKE)]),
-             ('Screen_Invert', [round(x, 3) if isinstance(x, float) else x for x in B.INV_WHITE])], 2) if B.INVERT_FX else
+          (([('Screen_Invert', rr(B.INV_STOP)), ('FRAME', [float(B.STRIKE)]), ('Screen_Invert', rr(B.INV_WHITE)),
+             ('FRAME', [float(B.STRIKE + B.INV_END)]), ('Screen_Invert', rr(B.INV_OFF))], 3) if B.INVERT_FX else
            ([('FRAME', [float(B.STRIKE)])], 0)))
+    check('v7 (the user\'s Screen_Invert test: part strengths are grey): every Screen_Invert straight on / off (FadeIn / '
+          'FadeOut 0), full strength', sorted({(c.params[1], c.params[3], c.params[4]) for c in allinv if c.params[0] == 1}
+                                              | {(None, 0, c.params[4]) for c in allinv if c.params[0] == 0}),
+          sorted({(1.0, 0, 0)} | {(None, 0, 0)}) if B.INVERT_FX else [])
+    seq = [(nm(c), c.params[0]) for c in f['effect'].script('specialairs') if nm(c) in ('Effect_Camera', 'Screen_Invert')]
+    k_off = next((k for k, x in enumerate(seq) if x == ('Screen_Invert', 0)), None)
+    check('v7: the white negative ends under the white fade quad: the quad started just before it, in the same frame',
+          seq[k_off - 1] if k_off else None, ('Effect_Camera', B.FX_FADE_ID) if B.INVERT_FX else None)
+    # the white negative's end (Python reference: screen_invert's f(x) on a grey picture): the contrast it shows each
+    # frame, v6's 14-frame fade (through flat grey) against v7's cut under the quad
+    br = B.INV_WHITE[6]
+    v6c = [round(1 - w_ * (1 + br * 1.0), 2) for w_ in [1 - (k + 1) / 14.0 for k in range(14)]]
+    flat6 = sum(1 for c_ in v6c if abs(c_) < 0.3)
+    v7c = [round(1 - B.FADE_A * max(0.0, 1 - k / float(B.FADE_N)), 2) for k in range(B.FADE_N)]
+    check('v7: after the white negative the picture\'s contrast only rises (%.2f -> 1) under the quad; v6\'s fade out '
+          'over 14 had %d frames near flat grey (|contrast| < 0.3), v7 none' % (v7c[0], flat6),
+          (all(b_ >= a_ for a_, b_ in zip(v7c, v7c[1:])), sum(1 for c_ in v7c if abs(c_) < 0.3), flat6 >= 4),
+          (True, 0, True))
     gen = [nm(c) for p in f for s in ('specials', 'specialairs') for c in f[p].script(s)
            if 'article' in nm(c).lower() or 'reflect' in nm(c).lower()]
     check('no Cape left (no article, no reflector) in the side special\'s scripts', gen, [])
@@ -1391,21 +1529,19 @@ def effect_tests(out, sh_out):
           (bool((img_[..., 2] >= img_[..., 0] - 0.02).all()), float(lum.mean()) < 0.2, float(lum.max()) > 0.8,
            len(sh_) > 20, max(sh_) - min(sh_) > 0.08, max(sh_) <= B.GLASS_SHEEN[1] + 1e-6),
           (True, True, True, True, True, True))
-    for key, fid in (('outline', B.FX_OUTLINE_ID), ('wash', B.FX_WASH_ID)):
+    check('v7: no outline ring set left in the bank (v6\'s PtcSupamarioTsOutline: the outline is Outline_Set)',
+          [p.set_name(i) for i in range(len(p.sets)) if p.set_name(i) == 'PtcSupamarioTsOutline'], [])
+    for key, fid in (('fade', B.FX_FADE_ID), ('wash', B.FX_WASH_ID)):
         si = e.entries[fid & 0xFFFF][1] - 1
         ds = [em['data'] for em in p.sets[si]['emitters'] if em['data'] is not None]
-        if key == 'outline':
+        if key == 'fade':
             d = ds[0]
-            check('v6 the outline\'s ring (0x%08X): one additive billboard, forever, following (follow 0), white-blue at '
-                  '%g alpha, a soft ring texture' % (fid, B.OUTLINE_ALPHA),
-                  (p.set_name(si), len(ds), p.field(d, 'blend_type'), p.field(d, 'ptcl_life'), bytes(d[0x310:0x314]).hex(),
-                   round(p.field(d, 'alpha_init'), 3)),
-                  ('PtcSupamarioTsOutline', 1, 1, 0x7FFFFFFF, '00000000', B.OUTLINE_ALPHA))
-            rg = B.ring_rgba()[..., 0].astype(float) / 255.0
-            n_ = rg.shape[0]
-            check('  its ring: half inside, 1 at %g of the radius (the part\'s edge), 0 at the rim' % B.OUTLINE_EDGE,
-                  (round(rg[n_ // 2, n_ // 2], 1), round(rg[n_ // 2, n_ // 2 + int(B.OUTLINE_EDGE * n_ / 2)], 1),
-                   round(rg[n_ // 2, n_ - 1], 1)), (0.5, 1.0, 0.0))
+            check('v7 the white fade quad (0x%08X): one alpha-blended white quad, %d real frames, alpha %g straight down to '
+                  '0 (no fade in)' % (fid, B.FADE_N, B.FADE_A),
+                  (p.set_name(si), len(ds), p.field(d, 'blend_type'), p.field(d, 'ptcl_life'),
+                   [round(p.field(d, k), 3) for k in ('alpha_init', 'alpha_diff21', 'alpha_diff32', 'alpha_section1',
+                                                       'alpha_section2')]),
+                  ('PtcSupamarioTsFade', 1, 0, B.FADE_N, [B.FADE_A, 0.0, -B.FADE_A, 0.0, 0.0]))
         else:
             got = [(p.field(d, 'blend_type'), p.field(d, 'ptcl_life'), round(p.field(d, 'alpha_diff21'), 3),
                     round(p.field(d, 'alpha_section1') * p.field(d, 'ptcl_life'), 2),
