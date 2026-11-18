@@ -3234,6 +3234,14 @@ stack; `--variant noprog` (the game's programs for the second draw) and `--varia
 the programs and the draw. The programs moved to `0x04BE6A00` / `0x04BE6E00` to make room (os_g grew a word): the
 release words differ from exe_v46z_outline3's, not shipped yet.
 
+**v5 (TEST ONLY): the v4 logs were empty for a reason.** All three v4 exes crashed, with no S4SP line, the nodraw one
+too. Cemu's log is written by its own thread from a queue (CemuLogging.cpp `cemuLog_thread`), so the lines just
+before a crash are lost: v3 / v4's logs only say the crash comes within milliseconds of the first marked draw. The
+v5 diag build pauses 50 ms (OSSleepTicks, stub `0x04B80970`, 3107812 ticks) after each line, and logs S4SM the moment
+a draw's pixel-stage FB1 carries the mark (os_dmark, called before os_chk: the context, FB1, the vertex stage's FB1,
+the geometry shader, the pixel shader, its blocks), then S4SP's steps for the first 4 shells (DIAG_STEPS 4).
+Diag format strings shortened to fit below the programs.
+
 **Claimed region: `0x04BE5000`-`0x04BE7000`** (past the mesh visibility's; `textregion:0x2BE7000 grow:0x04BE7000`; code
 and data `0x04BE5000`-`0x04BE6244`, the diag build to `0x04BE66FC`; the programs at `0x04BE6800` (vertex, 0x348 bytes)
 and `0x04BE6C00` (pixel, 0x120), 256-aligned; the table `os_tab` 16 x 0x50). Order: exe_v46z_ol -> tools/mesh_vis_cave.py

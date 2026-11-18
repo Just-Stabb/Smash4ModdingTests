@@ -581,7 +581,7 @@ def diag_tests(exe, orig):
     for at, w in words.items():
         w32(pm, at, w)
     rec = 0x7F00C000
-    ensure(pm, rec, rec + 0x2000)
+    ensure(pm, rec - 0x1000, rec + 0x2000)
     st = Asm(G.OSREPORT_VENEER)
     st.asm("""
         lis r12, 0x%X
@@ -638,6 +638,19 @@ def diag_tests(exe, orig):
     stub.asm('\n        li r3, 2\n        blr\n')
     for i, x in enumerate(stub.words()):
         w32(pm, SC.OS_GET_CORE_ID + 4 * i, x)
+    sleep = Asm(SC.OS_SLEEP_TICKS)                    # OSSleepTicks: records its ticks (r3:r4) at rec - 8, returns
+    sleep.asm('''
+        lis r12, 0x%X
+        ori r12, r12, 0x%X
+        lwz r11, 0(r12)
+        addi r11, r11, 1
+        stw r11, 0(r12)
+        stw r4, 4(r12)
+        blr
+''' % ((rec - 8) >> 16, (rec - 8) & 0xFFFF))
+    for i, x in enumerate(sleep.words()):
+        w32(pm, SC.OS_SLEEP_TICKS + 4 * i, x)
+    w32(pm, rec - 8, 0)
     chain = [(0x7F00F000, 0x7F00F100, 0x037174DC), (0x7F00F100, 0x7F00F200, 0x11111111),
              (0x7F00F200, 0x7F00F300, 0x22222222), (0x7F00F300, 0, 0x33333333)]
     for f, nxt, lr in chain:                          # the stack above os_draw: back chain + saved LR per frame
@@ -649,7 +662,14 @@ def diag_tests(exe, orig):
     check('diag: S4SP at each step of a shell drawn (1 mark, 2 programs, 3 states, 4 draw, 5 back), shell 1, the core, '
           'the return addresses up the stack', [x[:8] for x in got if x[0] == 'S4SP'],
           [('S4SP', k, 1, 2, 0x037174DC, 0x11111111, 0x22222222, 0x33333333) for k in range(1, 6)])
-    got = [x for x in got if x[0] != 'S4SP']
+    check('diag: S4SM the moment the draw\'s FB1 carries the mark (the context, FB1, the vertex stage\'s FB1, no '
+          'geometry shader, the pixel shader, its 2 blocks), before os_chk\'s tests', [x[:8] for x in got if x[0] == 'S4SM'],
+          [('S4SM', CTXA, env.fbd, env.fbd, 0, GAME_PS, 2, r32(pm, GAME_PS + 0xB4))])
+    check('diag: a 50 ms pause (OSSleepTicks %d ticks) after S4SM and each S4SP: 6' % SC.DIAG_PAUSE,
+          (r32(pm, rec - 8), r32(pm, rec - 4)), (6, SC.DIAG_PAUSE))
+    check('diag: S4SM / S4SP first, so a crash after them leaves them in the log', [x[0] for x in got][:6],
+          ['S4SM'] + ['S4SP'] * 5)
+    got = [x for x in got if x[0] not in ('S4SP', 'S4SM')]
     check('diag: S4SR at a shell drawn (shells drawn 1, the device context, its programs, FB1, the width, the rasterizer '
           'state set)', [(x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]) for x in got],
           [('S4SR', 1, CTXA, GAME_VS, GAME_PS, env.fbd, struct.unpack('>I', struct.pack('>f', 1.5))[0],
@@ -659,7 +679,7 @@ def diag_tests(exe, orig):
     env.draw()
     got = lines(n0)
     check('diag: S4SX at a marked FB1 refused (refusals 1, the context, the pixel shader, its block count, FB1)',
-          [(x[0], x[1], x[2], x[3], x[4], x[6]) for x in got], [('S4SX', 1, CTXA, GAME_PS, 1, env.fbd)])
+          [(x[0], x[1], x[2], x[3], x[4], x[6]) for x in got if x[0] != 'S4SM'], [('S4SX', 1, CTXA, GAME_PS, 1, env.fbd)])
     n0 = r32(pm, rec)
     pm.reg_write(UC_PPC_REG_1, 0x7F00F000)
     pm.reg_write(UC_PPC_REG_3, SMGR)

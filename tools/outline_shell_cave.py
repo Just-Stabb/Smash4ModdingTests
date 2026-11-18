@@ -339,15 +339,19 @@ def find(orig):
 
 
 DIAG_FMTS = [
-    ('s_sc', 'S4SC tgt=%d acc=%08X mi=%08X rgb=%08X %08X %08X a=%08X\n'),
+    ('s_sc', 'S4SC t=%d acc=%08X mi=%08X c=%08X %08X %08X a=%08X\n'),
     ('s_sd', 'S4SD width=%08X fr=%d in=%d out=%d flash=%d blend=%d k=%d\n'),
     ('s_st', 'S4ST n=%d k=%d ph=%d eff=%08X drawn=%d checked=%d refused=%d\n'),
     ('s_sf', 'S4SF n=%d mi=%08X fb=%08X width=%08X a=%08X blend=%d marked=%d\n'),
-    ('s_sr', 'S4SR n=%d ctx=%08X vs=%08X ps=%08X fb=%08X width=%08X poly=%08X ds=%08X\n'),
-    ('s_sx', 'S4SX n=%d ctx=%08X ps=%08X blocks=%d ptr=%08X fb=%08X\n'),
-    ('s_sp', 'S4SP step=%d shell=%d core=%d ret=%08X %08X %08X %08X\n'),
+    ('s_sr', 'S4SR n=%d c=%08X v=%08X p=%08X f=%08X w=%08X r=%08X d=%08X\n'),
+    ('s_sx', 'S4SX n=%d c=%08X p=%08X b=%d t=%08X f=%08X\n'),
+    ('s_sp', 'S4SP s=%d n=%d c=%d r=%08X %08X %08X %08X\n'),
+    ('s_sm', 'S4SM c=%08X f=%08X v=%08X g=%08X p=%08X b=%d t=%08X\n'),
 ]
-DIAG_STEPS = 24                 # S4SP: the first 24 shells drawn, every step
+DIAG_MARKS = 4                  # S4SM: the first 4 marked draws
+DIAG_PAUSE = 3107812            # 50 ms of the 62.15625 MHz timer (OSSleepTicks) after each S4SM / S4SP
+OS_SLEEP_TICKS = 0x04B80970     # OSSleepTicks' import stub
+DIAG_STEPS = 4                  # S4SP: the first 4 shells drawn, every step (v5: 4, each line + a pause)
 OS_GET_CORE_ID = 0x04B80340     # OSGetCoreId's import stub (bl targets at 0x032EF0F8, 0x036F7564, ...)
 
 
@@ -364,6 +368,7 @@ def src(s, hand, diag=False, pad=False, variant='full'):
              vcb7=CTX['vcb'] + 8 * 7, pcb7=CTX['pcb'] + 8 * 7, pcb7s=CTX['pcb'] + 8 * 7 + 4,
              **{'c_' + k: v for k, v in CTX.items()}, **{'g_' + k: v[0] for k, v in GX2.items()})
     step = (lambda n: '\n        li r3, %d\n        mr r4, r31\n        bl os_dstep' % n) if diag else (lambda n: '')
+    D.update(mark='\n        mr r3, r31\n        bl os_dmark' if diag else '')
     D.update(st1=step(1), st2=step(2), st3=step(3), st4=step(4), st5=step(5),
              setprog='' if variant == 'noprog' else '''
         lis r3, os_vs@ha                # the shell's programs
@@ -850,7 +855,7 @@ os_draw:
         stw r12, 0x2C(r1)
         mtctr r12
         bctrl                           # the game's draw
-        lwz r31, 0x10(r1)
+        lwz r31, 0x10(r1)%(mark)s
         mr r3, r31
         bl os_chk
         mr. r30, r3
@@ -1058,6 +1063,7 @@ os_dtick:
 os_dfb:
 os_ddraw:
 os_dstep:
+os_dmark:
         blr
 os_dref:
         li r3, 0
@@ -1080,7 +1086,8 @@ os_k:                                   # +0 0, +4 1, +8 2, +0xC 3, +0x10 1/255,
 os_g:                                   # +0 entries in use, +4 frames ticked, +8 FB1 writes, +0xC commands,
         .word 0                         # +0x10 frames since the last command (diag), +0x14 round robin, +0x18 shells
         .word 0                         # drawn, +0x1C marked FB1s refused (diag), +0x20 draws checked while a shell is
-        .word 0                         # in use, +0x24 marked draws seen (diag), +0x28 shells stepped (diag S4SP)
+        .word 0                         # in use, +0x24 marked draws seen (diag), +0x28 shells stepped (diag S4SP),
+        .word 0                         # +0x2C marks logged (diag S4SM)
         .word 0
         .word 0
         .word 0
@@ -1247,7 +1254,66 @@ ods_pr:
         lis r12, os_g@ha
         addi r12, r12, os_g@l
         lwz r5, 0x28(r12)""" + rep + """
+        bl os_dsleep
 ods_out:""" + tail + """
+# --- diag: S4SM the moment a draw's pixel-stage FB1 carries the mark (either byte order), before os_chk's other tests
+#     (the first DIAG_MARKS; r3 the device context): the context, FB1, the vertex stage's FB1, the geometry shader,
+#     the pixel shader, its block count and table; then a pause (os_dsleep) so Cemu's log thread writes the line out
+#     before anything after it can crash -----------------------------------------------------------------------------
+os_dmark:""" + head + """
+        mr r31, r3
+        lis r12, os_g@ha
+        addi r12, r12, os_g@l
+        lwz r0, 0(r12)
+        cmpwi r0, 0
+        beq odm_out
+        lwz r0, 0x2C(r12)
+        cmpwi r0, %(nm)d
+        bge odm_out""" % dict(nm=DIAG_MARKS) + OL.chk('r31', 'odm_out') + """
+        lwz r30, %(pcb7)d(r31)""" % dict(pcb7=CTX['pcb'] + 8 * 7) + OL.chk('r30', 'odm_out') + """
+        lwz r0, %(sh4)d(r30)
+        lis r11, %(mh)d
+        ori r11, r11, %(ml)d
+        cmplw r0, r11
+        beq odm_hit
+        lis r11, %(smh)d
+        ori r11, r11, %(sml)d
+        cmplw r0, r11
+        bne odm_out
+odm_hit:
+        lwz r11, 0x2C(r12)
+        addi r11, r11, 1
+        stw r11, 0x2C(r12)
+        lis r3, s_sm@ha
+        addi r3, r3, s_sm@l
+        mr r4, r31
+        mr r5, r30
+        lwz r6, %(vcb7)d(r31)
+        lwz r7, %(gs)d(r31)
+        lwz r8, %(ps)d(r31)
+        li r9, -1
+        li r10, -1""" % dict(sh4=FB_SHELL + 4, mh=MAGIC >> 16, ml=MAGIC & 0xFFFF, smh=SMAGIC >> 16,
+                             sml=SMAGIC & 0xFFFF, vcb7=CTX['vcb'] + 8 * 7, gs=CTX['gs'], ps=CTX['ps']) + \
+        OL.chk('r8', 'odm_pr') + """
+        lwz r9, 0xB0(r8)
+        lwz r10, 0xB4(r8)
+odm_pr:""" + rep + """
+        bl os_dsleep
+odm_out:""" + tail + """
+# --- diag: a pause of DIAG_PAUSE ticks (OSSleepTicks): Cemu's log is written by its own thread from a queue, so the
+#     last lines before a crash are lost unless the game waits a moment after them ----------------------------------
+os_dsleep:
+        stwu r1, -0x10(r1)
+        mflr r0
+        stw r0, 0x14(r1)
+        li r3, 0
+        lis r4, %(ph)d
+        ori r4, r4, %(pl)d
+        bl 0x%(sleep)08X
+        lwz r0, 0x14(r1)
+        mtlr r0
+        addi r1, r1, 0x10
+        blr""" % dict(ph=DIAG_PAUSE >> 16, pl=DIAG_PAUSE & 0xFFFF, sleep=OS_SLEEP_TICKS) + """
 # --- diag: S4SR at a shell drawn (r3 the device context, r4 FB1, r5 the states set: rasterizer, depth) ---------------
 os_ddraw:""" + head + """
         mr r31, r3
