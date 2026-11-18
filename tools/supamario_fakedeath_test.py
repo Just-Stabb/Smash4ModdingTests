@@ -572,9 +572,10 @@ def script_tests(out, base):
             ns = f[p].scripts.get(h)
             if [(c.ident, c.params) for c in s] != [(c.ident, c.params) for c in (ns or [])] and \
                     h not in (acmd.crc('attackdash'), acmd.crc('specialhi'), acmd.crc('specialairhi'),
-                              acmd.crc('specials'), acmd.crc('specialairs')):
+                              acmd.crc('specials'), acmd.crc('specialairs'), acmd.crc('speciallwlight'),
+                              acmd.crc('speciallwheavy'), acmd.crc('specialairlwlight')):
                 same.append((p, hex(h)))
-    check('every other script as the user\'s (but the God Fist\'s / Core Breaker\'s / Time Skip\'s: '
+    check('every other script as the user\'s (but the God Fist\'s / Core Breaker\'s / Time Skip\'s / Ultra Instinct\'s: '
           'tools/supamario_timeskip_test.py checks those)', same, [])
 
 

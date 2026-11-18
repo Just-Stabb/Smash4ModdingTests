@@ -1788,6 +1788,7 @@ void func_82()
     fd_tick(); // Fake Death: the grounded victim's hitstun and place, the repeats' clock
     sh_tick(); // Sledgehammer v2: a grounded victim's bounce / its 40 frames lying (charged)
     ts_tick(); // Time Skip: the air side special's use back on landing, a ledge, a hit, a KO
+    ui_tick(); // Ultra Instinct: the transformation's trigger, the autododge's signal, the aura, the resets
 }
 
 float func_83()
@@ -36446,6 +36447,9 @@ int func_2252()
 
 int func_2253()
 {
+    // Ultra Instinct (README "Ultra Instinct v1"): status 0x157 is the transformation / counter now (F.L.U.D.D.'s
+    // shoot is unreachable since Fake Death / Sledgehammer)
+    return ui_pre();
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x1, 0, 0x400, 0);
     return 0;
@@ -36455,6 +36459,7 @@ int func_2254()
 {
     int var0;
     int var1;
+    return ui_pre();           // Ultra Instinct: status 0x158 is the autododge now
     var0 = WorkModule(0x6, 0x1000004b);
     var1 = 0x10001;
     if (0x1 == var0)
@@ -36804,6 +36809,10 @@ void func_2267()
 void func_2268()
 {
     int var0;
+    // Ultra Instinct: the transformation / counter (status 0x157); the F.L.U.D.D. shoot below is no longer reached
+    ui_init();
+    func_78(ui_loop);
+    return;
     ControlModule(0x271f);
     var0 = 0x4 + WorkModule(0x6, 0x1000004b);
     ArticleModule(0x2715, 0x2, var0, 0);
@@ -36925,6 +36934,10 @@ void func_2271()
 void func_2272()
 {
     int var0;
+    // Ultra Instinct: the autododge (status 0x158); the F.L.U.D.D. end below is no longer reached
+    ui_dodge_init();
+    func_78(ui_dodge_loop);
+    return;
     if (WorkModule(0x6, 0x10000083) < WorkModule(0x6, 0x18000001))
     {
         WorkModule(0x7, 0x231, 0x11000002);
@@ -37020,6 +37033,7 @@ void func_2275()
     float var1;
     float var2;
     float var3;
+    return;                    // Ultra Instinct: status 0x158's exec (F.L.U.D.D.'s) does nothing
     var0 = (float)WorkModule(0x6, 0x10000083);
     var1 = (float)WorkModule(0x6, 0x18000000);
     var2 = var0 / var1;
@@ -37145,6 +37159,8 @@ void func_2282()
 void func_2283()
 {
     int var0;
+    ui_end();                  // Ultra Instinct (status 0x157)
+    return;
     var0 = global6;
     if (var0 != 0x158)
     {
@@ -37174,6 +37190,8 @@ void func_2283()
 
 void func_2284()
 {
+    ui_dodge_end();            // Ultra Instinct (status 0x158)
+    return;
     WorkModule(0x7, 0, 0x10000083);
     WorkModule(0x7, WorkModule(0x6, 0x18000003), 0x10000084);
     ArticleModule(0x2713, 0x2, 0);
@@ -42405,4 +42423,360 @@ void ts_land_lag()
     {
         WorkModule(0, 0.0f, TS_V_RETRY);
     }
+}
+
+// ===================================================================
+// Ultra Instinct v1 (fighters/supamario/README.md "Ultra Instinct v1"; Dragon Ball Xenoverse 2's Awoken Skill
+// 1510_GKS_MGT "Ultra Instinct -Sign-"; tools/supamario_ui_build.py makes the UI_* values; the native part is
+// tools/supamario_ui_cave.py, exe_v46z_ui).
+// - The transformation: his first actionable frame at UI_TRIGGER_PCT% or more (Wait, Walk, WalkBrake, Dash, Run,
+//   RunBrake, Squat .. SquatB on the ground, Fall / FallAerial in the air; never in tumble, hitstun, a shield, a ledge
+//   or a move), once a stock: status UI_ST (0x157, Mario's unreachable F.L.U.D.D. shoot), UI_FORM_N frames, motion
+//   UI_MOT_FORM; intangible throughout (nothing hits his body, no grab), held still in the air; the counter shape
+//   (the cave's ShieldModule group 1) on. A hit on it (any attacker: fighter, projectile, item) is the cave's slot 42
+//   record: he answers at once (ui_counter): beside the fighter to answer (a projectile's / item's owner), facing it,
+//   a strike (motion UI_MOT_STRIKE, the game script's hitbox reads its damage from status float UI_F_DMG: 1.2x the
+//   hit, UI_MIN_DMG at least). Either way he is transformed afterwards, until his KO.
+// - The autododge (transformed, the cave's slot 43: a fighter's attack on him in Wait / Walk / Squat .. on the
+//   ground skipped, TIMER_1 / TIMER_2 set by side): status UI_ST_DODGE (0x158), a sidestep away, intangible
+//   UI_DODGE_INV frames, then actionable; no cooldown.
+// State (no new globals; New_Var / VAR_* are all taken): the user variables TIMER_0-2 (0x0F000320-322, unused before;
+// they count down by themselves every frame, so the MSC writes TIMER_0 every frame and the cave's signals die in 4):
+// TIMER_0 UI_V_FORM 0 none / UI_FORMING (1000) the transformation status / UI_FORMED (2000) transformed; TIMER_1 /
+// TIMER_2 the dodge asked (the attacker right / left of him). The statuses' own work: floats 6-9 the cave's (damage,
+// side, the X / Y to answer), 0x0100000A the strike's damage, 0x0100000B the phase (0 forming, 1 the strike),
+// 0x0100000C frames, 0x0100000D the dodge's way (world X sign); flags 0x21000010-12 the cave's.
+// Resets: TIMER_0-2 back to 0 on Dead / Rebirth / Entry (ui_tick); the timers are also cleared by the fighter's
+// set-up (a KO, docs/acmd-extra-commands.md).
+// ===================================================================
+
+float ui_state()
+{
+    float v;
+    v = WorkModuleF(0, UI_V_FORM);
+    if (v > UI_FORMED - 500.0f)
+    {
+        return UI_FORMED;
+    }
+    if (v > UI_FORMING - 500.0f)
+    {
+        return UI_FORMING;
+    }
+    return 0.0f;
+}
+
+// the trigger's statuses: Wait, Walk, WalkBrake, Dash, Run, RunBrake, Squat, SquatWait, SquatF, SquatB on the ground;
+// Fall, FallAerial in the air
+int ui_can_form(float st)
+{
+    if (global18 == 0 && (st <= 5.0f || st >= 17.0f && st <= 20.0f))
+    {
+        return 0x1;
+    }
+    if (global18 == 0x2 && (st == 14.0f || st == 15.0f))
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// the autododge's statuses: Wait, Walk, WalkBrake, Squat .. SquatRv (the cave's)
+int ui_can_dodge(float st)
+{
+    if (global18 == 0 && (st <= 2.0f || st >= 17.0f && st <= 21.0f))
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// the aura while transformed: XV2's (BTL_AURA effect 848, the Ultra Instinct loops: the pelvis's, the head's, the
+// feet's) following his bones (EffectModule 0x2730: the following request, white = untinted), ended and made again
+// every UI_AURA_EVERY frames (Smash 4 ends an MSC effect it can't see: the renewal keeps one of each); off on his KO
+void ui_aura_off()
+{
+    EffectModule(0x2723, UI_FX_AURA1, 0x1, 0x1);
+    EffectModule(0x2723, UI_FX_AURA2, 0x1, 0x1);
+    EffectModule(0x2723, UI_FX_AURA3, 0x1, 0x1);
+}
+
+void ui_aura()
+{
+    ui_aura_off();
+    EffectModule(0x2730, UI_FX_AURA1, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_AURA_SIZE, 0, 0, 0, 0, 0, 0, 0x1, 0xff, 0xff, 0xff);
+    EffectModule(0x2730, UI_FX_AURA2, UI_BONE_HEAD, 0, UI_HEAD_UP, 0, 0, 0, 0, UI_AURA_SIZE, 0, 0, 0, 0, 0, 0, 0x1, 0xff, 0xff, 0xff);
+    EffectModule(0x2730, UI_FX_AURA3, UI_BONE_LFOOT, 0, 0, 0, 0, 0, 0, UI_FOOT_SIZE, 0, 0, 0, 0, 0, 0, 0x1, 0xff, 0xff, 0xff);
+    EffectModule(0x2730, UI_FX_AURA3, UI_BONE_RFOOT, 0, 0, 0, 0, 0, 0, UI_FOOT_SIZE, 0, 0, 0, 0, 0, 0, 0x1, 0xff, 0xff, 0xff);
+}
+
+// every frame (func_82, every status)
+void ui_tick()
+{
+    float st;
+    float s;
+    float n;
+    st = WorkModuleF(0, 0x0F0000A2);
+    if (st == UI_ST_DEAD || st == UI_ST_REBIRTH || st == UI_ST_ENTRY)
+    {
+        if (WorkModuleF(0, UI_V_FORM) > 0.5f)
+        {
+            ui_aura_off();
+        }
+        WorkModule(0, 0.0f, UI_V_FORM);
+        WorkModule(0, 0.0f, UI_V_DODGE_R);
+        WorkModule(0, 0.0f, UI_V_DODGE_L);
+        return;
+    }
+    s = ui_state();
+    if (s == UI_FORMING && st != UI_ST_F)
+    {
+        s = UI_FORMED;              // the transformation's status left (it ends transformed)
+    }
+    WorkModule(0, s, UI_V_FORM);
+    if (s == 0.0f)
+    {
+        if (WorkModuleF(0, 0x0F000117) >= UI_TRIGGER_PCT && StopModule(0x1) == 0 && ui_can_form(st) != 0)
+        {
+            func_16(UI_ST, 0);
+        }
+        return;
+    }
+    if (s != UI_FORMED)
+    {
+        return;
+    }
+    n = WorkModuleF(0, UI_V_DODGE_R) + WorkModuleF(0, UI_V_DODGE_L);
+    if (n > 0.5f && st != UI_ST_DODGE_F)
+    {
+        if (ui_can_dodge(st) != 0)
+        {
+            func_16(UI_ST_DODGE, 0);
+        }
+        else
+        {
+            WorkModule(0, 0.0f, UI_V_DODGE_R);
+            WorkModule(0, 0.0f, UI_V_DODGE_L);
+        }
+    }
+    if (UI_AURA_EVERY > 0.5f && StopModule(0x1) == 0)
+    {
+        n = WorkModuleF(0, UI_V_AURA);
+        if (n < 0.5f)
+        {
+            ui_aura();
+            WorkModule(0, UI_AURA_EVERY, UI_V_AURA);
+        }
+    }
+}
+
+// the statuses' set-up (their pre): Mario's, the attack log empty (no staling)
+int ui_pre()
+{
+    StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
+    StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0, 0, 0x400, 0);
+    return 0;
+}
+
+// held where he is (the transformation, the strike): on the ground no speed; in the air no gravity, no drift
+void ui_still()
+{
+    if (global18 == 0)
+    {
+        KineticModule(0x11, 0x3, 0.0f, 0.0f);
+        return;
+    }
+    cb_speed(0.0f, 0.0f);
+    KineticModule(0x11, 0x2, 0.0f, 0.0f);
+}
+
+void ui_init()
+{
+    WorkModule(0, UI_FORMING, UI_V_FORM);
+    WorkModule(0, 0.0f, 0x0100000B);
+    WorkModule(0, 0.0f, 0x0100000C);
+    WorkModule(0, 0.0f, UI_F_DMG);
+    if (global18 == 0)
+    {
+        KineticModule(0, 0x6);
+        GroundModule(0x2710, 0x1);
+    }
+    else
+    {
+        ts_air_kinetics();
+    }
+    func_22(UI_MOT_FORM, 0, 1.0f);
+    ui_still();
+    WorkModule(0, 2.0f, 0x0F00011B);            // intangible (renewed every frame of the status)
+    ShieldModule(0, 0x2, 0, 0x1, 0x1);          // the counter shape on (the cave's group 1)
+}
+
+// the counter (the cave's record, status flag 0x21000010): the shape off, the strike's damage (1.2x, UI_MIN_DMG at
+// least), facing the side, moved beside the fighter to answer (found: 0x21000012), the strike's motion
+void ui_counter()
+{
+    float d;
+    float side;
+    float tx;
+    float ty;
+    ShieldModule(0, 0x2, 0, 0, 0x1);
+    d = WorkModuleF(0, 0x01000006) * UI_MUL;
+    if (d < UI_MIN_DMG)
+    {
+        d = UI_MIN_DMG;
+    }
+    WorkModule(0, d, UI_F_DMG);
+    side = WorkModuleF(0, 0x01000007);
+    EffectModule(0x2710, UI_FX_VANISH, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_VANISH_SIZE, 0, 0, 0, 0, 0, 0, 0x1);   // where he was
+    if (side * WorkModuleF(0, 0x0f000003) < 0.0f)
+    {
+        PostureModule(0x1);
+        PostureModule(0x2);
+    }
+    if (WorkModule(0x10, 0x21000012))
+    {
+        tx = WorkModuleF(0, 0x01000008);
+        ty = WorkModuleF(0, 0x01000009);
+        WorkModule(0, tx - side * UI_GAP, 0x0f000000);
+        if (global18 != 0 || MathF(0, (ty - WorkModuleF(0, 0x0f000001)) * (ty - WorkModuleF(0, 0x0f000001))) > UI_GROUND_DY)
+        {
+            if (global18 == 0)
+            {
+                func_94();
+                ts_air_kinetics();
+            }
+            WorkModule(0, ty, 0x0f000001);
+        }
+    }
+    WorkModule(0, UI_FORMED, UI_V_FORM);
+    WorkModule(0, 1.0f, 0x0100000B);
+    WorkModule(0, 0.0f, 0x0100000C);
+    func_22(UI_MOT_STRIKE, 0, 1.0f);
+    ui_still();
+}
+
+// the end: Wait on the ground, Fall in the air (his gravity back)
+void ui_finish()
+{
+    if (global18 == 0)
+    {
+        KineticModule(0x11, 0x3, 0.0f, 0.0f);
+        func_16(0, 0);
+        return;
+    }
+    sh_grav();
+    KineticModule(0xb, 0x2);
+    func_16(0xe, 0);
+}
+
+void ui_loop()
+{
+    float ph;
+    float n;
+    ph = WorkModuleF(0, 0x0100000B);
+    n = WorkModuleF(0, 0x0100000C) + 1.0f;
+    WorkModule(0, n, 0x0100000C);
+    ui_still();
+    if (ph < 0.5f)
+    {
+        WorkModule(0, 2.0f, 0x0F00011B);
+        if (WorkModule(0x10, 0x21000010))
+        {
+            ui_counter();
+            return;
+        }
+        if (n > UI_FORM_N - 0.5f)
+        {
+            ShieldModule(0, 0x2, 0, 0, 0x1);
+            WorkModule(0, UI_FORMED, UI_V_FORM);
+            WorkModule(0, 0.0f, UI_V_AURA);
+            ui_finish();
+        }
+        return;
+    }
+    if (n < UI_STRIKE_SAFE + 0.5f)
+    {
+        WorkModule(0, 2.0f, 0x0F00011B);    // intangible through the strike's active frames
+    }
+    if (n > UI_STRIKE_N - 0.5f)
+    {
+        ui_finish();
+    }
+}
+
+void ui_end()
+{
+    ShieldModule(0, 0x2, 0, 0, 0x1);
+    if (ui_state() == UI_FORMING)
+    {
+        WorkModule(0, UI_FORMED, UI_V_FORM);
+    }
+    if (global18 == 0x2)
+    {
+        sh_grav();
+        KineticModule(0xb, 0x2);
+    }
+    else
+    {
+        KineticModule(0x11, 0x3, 0.0f, 0.0f);
+    }
+}
+
+// the dodge (status 0x158): away from the attacker (TIMER_1: it is to his right -> left), his facing kept; UI_DODGE_V a
+// frame over UI_DODGE_MOVE frames (energy 3, world X; ground correction 2: it stops at an edge), intangible
+// UI_DODGE_INV frames, actionable from then (func_39 / func_41), Wait at UI_DODGE_N
+void ui_dodge_init()
+{
+    float way;
+    way = 1.0f;
+    if (WorkModuleF(0, UI_V_DODGE_R) > 0.5f)
+    {
+        way = -1.0f;
+    }
+    WorkModule(0, 0.0f, UI_V_DODGE_R);
+    WorkModule(0, 0.0f, UI_V_DODGE_L);
+    WorkModule(0, way, 0x0100000D);
+    WorkModule(0, 0.0f, 0x0100000C);
+    KineticModule(0, 0x6);
+    GroundModule(0x2710, 0x2);
+    WorkModule(0, UI_DODGE_INV, 0x0F00011B);
+    func_22(UI_MOT_DODGE, 0, 1.0f);
+    KineticModule(0x11, 0x3, way * UI_DODGE_V, 0.0f);
+}
+
+void ui_dodge_loop()
+{
+    float n;
+    n = WorkModuleF(0, 0x0100000C) + 1.0f;
+    WorkModule(0, n, 0x0100000C);
+    if (global18 == 0x2)
+    {
+        KineticModule(0x11, 0x3, 0.0f, 0.0f);
+        func_16(0xe, 0);
+        return;
+    }
+    if (n < UI_DODGE_MOVE - 0.5f)
+    {
+        KineticModule(0x11, 0x3, WorkModuleF(0, 0x0100000D) * UI_DODGE_V, 0.0f);
+    }
+    else
+    {
+        KineticModule(0x11, 0x3, 0.0f, 0.0f);
+    }
+    if (n > UI_DODGE_INV - 0.5f)
+    {
+        if (func_39() != 0 || func_41() != 0)
+        {
+            return;
+        }
+    }
+    if (n > UI_DODGE_N - 0.5f)
+    {
+        func_16(0, 0);
+    }
+}
+
+void ui_dodge_end()
+{
+    KineticModule(0x11, 0x3, 0.0f, 0.0f);
+    GroundModule(0x2710, 0x1);
 }

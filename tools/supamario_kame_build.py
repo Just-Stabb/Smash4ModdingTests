@@ -520,7 +520,14 @@ def supamario_values(fx):
         # Sledgehammer's (the air down special, tools/supamario_sledgehammer_build.py)
         **sledgehammer_values(),
         # Time Skip's (the side special, tools/supamario_timeskip_build.py)
-        **timeskip_values()}
+        **timeskip_values(),
+        # Ultra Instinct's (his gimmick, tools/supamario_ui_build.py)
+        **ultrainstinct_values()}
+
+
+def ultrainstinct_values():
+    import supamario_ui_build
+    return supamario_ui_build.msc_values()
 
 
 def godfist_values():
