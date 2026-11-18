@@ -12,7 +12,10 @@ this adds:
    transformation status (0x157): ShieldModule(0, 2, 0, 1, 1) / (0, 2, 0, 0, 1).
 2. SLOT42 (0x02F1B218 `blr`, the shield-hit event's call): for kind 0x41, a hit on group 1 (message +0x14 == 1) in
    status 0x157 (the transformation) or 0x155 (Secret Sensation, the transformed grounded down special: his MSC has
-   the shape on only in its window; Fake Death / Sledgehammer never switch it on) before any (status flag 0x21000010 off), counterable (the attacker AttackModule's hit data
+   the shape on only in its window; Fake Death / Sledgehammer never switch it on) before any. The two counters' rules
+   differ (the user's): the transformation's is XV2's (1510_GKS_MGT_PLAYER.bcm: its counter children's
+   PrimaryActivatorConditions CounterMelee, not CounterProjectile): a FIGHTER's own attack only (record category 0);
+   Secret Sensation's: anything an opponent owns (0 fighter, 1 weapon, 2 item), never a stage gimmick (3); (status flag 0x21000010 off), counterable (the attacker AttackModule's hit data
    vt +0x194(id, part): +0x54 == 0): status float 0x01000006 = the hit's damage (message +0xC), 0x01000007 = the side
    (+1.0 the attacker to his right: the facing that faces it), 0x01000008 / 0x01000009 = X / Y of the fighter to
    answer: the attacker itself (record +0x1C category 0), or for a weapon / item (1 / 2) its current owner (the
@@ -224,9 +227,16 @@ s42_st: lwz r11, %(work)d(r12)
         mr r29, r11                     # status work
         lwz r28, 0x10(r5)               # the collision record
         li r25, 0                       # flag bits to add
-        lbz r0, 0x1C(r28)               # a stage gimmick (category 3) or anything past: not countered
-        cmplwi r0, 3
+        lbz r0, 0x1C(r28)               # the attacker's category: 0 fighter, 1 weapon, 2 item, 3 gimmick
+        cmplwi r0, 3                    # Secret Sensation: anything an opponent owns (0-2), never a gimmick
         bge out42
+        lwz r12, %(st)d(r31)
+        lwz r12, 0x48(r12)
+        cmpwi r12, %(st_ui)d            # the transformation: XV2's CounterMelee only (a fighter's own attack)
+        bne s42_cat
+        cmplwi r0, 0
+        bne out42
+s42_cat:
         lwz r3, 8(r30)                  # the attacker's AttackModule: vt +0x194(id, part) = hit data
         lwz r12, 0(r3)
         lwz r12, 0x194(r12)

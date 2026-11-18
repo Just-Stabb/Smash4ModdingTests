@@ -42444,10 +42444,10 @@ void ts_land_lag()
 //   RunBrake, Squat .. SquatB on the ground, Fall / FallAerial in the air; never in tumble, hitstun, a shield, a ledge
 //   or a move), once a stock: status UI_ST (0x157, Mario's unreachable F.L.U.D.D. shoot), UI_FORM_N frames, motion
 //   UI_MOT_FORM; intangible throughout (nothing hits his body, no grab), held still in the air; the counter shape
-//   (the cave's ShieldModule group 1) on. A hit on it (any attacker: fighter, projectile, item) is the cave's slot 42
-//   record: he answers at once (ui_counter): beside the fighter to answer (a projectile's / item's owner), facing it,
-//   a strike (motion UI_MOT_STRIKE, the game script's hitbox reads its damage from status float UI_F_DMG: 1.2x the
-//   hit, UI_MIN_DMG at least). Either way he is transformed afterwards, until his KO.
+//   (the cave's ShieldModule group 1) on in XV2's counter window (UI_CW_ON-UI_CW_OFF: BAC entry 0's 30-151). A
+//   fighter's own attack on it (XV2's CounterMelee: no projectile / item, the cave's filter) is the cave's slot 42
+//   record: he answers at once (ui_counter, XV2's BAC entry 5): beside the attacker, facing it, the counter's motion
+//   (the freeze box at once, XV2's finisher). Either way he is transformed afterwards, until his KO.
 // - The autododge (transformed, the cave's slot 43: a fighter's attack on him in Wait / Walk / Squat .. on the
 //   ground skipped, TIMER_1 / TIMER_2 set by side): status UI_ST_DODGE (0x158), a sidestep away, intangible
 //   UI_DODGE_INV frames, then actionable; no cooldown.
@@ -42604,8 +42604,7 @@ void ui_init()
 {
     WorkModule(0, UI_FORMING, UI_V_FORM);
     WorkModule(0, 0.0f, 0x0100000B);
-    WorkModule(0, 0.0f, 0x0100000C);
-    WorkModule(0, 0.0f, UI_F_DMG);
+    WorkModule(0, -1.0f, 0x0100000C);    // its loop runs on this frame too: frame 0
     if (global18 == 0)
     {
         KineticModule(0, 0x6);
@@ -42618,24 +42617,18 @@ void ui_init()
     func_22(UI_MOT_FORM, 0, 1.0f);
     ui_still();
     WorkModule(0, 2.0f, 0x0F00011B);            // intangible (renewed every frame of the status)
-    ShieldModule(0, 0x2, 0, 0x1, 0x1);          // the counter shape on (the cave's group 1)
 }
 
-// the counter (the cave's record, status flag 0x21000010): the shape off, the strike's damage (1.2x, UI_MIN_DMG at
-// least), facing the side, moved beside the fighter to answer (found: 0x21000012), the strike's motion
+// the counter (the cave's record, status flag 0x21000010: XV2's CounterMelee, a fighter's own attack in the window):
+// XV2's BAC entry 5 (BCM #2, the stance's child): the shape off, facing the attacker, moved beside it (XV2's vanish:
+// effect 82, the Vanish sound, Movement to the target), the counter's motion (its game script: the freeze box at 0,
+// XV2's BDM #0, the finisher at UI_STRIKE_N's hit frame, BDM #2)
 void ui_counter()
 {
-    float d;
     float side;
     float tx;
     float ty;
     ShieldModule(0, 0x2, 0, 0, 0x1);
-    d = WorkModuleF(0, 0x01000006) * UI_MUL;
-    if (d < UI_MIN_DMG)
-    {
-        d = UI_MIN_DMG;
-    }
-    WorkModule(0, d, UI_F_DMG);
     side = WorkModuleF(0, 0x01000007);
     EffectModule(0x2710, UI_FX_VANISH, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_VANISH_SIZE, 0, 0, 0, 0, 0, 0, 0x1);   // where he was
     if (side * WorkModuleF(0, 0x0f000003) < 0.0f)
@@ -42695,6 +42688,15 @@ void ui_loop()
             ui_counter();
             return;
         }
+        // XV2's counter window (entry 0's BcmCallback / invulnerability type 6, 30-151): the cave's shape on
+        if (n > UI_CW_ON - 0.5f && n < UI_CW_ON + 0.5f)
+        {
+            ShieldModule(0, 0x2, 0, 0x1, 0x1);
+        }
+        if (n > UI_CW_OFF - 0.5f && n < UI_CW_OFF + 0.5f)
+        {
+            ShieldModule(0, 0x2, 0, 0, 0x1);
+        }
         if (n > UI_FORM_N - 1.5f)
         {
             ShieldModule(0, 0x2, 0, 0, 0x1);
@@ -42746,7 +42748,7 @@ void ui_dodge_init()
     WorkModule(0, 0.0f, UI_V_DODGE_R);
     WorkModule(0, 0.0f, UI_V_DODGE_L);
     WorkModule(0, way, 0x0100000D);
-    WorkModule(0, 0.0f, 0x0100000C);
+    WorkModule(0, -1.0f, 0x0100000C);    // its loop runs on this frame too: frame 0
     KineticModule(0, 0x6);
     GroundModule(0x2710, 0x2);
     WorkModule(0, UI_DODGE_INV, 0x0F00011B);
@@ -42808,7 +42810,7 @@ void ss_init()
 {
     WorkModule(0, 3.0f, UI_V_SS);
     WorkModule(0, 0.0f, 0x0100000B);
-    WorkModule(0, 0.0f, 0x0100000C);
+    WorkModule(0, -1.0f, 0x0100000C);    // its loop runs on this frame too: frame 0
     KineticModule(0, 0x6);
     GroundModule(0x2710, 0x2);
     KineticModule(0x11, 0x3, 0.0f, 0.0f);

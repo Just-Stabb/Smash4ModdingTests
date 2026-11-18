@@ -246,9 +246,10 @@ def form_tests(r):
     check('its pre: the attack log empty (no staling)', [e[2] for e in g.ev('status_data')][:1],
           [(0x2713, 0, 1, 0, 0, 0, 0, 0, 0x400, 0)])
     check('its motion: 0x231 (SpecialLwLight)', [e[2] for e in g.ev('motion')][:1], [B.MOT_FORM])
-    sh = [e[2] for e in g.ev('shield')]
-    check('the counter shape on at the start, off at the end (ShieldModule(0, 2, 0, on, 1))',
-          (sh[0], sh[-1]), ((0, 2, 0, 1, 1), (0, 2, 0, 0, 1)))
+    sh = [(e[0] - start, e[2]) for e in g.ev('shield')]
+    check('the counter shape on in XV2\'s window only: frames %d-%d (entry 0\'s 30-151), off at the end'
+          % (B.CW_ON, B.CW_OFF), (sh[0], sh[1], sh[-1][1]),
+          ((B.CW_ON, (0, 2, 0, 1, 1)), (B.CW_OFF, (0, 2, 0, 0, 1)), (0, 2, 0, 0, 1)))
     ints = [e for e in g.ev('set') if e[2] == 0x0F00011B]
     check('intangible (2 frames, renewed) every frame of the %d' % B.FORM_N,
           sorted({e[0] for e in ints}) == list(range(start, start + B.FORM_N)), True)
@@ -276,21 +277,20 @@ def form_tests(r):
 
 def counter_tests(r):
     for what, rec, air, want_x, want_y, want_dmg, turn in (
-            ('a fighter on the ground to his right, 10%', (10.0, 1.0, True, 40.0, 0.0, 0), False, 40.0 - B.GAP, 0.0,
+            ('a fighter on the ground to his right', (10.0, 1.0, True, 40.0, 0.0, 0), False, 40.0 - B.GAP, 0.0,
              12.0, True),
-            ('a fighter to his left, 5% (8 at least)', (5.0, -1.0, True, -20.0, 0.0, 0), False, -20.0 + B.GAP, 0.0,
+            ('a fighter to his left', (5.0, -1.0, True, -20.0, 0.0, 0), False, -20.0 + B.GAP, 0.0,
              8.0, False),
-            ('a projectile, its owner high up to the right', (20.0, 1.0, True, 60.0, 25.0, 1), False, 60.0 - B.GAP,
+            ('a fighter high up to the right', (20.0, 1.0, True, 60.0, 25.0, 0), False, 60.0 - B.GAP,
              25.0, 24.0, True),
-            ('a projectile with no owner found', (7.0, 1.0, False, 0.0, 0.0, 1), False, 10.0, 0.0, 8.4, True)):
+            ('nobody found (the record without 0x21000012)', (7.0, 1.0, False, 0.0, 0.0, 0), False, 10.0, 0.0, 8.4,
+             True)):
         g, vm = form_run(r, air=air, counter_at=20, record=rec, frames=B.FORM_N + B.STRIKE_N + 5)
         ms = [e[2] for e in g.ev('motion')]
         check('counter, %s: the strike\'s motion (0x235) after the transformation\'s' % what, ms[:2],
               [B.MOT_FORM, B.MOT_STRIKE])
         at = [e for e in g.ev('motion') if e[2] == B.MOT_STRIKE][0][0]
         check('  at once (the frame the record is read)', at, 22)
-        check('  its damage %.1f (status float 0x0100000A)' % want_dmg,
-              [e[3] for e in g.ev('set') if e[2] == B.F_DMG and e[3] > 0][:1], [round(want_dmg, 4)])
         check('  turned to face it' if turn else '  not turned', len(g.ev('turn')), 1 if turn else 0)
         check('  placed at X %.1f, Y %.1f' % (want_x, want_y), (round(g.x, 3), round(g.y, 3)), (want_x, want_y))
         check('  the shape off at once', [e[2] for e in g.ev('shield') if e[0] == at][:1], [(0, 2, 0, 0, 1)])
@@ -374,6 +374,66 @@ def reset_tests(r):
     check('the transformation\'s status left some other way: transformed (2000)', g.vars[C.V_FORM], 2000.0)
 
 
+def ss_run(r, rec=None, at=10, frames=60, form=2000.0, air_target=False):
+    """the grounded down special (status 0x155's main func_2265, its loop, its end func_2282)"""
+    g = Game(status=0x155, damage=150.0, x=0.0, y=0.0, face=1.0)
+    g.vars[C.V_FORM] = form
+    g.vars[B.V_AURA] = 999.0
+    vm = r.vm(g)
+    vm.g[18] = 0
+    r.call(vm, 'func_2265')
+    zs = []
+    for k in range(frames):
+        if rec is not None and k == at and g.status == 0x155:
+            g.sw.update({0x01000006: 9.0, 0x01000007: rec[0], 0x01000008: rec[1], 0x01000009: rec[2]})
+            g.flags |= {C.FLAG_HIT} | ({C.FLAG_FOUND} if rec[3] else set())
+        g.n += 1
+        for t in TIMERS + (B.V_SS,):
+            if g.vars.get(t, 0.0) > 0.0:
+                g.vars[t] = max(0.0, g.vars[t] - 1.0)
+        vm.g[18] = 2 if g.air else 0
+        g.req = None
+        r.call(vm, 'func_82')
+        if g.status == 0x155:
+            r.call(vm, 'ss_loop')
+        zs.append(round(g.vars.get(0x0F000002, 0.0), 3))
+        if g.req is not None and g.req != g.status:
+            if g.status == 0x155:
+                r.call(vm, 'func_2282')
+            g.status = g.req
+            break
+    return g, vm, zs
+
+
+def ss_tests(r):
+    g, vm, zs = ss_run(r, frames=80)
+    check('Secret Sensation (transformed, grounded down special): its stance motion 0x245',
+          [e[2] for e in g.ev('motion')][:1], [B.MOT_SS])
+    sh = [(e[0], e[2]) for e in g.ev('shield')]
+    check('  the counter shape on at %d, off at %d (Marth-like)' % (B.SS_ON, B.SS_OFF), sh[:2],
+          [(B.SS_ON, (0, 2, 0, 1, 1)), (B.SS_OFF, (0, 2, 0, 0, 1))])
+    check('  no counter: Wait after the %d-frame stance' % B.SS_END, (g.status, g.n), (0, B.SS_END - 1))
+    g, vm, zs = ss_run(r, form=0.0, frames=1)
+    check('  not transformed: the grounded down special is Fake Death (motion 0x229)',
+          [e[2] for e in g.ev('motion')][:1], [0x229])
+    for what, rec, want in (('a grounded fighter 30 to his right', (1.0, 30.0, 0.0, True), (30.0 + B.SS_BEHIND, B.SS_UP_GROUND)),
+                            ('a grounded fighter 25 to his left', (-1.0, -25.0, 0.0, True), (-25.0 - B.SS_BEHIND, B.SS_UP_GROUND)),
+                            ('an airborne fighter (30, 20)', (1.0, 30.0, 20.0, True), (30.0 + B.SS_BEHIND_AIR, 20.0 + B.SS_UP_AIR))):
+        g, vm, zs = ss_run(r, rec=rec)
+        check('Secret Sensation, %s: the spot dodge (0x4B) slide' % what, [e[2] for e in g.ev('motion')][-1:],
+              [B.MOT_ESCAPE_N])
+        check('  ends behind it, airborne: (%g, %g)' % want, (round(g.x, 3), round(g.y, 3), g.air), want + (True,))
+        check('  Fall after %d frames of slide (actionable)' % B.SS_SLIDE_N, g.status, 0xE)
+        check('  into the background on the way (Z down to -%g) and back to 0' % B.SS_DEPTH,
+              (min(zs) <= -B.SS_DEPTH + 0.05, zs[-1]), (True, 0.0))
+        check('  facing it at the end', g.face == -rec[0], True)
+        ints = [e for e in g.ev('set') if e[2] == 0x0F00011B]
+        check('  intangible every frame of the slide', len(ints) >= B.SS_SLIDE_N, True)
+    g, vm, zs = ss_run(r, rec=(1.0, 0.0, 0.0, False), frames=80)
+    check('Secret Sensation, nobody to answer (an unowned item): no slide, the stance ends (Wait)',
+          (B.MOT_ESCAPE_N in [e[2] for e in g.ev('motion')], g.status), (False, 0))
+
+
 def script_tests(out, ts_out):
     body = os.path.join(out, 'fighter', 'supamario', 'script', 'animcmd', 'body')
     tbody = os.path.join(ts_out, 'fighter', 'supamario', 'script', 'animcmd', 'body')
@@ -382,17 +442,22 @@ def script_tests(out, ts_out):
     nm = lambda c: c.name  # noqa: E731
     g = f['game'].script('speciallwheavy')
     hb = [c for c in g if nm(c).lower() == 'extra_special_hitbox']
-    check('the strike: one Extra hitbox', len(hb), 1)
-    if hb:
+    check('the counter: two Extra hitboxes (XV2\'s BDM #0 freeze, BDM #2 finisher)', len(hb), 2)
+    if len(hb) == 2:
         syn = acmd.INFO[hb[0].ident]['syntax']
-        d = dict(zip(syn, hb[0].params))
-        check('  its Damage the variable 0x0100000A (1.2x the hit, 8 at least: the MSC)',
-              struct.unpack('>I', struct.pack('>f', d['Damage']))[0], B.F_DMG)
-        check('  angle 35, BKB 80, KBG 75, no clank', (d['Angle'], d['BKB'], d['KBG'], d['Clang']), (35, 80, 75, 0))
+        fz, st = dict(zip(syn, hb[0].params)), dict(zip(syn, hb[1].params))
+        check('  the freeze at 0: ID 1 Part 1, no damage / knockback, the attacker held %d frames (to the finisher), '
+              'his own hitstop 0, a 3 m sphere' % B.STRIKE_AT,
+              (fz['ID'], fz['Part'], fz['Damage'], fz['KBG'], fz['BKB'], fz['HitstopFrames'], fz['SelfHitstopFrames'],
+               round(fz['Size'], 2)), (1, 1, 0.0, 0, 0, B.STRIKE_AT, 0, B.FREEZE_SIZE))
+        check('  the finisher: XV2\'s 10 (as %%), angle 35, BKB 80, KBG 75, no clank',
+              (st['Damage'], st['Angle'], st['BKB'], st['KBG'], st['Clang']), (10.0, 35, 80, 75, 0))
     frames = [c.params[0] for c in g if nm(c).upper() == 'FRAME']
-    check('  out at %d, removed at %d' % (B.STRIKE_AT, B.STRIKE_AT + 3), frames, [float(B.STRIKE_AT), float(B.STRIKE_AT + 3)])
-    check('the transformation / the dodge: no hitbox',
-          [nm(c) for s in ('speciallwlight', 'specialairlwlight') for c in f['game'].script(s)], ['Script_End', 'Script_End'])
+    check('  the freeze off at 1, the finisher out at %d, removed at %d' % (B.STRIKE_AT, B.STRIKE_AT + 3), frames,
+          [1.0, float(B.STRIKE_AT), float(B.STRIKE_AT + 3)])
+    check('the transformation / the dodge / Secret Sensation\'s stance: no hitbox',
+          [nm(c) for s in ('speciallwlight', 'specialairlwlight', 'specialairlwheavy') for c in f['game'].script(s)],
+          ['Script_End', 'Script_End', 'Script_End'])
     eff = [c for c in f['effect'].script('speciallwlight') if 'graphic' in nm(c).lower()]
     check('the transformation\'s effects: start, the aura (7 parts), the burst',
           [c.params[0] for c in eff], [B.fx_id('start')] + [B.fx_id(k) for k in ('aura_hip', 'aura_chest', 'aura_head',
@@ -424,10 +489,9 @@ def motion_tests(out, ts_out):
         new = dict(omo.pac_read(os.path.join(out, 'fighter', 'supamario', 'motion', 'body', part + '.pac')))
         old = dict(omo.pac_read(os.path.join(ts_out, 'fighter', 'supamario', 'motion', 'body', part + '.pac')))
         diff = sorted(n.split('D03')[-1] for n in new if new[n] != old.get(n))
-        check('%s.pac: only the three slots changed' % part, diff,
-              sorted([A.DODGE, A.STRIKE, A.FORM]))
+        check('%s.pac: only the four slots changed' % part, diff, sorted([A.DODGE, A.STRIKE, A.FORM, A.SS]))
         fr = {m: omo.Omo(new[[n for n in new if n.endswith('D03' + m)][0]]).frames for m in A.MOTIONS}
-        check('%s.pac: 60 / 58 / 16 frames' % part, fr, {A.FORM: 60, A.STRIKE: 58, A.DODGE: 16})
+        check('%s.pac: 60 / 58 / 16 / 45 frames' % part, fr, {A.FORM: 60, A.STRIKE: 58, A.DODGE: 16, A.SS: 45})
 
 
 def effect_tests(out, ts_out):
@@ -462,6 +526,7 @@ def main():
     counter_tests(r)
     dodge_tests(r)
     reset_tests(r)
+    ss_tests(r)
     script_tests(out, ts_out)
     motion_tests(out, ts_out)
     effect_tests(out, ts_out)

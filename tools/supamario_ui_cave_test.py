@@ -403,7 +403,15 @@ def slot42_checks(e, kind):
         check('  registers kept', kept, True)
     # a weapon / an item: the current owner's place, the side from the owner
     for cat, label in ((1, 'weapon'), (2, 'item')):
-        fk = e.fighter(kind, x=0.0)
+        fk = e.fighter(kind, status=C.ST_UI, x=0.0)
+        e.obj(0x00040012, x=-25.0, y=3.0)
+        e.obj((cat << 28) | 0x0000ABCD, x=10.0, y=5.0, owner=0x00040012)
+        msg, am, rec = message(e, damage=9.0, category=cat, oid=(cat << 28) | 0x0000ABCD)
+        hitdata(e)
+        r, kept = e.run(C.SLOT42_HOOK, 0, fk['f'], msg)
+        check('slot 42, the transformation (0x157), a %s: not countered (XV2: CounterMelee only)' % label,
+              (e.floats(fk), e.flagw(fk), kept), (base, (F0, 0x12345678), True))
+        fk = e.fighter(kind, status=C.ST_SS, x=0.0)
         owner = 0x00040012
         e.obj(owner, x=-25.0, y=3.0)
         wid = (cat << 28) | 0x0000ABCD
@@ -413,7 +421,7 @@ def slot42_checks(e, kind):
         r, kept = e.run(C.SLOT42_HOOK, 0, fk['f'], msg)
         want = list(base)
         want[6], want[7], want[8], want[9] = 9.0, -1.0, -25.0, 3.0
-        check('slot 42, a %s at +10 fired by a fighter at -25: the owner\'s X / Y, side -1' % label, e.floats(fk), want)
+        check('slot 42, Secret Sensation, a %s at +10 fired by a fighter at -25: the owner\'s X / Y, side -1' % label, e.floats(fk), want)
         check('  flags 0x21000010 + 11 (not a fighter) + 12 (found)', e.flagw(fk), (F0 | 0x70000, 0x12345678))
         check('  handles: the %s, then its owner' % label, [c[3] for c in e.calls if c[0] == 'handle'], [wid, owner])
         check('  registers kept', kept, True)
@@ -422,7 +430,7 @@ def slot42_checks(e, kind):
                                              ('owner 0x50000000 (none)', 0x50000000, True, True),
                                              ('owner gone', 0x00050012, False, True),
                                              ('no owner module', None, True, False)):
-        fk = e.fighter(kind, x=0.0)
+        fk = e.fighter(kind, status=C.ST_SS, x=0.0)
         if owner is not None and owner >> 28 == 0:
             e.obj(owner, x=-40.0, alive=alive_owner)
         wid = 0x1000BEEF
@@ -435,7 +443,7 @@ def slot42_checks(e, kind):
         check('slot 42, a weapon at +12, %s: no target, the side from the weapon (+1)' % what, e.floats(fk), want)
         check('  flags 0x21000010 + 11, not 12', e.flagw(fk), (F0 | 0x30000, 0x12345678))
     # an item whose object is gone: Marth's side function
-    fk = e.fighter(kind)
+    fk = e.fighter(kind, status=C.ST_SS)
     e.side = -0.5
     msg, am, rec = message(e, damage=11.0, category=2, oid=0x2000FFFF)
     hd = hitdata(e)
@@ -446,8 +454,8 @@ def slot42_checks(e, kind):
           (want, (F0 | 0x30000, 0x12345678)))
     check('  0x02C22684 with Marth\'s arguments', [c for c in e.calls if c[0] == 'side'],
           [('side', 0x7290AAAA, am, hd, 3, 1, 0.25, -0.75)])
-    # a stage gimmick (category 3): not countered
-    fk = e.fighter(kind)
+    # a stage gimmick (category 3): not countered (either status)
+    fk = e.fighter(kind, status=C.ST_SS)
     msg, am, rec = message(e, damage=11.0, category=3, oid=0x30001234)
     hitdata(e)
     r, kept = e.run(C.SLOT42_HOOK, 0, fk['f'], msg)

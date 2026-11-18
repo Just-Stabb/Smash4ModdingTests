@@ -25,7 +25,6 @@ The move: fighters/supamario/README.md "Ultra Instinct v1".
 """
 import json
 import os
-import struct
 import sys
 import tempfile
 
@@ -39,12 +38,20 @@ import supamario_ui_cave as cave  # noqa: E402
 # ---------------------------------------------------------------- the rules (the user's spec)
 TRIGGER_PCT = 100.0                  # his first actionable frame at 100% or more
 FORM_N = anim.frames_of(anim.FORM)   # 60: the transformation (XV2 entry 0's 0-229, the user's "about 60 frames")
-MUL, MIN_DMG = 1.2, 8.0              # the counter: 1.2x the hit, 8% at least
 STRIKE_N = anim.frames_of(anim.STRIKE)
-STRIKE_AT = anim.frame_of(anim.STRIKE, 1, 280)     # XV2's finisher (BDM #2) at entry 1's 280
-STRIKE_SAFE = STRIKE_AT + 3          # intangible to the strike's last active frame + 1
-# the strike's hitbox (the user: "strong sideways knockback, like Marth's counter"): angle 35, BKB 80, KBG 75 (no XV2
-# values: its finisher is a launch of its own), in front of his chest, on his facing
+STRIKE_AT = anim.frame_of(anim.STRIKE, 1, 280)     # XV2's finisher (BDM #2) at entry 5's 280
+STRIKE_SAFE = STRIKE_AT + 3          # intangible to the strike's last active frame + 1 (XV2: invulnerable to the end)
+# XV2's counter (1510_GKS_MGT_PLAYER.bcm: the stance's children #2 / #3, PrimaryActivatorConditions CounterMelee, NOT
+# CounterProjectile, linked through BAC entry 0's BcmCallback "Counters / Supers" 30-152 -> BAC entries 5 / 6): its
+# window is entry 0's 30-151 (motion frames CW_ON-CW_OFF); BAC 5 at 151: BDM #0 (damage type 18, 0 damage, 150-frame
+# hold: the attacker frozen) in a 3 m sphere, invulnerable, the vanish (BTL_CMN 82, CMN SE 96), Movement to the target
+# (flags 0x80) and 2 frames at 2.5 m, the finisher at 280: BDM #2 (type 7, a launch, hitstop 7 / 7), damage 10.
+# Damage: XV2's 10 taken as 10% (XV2's numbers are its own scale: Fake Death's 20 / Core Breaker's 405 were the user's
+# own % in Smash; open to the user); the launch's angle / knockback (not in XV2's units): angle 35, BKB 80, KBG 75
+CW_ON = anim.frame_of(anim.FORM, 0, 30)
+CW_OFF = anim.frame_of(anim.FORM, 0, 151)
+STRIKE_DMG = 10.0
+FREEZE_SIZE = round(3.0 * 5.04, 2)   # BDM #0's 3 m sphere
 STRIKE_HIT = dict(Angle=35, KBG=75, FKB=0, BKB=80)
 STRIKE_SIZE, STRIKE_Y, STRIKE_Z = 6.0, 7.0, 7.0
 GAP = 9.0                            # beside the fighter to answer: this far on his side of it
@@ -69,7 +76,6 @@ SS_SLIDE_N, SS_DEPTH = 14, 6.0
 SS_BEHIND, SS_UP_GROUND, SS_BEHIND_AIR, SS_UP_AIR = 10.0, 6.0, 10.0, 10.0
 V_SS = 0x0F000324                    # TIMER_4: Secret Sensation's mark
 BONES = {'TransN': 0, 'HipN': 2, 'LFootJ': 5, 'RFootJ': 9, 'BustN': 12, 'HeadN': 22, 'LHandN': 16, 'RHandN': 20}
-F_DMG = 0x0100000A                   # the strike's damage (status float 10), the hitbox's Damage variable
 V_AURA = 0x0F000323                  # TIMER_3: the aura's renewal
 
 # ---------------------------------------------------------------- XV2's effects (BTL_AURA.eepk / BTL_CMN.eepk)
@@ -117,7 +123,7 @@ def msc_values():
          'UI_V_FORM': '0x%X' % cave.V_FORM, 'UI_V_DODGE_R': '0x%X' % cave.V_DODGE_R,
          'UI_V_DODGE_L': '0x%X' % cave.V_DODGE_L, 'UI_V_AURA': '0x%X' % V_AURA,
          'UI_FORMING': fl(1000.0), 'UI_FORMED': fl(2000.0), 'UI_TRIGGER_PCT': fl(TRIGGER_PCT),
-         'UI_F_DMG': '0x%X' % F_DMG, 'UI_MUL': fl(MUL), 'UI_MIN_DMG': fl(MIN_DMG), 'UI_GAP': fl(GAP),
+         'UI_CW_ON': fl(CW_ON), 'UI_CW_OFF': fl(CW_OFF), 'UI_GAP': fl(GAP),
          'UI_GROUND_DY': fl(GROUND_DY), 'UI_FORM_N': fl(FORM_N), 'UI_STRIKE_N': fl(STRIKE_N),
          'UI_STRIKE_SAFE': fl(STRIKE_SAFE), 'UI_DODGE_N': fl(DODGE_N), 'UI_DODGE_INV': fl(DODGE_INV),
          'UI_DODGE_MOVE': fl(DODGE_MOVE), 'UI_DODGE_V': fl(DODGE_V), 'UI_AURA_EVERY': fl(AURA_EVERY),
@@ -150,15 +156,20 @@ def timeline(events):
     return out
 
 
-def var_float(v):
-    """a variable in a float parameter of an Extra hitbox (docs/acmd-extra-commands.md "Variables in Extra hitboxes")"""
-    return struct.unpack('>f', struct.pack('>I', v))[0]
-
-
 def strike_box():
+    """XV2's finisher (BDM #2): STRIKE_DMG, a launch"""
     import supamario_sledgehammer_build as SB
-    return SB.hitbox(ID=0, Part=0, Bone=0, Damage=var_float(F_DMG), Size=STRIKE_SIZE, Y=STRIKE_Y, Z=STRIKE_Z,
+    return SB.hitbox(ID=0, Part=0, Bone=0, Damage=STRIKE_DMG, Size=STRIKE_SIZE, Y=STRIKE_Y, Z=STRIKE_Z,
                      Hitlag=1.5, SDI=0.5, Clang=0, Rebound=0, SFXLevel=2, SFXType=1, NoGFX=0, **STRIKE_HIT)
+
+
+def freeze_box():
+    """XV2's BDM #0 at the counter's start: no damage, the attacker held (its hitstop to the finisher), Part 1 (the
+    finisher's record stays its own)"""
+    import supamario_sledgehammer_build as SB
+    return SB.hitbox(ID=1, Part=1, Bone=0, Damage=0.0, Angle=0, KBG=0, FKB=0, BKB=0, Size=FREEZE_SIZE, Y=5.0, Z=0.0,
+                     Hitlag=0.0, SDI=0.0, Clang=0, Rebound=0, SFXLevel=0, SFXType=0, NoGFX=1, Flinchless=1,
+                     HitstopFrames=STRIKE_AT, SelfHitstopFrames=0)
 
 
 def graphic(key, bone=None, follow=True, size=1.0):
@@ -175,7 +186,8 @@ def scripts_for():
     """{script name: {part: body}}"""
     aura = [graphic('aura_hip'), graphic('aura_chest'), graphic('aura_head'), graphic('aura_foot'),
             graphic('aura_foot', 'RFootJ'), graphic('aura_hand'), graphic('aura_hand', 'LHandN')]
-    game = {anim.FORM: [], anim.STRIKE: timeline([(STRIKE_AT, [strike_box()]),
+    game = {anim.FORM: [], anim.STRIKE: timeline([(0, [freeze_box()]), (1, [cmd('remove_all_hitboxes')]),
+                                                  (STRIKE_AT, [strike_box()]),
                                                   (STRIKE_AT + 3, [cmd('remove_all_hitboxes')])]),
             anim.DODGE: [], anim.SS: []}
     effect = {anim.FORM: timeline([(FX_START_AT, [graphic('start')]), (FX_AURA_AT, aura),
@@ -277,6 +289,7 @@ def build(sm_dir, out_dir, ui_skill, ui_se_wav, ts_args):
     scripts(os.path.join(fdir, 'script', 'animcmd', 'body'))
     GB.msc(os.path.join(fdir, 'script', 'msc', 'supamario.mscsb'))
     doc = {'frames': {m: anim.frames_of(m) for m in anim.MOTIONS}, 'strike_at': STRIKE_AT,
+           'counter_window': [CW_ON, CW_OFF],
            'events': {'snd_start': SND_START, 'snd_success': SND_SUCCESS, 'fx_start': FX_START_AT,
                       'fx_aura': FX_AURA_AT, 'fx_burst': FX_BURST_AT},
            'fx_ids': {k: '0x%08X' % v for k, v in FX_IDS.items()}, 'se_ids': {k: '0x%08X' % v for k, v in SE_IDS.items()},
