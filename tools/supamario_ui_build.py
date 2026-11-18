@@ -303,4 +303,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # through the module itself: supamario_kame_build's MSC values import supamario_ui_build, whose FX_IDS / SE_IDS
+    # must be the ones this run fills (not __main__'s copy)
+    import supamario_ui_build
+    supamario_ui_build.main()

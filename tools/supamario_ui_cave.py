@@ -11,7 +11,8 @@ this adds:
    (0, 9.5, 0), radius 6.5 (front and back: an attack from either side meets it). His MSC switches it on only in the
    transformation status (0x157): ShieldModule(0, 2, 0, 1, 1) / (0, 2, 0, 0, 1).
 2. SLOT42 (0x02F1B218 `blr`, the shield-hit event's call): for kind 0x41, a hit on group 1 (message +0x14 == 1) in
-   status 0x157 before any (status flag 0x21000010 off), counterable (the attacker AttackModule's hit data
+   status 0x157 (the transformation) or 0x155 (Secret Sensation, the transformed grounded down special: his MSC has
+   the shape on only in its window; Fake Death / Sledgehammer never switch it on) before any (status flag 0x21000010 off), counterable (the attacker AttackModule's hit data
    vt +0x194(id, part): +0x54 == 0): status float 0x01000006 = the hit's damage (message +0xC), 0x01000007 = the side
    (+1.0 the attacker to his right: the facing that faces it), 0x01000008 / 0x01000009 = X / Y of the fighter to
    answer: the attacker itself (record +0x1C category 0), or for a weapon / item (1 / 2) its current owner (the
@@ -29,6 +30,7 @@ this adds:
      TIMER_2 0x0F000322 (to his left) = 4.0 (the other 0) through his WorkModule's set_float (vt +0x4C, the MSC's
      path: the user variables' hooks), which his MSC turns into the dodge status (0x158). Weapons / items / stage
      gimmicks (no fighter's records hold him), grabs (no damage event) and uncounterable hits fall through: 1.
+   - status 0x155 with 0x21000010 on (Secret Sensation answering): 0 and the handled bit; without it: 1;
    - anything else: 1 (Mario's stub).
 The damage event's message has no attacker fields that are known (only +8, the handled byte, is read by the game's
 handler and by Marth's / Sephiroth's slot 43), so the attacker is found from the attackers' side: their hit records,
@@ -91,6 +93,7 @@ NO_OBJECT = 0x50000000
 GROUP = 1
 ST_UI = 0x157                    # the transformation / counter status (Mario's F.L.U.D.D. shoot, unreachable)
 ST_DODGE = 0x158                 # the dodge status (MSC's own; nothing here)
+ST_SS = 0x155                    # the down special: Secret Sensation while transformed (its MSC switches the shape)
 DODGE_LO, DODGE_HI = 0x0, 0x2    # Wait, Walk, WalkBrake
 SQUAT_LO, SQUAT_HI = 0x11, 0x15  # Squat, SquatWait, SquatF, SquatB, SquatRv
 # status work: floats 6-9, flags word 0 bits 16-18
@@ -149,7 +152,7 @@ def build(kind_id=None):
                  ('gone', HANDLE_GONE), ('pos', HANDLE_POS)):
         calls[n + '_hi'], calls[n + '_lo'] = hilo(v)
     p = dict(kind=kind_id, acc=ACC, kind_at=KIND_AT, shield=SHIELD, st=STATUS_MOD, work=WORK, posture=POSTURE,
-             sidemod=SIDE_MOD, group=GROUP, st_ui=ST_UI, back=SETUP_BODY, fdmg=4 * F_DAMAGE, fside=4 * F_SIDE,
+             sidemod=SIDE_MOD, group=GROUP, st_ui=ST_UI, st_ss=ST_SS, back=SETUP_BODY, fdmg=4 * F_DAMAGE, fside=4 * F_SIDE,
              ftx=4 * F_TX, fty=4 * F_TY, mgr_ha=ha(OBJ_MANAGER), mgr_lo=slo(OBJ_MANAGER), fts_ha=ha(FIGHTERS),
              fts_lo=slo(FIGHTERS), entry=FIGHTER_ENTRY, bpost=BASE_POSTURE, batk=BASE_ATTACK, bown=BASE_OWNER,
              noobj_hi=NO_OBJECT >> 16, dlo=DODGE_LO, dhi=DODGE_HI, sqlo=SQUAT_LO, sqhi=SQUAT_HI,
@@ -198,10 +201,12 @@ slot42: lwz r12, %(kind_at)d(r4)
         bnelr
         lwz r12, %(acc)d(r4)
         lwz r11, %(st)d(r12)
-        lwz r11, 0x48(r11)              # status kind
+        lwz r11, 0x48(r11)              # status kind: the transformation or Secret Sensation (the down special)
         cmpwi r11, %(st_ui)d
+        beq s42_st
+        cmpwi r11, %(st_ss)d
         bnelr
-        lwz r11, %(work)d(r12)
+s42_st: lwz r11, %(work)d(r12)
         lwz r11, 8(r11)
         lwz r11, 4(r11)                 # status work
         lwz r10, 0x14(r11)
@@ -338,6 +343,17 @@ slot43: li r3, 1
         lwz r11, 0x48(r11)
         cmpwi r11, %(st_ui)d
         beq handled                     # the transformation / its strike: fully invincible
+        cmpwi r11, %(st_ss)d
+        bne s43_dodge
+        lwz r11, %(work)d(r12)          # Secret Sensation answering (0x21000010): no damage
+        lwz r11, 8(r11)
+        lwz r11, 4(r11)
+        lwz r11, 0x14(r11)
+        lwz r11, 0(r11)
+        rlwinm. r11, r11, 0, 15, 15
+        bne handled
+        blr
+s43_dodge:
         cmplwi r11, %(dhi)d
         ble s43_go                      # Wait, Walk, WalkBrake
         cmpwi r11, %(sqlo)d
