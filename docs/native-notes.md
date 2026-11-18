@@ -3208,6 +3208,19 @@ an opaque one): the v2 in-game test hides both (tools/outline_shell_ingame_test_
 
 ## Outline shell (model_commands v2: `tools/outline_shell_cave.py`, exe_v46z_outline2)
 
+**v3 (exe_v46z_outline3, the user's outline_v2 test): no band ever drew.** The diag log (Dr. Mario's taunts): S4ST
+`drawn=0 checked=~227 a frame refused=0`, S4SF writing the mark into the instance's FB1 (`fb=64F5C000`) every frame,
+Mesh_Visibility working. So every draw was turned down before the block-table test, at the mark. The cause:
+**NU::ConstantBufferWiiU's unlock (vt +0x44 = `0x037291BC`, its vtable's RTTI name at `0x10209E48`) swaps the block
+in place** (`lwzx` / `stwbrx` per word over its size) and then `GX2Invalidate(0x40, data, size)`: the GPU reads uniform
+blocks little-endian. The game writes FB1 big-endian before the unlock, as the outline's rim and this cave's colour do
+(the GPU sees them right); but by the draw the CPU copy is swapped, so `lwz` of the mark read `0x534F3453`, never
+`MAGIC`. os_chk now takes the mark both ways (SMAGIC = MAGIC byte-swapped). The width (`lfs`, only tested against 0)
+and the blend word (only tested against 0) are the same either way. The same swap applies to every constant buffer the game builds through
+that class: a cave that reads back a uniform block after its unlock reads it swapped. The diag build's S4SF adds
+`marked=` (the draws that carried the mark: os_g +0x24). `outline_shell_cave.draws()` tells an exe_v46z_outline3 shell
+from v2's (port_check X13 errors on v2's).
+
 **Claimed region: `0x04BE5000`-`0x04BE7000`** (past the mesh visibility's; `textregion:0x2BE7000 grow:0x04BE7000`; code
 and data `0x04BE5000`-`0x04BE6244`, the diag build to `0x04BE66FC`; the programs at `0x04BE6800` (vertex, 0x348 bytes)
 and `0x04BE6C00` (pixel, 0x120), 256-aligned; the table `os_tab` 16 x 0x50). Order: exe_v46z_ol -> tools/mesh_vis_cave.py

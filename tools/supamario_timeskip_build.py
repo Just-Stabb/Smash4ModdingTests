@@ -273,6 +273,16 @@ OL_RGB = (215.0, 230.0, 255.0)
 OL_ALPHA, OL_TINT, OL_FLASH = 140.0, 0.0, 0
 OL_IN, OL_OUT, OL_PUNCH_OUT = 4, 4, 0
 OL_KEEP, OL_HOLD, OL_CUT_OUT = 4, 12, 4
+# v9 (user, v8: "looks good aside from the aura and lack of outline"; Outline_Set's rim is inside the silhouette and
+# barely shows): the outline is Outline_Shell now (exe_v46z_outline3: model_commands v3), a band OUTSIDE his silhouette.
+# Clip b66e8a38's rim is 2-3 px at 1080p plus a faint haze past it: OL_WIDTH 2.5 px of the 1280 x 720 picture (~3.75 at
+# 1080p), added as a glow (OL_BLEND 1: XV2's outline brightens what is behind it) at OL_SH_ALPHA. Same timing (OL_*).
+OL_WIDTH, OL_BLEND, OL_SH_ALPHA = 2.5, 1, 220.0
+# The connect (the stop) runs under Screen_Invert's INV_STOP (Strength 1, Saturation 0, Brightness 0.8, + (19, 37, 60)):
+# out = 0.8 - 0.8 x luma + add, so a white band (added) would come out dark; a BLACK band drawn over (Blend 0) comes out
+# (223, 241, 255), the outline's own light blue-white. So the connect's outline is OL_INV_RGB over (screen_invert_cave
+# filter_matrix; the test checks the band's colour through it).
+OL_INV_RGB, OL_INV_BLEND = (0.0, 0.0, 0.0), 0
 OL_ON = WIND_END
 OL_OFF = int(real0(100))            # 75
 # v6 (user: "add XV2's photo-negative look after the punch"). XV2's BAC: BPE 78 "Invert World Colors" on at the connect's
@@ -528,8 +538,8 @@ def effect_scripts():
     dash += [(f, outline_on(OL_HOLD)) for f in range(OL_ON, OL_OFF, OL_KEEP)]
     dash += [(OL_OFF, outline_off(OL_OUT))]
     connect = [(0, (time_stop_look() if CAMERA_FX and not INVERT_FX else []) + invert_on() + glass_on_screen() +
-                outline_on(OL_HOLD))]
-    connect += [(f, outline_on(OL_HOLD)) for f in range(OL_KEEP, STRIKE, OL_KEEP)]
+                outline_on(OL_HOLD, True))]
+    connect += [(f, outline_on(OL_HOLD, True)) for f in range(OL_KEEP, STRIKE, OL_KEEP)]
     connect += [(STRIKE, outline_off(OL_PUNCH_OUT) + wash_on() + invert_off()),
                 (STRIKE + INV_END, invert_end()),
                 (STRIKE + GLASS_BREAK, [cmd('terminate_graphic_effect', FX_GLASS_ID, 1, 1)])]
@@ -582,21 +592,31 @@ def glass_on_screen():
 # ---------------------------------------------------------------- the outline: its only two commands
 # v8: every outline command of both scripts comes from outline_on / outline_off (effect_scripts only decides when): to
 # move to another outline mode or command, change these two (and OL_*); the test reads its expected commands from them
-OUTLINE_CMD = 'outline_set'
+OUTLINE_CMD = 'outline_shell'
 
 
-def outline_on(frames):
+def outline_on(frames, inverted=False):
     """v3 (user: "Time Skip wraps the user in a faint white translucent glowing outline"; XV2's BPE 85 "Flashing White
     Body Outline 3", BAC entry 0 at 20 and 100, entry 4 at the punch). v3: a light (LIGHT_SHINE), v4 / v5 the colour
     overlay (FLASH): both tint the whole body; v6: 16 ring billboards on his bones (an effect-only rim). v7: Outline_Set
     (exe_v46z_outline): his own edges lit (the shaders' rim), edge only (Tint 0), OL_RGB at OL_ALPHA, steady (Flash 0),
     in over OL_IN (a renewal fades from where it is: none once on), held `frames`, then out over OL_CUT_OUT if not
-    renewed (a cut move)"""
+    renewed (a cut move).
+    v9: Outline_Shell (exe_v46z_outline3): a band OL_WIDTH pixels wide outside his silhouette, OL_RGB added at
+    OL_SH_ALPHA (Blend OL_BLEND), the same timing; `inverted` (the connect, under Screen_Invert's stop): OL_INV_RGB
+    drawn over (Blend OL_INV_BLEND), which the negative turns into the light blue-white"""
+    if OUTLINE_CMD == 'outline_shell' and inverted and INVERT_FX:
+        return [cmd(OUTLINE_CMD, 0, *OL_INV_RGB, OL_SH_ALPHA, OL_WIDTH, int(frames), OL_IN, OL_CUT_OUT, OL_FLASH,
+                    OL_INV_BLEND)]
+    if OUTLINE_CMD == 'outline_shell':
+        return [cmd(OUTLINE_CMD, 0, *OL_RGB, OL_SH_ALPHA, OL_WIDTH, int(frames), OL_IN, OL_CUT_OUT, OL_FLASH, OL_BLEND)]
     return [cmd(OUTLINE_CMD, 0, *OL_RGB, OL_ALPHA, OL_TINT, int(frames), OL_IN, OL_CUT_OUT, OL_FLASH)]
 
 
 def outline_off(fade):
-    """v7: Outline_Set's end (Alpha 0) over `fade` frames"""
+    """v7: Outline_Set's end (Alpha 0) over `fade` frames; v9 Outline_Shell's"""
+    if OUTLINE_CMD == 'outline_shell':
+        return [cmd(OUTLINE_CMD, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, int(fade), 0, 0)]
     return [cmd(OUTLINE_CMD, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, int(fade), 0)]
 
 
@@ -730,7 +750,9 @@ def convert_fx(cmn_dir, fx_dir, halo=True, frt_dir=None, joints0=None):
     return {'sets': sets, 'skipped': log, 'notes': notes, 'halos': halos, 'ptcl_bytes': [before, len(out)],
             'facing_problems': bad, 'lod': lod, 'e11': e11, 'aura': e0,
             'e0_follow': e0h, 'glass': glass, 'dark': dark, 'wash': wash, 'fade': fade,
-            'outline': {'command': 'Outline_Set', 'rgb': OL_RGB, 'alpha': OL_ALPHA, 'tint': OL_TINT, 'flash': OL_FLASH,
+            'outline': {'command': acmd.INFO[acmd.BY_NAME[OUTLINE_CMD]]['name'], 'rgb': OL_RGB,
+                        'alpha': OL_SH_ALPHA if OUTLINE_CMD == 'outline_shell' else OL_ALPHA, 'tint': OL_TINT,
+                        'width': OL_WIDTH, 'blend': OL_BLEND, 'flash': OL_FLASH,
                         'on': OL_ON, 'off': OL_OFF, 'keep': OL_KEEP, 'hold': OL_HOLD, 'in': OL_IN, 'out': OL_OUT,
                         'cut_out': OL_CUT_OUT, 'punch_out': OL_PUNCH_OUT}}
 

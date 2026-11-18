@@ -1202,8 +1202,30 @@ def outline_tests(f):
               'Tint 0, held OL_HOLD, in OL_IN, out OL_CUT_OUT, Flash 0; its end Alpha 0', (pon(), poff(B.OL_OUT)),
               ([0, B.OL_RGB[0], B.OL_RGB[1], B.OL_RGB[2], B.OL_ALPHA, 0.0, B.OL_HOLD, B.OL_IN, B.OL_CUT_OUT, 0],
                [0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, B.OL_OUT, 0]))
+    elif olname == 'Outline_Shell':
+        check('v9 the outline\'s two commands: Outline_Shell on him, OL_RGB at OL_SH_ALPHA, OL_WIDTH px, held OL_HOLD, '
+              'in OL_IN, out OL_CUT_OUT, Flash 0, Blend OL_BLEND (a glow); its end Alpha 0', (pon(), poff(B.OL_OUT)),
+              ([0, B.OL_RGB[0], B.OL_RGB[1], B.OL_RGB[2], B.OL_SH_ALPHA, B.OL_WIDTH, B.OL_HOLD, B.OL_IN, B.OL_CUT_OUT,
+                0, B.OL_BLEND], [0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, B.OL_OUT, 0, 0]))
     want_d = [(t, pon()) for t in range(B.OL_ON, B.OL_OFF, B.OL_KEEP)] + [(B.OL_OFF, poff(B.OL_OUT))]
-    want_c = [(t, pon()) for t in range(0, B.STRIKE, B.OL_KEEP)] + [(B.STRIKE, poff(B.OL_PUNCH_OUT))]
+    pin = lambda: list(B.outline_on(B.OL_HOLD, True)[0].params)     # noqa: E731
+    want_c = [(t, pin()) for t in range(0, B.STRIKE, B.OL_KEEP)] + [(B.STRIKE, poff(B.OL_PUNCH_OUT))]
+    if olname == 'Outline_Shell' and B.INVERT_FX:
+        import screen_invert_cave as SI
+        st = B.INV_STOP
+        A = SI.filter_matrix(1.0, st[1], st[5], st[6], st[7:10])
+        a = B.OL_SH_ALPHA / 255.0
+
+        def seen(bg):        # the band over a background pixel bg (0-1), then the stop's filter
+            px = [a * B.OL_INV_RGB[i] / 255.0 + (1 - a) * bg[i] for i in range(3)]
+            return [round(255 * min(1.0, max(0.0, sum(A[i][j] * px[j] for j in range(3)) + A[i][3]))) for i in range(3)]
+        dark, light = seen([0.1, 0.1, 0.1]), seen([0.8, 0.8, 0.8])
+        check('v9 the connect\'s outline (under the stop\'s negative): OL_INV_RGB drawn over (Blend 0), the rest as '
+              'the dash\'s; through Screen_Invert\'s INV_STOP it shows light blue-white near OL_RGB %s (over a dark / '
+              'a light background: %s / %s)' % (B.OL_RGB, dark, light),
+              (pin()[1:4], pin()[10], pin()[4:10] == pon()[4:10],
+               all(abs(x - y) <= 30 for x, y in zip(dark, B.OL_RGB)), all(x >= 190 for x in light)),
+              (list(B.OL_INV_RGB), B.OL_INV_BLEND, True, True, True))
     check('v7 outline (the dash): Outline_Set on him (Target 0) from the charge\'s start %d (XV2\'s BPE 85 at BAC 20), '
           'white-blue %s at Alpha %g, edge only (Tint 0), steady (Flash 0), in over %d, renewed every %d frames (each held '
           '%d, then out over %d), off at %d (BAC 100) over %d' % (
@@ -1221,8 +1243,8 @@ def outline_tests(f):
         for e_, p_ in pairs:
             d.setdefault(e_, []).append(p_)
         return d
-    if olname != 'Outline_Set':
-        print('     outline: %s, not Outline_Set: outline_sim (Outline_Set\'s tick) not run' % olname)
+    if olname not in ('Outline_Set', 'Outline_Shell'):     # (v9: Outline_Shell's tick is Outline_Set's, same params)
+        print('     outline: %s: outline_sim (Outline_Set\'s tick) not run' % olname)
         return
     D = [(t, p_) for t, p_ in ol['dash']]
     C = [(t, p_) for t, p_ in ol['connect']]

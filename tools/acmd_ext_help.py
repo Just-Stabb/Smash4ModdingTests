@@ -3232,7 +3232,7 @@ HELP['Outline_Set'] = [
     '## v1.7.14 (exe_v46z_outline2): Outline_Shell',
     'Outline_Set itself is unchanged (same parameters, same look), but in game its glow is a rim light, so it stays '
     '**inside** the silhouette and reads as lighting. For a real outline, a band of colour **outside** the '
-    'silhouette, use **Outline_Shell** (New Commands / Effects, exe_v46z_outline2). The two work together on one '
+    'silhouette, use **Outline_Shell** (New Commands / Effects, exe_v46z_outline3). The two work together on one '
     'object: the shell round the body and the rim lighting its edges from inside (example 6).',
 ]
 EXAMPLES['Outline_Set'] = [
@@ -3349,11 +3349,11 @@ EXAMPLES['Mesh_Visibility'] = [
 # --- model_commands v2: Outline_Shell (tools/outline_shell_cave.py), exe_v46z_outline2
 GROUP['Outline_Shell'] = 'Effects'
 _ov.insert(next(i for i, x in enumerate(_ov) if x.startswith('- Effects (exe_v46z_outline)')) + 1,
-           '- Effects (exe_v46z_outline2): a real outline: a band of colour round an object\'s silhouette, outside '
+           '- Effects (exe_v46z_outline3): a real outline: a band of colour round an object\'s silhouette, outside '
            'it, solid or glowing, growing in and pulsing (Outline_Shell).')
 GROUP_HELP[NEW_GROUP + ' / Effects'] += [
     '',
-    'Outline_Shell (exe_v46z_outline2, tools/outline_shell_cave.py) draws a band of colour outside an object\'s '
+    'Outline_Shell (exe_v46z_outline3, tools/outline_shell_cave.py) draws a band of colour outside an object\'s '
     'silhouette: each of its meshes drawn a second time right after itself, pushed out along its normals with its '
     'front faces culled (only the fattened copy\'s back faces show, round the edges), in a flat colour behind the body '
     '(an inverted hull; docs/native-notes.md "Outline shell").',
@@ -3414,8 +3414,21 @@ HELP['Outline_Shell'] = [
     '- **Articles**: Target 0 in an article\'s script outlines that article\'s model.',
     '- **The Hitbox Viewer** draws the band round the model\'s silhouette (the outer edge only) and lists the command; '
     'the game\'s look is the reference.',
-    'Needs exe_v46z_outline2 (tools/outline_shell_cave.py: exe_v46z_outline + the mesh visibility v2 + it). Without it '
+    'Needs exe_v46z_outline3 (tools/outline_shell_cave.py: exe_v46z_outline + the mesh visibility v2 + it). Without it '
     'a script that uses this command won\'t load properly: ship the executable with any script that uses it.',
+    '',
+    '## What changed in v1.7.15 (exe_v46z_outline3)',
+    '- **The band is drawn now.** With exe_v46z_outline2 the command ran (its timing, fades and pulse) but no band '
+    'ever showed: the game byte-swaps each model\'s constant buffer in place for the GPU when it is unlocked '
+    '(NU::ConstantBufferWiiU, 0x037291BC), so the mark the shell leaves in it was read back reversed at the draw and '
+    'never matched. exe_v46z_outline3 recognises the mark both ways. Same parameters, same scripts: nothing to '
+    'change in a script, only the executable (exe_v46z_outline2 draws nothing).',
+    '- The diag build\'s S4SF lines add marked= (the draws that carried the mark so far): if a band still doesn\'t '
+    'show, a log with marked=0 means no draw of the model got the mark, marked > 0 with S4ST drawn=0 that the draw '
+    'was refused (S4SX lines say why).',
+    '- On a greyed negative (Screen_Invert with Saturation 0, Xenoverse 2\'s stop) the picture\'s darkest colour '
+    'comes out brightest: draw the band black over (Blend 0) while it is on and it shows as the negative\'s light '
+    'colour (example 7).',
 ]
 EXAMPLES['Outline_Shell'] = [
     '// Example 1: XV2\'s white outline for a time-stop move: a thin white glowing band (1.5 pixels, added), grown in',
@@ -3446,4 +3459,17 @@ EXAMPLES['Outline_Shell'] = [
     'Outline_Shell(Target=0, Red=0, Green=0, Blue=0, Alpha=255, Width=2, Frames=0, FadeIn=0, FadeOut=0, Flash=0, Blend=0)',
     'FRAME(Frames=80)',
     'Outline_Shell(Target=0, Red=255, Green=255, Blue=255, Alpha=255, Width=2, Frames=30, FadeIn=0, FadeOut=10, Flash=0, Blend=1)',
+    '',
+    '// Example 7 (v1.7.15, exe_v46z_outline3): Xenoverse 2\'s time stop: a light blue-white glow while he charges,',
+    '// then the dark blue-grey stop (Screen_Invert, greyed: Saturation 0) for 45 frames with the band switched to',
+    '// black drawn over, which the stop turns into about (223, 241, 255), the same light blue-white; each band',
+    '// renewed every 4 frames and held 12, so a cut move loses it within ~16 frames',
+    'Outline_Shell(Target=0, Red=215, Green=230, Blue=255, Alpha=220, Width=2.5, Frames=12, FadeIn=4, FadeOut=4, Flash=0, Blend=1)',
+    'FRAME(Frames=24)',
+    'Screen_Invert(Mode=1, Strength=1, Frames=45, FadeIn=0, FadeOut=0, Saturation=0, Brightness=0.8, Red=19, Green=37, Blue=60)',
+    'Outline_Shell(Target=0, Red=0, Green=0, Blue=0, Alpha=220, Width=2.5, Frames=12, FadeIn=4, FadeOut=4, Flash=0, Blend=0)',
+    'FRAME(Frames=28)',
+    'Outline_Shell(Target=0, Red=0, Green=0, Blue=0, Alpha=220, Width=2.5, Frames=12, FadeIn=4, FadeOut=4, Flash=0, Blend=0)',
+    'FRAME(Frames=69)',
+    'Outline_Shell(Target=0, Red=0, Green=0, Blue=0, Alpha=0, Width=0, Frames=0, FadeIn=0, FadeOut=0, Flash=0, Blend=0)',
 ]

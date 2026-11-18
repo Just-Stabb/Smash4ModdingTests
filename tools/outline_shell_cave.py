@@ -89,6 +89,7 @@ CMD_CRC = zlib.crc32(CMD_NAME.encode()) & 0xFFFFFFFF
 NPARAMS = 11
 N_ENT, ENT = 16, 0x50
 MAGIC = 0x53344F53              # 'S4OS' in FB1 +0xD4: this FB1 carries a shell
+SMAGIC = struct.unpack('<I', struct.pack('>I', MAGIC))[0]   # the same after the unlock's in-place swap
 FB_COL, FB_SHELL = 0xC0, 0xD0   # FB1 vec4 12 (r, g, b, alpha), vec4 13 (width, MAGIC, blend, weight)
 MAX_WIDTH = 64.0
 
@@ -339,7 +340,7 @@ DIAG_FMTS = [
     ('s_sc', 'S4SC tgt=%d acc=%08X mi=%08X rgb=%08X %08X %08X a=%08X\n'),
     ('s_sd', 'S4SD width=%08X fr=%d in=%d out=%d flash=%d blend=%d k=%d\n'),
     ('s_st', 'S4ST n=%d k=%d ph=%d eff=%08X drawn=%d checked=%d refused=%d\n'),
-    ('s_sf', 'S4SF n=%d mi=%08X fb=%08X width=%08X a=%08X blend=%d\n'),
+    ('s_sf', 'S4SF n=%d mi=%08X fb=%08X width=%08X a=%08X blend=%d marked=%d\n'),
     ('s_sr', 'S4SR n=%d ctx=%08X vs=%08X ps=%08X fb=%08X width=%08X poly=%08X ds=%08X\n'),
     ('s_sx', 'S4SX n=%d ctx=%08X ps=%08X blocks=%d ptr=%08X fb=%08X\n'),
 ]
@@ -350,7 +351,7 @@ def src(s, hand, diag=False, pad=False):
              tick_prev=s['tick_prev'], clear_to=OL.CLEAR_BACK, smvt_h=OL.FIGHTER_SM_VT >> 16,
              smvt_l=OL.FIGHTER_SM_VT & 0xFFFF, dead=OL.DEAD, every=DIAG_EVERY, ol_apply=s['ol_apply'],
              col=FB_COL, col4=FB_COL + 4, col8=FB_COL + 8, colc=FB_COL + 12, sh=FB_SHELL, sh4=FB_SHELL + 4,
-             sh8=FB_SHELL + 8, shc=FB_SHELL + 12, magic_h=MAGIC >> 16, magic_l=MAGIC & 0xFFFF,
+             sh8=FB_SHELL + 8, shc=FB_SHELL + 12, magic_h=MAGIC >> 16, magic_l=MAGIC & 0xFFFF, smagic_h=SMAGIC >> 16, smagic_l=SMAGIC & 0xFFFF,
              fni_h=DRAW_FN_I >> 16, fni_l=DRAW_FN_I & 0xFFFF, fnn_h=DRAW_FN_N >> 16, fnn_l=DRAW_FN_N & 0xFFFF,
              bl0_h=BLEND_REG[0] >> 16, bl0_l=BLEND_REG[0] & 0xFFFF, bl1_l=BLEND_REG[1] & 0xFFFF,
              cf=CULL_FRONT, cb=CULL_BACK, dsoff=DS_STENCIL | DS_BACKFACE, dson=DS_Z | DS_ZWRITE,
@@ -946,11 +947,21 @@ os_chk:
         lwz r0, %(pcb7s)d(r3)
         cmplwi r0, 0x2A0
         blt oc_no
-        lis r11, %(magic_h)d
-        ori r11, r11, %(magic_l)d
+        lis r11, %(magic_h)d             # the mark: as written, or byte-swapped (NU::ConstantBufferWiiU's unlock,
+        ori r11, r11, %(magic_l)d        # 0x037291BC, swaps the block in place for the GPU before the draw)
         lwz r0, %(sh4)d(r12)
         cmplw r0, r11
+        beq oc_mark
+        lis r11, %(smagic_h)d
+        ori r11, r11, %(smagic_l)d
+        cmplw r0, r11
         bne oc_no
+oc_mark:
+        lis r11, os_g@ha                # marked draws seen (diag: S4SF)
+        addi r11, r11, os_g@l
+        lwz r9, 0x24(r11)
+        addi r9, r9, 1
+        stw r9, 0x24(r11)
         lwz r0, %(vcb7)d(r3)             # the vertex stage's the same
         cmplw r0, r12
         bne oc_no
@@ -1059,7 +1070,7 @@ os_k:                                   # +0 0, +4 1, +8 2, +0xC 3, +0x10 1/255,
 os_g:                                   # +0 entries in use, +4 frames ticked, +8 FB1 writes, +0xC commands,
         .word 0                         # +0x10 frames since the last command (diag), +0x14 round robin, +0x18 shells
         .word 0                         # drawn, +0x1C marked FB1s refused (diag), +0x20 draws checked while a shell is
-        .word 0                         # in use
+        .word 0                         # in use, +0x24 marked draws seen (diag)
         .word 0
         .word 0
         .word 0
@@ -1180,7 +1191,10 @@ os_dfb:""" + head + """
         mr r6, r29
         lwz r7, %(sh)d(r29)
         lwz r8, %(colc)d(r29)
-        lwz r9, %(sh8)d(r29)""" % dict(sh=FB_SHELL, colc=FB_COL + 12, sh8=FB_SHELL + 8) + rep + """
+        lwz r9, %(sh8)d(r29)
+        lis r12, os_g@ha
+        addi r12, r12, os_g@l
+        lwz r10, 0x24(r12)""" % dict(sh=FB_SHELL, colc=FB_COL + 12, sh8=FB_SHELL + 8) + rep + """
 odf_out:""" + tail + """
 # --- diag: S4SR at a shell drawn (r3 the device context, r4 FB1, r5 the states set: rasterizer, depth) ---------------
 os_ddraw:""" + head + """
@@ -1273,6 +1287,16 @@ def labels(path):
 
 def present(img_w):
     return OL.present(img_w, CMD_CRC, CAVE)
+
+
+def draws(img_w):
+    """v3 (exe_v46z_outline3): the executable's shell takes FB1's mark byte-swapped too (lis r11 / ori r11 of SMAGIC
+    in os_chk). exe_v46z_outline2's (present but not this) never draws: the game's unlock swaps the block in place"""
+    hi, lo = 0x3D600000 | (SMAGIC >> 16), 0x616B0000 | (SMAGIC & 0xFFFF)
+    for a in range(CAVE, VS_PROG, 4):
+        if img_w(a) == hi and img_w(a + 4) == lo:
+            return True
+    return False
 
 
 def apply_ref(entry, weight):

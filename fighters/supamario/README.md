@@ -3659,3 +3659,22 @@ rotation of any kind, scale 2 (over 1.9 screen heights wide at their Mode 1 Size
 a billboard; the outline's two commands checked once against OL_* (the scripts' expected commands built from them). On
 the v8 build: `supamario_sledgehammer_test` 141 ok, `supamario_fakedeath_test` 47, `supamario_corebreaker_test`
 104, `supamario_godfist_test --all-models` 566 (0 problems each); `msc_stack_check` 0 problems (globals 127 of 128).
+
+## Time Skip v9 (`supamario_timeskip_v9.zip`): the outline outside his silhouette (Outline_Shell)
+
+The user's v8 test: "looks good aside from the aura and lack of outline". Outline_Set's rim (v7 / v8) stays inside the
+silhouette and barely shows; Outline_Shell (exe_v46z_outline2) drew nothing (its mark in FB1 was read back after the
+game's in-place byte swap: docs/native-notes.md "Outline shell" v3), fixed in exe_v46z_outline3.
+
+- The outline is Outline_Shell now (`OUTLINE_CMD`, `outline_on` / `outline_off`): a band `OL_WIDTH` 2.5 px of the
+  1280 x 720 picture (~3.75 at 1080p; clip b66e8a38's rim 2-3 px + a faint haze), `OL_RGB` (215, 230, 255) added
+  (`OL_BLEND` 1, a glow) at `OL_SH_ALPHA` 220. Timing unchanged (on at OL_ON, renewed every OL_KEEP, held OL_HOLD, off
+  at OL_OFF / at once at the punch).
+- **Under the stop's negative** (the connect, Screen_Invert `INV_STOP`: Strength 1, Saturation 0, Brightness 0.8,
+  + (19, 37, 60)) the picture becomes `0.8 - 0.8 x luma + add`: a white band would come out dark. The connect's band is
+  `OL_INV_RGB` black drawn over (Blend 0), which comes out (223, 241, 255): the same light blue-white (the test checks it
+  through `screen_invert_cave.filter_matrix` over a dark and a light background).
+- Approximated: the width and alpha are read off the clip by eye (XV2's BPE 85 entry is in its system BPE file, not in
+  the user's files); the haze past XV2's rim isn't drawn.
+- Needs exe_v46z_outline3 (outline_v3.zip). The aura is unchanged pending the user's description of what is wrong.
+

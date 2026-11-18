@@ -323,6 +323,16 @@ def main():
           'the same, Blend 1 adds (SRC_ALPHA / ONE)', ([x[0] for x in d['calls']] == want_seq,
                                                        d['calls'][5][2], d['calls'][0][1][6], d['pc']),
           (True, (0, SC.BLEND_REG[1]), 1, SC.DRAW_N + 4))
+    fbset(3.0, 1, swapped=True)
+    d = draw()
+    check('the FB1 as the game leaves it at the draw (byte-swapped in place by the unlock): a shell, Blend 1 adds',
+          ([x[0] for x in d['calls']] == want_seq, d['calls'][5][2]), (True, (0, SC.BLEND_REG[1])))
+    fbset(3.0, 0, swapped=True)
+    check('... Blend 0 over', draw()['calls'][5][2], (0, SC.BLEND_REG[0]))
+    fbset(0.0, 0, swapped=True)
+    check('... Width 0: the game\'s draw only', only_draw(draw()), True)
+    fbset(3.0, 0, magic=0x12345678, swapped=True)
+    check('... another mark: the game\'s draw only', only_draw(draw()), True)
     ctx(rs=0x00080005)
     fbset(3.0, 0)
     check('a material that culls front faces: the shell culls the back ones', draw()['calls'][3][2][0],
@@ -484,12 +494,15 @@ class DrawEnv:
             return dict(calls=calls, kept=kept, pc=pm.reg_read(UC_PPC_REG_PC), sp=pm.reg_read(UC_PPC_REG_1),
                         args=args)
 
-        def fbset(width, blend, alpha=1.0, magic=SC.MAGIC):
+        def fbset(width, blend, alpha=1.0, magic=SC.MAGIC, swapped=False):
             pm.mem_write(fbd, b'\0' * 0x2A0)
             wf(pm, fbd + SC.FB_COL, [1.0, 1.0, 1.0, alpha])
             wf(pm, fbd + SC.FB_SHELL, [width])
             w32(pm, fbd + SC.FB_SHELL + 4, magic)
             w32(pm, fbd + SC.FB_SHELL + 8, blend)
+            if swapped:                    # as the game leaves it at the draw: NU::ConstantBufferWiiU's unlock
+                b = bytes(pm.mem_read(fbd, 0x2A0))      # (0x037291BC) swaps every word in place
+                pm.mem_write(fbd, b''.join(b[i:i + 4][::-1] for i in range(0, 0x2A0, 4)))
 
         def only_draw(d):
             return [c[0] for c in d['calls']] == ['draw'] and d['calls'][0][1] == d['args'] and d['pc'] == SC.DRAW_I + 4 \
