@@ -579,6 +579,12 @@ def glass_on_screen():
     return [cmd('effect_camera', FX_GLASS_ID, 0.0, 0.0, GLASS_SCREEN_Z, 0.0, 0.0, 0.0, GLASS_SCREEN_SIZE, 1, 0, 1)]
 
 
+# ---------------------------------------------------------------- the outline: its only two commands
+# v8: every outline command of both scripts comes from outline_on / outline_off (effect_scripts only decides when): to
+# move to another outline mode or command, change these two (and OL_*); the test reads its expected commands from them
+OUTLINE_CMD = 'outline_set'
+
+
 def outline_on(frames):
     """v3 (user: "Time Skip wraps the user in a faint white translucent glowing outline"; XV2's BPE 85 "Flashing White
     Body Outline 3", BAC entry 0 at 20 and 100, entry 4 at the punch). v3: a light (LIGHT_SHINE), v4 / v5 the colour
@@ -586,12 +592,12 @@ def outline_on(frames):
     (exe_v46z_outline): his own edges lit (the shaders' rim), edge only (Tint 0), OL_RGB at OL_ALPHA, steady (Flash 0),
     in over OL_IN (a renewal fades from where it is: none once on), held `frames`, then out over OL_CUT_OUT if not
     renewed (a cut move)"""
-    return [cmd('outline_set', 0, *OL_RGB, OL_ALPHA, OL_TINT, int(frames), OL_IN, OL_CUT_OUT, OL_FLASH)]
+    return [cmd(OUTLINE_CMD, 0, *OL_RGB, OL_ALPHA, OL_TINT, int(frames), OL_IN, OL_CUT_OUT, OL_FLASH)]
 
 
 def outline_off(fade):
     """v7: Outline_Set's end (Alpha 0) over `fade` frames"""
-    return [cmd('outline_set', 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, int(fade), 0)]
+    return [cmd(OUTLINE_CMD, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, int(fade), 0)]
 
 
 def sound_scripts():
@@ -1019,9 +1025,8 @@ def e0_follow_set(p, e, frt_dir, halo=True):
 
 def dark_set(p, e, hitl_si):
     """v3: the time stop's darkening for Effect_Camera: one alpha-blended billboard (Btl_HitL's flash_1, blend 0, its
-    texture made solid white), 1 x 1 at size 1, DARK_RGBA, one particle that lives until the call's Frames fade it,
-    follow type 0 (it moves with the camera)"""
-    import struct
+    texture made solid white), DARK_RGBA, one particle that lives until the call's Frames fade it, follow type 0 (it
+    moves with the camera); v8: _screen_quad's size (QUAD_W) and no spin"""
     import numpy as np
     src = next(em['data'] for em in p.sets[hitl_si]['emitters'] if em['data'] is not None and
                p.emitter_name(em['data']) == 'flash_1')
@@ -1041,17 +1046,39 @@ def dark_set(p, e, hitl_si):
     for track in (0, 1):
         p.set_color_keys(d, track, [DARK_RGBA[:3] + (1.0,)], 0)
     p.set_texture(d, 0, np.full((16, 16, 4), 255, np.uint8))
-    struct.pack_into('>I', d, 0x310, 0)                 # follow: an overlay moving with the camera
+    _screen_quad(p, d)                                  # v8: QUAD_W across, no spin; follow 0 (moves with the camera)
     si = p.new_set('PtcSupamarioTsDark', [bytes(d)], ['dark'])
     idx = e.add(si + 1)
     assert 0x03410000 | idx == FX_DARK_ID, ('FX_DARK_ID is out of date', hex(0x03410000 | idx))
     return {'set': 'PtcSupamarioTsDark', 'set_index': si, 'efc': idx, 'id': '0x%08X' % FX_DARK_ID, 'rgba': DARK_RGBA}
 
 
+# v8 (the user's v7 clip 869ac5f5, 156-171: "a rotating square appears during / after the punch"): the fade quad drew as
+# a white square about 1.1 screen heights wide (64% of the screen's width), turning a little each frame. Two things kept
+# from Btl_HitL's flash_1, the converted emitter every screen quad here is cut from: its random spin
+# (rotation_velocity_random Z 0.035 rad = 2 degrees a frame; v6 / v7 zeroed rotation_velocity only) and its scale 1,
+# which is 1 unit across, not 2 (Effect_Camera Mode 1: a particle W wide is W x Size / 2 screen heights): at Size 2.2
+# it was 1.1 screen heights. Every screen quad (the fade, the wash, the darkening) now: QUAD_W 2 units (-1 to 1: 2.2
+# screen heights at Size 2.2, over a 16:9 screen's 1.78), no turn of any kind, no camera offset, the alpha keys only
+QUAD_W = 2.0
+
+
+def _screen_quad(p, d):
+    """v8: a screen-filling quad's emitter fields: QUAD_W across, no rotation (initial, random, velocity, random
+    velocity), no camera offset / drag / interval spread; follow type 0 (it moves with its set, so with the camera)"""
+    import struct
+    for name, v in (('scale', [QUAD_W, QUAD_W]), ('scale_random', [0.0, 0.0]), ('scale_init_ratio', [1.0, 1.0]),
+                    ('scale_diff21', [0.0, 0.0]), ('scale_diff32', [0.0, 0.0]), ('rotation_init', [0.0, 0.0, 0.0]),
+                    ('rotation_random', [0.0, 0.0, 0.0]), ('rotation_velocity', [0.0, 0.0, 0.0]),
+                    ('rotation_velocity_random', [0.0, 0.0, 0.0]), ('camera_offset', 0.0), ('air_resistance', 1.0),
+                    ('emit_interval_random', 0), ('velocity_stretch', 0.0)):
+        p.set_field(d, name, v)
+    struct.pack_into('>I', d, 0x310, 0)
+
+
 def _quad(p, hitl_si, rgb, a, life):
     """v6: an alpha-blended (or additive) billboard from Btl_HitL's flash_1 (dark_set's way): one particle, `life`
-    frames (0: forever), scale 1 (2 units across at size 1), colour rgb, constant alpha a, follow type 0"""
-    import struct
+    frames (0: forever), colour rgb, constant alpha a, follow type 0. v8: _screen_quad's (QUAD_W across, no spin)"""
     src = next(em['data'] for em in p.sets[hitl_si]['emitters'] if em['data'] is not None and
                p.emitter_name(em['data']) == 'flash_1')
     d = bytearray(src)
@@ -1068,7 +1095,7 @@ def _quad(p, hitl_si, rgb, a, life):
     p.set_emitter_srt(d)
     for track in (0, 1):
         p.set_color_keys(d, track, [tuple(rgb) + (1.0,)], 0)
-    struct.pack_into('>I', d, 0x310, 0)
+    _screen_quad(p, d)
     return d
 
 

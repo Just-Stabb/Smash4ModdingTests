@@ -1192,12 +1192,18 @@ def outline_tests(f):
     outline_cave's tick (outline_sim) on the effect frames of a whiff, a held charge (the script's clock running, and
     stopped), a catch at every frame of the box (+ its freeze and the retries) and a cut at any frame"""
     dash, conn = timed(f['effect'].script('specials')), timed(f['effect'].script('specialairs'))
-    ol = {sc: [(t, p_) for t, n_, p_ in b_ if n_ == 'Outline_Set'] for sc, b_ in (('dash', dash), ('connect', conn))}
-    on = [B.OL_RGB[0], B.OL_RGB[1], B.OL_RGB[2], B.OL_ALPHA, B.OL_TINT]
-    want_d = [(t, [0] + on + [B.OL_HOLD, B.OL_IN, B.OL_CUT_OUT, B.OL_FLASH])
-              for t in range(B.OL_ON, B.OL_OFF, B.OL_KEEP)] + [(B.OL_OFF, [0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, B.OL_OUT, 0])]
-    want_c = [(t, [0] + on + [B.OL_HOLD, B.OL_IN, B.OL_CUT_OUT, B.OL_FLASH]) for t in range(0, B.STRIKE, B.OL_KEEP)] + [
-        (B.STRIKE, [0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, B.OL_PUNCH_OUT, 0])]
+    # v8: the expected commands come from the build's outline_on / outline_off (the outline's one place); the values
+    # are checked against OL_* once, here, for Outline_Set
+    olname = acmd.INFO[acmd.BY_NAME[B.OUTLINE_CMD]]['name']
+    ol = {sc: [(t, p_) for t, n_, p_ in b_ if n_ == olname] for sc, b_ in (('dash', dash), ('connect', conn))}
+    pon, poff = (lambda: list(B.outline_on(B.OL_HOLD)[0].params)), (lambda f_: list(B.outline_off(f_)[0].params))   # noqa: E731
+    if olname == 'Outline_Set':
+        check('v7 / v8 the outline\'s two commands (outline_on / outline_off): Outline_Set on him, OL_RGB at OL_ALPHA, '
+              'Tint 0, held OL_HOLD, in OL_IN, out OL_CUT_OUT, Flash 0; its end Alpha 0', (pon(), poff(B.OL_OUT)),
+              ([0, B.OL_RGB[0], B.OL_RGB[1], B.OL_RGB[2], B.OL_ALPHA, 0.0, B.OL_HOLD, B.OL_IN, B.OL_CUT_OUT, 0],
+               [0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, B.OL_OUT, 0]))
+    want_d = [(t, pon()) for t in range(B.OL_ON, B.OL_OFF, B.OL_KEEP)] + [(B.OL_OFF, poff(B.OL_OUT))]
+    want_c = [(t, pon()) for t in range(0, B.STRIKE, B.OL_KEEP)] + [(B.STRIKE, poff(B.OL_PUNCH_OUT))]
     check('v7 outline (the dash): Outline_Set on him (Target 0) from the charge\'s start %d (XV2\'s BPE 85 at BAC 20), '
           'white-blue %s at Alpha %g, edge only (Tint 0), steady (Flash 0), in over %d, renewed every %d frames (each held '
           '%d, then out over %d), off at %d (BAC 100) over %d' % (
@@ -1215,6 +1221,9 @@ def outline_tests(f):
         for e_, p_ in pairs:
             d.setdefault(e_, []).append(p_)
         return d
+    if olname != 'Outline_Set':
+        print('     outline: %s, not Outline_Set: outline_sim (Outline_Set\'s tick) not run' % olname)
+        return
     D = [(t, p_) for t, p_ in ol['dash']]
     C = [(t, p_) for t, p_ in ol['connect']]
     full = lambda ws, a, b_: all(x == 1.0 for x in ws[a:b_])     # noqa: E731
@@ -1529,6 +1538,23 @@ def effect_tests(out, sh_out):
           (bool((img_[..., 2] >= img_[..., 0] - 0.02).all()), float(lum.mean()) < 0.2, float(lum.max()) > 0.8,
            len(sh_) > 20, max(sh_) - min(sh_) > 0.08, max(sh_) <= B.GLASS_SHEEN[1] + 1e-6),
           (True, True, True, True, True, True))
+    # v8 (the user's v7 clip 869ac5f5, 156-171: a white square ~64% of the screen wide, turning, after the punch)
+    for nm_, fid, size_ in (('fade', B.FX_FADE_ID, B.WASH_SIZE), ('wash', B.FX_WASH_ID, B.WASH_SIZE),
+                            ('dark', B.FX_DARK_ID, B.DARK_SIZE)):
+        si = e.entries[fid & 0xFFFF][1] - 1
+        for d in [em['data'] for em in p.sets[si]['emitters'] if em['data'] is not None]:
+            rot = [p.field(d, k) for k in ('rotation_init', 'rotation_random', 'rotation_velocity',
+                                           'rotation_velocity_random')]
+            sc = p.field(d, 'scale')
+            wide = min(sc) * size_ / 2.0
+            check('v8 the %s quad (0x%08X, %s) fills the screen and doesn\'t turn: no rotation of any kind (init, random, '
+                  'velocity, random velocity), scale %g (%.2f screen heights at Mode 1 Size %g: over a 16:9 screen\'s '
+                  '1.78), no scale / key animation, follow 0, a billboard' % (
+                      nm_, fid, p.set_name(si), B.QUAD_W, wide, size_),
+                  (all(x == 0.0 for r in rot for x in r), wide > 1.9, list(p.field(d, 'scale_diff21')),
+                   list(p.field(d, 'scale_diff32')), p.field(d, 'keyanim_size'), bytes(d[0x310:0x314]).hex(),
+                   p.field(d, 'particle_type'), p.field(d, 'camera_offset')),
+                  (True, True, [0.0, 0.0], [0.0, 0.0], 0, '00000000', 0, 0.0))
     check('v7: no outline ring set left in the bank (v6\'s PtcSupamarioTsOutline: the outline is Outline_Set)',
           [p.set_name(i) for i in range(len(p.sets)) if p.set_name(i) == 'PtcSupamarioTsOutline'], [])
     for key, fid in (('fade', B.FX_FADE_ID), ('wash', B.FX_WASH_ID)):
