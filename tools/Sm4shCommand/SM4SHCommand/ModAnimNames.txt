@@ -64,6 +64,14 @@ finish3 -> kamehameha/FitMarioFireballMain.omo
 // speciallwstart = the collapse and the lying loop, speciallwhold = the wake-up attack (its hitboxes):
 // tools/supamario_fakedeath_build.py. speciallwhold is in AnimNames.txt already; speciallwstart isn't
 speciallwstart
+// Ultra Instinct v1 (his gimmick, tools/supamario_ui_build.py; F.L.U.D.D.'s shoot slots 0x231 / 0x235 / 0x241 /
+// 0x245, unreachable since Fake Death / Sledgehammer): speciallwlight = the transformation (status 0x157),
+// speciallwheavy = its counter (XV2's BAC entry 5: the freeze box, the finisher), specialairlwlight = the autododge
+// (status 0x158), specialairlwheavy = Secret Sensation's stance (the transformed grounded down special, 0x155)
+SpecialLwLight
+SpecialLwHeavy
+SpecialAirLwLight
+SpecialAirLwHeavy
 
 // ---- Sephiroth (edge)
 // his 3-hit jab: motion slots 0x51 / 0x52 (Zelda, his base, has one jab; extra_kinds.json "motions",

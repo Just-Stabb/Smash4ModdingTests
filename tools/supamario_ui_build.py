@@ -9,13 +9,14 @@ scripts, the new effect sets, three new sounds and the MSC change).
         --fd-se-wav ... --skill ... --se-wav ... --ean ... --cmn-vfx VFX_CMN_DIR --skill-vfx ... --cmn-se ... --stb ...]
         [--png SHEET.png]
 
---ui-skill: XV2's data/skill/MET/1510_GKS_MGT (the .ean / .bac / _PLAYER.bcm the timings come from: reference/xv2/
-ultrainstinct_skill.json). --ui-se-wav: the skill SE bank CAR_BTL_M1510_MGT_SE.acb's cues 0 / 1 and CAR_BTL_CMN.acb's
+--ui-skill: XV2's data/skill/MET/1510_GKS_MGT (the .ean; the .bac / _PLAYER.bcm / .bdm the timings and the counter's
+rules come from: fighters/supamario/README.md "Ultra Instinct v1", read with tools/xv2bac.py). --ui-se-wav: the skill SE bank CAR_BTL_M1510_MGT_SE.acb's cues 0 / 1 and CAR_BTL_CMN.acb's
 cue 96 "Vanish", levelled (tools/xv2acb.py extract + tools/xv2acb_decode.mjs + tools/supamario_timeskip_xv2.py se).
 --cmn-vfx: XV2's vfx/cmn (BTL_AURA.eepk: the skill's effects 846-851 with the Ultra Instinct aura; BTL_CMN.eepk:
 effect 82, the vanish's lines).
 Writes OUT_DIR/fighter/supamario (Time Skip's build, then): motion/body (SpecialLwLight 0x231 = the transformation,
-SpecialLwHeavy 0x235 = the counter's strike, SpecialAirLwLight 0x241 = the autododge: tools/supamario_ui_anim.py),
+SpecialLwHeavy 0x235 = the counter, SpecialAirLwLight 0x241 = the autododge, SpecialAirLwHeavy 0x245 = Secret
+Sensation's stance: tools/supamario_ui_anim.py),
 script/animcmd/body (their game / effect / sound / expression scripts), effect/supamario (the converted sets after
 every earlier one), sound (UI_SE in his bank, the soundlabeltable's row grown), script/msc (supamario.c's ui_*),
 OUT_DIR/ultrainstinct.json.

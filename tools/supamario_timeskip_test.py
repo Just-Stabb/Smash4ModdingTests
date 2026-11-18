@@ -1421,7 +1421,7 @@ def script_tests(out, sh_out):
     other = []
     skip = {acmd.crc(n) for n in B.SCRIPT_NAMES}
     # Ultra Instinct's (later: tools/supamario_ui_test.py checks them): F.L.U.D.D.'s shoot slots
-    skip |= {acmd.crc(n) for n in ('speciallwlight', 'speciallwheavy', 'specialairlwlight')}
+    skip |= {acmd.crc(n) for n in ('speciallwlight', 'speciallwheavy', 'specialairlwlight', 'specialairlwheavy')}
     for p in f:
         for h, s in b[p].scripts.items():
             if h in skip:
@@ -1625,7 +1625,8 @@ def motion_tests(out, sh_out):
         new = dict(omo.pac_read(os.path.join(out, 'fighter', 'supamario', 'motion', 'body', part + '.pac')))
         old = dict(omo.pac_read(os.path.join(sh_out, 'fighter', 'supamario', 'motion', 'body', part + '.pac')))
         diff = sorted(n for n in new if new[n] != old.get(n) and not any(  # Ultra Instinct's (later: its own test)
-            n.endswith('D03' + m) for m in ('SpecialLwLight.omo', 'SpecialLwHeavy.omo', 'SpecialAirLwLight.omo')))
+            n.endswith('D03' + m) for m in ('SpecialLwLight.omo', 'SpecialLwHeavy.omo', 'SpecialAirLwLight.omo',
+                                    'SpecialAirLwHeavy.omo')))
         check('%s.pac: only SpecialS / SpecialAirS changed (both)' % part, sorted(n.split('D01')[-1] for n in diff),
               ['SpecialAirS.omo', 'SpecialS.omo'])
         if part == 'main':

@@ -3696,3 +3696,88 @@ bright", and in the stop it "is persisting, it's just hardly noticeable because 
 - Only effect.bin changes. Needs exe_v46z_outline4.
 
 **Time Skip / Jump Spike accepted by the user as of v10** (with exe_v46z_outline4).
+
+## Ultra Instinct v1 (`supamario_ultrainstinct_v1.zip`, exe `exe_v46z_ui`): his gimmick
+Install over Time Skip v10 (`supamario_timeskip_v10.zip`) with the package's executable (exe_v46z_ui = the user's
+exe_v46z_outline4 + `tools/supamario_ui_cave.py`). Built by `tools/supamario_ui_build.py` (it runs Time Skip's build, which
+runs the earlier moves'; their files are theirs byte for byte except the shared ones). Source: Dragon Ball Xenoverse 2's
+Awoken Skill **1510_GKS_MGT "Ultra Instinct -Sign-"** (the user's files: `.ean` (+ `_F` / `_MAM`), `.bac`,
+`_PLAYER.bcm` / `.bdm`, three `.cam.ean`; the SE bank `CAR_BTL_M1510_MGT_SE.acb`; `custom_skill.cus` / `aura_setting.aur`
+and vfx/cmn from Time Skip's / the God Fist's work).
+
+### What the XV2 files say (`tools/xv2bac.py`, `supamario_fakedeath_xv2.read_bcm_full`)
+- **BCM:** five roots (#1, #4, #7, #10, #13: button 0x2000, PrimaryActivatorConditions 0x2000C80, ReceiverLinkID
+  Ultimate / Awoken / Evasive) play BAC 4, 4, 4, 8, 0 (the same stance); #16 (conditions 0xD00) plays BAC 13 (empty).
+  Each root has two children (no button, ActivatorState Attacking, ReceiverLinkID Supers): **PrimaryActivatorConditions
+  CounterMelee** (0x1000; the first child also 0x400000, unnamed), **not CounterProjectile** (0x2000): BAC 5 / 6 (under
+  BAC 4), 9 / 10 (under 8), 1 / 2 (under 0). They are reached through the stance's BcmCallback (Counters / Supers,
+  DisableKiBlastLink) **30-152**.
+- **BAC 0 / 4 / 8 (the stance and the transformation, EAN #0, 325 frames):** effect 846 at 10 (BTL_AURA: MGT_HENSIN01 on
+  the chest + the Mgt_AuraStart ECF), BPE 316 at 20, skill SE cue 0 (Start_F22) at 22, **invulnerability type 6 30-151**
+  (the counter window), the aura (BTL_AURA 848: the Ultra Instinct loops on the feet, knees, legs, pelvis, chest, head,
+  arms, hands) at 40, invulnerability type 5 151-324, the camera 151-324, skill SE cue 1 (Success) at 205, at **220**
+  the burst (851 MGT_HENSIN02 under him, 849 Mgt_AuraEnd ECF, BPE 10, BDM #187 0-damage push box 3.5 m) and the start
+  effects off.
+- **BAC 5 / 6 (the counter, EAN #1 from 151):** at 151 **BDM #0** (damage type 18, 0 damage, a 150-frame hold) in a 3 m
+  sphere, invulnerable (type 0) 151-176, BTL_CMN 82 (Ski_Ref.emo + SKI_line: the vanish), CMN SE cue 96 "Vanish",
+  Movement 156-176 (flags 0x80: to the target) with tracking, 2.5 m a frame 159-161, BPE 315, 82 again at 170,
+  invulnerable (type 3) to the end, the **finisher BDM #2 at 280** (type 7 launch, hitstop 7 / 7, damage 10), skill SE
+  cue 1 at 335, the eye glint (850) and the end at 350. BAC 6 adds function 0x2B (100) at 151. BAC 1 / 2 / 9 / 10 (the
+  other roots') add a 14-hit rush (BDM #1, 5 each, 210-275) before the same finisher. The first root's (BAC 5) is used.
+- **custom_skill.cus:** MGT (26510 / 1510, no paths) and MGQ (26511 / 1511: EAN / camera EAN `MET/1510_GKS_MGT/...`, SE
+  `CAR_BTL_M1510_MGT_SE`), both ending `0f 01 03 00 02 00 7a 00 1e 00 01 00 04 07 b1 04` (read as u8 0x0F, u8 1, u16 3,
+  2, 122, 30 (PUP?), 1 (CUS aura?), 0x0704, 0x04B1: not decoded with certainty). The transformed body colours (silver
+  hair / eyes) are a race BCS part set that wasn't sent: **not done** (open: the race .bcs, e.g. HUM.bcs, and the part
+  set / PUP / CUS aura entries).
+
+### The gimmick (`supamario.c` ui_* / ss_*; the user's spec where it isn't XV2's)
+| | |
+|---|---|
+| Trigger (the user) | his first actionable frame at **100%** or more: Wait, Walk, WalkBrake, Dash, Run, RunBrake, Squat, SquatWait, SquatF / B on the ground; Fall / FallAerial in the air. Never in tumble, hitstun, a shield, a ledge, landing lag or a move; not in hitlag. Once a stock (transformed until his KO) |
+| Transformation | status **0x157** (Mario's F.L.U.D.D. shoot, unreachable since Fake Death / Sledgehammer), motion **0x231 SpecialLwLight**: XV2's EAN #0 0-229 in **60** frames (0-30 in 12, the window 30-151 in 18, the power-up 151-229 in 30: the burst at 57). **Intangible every frame** (2 frames renewed: nothing reaches his body, no grab); held still (in the air no gravity, Fall at the end). Effects: 846's emitter at 4, the aura (7 parts, following) at 13, the burst at 57; sounds Start at 9, Success at 51 |
+| Its counter (XV2's) | the cave's shape (ShieldModule group 1) on in **XV2's window: frames 12-30** (BAC 30-151). A **fighter's own attack** on it (CounterMelee: projectiles / items pass through, he is intangible) -> at once (XV2's BAC 5): the vanish effect where he was, **beside the attacker** (9 units on his side of it, facing it; its height if it is off the ground: airborne), motion **0x235 SpecialLwHeavy** (EAN #1 151-176 in 8 = the vanish, 270-320 1:1 = the finisher), its game script: **the freeze box** at 0 (BDM #0: no damage, no knockback, the attacker held to the finisher: HitstopFrames 18, a 3 m sphere, Part 1) and **the finisher at 18** (BDM #2: **10%** = XV2's 10 taken as %, angle 35, BKB 80, KBG 75), intangible to 21, the end at 58. Transformed afterwards |
+| Autododge (the user) | transformed, **Wait / Walk / WalkBrake / Squat .. SquatRv on the ground**, a **fighter's** attack (the cave finds the attacker in the fighters' hit records; projectiles, items, gimmicks, grabs and uncounterable hits hit him as normal): the hit does nothing (the cave's slot 43 returns 0) and status **0x158**: motion **0x241 SpecialAirLwLight** (EAN #1 151-167: the vanish), away from the attacker 2 a frame for 8 frames (16 units, energy 3, not off an edge), **intangible 12 frames**, actionable from 12 (func_39 / func_41), Wait at 16. The vanish sound / effect at 0. No cooldown |
+| Secret Sensation (the user's, DBFZ's UI Goku) | transformed, the **grounded down special** (status 0x155; Fake Death otherwise; the air one is Sledgehammer as before): the stance (motion **0x245 SpecialAirLwHeavy**: EAN #0 0-40 in 18, 40-151 in 27: 45 frames), the counter shape on **5-30**, Wait at 45. A hit on it from **anything an opponent owns** (its attack, projectile / weapon, item; never a stage gimmick; grabs never reach a shield shape) -> **no attack**: intangible, he slides in his **spot dodge (EscapeN)** over **14 frames** (smoothstep) to **behind** the fighter to answer (the projectile's / item's owner): a grounded one -> 10 past it, 6 above its feet; an airborne one -> 10 past, 10 above; **into the background** on the way (his position's Z eased to -6 and back to 0 by the end: a sine); airborne at the end, facing it, Fall (actionable). Nobody to answer (an unowned item): the stance goes on (a whiff) |
+| The look | the aura while transformed: BTL_AURA 848's pelvis, head and feet loops (following requests, EffectModule 0x2730, ended and made again every 30 frames from func_82); the vanish lines (BTL_CMN 82's SKI_line) at the counter / dodge / slide. Not done: the silver hair / eyes (the BCS), the ECF colour effects (846 / 847 / 849), XV2's camera and BPE screen effects, Ski_Ref.emo (the afterimage model) |
+| Resets | TIMER_0-2 to 0 (and the aura ended) on Dead / Rebirth / Entry (func_82); the fighter's set-up clears the user variables too (a KO) |
+
+### State (no new globals: 127 of 128; New_Var / VAR_* are all taken)
+The user variables **TIMER_0-4** (`0x0F000320`-`324`, unused by every earlier script and the MSC; they count down by
+themselves each frame, so values are written every frame or used as signals that expire): TIMER_0 the state (0, 1000
+transforming, 2000 transformed: the cave reads > 1500), TIMER_1 / TIMER_2 the cave's dodge signal (4 frames; the attacker
+right / left), TIMER_3 the aura's renewal clock, TIMER_4 Secret Sensation's mark (func_2282 tells it from Fake Death).
+The statuses' own work: floats 6-9 the cave's (damage, side, X / Y to answer), `0x0100000B`-`10` the phases / counters /
+the slide's ends; flags `0x21000010`-`12` the cave's.
+
+### The native part (`tools/supamario_ui_cave.py`, docs/native-notes.md "Supamario's Ultra Instinct")
+Mario's specializer slots 0 / 42 / 43 for kind 0x41 only (Mario, kind 3, untouched): the shape built at set-up (Marth's
+way), the counter's record in 0x157 (fighters only) and 0x155 (owners of attacks / weapons / items, not gimmicks), the
+autododge in slot 43 (the damage event's message has no known attacker fields: the attacker is found from the fighters'
+hit records), slot 43's 0 in 0x157 (fully invincible) and in 0x155 once countered.
+
+### How (files)
+- `supamario.c`: `ui_*` (the transformation, its counter, the dodge, the trigger / resets / aura in `ui_tick` from
+  `func_82`), `ss_*` (Secret Sensation); hooks `func_2253` / `func_2254` (pre), `func_2268` / `func_2272` (main),
+  `func_2283` / `func_2284` (end), `func_2275` (0x158's exec, empty), `func_2265` / `func_2282` (0x155 main / end),
+  `func_82` (ui_tick).
+- `tools/supamario_ui_anim.py` (the four motions), `supamario_ui_build.py` (values, scripts, effects, sounds),
+  `supamario_ui_test.py` (the MSC in rolloff_hold_test's interpreter + the files), `supamario_ui_cave.py` /
+  `supamario_ui_cave_test.py` (unicorn). Sounds `0x0CB100A4`-`A6` (Start, Success, Vanish), effects `0x0341006C`-`73`.
+- ModAnimNames.txt: SpecialLwLight / SpecialLwHeavy / SpecialAirLwLight / SpecialAirLwHeavy (Sm4shCommand v1.7.17).
+
+### Tests
+`supamario_ui_cave_test.py` **144 ok** (words, set-up vs Marth's, slot 42 by status / category / owner / side, slot 43
+autododge cases incl. Mario untouched); `supamario_ui_test.py` **136 ok** (trigger statuses and refusals, the 60 frames,
+the window, the counter's placement / motion / intangibility, the dodge's way / frames / refusals / no cooldown, resets,
+Secret Sensation's stance / slide / ends / depth / Fake Death otherwise, the scripts, motions, effect sets); the earlier
+suites (their "unchanged" checks now except the four slots), `msc_stack_check` 0 problems, `import_call_check` 0.
+
+### Not confirmed in game / approximated
+- The cave-built counter shape for kind 0x41 (Sephiroth's works in game); that a projectile on Secret Sensation's shape
+  is recorded (Marth's counters projectiles in vanilla); the autododge's attacker lookup through the hit records (written
+  at the collision, before the damage event: a static reading) and the 1-frame gap between the cave's signal and the
+  dodge status (the hit itself always does nothing); MSC effect op 0x2730 as a following request; position Z writes for
+  the slide's depth (the camera's side assumed +Z; the stage's collision ignores Z).
+- XV2's damage 10 taken as 10%; the launch's angle / knockback chosen; the freeze box's hitstop as XV2's hold; the
+  transformation compressed to the user's 60 frames (XV2: 229 to the burst); BAC 5 (no rush) chosen over the rush roots;
+  Mario's EscapeN for the slide (the user's); no hair / eye recolour (no BCS), no ECF / BPE / camera effects.

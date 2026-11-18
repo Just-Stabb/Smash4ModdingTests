@@ -2639,7 +2639,7 @@ temporary diag caves' `0x04BCC000`); variables `0x0F0003D0`-`0x0F0003DA`; comman
 `0x04BD88C4`, data `0x04BD9F00`, the reset lists `0x04BDA000`; `textregion:0x2BE0000 grow:0x04BE0000`).
 `0x04BD6000`-`0x04BD8000` (between ts_data's end and this) was free; `0x04BD6000`-`0x04BD7000` is now the whip motion
 table's (Byleth v15, below), `0x04BD7000`-`0x04BD8000` the hitbox hold's (rapid_setoff v1, below). `0x04BE0000`-`0x04BE2000`
-(past this region, the text region grown again) is the camera effects' (camera_effects v1, "Camera effects" below). `0x04BE2000`-`0x04BE3000` (grown again) is the screen invert's (screen_invert v1, "Screen colour" below). `0x04BE3000`-`0x04BE4000` (grown again) is the outline's and `0x04BE4000`-`0x04BE5000` (grown again) the mesh visibility's (model_commands v1, "Outline" / "Mesh visibility" below). `0x04BE5000`-`0x04BE8000` (grown again; to `0x04BE7000` before exe_v46z_outline4) is the outline shell's (model_commands v2, "Outline shell" below). The combined exe the user runs:
+(past this region, the text region grown again) is the camera effects' (camera_effects v1, "Camera effects" below). `0x04BE2000`-`0x04BE3000` (grown again) is the screen invert's (screen_invert v1, "Screen colour" below). `0x04BE3000`-`0x04BE4000` (grown again) is the outline's and `0x04BE4000`-`0x04BE5000` (grown again) the mesh visibility's (model_commands v1, "Outline" / "Mesh visibility" below). `0x04BE5000`-`0x04BE8000` (grown again; to `0x04BE7000` before exe_v46z_outline4) is the outline shell's (model_commands v2, "Outline shell" below). `0x04BE8000`-`0x04BE9000` (grown again) is Supamario's Ultra Instinct cave (exe_v46z_ui, "Supamario's Ultra Instinct" below). The combined exe the user runs:
 exe_v46v_threads -> var_reset_cave.py (exe_v46w_vars) -> tools/line_test_cave.py (exe_v46w_vars_line, which chains on
 four of these hooks).
 
@@ -3346,3 +3346,32 @@ uses a pixel program with MC and FB1 (it would get the band too); Cemu's / the G
 in the text region (256-aligned, uniform-block mode) and of a fetch shader with more semantics than the vertex program
 maps; the band's look at Width 1.5 / 3 (pixels of 1280 x 720) on Dr. Mario; the draw order (depth write keeps the band
 when the background is drawn after the fighter; a part drawn after another may lose a sliver behind the first's band).
+
+## Supamario's Ultra Instinct (`tools/supamario_ui_cave.py`, exe_v46z_ui)
+
+**Claimed region: `0x04BE8000`-`0x04BE9000`** (past the outline shell's; `textregion:0x2BE9000 grow:0x04BE9000`). Base:
+exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATCHED]` (unicorn, 144 checks).
+`tools/import_call_check.py` 0 (only game functions are called, through ctr). User-side: fighters/supamario/README.md
+"Ultra Instinct v1".
+
+- **Mario's specializer** (vtable `0x10139E60`; slot n at `+0xC + 8n`): slot 0 `0x02F1A6F0` (`li r5, 1; b 0x02F1A598`, his
+  set-up: it builds the Cape's reflector, ReflectorModule `[acc + 0x72F8]` group 3; ShieldModule group 1 is free), slot 42
+  `0x02F1B218` (`blr`), slot 43 `0x02F1B21C` (`li r3, 1`). Each is referenced once (its vtable entry). Kind test `[fighter
+  + 4] == 0x41` (Mario is 3 in this numbering): nothing changes for Mario or any other kind.
+- **Set-up:** Marth's group-1 build (`0x0200C858(M, desc, 1)`, then `0x0200BD8C(M, 0, 0, 1)` off); a capsule on joint 0
+  (0, 2.5, 0)-(0, 9.5, 0), radius 6.5.
+- **Slot 42** (shield hit, message +8 AM / +0xC damage / +0x10 record / +0x14 group): kind 0x41, group 1, status 0x157 or
+  0x155, flag `0x21000010` off, record category < 3 (0x157: 0 only), hit data `+0x54 == 0`: status floats 6 damage, 7 side,
+  8 / 9 the X / Y of the fighter to answer (category 0: the record's object; 1 / 2: the object's owner module `[acc +
+  0x6C] +0x34`, the current owner, when it is a fighter id), flags `0x21000010` (+ `11` not a fighter, + `12` found).
+  Handles: `0x02BF2108` / `0x02BEF50C` / `0x02BEF640` (edge_counter_cave.py's).
+- **Slot 43** (the damage event `0x02E35EE4`, event id 0x12; its message is only read at +8, the handled byte, by the
+  game's handler and by Marth's slot 43: no attacker fields are known): 0x157 -> 0; 0x155 with `0x21000010` -> 0; the
+  autododge: Wait / Walk / WalkBrake / Squat .. SquatRv, TIMER_0 (`0x0F000320`, through his WorkModule's get_float vt
+  `+0x44`) > 1500, and a live other fighter (table `[[0x1035184C]]`, entries of `0x76B0`, `+0x1E >= 4`) whose
+  AttackModule (`[[entry + 0xC] + 0x50]`, records on `+0x4C`) has his object id in a part's record list (`[AM + 0x14] +
+  part x 0x174`: sentinel `+0x124`, first node `+0x128`, node `+0x18` the object hit, `+0x27` the hitbox id), hit data
+  `+0x54 == 0`: TIMER_1 (attacker to his right) / TIMER_2 = 4.0 through set_float (vt `+0x4C`), the handled bit, 0.
+- **Not confirmed in game:** the hit records' timing against the damage event (records are the collision's "don't hit
+  twice" log: present when the hit is dealt, by static reading); a stale record of an earlier hit of the same move could
+  make a projectile hit in the same move's lifetime dodge.

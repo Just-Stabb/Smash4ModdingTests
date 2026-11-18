@@ -1152,7 +1152,8 @@ def script_tests(out, base):
             if [(c.ident, c.params) for c in s] != [(c.ident, c.params) for c in (ns or [])] and \
                     h not in {acmd.crc(n) for n in ('attackdash', 'specialhi', 'specialairhi', 'speciallwstart',
                                                      'speciallwhold', 'specials', 'specialairs',
-                                                     'speciallwlight', 'speciallwheavy', 'specialairlwlight')}:
+                                                     'speciallwlight', 'speciallwheavy', 'specialairlwlight',
+                                                     'specialairlwheavy')}:
                 same.append((p, hex(h)))
     check('every other script as the user\'s (but the God Fist\'s / Core Breaker\'s / Fake Death\'s / Time Skip\'s / '
           'Ultra Instinct\'s)',
