@@ -56,8 +56,18 @@ AURA_EVERY = 30.0                    # the aura made again every 30 frames
 SCALE = 1.75                         # xv2_smash_fx.SIZE (the earlier XV2 ports': XV2's x1.0)
 
 ST_UI, ST_DODGE = cave.ST_UI, cave.ST_DODGE
-MOT_FORM, MOT_STRIKE, MOT_DODGE = 0x231, 0x235, 0x241
-SCRIPT = {anim.FORM: 'speciallwlight', anim.STRIKE: 'speciallwheavy', anim.DODGE: 'specialairlwlight'}
+MOT_FORM, MOT_STRIKE, MOT_DODGE, MOT_SS = 0x231, 0x235, 0x241, 0x245
+MOT_ESCAPE_N = 0x4B                  # Mario's spot dodge (Secret Sensation's slide, the user's)
+SCRIPT = {anim.FORM: 'speciallwlight', anim.STRIKE: 'speciallwheavy', anim.DODGE: 'specialairlwlight',
+          anim.SS: 'specialairlwheavy'}
+# Secret Sensation (the user's, Dragon Ball FighterZ's; the transformed grounded down special): the counter shape on
+# frames 5-30 of a 45-frame stance (Marth-like); a counter: a 14-frame slide (EscapeN) behind the fighter to answer, a
+# little into the background (Z out to -6 and back), ending airborne: 10 past a grounded one, 6 above its feet; 10 past
+# and 10 above an airborne one; no hitbox
+SS_ON, SS_OFF, SS_END = 5, 30, anim.frames_of(anim.SS)
+SS_SLIDE_N, SS_DEPTH = 14, 6.0
+SS_BEHIND, SS_UP_GROUND, SS_BEHIND_AIR, SS_UP_AIR = 10.0, 6.0, 10.0, 10.0
+V_SS = 0x0F000324                    # TIMER_4: Secret Sensation's mark
 BONES = {'TransN': 0, 'HipN': 2, 'LFootJ': 5, 'RFootJ': 9, 'BustN': 12, 'HeadN': 22, 'LHandN': 16, 'RHandN': 20}
 F_DMG = 0x0100000A                   # the strike's damage (status float 10), the hitbox's Damage variable
 V_AURA = 0x0F000323                  # TIMER_3: the aura's renewal
@@ -117,7 +127,11 @@ def msc_values():
          'UI_BONE_HIP': '0x%X' % BONES['HipN'], 'UI_BONE_HEAD': '0x%X' % BONES['HeadN'],
          'UI_BONE_LFOOT': '0x%X' % BONES['LFootJ'], 'UI_BONE_RFOOT': '0x%X' % BONES['RFootJ'],
          'UI_HEAD_UP': fl(round(0.2 * METRE, 3)), 'UI_AURA_SIZE': fl(SCALE), 'UI_FOOT_SIZE': fl(round(0.8 * SCALE, 3)),
-         'UI_VANISH_SIZE': fl(SCALE)}
+         'UI_VANISH_SIZE': fl(SCALE), 'UI_SND_VANISH': '0x%X' % se_id('ui_vanish'),
+         'UI_SS_MOT': '0x%X' % MOT_SS, 'UI_SS_SLIDE_MOT': '0x%X' % MOT_ESCAPE_N, 'UI_SS_ON': fl(SS_ON),
+         'UI_SS_OFF': fl(SS_OFF), 'UI_SS_END': fl(SS_END), 'UI_SS_SLIDE_N': fl(SS_SLIDE_N), 'UI_SS_DEPTH': fl(SS_DEPTH),
+         'UI_SS_BEHIND_AIR': fl(SS_BEHIND_AIR), 'UI_SS_BEHIND': fl(SS_BEHIND), 'UI_SS_UP_GROUND': fl(SS_UP_GROUND),
+         'UI_SS_UP_AIR': fl(SS_UP_AIR), 'UI_V_SS': '0x%X' % V_SS}
     return v
 
 
@@ -163,17 +177,17 @@ def scripts_for():
             graphic('aura_foot', 'RFootJ'), graphic('aura_hand'), graphic('aura_hand', 'LHandN')]
     game = {anim.FORM: [], anim.STRIKE: timeline([(STRIKE_AT, [strike_box()]),
                                                   (STRIKE_AT + 3, [cmd('remove_all_hitboxes')])]),
-            anim.DODGE: []}
+            anim.DODGE: [], anim.SS: []}
     effect = {anim.FORM: timeline([(FX_START_AT, [graphic('start')]), (FX_AURA_AT, aura),
                                    (FX_BURST_AT, [graphic('burst', follow=False)])]),
               anim.STRIKE: timeline([(0, [graphic('vanish', follow=False)])]),
-              anim.DODGE: timeline([(0, [graphic('vanish', follow=False)])])}
+              anim.DODGE: timeline([(0, [graphic('vanish', follow=False)])]), anim.SS: []}
     sound = {anim.FORM: timeline([(SND_START, [cmd('sound_effect', se_id('ui_start'))]),
                                   (SND_SUCCESS, [cmd('sound_effect', se_id('ui_success'))])]),
              anim.STRIKE: timeline([(0, [cmd('sound_effect', se_id('ui_vanish'))])]),
-             anim.DODGE: timeline([(0, [cmd('sound_effect', se_id('ui_vanish'))])])}
+             anim.DODGE: timeline([(0, [cmd('sound_effect', se_id('ui_vanish'))])]), anim.SS: []}
     expression = {anim.FORM: timeline([(FX_BURST_AT, [cmd('rumble', 0x12, 0)])]),
-                  anim.STRIKE: timeline([(STRIKE_AT, [cmd('rumble', 0x12, 0)])]), anim.DODGE: []}
+                  anim.STRIKE: timeline([(STRIKE_AT, [cmd('rumble', 0x12, 0)])]), anim.DODGE: [], anim.SS: []}
     return {'game': game, 'effect': effect, 'sound': sound, 'expression': expression}
 
 

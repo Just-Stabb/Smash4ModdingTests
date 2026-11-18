@@ -434,17 +434,36 @@ def slot42_checks(e, kind):
         want[6], want[7] = 5.0, 1.0
         check('slot 42, a weapon at +12, %s: no target, the side from the weapon (+1)' % what, e.floats(fk), want)
         check('  flags 0x21000010 + 11, not 12', e.flagw(fk), (F0 | 0x30000, 0x12345678))
-    # a stage gimmick whose object is gone: Marth's side function
+    # an item whose object is gone: Marth's side function
     fk = e.fighter(kind)
     e.side = -0.5
-    msg, am, rec = message(e, damage=11.0, category=3, oid=0x3000FFFF)
+    msg, am, rec = message(e, damage=11.0, category=2, oid=0x2000FFFF)
     hd = hitdata(e)
     e.run(C.SLOT42_HOOK, 0, fk['f'], msg)
     want = list(base)
     want[6], want[7] = 11.0, -0.5
-    check('slot 42, a gone gimmick: Marth\'s side (-0.5)', e.floats(fk), want)
+    check('slot 42, a gone item: Marth\'s side (-0.5), not found', (e.floats(fk), e.flagw(fk)),
+          (want, (F0 | 0x30000, 0x12345678)))
     check('  0x02C22684 with Marth\'s arguments', [c for c in e.calls if c[0] == 'side'],
           [('side', 0x7290AAAA, am, hd, 3, 1, 0.25, -0.75)])
+    # a stage gimmick (category 3): not countered
+    fk = e.fighter(kind)
+    msg, am, rec = message(e, damage=11.0, category=3, oid=0x30001234)
+    hitdata(e)
+    r, kept = e.run(C.SLOT42_HOOK, 0, fk['f'], msg)
+    check('slot 42, a stage gimmick (category 3): nothing written, nothing called',
+          (e.floats(fk), e.flagw(fk), e.calls, kept), (base, (F0, 0x12345678), [], True))
+    # Secret Sensation (0x155): recorded as in 0x157
+    fk = e.fighter(kind, status=C.ST_SS, x=0.0)
+    aid = 0x00030012
+    e.obj(aid, x=-20.0, y=4.0)
+    msg, am, rec = message(e, category=0, oid=aid)
+    hitdata(e)
+    r, kept = e.run(C.SLOT42_HOOK, 0, fk['f'], msg)
+    want = list(base)
+    want[6], want[7], want[8], want[9] = 13.5, -1.0, -20.0, 4.0
+    check('slot 42, Secret Sensation (0x155), a fighter to his left: recorded', (e.floats(fk), e.flagw(fk), kept),
+          (want, (F0 | 0x50000, 0x12345678), True))
     # nothing
     fk = e.fighter(kind)
     e.setw(fk['flags'], F0 | 0x10000)
@@ -533,6 +552,19 @@ def slot43_checks(e, kind):
         r, kept, msg, sk, att = slot43_case(e, kind, **kw)
         check('slot 43, %s: 1, message untouched, nothing set' % what,
               (r, bytes(e.mu.mem_read(msg + 8, 1))[0], [c for c in e.calls if c[0] == 'set'], kept), (1, 0x40, [], True))
+    for flag, want in ((True, 0), (False, 1)):
+        e.setw(e.ftab + 8, 0)
+        sk = e.fighter(kind, status=C.ST_SS)
+        if flag:
+            e.setw(sk['flags'], 0x0000C00F | 0x10000)
+        msg = e.alloc(0x20, b'\0')
+        e.mu.mem_write(msg + 8, bytes([0x40]))
+        r, kept = e.run(C.SLOT43_HOOK, 0, sk['f'], msg)
+        check('slot 43, Secret Sensation (0x155), 0x21000010 %s: %d' % ('on' if flag else 'off', want),
+              (r, bytes(e.mu.mem_read(msg + 8, 1))[0], e.calls, kept), (want, 0x41 if want == 0 else 0x40, [], True))
+    r, kept, msg, sk, att = slot43_case(e, kind, status=C.ST_SS, form=2000.0)
+    check('slot 43, 0x155 without the flag, transformed, a fighter\'s records hold him: 1 (no dodge in a move)',
+          (r, [c for c in e.calls if c[0] == 'set']), (1, []))
     r, kept, msg, sk, att = slot43_case(e, MARIO)
     check('slot 43, Mario (3) in Wait, a fighter\'s records hold him: 1, nothing read or set',
           (r, bytes(e.mu.mem_read(msg + 8, 1))[0], e.calls, kept), (1, 0x40, [], True))

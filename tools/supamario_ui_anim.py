@@ -18,6 +18,8 @@ source frames, output frames):
   SpecialLwHeavy (0x235, the counter's strike, 58 frames): #1 151-176 in 8 (the vanish / reappearance), 270-320 1:1
      (the finisher: XV2's 280 at frame 18).
   SpecialAirLwLight (0x241, the autododge, 16 frames): #1 151-167 1:1 (the vanish's first frames).
+  SpecialAirLwHeavy (0x245, Secret Sensation's stance, 45 frames): #0 0-40 in 18 (into the stance), 40-151 in 27 (the
+     counter stance held: XV2's window). Its slide is Mario's own spot dodge (EscapeN), the user's.
 They were F.L.U.D.D.'s shoot motions (unreachable since Fake Death / Sledgehammer).
 """
 import os
@@ -31,9 +33,9 @@ import xv2ean as X  # noqa: E402
 import supamario_fakedeath_anim as FA  # noqa: E402
 
 SCALE = 5.04
-FORM, STRIKE, DODGE = 'SpecialLwLight.omo', 'SpecialLwHeavy.omo', 'SpecialAirLwLight.omo'
-MOTIONS = (FORM, STRIKE, DODGE)
-PAC_TAG = {FORM: 'D03', STRIKE: 'D03', DODGE: 'D03'}
+FORM, STRIKE, DODGE, SS = 'SpecialLwLight.omo', 'SpecialLwHeavy.omo', 'SpecialAirLwLight.omo', 'SpecialAirLwHeavy.omo'
+MOTIONS = (FORM, STRIKE, DODGE, SS)
+PAC_TAG = {FORM: 'D03', STRIKE: 'D03', DODGE: 'D03', SS: 'D03'}
 # (name, motion, EAN animation, source start, source end (exclusive), output frames)
 SEGMENTS = [
     ('stance', FORM, 0, 0, 30, 12),
@@ -42,6 +44,8 @@ SEGMENTS = [
     ('vanish', STRIKE, 1, 151, 176, 8),
     ('finisher', STRIKE, 1, 270, 320, 50),
     ('dodge', DODGE, 1, 151, 167, 16),
+    ('ss_in', SS, 0, 0, 40, 18),
+    ('ss_hold', SS, 0, 40, 151, 27),
 ]
 EAN_FRAMES = [325, 500]
 

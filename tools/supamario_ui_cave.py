@@ -18,7 +18,9 @@ this adds:
    answer: the attacker itself (record +0x1C category 0), or for a weapon / item (1 / 2) its current owner (the
    object's owner module [acc + 0x6C] +0x34, a fighter id (id >> 28 == 0)); flags 0x21000010 on, 0x21000011 on for a
    non-fighter attacker, 0x21000012 on when the fighter to answer was found (else the side from the attacker object's
-   place, or Marth's 0x02C22684 when that is gone too). No hitstop, no attacker freeze (his MSC answers at once).
+   place, or Marth's 0x02C22684 when that is gone too). No hitstop, no attacker freeze (his MSC answers at once). A stage gimmick's hit (category 3:
+   owned by no opponent, the user's) is not countered: nothing recorded. Grabs never reach the shape (a catch box
+   isn't a hitbox: the shield-hit event is the attack collision's).
 3. SLOT43 (0x02F1B21C `li r3, 1`, the damage event's call; 0 skips the damage, knockback and reaction):
    - status 0x157 (the transformation and its counter strike): 0, the message's handled bit (+8 |= 1): fully
      invincible (his MSC also makes him intangible: no grab, nothing reaches the body);
@@ -222,6 +224,9 @@ s42_st: lwz r11, %(work)d(r12)
         mr r29, r11                     # status work
         lwz r28, 0x10(r5)               # the collision record
         li r25, 0                       # flag bits to add
+        lbz r0, 0x1C(r28)               # a stage gimmick (category 3) or anything past: not countered
+        cmplwi r0, 3
+        bge out42
         lwz r3, 8(r30)                  # the attacker's AttackModule: vt +0x194(id, part) = hit data
         lwz r12, 0(r3)
         lwz r12, 0x194(r12)
