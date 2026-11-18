@@ -28,7 +28,11 @@ Command: Mesh_Visibility(Target, Mesh, Visible, Persist) (index MV_INDEX, CRC of
   Visible  0 hide, 1 show, 2 end this mesh's override (the game's own state again).
   Persist  0 until the animation (the motion kind) changes, as vanilla visibility changes; 1 until changed, a KO, the
            match end or a training reset.
-Every mesh whose name has that CRC is changed (names are unique in the game's models).
+Every mesh whose name has that CRC is changed (names are unique in the game's models), and (v2, exe_v46z_outline2)
+every entry right after a match that has no name of its own (a null or empty name: a part of that mesh), so a mesh
+with several parts (Smash Forge's Polygon_0, Polygon_1 ...) changes whole whatever the model's layout (by the game's
+code one entry already covers a NUD mesh's polygons: docs/native-notes.md "Mesh visibility", v2). The index form is the
+game's mesh index.
 
 Hooks (each word asserted):
   SETVIS 0x034232FC  lwz r7, 0x6E4(r3)  (the mesh visibility setter) -> mv_set: a which-0 write to an overridden mesh
@@ -38,8 +42,8 @@ Hooks (each word asserted):
   CLEAR  the clear-all chain's last `b 0x02FB349C` (outline_cave.py's ol_clear) -> mv_clear: every override ends (the
          byte put back while the object still has that model)
   LOOKUP / SIZE1 / SIZE2 / FETCH: chained in front of Outline_Set's.
-  --diag: TEST ONLY OSReport lines (S4MC per command, S4MF per override and frame: the first 30 frames after a command,
-  then every 30th).
+  --diag: TEST ONLY OSReport lines (S4MC per command, S4MH per mesh entry it changed (part 1: an unnamed part after a
+  match), S4MF per override and frame: the first 30 frames after a command, then every 30th).
 Space: 0x04BE4000-0x04BE5000 (docs/native-notes.md "Mesh visibility": past the outline's, the text region grown).
 Test: tools/mesh_vis_test.py (unicorn: the game's setter 0x034232FC, by-name setter 0x0342633C, the per-frame result
 0x03424E88's decision, the tick, the handler, the tables).
@@ -83,15 +87,16 @@ NEW_CMDS = [
     (CMD_NAME, 'h_meshvis', [
         ('Target', 0, OL._T),
         ('Mesh', 0, 'The mesh (model part): its name in quotes, e.g. Mesh="stethoscope_VIS_O_OBJ" (Sm4shCommand stores '
-                    'its CRC32; the Hitbox Viewer\'s Model parts tab lists the names), or 0-255 a mesh index. -1: '
+                    'its CRC32; the Hitbox Viewer\'s Model parts tab lists the names), or 0-255 a mesh index (the '
+                    'game\'s mesh order). The mesh changes with all its parts (v2: Polygon_0, Polygon_1 ...). -1: '
                     'every Mesh_Visibility override of this object ends.'),
         ('Visible', 0, '0 hide it, 1 show it, 2 end this mesh\'s override (the motion\'s visibility animation and the '
                        'visibility groups decide again).'),
         ('Persist', 0, '0: until the animation changes (as Model_Changer and the motion\'s own visibility); 1: until '
                        'changed, a KO, the match end or a training reset.')],
      'Hides or shows one of an object\'s meshes by name, for this animation or until changed, over the motion\'s '
-     'visibility animation and the visibility groups. New command: needs the patched cross_f.rpx '
-     '(tools/mesh_vis_cave.py, exe_v46z_outline).'),
+     'visibility animation and the visibility groups; a mesh with several parts changes whole (exe_v46z_outline2). New '
+     'command: needs the patched cross_f.rpx (tools/mesh_vis_cave.py, exe_v46z_outline; v2 in exe_v46z_outline2).'),
 ]
 
 
@@ -115,6 +120,7 @@ def find(orig):
 DIAG_FMTS = [
     ('s_mc', 'S4MC tgt=%d mesh=%08X vis=%d per=%d acc=%08X mi=%08X hit=%d\n'),
     ('s_mf', 'S4MF n=%d k=%d mesh=%d byte=%02X forced=%d per=%d kind=%d\n'),
+    ('s_mh', 'S4MH mesh=%d part=%d\n'),
 ]
 
 
@@ -169,13 +175,15 @@ mv_one:
         cmplw r0, r25                   # a mesh index
         bge mv_done
         mr r3, r0
+        li r4, 0
         bl mv_apply
         b mv_done
-mv_hash:                                # a name's CRC32: every mesh whose name has it (0x0342633C's walk)
-        lwz r0, 0x3C(r26)
-        mulli r0, r0, 0x14
+mv_hash:                                # a name's CRC32: every mesh whose name has it (0x0342633C's walk), and (v2)
+        lwz r0, 0x3C(r26)               # every entry right after a match that has no name of its own (a part of
+        mulli r0, r0, 0x14              # that mesh)
         lwzx r24, r26, r0""" + chk('r24', 'mv_done') + """
         li r23, 0
+        li r22, 0                       # r22: in a matched mesh's run
 mvh_loop:
         cmplw r23, r25
         bge mv_done
@@ -185,17 +193,29 @@ mvh_loop:
         mr r3, r24
         mr r4, r23
         li r5, 0
-        bctrl""" + chk('r3', 'mvh_next') + """
+        bctrl""" + chk('r3', 'mvh_noname') + """
         lwz r12, 0(r3)
         lwz r0, 0x2C(r12)
         mtctr r0
-        bctrl""" + chk('r3', 'mvh_next') + """
+        bctrl""" + chk('r3', 'mvh_noname') + """
+        lbz r0, 0(r3)
+        cmpwi r0, 0
+        beq mvh_noname
         bl mv_crc
         lwz r0, 4(r30)
         cmplw r3, r0
+        li r22, 0
         bne mvh_next
+        li r22, 1
+        li r4, 0                        # (diag: the named mesh)
+mvh_hit:
         mr r3, r23
         bl mv_apply
+        b mvh_next
+mvh_noname:
+        cmpwi r22, 0
+        li r4, 1                        # (diag: a part of it, no name of its own)
+        bne mvh_hit
 mvh_next:
         addi r23, r23, 1
         b mvh_loop
@@ -220,11 +240,15 @@ mv_ret:
         addi r1, r1, 0x50
         blr
 
-# mv_apply(r3 mesh index; r28 accessor, r27 instance, r30 the parameters): this mesh's override set / ended
+# mv_apply(r3 mesh index, r4 (diag) 1 for a part with no name of its own; r28 accessor, r27 instance, r30 the
+# parameters): this mesh's override set / ended
 mv_apply:
         stwu r1, -0x20(r1)
         mflr r0
         stw r0, 0x24(r1)
+        stw r3, 0x10(r1)
+        bl mv_dhit                      # (diag: S4MH; else a blr)
+        lwz r3, 0x10(r1)
         lis r12, mv_g@ha
         addi r12, r12, mv_g@l
         lwz r11, 0x14(r12)
@@ -575,6 +599,7 @@ mvx_next:
         out += """
 mv_dcmd:
 mv_dtick:
+mv_dhit:
         blr
 """
     out += """
@@ -623,6 +648,21 @@ mv_dcmd:
         lwz r0, 0x34(r1)
         mtlr r0
         addi r1, r1, 0x30
+        blr
+
+# --- diag: S4MH at every mesh a command changes (r3 its index, r4 1 when it has no name of its own: a part of the
+#     matched mesh) ----------------------------------------------------------------------------------------------------
+mv_dhit:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        mr r5, r4
+        mr r4, r3
+        lis r3, s_mh@ha
+        addi r3, r3, s_mh@l""" + rep + """
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
         blr
 
 # --- diag: S4MF per override and frame (r3 entry, r4 its number) ------------------------------------------------------

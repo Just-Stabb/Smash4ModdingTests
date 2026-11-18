@@ -84,6 +84,9 @@ namespace Sm4shCommand.Viewer
         // v1.7.13: this object's Outline_Set glow on this frame (r g b 0-1, strength (Alpha / 255 x fade x pulse), tint
         // (Tint / 255 x fade x pulse)); null: none
         public float[] Outline;
+        // v1.7.14: this object's Outline_Shell band on this frame (r g b 0-1, alpha 0-1, width (pixels of 1280 x 720 when
+        // above 0, game units when below) x fade x pulse, blend 0 over / 1 added); null: none
+        public float[] Shell;
     }
 
     /// <summary>v1.6.2: a script's visibility state: each group's state (Model_Changer / VIS_SET_DEFAULT ...), the defaults
@@ -207,6 +210,34 @@ namespace Sm4shCommand.Viewer
         }
     }
 
+    /// <summary>v1.7.14: Outline_Shell's band over time, as the game runs it (tools/outline_shell_cave.py): Outline_Set's
+    /// timing (grow in, Frames held, shrink, the pulse, Alpha 0 ends it), which scales the band's width; the colour and
+    /// alpha stay.</summary>
+    public class ShellState
+    {
+        readonly OutlineState timing = new OutlineState();
+        float r, g, b, alpha = 1, width;
+        int blend;
+
+        public void Set(int frame, float red, float green, float blue, float a, float wd, int fr, int fadeIn, int fadeOut, int fl, int bl)
+        {
+            if (a > 0)
+            {
+                r = red / 255f; g = green / 255f; b = blue / 255f; alpha = Math.Min(1, a / 255f);
+                width = Math.Max(-64, Math.Min(64, wd)); blend = bl != 0 ? 1 : 0;
+            }
+            timing.Set(frame, 255, 255, 255, a > 0 ? 255 : 0, 0, fr, fadeIn, fadeOut, fl);
+        }
+
+        public float[] At(int frame)
+        {
+            var t = timing.At(frame);
+            if (t == null) return null;
+            float wd = width * t[3];
+            return new[] { r, g, b, alpha, wd == 0 ? 0 : wd, blend };
+        }
+    }
+
     /// <summary>
     /// Runs a game (ACMD) script frame by frame the way the game times it, following Smash Forge's
     /// ACMDScript.cs (MIT): FRAME / WAIT timers in animation frames, Set_Frame_Duration and
@@ -274,6 +305,7 @@ namespace Sm4shCommand.Viewer
         // v1.6.2: the body overlay and the visibility groups as the script sets them (threads share the root's)
         OverlayState overlay = new OverlayState();
         OutlineState outline = new OutlineState();
+        ShellState shell = new ShellState();         // v1.7.14
         VisState vis = new VisState();
         // what a variable in an Extra hitbox is drawn with when the script doesn't SET_FLOAT it first
         static readonly float[] VarStandIn = { 10, 0, 100, 0, 40, 4 };
@@ -316,6 +348,7 @@ namespace Sm4shCommand.Viewer
             th.varValues = r.varValues;
             th.overlay = r.overlay;
             th.outline = r.outline;
+            th.shell = r.shell;
             th.vis = r.vis;
             th.fx = r.fx;
             th.script = block;
@@ -371,6 +404,7 @@ namespace Sm4shCommand.Viewer
             fx = new EffectState();
             overlay = new OverlayState();
             outline = new OutlineState();
+            shell = new ShellState();
             vis = new VisState();
             index = 0; loopStart = 0; loopIterations = 0; skipWords = 0;
             currentFrame = 0; animFrame = 0; frameSpeed = 1; syncFrames = -1; rate = 1;
@@ -388,6 +422,7 @@ namespace Sm4shCommand.Viewer
                 pr.varValues = varValues;
                 pr.overlay = overlay;
                 pr.outline = outline;
+                pr.shell = shell;
                 pr.vis = vis;
                 pr.fx = fx;
                 pr.script = o.Commands;
@@ -436,7 +471,7 @@ namespace Sm4shCommand.Viewer
                     Intangible = intangible, Invincible = invincible, SuperArmor = armor, Writes = writes,
                     Speed = speedNow, Screen = fx.Screen,
                     Overlay = overlay.At(game + 1), OverlayLight = overlay.Light, Vis = vis.Clone(),
-                    Outline = outline.At(game + 1),
+                    Outline = outline.At(game + 1), Shell = shell.At(game + 1),
                 };
                 foreach (var h in hitboxes.Values)
                     st.Hitboxes.Add(h.Clone());
@@ -789,7 +824,7 @@ namespace Sm4shCommand.Viewer
         public List<TrailData> AllTrails { get { return fx.AllTrails; } }
         public List<ScreenEvent> AllScreen { get { return fx.AllScreen; } }
 
-        enum FxKind { None, Spawn, Off, OffAll, OffLast, Detach, Last, Trail, TrailOff, Screen, Note, Overlay, Vis, Outline }
+        enum FxKind { None, Spawn, Off, OffAll, OffLast, Detach, Last, Trail, TrailOff, Screen, Note, Overlay, Vis, Outline, Shell }
 
         /// <summary>What an effect command does and where its parameters are, from its name and its parameters' names
         /// (Events.cfg's syntax, from the ACMD events sheet: no fixed positions guessed).</summary>
@@ -800,6 +835,7 @@ namespace Sm4shCommand.Viewer
             public bool Camera;         // v1.7.6: Effect_Camera
             public int Mode = -1, Frames = -1;
             public int Target = -1, Tint = -1, FadeIn = -1, Flash = -1;     // v1.7.13: Outline_Set / Mesh_Visibility
+            public int Width = -1, Blend = -1;                              // v1.7.14: Outline_Shell
             public string Op;           // v1.6.2: an overlay / visibility command's operation
             public int G = -1, GL = -1, Work = -1, Bone = -1, BoneHash = -1, X = -1, Y = -1, Z = -1, RX = -1, RY = -1,
                 RZ = -1, Size = -1, Term = -1, R = -1, Gr = -1, B = -1, Alpha = -1, Rate = -1, Fade = -1,
@@ -852,6 +888,15 @@ namespace Sm4shCommand.Viewer
                 d.R = at(new[] { "Red" }); d.Gr = at(new[] { "Green" }); d.B = at(new[] { "Blue" }); d.Alpha = at(new[] { "Alpha" });
                 d.Tint = at(new[] { "Tint" }); d.Frames = at(new[] { "Frames" }); d.FadeIn = at(new[] { "FadeIn" });
                 d.Fade = at(new[] { "FadeOut" }); d.Flash = at(new[] { "Flash" });
+            }
+            else if (n == "Outline_Shell")
+            {
+                // v1.7.14 (exe_v46z_outline2): a band round the silhouette, outside it, drawn round the model (Target 0)
+                d.Kind = FxKind.Shell;
+                d.Target = at(new[] { "Target" });
+                d.R = at(new[] { "Red" }); d.Gr = at(new[] { "Green" }); d.B = at(new[] { "Blue" }); d.Alpha = at(new[] { "Alpha" });
+                d.Width = at(new[] { "Width" }); d.Frames = at(new[] { "Frames" }); d.FadeIn = at(new[] { "FadeIn" });
+                d.Fade = at(new[] { "FadeOut" }); d.Flash = at(new[] { "Flash" }); d.Blend = at(new[] { "Blend" });
             }
             else if (n == "Mesh_Visibility")
             {
@@ -1079,6 +1124,16 @@ namespace Sm4shCommand.Viewer
                         if (it(d.Target) == 0)
                             r.outline.Set(r.gameFrame, fl(d.R, 255), fl(d.Gr, 255), fl(d.B, 255), fl(d.Alpha, 0), fl(d.Tint, 0),
                                           it(d.Frames), it(d.FadeIn), it(d.Fade), it(d.Flash));
+                        var ev = new ScreenEvent { Frame = r.gameFrame, Text = Text(cmd) + (it(d.Target) == 0 ? "" : "  (another object: listed only)") };
+                        fs.Screen.Add(ev);
+                        fs.AllScreen.Add(ev);
+                        break;
+                    }
+                case FxKind.Shell:
+                    {
+                        if (it(d.Target) == 0)
+                            r.shell.Set(r.gameFrame, fl(d.R, 255), fl(d.Gr, 255), fl(d.B, 255), fl(d.Alpha, 0), fl(d.Width, 0),
+                                        it(d.Frames), it(d.FadeIn), it(d.Fade), it(d.Flash), it(d.Blend));
                         var ev = new ScreenEvent { Frame = r.gameFrame, Text = Text(cmd) + (it(d.Target) == 0 ? "" : "  (another object: listed only)") };
                         fs.Screen.Add(ev);
                         fs.AllScreen.Add(ev);

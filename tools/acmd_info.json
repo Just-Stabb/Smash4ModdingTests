@@ -10876,6 +10876,36 @@
 "FadeOut",
 "Flash"
 ]
+},
+"FFC60785": {
+"size": 12,
+"name": "Outline_Shell",
+"format": [
+0,
+1,
+1,
+1,
+1,
+1,
+0,
+0,
+0,
+0,
+0
+],
+"syntax": [
+"Target",
+"Red",
+"Green",
+"Blue",
+"Alpha",
+"Width",
+"Frames",
+"FadeIn",
+"FadeOut",
+"Flash",
+"Blend"
+]
 }
 }
 }

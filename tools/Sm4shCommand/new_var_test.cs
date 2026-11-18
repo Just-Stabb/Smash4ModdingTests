@@ -85,10 +85,10 @@ class NvTest
         var errors = new List<string>();
         int n = ACMD_INFO.OverrideInfo(args[0], errors);
         Check("Events.cfg loads with no errors", string.Join("; ", errors), "");
-        Check("commands", ACMD_INFO.CMD_NAMES.Count, 634);   // v1.7.13: + Outline_Set, Mesh_Visibility; v1.7.12: + Screen_Invert; v1.4.12: + Position_Place, Position_Offset_Get; v1.4.13: + Buffer_Clear, Buffer_Set; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
+        Check("commands", ACMD_INFO.CMD_NAMES.Count, 635);   // v1.7.14: + Outline_Shell; v1.7.13: + Outline_Set, Mesh_Visibility; v1.7.12: + Screen_Invert; v1.4.12: + Position_Place, Position_Offset_Get; v1.4.13: + Buffer_Clear, Buffer_Set; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
         Check("New_Var known: size 11, group", ACMD_INFO.CMD_SIZES[FighterVariable.NewVarIdent] + " " +
               ACMD_INFO.GetCategory(FighterVariable.NewVarIdent), "11 New Commands / Variables");
-        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 50);       // v1.7.13: + Outline_Set, Mesh_Visibility; v1.7.12: + Screen_Invert; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
+        Check("commands with help", ACMD_INFO.CMD_HELP.Count, 51);       // v1.7.14: + Outline_Shell; v1.7.13: + Outline_Set, Mesh_Visibility; v1.7.12: + Screen_Invert; v1.7.0: + Time_Scale, Target_Time_Scale, Stage_Freeze; v1.7.3: + Line_Test; v1.7.4: + Var_Reset_Set; v1.7.5: + Hitbox_Hold; v1.7.6: + Effect_Camera
         Check("group help blocks", ACMD_INFO.GROUP_HELP.Count, 11);      // v1.7.0: + New Commands / Time & stage; v1.7.6: + New Commands / Effects
         LoadAliases(args[1]);
         Check("aliases loaded", FighterVariable.AliasCount > 500, true);
@@ -198,6 +198,18 @@ class NvTest
         Check("Mesh_Visibility(Mesh=-1): every override ends", Hex(Bytes(Compile("Mesh_Visibility(Target=0, Mesh=-1, Visible=0, Persist=0)"))),
               "D627E02A00000000FFFFFFFF00000000000000005766F889");
         Check("Mesh_Visibility: New Commands / Animation", ACMD_INFO.GetCategory(0xD627E02A), "New Commands / Animation");
+        // ---- v1.7.14: Outline_Shell(Target, Red, Green, Blue, Alpha, Width, Frames, FadeIn, FadeOut, Flash, Blend)
+        //      (exe_v46z_outline2); Mesh_Visibility's multi-part meshes (the same words)
+        s = Compile("Outline_Shell(Target=0, Red=255, Green=255, Blue=255, Alpha=255, Width=1.5, Frames=120, FadeIn=4, FadeOut=10, Flash=0, Blend=1)");
+        Check("Outline_Shell: 12 words, its CRC, Target, 5 floats (Width 1.5), Frames, FadeIn, FadeOut, Flash, Blend", Hex(Bytes(s)),
+              "FFC6078500000000437F0000437F0000437F0000437F00003FC0000000000078000000040000000A00000000000000015766F889");
+        Check("Outline_Shell round-trips", Hex(Bytes(Compile(s.Deserialize()))), Hex(Bytes(s)));
+        Check("Outline_Shell: a game-unit width (-0.4) compiles", Hex(Bytes(Compile("Outline_Shell(Target=0, Red=0, Green=0, Blue=0, Alpha=255, Width=-0.4, Frames=0, FadeIn=0, FadeOut=0, Flash=0, Blend=0)"))).Substring(48, 8),
+              "BECCCCCD");
+        Check("Outline_Shell: New Commands / Effects", ACMD_INFO.GetCategory(0xFFC60785), "New Commands / Effects");
+        Check("Mesh_Visibility v1.7.14: a multi-part mesh's name compiles as any (HammerM2_O_OBJ's CRC32)",
+              Hex(Bytes(Compile("Mesh_Visibility(Target=0, Mesh=\"HammerM2_O_OBJ\", Visible=0, Persist=0)"))).Substring(16, 8),
+              System.Security.Cryptography.Crc32.Compute("HammerM2_O_OBJ").ToString("X8"));
 
         // ---- errors
         Check("unknown name", Error("INC_INT(Variable=nothing_here)"),

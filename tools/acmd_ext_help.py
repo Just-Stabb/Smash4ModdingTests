@@ -3228,6 +3228,12 @@ HELP['Outline_Set'] = [
     'tints the model\'s edges in its colour while it shows; the game\'s look is the reference.',
     'Needs exe_v46z_outline (tools/outline_cave.py; exe_v46z_inv + it). Without it a script that uses this command '
     'won\'t load properly: ship the executable with any script that uses it.',
+    '',
+    '## v1.7.14 (exe_v46z_outline2): Outline_Shell',
+    'Outline_Set itself is unchanged (same parameters, same look), but in game its glow is a rim light, so it stays '
+    '**inside** the silhouette and reads as lighting. For a real outline, a band of colour **outside** the '
+    'silhouette, use **Outline_Shell** (New Commands / Effects, exe_v46z_outline2). The two work together on one '
+    'object: the shell round the body and the rim lighting its edges from inside (example 6).',
 ]
 EXAMPLES['Outline_Set'] = [
     '// Example 1: a white edge glow for a time-stop move (Xenoverse 2\'s "Flashing White Body Outline"): edge only,',
@@ -3252,6 +3258,11 @@ EXAMPLES['Outline_Set'] = [
     _hitbox('Hitbox', ID=0, Damage=8, Angle=361, KBG=50, BKB=40, Size=5, Z=8),
     'FRAME(Frames=14)',
     'Outline_Set(Target=12, Red=40, Green=120, Blue=255, Alpha=700, Tint=0, Frames=60, FadeIn=0, FadeOut=20, Flash=0)',
+    '',
+    '// Example 6 (v1.7.14, exe_v46z_outline2): XV2\'s white outline in full: a white band outside the silhouette',
+    '// (Outline_Shell, 2.5 pixels, added) and the rim lighting the edges inside it, both for 2 seconds',
+    'Outline_Shell(Target=0, Red=255, Green=255, Blue=255, Alpha=255, Width=2.5, Frames=120, FadeIn=4, FadeOut=10, Flash=0, Blend=1)',
+    'Outline_Set(Target=0, Red=255, Green=255, Blue=255, Alpha=400, Tint=0, Frames=120, FadeIn=4, FadeOut=10, Flash=0)',
 ]
 HELP['Mesh_Visibility'] = [
     '## What it does',
@@ -3270,8 +3281,9 @@ HELP['Mesh_Visibility'] = [
     '- Mesh: the mesh. Write its name in quotes, **Mesh="stethoscope_VIS_O_OBJ"**: Sm4shCommand stores the name\'s '
     'CRC32 (exact case; the script shows it as a hex number after it is saved, which compiles the same). The Hitbox '
     'Viewer\'s Model parts tab lists a fighter\'s mesh names (also in the fighter\'s model.nud). A number 0-255 is a mesh '
-    'index (the order in model.nud). **-1: every Mesh_Visibility override of this object ends** (Visible / Persist '
-    'unused). Every mesh with that name is changed.',
+    'index (the game\'s mesh order: model.nud\'s meshes in order, each with all its polygons). **-1: every '
+    'Mesh_Visibility override of this object ends** (Visible / Persist unused). Every mesh with that name is changed, '
+    'with all its parts (v1.7.14).',
     '- Visible: 0 hide it, 1 show it (even if the animation hides it), 2 end this mesh\'s override (the motion\'s '
     'visibility and the groups decide again).',
     '- Persist: 0 until the animation changes (the next motion: the end of the move, a hit, a jump); 1 until changed, '
@@ -3289,6 +3301,18 @@ HELP['Mesh_Visibility'] = [
     '- The Hitbox Viewer follows it (the Model parts tab shows the mesh hidden / shown "by Mesh_Visibility").',
     'Needs exe_v46z_outline (tools/mesh_vis_cave.py; exe_v46z_inv + the outline + it). Without it a script that uses '
     'this command won\'t load properly: ship the executable with any script that uses it.',
+    '',
+    '## What changed in v1.7.14 (exe_v46z_outline2)',
+    '- **Meshes with several parts** (Smash Forge shows them as Polygon_0, Polygon_1 ... under the mesh: '
+    'HammerM2_O_OBJ, Dr. Mario\'s stethoscope and hair) are hidden / shown / given back whole. The game\'s own model '
+    'code keeps one visibility entry per mesh with all its polygons; the v2 executable also changes every entry right '
+    'after a matched mesh that has no name of its own (a part of it), so whichever way the model was built, all its '
+    'parts go (the diag build\'s S4MH lines list each entry changed: part=1 for such a part). Same parameters, same '
+    'scripts; v1 scripts work unchanged (example 7).',
+    '- If a mesh still shows a part: check that the mesh is in this object\'s model (an article\'s or a held item\'s '
+    'meshes need Target 0 in that article\'s script) and send the diag log (S4MC hit= and the S4MH lines).',
+    'Needs exe_v46z_outline2 for the multi-part fix (tools/mesh_vis_cave.py v2); exe_v46z_outline runs the same '
+    'scripts with v1\'s behaviour.',
 ]
 EXAMPLES['Mesh_Visibility'] = [
     '// Example 1: hide a weapon mesh for one animation (a punch thrown without the sword): back by itself when the',
@@ -3313,4 +3337,113 @@ EXAMPLES['Mesh_Visibility'] = [
     'Mesh_Visibility(Target=0, Mesh=32, Visible=0, Persist=1)',
     'FRAME(Frames=30)',
     'Mesh_Visibility(Target=0, Mesh=-1, Visible=0, Persist=0)',
+    '',
+    '// Example 7 (v1.7.14, exe_v46z_outline2): a mesh with two parts (Polygon_0 and Polygon_1 under HammerM2_O_OBJ',
+    '// in Smash Forge) hidden whole for the move, then Dr. Mario\'s two-part hair hidden until given back',
+    'Mesh_Visibility(Target=0, Mesh="HammerM2_O_OBJ", Visible=0, Persist=0)',
+    'Mesh_Visibility(Target=0, Mesh="MarioD_hair_O_OBJ", Visible=0, Persist=1)',
+    'FRAME(Frames=40)',
+    'Mesh_Visibility(Target=0, Mesh="MarioD_hair_O_OBJ", Visible=2, Persist=0)',
+]
+
+# --- model_commands v2: Outline_Shell (tools/outline_shell_cave.py), exe_v46z_outline2
+GROUP['Outline_Shell'] = 'Effects'
+_ov.insert(next(i for i, x in enumerate(_ov) if x.startswith('- Effects (exe_v46z_outline)')) + 1,
+           '- Effects (exe_v46z_outline2): a real outline: a band of colour round an object\'s silhouette, outside '
+           'it, solid or glowing, growing in and pulsing (Outline_Shell).')
+GROUP_HELP[NEW_GROUP + ' / Effects'] += [
+    '',
+    'Outline_Shell (exe_v46z_outline2, tools/outline_shell_cave.py) draws a band of colour outside an object\'s '
+    'silhouette: each of its meshes drawn a second time right after itself, pushed out along its normals with its '
+    'front faces culled (only the fattened copy\'s back faces show, round the edges), in a flat colour behind the body '
+    '(an inverted hull; docs/native-notes.md "Outline shell").',
+]
+HELP['Outline_Shell'] = [
+    '## What it does',
+    'Draws a band of colour **round** an object\'s silhouette, **outside** it: a real outline, as Xenoverse 2\'s '
+    '"Flashing White Body Outline" (BPE 85), a power-up\'s aura edge, a selection mark, a cel-shaded ink line. It can '
+    'be solid or glowing (Blend), thin or thick (Width), grow in and out (FadeIn / FadeOut), pulse (Flash), and it '
+    'ends by itself after Frames, with Alpha 0, a KO, the match end or a training reset.',
+    'How (an "inverted hull"): every mesh of the model is drawn a second time right after the game draws it, with the '
+    'patched executable\'s own vertex / pixel programs: the vertices pushed out along their normals by Width, the '
+    'front faces culled (so only the back faces of the fattened copy are drawn, and they show only round the edges, '
+    'where they stick out of the body), in the colour, with the depth test on (behind the body). The game\'s states '
+    'are put back after each mesh. Outline_Set (v1) colours the shaders\' rim light, which is inside the silhouette; '
+    'this is outside it, and the two can run together.',
+    '',
+    '## Parameters',
+    '- Target: whose model: 0 this object (the fighter, or the article whose script it is), 1 the nearest opponent, '
+    '2 the last fighter hit, 3-10 player slots 1-8, 11 the last fighter that hit this one, 12 the fighter this attack '
+    'hit (see the New Commands group). One shell per object: a new Outline_Shell on it replaces the one showing.',
+    '- Red, Green, Blue (float, 0-255): the band\'s colour.',
+    '- Alpha (float, 0-255): how solid. 255 = the colour itself (Blend 0) or the colour added at full (Blend 1); lower '
+    'values let what is behind show through. **0 ends the shell** (shrinking away over this command\'s FadeOut, or at '
+    'once with FadeOut 0).',
+    '- Width (float): the band\'s width outside the silhouette. **Above 0: pixels** of the 1280 x 720 picture, the '
+    'same on screen whatever the camera does (1.5 a thin line, 3 a clear band, 6 a thick glow; an upscaled Cemu '
+    'picture scales it). **Below 0: game units** round the model (-0.3 to -1 on a fighter: about 2-6 % of Mario\'s '
+    'height), which grows as the camera zooms in, like the model. Up to 64 either way. The fades and the pulse scale '
+    'the width.',
+    '- Frames (int): held this many frames once grown in, then it shrinks away over FadeOut. 0 = held until Alpha 0, '
+    'a KO or the match end.',
+    '- FadeIn (int): frames to grow in from nothing (0 at once). A new shell on an object that has one grows from '
+    'where that one is.',
+    '- FadeOut (int): frames to shrink away when Frames run out (0 off at once).',
+    '- Flash (int): a pulse, one cycle every Flash frames: full width, smoothly down to nothing at half the cycle, '
+    'back to full (20: three pulses a second). 0 = steady.',
+    '- Blend (int): 0 the colour drawn over what is behind (Alpha 255: solid, an ink line or a solid band); 1 added '
+    'to it (a glow: white stays white over a bright background and lights up a dark one; black adds nothing, so a '
+    'black outline wants Blend 0).',
+    '',
+    '## How it looks',
+    '- The band follows the whole silhouette, and also the edges of a part in front of another (an arm across the '
+    'body gets its own outline over the body): that is how an inverted hull outline looks.',
+    '- It is depth-tested: a stage part in front of the fighter hides it as it hides the fighter.',
+    '- It fades by width (growing and shrinking), not by transparency: the band is written to the depth buffer so the '
+    'background drawn after the fighter can\'t paint over it, which also means a see-through band (Alpha below 255) '
+    'shows what was drawn before the fighter behind it, not the final background. Keep Alpha 255 for a steady band and '
+    'Blend 1 for a glow.',
+    '- Counted in the effects\' frame (as Outline_Set): runs through hitlag and Stage_Freeze, stops while paused.',
+    '',
+    '## Gotchas',
+    '- **Materials**: drawn for the meshes whose pixel program is a material one (the lit fighter shaders: every '
+    'Dr. Mario mesh); other passes (shadows, masks) are left alone. A mesh with no normals gets no band.',
+    '- **Two-sided parts** (capes, hair cards, thin cloth) get a band on the side facing away from the camera only.',
+    '- **Screen_Invert** inverts the band with the picture (a white band becomes black on the negative): for a white '
+    'band on a negative, use a black colour (Blend 0) while the negative is on.',
+    '- **Articles**: Target 0 in an article\'s script outlines that article\'s model.',
+    '- **The Hitbox Viewer** draws the band round the model\'s silhouette (the outer edge only) and lists the command; '
+    'the game\'s look is the reference.',
+    'Needs exe_v46z_outline2 (tools/outline_shell_cave.py: exe_v46z_outline + the mesh visibility v2 + it). Without it '
+    'a script that uses this command won\'t load properly: ship the executable with any script that uses it.',
+]
+EXAMPLES['Outline_Shell'] = [
+    '// Example 1: XV2\'s white outline for a time-stop move: a thin white glowing band (1.5 pixels, added), grown in',
+    '// over 4 frames, held 120 frames (2 seconds), shrinking away over 10',
+    'Outline_Shell(Target=0, Red=255, Green=255, Blue=255, Alpha=255, Width=1.5, Frames=120, FadeIn=4, FadeOut=10, Flash=0, Blend=1)',
+    '',
+    '// Example 2: a red pulsing outline for a power-up: 3 pixels, a pulse every 20 frames (3 a second), until ended',
+    '// (example 3)',
+    'Outline_Shell(Target=0, Red=255, Green=30, Blue=20, Alpha=255, Width=3, Frames=0, FadeIn=6, FadeOut=0, Flash=20, Blend=1)',
+    '',
+    '// Example 3: ending it from the move\'s end (or another script): shrinks away over 12 frames',
+    'Outline_Shell(Target=0, Red=0, Green=0, Blue=0, Alpha=0, Width=0, Frames=0, FadeIn=0, FadeOut=12, Flash=0, Blend=0)',
+    '',
+    '// Example 4: a solid black ink outline (cel-shaded look) in game units, so it thickens as the camera zooms in',
+    'Outline_Shell(Target=0, Red=0, Green=0, Blue=0, Alpha=255, Width=-0.4, Frames=0, FadeIn=0, FadeOut=0, Flash=0, Blend=0)',
+    '',
+    '// Example 5: the opponent this attack hit gets a blue band for a second (a mark); nothing if it missed',
+    'FRAME(Frames=12)',
+    _hitbox('Hitbox', ID=0, Damage=8, Angle=361, KBG=50, BKB=40, Size=5, Z=8),
+    'FRAME(Frames=14)',
+    'Outline_Shell(Target=12, Red=40, Green=120, Blue=255, Alpha=255, Width=3, Frames=60, FadeIn=0, FadeOut=20, Flash=0, Blend=1)',
+    '',
+    '// Example 6: XV2\'s outline over its negative: the white band (example 1) with Screen_Invert, switched to a black',
+    '// band while the negative is on (the negative turns black into white), and back to white after it',
+    'Outline_Shell(Target=0, Red=255, Green=255, Blue=255, Alpha=255, Width=2, Frames=0, FadeIn=4, FadeOut=0, Flash=0, Blend=1)',
+    'FRAME(Frames=20)',
+    'Screen_Invert(Mode=1, Strength=1, Frames=60, FadeIn=0, FadeOut=0, Saturation=1, Brightness=1, Red=0, Green=0, Blue=0)',
+    'Outline_Shell(Target=0, Red=0, Green=0, Blue=0, Alpha=255, Width=2, Frames=0, FadeIn=0, FadeOut=0, Flash=0, Blend=0)',
+    'FRAME(Frames=80)',
+    'Outline_Shell(Target=0, Red=255, Green=255, Blue=255, Alpha=255, Width=2, Frames=30, FadeIn=0, FadeOut=10, Flash=0, Blend=1)',
 ]

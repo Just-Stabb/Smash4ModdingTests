@@ -228,6 +228,31 @@ class HvTest
         Check("viewer: Visible 2 ends the index's override, the name's stays", run[s2 - 2].Vis.MeshOverride("Gamemodel", 4) + "|" +
               run[s2 - 2].Vis.MeshOverride("stethoscope_VIS_O_OBJ", 0), "|False");
         Check("viewer: Mesh -1 ends every override", run[s2].Vis.Meshes.Count, 0);
+        // ---- v1.7.14: the Hitbox Viewer follows Outline_Shell (Target 0: the band drawn round the silhouette; Outline_Set's
+        //      timing scaling the width) and draws it outside the model's pixels
+        run = new Sm4shCommand.Viewer.HitboxRunner().Run(Compile(
+            "Outline_Shell(Target=0, Red=255, Green=0, Blue=0, Alpha=255, Width=4, Frames=3, FadeIn=2, FadeOut=2, Flash=0, Blend=1)\nFRAME(Frames=10)\n" +
+            "Outline_Shell(Target=1, Red=0, Green=0, Blue=255, Alpha=255, Width=3, Frames=0, FadeIn=0, FadeOut=0, Flash=0, Blend=0)\n" +
+            "Outline_Shell(Target=0, Red=0, Green=0, Blue=0, Alpha=255, Width=-0.5, Frames=0, FadeIn=0, FadeOut=0, Flash=20, Blend=0)").Commands, 60);
+        Func<int, string> shAt = f => run[f].Shell == null ? "none" : string.Join(" ", run[f].Shell.Select(x => x.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)));
+        Check("viewer: Outline_Shell grows in over 2 frames (width 4 x 0.5, then 4), colour / alpha / blend kept",
+              shAt(0) + " / " + shAt(1) + " / " + shAt(2), "none / 1 0 0 1 2 1 / 1 0 0 1 4 1");
+        Check("viewer: held 3 frames once in, shrinks over 2, gone", shAt(5) + " / " + shAt(6) + " / " + shAt(7), "1 0 0 1 4 1 / 1 0 0 1 2 1 / none");
+        int s3 = Enumerable.Range(8, 50).First(f => run[f].Shell != null);
+        Check("viewer: another object's shell listed only; a game-unit width pulsing (Flash 20): full, width 0 half-way, full",
+              shAt(s3) + " / " + shAt(s3 + 10) + " / " + shAt(s3 + 20), "0 0 0 1 -0.5 0 / 0 0 0 1 0 0 / 0 0 0 1 -0.5 0");
+        {
+            // the band: a 4 x 4 model square in a 20 x 20 view 720 pixels high scale (width in 1280 x 720 pixels = view pixels)
+            int vw = 20, vht = 20;
+            var pix = new int[vw * vht];
+            var zb = new float[vw * vht];
+            for (int i = 0; i < zb.Length; i++) { zb[i] = float.MaxValue; pix[i] = unchecked((int)0xFF000000); }
+            for (int y = 8; y < 12; y++) for (int x = 8; x < 12; x++) { zb[y * vw + x] = 1; pix[y * vw + x] = unchecked((int)0xFF808080); }
+            Sm4shCommand.Viewer.Viewport.DrawShell(pix, zb, vw, vht, new float[] { 1, 0, 0, 1, 2 * 720f / vht, 0 }, 1);
+            Func<int, int, int> red = (x, y) => (pix[y * vw + x] >> 16) & 255;
+            Check("viewer: the band 2 pixels outside the model (red at 1 and 2 pixels out, not at 4), the model's pixels kept",
+                  red(7, 10) + " " + red(6, 10) + " " + red(4, 10) + " " + red(9, 9), "255 255 0 128");
+        }
         Console.WriteLine($"{exampleBlocks} example blocks");
         Console.WriteLine($"{oks} ok, {fails} failures");
         return fails == 0 ? 0 : 1;

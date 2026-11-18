@@ -2639,7 +2639,7 @@ temporary diag caves' `0x04BCC000`); variables `0x0F0003D0`-`0x0F0003DA`; comman
 `0x04BD88C4`, data `0x04BD9F00`, the reset lists `0x04BDA000`; `textregion:0x2BE0000 grow:0x04BE0000`).
 `0x04BD6000`-`0x04BD8000` (between ts_data's end and this) was free; `0x04BD6000`-`0x04BD7000` is now the whip motion
 table's (Byleth v15, below), `0x04BD7000`-`0x04BD8000` the hitbox hold's (rapid_setoff v1, below). `0x04BE0000`-`0x04BE2000`
-(past this region, the text region grown again) is the camera effects' (camera_effects v1, "Camera effects" below). `0x04BE2000`-`0x04BE3000` (grown again) is the screen invert's (screen_invert v1, "Screen colour" below). `0x04BE3000`-`0x04BE4000` (grown again) is the outline's and `0x04BE4000`-`0x04BE5000` (grown again) the mesh visibility's (model_commands v1, "Outline" / "Mesh visibility" below). The combined exe the user runs:
+(past this region, the text region grown again) is the camera effects' (camera_effects v1, "Camera effects" below). `0x04BE2000`-`0x04BE3000` (grown again) is the screen invert's (screen_invert v1, "Screen colour" below). `0x04BE3000`-`0x04BE4000` (grown again) is the outline's and `0x04BE4000`-`0x04BE5000` (grown again) the mesh visibility's (model_commands v1, "Outline" / "Mesh visibility" below). `0x04BE5000`-`0x04BE7000` (grown again) is the outline shell's (model_commands v2, "Outline shell" below). The combined exe the user runs:
 exe_v46v_threads -> var_reset_cave.py (exe_v46w_vars) -> tools/line_test_cave.py (exe_v46w_vars_line, which chains on
 four of these hooks).
 
@@ -3177,3 +3177,117 @@ then every 30th).
 **Not confirmed in game:** that the fighters' MotionModule keeps its kind at +0x38 (read from motion_module_impl's code and
 earlier notes) and so that Persist 0 ends at the motion change; meshes drawn by another path than 0x03424E88's (none
 found: 0x03420300 reads the same bits); articles' models (the same classes).
+
+**v2 (model_commands v2, exe_v46z_outline2): meshes with several parts.** The user: "Mesh_Visibility doesn't disable the
+mesh visibility for meshes with multiple parts, e.g. HammerM2_O_OBJ can't be disabled because it has Polygon_0 and
+Polygon_1". What the code says about the entries:
+- The resource the walk uses ([MI + 0x6E4] + its +0x3C x 0x14) is a NU::ActorObject (RTTI; its vtable's pointer is the
+  typeinfo word - 4: vt +0x8C 0x0370F0A0 = +0x58 the mesh count, vt +0x94 0x0370F0A8 = +0x5C the LOD count, vt +0xA4
+  0x0370F0B0 get(mesh, lod) = [+0x60][mesh + lod x count], vt +0xAC its setter, vt +0x19C / +0x1A4 the subset
+  control +0xE0). Its counts come from the model resource's header (0x0370E9FC: [[model + 0x10] + 0x20] meshes, +0x24
+  LODs, +0x1C bones). The model loader (0x036DD278) builds per NUD mesh (polyset: bounding sphere, name at +0x20,
+  polygon count at +0x2A) one 0x40 entry (+0x20 its polygon count, +0x24 its first part) and per polygon a 0x30 part
+  (0x036DD0C8: +0x20 the mesh's name object, +0x2A 1, +0x2C the polygon), so **one visibility entry per NUD mesh, with
+  all its polygons**: the visible-index list goes to NU::ActorSubsetControl (vt +0x24: [MI + 0x7EC]), and
+  NU::ActorRenderablePartSet (0x037306EC builds, 0x037301D0 / 0x03730390 walk) draws for each visible mesh index its
+  list of parts (polygons). Each part is drawn by one NU::CommandDrawModel (0x03717514 builds it from the 0x30 part:
+  [part + 4]'s +0x2A / +0x2C), skipping polygons whose material has no shader for the pass ([material + 0xC] 0).
+- The game's own by-name setter (0x0342633C) stops at the first match; v1's walk already changed every match.
+So by the code a mesh's entry covers its polygons, and v1 should have hidden HammerM2 whole; the cause of the user's
+case isn't found statically (not confirmed: the mesh in another model (an article / a held item: Target 0 is the
+script's own object), a part drawn through a path the subset list doesn't gate). v2 makes the name match cover any
+layout: every entry whose name matches, **and every entry right after a match that has no name of its own** (a null
+name or an empty string: a part of that mesh) until the next named one, for the hide / show and the restore (each gets
+its own override entry, so the game's state of each comes back). The index form is the game's mesh index (NUD mesh
+order, all its polygons). The diag build adds `S4MH mesh=%d part=%d` per entry changed (part 1: an unnamed one after a
+match), so a log shows what each command reached (S4MC's hit= counts them). Test: `tools/mesh_vis_test.py` (63 checks:
+a two-part mesh whose second entry has no name, two entries with the same name, a one-part mesh followed by a named
+one; the group write to a part kept aside and given back). Dr. Mario's own two-part meshes (model.nud):
+stethoscope_VIS_O_OBJ (shaders 0x9601106B / 0x9A011063) and MarioD_hair_O_OBJ (a blended polygon, src 1 / dst 1, and
+an opaque one): the v2 in-game test hides both (tools/outline_shell_ingame_test_build.py, down taunt facing left).
+
+## Outline shell (model_commands v2: `tools/outline_shell_cave.py`, exe_v46z_outline2)
+
+**Claimed region: `0x04BE5000`-`0x04BE7000`** (past the mesh visibility's; `textregion:0x2BE7000 grow:0x04BE7000`; code
+and data `0x04BE5000`-`0x04BE6244`, the diag build to `0x04BE66FC`; the programs at `0x04BE6800` (vertex, 0x348 bytes)
+and `0x04BE6C00` (pixel, 0x120), 256-aligned; the table `os_tab` 16 x 0x50). Order: exe_v46z_ol -> tools/mesh_vis_cave.py
+v2 -> this (exe_v46z_outline2); it also builds on exe_v46z_outline (v1 mesh visibility). It chains on the outline
+cave's FB1 hook (ol_fbgo's `bl ol_apply`), the mesh visibility's tick (mv_tick), clear (mv_clear) and table fallbacks.
+Test `tools/outline_shell_test.py EXE` (unicorn, 97 checks on the v2 mesh visibility's exe). User docs:
+docs/acmd-extra-commands.md "Outline_Shell".
+
+**Why a shell:** Outline_Set (v1) colours the fighter shaders' rim term, which is a lighting term on the model's own
+pixels: in game (the user's Time Skip clip) it reads as lighting, inside the silhouette and thin. The user wants a band
+outside the silhouette (XV2's BPE 85). Options: (1) an inverted hull: the meshes drawn again, pushed out along their
+normals, front faces culled, flat colour; (2) a screen-space silhouette (mask, dilate, composite): the game has a mask
+pass (shader/special.nsh: the fighter vertex transform, a one-channel PIX0 = 0) but no hook to dilate / composite and
+no spare target was found; (3) a stronger rim (v1's limits). (1) was feasible: the draw path, the device's state
+caches and the GX2 programs are all reachable, so it is what this does.
+
+**How a fighter's mesh is drawn (cross_f.rpx; RTTI names from the NU library's typeinfo):**
+- NU::CommandDrawModel (vtable 0x10207DC0, execute 0x037173EC = [0x10207DCC]) draws one polygon part (see "Mesh
+  visibility" v2): the vertex declaration ([cmd + 8] -> device +0x28), PerDraw (CB2) bound to the vertex and pixel
+  stages (0x036F3AC4 stage 0 / 4, slot 2), per sub-draw (0x40 each at [cmd + 0x24]) the material (0x036E1450,
+  0x036E157C, 0x036DFFBC: the shaders, the material's blocks MC / FB1 through 0x036DFE2C / 0x036F3AC4, the
+  blend / depth / rasterizer states 0x036F464C / 0x036F4C2C ...), the vertex buffers (0x036F38E8), the index buffer
+  (0x036F4338), then the draw: 0x037174D8 `bl 0x036F3EDC` (DrawIndexed, instances [cmd + 0x1C]) or 0x037174E8
+  `bl 0x036F3EC8` (vt +0xB4 with one instance). DrawIndexed (NU::DeviceContextWiiU, vtable 0x10206444: +0xB4)
+  flushes the attributes / fetch shader (0x036F3CE0, GX2SetAttribBuffer / GX2SetFetchShader through its caches) and
+  calls GX2RDrawIndexed.
+- The device context's caches (each read off the code that fills it): +0x1C4 the GX2VertexShader (0x036F4340), +0x1C8
+  the geometry shader (0x036F43FC), +0x1CC the GX2PixelShader (0x036F453C), +0x1D0 + 8 x slot the vertex uniform
+  blocks {data, size} and +0x2B0 + 8 x slot the pixel ones (0x036F3AC4), +0x3B0 the blend state (0x036F464C: +0xC + 8 x
+  target the GX2BlendControlReg pairs, +0x4C the GX2AlphaTestReg, +0x58 the channel masks), +0x438 the depth / stencil
+  state (0x036F4AE0: +0x440 DB_DEPTH_CONTROL, +0x444 the stencil masks), +0x44C the rasterizer state (0x036F4C2C: +0x450
+  PA_SU_SC_MODE_CNTL, +0x454 the polygon offset), +0x468 the colour control (+4 logic op, +8 blend mask, +0xC
+  multi-write, +0x10 colour buffer on). GX2 import stubs: SetVertexShader 0x04B7BD08, SetPixelShader 0x04B7BBC0,
+  SetPolygonControlReg 0x04B7BC08, SetDepthStencilControlReg 0x04B7BB18, SetBlendControlReg 0x04B7BA48,
+  SetColorControl 0x04B7BA70, SetAlphaTestReg 0x04B7BA10 (the rpx's import relocations).
+- The programs: all 620 texas_cross vertex programs take a_Position at attribute location 0 and a_Normal at 1 (the
+  fetch shaders' semantics); PerDraw (CB2) vec4 0-3 are the LocalToWorld rows (row-vector: world = p.x L0 + p.y L1 +
+  p.z L2 + L3), PerView (CB3) vec4 0-3 the WorldToProjection rows, FB1 (CB7) vec4 9 compressParam (world z = C.x (z -
+  C.y) + C.y), read off special.nsh's vertex program (the same opening clause as the lit ones). No program in
+  texas_cross, special, only_alpha, instancing, mii, primitive or lumen reads FB1 vec4 12-15 (outlineColor and
+  padding), so the cave owns them. The lit pixel programs declare uniform blocks MC (4) and FB1 (7, 0x2A0); the mask /
+  shadow ones (special, only_alpha) don't have MC.
+
+**The cave:**
+- os_fb (ol_fbgo's `bl ol_apply` -> bl): ol_apply, then the instance's shell (if any) into its FB1 before the unlock:
+  vec4 12 = (r, g, b, alpha), vec4 13 = (Width x weight, 'S4OS' (0x53344F53), blend, weight). Every other model's FB1
+  has zeros there (DCZeroRange'd every frame by the game).
+- os_drawI / os_drawN (the two draw calls -> bl): the game's draw; then os_chk: a shell in use, the pixel stage's slot
+  7 data carries the mark (size 0x2A0), the vertex stage's slot 7 the same buffer, no geometry shader, the caches
+  filled, the pixel program's block table (absolute, or the .gsh file's 0xD06xxxxx offsets from the struct) has 4 and
+  7 (0x2A0), the width not 0. Then GX2SetVertexShader / PixelShader (the cave's), the cached PA_SU_SC_MODE_CNTL with
+  the front faces culled (the back ones if the material culls front), DB_DEPTH_CONTROL with Z test / write on and
+  stencil / back-face stencil off (its compare kept), CB_BLEND0_CONTROL 0x21000504 (Blend 0: SRC_ALPHA /
+  INV_SRC_ALPHA) or 0x21000104 (Blend 1: SRC_ALPHA / ONE; alpha kept: ZERO / ONE, separate), the colour control with
+  target 0's blend bit, alpha test off; the same draw again (r3-r9 as the game passed them); then the game's
+  programs and every state set again from the caches (SetPolygonControlReg(ctx + 0x450), SetDepthStencilControlReg(ctx
+  + 0x440), SetBlendControlReg(ctx + 0x3BC), SetColorControl(the cached four), SetAlphaTestReg(ctx + 0x3FC)), so the
+  caches stay true.
+- The programs (latte-asm sources in the cave script; one ALU instruction a group: no GPR read-port conflicts):
+  vertex: nw = n L3x3 normalized (RECIPSQRT_IEEE; MUL's 0 x inf = 0 for a zero normal), world = p L + compress, Width
+  < 0: world += nw |Width|; clip = world P; Width > 0: nc = nw P2x2, clip.xy += nc / |(640 nc.x, 360 nc.y)| x Width x
+  clip.w (Width pixels of a 1280 x 720 picture). Exports POS0 and a masked PARAM0, as special.nsh's. Pixel: PIX0 =
+  FB1 vec4 12. Registers: special.nsh's vertex ones (9 GPRs, NUM_SQ_VTX_SEMANTIC 2: semantic 0 -> R1, 1 -> R2) and
+  pixel ones (no inputs). GX2 structs: those registers, size, program, mode 1 (uniform block), no metadata.
+- os_tick (TICK, before it mv_tick) / h_shell / os_clear: Outline_Set's timing (fades, Frames, the pulse; a KO or a
+  changed model drops it); the weight scales the width (the band grows / shrinks), the alpha stays.
+- Depth write on: the stage drawn after the fighter can't paint over the band; a see-through band (Alpha < 255) mixes
+  with what was drawn before it, not the final background (documented: Alpha 255 / Blend 1 recommended).
+
+**The diag build** (`--diag`, TEST ONLY, exe_v46z_outline2_diag): `S4SC tgt acc mi rgb a` / `S4SD width fr in out flash
+blend k` per command; `S4ST n k ph eff drawn checked refused` per shell frame (shells drawn, draws checked while a shell
+is in use, marked FB1s refused); `S4SF n mi fb width a blend` per FB1 write; `S4SR n ctx vs ps fb width poly ds` per
+shell drawn; `S4SX n ctx ps blocks ptr fb` per marked FB1 refused (the first 30 frames after a command, then every
+30th). Read: checked 0 -> the fighters aren't drawn through CommandDrawModel's calls; checked > 0, drawn 0, refused 0 ->
+the FB1 isn't bound through the device's cache (the mark not seen); refused > 0 -> the pixel program's block table
+isn't as read (S4SX shows it).
+
+**Not confirmed in game:** that the fighters' polygons are drawn through those two CommandDrawModel calls with FB1
+bound through the device's cache (0x036F3AC4) in the main pass; that no other pass (shadow, reflection, the loupe)
+uses a pixel program with MC and FB1 (it would get the band too); Cemu's / the GPU's acceptance of the cave's programs
+in the text region (256-aligned, uniform-block mode) and of a fetch shader with more semantics than the vertex program
+maps; the band's look at Width 1.5 / 3 (pixels of 1280 x 720) on Dr. Mario; the draw order (depth write keeps the band
+when the background is drawn after the fighter; a part drawn after another may lose a sliver behind the first's band).

@@ -1510,6 +1510,9 @@ mark on a fighter. Index 2400, 11 words, needs exe_v46z_outline (`tools/outline_
 - Counted in the effects' frame (as Screen_Invert's): through hitlag and Stage_Freeze, not while paused.
 - The Hitbox Viewer draws it on the model (Target 0: a rim on the edges seen edge-on, the tint) and lists it.
   `port_check` X11 (ERROR): a script using it with no executable carrying the cave.
+- **v1.7.14 (exe_v46z_outline2):** unchanged, but it is a rim light: in game it stays inside the silhouette and reads as
+  lighting. For a band of colour **outside** the silhouette use **Outline_Shell** (below); both can run on one object
+  (the band round the body, the rim lighting its edges).
 
 ```
 // a white edge glow for a time-stop move: 2 seconds, faded in over 4 frames, out over 10
@@ -1518,6 +1521,9 @@ Outline_Set(Target=0, Red=255, Green=255, Blue=255, Alpha=510, Tint=0, Frames=12
 Outline_Set(Target=0, Red=255, Green=40, Blue=20, Alpha=400, Tint=40, Frames=0, FadeIn=6, FadeOut=0, Flash=20)
 // ending it over 12 frames
 Outline_Set(Target=0, Red=0, Green=0, Blue=0, Alpha=0, Tint=0, Frames=0, FadeIn=0, FadeOut=12, Flash=0)
+// (v1.7.14) with Outline_Shell: XV2's white outline in full, the band outside and the rim inside, 2 seconds
+Outline_Shell(Target=0, Red=255, Green=255, Blue=255, Alpha=255, Width=2.5, Frames=120, FadeIn=4, FadeOut=10, Flash=0, Blend=1)
+Outline_Set(Target=0, Red=255, Green=255, Blue=255, Alpha=400, Tint=0, Frames=120, FadeIn=4, FadeOut=10, Flash=0)
 ```
 
 ## Mesh_Visibility (model_commands v1, exe_v46z_outline)
@@ -1529,7 +1535,7 @@ visibility animation and the visibility groups (Model_Changer). Index 2500, 5 wo
 | Parameter | |
 |---|---|
 | Target | int: whose model (as Outline_Set's) |
-| Mesh | int: the mesh's name in quotes, `Mesh="stethoscope_VIS_O_OBJ"` (Sm4shCommand stores its CRC32, exact case), or 0-255 an index (model.nud's order); **-1 ends every override of this object** |
+| Mesh | int: the mesh's name in quotes, `Mesh="stethoscope_VIS_O_OBJ"` (Sm4shCommand stores its CRC32, exact case), or 0-255 an index (the game's mesh order: model.nud's meshes, each with all its polygons); **-1 ends every override of this object** |
 | Visible | int: 0 hide, 1 show, 2 end this mesh's override |
 | Persist | int: 0 until the motion (kind) changes, as vanilla visibility; 1 until changed, a KO, the match end or a training reset |
 
@@ -1540,6 +1546,12 @@ visibility animation and the visibility groups (Model_Changer). Index 2500, 5 wo
   hex number afterwards, which compiles the same.
 - The Hitbox Viewer follows it (the Model parts tab: "hidden / shown by Mesh_Visibility"). `port_check` X12 (ERROR): a
   script using it with no executable carrying the cave.
+- **v1.7.14 (exe_v46z_outline2, mesh visibility v2): meshes with several parts** (Smash Forge's Polygon_0, Polygon_1 ...
+  under a mesh: HammerM2_O_OBJ, Dr. Mario's stethoscope and hair) change whole: every entry with the name, and every
+  entry right after it that has no name of its own (a part of it), for the hide / show and the restore. By the game's
+  code a mesh's entry already covers all its polygons (docs/native-notes.md "Mesh visibility", v2), so if a part still
+  shows, the mesh may be in another model (an article's or a held item's: Target 0 in that article's script); the
+  diag build's S4MH lines list every entry a command changed. Same words, v1 scripts unchanged.
 
 ```
 // a weapon hidden for one animation (back when the move ends)
@@ -1555,3 +1567,52 @@ Tests: `tools/outline_test.py` / `tools/mesh_vis_test.py` (unicorn: the command 
 commands, the handlers, the ticks, the FB1 unlocks / the game's mesh setter, by-name setter and per-frame visibility,
 the clear chain, the diag lines), `new_var_test.cs` (words, round trips, groups, every example), `hitbox_var_test.cs` (the
 viewer's outline and mesh overrides). In game: `tools/model_commands_ingame_test_build.py` (Dr. Mario's taunts).
+
+## Outline_Shell (model_commands v2, exe_v46z_outline2)
+
+`Outline_Shell(Target, Red, Green, Blue, Alpha, Width, Frames, FadeIn, FadeOut, Flash, Blend)` draws a band of colour
+**round an object's silhouette, outside it**: a real outline (Xenoverse 2's "Flashing White Body Outline", a power-up's
+aura edge, a cel-shaded ink line). Index 2600, 12 words, needs exe_v46z_outline2 (`tools/outline_shell_cave.py`).
+
+| Parameter | |
+|---|---|
+| Target | int: whose model (as Outline_Set's). One shell per object (a new one replaces it, growing from where it is) |
+| Red, Green, Blue | float, 0-255: the band's colour |
+| Alpha | float, 0-255: how solid (255 solid; with Blend 1 the colour added x Alpha / 255); **0 ends it** (over this command's FadeOut) |
+| Width | float: the band's width. **> 0 pixels** of the 1280 x 720 picture (constant on screen: 1.5 thin, 3 a clear band, 6 thick); **< 0 game units** round the model (-0.3 to -1 on a fighter; grows with the zoom). Up to 64. The fades and the pulse scale it |
+| Frames | int: held once grown in, then shrinks over FadeOut; 0 until Alpha 0, a KO, the match end or a training reset |
+| FadeIn / FadeOut | int: frames (0 at once) |
+| Flash | int: a pulse, one cycle every Flash frames (full width, none, full; smooth); 0 steady |
+| Blend | int: 0 the colour over what is behind it; 1 added to it (a glow) |
+
+- **How (an inverted hull):** each of the model's meshes is drawn a second time right after the game draws it, with the
+  executable's own vertex / pixel programs: pushed out along its normals by Width, its front faces culled (only the back
+  faces of the fattened copy show, round the edges), in the colour, depth-tested behind the body; the game's states are
+  put back after each mesh. Which models: the model instance's own FB1 block carries the colour and width (the outline
+  cave's FB1 hook) - docs/native-notes.md "Outline shell".
+- An inverted hull also outlines a part in front of another (an arm across the body). It fades by width (growing /
+  shrinking), not by transparency: the band is written to the depth buffer, so a see-through band (Alpha below 255)
+  mixes with what was drawn before the fighter; use Alpha 255, Blend 1 for a glow, Blend 0 for a solid / black line.
+- Only the meshes whose pixel program is a material one (the lit fighter shaders; every Dr. Mario mesh) get it;
+  two-sided thin parts get it on the side facing away; Screen_Invert inverts it with the picture.
+- Counted in the effects' frame (as Outline_Set): through hitlag and Stage_Freeze, not while paused.
+- The Hitbox Viewer draws the band round the model's silhouette (outer edge only) and lists it. `port_check` X13
+  (ERROR): a script using it with no executable carrying the cave.
+
+```
+// XV2's white outline for a time-stop move: 1.5 pixels, added, grown in over 4 frames, held 2 seconds, out over 10
+Outline_Shell(Target=0, Red=255, Green=255, Blue=255, Alpha=255, Width=1.5, Frames=120, FadeIn=4, FadeOut=10, Flash=0, Blend=1)
+// a red pulsing outline for a power-up (3 pulses a second), until ended
+Outline_Shell(Target=0, Red=255, Green=30, Blue=20, Alpha=255, Width=3, Frames=0, FadeIn=6, FadeOut=0, Flash=20, Blend=1)
+// ending it over 12 frames
+Outline_Shell(Target=0, Red=0, Green=0, Blue=0, Alpha=0, Width=0, Frames=0, FadeIn=0, FadeOut=12, Flash=0, Blend=0)
+// a black ink line in game units (thickens as the camera zooms in)
+Outline_Shell(Target=0, Red=0, Green=0, Blue=0, Alpha=255, Width=-0.4, Frames=0, FadeIn=0, FadeOut=0, Flash=0, Blend=0)
+```
+
+Tests: `tools/outline_shell_test.py` (unicorn: the command tables with every earlier cave's commands; the handler and
+tick; the FB1 hook chained on the outline's; CommandDrawModel's two draw calls on a fake device context with the game's
+draw and every GX2 call recorded: no shell / a shell (programs, states, the draw again, every state back), the refusals;
+the programs re-assembled and run in tools/latte_exec.py against `shell_ref` (the band Width pixels wide on screen);
+the clear; the diag lines), `tools/mesh_vis_test.py` (v2's multi-part meshes), `new_var_test.cs`, `hitbox_var_test.cs`
+(the viewer's band). In game: `tools/outline_shell_ingame_test_build.py` (Dr. Mario's taunts).

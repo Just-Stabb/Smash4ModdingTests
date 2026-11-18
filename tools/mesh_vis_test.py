@@ -18,6 +18,8 @@ small stubs), the result array the instance's vt +0x74 writes, its change listen
   - the tick (0x032EFB78 -> mv_tick -> outline's ol_tick -> screen_invert's si_tick): Persist 0 ends when the motion
     kind changes, Persist 1 stays, a KO ends it, a changed model drops it;
   - the clear chain (0x02FB3498 -> ... -> ol_clear -> mv_clear -> 0x02FB349C): every override ends, bytes put back;
+  - v2: a mesh with two parts (polygons) whose second entry has no name of its own (or the same name): both parts
+    hidden / shown / given back, the next named mesh left alone;
   - the diag build's lines.
 """
 import os
@@ -289,6 +291,35 @@ def main():
     w32(pm, m1.mm + 0xC, m1.mi)
     m1.set_byte(4, 0x11)
 
+    # v2: a mesh with two parts (polygons): the entry after it has no name of its own (or the same name)
+    hair = MV.crc32('MarioD_hair_O_OBJ')
+    pm.mem_write(m1.names + 0x40 * 2, b'\0')
+    b0 = [m1.byte(i) for i in range(len(NAMES))]
+    r = mv(m1, hair, 0, 1)
+    check('v2: a two-part mesh (the entry after it has no name): both parts hidden, the next named mesh not',
+          (r['hits'], sorted(x['i'] for x in entries() if x['acc'] == m1.acc), drawn(m1)), (2, [1, 2], [1, 0, 0, 1, 1]))
+    check('... each part\'s byte bits 0-1 = 0, the game\'s bits kept for the end',
+          sorted((x['i'], x['saved']) for x in entries() if x['acc'] == m1.acc), [(1, 1), (2, 2)])
+    setter(m1, 2, 1, 0)
+    check('... a group write to the second part kept aside (still hidden)', drawn(m1), [1, 0, 0, 1, 1])
+    r = mv(m1, hair, 1, 1)
+    check('... shown (Visible 1): both parts forced shown, one entry each', (r['hits'], drawn(m1),
+                                                                          len(entries())), (2, [1, 1, 1, 1, 1], 2))
+    r = mv(m1, hair, 2, 0)
+    check('... Visible 2 ends both: the bytes back (the second part: the group\'s write kept aside)',
+          (r['hits'], entries(), [m1.byte(i) & 3 for i in range(len(NAMES))]),
+          (2, [], [b0[0] & 3, b0[1] & 3, 1, b0[3] & 3, b0[4] & 3]))
+    m1.set_byte(2, 0x26)
+    pm.mem_write(m1.names + 0x40 * 2, b'MarioD_hair_O_OBJ\0')
+    r = mv(m1, hair, 0, 0)
+    check('v2: two entries with the same name: both hidden', (r['hits'], drawn(m1)), (2, [1, 0, 0, 1, 1]))
+    mv(m1, -1, 0, 0)
+    check('... Mesh -1 ends both', (entries(), drawn(m1)), ([], [1, 1, 1, 1, 1]))
+    pm.mem_write(m1.names + 0x40 * 2, NAMES[2].encode() + b'\0')
+    r = mv(m1, MV.crc32('stethoscope_VIS_O_OBJ'), 0, 0)
+    check('... a one-part mesh followed by a named one: only it', (r['hits'], drawn(m1)), (1, [0, 1, 1, 1, 1]))
+    mv(m1, -1, 0, 0)
+
     # the clear chain
     mv(m0, MV.crc32('Gamemodel'), 0, 1)
     mv(m1, MV.crc32('stethoscope_VIS_O_OBJ'), 0, 1)
@@ -306,7 +337,7 @@ def main():
                              pm.reg_read(UC_PPC_REG_LR), r32(pm, g), entries(), drawn(m0), drawn(m1)),
           (OL.CLEAR_BACK, 0x7F00BB00, 0x10, RET, 0, [], [1, 1, 0, 1, 1], [1, 1, 1, 1, 1]))
     check('the setter with no override: as the game\'s (bounds: mesh 9 -> 0)', setter(m0, 9, 1, 0), 0)
-    check('counter: group writes kept aside', r32(pm, g + 0x18), 2)
+    check('counter: group writes kept aside (one in the two-part test)', r32(pm, g + 0x18), 3)
     check('CRC32 in the cave = zlib\'s (Gamemodel)', crc_run(pm, lab, m0.names + 0x40 * 4), zlib.crc32(b'Gamemodel'))
     diag_tests(exe, orig)
     sys.exit(1 if acmd_ext_test.fails else 0)
@@ -365,8 +396,8 @@ def diag_tests(exe, orig):
     n = r32(pm, rec)
     got = [(bytes(pm.mem_read(r32(pm, rec + 0x20 * (i + 1)), 4)).decode('latin1'),
             r32(pm, rec + 0x20 * (i + 1) + 8)) for i in range(n)]
-    check('diag: S4MC at the command (the mesh CRC), S4MF at the tick (entry 0)', got,
-          [('S4MC', MV.crc32('Gamemodel')), ('S4MF', 0)])
+    check('diag: S4MH at the mesh changed (named: part 0), S4MC at the command (the mesh CRC), S4MF at the tick '
+          '(entry 0)', got, [('S4MH', 0), ('S4MC', MV.crc32('Gamemodel')), ('S4MF', 0)])
 
 
 if __name__ == '__main__':

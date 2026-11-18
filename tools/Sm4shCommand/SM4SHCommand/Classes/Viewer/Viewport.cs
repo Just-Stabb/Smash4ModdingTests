@@ -239,6 +239,9 @@ namespace Sm4shCommand.Viewer
                 FaceCamera(held, r, u, f);
                 if (attacker != null && WholeVisible) Rasterize(attacker, pix, zbuf, w, h, r, u, f, ov, ovAdd, ol);
                 if (held != null && WholeVisible) Rasterize(held, pix, zbuf, w, h, r, u, f, ov, ovAdd, ol);
+                // v1.7.14: Outline_Shell's band round the silhouette (the fighter and what it holds), outside it
+                var shl = ShowOverlays && Frame != null ? Frame.Shell : null;
+                if (shl != null && WholeVisible && (attacker != null || held != null)) DrawShell(pix, zbuf, w, h, shl, zoom);
                 if (enemy != null) Rasterize(enemy, pix, zbuf, w, h, r, u, f);
                 texturedTrails.Clear();
                 try { DrawFx(pix, zbuf, w, h, r, u, f); }
@@ -258,6 +261,61 @@ namespace Sm4shCommand.Viewer
                     DrawStatus(g);
                 }
                 e.Graphics.DrawImageUnscaled(bmp, 0, 0);
+            }
+        }
+
+        /// <summary>v1.7.14: Outline_Shell's band: the pixels within the width of the drawn model (a two-pass chamfer
+        /// distance from the covered pixels), outside it, in the colour over (Blend 0) or added to (1) what is there. The
+        /// width: pixels of a 1280 x 720 picture (scaled to this view's height) when above 0, game units (this view's
+        /// zoom) when below. The game's shell is the meshes drawn fattened, so it also outlines a part in front of
+        /// another (an arm over the body); this draws the outer silhouette only.</summary>
+        public static void DrawShell(int[] pix, float[] zbuf, int w, int h, float[] sh, float unitPx)
+        {
+            float rad = sh[4] > 0 ? sh[4] * h / 720f : -sh[4] * unitPx;
+            if (rad < 0.5f || sh[3] <= 0) return;
+            const float INF = 1e9f, D2 = 1.41421356f;
+            var d = new float[w * h];
+            for (int i = 0; i < d.Length; i++) d[i] = zbuf[i] < float.MaxValue ? 0 : INF;
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                {
+                    int i = y * w + x;
+                    float v = d[i];
+                    if (x > 0) v = Math.Min(v, d[i - 1] + 1);
+                    if (y > 0)
+                    {
+                        v = Math.Min(v, d[i - w] + 1);
+                        if (x > 0) v = Math.Min(v, d[i - w - 1] + D2);
+                        if (x < w - 1) v = Math.Min(v, d[i - w + 1] + D2);
+                    }
+                    d[i] = v;
+                }
+            for (int y = h - 1; y >= 0; y--)
+                for (int x = w - 1; x >= 0; x--)
+                {
+                    int i = y * w + x;
+                    float v = d[i];
+                    if (x < w - 1) v = Math.Min(v, d[i + 1] + 1);
+                    if (y < h - 1)
+                    {
+                        v = Math.Min(v, d[i + w] + 1);
+                        if (x < w - 1) v = Math.Min(v, d[i + w + 1] + D2);
+                        if (x > 0) v = Math.Min(v, d[i + w - 1] + D2);
+                    }
+                    d[i] = v;
+                }
+            float cr = sh[0] * 255, cg = sh[1] * 255, cb = sh[2] * 255;
+            bool add = sh[5] != 0;
+            for (int i = 0; i < pix.Length; i++)
+            {
+                float di = d[i];
+                if (di <= 0 || di >= rad + 1) continue;
+                float a = sh[3] * Math.Min(1, rad + 1 - di);        // a soft last pixel
+                int p = pix[i];
+                float pr = (p >> 16) & 255, pg = (p >> 8) & 255, pb = p & 255;
+                if (add) { pr += cr * a; pg += cg * a; pb += cb * a; }
+                else { pr += (cr - pr) * a; pg += (cg - pg) * a; pb += (cb - pb) * a; }
+                pix[i] = unchecked((int)0xFF000000) | Clamp((int)pr) << 16 | Clamp((int)pg) << 8 | Clamp((int)pb);
             }
         }
 
