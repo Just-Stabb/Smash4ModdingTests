@@ -318,6 +318,127 @@ def _material_bytes(mat, strs):
     return bytes(b)
 
 
+# ---------------------------------------------------------------- copies of meshes (binary)
+def _vertex_stride(vs, us):
+    """bytes a vertex in the vertex section of an unrigged polygon (bone type 0), as _read_vertices"""
+    vt, ct, nuv, half = vs & 0xF, us & 0xE, us >> 4, not us & 1
+    n = 12 + {0: 4, 1: 20, 3: 52, 6: 8, 7: 24}[vt] if vs >> 4 == 0 else 0     # rigged: positions in the add section
+    n += {0: 0, 2: 4, 4: 8}[ct]
+    return n + nuv * (4 if half else 8)
+
+
+def _vertex_add_stride(vs):
+    """bytes a vertex in the "vertex add" section of a rigged polygon: position + normals (vs & 0xF), bone indices and
+    weights (vs >> 4: 1 floats, 2 half floats, 4 bytes)"""
+    return 12 + {0: 4, 1: 20, 3: 52, 6: 8, 7: 24}[vs & 0xF] + {1: 32, 2: 16, 4: 8}[vs >> 4]
+
+
+def clone_meshes(data, copies):
+    """the .nud's bytes with meshes copied, every existing byte of it kept (only offsets moved): COPIES [(source mesh
+    name, new name, {polygon index: {texture slot: new texture hash}})]. Each copy gets its own polygon entries, its
+    own materials (byte copies: the same properties and NU_materialHash, so the material animations that bind by hash
+    drive it too) and its own index / vertex data, appended after the meshes; same bone / bind / sort bias / sphere.
+    Rigged polygons copy their vertex add data too. The layout as read(): header, mesh entries, polygon entries, materials,
+    then the index, vertex, vertex add sections and the names"""
+    d = data
+    packed = d[:2] == b'\x78\x9c'
+    if packed:
+        d = zlib.decompress(d)
+    assert d[:4] == b'NDP3', d[:4]
+    _, version, nmesh, bstart, bend, pstart, psize, vsize, vasize = struct.unpack('>IHhhhiiii', d[4:0x20])
+    poly_base = 0x30 + pstart
+    vert_base = poly_base + psize
+    va_base = vert_base + vsize
+    str_base = va_base + vasize
+    names, polys = [], []                      # per mesh: name, [(entry offset)]
+    for i in range(nmesh):
+        o = 0x30 + i * 0x30
+        name_off, = struct.unpack('>i', d[o + 32:o + 36])
+        npoly, obj = struct.unpack('>hi', d[o + 42:o + 48])
+        names.append(d[str_base + name_off:d.index(b'\0', str_base + name_off)].decode())
+        polys.append([obj + j * 0x30 for j in range(npoly)])
+    ptab = 0x30 + 0x30 * nmesh
+    npoly_all = sum(len(x) for x in polys)
+    assert sorted(q for x in polys for q in x) == [ptab + 0x30 * k for k in range(npoly_all)], 'polygon table layout'
+    mat_start = ptab + 0x30 * npoly_all
+    mat_offs = sorted({struct.unpack('>i', d[q + 16 + 4 * k:q + 20 + 4 * k])[0] for x in polys for q in x
+                       for k in range(4)} - {0})
+    assert mat_offs[0] >= mat_start
+    mat_end = 0x30 + pstart
+    mat_size = {m: (mat_offs[i + 1] if i + 1 < len(mat_offs) else mat_end) - m for i, m in enumerate(mat_offs)}
+    new_polys = sum(len(polys[names.index(src)]) for src, _n, _t in copies)
+    sh_poly = 0x30 * len(copies)               # old polygon entries move by the new mesh entries
+    sh_mat = sh_poly + 0x30 * new_polys        # old materials by the new mesh and polygon entries
+    out_mesh = bytearray()
+    for i in range(nmesh):
+        e = bytearray(d[0x30 + i * 0x30:0x60 + i * 0x30])
+        struct.pack_into('>i', e, 44, struct.unpack('>i', e[44:48])[0] + sh_poly)
+        out_mesh += e
+    out_poly = bytearray()
+    for x in polys:
+        for q in x:
+            e = bytearray(d[q:q + 0x30])
+            for k in range(4):
+                v, = struct.unpack('>i', e[16 + 4 * k:20 + 4 * k])
+                if v:
+                    struct.pack_into('>i', e, 16 + 4 * k, v + sh_mat)
+            out_poly += e
+    old_mats = bytes(d[mat_start:mat_end])
+    new_mats = bytearray()
+    idx, vtx = bytearray(d[poly_base:vert_base]), bytearray(d[vert_base:va_base])
+    vadd = bytearray(d[va_base:str_base])
+    strs = bytearray(d[str_base:])
+    mesh_new = bytearray()
+    pe_new = bytearray()
+    first_new_poly = ptab + sh_poly + 0x30 * npoly_all
+    mats_new_base = mat_start + sh_mat + len(old_mats)
+    for src, new_name, tex in copies:
+        i = names.index(src)
+        e = bytearray(d[0x30 + i * 0x30:0x60 + i * 0x30])
+        strs += b'\0' * (-len(strs) % 16)
+        struct.pack_into('>i', e, 32, len(strs))
+        strs += new_name.encode() + b'\0'
+        struct.pack_into('>i', e, 44, first_new_poly + len(pe_new))
+        mesh_new += e
+        for j, q in enumerate(polys[i]):
+            pe = bytearray(d[q:q + 0x30])
+            poff, voff, vaoff, nv, vs, us = struct.unpack('>iiiHBB', pe[:16])
+            nidx, = struct.unpack('>H', pe[32:34])
+            idx += b'\0' * (-len(idx) % 16)
+            struct.pack_into('>i', pe, 0, len(idx))
+            idx += d[poly_base + poff:poly_base + poff + 2 * nidx]
+            vtx += b'\0' * (-len(vtx) % 16)
+            struct.pack_into('>i', pe, 4, len(vtx))
+            vtx += d[vert_base + voff:vert_base + voff + nv * _vertex_stride(vs, us)]
+            if vs >> 4:
+                vadd += b'\0' * (-len(vadd) % 16)
+                struct.pack_into('>i', pe, 8, len(vadd))
+                vadd += d[va_base + vaoff:va_base + vaoff + nv * _vertex_add_stride(vs)]
+            for k in range(4):
+                m, = struct.unpack('>i', pe[16 + 4 * k:20 + 4 * k])
+                if not m:
+                    continue
+                mb = bytearray(d[m:m + mat_size[m]])
+                ntex, = struct.unpack('>H', mb[10:12])
+                for slot, h in tex.get(j, {}).items():
+                    if k == 0 and slot < ntex:
+                        struct.pack_into('>I', mb, 0x20 + 0x18 * slot, h)
+                struct.pack_into('>i', pe, 16 + 4 * k, mats_new_base + len(new_mats))
+                new_mats += mb
+            pe_new += pe
+    idx += b'\0' * (-len(idx) % 16)
+    vtx += b'\0' * (-len(vtx) % 16)
+    vadd += b'\0' * (-len(vadd) % 16)
+    head = bytes(out_mesh + mesh_new + out_poly + pe_new) + old_mats + bytes(new_mats)
+    head += b'\0' * (-(0x30 + len(head)) % 16)
+    out = bytearray(d[:0x30])
+    struct.pack_into('>h', out, 0xA, nmesh + len(copies))
+    struct.pack_into('>iiii', out, 0x10, len(head), len(idx), len(vtx), len(vadd))
+    out += head + idx + vtx + vadd + strs
+    struct.pack_into('>I', out, 4, len(out))
+    return zlib.compress(bytes(out)) if packed else bytes(out)
+
+
 def main():
     if sys.argv[1] == 'info':
         for m in read(sys.argv[2]):

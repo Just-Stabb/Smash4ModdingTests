@@ -119,6 +119,72 @@ def write(frames, mats, rate=60, unk=9, vis=()):
     return bytes(out)
 
 
+def _vis_bytes(base, vis):
+    """the visibility section (table + entries) at offset BASE: vis [(name, frame count - 1, [(frame, 0 / 1)])], laid
+    out as the game's files (and write())"""
+    out = bytearray(b'\0' * (4 * len(vis)))
+    for i, (name, last, keys) in enumerate(vis):
+        out += b'\0' * (-(base + len(out)) % ALIGN)
+        e = base + len(out)
+        struct.pack_into('>I', out, 4 * i, e)
+        nm = _pad(name.encode('latin1') + b'\0')
+        out += struct.pack('>III', e + 0x20, 0, e + 0x20 + len(nm)) + b'\0' * 0x14 + nm
+        ko = base + len(out) + 0x20
+        out += struct.pack('>IHhI', last, 1, len(keys), ko) + b'\0' * 0x14
+        out += b''.join(struct.pack('>hBB', f, v, 0) for f, v in keys)
+    return bytes(out)                          # the game's files end at the last key
+
+
+def add_vis(d, tracks):
+    """an MTA4's bytes with visibility tracks added: TRACKS {existing mesh name: (new mesh name, keys or None)}: after
+    each existing track a new one (keys None: hidden all through, [(0, 0)]). Everything before the visibility section
+    is kept byte for byte; the section (the file's tail) is laid out again. Returns d unchanged without a match"""
+    r = read(d)
+    vc, vo = struct.unpack('>II', d[0x20:0x28])
+    if not vc:
+        return d
+    vis = [(v['name'], v['frames'], [(f, s) for f, s, _ in v['keys']]) for v in r['vis']]
+    assert d[vo:] == _vis_bytes(vo, vis), 'vis layout'
+    out = []
+    for name, last, keys in vis:
+        out.append((name, last, keys))
+        if name in tracks:
+            new, k = tracks[name]
+            out.append((new, last, list(k) if k is not None else [(0, 0)]))
+    if len(out) == len(vis):
+        return d
+    b = bytearray(d[:vo]) + _vis_bytes(vo, out)
+    struct.pack_into('>I', b, 0x20, len(out))
+    return bytes(b)
+
+
+def pac_map(d, fn):
+    """a KCAP .pac's bytes with fn(name, bytes) -> bytes applied to each file (the pack laid out again only when a
+    file's size changes: entries in their order, each from a 0x10 boundary, the file ending at the last one, as the game's)"""
+    assert d[:4] == b'KCAP', d[:4]
+    n = struct.unpack('>I', d[8:12])[0]
+    ents = []
+    for i in range(n):
+        no, o, s = (struct.unpack('>I', d[0x10 + 4 * (i + k * n):0x14 + 4 * (i + k * n)])[0] for k in range(3))
+        ents.append((no, o, s))
+    files = [fn(_cstr(d, no), d[o:o + s]) for no, o, s in ents]
+    if all(len(f) == s for f, (_no, _o, s) in zip(files, ents)):
+        out = bytearray(d)
+        for f, (_no, o, s) in zip(files, ents):
+            out[o:o + s] = f
+        return bytes(out)
+    first = min(o for _no, o, _s in ents)
+    out = bytearray(d[:first])
+    for i, f in enumerate(files):
+        out += b'\0' * (-len(out) % 0x10)
+        struct.pack_into('>I', out, 0x10 + 4 * (i + n), len(out))
+        struct.pack_into('>I', out, 0x10 + 4 * (i + 2 * n), len(f))
+        out += f
+    if len(d) >= 8 and struct.unpack('>I', d[4:8])[0] == len(d):
+        struct.pack_into('>I', out, 4, len(out))
+    return bytes(out)
+
+
 def main():
     for f in sys.argv[1:]:
         m = read(open(f, 'rb').read())

@@ -51,7 +51,10 @@ class Tex:
 
 
 def load(path):
-    d = open(path, 'rb').read()
+    return load_bytes(open(path, 'rb').read())
+
+
+def load_bytes(d):
     if d[:2] == b'\x78\x9c':
         d = zlib.decompress(d)
     assert d[:4] == b'NTWU', d[:4]
@@ -427,6 +430,66 @@ def write_ntwu(textures):
     for s in surfs:
         out += s.gx2()
     return bytes(out)
+
+
+def append_ntwu(data, textures):
+    """an NTWU .nut's bytes with TEXTURES [(tex_id, GX2 format 0x31 / 0x33 / 0x1A, RGBA [h, w, 4])] added after its
+    own (single-mip, as write_ntwu's). Every existing texture keeps its header, image, mip and GX2 surface bytes (only
+    its relative offsets change): the headers (old, then new), each texture's image (and mips) at its alignment from
+    0x1000, the GX2 surfaces at the end, as the game's own files"""
+    d = data
+    packed = d[:2] == b'\x78\x9c'
+    if packed:
+        d = zlib.decompress(d)
+    d, texs = load_bytes(d)
+    hs_new = 0x50
+    surfs = [Surface(fmt, img.shape[1], img.shape[0]) for _, fmt, img in textures]
+    heads = [bytearray(d[t.hp:t.hp + t.header_size]) for t in texs]
+    hp, hps = 0x10, []
+    for h in heads:
+        hps.append(hp)
+        hp += len(h)
+    new_hps = [hp + hs_new * i for i in range(len(textures))]
+    pos = hp + hs_new * len(textures)
+    blobs = []
+    for t in texs:
+        img = d[t.data_off:t.data_off + t.image_size]
+        mip = d[t.mip_off:t.mip_off + t.mip_size] if t.levels > 1 else b''
+        al = max(t.alignment, 0x100)
+        pos = -(-max(pos, 0x1000) // al) * al
+        blobs.append((pos, img + (b'\0' * (t.mip_off - t.data_off - t.image_size) if mip else b'') + mip))
+        pos += len(blobs[-1][1])
+    for (tex_id, fmt, img), s in zip(textures, surfs):
+        pos = -(-max(pos, 0x1000) // s.alignment) * s.alignment
+        blobs.append((pos, encode(img, s)))
+        pos += len(blobs[-1][1])
+    gtx = -(-pos // 0x80) * 0x80
+    for i, (t, h) in enumerate(zip(texs, heads)):
+        o = blobs[i][0]
+        struct.pack_into('>i', h, 0x20, o - hps[i])
+        if t.levels > 1:
+            struct.pack_into('>i', h, 0x24, o + (t.mip_off - t.data_off) - hps[i])
+        struct.pack_into('>i', h, 0x28, gtx + 0x80 * i - hps[i])
+    out = bytearray(d[:0x10])
+    struct.pack_into('>H', out, 6, len(texs) + len(textures))
+    for h in heads:
+        out += h
+    for k, ((tex_id, fmt, img), s) in enumerate(zip(textures, surfs)):
+        i = len(texs) + k
+        out += struct.pack('>IIIHHBBBBHHII', s.image_size + hs_new, 0, s.image_size, hs_new, 0, 0, 1, 0, NTWU_CODE[fmt],
+                           s.w, s.h, 1, 0)
+        out += struct.pack('>IIII', blobs[i][0] - new_hps[k], 0, gtx + 0x80 * i - new_hps[k], 0)
+        out += b'eXt\0' + struct.pack('>III', 0x20, 0x10, 0)
+        out += b'GIDX' + struct.pack('>III', 0x10, tex_id, 0)
+    for o, b in blobs:
+        out += b'\0' * (o - len(out))
+        out += b
+    out += b'\0' * (gtx - len(out))
+    for t in texs:
+        out += d[t.gtx:t.gtx + 0x80]
+    for s in surfs:
+        out += s.gx2()
+    return zlib.compress(bytes(out)) if packed else bytes(out)
 
 
 def main():
