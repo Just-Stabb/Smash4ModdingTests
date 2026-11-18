@@ -634,9 +634,22 @@ def diag_tests(exe, orig):
     env = DrawEnv(pm)
     env.ctx()
     env.fbset(1.5, 1)
+    stub = Asm(SC.OS_GET_CORE_ID)                     # OSGetCoreId: core 2
+    stub.asm('\n        li r3, 2\n        blr\n')
+    for i, x in enumerate(stub.words()):
+        w32(pm, SC.OS_GET_CORE_ID + 4 * i, x)
+    chain = [(0x7F00F000, 0x7F00F100, 0x037174DC), (0x7F00F100, 0x7F00F200, 0x11111111),
+             (0x7F00F200, 0x7F00F300, 0x22222222), (0x7F00F300, 0, 0x33333333)]
+    for f, nxt, lr in chain:                          # the stack above os_draw: back chain + saved LR per frame
+        w32(pm, f, nxt)
+        w32(pm, f + 4, lr)
     n0 = r32(pm, rec)
     env.draw()
     got = lines(n0)
+    check('diag: S4SP at each step of a shell drawn (1 mark, 2 programs, 3 states, 4 draw, 5 back), shell 1, the core, '
+          'the return addresses up the stack', [x[:8] for x in got if x[0] == 'S4SP'],
+          [('S4SP', k, 1, 2, 0x037174DC, 0x11111111, 0x22222222, 0x33333333) for k in range(1, 6)])
+    got = [x for x in got if x[0] != 'S4SP']
     check('diag: S4SR at a shell drawn (shells drawn 1, the device context, its programs, FB1, the width, the rasterizer '
           'state set)', [(x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7]) for x in got],
           [('S4SR', 1, CTXA, GAME_VS, GAME_PS, env.fbd, struct.unpack('>I', struct.pack('>f', 1.5))[0],
@@ -655,6 +668,24 @@ def diag_tests(exe, orig):
     got = lines(n0)
     check('diag: S4ST\'s counts: shells drawn 1, draws checked 2, refused 1', [(x[0], x[5], x[6], x[7]) for x in got],
           [('S4ST', 1, 2, 1)])
+    # v4 TEST ONLY variants: noprog (the game's programs kept for the shell's draw), nodraw (no second draw)
+    env.ctx()
+    env.fbset(1.5, 1)
+    full = [c[0] for c in env.draw()['calls']]
+    for var, want in (('noprog', [x for i, x in enumerate(full) if i not in (1, 2)]),
+                      ('nodraw', full[:8] + full[9:])):
+        vw, vlab, _s = SC.build(orig, diag=True, variant=var)
+        for at in range(SC.CAVE, SC.VS_PROG, 4):
+            w32(pm, at, vw.get(at, 0))
+        for at, w in vw.items():
+            w32(pm, at, w)
+        w32(pm, vlab['os_g'], 1)
+        pm.ctl_remove_cache(SC.CAVE, SC.LIMIT)        # (the emulator's translated blocks of the old code)
+        env.ctx()
+        env.fbset(1.5, 1)
+        d = env.draw()
+        check('diag --variant %s: the calls (%s)' % (var, 'no programs set' if var == 'noprog' else 'no second draw'),
+              ([c[0] for c in d['calls']], d['pc'], d['sp'], d['kept']), (want, SC.DRAW_I + 4, 0x7F00F000, []))
 
 
 if __name__ == '__main__':

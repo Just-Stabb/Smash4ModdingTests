@@ -64,7 +64,7 @@ Hooks (each word asserted):
   checked while a shell is in use and marked FB1s refused; S4SF per FB1 write, S4SR per shell drawn, S4SX a marked FB1
   refused (the pixel program's blocks): the first 30 frames after a command, then every 30th).
 Space: 0x04BE5000-0x04BE7000 (docs/native-notes.md "Outline shell": past the mesh visibility's, the text region grown),
-the programs at 0x04BE6800 / 0x04BE6C00 (256-aligned).
+the programs at 0x04BE6A00 / 0x04BE6E00 (256-aligned).
 Test: tools/outline_shell_test.py.
 """
 import argparse
@@ -82,7 +82,7 @@ import mesh_vis_cave as MV  # noqa: E402
 
 CAVE, LIMIT = 0x04BE5000, 0x04BE7000
 TEXT_REGION = LIMIT - 0x02000000
-VS_PROG, PS_PROG = 0x04BE6800, 0x04BE6C00
+VS_PROG, PS_PROG = 0x04BE6A00, 0x04BE6E00   # (v4: up 0x200 for the diag build's S4SP)
 OS_INDEX = 2600                 # (Mesh_Visibility 2500)
 CMD_NAME = 'Outline_Shell'
 CMD_CRC = zlib.crc32(CMD_NAME.encode()) & 0xFFFFFFFF
@@ -92,6 +92,8 @@ MAGIC = 0x53344F53              # 'S4OS' in FB1 +0xD4: this FB1 carries a shell
 SMAGIC = struct.unpack('<I', struct.pack('>I', MAGIC))[0]   # the same after the unlock's in-place swap
 FB_COL, FB_SHELL = 0xC0, 0xD0   # FB1 vec4 12 (r, g, b, alpha), vec4 13 (width, MAGIC, blend, weight)
 MAX_WIDTH = 64.0
+VARIANTS = ('full', 'noprog', 'nodraw')   # v4 TEST ONLY (--variant, with --diag): noprog keeps the game's programs for
+                                          # the shell's draw, nodraw sets the shell's programs / states but skips the draw
 
 DRAW_I, DRAW_N = 0x037174D8, 0x037174E8
 DRAW_FN_I, DRAW_FN_N = 0x036F3EDC, 0x036F3EC8
@@ -343,10 +345,14 @@ DIAG_FMTS = [
     ('s_sf', 'S4SF n=%d mi=%08X fb=%08X width=%08X a=%08X blend=%d marked=%d\n'),
     ('s_sr', 'S4SR n=%d ctx=%08X vs=%08X ps=%08X fb=%08X width=%08X poly=%08X ds=%08X\n'),
     ('s_sx', 'S4SX n=%d ctx=%08X ps=%08X blocks=%d ptr=%08X fb=%08X\n'),
+    ('s_sp', 'S4SP step=%d shell=%d core=%d ret=%08X %08X %08X %08X\n'),
 ]
+DIAG_STEPS = 24                 # S4SP: the first 24 shells drawn, every step
+OS_GET_CORE_ID = 0x04B80340     # OSGetCoreId's import stub (bl targets at 0x032EF0F8, 0x036F7564, ...)
 
 
-def src(s, hand, diag=False, pad=False):
+def src(s, hand, diag=False, pad=False, variant='full'):
+    assert variant in VARIANTS
     D = dict(size=1 + NPARAMS, step=4 * (1 + NPARAMS), n=N_ENT, ent=ENT, nct=OL.NC_TARGET,
              tick_prev=s['tick_prev'], clear_to=OL.CLEAR_BACK, smvt_h=OL.FIGHTER_SM_VT >> 16,
              smvt_l=OL.FIGHTER_SM_VT & 0xFFFF, dead=OL.DEAD, every=DIAG_EVERY, ol_apply=s['ol_apply'],
@@ -357,6 +363,16 @@ def src(s, hand, diag=False, pad=False):
              cf=CULL_FRONT, cb=CULL_BACK, dsoff=DS_STENCIL | DS_BACKFACE, dson=DS_Z | DS_ZWRITE,
              vcb7=CTX['vcb'] + 8 * 7, pcb7=CTX['pcb'] + 8 * 7, pcb7s=CTX['pcb'] + 8 * 7 + 4,
              **{'c_' + k: v for k, v in CTX.items()}, **{'g_' + k: v[0] for k, v in GX2.items()})
+    step = (lambda n: '\n        li r3, %d\n        mr r4, r31\n        bl os_dstep' % n) if diag else (lambda n: '')
+    D.update(st1=step(1), st2=step(2), st3=step(3), st4=step(4), st5=step(5),
+             setprog='' if variant == 'noprog' else '''
+        lis r3, os_vs@ha                # the shell's programs
+        addi r3, r3, os_vs@l
+        bl 0x%08X
+        lis r3, os_ps@ha
+        addi r3, r3, os_ps@l
+        bl 0x%08X''' % (GX2['SetVertexShader'][0], GX2['SetPixelShader'][0]),
+             redraw='' if variant == 'nodraw' else '\n        bctrl')
     D.update(maxw=MAX_WIDTH, cc4=CTX['cc'] + 4, cc8=CTX['cc'] + 8, ccc=CTX['cc'] + 0xC, cc10=CTX['cc'] + 0x10)
     chk, mi_of = OL.chk, OL.mi_of
     out = OL.table_src(s, 'os', OS_INDEX, CMD_CRC, 1 + NPARAMS, hand)
@@ -838,13 +854,7 @@ os_draw:
         mr r3, r31
         bl os_chk
         mr. r30, r3
-        beq osd_out
-        lis r3, os_vs@ha                # the shell's programs
-        addi r3, r3, os_vs@l
-        bl 0x%(g_SetVertexShader)08X
-        lis r3, os_ps@ha
-        addi r3, r3, os_ps@l
-        bl 0x%(g_SetPixelShader)08X
+        beq osd_out%(st1)s%(setprog)s%(st2)s
         lwz r0, %(c_rsreg)d(r31)         # the rasterizer's: front faces culled (back faces, if the game culls front)
         clrlwi r11, r0, 30
         rlwinm r0, r0, 0, 0, 29
@@ -887,7 +897,7 @@ osd_bl:
         stw r0, 0x40(r1)
         stw r0, 0x44(r1)
         addi r3, r1, 0x40
-        bl 0x%(g_SetAlphaTestReg)08X
+        bl 0x%(g_SetAlphaTestReg)08X%(st3)s
         lwz r3, 0x10(r1)                # the same draw again
         lwz r4, 0x14(r1)
         lwz r5, 0x18(r1)
@@ -896,8 +906,7 @@ osd_bl:
         lwz r8, 0x24(r1)
         lwz r9, 0x28(r1)
         lwz r12, 0x2C(r1)
-        mtctr r12
-        bctrl
+        mtctr r12%(redraw)s%(st4)s
         lwz r3, %(c_vs)d(r31)            # everything back as the device's caches have it
         bl 0x%(g_SetVertexShader)08X
         lwz r3, %(c_ps)d(r31)
@@ -914,7 +923,7 @@ osd_bl:
         lwz r6, %(cc10)d(r31)
         bl 0x%(g_SetColorControl)08X
         addi r3, r31, %(c_atest)d
-        bl 0x%(g_SetAlphaTestReg)08X
+        bl 0x%(g_SetAlphaTestReg)08X%(st5)s
         lis r12, os_g@ha
         addi r12, r12, os_g@l
         lwz r11, 0x18(r12)              # shells drawn
@@ -1048,6 +1057,7 @@ os_dcmd:
 os_dtick:
 os_dfb:
 os_ddraw:
+os_dstep:
         blr
 os_dref:
         li r3, 0
@@ -1070,7 +1080,8 @@ os_k:                                   # +0 0, +4 1, +8 2, +0xC 3, +0x10 1/255,
 os_g:                                   # +0 entries in use, +4 frames ticked, +8 FB1 writes, +0xC commands,
         .word 0                         # +0x10 frames since the last command (diag), +0x14 round robin, +0x18 shells
         .word 0                         # drawn, +0x1C marked FB1s refused (diag), +0x20 draws checked while a shell is
-        .word 0                         # in use, +0x24 marked draws seen (diag)
+        .word 0                         # in use, +0x24 marked draws seen (diag), +0x28 shells stepped (diag S4SP)
+        .word 0
         .word 0
         .word 0
         .word 0
@@ -1196,6 +1207,47 @@ os_dfb:""" + head + """
         addi r12, r12, os_g@l
         lwz r10, 0x24(r12)""" % dict(sh=FB_SHELL, colc=FB_COL + 12, sh8=FB_SHELL + 8) + rep + """
 odf_out:""" + tail + """
+# --- diag: S4SP at each step of the first DIAG_STEPS shells drawn (r3 the step: 1 the mark taken, 2 the programs
+#     set, 3 the states set, 4 the draw made, 5 everything back; r4 the device context): the core, the return
+#     addresses up the stack (who drew: CommandDrawModel, its caller, ...) ----------------------------------------
+os_dstep:""" + head + """
+        mr r31, r3
+        mr r30, r4
+        lis r12, os_g@ha
+        addi r12, r12, os_g@l
+        cmpwi r31, 1
+        bne ods_chk
+        lwz r11, 0x28(r12)
+        addi r11, r11, 1
+        stw r11, 0x28(r12)
+ods_chk:
+        lwz r11, 0x28(r12)
+        cmpwi r11, %(n)d
+        bgt ods_out
+        bl 0x%(core)08X                 # OSGetCoreId
+        mr r6, r3
+        li r7, 0
+        li r8, 0
+        li r9, 0
+        li r10, 0
+        lwz r29, 0(r1)                  # os_draw's frame
+        lwz r29, 0(r29)                 # its caller's (CommandDrawModel)""" % dict(n=DIAG_STEPS, core=OS_GET_CORE_ID) + \
+        OL.chk('r29', 'ods_pr') + """
+        lwz r7, 4(r29)                  # the return into CommandDrawModel
+        lwz r29, 0(r29)""" + OL.chk('r29', 'ods_pr') + """
+        lwz r8, 4(r29)                  # into its caller
+        lwz r29, 0(r29)""" + OL.chk('r29', 'ods_pr') + """
+        lwz r9, 4(r29)
+        lwz r29, 0(r29)""" + OL.chk('r29', 'ods_pr') + """
+        lwz r10, 4(r29)
+ods_pr:
+        lis r3, s_sp@ha
+        addi r3, r3, s_sp@l
+        mr r4, r31
+        lis r12, os_g@ha
+        addi r12, r12, os_g@l
+        lwz r5, 0x28(r12)""" + rep + """
+ods_out:""" + tail + """
 # --- diag: S4SR at a shell drawn (r3 the device context, r4 FB1, r5 the states set: rasterizer, depth) ---------------
 os_ddraw:""" + head + """
         mr r31, r3
@@ -1247,12 +1299,12 @@ def _diag_data():
     return out
 
 
-def build(orig, diag=False):
+def build(orig, diag=False, variant='full'):
     s = find(orig)
     hand, pad = 0, False
     for _p in range(3):
         a = Asm(CAVE)
-        a.asm(src(s, hand, diag, pad))
+        a.asm(src(s, hand, diag, pad, variant))
         hand = a.addr('h_shell')
         if a.addr('os_k') % 8:
             pad = not pad
@@ -1328,13 +1380,17 @@ def main():
     p.add_argument('--labels', help='update this param_labels.json with Outline_Shell')
     p.add_argument('--diag', action='store_true', help='TEST ONLY: the OSReport build (S4SC / S4SD / S4ST / S4SF / '
                    'S4SR / S4SX lines, docs/native-notes.md "Outline shell")')
+    p.add_argument('--variant', default='full', choices=VARIANTS, help='TEST ONLY (with --diag): noprog draws the shell '
+                   'with the game\'s own programs, nodraw sets the shell\'s programs and states but skips its draw')
     args = p.parse_args()
     if args.labels:
         labels(args.labels)
         return
     if not args.rpx:
         p.error('--rpx or --labels')
-    words, lab, _s = build(rpx_reader(args.rpx), args.diag)
+    if args.variant != 'full' and not args.diag:
+        p.error('--variant is TEST ONLY: with --diag')
+    words, lab, _s = build(rpx_reader(args.rpx), args.diag, args.variant)
     print(' '.join(['textregion:0x%X' % TEXT_REGION, 'grow:0x%08X' % LIMIT] +
                    ['0x%08X=0x%08X' % kv for kv in sorted(words.items())]))
     sys.stderr.write('outline shell: %d words, Outline_Shell index %d (0x%08X), h_shell 0x%08X, os_draw 0x%08X, '

@@ -3221,6 +3221,19 @@ that class: a cave that reads back a uniform block after its unlock reads it swa
 `marked=` (the draws that carried the mark: os_g +0x24). `outline_shell_cave.draws()` tells an exe_v46z_outline3 shell
 from v2's (port_check X13 errors on v2's).
 
+**v4 (TEST ONLY, the user's v3 test): the game crashed on the first shell drawn.** Log: S4SF marked=0 for two frames,
+then nothing more after a frame's draws (the first mark taken: no S4SR, no S4SX). Read so far, none conclusive: Cemu maps
+virtual = physical (MMU.cpp `memory_virtualToPhysical`), so programs in the code area are readable; GX2SetVertexShader /
+GX2SetPixelShader read only the structs' registers and program pointer; special.nsh exports a masked PARAM0 too. The
+game records draws into GX2 display lists per core (`0x032EF244`: 11 passes, each sized by its pool's room;
+`0x032EEFC4`: 0x400 bytes on the stack; `0x04A58018`: 0x200), and Cemu's display-list writes don't stop at the end
+(GX2Command.cpp: a flush is a no-op in a display list), so the shell's extra commands (~300 words a mesh) could overrun
+one. The v4 diag build logs S4SP per step (1 the mark taken, 2 the programs set, 3 the states, 4 the draw, 5 the
+restore) for the first 24 shells, with the core (OSGetCoreId's stub `0x04B80340`) and four return addresses up the
+stack; `--variant noprog` (the game's programs for the second draw) and `--variant nodraw` (no second draw) isolate
+the programs and the draw. The programs moved to `0x04BE6A00` / `0x04BE6E00` to make room (os_g grew a word): the
+release words differ from exe_v46z_outline3's, not shipped yet.
+
 **Claimed region: `0x04BE5000`-`0x04BE7000`** (past the mesh visibility's; `textregion:0x2BE7000 grow:0x04BE7000`; code
 and data `0x04BE5000`-`0x04BE6244`, the diag build to `0x04BE66FC`; the programs at `0x04BE6800` (vertex, 0x348 bytes)
 and `0x04BE6C00` (pixel, 0x120), 256-aligned; the table `os_tab` 16 x 0x50). Order: exe_v46z_ol -> tools/mesh_vis_cave.py
