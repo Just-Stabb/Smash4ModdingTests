@@ -3680,3 +3680,17 @@ game's in-place byte swap: docs/native-notes.md "Outline shell" v3), fixed in ex
   the stop's negative.
 - Needs exe_v46z_outline4 (outline_v6.zip; exe_v46z_outline3 crashes at the outline, exe_v46z_outline2 shows none). The aura is unchanged pending the user's description of what is wrong.
 
+
+## Time Skip v10 (`supamario_timeskip_v10.zip`): the outline's colour
+
+The user's v9 clip (exe_v46z_outline4): the outline shows, but "there's no blue tint and the glow is slightly too
+bright", and in the stop it "is persisting, it's just hardly noticeable because of the color".
+
+- Dash / charge: `OL_SH_RGB` (150, 195, 255) added at `OL_SH_ALPHA` 165 (v9: (215, 230, 255) at 220, which saturated
+  to white). Over a mid grey (100) it comes out (197, 226, 255).
+- The stop: v9's black band came out (223, 241, 255) through INV_STOP (the greyed negative's brightest), and a dark
+  stage's negative is light (~200 round him on Smashville at night), so it barely showed. Now white drawn over at
+  `OL_INV_ALPHA` 230, which the negative turns dark navy (~25-37, 41-55, 64-78): a clear line on a light negative.
+  On a bright stage (whose negative is dark) this line is faint; the user had no preference between this, a thicker
+  light band and a darker stop.
+- Only effect.bin changes. Needs exe_v46z_outline4.

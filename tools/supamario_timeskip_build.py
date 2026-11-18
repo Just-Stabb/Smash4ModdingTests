@@ -283,6 +283,16 @@ OL_WIDTH, OL_BLEND, OL_SH_ALPHA = 2.5, 1, 220.0
 # (223, 241, 255), the outline's own light blue-white. So the connect's outline is OL_INV_RGB over (screen_invert_cave
 # filter_matrix; the test checks the band's colour through it).
 OL_INV_RGB, OL_INV_BLEND = (0.0, 0.0, 0.0), 0
+# v10 (user, v9 clip: "There's no blue tint and the glow is slightly too bright"; the stop's band "is persisting, it's
+# just hardly noticeable because of the color"): added at 220, (215, 230, 255) saturated to white over most of the
+# stage. Now OL_SH_RGB (150, 195, 255) at 165: over a mid grey (100) it comes out (197, 226, 255), a clear blue-white.
+# The stop: black over came out (223, 241, 255), the brightest the greyed negative allows, and a dark stage's negative
+# is light (Smashville at night: ~200 round him), so it barely showed. The stop's band is now white drawn over at
+# OL_INV_ALPHA 230, which the negative turns dark navy (~35, 52, 75): a clear line on a light negative (the user had
+# no preference between this, a thicker light band and a darker stop; a bright stage's negative is dark, where this
+# line is faint).
+OL_SH_RGB, OL_SH_ALPHA = (150.0, 195.0, 255.0), 165.0
+OL_INV_RGB, OL_INV_ALPHA = (255.0, 255.0, 255.0), 230.0
 OL_ON = WIND_END
 OL_OFF = int(real0(100))            # 75
 # v6 (user: "add XV2's photo-negative look after the punch"). XV2's BAC: BPE 78 "Invert World Colors" on at the connect's
@@ -604,12 +614,14 @@ def outline_on(frames, inverted=False):
     renewed (a cut move).
     v9: Outline_Shell (exe_v46z_outline4): a band OL_WIDTH pixels wide outside his silhouette, OL_RGB added at
     OL_SH_ALPHA (Blend OL_BLEND), the same timing; `inverted` (the connect, under Screen_Invert's stop): OL_INV_RGB
-    drawn over (Blend OL_INV_BLEND), which the negative turns into the light blue-white"""
+    drawn over (Blend OL_INV_BLEND) at OL_INV_ALPHA; v10: OL_SH_RGB, and white over in the stop (dark navy through the
+    negative)"""
     if OUTLINE_CMD == 'outline_shell' and inverted and INVERT_FX:
-        return [cmd(OUTLINE_CMD, 0, *OL_INV_RGB, OL_SH_ALPHA, OL_WIDTH, int(frames), OL_IN, OL_CUT_OUT, OL_FLASH,
+        return [cmd(OUTLINE_CMD, 0, *OL_INV_RGB, OL_INV_ALPHA, OL_WIDTH, int(frames), OL_IN, OL_CUT_OUT, OL_FLASH,
                     OL_INV_BLEND)]
     if OUTLINE_CMD == 'outline_shell':
-        return [cmd(OUTLINE_CMD, 0, *OL_RGB, OL_SH_ALPHA, OL_WIDTH, int(frames), OL_IN, OL_CUT_OUT, OL_FLASH, OL_BLEND)]
+        return [cmd(OUTLINE_CMD, 0, *OL_SH_RGB, OL_SH_ALPHA, OL_WIDTH, int(frames), OL_IN, OL_CUT_OUT, OL_FLASH,
+                    OL_BLEND)]
     return [cmd(OUTLINE_CMD, 0, *OL_RGB, OL_ALPHA, OL_TINT, int(frames), OL_IN, OL_CUT_OUT, OL_FLASH)]
 
 
@@ -750,7 +762,9 @@ def convert_fx(cmn_dir, fx_dir, halo=True, frt_dir=None, joints0=None):
     return {'sets': sets, 'skipped': log, 'notes': notes, 'halos': halos, 'ptcl_bytes': [before, len(out)],
             'facing_problems': bad, 'lod': lod, 'e11': e11, 'aura': e0,
             'e0_follow': e0h, 'glass': glass, 'dark': dark, 'wash': wash, 'fade': fade,
-            'outline': {'command': acmd.INFO[acmd.BY_NAME[OUTLINE_CMD]]['name'], 'rgb': OL_RGB,
+            'outline': {'command': acmd.INFO[acmd.BY_NAME[OUTLINE_CMD]]['name'],
+                        'rgb': OL_SH_RGB if OUTLINE_CMD == 'outline_shell' else OL_RGB, 'stop_rgb': OL_INV_RGB,
+                        'stop_alpha': OL_INV_ALPHA,
                         'alpha': OL_SH_ALPHA if OUTLINE_CMD == 'outline_shell' else OL_ALPHA, 'tint': OL_TINT,
                         'width': OL_WIDTH, 'blend': OL_BLEND, 'flash': OL_FLASH,
                         'on': OL_ON, 'off': OL_OFF, 'keep': OL_KEEP, 'hold': OL_HOLD, 'in': OL_IN, 'out': OL_OUT,
