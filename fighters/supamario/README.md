@@ -3585,3 +3585,60 @@ Sledgehammer's landings unchanged; brightness (effect 0, the rings, the wash). O
 `supamario_sledgehammer_test` 141 ok, `supamario_fakedeath_test` 47, `supamario_corebreaker_test` 104,
 `supamario_godfist_test --all-models` 566 (0 problems each); `msc_stack_check` 0 problems (globals 127 of 128).
 
+
+## Time Skip v7 (`supamario_timeskip_v7.zip`): the outline through Outline_Set, the negative's fades
+Over v6. **Needs exe_v46z_outline** (model_commands_v1.zip: everything of exe_v46z_inv / the camera exes plus
+Outline_Set and Mesh_Visibility; `port_check` X10 / X11); the user confirmed Outline_Set, Screen_Invert, Mesh_Visibility
+and Effect_Camera in game. No exe in the package. Changed: the MSC, effect.bin, the ptcl / efc (the outline's ring set
+gone, the white fade quad added). Every other move's set byte for byte as before.
+
+### The outline: Outline_Set instead of v6's rings
+v6's `PtcSupamarioTsOutline` (16 ring billboards on his bones, an effect-only rim) is gone from the scripts and the bank.
+The outline is `Outline_Set` (docs/acmd-extra-commands.md): his own edges lit through the fighter shaders' rim term,
+edge only.
+| | value | from |
+|---|---|---|
+| colour | (215, 230, 255), Tint 0 (edge only) | v5 / v6's light blue-white (the user); the clip's rim adds a near-neutral white |
+| strength | **Alpha 140** (0.55 of the colour at a fully edge-on pixel; the material's exponent 2-4 thins it inward) | clip b66e8a38, the stop 46-50 against the dark world: a 2-3 px rim adding (+55, +59, +58) / 255 to the background beside him and taking his dark hair's edge from ~10 to 120-142 (~0.45-0.5 of white at the very edge), plus a faint +10-20 haze outside his silhouette that a rim can't draw |
+| pulse | **none** (Flash 0) | the rim's peak is steady frame to frame through the stop (46 / 48 / 50) and the dash (32-41); BPE 85's own entry ("Flashing ...") lives in XV2's system BPE file, not in the user's files, so no rate to copy |
+| on | **SpecialS frame 20** (WIND_END, the charge's start), in over 4 | `reference/xv2/timeskip_skill.json`: BAC 0's BPE 85 at 20 (flag word 0); the clip: faint at 15, clear from 21 |
+| off (whiff) | **frame 75** (real of BAC 100), out over 4 | BAC 0's BPE 85 at 100 with flag word 2 (its off form); BAC 2 (charged) on again at 100, off at 160 = its stop: our charged dash is the same motion, so 75 too |
+| off (punch) | **SpecialAirS frame 16, at once** | BAC 4's BPE 85 at 16 (off), under BPE 2's white flash; the clip: gone under the white at 59 |
+| connect | renewed from SpecialAirS 0 to the punch | BAC 4 has no "on": the dash's outline stays through the stop (clip 46-58: the rim on him round the stop) |
+
+**Ending it on every exit.** Outline_Set is an ACMD command (the MSC can't send it; `ts_fx_off` no longer kills
+anything of it). The scripts renew it every 4 frames (`OL_KEEP`), each held 12 (`OL_HOLD`: the catch's 3-frame freeze
+and its 3 retries between the dash's last renewal and the connect's first fit), then out over 4 (`OL_CUT_OUT`): a cut
+move (hit, ledge, any status change) leaves it at most 20 frames (in 4 + held 12 + out 4: the hold counts once it is
+full; 18 at worst in the test's model), fading over the last 4; a KO, the match's end and a
+training reset drop it at once (the cave). A held charge stays lit: the scripts' clock runs on while the MSC holds the
+pose (Core Breaker v4's finding, the test model's), so the renewals go on, and the restart at frame 20 renews it again.
+A renewal fades from where it is (none once full): no flicker.
+
+### The negative's fades (the user's Screen_Invert note: partial strengths show grey)
+A fade shows `(1 - w) x + w f(x)`, whose contrast is `1 - w (1 + Brightness x Strength)`: somewhere in every fade the
+picture goes flat.
+| | v6 | v7 |
+|---|---|---|
+| the stop (connect 0) | in over 2 (w 0.5: flat grey for a frame), held 16, a cut move's end out over 4 | **at once**, held 21 (the punch + the catch's freeze + 2), a cut move's end at once (XV2's BPE 78 is a cut: clip 44 -> 45) |
+| the punch (16) | the white negative at once, held 34, out over 14: its contrast -0.35 -> 1 passes 0 at w = 1 / 1.35 = 0.74 (the 4th frame) and stays near flat light grey (abs. under 0.3) for 6 of the 14 | the white negative at once, **ended by the script at the punch + 4** (its 30 frozen frames + 4 = v6's +34) at once, under **a white quad** on the camera started in the same frame (`PtcSupamarioTsFade` 0x0341006B: Effect_Camera Mode 1, Z 20, size 2.2, unslowed; alpha-blended (0.94, 0.97, 1.0) from 0.7 straight down to 0 over 14 real frames). The negative's mean (~0.84 on a mid picture) = 0.3 x 0.5 + 0.7 x 0.97: no step in brightness; the contrast only rises (0.3 -> 1), never through grey: the clip's white after the punch fading back to the stage by +50. The white negative's own Frames (38) end it should the script not get there |
+
+The wash set (INVERT_FX off only) moved to 0x0341006A (the rings' id); the fade quad is killed by `ts_fx_off` on any
+exit like the wash and the glass.
+
+### Not confirmed in game
+Alpha 140's look on his materials under each stage's light (g_fresnelOffset is added unscaled); the quad and
+Screen_Invert's Mode 0 in the same frame (whether the quad's first frame draws on the frame it is made: a frame of the
+pale negative darkened slightly, or a frame of the plain stage, at worst).
+
+### Tests
+`tools/supamario_timeskip_test.py`: **191 ok**, 0 problems (v6 183). New / changed: Outline_Set in both scripts (values,
+the renewals, the off at 75 / at the punch) and through `outline_cave`'s tick in Python (`outline_sim`): a whiff (full
+24-74, gone by 79), a 40-frame charge (full through the restart), a catch at every frame of the box with the freeze and
+the retries (no dip to the punch, off at once there), a cut at any frame (gone within 18); no ring effect / set left;
+every Screen_Invert straight on / off, the white negative ended under the quad (the quad first, in the same frame); the
+contrast after the punch only rising (v6: 6 frames near flat); the fade set (alpha 0.7 straight to 0 over 14); its
+brightness (alpha-blended: under 1.0); `ts_fx_off` ending the quad / wash / glass on the normal end and every cut.
+`supamario_fx_glow.py`: ts_outline gone. On the v7 build: `supamario_sledgehammer_test` 141 ok,
+`supamario_fakedeath_test` 47, `supamario_corebreaker_test` 104, `supamario_godfist_test --all-models` 566 (0 problems
+each); `msc_stack_check` 0 problems (globals 127 of 128).

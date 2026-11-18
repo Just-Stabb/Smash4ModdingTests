@@ -41574,8 +41574,8 @@ void ts_stop_look_off()
 // v6: the move's camera effects ended (ts_end, any exit: a hit, a KO, a ledge, the match's end, its own end): the
 // punch's white wash and the glass (Effect_Camera; the glass already off by then at its own end). v7: the outline is
 // Outline_Set (an ACMD command: the effect scripts renew it every few frames, so it ends by itself within the
-// build's OL_HOLD + OL_CUT_OUT frames of a cut; a KO / the match's end drop it at once); the white fade quad after the
-// punch
+// build's OL_IN + OL_HOLD + OL_CUT_OUT frames of a cut; a KO / the match's end drop it at once); the white fade quad
+// after the punch
 void ts_fx_off()
 {
     EffectModule(0x2723, TS_FX_FADE, 0x1, 0x1);

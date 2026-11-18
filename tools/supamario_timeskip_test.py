@@ -1194,14 +1194,14 @@ def outline_tests(f):
     dash, conn = timed(f['effect'].script('specials')), timed(f['effect'].script('specialairs'))
     ol = {sc: [(t, p_) for t, n_, p_ in b_ if n_ == 'Outline_Set'] for sc, b_ in (('dash', dash), ('connect', conn))}
     on = [B.OL_RGB[0], B.OL_RGB[1], B.OL_RGB[2], B.OL_ALPHA, B.OL_TINT]
-    want_d = [(t, [0] + on + [B.OL_HOLD + (B.CHARGE if t == B.OL_ON else 0), B.OL_IN, B.OL_CUT_OUT, B.OL_FLASH])
+    want_d = [(t, [0] + on + [B.OL_HOLD, B.OL_IN, B.OL_CUT_OUT, B.OL_FLASH])
               for t in range(B.OL_ON, B.OL_OFF, B.OL_KEEP)] + [(B.OL_OFF, [0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, B.OL_OUT, 0])]
     want_c = [(t, [0] + on + [B.OL_HOLD, B.OL_IN, B.OL_CUT_OUT, B.OL_FLASH]) for t in range(0, B.STRIKE, B.OL_KEEP)] + [
         (B.STRIKE, [0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, B.OL_PUNCH_OUT, 0])]
     check('v7 outline (the dash): Outline_Set on him (Target 0) from the charge\'s start %d (XV2\'s BPE 85 at BAC 20), '
           'white-blue %s at Alpha %g, edge only (Tint 0), steady (Flash 0), in over %d, renewed every %d frames (each held '
-          '%d, the first %d more for a held charge, then out over %d), off at %d (BAC 100) over %d' % (
-              B.OL_ON, B.OL_RGB, B.OL_ALPHA, B.OL_IN, B.OL_KEEP, B.OL_HOLD, B.CHARGE, B.OL_CUT_OUT, B.OL_OFF, B.OL_OUT),
+          '%d, then out over %d), off at %d (BAC 100) over %d' % (
+              B.OL_ON, B.OL_RGB, B.OL_ALPHA, B.OL_IN, B.OL_KEEP, B.OL_HOLD, B.OL_CUT_OUT, B.OL_OFF, B.OL_OUT),
           ol['dash'], want_d)
     check('v7 outline (the connect): renewed from its 0 every %d frames, off at once at the punch %d (BPE 85 off at '
           'entry 4\'s 16); nothing after it' % (B.OL_KEEP, B.STRIKE), ol['connect'], want_c)
@@ -1224,8 +1224,8 @@ def outline_tests(f):
         B.OL_ON, B.OL_ON + B.OL_IN, B.OL_IN, B.OL_OFF, B.OL_OFF + B.OL_OUT),
           (max(ws[:B.OL_ON]), full(ws, B.OL_ON + B.OL_IN - 1, B.OL_OFF), max(ws[B.OL_OFF + B.OL_OUT - 1:])),
           (0.0, True, 0.0))
-    # a full charge: the clock running on through the hold (the model's: Core Breaker v4) or stopped at the pose's frame
-    for name, hold_clock in (('the script\'s clock running on', True), ('the script\'s clock stopped', False)):
+    # a full charge: the clock running on through the hold (the model's: Core Breaker v4's finding)
+    for name, hold_clock in (('the script\'s clock running on', True),):
         ev, e_ = [], 0
         for s_ in range(0, B.OL_ON + B.CHARGE + 1) if hold_clock else range(0, B.OL_ON + 1):
             ev += [(e_, p_) for t, p_ in D if t == s_]
@@ -1254,7 +1254,7 @@ def outline_tests(f):
     check('v7 outline (a catch at every frame %d-%d of the box, %d / %d frames before the connect starts, sim): full '
           'without a dip to the punch, off at once there' % (B.HIT_FROM, B.HIT_LAST + int(B.HIT_LATE), B.CATCH_FREEZE,
                                                              B.CATCH_FREEZE + B.RETRY_N), bad, [])
-    # a cut: the scripts stop at any frame (no more renewals): gone within OL_HOLD + OL_CUT_OUT
+    # a cut: the scripts stop at any frame (no more renewals): gone within OL_IN + OL_HOLD + OL_CUT_OUT
     worst = 0
     allev = D + [(B.OL_OFF + 10 + t, p_) for t, p_ in C]
     for cut in range(B.OL_ON, B.OL_OFF + 10 + B.STRIKE):
@@ -1262,8 +1262,8 @@ def outline_tests(f):
         last = max([k for k in range(len(ws)) if ws[k] > 0] or [cut])
         worst = max(worst, last - cut + 1)
     check('v7 outline (the move cut at any frame, sim: a hit, a ledge, any status change; the MSC can\'t send it): '
-          'gone within %d frames (OL_HOLD + OL_CUT_OUT)' % (B.OL_HOLD + B.OL_CUT_OUT), worst <= B.OL_HOLD + B.OL_CUT_OUT,
-          True)
+          'gone within %d frames (OL_IN + OL_HOLD + OL_CUT_OUT: its hold counts once it is full)' % (
+              B.OL_IN + B.OL_HOLD + B.OL_CUT_OUT), worst <= B.OL_IN + B.OL_HOLD + B.OL_CUT_OUT, True)
     print('     outline: gone at most %d frames after a cut' % worst)
 
 
@@ -1361,9 +1361,9 @@ def script_tests(out, sh_out):
              ('FRAME', [float(B.STRIKE + B.INV_END)]), ('Screen_Invert', rr(B.INV_OFF))], 3) if B.INVERT_FX else
            ([('FRAME', [float(B.STRIKE)])], 0)))
     check('v7 (the user\'s Screen_Invert test: part strengths are grey): every Screen_Invert straight on / off (FadeIn / '
-          'FadeOut 0), full strength', sorted({(c.params[1], c.params[3], c.params[4]) for c in allinv if c.params[0] == 1}
-                                              | {(None, 0, c.params[4]) for c in allinv if c.params[0] == 0}),
-          sorted({(1.0, 0, 0)} | {(None, 0, 0)}) if B.INVERT_FX else [])
+          'FadeOut 0), full strength', ({(c.params[1], c.params[3], c.params[4]) for c in allinv if c.params[0] == 1},
+                                         {c.params[4] for c in allinv if c.params[0] == 0}),
+          ({(1.0, 0, 0)}, {0}) if B.INVERT_FX else (set(), set()))
     seq = [(nm(c), c.params[0]) for c in f['effect'].script('specialairs') if nm(c) in ('Effect_Camera', 'Screen_Invert')]
     k_off = next((k for k, x in enumerate(seq) if x == ('Screen_Invert', 0)), None)
     check('v7: the white negative ends under the white fade quad: the quad started just before it, in the same frame',

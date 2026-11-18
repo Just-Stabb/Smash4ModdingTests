@@ -263,10 +263,12 @@ OVERLAY_OUTLINE = False
 #  - Ending it on every exit: Outline_Set is an ACMD command (the MSC can't send it), so the scripts renew it every
 #    OL_KEEP frames, each held OL_HOLD frames (the catch's 3-frame freeze and its retries between the dash's last renewal
 #    and the connect's first: up to ~10), then fading over OL_CUT_OUT: a cut move (a hit, a ledge, any status change)
-#    leaves it at most OL_HOLD + OL_CUT_OUT frames; a KO / the match's end / a training reset drop it at once (the cave).
-#    The first one at WIND_END is held OL_HOLD + CHARGE (covers a held charge should the script's clock stop while the
-#    MSC holds the pose; the renewals replace it otherwise). Normal ends: Alpha 0 at OL_OFF (out over OL_OUT) and at the
-#    punch (at once: XV2's off at 16, under the white negative / flash)
+#    leaves it at most OL_IN + OL_HOLD + OL_CUT_OUT frames (the hold counts once it is full; 18 at worst in the test's
+#    model); a KO / the match's end / a training reset drop it at once (the cave).
+#    A held charge keeps it: the scripts' clock runs on while the MSC holds the pose (MotionModule 0x2713; Core Breaker
+#    v4's finding, the test model's), so the renewals go on through it, and the restart at WIND_END renews it again.
+#    Normal ends: Alpha 0 at OL_OFF (out over OL_OUT) and at the punch (at once: XV2's off at 16, under the white
+#    negative / flash)
 OL_RGB = (215.0, 230.0, 255.0)
 OL_ALPHA, OL_TINT, OL_FLASH = 140.0, 0.0, 0
 OL_IN, OL_OUT, OL_PUNCH_OUT = 4, 4, 0
@@ -523,7 +525,7 @@ def effect_scripts():
                      E0_FOLLOW[2] * AURA_SIZE, 0)]),
             (MOVE_FROM, if_(0x0F000116, 0, 0, if_(V_PH, 5, DASHING, [
                 cmd('graphic_effect', FX_DUST, 0, 0.0, 0.0, -2.0, 0.0, 0.0, 0.0, 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1)])))]
-    dash += [(f, outline_on(OL_HOLD + (CHARGE if f == OL_ON else 0))) for f in range(OL_ON, OL_OFF, OL_KEEP)]
+    dash += [(f, outline_on(OL_HOLD)) for f in range(OL_ON, OL_OFF, OL_KEEP)]
     dash += [(OL_OFF, outline_off(OL_OUT))]
     connect = [(0, (time_stop_look() if CAMERA_FX and not INVERT_FX else []) + invert_on() + glass_on_screen() +
                 outline_on(OL_HOLD))]
