@@ -3642,3 +3642,20 @@ brightness (alpha-blended: under 1.0); `ts_fx_off` ending the quad / wash / glas
 `supamario_fx_glow.py`: ts_outline gone. On the v7 build: `supamario_sledgehammer_test` 141 ok,
 `supamario_fakedeath_test` 47, `supamario_corebreaker_test` 104, `supamario_godfist_test --all-models` 566 (0 problems
 each); `msc_stack_check` 0 problems (globals 127 of 128).
+
+## Time Skip v8 (`supamario_timeskip_v8.zip`): the rotating square after the punch
+Over v7, the same executable (**exe_v46z_outline**, model_commands_v1.zip). Changed: the ptcl only (the screen quads:
+PtcSupamarioTsFade / Wash / Dark; effect.bin and the MSC build byte for byte as v7's, every other set too).
+
+### The user's v7 test (clip 869ac5f5, 60 fps)
+| | cause (evidence) | fix |
+|---|---|---|
+| "a rotating square appears during / after the punch" (new in v7) | 869ac5f5 156-171: as the white negative ends, a white square about 64% of the screen's width and taller than it, centred, its edges tilting a little more each frame, fading out over ~14 frames: v7's white fade quad (`PtcSupamarioTsFade` 0x0341006B, Effect_Camera Mode 1, Size 2.2). Its emitter is cut from Btl_HitL's `flash_1` (as v3's darkening and v6's wash), which kept the converted flash's **random spin** (`rotation_velocity_random` Z 0.035 rad: up to 2 degrees a frame; v3-v7 zeroed `rotation_velocity` only) and **scale 1**, which is 1 unit across, not 2 (Effect_Camera Mode 1: a particle W wide is W x Size / 2 screen heights): 1.1 screen heights at Size 2.2, against a 16:9 screen's 1.78 | every screen quad (the fade, the wash, the darkening: `_screen_quad`) **2 units across** (`QUAD_W`: 2.2 screen heights at Size 2.2) with **no rotation of any kind** (init, random, velocity, random velocity), no camera offset, follow type 0, a plain billboard, its alpha keys the only animation. The wash (0x0341006A) and darkening (0x03410065) are used only with INVERT_FX off but had the same two faults |
+| the outline "barely visible; more like lighting than an outline, on the inside of the model rather than outside, thin" | Outline_Set is the shaders' fresnel rim: it lights his own edge pixels, never past his silhouette | not changed here (a true outside outline is being built as an exe feature). Every outline command comes from `outline_on` / `outline_off` (`OUTLINE_CMD`, the OL_* values) in tools/supamario_timeskip_build.py: swapping the mode or command is those two functions; the test takes its expected commands from them (and runs outline_cave's simulation only for Outline_Set) |
+
+### Tests
+`tools/supamario_timeskip_test.py`: **196 ok**, 0 problems (v7 191). New: the fade / wash / darkening quads have no
+rotation of any kind, scale 2 (over 1.9 screen heights wide at their Mode 1 Size), no scale / key animation, follow 0,
+a billboard; the outline's two commands checked once against OL_* (the scripts' expected commands built from them). On
+the v8 build: `supamario_sledgehammer_test` 141 ok, `supamario_fakedeath_test` 47, `supamario_corebreaker_test`
+104, `supamario_godfist_test --all-models` 566 (0 problems each); `msc_stack_check` 0 problems (globals 127 of 128).
