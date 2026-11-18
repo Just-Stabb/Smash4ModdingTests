@@ -3257,6 +3257,9 @@ isn't a `bl` / `bla` leaves no shell drawn. The region grew to `0x04BE8000` (`te
 every other cave of the user's exe); outline_shell_test runs it on both builds and emulates Cemu's relocated sites
 (a relative bl, absolute blas to trampolines). port_check X13 errors on exe_v46z_outline2 and 3 (`draws()` wants the
 swapped mark and the os_site table).
+**Confirmed in game (exe_v46z_outline4, the user's clip of Time Skip v9):** no crash; a light band outside
+Supamario's silhouette through the charge and dash (inner edges too, e.g. the arm across the body: an inverted hull's
+look), light around him on the stop's negative (the black-over band inverted), gone at the punch.
 **Rule for every cave: never `bl` an import's file target.** Call imports through a site's run-time target
 (os_resolve) or a relocated veneer.
 

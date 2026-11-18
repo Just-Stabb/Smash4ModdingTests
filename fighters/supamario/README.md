@@ -3676,5 +3676,7 @@ game's in-place byte swap: docs/native-notes.md "Outline shell" v3), fixed in ex
   through `screen_invert_cave.filter_matrix` over a dark and a light background).
 - Approximated: the width and alpha are read off the clip by eye (XV2's BPE 85 entry is in its system BPE file, not in
   the user's files); the haze past XV2's rim isn't drawn.
+- Confirmed in game with exe_v46z_outline4 (the user's clip): the band round him through the charge and dash, light on
+  the stop's negative.
 - Needs exe_v46z_outline4 (outline_v6.zip; exe_v46z_outline3 crashes at the outline, exe_v46z_outline2 shows none). The aura is unchanged pending the user's description of what is wrong.
 
