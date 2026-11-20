@@ -3922,6 +3922,8 @@ fired; Secret Sensation blocked a Killer Eye's shot (placed by Donkey Kong) with
 - Tests: `supamario_ui_cave_test.py` **187 ok** (v4: the owner chain's 10 cases, Persist 2's setter / pass-through, the
   diag lines S4U2 / S4U5 / S4U3 / S4UV / S4UM / S4UB); `supamario_ui_test.py` **342 ok** (v4: the moi invariant,
   the follow tracks, the cap / silver scripts (Persist 2 only), the mustache texture, the script lookup per slot);
-  the earlier suites (see the v4 commit); `import_call_check` 0 on both exes; `fighter_texture_ids.py check` 0 errors.
+  `supamario_timeskip_test` 198 ok, `supamario_godfist_test` 566 ok, `supamario_sledgehammer_test` 141 ok,
+  `supamario_corebreaker_test` 104 ok, `supamario_fakedeath_test` 47 ok, `msc_stack_check` 0 problems (the MSC
+  unchanged since v3); `import_call_check` 0 on both exes; `fighter_texture_ids.py check` 0 errors.
 - **Not done / open:** the Sm4shCommand rebuild for Persist 2's help text (`tools/acmd_ext_help.py` updated; the
   parameter list is unchanged, Events.cfg regenerated identical); the 0x157 status move; the aura's distortion.
