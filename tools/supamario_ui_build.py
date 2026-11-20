@@ -92,7 +92,8 @@ SCRIPT = {anim.FORM: 'speciallwlight', anim.STRIKE: 'speciallwheavy', anim.DODGE
 SS_ON, SS_OFF, SS_END = 5, 30, anim.frames_of(anim.SS)
 SS_SLIDE_N, SS_DEPTH = 14, 6.0
 SS_BEHIND, SS_UP_GROUND, SS_BEHIND_AIR, SS_UP_AIR = 10.0, 6.0, 10.0, 10.0
-V_SS = 0x0F000324                    # TIMER_4: Secret Sensation's mark
+V_SS = 0x0F000324                    # TIMER_4: Secret Sensation's mark; v5 status 0x155's mode (cave.V_MODE)
+assert V_SS == cave.V_MODE
 BONES = {'TransN': 0, 'HipN': 2, 'LFootJ': 5, 'RFootJ': 9, 'BustN': 12, 'HeadN': 22, 'LHandN': 16, 'RHandN': 20}
 V_AURA = 0x0F000323                  # TIMER_3: the aura's renewal
 
@@ -180,7 +181,10 @@ def msc_values():
          'UI_SS_MOT': '0x%X' % MOT_SS, 'UI_SS_SLIDE_MOT': '0x%X' % MOT_ESCAPE_N, 'UI_SS_ON': fl(SS_ON),
          'UI_SS_OFF': fl(SS_OFF), 'UI_SS_END': fl(SS_END), 'UI_SS_SLIDE_N': fl(SS_SLIDE_N), 'UI_SS_DEPTH': fl(SS_DEPTH),
          'UI_SS_BEHIND_AIR': fl(SS_BEHIND_AIR), 'UI_SS_BEHIND': fl(SS_BEHIND), 'UI_SS_UP_GROUND': fl(SS_UP_GROUND),
-         'UI_SS_UP_AIR': fl(SS_UP_AIR), 'UI_V_SS': '0x%X' % V_SS}
+         'UI_SS_UP_AIR': fl(SS_UP_AIR), 'UI_V_SS': '0x%X' % V_SS,
+         # v5: status 0x155's modes in TIMER_4 (= V_SS; the cave reads them too)
+         'UI_MODE_FORM': fl(cave.MODE_FORM), 'UI_MODE_DODGE': fl(cave.MODE_DODGE),
+         'UI_MODE_FORM_ON': fl(cave.MODE_FORM_ON), 'UI_MODE_DODGE_ON': fl(cave.MODE_DODGE_ON)}
     return v
 
 

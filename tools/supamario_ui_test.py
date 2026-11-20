@@ -51,7 +51,7 @@ def check(name, got, want):
         PROBLEMS.append(name)
 
 
-TIMERS = (C.V_FORM, C.V_DODGE_R, C.V_DODGE_L, B.V_AURA)
+TIMERS = (C.V_FORM, C.V_DODGE_R, C.V_DODGE_L, B.V_AURA, B.V_SS)   # (v5: TIMER_4, status 0x155's mode, counts down too)
 
 
 class Game:
@@ -66,6 +66,7 @@ class Game:
         self.n = 0
         self.hitlag = 0
         self.motion = None
+        self.loop = None                  # the status's loop (v5: 0x155's by its mode)
         self.vx = 0.0
         self.shield = 0
 
@@ -177,26 +178,27 @@ class Run:
         vm.g[18] = 2 if g.air else 0
         g.req = None
         self.call(vm, 'func_82')
-        if status_funcs and g.status in (C.ST_UI, C.ST_DODGE) and g.req is None:
-            self.call(vm, 'ui_loop' if g.status == C.ST_UI else 'ui_dodge_loop')
+        if status_funcs and g.status == C.ST_UI and g.loop and g.req is None:
+            self.call(vm, g.loop)
         vm.g[18] = 2 if g.air else 0
         if g.req is not None and g.req != g.status:
             self.change(vm, g, g.req)
 
     def change(self, vm, g, st):
-        if g.status == C.ST_UI:
-            self.call(vm, 'func_2283')
-        elif g.status == C.ST_DODGE:
-            self.call(vm, 'func_2284')
+        """v5: the transformation / its counter and the dodge are status 0x155 (its end func_2282, pre func_2252, main
+        func_2265: each picks the mode from TIMER_4); the loop is the mode's"""
+        if g.status == 0x155:
+            self.call(vm, 'func_2282')
         g.status = st
         g.sw, g.flags = {}, set()
+        g.loop = None
         vm.g[18] = 2 if g.air else 0
-        if st == C.ST_UI:
-            self.call(vm, 'func_2253')
-            self.call(vm, 'func_2268')
-        elif st == C.ST_DODGE:
-            self.call(vm, 'func_2254')
-            self.call(vm, 'func_2272')
+        if st == 0x155:
+            self.call(vm, 'func_2252')
+            self.call(vm, 'func_2265')
+            m = g.vars.get(B.V_SS, 0.0)
+            g.loop = 'ui_loop' if m > C.MODE_FORM_ON else 'ui_dodge_loop' if m > C.MODE_DODGE_ON else None
+            g.log.append((g.n, 'mode', g.loop))
 
 
 def trigger_tests(r):
@@ -254,7 +256,15 @@ def form_run(r, air=False, counter_at=None, record=None, frames=None):
 def form_tests(r):
     g, vm = form_run(r)
     start = [e for e in g.log if e[1] == 'status' and e[2] == C.ST_UI][0][0]
-    check('the transformation: status 0x157 asked on the first frame', start, 1)
+    check('the transformation: status 0x155 asked on the first frame (v5; v1-v4 0x157)', start, 1)
+    check('  TIMER_4 = %g (the mode) written right before it' % C.MODE_FORM,
+          [e[3] for e in g.ev('set') if e[2] == B.V_SS and e[0] == start][:1], [C.MODE_FORM])
+    check('  its pre / main took the transformation\'s mode (ui_pre, ui_init, ui_loop)', [e[2] for e in g.ev('mode')][:1],
+          ['ui_loop'])
+    ren = sorted({e[0] for e in g.ev('set') if e[2] == B.V_SS and e[3] == C.MODE_FORM})
+    end0 = [e for e in g.ev('status') if e[2] == 0][0][0]
+    check('  the mode renewed every frame of the status (TIMER_4 counts down)', ren == list(range(start, end0 + 1)), True)
+    check('  its end (func_2282 -> ui_end) clears the mode', [e[3] for e in g.ev('set') if e[2] == B.V_SS][-1:], [0.0])
     check('its pre: the attack log empty (no staling)', [e[2] for e in g.ev('status_data')][:1],
           [(0x2713, 0, 1, 0, 0, 0, 0, 0, 0x400, 0)])
     check('its motion: 0x231 (SpecialLwLight)', [e[2] for e in g.ev('motion')][:1], [B.MOT_FORM])
@@ -344,8 +354,8 @@ def dodge_run(r, status=0, timer=C.V_DODGE_R, form=2000.0, air=False, frames=30)
 def dodge_tests(r):
     for st, name in ((0, 'Wait'), (1, 'Walk'), (2, 'WalkBrake'), (0x11, 'Squat'), (0x12, 'SquatWait'), (0x15, 'SquatRv')):
         g, vm, xs = dodge_run(r, status=st)
-        check('dodge: transformed, %s, TIMER_1 (attacker right) -> status 0x158' % name,
-              [e[2] for e in g.ev('status')][:1], [C.ST_DODGE])
+        check('dodge: transformed, %s, TIMER_1 (attacker right) -> status 0x155 in the dodge\'s mode (v5; v1-v4 0x158)'
+              % name, ([e[2] for e in g.ev('status')][:1], [e[2] for e in g.ev('mode')][:1]), ([C.ST_DODGE], ['ui_dodge_loop']))
     g, vm, xs = dodge_run(r)
     start = [e for e in g.ev('status') if e[2] == C.ST_DODGE][0][0]
     check('  its motion 0x241 (SpecialAirLwLight)', [e[2] for e in g.ev('motion')], [B.MOT_DODGE])
@@ -363,7 +373,8 @@ def dodge_tests(r):
                      ('in Dash (3)', dict(status=3)), ('in the air (Fall)', dict(status=0xE, air=True)),
                      ('shielding (0x1C)', dict(status=0x1C))):
         g, vm, xs = dodge_run(r, frames=2, **kw)
-        check('dodge: %s -> no dodge' % what, [e[2] for e in g.ev('status') if e[2] == C.ST_DODGE], [])
+        check('dodge: %s -> no dodge (no 0x155 in the dodge\'s mode)' % what,
+              [e[2] for e in g.ev('mode') if e[2] == 'ui_dodge_loop'], [])
     g, vm, xs = dodge_run(r, status=3, frames=1)
     check('  a signal in Dash is dropped (TIMER_1 / 2 back to 0)', (g.vars[C.V_DODGE_R], g.vars[C.V_DODGE_L]), (0.0, 0.0))
     g, vm, xs = dodge_run(r, frames=40)
@@ -371,7 +382,26 @@ def dodge_tests(r):
     for _ in range(3):
         r.frame(vm, g)
     check('no cooldown: a second signal right after the first dodge dodges again',
-          len([e for e in g.ev('status') if e[2] == C.ST_DODGE]), 2)
+          len([e for e in g.ev('mode') if e[2] == 'ui_dodge_loop']), 2)
+
+
+def mode_tests(r):
+    """v5: status 0x155's other modes untouched; a stale mode can't leak"""
+    g, vm, xs = dodge_run(r, frames=30)
+    check('dodge: its end clears the mode (TIMER_4 0)', g.vars.get(B.V_SS), 0.0)
+    g = Game(status=0, damage=150.0)
+    g.flags.add(0x2000004d)
+    vm = r.vm(g)
+    r.frame(vm, g, status_funcs=False)
+    check('trigger: Wait at 150% with 0x2000004d on (func_79 would turn a special status into 0x83): nothing, no mode',
+          (g.ev('status'), g.vars.get(B.V_SS, 0.0)), ([], 0.0))
+    g2 = Game(status=0, damage=150.0)
+    g2.vars.update({C.V_FORM: 2000.0, C.V_DODGE_R: 4.0})
+    g2.flags.add(0x2000004d)
+    vm2 = r.vm(g2)
+    r.frame(vm2, g2, status_funcs=False)
+    check('dodge: with 0x2000004d on: no dodge status, the signal dropped', (g2.ev('status'), g2.vars[C.V_DODGE_R]),
+          ([], 0.0))
 
 
 def reset_tests(r):
@@ -387,7 +417,8 @@ def reset_tests(r):
     g = Game(status=0x0, damage=150.0)
     vm = r.vm(g)
     r.frame(vm, g)
-    check('after a reset: at 150% in Wait he transforms again (a new stock)', [e[2] for e in g.ev('status')], [C.ST_UI])
+    check('after a reset: at 150% in Wait he transforms again (a new stock)', ([e[2] for e in g.ev('status')],
+          g.vars.get(B.V_SS)), ([C.ST_UI], C.MODE_FORM))
     g = Game(status=0x45, damage=150.0)
     g.vars[C.V_FORM] = 1000.0
     vm = r.vm(g)
@@ -867,6 +898,102 @@ def model_tests(out, base):
                    vis[M.MESHES['eye'][0]]])
 
 
+# ---------------------------------------------------------------- v5: the game's own script-binding decision (unicorn)
+DESC_GETTER = 0x02E4313C          # (mgr, kind) -> the kind's descriptor (+4 its motion info: +0 the motion table)
+MOTION_LINK = 0x02C639E0          # MotionModule vt +0x1F4 (this, motion): the entry's flag 0x8 -> the script module's
+                                  # +0x2E (vt +0x4C's r7, 0x02C5E5EC): 0x027606C0 then binds the LINKED object's scripts,
+                                  # or clears every body agent when there is no link 0 (0x02760750)
+PUMP_POS = 0x02F11C0C             # the pump's per-frame placement: status 0x152 / 0x157-0x159 -> 0x02F16864
+PUMP_POS_BODY = 0x02F16864
+STATUS_CB = 0x02F169D0            # Mario's status-change callback (vtable 0x101393C4 + 0x14): the pump article / flag
+                                  # 0x20000078 / [acc + 0xA0] vt +0x1DC / +0x1E4 (0x1A) for 0x152 / 0x157-0x159
+
+
+def native_tests(exe):
+    """the exe's own code: (1) the motion -> link-kind script decision for every UI motion (body scripts kept: 0);
+    (2) Mario's status-keyed native code (the pump's placement, the status-change callback) never acts on 0x155, the UI
+    statuses since v5, and does on v1-v4's 0x157 / 0x158 (controls)"""
+    from kind_expand_test import Emu, REGS  # noqa: F401
+    from unicorn.ppc_const import UC_PPC_REG_MSR
+    e = Emu(exe)
+    e.mu.reg_write(UC_PPC_REG_MSR, e.mu.reg_read(UC_PPC_REG_MSR) | 0x2000)     # floating point on
+    desc = e.call(DESC_GETTER, 0, M_KIND)
+    table = e.w(e.w(desc + 4))
+    count = e.w(e.w(desc + 4) + 4)
+    check('native: kind 0x%X\'s descriptor and motion table found (%d motions)' % (M_KIND, count),
+          (e.w(desc), count > 0x249), (M_KIND, True))
+    mm = e.alloc(0x40, b'\0')
+    e.setw(mm + 0x1C, table)
+    e.setw(0x10492CB4, 1)                               # its static default's guard (its init calls an import)
+    got = {}
+    for mot in (B.MOT_FORM, B.MOT_STRIKE, B.MOT_DODGE, B.MOT_SS, B.MOT_ESCAPE_N, 0x229, 0x239, 0x1BE):
+        got[mot] = e.call(MOTION_LINK, mm, mot)
+    check('native: the game\'s link-kind decision (0x02C639E0) for SpecialLwLight / Heavy, SpecialAirLwLight / Heavy, '
+          'EscapeN, Fake Death\'s / Sledgehammer\'s: 0 (the body\'s own scripts bound); a thrown motion (0x1BE): 1',
+          got, {B.MOT_FORM: 0, B.MOT_STRIKE: 0, B.MOT_DODGE: 0, B.MOT_SS: 0, B.MOT_ESCAPE_N: 0, 0x229: 0, 0x239: 0,
+                0x1BE: 1})
+    # the pump's placement: which statuses reach its body
+    hit = []
+    e.stub(PUMP_POS_BODY, lambda em: hit.append(1))
+    f = e.alloc(0x7400, b'\0')
+    stm = e.alloc(0x80, b'\0')
+    e.setw(f + 0x7264, stm)
+    wpn = e.alloc(0x40, b'\0')
+    e.setw(wpn + 0x28, f)
+    reach = []
+    for st in (0x152, 0x153, 0x154, 0x155, 0x156, 0x157, 0x158, 0x159):
+        e.setw(stm + 0x48, st)
+        del hit[:]
+        e.call(PUMP_POS, 0, wpn)
+        if hit:
+            reach.append(st)
+    check('native: the pump\'s placement (0x02F11C0C) acts in 0x152 / 0x157-0x159, never in 0x155 (the UI statuses, v5)',
+          (reach, C.ST_UI in reach, C.ST_DODGE in reach), ([0x152, 0x157, 0x158, 0x159], False, False))
+    # the status-change callback
+    calls = []
+
+    def fn(name, ret=0):
+        a = e.alloc(8, b'\0')
+        e.stub(a, lambda em: (calls.append((name, em.r(4))), ret)[1])
+        return a
+
+    def vt(entries):
+        t = e.alloc(0x400, b'\0')
+        for off, a in entries.items():
+            e.setw(t + off, a)
+        return t
+    e.stub(0x02BF2108, lambda em: 0)                     # the handle
+    e.stub(0x02BEF604, lambda em: M_KIND)                # its kind (8 = Kirby takes the other status set)
+    e.stub(0x02F1124C, lambda em: calls.append(('flag 0x20000078', em.r(4))))
+    acc = e.alloc(0x200, b'\0')
+    cur = {'st': 0}
+    stmod = e.alloc(0x10, b'\0')
+    e.setw(stmod, vt({0x8C: fn('status')}))
+    e.setw(acc + 0x20, stmod)
+    art = e.alloc(0x10, b'\0')
+    e.setw(art, vt({0xFC: fn('article exists'), 0x13C: fn('article get'), 0xEC: fn('article remove')}))
+    e.setw(acc + 0x4C, art)
+    em_ = e.alloc(0x10, b'\0')
+    e.setw(em_, vt({0x1DC: fn('0xA0 vt+0x1DC'), 0x1E4: fn('0xA0 vt+0x1E4')}))
+    e.setw(acc + 0xA0, em_)
+    e.setw(acc, 0x00010012)
+    res = {}
+    status_fn = e.w(e.w(stmod) + 0x8C)
+    for old, new in ((0, 0x155), (0x155, 0), (0x155, 0xE), (0x155, 0x1B), (0x155, 0x155), (0, 0x157), (0x157, 0),
+                     (0x158, 0)):
+        e.stub(status_fn, lambda em, o=old: (calls.append(('status', 0)), o)[1])
+        del calls[:]
+        e.call(STATUS_CB, 0, acc, new)
+        res[(old, new)] = sorted({c[0] for c in calls} - {'status'})
+    check('native: Mario\'s status-change callback (0x02F169D0) does nothing for 0x155 in or out (the UI statuses, v5)',
+          [res[k] for k in ((0, 0x155), (0x155, 0), (0x155, 0xE), (0x155, 0x1B), (0x155, 0x155))], [[]] * 5)
+    check('  ... and acts on v1-v4\'s 0x157 / 0x158 (leaving them: the pump article removed, effect kind 0x1A, flag '
+          '0x20000078; controls)', [bool(res[k]) for k in ((0, 0x157), (0x157, 0), (0x158, 0))], [False, True, True])
+
+
+M_KIND = 0x41
+
+
 def ids_from_json(out):
     import json
     js = json.load(open(os.path.join(out, 'ultrainstinct.json')))
@@ -877,6 +1004,11 @@ def ids_from_json(out):
 
 def main():
     a = sys.argv[1:]
+    exe = None
+    if '--exe' in a:
+        i = a.index('--exe')
+        exe = a[i + 1]
+        del a[i:i + 2]
     if len(a) != 3:
         sys.exit(__doc__)
     out, ts_out, base = a
@@ -888,6 +1020,7 @@ def main():
     form_tests(r)
     counter_tests(r)
     dodge_tests(r)
+    mode_tests(r)
     reset_tests(r)
     ss_tests(r)
     script_tests(out, ts_out)
@@ -895,6 +1028,8 @@ def main():
     effect_tests(out, ts_out)
     aura_tests(out, ts_out)
     model_tests(out, base)
+    if exe:
+        native_tests(exe)
     print('%d problem(s)' % len(PROBLEMS))
     sys.exit(1 if PROBLEMS else 0)
 
