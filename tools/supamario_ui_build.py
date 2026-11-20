@@ -132,8 +132,31 @@ FX = [('start', 'BTL_AURA.eepk', 'MGT_HENSIN01.emp', 'BustN', (0.0, 0.0, 0.0), 1
 # aura_setting.aur holds only effect ids (aura 1: BTL_AURA 40-44), no colours; the purple is the game's rendering
 # (glare / screen effects). So the clip's colour is applied: every colour key of the aura's sets (AURA_SETS) turned to
 # AURA_HUE and its saturation scaled by AURA_SAT (its value kept). An approximation, from the clip
-AURA_HUE, AURA_SAT = 262.0, 0.45     # v4 (the user: "splotchy and purple"; wanted a slightly blue purple): blue-violet, softer
+AURA_HUE, AURA_SAT = 262.0, 0.8      # v4 (the user: "splotchy and purple"; wanted a slightly blue purple): blue-violet, x 0.45;
+                                     # v5 x 0.8: additive now, the light itself carries the colour (x 0.45 came out white)
 AURA_SETS = ('aura_hip', 'aura_head', 'aura_foot', 'aura_chest', 'aura_hand')
+# v5 (the user: "splotchy and purple instead of a slightly blue purple glow with distortion"). What made it splotchy
+# (the converted sets, read with ptcl.emitter_params): every emitter emits ONE particle every 19-39 frames (XV2's
+# rates converted to intervals: 1-4 big sprites alive at a time, each popping in and out), and the big ones are
+# alpha-blended smoke (blend 0: the 64x64 cloud texture and the 16x32 flame, 3.4-5.5 units at the call's size 1.75): a
+# few opaque purple patches over him, not a glow. smooth_aura(): the intervals / AURA_DENSITY (at least 1 frame) with
+# the alpha scaled by the same ratio (the same coverage on average, spread over many overlapping sprites), every
+# emitter ADDITIVE (blend 1: shader 11 is drawn with blend 1 by 32 other emitters in this file, 39 already is): a soft
+# glow round him, not patches. The heat haze: haze() adds Mario's fireball's refraction emitter (PtcMarioFireball
+# 'refraction1', shader 7: the distortion pass, a 64x64 distortion map, 128 grey = none; Supamario's Kamehameha charge
+# already draws a copy in game) to the three sets the MSC keeps on him (hip, head, feet), soft (HAZE_*): it bends
+# the picture behind him as XV2's aura does (its EMM refraction materials)
+AURA_DENSITY = 6.0
+AURA_ADD_ALPHA = 0.3                 # the alpha-blended (smoke) emitters' alpha x this once additive (added light, not
+                                     # cover: at their old alpha they burn white on a bright stage)
+AURA_SMOOTH_SETS = AURA_SETS
+HAZE_SRC = ('PtcMarioFireball', 'refraction1')
+HAZE = {'aura_hip': dict(scale=5.0, radius=2.0), 'aura_head': dict(scale=3.6, radius=1.2),
+        'aura_foot': dict(scale=3.0, radius=1.0)}
+HAZE_LIFE = 30                       # frames (the fireball's 14)
+HAZE_INTERVAL = 2                    # one every 2 frames (the fireball's every frame)
+HAZE_ALPHA = 0.45                    # its strength at the peak (the fireball's 1.0)
+HAZE_RISE = 0.03                     # units a frame, up (heat rising)
 FX_IDS = {}                          # key -> the ACMD / MSC id (0x0341xxxx), filled by effects()
 FX_DEFAULT = 0x1000009               # before the build has made them (the earlier builds compile the MSC too)
 METRE = 5.04
@@ -366,6 +389,59 @@ def tint_aura(p, rep):
     return done
 
 
+def smooth_aura(p, rep):
+    """v5: the aura sets' emitters many and soft instead of few and big (AURA_DENSITY), all additive"""
+    done = {}
+    for key in AURA_SMOOTH_SETS:
+        emp = [x for x in FX if x[0] == key][0][2]
+        name = 'PtcSupamarioUi' + emp[:-4]
+        si = p.find_set(name)
+        for e in p.sets[si]['emitters']:
+            em = e['data']
+            if em is None:
+                continue
+            old = p.field(em, 'emit_interval')
+            new = max(1, int(round(old / AURA_DENSITY))) if old > 0 else old
+            f = (float(new) / old) if old > 0 else 1.0
+            if p.field(em, 'blend_type') == 0:
+                f *= AURA_ADD_ALPHA
+            p.set_field(em, 'emit_interval', new)
+            for fld in ('alpha_init', 'alpha_diff21', 'alpha_diff32'):
+                p.set_field(em, fld, p.field(em, fld) * f)
+            p.set_field(em, 'blend_type', 1)
+            done.setdefault(name, []).append((p.emitter_name(em), old, new, round(f, 3)))
+        rep[name]['smooth'] = done[name]
+    return done
+
+
+def haze(p, rep):
+    """v5: the fireball's refraction emitter, soft and rising, appended to the hip / head / feet aura sets"""
+    import struct
+    src = p.find_set(HAZE_SRC[0])
+    ks = [k for k, e in enumerate(p.sets[src]['emitters']) if e['data'] is not None and
+          p.emitter_name(e['data']) == HAZE_SRC[1]]
+    assert ks, HAZE_SRC
+    base = p.emitter_bytes(src, ks[0])
+    for key, prm in HAZE.items():
+        emp = [x for x in FX if x[0] == key][0][2]
+        name = 'PtcSupamarioUi' + emp[:-4]
+        si = p.find_set(name)
+        em = bytearray(base)
+        struct.pack_into('>I', em, 0x38, p.add_name('UiHaze'))
+        p.set_field(em, 'ptcl_life', HAZE_LIFE)
+        p.set_field(em, 'emit_interval', HAZE_INTERVAL)
+        p.set_field(em, 'scale', [prm['scale'], prm['scale']])
+        p.set_field(em, 'volume_radius', [prm['radius']] * 3)
+        a1, a2 = p.field(em, 'alpha_diff21'), p.field(em, 'alpha_diff32')
+        p.set_field(em, 'alpha_diff21', a1 * HAZE_ALPHA)
+        p.set_field(em, 'alpha_diff32', a2 * HAZE_ALPHA)
+        p.set_field(em, 'emit_direction', [0.0, 1.0, 0.0])
+        p.set_field(em, 'emitter_velocity', HAZE_RISE)
+        p.sets[si]['emitters'].append({'pos': 0, 'rt': (0, 0, 0), 'data': em})
+        p.dirty_layout = True
+        rep[name]['haze'] = dict(prm, life=HAZE_LIFE, interval=HAZE_INTERVAL, alpha=HAZE_ALPHA, rise=HAZE_RISE)
+
+
 def effects(cmn_dir, fx_dir):
     """FX's EMPs (XV2's vfx/cmn) into his ptcl / efc after every earlier set; FX_IDS their ids"""
     import efc
@@ -395,6 +471,8 @@ def effects(cmn_dir, fx_dir):
             if ep == eepk:
                 FX_IDS[key] = 0x03410000 | by_emp[emp]
     tint_aura(p, rep)
+    smooth_aura(p, rep)
+    haze(p, rep)
     out = p.build()
     assert ptcl.Ptcl(out).validate() == []
     open(os.path.join(fx_dir, base + '.ptcl'), 'wb').write(out)

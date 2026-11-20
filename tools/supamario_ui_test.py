@@ -691,7 +691,7 @@ def aura_tests(out, ts_out):
         if not name.startswith('PtcSupamarioUi'):
             continue
         for e in p.sets[i]['emitters']:
-            if e['data'] is None:
+            if e['data'] is None or p.emitter_name(e['data']) == 'UiHaze':   # v5: the haze (no colour drawn)
                 continue
             for t in (0, 1):
                 for k in p.color_keys(e['data'], t):
@@ -715,6 +715,50 @@ def aura_tests(out, ts_out):
     check('  the tint of a blue (0.45, 0.62, 1.0: hue 220, saturation 0.55) -> hue %g, saturation 0.55 x %g, value 1' % (
         B.AURA_HUE, B.AURA_SAT), (round(h * 360, 1), round(sa, 3), round(v, 3)),
           (B.AURA_HUE, round(0.55 * B.AURA_SAT, 3), 1.0))
+
+
+def aura_v5_tests(out, base):
+    """v5: the aura's sets smooth (many soft additive sprites, the same average coverage) and the heat haze"""
+    import ptcl
+    d = os.path.join(out, 'fighter', 'supamario', 'effect', 'supamario')
+    p = ptcl.Ptcl(open(os.path.join(d, 'supamario.010d0000.ptcl'), 'rb').read())
+    q = ptcl.Ptcl(open(os.path.join(base, 'effect', 'supamario', 'supamario.010d0000.ptcl'), 'rb').read())
+    rows, bad = [], []
+    for key in B.AURA_SETS:
+        name = 'PtcSupamarioUi' + [x for x in B.FX if x[0] == key][0][2][:-4]
+        ems = [e['data'] for e in p.sets[p.find_set(name)]['emitters'] if e['data'] is not None]
+        for em in ems:
+            if p.emitter_name(em) == 'UiHaze':
+                continue
+            iv, bl = p.field(em, 'emit_interval'), p.field(em, 'blend_type')
+            rows.append((iv, bl))
+            if not (1 <= iv <= 7 and bl == 1):
+                bad.append((name, p.emitter_name(em), iv, bl))
+    check('v5: the aura sets\' %d emitters: one particle every 1-7 frames (XV2\'s converted 9-39 / %g), additive (blend 1)'
+          % (len(rows), B.AURA_DENSITY), bad, [])
+    fsrc = p.find_set(B.HAZE_SRC[0])
+    ref = [e['data'] for e in p.sets[fsrc]['emitters'] if e['data'] is not None and
+           p.emitter_name(e['data']) == B.HAZE_SRC[1]][0]
+    for key, prm in B.HAZE.items():
+        name = 'PtcSupamarioUi' + [x for x in B.FX if x[0] == key][0][2][:-4]
+        hz = [e['data'] for e in p.sets[p.find_set(name)]['emitters'] if e['data'] is not None and
+              p.emitter_name(e['data']) == 'UiHaze']
+        check('v5: %s: one heat-haze emitter (the fireball\'s refraction1: its shader, its distortion map)' % name,
+              [(p.field(h, 'shader_index'), p.texres(h, 0)['native_pos']) for h in hz],
+              [(p.field(ref, 'shader_index'), p.texres(ref, 0)['native_pos'])])
+        if hz:
+            h = hz[0]
+            check('  size %g, volume %g, life %d, every %d frames, rising %g, strength x %g' % (
+                prm['scale'], prm['radius'], B.HAZE_LIFE, B.HAZE_INTERVAL, B.HAZE_RISE, B.HAZE_ALPHA),
+                  ([round(x, 3) for x in p.field(h, 'scale')], [round(x, 3) for x in p.field(h, 'volume_radius')],
+                   p.field(h, 'ptcl_life'), p.field(h, 'emit_interval'), round(p.field(h, 'emitter_velocity'), 4),
+                   round(p.field(h, 'alpha_diff21'), 4)),
+                  ([prm['scale']] * 2, [prm['radius']] * 3, B.HAZE_LIFE, B.HAZE_INTERVAL, B.HAZE_RISE,
+                   round(p.field(ref, 'alpha_diff21') * B.HAZE_ALPHA, 4)))
+    qs = q.find_set(B.HAZE_SRC[0])
+    check('v5: the fireball\'s own set untouched', [bytes(e['data']) for e in p.sets[fsrc]['emitters'] if e['data']],
+          [bytes(e['data']) for e in q.sets[qs]['emitters'] if e['data']])
+    check('v5: the file still validates', p.validate(), [])
 
 
 def model_tests(out, base):
@@ -1027,6 +1071,7 @@ def main():
     motion_tests(out, ts_out)
     effect_tests(out, ts_out)
     aura_tests(out, ts_out)
+    aura_v5_tests(out, base)
     model_tests(out, base)
     if exe:
         native_tests(exe)
