@@ -93,7 +93,11 @@ BIND_HOOK = 0x02BEE580           # `bl 0x02BEE404` in the agent bind 0x02BEE560 
 BIND_FN = 0x02BEE404
 BIND_FROM = 0x02760864           # 0x02BEE560's call in the motion change (r29 the set: 0 game 1 expression 2 sound
                                  # 3 effect, r30 the kind)
-DIAG_ORIGINAL = {MHASH_HOOK: 0x38000010, BIND_HOOK: 0x4BFFFE85}
+LATE_FN = 0x02760DB0             # v5: the script module's per-frame late update (r3 the module, [r3 + 4] its object)
+LATE_HOOK = 0x02E4133C           # its one call (`bl 0x02760DB0`, the accessor's update: r3 = [acc + 0xC4]): S4U4 for
+                                 # the fighter whose dodge slot 43 just signalled (0x02760DB0 itself is out of a b's reach)
+DIAG_ORIGINAL = {MHASH_HOOK: 0x38000010, BIND_HOOK: 0x4BFFFE85, LATE_HOOK: 0x4B91FA75}
+DIAG_LATE_N = 8                  # S4U4 lines after a dodge signal (that many frames of his)
 DIAG_CAP = 1500                  # lines of S4UM / S4UB at most (the UI motions' lines always)
 DIAG_MOTIONS = (0x229, 0x231, 0x235, 0x239, 0x241, 0x245)   # S4UM always (Fake Death's / Sledgehammer's: controls)
 DIAG_HASHES = ('speciallwlight', 'speciallwheavy', 'specialairlwlight', 'specialairlwheavy', 'speciallwstart',
@@ -103,8 +107,9 @@ DIAG_FMTS = [
     ('f42c', 'S4U5 chain n=%d %08X %08X %08X %08X\n'),
     ('f43', 'S4U3 st=%X t0=%08X found=%d att=%08X unc=%d ret=%d\n'),
     ('fmv', 'S4UV mi=%08X mesh=%d val=%d before=%02X after=%02X\n'),
-    ('fmh', 'S4UM kind=%X motion=%X hash=%08X n=%d\n'),
+    ('fmh', 'S4UM kind=%X motion=%X hash=%08X n=%d st=%X\n'),
     ('fbd', 'S4UB hash=%08X found=%d set=%d kind=%X n=%d\n'),
+    ('f44', 'S4U4 st=%X t1=%08X t2=%08X mode=%08X left=%d\n'),
 ]
 FIGHTERS = 0x1035184C            # [[FIGHTERS] + 0]: +0 the entries, +8 their count (acmd_ext_cave.py)
 FIGHTER_ENTRY = 0x76B0           # entry: +0 object id, +0xC accessor, byte +0x1E >= 4 live
@@ -128,9 +133,14 @@ OWNER_DEPTH = 4                  # v4: the owner chain's steps at most (a shot -
 NO_OBJECT = 0x50000000
 
 GROUP = 1
-ST_UI = 0x157                    # the transformation / counter status (Mario's F.L.U.D.D. shoot, unreachable)
-ST_DODGE = 0x158                 # the dodge status (MSC's own; nothing here)
+# v5 (exe_v46z_ui3): the transformation / its counter and the autododge are MODES of the down special's status 0x155
+# (Fake Death's / Sledgehammer's / Secret Sensation's), told apart by TIMER_4 (V_MODE): v1-v4 used Mario's F.L.U.D.D.
+# statuses 0x157 / 0x158, which his native code keeps for the pump (0x02F169D0 on leaving them, 0x02F11C0C, the pump's
+# own code; docs/native-notes.md "Supamario's Ultra Instinct" v5)
 ST_SS = 0x155                    # the down special: Secret Sensation while transformed (its MSC switches the shape)
+ST_UI = ST_SS                    # the transformation / counter: 0x155 with TIMER_4 > MODE_FORM_ON
+ST_DODGE = ST_SS                 # the dodge: 0x155 with TIMER_4 in (MODE_DODGE_ON, MODE_FORM_ON] (nothing here)
+OLD_ST_UI, OLD_ST_DODGE = 0x157, 0x158   # v1-v4's (the tests: nothing special there any more)
 DODGE_LO, DODGE_HI = 0x0, 0x2    # Wait, Walk, WalkBrake
 SQUAT_LO, SQUAT_HI = 0x11, 0x15  # Squat, SquatWait, SquatF, SquatB, SquatRv
 # status work: floats 6-9, flags word 0 bits 16-18
@@ -140,6 +150,12 @@ FLAG_HIT, FLAG_NOTFIGHTER, FLAG_FOUND = 0x21000010, 0x21000011, 0x21000012
 V_FORM = 0x0F000320              # TIMER_0: his MSC writes 0 / 1000 (transforming) / 2000 (transformed) every frame
 V_DODGE_R = 0x0F000321           # TIMER_1: a dodge asked, the attacker to his right
 V_DODGE_L = 0x0F000322           # TIMER_2: ... to his left
+V_MODE = 0x0F000324              # TIMER_4: status 0x155's mode (his MSC: 7 the transformation, 5 the dodge, renewed every
+                                 # frame; 3 Secret Sensation; 0 Fake Death / Sledgehammer)
+MODE_FORM = 7.0
+MODE_DODGE = 5.0
+MODE_FORM_ON = 5.5               # 0x155 is the transformation (its counter included) above this
+MODE_DODGE_ON = 3.5              # ... the autododge above this (and not above MODE_FORM_ON)
 FORM_ON = 1500.0                 # transformed: TIMER_0 above this
 DODGE_SIGNAL = 4.0               # the timers count down by themselves: a signal the MSC missed dies in 4 frames
 MAX_FIGHTERS, MAX_PARTS, MAX_NODES = 16, 16, 32
@@ -206,6 +222,12 @@ D43 = {'d43_zero': """
         stw r0, 4(r11)
         li r0, 1
         stw r0, 8(r11)""",
+       'd43_sig': """
+        lis r11, ui_drec@ha
+        addi r11, r11, ui_drec@l
+        stw r31, 0x28(r11)
+        li r0, """ + str(DIAG_LATE_N) + """
+        stw r0, 0x2C(r11)""",
        'd43_unc': """
         lis r11, ui_drec@ha
         addi r11, r11, ui_drec@l
@@ -385,6 +407,9 @@ dmh_log:
         lwz r5, 0x14(r1)
         lwz r6, 0x18(r1)
         mr r7, r8
+        lwz r12, 4(r27)                 # v5: the status (0x027606C0's r27 = the script module, + 4 its object)
+        lwz r12, %(st)d(r12)
+        lwz r8, 0x48(r12)
         lis r3, ui_fmh@ha
         addi r3, r3, ui_fmh@l""" + OSR + """
 dmh_out:
@@ -396,6 +421,76 @@ dmh_out:
 dmh_orig:
         li r0, 0x10                     # the replaced word
         b 0x%(mh_back)08X
+
+# v5: the script module's late update (bl from its call 0x02E4133C; every object, every frame): S4U4 for the
+# fighter slot 43 just wrote a dodge signal for (ui_drec +0x28 its module block, +0x2C frames left): his status,
+# TIMER_1 / TIMER_2 / TIMER_4 (float bits), the lines left
+ui_dlate:
+        lis r11, ui_drec@ha
+        addi r11, r11, ui_drec@l
+        lwz r12, 0x2C(r11)
+        cmpwi r12, 0
+        ble dl_orig
+        lwz r0, 4(r3)
+        lwz r12, 0x28(r11)
+        cmpw r0, r12
+        bne dl_orig
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stw r3, 0x10(r1)
+        stw r30, 0x38(r1)
+        stw r31, 0x3C(r1)
+        lwz r12, 0x2C(r11)
+        addi r12, r12, -1               # (not r0: addi's rA 0 is the literal 0)
+        stw r12, 0x2C(r11)
+        lwz r31, 0x28(r11)              # his module block
+        lwz r30, %(work)d(r31)          # his WorkModule
+        mr r3, r30
+        lis r4, %(vform_hi)d
+        ori r4, r4, %(vr_lo)d
+        lwz r12, 0(r3)
+        lwz r12, 0x44(r12)
+        mtctr r12
+        bctrl
+        stfs f1, 0x18(r1)
+        mr r3, r30
+        lis r4, %(vform_hi)d
+        ori r4, r4, %(vl_lo)d
+        lwz r12, 0(r3)
+        lwz r12, 0x44(r12)
+        mtctr r12
+        bctrl
+        stfs f1, 0x1C(r1)
+        mr r3, r30
+        lis r4, %(vmode_hi)d
+        ori r4, r4, %(vmode_lo)d
+        lwz r12, 0(r3)
+        lwz r12, 0x44(r12)
+        mtctr r12
+        bctrl
+        stfs f1, 0x20(r1)
+        lwz r12, %(st)d(r31)
+        lwz r4, 0x48(r12)
+        lwz r5, 0x18(r1)
+        lwz r6, 0x1C(r1)
+        lwz r7, 0x20(r1)
+        lis r11, ui_drec@ha
+        addi r11, r11, ui_drec@l
+        lwz r8, 0x2C(r11)
+        lis r3, ui_f44@ha
+        addi r3, r3, ui_f44@l""" + OSR + """
+        lwz r3, 0x10(r1)
+        lwz r30, 0x38(r1)
+        lwz r31, 0x3C(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+dl_orig:
+        lis r12, %(late_hi)d             # on to 0x02760DB0 (LR: the call's return)
+        ori r12, r12, %(late_lo)d
+        mtctr r12
+        bctr
 
 # ui_dmot(r5 a motion): r3 1 when it is one of DIAG_MOTIONS. Leaf: r0, r3, r12
 ui_dmot:
@@ -480,11 +575,12 @@ def build(kind_id=None, diag=False):
              ftx=4 * F_TX, fty=4 * F_TY, mgr_ha=ha(OBJ_MANAGER), mgr_lo=slo(OBJ_MANAGER), fts_ha=ha(FIGHTERS),
              fts_lo=slo(FIGHTERS), entry=FIGHTER_ENTRY, bpost=BASE_POSTURE, batk=BASE_ATTACK, bown=BASE_OWNER, blink=BASE_LINK, depth=OWNER_DEPTH,
              noobj_hi=NO_OBJECT >> 16, dlo=DODGE_LO, dhi=DODGE_HI, sqlo=SQUAT_LO, sqhi=SQUAT_HI,
-             vform_hi=V_FORM >> 16, vform_lo=V_FORM & 0xFFFF, vr_lo=V_DODGE_R & 0xFFFF, vl_lo=V_DODGE_L & 0xFFFF,
+             vform_hi=V_FORM >> 16, vform_lo=V_FORM & 0xFFFF, vmode_hi=V_MODE >> 16, vmode_lo=V_MODE & 0xFFFF, vr_lo=V_DODGE_R & 0xFFFF, vl_lo=V_DODGE_L & 0xFFFF,
              maxf=MAX_FIGHTERS, maxp=MAX_PARTS, maxn=MAX_NODES, mv_back=MV_APPLY + 4, va=MV_ARR,
              osr_hi=OSREPORT_VENEER >> 16, osr_lo=OSREPORT_VENEER & 0xFFFF, mhf_hi=MHASH_FROM >> 16,
              mhf_lo=MHASH_FROM & 0xFFFF, mh_back=MHASH_HOOK + 4, bind_hi=BIND_FN >> 16, bind_lo=BIND_FN & 0xFFFF,
-             bdf_hi=BIND_FROM >> 16, bdf_lo=BIND_FROM & 0xFFFF, cap=DIAG_CAP, **calls)
+             bdf_hi=BIND_FROM >> 16, bdf_lo=BIND_FROM & 0xFFFF, cap=DIAG_CAP, late_n=DIAG_LATE_N,
+             late_hi=LATE_FN >> 16, late_lo=LATE_FN & 0xFFFF, **calls)
     p.update({k: (v if diag else '') for k, v in D43.items()})
     a.asm(("""
 # ---- 1. setup (r3 spec, r4 fighter, r5 = whatever: the replaced word sets 1)
@@ -529,12 +625,10 @@ slot42: lwz r12, %(kind_at)d(r4)
         bnelr
         lwz r12, %(acc)d(r4)
         lwz r11, %(st)d(r12)
-        lwz r11, 0x48(r11)              # status kind: the transformation or Secret Sensation (the down special)
-        cmpwi r11, %(st_ui)d
-        beq s42_st
+        lwz r11, 0x48(r11)              # status kind: 0x155 (the transformation, Secret Sensation; v5)
         cmpwi r11, %(st_ss)d
         bnelr
-s42_st: lwz r11, %(work)d(r12)
+        lwz r11, %(work)d(r12)
         lwz r11, 8(r11)
         lwz r11, 4(r11)                 # status work
         lwz r10, 0x14(r11)
@@ -553,10 +647,11 @@ s42_st: lwz r11, %(work)d(r12)
         lbz r0, 0x1C(r28)               # the attacker's category: 0 fighter, 1 weapon, 2 item, 3 gimmick
         cmplwi r0, 3                    # Secret Sensation: anything an opponent owns (0-2), never a gimmick
         bge out42
-        lwz r12, %(st)d(r31)
-        lwz r12, 0x48(r12)
-        cmpwi r12, %(st_ui)d            # the transformation: XV2's CounterMelee only (a fighter's own attack)
-        bne s42_cat
+        lwz r3, %(work)d(r31)           # the transformation (v5: 0x155 with TIMER_4 > MODE_FORM_ON): XV2's
+        bl ui_isform                    # CounterMelee only (a fighter's own attack)
+        cmpwi r3, 0
+        beq s42_cat
+        lbz r0, 0x1C(r28)
         cmplwi r0, 0
         bne out42
 s42_cat:
@@ -783,8 +878,6 @@ slot43: li r3, 1
         lwz r12, %(acc)d(r4)
         lwz r11, %(st)d(r12)
         lwz r11, 0x48(r11)
-        cmpwi r11, %(st_ui)d
-        beq handled                     # the transformation / its strike: fully invincible
         cmpwi r11, %(st_ss)d
         bne s43_dodge
         lwz r11, %(work)d(r12)          # Secret Sensation answering (0x21000010): no damage
@@ -794,6 +887,19 @@ slot43: li r3, 1
         lwz r11, 0(r11)
         rlwinm. r11, r11, 0, 15, 15
         bne handled
+        stwu r1, -0x20(r1)              # v5: the transformation / its strike (TIMER_4 > MODE_FORM_ON): fully invincible
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r5, 0x10(r1)
+        lwz r3, %(work)d(r12)
+        bl ui_isform
+        lwz r5, 0x10(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        cmpwi r3, 0
+        bne handled
+        li r3, 1
         blr
 s43_dodge:
         cmplwi r11, %(dhi)d
@@ -919,7 +1025,7 @@ s43_side:
         blt s43_sig
         li r26, %(vl_lo)d               # to his left: TIMER_2
         li r27, %(vr_lo)d
-s43_sig:
+s43_sig:%(d43_sig)s
         mr r3, r29                      # set_float(WM, 4.0, the side's timer)
         lis r4, %(vform_hi)d
         or r4, r4, r26
@@ -957,10 +1063,34 @@ handled:
         stb r0, 8(r5)
         li r3, 0
         blr
+
+# ui_isform(r3 his WorkModule): r3 1 when TIMER_4 (status 0x155's mode, his MSC's) > MODE_FORM_ON, the transformation /
+# its counter; else 0. Its own frame (get_float vt +0x44: the volatile registers go)
+ui_isform:
+        stwu r1, -0x10(r1)
+        mflr r0
+        stw r0, 0x14(r1)
+        lis r4, %(vmode_hi)d
+        ori r4, r4, %(vmode_lo)d
+        lwz r12, 0(r3)
+        lwz r12, 0x44(r12)
+        mtctr r12
+        bctrl
+        lis r12, ui_modef@ha
+        lfs f0, ui_modef@l(r12)
+        li r3, 0
+        fcmpu cr0, f1, f0
+        ble isf_out
+        li r3, 1
+isf_out:
+        lwz r0, 0x14(r1)
+        mtlr r0
+        addi r1, r1, 0x10
+        blr
 """ + (DIAG_TAIL if diag else RELEASE_TAIL)) % p)
     if diag:
         import zlib
-        a.asm('ui_drec:' + '\n        .word 0' * 10)
+        a.asm('ui_drec:' + '\n        .word 0' * 12)
         a.asm('ui_dmots:' + ''.join('\n        .word 0x%X' % m for m in DIAG_MOTIONS) + '\n        .word -1')
         a.asm('ui_dhash:' + ''.join('\n        .word 0x%08X' % (zlib.crc32(h.encode()) & 0xFFFFFFFF)
                                     for h in DIAG_HASHES) + '\n        .word 0')
@@ -985,7 +1115,8 @@ ui_desc:
         .word 0x%(shape_at)08X
         .word 1
         .word 0x%(descbytes)08X
-""" % dict(form=FORM_ON, sig=DODGE_SIGNAL, x1=SHAPE['p1'][0], y1=SHAPE['p1'][1], z1=SHAPE['p1'][2],
+ui_modef: .float %(modef)r
+""" % dict(form=FORM_ON, modef=MODE_FORM_ON, sig=DODGE_SIGNAL, x1=SHAPE['p1'][0], y1=SHAPE['p1'][1], z1=SHAPE['p1'][2],
            x2=SHAPE['p2'][0], y2=SHAPE['p2'][1], z2=SHAPE['p2'][2], radius=SHAPE['radius'],
            bonetype=(SHAPE['bone'] << 16) | (SHAPE_TYPE << 8), shape_at=shape_at,
            descbytes=int.from_bytes(bytes(DESC_BYTES), 'big')))
@@ -1014,6 +1145,7 @@ def patches(kind_id=None, diag=False):
         out[hook] = branch(hook, labels[label])
     if diag:
         out[BIND_HOOK] = branch(BIND_HOOK, labels['ui_dbind']) | 1
+        out[LATE_HOOK] = branch(LATE_HOOK, labels['ui_dlate']) | 1
     return out
 
 

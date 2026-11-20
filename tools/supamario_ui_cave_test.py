@@ -17,18 +17,20 @@ Checks:
   Marth's (x y z x y z radius bone type) with the capsule's values; the shape switched off (0x0200BD8C); then Mario's
   setup (0x02F1A598) with r5 = 1 and the fighter; non-volatile registers and the stack kept. Mario (kind 3), another kind
   and kind 0x41 without a shield module: nothing built, Mario's setup with r5 = 1 as before;
-- slot 42: kind 0x41, group 1, status 0x157, first hit: float 6 = the damage, 7 = the side, 8 / 9 = the X / Y of the
+- v5: the transformation / its counter is status 0x155 with TIMER_4 (C.V_MODE) 7, the dodge 0x155 with 5 (Mario's
+  F.L.U.D.D. statuses 0x157 / 0x158 are nothing special any more); the TIMER_4 read goes through get_float;
+- slot 42: kind 0x41, group 1, status 0x155 (the transformation: TIMER_4 7), first hit: float 6 = the damage, 7 = the side, 8 / 9 = the X / Y of the
   fighter to answer, flags 0x21000010 (+ 0x21000011 not a fighter, + 0x21000012 found); a fighter attacker: its own place
   (left / right); a weapon: its current owner's place (owner module +0x34), the side from the owner; an item the same; a
   weapon whose owner is no fighter (a gimmick's id) or gone: no target, the side from the weapon's place; a stage gimmick
   (category 3) whose object is gone: Marth's side function's value; nothing for: a second hit, group 0, another status,
   an uncounterable hit (+0x54), Mario's kind (3); registers kept;
-- slot 43: 0x157 -> 0 and the handled bit whatever else; transformed (TIMER_0 > 1500) in Wait / Walk / WalkBrake /
+- slot 43: 0x155 with TIMER_4 7 -> 0 and the handled bit whatever else; transformed (TIMER_0 > 1500) in Wait / Walk / WalkBrake /
   Squat .. SquatRv with a fighter's hit records holding him -> 0, the handled bit, TIMER_1 (attacker right) or TIMER_2
   (left) = 4.0 and the other 0 through set_float, the hit data asked with (AM, node +0x27, part); the record found in a
   later part / after other nodes / of the second live fighter; -> 1 and nothing written for: no fighter's records (a
   weapon / item / gimmick hit), records of a dead fighter, his own records, records off (+0x4C 0), not transformed
-  (TIMER_0 1000 / 0), another status (Dash 3, Fall 0xE, Damage 0x45, Guard 0x1C, the dodge 0x158), an uncounterable
+  (TIMER_0 1000 / 0), another status (Dash 3, Fall 0xE, Damage 0x45, Guard 0x1C, v1-v4's 0x157 / 0x158), an uncounterable
   hit (+0x54), Mario (kind 3) in Wait with a fighter's records holding him; registers kept.
 """
 import os
@@ -410,6 +412,7 @@ def slot42_checks(e, kind):
     e.objects.clear()
     # a fighter attacker: its own place
     for my_x, ax, side in ((0.0, 20.0, 1.0), (30.0, 20.0, -1.0)):
+        e.vars = {C.V_MODE: C.MODE_FORM}
         fk = e.fighter(kind, x=my_x)
         aid = 0x00030012
         e.obj(aid, x=ax, y=7.5)
@@ -423,16 +426,30 @@ def slot42_checks(e, kind):
         check('  hit data asked with (AM, id, part)', [c for c in e.calls if c[0] == 'hitdata'], [('hitdata', am, 3, 1)])
         check('  its handle from its id', [c[3:] for c in e.calls if c[0] == 'handle'], [(aid, 0)])
         check('  registers kept', kept, True)
+        check('  TIMER_4 (the mode) read through get_float', [c[1:] for c in e.calls if c[0] == 'get'],
+              [(fk['wm'], C.V_MODE)])
     # a weapon / an item: the current owner's place, the side from the owner
     for cat, label in ((1, 'weapon'), (2, 'item')):
+        e.vars = {C.V_MODE: C.MODE_FORM}
         fk = e.fighter(kind, status=C.ST_UI, x=0.0)
         e.obj(0x00040012, x=-25.0, y=3.0)
         e.obj((cat << 28) | 0x0000ABCD, x=10.0, y=5.0, owner=0x00040012)
         msg, am, rec = message(e, damage=9.0, category=cat, oid=(cat << 28) | 0x0000ABCD)
         hitdata(e)
         r, kept = e.run(C.SLOT42_HOOK, 0, fk['f'], msg)
-        check('slot 42, the transformation (0x157), a %s: not countered (XV2: CounterMelee only)' % label,
+        check('slot 42, the transformation (0x155, TIMER_4 7), a %s: not countered (XV2: CounterMelee only)' % label,
               (e.floats(fk), e.flagw(fk), kept), (base, (F0, 0x12345678), True))
+        for mode in (C.MODE_DODGE, 3.0):
+            e.vars = {C.V_MODE: mode}
+            fk = e.fighter(kind, status=C.ST_SS, x=0.0)
+            e.obj(0x00040012, x=-25.0, y=3.0)
+            e.obj((cat << 28) | 0x0000ABCD, x=10.0, y=5.0, owner=0x00040012)
+            msg, am, rec = message(e, damage=9.0, category=cat, oid=(cat << 28) | 0x0000ABCD)
+            hitdata(e)
+            e.run(C.SLOT42_HOOK, 0, fk['f'], msg)
+            check('  0x155 with TIMER_4 %g (not the transformation): the %s recorded' % (mode, label),
+                  e.flagw(fk)[0] & 0x10000, 0x10000)
+        e.vars = {}
         fk = e.fighter(kind, status=C.ST_SS, x=0.0)
         owner = 0x00040012
         e.obj(owner, x=-25.0, y=3.0)
@@ -503,9 +520,10 @@ def slot42_checks(e, kind):
     check('slot 42, second hit: nothing written, nothing called',
           (e.floats(fk), e.flagw(fk), e.calls), (base, (F0 | 0x10000, 0x12345678), []))
     for what, fkw, kw, hd in (('group 0 (the guard)', dict(kind=kind), {'group': 0}, {}),
-                              ('status 0x158', dict(kind=kind, status=0x158), {}, {}),
+                              ('status 0x158 (v1-v4\'s dodge)', dict(kind=kind, status=C.OLD_ST_DODGE), {}, {}),
+                              ('status 0x157 (v1-v4\'s transformation)', dict(kind=kind, status=C.OLD_ST_UI), {}, {}),
                               ('Wait (0)', dict(kind=kind, status=0), {}, {}),
-                              ('Mario (3) in 0x157', dict(kind=MARIO), {}, {}),
+                              ('Mario (3) in 0x155', dict(kind=MARIO), {}, {}),
                               ('uncounterable (+0x54)', dict(kind=kind), {}, {'b54': 1})):
         fk = e.fighter(**fkw)               # (one table entry: made just before its run)
         msg, am, rec = message(e, **kw)
@@ -516,7 +534,7 @@ def slot42_checks(e, kind):
 
 
 def slot43_case(e, kind, status=0, form=2000.0, my_x=0.0, att_x=20.0, records='attacker', b54=0, live=5,
-                rec_on=1, part=1, before=()):
+                rec_on=1, part=1, before=(), mode=0.0):
     """him in slot 0 of the table; an attacker (slot 1) whose records hold him (or not); returns (r, kept, msg, att)"""
     e.setw(e.ftab + 8, 0)
     sk = e.fighter(kind, status=status, x=my_x, slot=0)
@@ -529,7 +547,7 @@ def slot43_case(e, kind, status=0, form=2000.0, my_x=0.0, att_x=20.0, records='a
     e.attack_records(att, hits, parts=3, on=rec_on)
     if records == 'self':
         e.attack_records(sk, {0: [sk['oid']]})
-    e.vars = {C.V_FORM: form, C.V_DODGE_R: 0.0, C.V_DODGE_L: 0.0}
+    e.vars = {C.V_FORM: form, C.V_DODGE_R: 0.0, C.V_DODGE_L: 0.0, C.V_MODE: mode}
     hitdata(e, b54)
     msg = e.alloc(0x20, b'\0')
     e.mu.mem_write(msg + 8, bytes([0x40]))
@@ -538,15 +556,26 @@ def slot43_case(e, kind, status=0, form=2000.0, my_x=0.0, att_x=20.0, records='a
 
 
 def slot43_checks(e, kind):
-    for st in (C.ST_UI,):
+    for mode in (C.MODE_FORM, C.MODE_FORM - 1.0):
         for form in (0.0, 2000.0):
             e.setw(e.ftab + 8, 0)
-            sk = e.fighter(kind, status=st)
+            e.vars = {C.V_FORM: form, C.V_MODE: mode}
+            sk = e.fighter(kind, status=C.ST_UI)
             msg = e.alloc(0x20, b'\0')
             e.mu.mem_write(msg + 8, bytes([0x40]))
             r, kept = e.run(C.SLOT43_HOOK, 0, sk['f'], msg)
-            check('slot 43, status 0x157 (TIMER_0 %g): 0, handled, nothing else called' % form,
-                  (r, bytes(e.mu.mem_read(msg + 8, 1))[0], e.calls, kept), (0, 0x41, [], True))
+            check('slot 43, the transformation (0x155, TIMER_4 %g, TIMER_0 %g): 0, handled, only TIMER_4 read'
+                  % (mode, form), (r, bytes(e.mu.mem_read(msg + 8, 1))[0], e.calls, kept),
+                  (0, 0x41, [('get', sk['wm'], C.V_MODE)], True))
+    for mode, what in ((C.MODE_DODGE, 'the dodge'), (C.MODE_DODGE - 1.0, 'the dodge a frame on'), (0.0, 'Fake Death')):
+        e.setw(e.ftab + 8, 0)
+        e.vars = {C.V_FORM: 2000.0, C.V_MODE: mode}
+        sk = e.fighter(kind, status=C.ST_SS)
+        msg = e.alloc(0x20, b'\0')
+        e.mu.mem_write(msg + 8, bytes([0x40]))
+        r, kept = e.run(C.SLOT43_HOOK, 0, sk['f'], msg)
+        check('slot 43, 0x155 with TIMER_4 %g (%s): 1, message untouched' % (mode, what),
+              (r, bytes(e.mu.mem_read(msg + 8, 1))[0], kept), (1, 0x40, True))
     for st, name in ((0, 'Wait'), (1, 'Walk'), (2, 'WalkBrake'), (0x11, 'Squat'), (0x12, 'SquatWait'),
                      (0x13, 'SquatF'), (0x14, 'SquatB'), (0x15, 'SquatRv')):
         for my_x, att_x, timer, other in ((0.0, 20.0, C.V_DODGE_R, C.V_DODGE_L), (40.0, 20.0, C.V_DODGE_L, C.V_DODGE_R)):
@@ -578,20 +607,24 @@ def slot43_checks(e, kind):
                      ('Dash (3)', dict(status=3)), ('Fall (0xE)', dict(status=0xE)),
                      ('Squat - 1 (0x10)', dict(status=0x10)), ('Landing (0x16)', dict(status=0x16)),
                      ('Guard (0x1C)', dict(status=0x1C)), ('Damage (0x45)', dict(status=0x45)),
-                     ('the dodge (0x158)', dict(status=0x158))):
+                     ('v1-v4\'s dodge (0x158)', dict(status=C.OLD_ST_DODGE)),
+                     ('v1-v4\'s transformation (0x157)', dict(status=C.OLD_ST_UI)),
+                     ('the dodge (0x155, TIMER_4 5)', dict(status=C.ST_DODGE, mode=C.MODE_DODGE))):
         r, kept, msg, sk, att = slot43_case(e, kind, **kw)
         check('slot 43, %s: 1, message untouched, nothing set' % what,
               (r, bytes(e.mu.mem_read(msg + 8, 1))[0], [c for c in e.calls if c[0] == 'set'], kept), (1, 0x40, [], True))
     for flag, want in ((True, 0), (False, 1)):
         e.setw(e.ftab + 8, 0)
+        e.vars = {C.V_MODE: 3.0}
         sk = e.fighter(kind, status=C.ST_SS)
         if flag:
             e.setw(sk['flags'], 0x0000C00F | 0x10000)
         msg = e.alloc(0x20, b'\0')
         e.mu.mem_write(msg + 8, bytes([0x40]))
         r, kept = e.run(C.SLOT43_HOOK, 0, sk['f'], msg)
-        check('slot 43, Secret Sensation (0x155), 0x21000010 %s: %d' % ('on' if flag else 'off', want),
-              (r, bytes(e.mu.mem_read(msg + 8, 1))[0], e.calls, kept), (want, 0x41 if want == 0 else 0x40, [], True))
+        check('slot 43, Secret Sensation (0x155, TIMER_4 3), 0x21000010 %s: %d' % ('on' if flag else 'off', want),
+              (r, bytes(e.mu.mem_read(msg + 8, 1))[0], e.calls, kept),
+              (want, 0x41 if want == 0 else 0x40, [] if flag else [('get', sk['wm'], C.V_MODE)], True))
     r, kept, msg, sk, att = slot43_case(e, kind, status=C.ST_SS, form=2000.0)
     check('slot 43, 0x155 without the flag, transformed, a fighter\'s records hold him: 1 (no dodge in a move)',
           (r, [c for c in e.calls if c[0] == 'set']), (1, []))
@@ -599,15 +632,18 @@ def slot43_checks(e, kind):
     check('slot 43, Mario (3) in Wait, a fighter\'s records hold him: 1, nothing read or set',
           (r, bytes(e.mu.mem_read(msg + 8, 1))[0], e.calls, kept), (1, 0x40, [], True))
     e.setw(e.ftab + 8, 0)
+    e.vars = {C.V_MODE: C.MODE_FORM}
     sk = e.fighter(MARIO, status=C.ST_UI)
     msg = e.alloc(0x20, b'\0')
     e.mu.mem_write(msg + 8, bytes([0x40]))
     r, kept = e.run(C.SLOT43_HOOK, 0, sk['f'], msg)
-    check('slot 43, Mario (3) in 0x157: 1 (Mario\'s stub)', (r, bytes(e.mu.mem_read(msg + 8, 1))[0]), (1, 0x40))
+    check('slot 43, Mario (3) in 0x155 with TIMER_4 7: 1 (Mario\'s stub)', (r, bytes(e.mu.mem_read(msg + 8, 1))[0]),
+          (1, 0x40))
 
 
 def chain_checks(e, kind):
     """v4: the owner chain (a projectile's / item's owner followed to a fighter)"""
+    e.vars = {}                          # v5: TIMER_4 0 (Secret Sensation's rules, not the transformation's)
     base = [round(100.0 + i, 4) for i in range(16)]
     F0 = 0x0000C00F
     e.objects.clear()
@@ -729,9 +765,10 @@ def diag_checks(path, kind):
     e.run(C.SLOT42_HOOK, 0, fm['f'], msg)
     check('diag: Mario (kind 3) gets no slot-42 line', lines, [])
     # slot 43: a dodge and a pass
-    for status, form, want_ret, want_found in ((0, 2000.0, 0, 1), (0, 0.0, 1, 0), (C.ST_UI, 0.0, 0, 0)):
+    for status, form, want_ret, want_found, mode in ((0, 2000.0, 0, 1, 0.0), (0, 0.0, 1, 0, 0.0),
+                                                     (C.ST_UI, 0.0, 0, 0, C.MODE_FORM)):
         lines.clear()
-        r, kept, msg, sk, att = slot43_case(e, kind, status=status, form=form)
+        r, kept, msg, sk, att = slot43_case(e, kind, status=status, form=form, mode=mode)
         l43 = [a for t, a in lines if t == 'S4U3']
         check('diag S4U3 st=0x%X TIMER_0 %g: one line, ret %d, found %d' % (status, form, want_ret, want_found),
               [(a[0], a[2], a[5]) if a else None for a in l43][:1],
@@ -763,16 +800,42 @@ def diag_checks(path, kind):
     e.setw(tab + 8, 600)
     e.setw(tab + 0xC, mt)
     e.setw(mt + 4 * 0x231, 0x9221C757)
+    fs = e.fighter(kind, status=C.ST_UI)           # v5: S4UM's status, from 0x027606C0's r27 (the script module)
+    smod = e.alloc(0x10, b'\0')
+    e.setw(smod + 4, fs['acc'])
     for k, mot, want_n in ((kind, 0x231, 1), (3, 0x231, 0)):
         lines.clear()
+        e.mu.reg_write(REGS[27], smod)
         e.mu.reg_write(REGS[3], tab)
         e.mu.reg_write(REGS[4], k)
         e.mu.reg_write(REGS[5], mot)
         e.mu.reg_write(UC_PPC_REG_1, 0x700F0000)
         e.mu.emu_start(C.MHASH_FROM - 4, C.MHASH_FROM, count=20000)
-        check('diag S4UM: kind 0x%X motion 0x%X: %d line(s), the hash returned' % (k, mot, want_n),
-              ([a[:3] for t, a in lines if t == 'S4UM'], e.r(3)),
-              ([(kind, 0x231, 0x9221C757)] * want_n, 0x9221C757 if k == kind else 0))
+        check('diag S4UM: kind 0x%X motion 0x%X: %d line(s), the hash returned, the status (v5)' % (k, mot, want_n),
+              ([a[:3] + a[4:5] for t, a in lines if t == 'S4UM'], e.r(3)),
+              ([(kind, 0x231, 0x9221C757, C.ST_UI)] * want_n, 0x9221C757 if k == kind else 0))
+    # v5: S4U4, the frames after a dodge signal (the script module's late update, its call 0x02E4133C)
+    late = []
+    e.stub(C.LATE_FN, lambda em: late.append(em.r(3)))
+    lines.clear()
+    r, kept, msg, sk, att = slot43_case(e, kind, status=0, form=2000.0)
+    check('diag: slot 43 signalled a dodge (the S4U4 lines armed)', r, 0)
+    smod = e.alloc(0x10, b'\0')
+    e.setw(smod + 4, sk['acc'])
+    other = e.alloc(0x10, b'\0')
+    e.setw(other + 4, att['acc'])
+    got = []
+    for k in range(C.DIAG_LATE_N + 2):
+        for mod in (other, smod):
+            lines.clear()
+            e.mu.reg_write(REGS[3], mod)
+            e.mu.reg_write(UC_PPC_REG_1, 0x700F0000)
+            e.mu.emu_start(C.LATE_HOOK, C.LATE_HOOK + 4, count=20000)
+            got.append((mod == smod, [a[:5] for t, a in lines if t == 'S4U4'], late[-1] == mod))
+    check('diag S4U4: his module only, %d lines (status, TIMER_1 / 2 / 4 bits, lines left), then none; the late update '
+          'called on for every object with its module' % C.DIAG_LATE_N, got,
+          [(m, [(0, fbits(4.0), fbits(0.0), fbits(0.0), C.DIAG_LATE_N - 1 - k)] if m and k < C.DIAG_LATE_N else [], True)
+           for k in range(C.DIAG_LATE_N + 2) for m in (False, True)])
     # the bind's lookup (0x02BEE580's bl) from the motion change: S4UB
     import zlib
     for found, h, want_n in ((0, 'speciallwlight', 1), (-1, 'speciallwlight', 1), (0, 'attack11', 0)):

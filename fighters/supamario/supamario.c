@@ -36437,6 +36437,12 @@ int func_2251()
 
 int func_2252()
 {
+    // Ultra Instinct v5 (README "Ultra Instinct v4"): the transformation / its counter and the autododge are modes of
+    // this status now (TIMER_4, ui_mode); Mario's F.L.U.D.D. statuses 0x157 / 0x158 are left to his native code
+    if (ui_mode() != 0)
+    {
+        return ui_pre();
+    }
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
     // Fake Death v2 (user: no staling): the status's attack log (the 6th value, vanilla 0x1 for the down special)
     // left empty, Core Breaker v6's way (docs/native-notes.md "The status's attack log and staling"); F.L.U.D.D. (the
@@ -36447,9 +36453,6 @@ int func_2252()
 
 int func_2253()
 {
-    // Ultra Instinct (README "Ultra Instinct v1"): status 0x157 is the transformation / counter now (F.L.U.D.D.'s
-    // shoot is unreachable since Fake Death / Sledgehammer)
-    return ui_pre();
     StatusModule(0x5, 0xffffffff, 0x32, 0x7, 0, 0x1, 0, 0, 0, 0);
     StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x1, 0, 0x400, 0);
     return 0;
@@ -36459,7 +36462,6 @@ int func_2254()
 {
     int var0;
     int var1;
-    return ui_pre();           // Ultra Instinct: status 0x158 is the autododge now
     var0 = WorkModule(0x6, 0x1000004b);
     var1 = 0x10001;
     if (0x1 == var0)
@@ -36719,6 +36721,18 @@ void func_2265()
     int var0;
     // Fake Death (fighters/supamario/README.md "Fake Death"): the GROUNDED down special; in the air Sledgehammer
     // (README "Sledgehammer": sh_*). The F.L.U.D.D. path below (and its statuses 0x157 / 0x158) is no longer reached
+    if (ui_mode() == 0x2)
+    {
+        ui_init();                  // Ultra Instinct: the transformation / its counter (ui_tick asked it)
+        func_78(ui_loop);
+        return;
+    }
+    if (ui_mode() == 0x1)
+    {
+        ui_dodge_init();            // Ultra Instinct: the autododge (ui_tick asked it)
+        func_78(ui_dodge_loop);
+        return;
+    }
     if (global18 == 0 && ui_state() == UI_FORMED)
     {
         ss_init();                  // Ultra Instinct: the grounded down special is Secret Sensation while transformed
@@ -36815,10 +36829,6 @@ void func_2267()
 void func_2268()
 {
     int var0;
-    // Ultra Instinct: the transformation / counter (status 0x157); the F.L.U.D.D. shoot below is no longer reached
-    ui_init();
-    func_78(ui_loop);
-    return;
     ControlModule(0x271f);
     var0 = 0x4 + WorkModule(0x6, 0x1000004b);
     ArticleModule(0x2715, 0x2, var0, 0);
@@ -36940,10 +36950,6 @@ void func_2271()
 void func_2272()
 {
     int var0;
-    // Ultra Instinct: the autododge (status 0x158); the F.L.U.D.D. end below is no longer reached
-    ui_dodge_init();
-    func_78(ui_dodge_loop);
-    return;
     if (WorkModule(0x6, 0x10000083) < WorkModule(0x6, 0x18000001))
     {
         WorkModule(0x7, 0x231, 0x11000002);
@@ -37039,7 +37045,6 @@ void func_2275()
     float var1;
     float var2;
     float var3;
-    return;                    // Ultra Instinct: status 0x158's exec (F.L.U.D.D.'s) does nothing
     var0 = (float)WorkModule(0x6, 0x10000083);
     var1 = (float)WorkModule(0x6, 0x18000000);
     var2 = var0 / var1;
@@ -37137,6 +37142,16 @@ void func_2281()
 void func_2282()
 {
     int var0;
+    if (ui_mode() == 0x2)
+    {
+        ui_end();                   // Ultra Instinct: the transformation / its counter
+        return;
+    }
+    if (ui_mode() == 0x1)
+    {
+        ui_dodge_end();             // Ultra Instinct: the autododge
+        return;
+    }
     if (WorkModuleF(0, UI_V_SS) > 0.5f)
     {
         ss_end();                   // Ultra Instinct: Secret Sensation
@@ -37170,8 +37185,6 @@ void func_2282()
 void func_2283()
 {
     int var0;
-    ui_end();                  // Ultra Instinct (status 0x157)
-    return;
     var0 = global6;
     if (var0 != 0x158)
     {
@@ -37201,8 +37214,6 @@ void func_2283()
 
 void func_2284()
 {
-    ui_dodge_end();            // Ultra Instinct (status 0x158)
-    return;
     WorkModule(0x7, 0, 0x10000083);
     WorkModule(0x7, WorkModule(0x6, 0x18000003), 0x10000084);
     ArticleModule(0x2713, 0x2, 0);
@@ -42442,14 +42453,14 @@ void ts_land_lag()
 // tools/supamario_ui_cave.py, exe_v46z_ui).
 // - The transformation: his first actionable frame at UI_TRIGGER_PCT% or more (Wait, Walk, WalkBrake, Dash, Run,
 //   RunBrake, Squat .. SquatB on the ground, Fall / FallAerial in the air; never in tumble, hitstun, a shield, a ledge
-//   or a move), once a stock: status UI_ST (0x157, Mario's unreachable F.L.U.D.D. shoot), UI_FORM_N frames, motion
+//   or a move), once a stock: status UI_ST (v5: 0x155 in mode 2, ui_mode), UI_FORM_N frames, motion
 //   UI_MOT_FORM; intangible throughout (nothing hits his body, no grab), held still in the air; the counter shape
 //   (the cave's ShieldModule group 1) on in XV2's counter window (UI_CW_ON-UI_CW_OFF: BAC entry 0's 30-151). A
 //   fighter's own attack on it (XV2's CounterMelee: no projectile / item, the cave's filter) is the cave's slot 42
 //   record: he answers at once (ui_counter, XV2's BAC entry 5): beside the attacker, facing it, the counter's motion
 //   (the freeze box at once, XV2's finisher). Either way he is transformed afterwards, until his KO.
 // - The autododge (transformed, the cave's slot 43: a fighter's attack on him in Wait / Walk / Squat .. on the
-//   ground skipped, TIMER_1 / TIMER_2 set by side): status UI_ST_DODGE (0x158), a sidestep away, intangible
+//   ground skipped, TIMER_1 / TIMER_2 set by side): status UI_ST_DODGE (v5: 0x155 in mode 1), a sidestep away, intangible
 //   UI_DODGE_INV frames, then actionable; no cooldown.
 // State (no new globals; New_Var / VAR_* are all taken): the user variables TIMER_0-2 (0x0F000320-322, unused before;
 // they count down by themselves every frame, so the MSC writes TIMER_0 every frame and the cave's signals die in 4):
@@ -42474,6 +42485,28 @@ float ui_state()
         return UI_FORMING;
     }
     return 0.0f;
+}
+
+// v5: the transformation / its counter and the autododge are MODES of status 0x155 (UI_ST = UI_ST_DODGE = 0x155, the down
+// special's status: Fake Death's / Sledgehammer's / Secret Sensation's, whose body scripts run in game; Mario's
+// F.L.U.D.D. statuses 0x157 / 0x158 are left to his native code). TIMER_4 (UI_V_SS) holds the mode: ui_tick writes
+// UI_MODE_FORM (7) / UI_MODE_DODGE (5) right before asking the status, the mode's loop renews it every frame, its end
+// writes 0; Secret Sensation's 3 (renewed) and Fake Death / Sledgehammer (0) are below UI_MODE_DODGE_ON. The cave reads
+// it too (tools/supamario_ui_cave.py: 0x155 with TIMER_4 > UI_MODE_FORM_ON is the transformation). 2 the transformation,
+// 1 the autododge, 0 neither
+int ui_mode()
+{
+    float m;
+    m = WorkModuleF(0, UI_V_SS);
+    if (m > UI_MODE_FORM_ON)
+    {
+        return 0x2;
+    }
+    if (m > UI_MODE_DODGE_ON)
+    {
+        return 0x1;
+    }
+    return 0;
 }
 
 // the trigger's statuses: Wait, Walk, WalkBrake, Dash, Run, RunBrake, Squat, SquatWait, SquatF, SquatB on the ground;
@@ -42544,15 +42577,17 @@ void ui_tick()
         return;
     }
     s = ui_state();
-    if (s == UI_FORMING && st != UI_ST_F)
+    if (s == UI_FORMING && (st != UI_ST_F || ui_mode() != 0x2))
     {
         s = UI_FORMED;              // the transformation's status left (it ends transformed)
     }
     WorkModule(0, s, UI_V_FORM);
     if (s == 0.0f)
     {
-        if (WorkModuleF(0, 0x0F000117) >= UI_TRIGGER_PCT && StopModule(0x1) == 0 && ui_can_form(st) != 0)
+        if (WorkModuleF(0, 0x0F000117) >= UI_TRIGGER_PCT && StopModule(0x1) == 0 && ui_can_form(st) != 0 &&
+            WorkModule(0x10, 0x2000004d) == 0)
         {
+            WorkModule(0, UI_MODE_FORM, UI_V_SS);     // v5: the mode first (func_2252 / func_2265 read it)
             func_16(UI_ST, 0);
         }
         return;
@@ -42562,10 +42597,11 @@ void ui_tick()
         return;
     }
     n = WorkModuleF(0, UI_V_DODGE_R) + WorkModuleF(0, UI_V_DODGE_L);
-    if (n > 0.5f && st != UI_ST_DODGE_F)
+    if (n > 0.5f && (st != UI_ST_DODGE_F || ui_mode() != 0x1))
     {
-        if (ui_can_dodge(st) != 0)
+        if (ui_can_dodge(st) != 0 && WorkModule(0x10, 0x2000004d) == 0)
         {
+            WorkModule(0, UI_MODE_DODGE, UI_V_SS);    // v5: the mode first
             func_16(UI_ST_DODGE, 0);
         }
         else
@@ -42607,6 +42643,7 @@ void ui_still()
 
 void ui_init()
 {
+    WorkModule(0, UI_MODE_FORM, UI_V_SS);
     WorkModule(0, UI_FORMING, UI_V_FORM);
     WorkModule(0, 0.0f, 0x0100000B);
     WorkModule(0, -1.0f, 0x0100000C);    // its loop runs on this frame too: frame 0
@@ -42689,6 +42726,7 @@ void ui_loop()
     ph = WorkModuleF(0, 0x0100000B);
     n = WorkModuleF(0, 0x0100000C) + 1.0f;
     WorkModule(0, n, 0x0100000C);
+    WorkModule(0, UI_MODE_FORM, UI_V_SS);        // v5: the mode renewed (TIMER_4 counts down)
     ui_still();
     if (ph < 0.5f)
     {
@@ -42726,6 +42764,7 @@ void ui_loop()
 
 void ui_end()
 {
+    WorkModule(0, 0.0f, UI_V_SS);
     ShieldModule(0, 0x2, 0, 0, 0x1);
     if (ui_state() == UI_FORMING)
     {
@@ -42742,7 +42781,7 @@ void ui_end()
     }
 }
 
-// the dodge (status 0x158): away from the attacker (TIMER_1: it is to his right -> left), his facing kept; UI_DODGE_V a
+// the dodge (status 0x155 in mode 1; v1-v4 0x158): away from the attacker (TIMER_1: it is to his right -> left), his facing kept; UI_DODGE_V a
 // frame over UI_DODGE_MOVE frames (energy 3, world X; ground correction 2: it stops at an edge), intangible
 // UI_DODGE_INV frames, actionable from then (func_39 / func_41), Wait at UI_DODGE_N
 void ui_dodge_init()
@@ -42756,6 +42795,7 @@ void ui_dodge_init()
     WorkModule(0, 0.0f, UI_V_DODGE_R);
     WorkModule(0, 0.0f, UI_V_DODGE_L);
     WorkModule(0, way, 0x0100000D);
+    WorkModule(0, UI_MODE_DODGE, UI_V_SS);
     WorkModule(0, -1.0f, 0x0100000C);    // its loop runs on this frame too: frame 0
     KineticModule(0, 0x6);
     GroundModule(0x2710, 0x2);
@@ -42769,6 +42809,7 @@ void ui_dodge_loop()
     float n;
     n = WorkModuleF(0, 0x0100000C) + 1.0f;
     WorkModule(0, n, 0x0100000C);
+    WorkModule(0, UI_MODE_DODGE, UI_V_SS);       // v5: the mode renewed
     if (global18 == 0x2)
     {
         KineticModule(0x11, 0x3, 0.0f, 0.0f);
@@ -42798,6 +42839,7 @@ void ui_dodge_loop()
 
 void ui_dodge_end()
 {
+    WorkModule(0, 0.0f, UI_V_SS);
     KineticModule(0x11, 0x3, 0.0f, 0.0f);
     GroundModule(0x2710, 0x1);
 }
