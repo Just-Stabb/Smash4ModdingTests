@@ -108,7 +108,6 @@ SILVER_MESHES = model.MESHES
 # ended at the burst (they follow their expressions' visibility tracks)
 OVERLAYS = []
 UI_TRANSFORMED_OVER = 1500.0         # TIMER_0 (UI_V_FORM) above this: transformed (the MSC writes 2000 every frame)
-NOHAT_ON, NOHAT_OFF = 17, 72         # AppealS: the eyelid animation's Mario_Nohat keys (Mario_Hair off between)
 
 # ---------------------------------------------------------------- XV2's effects (BTL_AURA.eepk / BTL_CMN.eepk)
 # (key, EEPK, EMP, the Smash bone, offset (m), EEPK scale): BAC entry 0 plays 846 at 10 (MGT_HENSIN01 on b_C_Chest),
@@ -132,7 +131,7 @@ FX = [('start', 'BTL_AURA.eepk', 'MGT_HENSIN01.emp', 'BustN', (0.0, 0.0, 0.0), 1
 # aura_setting.aur holds only effect ids (aura 1: BTL_AURA 40-44), no colours; the purple is the game's rendering
 # (glare / screen effects). So the clip's colour is applied: every colour key of the aura's sets (AURA_SETS) turned to
 # AURA_HUE and its saturation scaled by AURA_SAT (its value kept). An approximation, from the clip
-AURA_HUE, AURA_SAT = 284.0, 0.65
+AURA_HUE, AURA_SAT = 262.0, 0.45     # v4 (the user: "splotchy and purple"; wanted a slightly blue purple): blue-violet, softer
 AURA_SETS = ('aura_hip', 'aura_head', 'aura_foot', 'aura_chest', 'aura_hand')
 FX_IDS = {}                          # key -> the ACMD / MSC id (0x0341xxxx), filled by effects()
 FX_DEFAULT = 0x1000009               # before the build has made them (the earlier builds compile the MSC too)
@@ -236,18 +235,30 @@ def meshvis(mesh, visible, persist):
     return cmd('mesh_visibility', 0, MV.crc32(mesh), visible, persist)
 
 
+P2 = 2            # Mesh_Visibility Persist 2 (exe_v46z_ui2): the mesh's own set state, no override entry (v4)
+HAT_OFF_AT = FX_START_AT              # v4 (the user): the cap off from the transformation's gold start (frame 10, the
+                                      # white body over him) until Ultra Instinct ends
+
+
+def hat_off():
+    """v4: the cap hidden, his sideburns hidden, his own (brown) full hair shown: the transformation's start"""
+    return ([meshvis(m, 0, P2) for m in model.HAT + (model.HAIR,)] +
+            [meshvis(SILVER_MESHES['nohat'][0], 1, P2)])
+
+
 def silver_on():
-    """his own hair / full hair / eyes hidden, the silver hair / eyes shown, until a KO (Persist 1); the mustache /
-    eyebrow overlays' overrides ended (they follow his expressions)"""
-    return ([meshvis(SILVER_MESHES[k][0], 0, 1) for k in ('hair', 'nohat', 'eye')] +
-            [meshvis(SILVER_MESHES[k][1], 1, 1) for k in ('hair', 'eye')] + [meshvis(o, 2, 0) for o in OVERLAYS])
+    """transformed (v4, Persist 2: each mesh's own set state, no override entry): his cap, sideburns, full hair and
+    eyes hidden; the silver full hair / eyes and the mustache / eyebrow overlays follow their visibility tracks (the
+    eyes his blinks, the overlays his expressions)"""
+    return ([meshvis(m, 0, P2) for m in model.HAT + (model.HAIR,) + tuple(SILVER_MESHES[k][0] for k in ('nohat', 'eye'))] +
+            [meshvis(SILVER_MESHES[k][1], 2, P2) for k in ('nohat', 'eye')] + [meshvis(o, 2, P2) for o in OVERLAYS])
 
 
 def silver_off():
-    """his own look: the hair / eye swap's overrides ended (the visibility animation decides again: his own shown, the
-    copies hidden), the mustache / eyebrow overlays hidden (Persist 1)"""
-    return [meshvis(m, 2, 0) for k in ('hair', 'nohat', 'eye') for m in SILVER_MESHES[k]] + \
-        [meshvis(o, 0, 1) for o in OVERLAYS]
+    """his own look (v4, Persist 2): his cap, sideburns, full hair and eyes follow their tracks again (the game's own
+    state), the copies and overlays hidden"""
+    return ([meshvis(m, 2, P2) for m in model.HAT + (model.HAIR,) + tuple(SILVER_MESHES[k][0] for k in ('nohat', 'eye'))] +
+            [meshvis(SILVER_MESHES[k][1], 0, P2) for k in ('nohat', 'eye')] + [meshvis(o, 0, P2) for o in OVERLAYS])
 
 
 def if_var(var, method, value, body):
@@ -257,13 +268,12 @@ def if_var(var, method, value, body):
 
 
 def silver_scripts():
-    """{script name: game script body} of the swap's other scripts (none of them had a game script)"""
+    """{script name: game script body} of the swap's other scripts (none of them had a game script): Wait1 (Rebirth
+    plays it) applies the transformed look or his own by TIMER_0, Entry his own. v4: no side taunt script (the full
+    hair's copy follows its track, shown all through; his own full hair and cap stay hidden by their set state)"""
     wait = if_var(cave.V_FORM, 5, UI_TRANSFORMED_OVER, silver_on()) + if_var(cave.V_FORM, 2, UI_TRANSFORMED_OVER,
                                                                               silver_off())
-    nohat = SILVER_MESHES['nohat'][1]
-    appeal = timeline([(NOHAT_ON, if_var(cave.V_FORM, 5, UI_TRANSFORMED_OVER, [meshvis(nohat, 1, 0)])),
-                       (NOHAT_OFF, [meshvis(nohat, 2, 0)])])
-    return {'wait1': wait, 'entryl': silver_off(), 'entryr': silver_off(), 'appealsl': appeal, 'appealsr': appeal}
+    return {'wait1': wait, 'entryl': silver_off(), 'entryr': silver_off()}
 
 
 def graphic(key, bone=None, follow=True, size=1.0):
@@ -283,7 +293,7 @@ def scripts_for():
     rush = []
     for f in RUSH_AT:
         rush += [(f, [cmd('hit_log_clear', 0), rush_box(), cmd('hitbox_hold', 0, 2)]), (f + 2, [cmd('remove_all_hitboxes')])]
-    game = {anim.FORM: timeline([(FX_BURST_AT, silver_on())]),
+    game = {anim.FORM: timeline([(HAT_OFF_AT, hat_off()), (FX_BURST_AT, silver_on())]),
             anim.STRIKE: timeline([(0, [freeze_box()]), (1, [cmd('remove_all_hitboxes')])] + rush +
                                   [(STRIKE_AT, [cmd('hit_log_clear', 0), strike_box()]),
                                    (STRIKE_AT + 3, [cmd('remove_all_hitboxes')]), (CNT_END, silver_on())]),

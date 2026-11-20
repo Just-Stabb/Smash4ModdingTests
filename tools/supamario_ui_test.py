@@ -31,6 +31,7 @@ import omo  # noqa: E402
 import rolloff_hold_test as R  # noqa: E402
 import supamario_fakedeath_test as FT  # noqa: E402
 import supamario_ui_anim as A  # noqa: E402
+import supamario_ui_model as M  # noqa: E402
 import supamario_ui_build as B  # noqa: E402
 import supamario_ui_cave as C  # noqa: E402
 
@@ -489,10 +490,11 @@ def script_tests(out, ts_out):
           ov, ['Color_Overlay', 'Outline_Shell', 'Terminate_Overlays', 'Outline_Shell'])
     cams = [nm(c) for p in f for sname in B.SCRIPT.values() for c in f[p].script(sname) if 'camera' in nm(c).lower()]
     check('no camera command in any Ultra Instinct script (the user)', cams, [])
-    check('the transformation / the dodge / Secret Sensation\'s stance: no hitbox (v3: the transformation\'s game script '
-          'only the silver swap)',
+    check('the transformation / the dodge / Secret Sensation\'s stance: no hitbox (v4: the transformation\'s game script '
+          'only the cap off and the silver look)',
           [nm(c) for s in ('speciallwlight', 'specialairlwlight', 'specialairlwheavy') for c in f['game'].script(s)],
-          ['FRAME'] + ['Mesh_Visibility'] * (5 + len(B.OVERLAYS)) + ['Script_End', 'Script_End', 'Script_End'])
+          ['FRAME'] + ['Mesh_Visibility'] * 3 + ['FRAME'] + ['Mesh_Visibility'] * (6 + len(B.OVERLAYS)) +
+          ['Script_End', 'Script_End', 'Script_End'])
     eff = [c for c in f['effect'].script('speciallwlight') if 'graphic' in nm(c).lower()]
     check('the transformation\'s effects: start, the aura (7 parts), the burst',
           [c.params[0] for c in eff], [B.fx_id('start')] + [B.fx_id(k) for k in ('aura_hip', 'aura_chest', 'aura_head',
@@ -524,6 +526,7 @@ def mv(c):
     """a Mesh_Visibility command -> (mesh name, visible, persist)"""
     import mesh_vis_cave as MV
     names = {MV.crc32(n): n for k in B.SILVER_MESHES.values() for n in k}
+    names.update({MV.crc32(n): n for n in M.HAT + (M.HAIR,)})
     names.update({MV.crc32(n): n for n in B.OVERLAYS})
     return (names.get(c.params[1], hex(c.params[1])), c.params[2], c.params[3]) if c.params[0] == 0 else None
 
@@ -542,47 +545,50 @@ def at_frames(body):
 
 
 def silver_script_tests(f, b):
-    """v3: the silver hair / eyes swap (Mesh_Visibility) in the game scripts"""
-    H, N, E = (B.SILVER_MESHES[k] for k in ('hair', 'nohat', 'eye'))
+    """v4: the transformed look (Mesh_Visibility Persist 2: each mesh's own set state) in the game scripts: the cap off
+    from the transformation's start, the silver full hair / eyes / mustache / eyebrows from the burst, his own look on
+    Entry and in Wait1 while not transformed"""
+    N, E = (B.SILVER_MESHES[k] for k in ('nohat', 'eye'))
     O = B.OVERLAYS
+    hat, hair = M.HAT[0], M.HAIR
     check('v3: the mustache / eyebrow overlays: 3 mustache shapes, 7 eyebrow shapes', (
         sum('Mustache' in o for o in O), sum('Brows' in o for o in O)), (3, 7))
-    on = [(H[0], 0, 1), (N[0], 0, 1), (E[0], 0, 1), (H[1], 1, 1), (E[1], 1, 1)] + [(o, 2, 0) for o in O]
-    off = sorted([(m, 2, 0) for k in (H, N, E) for m in k] + [(o, 0, 1) for o in O])
+    on = [(hat, 0, 2), (hair, 0, 2), (N[0], 0, 2), (E[0], 0, 2), (N[1], 2, 2), (E[1], 2, 2)] + [(o, 2, 2) for o in O]
+    off = [(hat, 2, 2), (hair, 2, 2), (N[0], 2, 2), (E[0], 2, 2), (N[1], 0, 2), (E[1], 0, 2)] + [(o, 0, 2) for o in O]
+    hat_off = [(hat, 0, 2), (hair, 0, 2), (N[0], 1, 2)]
     nn = len(O)
     g = f['game']
     got = [(fr, mv(c)) for fr, c in at_frames(g.script('speciallwlight')) if c.name == 'Mesh_Visibility']
-    check('v3: the transformation\'s burst (%d): his hair / full hair / eyes hidden, the silver hair / eyes shown, '
-          'Persist 1; the overlays\' hiding ended (they follow his expressions)' % B.FX_BURST_AT, got,
-          [(float(B.FX_BURST_AT), x) for x in on])
-    check('v3: the burst is XV2\'s frame 220', B.FX_BURST_AT, 220)
+    check('v4: the transformation: the cap and sideburns off, his own full hair shown at its start (%d: the gold start, '
+          'the white body); at the burst (%d) the silver full hair / eyes / overlays follow their tracks, his own hidden '
+          '(Persist 2 every one)' % (B.HAT_OFF_AT, B.FX_BURST_AT), got,
+          [(float(B.HAT_OFF_AT), x) for x in hat_off] + [(float(B.FX_BURST_AT), x) for x in on])
+    check('v3: the burst is XV2\'s frame 220; v4: the cap off at XV2\'s 10', (B.FX_BURST_AT, B.HAT_OFF_AT), (220, 10))
     got = [(fr, mv(c)) for fr, c in at_frames(g.script('speciallwheavy')) if c.name == 'Mesh_Visibility']
-    check('v3: the counter (transformed afterwards): the same swap at its white body\'s end (%d)' % B.CNT_END, got,
+    check('v4: the counter (transformed afterwards): the transformed look at its white body\'s end (%d)' % B.CNT_END, got,
           [(float(B.CNT_END), x) for x in on])
     w = g.script('wait1')
     names = [c.name for c in w]
-    check('v3: Wait1 (no game script before): transformed (TIMER_0 > %g) the swap again, else every override ended' %
-          B.UI_TRANSFORMED_OVER, names, ['Float_Var_Compare', 'True'] + ['Mesh_Visibility'] * (5 + nn) +
-          ['Float_Var_Compare', 'True'] + ['Mesh_Visibility'] * (6 + nn) + ['Script_End'])
-    if len(w) == 17 + 2 * nn:
-        a, b2 = 2 + 5 + nn, 2 + 5 + nn + 2
+    k = len(on)
+    check('v4: Wait1: transformed (TIMER_0 > %g) the transformed look, else his own' % B.UI_TRANSFORMED_OVER, names,
+          ['Float_Var_Compare', 'True'] + ['Mesh_Visibility'] * k + ['Float_Var_Compare', 'True'] +
+          ['Mesh_Visibility'] * k + ['Script_End'])
+    if len(names) == 5 + 2 * k:
+        a = 2 + k
         check('  its conditions: TIMER_0 (0x%X) > / <= %g; the True blocks\' sizes' % (C.V_FORM, B.UI_TRANSFORMED_OVER),
               [(w[0].params, w[1].params), (w[a].params, w[a + 1].params)],
-              [([C.V_FORM, 5, B.UI_TRANSFORMED_OVER], [2 + 5 * (5 + nn)]),
-               ([C.V_FORM, 2, B.UI_TRANSFORMED_OVER], [2 + 5 * (6 + nn)])])
-        check('  the blocks: the swap / his own look (the overlays hidden)',
-              ([mv(c) for c in w[2:a]], sorted(mv(c) for c in w[b2:b2 + 6 + nn])), (on, off))
+              [([C.V_FORM, 5, B.UI_TRANSFORMED_OVER], [2 + 5 * k]), ([C.V_FORM, 2, B.UI_TRANSFORMED_OVER], [2 + 5 * k])])
+        check('  the blocks: transformed / his own', ([mv(c) for c in w[2:a]], [mv(c) for c in w[a + 2:a + 2 + k]]),
+              (on, off))
     for e in ('entryl', 'entryr'):
-        check('v3: %s: at frame 0 his own look (the swap\'s overrides ended, the overlays hidden)' % e,
-              sorted((fr, mv(c)) for fr, c in at_frames(g.script(e)) if c.name == 'Mesh_Visibility'),
-              [(0.0, x) for x in off])
+        check('v4: %s: at frame 0 his own look (Persist 2)' % e,
+              [(fr, mv(c)) for fr, c in at_frames(g.script(e)) if c.name == 'Mesh_Visibility'], [(0.0, x) for x in off])
     for a in ('appealsl', 'appealsr'):
-        got = [(fr, c.name, mv(c) if c.name == 'Mesh_Visibility' else c.params) for fr, c in at_frames(g.script(a))
-               if c.name != 'Script_End']
-        check('v3: %s (the cap off 17-72: Mario_Nohat on, Mario_Hair off): the silver full hair shown 17-72 while '
-              'transformed (Persist 0)' % a, got,
-              [(17.0, 'Float_Var_Compare', [C.V_FORM, 5, B.UI_TRANSFORMED_OVER]), (17.0, 'True', [7]),
-               (17.0, 'Mesh_Visibility', (N[1], 1, 0)), (72.0, 'Mesh_Visibility', (N[1], 2, 0))])
+        check('v4: %s has no game script (the full hair\'s copy follows its track; the cap stays hidden)' % a,
+              g.script(a), b['game'].script(a))
+    check('v4: every Mesh_Visibility of the Ultra Instinct scripts is Persist 2 (no override entry)',
+          sorted({c.params[3] for n in list(B.SCRIPT.values()) + list(B.silver_scripts()) for c in g.script(n) or []
+                  if c.name == 'Mesh_Visibility'}), [2])
     for p in f:
         for n in B.silver_scripts():
             if p != 'game':
@@ -591,6 +597,31 @@ def silver_script_tests(f, b):
     check('v3: no Mesh_Visibility override ends the whole object (Mesh -1: other moves\' overrides kept)',
           [n for p in f for h, sc in f[p].scripts.items() for c in sc if c.name == 'Mesh_Visibility' and
            c.params[1] == 0xFFFFFFFF], [])
+    mt = acmd_lookup_tests(f)
+    return mt
+
+
+BASE_DIR = None
+
+
+def acmd_lookup_tests(f):
+    """v4: the game's lookup for each Ultra Instinct slot: the slot -> the motion table's hash -> a script of that hash
+    in each file (sorted unsigned: the game's binary search, docs/native-notes.md "Script binding")"""
+    import struct as st_
+    mtab = os.path.join(BASE_DIR, 'script', 'animcmd', 'body', 'motion.mtable')
+    d = open(mtab, 'rb').read()
+    ws = st_.unpack('>%dI' % (len(d) // 4), d)
+    for slot, name in ((B.MOT_FORM, 'speciallwlight'), (B.MOT_STRIKE, 'speciallwheavy'), (B.MOT_DODGE, 'specialairlwlight'),
+                       (B.MOT_SS, 'specialairlwheavy')):
+        h = ws[slot]
+        check('v4: motion 0x%X -> the motion table\'s hash 0x%08X = crc("%s")' % (slot, h, name), h, acmd.crc(name))
+        for p in ('game', 'effect', 'sound', 'expression'):
+            hashes = [x for x in f[p].scripts]
+            check('  %s.bin: a script of that hash (binary search over the sorted table finds it)' % p,
+                  h in hashes and hashes == sorted(hashes), True)
+        n_cmd = {p: len([c for c in f[p].script(name) if c.name != 'Script_End']) for p in ('game', 'effect', 'sound')}
+        if slot == B.MOT_FORM:
+            check('  the transformation\'s game / effect / sound scripts are not empty', all(n_cmd.values()), True)
 
 
 def motion_tests(out, ts_out):
@@ -669,9 +700,20 @@ def model_tests(out, base):
         old, new = nud.read(os.path.join(src, 'model.nud')), nud.read(os.path.join(dst, 'model.nud'))
         n0 = len(old)
         ovs = M.overlays(old)
-        check('%s model.nud: the meshes as before, then the 3 copies and the %d overlays (c00\'s names)' % (c, len(ovs)),
-              ([m.name for m in new], [o['name'] for o in ovs]),
-              ([m.name for m in old] + [M.MESHES[k][1] for k in ('hair', 'nohat', 'eye')] + B.OVERLAYS, B.OVERLAYS))
+        check('%s model.nud: the meshes as before, then the 2 copies (v4: no sideburn copy) and the %d overlays (c00\'s '
+              'names)' % (c, len(ovs)), ([m.name for m in new], [o['name'] for o in ovs]),
+              ([m.name for m in old] + [M.MESHES[k][1] for k in ('nohat', 'eye')] + B.OVERLAYS, B.OVERLAYS))
+        import moi
+        m0 = moi.read(open(os.path.join(src, 'model.moi'), 'rb').read())
+        m1 = moi.read(open(os.path.join(dst, 'model.moi'), 'rb').read())
+        check('%s model.moi (v4): one table-1 entry per NUD mesh (the invariant every vanilla model keeps; v3: 47 meshes, '
+              '34 entries), the old entries kept, each copy\'s at its NUD index with its bone, VIS 1; table 2 the same '
+              'plus the copies\' names' % c,
+              (len(m1['t1']), m1['t1'][:len(m0['t1'])] == m0['t1'], m1['t2'][:len(m0['t2'])] == m0['t2'],
+               [(e['name'], e['index'], e['bone'], e['vis']) for e in m1['t1'][len(m0['t1']):]],
+               [(e['name'], e['index']) for e in m1['t2'][len(m0['t2']):]]),
+              (len(new), True, True, [(moi.prefix(x.name), i, x.bone & 0xFFFF, 1) for i, x in enumerate(new) if i >= n0],
+               [(moi.prefix(x.name), i) for i, x in enumerate(new) if i >= n0]))
         P = M.positions
         same = all(a.name == b.name and a.bone == b.bone and len(a.polygons) == len(b.polygons) and all(
             np.array_equal(pa.idx, pb.idx) and np.array_equal(P(pa), P(pb)) and
@@ -681,7 +723,8 @@ def model_tests(out, base):
         check('%s: every existing mesh unchanged (geometry, materials, textures)' % c, same, True)
         hair_id, iris_id = M.tex_ids(nn)
         by = {m.name: m for m in new}
-        for k, want in (('hair', {0: hair_id}), ('nohat', {0: hair_id}), ('eye', {0: iris_id, 1: iris_id})):
+        face_id = M.face_tex_id(nn)
+        for k, want in (('nohat', {0: hair_id}), ('eye', {0: iris_id, 1: iris_id})):
             a, b = by[M.MESHES[k][0]], by[M.MESHES[k][1]]
             geo = (a.bone, a.bind, len(a.polygons)) == (b.bone, b.bind, len(b.polygons)) and all(
                 np.array_equal(pa.idx, pb.idx) and np.array_equal(P(pa), P(pb)) and
@@ -710,14 +753,14 @@ def model_tests(out, base):
             ok = (b.bone == by[o['source']].bone and np.array_equal(pb.idx, tri) and
                   np.allclose(P(pb), P(a) + M.PUSH * n, atol=1e-3) and
                   [t['hash'] for t in pb.materials[0].textures][1:] == [t['hash'] for t in a.materials[0].textures][1:]
-                  and pb.materials[0].textures[0]['hash'] == hair_id and
+                  and pb.materials[0].textures[0]['hash'] == face_id and
                   [x.props for x in pb.materials] == [x.props for x in a.materials])
             ys = P(pb)[pb.idx.reshape(-1, 3)][:, :, 1]
             part_ok = (ys > M.BROW_Y - M.PUSH).all() if o['part'] == 'Brows' else (ys <= M.BROW_Y + M.PUSH).any(1).all()
             if not (ok and part_ok):
                 bad.append(o['name'])
         check('%s: each overlay = its face\'s mustache / eyebrow triangles (texture ..0B), pushed %g out along the '
-              'normals, the silver hair texture, the material otherwise as its source' % (c, M.PUSH), bad, [])
+              'normals, the face\'s own silver texture (v4), the material otherwise as its source' % (c, M.PUSH), bad, [])
         cover = sorted(m for o in ovs for m in o['members'])
         faces = sorted(m.name for m in old for p in m.polygons if p.materials and
                        (p.materials[0].textures[0]['hash'] & 0xFF) == M.FACE_TEX)
@@ -725,28 +768,34 @@ def model_tests(out, base):
               cover, sorted(faces * 2))
         mo, mn = nud.read(os.path.join(src, 'metal.nud')), nud.read(os.path.join(dst, 'metal.nud'))
         mb = {m.name: m for m in mn}
-        check('%s metal.nud: the 3 copies with the metal textures (the same mesh list as model.nud)' % c,
+        check('%s metal.nud: the 2 copies with the metal textures (the same mesh list as model.nud)' % c,
               ([m.name for m in mn][len(mo):], [[t['hash'] for t in mb[M.MESHES[k][1]].polygons[0].materials[0].textures]
                                                for k in M.MESHES]),
-              ([M.MESHES[k][1] for k in ('hair', 'nohat', 'eye')] + B.OVERLAYS,
+              ([M.MESHES[k][1] for k in ('nohat', 'eye')] + B.OVERLAYS,
                [[t['hash'] for t in mb[M.MESHES[k][0]].polygons[0].materials[0].textures] for k in M.MESHES]))
         d0, t0 = nut.load(os.path.join(src, 'model.nut'))
         d1, t1 = nut.load(os.path.join(dst, 'model.nut'))
-        kept = len(t1) == len(t0) + 2 and all(
+        kept = len(t1) == len(t0) + 3 and all(
             a.tex_id == b.tex_id and d0[a.data_off:a.data_off + a.image_size] == d1[b.data_off:b.data_off + b.image_size]
             and d0[a.mip_off:a.mip_off + a.mip_size * (a.levels > 1)] == d1[b.mip_off:b.mip_off + b.mip_size * (b.levels > 1)]
             and d0[a.gtx:a.gtx + 0x80] == d1[b.gtx:b.gtx + 0x80] for a, b in zip(t0, t1))
-        check('%s model.nut: every texture kept byte for byte, 2 added' % c, kept, True)
+        check('%s model.nut: every texture kept byte for byte, 3 added' % c, kept, True)
         lo, hi = T.fighter_range('supamario')
-        check('%s: the new ids 0x%08X / 0x%08X, in Supamario\'s own range' % (c, hair_id, iris_id),
-              ([t.tex_id for t in t1[-2:]], all(lo <= t.tex_id < hi for t in t1[-2:])), ([hair_id, iris_id], True))
-        hair = nut.decode(d1, t1[-2]).reshape(-1, 4).astype(float)
+        check('%s: the new ids 0x%08X / 0x%08X / 0x%08X, in Supamario\'s own range' % (c, hair_id, iris_id, face_id),
+              ([t.tex_id for t in t1[-3:]], all(lo <= t.tex_id < hi for t in t1[-3:])), ([hair_id, iris_id, face_id], True))
+        face = nut.decode(d1, t1[-1])[..., :3].astype(float)
+        main, shade = M.SILVER['hair']
+        check('%s: the mustache / eyebrows\' silver (v4): darker than v3\'s flat %g (at most %g x the sheen: FACE_TONE %g), '
+              'grey (blue >= red), with the strands\' shading (not flat)' % (c, main, main * M.FACE_TONE, M.FACE_TONE),
+              (bool(face.max() <= 255 * main * M.FACE_TONE * max(M.SHEEN) + 4), bool((face[..., 2] >= face[..., 0] - 2).all()),
+               bool(face.std() > 1.0)), (True, True, True))
+        hair = nut.decode(d1, t1[-3]).reshape(-1, 4).astype(float)
         main, _shade = M.SILVER['hair']
         want = [round(255 * main * x) for x in M.SHEEN]
         check('%s: the silver hair %s (SILVER hair %g x the sheen, BC1 within 4)' % (c, want, main),
               bool((abs(hair[:, :3] - want) <= 4).all()), True)
         src_iris = nut.decode(d0, [t for t in t0 if t.tex_id & 0xFF == M.SRC_TEX['iris']][0])
-        iris = nut.decode(d1, t1[-1])
+        iris = nut.decode(d1, t1[-2])
         a = iris[..., 3] > 128
         rgb = iris[a][:, :3].astype(float)
         rgb = rgb[rgb.max(1) > 40]                 # the pupil's near-black left out (BC rounding there)
@@ -769,19 +818,28 @@ def model_tests(out, base):
                     continue
                 r0, r1 = mta.read(x0), mta.read(x1)
                 want = []
+                vis0 = {v['name']: [(f, st) for f, st, _ in v['keys']] for v in r0['vis']}
+                hidden = any(k in na for k in M.OVERLAY_HIDDEN)
                 for v in r0['vis']:
                     want.append((v['name'], v['keys']))
                     for k, (orig, cp) in M.MESHES.items():
                         if v['name'] == orig:
-                            want.append((cp, [(0, 0, 0)]))
+                            if hidden:
+                                kk = [(0, 0, 0)]
+                            elif k == 'eye':
+                                kk = list(v['keys'])
+                            else:
+                                last = max(f for f, _s, _x in v['keys'])
+                                kk = [(0, 1, 0)] + ([(last, 1, 0)] if last > 0 else [])
+                            want.append((cp, kk))
                             n += 1
-                vis0 = {v['name']: [(f, st) for f, st, _ in v['keys']] for v in r0['vis']}
                 want += [(nm, [(f, st, 0) for f, st in k]) for nm, k in M.overlay_tracks(na, vis0, ovs)]
                 vo = struct.unpack('>I', x0[0x24:0x28])[0]
                 if r0['mats'] != r1['mats'] or [(v['name'], v['keys']) for v in r1['vis']] != want or \
                         x0[:0x20] + x0[0x24:vo] != x1[:0x20] + x1[0x24:vo]:
                     bad.append(na)
-            check('%s %s: each hair / full hair / eye track followed by its copy\'s, hidden all through (%d added); '
+            check('%s %s: v4: each full hair / eye track followed by its copy\'s (the eye copy = his eyes\' keys, the full '
+                  'hair\'s shown all through; hidden all through in the entry / win / lose / display motions) (%d added); '
                   'every other byte before the tracks, the materials and the tracks kept' % (c, pk, n), bad, [])
         pk = open(os.path.join(dst, M.PACS[0]), 'rb').read()
         tr = {}
@@ -801,9 +859,12 @@ def model_tests(out, base):
         if dm:
             x = open(os.path.join(dst, M.PACS[0]), 'rb').read()[dm[0][1]:dm[0][1] + dm[0][2]]
             vis = {v['name']: v['keys'] for v in mta.read(x)['vis']}
-            check('%s: hidden by default (default.mta: the copies off, his own hair / eyes on)' % c,
-                  [vis.get(M.MESHES[k][1]) for k in ('hair', 'eye')] + [vis.get(M.MESHES[k][0]) for k in ('hair', 'eye')],
-                  [[(0, 0, 0)]] * 2 + [[(0, 1, 0)]] * 2)
+            check('%s: v4 default.mta: the eye copy follows his eyes\' track, the full hair\'s copy shown (untransformed '
+                  'they are hidden by their set state: Persist 2)' % c,
+                  [vis.get(M.MESHES[k][1]) for k in ('nohat', 'eye')],
+                  [[(0, 1, 0)] + ([(max(f for f, _s, _x in vis[M.MESHES['nohat'][0]]), 1, 0)]
+                                  if max(f for f, _s, _x in vis[M.MESHES['nohat'][0]]) > 0 else []),
+                   vis[M.MESHES['eye'][0]]])
 
 
 def ids_from_json(out):
@@ -819,6 +880,8 @@ def main():
     if len(a) != 3:
         sys.exit(__doc__)
     out, ts_out, base = a
+    global BASE_DIR
+    BASE_DIR = base
     ids_from_json(out)
     r = Run(os.path.join(out, 'fighter', 'supamario', 'script', 'msc', 'supamario.mscsb'))
     trigger_tests(r)

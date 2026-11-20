@@ -31,6 +31,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.append(HERE)
+import moi  # noqa: E402
 import mta  # noqa: E402
 import nud  # noqa: E402
 import nut  # noqa: E402
@@ -68,10 +69,17 @@ SHEEN = (0.96, 0.99, 1.05)           # the faint blue-white tint on both (Ultra 
 
 COSTUMES = 8
 TEX_BASE = 0x40C10000                # Supamario's own texture ids (fighter_texture_ids.py: kind 0x41), + 0x400 a costume
-TEX_HAIR, TEX_IRIS = 0, 1            # + these
-MESHES = {'hair': ('Mario_Hair_VIS_O_OBJ', 'Mario_HairUI_VIS_O_OBJ'),
-          'nohat': ('Mario_Nohat_VIS_O_OBJ', 'Mario_NohatUI_VIS_O_OBJ'),
+TEX_HAIR, TEX_IRIS, TEX_FACE = 0, 1, 2     # + these (v4: TEX_FACE the mustache / eyebrows' own silver)
+# v4: no sideburn copy (Mario_HairUI): while transformed his cap is off and the full hair (Mario_Nohat's copy) shows
+MESHES = {'nohat': ('Mario_Nohat_VIS_O_OBJ', 'Mario_NohatUI_VIS_O_OBJ'),
           'eye': ('Mario_Eye_VIS_O_OBJ', 'Mario_EyeUI_VIS_O_OBJ')}
+HAT = ('Mario_Hathead_VIS_O_OBJ',)  # his cap (model.nud: the only cap mesh, bone 64; Mario_Hair = the sideburns /
+                                     # back hair under it)
+HAIR = 'Mario_Hair_VIS_O_OBJ'
+# v4: the mustache / eyebrows' silver is the face texture's own shading (..0B: the strands) mapped onto the hair's
+# grey range and darkened by FACE_TONE: v3 put the flat hair silver (0.8) on them and the face's material drew it
+# almost white (the user's v3 close-up). APPROXIMATED (flagged): FACE_TONE chosen, not from XV2's files
+FACE_TONE = 0.62
 PACS = ('material_anime_eyelid.pac', 'material_anime_eyelid_lang.pac')   # the ones with the hair / eye / face tracks
 FACE_TEX = 0x0B                      # the mustache / eyebrows polygon's texture (low byte)
 BROW_Y = 11.8                        # its triangles above this (all three vertices): the eyebrows; below: the mustache
@@ -83,6 +91,23 @@ SRC_TEX = {'hair': 0x09, 'iris': 0x07}       # Mario's texture ids' low byte (0x
 
 def tex_ids(nn):
     return TEX_BASE + 0x400 * nn + TEX_HAIR, TEX_BASE + 0x400 * nn + TEX_IRIS
+
+
+def face_tex_id(nn):
+    return TEX_BASE + 0x400 * nn + TEX_FACE
+
+
+def silver_face(img):
+    """the face texture (..0B: the mustache / eyebrows, near black with the strands' shading) -> silver: its brightness
+    normalised (the strands' shading kept), mapped onto SILVER['hair']'s shading .. main grey, times FACE_TONE, the
+    sheen; alpha unchanged"""
+    main, shade = SILVER['hair']
+    v = img[..., :3].astype(float).max(2) / 255.0
+    t = v / max(v.max(), 1e-6)
+    g = (shade + (main - shade) * t) * FACE_TONE
+    out = img.copy()
+    out[..., :3] = np.round(255 * np.clip(g[..., None] * np.array(SHEEN), 0, 1))
+    return out
 
 
 def _rgb(grey):
@@ -187,6 +212,26 @@ def or_keys(tracks, last):
     return out
 
 
+def copy_tracks(mta_name, vis):
+    """v4: {his mesh: (its copy, keys)} for one MTA (VIS {mesh: [(frame, state)]}): the eye copy follows his eyes'
+    track (blinks), the full hair's copy is shown all through (the cap is off while transformed); both hidden all through
+    in the entry / win / lose / display motions. Untransformed the copies are kept hidden by their own set state
+    (Mesh_Visibility Persist 2, tools/supamario_ui_build.py), not by these tracks"""
+    hidden = any(k in mta_name for k in OVERLAY_HIDDEN)
+    out = {}
+    for k, (orig, cp) in MESHES.items():
+        if orig not in vis:
+            continue
+        if hidden:
+            out[orig] = (cp, [(0, 0)])
+        elif k == 'eye':
+            out[orig] = (cp, list(vis[orig]))
+        else:
+            last = max(f for f, _s in vis[orig])
+            out[orig] = (cp, [(0, 1)] + ([(last, 1)] if last > 0 else []))
+    return out
+
+
 def overlay_tracks(mta_name, vis, ovs):
     """[(overlay name, keys)] for one MTA's visibility tracks VIS ({mesh: [(frame, state)]}, last frame LAST)"""
     if not vis:
@@ -209,27 +254,36 @@ def costume(src, dst, nn, png=None):
     hair_id, iris_id = tex_ids(nn)
     d, texs = nut.load(os.path.join(src, 'model.nut'))
     by = {t.tex_id & 0xFF: t for t in texs if (t.tex_id & 0xFFFFFC00) == 0x40110000 + 0x400 * nn}
+    face_id = face_tex_id(nn)
     hair = silver_hair(nut.decode(d, by[SRC_TEX['hair']]))
     iris = silver_iris(nut.decode(d, by[SRC_TEX['iris']]))
+    face = silver_face(nut.decode(d, by[FACE_TEX]))
     raw = open(os.path.join(src, 'model.nut'), 'rb').read()
-    out = nut.append_ntwu(raw, [(hair_id, 0x31, hair), (iris_id, 0x33, iris)])
+    out = nut.append_ntwu(raw, [(hair_id, 0x31, hair), (iris_id, 0x33, iris),
+                                (face_id, 0x33 if (face[..., 3] < 250).any() else 0x31, face)])
     open(os.path.join(dst, 'model.nut'), 'wb').write(out)
     if png:
         from PIL import Image
         os.makedirs(png, exist_ok=True)
-        for name, img, t in (('hair', hair, SRC_TEX['hair']), ('iris', iris, SRC_TEX['iris'])):
+        for name, img, t in (('hair', hair, SRC_TEX['hair']), ('iris', iris, SRC_TEX['iris']), ('face', face, FACE_TEX)):
             Image.fromarray(nut.decode(d, by[t]), 'RGBA').save(os.path.join(png, 'c%02d_%s_before.png' % (nn, name)))
             Image.fromarray(img, 'RGBA').save(os.path.join(png, 'c%02d_%s_after.png' % (nn, name)))
-    texmap = {'hair': {0: {0: hair_id}}, 'nohat': {0: {0: hair_id}}, 'eye': {0: {0: iris_id}, 1: {0: iris_id}}}
-    ovs = overlays(nud.read(os.path.join(src, 'model.nud')))
+    texmap = {'nohat': {0: {0: hair_id}}, 'eye': {0: {0: iris_id}, 1: {0: iris_id}}}
+    base_meshes = nud.read(os.path.join(src, 'model.nud'))
+    ovs = overlays(base_meshes)
     for fn, retex in (('model.nud', True), ('metal.nud', False)):
         p = os.path.join(src, fn)
         if os.path.exists(p):
             copies = [(a, b, texmap[k] if retex else {}) for k, (a, b) in MESHES.items()]
-            copies += [(o['source'], o['name'], {o['poly']: {0: hair_id}} if retex else {},
+            copies += [(o['source'], o['name'], {o['poly']: {0: face_id}} if retex else {},
                         {'polys': [o['poly']], 'tris': {o['poly']: o['tris']}, 'push': PUSH}) for o in ovs]
             open(os.path.join(dst, fn), 'wb').write(nud.clone_meshes(open(p, 'rb').read(), copies))
-    tracks = {a: (b, None) for a, b in MESHES.values()}
+    # v4: model.moi gets the copies' entries: every model's table has one entry per NUD mesh (its count = the NUD's
+    # mesh count in every vanilla model; v3's copies had none: 47 meshes, 34 entries)
+    new_meshes = nud.read(os.path.join(dst, 'model.nud'))
+    added_meshes = [(m.name, i, m.bone) for i, m in enumerate(new_meshes) if i >= len(base_meshes)]
+    open(os.path.join(dst, 'model.moi'), 'wb').write(
+        moi.add_meshes(open(os.path.join(src, 'model.moi'), 'rb').read(), added_meshes))
     added = 0
     for pk in PACS:
         p = os.path.join(src, pk)
@@ -240,11 +294,12 @@ def costume(src, dst, nn, png=None):
             if b[:4] != b'MTA4':
                 return b
             vis = {v['name']: [(f, s) for f, s, _ in v['keys']] for v in mta.read(b)['vis']}
-            return mta.add_vis(b, tracks, overlay_tracks(name, vis, ovs))
+            return mta.add_vis(b, copy_tracks(name, vis), overlay_tracks(name, vis, ovs))
         new = mta.pac_map(open(p, 'rb').read(), fn)
         open(os.path.join(dst, pk), 'wb').write(new)
         added += 1
-    return {'hair_id': '0x%08X' % hair_id, 'iris_id': '0x%08X' % iris_id, 'pacs': added,
+    return {'hair_id': '0x%08X' % hair_id, 'iris_id': '0x%08X' % iris_id, 'face_id': '0x%08X' % face_id, 'pacs': added,
+            'moi_added': [n for n, _i, _b in added_meshes],
             'overlays': {o['name']: o['members'] for o in ovs},
             'hair_rgb': [int(x) for x in hair[0, 0, :3]]}
 
