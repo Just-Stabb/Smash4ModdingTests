@@ -3875,3 +3875,53 @@ Install over v2 (only the files that changed). Built by the same `tools/supamari
 - **Open (the user, later):** the exact UI colours (the CUS aura row); the dodge's manual counter, the user's rule: not
   during the autododge, but from his **spot dodge (EscapeN) while transformed** when an opponent's attack came at him
   during it and attack or special is pressed during it. XV2's CMN.bac / CMN.ean (common moves) are in `ui_in/cmn` for it.
+
+## Ultra Instinct v4 (`supamario_ultrainstinct_v4.zip`, exe `exe_v46z_ui2`; TEST ONLY `exe_v46z_ui2_diag`)
+Install over v3 (only the files that changed) with the new executable (exe_v46z_ui2 = exe_v46z_outline4 +
+`tools/supamario_ui_cave.py`, reproduced byte for byte by it). The user's v3 report: the silver eyes / mustache always
+showed and the hair never changed; no effects / sounds / white glow during the transformation; the autododge never
+fired; Secret Sensation blocked a Killer Eye's shot (placed by Donkey Kong) without sliding; the aura splotchy purple.
+- **Why the copies always showed (from the files):** every model in the repo has `model.moi` table 1's count = its
+  `model.nud`'s mesh count (one entry per mesh, NUD order; table 2 the VIS names -> mesh index). v3 appended 13 meshes
+  (47) and left the moi at 34. The game's visibility track binding / mesh walks use a per-model mesh count, and a new
+  mesh's byte starts as "follow the animation, shown" (docs/native-notes.md "Supamario's Ultra Instinct" v4), so a copy
+  the animation can't reach is drawn. v4: `tools/moi.py` gives every copy its entries (table 1: its prefix, bone, index,
+  VIS 1; table 2 its name; hash = CRC32 of the prefix: the game's hash function isn't known, flagged); round trips
+  Mario's moi byte for byte.
+- **The look by the meshes' own state (no override entries):** Mesh_Visibility **Persist 2** (new, exe_v46z_ui2): the
+  game's setter writes the mesh's own set state (0 hidden, 1 shown, 2 follow the animation), no entry in the 32-entry
+  table, kept until written again. The copies' tracks now FOLLOW (the eye copy = his eyes' keys, the full hair's copy
+  shown all through, the overlays their faces; all hidden in the entry / win / lose / display motions), and his own
+  state hides them while untransformed: Entry and Wait1 (Rebirth plays it) write his own look (cap / sideburns / full
+  hair / eyes 2, copies 0); the transformation, its counter's end and Wait1 while transformed write the transformed
+  look. No sideburn copy any more (Mario_HairUI dropped).
+- **The cap (the user's request):** from the transformation's start (**frame 10**, XV2's gold start under the white
+  body) Mario_Hathead (his only cap mesh) and Mario_Hair (the sideburns under it) hidden, his own full hair
+  (Mario_Nohat) shown; at the burst (220) the silver full hair (Mario_NohatUI) / eyes / overlays follow their tracks
+  and his own are hidden, until Entry / a respawn (TIMER_0 reset) gives his look back. The side taunt while transformed:
+  no cap to take off (its own cap-off animation untransformed is untouched: no side-taunt script any more).
+- **The mustache's colour:** its overlays get their own silver (`silver_face`: the face texture ..0B's strand shading
+  on the hair's grey range x `FACE_TONE` 0.62, approximated) instead of v3's flat 0.8 (drawn almost white by the
+  face's material).
+- **Secret Sensation's owner chain** (cave slot 42): `[acc + 0x6C] + 0x34`, else LinkModule link 0, followed through
+  weapons / items to a fighter (4 steps, loop guard); none: the stance plays out as before.
+- **The transformation's scripts:** the lookup by files is right (motion 0x231 -> `0x9221C757` -> a non-empty
+  script in each sorted .bin; `supamario_ui_test.py` checks it for all four slots). Prime suspect, not confirmed:
+  Mario's native code special-cases statuses 0x157 / 0x158 (F.L.U.D.D.: its scripts are the pump article's), so the
+  transformation / counter / dodge statuses would bind no body scripts. **Not fixed in v4:** the diag build's S4UM /
+  S4UB lines settle it; the fix then is the transformation in another status (0x155 with a phase). Until then the
+  transformed look still comes from Wait1 after the transformation.
+- **The autododge:** re-read statically (slot 43's search, TIMER_1 / 2 4-frame signals, ui_tick / ui_can_dodge): no
+  error found; the diag's S4U3 lines (status, TIMER_0 as read, attacker found, uncounterable, result) say where it
+  stops.
+- **The aura:** hue 262 (blue-violet), saturation x 0.45 (`AURA_HUE` / `AURA_SAT`). Distortion: Smash 4's format has
+  refraction emitters (shader_type 1, a distortion-map texture: the fireball's shimmer; docs/custom-effects.md), so an
+  XV2-style heat haze can be added by cloning one into the aura sets: **not done in v4**, nor the splotchiness study
+  (particle size / alpha / emission against the clip).
+- Diag lines: docs/native-notes.md "Supamario's Ultra Instinct" v4.
+- Tests: `supamario_ui_cave_test.py` **187 ok** (v4: the owner chain's 10 cases, Persist 2's setter / pass-through, the
+  diag lines S4U2 / S4U5 / S4U3 / S4UV / S4UM / S4UB); `supamario_ui_test.py` **342 ok** (v4: the moi invariant,
+  the follow tracks, the cap / silver scripts (Persist 2 only), the mustache texture, the script lookup per slot);
+  the earlier suites (see the v4 commit); `import_call_check` 0 on both exes; `fighter_texture_ids.py check` 0 errors.
+- **Not done / open:** the Sm4shCommand rebuild for Persist 2's help text (`tools/acmd_ext_help.py` updated; the
+  parameter list is unchanged, Events.cfg regenerated identical); the 0x157 status move; the aura's distortion.

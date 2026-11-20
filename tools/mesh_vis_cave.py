@@ -93,7 +93,8 @@ NEW_CMDS = [
         ('Visible', 0, '0 hide it, 1 show it, 2 end this mesh\'s override (the motion\'s visibility animation and the '
                        'visibility groups decide again).'),
         ('Persist', 0, '0: until the animation changes (as Model_Changer and the motion\'s own visibility); 1: until '
-                       'changed, a KO, the match end or a training reset.')],
+                       'changed, a KO, the match end or a training reset; 2 (exe_v46z_ui2): the mesh\'s own state (0 '
+                       'hidden, 1 shown, 2 follow the animation), no override, kept until written again.')],
      'Hides or shows one of an object\'s meshes by name, for this animation or until changed, over the motion\'s '
      'visibility animation and the visibility groups; a mesh with several parts changes whole (exe_v46z_outline2). New '
      'command: needs the patched cross_f.rpx (tools/mesh_vis_cave.py, exe_v46z_outline; v2 in exe_v46z_outline2).'),

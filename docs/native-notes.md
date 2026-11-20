@@ -2639,7 +2639,7 @@ temporary diag caves' `0x04BCC000`); variables `0x0F0003D0`-`0x0F0003DA`; comman
 `0x04BD88C4`, data `0x04BD9F00`, the reset lists `0x04BDA000`; `textregion:0x2BE0000 grow:0x04BE0000`).
 `0x04BD6000`-`0x04BD8000` (between ts_data's end and this) was free; `0x04BD6000`-`0x04BD7000` is now the whip motion
 table's (Byleth v15, below), `0x04BD7000`-`0x04BD8000` the hitbox hold's (rapid_setoff v1, below). `0x04BE0000`-`0x04BE2000`
-(past this region, the text region grown again) is the camera effects' (camera_effects v1, "Camera effects" below). `0x04BE2000`-`0x04BE3000` (grown again) is the screen invert's (screen_invert v1, "Screen colour" below). `0x04BE3000`-`0x04BE4000` (grown again) is the outline's and `0x04BE4000`-`0x04BE5000` (grown again) the mesh visibility's (model_commands v1, "Outline" / "Mesh visibility" below). `0x04BE5000`-`0x04BE8000` (grown again; to `0x04BE7000` before exe_v46z_outline4) is the outline shell's (model_commands v2, "Outline shell" below). `0x04BE8000`-`0x04BE9000` (grown again) is Supamario's Ultra Instinct cave (exe_v46z_ui, "Supamario's Ultra Instinct" below). The combined exe the user runs:
+(past this region, the text region grown again) is the camera effects' (camera_effects v1, "Camera effects" below). `0x04BE2000`-`0x04BE3000` (grown again) is the screen invert's (screen_invert v1, "Screen colour" below). `0x04BE3000`-`0x04BE4000` (grown again) is the outline's and `0x04BE4000`-`0x04BE5000` (grown again) the mesh visibility's (model_commands v1, "Outline" / "Mesh visibility" below). `0x04BE5000`-`0x04BE8000` (grown again; to `0x04BE7000` before exe_v46z_outline4) is the outline shell's (model_commands v2, "Outline shell" below). `0x04BE8000`-`0x04BEA000` (grown again; to `0x04BE9000` before exe_v46z_ui2) is Supamario's Ultra Instinct cave (exe_v46z_ui / exe_v46z_ui2, "Supamario's Ultra Instinct" below). The combined exe the user runs:
 exe_v46v_threads -> var_reset_cave.py (exe_v46w_vars) -> tools/line_test_cave.py (exe_v46w_vars_line, which chains on
 four of these hooks).
 
@@ -3349,7 +3349,7 @@ when the background is drawn after the fighter; a part drawn after another may l
 
 ## Supamario's Ultra Instinct (`tools/supamario_ui_cave.py`, exe_v46z_ui)
 
-**Claimed region: `0x04BE8000`-`0x04BE9000`** (past the outline shell's; `textregion:0x2BE9000 grow:0x04BE9000`). Base:
+**Claimed region: `0x04BE8000`-`0x04BEA000`** (v1-v3 to `0x04BE9000`; `textregion:0x2BEA000 grow:0x04BEA000`). Base:
 exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATCHED]` (unicorn, 144 checks).
 `tools/import_call_check.py` 0 (only game functions are called, through ctr). User-side: fighters/supamario/README.md
 "Ultra Instinct v1".
@@ -3372,6 +3372,45 @@ exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATC
   AttackModule (`[[entry + 0xC] + 0x50]`, records on `+0x4C`) has his object id in a part's record list (`[AM + 0x14] +
   part x 0x174`: sentinel `+0x124`, first node `+0x128`, node `+0x18` the object hit, `+0x27` the hitbox id), hit data
   `+0x54 == 0`: TIMER_1 (attacker to his right) / TIMER_2 = 4.0 through set_float (vt `+0x4C`), the handled bit, 0.
+- **v4 (exe_v46z_ui2; region now `0x04BE8000`-`0x04BEA000`, `textregion:0x2BEA000 grow:0x04BEA000`):**
+  - **Slot 42's owner CHAIN** (the user's v3 test: Secret Sensation blocked a Killer Eye's shot (an item placed by
+    Donkey Kong) and didn't slide: v3 took the hit object's `[acc + 0x6C] + 0x34` once and required a fighter id, so a
+    shot owned by an item failed): each step takes the object's `[acc + 0x6C] + 0x34` (the current owner: the
+    reflector after a reflect, docs "Reflection"), else its LinkModule (`acc + 0x68`) link 0 (vt `+0x5C(0)` has it,
+    vt `+0x6C(0, 1)` its id: "A weapon's owner"), an id of category 0-2 that isn't the object itself; a fighter ends
+    it, a weapon / item is resolved (handle, alive) and followed, at most 4 steps; none (a stage item, a gimmick's, a
+    loop): the stance plays out as before. Static reading + unicorn (`supamario_ui_cave_test.py`: the Killer Eye's
+    chain both ways, Link's arrow by link 0, Samus's missile by `+0x34`, an article's shot, a stage item, a gimmick
+    owner, a loop, a 5-step chain, a gone thrower). Not confirmed in game: which of the two fields the game fills for
+    a placed item (the chain tries both).
+  - **Mesh_Visibility Persist 2**: `mv_apply` (`0x04BE4294` in exe_v46z_outline4, its first four words asserted)
+    branches to `mvp2` first: Persist 2 -> the game's setter `0x034232FC(MI, mesh, Visible (0-2), 0)` (mv_set still
+    keeps it aside under an override), no table entry; else mv_apply's own first word and on.
+  - **Why v3's copies always showed** (the user: silver eyes / white mustache at 0%): every model the repo holds has
+    `model.moi` table 1's count = its NUD's mesh count (one entry per mesh, in order; table 2 the VIS names -> mesh
+    index); v3 appended 13 meshes to the NUD and none to the moi (47 / 34). The game's own binding of a visibility
+    track (`0x03427B58`: each track's name against the model resource's meshes, `0x0347A078`) and the mesh walk read
+    `[[MI + 0x6E4] + 0x44]` (= the resource's vt `+0x94`, `0x03478A6C`); which count the moi feeds wasn't traced: v4
+    gives the copies moi entries (`tools/moi.py`), so both counts agree whichever it is. A new mesh's byte starts
+    `0xFE` (`0x03420B4C`: follow the animation, the animation's bit on): a copy the animation can't reach is drawn.
+  - **The transformation's scripts (the user: no effects, sounds or hair change in SpecialLwLight):** motion 0x231's
+    hash (`0x9221C757`) is in the motion table and in every installed .bin (sorted), so the lookup by files is right.
+    Prime suspect, not confirmed: Mario's native code special-cases statuses **0x157 / 0x158** (F.L.U.D.D.'s shoot /
+    end, `0x02F169D0`: transitions 0x152 -> 0x157 -> 0x158 -> 0x159, and for 0x157 / 0x158 a table at `0x101393A0`),
+    and the motion change `0x027606C0` clears all three script agents when its byte `+0x2E` (set through vt `+0x4C`
+    `0x027608B0`) asks for the linked object's kind and no link 0 exists (`0x02760750`): F.L.U.D.D.'s scripts are the
+    pump article's (vanilla game.bin has none for the down special). The transformation, its counter (0x157) and the
+    dodge (0x158) would then run no body scripts. The diag build logs it (S4UM / S4UB below); the fix, once
+    confirmed: the transformation in another status (0x155 with a phase, as Fake Death's scripts run there).
+  - **--diag (TEST ONLY, exe_v46z_ui2_diag)**, OSReport through the veneer `0x0288B4D4`, no pauses: `S4U2 st grp cat
+    obj flags x y` per slot-42 call of kind 0x41 (flags: 0x10000 answered, 0x20000 not a fighter, 0x40000 found; x / y
+    float bits), `S4U5 chain n ids` (the owner chain), `S4U3 st t0 found att unc ret` per slot-43 call (t0 TIMER_0's
+    bits as slot 43 read it, att the attacker found in the hit records, unc the hit's uncounterable byte (-1 not read),
+    ret 0 = no damage / dodge signalled), `S4UV mi mesh val before after` per Persist-2 write, `S4UM kind motion hash
+    n` (`0x02E42518` hooked: its call from the motion change for kind 0x41; motions 0x229 / 0x231 / 0x235 / 0x239 /
+    0x241 / 0x245 always, 20 others), `S4UB hash found set kind n` (`0x02BEE580`'s `bl 0x02BEE404`: the bind from the
+    motion change for kind 0x41 and the UI / Entry / Wait1 / Fake Death / Sledgehammer hashes; set 0 game 1 expression
+    2 sound 3 effect). At most 1500 S4UM / S4UB lines.
 - **Not confirmed in game:** the hit records' timing against the damage event (records are the collision's "don't hit
   twice" log: present when the hit is dealt, by static reading); a stale record of an earlier hit of the same move could
   make a projectile hit in the same move's lifetime dodge.

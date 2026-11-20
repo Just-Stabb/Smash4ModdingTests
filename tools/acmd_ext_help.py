@@ -3287,7 +3287,11 @@ HELP['Mesh_Visibility'] = [
     '- Visible: 0 hide it, 1 show it (even if the animation hides it), 2 end this mesh\'s override (the motion\'s '
     'visibility and the groups decide again).',
     '- Persist: 0 until the animation changes (the next motion: the end of the move, a hit, a jump); 1 until changed, '
-    'a KO, the match end or a training reset.',
+    'a KO, the match end or a training reset; **2 (new in exe_v46z_ui2, Sm4shCommand v1.7.18): the mesh\'s own state**: '
+    'Visible 0 hidden, 1 shown, 2 follow the motion\'s visibility animation, written as the game\'s own set state (as a '
+    'visibility group writes it): no override entry, nothing ends it (motion changes, KOs, training resets keep it) '
+    'until another Persist 2 (or a visibility group) writes that mesh again. An override (Persist 0 / 1) on that mesh '
+    'still wins while it lasts and gives this state back when it ends.',
     '',
     '## Gotchas',
     '- **Names, not groups**: a vanilla visibility group (Model_Changer\'s ChangerID) switches between sets of meshes; '
@@ -3298,6 +3302,11 @@ HELP['Mesh_Visibility'] = [
     '- **Articles** (a projectile, a held item) have their own models: Target 0 in the article\'s script, or the '
     'fighter\'s Mesh_Visibility won\'t find the article\'s meshes.',
     '- A name the model doesn\'t have does nothing (check the spelling and case: "Gamemodel" is not "GameModel").',
+    '- **Persist 2 (what changed in exe_v46z_ui2)**: before, Persist was 0 or 1 (an override, kept in a 32-entry table '
+    'shared by every object). Persist 2 uses no table entry, so a look that lasts a whole stock (a transformation\'s '
+    'hair, a hidden cap) costs nothing; it needs exe_v46z_ui2 or later (an older executable treats 2 as Persist 1). It '
+    'does not end by itself: write the mesh\'s state back (usually Visible 2, follow the animation) when the look ends, '
+    'e.g. in Entry and in Wait1 (Rebirth plays it).',
     '- The Hitbox Viewer follows it (the Model parts tab shows the mesh hidden / shown "by Mesh_Visibility").',
     'Needs exe_v46z_outline (tools/mesh_vis_cave.py; exe_v46z_inv + the outline + it). Without it a script that uses '
     'this command won\'t load properly: ship the executable with any script that uses it.',
@@ -3344,6 +3353,14 @@ EXAMPLES['Mesh_Visibility'] = [
     'Mesh_Visibility(Target=0, Mesh="MarioD_hair_O_OBJ", Visible=0, Persist=1)',
     'FRAME(Frames=40)',
     'Mesh_Visibility(Target=0, Mesh="MarioD_hair_O_OBJ", Visible=2, Persist=0)',
+    '',
+    '// Example 8 (Persist 2, exe_v46z_ui2): a transformation that takes the cap off for the rest of the stock with',
+    '// no override entry; a silver copy of the hair follows its own visibility track; Entry gives his look back',
+    'Mesh_Visibility(Target=0, Mesh="Mario_Hathead_VIS_O_OBJ", Visible=0, Persist=2)',
+    'Mesh_Visibility(Target=0, Mesh="Mario_NohatUI_VIS_O_OBJ", Visible=2, Persist=2)',
+    '// ... in EntryL / EntryR:',
+    'Mesh_Visibility(Target=0, Mesh="Mario_Hathead_VIS_O_OBJ", Visible=2, Persist=2)',
+    'Mesh_Visibility(Target=0, Mesh="Mario_NohatUI_VIS_O_OBJ", Visible=0, Persist=2)',
 ]
 
 # --- model_commands v2: Outline_Shell (tools/outline_shell_cave.py), exe_v46z_outline2

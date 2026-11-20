@@ -1537,7 +1537,7 @@ visibility animation and the visibility groups (Model_Changer). Index 2500, 5 wo
 | Target | int: whose model (as Outline_Set's) |
 | Mesh | int: the mesh's name in quotes, `Mesh="stethoscope_VIS_O_OBJ"` (Sm4shCommand stores its CRC32, exact case), or 0-255 an index (the game's mesh order: model.nud's meshes, each with all its polygons); **-1 ends every override of this object** |
 | Visible | int: 0 hide, 1 show, 2 end this mesh's override |
-| Persist | int: 0 until the motion (kind) changes, as vanilla visibility; 1 until changed, a KO, the match end or a training reset |
+| Persist | int: 0 until the motion (kind) changes, as vanilla visibility; 1 until changed, a KO, the match end or a training reset; **2 (exe_v46z_ui2): the mesh's own set state** (Visible 0 hidden, 1 shown, 2 follow the animation) written through the game's setter: no override entry, kept until written again |
 
 - **How:** each mesh's visibility byte (set state: hidden / shown / follow the animation; the animation's bit) is forced
   while the override lasts; the game's own changes to the set state (visibility groups) are kept aside and come back when
@@ -1553,6 +1553,12 @@ visibility animation and the visibility groups (Model_Changer). Index 2500, 5 wo
   shows, the mesh may be in another model (an article's or a held item's: Target 0 in that article's script); the
   diag build's S4MH lines list every entry a command changed. Same words, v1 scripts unchanged.
 
+- **Persist 2 (exe_v46z_ui2, `tools/supamario_ui_cave.py` hooks mesh_vis_cave's mv_apply):** the mesh's own set state
+  (what a visibility group writes), written with the game's setter `0x034232FC(MI, mesh, Visible, 0)`: no entry in the
+  32-entry override table, nothing ends it (motion changes, KOs, training resets keep it) until another Persist 2 (or a
+  group) writes that mesh. For a look that lasts a stock (Supamario's Ultra Instinct: the cap off, the silver copies
+  following their own visibility tracks); write the state back in Entry / Wait1. An older executable takes 2 as 1.
+
 ```
 // a weapon hidden for one animation (back when the move ends)
 Mesh_Visibility(Target=0, Mesh="sword_VIS_O_OBJ", Visible=0, Persist=0)
@@ -1561,6 +1567,9 @@ Mesh_Visibility(Target=0, Mesh="sword_VIS_O_OBJ", Visible=0, Persist=1)
 Mesh_Visibility(Target=0, Mesh="sword_VIS_O_OBJ", Visible=2, Persist=0)
 // a hidden prop shown for this animation
 Mesh_Visibility(Target=0, Mesh="Mario_Result_VIS_O_OBJ", Visible=1, Persist=0)
+// (exe_v46z_ui2) the cap hidden for the rest of the stock, no override entry; given back on Entry
+Mesh_Visibility(Target=0, Mesh="Mario_Hathead_VIS_O_OBJ", Visible=0, Persist=2)
+Mesh_Visibility(Target=0, Mesh="Mario_Hathead_VIS_O_OBJ", Visible=2, Persist=2)
 ```
 
 Tests: `tools/outline_test.py` / `tools/mesh_vis_test.py` (unicorn: the command tables with every earlier cave's
