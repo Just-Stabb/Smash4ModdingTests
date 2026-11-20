@@ -1,15 +1,19 @@
-"""before (v4) / after (v5) render of the MSC's aura (hip, head, both feet: as ui_aura places them), fx_render's
+#!/usr/bin/env python3
+"""Supamario's Ultra Instinct aura (README "Ultra Instinct v4", v5's aura): before / after render of the MSC's aura (hip, head, both feet: as ui_aura places them), fx_render's
 Smash 4 side on a sandy background; + the haze's distortion preview (fx_render doesn't draw the distortion pass:
 its particles from fx_render.simulate, each a sprite of the emitter's distortion map (R / G - 0.5) x alpha x size,
-warping the background)"""
-import sys, os
-sys.path.insert(0, '/home/user/Smash4ModdingTests/tools')
+warping the background)
+
+  python3 tools/supamario_ui_aura_render.py BEFORE_OUT AFTER_OUT OUT.png   (build output dirs of supamario_ui_build.py)
+"""
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 import ptcl, efc
 import fx_render as R
 import supamario_ui_build as B
 from PIL import Image
-S = '/tmp/claude-0/-home-user-Smash4ModdingTests/6eb8574a-1476-5ed6-b61b-e676bf32d8c0/scratchpad'
 BG = (0.55, 0.45, 0.32)
 FRAMES = [60, 67, 74, 81]
 HIP, HEAD = 6.5, 12.5
@@ -80,8 +84,8 @@ def render(out, haze_px=6.0):
 
 
 if __name__ == '__main__':
-    a, oa = render(S + '/ui4/out')
-    b, ob = render(S + '/ui4b/out')
+    a, oa = render(sys.argv[1])
+    b, ob = render(sys.argv[2])
     sheet = np.concatenate([a, b], axis=0)
-    Image.fromarray(sheet).save(S + '/ui4b/aura_before_after.png')
+    Image.fromarray(sheet).save(sys.argv[3])
     print('haze offsets max px: before %.1f after %.1f' % (max(np.abs(o).max() for o in oa.values()), max(np.abs(o).max() for o in ob.values())))

@@ -4,6 +4,12 @@
 kind 0x41 ONLY (the fighter's kind [fighter + 4]; Mario, kind 3, and every other kind run the game's words as before)
 this adds:
 
+v5 (exe_v46z_ui3): every "status 0x157" below is now status 0x155 with TIMER_4 (V_MODE) above MODE_FORM_ON (the
+transformation / its counter: his MSC writes 7 every frame of it), and the dodge's 0x158 is 0x155 with TIMER_4 5; 0x155
+without the transformation's mode keeps Secret Sensation's rules. Mario's F.L.U.D.D. statuses 0x157 / 0x158 are nothing
+special here any more. The diag build adds S4U4 (the 8 frames after a dodge signal: his status, TIMER_1 / 2 / 4) and
+S4UM's status.
+
 1. SETUP: Mario's specializer slot 0 (0x02F1A6F0 `li r5, 1`, then `b 0x02F1A598` his setup) branches here first: for
    kind 0x41 the counter shape, ShieldModule ([acc + 0x72F4], kind 2) group 1, built as Marth's setup builds his
    (0x0200C858(M, &desc, 1), desc {&shape, 1, bytes 0, 0, 0, 1}) and switched off (0x0200BD8C(M, 0, 0, 1)); then the

@@ -144,7 +144,7 @@ AURA_SETS = ('aura_hip', 'aura_head', 'aura_foot', 'aura_chest', 'aura_hand')
 # emitter ADDITIVE (blend 1: shader 11 is drawn with blend 1 by 32 other emitters in this file, 39 already is): a soft
 # glow round him, not patches. The heat haze: haze() adds Mario's fireball's refraction emitter (PtcMarioFireball
 # 'refraction1', shader 7: the distortion pass, a 64x64 distortion map, 128 grey = none; Supamario's Kamehameha charge
-# already draws a copy in game) to the three sets the MSC keeps on him (hip, head, feet), soft (HAZE_*): it bends
+# carries copies, KameShimmer) to the three sets the MSC keeps on him (hip, head, feet), soft (HAZE_*): it bends
 # the picture behind him as XV2's aura does (its EMM refraction materials)
 AURA_DENSITY = 6.0
 AURA_ADD_ALPHA = 0.3                 # the alpha-blended (smoke) emitters' alpha x this once additive (added light, not

@@ -3876,9 +3876,11 @@ Install over v2 (only the files that changed). Built by the same `tools/supamari
   during the autododge, but from his **spot dodge (EscapeN) while transformed** when an opponent's attack came at him
   during it and attack or special is pressed during it. XV2's CMN.bac / CMN.ean (common moves) are in `ui_in/cmn` for it.
 
-## Ultra Instinct v4 (`supamario_ultrainstinct_v4.zip`, exe `exe_v46z_ui2`; TEST ONLY `exe_v46z_ui2_diag`)
-Install over v3 (only the files that changed) with the new executable (exe_v46z_ui2 = exe_v46z_outline4 +
-`tools/supamario_ui_cave.py`, reproduced byte for byte by it). The user's v3 report: the silver eyes / mustache always
+## Ultra Instinct v4 (`supamario_ultrainstinct_v4.zip`, exe `exe_v46z_ui3`; TEST ONLY `exe_v46z_ui3_diag`)
+Install over v3 (only the files that changed) with the new executable (exe_v46z_ui3 = exe_v46z_outline4 +
+`tools/supamario_ui_cave.py`, reproduced byte for byte by it; the package was rebuilt before the user received it:
+exe_v46z_ui2 was its first build). The second build's changes (the status move, the aura, Sm4shCommand v1.7.18) are
+in "v4, second build" below. The user's v3 report: the silver eyes / mustache always
 showed and the hair never changed; no effects / sounds / white glow during the transformation; the autododge never
 fired; Secret Sensation blocked a Killer Eye's shot (placed by Donkey Kong) without sliding; the aura splotchy purple.
 - **Why the copies always showed (from the files):** every model in the repo has `model.moi` table 1's count = its
@@ -3925,5 +3927,60 @@ fired; Secret Sensation blocked a Killer Eye's shot (placed by Donkey Kong) with
   `supamario_timeskip_test` 198 ok, `supamario_godfist_test` 566 ok, `supamario_sledgehammer_test` 141 ok,
   `supamario_corebreaker_test` 104 ok, `supamario_fakedeath_test` 47 ok, `msc_stack_check` 0 problems (the MSC
   unchanged since v3); `import_call_check` 0 on both exes; `fighter_texture_ids.py check` 0 errors.
-- **Not done / open:** the Sm4shCommand rebuild for Persist 2's help text (`tools/acmd_ext_help.py` updated; the
-  parameter list is unchanged, Events.cfg regenerated identical); the 0x157 status move; the aura's distortion.
+- **Not done in the first build:** the Sm4shCommand rebuild, the 0x157 status move, the aura's distortion (all in
+  the second build below).
+
+### v4, second build (exe `exe_v46z_ui3`, Sm4shCommand v1.7.18)
+- **The status move.** The transformation / its counter and the autododge are now MODES of status **0x155** (the down
+  special's: Fake Death's / Sledgehammer's / Secret Sensation's, whose body scripts run in game), not Mario's
+  F.L.U.D.D. statuses 0x157 / 0x158. TIMER_4 (`UI_V_SS`, `0x0F000324`) holds the mode: `ui_tick` writes 7 (the
+  transformation) / 5 (the dodge) right before asking the status; `func_2252` (pre) / `func_2265` (main) / `func_2282`
+  (end) dispatch on `ui_mode()` (above 5.5: the transformation, above 3.5: the dodge; Secret Sensation writes 3, Fake
+  Death / Sledgehammer 0); each mode's loop renews it, its end writes 0. `ui_tick` asks neither while flag
+  `0x2000004d` is on (`func_79` turns a special status into 0x83 / 0x10 then). The 0x157 / 0x158 functions are
+  Mario's again (unreachable). The cave (`supamario_ui_cave.py`): slot 42 in 0x155 takes a fighter's attack only
+  (XV2's CounterMelee) when TIMER_4 > 5.5, else anything an opponent owns; slot 43 in 0x155 returns 0 when TIMER_4 >
+  5.5 (fully invincible) or the counter flag is on (`ui_isform`, TIMER_4 through get_float).
+- **The evidence (exe, unicorn-checked by `supamario_ui_test.py --exe`):** the motion change's "use the linked
+  object's scripts" byte (`+0x2E`, which makes `0x027606C0` clear every body agent when there is no link 0) is a
+  per-MOTION flag, not a status one: `0x02C5E5EC` passes `MotionModule vt +0x1F4` (`0x02C639E0`: the motion table
+  entry's halfword +6 bit 0x8) as vt +0x4C's r7. Kind 0x41's table (Mario's) has it only on 0x7C-0x87, 0x96-0xC2 and
+  0x1BE-0x20F (catches / throws / thrown), none of SpecialLwLight / Heavy, SpecialAirLwLight / Heavy, EscapeN; the run-
+  time build (`0x02EA9008`) only sets byte +4 and bit 0x80 from vl group 1. Mario's status-keyed code: `0x02F169D0`
+  (his status-change callback, vtable `0x101393C4 + 0x14`): leaving 0x152 / 0x157-0x159 (Kirby, kind 8: 0x1EB-0x1EE)
+  clears flag `0x20000078`, removes article 0 (the pump) and calls `[acc + 0xA0]` vt +0x1E4(0x1A) (an effect kind,
+  the vanilla MSC's `EffectModule(0x2727, 0x1a)`); entering them does nothing; `0x02F11C0C` (the pump's placement)
+  acts in 0x152 / 0x157-0x159; the pump weapon's own code reads its owner's 0x157 / 0x158. **None of it clears or
+  rebinds body scripts**, so the v3 silence is NOT explained by the native code read; the move takes those statuses
+  out of the question (the game runs nothing of its own on 0x155 for kind 0x41: unicorn-checked), and the diag
+  build's S4UM / S4UB / S4U4 lines settle what is left. Open: the cause of v3's silent scripts, if 0x155 is silent too.
+- **The autododge (problem 2):** nothing else depended on 0x158 (the cave never tested it for the dodge; `ui_tick`'s
+  guard is now "not in 0x155's dodge mode"). Diag: **S4U4** `st t1 t2 mode left`, the 8 frames after slot 43 wrote a
+  dodge signal (the script module's per-frame late update, hooked at its call `0x02E4133C`: his status, TIMER_1 / 2 /
+  4 as float bits), and S4UM now carries the status (`[[r27 + 4] + 0x7264] + 0x48`).
+- **The aura (the user: "splotchy and purple instead of a slightly blue purple glow with distortion").** What made it
+  splotchy (`ptcl.emitter_params` of the converted sets): every emitter emits ONE particle every 9-39 frames (1-4 big
+  sprites alive, each popping in and out), and the big ones are alpha-blended smoke (blend 0: the 64x64 cloud and
+  16x32 flame textures, 3.4-5.5 units at the call's 1.75): a few opaque purple patches. `smooth_aura()`: intervals /
+  `AURA_DENSITY` 6 (1-7 frames), alpha x the same ratio (the same coverage, spread over many overlapping sprites), the
+  smoke ones x `AURA_ADD_ALPHA` 0.3 more, every emitter **additive** (shader 11 is drawn with blend 1 by 32 other
+  emitters of the file); saturation x `AURA_SAT` 0.8 (x 0.45 came out white once additive), hue 262. **The heat haze**
+  (`haze()`): Mario's fireball's refraction emitter (`PtcMarioFireball` `refraction1`, shader 7: the distortion pass,
+  its 64x64 distortion map; Supamario's Kamehameha charge set carries copies, KameShimmer) appended as `UiHaze` to the hip / head /
+  feet sets (the ones the MSC keeps on him): sizes 5.0 / 3.6 / 3.0, volume 2.0 / 1.2 / 1.0, life 30, one every 2
+  frames, rising 0.03 a frame, strength x 0.45. Render: `tools/supamario_ui_aura_render.py BEFORE AFTER OUT.png`
+  (fx_render's Smash 4 side for the colour; fx_render doesn't draw the distortion pass, so the haze's particles warp a
+  checker behind: about 3 px at 12 px a unit). Against the user's XV2 clip (a thin blue-white / violet rim glow, a
+  heat shimmer): ours is a soft glow round the hips / feet / head, no rim along the limbs (no XV2-style per-limb
+  emitters are called: the MSC keeps three sets); approximated, for the user to judge.
+- **Sm4shCommand v1.7.18:** Mesh_Visibility's help / example 8 (Persist 2) in Events.cfg (the caves' `--labels`
+  regenerated `param_labels.json`, then `apply_param_labels.py`); NvTest 288 ok (every Mesh_Visibility example
+  compiles and round-trips), 1 known failure (effect.bin's else-if chains, upstream).
+- Tests: `supamario_ui_cave_test.py` **204 ok** (v5: the modes in slots 42 / 43, the old statuses nothing special, the
+  diag S4U4 / S4UM's status); `supamario_ui_test.py --exe` **363 ok** (v5: the 0x155 modes (pre / main / loop / end,
+  the mode renewed and cleared, flag 0x2000004d), the game's own link-kind decision for every UI motion, the pump's
+  placement and the status-change callback never acting on 0x155 (and acting on 0x157 / 0x158: controls), the aura's
+  intervals / blend, the haze emitters); `supamario_timeskip_test` 198, `supamario_godfist_test` 566,
+  `supamario_sledgehammer_test` 141, `supamario_corebreaker_test` 104, `supamario_fakedeath_test` 47 ok;
+  `msc_stack_check` 0 of 2483; `import_call_check` 0 on both exes; `fighter_texture_ids.py check` 0 errors; both exes
+  reproduced byte for byte from the cave script.

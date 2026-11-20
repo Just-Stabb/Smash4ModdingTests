@@ -3411,6 +3411,34 @@ exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATC
     0x241 / 0x245 always, 20 others), `S4UB hash found set kind n` (`0x02BEE580`'s `bl 0x02BEE404`: the bind from the
     motion change for kind 0x41 and the UI / Entry / Wait1 / Fake Death / Sledgehammer hashes; set 0 game 1 expression
     2 sound 3 effect). At most 1500 S4UM / S4UB lines.
+- **v5 (exe_v46z_ui3): the statuses and the script bind, read to the instruction (unicorn: `supamario_ui_test.py
+  --exe`).**
+  - The motion change's link-kind byte (`+0x2E`, the "0x157 lead"): `MotionAnimcmdModule` is the accessor's `+0xC4`
+    (set by `0x02BF6A0C`; the fighter's `+0x72DC`); its vt `+0x4C` (`0x027608B0`: `+0x1C` motion, `+0x2C` r5, `+0x2D` r6,
+    `+0x2E` r7, `+0x20` / `+0x24` f1 / f2, `+0x28` = -1, then `0x027606C0(this, 0, 1)`) has one caller that sets r7,
+    the MotionModule's change `0x02C5E5EC` (vtable slot `+0xCC` of `0x1010A3EC` / `0x1012CCEC` / `0x10154C98`): r7 =
+    MotionModule vt `+0x1F4(motion)` = `0x02C639E0`: `[this + 0x1C] + 8 x motion`, halfword `+6` bit 0x8 (the motion
+    table, descriptor `+0x1C`; `0x02EA9008` adds only byte `+4` and bit 0x80 from vl group 1). Mario's (and kind
+    0x41's) table has bit 0x8 on 0x7C-0x87, 0x96-0xC2, 0x1BE-0x20F only (catch / throw / thrown motions: the
+    thrower's scripts), on no down-special motion. So the lead does not apply.
+  - Mario's status-keyed code: `0x02F169D0` (vtable `0x101393C4` + 0x14, a status-change callback (this, accessor,
+    new status); the current status from `[acc + 0x20]` vt `+0x8C`; kind 8 (Kirby, through `0x02BEF604`) takes
+    0x1EB-0x1EE instead of 0x152 / 0x157-0x159): on leaving 0x157 / 0x158 (and 0x152 -> not 0x157 / 0x159, 0x159
+    with the pump out) `0x02F1124C(acc, 0, 0)` (flag `0x20000078` off, a word at WorkModule +0x20C), then for a new
+    status in the table `0x101393A0` (0x1B, 0x1F-0x22, 0x35) the pump kept (`[acc + 0xA0]` vt `+0x1DC(0x1A)`), else
+    `[acc + 0xA0]` vt `+0x1E4(0x1A)` and ArticleModule (`[acc + 0x4C]`) vt `+0xEC(0, 0)` (the pump removed). Entering
+    them: nothing. `0x02F11C0C` (`0x10138B7C`, the pump's per-frame placement) reads its owner's status 0x152 /
+    0x157-0x159; `0x02F0FE84` / `0x02F0F2FC` / ... (the pump weapon) its owner's 0x157 / 0x158. None touches the
+    script agents. Checked in unicorn on exe_v46z_ui3: the decision 0 for the UI motions (1 for 0x1BE), the placement
+    reached for 0x152 / 0x157-0x159 only, the callback silent for every 0x155 transition (and acting when leaving
+    0x157 / 0x158).
+  - The move anyway (the user's v3 report stands unexplained): the transformation / counter / dodge are 0x155 modes
+    (TIMER_4, README "v4, second build"); the cave tells them apart by TIMER_4 (`ui_isform`, get_float `0x0F000324`
+    > 5.5). Diag: S4UM gains the status (`[[r27 + 4] + 0x7264] + 0x48`, r27 = `0x027606C0`'s module), and **S4U4** `st
+    t1 t2 mode left`: after slot 43 writes a dodge signal (`ui_drec` +0x28 his module block, +0x2C 8 lines), the
+    script module's late update `0x02760DB0` logs his status / TIMER_1 / 2 / 4 each frame; hooked at its one call
+    `0x02E4133C` (`bl`; `0x02760DB0` itself is 0x2487000 from the cave, out of a `b`'s reach), the hook goes on to it
+    through ctr. (`addi rX, r0, n` is `li`: the countdown uses r12.)
 - **Not confirmed in game:** the hit records' timing against the damage event (records are the collision's "don't hit
   twice" log: present when the hit is dealt, by static reading); a stale record of an earlier hit of the same move could
   make a projectile hit in the same move's lifetime dodge.
