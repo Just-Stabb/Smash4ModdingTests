@@ -3814,3 +3814,62 @@ counter is XV2's rush, the body glows white while transforming, no camera change
   manual counter after a dodge (its files).
 - Tests: `supamario_ui_test.py` (v2: the 325 / 349 frames, the window, the counter staying / the gap, the 16 hitboxes,
   the holds and log clears, the white body, no camera), the earlier suites, `msc_stack_check`; the exe is v1's.
+
+## Ultra Instinct v3 (`supamario_ultrainstinct_v3.zip`, same exe_v46z_ui): the crash fix, the silver hair / eyes / mustache, the lavender aura
+Install over v2 (only the files that changed). Built by the same `tools/supamario_ui_build.py` (now also
+`tools/supamario_ui_model.py`).
+- **The crash fix (the user: v2 crashed near the end of the transformation, ~5.4 s):** the aura's MSC requests
+  (`ui_aura`) are EffectModule **0x2717** (id, bone, x, y, z, rx, ry, rz, size, 0), the vanilla following request the
+  Kamehameha already uses in game, instead of v1 / v2's 0x2730 (+ colour), which no vanilla MSC uses: its first call is
+  the frame the transformation ends. The test checks the four calls' ids / bones / offsets / sizes and that no 0x2730 is
+  left. (MSC edit by the coordinating session.)
+- **Silver hair, eyes, mustache and eyebrows** (`tools/supamario_ui_model.py`, every costume c00-c07): silver copies in
+  model.nud (and metal.nud, with its own textures): `Mario_HairUI_VIS_O_OBJ` (the sideburns / back hair), `Mario_NohatUI_VIS_O_OBJ`
+  (the full hair, only in the side taunt's cap-off frames 17-72), `Mario_EyeUI_VIS_O_OBJ` (both irises; its materials keep
+  NU_materialHash, so the eye animations move it as his own), and 10 **overlays** of the mustache / eyebrows: that
+  polygon (texture ..0B) is part of each of the 15 expression faces, so one overlay per distinct shape (mustache: FaceN's
+  in 10 faces, Furafura's in 4, Damageflyfront's; eyebrows: 7), its triangles only, pushed 0.03 out along the normals
+  over his own. Two textures added to model.nut (Supamario's own ids `0x40C10000 + 0x400 x NN` + 0 / 1, every existing
+  texture byte for byte): the silver hair (also the mustache / eyebrows) and the silver iris (Mario's blue ring greyed:
+  the shading tone to the main tone by brightness, the pupil dark grey, the highlight kept).
+  - Visibility: the copies have tracks hidden all through in `material_anime_eyelid(_lang).pac` (after each of his
+    own hair / full hair / eye tracks); the overlays follow their faces (the OR of their faces' tracks per motion; hidden
+    in the entry / win / lose / display motions).
+  - The swap (game scripts, Mesh_Visibility): at the burst (SpecialLwLight 220) and at the counter's white body's end
+    (SpecialLwHeavy 199): his hair / full hair / eyes hidden and the silver hair / eyes shown (Persist 1), the overlays'
+    overrides ended (they follow his expressions). His own look (the swap's overrides ended, the overlays hidden Persist 1)
+    on Entry (EntryL / EntryR frame 0) and in Wait1 while not transformed (TIMER_0 <= 1500; Rebirth plays Wait1, so a
+    respawn too); Wait1 applies the swap again while transformed (> 1500). A KO / the match end / a training reset end
+    every override (the cave), and the MSC resets TIMER_0 on Dead / Rebirth / Entry. The side taunt shows the silver full
+    hair in its frames 17-72 while transformed (Persist 0). New game scripts (no game script before): wait1, entryl,
+    entryr, appealsl, appealsr (motion slots unchanged: no ModAnimNames change).
+  - **The colour (approximated, flagged: the user wants XV2's exact silver):** `XV2_COLOURS` (one constant) holds HUM.bcs
+    entries HAIR_ 5 (main 0.8 grey, shading 0.4) and eye_ 5 (0.8), all five RGBA colours as the file has them
+    (`tools/xv2bcs.py`). The exact Ultra Instinct indices are XV2's **CUS aura table** row for the skill's CUS aura (1):
+    bcs_hair_color / bcs_eyes_color, kept in the **game executable** (XV2 Patcher's CusAuraData), not in any file sent:
+    `powerup_parameter.pup` entry 30 holds only stat changes (`tools/xv2pup.py`), `aura_setting.aur` only effect ids,
+    part set 122 only an eye part of eye_ colour 1 (dark grey 0.11). Mapping onto Smash: HAIR_ colour 1 = the hair /
+    mustache / eyebrow texture's flat colour (Mario's own hair texture is flat; the game's lighting shades it; colour 2,
+    the shading tone, isn't baked in); eye_ colour 4 = the iris ring's bright edge, its dark edge x 0.5 (HAIR_'s
+    shading / main); a faint blue-white sheen (x 0.96 / 0.99 / 1.05) on both.
+  - `tools/xv2bcs.py` (HUM.bcs: the part sets / parts / colour selectors, the colour groups; selector reading confirmed:
+    131 of 135 hair / eye / skin selectors name their part's group), `tools/nud.py clone_meshes` (meshes copied, every
+    existing byte kept; polygon / triangle subsets, a push along the normals; rigged polygons too: c04's faces are
+    rigged), `tools/nut.py append_ntwu`, `tools/mta.py add_vis / pac_map`.
+- **The aura's colour:** the converted emitters kept XV2's EMP colours (blue / cyan / white: fx_render's Smash 4 side,
+  the drawn pixels' median hue 192 deg, saturation 0.26); the user's clip after the burst: lavender / purple-white (the
+  aura pixels' median hue 281-287 deg, saturation 0.16-0.18, frames 5.6-6.9 s). XV2's data has no purple for it (848's
+  EMPs and EMM materials, the ECFs 846 / 847 / 849 (diffuse 0.42 0.60 0.68, ambient 0.63 0.75 1.0), aura_setting.aur:
+  effect ids only): the purple is XV2's rendering. So the clip's colour is baked into the five aura sets' emitter colours
+  (`AURA_HUE` 284, saturation x `AURA_SAT` 0.65, the value kept): rendered after, hue 284, saturation 0.17.
+- Tests: `supamario_ui_test.py` (v3: the aura calls 0x2717, the swap scripts, the copies / overlays / textures / tracks
+  per costume, the aura colours), the earlier suites, `supamario_ui_cave_test.py` (the exe unchanged), `msc_stack_check`,
+  `fighter_texture_ids.py check` 0 errors.
+- **Only in game:** the copies hidden by their tracks until the burst (the game's default set state "follow the
+  animation" for new meshes); the overlays covering his own mustache / eyebrows at 0.03 (no dark edge, no z-fighting);
+  the eye copy following the eye animations by NU_materialHash; the overrides at a training reset (Wait1 restores them if
+  the reset plays it); 10 overlay overrides per untransformed Supamario in the cave's 32-entry table (four untransformed
+  Supamarios would fill it: then some overlays could show); how the lavender reads on stage.
+- **Open (the user, later):** the exact UI colours (the CUS aura row); the dodge's manual counter, the user's rule: not
+  during the autododge, but from his **spot dodge (EscapeN) while transformed** when an opponent's attack came at him
+  during it and attack or special is pressed during it. XV2's CMN.bac / CMN.ean (common moves) are in `ui_in/cmn` for it.
