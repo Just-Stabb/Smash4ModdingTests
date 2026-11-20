@@ -103,6 +103,10 @@ V_AURA = 0x0F000323                  # TIMER_3: the aura's renewal
 # taunt's game script while transformed (TIMER_0 > 1500). Wait1's game script applies the swap again while transformed
 # and ends it otherwise (a training reset, a respawn); Entry's ends it
 SILVER_MESHES = model.MESHES
+# the mustache / eyebrow overlays (model.overlays, from the base's c00 model.nud: build() fills it before the scripts):
+# hidden by Mesh_Visibility Persist 1 while he isn't transformed (Entry, Wait1: Rebirth plays Wait1), their overrides
+# ended at the burst (they follow their expressions' visibility tracks)
+OVERLAYS = []
 UI_TRANSFORMED_OVER = 1500.0         # TIMER_0 (UI_V_FORM) above this: transformed (the MSC writes 2000 every frame)
 NOHAT_ON, NOHAT_OFF = 17, 72         # AppealS: the eyelid animation's Mario_Nohat keys (Mario_Hair off between)
 
@@ -233,14 +237,17 @@ def meshvis(mesh, visible, persist):
 
 
 def silver_on():
-    """his own hair / full hair / eyes hidden, the silver hair / eyes shown, until a KO (Persist 1)"""
+    """his own hair / full hair / eyes hidden, the silver hair / eyes shown, until a KO (Persist 1); the mustache /
+    eyebrow overlays' overrides ended (they follow his expressions)"""
     return ([meshvis(SILVER_MESHES[k][0], 0, 1) for k in ('hair', 'nohat', 'eye')] +
-            [meshvis(SILVER_MESHES[k][1], 1, 1) for k in ('hair', 'eye')])
+            [meshvis(SILVER_MESHES[k][1], 1, 1) for k in ('hair', 'eye')] + [meshvis(o, 2, 0) for o in OVERLAYS])
 
 
 def silver_off():
-    """every override of the swap ended: the visibility animation decides again (his own shown, the copies hidden)"""
-    return [meshvis(m, 2, 0) for k in ('hair', 'nohat', 'eye') for m in SILVER_MESHES[k]]
+    """his own look: the hair / eye swap's overrides ended (the visibility animation decides again: his own shown, the
+    copies hidden), the mustache / eyebrow overlays hidden (Persist 1)"""
+    return [meshvis(m, 2, 0) for k in ('hair', 'nohat', 'eye') for m in SILVER_MESHES[k]] + \
+        [meshvis(o, 0, 1) for o in OVERLAYS]
 
 
 def if_var(var, method, value, body):
@@ -415,10 +422,15 @@ def build(sm_dir, out_dir, ui_skill, ui_se_wav, ts_args):
     outs, _bones, info = anim.build(mo, vbn, os.path.join(ui_skill, '1510_GKS_MGT.ean'), mo)
     rep = effects(ts_args['sh']['fd']['cb']['gf']['cmn_vfx'], os.path.join(fdir, 'effect', 'supamario'))
     sound_bank(fdir, out_dir, ui_se_wav)
+    import nud
+    OVERLAYS[:] = [o['name'] for o in model.overlays(nud.read(os.path.join(sm_dir, 'model', 'body', 'c00', 'model.nud')))]
     scripts(os.path.join(fdir, 'script', 'animcmd', 'body'))
     GB.msc(os.path.join(fdir, 'script', 'msc', 'supamario.mscsb'))
     silver = model.build(sm_dir, fdir)
-    doc = {'silver': {'colours': model.SILVER, 'sheen': model.SHEEN, 'meshes': model.MESHES, 'costumes': silver},
+    for c, rep_c in silver.items():
+        assert list(rep_c['overlays']) == OVERLAYS, (c, 'the overlays differ from c00\'s: the scripts name c00\'s')
+    doc = {'silver': {'colours': model.SILVER, 'sheen': model.SHEEN, 'meshes': model.MESHES, 'overlays': OVERLAYS,
+                      'costumes': silver},
            'frames': {m: anim.frames_of(m) for m in anim.MOTIONS}, 'strike_at': STRIKE_AT,
            'counter_window': [CW_ON, CW_OFF],
            'events': {'snd_start': SND_START, 'snd_success': SND_SUCCESS, 'fx_start': FX_START_AT,

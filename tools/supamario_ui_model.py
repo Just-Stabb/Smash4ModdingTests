@@ -35,11 +35,36 @@ import mta  # noqa: E402
 import nud  # noqa: E402
 import nut  # noqa: E402
 
-# ---------------------------------------------------------------- the colours (change them here)
-# (main, shading) greys, XV2 HUM.bcs HAIR_ colour 5 and eye_ colour 5 (the fallback until the user sends XV2's own Ultra
-# Instinct colour data); SHEEN the faint blue-white tint on both
-SILVER = {'hair': (0.80, 0.40), 'iris': (0.80, 0.40)}
-SHEEN = (0.96, 0.99, 1.05)
+# ---------------------------------------------------------------- the colours (change them here: XV2_COLOURS only)
+# XV2_COLOURS: the BCS colour entries used, each (group, index, its five RGBA colours as HUM.bcs has them: tools/xv2bcs.py
+# colours). APPROXIMATED: the exact Ultra Instinct hair / eye colour indices are XV2's CUS aura table row for the skill's
+# CUS aura (1), bcs_hair_color / bcs_eyes_color, which is in the game's executable (XV2 Patcher's CusAuraData), not in
+# any file sent (powerup_parameter.pup entry 30 holds only stat multipliers; aura_setting.aur only effect ids; part set
+# 122 only an eye part of eye_ colour 1, dark grey 0.11). The fallback: HAIR_ 5 (main 0.8 grey, shading 0.4) and eye_ 5
+# (0.8 grey). When the indices are known, put those entries' five colours here.
+# How they map onto Smash's textures: HAIR_ colour 1 (the main tone) is the hair / mustache / eyebrows texture's flat
+# colour (Mario's own hair texture is flat: the game's lighting shades it); colour 2 (the shading tone) is not baked in
+# (it would double the game's shading). eye_ colour 4 (its only one) is the iris ring's bright edge, its dark edge that
+# times HAIR_'s shading / main ratio (0.5); the pupil and highlight stay as Mario's (greyed).
+XV2_COLOURS = {
+    'hair': ('HAIR_', 5, [(0.8, 0.8, 0.8, 1.0), (0.4, 0.4, 0.4, 1.0), (0.4, 0.4, 0.4, 1.0), (0.8, 0.8, 0.8, 1.0),
+                          (0.0, 0.0, 0.0, 0.0)]),
+    'iris': ('eye_', 5, [(0.0, 0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 0.0), (0.0, 0.0, 0.0, 0.0), (0.8, 0.8, 0.8, 1.0),
+                         (0.0, 0.0, 0.0, 0.0)]),
+}
+EXACT = False                        # True once XV2_COLOURS holds the CUS aura row's entries
+
+
+def _grey(c):
+    return sum(c[:3]) / 3.0
+
+
+_H = XV2_COLOURS['hair'][2]
+_E = XV2_COLOURS['iris'][2]
+# (main, shading) greys the textures use, from XV2_COLOURS
+SILVER = {'hair': (_grey(_H[0]), _grey(_H[1])),
+          'iris': (_grey(_E[3]), _grey(_E[3]) * _grey(_H[1]) / max(_grey(_H[0]), 1e-6))}
+SHEEN = (0.96, 0.99, 1.05)           # the faint blue-white tint on both (Ultra Instinct's look: the clip's silver)
 
 COSTUMES = 8
 TEX_BASE = 0x40C10000                # Supamario's own texture ids (fighter_texture_ids.py: kind 0x41), + 0x400 a costume
