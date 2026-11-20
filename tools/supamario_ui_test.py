@@ -37,6 +37,12 @@ import supamario_ui_cave as C  # noqa: E402
 PROBLEMS = []
 
 
+def fbits(x):
+    """an MSC argument as the interpreter logs it: a float's bits (ints stay as they are when small)"""
+    x = int(x)
+    return struct.unpack('>f', struct.pack('>I', x & 0xFFFFFFFF))[0] if abs(x) > 0xFFFFF else float(x)
+
+
 def check(name, got, want):
     ok = got == want
     print('%s %s%s' % ('ok  ' if ok else 'FAIL', name, '' if ok else ': got %r, want %r' % (got, want)))
@@ -276,7 +282,8 @@ def form_tests(r):
     head_up = round(0.2 * B.METRE, 3)
     check('  their arguments (id, bone, x, y, z, rx, ry, rz, size, flag 0): the head 0.2 m up, the sizes %g / %g' % (
         B.SCALE, round(0.8 * B.SCALE, 3)),
-          sorted(tuple(round(float(x), 3) for x in e[5][1:]) for e in aura if e[2] == 0x2717),
+          sorted((e[5][1], e[5][2]) + tuple(round(fbits(x), 3) for x in e[5][3:10]) + (e[5][10],) for e in aura
+                 if e[2] == 0x2717),
           sorted([(B.fx_id('aura_hip'), B.BONES['HipN'], 0, 0, 0, 0, 0, 0, B.SCALE, 0),
                   (B.fx_id('aura_head'), B.BONES['HeadN'], 0, head_up, 0, 0, 0, 0, B.SCALE, 0),
                   (B.fx_id('aura_foot'), B.BONES['LFootJ'], 0, 0, 0, 0, 0, 0, round(0.8 * B.SCALE, 3), 0),
@@ -641,8 +648,11 @@ def aura_tests(out, ts_out):
     check('  their saturations at most %g (XV2\'s x %g)' % (B.AURA_SAT, B.AURA_SAT), max(sats) <= B.AURA_SAT + 1e-4, True)
     check('  the other UI sets (start, burst, vanish) keep XV2\'s colours (none at %g deg)' % B.AURA_HUE,
           round(B.AURA_HUE) in other, False)
-    check('  the tint of a blue (0.45, 0.62, 1.0) -> lavender', tuple(round(x, 3) for x in B.lavender((0.45, 0.62, 1.0))),
-          (0.832, 0.643, 1.0))
+    lv = B.lavender((0.45, 0.62, 1.0))
+    h, sa, v = colorsys.rgb_to_hsv(*lv)
+    check('  the tint of a blue (0.45, 0.62, 1.0: hue 220, saturation 0.55) -> hue %g, saturation 0.55 x %g, value 1' % (
+        B.AURA_HUE, B.AURA_SAT), (round(h * 360, 1), round(sa, 3), round(v, 3)),
+          (B.AURA_HUE, round(0.55 * B.AURA_SAT, 3), 1.0))
 
 
 def model_tests(out, base):
@@ -739,10 +749,13 @@ def model_tests(out, base):
         iris = nut.decode(d1, t1[-1])
         a = iris[..., 3] > 128
         rgb = iris[a][:, :3].astype(float)
+        rgb = rgb[rgb.max(1) > 40]                 # the pupil's near-black left out (BC rounding there)
         sat = (rgb.max(1) - rgb.min(1)) / np.maximum(rgb.max(1), 1)
-        check('%s: the silver iris: the alpha as Mario\'s (within BC3), grey (saturation under 0.12), its ring up to '
-              'SILVER iris %g' % (c, M.SILVER['iris'][0]),
-              (int(abs(iris[..., 3].astype(int) - src_iris[..., 3]).max()) <= 8, bool(sat.max() < 0.12),
+        da = abs(iris[..., 3].astype(int) - src_iris[..., 3])
+        check('%s: the silver iris: the alpha as Mario\'s (BC3: mean under 1, edges within 24), grey with the blue-white '
+              'sheen only (saturation under 0.25 incl. BC rounding on the dark ring, blue >= red everywhere), its ring '
+              'up to SILVER iris %g' % (c, M.SILVER['iris'][0]),
+              (bool(da.mean() < 1 and da.max() <= 24), bool(sat.max() < 0.25 and (rgb[:, 2] >= rgb[:, 0]).all()),
                abs(np.percentile(rgb.max(1), 90) / 255 - M.SILVER['iris'][0] * M.SHEEN[2]) < 0.12), (True, True, True))
         for pk in M.PACS:
             pd0, pd1 = open(os.path.join(src, pk), 'rb').read(), open(os.path.join(dst, pk), 'rb').read()
@@ -764,8 +777,9 @@ def model_tests(out, base):
                             n += 1
                 vis0 = {v['name']: [(f, st) for f, st, _ in v['keys']] for v in r0['vis']}
                 want += [(nm, [(f, st, 0) for f, st in k]) for nm, k in M.overlay_tracks(na, vis0, ovs)]
+                vo = struct.unpack('>I', x0[0x24:0x28])[0]
                 if r0['mats'] != r1['mats'] or [(v['name'], v['keys']) for v in r1['vis']] != want or \
-                        x0[:struct.unpack('>I', x0[0x24:0x28])[0]] != x1[:struct.unpack('>I', x1[0x24:0x28])[0]]:
+                        x0[:0x20] + x0[0x24:vo] != x1[:0x20] + x1[0x24:vo]:
                     bad.append(na)
             check('%s %s: each hair / full hair / eye track followed by its copy\'s, hidden all through (%d added); '
                   'every other byte before the tracks, the materials and the tracks kept' % (c, pk, n), bad, [])
