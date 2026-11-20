@@ -3862,9 +3862,11 @@ Install over v2 (only the files that changed). Built by the same `tools/supamari
   EMPs and EMM materials, the ECFs 846 / 847 / 849 (diffuse 0.42 0.60 0.68, ambient 0.63 0.75 1.0), aura_setting.aur:
   effect ids only): the purple is XV2's rendering. So the clip's colour is baked into the five aura sets' emitter colours
   (`AURA_HUE` 284, saturation x `AURA_SAT` 0.65, the value kept): rendered after, hue 284, saturation 0.17.
-- Tests: `supamario_ui_test.py` (v3: the aura calls 0x2717, the swap scripts, the copies / overlays / textures / tracks
-  per costume, the aura colours), the earlier suites, `supamario_ui_cave_test.py` (the exe unchanged), `msc_stack_check`,
-  `fighter_texture_ids.py check` 0 errors.
+- Tests: `supamario_ui_test.py` **316 ok** (v3: the aura calls 0x2717, the swap scripts, the copies / overlays /
+  textures / tracks per costume, the aura colours), `supamario_timeskip_test` 198 ok, `supamario_godfist_test` 566 ok,
+  `supamario_sledgehammer_test` 141 ok, `supamario_corebreaker_test` 104 ok, `supamario_fakedeath_test` 47 ok,
+  `supamario_ui_cave_test.py` 144 ok (the exe unchanged), `msc_stack_check` 0 of 2482, `fighter_texture_ids.py check`
+  0 errors; 0 failures.
 - **Only in game:** the copies hidden by their tracks until the burst (the game's default set state "follow the
   animation" for new meshes); the overlays covering his own mustache / eyebrows at 0.03 (no dark edge, no z-fighting);
   the eye copy following the eye animations by NU_materialHash; the overrides at a training reset (Wait1 restores them if
