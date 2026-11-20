@@ -42511,13 +42511,18 @@ void ui_aura_off()
     EffectModule(0x2723, UI_FX_AURA3, 0x1, 0x1);
 }
 
+// v3: the following request is 0x2717 (id, bone, x, y, z, rx, ry, rz, size, flag), the vanilla op Supamario's
+// Kamehameha already uses in game (kame_n_fx). v1 / v2 used 0x2730 (the following request + colour), which no vanilla
+// MSC uses and was never run before: its first call is the frame the transformation ends, where v2 crashed the game
+// (the user's report: "near the end", ~5.4 s). The colour it passed was white (untinted), so nothing visible changes;
+// a tint belongs in the effect's own colours.
 void ui_aura()
 {
     ui_aura_off();
-    EffectModule(0x2730, UI_FX_AURA1, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_AURA_SIZE, 0, 0, 0, 0, 0, 0, 0x1, 0xff, 0xff, 0xff);
-    EffectModule(0x2730, UI_FX_AURA2, UI_BONE_HEAD, 0, UI_HEAD_UP, 0, 0, 0, 0, UI_AURA_SIZE, 0, 0, 0, 0, 0, 0, 0x1, 0xff, 0xff, 0xff);
-    EffectModule(0x2730, UI_FX_AURA3, UI_BONE_LFOOT, 0, 0, 0, 0, 0, 0, UI_FOOT_SIZE, 0, 0, 0, 0, 0, 0, 0x1, 0xff, 0xff, 0xff);
-    EffectModule(0x2730, UI_FX_AURA3, UI_BONE_RFOOT, 0, 0, 0, 0, 0, 0, UI_FOOT_SIZE, 0, 0, 0, 0, 0, 0, 0x1, 0xff, 0xff, 0xff);
+    EffectModule(0x2717, UI_FX_AURA1, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_AURA_SIZE, 0);
+    EffectModule(0x2717, UI_FX_AURA2, UI_BONE_HEAD, 0, UI_HEAD_UP, 0, 0, 0, 0, UI_AURA_SIZE, 0);
+    EffectModule(0x2717, UI_FX_AURA3, UI_BONE_LFOOT, 0, 0, 0, 0, 0, 0, UI_FOOT_SIZE, 0);
+    EffectModule(0x2717, UI_FX_AURA3, UI_BONE_RFOOT, 0, 0, 0, 0, 0, 0, UI_FOOT_SIZE, 0);
 }
 
 // every frame (func_82, every status)

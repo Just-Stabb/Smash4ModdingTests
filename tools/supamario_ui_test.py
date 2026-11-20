@@ -132,7 +132,7 @@ class Game:
             self.log.append((self.n, 'turn'))
             return 0
         if sid == 0x1C:
-            self.log.append((self.n, 'effect', a[0], a[1], a[2] if len(a) > 2 else None))
+            self.log.append((self.n, 'effect', a[0], a[1], a[2] if len(a) > 2 else None, tuple(a)))
             return 0
         if sid == 0x1E:
             self.log.append((self.n, 'sound', tuple(a)))
@@ -265,16 +265,26 @@ def form_tests(r):
     check('no hitbox (the transformation\'s game script is empty)', True, True)
     r.frame(vm, g)
     aura = [e for e in g.ev('effect', end + 1)]
-    check('the aura made right after (4 following requests 0x2730, the three old ones ended first)',
+    check('the aura made right after (4 following requests 0x2717, the three old ones ended first; v3: 0x2717, the '
+          'vanilla following request the Kamehameha uses, not v1 / v2\'s 0x2730: the crash fix)',
           sorted((e[2], e[3]) for e in aura),
           sorted([(0x2723, B.fx_id('aura_hip')), (0x2723, B.fx_id('aura_head')), (0x2723, B.fx_id('aura_foot')),
-                  (0x2730, B.fx_id('aura_hip')), (0x2730, B.fx_id('aura_head')), (0x2730, B.fx_id('aura_foot')),
-                  (0x2730, B.fx_id('aura_foot'))]))
-    check('  on HipN / HeadN / LFootJ / RFootJ', sorted(e[4] for e in aura if e[2] == 0x2730),
+                  (0x2717, B.fx_id('aura_hip')), (0x2717, B.fx_id('aura_head')), (0x2717, B.fx_id('aura_foot')),
+                  (0x2717, B.fx_id('aura_foot'))]))
+    check('  on HipN / HeadN / LFootJ / RFootJ', sorted(e[4] for e in aura if e[2] == 0x2717),
           sorted([B.BONES['HipN'], B.BONES['HeadN'], B.BONES['LFootJ'], B.BONES['RFootJ']]))
+    head_up = round(0.2 * B.METRE, 3)
+    check('  their arguments (id, bone, x, y, z, rx, ry, rz, size, flag 0): the head 0.2 m up, the sizes %g / %g' % (
+        B.SCALE, round(0.8 * B.SCALE, 3)),
+          sorted(tuple(round(float(x), 3) for x in e[5][1:]) for e in aura if e[2] == 0x2717),
+          sorted([(B.fx_id('aura_hip'), B.BONES['HipN'], 0, 0, 0, 0, 0, 0, B.SCALE, 0),
+                  (B.fx_id('aura_head'), B.BONES['HeadN'], 0, head_up, 0, 0, 0, 0, B.SCALE, 0),
+                  (B.fx_id('aura_foot'), B.BONES['LFootJ'], 0, 0, 0, 0, 0, 0, round(0.8 * B.SCALE, 3), 0),
+                  (B.fx_id('aura_foot'), B.BONES['RFootJ'], 0, 0, 0, 0, 0, 0, round(0.8 * B.SCALE, 3), 0)]))
+    check('  no 0x2730 call left (v1 / v2\'s untested op)', [e for e in g.ev('effect') if e[2] == 0x2730], [])
     for k in range(int(B.AURA_EVERY)):
         r.frame(vm, g)
-    again = [e for e in g.ev('effect', end + 2) if e[2] == 0x2730]
+    again = [e for e in g.ev('effect', end + 2) if e[2] == 0x2717]
     check('  made again after %d frames' % B.AURA_EVERY, len(again), 4)
     g, vm = form_run(r, air=True)
     check('in the air: held still, Fall at the end', ([e[2] for e in g.ev('status')][-1], g.air), (0xE, True))
