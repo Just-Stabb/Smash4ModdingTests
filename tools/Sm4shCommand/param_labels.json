@@ -19579,7 +19579,7 @@
   },
   "3": {
    "name": "Persist",
-   "desc": "0: until the animation changes (as Model_Changer and the motion's own visibility); 1: until changed, a KO, the match end or a training reset.",
+   "desc": "0: until the animation changes (as Model_Changer and the motion's own visibility); 1: until changed, a KO, the match end or a training reset; 2 (exe_v46z_ui2): the mesh's own state (0 hidden, 1 shown, 2 follow the animation), no override, kept until written again.",
    "confidence": "high"
   },
   "_example": [
@@ -19611,7 +19611,15 @@
    "Mesh_Visibility(Target=0, Mesh=\"HammerM2_O_OBJ\", Visible=0, Persist=0)",
    "Mesh_Visibility(Target=0, Mesh=\"MarioD_hair_O_OBJ\", Visible=0, Persist=1)",
    "FRAME(Frames=40)",
-   "Mesh_Visibility(Target=0, Mesh=\"MarioD_hair_O_OBJ\", Visible=2, Persist=0)"
+   "Mesh_Visibility(Target=0, Mesh=\"MarioD_hair_O_OBJ\", Visible=2, Persist=0)",
+   "",
+   "// Example 8 (Persist 2, exe_v46z_ui2): a transformation that takes the cap off for the rest of the stock with",
+   "// no override entry; a silver copy of the hair follows its own visibility track; Entry gives his look back",
+   "Mesh_Visibility(Target=0, Mesh=\"Mario_Hathead_VIS_O_OBJ\", Visible=0, Persist=2)",
+   "Mesh_Visibility(Target=0, Mesh=\"Mario_NohatUI_VIS_O_OBJ\", Visible=2, Persist=2)",
+   "// ... in EntryL / EntryR:",
+   "Mesh_Visibility(Target=0, Mesh=\"Mario_Hathead_VIS_O_OBJ\", Visible=2, Persist=2)",
+   "Mesh_Visibility(Target=0, Mesh=\"Mario_NohatUI_VIS_O_OBJ\", Visible=0, Persist=2)"
   ],
   "_group": "Animation",
   "_help": [
@@ -19623,13 +19631,14 @@
    "- Target: whose model (0 this object, 1 nearest opponent, ... 12 the fighter this attack hit: see the group).",
    "- Mesh: the mesh. Write its name in quotes, **Mesh=\"stethoscope_VIS_O_OBJ\"**: Sm4shCommand stores the name's CRC32 (exact case; the script shows it as a hex number after it is saved, which compiles the same). The Hitbox Viewer's Model parts tab lists a fighter's mesh names (also in the fighter's model.nud). A number 0-255 is a mesh index (the game's mesh order: model.nud's meshes in order, each with all its polygons). **-1: every Mesh_Visibility override of this object ends** (Visible / Persist unused). Every mesh with that name is changed, with all its parts (v1.7.14).",
    "- Visible: 0 hide it, 1 show it (even if the animation hides it), 2 end this mesh's override (the motion's visibility and the groups decide again).",
-   "- Persist: 0 until the animation changes (the next motion: the end of the move, a hit, a jump); 1 until changed, a KO, the match end or a training reset.",
+   "- Persist: 0 until the animation changes (the next motion: the end of the move, a hit, a jump); 1 until changed, a KO, the match end or a training reset; **2 (new in exe_v46z_ui2, Sm4shCommand v1.7.18): the mesh's own state**: Visible 0 hidden, 1 shown, 2 follow the motion's visibility animation, written as the game's own set state (as a visibility group writes it): no override entry, nothing ends it (motion changes, KOs, training resets keep it) until another Persist 2 (or a visibility group) writes that mesh again. An override (Persist 0 / 1) on that mesh still wins while it lasts and gives this state back when it ends.",
    "",
    "## Gotchas",
    "- **Names, not groups**: a vanilla visibility group (Model_Changer's ChangerID) switches between sets of meshes; this command names the mesh itself. Both work together: a group change on an overridden mesh waits until the override ends.",
    "- **\"The animation changes\"** means the motion kind: the same motion played again (a second jab of the same kind) keeps a Persist 0 override; end it with Visible 2 if needed.",
    "- **Articles** (a projectile, a held item) have their own models: Target 0 in the article's script, or the fighter's Mesh_Visibility won't find the article's meshes.",
    "- A name the model doesn't have does nothing (check the spelling and case: \"Gamemodel\" is not \"GameModel\").",
+   "- **Persist 2 (what changed in exe_v46z_ui2)**: before, Persist was 0 or 1 (an override, kept in a 32-entry table shared by every object). Persist 2 uses no table entry, so a look that lasts a whole stock (a transformation's hair, a hidden cap) costs nothing; it needs exe_v46z_ui2 or later (an older executable treats 2 as Persist 1). It does not end by itself: write the mesh's state back (usually Visible 2, follow the animation) when the look ends, e.g. in Entry and in Wait1 (Rebirth plays it).",
    "- The Hitbox Viewer follows it (the Model parts tab shows the mesh hidden / shown \"by Mesh_Visibility\").",
    "Needs exe_v46z_outline (tools/mesh_vis_cave.py; exe_v46z_inv + the outline + it). Without it a script that uses this command won't load properly: ship the executable with any script that uses it.",
    "",
@@ -20447,7 +20456,7 @@
    "Needs exe_v46z_outline (tools/outline_cave.py; exe_v46z_inv + it). Without it a script that uses this command won't load properly: ship the executable with any script that uses it.",
    "",
    "## v1.7.14 (exe_v46z_outline2): Outline_Shell",
-   "Outline_Set itself is unchanged (same parameters, same look), but in game its glow is a rim light, so it stays **inside** the silhouette and reads as lighting. For a real outline, a band of colour **outside** the silhouette, use **Outline_Shell** (New Commands / Effects, exe_v46z_outline2). The two work together on one object: the shell round the body and the rim lighting its edges from inside (example 6)."
+   "Outline_Set itself is unchanged (same parameters, same look), but in game its glow is a rim light, so it stays **inside** the silhouette and reads as lighting. For a real outline, a band of colour **outside** the silhouette, use **Outline_Shell** (New Commands / Effects, exe_v46z_outline4). The two work together on one object: the shell round the body and the rim lighting its edges from inside (example 6)."
   ]
  },
  "DBDDC840": {
