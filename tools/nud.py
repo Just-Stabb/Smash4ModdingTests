@@ -101,6 +101,7 @@ def read(path):
                 _read_vertices(d, p)
             else:
                 _read_rigged_uvs(d, p)
+                _read_rigged_positions(d, p, vs)
             for to in texoffs:
                 if to:
                     p.materials.append(_read_material(d, to, str_base))
@@ -143,6 +144,19 @@ def _read_rigged_uvs(d, p):
     if ct:
         p.col = a['col'].astype(np.float64) * (255 if ct == 4 else 1)
     p.uvs = [a['uv%d' % i].astype(np.float64) for i in range(nuv)]
+
+
+def _read_rigged_positions(d, p, vs):
+    """a rigged polygon's positions / normals from its "vertex add" section, as p.rpos / p.rnrm (p.pos stays None:
+    callers tell rigged polygons by it)"""
+    vt = vs & 0xF
+    if vt not in (6, 7):
+        p.rpos = p.rnrm = None
+        return
+    st = _vertex_add_stride(vs)
+    a = np.frombuffer(d, np.uint8, p.nv * st, p.vaoff).reshape(p.nv, st)
+    p.rpos = a[:, :12].copy().view('>f4').reshape(p.nv, 3).astype(np.float64)
+    p.rnrm = a[:, 12:18].copy().view('>f2').reshape(p.nv, 3).astype(np.float64)
 
 
 def _read_material(d, o, str_base):
@@ -333,6 +347,17 @@ def _vertex_add_stride(vs):
     return 12 + {0: 4, 1: 20, 3: 52, 6: 8, 7: 24}[vs & 0xF] + {1: 32, 2: 16, 4: 8}[vs >> 4]
 
 
+def _pushed(vb, nv, st, vs, dist):
+    """vertex bytes (position 3 floats, then half float normal) with every position moved DIST along its normal"""
+    assert vs & 0xF in (6, 7), 'push: half float normals only'
+    a = np.frombuffer(vb, np.uint8).reshape(nv, st).copy()
+    pos = a[:, :12].copy().view('>f4').reshape(nv, 3).astype(np.float64)
+    nrm = a[:, 12:18].copy().view('>f2').reshape(nv, 3).astype(np.float64)
+    nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-9)
+    a[:, :12] = (pos + dist * nrm).astype('>f4').view(np.uint8).reshape(nv, 12)
+    return a.tobytes()
+
+
 def clone_meshes(data, copies):
     """the .nud's bytes with meshes copied, every existing byte of it kept (only offsets moved): COPIES [(source mesh
     name, new name, {polygon index: {texture slot: new texture hash}}[, options])]; options: 'polys' [polygon
@@ -425,19 +450,15 @@ def clone_meshes(data, copies):
             struct.pack_into('>i', pe, 4, len(vtx))
             vb = d[vert_base + voff:vert_base + voff + nv * _vertex_stride(vs, us)]
             if opts.get('push') and vs >> 4 == 0:
-                assert vs & 0xF in (6, 7), 'push: half float normals only'
-                st = _vertex_stride(vs, us)
-                a = np.frombuffer(vb, np.uint8).reshape(nv, st).copy()
-                pos = a[:, :12].copy().view('>f4').reshape(nv, 3).astype(np.float64)
-                nrm = a[:, 12:18].copy().view('>f2').reshape(nv, 3).astype(np.float64)
-                nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-9)
-                a[:, :12] = (pos + opts['push'] * nrm).astype('>f4').view(np.uint8).reshape(nv, 12)
-                vb = a.tobytes()
+                vb = _pushed(vb, nv, _vertex_stride(vs, us), vs, opts['push'])
             vtx += vb
             if vs >> 4:
                 vadd += b'\0' * (-len(vadd) % 16)
                 struct.pack_into('>i', pe, 8, len(vadd))
-                vadd += d[va_base + vaoff:va_base + vaoff + nv * _vertex_add_stride(vs)]
+                ab = d[va_base + vaoff:va_base + vaoff + nv * _vertex_add_stride(vs)]
+                if opts.get('push'):
+                    ab = _pushed(ab, nv, _vertex_add_stride(vs), vs, opts['push'])
+                vadd += ab
             for k in range(4):
                 m, = struct.unpack('>i', pe[16 + 4 * k:20 + 4 * k])
                 if not m:

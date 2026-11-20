@@ -127,19 +127,30 @@ def _hausdorff(a, b):
     return max(dd.min(1).max(), dd.min(0).max())
 
 
+def positions(p):
+    """a polygon's vertex positions (an unrigged one's, or a rigged one's from its vertex add section: some costumes'
+    faces are rigged, c04's)"""
+    return p.pos if p.pos is not None else getattr(p, 'rpos', None)
+
+
+def normals(p):
+    return p.nrm if p.pos is not None else getattr(p, 'rnrm', None)
+
+
 def overlays(meshes):
     """[{'name', 'source', 'poly', 'tris', 'members'}] from the model's meshes (nud.read): the mustache / eyebrows
     polygon (texture ..0B) of each face, its triangles split at BROW_Y, one overlay per distinct shape (SAME)"""
     groups = {'Mustache': [], 'Brows': []}
     for m in meshes:
         for j, p in enumerate(m.polygons):
-            if p.pos is None or not p.materials or (p.materials[0].textures[0]['hash'] & 0xFF) != FACE_TEX:
+            pos = positions(p)
+            if pos is None or not p.materials or (p.materials[0].textures[0]['hash'] & 0xFF) != FACE_TEX:
                 continue
             tri = p.idx.reshape(-1, 3)
-            brow = (p.pos[tri][:, :, 1] > BROW_Y).all(1)
+            brow = (pos[tri][:, :, 1] > BROW_Y).all(1)
             for part, mask in (('Mustache', ~brow), ('Brows', brow)):
                 t = np.nonzero(mask)[0]
-                pts = p.pos[np.unique(tri[t])]
+                pts = pos[np.unique(tri[t])]
                 for g in groups[part]:
                     if _hausdorff(g['pts'], pts) < SAME:
                         g['members'].append(m.name)

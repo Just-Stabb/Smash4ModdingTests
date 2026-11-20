@@ -485,7 +485,7 @@ def script_tests(out, ts_out):
     check('the transformation / the dodge / Secret Sensation\'s stance: no hitbox (v3: the transformation\'s game script '
           'only the silver swap)',
           [nm(c) for s in ('speciallwlight', 'specialairlwlight', 'specialairlwheavy') for c in f['game'].script(s)],
-          ['FRAME'] + ['Mesh_Visibility'] * 5 + ['Script_End', 'Script_End', 'Script_End'])
+          ['FRAME'] + ['Mesh_Visibility'] * (5 + len(B.OVERLAYS)) + ['Script_End', 'Script_End', 'Script_End'])
     eff = [c for c in f['effect'].script('speciallwlight') if 'graphic' in nm(c).lower()]
     check('the transformation\'s effects: start, the aura (7 parts), the burst',
           [c.params[0] for c in eff], [B.fx_id('start')] + [B.fx_id(k) for k in ('aura_hip', 'aura_chest', 'aura_head',
@@ -517,6 +517,7 @@ def mv(c):
     """a Mesh_Visibility command -> (mesh name, visible, persist)"""
     import mesh_vis_cave as MV
     names = {MV.crc32(n): n for k in B.SILVER_MESHES.values() for n in k}
+    names.update({MV.crc32(n): n for n in B.OVERLAYS})
     return (names.get(c.params[1], hex(c.params[1])), c.params[2], c.params[3]) if c.params[0] == 0 else None
 
 
@@ -536,12 +537,17 @@ def at_frames(body):
 def silver_script_tests(f, b):
     """v3: the silver hair / eyes swap (Mesh_Visibility) in the game scripts"""
     H, N, E = (B.SILVER_MESHES[k] for k in ('hair', 'nohat', 'eye'))
-    on = [(H[0], 0, 1), (N[0], 0, 1), (E[0], 0, 1), (H[1], 1, 1), (E[1], 1, 1)]
-    off = sorted((m, 2, 0) for k in (H, N, E) for m in k)
+    O = B.OVERLAYS
+    check('v3: the mustache / eyebrow overlays: 3 mustache shapes, 7 eyebrow shapes', (
+        sum('Mustache' in o for o in O), sum('Brows' in o for o in O)), (3, 7))
+    on = [(H[0], 0, 1), (N[0], 0, 1), (E[0], 0, 1), (H[1], 1, 1), (E[1], 1, 1)] + [(o, 2, 0) for o in O]
+    off = sorted([(m, 2, 0) for k in (H, N, E) for m in k] + [(o, 0, 1) for o in O])
+    nn = len(O)
     g = f['game']
     got = [(fr, mv(c)) for fr, c in at_frames(g.script('speciallwlight')) if c.name == 'Mesh_Visibility']
     check('v3: the transformation\'s burst (%d): his hair / full hair / eyes hidden, the silver hair / eyes shown, '
-          'Persist 1' % B.FX_BURST_AT, got, [(float(B.FX_BURST_AT), x) for x in on])
+          'Persist 1; the overlays\' hiding ended (they follow his expressions)' % B.FX_BURST_AT, got,
+          [(float(B.FX_BURST_AT), x) for x in on])
     check('v3: the burst is XV2\'s frame 220', B.FX_BURST_AT, 220)
     got = [(fr, mv(c)) for fr, c in at_frames(g.script('speciallwheavy')) if c.name == 'Mesh_Visibility']
     check('v3: the counter (transformed afterwards): the same swap at its white body\'s end (%d)' % B.CNT_END, got,
@@ -549,15 +555,18 @@ def silver_script_tests(f, b):
     w = g.script('wait1')
     names = [c.name for c in w]
     check('v3: Wait1 (no game script before): transformed (TIMER_0 > %g) the swap again, else every override ended' %
-          B.UI_TRANSFORMED_OVER, names, ['Float_Var_Compare', 'True'] + ['Mesh_Visibility'] * 5 +
-          ['Float_Var_Compare', 'True'] + ['Mesh_Visibility'] * 6 + ['Script_End'])
-    if len(w) == 17:
+          B.UI_TRANSFORMED_OVER, names, ['Float_Var_Compare', 'True'] + ['Mesh_Visibility'] * (5 + nn) +
+          ['Float_Var_Compare', 'True'] + ['Mesh_Visibility'] * (6 + nn) + ['Script_End'])
+    if len(w) == 17 + 2 * nn:
+        a, b2 = 2 + 5 + nn, 2 + 5 + nn + 2
         check('  its conditions: TIMER_0 (0x%X) > / <= %g; the True blocks\' sizes' % (C.V_FORM, B.UI_TRANSFORMED_OVER),
-              [(w[0].params, w[1].params), (w[7].params, w[8].params)],
-              [([C.V_FORM, 5, B.UI_TRANSFORMED_OVER], [2 + 5 * 5]), ([C.V_FORM, 2, B.UI_TRANSFORMED_OVER], [2 + 6 * 5])])
-        check('  the blocks: the swap / the restore', ([mv(c) for c in w[2:7]], sorted(mv(c) for c in w[9:15])), (on, off))
+              [(w[0].params, w[1].params), (w[a].params, w[a + 1].params)],
+              [([C.V_FORM, 5, B.UI_TRANSFORMED_OVER], [2 + 5 * (5 + nn)]),
+               ([C.V_FORM, 2, B.UI_TRANSFORMED_OVER], [2 + 5 * (6 + nn)])])
+        check('  the blocks: the swap / his own look (the overlays hidden)',
+              ([mv(c) for c in w[2:a]], sorted(mv(c) for c in w[b2:b2 + 6 + nn])), (on, off))
     for e in ('entryl', 'entryr'):
-        check('v3: %s: every swap override ended at frame 0 (a new match / stock: his own hair and eyes)' % e,
+        check('v3: %s: at frame 0 his own look (the swap\'s overrides ended, the overlays hidden)' % e,
               sorted((fr, mv(c)) for fr, c in at_frames(g.script(e)) if c.name == 'Mesh_Visibility'),
               [(0.0, x) for x in off])
     for a in ('appealsl', 'appealsr'):
@@ -649,10 +658,13 @@ def model_tests(out, base):
         dst = os.path.join(out, 'fighter', 'supamario', 'model', 'body', c)
         old, new = nud.read(os.path.join(src, 'model.nud')), nud.read(os.path.join(dst, 'model.nud'))
         n0 = len(old)
-        check('%s model.nud: the meshes as before, then the 3 copies' % c, [m.name for m in new],
-              [m.name for m in old] + [M.MESHES[k][1] for k in ('hair', 'nohat', 'eye')])
+        ovs = M.overlays(old)
+        check('%s model.nud: the meshes as before, then the 3 copies and the %d overlays (c00\'s names)' % (c, len(ovs)),
+              ([m.name for m in new], [o['name'] for o in ovs]),
+              ([m.name for m in old] + [M.MESHES[k][1] for k in ('hair', 'nohat', 'eye')] + B.OVERLAYS, B.OVERLAYS))
+        P = M.positions
         same = all(a.name == b.name and a.bone == b.bone and len(a.polygons) == len(b.polygons) and all(
-            (pa.idx == pb.idx).all() and (pa.pos is None or (pa.pos == pb.pos).all()) and
+            np.array_equal(pa.idx, pb.idx) and np.array_equal(P(pa), P(pb)) and
             [x.textures for x in pa.materials] == [x.textures for x in pb.materials] and
             [x.props for x in pa.materials] == [x.props for x in pb.materials]
             for pa, pb in zip(a.polygons, b.polygons)) for a, b in zip(old, new))
@@ -662,8 +674,9 @@ def model_tests(out, base):
         for k, want in (('hair', {0: hair_id}), ('nohat', {0: hair_id}), ('eye', {0: iris_id, 1: iris_id})):
             a, b = by[M.MESHES[k][0]], by[M.MESHES[k][1]]
             geo = (a.bone, a.bind, len(a.polygons)) == (b.bone, b.bind, len(b.polygons)) and all(
-                (pa.idx == pb.idx).all() and (pa.pos == pb.pos).all() and (pa.nrm is None or (pa.nrm == pb.nrm).all())
-                and all((u == v).all() for u, v in zip(pa.uvs, pb.uvs)) for pa, pb in zip(a.polygons, b.polygons))
+                np.array_equal(pa.idx, pb.idx) and np.array_equal(P(pa), P(pb)) and
+                np.array_equal(M.normals(pa), M.normals(pb)) and all(np.array_equal(u, v) for u, v in zip(pa.uvs, pb.uvs))
+                for pa, pb in zip(a.polygons, b.polygons))
             tex = [[t['hash'] for m in p.materials for t in m.textures] for p in b.polygons]
             exp = []
             for j, p in enumerate(a.polygons):
@@ -675,12 +688,37 @@ def model_tests(out, base):
                         for pa, pb in zip(a.polygons, b.polygons))
             check('%s %s: the same geometry / bone / UVs as %s, its materials\' properties (NU_materialHash) kept, '
                   'the silver texture' % (c, M.MESHES[k][1], M.MESHES[k][0]), (geo, props, tex), (True, True, exp))
+        bad = []
+        for o in ovs:
+            a, b = by[o['source']].polygons[o['poly']], by[o['name']]
+            pb = b.polygons[0] if len(b.polygons) == 1 else None
+            if pb is None:
+                bad.append(o['name'])
+                continue
+            n = M.normals(a) / np.linalg.norm(M.normals(a), axis=1, keepdims=True)
+            tri = a.idx.reshape(-1, 3)[o['tris']].reshape(-1)
+            ok = (b.bone == by[o['source']].bone and np.array_equal(pb.idx, tri) and
+                  np.allclose(P(pb), P(a) + M.PUSH * n, atol=1e-3) and
+                  [t['hash'] for t in pb.materials[0].textures][1:] == [t['hash'] for t in a.materials[0].textures][1:]
+                  and pb.materials[0].textures[0]['hash'] == hair_id and
+                  [x.props for x in pb.materials] == [x.props for x in a.materials])
+            ys = P(pb)[pb.idx.reshape(-1, 3)][:, :, 1]
+            part_ok = (ys > M.BROW_Y - M.PUSH).all() if o['part'] == 'Brows' else (ys <= M.BROW_Y + M.PUSH).any(1).all()
+            if not (ok and part_ok):
+                bad.append(o['name'])
+        check('%s: each overlay = its face\'s mustache / eyebrow triangles (texture ..0B), pushed %g out along the '
+              'normals, the silver hair texture, the material otherwise as its source' % (c, M.PUSH), bad, [])
+        cover = sorted(m for o in ovs for m in o['members'])
+        faces = sorted(m.name for m in old for p in m.polygons if p.materials and
+                       (p.materials[0].textures[0]['hash'] & 0xFF) == M.FACE_TEX)
+        check('%s: every face with the mustache polygon (%d) in one mustache and one eyebrow overlay' % (c, len(faces)),
+              cover, sorted(faces * 2))
         mo, mn = nud.read(os.path.join(src, 'metal.nud')), nud.read(os.path.join(dst, 'metal.nud'))
         mb = {m.name: m for m in mn}
         check('%s metal.nud: the 3 copies with the metal textures (the same mesh list as model.nud)' % c,
               ([m.name for m in mn][len(mo):], [[t['hash'] for t in mb[M.MESHES[k][1]].polygons[0].materials[0].textures]
                                                for k in M.MESHES]),
-              ([M.MESHES[k][1] for k in ('hair', 'nohat', 'eye')],
+              ([M.MESHES[k][1] for k in ('hair', 'nohat', 'eye')] + B.OVERLAYS,
                [[t['hash'] for t in mb[M.MESHES[k][0]].polygons[0].materials[0].textures] for k in M.MESHES]))
         d0, t0 = nut.load(os.path.join(src, 'model.nut'))
         d1, t1 = nut.load(os.path.join(dst, 'model.nut'))
@@ -724,12 +762,28 @@ def model_tests(out, base):
                         if v['name'] == orig:
                             want.append((cp, [(0, 0, 0)]))
                             n += 1
+                vis0 = {v['name']: [(f, st) for f, st, _ in v['keys']] for v in r0['vis']}
+                want += [(nm, [(f, st, 0) for f, st in k]) for nm, k in M.overlay_tracks(na, vis0, ovs)]
                 if r0['mats'] != r1['mats'] or [(v['name'], v['keys']) for v in r1['vis']] != want or \
                         x0[:struct.unpack('>I', x0[0x24:0x28])[0]] != x1[:struct.unpack('>I', x1[0x24:0x28])[0]]:
                     bad.append(na)
             check('%s %s: each hair / full hair / eye track followed by its copy\'s, hidden all through (%d added); '
                   'every other byte before the tracks, the materials and the tracks kept' % (c, pk, n), bad, [])
-        dm = [e for e in T.pac_entries(open(os.path.join(dst, M.PACS[0]), 'rb').read()) if e[0] == 'default.mta']
+        pk = open(os.path.join(dst, M.PACS[0]), 'rb').read()
+        tr = {}
+        for na, o, sz in T.pac_entries(pk):
+            if na.endswith('.mta'):
+                tr[na] = {v['name']: [(f, st) for f, st, _ in v['keys']] for v in mta.read(pk[o:o + sz])['vis']}
+        ap = tr['FitMarioBodyMainJ01AppealS.mta']
+        check('%s: the overlays follow their faces (the side taunt: FaceN\'s mustache / eyebrows as FaceN, Furafura\'s '
+              'mustache and Escape\'s eyebrows as Escape, 17-72)' % c,
+              [ap.get('Mario_FaceNMustacheUI_VIS_O_OBJ'), ap.get('Mario_FaceNBrowsUI_VIS_O_OBJ'),
+               ap.get('Mario_FurafuraMustacheUI_VIS_O_OBJ'), ap.get('Mario_EscapeBrowsUI_VIS_O_OBJ')],
+              [ap['Mario_FaceN_VIS_O_OBJ']] * 2 + [ap['Mario_Escape_VIS_O_OBJ']] * 2)
+        hid = [na for na in tr if any(k in na for k in M.OVERLAY_HIDDEN) and tr[na] and
+               any(tr[na].get(o) != [(0, 0)] for o in B.OVERLAYS)]
+        check('%s: the overlays hidden all through the entry / win / lose / display motions' % c, hid, [])
+        dm = [e for e in T.pac_entries(pk) if e[0] == 'default.mta']
         if dm:
             x = open(os.path.join(dst, M.PACS[0]), 'rb').read()[dm[0][1]:dm[0][1] + dm[0][2]]
             vis = {v['name']: v['keys'] for v in mta.read(x)['vis']}
@@ -743,6 +797,7 @@ def ids_from_json(out):
     js = json.load(open(os.path.join(out, 'ultrainstinct.json')))
     B.FX_IDS.update({k: int(v, 16) for k, v in js['fx_ids'].items()})
     B.SE_IDS.update({k: int(v, 16) for k, v in js['se_ids'].items()})
+    B.OVERLAYS[:] = js['silver']['overlays']
 
 
 def main():
