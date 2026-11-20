@@ -335,7 +335,10 @@ def _vertex_add_stride(vs):
 
 def clone_meshes(data, copies):
     """the .nud's bytes with meshes copied, every existing byte of it kept (only offsets moved): COPIES [(source mesh
-    name, new name, {polygon index: {texture slot: new texture hash}})]. Each copy gets its own polygon entries, its
+    name, new name, {polygon index: {texture slot: new texture hash}}[, options])]; options: 'polys' [polygon
+    indices] (only these polygons copied; default all), 'tris' {polygon index: [triangle numbers]} (only these
+    triangles of its list; its vertices all kept), 'push' a distance every copied vertex of an unrigged polygon is moved
+    along its normal (an overlay drawn over its source). Each copy gets its own polygon entries, its
     own materials (byte copies: the same properties and NU_materialHash, so the material animations that bind by hash
     drive it too) and its own index / vertex data, appended after the meshes; same bone / bind / sort bias / sphere.
     Rigged polygons copy their vertex add data too. The layout as read(): header, mesh entries, polygon entries, materials,
@@ -366,7 +369,9 @@ def clone_meshes(data, copies):
     assert mat_offs[0] >= mat_start
     mat_end = 0x30 + pstart
     mat_size = {m: (mat_offs[i + 1] if i + 1 < len(mat_offs) else mat_end) - m for i, m in enumerate(mat_offs)}
-    new_polys = sum(len(polys[names.index(src)]) for src, _n, _t in copies)
+    copies = [tuple(c) + ({},) * (4 - len(c)) for c in copies]
+    sel = [o.get('polys', range(len(polys[names.index(src)]))) for src, _n, _t, o in copies]
+    new_polys = sum(len(x) for x in sel)
     sh_poly = 0x30 * len(copies)               # old polygon entries move by the new mesh entries
     sh_mat = sh_poly + 0x30 * new_polys        # old materials by the new mesh and polygon entries
     out_mesh = bytearray()
@@ -392,24 +397,43 @@ def clone_meshes(data, copies):
     pe_new = bytearray()
     first_new_poly = ptab + sh_poly + 0x30 * npoly_all
     mats_new_base = mat_start + sh_mat + len(old_mats)
-    for src, new_name, tex in copies:
+    for (src, new_name, tex, opts), keep in zip(copies, sel):
         i = names.index(src)
         e = bytearray(d[0x30 + i * 0x30:0x60 + i * 0x30])
         strs += b'\0' * (-len(strs) % 16)
         struct.pack_into('>i', e, 32, len(strs))
         strs += new_name.encode() + b'\0'
         struct.pack_into('>i', e, 44, first_new_poly + len(pe_new))
+        struct.pack_into('>h', e, 42, len(keep))
         mesh_new += e
         for j, q in enumerate(polys[i]):
+            if j not in keep:
+                continue
             pe = bytearray(d[q:q + 0x30])
             poff, voff, vaoff, nv, vs, us = struct.unpack('>iiiHBB', pe[:16])
             nidx, = struct.unpack('>H', pe[32:34])
             idx += b'\0' * (-len(idx) % 16)
             struct.pack_into('>i', pe, 0, len(idx))
-            idx += d[poly_base + poff:poly_base + poff + 2 * nidx]
+            ib = d[poly_base + poff:poly_base + poff + 2 * nidx]
+            if j in opts.get('tris', {}):
+                assert (struct.unpack('>H', pe[34:36])[0] >> 8) == 0x40, 'triangle lists only'
+                t = np.frombuffer(ib, '>u2').reshape(-1, 3)[list(opts['tris'][j])]
+                ib = t.astype('>u2').tobytes()
+                struct.pack_into('>H', pe, 32, len(ib) // 2)
+            idx += ib
             vtx += b'\0' * (-len(vtx) % 16)
             struct.pack_into('>i', pe, 4, len(vtx))
-            vtx += d[vert_base + voff:vert_base + voff + nv * _vertex_stride(vs, us)]
+            vb = d[vert_base + voff:vert_base + voff + nv * _vertex_stride(vs, us)]
+            if opts.get('push') and vs >> 4 == 0:
+                assert vs & 0xF in (6, 7), 'push: half float normals only'
+                st = _vertex_stride(vs, us)
+                a = np.frombuffer(vb, np.uint8).reshape(nv, st).copy()
+                pos = a[:, :12].copy().view('>f4').reshape(nv, 3).astype(np.float64)
+                nrm = a[:, 12:18].copy().view('>f2').reshape(nv, 3).astype(np.float64)
+                nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-9)
+                a[:, :12] = (pos + opts['push'] * nrm).astype('>f4').view(np.uint8).reshape(nv, 12)
+                vb = a.tobytes()
+            vtx += vb
             if vs >> 4:
                 vadd += b'\0' * (-len(vadd) % 16)
                 struct.pack_into('>i', pe, 8, len(vadd))

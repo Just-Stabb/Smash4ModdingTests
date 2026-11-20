@@ -135,10 +135,11 @@ def _vis_bytes(base, vis):
     return bytes(out)                          # the game's files end at the last key
 
 
-def add_vis(d, tracks):
+def add_vis(d, tracks, append=()):
     """an MTA4's bytes with visibility tracks added: TRACKS {existing mesh name: (new mesh name, keys or None)}: after
-    each existing track a new one (keys None: hidden all through, [(0, 0)]). Everything before the visibility section
-    is kept byte for byte; the section (the file's tail) is laid out again. Returns d unchanged without a match"""
+    each existing track a new one (keys None: hidden all through, [(0, 0)]); APPEND [(mesh name, [(frame, 0 / 1)])]
+    after all of them. Everything before the visibility section is kept byte for byte; the section (the file's tail) is
+    laid out again. Returns d unchanged without a match (and without a visibility section)"""
     r = read(d)
     vc, vo = struct.unpack('>II', d[0x20:0x28])
     if not vc:
@@ -151,6 +152,7 @@ def add_vis(d, tracks):
         if name in tracks:
             new, k = tracks[name]
             out.append((new, last, list(k) if k is not None else [(0, 0)]))
+    out += [(n, vis[0][1], list(k)) for n, k in append]
     if len(out) == len(vis):
         return d
     b = bytearray(d[:vo]) + _vis_bytes(vo, out)

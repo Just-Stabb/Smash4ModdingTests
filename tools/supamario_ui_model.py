@@ -15,8 +15,12 @@ texture 0x40KK..09 with a strand normal map, and a skin polygon), Mario_Nohat_VI
 the side taunt's frames 17-72 with the cap off), Mario_Eye_VIS_O_OBJ (both irises: texture ..07, blue, an alpha oval,
 over the white ..06; the material animations move its UVs by NU_materialHash, which the copy keeps, so it looks
 around as his own does). The eyebrows and the mustache are one polygon (texture ..0B, near-black) of each of the 17
-expression faces (FaceN, Ouch, Talk ...), which the eyelid animation switches: they are left as they are (a forced
-copy would show every expression's face at once).
+expression faces (FaceN, Ouch, Talk ...), which the eyelid animation switches (v3, the user: the mustache silver too;
+the eyebrows with it, as his hair): OVERLAYS, silver copies of that polygon's mustache / eyebrow triangles, one per
+distinct shape (the mustache 3: FaceN's in 10 expressions, Furafura's in 4, Damageflyfront's; the eyebrows 7), pushed
+PUSH along the normals over his own, each following its expressions' visibility (the OR of their tracks, per motion;
+hidden in the entry / win / lose / display motions) and kept hidden by Mesh_Visibility while he isn't transformed
+(tools/supamario_ui_build.py: 10 overrides, from Entry / Wait1, which Rebirth plays), ended at the burst.
 """
 import os
 import shutil
@@ -43,7 +47,12 @@ TEX_HAIR, TEX_IRIS = 0, 1            # + these
 MESHES = {'hair': ('Mario_Hair_VIS_O_OBJ', 'Mario_HairUI_VIS_O_OBJ'),
           'nohat': ('Mario_Nohat_VIS_O_OBJ', 'Mario_NohatUI_VIS_O_OBJ'),
           'eye': ('Mario_Eye_VIS_O_OBJ', 'Mario_EyeUI_VIS_O_OBJ')}
-PACS = ('material_anime_eyelid.pac', 'material_anime_eyelid_lang.pac')   # the ones with the hair / eye tracks
+PACS = ('material_anime_eyelid.pac', 'material_anime_eyelid_lang.pac')   # the ones with the hair / eye / face tracks
+FACE_TEX = 0x0B                      # the mustache / eyebrows polygon's texture (low byte)
+BROW_Y = 11.8                        # its triangles above this (all three vertices): the eyebrows; below: the mustache
+SAME = 0.01                          # two shapes the same: no vertex further than this from the other's
+PUSH = 0.03                          # the overlays this far out along the normals
+OVERLAY_HIDDEN = ('Entry', 'Win', 'Lose', 'display')      # motions (MTA names) with the overlays hidden all through
 SRC_TEX = {'hair': 0x09, 'iris': 0x07}       # Mario's texture ids' low byte (0x40KK0000 + 0x400 x NN + this)
 
 
@@ -86,6 +95,78 @@ def silver_iris(img):
     return out
 
 
+def _hausdorff(a, b):
+    if len(a) != len(b):
+        return 1e9
+    dd = np.sqrt(((a[:, None] - b[None]) ** 2).sum(2))
+    return max(dd.min(1).max(), dd.min(0).max())
+
+
+def overlays(meshes):
+    """[{'name', 'source', 'poly', 'tris', 'members'}] from the model's meshes (nud.read): the mustache / eyebrows
+    polygon (texture ..0B) of each face, its triangles split at BROW_Y, one overlay per distinct shape (SAME)"""
+    groups = {'Mustache': [], 'Brows': []}
+    for m in meshes:
+        for j, p in enumerate(m.polygons):
+            if p.pos is None or not p.materials or (p.materials[0].textures[0]['hash'] & 0xFF) != FACE_TEX:
+                continue
+            tri = p.idx.reshape(-1, 3)
+            brow = (p.pos[tri][:, :, 1] > BROW_Y).all(1)
+            for part, mask in (('Mustache', ~brow), ('Brows', brow)):
+                t = np.nonzero(mask)[0]
+                pts = p.pos[np.unique(tri[t])]
+                for g in groups[part]:
+                    if _hausdorff(g['pts'], pts) < SAME:
+                        g['members'].append(m.name)
+                        break
+                else:
+                    groups[part].append(dict(source=m.name, poly=j, tris=[int(x) for x in t], members=[m.name], pts=pts,
+                                             part=part))
+    out = []
+    for part in ('Mustache', 'Brows'):
+        for g in groups[part]:
+            short = g['source'][len('Mario_'):-len('_VIS_O_OBJ')]
+            out.append(dict(name='Mario_%s%sUI_VIS_O_OBJ' % (short, part), source=g['source'], poly=g['poly'],
+                            tris=g['tris'], members=g['members'], part=part))
+    return out
+
+
+def or_keys(tracks, last):
+    """the OR of step tracks [[(frame, state)]] (each state holds to its next key): [(frame, state)], a key where it
+    changes (and at 0)"""
+    frames = sorted({f for t in tracks for f, _s in t} | {0})
+    out = []
+    for f in frames:
+        on = 0
+        for t in tracks:
+            cur = 0
+            for kf, st in t:
+                if kf <= f:
+                    cur = st
+            on |= cur
+        if not out or out[-1][1] != on:
+            out.append((f, on))
+    if out[-1][0] != last and any(f == last for t in tracks for f, _s in t):
+        out.append((last, out[-1][1]))       # the game's tracks end with a key on the last frame
+    return out
+
+
+def overlay_tracks(mta_name, vis, ovs):
+    """[(overlay name, keys)] for one MTA's visibility tracks VIS ({mesh: [(frame, state)]}, last frame LAST)"""
+    if not vis:
+        return []
+    hidden = any(k in mta_name for k in OVERLAY_HIDDEN)
+    last = max(f for t in vis.values() for f, _s in t)
+    out = []
+    for o in ovs:
+        have = [vis[m] for m in o['members'] if m in vis]
+        if hidden:
+            out.append((o['name'], [(0, 0)]))
+        elif have:
+            out.append((o['name'], or_keys(have, last)))
+    return out
+
+
 def costume(src, dst, nn, png=None):
     """one model folder: SRC (the base's cNN) -> DST (the files changed); returns a report"""
     os.makedirs(dst, exist_ok=True)
@@ -104,10 +185,13 @@ def costume(src, dst, nn, png=None):
             Image.fromarray(nut.decode(d, by[t]), 'RGBA').save(os.path.join(png, 'c%02d_%s_before.png' % (nn, name)))
             Image.fromarray(img, 'RGBA').save(os.path.join(png, 'c%02d_%s_after.png' % (nn, name)))
     texmap = {'hair': {0: {0: hair_id}}, 'nohat': {0: {0: hair_id}}, 'eye': {0: {0: iris_id}, 1: {0: iris_id}}}
+    ovs = overlays(nud.read(os.path.join(src, 'model.nud')))
     for fn, retex in (('model.nud', True), ('metal.nud', False)):
         p = os.path.join(src, fn)
         if os.path.exists(p):
             copies = [(a, b, texmap[k] if retex else {}) for k, (a, b) in MESHES.items()]
+            copies += [(o['source'], o['name'], {o['poly']: {0: hair_id}} if retex else {},
+                        {'polys': [o['poly']], 'tris': {o['poly']: o['tris']}, 'push': PUSH}) for o in ovs]
             open(os.path.join(dst, fn), 'wb').write(nud.clone_meshes(open(p, 'rb').read(), copies))
     tracks = {a: (b, None) for a, b in MESHES.values()}
     added = 0
@@ -116,12 +200,16 @@ def costume(src, dst, nn, png=None):
         if not os.path.exists(p):
             continue
 
-        def fn(_name, b):
-            return mta.add_vis(b, tracks) if b[:4] == b'MTA4' else b
+        def fn(name, b):
+            if b[:4] != b'MTA4':
+                return b
+            vis = {v['name']: [(f, s) for f, s, _ in v['keys']] for v in mta.read(b)['vis']}
+            return mta.add_vis(b, tracks, overlay_tracks(name, vis, ovs))
         new = mta.pac_map(open(p, 'rb').read(), fn)
         open(os.path.join(dst, pk), 'wb').write(new)
         added += 1
     return {'hair_id': '0x%08X' % hair_id, 'iris_id': '0x%08X' % iris_id, 'pacs': added,
+            'overlays': {o['name']: o['members'] for o in ovs},
             'hair_rgb': [int(x) for x in hair[0, 0, :3]]}
 
 
