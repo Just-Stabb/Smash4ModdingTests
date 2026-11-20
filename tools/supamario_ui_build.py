@@ -33,8 +33,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.append(HERE)
 import acmd  # noqa: E402
+import mesh_vis_cave as MV  # noqa: E402
 import supamario_ui_anim as anim  # noqa: E402
 import supamario_ui_cave as cave  # noqa: E402
+import supamario_ui_model as model  # noqa: E402
 
 # ---------------------------------------------------------------- the rules (the user's spec)
 TRIGGER_PCT = 100.0                  # his first actionable frame at 100% or more
@@ -94,6 +96,16 @@ V_SS = 0x0F000324                    # TIMER_4: Secret Sensation's mark
 BONES = {'TransN': 0, 'HipN': 2, 'LFootJ': 5, 'RFootJ': 9, 'BustN': 12, 'HeadN': 22, 'LHandN': 16, 'RHandN': 20}
 V_AURA = 0x0F000323                  # TIMER_3: the aura's renewal
 
+# v3: the silver hair and eyes (tools/supamario_ui_model.py: the colours there, model.SILVER): silver copies of his
+# hair / full hair / eye meshes, hidden by their visibility tracks; at the burst (and at the counter's white body's end)
+# Mesh_Visibility Persist 1 hides his own hair / full hair / eyes and shows the copies (until a KO, the match end or a
+# training reset). The full hair shows only in the side taunt's frames 17-72 (cap off): its copy is shown there by the
+# taunt's game script while transformed (TIMER_0 > 1500). Wait1's game script applies the swap again while transformed
+# and ends it otherwise (a training reset, a respawn); Entry's ends it
+SILVER_MESHES = model.MESHES
+UI_TRANSFORMED_OVER = 1500.0         # TIMER_0 (UI_V_FORM) above this: transformed (the MSC writes 2000 every frame)
+NOHAT_ON, NOHAT_OFF = 17, 72         # AppealS: the eyelid animation's Mario_Nohat keys (Mario_Hair off between)
+
 # ---------------------------------------------------------------- XV2's effects (BTL_AURA.eepk / BTL_CMN.eepk)
 # (key, EEPK, EMP, the Smash bone, offset (m), EEPK scale): BAC entry 0 plays 846 at 10 (MGT_HENSIN01 on b_C_Chest),
 # 848 at 40 (the aura: loops on the feet, knees, legs, pelvis, chest, head, arms, hands), 851 / 849 at 220
@@ -108,6 +120,16 @@ FX = [('start', 'BTL_AURA.eepk', 'MGT_HENSIN01.emp', 'BustN', (0.0, 0.0, 0.0), 1
       ('aura_chest', 'BTL_AURA.eepk', 'Aura_LoopFOK2.emp', 'BustN', (0.0, 0.0, 0.0), 1.0),
       ('aura_hand', 'BTL_AURA.eepk', 'Aura_HandLoopFOK.emp', 'RHandN', (0.0, 0.0, 0.0), 0.65),
       ('vanish', 'BTL_CMN.eepk', 'SKI_line.emp', 'HipN', (0.0, 0.0, 0.0), 1.0)]
+# v3: the aura's colour. The converted emitters keep XV2's EMP colours (blue / cyan / white: rendered with fx_render's
+# Smash 4 side, the drawn pixels' median hue 192 deg, saturation 0.26); the user's XV2 clip after the burst shows a
+# lavender / purple-white flicker (the aura pixels' median hue 281-287 deg, saturation 0.16-0.18, value 0.88-0.96, four
+# frames 5.6-6.9 s). XV2's own data has no purple for it: effect 848's EMP colours, its EMM materials (glare / refraction)
+# and the body ECFs (847 Mgt_Aura.ecf: diffuse 0.42 0.60 0.68, ambient 0.63 0.75 1.0) are blue-white, and
+# aura_setting.aur holds only effect ids (aura 1: BTL_AURA 40-44), no colours; the purple is the game's rendering
+# (glare / screen effects). So the clip's colour is applied: every colour key of the aura's sets (AURA_SETS) turned to
+# AURA_HUE and its saturation scaled by AURA_SAT (its value kept). An approximation, from the clip
+AURA_HUE, AURA_SAT = 284.0, 0.65
+AURA_SETS = ('aura_hip', 'aura_head', 'aura_foot', 'aura_chest', 'aura_hand')
 FX_IDS = {}                          # key -> the ACMD / MSC id (0x0341xxxx), filled by effects()
 FX_DEFAULT = 0x1000009               # before the build has made them (the earlier builds compile the MSC too)
 METRE = 5.04
@@ -206,6 +228,37 @@ def white_off():
     return [cmd('terminate_overlays'), cmd('outline_shell', 0, 0.0, 0.0, 0.0, 0.0, RIM_WIDTH, 0, 0, 10, 0, 1)]
 
 
+def meshvis(mesh, visible, persist):
+    return cmd('mesh_visibility', 0, MV.crc32(mesh), visible, persist)
+
+
+def silver_on():
+    """his own hair / full hair / eyes hidden, the silver hair / eyes shown, until a KO (Persist 1)"""
+    return ([meshvis(SILVER_MESHES[k][0], 0, 1) for k in ('hair', 'nohat', 'eye')] +
+            [meshvis(SILVER_MESHES[k][1], 1, 1) for k in ('hair', 'eye')])
+
+
+def silver_off():
+    """every override of the swap ended: the visibility animation decides again (his own shown, the copies hidden)"""
+    return [meshvis(m, 2, 0) for k in ('hair', 'nohat', 'eye') for m in SILVER_MESHES[k]]
+
+
+def if_var(var, method, value, body):
+    """Float_Var_Compare(var method value) True { body }"""
+    return [cmd('float_var_compare', var, method, float(value)),
+            cmd('true', 2 + sum(acmd.INFO[c.ident]['size'] for c in body))] + body
+
+
+def silver_scripts():
+    """{script name: game script body} of the swap's other scripts (none of them had a game script)"""
+    wait = if_var(cave.V_FORM, 5, UI_TRANSFORMED_OVER, silver_on()) + if_var(cave.V_FORM, 2, UI_TRANSFORMED_OVER,
+                                                                              silver_off())
+    nohat = SILVER_MESHES['nohat'][1]
+    appeal = timeline([(NOHAT_ON, if_var(cave.V_FORM, 5, UI_TRANSFORMED_OVER, [meshvis(nohat, 1, 0)])),
+                       (NOHAT_OFF, [meshvis(nohat, 2, 0)])])
+    return {'wait1': wait, 'entryl': silver_off(), 'entryr': silver_off(), 'appealsl': appeal, 'appealsr': appeal}
+
+
 def graphic(key, bone=None, follow=True, size=1.0):
     e = [x for x in FX if x[0] == key][0]
     b = BONES[bone or e[3]]
@@ -223,9 +276,10 @@ def scripts_for():
     rush = []
     for f in RUSH_AT:
         rush += [(f, [cmd('hit_log_clear', 0), rush_box(), cmd('hitbox_hold', 0, 2)]), (f + 2, [cmd('remove_all_hitboxes')])]
-    game = {anim.FORM: [], anim.STRIKE: timeline([(0, [freeze_box()]), (1, [cmd('remove_all_hitboxes')])] + rush +
-                                                 [(STRIKE_AT, [cmd('hit_log_clear', 0), strike_box()]),
-                                                  (STRIKE_AT + 3, [cmd('remove_all_hitboxes')])]),
+    game = {anim.FORM: timeline([(FX_BURST_AT, silver_on())]),
+            anim.STRIKE: timeline([(0, [freeze_box()]), (1, [cmd('remove_all_hitboxes')])] + rush +
+                                  [(STRIKE_AT, [cmd('hit_log_clear', 0), strike_box()]),
+                                   (STRIKE_AT + 3, [cmd('remove_all_hitboxes')]), (CNT_END, silver_on())]),
             anim.DODGE: [], anim.SS: []}
     effect = {anim.FORM: timeline([(FX_START_AT, [graphic('start')] + white_on(FX_BURST_AT - FX_START_AT)),
                                    (FX_AURA_AT, aura), (FX_BURST_AT, [graphic('burst', follow=False)] + white_off())]),
@@ -254,10 +308,43 @@ def scripts(body_dir):
         f = acmd.ACMDFile.load(path)
         for m, body in bodies.items():
             f.scripts[acmd.crc(SCRIPT[m])] = body + [acmd.Command(acmd.END)]     # F.L.U.D.D.'s replaced
+        if part == 'game':
+            for name, body in silver_scripts().items():
+                assert acmd.crc(name) not in f.scripts, name
+                f.scripts[acmd.crc(name)] = body + [acmd.Command(acmd.END)]
         f.save(path)
 
 
 # ---------------------------------------------------------------- effects / sounds
+def lavender(rgb):
+    """an emitter colour turned to the clip's lavender: hue AURA_HUE, saturation x AURA_SAT, its value kept"""
+    import colorsys
+    v = max(rgb)
+    if v <= 0:
+        return tuple(rgb)
+    h, s_, _v = colorsys.rgb_to_hsv(*[c / v for c in rgb])
+    return tuple(c * v for c in colorsys.hsv_to_rgb(AURA_HUE / 360.0, s_ * AURA_SAT, 1.0))
+
+
+def tint_aura(p, rep):
+    """lavender() over every colour key (both tracks) of the aura's converted sets; {set: [emitters]}"""
+    done = {}
+    for key in AURA_SETS:
+        emp = [x for x in FX if x[0] == key][0][2]
+        name = 'PtcSupamarioUi' + emp[:-4]
+        si = p.find_set(name)
+        for e in p.sets[si]['emitters']:
+            em = e['data']
+            if em is None:
+                continue
+            for track in (0, 1):
+                keys = [tuple(k) for k in p.color_keys(em, track)]
+                p.set_color_keys(em, track, [lavender(k[:3]) + tuple(k[3:]) for k in keys])
+            done.setdefault(name, []).append(p.emitter_name(em))
+        rep[name]['tint'] = [AURA_HUE, AURA_SAT]
+    return done
+
+
 def effects(cmn_dir, fx_dir):
     """FX's EMPs (XV2's vfx/cmn) into his ptcl / efc after every earlier set; FX_IDS their ids"""
     import efc
@@ -286,6 +373,7 @@ def effects(cmn_dir, fx_dir):
         for key, ep, emp, _bone, _o, _s in FX:
             if ep == eepk:
                 FX_IDS[key] = 0x03410000 | by_emp[emp]
+    tint_aura(p, rep)
     out = p.build()
     assert ptcl.Ptcl(out).validate() == []
     open(os.path.join(fx_dir, base + '.ptcl'), 'wb').write(out)
@@ -329,7 +417,9 @@ def build(sm_dir, out_dir, ui_skill, ui_se_wav, ts_args):
     sound_bank(fdir, out_dir, ui_se_wav)
     scripts(os.path.join(fdir, 'script', 'animcmd', 'body'))
     GB.msc(os.path.join(fdir, 'script', 'msc', 'supamario.mscsb'))
-    doc = {'frames': {m: anim.frames_of(m) for m in anim.MOTIONS}, 'strike_at': STRIKE_AT,
+    silver = model.build(sm_dir, fdir)
+    doc = {'silver': {'colours': model.SILVER, 'sheen': model.SHEEN, 'meshes': model.MESHES, 'costumes': silver},
+           'frames': {m: anim.frames_of(m) for m in anim.MOTIONS}, 'strike_at': STRIKE_AT,
            'counter_window': [CW_ON, CW_OFF],
            'events': {'snd_start': SND_START, 'snd_success': SND_SUCCESS, 'fx_start': FX_START_AT,
                       'fx_aura': FX_AURA_AT, 'fx_burst': FX_BURST_AT},
