@@ -56,7 +56,7 @@ sys.path.insert(0, HERE)
 from ppcasm import Asm  # noqa: E402
 
 CAVE = 0x04BE8000
-LIMIT = 0x04BE9000
+LIMIT = 0x04BEA000                # v4: 0x04BE8000-0x04BEA000 (v1-v3: to 0x04BE9000)
 TEXT_REGION = LIMIT - 0x02000000
 SPEC = os.path.join(HERE, 'extra_kinds.json')
 NAME = 'supamario'
@@ -78,6 +78,34 @@ HANDLE = 0x02BF2108              # (manager [0x102F6C30], &handle, object id, 0)
 HANDLE_GONE = 0x02BEF50C         # (&handle) -> 0 while the object exists
 HANDLE_POS = 0x02BEF640          # (&handle) -> its position (x +0, y +4)
 OBJ_MANAGER = 0x102F6C30
+SETVIS = 0x034232FC              # the game's mesh visibility setter (MI, mesh, value, which): which 0 = the set state
+MV_APPLY = 0x04BE4294            # tools/mesh_vis_cave.py's mv_apply in exe_v46z_outline4 (its words asserted)
+MV_APPLY_WORDS = (0x9421FFE0, 0x7C0802A6, 0x90010024, 0x90610010)
+MV_ARR = 0x7DC                   # the instance's per-mesh visibility bytes: [[MI + 0x7DC] + 4] + mesh
+
+# --diag (TEST ONLY): OSReport lines through the game's veneer (diag_crumbs_cave.py), no pauses (nothing here can crash
+# the game in a way the lines would explain); the motion -> script lookup's two hooks
+OSREPORT_VENEER = 0x0288B4D4
+VENEER_WORDS = (0x9421FFF0, 0x93E1000C, None, None, 0x7FE903A6, 0x83E1000C, 0x38210010, 0x4E800420)
+MHASH_HOOK = 0x02E42518          # the kind's motion -> script hash (table, kind, motion): `li r0, 0x10`
+MHASH_FROM = 0x027607D0          # its call in the motion change 0x027606C0 (r30 the kind, r29 / r28 the sets)
+BIND_HOOK = 0x02BEE580           # `bl 0x02BEE404` in the agent bind 0x02BEE560 (r5 the hash): r3 0 found / -1 not
+BIND_FN = 0x02BEE404
+BIND_FROM = 0x02760864           # 0x02BEE560's call in the motion change (r29 the set: 0 game 1 expression 2 sound
+                                 # 3 effect, r30 the kind)
+DIAG_ORIGINAL = {MHASH_HOOK: 0x38000010, BIND_HOOK: 0x4BFFFE85}
+DIAG_CAP = 1500                  # lines of S4UM / S4UB at most (the UI motions' lines always)
+DIAG_MOTIONS = (0x229, 0x231, 0x235, 0x239, 0x241, 0x245)   # S4UM always (Fake Death's / Sledgehammer's: controls)
+DIAG_HASHES = ('speciallwlight', 'speciallwheavy', 'specialairlwlight', 'specialairlwheavy', 'speciallwstart',
+               'specialairlwstart', 'entryl', 'entryr', 'wait1')
+DIAG_FMTS = [
+    ('f42', 'S4U2 st=%X grp=%d cat=%d obj=%08X flags=%08X x=%08X y=%08X\n'),
+    ('f42c', 'S4U5 chain n=%d %08X %08X %08X %08X\n'),
+    ('f43', 'S4U3 st=%X t0=%08X found=%d att=%08X unc=%d ret=%d\n'),
+    ('fmv', 'S4UV mi=%08X mesh=%d val=%d before=%02X after=%02X\n'),
+    ('fmh', 'S4UM kind=%X motion=%X hash=%08X n=%d\n'),
+    ('fbd', 'S4UB hash=%08X found=%d set=%d kind=%X n=%d\n'),
+]
 FIGHTERS = 0x1035184C            # [[FIGHTERS] + 0]: +0 the entries, +8 their count (acmd_ext_cave.py)
 FIGHTER_ENTRY = 0x76B0           # entry: +0 object id, +0xC accessor, byte +0x1E >= 4 live
 
@@ -92,7 +120,11 @@ POSTURE = 0x72E4                 # PostureModule (+0x10 x)
 SIDE_MOD = 0x7290
 BASE_POSTURE = 0x18              # a base accessor's PostureModule (vt +0x44 -> its position)
 BASE_ATTACK = 0x50               # a base accessor's AttackModule
-BASE_OWNER = 0x6C                # a base accessor's owner module (+0x34 the current owner's id)
+BASE_OWNER = 0x6C                # a base accessor's team / owner module (+0x34 the current owner's id: the reflector
+                                 # after a reflect; docs/native-notes.md "Reflection", "Teams")
+BASE_LINK = 0x68                 # a base accessor's LinkModule: vt +0x5C(0) has link 0, vt +0x6C(0, 1) its object id
+                                 # (a weapon's owner: docs/native-notes.md "A weapon's owner")
+OWNER_DEPTH = 4                  # v4: the owner chain's steps at most (a shot -> its item -> the item's thrower ...)
 NO_OBJECT = 0x50000000
 
 GROUP = 1
@@ -147,22 +179,313 @@ def call(name):
         bctrl"""
 
 
-def build(kind_id=None):
-    """(words, labels): the cave from CAVE"""
+def fmt_words(text):
+    """.word lines of a NUL-ended string, padded to a word"""
+    b = text.encode() + b'\0'
+    b += b'\0' * (-len(b) % 4)
+    return ''.join('\n        .word 0x%08X' % int.from_bytes(b[i:i + 4], 'big') for i in range(0, len(b), 4))
+
+
+D43 = {'d43_zero': """
+        lis r11, ui_drec@ha
+        addi r11, r11, ui_drec@l
+        li r0, 0
+        stw r0, 0(r11)
+        stw r0, 4(r11)
+        stw r0, 8(r11)
+        li r0, -1
+        stw r0, 0xC(r11)""",
+       'd43_t0': """
+        lis r11, ui_drec@ha
+        addi r11, r11, ui_drec@l
+        stfs f1, 0(r11)""",
+       'd43_found': """
+        lis r11, ui_drec@ha
+        addi r11, r11, ui_drec@l
+        lwz r0, 0(r24)
+        stw r0, 4(r11)
+        li r0, 1
+        stw r0, 8(r11)""",
+       'd43_unc': """
+        lis r11, ui_drec@ha
+        addi r11, r11, ui_drec@l
+        stw r0, 0xC(r11)"""}
+
+OSR = """
+        lis r12, %(osr_hi)d
+        ori r12, r12, %(osr_lo)d
+        mtctr r12
+        .word 0x4CC63182                # crclr 6: no float arguments
+        bctrl"""
+
+RELEASE_TAIL = """
+# the diag build's lines (TEST ONLY); this build: none
+ui_dchain:
+ui_dmv:
+        blr
+"""
+
+DIAG_TAIL = """
+# ---- TEST ONLY (--diag): the lines (docs/native-notes.md "Supamario's Ultra Instinct" v4) --------------------------
+# ui_drec: +0 TIMER_0 as slot 43 read it, +4 the attacker found (its id), +8 found, +0xC the hit's uncounterable byte
+# (-1 not read), +0x10 the slot-42 owner chain's ids (4), +0x20 their count, +0x24 S4UM / S4UB lines so far
+# ui_dchain (slot 42, r26 the next owner): kept in the record. Leaf: r0, r11, r12
+ui_dchain:
+        lis r11, ui_drec@ha
+        addi r11, r11, ui_drec@l
+        lwz r12, 0x20(r11)
+        cmplwi r12, 4
+        bgelr
+        slwi r0, r12, 2
+        add r0, r0, r11
+        addi r12, r12, 1
+        stw r12, 0x20(r11)
+        mr r12, r0
+        stw r26, 0x10(r12)
+        blr
+
+# slot 42 for kind 0x41 (the hook's target in this build): the slot, then S4U2 (and S4U5 when an owner chain ran)
+ui_d42w:
+        lwz r12, %(kind_at)d(r4)
+        cmpwi r12, %(kind)d
+        bne slot42
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stw r4, 0x10(r1)
+        stw r5, 0x14(r1)
+        lis r11, ui_drec@ha
+        addi r11, r11, ui_drec@l
+        li r0, 0
+        stw r0, 0x20(r11)
+        bl slot42
+        lwz r5, 0x14(r1)
+        lwz r12, 0x10(r5)               # the record
+        lbz r6, 0x1C(r12)               # its category
+        lwz r7, 0x18(r12)               # its object
+        lwz r5, 0x14(r5)                # the group hit
+        lwz r4, 0x10(r1)
+        lwz r12, %(acc)d(r4)
+        lwz r11, %(st)d(r12)
+        lwz r4, 0x48(r11)               # the status
+        lwz r11, %(work)d(r12)
+        lwz r11, 8(r11)
+        lwz r11, 4(r11)                 # status work
+        lwz r8, 0x14(r11)
+        lwz r8, 0(r8)                   # its flags word (0x21000010 = 0x00010000, 11 = 0x20000, 12 = 0x40000)
+        lwz r11, 4(r11)
+        lwz r9, %(ftx)d(r11)            # the X / Y written (float bits)
+        lwz r10, %(fty)d(r11)
+        lis r3, ui_f42@ha
+        addi r3, r3, ui_f42@l""" + OSR + """
+        lis r11, ui_drec@ha
+        addi r11, r11, ui_drec@l
+        lwz r4, 0x20(r11)
+        cmpwi r4, 0
+        beq d42_out
+        lwz r5, 0x10(r11)
+        lwz r6, 0x14(r11)
+        lwz r7, 0x18(r11)
+        lwz r8, 0x1C(r11)
+        lis r3, ui_f42c@ha
+        addi r3, r3, ui_f42c@l""" + OSR + """
+d42_out:
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+
+# slot 43 for kind 0x41: the slot, then S4U3 (every damage event of his)
+ui_d43w:
+        lwz r12, %(kind_at)d(r4)
+        cmpwi r12, %(kind)d
+        bne slot43
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stw r4, 0x10(r1)
+        lis r11, ui_drec@ha
+        addi r11, r11, ui_drec@l
+        li r0, 0
+        stw r0, 0(r11)
+        stw r0, 4(r11)
+        stw r0, 8(r11)
+        li r0, -1
+        stw r0, 0xC(r11)
+        bl slot43
+        stw r3, 0x18(r1)
+        mr r9, r3
+        lwz r4, 0x10(r1)
+        lwz r12, %(acc)d(r4)
+        lwz r11, %(st)d(r12)
+        lwz r4, 0x48(r11)
+        lis r11, ui_drec@ha
+        addi r11, r11, ui_drec@l
+        lwz r5, 0(r11)
+        lwz r6, 8(r11)
+        lwz r7, 4(r11)
+        lwz r8, 0xC(r11)
+        lis r3, ui_f43@ha
+        addi r3, r3, ui_f43@l""" + OSR + """
+        lwz r3, 0x18(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+
+# Persist 2's write (mvp2: r3 the mesh, r4 the byte before, r27 the instance, r30 the parameters): S4UV
+ui_dmv:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        mr r5, r3
+        lwz r12, %(va)d(r27)
+        lwz r12, 4(r12)
+        lbzx r8, r12, r3                # the byte after
+        mr r7, r4
+        lwz r6, 8(r30)
+        mr r4, r27
+        mr r5, r3
+        lis r3, ui_fmv@ha
+        addi r3, r3, ui_fmv@l""" + OSR + """
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+# the motion -> script hash lookup (b from its first word): from the motion change for kind 0x41, S4UM
+ui_dmh: mflr r0
+        lis r12, %(mhf_hi)d
+        ori r12, r12, %(mhf_lo)d
+        cmplw r0, r12
+        bne dmh_orig
+        cmpwi r4, %(kind)d
+        bne dmh_orig
+        stwu r1, -0x30(r1)
+        stw r0, 0x34(r1)
+        stw r4, 0x10(r1)
+        stw r5, 0x14(r1)
+        bl dmh_orig
+        stw r3, 0x18(r1)
+        lis r11, ui_drec@ha
+        addi r11, r11, ui_drec@l
+        lwz r8, 0x24(r11)
+        lwz r5, 0x14(r1)
+        bl ui_dmot                      # r3 1: a motion always logged
+        cmpwi r3, 0
+        bne dmh_log
+        cmplwi r8, 20
+        bge dmh_out
+dmh_log:
+        cmplwi r8, %(cap)d
+        bge dmh_out
+        addi r8, r8, 1
+        stw r8, 0x24(r11)
+        lwz r4, 0x10(r1)
+        lwz r5, 0x14(r1)
+        lwz r6, 0x18(r1)
+        mr r7, r8
+        lis r3, ui_fmh@ha
+        addi r3, r3, ui_fmh@l""" + OSR + """
+dmh_out:
+        lwz r3, 0x18(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+dmh_orig:
+        li r0, 0x10                     # the replaced word
+        b 0x%(mh_back)08X
+
+# ui_dmot(r5 a motion): r3 1 when it is one of DIAG_MOTIONS. Leaf: r0, r3, r12
+ui_dmot:
+        lis r12, ui_dmots@ha
+        addi r12, r12, ui_dmots@l
+dmo_l:  lwz r0, 0(r12)
+        cmpwi r0, -1
+        beq dmo_no
+        addi r12, r12, 4
+        cmpw r0, r5
+        bne dmo_l
+        li r3, 1
+        blr
+dmo_no: li r3, 0
+        blr
+
+# the agent bind's lookup (bl from 0x02BEE580): the lookup, then for the motion change of kind 0x41 and one of
+# DIAG_HASHES, S4UB (found: the hash is in that set's files)
+ui_dbind:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stw r5, 0x10(r1)""" + """
+        lis r12, %(bind_hi)d
+        ori r12, r12, %(bind_lo)d
+        mtctr r12
+        bctrl
+        stw r3, 0x14(r1)
+        lwz r0, 0x54(r1)                # 0x02BEE560's saved LR (its 0x10 frame above ours)
+        lis r12, %(bdf_hi)d
+        ori r12, r12, %(bdf_lo)d
+        cmplw r0, r12
+        bne dbd_out
+        cmpwi r30, %(kind)d
+        bne dbd_out
+        lwz r5, 0x10(r1)
+        lis r12, ui_dhash@ha
+        addi r12, r12, ui_dhash@l
+dbd_l:  lwz r0, 0(r12)
+        cmpwi r0, 0
+        beq dbd_out
+        addi r12, r12, 4
+        cmplw r0, r5
+        bne dbd_l
+        lis r11, ui_drec@ha
+        addi r11, r11, ui_drec@l
+        lwz r8, 0x24(r11)
+        cmplwi r8, %(cap)d
+        bge dbd_out
+        addi r8, r8, 1
+        stw r8, 0x24(r11)
+        lwz r4, 0x10(r1)
+        lwz r0, 0x14(r1)
+        li r5, 1
+        cmpwi r0, 0
+        beq dbd_f
+        li r5, 0
+dbd_f:  mr r6, r29
+        mr r7, r30
+        lis r3, ui_fbd@ha
+        addi r3, r3, ui_fbd@l""" + OSR + """
+dbd_out:
+        lwz r3, 0x14(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+"""
+
+
+def build(kind_id=None, diag=False):
+    """(words, labels): the cave from CAVE (diag: TEST ONLY, the OSReport lines and their hooks)"""
     if kind_id is None:
         kind_id = kind()
     a = Asm(CAVE)
     calls = {}
     for n, v in (('init', GROUP_INIT), ('state', GROUP_STATE), ('side', SIDE), ('handle', HANDLE),
-                 ('gone', HANDLE_GONE), ('pos', HANDLE_POS)):
+                 ('gone', HANDLE_GONE), ('pos', HANDLE_POS), ('setvis', SETVIS)):
         calls[n + '_hi'], calls[n + '_lo'] = hilo(v)
     p = dict(kind=kind_id, acc=ACC, kind_at=KIND_AT, shield=SHIELD, st=STATUS_MOD, work=WORK, posture=POSTURE,
              sidemod=SIDE_MOD, group=GROUP, st_ui=ST_UI, st_ss=ST_SS, back=SETUP_BODY, fdmg=4 * F_DAMAGE, fside=4 * F_SIDE,
              ftx=4 * F_TX, fty=4 * F_TY, mgr_ha=ha(OBJ_MANAGER), mgr_lo=slo(OBJ_MANAGER), fts_ha=ha(FIGHTERS),
-             fts_lo=slo(FIGHTERS), entry=FIGHTER_ENTRY, bpost=BASE_POSTURE, batk=BASE_ATTACK, bown=BASE_OWNER,
+             fts_lo=slo(FIGHTERS), entry=FIGHTER_ENTRY, bpost=BASE_POSTURE, batk=BASE_ATTACK, bown=BASE_OWNER, blink=BASE_LINK, depth=OWNER_DEPTH,
              noobj_hi=NO_OBJECT >> 16, dlo=DODGE_LO, dhi=DODGE_HI, sqlo=SQUAT_LO, sqhi=SQUAT_HI,
              vform_hi=V_FORM >> 16, vform_lo=V_FORM & 0xFFFF, vr_lo=V_DODGE_R & 0xFFFF, vl_lo=V_DODGE_L & 0xFFFF,
-             maxf=MAX_FIGHTERS, maxp=MAX_PARTS, maxn=MAX_NODES, **calls)
+             maxf=MAX_FIGHTERS, maxp=MAX_PARTS, maxn=MAX_NODES, mv_back=MV_APPLY + 4, va=MV_ARR,
+             osr_hi=OSREPORT_VENEER >> 16, osr_lo=OSREPORT_VENEER & 0xFFFF, mhf_hi=MHASH_FROM >> 16,
+             mhf_lo=MHASH_FROM & 0xFFFF, mh_back=MHASH_HOOK + 4, bind_hi=BIND_FN >> 16, bind_lo=BIND_FN & 0xFFFF,
+             bdf_hi=BIND_FROM >> 16, bdf_lo=BIND_FROM & 0xFFFF, cap=DIAG_CAP, **calls)
+    p.update({k: (v if diag else '') for k, v in D43.items()})
     a.asm(("""
 # ---- 1. setup (r3 spec, r4 fighter, r5 = whatever: the replaced word sets 1)
 setup:  lwz r12, %(kind_at)d(r4)
@@ -271,19 +594,72 @@ s42_cat:
         bl ui_side_of                   # the side from the attacker object (0x10(r1)), when it exists
         cmpwi r3, 0
         bne no_target
+        li r24, %(depth)d               # v4: the owner CHAIN (a Killer Eye's shot -> the Killer Eye -> its thrower)
+own_step:
         lwz r12, 0x18(r1)               # [handle] = the object's entry: +0xC its accessor
         lwz r12, 0xC(r12)
         cmpwi r12, 0
         beq no_target
-        lwz r12, %(bown)d(r12)          # the owner module
-        cmpwi r12, 0
-        beq no_target
-        lwz r26, 0x34(r12)              # the current owner's id (a reflector after a reflect)
-        rlwinm. r0, r26, 4, 28, 31      # a fighter: id >> 28 == 0
-        bne no_target
-        lis r0, %(noobj_hi)d
-        cmpw r26, r0
-        beq no_target
+        stw r12, 0x30(r1)
+        li r0, -1
+        stw r0, 0x34(r1)                # the next object (none yet)
+        lwz r11, %(bown)d(r12)          # 1. the team / owner module's +0x34: the current owner (a reflector
+        cmpwi r11, 0                    #    after a reflect, else the spawner)
+        beq own_link
+        lwz r0, 0x34(r11)
+        stw r0, 0x34(r1)
+        mr r3, r0
+        bl ui_id_ok
+        cmpwi r3, 0
+        beq own_link
+        lwz r3, 0x34(r1)
+        cmpw r3, r26                    # itself: the link instead
+        bne own_next
+own_link:
+        lwz r12, 0x30(r1)               # 2. LinkModule ([acc + 0x68]) link 0: vt +0x5C(0) has it, vt +0x6C(0, 1) its id
+        lwz r3, %(blink)d(r12)
+        cmpwi r3, 0
+        beq own_none
+        lwz r12, 0(r3)
+        lwz r12, 0x5C(r12)
+        li r4, 0
+        mtctr r12
+        bctrl
+        cmpwi r3, 0
+        beq own_none
+        lwz r12, 0x30(r1)
+        lwz r3, %(blink)d(r12)
+        lwz r12, 0(r3)
+        lwz r12, 0x6C(r12)
+        li r4, 0
+        li r5, 1
+        mtctr r12
+        bctrl
+        stw r3, 0x34(r1)
+        bl ui_id_ok
+        cmpwi r3, 0
+        beq own_none
+own_next:
+        lwz r3, 0x34(r1)
+        cmpw r3, r26                    # the same object again: a loop
+        beq own_none
+        mr r26, r3
+        bl ui_dchain                    # (diag: the chain's ids; else a blr)
+        rlwinm. r0, r26, 4, 28, 31      # a fighter (id >> 28 == 0): the one to answer
+        beq have_id
+        addi r24, r24, -1               # a weapon / item: its own owner next (at most %(depth)d steps)
+        cmpwi r24, 0
+        beq own_none
+        lis r3, %(mgr_ha)d
+        lwz r3, %(mgr_lo)d(r3)
+        addi r4, r1, 0x18
+        mr r5, r26
+        li r6, 0""" + call('handle') + """
+        addi r3, r1, 0x18""" + call('gone') + """
+        cmpwi r3, 0
+        beq own_step
+own_none:
+        b no_target
 have_id:
         lis r3, %(mgr_ha)d
         lwz r3, %(mgr_lo)d(r3)
@@ -348,6 +724,57 @@ uso_out:
         addi r1, r1, 0x20
         blr
 
+# ui_id_ok(r3 an object id): r3 non-zero when it is an object of category 0-2 (fighter, weapon, item): not none
+# (0x50000000), not -1, not a stage gimmick (3). Leaf: r0, r3
+ui_id_ok:
+        cmpwi r3, -1
+        beq uio_no
+        lis r0, %(noobj_hi)d
+        cmpw r3, r0
+        beq uio_no
+        rlwinm r0, r3, 4, 28, 31
+        cmplwi r0, 2
+        bgt uio_no
+        li r3, 1
+        blr
+uio_no: li r3, 0
+        blr
+
+# v4: Mesh_Visibility Persist 2 (tools/mesh_vis_cave.py's mv_apply entered here first: r3 the mesh index, r27 the
+# instance, r28 the accessor, r30 the parameters; r22-r31 kept for its caller): the mesh's OWN set state written through
+# the game's setter 0x034232FC(MI, mesh, Visible, 0) (0 hidden, 1 shown, 2 follow the motion's visibility animation):
+# no override entry, it lasts until written again (motion changes, KOs, training resets keep it; a visibility group
+# writes the same state). An override of that mesh (Persist 0 / 1) keeps it aside (mesh_vis_cave's mv_set) and gives
+# it back when it ends. Persist 0 / 1: mv_apply as before.
+mvp2:   lwz r0, 0xC(r30)
+        cmpwi r0, 2
+        beq mvp2_go
+        stwu r1, -0x20(r1)              # mv_apply's first word
+        b 0x%(mv_back)08X
+mvp2_go:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r3, 0x10(r1)
+        lwz r12, %(va)d(r27)            # the byte before (diag)
+        lwz r12, 4(r12)
+        lbzx r0, r12, r3
+        stw r0, 0x14(r1)
+        mr r4, r3
+        mr r3, r27
+        lwz r5, 8(r30)                  # Visible: 0 / 1 / 2
+        cmplwi r5, 2
+        ble mvp2_v
+        li r5, 2
+mvp2_v: li r6, 0""" + call('setvis') + """
+        lwz r3, 0x10(r1)
+        lwz r4, 0x14(r1)
+        bl ui_dmv                       # (diag: S4UV; else a blr)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
 # ---- 3. slot 43 (r3 spec, r4 fighter, r5 message) -> 0: no damage / knockback / reaction
 slot43: li r3, 1
         lwz r12, %(kind_at)d(r4)
@@ -378,7 +805,7 @@ s43_dodge:
 s43_go: stwu r1, -0x70(r1)
         mflr r0
         stw r0, 0x74(r1)
-        stmw r17, 0x2C(r1)
+        stmw r17, 0x2C(r1)%(d43_zero)s
         mr r31, r12                     # the module block
         mr r30, r5                      # message
         lwz r29, %(work)d(r12)          # his WorkModule
@@ -389,7 +816,7 @@ s43_go: stwu r1, -0x70(r1)
         lwz r12, 0(r3)
         lwz r12, 0x44(r12)
         mtctr r12
-        bctrl
+        bctrl%(d43_t0)s
         lis r12, ui_form@ha
         lfs f0, ui_form@l(r12)
         fcmpu cr0, f1, f0
@@ -462,7 +889,7 @@ s43_nloop:
 s43_pnext:
         addi r19, r19, 1
         b s43_ploop
-s43_found:
+s43_found:%(d43_found)s
         mr r3, r22                      # its hit data: vt +0x194(id, part)
         lwz r12, 0(r3)
         lwz r12, 0x194(r12)
@@ -472,7 +899,7 @@ s43_found:
         bctrl
         cmpwi r3, 0
         beq s43_side
-        lbz r0, 0x54(r3)
+        lbz r0, 0x54(r3)%(d43_unc)s
         cmpwi r0, 0
         bne s43_no                      # can't be countered: no dodge
 s43_side:
@@ -530,7 +957,15 @@ handled:
         stb r0, 8(r5)
         li r3, 0
         blr
-""") % p)
+""" + (DIAG_TAIL if diag else RELEASE_TAIL)) % p)
+    if diag:
+        import zlib
+        a.asm('ui_drec:' + '\n        .word 0' * 10)
+        a.asm('ui_dmots:' + ''.join('\n        .word 0x%X' % m for m in DIAG_MOTIONS) + '\n        .word -1')
+        a.asm('ui_dhash:' + ''.join('\n        .word 0x%08X' % (zlib.crc32(h.encode()) & 0xFFFFFFFF)
+                                    for h in DIAG_HASHES) + '\n        .word 0')
+        for lab, text in DIAG_FMTS:
+            a.asm('ui_%s:' % lab + fmt_words(text))
     shape_at = a.pc + 4 * 4
     a.asm("""
 ui_one: .float 1.0
@@ -566,12 +1001,19 @@ def branch(src, dst):
     return (18 << 26) | (off & 0x3FFFFFC)
 
 
-def patches(kind_id=None):
-    """{address: word}: the cave and the three hooks"""
-    words, labels = build(kind_id)
+def patches(kind_id=None, diag=False):
+    """{address: word}: the cave and its hooks (Mario's slots 0 / 42 / 43, mesh_vis_cave's mv_apply; diag: the
+    lookup / bind hooks, slots 42 / 43 through their line wrappers)"""
+    words, labels = build(kind_id, diag)
     out = {CAVE + 4 * i: w for i, w in enumerate(words)}
-    for hook, label in ((SETUP_HOOK, 'setup'), (SLOT42_HOOK, 'slot42'), (SLOT43_HOOK, 'slot43')):
+    hooks = [(SETUP_HOOK, 'setup'), (SLOT42_HOOK, 'ui_d42w' if diag else 'slot42'),
+             (SLOT43_HOOK, 'ui_d43w' if diag else 'slot43'), (MV_APPLY, 'mvp2')]
+    if diag:
+        hooks.append((MHASH_HOOK, 'ui_dmh'))
+    for hook, label in hooks:
         out[hook] = branch(hook, labels[label])
+    if diag:
+        out[BIND_HOOK] = branch(BIND_HOOK, labels['ui_dbind']) | 1
     return out
 
 
@@ -586,33 +1028,40 @@ def check_base(rpx):
     """the hooks' words in the base are the game's (or this cave's own branches: re-applying); the space is free"""
     import kind_expand as K
     img = K.Image(rpx)
-    p = patches()
-    bad = ['0x%08X: 0x%08X' % (a, img.w(a)) for a, w in ORIGINAL.items() if img.w(a) not in (w, p.get(a, w))]
+    p = patches(diag=True)
+    want = dict(ORIGINAL)
+    want.update(DIAG_ORIGINAL)
+    want.update({MV_APPLY + 4 * i: w for i, w in enumerate(MV_APPLY_WORDS)})
+    bad = ['0x%08X: 0x%08X' % (a, img.w(a)) for a, w in want.items() if img.w(a) not in (w, p.get(a, w))]
+    bad += ['veneer 0x%08X' % (OSREPORT_VENEER + 4 * i) for i, w in enumerate(VENEER_WORDS)
+            if w is not None and img.w(OSREPORT_VENEER + 4 * i) != w]
     if bad:
         raise SystemExit('supamario_ui_cave: unexpected words in %s: %s' % (rpx, ', '.join(bad)))
     for s, hook in ((0, SETUP_HOOK), (42, SLOT42_HOOK), (43, SLOT43_HOOK)):
         if img.w(MARIO_VT + 0xC + 8 * s) != hook:
             raise SystemExit('supamario_ui_cave: Mario\'s vtable slot %d is not 0x%08X in %s' % (s, hook, rpx))
-    used = [a for a in range(CAVE, LIMIT, 4) if word_or_0(img, a) not in (0, p.get(a, 0))]
+    used = [a for a in range(CAVE, LIMIT, 4) if word_or_0(img, a) not in (0, p.get(a, 0), patches().get(a, 0))]
     if used:
         raise SystemExit('supamario_ui_cave: the cave space is in use in %s (0x%08X)' % (rpx, used[0]))
 
 
-def args(kind_id=None):
+def args(kind_id=None, diag=False):
     return ['textregion:0x%X' % TEXT_REGION, 'grow:0x%08X' % LIMIT] + \
-        ['0x%08X=0x%08X' % (a, w) for a, w in sorted(patches(kind_id).items())]
+        ['0x%08X=0x%08X' % (a, w) for a, w in sorted(patches(kind_id, diag).items())]
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     ap.add_argument('--rpx', help='check the hooks\' original words and the cave space in this base')
     ap.add_argument('--kinds', default=SPEC)
+    ap.add_argument('--diag', action='store_true', help='TEST ONLY: the OSReport build (S4U2 / S4U5 / S4U3 / S4UV / '
+                    'S4UM / S4UB lines)')
     a = ap.parse_args()
     if a.rpx:
         check_base(a.rpx)
     k = kind(a.kinds)
-    words, labels = build(k)
-    print(' '.join(args(k)))
+    words, labels = build(k, a.diag)
+    print(' '.join(args(k, a.diag)))
     sys.stderr.write('supamario ui: kind 0x%X, cave 0x%08X-0x%08X (%d words), hooks 0x%08X / 0x%08X / 0x%08X\n'
                      % (k, CAVE, CAVE + 4 * len(words), len(words), SETUP_HOOK, SLOT42_HOOK, SLOT43_HOOK))
 

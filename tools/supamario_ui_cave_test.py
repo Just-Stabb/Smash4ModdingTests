@@ -2,7 +2,7 @@
 """Runs tools/supamario_ui_cave.py's code in unicorn, in a patched RPX (Supamario's Ultra Instinct: the counter shape,
 the counter's record and the autododge).
 
-  python3 tools/supamario_ui_cave_test.py BASE.rpx [PATCHED.rpx]
+  python3 tools/supamario_ui_cave_test.py BASE.rpx [PATCHED.rpx [DIAG.rpx]]
 
 BASE: exe_v46z_outline4 (the cave's base); PATCHED (BASE + the cave's arguments) is made in a temporary folder when not
 given. Fake fighters / modules / a fighter table in emulator memory; the game functions the cave calls are stubbed
@@ -113,6 +113,14 @@ class Run(Emu):
         self.setw(self.ftab + 8, 0)
         self.mgr = self.alloc(0x10, b'\0')
         self.setw(C.OBJ_MANAGER, self.mgr)
+        self.links = {}                  # LinkModule -> link 0's id (None: no link 0)
+        self.lm_has = self.alloc(4)
+        self.stub(self.lm_has, self.link_has)
+        self.lm_get = self.alloc(4)
+        self.stub(self.lm_get, self.link_id)
+        self.lm_vt = self.alloc(0x100, b'\0')
+        self.setw(self.lm_vt + 0x5C, self.lm_has)
+        self.setw(self.lm_vt + 0x6C, self.lm_get)
 
     def rec(self, name, *regs):
         self.calls.append((name,) + tuple(self.r(i) for i in regs))
@@ -174,12 +182,26 @@ class Run(Emu):
         return r, kept and self.mu.reg_read(UC_PPC_REG_1) == 0x700F0000
 
     # ---- objects
-    def obj(self, oid, x=0.0, y=0.0, alive=True, owner=None):
-        """a weapon / item / gimmick object: its entry (+0xC its accessor: +0x6C the owner module)"""
+    def link_has(self, e):
+        self.rec('link_has', 3, 4)
+        return 1 if self.links.get(self.r(3)) is not None else 0
+
+    def link_id(self, e):
+        self.rec('link_id', 3, 4, 5)
+        return self.links.get(self.r(3), 0x50000000)
+
+    def obj(self, oid, x=0.0, y=0.0, alive=True, owner=None, link=None):
+        """a weapon / item / gimmick object: its entry (+0xC its accessor: +0x6C the team / owner module, +0x68 its
+        LinkModule when `link` (link 0's object id; False: a LinkModule without link 0))"""
         entry = self.alloc(0x40, b'\0')
         acc = self.alloc(0x80, b'\0')
         self.setw(entry, oid)
         self.setw(entry + 0xC, acc)
+        if link is not None:
+            lm = self.alloc(0x20, b'\0')
+            self.setw(lm, self.lm_vt)
+            self.setw(acc + C.BASE_LINK, lm)
+            self.links[lm] = None if link is False else link
         if owner is not None:
             om = self.alloc(0x40, b'\0')
             self.setw(acc + C.BASE_OWNER, om)
@@ -584,6 +606,190 @@ def slot43_checks(e, kind):
     check('slot 43, Mario (3) in 0x157: 1 (Mario\'s stub)', (r, bytes(e.mu.mem_read(msg + 8, 1))[0]), (1, 0x40))
 
 
+def chain_checks(e, kind):
+    """v4: the owner chain (a projectile's / item's owner followed to a fighter)"""
+    base = [round(100.0 + i, 4) for i in range(16)]
+    F0 = 0x0000C00F
+    e.objects.clear()
+    dk = 0x00020012
+    cases = [
+        # (what, objects: [(id, x, y, owner (+0x34), link)], the hit object, want (x, y) or None)
+        ('a Killer Eye\'s shot: shot -> the Killer Eye (an item, +0x34) -> its thrower Donkey Kong (+0x34)',
+         [(dk, -30.0, 2.0, None, None), (0x20000777, 15.0, 4.0, dk, None), (0x10000888, 8.0, 4.0, 0x20000777, None)],
+         0x10000888, (-30.0, 2.0)),
+        ('a Killer Eye\'s shot: the shot\'s owner by LinkModule link 0 (no +0x34), the item\'s by +0x34',
+         [(dk, -30.0, 2.0, None, None), (0x20000777, 15.0, 4.0, dk, None), (0x10000888, 8.0, 4.0, None, 0x20000777)],
+         0x10000888, (-30.0, 2.0)),
+        ('Link\'s arrow: +0x34 none (0x50000000), LinkModule link 0 = Link',
+         [(dk, 40.0, 1.0, None, None), (0x10000999, 9.0, 3.0, 0x50000000, dk)], 0x10000999, (40.0, 1.0)),
+        ('Samus\'s missile: +0x34 = Samus (the v3 path)',
+         [(dk, 40.0, 1.0, None, None), (0x10000AAA, 9.0, 3.0, dk, False)], 0x10000AAA, (40.0, 1.0)),
+        ('an article\'s projectile: shot -> article (a weapon, link 0) -> its fighter (+0x34)',
+         [(dk, -12.0, 6.0, None, None), (0x10000BB1, 3.0, 3.0, dk, None), (0x10000BB2, 6.0, 3.0, None, 0x10000BB1)],
+         0x10000BB2, (-12.0, 6.0)),
+        ('a stage-spawned item (no owner anywhere): no target', [(0x20000CCC, 7.0, 0.0, 0x50000000, False)],
+         0x20000CCC, None),
+        ('an item owned by a gimmick (category 3): no target', [(0x20000CCD, 7.0, 0.0, 0x30000001, False)],
+         0x20000CCD, None),
+        ('a loop (the shot\'s owner is itself, its link the item, the item\'s owner the shot): no target',
+         [(0x10000D01, 7.0, 0.0, 0x10000D01, 0x20000D02), (0x20000D02, 5.0, 0.0, 0x10000D01, None)],
+         0x10000D01, None),
+        ('a chain longer than %d steps: no target' % C.OWNER_DEPTH,
+         [(0x10000E00 + i, 7.0, 0.0, 0x10000E01 + i, None) for i in range(C.OWNER_DEPTH + 1)] +
+         [(0x00070012, 1.0, 1.0, None, None)], 0x10000E00, None),
+        ('the thrower gone: no target', [(0x20000F01, 7.0, 0.0, 0x00080012, None)], 0x20000F01, None),
+    ]
+    for what, objs, hit, want_xy in cases:
+        e.objects.clear()
+        fk = e.fighter(kind, status=C.ST_SS, x=0.0)
+        for oid, x, y, owner, link in objs:
+            e.obj(oid, x=x, y=y, owner=owner, link=link)
+        if 'gone' in what:
+            e.obj(0x00080012, x=-3.0, alive=False)
+        msg, am, rec = message(e, damage=6.0, category=hit >> 28, oid=hit)
+        hitdata(e)
+        r, kept = e.run(C.SLOT42_HOOK, 0, fk['f'], msg)
+        want = list(base)
+        hx = [o for o in objs if o[0] == hit][0][1]
+        if want_xy:
+            want[6], want[7], want[8], want[9] = 6.0, (1.0 if want_xy[0] > 0 else -1.0), want_xy[0], want_xy[1]
+            fl = F0 | 0x70000
+        else:
+            want[6], want[7] = 6.0, (1.0 if hx > 0 else -1.0)
+            fl = F0 | 0x30000
+        check('slot 42 (v4 chain), %s' % what, (e.floats(fk), e.flagw(fk)[0]), (want, fl))
+        check('  registers kept', kept, True)
+
+
+def persist2_checks(e):
+    """v4: Mesh_Visibility Persist 2 (mvp2, mesh_vis_cave's mv_apply entered through it)"""
+    got = []
+    e.stub(C.SETVIS, lambda em: (got.append(tuple(em.r(i) for i in (3, 4, 5, 6))), 1)[1])
+    back = []
+    e.stub(C.MV_APPLY + 4, lambda em: back.append((em.r(3), em.r(1))))
+    mi = e.alloc(0x800, b'\0')
+    arr = e.alloc(0x10, b'\0')
+    bytes_ = e.alloc(0x40, b'\xFE')
+    e.setw(mi + C.MV_ARR, arr)
+    e.setw(arr + 4, bytes_)
+    for vis, want_v in ((0, 0), (1, 1), (2, 2), (7, 2)):
+        prm = e.alloc(0x20, b'\0')
+        e.setw(prm + 8, vis)
+        e.setw(prm + 0xC, 2)
+        got.clear()
+        back.clear()
+        e.mu.reg_write(REGS[27], mi)
+        e.mu.reg_write(REGS[30], prm)
+        e.mu.reg_write(UC_PPC_REG_1, 0x700F0000)
+        e.call(C.MV_APPLY, 9)
+        check('Persist 2, Visible %d: the game\'s setter (MI, mesh 9, %d, which 0), no override entry' % (vis, want_v),
+              (got, back), ([(mi, 9, want_v, 0)], []))
+    for per in (0, 1):
+        prm = e.alloc(0x20, b'\0')
+        e.setw(prm + 8, 0)
+        e.setw(prm + 0xC, per)
+        got.clear()
+        back.clear()
+        e.mu.reg_write(REGS[27], mi)
+        e.mu.reg_write(REGS[30], prm)
+        e.call(C.MV_APPLY, 9)
+        check('Persist %d: mv_apply as before (its first word run, on at +4 with the mesh), no setter call' % per,
+              (got, [(m, sp) for m, sp in back]), ([], [(9, 0x700F0000 - 0x20)]))
+
+
+def diag_checks(path, kind):
+    """--diag: the lines (OSReport through the veneer, its arguments)"""
+    e = Run(path)
+    lines = []
+
+    def osr(em):
+        fmt = em.cstr(em.r(3))
+        lines.append((fmt.split(' ')[0], tuple(em.r(i) for i in range(4, 11))))
+    e.stub(C.OSREPORT_VENEER, osr)
+    # slot 42: the Killer Eye's chain
+    e.objects.clear()
+    dk = 0x00020012
+    fk = e.fighter(kind, status=C.ST_SS, x=0.0)
+    e.obj(dk, x=-30.0, y=2.0)
+    e.obj(0x20000777, x=15.0, y=4.0, owner=dk)
+    e.obj(0x10000888, x=8.0, y=4.0, owner=0x20000777)
+    msg, am, rec = message(e, damage=6.0, category=1, oid=0x10000888)
+    hitdata(e)
+    lines.clear()
+    r, kept = e.run(C.SLOT42_HOOK, 0, fk['f'], msg)
+    want = [('S4U2', (C.ST_SS, 1, 1, 0x10000888, (0x0000C00F | 0x70000), fbits(-30.0), fbits(2.0))),
+            ('S4U5', (2, 0x20000777, dk, 0, 0))]
+    check('diag S4U2 / S4U5: the status, group, category, object, flags, X / Y; the chain\'s ids',
+          [(t, a[:7] if t == 'S4U2' else a[:5]) for t, a in lines], want)
+    check('  floats as the release build', e.floats(fk)[6:10], [6.0, -1.0, -30.0, 2.0])
+    check('  registers kept', kept, True)
+    # slot 42 for Mario (kind 3): no line
+    lines.clear()
+    fm = e.fighter(3, status=C.ST_SS)
+    e.run(C.SLOT42_HOOK, 0, fm['f'], msg)
+    check('diag: Mario (kind 3) gets no slot-42 line', lines, [])
+    # slot 43: a dodge and a pass
+    for status, form, want_ret, want_found in ((0, 2000.0, 0, 1), (0, 0.0, 1, 0), (C.ST_UI, 0.0, 0, 0)):
+        lines.clear()
+        r, kept, msg, sk, att = slot43_case(e, kind, status=status, form=form)
+        l43 = [a for t, a in lines if t == 'S4U3']
+        check('diag S4U3 st=0x%X TIMER_0 %g: one line, ret %d, found %d' % (status, form, want_ret, want_found),
+              [(a[0], a[2], a[5]) if a else None for a in l43][:1],
+              [(status, want_found, want_ret)])
+        if want_found:
+            check('  the attacker\'s id, the uncounterable byte 0, TIMER_0\'s bits', (l43[0][4], l43[0][3], l43[0][1]),
+                  (0, att['oid'], fbits(form)))
+        check('  slot 43\'s result as the release build\'s', (r, kept), (want_ret, True))
+    # Persist 2: S4UV
+    e.stub(C.SETVIS, lambda em: 1)
+    mi = e.alloc(0x800, b'\0')
+    arr = e.alloc(0x10, b'\0')
+    by = e.alloc(0x40, b'\xFE')
+    e.setw(mi + C.MV_ARR, arr)
+    e.setw(arr + 4, by)
+    prm = e.alloc(0x20, b'\0')
+    e.setw(prm + 8, 0)
+    e.setw(prm + 0xC, 2)
+    e.mu.reg_write(REGS[27], mi)
+    e.mu.reg_write(REGS[30], prm)
+    lines.clear()
+    e.call(C.MV_APPLY, 5)
+    check('diag S4UV: the instance, mesh, value, the byte before / after', [(t, a[:5]) for t, a in lines],
+          [('S4UV', (mi, 5, 0, 0xFE, 0xFE))])
+    # the motion -> hash lookup from the motion change (0x027607CC's bl, LR 0x027607D0): S4UM
+    tab = e.alloc(0x400, b'\0')
+    mt = e.alloc(0x1000, b'\0')
+    e.setw(tab, kind)
+    e.setw(tab + 8, 600)
+    e.setw(tab + 0xC, mt)
+    e.setw(mt + 4 * 0x231, 0x9221C757)
+    for k, mot, want_n in ((kind, 0x231, 1), (3, 0x231, 0)):
+        lines.clear()
+        e.mu.reg_write(REGS[3], tab)
+        e.mu.reg_write(REGS[4], k)
+        e.mu.reg_write(REGS[5], mot)
+        e.mu.reg_write(UC_PPC_REG_1, 0x700F0000)
+        e.mu.emu_start(C.MHASH_FROM - 4, C.MHASH_FROM, count=20000)
+        check('diag S4UM: kind 0x%X motion 0x%X: %d line(s), the hash returned' % (k, mot, want_n),
+              ([a[:3] for t, a in lines if t == 'S4UM'], e.r(3)),
+              ([(kind, 0x231, 0x9221C757)] * want_n, 0x9221C757 if k == kind else 0))
+    # the bind's lookup (0x02BEE580's bl) from the motion change: S4UB
+    import zlib
+    for found, h, want_n in ((0, 'speciallwlight', 1), (-1, 'speciallwlight', 1), (0, 'attack11', 0)):
+        e.stub(C.BIND_FN, lambda em, f=found: f & 0xFFFFFFFF)
+        lines.clear()
+        sp = 0x700F0000
+        e.setw(sp + 0x14, C.BIND_FROM)
+        e.mu.reg_write(UC_PPC_REG_1, sp)
+        e.mu.reg_write(REGS[5], zlib.crc32(h.encode()))
+        e.mu.reg_write(REGS[29], 3)
+        e.mu.reg_write(REGS[30], kind)
+        e.mu.emu_start(C.BIND_HOOK, C.BIND_HOOK + 4, count=20000)
+        check('diag S4UB: %s, found %d: %d line(s), the lookup\'s result given back' % (h, found == 0, want_n),
+              ([a[:4] for t, a in lines if t == 'S4UB'], e.r(3)),
+              ([(zlib.crc32(h.encode()), int(found == 0), 3, kind)] * want_n, found & 0xFFFFFFFF))
+
+
 def main():
     a = sys.argv[1:]
     if not a:
@@ -606,6 +812,17 @@ def main():
     setup_checks(e, kind)
     slot42_checks(e, kind)
     slot43_checks(e, kind)
+    chain_checks(e, kind)
+    persist2_checks(e)
+    diag = a[2] if len(a) > 2 else None
+    if diag is None:
+        tmp2 = tempfile.TemporaryDirectory()
+        diag = os.path.join(tmp2.name, 'diag.rpx')
+        r = subprocess.run([sys.executable, os.path.join(HERE, 'rpx_patch.py'), base, diag] + C.args(diag=True),
+                           capture_output=True, text=True)
+        if r.returncode:
+            sys.exit(r.stdout + r.stderr)
+    diag_checks(diag, kind)
     print('%d failure(s)' % fails)
     sys.exit(1 if fails else 0)
 
