@@ -3628,3 +3628,25 @@ exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATC
     never updates it: a GPU particle follows only when its program reads the live emitter matrix (`emm`), the program
     variant whose shader key byte 4 has bit 0x04 (every vanilla emitter on one has follow 0; on the plain variant
     follow 1). `ptcl-format.md` 0x310 / 0x004.
+- **v11 (README "Ultra Instinct v11"; the exe unchanged, exe_v46z_ui7): Soaring Fist's projectile, the streaks'
+  rotBasis, the aura's flipbooks.**
+  - **The projectile is article 0, the fireball's slot** (kind 0x185, a copy of Mario's fireball: max 5 at once,
+    `docs/weapon-expansion.md` "How it fits together"; Supamario never fires one, his neutral special being the
+    Kamehameha, article 5). Its MSC (`fireball.mscsb`) is ours (`fighters/supamario/weapons/soaringfist.c`); the class's
+    native hit method (`0x0320EE2C`, the fireball's default) removes it on a hit (bits `0x13`), a shield (`0x4`) or a
+    clank, and checks reflect / absorb on `0x8`, which never comes: its hitbox is Reflectable 0 / Absorbable 0 and the
+    reflector's / absorber's shapes meet only reflectable / absorbable attacks (their w1 `0xFFFFFF5F` / `0xFFFFFF9F`,
+    "The masks" above). No exe change: a new kind (`weapon_expand_append.py`) wasn't needed.
+  - **What a weapon MSC can read of its owner:** the custom slot int `0x10000048` copied at generation into the
+    weapon's `0x10000005` (the punch's kind: (level - 1) x 2 + 0 / 1), the position variables (`0x0F000020 + 4 x slot`)
+    and the KIND quantity (`0x0F0000BD + 8 x slot`), so the punch finds its owner by kind (nearest to where it was made)
+    and puts itself on his line (`PostureModule(0x3, x, y, z)`), whatever the article's spawn bone.
+  - **rotBasis (ptcl `0x4C4`)** places the quad off its particle by rotBasis x its size before turning it (every vertex
+    program). xv2_to_ptcl's type-3 template has (0, -1.34): a streak drawn 0.84-1.84 of its length behind its
+    particle. Run on the game's programs (`latte_exec`, `tools/supamario_sf_test.py`): Secret Sensation's KTN wind_1
+    (length 10.6) 10.7-21.4 under its particle, Time Skip's stripe 5.2-11.9. 226 type-3 emitters of the XV2 conversions
+    have it; v11 fixes the two auras (and its own new sets): centred (0) for VisibleOnSpeed sprites, -0.5 (the quad
+    from the particle back) for ConeExtrude ribbons.
+  - **Flipbook variants:** a program plays a flipbook only when its key's byte 10 has 0x08 (the same pixel program;
+    vanilla pairs: Donkey Kong's 39 = the aura's follow program 63 + flipbook, Ganondorf's 36 = 64 + flipbook); slot
+    0's UV block (`0x514`-`0x54C`) is then drawn too (scale 1 neutral). Converted sprites had one sprite-sheet cell.

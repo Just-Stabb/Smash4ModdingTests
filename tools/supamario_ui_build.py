@@ -194,7 +194,8 @@ SCRIPT = {anim.FORM: 'speciallwlight', anim.STRIKE: 'speciallwheavy', anim.DODGE
 # frames 5-30 of a 45-frame stance (Marth-like); a counter: a 14-frame slide (EscapeN) behind the fighter to answer, a
 # little into the background (Z out to -6 and back), ending airborne: 10 past a grounded one, 6 above its feet; 10 past
 # and 10 above an airborne one; no hitbox
-SS_ON, SS_OFF, SS_END = 5, 30, anim.frames_of(anim.SS)
+SS_ON, SS_OFF, SS_END = 5, 30, anim.part_len('ss_in') + anim.part_len('ss_hold')   # (v11: the stance's own 45;
+# its animation goes on with Soaring Fist's)
 SS_SLIDE_N, SS_DEPTH = 14, 6.0       # v1-v9 (v10: SS_HOLD + SS_DASH)
 SS_SLIDE_N = SS_HOLD + SS_DASH       # v10: 24 frames (the hold, then the dash)
 SS_BEHIND, SS_UP_GROUND, SS_BEHIND_AIR, SS_UP_AIR = 10.0, 6.0, 10.0, 10.0
@@ -1256,7 +1257,13 @@ def build(sm_dir, out_dir, ui_skill, ui_se_wav, ts_args):
                       'fx_aura': FX_AURA_AT, 'fx_burst': FX_BURST_AT},
            'fx_ids': {k: '0x%08X' % v for k, v in FX_IDS.items()}, 'se_ids': {k: '0x%08X' % v for k, v in SE_IDS.items()},
            'mesh_index': dict(MESH_INDEX),
-           'fx': rep, 'source': {m: info['info'][m]['source'] for m in anim.MOTIONS}}
+           'fx': rep, 'source': {m: info['info'][m]['source'] for m in anim.MOTIONS},
+           'sf': {'fx_ids': {k: '0x%08X' % v for k, v in list(SF.FX_IDS.items()) + list(SF_CMN.items())},
+                  'motions': {'start': SF.MOT_START, 'release': SF.MOT_REL, 'start_at': SF.START_AT,
+                              'hold_at': SF.HOLD_AT, 'release_at': SF.REL_AT, 'release_n': SF.REL_N},
+                  'punch': SF.PUNCH, 'iasa': SF.IASA, 'life': SF.LIFE, 'speed': SF.SPEED, 'size': SF.SIZE,
+                  'levels': [SF.LV2, SF.LV3], 'final': SF.FINAL, 'nonfinal': SF.NONFINAL,
+                  'nonfinal_damage': SF.NONFINAL_DMG}}
     with open(os.path.join(out_dir, 'ultrainstinct.json'), 'w') as fh:
         json.dump(doc, fh, indent=1)
     return fdir

@@ -35,6 +35,8 @@ import supamario_ui_anim as A  # noqa: E402
 import supamario_ui_model as M  # noqa: E402
 import supamario_ui_build as B  # noqa: E402
 import supamario_ui_cave as C  # noqa: E402
+import supamario_sf_build as SF  # noqa: E402
+import supamario_ui_fx11 as FX11  # noqa: E402
 
 PROBLEMS = []
 
@@ -309,9 +311,9 @@ def form_tests(r):
     check('v6: the renewal FADES the old ones (0x2723 (id, 0, 0): emission stopped, particles live out), never kills '
           'them at once (id, 1, 1: v1-v5, their sprites never got past 29 frames: the user\'s v5 clip)',
           sorted(tuple(e[5][2:4]) for e in aura if e[2] == 0x2723), [(0, 0)] * 6)
-    check('  on HipN / BustN / HeadN / LFootJ / RFootJ / RHandN / LHandN (+ HipN: the sparkles)',
+    check('  on HipN / BustN / HeadN / LFootJ / RFootJ / RHandN / LHandN (+ v11: TransN, the sparkles)',
           sorted(e[4] for e in aura if e[2] == 0x2717),
-          sorted([B.BONES[b] for b in ('HipN', 'BustN', 'HeadN', 'LFootJ', 'RFootJ', 'RHandN', 'LHandN', 'HipN')]))
+          sorted([B.BONES[b] for b in ('HipN', 'BustN', 'HeadN', 'LFootJ', 'RFootJ', 'RHandN', 'LHandN', 'TransN')]))
     head_up = round(0.2 * B.METRE, 3)
     check('  their arguments (id, bone, x, y, z, rx, ry, rz, size, flag 0): the head 0.2 m up, the sizes %g / %g' % (
         B.SCALE, round(0.8 * B.SCALE, 3)),
@@ -324,7 +326,7 @@ def form_tests(r):
                   (B.fx_id('aura_head'), B.BONES['HeadN'], 0, head_up, 0, 0, 0, 0, B.SCALE, 0),
                   (B.fx_id('aura_foot'), B.BONES['LFootJ'], 0, 0, 0, 0, 0, 0, round(0.8 * B.SCALE, 3), 0),
                   (B.fx_id('aura_foot'), B.BONES['RFootJ'], 0, 0, 0, 0, 0, 0, round(0.8 * B.SCALE, 3), 0),
-                  (B.fx_id('aura_piace'), B.BONES['HipN'], 0, 0, 0, 0, 0, 0, B.SCALE, 0)]))
+                  (B.fx_id('aura_piace'), B.BONES['TransN'], 0, 5.0, 0, 0, 0, 0, B.SCALE, 0)]))   # v11: TransN, 5 up
     check('  no 0x2730 call left (v1 / v2\'s untested op)', [e for e in g.ev('effect') if e[2] == 0x2730], [])
     for k in range(int(B.AURA_EVERY) - 1):
         r.frame(vm, g)
@@ -1112,6 +1114,7 @@ def silver_script_tests(f, b):
 
 
 BASE_DIR = None
+SF_SKILL_DIR = None                  # v11: XV2's 1510_GKS_HKN folder (--sf-skill): its BAC / BSA / BDM read
 
 
 def acmd_lookup_tests(f):
@@ -1143,8 +1146,9 @@ def motion_tests(out, ts_out):
         diff = sorted(n.split('D03')[-1] for n in new if new[n] != old.get(n))
         check('%s.pac: only the four slots changed' % part, diff, sorted([A.DODGE, A.STRIKE, A.FORM, A.SS]))
         fr = {m: omo.Omo(new[[n for n in new if n.endswith('D03' + m)][0]]).frames for m in A.MOTIONS}
-        check('%s.pac: 325 / 499 / 148 / 45 frames (v10: SpecialLwHeavy the long rush 349 + the short 150; '
-              'SpecialAirLwLight the four sways, 4 x 37)' % part, fr, {A.FORM: 325, A.STRIKE: 499, A.DODGE: 148, A.SS: 45})
+        check('%s.pac: 325 / 499 / 148 / 444 frames (v10: SpecialLwHeavy the long rush 349 + the short 150; '
+              'SpecialAirLwLight the four sways, 4 x 37; v11: SpecialAirLwHeavy Secret Sensation\'s 45 + Soaring '
+              'Fist\'s 12 + 60 + 89 + 109 + 129)' % part, fr, {A.FORM: 325, A.STRIKE: 499, A.DODGE: 148, A.SS: 444})
     src = [(A.source(A.DODGE, f_)[0][0], A.source(A.DODGE, f_)[1], round(A.source(A.DODGE, f_)[2], 2))
            for f_ in (0, 1, 2, 36, 37, 38, 73)]
     check('v7: SpecialAirLwLight\'s frames: the back sway CMN #189 (0 shows XV2 0, 1-36 XV2 7-42: the x7 start), the '
@@ -1173,8 +1177,10 @@ def effect_tests(out, ts_out):
     check('the ptcl validates', p.validate(), [])
     n = len(tp.sets)
     check('the earlier sets kept (names)', [p.set_name(i) for i in range(n)], [tp.set_name(i) for i in range(n)])
-    check('new sets: PtcSupamarioUi* (v10: KTN_GKS_Loop in two: 17 emitters)', sorted(p.set_name(i) for i in range(n, len(p.sets))),
-          sorted(['PtcSupamarioUi' + x[2][:-4] for x in B.FX] + ['PtcSupamarioUiKTN_GKS_Loop_2']))
+    check('new sets: PtcSupamarioUi* (v10: KTN_GKS_Loop in two: 17 emitters; v11: Soaring Fist\'s Hkn_Fir / Hkn_Wav and '
+          'BTL_CMN\'s GHit / GHitSmk)', sorted(p.set_name(i) for i in range(n, len(p.sets))),
+          sorted(['PtcSupamarioUi' + x[2][:-4] for x in B.FX] + ['PtcSupamarioUiKTN_GKS_Loop_2'] +
+                 ['PtcSupamarioSf' + x[:-4] for x in SF.SKILL_EMPS + SF.CMN_EMPS]))
 
 
 def aura_tests(out, ts_out):
@@ -1319,14 +1325,15 @@ def aura_v6_tests(out):
           'logs "Emitter is Empty." if it runs out)' % (B.AURA_GENERATIONS, n * B.AURA_GENERATIONS),
           n * B.AURA_GENERATIONS <= 80, True)
     em = [e['data'] for e in p.sets[pi]['emitters'] if e['data'] is not None]
-    check('v10: the sparkles (aura 51\'s Aura_FOKpiace): converted (%d emitters), additive, white, rising (0.3 m/s up), '
-          'from XV2\'s circle (0.3 m, 0.5 m under the pelvis), 30 frames' % len(em),
+    check('v10: the sparkles (aura 51\'s Aura_FOKpiace): converted (%d emitters), additive, white, rising (v11: %g a '
+          'frame along his up), from an upright disc round his middle (v11; v10 XV2\'s circle 0.3 m, 0.5 m under the '
+          'pelvis), 30 frames' % (len(em), FX11.PIACE_RISE),
           (len(em), {p.field(x, 'blend_type') for x in em}, {tuple(p.color_keys(x, 0)[0][:3]) for x in em},
            {(tuple(p.field(x, 'emit_direction')), round(p.field(x, 'emitter_velocity'), 4)) for x in em},
            {(p.field(x, 'volume_type'), tuple(round(v, 3) for v in p.field(x, 'volume_radius')),
              round(p.field(x, 'emitter_translation')[1], 3)) for x in em}, {p.field(x, 'ptcl_life') for x in em}),
-          (2, {1}, {(1.0, 1.0, 1.0)}, {((0.0, 1.0, 0.0), round(0.3 / 60 * 8.5, 4))},
-           {(3, (B.PIACE_RADIUS, 0.0, B.PIACE_RADIUS), -4.25)}, {30}))
+          (2, {1}, {(1.0, 1.0, 1.0)}, {((0.0, 0.0, 1.0), FX11.PIACE_RISE)},
+           {(3, (FX11.PIACE_R, 0.0, FX11.PIACE_R), 0.0)}, {30}))
 
 
 def model_tests(out, base):
@@ -1724,6 +1731,11 @@ def main():
         i = a.index('--package')
         pkg = a[i + 1]
         del a[i:i + 2]
+    global SF_SKILL_DIR
+    if '--sf-skill' in a:
+        i = a.index('--sf-skill')
+        SF_SKILL_DIR = a[i + 1]
+        del a[i:i + 2]
     since = None
     if '--since' in a:
         i = a.index('--since')
@@ -1754,6 +1766,9 @@ def main():
     model_tests(out, base)
     if exe:
         native_tests(exe)
+    import supamario_sf_test as SFT                      # v11: Soaring Fist, the effect fixes, crouch
+    SFT.check = check                                    # (this run's PROBLEMS)
+    SFT.run(r, out, ts_out, base, SF_SKILL_DIR, exe)
     if pkg and since:
         package_since_tests(pkg, out, since, exe)
     elif pkg:

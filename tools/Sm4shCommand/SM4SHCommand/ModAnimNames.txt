@@ -87,6 +87,22 @@ SpecialLwHeavy_c2
 SpecialAirLwLight_c2 -> body/FitMarioBodyMainD03SpecialAirLwLight.omo
 SpecialAirLwLight_c4 -> body/FitMarioBodyMainD03SpecialAirLwLight.omo
 SpecialLwHeavy_c2 -> body/FitMarioBodyMainD03SpecialLwHeavy.omo
+// Ultra Instinct v11: Soaring Fist (XV2 skill 1510_GKS_HKN), the transformed forward smash (tools/supamario_sf_build.py),
+// in SpecialAirLwHeavy's animation after Secret Sensation's stance, through its custom-move slots:
+// specialairlwheavy_c2 (0x246, from frame 45) = the wind-up and the charge, specialairlwheavy_c3 (0x247, from 117 / 206 / 315)
+// = the one / two / three-punch releases
+SpecialAirLwHeavy_c2
+SpecialAirLwHeavy_c3
+SpecialAirLwHeavy_c2 -> body/FitMarioBodyMainD03SpecialAirLwHeavy.omo
+SpecialAirLwHeavy_c3 -> body/FitMarioBodyMainD03SpecialAirLwHeavy.omo
+// its projectile: article 0 (the fireball's slot; weapons/soaringfist.c; motion.mtable): soaringfist = the final punch
+// (14%, 50 degrees), soaringfist2 / soaringfist3 = a level-2 / level-3 non-final punch
+soaringfist
+soaringfist2
+soaringfist3
+soaringfist -> fireball/FitMarioFireballMain.omo
+soaringfist2 -> fireball/FitMarioFireballMain.omo
+soaringfist3 -> fireball/FitMarioFireballMain.omo
 
 // ---- Sephiroth (edge)
 // his 3-hit jab: motion slots 0x51 / 0x52 (Zelda, his base, has one jab; extra_kinds.json "motions",

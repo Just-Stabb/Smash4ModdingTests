@@ -4582,3 +4582,122 @@ leave out the new custom-move slots too); `outline_shell_test.py` 124 ok; `mesh_
 failures; `msc_stack_check` 0 of 2491 (globals 127 of 128); `fighter_texture_ids.py check` 0 errors; `import_call_check`
 0 on both exes; exe_v46z_ui7 (SHA-1 f5f75fc0) / ui7_diag (8380ba0f) reproduced byte for byte from the cave script;
 Sm4shCommand v1.7.23 NvTest 290 ok / 1 known failure (effect.bin's else-if chains, upstream), HvTest 248 ok. 0 failures.
+
+## Ultra Instinct v11 (`supamario_ultrainstinct_v11.zip`; exe unchanged: `exe_v46z_ui7`; Sm4shCommand v1.7.24)
+Install over v10: `INSTALL_TO_data/` holds the files changed since v10 (his body motions, scripts, effects, sound bank,
+soundlabeltable and MSC, and article 0's files: `script/msc/fireball/fireball.mscsb`, `script/animcmd/weapon/fireball/*`,
+`model/fireball/c00/model.nud`, `motion/fireball/main.pac`). Built by `supamario_ui_build.py` with two new inputs,
+`--sf-skill` (XV2's `skill/HKN/1510_GKS_HKN`, the user's) and `--flip-ptcl` (vanilla Donkey Kong's and Ganondorf's
+.ptcl: two programs' flipbook variants); the move is `tools/supamario_sf_build.py`, the effect fixes
+`tools/supamario_ui_fx11.py`, the tests `tools/supamario_sf_test.py` (run by `supamario_ui_test.py`, `--sf-skill`).
+The user's spec (`ui_in/fsmash_spec.txt`): "Skill 1510, Soaring Fist is what I want for Ultra Instinct Supamario's
+forward smash. It should be an indirect physical hit non-reflectable, non-absorbable projectile that works similarly to
+Xenoverse. There shouldn't be any tracking. Uncharged forward smash should do one punch that knocks back at a 50 degree
+angle with 1.1x hitstun, the final hit of each punch barrage should act like the uncharged hit. Charging should increase
+the number of punches up to 3, with the non-final punches being low knockback hitboxes with windboxes that should push
+the opponent a bit back and always connect into the final punch. The non-final punches should be weaker and push back
+shielding enemies slightly, the final punch should push a shielding opponent back even more. Please use Xenoverse's
+effects, animations and timings." With it, four v10 reports: the idle aura stiff and the sparkles at his feet, Secret
+Sensation's / Jump Spike's aura far below him, the autododge from a crouch.
+
+### 1. What XV2's files say (Soaring Fist, `1510_GKS_HKN`)
+- **BCM:** roots #3 / #4 / #1 / #2 play BAC 0 / 3 / 8 / 11 (the same move; 8 / 11 track harder early), each with its
+  charge entries +1 / +2. **BAC 0** one punch (EAN #0 GKS_SPA_HKN_00_C, 101 frames), **1** two (EAN #1, 121), **2**
+  three (EAN #2, 141); their first 20 frames are the same pose (0.06 at most). ChargeControl [0, 0, 30, 0] on 5-17.
+- **The punches:** BAC Projectile items at **20 / 40 / 60** (BSA entries 0 | 1, 2 | 3, 4, 5), each with the skill's effect
+  0 (Hkn_Fir on b_R_Hand) or 1 (Hkn_Fir on b_L_Hand) and skill SE cue 1 (CAR_S1510_HKN_Fire); cue 0 (Bishi) at 0.
+  BcmCallback (the next move) from **65 / 85 / 105**. BTL_CMN 120 (MHitSmk) at 1, 140 (GHitSmk) and 240 (GHit) after
+  the punches, 220 (MHit) at level 3; a camera and BPE 10 (not used: no camera, the user's earlier rule).
+- **The BSA** (no reader existed: `supamario_sf_build.sf_bsa`, the layout read from the file): six shots alike but for
+  their life and BDM: still to frame 3, then **80 m/s** (1.33 m a frame; type 1, +4), a **1.2 m** hitbox from frame 2
+  to the end (type 3, +0x14; its BDM entries +0x3A-0x3E = the shot's own index), the skill's effect 5 at 1 (Hkn_Wav,
+  PositionUpdate + RotateUpdate, + the Hkn_Wind trace); **life 15 / 25 / 25 / 35 / 35 / 35**.
+- **The BDM:** entries 0 / 2 / 5 (the uncharged and the final punches) damage type 7 (a launch), victim hitstop 10,
+  stun 110 (the uncharged: the clips' "extra hitstun with only one punch") / 40; entries 1 / 3 / 4 (non-final) type 3
+  (a stagger), pushback 0.7 / 0.75, hitstop 7, stun 30. Damage 80 | 40 + 60 | 30 + 30 + 60 (XV2's scale).
+- **The clips** (`hkn_clips`, 60 fps): clip 1 the uncharged punch (a white starburst at the fist, the target ~10 m away
+  hit ~7 frames later, a long tumble), clip 2 three punches 20 frames apart (the hit counter to 3).
+
+### 2. The move (transformed: TIMER_0 > 1500; untransformed his forward smash is Mario's, unchanged)
+| | |
+|---|---|
+| Statuses | 0x2B (AttackS4Start)'s main (`func_286`) runs `sf_init` / `sf_loop` (supamario.c `sf_*`); 0x2C / 0x2D never reached; `func_347` (its end) stops the charge sound |
+| Motions | SpecialAirLwHeavy's animation after Secret Sensation's 45 frames (`supamario_ui_anim` `sf_*`): the wind-up 45-56 (XV2 #0 0-12), the charge 57-116 (#0 frame 12 held), the releases 117 (#0 12-100, 89 frames), 206 (#1 12-120, 109), 315 (#2 12-140, 129); XV2's lunge kept (TransN Z: 1.03 m at each punch). Played through its custom-move slots **0x246 specialairlwheavy_c2** (the wind-up / charge) and **0x247 specialairlwheavy_c3** (the releases), the native motion table checked |
+| Charge | the wind-up's game script turns the hold flag 0x2100001B on at its frame 6 (Mario's AttackS4S way); at frame 12 the attack button held and the flag on -> the charge (Mario's AttackS4Hold look: sparkles, flash, START_CHARGE, rumble, sound 0x69), at most **60 frames**; released (or 60) -> the release. Frames charged (with the release's): **under 20: 1 punch, 20-39: 2, 40+: 3** (chosen) |
+| Punches | at **8 / 28 / 48 frames into the release** (XV2's 20 / 40 / 60): article 0 generated (`sf_fire`), the custom slot telling it (level - 1) x 2 + 0 the final / 1 a non-final punch, put back after. Uncharged: one punch on frame 20 |
+| End | actionable from **53 / 73 / 93** frames into the release (XV2's BcmCallback; func_39 / func_41), Wait at its end; off the ground -> Fall |
+| The projectile (`weapons/soaringfist.c`, article 0 = the fireball's slot, kind 0x185) | finds him by kind (the nearest fighter of kind 0x41), puts itself **9 in front of him, 6.5 up** (his fist), still for 3 frames, then **6.72 a frame** (XV2's 80 m/s at 5.04 a metre) straight along his facing: **no tracking**; removed at its life (**15 / 25 / 35** frames by level, XV2's), on a wall, or by the fireball class's own hit method on a hit / shield / clank (one hit each). Motion 0 / 1 / 2 (`soaringfist` the final, `soaringfist2` / `3` the level-2 / -3 non-final): their ACMD has the hitbox from frame 2 and the wave (Hkn_Wav, External_Graphic on its bone 0, following it). Its model hidden (`nud.hidden`), its motion still (the fireball's spins its root) |
+| Non-reflectable / non-absorbable | its hitbox is **Reflectable 0 / Absorbable 0** (Shieldable 1, Direct/Indirect **0**: an indirect hit): the reflector's / absorber's shapes meet only reflectable / absorbable attacks (their masks, docs/native-notes.md "The masks"), so a Franklin Badge, Fox's reflector or Ness's PSI Magnet lets it through (vanilla's unreflectable projectiles are made the same way) |
+| Effects | the skill's Hkn_Fir at his fist at every punch (in his frame: the rings face along the punch), Hkn_Wav on the shot, BTL_CMN MHitSmk at 1 and GHitSmk / GHit / MHit at XV2's frames, at his feet; sizes at 5.04 units a metre (the hitbox's) |
+| Sounds | the skill's SE cues 0 (Bishi) at the wind-up's start and 1 (Fire) at every punch (`sf_bishi` 0x0CB100A8, `sf_fire` 0x0CB100A9) |
+
+### 3. The numbers (chosen: the user gave only the angle and the 1.1x hitstun; adjust in `tools/supamario_sf_build.py`)
+| Punch | Damage | Angle | KBG | Set KB (FKB) | BKB | Hitstun | Hitstop | SDI | Shield pushback |
+|---|---|---|---|---|---|---|---|---|---|
+| Uncharged / every final punch | **14%** | **50** | 96 | 0 | 30 | **x1.1** (HitstunMul) | 10 (XV2's) | 1.0 | 2.0 a frame, fading over 10 frames |
+| Level 2's first punch | **5%** | 0 | 100 | 10 | 0 | +20 frames (HitstunMul -20: XV2's stun 30) | 7 (XV2's) | 0.5 | 0.8 a frame, fading over 10 |
+| Level 3's first two | **4%** each | 0 | 100 | 10 | 0 | +20 frames | 7 | 0.5 | 0.8, fading over 10 |
+Totals **14 / 19 / 22%**. The final punch is the uncharged one at every level (the user: "acts like the uncharged
+hit"): no smash-charge multiplier. Against Mario-weight at 120% the 14% launch is ~KB 190 at 50 degrees (a KO from
+mid-stage round 110-120%, like his other smashes); the non-final set knockback (~26 KB on a 100-weight fighter) slides
+a grounded opponent back a few units ("push back a bit"). The hitstun multiplier is the repo's Extra hitbox's
+HitstunMul (in a weapon's script, as `acmd_ext_help`'s rules allow; no new command).
+
+### 4. How "always connect" is guaranteed (`sf_hold`, his MSC, every frame of a 2- / 3-punch release)
+- A Smash 4 projectile is removed when it hits (the fireball class), so a windbox riding the punch can't act after its
+  hit; the "windbox" is his MSC's: for every other fighter in the punches' lane (in front of him, its feet 14 under to 12
+  over his), the release frame each punch reaches it is known (it starts 9 ahead, waits 3 frames, then 6.72 a frame; a
+  reach of its 6.05 + 3): once a punch has reached it and another is still on its way (and it can reach it in its life):
+  - **its hitstun kept** at least to that punch's arrival + 3 frames (its slot's HITSTUN variable; never lowered);
+  - **airborne, pulled to the lane:** 35% of the way a frame toward its middle on the punches' line (feet 1.5 over
+    his: the line 6.5 up less a middle of 5); on the ground nothing (its own knockback, angle 0, pushes it back);
+  - so the next punch, fired 20 frames after the last (XV2's spacing), always meets it; after the final one's arrival
+    nothing is touched (its 14% launch is its own).
+- Shields: a fighter in guard damage (0x1E) as a punch reaches it gets its pushback speed set (PUSH, docs/position-
+  variables.md; Sephiroth's forward smash's way) every frame for 10 frames, fading: 0.8 a frame for a non-final punch,
+  2.0 for the final one, away from him.
+
+### 5. The effect fixes
+- **Secret Sensation's / Jump Spike's aura far below him** (clips `ss.mp4`, `jumpspike.mp4`: teal streaks one to two
+  body heights under / beside him). Cause (evidence: the game's own vertex programs run in `latte_exec`): every converted
+  type-3 streak (XV2's VisibleOnSpeed sprites, ConeExtrude ribbons) kept its template's **rotBasis (0, -1.34)**, which
+  draws the quad 0.84-1.84 of its length BEHIND its particle: KTN's wind_1 (length 10.6) 10.7-21.4 under it, Time
+  Skip's stripe 5.2-11.9; with their upward motion and the emitters' own offsets, the auras hung under him. Now
+  VisibleOnSpeed sprites are centred (0) and ConeExtrude ribbons run from the particle back (-0.5): KTN_GKS_Loop(_2),
+  BoostGKS_End, Time Skip's CrgAura / CrgAuraH and Soaring Fist's sets. (The same offset sits in other XV2 sets' hit
+  sparks, Btl_HitL's lines and Frt_Hit's waves; left as the user approved them.) The transformation's aura has no
+  streaks: unchanged.
+- **The aura stiff** (v10 clip `v10.mp4` against XV2's `idle.mp4`): XV2's aura sprites are SpriteSheet textures played in
+  order (Aura_LoopFOK's 8 x 2 flames every 3 / 4 frames); the converter keeps the first cell, so every sprite was one
+  still flame. v9's sprites stayed where they were born and smeared over his idle sway (looking alive, but the trail);
+  v10's follow variants hold them on him, still. The follow programs were run against the plain ones (the same output
+  at every age: no motion lost there). Now each GPU aura sprite on a sheet has the whole sheet and plays it (mode 2, XV2's
+  frames a cell) on its program's flipbook variant (still following him); and XV2's scatter (VerticalDistribution's
+  Position_Variance, lost in the conversion: every sprite on its bone's point) as a circle volume (0.3 m -> 2.55, 0.1 m
+  -> 0.85). Colours, glow and following as v10. The CPU sprites (program 11: no flipbook variant in the game's files)
+  keep one cell.
+- **The sparkles** (Aura_FOKpiace): XV2 emits them from a 0.3 m circle 0.5 m under the pelvis with a 1 m Position_Variance
+  (the whole body), rising; the conversion kept the -0.5 m (x 1.75 = 7 under his hip: his feet) and lost the variance.
+  Now on TransN 5 up (his hip's height: his up is the world's), an upright disc (radius 2.9 x 1.75 = 5 round his middle),
+  rising 0.12 a frame (x 1.75 ~6 units over their 30 frames), 3.5x bigger.
+
+### 6. The autododge from a crouch (the user: "please make the autododge accessible from crouching")
+Checked, all as meant: the MSC (`ui_can_dodge` / `ui_shape_on`: Squat .. SquatRv on the ground, the tests' Squat,
+SquatWait, SquatF / B, SquatRv), the cave (slot 42 / 43: 0x11-0x15), the counter shape's capsule (joint 0, y 2.5-9.5,
+radius 6.5) round his SquatWait pose (every joint within y 0-6.2, z -3.3..4.1: inside), SquatWait's status data the
+same as Wait's. **Not found offline**; the game's cause needs the TEST ONLY diag exe (exe_v46z_ui7_diag): a log of a
+few attacks on him crouching (S4U2 lines: whether the shape is hit) — the package's test steps ask for it.
+
+### 7. Not confirmed in game / approximated
+- The punches' spawn (9 ahead, 6.5 up), the 20 / 40 charge thresholds, the damage table, the hold's pull / pad, the
+  shield push speeds: chosen. XV2's 35-frame lives give a full charge ~215 units of range (XV2's, kept).
+- The projectile's place set by its MSC (`PostureModule(0x3)`) on its first frame, the owner found by kind (two
+  Supamarios: the nearer); the weapon's facing taken as his (the game's spawn).
+- The punch disappears on its hit (the fireball class); XV2's hit sound (cue 2) isn't played (the hit's own SFX); the
+  Hkn_Wind trace, BPE 10 and the camera not converted; CMN 30 / 60 (an EMO model, ice) not used.
+- The shield push through PUSH (energy 4 made again each frame) as Sephiroth's; the GuardDamage status's own pushback is
+  replaced for those frames.
+- The crouch dodge (above).
+
+### Ultra Instinct v11, results
+RESULTS_PLACEHOLDER

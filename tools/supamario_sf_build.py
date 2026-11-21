@@ -68,7 +68,8 @@ NONFINAL = dict(Angle=0, KBG=100, FKB=10, BKB=0, HitstunMul=-20.0, HitstopFrames
 # ---------------------------------------------------------------- always connecting / shields (sf_hold)
 REACH = SIZE + 3.0                    # a punch reaches a fighter this far short of its centre
 BEHIND = 4.0
-LANE_DOWN, LANE_UP = 14.0, 6.0        # a fighter's feet this far under / over his own: in the lane
+LANE_DOWN, LANE_UP = 14.0, 12.0       # a fighter's feet this far under / over his own: in the lane (its body
+                                      # within the punches' 6.05 of their line, 6.5 up)
 GROUNDED = 0.5                        # its feet within this of his: on the ground (no pull)
 MID = 5.0                             # a fighter's middle above its feet (the pull puts it on the punches' line)
 PULL = 0.35                           # of the way to the lane a frame (the "windbox")
@@ -232,10 +233,13 @@ def gfx(fx, bone, x, y, z, size):
 
 
 def body_scripts(se_id, cmn_fx):
-    """{script: {part: body}} for the two slots; frames are the animation's (the MSC starts each motion at a segment)"""
+    """{script: {part: body}} for the two slots; frames are the animation's (the MSC starts each motion at a segment).
+    The charge's look is Mario's AttackS4Hold's (its sparkle 0x1000019 every 10 frames, the flash 0x1000010 on bone 0x11
+    between, START_CHARGE, the rumble loop), its sparkle through Graphic_Effect2 (Graphic_Effect is the game's
+    FOOT_EFFECT, refused in some states: v10)"""
     hold = []
     for k in range(0, HOLD_N, 10):
-        hold += [(HOLD_AT + k, [cmd('graphic_effect', 0x1000019, 0, -2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 10.0, 0.0, 4.0,
+        hold += [(HOLD_AT + k, [cmd('graphic_effect2', 0x1000019, 0, -2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 10.0, 0.0, 4.0,
                                     0.0, 0.0, 0.0, 0)]),
                  (HOLD_AT + k + 5, [cmd('graphic_effect2', 0x1000010, 0x11, 2.0, 3.0, 0.0, 0.0, 0.0, 0.0, 1.0, 3.0,
                                         3.0, 3.0, 0.0, 0.0, 0.0, 1)])]
