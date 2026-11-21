@@ -86,7 +86,7 @@ DODGE_MOVE, DODGE_V = 4, 1.0         # v2 (the user's XV2 clip: a sway almost in
 # Ultimates / ZVanish; 765-768 have the counter's own link 0x8 through all of it) = 24 of its 37 frames; other actions
 # from SWAY_IASA; Wait at SWAY_N. The sway's effects: BTL_CMN 493 (SKI_lineX_S, 0.35, at his feet) at XV2 1 and 4 (ours
 # 0 and 1), 911 / 900 are ECFs (colour over the body: not drawn); its sound: CAR_BTL_CMN cue 5 (swing_05) at XV2 7 (ours 1)
-SWAY_N = anim.frames_of(anim.DODGE) - anim.part_start('sway_f_in') - (anim.frames_of(anim.DODGE) - anim.part_start('ctr_out'))
+SWAY_N = anim.part_start('sway_f_in')         # 37: each sway (1 + 36)
 SWAY_F_AT = anim.part_start('sway_f_in')     # 37: the forward sway's first frame in the motion
 CTR_AT = anim.part_start('ctr_out')          # 74: the counter's
 CTR_N = anim.frames_of(anim.DODGE) - CTR_AT  # 22
@@ -98,6 +98,7 @@ SWAY_SND_AT = 1
 # the counter: CMN.bac 706 (707 the same on the other hand): animation 0-5 (the character's own EAN #30: ours the skill's
 # finisher punch), its hitbox 0-6 (frames 0-5), BDM #0 (CMN.bdm), 1.5 m in front at 0.75 m, 1 m; BTL_CMN 492 (SKI_lineX_L
 # on the pelvis) and CMN 230 (Btl_RHit) at 0, 491 (SKI_lineX_S, 0.35) at 4; no sound; its link 0x8 0-6: actionable at
+# (its animation, the character's EAN #30, isn't in the files: XV2's straight punch of Hit's Time Skip, supamario_ui_anim)
 # CTR_IASA. Damage: BDM #0 sub-entry 0 (the standing victim): DamageType 3, DamageAmount 0, user / victim stun 5, a
 # 30-frame stagger (KnockbackDuration 30, strength Y 0.1 / Z 0.04 a frame). Smash 4: CTR_DMG (the smallest whole
 # percent: XV2's 0 is a stagger, the hit still lands: its hitlag 5 = XV2's stun 5), knockback set (WKB) for XV2's
@@ -686,7 +687,8 @@ def build(sm_dir, out_dir, ui_skill, ui_se_wav, ts_args):
                     ts_args.get('halo', True), ts_args['frt'])
     mo = os.path.join(fdir, 'motion', 'body')
     vbn = os.path.join(sm_dir, 'model', 'body', 'c00', 'model.vbn')
-    outs, _bones, info = anim.build(mo, vbn, os.path.join(ui_skill, '1510_GKS_MGT.ean'), mo, ts_args.get('cmn_ean'))
+    outs, _bones, info = anim.build(mo, vbn, os.path.join(ui_skill, '1510_GKS_MGT.ean'), mo, ts_args.get('cmn_ean'),
+                                    os.path.join(ts_args['ts_skill'], '1352_HIK_DSH.ean'))
     rep = effects(ts_args['sh']['fd']['cb']['gf']['cmn_vfx'], os.path.join(fdir, 'effect', 'supamario'))
     sound_bank(fdir, out_dir, ui_se_wav)
     import nud

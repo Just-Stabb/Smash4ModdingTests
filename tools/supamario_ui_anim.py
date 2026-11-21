@@ -4,7 +4,7 @@
 (`xv2ean.retarget`, 5.04 units a metre, no TransN: the MSC places him; the pelvis's height on RotN, Fake Death's
 floor_fix).
 
-  python3 -I tools/supamario_ui_anim.py BODY_MOTION_DIR MODEL_VBN 1510_GKS_MGT.ean OUT_DIR CMN.ean
+  python3 -I tools/supamario_ui_anim.py BODY_MOTION_DIR MODEL_VBN 1510_GKS_MGT.ean OUT_DIR CMN.ean 1352_HIK_DSH.ean
 
 The EAN (the default body "_C"; `_F` / `_MAM` the other builds) has two animations:
   #0 GKS_MET_MGT_00_C (325 frames), BAC entry 0: the stance (0-30 into it, the counter window 30-151), the power-up
@@ -27,8 +27,9 @@ XV2's CMN.ean (`--cmn-ean`, the user's chara/CMN) and the skill's EAN:
                 7-42 1:1 (37 frames); motion 0x241 from 0;
   frames 37-73  the forward sway: CMN #191 CMN_SPA_ASW_F_L_S, the same timeline; motion 0x243 from 37;
   frames 74-95  the counter (CMN.bac 706's 6-frame strike; its own animation, the character EAN's #30 / #31, isn't in the
-                files): the skill's EAN #1 finisher, 274-281 in 3 (the punch out), 281-284 in 3 (held), 284-350 in 16
-                (back to the stance); motion 0x242 from 74.
+                files; this skill's EAN #1 270-350 is the rush's arm held out sideways, no strike): XV2's straight
+                right punch of Hit's Time Skip (1352_HIK_DSH.ean #1 HIK_SPA_DSH_01_C, `--hit-ean`): 8-14 in 3 (the
+                fist out), 14-20 in 3 (held), 50-81 in 16 (back to the stance); motion 0x242 from 74.
 The sways keep their own root lean (TransN's X / Z: up to 0.9 units back / 2.4 forward, back to 0 at the end: XV2's
 Movement is none, the MSC doesn't move him).
 """
@@ -55,14 +56,15 @@ SEGMENTS = [
     ('sway_b', DODGE, 189, 7, 43, 36, 'cmn'),        # 7-42 1:1
     ('sway_f_in', DODGE, 191, 0, 7, 1, 'cmn'),
     ('sway_f', DODGE, 191, 7, 43, 36, 'cmn'),
-    ('ctr_out', DODGE, 1, 274, 281, 3),              # v7: the counter: the skill's finisher punch
-    ('ctr_hold', DODGE, 1, 281, 284, 3),
-    ('ctr_back', DODGE, 1, 284, 350, 16),
+    ('ctr_out', DODGE, 1, 8, 14, 3, 'hit'),          # v7: the counter: Hit's straight punch (1352_HIK_DSH #1)
+    ('ctr_hold', DODGE, 1, 14, 20, 3, 'hit'),
+    ('ctr_back', DODGE, 1, 50, 81, 16, 'hit'),
     ('ss_in', SS, 0, 0, 40, 18),
     ('ss_hold', SS, 0, 40, 151, 27),
 ]
 EAN_FRAMES = [325, 500]
 CMN_ANIMS = {189: 'CMN_SPA_ASW_B_L_S', 191: 'CMN_SPA_ASW_F_L_S'}
+HIT_ANIMS = {1: 'HIK_SPA_DSH_01_C'}
 KEEP_TRANS = ('sway_b_in', 'sway_b', 'sway_f_in', 'sway_f')   # their root lean kept (TransN X / Z)
 
 
@@ -107,16 +109,16 @@ def _local(ean, anim, name, f):
     return ean.local(anim, bi[name], f)
 
 
-def body_frames(ean, smash, motion, cmn=None):
+def body_frames(ean, smash, motion, cmn=None, hit=None):
     frames, base, keep = [], [], []
     a0 = ean.animations[0]
     pel_ref = _local(ean, a0, 'b_C_Pelvis', 0)[0][1] + _local(ean, a0, 'b_C_Base', 0)[0][1]
     for f in range(frames_of(motion)):
         s, ai, sf = source(motion, f)
-        e = cmn if len(s) > 6 and s[6] == 'cmn' else ean
+        e = {'cmn': cmn, 'hit': hit}.get(s[6], ean) if len(s) > 6 else ean
         a = e.animations[ai]
-        if e is cmn:
-            assert a.name == CMN_ANIMS[ai], (ai, a.name)
+        if len(s) > 6:
+            assert a.name == {'cmn': CMN_ANIMS, 'hit': HIT_ANIMS}[s[6]][ai], (ai, a.name)
         frames.append(X.retarget(e, a, smash, at=[sf], root_scale=SCALE)[0])
         by = _local(e, a, 'b_C_Base', sf)[0][1]
         base.append((_local(e, a, 'b_C_Pelvis', sf)[0][1] + by, by))
@@ -130,15 +132,17 @@ def body_frames(ean, smash, motion, cmn=None):
     return frames, [b[1] for b in base]
 
 
-def build(motion_dir, vbn_path, ean_path, out_dir, cmn_ean_path=None):
+def build(motion_dir, vbn_path, ean_path, out_dir, cmn_ean_path=None, hit_ean_path=None):
     ean = X.Ean(open(ean_path, 'rb').read(), smash_axes=True)
     assert [a.frames for a in ean.animations] == EAN_FRAMES, [(a.name, a.frames) for a in ean.animations]
     cmn = X.Ean(open(cmn_ean_path, 'rb').read(), smash_axes=True) if cmn_ean_path else None
-    assert cmn is not None or not any(len(s) > 6 for s in SEGMENTS), 'v7: the sways need --cmn-ean (CMN.ean)'
+    hit = X.Ean(open(hit_ean_path, 'rb').read(), smash_axes=True) if hit_ean_path else None
+    assert cmn is not None and hit is not None or not any(len(s) > 6 for s in SEGMENTS), \
+        'v7: the sways need CMN.ean, the counter 1352_HIK_DSH.ean'
     smash = X.vbn_rest(vbn_path)
     info, per = {}, {}
     for m in MOTIONS:
-        frames, base_y = body_frames(ean, smash, m, cmn)
+        frames, base_y = body_frames(ean, smash, m, cmn, hit)
         offs, contact = FA.floor_fix(frames, smash, base_y)
         per[m] = frames
         info[m] = {'rotn_offsets': offs, 'contact': contact,
@@ -168,7 +172,7 @@ def joints(frames, smash):
 
 def main():
     a = sys.argv[1:]
-    if len(a) != 5:
+    if len(a) != 6:
         sys.exit(__doc__)
     out, _bones, info = build(*a)
     for m in MOTIONS:

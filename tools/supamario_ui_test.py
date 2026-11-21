@@ -964,10 +964,10 @@ def motion_tests(out, ts_out):
     src = [(A.source(A.DODGE, f_)[0][0], A.source(A.DODGE, f_)[1], round(A.source(A.DODGE, f_)[2], 2))
            for f_ in (0, 1, 2, 36, 37, 38, 73, 74, 77, 80, 95)]
     check('v7: SpecialAirLwLight\'s frames: the back sway CMN #189 (0 shows XV2 0, 1-36 XV2 7-42: the x7 start), the '
-          'forward sway #191 from 37, the counter (the skill\'s EAN #1 finisher 274-350) from 74', src,
+          'forward sway #191 from 37, the counter (Hit\'s straight punch, 1352_HIK_DSH #1 8-20, 50-81) from 74', src,
           [('sway_b_in', 189, 0.0), ('sway_b', 189, 7.0), ('sway_b', 189, 8.0), ('sway_b', 189, 42.0),
-           ('sway_f_in', 191, 0.0), ('sway_f', 191, 7.0), ('sway_f', 191, 42.0), ('ctr_out', 1, 274.0),
-           ('ctr_hold', 1, 281.0), ('ctr_back', 1, 284.0), ('ctr_back', 1, round(284 + 66 * 15 / 16.0, 2))])
+           ('sway_f_in', 191, 0.0), ('sway_f', 191, 7.0), ('sway_f', 191, 42.0), ('ctr_out', 1, 8.0),
+           ('ctr_hold', 1, 14.0), ('ctr_back', 1, 50.0), ('ctr_back', 1, round(50 + 31 * 15 / 16.0, 2))])
     check('v7: the build\'s frames agree with the anim\'s (SWAY_F_AT, CTR_AT, SWAY_N, CTR_N)',
           (B.SWAY_F_AT, B.CTR_AT, B.SWAY_N, B.CTR_N, B.SWAY_N + B.SWAY_N + B.CTR_N), (37, 74, 37, 22, 96))
 
