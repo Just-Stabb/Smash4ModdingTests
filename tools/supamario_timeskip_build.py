@@ -293,6 +293,12 @@ OL_INV_RGB, OL_INV_BLEND = (0.0, 0.0, 0.0), 0
 # line is faint).
 OL_SH_RGB, OL_SH_ALPHA = (150.0, 195.0, 255.0), 165.0
 OL_INV_RGB, OL_INV_ALPHA = (255.0, 255.0, 255.0), 230.0
+# v11 (with Ultra Instinct v9; the user: the outline "only displays as white", Time Skip's too): added (Blend 1), a light
+# colour clips to white once the game's encoding scales the shell's colour by k >= ~1.3 (the v7 clip's UI band: k >= 2.2,
+# README "Ultra Instinct v9"). Now drawn over (Blend 0: it can't pass its own colour) in a deeper light blue that stays
+# blue for k up to ~4 (k 1: (50, 110, 255); k 2: (100, 220, 255); k 4: (200, 255, 255)), 2 px
+OL_SH_RGB, OL_SH_ALPHA, OL_WIDTH, OL_BLEND = (50.0, 110.0, 255.0), 160.0, 2.0, 0
+OL_SH_K_MAX = 4.0
 OL_ON = WIND_END
 OL_OFF = int(real0(100))            # 75
 # v6 (user: "add XV2's photo-negative look after the punch"). XV2's BAC: BPE 78 "Invert World Colors" on at the connect's

@@ -42613,20 +42613,26 @@ int ui_shape_on(float st)
     return 0;
 }
 
+// v9 (the user's v7 test: "the autododge works but seems to only reactivate after being hit"; the v7 log: a dodge (S4U2,
+// then the sway), the next attack on his body (no S4U2), the next dodged, ...): v4-v8 switched the shape on only when
+// TIMER_5 said it was off, and TIMER_5 stayed "on" through the sway into Wait (the sway keeps the shape for its chain).
+// The game's own state can drop the group in between without the MSC knowing: the ShieldModule's per-frame update
+// (0x02E40DA4 -> 0x02C6F794) updates only the groups below M + 0x28 and each group's shapes below group + 0x30, both
+// recomputed every frame and zeroed by the module's re-initialisation (vt +0x24: 0x02DACF04 / 0x02E60EC8 ->
+// 0x0200BCCC -> 0x02C6F508), while the shape's own word (+0x20) stays 1; only the ON call (0x0200BD8C -> 0x02C6F954)
+// raises them again. After a hit the damage status had switched it off (TIMER_5 0) and Wait switched it on again:
+// the "reactivates after being hit". Now the ON call is made EVERY frame he is in a shape status (it only sets the
+// shape's word and raises the two counts: no side effect), so the group is live again the frame after the game drops it
 void ui_shape(float st)
 {
-    if (ui_shape_on(st) != 0 && StopModule(0x1) == 0)
-    {
-        if (WorkModuleF(0, UI_V_SHAPE) < 0.5f)
-        {
-            ShieldModule(0, 0x2, 0, 0x1, 0x1);
-        }
-        WorkModule(0, 3.0f, UI_V_SHAPE);
-        return;
-    }
     if (ui_shape_on(st) != 0)
     {
-        return;                     // in hitlag: kept as it is
+        if (StopModule(0x1) == 0 || WorkModuleF(0, UI_V_SHAPE) > 0.5f)
+        {
+            ShieldModule(0, 0x2, 0, 0x1, 0x1);      // (in hitlag only kept, never switched on)
+            WorkModule(0, 3.0f, UI_V_SHAPE);
+        }
+        return;
     }
     if (WorkModuleF(0, UI_V_SHAPE) > 0.5f)
     {

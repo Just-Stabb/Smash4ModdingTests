@@ -1216,9 +1216,18 @@ def outline_tests(f):
         A = SI.filter_matrix(1.0, st[1], st[5], st[6], st[7:10])
         a = B.OL_INV_ALPHA / 255.0
         sa = B.OL_SH_ALPHA / 255.0
-        grey = [round(255 * min(1.0, 100 / 255.0 + sa * c / 255.0)) for c in B.OL_SH_RGB]   # the dash's over mid grey
-        check('v10 the dash\'s band over a mid grey (100): blue-white, not white (blue - red >= 40), not saturating '
-              'red / green: %s' % grey, (grey[2] - grey[0] >= 40, grey[0] < 230 and grey[1] < 240), (True, True))
+        # v11: drawn over (Blend 0), for any encoding scale k up to OL_SH_K_MAX (the v7 clip: k >= 2.2; v10's added
+        # light colour clipped to white at k >= ~1.3: this check fails on v10's values)
+        def over(bg, k):
+            return [round(255 * ((1 - sa) * bg / 255.0 + sa * min(1.0, k * c / 255.0))) for c in B.OL_SH_RGB]
+        if B.OL_BLEND == 1:
+            grey = [[round(255 * min(1.0, 100 / 255.0 + sa * min(1.0, k * c / 255.0))) for c in B.OL_SH_RGB]
+                    for k in (1.0, 2.0, B.OL_SH_K_MAX)]
+        else:
+            grey = [over(100, k) for k in (1.0, 2.0, B.OL_SH_K_MAX)] + [over(20, k) for k in (1.0, 2.0, B.OL_SH_K_MAX)]
+        check('v11 the dash\'s band over a mid grey (100) and a dark stage (20), encoding scale k 1 / 2 / %g: blue, '
+              'never white (blue - red >= 40 every time): %s' % (B.OL_SH_K_MAX, grey),
+              (B.OL_BLEND, all(g[2] - g[0] >= 40 for g in grey)), (0, True))
 
         def seen(bg):        # the band over a background pixel bg (0-1), then the stop's filter
             px = [a * B.OL_INV_RGB[i] / 255.0 + (1 - a) * bg[i] for i in range(3)]

@@ -32,6 +32,7 @@ BODY_RGB = (0.62, 0.62, 0.70)      # the stand-in silhouette (silver-blue clothe
 SHELL_PX = 5                       # Outline_Shell's 3 px of 1280 x 720 at this canvas's scale (Mario ~180 px tall here,
                                    # ~110 px in a typical battle shot)
 RIM_PX = 4
+K = 1.0                            # v9: the game's encoding scale on Outline_Shell's colour (--k; the v7 clip: >= 2.2)
 
 
 def calls(mode):
@@ -89,9 +90,20 @@ def draw_glow(c):
         ring = inner & ~nxt
         c.rgb[ring] += rim_rgb * min(B.GLOW_RIM_A / 255.0, 4.0) * 0.5 * (1 - k / float(RIM_PX))
         inner = nxt
-    band = grow(m, SHELL_PX) & ~m
-    c.rgb[band] += np.array(B.GLOW_SHELL_RGB) / 255.0 * (B.GLOW_SHELL_A / 255.0)
+    band = grow(m, max(1, int(round(SHELL_PX * B.GLOW_SHELL_W / 3.0)))) & ~m
+    col = np.minimum(1.0, K * np.array(B.GLOW_SHELL_RGB) / 255.0)
+    a = B.GLOW_SHELL_A / 255.0
+    if getattr(B, 'GLOW_SHELL_BLEND', 1) == 0:      # v9: drawn over
+        c.rgb[band] = c.rgb[band] * (1 - a) + col * a
+    else:
+        c.rgb[band] += col * a
     return m
+
+
+def refracts(p, raw):
+    """v9: an emitter whose program reads the frame buffer (the fireball's refraction: draws the picture behind it,
+    bent; fx_render draws it as colour)"""
+    return b'frameBufferTexture' in bytes(p.shader_binary(p.field(raw, 'shader_index')))
 
 
 def render(out, mode='steady', haze_px=6.0, glow=None):
@@ -117,7 +129,9 @@ def render(out, mode='steady', haze_px=6.0, glow=None):
         cm = R.call_matrix(xyz, (0, 0, 0), size)
         for k, em in enumerate(ems):
             sim = R.simulate(em, (0, cm, size, None), frames, seed=n * 10 + k + 1)
-            is_haze = 'distortion pass (not drawn)' in getattr(em, 'notes', ()) or em.name == 'UiHaze'
+            raw = p.sets[sets[key]]['emitters'][k]['data']
+            is_haze = ('distortion pass (not drawn)' in getattr(em, 'notes', ()) or em.name == 'UiHaze' or
+                       refracts(p, raw))
             for fr in frames:
                 if not sim[fr]:
                     continue
@@ -182,7 +196,10 @@ if __name__ == '__main__':
     ap.add_argument('--after-mode', default='steady', choices=sorted(MODES))
     ap.add_argument('--bg', help='the background r,g,b (0-1; default the sand %s; e.g. 0.10,0.08,0.22 for a dark stage '
                     'like the user\'s v5 clip)' % (BG,))
+    ap.add_argument('--k', type=float, default=1.0, help='v9: the encoding scale on Outline_Shell\'s colour (1 = as '
+                    'given; the v7 clip shows >= 2.2)')
     a = ap.parse_args()
+    K = a.k
     if a.bg:
         BG = tuple(float(x) for x in a.bg.split(','))
     ia, oa = render(a.before, a.before_mode)

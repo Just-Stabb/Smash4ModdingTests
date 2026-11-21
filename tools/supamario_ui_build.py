@@ -27,6 +27,7 @@ The move: fighters/supamario/README.md "Ultra Instinct v1".
 import json
 import os
 import sys
+import struct
 import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -109,8 +110,15 @@ ST_ESCAPE_N = cave.ST_ESCAPE_N
 # (slight: the fighter he passes stays in the frame), SS_CAM2_D over SS_CAM2_T from the slide's frame SS_CAM2_AT (the
 # last 6 frames = 18 screen frames on him), back to normal at the arrival
 SS_SLOW, SS_SLOW_FRAMES = 3, 48
-SS_CAM1_T, SS_CAM1_D = 6, 1.2
-SS_CAM2_AT, SS_CAM2_T, SS_CAM2_D = 8, 6, 1.5
+# v9 (the user's v7 test: "the camera shift for Secret Sensation is too close, it should be a slight zoom rather than a
+# close one"): CameraModule 0x2714's distance is how far the camera stays (higher = farther: Kirby's MSC, tuned in game,
+# has 4.0 for "a slight zoom on Kirby", 2.0 for the back throw's big hit and the Final Smash's, and notes 1.4 as "much
+# closer"; Ryu's critical 1.1); v7's 1.2 / 1.5 were close-ups. DBFZ's (ss/a.mp4) is about a 2x zoom from its own wide
+# frame, both fighters in it, then closer on Goku: here SS_CAM1_D 5.5 (both in the frame), SS_CAM2_D 4.0 (on him, Kirby's
+# "slight"), both at least SS_CAM_MIN
+SS_CAM1_T, SS_CAM1_D = 6, 5.5
+SS_CAM2_AT, SS_CAM2_T, SS_CAM2_D = 8, 6, 4.0
+SS_CAM_MIN = 3.5                     # a slight zoom: no closer than this (supamario_ui_test checks both)
 # v6 (the user's v5 clip: no aura after the burst, only faint wisps): the MSC's renewal every 30 frames killed the aura AT
 # ONCE (EffectModule 0x2723 (id, 1, 1): the effect manager's kill -> eft's KillEmitterSet 0x04A55714, its particles
 # gone) and made it again, so its sprites (48-96 frames long, fading in over their life) never got past 29 frames: in
@@ -201,14 +209,33 @@ AURA_SAT_MIN = 0.45                  # v6: every aura colour at least this satur
 AURA_GAIN = 1.6                      # v6: every aura emitter's alpha x this (v5's smoothing kept XV2's average coverage; in
                                      # game the sprites round the bone centres are half inside his body: the halo outside
                                      # the silhouette wants more, the user: "clearly visible")
+# v9: XV2's big pale sprites (Ref_FOK) are the distortion now, not light, so the aura's light is its flames and soft
+# glows alone: rendered steady on a dark stage (supamario_ui_aura_render.py) v8 added 0.30, v9 at v6's gains 0.048; at
+# AURA_GAIN / AURA_ADD_ALPHA below 0.12, white cores, sky-blue glows and violet flames apart (approximated: XV2's glare,
+# its bloom round those additive sprites, has no Smash 4 counterpart)
+AURA_GAIN, AURA_ADD_ALPHA = 3.5, 0.6
 AURA_GENERATIONS = 2                 # v6: aura instances alive per part at most (the renewing one and the fading one)
 # v6: the glow on the body while transformed (XV2's UI form: a white-lavender rim on the body and a blue-violet halo
 # round the silhouette, the user's clips): Outline_Set (the fighter shaders' own rim light, inside the silhouette, with
 # a slight tint) and Outline_Shell (the band outside it, added: a glow; its colour shows as given from exe_v46z_outline5),
 # both held (Frames 0) until a KO / the match end / a training reset: at the burst, at the counter's end and in Wait1
 # while transformed (again after a training reset or another move's outline)
-GLOW_RIM_RGB, GLOW_RIM_A, GLOW_RIM_TINT = (205.0, 195.0, 255.0), 600.0, 18.0
-GLOW_SHELL_RGB, GLOW_SHELL_A, GLOW_SHELL_W = (150.0, 135.0, 255.0), 200.0, 3.0
+# v9 (the user's v7 test: "the glow outline is very thick and bright and still only white"). The v7 clip (60 fps,
+# 1302 x 806): the band outside his silhouette over the night sky (23, 20, 26) is (254, 251, 255), 4-6 px wide, and the
+# body inside it washed pale lavender (his blue overalls (190, 183, 246)). v6-v8's band, (150, 135, 255) at 200 ADDED
+# (Blend 1), adds at most 106 x k to green where k is what the game's encoding does to the shell's colour (1 if
+# exe_v46z_outline5's hdrRange scaling did what it was meant to): green went up by 231, so k >= 2.2 (one layer), and with
+# k >= 1.7 every channel of that light colour clips: white, whatever k is exactly. Not the hull's layering: drawn once
+# per polygon part, Supamario's 13 parts (transformed, Wait) cover 87 % of the band once, 8 % twice (the bind pose,
+# $S/u9/hull_layers.py). Inside, Outline_Set's rim at Alpha 600 (2.35 x the colour at the edges) with Tint 18 lit and
+# tinted the whole body. So: the band DRAWN OVER (Blend 0: no sum, it can't get past its own colour however many parts
+# overlap) in a deep blue-violet that stays blue-violet for any k up to ~4 (k 1: (60, 40, 255); k 2: (120, 80, 255);
+# k 4: (240, 160, 255), lavender), half see-through (130), thin (1.5 px of 1280 x 720); the rim a light lavender at 255
+# (the colour at full only at the very edge), no tint. Approximated: k itself (not measured in game)
+GLOW_RIM_RGB, GLOW_RIM_A, GLOW_RIM_TINT = (175.0, 165.0, 255.0), 255.0, 0.0
+GLOW_SHELL_RGB, GLOW_SHELL_A, GLOW_SHELL_W = (60.0, 40.0, 255.0), 130.0, 1.5
+GLOW_SHELL_BLEND = 0
+GLOW_SHELL_K_MAX = 4.0               # the encoding scale (k) up to which the band stays blue-violet (tested)
 GLOW_IN, GLOW_OUT = 10, 10
 HAZE_SRC = ('PtcMarioFireball', 'refraction1')
 HAZE = {'aura_hip': dict(scale=5.0, radius=2.0), 'aura_head': dict(scale=3.6, radius=1.2),
@@ -346,9 +373,10 @@ def white_off():
 
 def glow_on():
     """v6: the transformed glow, held: the rim light (Outline_Set) and the blue-violet band (Outline_Shell: it replaces
-    the white body's band, growing from where that one is)"""
+    the white body's band, growing from where that one is); v9: the band drawn over (GLOW_SHELL_BLEND 0), thin"""
     return [cmd('outline_set', 0, *GLOW_RIM_RGB, GLOW_RIM_A, GLOW_RIM_TINT, 0, GLOW_IN, GLOW_OUT, 0),
-            cmd('outline_shell', 0, *GLOW_SHELL_RGB, GLOW_SHELL_A, GLOW_SHELL_W, 0, GLOW_IN, GLOW_OUT, 0, 1)]
+            cmd('outline_shell', 0, *GLOW_SHELL_RGB, GLOW_SHELL_A, GLOW_SHELL_W, 0, GLOW_IN, GLOW_OUT, 0,
+                GLOW_SHELL_BLEND)]
 
 
 def white_to_glow():
@@ -475,12 +503,52 @@ def se_id(key):
     return SE_IDS.get(key, 0)
 
 
+# v9 (the user's v7 test: "the aura and glowing outline disappear after Time Skip / Jump Spike is used until he
+# lands"). The glow: Time Skip's outline is its own Outline_Shell (one shell per object), renewed through the dash /
+# the stop and ended (Alpha 0) at its end (the dash's 75, the punch): the transformed band was replaced and then ended,
+# and only Wait1's game script (silver_scripts) put it back, i.e. at the landing. Now every effect script that ends an
+# Outline_Shell and isn't Ultra Instinct's own gets, after its last command, the glow again when transformed (TIMER_0 >
+# 1500: glow_on, which replaces Time Skip's fading band); and the motions a move can end in before its own end runs
+# (GLOW_AFTER: the falls and landings) put it on at their frame 0 when transformed. (The aura's part was its emitters
+# left in the world: aura_follow below)
+GLOW_AFTER = ('fall', 'fallf', 'fallb', 'fallaerial', 'fallaerialf', 'fallaerialb', 'landinglight', 'landingheavy',
+              'landingfallspecial')
+
+
+def glow_restore():
+    """the glow put back while transformed: Float_Var_Compare(TIMER_0 > UI_TRANSFORMED_OVER) True { glow_on() }"""
+    return if_var(cave.V_FORM, 5, UI_TRANSFORMED_OVER, glow_on())
+
+
+def restore_glow(f, own):
+    """v9: glow_restore() after the last command of every effect script (not in `own`) ending an Outline_Shell, and at
+    frame 0 of the GLOW_AFTER motions' (new ones made); [(script hash, 'end' / 'start')]"""
+    shell = acmd.BY_NAME['outline_shell']
+    done = []
+    for h in sorted(f.scripts):
+        body = f.scripts[h]
+        if h in own or not any(c.ident == shell and c.params[4] == 0.0 for c in body):
+            continue
+        assert body[-1].ident == acmd.END, hex(h)
+        f.scripts[h] = body[:-1] + glow_restore() + body[-1:]
+        done.append((h, 'end'))
+    for name in GLOW_AFTER:
+        h = acmd.crc(name)
+        assert h not in own, name
+        f.scripts[h] = glow_restore() + (f.scripts.get(h) or [acmd.Command(acmd.END)])
+        done.append((h, 'start'))
+    return done
+
+
 def scripts(body_dir):
+    own = {acmd.crc(n) for n in list(SCRIPT.values()) + list(SWAY_SCRIPTS) + list(silver_scripts())}
     for part, bodies in scripts_for().items():
         path = os.path.join(body_dir, part + '.bin')
         f = acmd.ACMDFile.load(path)
         for m, body in bodies.items():
             f.scripts[acmd.crc(SCRIPT[m])] = body + [acmd.Command(acmd.END)]     # F.L.U.D.D.'s replaced
+        if part == 'effect':
+            restore_glow(f, own)
         for name in SWAY_SCRIPTS:                # v7: the custom-move slots' scripts (vanilla's replaced or new)
             f.scripts[acmd.crc(name)] = sway_scripts()[name][part] + [acmd.Command(acmd.END)]
         if part == 'game':
@@ -530,8 +598,8 @@ def smooth_aura(p, rep):
         si = p.find_set(name)
         for e in p.sets[si]['emitters']:
             em = e['data']
-            if em is None:
-                continue
+            if em is None or p.field(em, 'shader_index') in REF_SHADERS:
+                continue                    # v9: XV2's refraction emissions keep XV2's rate and strength
             old = p.field(em, 'emit_interval')
             new = max(1, int(round(old / AURA_DENSITY))) if old > 0 else old
             f = (float(new) / old) if old > 0 else 1.0
@@ -575,6 +643,169 @@ def haze(p, rep):
         rep[name]['haze'] = dict(prm, life=HAZE_LIFE, interval=HAZE_INTERVAL, alpha=HAZE_ALPHA, rise=HAZE_RISE)
 
 
+# ---------------------------------------------------------------- v9: the aura on him, XV2's colours, XV2's distortion
+# v9 (the user's v7 test: "the aura seems to trail behind Supamario rather than stay attached to him", "the aura and
+# glowing outline disappear after Time Skip / Jump Spike until he lands", "the aura doesn't have any of its blue or
+# white hue mixed in", "please add the slight distortion around the aura like Xenoverse does"; the v7 clip: the aura's
+# sprites left in a trail as he moves, his Time Skip dash / the jump without them near him).
+# 1. The trail: every converted aura emitter had follow type 1 (ptcl 0x310: none; the particles copy the emitter's
+#    matrices at birth and stay where they were born, docs/ptcl-format.md), the converter's default. XV2 attaches 848's
+#    parts to their bones with PositionUpdate + RotateUpdate (BTL_AURA.eepk). Now AURA_FOLLOW 2 (position only: the
+#    particles move with the bone, upright: his rotations don't spin the sprites), every vertex program of theirs drawing
+#    it (eft_vertex.features 'follow'). The same was the Time Skip "disappearance": at the dash's / the jump's speed the
+#    particles (alpha 0 at birth, faded in over a fifth of their life) were all behind him.
+AURA_FOLLOW = 2
+# 2. The colours: XV2's aura nodes have two colours (EnableSecondaryColor: Color2 the texture's bright core, Color1 its
+#    edge: white cores, blue / cyan edges; 15 of 19 nodes), and none animates its colour (only its transparency keys):
+#    the converter kept Color1 alone, and v3-v8's tint_aura turned every key to hue 262 with a saturation floor of
+#    0.45: one flat violet. Now (aura_colours): the two-colour programs (combiner 2: colour 1 + (colour 0 - colour 1) x
+#    texture) get Color2 as colour 0 (the core) and Color1 as colour 1 (the edge); the one-colour ones (combiner 1) the
+#    mean of the two (Time Skip's _secondary rule); each colour's hue moved from XV2's blue / cyan range onto the clip's
+#    (AURA_HUE_MAP: XV2 180 -> 215 sky blue, 240 -> 280 violet, linear: the clip's mix of blue glow and violet wisps),
+#    its saturation and value XV2's (white stays white: the v6 floor gone)
+AURA_HUE_MAP = ((180.0, 215.0), (240.0, 280.0))
+# 3. The distortion: XV2's aura draws its heat haze with two emissions of its own, Aura_LoopFOK's and FOK_FootL's
+#    sprite_2_1_* (material Ref_FOK_L / Ref_FOK_R: a refraction shader; MatScale0 (+-0.05, -0.5)), which the converter
+#    drew as big pale colour sprites (the 64 x 64 smoke: v4-v8's "purple patches"), and v5-v8's UiHaze (the fireball's
+#    refraction, appended at 3-5 units, 0.45 strength, left behind as he moved) was too small and faint to see. Now those
+#    four ARE the distortion (aura_refraction): each takes Mario's fireball's refraction emitter (PtcMarioFireball
+#    'refraction1': its program reads the frame buffer, frameBufferTexture_CROSS, and draws it offset by its distortion
+#    map: draw path 11, the vanilla way Smash 4 bends the picture) with XV2's emission kept (where, how many, how long,
+#    how big, its 0 -> 0.6 -> 0 transparency as the bend's strength x REF_STRENGTH), following him (AURA_FOLLOW)
+REF_MATERIALS = ('Ref_FOK_L', 'Ref_FOK_R')
+REF_STRENGTH = 1.0
+REF_COPY = ('one_time', 'volume_type', 'volume_radius', 'volume_sweep_start', 'volume_sweep_param',
+            'volume_surface_random', 'volume_sweep_start_random', 'emitter_matrix', 'emitter_scale',
+            'emitter_rotation', 'emitter_translation', 'emit_rate', 'start_frame', 'emit_start', 'end_frame',
+            'emit_interval', 'emit_interval_random', 'figure_velocity', 'init_velocity_random', 'emitter_velocity',
+            'emit_direction', 'dispersion_angle', 'spread_vec', 'air_resistance', 'gravity', 'world_gravity',
+            'ptcl_life', 'ptcl_life_random', 'alpha_init', 'alpha_diff21', 'alpha_diff32', 'alpha_section1',
+            'alpha_section2', 'scale_sections', 'scale_random', 'scale', 'scale_init_ratio', 'scale_diff21',
+            'scale_diff32', 'rotation_init', 'rotation_random', 'rotation_velocity', 'rotation_velocity_random',
+            'rotation_attenuation')
+
+
+def aura_set_names():
+    return ['PtcSupamarioUi' + [x for x in FX if x[0] == key][0][2][:-4] for key in AURA_SETS]
+
+
+def xv2_aura_nodes(cmn_dir):
+    """{(set name, emitter name): XV2's emission node} of the aura's EMPs (BTL_AURA.eepk's package)"""
+    import xv2vfx
+    out = {}
+    with tempfile.TemporaryDirectory() as pkg:
+        for fn in os.listdir(cmn_dir):
+            if not fn.lower().endswith('.eepk') or fn == 'BTL_AURA.eepk':
+                os.symlink(os.path.abspath(os.path.join(cmn_dir, fn)), os.path.join(pkg, fn))
+        pk = xv2vfx.load_package(pkg, strict=False)
+    for key in AURA_SETS:
+        emp = [x for x in FX if x[0] == key][0][2]
+        for _d, n in xv2vfx.emp_nodes(pk['emp'][emp]):
+            if n['NodeType'] == 'Emission':
+                k = ('PtcSupamarioUi' + emp[:-4], n['Name'])
+                assert k not in out, k
+                out[k] = n
+    return out
+
+
+def hue_map(h):
+    """XV2's hue (degrees) onto the aura's (AURA_HUE_MAP, linear, clamped to its ends)"""
+    (a0, b0), (a1, b1) = AURA_HUE_MAP
+    t = min(1.0, max(0.0, (h - a0) / (a1 - a0)))
+    return b0 + (b1 - b0) * t
+
+
+def ui_colour(rgb):
+    """an XV2 colour (0-1) with its hue moved by hue_map, its saturation and value kept"""
+    import colorsys
+    v = max(rgb)
+    if v <= 0:
+        return tuple(float(c) for c in rgb)
+    h, s_, _v = colorsys.rgb_to_hsv(*[c / v for c in rgb])
+    return tuple(c * v for c in colorsys.hsv_to_rgb(hue_map(h * 360.0) / 360.0, s_, 1.0))
+
+
+def aura_colours(p, rep, nodes):
+    """v9: XV2's two colours per emitter (EnableSecondaryColor), their hues moved (ui_colour); {set: [(emitter,
+    combiner, colour 0, colour 1)]}"""
+    done = {}
+    for name in aura_set_names():
+        si = p.find_set(name)
+        for e in p.sets[si]['emitters']:
+            em = e['data']
+            if em is None or p.field(em, 'shader_index') in REF_SHADERS:
+                continue
+            n = nodes[(name, p.emitter_name(em))]
+            t = n['EmissionNode']['Texture']
+            c1 = tuple(t['Color1'])
+            c2 = tuple(t['Color2']) if 'EnableSecondaryColor' in n['NodeFlags_names'] else c1
+            comb = struct.unpack_from('>I', em, 0x314)[0]
+            if comb == 2:
+                k0, k1 = ui_colour(c2), ui_colour(c1)
+            else:
+                k0 = k1 = ui_colour(tuple((a + b) / 2.0 for a, b in zip(c1, c2)))
+            for track, k in ((0, k0), (1, k1)):
+                keys = p.color_keys(em, track)
+                p.set_color_keys(em, track, [tuple(k) + tuple(x[3:]) for x in keys])
+            done.setdefault(name, []).append((p.emitter_name(em), comb, tuple(round(c, 3) for c in k0),
+                                              tuple(round(c, 3) for c in k1)))
+        rep[name]['colours'] = done.get(name, [])
+    return done
+
+
+REF_SHADERS = set()                  # the refraction template's shader index (filled by aura_refraction)
+
+
+def aura_refraction(p, rep, nodes):
+    """v9: XV2's Ref_FOK emissions as the fireball's refraction (its bytes, XV2's emission fields); [(set, name)]"""
+    src = p.find_set(HAZE_SRC[0])
+    ks = [k for k, e in enumerate(p.sets[src]['emitters']) if e['data'] is not None and
+          p.emitter_name(e['data']) == HAZE_SRC[1]]
+    assert ks, HAZE_SRC
+    base = p.emitter_bytes(src, ks[0])
+    REF_SHADERS.clear()
+    REF_SHADERS.add(p.field(base, 'shader_index'))
+    done = []
+    for name in aura_set_names():
+        si = p.find_set(name)
+        for e in p.sets[si]['emitters']:
+            em = e['data']
+            if em is None:
+                continue
+            n = nodes[(name, p.emitter_name(em))]
+            if n['EmissionNode']['Texture']['MaterialRef'] not in REF_MATERIALS:
+                continue
+            new = bytearray(base)
+            struct.pack_into('>I', new, 0x38, struct.unpack_from('>I', em, 0x38)[0])     # its own name
+            for fld in REF_COPY:
+                p.set_field(new, fld, p.field(em, fld))
+            for fld in ('alpha_init', 'alpha_diff21', 'alpha_diff32'):
+                p.set_field(new, fld, p.field(new, fld) * REF_STRENGTH)
+            e['data'] = new
+            p.dirty_layout = True
+            done.append((name, p.emitter_name(new)))
+        rep[name]['refraction'] = [x[1] for x in done if x[0] == name]
+    return done
+
+
+def aura_follow(p, rep):
+    """v9: every aura emitter's particles follow him (ptcl 0x310 = AURA_FOLLOW), checked against its program"""
+    import eft_vertex
+    n = 0
+    for name in aura_set_names():
+        si = p.find_set(name)
+        for e in p.sets[si]['emitters']:
+            em = e['data']
+            if em is None:
+                continue
+            sh = p.field(em, 'shader_index')
+            assert AURA_FOLLOW in eft_vertex.features(p.shader_binary(sh))['follow'], (name, p.emitter_name(em), sh)
+            struct.pack_into('>I', em, 0x310, AURA_FOLLOW)
+            n += 1
+        rep[name]['follow'] = AURA_FOLLOW
+    return n
+
+
 def aura_life(p):
     """v6: the longest particle life (+ its random part) of the aura sets' emitters (haze included): a faded generation
     is gone this long after its fade"""
@@ -616,9 +847,11 @@ def effects(cmn_dir, fx_dir):
         for key, ep, emp, _bone, _o, _s in FX:
             if ep == eepk and emp in emps:
                 FX_IDS[key] = 0x03410000 | by_emp[emp]
-    tint_aura(p, rep)
+    nodes = xv2_aura_nodes(cmn_dir)
+    aura_refraction(p, rep, nodes)       # v9: XV2's own distortion (v5-v8: haze(), the fireball's, appended)
+    aura_colours(p, rep, nodes)          # v9: XV2's two colours (v3-v8: tint_aura, one flat violet)
     smooth_aura(p, rep)
-    haze(p, rep)
+    aura_follow(p, rep)                  # v9: on him (v1-v8: left where they were born)
     life = aura_life(p)
     assert AURA_EVERY >= life, ('v6: the renewal must outlast the aura sprites (at most %d generations)'
                                 % AURA_GENERATIONS, AURA_EVERY, life)
