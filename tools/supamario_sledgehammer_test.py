@@ -1153,7 +1153,8 @@ def script_tests(out, base):
                     h not in {acmd.crc(n) for n in ('attackdash', 'specialhi', 'specialairhi', 'speciallwstart',
                                                      'speciallwhold', 'specials', 'specialairs',
                                                      'speciallwlight', 'speciallwheavy', 'specialairlwlight',
-                                                     'specialairlwheavy')}:
+                                                     'specialairlwheavy', 'specialairlwlight_c2',
+                                                     'specialairlwlight_c3')}:      # (UI v7: the sway's custom slots)
                 same.append((p, hex(h)))
     check('every other script as the user\'s (but the God Fist\'s / Core Breaker\'s / Fake Death\'s / Time Skip\'s / '
           'Ultra Instinct\'s)',

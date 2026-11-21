@@ -747,8 +747,10 @@ def main():
     print(build(a[0], a[1], opts['--ui-skill'], opts['--ui-se-wav'], ts))
     print('sounds: ' + ', '.join('%s 0x%08X' % kv for kv in SE_IDS.items()))
     print('effects: ' + ', '.join('%s 0x%08X' % kv for kv in FX_IDS.items()))
-    print('transformation %d frames (window %d-%d), counter %d (rush %s, finisher %d), dodge %d (intangible %d)' % (
-        FORM_N, CW_ON, CW_OFF, STRIKE_N, RUSH_AT, STRIKE_AT, DODGE_N, DODGE_INV))
+    print('transformation %d frames (window %d-%d), counter %d (rush %s, finisher %d); v7 sway %d (intangible %d, the '
+          'counter window %d-%d), its counter %d from %d (actionable %d)' % (
+              FORM_N, CW_ON, CW_OFF, STRIKE_N, RUSH_AT, STRIKE_AT, SWAY_N, SWAY_INV, SWAY_CW_ON, SWAY_CW_OFF, CTR_N, CTR_AT,
+              CTR_IASA))
 
 
 if __name__ == '__main__':

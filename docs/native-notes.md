@@ -3530,3 +3530,40 @@ exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATC
   never showed because the MSC renewed it with `EffectModule(0x2723, id, 1, 1)` (at once, "EffectModule MSC ops by
   handle") every 30 frames; now a fade (0, 0) and a new request the same frame every 120 frames. The transformed glow
   is Outline_Set + Outline_Shell (exe_v46z_outline5: the shell's colour scaled by hdrRange, "Outline shell" v7).
+- **v7 (exe_v46z_ui6; README "Ultra Instinct v7"): the projectile filter, the sway family, EscapeN.**
+  - **The collision pair pass.** `0x02C117F8` (the collision manager's update) runs `0x02C0F6F0(A, B, flag)` for every
+    container of list type A against every container of type B, over the table `0x10351914` (11 x {type A, type B,
+    flag}; `li r25, 0xB`): (3, 0) reflector / attack, (4, 0) absorber, (0, 0) attack / attack (the clank, "Clanks"),
+    **(2, 0) shield / attack**, **(0, 1, flag 1) attack / hurtbox**, (6, 1) catch / hurtbox, (5, 3) (5, 4) (5, 2) (5, 1)
+    (5, 0) search. A container (the lists' entries; a ShieldModule's is `M + 0x18`): `+0xC` its collision objects (0x174
+    each; a shield group's first one at group `+0`, the group array `[M + 8]`, 0x34 a group), `+0x10` their count, `+0x14`
+    its type, `+0x18` the object id, `+0x1C` the id's category (`>> 28`), `+0x20` an object for the team test. In the pass:
+    `0x02C0F180` the team / owner test (non-zero skips the pair), per entry pair `0x02C0F2D0` both ways (`0x02C1118C`:
+    the entry's record lists `+0x130` / `+0x134` already hold this object: the "don't hit twice" log), `0x02C0F2E8` the
+    facing / position test (`+0x15C` / `+0x16D` front only; 0 skips), then per node pair the bounding boxes, the mask
+    test `0x02D42C44` and the shapes (`0x02D42CEC` / `0x02D430D8`), and a record on both sides (`0x02C10F40`). So a
+    shield meets an attack before the hurtboxes, and its record keeps the attack off the body.
+  - **The masks** (`0x02D42C44`): for each field of the two words (bits 25-31, 19-24, 16-18, 12-15, 8-11, 5-7, 3-4, 0-2)
+    A.w0 & B.w1 and A.w1 & B.w0 must both be non-zero. An attack node (`0x02C0E77C`): w0 = type 1 (attack) in bits
+    25-31, its object class `1 << [AttackModule + 0x110]` in 19-24, 1 / +2 reflectable / +4 absorbable in 5-7, the rest
+    all; w1 = the types it meets (0x22 | 1 Clang | 4 Shieldable | 8 Reflectable | 0x10 Absorbable), HitBits (`+0x3F`),
+    `+0x40`, CollisionPart (`+0x42`), 3 / 7 (HitAllStates `+0x4E`), ... A shield node (`0x02C6FBB4`, from the group init
+    and `0x02C6F508`): type 3 (reflector) w1 `0xFFFFFF5F` (only reflectable attacks), type 4 (absorber) `0xFFFFFF9F`,
+    others w1 all ones; w0 = `1 << type` in 25-31, `1 << [M + 0x44]` in 19-24. The class (`[AttackModule + 0x110]` =
+    the module block `+0xD4`, `0x02C07B58`): fighters 0 (`0x02E5402C`), weapons 0 (their default fill `0x032108D8`
+    through `0x0320E748`, in ~400 weapon kinds' vtables), `0x02DA2AA4`'s class 1: **a projectile's attack and a
+    fighter's look the same to every mask**, and slot 42's return is ignored (`0x02E35794`).
+  - **The hook:** `0x02C0F7F0` (`bl 0x02C0F2E8`, word `0x4BFFFAF9`) -> `ui_pf`: the game's test, then for HIS counter
+    shape (A's object a live kind-0x41 fighter by its handle, A his ShieldModule's container, r4 group 1's first
+    collision object) and a non-fighter B (`B + 0x1C` != 0): 0 (no meeting), unless he is in 0x155 below the sway family
+    (Secret Sensation). Every other shield (his guard bubble too) and pair: the game's answer. Diag S4UP `obj him n` (at
+    most 200; `ui_drec + 0x38`).
+  - **0x155's modes** (TIMER_4): the transformation 9 (> 7.5), the sway 7 (> 5.5), its counter 5 (> 3.5), Secret
+    Sensation 3, Fake Death / Sledgehammer 0 (each at least 1.5 from the next threshold: TIMER_4 counts down by itself).
+    Slot 42 in 0x155 with TIMER_4 in (3.5, 7.5] is the autododge's (`ui_mode4` 1: TIMER_1 / TIMER_2, the chain); slot 43
+    there returns 0 (no shield damage). EscapeN (0x1F) joins slot 42's / 43's autododge statuses (the counter's mark).
+  - **MSC SlowModule** (vtable `0x101211D4`, MSC handler `0x0200CDC0`): op 0 = vt `+0x8C` `0x0200CCE0(rate, frames)`:
+    `+0x14` = max(frames), a global slow request (`0x02FB35AC`, the rate a byte) kept in `+0x28` (0xFF none); op 1 = vt
+    `+0x94` `0x0200CD38`: the request freed (`0x02FB3600`), `+0x14` 0; op 2 vt `+0x9C`, op 3 `+0xD`. MSC
+    `CameraModule(0x2714, frames, 0, distance[, x, y, flag])` is the zoom in (Camera_Closeup's call; Ryu / Kirby use it),
+    `CameraModule(0x2718)` its end (Kirby's).

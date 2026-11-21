@@ -4164,3 +4164,124 @@ examples 1-9 compile and round-trip), HvTest 248 ok. 0 failures.
 - **Not confirmed in game:** Cemu linking the shell's PARAM0 to its pixel input by semantic 0x80; the eft emitter pool with
   the aura's two generations (at most 2 x 31 emitters a Supamario: the diag logs "Emitter is Empty." if it runs out);
   the glow's strength on bright / dark stages; why the effect script's chest / hand aura stopped at v5's landing.
+
+## Ultra Instinct v7 (`supamario_ultrainstinct_v7.zip`, exe `exe_v46z_ui6`; TEST ONLY `exe_v46z_ui6_diag`; Sm4shCommand v1.7.21)
+Install over v6: `INSTALL_TO_data/` holds the 13 files changed since v6 (the four motion .pac, the four script .bin,
+the .ptcl / .efc, the MSC, his sound bank, the soundlabeltable), with the new executable (exe_v46z_ui6 =
+exe_v46z_outline5 + `tools/supamario_ui_cave.py`, both builds reproduced byte for byte by it, `import_call_check` 0).
+Built by `supamario_ui_build.py` with two new inputs: `--cmn-ean` (XV2's `CMN.ean`, the user's chara/CMN) and the
+Time Skip skill's `1352_HIK_DSH.ean` (already an input). The user's v6 answers: the autododge "should be able to chain
+into itself and should be cancelable into the short ranged counter when an attack button is pressed during most of the
+dodge's animation length. XV2 Sway, sounds and effects should be used"; "Projectiles shouldn't trigger"; "Different
+motion"; Secret Sensation should "slow time for everyone during its traveling and until reaching, do a slight zoom
+between Supamario and the opponent, then on Supamario", as in Dragon Ball FighterZ.
+
+### 1. Only fighters' own attacks trigger the autododge (the projectile filter, exe_v46z_ui6)
+v5 / v6 dodged anything because the counter shape (ShieldModule group 1) stops whatever reaches it. The evidence for
+where a non-fighter hit can be let through (docs/native-notes.md "Supamario's Ultra Instinct" v7):
+- **The pass order.** The collision manager runs `0x02C0F6F0(A, B, flag)` over the type pairs of the table `0x10351914`
+  (`0x02C117F8`, 11 entries): (3, 0) reflector / attack, (4, 0) absorber, (0, 0) clank, **(2, 0) shield vs attack**,
+  **(0, 1) attack vs hurtbox**, (6, 1) catch vs hurtbox, (5, x) search. A shield meets an attack before the hurtboxes
+  do, and the record it leaves keeps that attack off the body ("don't hit twice"); grabs are the catch pass, which never
+  meets a shield.
+- **The masks can't do it.** The node test `0x02D42C44` ANDs A.w0 with B.w1 and A.w1 with B.w0, field by field. A
+  shield node's w1 is all ones (`0x02C6FBB4`'s default path), and the only owner field of an attack's w0 is its object
+  class (bits 19-24, `1 << [AttackModule + 0x110]`, from the module block's `+0xD4`): fighters 0 (`0x02E5402C`) and every
+  weapon 0 too (their default block fill `0x032108D8`, `0x0320E748` in ~400 weapon vtables): a projectile and a punch
+  look the same to the masks. Slot 42's return is ignored (`0x02E35794`), so it can't send a hit on either.
+- **The fix:** the pass's per-entry check (`bl 0x02C0F2E8` at `0x02C0F7F0`: A's container r3, A's entry r4, B's entry
+  r5; the pass keeps B's container in r31) is hooked (`ui_pf`): after the game's own check, when A is his counter shape
+  (A's object a fighter of kind 0x41 found by its handle, A = his ShieldModule's container `M + 0x18`, the entry = group
+  1's collision object `[M + 0x24] + [[M + 8] + 0x34] x 0x174`) and B's object is not a fighter (`B + 0x1C`, id >> 28:
+  weapons 1, items 4, gimmicks 3), the pair doesn't meet, except in Secret Sensation (0x155 below the sway family: it
+  answers anything an opponent owns). The projectile then goes on to the attack / hurtbox pass and hits him. His guard
+  bubble (group 0), other fighters' shields and every other pair keep the game's answer. Diag: **S4UP** `obj him n`
+  for each pair let through.
+- **His spot dodge** (EscapeN, 0x1F) is one of slot 42's / 43's autododge statuses now (the counter's "attacked" mark).
+
+### 2. The sway (XV2's CMN files)
+- **Data:** CMN.bac entries **260-263** and **765-768** are XV2's auto sways (the same four animations, CMN.ean **#189-192**
+  `CMN_SPA_ASW_{B,F}_{L,R}_S`, 43 frames): Invulnerability type 0 **0-13**, **TimeScale x7 on 0-7** (its first 7 frames in
+  one), BTL_CMN **911** (`UP_start.ecf`) at 0, **493** (`SKI_lineX_S.emp`, 0.35) at 1 and 4, Movement 7-31 flags 0x80
+  with a zero direction (no travel), **CAR_BTL_CMN cue 5** (`swing_05`) at 7, functions 0x16 / 0x4 (-25) / 0x21 at 7,
+  900 off at 25 (`Nml_Dmg00.ecf`); BcmCallback **260: 0xF80 on 7-30** (BackHits, Combos, Supers, Ultimates / Evasives,
+  ZVanish), **765: 0x8 on 0-20 and 27-42, 0x188 on 21-26** (0x8, unnamed in XV2-Tools, is the link the counter 706 /
+  707 carries too: the UI sway set). Which EEPK: effect type 0 with skill id 0 / 0xFFFF is BTL_CMN (82's vanish in the
+  1510 skill is the same form); 911 / 900 are ECFs (colour over the body), not drawn (approximated).
+- **Ours** (motion SpecialAirLwLight 0x241; status 0x155 in mode 1, TIMER_4 7): the attacker in front of him -> the back
+  sway (#189 from frame 0), behind him -> the forward sway (#191; the same animation file from frame 37, played through
+  the custom-move slot **0x243** `specialairlwlight_c3`: the game's motion table gives 0x241-0x244 one animation hash);
+  XV2's frames 0-7 in one, then 7-42 1:1: **37 frames**; intangible **8** (XV2's 0-13); his facing kept, no travel (the
+  animation's own lean kept in TransN X / Z: up to 0.9 units back / 2.4 forward, back to 0); the streaks (SKI_lineX_S,
+  0.35, at his feet) at frames 0 and 1, the whoosh at 1 (XV2 7); Wait at 37.
+- **The chain:** the counter shape stays on through the sway (ui_shape), and slot 42 in 0x155 with TIMER_4 in the sway
+  family (above 3.5, not above 7.5) signals another dodge (slot 43 there skips the shield damage): from frame 8 a
+  fighter's hit restarts the sway (the side picked again); in frames 0-7 (XV2's invulnerable span: attacks miss) the
+  signal is dropped.
+- **The counter cancel:** attack or smash (A+B / C-stick) pressed on frames **1-24** (XV2 7-30: 260's Combos window; 24
+  of the sway's 37 frames: "most of its length") -> the counter; other actions (func_39 / func_41) from 25, after XV2's
+  window.
+
+### 3. The counter (XV2's short-range counter, CMN.bac 706)
+- **Data:** CMN.bac **706** (707 the same, character EAN #31): character EAN **#30** frames 0-5, Hitbox **BDM #0
+  (CMN.bdm)** 0-6 at **(0, 0.75, -1.5) m** (XV2 faces -Z: 1.5 m in front) size **1 m**, BcmCallback **0x8 0-6** (the link
+  back into the sway set), BTL_CMN **492** (`SKI_lineX_L.emp` on the pelvis) and CMN **230** (`Btl_RHit.emp`, the hit
+  flash) at 0, **491** (`SKI_lineX_S`, 0.35) at 4; no sound. CMN.bdm #0 sub-entry 0 (the standing victim): DamageType
+  3, **DamageAmount 0**, user / victim stun **5**, KnockbackDuration **30**, strength Y 0.1 / Z 0.04 a frame.
+- **Ours** (motion 0x242 `specialairlwlight_c2`, from frame 74 of SpecialAirLwLight's animation; 0x155 mode 3, TIMER_4 5):
+  facing the attacker (turned when it was behind), held in place, the hitbox on frames 0-5 (ID 0: **1%**, angle **68**,
+  set knockback **75**, KBG 100, BKB 0, 7.56 in front, 3.78 up, 5.04), the streaks / flash at 0, the small streaks at 4;
+  actionable from **6** (XV2's entry length), Wait at 22.
+- **Damage conversion:** XV2's 0 is a stagger (the hit still lands: stun 5, a 30-frame push). Smash 4: the smallest
+  whole percent (a hit needs one: its hitlag (1 / 2.6 + 5) = 5 frames = XV2's stun 5), set knockback for XV2's 30-frame
+  stagger (knockback 71.9 at weight 100 -> 28.8 frames of hitstun), the angle the push's (atan(0.1 / 0.04) = 68).
+- **Animation (approximated, flagged):** 706's own (the character EAN's #30) isn't in the files sent (CMN.ean holds no
+  strike; the 1510 skill's EAN #1 270-350 is the rush's arm held out sideways): XV2's straight right punch of Hit's
+  Time Skip (`1352_HIK_DSH.ean` #1 HIK_SPA_DSH_01_C) is used: 8-14 in 3 (the fist out), 14-20 in 3, 50-81 in 16 (back to
+  the stance).
+- **From his spot dodge** (the user's rule): transformed, in EscapeN on the ground the counter shape is on; a hit on it
+  (slot 42: TIMER_1 / TIMER_2, kept renewed through the spot dodge by `ui_escape_counter`) marks "attacked"; attack,
+  special or smash pressed while marked -> status 0x155 in the counter's mode (facing the attacker).
+
+### 4. Secret Sensation: slow-motion and camera (DBFZ)
+- **DBFZ (the user's clips `ss/a.mp4`, `ss/b.mp4`, 60 fps):** the counter ~0.25 s in; the camera in by ~0.55 s with UI
+  Goku and the opponent both in the frame (Goku crossing over the beam), closer round his arrival behind the opponent
+  at ~1.05-1.10 s, back out by ~1.45 s: **~0.8 s of slowed travel**.
+- **Ours:** at the counter's read (`ss_counter`) **SlowModule(0, 3, 48)** (MSC op 0: the game's global slow-motion, as
+  Final Smashes and Hero's critical hits use it: everyone at 1/3; 48 frames its own bound) and **CameraModule(0x2714, 6,
+  0, 1.2)** (the MSC's zoom, ACMD Camera_Closeup's call: slight, the fighter he passes stays in the frame); from the
+  slide's frame 8 **CameraModule(0x2714, 6, 0, 1.5)** (on him); at the arrival (the slide's 14 frames = 42 screen frames
+  = **0.70 s**) **SlowModule(1)** (frees his request: `0x0200CD38`, vt +0x94) and **CameraModule(0x2718)** (back to the
+  normal camera, the op Kirby's MSC ends its zoom with). `ss_end` (any exit with the slide running: a KO's Dead runs it)
+  ends both, and `ss_stale` (every frame, ui_tick) ends them when the status was left without its end (TIMER_4 still in
+  Secret Sensation's range outside 0x155); a training reset clears every slow-motion (the game's). The transformation
+  has no camera change (tested).
+
+### Tests
+`supamario_ui_cave_test.py` (v7: the filter in 30 cases: projectiles / items / gimmicks dropped in every autododge
+status, the sway, its counter, the transformation; kept for a fighter's attack, his guard bubble, other containers,
+Secret Sensation, Mario, a gone owner; the pass's registers, the pair table, the mask and class words read from the
+base; the sway family in slots 42 / 43; EscapeN; diag S4UP), `supamario_ui_test.py --exe --package --since` (v7: the
+sway's side / motion / frames / intangibility / no travel / shape, the chain on and off its intangible frames, the
+counter window's edges and buttons, the counter's facing / mode / frames, EscapeN's counter (6 cases), Secret
+Sensation's slow / camera / arrival / KO / stale exit, the scripts' frames, hitbox and effects, the motion's parts) and
+the other suites: counts in "Ultra Instinct v7, results" below.
+
+### Ultra Instinct v7, results
+`supamario_ui_test.py --exe --package --since` **469 ok**; `supamario_ui_cave_test.py` **332 ok** (exe_v46z_outline5 /
+ui6 / ui6_diag); `supamario_timeskip_test` 198, `supamario_godfist_test` 566, `supamario_sledgehammer_test` 141,
+`supamario_corebreaker_test` 104, `supamario_fakedeath_test` 47 ok (their "every other script unchanged" checks now leave
+out `specialairlwlight_c2` / `_c3`); `outline_shell_test.py` 124 ok; `mesh_vis_test.py` 64 ok; `msc_stack_check` 0 of
+2491 (globals 127 of 128); `fighter_texture_ids.py check` 0 errors; `import_call_check` 0 on both exes; exe_v46z_ui6 /
+ui6_diag reproduced byte for byte from the cave script; Sm4shCommand v1.7.21 NvTest 290 ok / 1 known failure (effect.bin's
+else-if chains, upstream), HvTest 248 ok. 0 failures.
+- **Not confirmed in game / approximated:** the container fields the filter reads (`M + 0x18` as the pass's container,
+  `+0x18` / `+0x1C` id / category, group `+0` its first collision object: static reading, the diag's S4UP shows it
+  working); that a projectile let past the shape then meets his hurtbox the same frame (the (0, 1) pass comes after,
+  with no shield record for it); the sway's ECF colour flash (911 / 900) not drawn; the counter's animation (Hit's
+  punch, not the character's #30), its 1% / set knockback 75 / angle 68 (XV2's stagger converted); 765's 0x8 link read
+  as the counter's (unnamed in XV2-Tools); a scripts' clock starting at the motion's start frame (the motion change's
+  `+0x20`, Time Skip's restart relies on it too); an attack on his spot dodge now meets the shape (shield-hit feedback
+  for the attacker, no damage to him, as the autododge's); SlowModule's frames bound counted by the game (the MSC ends
+  it at the arrival anyway); the zoom distances 1.2 / 1.5 and the slow 1/3 against DBFZ's look (its ~0.8 s travel; ours
+  0.70 s); the camera returns at the arrival (DBFZ holds ~0.35 s more).

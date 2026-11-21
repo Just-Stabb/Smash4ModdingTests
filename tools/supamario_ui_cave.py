@@ -18,6 +18,13 @@ gone. Objects of category 4 (items: the Killer Eye 0x4001000x) count as an oppon
 Mesh_Visibility's name walk (mesh_vis_cave in the base) takes unaligned names (WALK_FIX). The diag build adds S4UF and
 the effect runtime's messages.
 
+v7 (exe_v46z_ui6; README "Ultra Instinct v7"): 0x155's modes are 9 the transformation, 7 the sway (the autododge), 5
+its counter, 3 Secret Sensation; slot 42 in 0x155 in the sway family (TIMER_4 in (MODE_SWAY_ON, MODE_FORM_ON]) is the
+autododge's (another sway: XV2's chain), slot 43 there returns 0; EscapeN (his spot dodge) is one of the autododge's
+statuses (the counter's "attacked" mark). The PROJECTILE FILTER (ui_pf, on the collision pair pass's per-entry check
+0x02C0F7F0): his counter shape doesn't meet anything that isn't a fighter's own attack (except in Secret Sensation), so a
+projectile / item goes on to his body (see PF_HOOK). The diag build adds S4UP.
+
 1. SETUP: Mario's specializer slot 0 (0x02F1A6F0 `li r5, 1`, then `b 0x02F1A598` his setup) branches here first: for
    kind 0x41 the counter shape, ShieldModule ([acc + 0x72F4], kind 2) group 1, built as Marth's setup builds his
    (0x0200C858(M, &desc, 1), desc {&shape, 1, bytes 0, 0, 0, 1}) and switched off (0x0200BD8C(M, 0, 0, 1)); then the
