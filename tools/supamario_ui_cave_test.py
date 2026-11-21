@@ -511,8 +511,8 @@ def slot42_checks(e, kind):
         check('  hit data asked with (AM, id, part)', [c for c in e.calls if c[0] == 'hitdata'], [('hitdata', am, 3, 1)])
         check('  its handle from its id', [c[3:] for c in e.calls if c[0] == 'handle'], [(aid, 0)])
         check('  registers kept', kept, True)
-        check('  TIMER_4 (the mode) read through get_float', [c[1:] for c in e.calls if c[0] == 'get'],
-              [(fk['wm'], C.V_MODE)])
+        check('  TIMER_4 (the mode) read through get_float (v7: ui_mode4, then ui_isform)',
+              [c[1:] for c in e.calls if c[0] == 'get'], [(fk['wm'], C.V_MODE)] * 2)
     # a weapon / an item: the current owner's place, the side from the owner
     for cat, label in ((1, 'weapon'), (2, 'item')):
         e.vars = {C.V_MODE: C.MODE_FORM}
@@ -524,7 +524,7 @@ def slot42_checks(e, kind):
         r, kept = e.run(C.SLOT42_HOOK, 0, fk['f'], msg)
         check('slot 42, the transformation (0x155, TIMER_4 7), a %s: not countered (XV2: CounterMelee only)' % label,
               (e.floats(fk), e.flagw(fk), kept), (base, (F0, 0x12345678), True))
-        for mode in (C.MODE_DODGE, 3.0):
+        for mode in (3.0, 2.0):             # v7: Secret Sensation (below MODE_SWAY_ON); the sway family below
             e.vars = {C.V_MODE: mode}
             fk = e.fighter(kind, status=C.ST_SS, x=0.0)
             e.obj(0x00040012, x=-25.0, y=3.0)
@@ -532,8 +532,21 @@ def slot42_checks(e, kind):
             msg, am, rec = message(e, damage=9.0, category=cat, oid=(cat << 28) | 0x0000ABCD)
             hitdata(e)
             e.run(C.SLOT42_HOOK, 0, fk['f'], msg)
-            check('  0x155 with TIMER_4 %g (not the transformation): the %s recorded' % (mode, label),
+            check('  0x155 with TIMER_4 %g (Secret Sensation): the %s recorded' % (mode, label),
                   e.flagw(fk)[0] & 0x10000, 0x10000)
+        for mode, what in ((C.MODE_DODGE, 'the sway'), (C.MODE_DODGE - 1.0, 'the sway a frame on'),
+                           (C.MODE_COUNTER, 'the sway\'s counter'), (C.MODE_SWAY_ON + 0.25, 'just above MODE_SWAY_ON')):
+            e.objects.clear()
+            e.vars = {C.V_FORM: 2000.0, C.V_MODE: mode}
+            fk = e.fighter(kind, status=C.ST_SS, x=0.0)
+            e.obj((cat << 28) | 0x0000ABCD, x=-10.0, y=5.0)
+            msg, am, rec = message(e, damage=9.0, category=cat, oid=(cat << 28) | 0x0000ABCD)
+            hitdata(e)
+            r, kept = e.run(C.SLOT42_HOOK, 0, fk['f'], msg)
+            check('v7: slot 42, 0x155 with TIMER_4 %g (%s), a %s\'s hit on the shape: another dodge (TIMER_2 = 4: it is '
+                  'to his left), nothing recorded in the status work' % (mode, what, label),
+                  (e.vars.get(C.V_DODGE_L), e.vars.get(C.V_DODGE_R), e.flagw(fk), e.floats(fk), kept),
+                  (4.0, 0.0, (F0, 0x12345678), base, True))
         e.vars = {}
         fk = e.fighter(kind, status=C.ST_SS, x=0.0)
         owner = 0x00040012
@@ -597,15 +610,15 @@ def slot42_checks(e, kind):
         msg, am, rec = message(e, damage=11.0, category=cat, oid=(cat << 28) | 0x1234)
         hitdata(e)
         r, kept = e.run(C.SLOT42_HOOK, 0, fk['f'], msg)
-        check('ui4: slot 42, Secret Sensation, category %d: nothing written, nothing called' % cat,
-              (e.floats(fk), e.flagw(fk), e.calls, kept), (base, (F0, 0x12345678), [], True))
+        check('ui4: slot 42, Secret Sensation, category %d: nothing written, nothing called (v7: but the mode read)' % cat,
+              (e.floats(fk), e.flagw(fk), e.calls, kept), (base, (F0, 0x12345678), [('get', fk['wm'], C.V_MODE)], True))
     # a stage gimmick (category 3): not countered (either status)
     fk = e.fighter(kind, status=C.ST_SS)
     msg, am, rec = message(e, damage=11.0, category=3, oid=0x30001234)
     hitdata(e)
     r, kept = e.run(C.SLOT42_HOOK, 0, fk['f'], msg)
-    check('slot 42, a stage gimmick (category 3): nothing written, nothing called',
-          (e.floats(fk), e.flagw(fk), e.calls, kept), (base, (F0, 0x12345678), [], True))
+    check('slot 42, a stage gimmick (category 3): nothing written, nothing called (v7: but the mode read)',
+          (e.floats(fk), e.flagw(fk), e.calls, kept), (base, (F0, 0x12345678), [('get', fk['wm'], C.V_MODE)], True))
     # Secret Sensation (0x155): recorded as in 0x157
     fk = e.fighter(kind, status=C.ST_SS, x=0.0)
     aid = 0x00030012
@@ -623,8 +636,8 @@ def slot42_checks(e, kind):
     msg, am, rec = message(e, damage=40.0)
     hitdata(e)
     e.run(C.SLOT42_HOOK, 0, fk['f'], msg)
-    check('slot 42, second hit: nothing written, nothing called',
-          (e.floats(fk), e.flagw(fk), e.calls), (base, (F0 | 0x10000, 0x12345678), []))
+    check('slot 42, second hit: nothing written, nothing called (v7: but the mode read)',
+          (e.floats(fk), e.flagw(fk), e.calls), (base, (F0 | 0x10000, 0x12345678), [('get', fk['wm'], C.V_MODE)]))
     for what, fkw, kw, hd in (('group 0 (the guard)', dict(kind=kind), {'group': 0}, {}),
                               ('status 0x158 (v1-v4\'s dodge)', dict(kind=kind, status=C.OLD_ST_DODGE), {}, {}),
                               ('status 0x157 (v1-v4\'s transformation)', dict(kind=kind, status=C.OLD_ST_UI), {}, {}),
@@ -641,9 +654,10 @@ def slot42_checks(e, kind):
 
 
 DODGE_STATUSES = ((0, 'Wait'), (1, 'Walk'), (2, 'WalkBrake'), (0x11, 'Squat'), (0x12, 'SquatWait'), (0x13, 'SquatF'),
-                  (0x14, 'SquatB'), (0x15, 'SquatRv'))
+                  (0x14, 'SquatB'), (0x15, 'SquatRv'), (C.ST_ESCAPE_N, 'v7: EscapeN (the spot dodge\'s counter mark)'))
 NOT_DODGE = ((3, 'Dash'), (0xE, 'Fall'), (0x10, 'Squat - 1 (0x10)'), (0x16, 'Landing (0x16)'), (0x1C, 'Guard'),
-             (0x45, 'Damage'), (C.OLD_ST_DODGE, 'v1-v4\'s dodge (0x158)'), (C.OLD_ST_UI, 'v1-v4\'s transformation (0x157)'))
+             (0x45, 'Damage'), (C.OLD_ST_DODGE, 'v1-v4\'s dodge (0x158)'), (C.OLD_ST_UI, 'v1-v4\'s transformation (0x157)'),
+             (0x20, 'EscapeF'), (0x21, 'EscapeB'), (0x22, 'EscapeAir'))
 
 
 def dodge42_case(e, kind, status=0, form=2000.0, my_x=0.0, obj_x=20.0, category=0, alive=True, group=1, mode=0.0):
@@ -707,6 +721,120 @@ def dodge42_checks(e, kind):
     check('ui4: slot 42, Mario (3) in Wait: nothing read, set or called', (e.calls, kept), ([], True))
 
 
+def pf_setup(e, kind, status=0, mode=0.0, category=1, guard=False, a_cat=0, other_container=False, game=1):
+    """v7: the projectile filter's inputs: him (slot 0) with his ShieldModule's container A (M + 0x18: +0xC its
+    collision objects, +0x18 his id), group 1's first collision object at index 1 (group 0 the guard at 0); B (the
+    attacker's container: +0x18 its id, +0x1C its category); the game's check 0x02C0F2E8 stubbed (returns `game`)"""
+    e.setw(e.ftab + 8, 0)
+    e.objects.clear()
+    sk = e.fighter(kind, status=status, slot=0)
+    m = sk['m']
+    groups = e.w(m + 8)
+    e.setw(groups + 0x34, 1)                          # group 1: collision object 1
+    colls = e.alloc(3 * 0x174, b'\0')
+    a = m + 0x18
+    e.setw(a + 0xC, colls)
+    e.setw(a + 0x18, (a_cat << 28) | (sk['oid'] & 0x0FFFFFFF))
+    e.objects[e.w(a + 0x18)] = dict(entry=sk['f'], pos=0, alive=True)
+    if other_container:
+        a = e.alloc(0x40, b'\0')
+        e.setw(a + 0xC, colls)
+        e.setw(a + 0x18, sk['oid'])
+    entry = colls + (0 if guard else 0x174)
+    b = e.alloc(0x40, b'\0')
+    e.setw(b + 0x18, (category << 28) | 0x00050012)
+    e.mu.mem_write(b + 0x1C, bytes([category]))
+    bentry = e.alloc(0x174, b'\0')
+    e.vars = {C.V_FORM: 2000.0, C.V_MODE: mode}
+    e.pf_game = game
+    if not getattr(e, 'pf_stubbed', False):
+        e.stub(C.PF_FN, lambda em: (em.rec('pf_fn', 3, 4, 5), em.pf_game)[1])
+        e.pf_stubbed = True
+    return sk, a, entry, b, bentry
+
+
+def pf_run(e, labels, a, entry, b, bentry):
+    """ui_pf as the pass calls it (bl from 0x02C0F7F0; the pass's r31 = B's container): (r3, registers kept)"""
+    e.calls = []
+    for i in range(14, 32):
+        e.mu.reg_write(REGS[i], 0x5A5A0000 + i)
+    e.mu.reg_write(REGS[31], b)
+    e.mu.reg_write(UC_PPC_REG_MSR, e.mu.reg_read(UC_PPC_REG_MSR) | 0x2000)
+    r = e.call(labels['ui_pf'], a, entry, bentry)
+    kept = all(e.r(i) == 0x5A5A0000 + i for i in range(14, 31)) and e.r(31) == b
+    return r, kept and e.mu.reg_read(UC_PPC_REG_1) == 0x700F0000
+
+
+def pf_checks(e, kind, base, patched, diag=False):
+    """v7: the projectile filter (the collision pair pass's per-entry check, 0x02C0F7F0)"""
+    img, pimg = K.Image(base), K.Image(patched)
+    words, labels = C.build(kind, diag)
+    check('v7: the pass\'s word at 0x02C0F7F0 is `bl 0x02C0F2E8` in the base, `bl ui_pf` in the patched RPX%s' %
+          (' (diag)' if diag else ''), (img.w(C.PF_HOOK), pimg.w(C.PF_HOOK)),
+          (C.PF_WORD, C.branch(C.PF_HOOK, labels['ui_pf']) | 1))
+    check('v7: the pass 0x02C0F6F0 calls 0x02C0F2E8 there with (A\'s container r30, A\'s entry r23, B\'s entry r24) '
+          'and keeps B\'s container in r31', [img.w(a) for a in (0x02C0F7E4, 0x02C0F7E8, 0x02C0F7EC, 0x02C0F734,
+                                                                  0x02C0F738, 0x02C0F7F4, 0x02C0F7F8)],
+          [0x7F05C378, 0x7EE4BB78, 0x7FC3F378, 0x7C9F2378, 0x7C7E1B78, 0x2C030000, 0x41820400])
+    check('v7: the pair table 0x10351914: (3, 0), (4, 0), (0, 0), (2, 0) shield vs attack before (0, 1) attack vs '
+          'hurtbox; (6, 1) the catch pass', [(img.w(0x10351914 + 0xC * i), img.w(0x10351918 + 0xC * i))
+                                              for i in range(11)],
+          [(3, 0), (4, 0), (0, 0), (2, 0), (0, 1), (6, 1), (5, 3), (5, 4), (5, 2), (5, 1), (5, 0)])
+    check('v7: the node mask test 0x02D42C44 ANDs A.w0 with B.w1 and A.w1 with B.w0 field by field; a shield node\'s '
+          'w1 is all ones (0x02C6FBB4\'s default path: li r7, -0xFE1 / ori 0x7F8 << 5)',
+          [img.w(a) for a in (0x02D42C44, 0x02D42C48, 0x02D42C4C, 0x02D42C50, 0x02D42C54, 0x02D42C58, 0x02C6FC30)],
+          [0x80030000, 0x81240004, 0x81440000, 0x7C0B4838, 0x81230004, 0x7D2C5038, 0x38E0F01F])
+    check('v7: an attack\'s object class (its node w0 bits 19-24 = 1 << [AttackModule + 0x110], 0x02C08758 -> '
+          '0x02C0E77C) is block +0xD4: fighters 0 (0x02E5402C `stw r24 = 0`), every weapon 0 (0x032108D8, '
+          '0x032107B4\'s r7 = 0): the masks can\'t tell a projectile from a fighter\'s attack',
+          [img.w(a) for a in (0x02C08758, 0x02C07B60, 0x02E54020, 0x02E5402C, 0x03210824, 0x032108D8)],
+          [0x80BC0110, 0x915C0110, 0x3B000000, 0x931C00D4, 0x38E00000, 0x90FF00D4])
+    e2 = e
+    for cat, what in ((1, 'a projectile (weapon, 1)'), (4, 'an item (4)'), (3, 'a stage gimmick (3)'),
+                      (2, 'category 2')):
+        for st, sname, mode in ((0, 'Wait', 0.0), (0x12, 'SquatWait', 0.0), (C.ST_ESCAPE_N, 'EscapeN', 0.0),
+                                (C.ST_SS, '0x155 the sway', C.MODE_DODGE), (C.ST_SS, '0x155 the sway\'s counter',
+                                                                             C.MODE_COUNTER),
+                                (C.ST_SS, '0x155 the transformation', C.MODE_FORM)):
+            sk, a, entry, b, bentry = pf_setup(e2, kind, status=st, mode=mode, category=cat)
+            r, kept = pf_run(e2, labels, a, entry, b, bentry)
+            if cat == 1 and st == 0:
+                check('v7: filter, %s, Wait: the game\'s check called with (A, A\'s entry, B\'s entry); A\'s owner '
+                      'by its handle (its id)' % what, ([c for c in e2.calls if c[0] == 'pf_fn'],
+                                                         [c[3] for c in e2.calls if c[0] == 'handle']),
+                      ([('pf_fn', a, entry, bentry)], [sk['oid']]))
+            check('v7: filter, %s on his counter shape, %s: they don\'t meet (0): it goes on to his body' % (what, sname),
+                  (r, kept), (0, True))
+    for st, mode, what in ((C.ST_SS, 3.0, 'Secret Sensation (TIMER_4 3)'), (C.ST_SS, 0.0, 'Fake Death (0)'),
+                           (C.ST_SS, C.MODE_SWAY_ON - 0.25, 'Secret Sensation a frame on')):
+        sk, a, entry, b, bentry = pf_setup(e2, kind, status=C.ST_SS, mode=mode, category=1)
+        r, kept = pf_run(e2, labels, a, entry, b, bentry)
+        check('v7: filter, a projectile, 0x155 %s: the game\'s answer (it meets the shape: answered)' % what,
+              (r, kept), (1, True))
+    for kw, what in ((dict(category=0), 'a fighter\'s own attack (category 0)'),
+                     (dict(guard=True), 'his guard bubble (group 0\'s collision object)'),
+                     (dict(other_container=True), 'another container than his ShieldModule\'s'),
+                     (dict(a_cat=1), 'A a weapon\'s (category 1)')):
+        sk, a, entry, b, bentry = pf_setup(e2, kind, **kw)
+        r, kept = pf_run(e2, labels, a, entry, b, bentry)
+        check('v7: filter, %s: the game\'s answer (1)' % what, (r, kept), (1, True))
+        if 'own attack' in what:
+            check('  nothing asked but the game\'s check', [c[0] for c in e2.calls], ['pf_fn'])
+    sk, a, entry, b, bentry = pf_setup(e2, kind, category=1, game=0)
+    r, kept = pf_run(e2, labels, a, entry, b, bentry)
+    check('v7: filter, the game\'s check says no (0): 0, nothing else asked', (r, [c[0] for c in e2.calls], kept),
+          (0, ['pf_fn'], True))
+    sk, a, entry, b, bentry = pf_setup(e2, MARIO, category=1)
+    r, kept = pf_run(e2, labels, a, entry, b, bentry)
+    check('v7: filter, Mario (kind 3)\'s group 1 (his own): the game\'s answer (1)', (r, kept), (1, True))
+    e2.objects.clear()
+    sk, a, entry, b, bentry = pf_setup(e2, kind, category=1)
+    e2.objects[e2.w(a + 0x18)]['alive'] = False
+    r, kept = pf_run(e2, labels, a, entry, b, bentry)
+    check('v7: filter, A\'s owner gone (its handle): the game\'s answer (1)', (r, kept), (1, True))
+    return labels
+
+
 def slot43_case(e, kind, status=0, form=2000.0, mode=0.0, flag=False):
     """him in slot 0; slot 43 (event 0x12, the shield damage after a shield hit); returns (r, kept, msg, sk)"""
     e.setw(e.ftab + 8, 0)
@@ -729,7 +857,13 @@ def slot43_checks(e, kind):
             check('slot 43, the transformation (0x155, TIMER_4 %g, TIMER_0 %g): 0, handled, only TIMER_4 read'
                   % (mode, form), (r, bytes(e.mu.mem_read(msg + 8, 1))[0], e.calls, kept),
                   (0, 0x41, [('get', sk['wm'], C.V_MODE)], True))
-    for mode, what in ((C.MODE_DODGE, 'the dodge'), (C.MODE_DODGE - 1.0, 'the dodge a frame on'), (0.0, 'Fake Death')):
+    for mode, what in ((C.MODE_DODGE, 'the sway'), (C.MODE_DODGE - 1.0, 'the sway a frame on'),
+                       (C.MODE_COUNTER, 'the sway\'s counter'), (C.MODE_COUNTER - 1.0, 'its counter a frame on')):
+        r, kept, msg, sk = slot43_case(e, kind, status=C.ST_SS, mode=mode)
+        check('v7: slot 43, 0x155 with TIMER_4 %g (%s, the sway family): 0, handled (no shield damage: the chain\'s '
+              'shape hit), only TIMER_4 read' % (mode, what), (r, bytes(e.mu.mem_read(msg + 8, 1))[0], e.calls, kept),
+              (0, 0x41, [('get', sk['wm'], C.V_MODE)], True))
+    for mode, what in ((0.0, 'Fake Death'), (C.MODE_SWAY_ON - 0.5, 'Secret Sensation a frame on')):
         r, kept, msg, sk = slot43_case(e, kind, status=C.ST_SS, mode=mode)
         check('slot 43, 0x155 with TIMER_4 %g (%s): 1, message untouched' % (mode, what),
               (r, bytes(e.mu.mem_read(msg + 8, 1))[0], kept), (1, 0x40, True))
@@ -1033,6 +1167,26 @@ def diag_checks(path, kind):
               ([(zlib.crc32(h.encode()), int(found == 0), 3, kind)] * want_n, found & 0xFFFFFFFF))
 
 
+def pf_diag_checks(base, diag, kind):
+    """v7 diag: the filter as the release build, and S4UP (the object let through, his id, the count) when it drops"""
+    e = Run(diag)
+    lines = []
+
+    def osr(em):
+        lines.append((em.cstr(em.r(3)).split(' ')[0], tuple(em.r(i) for i in range(4, 7))))
+    e.stub(C.OSREPORT_VENEER, osr)
+    labels = pf_checks(e, kind, base, diag, diag=True)
+    lines.clear()
+    sk, a, entry, b, bentry = pf_setup(e, kind, category=1)
+    r, kept = pf_run(e, labels, a, entry, b, bentry)
+    check('v7 diag: S4UP when the filter drops a pair: B\'s id, his id, the count', (r, lines, kept),
+          (0, [('S4UP', (0x10050012, sk['oid'], len([1]) + e.w(labels['ui_drec'] + 0x38) - 1))], True))
+    sk, a, entry, b, bentry = pf_setup(e, kind, category=0)
+    lines.clear()
+    pf_run(e, labels, a, entry, b, bentry)
+    check('v7 diag: no S4UP for a fighter\'s attack', lines, [])
+
+
 def main():
     a = sys.argv[1:]
     if not a:
@@ -1059,6 +1213,7 @@ def main():
     slot43_checks(e, kind)
     chain_checks(e, kind)
     persist2_checks(e)
+    pf_checks(e, kind, base, patched)
     diag = a[2] if len(a) > 2 else None
     if diag is None:
         tmp2 = tempfile.TemporaryDirectory()
@@ -1068,6 +1223,7 @@ def main():
         if r.returncode:
             sys.exit(r.stdout + r.stderr)
     diag_checks(diag, kind)
+    pf_diag_checks(base, diag, kind)
     print('%d failure(s)' % fails)
     sys.exit(1 if fails else 0)
 

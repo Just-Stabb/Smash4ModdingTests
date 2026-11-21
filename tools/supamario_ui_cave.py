@@ -82,7 +82,7 @@ SETUP_BODY = 0x02F1A598          # his setup (r5 = 1)
 SLOT42_HOOK = 0x02F1B218         # slot 42 (entry 0x10139FBC): blr
 SLOT43_HOOK = 0x02F1B21C         # slot 43 (entry 0x10139FC4): li r3, 1
 ORIGINAL = {SETUP_HOOK: 0x38A00001, SETUP_HOOK + 4: 0x4BFFFEA4, SLOT42_HOOK: 0x4E800020, SLOT43_HOOK: 0x38600001,
-            SLOT43_HOOK + 4: 0x4E800020}
+            SLOT43_HOOK + 4: 0x4E800020, 0x02C0F7F0: 0x4BFFFAF9}
 
 # game functions (none is an import)
 GROUP_INIT = 0x0200C858          # ShieldModule: (M, desc, group)
@@ -141,7 +141,9 @@ DIAG_FMTS = [
     ('fbd', 'S4UB hash=%08X found=%d set=%d kind=%X n=%d\n'),
     ('f44', 'S4U4 st=%X t1=%08X t2=%08X mode=%08X left=%d\n'),
     ('fef', 'S4UF bank=%X slot=%d entries=%d res=%d motion=%X\n'),
+    ('fpf', 'S4UP obj=%08X him=%08X n=%d\n'),
 ]
+DIAG_PF_CAP = 200                # v7: S4UP lines at most
 FIGHTERS = 0x1035184C            # [[FIGHTERS] + 0]: +0 the entries, +8 their count (acmd_ext_cave.py)
 FIGHTER_ENTRY = 0x76B0           # entry: +0 object id, +0xC accessor, byte +0x1E >= 4 live
 
@@ -183,10 +185,30 @@ V_DODGE_R = 0x0F000321           # TIMER_1: a dodge asked, the attacker to his r
 V_DODGE_L = 0x0F000322           # TIMER_2: ... to his left
 V_MODE = 0x0F000324              # TIMER_4: status 0x155's mode (his MSC: 7 the transformation, 5 the dodge, renewed every
                                  # frame; 3 Secret Sensation; 0 Fake Death / Sledgehammer)
-MODE_FORM = 7.0
-MODE_DODGE = 5.0
-MODE_FORM_ON = 5.5               # 0x155 is the transformation (its counter included) above this
-MODE_DODGE_ON = 3.5              # ... the autododge above this (and not above MODE_FORM_ON)
+# v7 (exe_v46z_ui6): four modes; TIMER_4 counts down by itself, so each mode is at least 1.5 from the next threshold
+MODE_FORM = 9.0                  # the transformation / its counter
+MODE_DODGE = 7.0                 # the autododge (XV2's sway)
+MODE_COUNTER = 5.0               # v7: the sway's / spot dodge's counter (XV2's CMN.bac entry 706)
+MODE_FORM_ON = 7.5               # 0x155 is the transformation (its counter included) above this
+MODE_DODGE_ON = 5.5              # ... the autododge above this (and not above MODE_FORM_ON)
+MODE_SWAY_ON = 3.5               # v7: the sway family (the autododge, its counter) above this; Secret Sensation (3) and
+                                 # Fake Death / Sledgehammer (0) below
+ST_ESCAPE_N = 0x1F               # v7: his spot dodge (EscapeN): the shape on while transformed (the counter's "attacked")
+# v7: the projectile filter (README "Ultra Instinct v7"). The collision manager's pair pass 0x02C0F6F0 (A, B, flag) is
+# run by 0x02C117F8 over the type pairs of the table 0x10351914 ({type A, type B, flag} x 11: (3, 0) reflector / attack,
+# (4, 0) absorber, (0, 0) clank, (2, 0) SHIELD vs attack, (0, 1) attack vs hurtbox, ...), so a shield meets an attack
+# before the hurtboxes do and its record keeps the attack off the body. The node masks (0x02D42C44: every 3-7 bit field
+# of A.w0 & B.w1 and A.w1 & B.w0 non-zero) can't tell a fighter's attack from a projectile: the attack's object class
+# (w0 bits 19-24, 1 << [AttackModule + 0x110]) is 0 for fighters (0x02E5402C) and for every weapon (their default block
+# fill 0x032108D8, 0x0320E748 in ~400 weapon vtables), and a shield node's w1 is 0xFFFFFFFF (0x02C6FBB4). So the cave
+# hooks the pass's per-entry check (`bl 0x02C0F2E8` at 0x02C0F7F0: A's entry r4, B's entry r5, A's container r3; the
+# caller's r31 = B's container): when A is HIS counter shape (kind 0x41, his ShieldModule's container M + 0x18, its
+# group 1's collision object) and B's object is not a fighter (container +0x1C = id >> 28 != 0), the pair doesn't meet
+# (except in Secret Sensation, which answers anything an opponent owns): the projectile / item goes on to the attack /
+# hurtbox pass and hits him as normal. Grabs never meet a shield (the catch pass is (6, 1)).
+PF_HOOK = 0x02C0F7F0             # `bl 0x02C0F2E8` in the pair pass
+PF_FN = 0x02C0F2E8               # the facing / position check (A container, A entry, B entry) -> 0 skip
+PF_WORD = 0x4BFFFAF9
 FORM_ON = 1500.0                 # transformed: TIMER_0 above this
 DODGE_SIGNAL = 4.0               # the timers count down by themselves: a signal the MSC missed dies in 4 frames
 MAX_FIGHTERS, MAX_PARTS, MAX_NODES = 16, 16, 32
@@ -264,6 +286,9 @@ D43 = {'d43_zero': """
         lis r11, ui_drec@ha
         addi r11, r11, ui_drec@l
         stw r0, 0xC(r11)"""}
+
+DPF = """
+        bl ui_dpf"""                    # v7 diag: S4UP, a projectile / item let through his counter shape
 
 OSR = """
         lis r12, %(osr_hi)d
@@ -581,6 +606,28 @@ deft_orig:
         stwu r1, -0x70(r1)              # the replaced word
         b 0x%(eft_back)08X
 
+# v7: S4UP (from ui_pf's drop: r29 A's container (his shape's), r31 B's (the attacker object's)): the object let
+# through, his id, the count; at most DIAG_PF_CAP lines (ui_drec +0x38)
+ui_dpf: stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        lis r11, ui_drec@ha
+        addi r11, r11, ui_drec@l
+        lwz r6, 0x38(r11)
+        cmplwi r6, %(pf_cap)d
+        bge dpf_out
+        addi r6, r6, 1
+        stw r6, 0x38(r11)
+        lwz r4, 0x18(r31)
+        lwz r5, 0x18(r29)
+        lis r3, ui_fpf@ha
+        addi r3, r3, ui_fpf@l""" + OSR + """
+dpf_out:
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
 # ui_dmot(r5 a motion): r3 1 when it is one of DIAG_MOTIONS. Leaf: r0, r3, r12
 ui_dmot:
         lis r12, ui_dmots@ha
@@ -671,8 +718,9 @@ def build(kind_id=None, diag=False):
              bdf_hi=BIND_FROM >> 16, bdf_lo=BIND_FROM & 0xFFFF, cap=DIAG_CAP, late_n=DIAG_LATE_N,
              late_hi=LATE_FN >> 16, late_lo=LATE_FN & 0xFFFF, efm_hi=EFF_MGR >> 16, efm_lo=EFF_MGR & 0xFFFF,
              efs_hi=EFF_SLOT >> 16, efs_lo=EFF_SLOT & 0xFFFF, bank=UI_BANK, eft_cap=EFT_CAP, eft_back=EFT_PRINT + 4,
-             mot_form=0x231, mot_ss=0x245, **calls)
+             mot_form=0x231, mot_ss=0x245, escn=ST_ESCAPE_N, pf_cap=DIAG_PF_CAP, pff_hi=PF_FN >> 16, pff_lo=PF_FN & 0xFFFF, **calls)
     p.update({k: (v if diag else '') for k, v in D43.items()})
+    p['dpf'] = DPF if diag else ''
     a.asm(("""
 # ---- 1. setup (r3 spec, r4 fighter, r5 = whatever: the replaced word sets 1)
 setup:  lwz r12, %(kind_at)d(r4)
@@ -719,6 +767,8 @@ slot42: lwz r12, %(kind_at)d(r4)
         lwz r11, 0x48(r11)              # status kind: 0x155 (the transformation, Secret Sensation; v5)
         cmpwi r11, %(st_ss)d
         beq s42_ss
+        cmpwi r11, %(escn)d             # v7: his spot dodge while transformed: the dodge's signal marks "attacked" (the
+        beq s42_dg                      # counter from EscapeN, his MSC)
         cmplwi r11, %(dhi)d             # ui4: the autododge (the shape is on in Wait / Walk / WalkBrake / Squat ..
         ble s42_dg                      # SquatRv while transformed: his MSC's ui_tick)
         cmpwi r11, %(sqlo)d
@@ -726,7 +776,23 @@ slot42: lwz r12, %(kind_at)d(r4)
         cmpwi r11, %(sqhi)d
         bgtlr
         b s42_dg
-s42_ss: lwz r11, %(work)d(r12)
+s42_ss: stwu r1, -0x20(r1)              # v7: 0x155 in the sway family (the autododge / its counter: TIMER_4 in
+        mflr r0                         # (MODE_SWAY_ON, MODE_FORM_ON]): a hit on the shape is another dodge (XV2's
+        stw r0, 0x24(r1)                # sway chains), not Secret Sensation's record
+        stw r4, 0x10(r1)
+        stw r5, 0x14(r1)
+        stw r12, 0x18(r1)
+        lwz r3, %(work)d(r12)
+        bl ui_mode4
+        lwz r4, 0x10(r1)
+        lwz r5, 0x14(r1)
+        lwz r12, 0x18(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        cmpwi r3, 1
+        beq s42_dg
+        lwz r11, %(work)d(r12)
         lwz r11, 8(r11)
         lwz r11, 4(r11)                 # status work
         lwz r10, 0x14(r11)
@@ -1083,7 +1149,7 @@ slot43: li r3, 1
         stw r0, 0x24(r1)
         stw r5, 0x10(r1)
         lwz r3, %(work)d(r12)
-        bl ui_isform
+        bl ui_mode4                     # v7: the transformation (2) or the sway family (1: no shield damage) -> 0
         lwz r5, 0x10(r1)
         lwz r0, 0x24(r1)
         mtlr r0
@@ -1093,6 +1159,8 @@ slot43: li r3, 1
         li r3, 1
         blr
 s43_dodge:                              # ui4: the autododge's statuses (the shape on while transformed): the shield
+        cmpwi r11, %(escn)d             # (v7: and his spot dodge)
+        beq s43_go
         cmplwi r11, %(dhi)d             # damage that follows the shape's hit skipped (no guard damage / stun)
         ble s43_go                      # Wait, Walk, WalkBrake
         cmpwi r11, %(sqlo)d
@@ -1151,6 +1219,109 @@ isf_out:
         mtlr r0
         addi r1, r1, 0x10
         blr
+
+# v7: ui_mode4(r3 his WorkModule): r3 2 when TIMER_4 > MODE_FORM_ON (the transformation / its counter), 1 when >
+# MODE_SWAY_ON (the autododge, its counter), else 0 (Secret Sensation 3, Fake Death / Sledgehammer 0). Its own frame
+ui_mode4:
+        stwu r1, -0x10(r1)
+        mflr r0
+        stw r0, 0x14(r1)
+        lis r4, %(vmode_hi)d
+        ori r4, r4, %(vmode_lo)d
+        lwz r12, 0(r3)
+        lwz r12, 0x44(r12)
+        mtctr r12
+        bctrl
+        li r3, 2
+        lis r12, ui_modef@ha
+        lfs f0, ui_modef@l(r12)
+        fcmpu cr0, f1, f0
+        bgt m4_out
+        li r3, 1
+        lis r12, ui_swayf@ha
+        lfs f0, ui_swayf@l(r12)
+        fcmpu cr0, f1, f0
+        bgt m4_out
+        li r3, 0
+m4_out: lwz r0, 0x14(r1)
+        mtlr r0
+        addi r1, r1, 0x10
+        blr
+
+# v7: the projectile filter (bl from 0x02C0F7F0 in the collision pair pass 0x02C0F6F0, for every pair of entries the
+# pass tests: r3 A's container, r4 A's entry, r5 B's entry, the pass's r31 B's container; the per-entry check
+# 0x02C0F2E8 -> 0: they don't meet). After the game's check: A is HIS counter shape (A's object a fighter of kind 0x41,
+# A his ShieldModule's container (M + 0x18), r4 its group 1's collision object ([M + 0x24] + [[M + 8] + 0x34] x 0x174))
+# and B's object is not a fighter (B +0x1C, its id >> 28: a weapon 1, an item 4, a gimmick 3 ...) -> 0, except in status
+# 0x155 below the sway family (Secret Sensation answers anything an opponent owns). A fighter's own attack (category
+# 0), every other shield (his guard bubble, group 0; other fighters') and every other pair: the game's answer
+ui_pf:  stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r27, 0x2C(r1)
+        mr r29, r3                      # A's container
+        mr r28, r4                      # A's entry
+        lis r12, %(pff_hi)d
+        ori r12, r12, %(pff_lo)d
+        mtctr r12
+        bctrl                           # the game's check
+        mr. r27, r3
+        beq pf_out
+        lbz r0, 0x1C(r31)               # B's object category: a fighter's own attack goes on as before
+        cmpwi r0, 0
+        beq pf_out
+        lwz r5, 0x18(r29)               # A's object: a fighter (category 0)
+        rlwinm. r0, r5, 4, 28, 31
+        bne pf_out
+        lis r3, %(mgr_ha)d
+        lwz r3, %(mgr_lo)d(r3)
+        addi r4, r1, 0x10
+        li r6, 0
+        lis r12, %(handle_hi)d
+        ori r12, r12, %(handle_lo)d
+        mtctr r12
+        bctrl
+        addi r3, r1, 0x10
+        lis r12, %(gone_hi)d
+        ori r12, r12, %(gone_lo)d
+        mtctr r12
+        bctrl
+        cmpwi r3, 0
+        bne pf_out
+        lwz r12, 0x10(r1)               # [handle]: the fighter's entry
+        lwz r0, %(kind_at)d(r12)
+        cmpwi r0, %(kind)d
+        bne pf_out
+        lwz r30, %(acc)d(r12)           # his module block
+        lwz r11, %(shield)d(r30)        # his ShieldModule
+        cmpwi r11, 0
+        beq pf_out
+        addi r0, r11, 0x18              # its container
+        cmpw r0, r29
+        bne pf_out
+        lwz r10, 8(r11)                 # group 1 (+0x34): its first collision object's index (+0)
+        lwz r10, 0x34(r10)
+        mulli r10, r10, 0x174
+        lwz r9, 0xC(r29)
+        add r9, r9, r10
+        cmpw r9, r28
+        bne pf_out                      # his guard bubble (group 0): as before
+        lwz r11, %(st)d(r30)
+        lwz r11, 0x48(r11)
+        cmpwi r11, %(st_ss)d
+        bne pf_drop
+        lwz r3, %(work)d(r30)
+        bl ui_mode4
+        cmpwi r3, 0
+        beq pf_out                      # Secret Sensation (or Fake Death / Sledgehammer: the shape is off there)
+pf_drop:
+        li r27, 0%(dpf)s
+pf_out: mr r3, r27
+        lmw r27, 0x2C(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
 """ + (DIAG_TAIL if diag else RELEASE_TAIL)) % p)
     if diag:
         import zlib
@@ -1180,7 +1351,8 @@ ui_desc:
         .word 1
         .word 0x%(descbytes)08X
 ui_modef: .float %(modef)r
-""" % dict(form=FORM_ON, modef=MODE_FORM_ON, sig=DODGE_SIGNAL, x1=SHAPE['p1'][0], y1=SHAPE['p1'][1], z1=SHAPE['p1'][2],
+ui_swayf: .float %(swayf)r
+""" % dict(form=FORM_ON, modef=MODE_FORM_ON, swayf=MODE_SWAY_ON, sig=DODGE_SIGNAL, x1=SHAPE['p1'][0], y1=SHAPE['p1'][1], z1=SHAPE['p1'][2],
            x2=SHAPE['p2'][0], y2=SHAPE['p2'][1], z2=SHAPE['p2'][2], radius=SHAPE['radius'],
            bonetype=(SHAPE['bone'] << 16) | (SHAPE_TYPE << 8), shape_at=shape_at,
            descbytes=int.from_bytes(bytes(DESC_BYTES), 'big')))
@@ -1212,6 +1384,7 @@ def patches(kind_id=None, diag=False):
         out[LATE_HOOK] = branch(LATE_HOOK, labels['ui_dlate']) | 1
         out[EFT_PRINT] = branch(EFT_PRINT, labels['ui_deft'])
     out[WALK_FIX] = NOP                 # ui4: Mesh_Visibility's name walk takes unaligned names
+    out[PF_HOOK] = branch(PF_HOOK, labels['ui_pf']) | 1      # v7: the projectile filter
     return out
 
 
