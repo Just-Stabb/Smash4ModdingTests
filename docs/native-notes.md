@@ -3277,6 +3277,28 @@ look), light around him on the stop's negative (the black-over band inverted), g
 **Rule for every cave: never `bl` an import's file target.** Call imports through a site's run-time target
 (os_resolve) or a relocated veneer.
 
+**v7 (exe_v46z_outline5): the colour came out white.** The user, on every Time Skip clip with the shell: "the outline is
+white", then after the colour change to (150, 195, 255) at 165 "there's no blue tint", and again on Ultra Instinct v5.
+The colour reached the pixel program intact (os_apply's words, the in-place swap at the unlock handled as for the mark,
+latte_exec's run: PIX0 = FB1 vec4 12); what it ignored is the **scene's encoding**. Every program that draws into
+Smash 4's picture writes its colour multiplied by the frame's **hdrRange**: the lit fighter programs (texas_cross: 597 of
+620 vertex programs declare uniform block **FB3 at location 9 (CB9), 32 bytes: hdrRange at vec4 0.x, colrHdrRange at
+vec4 1**; e.g. 0x9601106B's vertex program `MULADD R4, R4, KC1[0].x, ...` with KCACHE1(CB9) exports PARAM7 = (colour
+scale) x hdrRange + the fog term, and its pixel program ends `PIX0 = PARAM7 x lit + PARAM8`), the sword trails
+(effect_trail.nsh: `rgb x hdrRange`, the block named hdrRange at CB9) and eft's effects (u_nwHdrRange); the finished
+frame is divided by it again. The shell's pixel program wrote FB1 vec4 12 as is, so its colour came out x 1 / hdrRange:
+(0.59, 0.76, 1.0) clipped to white for any hdrRange at or below 0.59 (the value itself is the game's per frame; not read
+here). Saturated colours (example 8's green) kept their hue, which is why only light colours looked wrong.
+Fix: the vertex program reads FB3's hdrRange (KCACHE1(CB9:0-15), `MOV R5.x, KC1[0].x`) and exports it in PARAM0 (R5.xxxx,
+SPI_VS_OUT_ID semantic `HDR_SEM` 0x80; special.nsh's 0xFF before); the pixel program has one input of that semantic
+(SPI_PS_INPUT_CNTL 0x180, SPI_PS_IN_CONTROL_0 0x14000001, 2 GPRs: effect_trail.nsh's pixel register pattern) and writes
+(FB1[12].rgb x hdrRange, FB1[12].a). os_chk also requires the vertex stage's slot 9 bound (device cache `+0x1D0 + 8 x 9`:
+data a plausible pointer, size at least 16), else the game's draw only. `coloured()` tells an exe_v46z_outline5 shell;
+port_check X13 WARNs on an older one when a script uses Outline_Shell. Test (`outline_shell_test.py`, 125 checks): the
+programs re-assembled, PARAM0 = FB3's hdrRange per vertex, PIX0 = colour x hdrRange (Time Skip's (150, 195, 255) at 0.5:
+(0.29, 0.38, 0.5) drawn, (0.59, 0.76, 1) shown), the registers, the FB3 refusals, coloured() on outline4's pixel program.
+Not confirmed in game: Cemu linking PARAM0 to the pixel input by semantic 0x80 (the same mechanism as every eft program).
+
 **Claimed region: `0x04BE5000`-`0x04BE7000`** (past the mesh visibility's; `textregion:0x2BE7000 grow:0x04BE7000`; code
 and data `0x04BE5000`-`0x04BE6244`, the diag build to `0x04BE66FC`; the programs at `0x04BE6800` (vertex, 0x348 bytes)
 and `0x04BE6C00` (pixel, 0x120), 256-aligned; the table `os_tab` 16 x 0x50). Order: exe_v46z_ol -> tools/mesh_vis_cave.py

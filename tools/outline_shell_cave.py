@@ -120,27 +120,35 @@ DIAG_EVERY = 30
 
 # the programs: special.nsh's registers (its vertex / pixel headers, the game's mask pass) with this vertex program's
 # GPR count and two semantics
-VS_REGS = ([0x109, 0, 0, 1] + [0xFFFFFFFF] * 10 + [0, 0xFFFFFFFC, 2, 0, 1] + [0xFF] * 30 + [0, 0xE, 0x10])
-PS_REGS = [1, 2, 0x04000000, 0, 0] + [0] * 32 + [0xF, 1, 0x10, 0]
+# v7 (exe_v46z_outline5): PARAM0 carries the frame's hdrRange to the pixel stage: its SPI_VS_OUT_ID semantic HDR_SEM
+# (special.nsh's 0xFF: none), the pixel program's one input of that semantic (SPI_PS_INPUT_CNTL semantic | 0x100 and
+# SPI_PS_IN_CONTROL_0 0x14000000 | 1 input, as effect_trail.nsh's pixel programs have them), 2 GPRs (R0 the input)
+HDR_SEM = 0x80
+VS_REGS = ([0x109, 0, 0, 1] + [0xFFFFFF00 | HDR_SEM] + [0xFFFFFFFF] * 9 + [0, 0xFFFFFFFC, 2, 0, 1] + [0xFF] * 30 +
+           [0, 0xE, 0x10])
+PS_REGS = [2, 2, 0x14000001, 0, 1] + [0x100 | HDR_SEM] + [0] * 31 + [0xF, 1, 0x10, 0]
 assert len(VS_REGS) == 52 and len(PS_REGS) == 41
 
 PS_SOURCE = """; $MODE = "UniformBlock"
 ; $UNIFORM_BLOCKS[0].name = "FB1"
 ; $UNIFORM_BLOCKS[0].offset = 7
 ; $UNIFORM_BLOCKS[0].size = 672
-; $NUM_SPI_PS_INPUT_CNTL = 0
-; $SQ_PGM_RESOURCES_PS.NUM_GPRS = 1
+; $NUM_SPI_PS_INPUT_CNTL = 1
+; $SPI_PS_INPUT_CNTL[0].SEMANTIC = 128
+; $SPI_PS_INPUT_CNTL[0].DEFAULT_VAL = 1
+; $SPI_PS_IN_CONTROL_0.NUM_INTERP = 1
+; $SQ_PGM_RESOURCES_PS.NUM_GPRS = 2
 ; $SQ_PGM_RESOURCES_PS.STACK_SIZE = 0
 ; $SQ_PGM_EXPORTS_PS.EXPORT_MODE = 2
 ; $CB_SHADER_MASK.OUTPUT0_ENABLE = true
 ; $CB_SHADER_CONTROL.RT0_ENABLE = true
 
 00 ALU: KCACHE0(CB7:0-15)
-  0  x: MOV R0.x, KC0[12].x
-     y: MOV R0.y, KC0[12].y
-     z: MOV R0.z, KC0[12].z
-     w: MOV R0.w, KC0[12].w
-01 EXP_DONE: PIX0, R0.xyzw
+  0  x: MUL R1.x, KC0[12].x, R0.x
+  1  y: MUL R1.y, KC0[12].y, R0.x
+  2  z: MUL R1.z, KC0[12].z, R0.x
+  3  w: MOV R1.w, KC0[12].w
+01 EXP_DONE: PIX0, R1.xyzw
 END_OF_PROGRAM
 """
 
@@ -154,6 +162,9 @@ VS_HEADER = """; $MODE = "UniformBlock"
 ; $UNIFORM_BLOCKS[2].name = "FB1"
 ; $UNIFORM_BLOCKS[2].offset = 7
 ; $UNIFORM_BLOCKS[2].size = 672
+; $UNIFORM_BLOCKS[3].name = "FB3"
+; $UNIFORM_BLOCKS[3].offset = 9
+; $UNIFORM_BLOCKS[3].size = 32
 ; $ATTRIB_VARS[0].name = "a_Position"
 ; $ATTRIB_VARS[0].type = "vec4"
 ; $ATTRIB_VARS[0].location = 0
@@ -163,7 +174,7 @@ VS_HEADER = """; $MODE = "UniformBlock"
 ; $SQ_PGM_RESOURCES_VS.NUM_GPRS = 9
 ; $SQ_PGM_RESOURCES_VS.STACK_SIZE = 1
 ; $NUM_SPI_VS_OUT_ID = 1
-; $SPI_VS_OUT_ID[0].SEMANTIC_0 = 0
+; $SPI_VS_OUT_ID[0].SEMANTIC_0 = 128
 ; $SQ_VTX_SEMANTIC_CLEAR = 0xFFFFFFFC
 ; $NUM_SQ_VTX_SEMANTIC = 2
 ; $SQ_VTX_SEMANTIC[0].SEMANTIC_ID = 0
@@ -210,20 +221,24 @@ def vs_source():
     c2 += [[('t', 'RECIPSQRT_IEEE R8.w, PV@.x')]]
     c2 += [[('z', 'MUL R8.z, R7.w, R6.w')], [('z', 'MUL R8.z, R8.z, R8.w')]]
     c2 += [[('x', 'MULADD R6.x, R7.x, R8.z, R6.x')], [('y', 'MULADD R6.y, R7.y, R8.z, R6.y')]]
+    # v7: the frame's hdrRange (FB3, CB9 vec4 0.x: the lit fighter programs scale their colour by it, PARAM7 =
+    # ... x hdrRange) to the pixel stage in PARAM0 (KC1 = CB9)
+    c2 += [[('x', 'MOV R5.x, KC1[0].x')]]
     out, g = [VS_HEADER, '00 CALL_FS NO_BARRIER'], 0
-    for n, (kc, cl) in enumerate([('KCACHE0(CB2:0-15) KCACHE1(CB7:0-15)', c1), ('KCACHE0(CB3:0-15)', c2)]):
+    for n, (kc, cl) in enumerate([('KCACHE0(CB2:0-15) KCACHE1(CB7:0-15)', c1),
+                                  ('KCACHE0(CB3:0-15) KCACHE1(CB9:0-15)', c2)]):
         out.append('%02d ALU: %s' % (n + 1, kc))
         for grp in cl:
             for k, (slot, ins) in enumerate(grp):
                 out.append(('%3d ' % g if k == 0 else '    ') + ' %s: %s' % (slot, ins.replace('PV@', 'PV%d' % (g - 1))))
             g += 1
-    out += ['03 EXP_DONE: POS0, R6.xyzw', '04 EXP_DONE: PARAM0, R6.____ NO_BARRIER', 'END_OF_PROGRAM', '']
+    out += ['03 EXP_DONE: POS0, R6.xyzw', '04 EXP_DONE: PARAM0, R5.xxxx NO_BARRIER', 'END_OF_PROGRAM', '']
     return '\n'.join(out)
 
 
 # latte-asm's output for vs_source() / PS_SOURCE (tools/outline_shell_test.py re-assembles and compares)
 VS_PROGRAM = bytes.fromhex("""
-00000000000080092000805C010094A04600C040000088A03C2003008806009400400300FF0F201400000000000000000000000000000000
+00000000000080092000805C010094A04600C06401008CA03C2003008806009400C002000000201400000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -238,14 +253,15 @@ VS_PROGRAM = bytes.fromhex("""
 04489081060CC260046C9081060CC260030010809000E000032410800700E200034810800700E200030090809000E020032490800704E220
 034890800704E22007A01F8090000001000020440000000007A41F80900000210000B4430000000008000100102800010804810000280020
 F8081F0100280040F80C9F8100280060FE0000809034006107CC8081900000410808818190000041070001810600C200070401810604C220
+A0000080900CA000
 """.replace('\n', ''))
 PS_PROGRAM = bytes.fromhex("""
-2000C04100000CA0000000008806209400000000000000000000000000000000000000000000000000000000000000000000000000000000
+2000C04100000CA0008000008806209400000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000008C000000900C00008C040000900C00208C080000900C0040
-8C0C0080900C0060
+00000000000000000000000000000000000000000000000000000000000000008C000080900020008C040080900020208C08008090002040
+8C0C0080900C2060
 """.replace('\n', ''))
 
 
@@ -384,6 +400,7 @@ def src(s, hand, diag=False, pad=False, variant='full'):
              bl0_h=BLEND_REG[0] >> 16, bl0_l=BLEND_REG[0] & 0xFFFF, bl1_l=BLEND_REG[1] & 0xFFFF,
              cf=CULL_FRONT, cb=CULL_BACK, dsoff=DS_STENCIL | DS_BACKFACE, dson=DS_Z | DS_ZWRITE,
              vcb7=CTX['vcb'] + 8 * 7, pcb7=CTX['pcb'] + 8 * 7, pcb7s=CTX['pcb'] + 8 * 7 + 4,
+             vcb9=CTX['vcb'] + 8 * 9, vcb9s=CTX['vcb'] + 8 * 9 + 4,
              **{'c_' + k: v for k, v in CTX.items()}, **{'g_' + k: v[0] for k, v in GX2.items()})
     step = (lambda n: '\n        li r3, %d\n        mr r4, r31\n        bl os_dstep' % n) if diag else (lambda n: '')
     D.update({'x_' + k: call('GX2' + k) for k in GX2})
@@ -999,6 +1016,11 @@ oc_mark:
         lwz r0, %(vcb7)d(r3)             # the vertex stage's the same
         cmplw r0, r12
         bne oc_no
+        lwz r9, %(vcb9)d(r3)             # v7: the vertex stage's FB3 (CB9: hdrRange, passed on by the vertex program)""" \
+        % D + chk('r9', 'oc_no') + """
+        lwz r0, %(vcb9s)d(r3)
+        cmplwi r0, 16
+        blt oc_no
         lwz r0, %(c_gs)d(r3)
         cmpwi r0, 0
         bne oc_no
@@ -1490,6 +1512,16 @@ def draws(img_w):
         if img_w(a) == IMPORTS[0][1] and img_w(a + 4) == IMPORTS[1][1]:
             resolved = True               # v6's os_site table (exe_v46z_outline4): imports resolved at run time
     return swapped and resolved
+
+
+def coloured(img_w):
+    """an executable whose shell shows its colour (v7, exe_v46z_outline5 or later): the GX2PixelShader in the cave has one
+    input (the vertex program's hdrRange, semantic HDR_SEM) and its program scales FB1 vec4 12's rgb by it. Earlier
+    shells write the colour unscaled into a target the game's fighter programs fill with colour x hdrRange: it comes
+    out brighter by 1 / hdrRange, light colours white (the user's Time Skip clips: "the outline is white", "no blue
+    tint")"""
+    w = [img_w(PS_PROG + 4 * i) for i in range(len(PS_PROGRAM) // 4)]
+    return w == list(struct.unpack('>%dI' % (len(PS_PROGRAM) // 4), PS_PROGRAM)) and draws(img_w)
 
 
 def apply_ref(entry, weight):

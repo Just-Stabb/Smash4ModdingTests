@@ -3763,6 +3763,11 @@ def check_model_commands_exe(inst, name, rep):
                     'exe_v46z_outline2\'s never draws (the FB1 mark the game byte-swaps), exe_v46z_outline3\'s crashes '
                     'the game at the first shell (GX2 called at the file\'s bl targets): ship exe_v46z_outline4 or '
                     'later' % ', '.join(sorted(rels)))
+        elif cmd == 'Outline_Shell' and not _exe_present(inst, cave, 'coloured'):
+            rep.add('WARN', rule, 'Outline_Shell in %s but the install\'s code/cross_f.rpx is a shell before '
+                    'exe_v46z_outline5: its band ignores the frame\'s hdrRange and comes out brighter than asked, '
+                    'light colours white (Time Skip\'s blue band in game): ship exe_v46z_outline5 or later'
+                    % ', '.join(sorted(rels)))
 
 
 def _exe_present(inst, cave, fn='present'):

@@ -66,6 +66,14 @@ def main():
           ([], []))
     check('v6: draws() (port_check X13): the patched words yes, the unpatched exe no',
           (SC.draws(lambda x: words.get(x, orig(x))), SC.draws(orig)), (True, False))
+    old_ps = bytes.fromhex('2000C04100000CA00000000088062094' + '00' * 0xF0 + '8C000000900C00008C040000900C0020'
+                           '8C080000900C00408C0C0080900C0060')    # exe_v46z_outline4's pixel program (unscaled)
+    old_w = dict(words)
+    old_w.update({SC.PS_PROG + i: struct.unpack_from('>I', old_ps, i)[0] for i in range(0, len(old_ps), 4)})
+    check('v7: coloured() (port_check X13\'s warning): the patched words yes; exe_v46z_outline4\'s pixel program (the '
+          'colour unscaled by hdrRange: white in game) no; the unpatched exe no',
+          (SC.coloured(lambda x: words.get(x, orig(x))), SC.coloured(lambda x: old_w.get(x, orig(x))),
+           SC.coloured(orig)), (True, False, False))
     check('present() on the patched words / the unpatched exe',
           (SC.present(lambda x: words.get(x, orig(x))), SC.present(orig)), (True, False))
     check('... the mesh visibility and outline caves present in the exe it builds on',
@@ -378,6 +386,11 @@ def main():
     check('a geometry shader in use: the game\'s draw only', only_draw(draw()), True)
     ctx(vfb=FB + 0xC00)
     check('the vertex stage\'s FB1 another: the game\'s draw only', only_draw(draw()), True)
+    ctx(fb3=(0, 0))
+    check('v7: no FB3 (CB9, hdrRange) bound to the vertex stage: the game\'s draw only (the band\'s colour needs it)',
+          only_draw(draw()), True)
+    ctx(fb3=(FB + 0xE00, 8))
+    check('v7: ... an FB3 under 16 bytes: the game\'s draw only', only_draw(draw()), True)
     ctx()
     fbset(0.0, 0)
     check('Width 0 (shrunk away): the game\'s draw only', only_draw(draw()), True)
@@ -489,7 +502,8 @@ class DrawEnv:
         blocks = CTXA + 0x1400
         C = SC.CTX
 
-        def ctx(fbuf=fbd, vfb=None, gs=0, blk=((4, 0x40), (7, 0x2A0)), rel=False, rs=0x00080006, ds=0x000000B7):
+        def ctx(fbuf=fbd, vfb=None, gs=0, blk=((4, 0x40), (7, 0x2A0)), rel=False, rs=0x00080006, ds=0x000000B7,
+                fb3=(FB + 0xE00, 32)):
             pm.mem_write(CTXA, b'\0' * 0x1000)
             w32(pm, CTXA, CTXA + 0x1800)
             w32(pm, CTXA + C['vs'], GAME_VS)
@@ -497,6 +511,8 @@ class DrawEnv:
             w32(pm, CTXA + C['ps'], GAME_PS)
             w32(pm, CTXA + C['vcb'] + 8 * 7, fbuf if vfb is None else vfb)
             w32(pm, CTXA + C['vcb'] + 8 * 7 + 4, 0x2A0)
+            w32(pm, CTXA + C['vcb'] + 8 * 9, fb3[0])      # v7: FB3 (hdrRange) bound to the vertex stage
+            w32(pm, CTXA + C['vcb'] + 8 * 9 + 4, fb3[1])
             w32(pm, CTXA + C['pcb'] + 8 * 7, fbuf)
             w32(pm, CTXA + C['pcb'] + 8 * 7 + 4, 0x2A0)
             w32(pm, CTXA + C['blend'], 0x7F052000)
@@ -581,9 +597,11 @@ def progs_tests(pm, lab):
           (SC.VS_PROGRAM, SC.PS_PROGRAM))
     V = LE.VertexProgram(SC.gsh('vs'))
     check('vertex program: inputs a_Position (R1), a_Normal (R2); reads PerDraw rows 0-3, PerView rows 0-3, FB1 '
-          'compressParam (9) and the width (13)', (V.attributes, sorted({(cb, i) for cb, i, _c in V.reads})),
+          'compressParam (9) and the width (13), v7 FB3 (CB9) vec4 0: hdrRange',
+          (V.attributes, sorted({(cb, i) for cb, i, _c in V.reads})),
           (['a_Position', 'a_Normal'], sorted({(2, i) for i in range(4)} | {(3, i) for i in range(4)} |
-                                               {(7, 9), (7, 13)})))
+                                               {(7, 9), (7, 13), (9, 0)})))
+    check('v7: PARAM0 exported with semantic HDR_SEM (the pixel program\'s one input)', V.params.get(0), SC.HDR_SEM)
     rng = np.random.default_rng(7)
     n = 64
     L = rng.normal(size=(4, 4)).astype(np.float32) * 0.5
@@ -599,7 +617,11 @@ def progs_tests(pm, lab):
         fb1[13, 0] = width
         attrs = np.stack([np.concatenate([pos, np.ones((n, 1), np.float32)], 1),
                           np.concatenate([nor, np.zeros((n, 1), np.float32)], 1)], 1)
-        out, _ = V.run(attrs, {2: L, 3: P, 7: fb1})
+        fb3 = np.zeros((2, 4), np.float32)
+        fb3[0, 0] = 0.4375
+        out, par = V.run(attrs, {2: L, 3: P, 7: fb1, 9: fb3})
+        check('v7: PARAM0 = FB3\'s hdrRange (0.4375) in every lane, every vertex', bool(np.all(par[:, 0, :] == 0.4375)),
+              True)
         ref = SC.shell_ref(pos.astype(np.float64), nor.astype(np.float64), L.astype(np.float64),
                            P.astype(np.float64), comp, width)
         err = float(np.abs(out - ref).max() / max(1.0, np.abs(ref).max()))
@@ -607,16 +629,31 @@ def progs_tests(pm, lab):
               % (width, comp), err < 1e-5, True)
         if width > 0:
             fb1[13, 0] = 0.0
-            base, _ = V.run(attrs, {2: L, 3: P, 7: fb1})
+            base, _ = V.run(attrs, {2: L, 3: P, 7: fb1, 9: fb3})
             px = np.linalg.norm((out[:, :2] - base[:, :2]).astype(np.float64) / base[:, 3:4] * [640.0, 360.0], axis=1)
             check('... every vertex moved %g pixels of a 1280 x 720 picture on screen' % width,
                   bool(np.allclose(px, width, rtol=1e-3, atol=0.01)), True)
     Pp = LE.PixelProgram(SC.gsh('ps'))
     fb1 = np.zeros((42, 4), np.float32)
     fb1[12] = [1.0, 0.25, 0.5, 0.75]
-    check('pixel program: FB1 vec4 12 (r, g, b, alpha), every pixel', Pp.run(np.zeros((3, 0, 4), np.float32), {7: fb1},
-                                                                             {}).tolist(),
-          [[1.0, 0.25, 0.5, 0.75, 1.0]] * 3)
+    hdr = np.full((3, 1, 4), 0.5, np.float32)
+    check('pixel program (v7): FB1 vec4 12\'s rgb x the input hdrRange (0.5), its alpha as is, every pixel',
+          Pp.run(hdr, {7: fb1}, {}).tolist(), [[0.5, 0.125, 0.25, 0.75, 1.0]] * 3)
+    check('v7: Time Skip\'s (150, 195, 255) at hdrRange 0.5 is drawn (0.29, 0.38, 0.5): blue, shown as (0.59, 0.76, 1) '
+          'once the frame is decoded; v6 drew (0.59, 0.76, 1) itself: shown as (1, 1, 1) clamped (white)',
+          [round(x, 2) for x in Pp.run(hdr, {7: np.array([[0] * 4] * 12 + [[150 / 255., 195 / 255., 1.0, 0.65]] +
+                                                          [[0] * 4] * 29, np.float32)}, {})[0][:3].tolist()],
+          [0.29, 0.38, 0.5])
+    import ult_to_latte as U
+    regs = None
+    for t, o, s_ in U._gsh_blocks(SC.gsh('ps')):
+        if t == 6:
+            regs = struct.unpack_from('>41I', SC.gsh('ps'), o)
+    check('v7: the pixel registers: 2 GPRs, one interpolated input of semantic HDR_SEM, SPI_PS_IN_CONTROL_0 as '
+          'effect_trail.nsh\'s (0x14000000 | 1)', (regs[0], regs[2], regs[4], regs[5]),
+          (2, 0x14000001, 1, 0x100 | SC.HDR_SEM))
+    check('v7: the vertex registers: PARAM0\'s semantic HDR_SEM (special.nsh\'s 0xFF: none)', SC.VS_REGS[4],
+          0xFFFFFF00 | SC.HDR_SEM)
 
 
 def diag_tests(exe, orig):
