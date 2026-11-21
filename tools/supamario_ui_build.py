@@ -520,6 +520,19 @@ def glow_restore():
     return if_var(cave.V_FORM, 5, UI_TRANSFORMED_OVER, glow_on())
 
 
+def strip_glow_restore(cmds):
+    """the commands without any glow_restore() block (the earlier moves' tests compare their scripts without it)"""
+    blk = [(c.ident, c.params) for c in glow_restore()]
+    out, i = [], 0
+    while i < len(cmds):
+        if [(c.ident, c.params) for c in cmds[i:i + len(blk)]] == blk:
+            i += len(blk)
+            continue
+        out.append(cmds[i])
+        i += 1
+    return out
+
+
 def restore_glow(f, own):
     """v9: glow_restore() after the last command of every effect script (not in `own`) ending an Outline_Shell, and at
     frame 0 of the GLOW_AFTER motions' (new ones made); [(script hash, 'end' / 'start')]"""

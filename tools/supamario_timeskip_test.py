@@ -1319,6 +1319,9 @@ def script_tests(out, sh_out):
     nm = lambda c: acmd.INFO[c.ident]['name']                                 # noqa: E731
     syn = acmd.INFO[acmd.BY_NAME['extra_special_hitbox']]['syntax']
     f = {p: acmd.ACMDFile.load(os.path.join(body, p + '.bin')) for p in ('game', 'effect', 'sound', 'expression')}
+    import supamario_ui_build as UIB      # Ultra Instinct v9: its glow restore (in Time Skip's ends, the falls / landings)
+    for h_ in list(f['effect'].scripts):  # is Ultra Instinct's: tools/supamario_ui_test.py checks it
+        f['effect'].scripts[h_] = UIB.strip_glow_restore(f['effect'].scripts[h_])
     b = {p: acmd.ACMDFile.load(os.path.join(sbody, p + '.bin')) for p in ('game', 'effect', 'sound', 'expression')}
     dash, conn = f['game'].script('specials'), f['game'].script('specialairs')
     keys = ('ID', 'Part', 'Damage', 'Angle', 'BKB', 'KBG', 'Size', 'Z', 'Y', 'HitstopFrames', 'SelfHitstopFrames',

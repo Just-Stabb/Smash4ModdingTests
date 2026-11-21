@@ -4354,7 +4354,7 @@ in Wait; 4 dodges (S4U2 `st=0 cat=0 flags=00000321`, S4U4 into 0x155 mode 7, mot
 - **Fix (no exe change):** the band DRAWN OVER (Outline_Shell Blend 0: no sum, it can't pass its own colour however
   many parts overlap) in a deep blue-violet (60, 40, 255) at 130, **1.5 px** (v6-v8 3): for k 1 / 2 / 4 it shows
   (60, 40, 255) / (120, 80, 255) / (240, 160, 255), blue-violet to lavender, never white; the rim (175, 165, 255) at
-  255, no tint. Time Skip's outline (v11 of its own constants) the same way: (50, 110, 255) at 160 over, 2 px (k 1 / 2 / 4:
+  255, no tint. Time Skip's outline (v11 of its own constants) the same way: (40, 95, 255) at 160 over, 2 px (k 1 / 2 / 4:
   blue / light blue / pale cyan). Tests: the band's colour over dark / mid / light stages for k 1 / 2 / 4 (v6-v8's fail).
 
 ### 2. The autododge only every other time
@@ -4424,3 +4424,14 @@ close-ups. DBFZ (`ss/a.mp4`) zooms about 2x from its own wide frame, both fighte
 - The refraction's strength in game (the fireball's program at XV2's 0.6), and the follow type 2 sprites at his bones'
   speed; XV2's glare (the bloom round its additive aura) has no Smash 4 counterpart.
 - The hue map and the gains are read off the clips by eye.
+
+### Ultra Instinct v9, results
+`supamario_ui_test.py --exe --package --since` (v8's build) **482 ok** (the same test on v8's build: 38 failures, one or
+more for each bug above: the shape's drop model, the glow's band / rim, Time Skip's restore and the falls / landings,
+the zooms, the colours, the follow types, the refraction); `supamario_ui_cave_test.py` 332 ok (the exe unchanged);
+`supamario_timeskip_test` 198 (v11: its band over for k 1 / 2 / 4), `supamario_godfist_test` 566,
+`supamario_sledgehammer_test` 141, `supamario_corebreaker_test` 104, `supamario_fakedeath_test` 47 ok (their script
+checks leave out the glow restore blocks: `supamario_ui_build.strip_glow_restore`); `outline_shell_test.py` 124 ok;
+`mesh_vis_test.py` 64 ok; `msc_stack_check` 0 of 2490 (globals 127 of 128); `fighter_texture_ids.py check` 0 errors.
+0 failures. Sm4shCommand unchanged (v1.7.22: no command changed; Outline_Shell's in-game note is in
+docs/acmd-extra-commands.md). Preview: `supamario_ui_aura_render.py BEFORE AFTER OUT --bg 0.10,0.08,0.12 --k 2`.

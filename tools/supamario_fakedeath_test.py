@@ -517,6 +517,9 @@ def msc_tests(path):
 def script_tests(out, base):
     body = os.path.join(out, 'fighter', 'supamario', 'script', 'animcmd', 'body')
     f = {p: acmd.ACMDFile.load(os.path.join(body, p + '.bin')) for p in ('game', 'effect', 'sound', 'expression')}
+    import supamario_ui_build as UIB      # Ultra Instinct v9: its glow restore (in Time Skip's ends, the falls / landings)
+    for h_ in list(f['effect'].scripts):  # is Ultra Instinct's: tools/supamario_ui_test.py checks it
+        f['effect'].scripts[h_] = UIB.strip_glow_restore(f['effect'].scripts[h_])
     b = {p: acmd.ACMDFile.load(os.path.join(base, 'script', 'animcmd', 'body', p + '.bin'))
          for p in ('game', 'effect', 'sound', 'expression')}
     nm = lambda c: acmd.INFO[c.ident]['name']                                 # noqa: E731
