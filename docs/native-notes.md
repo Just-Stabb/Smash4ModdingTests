@@ -3698,3 +3698,26 @@ exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATC
   - **LAST_EFFECT_SET_COLOR is 0-255.** Its handler `0x02BE44B0` loads the three floats and divides each by the float
     at `0x100FC3E4` (255.0; `fdivs` at `0x02BE4534`, `0x02BE4540`, `0x02BE4544`) before EffectModule vt `+0x27C`. The
     fighter colour table (fighter_param 0x13C-0x147) feeds the set colour directly (`0x0334C938`), already in 0-1+.
+
+- **v14 (exe_v46z_ui10; README "Ultra Instinct v14"): the stopped frame's rate, his second update, the objects'
+  effects paused again.**
+  - **What still moves on a stopped frame.** The frame state's `+4` is the rate 1/N (the fill `0x02BFB97C`: `stfs f12,
+    4(r30)` at `0x02BFBA14` on a slowed frame, `1.0` at `0x02BFBA8C` with `+8` / `+0` 0 on a normal one). The fighter's
+    second update `0x02E22454` (vtable `0x10126E6C`, r3 the fighter: `mr r31, r3` at `0x02E224E8`) runs in full only
+    on a normal frame (`+8` 0 or `+0` 0, `0x02E224F0`-`0x02E2252C`); otherwise only `0x02E23D90`: `0x02E4051C` ->
+    `0x02E402CC`, which plays the motion (`0x02C5D2B4`, phase 1 at `0x02E403F0`) at the rate (`lfs f31, 4(r12)` at
+    `0x02E40304`), and `0x02E23DC0` a module's rate (`+4` x the SlowModule's). 26 readers of `+4` in all (weapons
+    `0x02B92CF8` / `0x02B9ADB4` / `0x02B9C938`, items `0x030422C0` / `0x03043998`, ...), each a multiplier or a rate
+    passed on (no division). v10-v13's stop forged `+8` 1 / `+0` 1 and left the game's `1.0`: no object stepped, but
+    every one played its motion at full speed between (the user's v13: "no longer freezes projectiles or enemies").
+  - **v14's stop:** `ws_fill` also writes `+4 = 0.01` (`ws_rate`, WS_RATE: N 100, the speed controller's clamp
+    `0x02FFA140`, a value the game makes itself); `ws_step` runs his step on the fill's own normal frame (`+8` 0, `+0`
+    0, `+4` 1.0; v10-v13 `+8` only) and puts it back; the new `ws_post` (POST_HOOK `0x02E22454`, whose first word is
+    `stwu r1, -0x528(r1)`, replayed in `wsp_orig`) does the same for his second update while it is his mode-0 stop
+    (v10-v13 he ran its slowed path too). The stage-only stop (mode 1) is untouched.
+  - **The objects' effects paused again:** `ws_begin` pauses the instances whose key has bit `0x8000` (an object's
+    EffectModule, the game's hitlag pause key `[EM + 0x10] | 0x8000`), not his, not paused, not `+0x1A4`, in both
+    modes; the stage's and the Final Smash sets' (no bit) run on (their pausing was the v10-v11 white). The list (100)
+    moved to `ws_data + 0x10` (`+0xC` the mode). Diag: **S4UW** `on owner paused stage mode`.
+  - Secret Sensation's MSC also holds every other fighter by the 2-frame hitstop (`ui_freeze(0)`) while it asks the
+    stop, a second lock that works without the frame state.

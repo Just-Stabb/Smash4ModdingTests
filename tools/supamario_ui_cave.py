@@ -149,7 +149,7 @@ DIAG_FMTS = [
     ('f44', 'S4U4 st=%X t1=%08X t2=%08X mode=%08X left=%d\n'),
     ('fef', 'S4UF bank=%X slot=%d entries=%d res=%d motion=%X\n'),
     ('fpf', 'S4UP obj=%08X him=%08X n=%d\n'),
-    ('fws', 'S4UW on=%d owner=%08X mode=%d stage=%08X\n'),
+    ('fws', 'S4UW on=%d owner=%08X paused=%d stage=%08X mode=%d\n'),
 ]
 DIAG_PF_CAP = 200                # v7: S4UP lines at most
 FIGHTERS = 0x1035184C            # [[FIGHTERS] + 0]: +0 the entries, +8 their count (acmd_ext_cave.py)
@@ -248,6 +248,9 @@ MAX_FIGHTERS, MAX_PARTS, MAX_NODES = 16, 16, 32
 #    +0x19F 0, its clock stopped), his own (+8 & PAUSE_MASK = his EffectModule's +0x10 | 0x8000: the EffectModule's own
 #    pause key, 0x02C27E88) left running, and stops the stage (0x0316505C(stage manager, 1), the Final Smashes' call,
 #    unless [[STAGE_FLAGS] + 0xB3] as they check); ws_end lets the instances it paused go and the stage on
+#    (v12-v13: no instance paused, the stage +0xD0 only. v14: the objects' instances paused again (key bit 0x8000), the
+#    stopped frame's rate +4 = WS_RATE (objects play their motion at it between steps), his step and his second
+#    update (POST_HOOK, ws_post) on a normal frame: docs/native-notes.md v14)
 INST_LIST = 0x10439088           # the effect manager's instance list (+0x18 next, +8 the owner key, +0x19E paused,
                                  # +0x1A4 kept out of a pause)
 PAUSE_MASK = 0x0100BFFF          # an EffectModule's own pause: key = [EM + 0x10] | 0x8000 under this mask (0x02C27E88)
@@ -257,6 +260,10 @@ STAGE_STOP = 0x0316505C
 FRAME_STATE = 0x102F6C04         # [FRAME_STATE]: +0 the phase (2 a step), +4 1/N, +8 1 while slowed
 FILL_HOOK = 0x02BFB97C           # the frame state fill: `mflr r0`
 STEP_HOOK = 0x02E40B90           # the fighter's step wrapper: `mflr r0`
+POST_HOOK = 0x02E22454           # v14: the fighter's second update (vtable 0x10126E6C): `stwu r1, -0x528(r1)`
+STWU_528 = 0x9421FAD8
+WS_RATE = 0.01                   # v14: the stop's frame rate (the frame state's +4, 1/N): the game's slowest (N 100,
+                                 # 0x02FFA140's clamp); v10-v13 left the game's 1.0
 SX_HOOK = 0x02C2CD28             # the EffectModule's shield-hit listener: `mflr r0`
 MFLR = 0x7C0802A6
 EFFM = 0x72A8                    # the module block's EffectModule (fighter + 0x74D8; the block is fighter + 0x230)
@@ -264,7 +271,7 @@ V_STOP = 0x0F000326              # TIMER_6: the world stop asked (his MSC)
 WS_LEASE = 2                     # frames the stop lasts after the last ask
 WS_MAX = 100                     # instances paused at most (the effect manager's pool holds 100)
 WS_STAGE_ONLY = 4.5              # v13: an ask (TIMER_6) above this stops the stage only (ws_stagef)
-ORIGINAL.update({FILL_HOOK: MFLR, STEP_HOOK: MFLR, SX_HOOK: MFLR})
+ORIGINAL.update({FILL_HOOK: MFLR, STEP_HOOK: MFLR, SX_HOOK: MFLR, POST_HOOK: STWU_528})
 
 # the shape: x sideways, y up, z forward (joint 0's frame); a capsule round his body
 SHAPE = {'bone': 0, 'p1': (0.0, 2.5, 0.0), 'p2': (0.0, 9.5, 0.0), 'radius': 8.0}   # v12: 6.5 -> 8 (OttottoWait's
@@ -360,8 +367,8 @@ ui_dws:
 """
 
 DIAG_TAIL = """
-# v10: S4UW on owner n stage (r4 1 the world stopped / 0 going on, r5 his fighter, r6 the instances paused, r7 the
-# stage manager): ws_begin / ws_end (the volatile registers go)
+# v10: S4UW on owner n stage mode (r4 1 the world stopped / 0 going on, r5 his fighter, r6 the instances paused, r7
+# the stage manager, v14 r8 the mode): ws_begin / ws_end (the volatile registers go)
 ui_dws: stwu r1, -0x20(r1)
         mflr r0
         stw r0, 0x24(r1)
@@ -787,7 +794,7 @@ def build(kind_id=None, diag=False):
              late_hi=LATE_FN >> 16, late_lo=LATE_FN & 0xFFFF, efm_hi=EFF_MGR >> 16, efm_lo=EFF_MGR & 0xFFFF,
              efs_hi=EFF_SLOT >> 16, efs_lo=EFF_SLOT & 0xFFFF, bank=UI_BANK, eft_cap=EFT_CAP, eft_back=EFT_PRINT + 4,
              mot_form=0x231, mot_ss=0x245, escn=ST_ESCAPE_N, pf_cap=DIAG_PF_CAP, pff_hi=PF_FN >> 16, pff_lo=PF_FN & 0xFFFF,
-             effm=EFFM, sx_back=SX_HOOK + 4, fill_back=FILL_HOOK + 4, step_back=STEP_HOOK + 4,
+             effm=EFFM, sx_back=SX_HOOK + 4, fill_back=FILL_HOOK + 4, step_back=STEP_HOOK + 4, post_back=POST_HOOK + 4,
              vstop_hi=V_STOP >> 16, vstop_lo=V_STOP & 0xFFFF, lease=WS_LEASE, wsmax=WS_MAX, wsguard=4 * WS_MAX,
              inst_ha=ha(INST_LIST), inst_lo=slo(INST_LIST), mask_hi=PAUSE_MASK >> 16, mask_lo=PAUSE_MASK & 0xFFFF,
              stg_ha=ha(STAGE_MGR), stg_lo=slo(STAGE_MGR), stgf_ha=ha(STAGE_FLAGS), stgf_lo=slo(STAGE_FLAGS),
@@ -1352,6 +1359,9 @@ wsf_stop:
         li r0, 1
         stb r0, 8(r31)
         stw r0, 0(r31)
+        lis r11, ws_rate@ha             # v14: the rate 1/N at the game's slowest (WS_RATE): the frames between two steps
+        lfs f0, ws_rate@l(r11)          # play every object's motion / movement at it (0x02E4051C -> 0x02E402CC, the
+        stfs f0, 4(r31)                 # weapons' and items' alike; v10-v13 the game's 1.0: they kept moving)
         li r30, 0
 wsf_out:
         mr r3, r30
@@ -1430,8 +1440,14 @@ wss_go: lwz r0, 0(r30)
         stw r0, 0x18(r1)
         lwz r0, 0(r30)
         stw r0, 0x1C(r1)
+        lwz r0, 4(r30)
+        stw r0, 0x20(r1)
         li r0, 0
-        stb r0, 8(r30)                  # his step: a normal frame
+        stb r0, 8(r30)                  # his step: a normal frame (v14: the fill's own normal frame, +8 0, +0 0,
+        stw r0, 0(r30)                  # +4 1.0; v10-v13 +8 only)
+        lis r12, ws_one@ha
+        lfs f0, ws_one@l(r12)
+        stfs f0, 4(r30)
         lwz r3, 0x10(r1)
         lwz r4, 0x14(r1)
         bl wss_orig
@@ -1439,6 +1455,8 @@ wss_go: lwz r0, 0(r30)
         stb r0, 8(r30)
         lwz r0, 0x1C(r1)
         stw r0, 0(r30)
+        lwz r0, 0x20(r1)
+        stw r0, 4(r30)
         b wss_out
 wss_plain:
         lwz r3, 0x10(r1)
@@ -1452,6 +1470,60 @@ wss_out:
         mtlr r0
         addi r1, r1, 0x30
         blr
+
+# v14 ws_post (POST_HOOK: the fighter's second update 0x02E22454, vtable 0x10126E6C, r3 the fighter): during his
+# world stop (mode 0) his runs on the fill's normal frame (+8 0, +0 0, +4 1.0, put back after): its full update (on a
+# slowed frame it only plays its motion at the rate, 0x02E23D90 -> 0x02E4051C, which v14's rate holds still), as his
+# step (ws_step); everyone else's as the frame state says. Volatile registers but r0 / r12 / f0 untouched (its
+# arguments)
+ws_post:
+        lwz r0, %(kind_at)d(r3)
+        cmpwi r0, %(kind)d
+        bne wsp_orig
+        lis r12, ws_data@ha
+        addi r12, r12, ws_data@l
+        lwz r0, 0(r12)
+        cmpwi r0, 0
+        beq wsp_orig                    # no stop
+        lwz r0, 0xC(r12)
+        cmpwi r0, 0
+        bne wsp_orig                    # the stage-only stop: every frame normal
+        lwz r0, 4(r12)
+        cmpw r0, r3
+        bne wsp_orig                    # not its owner
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r31, 0x1C(r1)
+        lis r12, %(fs_ha)d
+        lwz r31, %(fs_lo)d(r12)         # the frame state
+        lwz r0, 0(r31)
+        stw r0, 0x10(r1)
+        lwz r0, 4(r31)
+        stw r0, 0x14(r1)
+        lbz r0, 8(r31)
+        stw r0, 0x18(r1)
+        li r0, 0
+        stw r0, 0(r31)
+        stb r0, 8(r31)
+        lis r12, ws_one@ha
+        lfs f0, ws_one@l(r12)
+        stfs f0, 4(r31)
+        bl wsp_orig
+        lwz r0, 0x10(r1)
+        stw r0, 0(r31)
+        lwz r0, 0x14(r1)
+        stw r0, 4(r31)
+        lwz r0, 0x18(r1)
+        stb r0, 8(r31)
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+wsp_orig:
+        stwu r1, -0x528(r1)             # the replaced word
+        b 0x%(post_back)08X
 
 # ws_begin(r3 his fighter): every effect instance not his, not paused and not kept out of pauses paused and noted; the
 # stage stopped
@@ -1475,18 +1547,51 @@ wsb_key:
         addi r30, r30, ws_data@l
         li r0, 0
         stw r0, 8(r30)
-        b wsb_stage                     # v12: no effect instance paused (v10-v11's sweep paused every instance not
-                                        # his, the stage's too: its emitter sets then ran at rate 0 (0x0334E238) and
-                                        # the screen went white, the user's v11 clip b); the stage stop is the Final
-                                        # Smashes' and handles the stage's own
+        lis r12, %(inst_ha)d            # v14: the objects' effects paused again (v12-v13: none; the white was the full
+        lwz r12, %(inst_lo)d(r12)       # stage stop, v13): every instance of an object's EffectModule (key bit 0x8000,
+        li r10, %(wsguard)d             # its own pause's: 0x02C27E88, the game's hitlag pause) not his, not paused, not
+wsb_loop:                               # kept out; the stage's instances left (their own clock)
+        cmpwi r12, 0
+        beq wsb_stage
+        addi r10, r10, -1
+        cmpwi r10, 0
+        blt wsb_stage
+        lbz r0, 0x1A4(r12)
+        cmpwi r0, 0
+        bne wsb_next
+        lbz r0, 0x19E(r12)
+        cmpwi r0, 0
+        bne wsb_next
+        lwz r0, 8(r12)
+        andi. r11, r0, 0x8000
+        beq wsb_next                    # not an object's
+        lis r11, %(mask_hi)d
+        ori r11, r11, %(mask_lo)d
+        and r0, r0, r11
+        cmpw r0, r31
+        beq wsb_next                    # his
+        lwz r11, 8(r30)
+        cmplwi r11, %(wsmax)d
+        bge wsb_next
+        li r0, 1
+        stb r0, 0x19E(r12)
+        slwi r0, r11, 2
+        add r9, r0, r30
+        stw r12, 0x10(r9)
+        addi r11, r11, 1
+        stw r11, 8(r30)
+wsb_next:
+        lwz r12, 0x18(r12)
+        b wsb_loop
 wsb_stage:
         li r4, 1
         bl ws_stage
         li r4, 1
         mr r5, r29
-        lwz r6, 0xC(r30)                # v13: the mode (diag: S4UW's third number)
+        lwz r6, 8(r30)                  # v14: the instances paused (diag: S4UW's third number; v13 the mode)
         lis r7, %(stg_ha)d
         lwz r7, %(stg_lo)d(r7)
+        lwz r8, 0xC(r30)                # v14: the mode (0 the world, 1 the stage only; diag: S4UW's fifth number)
         bl ui_dws
         lwz r29, 0x14(r1)
         lwz r30, 0x18(r1)
@@ -1508,7 +1613,7 @@ ws_end: stwu r1, -0x20(r1)
         cmplwi r11, %(wsmax)d
         ble wse_n
         li r11, %(wsmax)d
-wse_n:  addi r12, r30, 0xC
+wse_n:  addi r12, r30, 0x10                # v14: the list after the mode word
         li r0, 0
 wse_loop:
         cmpwi r11, 0
@@ -1534,6 +1639,7 @@ wse_done:
         mr r6, r31
         lis r7, %(stg_ha)d
         lwz r7, %(stg_lo)d(r7)
+        li r8, 0
         bl ui_dws
         lwz r30, 0x18(r1)
         lwz r31, 0x1C(r1)
@@ -1720,6 +1826,8 @@ ui_modef: .float %(modef)r
 ui_swayf: .float %(swayf)r
 ws_half: .float 0.5
 ws_stagef: .float %(stagef)r
+ws_rate: .float %(wsrate)r
+ws_one: .float 1.0
 ws_data:
         .word 0
         .word 0
@@ -1824,7 +1932,8 @@ ws_data:
         .word 0
         .word 0
         .word 0
-""" % dict(form=FORM_ON, modef=MODE_FORM_ON, swayf=MODE_SWAY_ON, sig=DODGE_SIGNAL, stagef=WS_STAGE_ONLY, x1=SHAPE['p1'][0], y1=SHAPE['p1'][1], z1=SHAPE['p1'][2],
+        .word 0
+""" % dict(form=FORM_ON, modef=MODE_FORM_ON, swayf=MODE_SWAY_ON, sig=DODGE_SIGNAL, stagef=WS_STAGE_ONLY, wsrate=WS_RATE, x1=SHAPE['p1'][0], y1=SHAPE['p1'][1], z1=SHAPE['p1'][2],
            x2=SHAPE['p2'][0], y2=SHAPE['p2'][1], z2=SHAPE['p2'][2], radius=SHAPE['radius'],
            bonetype=(SHAPE['bone'] << 16) | (SHAPE_TYPE << 8), shape_at=shape_at,
            descbytes=int.from_bytes(bytes(DESC_BYTES), 'big')))
@@ -1860,6 +1969,7 @@ def patches(kind_id=None, diag=False):
     out[SX_HOOK] = branch(SX_HOOK, labels['ui_sx'])          # v10: no shield-hit mark on his counter shape
     out[FILL_HOOK] = branch(FILL_HOOK, labels['ws_fill'])    # v10: the world stop
     out[STEP_HOOK] = branch(STEP_HOOK, labels['ws_step'])
+    out[POST_HOOK] = branch(POST_HOOK, labels['ws_post'])    # v14: his second update on a normal frame in his stop
     return out
 
 

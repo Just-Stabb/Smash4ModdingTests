@@ -431,6 +431,33 @@ def v13_freeze_tests(r):
           min(stops) > C.WS_STAGE_ONLY, True)
 
 
+def v14_ss_freeze_tests(r):
+    """v14 (the user: "Secret Sensation no longer freezes projectiles or enemies ... make it freeze the stage, enemies,
+    projectiles and effects without the white flash"): besides the cave's world stop (now at the game's slowest rate,
+    supamario_ui_cave_test), every other fighter is held by Time Skip's 2-frame hitstop on every frame the stop is asked
+    (the transformation counter's freeze, which holds them in game), not him; the counter keeps the attacker free"""
+    slots = {2: (30.0, 0.0), 3: (-40.0, 0.0), 4: (60.0, 20.0)}
+
+    def place(g):
+        for sl, (x, y) in slots.items():
+            g.vars[0x0F000020 + 4 * (sl - 1)], g.vars[0x0F000021 + 4 * (sl - 1)] = x, y
+            g.vars[0x0F000023 + 4 * (sl - 1)] = 1.0
+        g.vars[0x0F000023] = 1.0                                   # slot 1: him (his live place, below)
+    g = Game(status=0x155, damage=150.0)
+    real = g.fvar
+    g.fvar = lambda v: g.x if v == 0x0F000020 else g.y if v == 0x0F000021 else real(v)   # noqa: E731
+    g, vm, zs = ss_run(r, rec=(1.0, 30.0, 0.0, True), at=10, others=place, g=g)
+    asks = sorted({e[0] for e in g.ev('set') if e[2] == B.V_STOP and e[3] == B.SS_STOP_ASK})
+    hs = {sl: sorted({e[0] for e in g.ev('set') if e[2] == 0x0F000044 + 8 * (sl + 2) and e[3] == 2.0})
+          for sl in (1, 2, 3, 4)}
+    check('v14: Secret Sensation: every other fighter (slots 2-4: the one it answered too) held by a 2-frame hitstop '
+          '(HITSTOP 0x0F000044 + 8 x (slot + 2)) on every frame it asks the world stop (%d frames), him (slot 1) never'
+          % len(asks), (bool(asks), hs[2] == asks, hs[3] == asks, hs[4] == asks, hs[1]), (True, True, True, True, []))
+    g, vm, zs = ss_run(r, frames=80, others=place)
+    check('  the stance alone (no counter): nobody held',
+          [e for e in g.ev('set') if 0x0F000044 <= e[2] < 0x0F000098 and (e[2] - 0x0F000044) % 8 == 0], [])
+
+
 def dodge_run(r, status=0, timer=C.V_DODGE_R, form=2000.0, air=False, frames=45, face=1.0, events=None):
     """events: {frame k (0-based, before it runs): callable(g)} (a press, a signal)"""
     g = Game(status=status, damage=150.0, air=air, x=0.0, face=face)
@@ -790,10 +817,10 @@ def reset_tests(r):
     check('the transformation\'s status left some other way: transformed (2000)', g.vars[C.V_FORM], 2000.0)
 
 
-def ss_run(r, rec=None, at=10, frames=60, form=2000.0, air_target=False, trace=None, stop_at=None):
+def ss_run(r, rec=None, at=10, frames=60, form=2000.0, air_target=False, trace=None, stop_at=None, others=None, g=None):
     """the grounded down special (status 0x155's main func_2265, its loop, its end func_2282); trace: {frame: his X}
     from the counter's read; stop_at: (v10) the slide's frame counter set to this after the read (the fallback)"""
-    g = Game(status=0x155, damage=150.0, x=0.0, y=0.0, face=1.0)
+    g = g if g is not None else Game(status=0x155, damage=150.0, x=0.0, y=0.0, face=1.0)
     g.vars[C.V_FORM] = form
     g.vars[B.V_AURA] = 999.0
     vm = r.vm(g)
@@ -808,6 +835,8 @@ def ss_run(r, rec=None, at=10, frames=60, form=2000.0, air_target=False, trace=N
         for t in TIMERS + (B.V_SS,):
             if g.vars.get(t, 0.0) > 0.0:
                 g.vars[t] = max(0.0, g.vars[t] - 1.0)
+        if others is not None:
+            others(g)
         vm.g[18] = 2 if g.air else 0
         g.req = None
         r.call(vm, 'func_82')
@@ -2026,6 +2055,7 @@ def main():
     shape_tests(r)
     v12_msc_tests(r)
     v13_freeze_tests(r)
+    v14_ss_freeze_tests(r)
     mode_tests(r)
     reset_tests(r)
     ss_tests(r)
@@ -2040,6 +2070,7 @@ def main():
         native_tests(exe)
     import supamario_sf_test as SFT                      # v11: Soaring Fist, the effect fixes, crouch
     SFT.check = check                                    # (this run's PROBLEMS)
+    SFT.SINCE[:] = [since] if since else []
     SFT.run(r, out, ts_out, base, SF_SKILL_DIR, exe)
     if pkg and since:
         package_since_tests(pkg, out, since, exe)

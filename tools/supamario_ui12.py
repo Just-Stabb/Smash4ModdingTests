@@ -331,6 +331,23 @@ def sf_swirl(p, e, rep):
     return FX_IDS['swirl']
 
 
+FIR_RINGS = ('wave_1', 'wave_ring', 'wave_ring_1', 'wave_ring_2')     # Hkn_Fir's colour rings (XV2's wind01 crescents)
+FIR_GAIN = 2.0
+
+
+def sf_fir(p, rep):
+    """v14 (the user: "the shockwaves from the release of the punches either aren't there or are hard to see"): Hkn_Fir's
+    colour rings x FIR_GAIN (XV2's alpha 0.3-1.0, normal blend drawn additive, faint), the call turned to show them
+    (supamario_sf_build FIR_TURN)"""
+    done = []
+    for x in p.sets[_set(p, SWIRL_FROM[0])]['emitters']:
+        if x['data'] is not None and p.emitter_name(x['data']) in FIR_RINGS:
+            _gain(p, x['data'], FIR_GAIN)
+            done.append(p.emitter_name(x['data']))
+    rep['v14_fir'] = {'gain': FIR_GAIN, 'emitters': done}
+    return done
+
+
 def effects(p, e, sf_skill, rep):
     """every v12 change to the bank (supamario_ui_build.effects, after v11's); v13's trail and swirls after them"""
     sf_3d(p, sf_skill, rep)
@@ -339,6 +356,7 @@ def effects(p, e, sf_skill, rep):
     smash_hed_blue(p, e, rep)
     sf_trail(p, e, rep)
     sf_swirl(p, e, rep)
+    sf_fir(p, rep)
 
 
 # ---------------------------------------------------------------- 5. the scripts

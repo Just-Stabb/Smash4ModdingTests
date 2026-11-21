@@ -4963,3 +4963,77 @@ no full-stop call; the stage-only mode (frame state and steps untouched, the lea
 `supamario_corebreaker_test` 104 ok; `outline_shell_test.py` 124 ok; `mesh_vis_test.py` 64 ok; `eft_vertex_test` 0
 failures; `msc_stack_check` 0 of 2510 (globals 127 of 128), the projectile's 0 of 48; `fighter_texture_ids.py check` 0
 errors; `import_call_check` 0 on both exes. Sm4shCommand unchanged (no command or slot). 0 failures.
+
+## Ultra Instinct v14 (`supamario_ultrainstinct_v14.zip`, exe `exe_v46z_ui10`; TEST ONLY `exe_v46z_ui10_diag`; Sm4shCommand unchanged)
+Over v13. Changed: the MSC, effect.bin, expression.bin, the ptcl, the exe (`tools/supamario_ui_cave.py`, reproduced by
+the cave test). The user's v13 test: "In the air, some times opponents fall fast enough to get pushed out of Soaring
+Fist's weaker hits, and they're able to be pushed off of edges with it which makes the final hit not connect. Also
+certain glows appear at Supamario's feet during the attack, and the shockwaves from the release of the punches either
+aren't there or are hard to see. Secret Sensation no longer freezes projectiles or enemies but the white flash is
+fixed. Please make it freeze the stage, enemies, projectiles and effects without the white flash." And: remove the
+controller rumble while charging Soaring Fist.
+
+### 1. Secret Sensation freezes the world again (no white flash)
+- **Cause:** the cave's stop made every frame a slowed frame between two steps (`+8` 1, `+0` 1: no object steps) but
+  left the frame state's rate `+4` at the game's 1.0. On such a frame every fighter's second update (`0x02E22454`)
+  runs only its slowed path, which plays its motion at that rate (`0x02E4051C` -> `0x02E402CC` -> `0x02C5D2B4`), and
+  the weapons' and items' paths read the same rate: everything kept moving at full speed (docs/native-notes.md v14).
+  v12's and v13's whites hid it until v13 fixed the flash.
+- **Fix (exe_v46z_ui10):** the stop writes the rate **0.01** (the game's slowest, N 100); his step and his second
+  update (new hook `ws_post`) run on a normal frame (`+8` 0, `+0` 0, `+4` 1.0), so he alone moves. The objects'
+  effects (key bit `0x8000`: fighters', weapons', items') are paused again, the stage's and the Final Smash sets' left
+  running (pausing those was v10-v11's white). The stage: `+0xD0` only (v13, no flash). Secret Sensation's MSC also
+  holds every other fighter by the 2-frame hitstop every frame it asks the stop (`ui_freeze(0)`), as the counter does.
+- **Its hit:** Secret Sensation has none (a reposition: the slide behind the attacker, intangible), so nothing has to
+  land under the stop; the stop's collision pass skip (v13 notes) can't cost it anything.
+- **Particles under a pause:** paused instances calculate at rate 0 (v12 notes); only objects' instances are paused,
+  the game's own hitlag pause path, which never whitened anything; a continuously emitting effect on a frozen fighter
+  adds particles that don't age for the stop's length (30-40 frames), as in hitlag. Not seen in game yet.
+- **The transformation counter** keeps v13's stage-only stop (the objects step, so its hits land) and the hitstop
+  freeze of everyone but the attacker; new: the objects' effects pause in it too. Weapons / items still move during it.
+
+### 2. Soaring Fist: the weak punches always reach the last
+- **Fast fallers (cause):** sf_hold pulled an airborne opponent 0.35 of the way to the lane a frame, so one falling v a
+  frame settled ~v / 0.35 under it; and one under his feet (gone over an edge) was taken for grounded and not pulled.
+- **Fix:** `SF_PULL` 1.0: put on the lane every frame it is held (a frame's fall under it at most: 1.08-2.55 for the
+  KO_FIGHTERS, 4.5 for a test faster than any); grounded means grounded hitstun (Damage `0x45`) within 0.5 of his
+  feet; anything else (in the air, above or under him) is pulled.
+- **Edges:** a grounded held opponent gets `GROUND` 2 every frame it is held (GroundModule(0x2710, 2), the grab
+  statuses' "can't slide off an edge", docs/position-variables.md); one that goes over anyway is pulled back up.
+- **Weights:** the non-final punches' knockback is set (KBG 0, BKB 40), the same on every weight; only the fall
+  differs, which the tests cover per fighter.
+
+### 3. Soaring Fist's look
+- **The feet glows:** every BTL_CMN effect at his feet (XV2's `b_C_Base`) is gone: GHit / MHit (hit flashes) and the
+  GHitSmk / MHitSmk smokes, whose conversion draws 7 of 15 emitters with glare and 4 "normal blend drawn additive"
+  (glowing blobs). Their sets stay in the bank, unused. Mario's own smash-charge sparkle (`0x1000019`, vanilla
+  AttackS4Hold's) stays.
+- **The release shockwaves:** Hkn_Fir's rings lie across the punch (his XY plane), edge-on to Smash 4's side camera;
+  the call is turned **55 degrees** about his up (an ellipse 0.82 wide), its colour rings' (wave_1, wave_ring,
+  wave_ring_1, wave_ring_2) alpha **x2** (`supamario_ui12.sf_fir`). Size and place unchanged (x1.3 of v11, at his fist).
+- **No rumble while charging:** the wind-up / charge script's expression part is empty (v11-v13 Rumble_Loop at 57);
+  the MSC never asked one. The release's rumble at each punch stays.
+
+### Not confirmed in game / approximated
+- That the rate 0.01 holds weapons and items as it holds fighters (their readers pass it on as a rate: read, not
+  traced to the movement); that his normal-frame second update during the stop changes nothing visible for him.
+- That GROUND 2 holds a fighter in grounded hitstun at an edge (the grab statuses' use); that a grounded Soaring Fist
+  victim is in status 0x45 (one in 0x46 at his feet is pulled instead, which also keeps it in the lane).
+- The rings' visibility (not rendered offline).
+
+### Ultra Instinct v14, results
+`supamario_ui_test.py --exe --package --since` (v13's build, `--sf-skill`) **728 ok** (v14: Secret Sensation holds
+every other fighter by hitstop on every stopped frame and nobody without a counter; no rumble command in the wind-up /
+charge script and no MSC rumble from the move's start to the release (4 charge lengths), one at each punch after;
+airborne opponents of five weights / gravities and one faster than any held in the lane from the first hit to the
+last punch (levels 2 and 3), put on the line every held frame; pushed off an edge and pulled back; GROUND 2 every held
+frame on the ground, none in the air; no BTL_CMN at his feet; Hkn_Fir turned 55 degrees and its rings x2 over v13's);
+`supamario_ui_cave_test.py` **422 ok** (exe_v46z_ui10 / ui10_diag reproduced byte for byte; the stopped frame's rate
+0.01; his step and his second update on a normal frame and the state put back; another fighter's on the stopped one;
+the stage-only stop untouched; the objects' effects paused (not his, not kept out, not already paused, not the
+stage's), 100 at most, all let go; S4UW's paused count and mode; the base's fill / second-update instructions);
+`supamario_timeskip_test` 198, `supamario_godfist_test` 566, `supamario_sledgehammer_test` 141,
+`supamario_fakedeath_test` 47, `supamario_corebreaker_test` 104 ok; `outline_shell_test.py` 124 ok; `mesh_vis_test.py`
+64 ok; `eft_vertex_test` 0 failures; `msc_stack_check` 0 of 2511 (globals 127 of 128), the projectile's 0 of 48;
+`fighter_texture_ids.py check` 0 errors; `import_call_check` 0 on both exes. Sm4shCommand unchanged (no command or
+slot). 0 failures.

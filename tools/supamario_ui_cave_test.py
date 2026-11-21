@@ -1196,6 +1196,38 @@ EV10_REG_WORDS = {0x02C28F48: 0x3D2002C3, 0x02C28F50: 0x3929CD28}       # the Ef
 EV11_REG_WORDS = {0x02C28DE4: 0x3CA002C3, 0x02C28DF0: 0x38A5CDC0}       # ... event 0x11 -> 0x02C2CDC0
 
 
+# v14 evidence (the base): what a stopped frame does with the frame state's rate +4 (1/N)
+V14_EVIDENCE = [
+    (0x02BFBA14, 'stfs f12, 4(r30)'),             # the fill: +4 = 1/N on a slowed frame
+    (0x02BFBA8C, 'stfs f0, 4(r30)'),              # ... 1.0 on a normal one
+    (0x02BFBA94, 'stb r31, 8(r30)'),              # ... +8 0
+    (0x02BFBA98, 'stw r31, 0(r30)'),              # ... +0 0
+    (0x02E224E8, 'mr r31, r3'),                   # the second update: r3 the fighter
+    (0x02E224F0, 'lwz r12, 0x6c04(r12)'),         # ... reads the frame state
+    (0x02E22524, 'clrlwi. r26, r6, 0x18'),        # ... a normal frame (+8 0 or +0 0) ...
+    (0x02E2252C, 'beq 0x2e23d90'),                # ... else only its slowed path
+    (0x02E23D98, 'bl 0x2e4051c'),                 # the slowed path: the motion's
+    (0x02E40624, 'bl 0x2e402cc'),                 # ... its rate step
+    (0x02E40304, 'lfs f31, 4(r12)'),              # ... the rate: the frame state's +4
+    (0x02E403F8, 'fmr f1, f31'),                  # ... phase 1 (the stop's): the motion at the rate
+    (0x02E403F0, 'bl 0x2c5d2b4'),
+]
+
+
+def v14_evidence(img):
+    import capstone
+    md = capstone.Cs(capstone.CS_ARCH_PPC, capstone.CS_MODE_32 | capstone.CS_MODE_BIG_ENDIAN)
+    got = []
+    for a, _want in V14_EVIDENCE:
+        ins = list(md.disasm(struct.pack('>I', img.w(a)), a))
+        got.append('%s %s' % (ins[0].mnemonic, ins[0].op_str) if ins else '?')
+    check('v14 evidence (the base RPX): the fill writes +4 = 1/N (1.0 on a normal frame, +8 / +0 0); the fighter\'s '
+          'second update 0x02E22454 (vtable 0x10126E6C, r3 the fighter) runs in full on a normal frame, else only '
+          '0x02E23D90 -> 0x02E4051C -> 0x02E402CC, whose phase-1 path plays the motion (0x02C5D2B4) at the rate +4',
+          got, [w for _a, w in V14_EVIDENCE])
+    check('v14 evidence: vtable 0x10126E6C holds 0x02E22454', img.w(0x10126E6C), C.POST_HOOK)
+
+
 def v10_words_checks(base, patched, labels):
     img, pimg = K.Image(base), K.Image(patched)
     check('v10: the three hooked words are `mflr r0` in the base (the shield-hit listener, the frame state fill, the '
@@ -1206,6 +1238,11 @@ def v10_words_checks(base, patched, labels):
            C.branch(C.STEP_HOOK, labels['ws_step'])])
     check('v10: no relocation on the new hooked words', [hex(a) for a in (C.SX_HOOK, C.FILL_HOOK, C.STEP_HOOK)
                                                          if a in img.relocs()], [])
+    check('v14: the fighter\'s second update (0x02E22454) starts with `stwu r1, -0x528(r1)` in the base, a branch to '
+          'ws_post in the patched RPX, no relocation on it',
+          (img.w(C.POST_HOOK), pimg.w(C.POST_HOOK), C.POST_HOOK in img.relocs()),
+          (C.STWU_528, C.branch(C.POST_HOOK, labels['ws_post']), False))
+    v14_evidence(img)
     check('v10 evidence: the EffectModule\'s init (0x02C28DD0) registers 0x02C2CD28 (event 0x10, the shield hit) and '
           '0x02C2CDC0 (0x11)', ([img.w(a) for a in EV10_REG_WORDS], [img.w(a) for a in EV11_REG_WORDS]),
           (list(EV10_REG_WORDS.values()), list(EV11_REG_WORDS.values())))
@@ -1273,7 +1310,19 @@ def v10_ws_checks(e, kind, labels):
     steps, fills, stage = [], [], []
     fs = e.alloc(0x10, b'\0')
     e.setw(C.FRAME_STATE, fs)
-    e.stub(C.STEP_HOOK + 4, lambda em: steps.append((em.r(3), em.r(4), em.mu.mem_read(fs + 8, 1)[0], em.w(fs))))
+    rates, posts = [], []
+    e.setw(fs + 4, fbits(1.0))                          # the game's normal frame: 1/N 1.0
+
+    def step(em):
+        steps.append((em.r(3), em.r(4), em.mu.mem_read(fs + 8, 1)[0], em.w(fs)))
+        rates.append(round(bitsf(em.w(fs + 4)), 4))
+    e.stub(C.STEP_HOOK + 4, step)
+
+    def post(em):                                       # v14: the fighter's second update (its stwu undone here)
+        posts.append((em.r(3), em.mu.mem_read(fs + 8, 1)[0], em.w(fs), round(bitsf(em.w(fs + 4)), 4)))
+        em.mu.reg_write(UC_PPC_REG_1, em.r(1) + 0x528)
+    e.stub(C.POST_HOOK + 4, post)
+    fstate = lambda: (e.mu.mem_read(fs + 8, 1)[0], e.w(fs), round(bitsf(e.w(fs + 4)), 4))   # noqa: E731
     e.fill_ret = 1
 
     def fill(em):
@@ -1314,27 +1363,36 @@ def v10_ws_checks(e, kind, labels):
     # no ask: his step and the fill as before
     e.vars = {C.V_STOP: 0.0}
     e.mu.mem_write(fs, b'\0' * 0x10)
+    e.setw(fs + 4, fbits(1.0))
     del steps[:]
     r, kept = e.run(labels['ws_step'], him['f'], him['acc'])
+    r, kept = e.run(labels['ws_post'], him['f'])
+    check('v14: ws_post, him, no stop: the game\'s second update as it was (the frame state as the game made it)',
+          (posts, kept), ([(him['f'], 0, 0, 1.0)], True))
+    del posts[:]
     check('v10: ws_step, him, no ask: the game\'s step (r3 / r4 his), nothing else; no stop',
           (steps, e.w(data), stage, paused(), kept), ([(him['f'], him['acc'], 0, 0)], 0, [], [0, 0, 0, 1, 0], True))
     r, kept = e.run(labels['ws_fill'], fs)
     check('v10: ws_fill, no stop: the game\'s fill and its answer; the frame state as it left it',
-          (fills[-1], r, bytes(e.mu.mem_read(fs, 12)), kept), (fs, 1, b'\0' * 12, True))
+          (fills[-1], r, bytes(e.mu.mem_read(fs, 12)), kept), (fs, 1, bytes(4) + struct.pack('>f', 1.0) + bytes(4), True))
     # his ask: the stop starts
     e.vars = {C.V_STOP: 2.0}
     e.mu.mem_write(fs + 8, bytes([1]))                  # (a slowed frame, as the fill made it)
     e.setw(fs, 1)
     del steps[:]
     r, kept = e.run(labels['ws_step'], him['f'], him['acc'])
-    check('v10: ws_step, his ask (TIMER_6 2): the stop starts (the lease WS_LEASE, its owner him); v12: no effect instance '
-          'paused (v10-v11 paused every one but his: the stage\'s ran at rate 0, the white screen); the stage stopped '
-          '(v13: its update flag +0xD0 set ONLY: no call of the full stop 0x0316505C, whose 0x031427D0 whites the screen '
-          'out, the v12 clips and Stage_Freeze On 2 in game); the mode 0 (the world)',
-          (e.w(data), e.w(data + 4), paused(), e.w(data + 8), stage, d0(), e.w(data + 0xC), kept),
-          (C.WS_LEASE, him['f'], [0, 0, 0, 1, 0], 0, [], 1, 0, True))
-    check('v10: ws_step, his step during his stop runs on a normal frame (+8 0 while it runs), the frame state put back',
-          (steps, e.mu.mem_read(fs + 8, 1)[0], e.w(fs)), ([(him['f'], him['acc'], 0, 1)], 1, 1))
+    check('v10: ws_step, his ask (TIMER_6 2): the stop starts (the lease WS_LEASE, its owner him); v14: the objects\' '
+          'effects paused again (key bit 0x8000, the game\'s own hitlag pause; v12-v13 none): the other fighter\'s '
+          '(0x8013) only: not his (0x8012 under the mask), not the kept-out one, not the already-paused one (left to '
+          'its owner), not one without the bit (0x0108xxxx: a stage / Final Smash one, its own clock); the count 1, '
+          'listed at ws_data + 0x10; the stage stopped (v13: its update flag +0xD0 set ONLY: no call of the full stop '
+          '0x0316505C, whose 0x031427D0 whites the screen out, the v12 clips and Stage_Freeze On 2 in game); the mode 0 '
+          '(the world)',
+          (e.w(data), e.w(data + 4), paused(), e.w(data + 8), e.w(data + 0x10), stage, d0(), e.w(data + 0xC), kept),
+          (C.WS_LEASE, him['f'], [0, 1, 0, 1, 0], 1, insts[1], [], 1, 0, True))
+    check('v10: ws_step, his step during his stop runs on a normal frame (v14: the fill\'s own: +8 0, +0 0, +4 1.0 '
+          'while it runs; v10-v13 +8 only), the frame state put back',
+          (steps, rates[-1:], fstate()), ([(him['f'], him['acc'], 0, 0)], [1.0], (1, 1, 1.0)))
     check('v10: ws_step asked TIMER_6 through his WorkModule (get_float)', ('get', him['wm'], C.V_STOP) in e.calls, True)
     del steps[:]
     r, kept = e.run(labels['ws_step'], other['f'], other['acc'])
@@ -1346,6 +1404,24 @@ def v10_ws_checks(e, kind, labels):
     check('v10: ws_fill during the stop: the game\'s fill, then a slowed frame between two steps (+8 1, +0 1), the '
           'answer 0, the lease one less', (r, e.mu.mem_read(fs + 8, 1)[0], e.w(fs), e.w(data), kept),
           (0, 1, 1, C.WS_LEASE - 1, True))
+    check('v14: ... and its rate 1/N (+4) the game\'s slowest, WS_RATE %g (N 100, 0x02FFA140\'s clamp): on the frames '
+          'between two steps the objects play their motion / movement at it (0x02E4051C -> 0x02E402CC, the weapons\' '
+          'and items\' alike), so the world holds still (v10-v13 left the game\'s 1.0: the user\'s "no longer freezes '
+          'projectiles or enemies")' % C.WS_RATE, round(bitsf(e.w(fs + 4)), 4), C.WS_RATE)
+    del steps[:], rates[:]
+    r, kept = e.run(labels['ws_step'], him['f'], him['acc'])
+    check('v14: his step in the stopped frame: the fill\'s normal frame (+8 0, +0 0, +4 1.0), put back after '
+          '(+8 1, +0 1, +4 %g)' % C.WS_RATE, (steps[-1][2:], rates, fstate(), kept),
+          ((0, 0), [1.0], (1, 1, C.WS_RATE), True))
+    r, kept = e.run(labels['ws_post'], him['f'])
+    check('v14: ws_post, him in his stop: his second update (0x02E22454: the full one on a normal frame; on a slowed '
+          'one 0x02E23D90 only, his motion at the rate) on the fill\'s normal frame, the frame state put back',
+          (posts, fstate(), kept), ([(him['f'], 0, 0, 1.0)], (1, 1, C.WS_RATE), True))
+    del posts[:]
+    r, kept = e.run(labels['ws_post'], other['f'])
+    check('v14: ws_post, another fighter in his stop: its update on the stopped frame (+8 1, +0 1, +4 %g): it holds '
+          'still' % C.WS_RATE, (posts, fstate(), kept), ([(other['f'], 1, 1, C.WS_RATE)], (1, 1, C.WS_RATE), True))
+    del posts[:]
     # renewed by his next ask
     e.run(labels['ws_step'], him['f'], him['acc'])
     check('v10: his next ask renews the lease (no second start; v13: the flag still set, nothing called)',
@@ -1371,6 +1447,14 @@ def v10_ws_checks(e, kind, labels):
     check('v13: ws_step, his ask over %g (TIMER_6 6: the transformation counter): the stage stopped (+0xD0), the mode 1, '
           'his step as the game\'s frame makes it (no frame state touched)' % C.WS_STAGE_ONLY,
           (e.w(data), e.w(data + 0xC), d0(), steps, kept), (C.WS_LEASE, 1, 1, [(him['f'], him['acc'], 1, 1)], True))
+    check('v14: ... the stage-only stop pauses the objects\' effects as well (the other fighter\'s, count 1)',
+          (paused(), e.w(data + 8)), ([0, 1, 0, 1, 0], 1))
+    e.mu.mem_write(fs, b'\0' * 12)
+    e.setw(fs + 4, fbits(1.0))
+    r, kept = e.run(labels['ws_post'], him['f'])
+    check('v14: ws_post, him in the stage-only stop: the game\'s update as the frame state says (nothing changed)',
+          (posts, fstate(), kept), ([(him['f'], 0, 0, 1.0)], (0, 0, 1.0), True))
+    del posts[:]
     e.mu.mem_write(fs, b'\0' * 12)
     r, kept = e.run(labels['ws_fill'], fs)
     check('v13: ws_fill during the stage-only stop: the game\'s fill and answer kept (every object steps: the rush\'s '
@@ -1382,7 +1466,27 @@ def v10_ws_checks(e, kind, labels):
     e.vars = {C.V_STOP: 0.0}
     for _ in range(3):
         e.run(labels['ws_fill'], fs)
-    check('v13: ... it ends with the lease (the stage on, the mode 0)', (e.w(data), e.w(data + 0xC), d0()), (0, 0, 0))
+    check('v13: ... it ends with the lease (the stage on, the mode 0; v14: the effect it paused goes on, the one '
+          'already paused stays)', (e.w(data), e.w(data + 0xC), d0(), paused()), (0, 0, 0, [0, 0, 0, 1, 0]))
+    # v14: a full pool: no more than WS_MAX paused (the list's room), every one put back at the end
+    many = []
+    for k in range(C.WS_MAX + 5):
+        i = e.alloc(0x1C0, b'\0')
+        e.setw(i + 8, 0x8100 + (k & 0xFF))
+        many.append(i)
+    for a, b in zip(many, many[1:] + [0]):
+        e.setw(a + 0x18, b)
+    e.setw(C.INST_LIST, many[0])
+    many_p = lambda: [e.mu.mem_read(i + 0x19E, 1)[0] for i in many]   # noqa: E731
+    e.vars = {C.V_STOP: 2.0}
+    e.run(labels['ws_step'], him['f'], him['acc'])
+    check('v14: a full effect pool (%d objects\' instances): WS_MAX (%d) paused, the rest left; the count WS_MAX'
+          % (len(many), C.WS_MAX), (sum(many_p()), e.w(data + 8), many_p()[C.WS_MAX:]), (C.WS_MAX, C.WS_MAX, [0] * 5))
+    e.vars = {C.V_STOP: 0.0}
+    for _ in range(3):
+        e.run(labels['ws_fill'], fs)
+    check('v14: ... every one of them goes on at the end (the lease out)', (sum(many_p()), e.w(data)), (0, 0))
+    e.setw(C.INST_LIST, insts[0])
     # the stage stop skipped as the Final Smashes skip it
     e.mu.mem_write(sflags + 0xB3, bytes([1]))
     del stage[:]
@@ -1408,14 +1512,17 @@ def v10_diag_checks(diag, kind):
     lines = []
 
     def osr(em):
-        lines.append((em.cstr(em.r(3)).split(' ')[0], tuple(em.r(i) for i in range(4, 8))))
+        lines.append((em.cstr(em.r(3)).split(' ')[0], tuple(em.r(i) for i in range(4, 9))))
     e.stub(C.OSREPORT_VENEER, osr)
     _w, labels = C.build(kind, diag=True)
     v10_sx_checks(e, kind, labels)
     v10_ws_checks(e, kind, labels)
     ws = [l_ for l_ in lines if l_[0] == 'S4UW']
-    check('v10 diag: S4UW on / off at each stop\'s start and end (on 1, his fighter, v13: the mode 0 / 1; off 0, his '
-          'fighter, 0)', [(x[1][0], x[1][2]) for x in ws][:4], [(1, 0), (0, 0), (1, 1), (0, 0)])
+    check('v10 diag: S4UW on / off at each stop\'s start and end (on 1 / off 0; v14: the effects paused 1 (the other '
+          'fighter\'s) at both, the mode 0 / 1 at the start, 0 at the end): the Secret Sensation stop, the '
+          'transformation counter\'s stage-only stop, the full pool', [(x[1][0], x[1][2], x[1][4]) for x in ws][:6],
+          [(1, 1, 0), (0, 1, 0), (1, 1, 1), (0, 1, 0), (1, C.WS_MAX, 0), (0, C.WS_MAX, 0)])
+    check('v10 diag: ... the owner his fighter in every line', len(set(x[1][1] for x in ws[:6])), 1)
 
 def main():
     a = sys.argv[1:]

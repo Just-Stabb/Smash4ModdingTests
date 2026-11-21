@@ -39,8 +39,10 @@ class Game(UT.Game):
         self.hold_flag = flag
         self.ints = {0x10000048: 7}
         self.arts = []
+        self.calls = []
 
     def sys(self, sid, a):
+        self.calls.append((self.n, sid, tuple(a)))      # v14: every call (the rumble test)
         if sid == 0xE and a[0] == ATK:
             return int(self.n <= self.held)
         if sid == 0x16 and a[0] == 0x10 and a[1] == 0x2100001B:
@@ -188,8 +190,8 @@ def hold_tests(r):
     ty = F.Y0 - F.MID
     check('  airborne (its feet 8 up): pulled to the lane (its middle on the punches\' line: feet at %g) by %g of the way a '
           'frame (the "windbox")' % (ty, F.PULL), (ys[0][1], ys[0][0]), (round(8.0 + (ty - 8.0) * F.PULL, 3), first))
-    g, vm = sf_run(r, held=held, others=[opp(y=0.0)])
-    check('  on the ground: not moved (its own knockback pushes it back)', [e for e in g.ev('set') if e[2] == SLOT_Y + 4],
+    g, vm = sf_run(r, held=held, others=[opp(y=0.0, st=F.ST_DAMAGE_GROUND)])
+    check('  on the ground (v14: in grounded hitstun, Damage 0x45): not moved (its own knockback pushes it back)', [e for e in g.ev('set') if e[2] == SLOT_Y + 4],
           [])
     g, vm = sf_run(r, held=held, others=[opp(hs=lambda g: 0.0)])
     check('  not in hitstun (missed or shielding): its hitstun untouched', [e for e in g.ev('set') if e[2] == HITSTUN + 8],
@@ -386,12 +388,12 @@ def file_tests(out, base, skill_dir):
           [f for f, p in at(F.SCRIPT_REL, 'effect', 'Graphic_Effect2') if p[0] == ids.get('fir')],
           [F.REL_AT[lv - 1] + F.PUNCH[k] for lv in (1, 2, 3) for k in range(lv)])
     check('v11: the charge: the smash charge\'s look (sparkles every 10 frames to %d; v13: no START_CHARGE, the body '
-          'shake: the user\'s "remove the character shake while charging"; the rumble kept at %d)' % (
-              F.HOLD_AT + F.HOLD_N, F.HOLD_AT),
+          'shake: the user\'s "remove the character shake while charging"; v14: no rumble either (v11-v13 at %d), the '
+          'user\'s "remove the controller rumble while charging")' % (F.HOLD_AT + F.HOLD_N, F.HOLD_AT),
           ([f for f, _p in at(F.SCRIPT_START, 'expression', 'START_CHARGE')],
            [f for f, _p in at(F.SCRIPT_START, 'expression', 'Rumble_Loop')],
            [f for f, p in at(F.SCRIPT_START, 'effect', 'Graphic_Effect2') if p[0] == 0x1000019]),
-          ([], [F.HOLD_AT], list(range(F.HOLD_AT, F.HOLD_AT + F.HOLD_N, 10))))
+          ([], [], list(range(F.HOLD_AT, F.HOLD_AT + F.HOLD_N, 10))))
     # the motion
     pac = dict(omo.pac_read(os.path.join(sup, 'motion', 'body', 'main.pac')))
     o = omo.Omo([d for n, d in pac.items() if n.endswith('SpecialAirLwHeavy.omo')][0])
@@ -735,6 +737,197 @@ def v13_swirl_tests(r):
     check('  nobody in the lane: no swirls', [e for e in g.ev('effect') if e[2] == 3 and e[3] == sid], [])
 
 
+GROUND = 0x0F0000BE                     # slot quantity 6 (GroundModule(0x2710, value)), slot 2 + 8 x (slot - 1)
+RUMBLE_SYS = 0x19                       # MSC ControlModule(0x19, ...): the controller rumble (msc-note-sheet)
+
+
+def v14_rumble_tests(r):
+    """v14 (the user: "remove the controller rumble while charging Soaring Fist ... add a test that no rumble is
+    requested between the charge start and the release"): the wind-up / charge script (SCRIPT_START, from the move's
+    start to the release's motion) has no rumble in any of its four parts, and the MSC requests none (ControlModule
+    0x19) from the move's start to the release; the release keeps one rumble a punch"""
+    body = {p: acmd.ACMDFile.load(os.path.join(UT_OUT[0], 'fighter', 'supamario', 'script', 'animcmd', 'body',
+                                               p + '.bin')) for p in ('game', 'effect', 'sound', 'expression')}
+    found = sorted({(p, c.name) for p, f in body.items() for c in f.script(F.SCRIPT_START)
+                    if 'rumble' in c.name.lower() or 'charge' in c.name.lower()})
+    check('v14: the wind-up / charge script (%s): no rumble command in any part (v11-v13: Rumble_Loop at %d) and no '
+          'START_CHARGE (v13)' % (F.SCRIPT_START, F.HOLD_AT), found, [])
+    rel_rumbles = []
+    fr = 0
+    for c in body['expression'].script(F.SCRIPT_REL):
+        if c.name == 'FRAME':
+            fr = int(c.params[0])
+        elif 'rumble' in c.name.lower():
+            rel_rumbles.append(fr)
+    check('v14: the release script: one rumble at each punch (from the release on), nothing else',
+          rel_rumbles, sorted(F.REL_AT[lv - 1] + F.PUNCH[k] for lv in (1, 2, 3) for k in range(lv)))
+    for held, what in ((500, 'charged to the most'), (F.HOLD_DECIDE + F.LV2, 'charged to 2 punches'),
+                       (F.HOLD_DECIDE + 5, 'a short charge'), (0, 'a tap')):
+        g, vm = sf_run(r, held=held)
+        rel = [e[0] for e in g.ev('motion_at') if e[2] == F.MOT_REL][:1]
+        msc = [(n, a) for n, sid, a in g.calls if sid == 0xE and a and a[0] == RUMBLE_SYS and n <= (rel or [999])[0]]
+        check('v14: %s: no MSC rumble (ControlModule(0x19)) from the move\'s start to the release (frame %s)'
+              % (what, rel), (bool(rel), msc), (True, []))
+
+
+def v14_fall_run(r, lv, gravity, max_fall, dx=30.0, y0=6.0, ledge_at=None):
+    """an opponent in the lane, its own gravity / max fall from the first punch's hit; each non-final punch's push
+    (set knockback 40: 1.2 a frame away, 0.051 a frame less) and hitstun (40 x 0.4 + 20); ledge_at: grounded (y 0)
+    until that many frames after the hit, then off an edge (falling). Returns the frames from the first punch's
+    arrival to the final's: (frame, its feet after its fall (before his MSC), in the lane, its hitstun), and the run"""
+    held = F.HOLD_DECIDE + (F.LV2 if lv == 2 else F.LV3)
+    r0 = held + 1
+    st = {'x': dx, 'y': y0 if ledge_at is None else 0.0, 'vy': 0.0, 'vx': 0.0, 'hs': 0.0, 'k': 0, 'hit': None,
+          'log': [], 'done': False}
+
+    def opp(g):
+        x = g.vars.get(SLOT_X + 4, st['x'])
+        y = g.vars.get(SLOT_Y + 4, st['y'])
+        hs = g.vars.get(HITSTUN + 8, st['hs'])
+        t = g.n - r0
+        k = st['k']
+        if not st['done'] and k < lv and t >= 0:
+            a = arrive(lv, k, x)
+            if a is not None and t >= a:                    # punch k reaches it
+                if st['hit'] is None:
+                    st['hit'] = g.n
+                if k < lv - 1:
+                    hs = 40 * 0.4 + 20.0
+                    st['vx'] = 1.2
+                    st['vy'] = 0.0
+                else:
+                    st['done'] = True
+                st['k'] = k + 1
+        if st['hit'] is not None:
+            grounded = ledge_at is not None and g.n - st['hit'] < ledge_at and y <= 0.0
+            if not grounded:
+                st['vy'] = max(st['vy'] - gravity, -max_fall)
+                y += st['vy']
+            x += st['vx']
+            st['vx'] = max(0.0, st['vx'] - 0.051)
+            if hs > 0.0 and g.n != st['hit']:
+                hs -= 1.0
+        st['x'], st['y'], st['hs'] = x, y, hs
+        g.vars[SLOT_X + 4], g.vars[SLOT_Y + 4], g.vars[SLOT_F + 4] = x, y, -1.0
+        g.vars[HITSTUN + 8] = hs
+        g.vars[STATUS + 8] = float(F.ST_DAMAGE_GROUND if ledge_at is not None and y <= 0.0 else 0x46)
+        if st['hit'] is not None and not st.get('closed'):
+            st['log'].append((g.n, round(y, 3), y > -F.LANE_DOWN, round(hs, 2)))
+            st['closed'] = st['done']
+    g, vm = sf_run(r, held=held, others=[opp])
+    return st, g
+
+
+def v14_hold_tests(r):
+    """v14 (the user: "In the air, some times opponents fall fast enough to get pushed out of Soaring Fist's weaker hits,
+    and they're able to be pushed off of edges with it which makes the final hit not connect"): from the first punch's
+    hit to the final punch's arrival the opponent stays in the lane (sf_hold keeps hold of it) and its middle is within
+    the punch's reach of the line when the final arrives (after its own fall that frame), whatever its weight /
+    gravity / fall speed; a grounded one can't slide off an edge (GROUND 2 every frame it is held), and one that went
+    over an edge anyway is pulled back up. The non-final punches' knockback is set (KBG 0, BKB 40: the same push on
+    every weight), so the fall is what differs"""
+    ws = sorted({round(F.knockback(dict(F.NONFINAL, Damage=F.NONFINAL_DMG[2]), pct, w), 3)
+                 for w, _g, _m in F.KO_FIGHTERS.values() for pct in (0.0, 80.0, 150.0)})
+    check('v14: the non-final punches\' knockback is %g on every weight (%s) at any percent: the push is the same, the '
+          'fall differs' % (F.NONFINAL['BKB'], ', '.join('%s %d' % (n, v[0]) for n, v in F.KO_FIGHTERS.items())),
+          ws, [float(F.NONFINAL['BKB'])])
+    line = F.Y0                                          # the punches' line over his feet
+    cases = [(n, g_, m) for n, (_w, g_, m) in F.KO_FIGHTERS.items()] + [('beyond any fighter', 0.35, 4.5)]
+    for name, gravity, max_fall in cases:
+        for lv in (2, 3):
+            st, g = v14_fall_run(r, lv, gravity, max_fall)
+            log = st['log']
+            fin = log[-1] if st['done'] else None
+            check('v14: level %d, an airborne %s (gravity %g, max fall %g) in front: in the lane every frame from the '
+                  'first hit (frame %s) to the final punch (frame %s), its hitstun kept, its middle within the punch\'s '
+                  '%g of the line when the final arrives (%s under its line)' % (
+                      lv, name, gravity, max_fall, st['hit'], fin and fin[0], F.SIZE,
+                      fin and round(line - (fin[1] + F.MID), 2)),
+                  (st['done'], all(e[2] for e in log), all(e[3] > 0 for e in log[:-1]),
+                   fin is not None and abs(fin[1] + F.MID - line) <= F.SIZE), (True, True, True, True))
+    # v11-v13's pull (0.35 a frame, nobody under his feet pulled) for the record: the fast faller fell out
+    for lv in (2, 3):
+        st, g = v14_fall_run(r, lv, 0.35, 4.5)
+        writes = sorted({e[0] for e in g.ev('set') if e[2] == SLOT_Y + 4})
+        check('  level %d (gravity 0.35, max fall 4.5): put on the lane (Y %g) on every frame it is held (%d: from the '
+              'first hit to the one before the final punch), never after' % (lv, F.Y0 - F.MID, len(st['log']) - 1),
+              (writes == [e[0] for e in st['log'][:-1]],
+               {round(e[3], 3) for e in g.ev('set') if e[2] == SLOT_Y + 4}), (True, {round(F.Y0 - F.MID, 3)}))
+    # the ledge: grounded, then off an edge 3 frames after the first hit
+    for name, gravity, max_fall in cases:
+        st, g = v14_fall_run(r, 3, gravity, max_fall, ledge_at=3)
+        fin = st['log'][-1] if st['done'] else None
+        check('v14: level 3, a grounded %s pushed off an edge 3 frames after the first hit: pulled back up every frame '
+              '(under his feet: v11-v13 left it), in the lane to the final punch, its middle within %g of the line then'
+              % (name, F.SIZE), (st['done'], all(e[2] for e in st['log']),
+                                 fin is not None and abs(fin[1] + F.MID - line) <= F.SIZE), (True, True, True))
+    for name, (w, gravity, max_fall) in F.KO_FIGHTERS.items():
+        st, g = v14_fall_run(r, 3, gravity, max_fall, ledge_at=999)
+        gw = sorted({e[0] for e in g.ev('set') if e[2] == GROUND + 8 and e[3] == 2.0})
+        held = [e[0] for e in st['log'][:-1]]
+        check('v14: level 3, a grounded %s (weight %d) in front: GROUND 2 (GroundModule(0x2710, 2): its stage collision '
+              'can\'t slide off an edge, the grab statuses\' way) every frame it is held (frames %s-%s), never after the '
+              'final punch' % (name, w, held[:1], held[-1:]),
+              (all(n in gw for n in held), max(gw or [0]) <= st['log'][-1][0]), (True, True))
+    st, g = v14_fall_run(r, 3, 0.1, 2.0)
+    check('  an airborne one: no GROUND write (it is pulled instead)',
+          [e for e in g.ev('set') if e[2] == GROUND + 8], [])
+    g, vm = sf_run(r, held=F.HOLD_DECIDE + F.LV3, others=[lambda g: g.vars.update({
+        SLOT_X + 4: 30.0, SLOT_Y + 4: 0.0, SLOT_F + 4: -1.0, HITSTUN + 8: 20.0, STATUS + 8: float(0x46)})])
+    check('  one in air hitstun (Damage 0x46) level with his feet (a grounded test would call it grounded): pulled, no '
+          'GROUND write (the move is grounded only: status 0x2B in the air falls, 0xE)',
+          ([e for e in g.ev('set') if e[2] == GROUND + 8], bool([e for e in g.ev('set') if e[2] == SLOT_Y + 4])),
+          ([], True))
+
+
+def v14_fx_tests(out):
+    """v14 (the user: "certain glows appear at Supamario's feet during the attack, and the shockwaves from the release
+    of the punches either aren't there or are hard to see"): no BTL_CMN effect at his feet any more (GHit / MHit hit
+    flashes, the GHitSmk / MHitSmk conversions drawn additive with glare); Hkn_Fir (the release's burst) turned FIR_TURN
+    about his up (its rings edge-on to the side camera before), its colour rings' alpha x FIR_GAIN"""
+    import ptcl
+    import supamario_ui12 as U12
+    sup = os.path.join(out, 'fighter', 'supamario')
+    eff = acmd.ACMDFile.load(os.path.join(sup, 'script', 'animcmd', 'body', 'effect.bin'))
+    ids = UT_IDS['sf']
+
+    def calls(script):
+        out_, fr = [], 0
+        for c in eff.script(script):
+            if c.name == 'FRAME':
+                fr = int(c.params[0])
+            elif c.name.startswith('Graphic_Effect') or c.name.startswith('EFFECT'):
+                out_.append((fr, c.params))
+        return out_
+    start, rel = calls(F.SCRIPT_START), calls(F.SCRIPT_REL)
+    check('v14: the wind-up / charge plays only Mario\'s smash-charge sparkle (0x1000019) and flash (0x1000010) (v11-v13 '
+          'also BTL_CMN MHitSmk at his feet at its start)', sorted({p_[0] for _f, p_ in start}), [0x1000010, 0x1000019])
+    check('v14: the release plays only Hkn_Fir (0x%08X), one at each punch (v11-v13 also BTL_CMN GHit / GHitSmk / MHit '
+          'at his feet: the glows)' % ids.get('fir', 0),
+          ({p_[0] for _f, p_ in rel}, [f for f, _p in rel]),
+          ({ids.get('fir')}, sorted(F.REL_AT[lv - 1] + F.PUNCH[k] for lv in (1, 2, 3) for k in range(lv))))
+    check('v14: every Hkn_Fir call turned %g degrees about his up (ry), at his fist (0, %g, %g), size %g' % (
+        F.FIR_TURN, F.Y0, F.X0 - 3.0, round(F.FIR_SIZE * F.V13_FIR, 4)),
+          {(round(p_[6], 3), round(p_[3], 3), round(p_[4], 3), round(p_[8], 4)) for _f, p_ in rel},
+          {(F.FIR_TURN, F.Y0, F.X0 - 3.0, round(F.FIR_SIZE * F.V13_FIR, 4))})
+    if SINCE:
+        name = 'effect/supamario/supamario.010d0000.ptcl'
+        cur = ptcl.Ptcl(open(os.path.join(sup, name), 'rb').read())
+        old = ptcl.Ptcl(open(os.path.join(SINCE[0], 'fighter', 'supamario', name), 'rb').read())
+
+        def rings(p):
+            return {p.emitter_name(x['data']): tuple(round(p.field(x['data'], f), 4) for f in
+                                                    ('alpha_init', 'alpha_diff21', 'alpha_diff32'))
+                    for x in p.sets[p.find_set(U12.SWIRL_FROM[0])]['emitters']
+                    if x['data'] is not None and p.emitter_name(x['data']) in U12.FIR_RINGS}
+        a, b = rings(old), rings(cur)
+        check('v14: Hkn_Fir\'s colour rings (%s) at x%g their v13 alpha (init and both changes)' % (
+            ', '.join(sorted(a)), U12.FIR_GAIN), (sorted(a) == sorted(U12.FIR_RINGS),
+                                                  all(abs(b[k][i] - a[k][i] * U12.FIR_GAIN) < 2e-3 for k in a for i in range(3))),
+              (True, True))
+
+
+SINCE = []
 UT_OUT = []
 
 
@@ -753,6 +946,9 @@ def run(r, out, ts_out, base, skill_dir=None, exe=None):
     v12_foot_tests(out, base)
     v12_hold_tests(r)
     v13_swirl_tests(r)
+    v14_rumble_tests(r)
+    v14_hold_tests(r)
+    v14_fx_tests(out)
     piace_msc_tests(r)
     fx_tests(out, ts_out)
     if skill_dir:

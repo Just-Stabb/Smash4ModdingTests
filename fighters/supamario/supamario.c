@@ -42860,9 +42860,15 @@ float ui_attacker_slot()
 // stop (TIMER_6 UI_CNT_STOP_ASK); the attacker steps, held by the freeze box, and takes the rush
 void ui_freeze_others()
 {
+    ui_freeze((int)WorkModuleF(0, 0x01000010));
+}
+
+// v14: every other fighter but slot v (0: none) frozen by a 2-frame hitstop (Time Skip's stopped time): the
+// transformation counter's (v the attacker) and Secret Sensation's (v14, the user: "Secret Sensation no longer freezes
+// projectiles or enemies"; with the cave's world stop)
+void ui_freeze(int v)
+{
     int s;
-    int v;
-    v = (int)WorkModuleF(0, 0x01000010);
     s = 1;
     while (s <= 8)
     {
@@ -43340,6 +43346,7 @@ void ss_counter()
     EffectModule(0x2710, UI_FX_SS_RELEASE, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_SS_RELEASE_SIZE, 0, 0, 0, 0, 0, 0, 0x1);
     SoundModule(0x2710, UI_SND_VANISH);
     WorkModule(0, UI_SS_STOP_ASK, UI_V_STOP);                // v10: the world stopped (the cave) until he arrives
+    ui_freeze(0);                                            // v14: every fighter held too
     CameraModule(0x2714, UI_SS_CAM1_T, 0, UI_SS_CAM1_D);    // v7: a slight zoom (him and the fighter he passes)
 }
 
@@ -43406,6 +43413,7 @@ void ss_loop()
         if (n < UI_SS_STOP_MAX + 0.5f)
         {
             WorkModule(0, UI_SS_STOP_ASK, UI_V_STOP);     // v10: the world stays stopped (asked every frame)
+            ui_freeze(0);                                 // v14: and every fighter held (Time Skip's hitstop)
         }
         else
         {
@@ -43700,9 +43708,19 @@ void sf_hold(float r, float lv)
                     {
                         WorkModule(0, x + f * dx, 0x0f000020 + 0x4 * s);     // v12: back inside the next punch's reach
                     }
-                    if (fy > y + SF_GROUNDED)
+                    if (st > SF_ST_DAMAGE_GROUND - 0.5f && st < SF_ST_DAMAGE_GROUND + 0.5f && fy < y + SF_GROUNDED &&
+                        fy > y - SF_GROUNDED)
                     {
-                        // in the air: pulled to the lane (its middle on the punches' line)
+                        // v14 (the user: "they're able to be pushed off of edges with it which makes the final hit not
+                        // connect"): in grounded hitstun (Damage 0x45) on his ground, its stage collision can't slide
+                        // off an edge (GROUND 2, renewed every frame it is held: its next status sets its own)
+                        WorkModule(0, 2.0f, 0x0f0000be + 0x8 * s);
+                    }
+                    else
+                    {
+                        // in the air, or off his ground (above it; v14: or under it, gone over an edge): pulled to the
+                        // lane (its middle on the punches' line); v14: SF_PULL 1, on it every frame (a fast faller fell
+                        // out of v11-v13's 0.35 a frame, and one under his feet wasn't pulled)
                         ty = y + SF_Y - SF_MID;
                         WorkModule(0, fy + (ty - fy) * SF_PULL, 0x0f000021 + 0x4 * s);
                     }

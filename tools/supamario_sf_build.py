@@ -138,7 +138,10 @@ LANE_DOWN, LANE_UP = 14.0, 12.0       # a fighter's feet this far under / over h
                                       # within the punches' 6.05 of their line, 6.5 up)
 GROUNDED = 0.5                        # its feet within this of his: on the ground (no pull)
 MID = 5.0                             # a fighter's middle above its feet (the pull puts it on the punches' line)
-PULL = 0.35                           # of the way to the lane a frame (the "windbox")
+PULL = 1.0                            # of the way to the lane a frame (the "windbox"; v14 1.0, v11-v13 0.35: the user,
+                                      # "opponents fall fast enough to get pushed out of Soaring Fist's weaker hits":
+                                      # a fall of v a frame left them v / 0.35 under the lane, out of a fast faller's
+                                      # reach; now on the lane every frame, a frame's fall at most under it)
 HOLD_PAD = 3.0                        # hitstun frames kept past the next punch's arrival
 PUSH_NF, PUSH_F = 1.3, 2.0            # a shield's pushback speed (units a frame) as a punch reaches it (v12: the
                                       # non-final 0.8 -> 1.3, the user: "increase the pushback on the weaker punches")
@@ -146,18 +149,24 @@ EDGE = 6.0                            # v12: an opponent pushed past the next pu
 PUSHED = 30.0                         # ... when it is at most this far past it (a non-final punch's push: ~15)
 PUSH_W = 10.0                         # ... fading to 0 over this many frames
 ST_GUARD_DAMAGE = 0x1E
+ST_DAMAGE_GROUND = 0x45                # v14: grounded hitstun (0x46: in the air); sf_hold's edge hold
 # ---------------------------------------------------------------- effects / sounds
 SKILL_EMPS = ('Hkn_Fir.emp', 'Hkn_Wav.emp')
 CMN_EMPS = ('Btl_GHit.emp', 'Btl_GHitSmk.emp')
 FX_SIZE = round(METRE / 8.5, 4)       # xv2_to_ptcl's 8.5 units a metre -> his 5.04 (the hitbox's size)
 FIR_SIZE = FX_SIZE                    # EEPK scale 0.8-1.2: 1.0
 WAV_SIZE = FX_SIZE
+FIR_TURN = 55.0                       # v14: the release burst turned about his up (degrees)
 V13_WAV, V13_FIR = 1.6, 1.3           # v13 (the user: "make the effect larger"): the shot x1.6, the punch's burst x1.3
 CMN_SIZE = FX_SIZE
 SE = {'sf_bishi': ('CAR_S1510_HKN_Bishi', 0.0), 'sf_fire': ('CAR_S1510_HKN_Fire', 0.0)}
 SND_CHARGE = 0x69                     # Smash 4's smash-charge sound (Mario's AttackS4Hold)
 FX_IDS = {}
 # BTL_CMN (EEPK type 1) per release: (XV2 frame, effect): the BAC's items
+CMN_V14 = ()                          # v14 (the user: "certain glows appear at Supamario's feet during the attack"):
+                                      # none of BTL_CMN's at his feet (XV2's b_C_Base): GHit / MHit are hit flashes and
+                                      # the GHitSmk conversion draws additive with glare (7 of its 15 emitters bloom, 4
+                                      # "normal blend drawn additive"): glows. Their sets stay in the bank, unused
 CMN_AT = {1: [(22, 'GHitSmk'), (27, 'GHit'), (31, 'GHit')],
           2: [(22, 'GHitSmk'), (23, 'GHit'), (28, 'GHit'), (41, 'GHitSmk'), (44, 'GHit'), (49, 'GHit'), (55, 'GHit')],
           3: [(22, 'MHit'), (22, 'GHitSmk'), (29, 'GHit'), (40, 'GHitSmk'), (46, 'GHit'), (50, 'GHit'), (62, 'GHitSmk'),
@@ -174,7 +183,7 @@ def msc_values(snd_charge=SND_CHARGE):
          'SF_HOLD_AT': fl(HOLD_AT), 'SF_HOLD_N': fl(HOLD_N), 'SF_HOLD_DECIDE': fl(HOLD_DECIDE), 'SF_LV2': fl(LV2),
          'SF_LV3': fl(LV3), 'SF_SPEED': fl(SPEED), 'SF_MOVE_FROM': fl(MOVE_FROM), 'SF_X0': fl(X0), 'SF_Y': fl(Y0),
          'SF_REACH': fl(REACH), 'SF_BEHIND': fl(BEHIND), 'SF_LANE_DOWN': fl(LANE_DOWN), 'SF_LANE_UP': fl(LANE_UP),
-         'SF_GROUNDED': fl(GROUNDED), 'SF_MID': fl(MID), 'SF_PULL': fl(PULL), 'SF_HOLD_PAD': fl(HOLD_PAD),
+         'SF_GROUNDED': fl(GROUNDED), 'SF_ST_DAMAGE_GROUND': fl(ST_DAMAGE_GROUND), 'SF_MID': fl(MID), 'SF_PULL': fl(PULL), 'SF_HOLD_PAD': fl(HOLD_PAD),
          'SF_PUSH_NF': fl(PUSH_NF), 'SF_PUSH_F': fl(PUSH_F), 'SF_PUSH_W': fl(PUSH_W), 'SF_EDGE': fl(EDGE), 'SF_PUSHED': fl(PUSHED),
          'SF_ST_GUARD_DAMAGE': fl(ST_GUARD_DAMAGE), 'SF_ARTICLE': '0x%X' % ARTICLE, 'SF_SND_CHARGE': '0x%X' % snd_charge,
          'SF_FX_SWIRL': '0x%X' % FX_IDS.get('swirl', 0), 'SF_SWIRL_SIZE': fl(round(WAV_SIZE * V13_WAV, 4))}
@@ -328,20 +337,29 @@ def body_scripts(se_id, cmn_fx):
                  (HOLD_AT + k + 5, [cmd('graphic_effect2', 0x1000010, 0x11, 2.0, 3.0, 0.0, 0.0, 0.0, 0.0, 1.0, 3.0,
                                         3.0, 3.0, 0.0, 0.0, 0.0, 1)])]
     start = {'game': timeline([(START_AT + HOLD_FLAG_AT, [cmd('on_flag', 0x2100001B)])]),
-             'effect': timeline([(START_AT + 1, [gfx(cmn_fx['MHitSmk'], 'TransN', 0, 0, 0, CMN_SIZE)])] + hold),
+             # v14: no BTL_CMN MHitSmk at his feet at the wind-up's start (v11-v13; the feet glows, CMN_V14)
+             'effect': timeline(hold),
              'sound': timeline([(START_AT, [cmd('sound_effect', se_id('sf_bishi'))])]),
              # v13 (the user: "remove the character shake while charging"): no START_CHARGE (Mario's AttackS4Hold body
-             # shake, PhysicsModule op 7); the rumble kept
-             'expression': timeline([(HOLD_AT, [cmd('rumble_loop', 0x22, 0x39)])])}
+             # shake, PhysicsModule op 7); v14 (the user): no rumble while charging either
+             'expression': []}
     eff, snd, exp = [], [], []
     for lv in (1, 2, 3):
         at = REL_AT[lv - 1]
         for k in range(lv):
             f = at + PUNCH[k]
-            eff.append((f, [gfx(FX_IDS['fir'], 'TransN', 0, Y0, X0 - 3.0, round(FIR_SIZE * V13_FIR, 4))]))
+            # v14 (the user: "the shockwaves from the release of the punches either aren't there or are hard to see"):
+            # XV2's burst rings lie across the punch (his XY plane: edge-on from Smash 4's side camera); turned FIR_TURN
+            # about his up they show as ellipses (their colours x2 too: supamario_ui12.sf_fir)
+            c = gfx(FX_IDS['fir'], 'TransN', 0, Y0, X0 - 3.0, round(FIR_SIZE * V13_FIR, 4))
+            c.params[6] = FIR_TURN
+            eff.append((f, [c]))
             snd.append((f, [cmd('sound_effect', se_id('sf_fire'))]))
             exp.append((f, [cmd('rumble', 0x12 if k == lv - 1 else 0x10, 0)]))
         for xf, name in CMN_AT[lv]:
+            if name not in CMN_V14:
+                continue            # v14 (the user: "certain glows appear at Supamario's feet"): every BTL_CMN effect
+                                    # at his feet (XV2's b_C_Base) dropped: CMN_V14
             eff.append((at + xf - XV2_HOLD, [gfx(cmn_fx[name], 'TransN', 0, 0, 0, CMN_SIZE)]))
         snd.append((at, [cmd('stop_sound_effect', SND_CHARGE)]))
     rel = {'game': [], 'effect': timeline(eff), 'sound': timeline(snd), 'expression': timeline(exp)}
