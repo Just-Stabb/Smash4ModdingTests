@@ -72,6 +72,13 @@ SpecialLwLight
 SpecialLwHeavy
 SpecialAirLwLight
 SpecialAirLwHeavy
+// Ultra Instinct v7: specialairlwlight = the autododge (XV2's back sway, frames 0-36 of SpecialAirLwLight's animation);
+// its custom-move slots (0x242 / 0x243: the game plays SpecialAirLwLight's animation for them) carry the rest:
+// specialairlwlight_c2 = the sway's counter (from frame 74), specialairlwlight_c3 = the forward sway (from frame 37)
+SpecialAirLwLight_c2
+SpecialAirLwLight_c3
+SpecialAirLwLight_c2 -> body/FitMarioBodyMainD03SpecialAirLwLight.omo
+SpecialAirLwLight_c3 -> body/FitMarioBodyMainD03SpecialAirLwLight.omo
 
 // ---- Sephiroth (edge)
 // his 3-hit jab: motion slots 0x51 / 0x52 (Zelda, his base, has one jab; extra_kinds.json "motions",

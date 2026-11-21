@@ -73,10 +73,55 @@ WHITE_RGB, WHITE_A = (255.0, 255.0, 255.0), 200.0
 RIM_RGB, RIM_A, RIM_WIDTH = (190.0, 215.0, 255.0), 200.0, 2.5
 GAP = 9.0                            # beside the fighter to answer: this far on his side of it
 GROUND_DY = 6.0                      # its feet within this of his: on the ground, the X only
-DODGE_N = anim.frames_of(anim.DODGE)  # 16
+DODGE_N = 16                         # v1-v6's dodge (EAN #1 151-167); v7: the sway below
 DODGE_INV = 12                       # the user: invincible ~12 frames, then actionable
 DODGE_MOVE, DODGE_V = 4, 1.0         # v2 (the user's XV2 clip: a sway almost in place): 4 units away over 4 frames (v1: 16
                                      # over 8); XV2's own dodge motion / afterimage are not in the skill's files
+# v7 (the user: "The dodge should be able to chain into itself and should be cancelable into the short ranged counter
+# when an attack button is pressed during most of the dodge's animation length. XV2 Sway, sounds and effects should be
+# used"; "Different motion"; "Projectiles shouldn't trigger"): XV2's sway (CMN.bac 260-263 / 765-768: CMN.ean #189-192;
+# the attacker in front -> the back sway #189, behind -> the forward sway #191), its first 7 frames in one (TimeScale
+# x7) then 1:1: SWAY_N frames; intangible SWAY_INV (XV2's invulnerability 0-13 = ours 0-7); the counter cancel (an
+# attack button) SWAY_CW_ON-SWAY_CW_OFF = XV2's 7-30 (260's BcmCallback 0xF80 window: Combos / BackHits / Supers /
+# Ultimates / ZVanish; 765-768 have the counter's own link 0x8 through all of it) = 24 of its 37 frames; other actions
+# from SWAY_IASA; Wait at SWAY_N. The sway's effects: BTL_CMN 493 (SKI_lineX_S, 0.35, at his feet) at XV2 1 and 4 (ours
+# 0 and 1), 911 / 900 are ECFs (colour over the body: not drawn); its sound: CAR_BTL_CMN cue 5 (swing_05) at XV2 7 (ours 1)
+SWAY_N = anim.frames_of(anim.DODGE) - anim.part_start('sway_f_in') - (anim.frames_of(anim.DODGE) - anim.part_start('ctr_out'))
+SWAY_F_AT = anim.part_start('sway_f_in')     # 37: the forward sway's first frame in the motion
+CTR_AT = anim.part_start('ctr_out')          # 74: the counter's
+CTR_N = anim.frames_of(anim.DODGE) - CTR_AT  # 22
+SWAY_INV = 8
+SWAY_CW_ON, SWAY_CW_OFF = 1, 24
+SWAY_IASA = 25
+SWAY_LINE_AT = (0, 1)
+SWAY_SND_AT = 1
+# the counter: CMN.bac 706 (707 the same on the other hand): animation 0-5 (the character's own EAN #30: ours the skill's
+# finisher punch), its hitbox 0-6 (frames 0-5), BDM #0 (CMN.bdm), 1.5 m in front at 0.75 m, 1 m; BTL_CMN 492 (SKI_lineX_L
+# on the pelvis) and CMN 230 (Btl_RHit) at 0, 491 (SKI_lineX_S, 0.35) at 4; no sound; its link 0x8 0-6: actionable at
+# CTR_IASA. Damage: BDM #0 sub-entry 0 (the standing victim): DamageType 3, DamageAmount 0, user / victim stun 5, a
+# 30-frame stagger (KnockbackDuration 30, strength Y 0.1 / Z 0.04 a frame). Smash 4: CTR_DMG (the smallest whole
+# percent: XV2's 0 is a stagger, the hit still lands: its hitlag 5 = XV2's stun 5), knockback set (WKB) for XV2's
+# 30-frame stagger (CTR_WKB 75, KBG 100: knockback 71.9 at weight 100 -> 28.8 frames of hitstun), its angle the push's
+# (atan(0.1 / 0.04) = 68)
+CTR_IASA = 6
+CTR_HIT_N = 6
+CTR_DMG, CTR_WKB, CTR_ANGLE = 1.0, 75, 68
+CTR_SIZE, CTR_Y, CTR_Z = round(1.0 * 5.04, 2), round(0.75 * 5.04, 2), round(1.5 * 5.04, 2)
+CTR_LINE2_AT = 4
+MOT_SWAY_B, MOT_CTR, MOT_SWAY_F = 0x241, 0x242, 0x243      # SpecialAirLwLight and its custom-move slots (one animation)
+SWAY_SCRIPTS = {'specialairlwlight_c2': 'counter', 'specialairlwlight_c3': 'sway_f'}
+ST_ESCAPE_N = cave.ST_ESCAPE_N
+# v7 Secret Sensation (the user: "slow time for everyone during its traveling and until reaching, do a slight zoom
+# between Supamario and the opponent, then on Supamario ... similar to how it looks in Dragon Ball FighterZ"; the DBFZ
+# clips ss/a.mp4, b.mp4: the counter at ~0.25 s, the camera in by ~0.55 s with both in the frame, closer round the
+# arrival behind the opponent at ~1.05-1.10 s (~0.8 s of slowed travel), back out by ~1.45 s): the whole match at
+# 1 / SS_SLOW from the counter's read to the arrival (the slide's 14 frames -> 42 screen frames = 0.70 s), at most
+# SS_SLOW_FRAMES (its own end, should the MSC miss it); the camera in on him SS_CAM1_D over SS_CAM1_T frames at the read
+# (slight: the fighter he passes stays in the frame), SS_CAM2_D over SS_CAM2_T from the slide's frame SS_CAM2_AT (the
+# last 6 frames = 18 screen frames on him), back to normal at the arrival
+SS_SLOW, SS_SLOW_FRAMES = 3, 48
+SS_CAM1_T, SS_CAM1_D = 6, 1.2
+SS_CAM2_AT, SS_CAM2_T, SS_CAM2_D = 8, 6, 1.5
 # v6 (the user's v5 clip: no aura after the burst, only faint wisps): the MSC's renewal every 30 frames killed the aura AT
 # ONCE (EffectModule 0x2723 (id, 1, 1): the effect manager's kill -> eft's KillEmitterSet 0x04A55714, its particles
 # gone) and made it again, so its sprites (48-96 frames long, fading in over their life) never got past 29 frames: in
@@ -131,7 +176,12 @@ FX = [('start', 'BTL_AURA.eepk', 'MGT_HENSIN01.emp', 'BustN', (0.0, 0.0, 0.0), 1
       ('aura_foot', 'BTL_AURA.eepk', 'FOK_FootL.emp', 'LFootJ', (0.0, 0.0, 0.0), 0.8),
       ('aura_chest', 'BTL_AURA.eepk', 'Aura_LoopFOK2.emp', 'BustN', (0.0, 0.0, 0.0), 1.0),
       ('aura_hand', 'BTL_AURA.eepk', 'Aura_HandLoopFOK.emp', 'RHandN', (0.0, 0.0, 0.0), 0.65),
-      ('vanish', 'BTL_CMN.eepk', 'SKI_line.emp', 'HipN', (0.0, 0.0, 0.0), 1.0)]
+      ('vanish', 'BTL_CMN.eepk', 'SKI_line.emp', 'HipN', (0.0, 0.0, 0.0), 1.0),
+      # v7: the sway's / counter's (BTL_CMN 493 / 491, 492, 230), converted after the others (their ids follow)
+      ('sway_line', 'BTL_CMN.eepk', 'SKI_lineX_S.emp', 'TransN', (0.0, 0.0, 0.0), 0.35),
+      ('ctr_line', 'BTL_CMN.eepk', 'SKI_lineX_L.emp', 'HipN', (0.0, 0.0, 0.0), 1.0),
+      ('ctr_hit', 'BTL_CMN.eepk', 'Btl_RHit.emp', 'TransN', (0.0, 0.75, 1.5), 0.9)]
+FX_V7 = ('sway_line', 'ctr_line', 'ctr_hit')
 # v3: the aura's colour. The converted emitters keep XV2's EMP colours (blue / cyan / white: rendered with fx_render's
 # Smash 4 side, the drawn pixels' median hue 192 deg, saturation 0.26); the user's XV2 clip after the burst shows a
 # lavender / purple-white flicker (the aura pixels' median hue 281-287 deg, saturation 0.16-0.18, value 0.88-0.96, four
@@ -187,7 +237,8 @@ METRE = 5.04
 # ---------------------------------------------------------------- sounds
 UI_SE = {'ui_start': ('CAR_BTL_M1510_MGT_00_Start_F22', 0.0),     # skill SE cue 0: entry 0 at 22
          'ui_success': ('CAR_BTL_M1510_MGT_01_Success', 0.0),     # skill SE cue 1: entry 0 at 205
-         'ui_vanish': ('Vanish', 0.0)}                             # CAR_BTL_CMN cue 96: entry 1 at 151
+         'ui_vanish': ('Vanish', 0.0),                             # CAR_BTL_CMN cue 96: entry 1 at 151
+         'ui_sway': ('swing_05', 0.0)}                             # v7: CAR_BTL_CMN cue 5: the sway (CMN.bac 260) at 7
 SE_IDS = {}
 SND_START = anim.frame_of(anim.FORM, 0, 22)
 SND_SUCCESS = anim.frame_of(anim.FORM, 0, 205)
@@ -234,7 +285,16 @@ def msc_values():
          'UI_SS_UP_AIR': fl(SS_UP_AIR), 'UI_V_SS': '0x%X' % V_SS,
          # v5: status 0x155's modes in TIMER_4 (= V_SS; the cave reads them too)
          'UI_MODE_FORM': fl(cave.MODE_FORM), 'UI_MODE_DODGE': fl(cave.MODE_DODGE),
-         'UI_MODE_FORM_ON': fl(cave.MODE_FORM_ON), 'UI_MODE_DODGE_ON': fl(cave.MODE_DODGE_ON)}
+         'UI_MODE_FORM_ON': fl(cave.MODE_FORM_ON), 'UI_MODE_DODGE_ON': fl(cave.MODE_DODGE_ON),
+         # v7: the sway, its counter, the spot dodge's counter; Secret Sensation's slow-motion and camera
+         'UI_MODE_COUNTER': fl(cave.MODE_COUNTER), 'UI_MODE_SWAY_ON': fl(cave.MODE_SWAY_ON),
+         'UI_ST_ESCAPE_N': fl(ST_ESCAPE_N), 'UI_MOT_SWAY_B': '0x%X' % MOT_SWAY_B, 'UI_MOT_SWAY_F': '0x%X' % MOT_SWAY_F,
+         'UI_MOT_CTR': '0x%X' % MOT_CTR, 'UI_SWAY_F_AT': fl(SWAY_F_AT), 'UI_CTR_AT': fl(CTR_AT), 'UI_SWAY_N': fl(SWAY_N),
+         'UI_SWAY_INV': fl(SWAY_INV), 'UI_SWAY_CW_ON': fl(SWAY_CW_ON), 'UI_SWAY_CW_OFF': fl(SWAY_CW_OFF),
+         'UI_SWAY_IASA': fl(SWAY_IASA), 'UI_CTR_IASA': fl(CTR_IASA), 'UI_CTR_N': fl(CTR_N),
+         'UI_SS_SLOW': '0x%X' % SS_SLOW, 'UI_SS_SLOW_FRAMES': '0x%X' % SS_SLOW_FRAMES, 'UI_SS_CAM1_T': '0x%X' % SS_CAM1_T,
+         'UI_SS_CAM1_D': fl(SS_CAM1_D), 'UI_SS_CAM2_AT': fl(SS_CAM2_AT), 'UI_SS_CAM2_T': '0x%X' % SS_CAM2_T,
+         'UI_SS_CAM2_D': fl(SS_CAM2_D)}
     return v
 
 
@@ -274,6 +334,30 @@ def freeze_box():
     return SB.hitbox(ID=1, Part=1, Bone=0, Damage=0.0, Angle=0, KBG=0, FKB=0, BKB=0, Size=FREEZE_SIZE, Y=5.0, Z=0.0,
                      Hitlag=0.0, SDI=0.0, Clang=0, Rebound=0, SFXLevel=0, SFXType=0, NoGFX=1, Flinchless=1,
                      HitstopFrames=RUSH_AT[0], SelfHitstopFrames=0)
+
+
+def ctr_box():
+    """v7: the counter's hit (CMN.bac 706's hitbox, CMN.bdm #0: a stagger): CTR_DMG, set knockback for XV2's 30-frame
+    stagger, at XV2's 1.5 m in front, 0.75 m up, 1 m"""
+    import supamario_sledgehammer_build as SB
+    return SB.hitbox(ID=0, Part=0, Bone=0, Damage=CTR_DMG, Angle=CTR_ANGLE, KBG=100, FKB=CTR_WKB, BKB=0, Size=CTR_SIZE,
+                     Y=CTR_Y, Z=CTR_Z, Hitlag=1.0, SDI=1.0, Clang=1, Rebound=0, SFXLevel=0, SFXType=1, NoGFX=0)
+
+
+def sway_scripts():
+    """v7: {script name: {part: body}} of the sways and the counter (SpecialAirLwLight's animation: the back sway from
+    frame 0 (motion 0x241, its own script), the forward sway from SWAY_F_AT (0x243, specialairlwlight_c3), the counter
+    from CTR_AT (0x242, specialairlwlight_c2): a motion started at frame F starts its scripts' clock at F (the motion
+    change's start frame, MotionAnimcmdModule vt +0x4C +0x20), so each script's first command waits for its F"""
+    def sway(at):
+        return {'game': [], 'expression': [],
+                'effect': timeline([(at + f, [graphic('sway_line', follow=False)]) for f in SWAY_LINE_AT]),
+                'sound': timeline([(at + SWAY_SND_AT, [cmd('sound_effect', se_id('ui_sway'))])])}
+    ctr = {'game': timeline([(CTR_AT, [ctr_box()]), (CTR_AT + CTR_HIT_N, [cmd('remove_all_hitboxes')])]),
+           'effect': timeline([(CTR_AT, [graphic('ctr_line', follow=False), graphic('ctr_hit', follow=False)]),
+                               (CTR_AT + CTR_LINE2_AT, [graphic('sway_line', follow=False)])]),
+           'sound': [], 'expression': []}
+    return {'specialairlwlight': sway(0), 'specialairlwlight_c3': sway(SWAY_F_AT), 'specialairlwlight_c2': ctr}
 
 
 def white_on(frames):
@@ -401,12 +485,12 @@ def scripts_for():
                                      # v6: no aura here: the counter ends the transformation, so the MSC's aura
                                      # (ui_aura, renewed by fading) is on from its first frame; this one doubled it
                                      (CNT_END, white_to_glow())]),
-              anim.DODGE: timeline([(0, [graphic('vanish', follow=False)])]), anim.SS: []}
+              anim.DODGE: sway_scripts()['specialairlwlight']['effect'], anim.SS: []}
     sound = {anim.FORM: timeline([(SND_START, [cmd('sound_effect', se_id('ui_start'))]),
                                   (SND_SUCCESS, [cmd('sound_effect', se_id('ui_success'))])]),
              anim.STRIKE: timeline([(0, [cmd('sound_effect', se_id('ui_vanish'))]),
                                     (anim.frame_of(anim.STRIKE, 1, 335), [cmd('sound_effect', se_id('ui_success'))])]),
-             anim.DODGE: timeline([(0, [cmd('sound_effect', se_id('ui_vanish'))])]), anim.SS: []}
+             anim.DODGE: sway_scripts()['specialairlwlight']['sound'], anim.SS: []}
     expression = {anim.FORM: timeline([(FX_BURST_AT, [cmd('rumble', 0x12, 0)])]),
                   anim.STRIKE: timeline([(STRIKE_AT, [cmd('rumble', 0x12, 0)])]), anim.DODGE: [], anim.SS: []}
     return {'game': game, 'effect': effect, 'sound': sound, 'expression': expression}
@@ -422,6 +506,8 @@ def scripts(body_dir):
         f = acmd.ACMDFile.load(path)
         for m, body in bodies.items():
             f.scripts[acmd.crc(SCRIPT[m])] = body + [acmd.Command(acmd.END)]     # F.L.U.D.D.'s replaced
+        for name in SWAY_SCRIPTS:                # v7: the custom-move slots' scripts (vanilla's replaced or new)
+            f.scripts[acmd.crc(name)] = sway_scripts()[name][part] + [acmd.Command(acmd.END)]
         if part == 'game':
             for name, body in silver_scripts().items():
                 assert acmd.crc(name) not in f.scripts, name
@@ -535,8 +621,9 @@ def effects(cmn_dir, fx_dir):
     p = ptcl.Ptcl(open(os.path.join(fx_dir, base + '.ptcl'), 'rb').read())
     e = efc.Efc(open(os.path.join(fx_dir, base + '.efc'), 'rb').read())
     rep = {}
-    for eepk in ('BTL_AURA.eepk', 'BTL_CMN.eepk'):
-        emps = [x[2] for x in FX if x[1] == eepk]
+    batches = [(ep, [x[2] for x in FX if x[1] == ep and x[0] not in FX_V7]) for ep in ('BTL_AURA.eepk', 'BTL_CMN.eepk')]
+    batches.append(('BTL_CMN.eepk', [x[2] for x in FX if x[0] in FX_V7]))   # v7: after (the earlier ids kept)
+    for eepk, emps in batches:
         with tempfile.TemporaryDirectory() as pkg:
             for fn in os.listdir(cmn_dir):
                 if not fn.lower().endswith('.eepk') or fn == eepk:
@@ -552,7 +639,7 @@ def effects(cmn_dir, fx_dir):
             by_emp.setdefault(name.replace('PtcSupamarioUi', '') + '.emp', e.add(si + 1))
             rep[name] = {'set': si, 'emitters': [en for _b, en, _n in chunk]}
         for key, ep, emp, _bone, _o, _s in FX:
-            if ep == eepk:
+            if ep == eepk and emp in emps:
                 FX_IDS[key] = 0x03410000 | by_emp[emp]
     tint_aura(p, rep)
     smooth_aura(p, rep)
@@ -599,7 +686,7 @@ def build(sm_dir, out_dir, ui_skill, ui_se_wav, ts_args):
                     ts_args.get('halo', True), ts_args['frt'])
     mo = os.path.join(fdir, 'motion', 'body')
     vbn = os.path.join(sm_dir, 'model', 'body', 'c00', 'model.vbn')
-    outs, _bones, info = anim.build(mo, vbn, os.path.join(ui_skill, '1510_GKS_MGT.ean'), mo)
+    outs, _bones, info = anim.build(mo, vbn, os.path.join(ui_skill, '1510_GKS_MGT.ean'), mo, ts_args.get('cmn_ean'))
     rep = effects(ts_args['sh']['fd']['cb']['gf']['cmn_vfx'], os.path.join(fdir, 'effect', 'supamario'))
     sound_bank(fdir, out_dir, ui_se_wav)
     import nud
@@ -640,7 +727,7 @@ def main():
         a.remove('--no-halo')
     keys = ('--ui-skill', '--ui-se-wav', '--ts-skill', '--ts-se-wav', '--frt-skill', '--sh-skill', '--sh-se-wav',
             '--fd-skill', '--fd-se-wav', '--skill', '--se-wav', '--ean', '--cmn-vfx', '--skill-vfx', '--cmn-se', '--stb',
-            '--png')
+            '--png', '--cmn-ean')
     for k in keys:
         if k in a:
             i = a.index(k)
@@ -654,7 +741,7 @@ def main():
     fd = {'fd_skill': opts['--fd-skill'], 'fd_se_wav': opts['--fd-se-wav'], 'cb': cb}
     sh = {'sh_skill': opts['--sh-skill'], 'sh_se_wav': opts['--sh-se-wav'], 'fd': fd}
     ts = {'ts_skill': opts['--ts-skill'], 'ts_se_wav': opts['--ts-se-wav'], 'frt': opts['--frt-skill'], 'sh': sh,
-          'png': opts.get('--png'), 'halo': halo}
+          'png': opts.get('--png'), 'halo': halo, 'cmn_ean': opts.get('--cmn-ean')}
     print(build(a[0], a[1], opts['--ui-skill'], opts['--ui-se-wav'], ts))
     print('sounds: ' + ', '.join('%s 0x%08X' % kv for kv in SE_IDS.items()))
     print('effects: ' + ', '.join('%s 0x%08X' % kv for kv in FX_IDS.items()))

@@ -36733,6 +36733,12 @@ void func_2265()
         func_78(ui_dodge_loop);
         return;
     }
+    if (ui_mode() == 0x3)
+    {
+        ui_ctr_init();              // v7: the counter from his spot dodge (ui_escape_counter asked it)
+        func_78(ui_dodge_loop);
+        return;
+    }
     if (global18 == 0 && ui_state() == UI_FORMED)
     {
         ss_init();                  // Ultra Instinct: the grounded down special is Secret Sensation while transformed
@@ -37147,9 +37153,9 @@ void func_2282()
         ui_end();                   // Ultra Instinct: the transformation / its counter
         return;
     }
-    if (ui_mode() == 0x1)
+    if (ui_mode() == 0x1 || ui_mode() == 0x3)
     {
-        ui_dodge_end();             // Ultra Instinct: the autododge
+        ui_dodge_end();             // Ultra Instinct: the autododge, its counter (v7)
         return;
     }
     if (WorkModuleF(0, UI_V_SS) > 0.5f)
@@ -42494,6 +42500,8 @@ float ui_state()
 // writes 0; Secret Sensation's 3 (renewed) and Fake Death / Sledgehammer (0) are below UI_MODE_DODGE_ON. The cave reads
 // it too (tools/supamario_ui_cave.py: 0x155 with TIMER_4 > UI_MODE_FORM_ON is the transformation). 2 the transformation,
 // 1 the autododge, 0 neither
+// v7: four modes (UI_MODE_FORM 9, UI_MODE_DODGE 7, UI_MODE_COUNTER 5: the sway's / spot dodge's counter, Secret
+// Sensation 3): 3 the counter
 int ui_mode()
 {
     float m;
@@ -42505,6 +42513,10 @@ int ui_mode()
     if (m > UI_MODE_DODGE_ON)
     {
         return 0x1;
+    }
+    if (m > UI_MODE_SWAY_ON)
+    {
+        return 0x3;
     }
     return 0;
 }
@@ -42585,9 +42597,24 @@ void ui_aura()
 // shape takes the hit, so his body never does. Elsewhere (moves, the air, hitstun, a shield, 0x155 until its own
 // windows: the transformation's 30-151, Secret Sensation's 5-30) it is off. TIMER_5 (UI_V_SHAPE) remembers it is
 // on (renewed every frame: it counts down by itself), so the shape is switched only when that changes
+// v7: also on in his spot dodge (EscapeN: an attack on it marks "attacked" for the counter, the user's rule) and
+// through the sway (0x155 in the dodge mode: a fighter's hit on it is another sway, XV2's chain); off in the counter
+int ui_shape_on(float st)
+{
+    if (ui_can_dodge(st) != 0 || global18 == 0 && st == UI_ST_ESCAPE_N)
+    {
+        return 0x1;
+    }
+    if (st == UI_ST_DODGE_F && ui_mode() == 0x1)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
 void ui_shape(float st)
 {
-    if (ui_can_dodge(st) != 0 && StopModule(0x1) == 0)
+    if (ui_shape_on(st) != 0 && StopModule(0x1) == 0)
     {
         if (WorkModuleF(0, UI_V_SHAPE) < 0.5f)
         {
@@ -42596,7 +42623,7 @@ void ui_shape(float st)
         WorkModule(0, 3.0f, UI_V_SHAPE);
         return;
     }
-    if (ui_can_dodge(st) != 0)
+    if (ui_shape_on(st) != 0)
     {
         return;                     // in hitlag: kept as it is
     }
@@ -42630,6 +42657,7 @@ void ui_tick()
         WorkModule(0, 0.0f, UI_V_DODGE_L);
         return;
     }
+    ss_stale(st);
     s = ui_state();
     if (s == UI_FORMING && (st != UI_ST_F || ui_mode() != 0x2))
     {
@@ -42652,7 +42680,12 @@ void ui_tick()
     }
     ui_shape(st);
     n = WorkModuleF(0, UI_V_DODGE_R) + WorkModuleF(0, UI_V_DODGE_L);
-    if (n > 0.5f && (st != UI_ST_DODGE_F || ui_mode() != 0x1))
+    if (st == UI_ST_ESCAPE_N)
+    {
+        ui_escape_counter(n);       // v7: the spot dodge's counter (the user's rule)
+        n = 0.0f;
+    }
+    if (n > 0.5f && (st != UI_ST_DODGE_F || ui_mode() == 0))
     {
         if (ui_can_dodge(st) != 0 && WorkModule(0x10, 0x2000004d) == 0)
         {
@@ -42836,9 +42869,17 @@ void ui_end()
     }
 }
 
-// the dodge (status 0x155 in mode 1; v1-v4 0x158): away from the attacker (TIMER_1: it is to his right -> left), his facing kept; UI_DODGE_V a
-// frame over UI_DODGE_MOVE frames (energy 3, world X; ground correction 2: it stops at an edge), intangible
-// UI_DODGE_INV frames, actionable from then (func_39 / func_41), Wait at UI_DODGE_N
+// v7: the autododge is XV2's SWAY (the user: "XV2 Sway, sounds and effects"; CMN.bac entries 260-263 / 765-768,
+// CMN.ean #189-192 CMN_SPA_ASW_{B,F}_{L,R}_S): status 0x155 in mode 1. The attacker in front of him (the side he faces)
+// -> the back sway (#189, motion UI_MOT_SWAY_B from frame 0), behind him -> the forward sway (#191, motion
+// UI_MOT_SWAY_F from UI_SWAY_F_AT: the same animation file, its second part); his facing kept, no travel (XV2's Movement
+// 0x80: none; the animation leans him). XV2's timeline: its first 7 frames in one (TimeScale x7), then 1:1:
+// UI_SWAY_N frames. Intangible UI_SWAY_INV frames (XV2's invulnerability 0-13); the counter shape stays on, so from
+// then a fighter's hit on it is ANOTHER sway (the user: "chain into itself"; XV2's sway re-entered); an attack button
+// (attack / smash) from UI_SWAY_CW_ON to UI_SWAY_CW_OFF (XV2's 7-31: the sway's Combos window, BcmCallback 0xF80)
+// cancels it into the counter (ui_ctr_init); other actions from UI_SWAY_IASA (func_39 / func_41); Wait at UI_SWAY_N.
+// The status work: 0x0100000B the phase (0 the sway, 1 the counter), 0x0100000C frames, 0x0100000D the way away from
+// the attacker (world X sign)
 void ui_dodge_init()
 {
     float way;
@@ -42851,14 +42892,110 @@ void ui_dodge_init()
     WorkModule(0, 0.0f, UI_V_DODGE_L);
     WorkModule(0, way, 0x0100000D);
     WorkModule(0, UI_MODE_DODGE, UI_V_SS);
-    ShieldModule(0, 0x2, 0, 0, 0x1);            // ui4: the autododge's shape off (ui_shape), intangible instead
-    WorkModule(0, 0.0f, UI_V_SHAPE);
+    WorkModule(0, 0.0f, 0x0100000B);
     WorkModule(0, -1.0f, 0x0100000C);    // its loop runs on this frame too: frame 0
     KineticModule(0, 0x6);
     GroundModule(0x2710, 0x2);
-    WorkModule(0, UI_DODGE_INV, 0x0F00011B);
-    func_22(UI_MOT_DODGE, 0, 1.0f);
-    KineticModule(0x11, 0x3, way * UI_DODGE_V, 0.0f);
+    WorkModule(0, UI_SWAY_INV, 0x0F00011B);
+    if (way * WorkModuleF(0, 0x0f000003) < 0.0f)
+    {
+        func_22(UI_MOT_SWAY_B, 0, 1.0f);    // the attacker in front (away = behind him): the back sway
+    }
+    else
+    {
+        func_22(UI_MOT_SWAY_F, UI_SWAY_F_AT, 1.0f);
+    }
+    KineticModule(0x11, 0x3, 0.0f, 0.0f);
+}
+
+// v7: the counter (the user: "the short ranged counter when an attack button is pressed"; XV2's CMN.bac entry 706, the
+// sway's link 0x8: a 6-frame strike, its hitbox BDM #0 (CMN.bdm) 1.5 m in front 0-6, the vanish lines (BTL_CMN 492 /
+// 491) and the hit flash (230); the animation is the skill's own strike, EAN #1's finisher, the character's EAN #30 /
+// #31 not being in the files): motion UI_MOT_CTR from UI_CTR_AT, facing the attacker, held in place; actionable from
+// UI_CTR_IASA (XV2's entry ends at 6), Wait at UI_CTR_N. From the sway, or from his spot dodge (ui_escape_counter):
+// the attacker's side from TIMER_1 / TIMER_2 when signalled, else from the sway's way
+void ui_ctr_init()
+{
+    float side;
+    side = 0.0f - WorkModuleF(0, 0x0100000D);
+    if (WorkModuleF(0, UI_V_DODGE_R) > 0.5f)
+    {
+        side = 1.0f;
+    }
+    else if (WorkModuleF(0, UI_V_DODGE_L) > 0.5f)
+    {
+        side = -1.0f;
+    }
+    WorkModule(0, 0.0f, UI_V_DODGE_R);
+    WorkModule(0, 0.0f, UI_V_DODGE_L);
+    WorkModule(0, 0.0f - side, 0x0100000D);
+    WorkModule(0, UI_MODE_COUNTER, UI_V_SS);
+    WorkModule(0, 1.0f, 0x0100000B);
+    WorkModule(0, -1.0f, 0x0100000C);
+    ShieldModule(0, 0x2, 0, 0, 0x1);            // the shape off: the counter can be hit
+    WorkModule(0, 0.0f, UI_V_SHAPE);
+    if (side * WorkModuleF(0, 0x0f000003) < 0.0f)
+    {
+        PostureModule(0x1);
+        PostureModule(0x2);
+    }
+    KineticModule(0, 0x6);
+    GroundModule(0x2710, 0x2);
+    func_22(UI_MOT_CTR, UI_CTR_AT, 1.0f);
+    KineticModule(0x11, 0x3, 0.0f, 0.0f);
+}
+
+// v7: his spot dodge while transformed (every frame of EscapeN, ui_tick): an attack on his counter shape marks
+// "attacked" (the cave's TIMER_1 / TIMER_2, renewed here so it lasts the whole spot dodge); attack, special or smash
+// pressed while attacked -> the counter (the user's rule: "from his normal spot dodge while transformed, if attack or
+// special is pressed during it and someone attacked him")
+void ui_escape_counter(float n)
+{
+    if (n < 0.5f)
+    {
+        return;
+    }
+    if (WorkModuleF(0, UI_V_DODGE_R) > 0.5f)
+    {
+        WorkModule(0, 4.0f, UI_V_DODGE_R);
+    }
+    if (WorkModuleF(0, UI_V_DODGE_L) > 0.5f)
+    {
+        WorkModule(0, 4.0f, UI_V_DODGE_L);
+    }
+    if (StopModule(0x1) != 0 || WorkModule(0x10, 0x2000004d) != 0)
+    {
+        return;
+    }
+    if (ControlModule(0x2710, 0) || ControlModule(0x2710, 0x1) || ControlModule(0x2710, 0x4))
+    {
+        WorkModule(0, UI_MODE_COUNTER, UI_V_SS);    // the mode first (func_2252 / func_2265 read it)
+        func_16(UI_ST, 0);
+    }
+}
+
+// the counter's frames (phase 1)
+void ui_ctr_loop(float n)
+{
+    WorkModule(0, UI_MODE_COUNTER, UI_V_SS);    // the mode renewed
+    if (global18 == 0x2)
+    {
+        KineticModule(0x11, 0x3, 0.0f, 0.0f);
+        func_16(0xe, 0);
+        return;
+    }
+    KineticModule(0x11, 0x3, 0.0f, 0.0f);
+    if (n > UI_CTR_IASA - 0.5f)
+    {
+        if (func_39() != 0 || func_41() != 0)
+        {
+            return;
+        }
+    }
+    if (n > UI_CTR_N - 1.5f)
+    {
+        func_16(0, 0);
+    }
 }
 
 void ui_dodge_loop()
@@ -42866,6 +43003,11 @@ void ui_dodge_loop()
     float n;
     n = WorkModuleF(0, 0x0100000C) + 1.0f;
     WorkModule(0, n, 0x0100000C);
+    if (WorkModuleF(0, 0x0100000B) > 0.5f)
+    {
+        ui_ctr_loop(n);
+        return;
+    }
     WorkModule(0, UI_MODE_DODGE, UI_V_SS);       // v5: the mode renewed
     if (global18 == 0x2)
     {
@@ -42873,22 +43015,35 @@ void ui_dodge_loop()
         func_16(0xe, 0);
         return;
     }
-    if (n < UI_DODGE_MOVE - 0.5f)
+    KineticModule(0x11, 0x3, 0.0f, 0.0f);
+    if (n < UI_SWAY_INV - 0.5f)
     {
-        KineticModule(0x11, 0x3, WorkModuleF(0, 0x0100000D) * UI_DODGE_V, 0.0f);
+        WorkModule(0, 0.0f, UI_V_DODGE_R);      // XV2's invulnerable frames: attacks miss (no chain)
+        WorkModule(0, 0.0f, UI_V_DODGE_L);
     }
-    else
+    else if (WorkModuleF(0, UI_V_DODGE_R) + WorkModuleF(0, UI_V_DODGE_L) > 0.5f && StopModule(0x1) == 0)
     {
-        KineticModule(0x11, 0x3, 0.0f, 0.0f);
+        ui_dodge_init();                        // another fighter's hit on the shape: another sway (the chain)
+        WorkModule(0, 0.0f, 0x0100000C);
+        return;
     }
-    if (n > UI_DODGE_INV - 0.5f)
+    if (n > UI_SWAY_CW_ON - 0.5f && n < UI_SWAY_CW_OFF + 0.5f && StopModule(0x1) == 0)
+    {
+        if (ControlModule(0x2710, 0) || ControlModule(0x2710, 0x4))
+        {
+            ui_ctr_init();                      // an attack button in the window: the counter
+            WorkModule(0, 0.0f, 0x0100000C);
+            return;
+        }
+    }
+    if (n > UI_SWAY_IASA - 0.5f)
     {
         if (func_39() != 0 || func_41() != 0)
         {
             return;
         }
     }
-    if (n > UI_DODGE_N - 1.5f)
+    if (n > UI_SWAY_N - 1.5f)
     {
         func_16(0, 0);
     }
@@ -42913,6 +43068,36 @@ void ui_dodge_end()
 // TIMER_4 (0x0F000324, UI_V_SS) marks the move (renewed every frame: func_2282 tells it from Fake Death); status floats
 // 0x0100000B the phase (0 stance, 1 the slide), 0x0100000C frames, 0x0100000D / 0x0100000E the slide's start X / Y,
 // 0x0100000F / 0x01000010 its end X / Y
+// v7 (the user: "slow time for everyone during its traveling and until reaching, do a slight zoom between Supamario and
+// the opponent, then on Supamario", Dragon Ball FighterZ's): from the counter's read to his arrival behind the fighter
+// the whole match runs at 1 / UI_SS_SLOW (MSC SlowModule op 0: the game's global slow-motion, Final Smashes' and Hero's
+// critical hits'; at most UI_SS_SLOW_FRAMES, its own end) and the camera closes in on him slightly (CameraModule
+// 0x2714 (frames, 0, distance): ACMD Camera_Closeup's call, UI_SS_CAM1_D: the fighter he passes in the frame too), then
+// closer on him from the slide's frame UI_SS_CAM2_AT (UI_SS_CAM2_D); at the arrival both end (ss_fx_off: SlowModule op 1
+// frees his request; CameraModule 0x2718 back to the normal camera). ss_end (any exit: a KO, a hit) ends them too, and
+// ss_stale (every frame, ui_tick) when the status was left without its end (TIMER_4 still in Secret Sensation's range
+// outside 0x155). The transformation keeps no camera change (the user)
+void ss_fx_off()
+{
+    SlowModule(0x1);
+    CameraModule(0x2718);
+}
+
+void ss_stale(float st)
+{
+    float m;
+    if (st == UI_ST_F)
+    {
+        return;
+    }
+    m = WorkModuleF(0, UI_V_SS);
+    if (m > 0.5f && m < UI_MODE_SWAY_ON)
+    {
+        ss_fx_off();
+        WorkModule(0, 0.0f, UI_V_SS);
+    }
+}
+
 void ss_init()
 {
     WorkModule(0, 3.0f, UI_V_SS);
@@ -42962,6 +43147,8 @@ void ss_counter()
     func_22(UI_SS_SLIDE_MOT, 0, 1.0f);
     EffectModule(0x2710, UI_FX_VANISH, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_VANISH_SIZE, 0, 0, 0, 0, 0, 0, 0x1);
     SoundModule(0x2710, UI_SND_VANISH);
+    SlowModule(0, UI_SS_SLOW, UI_SS_SLOW_FRAMES);           // v7: everyone slowed until he arrives
+    CameraModule(0x2714, UI_SS_CAM1_T, 0, UI_SS_CAM1_D);    // v7: a slight zoom (him and the fighter he passes)
 }
 
 // the slide's frame k (1 .. UI_SS_SLIDE_N): eased (smoothstep) from the start to the end, Z out and back (a sine)
@@ -43009,8 +43196,13 @@ void ss_loop()
     {
         WorkModule(0, 2.0f, 0x0F00011B);    // intangible through the slide
         ss_slide(n);
+        if (n > UI_SS_CAM2_AT - 0.5f && n < UI_SS_CAM2_AT + 0.5f)
+        {
+            CameraModule(0x2714, UI_SS_CAM2_T, 0, UI_SS_CAM2_D);   // v7: closer, on him
+        }
         if (n > UI_SS_SLIDE_N - 0.5f)
         {
+            ss_fx_off();                    // v7: arrived: normal speed, the normal camera
             ss_land();
         }
         return;
@@ -43043,6 +43235,10 @@ void ss_loop()
 
 void ss_end()
 {
+    if (WorkModuleF(0, 0x0100000B) > 0.5f && WorkModuleF(0, 0x0100000B) < 1.5f)
+    {
+        ss_fx_off();                // v7: left during the slide (a KO, ...): the slow-motion and the camera ended
+    }
     WorkModule(0, 0.0f, UI_V_SS);
     ShieldModule(0, 0x2, 0, 0, 0x1);
     WorkModule(0, 0.0f, 0x0f000002);
