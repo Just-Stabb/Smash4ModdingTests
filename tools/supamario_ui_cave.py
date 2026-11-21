@@ -149,6 +149,7 @@ DIAG_FMTS = [
     ('f44', 'S4U4 st=%X t1=%08X t2=%08X mode=%08X left=%d\n'),
     ('fef', 'S4UF bank=%X slot=%d entries=%d res=%d motion=%X\n'),
     ('fpf', 'S4UP obj=%08X him=%08X n=%d\n'),
+    ('fws', 'S4UW on=%d owner=%08X paused=%d stage=%08X\n'),
 ]
 DIAG_PF_CAP = 200                # v7: S4UP lines at most
 FIGHTERS = 0x1035184C            # [[FIGHTERS] + 0]: +0 the entries, +8 their count (acmd_ext_cave.py)
@@ -219,6 +220,46 @@ PF_WORD = 0x4BFFFAF9
 FORM_ON = 1500.0                 # transformed: TIMER_0 above this
 DODGE_SIGNAL = 4.0               # the timers count down by themselves: a signal the MSC missed dies in 4 frames
 MAX_FIGHTERS, MAX_PARTS, MAX_NODES = 16, 16, 32
+
+# v10 (exe_v46z_ui7; README "Ultra Instinct v10"):
+# 1. The shield-hit mark. A hit on a shield shape is event 0x10 (fighter.handler 0x02E35794: slot 42 first, then the
+#    EffectModule's +0x90 = 0x0100001F, common effect 0x1F: PtcCommonGuardMark, the ring and flash of the user's v9
+#    clip). The EffectModule listens to the same event (its init 0x02C28DD0 registers 0x02C2CD28 for event 0x10,
+#    0x02C2CDC0 for 0x11): 0x02C2CD28 (r3 the EffectModule, r4 the message: +8 the attacker's AttackModule, +0x10 the
+#    record, +0x14 the shape group) asks the hit's data (vt +0x194) and, when its +0x54 is 0, requests effect [EM +
+#    0x90] at the record's place (vt +0x44). SX_HOOK: for HIS counter shape (group 1; the EffectModule the one of a live
+#    kind-0x41 fighter: module block + EFFM = fighter + 0x74D8, the module the handler writes +0x90 into) nothing is
+#    requested: no mark on a dodge (and on Secret Sensation / the transformation's counter, which have their own
+#    effects now); his guard bubble (group 0) and every other shield keep it.
+# 2. The WORLD STOP (Secret Sensation, DBFZ's): his MSC asks it with TIMER_6 (V_STOP > 0.5, renewed every frame).
+#    STEP_HOOK (the fighter's step wrapper 0x02E40B90, r3 the fighter, r4 its module block; from the fighter update
+#    0x02E40C4C and 0x02E2534C): for a kind-0x41 fighter asking it, the stop starts (ws_begin) or its lease is renewed
+#    (WS_LEASE frames); while it runs, HIS step runs on a normal frame (the frame state's +8 cleared for its length:
+#    every module of his runs). FILL_HOOK (the frame state fill 0x02BFB97C, once a battle step, before the objects): the
+#    lease counted down; while it lasts the frame state is a slowed frame in the middle of its cycle (+8 1, +0 1, the
+#    fill's answer 0), the one in which no object steps (0x02E40B90, the weapons' and items' wrappers: +8 0 or +0 2
+#    steps; the game's own slow-motion frames between two steps); at 0 the world goes on (ws_end). ws_begin pauses
+#    every effect instance that isn't his and isn't paused (the instance list [INST_LIST], +0x18 next: +0x19E = 1,
+#    0x032F0F10's write, the Final Smashes' way through 0x0334CA30; the instance update 0x0334E080 then holds it:
+#    +0x19F 0, its clock stopped), his own (+8 & PAUSE_MASK = his EffectModule's +0x10 | 0x8000: the EffectModule's own
+#    pause key, 0x02C27E88) left running, and stops the stage (0x0316505C(stage manager, 1), the Final Smashes' call,
+#    unless [[STAGE_FLAGS] + 0xB3] as they check); ws_end lets the instances it paused go and the stage on
+INST_LIST = 0x10439088           # the effect manager's instance list (+0x18 next, +8 the owner key, +0x19E paused,
+                                 # +0x1A4 kept out of a pause)
+PAUSE_MASK = 0x0100BFFF          # an EffectModule's own pause: key = [EM + 0x10] | 0x8000 under this mask (0x02C27E88)
+STAGE_MGR = 0x102F7020           # [STAGE_MGR]: the stage manager (0x0316505C(manager, on): +0xD0 the stop)
+STAGE_FLAGS = 0x102F7024         # [STAGE_FLAGS] + 0xB3: the Final Smash code skips the stage stop when set (0x02772674)
+STAGE_STOP = 0x0316505C
+FRAME_STATE = 0x102F6C04         # [FRAME_STATE]: +0 the phase (2 a step), +4 1/N, +8 1 while slowed
+FILL_HOOK = 0x02BFB97C           # the frame state fill: `mflr r0`
+STEP_HOOK = 0x02E40B90           # the fighter's step wrapper: `mflr r0`
+SX_HOOK = 0x02C2CD28             # the EffectModule's shield-hit listener: `mflr r0`
+MFLR = 0x7C0802A6
+EFFM = 0x72A8                    # the module block's EffectModule (fighter + 0x74D8; the block is fighter + 0x230)
+V_STOP = 0x0F000326              # TIMER_6: the world stop asked (his MSC)
+WS_LEASE = 2                     # frames the stop lasts after the last ask
+WS_MAX = 100                     # instances paused at most (the effect manager's pool holds 100)
+ORIGINAL.update({FILL_HOOK: MFLR, STEP_HOOK: MFLR, SX_HOOK: MFLR})
 
 # the shape: x sideways, y up, z forward (joint 0's frame); a capsule round his body
 SHAPE = {'bone': 0, 'p1': (0.0, 2.5, 0.0), 'p2': (0.0, 9.5, 0.0), 'radius': 6.5}
@@ -308,10 +349,23 @@ RELEASE_TAIL = """
 # the diag build's lines (TEST ONLY); this build: none
 ui_dchain:
 ui_dmv:
+ui_dws:
         blr
 """
 
 DIAG_TAIL = """
+# v10: S4UW on owner n stage (r4 1 the world stopped / 0 going on, r5 his fighter, r6 the instances paused, r7 the
+# stage manager): ws_begin / ws_end (the volatile registers go)
+ui_dws: stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        lis r3, ui_fws@ha
+        addi r3, r3, ui_fws@l""" + OSR + """
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
 # ---- TEST ONLY (--diag): the lines (docs/native-notes.md "Supamario's Ultra Instinct" v4) --------------------------
 # ui_drec: +0 TIMER_0 as slot 43 read it, +4 the attacker found (its id), +8 found, +0xC the hit's uncounterable byte
 # (-1 not read), +0x10 the slot-42 owner chain's ids (4), +0x20 their count, +0x24 S4UM / S4UB lines so far
@@ -725,7 +779,13 @@ def build(kind_id=None, diag=False):
              bdf_hi=BIND_FROM >> 16, bdf_lo=BIND_FROM & 0xFFFF, cap=DIAG_CAP, late_n=DIAG_LATE_N,
              late_hi=LATE_FN >> 16, late_lo=LATE_FN & 0xFFFF, efm_hi=EFF_MGR >> 16, efm_lo=EFF_MGR & 0xFFFF,
              efs_hi=EFF_SLOT >> 16, efs_lo=EFF_SLOT & 0xFFFF, bank=UI_BANK, eft_cap=EFT_CAP, eft_back=EFT_PRINT + 4,
-             mot_form=0x231, mot_ss=0x245, escn=ST_ESCAPE_N, pf_cap=DIAG_PF_CAP, pff_hi=PF_FN >> 16, pff_lo=PF_FN & 0xFFFF, **calls)
+             mot_form=0x231, mot_ss=0x245, escn=ST_ESCAPE_N, pf_cap=DIAG_PF_CAP, pff_hi=PF_FN >> 16, pff_lo=PF_FN & 0xFFFF,
+             effm=EFFM, sx_back=SX_HOOK + 4, fill_back=FILL_HOOK + 4, step_back=STEP_HOOK + 4,
+             vstop_hi=V_STOP >> 16, vstop_lo=V_STOP & 0xFFFF, lease=WS_LEASE, wsmax=WS_MAX, wsguard=4 * WS_MAX,
+             inst_ha=ha(INST_LIST), inst_lo=slo(INST_LIST), mask_hi=PAUSE_MASK >> 16, mask_lo=PAUSE_MASK & 0xFFFF,
+             stg_ha=ha(STAGE_MGR), stg_lo=slo(STAGE_MGR), stgf_ha=ha(STAGE_FLAGS), stgf_lo=slo(STAGE_FLAGS),
+             fs_ha=ha(FRAME_STATE), fs_lo=slo(FRAME_STATE), stop_hi=STAGE_STOP >> 16, stop_lo=STAGE_STOP & 0xFFFF,
+             **calls)
     p.update({k: (v if diag else '') for k, v in D43.items()})
     p['dpf'] = DPF if diag else ''
     a.asm(("""
@@ -1203,6 +1263,302 @@ handled:
         li r3, 0
         blr
 
+# ---- v10 (exe_v46z_ui7) 8. ui_sx: the shield-hit mark (SX_HOOK: the EffectModule's event-0x10 listener 0x02C2CD28,
+# r3 the EffectModule, r4 the message): not for HIS counter shape (group 1, the EffectModule a live kind-0x41
+# fighter's: the fighter table's entries, module block + EFFM). Leaf: r0, r10-r12
+ui_sx:  lwz r0, 0x14(r4)
+        cmpwi r0, %(group)d
+        bne sx_go
+        lis r12, %(fts_ha)d
+        lwz r12, %(fts_lo)d(r12)
+        cmpwi r12, 0
+        beq sx_go
+        lwz r12, 0(r12)
+        cmpwi r12, 0
+        beq sx_go
+        lwz r11, 8(r12)                 # the count
+        lwz r12, 0(r12)                 # the entries
+        cmpwi r12, 0
+        beq sx_go
+        cmplwi r11, %(maxf)d
+        bgt sx_go
+sx_loop:
+        cmpwi r11, 0
+        beq sx_go
+        lbz r0, 0x1E(r12)               # live
+        cmplwi r0, 4
+        blt sx_next
+        lwz r0, %(kind_at)d(r12)
+        cmpwi r0, %(kind)d
+        bne sx_next
+        lwz r10, %(acc)d(r12)
+        cmpwi r10, 0
+        beq sx_next
+        lwz r10, %(effm)d(r10)          # his EffectModule
+        cmpw r10, r3
+        beqlr                           # his counter shape: no mark
+sx_next:
+        addi r12, r12, %(entry)d
+        addi r11, r11, -1
+        b sx_loop
+sx_go:  mflr r0                         # the replaced word
+        b 0x%(sx_back)08X
+
+# ---- v10 9. the world stop. ws_data: +0 the lease (frames left), +4 its owner (his fighter), +8 the instances paused,
+# +0xC the list of them (WS_MAX words)
+# ws_fill (FILL_HOOK: the frame state fill, r3 the frame state): the game's fill, then while the lease lasts a slowed
+# frame between two steps (+8 1, +0 1, answer 0): no object steps; the last frame of the lease ends the stop
+ws_fill:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r30, 0x18(r1)
+        stw r31, 0x1C(r1)
+        mr r31, r3
+        bl wsf_orig
+        mr r30, r3
+        lis r12, ws_data@ha
+        addi r12, r12, ws_data@l
+        lwz r11, 0(r12)
+        cmpwi r11, 0
+        beq wsf_out
+        addi r11, r11, -1               # (addi from r0 would be li)
+        stw r11, 0(r12)
+        cmpwi r11, 0
+        bne wsf_stop
+        bl ws_end
+        b wsf_out
+wsf_stop:
+        li r0, 1
+        stb r0, 8(r31)
+        stw r0, 0(r31)
+        li r30, 0
+wsf_out:
+        mr r3, r30
+        lwz r30, 0x18(r1)
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+wsf_orig:
+        mflr r0                         # the replaced word
+        b 0x%(fill_back)08X
+
+# ws_step (STEP_HOOK: the fighter's step wrapper, r3 the fighter, r4 its module block): another kind as before; his
+# ask (TIMER_6 > 0.5) starts the stop / renews its lease; while it is his stop, his step on a normal frame
+ws_step:
+        lwz r0, %(kind_at)d(r3)
+        cmpwi r0, %(kind)d
+        beq wss_him
+wss_orig:
+        mflr r0                         # the replaced word
+        b 0x%(step_back)08X
+wss_him:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stw r3, 0x10(r1)
+        stw r4, 0x14(r1)
+        stw r30, 0x28(r1)
+        stw r31, 0x2C(r1)
+        mr r31, r3
+        lwz r12, %(acc)d(r3)
+        lwz r3, %(work)d(r12)
+        lis r4, %(vstop_hi)d
+        ori r4, r4, %(vstop_lo)d
+        lwz r12, 0(r3)
+        lwz r12, 0x44(r12)
+        mtctr r12
+        bctrl                           # get_float(TIMER_6)
+        lis r30, ws_data@ha
+        addi r30, r30, ws_data@l
+        lis r12, ws_half@ha
+        lfs f0, ws_half@l(r12)
+        fcmpu cr0, f1, f0
+        ble wss_go
+        lwz r0, 0(r30)
+        cmpwi r0, 0
+        bne wss_lease
+        stw r31, 4(r30)
+        mr r3, r31
+        bl ws_begin
+wss_lease:
+        li r0, %(lease)d
+        stw r0, 0(r30)
+        stw r31, 4(r30)
+wss_go: lwz r0, 0(r30)
+        cmpwi r0, 0
+        beq wss_plain
+        lwz r0, 4(r30)
+        cmpw r0, r31
+        bne wss_plain
+        lis r12, %(fs_ha)d
+        lwz r30, %(fs_lo)d(r12)         # the frame state
+        lbz r0, 8(r30)
+        stw r0, 0x18(r1)
+        lwz r0, 0(r30)
+        stw r0, 0x1C(r1)
+        li r0, 0
+        stb r0, 8(r30)                  # his step: a normal frame
+        lwz r3, 0x10(r1)
+        lwz r4, 0x14(r1)
+        bl wss_orig
+        lwz r0, 0x18(r1)
+        stb r0, 8(r30)
+        lwz r0, 0x1C(r1)
+        stw r0, 0(r30)
+        b wss_out
+wss_plain:
+        lwz r3, 0x10(r1)
+        lwz r4, 0x14(r1)
+        bl wss_orig
+wss_out:
+        lwz r30, 0x28(r1)
+        lwz r31, 0x2C(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+
+# ws_begin(r3 his fighter): every effect instance not his, not paused and not kept out of pauses paused and noted; the
+# stage stopped
+ws_begin:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r29, 0x14(r1)
+        stw r30, 0x18(r1)
+        stw r31, 0x1C(r1)
+        mr r29, r3
+        lwz r12, %(acc)d(r3)
+        lwz r12, %(effm)d(r12)          # his EffectModule's pause key
+        li r31, -1
+        cmpwi r12, 0
+        beq wsb_key
+        lwz r31, 0x10(r12)
+        ori r31, r31, 0x8000
+wsb_key:
+        lis r30, ws_data@ha
+        addi r30, r30, ws_data@l
+        li r0, 0
+        stw r0, 8(r30)
+        lis r12, %(inst_ha)d
+        lwz r12, %(inst_lo)d(r12)
+        li r10, %(wsguard)d             # a loop guard
+wsb_loop:
+        cmpwi r12, 0
+        beq wsb_stage
+        addi r10, r10, -1
+        cmpwi r10, 0
+        blt wsb_stage
+        lbz r0, 0x1A4(r12)
+        cmpwi r0, 0
+        bne wsb_next
+        lbz r0, 0x19E(r12)
+        cmpwi r0, 0
+        bne wsb_next
+        lwz r0, 8(r12)
+        lis r11, %(mask_hi)d
+        ori r11, r11, %(mask_lo)d
+        and r0, r0, r11
+        cmpw r0, r31
+        beq wsb_next                    # his
+        lwz r11, 8(r30)
+        cmplwi r11, %(wsmax)d
+        bge wsb_next
+        li r0, 1
+        stb r0, 0x19E(r12)
+        slwi r0, r11, 2
+        add r0, r0, r30
+        mr r9, r0
+        stw r12, 0xC(r9)
+        addi r11, r11, 1
+        stw r11, 8(r30)
+wsb_next:
+        lwz r12, 0x18(r12)
+        b wsb_loop
+wsb_stage:
+        li r4, 1
+        bl ws_stage
+        li r4, 1
+        mr r5, r29
+        lwz r6, 8(r30)
+        lis r7, %(stg_ha)d
+        lwz r7, %(stg_lo)d(r7)
+        bl ui_dws
+        lwz r29, 0x14(r1)
+        lwz r30, 0x18(r1)
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+# ws_end: the instances ws_begin paused go on; the stage goes on; the stop's state cleared
+ws_end: stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r30, 0x18(r1)
+        stw r31, 0x1C(r1)
+        lis r30, ws_data@ha
+        addi r30, r30, ws_data@l
+        lwz r11, 8(r30)
+        cmplwi r11, %(wsmax)d
+        ble wse_n
+        li r11, %(wsmax)d
+wse_n:  addi r12, r30, 0xC
+        li r0, 0
+wse_loop:
+        cmpwi r11, 0
+        beq wse_done
+        lwz r10, 0(r12)
+        stb r0, 0x19E(r10)
+        addi r12, r12, 4
+        addi r11, r11, -1
+        b wse_loop
+wse_done:
+        lwz r31, 8(r30)
+        lwz r5, 4(r30)
+        li r0, 0
+        stw r0, 0(r30)
+        stw r0, 4(r30)
+        stw r0, 8(r30)
+        stw r5, 0x10(r1)
+        li r4, 0
+        bl ws_stage
+        li r4, 0
+        lwz r5, 0x10(r1)
+        mr r6, r31
+        lis r7, %(stg_ha)d
+        lwz r7, %(stg_lo)d(r7)
+        bl ui_dws
+        lwz r30, 0x18(r1)
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+# ws_stage(r4 on): the stage stopped / on, as the Final Smashes do (0x0316505C(manager, on), skipped while [[STAGE_FLAGS]
+# + 0xB3] or without a manager)
+ws_stage:
+        lis r3, %(stg_ha)d
+        lwz r3, %(stg_lo)d(r3)
+        cmpwi r3, 0
+        beqlr
+        lis r12, %(stgf_ha)d
+        lwz r12, %(stgf_lo)d(r12)
+        cmpwi r12, 0
+        beq wst_go
+        lbz r0, 0xB3(r12)
+        cmpwi r0, 0
+        bnelr
+wst_go: lis r12, %(stop_hi)d
+        ori r12, r12, %(stop_lo)d
+        mtctr r12
+        bctr
+
 # ui_isform(r3 his WorkModule): r3 1 when TIMER_4 (status 0x155's mode, his MSC's) > MODE_FORM_ON, the transformation /
 # its counter; else 0. Its own frame (get_float vt +0x44: the volatile registers go)
 ui_isform:
@@ -1359,6 +1715,111 @@ ui_desc:
         .word 0x%(descbytes)08X
 ui_modef: .float %(modef)r
 ui_swayf: .float %(swayf)r
+ws_half: .float 0.5
+ws_data:
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
+        .word 0
 """ % dict(form=FORM_ON, modef=MODE_FORM_ON, swayf=MODE_SWAY_ON, sig=DODGE_SIGNAL, x1=SHAPE['p1'][0], y1=SHAPE['p1'][1], z1=SHAPE['p1'][2],
            x2=SHAPE['p2'][0], y2=SHAPE['p2'][1], z2=SHAPE['p2'][2], radius=SHAPE['radius'],
            bonetype=(SHAPE['bone'] << 16) | (SHAPE_TYPE << 8), shape_at=shape_at,
@@ -1392,6 +1853,9 @@ def patches(kind_id=None, diag=False):
         out[EFT_PRINT] = branch(EFT_PRINT, labels['ui_deft'])
     out[WALK_FIX] = NOP                 # ui4: Mesh_Visibility's name walk takes unaligned names
     out[PF_HOOK] = branch(PF_HOOK, labels['ui_pf']) | 1      # v7: the projectile filter
+    out[SX_HOOK] = branch(SX_HOOK, labels['ui_sx'])          # v10: no shield-hit mark on his counter shape
+    out[FILL_HOOK] = branch(FILL_HOOK, labels['ws_fill'])    # v10: the world stop
+    out[STEP_HOOK] = branch(STEP_HOOK, labels['ws_step'])
     return out
 
 

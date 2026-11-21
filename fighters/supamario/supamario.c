@@ -42686,6 +42686,10 @@ void ui_tick()
         return;
     }
     ui_shape(st);
+    if (WorkModuleF(0, UI_V_SWAY) > 0.5f)
+    {
+        WorkModule(0, 2.0f, UI_V_SWAY);     // v10: the next sway's side (R) kept (TIMER_7 counts down by itself)
+    }
     n = WorkModuleF(0, UI_V_DODGE_R) + WorkModuleF(0, UI_V_DODGE_L);
     if (st == UI_ST_ESCAPE_N)
     {
@@ -42760,7 +42764,8 @@ void ui_init()
 // v2 (the user's XV2 clip): XV2's rush entry (BAC 1): he stays where he is, facing the attacker; the counter's motion
 // (its game script: the freeze box at 0 (BDM #0), the 14-hit rush (BDM #1, held) and the finisher (BDM #2)); ui_gap
 // closes a gap only
-void ui_counter()
+// v10: the counter's start: the long rush (shortr 0: the transformation's) or the dodge's short one (1)
+void ui_counter_go(int shortr)
 {
     float side;
     ShieldModule(0, 0x2, 0, 0, 0x1);
@@ -42773,8 +42778,24 @@ void ui_counter()
     WorkModule(0, UI_FORMED, UI_V_FORM);
     WorkModule(0, 1.0f, 0x0100000B);
     WorkModule(0, 0.0f, 0x0100000C);
-    func_22(UI_MOT_STRIKE, 0, 1.0f);
+    if (shortr != 0)
+    {
+        // v10 (the user: "the autododge version should use the short animation with far less hits"): the dodge's
+        // short rush (motion 0x236 from SpecialLwHeavy's frame UI_STRIKE_S_AT: its own scripts, 11 hits)
+        WorkModule(0, UI_STRIKE_S_N, 0x0100000F);
+        func_22(UI_MOT_STRIKE_S, UI_STRIKE_S_AT, 1.0f);
+    }
+    else
+    {
+        WorkModule(0, UI_STRIKE_N, 0x0100000F);     // v10: the counter's length (ui_loop's end)
+        func_22(UI_MOT_STRIKE, 0, 1.0f);
+    }
     ui_still();
+}
+
+void ui_counter()
+{
+    ui_counter_go(0);
 }
 
 // v2: XV2's Movement to the target (BAC 1's 156-161): only a gap closed, he stays where he is otherwise: on frames
@@ -42851,7 +42872,7 @@ void ui_loop()
     }
     WorkModule(0, 2.0f, 0x0F00011B);        // v2: intangible through the whole counter (XV2: invulnerable 151-499)
     ui_gap(n);
-    if (n > UI_STRIKE_N - 1.5f)
+    if (n > WorkModuleF(0, 0x0100000F) - 1.5f)
     {
         ui_finish();
     }
@@ -42904,13 +42925,31 @@ void ui_dodge_init()
     KineticModule(0, 0x6);
     GroundModule(0x2710, 0x2);
     WorkModule(0, UI_SWAY_INV, 0x0F00011B);
-    if (way * WorkModuleF(0, 0x0f000003) < 0.0f)
+    // v10 (the user: "make it so the autododge alternates between animations"): XV2's four sways, the side by the
+    // attacker (v7), L / R alternating dodge after dodge (TIMER_7: > 0.5 the next is R)
+    if (WorkModuleF(0, UI_V_SWAY) > 0.5f)
     {
-        func_22(UI_MOT_SWAY_B, 0, 1.0f);    // the attacker in front (away = behind him): the back sway
+        WorkModule(0, 0.0f, UI_V_SWAY);
+        if (way * WorkModuleF(0, 0x0f000003) < 0.0f)
+        {
+            func_22(UI_MOT_SWAY_BR, UI_SWAY_BR_AT, 1.0f);
+        }
+        else
+        {
+            func_22(UI_MOT_SWAY_FR, UI_SWAY_FR_AT, 1.0f);
+        }
     }
     else
     {
-        func_22(UI_MOT_SWAY_F, UI_SWAY_F_AT, 1.0f);
+        WorkModule(0, 2.0f, UI_V_SWAY);
+        if (way * WorkModuleF(0, 0x0f000003) < 0.0f)
+        {
+            func_22(UI_MOT_SWAY_B, 0, 1.0f);    // the attacker in front (away = behind him): the back sway
+        }
+        else
+        {
+            func_22(UI_MOT_SWAY_F, UI_SWAY_F_AT, 1.0f);
+        }
     }
     KineticModule(0x11, 0x3, 0.0f, 0.0f);
 }
@@ -42941,7 +42980,7 @@ void ui_rush_init()
     WorkModule(0, 0.0f, UI_V_SHAPE);
     KineticModule(0, 0x6);
     GroundModule(0x2710, 0x1);
-    ui_counter();                               // the shape off, turned, phase 1, the counter's motion, held
+    ui_counter_go(0x1);                         // the shape off, turned, phase 1, v10: the SHORT rush, held
 }
 
 // v7: his spot dodge while transformed (every frame of EscapeN, ui_tick): an attack on his counter shape marks
@@ -43005,9 +43044,9 @@ void ui_dodge_loop()
     }
     if (n > UI_SWAY_CW_ON - 0.5f && n < UI_SWAY_CW_OFF + 0.5f && StopModule(0x1) == 0)
     {
-        if (ControlModule(0x2710, 0) || ControlModule(0x2710, 0x4))
+        if (ControlModule(0x2710, 0x1))
         {
-            ui_rush_init();                     // v8: an attack button in the window: the rush counter
+            ui_rush_init();                     // v8: the rush counter; v10: special only (the user), the short rush
             return;
         }
     }
@@ -43052,9 +43091,17 @@ void ui_dodge_end()
 // frees his request; CameraModule 0x2718 back to the normal camera). ss_end (any exit: a KO, a hit) ends them too, and
 // ss_stale (every frame, ui_tick) when the status was left without its end (TIMER_4 still in Secret Sensation's range
 // outside 0x155). The transformation keeps no camera change (the user)
+// v10 (the user: "make secret sensation work closer to how it does in DBFZ. The counter once activated should stop the
+// world, all effects, projectiles and stage until Supamario reaches his target (or a long timer elapses as a fallback)
+// along with a time slowdown for Supamario. His movement speed should stop and then accelerate quickly"): no slow-motion
+// any more (v7-v9's SlowModule(0, 3, 48)); from the counter's read to UI_SS_ARRIVE frames after his arrival he asks the
+// cave's WORLD STOP (TIMER_6 UI_V_STOP = UI_SS_STOP_ASK every frame, at most UI_SS_STOP_MAX frames: the fallback;
+// exe_v46z_ui7's ws_*: every other object stopped, every effect but his paused, the stage stopped; it ends 2 frames after
+// the asks stop, whatever ended them: the arrival, a KO, a reset, the match's end, leaving the status). ss_fx_off: the
+// asks end (0), the camera back
 void ss_fx_off()
 {
-    SlowModule(0x1);
+    WorkModule(0, 0.0f, UI_V_STOP);
     CameraModule(0x2718);
 }
 
@@ -43075,6 +43122,7 @@ void ss_stale(float st)
 
 void ss_init()
 {
+    WorkModule(0, 0.0f, UI_V_STOP);
     WorkModule(0, 3.0f, UI_V_SS);
     WorkModule(0, 0.0f, 0x0100000B);
     WorkModule(0, -1.0f, 0x0100000C);    // its loop runs on this frame too: frame 0
@@ -43119,24 +43167,42 @@ void ss_counter()
     cb_speed(0.0f, 0.0f);
     KineticModule(0x11, 0x2, 0.0f, 0.0f);
     GroundModule(0x2710, 0);
-    func_22(UI_SS_SLIDE_MOT, 0, 1.0f);
-    EffectModule(0x2710, UI_FX_VANISH, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_VANISH_SIZE, 0, 0, 0, 0, 0, 0, 0x1);
+    func_22(UI_SS_SLIDE_MOT, 0, UI_SS_RATE);                // v10: his own slow motion (the user's "3/4")
+    // v10 (1511_GKS_KTM's release, the DBFZ flash): the stance's charge faded, KiryokuMax's burst on him
+    EffectModule(0x2723, UI_FX_SS_CHARGE, 0, 0);
+    EffectModule(0x2710, UI_FX_SS_RELEASE, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_SS_RELEASE_SIZE, 0, 0, 0, 0, 0, 0, 0x1);
     SoundModule(0x2710, UI_SND_VANISH);
-    SlowModule(0, UI_SS_SLOW, UI_SS_SLOW_FRAMES);           // v7: everyone slowed until he arrives
+    WorkModule(0, UI_SS_STOP_ASK, UI_V_STOP);                // v10: the world stopped (the cave) until he arrives
     CameraModule(0x2714, UI_SS_CAM1_T, 0, UI_SS_CAM1_D);    // v7: a slight zoom (him and the fighter he passes)
 }
 
-// the slide's frame k (1 .. UI_SS_SLIDE_N): eased (smoothstep) from the start to the end, Z out and back (a sine)
+// the slide's frame k (1 .. UI_SS_SLIDE_N): v1-v9 eased (smoothstep) from the start to the end; v10 (DBFZ: he stops,
+// then goes fast): over UI_SS_HOLD frames UI_SS_HOLD_FRAC of the way, slowing to a stop (ease-out), then the rest over
+// UI_SS_DASH frames, faster and faster (ease-in: the speed grows to the arrival); Z out and back (a sine)
 void ss_slide(float k)
 {
     float t;
     float w;
+    float u;
     t = k / UI_SS_SLIDE_N;
     if (t > 1.0f)
     {
         t = 1.0f;
     }
-    w = t * t * (3.0f - 2.0f * t);
+    if (k < UI_SS_HOLD)
+    {
+        u = 1.0f - k / UI_SS_HOLD;
+        w = UI_SS_HOLD_FRAC * (1.0f - u * u);
+    }
+    else
+    {
+        u = (k - UI_SS_HOLD) / UI_SS_DASH;
+        if (u > 1.0f)
+        {
+            u = 1.0f;
+        }
+        w = UI_SS_HOLD_FRAC + (1.0f - UI_SS_HOLD_FRAC) * u * u;
+    }
     WorkModule(0, WorkModuleF(0, 0x0100000D) + (WorkModuleF(0, 0x0100000F) - WorkModuleF(0, 0x0100000D)) * w, 0x0f000000);
     WorkModule(0, WorkModuleF(0, 0x0100000E) + (WorkModuleF(0, 0x01000010) - WorkModuleF(0, 0x0100000E)) * w, 0x0f000001);
     WorkModule(0, -UI_SS_DEPTH * 4.0f * t * (1.0f - t), 0x0f000002);
@@ -43167,18 +43233,43 @@ void ss_loop()
     ph = WorkModuleF(0, 0x0100000B);
     n = WorkModuleF(0, 0x0100000C) + 1.0f;
     WorkModule(0, n, 0x0100000C);
-    if (ph > 0.5f && ph < 1.5f)
+    if (ph > 0.5f && ph < 2.5f)
     {
-        WorkModule(0, 2.0f, 0x0F00011B);    // intangible through the slide
+        WorkModule(0, 2.0f, 0x0F00011B);    // intangible through the slide and the arrival
+        if (n < UI_SS_STOP_MAX + 0.5f)
+        {
+            WorkModule(0, UI_SS_STOP_ASK, UI_V_STOP);     // v10: the world stays stopped (asked every frame)
+        }
+        else
+        {
+            WorkModule(0, 0.0f, UI_V_STOP);               // v10: the fallback
+        }
+        if (ph > 1.5f)
+        {
+            // v10: arrived (DBFZ: he lands behind the fighter, the world still stopped): held there, then the world
+            // goes on and he falls
+            cb_speed(0.0f, 0.0f);
+            KineticModule(0x11, 0x2, 0.0f, 0.0f);
+            if (n > UI_SS_SLIDE_N + UI_SS_ARRIVE - 0.5f)
+            {
+                ss_fx_off();
+                ss_land();
+            }
+            return;
+        }
         ss_slide(n);
         if (n > UI_SS_CAM2_AT - 0.5f && n < UI_SS_CAM2_AT + 0.5f)
         {
-            CameraModule(0x2714, UI_SS_CAM2_T, 0, UI_SS_CAM2_D);   // v7: closer, on him
+            CameraModule(0x2714, UI_SS_CAM2_T, 0, UI_SS_CAM2_D);   // v7: closer, on him (v10: as the dash starts)
+            // v10: the dash: the vanish lines where he leaves
+            EffectModule(0x2710, UI_FX_VANISH, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_VANISH_SIZE, 0, 0, 0, 0, 0, 0, 0x1);
         }
         if (n > UI_SS_SLIDE_N - 0.5f)
         {
-            ss_fx_off();                    // v7: arrived: normal speed, the normal camera
-            ss_land();
+            // v10: the arrival: the vanish lines and a small burst of his aura (MGT_HENSIN02) where he lands
+            EffectModule(0x2710, UI_FX_VANISH, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_VANISH_SIZE, 0, 0, 0, 0, 0, 0, 0x1);
+            EffectModule(0x2710, UI_FX_BURST, UI_BONE_TRANS, 0, 0, 0, 0, 0, 0, UI_SS_FX_BURST_SIZE, 0, 0, 0, 0, 0, 0, 0x1);
+            WorkModule(0, 2.0f, 0x0100000B);
         }
         return;
     }
@@ -43210,10 +43301,12 @@ void ss_loop()
 
 void ss_end()
 {
-    if (WorkModuleF(0, 0x0100000B) > 0.5f && WorkModuleF(0, 0x0100000B) < 1.5f)
+    if (WorkModuleF(0, 0x0100000B) > 0.5f && WorkModuleF(0, 0x0100000B) < 2.5f)
     {
-        ss_fx_off();                // v7: left during the slide (a KO, ...): the slow-motion and the camera ended
+        ss_fx_off();                // v7: left during the slide (a KO, ...): the camera ended; v10: the world stop's asks
     }
+    WorkModule(0, 0.0f, UI_V_STOP);
+    EffectModule(0x2723, UI_FX_SS_CHARGE, 0, 0);
     WorkModule(0, 0.0f, UI_V_SS);
     ShieldModule(0, 0x2, 0, 0, 0x1);
     WorkModule(0, 0.0f, 0x0f000002);

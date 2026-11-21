@@ -1187,6 +1187,207 @@ def pf_diag_checks(base, diag, kind):
     check('v7 diag: no S4UP for a fighter\'s attack', lines, [])
 
 
+
+# ---------------------------------------------------------------- v10 (exe_v46z_ui7): the shield-hit mark, the world stop
+EV10_REG_WORDS = {0x02C28F48: 0x3D2002C3, 0x02C28F50: 0x3929CD28}       # the EffectModule's init: event 0x10 -> 0x02C2CD28
+EV11_REG_WORDS = {0x02C28DE4: 0x3CA002C3, 0x02C28DF0: 0x38A5CDC0}       # ... event 0x11 -> 0x02C2CDC0
+
+
+def v10_words_checks(base, patched, labels):
+    img, pimg = K.Image(base), K.Image(patched)
+    check('v10: the three hooked words are `mflr r0` in the base (the shield-hit listener, the frame state fill, the '
+          'fighter\'s step wrapper)', [img.w(a) for a in (C.SX_HOOK, C.FILL_HOOK, C.STEP_HOOK)], [C.MFLR] * 3)
+    check('v10: ... and branches to ui_sx / ws_fill / ws_step in the patched RPX',
+          [pimg.w(a) for a in (C.SX_HOOK, C.FILL_HOOK, C.STEP_HOOK)],
+          [C.branch(C.SX_HOOK, labels['ui_sx']), C.branch(C.FILL_HOOK, labels['ws_fill']),
+           C.branch(C.STEP_HOOK, labels['ws_step'])])
+    check('v10: no relocation on the new hooked words', [hex(a) for a in (C.SX_HOOK, C.FILL_HOOK, C.STEP_HOOK)
+                                                         if a in img.relocs()], [])
+    check('v10 evidence: the EffectModule\'s init (0x02C28DD0) registers 0x02C2CD28 (event 0x10, the shield hit) and '
+          '0x02C2CDC0 (0x11)', ([img.w(a) for a in EV10_REG_WORDS], [img.w(a) for a in EV11_REG_WORDS]),
+          (list(EV10_REG_WORDS.values()), list(EV11_REG_WORDS.values())))
+    check('v10 evidence: the listener asks the hit data (vt +0x194 of [msg + 8], the record [msg + 0x10]), skips when '
+          'its +0x54 is set, and requests effect [EM + 0x90] at the record (vt +0x44)',
+          [img.w(a) for a in (0x02C2CD40, 0x02C2CD48, 0x02C2CD4C, 0x02C2CD60, 0x02C2CD68, 0x02C2CD94, 0x02C2CDA0)],
+          [0x80640008, 0x80090194, 0x83E40010, 0x89430054, 0x40820040, 0x809E0090, 0x38BF0008])
+    check('v10 evidence: the fighter\'s event-0x10 handler (0x02E35794) calls slot 42 ([F + 0x7538] vt +0x15C) and then '
+          'writes 0x0100001F (common 0x1F: PtcCommonGuardMark) into [F + 0x74D8] + 0x90',
+          [img.w(a) for a in (0x02E357DC, 0x02E357EC, 0x02E35828, 0x02E3582C, 0x02E35830, 0x02E35838, 0x02E3583C)],
+          [0x807D7538, 0x800B015C, 0x3F000100, 0x80FD74D8, 0x3B18FFFF, 0x39580020, 0x91470090])
+    check('v10 evidence: the fighter update calls the step wrapper with (F, F + 0x230): the module block is F + 0x230, '
+          'so the EffectModule F + 0x74D8 is block + EFFM', ([img.w(a) for a in (0x02E25344, 0x02E25348, 0x02E2534C)],
+                                                               0x230 + C.EFFM),
+          ([0x7FE3FB78, 0x389F0230, 0x4801B845], 0x74D8))
+    check('v10 evidence: the step wrapper steps when the frame state\'s +8 is 0 or its +0 is 2 (0x02E40BB0-0x02E40BD0)',
+          [img.w(a) for a in (0x02E40BB0, 0x02E40BB4, 0x02E40BC4, 0x02E40BC8)],
+          [0x818C6C04, 0x896C0008, 0x814C0000, 0x2C0A0002])
+    check('v10 evidence: the Final Smash code (0x02772670) stops the stage (0x0316505C, unless [[0x102F7024] + 0xB3]) '
+          'and pauses effects by key (0x0334CA30 -> 0x032F0F10: +0x19E of the instances [0x10439088] whose +8 & mask '
+          '= key and +0x1A4 = 0)',
+          [img.w(a) for a in (0x02772678, 0x0277267C, 0x02772694, 0x027726C4, 0x032F0F14, 0x032F0F24, 0x032F0F30,
+                              0x032F0F3C, 0x032F0F40)],
+          [0x818C7024, 0x880C00B3, 0x489F29C9, 0x48BDA36D, 0x818C9088, 0x7C0A2838, 0x892C01A4, 0x98CC019E, 0x818C0018])
+    check('v10 evidence: the instance update (0x0334E080) holds a paused instance (+0x19E -> +0x19F 0, its clock kept)',
+          [img.w(a) for a in (0x0334E09C, 0x0334E0A0, 0x0334E0A8, 0x0334E0AC, 0x0334E0C0)],
+          [0x8963019E, 0x69600001, 0x9803019F, 0x4D820020, 0xD1A30140])
+    check('v10 evidence: the EffectModule\'s own pause (0x02C27E88): key [EM + 0x10] | 0x8000 under 0x0100BFFF',
+          [img.w(a) for a in (0x02C27E88, 0x02C27E8C, 0x02C27E90, 0x02C27E98)],
+          [0x3C800101, 0x801F0010, 0x3884BFFF, 0x60038000])
+
+
+def v10_sx_checks(e, kind, labels):
+    """ui_sx: the shield-hit mark skipped for his counter shape (group 1, his EffectModule)"""
+    marks = []
+    e.stub(C.SX_HOOK + 4, lambda em: marks.append((em.r(3), em.r(4))))
+    e.setw(e.ftab + 8, 0)
+    him = e.fighter(kind, status=0, slot=0)
+    other = e.fighter(3, status=0, slot=1)
+    for sk in (him, other):
+        sk['em'] = e.alloc(0x100, b'\0')
+        e.setw(sk['acc'] + C.EFFM, sk['em'])
+    cases = [('his counter shape (group 1)', him['em'], 1, False),
+             ('his guard bubble (group 0)', him['em'], 0, True),
+             ('another fighter\'s (Mario, kind 3) group 1', other['em'], 1, True),
+             ('an EffectModule of no fighter', e.alloc(0x40, b'\0'), 1, True)]
+    for what, em, grp, want in cases:
+        msg = e.alloc(0x20, b'\0')
+        e.setw(msg + 0x14, grp)
+        del marks[:]
+        r, kept = e.run(labels['ui_sx'], em, msg)
+        check('v10: ui_sx, %s: the mark %s (the listener goes on with its registers)' %
+              (what, 'requested' if want else 'NOT requested'), (bool(marks), marks[0] if marks else None, kept),
+              (want, (em, msg) if want else None, True))
+    e.mu.mem_write(him['f'] + 0x1E, bytes([2]))
+    msg = e.alloc(0x20, b'\0')
+    e.setw(msg + 0x14, 1)
+    del marks[:]
+    e.run(labels['ui_sx'], him['em'], msg)
+    check('v10: ui_sx, his entry not live: the mark requested', bool(marks), True)
+
+
+def v10_ws_checks(e, kind, labels):
+    """the world stop: ws_step (his ask, his normal frame), ws_fill (the stopped frames, the lease), ws_begin / ws_end"""
+    steps, fills, stage = [], [], []
+    fs = e.alloc(0x10, b'\0')
+    e.setw(C.FRAME_STATE, fs)
+    e.stub(C.STEP_HOOK + 4, lambda em: steps.append((em.r(3), em.r(4), em.mu.mem_read(fs + 8, 1)[0], em.w(fs))))
+    e.fill_ret = 1
+
+    def fill(em):
+        fills.append(em.r(3))
+        return em.fill_ret
+    e.stub(C.FILL_HOOK + 4, fill)
+    e.stub(C.STAGE_STOP, lambda em: stage.append((em.r(3), em.r(4))))
+    smgr = e.alloc(0x100, b'\0')
+    e.setw(C.STAGE_MGR, smgr)
+    sflags = e.alloc(0x100, b'\0')
+    e.setw(C.STAGE_FLAGS, sflags)
+    e.setw(e.ftab + 8, 0)
+    him = e.fighter(kind, status=C.ST_SS, slot=0)
+    other = e.fighter(3, status=0, slot=1)
+    em = e.alloc(0x100, b'\0')
+    e.setw(him['acc'] + C.EFFM, em)
+    e.setw(em + 0x10, 0x12)                             # his owner key (0x02005AF0's +0x10)
+    # the instance list: his (key | 0x8000, other bits outside the mask), another's, one kept out of pauses, one already
+    # paused, a Final Smash one (0x0108xxxx)
+    insts = []
+    for key, keep, paused in ((0x00058012, 0, 0), (0x00008013, 0, 0), (0x00008014, 1, 0),
+                              (0x00008015, 0, 1), (0x01080000, 0, 0)):
+        i = e.alloc(0x1C0, b'\0')
+        e.setw(i + 8, key)
+        e.mu.mem_write(i + 0x1A4, bytes([keep]))
+        e.mu.mem_write(i + 0x19E, bytes([paused]))
+        insts.append(i)
+    for a, b in zip(insts, insts[1:] + [0]):
+        e.setw(a + 0x18, b)
+    e.setw(C.INST_LIST, insts[0])
+    paused = lambda: [e.mu.mem_read(i + 0x19E, 1)[0] for i in insts]   # noqa: E731
+    data = labels['ws_data']
+    e.setw(data, 0)
+    e.setw(data + 4, 0)
+    e.setw(data + 8, 0)
+    # no ask: his step and the fill as before
+    e.vars = {C.V_STOP: 0.0}
+    e.mu.mem_write(fs, b'\0' * 0x10)
+    del steps[:]
+    r, kept = e.run(labels['ws_step'], him['f'], him['acc'])
+    check('v10: ws_step, him, no ask: the game\'s step (r3 / r4 his), nothing else; no stop',
+          (steps, e.w(data), stage, paused(), kept), ([(him['f'], him['acc'], 0, 0)], 0, [], [0, 0, 0, 1, 0], True))
+    r, kept = e.run(labels['ws_fill'], fs)
+    check('v10: ws_fill, no stop: the game\'s fill and its answer; the frame state as it left it',
+          (fills[-1], r, bytes(e.mu.mem_read(fs, 12)), kept), (fs, 1, b'\0' * 12, True))
+    # his ask: the stop starts
+    e.vars = {C.V_STOP: 2.0}
+    e.mu.mem_write(fs + 8, bytes([1]))                  # (a slowed frame, as the fill made it)
+    e.setw(fs, 1)
+    del steps[:]
+    r, kept = e.run(labels['ws_step'], him['f'], him['acc'])
+    check('v10: ws_step, his ask (TIMER_6 2): the stop starts (the lease WS_LEASE, its owner him); every instance but his, '
+          'the one kept out and the one already paused is paused; the stage stopped (manager, 1)',
+          (e.w(data), e.w(data + 4), paused(), e.w(data + 8), stage, kept),
+          (C.WS_LEASE, him['f'], [0, 1, 0, 1, 1], 2, [(smgr, 1)], True))
+    check('v10: ws_step, his step during his stop runs on a normal frame (+8 0 while it runs), the frame state put back',
+          (steps, e.mu.mem_read(fs + 8, 1)[0], e.w(fs)), ([(him['f'], him['acc'], 0, 1)], 1, 1))
+    check('v10: ws_step asked TIMER_6 through his WorkModule (get_float)', ('get', him['wm'], C.V_STOP) in e.calls, True)
+    del steps[:]
+    r, kept = e.run(labels['ws_step'], other['f'], other['acc'])
+    check('v10: ws_step, another fighter during the stop: the game\'s step on the stopped frame (it doesn\'t step)',
+          (steps, kept), ([(other['f'], other['acc'], 1, 1)], True))
+    # the fill: the lease counts down
+    e.mu.mem_write(fs, b'\0' * 12)
+    r, kept = e.run(labels['ws_fill'], fs)
+    check('v10: ws_fill during the stop: the game\'s fill, then a slowed frame between two steps (+8 1, +0 1), the '
+          'answer 0, the lease one less', (r, e.mu.mem_read(fs + 8, 1)[0], e.w(fs), e.w(data), kept),
+          (0, 1, 1, C.WS_LEASE - 1, True))
+    # renewed by his next ask
+    e.run(labels['ws_step'], him['f'], him['acc'])
+    check('v10: his next ask renews the lease (no second start: the stage asked once)', (e.w(data), len(stage)),
+          (C.WS_LEASE, 1))
+    # the asks stop: two fills end it
+    e.vars = {C.V_STOP: 0.0}
+    e.run(labels['ws_step'], him['f'], him['acc'])
+    e.mu.mem_write(fs, b'\0' * 12)
+    r1, _k = e.run(labels['ws_fill'], fs)
+    e.mu.mem_write(fs, b'\0' * 12)
+    r2, kept = e.run(labels['ws_fill'], fs)
+    check('v10: the asks stopped: the first fill a stopped frame (lease 1), the second ends the stop: the instances it '
+          'paused go on (the one paused before stays), the stage on (manager, 0), the state cleared, the game\'s frame',
+          (r1, r2, paused(), stage[-1], [e.w(data + 4 * k) for k in range(3)], bytes(e.mu.mem_read(fs, 12)), kept),
+          (0, 1, [0, 0, 0, 1, 0], (smgr, 0), [0, 0, 0], b'\0' * 12, True))
+    # the stage stop skipped as the Final Smashes skip it
+    e.mu.mem_write(sflags + 0xB3, bytes([1]))
+    del stage[:]
+    e.vars = {C.V_STOP: 2.0}
+    e.run(labels['ws_step'], him['f'], him['acc'])
+    check('v10: [[0x102F7024] + 0xB3] set: no stage stop (the Final Smash code\'s test)', stage, [])
+    e.vars = {C.V_STOP: 0.0}
+    for _ in range(3):
+        e.run(labels['ws_fill'], fs)
+    e.mu.mem_write(sflags + 0xB3, bytes([0]))
+    check('v10: ... and the stop still ends with the lease', (e.w(data), paused()), (0, [0, 0, 0, 1, 0]))
+    # Mario (kind 3) asking: nothing
+    e.vars = {C.V_STOP: 2.0}
+    del steps[:]
+    e.run(labels['ws_step'], other['f'], other['acc'])
+    check('v10: another kind with TIMER_6 set: no stop, its step as before', (e.w(data), len(steps)), (0, 1))
+    e.vars = {}
+
+
+def v10_diag_checks(diag, kind):
+    """v10 diag: the world stop and the mark as the release build, and S4UW at the stop's start and end"""
+    e = Run(diag)
+    lines = []
+
+    def osr(em):
+        lines.append((em.cstr(em.r(3)).split(' ')[0], tuple(em.r(i) for i in range(4, 8))))
+    e.stub(C.OSREPORT_VENEER, osr)
+    _w, labels = C.build(kind, diag=True)
+    v10_sx_checks(e, kind, labels)
+    v10_ws_checks(e, kind, labels)
+    ws = [l_ for l_ in lines if l_[0] == 'S4UW']
+    check('v10 diag: S4UW on / off at each stop\'s start and end (on 1, his fighter, 2 paused; off 0, his fighter, 2)',
+          [(x[1][0], x[1][2]) for x in ws][:2], [(1, 2), (0, 2)])
+
 def main():
     a = sys.argv[1:]
     if not a:
@@ -1213,7 +1414,10 @@ def main():
     slot43_checks(e, kind)
     chain_checks(e, kind)
     persist2_checks(e)
-    pf_checks(e, kind, base, patched)
+    labels = pf_checks(e, kind, base, patched)
+    v10_words_checks(base, patched, labels)
+    v10_sx_checks(e, kind, labels)
+    v10_ws_checks(e, kind, labels)
     diag = a[2] if len(a) > 2 else None
     if diag is None:
         tmp2 = tempfile.TemporaryDirectory()
@@ -1224,6 +1428,7 @@ def main():
             sys.exit(r.stdout + r.stderr)
     diag_checks(diag, kind)
     pf_diag_checks(base, diag, kind)
+    v10_diag_checks(diag, kind)
     print('%d failure(s)' % fails)
     sys.exit(1 if fails else 0)
 

@@ -235,9 +235,20 @@ FX = [('start', 'BTL_AURA.eepk', 'MGT_HENSIN01.emp', 'BustN', (0.0, 0.0, 0.0), 1
       # carry Effect1 = BTL_CMN effect 0 (Btl_HitLOD x1.5 + Btl_HitS x0.8, camera-facing, at the hit): the yellow
       # bursts on every hit of the user's clips (udclip e 92-150, uiclip c); the scripts had none (only the vanish)
       ('hit_s', 'BTL_CMN.eepk', 'Btl_HitS.emp', 'TransN', (0.0, 0.0, 0.0), 0.8),
-      ('hit_lod', 'BTL_CMN.eepk', 'Btl_HitLOD.emp', 'TransN', (0.0, 0.0, 0.0), 1.5)]
+      ('hit_lod', 'BTL_CMN.eepk', 'Btl_HitLOD.emp', 'TransN', (0.0, 0.0, 0.0), 1.5),
+      # v10 Secret Sensation's startup (the user: "Hopefully we can use [1511_GKS_KTM's] effects for Secret Sensation's
+      # startup to fade away during its recovery"). KTM's BAC (entries 0-3) holds no effect of its own: Aura type 3
+      # (KiaiCharge) on at 25 and off at 469, type 4 (KiryokuMax) at 468, its "CMN" (EEPK type 1) effects 140 / 200 /
+      # 116 (type 1 isn't BTL_CMN: its 116 doesn't exist there; the stage's own debris, XV2-Tools' StageBG) and BPE 10 /
+      # 20 (screen flashes). The aura types are the character's aura_setting.aur row: for the skill's CUS aura 1 (MGT's
+      # cus entry), aura 1 = BTL_AURA 40-44: KiaiCharge 43 (KTN_V_Loop on the pelvis, x0.6, LoopCancel: it fades),
+      # KiryokuMax 44 (BoostV_End x0.8 on the pelvis). (Approximated: CUS aura 1 -> aura_setting aura 1, XV2's
+      # CusAuraData table in the exe, not in the files sent.) The charge from the stance's start, faded at its
+      # recovery (or at the counter's read, where KiryokuMax's burst plays: KTM's release)
+      ('ss_charge', 'BTL_AURA.eepk', 'KTN_V_Loop.emp', 'HipN', (0.0, 0.0, 0.0), 0.6),
+      ('ss_release', 'BTL_AURA.eepk', 'BoostV_End.emp', 'HipN', (0.0, 0.0, 0.0), 0.8)]
 FX_V7 = ('sway_line',)
-FX_V10 = ('hit_s', 'hit_lod')
+FX_V10 = ('hit_s', 'hit_lod', 'ss_charge', 'ss_release')
 # v3: the aura's colour. The converted emitters keep XV2's EMP colours (blue / cyan / white: rendered with fx_render's
 # Smash 4 side, the drawn pixels' median hue 192 deg, saturation 0.26); the user's XV2 clip after the burst shows a
 # lavender / purple-white flicker (the aura pixels' median hue 281-287 deg, saturation 0.16-0.18, value 0.88-0.96, four
@@ -370,6 +381,16 @@ def msc_values():
          'UI_SS_SLOW': '0x%X' % SS_SLOW, 'UI_SS_SLOW_FRAMES': '0x%X' % SS_SLOW_FRAMES, 'UI_SS_CAM1_T': '0x%X' % SS_CAM1_T,
          'UI_SS_CAM1_D': fl(SS_CAM1_D), 'UI_SS_CAM2_AT': fl(SS_CAM2_AT), 'UI_SS_CAM2_T': '0x%X' % SS_CAM2_T,
          'UI_SS_CAM2_D': fl(SS_CAM2_D)}
+    # v10: the alternating sways, the dodge's short rush, Secret Sensation's world stop / travel / effects
+    v.update({'UI_MOT_SWAY_BR': '0x%X' % MOT_SWAY_BR, 'UI_MOT_SWAY_FR': '0x%X' % MOT_SWAY_FR,
+              'UI_SWAY_BR_AT': fl(SWAY_BR_AT), 'UI_SWAY_FR_AT': fl(SWAY_FR_AT), 'UI_V_SWAY': '0x%X' % V_SWAY,
+              'UI_MOT_STRIKE_S': '0x%X' % MOT_STRIKE_S, 'UI_STRIKE_S_AT': fl(STRIKE_S_AT), 'UI_STRIKE_S_N': fl(STRIKE_S_N),
+              'UI_V_STOP': '0x%X' % V_STOP, 'UI_SS_STOP_ASK': fl(SS_STOP_ASK), 'UI_SS_HOLD': fl(SS_HOLD),
+              'UI_SS_DASH': fl(SS_DASH), 'UI_SS_HOLD_FRAC': fl(SS_HOLD_FRAC), 'UI_SS_ARRIVE': fl(SS_ARRIVE),
+              'UI_SS_STOP_MAX': fl(SS_STOP_MAX), 'UI_SS_RATE': fl(SS_RATE), 'UI_SS_CAM2_AT': fl(SS_CAM2_AT_V10),
+              'UI_FX_SS_CHARGE': '0x%X' % fx_id('ss_charge'), 'UI_FX_SS_RELEASE': '0x%X' % fx_id('ss_release'),
+              'UI_FX_BURST': '0x%X' % fx_id('burst'), 'UI_SS_FX_BURST_SIZE': fl(round(0.9 * SCALE * SS_FX_BURST_SIZE, 3)),
+              'UI_SS_RELEASE_SIZE': fl(round(0.8 * SCALE, 3)), 'UI_BONE_TRANS': '0x%X' % BONES['TransN']})
     return v
 
 
@@ -420,7 +441,7 @@ def sway_scripts():
         return {'game': [], 'expression': [],
                 'effect': timeline([(at + f, [graphic('sway_line', follow=False)]) for f in SWAY_LINE_AT]),
                 'sound': timeline([(at + SWAY_SND_AT, [cmd('sound_effect', se_id('ui_sway'))])])}
-    return {'specialairlwlight': sway(0), 'specialairlwlight_c3': sway(SWAY_F_AT)}
+    return {name: sway(at) for name, at in SWAY_AT.items()}     # v10: the R sways (0x242, 0x244) too
 
 
 def white_on(frames):
@@ -558,11 +579,12 @@ def scripts_for():
     effect = {anim.FORM: timeline([(FX_START_AT, [graphic('start')] + white_on(FX_BURST_AT - FX_START_AT)),
                                    (FX_AURA_AT, aura), (FX_BURST_AT, [graphic('burst', follow=False)] + white_to_glow())]),
               anim.STRIKE: timeline([(0, [graphic('vanish', follow=False)] + white_on(CNT_END)),
-                                     (anim.frame_of(anim.STRIKE, 1, 170), [graphic('vanish', follow=False)]),
+                                     (anim.frame_of(anim.STRIKE, 1, 170), [graphic('vanish', follow=False)])] +
+                                    [(f, hit_fx()) for f in RUSH_AT] + [(STRIKE_AT, hit_fx(FINISH_FX))] + [
                                      # v6: no aura here: the counter ends the transformation, so the MSC's aura
                                      # (ui_aura, renewed by fading) is on from its first frame; this one doubled it
                                      (CNT_END, white_to_glow())]),
-              anim.DODGE: sway_scripts()['specialairlwlight']['effect'], anim.SS: []}
+              anim.DODGE: sway_scripts()['specialairlwlight']['effect'], anim.SS: ss_stance_fx()}
     sound = {anim.FORM: timeline([(SND_START, [cmd('sound_effect', se_id('ui_start'))]),
                                   (SND_SUCCESS, [cmd('sound_effect', se_id('ui_success'))])]),
              anim.STRIKE: timeline([(0, [cmd('sound_effect', se_id('ui_vanish'))]),
@@ -575,6 +597,47 @@ def scripts_for():
 
 def se_id(key):
     return SE_IDS.get(key, 0)
+
+
+FINISH_FX = 1.6                      # v10: the finisher's hit effect x this (XV2's BDM #2: the same effect 0; the clips'
+                                     # finisher burst and its ring are bigger than a rush hit's)
+
+
+def short_rush_scripts():
+    """v10: the dodge's short rush (motion 0x236 speciallwheavy_c2, from STRIKE_S_AT of SpecialLwHeavy's animation: its
+    scripts' clock starts there): the freeze to the first hit, RUSH_S_N held hits at RUSH_S_AT, the finisher at
+    STRIKE_S_HIT, XV2's hit effect on each, the vanish at 0 and CNT_S_VANISH2, the white body to CNT_S_END"""
+    at = STRIKE_S_AT
+    rush = []
+    for f in RUSH_S_AT:
+        rush += [(at + f, [cmd('hit_log_clear', 0), rush_box(), cmd('hitbox_hold', 0, 2)]),
+                 (at + f + 2, [cmd('remove_all_hitboxes')])]
+    game = timeline([(at, [freeze_box(RUSH_S_AT[0])]), (at + 1, [cmd('remove_all_hitboxes')])] + rush +
+                    [(at + STRIKE_S_HIT, [cmd('hit_log_clear', 0), strike_box()]),
+                     (at + STRIKE_S_HIT + 3, [cmd('remove_all_hitboxes')]), (at + CNT_S_END, silver_on())])
+    effect = timeline([(at, [graphic('vanish', follow=False)] + white_on(CNT_S_END)),
+                       (at + CNT_S_VANISH2, [graphic('vanish', follow=False)])] +
+                      [(at + f, hit_fx()) for f in RUSH_S_AT] + [(at + STRIKE_S_HIT, hit_fx(FINISH_FX)),
+                                                                 (at + CNT_S_END, white_to_glow())])
+    sound = timeline([(at, [cmd('sound_effect', se_id('ui_vanish'))]),
+                      (at + CNT_S_SND, [cmd('sound_effect', se_id('ui_success'))])])
+    expression = timeline([(at + STRIKE_S_HIT, [cmd('rumble', 0x12, 0)])])
+    return {'game': game, 'effect': effect, 'sound': sound, 'expression': expression}
+
+
+def ss_stance_fx():
+    """v10: Secret Sensation's stance (SpecialAirLwHeavy's effect script): 1511_GKS_KTM's charge (KiaiCharge: KTN_V_Loop,
+    following his pelvis) from its frame 0, faded (Terminate 0: emission stopped, the sprites live out) at its recovery
+    (SS_OFF: the counter window's end); the counter's read fades it too (his MSC, ss_counter)"""
+    return timeline([(0, [graphic('ss_charge')]), (SS_OFF, [cmd('terminate_graphic_effect', fx_id('ss_charge'), 0, 0)])])
+
+
+def extra_scripts():
+    """{script name: {part: body}}: the custom-move slots the build writes (v7 / v10's sways, v10's short rush)"""
+    out = dict(sway_scripts())
+    del out['specialairlwlight']
+    out['speciallwheavy_c2'] = short_rush_scripts()
+    return out
 
 
 # v9 (the user's v7 test: "the aura and glowing outline disappear after Time Skip / Jump Spike is used until he
@@ -628,7 +691,7 @@ def restore_glow(f, own):
 
 
 def scripts(body_dir):
-    own = {acmd.crc(n) for n in list(SCRIPT.values()) + list(SWAY_SCRIPTS) + list(silver_scripts())}
+    own = {acmd.crc(n) for n in list(SCRIPT.values()) + EXTRA_SCRIPTS + list(silver_scripts())}
     for part, bodies in scripts_for().items():
         path = os.path.join(body_dir, part + '.bin')
         f = acmd.ACMDFile.load(path)
@@ -636,8 +699,8 @@ def scripts(body_dir):
             f.scripts[acmd.crc(SCRIPT[m])] = body + [acmd.Command(acmd.END)]     # F.L.U.D.D.'s replaced
         if part == 'effect':
             restore_glow(f, own)
-        for name in SWAY_SCRIPTS:                # v7: the custom-move slots' scripts (vanilla's replaced or new)
-            f.scripts[acmd.crc(name)] = sway_scripts()[name][part] + [acmd.Command(acmd.END)]
+        for name, bodies in extra_scripts().items():   # v7 / v10: the custom-move slots' scripts (F.L.U.D.D.'s replaced)
+            f.scripts[acmd.crc(name)] = bodies[part] + [acmd.Command(acmd.END)]
         if part == 'game':
             for name, body in silver_scripts().items():
                 assert acmd.crc(name) not in f.scripts, name
@@ -884,21 +947,77 @@ def aura_refraction(p, rep, nodes):
     return done
 
 
+# v10 (the user's v9 clips: "the aura still follows a bit behind Supamario than stay attached to him"; the jump in clip
+# 3407709b: a bright purple blob left on the stage's edge where he took off and a column of white specks up to him, for
+# ~0.8 s). eft's two particle kinds follow differently (the game's code):
+# - CPU particles (emitter flag 0x00800000 off): at emission a follow-0 particle points at the emitter's live matrices,
+#   1 / 2 at copies (0x04A5C89C); every frame the CPU update (0x04A624E4 / 0x04A62AE8) copies the emitter's
+#   translation into a follow-2 particle's copies (`cmpwi r0, 2` at 0x04A62554 / 0x04A62AFC): v9's follow 2 works there.
+# - GPU particles (flag 0x00800000: the converter's additive billboards, shader 39, the flare template's, and v9's
+#   refraction, shader 7): their record is written once at emission (0x04A6680C-0x04A6690C: the local place p + 0x14,
+#   the emitter matrix [p + 0x108] copied into the record's EmtMat), never again (the GPU calc 0x04A65FC0 calls neither
+#   update), and the program places the particle with that birth matrix (v_inEmtMat0-2): it stays where it was born
+#   whatever the follow type. eft compiles each program per follow kind: key byte 4 bit 0x04 is the variant that
+#   reads the LIVE emitter matrix (emm) instead; every vanilla emitter on such a variant has follow 0 (c6 / c4 / 06
+#   keys: Pit's flash1, Ganon's Majinken, Lucas's PK Freeze, Mario's own refraction1_Copy1), every one on the plain
+#   variant follow 1. 10 of the 19 aura emitters were GPU ones (the glows and the refraction): the trail.
+# Now (aura_follow): a GPU emitter gets its program's follow variant (the same key but byte 4 | 0x04 and the same pixel
+# program: Supamario's own shader 8 for the refraction (7's), Pit's shader 13 for the glows (39's): imported from
+# TWIN_PTCL, a vanilla .ptcl) and follow 0 (it reads the live matrix: on him every frame, XV2's PositionUpdate +
+# RotateUpdate); a CPU emitter keeps follow 2 (refreshed every frame). The look (pixel program, colours) unchanged
+AURA_FOLLOW_CPU = 2
+AURA_FOLLOW_GPU = 0
+GPU_FLAG = 0x00800000
+TWIN_PTCL = []                       # the vanilla .ptcl the follow variants come from (main's --twin-ptcl)
+FOLLOW_SETS = AURA_SETS + ('ss_charge',)
+
+
+def is_gpu(em):
+    return bool(struct.unpack_from('>I', em, 4)[0] & GPU_FLAG)
+
+
+def follow_variant(p, sh, others):
+    """v10: the follow variant of shader `sh` (its key entry with byte 4 | 0x04, every other key byte the same, the same
+    pixel program), in p or imported from one of `others` (vanilla Ptcls): its index in p"""
+    import eft_pixel
+    want = bytearray(p.shader_entry(sh))
+    if want[4] & 0x04:
+        return sh
+    want[4] |= 0x04
+    pix = eft_pixel.disassemble(p.shader_binary(sh))
+    for q in [p] + list(others):
+        for i in range(q.shader_count()):
+            e = q.shader_entry(i)
+            if e[:0x68] == bytes(want[:0x68]) and eft_pixel.disassemble(q.shader_binary(i)) == pix:
+                return i if q is p else p.import_shader(q, i)
+    raise SystemExit('supamario_ui_build: no follow variant of shader %d (key %s) in %s' % (
+        sh, bytes(want[:0x10]).hex(), [getattr(q, 'path', '?') for q in others]))
+
+
 def aura_follow(p, rep):
-    """v9: every aura emitter's particles follow him (ptcl 0x310 = AURA_FOLLOW), checked against its program"""
-    import eft_vertex
+    """v9: every aura emitter's particles follow him; v10: CPU ones follow 2, GPU ones follow 0 on their program's
+    follow variant (follow_variant)"""
+    import ptcl
+    others = []
+    for path in TWIN_PTCL:
+        q = ptcl.Ptcl(open(path, 'rb').read())
+        q.path = path
+        others.append(q)
     n = 0
-    for name in aura_set_names():
+    for key in FOLLOW_SETS:
+        name = 'PtcSupamarioUi' + [x for x in FX if x[0] == key][0][2][:-4]
         si = p.find_set(name)
         for e in p.sets[si]['emitters']:
             em = e['data']
             if em is None:
                 continue
-            sh = p.field(em, 'shader_index')
-            assert AURA_FOLLOW in eft_vertex.features(p.shader_binary(sh))['follow'], (name, p.emitter_name(em), sh)
-            struct.pack_into('>I', em, 0x310, AURA_FOLLOW)
+            if is_gpu(em):
+                p.set_field(em, 'shader_index', follow_variant(p, p.field(em, 'shader_index'), others))
+                struct.pack_into('>I', em, 0x310, AURA_FOLLOW_GPU)
+            else:
+                struct.pack_into('>I', em, 0x310, AURA_FOLLOW_CPU)
             n += 1
-        rep[name]['follow'] = AURA_FOLLOW
+        rep.setdefault(name, {})['follow'] = {'cpu': AURA_FOLLOW_CPU, 'gpu': AURA_FOLLOW_GPU}
     return n
 
 
@@ -926,7 +1045,8 @@ def effects(cmn_dir, fx_dir):
     batches = [(ep, [x[2] for x in FX if x[1] == ep and x[0] not in FX_V7 + FX_V10])
                for ep in ('BTL_AURA.eepk', 'BTL_CMN.eepk')]
     batches.append(('BTL_CMN.eepk', [x[2] for x in FX if x[0] in FX_V7]))   # v7: after (the earlier ids kept)
-    batches.append(('BTL_CMN.eepk', [x[2] for x in FX if x[0] in FX_V10]))  # v10: after (the earlier ids kept)
+    for ep in ('BTL_CMN.eepk', 'BTL_AURA.eepk'):                        # v10: after (the earlier ids kept)
+        batches.append((ep, [x[2] for x in FX if x[0] in FX_V10 and x[1] == ep]))
     for eepk, emps in batches:
         with tempfile.TemporaryDirectory() as pkg:
             for fn in os.listdir(cmn_dir):
@@ -1034,7 +1154,7 @@ def main():
         a.remove('--no-halo')
     keys = ('--ui-skill', '--ui-se-wav', '--ts-skill', '--ts-se-wav', '--frt-skill', '--sh-skill', '--sh-se-wav',
             '--fd-skill', '--fd-se-wav', '--skill', '--se-wav', '--ean', '--cmn-vfx', '--skill-vfx', '--cmn-se', '--stb',
-            '--png', '--cmn-ean')
+            '--png', '--cmn-ean', '--twin-ptcl')
     for k in keys:
         if k in a:
             i = a.index(k)
@@ -1042,6 +1162,8 @@ def main():
             del a[i:i + 2]
     if len(a) != 2 or any(k not in opts for k in keys[:13]):
         sys.exit(__doc__)
+    if '--twin-ptcl' in opts:
+        TWIN_PTCL[:] = [opts['--twin-ptcl']]     # v10: a vanilla .ptcl holding the aura programs' follow variants
     gf = {'ean': opts['--ean'], 'cmn_vfx': opts['--cmn-vfx'], 'skill_vfx': opts.get('--skill-vfx'),
           'cmn_se': opts.get('--cmn-se'), 'stb': opts.get('--stb')}
     cb = {'skill': opts['--skill'], 'se_wav': opts['--se-wav'], 'gf': gf}
