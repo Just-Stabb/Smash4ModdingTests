@@ -231,24 +231,21 @@ FX = [('start', 'BTL_AURA.eepk', 'MGT_HENSIN01.emp', 'BustN', (0.0, 0.0, 0.0), 1
       ('vanish', 'BTL_CMN.eepk', 'SKI_line.emp', 'HipN', (0.0, 0.0, 0.0), 1.0),
       # v7: the sway's (BTL_CMN 493), converted after the others (its id follows; v8: 706's 492 / 230 gone)
       ('sway_line', 'BTL_CMN.eepk', 'SKI_lineX_S.emp', 'TransN', (0.0, 0.0, 0.0), 0.35),
-      # v10 (the user: "the counter still doesn't have any visual effects"): XV2's rush hits (BDM #1) and finisher (#2)
-      # carry Effect1 = BTL_CMN effect 0 (Btl_HitLOD x1.5 + Btl_HitS x0.8, camera-facing, at the hit): the yellow
-      # bursts on every hit of the user's clips (udclip e 92-150, uiclip c); the scripts had none (only the vanish)
-      ('hit_s', 'BTL_CMN.eepk', 'Btl_HitS.emp', 'TransN', (0.0, 0.0, 0.0), 0.8),
-      ('hit_lod', 'BTL_CMN.eepk', 'Btl_HitLOD.emp', 'TransN', (0.0, 0.0, 0.0), 1.5),
       # v10 Secret Sensation's startup (the user: "Hopefully we can use [1511_GKS_KTM's] effects for Secret Sensation's
       # startup to fade away during its recovery"). KTM's BAC (entries 0-3) holds no effect of its own: Aura type 3
       # (KiaiCharge) on at 25 and off at 469, type 4 (KiryokuMax) at 468, its "CMN" (EEPK type 1) effects 140 / 200 /
       # 116 (type 1 isn't BTL_CMN: its 116 doesn't exist there; the stage's own debris, XV2-Tools' StageBG) and BPE 10 /
       # 20 (screen flashes). The aura types are the character's aura_setting.aur row: for the skill's CUS aura 1 (MGT's
-      # cus entry), aura 1 = BTL_AURA 40-44: KiaiCharge 43 (KTN_V_Loop on the pelvis, x0.6, LoopCancel: it fades),
-      # KiryokuMax 44 (BoostV_End x0.8 on the pelvis). (Approximated: CUS aura 1 -> aura_setting aura 1, XV2's
-      # CusAuraData table in the exe, not in the files sent.) The charge from the stance's start, faded at its
-      # recovery (or at the counter's read, where KiryokuMax's burst plays: KTM's release)
-      ('ss_charge', 'BTL_AURA.eepk', 'KTN_V_Loop.emp', 'HipN', (0.0, 0.0, 0.0), 0.6),
-      ('ss_release', 'BTL_AURA.eepk', 'BoostV_End.emp', 'HipN', (0.0, 0.0, 0.0), 0.8)]
+      # transformed aura): aura_setting.aur's aura 51 is Ultra Instinct's (its HenshinStart 806 = the FOK loops, the
+      # parts of 848 the skill plays: the same EMPs), so KiaiCharge = BTL_AURA 803 (KTN_GKS_Loop on the pelvis, x0.6,
+      # LoopCancel: it fades) and KiryokuMax = 804 (BoostGKS_End x0.8 + x0.5 on the pelvis). (Which aura row the skill's
+      # CUS aura (1, MGT's cus entry) selects is XV2's CusAuraData, in the executable; aura 51's content identifies it.)
+      # The charge from the stance's start, faded at its recovery (or at the counter's read, where KiryokuMax's burst
+      # plays: KTM's release)
+      ('ss_charge', 'BTL_AURA.eepk', 'KTN_GKS_Loop.emp', 'HipN', (0.0, 0.0, 0.0), 0.6),
+      ('ss_release', 'BTL_AURA.eepk', 'BoostGKS_End.emp', 'HipN', (0.0, 0.0, 0.0), 0.8)]
 FX_V7 = ('sway_line',)
-FX_V10 = ('hit_s', 'hit_lod', 'ss_charge', 'ss_release')
+FX_V10 = ('ss_charge', 'ss_release')
 # v3: the aura's colour. The converted emitters keep XV2's EMP colours (blue / cyan / white: rendered with fx_render's
 # Smash 4 side, the drawn pixels' median hue 192 deg, saturation 0.26); the user's XV2 clip after the burst shows a
 # lavender / purple-white flicker (the aura pixels' median hue 281-287 deg, saturation 0.16-0.18, value 0.88-0.96, four
@@ -554,13 +551,30 @@ def graphic(key, bone=None, follow=True, size=1.0):
 # v10: the non-following effects are Graphic_Effect2 (v1-v9 Graphic_Effect: the game's FOOT_EFFECT, whose handler
 # 0x02BE1444 asks EffectModule vt +0x32C and plays nothing when foot effects are off, as in the air: docs/native-notes.md
 # "Graphic_Effect can be refused"; the transformation's counter starts where he was, in the air too)
+# v10 (the user: "the counter still doesn't have any visual effects"): XV2's rush hits (BDM #1) and finisher (#2) carry
+# Effect1 = BTL_CMN effect 0 (Btl_HitLOD x1.5 + Btl_HitS x0.8, camera-facing, at the hit): the yellow bursts on every hit
+# of the user's clips (udclip e 92-150); the scripts had none (only the vanish). Btl_HitLOD is Sledgehammer's converted
+# set already (0x0341005C), Btl_HitS isn't in the vfx/cmn files sent (BTL_CMN.eepk names it, its .pbind.emb doesn't hold
+# it): Time Skip's Btl_HitL (BTL_CMN 2's, the same burst bigger: 0x0341005F / 60) stands in for it, x HIT_S_FOR_L; the
+# LOD burst is Time Skip's capped copy of it (0x03410061, the user found the uncapped one too bright)
+HIT_FX = (('hitlod', 1.5), ('hitl', 0.8), ('hitl_2', 0.8))
+HIT_S_FOR_L = 0.7                    # Btl_HitS's 0.8 against Btl_HitL's 0.8: HitS is the smaller hit (approximated)
+
+
+def hit_fx_ids():
+    import supamario_timeskip_build as TS
+    return {'hitlod': TS.FX_LOD_ID, 'hitl': TS.FX_IDS['hitl'], 'hitl_2': TS.FX_IDS['hitl_2']}   # (Time Skip's own capped
+                                                                                                # LOD copy: its hit's)
+
+
 def hit_fx(size=1.0):
-    """v10: XV2's hit effect (BTL_CMN 0: Btl_HitLOD + Btl_HitS) at the rush hitbox's centre (in front of him)"""
+    """v10: XV2's hit effect (BTL_CMN 0) at the rush hitbox's centre (in front of him)"""
+    ids = hit_fx_ids()
     out = []
-    for key in ('hit_lod', 'hit_s'):
-        e = [x for x in FX if x[0] == key][0]
-        out.append(cmd('graphic_effect2', fx_id(key), BONES['TransN'], 0.0, RUSH_Y, RUSH_Z, 0.0, 0.0, 0.0,
-                       e[5] * SCALE * size, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1))
+    for key, sc in HIT_FX:
+        k = 1.0 if key == 'hitlod' else HIT_S_FOR_L
+        out.append(cmd('graphic_effect2', ids[key], BONES['TransN'], 0.0, RUSH_Y, RUSH_Z, 0.0, 0.0, 0.0,
+                       round(sc * SCALE * size * k, 3), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1))
     return out
 
 
