@@ -25,6 +25,12 @@ Checks:
   weapon whose owner is no fighter (a gimmick's id) or gone: no target, the side from the weapon's place; a stage gimmick
   (category 3) whose object is gone: Marth's side function's value; nothing for: a second hit, group 0, another status,
   an uncounterable hit (+0x54), Mario's kind (3); registers kept;
+- ui4: the native events (registration code: 0x10 -> slot 42, 0x12 -> slot 43 = the shield damage, 0xB / 0xC the body
+  damage with no slot before the damage add); the autododge in slot 42 (Wait / Walk / WalkBrake / Squat .. SquatRv,
+  transformed: TIMER_1 / 2 by the hitting object's side; Marth's side when it is gone; nothing otherwise) and slot 43 in
+  those statuses (0, handled: no guard damage); category-4 items in Secret Sensation and the owner chain; the name
+  walk's alignment test a nop; diag S4UF, the effect runtime's messages, S4U3 st / t0 / ret, S4U2's dodge bits.
+  (Below, v1-v4's slot 43 autododge through the fighters' hit records no longer exists.)
 - slot 43: 0x155 with TIMER_4 7 -> 0 and the handled bit whatever else; transformed (TIMER_0 > 1500) in Wait / Walk / WalkBrake /
   Squat .. SquatRv with a fighter's hit records holding him -> 0, the handled bit, TIMER_1 (attacker right) or TIMER_2
   (left) = 4.0 and the other 0 through set_float, the hit data asked with (AM, node +0x27, part); the record found in a

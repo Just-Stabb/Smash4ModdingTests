@@ -10,6 +10,14 @@ without the transformation's mode keeps Secret Sensation's rules. Mario's F.L.U.
 special here any more. The diag build adds S4U4 (the 8 frames after a dodge signal: his status, TIMER_1 / 2 / 4) and
 S4UM's status.
 
+ui4 (exe_v46z_ui4; README "Ultra Instinct v5", from the v4 diag log): slot 43 is event 0x12, the shield DAMAGE that
+follows a shield hit, never a body hit (3. below is v1-v4's reading, kept for the 0x155 cases): the autododge is now a
+hit on the counter shape his MSC keeps on in Wait / Walk / WalkBrake / Squat .. SquatRv while transformed, in slot 42
+(s42_dg: TIMER_1 / TIMER_2 by the hitting object's side), slot 43 returning 0 there; the fighters' hit-record search is
+gone. Objects of category 4 (items: the Killer Eye 0x4001000x) count as an opponent's in slot 42 / the owner chain.
+Mesh_Visibility's name walk (mesh_vis_cave in the base) takes unaligned names (WALK_FIX). The diag build adds S4UF and
+the effect runtime's messages.
+
 1. SETUP: Mario's specializer slot 0 (0x02F1A6F0 `li r5, 1`, then `b 0x02F1A598` his setup) branches here first: for
    kind 0x41 the counter shape, ShieldModule ([acc + 0x72F4], kind 2) group 1, built as Marth's setup builds his
    (0x0200C858(M, &desc, 1), desc {&shape, 1, bytes 0, 0, 0, 1}) and switched off (0x0200BD8C(M, 0, 0, 1)); then the

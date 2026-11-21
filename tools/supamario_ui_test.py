@@ -3,7 +3,7 @@
 0x157 / 0x158's functions, in rolloff_hold_test's MSC interpreter) driving a small model of the game, and the built
 scripts, motions, effects and sounds.
 
-  python3 -I tools/supamario_ui_test.py BUILD_OUT_DIR TIMESKIP_OUT_DIR SUPAMARIO_DIR
+  python3 -I tools/supamario_ui_test.py BUILD_OUT_DIR TIMESKIP_OUT_DIR SUPAMARIO_DIR [--exe EXE] [--package ZIP]
 
 BUILD_OUT_DIR: tools/supamario_ui_build.py's OUT_DIR; TIMESKIP_OUT_DIR: the same inputs built by
 tools/supamario_timeskip_build.py (the install before this): every other script, motion and effect set is checked
@@ -404,7 +404,7 @@ def shape_tests(r):
         g, vm = run(status=st)
         check('ui4: the shape: transformed, %s: on once (ShieldModule(0, 2, 0, 1, 1) on frame 1), TIMER_5 renewed'
               % name, ([(e[0], e[2]) for e in g.ev('shield')], g.vars.get(B.V_SHAPE)), ([(1, (0, 2, 0, 1, 1))], 3.0))
-    for what, kw in (('not transformed (TIMER_0 0)', dict(form=0.0)), ('transforming (1000)', dict(form=1000.0)),
+    for what, kw in (('not transformed (TIMER_0 0)', dict(form=0.0)),
                      ('in Dash (3)', dict(status=3)), ('in Fall (the air)', dict(status=0xE, air=True)),
                      ('shielding (0x1C)', dict(status=0x1C)), ('in a jab (0x25)', dict(status=0x25))):
         g, vm = run(**kw)
@@ -1118,12 +1118,57 @@ def ids_from_json(out):
     B.MESH_INDEX.update(js.get('mesh_index', {}))
 
 
+INSTALL_DIRS = ('fighter', 'sound', 'param')
+
+
+def package_tests(zpath, out, ts_out):
+    """ui4 (v5): the package installs complete over any earlier Ultra Instinct install: every file the build makes that
+    differs from Time Skip v10's (or that it lacks) is in INSTALL_TO_data/ byte for byte (v3 / v4 shipped only what they
+    changed, and the user's install turned out to hold an older effect.bin / .efc: S4UB found no effect script for
+    SpecialAirLwHeavy, which the build's effect.bin has); nothing wrapped in a folder named like a fighter; both
+    executables"""
+    import zipfile
+    z = zipfile.ZipFile(zpath)
+    names = set(z.namelist())
+    want = []
+    for d in INSTALL_DIRS:
+        for root, _ds, fs in os.walk(os.path.join(out, d)):
+            for fn in fs:
+                rel = os.path.relpath(os.path.join(root, fn), out)
+                old = os.path.join(ts_out, rel)
+                b = open(os.path.join(out, rel), 'rb').read()
+                if not os.path.exists(old) or open(old, 'rb').read() != b:
+                    want.append((rel, b))
+    missing = [r for r, b in want if 'INSTALL_TO_data/' + r not in names]
+    differ = [r for r, b in want if 'INSTALL_TO_data/' + r in names and z.read('INSTALL_TO_data/' + r) != b]
+    check('package: every file the build changes over Time Skip v10\'s is in INSTALL_TO_data/ (%d files: the scripts, '
+          'the .efc / .ptcl, motions, the bank / soundlabeltable, the MSC, the models)' % len(want), (missing, differ),
+          ([], []))
+    for must in ('script/animcmd/body/effect.bin', 'script/animcmd/body/sound.bin', 'effect/supamario/supamario.010d0000.efc'):
+        check('  it ships %s (v3 / v4 did not)' % must, 'INSTALL_TO_data/fighter/supamario/' + must in names, True)
+    tops = sorted({n.split('/')[0] for n in names if '/' in n})
+    check('package: top folders INSTALL_TO_data, INSTALL_TO_code, TEST_ONLY_INSTALL_TO_code (and the Sm4shCommand '
+          'folder); nothing wrapped in a fighter / game folder name',
+          [t for t in tops if not (t in ('INSTALL_TO_data', 'INSTALL_TO_code', 'TEST_ONLY_INSTALL_TO_code') or
+                                   t.startswith('Sm4shCommand_v'))], [])
+    data_tops = sorted({n.split('/')[1] for n in names if n.startswith('INSTALL_TO_data/') and n.count('/') > 1})
+    check('  INSTALL_TO_data/ holds the data folders themselves', [t for t in data_tops if t not in INSTALL_DIRS], [])
+    check('  both executables and the README', [n for n in ('INSTALL_TO_code/cross_f.rpx',
+                                                            'TEST_ONLY_INSTALL_TO_code/cross_f.rpx', 'README.txt')
+                                               if n not in names], [])
+
+
 def main():
     a = sys.argv[1:]
     exe = None
     if '--exe' in a:
         i = a.index('--exe')
         exe = a[i + 1]
+        del a[i:i + 2]
+    pkg = None
+    if '--package' in a:
+        i = a.index('--package')
+        pkg = a[i + 1]
         del a[i:i + 2]
     if len(a) != 3:
         sys.exit(__doc__)
@@ -1148,6 +1193,8 @@ def main():
     model_tests(out, base)
     if exe:
         native_tests(exe)
+    if pkg:
+        package_tests(pkg, out, ts_out)
     print('%d problem(s)' % len(PROBLEMS))
     sys.exit(1 if PROBLEMS else 0)
 

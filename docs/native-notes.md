@@ -2349,12 +2349,15 @@ Test: `tools/edge_counter_cave_test.py` (unicorn, against Marth's own setup). Ap
 
   Outside the guard statuses (`0x1B`-`0x1E`), that event does nothing else to the victim: no damage
   and no hitstop.
-- A body hit sends the damage event `0x02E35EE4`. That calls **slot 43** (`+0x164`); 0 skips the
-  damage, the knockback and the reaction. Marth also queues his counter status there and sets his
-  16-frame hitstop (`0x0200DDB4`).
+- ~~A body hit sends the damage event `0x02E35EE4`.~~ **Corrected (Supamario's Ultra Instinct v5, the in-game
+  log):** `0x02E35EE4` is event 0x12, the shield DAMAGE that follows a hit on a shield shape (event 0x10, slot 42),
+  not a body hit. It calls **slot 43** (`+0x164`); 0 skips that shield damage and its reaction. Marth queues his
+  counter status there and sets his 16-frame hitstop (`0x0200DDB4`). A body hit is events 0xB / 0xC, which ask no
+  specializer slot before adding the damage.
 - **The record's category** (`+0x1C`) is the attacker AttackModule owner's object id `>> 28`. It is
   set by `0x02C0EEB4` from `0x02C0800C`: `r7 = id >> 28`.
-  - 0 fighter, 1 weapon, 2 item, 3 stage gimmick. Default 6, with id `0x50000000` = none.
+  - 0 fighter, 1 weapon, 2 item, 3 stage gimmick. Default 6, with id `0x50000000` = none. **Corrected (Supamario's
+    Ultra Instinct v5, the in-game log): an item (a placed Killer Eye) is 4 (`0x4001000x`)**; 2 / 3 unverified.
   - A projectile's AttackModule is the weapon's own, so a projectile reads 1.
   - Marth / Ike use it for their "item" flag (category 2, or a weapon whose int `0x10000000` is an
     item).
@@ -3206,6 +3209,17 @@ one; the group write to a part kept aside and given back). Dr. Mario's own two-p
 stethoscope_VIS_O_OBJ (shaders 0x9601106B / 0x9A011063) and MarioD_hair_O_OBJ (a blended polygon, src 1 / dst 1, and
 an opaque one): the v2 in-game test hides both (tools/outline_shell_ingame_test_build.py, down taunt facing left).
 
+**v3 (exe_v46z_ui4; `mesh_vis_cave.py` chk_str): names at unaligned addresses.** The walk checked the name pointer (the
+mesh's vt `+0x2C`) with `chk`, which also requires 4-alignment. The model loader copies a model's mesh names into one
+buffer back to back (`0x036DC8E8`: the buffer `[res + 0x90]`, a running offset `+0xA0`, strlen + 1 a name, no
+alignment; its size from `0x036DB424`'s count), so most names start at an odd address: the walk read them as "no name",
+never matched them, and swept them into the run of the mesh matched before (v2's rule). The user's Supamario v4 log
+(S4UV): by name, his own meshes 6-8 changed with Mario_Nohat's command (5), Mario_Hair (32) and meshes 34-39 never;
+laid out from the buffer's start, exactly meshes 0, 4, 5, 9, 13, 26, 29, 30 and 40-43 have aligned names. The fix: the
+string pointer checked for the range only (the `andi.` a nop, the same size: exe_v46z_ui4 patches exe_v46z_outline4's
+word `0x04BE4200`). This may also be the v2 report's cause (HammerM2_O_OBJ "can't be disabled"). `mesh_vis_test.py`:
+names packed back to back (4 of 5 unaligned) each found. The index form never searched names.
+
 ## Outline shell (model_commands v2: `tools/outline_shell_cave.py`, exe_v46z_outline2; fixed in exe_v46z_outline4)
 
 **v3 (exe_v46z_outline3, the user's outline_v2 test): no band ever drew.** The diag log (Dr. Mario's taunts): S4ST
@@ -3347,7 +3361,7 @@ in the text region (256-aligned, uniform-block mode) and of a fetch shader with 
 maps; the band's look at Width 1.5 / 3 (pixels of 1280 x 720) on Dr. Mario; the draw order (depth write keeps the band
 when the background is drawn after the fighter; a part drawn after another may lose a sliver behind the first's band).
 
-## Supamario's Ultra Instinct (`tools/supamario_ui_cave.py`, exe_v46z_ui)
+## Supamario's Ultra Instinct (`tools/supamario_ui_cave.py`, exe_v46z_ui; v5: exe_v46z_ui4)
 
 **Claimed region: `0x04BE8000`-`0x04BEA000`** (v1-v3 to `0x04BE9000`; `textregion:0x2BEA000 grow:0x04BEA000`). Base:
 exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATCHED]` (unicorn, 144 checks).
@@ -3442,3 +3456,38 @@ exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATC
 - **Not confirmed in game:** the hit records' timing against the damage event (records are the collision's "don't hit
   twice" log: present when the hit is dealt, by static reading); a stale record of an earlier hit of the same move could
   make a projectile hit in the same move's lifetime dodge.
+- **ui4 (exe_v46z_ui4; README "Ultra Instinct v5"), from the user's v4 diag log (exe_v46z_ui3_diag, RPX hash 0946ac90):**
+  - **Slot 43 is NOT the body's damage.** The fighter's event handlers are registered at `0x02E14288`... through
+    `0x02E3C1BC(listener, id, r5, {flags, fn})`: event **0xB** `0x02E2AFBC` and **0xC** `0x02E2B59C` (the body hit's
+    damage: they add it, `0x02E29C28(F, 1, f1)`, before asking any specializer slot; 0xB asks slot 56 afterwards: Kirby's
+    "lose the copy when hit"), 0xA `0x02E31A90` (a generic notification, message type at `+8`: slot 38 first, 0 skips
+    it), 0x10 `0x02E35794` (the shield hit: slot 42), 0x11 `0x02E35ED0`, **0x12 `0x02E35EE4` (slot 43: the shield
+    DAMAGE that follows a shield hit**; Marth's counter queues its status there), 0x13-0x17 the reflector / absorb
+    events (slots 44-47; Mario's 44 / 45 his cape's reflector). The log: S4U3 only at the same timestamp as an S4U2,
+    never for DK's punches on his body ("Sephiroth's counter shape" corrected). The damage REACTION is DamageModule vt
+    `+0x94` (`0x02C22EF0`) -> the owner's vt `+0x14C` (`0x02E76BB4` for fighters, acmd_ext's gs_hit), not a slot. The
+    v1-v4 hit-record search (TIMER_0 read, fighters' AttackModule records) is gone with it.
+  - So the autododge is the counter shape (`supamario.c` ui_shape keeps it on while transformed in Wait / Walk /
+    WalkBrake / Squat .. SquatRv on the ground; TIMER_5 its marker) and slot 42 in those statuses (`s42_dg`): TIMER_0 >
+    1500 through get_float, the side from the hitting object's place (handle; Marth's side when gone), TIMER_1 / 2 = 4
+    through set_float; slot 43 there returns 0 + the handled bit (no guard damage / stun). Any category: the shape
+    blocks whatever reaches it.
+  - **Items are category 4** (`id >> 28`; the Killer Eye 0x4001000x in the log: `S4U2 st=155 grp=1 cat=4
+    obj=40010000`); the handle lookup `0x02BF205C` has cases 0-4 (object managers `[0x1035184C] + 4 x cat`). Slot 42
+    (Secret Sensation) and the owner chain (`ui_id_ok`) take 0, 1, 2 and 4 (3 still excluded).
+  - **Mesh_Visibility's name walk** (mesh_vis_cave.py in exe_v46z_outline4) rejected unaligned name pointers (`chk`'s
+    `andi. r0, r3, 3`): "Mesh visibility" v3. `WALK_FIX` `0x04BE4200` -> nop. The Ultra Instinct scripts use mesh
+    indices anyway.
+  - **The installed effect.bin was not the build's:** S4UB for SpecialAirLwHeavy (0x064F2A11) found no effect script
+    (set 3), which the build's effect.bin has and Time Skip v10's lacks; SpecialLwLight's hash is in every vanilla-based
+    .bin (F.L.U.D.D.'s scripts), so "found" there proved nothing. v5 ships every file the build changes.
+  - **Diag (exe_v46z_ui4_diag):** **S4UF** `bank slot entries res motion` (the motion change of 0x231 / 0x245: bank
+    0x341's slot `0x032EFEA0(mgr [0x10353CA4], 0x341, 0)`, the .efc's entry count `lha [[slot + 8] + 8]`, the .ptcl
+    resource `[slot + 4]`); the effect runtime's print `0x04A58A8C` (a no-op in this build: "Emitter is Empty.",
+    "Particle is Empty.", "Emitter Set is Empty.", "EmitterSet Remove Failed.", ...) branched to OSReport with its own
+    arguments (at most 300 lines); S4U3 is now `st t0 ret`; S4U2's flags `| 0x321 / 0x322` when the autododge signalled
+    TIMER_1 / 2 (then S4U4).
+  - eft's emitter-set creation `0x04A55BF0` fails ("Emitter is Empty.") when the set's emitter count is above the free
+    emitters (`[eft + 0x23C]`, from the config's `+8`), "Emitter Set is Empty." when no set instance is free
+    (`0x04A54D48`); an effect id's index must be below the .efc's entry count (`0x0334D8D8`); the instance pool holds
+    100 (`0x032F0110`).
