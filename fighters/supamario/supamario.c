@@ -7000,6 +7000,12 @@ void func_286()
     {
         KineticModule(0, 0x7);
     }
+    if (sf_on())
+    {
+        sf_init();              // Ultra Instinct v11: transformed, XV2's Soaring Fist (sf_*)
+        func_78(sf_loop);
+        return;
+    }
     WorkModule(0x16, 0x1e00005a);
     WorkModule(0x16, 0x1e000058);
     PostureModule(0x2);
@@ -7870,6 +7876,10 @@ void func_347()
         {
             func_285();
         }
+    }
+    if (global4 == 0x2b)
+    {
+        sf_end();               // Ultra Instinct v11: Soaring Fist's charge sound off
     }
 }
 
@@ -42590,8 +42600,10 @@ void ui_aura()
     EffectModule(0x2717, UI_FX_AURA3, UI_BONE_RFOOT, 0, 0, 0, 0, 0, 0, UI_FOOT_SIZE, 0);
     EffectModule(0x2717, UI_FX_AURA5, UI_BONE_RHAND, 0, 0, 0, 0, 0, 0, UI_HAND_SIZE, 0);
     EffectModule(0x2717, UI_FX_AURA5, UI_BONE_LHAND, 0, 0, 0, 0, 0, 0, UI_HAND_SIZE, 0);
-    // v10 (the user's XV2 idle clip: "our version lacks the rising sparkles"): Aura_FOKpiace on the pelvis (aura 51's)
-    EffectModule(0x2717, UI_FX_AURA6, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_AURA_SIZE, 0);
+    // v10 (the user's XV2 idle clip: "our version lacks the rising sparkles"): Aura_FOKpiace (aura 51's); v11 (the user:
+    // "positioned at Supamario's feet rather than covering his body and moving up"): on TransN at his hip's height, so
+    // its rise is his up (the emitter's upright disc: tools/supamario_ui_fx11.py piace)
+    EffectModule(0x2717, UI_FX_AURA6, UI_BONE_TRANS, 0, UI_PIACE_Y, 0, 0, 0, 0, UI_AURA_SIZE, 0);
 }
 
 // ui4 (exe_v46z_ui4): the autododge's detection. v1-v4 waited for the cave's slot 43, taken for the body's damage event:
@@ -43327,4 +43339,335 @@ void ss_end()
         KineticModule(0x11, 0x3, 0.0f, 0.0f);
         GroundModule(0x2710, 0x1);
     }
+}
+
+// ===================================================================
+// Ultra Instinct v11: Soaring Fist (fighters/supamario/README.md "Ultra Instinct v11"; Dragon Ball Xenoverse 2's skill
+// 1510_GKS_HKN; tools/supamario_sf_build.py makes the SF_* values). Transformed (UI_FORMED), his forward smash (status
+// 0x2B, its main func_286) is XV2's skill in its own loop (sf_loop; statuses 0x2C / 0x2D never reached): the wind-up
+// (motion SF_MOT_START from SF_START_AT: XV2's frames 0-12), the charge (attack held at SF_HOLD_DECIDE and the game's
+// hold flag 0x2100001B, which the wind-up's game script turns on as Mario's does: SF_HOLD_AT on, at most SF_HOLD_N
+// frames, the smash charge's look and sound), the release (motion SF_MOT_REL from the level's segment): the level by
+// the frames held (under SF_LV2: 1, under SF_LV3: 2, else 3) = the number of punches, each fired SF_PUNCH_n frames into
+// the release (XV2's 20 / 40 / 60 less 12) as a projectile (article SF_ARTICLE, the fireball's slot: weapons/
+// soaringfist.c), told what it is through the custom slot int 0x10000048 (copied into the new weapon's 0x10000005):
+// (level - 1) x 2 + 0 the final punch / 1 a non-final one. Actionable from the level's SF_IASA_n (XV2's BcmCallback),
+// Wait at its end. Untransformed, the vanilla forward smash.
+// While the release lasts, sf_hold: the non-final punches always lead into the next: an opponent in hitstun in the
+// punches' lane that a punch has reached keeps its hitstun until the next punch reaches it and, airborne, is pulled to
+// the lane's height (the "windbox": SF_PULL of the way a frame); a shielding one (guard damage) is pushed back as each
+// punch reaches it (SF_PUSH_NF, the final SF_PUSH_F, fading over SF_PUSH_W frames).
+// State (the status's work, 0x2B's own): 0x0100000B the phase (0 wind-up, 1 charge, 2 release), 0x0100000C frames,
+// 0x0100000D the level, 0x0100000E the release's frame, 0x0100000F frames held.
+// ===================================================================
+
+int sf_on()
+{
+    if (ui_state() == UI_FORMED)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+void sf_init()
+{
+    WorkModule(0, 0.0f, 0x0100000B);
+    WorkModule(0, -1.0f, 0x0100000C);    // its loop runs on this frame too: frame 0
+    WorkModule(0, 0.0f, 0x0100000D);
+    WorkModule(0, 0.0f, 0x0100000E);
+    WorkModule(0, 0.0f, 0x0100000F);
+    func_22(SF_MOT_START, SF_START_AT, 1.0f);
+}
+
+// the punch k's frame in the release (k 0 .. level - 1)
+float sf_punch_at(float lv, float k)
+{
+    if (k > 1.5f)
+    {
+        return SF_PUNCH_3;
+    }
+    if (k > 0.5f)
+    {
+        return SF_PUNCH_2;
+    }
+    return SF_PUNCH_1;
+}
+
+// the projectile's life (XV2's BSA: entry 0 15 frames, entries 1 / 2 25, entries 3 - 5 35)
+float sf_life(float lv)
+{
+    if (lv > 2.5f)
+    {
+        return SF_LIFE_3;
+    }
+    if (lv > 1.5f)
+    {
+        return SF_LIFE_2;
+    }
+    return SF_LIFE_1;
+}
+
+// the release frame at which punch k (of level lv) reaches a fighter dx in front of him, or -1 if it can't (its range)
+float sf_arrive(float lv, float k, float dx)
+{
+    float d;
+    float fr;
+    d = dx - SF_REACH - SF_X0;
+    if (d < 0.0f)
+    {
+        d = 0.0f;
+    }
+    fr = d / SF_SPEED;
+    if (SF_MOVE_FROM + fr > sf_life(lv))
+    {
+        return -1.0f;
+    }
+    return sf_punch_at(lv, k) + SF_MOVE_FROM + fr;
+}
+
+// punch k: the weapon told its kind (custom slot, put back after: kame_n_generate's way)
+void sf_fire(float lv, float k)
+{
+    int slot;
+    int code;
+    code = ((int)(lv + 0.5f) - 0x1) * 0x2;
+    if (k < lv - 1.5f)
+    {
+        code = code + 0x1;          // a non-final punch
+    }
+    slot = WorkModule(0x6, 0x10000048);
+    WorkModule(0x7, code, 0x10000048);
+    ArticleModule(0x2710, SF_ARTICLE);
+    WorkModule(0x7, slot, 0x10000048);
+}
+
+// the opponents in the punches' lane (r: frames into the release)
+void sf_hold(float r, float lv)
+{
+    int s;
+    float k;
+    float x;
+    float y;
+    float f;
+    float sx;
+    float fy;
+    float dx;
+    float a;
+    float an;
+    float pk;
+    float pa;
+    float reached;
+    float st;
+    float hs;
+    float need;
+    float side;
+    float v;
+    float ty;
+    x = WorkModuleF(0, 0x0f000000);
+    y = WorkModuleF(0, 0x0f000001);
+    f = WorkModuleF(0, 0x0f000003);
+    s = 0;
+    while (s < 0x8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
+        {
+            sx = WorkModuleF(0, 0x0f000020 + 0x4 * s);
+            fy = WorkModuleF(0, 0x0f000021 + 0x4 * s);
+            dx = (sx - x) * f;
+            if ((sx - x > 0.01f || sx - x < -0.01f || fy - y > 0.01f || fy - y < -0.01f) && dx > -SF_BEHIND &&
+                fy > y - SF_LANE_DOWN && fy < y + SF_LANE_UP)
+            {
+                an = -1.0f;
+                pk = -1.0f;
+                pa = 0.0f;
+                reached = 0.0f;
+                k = 0.0f;
+                while (k < lv - 0.5f)
+                {
+                    a = sf_arrive(lv, k, dx);
+                    if (a > -0.5f)
+                    {
+                        if (a <= r)
+                        {
+                            reached = 1.0f;
+                            pk = k;
+                            pa = a;
+                        }
+                        else if (an < 0.0f)
+                        {
+                            an = a;
+                        }
+                    }
+                    k += 1.0f;
+                }
+                st = WorkModuleF(0, 0x0f0000ba + 0x8 * s);
+                if (pk > -0.5f && st > SF_ST_GUARD_DAMAGE - 0.5f && st < SF_ST_GUARD_DAMAGE + 0.5f &&
+                    r - pa < SF_PUSH_W)
+                {
+                    // a shield the punch reached: pushed back (its guard damage pushback made again, every frame,
+                    // fading out), the final punch further
+                    side = 1.0f;
+                    if (sx < x)
+                    {
+                        side = -1.0f;
+                    }
+                    v = SF_PUSH_NF;
+                    if (pk > lv - 1.5f)
+                    {
+                        v = SF_PUSH_F;
+                    }
+                    WorkModule(0, side * v * (1.0f - (r - pa) / SF_PUSH_W), 0x0f0000bf + 0x8 * s);
+                }
+                hs = WorkModuleF(0, 0x0f000058 + 0x8 * s);
+                if (reached > 0.5f && an > -0.5f && hs > 0.0f)
+                {
+                    // a punch has reached it and another is on its way: its hitstun lasts until that one is there
+                    need = an - r + SF_HOLD_PAD;
+                    if (hs < need)
+                    {
+                        WorkModule(0, need, 0x0f000058 + 0x8 * s);
+                    }
+                    if (fy > y + SF_GROUNDED)
+                    {
+                        // in the air: pulled to the lane (its middle on the punches' line)
+                        ty = y + SF_Y - SF_MID;
+                        WorkModule(0, fy + (ty - fy) * SF_PULL, 0x0f000021 + 0x4 * s);
+                    }
+                }
+            }
+        }
+        s += 1;
+    }
+}
+
+void sf_release(float n)
+{
+    float held;
+    float lv;
+    held = WorkModuleF(0, 0x0100000F);
+    lv = 1.0f;
+    if (held > SF_LV2 - 0.5f)
+    {
+        lv = 2.0f;
+    }
+    if (held > SF_LV3 - 0.5f)
+    {
+        lv = 3.0f;
+    }
+    SoundModule(0x2714, SF_SND_CHARGE);
+    WorkModule(0, lv, 0x0100000D);
+    WorkModule(0, n, 0x0100000E);
+    WorkModule(0, 2.0f, 0x0100000B);
+    if (lv > 2.5f)
+    {
+        func_22(SF_MOT_REL, SF_REL3_AT, 1.0f);
+    }
+    else if (lv > 1.5f)
+    {
+        func_22(SF_MOT_REL, SF_REL2_AT, 1.0f);
+    }
+    else
+    {
+        func_22(SF_MOT_REL, SF_REL1_AT, 1.0f);
+    }
+}
+
+float sf_iasa(float lv)
+{
+    if (lv > 2.5f)
+    {
+        return SF_IASA_3;
+    }
+    if (lv > 1.5f)
+    {
+        return SF_IASA_2;
+    }
+    return SF_IASA_1;
+}
+
+float sf_rel_n(float lv)
+{
+    if (lv > 2.5f)
+    {
+        return SF_REL3_N;
+    }
+    if (lv > 1.5f)
+    {
+        return SF_REL2_N;
+    }
+    return SF_REL1_N;
+}
+
+void sf_loop()
+{
+    float ph;
+    float n;
+    float held;
+    float lv;
+    float r;
+    float k;
+    n = WorkModuleF(0, 0x0100000C) + 1.0f;
+    WorkModule(0, n, 0x0100000C);
+    ph = WorkModuleF(0, 0x0100000B);
+    if (global18 == 0x2)
+    {
+        SoundModule(0x2714, SF_SND_CHARGE);
+        func_16(0xe, 0);
+        return;
+    }
+    if (ph < 0.5f)
+    {
+        if (n > SF_HOLD_DECIDE - 0.5f)
+        {
+            if (WorkModule(0x10, 0x2100001b) && ControlModule(0x2712, 0))
+            {
+                WorkModule(0, 1.0f, 0x0100000B);
+                WorkModule(0, 0.0f, 0x0100000F);
+                func_22(SF_MOT_START, SF_HOLD_AT, 1.0f);
+                SoundModule(0x2710, SF_SND_CHARGE);
+                return;
+            }
+            sf_release(n);
+        }
+        return;
+    }
+    if (ph < 1.5f)
+    {
+        held = WorkModuleF(0, 0x0100000F) + 1.0f;
+        WorkModule(0, held, 0x0100000F);
+        if (held > SF_HOLD_N - 0.5f || ControlModule(0x2712, 0) == 0)
+        {
+            sf_release(n);
+        }
+        return;
+    }
+    r = n - WorkModuleF(0, 0x0100000E);
+    lv = WorkModuleF(0, 0x0100000D);
+    k = 0.0f;
+    while (k < lv - 0.5f)
+    {
+        if (r > sf_punch_at(lv, k) - 0.5f && r < sf_punch_at(lv, k) + 0.5f)
+        {
+            sf_fire(lv, k);
+        }
+        k += 1.0f;
+    }
+    if (lv > 1.5f)
+    {
+        sf_hold(r, lv);
+    }
+    if (r > sf_iasa(lv) - 0.5f && (func_39() != 0 || func_41() != 0))
+    {
+        return;
+    }
+    if (r > sf_rel_n(lv) - 1.5f)
+    {
+        func_16(0, 0);
+    }
+}
+
+void sf_end()
+{
+    SoundModule(0x2714, SF_SND_CHARGE);
 }

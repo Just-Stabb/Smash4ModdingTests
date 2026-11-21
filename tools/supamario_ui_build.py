@@ -38,6 +38,7 @@ import mesh_vis_cave as MV  # noqa: E402
 import supamario_ui_anim as anim  # noqa: E402
 import supamario_ui_cave as cave  # noqa: E402
 import supamario_ui_model as model  # noqa: E402
+import supamario_sf_build as SF  # noqa: E402
 
 # ---------------------------------------------------------------- the rules (the user's spec)
 TRIGGER_PCT = 100.0                  # his first actionable frame at 100% or more
@@ -132,7 +133,8 @@ STRIKE_S_HIT = anim.part_frame('counter_s_end', 280) - STRIKE_S_AT              
 CNT_S_VANISH2 = anim.part_frame('counter_s_in', 170) - STRIKE_S_AT                 # XV2's second vanish (170)
 CNT_S_SND = anim.part_frame('counter_s_end', 335) - STRIKE_S_AT                    # skill SE cue 1 (335)
 CNT_S_END = STRIKE_S_N - 1                                                         # the white body off (XV2 350)
-EXTRA_SCRIPTS = list(SWAY_SCRIPTS) + ['speciallwheavy_c2']           # the custom-move slots' scripts the build writes
+EXTRA_SCRIPTS = list(SWAY_SCRIPTS) + ['speciallwheavy_c2', SF.SCRIPT_START, SF.SCRIPT_REL]   # the custom-move slots'
+                                                                    # scripts the build writes (v11: Soaring Fist's)
 ST_ESCAPE_N = cave.ST_ESCAPE_N
 # v7 Secret Sensation (the user: "slow time for everyone during its traveling and until reaching, do a slight zoom
 # between Supamario and the opponent, then on Supamario ... similar to how it looks in Dragon Ball FighterZ"; the DBFZ
@@ -325,10 +327,13 @@ FX_DEFAULT = 0x1000009               # before the build has made them (the earli
 METRE = 5.04
 
 # ---------------------------------------------------------------- sounds
+SF_CMN = {}                          # v11: BTL_CMN's GHit / GHitSmk converted for Soaring Fist (SF.effects)
+SF_SKILL = []                        # v11: (the skill's folder, vfx/cmn) for SF.effects
 UI_SE = {'ui_start': ('CAR_BTL_M1510_MGT_00_Start_F22', 0.0),     # skill SE cue 0: entry 0 at 22
          'ui_success': ('CAR_BTL_M1510_MGT_01_Success', 0.0),     # skill SE cue 1: entry 0 at 205
          'ui_vanish': ('Vanish', 0.0),                             # CAR_BTL_CMN cue 96: entry 1 at 151
          'ui_sway': ('swing_05', 0.0)}                             # v7: CAR_BTL_CMN cue 5: the sway (CMN.bac 260) at 7
+UI_SE.update(SF.SE)                  # v11: Soaring Fist's skill SE cues 0 (Bishi) / 1 (Fire)
 SE_IDS = {}
 SND_START = anim.frame_of(anim.FORM, 0, 22)
 SND_SUCCESS = anim.frame_of(anim.FORM, 0, 205)
@@ -396,6 +401,9 @@ def msc_values():
               'UI_FX_SS_CHARGE2': '0x%X' % fx_id('ss_charge_2'), 'UI_FX_AURA6': '0x%X' % fx_id('aura_piace'),
               'UI_FX_BURST': '0x%X' % fx_id('burst'), 'UI_SS_FX_BURST_SIZE': fl(round(0.9 * SCALE * SS_FX_BURST_SIZE, 3)),
               'UI_SS_RELEASE_SIZE': fl(round(0.8 * SCALE, 3)), 'UI_BONE_TRANS': '0x%X' % BONES['TransN']})
+    import supamario_ui_fx11 as FX11
+    v['UI_PIACE_Y'] = fl(FX11.PIACE_Y)   # v11: the sparkles on TransN at his hip's height (supamario_ui_fx11.piace)
+    v.update(SF.msc_values())        # v11: Soaring Fist (tools/supamario_sf_build.py)
     return v
 
 
@@ -665,6 +673,9 @@ def extra_scripts():
     out = dict(sway_scripts())
     del out['specialairlwlight']
     out['speciallwheavy_c2'] = short_rush_scripts()
+    if FX_IDS:                   # v11: Soaring Fist (the transformed forward smash: specialairlwheavy_c2 / _c3)
+        import supamario_godfist_build as GB
+        out.update(SF.body_scripts(se_id, dict(SF_CMN, MHitSmk=GB.CMN_FX['MHitSmk'], MHit=GB.CMN_FX['MHit'])))
     return out
 
 
@@ -1079,6 +1090,37 @@ def piace_volume(p, rep):
     rep[name]['volume'] = (3, PIACE_RADIUS)
 
 
+FLIP_PTCL = []                       # v11: vanilla .ptcl files holding the aura programs' flipbook variants (--flip-ptcl)
+FRT_SKILL = []                       # v11: Time Skip's skill folder (its streaks' node types)
+
+
+def v11_fixes(p, cmn_dir, rep):
+    """v11 (tools/supamario_ui_fx11.py): the type-3 streaks' rotBasis (Secret Sensation's / Time Skip's aura far
+    below him), the aura sprites' sprite sheets (flipbooks) and spread, the sparkles"""
+    import ptcl
+    import xv2vfx
+    import supamario_ui_fx11 as FX11
+    aura_pkg = xv2vfx.load_package(FX11.pkg_dir(cmn_dir, 'BTL_AURA.eepk'), strict=False)
+    others = []
+    for path in FLIP_PTCL:
+        q = ptcl.Ptcl(open(path, 'rb').read())
+        q.path = path
+        others.append(q)
+    names = []
+    for key in AURA_SETS + ('ss_charge',):
+        name = 'PtcSupamarioUi' + [x for x in FX if x[0] == key][0][2][:-4]
+        names.append(name)
+        if name + '_2' in rep:
+            names.append(name + '_2')
+    FX11.aura_flipbook(p, aura_pkg, names, others, rep)
+    FX11.aura_spread(p, aura_pkg, names[:len(AURA_SETS)], rep)
+    FX11.piace(p, rep)
+    pkgs = [aura_pkg]
+    for d in FRT_SKILL + SF_SKILL[:1]:
+        pkgs.append(xv2vfx.load_package(FX11.pkg_dir(d), strict=False))
+    FX11.streak_basis(p, pkgs, rep)
+
+
 def aura_life(p):
     """v6: the longest particle life (+ its random part) of the aura sets' emitters (haze included): a faded generation
     is gone this long after its fade"""
@@ -1136,6 +1178,9 @@ def effects(cmn_dir, fx_dir):
     piace_volume(p, rep)                 # v10: the sparkles from XV2's circle
     smooth_aura(p, rep)
     aura_follow(p, rep)                  # v9: on him (v1-v8: left where they were born)
+    if SF_SKILL:                         # v11: Soaring Fist's effects, after every earlier set
+        SF_CMN.update(SF.effects(p, e, SF_SKILL[0], SF_SKILL[1], rep))
+    v11_fixes(p, cmn_dir, rep)           # v11: the streaks' place, the aura's flipbooks and spread, the sparkles
     life = aura_life(p)
     assert AURA_EVERY >= life, ('v6: the renewal must outlast the aura sprites (at most %d generations)'
                                 % AURA_GENERATIONS, AURA_EVERY, life)
@@ -1179,7 +1224,10 @@ def build(sm_dir, out_dir, ui_skill, ui_se_wav, ts_args):
     mo = os.path.join(fdir, 'motion', 'body')
     vbn = os.path.join(sm_dir, 'model', 'body', 'c00', 'model.vbn')
     outs, _bones, info = anim.build(mo, vbn, os.path.join(ui_skill, '1510_GKS_MGT.ean'), mo, ts_args.get('cmn_ean'),
-                                    os.path.join(ts_args['ts_skill'], '1352_HIK_DSH.ean'))
+                                    os.path.join(ts_args['ts_skill'], '1352_HIK_DSH.ean'),
+                                    os.path.join(ts_args['sf_skill'], '1510_GKS_HKN.ean'))
+    SF_SKILL[:] = [ts_args['sf_skill'], ts_args['sh']['fd']['cb']['gf']['cmn_vfx']]
+    FRT_SKILL[:] = [ts_args['frt']]
     rep = effects(ts_args['sh']['fd']['cb']['gf']['cmn_vfx'], os.path.join(fdir, 'effect', 'supamario'))
     sound_bank(fdir, out_dir, ui_se_wav)
     import nud
@@ -1189,6 +1237,8 @@ def build(sm_dir, out_dir, ui_skill, ui_se_wav, ts_args):
     MESH_INDEX.update(mesh_indices([m.name for m in base_meshes]))
     scripts(os.path.join(fdir, 'script', 'animcmd', 'body'))
     GB.msc(os.path.join(fdir, 'script', 'msc', 'supamario.mscsb'))
+    with tempfile.TemporaryDirectory(dir=out_dir) as tmp:      # v11: Soaring Fist's projectile (article 0)
+        SF.write_weapon(fdir, sm_dir, tmp)
     silver = model.build(sm_dir, fdir)
     for c, rep_c in silver.items():
         assert list(rep_c['overlays']) == OVERLAYS, (c, 'the overlays differ from c00\'s: the scripts name c00\'s')
@@ -1220,7 +1270,7 @@ def main():
         a.remove('--no-halo')
     keys = ('--ui-skill', '--ui-se-wav', '--ts-skill', '--ts-se-wav', '--frt-skill', '--sh-skill', '--sh-se-wav',
             '--fd-skill', '--fd-se-wav', '--skill', '--se-wav', '--ean', '--cmn-vfx', '--skill-vfx', '--cmn-se', '--stb',
-            '--png', '--cmn-ean', '--twin-ptcl')
+            '--png', '--cmn-ean', '--twin-ptcl', '--sf-skill', '--flip-ptcl')
     for k in keys:
         if k in a:
             i = a.index(k)
@@ -1228,6 +1278,8 @@ def main():
             del a[i:i + 2]
     if len(a) != 2 or any(k not in opts for k in keys[:13]):
         sys.exit(__doc__)
+    if '--flip-ptcl' in opts:
+        FLIP_PTCL[:] = opts['--flip-ptcl'].split(',')   # v11: vanilla .ptcl files holding the flipbook variants
     if '--twin-ptcl' in opts:
         TWIN_PTCL[:] = opts['--twin-ptcl'].split(',')   # v10: vanilla .ptcl files holding the programs' follow variants
     gf = {'ean': opts['--ean'], 'cmn_vfx': opts['--cmn-vfx'], 'skill_vfx': opts.get('--skill-vfx'),
@@ -1236,7 +1288,7 @@ def main():
     fd = {'fd_skill': opts['--fd-skill'], 'fd_se_wav': opts['--fd-se-wav'], 'cb': cb}
     sh = {'sh_skill': opts['--sh-skill'], 'sh_se_wav': opts['--sh-se-wav'], 'fd': fd}
     ts = {'ts_skill': opts['--ts-skill'], 'ts_se_wav': opts['--ts-se-wav'], 'frt': opts['--frt-skill'], 'sh': sh,
-          'png': opts.get('--png'), 'halo': halo, 'cmn_ean': opts.get('--cmn-ean')}
+          'png': opts.get('--png'), 'halo': halo, 'cmn_ean': opts.get('--cmn-ean'), 'sf_skill': opts['--sf-skill']}
     print(build(a[0], a[1], opts['--ui-skill'], opts['--ui-se-wav'], ts))
     print('sounds: ' + ', '.join('%s 0x%08X' % kv for kv in SE_IDS.items()))
     print('effects: ' + ', '.join('%s 0x%08X' % kv for kv in FX_IDS.items()))
