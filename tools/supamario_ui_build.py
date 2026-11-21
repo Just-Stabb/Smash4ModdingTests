@@ -242,9 +242,15 @@ FX = [('start', 'BTL_AURA.eepk', 'MGT_HENSIN01.emp', 'BustN', (0.0, 0.0, 0.0), 1
       # stance's start, faded at its recovery (SS_OFF) or at the counter's read, where KiryokuMax's burst plays (the
       # clip's burst as the charge ends). (1511_GKS_KTM, the user's first pick, is dropped: it plays the same aura types)
       ('ss_charge', 'BTL_AURA.eepk', 'KTN_GKS_Loop.emp', 'HipN', (0.0, 0.0, 0.0), 0.6),
-      ('ss_release', 'BTL_AURA.eepk', 'BoostGKS_End.emp', 'HipN', (0.0, 0.0, 0.0), 0.8)]
+      ('ss_release', 'BTL_AURA.eepk', 'BoostGKS_End.emp', 'HipN', (0.0, 0.0, 0.0), 0.8),
+      # v10 (the user's XV2 idle clip ui_in/idle_clip/idle.mp4: "our version lacks the rising sparkles"): the transformed
+      # aura row's own loop (aura 51's HenshinStart 806: the FOK parts the skill's 848 plays too, PLUS Aura_FOKpiace on
+      # the pelvis x1.0 and x0.5, LoopCancel) has the sparkles the skill's 848 lacks: Aura_FOKpiace (small white
+      # additive sprites, 30-frame life, rising): a sixth part of the MSC's aura (UI_FX_AURA6, the pelvis), XV2's
+      # emission and colours (white stays white under the hue map), following him
+      ('aura_piace', 'BTL_AURA.eepk', 'Aura_FOKpiace.emp', 'HipN', (0.0, 0.0, 0.0), 1.0)]
 FX_V7 = ('sway_line',)
-FX_V10 = ('ss_charge', 'ss_release')
+FX_V10 = ('ss_charge', 'ss_release', 'aura_piace')
 # v3: the aura's colour. The converted emitters keep XV2's EMP colours (blue / cyan / white: rendered with fx_render's
 # Smash 4 side, the drawn pixels' median hue 192 deg, saturation 0.26); the user's XV2 clip after the burst shows a
 # lavender / purple-white flicker (the aura pixels' median hue 281-287 deg, saturation 0.16-0.18, value 0.88-0.96, four
@@ -271,6 +277,8 @@ AURA_DENSITY = 6.0
 AURA_ADD_ALPHA = 0.3                 # the alpha-blended (smoke) emitters' alpha x this once additive (added light, not
                                      # cover: at their old alpha they burn white on a bright stage)
 AURA_SMOOTH_SETS = AURA_SETS
+AURA_SETS_V10 = AURA_SETS + ('aura_piace',)    # v10: the sparkles: colours / follow / life as the aura's (not smoothed:
+                                               # XV2's rate and alpha kept, they're tiny)
 AURA_SAT_MIN = 0.45                  # v6: every aura colour at least this saturated (XV2's pale smoke colours came out white
                                      # once additive: the steady render's big sprites hue 262 at 0.15-0.19); a soft
                                      # blue-violet (the user: "a slightly blue purple glow")
@@ -385,7 +393,7 @@ def msc_values():
               'UI_SS_DASH': fl(SS_DASH), 'UI_SS_HOLD_FRAC': fl(SS_HOLD_FRAC), 'UI_SS_ARRIVE': fl(SS_ARRIVE),
               'UI_SS_STOP_MAX': fl(SS_STOP_MAX), 'UI_SS_RATE': fl(SS_RATE), 'UI_SS_CAM2_AT': fl(SS_CAM2_AT_V10),
               'UI_FX_SS_CHARGE': '0x%X' % fx_id('ss_charge'), 'UI_FX_SS_RELEASE': '0x%X' % fx_id('ss_release'),
-              'UI_FX_SS_CHARGE2': '0x%X' % fx_id('ss_charge_2'),
+              'UI_FX_SS_CHARGE2': '0x%X' % fx_id('ss_charge_2'), 'UI_FX_AURA6': '0x%X' % fx_id('aura_piace'),
               'UI_FX_BURST': '0x%X' % fx_id('burst'), 'UI_SS_FX_BURST_SIZE': fl(round(0.9 * SCALE * SS_FX_BURST_SIZE, 3)),
               'UI_SS_RELEASE_SIZE': fl(round(0.8 * SCALE, 3)), 'UI_BONE_TRANS': '0x%X' % BONES['TransN']})
     return v
@@ -844,6 +852,12 @@ AURA_HUE_MAP = ((180.0, 215.0), (240.0, 280.0))
 #    how big, its 0 -> 0.6 -> 0 transparency as the bend's strength x REF_STRENGTH), following him (AURA_FOLLOW)
 REF_MATERIALS = ('Ref_FOK_L', 'Ref_FOK_R')
 REF_STRENGTH = 1.0
+# v10 (the user's XV2 idle clip: "our distortion haze is less aggressive and closer to the user"; the clip, 1080p, his
+# body ~560 px tall: the background is bent up to ~120-190 px over his head and ~150 px beyond his sides, i.e. a quarter
+# to a third of his height round him, the rocks behind him visibly bent): the bend twice as strong (REF_STRENGTH x2: the
+# program's offset is its alpha x its distortion map) and the refraction sprites and their emission volume x REF_WIDE
+REF_STRENGTH = 2.0
+REF_WIDE = 1.5
 REF_COPY = ('one_time', 'volume_type', 'volume_radius', 'volume_sweep_start', 'volume_sweep_param',
             'volume_surface_random', 'volume_sweep_start_random', 'emitter_matrix', 'emitter_scale',
             'emitter_rotation', 'emitter_translation', 'emit_rate', 'start_frame', 'emit_start', 'end_frame',
@@ -856,7 +870,7 @@ REF_COPY = ('one_time', 'volume_type', 'volume_radius', 'volume_sweep_start', 'v
 
 
 def aura_set_names():
-    return ['PtcSupamarioUi' + [x for x in FX if x[0] == key][0][2][:-4] for key in AURA_SETS]
+    return ['PtcSupamarioUi' + [x for x in FX if x[0] == key][0][2][:-4] for key in AURA_SETS_V10]
 
 
 def xv2_aura_nodes(cmn_dir):
@@ -868,7 +882,7 @@ def xv2_aura_nodes(cmn_dir):
             if not fn.lower().endswith('.eepk') or fn == 'BTL_AURA.eepk':
                 os.symlink(os.path.abspath(os.path.join(cmn_dir, fn)), os.path.join(pkg, fn))
         pk = xv2vfx.load_package(pkg, strict=False)
-    for key in AURA_SETS:
+    for key in AURA_SETS_V10:
         emp = [x for x in FX if x[0] == key][0][2]
         for _d, n in xv2vfx.emp_nodes(pk['emp'][emp]):
             if n['NodeType'] == 'Emission':
@@ -960,6 +974,9 @@ def aura_refraction(p, rep, nodes):
                 p.set_field(new, fld, p.field(em, fld))
             for fld in ('alpha_init', 'alpha_diff21', 'alpha_diff32'):
                 p.set_field(new, fld, p.field(new, fld) * REF_STRENGTH)
+            for fld in ('scale', 'volume_radius'):                 # v10: wider
+                v = p.field(new, fld)
+                p.set_field(new, fld, [x * REF_WIDE for x in v] if isinstance(v, (list, tuple)) else v * REF_WIDE)
             e['data'] = new
             p.dirty_layout = True
             done.append((name, p.emitter_name(new)))
@@ -989,7 +1006,7 @@ AURA_FOLLOW_CPU = 2
 AURA_FOLLOW_GPU = 0
 GPU_FLAG = 0x00800000
 TWIN_PTCL = []                       # the vanilla .ptcl the follow variants come from (main's --twin-ptcl)
-FOLLOW_SETS = AURA_SETS + ('ss_charge',)
+FOLLOW_SETS = AURA_SETS_V10 + ('ss_charge',)
 
 
 def is_gpu(em):
@@ -1046,11 +1063,27 @@ def aura_follow(p, rep):
     return n
 
 
+# v10: the sparkles' spread. XV2's Aura_FOKpiace is a hierarchy: edge_1_1 (a filled Circle, EmitFromArea, radius 0.3 m,
+# 0.5 m under the pelvis) -> omni / omni_1 (points, 0.3 m/s up) -> sprite / sprite_1 (30 frames): the converter keeps
+# the emissions' own point and the parents' offset (-0.5 m), not the grandparent's circle: every sparkle from one point.
+# piace_volume gives them XV2's circle (volume type 3, circle fill, XZ plane, radius PIACE_RADIUS)
+PIACE_RADIUS = round(0.3 * 8.5, 3)       # xv2_to_ptcl.UNIT
+
+
+def piace_volume(p, rep):
+    name = 'PtcSupamarioUiAura_FOKpiace'
+    for e in p.sets[p.find_set(name)]['emitters']:
+        if e['data'] is not None:
+            p.set_field(e['data'], 'volume_type', 3)
+            p.set_field(e['data'], 'volume_radius', [PIACE_RADIUS, 0.0, PIACE_RADIUS])
+    rep[name]['volume'] = (3, PIACE_RADIUS)
+
+
 def aura_life(p):
     """v6: the longest particle life (+ its random part) of the aura sets' emitters (haze included): a faded generation
     is gone this long after its fade"""
     out = 0
-    for key in AURA_SETS:
+    for key in AURA_SETS_V10:
         name = 'PtcSupamarioUi' + [x for x in FX if x[0] == key][0][2][:-4]
         for e in p.sets[p.find_set(name)]['emitters']:
             if e['data'] is not None:
@@ -1100,6 +1133,7 @@ def effects(cmn_dir, fx_dir):
     nodes = xv2_aura_nodes(cmn_dir)
     aura_refraction(p, rep, nodes)       # v9: XV2's own distortion (v5-v8: haze(), the fireball's, appended)
     aura_colours(p, rep, nodes)          # v9: XV2's two colours (v3-v8: tint_aura, one flat violet)
+    piace_volume(p, rep)                 # v10: the sparkles from XV2's circle
     smooth_aura(p, rep)
     aura_follow(p, rep)                  # v9: on him (v1-v8: left where they were born)
     life = aura_life(p)

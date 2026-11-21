@@ -4435,3 +4435,150 @@ checks leave out the glow restore blocks: `supamario_ui_build.strip_glow_restore
 `mesh_vis_test.py` 64 ok; `msc_stack_check` 0 of 2490 (globals 127 of 128); `fighter_texture_ids.py check` 0 errors.
 0 failures. Sm4shCommand unchanged (v1.7.22: no command changed; Outline_Shell's in-game note is in
 docs/acmd-extra-commands.md). Preview: `supamario_ui_aura_render.py BEFORE AFTER OUT --bg 0.10,0.08,0.12 --k 2`.
+
+## Ultra Instinct v10 (`supamario_ultrainstinct_v10.zip`, exe `exe_v46z_ui7`; TEST ONLY `exe_v46z_ui7_diag`; Sm4shCommand v1.7.23)
+Install over v9: `INSTALL_TO_data/` holds the 11 files changed since v9 (the four motion .pac, the four script .bin, the
+.ptcl / .efc, the MSC), with the new executable (exe_v46z_ui7 = exe_v46z_outline5 + `tools/supamario_ui_cave.py`, both
+builds reproduced byte for byte by it, `import_call_check` 0). Built by `supamario_ui_build.py` with one new input,
+`--twin-ptcl` (vanilla Pit's and Rosalina's .ptcl: two eft programs' follow variants). The user's v9 test (clips
+3407709b / 4d8fb7cf): "The aura and glow look good now. The aura still follows a bit behind ... make it so the
+autododge alternates between animations and the 'invulnerability hit' effect doesn't show when Supamario dodges ...
+make the autododge counter use the fast version that does less hits and make it only happen from a special button
+input. The counter still doesn't have any visual effects", then: Secret Sensation like DBFZ's (the world stopped until
+he arrives, him slowed, a hold then a fast dash: clip 060b49a3), its effects (none showed), the transformation's own ki
+charge on its stance (clip `ui_in/charge_clip`), and the idle look's rising sparkles and a stronger, wider haze (clip
+`ui_in/idle_clip`). The glow, the aura's colours and wisps are v9's.
+
+### 1. The aura still trailing: GPU particles never follow on the plain program
+- **The clip (3407709b, the jump):** a bright purple blob stays on the stage's edge where he took off and a column of
+  white specks rises from it to him for ~0.8 s; standing, the glow sits a little behind his moves.
+- **The game's code (exe):** eft's CPU particles follow: at emission a follow-0 particle points at the emitter's live
+  matrices, a follow-1 / 2 one at copies (`0x04A5C89C`), and the CPU update (`0x04A624E4` / `0x04A62AE8`, `cmpwi r0, 2`
+  at `0x04A62554`) refreshes a follow-2 particle's translation every frame: v9's follow 2 works there. GPU particles
+  (emitter flag `0x00800000`) don't: their record is written once at emission (`0x04A6680C`-`0x04A6690C`: the local
+  place and the emitter matrix [p + 0x108] copied into it), the GPU calc (`0x04A65FC0`) runs neither update, and their
+  program places them with that birth matrix (`v_inEmtMat0-2`): whatever the follow type, they stay where they were
+  born. eft compiles each program per follow kind: the shader key's byte 4 bit 0x04 is the variant reading the LIVE
+  emitter matrix (`emm`); every vanilla emitter on such a variant has follow 0 (Pit's flash1, Ganon's Majinken, Lucas's
+  PK Freeze, Mario's refraction1_Copy1), every one on the plain variant 1. 10 of v9's 19 aura emitters were GPU ones
+  (the soft glows, shader 39, and the refraction, shader 7): the purple blob is the refraction bending the stage's
+  magenta edge where it stayed, the specks its bend of the speed lines.
+- **Fix (`aura_follow`, `follow_variant`):** each GPU aura emitter gets its program's follow variant (the same key but
+  byte 4 | 0x04 and the same pixel program, checked: Supamario's own shader 8 for the refraction's 7, Pit's shader 13
+  for 39, Rosalina's 59 for 62, imported) and follow 0; CPU ones keep follow 2. XV2's PositionUpdate + RotateUpdate: on
+  him every frame. The 0x2717 request itself follows (its flags 0x8000 | 0x10000, docs/native-notes.md); a one-frame
+  update order isn't measurable from the clips.
+- **Tests:** every aura emitter: CPU follow 2 / GPU follow 0 on a key-0x04 program (v9's GPU ones on the plain
+  programs fail it); the refraction's follow variant with the same pixel program.
+
+### 2. The sway alternates (XV2's four)
+- CMN.bac 260-263 play CMN.ean #189 B_L, #190 B_R, #191 F_L, #192 F_R (the same timeline; the user's clips d / e show one
+  dodge each: no order to read). v7 used only the two L ones. Now SpecialAirLwLight holds all four (frames 0 / 37 / 74 /
+  111, motions 0x241 / 0x243 / 0x242 / 0x244: the motion table gives 0x241-0x244 one animation, checked in the exe; the
+  R slots' scripts were F.L.U.D.D.'s, unreachable): the side by the attacker (back from the front, forward from behind,
+  v7), L / R alternating dodge after dodge (TIMER_7: the MSC's parity, renewed every frame by ui_tick). Each sway keeps
+  v7's timing, effects and sound.
+
+### 3. No "invulnerability hit" mark on a dodge (exe_v46z_ui7)
+- **What it is:** a hit on a shield shape is event 0x10. The fighter's handler (`0x02E35794`) calls slot 42 and writes
+  `0x0100001F` into its EffectModule's `+0x90` (common effect 0x1F = **PtcCommonGuardMark**: GuardMarkRing1-3,
+  GuardMarkFlash, the ring and flash in the clip); the EffectModule listens to the same event (its init `0x02C28DD0`
+  registers `0x02C2CD28`), which asks the hit's data and, when its `+0x54` is 0, requests effect `[EM + 0x90]` at the
+  record's place.
+- **Fix:** the listener's first word branches to `ui_sx`: for HIS counter shape (group 1, the EffectModule a live
+  kind-0x41 fighter's: module block + 0x72A8 = fighter + 0x74D8) it returns before the request. His guard bubble and
+  every other shield keep the mark. The same mark showed on Secret Sensation and the transformation's counter (the same
+  shape): gone there too, as both have their own effects now (XV2's vanish / DBFZ's flash). The shield-hit sound, if
+  any, is untouched (not traced).
+
+### 4. The dodge's counter: the short rush, special only
+- **Data:** no XV2 file has a shorter rush (the skill's counter entries 1 / 2 / 5 / 6 / 9 / 10 all have the 16
+  hitboxes; CMN.bac has no multi-hit entry: 31 hitboxes in all, none in a rush). Built from the user's clip udclip e
+  (60 fps): the vanish at 36, the first impact at 92 (56 later; the long rush's 59), the HUD's count to 11 at 144 (11
+  hits ~5.2 frames apart: 10 rush hits and the finisher), the finisher's ring at ~150, the camera back on him at ~158.
+- **Ours:** SpecialLwHeavy's animation goes on after the long rush with the short one (frames 349-498: XV2 #1 151-210 in
+  56, 210-280 in 52, 280-350 in 42), played through motion 0x236 (`speciallwheavy_c2`, the slot playing that animation)
+  from 349: the freeze to the first hit, hits at 56, 61, 66, 72, 77, 82, 87, 92, 98, 103, the finisher at 108, the
+  vanish at 0 / 18, the success sound at 141, the white body to 149; 150 frames (the long one 349). 1.2% x 10 + 8% =
+  20%. From the sway: **special only** on its frames 1-24 (attack / smash no longer); from the spot dodge: the same short
+  rush (its v7 rule kept: attacked, then attack, special or smash). The transformation's counter keeps the long rush.
+
+### 5. The rush counters' effects
+- **Cause:** XV2's rush shows BTL_CMN effect 0 on every hit (BDM #1 / #2's Effect1: Btl_HitLOD x1.5 + Btl_HitS x0.8,
+  the yellow bursts of the clips); our scripts had only the vanish lines, as Graphic_Effect: the game's FOOT_EFFECT,
+  refused off the ground (docs/native-notes.md "Graphic_Effect can be refused"; the transformation's counter starts in
+  the air too).
+- **Fix:** every rush hit and finisher of both rushes plays the hit burst at the hitbox's centre (Graphic_Effect2): Time
+  Skip's capped Btl_HitLOD copy (0x03410061) and its Btl_HitL (BTL_CMN 2's, 0x0341005F / 60) standing in for Btl_HitS,
+  which BTL_CMN.eepk names but its .pbind.emb doesn't hold (x 0.7: HitS is the smaller); the finisher x 1.6. Every UI
+  non-following effect is Graphic_Effect2 now.
+
+### 6. Secret Sensation like DBFZ's: the world stop (exe_v46z_ui7), his slow motion, the hold and the dash, its effects
+- **DBFZ (060b49a3, 60 fps):** the counter at ~0.40 s; the beam and the opponent frozen from then on (still at 1.4 s);
+  Goku rises slowly over it for ~16 frames, crosses it in ~8, lands behind the opponent with motion lines (~0.80-0.97 s).
+- **The world stop (`ws_*`):** his MSC asks it (TIMER_6, renewed every frame) from the counter's read to his landing
+  plus 6 frames, at most 240 frames (the fallback). The fighter step wrapper (`0x02E40B90`) hook: his ask starts the stop
+  / renews a 2-frame lease, and HIS step runs on a normal frame (the frame state's slowed byte cleared for its length:
+  all his modules run). The frame state fill (`0x02BFB97C`, once a battle step) hook: while the lease lasts, the frame
+  is a slowed frame between two steps (+8 1, +0 1): the frame in which no fighter, weapon or item steps (the game's own
+  slow-motion's in-between frames), with no stepping at all until the lease ends. At the start every effect instance
+  that isn't his (and isn't already paused or kept out of pauses) is paused (+0x19E, the Final Smashes' way: 0x0334CA30
+  -> 0x032F0F10; the instance update 0x0334E080 then holds it) and the stage stopped (0x0316505C(manager, 1), the Final
+  Smashes' call, unless their `+0xB3` test says not); at the end both undone. Nothing can leave it on: the lease ends 2
+  frames after the last ask, whatever stopped the asks (the arrival, a KO, leaving the status, a training reset, the
+  match's end); the MSC also writes 0 at every exit (ss_end, ss_stale).
+- **His travel:** EscapeN at rate 0.75 (the user's "3/4"); a hold (16 frames: 8% of the way, slowing to a stop), then
+  the dash (8 frames, faster every frame to the arrival), 6 frames held behind the fighter, then Fall and the world
+  goes on. v1-v9's smoothstep and v7's SlowModule(0, 3, 48) are gone. Z into the background as before. The camera: v9's
+  slight zooms, in at the read, closer as the dash starts, back when the world goes on.
+- **Effects (v1-v9: one vanish lines burst at the read, nothing else; the GuardMark at the hit):** the stance plays the
+  transformed aura's own ki charge: XV2's ki charge is the character's aura row (aura_setting.aur; CMN.bac's charge entry
+  453 switches its KiaiCharge on and ends with KiryokuMax), and aura 51 is Ultra Instinct's (its HenshinStart 806 = the
+  FOK aura, the same EMPs as the skill's 848), so KiaiCharge 803 = KTN_GKS_Loop (its 17 emitters in two sets, following
+  the pelvis) from the stance's frame 0, faded at its recovery (frame 30) or at the counter's read, where KiryokuMax 804
+  (BoostGKS_End, the user's charge clip's burst as the charge ends) flashes; the vanish lines as the dash starts and at
+  the arrival, with a small burst of his aura (MGT_HENSIN02 x0.45) where he lands. His own effects run during the stop.
+  (1511_GKS_KTM, sent first, is dropped: it plays the same aura types.) Which aura row the skill's CUS aura 1 selects is
+  XV2's CusAuraData (in its executable); aura 51's content identifies it.
+
+### 7. The idle look: the sparkles, the haze
+- **Sparkles:** aura 51's loop (806) has Aura_FOKpiace (x1.0 and x0.5 on the pelvis) which the skill's 848 lacks: small
+  white additive sprites from a filled circle (0.3 m, 0.5 m under the pelvis) rising 0.3 m/s for 30 frames. Converted
+  (its circle restored: `piace_volume`; the converter keeps only the emission's own point), following him, a sixth part
+  of the MSC's aura (UI_FX_AURA6, renewed and ended with the others).
+- **Haze:** the idle clip (1080p, his body ~560 px tall) bends the background up to ~120-190 px over his head and ~150 px
+  beyond his sides (a quarter to a third of his height round him). The refraction emitters' strength x 2 (REF_STRENGTH)
+  and their sprites and emission volume x 1.5 (REF_WIDE).
+
+### Tests
+`supamario_ui_cave_test.py` (v10: the three hooks' words, the evidence words (the EffectModule's event registration and
+listener, the fighter handler's GuardMark write, the step wrapper's (F, F + 0x230), its step test, the Final Smash
+code's stage stop / effect pause, the instance update's hold, the EffectModule's own pause key), ui_sx's 5 cases, the
+world stop: no ask, the start (instances paused but his / kept out / already paused; the stage), his normal frame,
+another fighter's stopped frame, the fill's stopped frame and lease, the renewal, the end (only its own instances back,
+the stage on, the state cleared), the Final Smash flag, another kind's ask; the diag's S4UW), `supamario_ui_test.py
+--exe --package --since` (v10: the alternation, special only, the short rush (motion, frames, 11 hits, timing, damage,
+effects), the spot dodge's short rush, Secret Sensation's asks / rate / hold / dash / arrival / camera / effects / KO /
+stale / fallback, the follow variants, the sparkles, the haze, the hit bursts, no Graphic_Effect, the stance's charge,
+the motion table and link kind of the new slots, the package with both executables) and the other suites: counts in
+"Ultra Instinct v10, results".
+
+### Not confirmed in game / approximated
+- The world stop's look in game: the stopped frame keeps every object between steps (as the game's slow-motion does)
+  and pauses effects as the Final Smashes do; its owner's step on a normal frame is the cave's (unicorn-tested). The
+  match timer, sounds and the camera aren't stopped. A fighter in hitlag when it starts has its own effects paused by
+  the game already (left as they are).
+- The GuardMark skip leaves any shield-hit sound (not traced).
+- The short rush's timing from the clip (11 counts, first impact 56 after the vanish); Btl_HitL standing in for
+  Btl_HitS; the hit bursts at the hitbox's centre (XV2 places them on the victim).
+- The haze's strength / width and the sparkles' size against the clip by eye.
+- Aura 51 as the skill's CUS aura's row (by its content); DBFZ's hold / dash split and the 3/4 rate.
+
+### Ultra Instinct v10, results
+`supamario_ui_test.py --exe --package --since` (v9's build) **537 ok**; `supamario_ui_cave_test.py` **378 ok**
+(exe_v46z_outline5 / ui7 / ui7_diag); `supamario_timeskip_test` 198, `supamario_godfist_test` 566,
+`supamario_sledgehammer_test` 141, `supamario_corebreaker_test` 104, `supamario_fakedeath_test` 47 ok (their script checks
+leave out the new custom-move slots too); `outline_shell_test.py` 124 ok; `mesh_vis_test.py` 64 ok; `eft_vertex_test` 0
+failures; `msc_stack_check` 0 of 2491 (globals 127 of 128); `fighter_texture_ids.py check` 0 errors; `import_call_check`
+0 on both exes; exe_v46z_ui7 (SHA-1 f5f75fc0) / ui7_diag (8380ba0f) reproduced byte for byte from the cave script;
+Sm4shCommand v1.7.23 NvTest 290 ok / 1 known failure (effect.bin's else-if chains, upstream), HvTest 248 ok. 0 failures.

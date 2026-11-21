@@ -298,18 +298,20 @@ def form_tests(r):
     check('no hitbox (the transformation\'s game script is empty)', True, True)
     r.frame(vm, g)
     aura = [e for e in g.ev('effect', end + 1)]
-    ids = [B.fx_id(k) for k in ('aura_hip', 'aura_head', 'aura_foot', 'aura_chest', 'aura_hand')]
-    check('the aura made right after (7 following requests 0x2717: v6 the chest and hands too; the five ids faded first; '
+    ids = [B.fx_id(k) for k in ('aura_hip', 'aura_head', 'aura_foot', 'aura_chest', 'aura_hand', 'aura_piace')]
+    check('the aura made right after (8 following requests 0x2717: v6 the chest and hands too, v10 the sparkles on the '
+          'pelvis; the six ids faded first; '
           'v3: 0x2717, the vanilla following request the Kamehameha uses, not v1 / v2\'s 0x2730: the crash fix)',
           sorted((e[2], e[3]) for e in aura),
           sorted([(0x2723, i) for i in ids] +
                  [(0x2717, B.fx_id(k)) for k in ('aura_hip', 'aura_chest', 'aura_head', 'aura_foot', 'aura_foot',
-                                                  'aura_hand', 'aura_hand')]))
+                                                  'aura_hand', 'aura_hand', 'aura_piace')]))
     check('v6: the renewal FADES the old ones (0x2723 (id, 0, 0): emission stopped, particles live out), never kills '
           'them at once (id, 1, 1: v1-v5, their sprites never got past 29 frames: the user\'s v5 clip)',
-          sorted(tuple(e[5][2:4]) for e in aura if e[2] == 0x2723), [(0, 0)] * 5)
-    check('  on HipN / BustN / HeadN / LFootJ / RFootJ / RHandN / LHandN', sorted(e[4] for e in aura if e[2] == 0x2717),
-          sorted([B.BONES[b] for b in ('HipN', 'BustN', 'HeadN', 'LFootJ', 'RFootJ', 'RHandN', 'LHandN')]))
+          sorted(tuple(e[5][2:4]) for e in aura if e[2] == 0x2723), [(0, 0)] * 6)
+    check('  on HipN / BustN / HeadN / LFootJ / RFootJ / RHandN / LHandN (+ HipN: the sparkles)',
+          sorted(e[4] for e in aura if e[2] == 0x2717),
+          sorted([B.BONES[b] for b in ('HipN', 'BustN', 'HeadN', 'LFootJ', 'RFootJ', 'RHandN', 'LHandN', 'HipN')]))
     head_up = round(0.2 * B.METRE, 3)
     check('  their arguments (id, bone, x, y, z, rx, ry, rz, size, flag 0): the head 0.2 m up, the sizes %g / %g' % (
         B.SCALE, round(0.8 * B.SCALE, 3)),
@@ -321,7 +323,8 @@ def form_tests(r):
                   (B.fx_id('aura_hand'), B.BONES['LHandN'], 0, 0, 0, 0, 0, 0, round(0.65 * B.SCALE, 3), 0),
                   (B.fx_id('aura_head'), B.BONES['HeadN'], 0, head_up, 0, 0, 0, 0, B.SCALE, 0),
                   (B.fx_id('aura_foot'), B.BONES['LFootJ'], 0, 0, 0, 0, 0, 0, round(0.8 * B.SCALE, 3), 0),
-                  (B.fx_id('aura_foot'), B.BONES['RFootJ'], 0, 0, 0, 0, 0, 0, round(0.8 * B.SCALE, 3), 0)]))
+                  (B.fx_id('aura_foot'), B.BONES['RFootJ'], 0, 0, 0, 0, 0, 0, round(0.8 * B.SCALE, 3), 0),
+                  (B.fx_id('aura_piace'), B.BONES['HipN'], 0, 0, 0, 0, 0, 0, B.SCALE, 0)]))
     check('  no 0x2730 call left (v1 / v2\'s untested op)', [e for e in g.ev('effect') if e[2] == 0x2730], [])
     for k in range(int(B.AURA_EVERY) - 1):
         r.frame(vm, g)
@@ -329,9 +332,9 @@ def form_tests(r):
           [e for e in g.ev('effect') if e[0] > end + 1 and e[2] in (0x2717, 0x2723)], [])
     r.frame(vm, g)
     again = [e for e in g.ev('effect', end + 1 + int(B.AURA_EVERY)) if e[2] == 0x2717]
-    check('  made again after %d frames (7), the old ones faded the same frame' % B.AURA_EVERY,
+    check('  made again after %d frames (8), the old ones faded the same frame' % B.AURA_EVERY,
           (len(again), sorted(tuple(e[5][2:4]) for e in g.ev('effect', end + 1 + int(B.AURA_EVERY)) if e[2] == 0x2723)),
-          (7, [(0, 0)] * 5))
+          (8, [(0, 0)] * 6))
     g, vm = form_run(r, air=True)
     check('in the air: held still, Fall at the end', ([e[2] for e in g.ev('status')][-1], g.air), (0xE, True))
 
@@ -672,7 +675,7 @@ def reset_tests(r):
               ((g.vars[C.V_FORM], g.vars[C.V_DODGE_R], g.vars[C.V_DODGE_L]),
                sorted(e[3] for e in g.ev('effect') if e[2] == 0x2723)),
               ((0.0, 0.0, 0.0), sorted([B.fx_id(k) for k in ('aura_hip', 'aura_head', 'aura_foot', 'aura_chest',
-                                                              'aura_hand')])))
+                                                              'aura_hand', 'aura_piace')])))
         check('  ... at once there (0x2723 (id, 1, 1): a KO / respawn takes the particles too)',
               sorted({tuple(e[5][2:4]) for e in g.ev('effect') if e[2] == 0x2723}), [(1, 1)])
     g = Game(status=0x0, damage=150.0)
@@ -885,7 +888,7 @@ def script_tests(out, ts_out):
                                                                    B.GLOW_RIM_TINT), (True, True, 0.0))
     # v9: Time Skip's outline ends (Alpha 0) followed by the glow again when transformed; the falls / landings put it on
     for h, cmds in sorted(f['effect'].scripts.items()):
-        if h in {acmd.crc(n_) for n_ in list(B.SCRIPT.values()) + list(B.SWAY_SCRIPTS)}:
+        if h in {acmd.crc(n_) for n_ in list(B.SCRIPT.values()) + B.EXTRA_SCRIPTS}:
             continue
         offs = [i for i, c in enumerate(cmds) if c.name == 'Outline_Shell' and c.params[4] == 0.0]
         if not offs:
@@ -902,7 +905,7 @@ def script_tests(out, ts_out):
     check('v6: the counter\'s effect script plays no aura (the MSC\'s runs from its first frame: it doubled it)',
           [c.params[0] for c in f['effect'].script('speciallwheavy') if 'graphic' in nm(c).lower() and
            c.params[0] in [B.fx_id(k) for k in B.AURA_SETS]], [])
-    cams = [nm(c) for p in f for sname in list(B.SCRIPT.values()) + list(B.SWAY_SCRIPTS) for c in f[p].script(sname)
+    cams = [nm(c) for p in f for sname in list(B.SCRIPT.values()) + B.EXTRA_SCRIPTS for c in f[p].script(sname)
             if 'camera' in nm(c).lower()]
     check('no camera command in any Ultra Instinct script (the user)', cams, [])
     check('the transformation / the dodge / Secret Sensation\'s stance: no hitbox (v4: the transformation\'s game script '
@@ -919,14 +922,15 @@ def script_tests(out, ts_out):
     check('its sounds: Start at %d (XV2 22), Success at %d (XV2 205)' % (B.SND_START, B.SND_SUCCESS), snd,
           [('FRAME', [float(B.SND_START)]), ('Sound_Effect', [B.SE_IDS['ui_start']]), ('FRAME', [float(B.SND_SUCCESS)]),
            ('Sound_Effect', [B.SE_IDS['ui_success']]), ('Script_End', [])])
-    for s in ('speciallwheavy',):
+    for s in ('speciallwheavy', 'speciallwheavy_c2'):
         check('%s: the vanish sound / effect first' % s,
               ([c.params[0] for c in f['sound'].script(s) if nm(c) == 'Sound_Effect'][:1],
                [c.params[0] for c in f['effect'].script(s) if 'graphic' in nm(c).lower()][:1]),
               ([B.SE_IDS['ui_vanish']], [B.fx_id('vanish')]))
     sway_script_tests(f)
+    v10_script_tests(f)
     skip = {acmd.crc(n) for n in B.SCRIPT.values()} | {acmd.crc(n) for n in B.silver_scripts()} | \
-        {acmd.crc(n) for n in B.SWAY_SCRIPTS}
+        {acmd.crc(n) for n in B.EXTRA_SCRIPTS}
     other = []
     import copy
     want_eff = copy.deepcopy(b['effect'])
@@ -956,7 +960,7 @@ def sway_script_tests(f):
     """v7: the sways' scripts (SpecialAirLwLight's animation: the back sway from 0 (0x241), the forward sway from
     SWAY_F_AT (0x243, specialairlwlight_c3)); v8: no counter script of its own (the rush's)"""
     nm = lambda c: c.name  # noqa: E731
-    for sname, at in (('specialairlwlight', 0), ('specialairlwlight_c3', B.SWAY_F_AT)):
+    for sname, at in B.SWAY_AT.items():
         eff = [(fr, c.params[0], round(c.params[8], 2)) for fr, c in at_frames(f['effect'].script(sname))
                if 'graphic' in nm(c).lower()]
         check('v7: %s (a sway from %d): XV2\'s SKI_lineX_S (BTL_CMN 493, 0.35) at its frames 0 and 1 (XV2 1 / 4, in '
@@ -968,11 +972,56 @@ def sway_script_tests(f):
         check('  no hitbox, no expression', ([nm(c) for c in f['game'].script(sname)],
                                             [nm(c) for c in f['expression'].script(sname)]),
               (['Script_End'], ['Script_End']))
-    check('v8: no script of v7\'s counter (specialairlwlight_c2, CMN.bac 706) written: the slot\'s scripts are Time '
-          'Skip v10\'s (the base\'s)', 'specialairlwlight_c2' in B.SWAY_SCRIPTS, False)
-    check('v7: the forward sway\'s script\'s first command waits for its start frame (the clock starts there)',
-          [(n, f['effect'].script(n)[0].params[0]) for n in ('specialairlwlight_c3',)],
-          [('specialairlwlight_c3', float(B.SWAY_F_AT))])
+    check('v10: the slot 0x242 (specialairlwlight_c2, v7\'s 706 counter, gone in v8) is the back R sway now',
+          B.SWAY_SCRIPTS.get('specialairlwlight_c2'), 'sway_br')
+    check('v7 / v10: each other sway\'s script\'s first command waits for its start frame (the clock starts there)',
+          [(n, f['effect'].script(n)[0].params[0]) for n in ('specialairlwlight_c3', 'specialairlwlight_c2',
+                                                              'specialairlwlight_c4')],
+          [('specialairlwlight_c3', float(B.SWAY_F_AT)), ('specialairlwlight_c2', float(B.SWAY_BR_AT)),
+           ('specialairlwlight_c4', float(B.SWAY_FR_AT))])
+
+
+def v10_script_tests(f):
+    """v10: the dodge's short rush (speciallwheavy_c2), the rush hits' effects, Graphic_Effect2, the stance's charge"""
+    nm = lambda c: c.name  # noqa: E731
+    at = B.STRIKE_S_AT
+    g = f['game'].script('speciallwheavy_c2')
+    hb = [dict(zip(acmd.INFO[acmd.BY_NAME['extra_special_hitbox']]['syntax'], c.params)) for c in g
+          if nm(c).lower() == 'extra_special_hitbox']
+    tl = [(fr, nm(c)) for fr, c in at_frames(g) if nm(c).lower() == 'extra_special_hitbox']
+    check('v10: the short rush (0x236 speciallwheavy_c2, from %d): the freeze, %d rush hits, the finisher = 11 hits '
+          '(the user\'s dodge-counter clips: "11 HITS")' % (at, B.RUSH_S_N), (len(hb), B.RUSH_S_N + 1), (12, 11))
+    check('  the freeze at its 0 holding the attacker to its first hit (%d), the hits at %s, the finisher at %d '
+          '(the clip: ~5.2 frames apart, the 11th 52 after the first)' % (B.RUSH_S_AT[0], B.RUSH_S_AT, B.STRIKE_S_HIT),
+          ([fr - at for fr, _n in tl], hb[0]['HitstopFrames'] if hb else None),
+          ([0.0] + [float(x) for x in B.RUSH_S_AT] + [float(B.STRIKE_S_HIT)], B.RUSH_S_AT[0]))
+    check('  the first impact sooner than the long rush\'s (the clip\'s 56 vs 59), the whole far shorter (%d vs %d)'
+          % (B.STRIKE_S_N, B.STRIKE_N), (B.RUSH_S_AT[0] < B.RUSH_AT[0], B.STRIKE_S_N < B.STRIKE_N / 2), (True, True))
+    check('  the rush hits / finisher the long one\'s (damage, angle), %.1f%% in all' % (
+        B.RUSH_S_N * B.RUSH_DMG + B.FINISH_DMG), {(round(x['Damage'], 2), x['Angle']) for x in hb[1:-1]} |
+        {(round(hb[-1]['Damage'], 2), hb[-1]['Angle'])} if hb else None, {(B.RUSH_DMG, 361), (B.FINISH_DMG, 35)})
+    ids = B.hit_fx_ids()
+    for sname, hits, fin, start in (('speciallwheavy', B.RUSH_AT, B.STRIKE_AT, 0),
+                                    ('speciallwheavy_c2', B.RUSH_S_AT, B.STRIKE_S_HIT, at)):
+        fx = [(fr - start, c.params[0]) for fr, c in at_frames(f['effect'].script(sname)) if nm(c) == 'Graphic_Effect2'
+              and c.params[0] in ids.values()]
+        check('v10: %s: XV2\'s hit effect (BTL_CMN 0: the LOD burst and the hit burst) on every rush hit and the '
+              'finisher (v1-v9: none)' % sname, sorted({x[0] for x in fx}), sorted(float(x) for x in list(hits) + [fin]))
+        fin_sz = [round(c.params[8], 3) for fr, c in at_frames(f['effect'].script(sname))
+                  if fr - start == fin and nm(c) == 'Graphic_Effect2' and c.params[0] in ids.values()]
+        check('  the finisher\'s bigger (x %g)' % B.FINISH_FX, fin_sz == [round(x.params[8], 3) for x in
+                                                                          B.hit_fx(B.FINISH_FX)], True)
+    ge = [(n, p) for p in ('effect',) for n in list(B.SCRIPT.values()) + B.EXTRA_SCRIPTS for c in f[p].script(n)
+          if nm(c) == 'Graphic_Effect']
+    check('v10: no Graphic_Effect (the game\'s FOOT_EFFECT, refused in the air) in the Ultra Instinct scripts: '
+          'Graphic_Effect2', ge, [])
+    eff = [(fr, nm(c), c.params[0] if c.params else None) for fr, c in at_frames(f['effect'].script('specialairlwheavy'))]
+    check('v10: Secret Sensation\'s stance: his aura\'s ki charge (aura 51\'s KiaiCharge, KTN_GKS_Loop: both its sets) '
+          'from its frame 0, faded (Terminate_Graphic_Effect 0, 0) at its recovery (%d)' % B.SS_OFF,
+          [x for x in eff if x[1] != 'Script_End'],
+          [(0.0, 'External_Graphic', B.fx_id('ss_charge')), (0.0, 'External_Graphic', B.fx_id('ss_charge_2')),
+           (float(B.SS_OFF), 'Terminate_Graphic_Effect', B.fx_id('ss_charge')),
+           (float(B.SS_OFF), 'Terminate_Graphic_Effect', B.fx_id('ss_charge_2'))])
 
 
 def mv(c):
@@ -1073,7 +1122,9 @@ def acmd_lookup_tests(f):
     d = open(mtab, 'rb').read()
     ws = st_.unpack('>%dI' % (len(d) // 4), d)
     for slot, name in ((B.MOT_FORM, 'speciallwlight'), (B.MOT_STRIKE, 'speciallwheavy'), (B.MOT_DODGE, 'specialairlwlight'),
-                       (B.MOT_SS, 'specialairlwheavy')):
+                       (B.MOT_SS, 'specialairlwheavy'), (B.MOT_SWAY_F, 'specialairlwlight_c3'),
+                       (B.MOT_SWAY_BR, 'specialairlwlight_c2'), (B.MOT_SWAY_FR, 'specialairlwlight_c4'),
+                       (B.MOT_STRIKE_S, 'speciallwheavy_c2')):        # v7 / v10: the custom-move slots
         h = ws[slot]
         check('v4: motion 0x%X -> the motion table\'s hash 0x%08X = crc("%s")' % (slot, h, name), h, acmd.crc(name))
         for p in ('game', 'effect', 'sound', 'expression'):
@@ -1092,16 +1143,25 @@ def motion_tests(out, ts_out):
         diff = sorted(n.split('D03')[-1] for n in new if new[n] != old.get(n))
         check('%s.pac: only the four slots changed' % part, diff, sorted([A.DODGE, A.STRIKE, A.FORM, A.SS]))
         fr = {m: omo.Omo(new[[n for n in new if n.endswith('D03' + m)][0]]).frames for m in A.MOTIONS}
-        check('%s.pac: 325 / 349 / 74 / 45 frames (v7: SpecialAirLwLight the two sways, 37 + 37; v8: no 706 strike)'
-              % part, fr, {A.FORM: 325, A.STRIKE: 349, A.DODGE: 74, A.SS: 45})
+        check('%s.pac: 325 / 499 / 148 / 45 frames (v10: SpecialLwHeavy the long rush 349 + the short 150; '
+              'SpecialAirLwLight the four sways, 4 x 37)' % part, fr, {A.FORM: 325, A.STRIKE: 499, A.DODGE: 148, A.SS: 45})
     src = [(A.source(A.DODGE, f_)[0][0], A.source(A.DODGE, f_)[1], round(A.source(A.DODGE, f_)[2], 2))
            for f_ in (0, 1, 2, 36, 37, 38, 73)]
     check('v7: SpecialAirLwLight\'s frames: the back sway CMN #189 (0 shows XV2 0, 1-36 XV2 7-42: the x7 start), the '
           'forward sway #191 from 37 (v8: nothing after)', src,
           [('sway_b_in', 189, 0.0), ('sway_b', 189, 7.0), ('sway_b', 189, 8.0), ('sway_b', 189, 42.0),
            ('sway_f_in', 191, 0.0), ('sway_f', 191, 7.0), ('sway_f', 191, 42.0)])
-    check('v7: the build\'s frames agree with the anim\'s (SWAY_F_AT, SWAY_N)', (B.SWAY_F_AT, B.SWAY_N, 2 * B.SWAY_N),
-          (37, 37, A.frames_of(A.DODGE)))
+    check('v7 / v10: the build\'s frames agree with the anim\'s (SWAY_F_AT, SWAY_N, the R sways at 74 / 111)',
+          (B.SWAY_F_AT, B.SWAY_N, B.SWAY_BR_AT, B.SWAY_FR_AT, 4 * B.SWAY_N), (37, 37, 74, 111, A.frames_of(A.DODGE)))
+    src = [(A.source(A.DODGE, f_)[0][0], A.source(A.DODGE, f_)[1]) for f_ in (74, 75, 110, 111, 112, 147)]
+    check('v10: SpecialAirLwLight\'s other two sways: CMN #190 (B_R) from 74, #192 (F_R) from 111, the same timeline',
+          src, [('sway_br_in', 190), ('sway_br', 190), ('sway_br', 190), ('sway_fr_in', 192), ('sway_fr', 192),
+                ('sway_fr', 192)])
+    src = [(A.source(A.STRIKE, f_)[0][0], round(A.source(A.STRIKE, f_)[2], 1)) for f_ in (348, 349, 405, 457, 498)]
+    check('v10: SpecialLwHeavy\'s short rush after the long one: XV2 #1 151 at 349, 210 (the first hit) at 405, 280 '
+          '(the finisher) at 457, ~350 at its end', src,
+          [('counter', 499.0), ('counter_s_in', 151.0), ('counter_s_rush', 210.0), ('counter_s_end', 280.0),
+           ('counter_s_end', 348.3)])
 
 
 def effect_tests(out, ts_out):
@@ -1113,8 +1173,8 @@ def effect_tests(out, ts_out):
     check('the ptcl validates', p.validate(), [])
     n = len(tp.sets)
     check('the earlier sets kept (names)', [p.set_name(i) for i in range(n)], [tp.set_name(i) for i in range(n)])
-    check('new sets: PtcSupamarioUi*', sorted(p.set_name(i) for i in range(n, len(p.sets))),
-          sorted('PtcSupamarioUi' + x[2][:-4] for x in B.FX))
+    check('new sets: PtcSupamarioUi* (v10: KTN_GKS_Loop in two: 17 emitters)', sorted(p.set_name(i) for i in range(n, len(p.sets))),
+          sorted(['PtcSupamarioUi' + x[2][:-4] for x in B.FX] + ['PtcSupamarioUiKTN_GKS_Loop_2']))
 
 
 def aura_tests(out, ts_out):
@@ -1127,11 +1187,13 @@ def aura_tests(out, ts_out):
     p = ptcl.Ptcl(open(os.path.join(d, 'supamario.010d0000.ptcl'), 'rb').read())
     aura = set(B.aura_set_names())
     B.ref_shader(p)
+    B.REF_SHADERS.add(B.follow_variant(p, min(B.REF_SHADERS), []))     # v10: the refraction's follow variant
     hues, whites, two, other = [], 0, 0, set()
     for i in range(len(p.sets)):
         name = p.set_name(i)
-        if not name.startswith('PtcSupamarioUi'):
-            continue
+        if not name.startswith('PtcSupamarioUi') or name in ('PtcSupamarioUiKTN_GKS_Loop', 'PtcSupamarioUiKTN_GKS_Loop_2',
+                                                              'PtcSupamarioUiBoostGKS_End'):
+            continue                    # (v10's ki charge sets: XV2's own violet, aura 51's)
         for e in p.sets[i]['emitters']:
             em = e['data']
             if em is None or p.field(em, 'shader_index') in B.REF_SHADERS:   # v9: the distortion (no colour drawn)
@@ -1188,20 +1250,28 @@ def aura_v5_tests(out, base):
                 continue
             names.append(p.emitter_name(em))
             fo = struct.unpack_from('>I', em, 0x310)[0]
-            follow.append((name, p.emitter_name(em), fo, fo in eft_vertex.features(
-                p.shader_binary(p.field(em, 'shader_index')))['follow']))
-            if p.field(em, 'shader_index') == rsh:
+            sh = p.field(em, 'shader_index')
+            gpu = bool(struct.unpack_from('>I', em, 4)[0] & 0x00800000)
+            feat = eft_vertex.features(p.shader_binary(sh))
+            follow.append((name, p.emitter_name(em), gpu, fo, p.shader_entry(sh)[4] & 0x04,
+                           fo in feat['follow'] and (feat['gpu_follows'] or not gpu)))
+            if p.field(em, 'shader_index') in (rsh, B.follow_variant(p, rsh, [])):
                 refr.append((name, p.emitter_name(em), em))
                 continue
+            if name.endswith('piace'):
+                continue                        # v10: the sparkles keep XV2's rate (not smoothed)
             iv, bl = p.field(em, 'emit_interval'), p.field(em, 'blend_type')
             rows.append((iv, bl))
             if not (1 <= iv <= 7 and bl == 1):
                 bad.append((name, p.emitter_name(em), iv, bl))
     check('v5: the aura sets\' %d colour emitters: one particle every 1-7 frames (XV2\'s converted 9-39 / %g), additive '
           '(blend 1)' % (len(rows), B.AURA_DENSITY), bad, [])
-    check('v9: every aura emitter follows him (ptcl 0x310 = %d, position only; v1-v8 1: left in the world, the trail) and '
-          'its program draws that follow type' % B.AURA_FOLLOW,
-          [x for x in follow if x[2] != B.AURA_FOLLOW or not x[3]], [])
+    check('v10: every aura emitter follows him: a CPU one with follow 2 (its copy refreshed every frame: 0x04A62554), a '
+          'GPU one with follow 0 on its program\'s follow variant (key byte 4 bit 0x04: it reads the live emitter matrix; '
+          'v9\'s GPU emitters on the plain variant were placed by their birth matrix: the trail)',
+          [x for x in follow if (x[3], bool(x[4])) != ((0, True) if x[2] else (2, x[4] != 0)) or not x[5]], [])
+    check('v10: GPU and CPU emitters both among the aura\'s (the glows / refraction GPU, the flames CPU)',
+          sorted({x[2] for x in follow}), [False, True])
     check('v9: the distortion = XV2\'s own refraction emissions (Ref_FOK_L / _R: Aura_LoopFOK\'s and FOK_FootL\'s two '
           'sprite_2_1_*), 4 of them, on the hip and feet sets; no v5-v8 UiHaze',
           (sorted((n, en) for n, en, _e in refr), 'UiHaze' in names),
@@ -1209,15 +1279,19 @@ def aura_v5_tests(out, base):
                    ('PtcSupamarioUiFOK_FootL', 'sprite_2_1_2_1_1'), ('PtcSupamarioUiFOK_FootL', 'sprite_2_1_2_1_1_1')]),
            False))
     rk = [o for o in range(0x304, 0x340, 4) if o not in (0x310,)] + list(range(0x830, 0x868, 4)) + [0x324, 0x4BC]
+    rk = [o for o in rk if o not in (0x304, 0x844)]      # (v10: the follow variant's index; the GPU flag word)
     for n, en, em in refr:
-        check('  %s %s: the fireball\'s refraction program (frame buffer read: %s), its two textures, its shader-keyed '
-              'words; XV2\'s strength (alpha up %g x %g), its life %d' % (
-                  n, en, b'frameBufferTexture' in bytes(p.shader_binary(rsh)), 0.6, B.REF_STRENGTH,
-                  p.field(em, 'ptcl_life')),
+        check('  %s %s: the fireball\'s refraction program (frame buffer read: %s; v10 its follow variant, the same pixel '
+              'program), its two textures, its shader-keyed words; XV2\'s strength x %g (v10: the clip\'s stronger bend: '
+              'alpha up %g), its life %d' % (
+                  n, en, b'frameBufferTexture' in bytes(p.shader_binary(p.field(em, 'shader_index'))), B.REF_STRENGTH,
+                  0.6 * B.REF_STRENGTH, p.field(em, 'ptcl_life')),
               ([p.texres(em, k)['native_pos'] for k in (0, 1)], [struct.unpack_from('>I', em, o)[0] for o in rk],
-               round(p.field(em, 'alpha_diff21'), 3)),
+               round(p.field(em, 'alpha_diff21'), 3), p.field(em, 'shader_index') == B.follow_variant(p, rsh, [])),
               ([p.texres(ref, k)['native_pos'] for k in (0, 1)], [struct.unpack_from('>I', ref, o)[0] for o in rk],
-               round(0.6 * B.REF_STRENGTH, 3)))
+               round(0.6 * B.REF_STRENGTH, 3), True))
+    check('v10: the haze stronger and wider than v9 (the user: "less aggressive and closer"): strength %g (v9 1.0), sprites '
+          'and volume x %g' % (B.REF_STRENGTH, B.REF_WIDE), (B.REF_STRENGTH >= 1.5, B.REF_WIDE > 1.0), (True, True))
     qs = q.find_set(B.HAZE_SRC[0])
     check('v5: the fireball\'s own set untouched', [bytes(e['data']) for e in p.sets[fsrc]['emitters'] if e['data']],
           [bytes(e['data']) for e in q.sets[qs]['emitters'] if e['data']])
@@ -1239,8 +1313,20 @@ def aura_v6_tests(out):
         name = 'PtcSupamarioUi' + [x for x in B.FX if x[0] == key][0][2][:-4]
         n += sum(1 for e in p.sets[p.find_set(name)]['emitters'] if e['data'] is not None) * (2 if key in (
             'aura_foot', 'aura_hand') else 1)
-    check('v6: emitters the MSC aura keeps (7 parts) x %d generations: %d (eft\'s pool; the diag logs "Emitter is '
-          'Empty." if it runs out)' % (B.AURA_GENERATIONS, n * B.AURA_GENERATIONS), n * B.AURA_GENERATIONS <= 80, True)
+    pi = p.find_set('PtcSupamarioUiAura_FOKpiace')
+    n += sum(1 for e in p.sets[pi]['emitters'] if e['data'] is not None)
+    check('v6 / v10: emitters the MSC aura keeps (8 parts: v10 the sparkles) x %d generations: %d (eft\'s pool; the diag '
+          'logs "Emitter is Empty." if it runs out)' % (B.AURA_GENERATIONS, n * B.AURA_GENERATIONS),
+          n * B.AURA_GENERATIONS <= 80, True)
+    em = [e['data'] for e in p.sets[pi]['emitters'] if e['data'] is not None]
+    check('v10: the sparkles (aura 51\'s Aura_FOKpiace): converted (%d emitters), additive, white, rising (0.3 m/s up), '
+          'from XV2\'s circle (0.3 m, 0.5 m under the pelvis), 30 frames' % len(em),
+          (len(em), {p.field(x, 'blend_type') for x in em}, {tuple(p.color_keys(x, 0)[0][:3]) for x in em},
+           {(tuple(p.field(x, 'emit_direction')), round(p.field(x, 'emitter_velocity'), 4)) for x in em},
+           {(p.field(x, 'volume_type'), tuple(round(v, 3) for v in p.field(x, 'volume_radius')),
+             round(p.field(x, 'emitter_translation')[1], 3)) for x in em}, {p.field(x, 'ptcl_life') for x in em}),
+          (2, {1}, {(1.0, 1.0, 1.0)}, {((0.0, 1.0, 0.0), round(0.3 / 60 * 8.5, 4))},
+           {(3, (B.PIACE_RADIUS, 0.0, B.PIACE_RADIUS), -4.25)}, {30}))
 
 
 def model_tests(out, base):
@@ -1459,12 +1545,20 @@ def native_tests(exe):
     count = e.w(e.w(desc + 4) + 4)
     check('native: kind 0x%X\'s descriptor and motion table found (%d motions)' % (M_KIND, count),
           (e.w(desc), count > 0x249), (M_KIND, True))
+    anim = {m: e.w(table + 8 * m) for m in (B.MOT_STRIKE, B.MOT_STRIKE_S, B.MOT_DODGE, B.MOT_SWAY_F, B.MOT_SWAY_BR,
+                                            B.MOT_SWAY_FR)}
+    check('native (v10): the motion table gives 0x236 SpecialLwHeavy\'s animation (the short rush after the long one) '
+          'and 0x242 / 0x243 / 0x244 SpecialAirLwLight\'s (the sways)',
+          (anim[B.MOT_STRIKE_S] == anim[B.MOT_STRIKE], {anim[m] for m in (B.MOT_SWAY_F, B.MOT_SWAY_BR, B.MOT_SWAY_FR)}),
+          (True, {anim[B.MOT_DODGE]}))
     mm = e.alloc(0x40, b'\0')
     e.setw(mm + 0x1C, table)
     e.setw(0x10492CB4, 1)                               # its static default's guard (its init calls an import)
     got = {}
     for mot in (B.MOT_FORM, B.MOT_STRIKE, B.MOT_DODGE, B.MOT_SS, B.MOT_ESCAPE_N, 0x229, 0x239, 0x1BE):
         got[mot] = e.call(MOTION_LINK, mm, mot)
+    check('native (v10): the custom-move slots 0x236 / 0x242 / 0x243 / 0x244 bind his own scripts too (link-kind 0)',
+          [e.call(MOTION_LINK, mm, m) for m in (B.MOT_STRIKE_S, B.MOT_SWAY_BR, B.MOT_SWAY_F, B.MOT_SWAY_FR)], [0] * 4)
     check('native: the game\'s link-kind decision (0x02C639E0) for SpecialLwLight / Heavy, SpecialAirLwLight / Heavy, '
           'EscapeN, Fake Death\'s / Sledgehammer\'s: 0 (the body\'s own scripts bound); a thrown motion (0x1BE): 1',
           got, {B.MOT_FORM: 0, B.MOT_STRIKE: 0, B.MOT_DODGE: 0, B.MOT_SS: 0, B.MOT_ESCAPE_N: 0, 0x229: 0, 0x239: 0,
@@ -1581,7 +1675,7 @@ def package_tests(zpath, out, ts_out):
                                                if n not in names], [])
 
 
-def package_since_tests(zpath, out, prev_out):
+def package_since_tests(zpath, out, prev_out, exe=None):
     """v6: a package over the previous one (prev_out: its build output): INSTALL_TO_data/ holds exactly the files the
     build changes since then, byte for byte; nothing wrapped in a fighter / game folder; both executables (the exe
     changed: exe_v46z_ui5) and the README"""
@@ -1611,6 +1705,11 @@ def package_since_tests(zpath, out, prev_out):
     exes = [n for n in ('INSTALL_TO_code/cross_f.rpx', 'TEST_ONLY_INSTALL_TO_code/cross_f.rpx') if n in names]
     check('  the README; both executables or none (v8: the exe unchanged since the previous package, exe_v46z_ui6)',
           ('README.txt' in names, len(exes) in (0, 2)), (True, True))
+    if exe:
+        check('v10: the executable changed (exe_v46z_ui7: the world stop, no shield-hit mark): both in the package, '
+              'INSTALL_TO_code/cross_f.rpx the one tested (--exe), the TEST ONLY one another build',
+              (len(exes), z.read('INSTALL_TO_code/cross_f.rpx') == open(exe, 'rb').read() if exes else None,
+               z.read(exes[-1]) != z.read(exes[0]) if len(exes) == 2 else None), (2, True, True))
 
 
 def main():
@@ -1656,7 +1755,7 @@ def main():
     if exe:
         native_tests(exe)
     if pkg and since:
-        package_since_tests(pkg, out, since)
+        package_since_tests(pkg, out, since, exe)
     elif pkg:
         package_tests(pkg, out, ts_out)
     print('%d problem(s)' % len(PROBLEMS))

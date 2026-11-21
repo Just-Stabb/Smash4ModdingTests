@@ -77,6 +77,16 @@ SpecialAirLwHeavy
 // sway (from frame 37). (v7's specialairlwlight_c2, the 706 strike, is gone in v8: the counter is the rush)
 SpecialAirLwLight_c3
 SpecialAirLwLight_c3 -> body/FitMarioBodyMainD03SpecialAirLwLight.omo
+// Ultra Instinct v10: the alternating sways (XV2's four: CMN.ean #190 B_R and #192 F_R after the first two) through
+// SpecialAirLwLight's other custom-move slots, specialairlwlight_c2 (0x242, from frame 74) and specialairlwlight_c4 (0x244,
+// from 111); the dodge's SHORT rush (11 hits) after the long one in SpecialLwHeavy's animation: speciallwheavy_c2 (0x236,
+// from frame 349)
+SpecialAirLwLight_c2
+SpecialAirLwLight_c4
+SpecialLwHeavy_c2
+SpecialAirLwLight_c2 -> body/FitMarioBodyMainD03SpecialAirLwLight.omo
+SpecialAirLwLight_c4 -> body/FitMarioBodyMainD03SpecialAirLwLight.omo
+SpecialLwHeavy_c2 -> body/FitMarioBodyMainD03SpecialLwHeavy.omo
 
 // ---- Sephiroth (edge)
 // his 3-hit jab: motion slots 0x51 / 0x52 (Zelda, his base, has one jab; extra_kinds.json "motions",

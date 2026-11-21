@@ -42562,6 +42562,7 @@ void ui_aura_off()
     EffectModule(0x2723, UI_FX_AURA3, 0x1, 0x1);
     EffectModule(0x2723, UI_FX_AURA4, 0x1, 0x1);
     EffectModule(0x2723, UI_FX_AURA5, 0x1, 0x1);
+    EffectModule(0x2723, UI_FX_AURA6, 0x1, 0x1);
 }
 
 void ui_aura_fade()
@@ -42571,6 +42572,7 @@ void ui_aura_fade()
     EffectModule(0x2723, UI_FX_AURA3, 0, 0);
     EffectModule(0x2723, UI_FX_AURA4, 0, 0);
     EffectModule(0x2723, UI_FX_AURA5, 0, 0);
+    EffectModule(0x2723, UI_FX_AURA6, 0, 0);
 }
 
 // v3: the following request is 0x2717 (id, bone, x, y, z, rx, ry, rz, size, flag), the vanilla op Supamario's
@@ -42588,6 +42590,8 @@ void ui_aura()
     EffectModule(0x2717, UI_FX_AURA3, UI_BONE_RFOOT, 0, 0, 0, 0, 0, 0, UI_FOOT_SIZE, 0);
     EffectModule(0x2717, UI_FX_AURA5, UI_BONE_RHAND, 0, 0, 0, 0, 0, 0, UI_HAND_SIZE, 0);
     EffectModule(0x2717, UI_FX_AURA5, UI_BONE_LHAND, 0, 0, 0, 0, 0, 0, UI_HAND_SIZE, 0);
+    // v10 (the user's XV2 idle clip: "our version lacks the rising sparkles"): Aura_FOKpiace on the pelvis (aura 51's)
+    EffectModule(0x2717, UI_FX_AURA6, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_AURA_SIZE, 0);
 }
 
 // ui4 (exe_v46z_ui4): the autododge's detection. v1-v4 waited for the cave's slot 43, taken for the body's damage event:

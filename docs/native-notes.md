@@ -3592,3 +3592,39 @@ exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATC
   which caller re-initialises the module after the sway (no direct caller of vt `+0x24` found; module-list calls).
   Also read here: the fighter's event 7 (`0x02E3B988`) and `0x02E20534` switch group 1 of `[fighter + 0x7528]` with the
   guard (the shield-size params `0x374` / `0x378`), a different module from the counter's (`[acc + 0x72F4]`).
+- **v10 (exe_v46z_ui7; README "Ultra Instinct v10"): the shield-hit mark, the world stop, eft's following.**
+  - **The shield-hit mark.** Event 0x10's fighter handler `0x02E35794` calls slot 42 (`[F + 0x7538]` vt `+0x15C`), then
+    writes `0x0100001F` (common effect 0x1F = PtcCommonGuardMark) into its EffectModule (`[F + 0x74D8]`) `+0x90`
+    (`0x02E35828`-`0x02E3583C`; event 0x11's `0x02E35ED0` the same). The EffectModule's init `0x02C28DD0` registers
+    listeners of its own on its owner's events: `0x02C2CD28` for 0x10, `0x02C2CDC0` for 0x11. `0x02C2CD28` (r3 the
+    module, r4 the message: +8 the attacker's AttackModule, +0x10 the record, +0x14 the shape group): the hit data (vt
+    `+0x194`), and when its `+0x54` is 0, vt `+0x44` request of `[EM + 0x90]` at the record's `+8`. The cave's `ui_sx`
+    (its first word) returns for group 1 of a live kind-0x41 fighter's EffectModule (module block `+0x72A8`: the block
+    is `F + 0x230`, `0x02E25348`).
+  - **Global slow-motion's frames.** The frame state `[0x102F6C04]` (filled by `0x02BFB97C` once a battle step,
+    `0x02BF2568` through exe_v46u_threads' tsu_frame): `+8` 1 while slowed, `+0` the phase (2 the step frame), the fill
+    returns 1 on a cycle's first frame. Every object step wrapper steps when `+8` is 0 or `+0` is 2; the fighter wrapper
+    `0x02E40B90` (r3 F, r4 F + 0x230; from the update `0x02E40C4C`, vtable `0x10126BF4`, and `0x02E2534C`) otherwise runs
+    `0x02E40B24` (its status agent's vt `+0x44` only). Modules check it too (the EffectModule's update `0x02C29960`,
+    ~100 readers in 0x02C00000-0x02F80000).
+  - **Effect pauses.** `0x0334CA30(key, mask, paused)` -> `0x032F0F10`: each instance of the list `[0x10439088]` (next
+    `+0x18`) whose `+8 & mask == key` and `+0x1A4 == 0` gets `+0x19E = paused`; the instance update `0x0334E080` (from
+    the manager's calc `0x032EFB44` / `0x032EFC90`) then sets `+0x19F = !paused` and returns before its clock (`+0x140`);
+    `+0x19F` gates its time advance and fades (`0x0334E150`, `0x0334EA34`, ...). Users: the Final Smash code (e.g.
+    `0x02772670`: the stage stop `0x0316505C(manager, !on)` unless `[[0x102F7024] + 0xB3]`, then keys `0x01080000` /
+    mask `0xFF080000`), and an EffectModule's own pause (`0x02C27E88`: key `[EM + 0x10] | 0x8000`, mask `0x0100BFFF`).
+  - **The world stop (`ws_fill` / `ws_step` / `ws_begin` / `ws_end`, `ws_data`):** the fill's first word -> `ws_fill`
+    (the game's fill, then while the lease lasts `+8` 1, `+0` 1, answer 0: no object steps; the lease's last frame ->
+    `ws_end`); the step wrapper's first word -> `ws_step` (kind 0x41: TIMER_6 through get_float; > 0.5 starts the stop
+    (`ws_begin`) or renews the lease (2 frames); his step during his stop with `+8` cleared, then put back). `ws_begin`
+    pauses every instance not his (his: `+8 & 0x0100BFFF == [EM + 0x10] | 0x8000`), not paused, not `+0x1A4`, notes them
+    (100 at most) and stops the stage as the Final Smashes do; `ws_end` lets the noted ones go, the stage on, the state
+    cleared. Diag: **S4UW** `on owner paused stage`.
+  - **eft's following, read to the instruction.** At emission (`0x04A5C898`) a follow-0 particle points `+0x104` /
+    `+0x108` at the emitter's live RT / SRT (`+0x84` / `+0xB4`), others at copies (`p + 0xA4` / `+0xD4`); the CPU particle
+    update `0x04A624E4` (and `0x04A62AE8`) copies the emitter's translation into a follow-2 particle's copies every frame
+    (`cmpwi r0, 2` at `0x04A62554`). The GPU calc `0x04A65FC0` writes a new particle's 128-byte record once
+    (`0x04A6680C`-`0x04A6690C`: the local place `p + 0x14`, the matrix `[p + 0x108]`'s 12 floats into its EmtMat) and
+    never updates it: a GPU particle follows only when its program reads the live emitter matrix (`emm`), the program
+    variant whose shader key byte 4 has bit 0x04 (every vanilla emitter on one has follow 0; on the plain variant
+    follow 1). `ptcl-format.md` 0x310 / 0x004.
