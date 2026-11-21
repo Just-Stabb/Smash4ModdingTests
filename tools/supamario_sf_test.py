@@ -311,7 +311,6 @@ def weapon_tests(out):
 
 # ---------------------------------------------------------------- files
 def file_tests(out, base, skill_dir):
-    import ptcl
     import nud
     import omo
     sup = os.path.join(out, 'fighter', 'supamario')
@@ -458,6 +457,17 @@ def fx_tests(out, ts_out):
             if q.field(em, 'particle_type') == 3:
                 old[(name, en)] = round(struct.unpack_from('>2f', em, FX11.ROT_BASIS)[1], 3)
     check('  Time Skip\'s build had them at -1.34 (the cause)', set(old.values()), {-1.34})
+    dim = []
+    for name in ('PtcSupamarioTsFrt_CrgAura', 'PtcSupamarioTsFrt_CrgAuraH'):
+        qe = dict(emitters(q, name))
+        for en, em in emitters(p, name):
+            if p.field(em, 'particle_type') == 3:
+                for t in (0, 1):
+                    dim.append(all(abs(a - b * FX11.TS_DIM) < 1e-4 for k1, k0 in zip(p.color_keys(em, t),
+                                                                                    q.color_keys(qe[en], t))
+                                   for a, b in zip(k1[:3], k0[:3])))
+    check('  Time Skip\'s streaks, on him now, at %g of their colours (the white-area rule: supamario_timeskip_test\'s '
+          'ts_e0 at most 1.0 square unit on grass)' % FX11.TS_DIM, (len(dim) >= 16, all(dim)), (True, True))
     # run the game's programs: where the quad's centre sits against its particle, before / after
     import latte_exec
     import eft_static
@@ -534,8 +544,6 @@ def fx_tests(out, ts_out):
           'rising %g a frame along his up, no offset (v10: 7 units under his hip)' % (FX11.PIACE_R, FX11.PIACE_RISE),
           set(vals.values()), {((round(-math.pi / 2, 3), 0.0, 0.0), 3, (FX11.PIACE_R, 0.0, FX11.PIACE_R), (0.0, 0.0, 1.0),
                                 FX11.PIACE_RISE, (0.0, 0.0, 0.0))})
-    qc = dict(emitters(q, 'PtcSupamarioUiAura_FOKpiace')) if 'PtcSupamarioUiAura_FOKpiace' in \
-        [q.set_name(i) for i in range(len(q.sets))] else {}
     check('  %g times bigger' % FX11.PIACE_SIZE, {en: [round(v, 3) for v in p.field(em, 'scale')] for en, em in pc.items()},
           {en: [round(v * FX11.PIACE_SIZE, 3) for v in (0.098 if en == 'sprite' else 0.059,) * 2] for en in pc})
     # the rotation's way: the disc's normal and the rise

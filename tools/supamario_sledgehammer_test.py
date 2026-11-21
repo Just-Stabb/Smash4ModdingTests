@@ -1158,8 +1158,9 @@ def script_tests(out, base):
                                                      'speciallwlight', 'speciallwheavy', 'specialairlwlight',
                                                      'specialairlwheavy',
                                                      'specialairlwlight_c3', 'specialairlwlight_c2',
-                                                     'specialairlwlight_c4', 'speciallwheavy_c2')}:
-                # (UI v7: the sway's custom slot; v10: the other sways, the dodge's short rush)
+                                                     'specialairlwlight_c4', 'speciallwheavy_c2',
+                                                     'specialairlwheavy_c2', 'specialairlwheavy_c3')}:
+                # (UI v7: the sway's custom slot; v10: the other sways, the dodge's short rush; v11: Soaring Fist's)
                 same.append((p, hex(h)))
     check('every other script as the user\'s (but the God Fist\'s / Core Breaker\'s / Fake Death\'s / Time Skip\'s / '
           'Ultra Instinct\'s)',

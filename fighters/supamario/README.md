@@ -4664,7 +4664,8 @@ HitstunMul (in a weapon's script, as `acmd_ext_help`'s rules allow; no new comma
   draws the quad 0.84-1.84 of its length BEHIND its particle: KTN's wind_1 (length 10.6) 10.7-21.4 under it, Time
   Skip's stripe 5.2-11.9; with their upward motion and the emitters' own offsets, the auras hung under him. Now
   VisibleOnSpeed sprites are centred (0) and ConeExtrude ribbons run from the particle back (-0.5): KTN_GKS_Loop(_2),
-  BoostGKS_End, Time Skip's CrgAura / CrgAuraH and Soaring Fist's sets. (The same offset sits in other XV2 sets' hit
+  BoostGKS_End, Time Skip's CrgAura / CrgAuraH and Soaring Fist's sets. On him now, Time Skip's streaks overlap more
+  (supamario_timeskip_test's white-area rule on grass: 1.1 square units over 1.0): their colours x 0.85. (The same offset sits in other XV2 sets' hit
   sparks, Btl_HitL's lines and Frt_Hit's waves; left as the user approved them.) The transformation's aura has no
   streaks: unchanged.
 - **The aura stiff** (v10 clip `v10.mp4` against XV2's `idle.mp4`): XV2's aura sprites are SpriteSheet textures played in

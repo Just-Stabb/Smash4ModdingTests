@@ -20,7 +20,6 @@ What XV2's files say (tools/xv2bac.py; the BSA read in sf_bsa below; fighters/su
   Damage 80 | 40 + 60 | 30 + 30 + 60 (XV2's scale).
 """
 import os
-import shutil
 import struct
 import sys
 import tempfile
@@ -176,9 +175,10 @@ def write_weapon(sup, base_sup, tmp):
     import supamario_kame_build as kb
     src = os.path.join(base_sup, 'model/fireball/c00')
     dst = os.path.join(sup, 'model/fireball/c00')
-    os.makedirs(dst, exist_ok=True)
+    os.makedirs(dst, exist_ok=True)            # (only the .nud changes; the package leaves out the files the install has)
     for fn in os.listdir(src):
-        shutil.copy(os.path.join(src, fn), os.path.join(dst, fn))
+        with open(os.path.join(src, fn), 'rb') as fi, open(os.path.join(dst, fn), 'wb') as fo:
+            fo.write(fi.read())
     open(os.path.join(dst, 'model.nud'), 'wb').write(nud.hidden(os.path.join(src, 'model.nud')))
     still = []
     for name, data in omo.pac_read(os.path.join(base_sup, 'motion/fireball/main.pac')):

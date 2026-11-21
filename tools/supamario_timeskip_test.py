@@ -1435,7 +1435,8 @@ def script_tests(out, sh_out):
     # Ultra Instinct's (later: tools/supamario_ui_test.py checks them): F.L.U.D.D.'s shoot slots
     skip |= {acmd.crc(n) for n in ('speciallwlight', 'speciallwheavy', 'specialairlwlight', 'specialairlwheavy',
                                    'specialairlwlight_c3', 'specialairlwlight_c2', 'specialairlwlight_c4',
-                                   'speciallwheavy_c2')}    # (v7: the sway's custom slot; v10: the other sways, the short rush)
+                                   'speciallwheavy_c2', 'specialairlwheavy_c2', 'specialairlwheavy_c3')}
+    # (v7: the sway's custom slot; v10: the other sways, the short rush; v11: Soaring Fist's)
     for p in f:
         for h, s in b[p].scripts.items():
             if h in skip:

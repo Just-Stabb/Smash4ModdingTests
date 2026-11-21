@@ -578,8 +578,10 @@ def script_tests(out, base):
                               acmd.crc('specials'), acmd.crc('specialairs'), acmd.crc('speciallwlight'),
                               acmd.crc('speciallwheavy'), acmd.crc('specialairlwlight'), acmd.crc('specialairlwheavy'),
                               acmd.crc('specialairlwlight_c3'), acmd.crc('specialairlwlight_c2'),
-                              acmd.crc('specialairlwlight_c4'), acmd.crc('speciallwheavy_c2')):
-                # UI v7's sway; v10: the other sways (0x242 / 0x244) and the dodge's short rush (0x236)
+                              acmd.crc('specialairlwlight_c4'), acmd.crc('speciallwheavy_c2'),
+                              acmd.crc('specialairlwheavy_c2'), acmd.crc('specialairlwheavy_c3')):
+                # UI v7's sway; v10: the other sways (0x242 / 0x244) and the dodge's short rush (0x236); v11: Soaring
+                # Fist's (0x246 / 0x247)
                 same.append((p, hex(h)))
     check('every other script as the user\'s (but the God Fist\'s / Core Breaker\'s / Time Skip\'s / Ultra Instinct\'s: '
           'tools/supamario_timeskip_test.py checks those)', same, [])

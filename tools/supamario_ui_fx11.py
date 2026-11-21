@@ -41,6 +41,7 @@ if HERE not in sys.path:
 
 ROT_BASIS = 0x4C4
 BASIS_CENTRED, BASIS_CONE = 0.0, -0.5
+TS_DIM = 0.85
 STREAK_PREFIXES = ('PtcSupamarioTs', 'PtcSupamarioUi', 'PtcSupamarioSf')
 # the sets fixed: the auras the user reported (Time Skip's CrgAura / CrgAuraH, Secret Sensation's KTN_GKS_Loop / its
 # BoostGKS_End) and Ultra Instinct's / Soaring Fist's own; the earlier moves' hit sparks (Btl_HitL's lines, Frt_Hit's
@@ -107,6 +108,12 @@ def streak_basis(p, pkgs, rep):
             b = BASIS_CONE if t == 'ConeExtrude' else BASIS_CENTRED
             old = struct.unpack_from('>2f', em, ROT_BASIS)
             struct.pack_into('>2f', em, ROT_BASIS, 0.0, b)
+            if name.startswith('PtcSupamarioTsFrt_CrgAura'):
+                # on him now, Time Skip's streaks overlap more: their colours x TS_DIM keep the user's white-area
+                # rule (supamario_fx_glow ts_e0 on grass: at most 1.0 square unit; v10 0.7, undimmed v11 1.1)
+                for track in (0, 1):
+                    keys = p.color_keys(em, track)
+                    p.set_color_keys(em, track, [tuple(c * TS_DIM for c in k[:3]) + tuple(k[3:]) for k in keys])
             done.append((name, en, t, round(old[1], 3), b))
     rep['v11_streak_basis'] = done
     return done
@@ -208,7 +215,6 @@ def aura_flipbook(p, aura_pkg, set_names, others, rep, tex_max=256):
 
 def aura_spread(p, aura_pkg, set_names, rep):
     """3: XV2's Position_Variance of a VerticalDistribution parent as a circle volume"""
-    import xv2vfx
     parent = {}
     for emp_name, emp in aura_pkg['emp'].items():
         def walk(ns, up):
