@@ -1581,7 +1581,8 @@ viewer's outline and mesh overrides). In game: `tools/model_commands_ingame_test
 
 `Outline_Shell(Target, Red, Green, Blue, Alpha, Width, Frames, FadeIn, FadeOut, Flash, Blend)` draws a band of colour
 **round an object's silhouette, outside it**: a real outline (Xenoverse 2's "Flashing White Body Outline", a power-up's
-aura edge, a cel-shaded ink line). Index 2600, 12 words, needs exe_v46z_outline2 (`tools/outline_shell_cave.py`).
+aura edge, a cel-shaded ink line). Index 2600, 12 words, needs exe_v46z_outline4 or later (`tools/outline_shell_cave.py`;
+exe_v46z_outline5 for the colour as given).
 
 | Parameter | |
 |---|---|
@@ -1606,7 +1607,12 @@ aura edge, a cel-shaded ink line). Index 2600, 12 words, needs exe_v46z_outline2
   two-sided thin parts get it on the side facing away; Screen_Invert inverts it with the picture.
 - Counted in the effects' frame (as Outline_Set): through hitlag and Stage_Freeze, not while paused.
 - The Hitbox Viewer draws the band round the model's silhouette (outer edge only) and lists it. `port_check` X13
-  (ERROR): a script using it with no executable carrying the cave.
+  (ERROR): a script using it with no executable carrying the cave; WARN: an executable before exe_v46z_outline5.
+- **Colour (exe_v46z_outline5, Sm4shCommand v1.7.20):** the game stores its picture with every colour x the frame's
+  hdrRange (FB3, CB9: the lit fighter programs, the trails and the effects all do) and divides the finished frame by it;
+  up to exe_v46z_outline4 the band's colour was written unscaled, so it came out 1 / hdrRange too bright and light
+  colours clipped to white (Time Skip's (150, 195, 255): "the outline is white"). exe_v46z_outline5 scales it like the
+  game's own programs: the colour shows as given. Scripts unchanged; only the executable.
 
 ```
 // XV2's white outline for a time-stop move: 1.5 pixels, added, grown in over 4 frames, held 2 seconds, out over 10

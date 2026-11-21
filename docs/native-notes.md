@@ -2127,6 +2127,19 @@ From the MSC handler `0x02C2CEC8` (int ops 3 - 0x35 switch at `0x02C2CF94`, the 
   plus r, g, b in 0 - 255 (divided by 255, vt `+0x27C` on the new handle: `LAST_EFFECT_SET_COLOR`'s);
   `0x2730` / `0x273D` the same after the following request (vt `+0x64`). They return 1, not the handle: read
   it with `0x30`.
+- **`0x2723` (id, a, b): end every effect of this id on the object** (case `0x02C30D08` -> vt `+0xC4` `0x02005AF0`: the
+  module's owner key `+0x10` masked -> `0x0334C708` -> the manager's `0x032F0454`: each of its 100 records whose owner and
+  id match -> `0x0334F308(record, a != 0, b != 0)`): **(1, 1) at once** (`0x0334D568`: the set removed, eft's
+  `0x04A55714` KillEmitterSet: its particles gone too); **(0, x) a fade** (eft `0x04A4B25C`: the set's fade byte, emission
+  stops, the live particles play out; vanilla `EffectModule(0x2723, 0x100000b, 0, 0)`); (1, 0) the set killed by eft
+  without the record's own teardown first. A looping aura renewed with (1, 1) never gets older than its renewal period
+  (Supamario's Ultra Instinct v1-v5: renewed every 30 frames, its 48-96-frame sprites, which fade in over their life,
+  never showed; v6 fades instead). Other kills: vt `+0xAC` by handle, vt `+0xD4` / `+0xDC` every following effect of the
+  object (flag 0x10000, set on every following request; MSC int op `0x2D` reaches `+0xD4`; ACMD EFFECT_DETACH_KIND
+  `+0xDC`), vt `+0xB4` by owner group (EFFECT_REMOVE_ATTR). No generic fighter code calls them on a status change.
+- MSC `0x2712` (ACMD External_Graphic / EFFECT_FOLLOW's op) and `0x2717` share their case: the following request
+  (vt `+0x64`) with flags 0x8000 (| 0x4000 when the last word is not 0), `0x2717` / `0x2719` position only (r8 1),
+  `0x2712` the bone's matrix.
 - In game (Sephiroth test 65): `0x17` / `0x18` on a `0x272C` request's handle put the effect off and drifting
   (the bone request's own frame, inferred); on a `0x3` request they place it in the world (Smash 4's `func_1764`).
 
@@ -3513,3 +3526,7 @@ exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATC
     emitters (`[eft + 0x23C]`, from the config's `+8`), "Emitter Set is Empty." when no set instance is free
     (`0x04A54D48`); an effect id's index must be below the .efc's entry count (`0x0334D8D8`); the instance pool holds
     100 (`0x032F0110`).
+- **v6 (exe_v46z_ui5 = exe_v46z_outline5 + the same UI cave words; README "Ultra Instinct v6"):** the aura after the burst
+  never showed because the MSC renewed it with `EffectModule(0x2723, id, 1, 1)` (at once, "EffectModule MSC ops by
+  handle") every 30 frames; now a fade (0, 0) and a new request the same frame every 120 frames. The transformed glow
+  is Outline_Set + Outline_Shell (exe_v46z_outline5: the shell's colour scaled by hdrRange, "Outline shell" v7).

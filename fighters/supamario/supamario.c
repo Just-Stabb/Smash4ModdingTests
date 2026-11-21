@@ -42534,14 +42534,30 @@ int ui_can_dodge(float st)
     return 0;
 }
 
-// the aura while transformed: XV2's (BTL_AURA effect 848, the Ultra Instinct loops: the pelvis's, the head's, the
-// feet's) following his bones (EffectModule 0x2730: the following request, white = untinted), ended and made again
-// every UI_AURA_EVERY frames (Smash 4 ends an MSC effect it can't see: the renewal keeps one of each); off on his KO
+// the aura while transformed: XV2's (BTL_AURA effect 848, the Ultra Instinct loops) following his bones. ui_aura_off ends
+// it AT ONCE (EffectModule 0x2723 (id, 1, 1): its particles too): his KO / respawn / Entry only.
+// v6 (the user's v5 clip: no aura after the burst): v1-v5 renewed it every 30 frames through ui_aura_off, so the
+// sprites (48-96 frames long, fading in over their life) never got past 29 frames: faint puffs growing and vanishing.
+// The renewal now FADES the old ones (0x2723 (id, 0, 0): emission stopped, the particles live out: the game's own fade,
+// func_1006's) and makes the new ones the same frame: the emission never stops, the glow stays at its full, every
+// UI_AURA_EVERY frames (at least the sprites' longest life: two generations at most). Seven parts, as the effect
+// script's: the pelvis, the chest, the head, the feet, the hands
 void ui_aura_off()
 {
     EffectModule(0x2723, UI_FX_AURA1, 0x1, 0x1);
     EffectModule(0x2723, UI_FX_AURA2, 0x1, 0x1);
     EffectModule(0x2723, UI_FX_AURA3, 0x1, 0x1);
+    EffectModule(0x2723, UI_FX_AURA4, 0x1, 0x1);
+    EffectModule(0x2723, UI_FX_AURA5, 0x1, 0x1);
+}
+
+void ui_aura_fade()
+{
+    EffectModule(0x2723, UI_FX_AURA1, 0, 0);
+    EffectModule(0x2723, UI_FX_AURA2, 0, 0);
+    EffectModule(0x2723, UI_FX_AURA3, 0, 0);
+    EffectModule(0x2723, UI_FX_AURA4, 0, 0);
+    EffectModule(0x2723, UI_FX_AURA5, 0, 0);
 }
 
 // v3: the following request is 0x2717 (id, bone, x, y, z, rx, ry, rz, size, flag), the vanilla op Supamario's
@@ -42551,11 +42567,14 @@ void ui_aura_off()
 // a tint belongs in the effect's own colours.
 void ui_aura()
 {
-    ui_aura_off();
+    ui_aura_fade();
     EffectModule(0x2717, UI_FX_AURA1, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_AURA_SIZE, 0);
+    EffectModule(0x2717, UI_FX_AURA4, UI_BONE_CHEST, 0, 0, 0, 0, 0, 0, UI_AURA_SIZE, 0);
     EffectModule(0x2717, UI_FX_AURA2, UI_BONE_HEAD, 0, UI_HEAD_UP, 0, 0, 0, 0, UI_AURA_SIZE, 0);
     EffectModule(0x2717, UI_FX_AURA3, UI_BONE_LFOOT, 0, 0, 0, 0, 0, 0, UI_FOOT_SIZE, 0);
     EffectModule(0x2717, UI_FX_AURA3, UI_BONE_RFOOT, 0, 0, 0, 0, 0, 0, UI_FOOT_SIZE, 0);
+    EffectModule(0x2717, UI_FX_AURA5, UI_BONE_RHAND, 0, 0, 0, 0, 0, 0, UI_HAND_SIZE, 0);
+    EffectModule(0x2717, UI_FX_AURA5, UI_BONE_LHAND, 0, 0, 0, 0, 0, 0, UI_HAND_SIZE, 0);
 }
 
 // ui4 (exe_v46z_ui4): the autododge's detection. v1-v4 waited for the cave's slot 43, taken for the body's damage event:

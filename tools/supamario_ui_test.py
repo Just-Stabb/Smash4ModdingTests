@@ -3,7 +3,8 @@
 0x157 / 0x158's functions, in rolloff_hold_test's MSC interpreter) driving a small model of the game, and the built
 scripts, motions, effects and sounds.
 
-  python3 -I tools/supamario_ui_test.py BUILD_OUT_DIR TIMESKIP_OUT_DIR SUPAMARIO_DIR [--exe EXE] [--package ZIP]
+  python3 -I tools/supamario_ui_test.py BUILD_OUT_DIR TIMESKIP_OUT_DIR SUPAMARIO_DIR [--exe EXE] [--package ZIP
+      [--since PREVIOUS_BUILD_OUT_DIR]]   (v6: --since: the package over the previous one, only the changed files)
 
 BUILD_OUT_DIR: tools/supamario_ui_build.py's OUT_DIR; TIMESKIP_OUT_DIR: the same inputs built by
 tools/supamario_timeskip_build.py (the install before this): every other script, motion and effect set is checked
@@ -283,28 +284,40 @@ def form_tests(r):
     check('no hitbox (the transformation\'s game script is empty)', True, True)
     r.frame(vm, g)
     aura = [e for e in g.ev('effect', end + 1)]
-    check('the aura made right after (4 following requests 0x2717, the three old ones ended first; v3: 0x2717, the '
-          'vanilla following request the Kamehameha uses, not v1 / v2\'s 0x2730: the crash fix)',
+    ids = [B.fx_id(k) for k in ('aura_hip', 'aura_head', 'aura_foot', 'aura_chest', 'aura_hand')]
+    check('the aura made right after (7 following requests 0x2717: v6 the chest and hands too; the five ids faded first; '
+          'v3: 0x2717, the vanilla following request the Kamehameha uses, not v1 / v2\'s 0x2730: the crash fix)',
           sorted((e[2], e[3]) for e in aura),
-          sorted([(0x2723, B.fx_id('aura_hip')), (0x2723, B.fx_id('aura_head')), (0x2723, B.fx_id('aura_foot')),
-                  (0x2717, B.fx_id('aura_hip')), (0x2717, B.fx_id('aura_head')), (0x2717, B.fx_id('aura_foot')),
-                  (0x2717, B.fx_id('aura_foot'))]))
-    check('  on HipN / HeadN / LFootJ / RFootJ', sorted(e[4] for e in aura if e[2] == 0x2717),
-          sorted([B.BONES['HipN'], B.BONES['HeadN'], B.BONES['LFootJ'], B.BONES['RFootJ']]))
+          sorted([(0x2723, i) for i in ids] +
+                 [(0x2717, B.fx_id(k)) for k in ('aura_hip', 'aura_chest', 'aura_head', 'aura_foot', 'aura_foot',
+                                                  'aura_hand', 'aura_hand')]))
+    check('v6: the renewal FADES the old ones (0x2723 (id, 0, 0): emission stopped, particles live out), never kills '
+          'them at once (id, 1, 1: v1-v5, their sprites never got past 29 frames: the user\'s v5 clip)',
+          sorted(tuple(e[5][2:4]) for e in aura if e[2] == 0x2723), [(0, 0)] * 5)
+    check('  on HipN / BustN / HeadN / LFootJ / RFootJ / RHandN / LHandN', sorted(e[4] for e in aura if e[2] == 0x2717),
+          sorted([B.BONES[b] for b in ('HipN', 'BustN', 'HeadN', 'LFootJ', 'RFootJ', 'RHandN', 'LHandN')]))
     head_up = round(0.2 * B.METRE, 3)
     check('  their arguments (id, bone, x, y, z, rx, ry, rz, size, flag 0): the head 0.2 m up, the sizes %g / %g' % (
         B.SCALE, round(0.8 * B.SCALE, 3)),
           sorted((e[5][1], e[5][2]) + tuple(round(fbits(x), 3) for x in e[5][3:10]) + (e[5][10],) for e in aura
                  if e[2] == 0x2717),
           sorted([(B.fx_id('aura_hip'), B.BONES['HipN'], 0, 0, 0, 0, 0, 0, B.SCALE, 0),
+                  (B.fx_id('aura_chest'), B.BONES['BustN'], 0, 0, 0, 0, 0, 0, B.SCALE, 0),
+                  (B.fx_id('aura_hand'), B.BONES['RHandN'], 0, 0, 0, 0, 0, 0, round(0.65 * B.SCALE, 3), 0),
+                  (B.fx_id('aura_hand'), B.BONES['LHandN'], 0, 0, 0, 0, 0, 0, round(0.65 * B.SCALE, 3), 0),
                   (B.fx_id('aura_head'), B.BONES['HeadN'], 0, head_up, 0, 0, 0, 0, B.SCALE, 0),
                   (B.fx_id('aura_foot'), B.BONES['LFootJ'], 0, 0, 0, 0, 0, 0, round(0.8 * B.SCALE, 3), 0),
                   (B.fx_id('aura_foot'), B.BONES['RFootJ'], 0, 0, 0, 0, 0, 0, round(0.8 * B.SCALE, 3), 0)]))
     check('  no 0x2730 call left (v1 / v2\'s untested op)', [e for e in g.ev('effect') if e[2] == 0x2730], [])
-    for k in range(int(B.AURA_EVERY)):
+    for k in range(int(B.AURA_EVERY) - 1):
         r.frame(vm, g)
-    again = [e for e in g.ev('effect', end + 2) if e[2] == 0x2717]
-    check('  made again after %d frames' % B.AURA_EVERY, len(again), 4)
+    check('v6: nothing ended or made in between (the aura runs on: no renewal before %d frames)' % B.AURA_EVERY,
+          [e for e in g.ev('effect') if e[0] > end + 1 and e[2] in (0x2717, 0x2723)], [])
+    r.frame(vm, g)
+    again = [e for e in g.ev('effect', end + 1 + int(B.AURA_EVERY)) if e[2] == 0x2717]
+    check('  made again after %d frames (7), the old ones faded the same frame' % B.AURA_EVERY,
+          (len(again), sorted(tuple(e[5][2:4]) for e in g.ev('effect', end + 1 + int(B.AURA_EVERY)) if e[2] == 0x2723)),
+          (7, [(0, 0)] * 5))
     g, vm = form_run(r, air=True)
     check('in the air: held still, Fall at the end', ([e[2] for e in g.ev('status')][-1], g.air), (0xE, True))
 
@@ -473,7 +486,10 @@ def reset_tests(r):
         check('reset: %s -> TIMER_0-2 0, the aura ended' % name,
               ((g.vars[C.V_FORM], g.vars[C.V_DODGE_R], g.vars[C.V_DODGE_L]),
                sorted(e[3] for e in g.ev('effect') if e[2] == 0x2723)),
-              ((0.0, 0.0, 0.0), sorted([B.fx_id('aura_hip'), B.fx_id('aura_head'), B.fx_id('aura_foot')])))
+              ((0.0, 0.0, 0.0), sorted([B.fx_id(k) for k in ('aura_hip', 'aura_head', 'aura_foot', 'aura_chest',
+                                                              'aura_hand')])))
+        check('  ... at once there (0x2723 (id, 1, 1): a KO / respawn takes the particles too)',
+              sorted({tuple(e[5][2:4]) for e in g.ev('effect') if e[2] == 0x2723}), [(1, 1)])
     g = Game(status=0x0, damage=150.0)
     vm = r.vm(g)
     r.frame(vm, g)
@@ -579,6 +595,21 @@ def script_tests(out, ts_out):
                                                                           'Outline_Shell')]
     check('the transformation\'s white body: Color_Overlay + Outline_Shell at 10, Terminate_Overlays + the shell off at 220',
           ov, ['Color_Overlay', 'Outline_Shell', 'Terminate_Overlays', 'Outline_Shell'])
+    glow = [(c.name, c.params) for c in B.glow_on()]
+    for sname, at in (('speciallwlight', B.FX_BURST_AT), ('speciallwheavy', B.CNT_END)):
+        got = [(fr, c.name, c.params) for fr, c in at_frames(f['effect'].script(sname))
+               if c.name in ('Outline_Set', 'Outline_Shell', 'Terminate_Overlays')]
+        check('v6: %s: the white body ends at %d into the held glow (Terminate_Overlays, Outline_Set\'s rim %s at %g, '
+              'Outline_Shell\'s band %s at %g, %g px, added; Frames 0)' % (
+                  sname, at, B.GLOW_RIM_RGB, B.GLOW_RIM_A, B.GLOW_SHELL_RGB, B.GLOW_SHELL_A, B.GLOW_SHELL_W),
+              [x for x in got if x[0] == float(at)],
+              [(float(at), 'Terminate_Overlays', [])] + [(float(at), n, p_) for n, p_ in glow])
+    check('v6: the glow held (Frames 0) and added (Blend 1); its band blue-violet (blue the largest, red over green)',
+          (B.glow_on()[0].params[6], B.glow_on()[1].params[6], B.glow_on()[1].params[10],
+           B.GLOW_SHELL_RGB[2] > B.GLOW_SHELL_RGB[0] > B.GLOW_SHELL_RGB[1]), (0, 0, 1, True))
+    check('v6: the counter\'s effect script plays no aura (the MSC\'s runs from its first frame: it doubled it)',
+          [c.params[0] for c in f['effect'].script('speciallwheavy') if 'graphic' in nm(c).lower() and
+           c.params[0] in [B.fx_id(k) for k in B.AURA_SETS]], [])
     cams = [nm(c) for p in f for sname in B.SCRIPT.values() for c in f[p].script(sname) if 'camera' in nm(c).lower()]
     check('no camera command in any Ultra Instinct script (the user)', cams, [])
     check('the transformation / the dodge / Secret Sensation\'s stance: no hitbox (v4: the transformation\'s game script '
@@ -658,15 +689,19 @@ def silver_script_tests(f, b):
     w = g.script('wait1')
     names = [c.name for c in w]
     k = len(on)
-    check('v4: Wait1: transformed (TIMER_0 > %g) the transformed look, else his own' % B.UI_TRANSFORMED_OVER, names,
-          ['Float_Var_Compare', 'True'] + ['Mesh_Visibility'] * k + ['Float_Var_Compare', 'True'] +
-          ['Mesh_Visibility'] * k + ['Script_End'])
-    if len(names) == 5 + 2 * k:
-        a = 2 + k
+    check('v4: Wait1: transformed (TIMER_0 > %g) the transformed look (v6: + the glow: Outline_Set, Outline_Shell), else '
+          'his own' % B.UI_TRANSFORMED_OVER, names,
+          ['Float_Var_Compare', 'True'] + ['Mesh_Visibility'] * k + ['Outline_Set', 'Outline_Shell'] +
+          ['Float_Var_Compare', 'True'] + ['Mesh_Visibility'] * k + ['Script_End'])
+    if len(names) == 7 + 2 * k:
+        a = 4 + k
         check('  its conditions: TIMER_0 (0x%X) > / <= %g; the True blocks\' sizes' % (C.V_FORM, B.UI_TRANSFORMED_OVER),
               [(w[0].params, w[1].params), (w[a].params, w[a + 1].params)],
-              [([C.V_FORM, 5, B.UI_TRANSFORMED_OVER], [2 + 5 * k]), ([C.V_FORM, 2, B.UI_TRANSFORMED_OVER], [2 + 5 * k])])
-        check('  the blocks: transformed / his own', ([mv(c) for c in w[2:a]], [mv(c) for c in w[a + 2:a + 2 + k]]),
+              [([C.V_FORM, 5, B.UI_TRANSFORMED_OVER], [2 + 5 * k + 11 + 12]),
+               ([C.V_FORM, 2, B.UI_TRANSFORMED_OVER], [2 + 5 * k])])
+        check('v6: Wait1\'s glow = the burst\'s (held: Frames 0)', [(c.name, c.params) for c in w[2 + k:a]],
+              [(c.name, c.params) for c in B.glow_on()])
+        check('  the blocks: transformed / his own', ([mv(c) for c in w[2:2 + k]], [mv(c) for c in w[a + 2:a + 2 + k]]),
               (on, off))
     for e in ('entryl', 'entryr'):
         check('v4: %s: at frame 0 his own look (Persist 2)' % e,
@@ -771,14 +806,19 @@ def aura_tests(out, ts_out):
                         other.add(round(h * 360))
     check('v3: the aura\'s 5 sets (848\'s loops) all lavender: hue %g deg (the clip 281-287)' % B.AURA_HUE, hues,
           {round(B.AURA_HUE)})
-    check('  their saturations at most %g (XV2\'s x %g)' % (B.AURA_SAT, B.AURA_SAT), max(sats) <= B.AURA_SAT + 1e-4, True)
+    check('  their saturations %g-%g (XV2\'s x %g, at least %g: v6)' % (B.AURA_SAT_MIN, B.AURA_SAT, B.AURA_SAT,
+                                                                      B.AURA_SAT_MIN),
+          (min(sats) >= B.AURA_SAT_MIN - 1e-4, max(sats) <= B.AURA_SAT + 1e-4), (True, True))
     check('  the other UI sets (start, burst, vanish) keep XV2\'s colours (none at %g deg)' % B.AURA_HUE,
           round(B.AURA_HUE) in other, False)
     lv = B.lavender((0.45, 0.62, 1.0))
     h, sa, v = colorsys.rgb_to_hsv(*lv)
-    check('  the tint of a blue (0.45, 0.62, 1.0: hue 220, saturation 0.55) -> hue %g, saturation 0.55 x %g, value 1' % (
-        B.AURA_HUE, B.AURA_SAT), (round(h * 360, 1), round(sa, 3), round(v, 3)),
-          (B.AURA_HUE, round(0.55 * B.AURA_SAT, 3), 1.0))
+    check('  the tint of a blue (0.45, 0.62, 1.0: hue 220, saturation 0.55) -> hue %g, saturation 0.55 x %g (v6: at least '
+          '%g), value 1' % (B.AURA_HUE, B.AURA_SAT, B.AURA_SAT_MIN), (round(h * 360, 1), round(sa, 3), round(v, 3)),
+          (B.AURA_HUE, round(max(0.55 * B.AURA_SAT, B.AURA_SAT_MIN), 3), 1.0))
+    h, sa, v = colorsys.rgb_to_hsv(*B.lavender((0.9, 0.95, 1.0)))
+    check('v6: a pale XV2 colour (0.9, 0.95, 1.0: saturation 0.1) -> saturation %g (the big smoke sprites came out white '
+          'once additive)' % B.AURA_SAT_MIN, round(sa, 3), B.AURA_SAT_MIN)
 
 
 def aura_v5_tests(out, base):
@@ -823,6 +863,25 @@ def aura_v5_tests(out, base):
     check('v5: the fireball\'s own set untouched', [bytes(e['data']) for e in p.sets[fsrc]['emitters'] if e['data']],
           [bytes(e['data']) for e in q.sets[qs]['emitters'] if e['data']])
     check('v5: the file still validates', p.validate(), [])
+
+
+def aura_v6_tests(out):
+    """v6 (the user's v5 clip: no aura after the burst): the renewal outlasts the sprites (the MSC fades, never kills at
+    once: msc_tests), so at most AURA_GENERATIONS instances a part; the aura's brightness as the game keeps it"""
+    import ptcl
+    d = os.path.join(out, 'fighter', 'supamario', 'effect', 'supamario')
+    p = ptcl.Ptcl(open(os.path.join(d, 'supamario.010d0000.ptcl'), 'rb').read())
+    life = B.aura_life(p)
+    check('v6: the renewal (%g frames) at least the aura sprites\' longest life (%d): a faded generation is gone before '
+          'the next fade (%d alive a part at most)' % (B.AURA_EVERY, life, B.AURA_GENERATIONS), B.AURA_EVERY >= life, True)
+    check('v6: the aura sprites live longer than v1-v5\'s 30-frame kill (the bug: none got past 29 frames)', life > 30, True)
+    n = 0
+    for key in B.AURA_SETS:
+        name = 'PtcSupamarioUi' + [x for x in B.FX if x[0] == key][0][2][:-4]
+        n += sum(1 for e in p.sets[p.find_set(name)]['emitters'] if e['data'] is not None) * (2 if key in (
+            'aura_foot', 'aura_hand') else 1)
+    check('v6: emitters the MSC aura keeps (7 parts) x %d generations: %d (eft\'s pool; the diag logs "Emitter is '
+          'Empty." if it runs out)' % (B.AURA_GENERATIONS, n * B.AURA_GENERATIONS), n * B.AURA_GENERATIONS <= 80, True)
 
 
 def model_tests(out, base):
@@ -1029,6 +1088,11 @@ def native_tests(exe):
     statuses since v5, and does on v1-v4's 0x157 / 0x158 (controls)"""
     from kind_expand_test import Emu, REGS  # noqa: F401
     from unicorn.ppc_const import UC_PPC_REG_MSR
+    import kind_expand as K
+    import outline_shell_cave as OSC
+    img = K.Image(exe)
+    check('v6: the exe\'s Outline_Shell shows its colour (exe_v46z_outline5\'s hdrRange scaling: the glow\'s blue-violet band '
+          'would come out white on exe_v46z_outline4)', OSC.coloured(img.w), True)
     e = Emu(exe)
     e.mu.reg_write(UC_PPC_REG_MSR, e.mu.reg_read(UC_PPC_REG_MSR) | 0x2000)     # floating point on
     desc = e.call(DESC_GETTER, 0, M_KIND)
@@ -1158,6 +1222,38 @@ def package_tests(zpath, out, ts_out):
                                                if n not in names], [])
 
 
+def package_since_tests(zpath, out, prev_out):
+    """v6: a package over the previous one (prev_out: its build output): INSTALL_TO_data/ holds exactly the files the
+    build changes since then, byte for byte; nothing wrapped in a fighter / game folder; both executables (the exe
+    changed: exe_v46z_ui5) and the README"""
+    import zipfile
+    z = zipfile.ZipFile(zpath)
+    names = set(z.namelist())
+    want = {}
+    for d in INSTALL_DIRS:
+        for root, _ds, fs in os.walk(os.path.join(out, d)):
+            for fn in fs:
+                rel = os.path.relpath(os.path.join(root, fn), out)
+                old = os.path.join(prev_out, rel)
+                b = open(os.path.join(out, rel), 'rb').read()
+                if not os.path.exists(old) or open(old, 'rb').read() != b:
+                    want['INSTALL_TO_data/' + rel] = b
+    data = {n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')}
+    check('package (v6): INSTALL_TO_data/ = the %d files changed since the previous build (%s), byte for byte' % (
+        len(want), ', '.join(sorted(os.path.basename(n) for n in want))),
+          (sorted(data ^ set(want)), [n for n in want if n in data and z.read(n) != want[n]]), ([], []))
+    tops = sorted({n.split('/')[0] for n in names if '/' in n})
+    check('package: top folders INSTALL_TO_data, INSTALL_TO_code, TEST_ONLY_INSTALL_TO_code (and the Sm4shCommand '
+          'folder); nothing wrapped in a fighter / game folder name',
+          [t for t in tops if not (t in ('INSTALL_TO_data', 'INSTALL_TO_code', 'TEST_ONLY_INSTALL_TO_code') or
+                                   t.startswith('Sm4shCommand_v'))], [])
+    data_tops = sorted({n.split('/')[1] for n in names if n.startswith('INSTALL_TO_data/') and n.count('/') > 1})
+    check('  INSTALL_TO_data/ holds the data folders themselves', [t for t in data_tops if t not in INSTALL_DIRS], [])
+    check('  both executables and the README', [n for n in ('INSTALL_TO_code/cross_f.rpx',
+                                                            'TEST_ONLY_INSTALL_TO_code/cross_f.rpx', 'README.txt')
+                                               if n not in names], [])
+
+
 def main():
     a = sys.argv[1:]
     exe = None
@@ -1169,6 +1265,11 @@ def main():
     if '--package' in a:
         i = a.index('--package')
         pkg = a[i + 1]
+        del a[i:i + 2]
+    since = None
+    if '--since' in a:
+        i = a.index('--since')
+        since = a[i + 1]
         del a[i:i + 2]
     if len(a) != 3:
         sys.exit(__doc__)
@@ -1190,10 +1291,13 @@ def main():
     effect_tests(out, ts_out)
     aura_tests(out, ts_out)
     aura_v5_tests(out, base)
+    aura_v6_tests(out)
     model_tests(out, base)
     if exe:
         native_tests(exe)
-    if pkg:
+    if pkg and since:
+        package_since_tests(pkg, out, since)
+    elif pkg:
         package_tests(pkg, out, ts_out)
     print('%d problem(s)' % len(PROBLEMS))
     sys.exit(1 if PROBLEMS else 0)

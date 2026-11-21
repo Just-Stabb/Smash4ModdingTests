@@ -4086,3 +4086,73 @@ is from the log, read against the game's code; each has a test that fails on v4'
 - **To do (later, the user):** XV2's common damage file `CMN.bdm` (sent; with CMN.bac / CMN.ean in `ui_in/cmn/`) for
   the dodge's manual counter (from his spot dodge while transformed, when an opponent's attack came at him during it and
   attack or special is pressed); the exact UI colours (the CUS aura row); the aura's look in game once it draws.
+
+## Ultra Instinct v6 (`supamario_ultrainstinct_v6.zip`, exe `exe_v46z_ui5`; TEST ONLY `exe_v46z_ui5_diag`; Sm4shCommand v1.7.20)
+Install over v5: `INSTALL_TO_data/` holds only the four files changed since v5 (the .ptcl, game.bin, effect.bin, the
+MSC), with the new executable (exe_v46z_ui5 = **exe_v46z_outline5** + `tools/supamario_ui_cave.py`, the UI cave's words
+the same as exe_v46z_ui4's; exe_v46z_outline5 = exe_mv2 + `tools/outline_shell_cave.py` v7: both reproduced byte for
+byte). The user's v5 clip (8.3 s, every other v5 fix confirmed): the white glow during the transformation, then only a
+few faint wisps and nothing: no aura, glow or distortion after the burst.
+
+### Why the aura didn't show (evidence)
+- **The clip, frame by frame (60 fps):** standing transformed, faint violet puffs near his head / body grow over ~16
+  frames and vanish, again and again (~0.5 s apart); nothing steady. In the air right after the burst, the effect
+  script's own aura (played at frame 40, 285 frames old) still showed round his chest / hands until he landed.
+- **The MSC:** `ui_tick` called `ui_aura` every `UI_AURA_EVERY` = 30 frames, which first called `ui_aura_off`:
+  `EffectModule(0x2723, id, 1, 1)`. The game's code for it: MSC handler `0x02C2CEC8`, op 0x2723's case `0x02C30D08` ->
+  EffectModule vt `+0xC4` (`0x02005AF0`: the module's owner key) -> `0x0334C708` -> the effect manager's kill by kind
+  `0x032F0454` (each of its 100 records whose owner and id match) -> `0x0334F308(record, a2 != 0, a3 != 0)`: with (1, 1)
+  `0x0334D568`, the set removed at once (`0x04A55714`, eft's KillEmitterSet: emitters and particles gone); with a2 = 0
+  eft's fade `0x04A4B25C` (the set's fade byte: emission stops, the particles live out; vanilla func_1006's
+  `EffectModule(0x2723, 0x100000b, 0, 0)`).
+- **The effect file:** the aura sets loop for ever (`one_time` 0, `end_frame` 0x7FFFFFFF), their sprites live 48-96
+  frames (`ptcl_life`) and fade in over that life (alpha 0 at birth). Killed and remade every 30 frames, no sprite got
+  past 29 frames. Rendered as the game ran it (`tools/supamario_ui_aura_render.py`, mode v5: frames 8 / 16 / 24 / 29 of a
+  renewal): the light it adds 0.004 / 0.010 / 0.019 / 0.023 against 0.063 at the steady state, i.e. 7-37 %, growing and
+  cut every half second: the clip's puffs. v4 / v5's preview drew frames 60-81 of one request, a state the game never
+  reached. Not the cause: the status change (0x155 -> Fall / Wait) - following requests (MSC 0x2717, ACMD 0x2712: the
+  same flags 0x8000 | 0x10000, position only vs the bone's matrix) aren't tied to the status, and no generic fighter
+  code kills following effects on a status change (the effect module's kill-all-following vt `+0xD4` / `+0xDC` callers:
+  none in the fighter code, only specific fighters' and the ACMD EFFECT_* commands); nor too faint an alpha alone.
+  Not explained: why the effect script's chest / hand parts stopped at the landing (none of the landing statuses'
+  MSC, effect scripts or the fighter code read kills them); moot now: the MSC keeps all seven parts.
+
+### Fix
+- `ui_aura` now **fades** the old aura (`ui_aura_fade`: `EffectModule(0x2723, id, 0, 0)`) and requests the new one the
+  same frame, every **120** frames (`AURA_EVERY`): the emission never stops, so the aura is always at its steady state;
+  120 >= the sprites' longest life (`aura_life`: the build asserts it), so at most two generations a part
+  (`AURA_GENERATIONS`). `ui_aura_off` (at once, (1, 1)) only on Dead / Rebirth / Entry. **Seven parts** (hip, chest,
+  head, both feet, both hands: the effect script's), ids 0x6E-0x72 (`UI_FX_AURA4` chest, `AURA5` hands).
+- The counter's effect script no longer plays the aura (at 176): the MSC's runs from the counter's first frame (it
+  doubled it).
+- **Colour:** every aura colour at least saturation `AURA_SAT_MIN` 0.45 (hue 262): XV2's big pale smoke sprites (0.15-0.19)
+  came out white once additive. **Brightness:** alpha x `AURA_GAIN` 1.6 (the sprites round the bone centres are half
+  inside his body; the halo outside wants more).
+- **The glow on the body** (XV2's white-lavender rim and blue-violet halo), held (Frames 0) until a KO / the match end /
+  a training reset: `Outline_Set(0, 205, 195, 255, Alpha 600, Tint 18, ...)` (the fighter shaders' rim light, coloured,
+  inside the silhouette; a slight sheen) and `Outline_Shell(0, 150, 135, 255, Alpha 200, Width 3 px, ..., Blend 1)` (the
+  band outside, added). At the burst (SpecialLwLight 220) and the counter's end (SpecialLwHeavy 199) they replace the
+  white body's band (`white_to_glow`); Wait1's game script applies them again while transformed (after a training
+  reset, or after Time Skip used its own Outline_Shell: one shell per object, Time Skip's ends it).
+- **The distortion:** v5's heat haze (the fireball's refraction emitter in the hip / head / feet sets) is unchanged; it
+  only lived as long as each 30-frame aura in v5, now it runs on with it.
+- **Outline_Shell's colour (exe_v46z_outline5, the user: "the outline glow only displays as white", Time Skip's (150,
+  195, 255) too):** the game draws its picture with every colour x the frame's hdrRange (FB3, CB9) and divides the
+  frame by it; the shell's pixel program wrote its colour unscaled (1 / hdrRange too bright: light colours white). Its
+  programs now scale it like the game's (docs/native-notes.md "Outline shell" v7), so the blue-violet band and Time
+  Skip's light blue show as given; the transformation's white body band (190, 215, 255) now shows its light blue-white
+  edge. Sm4shCommand v1.7.20: Outline_Shell's help / example 9.
+
+### Preview (`tools/supamario_ui_aura_render.py BEFORE AFTER OUT [--bg r,g,b]`)
+Rows: v5 as the game ran it; v6's aura (steady, 7 parts); v6 with the glow (Outline_Set's rim inside and Outline_Shell's
+band outside a stand-in silhouette: approximated, no model drawn). Added light: v5 0.004-0.023, v6 0.10. Colour against
+the user's XV2 clip (t.mp4 6.5 s, the glow pixels: value > 0.8, hue 200-330): XV2 hue 278, saturation 0.19, value 0.95;
+v6 on sand: the aura alone hue 300 / 0.20, with the glow 262 / 0.17; on a dark stage 253 / 0.19 (blue-violet,
+XV2's a little more purple; approximated).
+
+### Tests
+`supamario_ui_test.py --exe --package --since` (v6: the renewal fades (0, 0) every 120 frames and nothing in between,
+seven parts / bones / sizes, the KO's kill (1, 1) of all five ids, the glow at the burst / counter end / Wait1, no aura
+in the counter's script, the renewal >= the sprites' life (fails on v5's 30), the colours' saturation floor, the exe's
+Outline_Shell colour check, the package = the files changed since v5); `outline_shell_test.py` (v7); the other suites
+as listed in the commit.

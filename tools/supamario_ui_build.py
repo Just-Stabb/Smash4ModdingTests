@@ -77,7 +77,14 @@ DODGE_N = anim.frames_of(anim.DODGE)  # 16
 DODGE_INV = 12                       # the user: invincible ~12 frames, then actionable
 DODGE_MOVE, DODGE_V = 4, 1.0         # v2 (the user's XV2 clip: a sway almost in place): 4 units away over 4 frames (v1: 16
                                      # over 8); XV2's own dodge motion / afterimage are not in the skill's files
-AURA_EVERY = 30.0                    # the aura made again every 30 frames
+# v6 (the user's v5 clip: no aura after the burst, only faint wisps): the MSC's renewal every 30 frames killed the aura AT
+# ONCE (EffectModule 0x2723 (id, 1, 1): the effect manager's kill -> eft's KillEmitterSet 0x04A55714, its particles
+# gone) and made it again, so its sprites (48-96 frames long, fading in over their life) never got past 29 frames: in
+# game the faint puffs growing and vanishing twice a second (rendered: 4-36 % of the steady glow). Now the renewal FADES
+# the old ones (0x2723 (id, 0, 0): eft's fade 0x04A4B25C, emission stopped, the particles live out) and makes new ones
+# at once, so the emission never stops (the steady glow), every AURA_EVERY frames (at least the aura sprites' longest
+# life: at most two generations alive, AURA_GENERATIONS)
+AURA_EVERY = 120.0
 SCALE = 1.75                         # xv2_smash_fx.SIZE (the earlier XV2 ports': XV2's x1.0)
 
 ST_UI, ST_DODGE = cave.ST_UI, cave.ST_DODGE
@@ -151,6 +158,21 @@ AURA_DENSITY = 6.0
 AURA_ADD_ALPHA = 0.3                 # the alpha-blended (smoke) emitters' alpha x this once additive (added light, not
                                      # cover: at their old alpha they burn white on a bright stage)
 AURA_SMOOTH_SETS = AURA_SETS
+AURA_SAT_MIN = 0.45                  # v6: every aura colour at least this saturated (XV2's pale smoke colours came out white
+                                     # once additive: the steady render's big sprites hue 262 at 0.15-0.19); a soft
+                                     # blue-violet (the user: "a slightly blue purple glow")
+AURA_GAIN = 1.6                      # v6: every aura emitter's alpha x this (v5's smoothing kept XV2's average coverage; in
+                                     # game the sprites round the bone centres are half inside his body: the halo outside
+                                     # the silhouette wants more, the user: "clearly visible")
+AURA_GENERATIONS = 2                 # v6: aura instances alive per part at most (the renewing one and the fading one)
+# v6: the glow on the body while transformed (XV2's UI form: a white-lavender rim on the body and a blue-violet halo
+# round the silhouette, the user's clips): Outline_Set (the fighter shaders' own rim light, inside the silhouette, with
+# a slight tint) and Outline_Shell (the band outside it, added: a glow; its colour shows as given from exe_v46z_outline5),
+# both held (Frames 0) until a KO / the match end / a training reset: at the burst, at the counter's end and in Wait1
+# while transformed (again after a training reset or another move's outline)
+GLOW_RIM_RGB, GLOW_RIM_A, GLOW_RIM_TINT = (205.0, 195.0, 255.0), 600.0, 18.0
+GLOW_SHELL_RGB, GLOW_SHELL_A, GLOW_SHELL_W = (150.0, 135.0, 255.0), 200.0, 3.0
+GLOW_IN, GLOW_OUT = 10, 10
 HAZE_SRC = ('PtcMarioFireball', 'refraction1')
 HAZE = {'aura_hip': dict(scale=5.0, radius=2.0), 'aura_head': dict(scale=3.6, radius=1.2),
         'aura_foot': dict(scale=3.0, radius=1.0)}
@@ -201,6 +223,10 @@ def msc_values():
          'UI_BONE_HIP': '0x%X' % BONES['HipN'], 'UI_BONE_HEAD': '0x%X' % BONES['HeadN'],
          'UI_BONE_LFOOT': '0x%X' % BONES['LFootJ'], 'UI_BONE_RFOOT': '0x%X' % BONES['RFootJ'],
          'UI_HEAD_UP': fl(round(0.2 * METRE, 3)), 'UI_AURA_SIZE': fl(SCALE), 'UI_FOOT_SIZE': fl(round(0.8 * SCALE, 3)),
+         # v6: the chest and the hands kept by the MSC too (all seven of XV2's parts the effect script plays)
+         'UI_FX_AURA4': '0x%X' % fx_id('aura_chest'), 'UI_FX_AURA5': '0x%X' % fx_id('aura_hand'),
+         'UI_BONE_CHEST': '0x%X' % BONES['BustN'], 'UI_BONE_RHAND': '0x%X' % BONES['RHandN'],
+         'UI_BONE_LHAND': '0x%X' % BONES['LHandN'], 'UI_HAND_SIZE': fl(round(0.65 * SCALE, 3)),
          'UI_VANISH_SIZE': fl(SCALE), 'UI_SND_VANISH': '0x%X' % se_id('ui_vanish'),
          'UI_SS_MOT': '0x%X' % MOT_SS, 'UI_SS_SLIDE_MOT': '0x%X' % MOT_ESCAPE_N, 'UI_SS_ON': fl(SS_ON),
          'UI_SS_OFF': fl(SS_OFF), 'UI_SS_END': fl(SS_END), 'UI_SS_SLIDE_N': fl(SS_SLIDE_N), 'UI_SS_DEPTH': fl(SS_DEPTH),
@@ -257,6 +283,18 @@ def white_on(frames):
 
 def white_off():
     return [cmd('terminate_overlays'), cmd('outline_shell', 0, 0.0, 0.0, 0.0, 0.0, RIM_WIDTH, 0, 0, 10, 0, 1)]
+
+
+def glow_on():
+    """v6: the transformed glow, held: the rim light (Outline_Set) and the blue-violet band (Outline_Shell: it replaces
+    the white body's band, growing from where that one is)"""
+    return [cmd('outline_set', 0, *GLOW_RIM_RGB, GLOW_RIM_A, GLOW_RIM_TINT, 0, GLOW_IN, GLOW_OUT, 0),
+            cmd('outline_shell', 0, *GLOW_SHELL_RGB, GLOW_SHELL_A, GLOW_SHELL_W, 0, GLOW_IN, GLOW_OUT, 0, 1)]
+
+
+def white_to_glow():
+    """v6: the white body's end into the transformed glow (the overlay ended; the white band replaced by the glow's)"""
+    return [cmd('terminate_overlays')] + glow_on()
 
 
 # ui4: Mesh_Visibility by the mesh's INDEX (the game's: NUD mesh order, every costume's model.nud and metal.nud the same,
@@ -329,7 +367,7 @@ def silver_scripts():
     """{script name: game script body} of the swap's other scripts (none of them had a game script): Wait1 (Rebirth
     plays it) applies the transformed look or his own by TIMER_0, Entry his own. v4: no side taunt script (the full
     hair's copy follows its track, shown all through; his own full hair and cap stay hidden by their set state)"""
-    wait = if_var(cave.V_FORM, 5, UI_TRANSFORMED_OVER, silver_on()) + if_var(cave.V_FORM, 2, UI_TRANSFORMED_OVER,
+    wait = if_var(cave.V_FORM, 5, UI_TRANSFORMED_OVER, silver_on() + glow_on()) + if_var(cave.V_FORM, 2, UI_TRANSFORMED_OVER,
                                                                               silver_off())
     return {'wait1': wait, 'entryl': silver_off(), 'entryr': silver_off()}
 
@@ -357,11 +395,12 @@ def scripts_for():
                                    (STRIKE_AT + 3, [cmd('remove_all_hitboxes')]), (CNT_END, silver_on())]),
             anim.DODGE: [], anim.SS: []}
     effect = {anim.FORM: timeline([(FX_START_AT, [graphic('start')] + white_on(FX_BURST_AT - FX_START_AT)),
-                                   (FX_AURA_AT, aura), (FX_BURST_AT, [graphic('burst', follow=False)] + white_off())]),
+                                   (FX_AURA_AT, aura), (FX_BURST_AT, [graphic('burst', follow=False)] + white_to_glow())]),
               anim.STRIKE: timeline([(0, [graphic('vanish', follow=False)] + white_on(CNT_END)),
                                      (anim.frame_of(anim.STRIKE, 1, 170), [graphic('vanish', follow=False)]),
-                                     (anim.frame_of(anim.STRIKE, 1, 176), aura),
-                                     (CNT_END, white_off())]),
+                                     # v6: no aura here: the counter ends the transformation, so the MSC's aura
+                                     # (ui_aura, renewed by fading) is on from its first frame; this one doubled it
+                                     (CNT_END, white_to_glow())]),
               anim.DODGE: timeline([(0, [graphic('vanish', follow=False)])]), anim.SS: []}
     sound = {anim.FORM: timeline([(SND_START, [cmd('sound_effect', se_id('ui_start'))]),
                                   (SND_SUCCESS, [cmd('sound_effect', se_id('ui_success'))])]),
@@ -392,13 +431,14 @@ def scripts(body_dir):
 
 # ---------------------------------------------------------------- effects / sounds
 def lavender(rgb):
-    """an emitter colour turned to the clip's lavender: hue AURA_HUE, saturation x AURA_SAT, its value kept"""
+    """an emitter colour turned to the clip's lavender: hue AURA_HUE, saturation x AURA_SAT (v6: at least AURA_SAT_MIN),
+    its value kept"""
     import colorsys
     v = max(rgb)
     if v <= 0:
         return tuple(rgb)
     h, s_, _v = colorsys.rgb_to_hsv(*[c / v for c in rgb])
-    return tuple(c * v for c in colorsys.hsv_to_rgb(AURA_HUE / 360.0, s_ * AURA_SAT, 1.0))
+    return tuple(c * v for c in colorsys.hsv_to_rgb(AURA_HUE / 360.0, max(s_ * AURA_SAT, AURA_SAT_MIN), 1.0))
 
 
 def tint_aura(p, rep):
@@ -436,6 +476,7 @@ def smooth_aura(p, rep):
             f = (float(new) / old) if old > 0 else 1.0
             if p.field(em, 'blend_type') == 0:
                 f *= AURA_ADD_ALPHA
+            f *= AURA_GAIN
             p.set_field(em, 'emit_interval', new)
             for fld in ('alpha_init', 'alpha_diff21', 'alpha_diff32'):
                 p.set_field(em, fld, p.field(em, fld) * f)
@@ -473,6 +514,18 @@ def haze(p, rep):
         rep[name]['haze'] = dict(prm, life=HAZE_LIFE, interval=HAZE_INTERVAL, alpha=HAZE_ALPHA, rise=HAZE_RISE)
 
 
+def aura_life(p):
+    """v6: the longest particle life (+ its random part) of the aura sets' emitters (haze included): a faded generation
+    is gone this long after its fade"""
+    out = 0
+    for key in AURA_SETS:
+        name = 'PtcSupamarioUi' + [x for x in FX if x[0] == key][0][2][:-4]
+        for e in p.sets[p.find_set(name)]['emitters']:
+            if e['data'] is not None:
+                out = max(out, p.field(e['data'], 'ptcl_life') + max(0, p.field(e['data'], 'ptcl_life_random')))
+    return out
+
+
 def effects(cmn_dir, fx_dir):
     """FX's EMPs (XV2's vfx/cmn) into his ptcl / efc after every earlier set; FX_IDS their ids"""
     import efc
@@ -504,6 +557,10 @@ def effects(cmn_dir, fx_dir):
     tint_aura(p, rep)
     smooth_aura(p, rep)
     haze(p, rep)
+    life = aura_life(p)
+    assert AURA_EVERY >= life, ('v6: the renewal must outlast the aura sprites (at most %d generations)'
+                                % AURA_GENERATIONS, AURA_EVERY, life)
+    rep['aura_life'] = life
     out = p.build()
     assert ptcl.Ptcl(out).validate() == []
     open(os.path.join(fx_dir, base + '.ptcl'), 'wb').write(out)
