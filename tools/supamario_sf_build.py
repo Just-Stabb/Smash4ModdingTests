@@ -19,6 +19,7 @@ What XV2's files say (tools/xv2bac.py; the BSA read in sf_bsa below; fighters/su
   (the uncharged one) / 40; entries 1 / 3 / 4 (non-final) type 3 (a stagger), pushback 0.7 / 0.75, hitstop 7, stun 30.
   Damage 80 | 40 + 60 | 30 + 30 + 60 (XV2's scale).
 """
+import math
 import os
 import struct
 import sys
@@ -58,12 +59,78 @@ LIFE = (15, 25, 35)                   # by level (BSA entries 0 | 1, 2 | 3, 4, 5
 X0, Y0 = 9.0, 6.5                     # where a punch starts: in front of him at his fist's height (chosen)
 ARTICLE = 0                           # the fireball's slot (Mario's; Supamario never fires one: his neutral special
                                       # is the Kamehameha, article 5)
-# ---------------------------------------------------------------- damage (chosen; README "Ultra Instinct v11")
-FINAL = dict(Damage=14.0, Angle=50, KBG=96, FKB=0, BKB=30, HitstunMul=1.1, HitstopFrames=10, SDI=1.0, Hitlag=1.0,
+# ---------------------------------------------------------------- damage (README "Ultra Instinct v11" / "v12")
+# v12 (the user: "make uncharged Soaring Fist do the same amount of knockback to every character and have 1.4x hitstun
+# ... not have knockback growth and do the same amount of knockback as it does to Donkey Kong at 61%"): Smash 4's
+# knockback is ((p/10 + p d/20) x 200/(w + 100) x 1.4 + 18) x KBG/100 + BKB (p the percent after the hit), so with KBG 0
+# it is BKB for every weight and percent (its set-knockback form, WBKB, still carries 200/(w + 100)): KBG 0, BKB =
+# v11's uncharged punch on Donkey Kong (weight 122, fighter_param 0x21) at 61% before the hit (knockback_v11_dk)
+V11_FINAL = dict(Damage=14.0, Angle=50, KBG=96, FKB=0, BKB=30)
+DK_WEIGHT, DK_PCT = 122.0, 61.0
+
+
+def knockback(hit, pct_before, weight=100.0):
+    """Smash 4's knockback of a hit (no rage, no staling, no crouch): set knockback (FKB) or the percent form"""
+    d = hit['Damage']
+    if hit.get('FKB'):
+        return ((1.0 + hit['FKB'] / 2.0) * 200.0 / (weight + 100.0) * 1.4 + 18.0) * hit['KBG'] / 100.0 + hit['BKB']
+    p = pct_before + d
+    return ((p / 10.0 + p * d / 20.0) * 200.0 / (weight + 100.0) * 1.4 + 18.0) * hit['KBG'] / 100.0 + hit['BKB']
+
+
+def knockback_v11_dk():
+    return knockback(V11_FINAL, DK_PCT, DK_WEIGHT)                      # 119.93
+
+
+UNCHARGED = dict(Damage=14.0, Angle=50, KBG=0, FKB=0, BKB=int(round(knockback_v11_dk())), HitstunMul=1.4,
+                 HitstopFrames=10, SDI=1.0, Hitlag=1.0, SFXLevel=2, SFXType=1)
+# v12 (the user: "increase the base knockback of the final hits of the 2 punch and 3 punch variants and reduce
+# knockback growth to keep their KO percentages about the same"): BKB 30 -> 70, KBG 96 -> 74 (ko_percent: from mid-stage
+# at 50 degrees within 3% of v11's for weights 68-130, the earlier punches' 5% / 8% counted)
+FINAL = dict(Damage=14.0, Angle=50, KBG=74, FKB=0, BKB=70, HitstunMul=1.1, HitstopFrames=10, SDI=1.0, Hitlag=1.0,
              SFXLevel=2, SFXType=1)
 NONFINAL_DMG = {2: 5.0, 3: 4.0}       # level 2's first punch, level 3's first two
-NONFINAL = dict(Angle=0, KBG=100, FKB=10, BKB=0, HitstunMul=-20.0, HitstopFrames=7, SDI=0.5, Hitlag=0.7,
+# v12 (the user: "increase the pushback on the weaker punches"): v11's set knockback 10 (KBG 100: 26.4 at weight 100,
+# 23.7 on Donkey Kong) -> 40 for every weight (KBG 0, BKB 40: a grounded opponent slides about twice as far)
+NONFINAL = dict(Angle=0, KBG=0, FKB=0, BKB=40, HitstunMul=-20.0, HitstopFrames=7, SDI=0.5, Hitlag=0.7,
                 SFXLevel=1, SFXType=1)
+V11_NONFINAL = dict(Angle=0, KBG=100, FKB=10, BKB=0)
+KO_FIGHTERS = {'Jigglypuff': (68, 0.053088, 1.08), 'Fox': (79, 0.19, 2.55), 'Mario': (98, 0.08715, 1.5),
+               'Donkey Kong': (122, 0.08505, 1.63), 'Bowser': (130, 0.11, 1.7)}   # weight, gravity, max fall
+
+
+def launched_out(kb, gravity, max_fall, angle=50.0, blast_x=224.0, blast_y=200.0):
+    """a fighter launched from mid-stage (x 0, its feet on the floor at 0) leaves the blast zone (Battlefield's 224 /
+    200): launch speed kb x 0.03 decaying 0.051 a frame along it, Smash 4's tumble boost (gravity - 0.075) x 5 up, its
+    own gravity to its max fall, no DI"""
+    v = kb * 0.03
+    a = math.radians(angle)
+    vx, vy = v * math.cos(a), v * math.sin(a)
+    if kb >= 80.0:
+        vy += 5.0 * (gravity - 0.075)
+    x = y = cy = 0.0
+    for _f in range(400):
+        sp = math.hypot(vx, vy)
+        if sp > 0.0:
+            r = max(sp - 0.051, 0.0) / sp
+            vx, vy = vx * r, vy * r
+        cy = max(cy - gravity, -max_fall)
+        x, y = x + vx, y + vy + cy
+        if x > blast_x or y > blast_y:
+            return True
+    return False
+
+
+def ko_percent(hit, earlier, fighter):
+    """the lowest percent (before the move) at which this final punch, after `earlier` % of the move's earlier punches,
+    KOs the fighter from mid-stage (launched_out)"""
+    w, g, mf = KO_FIGHTERS[fighter]
+    for pb in range(0, 999):
+        if launched_out(knockback(hit, pb + earlier, w), g, mf, hit['Angle']):
+            return pb
+    return 999
+
+
 # ---------------------------------------------------------------- always connecting / shields (sf_hold)
 REACH = SIZE + 3.0                    # a punch reaches a fighter this far short of its centre
 BEHIND = 4.0
@@ -73,7 +140,10 @@ GROUNDED = 0.5                        # its feet within this of his: on the grou
 MID = 5.0                             # a fighter's middle above its feet (the pull puts it on the punches' line)
 PULL = 0.35                           # of the way to the lane a frame (the "windbox")
 HOLD_PAD = 3.0                        # hitstun frames kept past the next punch's arrival
-PUSH_NF, PUSH_F = 0.8, 2.0            # a shield's pushback speed (units a frame) as a punch reaches it
+PUSH_NF, PUSH_F = 1.3, 2.0            # a shield's pushback speed (units a frame) as a punch reaches it (v12: the
+                                      # non-final 0.8 -> 1.3, the user: "increase the pushback on the weaker punches")
+EDGE = 6.0                            # v12: an opponent pushed past the next punch's reach is kept this far inside it
+PUSHED = 30.0                         # ... when it is at most this far past it (a non-final punch's push: ~15)
 PUSH_W = 10.0                         # ... fading to 0 over this many frames
 ST_GUARD_DAMAGE = 0x1E
 # ---------------------------------------------------------------- effects / sounds
@@ -104,7 +174,7 @@ def msc_values(snd_charge=SND_CHARGE):
          'SF_LV3': fl(LV3), 'SF_SPEED': fl(SPEED), 'SF_MOVE_FROM': fl(MOVE_FROM), 'SF_X0': fl(X0), 'SF_Y': fl(Y0),
          'SF_REACH': fl(REACH), 'SF_BEHIND': fl(BEHIND), 'SF_LANE_DOWN': fl(LANE_DOWN), 'SF_LANE_UP': fl(LANE_UP),
          'SF_GROUNDED': fl(GROUNDED), 'SF_MID': fl(MID), 'SF_PULL': fl(PULL), 'SF_HOLD_PAD': fl(HOLD_PAD),
-         'SF_PUSH_NF': fl(PUSH_NF), 'SF_PUSH_F': fl(PUSH_F), 'SF_PUSH_W': fl(PUSH_W),
+         'SF_PUSH_NF': fl(PUSH_NF), 'SF_PUSH_F': fl(PUSH_F), 'SF_PUSH_W': fl(PUSH_W), 'SF_EDGE': fl(EDGE), 'SF_PUSHED': fl(PUSHED),
          'SF_ST_GUARD_DAMAGE': fl(ST_GUARD_DAMAGE), 'SF_ARTICLE': '0x%X' % ARTICLE, 'SF_SND_CHARGE': '0x%X' % snd_charge}
     for k in range(3):
         v['SF_PUNCH_%d' % (k + 1)] = fl(PUNCH[k])
@@ -132,33 +202,41 @@ def code_of(level, k):
 
 
 # ---------------------------------------------------------------- the projectile's ACMD
-# fireball's motion.mtable: 4 slots; 0 the final punch, 1 a level-2 non-final one, 2 a level-3 non-final one (3 left)
-WEAPON_SCRIPTS = ('soaringfist', 'soaringfist2', 'soaringfist3')
+# fireball's motion.mtable: 4 slots; 0 the final punch of a 2- / 3-punch release, 1 a level-2 non-final one, 2 a level-3
+# non-final one, 3 (v12) the uncharged punch (its own numbers: UNCHARGED)
+WEAPON_SCRIPTS = ('soaringfist', 'soaringfist2', 'soaringfist3', 'soaringfist1')
 
 
 def motion_of(code):
     level, nonfinal = code // 2 + 1, code % 2
+    if level == 1:
+        return 3
     return 0 if not nonfinal else (1 if level == 2 else 2)
+
+
+def hit_of(script):
+    """the numbers of a projectile script's hitbox (by its name)"""
+    i = WEAPON_SCRIPTS.index(script)
+    return [dict(FINAL), dict(NONFINAL, Damage=NONFINAL_DMG[2]), dict(NONFINAL, Damage=NONFINAL_DMG[3]),
+            dict(UNCHARGED)][i]
 
 
 def cmd(name, *params):
     return acmd.Command(acmd.BY_NAME[name.lower()], list(params))
 
 
-def punch_box(final, level=3):
+def punch_box(script):
     """the punch's hitbox: an indirect hit (a projectile), never reflected or absorbed (the reflector's and absorber's
     shapes meet only reflectable / absorbable attacks: docs/native-notes.md "The masks"), shieldable"""
     import supamario_sledgehammer_build as SB
-    kw = dict(FINAL) if final else dict(NONFINAL, Damage=NONFINAL_DMG[level])
+    kw = hit_of(script)
     return SB.hitbox(ID=0, Part=0, Bone=0, Size=SIZE, X=0.0, Y=0.0, Z=0.0, Clang=1, Rebound=1, ShieldDamage=0,
                      **{'Direct/Indirect': 0}, Type=4, Shieldable=1, Reflectable=0, Absorbable=0, FacingRestrict=1,
                      NoGFX=0, **kw)
 
 
 def weapon_game():
-    return {WEAPON_SCRIPTS[0]: [cmd('frame', float(HIT_FROM)), punch_box(True)],
-            WEAPON_SCRIPTS[1]: [cmd('frame', float(HIT_FROM)), punch_box(False, 2)],
-            WEAPON_SCRIPTS[2]: [cmd('frame', float(HIT_FROM)), punch_box(False, 3)]}
+    return {n: [cmd('frame', float(HIT_FROM)), punch_box(n)] for n in WEAPON_SCRIPTS}
 
 
 def weapon_effect():

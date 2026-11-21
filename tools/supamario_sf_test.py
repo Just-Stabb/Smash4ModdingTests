@@ -15,6 +15,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.append(HERE)
 import acmd  # noqa: E402
+import omo  # noqa: E402
 import rolloff_hold_test as R  # noqa: E402
 import supamario_sf_build as F  # noqa: E402
 import supamario_ui_anim as A  # noqa: E402
@@ -317,14 +318,14 @@ def file_tests(out, base, skill_dir):
     w = os.path.join(sup, 'script', 'animcmd', 'weapon', 'fireball')
     mt = open(os.path.join(w, 'motion.mtable'), 'rb').read()
     hs = struct.unpack('>%dI' % (len(mt) // 4), mt)
-    check('v11: the projectile\'s motion table: slots 0-2 = %s (the final punch, level 2 / 3 non-final)' % (
-        list(F.WEAPON_SCRIPTS),), list(hs[:3]), [acmd.crc(n) for n in F.WEAPON_SCRIPTS])
+    check('v11: the projectile\'s motion table: slots 0-3 = %s (the final punch, level 2 / 3 non-final, v12: the '
+          'uncharged punch)' % (list(F.WEAPON_SCRIPTS),), list(hs[:4]), [acmd.crc(n) for n in F.WEAPON_SCRIPTS])
     game = acmd.ACMDFile.load(os.path.join(w, 'game.bin'))
     syn = acmd.INFO[acmd.BY_NAME['extra_special_hitbox']]['syntax']
     for i, n in enumerate(F.WEAPON_SCRIPTS):
         s = [c for c in game.script(n) if c.name != 'Script_End']
         hb = dict(zip(syn, s[1].params))
-        want = dict(F.FINAL) if i == 0 else dict(F.NONFINAL, Damage=F.NONFINAL_DMG[i + 1])
+        want = F.hit_of(n)
         check('v11: %s: frame %d, one Extra_Special_Hitbox: an indirect hit (Direct/Indirect 0), Reflectable 0, '
               'Absorbable 0, Shieldable 1, size %g (XV2\'s 1.2 m), %s' % (
                   n, F.HIT_FROM, F.SIZE, ', '.join('%s %g' % kv for kv in sorted(want.items()))),
@@ -584,15 +585,145 @@ def native_tests(exe):
                                                                                                     F.MOT_REL)], [0, 0])
 
 
+# ---------------------------------------------------------------- v12
+def v12_knockback_tests():
+    """v12: the uncharged punch's fixed knockback (every weight, every percent), the finals' BKB / KBG and their KO
+    percents, the non-final punches' pushback"""
+    dk = F.knockback_v11_dk()
+    check('v12: v11\'s uncharged punch (14%%, angle 50, KBG 96, BKB 30) on Donkey Kong (weight %g, fighter_param 0x21) at '
+          '%g%% before the hit: knockback %.2f -> the uncharged BKB %d' % (F.DK_WEIGHT, F.DK_PCT, dk, F.UNCHARGED['BKB']),
+          (round(dk, 2), F.UNCHARGED['BKB']), (119.93, 120))
+    kbs = {round(F.knockback(F.UNCHARGED, pct, w), 6) for w in (68, 79, 98, 100, 122, 130, 400) for pct in (0, 40, 61, 150)}
+    check('v12: the uncharged punch\'s knockback is %d for every weight (68-400) and percent (KBG 0: Smash 4\'s '
+          '(growth term + 18) x KBG/100 + BKB): launch speed %.2f a frame for all' % (F.UNCHARGED['BKB'],
+                                                                                   F.UNCHARGED['BKB'] * 0.03),
+          kbs, {float(F.UNCHARGED['BKB'])})
+    wb = dict(F.UNCHARGED, KBG=100, FKB=40, BKB=0)
+    check('  (Smash 4\'s set knockback (FKB 40, KBG 100) is not: %s at weights 68 / 130)' % (
+        [round(F.knockback(wb, 0, w), 1) for w in (68, 130)],), F.knockback(wb, 0, 68) > F.knockback(wb, 0, 130), True)
+    check('  hitstun x %g (Extra hitbox HitstunMul): %d frames for every weight (v11: x1.1, by percent)' % (
+        F.UNCHARGED['HitstunMul'], int(F.UNCHARGED['BKB'] * 0.4 * F.UNCHARGED['HitstunMul'])),
+          (F.UNCHARGED['HitstunMul'], F.UNCHARGED['KBG'], F.UNCHARGED['Angle'], F.UNCHARGED['Damage']), (1.4, 0, 50, 14.0))
+    rows = []
+    for lv, earlier in ((2, 5.0), (3, 8.0)):
+        for fname in F.KO_FIGHTERS:
+            a = F.ko_percent(F.V11_FINAL, earlier, fname)
+            b = F.ko_percent(F.FINAL, earlier, fname)
+            rows.append((lv, fname, a, b))
+    check('v12: the 2- / 3-punch finals BKB %d KBG %d (v11 30 / 96): their KO percents from mid-stage within 3 of v11\'s '
+          'for weights 68-130 (%s)' % (F.FINAL['BKB'], F.FINAL['KBG'], '; '.join('L%d %s %d->%d' % r_ for r_ in rows)),
+          all(abs(b - a) <= 3 for _l, _f, a, b in rows), True)
+    check('  and they launch harder at low percents (Mario at 0%%: %.1f -> %.1f)' % (
+        F.knockback(F.V11_FINAL, 5.0, 98), F.knockback(F.FINAL, 5.0, 98)),
+          F.knockback(F.FINAL, 5.0, 98) > F.knockback(F.V11_FINAL, 5.0, 98) + 20, True)
+    nf = {round(F.knockback(dict(F.NONFINAL, Damage=4.0), pct, w), 3) for w in (68, 100, 130) for pct in (0, 80)}
+    v11 = F.knockback(dict(F.V11_NONFINAL, Damage=4.0), 0, 100)
+    check('v12: the non-final punches\' pushback: knockback %d for every weight (v11 %.1f at weight 100, %.1f on Donkey '
+          'Kong); shields pushed %g a frame (v11 0.8)' % (F.NONFINAL['BKB'], v11,
+                                                         F.knockback(dict(F.V11_NONFINAL, Damage=4.0), 0, 122), F.PUSH_NF),
+          (nf, F.NONFINAL['BKB'] > v11 * 1.4, F.PUSH_NF > 0.8, F.PUSH_NF < F.PUSH_F), ({float(F.NONFINAL['BKB'])}, True,
+                                                                                         True, True))
+
+
+def v12_jitter_tests(r):
+    """v12 (the user: "a bug with Soaring Fist where it makes Supamario jitter in every animation after using it until
+    he's KO'd"): his state after the move as before it. The charge's expression script plays START_CHARGE (PhysicsModule
+    op 7, the smash charge's body shake), which only the hold statuses' exits stop (PhysicsModule(0x8)); the model: the
+    shake on from START_CHARGE's frame, off at op 8"""
+    def state(g, charged, left_at=None):
+        on = False
+        ev = sorted([(F.HOLD_DECIDE, 7)] if charged else [], key=lambda e: e[0])
+        ev += [(e[0], e[2][0]) for e in g.ev('physics')]
+        for _n, op in sorted(ev, key=lambda e: (e[0], e[1] != 7)):
+            on = op == 7 or (on and op != 8)
+        return {'shake': on, 'rate var': [e for e in g.ev('set') if e[2] == 0x0F000098],
+                'his position written': [e for e in g.ev('set') if e[2] in (SLOT_X, SLOT_Y, 0x0F000000, 0x0F000001)],
+                'hidden': [e for e in g.ev('visibility') if e[2][1] == 0]}
+    before = {'shake': False, 'rate var': [], 'his position written': [], 'hidden': []}
+    exp = acmd.ACMDFile.load(os.path.join(UT_OUT[0], 'fighter', 'supamario', 'script', 'animcmd', 'body', 'expression.bin'))
+    sc = [(fr, c.name) for fr, c in UT.at_frames(exp.script(F.SCRIPT_START)) if c.name == 'START_CHARGE']
+    check('v12: the charge\'s expression script plays START_CHARGE (the smash charge\'s body shake) at its frame %d '
+          '(the charge\'s first)' % F.HOLD_AT, sc, [(float(F.HOLD_AT), 'START_CHARGE')])
+    for held, what in ((500, 'charged to the most (3 punches)'), (F.HOLD_DECIDE + F.LV2, 'charged to 2 punches'),
+                       (0, 'a tap (1 punch)')):
+        g, vm = sf_run(r, held=held)
+        vm.g[4], vm.g[6] = 0x2B, 0
+        r.call(vm, 'func_347')
+        rel = [e[0] for e in g.ev('motion_at') if e[2] == F.MOT_REL][:1]
+        check('v12: %s: the shake stopped at the release (PhysicsModule(0x8) on frame %s) and at the status\'s end: his '
+              'state after it as before it (no shake, no rate, his own position never written, not hidden)' % (what, rel),
+              (state(g, held > F.HOLD_DECIDE), [e[0] for e in g.ev('physics') if e[2][0] == 8][:1]), (before, rel))
+    g, vm = sf_run(r, held=500, frames=30)
+    vm.g[4], vm.g[6] = 0x2B, 0x46
+    r.call(vm, 'func_347')
+    check('v12: hit during the charge (0x2B left at frame 30 for a damage status): the shake stopped by its end (sf_end)',
+          state(g, True)['shake'], False)
+
+
+def v12_foot_tests(out, base):
+    """v12 (the user: "Soaring Fist's animation also seems to take Supamario off of the ground"): his feet on the floor
+    every frame of the move as in Wait (floor_fix's contact on every Soaring Fist frame: XV2's HKN b_C_Base sits higher
+    than CONTACT_BASE_Y, so v11 only lifted those frames: his feet 2.8-4.4 up)"""
+    import supamario_fakedeath_anim as FA
+    bones = omo.vbn_read(os.path.join(base, 'model', 'body', 'c00', 'model.vbn'))
+
+    def lows(pac, name, frames=None):
+        o = omo.Omo(dict(omo.pac_read(pac))[name])
+        gap, low = [], []
+        for fr in (frames if frames is not None else range(o.frames)):
+            w = omo.world(o, bones, fr)
+            inv = np.linalg.inv(np.array(w['TransN']))
+            y = {k: (inv @ np.array(w[k]))[1, 3] for k in FA.FLOOR if k in w}
+            gap.append(min(y[k] - FA.FLOOR[k] for k in y))
+            low.append(min(y['LToeN'], y['RToeN'], y['LFootJ'], y['RFootJ']))
+        return gap, low
+    wg, wl = lows(os.path.join(base, 'motion', 'body', 'main.pac'), 'FitMarioBodyMainA00Wait1.omo')
+    pac = os.path.join(out, 'fighter', 'supamario', 'motion', 'body', 'main.pac')
+    name = [n for n, _d in omo.pac_read(pac) if n.endswith('SpecialAirLwHeavy.omo')][0]
+    frames = [f for part in A.SF_PARTS for f in range(A.part_start(part), A.part_start(part) + A.part_len(part))]
+    g, lo = lows(pac, name, frames)
+    check('v12: Soaring Fist\'s %d frames (wind-up, charge, releases): his lowest joint on the floor as in Wait (its '
+          'clearance gap (fakedeath_anim FLOOR) within Wait1\'s '
+          '%.2f .. %.2f; Wait1 %.2f .. %.2f) and his lowest foot / toe %.2f .. %.2f up (Wait1 %.2f .. %.2f; v11 2.8 .. 4.4)'
+          % (len(frames), min(g), max(g), min(wg), max(wg), min(lo), max(lo), min(wl), max(wl)),
+          (all(min(wg) - 0.05 <= x <= max(wg) + 0.05 for x in g),
+           FA.FLOOR['LToeN'] - 0.05 <= min(lo) and max(lo) <= max(wl) + 0.3), (True, True))
+
+
+def v12_hold_tests(r):
+    """v12: an opponent pushed past the next punch's reach is kept just inside it (the harder non-final push)"""
+    held = F.HOLD_DECIDE + F.LV2
+    reach = F.X0 + F.REACH + F.SPEED * (F.LIFE[1] - F.MOVE_FROM) - F.EDGE
+    for dx, want in ((reach + 10.0, True), (reach + F.PUSHED + 10.0, False)):
+        def opp(g, dx=dx):
+            g.vars[SLOT_X + 4], g.vars[SLOT_Y + 4], g.vars[SLOT_F + 4] = dx, 0.0, -1.0
+            g.vars[HITSTUN + 8] = 20.0
+            g.vars[STATUS + 8] = float(0x46)
+        g, vm = sf_run(r, held=held, others=[opp])
+        xs = sorted({round(e[3], 2) for e in g.ev('set') if e[2] == SLOT_X + 4})
+        check('v12: level 2, an opponent %g in front (%s): %s' % (
+            dx, 'pushed %g past the punches\' reach' % (dx - reach) if want else 'farther than a push carries',
+            'put back at %.2f (inside the next punch\'s reach) once the first punch reached it' % reach if want else
+            'untouched'), xs, [round(reach, 2)] if want else [])
+
+
+UT_OUT = []
+
+
 def run(r, out, ts_out, base, skill_dir=None, exe=None):
     import json
     d = json.load(open(os.path.join(out, 'ultrainstinct.json')))
     UT_IDS['se'] = {k: int(v, 16) for k, v in d['se_ids'].items()}
     UT_IDS['sf'] = {k: int(v, 16) for k, v in d.get('sf', {}).get('fx_ids', {}).items()}
     UT_IDS['aura_piace'] = int(d['fx_ids']['aura_piace'], 16)
+    UT_OUT[:] = [out]
     msc_tests(r)
     hold_tests(r)
     weapon_tests(out)
+    v12_knockback_tests()
+    v12_jitter_tests(r)
+    v12_foot_tests(out, base)
+    v12_hold_tests(r)
     piace_msc_tests(r)
     fx_tests(out, ts_out)
     if skill_dir:

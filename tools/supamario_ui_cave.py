@@ -184,6 +184,10 @@ ST_DODGE = ST_SS                 # the dodge: 0x155 with TIMER_4 in (MODE_DODGE_
 OLD_ST_UI, OLD_ST_DODGE = 0x157, 0x158   # v1-v4's (the tests: nothing special there any more)
 DODGE_LO, DODGE_HI = 0x0, 0x2    # Wait, Walk, WalkBrake
 SQUAT_LO, SQUAT_HI = 0x11, 0x15  # Squat, SquatWait, SquatF, SquatB, SquatRv
+# v12 (exe_v46z_ui8; the user: "teetering on an edge also allows for the autododge"): Ottotto, OttottoWait (the teeter on
+# a ledge's edge, reference/msc-note-sheet/Actions_Fighters.csv)
+OTTOTTO_LO, OTTOTTO_HI = 0x7B, 0x7C
+ST_OTTOTTO = OTTOTTO_LO
 # status work: floats 6-9, flags word 0 bits 16-18
 F_DAMAGE, F_SIDE, F_TX, F_TY = 6, 7, 8, 9
 FLAG_HIT, FLAG_NOTFIGHTER, FLAG_FOUND = 0x21000010, 0x21000011, 0x21000012
@@ -262,7 +266,8 @@ WS_MAX = 100                     # instances paused at most (the effect manager'
 ORIGINAL.update({FILL_HOOK: MFLR, STEP_HOOK: MFLR, SX_HOOK: MFLR})
 
 # the shape: x sideways, y up, z forward (joint 0's frame); a capsule round his body
-SHAPE = {'bone': 0, 'p1': (0.0, 2.5, 0.0), 'p2': (0.0, 9.5, 0.0), 'radius': 6.5}
+SHAPE = {'bone': 0, 'p1': (0.0, 2.5, 0.0), 'p2': (0.0, 9.5, 0.0), 'radius': 8.0}   # v12: 6.5 -> 8 (OttottoWait's
+# flailing hand reaches 7.73 from the axis; Wait 5.07, SquatWait 4.11)
 SHAPE_TYPE = 2
 DESC_BYTES = (0, 0, 0, 1)        # Marth's counter group (+0x28 0: not front only)
 
@@ -772,6 +777,7 @@ def build(kind_id=None, diag=False):
              ftx=4 * F_TX, fty=4 * F_TY, mgr_ha=ha(OBJ_MANAGER), mgr_lo=slo(OBJ_MANAGER), fts_ha=ha(FIGHTERS),
              fts_lo=slo(FIGHTERS), entry=FIGHTER_ENTRY, bpost=BASE_POSTURE, batk=BASE_ATTACK, bown=BASE_OWNER, blink=BASE_LINK, depth=OWNER_DEPTH,
              noobj_hi=NO_OBJECT >> 16, dlo=DODGE_LO, dhi=DODGE_HI, sqlo=SQUAT_LO, sqhi=SQUAT_HI,
+             otlo=OTTOTTO_LO, othi=OTTOTTO_HI,
              vform_hi=V_FORM >> 16, vform_lo=V_FORM & 0xFFFF, vmode_hi=V_MODE >> 16, vmode_lo=V_MODE & 0xFFFF, vr_lo=V_DODGE_R & 0xFFFF, vl_lo=V_DODGE_L & 0xFFFF,
              maxf=MAX_FIGHTERS, maxp=MAX_PARTS, maxn=MAX_NODES, mv_back=MV_APPLY + 4, va=MV_ARR,
              osr_hi=OSREPORT_VENEER >> 16, osr_lo=OSREPORT_VENEER & 0xFFFF, mhf_hi=MHASH_FROM >> 16,
@@ -838,7 +844,12 @@ slot42: lwz r12, %(kind_at)d(r4)
         beq s42_dg                      # counter from EscapeN, his MSC)
         cmplwi r11, %(dhi)d             # ui4: the autododge (the shape is on in Wait / Walk / WalkBrake / Squat ..
         ble s42_dg                      # SquatRv while transformed: his MSC's ui_tick)
-        cmpwi r11, %(sqlo)d
+        cmpwi r11, %(otlo)d             # v12: Ottotto / OttottoWait (the teeter)
+        blt s42_sq
+        cmpwi r11, %(othi)d
+        ble s42_dg
+        blr
+s42_sq: cmpwi r11, %(sqlo)d
         bltlr
         cmpwi r11, %(sqhi)d
         bgtlr
@@ -887,6 +898,9 @@ s42_ss: stwu r1, -0x20(r1)              # v7: 0x155 in the sway family (the auto
         lbz r0, 0x1C(r28)
         cmplwi r0, 0
         bne out42
+        lwz r0, 0x18(r28)               # v12: the attacker (its object id) steps through the counter's world stop
+        lis r12, ws_vic@ha
+        stw r0, ws_vic@l(r12)
 s42_cat:
         lwz r3, 8(r30)                  # the attacker's AttackModule: vt +0x194(id, part) = hit data
         lwz r12, 0(r3)
@@ -1230,7 +1244,12 @@ s43_dodge:                              # ui4: the autododge's statuses (the sha
         beq s43_go
         cmplwi r11, %(dhi)d             # damage that follows the shape's hit skipped (no guard damage / stun)
         ble s43_go                      # Wait, Walk, WalkBrake
-        cmpwi r11, %(sqlo)d
+        cmpwi r11, %(otlo)d             # v12: Ottotto / OttottoWait
+        blt s43_sq
+        cmpwi r11, %(othi)d
+        ble s43_go
+        blr
+s43_sq: cmpwi r11, %(sqlo)d
         bltlr
         cmpwi r11, %(sqhi)d
         bgtlr                           # Squat .. SquatRv
@@ -1351,6 +1370,17 @@ ws_step:
         lwz r0, %(kind_at)d(r3)
         cmpwi r0, %(kind)d
         beq wss_him
+        lis r12, ws_data@ha             # v12: the attacker his transformation counter answers (ws_vic: its object
+        lwz r0, ws_data@l(r12)          # id, slot 42's) steps on a normal frame during the stop, as he does: the
+        cmpwi r0, 0                     # rush's hits land and it reacts (the freeze box holds it)
+        beq wss_orig
+        lis r12, ws_vic@ha
+        lwz r12, ws_vic@l(r12)
+        cmpwi r12, 0
+        beq wss_orig
+        lwz r0, 0(r3)
+        cmpw r0, r12
+        beq wss_vic
 wss_orig:
         mflr r0                         # the replaced word
         b 0x%(step_back)08X
@@ -1413,6 +1443,28 @@ wss_plain:
         lwz r3, 0x10(r1)
         lwz r4, 0x14(r1)
         bl wss_orig
+        b wss_out
+wss_vic:                                # v12: the attacker's step on a normal frame (its own frame state words kept)
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stw r30, 0x28(r1)
+        stw r31, 0x2C(r1)
+        stw r3, 0x10(r1)
+        stw r4, 0x14(r1)
+        lis r12, %(fs_ha)d
+        lwz r30, %(fs_lo)d(r12)         # the frame state
+        lbz r0, 8(r30)
+        stw r0, 0x18(r1)
+        lwz r0, 0(r30)
+        stw r0, 0x1C(r1)
+        li r0, 0
+        stb r0, 8(r30)
+        bl wss_orig
+        lwz r0, 0x18(r1)
+        stb r0, 8(r30)
+        lwz r0, 0x1C(r1)
+        stw r0, 0(r30)
 wss_out:
         lwz r30, 0x28(r1)
         lwz r31, 0x2C(r1)
@@ -1443,41 +1495,10 @@ wsb_key:
         addi r30, r30, ws_data@l
         li r0, 0
         stw r0, 8(r30)
-        lis r12, %(inst_ha)d
-        lwz r12, %(inst_lo)d(r12)
-        li r10, %(wsguard)d             # a loop guard
-wsb_loop:
-        cmpwi r12, 0
-        beq wsb_stage
-        addi r10, r10, -1
-        cmpwi r10, 0
-        blt wsb_stage
-        lbz r0, 0x1A4(r12)
-        cmpwi r0, 0
-        bne wsb_next
-        lbz r0, 0x19E(r12)
-        cmpwi r0, 0
-        bne wsb_next
-        lwz r0, 8(r12)
-        lis r11, %(mask_hi)d
-        ori r11, r11, %(mask_lo)d
-        and r0, r0, r11
-        cmpw r0, r31
-        beq wsb_next                    # his
-        lwz r11, 8(r30)
-        cmplwi r11, %(wsmax)d
-        bge wsb_next
-        li r0, 1
-        stb r0, 0x19E(r12)
-        slwi r0, r11, 2
-        add r0, r0, r30
-        mr r9, r0
-        stw r12, 0xC(r9)
-        addi r11, r11, 1
-        stw r11, 8(r30)
-wsb_next:
-        lwz r12, 0x18(r12)
-        b wsb_loop
+        b wsb_stage                     # v12: no effect instance paused (v10-v11's sweep paused every instance not
+                                        # his, the stage's too: its emitter sets then ran at rate 0 (0x0334E238) and
+                                        # the screen went white, the user's v11 clip b); the stage stop is the Final
+                                        # Smashes' and handles the stage's own
 wsb_stage:
         li r4, 1
         bl ws_stage
@@ -1521,6 +1542,8 @@ wse_done:
         lwz r31, 8(r30)
         lwz r5, 4(r30)
         li r0, 0
+        lis r12, ws_vic@ha              # v12: the attacker's pass ends with the stop
+        stw r0, ws_vic@l(r12)
         stw r0, 0(r30)
         stw r0, 4(r30)
         stw r0, 8(r30)
@@ -1716,6 +1739,7 @@ ui_desc:
 ui_modef: .float %(modef)r
 ui_swayf: .float %(swayf)r
 ws_half: .float 0.5
+ws_vic: .word 0
 ws_data:
         .word 0
         .word 0

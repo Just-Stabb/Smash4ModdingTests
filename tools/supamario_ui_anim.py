@@ -161,7 +161,11 @@ def body_frames(ean, smash, motion, cmn=None, hit=None, hkn=None):
             assert a.name == {'cmn': CMN_ANIMS, 'hit': HIT_ANIMS, 'hkn': HKN_ANIMS}[s[6]][ai], (ai, a.name)
         frames.append(X.retarget(e, a, smash, at=[sf], root_scale=SCALE)[0])
         by = _local(e, a, 'b_C_Base', sf)[0][1]
-        base.append((_local(e, a, 'b_C_Pelvis', sf)[0][1] + by, by))
+        # v12 (the user: "Soaring Fist's animation also seems to take Supamario off of the ground"): floor_fix puts the
+        # lowest joint on the floor only on CONTACT frames (XV2's b_C_Base under 0.05 m); HKN's base sits higher (his
+        # feet stayed 2.8-4.4 units up, Wait's 0.9-1.4), so its frames were only lifted, never lowered. He stands through
+        # the whole move: every Soaring Fist frame is a contact frame (his feet on the floor as in Wait)
+        base.append((_local(e, a, 'b_C_Pelvis', sf)[0][1] + by, 0.0 if s[0] in SF_PARTS else by))
         keep.append(s[0] in KEEP_TRANS)
     rot_rest = frames[0]['RotN'][0]
     for f, fr in enumerate(frames):

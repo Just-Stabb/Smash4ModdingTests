@@ -133,6 +133,21 @@ STRIKE_S_HIT = anim.part_frame('counter_s_end', 280) - STRIKE_S_AT              
 CNT_S_VANISH2 = anim.part_frame('counter_s_in', 170) - STRIKE_S_AT                 # XV2's second vanish (170)
 CNT_S_SND = anim.part_frame('counter_s_end', 335) - STRIKE_S_AT                    # skill SE cue 1 (335)
 CNT_S_END = STRIKE_S_N - 1                                                         # the white body off (XV2 350)
+# v12 (the user: "add the moving forward 18 units and vanishing behind the opponent part of the rush counter and remove
+# the white glow"; XV2's clip xv2_1, 20 fps: the lunge ~18 frames, the vanish, behind the opponent): the short rush
+# (sway / spot dodge) lunges RS_FWD units over its first RS_FWD_N frames, vanishes at its second vanish (XV2's 170),
+# reappears RS_BEHIND past the nearest opponent facing it at XV2's 176 (the end of the hidden 156-176); no white body
+RS_FWD, RS_FWD_N = 18.0, 18
+RS_HIDE = CNT_S_VANISH2                                                            # 18
+RS_SHOW = anim.part_frame('counter_s_in', 176) - STRIKE_S_AT                       # 24
+RS_BEHIND = 9.0
+# v12 (the user: "Make it so the transformation counter has no maximum range and keeps that glow, but add the vanish and
+# make it freeze everyone"): XV2's BAC 1: hidden 156-176 (function 0x6), the Movement to the target 159-161, the
+# second vanish at 170: hidden from BLINK_HIDE, put at the attacker (RUSH_REACH in front of it) at BLINK_AT, shown at
+# BLINK_SHOW (the freeze box again there: the attacker held wherever it was); the world stopped from the read to the end
+BLINK_HIDE = anim.frame_of(anim.STRIKE, 1, 156)                                     # 5
+BLINK_AT = anim.frame_of(anim.STRIKE, 1, 159)                                       # 8
+BLINK_SHOW = anim.frame_of(anim.STRIKE, 1, 170)                                     # 19
 EXTRA_SCRIPTS = list(SWAY_SCRIPTS) + ['speciallwheavy_c2', SF.SCRIPT_START, SF.SCRIPT_REL]   # the custom-move slots'
                                                                     # scripts the build writes (v11: Soaring Fist's)
 ST_ESCAPE_N = cave.ST_ESCAPE_N
@@ -244,7 +259,9 @@ FX = [('start', 'BTL_AURA.eepk', 'MGT_HENSIN01.emp', 'BustN', (0.0, 0.0, 0.0), 1
       # entry) selects is XV2's CusAuraData, in the executable; aura 51's content identifies it.) The charge from the
       # stance's start, faded at its recovery (SS_OFF) or at the counter's read, where KiryokuMax's burst plays (the
       # clip's burst as the charge ends). (1511_GKS_KTM, the user's first pick, is dropped: it plays the same aura types)
-      ('ss_charge', 'BTL_AURA.eepk', 'KTN_GKS_Loop.emp', 'HipN', (0.0, 0.0, 0.0), 0.6),
+      # v12 (the user: "the aura is weak and too small"; XV2's charge clip: a column from his feet to about twice his
+      # height): x1.0 (v10-v11 0.6) on TransN, SS_CHARGE_UP m up (v10-v11 on the pelvis: it hung under him)
+      ('ss_charge', 'BTL_AURA.eepk', 'KTN_GKS_Loop.emp', 'TransN', (0.0, 2.2, 0.0), 1.0),
       ('ss_release', 'BTL_AURA.eepk', 'BoostGKS_End.emp', 'HipN', (0.0, 0.0, 0.0), 0.8),
       # v10 (the user's XV2 idle clip ui_in/idle_clip/idle.mp4: "our version lacks the rising sparkles"): the transformed
       # aura row's own loop (aura 51's HenshinStart 806: the FOK parts the skill's 848 plays too, PLUS Aura_FOKpiace on
@@ -403,6 +420,13 @@ def msc_values():
               'UI_FX_BURST': '0x%X' % fx_id('burst'), 'UI_SS_FX_BURST_SIZE': fl(round(0.9 * SCALE * SS_FX_BURST_SIZE, 3)),
               'UI_SS_RELEASE_SIZE': fl(round(0.8 * SCALE, 3)), 'UI_BONE_TRANS': '0x%X' % BONES['TransN']})
     import supamario_ui_fx11 as FX11
+    # v12: the rushes' vanishes, the transformation counter's world stop, the teeter
+    v.update({'UI_RS_FWD': fl(RS_FWD), 'UI_RS_FWD_N': fl(RS_FWD_N), 'UI_RS_HIDE': fl(RS_HIDE), 'UI_RS_SHOW': fl(RS_SHOW),
+              'UI_RS_BEHIND': fl(RS_BEHIND), 'UI_BLINK_HIDE': fl(BLINK_HIDE), 'UI_BLINK_AT': fl(BLINK_AT),
+              'UI_BLINK_SHOW': fl(BLINK_SHOW), 'UI_CNT_STOP_MAX': fl(STRIKE_N + 10),
+              'UI_ST_OTTOTTO': fl(cave.ST_OTTOTTO)})
+    import supamario_ui12 as U12
+    v['TS_AURA_SIZE'] = fl(U12.TS_AURA_SIZE)     # v12: Time Skip's aura bigger, following (ts_aura)
     v['UI_PIACE_Y'] = fl(FX11.PIACE_Y)   # v11: the sparkles on TransN at his hip's height (supamario_ui_fx11.piace)
     v.update(SF.msc_values())        # v11: Soaring Fist (tools/supamario_sf_build.py)
     return v
@@ -603,7 +627,10 @@ def scripts_for():
     for f in RUSH_AT:
         rush += [(f, [cmd('hit_log_clear', 0), rush_box(), cmd('hitbox_hold', 0, 2)]), (f + 2, [cmd('remove_all_hitboxes')])]
     game = {anim.FORM: timeline([(HAT_OFF_AT, hat_off()), (FX_BURST_AT, silver_on())]),
-            anim.STRIKE: timeline([(0, [freeze_box()]), (1, [cmd('remove_all_hitboxes')])] + rush +
+            anim.STRIKE: timeline([(0, [freeze_box()]), (1, [cmd('remove_all_hitboxes')]),
+                                   # v12: the freeze box again where he reappears (the attacker held wherever it was)
+                                   (BLINK_SHOW, [cmd('hit_log_clear', 0), freeze_box(RUSH_AT[0] - BLINK_SHOW)]),
+                                   (BLINK_SHOW + 1, [cmd('remove_all_hitboxes')])] + rush +
                                   [(STRIKE_AT, [cmd('hit_log_clear', 0), strike_box()]),
                                    (STRIKE_AT + 3, [cmd('remove_all_hitboxes')]), (CNT_END, silver_on())]),
             anim.DODGE: [], anim.SS: []}
@@ -646,10 +673,12 @@ def short_rush_scripts():
     game = timeline([(at, [freeze_box(RUSH_S_AT[0])]), (at + 1, [cmd('remove_all_hitboxes')])] + rush +
                     [(at + STRIKE_S_HIT, [cmd('hit_log_clear', 0), strike_box()]),
                      (at + STRIKE_S_HIT + 3, [cmd('remove_all_hitboxes')]), (at + CNT_S_END, silver_on())])
-    effect = timeline([(at, [graphic('vanish', follow=False)] + white_on(CNT_S_END)),
-                       (at + CNT_S_VANISH2, [graphic('vanish', follow=False)])] +
-                      [(at + f, hit_fx()) for f in RUSH_S_AT] + [(at + STRIKE_S_HIT, hit_fx(FINISH_FX)),
-                                                                 (at + CNT_S_END, white_to_glow())])
+    # v12: no white body (the user: "remove the white glow" of this one: the transformed glow stays on); the vanish
+    # where he disappears (RS_HIDE) and where he reappears behind the opponent (RS_SHOW)
+    effect = timeline([(at, [graphic('vanish', follow=False)]),
+                       (at + RS_HIDE, [graphic('vanish', follow=False)]),
+                       (at + RS_SHOW, [graphic('vanish', follow=False)])] +
+                      [(at + f, hit_fx()) for f in RUSH_S_AT] + [(at + STRIKE_S_HIT, hit_fx(FINISH_FX))])
     sound = timeline([(at, [cmd('sound_effect', se_id('ui_vanish'))]),
                       (at + CNT_S_SND, [cmd('sound_effect', se_id('ui_success'))])])
     expression = timeline([(at + STRIKE_S_HIT, [cmd('rumble', 0x12, 0)])])
@@ -698,7 +727,10 @@ def glow_restore():
 
 
 def strip_glow_restore(cmds):
-    """the commands without any glow_restore() block (the earlier moves' tests compare their scripts without it)"""
+    """the commands without any glow_restore() block (the earlier moves' tests compare their scripts without it); v12:
+    nor supamario_ui12.blue_arcs' (the arcs' colour while transformed)"""
+    import supamario_ui12 as U12
+    cmds = U12.strip_blocks(cmds)
     blk = [(c.ident, c.params) for c in glow_restore()]
     out, i = [], 0
     while i < len(cmds):
@@ -739,6 +771,8 @@ def scripts(body_dir):
             f.scripts[acmd.crc(SCRIPT[m])] = body + [acmd.Command(acmd.END)]     # F.L.U.D.D.'s replaced
         if part == 'effect':
             restore_glow(f, own)
+            import supamario_ui12 as U12
+            U12.blue_arcs(f, own)        # v12: his attack arcs light blue while transformed
         for name, bodies in extra_scripts().items():   # v7 / v10: the custom-move slots' scripts (F.L.U.D.D.'s replaced)
             f.scripts[acmd.crc(name)] = bodies[part] + [acmd.Command(acmd.END)]
         if part == 'game':
@@ -1185,6 +1219,9 @@ def effects(cmn_dir, fx_dir):
     if SF_SKILL:                         # v11: Soaring Fist's effects, after every earlier set
         SF_CMN.update(SF.effects(p, e, SF_SKILL[0], SF_SKILL[1], rep))
     v11_fixes(p, cmn_dir, rep)           # v11: the streaks' place, the aura's flipbooks and spread, the sparkles
+    if SF_SKILL:                         # v12: Soaring Fist's 3D shot, the charge / Time Skip auras, the blue arc
+        import supamario_ui12 as U12
+        U12.effects(p, e, SF_SKILL[0], rep)
     life = aura_life(p)
     assert AURA_EVERY >= life, ('v6: the renewal must outlast the aura sprites (at most %d generations)'
                                 % AURA_GENERATIONS, AURA_EVERY, life)

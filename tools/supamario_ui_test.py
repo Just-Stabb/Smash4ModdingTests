@@ -160,6 +160,12 @@ class Game:
         if sid == 0x1E:
             self.log.append((self.n, 'sound', tuple(a)))
             return 0
+        if sid == 0x39:                                 # v12: VisibilityModule (0x2710, on)
+            self.log.append((self.n, 'visibility', tuple(a)))
+            return 0
+        if sid == 0x44:                                 # v12: PhysicsModule (7 the smash charge's shake, 8 its end)
+            self.log.append((self.n, 'physics', tuple(a)))
+            return 0
         return 0
 
     def ev(self, what, frm=None):
@@ -342,14 +348,18 @@ def form_tests(r):
 
 
 def counter_tests(r):
-    """v2: XV2's rush (BAC 1): he stays, faces the attacker, closes a gap only on frames GAP_FROM-GAP_TO"""
-    for what, rec, want_x, turn in (
-            ('a fighter in melee range to his right', (10.0, 1.0, True, 17.0, 0.0, 0), 10.0, True),
-            ('a fighter 30 to his right (a gap closed to 9 short of it)', (10.0, 1.0, True, 40.0, 0.0, 0), 31.0, True),
-            ('a fighter far to his right (the gap closed by at most 6 x 12.6)', (10.0, 1.0, True, 200.0, 0.0, 0),
-             10.0 + 6 * B.GAP_V, True),
-            ('a fighter to his left in range', (5.0, -1.0, True, 3.0, 0.0, 0), 10.0, False),
-            ('nobody found (no 0x21000012)', (7.0, 1.0, False, 0.0, 0.0, 0), 10.0, True)):
+    """v2: XV2's rush (BAC 1): he stays, faces the attacker; v12 (the user: "no maximum range ... add the vanish and make it
+    freeze everyone"): hidden at BLINK_HIDE, put RUSH_REACH in front of the attacker (the cave's record) at BLINK_AT
+    wherever it is (v2-v11: a gap closed at most GAP_V a frame), shown at BLINK_SHOW, the world stop asked every frame"""
+    for what, rec, want, turn in (
+            ('a fighter in melee range to his right', (10.0, 1.0, True, 17.0, 0.0, 0), (17.0 - B.RUSH_REACH, 0.0), True),
+            ('a fighter 30 to his right', (10.0, 1.0, True, 40.0, 0.0, 0), (40.0 - B.RUSH_REACH, 0.0), True),
+            ('a fighter far to his right (v12: no maximum range; v11 stopped at 10 + 6 x 12.6)',
+             (10.0, 1.0, True, 200.0, 0.0, 0), (200.0 - B.RUSH_REACH, 0.0), True),
+            ('a fighter to his left in range', (5.0, -1.0, True, 3.0, 0.0, 0), (3.0 + B.RUSH_REACH, 0.0), False),
+            ('a fighter high in the air to his right (v12: there, airborne)', (10.0, 1.0, True, 60.0, 40.0, 0),
+             (60.0 - B.RUSH_REACH, 40.0), True),
+            ('nobody found (no 0x21000012)', (7.0, 1.0, False, 0.0, 0.0, 0), (10.0, 0.0), True)):
         g, vm = form_run(r, counter_at=40, record=rec, frames=B.FORM_N + B.STRIKE_N + 5)
         ms = [e[2] for e in g.ev('motion')]
         check('counter, %s: the counter\'s motion (0x235) after the transformation\'s' % what, ms[:2],
@@ -357,16 +367,25 @@ def counter_tests(r):
         at = [e for e in g.ev('motion') if e[2] == B.MOT_STRIKE][0][0]
         check('  at once (the frame the record is read)', at, 42)
         check('  turned to face it' if turn else '  not turned', len(g.ev('turn')), 1 if turn else 0)
-        check('  stays where he is but for the gap: X %.1f, Y 0' % want_x, (round(g.x, 3), round(g.y, 3)),
-              (round(want_x, 3), 0.0))
-        moves = sorted({e[0] - at for e in g.ev('set') if e[2] == 0x0f000004})
-        check('  the gap closed only on frames %d-%d' % (B.GAP_FROM, B.GAP_TO), all(B.GAP_FROM <= m <= B.GAP_TO for m in moves),
-              True)
+        check('  v12: put at X %.1f, Y %.1f (in front of the attacker; nobody: where he was)' % want,
+              (round(g.x, 3), round(g.y, 3)), (round(want[0], 3), round(want[1], 3)))
+        moves = sorted({e[0] - at for e in g.ev('set') if e[2] in (0x0f000000, 0x0f000001)})
+        check('  v12: placed only on frame %d (XV2\'s Movement 159)' % B.BLINK_AT, moves, [B.BLINK_AT] if rec[2] else [])
+        check('  v12: airborne there when it is off his ground (more than %g up / down)' % B.GROUND_DY, g.air,
+              rec[4] > B.GROUND_DY)
+        vis = [(e[0] - at, e[2][1]) for e in g.ev('visibility')]
+        check('  v12: hidden at %d (XV2 156), shown at %d (XV2 170: the second vanish), shown at the end' % (
+            B.BLINK_HIDE, B.BLINK_SHOW), vis[:2] + vis[-1:], [(B.BLINK_HIDE, 0), (B.BLINK_SHOW, 1), (B.STRIKE_N - 1, 1)])
+        end = [e for e in g.ev('status') if e[2] in (0, 0xE)]
+        asks = sorted({e[0] for e in g.ev('set') if e[2] == B.V_STOP and e[3] > 0.5})
+        check('  v12: the world stop asked (TIMER_6 %g) every frame of the counter (the cave\'s, Secret Sensation\'s), '
+              '0 at its end' % B.SS_STOP_ASK,
+              (asks == list(range(at, end[0][0] + 1)) if end else False,
+               [e[3] for e in g.ev('set') if e[2] == B.V_STOP][-1:]), (True, [0.0]))
         check('  the shape off at once', [e[2] for e in g.ev('shield') if e[0] == at][:1], [(0, 2, 0, 0, 1)])
         check('  transformed from then on (TIMER_0 2000)',
               [e[3] for e in g.ev('set') if e[2] == C.V_FORM and e[0] == at][-1:], [2000.0])
         ints = sorted({e[0] for e in g.ev('set') if e[2] == 0x0F00011B and e[0] >= at})
-        end = [e for e in g.ev('status') if e[2] in (0, 0xE)]
         check('  intangible every frame of the counter', ints == list(range(at, end[0][0] + 1)) if end else False, True)
         check('  the end after the counter\'s %d frames' % B.STRIKE_N, end[0][0] - at if end else None, B.STRIKE_N - 1)
 
@@ -839,13 +858,17 @@ def script_tests(out, ts_out):
     hb = [c for c in g if nm(c).lower() == 'extra_special_hitbox']
     syn = acmd.INFO[acmd.BY_NAME['extra_special_hitbox']]['syntax']
     d = [dict(zip(syn, c.params)) for c in hb]
-    check('the counter (XV2\'s BAC 1): the freeze, 14 rush hits, the finisher', len(hb), 16)
-    if len(hb) == 16:
-        fz, ru, st = d[0], d[1:15], d[15]
+    check('the counter (XV2\'s BAC 1): the freeze, v12: the freeze again where he reappears (%d), 14 rush hits, the '
+          'finisher' % B.BLINK_SHOW, len(hb), 17)
+    if len(hb) == 17:
+        fz, fz2, ru, st = d[0], d[1], d[2:16], d[16]
         check('  the freeze at 0: ID 1 Part 1, no damage / knockback, the attacker held to the first rush hit (%d), '
               'a 3 m sphere' % B.RUSH_AT[0],
               (fz['ID'], fz['Part'], fz['Damage'], fz['KBG'], fz['BKB'], fz['HitstopFrames'], fz['SelfHitstopFrames'],
                round(fz['Size'], 2)), (1, 1, 0.0, 0, 0, B.RUSH_AT[0], 0, B.FREEZE_SIZE))
+        check('  v12: again at %d, held to the same first rush hit (%d frames)' % (B.BLINK_SHOW, B.RUSH_AT[0] - B.BLINK_SHOW),
+              (fz2['ID'], fz2['Damage'], fz2['HitstopFrames'], round(fz2['Size'], 2)),
+              (1, 0.0, B.RUSH_AT[0] - B.BLINK_SHOW, B.FREEZE_SIZE))
         check('  the rush: 14 x %.1f%%, angle 361, KBG 0, BKB 15' % B.RUSH_DMG,
               {(round(x['Damage'], 3), x['Angle'], x['KBG'], x['BKB']) for x in ru}, {(B.RUSH_DMG, 361, 0, 15)})
         check('  the finisher: %.1f%%, angle 35, BKB 80, KBG 75, no clank' % B.FINISH_DMG,
@@ -853,11 +876,12 @@ def script_tests(out, ts_out):
     holds = [c.params for c in g if nm(c).lower() == 'hitbox_hold']
     check('  every rush hit held (Hitbox_Hold(0, 2))', holds, [[0, 2]] * 14)
     clears = sum(1 for c in g if nm(c).lower() == 'hit_log_clear')
-    check('  the hit log cleared before each rush hit and the finisher (15)', clears, 15)
+    check('  the hit log cleared before the second freeze, each rush hit and the finisher (16)', clears, 16)
     frames = [int(c.params[0]) for c in g if nm(c).upper() == 'FRAME']
-    want = [1] + [x for f in B.RUSH_AT for x in (f, f + 2)] + [B.STRIKE_AT, B.STRIKE_AT + 3, B.CNT_END]
-    check('  frames: freeze off 1, the rush at %s (2 frames each), the finisher %d, the silver swap %d (v3)' % (
-        B.RUSH_AT, B.STRIKE_AT, B.CNT_END), frames, want)
+    want = [1, B.BLINK_SHOW, B.BLINK_SHOW + 1] + [x for f in B.RUSH_AT for x in (f, f + 2)] + [B.STRIKE_AT, B.STRIKE_AT + 3,
+                                                                                               B.CNT_END]
+    check('  frames: freeze off 1, v12: the second freeze %d / off %d, the rush at %s (2 frames each), the finisher %d, '
+          'the silver swap %d (v3)' % (B.BLINK_SHOW, B.BLINK_SHOW + 1, B.RUSH_AT, B.STRIKE_AT, B.CNT_END), frames, want)
     ov = [nm(c) for c in f['effect'].script('speciallwlight') if nm(c) in ('Color_Overlay', 'Terminate_Overlays',
                                                                           'Outline_Shell')]
     check('the transformation\'s white body: Color_Overlay + Outline_Shell at 10, Terminate_Overlays + the shell off at 220',
@@ -937,6 +961,9 @@ def script_tests(out, ts_out):
     import copy
     want_eff = copy.deepcopy(b['effect'])
     restored = B.restore_glow(want_eff, skip)       # v9: Time Skip's outline ends / the falls and landings: the glow back
+    import supamario_ui12 as U12
+    arcs = U12.blue_arcs(want_eff, skip)            # v12: the arcs light blue while transformed
+    arc_tests(f, arcs)
     for p in f:
         for h, s in b[p].scripts.items():
             if h in skip:
@@ -956,6 +983,43 @@ def script_tests(out, ts_out):
     check('v9: the glow restored after Time Skip\'s two outline ends and at the start of the %d falls / landings'
           % len(B.GLOW_AFTER), sorted(w for _h, w in restored), ['end'] * 2 + ['start'] * len(B.GLOW_AFTER))
     silver_script_tests(f, b)
+
+
+def arc_tests(f, arcs):
+    """v12 (the user: "make Supamario's Ultra Instinct hitbox trail color into a somewhat light blue ... up air's trail
+    should be blue with its glow inside rather than brown"): every arc request of his normals followed, while
+    transformed (TIMER_0 > 1500), by LAST_EFFECT_SET_COLOR light blue (the common greyscale arcs: blue edge, white core);
+    the smash arc (his own orange PtcMarioSmashHed) swapped for its blue copy"""
+    import supamario_ui12 as U12
+    names = {acmd.crc(n): n for n in ('attack11', 'attack12', 'attack13', 'attacks3', 'attacks3hi', 'attacks3lw',
+                                       'attackhi3', 'attacklw3', 'attacks4', 'attacks4hi', 'attacks4lw', 'attackhi4',
+                                       'attacklw4', 'attackairf', 'attackairb', 'attackairhi', 'downattacku',
+                                       'downattackd', 'cliffattackquick')}
+    got = {names.get(h, hex(h)) for h, _w in arcs}
+    want = {'attack11', 'attack12', 'attack13', 'attacks3', 'attacks3hi', 'attacks3lw', 'attackhi3', 'attacklw3',
+            'attacks4', 'attacks4hi', 'attacks4lw', 'attackhi4', 'attacklw4', 'attackairf', 'attackairb', 'attackairhi',
+            'downattacku', 'downattackd', 'cliffattackquick', '0x916dc37e'}
+    check('v12: the arcs light blue while transformed in %d scripts (jab 1-3, tilts, smashes, forward / back / up air, '
+          'getup / ledge attacks)' % len(want), sorted(got), sorted(want))
+    eff = f['effect']
+    ua = eff.script('attackairhi')
+    i = [k for k, c in enumerate(ua) if c.params and c.params[0] == 0x0100008E][0]
+    check('  up air: EFFECT_FOLLOW_FLIP 0x0100008E, then Float_Var_Compare(TIMER_0 > 1500) True { LAST_EFFECT_SET_COLOR%s }'
+          % (U12.ARC_IDS[0x0100008E],),
+          [(c.name, c.params) for c in ua[i + 1:i + 4]],
+          [('Float_Var_Compare', [C.V_FORM, 5, B.UI_TRANSFORMED_OVER]), ('True', [6]),
+           ('LAST_EFFECT_SET_COLOR', U12.f32(U12.ARC_IDS[0x0100008E]))])
+    for rgb in set(U12.ARC_IDS.values()):
+        edge = [round(0.32 * c, 2) for c in rgb]
+        check('  %s on the common arcs\' greyscale (colour 1 grey 0.32-0.83, colour 0 white): the edge %s light blue '
+              '(blue the most, red the least), the core past 1 (white)' % (rgb, edge),
+              (edge[2] > edge[1] > edge[0], min(rgb) * 1.0 >= 0.8 and max(rgb) > 1.0), (True, True))
+    us = eff.script('attackhi4')
+    sw = [c for c in us if c.params and c.params[0] == U12.FX_IDS['hed_blue']]
+    check('  up smash: its own arc (0x%08X, PtcMarioSmashHed: orange keys) requested again on the blue copy (0x%08X) '
+          'while transformed, the orange one ended at once, the blue one ended where it is' % (U12.HED_ID,
+                                                                                              U12.FX_IDS['hed_blue']),
+          [c.name for c in sw], ['EFFECT_FLIP', 'Terminate_Graphic_Effect'])
 
 
 def sway_script_tests(f):
@@ -1168,6 +1232,38 @@ def motion_tests(out, ts_out):
            ('counter_s_end', 348.3)])
 
 
+def v12_effect_tests(p):
+    """v12: the smash arc's blue copy; Secret Sensation's charge stronger; Time Skip's aura following, higher, stronger;
+    Soaring Fist's 3D shot (supamario_ui12)"""
+    import supamario_ui12 as U12
+    src, blue = p.find_set(U12.HED_SET), p.find_set(U12.HED_BLUE)
+    ok = []
+    for a, b in zip(p.sets[src]['emitters'], p.sets[blue]['emitters']):
+        if a['data'] is None:
+            continue
+        for track in (0, 1):
+            for ka, kb in zip(p.color_keys(a['data'], track), p.color_keys(b['data'], track)):
+                ok.append(tuple(round(v, 3) for v in kb[:3]) == tuple(round(v, 3) for v in U12._blue(ka[:3])))
+                if ka[0] > ka[2] + 0.2:
+                    ok.append(kb[2] > kb[0])
+    check('v12: PtcSupamarioUiSmashHedBlue = PtcMarioSmashHed with every colour key\'s red and blue swapped, lifted %g '
+          'to white (its orange keys blue: (1, 0.64, 0.24) -> %s)' % (U12.ARC_LIFT, tuple(round(v, 2) for v in
+                                                                                         U12._blue((1, 0.64, 0.24)))),
+          (bool(ok), all(ok)), (True, True))
+    # Time Skip's aura
+    si = p.find_set(U12.TS_SET)
+    ems = [e['data'] for e in p.sets[si]['emitters'] if e['data'] is not None]
+    gpu = [bool(struct.unpack_from('>I', em, 4)[0] & 0x00800000) for em in ems]
+    fol = [struct.unpack_from('>I', em, 0x310)[0] for em in ems]
+    keys = [bytes(p.shader_entry(p.field(em, 'shader_index')))[4] & 0x04 for em in ems]
+    check('v12: Time Skip\'s aura (%s, %d emitters) follows him: GPU ones follow 0 on a live-matrix variant (key byte 4 '
+          '0x04), CPU ones follow 2' % (U12.TS_SET, len(ems)),
+          all((f_ == 0 and k) if g_ else f_ == 2 for g_, f_, k in zip(gpu, fol, keys)), True)
+    ys = [p.field(em, 'emitter_translation')[1] for em in ems]
+    check('  its parts at least %g up (x the call\'s %g: none under his feet; v11: down to -0.86 x 1.75)' % (
+        U12.TS_AURA_UP - 1.0, U12.TS_AURA_SIZE), min(ys) >= U12.TS_AURA_UP - 1.0, True)
+
+
 def effect_tests(out, ts_out):
     import ptcl
     d = os.path.join(out, 'fighter', 'supamario', 'effect', 'supamario')
@@ -1180,7 +1276,8 @@ def effect_tests(out, ts_out):
     check('new sets: PtcSupamarioUi* (v10: KTN_GKS_Loop in two: 17 emitters; v11: Soaring Fist\'s Hkn_Fir / Hkn_Wav and '
           'BTL_CMN\'s GHit / GHitSmk)', sorted(p.set_name(i) for i in range(n, len(p.sets))),
           sorted(['PtcSupamarioUi' + x[2][:-4] for x in B.FX] + ['PtcSupamarioUiKTN_GKS_Loop_2'] +
-                 ['PtcSupamarioSf' + x[:-4] for x in SF.SKILL_EMPS + SF.CMN_EMPS]))
+                 ['PtcSupamarioSf' + x[:-4] for x in SF.SKILL_EMPS + SF.CMN_EMPS] + ['PtcSupamarioUiSmashHedBlue']))
+    v12_effect_tests(p)
 
 
 def aura_tests(out, ts_out):
@@ -1640,6 +1737,9 @@ def ids_from_json(out):
     B.OVERLAYS[:] = js['silver']['overlays']
     B.MESH_INDEX.clear()
     B.MESH_INDEX.update(js.get('mesh_index', {}))
+    import supamario_ui12 as U12
+    if 'v12_hed_blue' in js['fx']:
+        U12.FX_IDS['hed_blue'] = int(js['fx']['v12_hed_blue']['id'], 16)
 
 
 INSTALL_DIRS = ('fighter', 'sound', 'param')

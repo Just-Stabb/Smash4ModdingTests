@@ -555,7 +555,7 @@ int func_40(int arg0)
 // with the custom slot int 0x10000048 (copied into this weapon's 0x10000005) = (level - 1) x 2 + 0 the final punch /
 // 1 a non-final one: it puts itself SF_X0 in front of him at his feet + SF_Y (his slot found by kind: the nearest
 // fighter of kind SF_KIND to where it was made), plays its motion (0 the final punch's script, 1 / 2 a level 2 / 3
-// non-final one's: their ACMD has the hitbox from frame 2 and the wave effect), still for SF_MOVE_FROM frames, then
+// non-final one's, v12: 3 the uncharged punch's: their ACMD has the hitbox from frame 2 and the wave effect), still for SF_MOVE_FROM frames, then
 // flies straight at SF_SPEED (XV2's 80 m/s) along his facing, no tracking, until its life (SF_LIFE_n by level, XV2's
 // 15 / 25 / 35) or a wall. A hit, a shield or a clank removes it (the fireball's own hit method: bits 0x13 / 0x4).
 int sf_code;
@@ -662,7 +662,11 @@ void sf_main()
         PostureModule(0x3, WorkModuleF(0, 0x0f000020 + 0x4 * owner) + f * SF_X0,
                       WorkModuleF(0, 0x0f000021 + 0x4 * owner) + SF_Y, 0);
     }
-    if (sf_code % 0x2 == 0)
+    if (sf_level == 0x1)
+    {
+        func_24(0x3, 0, 1.0f);      // v12: the uncharged punch's own script (soaringfist1: fixed knockback)
+    }
+    else if (sf_code % 0x2 == 0)
     {
         func_24(0, 0, 1.0f);
     }

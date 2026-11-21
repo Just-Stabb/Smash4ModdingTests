@@ -41576,16 +41576,13 @@ void ts_e11()
 // parts at the bones' places of SpecialS frame 0, forward +X) at his ground point turned to his facing; at the move's
 // start (ts_init: XV2's frame 0) and every TS_AURA_EVERY frames of a held charge (its emission lasts 40 frames). v3's
 // Hit's aura (BTL_AURA's BoostV_Loop) replaced
+// v12 (the user: "Time Skip/Jump Spike's aura is also too small, weak, doesn't follow Supamario when charging and
+// placed too low"; the screenshot: its purple streaks left behind and under him as he drifts): a FOLLOWING request on
+// TransN (tools/supamario_ui12.py ts_aura: the set in TransN's frame, higher, its particles on him, stronger), bigger
+// (TS_AURA_SIZE); the dash fades it (ts_dash_start)
 void ts_aura()
 {
-    float ry;
-    ry = 0.0f;
-    if (WorkModuleF(0, 0x0f000003) < 0.0f)
-    {
-        ry = M_PI;
-    }
-    EffectModule(0x3, TS_FX_AURA, WorkModuleF(0, 0x0f000000), WorkModuleF(0, 0x0f000001), WorkModuleF(0, 0x0f000002),
-                 0, ry, 0, TS_AURA_SIZE, 0, 0xffffffff);
+    EffectModule(0x2717, TS_FX_AURA, UI_BONE_TRANS, 0, 0, 0, 0, 0, 0, TS_AURA_SIZE, 0);
 }
 
 // v3 (the user: the darkening and the glass must end if the move is cut before the punch). Two builds
@@ -41735,6 +41732,7 @@ float ts_vdash()
 // frame, so its scripts (their clocks ran on while the pose was held) start again there
 void ts_dash_start(int restart)
 {
+    EffectModule(0x2723, TS_FX_AURA, 0, 0);     // v12: the charge's aura (following) faded as he dashes
     WorkModule(0, 3.0f, TS_V_PH);
     WorkModule(0, 0.0f, TS_V_K);
     if (restart != 0)
@@ -42547,10 +42545,11 @@ int ui_can_form(float st)
     return 0;
 }
 
-// the autododge's statuses: Wait, Walk, WalkBrake, Squat .. SquatRv (the cave's)
+// the autododge's statuses: Wait, Walk, WalkBrake, Squat .. SquatRv (the cave's); v12 (the user: "teetering on an
+// edge also allows for the autododge"): Ottotto / OttottoWait (0x7B / 0x7C, the teeter on a ledge's edge)
 int ui_can_dodge(float st)
 {
-    if (global18 == 0 && (st <= 2.0f || st >= 17.0f && st <= 21.0f))
+    if (global18 == 0 && (st <= 2.0f || st >= 17.0f && st <= 21.0f || st == UI_ST_OTTOTTO || st == UI_ST_OTTOTTO + 1.0f))
     {
         return 0x1;
     }
@@ -42805,6 +42804,7 @@ void ui_counter_go(int shortr)
     {
         WorkModule(0, UI_STRIKE_N, 0x0100000F);     // v10: the counter's length (ui_loop's end)
         func_22(UI_MOT_STRIKE, 0, 1.0f);
+        WorkModule(0, UI_SS_STOP_ASK, UI_V_STOP);   // v12: the world stopped (the cave) from the read (ui_blink)
     }
     ui_still();
 }
@@ -42814,32 +42814,109 @@ void ui_counter()
     ui_counter_go(0);
 }
 
-// v2: XV2's Movement to the target (BAC 1's 156-161): only a gap closed, he stays where he is otherwise: on frames
-// UI_GAP_FROM-UI_GAP_TO, toward UI_RUSH_REACH short of the attacker (found: 0x21000012), at most UI_GAP_V a frame
-void ui_gap(float n)
+// v12: put him at (x, y): on the ground the X only while the place is within UI_GROUND_DY of his height, else there,
+// airborne (Secret Sensation's way: func_94, his air kinetics, no gravity: ui_still holds him)
+void ui_place(float x, float y)
+{
+    WorkModule(0, x, 0x0f000000);
+    if (y - WorkModuleF(0, 0x0f000001) > UI_GROUND_DY || WorkModuleF(0, 0x0f000001) - y > UI_GROUND_DY)
+    {
+        WorkModule(0, y, 0x0f000001);
+        if (global18 == 0)
+        {
+            func_94();
+            ts_air_kinetics();
+            GroundModule(0x2710, 0x5);
+        }
+        cb_speed(0.0f, 0.0f);
+        KineticModule(0x11, 0x2, 0.0f, 0.0f);
+    }
+}
+
+// v12: facing world X sign `side` (turned when not)
+void ui_face(float side)
+{
+    if (side * WorkModuleF(0, 0x0f000003) < 0.0f)
+    {
+        PostureModule(0x1);
+        PostureModule(0x2);
+    }
+}
+
+// v12 (the user: "Make it so the transformation counter has no maximum range and keeps that glow, but add the vanish
+// and make it freeze everyone"; XV2's BAC entry 1: the vanish at 151, hidden 156-176 (function 0x6), the Movement to
+// the target 159-161 at 2.5 m a frame, the vanish again at 170): the long rush (the transformation's counter). The
+// world stop (the cave's, Secret Sensation's: TIMER_6 asked every frame, the fallback UI_CNT_STOP_MAX) from the read
+// to the counter's end: everyone but him (and the attacker: the cave lets the fighter whose attack it recorded step, so
+// the rush's hits land and it reacts, held by the freeze box) stopped; hidden from UI_BLINK_HIDE (VisibilityModule:
+// his following effects with him), at UI_BLINK_AT put UI_RUSH_REACH in front of the attacker (the cave's record:
+// 0x01000008 / 9, found 0x21000012) wherever it is (v2-v11: ui_gap, at most UI_GAP_V a frame), shown again at
+// UI_BLINK_SHOW (the second vanish)
+void ui_blink(float n)
 {
     float face;
-    float dx;
-    if (n < UI_GAP_FROM - 0.5f || n > UI_GAP_TO + 0.5f || WorkModule(0x10, 0x21000012) == 0)
+    if (n < UI_CNT_STOP_MAX + 0.5f)
     {
-        return;
+        WorkModule(0, UI_SS_STOP_ASK, UI_V_STOP);
     }
-    face = WorkModuleF(0, 0x0f000003);
-    dx = (WorkModuleF(0, 0x01000008) - WorkModuleF(0, 0x0f000000)) * face - UI_RUSH_REACH;
-    if (dx <= 0.0f)
+    else
     {
-        return;
+        WorkModule(0, 0.0f, UI_V_STOP);
     }
-    if (dx > UI_GAP_V)
+    if (n > UI_BLINK_HIDE - 0.5f && n < UI_BLINK_HIDE + 0.5f)
     {
-        dx = UI_GAP_V;
+        VisibilityModule(0x2710, 0);
     }
-    WorkModule(0, dx, 0x0f000004);
+    if (n > UI_BLINK_AT - 0.5f && n < UI_BLINK_AT + 0.5f && WorkModule(0x10, 0x21000012) != 0)
+    {
+        face = WorkModuleF(0, 0x0f000003);
+        ui_place(WorkModuleF(0, 0x01000008) - face * UI_RUSH_REACH, WorkModuleF(0, 0x01000009));
+    }
+    if (n > UI_BLINK_SHOW - 0.5f && n < UI_BLINK_SHOW + 0.5f)
+    {
+        VisibilityModule(0x2710, 0x1);
+    }
+}
+
+// v12 (the user: "add the moving forward 18 units and vanishing behind the opponent part of the rush counter and remove
+// the white glow"; XV2's clip xv2_1: he lunges ~18 frames, vanishes and is behind the opponent): the short rush (the
+// sway's / spot dodge's counter): UI_RS_FWD units forward over his first UI_RS_FWD_N frames (ground speed, not off an
+// edge: GroundModule 2), hidden at UI_RS_HIDE (the second vanish), put UI_RS_BEHIND past the nearest opponent (its far
+// side) facing it, shown again at UI_RS_SHOW
+void ui_rush_s(float n)
+{
+    float ox;
+    float d;
+    if (n < UI_RS_FWD_N - 0.5f && global18 == 0)
+    {
+        KineticModule(0x11, 0x3, UI_RS_FWD / UI_RS_FWD_N * WorkModuleF(0, 0x0f000003), 0.0f);
+    }
+    if (n > UI_RS_HIDE - 0.5f && n < UI_RS_HIDE + 0.5f)
+    {
+        VisibilityModule(0x2710, 0);
+        if (WorkModuleF(0, 0x0f00000B) > 0.5f)
+        {
+            ox = WorkModuleF(0, 0x0f000008);
+            d = 1.0f;
+            if (ox < WorkModuleF(0, 0x0f000000))
+            {
+                d = -1.0f;
+            }
+            ui_place(ox + d * UI_RS_BEHIND, WorkModuleF(0, 0x0f000009));
+            ui_face(0.0f - d);
+        }
+    }
+    if (n > UI_RS_SHOW - 0.5f && n < UI_RS_SHOW + 0.5f)
+    {
+        VisibilityModule(0x2710, 0x1);
+    }
 }
 
 // the end: Wait on the ground, Fall in the air (his gravity back)
 void ui_finish()
 {
+    VisibilityModule(0x2710, 0x1);      // v12: (the vanishes)
+    WorkModule(0, 0.0f, UI_V_STOP);     // v12: the long rush's world stop ends with it
     if (global18 == 0)
     {
         KineticModule(0x11, 0x3, 0.0f, 0.0f);
@@ -42887,7 +42964,14 @@ void ui_loop()
         return;
     }
     WorkModule(0, 2.0f, 0x0F00011B);        // v2: intangible through the whole counter (XV2: invulnerable 151-499)
-    ui_gap(n);
+    if (WorkModuleF(0, 0x0100000F) < UI_STRIKE_N - 0.5f)
+    {
+        ui_rush_s(n);                       // v12: the short rush's lunge and vanish behind the opponent
+    }
+    else
+    {
+        ui_blink(n);                        // v12: the long rush's world stop and vanish to the attacker
+    }
     if (n > WorkModuleF(0, 0x0100000F) - 1.5f)
     {
         ui_finish();
@@ -42896,6 +42980,8 @@ void ui_loop()
 
 void ui_end()
 {
+    VisibilityModule(0x2710, 0x1);      // v12: any exit (a KO, ...) shows him and ends the counter's world stop
+    WorkModule(0, 0.0f, UI_V_STOP);
     WorkModule(0, 0.0f, UI_V_SS);
     ShieldModule(0, 0x2, 0, 0, 0x1);
     if (ui_state() == UI_FORMING)
@@ -42995,7 +43081,7 @@ void ui_rush_init()
     WorkModule(0, UI_MODE_FORM, UI_V_SS);
     WorkModule(0, 0.0f, UI_V_SHAPE);
     KineticModule(0, 0x6);
-    GroundModule(0x2710, 0x1);
+    GroundModule(0x2710, 0x2);                  // v12: its lunge stops at an edge (v8-v11: 1)
     ui_counter_go(0x1);                         // the shape off, turned, phase 1, v10: the SHORT rush, held
 }
 
@@ -43081,6 +43167,7 @@ void ui_dodge_loop()
 
 void ui_dodge_end()
 {
+    VisibilityModule(0x2710, 0x1);      // v12: (the short rush's vanish, entered from the sway)
     WorkModule(0, 0.0f, UI_V_SS);
     KineticModule(0x11, 0x3, 0.0f, 0.0f);
     GroundModule(0x2710, 0x1);
@@ -43426,6 +43513,12 @@ float sf_arrive(float lv, float k, float dx)
     return sf_punch_at(lv, k) + SF_MOVE_FROM + fr;
 }
 
+// v12: the farthest a punch of level lv reaches (its centre's last place + its reach), less SF_EDGE
+float sf_reach(float lv)
+{
+    return SF_X0 + SF_REACH + SF_SPEED * (sf_life(lv) - SF_MOVE_FROM) - SF_EDGE;
+}
+
 // punch k: the weapon told its kind (custom slot, put back after: kame_n_generate's way)
 void sf_fire(float lv, float k)
 {
@@ -43464,6 +43557,7 @@ void sf_hold(float r, float lv)
     float side;
     float v;
     float ty;
+    float far;
     x = WorkModuleF(0, 0x0f000000);
     y = WorkModuleF(0, 0x0f000001);
     f = WorkModuleF(0, 0x0f000003);
@@ -43478,6 +43572,17 @@ void sf_hold(float r, float lv)
             if ((sx - x > 0.01f || sx - x < -0.01f || fy - y > 0.01f || fy - y < -0.01f) && dx > -SF_BEHIND &&
                 fy > y - SF_LANE_DOWN && fy < y + SF_LANE_UP)
             {
+                // v12: the non-final punches push harder (SF_NONFINAL's knockback 40): an opponent pushed past the
+                // punches' reach (the level's life) is read (and, held below, kept) just inside it
+                far = dx - sf_reach(lv);
+                if (far > SF_PUSHED)
+                {
+                    far = 0.0f;                 // beyond what a punch's push can carry: as far as it is
+                }
+                else if (far > 0.0f)
+                {
+                    dx = sf_reach(lv);
+                }
                 an = -1.0f;
                 pk = -1.0f;
                 pa = 0.0f;
@@ -43528,6 +43633,10 @@ void sf_hold(float r, float lv)
                     {
                         WorkModule(0, need, 0x0f000058 + 0x8 * s);
                     }
+                    if (far > 0.0f)
+                    {
+                        WorkModule(0, x + f * dx, 0x0f000020 + 0x4 * s);     // v12: back inside the next punch's reach
+                    }
                     if (fy > y + SF_GROUNDED)
                     {
                         // in the air: pulled to the lane (its middle on the punches' line)
@@ -43556,6 +43665,7 @@ void sf_release(float n)
         lv = 3.0f;
     }
     SoundModule(0x2714, SF_SND_CHARGE);
+    PhysicsModule(0x8);                 // v12: the charge's body shake off (sf_end's note)
     WorkModule(0, lv, 0x0100000D);
     WorkModule(0, n, 0x0100000E);
     WorkModule(0, 2.0f, 0x0100000B);
@@ -43667,7 +43777,13 @@ void sf_loop()
     }
 }
 
+// v12 (the user: "a bug with Soaring Fist where it makes Supamario jitter in every animation after using it until he's
+// KO'd"): the charge's expression script plays Mario's AttackS4Hold START_CHARGE (PhysicsModule op 7: the smash charge's
+// body shake), and the game stops it only in the hold statuses' exits (0x2C / 0x2F / 0x32: func_326 / func_329 / func_332,
+// PhysicsModule(0x8)), which Soaring Fist never enters: the shake ran on until a KO reset the module. Now stopped at
+// the release (sf_release) and at any exit of 0x2B (here: a hit during the charge, ...)
 void sf_end()
 {
     SoundModule(0x2714, SF_SND_CHARGE);
+    PhysicsModule(0x8);
 }
