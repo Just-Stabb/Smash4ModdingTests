@@ -3567,3 +3567,6 @@ exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATC
     `+0x94` `0x0200CD38`: the request freed (`0x02FB3600`), `+0x14` 0; op 2 vt `+0x9C`, op 3 `+0xD`. MSC
     `CameraModule(0x2714, frames, 0, distance[, x, y, flag])` is the zoom in (Camera_Closeup's call; Ryu / Kirby use it),
     `CameraModule(0x2718)` its end (Kirby's).
+- **v8 (README "Ultra Instinct v8"; the exe unchanged, exe_v46z_ui6):** the sway's / spot dodge's counter is the
+  transformation's rush, run in 0x155 with TIMER_4 9 (the cave's transformation mode: slot 43 fully invincible); the
+  spot dodge asks 0x155 with TIMER_4 5 (the sway family: nothing in the cave depends on it for that frame).

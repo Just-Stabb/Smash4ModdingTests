@@ -36735,8 +36735,9 @@ void func_2265()
     }
     if (ui_mode() == 0x3)
     {
-        ui_ctr_init();              // v7: the counter from his spot dodge (ui_escape_counter asked it)
-        func_78(ui_dodge_loop);
+        ui_rush_init();             // v8: the rush counter from his spot dodge (ui_escape_counter asked it: TIMER_4 5)
+        WorkModule(0, -1.0f, 0x0100000C);    // its loop runs on this frame too: frame 0
+        func_78(ui_loop);
         return;
     }
     if (global18 == 0 && ui_state() == UI_FORMED)
@@ -42877,7 +42878,7 @@ void ui_end()
 // UI_SWAY_N frames. Intangible UI_SWAY_INV frames (XV2's invulnerability 0-13); the counter shape stays on, so from
 // then a fighter's hit on it is ANOTHER sway (the user: "chain into itself"; XV2's sway re-entered); an attack button
 // (attack / smash) from UI_SWAY_CW_ON to UI_SWAY_CW_OFF (XV2's 7-31: the sway's Combos window, BcmCallback 0xF80)
-// cancels it into the counter (ui_ctr_init); other actions from UI_SWAY_IASA (func_39 / func_41); Wait at UI_SWAY_N.
+// cancels it into the counter (v8: the rush, ui_rush_init); other actions from UI_SWAY_IASA (func_39 / func_41); Wait at UI_SWAY_N.
 // The status work: 0x0100000B the phase (0 the sway, 1 the counter), 0x0100000C frames, 0x0100000D the way away from
 // the attacker (world X sign)
 void ui_dodge_init()
@@ -42908,13 +42909,14 @@ void ui_dodge_init()
     KineticModule(0x11, 0x3, 0.0f, 0.0f);
 }
 
-// v7: the counter (the user: "the short ranged counter when an attack button is pressed"; XV2's CMN.bac entry 706, the
-// sway's link 0x8: a 6-frame strike, its hitbox BDM #0 (CMN.bdm) 1.5 m in front 0-6, the vanish lines (BTL_CMN 492 /
-// 491) and the hit flash (230); the animation is the skill's own strike, EAN #1's finisher, the character's EAN #30 /
-// #31 not being in the files): motion UI_MOT_CTR from UI_CTR_AT, facing the attacker, held in place; actionable from
-// UI_CTR_IASA (XV2's entry ends at 6), Wait at UI_CTR_N. From the sway, or from his spot dodge (ui_escape_counter):
-// the attacker's side from TIMER_1 / TIMER_2 when signalled, else from the sway's way
-void ui_ctr_init()
+// v8 (the user: the sway's counter and the spot dodge's are "the rush from the clip": the vanish and the multi-hit rush,
+// the transformation's counter; v7's CMN.bac 706 strike is gone): the transformation's counter (ui_counter: XV2's BAC 1,
+// motion UI_MOT_STRIKE, its freeze box, 14 rush hits and the finisher, the white body, intangible throughout; Wait / Fall
+// at its end) in the same status, its mode the transformation's (TIMER_4 UI_MODE_FORM: the cave's slot 43 makes him
+// fully invincible, as there), run by ui_loop's counter phase. Facing the attacker: its side from TIMER_1 / TIMER_2 when
+// signalled (the spot dodge's mark), else from the sway's way. No gap closed (ui_gap: no fighter found, flag
+// 0x21000012 off: the freeze box holds an attacker in melee range, as the clip's)
+void ui_rush_init()
 {
     float side;
     side = 0.0f - WorkModuleF(0, 0x0100000D);
@@ -42928,27 +42930,18 @@ void ui_ctr_init()
     }
     WorkModule(0, 0.0f, UI_V_DODGE_R);
     WorkModule(0, 0.0f, UI_V_DODGE_L);
-    WorkModule(0, 0.0f - side, 0x0100000D);
-    WorkModule(0, UI_MODE_COUNTER, UI_V_SS);
-    WorkModule(0, 1.0f, 0x0100000B);
-    WorkModule(0, -1.0f, 0x0100000C);
-    ShieldModule(0, 0x2, 0, 0, 0x1);            // the shape off: the counter can be hit
+    WorkModule(0, side, 0x01000007);
+    WorkModule(0, UI_MODE_FORM, UI_V_SS);
     WorkModule(0, 0.0f, UI_V_SHAPE);
-    if (side * WorkModuleF(0, 0x0f000003) < 0.0f)
-    {
-        PostureModule(0x1);
-        PostureModule(0x2);
-    }
     KineticModule(0, 0x6);
-    GroundModule(0x2710, 0x2);
-    func_22(UI_MOT_CTR, UI_CTR_AT, 1.0f);
-    KineticModule(0x11, 0x3, 0.0f, 0.0f);
+    GroundModule(0x2710, 0x1);
+    ui_counter();                               // the shape off, turned, phase 1, the counter's motion, held
 }
 
 // v7: his spot dodge while transformed (every frame of EscapeN, ui_tick): an attack on his counter shape marks
 // "attacked" (the cave's TIMER_1 / TIMER_2, renewed here so it lasts the whole spot dodge); attack, special or smash
 // pressed while attacked -> the counter (the user's rule: "from his normal spot dodge while transformed, if attack or
-// special is pressed during it and someone attacked him")
+// special is pressed during it and someone attacked him"; v8: the rush). TIMER_4 UI_MODE_COUNTER asks it (func_2265)
 void ui_escape_counter(float n)
 {
     if (n < 0.5f)
@@ -42974,30 +42967,6 @@ void ui_escape_counter(float n)
     }
 }
 
-// the counter's frames (phase 1)
-void ui_ctr_loop(float n)
-{
-    WorkModule(0, UI_MODE_COUNTER, UI_V_SS);    // the mode renewed
-    if (global18 == 0x2)
-    {
-        KineticModule(0x11, 0x3, 0.0f, 0.0f);
-        func_16(0xe, 0);
-        return;
-    }
-    KineticModule(0x11, 0x3, 0.0f, 0.0f);
-    if (n > UI_CTR_IASA - 0.5f)
-    {
-        if (func_39() != 0 || func_41() != 0)
-        {
-            return;
-        }
-    }
-    if (n > UI_CTR_N - 1.5f)
-    {
-        func_16(0, 0);
-    }
-}
-
 void ui_dodge_loop()
 {
     float n;
@@ -43005,7 +42974,8 @@ void ui_dodge_loop()
     WorkModule(0, n, 0x0100000C);
     if (WorkModuleF(0, 0x0100000B) > 0.5f)
     {
-        ui_ctr_loop(n);
+        WorkModule(0, n - 1.0f, 0x0100000C);    // v8: the transformation's counter (ui_loop counts its own frames)
+        ui_loop();
         return;
     }
     WorkModule(0, UI_MODE_DODGE, UI_V_SS);       // v5: the mode renewed
@@ -43031,8 +43001,7 @@ void ui_dodge_loop()
     {
         if (ControlModule(0x2710, 0) || ControlModule(0x2710, 0x4))
         {
-            ui_ctr_init();                      // an attack button in the window: the counter
-            WorkModule(0, 0.0f, 0x0100000C);
+            ui_rush_init();                     // v8: an attack button in the window: the rush counter
             return;
         }
     }

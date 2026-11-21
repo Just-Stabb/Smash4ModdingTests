@@ -88,29 +88,17 @@ DODGE_MOVE, DODGE_V = 4, 1.0         # v2 (the user's XV2 clip: a sway almost in
 # 0 and 1), 911 / 900 are ECFs (colour over the body: not drawn); its sound: CAR_BTL_CMN cue 5 (swing_05) at XV2 7 (ours 1)
 SWAY_N = anim.part_start('sway_f_in')         # 37: each sway (1 + 36)
 SWAY_F_AT = anim.part_start('sway_f_in')     # 37: the forward sway's first frame in the motion
-CTR_AT = anim.part_start('ctr_out')          # 74: the counter's
-CTR_N = anim.frames_of(anim.DODGE) - CTR_AT  # 22
 SWAY_INV = 8
 SWAY_CW_ON, SWAY_CW_OFF = 1, 24
 SWAY_IASA = 25
 SWAY_LINE_AT = (0, 1)
 SWAY_SND_AT = 1
-# the counter: CMN.bac 706 (707 the same on the other hand): animation 0-5 (the character's own EAN #30: ours the skill's
-# finisher punch), its hitbox 0-6 (frames 0-5), BDM #0 (CMN.bdm), 1.5 m in front at 0.75 m, 1 m; BTL_CMN 492 (SKI_lineX_L
-# on the pelvis) and CMN 230 (Btl_RHit) at 0, 491 (SKI_lineX_S, 0.35) at 4; no sound; its link 0x8 0-6: actionable at
-# (its animation, the character's EAN #30, isn't in the files: XV2's straight punch of Hit's Time Skip, supamario_ui_anim)
-# CTR_IASA. Damage: BDM #0 sub-entry 0 (the standing victim): DamageType 3, DamageAmount 0, user / victim stun 5, a
-# 30-frame stagger (KnockbackDuration 30, strength Y 0.1 / Z 0.04 a frame). Smash 4: CTR_DMG (the smallest whole
-# percent: XV2's 0 is a stagger, the hit still lands: its hitlag 5 = XV2's stun 5), knockback set (WKB) for XV2's
-# 30-frame stagger (CTR_WKB 75, KBG 100: knockback 71.9 at weight 100 -> 28.8 frames of hitstun), its angle the push's
-# (atan(0.1 / 0.04) = 68)
-CTR_IASA = 6
-CTR_HIT_N = 6
-CTR_DMG, CTR_WKB, CTR_ANGLE = 1.0, 75, 68
-CTR_SIZE, CTR_Y, CTR_Z = round(1.0 * 5.04, 2), round(0.75 * 5.04, 2), round(1.5 * 5.04, 2)
-CTR_LINE2_AT = 4
-MOT_SWAY_B, MOT_CTR, MOT_SWAY_F = 0x241, 0x242, 0x243      # SpecialAirLwLight and its custom-move slots (one animation)
-SWAY_SCRIPTS = {'specialairlwlight_c2': 'counter', 'specialairlwlight_c3': 'sway_f'}
+# the sway's counter: v7 played CMN.bac 706's strike (README "Ultra Instinct v7" 3: its data and conversion); v8 (the
+# user: "the rush from their clip": the vanish and the multi-hit rush) plays the transformation's counter (SpecialLwHeavy,
+# STRIKE_N frames, ui_counter: XV2's BAC 1, the same entry every counter root of the skill's BCM plays) from the sway's
+# window and the spot dodge; 706's motion part, its slot 0x242 script and effects are gone
+MOT_SWAY_B, MOT_SWAY_F = 0x241, 0x243      # SpecialAirLwLight and its custom-move slot 0x243 (one animation)
+SWAY_SCRIPTS = {'specialairlwlight_c3': 'sway_f'}
 ST_ESCAPE_N = cave.ST_ESCAPE_N
 # v7 Secret Sensation (the user: "slow time for everyone during its traveling and until reaching, do a slight zoom
 # between Supamario and the opponent, then on Supamario ... similar to how it looks in Dragon Ball FighterZ"; the DBFZ
@@ -178,11 +166,9 @@ FX = [('start', 'BTL_AURA.eepk', 'MGT_HENSIN01.emp', 'BustN', (0.0, 0.0, 0.0), 1
       ('aura_chest', 'BTL_AURA.eepk', 'Aura_LoopFOK2.emp', 'BustN', (0.0, 0.0, 0.0), 1.0),
       ('aura_hand', 'BTL_AURA.eepk', 'Aura_HandLoopFOK.emp', 'RHandN', (0.0, 0.0, 0.0), 0.65),
       ('vanish', 'BTL_CMN.eepk', 'SKI_line.emp', 'HipN', (0.0, 0.0, 0.0), 1.0),
-      # v7: the sway's / counter's (BTL_CMN 493 / 491, 492, 230), converted after the others (their ids follow)
-      ('sway_line', 'BTL_CMN.eepk', 'SKI_lineX_S.emp', 'TransN', (0.0, 0.0, 0.0), 0.35),
-      ('ctr_line', 'BTL_CMN.eepk', 'SKI_lineX_L.emp', 'HipN', (0.0, 0.0, 0.0), 1.0),
-      ('ctr_hit', 'BTL_CMN.eepk', 'Btl_RHit.emp', 'TransN', (0.0, 0.75, 1.5), 0.9)]
-FX_V7 = ('sway_line', 'ctr_line', 'ctr_hit')
+      # v7: the sway's (BTL_CMN 493), converted after the others (its id follows; v8: 706's 492 / 230 gone)
+      ('sway_line', 'BTL_CMN.eepk', 'SKI_lineX_S.emp', 'TransN', (0.0, 0.0, 0.0), 0.35)]
+FX_V7 = ('sway_line',)
 # v3: the aura's colour. The converted emitters keep XV2's EMP colours (blue / cyan / white: rendered with fx_render's
 # Smash 4 side, the drawn pixels' median hue 192 deg, saturation 0.26); the user's XV2 clip after the burst shows a
 # lavender / purple-white flicker (the aura pixels' median hue 281-287 deg, saturation 0.16-0.18, value 0.88-0.96, four
@@ -290,9 +276,9 @@ def msc_values():
          # v7: the sway, its counter, the spot dodge's counter; Secret Sensation's slow-motion and camera
          'UI_MODE_COUNTER': fl(cave.MODE_COUNTER), 'UI_MODE_SWAY_ON': fl(cave.MODE_SWAY_ON),
          'UI_ST_ESCAPE_N': fl(ST_ESCAPE_N), 'UI_MOT_SWAY_B': '0x%X' % MOT_SWAY_B, 'UI_MOT_SWAY_F': '0x%X' % MOT_SWAY_F,
-         'UI_MOT_CTR': '0x%X' % MOT_CTR, 'UI_SWAY_F_AT': fl(SWAY_F_AT), 'UI_CTR_AT': fl(CTR_AT), 'UI_SWAY_N': fl(SWAY_N),
+         'UI_SWAY_F_AT': fl(SWAY_F_AT), 'UI_SWAY_N': fl(SWAY_N),
          'UI_SWAY_INV': fl(SWAY_INV), 'UI_SWAY_CW_ON': fl(SWAY_CW_ON), 'UI_SWAY_CW_OFF': fl(SWAY_CW_OFF),
-         'UI_SWAY_IASA': fl(SWAY_IASA), 'UI_CTR_IASA': fl(CTR_IASA), 'UI_CTR_N': fl(CTR_N),
+         'UI_SWAY_IASA': fl(SWAY_IASA),
          'UI_SS_SLOW': '0x%X' % SS_SLOW, 'UI_SS_SLOW_FRAMES': '0x%X' % SS_SLOW_FRAMES, 'UI_SS_CAM1_T': '0x%X' % SS_CAM1_T,
          'UI_SS_CAM1_D': fl(SS_CAM1_D), 'UI_SS_CAM2_AT': fl(SS_CAM2_AT), 'UI_SS_CAM2_T': '0x%X' % SS_CAM2_T,
          'UI_SS_CAM2_D': fl(SS_CAM2_D)}
@@ -337,28 +323,16 @@ def freeze_box():
                      HitstopFrames=RUSH_AT[0], SelfHitstopFrames=0)
 
 
-def ctr_box():
-    """v7: the counter's hit (CMN.bac 706's hitbox, CMN.bdm #0: a stagger): CTR_DMG, set knockback for XV2's 30-frame
-    stagger, at XV2's 1.5 m in front, 0.75 m up, 1 m"""
-    import supamario_sledgehammer_build as SB
-    return SB.hitbox(ID=0, Part=0, Bone=0, Damage=CTR_DMG, Angle=CTR_ANGLE, KBG=100, FKB=CTR_WKB, BKB=0, Size=CTR_SIZE,
-                     Y=CTR_Y, Z=CTR_Z, Hitlag=1.0, SDI=1.0, Clang=1, Rebound=0, SFXLevel=0, SFXType=1, NoGFX=0)
-
-
 def sway_scripts():
-    """v7: {script name: {part: body}} of the sways and the counter (SpecialAirLwLight's animation: the back sway from
-    frame 0 (motion 0x241, its own script), the forward sway from SWAY_F_AT (0x243, specialairlwlight_c3), the counter
-    from CTR_AT (0x242, specialairlwlight_c2): a motion started at frame F starts its scripts' clock at F (the motion
-    change's start frame, MotionAnimcmdModule vt +0x4C +0x20), so each script's first command waits for its F"""
+    """v7: {script name: {part: body}} of the sways (SpecialAirLwLight's animation: the back sway from frame 0 (motion
+    0x241, its own script), the forward sway from SWAY_F_AT (0x243, specialairlwlight_c3): a motion started at frame F
+    starts its scripts' clock at F (the motion change's start frame, MotionAnimcmdModule vt +0x4C +0x20), so the
+    script's first command waits for its F). v8: no counter script (the rush's own, speciallwheavy)"""
     def sway(at):
         return {'game': [], 'expression': [],
                 'effect': timeline([(at + f, [graphic('sway_line', follow=False)]) for f in SWAY_LINE_AT]),
                 'sound': timeline([(at + SWAY_SND_AT, [cmd('sound_effect', se_id('ui_sway'))])])}
-    ctr = {'game': timeline([(CTR_AT, [ctr_box()]), (CTR_AT + CTR_HIT_N, [cmd('remove_all_hitboxes')])]),
-           'effect': timeline([(CTR_AT, [graphic('ctr_line', follow=False), graphic('ctr_hit', follow=False)]),
-                               (CTR_AT + CTR_LINE2_AT, [graphic('sway_line', follow=False)])]),
-           'sound': [], 'expression': []}
-    return {'specialairlwlight': sway(0), 'specialairlwlight_c3': sway(SWAY_F_AT), 'specialairlwlight_c2': ctr}
+    return {'specialairlwlight': sway(0), 'specialairlwlight_c3': sway(SWAY_F_AT)}
 
 
 def white_on(frames):
@@ -748,9 +722,8 @@ def main():
     print('sounds: ' + ', '.join('%s 0x%08X' % kv for kv in SE_IDS.items()))
     print('effects: ' + ', '.join('%s 0x%08X' % kv for kv in FX_IDS.items()))
     print('transformation %d frames (window %d-%d), counter %d (rush %s, finisher %d); v7 sway %d (intangible %d, the '
-          'counter window %d-%d), its counter %d from %d (actionable %d)' % (
-              FORM_N, CW_ON, CW_OFF, STRIKE_N, RUSH_AT, STRIKE_AT, SWAY_N, SWAY_INV, SWAY_CW_ON, SWAY_CW_OFF, CTR_N, CTR_AT,
-              CTR_IASA))
+          'counter window %d-%d: the rush)' % (
+              FORM_N, CW_ON, CW_OFF, STRIKE_N, RUSH_AT, STRIKE_AT, SWAY_N, SWAY_INV, SWAY_CW_ON, SWAY_CW_OFF))
 
 
 if __name__ == '__main__':

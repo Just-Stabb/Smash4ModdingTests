@@ -4285,3 +4285,47 @@ else-if chains, upstream), HvTest 248 ok. 0 failures.
   for the attacker, no damage to him, as the autododge's); SlowModule's frames bound counted by the game (the MSC ends
   it at the arrival anyway); the zoom distances 1.2 / 1.5 and the slow 1/3 against DBFZ's look (its ~0.8 s travel; ours
   0.70 s); the camera returns at the arrival (DBFZ holds ~0.35 s more).
+
+## Ultra Instinct v8 (`supamario_ultrainstinct_v8.zip`; exe unchanged: `exe_v46z_ui6`; Sm4shCommand v1.7.22)
+Install over v7: `INSTALL_TO_data/` holds the 11 files changed since v7 (the four motion .pac, the four script .bin, the
+.ptcl / .efc, the MSC); no executable (v7's exe_v46z_ui6: the cave needed nothing new). The user's answer to v7's
+question: the sway's counter and the spot dodge's counter are **the rush from the clip** (the vanish and the multi-hit
+rush, arm held out), the transformation's counter, not CMN.bac 706's single strike.
+- **The rush from the sway / the spot dodge** (`ui_rush_init`, supamario.c): the transformation's counter as it runs
+  after the transformation's window (ui_counter: XV2's BAC 1, motion SpecialLwHeavy 0x235, its game / effect / sound /
+  expression scripts: the freeze box, 14 rush hits held, the finisher, the vanish, the white body into the glow;
+  intangible every frame; Wait / Fall after its 349 frames), in the same status 0x155 with the transformation's mode
+  (TIMER_4 9: the cave's slot 43 makes him fully invincible, as there; ui_loop's counter phase runs it, from the sway's
+  loop). From the sway: attack / smash on its frames 1-24 (v7's window). From the spot dodge: attacked (the shape's
+  mark) and attack / special / smash pressed: status 0x155 asked with TIMER_4 5 (func_2265: ui_rush_init, then ui_loop).
+  Facing the attacker (its side from TIMER_1 / TIMER_2 when signalled, else the sway's way); no gap closed (no fighter
+  found from the sway's hit: the freeze box, a 3 m sphere, holds an attacker in melee range).
+- **The user's clips (`udclip/d.mp4`, `e.mp4`, the dodge's manual counter) against it:** the vanish lines at the
+  counter's start (e frames 36-39), the first rush impact ~60 frames later (e ~96; ours 59 = XV2 210 - 151), impacts
+  over ~64 frames (e ~96-160; ours 14 hits 5 frames apart over 65, the finisher at 129), the attacker frozen in front of
+  him, his arm held out. The HUD's count at the end is **11 HITS** in both clips, where the transformation's counter
+  clip (v2) showed 15. Every counter entry of the skill (BAC 1 / 2 / 5 / 6 / 9 / 10) has the same 16 hitboxes (the
+  freeze BDM #0 at 151, BDM #1 every 5 frames 210-275, the finisher BDM #2 at 280), so the data gives no 11-hit rush:
+  the rush is kept as the files have it (15 hits counting the finisher, and a damage-less freeze); the difference is
+  XV2's hit counter (not explained by the files; flagged). XV2's camera cut (behind the attacker, then the close-up) is
+  not reproduced: no camera change in the counter (the user's rule for the transformation).
+- **v7's 706 strike removed:** its motion part (SpecialAirLwLight is 74 frames again: the two sways), its slot 0x242
+  scripts (`specialairlwlight_c2`: the slot's scripts are Time Skip v10's again), its effects (BTL_CMN 492 / 230; the
+  sway's 493 keeps id 0x03410074), its MSC values; ModAnimNames drops `SpecialAirLwLight_c2` (Sm4shCommand v1.7.22). The
+  reading of 706 stays in "Ultra Instinct v7" 3 for the record.
+- **Kept from v7:** the sway, its chain, the projectile filter, the spot dodge's mark, Secret Sensation's slow-motion
+  and camera.
+- **Tests:** `supamario_ui_test.py --exe --package --since` (v8: the rush from the sway's window edges / buttons, its
+  mode, the shape off, intangible every frame, Wait after 349, not turned / turned, no gap, the mode cleared and still
+  transformed; the spot dodge's rush in 6 cases with its asked mode 5 and the transformation's mode 9 at its start; the
+  package: no executable this time) and the other suites: counts in "Ultra Instinct v8, results" below.
+
+### Ultra Instinct v8, results
+`supamario_ui_test.py --exe --package --since` (v7's build) **466 ok**; `supamario_ui_cave_test.py` 332 ok (the exe
+unchanged); `supamario_timeskip_test` 198, `supamario_godfist_test` 566, `supamario_sledgehammer_test` 141,
+`supamario_corebreaker_test` 104, `supamario_fakedeath_test` 47 ok (their script checks leave out only
+`specialairlwlight_c3` now: `_c2` is checked unchanged again); `outline_shell_test.py` 124 ok; `mesh_vis_test.py` 64 ok;
+`msc_stack_check` 0 of 2490 (globals 127 of 128); `fighter_texture_ids.py check` 0 errors; Sm4shCommand v1.7.22 NvTest 290
+ok / 1 known failure (effect.bin's else-if chains, upstream), HvTest 248 ok. 0 failures.
+- **Not confirmed in game:** the rush entered from the sway's loop (ui_loop called from ui_dodge_loop in the same
+  status) and from func_2265 with ui_loop as the loop; the 11-hit HUD count of the clips (the files give 15 hits).

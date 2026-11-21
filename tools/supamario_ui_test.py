@@ -209,7 +209,8 @@ class Run:
             self.call(vm, 'func_2252')
             self.call(vm, 'func_2265')
             m = g.vars.get(B.V_SS, 0.0)
-            g.loop = 'ui_loop' if m > C.MODE_FORM_ON else 'ui_dodge_loop' if m > C.MODE_SWAY_ON else None
+            g.loop = ('ui_loop' if m > C.MODE_FORM_ON else 'ui_dodge_loop' if m > C.MODE_DODGE_ON else
+                      'ui_loop' if m > C.MODE_SWAY_ON else None)       # v8: the spot dodge's rush: ui_loop
             g.log.append((g.n, 'mode', g.loop))
 
 
@@ -433,31 +434,37 @@ def dodge_tests(r):
             check('  the second sway runs its full %d frames, intangible again' % B.SWAY_N,
                   ([e[0] for e in g.ev('status') if e[2] == 0][0] - st2,
                    [e[3] for e in g.ev('set') if e[2] == 0x0F00011B]), (B.SWAY_N - 1, [float(B.SWAY_INV)] * 2))
-    # the counter cancel
+    # the counter cancel (v8: the transformation's rush, the user's clip)
     for k, btn, what, want in ((B.SWAY_CW_ON, 0, 'attack on its first counter frame (%d)' % B.SWAY_CW_ON, True),
                                (B.SWAY_CW_OFF, 0, 'attack on its last counter frame (%d)' % B.SWAY_CW_OFF, True),
                                (12, 4, 'smash (A+B / C-stick) mid-sway', True),
                                (B.SWAY_CW_ON - 1, 0, 'attack on its frame 0 (before the window)', False),
                                (B.SWAY_CW_OFF + 1, 0, 'attack after the window', False),
                                (12, 1, 'special mid-sway', False)):
-        g, vm, xs = dodge_run(r, frames=70, events={k: press(btn)})
-        ctr = [e for e in g.ev('motion_at') if e[2] == B.MOT_CTR]
-        check('v7: counter cancel: %s -> %s' % (what, 'the counter (motion 0x242 from %d)' % B.CTR_AT if want else
-                                                 'no counter'), [e[2:] for e in ctr],
-              [(B.MOT_CTR, float(B.CTR_AT))] if want else [])
+        g, vm, xs = dodge_run(r, frames=B.STRIKE_N + 40, events={k: press(btn)})
+        ctr = [e for e in g.ev('motion_at') if e[2] == B.MOT_STRIKE]
+        check('v8: counter cancel: %s -> %s' % (what, 'the rush (the transformation\'s counter: motion 0x235 from 0)'
+                                                 if want else 'no counter'), [e[2:] for e in ctr],
+              [(B.MOT_STRIKE, 0.0)] if want else [])
         if want and k == 12:
             at = ctr[0][0]
-            check('  its mode %g (TIMER_4), the shape off at once, the same status (0x155)' % C.MODE_COUNTER,
-                  ([e[3] for e in g.ev('set') if e[2] == B.V_SS and e[0] == at][-1:],
-                   [e[2] for e in g.ev('shield') if e[0] == at], len([e for e in g.ev('status') if e[2] == C.ST_UI])),
-                  ([C.MODE_COUNTER], [(0, 2, 0, 0, 1)], 1))
+            check('  its mode the transformation\'s (TIMER_4 %g), the shape off at once, the same status (0x155)'
+                  % C.MODE_FORM, ([e[3] for e in g.ev('set') if e[2] == B.V_SS and e[0] == at][-1:],
+                                  [e[2] for e in g.ev('shield') if e[0] == at],
+                                  len([e for e in g.ev('status') if e[2] == C.ST_UI])),
+                  ([C.MODE_FORM], [(0, 2, 0, 0, 1)], 1))
             end = [e for e in g.ev('status') if e[2] == 0]
-            check('  Wait after its %d frames (actionable from %d)' % (B.CTR_N, B.CTR_IASA),
-                  end[0][0] - at if end else None, B.CTR_N - 1)
-            check('  not turned (the attacker in front)', g.ev('turn'), [])
+            ints = sorted({e[0] for e in g.ev('set') if e[2] == 0x0F00011B and e[0] > at})
+            check('  intangible every frame of it, Wait after the rush\'s %d frames (as the transformation\'s)'
+                  % B.STRIKE_N, (ints == list(range(at + 1, end[0][0] + 1)) if end else False,
+                                 end[0][0] - at if end else None), (True, B.STRIKE_N - 1))
+            check('  not turned (the attacker in front), no gap closed (no fighter found: the freeze box holds it)',
+                  (g.ev('turn'), [e for e in g.ev('set') if e[2] == 0x0f000004]), ([], []))
+            check('  its end (func_2282 -> ui_end) clears the mode, transformed afterwards',
+                  (g.vars.get(B.V_SS), g.vars.get(C.V_FORM)), (0.0, 2000.0))
     g, vm, xs = dodge_run(r, timer=C.V_DODGE_L, frames=10, events={5: press(0)})
-    check('v7: counter from the forward sway (the attacker behind): turned to face it',
-          ([e[2] for e in g.ev('motion_at')][-1:], len(g.ev('turn'))), ([B.MOT_CTR], 1))
+    check('v8: the rush from the forward sway (the attacker behind): turned to face it',
+          ([e[2] for e in g.ev('motion_at')][-1:], len(g.ev('turn'))), ([B.MOT_STRIKE], 1))
     for what, kw in (('not transformed (TIMER_0 0)', dict(form=0.0)),
                      ('in Dash (3)', dict(status=3)), ('in the air (Fall)', dict(status=0xE, air=True)),
                      ('shielding (0x1C)', dict(status=0x1C))):
@@ -475,8 +482,8 @@ def dodge_tests(r):
 
 
 def escape_tests(r):
-    """v7: the counter from his spot dodge (EscapeN) while transformed (the user's rule)"""
-    def run(events, form=2000.0, frames=12, status=0x1F):
+    """v7: the counter from his spot dodge (EscapeN) while transformed (the user's rule; v8: the rush)"""
+    def run(events, form=2000.0, frames=16, status=0x1F):
         g = Game(status=status, damage=150.0)
         g.vars[C.V_FORM] = form
         g.vars[B.V_AURA] = 999.0
@@ -497,11 +504,15 @@ def escape_tests(r):
                                ({2: signal(C.V_DODGE_R)}, 'attacked, nothing pressed', False),
                                ({2: signal(C.V_DODGE_R), 3: press(2)}, 'attacked, jump pressed', False)):
         g, vm = run(events)
-        ctr = [e for e in g.ev('motion_at') if e[2] == B.MOT_CTR]
-        check('v7: EscapeN, %s -> %s' % (what, 'status 0x155 in the counter\'s mode, motion 0x242 from %d' % B.CTR_AT
+        ctr = [e for e in g.ev('motion_at') if e[2] == B.MOT_STRIKE]
+        check('v8: EscapeN, %s -> %s' % (what, 'status 0x155 (asked in the counter\'s mode %g), the rush (motion 0x235 '
+                                          'from 0, the transformation\'s mode, its loop)' % C.MODE_COUNTER
                                           if want else 'no counter'),
-              ([e[2] for e in g.ev('status')][:1], [e[2] for e in g.ev('mode')][:1], [e[2:] for e in ctr]),
-              ([C.ST_UI], ['ui_dodge_loop'], [(B.MOT_CTR, float(B.CTR_AT))]) if want else ([], [], []))
+              ([e[2] for e in g.ev('status')][:1], [e[3] for e in g.ev('set') if e[2] == B.V_SS][:1],
+               [e[2] for e in g.ev('mode')][:1], [e[2:] for e in ctr],
+               [e[3] for e in g.ev('set') if e[2] == B.V_SS and ctr and e[0] == ctr[0][0]][-1:]),
+              ([C.ST_UI], [C.MODE_COUNTER], ['ui_loop'], [(B.MOT_STRIKE, 0.0)], [C.MODE_FORM]) if want else
+              ([], [], [], [], []))
         if what.startswith('attacked, nothing'):
             check('  the mark kept through the spot dodge (TIMER_1 renewed to 4)', g.vars.get(C.V_DODGE_R), 4.0)
         if want and 'special' in what:
@@ -797,8 +808,8 @@ def script_tests(out, ts_out):
 
 
 def sway_script_tests(f):
-    """v7: the sways' and the counter's scripts (SpecialAirLwLight's animation: the back sway from 0 (0x241), the
-    forward sway from SWAY_F_AT (0x243, specialairlwlight_c3), the counter from CTR_AT (0x242, specialairlwlight_c2))"""
+    """v7: the sways' scripts (SpecialAirLwLight's animation: the back sway from 0 (0x241), the forward sway from
+    SWAY_F_AT (0x243, specialairlwlight_c3)); v8: no counter script of its own (the rush's)"""
     nm = lambda c: c.name  # noqa: E731
     for sname, at in (('specialairlwlight', 0), ('specialairlwlight_c3', B.SWAY_F_AT)):
         eff = [(fr, c.params[0], round(c.params[8], 2)) for fr, c in at_frames(f['effect'].script(sname))
@@ -812,34 +823,11 @@ def sway_script_tests(f):
         check('  no hitbox, no expression', ([nm(c) for c in f['game'].script(sname)],
                                             [nm(c) for c in f['expression'].script(sname)]),
               (['Script_End'], ['Script_End']))
-    g = f['game'].script('specialairlwlight_c2')
-    syn = acmd.INFO[acmd.BY_NAME['extra_special_hitbox']]['syntax']
-    hb = [(fr, dict(zip(syn, c.params))) for fr, c in at_frames(g) if nm(c).lower() == 'extra_special_hitbox']
-    check('v7: the counter (specialairlwlight_c2): one hitbox at its first frame (%d: CMN.bac 706\'s 0-6), removed '
-          'at %d' % (B.CTR_AT, B.CTR_AT + B.CTR_HIT_N), ([x[0] for x in hb],
-                                                           [fr for fr, c in at_frames(g) if nm(c) == 'Remove_All_Hitboxes']),
-          ([float(B.CTR_AT)], [float(B.CTR_AT + B.CTR_HIT_N)]))
-    if hb:
-        d = hb[0][1]
-        check('  XV2\'s BDM #0 converted: %g%%, angle %d, set knockback %d, KBG 100, BKB 0; 1.5 m in front (%g), '
-              '0.75 m up (%g), 1 m (%g)' % (B.CTR_DMG, B.CTR_ANGLE, B.CTR_WKB, B.CTR_Z, B.CTR_Y, B.CTR_SIZE),
-              (d['Damage'], d['Angle'], d['FKB'], d['KBG'], d['BKB'], round(d['Z'], 2), round(d['Y'], 2),
-               round(d['Size'], 2), d['Bone']),
-              (B.CTR_DMG, B.CTR_ANGLE, B.CTR_WKB, 100, 0, B.CTR_Z, B.CTR_Y, B.CTR_SIZE, 0))
-        kb = ((B.CTR_WKB * 10.0 / 20.0 + 1.0) * 1.4 * 200.0 / (100.0 + 100.0) + 18.0) * 100 / 100.0
-        check('  its knockback at weight 100 ~ XV2\'s 30-frame stagger (hitstun 0.4 x knockback within 3 frames of 30)',
-              abs(0.4 * kb - 30.0) <= 3.0, True)
-    eff = [(fr, c.params[0]) for fr, c in at_frames(f['effect'].script('specialairlwlight_c2')) if 'graphic' in nm(c).lower()]
-    check('  its effects: SKI_lineX_L (492) and the hit flash Btl_RHit (230) at %d, SKI_lineX_S (491) at %d'
-          % (B.CTR_AT, B.CTR_AT + B.CTR_LINE2_AT), eff,
-          [(float(B.CTR_AT), B.fx_id('ctr_line')), (float(B.CTR_AT), B.fx_id('ctr_hit')),
-           (float(B.CTR_AT + B.CTR_LINE2_AT), B.fx_id('sway_line'))])
-    check('  no sound (XV2\'s 706 has none), no expression',
-          ([nm(c) for c in f['sound'].script('specialairlwlight_c2')],
-           [nm(c) for c in f['expression'].script('specialairlwlight_c2')]), (['Script_End'], ['Script_End']))
-    check('v7: every script\'s first command waits for its start frame (the clock starts there)',
-          [(n, f['effect'].script(n)[0].params[0]) for n in ('specialairlwlight_c2', 'specialairlwlight_c3')],
-          [('specialairlwlight_c2', float(B.CTR_AT)), ('specialairlwlight_c3', float(B.SWAY_F_AT))])
+    check('v8: no script of v7\'s counter (specialairlwlight_c2, CMN.bac 706) written: the slot\'s scripts are Time '
+          'Skip v10\'s (the base\'s)', 'specialairlwlight_c2' in B.SWAY_SCRIPTS, False)
+    check('v7: the forward sway\'s script\'s first command waits for its start frame (the clock starts there)',
+          [(n, f['effect'].script(n)[0].params[0]) for n in ('specialairlwlight_c3',)],
+          [('specialairlwlight_c3', float(B.SWAY_F_AT))])
 
 
 def mv(c):
@@ -959,17 +947,16 @@ def motion_tests(out, ts_out):
         diff = sorted(n.split('D03')[-1] for n in new if new[n] != old.get(n))
         check('%s.pac: only the four slots changed' % part, diff, sorted([A.DODGE, A.STRIKE, A.FORM, A.SS]))
         fr = {m: omo.Omo(new[[n for n in new if n.endswith('D03' + m)][0]]).frames for m in A.MOTIONS}
-        check('%s.pac: 325 / 349 / 96 / 45 frames (v7: SpecialAirLwLight the two sways and the counter, 37 + 37 + 22)'
-              % part, fr, {A.FORM: 325, A.STRIKE: 349, A.DODGE: 96, A.SS: 45})
+        check('%s.pac: 325 / 349 / 74 / 45 frames (v7: SpecialAirLwLight the two sways, 37 + 37; v8: no 706 strike)'
+              % part, fr, {A.FORM: 325, A.STRIKE: 349, A.DODGE: 74, A.SS: 45})
     src = [(A.source(A.DODGE, f_)[0][0], A.source(A.DODGE, f_)[1], round(A.source(A.DODGE, f_)[2], 2))
-           for f_ in (0, 1, 2, 36, 37, 38, 73, 74, 77, 80, 95)]
+           for f_ in (0, 1, 2, 36, 37, 38, 73)]
     check('v7: SpecialAirLwLight\'s frames: the back sway CMN #189 (0 shows XV2 0, 1-36 XV2 7-42: the x7 start), the '
-          'forward sway #191 from 37, the counter (Hit\'s straight punch, 1352_HIK_DSH #1 8-20, 50-81) from 74', src,
+          'forward sway #191 from 37 (v8: nothing after)', src,
           [('sway_b_in', 189, 0.0), ('sway_b', 189, 7.0), ('sway_b', 189, 8.0), ('sway_b', 189, 42.0),
-           ('sway_f_in', 191, 0.0), ('sway_f', 191, 7.0), ('sway_f', 191, 42.0), ('ctr_out', 1, 8.0),
-           ('ctr_hold', 1, 14.0), ('ctr_back', 1, 50.0), ('ctr_back', 1, round(50 + 31 * 15 / 16.0, 2))])
-    check('v7: the build\'s frames agree with the anim\'s (SWAY_F_AT, CTR_AT, SWAY_N, CTR_N)',
-          (B.SWAY_F_AT, B.CTR_AT, B.SWAY_N, B.CTR_N, B.SWAY_N + B.SWAY_N + B.CTR_N), (37, 74, 37, 22, 96))
+           ('sway_f_in', 191, 0.0), ('sway_f', 191, 7.0), ('sway_f', 191, 42.0)])
+    check('v7: the build\'s frames agree with the anim\'s (SWAY_F_AT, SWAY_N)', (B.SWAY_F_AT, B.SWAY_N, 2 * B.SWAY_N),
+          (37, 37, A.frames_of(A.DODGE)))
 
 
 def effect_tests(out, ts_out):
@@ -1457,9 +1444,9 @@ def package_since_tests(zpath, out, prev_out):
                                    t.startswith('Sm4shCommand_v'))], [])
     data_tops = sorted({n.split('/')[1] for n in names if n.startswith('INSTALL_TO_data/') and n.count('/') > 1})
     check('  INSTALL_TO_data/ holds the data folders themselves', [t for t in data_tops if t not in INSTALL_DIRS], [])
-    check('  both executables and the README', [n for n in ('INSTALL_TO_code/cross_f.rpx',
-                                                            'TEST_ONLY_INSTALL_TO_code/cross_f.rpx', 'README.txt')
-                                               if n not in names], [])
+    exes = [n for n in ('INSTALL_TO_code/cross_f.rpx', 'TEST_ONLY_INSTALL_TO_code/cross_f.rpx') if n in names]
+    check('  the README; both executables or none (v8: the exe unchanged since the previous package, exe_v46z_ui6)',
+          ('README.txt' in names, len(exes) in (0, 2)), (True, True))
 
 
 def main():

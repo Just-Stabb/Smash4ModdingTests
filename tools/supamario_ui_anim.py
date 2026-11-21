@@ -26,10 +26,8 @@ XV2's CMN.ean (`--cmn-ean`, the user's chara/CMN) and the skill's EAN:
   frames 0-36   the back sway: CMN #189 CMN_SPA_ASW_B_L_S (CMN.bac 260 / 765): its frames 0-7 in one (TimeScale x7), then
                 7-42 1:1 (37 frames); motion 0x241 from 0;
   frames 37-73  the forward sway: CMN #191 CMN_SPA_ASW_F_L_S, the same timeline; motion 0x243 from 37;
-  frames 74-95  the counter (CMN.bac 706's 6-frame strike; its own animation, the character EAN's #30 / #31, isn't in the
-                files; this skill's EAN #1 270-350 is the rush's arm held out sideways, no strike): XV2's straight
-                right punch of Hit's Time Skip (1352_HIK_DSH.ean #1 HIK_SPA_DSH_01_C, `--hit-ean`): 8-14 in 3 (the
-                fist out), 14-20 in 3 (held), 50-81 in 16 (back to the stance); motion 0x242 from 74.
+  (v7 had a third part, frames 74-95, CMN.bac 706's strike on Hit's punch through slot 0x242; v8: the sway's counter
+  is the transformation's rush, SpecialLwHeavy, the user's answer: gone.)
 The sways keep their own root lean (TransN's X / Z: up to 0.9 units back / 2.4 forward, back to 0 at the end: XV2's
 Movement is none, the MSC doesn't move him).
 """
@@ -56,9 +54,6 @@ SEGMENTS = [
     ('sway_b', DODGE, 189, 7, 43, 36, 'cmn'),        # 7-42 1:1
     ('sway_f_in', DODGE, 191, 0, 7, 1, 'cmn'),
     ('sway_f', DODGE, 191, 7, 43, 36, 'cmn'),
-    ('ctr_out', DODGE, 1, 8, 14, 3, 'hit'),          # v7: the counter: Hit's straight punch (1352_HIK_DSH #1)
-    ('ctr_hold', DODGE, 1, 14, 20, 3, 'hit'),
-    ('ctr_back', DODGE, 1, 50, 81, 16, 'hit'),
     ('ss_in', SS, 0, 0, 40, 18),
     ('ss_hold', SS, 0, 40, 151, 27),
 ]
