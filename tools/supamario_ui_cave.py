@@ -149,7 +149,7 @@ DIAG_FMTS = [
     ('f44', 'S4U4 st=%X t1=%08X t2=%08X mode=%08X left=%d\n'),
     ('fef', 'S4UF bank=%X slot=%d entries=%d res=%d motion=%X\n'),
     ('fpf', 'S4UP obj=%08X him=%08X n=%d\n'),
-    ('fws', 'S4UW on=%d owner=%08X paused=%d stage=%08X\n'),
+    ('fws', 'S4UW on=%d owner=%08X mode=%d stage=%08X\n'),
 ]
 DIAG_PF_CAP = 200                # v7: S4UP lines at most
 FIGHTERS = 0x1035184C            # [[FIGHTERS] + 0]: +0 the entries, +8 their count (acmd_ext_cave.py)
@@ -263,6 +263,7 @@ EFFM = 0x72A8                    # the module block's EffectModule (fighter + 0x
 V_STOP = 0x0F000326              # TIMER_6: the world stop asked (his MSC)
 WS_LEASE = 2                     # frames the stop lasts after the last ask
 WS_MAX = 100                     # instances paused at most (the effect manager's pool holds 100)
+WS_STAGE_ONLY = 4.5              # v13: an ask (TIMER_6) above this stops the stage only (ws_stagef)
 ORIGINAL.update({FILL_HOOK: MFLR, STEP_HOOK: MFLR, SX_HOOK: MFLR})
 
 # the shape: x sideways, y up, z forward (joint 0's frame); a capsule round his body
@@ -898,9 +899,6 @@ s42_ss: stwu r1, -0x20(r1)              # v7: 0x155 in the sway family (the auto
         lbz r0, 0x1C(r28)
         cmplwi r0, 0
         bne out42
-        lwz r0, 0x18(r28)               # v12: the attacker (its object id) steps through the counter's world stop
-        lis r12, ws_vic@ha
-        stw r0, ws_vic@l(r12)
 s42_cat:
         lwz r3, 8(r30)                  # the attacker's AttackModule: vt +0x194(id, part) = hit data
         lwz r12, 0(r3)
@@ -1323,8 +1321,8 @@ sx_next:
 sx_go:  mflr r0                         # the replaced word
         b 0x%(sx_back)08X
 
-# ---- v10 9. the world stop. ws_data: +0 the lease (frames left), +4 its owner (his fighter), +8 the instances paused,
-# +0xC the list of them (WS_MAX words)
+# ---- v10 9. the world stop. ws_data: +0 the lease (frames left), +4 its owner (his fighter), +8 the instances paused
+# (v12: none), +0xC (v10-v11: the list of them) v13: the mode (0 the world stopped, 1 the stage only: an ask over 4.5)
 # ws_fill (FILL_HOOK: the frame state fill, r3 the frame state): the game's fill, then while the lease lasts a slowed
 # frame between two steps (+8 1, +0 1, answer 0): no object steps; the last frame of the lease ends the stop
 ws_fill:
@@ -1348,6 +1346,9 @@ ws_fill:
         bl ws_end
         b wsf_out
 wsf_stop:
+        lwz r0, 0xC(r12)                # v13: the stage-only stop (ws_data + 0xC 1): the frame as the game made it
+        cmpwi r0, 0
+        bne wsf_out
         li r0, 1
         stb r0, 8(r31)
         stw r0, 0(r31)
@@ -1370,17 +1371,6 @@ ws_step:
         lwz r0, %(kind_at)d(r3)
         cmpwi r0, %(kind)d
         beq wss_him
-        lis r12, ws_data@ha             # v12: the attacker his transformation counter answers (ws_vic: its object
-        lwz r0, ws_data@l(r12)          # id, slot 42's) steps on a normal frame during the stop, as he does: the
-        cmpwi r0, 0                     # rush's hits land and it reacts (the freeze box holds it)
-        beq wss_orig
-        lis r12, ws_vic@ha
-        lwz r12, ws_vic@l(r12)
-        cmpwi r12, 0
-        beq wss_orig
-        lwz r0, 0(r3)
-        cmpw r0, r12
-        beq wss_vic
 wss_orig:
         mflr r0                         # the replaced word
         b 0x%(step_back)08X
@@ -1410,6 +1400,14 @@ wss_him:
         lwz r0, 0(r30)
         cmpwi r0, 0
         bne wss_lease
+        lis r12, ws_stagef@ha           # v13: an ask above 4.5 (the transformation counter's) stops the stage only
+        lfs f0, ws_stagef@l(r12)        # (the objects step: its hits land; his MSC freezes the others itself)
+        li r0, 0
+        fcmpu cr0, f1, f0
+        ble wss_mode
+        li r0, 1
+wss_mode:
+        stw r0, 0xC(r30)
         stw r31, 4(r30)
         mr r3, r31
         bl ws_begin
@@ -1422,6 +1420,9 @@ wss_go: lwz r0, 0(r30)
         beq wss_plain
         lwz r0, 4(r30)
         cmpw r0, r31
+        bne wss_plain
+        lwz r0, 0xC(r30)                # v13: the stage-only stop: his step as any
+        cmpwi r0, 0
         bne wss_plain
         lis r12, %(fs_ha)d
         lwz r30, %(fs_lo)d(r12)         # the frame state
@@ -1444,27 +1445,6 @@ wss_plain:
         lwz r4, 0x14(r1)
         bl wss_orig
         b wss_out
-wss_vic:                                # v12: the attacker's step on a normal frame (its own frame state words kept)
-        stwu r1, -0x30(r1)
-        mflr r0
-        stw r0, 0x34(r1)
-        stw r30, 0x28(r1)
-        stw r31, 0x2C(r1)
-        stw r3, 0x10(r1)
-        stw r4, 0x14(r1)
-        lis r12, %(fs_ha)d
-        lwz r30, %(fs_lo)d(r12)         # the frame state
-        lbz r0, 8(r30)
-        stw r0, 0x18(r1)
-        lwz r0, 0(r30)
-        stw r0, 0x1C(r1)
-        li r0, 0
-        stb r0, 8(r30)
-        bl wss_orig
-        lwz r0, 0x18(r1)
-        stb r0, 8(r30)
-        lwz r0, 0x1C(r1)
-        stw r0, 0(r30)
 wss_out:
         lwz r30, 0x28(r1)
         lwz r31, 0x2C(r1)
@@ -1504,7 +1484,7 @@ wsb_stage:
         bl ws_stage
         li r4, 1
         mr r5, r29
-        lwz r6, 8(r30)
+        lwz r6, 0xC(r30)                # v13: the mode (diag: S4UW's third number)
         lis r7, %(stg_ha)d
         lwz r7, %(stg_lo)d(r7)
         bl ui_dws
@@ -1542,8 +1522,7 @@ wse_done:
         lwz r31, 8(r30)
         lwz r5, 4(r30)
         li r0, 0
-        lis r12, ws_vic@ha              # v12: the attacker's pass ends with the stop
-        stw r0, ws_vic@l(r12)
+        stw r0, 0xC(r30)                # v13: the mode
         stw r0, 0(r30)
         stw r0, 4(r30)
         stw r0, 8(r30)
@@ -1577,10 +1556,11 @@ ws_stage:
         lbz r0, 0xB3(r12)
         cmpwi r0, 0
         bnelr
-wst_go: lis r12, %(stop_hi)d
-        ori r12, r12, %(stop_lo)d
-        mtctr r12
-        bctr
+wst_go: lwz r0, 0(r3)                   # v13: a stage loaded: its update skipped (+0xD0) and nothing told (v10-v12 the
+        cmpwi r0, 0                     # Final Smashes' full stop 0x0316505C, whose 0x031427D0 whites the screen out:
+        beqlr                           # Stage_Freeze On 1 / 2 in game, docs/acmd-extra-commands.md)
+        stb r4, 0xD0(r3)
+        blr
 
 # ui_isform(r3 his WorkModule): r3 1 when TIMER_4 (status 0x155's mode, his MSC's) > MODE_FORM_ON, the transformation /
 # its counter; else 0. Its own frame (get_float vt +0x44: the volatile registers go)
@@ -1739,7 +1719,7 @@ ui_desc:
 ui_modef: .float %(modef)r
 ui_swayf: .float %(swayf)r
 ws_half: .float 0.5
-ws_vic: .word 0
+ws_stagef: .float %(stagef)r
 ws_data:
         .word 0
         .word 0
@@ -1844,7 +1824,7 @@ ws_data:
         .word 0
         .word 0
         .word 0
-""" % dict(form=FORM_ON, modef=MODE_FORM_ON, swayf=MODE_SWAY_ON, sig=DODGE_SIGNAL, x1=SHAPE['p1'][0], y1=SHAPE['p1'][1], z1=SHAPE['p1'][2],
+""" % dict(form=FORM_ON, modef=MODE_FORM_ON, swayf=MODE_SWAY_ON, sig=DODGE_SIGNAL, stagef=WS_STAGE_ONLY, x1=SHAPE['p1'][0], y1=SHAPE['p1'][1], z1=SHAPE['p1'][2],
            x2=SHAPE['p2'][0], y2=SHAPE['p2'][1], z2=SHAPE['p2'][2], radius=SHAPE['radius'],
            bonetype=(SHAPE['bone'] << 16) | (SHAPE_TYPE << 8), shape_at=shape_at,
            descbytes=int.from_bytes(bytes(DESC_BYTES), 'big')))

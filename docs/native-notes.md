@@ -3680,3 +3680,21 @@ exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATC
   - **Visibility:** MSC `VisibilityModule(0x2710, 0 / 1)` hides / shows the whole fighter (his following effects with
     him: "Effects follow the model's visibility" above): the rushes' vanishes, shown again at every exit (`ui_end`,
     `ui_dodge_end`, `ui_finish`).
+
+- **v13 (exe_v46z_ui9; README "Ultra Instinct v13"): the white flash's real cause, the stage-only stop, the colour
+  command's scale.**
+  - **The white flash is the full stage stop.** v12's clips (Secret Sensation; the transformation counter) whiten the
+    stage and background for exactly the world stop's span with no effect paused, so v12's paused-effect reading was
+    wrong. The stop called `0x0316505C(manager, 1)`, the Final Smashes' full stop (it tells the stage, `0x031427D0`):
+    the same call camera_effects v3 found whitening the screen in game (Stage_Freeze On 2 / 3 flash, On 1 = `+0xD0`
+    only doesn't). `ws_stage` now writes `+0xD0` only (when `[manager + 0]`, a stage, is set); nothing is called.
+  - **The stage-only stop.** `ws_data + 0xC` (the v10-v11 instance list's first word, unused since v12) is the stop's
+    mode: an ask over `WS_STAGE_ONLY` (4.5, `ws_stagef`) at the start makes mode 1: `ws_fill` keeps the game's frame and
+    answer, his step is plain, only `+0xD0` is set; `ws_end` clears it. `ws_vic` (v12) removed.
+  - **What a frame-state stop skips.** The battle world phase `0x02BF2544` calls the fill (`bl 0x04BD4A00`, the
+    cave's ws_fill) and runs `0x02BF2338` / `0x02BF23FC` only when its answer is non-zero (`0x02BF2588`, `0x02BF25A4`);
+    with the frame state stopped no object steps. In game no hit of his rush landed on the attacker the cave let step
+    (v12, clip b); the counter now freezes fighters by a renewed 2-frame hitstop instead (Time Skip's way).
+  - **LAST_EFFECT_SET_COLOR is 0-255.** Its handler `0x02BE44B0` loads the three floats and divides each by the float
+    at `0x100FC3E4` (255.0; `fdivs` at `0x02BE4534`, `0x02BE4540`, `0x02BE4544`) before EffectModule vt `+0x27C`. The
+    fighter colour table (fighter_param 0x13C-0x147) feeds the set colour directly (`0x0334C938`), already in 0-1+.

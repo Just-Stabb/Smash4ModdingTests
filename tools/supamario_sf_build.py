@@ -152,6 +152,7 @@ CMN_EMPS = ('Btl_GHit.emp', 'Btl_GHitSmk.emp')
 FX_SIZE = round(METRE / 8.5, 4)       # xv2_to_ptcl's 8.5 units a metre -> his 5.04 (the hitbox's size)
 FIR_SIZE = FX_SIZE                    # EEPK scale 0.8-1.2: 1.0
 WAV_SIZE = FX_SIZE
+V13_WAV, V13_FIR = 1.6, 1.3           # v13 (the user: "make the effect larger"): the shot x1.6, the punch's burst x1.3
 CMN_SIZE = FX_SIZE
 SE = {'sf_bishi': ('CAR_S1510_HKN_Bishi', 0.0), 'sf_fire': ('CAR_S1510_HKN_Fire', 0.0)}
 SND_CHARGE = 0x69                     # Smash 4's smash-charge sound (Mario's AttackS4Hold)
@@ -175,7 +176,8 @@ def msc_values(snd_charge=SND_CHARGE):
          'SF_REACH': fl(REACH), 'SF_BEHIND': fl(BEHIND), 'SF_LANE_DOWN': fl(LANE_DOWN), 'SF_LANE_UP': fl(LANE_UP),
          'SF_GROUNDED': fl(GROUNDED), 'SF_MID': fl(MID), 'SF_PULL': fl(PULL), 'SF_HOLD_PAD': fl(HOLD_PAD),
          'SF_PUSH_NF': fl(PUSH_NF), 'SF_PUSH_F': fl(PUSH_F), 'SF_PUSH_W': fl(PUSH_W), 'SF_EDGE': fl(EDGE), 'SF_PUSHED': fl(PUSHED),
-         'SF_ST_GUARD_DAMAGE': fl(ST_GUARD_DAMAGE), 'SF_ARTICLE': '0x%X' % ARTICLE, 'SF_SND_CHARGE': '0x%X' % snd_charge}
+         'SF_ST_GUARD_DAMAGE': fl(ST_GUARD_DAMAGE), 'SF_ARTICLE': '0x%X' % ARTICLE, 'SF_SND_CHARGE': '0x%X' % snd_charge,
+         'SF_FX_SWIRL': '0x%X' % FX_IDS.get('swirl', 0), 'SF_SWIRL_SIZE': fl(round(WAV_SIZE * V13_WAV, 4))}
     for k in range(3):
         v['SF_PUNCH_%d' % (k + 1)] = fl(PUNCH[k])
         v['SF_LIFE_%d' % (k + 1)] = fl(LIFE[k])
@@ -241,7 +243,11 @@ def weapon_game():
 
 def weapon_effect():
     """the skill's effect 5 (Hkn_Wav, PositionUpdate + RotateUpdate: following the shot) at the BSA's frame 1"""
-    body = [cmd('frame', 1.0), cmd('external_graphic', FX_IDS['wav'], 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, WAV_SIZE, 1)]
+    body = [cmd('frame', 1.0), cmd('external_graphic', FX_IDS['wav'], 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                   round(WAV_SIZE * V13_WAV, 4), 1)]
+    if 'trail' in FX_IDS:            # v13: XV2's Hkn_Wind trace (supamario_ui12.sf_trail): the same call, its wisps left behind
+        body.append(cmd('external_graphic', FX_IDS['trail'], 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                        round(WAV_SIZE * V13_WAV, 4), 1))
     return {n: list(body) for n in WEAPON_SCRIPTS}
 
 
@@ -324,14 +330,15 @@ def body_scripts(se_id, cmn_fx):
     start = {'game': timeline([(START_AT + HOLD_FLAG_AT, [cmd('on_flag', 0x2100001B)])]),
              'effect': timeline([(START_AT + 1, [gfx(cmn_fx['MHitSmk'], 'TransN', 0, 0, 0, CMN_SIZE)])] + hold),
              'sound': timeline([(START_AT, [cmd('sound_effect', se_id('sf_bishi'))])]),
-             'expression': timeline([(HOLD_AT, [cmd('start_charge', -1.0, -1.0, -1.0, -1.0, 0.1, -1.0, -1),
-                                                cmd('rumble_loop', 0x22, 0x39)])])}
+             # v13 (the user: "remove the character shake while charging"): no START_CHARGE (Mario's AttackS4Hold body
+             # shake, PhysicsModule op 7); the rumble kept
+             'expression': timeline([(HOLD_AT, [cmd('rumble_loop', 0x22, 0x39)])])}
     eff, snd, exp = [], [], []
     for lv in (1, 2, 3):
         at = REL_AT[lv - 1]
         for k in range(lv):
             f = at + PUNCH[k]
-            eff.append((f, [gfx(FX_IDS['fir'], 'TransN', 0, Y0, X0 - 3.0, FIR_SIZE)]))
+            eff.append((f, [gfx(FX_IDS['fir'], 'TransN', 0, Y0, X0 - 3.0, round(FIR_SIZE * V13_FIR, 4))]))
             snd.append((f, [cmd('sound_effect', se_id('sf_fire'))]))
             exp.append((f, [cmd('rumble', 0x12 if k == lv - 1 else 0x10, 0)]))
         for xf, name in CMN_AT[lv]:

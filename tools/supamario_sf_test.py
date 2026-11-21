@@ -336,7 +336,12 @@ def file_tests(out, base, skill_dir):
     ids = UT_IDS.get('sf', {})
     check('v11: each punch\'s effect script: the skill\'s effect 5 (Hkn_Wav, following the shot) at frame 1 on its bone 0',
           {n: [(c.name, c.params[0], c.params[1], c.params[-1]) for c in eff.script(n) if c.name == 'External_Graphic']
-           for n in F.WEAPON_SCRIPTS}, {n: [('External_Graphic', ids.get('wav'), 0, 1)] for n in F.WEAPON_SCRIPTS})
+           for n in F.WEAPON_SCRIPTS}, {n: [('External_Graphic', ids.get('wav'), 0, 1), ('External_Graphic', ids.get('trail'), 0, 1)]
+                                        for n in F.WEAPON_SCRIPTS})
+    check('v13: the shot x%g (the user: "make the effect larger"), its trail (XV2\'s Hkn_Wind) the same size, both '
+          'following its bone 0' % F.V13_WAV,
+          {round(c.params[8], 4) for n in F.WEAPON_SCRIPTS for c in eff.script(n) if c.name == 'External_Graphic'},
+          {round(F.WAV_SIZE * F.V13_WAV, 4)})
     check('v11: the projectile\'s model hidden (nud.hidden of the fireball\'s)',
           open(os.path.join(sup, 'model', 'fireball', 'c00', 'model.nud'), 'rb').read(),
           nud.hidden(os.path.join(base, 'model', 'fireball', 'c00', 'model.nud')))
@@ -380,11 +385,13 @@ def file_tests(out, base, skill_dir):
     check('v11: the hand burst (the skill\'s effect 0 / 1: Hkn_Fir) at every punch, at his fist\'s place in his frame',
           [f for f, p in at(F.SCRIPT_REL, 'effect', 'Graphic_Effect2') if p[0] == ids.get('fir')],
           [F.REL_AT[lv - 1] + F.PUNCH[k] for lv in (1, 2, 3) for k in range(lv)])
-    check('v11: the charge: the smash charge\'s look (START_CHARGE at %d; sparkles every 10 frames to %d)' % (
-        F.HOLD_AT, F.HOLD_AT + F.HOLD_N),
+    check('v11: the charge: the smash charge\'s look (sparkles every 10 frames to %d; v13: no START_CHARGE, the body '
+          'shake: the user\'s "remove the character shake while charging"; the rumble kept at %d)' % (
+              F.HOLD_AT + F.HOLD_N, F.HOLD_AT),
           ([f for f, _p in at(F.SCRIPT_START, 'expression', 'START_CHARGE')],
+           [f for f, _p in at(F.SCRIPT_START, 'expression', 'Rumble_Loop')],
            [f for f, p in at(F.SCRIPT_START, 'effect', 'Graphic_Effect2') if p[0] == 0x1000019]),
-          ([F.HOLD_AT], list(range(F.HOLD_AT, F.HOLD_AT + F.HOLD_N, 10))))
+          ([], [F.HOLD_AT], list(range(F.HOLD_AT, F.HOLD_AT + F.HOLD_N, 10))))
     # the motion
     pac = dict(omo.pac_read(os.path.join(sup, 'motion', 'body', 'main.pac')))
     o = omo.Omo([d for n, d in pac.items() if n.endswith('SpecialAirLwHeavy.omo')][0])
@@ -642,8 +649,9 @@ def v12_jitter_tests(r):
     before = {'shake': False, 'rate var': [], 'his position written': [], 'hidden': []}
     exp = acmd.ACMDFile.load(os.path.join(UT_OUT[0], 'fighter', 'supamario', 'script', 'animcmd', 'body', 'expression.bin'))
     sc = [(fr, c.name) for fr, c in UT.at_frames(exp.script(F.SCRIPT_START)) if c.name == 'START_CHARGE']
-    check('v12: the charge\'s expression script plays START_CHARGE (the smash charge\'s body shake) at its frame %d '
-          '(the charge\'s first)' % F.HOLD_AT, sc, [(float(F.HOLD_AT), 'START_CHARGE')])
+    check('v13: the charge\'s expression script plays no START_CHARGE (the smash charge\'s body shake; v11-v12: at its '
+          'frame %d; the user: "remove the character shake while charging"); v12\'s stops (PhysicsModule(0x8)) kept'
+          % F.HOLD_AT, sc, [])
     for held, what in ((500, 'charged to the most (3 punches)'), (F.HOLD_DECIDE + F.LV2, 'charged to 2 punches'),
                        (0, 'a tap (1 punch)')):
         g, vm = sf_run(r, held=held)
@@ -707,6 +715,26 @@ def v12_hold_tests(r):
             'untouched'), xs, [round(reach, 2)] if want else [])
 
 
+def v13_swirl_tests(r):
+    """v13 (the user: "the on-hit distortion swirls"): where a punch reaches a fighter in its lane, the swirls set
+    world-placed on it (EffectModule op 3), once a punch"""
+    sid = UT_IDS['sf'].get('swirl')
+    for held, lv in ((0, 1), (F.HOLD_DECIDE + F.LV3, 3)):
+        dx = 30.0
+
+        def opp(g):
+            g.vars[SLOT_X + 4], g.vars[SLOT_Y + 4], g.vars[SLOT_F + 4] = dx, 0.0, -1.0
+        g, vm = sf_run(r, held=held, others=[opp])
+        r0 = [e[0] for e in g.ev('motion_at') if e[2] == F.MOT_REL][0]
+        sw = [(e[0] - r0, round(R.i2f(e[5][2]), 2), round(R.i2f(e[5][3]), 2)) for e in g.ev('effect')
+              if e[2] == 3 and e[3] == sid]
+        want = [(int(round(arrive(lv, k, dx))), dx, F.MID) for k in range(lv)]
+        check('v13: level %d, a fighter %g in front: the swirls (0x%08X) on it (X %g, its middle %g up) as each punch '
+              'reaches it (release frames %s)' % (lv, dx, sid or 0, dx, F.MID, [w[0] for w in want]), sw, want)
+    g, vm = sf_run(r, held=0)
+    check('  nobody in the lane: no swirls', [e for e in g.ev('effect') if e[2] == 3 and e[3] == sid], [])
+
+
 UT_OUT = []
 
 
@@ -724,6 +752,7 @@ def run(r, out, ts_out, base, skill_dir=None, exe=None):
     v12_jitter_tests(r)
     v12_foot_tests(out, base)
     v12_hold_tests(r)
+    v13_swirl_tests(r)
     piace_msc_tests(r)
     fx_tests(out, ts_out)
     if skill_dir:

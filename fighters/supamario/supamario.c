@@ -42804,7 +42804,9 @@ void ui_counter_go(int shortr)
     {
         WorkModule(0, UI_STRIKE_N, 0x0100000F);     // v10: the counter's length (ui_loop's end)
         func_22(UI_MOT_STRIKE, 0, 1.0f);
-        WorkModule(0, UI_SS_STOP_ASK, UI_V_STOP);   // v12: the world stopped (the cave) from the read (ui_blink)
+        WorkModule(0, ui_attacker_slot(), 0x01000010);   // v13: the attacker (not frozen: ui_freeze_others)
+        WorkModule(0, UI_CNT_STOP_ASK, UI_V_STOP);  // v13: the stage stopped (the cave's stage-only stop)
+        ui_freeze_others();
     }
     ui_still();
 }
@@ -42812,6 +42814,66 @@ void ui_counter_go(int shortr)
 void ui_counter()
 {
     ui_counter_go(0);
+}
+
+// v13: the slot (1-8) of the fighter whose attack the cave recorded (the nearest to its place, 0x01000008 / 9; not
+// him), 0 when none was found
+float ui_attacker_slot()
+{
+    int s;
+    float best;
+    float bd;
+    float dx;
+    float dy;
+    float d;
+    best = 0.0f;
+    bd = 0.0f;
+    if (WorkModule(0x10, 0x21000012) == 0)
+    {
+        return 0.0f;
+    }
+    s = 1;
+    while (s <= 8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f &&
+            (WorkModuleF(0, 0x0f000020 + 4 * (s - 1)) != WorkModuleF(0, 0x0f000000) ||
+             WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) != WorkModuleF(0, 0x0f000001)))
+        {
+            dx = WorkModuleF(0, 0x0f000020 + 4 * (s - 1)) - WorkModuleF(0, 0x01000008);
+            dy = WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) - WorkModuleF(0, 0x01000009);
+            d = dx * dx + dy * dy;
+            if (best < 0.5f || d < bd)
+            {
+                best = (float)s;
+                bd = d;
+            }
+        }
+        s = s + 1;
+    }
+    return best;
+}
+
+// v13 (the user: the transformation counter "seems to not hit opponents" in v12): v12 froze the world through the
+// cave's frame state (every object's step skipped, the attacker let through by its id); the rush hit nothing. Now
+// Time Skip's stopped time, which lands its punch in game: every other fighter but the attacker frozen by a 2-frame
+// hitstop renewed every frame (its slot's HITSTOP, 0x0F000044 + 8 x (slot + 2)), the stage by the cave's stage-only
+// stop (TIMER_6 UI_CNT_STOP_ASK); the attacker steps, held by the freeze box, and takes the rush
+void ui_freeze_others()
+{
+    int s;
+    int v;
+    v = (int)WorkModuleF(0, 0x01000010);
+    s = 1;
+    while (s <= 8)
+    {
+        if (s != v && WorkModuleF(0, 0x0f000023 + 4 * (s - 1)) != 0.0f &&
+            (WorkModuleF(0, 0x0f000020 + 4 * (s - 1)) != WorkModuleF(0, 0x0f000000) ||
+             WorkModuleF(0, 0x0f000021 + 4 * (s - 1)) != WorkModuleF(0, 0x0f000001)))
+        {
+            WorkModule(0, 2.0f, 0x0F000044 + 8 * (s + 0x2));
+        }
+        s = s + 1;
+    }
 }
 
 // v12: put him at (x, y): on the ground the X only while the place is within UI_GROUND_DY of his height, else there,
@@ -42857,7 +42919,8 @@ void ui_blink(float n)
     float face;
     if (n < UI_CNT_STOP_MAX + 0.5f)
     {
-        WorkModule(0, UI_SS_STOP_ASK, UI_V_STOP);
+        WorkModule(0, UI_CNT_STOP_ASK, UI_V_STOP);      // v13: the stage only (v12: the whole world: no hit landed)
+        ui_freeze_others();
     }
     else
     {
@@ -43650,6 +43713,50 @@ void sf_hold(float r, float lv)
     }
 }
 
+// v13 (the user: "add ... the on-hit distortion swirls"; XV2's picture: blocky distortion round the hit): where a punch
+// reaches a fighter in its lane (sf_hold's lane and arrival), XV2's punch burst's refraction rings
+// (tools/supamario_ui12.py sf_swirl) world-placed on it, once a punch
+void sf_swirls(float r, float lv)
+{
+    int s;
+    float k;
+    float x;
+    float y;
+    float f;
+    float sx;
+    float fy;
+    float dx;
+    float a;
+    x = WorkModuleF(0, 0x0f000000);
+    y = WorkModuleF(0, 0x0f000001);
+    f = WorkModuleF(0, 0x0f000003);
+    s = 0;
+    while (s < 0x8)
+    {
+        if (WorkModuleF(0, 0x0f000023 + 0x4 * s) != 0)
+        {
+            sx = WorkModuleF(0, 0x0f000020 + 0x4 * s);
+            fy = WorkModuleF(0, 0x0f000021 + 0x4 * s);
+            dx = (sx - x) * f;
+            if ((sx - x > 0.01f || sx - x < -0.01f || fy - y > 0.01f || fy - y < -0.01f) && dx > -SF_BEHIND &&
+                fy > y - SF_LANE_DOWN && fy < y + SF_LANE_UP)
+            {
+                k = 0.0f;
+                while (k < lv - 0.5f)
+                {
+                    a = sf_arrive(lv, k, dx);
+                    if (a > -0.5f && r > a - 0.5f && r < a + 0.5f)
+                    {
+                        EffectModule(0x3, SF_FX_SWIRL, sx, fy + SF_MID, 0, 0, 0, 0, SF_SWIRL_SIZE, 0, 0xffffffff);
+                    }
+                    k += 1.0f;
+                }
+            }
+        }
+        s += 1;
+    }
+}
+
 void sf_release(float n)
 {
     float held;
@@ -43767,6 +43874,7 @@ void sf_loop()
     {
         sf_hold(r, lv);
     }
+    sf_swirls(r, lv);
     if (r > sf_iasa(lv) - 0.5f && (func_39() != 0 || func_41() != 0))
     {
         return;

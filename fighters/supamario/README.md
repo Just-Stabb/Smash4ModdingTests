@@ -4876,3 +4876,90 @@ the glow restore); `outline_shell_test.py` 124 ok; `mesh_vis_test.py` 64 ok; `ef
 `msc_stack_check` 0 of 2507 (globals 127 of 128), the projectile's 0 of 48; `fighter_texture_ids.py check` 0 errors;
 `import_call_check` 0 on both exes; Sm4shCommand v1.7.25 NvTest 290 ok / 1 known failure (effect.bin's else-if
 chains, upstream), HvTest 248 ok. 0 failures.
+
+## Ultra Instinct v13 (`supamario_ultrainstinct_v13.zip`, exe `exe_v46z_ui9`; TEST ONLY `exe_v46z_ui9_diag`; Sm4shCommand unchanged)
+Install over v12: `INSTALL_TO_data/` holds only the files changed since v12, with exe_v46z_ui9 (= exe_v46z_outline5 +
+`tools/supamario_ui_cave.py`, both builds reproduced byte for byte, `import_call_check` 0). The user's v12 test (clips
+`v12clip/a` (Secret Sensation), `b` (the transformation counter), `c` (the autododge counter, Soaring Fist), XV2's
+`xv2_soaringfist.webp`, `black_trail.png`): "Secret Sensation still does the white flash and the transformation counter
+does a white flash now and seems to not hit opponents ... add Xenoverse's hit effects to the autododge and
+transformation counter ... add the trail to Soaring Fist and the on-hit distortion swirls, remove the character shake
+while charging and make the effect larger ... made the autododge counter activate faster. The hitbox trails are all
+black now".
+
+### 1. The white flash (Secret Sensation; the transformation counter)
+- **Evidence:** clip a (Secret Sensation): white from the counter's read (~0.4 s) to the world going on (~0.85 s); clip
+  b (the transformation counter): white for the whole 349-frame counter. In both the stage and background white, the
+  fighters and the HUD drawn: the world stop's span, with or without effect pauses (v12 had none: v12's diagnosis was
+  wrong).
+- **Cause:** the world stop's stage stop was the Final Smashes' full stop `0x0316505C(manager, 1)`, which tells the
+  stage (`0x031427D0`: its objects paused / hidden through the render managers). That call is the one camera_effects
+  v3's in-game test pinned as the white screen (docs/acmd-extra-commands.md "The white screen": Stage_Freeze On 2 / 3,
+  the full stop, flash; On 1, the update flag `+0xD0` only, doesn't; log a5622166).
+- **Fix (exe_v46z_ui9):** `ws_stage` sets / clears the stage manager's `+0xD0` only (the stage's update skipped), no
+  call: Time Skip's proven Stage_Freeze On 1. Diag: S4UW's third number is now the stop's mode.
+
+### 2. The transformation counter hit nothing
+- **Cause:** v12 froze the world through the cave's frame state (no object steps; the fill answers 0, so the battle
+  world skips its step-frame work: `0x02BF2588` / `0x02BF25A4` test the fill's answer), and let only the attacker step
+  (`ws_vic`). In game the rush landed nothing (clip b: DK at 0% after it). Which step-frame work the collision pass
+  needs wasn't pinned down offline; Time Skip's stopped time, whose punch lands in game, never touches the frame state.
+- **Fix:** the counter asks the cave's new **stage-only stop** (TIMER_6 6.0, over 4.5: `+0xD0` only, the frame state
+  untouched, every object steps) and freezes every other fighter but the attacker itself, Time Skip's way: a 2-frame
+  hitstop (`HITSTOP`, `0x0F000044 + 8 x (slot + 2)`) renewed every frame from the read to the end
+  (`ui_freeze_others`); the attacker is the fighter nearest the cave's record (`ui_attacker_slot`), held by the freeze
+  box as in v11 (whose counter hit). `ws_vic` removed. Weapons / items are not frozen (as Time Skip's).
+- **Tests that would have caught it:** the counter never asks the whole-world stop (TIMER_6 always over 4.5), the
+  others frozen by hitstop and not the attacker; the cave's stage-only stop leaves the frame state and every object's
+  step alone.
+
+### 3. XV2's hit effects on both rushes
+The rush hits' and the finisher's BDM Effect1 is BTL_CMN effect 0: **Btl_HitLOD x1.5, Btl_HitS x0.8, Btl_Sweat00 x1.0**
+(its CBIND left out). v10-v12 stood Time Skip's capped LOD copy and Btl_HitL in for them (v10 thought Btl_HitS wasn't in
+BTL_CMN.pbind.emb: it is, entry 0). Now the three sets Sledgehammer converted from that very effect (0x0341005C-5E,
+XV2's colours), at XV2's scales x1.75, on every rush hit and the finisher (x1.6) of both rushes.
+
+### 4. Soaring Fist
+- **(a) The trail:** XV2's Hkn_Wind trace (effect 5's TBIND part: three ribbons at (0, +0.2, 0) / (0, -0.2, 0) /
+  (0, 0, -0.5) m, held 13 / 15 / 17 frames, white to (0.4, 0.5, 0.5), 0.4 transparency) as three wisps a frame
+  (`PtcSupamarioSfTrail`: the fireball's own smoke-trail emitter, one a frame, left where it is made), played with the
+  wave on the shot.
+- **(b) The swirls:** the shot's refraction rings are left where they are made (the plain refraction program, follow 1:
+  distortion along its path, XV2's picture); XV2's punch burst's refraction rings (Hkn_Fir wave_ref / wave_ring_ref, v11-
+  v12 flat colour) refract, and a copy x1.6 (`PtcSupamarioSfSwirl`) is world-placed on a fighter as each punch reaches it
+  (`sf_swirls`: sf_hold's lane and arrival, every level).
+- **(c) No charge shake:** the charge's expression script has no START_CHARGE any more (the rumble kept); v12's stops
+  (`PhysicsModule(0x8)`) and its test kept.
+- **(d) Larger:** the shot (and its trail) x1.6, the punch's burst x1.3.
+
+### 5. The autododge counter faster
+SpecialLwHeavy's short-rush lead-in (XV2 #1 151-210) **56 -> 30 frames**: the input to the first hit **56 -> 30**, the
+whole rush 150 -> 124. The 18-unit lunge kept, over its frames 1-10 (1.8 a frame; v12 1-18), the vanish at 10 (v12 18),
+behind the opponent at 13 (v12 24).
+
+### 6. The black trails
+- **Cause:** LAST_EFFECT_SET_COLOR's handler (`0x02BE44B0`) divides its three floats by 255 (`fdivs` at
+  `0x02BE4534`-`44` by the float at `0x100FC3E4`); v12 passed the set colour itself (0.8, 1.5, 3.0): 0.003-0.012, black.
+- **Fix:** the commands carry x255 (204, 382.5, 765) / (306, 573.75, 1147.5): the set colour (0.8, 1.5, 3.0) /
+  (1.2, 2.25, 4.5) again, a light-blue edge on the arcs' grey with a white core. The smash arc's blue copy is ptcl colour
+  keys (no command): unaffected. Test: the decoded set colour (/ 255, the divisor read from the exe) and its edge / core
+  on the greyscale arc, v12's values decoding black.
+
+### Not confirmed in game / approximated
+- That the collision pass needs object steps (v12's no-hit is explained by it, not traced to the instruction); the
+  counter's freeze leaves weapons / items moving (Time Skip's too).
+- The trail as billboard wisps (XV2 draws ribbons); the swirls placed on the fighter when the punch reaches its place
+  (not the projectile's own hit event).
+
+### Ultra Instinct v13, results
+`supamario_ui_test.py --exe --package --since` (v12's build, `--sf-skill`) **688 ok** (v13: the counter's stage-only
+asks and the others' hitstop freeze (not the attacker, not him), the arcs' decoded colour (/ 255, the divisor and the
+three fdivs read from the exe) light blue with a white core and v12's decoding black, no START_CHARGE, the shot x1.6 and
+its trail call, the trail / swirl sets, the refraction left behind, the swirls on a fighter at each punch's arrival
+(levels 1 and 3, nobody near), XV2's hit sets on both rushes, the short rush's 30-frame lead-in and 1.8-a-frame lunge);
+`supamario_ui_cave_test.py` **400 ok** (exe_v46z_ui9 / ui9_diag reproduced byte for byte; the stage stop `+0xD0` only,
+no full-stop call; the stage-only mode (frame state and steps untouched, the lease); S4UW's mode); `supamario_timeskip_test`
+198, `supamario_godfist_test` 566, `supamario_sledgehammer_test` 141, `supamario_fakedeath_test` 47,
+`supamario_corebreaker_test` 104 ok; `outline_shell_test.py` 124 ok; `mesh_vis_test.py` 64 ok; `eft_vertex_test` 0
+failures; `msc_stack_check` 0 of 2510 (globals 127 of 128), the projectile's 0 of 48; `fighter_texture_ids.py check` 0
+errors; `import_call_check` 0 on both exes. Sm4shCommand unchanged (no command or slot). 0 failures.

@@ -70,7 +70,7 @@ SEGMENTS = [
     # the short rush after the long one in SpecialLwHeavy's animation (motion 0x236 from 349, the slot that plays it):
     # the vanish to the first impact in 56 (e: 92 - 36), the 11 hits in 52 (the arm held out: 210-280), the finisher's
     # end in 42 (280-350): 150 frames
-    ('counter_s_in', STRIKE, 1, 151, 210, 56),
+    ('counter_s_in', STRIKE, 1, 151, 210, 30),   # v13 (the user: "made the autododge counter activate faster"): 56 -> 30
     ('counter_s_rush', STRIKE, 1, 210, 280, 52),
     ('counter_s_end', STRIKE, 1, 280, 350, 42),
     ('ss_in', SS, 0, 0, 40, 18),

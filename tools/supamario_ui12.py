@@ -155,6 +155,13 @@ def sf_3d(p, skill_dir, rep):
             else:
                 _gain(p, em, 0.0)
                 done['quiet'].append(name)
+        if name in done['refraction']:
+            # v13 (the user: "the on-hit distortion swirls"; XV2's picture: blocky distortion where the shot passed):
+            # the refraction rings left where they are made (the plain refraction program, follow 1: v12 had them
+            # follow the shot, so nothing stayed behind)
+            struct.pack_into('>I', e['data'], 0x310, 1)
+            done['follow'][name] = 'left behind'
+            continue
         done['follow'][name] = _follow(p, e['data'], twins)
     rep['v12_sf_3d'] = done
     return done
@@ -198,6 +205,23 @@ def f32(vals):
     return [struct.unpack('>f', struct.pack('>f', v))[0] for v in vals]
 
 
+# v13 (the user, v12: "The hitbox trails are all black now"): LAST_EFFECT_SET_COLOR's handler (0x02BE44B0) DIVIDES its
+# three floats by 255 (fdivs at 0x02BE4534-44 by the float at 0x100FC3E4, 255.0) before the set colour call (EffectModule vt
+# +0x27C): v12 passed the set colour itself (0.8, 1.5, 3.0), i.e. 0.003-0.012: black. The command takes 0-255 (more to
+# brighten); the fighter table's colours (the 2 / 0.8 / 0.35 kind) are the set colour already
+COLOR_DIV = 255.0
+
+
+def arc_cmd_rgb(rgb):
+    """the command's Red / Green / Blue for a set colour (what the handler divides back)"""
+    return f32([v * COLOR_DIV for v in rgb])
+
+
+def set_colour_of_cmd(params):
+    """the set colour the handler makes of the command's parameters (the game's: / 255)"""
+    return [v / COLOR_DIV for v in params]
+
+
 def _blue(rgb):
     r, g, b = rgb[:3]
     r, g, b = b, g, r
@@ -219,12 +243,102 @@ def smash_hed_blue(p, e, rep):
     return FX_IDS['hed_blue']
 
 
+# ---------------------------------------------------------------- v13: Soaring Fist's trail and swirls
+TRAIL_SET = 'PtcSupamarioSfTrail'
+SWIRL_SET = 'PtcSupamarioSfSwirl'
+TRAIL_SRC = ('PtcMarioFireball', 'PtcMarioFireballSmoke_Copy2')   # vanilla's own trail (the fireball's grey smoke: CPU,
+# one a frame, left where it is made)
+# XV2's Hkn_Wind.etr (1510_GKS_HKN.eepk effect 5's TBIND part: the shot's trace, Orientation None): three ribbons from
+# the shot, at (0, +0.2, 0) / (0, -0.2, 0) / (0, 0, -0.5) m, held 13 / 15 / 17 frames, width 0.5 -> 0.1 m, colour 1
+# white -> (0.4, 0.5, 0.5), transparency 0.4 -> 0.25 -> 0 (TranceNML: normal blend)
+TRAIL_NODES = ((0.0, 0.2, 0.0, 13), (0.0, -0.2, 0.0, 15), (0.0, 0.0, -0.5, 17))
+TRAIL_METRE = 5.04
+TRAIL_WIDTH = 0.5 * 5.04 * 2.0         # the wisp's size (units): XV2's ribbon half-width 0.5 m, doubled (a billboard
+                                       # puff spans the ribbon's width)
+TRAIL_ALPHA = 0.4
+TRAIL_RGB0, TRAIL_RGB1 = (1.0, 1.0, 1.0), (0.4, 0.5, 0.5)
+SWIRL_FROM = ('PtcSupamarioSfHkn_Fir', ('wave_ref', 'wave_ring_ref'))   # XV2's punch burst's refraction rings
+SWIRL_SIZE = 1.6
+
+
+def _refraction_of(p, em, base):
+    """the fireball's refraction program with this emitter's emission fields (v9's aura_refraction way)"""
+    import supamario_ui_build as B
+    new = bytearray(base)
+    struct.pack_into('>I', new, 0x38, struct.unpack_from('>I', em, 0x38)[0])
+    for fld in B.REF_COPY:
+        p.set_field(new, fld, p.field(em, fld))
+    _gain(p, new, SF_REF_STRENGTH)
+    return new
+
+
+def sf_trail(p, e, rep):
+    """v13 (the user: "please add the trail to Soaring Fist"): XV2's Hkn_Wind trace as three wisps a frame (the
+    fireball's own smoke trail emitter, recoloured / sized as the trace's three nodes), left where they are made as the
+    shot flies on: a set the projectile's effect script plays with the wave (following its bone 0)"""
+    src = _set(p, TRAIL_SRC[0])
+    base = [x['data'] for x in p.sets[src]['emitters'] if x['data'] is not None and
+            p.emitter_name(x['data']) == TRAIL_SRC[1]][0]
+    import supamario_sf_build as SF
+    size = SF.WAV_SIZE * SF.V13_WAV
+    ems, names = [], []
+    for k, (x, y, z, life) in enumerate(TRAIL_NODES):
+        em = bytearray(base)
+        p.set_field(em, 'ptcl_life', life)
+        p.set_field(em, 'scale', [TRAIL_WIDTH / size] * 2)
+        t = [x * TRAIL_METRE / size, y * TRAIL_METRE / size, z * TRAIL_METRE / size]
+        p.set_emitter_srt(em, tuple(p.field(em, 'emitter_scale')), tuple(p.field(em, 'emitter_rotation')), t)
+        for track, rgb in ((0, TRAIL_RGB0), (1, TRAIL_RGB1)):
+            keys = [tuple(k_) for k_ in p.color_keys(em, track)]
+            p.set_color_keys(em, track, [tuple(rgb) + tuple(k_[3:]) for k_ in keys])
+        for fld in ('alpha_init', 'alpha_diff21', 'alpha_diff32'):
+            p.set_field(em, fld, p.field(em, fld) * TRAIL_ALPHA)
+        struct.pack_into('>I', em, 0x310, 1)                      # left behind: the trail
+        ems.append(bytes(em))
+        names.append('HknWind%d' % k)
+    si = p.new_set(TRAIL_SET, ems, names)
+    FX_IDS['trail'] = SF.FX_IDS['trail'] = 0x03410000 | e.add(si + 1)
+    rep['v13_trail'] = {'set': si, 'id': '0x%08X' % FX_IDS['trail'], 'nodes': TRAIL_NODES}
+    return FX_IDS['trail']
+
+
+def sf_swirl(p, e, rep):
+    """v13 (the user: "the on-hit distortion swirls"): XV2's punch burst's refraction rings (Hkn_Fir wave_ref /
+    wave_ring_ref: one-time bursts, v11-v12 drawn as flat colour) as the fireball's refraction program, x SWIRL_SIZE,
+    in a set of their own the MSC plays where a punch reaches a fighter; Hkn_Fir's own rings refract too"""
+    import supamario_ui_build as B
+    src = p.find_set(B.HAZE_SRC[0])
+    base = [x['data'] for x in p.sets[src]['emitters'] if x['data'] is not None and
+            p.emitter_name(x['data']) == B.HAZE_SRC[1]][0]
+    fir = _set(p, SWIRL_FROM[0])
+    ems, names = [], []
+    for x in p.sets[fir]['emitters']:
+        em = x['data']
+        if em is None or p.emitter_name(em) not in SWIRL_FROM[1]:
+            continue
+        new = _refraction_of(p, em, base)
+        struct.pack_into('>I', new, 0x310, 1)
+        x['data'] = bytearray(new)
+        p.dirty_layout = True
+        sw = bytearray(new)
+        p.set_field(sw, 'scale', [v * SWIRL_SIZE for v in p.field(sw, 'scale')])
+        ems.append(bytes(sw))
+        names.append(p.emitter_name(em) + 'Swirl')
+    si = p.new_set(SWIRL_SET, ems, names)
+    import supamario_sf_build as SF
+    FX_IDS['swirl'] = SF.FX_IDS['swirl'] = 0x03410000 | e.add(si + 1)
+    rep['v13_swirl'] = {'set': si, 'id': '0x%08X' % FX_IDS['swirl'], 'emitters': names}
+    return FX_IDS['swirl']
+
+
 def effects(p, e, sf_skill, rep):
-    """every v12 change to the bank (supamario_ui_build.effects, after v11's)"""
+    """every v12 change to the bank (supamario_ui_build.effects, after v11's); v13's trail and swirls after them"""
     sf_3d(p, sf_skill, rep)
     ss_charge(p, rep)
     ts_aura(p, rep)
     smash_hed_blue(p, e, rep)
+    sf_trail(p, e, rep)
+    sf_swirl(p, e, rep)
 
 
 # ---------------------------------------------------------------- 5. the scripts
@@ -237,7 +351,7 @@ def _transformed(body):
 def arc_blocks():
     """[the blocks blue_arcs adds] (supamario_ui_build.strip_glow_restore takes them out for the earlier suites)"""
     import supamario_ui_build as B
-    out = [_transformed([B.cmd('last_effect_set_color', *f32(rgb))]) for rgb in sorted(set(ARC_IDS.values()))]
+    out = [_transformed([B.cmd('last_effect_set_color', *arc_cmd_rgb(rgb))]) for rgb in sorted(set(ARC_IDS.values()))]
     return out
 
 
@@ -273,7 +387,7 @@ def blue_arcs(f, own):
                     hit.append('hed_end')
                 continue
             if p0 in ARC_IDS and 'EFFECT' in c.name.upper():
-                out += _transformed([acmd.Command(acmd.BY_NAME['last_effect_set_color'], f32(ARC_IDS[p0]))])
+                out += _transformed([acmd.Command(acmd.BY_NAME['last_effect_set_color'], arc_cmd_rgb(ARC_IDS[p0]))])
                 hit.append('0x%08X' % p0)
             elif p0 == HED_ID and 'EFFECT' in c.name.upper():
                 out += _hed_swap(c)

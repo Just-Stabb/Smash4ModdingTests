@@ -380,9 +380,9 @@ def counter_tests(r):
         check('  v12: hidden at %d (XV2 156), shown at %d (XV2 170: the second vanish), shown at the end' % (
             B.BLINK_HIDE, B.BLINK_SHOW), vis[:2] + vis[-1:], [(B.BLINK_HIDE, 0), (B.BLINK_SHOW, 1), (B.STRIKE_N - 1, 1)])
         end = [e for e in g.ev('status') if e[2] in (0, 0xE)]
-        asks = sorted({e[0] for e in g.ev('set') if e[2] == B.V_STOP and e[3] > 0.5})
-        check('  v12: the world stop asked (TIMER_6 %g) every frame of the counter (the cave\'s, Secret Sensation\'s), '
-              '0 at its end' % B.SS_STOP_ASK,
+        asks = sorted({e[0] for e in g.ev('set') if e[2] == B.V_STOP and e[3] > C.WS_STAGE_ONLY})
+        check('  v13: the stage-only stop asked (TIMER_6 %g, over the cave\'s 4.5: the objects step) every frame of the '
+              'counter, 0 at its end (v12: the whole world, %g: no hit landed)' % (B.CNT_STOP_ASK, B.SS_STOP_ASK),
               (asks == list(range(at, end[0][0] + 1)) if end else False,
                [e[3] for e in g.ev('set') if e[2] == B.V_STOP][-1:]), (True, [0.0]))
         check('  the shape off at once', [e[2] for e in g.ev('shield') if e[0] == at][:1], [(0, 2, 0, 0, 1)])
@@ -391,6 +391,44 @@ def counter_tests(r):
         ints = sorted({e[0] for e in g.ev('set') if e[2] == 0x0F00011B and e[0] >= at})
         check('  intangible every frame of the counter', ints == list(range(at, end[0][0] + 1)) if end else False, True)
         check('  the end after the counter\'s %d frames' % B.STRIKE_N, end[0][0] - at if end else None, B.STRIKE_N - 1)
+
+
+def v13_freeze_tests(r):
+    """v13 (the user: the transformation counter "seems to not hit opponents"): v12 stopped the whole world through the
+    cave's frame state (no object stepped: the rush hit nothing). Now the stage only (the cave's stage-only stop) and
+    every other fighter but the attacker frozen by a 2-frame hitstop renewed every frame (Time Skip's stopped time, whose
+    punch lands in game); the attacker (the fighter nearest the cave's record) steps and takes the rush"""
+    g = Game(status=0, damage=120.0, x=10.0, face=-1.0)
+    vm = r.vm(g)
+    slots = {1: None, 2: (17.0, 0.0), 3: (-40.0, 0.0), 4: (60.0, 20.0)}       # 1 him; 2 the attacker; 3 / 4 others
+
+    def place():
+        for sl, pos in slots.items():
+            x, y = (g.x, g.y) if pos is None else pos
+            g.vars[0x0F000020 + 4 * (sl - 1)], g.vars[0x0F000021 + 4 * (sl - 1)] = x, y
+            g.vars[0x0F000023 + 4 * (sl - 1)] = 1.0
+    place()
+    r.frame(vm, g)
+    for k in range(B.FORM_N + B.STRIKE_N + 5):
+        place()
+        if g.status == C.ST_UI and k == 40:
+            g.sw.update({0x01000006: 10.0, 0x01000007: 1.0, 0x01000008: 17.0, 0x01000009: 0.0})
+            g.flags |= {C.FLAG_HIT, C.FLAG_FOUND}
+        r.frame(vm, g)
+        if g.status not in (C.ST_UI,) and k > 2:
+            break
+    at = [e for e in g.ev('motion') if e[2] == B.MOT_STRIKE][0][0]
+    end = [e for e in g.ev('status') if e[2] in (0, 0xE)][0][0]
+    hs = {sl: sorted({e[0] for e in g.ev('set') if e[2] == 0x0F000044 + 8 * (sl + 2) and e[3] == 2.0}) for sl in slots}
+    check('v13: the transformation counter freezes the others (slots 3 / 4: a 2-frame hitstop, HITSTOP 0x0F000044 + 8 x '
+          '(slot + 2), every frame from the read to its end), not the attacker (slot 2: the nearest to the record, 17 / 0) '
+          'nor him (slot 1)',
+          (hs[3] == list(range(at, end)) or hs[3] == list(range(at, end + 1)), hs[4] == hs[3], hs[2], hs[1],
+           [e[3] for e in g.ev('set') if e[2] == 0x01000010][:1]), (True, True, [], [], [2.0]))
+    stops = {e[3] for e in g.ev('set') if e[2] == B.V_STOP and at <= e[0] < end}
+    check('v13: ... and never asks the whole-world stop (no TIMER_6 under the cave\'s %g in it: the objects step, so the '
+          'collision pass sees the attacker and its hurtboxes)' % C.WS_STAGE_ONLY,
+          min(stops) > C.WS_STAGE_ONLY, True)
 
 
 def dodge_run(r, status=0, timer=C.V_DODGE_R, form=2000.0, air=False, frames=45, face=1.0, events=None):
@@ -1049,12 +1087,30 @@ def arc_tests(f, arcs):
           % (U12.ARC_IDS[0x0100008E],),
           [(c.name, c.params) for c in ua[i + 1:i + 4]],
           [('Float_Var_Compare', [C.V_FORM, 5, B.UI_TRANSFORMED_OVER]), ('True', [6]),
-           ('LAST_EFFECT_SET_COLOR', U12.f32(U12.ARC_IDS[0x0100008E]))])
-    for rgb in set(U12.ARC_IDS.values()):
-        edge = [round(0.32 * c, 2) for c in rgb]
-        check('  %s on the common arcs\' greyscale (colour 1 grey 0.32-0.83, colour 0 white): the edge %s light blue '
-              '(blue the most, red the least), the core past 1 (white)' % (rgb, edge),
-              (edge[2] > edge[1] > edge[0], min(rgb) * 1.0 >= 0.8 and max(rgb) > 1.0), (True, True))
+           ('LAST_EFFECT_SET_COLOR', U12.arc_cmd_rgb(U12.ARC_IDS[0x0100008E]))])
+    # v13 (the user, v12: "The hitbox trails are all black now"): the colour as the game decodes it: the command's three
+    # floats / 255 (its handler 0x02BE44B0, read from the base: fdivs by the float at 0x100FC3E4 = 255) = the set
+    # colour, which multiplies the arc's greyscale (colour 0 white, colour 1 grey 0.32-0.83)
+    cmds = {tuple(c.params) for h in [acmd.crc(n) for n in ('attackairhi', 'attack11', 'attacks3', 'attackairf')]
+            for c in eff.scripts[h] if c.name == 'LAST_EFFECT_SET_COLOR'}
+    for prm in sorted(cmds):
+        rgb = U12.set_colour_of_cmd(prm)
+        edge = [0.32 * c for c in rgb]
+        core = [1.0 * c for c in rgb]
+        check('  v13: LAST_EFFECT_SET_COLOR%s decodes (/ 255) to the set colour %s: the arc\'s grey edge (0.32) %s light '
+              'blue (blue the most, red the least, none black), its white core %s (past 1: the white glow); v12\'s '
+              '(0.8, 1.5, 3.0) decoded to under 0.012: black' % (
+                  tuple(round(v, 2) for v in prm), tuple(round(v, 2) for v in rgb), tuple(round(v, 2) for v in edge),
+                  tuple(round(v, 2) for v in core)),
+              (edge[2] > edge[1] > edge[0] > 0.2, max(core) > 1.0, min(rgb) >= 0.8,
+               max(U12.set_colour_of_cmd((0.8, 1.5, 3.0))) < 0.02), (True, True, True, True))
+    import rpx_patch as RP
+    if NATIVE_EXE[:1]:
+        d_, _o, _e, secs = RP.load(NATIVE_EXE[0])
+        div = struct.unpack('>f', struct.pack('>I', RP.read_u32(d_, secs, 0x100FC3E4)))[0]
+        ins = [RP.read_u32(d_, secs, a) for a in (0x02BE4534, 0x02BE4540, 0x02BE4544)]
+        check('  v13 (the exe): the handler divides by %g (fdivs x 3 at 0x02BE4534 / 40 / 44, the divisor at 0x100FC3E4)'
+              % div, (div, [i >> 26 for i in ins], [(i >> 1) & 0x1F for i in ins]), (255.0, [59] * 3, [18] * 3))
     us = eff.script('attackhi4')
     sw = [c for c in us if c.params and c.params[0] == U12.FX_IDS['hed_blue']]
     check('  up smash: its own arc (0x%08X, PtcMarioSmashHed: orange keys) requested again on the blue copy (0x%08X) '
@@ -1263,9 +1319,10 @@ def motion_tests(out, ts_out):
         diff = sorted(n.split('D03')[-1] for n in new if new[n] != old.get(n))
         check('%s.pac: only the four slots changed' % part, diff, sorted([A.DODGE, A.STRIKE, A.FORM, A.SS]))
         fr = {m: omo.Omo(new[[n for n in new if n.endswith('D03' + m)][0]]).frames for m in A.MOTIONS}
-        check('%s.pac: 325 / 499 / 148 / 444 frames (v10: SpecialLwHeavy the long rush 349 + the short 150; '
-              'SpecialAirLwLight the four sways, 4 x 37; v11: SpecialAirLwHeavy Secret Sensation\'s 45 + Soaring '
-              'Fist\'s 12 + 60 + 89 + 109 + 129)' % part, fr, {A.FORM: 325, A.STRIKE: 499, A.DODGE: 148, A.SS: 444})
+        check('%s.pac: 325 / 473 / 148 / 444 frames (v10: SpecialLwHeavy the long rush 349 + the short 150, v13 124: its '
+              'lead-in 56 -> 30; SpecialAirLwLight the four sways, 4 x 37; v11: SpecialAirLwHeavy Secret Sensation\'s 45 '
+              '+ Soaring Fist\'s 12 + 60 + 89 + 109 + 129)' % part, fr, {A.FORM: 325, A.STRIKE: 473, A.DODGE: 148,
+                                                                       A.SS: 444})
     src = [(A.source(A.DODGE, f_)[0][0], A.source(A.DODGE, f_)[1], round(A.source(A.DODGE, f_)[2], 2))
            for f_ in (0, 1, 2, 36, 37, 38, 73)]
     check('v7: SpecialAirLwLight\'s frames: the back sway CMN #189 (0 shows XV2 0, 1-36 XV2 7-42: the x7 start), the '
@@ -1278,9 +1335,9 @@ def motion_tests(out, ts_out):
     check('v10: SpecialAirLwLight\'s other two sways: CMN #190 (B_R) from 74, #192 (F_R) from 111, the same timeline',
           src, [('sway_br_in', 190), ('sway_br', 190), ('sway_br', 190), ('sway_fr_in', 192), ('sway_fr', 192),
                 ('sway_fr', 192)])
-    src = [(A.source(A.STRIKE, f_)[0][0], round(A.source(A.STRIKE, f_)[2], 1)) for f_ in (348, 349, 405, 457, 498)]
-    check('v10: SpecialLwHeavy\'s short rush after the long one: XV2 #1 151 at 349, 210 (the first hit) at 405, 280 '
-          '(the finisher) at 457, ~350 at its end', src,
+    src = [(A.source(A.STRIKE, f_)[0][0], round(A.source(A.STRIKE, f_)[2], 1)) for f_ in (348, 349, 379, 431, 472)]
+    check('v10: SpecialLwHeavy\'s short rush after the long one: XV2 #1 151 at 349, 210 (the first hit) at 379 (v13: its '
+          'lead-in 30 frames, v10-v12 56: the rush 26 frames sooner), 280 (the finisher) at 431, ~350 at its end', src,
           [('counter', 499.0), ('counter_s_in', 151.0), ('counter_s_rush', 210.0), ('counter_s_end', 280.0),
            ('counter_s_end', 348.3)])
 
@@ -1322,17 +1379,38 @@ def v12_effect_tests(p):
           'side)' % (U12.SF_SET, list(U12.SF_TUMBLE)),
           [tuple(round(v, 4) for v in p.field(by[n], 'rotation_random')) for n in U12.SF_TUMBLE],
           [(round(m_.pi, 4),) * 3] * len(U12.SF_TUMBLE))
-    vr = {n: p.field(by[n], 'shader_index') for n in U12.SF_REF_KEEP}
-    keyed = {n: bytes(p.shader_entry(v))[:0x10] for n, v in vr.items()}
-    want = bytearray(p.shader_entry(ref))
-    want[4] |= 0x04
-    check('  XV2\'s refraction rings / cores %s the fireball\'s refraction program (its live-matrix variant: on the shot '
-          'every frame), not v11\'s flat additive colour' % (list(U12.SF_REF_KEEP),),
-          set(keyed.values()), {bytes(want[:0x10])})
-    gpu = [n for n, em in by.items() if struct.unpack_from('>I', em, 4)[0] & 0x00800000]
-    check('  every GPU emitter follows the shot (follow 0 on a key-0x04 program; v11: left where born)',
+    vr = {n: (p.field(by[n], 'shader_index'), struct.unpack_from('>I', by[n], 0x310)[0]) for n in U12.SF_REF_KEEP}
+    check('  XV2\'s refraction rings / cores %s the fireball\'s refraction program, not v11\'s flat additive colour; v13: '
+          'left where they are made (the plain program, follow 1: the distortion swirls where the shot passed, XV2\'s '
+          'picture; v12 followed the shot)' % (list(U12.SF_REF_KEEP),), set(vr.values()), {(ref, 1)})
+    gpu = [n for n, em in by.items() if struct.unpack_from('>I', em, 4)[0] & 0x00800000 and n not in U12.SF_REF_KEEP]
+    check('  every other GPU emitter follows the shot (follow 0 on a key-0x04 program; v11: left where born)',
           [n for n in gpu if not (struct.unpack_from('>I', by[n], 0x310)[0] == 0 and
                                   bytes(p.shader_entry(p.field(by[n], 'shader_index')))[4] & 0x04)], [])
+    # v13: the trail and the swirls
+    tr = p.find_set(U12.TRAIL_SET)
+    te = [e['data'] for e in p.sets[tr]['emitters'] if e['data'] is not None]
+    src = [e['data'] for e in p.sets[p.find_set(U12.TRAIL_SRC[0])]['emitters'] if e['data'] is not None and
+           p.emitter_name(e['data']) == U12.TRAIL_SRC[1]][0]
+    check('v13: Soaring Fist\'s trail (%s): XV2\'s Hkn_Wind three nodes (lives 13 / 15 / 17) as the fireball\'s smoke '
+          'trail emitter (one a frame, CPU), left where made (follow 1), white -> (0.4, 0.5, 0.5), its alpha x %g'
+          % (U12.TRAIL_SET, U12.TRAIL_ALPHA),
+          ([p.field(em, 'ptcl_life') for em in te], {struct.unpack_from('>I', em, 0x310)[0] for em in te},
+           {p.field(em, 'emit_interval') for em in te}, {p.field(em, 'shader_index') for em in te},
+           [tuple(round(v, 2) for v in p.color_keys(te[0], 1)[0][:3])],
+           round(p.field(te[0], 'alpha_diff21'), 4)),
+          ([13, 15, 17], {1}, {0}, {p.field(src, 'shader_index')}, [U12.TRAIL_RGB1],
+           round(p.field(src, 'alpha_diff21') * U12.TRAIL_ALPHA, 4)))
+    sw = p.find_set(U12.SWIRL_SET)
+    se = [e['data'] for e in p.sets[sw]['emitters'] if e['data'] is not None]
+    check('v13: the on-hit swirls (%s): XV2\'s punch burst\'s refraction rings (Hkn_Fir wave_ref / wave_ring_ref) on '
+          'the refraction program, one-time, left where made, x%g; Hkn_Fir\'s own rings refract too' % (
+              U12.SWIRL_SET, U12.SWIRL_SIZE),
+          (len(se), {p.field(em, 'shader_index') for em in se}, {p.field(em, 'one_time') for em in se},
+           {struct.unpack_from('>I', em, 0x310)[0] for em in se},
+           {p.field(e['data'], 'shader_index') for e in p.sets[p.find_set(U12.SWIRL_FROM[0])]['emitters']
+            if e['data'] is not None and p.emitter_name(e['data']) in U12.SWIRL_FROM[1]}),
+          (2, {ref}, {1}, {1}, {ref}))
     # Secret Sensation's charge
     kt = p.find_set(U12.SS_SETS[0])
     check('v12: Secret Sensation\'s charge (KTN_GKS_Loop) called x%g (v10-v11 x0.6) on TransN %g m up (v10-v11: the '
@@ -1356,7 +1434,8 @@ def effect_tests(out, ts_out):
     check('new sets: PtcSupamarioUi* (v10: KTN_GKS_Loop in two: 17 emitters; v11: Soaring Fist\'s Hkn_Fir / Hkn_Wav and '
           'BTL_CMN\'s GHit / GHitSmk)', sorted(p.set_name(i) for i in range(n, len(p.sets))),
           sorted(['PtcSupamarioUi' + x[2][:-4] for x in B.FX] + ['PtcSupamarioUiKTN_GKS_Loop_2'] +
-                 ['PtcSupamarioSf' + x[:-4] for x in SF.SKILL_EMPS + SF.CMN_EMPS] + ['PtcSupamarioUiSmashHedBlue']))
+                 ['PtcSupamarioSf' + x[:-4] for x in SF.SKILL_EMPS + SF.CMN_EMPS] +
+                 ['PtcSupamarioUiSmashHedBlue', 'PtcSupamarioSfTrail', 'PtcSupamarioSfSwirl']))
     v12_effect_tests(p)
 
 
@@ -1809,6 +1888,9 @@ def native_tests(exe):
 M_KIND = 0x41
 
 
+NATIVE_EXE = []
+
+
 def ids_from_json(out):
     import json
     js = json.load(open(os.path.join(out, 'ultrainstinct.json')))
@@ -1930,6 +2012,8 @@ def main():
     if len(a) != 3:
         sys.exit(__doc__)
     out, ts_out, base = a
+    if exe:
+        NATIVE_EXE[:] = [exe]
     global BASE_DIR
     BASE_DIR = base
     ids_from_json(out)
@@ -1941,6 +2025,7 @@ def main():
     escape_tests(r)
     shape_tests(r)
     v12_msc_tests(r)
+    v13_freeze_tests(r)
     mode_tests(r)
     reset_tests(r)
     ss_tests(r)

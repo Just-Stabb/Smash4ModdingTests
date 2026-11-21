@@ -137,8 +137,8 @@ CNT_S_END = STRIKE_S_N - 1                                                      
 # the white glow"; XV2's clip xv2_1, 20 fps: the lunge ~18 frames, the vanish, behind the opponent): the short rush
 # (sway / spot dodge) lunges RS_FWD units over its first RS_FWD_N frames, vanishes at its second vanish (XV2's 170),
 # reappears RS_BEHIND past the nearest opponent facing it at XV2's 176 (the end of the hidden 156-176); no white body
-RS_FWD, RS_FWD_N = 18.0, 18
-RS_HIDE = CNT_S_VANISH2                                                            # 18
+RS_HIDE = CNT_S_VANISH2                                                            # v12 18, v13 10
+RS_FWD, RS_FWD_N = 18.0, RS_HIDE     # v13: the 18-unit lunge over his frames 1 .. RS_HIDE (v12: 18 frames, 1 a frame)
 RS_SHOW = anim.part_frame('counter_s_in', 176) - STRIKE_S_AT                       # 24
 RS_BEHIND = 9.0
 # v12 (the user: "Make it so the transformation counter has no maximum range and keeps that glow, but add the vanish and
@@ -148,6 +148,7 @@ RS_BEHIND = 9.0
 BLINK_HIDE = anim.frame_of(anim.STRIKE, 1, 156)                                     # 5
 BLINK_AT = anim.frame_of(anim.STRIKE, 1, 159)                                       # 8
 BLINK_SHOW = anim.frame_of(anim.STRIKE, 1, 170)                                     # 19
+CNT_STOP_ASK = 6.0                   # v13: TIMER_6 above 4.5: the cave stops the stage only (ui_freeze_others the fighters)
 EXTRA_SCRIPTS = list(SWAY_SCRIPTS) + ['speciallwheavy_c2', SF.SCRIPT_START, SF.SCRIPT_REL]   # the custom-move slots'
                                                                     # scripts the build writes (v11: Soaring Fist's)
 ST_ESCAPE_N = cave.ST_ESCAPE_N
@@ -423,7 +424,7 @@ def msc_values():
     # v12: the rushes' vanishes, the transformation counter's world stop, the teeter
     v.update({'UI_RS_FWD': fl(RS_FWD), 'UI_RS_FWD_N': fl(RS_FWD_N), 'UI_RS_HIDE': fl(RS_HIDE), 'UI_RS_SHOW': fl(RS_SHOW),
               'UI_RS_BEHIND': fl(RS_BEHIND), 'UI_BLINK_HIDE': fl(BLINK_HIDE), 'UI_BLINK_AT': fl(BLINK_AT),
-              'UI_BLINK_SHOW': fl(BLINK_SHOW), 'UI_CNT_STOP_MAX': fl(STRIKE_N + 10),
+              'UI_BLINK_SHOW': fl(BLINK_SHOW), 'UI_CNT_STOP_MAX': fl(STRIKE_N + 10), 'UI_CNT_STOP_ASK': fl(CNT_STOP_ASK),
               'UI_ST_OTTOTTO': fl(cave.ST_OTTOTTO)})
     import supamario_ui12 as U12
     v['TS_AURA_SIZE'] = fl(U12.TS_AURA_SIZE)     # v12: Time Skip's aura bigger, following (ts_aura)
@@ -598,24 +599,26 @@ def graphic(key, bone=None, follow=True, size=1.0):
 # set already (0x0341005C), Btl_HitS isn't in the vfx/cmn files sent (BTL_CMN.eepk names it, its .pbind.emb doesn't hold
 # it): Time Skip's Btl_HitL (BTL_CMN 2's, the same burst bigger: 0x0341005F / 60) stands in for it, x HIT_S_FOR_L; the
 # LOD burst is Time Skip's capped copy of it (0x03410061, the user found the uncapped one too bright)
-HIT_FX = (('hitlod', 1.5), ('hitl', 0.8), ('hitl_2', 0.8))
+HIT_FX = (('hitlod', 1.5), ('hits', 0.8), ('sweat', 1.0))     # v13: BTL_CMN effect 0's parts and EEPK scales
 HIT_S_FOR_L = 0.7                    # Btl_HitS's 0.8 against Btl_HitL's 0.8: HitS is the smaller hit (approximated)
 
 
 def hit_fx_ids():
-    import supamario_timeskip_build as TS
-    return {'hitlod': TS.FX_LOD_ID, 'hitl': TS.FX_IDS['hitl'], 'hitl_2': TS.FX_IDS['hitl_2']}   # (Time Skip's own capped
-                                                                                                # LOD copy: its hit's)
+    """v13 (the user: "add Xenoverse's hit effects to the autododge and transformation counter instead of using the
+    current hit effects"): XV2's own BTL_CMN effect 0 (the rush hits' and the finisher's BDM Effect1: Btl_HitLOD x1.5,
+    Btl_HitS x0.8, Btl_Sweat00 x1.0; its CBIND left out), the sets Sledgehammer converted (0x0341005C-5E, their
+    colours XV2's); v10-v12 used Time Skip's capped LOD copy and Btl_HitL for Btl_HitS"""
+    import supamario_sledgehammer_build as SB
+    return {'hitlod': SB.FX_IDS['hitlod'], 'hits': SB.FX_IDS['hits'], 'sweat': SB.FX_IDS['sweat']}
 
 
 def hit_fx(size=1.0):
-    """v10: XV2's hit effect (BTL_CMN 0) at the rush hitbox's centre (in front of him)"""
+    """v10: XV2's hit effect (BTL_CMN 0) at the rush hitbox's centre (in front of him); v13: its own three parts"""
     ids = hit_fx_ids()
     out = []
     for key, sc in HIT_FX:
-        k = 1.0 if key == 'hitlod' else HIT_S_FOR_L
         out.append(cmd('graphic_effect2', ids[key], BONES['TransN'], 0.0, RUSH_Y, RUSH_Z, 0.0, 0.0, 0.0,
-                       round(sc * SCALE * size * k, 3), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1))
+                       round(sc * SCALE * size, 3), 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1))
     return out
 
 
