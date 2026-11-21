@@ -227,8 +227,8 @@ AURA_GENERATIONS = 2                 # v6: aura instances alive per part at most
 # exe_v46z_outline5's hdrRange scaling did what it was meant to): green went up by 231, so k >= 2.2 (one layer), and with
 # k >= 1.7 every channel of that light colour clips: white, whatever k is exactly. Not the hull's layering: drawn once
 # per polygon part, Supamario's 13 parts (transformed, Wait) cover 87 % of the band once, 8 % twice (the bind pose,
-# $S/u9/hull_layers.py). Inside, Outline_Set's rim at Alpha 600 (2.35 x the colour at the edges) with Tint 18 lit and
-# tinted the whole body. So: the band DRAWN OVER (Blend 0: no sum, it can't get past its own colour however many parts
+# tools/outline_shell_layers.py). Inside, Outline_Set's rim at Alpha 600 (2.35 x the colour at the edges) with Tint 18
+# lit and tinted the whole body. So: the band DRAWN OVER (Blend 0: no sum, it can't get past its own colour however many parts
 # overlap) in a deep blue-violet that stays blue-violet for any k up to ~4 (k 1: (60, 40, 255); k 2: (120, 80, 255);
 # k 4: (240, 160, 255), lavender), half see-through (130), thin (1.5 px of 1280 x 720); the rim a light lavender at 255
 # (the colour at full only at the very edge), no tint. Approximated: k itself (not measured in game)
@@ -753,7 +753,16 @@ def aura_colours(p, rep, nodes):
     return done
 
 
-REF_SHADERS = set()                  # the refraction template's shader index (filled by aura_refraction)
+REF_SHADERS = set()                  # the refraction template's shader index (filled by aura_refraction / ref_shader)
+
+
+def ref_shader(p):
+    """the shader index of the refraction template (PtcMarioFireball 'refraction1'), noted in REF_SHADERS"""
+    src = p.find_set(HAZE_SRC[0])
+    em = [e['data'] for e in p.sets[src]['emitters'] if e['data'] is not None and
+          p.emitter_name(e['data']) == HAZE_SRC[1]][0]
+    REF_SHADERS.add(p.field(em, 'shader_index'))
+    return p.field(em, 'shader_index')
 
 
 def aura_refraction(p, rep, nodes):

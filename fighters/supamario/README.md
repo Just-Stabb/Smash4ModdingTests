@@ -4329,3 +4329,98 @@ unchanged); `supamario_timeskip_test` 198, `supamario_godfist_test` 566, `supama
 ok / 1 known failure (effect.bin's else-if chains, upstream), HvTest 248 ok. 0 failures.
 - **Not confirmed in game:** the rush entered from the sway's loop (ui_loop called from ui_dodge_loop in the same
   status) and from func_2265 with ui_loop as the loop; the 11-hit HUD count of the clips (the files give 15 hits).
+
+## Ultra Instinct v9 (`supamario_ultrainstinct_v9.zip`; exe unchanged: `exe_v46z_ui6`)
+Install over v8: `INSTALL_TO_data/` holds only the files changed since v8; no executable (none of the fixes needed the
+caves). The user's v7 test (v8 only changed the sway / spot dodge's counter, so it stands for v8): "the glow outline is
+very thick and bright and still only white, the autododge works but seems to only reactivate after being hit. The aura
+seems to trail behind Supamario rather than stay attached to him, and both the aura and glowing outline disappear after
+Time Skip / Jump Spike is used until he lands. Also, the camera shift for Secret Sensation is too close ... a slight zoom.
+Also please add the slight distortion around the aura like Xenoverse does", then "the aura also doesn't have any of its
+blue or white hue mixed in". The log (exe_v46z_ui6_diag, RPX hash caf56fed: the right exe): a CPU attacking him 6 times
+in Wait; 4 dodges (S4U2 `st=0 cat=0 flags=00000321`, S4U4 into 0x155 mode 7, motion 0x241) at 09.27, 12.70, 14.89 and
+16.57; no S4U2 at all for the other attacks (they never met the shape); S4UF entries=119, no "Emitter is Empty".
+
+### 1. The glow: white, thick
+- **The clip (60 fps, 1302 x 806):** the band outside his silhouette over the night sky (23, 20, 26) is (254, 251, 255),
+  4-6 px wide; inside it his blue overalls read (190, 183, 246) (the whole body washed pale lavender).
+- **The band:** v6-v8's (150, 135, 255) at Alpha 200 ADDED (Blend 1) can add at most 106 x k to green, k being the scale
+  the game's encoding puts on the shell's colour (1 if exe_v46z_outline5's hdrRange scaling did what it was meant to);
+  green rose by 231 there, so **k >= 2.2**, and any light colour clips to white from k ~1.7 (v5 unscaled and v7 scaled
+  were both white: the scaling isn't what decides it). Not the inverted hull's layering: drawn once per polygon part,
+  the 13 parts he draws transformed in Wait cover 87 % of the band once and 8 % twice (bind pose, side view:
+  `tools/outline_shell_layers.py`). k itself isn't readable from the files (Cemu's state at run time; not measured).
+- **Inside:** Outline_Set's rim at Alpha 600 (2.35 x its colour at the edges) with Tint 18 (the body mixed toward it).
+- **Fix (no exe change):** the band DRAWN OVER (Outline_Shell Blend 0: no sum, it can't pass its own colour however
+  many parts overlap) in a deep blue-violet (60, 40, 255) at 130, **1.5 px** (v6-v8 3): for k 1 / 2 / 4 it shows
+  (60, 40, 255) / (120, 80, 255) / (240, 160, 255), blue-violet to lavender, never white; the rim (175, 165, 255) at
+  255, no tint. Time Skip's outline (v11 of its own constants) the same way: (50, 110, 255) at 160 over, 2 px (k 1 / 2 / 4:
+  blue / light blue / pale cyan). Tests: the band's colour over dark / mid / light stages for k 1 / 2 / 4 (v6-v8's fail).
+
+### 2. The autododge only every other time
+- **The log:** dodge, the next attack on his body (no S4U2), the next dodged, ... (the user: "seems to only reactivate
+  after being hit").
+- **Cause:** `ui_shape` made the ON call only when TIMER_5 said the shape was off, and TIMER_5 stays "on" through the
+  sway into Wait (the sway keeps the shape for its chain). The game's state can drop the group without the MSC knowing:
+  the ShieldModule's per-frame update (the fighter's `0x02E40DA4` -> `0x02C6F794`) updates only the groups below
+  `M + 0x28` and each group's shapes below `group + 0x30`, both recomputed every frame, and the module's
+  re-initialisation (vt `+0x24`: `0x02DACF04` / the fighter's `0x02E60EC8` -> `0x0200BCCC` -> `0x02C6F508`) zeroes them
+  while the shape's own word (`+0x20`) stays 1; only the ON call (`0x0200BD8C` -> `0x02C6F954`) raises them again. A hit
+  on his body put him in a damage status (shape off, TIMER_5 0), so Wait made the ON call again: the alternation. (Which
+  game path re-initialises it after the sway is not pinned down; the MSC fix doesn't depend on it.)
+- **Fix (MSC):** the ON call every frame he is in a shape status (Wait / Walk / WalkBrake / Squat .. SquatRv, EscapeN,
+  the sway; in hitlag only kept, never switched on): it sets the word and raises the two counts, nothing else.
+- **Tests:** `supamario_ui_test.py` models the game dropping the group (at every status change; on every frame): after a
+  sway every Wait frame has it live (v4-v8: dead until a hit); the shape on every frame of the shape statuses.
+
+### 3 + 4. The aura trailing, and gone after Time Skip until the landing
+- **Cause (the aura):** every converted aura emitter had follow type 1 (ptcl `0x310`: none: the particles copy the
+  emitter's matrices at birth and stay where they were born), the converter's default. XV2 attaches effect 848's parts
+  to their bones (PositionUpdate + RotateUpdate, BTL_AURA.eepk). At Time Skip's / a jump's speed every particle (alpha 0
+  at birth, faded in over a fifth of its life) was behind him: "disappears until he lands".
+- **Fix:** follow type **2** (position only: with the bone, upright) on every aura emitter; each one's vertex program
+  draws it (`eft_vertex.features`).
+- **Cause (the glow):** Time Skip's outline is its own Outline_Shell (one shell per object): it replaced the transformed
+  band and ended it (Alpha 0) at its end; only Wait1's game script put the glow back, at the landing.
+- **Fix:** every effect script that ends an Outline_Shell and isn't Ultra Instinct's (Time Skip's dash and connect)
+  gets the glow again after its last command when transformed (`Float_Var_Compare(TIMER_0 > 1500) True { glow_on }`),
+  and the falls / landings (`fall`, `fallf`, `fallb`, `fallaerial(f / b)`, `landinglight`, `landingheavy`,
+  `landingfallspecial`: where a move can end before its own end runs) put it on at their frame 0 when transformed.
+
+### 5. Secret Sensation's camera
+`CameraModule(0x2714, frames, 0, distance)`'s distance is how far the camera stays (Kirby's MSC, tuned in game: 4.0 "a
+slight zoom on Kirby", 2.0 the big hits / Final Smash, 1.4 "much closer"; Ryu's critical 1.1): v7's 1.2 / 1.5 were
+close-ups. DBFZ (`ss/a.mp4`) zooms about 2x from its own wide frame, both fighters in it, then closer on Goku. Now
+**5.5** (both in the frame) then **4.0** (on him). Test: both at least 3.5, the second the closer.
+
+### 6. The distortion
+- **Evidence:** XV2's aura draws its heat haze with two emissions of its own, Aura_LoopFOK's and FOK_FootL's
+  `sprite_2_1_*` (material **Ref_FOK_L / Ref_FOK_R**: refraction; MatScale0 (+-0.05, -0.5)); the converter drew them as
+  big pale colour sprites (the 64 x 64 smoke: v4-v8's "purple patches"), and v5-v8's `UiHaze` (the fireball's refraction
+  appended at 3-5 units, 0.45 strength, left where it was born as he moved) was too small and faint to see. The
+  fireball's refraction program does draw in Smash 4's way: it reads `frameBufferTexture_CROSS` and draws the picture
+  behind it offset by its distortion map (draw path 11; `(2 m - 1) x 25 x the emitter's 0.005 x alpha x the mask`, the
+  pixel program read with `eft_pixel.disassemble`).
+- **Fix:** those four ARE the distortion: each takes PtcMarioFireball `refraction1`'s bytes (program, textures,
+  shader-keyed words) with XV2's emission (where, how many, life 96, size, its 0 -> 0.6 -> 0 transparency as the bend's
+  strength), following him. UiHaze is gone. Preview (`supamario_ui_aura_render.py`, its haze model: the frame-buffer
+  programs now count as haze): up to ~11 px of bend at 12 px a unit.
+
+### 7. The aura's colours: one flat violet
+- **Cause:** XV2's aura nodes have two colours (EnableSecondaryColor: Color2 the texture's bright core, Color1 its edge:
+  white cores with blue / cyan edges, 15 of 19 nodes; none animates its colour, only its transparency): the converter
+  kept Color1 alone, and v3-v8's `tint_aura` turned every key to hue 262 with a saturation floor of 0.45.
+- **Fix (`aura_colours`):** the two-colour programs (combiner 2: colour 1 + (colour 0 - colour 1) x texture) get Color2
+  as colour 0 (the core) and Color1 as colour 1 (the edge), the one-colour ones the mean (Time Skip's `_secondary`
+  rule); each hue moved from XV2's range onto the clip's (`AURA_HUE_MAP`: 180 -> 215 sky blue, 240 -> 280 violet), XV2's
+  saturation and value kept (white stays white). With the big pale sprites now the distortion, the light is the flames
+  and soft glows': `AURA_GAIN` 3.5, `AURA_ADD_ALPHA` 0.6 (rendered steady on a dark stage: v8 0.30 added light, v9 0.12;
+  white cores, sky-blue glows and violet flames apart). Tests: white, blue and violet keys all present (v8: one hue),
+  core and edge apart on the two-colour programs.
+
+### Not confirmed in game / approximated
+- k (the shell colour's scale in game) is only bounded (>= 2.2); the band's look is chosen to stay blue-violet up to 4.
+- Which game path drops the counter group after the sway (the fix re-arms it every frame regardless).
+- The refraction's strength in game (the fireball's program at XV2's 0.6), and the follow type 2 sprites at his bones'
+  speed; XV2's glare (the bloom round its additive aura) has no Smash 4 counterpart.
+- The hue map and the gains are read off the clips by eye.

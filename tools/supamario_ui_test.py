@@ -450,7 +450,7 @@ def dodge_tests(r):
             at = ctr[0][0]
             check('  its mode the transformation\'s (TIMER_4 %g), the shape off at once, the same status (0x155)'
                   % C.MODE_FORM, ([e[3] for e in g.ev('set') if e[2] == B.V_SS and e[0] == at][-1:],
-                                  [e[2] for e in g.ev('shield') if e[0] == at],
+                                  [e[2] for e in g.ev('shield') if e[0] == at][-1:],
                                   len([e for e in g.ev('status') if e[2] == C.ST_UI])),
                   ([C.MODE_FORM], [(0, 2, 0, 0, 1)], 1))
             end = [e for e in g.ev('status') if e[2] == 0]
@@ -540,8 +540,9 @@ def shape_tests(r):
     for st, name in ((0, 'Wait'), (1, 'Walk'), (2, 'WalkBrake'), (0x11, 'Squat'), (0x12, 'SquatWait'), (0x13, 'SquatF'),
                      (0x14, 'SquatB'), (0x15, 'SquatRv')):
         g, vm = run(status=st)
-        check('ui4: the shape: transformed, %s: on once (ShieldModule(0, 2, 0, 1, 1) on frame 1), TIMER_5 renewed'
-              % name, ([(e[0], e[2]) for e in g.ev('shield')], g.vars.get(B.V_SHAPE)), ([(1, (0, 2, 0, 1, 1))], 3.0))
+        check('ui4 / v9: the shape: transformed, %s: on EVERY frame (ShieldModule(0, 2, 0, 1, 1): v4-v8 only on frame 1),'
+              ' TIMER_5 renewed' % name, ([(e[0], e[2]) for e in g.ev('shield')], g.vars.get(B.V_SHAPE)),
+              ([(n, (0, 2, 0, 1, 1)) for n in range(1, 6)], 3.0))
     for what, kw in (('not transformed (TIMER_0 0)', dict(form=0.0)),
                      ('in Dash (3)', dict(status=3)), ('in Fall (the air)', dict(status=0xE, air=True)),
                      ('shielding (0x1C)', dict(status=0x1C)), ('in a jab (0x25)', dict(status=0x25))):
@@ -553,26 +554,60 @@ def shape_tests(r):
         r.frame(vm, g)
     check('ui4: the shape: Wait -> Dash: off once on the first Dash frame, TIMER_5 0',
           ([(e[0], e[2]) for e in g.ev('shield')], g.vars.get(B.V_SHAPE)),
-          ([(1, (0, 2, 0, 1, 1)), (4, (0, 2, 0, 0, 1))], 0.0))
+          ([(n, (0, 2, 0, 1, 1)) for n in (1, 2, 3)] + [(4, (0, 2, 0, 0, 1))], 0.0))
     g, vm = run(frames=3)
     g.status = 0x155
     g.vars[B.V_SS] = 3.0
     r.frame(vm, g, status_funcs=False)
     check('ui4: the shape: Wait -> 0x155 (Secret Sensation\'s window switches it later): off at once',
-          [(e[0], e[2]) for e in g.ev('shield')][1:], [(4, (0, 2, 0, 0, 1))])
+          [(e[0], e[2]) for e in g.ev('shield')][3:], [(4, (0, 2, 0, 0, 1))])
     g, vm = run(frames=2)
     g.hitlag = 3
     g.status = 3
     r.frame(vm, g)
     check('ui4: the shape: in hitlag the frame he leaves Wait: off (only Wait-like statuses keep it)',
-          [(e[0], e[2]) for e in g.ev('shield')], [(1, (0, 2, 0, 1, 1)), (3, (0, 2, 0, 0, 1))])
+          [(e[0], e[2]) for e in g.ev('shield')], [(1, (0, 2, 0, 1, 1)), (2, (0, 2, 0, 1, 1)), (3, (0, 2, 0, 0, 1))])
+    g, vm = run(frames=2)
+    g.hitlag = 3
+    r.frame(vm, g)
+    g2, vm2 = run(frames=1, hitlag=3)
+    check('v9: the shape in hitlag: kept on when on (re-armed), never switched on when off',
+          ([e[0] for e in g.ev('shield')][-1:], g2.ev('shield')), ([3], []))
     g, vm = run(frames=2)
     g.vars[C.V_DODGE_R] = 4.0
     for _ in range(3):
         r.frame(vm, g)
     dg = [e[0] for e in g.ev('mode') if e[2] == 'ui_dodge_loop']
     check('ui4: the shape: a signal (slot 42) -> the dodge; v7: the shape kept on through the sway (its chain)',
-          ([(e[0], e[2]) for e in g.ev('shield')], dg[:1]), ([(1, (0, 2, 0, 1, 1))], dg[:1]))
+          ([e for e in g.ev('shield') if e[2][3] != 1], dg[:1]), ([], dg[:1]))
+    # v9 (the user's v7 test: "seems to only reactivate after being hit"; the v7 log: a dodge, the next attack on his
+    # body, the next dodged): the game can drop the group between frames (its update range M + 0x28 / group + 0x30,
+    # zeroed by the module's re-initialisation, the shape's word left at 1). Modelled: the group LIVE only from an ON
+    # call to the game's next drop; the drop at every status change and at random frames. v4-v8 (the ON call only when
+    # TIMER_5 said off) left it dead from the sway's end until a hit; now live on the next frame every time
+    for drops, what in (('status', 'at every status change'), ('every', 'on every frame')):
+        g, vm = run(frames=2)
+        live, dead_frames = [True], []
+        n_shield = [len(g.ev('shield'))]
+        last_status = [g.status]
+
+        def step():
+            if drops == 'every' or g.status != last_status[0]:
+                live[0] = False                      # the game drops the group (after this frame's MSC)
+            last_status[0] = g.status
+            r.frame(vm, g)
+            new_ev = g.ev('shield')[n_shield[0]:]
+            n_shield[0] = len(g.ev('shield'))
+            for e in new_ev:
+                live[0] = e[2][3] == 1
+            if g.status in (0, 1, 2) and not live[0]:
+                dead_frames.append(g.n)
+        g.vars[C.V_DODGE_R] = 4.0
+        for _ in range(B.SWAY_N + 12):
+            step()
+        sways = [e for e in g.ev('mode') if e[2] == 'ui_dodge_loop']
+        check('v9: the group dropped by the game %s: after the sway (back in Wait) the shape is live on every Wait frame '
+              '(v4-v8: dead until a hit)' % what, (len(sways), g.status, dead_frames), (1, 0, []))
     for st, name in ((0xB1, 'Dead'), (0xB2, 'Rebirth'), (0x14F, 'Entry')):
         g = Game(status=st, damage=0.0)
         g.vars.update({C.V_FORM: 2000.0, B.V_SHAPE: 2.0})
@@ -694,6 +729,9 @@ def ss_tests(r):
           '%d, 0, %g): slight) on that frame' % (B.SS_SLOW, B.SS_SLOW_FRAMES, B.SS_SLOW, B.SS_CAM1_T, B.SS_CAM1_D),
           ([(e[0], e[2]) for e in g.ev('slow')][:1], [(e[0], e[2]) for e in g.ev('camera')][:1]),
           ([(read, (0, B.SS_SLOW, B.SS_SLOW_FRAMES))], [(read, (0x2714, B.SS_CAM1_T, 0, B.SS_CAM1_D))]))
+    check('v9: both zooms slight (the user: "a slight zoom rather than a close one"; distance = how far: Kirby\'s 4.0 '
+          '"slight", 1.4 "much closer"; v7 / v8 1.2 / 1.5): at least %g, the second (on him) the closer'
+          % B.SS_CAM_MIN, (min(B.SS_CAM1_D, B.SS_CAM2_D) >= B.SS_CAM_MIN, B.SS_CAM2_D < B.SS_CAM1_D), (True, True))
     check('  closer on him at the slide\'s frame %d (CameraModule(0x2714, %d, 0, %g))' % (B.SS_CAM2_AT, B.SS_CAM2_T,
                                                                                          B.SS_CAM2_D),
           [(e[0] - read, e[2]) for e in g.ev('camera')][1:2], [(B.SS_CAM2_AT, (0x2714, B.SS_CAM2_T, 0, B.SS_CAM2_D))])
@@ -764,9 +802,39 @@ def script_tests(out, ts_out):
                   sname, at, B.GLOW_RIM_RGB, B.GLOW_RIM_A, B.GLOW_SHELL_RGB, B.GLOW_SHELL_A, B.GLOW_SHELL_W),
               [x for x in got if x[0] == float(at)],
               [(float(at), 'Terminate_Overlays', [])] + [(float(at), n, p_) for n, p_ in glow])
-    check('v6: the glow held (Frames 0) and added (Blend 1); its band blue-violet (blue the largest, red over green)',
+    # v9 (the user's v7 clip: the band white, 4-6 px, the body washed pale): the band drawn OVER (Blend 0: no sum over
+    # the parts), thin, and blue-violet for any encoding scale k up to GLOW_SHELL_K_MAX (the clip: k >= 2.2); v6-v8's
+    # (150, 135, 255) added at 200 fails it (white from k 1.7); the rim no stronger than its colour at the edge, no tint
+    def band(bg, k):
+        a = B.GLOW_SHELL_A / 255.0
+        col = [min(1.0, k * c / 255.0) for c in B.GLOW_SHELL_RGB]
+        if B.GLOW_SHELL_BLEND == 1:
+            return [round(255 * min(1.0, bg / 255.0 + a * c)) for c in col]
+        return [round(255 * ((1 - a) * bg / 255.0 + a * c)) for c in col]
+    bands = [band(bg, k) for bg in (23, 100, 200) for k in (1.0, 2.0, B.GLOW_SHELL_K_MAX)]
+    check('v9: the glow held (Frames 0), its band drawn over (Blend 0) and blue-violet over a dark / mid / light stage '
+          'for k 1 / 2 / %g (blue >= red >= green, blue over green by 30, never white): %s' % (B.GLOW_SHELL_K_MAX, bands),
           (B.glow_on()[0].params[6], B.glow_on()[1].params[6], B.glow_on()[1].params[10],
-           B.GLOW_SHELL_RGB[2] > B.GLOW_SHELL_RGB[0] > B.GLOW_SHELL_RGB[1]), (0, 0, 1, True))
+           all(b[2] >= b[0] >= b[1] and b[2] - b[1] >= 30 and min(b) < 200 for b in bands)), (0, 0, 0, True))
+    check('v9: the band thin (at most 2 px of 1280 x 720; v6-v8 3), the rim at most its colour at the edge (Alpha <= 255; '
+          'v6-v8 600) with no tint (v6-v8 18: the body washed)', (B.GLOW_SHELL_W <= 2.0, B.GLOW_RIM_A <= 255.0,
+                                                                   B.GLOW_RIM_TINT), (True, True, 0.0))
+    # v9: Time Skip's outline ends (Alpha 0) followed by the glow again when transformed; the falls / landings put it on
+    for h, cmds in sorted(f['effect'].scripts.items()):
+        if h in {acmd.crc(n_) for n_ in list(B.SCRIPT.values()) + list(B.SWAY_SCRIPTS)}:
+            continue
+        offs = [i for i, c in enumerate(cmds) if c.name == 'Outline_Shell' and c.params[4] == 0.0]
+        if not offs:
+            continue
+        tail = [(c.name, c.params) for c in cmds[offs[-1] + 1:]]
+        want = [(c.name, c.params) for c in B.glow_restore()]
+        check('v9: effect script 0x%08X ends an Outline_Shell (Time Skip\'s): the glow again after its last command '
+              'when transformed (TIMER_0 > %g: glow_on)' % (h, B.UI_TRANSFORMED_OVER),
+              [x for x in tail if x[0] in ('Float_Var_Compare', 'True', 'Outline_Set', 'Outline_Shell')][-4:], want)
+    for name in B.GLOW_AFTER:
+        sc = f['effect'].script(name)
+        check('v9: %s\'s effect script puts the glow on at frame 0 when transformed' % name,
+              [(c.name, c.params) for c in (sc or [])[:4]], [(c.name, c.params) for c in B.glow_restore()])
     check('v6: the counter\'s effect script plays no aura (the MSC\'s runs from its first frame: it doubled it)',
           [c.params[0] for c in f['effect'].script('speciallwheavy') if 'graphic' in nm(c).lower() and
            c.params[0] in [B.fx_id(k) for k in B.AURA_SETS]], [])
@@ -796,14 +864,27 @@ def script_tests(out, ts_out):
     skip = {acmd.crc(n) for n in B.SCRIPT.values()} | {acmd.crc(n) for n in B.silver_scripts()} | \
         {acmd.crc(n) for n in B.SWAY_SCRIPTS}
     other = []
+    import copy
+    want_eff = copy.deepcopy(b['effect'])
+    restored = B.restore_glow(want_eff, skip)       # v9: Time Skip's outline ends / the falls and landings: the glow back
     for p in f:
         for h, s in b[p].scripts.items():
             if h in skip:
                 continue
             ns = f[p].scripts.get(h)
-            if [(c.ident, c.params) for c in s] != [(c.ident, c.params) for c in (ns or [])]:
+            if p == 'effect':
+                s = want_eff.scripts[h]
+
+            def key(c):          # v9: Time Skip's own outline values are its v11's (its test checks them)
+                if c.name == 'Outline_Shell':
+                    return (c.ident, c.params[4] == 0.0, c.params[6:9])
+                return (c.ident, c.params)
+            if [key(c) for c in s] != [key(c) for c in (ns or [])]:
                 other.append((p, hex(h)))
-    check('every other script as Time Skip v10\'s build', other, [])
+    check('every other script as Time Skip v10\'s build (v9: but for the glow restored in %d effect scripts)'
+          % len(restored), other, [])
+    check('v9: the glow restored after Time Skip\'s two outline ends and at the start of the %d falls / landings'
+          % len(B.GLOW_AFTER), sorted(w for _h, w in restored), ['end'] * 2 + ['start'] * len(B.GLOW_AFTER))
     silver_script_tests(f, b)
 
 
@@ -973,87 +1054,106 @@ def effect_tests(out, ts_out):
 
 
 def aura_tests(out, ts_out):
-    """v3: the aura's sets turned to the clip's lavender (B.AURA_HUE, saturation x B.AURA_SAT); the others not"""
+    """v9 (the user's v7 test: "the aura doesn't have any of its blue or white hue mixed in"): XV2's two colours per
+    emitter (EnableSecondaryColor: a white core, a blue / cyan edge; the converter kept one, v3-v8's tint_aura turned all
+    to hue 262 with saturation >= 0.45) kept, their hues moved onto the clip's blue .. violet; the other UI sets not"""
     import colorsys
     import ptcl
     d = os.path.join(out, 'fighter', 'supamario', 'effect', 'supamario')
     p = ptcl.Ptcl(open(os.path.join(d, 'supamario.010d0000.ptcl'), 'rb').read())
-    aura = {'PtcSupamarioUi' + x[2][:-4] for x in B.FX if x[0] in B.AURA_SETS}
-    hues, sats, other = set(), [], set()
+    aura = set(B.aura_set_names())
+    B.ref_shader(p)
+    hues, whites, two, other = [], 0, 0, set()
     for i in range(len(p.sets)):
         name = p.set_name(i)
         if not name.startswith('PtcSupamarioUi'):
             continue
         for e in p.sets[i]['emitters']:
-            if e['data'] is None or p.emitter_name(e['data']) == 'UiHaze':   # v5: the haze (no colour drawn)
+            em = e['data']
+            if em is None or p.field(em, 'shader_index') in B.REF_SHADERS:   # v9: the distortion (no colour drawn)
                 continue
-            for t in (0, 1):
-                for k in p.color_keys(e['data'], t):
-                    v = max(k[:3])
-                    if v <= 0:
-                        continue
-                    h, sa, _ = colorsys.rgb_to_hsv(*[c / v for c in k[:3]])
-                    if name in aura:
-                        if sa > 1e-4:
-                            hues.add(round(h * 360))
-                        sats.append(sa)
-                    elif sa > 0.05:
-                        other.add(round(h * 360))
-    check('v3: the aura\'s 5 sets (848\'s loops) all lavender: hue %g deg (the clip 281-287)' % B.AURA_HUE, hues,
-          {round(B.AURA_HUE)})
-    check('  their saturations %g-%g (XV2\'s x %g, at least %g: v6)' % (B.AURA_SAT_MIN, B.AURA_SAT, B.AURA_SAT,
-                                                                      B.AURA_SAT_MIN),
-          (min(sats) >= B.AURA_SAT_MIN - 1e-4, max(sats) <= B.AURA_SAT + 1e-4), (True, True))
-    check('  the other UI sets (start, burst, vanish) keep XV2\'s colours (none at %g deg)' % B.AURA_HUE,
-          round(B.AURA_HUE) in other, False)
-    lv = B.lavender((0.45, 0.62, 1.0))
-    h, sa, v = colorsys.rgb_to_hsv(*lv)
-    check('  the tint of a blue (0.45, 0.62, 1.0: hue 220, saturation 0.55) -> hue %g, saturation 0.55 x %g (v6: at least '
-          '%g), value 1' % (B.AURA_HUE, B.AURA_SAT, B.AURA_SAT_MIN), (round(h * 360, 1), round(sa, 3), round(v, 3)),
-          (B.AURA_HUE, round(max(0.55 * B.AURA_SAT, B.AURA_SAT_MIN), 3), 1.0))
-    h, sa, v = colorsys.rgb_to_hsv(*B.lavender((0.9, 0.95, 1.0)))
-    check('v6: a pale XV2 colour (0.9, 0.95, 1.0: saturation 0.1) -> saturation %g (the big smoke sprites came out white '
-          'once additive)' % B.AURA_SAT_MIN, round(sa, 3), B.AURA_SAT_MIN)
+            k0, k1 = p.color_keys(em, 0)[0][:3], p.color_keys(em, 1)[0][:3]
+            if name in aura and struct.unpack_from('>I', em, 0x314)[0] == 2 and k0 != k1:
+                two += 1
+            for k in (k0, k1):
+                v = max(k)
+                if v <= 0:
+                    continue
+                h, sa, _ = colorsys.rgb_to_hsv(*[c / v for c in k])
+                if name in aura:
+                    if sa < 0.08:
+                        whites += 1
+                    else:
+                        hues.append(h * 360)
+                elif sa > 0.05:
+                    other.add(round(h * 360))
+    blue = [h for h in hues if h < 245]
+    violet = [h for h in hues if h > 262]
+    check('v9: the aura\'s colours mixed as XV2\'s: white (saturation < 0.08: %d keys), blue (hue < 245: %d), violet '
+          '(> 262: %d), all within the map\'s %g-%g; v3-v8: all one hue (262)' % (
+              whites, len(blue), len(violet), B.AURA_HUE_MAP[0][1], B.AURA_HUE_MAP[1][1]),
+          (whites > 0, len(blue) > 0, len(violet) > 0,
+           all(B.AURA_HUE_MAP[0][1] - 0.5 <= h <= B.AURA_HUE_MAP[1][1] + 0.5 for h in hues)), (True, True, True, True))
+    check('v9: the two-colour programs (combiner 2) draw XV2\'s two colours: core (colour 0) and edge (colour 1) differ '
+          'on at least 6 emitters (XV2: 15 of 19 nodes have a secondary colour)', two >= 6, True)
+    check('  the other UI sets (start, burst, vanish) keep XV2\'s colours (none moved into the violet)',
+          any(h > 262 for h in other), False)
+    check('v9: the hue map: XV2 180 (cyan) -> %g, 240 (blue) -> %g, a white stays white' % (
+        B.AURA_HUE_MAP[0][1], B.AURA_HUE_MAP[1][1]),
+          (round(B.hue_map(180.0), 3), round(B.hue_map(240.0), 3), tuple(round(c, 3) for c in B.ui_colour((1.0, 1.0, 1.0)))),
+          (B.AURA_HUE_MAP[0][1], B.AURA_HUE_MAP[1][1], (1.0, 1.0, 1.0)))
 
 
 def aura_v5_tests(out, base):
-    """v5: the aura's sets smooth (many soft additive sprites, the same average coverage) and the heat haze"""
+    """v5: the aura's sets smooth (many soft additive sprites); v9: XV2's own refraction emissions (Ref_FOK) as the
+    distortion (the fireball's refraction program, XV2's emission), every aura emitter following him"""
     import ptcl
+    import eft_vertex
     d = os.path.join(out, 'fighter', 'supamario', 'effect', 'supamario')
     p = ptcl.Ptcl(open(os.path.join(d, 'supamario.010d0000.ptcl'), 'rb').read())
     q = ptcl.Ptcl(open(os.path.join(base, 'effect', 'supamario', 'supamario.010d0000.ptcl'), 'rb').read())
-    rows, bad = [], []
-    for key in B.AURA_SETS:
-        name = 'PtcSupamarioUi' + [x for x in B.FX if x[0] == key][0][2][:-4]
-        ems = [e['data'] for e in p.sets[p.find_set(name)]['emitters'] if e['data'] is not None]
-        for em in ems:
-            if p.emitter_name(em) == 'UiHaze':
+    fsrc = p.find_set(B.HAZE_SRC[0])
+    ref = [e['data'] for e in p.sets[fsrc]['emitters'] if e['data'] is not None and
+           p.emitter_name(e['data']) == B.HAZE_SRC[1]][0]
+    rsh = p.field(ref, 'shader_index')
+    rows, bad, refr, follow, names = [], [], [], [], []
+    for name in B.aura_set_names():
+        for e in p.sets[p.find_set(name)]['emitters']:
+            em = e['data']
+            if em is None:
+                continue
+            names.append(p.emitter_name(em))
+            fo = struct.unpack_from('>I', em, 0x310)[0]
+            follow.append((name, p.emitter_name(em), fo, fo in eft_vertex.features(
+                p.shader_binary(p.field(em, 'shader_index')))['follow']))
+            if p.field(em, 'shader_index') == rsh:
+                refr.append((name, p.emitter_name(em), em))
                 continue
             iv, bl = p.field(em, 'emit_interval'), p.field(em, 'blend_type')
             rows.append((iv, bl))
             if not (1 <= iv <= 7 and bl == 1):
                 bad.append((name, p.emitter_name(em), iv, bl))
-    check('v5: the aura sets\' %d emitters: one particle every 1-7 frames (XV2\'s converted 9-39 / %g), additive (blend 1)'
-          % (len(rows), B.AURA_DENSITY), bad, [])
-    fsrc = p.find_set(B.HAZE_SRC[0])
-    ref = [e['data'] for e in p.sets[fsrc]['emitters'] if e['data'] is not None and
-           p.emitter_name(e['data']) == B.HAZE_SRC[1]][0]
-    for key, prm in B.HAZE.items():
-        name = 'PtcSupamarioUi' + [x for x in B.FX if x[0] == key][0][2][:-4]
-        hz = [e['data'] for e in p.sets[p.find_set(name)]['emitters'] if e['data'] is not None and
-              p.emitter_name(e['data']) == 'UiHaze']
-        check('v5: %s: one heat-haze emitter (the fireball\'s refraction1: its shader, its distortion map)' % name,
-              [(p.field(h, 'shader_index'), p.texres(h, 0)['native_pos']) for h in hz],
-              [(p.field(ref, 'shader_index'), p.texres(ref, 0)['native_pos'])])
-        if hz:
-            h = hz[0]
-            check('  size %g, volume %g, life %d, every %d frames, rising %g, strength x %g' % (
-                prm['scale'], prm['radius'], B.HAZE_LIFE, B.HAZE_INTERVAL, B.HAZE_RISE, B.HAZE_ALPHA),
-                  ([round(x, 3) for x in p.field(h, 'scale')], [round(x, 3) for x in p.field(h, 'volume_radius')],
-                   p.field(h, 'ptcl_life'), p.field(h, 'emit_interval'), round(p.field(h, 'emitter_velocity'), 4),
-                   round(p.field(h, 'alpha_diff21'), 4)),
-                  ([prm['scale']] * 2, [prm['radius']] * 3, B.HAZE_LIFE, B.HAZE_INTERVAL, B.HAZE_RISE,
-                   round(p.field(ref, 'alpha_diff21') * B.HAZE_ALPHA, 4)))
+    check('v5: the aura sets\' %d colour emitters: one particle every 1-7 frames (XV2\'s converted 9-39 / %g), additive '
+          '(blend 1)' % (len(rows), B.AURA_DENSITY), bad, [])
+    check('v9: every aura emitter follows him (ptcl 0x310 = %d, position only; v1-v8 1: left in the world, the trail) and '
+          'its program draws that follow type' % B.AURA_FOLLOW,
+          [x for x in follow if x[2] != B.AURA_FOLLOW or not x[3]], [])
+    check('v9: the distortion = XV2\'s own refraction emissions (Ref_FOK_L / _R: Aura_LoopFOK\'s and FOK_FootL\'s two '
+          'sprite_2_1_*), 4 of them, on the hip and feet sets; no v5-v8 UiHaze',
+          (sorted((n, en) for n, en, _e in refr), 'UiHaze' in names),
+          (sorted([('PtcSupamarioUiAura_LoopFOK', 'sprite_2_1_1_1'), ('PtcSupamarioUiAura_LoopFOK', 'sprite_2_1_2_1'),
+                   ('PtcSupamarioUiFOK_FootL', 'sprite_2_1_2_1_1'), ('PtcSupamarioUiFOK_FootL', 'sprite_2_1_2_1_1_1')]),
+           False))
+    rk = [o for o in range(0x304, 0x340, 4) if o not in (0x310,)] + list(range(0x830, 0x868, 4)) + [0x324, 0x4BC]
+    for n, en, em in refr:
+        check('  %s %s: the fireball\'s refraction program (frame buffer read: %s), its two textures, its shader-keyed '
+              'words; XV2\'s strength (alpha up %g x %g), its life %d' % (
+                  n, en, b'frameBufferTexture' in bytes(p.shader_binary(rsh)), 0.6, B.REF_STRENGTH,
+                  p.field(em, 'ptcl_life')),
+              ([p.texres(em, k)['native_pos'] for k in (0, 1)], [struct.unpack_from('>I', em, o)[0] for o in rk],
+               round(p.field(em, 'alpha_diff21'), 3)),
+              ([p.texres(ref, k)['native_pos'] for k in (0, 1)], [struct.unpack_from('>I', ref, o)[0] for o in rk],
+               round(0.6 * B.REF_STRENGTH, 3)))
     qs = q.find_set(B.HAZE_SRC[0])
     check('v5: the fireball\'s own set untouched', [bytes(e['data']) for e in p.sets[fsrc]['emitters'] if e['data']],
           [bytes(e['data']) for e in q.sets[qs]['emitters'] if e['data']])

@@ -1631,3 +1631,9 @@ draw and every GX2 call recorded: no shell / a shell (programs, states, the draw
 the programs re-assembled and run in tools/latte_exec.py against `shell_ref` (the band Width pixels wide on screen);
 the clear; the diag lines), `tools/mesh_vis_test.py` (v2's multi-part meshes), `new_var_test.cs`, `hitbox_var_test.cs`
 (the viewer's band). In game: `tools/outline_shell_ingame_test_build.py` (Dr. Mario's taunts).
+
+- **In game (Supamario's Ultra Instinct v9):** a light colour ADDED (Blend 1) comes out white: the v7 clip's (150, 135,
+  255) at 200 reached the frame at >= 2.2 x (k; not measured exactly). For a coloured glow use **Blend 0** (drawn over:
+  never past its own colour, however many mesh parts overlap) with a deep colour that stays itself at 2-4x, e.g.
+  `Outline_Shell(Target=0, Red=60, Green=40, Blue=255, Alpha=130, Width=1.5, Frames=0, FadeIn=10, FadeOut=10, Flash=0,
+  Blend=0)` (Ultra Instinct's blue-violet band). Nothing in the command changed.

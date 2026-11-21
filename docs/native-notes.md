@@ -3312,6 +3312,15 @@ programs re-assembled, PARAM0 = FB3's hdrRange per vertex, PIX0 = colour x hdrRa
 (0.29, 0.38, 0.5) drawn, (0.59, 0.76, 1) shown), the registers, the FB3 refusals, coloured() on outline4's pixel program.
 Not confirmed in game: Cemu linking PARAM0 to the pixel input by semantic 0x80 (the same mechanism as every eft program).
 
+**In game after v7 (the user's Ultra Instinct v7 clip, exe_v46z_ui6 = outline5 + the UI cave):** the band still white.
+Measured: (150, 135, 255) at Alpha 200 added (Blend 1) over the night sky (23, 20, 26) came out (254, 251, 255), 4-6 px:
+green rose by 231 where one layer can add 106 x k, so the colour reached the frame at **k >= 2.2** x its value (k = 1 if
+the hdrRange scaling did what it was meant to; v5 unscaled was white too, so the scaling isn't what decides it). Not the
+hull's layering: drawn once per polygon part, Supamario's 13 visible parts cover 87 % of the band once, 8 % twice (bind
+pose, side view). k itself not measured (Cemu's state at run time). **Rule:** for a coloured glow use Blend 0 (drawn
+over: it can't pass its own colour, whatever k or the overlaps) with a colour that stays itself at 2-4x (a deep one:
+(60, 40, 255) -> (240, 160, 255) at 4x); Blend 1 (added) with a light colour clips to white in game.
+
 **Claimed region: `0x04BE5000`-`0x04BE7000`** (past the mesh visibility's; `textregion:0x2BE7000 grow:0x04BE7000`; code
 and data `0x04BE5000`-`0x04BE6244`, the diag build to `0x04BE66FC`; the programs at `0x04BE6800` (vertex, 0x348 bytes)
 and `0x04BE6C00` (pixel, 0x120), 256-aligned; the table `os_tab` 16 x 0x50). Order: exe_v46z_ol -> tools/mesh_vis_cave.py
@@ -3570,3 +3579,16 @@ exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATC
 - **v8 (README "Ultra Instinct v8"; the exe unchanged, exe_v46z_ui6):** the sway's / spot dodge's counter is the
   transformation's rush, run in 0x155 with TIMER_4 9 (the cave's transformation mode: slot 43 fully invincible); the
   spot dodge asks 0x155 with TIMER_4 5 (the sway family: nothing in the cave depends on it for that frame).
+- **v9 (README "Ultra Instinct v9"; the exe unchanged, exe_v46z_ui6): the counter shape's live state.** The v7 log: a
+  dodge, then the next attack on his body (no S4U2), the next dodged... The ShieldModule's per-frame update (the
+  fighter's `0x02E40DA4`: for each of its three shield modules, groups below `M + 0x28`, unless `M + 0x4B`) runs the group
+  update `0x02C6F794` (each shape below `group + 0x30` by `0x02C6FCA8`, which tests the shape's word `+0x20`; then `group
+  + 0x30` = the last shape on + 1, the group's records of this generation removed) and sets `M + 0x28` = the last group
+  that had one + 1. The module's re-initialisation (vt `+0x24`: `0x02DACF04`, the fighter's `0x02E60EC8`; per group
+  `0x0200BCCC` -> `0x02C6F508`) zeroes `M + 0x28` and `group + 0x30` and leaves `+0x20`: the shape stays "on" in its word but
+  is never updated (never met) until an ON call (`0x0200BD8C` -> `0x02C6F954`: `+0x20` = on, `group + 0x30` and `M + 0x28`
+  raised). The MSC's TIMER_5 only knew its own calls, so after the sway it never made the ON call again; a damage status
+  (shape off, TIMER_5 0) then Wait did. Now the MSC makes the ON call every frame of a shape status. Not pinned down:
+  which caller re-initialises the module after the sway (no direct caller of vt `+0x24` found; module-list calls).
+  Also read here: the fighter's event 7 (`0x02E3B988`) and `0x02E20534` switch group 1 of `[fighter + 0x7528]` with the
+  guard (the shield-size params `0x374` / `0x378`), a different module from the counter's (`[acc + 0x72F4]`).
