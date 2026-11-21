@@ -75,11 +75,26 @@ SEGMENTS = [
     ('counter_s_end', STRIKE, 1, 280, 350, 42),
     ('ss_in', SS, 0, 0, 40, 18),
     ('ss_hold', SS, 0, 40, 151, 27),
+    # v11 (the user: XV2 skill 1510_GKS_HKN "Soaring Fist" as the transformed forward smash): after Secret Sensation's
+    # stance in SpecialAirLwHeavy's animation, played through its custom-move slots 0x246 (specialairlwheavy_c2: the
+    # wind-up and the charge) and 0x247 (specialairlwheavy_c3: the three releases). 1510_GKS_HKN.ean (`--sf-skill`):
+    # #0 GKS_SPA_HKN_00_C (101 frames, BAC entry 0: one punch at 20), #1 (121, entry 1: punches at 20 / 40), #2 (141,
+    # entry 2: 20 / 40 / 60); their first 20 frames are the same pose (checked: 0.06 at most). XV2's ChargeControl
+    # (5-17) holds the skill on its charge: the hold here is #0's frame 12 held SF_HOLD_N frames (the move's charge),
+    # each release #n from 12 to its end 1:1 (60 fps)
+    ('sf_start', SS, 0, 0, 12, 12, 'hkn'),
+    ('sf_hold', SS, 0, 12, 12, 60, 'hkn'),
+    ('sf_rel1', SS, 0, 12, 101, 89, 'hkn'),
+    ('sf_rel2', SS, 1, 12, 121, 109, 'hkn'),
+    ('sf_rel3', SS, 2, 12, 141, 129, 'hkn'),
 ]
 EAN_FRAMES = [325, 500]
 CMN_ANIMS = {189: 'CMN_SPA_ASW_B_L_S', 190: 'CMN_SPA_ASW_B_R_S', 191: 'CMN_SPA_ASW_F_L_S', 192: 'CMN_SPA_ASW_F_R_S'}
 HIT_ANIMS = {1: 'HIK_SPA_DSH_01_C'}
-KEEP_TRANS = ('sway_b_in', 'sway_b', 'sway_f_in', 'sway_f', 'sway_br_in', 'sway_br', 'sway_fr_in', 'sway_fr')   # their root lean kept (TransN X / Z)
+HKN_ANIMS = {0: 'GKS_SPA_HKN_00_C', 1: 'GKS_SPA_HKN_01_C', 2: 'GKS_SPA_HKN_02_C'}     # v11: Soaring Fist
+SF_PARTS = ('sf_start', 'sf_hold', 'sf_rel1', 'sf_rel2', 'sf_rel3')
+KEEP_TRANS = ('sway_b_in', 'sway_b', 'sway_f_in', 'sway_f', 'sway_br_in', 'sway_br', 'sway_fr_in', 'sway_fr') + SF_PARTS
+# (v11: the punches' lunge kept too: XV2's b_C_Base goes 1.03 m forward at each punch and back; the MSC doesn't move him)   # their root lean kept (TransN X / Z)
 
 
 def part_start(name):
@@ -134,16 +149,16 @@ def _local(ean, anim, name, f):
     return ean.local(anim, bi[name], f)
 
 
-def body_frames(ean, smash, motion, cmn=None, hit=None):
+def body_frames(ean, smash, motion, cmn=None, hit=None, hkn=None):
     frames, base, keep = [], [], []
     a0 = ean.animations[0]
     pel_ref = _local(ean, a0, 'b_C_Pelvis', 0)[0][1] + _local(ean, a0, 'b_C_Base', 0)[0][1]
     for f in range(frames_of(motion)):
         s, ai, sf = source(motion, f)
-        e = {'cmn': cmn, 'hit': hit}.get(s[6], ean) if len(s) > 6 else ean
+        e = {'cmn': cmn, 'hit': hit, 'hkn': hkn}.get(s[6], ean) if len(s) > 6 else ean
         a = e.animations[ai]
         if len(s) > 6:
-            assert a.name == {'cmn': CMN_ANIMS, 'hit': HIT_ANIMS}[s[6]][ai], (ai, a.name)
+            assert a.name == {'cmn': CMN_ANIMS, 'hit': HIT_ANIMS, 'hkn': HKN_ANIMS}[s[6]][ai], (ai, a.name)
         frames.append(X.retarget(e, a, smash, at=[sf], root_scale=SCALE)[0])
         by = _local(e, a, 'b_C_Base', sf)[0][1]
         base.append((_local(e, a, 'b_C_Pelvis', sf)[0][1] + by, by))
@@ -157,17 +172,18 @@ def body_frames(ean, smash, motion, cmn=None, hit=None):
     return frames, [b[1] for b in base]
 
 
-def build(motion_dir, vbn_path, ean_path, out_dir, cmn_ean_path=None, hit_ean_path=None):
+def build(motion_dir, vbn_path, ean_path, out_dir, cmn_ean_path=None, hit_ean_path=None, hkn_ean_path=None):
     ean = X.Ean(open(ean_path, 'rb').read(), smash_axes=True)
     assert [a.frames for a in ean.animations] == EAN_FRAMES, [(a.name, a.frames) for a in ean.animations]
     cmn = X.Ean(open(cmn_ean_path, 'rb').read(), smash_axes=True) if cmn_ean_path else None
     hit = X.Ean(open(hit_ean_path, 'rb').read(), smash_axes=True) if hit_ean_path else None
-    assert cmn is not None and hit is not None or not any(len(s) > 6 for s in SEGMENTS), \
-        'v7: the sways need CMN.ean, the counter 1352_HIK_DSH.ean'
+    hkn = X.Ean(open(hkn_ean_path, 'rb').read(), smash_axes=True) if hkn_ean_path else None
+    assert cmn is not None and hit is not None and hkn is not None or not any(len(s) > 6 for s in SEGMENTS), \
+        'v7: the sways need CMN.ean, the counter 1352_HIK_DSH.ean; v11 Soaring Fist 1510_GKS_HKN.ean'
     smash = X.vbn_rest(vbn_path)
     info, per = {}, {}
     for m in MOTIONS:
-        frames, base_y = body_frames(ean, smash, m, cmn, hit)
+        frames, base_y = body_frames(ean, smash, m, cmn, hit, hkn)
         offs, contact = FA.floor_fix(frames, smash, base_y)
         per[m] = frames
         info[m] = {'rotn_offsets': offs, 'contact': contact,
