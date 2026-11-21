@@ -4154,5 +4154,13 @@ XV2's a little more purple; approximated).
 `supamario_ui_test.py --exe --package --since` (v6: the renewal fades (0, 0) every 120 frames and nothing in between,
 seven parts / bones / sizes, the KO's kill (1, 1) of all five ids, the glow at the burst / counter end / Wait1, no aura
 in the counter's script, the renewal >= the sprites' life (fails on v5's 30), the colours' saturation floor, the exe's
-Outline_Shell colour check, the package = the files changed since v5); `outline_shell_test.py` (v7); the other suites
-as listed in the commit.
+Outline_Shell colour check, the package = the files changed since v5) **419 ok**; `outline_shell_test.py` (v7) **124
+ok**; `supamario_ui_cave_test.py` 226 ok (exe_v46z_outline5 / ui5 / ui5_diag); `supamario_timeskip_test` 198,
+`supamario_godfist_test` 566, `supamario_sledgehammer_test` 141, `supamario_corebreaker_test` 104,
+`supamario_fakedeath_test` 47 ok; `mesh_vis_test.py` 64 ok; `msc_stack_check` 0 of 2485; `fighter_texture_ids.py check` 0
+errors; `import_call_check` 0 on both exes; exe_v46z_outline5 / ui5 / ui5_diag reproduced byte for byte from the cave
+scripts; Sm4shCommand v1.7.20 NvTest 290 ok / 1 known failure (effect.bin's else-if chains, upstream; Outline_Shell's
+examples 1-9 compile and round-trip), HvTest 248 ok. 0 failures.
+- **Not confirmed in game:** Cemu linking the shell's PARAM0 to its pixel input by semantic 0x80; the eft emitter pool with
+  the aura's two generations (at most 2 x 31 emitters a Supamario: the diag logs "Emitter is Empty." if it runs out);
+  the glow's strength on bright / dark stages; why the effect script's chest / hand aura stopped at v5's landing.

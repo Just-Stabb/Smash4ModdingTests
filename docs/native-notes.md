@@ -3307,7 +3307,7 @@ SPI_VS_OUT_ID semantic `HDR_SEM` 0x80; special.nsh's 0xFF before); the pixel pro
 (SPI_PS_INPUT_CNTL 0x180, SPI_PS_IN_CONTROL_0 0x14000001, 2 GPRs: effect_trail.nsh's pixel register pattern) and writes
 (FB1[12].rgb x hdrRange, FB1[12].a). os_chk also requires the vertex stage's slot 9 bound (device cache `+0x1D0 + 8 x 9`:
 data a plausible pointer, size at least 16), else the game's draw only. `coloured()` tells an exe_v46z_outline5 shell;
-port_check X13 WARNs on an older one when a script uses Outline_Shell. Test (`outline_shell_test.py`, 125 checks): the
+port_check X13 WARNs on an older one when a script uses Outline_Shell. Test (`outline_shell_test.py`, 124 checks): the
 programs re-assembled, PARAM0 = FB3's hdrRange per vertex, PIX0 = colour x hdrRange (Time Skip's (150, 195, 255) at 0.5:
 (0.29, 0.38, 0.5) drawn, (0.59, 0.76, 1) shown), the registers, the FB3 refusals, coloured() on outline4's pixel program.
 Not confirmed in game: Cemu linking PARAM0 to the pixel input by semantic 0x80 (the same mechanism as every eft program).
