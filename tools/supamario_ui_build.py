@@ -42,7 +42,8 @@ import supamario_ui_model as model  # noqa: E402
 # ---------------------------------------------------------------- the rules (the user's spec)
 TRIGGER_PCT = 100.0                  # his first actionable frame at 100% or more
 FORM_N = anim.frames_of(anim.FORM)   # 60: the transformation (XV2 entry 0's 0-229, the user's "about 60 frames")
-STRIKE_N = anim.frames_of(anim.STRIKE)          # 349: XV2's BAC 1 from 151 to 499, 1:1
+STRIKE_N = anim.part_len('counter')             # 349: XV2's BAC 1 from 151 to 499, 1:1 (v10: the long rush; the
+                                                # motion's animation goes on with the short one)
 STRIKE_AT = anim.frame_of(anim.STRIKE, 1, 280)     # 129: the finisher (BDM #2)
 # v2 (the user's XV2 clip of the counter: the attacker held in front of him, 14 strike flashes, the finisher, 15 hits):
 # XV2's rush entry. The BCM: the five roots share their conditions; roots #1 / #4 / #7 play BAC 4 (counter children
@@ -99,7 +100,39 @@ SWAY_SND_AT = 1
 # STRIKE_N frames, ui_counter: XV2's BAC 1, the same entry every counter root of the skill's BCM plays) from the sway's
 # window and the spot dodge; 706's motion part, its slot 0x242 script and effects are gone
 MOT_SWAY_B, MOT_SWAY_F = 0x241, 0x243      # SpecialAirLwLight and its custom-move slot 0x243 (one animation)
-SWAY_SCRIPTS = {'specialairlwlight_c3': 'sway_f'}
+# v10 (the user: "make it so the autododge alternates between animations"): XV2's four auto sways (CMN.bac 260-263 /
+# 765-768: CMN.ean #189 B_L, #190 B_R, #191 F_L, #192 F_R); the attacker in front -> a back sway, behind -> a forward one
+# (v7), and successive dodges alternate L / R (TIMER_7, V_SWAY: his MSC's parity, renewed every frame). The R sways play
+# through SpecialAirLwLight's other custom-move slots (0x242 from 74, 0x244 from 111: the motion table gives 0x241-0x244
+# one animation; their vanilla scripts were F.L.U.D.D.'s, unreachable)
+MOT_SWAY_BR, MOT_SWAY_FR = 0x242, 0x244
+SWAY_BR_AT, SWAY_FR_AT = anim.part_start('sway_br_in'), anim.part_start('sway_fr_in')
+V_SWAY = 0x0F000327                  # TIMER_7: the next sway's side (> 0.5: R), his MSC's (renewed every frame)
+SWAY_SCRIPTS = {'specialairlwlight_c3': 'sway_f', 'specialairlwlight_c2': 'sway_br', 'specialairlwlight_c4': 'sway_fr'}
+SWAY_AT = {'specialairlwlight': 0, 'specialairlwlight_c3': SWAY_F_AT, 'specialairlwlight_c2': SWAY_BR_AT,
+           'specialairlwlight_c4': SWAY_FR_AT}
+# v10 (the user: "make the autododge counter use the fast version that does less hits and make it only happen from a
+# special button input"; then "the transformation version of the rush counter should use the long animation with more
+# hits, the autododge version should use the short animation with far less hits"). No XV2 file has a shorter rush (the
+# skill's counter entries 1 / 2 / 5 / 6 / 9 / 10 all hold the 16 hitboxes, CMN.bac has no multi-hit entry), so the
+# dodge's rush is built from the user's clips (udclip e, 60 fps): the vanish at 36, the first impact at 92 (56 later; the
+# long rush's is 59), the HUD's count 2 .. 11 at 100 .. 144: 11 hits ~5.2 frames apart (10 rush hits and the finisher),
+# the finisher's ring at ~150, the camera back on him standing at ~158. SpecialLwHeavy's animation goes on after the long
+# rush with it (supamario_ui_anim 'counter_s_*', motion 0x236 speciallwheavy_c2 from STRIKE_S_AT): STRIKE_S_N frames;
+# its rush hits at RUSH_S_AT, the finisher at STRIKE_S_HIT (its own frames); XV2's 170 vanish, 335 sound, 350 end
+# placed by its parts' timing. The sway's counter (special only, its window) and the spot dodge's use it; the
+# transformation's counter keeps the long one
+MOT_STRIKE_S = 0x236
+STRIKE_S_AT = anim.part_start('counter_s_in')                        # 349
+STRIKE_S_N = sum(anim.part_len(n) for n in ('counter_s_in', 'counter_s_rush', 'counter_s_end'))   # 150
+RUSH_S_N = 10
+RUSH_S_GAP = 5.2                     # the clip's 11 counts over 52 frames
+RUSH_S_AT = [anim.part_frame('counter_s_rush', 210) - STRIKE_S_AT + int(round(RUSH_S_GAP * k)) for k in range(RUSH_S_N)]
+STRIKE_S_HIT = anim.part_frame('counter_s_end', 280) - STRIKE_S_AT                 # 108: the 11th hit
+CNT_S_VANISH2 = anim.part_frame('counter_s_in', 170) - STRIKE_S_AT                 # XV2's second vanish (170)
+CNT_S_SND = anim.part_frame('counter_s_end', 335) - STRIKE_S_AT                    # skill SE cue 1 (335)
+CNT_S_END = STRIKE_S_N - 1                                                         # the white body off (XV2 350)
+EXTRA_SCRIPTS = list(SWAY_SCRIPTS) + ['speciallwheavy_c2']           # the custom-move slots' scripts the build writes
 ST_ESCAPE_N = cave.ST_ESCAPE_N
 # v7 Secret Sensation (the user: "slow time for everyone during its traveling and until reaching, do a slight zoom
 # between Supamario and the opponent, then on Supamario ... similar to how it looks in Dragon Ball FighterZ"; the DBFZ
@@ -109,7 +142,7 @@ ST_ESCAPE_N = cave.ST_ESCAPE_N
 # SS_SLOW_FRAMES (its own end, should the MSC miss it); the camera in on him SS_CAM1_D over SS_CAM1_T frames at the read
 # (slight: the fighter he passes stays in the frame), SS_CAM2_D over SS_CAM2_T from the slide's frame SS_CAM2_AT (the
 # last 6 frames = 18 screen frames on him), back to normal at the arrival
-SS_SLOW, SS_SLOW_FRAMES = 3, 48
+SS_SLOW, SS_SLOW_FRAMES = 3, 48      # v7-v9 (v10: the world stop below replaces it)
 # v9 (the user's v7 test: "the camera shift for Secret Sensation is too close, it should be a slight zoom rather than a
 # close one"): CameraModule 0x2714's distance is how far the camera stays (higher = farther: Kirby's MSC, tuned in game,
 # has 4.0 for "a slight zoom on Kirby", 2.0 for the back throw's big hit and the Final Smash's, and notes 1.4 as "much
@@ -119,6 +152,27 @@ SS_SLOW, SS_SLOW_FRAMES = 3, 48
 SS_CAM1_T, SS_CAM1_D = 6, 5.5
 SS_CAM2_AT, SS_CAM2_T, SS_CAM2_D = 8, 6, 4.0
 SS_CAM_MIN = 3.5                     # a slight zoom: no closer than this (supamario_ui_test checks both)
+# v10 (the user: "make secret sensation work closer to how it does in DBFZ. The counter once activated should stop the
+# world, all effects, projectiles and stage until Supamario reaches his target (or a long timer elapses as a fallback)
+# along with a time slowdown for Supamario. His movement speed should stop and then accelerate quickly"; the DBFZ clip
+# 060b49a3, 60 fps: the counter at ~0.40 s, the beam and the opponent frozen from then on (still frozen at 1.4 s), Goku
+# rising slowly over it to ~0.67 s (~16 frames), then across it in ~8 frames, landing behind the opponent with motion
+# lines by ~0.80-0.97 s). The world stop: his MSC asks it (TIMER_6, V_STOP, renewed every frame: SS_STOP_ASK) from the
+# counter's read until SS_ARRIVE frames after his arrival, at most SS_STOP_MAX frames (the fallback); the cave
+# (exe_v46z_ui7, supamario_ui_cave.py ws_*) stops every other object (each frame a slowed frame in which nothing steps,
+# his own step a normal one), pauses every effect but his and stops the stage, and lets them go when the asks stop (2
+# frames' lease: a KO, a reset, the match's end or leaving the status ends it). He runs at SS_RATE (his slide's motion
+# rate, the user's "3/4"); his travel holds (SS_HOLD frames, SS_HOLD_FRAC of the way, easing out) then accelerates over
+# SS_DASH frames (ease-in: the speed grows to the arrival): SS_SLIDE_N frames, then SS_ARRIVE frames held behind the
+# fighter (DBFZ: he lands, the world still stopped), then Fall and the world goes on
+V_STOP = 0x0F000326                  # TIMER_6: the world stop asked (his MSC renews it; the cave reads > 0.5)
+SS_STOP_ASK = 2.0
+SS_HOLD, SS_DASH, SS_HOLD_FRAC = 16, 8, 0.08
+SS_ARRIVE = 6
+SS_STOP_MAX = 240                    # 4 s: the fallback (the slide always arrives at SS_SLIDE_N + SS_ARRIVE)
+SS_RATE = 0.75
+SS_CAM2_AT_V10 = SS_HOLD             # the closer zoom from the dash's start
+SS_FX_FLASH_SIZE, SS_FX_BURST_SIZE = 0.7, 0.45
 # v6 (the user's v5 clip: no aura after the burst, only faint wisps): the MSC's renewal every 30 frames killed the aura AT
 # ONCE (EffectModule 0x2723 (id, 1, 1): the effect manager's kill -> eft's KillEmitterSet 0x04A55714, its particles
 # gone) and made it again, so its sprites (48-96 frames long, fading in over their life) never got past 29 frames: in
@@ -139,7 +193,8 @@ SCRIPT = {anim.FORM: 'speciallwlight', anim.STRIKE: 'speciallwheavy', anim.DODGE
 # little into the background (Z out to -6 and back), ending airborne: 10 past a grounded one, 6 above its feet; 10 past
 # and 10 above an airborne one; no hitbox
 SS_ON, SS_OFF, SS_END = 5, 30, anim.frames_of(anim.SS)
-SS_SLIDE_N, SS_DEPTH = 14, 6.0
+SS_SLIDE_N, SS_DEPTH = 14, 6.0       # v1-v9 (v10: SS_HOLD + SS_DASH)
+SS_SLIDE_N = SS_HOLD + SS_DASH       # v10: 24 frames (the hold, then the dash)
 SS_BEHIND, SS_UP_GROUND, SS_BEHIND_AIR, SS_UP_AIR = 10.0, 6.0, 10.0, 10.0
 V_SS = 0x0F000324                    # TIMER_4: Secret Sensation's mark; v5 status 0x155's mode (cave.V_MODE)
 assert V_SS == cave.V_MODE
@@ -175,8 +230,14 @@ FX = [('start', 'BTL_AURA.eepk', 'MGT_HENSIN01.emp', 'BustN', (0.0, 0.0, 0.0), 1
       ('aura_hand', 'BTL_AURA.eepk', 'Aura_HandLoopFOK.emp', 'RHandN', (0.0, 0.0, 0.0), 0.65),
       ('vanish', 'BTL_CMN.eepk', 'SKI_line.emp', 'HipN', (0.0, 0.0, 0.0), 1.0),
       # v7: the sway's (BTL_CMN 493), converted after the others (its id follows; v8: 706's 492 / 230 gone)
-      ('sway_line', 'BTL_CMN.eepk', 'SKI_lineX_S.emp', 'TransN', (0.0, 0.0, 0.0), 0.35)]
+      ('sway_line', 'BTL_CMN.eepk', 'SKI_lineX_S.emp', 'TransN', (0.0, 0.0, 0.0), 0.35),
+      # v10 (the user: "the counter still doesn't have any visual effects"): XV2's rush hits (BDM #1) and finisher (#2)
+      # carry Effect1 = BTL_CMN effect 0 (Btl_HitLOD x1.5 + Btl_HitS x0.8, camera-facing, at the hit): the yellow
+      # bursts on every hit of the user's clips (udclip e 92-150, uiclip c); the scripts had none (only the vanish)
+      ('hit_s', 'BTL_CMN.eepk', 'Btl_HitS.emp', 'TransN', (0.0, 0.0, 0.0), 0.8),
+      ('hit_lod', 'BTL_CMN.eepk', 'Btl_HitLOD.emp', 'TransN', (0.0, 0.0, 0.0), 1.5)]
 FX_V7 = ('sway_line',)
+FX_V10 = ('hit_s', 'hit_lod')
 # v3: the aura's colour. The converted emitters keep XV2's EMP colours (blue / cyan / white: rendered with fx_render's
 # Smash 4 side, the drawn pixels' median hue 192 deg, saturation 0.26); the user's XV2 clip after the burst shows a
 # lavender / purple-white flicker (the aura pixels' median hue 281-287 deg, saturation 0.16-0.18, value 0.88-0.96, four
@@ -342,12 +403,12 @@ def rush_box():
                      Z=RUSH_Z, Hitlag=0.5, SDI=0.0, Clang=0, Rebound=0, SFXLevel=0, SFXType=1, NoGFX=0)
 
 
-def freeze_box():
+def freeze_box(hold=None):
     """XV2's BDM #0 at the counter's start: no damage, the attacker held (its hitstop to the first rush hit), Part 1"""
     import supamario_sledgehammer_build as SB
     return SB.hitbox(ID=1, Part=1, Bone=0, Damage=0.0, Angle=0, KBG=0, FKB=0, BKB=0, Size=FREEZE_SIZE, Y=5.0, Z=0.0,
                      Hitlag=0.0, SDI=0.0, Clang=0, Rebound=0, SFXLevel=0, SFXType=0, NoGFX=1, Flinchless=1,
-                     HitstopFrames=RUSH_AT[0], SelfHitstopFrames=0)
+                     HitstopFrames=RUSH_AT[0] if hold is None else hold, SelfHitstopFrames=0)
 
 
 def sway_scripts():
@@ -465,8 +526,21 @@ def graphic(key, bone=None, follow=True, size=1.0):
     x, y, z = (c * METRE for c in e[4])
     if follow:
         return cmd('external_graphic', fx_id(key), b, x, y, z, 0.0, 0.0, 0.0, e[5] * SCALE * size, 0)
-    return cmd('graphic_effect', fx_id(key), b, x, y, z, 0.0, 0.0, 0.0, e[5] * SCALE * size, 0.0, 0.0, 0.0, 0.0, 0.0,
+    return cmd('graphic_effect2', fx_id(key), b, x, y, z, 0.0, 0.0, 0.0, e[5] * SCALE * size, 0.0, 0.0, 0.0, 0.0, 0.0,
                0.0, 1)
+
+
+# v10: the non-following effects are Graphic_Effect2 (v1-v9 Graphic_Effect: the game's FOOT_EFFECT, whose handler
+# 0x02BE1444 asks EffectModule vt +0x32C and plays nothing when foot effects are off, as in the air: docs/native-notes.md
+# "Graphic_Effect can be refused"; the transformation's counter starts where he was, in the air too)
+def hit_fx(size=1.0):
+    """v10: XV2's hit effect (BTL_CMN 0: Btl_HitLOD + Btl_HitS) at the rush hitbox's centre (in front of him)"""
+    out = []
+    for key in ('hit_lod', 'hit_s'):
+        e = [x for x in FX if x[0] == key][0]
+        out.append(cmd('graphic_effect2', fx_id(key), BONES['TransN'], 0.0, RUSH_Y, RUSH_Z, 0.0, 0.0, 0.0,
+                       e[5] * SCALE * size, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1))
+    return out
 
 
 def scripts_for():
@@ -849,8 +923,10 @@ def effects(cmn_dir, fx_dir):
     p = ptcl.Ptcl(open(os.path.join(fx_dir, base + '.ptcl'), 'rb').read())
     e = efc.Efc(open(os.path.join(fx_dir, base + '.efc'), 'rb').read())
     rep = {}
-    batches = [(ep, [x[2] for x in FX if x[1] == ep and x[0] not in FX_V7]) for ep in ('BTL_AURA.eepk', 'BTL_CMN.eepk')]
+    batches = [(ep, [x[2] for x in FX if x[1] == ep and x[0] not in FX_V7 + FX_V10])
+               for ep in ('BTL_AURA.eepk', 'BTL_CMN.eepk')]
     batches.append(('BTL_CMN.eepk', [x[2] for x in FX if x[0] in FX_V7]))   # v7: after (the earlier ids kept)
+    batches.append(('BTL_CMN.eepk', [x[2] for x in FX if x[0] in FX_V10]))  # v10: after (the earlier ids kept)
     for eepk, emps in batches:
         with tempfile.TemporaryDirectory() as pkg:
             for fn in os.listdir(cmn_dir):

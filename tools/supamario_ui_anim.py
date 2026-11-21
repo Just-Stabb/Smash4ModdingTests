@@ -28,6 +28,10 @@ XV2's CMN.ean (`--cmn-ean`, the user's chara/CMN) and the skill's EAN:
   frames 37-73  the forward sway: CMN #191 CMN_SPA_ASW_F_L_S, the same timeline; motion 0x243 from 37;
   (v7 had a third part, frames 74-95, CMN.bac 706's strike on Hit's punch through slot 0x242; v8: the sway's counter
   is the transformation's rush, SpecialLwHeavy, the user's answer: gone.)
+  v10: frames 74-110 the back sway's other side (CMN #190 CMN_SPA_ASW_B_R_S, motion 0x242 from 74) and 111-147 the
+  forward sway's (#192 CMN_SPA_ASW_F_R_S, 0x244 from 111): successive dodges alternate L / R.
+v10: SpecialLwHeavy holds the dodge's SHORT rush after the long one (frames 349-498, motion 0x236 from 349): #1 151-210
+in 56, 210-280 in 52 (10 hits and the finisher), 280-350 in 42 (the user's dodge-counter clips: 11 hits).
 The sways keep their own root lean (TransN's X / Z: up to 0.9 units back / 2.4 forward, back to 0 at the end: XV2's
 Movement is none, the MSC doesn't move him).
 """
@@ -54,13 +58,28 @@ SEGMENTS = [
     ('sway_b', DODGE, 189, 7, 43, 36, 'cmn'),        # 7-42 1:1
     ('sway_f_in', DODGE, 191, 0, 7, 1, 'cmn'),
     ('sway_f', DODGE, 191, 7, 43, 36, 'cmn'),
+    # v10 (the user: "make it so the autododge alternates between animations"): XV2's other two sways (CMN.bac 261 /
+    # 263: CMN.ean #190 CMN_SPA_ASW_B_R_S, #192 CMN_SPA_ASW_F_R_S), the same timeline, after the first two: successive
+    # dodges alternate L / R (motion 0x242 from 74, 0x244 from 111: the slots that play this animation)
+    ('sway_br_in', DODGE, 190, 0, 7, 1, 'cmn'),
+    ('sway_br', DODGE, 190, 7, 43, 36, 'cmn'),
+    ('sway_fr_in', DODGE, 192, 0, 7, 1, 'cmn'),
+    ('sway_fr', DODGE, 192, 7, 43, 36, 'cmn'),
+    # v10 (the user: "the transformation version of the rush counter should use the long animation with more hits, the
+    # autododge version should use the short animation with far less hits"; the dodge counter's clips udclip d / e):
+    # the short rush after the long one in SpecialLwHeavy's animation (motion 0x236 from 349, the slot that plays it):
+    # the vanish to the first impact in 56 (e: 92 - 36), the 11 hits in 52 (the arm held out: 210-280), the finisher's
+    # end in 42 (280-350): 150 frames
+    ('counter_s_in', STRIKE, 1, 151, 210, 56),
+    ('counter_s_rush', STRIKE, 1, 210, 280, 52),
+    ('counter_s_end', STRIKE, 1, 280, 350, 42),
     ('ss_in', SS, 0, 0, 40, 18),
     ('ss_hold', SS, 0, 40, 151, 27),
 ]
 EAN_FRAMES = [325, 500]
-CMN_ANIMS = {189: 'CMN_SPA_ASW_B_L_S', 191: 'CMN_SPA_ASW_F_L_S'}
+CMN_ANIMS = {189: 'CMN_SPA_ASW_B_L_S', 190: 'CMN_SPA_ASW_B_R_S', 191: 'CMN_SPA_ASW_F_L_S', 192: 'CMN_SPA_ASW_F_R_S'}
 HIT_ANIMS = {1: 'HIK_SPA_DSH_01_C'}
-KEEP_TRANS = ('sway_b_in', 'sway_b', 'sway_f_in', 'sway_f')   # their root lean kept (TransN X / Z)
+KEEP_TRANS = ('sway_b_in', 'sway_b', 'sway_f_in', 'sway_f', 'sway_br_in', 'sway_br', 'sway_fr_in', 'sway_fr')   # their root lean kept (TransN X / Z)
 
 
 def part_start(name):
@@ -97,6 +116,17 @@ def frame_of(motion, anim, xv2):
         if s[2] == anim and s[3] <= xv2 < s[4]:
             return int(round(a + (xv2 - s[3]) * s[5] / float(s[4] - s[3])))
     raise ValueError((motion, anim, xv2))
+
+
+def part_frame(name, xv2):
+    """v10: the motion frame showing XV2 frame `xv2` in segment `name` (or its end: xv2 = the segment's source end)"""
+    s = [x for x in SEGMENTS if x[0] == name][0]
+    assert s[3] <= xv2 <= s[4], (name, xv2)
+    return int(round(part_start(name) + (xv2 - s[3]) * s[5] / float(s[4] - s[3])))
+
+
+def part_len(name):
+    return [x for x in SEGMENTS if x[0] == name][0][5]
 
 
 def _local(ean, anim, name, f):
