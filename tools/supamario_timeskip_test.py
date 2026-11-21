@@ -31,6 +31,7 @@ The model of the game (its assumptions):
 """
 import math
 import os
+import struct
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -1544,14 +1545,19 @@ def effect_tests(out, sh_out):
     dw = [em['data'] for em in p.sets[si]['emitters'] if em['data'] is not None]
     hip, foot = rep4['aura']['emitters'][:3:2]
     tr_ = {p.emitter_name(d): [round(x_, 2) for x_ in p.field(d, 'emitter_translation')] for d in dw}
+    # Ultra Instinct v11 (tools/supamario_ui_fx11.py, run on its build): the streaks on him (rotBasis -0.5), their colours
+    # x TS_DIM (the white-area rule)
+    import supamario_ui_fx11 as FX11
+    dim = FX11.TS_DIM if all(abs(struct.unpack_from('>2f', d, FX11.ROT_BASIS)[1] - FX11.BASIS_CONE) < 1e-4
+                             for d in dw if p.field(d, 'particle_type') == 3) else 1.0
     check('v4: effect 0\'s world parts (Frt_CrgAura at b_C_Pelvis 0.3 m down and at b_R_Foot, Frt_CrgAuraB at b_C_Pelvis: '
           '0x%08X): ConeExtrude stripes as streaks (type 3), rising, follow none; v6: lavender (blue > red > green) at %g '
           '(v4 / v5: 0.32, CrgAuraB pale cyan); + their halos; the foot\'s part behind (SpecialS frame 0: RFootJ behind '
           'TransN)' % (B.FX_AURA_ID, B.E0_CAP6),
           (p.set_name(si), [p.emitter_name(d) for d in dw][:3], {p.field(d, 'particle_type') for d in dw},
            {tuple(p.field(d, 'emit_direction')) for d in dw}, {bytes(d[0x310:0x314]).hex() for d in dw},
-           all((abs(SB.arc_peak(p, d) - B.E0_CAP6) < 1e-3 if p.field(d, 'blend_type') == 1 else
-                p.field(d, 'alpha_diff21') <= B.E0_B_ALPHA + 1e-3 and min(p.color_keys(d, 0)[0][:3]) > 0.4) and
+           all((abs(SB.arc_peak(p, d) - B.E0_CAP6 * dim) < 1e-3 if p.field(d, 'blend_type') == 1 else
+                p.field(d, 'alpha_diff21') <= B.E0_B_ALPHA + 1e-3 and min(p.color_keys(d, 0)[0][:3]) > 0.4 * dim) and
                p.color_keys(d, 0)[0][2] > p.color_keys(d, 0)[0][0] > p.color_keys(d, 0)[0][1] for d in dw[:3]),
            len(dw), tr_[foot][0] < 0.0),
           ('PtcSupamarioTsFrt_CrgAura', ['CrgAura_HipN', 'CrgAuraB_HipN', 'CrgAura_RFootJ'], {3}, {(0.0, 1.0, 0.0)},
