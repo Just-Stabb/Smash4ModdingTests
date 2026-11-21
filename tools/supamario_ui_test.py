@@ -51,7 +51,8 @@ def check(name, got, want):
         PROBLEMS.append(name)
 
 
-TIMERS = (C.V_FORM, C.V_DODGE_R, C.V_DODGE_L, B.V_AURA, B.V_SS)   # (v5: TIMER_4, status 0x155's mode, counts down too)
+TIMERS = (C.V_FORM, C.V_DODGE_R, C.V_DODGE_L, B.V_AURA, B.V_SS, B.V_SHAPE)   # (v5: TIMER_4, status 0x155's mode, counts
+                                                                            # down too; ui4: TIMER_5, the shape's marker)
 
 
 class Game:
@@ -385,6 +386,65 @@ def dodge_tests(r):
           len([e for e in g.ev('mode') if e[2] == 'ui_dodge_loop']), 2)
 
 
+def shape_tests(r):
+    """ui4: the autododge's counter shape (ui_shape from ui_tick): on while transformed in Wait / Walk / WalkBrake /
+    Squat .. SquatRv on the ground (a hit on it is the cave's slot 42: the dodge), off elsewhere, switched only when that
+    changes; off at the dodge's start and on a KO"""
+    def run(status=0, form=2000.0, air=False, frames=5, hitlag=0):
+        g = Game(status=status, damage=150.0, air=air)
+        g.vars[C.V_FORM] = form
+        g.vars[B.V_AURA] = 999.0
+        g.hitlag = hitlag
+        vm = r.vm(g)
+        for _ in range(frames):
+            r.frame(vm, g)
+        return g, vm
+    for st, name in ((0, 'Wait'), (1, 'Walk'), (2, 'WalkBrake'), (0x11, 'Squat'), (0x12, 'SquatWait'), (0x13, 'SquatF'),
+                     (0x14, 'SquatB'), (0x15, 'SquatRv')):
+        g, vm = run(status=st)
+        check('ui4: the shape: transformed, %s: on once (ShieldModule(0, 2, 0, 1, 1) on frame 1), TIMER_5 renewed'
+              % name, ([(e[0], e[2]) for e in g.ev('shield')], g.vars.get(B.V_SHAPE)), ([(1, (0, 2, 0, 1, 1))], 3.0))
+    for what, kw in (('not transformed (TIMER_0 0)', dict(form=0.0)), ('transforming (1000)', dict(form=1000.0)),
+                     ('in Dash (3)', dict(status=3)), ('in Fall (the air)', dict(status=0xE, air=True)),
+                     ('shielding (0x1C)', dict(status=0x1C)), ('in a jab (0x25)', dict(status=0x25))):
+        g, vm = run(**kw)
+        check('ui4: the shape: %s: never switched' % what, g.ev('shield'), [])
+    g, vm = run(frames=3)
+    g.status = 3
+    for _ in range(3):
+        r.frame(vm, g)
+    check('ui4: the shape: Wait -> Dash: off once on the first Dash frame, TIMER_5 0',
+          ([(e[0], e[2]) for e in g.ev('shield')], g.vars.get(B.V_SHAPE)),
+          ([(1, (0, 2, 0, 1, 1)), (4, (0, 2, 0, 0, 1))], 0.0))
+    g, vm = run(frames=3)
+    g.status = 0x155
+    g.vars[B.V_SS] = 3.0
+    r.frame(vm, g, status_funcs=False)
+    check('ui4: the shape: Wait -> 0x155 (Secret Sensation\'s window switches it later): off at once',
+          [(e[0], e[2]) for e in g.ev('shield')][1:], [(4, (0, 2, 0, 0, 1))])
+    g, vm = run(frames=2)
+    g.hitlag = 3
+    g.status = 3
+    r.frame(vm, g)
+    check('ui4: the shape: in hitlag the frame he leaves Wait: off (only Wait-like statuses keep it)',
+          [(e[0], e[2]) for e in g.ev('shield')], [(1, (0, 2, 0, 1, 1)), (3, (0, 2, 0, 0, 1))])
+    g, vm = run(frames=2)
+    g.vars[C.V_DODGE_R] = 4.0
+    for _ in range(3):
+        r.frame(vm, g)
+    dg = [e[0] for e in g.ev('mode') if e[2] == 'ui_dodge_loop']
+    check('ui4: the shape: a signal (slot 42) -> the dodge; the shape off at its start, TIMER_5 0',
+          ([(e[0], e[2]) for e in g.ev('shield')], dg[:1]), ([(1, (0, 2, 0, 1, 1)), (dg[0] if dg else -1,
+                                                                                    (0, 2, 0, 0, 1))], dg[:1]))
+    for st, name in ((0xB1, 'Dead'), (0xB2, 'Rebirth'), (0x14F, 'Entry')):
+        g = Game(status=st, damage=0.0)
+        g.vars.update({C.V_FORM: 2000.0, B.V_SHAPE: 2.0})
+        vm = r.vm(g)
+        r.frame(vm, g)
+        check('ui4: the shape: %s with it on: off, TIMER_5 0' % name,
+              ([e[2] for e in g.ev('shield')], g.vars.get(B.V_SHAPE)), ([(0, 2, 0, 0, 1)], 0.0))
+
+
 def mode_tests(r):
     """v5: status 0x155's other modes untouched; a stale mode can't leak"""
     g, vm, xs = dodge_run(r, frames=30)
@@ -554,11 +614,8 @@ def script_tests(out, ts_out):
 
 
 def mv(c):
-    """a Mesh_Visibility command -> (mesh name, visible, persist)"""
-    import mesh_vis_cave as MV
-    names = {MV.crc32(n): n for k in B.SILVER_MESHES.values() for n in k}
-    names.update({MV.crc32(n): n for n in M.HAT + (M.HAIR,)})
-    names.update({MV.crc32(n): n for n in B.OVERLAYS})
+    """a Mesh_Visibility command -> (mesh name, visible, persist); ui4: the Mesh is the mesh's index (B.MESH_INDEX)"""
+    names = {i: n for n, i in B.MESH_INDEX.items()}
     return (names.get(c.params[1], hex(c.params[1])), c.params[2], c.params[3]) if c.params[0] == 0 else None
 
 
@@ -625,6 +682,13 @@ def silver_script_tests(f, b):
             if p != 'game':
                 check('v3: %s %s unchanged' % (p, n), [(c.ident, c.params) for c in f[p].script(n) or []],
                       [(c.ident, c.params) for c in b[p].script(n) or []])
+    allmv = [c for n in list(B.SCRIPT.values()) + list(B.silver_scripts()) for c in g.script(n) or []
+             if c.name == 'Mesh_Visibility']
+    check('ui4: every Mesh_Visibility of the Ultra Instinct scripts names its mesh by INDEX (< 256: the game\'s mesh '
+          'order, no name walk: v4\'s by-name commands missed every mesh whose name the model loader packs at an '
+          'unaligned address), every index one of the build\'s', sorted({c.params[1] < 256 and c.params[1] in
+                                                                      set(B.MESH_INDEX.values()) for c in allmv}),
+          [True])
     check('v3: no Mesh_Visibility override ends the whole object (Mesh -1: other moves\' overrides kept)',
           [n for p in f for h, sc in f[p].scripts.items() for c in sc if c.name == 'Mesh_Visibility' and
            c.params[1] == 0xFFFFFFFF], [])
@@ -778,6 +842,12 @@ def model_tests(out, base):
         check('%s model.nud: the meshes as before, then the 2 copies (v4: no sideburn copy) and the %d overlays (c00\'s '
               'names)' % (c, len(ovs)), ([m.name for m in new], [o['name'] for o in ovs]),
               ([m.name for m in old] + [M.MESHES[k][1] for k in ('nohat', 'eye')] + B.OVERLAYS, B.OVERLAYS))
+        for fn in ('model.nud', 'metal.nud'):
+            if os.path.exists(os.path.join(dst, fn)):
+                nm = [m.name for m in nud.read(os.path.join(dst, fn))]
+                check('ui4: %s %s: every mesh index the scripts use names its mesh (%d)' % (c, fn, len(B.MESH_INDEX)),
+                      [(n, nm[i] if i < len(nm) else None) for n, i in sorted(B.MESH_INDEX.items()) if
+                       i >= len(nm) or nm[i] != n], [])
         import moi
         m0 = moi.read(open(os.path.join(src, 'model.moi'), 'rb').read())
         m1 = moi.read(open(os.path.join(dst, 'model.moi'), 'rb').read())
@@ -1044,6 +1114,8 @@ def ids_from_json(out):
     B.FX_IDS.update({k: int(v, 16) for k, v in js['fx_ids'].items()})
     B.SE_IDS.update({k: int(v, 16) for k, v in js['se_ids'].items()})
     B.OVERLAYS[:] = js['silver']['overlays']
+    B.MESH_INDEX.clear()
+    B.MESH_INDEX.update(js.get('mesh_index', {}))
 
 
 def main():
@@ -1064,6 +1136,7 @@ def main():
     form_tests(r)
     counter_tests(r)
     dodge_tests(r)
+    shape_tests(r)
     mode_tests(r)
     reset_tests(r)
     ss_tests(r)

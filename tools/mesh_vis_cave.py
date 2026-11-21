@@ -130,6 +130,19 @@ def src(s, hand, diag=False):
              clear_to=OL.CLEAR_BACK, smvt_h=OL.FIGHTER_SM_VT >> 16, smvt_l=OL.FIGHTER_SM_VT & 0xFFFF, dead=OL.DEAD,
              back=SETVIS_BACK, va=VIS_ARR, md=MDATA, macc=MOTION_ACC, mkind=MOTION_KIND)
     chk, mi_of = OL.chk, OL.mi_of
+
+    def chk_str(reg, fail):
+        """a C string's pointer: the heap range only. v2 used chk (4-aligned too), and the model loader copies the
+        meshes' names into one buffer back to back (strlen + 1 each, 0x036DC8E8), so most names are unaligned: their
+        meshes read as "no name" (a part of the match before them) and never matched (Supamario's Ultra Instinct v4
+        log, docs/native-notes.md "Mesh visibility" v3). The word chk's alignment test had is a nop (the same size:
+        exe_v46z_ui4 patches exe_v46z_outline4's copy the same way, tools/supamario_ui_cave.py WALK_FIX)"""
+        return """
+        addis r0, %(r)s, -0x1000
+        rlwinm. r0, r0, 0, 0, 0
+        bne %(f)s
+        nop
+        bne %(f)s""" % dict(r=reg, f=fail)
     out = OL.table_src(s, 'mv', MV_INDEX, CMD_CRC, 1 + NPARAMS, hand)
     out += """
 # --- Mesh_Visibility(Target, Mesh, Visible, Persist): (r3 accessor, r5 script state, r6 (+8 execute), r7 parameters)
@@ -198,7 +211,7 @@ mvh_loop:
         lwz r12, 0(r3)
         lwz r0, 0x2C(r12)
         mtctr r0
-        bctrl""" + chk('r3', 'mvh_noname') + """
+        bctrl""" + chk_str('r3', 'mvh_noname') + """
         lbz r0, 0(r3)
         cmpwi r0, 0
         beq mvh_noname

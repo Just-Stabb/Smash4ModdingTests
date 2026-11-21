@@ -96,6 +96,7 @@ V_SS = 0x0F000324                    # TIMER_4: Secret Sensation's mark; v5 stat
 assert V_SS == cave.V_MODE
 BONES = {'TransN': 0, 'HipN': 2, 'LFootJ': 5, 'RFootJ': 9, 'BustN': 12, 'HeadN': 22, 'LHandN': 16, 'RHandN': 20}
 V_AURA = 0x0F000323                  # TIMER_3: the aura's renewal
+V_SHAPE = 0x0F000325                 # ui4 TIMER_5: the autododge's counter shape is on (his MSC's ui_shape, renewed)
 
 # v3: the silver hair and eyes (tools/supamario_ui_model.py: the colours there, model.SILVER): silver copies of his
 # hair / full hair / eye meshes, hidden by their visibility tracks; at the burst (and at the counter's white body's end)
@@ -187,7 +188,7 @@ def msc_values():
     v = {'UI_ST_DODGE_F': fl(ST_DODGE), 'UI_ST_DODGE': '0x%X' % ST_DODGE, 'UI_ST_F': fl(ST_UI), 'UI_ST': '0x%X' % ST_UI,
          'UI_ST_DEAD': fl(0xB1), 'UI_ST_REBIRTH': fl(0xB2), 'UI_ST_ENTRY': fl(0x14F),
          'UI_V_FORM': '0x%X' % cave.V_FORM, 'UI_V_DODGE_R': '0x%X' % cave.V_DODGE_R,
-         'UI_V_DODGE_L': '0x%X' % cave.V_DODGE_L, 'UI_V_AURA': '0x%X' % V_AURA,
+         'UI_V_DODGE_L': '0x%X' % cave.V_DODGE_L, 'UI_V_AURA': '0x%X' % V_AURA, 'UI_V_SHAPE': '0x%X' % V_SHAPE,
          'UI_FORMING': fl(1000.0), 'UI_FORMED': fl(2000.0), 'UI_TRIGGER_PCT': fl(TRIGGER_PCT),
          'UI_CW_ON': fl(CW_ON), 'UI_CW_OFF': fl(CW_OFF), 'UI_GAP_FROM': fl(GAP_FROM), 'UI_GAP_TO': fl(GAP_TO),
          'UI_GAP_V': fl(GAP_V), 'UI_RUSH_REACH': fl(RUSH_REACH),
@@ -258,8 +259,25 @@ def white_off():
     return [cmd('terminate_overlays'), cmd('outline_shell', 0, 0.0, 0.0, 0.0, 0.0, RIM_WIDTH, 0, 0, 10, 0, 1)]
 
 
+# ui4: Mesh_Visibility by the mesh's INDEX (the game's: NUD mesh order, every costume's model.nud and metal.nud the same,
+# checked), not by its name: v4's by-name commands went through mesh_vis_cave's name walk, which took the unaligned names
+# the model loader packs back to back for "no name" (docs/native-notes.md "Mesh visibility" v3; exe_v46z_ui4 fixes the
+# walk too): the v4 log has Mario_Nohat's command hiding meshes 5-8 (Nohat, Eye, Halfblink1 / 2), Mario_Hair (the
+# sideburns: the black boxes beside the silver hair), the full hair / eye copies and 6 overlays (the silver at 0%) never
+# reached. MESH_INDEX: name -> index, filled by build() from the base's c00 model.nud and the copies' order
+MESH_INDEX = {}
+
+
+def mesh_index(mesh):
+    if mesh in MESH_INDEX:
+        return MESH_INDEX[mesh]
+    return MV.crc32(mesh)                # before build() fills it (the earlier builds compile the scripts' tests)
+
+
 def meshvis(mesh, visible, persist):
-    return cmd('mesh_visibility', 0, MV.crc32(mesh), visible, persist)
+    i = mesh_index(mesh)
+    assert MESH_INDEX == {} or 0 <= i < 256, (mesh, i)
+    return cmd('mesh_visibility', 0, i, visible, persist)
 
 
 P2 = 2            # Mesh_Visibility Persist 2 (exe_v46z_ui2): the mesh's own set state, no override entry (v4)
@@ -286,6 +304,19 @@ def silver_off():
     state), the copies and overlays hidden"""
     return ([meshvis(m, 2, P2) for m in model.HAT + (model.HAIR,) + tuple(SILVER_MESHES[k][0] for k in ('nohat', 'eye'))] +
             [meshvis(SILVER_MESHES[k][1], 0, P2) for k in ('nohat', 'eye')] + [meshvis(o, 0, P2) for o in OVERLAYS])
+
+
+def mesh_indices(base_names):
+    """{name: the game's mesh index} for the meshes the scripts name: his own (the base model's order) and the copies
+    model.costume appends after them (MESHES' copies in order, then the overlays)"""
+    out = {n: i for i, n in enumerate(base_names)}
+    added = [SILVER_MESHES[k][1] for k in SILVER_MESHES] + list(OVERLAYS)
+    for k, n in enumerate(added):
+        out[n] = len(base_names) + k
+    want = [m for m in model.HAT + (model.HAIR,)] + [n for k in SILVER_MESHES.values() for n in k] + list(OVERLAYS)
+    missing = [n for n in want if n not in out]
+    assert not missing, missing
+    return {n: out[n] for n in want}
 
 
 def if_var(var, method, value, body):
@@ -515,12 +546,21 @@ def build(sm_dir, out_dir, ui_skill, ui_se_wav, ts_args):
     rep = effects(ts_args['sh']['fd']['cb']['gf']['cmn_vfx'], os.path.join(fdir, 'effect', 'supamario'))
     sound_bank(fdir, out_dir, ui_se_wav)
     import nud
-    OVERLAYS[:] = [o['name'] for o in model.overlays(nud.read(os.path.join(sm_dir, 'model', 'body', 'c00', 'model.nud')))]
+    base_meshes = nud.read(os.path.join(sm_dir, 'model', 'body', 'c00', 'model.nud'))
+    OVERLAYS[:] = [o['name'] for o in model.overlays(base_meshes)]
+    MESH_INDEX.clear()
+    MESH_INDEX.update(mesh_indices([m.name for m in base_meshes]))
     scripts(os.path.join(fdir, 'script', 'animcmd', 'body'))
     GB.msc(os.path.join(fdir, 'script', 'msc', 'supamario.mscsb'))
     silver = model.build(sm_dir, fdir)
     for c, rep_c in silver.items():
         assert list(rep_c['overlays']) == OVERLAYS, (c, 'the overlays differ from c00\'s: the scripts name c00\'s')
+        for fn in ('model.nud', 'metal.nud'):
+            path = os.path.join(fdir, 'model', 'body', c, fn)
+            if os.path.exists(path):
+                names = [m.name for m in nud.read(path)]
+                bad = [(n, i) for n, i in MESH_INDEX.items() if i >= len(names) or names[i] != n]
+                assert not bad, (c, fn, bad[:3], 'the scripts\' mesh indices name other meshes')
     doc = {'silver': {'colours': model.SILVER, 'sheen': model.SHEEN, 'meshes': model.MESHES, 'overlays': OVERLAYS,
                       'costumes': silver},
            'frames': {m: anim.frames_of(m) for m in anim.MOTIONS}, 'strike_at': STRIKE_AT,
@@ -528,6 +568,7 @@ def build(sm_dir, out_dir, ui_skill, ui_se_wav, ts_args):
            'events': {'snd_start': SND_START, 'snd_success': SND_SUCCESS, 'fx_start': FX_START_AT,
                       'fx_aura': FX_AURA_AT, 'fx_burst': FX_BURST_AT},
            'fx_ids': {k: '0x%08X' % v for k, v in FX_IDS.items()}, 'se_ids': {k: '0x%08X' % v for k, v in SE_IDS.items()},
+           'mesh_index': dict(MESH_INDEX),
            'fx': rep, 'source': {m: info['info'][m]['source'] for m in anim.MOTIONS}}
     with open(os.path.join(out_dir, 'ultrainstinct.json'), 'w') as fh:
         json.dump(doc, fh, indent=1)

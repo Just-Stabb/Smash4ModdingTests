@@ -88,6 +88,16 @@ SETVIS = 0x034232FC              # the game's mesh visibility setter (MI, mesh, 
 MV_APPLY = 0x04BE4294            # tools/mesh_vis_cave.py's mv_apply in exe_v46z_outline4 (its words asserted)
 MV_APPLY_WORDS = (0x9421FFE0, 0x7C0802A6, 0x90010024, 0x90610010)
 MV_ARR = 0x7DC                   # the instance's per-mesh visibility bytes: [[MI + 0x7DC] + 4] + mesh
+# ui4: Mesh_Visibility's name walk (tools/mesh_vis_cave.py in exe_v46z_outline4) checked the name pointer the mesh's vt
+# +0x2C gives like any heap pointer, 4-aligned too; the model loader copies the names into one buffer back to back
+# (0x036DC8E8: strlen + 1 each), so a name at an unaligned address read as "no name": its mesh was never matched and
+# was taken for a part of the match before it (the v4 log: Mario_Nohat hit meshes 5-8, Mario_Hair / the eye and full
+# hair copies / 6 overlays never). The alignment test (andi. r0, r3, 3) becomes a nop; its bne then never branches
+# (cr0 from the range test just passed). mesh_vis_cave.py's source has the same fix (chk_str)
+WALK_FIX = 0x04BE4200
+WALK_WORDS = {0x04BE41F0: 0x4E800421, 0x04BE41F4: 0x3C03F000, 0x04BE41F8: 0x54000001, 0x04BE41FC: 0x40820040,
+              WALK_FIX: 0x70600003, 0x04BE4204: 0x40820038, 0x04BE4208: 0x88030000}
+NOP = 0x60000000
 
 # --diag (TEST ONLY): OSReport lines through the game's veneer (diag_crumbs_cave.py), no pauses (nothing here can crash
 # the game in a way the lines would explain); the motion -> script lookup's two hooks
@@ -102,7 +112,13 @@ BIND_FROM = 0x02760864           # 0x02BEE560's call in the motion change (r29 t
 LATE_FN = 0x02760DB0             # v5: the script module's per-frame late update (r3 the module, [r3 + 4] its object)
 LATE_HOOK = 0x02E4133C           # its one call (`bl 0x02760DB0`, the accessor's update: r3 = [acc + 0xC4]): S4U4 for
                                  # the fighter whose dodge slot 43 just signalled (0x02760DB0 itself is out of a b's reach)
-DIAG_ORIGINAL = {MHASH_HOOK: 0x38000010, BIND_HOOK: 0x4BFFFE85, LATE_HOOK: 0x4B91FA75}
+EFT_PRINT = 0x04A58A8C           # ui4 diag: the effect runtime's message print ("Emitter is Empty.", "Particle is
+                                 # Empty.", "Emitter Set is Empty.", ...: a no-op in the game's build): to OSReport
+EFT_CAP = 300                    # its lines at most
+EFF_MGR = 0x10353CA4             # ui4 diag S4UF: the effect manager (docs/efc-format.md): 0x032EFEA0(mgr, bank, 0) its
+EFF_SLOT = 0x032EFEA0            # bank's slot index (< 0x7F), slot = mgr + 0xB8 + 0x80 index: +4 the .ptcl's resource,
+UI_BANK = 0x341                  # +8 the .efc file (+8 its entry count: an effect id's index must be below it)
+DIAG_ORIGINAL = {MHASH_HOOK: 0x38000010, BIND_HOOK: 0x4BFFFE85, LATE_HOOK: 0x4B91FA75, EFT_PRINT: 0x9421FF90}
 DIAG_LATE_N = 8                  # S4U4 lines after a dodge signal (that many frames of his)
 DIAG_CAP = 1500                  # lines of S4UM / S4UB at most (the UI motions' lines always)
 DIAG_MOTIONS = (0x229, 0x231, 0x235, 0x239, 0x241, 0x245)   # S4UM always (Fake Death's / Sledgehammer's: controls)
@@ -111,11 +127,12 @@ DIAG_HASHES = ('speciallwlight', 'speciallwheavy', 'specialairlwlight', 'special
 DIAG_FMTS = [
     ('f42', 'S4U2 st=%X grp=%d cat=%d obj=%08X flags=%08X x=%08X y=%08X\n'),
     ('f42c', 'S4U5 chain n=%d %08X %08X %08X %08X\n'),
-    ('f43', 'S4U3 st=%X t0=%08X found=%d att=%08X unc=%d ret=%d\n'),
+    ('f43', 'S4U3 st=%X t0=%08X ret=%d\n'),
     ('fmv', 'S4UV mi=%08X mesh=%d val=%d before=%02X after=%02X\n'),
     ('fmh', 'S4UM kind=%X motion=%X hash=%08X n=%d st=%X\n'),
     ('fbd', 'S4UB hash=%08X found=%d set=%d kind=%X n=%d\n'),
     ('f44', 'S4U4 st=%X t1=%08X t2=%08X mode=%08X left=%d\n'),
+    ('fef', 'S4UF bank=%X slot=%d entries=%d res=%d motion=%X\n'),
 ]
 FIGHTERS = 0x1035184C            # [[FIGHTERS] + 0]: +0 the entries, +8 their count (acmd_ext_cave.py)
 FIGHTER_ENTRY = 0x76B0           # entry: +0 object id, +0xC accessor, byte +0x1E >= 4 live
@@ -231,6 +248,7 @@ D43 = {'d43_zero': """
        'd43_sig': """
         lis r11, ui_drec@ha
         addi r11, r11, ui_drec@l
+        stw r26, 0x30(r11)
         stw r31, 0x28(r11)
         li r0, """ + str(DIAG_LATE_N) + """
         stw r0, 0x2C(r11)""",
@@ -286,6 +304,7 @@ ui_d42w:
         addi r11, r11, ui_drec@l
         li r0, 0
         stw r0, 0x20(r11)
+        stw r0, 0x30(r11)
         bl slot42
         lwz r5, 0x14(r1)
         lwz r12, 0x10(r5)               # the record
@@ -301,6 +320,10 @@ ui_d42w:
         lwz r11, 4(r11)                 # status work
         lwz r8, 0x14(r11)
         lwz r8, 0(r8)                   # its flags word (0x21000010 = 0x00010000, 11 = 0x20000, 12 = 0x40000)
+        lis r12, ui_drec@ha
+        addi r12, r12, ui_drec@l
+        lwz r0, 0x30(r12)               # ui4: | 0x321 / 0x322 when the autododge signalled TIMER_1 / TIMER_2
+        or r8, r8, r0
         lwz r11, 4(r11)
         lwz r9, %(ftx)d(r11)            # the X / Y written (float bits)
         lwz r10, %(fty)d(r11)
@@ -350,9 +373,7 @@ ui_d43w:
         lis r11, ui_drec@ha
         addi r11, r11, ui_drec@l
         lwz r5, 0(r11)
-        lwz r6, 8(r11)
-        lwz r7, 4(r11)
-        lwz r8, 0xC(r11)
+        mr r6, r9
         lis r3, ui_f43@ha
         addi r3, r3, ui_f43@l""" + OSR + """
         lwz r3, 0x18(r1)
@@ -418,6 +439,42 @@ dmh_log:
         lwz r8, 0x48(r12)
         lis r3, ui_fmh@ha
         addi r3, r3, ui_fmh@l""" + OSR + """
+        lwz r8, 0x14(r1)                # ui4: the transformation's / Secret Sensation's motion: S4UF, his effect
+        cmpwi r8, 0x%(mot_form)X        # bank's .efc entry count as the game holds it (an id 0x0341nnnn needs nnnn
+        beq dmh_ef                      # below it)
+        cmpwi r8, 0x%(mot_ss)X
+        bne dmh_out
+dmh_ef: lis r3, %(efm_hi)d
+        ori r3, r3, %(efm_lo)d
+        lwz r3, 0(r3)
+        cmpwi r3, 0
+        beq dmh_out
+        stw r3, 0x1C(r1)
+        li r4, %(bank)d
+        li r5, 0
+        lis r12, %(efs_hi)d
+        ori r12, r12, %(efs_lo)d
+        mtctr r12
+        bctrl
+        mr r5, r3
+        li r6, -1
+        li r7, -1
+        cmplwi r3, 0x7F
+        bge dmh_efp
+        slwi r12, r3, 7
+        lwz r11, 0x1C(r1)
+        add r12, r12, r11
+        addi r12, r12, 0xB8
+        lwz r7, 4(r12)                  # the .ptcl's resource
+        lwz r11, 8(r12)                 # the .efc
+        cmpwi r11, 0
+        beq dmh_efp
+        lha r6, 8(r11)
+dmh_efp:
+        li r4, %(bank)d
+        lwz r8, 0x14(r1)
+        lis r3, ui_fef@ha
+        addi r3, r3, ui_fef@l""" + OSR + """
 dmh_out:
         lwz r3, 0x18(r1)
         lwz r0, 0x34(r1)
@@ -497,6 +554,24 @@ dl_orig:
         ori r12, r12, %(late_lo)d
         mtctr r12
         bctr
+
+# ui4: the effect runtime's message print (b from 0x04A58A8C, its first word): OSReport with the same arguments (r3 the
+# format, r4-r10, cr1 as the caller set it), at most EFT_CAP lines; then the game's no-op as before
+ui_deft:
+        lis r11, ui_drec@ha
+        addi r11, r11, ui_drec@l
+        lwz r12, 0x34(r11)
+        cmplwi r12, %(eft_cap)d
+        bge deft_orig
+        addi r12, r12, 1
+        stw r12, 0x34(r11)
+        lis r12, %(osr_hi)d
+        ori r12, r12, %(osr_lo)d
+        mtctr r12
+        bctr                            # OSReport returns to the print's caller
+deft_orig:
+        stwu r1, -0x70(r1)              # the replaced word
+        b 0x%(eft_back)08X
 
 # ui_dmot(r5 a motion): r3 1 when it is one of DIAG_MOTIONS. Leaf: r0, r3, r12
 ui_dmot:
@@ -586,7 +661,9 @@ def build(kind_id=None, diag=False):
              osr_hi=OSREPORT_VENEER >> 16, osr_lo=OSREPORT_VENEER & 0xFFFF, mhf_hi=MHASH_FROM >> 16,
              mhf_lo=MHASH_FROM & 0xFFFF, mh_back=MHASH_HOOK + 4, bind_hi=BIND_FN >> 16, bind_lo=BIND_FN & 0xFFFF,
              bdf_hi=BIND_FROM >> 16, bdf_lo=BIND_FROM & 0xFFFF, cap=DIAG_CAP, late_n=DIAG_LATE_N,
-             late_hi=LATE_FN >> 16, late_lo=LATE_FN & 0xFFFF, **calls)
+             late_hi=LATE_FN >> 16, late_lo=LATE_FN & 0xFFFF, efm_hi=EFF_MGR >> 16, efm_lo=EFF_MGR & 0xFFFF,
+             efs_hi=EFF_SLOT >> 16, efs_lo=EFF_SLOT & 0xFFFF, bank=UI_BANK, eft_cap=EFT_CAP, eft_back=EFT_PRINT + 4,
+             mot_form=0x231, mot_ss=0x245, **calls)
     p.update({k: (v if diag else '') for k, v in D43.items()})
     a.asm(("""
 # ---- 1. setup (r3 spec, r4 fighter, r5 = whatever: the replaced word sets 1)
@@ -633,8 +710,15 @@ slot42: lwz r12, %(kind_at)d(r4)
         lwz r11, %(st)d(r12)
         lwz r11, 0x48(r11)              # status kind: 0x155 (the transformation, Secret Sensation; v5)
         cmpwi r11, %(st_ss)d
-        bnelr
-        lwz r11, %(work)d(r12)
+        beq s42_ss
+        cmplwi r11, %(dhi)d             # ui4: the autododge (the shape is on in Wait / Walk / WalkBrake / Squat ..
+        ble s42_dg                      # SquatRv while transformed: his MSC's ui_tick)
+        cmpwi r11, %(sqlo)d
+        bltlr
+        cmpwi r11, %(sqhi)d
+        bgtlr
+        b s42_dg
+s42_ss: lwz r11, %(work)d(r12)
         lwz r11, 8(r11)
         lwz r11, 4(r11)                 # status work
         lwz r10, 0x14(r11)
@@ -650,9 +734,11 @@ slot42: lwz r12, %(kind_at)d(r4)
         mr r29, r11                     # status work
         lwz r28, 0x10(r5)               # the collision record
         li r25, 0                       # flag bits to add
-        lbz r0, 0x1C(r28)               # the attacker's category: 0 fighter, 1 weapon, 2 item, 3 gimmick
-        cmplwi r0, 3                    # Secret Sensation: anything an opponent owns (0-2), never a gimmick
-        bge out42
+        lbz r0, 0x1C(r28)               # the attacker's category (id >> 28): 0 fighter, 1 weapon, 4 item (ui4: the
+        cmplwi r0, 3                    # Killer Eye's 0x4001000x in the v4 log; 2 kept), 3 a gimmick: Secret
+        beq out42                       # Sensation answers anything an opponent owns, never a gimmick
+        cmplwi r0, 4
+        bgt out42
         lwz r3, %(work)d(r31)           # the transformation (v5: 0x155 with TIMER_4 > MODE_FORM_ON): XV2's
         bl ui_isform                    # CounterMelee only (a fighter's own attack)
         cmpwi r3, 0
@@ -794,6 +880,95 @@ out42:  lmw r24, 0x40(r1)
         addi r1, r1, 0x60
         blr
 
+# ui4: the AUTODODGE (r4 fighter, r5 message, r12 his module block; Wait / Walk / WalkBrake / Squat .. SquatRv).
+# v1-v4 waited for slot 43, taking it for the body's damage event: it is event 0x12, the shield DAMAGE that follows a
+# shield hit (the v4 log: slot 43 ran only right after slot 42, never for DK's punches on his body; the body hit is
+# events 0xB / 0xC, 0x02E2AFBC / 0x02E2B59C, no specializer veto). So his MSC keeps the counter shape on in these
+# statuses while transformed, and a hit on it here is the dodge: transformed (TIMER_0 > FORM_ON through his
+# WorkModule's get_float), any object's hit (the shape blocks whatever reaches it: nothing is absorbed without a
+# dodge), the side from the hitting object's place (Marth's side function when it is gone): TIMER_1 (it is to his
+# right) or TIMER_2 = DODGE_SIGNAL, the other 0, through set_float. Nothing in the status work (a normal status's)
+s42_dg: stwu r1, -0x60(r1)
+        mflr r0
+        stw r0, 0x64(r1)
+        stmw r24, 0x40(r1)
+        mr r31, r12                     # the module block
+        mr r30, r5                      # message
+        lwz r29, %(work)d(r31)          # his WorkModule
+        mr r3, r29                      # transformed: TIMER_0 > FORM_ON
+        lis r4, %(vform_hi)d
+        ori r4, r4, %(vform_lo)d
+        lwz r12, 0(r3)
+        lwz r12, 0x44(r12)
+        mtctr r12
+        bctrl%(d43_t0)s
+        lis r12, ui_form@ha
+        lfs f0, ui_form@l(r12)
+        fcmpu cr0, f1, f0
+        ble dg_out
+        lwz r28, 0x10(r30)              # the collision record: +0x18 the object that hit him
+        lis r3, %(mgr_ha)d
+        lwz r3, %(mgr_lo)d(r3)
+        addi r4, r1, 0x18
+        lwz r5, 0x18(r28)
+        li r6, 0""" + call('handle') + """
+        addi r3, r1, 0x18
+        bl ui_side_of                   # 0x10(r1) = +1.0: the object to his right
+        cmpwi r3, 0
+        beq dg_sig
+        lwz r3, 8(r30)                  # gone: Marth's side (the attacker's AttackModule's hit data)
+        lwz r12, 0(r3)
+        lwz r12, 0x194(r12)
+        lbz r4, 0x26(r28)
+        lbz r5, 0x29(r28)
+        mtctr r12
+        bctrl
+        lis r12, ui_one@ha
+        lfs f1, ui_one@l(r12)
+        mr. r27, r3
+        beq dg_one
+        lwz r3, %(sidemod)d(r31)
+        lwz r4, 8(r30)
+        mr r5, r27
+        lbz r6, 0x26(r28)
+        lbz r7, 0x29(r28)
+        lfs f1, 0x18(r30)
+        lfs f2, 0x1C(r30)""" + call('side') + """
+dg_one: stfs f1, 0x10(r1)
+dg_sig: lfs f1, 0x10(r1)
+        li r26, %(vr_lo)d               # to his right: TIMER_1
+        li r27, %(vl_lo)d
+        lis r12, ui_zero@ha
+        lfs f0, ui_zero@l(r12)
+        fcmpu cr0, f1, f0
+        bgt dg_set
+        li r26, %(vl_lo)d               # to his left: TIMER_2
+        li r27, %(vr_lo)d
+dg_set:%(d43_sig)s
+        mr r3, r29                      # set_float(WM, 4.0, the side's timer)
+        lis r4, %(vform_hi)d
+        or r4, r4, r26
+        lis r12, ui_sig@ha
+        lfs f1, ui_sig@l(r12)
+        lwz r12, 0(r3)
+        lwz r12, 0x4C(r12)
+        mtctr r12
+        bctrl
+        mr r3, r29                      # the other side's timer 0
+        lis r4, %(vform_hi)d
+        or r4, r4, r27
+        lis r12, ui_zero@ha
+        lfs f1, ui_zero@l(r12)
+        lwz r12, 0(r3)
+        lwz r12, 0x4C(r12)
+        mtctr r12
+        bctrl
+dg_out: lmw r24, 0x40(r1)
+        lwz r0, 0x64(r1)
+        mtlr r0
+        addi r1, r1, 0x60
+        blr
+
 # ui_side_of(r3 &handle; r31 his module block; caller's frame at r1): 0 and 0x10(caller r1) = +-1.0 (the object to
 # his right: +1), 0x28 / 0x2C(caller r1) its X / Y, when the object exists; else non-zero, nothing written.
 # (r24-r31 kept; a leaf frame of its own)
@@ -825,8 +1000,8 @@ uso_out:
         addi r1, r1, 0x20
         blr
 
-# ui_id_ok(r3 an object id): r3 non-zero when it is an object of category 0-2 (fighter, weapon, item): not none
-# (0x50000000), not -1, not a stage gimmick (3). Leaf: r0, r3
+# ui_id_ok(r3 an object id): r3 non-zero when it is an object of category 0, 1, 2 or 4 (fighter, weapon, ui4: item 4;
+# 2 kept): not none (0x50000000), not -1, not a stage gimmick (3). Leaf: r0, r3
 ui_id_ok:
         cmpwi r3, -1
         beq uio_no
@@ -834,7 +1009,9 @@ ui_id_ok:
         cmpw r3, r0
         beq uio_no
         rlwinm r0, r3, 4, 28, 31
-        cmplwi r0, 2
+        cmplwi r0, 3
+        beq uio_no
+        cmplwi r0, 4
         bgt uio_no
         li r3, 1
         blr
@@ -907,160 +1084,33 @@ slot43: li r3, 1
         bne handled
         li r3, 1
         blr
-s43_dodge:
-        cmplwi r11, %(dhi)d
+s43_dodge:                              # ui4: the autododge's statuses (the shape on while transformed): the shield
+        cmplwi r11, %(dhi)d             # damage that follows the shape's hit skipped (no guard damage / stun)
         ble s43_go                      # Wait, Walk, WalkBrake
         cmpwi r11, %(sqlo)d
         bltlr
         cmpwi r11, %(sqhi)d
         bgtlr                           # Squat .. SquatRv
-s43_go: stwu r1, -0x70(r1)
+s43_go: stwu r1, -0x20(r1)
         mflr r0
-        stw r0, 0x74(r1)
-        stmw r17, 0x2C(r1)%(d43_zero)s
-        mr r31, r12                     # the module block
-        mr r30, r5                      # message
-        lwz r29, %(work)d(r12)          # his WorkModule
-        lwz r28, 0(r4)                  # his object id
-        mr r3, r29                      # transformed: TIMER_0 > FORM_ON
+        stw r0, 0x24(r1)
+        stw r5, 0x10(r1)
+        lwz r3, %(work)d(r12)           # transformed: TIMER_0 > FORM_ON
         lis r4, %(vform_hi)d
         ori r4, r4, %(vform_lo)d
         lwz r12, 0(r3)
         lwz r12, 0x44(r12)
         mtctr r12
         bctrl%(d43_t0)s
+        lwz r5, 0x10(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
         lis r12, ui_form@ha
         lfs f0, ui_form@l(r12)
+        li r3, 1
         fcmpu cr0, f1, f0
-        ble s43_no
-        # a fighter whose hit records hold him
-        lis r12, %(fts_ha)d
-        lwz r12, %(fts_lo)d(r12)
-        cmpwi r12, 0
-        beq s43_no
-        lwz r12, 0(r12)
-        cmpwi r12, 0
-        beq s43_no
-        lwz r27, 0(r12)                 # entries
-        lwz r26, 8(r12)                 # count
-        cmpwi r27, 0
-        beq s43_no
-        cmplwi r26, %(maxf)d
-        ble s43_cnt
-        li r26, %(maxf)d
-s43_cnt:
-        li r25, 0                       # entry index
-s43_floop:
-        cmpw r25, r26
-        bge s43_no
-        mulli r24, r25, %(entry)d
-        add r24, r27, r24               # the entry
-        addi r25, r25, 1
-        lbz r0, 0x1E(r24)
-        cmplwi r0, 4
-        blt s43_floop                   # not live
-        lwz r0, 0(r24)
-        cmpw r0, r28
-        beq s43_floop                   # himself
-        lwz r23, 0xC(r24)               # its accessor
-        cmpwi r23, 0
-        beq s43_floop
-        lwz r22, %(batk)d(r23)          # its AttackModule
-        cmpwi r22, 0
-        beq s43_floop
-        lwz r0, 0x4C(r22)               # records on
-        cmpwi r0, 0
-        beq s43_floop
-        lwz r21, 0x18(r22)              # parts in use
-        cmplwi r21, %(maxp)d
-        ble s43_pn
-        li r21, %(maxp)d
-s43_pn: lwz r20, 0x14(r22)              # the per-part collision groups
-        cmpwi r20, 0
-        beq s43_floop
-        li r19, 0                       # part
-s43_ploop:
-        cmpw r19, r21
-        bge s43_floop
-        mulli r18, r19, 0x174
-        add r18, r20, r18
-        addi r17, r18, 0x124            # the sentinel
-        lwz r18, 0x128(r18)             # the first node
-        li r0, %(maxn)d
-        mtctr r0
-s43_nloop:
-        cmpwi r18, 0
-        beq s43_pnext
-        cmpw r18, r17
-        beq s43_pnext
-        lwz r0, 0x18(r18)               # the object it hit
-        cmpw r0, r28
-        beq s43_found
-        lwz r18, 4(r18)
-        bdnz s43_nloop
-s43_pnext:
-        addi r19, r19, 1
-        b s43_ploop
-s43_found:%(d43_found)s
-        mr r3, r22                      # its hit data: vt +0x194(id, part)
-        lwz r12, 0(r3)
-        lwz r12, 0x194(r12)
-        lbz r4, 0x27(r18)
-        mr r5, r19
-        mtctr r12
-        bctrl
-        cmpwi r3, 0
-        beq s43_side
-        lbz r0, 0x54(r3)%(d43_unc)s
-        cmpwi r0, 0
-        bne s43_no                      # can't be countered: no dodge
-s43_side:
-        lwz r3, %(bpost)d(r23)          # its place: [acc + 0x18] vt +0x44 -> the position
-        cmpwi r3, 0
-        beq s43_no
-        lwz r12, 0(r3)
-        lwz r12, 0x44(r12)
-        mtctr r12
-        bctrl
-        lfs f0, 0(r3)                   # its X
-        lwz r12, %(posture)d(r31)
-        lfs f13, 0x10(r12)              # his X
-        li r26, %(vr_lo)d               # to his right: TIMER_1
-        li r27, %(vl_lo)d
-        fcmpu cr0, f13, f0
-        blt s43_sig
-        li r26, %(vl_lo)d               # to his left: TIMER_2
-        li r27, %(vr_lo)d
-s43_sig:%(d43_sig)s
-        mr r3, r29                      # set_float(WM, 4.0, the side's timer)
-        lis r4, %(vform_hi)d
-        or r4, r4, r26
-        lis r12, ui_sig@ha
-        lfs f1, ui_sig@l(r12)
-        lwz r12, 0(r3)
-        lwz r12, 0x4C(r12)
-        mtctr r12
-        bctrl
-        mr r3, r29                      # the other side's timer 0
-        lis r4, %(vform_hi)d
-        or r4, r4, r27
-        lis r12, ui_zero@ha
-        lfs f1, ui_zero@l(r12)
-        lwz r12, 0(r3)
-        lwz r12, 0x4C(r12)
-        mtctr r12
-        bctrl
-        lbz r0, 8(r30)                  # the handled bit
-        ori r0, r0, 1
-        stb r0, 8(r30)
-        li r3, 0
-        b s43_out
-s43_no: li r3, 1
-s43_out:
-        lmw r17, 0x2C(r1)
-        lwz r0, 0x74(r1)
-        mtlr r0
-        addi r1, r1, 0x70
+        bgt handled
         blr
 
 handled:
@@ -1096,7 +1146,7 @@ isf_out:
 """ + (DIAG_TAIL if diag else RELEASE_TAIL)) % p)
     if diag:
         import zlib
-        a.asm('ui_drec:' + '\n        .word 0' * 12)
+        a.asm('ui_drec:' + '\n        .word 0' * 16)
         a.asm('ui_dmots:' + ''.join('\n        .word 0x%X' % m for m in DIAG_MOTIONS) + '\n        .word -1')
         a.asm('ui_dhash:' + ''.join('\n        .word 0x%08X' % (zlib.crc32(h.encode()) & 0xFFFFFFFF)
                                     for h in DIAG_HASHES) + '\n        .word 0')
@@ -1152,6 +1202,8 @@ def patches(kind_id=None, diag=False):
     if diag:
         out[BIND_HOOK] = branch(BIND_HOOK, labels['ui_dbind']) | 1
         out[LATE_HOOK] = branch(LATE_HOOK, labels['ui_dlate']) | 1
+        out[EFT_PRINT] = branch(EFT_PRINT, labels['ui_deft'])
+    out[WALK_FIX] = NOP                 # ui4: Mesh_Visibility's name walk takes unaligned names
     return out
 
 
@@ -1170,6 +1222,7 @@ def check_base(rpx):
     want = dict(ORIGINAL)
     want.update(DIAG_ORIGINAL)
     want.update({MV_APPLY + 4 * i: w for i, w in enumerate(MV_APPLY_WORDS)})
+    want.update(WALK_WORDS)
     bad = ['0x%08X: 0x%08X' % (a, img.w(a)) for a, w in want.items() if img.w(a) not in (w, p.get(a, w))]
     bad += ['veneer 0x%08X' % (OSREPORT_VENEER + 4 * i) for i, w in enumerate(VENEER_WORDS)
             if w is not None and img.w(OSREPORT_VENEER + 4 * i) != w]

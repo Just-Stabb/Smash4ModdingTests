@@ -3984,3 +3984,104 @@ fired; Secret Sensation blocked a Killer Eye's shot (placed by Donkey Kong) with
   `supamario_sledgehammer_test` 141, `supamario_corebreaker_test` 104, `supamario_fakedeath_test` 47 ok;
   `msc_stack_check` 0 of 2483; `import_call_check` 0 on both exes; `fighter_texture_ids.py check` 0 errors; both exes
   reproduced byte for byte from the cave script.
+
+## Ultra Instinct v5 (`supamario_ultrainstinct_v5.zip`, exe `exe_v46z_ui4`; TEST ONLY `exe_v46z_ui4_diag`; Sm4shCommand v1.7.19)
+Install over v4, with the new executable (exe_v46z_ui4 = exe_v46z_outline4 + `tools/supamario_ui_cave.py`, reproduced
+byte for byte by it). The user's v4 test (the release exe confirmed by its RPX hash) and the diag log (exe_v46z_ui3_diag,
+RPX hash 0946ac90: a transformation, 3 punches by DK while transformed, Secret Sensation 3 x against Dr. Mario's capsule
+and 3 x against a Killer Eye's shot): every automated test passed, yet the silver showed at 0%, black boxes beside the
+silver hair, no effect / white glow, no autododge, Secret Sensation never reached a Killer Eye's owner. Each cause below
+is from the log, read against the game's code; each has a test that fails on v4's files / code.
+
+### 1 + 2. The silver at 0% and the black boxes: Mesh_Visibility's name search missed most names
+- **Evidence (the log's S4UV lines, one per mesh the cave's Persist 2 wrote):** Entry / Wait1's "his own look" (4 meshes
+  to follow, 12 copies to hide) wrote meshes 4-8 (val 2) and 40-45 (val 0); the transformation's cap-off (Mario_Hathead
+  0, Mario_Hair 0, Mario_Nohat 1) wrote mesh 4 = 0 and meshes **5, 6, 7, 8 = 1**; nothing ever reached mesh 32
+  (Mario_Hair) or 34-39 (the silver full hair / eyes and the FaceN / Furafura / Damageflyfront mustaches, the FaceN
+  brows). The bytes before each write (4 EE shown, 5 22 hidden, 6 66 shown, 7 / 8 22) are model.nud's order (Hathead,
+  Nohat, Eye, Halfblink1 / 2), so the indices are right and the NAME search is what went wrong.
+- **Cause:** `tools/mesh_vis_cave.py`'s walk checks the name pointer a mesh's vt +0x2C gives with `chk`, the plausible
+  heap pointer test, which also requires 4-alignment. The game's model loader copies a model's mesh names into one
+  buffer back to back (`0x036DC8E8`, strlen + 1 each; sized by `0x036DB424`), so most names start at an odd address:
+  the walk took them for "no name", never matched them, and (v2's multi-part rule) treated them as unnamed parts of the
+  mesh matched just before. Laid out from the buffer's start, the names at 4-aligned addresses are exactly meshes 0, 4,
+  5, 9, 13, 26, 29, 30, 40-43: Nohat (5) matched and swept 6-8 (unaligned) along until Halfblink3 (9, aligned);
+  OuchBrowsUI .. AttackBrowsUI (40-43) matched, Attack's run swept 44 / 45; everything at 32 and 34-39 is unaligned.
+  So untransformed the silver full hair, eyes and FaceN mustache / brows (34-39) kept their default state (follow the
+  animation, shown by their tracks): **the silver at 0%**; transformed, Mario_Hair (32, the brown sideburns, which the
+  vanilla side taunt hides whenever it shows Mario_Nohat) was never hidden and poked out at the silver hair's edges:
+  **the black boxes**. (v3's "the hair never changed" was the same search.)
+- **Fix:** (a) the scripts name every mesh by **index** (`supamario_ui_build.MESH_INDEX`: his own from the base c00
+  model.nud, the copies after them in the order `supamario_ui_model` appends them; the build asserts every costume's
+  model.nud / metal.nud has those names at those indices; `ultrainstinct.json` "mesh_index"): the index form never
+  searches names. (b) The search itself: exe_v46z_ui4 nops the alignment test (`WALK_FIX` 0x04BE4200, `andi. r0, r3, 3`;
+  the next `bne` then never branches), and `mesh_vis_cave.py` builds it the same way (`chk_str`); Sm4shCommand v1.7.19's
+  Mesh_Visibility help says what changed and example 9 shows the index form.
+- **Tests that would have caught it:** `mesh_vis_test.py` "v3: names packed back to back" (the loader's layout, 4 of 5
+  names unaligned: v4's walk finds 1 of 5); `supamario_ui_test.py`: every UI Mesh_Visibility by index, each index naming
+  its mesh in every costume's model.nud / metal.nud; `supamario_ui_cave_test.py`: the walk's word.
+
+### 3. No effects, no white glow: the installed effect files were not the Ultra Instinct build's
+- **Evidence:** the log's S4UB lines for Secret Sensation's motion 0x245 (SpecialAirLwHeavy, hash 064F2A11): sets 0-2
+  found, **set 3 (effect) not found**. The build's effect.bin has a script for it (empty, `Script_End`: v2's); Time
+  Skip v10's / vanilla Mario's effect.bin has none. So the effect.bin in the user's install is an older one, not v2's
+  (which carried every Ultra Instinct effect script). SpecialLwLight's "found" in all four sets is no proof: vanilla
+  Mario has F.L.U.D.D. effect / sound scripts under that hash. The MSC aura (EffectModule 0x2717 with ids 0x6E-0x70,
+  no script involved) showing nothing either fits an older .efc: Time Skip v10's has entries 0-0x6B, so any id
+  0x0341006C-73 is past `[efc + 8]` and the spawn (`0x0334D8D8`) returns at once; Time Skip's own effects (0x65-0x6B)
+  draw. v3 and v4 shipped neither effect.bin, sound.bin, expression.bin nor the .efc (only v1 / v2 did), so whatever
+  later replaced them (a reinstall of an earlier package) was never undone.
+- **Fix:** v5 ships every file the Ultra Instinct build changes over Time Skip v10's (scripts, .efc / .ptcl, motions,
+  the sound bank and soundlabeltable, MSC, models, vl params), so it installs complete over v4 whatever came before.
+  `supamario_ui_test.py`: the package holds every file of the build that differs from Time Skip v10's output.
+- **Diag (decisive next time):** **S4UF** `bank=341 slot entries res motion` at the transformation's and Secret
+  Sensation's motion change: the .efc entry count as the game holds it (0x74 = v5's; 0x6C = Time Skip's: ids 0x6C+ can't
+  spawn) and the .ptcl resource; the effect runtime's own messages ("Emitter is Empty.", "Particle is Empty.", "Emitter
+  Set is Empty.", ...: `0x04A58A8C`, a no-op in the game's build) now go to the log (at most 300 lines).
+
+### 4. The autododge never fired: slot 43 is not the body's damage
+- **Evidence:** 3 punches on him while transformed, no S4U3 line; the only S4U3 lines follow an S4U2 (a hit on Secret
+  Sensation's shape) at the same timestamp.
+- **Cause (the game's code):** the fighter's event registrations (`0x02E14288`..., `0x02E3C1BC(listener, id, r5,
+  {flags, fn})`): event 0x10 = `0x02E35794` (the shield hit: slot 42), **event 0x12 = `0x02E35EE4` (slot 43): the shield
+  DAMAGE** that follows a shield hit; a body hit's damage is events 0xB / 0xC (`0x02E2AFBC` / `0x02E2B59C`), which add the
+  damage (`0x02E29C28`) before asking any specializer slot, and never ask 42 / 43 (slot 56 afterwards: Kirby's "lose the
+  copy when hit"). v1's reading ("the damage event 0x02E35EE4, event id 0x12": edge_counter's note) was wrong; the
+  unicorn tests modelled slot 43 as the damage event, so they passed. (S4U3's t0 = 0 in 0x155 was not a broken read:
+  0x155 never read TIMER_0.)
+- **Fix:** the autododge detects the hit with the counter shape, the mechanism the log proves works (Secret Sensation's
+  S4U2 lines). His MSC (`ui_shape` from `ui_tick`, TIMER_5 `0x0F000325` remembering it) keeps the shape on while
+  transformed in Wait / Walk / WalkBrake / Squat .. SquatRv on the ground (off elsewhere, on a KO, at the dodge's start,
+  and into 0x155 until its own windows); a hit on it is slot 42, which now acts in those statuses too: transformed
+  (TIMER_0 > 1500 through get_float), the side from the hitting object's place (Marth's side function if it is gone):
+  TIMER_1 (it is to his right) / TIMER_2 = 4, the other 0; the MSC dodges as before. Slot 43 (the shield damage that
+  follows) returns 0 there (no guard damage / stun). The shape takes the hit, so his body never does. **Changed from
+  the v1 spec (flagged):** a shape blocks whatever reaches it, so projectiles / items reaching it are dodged too
+  (nothing is absorbed without a dodge); grabs still grab (a catch box isn't a hitbox).
+- **Tests:** `supamario_ui_cave_test.py` native checks (the events' registered handlers, 42 / 43 asked by 0x10 / 0x12,
+  0xB / 0xC adding damage before any slot) and the autododge's slot 42 / 43 cases; `supamario_ui_test.py` the shape's
+  switching.
+- **Diag:** S4U2 for the autododge (status 0-2 / 0x11-0x15, group 1) with flags `| 0x321` (TIMER_1 signalled) or
+  `| 0x322` (TIMER_2); S4U4 then logs his status / timers for 8 frames (the dodge status 0x155 with TIMER_4 5 expected);
+  S4U3 `st t0 ret` per shield-damage event (t0 now read in the autododge's statuses).
+
+### 5. Secret Sensation and the Killer Eye: items are category 4
+- **Evidence:** `S4U2 st=155 grp=1 cat=4 obj=40010000 flags=00000000`, then `S4U3 ... ret=1` (x3: 0x40010000-02); Dr.
+  Mario's capsule `cat=1 obj=10140000 flags=00070000`, chain `n=1 00010000` (found).
+- **Cause:** the record's category is the object id's `>> 28`; items are **4** in game (`0x02BF205C`: the object
+  managers `[0x1035184C] + 4 x category`, 0-4), not 2 as edge_counter's note had it. Slot 42 took 0-2 only, so the Killer
+  Eye's hit recorded nothing: the shape just blocked it ("dodges in place").
+- **Fix:** slot 42 (Secret Sensation) and the owner chain take categories 0, 1, 2 and 4 (3 still excluded: a stage
+  gimmick, unverified); the chain's steps (`[acc + 0x6C] + 0x34`, else LinkModule link 0) are the same for an item.
+  Tests: cave_test's category-4 cases (the Killer Eye by +0x34, its shot -> the Killer Eye by link 0 -> DK, an owner of
+  category 5: none). Not confirmed in game: which field a placed Killer Eye fills (the chain tries both; S4U5 shows it).
+
+### Files / tests
+- Files: `supamario.c` (`ui_shape`; `ui_tick` / `ui_dodge_init`), `supamario_ui_build.py` (`MESH_INDEX`, `V_SHAPE`),
+  `supamario_ui_cave.py` (slot 42's autododge `s42_dg`, slot 43's shield-damage skip, categories, `WALK_FIX`, diag
+  S4UF / the effect runtime's messages / S4U3 / S4U2 bits), `mesh_vis_cave.py` (`chk_str`), Sm4shCommand v1.7.19
+  (`acmd_ext_help.py`: Mesh_Visibility's help and example 9; `param_labels.json`, Events.cfg).
+- TESTS_PLACEHOLDER
+- **To do (later, the user):** XV2's common damage file `CMN.bdm` (sent; with CMN.bac / CMN.ean in `ui_in/cmn/`) for
+  the dodge's manual counter (from his spot dodge while transformed, when an opponent's attack came at him during it and
+  attack or special is pressed); the exact UI colours (the CUS aura row); the aura's look in game once it draws.

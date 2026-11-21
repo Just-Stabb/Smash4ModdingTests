@@ -320,6 +320,28 @@ def main():
     check('... a one-part mesh followed by a named one: only it', (r['hits'], drawn(m1)), (1, [0, 1, 1, 1, 1]))
     mv(m1, -1, 0, 0)
 
+    # v3: the names as the game's model loader lays them out (0x036DC8E8: one buffer, back to back, strlen + 1 each:
+    # most are NOT 4-aligned). v2 checked the name pointer like any heap pointer (4-aligned), so an unaligned name read
+    # as "no name": never matched, and swept into the match before it (Supamario's Ultra Instinct v4 log: Mario_Hair,
+    # the eye / full hair copies never reached, Mario_Eye / Halfblink1 / 2 hidden with Mario_Nohat)
+    packed, at = W0 + 0x8000 + 1, []
+    o = packed
+    for i, n in enumerate(NAMES):
+        pm.mem_write(o, n.encode() + b'\0')
+        w32(pm, m1.meshes + 0x10 * i + 4, o)
+        at.append(o)
+        o += len(n) + 1
+    got = []
+    for i, n in enumerate(NAMES):
+        r = mv(m1, MV.crc32(n), 0, 0)
+        got.append((n, r['hits'], drawn(m1)))
+        mv(m1, -1, 0, 0)
+    check('v3: names packed back to back (the game\'s layout; %d of %d unaligned): each found, only its own mesh hidden'
+          % (sum(a % 4 != 0 for a in at), len(NAMES)), got,
+          [(n, 1, [0 if j == i else 1 for j in range(len(NAMES))]) for i, n in enumerate(NAMES)])
+    for i, n in enumerate(NAMES):
+        w32(pm, m1.meshes + 0x10 * i + 4, m1.names + 0x40 * i)
+
     # the clear chain
     mv(m0, MV.crc32('Gamemodel'), 0, 1)
     mv(m1, MV.crc32('stethoscope_VIS_O_OBJ'), 0, 1)

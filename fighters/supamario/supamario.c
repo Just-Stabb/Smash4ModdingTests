@@ -42558,6 +42558,36 @@ void ui_aura()
     EffectModule(0x2717, UI_FX_AURA3, UI_BONE_RFOOT, 0, 0, 0, 0, 0, 0, UI_FOOT_SIZE, 0);
 }
 
+// ui4 (exe_v46z_ui4): the autododge's detection. v1-v4 waited for the cave's slot 43, taken for the body's damage event:
+// in game it is the shield damage that follows a shield hit (the v4 log), so a punch on his body never reached it.
+// Now, transformed, in the autododge's statuses (Wait / Walk / WalkBrake / Squat .. SquatRv on the ground) the counter
+// shape (the cave's ShieldModule group 1, the one Secret Sensation and the transformation use) is ON: a hit on it is
+// the cave's slot 42 (proven in game by Secret Sensation), which writes TIMER_1 / TIMER_2 (the dodge below); the
+// shape takes the hit, so his body never does. Elsewhere (moves, the air, hitstun, a shield, 0x155 until its own
+// windows: the transformation's 30-151, Secret Sensation's 5-30) it is off. TIMER_5 (UI_V_SHAPE) remembers it is
+// on (renewed every frame: it counts down by itself), so the shape is switched only when that changes
+void ui_shape(float st)
+{
+    if (ui_can_dodge(st) != 0 && StopModule(0x1) == 0)
+    {
+        if (WorkModuleF(0, UI_V_SHAPE) < 0.5f)
+        {
+            ShieldModule(0, 0x2, 0, 0x1, 0x1);
+        }
+        WorkModule(0, 3.0f, UI_V_SHAPE);
+        return;
+    }
+    if (ui_can_dodge(st) != 0)
+    {
+        return;                     // in hitlag: kept as it is
+    }
+    if (WorkModuleF(0, UI_V_SHAPE) > 0.5f)
+    {
+        ShieldModule(0, 0x2, 0, 0, 0x1);   // (into 0x155 too: its modes switch it on in their own windows)
+        WorkModule(0, 0.0f, UI_V_SHAPE);
+    }
+}
+
 // every frame (func_82, every status)
 void ui_tick()
 {
@@ -42570,6 +42600,11 @@ void ui_tick()
         if (WorkModuleF(0, UI_V_FORM) > 0.5f)
         {
             ui_aura_off();
+        }
+        if (WorkModuleF(0, UI_V_SHAPE) > 0.5f)
+        {
+            ShieldModule(0, 0x2, 0, 0, 0x1);
+            WorkModule(0, 0.0f, UI_V_SHAPE);
         }
         WorkModule(0, 0.0f, UI_V_FORM);
         WorkModule(0, 0.0f, UI_V_DODGE_R);
@@ -42596,6 +42631,7 @@ void ui_tick()
     {
         return;
     }
+    ui_shape(st);
     n = WorkModuleF(0, UI_V_DODGE_R) + WorkModuleF(0, UI_V_DODGE_L);
     if (n > 0.5f && (st != UI_ST_DODGE_F || ui_mode() != 0x1))
     {
@@ -42796,6 +42832,8 @@ void ui_dodge_init()
     WorkModule(0, 0.0f, UI_V_DODGE_L);
     WorkModule(0, way, 0x0100000D);
     WorkModule(0, UI_MODE_DODGE, UI_V_SS);
+    ShieldModule(0, 0x2, 0, 0, 0x1);            // ui4: the autododge's shape off (ui_shape), intangible instead
+    WorkModule(0, 0.0f, UI_V_SHAPE);
     WorkModule(0, -1.0f, 0x0100000C);    // its loop runs on this frame too: frame 0
     KineticModule(0, 0x6);
     GroundModule(0x2710, 0x2);
