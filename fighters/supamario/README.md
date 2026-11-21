@@ -4701,4 +4701,15 @@ few attacks on him crouching (S4U2 lines: whether the shape is hit) — the pack
 - The crouch dodge (above).
 
 ### Ultra Instinct v11, results
-RESULTS_PLACEHOLDER
+`supamario_ui_test.py --exe --package --since` (v10's build, `--sf-skill`) **608 ok** (with `supamario_sf_test.py`'s 71:
+the charge levels and their frames, the punches' generation and custom numbers, the hold / pull / shield push, the
+projectile's MSC per kind (place, motion, speed, life, facing, walls), its scripts' hitbox fields, its effects, model
+and still motion, his body scripts and motion, XV2's BSA / BAC / BDM against the values, the streaks run on the game's
+vertex programs before / after, the flipbooks, spread and sparkles, the motion table's 0x246 / 0x247); 
+`supamario_ui_cave_test.py` **378 ok** (the exe unchanged, exe_v46z_ui7 / ui7_diag); `supamario_timeskip_test` 198,
+`supamario_godfist_test` 566, `supamario_sledgehammer_test` 141, `supamario_fakedeath_test` 47,
+`supamario_corebreaker_test` 104 ok (their script checks leave out the new custom-move slots too); `outline_shell_test.py`
+124 ok; `mesh_vis_test.py` 64 ok; `eft_vertex_test` 0 failures; `msc_stack_check` 0 of 2503 (globals 127 of 128), the
+projectile's MSC 0 of 48 (27 globals); `fighter_texture_ids.py check` 0 errors; Sm4shCommand v1.7.24 NvTest 290 ok / 1
+known failure (effect.bin's else-if chains, upstream), HvTest 248 ok. 0 failures. No exe change (`import_call_check` not
+needed: exe_v46z_ui7 kept).

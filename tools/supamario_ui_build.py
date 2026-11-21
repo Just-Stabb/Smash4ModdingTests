@@ -1120,6 +1120,9 @@ def v11_fixes(p, cmn_dir, rep):
     for d in FRT_SKILL + SF_SKILL[:1]:
         pkgs.append(xv2vfx.load_package(FX11.pkg_dir(d), strict=False))
     FX11.streak_basis(p, pkgs, rep)
+    import shutil
+    for pk in pkgs:                      # (the temporary package folders: symbolic links only)
+        shutil.rmtree(pk['dir'], ignore_errors=True)
 
 
 def aura_life(p):

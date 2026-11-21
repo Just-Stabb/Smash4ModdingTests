@@ -1696,6 +1696,10 @@ def package_since_tests(zpath, out, prev_out, exe=None):
                 rel = os.path.relpath(os.path.join(root, fn), out)
                 old = os.path.join(prev_out, rel)
                 b = open(os.path.join(out, rel), 'rb').read()
+                if not os.path.exists(old) and BASE_DIR and rel.startswith('fighter/supamario/'):
+                    base = os.path.join(BASE_DIR, os.path.relpath(rel, 'fighter/supamario'))
+                    if os.path.exists(base) and open(base, 'rb').read() == b:
+                        continue        # v11: the install's own file (the fireball's model folder, its .nud apart)
                 if not os.path.exists(old) or open(old, 'rb').read() != b:
                     want['INSTALL_TO_data/' + rel] = b
     data = {n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')}
@@ -1712,7 +1716,9 @@ def package_since_tests(zpath, out, prev_out, exe=None):
     exes = [n for n in ('INSTALL_TO_code/cross_f.rpx', 'TEST_ONLY_INSTALL_TO_code/cross_f.rpx') if n in names]
     check('  the README; both executables or none (v8: the exe unchanged since the previous package, exe_v46z_ui6)',
           ('README.txt' in names, len(exes) in (0, 2)), (True, True))
-    if exe:
+    if exe and not exes:
+        check('v11: the executable unchanged (exe_v46z_ui7, tested with --exe): none in the package', len(exes), 0)
+    elif exe:
         check('v10: the executable changed (exe_v46z_ui7: the world stop, no shield-hit mark): both in the package, '
               'INSTALL_TO_code/cross_f.rpx the one tested (--exe), the TEST ONLY one another build',
               (len(exes), z.read('INSTALL_TO_code/cross_f.rpx') == open(exe, 'rb').read() if exes else None,
