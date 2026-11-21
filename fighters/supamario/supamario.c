@@ -43168,8 +43168,9 @@ void ss_counter()
     KineticModule(0x11, 0x2, 0.0f, 0.0f);
     GroundModule(0x2710, 0);
     func_22(UI_SS_SLIDE_MOT, 0, UI_SS_RATE);                // v10: his own slow motion (the user's "3/4")
-    // v10 (1511_GKS_KTM's release, the DBFZ flash): the stance's charge faded, KiryokuMax's burst on him
+    // v10 (his aura's ki charge let go, the DBFZ flash): the stance's charge faded, KiryokuMax's burst on him
     EffectModule(0x2723, UI_FX_SS_CHARGE, 0, 0);
+    EffectModule(0x2723, UI_FX_SS_CHARGE2, 0, 0);
     EffectModule(0x2710, UI_FX_SS_RELEASE, UI_BONE_HIP, 0, 0, 0, 0, 0, 0, UI_SS_RELEASE_SIZE, 0, 0, 0, 0, 0, 0, 0x1);
     SoundModule(0x2710, UI_SND_VANISH);
     WorkModule(0, UI_SS_STOP_ASK, UI_V_STOP);                // v10: the world stopped (the cave) until he arrives
@@ -43307,6 +43308,7 @@ void ss_end()
     }
     WorkModule(0, 0.0f, UI_V_STOP);
     EffectModule(0x2723, UI_FX_SS_CHARGE, 0, 0);
+    EffectModule(0x2723, UI_FX_SS_CHARGE2, 0, 0);
     WorkModule(0, 0.0f, UI_V_SS);
     ShieldModule(0, 0x2, 0, 0, 0x1);
     WorkModule(0, 0.0f, 0x0f000002);

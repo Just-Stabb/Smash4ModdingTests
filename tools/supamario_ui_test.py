@@ -797,9 +797,10 @@ def ss_tests(r):
     check('v10: the effects: at the read the stance\'s charge faded (0x2723 (KTN_GKS_Loop, 0, 0)) and KiryokuMax\'s burst '
           '(BoostGKS_End) on him; the vanish lines as the dash starts; the vanish lines and his aura\'s burst '
           '(MGT_HENSIN02) where he lands; the charge faded again at the end',
-          fx, [(0, 0x2723, B.fx_id('ss_charge')), (0, 0x2710, B.fx_id('ss_release')), (B.SS_HOLD, 0x2710, B.fx_id('vanish')),
-               (B.SS_SLIDE_N, 0x2710, B.fx_id('vanish')), (B.SS_SLIDE_N, 0x2710, B.fx_id('burst')),
-               (land - read, 0x2723, B.fx_id('ss_charge'))])
+          fx, [(0, 0x2723, B.fx_id('ss_charge')), (0, 0x2723, B.fx_id('ss_charge_2')), (0, 0x2710, B.fx_id('ss_release')),
+               (B.SS_HOLD, 0x2710, B.fx_id('vanish')), (B.SS_SLIDE_N, 0x2710, B.fx_id('vanish')),
+               (B.SS_SLIDE_N, 0x2710, B.fx_id('burst')), (land - read, 0x2723, B.fx_id('ss_charge')),
+               (land - read, 0x2723, B.fx_id('ss_charge_2'))])
     # a KO mid-slide (its end runs) / the status left without its end (stale) / the fallback
     g, vm, zs = ss_run(r, rec=(1.0, 30.0, 0.0, True), at=10, frames=14)
     r.call(vm, 'func_2282')

@@ -231,17 +231,16 @@ FX = [('start', 'BTL_AURA.eepk', 'MGT_HENSIN01.emp', 'BustN', (0.0, 0.0, 0.0), 1
       ('vanish', 'BTL_CMN.eepk', 'SKI_line.emp', 'HipN', (0.0, 0.0, 0.0), 1.0),
       # v7: the sway's (BTL_CMN 493), converted after the others (its id follows; v8: 706's 492 / 230 gone)
       ('sway_line', 'BTL_CMN.eepk', 'SKI_lineX_S.emp', 'TransN', (0.0, 0.0, 0.0), 0.35),
-      # v10 Secret Sensation's startup (the user: "Hopefully we can use [1511_GKS_KTM's] effects for Secret Sensation's
-      # startup to fade away during its recovery"). KTM's BAC (entries 0-3) holds no effect of its own: Aura type 3
-      # (KiaiCharge) on at 25 and off at 469, type 4 (KiryokuMax) at 468, its "CMN" (EEPK type 1) effects 140 / 200 /
-      # 116 (type 1 isn't BTL_CMN: its 116 doesn't exist there; the stage's own debris, XV2-Tools' StageBG) and BPE 10 /
-      # 20 (screen flashes). The aura types are the character's aura_setting.aur row: for the skill's CUS aura 1 (MGT's
-      # transformed aura): aura_setting.aur's aura 51 is Ultra Instinct's (its HenshinStart 806 = the FOK loops, the
-      # parts of 848 the skill plays: the same EMPs), so KiaiCharge = BTL_AURA 803 (KTN_GKS_Loop on the pelvis, x0.6,
-      # LoopCancel: it fades) and KiryokuMax = 804 (BoostGKS_End x0.8 + x0.5 on the pelvis). (Which aura row the skill's
-      # CUS aura (1, MGT's cus entry) selects is XV2's CusAuraData, in the executable; aura 51's content identifies it.)
-      # The charge from the stance's start, faded at its recovery (or at the counter's read, where KiryokuMax's burst
-      # plays: KTM's release)
+      # v10 Secret Sensation's startup (the user: "the Ultra Instinct transformation has a built-in charge skill"; his
+      # XV2 clip ui_in/charge_clip/charge.mp4: transformed, holding ki charge: a tall white-violet flame round him over
+      # the aura, a burst as he lets go). XV2's ki charge is the character's aura row (aura_setting.aur): CMN.bac's
+      # charge entry (453) switches its KiaiCharge on (BAC Aura type 3) and ends with KiryokuMax (type 4) and KiaiCharge
+      # off. The transformed Ultra Instinct's row is aura 51: its HenshinStart 806 is the FOK aura (the same EMPs as the
+      # skill's 848: Aura_LoopFOK, FOK_FootL, Aura_HLoopFOK ...), its KiaiCharge 803 = KTN_GKS_Loop on the pelvis (x0.6,
+      # LoopCancel: it fades), KiryokuMax 804 = BoostGKS_End (x0.8 + x0.5). (Which row the skill's CUS aura 1 (MGT's cus
+      # entry) selects is XV2's CusAuraData, in the executable; aura 51's content identifies it.) The charge from the
+      # stance's start, faded at its recovery (SS_OFF) or at the counter's read, where KiryokuMax's burst plays (the
+      # clip's burst as the charge ends). (1511_GKS_KTM, the user's first pick, is dropped: it plays the same aura types)
       ('ss_charge', 'BTL_AURA.eepk', 'KTN_GKS_Loop.emp', 'HipN', (0.0, 0.0, 0.0), 0.6),
       ('ss_release', 'BTL_AURA.eepk', 'BoostGKS_End.emp', 'HipN', (0.0, 0.0, 0.0), 0.8)]
 FX_V7 = ('sway_line',)
@@ -386,6 +385,7 @@ def msc_values():
               'UI_SS_DASH': fl(SS_DASH), 'UI_SS_HOLD_FRAC': fl(SS_HOLD_FRAC), 'UI_SS_ARRIVE': fl(SS_ARRIVE),
               'UI_SS_STOP_MAX': fl(SS_STOP_MAX), 'UI_SS_RATE': fl(SS_RATE), 'UI_SS_CAM2_AT': fl(SS_CAM2_AT_V10),
               'UI_FX_SS_CHARGE': '0x%X' % fx_id('ss_charge'), 'UI_FX_SS_RELEASE': '0x%X' % fx_id('ss_release'),
+              'UI_FX_SS_CHARGE2': '0x%X' % fx_id('ss_charge_2'),
               'UI_FX_BURST': '0x%X' % fx_id('burst'), 'UI_SS_FX_BURST_SIZE': fl(round(0.9 * SCALE * SS_FX_BURST_SIZE, 3)),
               'UI_SS_RELEASE_SIZE': fl(round(0.8 * SCALE, 3)), 'UI_BONE_TRANS': '0x%X' % BONES['TransN']})
     return v
@@ -640,10 +640,16 @@ def short_rush_scripts():
 
 
 def ss_stance_fx():
-    """v10: Secret Sensation's stance (SpecialAirLwHeavy's effect script): 1511_GKS_KTM's charge (KiaiCharge: KTN_V_Loop,
+    """v10: Secret Sensation's stance (SpecialAirLwHeavy's effect script): his transformed aura's ki charge (KiaiCharge:
+    KTN_GKS_Loop,
     following his pelvis) from its frame 0, faded (Terminate 0: emission stopped, the sprites live out) at its recovery
     (SS_OFF: the counter window's end); the counter's read fades it too (his MSC, ss_counter)"""
-    return timeline([(0, [graphic('ss_charge')]), (SS_OFF, [cmd('terminate_graphic_effect', fx_id('ss_charge'), 0, 0)])])
+    on = [graphic('ss_charge')]
+    off = [cmd('terminate_graphic_effect', fx_id('ss_charge'), 0, 0)]
+    if 'ss_charge_2' in FX_IDS or not FX_IDS:     # KTN_GKS_Loop's 17 emitters: two sets, played together
+        on.append(cmd('external_graphic', fx_id('ss_charge_2'), *on[0].params[1:]))
+        off.append(cmd('terminate_graphic_effect', fx_id('ss_charge_2'), 0, 0))
+    return timeline([(0, on), (SS_OFF, off)])
 
 
 def extra_scripts():
@@ -1018,8 +1024,13 @@ def aura_follow(p, rep):
         q.path = path
         others.append(q)
     n = 0
+    names = []
     for key in FOLLOW_SETS:
         name = 'PtcSupamarioUi' + [x for x in FX if x[0] == key][0][2][:-4]
+        names.append(name)
+        if name + '_2' in rep:
+            names.append(name + '_2')
+    for name in names:
         si = p.find_set(name)
         for e in p.sets[si]['emitters']:
             em = e['data']
@@ -1060,7 +1071,9 @@ def effects(cmn_dir, fx_dir):
                for ep in ('BTL_AURA.eepk', 'BTL_CMN.eepk')]
     batches.append(('BTL_CMN.eepk', [x[2] for x in FX if x[0] in FX_V7]))   # v7: after (the earlier ids kept)
     for ep in ('BTL_CMN.eepk', 'BTL_AURA.eepk'):                        # v10: after (the earlier ids kept)
-        batches.append((ep, [x[2] for x in FX if x[0] in FX_V10 and x[1] == ep]))
+        emps = [x[2] for x in FX if x[0] in FX_V10 and x[1] == ep]
+        if emps:                                                        # (an empty list converts the whole EEPK)
+            batches.append((ep, emps))
     for eepk, emps in batches:
         with tempfile.TemporaryDirectory() as pkg:
             for fn in os.listdir(cmn_dir):
@@ -1072,13 +1085,18 @@ def effects(cmn_dir, fx_dir):
                 made, log = xv2_to_ptcl.convert_package(p, pkg, 'PtcSupamarioUi', emps=emps, strict=False)
             finally:
                 xv2_to_ptcl.TEX_MAX = old
-        by_emp = {}
+        by_emp, by_emp2 = {}, {}
         for si, name, chunk in made:
-            by_emp.setdefault(name.replace('PtcSupamarioUi', '') + '.emp', e.add(si + 1))
+            idx = e.add(si + 1)
+            by_emp.setdefault(name.replace('PtcSupamarioUi', '') + '.emp', idx)
+            if name.endswith('_2'):              # v10: an EMP of more than 16 emitters: its second set (KTN_GKS_Loop)
+                by_emp2[name[len('PtcSupamarioUi'):-2] + '.emp'] = idx
             rep[name] = {'set': si, 'emitters': [en for _b, en, _n in chunk]}
         for key, ep, emp, _bone, _o, _s in FX:
             if ep == eepk and emp in emps:
                 FX_IDS[key] = 0x03410000 | by_emp[emp]
+                if emp in by_emp2:
+                    FX_IDS[key + '_2'] = 0x03410000 | by_emp2[emp]
     nodes = xv2_aura_nodes(cmn_dir)
     aura_refraction(p, rep, nodes)       # v9: XV2's own distortion (v5-v8: haze(), the fireball's, appended)
     aura_colours(p, rep, nodes)          # v9: XV2's two colours (v3-v8: tint_aura, one flat violet)
