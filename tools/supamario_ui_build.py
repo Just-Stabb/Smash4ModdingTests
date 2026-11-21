@@ -976,8 +976,8 @@ def aura_refraction(p, rep, nodes):
 #   keys: Pit's flash1, Ganon's Majinken, Lucas's PK Freeze, Mario's own refraction1_Copy1), every one on the plain
 #   variant follow 1. 10 of the 19 aura emitters were GPU ones (the glows and the refraction): the trail.
 # Now (aura_follow): a GPU emitter gets its program's follow variant (the same key but byte 4 | 0x04 and the same pixel
-# program: Supamario's own shader 8 for the refraction (7's), Pit's shader 13 for the glows (39's): imported from
-# TWIN_PTCL, a vanilla .ptcl) and follow 0 (it reads the live matrix: on him every frame, XV2's PositionUpdate +
+# program: Supamario's own shader 8 for the refraction (7's), Pit's shader 13 for the glows (39's), Rosalina's 59 for
+# KTN_GKS_Loop's streaks (62's): imported from TWIN_PTCL, vanilla .ptcl files) and follow 0 (it reads the live matrix: on him every frame, XV2's PositionUpdate +
 # RotateUpdate); a CPU emitter keeps follow 2 (refreshed every frame). The look (pixel program, colours) unchanged
 AURA_FOLLOW_CPU = 2
 AURA_FOLLOW_GPU = 0
@@ -1177,7 +1177,7 @@ def main():
     if len(a) != 2 or any(k not in opts for k in keys[:13]):
         sys.exit(__doc__)
     if '--twin-ptcl' in opts:
-        TWIN_PTCL[:] = [opts['--twin-ptcl']]     # v10: a vanilla .ptcl holding the aura programs' follow variants
+        TWIN_PTCL[:] = opts['--twin-ptcl'].split(',')   # v10: vanilla .ptcl files holding the programs' follow variants
     gf = {'ean': opts['--ean'], 'cmn_vfx': opts['--cmn-vfx'], 'skill_vfx': opts.get('--skill-vfx'),
           'cmn_se': opts.get('--cmn-se'), 'stb': opts.get('--stb')}
     cb = {'skill': opts['--skill'], 'se_wav': opts['--se-wav'], 'gf': gf}

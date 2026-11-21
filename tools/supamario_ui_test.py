@@ -52,7 +52,7 @@ def check(name, got, want):
         PROBLEMS.append(name)
 
 
-TIMERS = (C.V_FORM, C.V_DODGE_R, C.V_DODGE_L, B.V_AURA, B.V_SS, B.V_SHAPE)   # (v5: TIMER_4, status 0x155's mode, counts
+TIMERS = (C.V_FORM, C.V_DODGE_R, C.V_DODGE_L, B.V_AURA, B.V_SS, B.V_SHAPE, B.V_STOP, B.V_SWAY)   # (v5: TIMER_4, status 0x155's mode, counts
                                                                             # down too; ui4: TIMER_5, the shape's marker)
 
 
@@ -135,6 +135,7 @@ class Game:
             self.motion = a[1]
             self.log.append((self.n, 'motion', a[1]))
             self.log.append((self.n, 'motion_at', a[1], fbits(a[2]) if len(a) > 2 else 0.0))
+            self.log.append((self.n, 'motion_rate', a[1], round(fbits(a[3]), 4) if len(a) > 3 else 1.0))
             return 0
         if sid == 0xE and a[0] == 0x2710:               # v7: a button pressed this frame
             return int(a[1] in self.pressed)
@@ -423,29 +424,31 @@ def dodge_tests(r):
     for k, what, want in ((B.SWAY_INV, 'on its first frame after the intangible ones', 2),
                           (B.SWAY_INV - 1, 'on its last intangible frame', 1)):
         g, vm, xs = dodge_run(r, frames=60, events={k: signal(C.V_DODGE_L)})
-        sways = [e for e in g.ev('motion_at') if e[2] in (B.MOT_SWAY_B, B.MOT_SWAY_F)]
+        sways = [e for e in g.ev('motion_at') if e[2] in (B.MOT_SWAY_B, B.MOT_SWAY_F, B.MOT_SWAY_BR, B.MOT_SWAY_FR)]
         check('v7: chain: a fighter\'s hit on the shape %s (TIMER_2 at sway frame %d) -> %s' % (
-            what, k, 'another sway (the forward one: it came from behind), the same status' if want == 2 else
-            'nothing (XV2: attacks miss there), the signal dropped'),
+            what, k, 'another sway (the forward one: it came from behind; v10: the R one, the next of the alternation), '
+            'the same status' if want == 2 else 'nothing (XV2: attacks miss there), the signal dropped'),
               ([e[2:] for e in sways], len([e for e in g.ev('status') if e[2] == C.ST_DODGE])),
-              ([(B.MOT_SWAY_B, 0.0), (B.MOT_SWAY_F, float(B.SWAY_F_AT))][:want], 1))
+              ([(B.MOT_SWAY_B, 0.0), (B.MOT_SWAY_FR, float(B.SWAY_FR_AT))][:want], 1))
         if want == 2:
             st2 = sways[1][0]
             check('  the second sway runs its full %d frames, intangible again' % B.SWAY_N,
                   ([e[0] for e in g.ev('status') if e[2] == 0][0] - st2,
                    [e[3] for e in g.ev('set') if e[2] == 0x0F00011B]), (B.SWAY_N - 1, [float(B.SWAY_INV)] * 2))
     # the counter cancel (v8: the transformation's rush, the user's clip)
-    for k, btn, what, want in ((B.SWAY_CW_ON, 0, 'attack on its first counter frame (%d)' % B.SWAY_CW_ON, True),
-                               (B.SWAY_CW_OFF, 0, 'attack on its last counter frame (%d)' % B.SWAY_CW_OFF, True),
-                               (12, 4, 'smash (A+B / C-stick) mid-sway', True),
-                               (B.SWAY_CW_ON - 1, 0, 'attack on its frame 0 (before the window)', False),
-                               (B.SWAY_CW_OFF + 1, 0, 'attack after the window', False),
-                               (12, 1, 'special mid-sway', False)):
-        g, vm, xs = dodge_run(r, frames=B.STRIKE_N + 40, events={k: press(btn)})
-        ctr = [e for e in g.ev('motion_at') if e[2] == B.MOT_STRIKE]
-        check('v8: counter cancel: %s -> %s' % (what, 'the rush (the transformation\'s counter: motion 0x235 from 0)'
-                                                 if want else 'no counter'), [e[2:] for e in ctr],
-              [(B.MOT_STRIKE, 0.0)] if want else [])
+    # v10 (the user: "make it only happen from a special button input"; the dodge's rush the short one)
+    for k, btn, what, want in ((B.SWAY_CW_ON, 1, 'special on its first counter frame (%d)' % B.SWAY_CW_ON, True),
+                               (B.SWAY_CW_OFF, 1, 'special on its last counter frame (%d)' % B.SWAY_CW_OFF, True),
+                               (12, 1, 'special mid-sway', True),
+                               (B.SWAY_CW_ON - 1, 1, 'special on its frame 0 (before the window)', False),
+                               (B.SWAY_CW_OFF + 1, 1, 'special after the window', False),
+                               (12, 0, 'attack mid-sway (v7-v9: the counter)', False),
+                               (12, 4, 'smash (A+B / C-stick) mid-sway (v7-v9: the counter)', False)):
+        g, vm, xs = dodge_run(r, frames=B.STRIKE_S_N + 40, events={k: press(btn)})
+        ctr = [e for e in g.ev('motion_at') if e[2] in (B.MOT_STRIKE, B.MOT_STRIKE_S)]
+        check('v10: counter cancel: %s -> %s' % (what, 'the SHORT rush (motion 0x236 from %d: SpecialLwHeavy\'s '
+                                                  'animation\'s second part)' % B.STRIKE_S_AT if want else 'no counter'),
+              [e[2:] for e in ctr], [(B.MOT_STRIKE_S, float(B.STRIKE_S_AT))] if want else [])
         if want and k == 12:
             at = ctr[0][0]
             check('  its mode the transformation\'s (TIMER_4 %g), the shape off at once, the same status (0x155)'
@@ -455,16 +458,39 @@ def dodge_tests(r):
                   ([C.MODE_FORM], [(0, 2, 0, 0, 1)], 1))
             end = [e for e in g.ev('status') if e[2] == 0]
             ints = sorted({e[0] for e in g.ev('set') if e[2] == 0x0F00011B and e[0] > at})
-            check('  intangible every frame of it, Wait after the rush\'s %d frames (as the transformation\'s)'
-                  % B.STRIKE_N, (ints == list(range(at + 1, end[0][0] + 1)) if end else False,
-                                 end[0][0] - at if end else None), (True, B.STRIKE_N - 1))
+            check('  intangible every frame of it, Wait after the short rush\'s %d frames (v8-v9: the long %d)'
+                  % (B.STRIKE_S_N, B.STRIKE_N), (ints == list(range(at + 1, end[0][0] + 1)) if end else False,
+                                                end[0][0] - at if end else None), (True, B.STRIKE_S_N - 1))
             check('  not turned (the attacker in front), no gap closed (no fighter found: the freeze box holds it)',
                   (g.ev('turn'), [e for e in g.ev('set') if e[2] == 0x0f000004]), ([], []))
             check('  its end (func_2282 -> ui_end) clears the mode, transformed afterwards',
                   (g.vars.get(B.V_SS), g.vars.get(C.V_FORM)), (0.0, 2000.0))
-    g, vm, xs = dodge_run(r, timer=C.V_DODGE_L, frames=10, events={5: press(0)})
-    check('v8: the rush from the forward sway (the attacker behind): turned to face it',
-          ([e[2] for e in g.ev('motion_at')][-1:], len(g.ev('turn'))), ([B.MOT_STRIKE], 1))
+    g, vm, xs = dodge_run(r, timer=C.V_DODGE_L, frames=10, events={5: press(1)})
+    check('v8: the rush from the forward sway (the attacker behind): turned to face it (v10: the short rush)',
+          ([e[2] for e in g.ev('motion_at')][-1:], len(g.ev('turn'))), ([B.MOT_STRIKE_S], 1))
+    # v10: the alternation (XV2's four sways: L / R dodge after dodge, the side by the attacker's)
+    g, vm, xs = dodge_run(r, frames=B.SWAY_N + 2)
+    seq = []
+    for timer in (C.V_DODGE_R, C.V_DODGE_L, C.V_DODGE_L, C.V_DODGE_R, C.V_DODGE_R):
+        g.vars[timer] = 4.0
+        for _ in range(B.SWAY_N + 2):
+            r.frame(vm, g)
+    seq = [e[2:] for e in g.ev('motion_at')]
+    check('v10: successive dodges alternate L / R (TIMER_7): in front, in front, behind, behind, in front, in front -> '
+          'B_L (0x241 from 0), B_R (0x242 from %d), F_L (0x243 from %d), F_R (0x244 from %d), B_L, B_R'
+          % (B.SWAY_BR_AT, B.SWAY_F_AT, B.SWAY_FR_AT), seq,
+          [(B.MOT_SWAY_B, 0.0), (B.MOT_SWAY_BR, float(B.SWAY_BR_AT)), (B.MOT_SWAY_F, float(B.SWAY_F_AT)),
+           (B.MOT_SWAY_FR, float(B.SWAY_FR_AT)), (B.MOT_SWAY_B, 0.0), (B.MOT_SWAY_BR, float(B.SWAY_BR_AT))])
+    check('  the parity kept in Wait between the dodges (TIMER_7 renewed by ui_tick: > 0.5 after an odd count)',
+          g.vars.get(B.V_SWAY, 0.0) > 0.5, False)
+    g, vm, xs = dodge_run(r, frames=B.SWAY_N + 2)
+    for _ in range(200):
+        r.frame(vm, g)
+    g.vars[C.V_DODGE_R] = 4.0
+    for _ in range(3):
+        r.frame(vm, g)
+    check('  ... however long between them (200 frames in Wait, then the next: B_R)', [e[2] for e in g.ev('motion_at')],
+          [B.MOT_SWAY_B, B.MOT_SWAY_BR])
     for what, kw in (('not transformed (TIMER_0 0)', dict(form=0.0)),
                      ('in Dash (3)', dict(status=3)), ('in the air (Fall)', dict(status=0xE, air=True)),
                      ('shielding (0x1C)', dict(status=0x1C))):
@@ -504,15 +530,15 @@ def escape_tests(r):
                                ({2: signal(C.V_DODGE_R)}, 'attacked, nothing pressed', False),
                                ({2: signal(C.V_DODGE_R), 3: press(2)}, 'attacked, jump pressed', False)):
         g, vm = run(events)
-        ctr = [e for e in g.ev('motion_at') if e[2] == B.MOT_STRIKE]
-        check('v8: EscapeN, %s -> %s' % (what, 'status 0x155 (asked in the counter\'s mode %g), the rush (motion 0x235 '
-                                          'from 0, the transformation\'s mode, its loop)' % C.MODE_COUNTER
-                                          if want else 'no counter'),
+        ctr = [e for e in g.ev('motion_at') if e[2] in (B.MOT_STRIKE, B.MOT_STRIKE_S)]
+        check('v8: EscapeN, %s -> %s' % (what, 'status 0x155 (asked in the counter\'s mode %g), the rush (v10: the '
+                                          'dodge\'s SHORT rush, motion 0x236 from %d; the transformation\'s mode, '
+                                          'its loop)' % (C.MODE_COUNTER, B.STRIKE_S_AT) if want else 'no counter'),
               ([e[2] for e in g.ev('status')][:1], [e[3] for e in g.ev('set') if e[2] == B.V_SS][:1],
                [e[2] for e in g.ev('mode')][:1], [e[2:] for e in ctr],
                [e[3] for e in g.ev('set') if e[2] == B.V_SS and ctr and e[0] == ctr[0][0]][-1:]),
-              ([C.ST_UI], [C.MODE_COUNTER], ['ui_loop'], [(B.MOT_STRIKE, 0.0)], [C.MODE_FORM]) if want else
-              ([], [], [], [], []))
+              ([C.ST_UI], [C.MODE_COUNTER], ['ui_loop'], [(B.MOT_STRIKE_S, float(B.STRIKE_S_AT))], [C.MODE_FORM])
+              if want else ([], [], [], [], []))
         if what.startswith('attacked, nothing'):
             check('  the mark kept through the spot dodge (TIMER_1 renewed to 4)', g.vars.get(C.V_DODGE_R), 4.0)
         if want and 'special' in what:
@@ -661,8 +687,9 @@ def reset_tests(r):
     check('the transformation\'s status left some other way: transformed (2000)', g.vars[C.V_FORM], 2000.0)
 
 
-def ss_run(r, rec=None, at=10, frames=60, form=2000.0, air_target=False):
-    """the grounded down special (status 0x155's main func_2265, its loop, its end func_2282)"""
+def ss_run(r, rec=None, at=10, frames=60, form=2000.0, air_target=False, trace=None, stop_at=None):
+    """the grounded down special (status 0x155's main func_2265, its loop, its end func_2282); trace: {frame: his X}
+    from the counter's read; stop_at: (v10) the slide's frame counter set to this after the read (the fallback)"""
     g = Game(status=0x155, damage=150.0, x=0.0, y=0.0, face=1.0)
     g.vars[C.V_FORM] = form
     g.vars[B.V_AURA] = 999.0
@@ -683,6 +710,10 @@ def ss_run(r, rec=None, at=10, frames=60, form=2000.0, air_target=False):
         r.call(vm, 'func_82')
         if g.status == 0x155:
             r.call(vm, 'ss_loop')
+        if stop_at is not None and k == at + 1:
+            g.sw[0x0100000C] = float(stop_at)
+        if trace is not None and g.ev('motion_at') and B.MOT_ESCAPE_N in [e[2] for e in g.ev('motion_at')]:
+            trace[k] = g.x
         zs.append(round(g.vars.get(0x0F000002, 0.0), 3))
         if g.req is not None and g.req != g.status:
             if g.status == 0x155:
@@ -725,39 +756,71 @@ def ss_tests(r):
           ([], []))
     g, vm, zs = ss_run(r, rec=(1.0, 30.0, 0.0, True), at=10)
     read = [e[0] for e in g.ev('motion') if e[2] == B.MOT_ESCAPE_N][0]
-    check('v7: the counter read: everyone slowed (SlowModule(0, %d, %d): 1 / %d) and the camera in (CameraModule(0x2714, '
-          '%d, 0, %g): slight) on that frame' % (B.SS_SLOW, B.SS_SLOW_FRAMES, B.SS_SLOW, B.SS_CAM1_T, B.SS_CAM1_D),
-          ([(e[0], e[2]) for e in g.ev('slow')][:1], [(e[0], e[2]) for e in g.ev('camera')][:1]),
-          ([(read, (0, B.SS_SLOW, B.SS_SLOW_FRAMES))], [(read, (0x2714, B.SS_CAM1_T, 0, B.SS_CAM1_D))]))
+    land = [e[0] for e in g.ev('status') if e[2] == 0xE][0]
+    check('v10: no slow-motion any more (v7-v9 SlowModule(0, 3, 48)): the world stop replaces it', g.ev('slow'), [])
+    asks = sorted({e[0] for e in g.ev('set') if e[2] == B.V_STOP and e[3] == B.SS_STOP_ASK})
+    check('v10: the world stop asked (TIMER_6 = %g) on every frame from the counter\'s read to his Fall (%d frames of '
+          'travel + %d held behind the fighter), then 0' % (B.SS_STOP_ASK, B.SS_SLIDE_N, B.SS_ARRIVE),
+          (asks == list(range(read, land + 1)) or asks == list(range(read, land)), land - read,
+           [e[3] for e in g.ev('set') if e[2] == B.V_STOP][-1:]),
+          (True, B.SS_SLIDE_N + B.SS_ARRIVE, [0.0]))
+    check('v10: his slide (EscapeN) at his own slow motion, rate %g (the user\'s "3/4")' % B.SS_RATE,
+          [e[2:] for e in g.ev('motion_rate') if e[2] == B.MOT_ESCAPE_N], [(B.MOT_ESCAPE_N, B.SS_RATE)])
+    # the travel: a hold, then faster and faster
+    xs_ = {}
+    g2, vm2, zs2 = ss_run(r, rec=(1.0, 30.0, 0.0, True), at=10, frames=10 + 1 + B.SS_SLIDE_N + B.SS_ARRIVE + 4,
+                          trace=xs_)
+    k0 = min(xs_)
+    path = [xs_[k] for k in sorted(xs_)]
+    start, end = path[0], 30.0 + B.SS_BEHIND
+    frac = [(x - start) / (end - start) for x in path]
+    hold = frac[:B.SS_HOLD + 1]
+    dash = frac[B.SS_HOLD:B.SS_SLIDE_N + 1]
+    steps = [round(b - a, 4) for a, b in zip(dash, dash[1:])]
+    check('v10: the hold: over its first %d frames he moves %g of the way, slowing to a stop (DBFZ: the stop)'
+          % (B.SS_HOLD, B.SS_HOLD_FRAC), (round(hold[-1], 3), all(b - a >= -1e-6 for a, b in zip(hold, hold[1:])),
+                                          hold[-1] - hold[-2] < hold[1] - hold[0]), (B.SS_HOLD_FRAC, True, True))
+    check('v10: the dash: the rest over %d frames, every frame faster than the last (DBFZ: it accelerates to the target), '
+          'arriving at frame %d' % (B.SS_DASH, B.SS_SLIDE_N),
+          (all(b > a for a, b in zip(steps, steps[1:])), round(frac[B.SS_SLIDE_N], 4)), (True, 1.0))
+    check('v10: held behind the fighter for %d frames after the arrival (the world still stopped)' % B.SS_ARRIVE,
+          {round(x, 3) for x in path[B.SS_SLIDE_N:B.SS_SLIDE_N + B.SS_ARRIVE]}, {round(end, 3)})
     check('v9: both zooms slight (the user: "a slight zoom rather than a close one"; distance = how far: Kirby\'s 4.0 '
           '"slight", 1.4 "much closer"; v7 / v8 1.2 / 1.5): at least %g, the second (on him) the closer'
           % B.SS_CAM_MIN, (min(B.SS_CAM1_D, B.SS_CAM2_D) >= B.SS_CAM_MIN, B.SS_CAM2_D < B.SS_CAM1_D), (True, True))
-    check('  closer on him at the slide\'s frame %d (CameraModule(0x2714, %d, 0, %g))' % (B.SS_CAM2_AT, B.SS_CAM2_T,
-                                                                                         B.SS_CAM2_D),
-          [(e[0] - read, e[2]) for e in g.ev('camera')][1:2], [(B.SS_CAM2_AT, (0x2714, B.SS_CAM2_T, 0, B.SS_CAM2_D))])
-    land = [e[0] for e in g.ev('status') if e[2] == 0xE][0]
-    check('  at the arrival (his Fall asked, slide frame %d): normal speed (SlowModule(1)) and the normal camera '
-          '(CameraModule(0x2718)), again from its end (any exit)' % B.SS_SLIDE_N,
-          ([(e[0] - read, e[2]) for e in g.ev('slow')][1:], [(e[0] - read, e[2]) for e in g.ev('camera')][2:]),
-          ([(land - read, (1,)), (land - read, (1,))], [(land - read, (0x2718,)), (land - read, (0x2718,))]))
-    check('  the slowed span: the slide\'s %d frames = %d screen frames (%.2f s; DBFZ ~0.8 s), within its %d-frame '
-          'bound' % (B.SS_SLIDE_N, B.SS_SLIDE_N * B.SS_SLOW, B.SS_SLIDE_N * B.SS_SLOW / 60.0, B.SS_SLOW_FRAMES),
-          (land - read == B.SS_SLIDE_N, B.SS_SLIDE_N * B.SS_SLOW <= B.SS_SLOW_FRAMES), (True, True))
-    # a KO mid-slide (its end runs) / the status left without its end (stale)
+    check('v10: the camera (v9\'s zooms, timed to the travel): in at the read, closer as the dash starts (frame %d), back '
+          'when the world goes on (his Fall), again from its end' % B.SS_HOLD,
+          [(e[0] - read, e[2]) for e in g.ev('camera')],
+          [(0, (0x2714, B.SS_CAM1_T, 0, B.SS_CAM1_D)), (B.SS_HOLD, (0x2714, B.SS_CAM2_T, 0, B.SS_CAM2_D)),
+           (land - read, (0x2718,)), (land - read, (0x2718,))])
+    fx = [(e[0] - read, e[2], e[3]) for e in g.ev('effect') if e[0] >= read]
+    check('v10: the effects: at the read the stance\'s charge faded (0x2723 (KTN_GKS_Loop, 0, 0)) and KiryokuMax\'s burst '
+          '(BoostGKS_End) on him; the vanish lines as the dash starts; the vanish lines and his aura\'s burst '
+          '(MGT_HENSIN02) where he lands; the charge faded again at the end',
+          fx, [(0, 0x2723, B.fx_id('ss_charge')), (0, 0x2710, B.fx_id('ss_release')), (B.SS_HOLD, 0x2710, B.fx_id('vanish')),
+               (B.SS_SLIDE_N, 0x2710, B.fx_id('vanish')), (B.SS_SLIDE_N, 0x2710, B.fx_id('burst')),
+               (land - read, 0x2723, B.fx_id('ss_charge'))])
+    # a KO mid-slide (its end runs) / the status left without its end (stale) / the fallback
     g, vm, zs = ss_run(r, rec=(1.0, 30.0, 0.0, True), at=10, frames=14)
     r.call(vm, 'func_2282')
-    check('v7: Secret Sensation left mid-slide through its end (a KO: Dead\'s change runs it): slow-motion and camera '
-          'ended', ([e[2] for e in g.ev('slow')][-1:], [e[2] for e in g.ev('camera')][-1:]), ([(1,)], [(0x2718,)]))
+    check('v10: Secret Sensation left mid-slide through its end (a KO: Dead\'s change runs it): the world stop\'s asks '
+          'ended (TIMER_6 0: the cave lets the world go within its 2-frame lease) and the camera back',
+          (g.vars.get(B.V_STOP), [e[2] for e in g.ev('camera')][-1:]), (0.0, [(0x2718,)]))
     g, vm, zs = ss_run(r, rec=(1.0, 30.0, 0.0, True), at=10, frames=14)
-    n0 = len(g.ev('slow'))
+    n0 = len(g.ev('camera'))
     g.status = 0x46
     g.loop = None
     r.frame(vm, g)
-    check('v7: left mid-slide WITHOUT its end (TIMER_4 still Secret Sensation\'s outside 0x155): the next frame ends '
-          'them (ss_stale) and clears TIMER_4', ([e[2] for e in g.ev('slow')][n0:], [e[2] for e in g.ev('camera')][-1:],
-                                                 g.vars.get(B.V_SS)), ([(1,)], [(0x2718,)], 0.0))
+    check('v7 / v10: left mid-slide WITHOUT its end (TIMER_4 still Secret Sensation\'s outside 0x155): the next frame ends '
+          'them (ss_stale: the asks 0, the camera back) and clears TIMER_4',
+          ([e[2] for e in g.ev('camera')][n0:], g.vars.get(B.V_STOP), g.vars.get(B.V_SS)), ([(0x2718,)], 0.0, 0.0))
     r.frame(vm, g)
-    check('  once only', [e[2] for e in g.ev('slow')][n0:], [(1,)])
+    check('  once only', [e[2] for e in g.ev('camera')][n0:], [(0x2718,)])
+    check('v10: the fallback bound covers the travel (%d frames asked at most, the travel and the hold %d)'
+          % (B.SS_STOP_MAX, B.SS_SLIDE_N + B.SS_ARRIVE), B.SS_SLIDE_N + B.SS_ARRIVE < B.SS_STOP_MAX, True)
+    g, vm, zs = ss_run(r, rec=(1.0, 30.0, 0.0, True), at=10, frames=13, stop_at=B.SS_STOP_MAX + 5)
+    check('v10: the fallback: past %d frames of the counter the asks stop (0) even if he hasn\'t arrived'
+          % B.SS_STOP_MAX, g.vars.get(B.V_STOP), 0.0)
 
 
 def script_tests(out, ts_out):
