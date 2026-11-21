@@ -160,6 +160,9 @@ class Game:
         if sid == 0x1E:
             self.log.append((self.n, 'sound', tuple(a)))
             return 0
+        if sid == 0x1A and a and a[0] == 0x2710:        # v12: GroundModule's correct type (1 / 2 / 5 ...)
+            self.log.append((self.n, 'ground', tuple(a)))
+            return 0
         if sid == 0x39:                                 # v12: VisibilityModule (0x2710, on)
             self.log.append((self.n, 'visibility', tuple(a)))
             return 0
@@ -574,6 +577,44 @@ def escape_tests(r):
           ([], []))
 
 
+def v12_msc_tests(r):
+    """v12: the teeter (Ottotto / OttottoWait) dodges; the short rush's lunge and vanish behind the opponent"""
+    for st, name in ((0x7B, 'Ottotto'), (0x7C, 'OttottoWait')):
+        g, vm, xs = dodge_run(r, status=st)
+        check('v12: dodge from the teeter: transformed, %s (0x%X), TIMER_1 -> status 0x155 in the dodge\'s mode' % (
+            name, st), ([e[2] for e in g.ev('status')][:1], [e[2] for e in g.ev('mode')][:1]),
+              ([C.ST_DODGE], ['ui_dodge_loop']))
+        check('  the sway doesn\'t take him off the ledge: no travel, GroundModule 2 (no sliding off an edge)',
+              ({v for s_, v in xs if s_ == C.ST_DODGE}, [e[2] for e in g.log if e[1] == 'ground'][:1]), ({0.0},
+                                                                                                    [(0x2710, 2)]))
+        g, vm, xs = dodge_run(r, status=st, air=True)
+        check('  not in the air (the teeter is a ground status)', [e[2] for e in g.ev('status')][:1], [])
+
+    def opp(x, y=0.0):
+        def f(g):
+            g.vars[0x0F000008], g.vars[0x0F000009], g.vars[0x0F00000B] = x, y, abs(x - g.x) + 0.01
+        return f
+    for ox, face_after, what in ((25.0, -1.0, 'in front of him'), (-25.0, 1.0, 'behind him')):
+        ev = {k: opp(ox) for k in range(0, 80)}
+        ev[12] = lambda g, f_=ev[12]: (f_(g), g.pressed.update({1}))
+        g, vm, xs = dodge_run(r, frames=B.STRIKE_S_N + 40, events=ev)
+        at = [e for e in g.ev('motion_at') if e[2] == B.MOT_STRIKE_S][0][0]
+        sp = [(n - at, round(v, 3)) for n, v in enumerate([x[1] for x in xs], start=1) if at <= n < at + B.RS_FWD_N + 3]
+        lunge = [v for k, v in sp if 1 <= k <= B.RS_FWD_N]
+        check('v12: the short rush (the opponent %s): it lunges %g over its first %d frames (ground speed %g a frame '
+              'along his facing, its frames 1-%d; XV2\'s clip: ~18 frames)' % (what, B.RS_FWD, B.RS_FWD_N, B.RS_FWD / B.RS_FWD_N,
+                                                                   B.RS_FWD_N),
+              (lunge, sum(lunge)), ([round(B.RS_FWD / B.RS_FWD_N, 3)] * B.RS_FWD_N, round(B.RS_FWD, 3)))
+        xsets = [(e[0] - at, round(e[3], 3)) for e in g.ev('set') if e[2] == 0x0f000000]
+        check('  hidden at %d (the second vanish), put %g past the opponent (X %.1f) facing it, shown at %d (XV2\'s 176)'
+              % (B.RS_HIDE, B.RS_BEHIND, ox + B.RS_BEHIND * (1 if ox > 0 else -1), B.RS_SHOW),
+              ([(e[0] - at, e[2][1]) for e in g.ev('visibility')][:2], xsets, g.face),
+              ([(B.RS_HIDE, 0), (B.RS_SHOW, 1)], [(B.RS_HIDE, ox + B.RS_BEHIND * (1 if ox > 0 else -1))], face_after))
+    g, vm, xs = dodge_run(r, frames=B.STRIKE_S_N + 40, events={12: press(1)})
+    check('v12: the short rush, nobody near: no vanish to anywhere (stays), shown again at %d' % B.RS_SHOW,
+          ([e for e in g.ev('set') if e[2] == 0x0f000000], [e[2][1] for e in g.ev('visibility')][:2]), ([], [0, 1]))
+
+
 def shape_tests(r):
     """ui4: the autododge's counter shape (ui_shape from ui_tick): on while transformed in Wait / Walk / WalkBrake /
     Squat .. SquatRv on the ground (a hit on it is the cave's slot 42: the dodge), off elsewhere, switched only when that
@@ -588,7 +629,7 @@ def shape_tests(r):
             r.frame(vm, g)
         return g, vm
     for st, name in ((0, 'Wait'), (1, 'Walk'), (2, 'WalkBrake'), (0x11, 'Squat'), (0x12, 'SquatWait'), (0x13, 'SquatF'),
-                     (0x14, 'SquatB'), (0x15, 'SquatRv')):
+                     (0x14, 'SquatB'), (0x15, 'SquatRv'), (0x7B, 'v12 Ottotto'), (0x7C, 'v12 OttottoWait')):
         g, vm = run(status=st)
         check('ui4 / v9: the shape: transformed, %s: on EVERY frame (ShieldModule(0, 2, 0, 1, 1): v4-v8 only on frame 1),'
               ' TIMER_5 renewed' % name, ([(e[0], e[2]) for e in g.ev('shield')], g.vars.get(B.V_SHAPE)),
@@ -1051,6 +1092,18 @@ def v10_script_tests(f):
     """v10: the dodge's short rush (speciallwheavy_c2), the rush hits' effects, Graphic_Effect2, the stance's charge"""
     nm = lambda c: c.name  # noqa: E731
     at = B.STRIKE_S_AT
+    e = f['effect'].script('speciallwheavy_c2')
+    check('v12: the short rush\'s effect script: no white body (no Color_Overlay, Outline_Shell, Terminate_Overlays: the '
+          'user\'s "remove the white glow"; the transformed glow stays), the vanish at its 0, %d (he vanishes) and %d '
+          '(he reappears behind the opponent)' % (B.RS_HIDE, B.RS_SHOW),
+          ([nm(c) for c in e if nm(c) in ('Color_Overlay', 'Outline_Shell', 'Terminate_Overlays', 'Outline_Set')],
+           [fr - at for fr, c in at_frames(e) if nm(c) == 'Graphic_Effect2' and c.params[0] == B.fx_id('vanish')]),
+          ([], [0.0, float(B.RS_HIDE), float(B.RS_SHOW)]))
+    e = f['effect'].script('speciallwheavy')
+    check('v12: the transformation counter keeps its white body (Color_Overlay at 0) and its vanishes at 0 / %d' %
+          B.BLINK_SHOW, ([fr for fr, c in at_frames(e) if nm(c) == 'Color_Overlay'],
+                         [fr for fr, c in at_frames(e) if nm(c) == 'Graphic_Effect2' and c.params[0] == B.fx_id('vanish')]),
+          ([0.0], [0.0, float(B.BLINK_SHOW)]))
     g = f['game'].script('speciallwheavy_c2')
     hb = [dict(zip(acmd.INFO[acmd.BY_NAME['extra_special_hitbox']]['syntax'], c.params)) for c in g
           if nm(c).lower() == 'extra_special_hitbox']
@@ -1259,6 +1312,33 @@ def v12_effect_tests(p):
     check('v12: Time Skip\'s aura (%s, %d emitters) follows him: GPU ones follow 0 on a live-matrix variant (key byte 4 '
           '0x04), CPU ones follow 2' % (U12.TS_SET, len(ems)),
           all((f_ == 0 and k) if g_ else f_ == 2 for g_, f_, k in zip(gpu, fol, keys)), True)
+    # Soaring Fist's 3D shot
+    si = p.find_set(U12.SF_SET)
+    by = {p.emitter_name(e['data']): e['data'] for e in p.sets[si]['emitters'] if e['data'] is not None}
+    ref = B.ref_shader(p)
+    import math as m_
+    check('v12: Soaring Fist\'s shot (%s): the wind crescents %s turned at random on all three axes (rotation random pi, '
+          'drawn by their program\'s v_inRot: XV2\'s RotationVariance 360 x 3; v11: one orientation, edge-on from the '
+          'side)' % (U12.SF_SET, list(U12.SF_TUMBLE)),
+          [tuple(round(v, 4) for v in p.field(by[n], 'rotation_random')) for n in U12.SF_TUMBLE],
+          [(round(m_.pi, 4),) * 3] * len(U12.SF_TUMBLE))
+    vr = {n: p.field(by[n], 'shader_index') for n in U12.SF_REF_KEEP}
+    keyed = {n: bytes(p.shader_entry(v))[:0x10] for n, v in vr.items()}
+    want = bytearray(p.shader_entry(ref))
+    want[4] |= 0x04
+    check('  XV2\'s refraction rings / cores %s the fireball\'s refraction program (its live-matrix variant: on the shot '
+          'every frame), not v11\'s flat additive colour' % (list(U12.SF_REF_KEEP),),
+          set(keyed.values()), {bytes(want[:0x10])})
+    gpu = [n for n, em in by.items() if struct.unpack_from('>I', em, 4)[0] & 0x00800000]
+    check('  every GPU emitter follows the shot (follow 0 on a key-0x04 program; v11: left where born)',
+          [n for n in gpu if not (struct.unpack_from('>I', by[n], 0x310)[0] == 0 and
+                                  bytes(p.shader_entry(p.field(by[n], 'shader_index')))[4] & 0x04)], [])
+    # Secret Sensation's charge
+    kt = p.find_set(U12.SS_SETS[0])
+    check('v12: Secret Sensation\'s charge (KTN_GKS_Loop) called x%g (v10-v11 x0.6) on TransN %g m up (v10-v11: the '
+          'pelvis), its alpha x %g' % ([x for x in B.FX if x[0] == 'ss_charge'][0][5],
+                                      [x for x in B.FX if x[0] == 'ss_charge'][0][4][1], U12.SS_CHARGE_GAIN),
+          [x for x in B.FX if x[0] == 'ss_charge'][0][3:], ('TransN', (0.0, 2.2, 0.0), 1.0))
     ys = [p.field(em, 'emitter_translation')[1] for em in ems]
     check('  its parts at least %g up (x the call\'s %g: none under his feet; v11: down to -0.86 x 1.75)' % (
         U12.TS_AURA_UP - 1.0, U12.TS_AURA_SIZE), min(ys) >= U12.TS_AURA_UP - 1.0, True)
@@ -1860,6 +1940,7 @@ def main():
     dodge_tests(r)
     escape_tests(r)
     shape_tests(r)
+    v12_msc_tests(r)
     mode_tests(r)
     reset_tests(r)
     ss_tests(r)

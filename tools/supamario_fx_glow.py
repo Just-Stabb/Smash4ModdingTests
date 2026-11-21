@@ -68,7 +68,11 @@ def moves(out_dir):
     # elbow's height at frame 0, about 6 up)
     e11 = [(0, i, 0, (0.0, TB.E11_AT[1], -TB.E11_AT[0]), (0, -90, 0), TB.E11_SIZE, None) for i in TB.FX_E11_IDS.values()]
     out['ts_e11'] = (e11, list(range(0, 140)))
-    out['ts_e0'] = ([(0, TB.FX_AURA_ID, 0, (0.0, 0.0, 0.0), (0, -90, 0), TB.AURA_SIZE, None),
+    import supamario_ui12 as U12      # v12: the set in TransN's frame (+Z forward), following, bigger; the build without
+    # Ultra Instinct (Time Skip's own output) keeps v4-v11's world-placed set
+    v12 = os.path.exists(os.path.join(out_dir, 'ultrainstinct.json'))
+    a_rot, a_size = ((0, 0, 0), U12.TS_AURA_SIZE) if v12 else ((0, -90, 0), TB.AURA_SIZE)
+    out['ts_e0'] = ([(0, TB.FX_AURA_ID, 0, (0.0, 0.0, 0.0), a_rot, a_size, None),
                      (0, TB.FX_E0H_ID, 0, (0.0, 6.0, 0.0), (0, 0, 0), TB.E0_FOLLOW[2] * TB.AURA_SIZE, None)],
                     list(range(0, 80)))
     c = [x for x in R.s4_calls(eb, 'attackdash') if (x[1] >> 16) == 0x341]

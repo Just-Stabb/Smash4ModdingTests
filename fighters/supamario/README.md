@@ -4686,8 +4686,8 @@ HitstunMul (in a weapon's script, as `acmd_ext_help`'s rules allow; no new comma
 Checked, all as meant: the MSC (`ui_can_dodge` / `ui_shape_on`: Squat .. SquatRv on the ground, the tests' Squat,
 SquatWait, SquatF / B, SquatRv), the cave (slot 42 / 43: 0x11-0x15), the counter shape's capsule (joint 0, y 2.5-9.5,
 radius 6.5) round his SquatWait pose (every joint within y 0-6.2, z -3.3..4.1: inside), SquatWait's status data the
-same as Wait's. **Not found offline**; the game's cause needs the TEST ONLY diag exe (exe_v46z_ui7_diag): a log of a
-few attacks on him crouching (S4U2 lines: whether the shape is hit) — the package's test steps ask for it.
+same as Wait's. **Confirmed working in game** (the user, after v11: "The crouch already allows for the dodge"): no
+change; v11's crouch-log request is withdrawn.
 
 ### 7. Not confirmed in game / approximated
 - The punches' spawn (9 ahead, 6.5 up), the 20 / 40 charge thresholds, the damage table, the hold's pull / pad, the
@@ -4698,8 +4698,6 @@ few attacks on him crouching (S4U2 lines: whether the shape is hit) — the pack
   Hkn_Wind trace, BPE 10 and the camera not converted; CMN 30 / 60 (an EMO model, ice) not used.
 - The shield push through PUSH (energy 4 made again each frame) as Sephiroth's; the GuardDamage status's own pushback is
   replaced for those frames.
-- The crouch dodge (above).
-
 ### Ultra Instinct v11, results
 `supamario_ui_test.py --exe --package --since` (v10's build, `--sf-skill`) **608 ok** (with `supamario_sf_test.py`'s 71:
 the charge levels and their frames, the punches' generation and custom numbers, the hold / pull / shield push, the
@@ -4713,3 +4711,168 @@ vertex programs before / after, the flipbooks, spread and sparkles, the motion t
 projectile's MSC 0 of 48 (27 globals); `fighter_texture_ids.py check` 0 errors; Sm4shCommand v1.7.24 NvTest 290 ok / 1
 known failure (effect.bin's else-if chains, upstream), HvTest 248 ok. 0 failures. No exe change (`import_call_check` not
 needed: exe_v46z_ui7 kept).
+
+## Ultra Instinct v12 (`supamario_ultrainstinct_v12.zip`, exe `exe_v46z_ui8`; TEST ONLY `exe_v46z_ui8_diag`; Sm4shCommand v1.7.25)
+Install over v11: `INSTALL_TO_data/` holds only the files changed since v11, with the new executable (exe_v46z_ui8 =
+exe_v46z_outline5 + `tools/supamario_ui_cave.py`, both builds reproduced byte for byte by it, `import_call_check` 0).
+The v12 effect work is `tools/supamario_ui12.py`; the rest is in `supamario.c`, `weapons/soaringfist.c`,
+`supamario_sf_build.py`, `supamario_ui_build.py`, `supamario_ui_anim.py`, `supamario_ui_cave.py`. The user's v11 report
+(clips `v11clip/a`, `b`, `c`, screenshot `timeskip_aura.png`) and four later requests (the teeter, the rush counters
+against XV2's clips `counter_clips/xv2_1` / `xv2_2`, the arcs' colour, Soaring Fist's height). The crouch autododge
+(v11 "not found offline") is confirmed working in game by the user: no change, the crouch-log request dropped.
+
+### 1. Soaring Fist's knockback (the user: "uncharged Soaring Fist do the same amount of knockback to every character and have 1.4x hitstun ... not have knockback growth and do the same amount of knockback as it does to Donkey Kong at 61%")
+- **The value:** Smash 4's knockback is ((p/10 + p d/20) x 200/(w + 100) x 1.4 + 18) x KBG/100 + BKB, p the percent after
+  the hit. v11's uncharged punch (14%, KBG 96, BKB 30) on Donkey Kong (weight 122: `fighter_param.bin` 0x21, the same in
+  `reference/fighter_param_attributes.csv`) at 61% before the hit (p = 75; the clips show DK at 0%, so the user's 61%
+  is taken as before the hit): (7.5 + 52.5) x 200/222 x 1.4 + 18 = 93.68, x 0.96 + 30 = **119.93** -> **BKB 120**
+  (a fresh move's 1.05 damage bonus would give 121.6; no rage counted).
+- **Weight-independent:** with **KBG 0** the formula is BKB alone for every weight and percent; Smash 4's set
+  knockback (WBKB / FKB) is ((1 + FKB/2) x 200/(w + 100) x 1.4 + 18) x KBG/100 + BKB, weight-dependent. No new command:
+  the punch's own script `soaringfist1` (article 0's motion slot 3, the weapon MSC picks it for level 1) is an
+  Extra_Special_Hitbox with KBG 0, BKB 120, **HitstunMul 1.4** (48 x 1.4 = 67 frames of hitstun for everyone). Launch
+  speed 120 x 0.03 = 3.6 a frame for every weight (tested 68-400); each fighter's own gravity then shapes the arc
+  (Smash 4's tumble boost (gravity - 0.075) x 5 is gravity's, not weight's). Rage and crouch-cancel still scale it, the
+  same for everyone. At 120 the punch no longer KOs from mid-stage (v11 KO'd Mario-weight at ~126%).
+- **2- / 3-punch finals:** BKB 30 -> **70**, KBG 96 -> **74**, 14%, angle 50, hitstun x1.1 (kept), `soaringfist`. KO
+  percents from mid-stage (`supamario_sf_build.ko_percent`: launched from x 0 at 50 degrees, speed decaying 0.051 a
+  frame, the tumble boost, each fighter's gravity / max fall, Battlefield's 224 / 200 blast zones, no DI; the earlier
+  punches' 5% / 8% counted), v11 -> v12:
+
+| Final punch | Jigglypuff (68) | Fox (79) | Mario (98) | Donkey Kong (122) | Bowser (130) |
+|---|---|---|---|---|---|
+| 2 punches | 102 -> 101 | 102 -> 99 | 121 -> 119 | 138 -> 136 | 142 -> 140 |
+| 3 punches | 99 -> 98 | 99 -> 96 | 118 -> 116 | 135 -> 133 | 139 -> 137 |
+
+  Low-percent launches are stronger (Mario at 0%: knockback 51 -> 87).
+- **Non-final punches (the user: "increase the pushback on the weaker punches"):** v11's set knockback 10 (KBG 100: 26.4
+  at weight 100, 25.6 on DK, 28 on Jigglypuff) -> **KBG 0, BKB 40 for every weight** (angle 0: a grounded opponent
+  slides about twice as far); hitstun +20 frames as v11; shields pushed **1.3** a frame (v11 0.8; the final 2.0).
+  They still always connect: `sf_hold` keeps the hitstun to the next punch's arrival as before, and an opponent pushed
+  past the next punch's reach (its life, `sf_reach`) by at most SF_PUSHED (30) is put back SF_EDGE (6) inside it.
+
+| Soaring Fist v12 | Damage | Angle | KBG | BKB | Hitstun | Shield push |
+|---|---|---|---|---|---|---|
+| Uncharged (1 punch) | 14% | 50 | **0** | **120** (fixed) | **x1.4** | 2.0 a frame |
+| 2 / 3 punches: final | 14% | 50 | **74** | **70** | x1.1 | 2.0 |
+| 2 punches: first | 5% | 0 | **0** | **40** (fixed) | +20 frames | **1.3** |
+| 3 punches: first two | 4% each | 0 | **0** | **40** (fixed) | +20 frames | **1.3** |
+
+### 2. The jitter after Soaring Fist (the user: "makes Supamario jitter in every animation after using it until he's KO'd")
+- **Cause:** the charge's expression script plays Mario's AttackS4Hold `START_CHARGE` (PhysicsModule op 7: the smash
+  charge's body shake, docs/acmd-params/misc-b.md). The game stops it only in the hold statuses' exits (status table 2
+  of 0x2C / 0x2F / 0x32: `func_326` / `func_329` / `func_332`, `PhysicsModule(0x8)`); Soaring Fist runs its charge
+  inside 0x2B and never enters 0x2C, so the shake ran on in every animation until a KO reset the module. The other
+  candidates checked: no motion rate or the rate variable 0x0F000098 written, his own position never written by sf_*,
+  the lunge only TransN X / Z inside the motion, the article's owner search reads only, no flag left.
+- **Fix:** `PhysicsModule(0x8)` at the release (`sf_release`) and at any exit of 0x2B (`sf_end`, func_347).
+- **Test (`supamario_sf_test` v12_jitter_tests):** his state after the move as before it (the shake off, no rate, his
+  position never written, not hidden) for a full charge, a two-punch charge, a tap and a hit during the charge.
+
+### 3. Soaring Fist's height (the user: "Soaring Fist's animation also seems to take Supamario off of the ground")
+- **Cause:** `floor_fix` (Fake Death's) puts the lowest joint on the floor only on contact frames (XV2's b_C_Base under
+  0.05 m); HKN's base sits higher, so every Soaring Fist frame was only lifted out of the floor, never lowered: his feet
+  2.8-4.4 units up (Wait1 0.9-1.4). Not related to the jitter (that is the physics shake).
+- **Fix:** every Soaring Fist frame is a contact frame (`supamario_ui_anim.body_frames`). Test: his lowest joint's
+  clearance within Wait1's (0.00-0.93) on all 399 frames, his lowest foot / toe 0.44-1.56 (Wait1 0.90-1.38).
+
+### 4. Soaring Fist's 3D shockwave (the user: "appears flat instead of like a 3-dimensional shockwave")
+- **XV2 (eepk effect 5, Hkn_Wav.emp; clips hkn_clips):** ShapeDraw wind crescents spawned turned at random on all three
+  axes (wind_1 / wind_1_1 / wind: RotationVariance 360 x 3), and 10 of the 16 emissions screen refraction (materials Ref
+  / Ref_Custom): XV2's shot is the background bent by rings round it, seen from behind.
+- **v11:** every ring one orientation (round the travel axis: edge-on from Smash 4's side camera), the refraction drawn
+  as flat additive colour, on plain GPU programs (particles left where born).
+- **v12 (`supamario_ui12.sf_3d`):** the crescents turned at random on all three axes (ptcl rotation random pi x 3,
+  drawn by their program 29, which reads `v_inRot`), their alpha x 2; XV2's refraction rings and lasting cores
+  (wave_ref_ring, wave_ref, ref_ring, core_1_1, core_3_1) as the fireball's refraction program at XV2's sizes x 2 bend
+  (a distortion bubble round the shot), the 5-frame cores and small refraction parts quiet; every GPU emitter on its
+  program's follow variant (on the shot every frame). The Hkn_Wind trace is not converted (flagged).
+
+### 5. Secret Sensation's white screen (the user: "makes the screen extremely bright after countering something")
+- **Evidence (clip b, 60 fps):** from the counter's read the stage and background brighten frame by frame from their
+  bright spots (the background's lights first) to full white within ~6 frames and stay white until the world goes on;
+  the fighters and the HUD unchanged. It is the world stop's length (v10's exe; v11 was the first counter tested).
+- **Cause:** `ws_begin` paused EVERY effect instance but his (+0x19E), the stage's own included. A paused instance's
+  emitter sets are calculated at rate 0 (`0x0334E080` holds its clock; `0x0334E238` sets the calc rate to 0.0 from
+  `0x10195FAC`), which ages nothing; the stage's continuous emitters kept adding particles that never died: the white.
+  The game itself never sweeps the stage's instances this way (its hitlag pause is the object's own key,
+  `0x02C27E88`).
+- **Fix (exe_v46z_ui8):** the world stop pauses no effect instance; objects (fighters, weapons, items) and the stage
+  (the Final Smashes' `0x0316505C(manager, 1)`) still stop. The counter's flash is BoostGKS_End alone (KiryokuMax: a
+  brief burst on him). Effects already playing on frozen objects play on (approximated: XV2 / DBFZ freeze them).
+
+### 6. Secret Sensation's charge aura (the user: "the aura is weak and too small"; XV2's charge clip: a white-violet column from his feet to about twice his height)
+KTN_GKS_Loop called **x1.0** (v10-v11 x0.6) on **TransN 2.2 m up** (v10-v11 the pelvis: half of it under the floor),
+its alpha **x1.8**. Rendered (fx_render): ~20 x 40 units (v11 ~11 x 24).
+
+### 7. Time Skip / Jump Spike's aura (the user: "too small, weak, doesn't follow Supamario when charging and placed too low")
+- **Cause:** XV2's effect 0 world parts (no PositionUpdate) were world-placed at his ground point (v4), on plain GPU
+  programs, and at SpecialS frame 0's bone places: the foot part under his feet; as he drifts in the charge they stay
+  behind and below (the screenshot).
+- **Fix:** `ts_aura` is a FOLLOWING request on TransN (`EffectModule 0x2717`); the set moved to TransN's frame (+Z
+  forward: turned -90 about Y), **5 units higher** (x the call's size), its GPU emitters on their follow variants
+  (follow 0), alpha **x1.4**, the call **x2.6** (v4-v11 1.75); faded as the dash starts. The white-area rule for it on
+  grass (supamario_timeskip_test) raised from 1.0 to 3.0 square units (a ~2x area at the user's request).
+
+### 8. The teeter autododge (the user: "make it so that teetering on an edge also allows for the autododge")
+Ottotto / OttottoWait (**0x7B / 0x7C**, reference/msc-note-sheet/Actions_Fighters.csv) are autododge statuses: the MSC
+(`ui_can_dodge`, so `ui_shape` keeps the counter shape on) and the cave (slot 42's dodge and slot 43's shield damage;
+the projectile filter covers every status). The counter shape's radius 6.5 -> **8** (OttottoWait's flailing hand
+reaches 7.73 from the capsule's axis; Wait 5.07, SquatWait 4.11). The sway from it doesn't move him (no travel,
+GroundModule 2: no sliding off an edge; the animation's lean is TransN only).
+
+### 9. The rush counters against XV2 (the user: "add the moving forward 18 units and vanishing behind the opponent part of the rush counter and remove the white glow. Make it so the transformation counter has no maximum range and keeps that glow, but add the vanish and make it freeze everyone")
+- **Which clip:** `xv2_1` / `ours_2` are the autododge's (short, 11 hits) counter; `xv2_2` / `ours_1` the
+  transformation's (15 hits, the white body).
+- **The short rush (sway / spot dodge):** XV2's xv2_1 (20 fps): a lunge of ~18 frames, the vanish, the camera behind
+  him behind the opponent. Now: **18 units over its frames 1-18** (ground speed, GroundModule 2: stops at an edge),
+  hidden at 18 (XV2's second vanish, 170) with the vanish effect, put **9 past the nearest opponent** facing it, shown
+  at 24 (XV2's 176, the end of BAC 1's hidden 156-176) with the vanish effect; **no white body** (the transformed glow
+  stays). Nobody near: no teleport.
+- **The transformation counter (long rush):** BAC entry 1: hidden 156-176 (function 0x6), Movement to the target 159-161
+  (2.5 m a frame), the vanish at 151 / 170. Now: hidden at 5, put **9 in front of the attacker** (the cave's record:
+  0x01000008 / 9) at 8 **wherever it is** (v2-v11: a gap closed at most 12.6 a frame over 6 frames; off his ground by
+  more than 6: airborne there), shown at 19 with the vanish, the freeze box again there (the attacker held to the
+  first rush hit wherever it stood); the white body kept. **The world stopped** (the cave's world stop, Secret
+  Sensation's TIMER_6 lease, asked every frame of the counter, the fallback 359 frames; any exit ends the asks: the stop
+  ends 2 frames later). The attacker isn't frozen: slot 42 notes its object id (`ws_vic`) for the transformation's
+  counter and `ws_step` lets it step on a normal frame like him, so the rush's hits land and it reacts (held by the
+  freeze box's hitstop, as XV2 holds the victim: BDM #0's 150-frame hold); everyone and everything else is stopped.
+
+### 10. The attack arcs light blue while transformed (the user: "make Supamario's Ultra Instinct hitbox trail color into a somewhat light blue ... up air's trail should be blue with its glow inside rather than brown")
+- The common arcs (0x0100008D / 8E / 90 / 92) are greyscale; each fighter's colour table makes them his (Mario's 2 /
+  0.8 / 0.35 and 3 / 0.7 / 0.2: orange-brown edge, white core; docs/native-notes.md "Fighter colours for the common
+  attack effects"). After each request, while transformed (Float_Var_Compare(TIMER_0 > 1500) True { ... }),
+  **LAST_EFFECT_SET_COLOR (0.8, 1.5, 3.0)** for 8D / 92 and **(1.2, 2.25, 4.5)** for 8E / 90 (as bright as his own):
+  a light-blue edge, the core still saturating white.
+- The up / down smash's arc is his own PtcMarioSmashHed (0x0341000B, orange colour keys): a blue copy
+  (PtcSupamarioUiSmashHedBlue, red and blue swapped, lifted 25% to white) requested instead while transformed (the
+  orange one ended at once).
+- Covered: jab 1-3, forward tilt (3 angles), up / down tilt, forward smash (3 angles: untransformed; transformed it is
+  Soaring Fist), up / down smash, forward / back / up air, the getup attacks, the ledge attack. Untransformed: vanilla.
+  No arc on neutral / down air (their effects aren't arcs).
+
+### Not confirmed in game / approximated
+- The world stop without effect pauses (objects' effects play on); hits on the attacker during the stop (it steps by
+  `ws_vic`; static reading of the step wrapper); the rush's teleport positions near ledges (GroundModule 2 keeps him on
+  the stage's edge).
+- The 3D shot's look (the renderer draws no refraction); the Hkn_Wind trace not converted; the auras' sizes / gains by
+  eye against the clips.
+- The KO model (mid-stage, Battlefield's blast zones, no DI / rage) for the finals' tuning.
+
+### Ultra Instinct v12, results
+`supamario_ui_test.py --exe --package --since` (v11's build, `--sf-skill`) **679 ok** (with `supamario_sf_test.py`:
+the knockback values and their weight independence, the finals' KO percents, the pushback, the jitter (his state after
+the move as before it, four cases), the feet on the floor in all 399 frames, the pushed opponent kept in reach; the
+counter's vanish / placement (6 cases incl. no maximum range and an airborne attacker) / world-stop asks / second
+freeze; the short rush's lunge / vanish behind the opponent (both sides, nobody near) and no white; the teeter dodges and
+shape; the arcs' colour blocks in 20 scripts and the smash arc's blue copy; Time Skip's aura following / higher; the 3D
+shot's tumble / refraction / follow variants; Secret Sensation's charge call); `supamario_ui_cave_test.py` **399 ok**
+(exe_v46z_ui8 / ui8_diag reproduced byte for byte; the teeter in slots 42 / 43, the world stop pausing nothing, the
+attacker's pass (`ws_vic`) and its clearing, Secret Sensation noting none, the shape's radius); `supamario_timeskip_test`
+198 (its aura following, x1.4, the white-area rule 3.0 for it), `supamario_godfist_test` 566, `supamario_sledgehammer_test`
+141, `supamario_fakedeath_test` 47, `supamario_corebreaker_test` 104 ok (their script checks strip the arcs' blocks with
+the glow restore); `outline_shell_test.py` 124 ok; `mesh_vis_test.py` 64 ok; `eft_vertex_test` 0 failures;
+`msc_stack_check` 0 of 2507 (globals 127 of 128), the projectile's 0 of 48; `fighter_texture_ids.py check` 0 errors;
+`import_call_check` 0 on both exes; Sm4shCommand v1.7.25 NvTest 290 ok / 1 known failure (effect.bin's else-if
+chains, upstream), HvTest 248 ok. 0 failures.

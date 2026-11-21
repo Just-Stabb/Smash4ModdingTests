@@ -96,13 +96,16 @@ SpecialAirLwHeavy_c3
 SpecialAirLwHeavy_c2 -> body/FitMarioBodyMainD03SpecialAirLwHeavy.omo
 SpecialAirLwHeavy_c3 -> body/FitMarioBodyMainD03SpecialAirLwHeavy.omo
 // its projectile: article 0 (the fireball's slot; weapons/soaringfist.c; motion.mtable): soaringfist = the final punch
-// (14%, 50 degrees), soaringfist2 / soaringfist3 = a level-2 / level-3 non-final punch
+// of a 2- / 3-punch release (14%, 50 degrees), soaringfist2 / soaringfist3 = a level-2 / level-3 non-final punch;
+// Ultra Instinct v12: soaringfist1 = the uncharged punch (slot 3: 14%, 50 degrees, fixed knockback 120 for every weight)
 soaringfist
 soaringfist2
 soaringfist3
+soaringfist1
 soaringfist -> fireball/FitMarioFireballMain.omo
 soaringfist2 -> fireball/FitMarioFireballMain.omo
 soaringfist3 -> fireball/FitMarioFireballMain.omo
+soaringfist1 -> fireball/FitMarioFireballMain.omo
 
 // ---- Sephiroth (edge)
 // his 3-hit jab: motion slots 0x51 / 0x52 (Zelda, his base, has one jab; extra_kinds.json "motions",

@@ -42887,7 +42887,7 @@ void ui_rush_s(float n)
 {
     float ox;
     float d;
-    if (n < UI_RS_FWD_N - 0.5f && global18 == 0)
+    if (n < UI_RS_FWD_N + 0.5f && global18 == 0)       // its frames 1 .. UI_RS_FWD_N
     {
         KineticModule(0x11, 0x3, UI_RS_FWD / UI_RS_FWD_N * WorkModuleF(0, 0x0f000003), 0.0f);
     }

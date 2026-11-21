@@ -3650,3 +3650,33 @@ exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATC
   - **Flipbook variants:** a program plays a flipbook only when its key's byte 10 has 0x08 (the same pixel program;
     vanilla pairs: Donkey Kong's 39 = the aura's follow program 63 + flipbook, Ganondorf's 36 = 64 + flipbook); slot
     0's UV block (`0x514`-`0x54C`) is then drawn too (scale 1 neutral). Converted sprites had one sprite-sheet cell.
+
+- **v12 (exe_v46z_ui8; README "Ultra Instinct v12"): the world stop without effect pauses, the attacker's pass, the
+  teeter, PhysicsModule's charge shake.**
+  - **A paused effect instance runs at rate 0.** The instance update `0x0334E080` sets `+0x19F = !paused` and returns
+    before its clock (`+0x140`); the instance calc (`0x0334E0CC`) takes the step `f29` from the instance's rates
+    (`+0x138` x `+0x13C` x `+0x140`) and, paused (`+0x19F` 0), `f29 = 0.0` (`0x0334E238`, the float at `0x10195FAC`) for
+    its emitter sets. A continuously emitting set then adds particles that never age. v10-v11's `ws_begin` paused every
+    instance but his, the stage's included: in game (Secret Sensation's counter, the user's v11 clip b) the stage and
+    background whitened from their bright spots within ~6 frames and stayed white until the stop ended. The game's own
+    pauses are narrower: an EffectModule's (hitlag) is its own key (`0x02C27E88`: `[EM + 0x10] | 0x8000`, mask
+    `0x0100BFFF`); the Final Smash code at `0x02772658` doesn't use `+0x19E` at all: `0x0334CA64` -> `0x032F0F88(key
+    0x01080000, mask 0xFF080000, r31)` -> `0x0334FD60(instance, r31)` = `+0x1A0` (a visibility / active byte) and
+    `0x0316505C(manager, !r31)`. exe_v46z_ui8's `ws_begin` pauses no instance (the stage stop kept).
+  - **The stage stop's argument.** `0x0316505C(manager, on)`: `+0xD0 = on`, `0x031427D0(stage, !on)`; the stage update
+    `0x03164B80` skips when `+0xD0` is set (`lbz r10, 0xd0(r30)` at `0x03164BD0`, `bne 0x03164DC8`). So on = stopped;
+    the Final Smash code passes `!r31` with r31 = "running" (its effect call's value).
+  - **The attacker's pass (`ws_vic`).** Slot 42, for the transformation's counter (0x155 with TIMER_4 above
+    MODE_FORM_ON, a fighter: category 0), stores the collision record's `+0x18` (the attacker's object id) in `ws_vic`;
+    `ws_step`, for any other fighter while a stop runs, compares its object id (`F + 0`, the fighter table entry's
+    `+0`) with it and steps it on a normal frame (the frame state's `+8` cleared for its step, put back), as his.
+    `ws_end` clears it. Secret Sensation stores nothing (everyone stops).
+  - **The teeter:** Ottotto / OttottoWait `0x7B` / `0x7C` join slot 42's dodge statuses and slot 43's (the shield
+    damage skipped). The counter shape's radius 6.5 -> 8 (OttottoWait's hand 7.73 from the capsule's axis).
+  - **PhysicsModule op 7 / 8 (ACMD START_CHARGE / the hold's exit).** START_CHARGE (`C52B4328`) is MSC PhysicsModule op
+    7 (the smash charge's body shake); the game stops it only in the hold statuses' exits (status table 2: 0x2C
+    `func_326`, 0x32 `func_329`, 0x2F `func_332`: `PhysicsModule(0x8)`); a charge run inside another status must call
+    it itself, or the shake lasts until a KO resets the module (Soaring Fist v11's jitter).
+  - **Visibility:** MSC `VisibilityModule(0x2710, 0 / 1)` hides / shows the whole fighter (his following effects with
+    him: "Effects follow the model's visibility" above): the rushes' vanishes, shown again at every exit (`ui_end`,
+    `ui_dodge_end`, `ui_finish`).

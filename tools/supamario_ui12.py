@@ -57,9 +57,9 @@ SS_SETS = ('PtcSupamarioUiKTN_GKS_Loop', 'PtcSupamarioUiKTN_GKS_Loop_2')
 SS_CHARGE_GAIN = 1.8
 # ---------------------------------------------------------------- 3. Time Skip
 TS_SET = 'PtcSupamarioTsFrt_CrgAura'
-TS_AURA_GAIN = 1.6
+TS_AURA_GAIN = 1.4
 TS_AURA_SIZE = 2.6                    # the call's size (v4-v11: 1.75, XV2's x1.0)
-TS_AURA_UP = 3.0                      # units (at the call's size) the set's parts are raised
+TS_AURA_UP = 5.0                      # units (at the call's size) the set's parts are raised
 # ---------------------------------------------------------------- 4 / 5. the arcs
 ARC_IDS = {0x0100008D: (0.8, 1.5, 3.0), 0x01000092: (0.8, 1.5, 3.0),     # Mario's 2-red ones
            0x0100008E: (1.2, 2.25, 4.5), 0x01000090: (1.2, 2.25, 4.5)}    # his 3-red ones, as bright

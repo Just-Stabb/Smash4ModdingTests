@@ -106,6 +106,7 @@ class Game(SHT.Game):
         self.vlims = []
         self.vel = []                # (n, vx, vy) each frame he moves
         self.fx_rot = []             # v4: (n, id, rotation Y) EffectModule 3's turn
+        self.fol = []                # v12: (n, op, id, args) the following requests (0x2717) and fades (0x2723)
         self.t12_empty = False       # v4: Target 12 reads nothing (the hit's first frame, the user's point-blank clip)
         self.script_lead = 0         # v5: the game script's events this many frames before the MSC's motion frame (an
                                      # ACMD FRAME N run as the motion reaches N - 1: the user's v4 point-blank clip)
@@ -200,6 +201,8 @@ class Game(SHT.Game):
             if a[1] == 0:
                 self.acc = -GRAVITY
             return 0
+        if sid == 0x1C and a and a[0] in (0x2717, 0x2723) and len(a) > 1:   # v12: following requests / their fades
+            self.fol.append((self.n, a[0], a[1], tuple(a[2:])))
         if sid == 0x1C and a and a[0] == 3 and len(a) > 8:    # v4: EffectModule 3's turn (Y)
             self.fx_rot.append((self.n, a[1], round(f(a[6]), 4)))
         if sid == 0x1C and a and a[0] == 0 and len(a) == 9:   # v3: Screen_Tint (EffectModule op 0)
@@ -768,6 +771,9 @@ def reset_tests(path):
           g.vars.get(B.V_USED), 1.0)
 
 
+TS_E0_WHITE_V12 = 3.0
+
+
 def brightness_tests(out):
     """v2 (user: "Does a massive white flash when it hits an opponent"): tools/supamario_fx_glow.py on a grass stage and a
     grey one: the punch's look against v1's (the shared Btl_HitLOD) and the user's earlier tolerance (Sledgehammer v5's
@@ -791,10 +797,13 @@ def brightness_tests(out):
               (h['max_over_1'] <= 1.0, e0 <= e1 / 3.0, h['brightest'][4] >= 8.0), (True, True, True))
         for k, lo in (('ts_e11', 20.0), ('ts_e0', 3.0)):
             o1 = 1e9    # v5 (user): the punch's burst limited by its white, not its purple; v6: effect 0 too (violet)
-            check('v5 %s: %s (XV2\'s skill effect) %s, at most 1.0 square unit white in any frame, visible (it changes the '
+            # Ultra Instinct v12 (the user: Time Skip's aura "too small, weak"): its effect 0 x 2.6 / 1.75 bigger, its
+            # alpha x 1.4: up to TS_E0_WHITE_V12 square units white on grass (the white cores over a ~2x area)
+            cap = TS_E0_WHITE_V12 if (k == 'ts_e0' and os.path.exists(os.path.join(out, 'ultrainstinct.json'))) else 1.0
+            check('v5 %s: %s (XV2\'s skill effect) %s, at most %g square unit white in any frame, visible (it changes the '
                   'picture by %g+)' % (bg_name, k, 'purple past 1.0 allowed (%.1f square units: it blooms purple)' %
-                                       r[k]['max_over_1'], lo),
-                  (r[k]['max_over_1'] <= o1, r[k]['max_white'] <= 1.0, max(abs(f_[4]) for f_ in r[k]['frames']) >= lo),
+                                       r[k]['max_over_1'], cap, lo),
+                  (r[k]['max_over_1'] <= o1, r[k]['max_white'] <= cap, max(abs(f_[4]) for f_ in r[k]['frames']) >= lo),
                   (True, True, True))
         # v7: the outline is Outline_Set (his own rim, no effect): nothing of it in the bank to measure (v6's rings went)
         # the wash: alpha-blended white at most WASH_A + the flash: the picture lifted toward white, never past it
@@ -936,26 +945,27 @@ def v3_tests(path):
 
 
 def aura_tests(path):
-    """v4: XV2's skill effect 0 (1350_HIK_FRT.eepk: the world parts as one set at his ground point, turned to his facing)
-    at the move's start (ts_init: XV2's frame 0), left behind as he dashes, again every AURA_EVERY frames of a held
-    charge"""
+    """v4: XV2's skill effect 0 at the move's start (ts_init: XV2's frame 0), again every AURA_EVERY frames of a held
+    charge; v12 (the user: "Time Skip/Jump Spike's aura is also too small, weak, doesn't follow Supamario when charging
+    and placed too low"): a FOLLOWING request on TransN (v4-v11: world-placed at his ground point, turned to his facing,
+    left behind), x U12.TS_AURA_SIZE, faded as the dash starts"""
+    import supamario_ui12 as U12
     for face in (1.0, -1.0):
         g = Game()
         g.face = face
         tr, vm = run(path, g)
-        au = [(n, x, y) for n, i, x, y, _s in g.fx if i == B.FX_AURA_ID]
-        rot = [r for n, i, r in g.fx_rot if i == B.FX_AURA_ID]
-        check('v4 effect 0 (facing %s): once at the move\'s frame 0 (XV2\'s BAC 0), at his ground point, x%.2f, turned to '
-              'his facing (Y %s)' % ('right' if face > 0 else 'left', B.AURA_SIZE, '0' if face > 0 else 'pi'),
-              ([(n, round(y, 2)) for n, _x, y in au], rot, [s_ for _n, i, _x, _y, s_ in g.fx if i == B.FX_AURA_ID]),
-              ([(0, 0.0)], [0.0 if face > 0 else round(math.pi, 4)], [round(B.AURA_SIZE, 3)]))
-        check('  ... he dashes on from there: %.1f units past it by the move\'s end' % abs(tr[-1][3] - au[0][1]),
-              abs(tr[-1][3] - au[0][1]) > 50.0, True)
+        au = [(n, a_[0], round(R.i2f(a_[7]), 3)) for n, op, i, a_ in g.fol if op == 0x2717 and i == B.FX_AURA_ID]
+        check('v12 effect 0 (facing %s): once at the move\'s frame 0 (XV2\'s BAC 0), following TransN (bone 0), x%.2f '
+              '(v4-v11: world-placed, x%.2f); no world-placed one' % ('right' if face > 0 else 'left', U12.TS_AURA_SIZE,
+                                                                     B.AURA_SIZE),
+              (au, [n for n, i, _x, _y, _s in g.fx if i == B.FX_AURA_ID]), ([(0, 0, round(U12.TS_AURA_SIZE, 3))], []))
+        fades = [n for n, op, i, a_ in g.fol if op == 0x2723 and i == B.FX_AURA_ID]
+        check('  v12: faded (0x2723 (id, 0, 0): its particles live out) once, as the dash starts', len(fades), 1)
     g = Game(held=lambda n: n < B.WIND_END + B.CHARGE + 5)
     tr, vm = run(path, g, frames=400)
-    au = [n for n, i, _x, _y, _s in g.fx if i == B.FX_AURA_ID]
+    au = [n for n, op, i, _a in g.fol if op == 0x2717 and i == B.FX_AURA_ID]
     check('v4 effect 0 in a full charge: at 0, then every %d charge frames (as the last one\'s 40-frame emission ends: '
-          'one at a time); v6: none as the dash starts (v4 / v5 played one more there)' % B.AURA_EVERY,
+          'one at a time); v6: none as the dash starts (v4 / v5 played one more there); v12: following him' % B.AURA_EVERY,
           au, [0] + [B.WIND_END + k for k in range(B.AURA_EVERY - 1, B.CHARGE - 1, B.AURA_EVERY)])
 
 
@@ -1550,18 +1560,23 @@ def effect_tests(out, sh_out):
     import supamario_ui_fx11 as FX11
     dim = FX11.TS_DIM if all(abs(struct.unpack_from('>2f', d, FX11.ROT_BASIS)[1] - FX11.BASIS_CONE) < 1e-4
                              for d in dw if p.field(d, 'particle_type') == 3) else 1.0
+    # Ultra Instinct v12 (tools/supamario_ui12.py ts_aura, run on its build): the set in TransN's frame (+Z forward),
+    # following him (GPU follow 0 on the live-matrix variant: the 00000000 below), higher, stronger
+    v12 = os.path.exists(os.path.join(out, 'ultrainstinct.json'))
+    import supamario_ui12 as U12
+    gain12 = U12.TS_AURA_GAIN if v12 else 1.0      # (its alpha x TS_AURA_GAIN)
     check('v4: effect 0\'s world parts (Frt_CrgAura at b_C_Pelvis 0.3 m down and at b_R_Foot, Frt_CrgAuraB at b_C_Pelvis: '
-          '0x%08X): ConeExtrude stripes as streaks (type 3), rising, follow none; v6: lavender (blue > red > green) at %g '
+          '0x%08X): ConeExtrude stripes as streaks (type 3), rising, follow none (UI v12: following); v6: lavender (blue > red > green) at %g '
           '(v4 / v5: 0.32, CrgAuraB pale cyan); + their halos; the foot\'s part behind (SpecialS frame 0: RFootJ behind '
           'TransN)' % (B.FX_AURA_ID, B.E0_CAP6),
           (p.set_name(si), [p.emitter_name(d) for d in dw][:3], {p.field(d, 'particle_type') for d in dw},
            {tuple(p.field(d, 'emit_direction')) for d in dw}, {bytes(d[0x310:0x314]).hex() for d in dw},
            all((abs(SB.arc_peak(p, d) - B.E0_CAP6 * dim) < 1e-3 if p.field(d, 'blend_type') == 1 else
-                p.field(d, 'alpha_diff21') <= B.E0_B_ALPHA + 1e-3 and min(p.color_keys(d, 0)[0][:3]) > 0.4 * dim) and
+                p.field(d, 'alpha_diff21') <= B.E0_B_ALPHA * gain12 + 1e-3 and min(p.color_keys(d, 0)[0][:3]) > 0.4 * dim) and
                p.color_keys(d, 0)[0][2] > p.color_keys(d, 0)[0][0] > p.color_keys(d, 0)[0][1] for d in dw[:3]),
-           len(dw), tr_[foot][0] < 0.0),
+           len(dw), tr_[foot][2 if v12 else 0] < 0.0),
           ('PtcSupamarioTsFrt_CrgAura', ['CrgAura_HipN', 'CrgAuraB_HipN', 'CrgAura_RFootJ'], {3}, {(0.0, 1.0, 0.0)},
-           {'00000001'}, True, 6, True))
+           {'00000000' if v12 else '00000001'}, True, 6, True))
     si = e.entries[B.FX_E0H_ID & 0xFFFF][1] - 1
     dh = [em['data'] for em in p.sets[si]['emitters'] if em['data'] is not None]
     check('v4: effect 0\'s following part (Frt_CrgAuraH, 0x%08X): its streak + halo, following (follow 0: XV2\'s '

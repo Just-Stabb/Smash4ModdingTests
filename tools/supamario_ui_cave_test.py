@@ -445,7 +445,8 @@ def setup_checks(e, kind):
         check('Marth\'s shape layout: x y z x y z radius bone type', ms, (1.5, 2.5, 3.5, 1.5, 2.5, 3.5, 4.5, 7, 2))
         ours = struct.unpack('>7fHB', inits[0][2][:0x1F])
         want = tuple(round(v, 4) for v in C.SHAPE['p1'] + C.SHAPE['p2'] + (C.SHAPE['radius'],)) + (C.SHAPE['bone'], 2)
-        check('our shape: (0, 2.5, 0) - (0, 9.5, 0), radius 6.5, joint 0, a capsule',
+        check('our shape: (0, 2.5, 0) - (0, 9.5, 0), radius %g (v12: 8, the teeter\'s hand; v1-v11 6.5), joint 0, a '
+              'capsule' % C.SHAPE['radius'],
               tuple(round(v, 4) for v in ours[:7]) + ours[7:], want)
     check('the module\'s shape count grows by one', e.w(m + 0x14), 2)
     shapes = e.w(m + 0xC + 4)
@@ -513,6 +514,18 @@ def slot42_checks(e, kind):
         check('  registers kept', kept, True)
         check('  TIMER_4 (the mode) read through get_float (v7: ui_mode4, then ui_isform)',
               [c[1:] for c in e.calls if c[0] == 'get'], [(fk['wm'], C.V_MODE)] * 2)
+        check('  v12: the transformation\'s counter: the attacker\'s object id noted for the world stop (ws_vic)',
+              e.w(e.labels['ws_vic']), aid)
+        e.setw(e.labels['ws_vic'], 0)
+    for mode in (3.0,):
+        e.vars = {C.V_MODE: mode}
+        fk = e.fighter(kind, status=C.ST_SS, x=0.0)
+        e.obj(0x00030012, x=20.0, y=7.5)
+        msg, am, rec = message(e, category=0, oid=0x00030012)
+        hitdata(e)
+        e.run(C.SLOT42_HOOK, 0, fk['f'], msg)
+        check('v12: slot 42, Secret Sensation (TIMER_4 3), a fighter: no attacker noted (its world stop stops everyone)',
+              e.w(e.labels['ws_vic']), 0)
     # a weapon / an item: the current owner's place, the side from the owner
     for cat, label in ((1, 'weapon'), (2, 'item')):
         e.vars = {C.V_MODE: C.MODE_FORM}
@@ -654,10 +667,12 @@ def slot42_checks(e, kind):
 
 
 DODGE_STATUSES = ((0, 'Wait'), (1, 'Walk'), (2, 'WalkBrake'), (0x11, 'Squat'), (0x12, 'SquatWait'), (0x13, 'SquatF'),
-                  (0x14, 'SquatB'), (0x15, 'SquatRv'), (C.ST_ESCAPE_N, 'v7: EscapeN (the spot dodge\'s counter mark)'))
+                  (0x14, 'SquatB'), (0x15, 'SquatRv'), (C.ST_ESCAPE_N, 'v7: EscapeN (the spot dodge\'s counter mark)'),
+                  (0x7B, 'v12: Ottotto (the teeter)'), (0x7C, 'v12: OttottoWait'))
 NOT_DODGE = ((3, 'Dash'), (0xE, 'Fall'), (0x10, 'Squat - 1 (0x10)'), (0x16, 'Landing (0x16)'), (0x1C, 'Guard'),
              (0x45, 'Damage'), (C.OLD_ST_DODGE, 'v1-v4\'s dodge (0x158)'), (C.OLD_ST_UI, 'v1-v4\'s transformation (0x157)'),
-             (0x20, 'EscapeF'), (0x21, 'EscapeB'), (0x22, 'EscapeAir'))
+             (0x20, 'EscapeF'), (0x21, 'EscapeB'), (0x22, 'EscapeAir'), (0x7A, 'v12: Ottotto - 1 (0x7A)'),
+             (0x7D, 'v12: OttottoWait + 1 (0x7D)'))
 
 
 def dodge42_case(e, kind, status=0, form=2000.0, my_x=0.0, obj_x=20.0, category=0, alive=True, group=1, mode=0.0):
@@ -1322,10 +1337,11 @@ def v10_ws_checks(e, kind, labels):
     e.setw(fs, 1)
     del steps[:]
     r, kept = e.run(labels['ws_step'], him['f'], him['acc'])
-    check('v10: ws_step, his ask (TIMER_6 2): the stop starts (the lease WS_LEASE, its owner him); every instance but his, '
-          'the one kept out and the one already paused is paused; the stage stopped (manager, 1)',
+    check('v10: ws_step, his ask (TIMER_6 2): the stop starts (the lease WS_LEASE, its owner him); v12: no effect instance '
+          'paused (v10-v11 paused every one but his: the stage\'s ran at rate 0, the white screen); the stage stopped '
+          '(manager, 1)',
           (e.w(data), e.w(data + 4), paused(), e.w(data + 8), stage, kept),
-          (C.WS_LEASE, him['f'], [0, 1, 0, 1, 1], 2, [(smgr, 1)], True))
+          (C.WS_LEASE, him['f'], [0, 0, 0, 1, 0], 0, [(smgr, 1)], True))
     check('v10: ws_step, his step during his stop runs on a normal frame (+8 0 while it runs), the frame state put back',
           (steps, e.mu.mem_read(fs + 8, 1)[0], e.w(fs)), ([(him['f'], him['acc'], 0, 1)], 1, 1))
     check('v10: ws_step asked TIMER_6 through his WorkModule (get_float)', ('get', him['wm'], C.V_STOP) in e.calls, True)
@@ -1333,6 +1349,18 @@ def v10_ws_checks(e, kind, labels):
     r, kept = e.run(labels['ws_step'], other['f'], other['acc'])
     check('v10: ws_step, another fighter during the stop: the game\'s step on the stopped frame (it doesn\'t step)',
           (steps, kept), ([(other['f'], other['acc'], 1, 1)], True))
+    # v12: the attacker the transformation counter answers (ws_vic: its object id, slot 42's) steps on a normal frame
+    vic = labels['ws_vic']
+    e.setw(vic, e.w(other['f']))
+    del steps[:]
+    r, kept = e.run(labels['ws_step'], other['f'], other['acc'])
+    check('v12: ws_step, the attacker the transformation counter answers (ws_vic = its object id) during the stop: its '
+          'step on a normal frame (+8 0 while it runs, put back): the rush\'s hits land and it reacts',
+          (steps, e.mu.mem_read(fs + 8, 1)[0], e.w(fs), kept), ([(other['f'], other['acc'], 0, 1)], 1, 1, True))
+    third = e.fighter(5, status=0, slot=2)
+    del steps[:]
+    r, kept = e.run(labels['ws_step'], third['f'], third['acc'])
+    check('v12: ... any other fighter still stopped', (steps, kept), ([(third['f'], third['acc'], 1, 1)], True))
     # the fill: the lease counts down
     e.mu.mem_write(fs, b'\0' * 12)
     r, kept = e.run(labels['ws_fill'], fs)
@@ -1350,10 +1378,10 @@ def v10_ws_checks(e, kind, labels):
     r1, _k = e.run(labels['ws_fill'], fs)
     e.mu.mem_write(fs, b'\0' * 12)
     r2, kept = e.run(labels['ws_fill'], fs)
-    check('v10: the asks stopped: the first fill a stopped frame (lease 1), the second ends the stop: the instances it '
-          'paused go on (the one paused before stays), the stage on (manager, 0), the state cleared, the game\'s frame',
-          (r1, r2, paused(), stage[-1], [e.w(data + 4 * k) for k in range(3)], bytes(e.mu.mem_read(fs, 12)), kept),
-          (0, 1, [0, 0, 0, 1, 0], (smgr, 0), [0, 0, 0], b'\0' * 12, True))
+    check('v10: the asks stopped: the first fill a stopped frame (lease 1), the second ends the stop: the stage on '
+          '(manager, 0), the state cleared (v12: ws_vic too), the game\'s frame',
+          (r1, r2, paused(), stage[-1], [e.w(data + 4 * k) for k in range(3)], e.w(vic), bytes(e.mu.mem_read(fs, 12)),
+           kept), (0, 1, [0, 0, 0, 1, 0], (smgr, 0), [0, 0, 0], 0, b'\0' * 12, True))
     # the stage stop skipped as the Final Smashes skip it
     e.mu.mem_write(sflags + 0xB3, bytes([1]))
     del stage[:]
@@ -1385,8 +1413,8 @@ def v10_diag_checks(diag, kind):
     v10_sx_checks(e, kind, labels)
     v10_ws_checks(e, kind, labels)
     ws = [l_ for l_ in lines if l_[0] == 'S4UW']
-    check('v10 diag: S4UW on / off at each stop\'s start and end (on 1, his fighter, 2 paused; off 0, his fighter, 2)',
-          [(x[1][0], x[1][2]) for x in ws][:2], [(1, 2), (0, 2)])
+    check('v10 diag: S4UW on / off at each stop\'s start and end (on 1, his fighter, v12: 0 paused; off 0, his fighter, 0)',
+          [(x[1][0], x[1][2]) for x in ws][:2], [(1, 0), (0, 0)])
 
 def main():
     a = sys.argv[1:]
@@ -1408,6 +1436,7 @@ def main():
     words_checks(base, patched)
     event_checks(base)
     e = Run(patched)
+    e.labels = C.build(kind)[1]          # v12: ws_vic
     setup_checks(e, kind)
     slot42_checks(e, kind)
     dodge42_checks(e, kind)
