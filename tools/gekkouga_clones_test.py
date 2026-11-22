@@ -1716,6 +1716,20 @@ def script_tests(out, user):
     ue = acmd.ACMDFile.load(os.path.join(user, 'body', 'effect.bin'))
     pg = acmd.ACMDFile.load(os.path.join(O, 'body', 'game.bin'))
     pe = acmd.ACMDFile.load(os.path.join(O, 'body', 'effect.bin'))
+    import rolloff_acmd as RA
+    mom = {nm: [(f, float(c.params[0])) for f, c in RA.timeline(pg.script(nm)) if c.ident == RA.MOM]
+           for nm in GB.ROLLOFF_SCRIPTS}
+    check('skeleton v1.3 package: his rolls\' roll-off speed (the user: 2.5; his game.bin had none, so the MSC\'s kinetic '
+          'type 0x6 rolls never moved): cleared at 0, cleared then +-2.5 at 5, cleared at 27 (the back roll -2.5)',
+          mom, {'EscapeF': [(0.0, 0.0), (5.0, 0.0), (5.0, 2.5), (27.0, 0.0)],
+                'EscapeB': [(0.0, 0.0), (5.0, 0.0), (5.0, -2.5), (27.0, 0.0)]})
+    msrc = open(os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c')).read()
+    check('skeleton v1.3 package: his MSC\'s roll-off air multiplier 1.24, the ground cap lifted (KineticModule(0x15, 3, -1, '
+          '-1) on the roll frames: universal_mechanics --ground-uncapped)',
+          ('float rolloff_air_speed_mult() { return 1.24f; }' in msrc,
+           'KineticModule(0x15, 0x3, -1.0f, -1.0f); // no ground speed limit on the roll\'s speed (user: gekkouga)' in msrc),
+          (True, True))
+    GB.add_rolloff(ug)                    # (the rest compared against his own with the roll-off added)
     tips = [(nm, [(int(c.params[1]), round(float(c.params[3]), 2), round(float(c.params[4]), 2), round(float(c.params[8]), 2))
                   for c in pe.script(nm) if c.name == 'External_Graphic' and int(c.params[0]) == GB.FIRE_TIP],
              len([c for c in pe.script(nm) if c.name == 'Terminate_Graphic_Effect' and int(c.params[0]) == GB.FIRE_TIP]))
@@ -1920,7 +1934,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 19:   # v15: the release exe and data, test exes and data
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
-    if len(earlier) in (20, 21):   # skeleton v1.2 / burn v2: the exes, the data, test exes (burn v2: + Sm4shCommand)
+    if len(earlier) in (20, 21, 26):   # skeleton v1.2 / burn v2 / skeleton v1.3: the exes, the data, test exes
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (23, 24, 25):   # burn v2.2 / v2.3 / aerial chain v1: data only
         want_top = ['INSTALL_TO_data', 'README.txt']
@@ -1948,7 +1962,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('update: none of the installed unchanged files again (%d unchanged)' % len(same1), [w for w in same1 if w in names], [])
         check('update: nothing in INSTALL_TO_data but the built files',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want), [])
-        if len(earlier) in (18, 19, 20, 22, 23, 24, 25):
+        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 21:
             check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
@@ -2010,6 +2024,16 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               'places delayed) and the clone\'s MSC (its playback delayed)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
               ['fighter/gekkouga/script/msc/clone/clone.mscsb', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
+    if z1 and len(earlier) == 26:
+        check('skeleton v1.3: INSTALL_TO_data: his effect bank (the runs born on time, the burn tiers\' fires, forward air\'s '
+              'blade flames), his body game.bin (the rolls\' roll-off speed) and effect.bin (forward air), the clone\'s '
+              'effect.bin (forward air), his MSC (roll-off air x 1.24, uncapped)',
+              sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              sorted(['fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.efc',
+                      'fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.ptcl',
+                      'fighter/gekkouga/script/animcmd/body/effect.bin', 'fighter/gekkouga/script/animcmd/body/game.bin',
+                      'fighter/gekkouga/script/animcmd/weapon/clone/effect.bin',
+                      'fighter/gekkouga/script/msc/gekkouga.mscsb']))
     if z1 and len(earlier) == 22:
         check('burn v2.1: no INSTALL_TO_data (the 1 %% floor is the exe\'s shielded damage table)',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')), [])
@@ -2115,7 +2139,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         import gekkouga_clone_cave as C
         for i, (member, b, dg, feats) in enumerate(exe_members(base, base_diag, len(earlier) >= 3, len(earlier) == 17,
                                                                len(earlier) == 18, len(earlier) >= 19, len(earlier) in (19, 20),
-                                                               len(earlier) == 21)):
+                                                               len(earlier) == 21, len(earlier) in (22, 23, 24, 25))):
             if not b:
                 continue
             p = os.path.join(td, '%d.rpx' % i)
@@ -2154,7 +2178,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18, 19, 20, 21, 22, 23, 24, 25) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18, 19, 20, 21, 22, 23, 24, 25, 26) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -2169,6 +2193,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         if len(earlier) == 24 else \
         ('greninja_burn_v2_3', 'aerial', 'chain', 'hit', 'shield', 'once', 'land', 'clone', 'dust', 'sparkle', 'size 1',
          'sword', '1 frame', '2 frames', 'hitlag', 'swap', 'S4GF', 'unconfirmed', 'exe_v46z_gkb5') if len(earlier) == 25 else \
+        ('greninja_aerialchain_v1', 'exe_v46z_gkb6', 'blink', 'collision', 'tier', 'stack', 'forward air', 'blade', 'roll',
+         '2.5', '1.24', 'A_release', 'G_pose', 'S4SD', 'unconfirmed', 'burn_tiers.png', 'fair.png') if len(earlier) == 26 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -2180,7 +2206,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
 
-def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=False, b2=False):
+def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=False, b2=False, gkb5=False):
     """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant; skeleton v1 the
     release and TEST_ONLY A_release (as the burn packages)"""
     import gekkouga_clone_cave as C
@@ -2194,6 +2220,7 @@ def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=
                 ('TEST_ONLY_INSTALL_TO_code/E_sway/cross_f.rpx', base_diag, True, sk1 | {'sway'})]
     if v15:     # (v15 and skeleton v1.2 (sk12): RELEASE without burn v2's burn2; burn v2 on: RELEASE)
         drop = {'burn2', 'floor1'} if sk12 else {'floor1'} if b2 else set()
+        drop |= {'tiers', 'gmupd'} if sk12 or b2 or gkb5 else set()   # (skeleton v1.3's exe_v46z_gkb6 adds them)
         return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE - drop)] + \
             [('TEST_ONLY_INSTALL_TO_code/%s/cross_f.rpx' % n, base_diag, True, f - drop) for n, f in C.VARIANTS]
     if not v4:
@@ -2223,7 +2250,8 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
     z = zipfile.ZipFile(pkg)
     with tempfile.TemporaryDirectory() as td:
         for member, b, dg, feats in exe_members(base, base_diag, v4, len(earlier) == 17, len(earlier) == 18,
-                                                len(earlier) >= 19, len(earlier) in (19, 20), len(earlier) == 21):
+                                                len(earlier) >= 19, len(earlier) in (19, 20), len(earlier) == 21,
+                                                len(earlier) in (22, 23, 24, 25)):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')
@@ -2245,7 +2273,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]

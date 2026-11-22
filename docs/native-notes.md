@@ -3945,6 +3945,25 @@ MSC on a bunshin-based kind, the 4-shape group.
   26 +0xC4, 27 +0x78. Slot 17 (+0x8C, ctor `0x02C4D2B8`, vtable `0x10108224`) is on the hydrant, Villager's tree /
   bowling ball, Wario's bike, Pikmin, Tico, Zelda's phantom, Rush coil; the hydrant's +0x3C calls its vt +0x3C(5),
   +0x74 / +0xC4 (Pac-Man's vl +0x4C0 / +0x4C4), +0x54(1) before making its grounds.
+- **eft emitter timing (Greninja skeleton v1.3: the user's "blinks out and back in")**: emitter +0x448 is the emission
+  count's random in percent (each emission accumulates rate x (1 - U x it / 100): the volume functions, `0x04A4B32C`;
+  frame 0 always emits one), not a start frame; the delay is +0x44C (the update `0x04A64F00`: t = the emitter's frame -
+  the set instance's +0x2AC, 0 at its init `0x04A55DC0`; nothing while t < +0x44C, `0x04A6507C`; one-time: nothing once
+  t is past +0x450 on the same clock, `0x04A64F70` / `0x04A65040`); then emissions every interval + 1 (`0x04A65120`,
+  `0x04A65378`). Skeleton v1.2 - aerial chain v1 put a flipbook's second run's start in +0x448: it was born at 0 with
+  the first (two cells drawn at once), its re-births thinned, and nothing drawn from the first run's end to the next
+  period (57 - 109 for the skeleton: the clip's ~1 s seen, ~0.8 s gone). `tools/gekkouga_fx_test.py eft_timing` models it.
+- **The hydrant's GroundModule frame update (skeleton v1.3)**: the weapon update switch (`0x02B6B7A8`, case = 0x02B6B7C4 +
+  4 x base kind) runs a per-kind template; the hydrant's (0x12D: `0x02BA993C`) ends with `0x02BA98F4`: `0x02B38AD0([acc
+  +0x2C])` = `0x02C34258` (the GroundModule's base frame update: [gm+0x14]+0x18 vt +0x74, its +0x18 object's
+  `0x02D64344`, vt +0x64 `0x02C35C9C` (the article's own ground contact), +0xE3 = 1), [[gm+0x14]+0x34] vt +0x54(3), its
+  vertices (`0x02B38A18` -> `0x02B38950` each, `0x02AC3204`), then `0x02AC3F3C([acc+0xA4], byte)`. Mario's pump's
+  template (`0x02B9B754`, the skeleton's base kind) never updates +0x2C. Its status hook's landing case (`0x02B37460`)
+  after `(gm, 1)` also calls gm vt +0x244(gm, 0) (`0x02C36F0C`: sets [gm+0x18]+0x248 bit 8, its own ground snap) and
+  [acc+0x7C] vt +0x54(f1). v1.3 runs `0x02C34258` on the skeleton's GroundModule every moved frame (feature `gmupd`): an
+  attempt, not confirmed.
+- **EffectModule MSC int op 0x2D (x)**: vt +0xD4 (`0x02C2BD44`): every following effect of the object (owner key | 0x10000)
+  ended through `0x032F0310` -> `0x0334F308(record, 0, 0, x)`: a fade (as 0x2723's (0, 0)); then `0x0334C82C`.
 - **eft flipbooks hold 32 cells (Greninja skeleton v1.2)**: every vanilla flipbook vertex program reads the cell from the
   pattern table (CB2 ptnAnm0's vec4 17-24, 32 entries, filled from emitter 0x4E0 by `0x04A5A858` whatever 0x4D5 says);
   no vanilla emitter has more than 32 cells (7128 checked). Run in `tools/latte_exec.py` (Kirby's PtcKirbyStoneEnd/stone

@@ -31,7 +31,10 @@ with the tools:
    other script was checked identical, and a plain load / save gives every user file back byte for byte.
 
 Speeds and air multipliers: default 2.2 / 1.0; Captain Falcon 2.4 / 1.0; Kirby 2.1 / 1.0 (Overdrive
-2.8 / 1.05, `fighters/kirby/specials.md`); Luigi 1.6 / 1.1; Sonic 2.76 / 1.0; **Pikachu 8 / 0.2** (user).
+2.8 / 1.05, `fighters/kirby/specials.md`); Luigi 1.6 / 1.1; Sonic 2.76 / 1.0; **Pikachu 8 / 0.2** (user); **Greninja 2.5 /
+1.24, ground-uncapped** (user, skeleton v1.3 package: "Greninja's roll doesn't move him anywhere": his game.bin never had
+the roll-off speed while his MSC's rolls were already kinetic type 0x6, which moves only by it: `tools/gekkouga_build.py`
+`add_rolloff` now adds it to EscapeF / EscapeB, and runs `universal_mechanics.py --air-mult 1.24 --ground-uncapped`).
 
 **Speed cleared before the roll's speed (user: it wasn't, for anyone):** the roll's kinetic type
 `0x6` sets up energy 3 with the speed the fighter had (a dash, a run), and the ACMD's
@@ -62,7 +65,7 @@ the one type 0x6 sets up: `0x02E7A4DC` case 6 → `0x02C5474C(3, ...)`) is held 
 limit, so a roll speed above it is cut down (Pikachu's 80 rolled like 8). `universal_mechanics.py
 --ground-uncapped` makes `rolloff_update()` call `KineticModule(0x15, 3, -1, -1)` every roll frame
 (no limit: the game's own pattern after resetting energy 3, `KineticModule(0xe, 3, ...)`). On:
-**Pikachu**, **Corrin**, **Meta Knight**, **Samus**, **Roy** (user; Meta Knight's own game.bin had no
+**Pikachu**, **Corrin**, **Meta Knight**, **Samus**, **Roy**, **Greninja** (user; Meta Knight's own game.bin had no
 roll-off yet: `--plain --add` 2.2; Samus' and Roy's had it). Not in game-tested yet: that op 0x15 is the limit that applies here.
 
 ## Reverse tilts

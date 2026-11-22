@@ -1122,3 +1122,53 @@ charge's dust / sparkle 1 and sword sizes at 0 - 120 for all three smashes), `de
 hitlag, swap, back in formation) and `clone_delay_tests` (the clone: 1 / 2 frames late, first frames, facing, frozen,
 history dropped when not alive); the physics / playback tests written before the delay run with it stubbed to 0.
 Not confirmed in game.
+
+## Skeleton v1.3 (`greninja_skeleton_v1_3.zip`, over aerial chain v1; exe_v46z_gkb6)
+
+The user's skeleton v1.2 clip (`$S/gk_in/sk12clip/a.mp4`): the look works; it runs through DK (no collision); it is
+gone ~0.8 s after ~1 s and comes back. Then: "different fire effects on the opponent to denote more/stronger fire
+stacks", "have the fire effects be visible the entire time", "forward air ... more fire along the edges of the water
+blade and ... larger", and "Greninja's roll doesn't move him anywhere ... 2.5 roll speed with a 1.24 roll speed
+multiplier" ("if the roll script is already in place, uncap his roll speed").
+
+- **The blink (every looping fire)**: `tools/gekkouga_fx.py flip_emitters` put a run's birth in emitter +0x448, which is
+  eft's emission count random (percent), not a start frame (docs/native-notes.md "eft emitter timing"): every run was
+  born at frame 0 (the second drawn over the first), nothing from the first run's end (57) to the next period (110), the
+  re-births thinned. Now +0x44C (emit start) holds it, +0x448 0, a one-shot's end frame = its start + 1 (the same clock).
+  The skeleton (R / L), the burning fighter's fire, the water-tip flames, the trails and the new sets.
+  `tools/gekkouga_fx_test.py timing_checks`: eft's timing (`eft_timing`, read from the update / emission code) over 600
+  frames draws every looping set on every frame; the v1.2 placement in the same model gives the clip's gap (57 - 109).
+  `ptcl.py` names +0x448 `emit_rate_random` (`start_frame` an alias); `fx_render` starts emitters at +0x44C. Not changed:
+  `vfxb_to_ptcl.py` / `xv2_to_ptcl.py` write start frames into +0x448 too (other fighters' ports).
+- **Burn tiers** (exe feature `tiers`, `tools/gekkouga_clone_cave.py` `BFX_TIERS` / `BFX_TIER_IDS` / `bfx_tier`): the
+  fire on a burning fighter by tier, from all its burns: instances, remaining damage (each damage a tick x frames left /
+  interval) and the strongest rate (x 60 / interval); the highest tier one of whose minimums is met (4: 6 / 20 % / 6 %/s,
+  3: 4 / 8 % / 4 %/s, 2: 2 / 4 % / 1.8 %/s), 1 with any burn. So one neutral air 1, a forward air 2, a smash 3, the
+  explosion 4; weak burns climb by count. Each tier its set (size 1): PtcGekkougaFireBody1 0x330001F (fire_torch_012 22
+  tall), FireBody 0x330001A (burn v2's, tier 2), FireBody3 0x3300020 (fire_small_5 42), FireBody4 0x3300021
+  (fire_ground_10 56 + fire_small_5 40 layered, colour x 1.25); swapped only on a tier change (0x2723 (old, 1, 1),
+  0x2717 new), a 15-frame fade when the burns end (0x2723 (id, 0, 0)). Preview `$S/gk_preview/burn_tiers.png`
+  (`tools/gekkouga_burn_preview.py`: his model in Wait1 as a grey stand-in).
+- **Forward air's blade flames**: PtcGekkougaFireBlade (0x3300022, `gekkouga_fx.py` `FIRE_BLADE`): 6 flames, one emitter
+  each, bases from 2.5 to 11 down the sword's joint (its -Y, as the sword), the n-air ring's clips in turn, each its own
+  start cell, 1.8x the ring's heights, +- 14 degrees (billboards: upright, they can't turn with the blade), looping until
+  ended; `gekkouga_build.py` `FIRE_BLADE_SCRIPTS` calls it at the sword's own External_Graphic (joint 25, size 1) in place
+  of burn v2's tip flame, ended with the sword; the clones' forward air too. Preview `$S/gk_preview/fair.png` / `.gif`
+  (`tools/gekkouga_fair_preview.py`). Unresolved there: model.jtb table 0 makes the sword's joint 25 ThrowN, which
+  AttackAirF holds still at his origin; the preview draws it on RHaveN (the hand in front) instead. The same mapping is
+  the clones' (the user's "forward air's water sword doesn't move" on them): not fixed here.
+- **Roll-off**: his game.bin's rolls had no roll-off speed (vanilla EscapeF, no EscapeB), while his MSC's rolls are
+  kinetic type 0x6 (moved only by that speed): they stood still. `gekkouga_build.py add_rolloff`: `rolloff_acmd.add_speed`
+  2.5 (EscapeB -2.5) at frame 5, cleared at 0 / 5 / 27; `cmd_msc` runs `universal_mechanics.py --air-mult 1.24
+  --ground-uncapped` (`KineticModule(0x15, 3, -1, -1)` on the roll frames). `rolloff_hold_test --mult gekkouga=1.24`: as
+  Hero's.
+- **Collision attempt** (exe feature `gmupd`): the hydrant's update template runs its GroundModule's frame update
+  (`0x02C34258`) every frame, Mario's pump's (the skeleton's base kind) never does (docs/native-notes.md "The hydrant's
+  GroundModule frame update"); `sk_col_place` now calls it on every moved frame before the vertices (the hydrant's
+  order). Not confirmed; the next step is the user's A_release log (S4SD / S4SE, S4CD - S4CH with the hydrant).
+- Exes: exe_v46z_gkb6 = RELEASE (+ tiers, gmupd); TEST_ONLY A_release / G_pose. exe_v46z_gkb5 still rebuilds byte for
+  byte (RELEASE - tiers - gmupd).
+- Tests: `gekkouga_clone_cave_test` 239 / 268 / 263 (release / A_release / G_pose; `tier_checks`: the Python reference
+  and the exe on 10 cases, swaps only on a tier change, the fade; the GroundModule update before the vertices);
+  `gekkouga_fx_test` 51 / 0; `rolloff_hold_test` gekkouga ok; `gekkouga_clones_test ... --vac` 307 / 0;
+  supamario_ui_cave_test 0; import_call_check 0. Not confirmed in game: everything here.

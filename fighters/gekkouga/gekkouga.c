@@ -39890,7 +39890,7 @@ void func_2413()
 float rolloff_start_frame() { return 5.0f; } // = the ACMD's speed frame
 float rolloff_clear_frames() { return 3.0f; } // the carried speed is cleared on the roll's frames before this
 int   rolloff_lock_frames()  { return 10; }   // shield held this many frames in a row: no roll-off for the rest of the roll
-float rolloff_air_speed_mult() { return 1.0f; } // speed carried off a ledge x this (1.0 = unchanged)
+float rolloff_air_speed_mult() { return 1.24f; } // speed carried off a ledge x this (1.0 = unchanged)
 
 void rolloff_fall_speed()
 {
@@ -39919,6 +39919,7 @@ void rolloff_update()
         KineticModule(0x11, 0x3, 0, 0);              // ACMD adds the roll's speed (user)
         KineticModule(0x11, 0x2, 0, KineticModuleF(0xb, 0x2)); // and a dash's slide, energy 2 (user: a back roll
     }                                                          // out of a dash went almost nowhere)
+    KineticModule(0x15, 0x3, -1.0f, -1.0f); // no ground speed limit on the roll's speed (user: gekkouga)
     if (global62 < rolloff_lock_frames())
     {
         if (ControlModule(0x2712, 0x3))

@@ -116,10 +116,19 @@ def patch_msc(src):
     return src + '\n' + open(CLONES_C).read()
 
 
+ROLLOFF_SPEED = 2.5               # skeleton v1.3 package (the user: "Greninja's roll doesn't move him anywhere, please give
+ROLLOFF_AIR_MULT = 1.24           # him a 2.5 roll speed with a 1.24 roll speed multiplier"): his rolls had no roll-off
+                                  # speed (his game.bin never got tools/rolloff_acmd.py; the MSC's rolls are kinetic type
+                                  # 0x6, which moves only by that speed: they stood still); the roll-off air multiplier,
+                                  # and his ground cap lifted (universal_mechanics.py --ground-uncapped, the user: "uncap
+                                  # his roll speed")
+ROLLOFF_SCRIPTS = ('EscapeF', 'EscapeB')
+
+
 def cmd_msc(vanilla, out):
     tmp = out + '.um.c'
-    subprocess.run([sys.executable, os.path.join(HERE, 'universal_mechanics.py'), '--name', 'gekkouga', vanilla, tmp],
-                   check=True, stdout=subprocess.DEVNULL)
+    subprocess.run([sys.executable, os.path.join(HERE, 'universal_mechanics.py'), '--name', 'gekkouga', '--air-mult',
+                    str(ROLLOFF_AIR_MULT), '--ground-uncapped', vanilla, tmp], check=True, stdout=subprocess.DEVNULL)
     src = open(tmp).read()
     os.remove(tmp)
     open(out, 'w').write(patch_msc(src))
@@ -449,6 +458,18 @@ def strip_fire_tips(effect):
     return n
 
 
+def add_rolloff(game):
+    """skeleton v1.3: his rolls' roll-off speed (tools/rolloff_acmd.py --plain --add ROLLOFF_SPEED EscapeF EscapeB: the
+    back roll -speed), where a roll has none yet"""
+    import acmd
+    import rolloff_acmd as RA
+    for nm in ROLLOFF_SCRIPTS:
+        sc = game.scripts.setdefault(acmd.crc(nm), [])
+        if any(c.ident == RA.MOM and float(c.params[0]) != 0 for _f, c in RA.timeline(sc)):
+            continue
+        RA.add_speed(sc, -ROLLOFF_SPEED if nm == 'EscapeB' else ROLLOFF_SPEED, 5.0, 27.0, scripts=game.scripts)
+
+
 def cmd_acmd(user_dir, vanilla_model, out_dir):
     """user_dir: his script/animcmd (body/ game, effect, sound, expression, motion.mtable); vanilla_model: his
     model/body/c00 (model.jtb / model.vbn for the clone's joints); out_dir: script/animcmd of the package"""
@@ -457,6 +478,7 @@ def cmd_acmd(user_dir, vanilla_model, out_dir):
     game = acmd.ACMDFile.load(os.path.join(body, 'game.bin'))
     effect = acmd.ACMDFile.load(os.path.join(body, 'effect.bin'))
     n = scale_smash(game, effect)
+    add_rolloff(game)
     tips = add_fire_tips(effect) if FIRE_TIPS else 0
     ob = os.path.join(out_dir, 'body')
     os.makedirs(ob, exist_ok=True)
