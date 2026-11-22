@@ -3817,3 +3817,8 @@ MSC on a bunshin-based kind, the 4-shape group.
   - Not found: the stage's blast zone data (the clones use a heartbeat for the game's own removal + a fallback).
   - Cave `0x04BEA000`-`0x04BEC400` (diag `0x04BEC8B8`), limit `0x04BEE000`. Tests: `gekkouga_clone_cave_test.py` 81 / 84
     (release / diag), `supamario_ui_cave_test.py` (outline5 -> gk3) 0 failures, import_call_check 0.
+- **v4 (exe_v46z_gk4 + four TEST_ONLY variants; fighters/gekkouga/README.md "Clones v4")**: the v3 exes crashed in game
+  when a clone was made (its objects built fine at the match start: `S4GI` x2). The native parts are build features
+  (`--features`: template / parts / hurt / poll); the release is the safe set (bunshin's row and routine, no parts, no
+  hurtboxes, no pollers). The `GX2RSetAttributeBuffer` burst at the match start is in an older Supamario-test log too: not
+  the clones'.

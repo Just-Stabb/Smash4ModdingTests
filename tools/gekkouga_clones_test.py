@@ -318,20 +318,23 @@ def msc_tests(mscsb, src):
           (r, g.status_req, m.g('gk_ability'), m.g('gk_lw_charge')), (0, [], 720, 0))
     g.x = 50.0
     frames(m, 1)
+    check('v4: frame 0: the left clone requested (flags + 64: the TEST_ONLY exe logs it before the generate), none made yet',
+          ([x for x in g.log if x[0] == 'article'], int(g.vars.get(0x0F000314)) & 0xC0), ([], 0x40))
+    frames(m, 1)
     arts = [x for x in g.log if x[0] == 'article']
-    check('frame 0: the left clone (article 6) made, VAR_31 = 4747000 + alive 1 + being made (left) 4, its smoke at X - 14',
+    check('frame 1: the left clone (article 6) made, VAR_31 = 4747000 + alive 1 + being made (left) 4, its smoke at X - 14',
           (arts, g.vars.get(0x0F00031F), [x[3] for x in g.log if x[0] == 'effect' and x[2] == 0x3300006]),
           ([('article', 0x2710, 6)], 4747005.0, [36.0]))
     check('v2: the ability hides his name tag (the cursor op BattleObject(0xA, 0))', [x for x in g.log if x[0] == 'cursor'],
           [('cursor', 0)])
     frames(m, 3)
     arts = [x for x in g.log if x[0] == 'article']
-    check('frame 3: the right clone (article 7), VAR_31 = 4747000 + 3 + being made (right) 8, its smoke at X + 14',
+    check('frame 4: the right clone (article 7), VAR_31 = 4747000 + 3 + being made (right) 8, its smoke at X + 14',
           (arts[-1], g.vars.get(0x0F00031F), [x[3] for x in g.log if x[0] == 'effect' and x[2] == 0x3300006][-1]),
           (('article', 0x2710, 7), 4747011.0, 64.0))
     check('flags: tag hidden (1) + v3 diag clones out (16 + 32)', g.vars.get(0x0F000314), 49.0)
     g.motion, g.frame, g.rate = 0x5F, 7.0, 1.0
-    frames(m, 2)
+    frames(m, 3)
     check('v3 channel: left clone X / Y 36 / 10, right 64 / 10, motion 0x5F x 1024 + frame 7, rate 1, the heartbeat '
           'cleared (0), 4747000 + alive 3', [g.vars.get(0x0F000318 + i) for i in range(8)],
           [36.0, 10.0, 64.0, 10.0, 95.0 * 1024 + 7.0, 1.0, 0.0, 4747003.0])
@@ -711,7 +714,7 @@ def physics_tests(mscsb, src):
     # ---- the fallback: falling on their own 300 frames (no blast zone removal seen) -> gone in smoke, no log
     m, g = start(0.0, 10.0, [])
     g.log = []
-    frames(m, 294)
+    frames(m, 295)
     check('v3 fallback: nothing under them, the left clone 300 frames falling: still there', m.g('gk_alive'), 3)
     frames(m, 1)
     check('its 301st: the left one gone (article 6 removed), its smoke, no Substitution log',
@@ -1062,7 +1065,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     names1 = set(z1.namelist()) if z1 else set()
     newest = os.path.basename(earlier[-1]).replace('.zip', '') if earlier else None
     top = {n.split('/')[0] for n in names}
-    exe_too = len(earlier) < 3             # v4: no executable change (v3's stays)
+    exe_too = True
     check('the package\'s top level: README.txt, INSTALL_TO_data%s (+ Sm4shCommand)' % (', INSTALL_TO_code, TEST_ONLY_INSTALL_TO_code'
                                                                                       if exe_too else ' (v4: the exe is v3\'s)'),
           sorted(t for t in top if not t.startswith('Sm4shCommand_v')),
@@ -1106,32 +1109,38 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
            ['fighter/gekkouga/model/clone/c%02d/%s' % (c, f) for c in range(8) for f in GB.CLONE_MODEL_FILES]
     check('the files the mod needs (with the earlier packages under it)', [m for m in must if 'INSTALL_TO_data/' + m not in names | names1], [])
     with tempfile.TemporaryDirectory() as td:
-        for nm, b in (('gk', base), ('gkd', base_diag)):
+        import gekkouga_clone_cave as C
+        for i, (member, b, dg, feats) in enumerate(exe_members(base, base_diag, len(earlier) >= 3)):
             if not b:
                 continue
-            p = os.path.join(td, nm + '.rpx')
-            import gekkouga_clone_cave as C
-            a = C.args(b, nm == 'gkd')
+            p = os.path.join(td, '%d.rpx' % i)
+            a = C.args(b, dg, feats)
             subprocess.run([sys.executable, os.path.join(HERE, 'rpx_patch.py'), b, p] + a, check=True, stdout=subprocess.DEVNULL)
-            member = ('INSTALL_TO_code' if nm == 'gk' else 'TEST_ONLY_INSTALL_TO_code') + '/cross_f.rpx'
-            if not exe_too:
-                check('v4: the installed %s (v3\'s) is still the cave on its base, rebuilt from the script' % member,
-                      z1.read(member) == open(p, 'rb').read(), True)
-                continue
-            check('%s is the cave on its base, rebuilt from the script' % member, z.read(member) == open(p, 'rb').read(), True)
-            if z1:
+            check('%s is the cave on its base (features %s), rebuilt from the script' % (member, ','.join(sorted(feats)) or 'safe'),
+                  z.read(member) == open(p, 'rb').read(), True)
+            if z1 and member in names1:
                 check('%s differs from %s\'s' % (member, newest), z.read(member) != z1.read(member), True)
     readme = z.read('README.txt').decode('utf8', 'replace')
     words = ('300', '720', '480', 'swap', 'chain', 'Technical') if not z1 else \
         ('greninja_clones_v1', 'hitlag', 'fall', 'face', 'hand', 'exe_v46z_gk2', 'swap', 'blast') if len(earlier) == 1 else \
         ('greninja_clones_v2', 'hurtbox', 'wall', 'ceiling', 'slope', 'blast zone', 'hitlag', 'exe_v46z_gk3', 'swap', '120',
          '5x', 'S4GF', 'S4GC', 'S4GU', 'Final Smash') if len(earlier) == 2 else \
-        ('greninja_clones_v3', 'hitbox', '5x', 'sword', 'offset', 'clone', 'exe_v46z_gk3', 'Hitbox Viewer')
+        ('greninja_clones_v3', 'hitbox', '5x', 'sword', 'offset', 'clone', 'exe_v46z_gk4', 'Hitbox Viewer', 'A_safe',
+         'B_template', 'C_hurt', 'D_full', 'S4GP', 'GX2R', 'crash')
     check('README.txt mentions every feature (%s)' % ', '.join(words), [w for w in words if w not in readme], [])
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
 
-def tool_tests(out, base, base_diag, pkg):
+def exe_members(base, base_diag, v4):
+    """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant"""
+    import gekkouga_clone_cave as C
+    if not v4:
+        return [('INSTALL_TO_code/cross_f.rpx', base, False, C.FEATURES), ('TEST_ONLY_INSTALL_TO_code/cross_f.rpx', base_diag, True, C.FEATURES)]
+    return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE)] + \
+        [('TEST_ONLY_INSTALL_TO_code/%s/cross_f.rpx' % n, base_diag, True, f) for n, f in C.VARIANTS]
+
+
+def tool_tests(out, base, base_diag, pkg, v4=False):
     import gekkouga_clone_cave as C
     mdl = os.path.join(out, 'fighter', 'gekkouga', 'model', 'clone', 'c00')
     bm = GB.bone_map(open(os.path.join(mdl, 'model.jtb'), 'rb').read(), os.path.join(mdl, 'model.vbn'))
@@ -1147,15 +1156,15 @@ def tool_tests(out, base, base_diag, pkg):
               (lines[-2].startswith('0 of') if len(lines) > 1 else False, bool(m) and int(m.group(1)) <= 128), (True, True))
     z = zipfile.ZipFile(pkg)
     with tempfile.TemporaryDirectory() as td:
-        for member, b in (('INSTALL_TO_code/cross_f.rpx', base), ('TEST_ONLY_INSTALL_TO_code/cross_f.rpx', base_diag)):
+        for member, b, dg, feats in exe_members(base, base_diag, v4):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')
             open(p, 'wb').write(z.read(member))
             r = subprocess.run([sys.executable, os.path.join(HERE, 'import_call_check.py'), b, p], capture_output=True, text=True)
             check('import_call_check %s: 0 direct import calls' % member, r.stdout.strip().splitlines()[-1:], ['0 direct import call(s)'])
-            r = subprocess.run([sys.executable, os.path.join(HERE, 'gekkouga_clone_cave_test.py'), b, p] +
-                               (['--diag'] if b == base_diag else []), capture_output=True, text=True)
+            r = subprocess.run([sys.executable, os.path.join(HERE, 'gekkouga_clone_cave_test.py'), b, p,
+                                '--features=' + ','.join(sorted(feats))] + (['--diag'] if dg else []), capture_output=True, text=True)
             last = r.stdout.strip().splitlines()[-1:]
             check('the cave\'s unicorn test on %s: %s' % (member, last[0] if last else '?'),
                   bool(last) and last[0].endswith(' 0 failures'), True)
@@ -1173,7 +1182,7 @@ def main():
     clone_tests(os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC)
     script_tests(out, user)
     package_tests(out, pkg, base, base_diag, v1, earlier)
-    tool_tests(out, base, base_diag, pkg)
+    tool_tests(out, base, base_diag, pkg, len(earlier) >= 3)
     kirby = open(os.path.join(ROOT, 'fighters', 'kirby', 'kirby.c')).read()
     check('Kirby\'s copy of Greninja (0x30): Technical', 'if (kind == 0x30) { return trait_technical(); } // Greninja' in kirby, True)
     traits = open(os.path.join(ROOT, 'docs', 'character-traits.md')).read()

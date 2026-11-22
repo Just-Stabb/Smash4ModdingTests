@@ -156,8 +156,8 @@ class Run(Emu):
         return all(self.r(i) == 0x5A5A0000 + i for i in range(14, 32))
 
 
-def words_checks(base, patched, diag):
-    out, info = C.build(base, diag)
+def words_checks(base, patched, diag, feats=None):
+    out, info = C.build(base, diag, feats)
     img, pimg = K.Image(base), K.Image(patched)
     check('the patched RPX has every word', [hex(a) for a, (w, _n) in sorted(out.words.items()) if pimg.w(a) != w][:4], [])
     check('the hooked words in the base are the game\'s', [hex(a) for a, w in C.ORIGINAL.items() if img.w(a) != w], [])
@@ -191,13 +191,16 @@ def weapon_checks(e, img, info, diag=False):
     mi = e.w(d + 8)
     check('its motion info: his 668 motions', (mi, e.w(mi + 4)), (A['w_minfo'], 668))
     ents = e.w(mi)
-    check('the entries: his body motions\' hashes and flags (v2: his fighter motion table\'s entries)',
-          [(e.w(ents + 8 * i), e.w(ents + 8 * i + 4)) for i in range(668)], L['ents'])
+    F = info['feats']
+    check('the entries: his body motions\' hashes and flags (v2: his fighter motion table\'s entries; v4: flags 0 without '
+          '"parts")', [(e.w(ents + 8 * i), e.w(ents + 8 * i + 4)) for i in range(668)],
+          L['ents'] if 'parts' in F else [(h, 0) for h, _f in L['ents']])
     his = img.w(C.GK_DESC + 4)
     check('his motion table: 668 entries, hashes the v1 list', ([h for h, _f in L['ents']] == L['hashes'], len(L['ents'])),
           (True, 668))
-    check('v2: its motion info\'s words 2-5 are his (parts 0x10378F70 x 6, groups 0x10378FA0 x 5)',
-          [e.w(mi + 4 * i) for i in range(2, 6)], [img.w(his + 4 * i) for i in range(2, 6)])
+    check('v2: its motion info\'s words 2-5 are his (parts 0x10378F70 x 6, groups 0x10378FA0 x 5); v4 without "parts": '
+          'bunshin\'s (0)', [e.w(mi + 4 * i) for i in range(2, 6)],
+          [img.w(his + 4 * i) if 'parts' in F else img.w(L['bminfo'] + 4 * i) for i in range(2, 6)])
     check('... his parts as read: 0x10378F70 6 0x10378FA0 5', [img.w(his + 4 * i) for i in range(2, 6)],
           [0x10378F70, 6, 0x10378FA0, 5])
     check('... each part a 668-word hash table (motion kind -> the part\'s animation; hands 4 / 3, parts 6 / 7 / 8)',
@@ -209,13 +212,14 @@ def weapon_checks(e, img, info, diag=False):
     s = e.call(W.SINGLETON_SWITCH, 0, C.CLONE_KIND)
     check('the singleton getter: kind 0x1A1 -> its own singleton', s, A['w_single'])
     vt = e.w(s)
-    VT_OURS = (0x1C, W.HIT_METHOD) + C.POLL_SLOTS
+    VT_OURS = (W.HIT_METHOD,) + ((0x1C,) if 'hurt' in F or diag else ()) + (C.POLL_SLOTS if 'poll' in F or diag else ())
     check('its vtable: bunshin\'s but +0x1C / +0x64 / +0x84 / +0x8C / +0x94 / +0xAC (v3)',
           [e.w(vt + o) for o in range(0, L['vsize'], 4) if o not in VT_OURS],
           [img.w(L['svt'] + o) for o in range(0, L['vsize'], 4) if o not in VT_OURS])
-    check('its +0xAC: the hit method, +0x1C the set-up, the 4 phases\' pollers',
-          [e.w(vt + o) for o in (W.HIT_METHOD, 0x1C) + C.POLL_SLOTS],
-          [lab['w_hit'], lab['w_init']] + [lab['wp_%X' % o] for o in C.POLL_SLOTS])
+    check('its +0xAC: the hit method, +0x1C the set-up, the 4 phases\' pollers (v4: by the build\'s features)',
+          [e.w(vt + o) for o in VT_OURS],
+          [lab['w_hit']] + ([lab['w_init']] if 0x1C in VT_OURS else []) + [lab['wp_%X' % o] for o in VT_OURS[2:]
+                                                                            if o in C.POLL_SLOTS])
     hits = []
     e.stub(L['old_hit'], lambda e_: e_.rec('base_hit', 3, 4, 5))
     # a clone: weapon +0x28 its accessor: +0x28 WorkModule (VAR_0 its owner's slot, VAR_1 its id), +0x50 AttackModule
@@ -347,11 +351,12 @@ def weapon_checks(e, img, info, diag=False):
     e.setw(cacc + C.W_HIT_MOD, hm)
     e.calls = []
     e.call(lab['w_init'], s, weapon)
-    check('v3 set-up (+0x1C): HitModule vt +0x4C(&{his 8 hurtboxes, 8}, 0)', [c for c in e.calls if c[0] == 'hurt'],
-          [('hurt', hm, A['hurt'], 8, 0)])
+    check('v3 set-up (+0x1C): HitModule vt +0x4C(&{his 8 hurtboxes, 8}, 0) (v4: only with "hurt")',
+          [c for c in e.calls if c[0] == 'hurt'], [('hurt', hm, A['hurt'], 8, 0)] if 'hurt' in F else [])
     if diag:
-        check('v3 diag: S4GI clone set-up logged with its HitModule', [c[1:3] for c in e.calls if c[0] == 'osr'],
-              [(A['gk_fi'], hm)])
+        osr_ = [c for c in e.calls if c[0] == 'osr']
+        check('v3 / v4 diag: S4GI clone set-up logged with its HitModule (before the hurtboxes), then S4GJ done',
+              ([c[1] for c in osr_], osr_[0][2]), ([A['gk_fi'], A['gk_fj']], hm))
     check('... the hurtbox data: his vl group 5 entries, bones 0x7D0 + his joint, pool 2',
           bytes(e.mu.mem_read(A['hurt'], 0x30 * 8)) == C.hurt_blob() and
           [struct.unpack_from('>I', C.hurt_blob(), 0x30 * i + 0x1C)[0] for i in range(8)] ==
@@ -383,21 +388,36 @@ def weapon_checks(e, img, info, diag=False):
     e.mu.mem_write(owner['f'] + 0x1E, b'\x04')
     e.clone_vars[C.VAR_SLOT] = 3.0
     e.clone_vars[C.VAR_LOGGED] = 0.0
-    poll(0x64, 0.0)
     if diag:
-        check('v3 diag: the clone\'s first poll logs S4GC (id 2, owner slot 3) once and marks its VAR_2',
+        e.clone_vars[C.VAR_ID] = 0.0
+        poll(0x64, 0.0)
+        check('v4 diag: the clone\'s first update logs S4GP (its accessor) before its script names it',
+              ([c[1:3] for c in e.osr_seen], e.clone_vars.get(C.VAR_LOGGED)), ([(A['gk_fp'], cacc)], 0.5))
+        poll(0x64, 0.0)
+        check('v4 diag: ... not again (still unnamed)', e.osr_seen, [])
+        e.clone_vars[C.VAR_ID] = 2.0
+        poll(0x64, 0.0)
+        check('v3 diag: named: S4GC (id 2, owner slot 3) once, its VAR_2 1',
               ([c[1:3] + (c[3],) for c in e.osr_seen], e.clone_vars.get(C.VAR_LOGGED)), ([(A['gk_fc'], 2, 3)], 1.0))
         poll(0x64, 0.0)
         check('v3 diag: ... not again', e.osr_seen, [])
-    for o in C.POLL_SLOTS:
+    if 'poll' not in F:
+        if diag:
+            check('v4 without "poll": the pollers never read the DamageModule, bunshin\'s methods still run',
+                  poll(0x64, 3.5)[0], [('orig64', s, weapon, 0x55, 0x66)])
+        POLLS = ()
+    else:
+        POLLS = C.POLL_SLOTS
+    for o in POLLS:
         check('v3 poller +0x%X, no damage: nothing set, bunshin\'s method with the same arguments' % o, poll(o, 0.0),
               ([('dmg', 0), ('orig%X' % o, s, weapon, 0x55, 0x66)], [], True))
-    check('v3 poller +0x64, 3.5 damage this frame: his VAR_21 = 20000 + its id (2) through his WorkModule, then bunshin\'s',
-          poll(0x64, 3.5), ([('dmg', 0), ('setf', C.VAR_HIT, 20002.0), ('orig64', s, weapon, 0x55, 0x66)], [owner['wm']], True))
-    e.clone_vars[C.VAR_ID] = 1.0
-    check('v3 poller +0x8C, the left clone (id 1)', poll(0x8C, 1.0)[0][1], ('setf', C.VAR_HIT, 20001.0))
-    e.clone_vars[C.VAR_SLOT] = 0.0
-    check('v3 poller: slot 0: nothing set', poll(0x94, 2.0)[0], [('dmg', 0), ('orig94', s, weapon, 0x55, 0x66)])
+    if POLLS:
+        check('v3 poller +0x64, 3.5 damage this frame: his VAR_21 = 20000 + its id (2) through his WorkModule, then bunshin\'s',
+              poll(0x64, 3.5), ([('dmg', 0), ('setf', C.VAR_HIT, 20002.0), ('orig64', s, weapon, 0x55, 0x66)], [owner['wm']], True))
+        e.clone_vars[C.VAR_ID] = 1.0
+        check('v3 poller +0x8C, the left clone (id 1)', poll(0x8C, 1.0)[0][1], ('setf', C.VAR_HIT, 20001.0))
+        e.clone_vars[C.VAR_SLOT] = 0.0
+        check('v3 poller: slot 0: nothing set', poll(0x94, 2.0)[0], [('dmg', 0), ('orig94', s, weapon, 0x55, 0x66)])
     e.mu.mem_write(owner['f'] + 0x1E, b'\x00')
     # the module row stub (the bl at MODULE_ROW): r30 = kind -> r8 = row - MODULE_TABLE
     mr = K.branch_target(W.MODULE_ROW, img.w(W.MODULE_ROW))
@@ -405,11 +425,13 @@ def weapon_checks(e, img, info, diag=False):
     e.call(mr)
     row = (e.r(8) + W.MODULE_TABLE) & 0xFFFFFFFF
     check('the module set-up: kind 0x1A1 -> its own row', row, A['w_row'])
-    want = [img.w(W.MODULE_TABLE + 0x70 * C.TEMPLATE + 4 * j) for j in range(28)]
+    tk = C.TEMPLATE if 'template' in F else C.CLONE_BASE
+    want = [img.w(W.MODULE_TABLE + 0x70 * tk + 4 * j) for j in range(28)]
     check('v3: its row: the template kind\'s (lizardonm, 0x15C: bunshin\'s modules + Kinetic, Attack, Hit, Damage)',
           [e.w(row + 4 * j) for j in range(28)], want)
     T_ = info['T']
-    check('v3: its base kind (the weapon switches\' templates): 0x15C', e.w(T_['bt'] + 4 * (C.CLONE_KIND - W.OLD_N)), C.TEMPLATE)
+    check('v3: its base kind (the weapon switches\' templates): 0x15C (v4 without "template": bunshin 0xFE)',
+          e.w(T_['bt'] + 4 * (C.CLONE_KIND - W.OLD_N)), tk)
     nt = dict(W.NAME_TABLES)
     check('... 0x15C is lizardon\'s lizardonm', (img.cstr(img.w(nt['owner'] + 4 * C.TEMPLATE)),
                                                  img.cstr(img.w(nt['name'] + 4 * C.TEMPLATE))), C.TEMPLATE_NAME)
@@ -597,7 +619,10 @@ def main():
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     diag = '--diag' in sys.argv
     base, patched = args[0], args[1]
-    out, info = words_checks(base, patched, diag)
+    fa = [a[11:] for a in sys.argv[1:] if a.startswith('--features=')]
+    feats = C.RELEASE if not fa else frozenset(f for f in fa[0].split(',') if f)
+    print('features: %s' % (','.join(sorted(feats)) or '(safe)'))
+    out, info = words_checks(base, patched, diag, feats)
     img = K.Image(base)
     e = Run(patched)
     if diag:

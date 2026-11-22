@@ -32,6 +32,7 @@ int gk_pips;           // charge pips shown over his head
 int gk_fx_t;           // frames to the next "ready" sparkle
 int gk_smash;          // v3: the smash charge kept (frames, 0 - gk_smash_full()), one for all three smashes
 int gk_hold_first;     // v3: the hold's first tick (its effects made at once)
+int gk_gen_req;        // v4 diag: 0x40 / 0x80 the left / right clone made next frame
 int gk_chain;          // the smashes used in this chain: 1 forward, 2 up, 4 down (0 no chain)
 int gk_chain_req;      // the smash a chain cancel asked for (its start status reads it)
 int gk_sm_auto;        // this smash releases on its own: 1 a full stored charge, 2 a chain
@@ -144,6 +145,10 @@ void gekkouga_frame()
         flags = flags | 0x8;              // v3 diag: the ability ready (the TEST_ONLY exe logs flag changes: S4GF)
     }
     flags = flags | gk_alive * 16;        // v3 diag: 16 / 32 the clones out
+    if (gk_ability > 0)
+    {
+        flags = flags | gk_gen_req;       // v4 diag: 64 / 128 a clone about to be made (next frame)
+    }
     WorkModule(0, (float)flags + 0, 0x0f000314);
 }
 
@@ -260,11 +265,22 @@ void gk_activate()
 
 void gk_ability_update()
 {
+    // v4: each clone is requested a frame before it is made (flags bit 64 / 128: the TEST_ONLY exe logs the request
+    // before the generate runs, and its result the frame after)
+    gk_gen_req = 0;
     if (gk_seq == 0)
+    {
+        gk_gen_req = 0x40;
+    }
+    if (gk_seq == 3)
+    {
+        gk_gen_req = 0x80;
+    }
+    if (gk_seq == 1)
     {
         gk_spawn(0x1);
     }
-    if (gk_seq == 3)
+    if (gk_seq == 4)
     {
         gk_spawn(0x2);
     }

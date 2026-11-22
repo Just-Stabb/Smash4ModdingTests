@@ -522,3 +522,26 @@ them through gaps and walls).
 - In game: the template swap, the hurtbox set-up, the damage poll, the native removal past the blast zone for this kind.
 - The hitlag hitbox: the strongest with records during the move (usually the one that just hit).
 - One wall test height; the fallback fall timer.
+
+## Clones v4 (`greninja_clones_v4.zip`)
+
+The user's v3 runs crashed when a clone was made (the release exe, then gk3_diag: two `S4GI` lines at the match start,
+the clone objects built; `S4GF flags=8` ready; the crash on the press, before the clone's first frame). The cause isn't
+known from the logs, so the native parts became build features (`tools/gekkouga_clone_cave.py --features`, `FEATURES`):
+`template` (lizardonm's per-frame routine and module row; else bunshin's exact row and routine: no Attack / Hit / Damage),
+`parts` (his motion parts and flags on the clone), `hurt` (its hurtboxes at +0x1C), `poll` (the damage pollers). The
+release exe exe_v46z_gk4 is the safe set (none of them: the clones are visual only); TEST_ONLY has one diag exe per
+`VARIANTS` step: A_safe, B_template, C_hurt (template + hurt + poll), D_full (= v3). More diag: `S4GJ` after the set-up,
+`S4GP` the first update of a made clone (the +0x64 poller, before its MSC names it), and his MSC now makes each clone a
+frame after requesting it (VAR_20 bits 64 / 128, logged by `S4GF`), so the log brackets the generate.
+
+The `GX2RSetAttributeBuffer` bursts in the user's logs aren't the clones': the same burst is in an older log of theirs
+(a Supamario test) at the match start; the clone objects are built at the match start too, just before it.
+
+Smash hitboxes grow with the effects (the user): `GROW` 5 (was 1.5) on his attacks4 / attackhi4 / attacklw4 hitbox Size;
+on his water-sword bones (`SWORD_BONES` 24 / 25) the hitbox offsets x5 too, as the sword effect and its trail grow from
+the bone; body-bone hitboxes (the up smash's geyser on bone 0, the forward smash's forearm on 23) keep their place. The
+biggest is 30 (6 x 5), his largest vanilla hitbox's size (his Final Smash). The clone's copies get the same hitboxes, and
+now his smash effects too (`flatten`: their conditions' True branches; v3's clones had none). Tests:
+`gekkouga_clones_test.py ... --v1 --v2 --v3`, `gekkouga_clone_cave_test.py --features=...` on every exe in the package,
+`supamario_ui_cave_test.py` on gk4, `import_call_check` 0 on all five.

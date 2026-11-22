@@ -95,6 +95,13 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # none: 2, loaded with the fighter. Bunshin's 0x87D has 0x1 (4: the Final Smash load,
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
+FEATURES = frozenset(('template', 'parts', 'hurt', 'poll'))   # v4: each risky part (the v3 in-game crash at a clone's
+# spawn), built in or not: template = lizardonm's per-frame routine / module row (else bunshin's own, exactly: no attack,
+# no hurtbox); parts = his motion parts and flags on the clone (else bunshin's: none); hurt = its hurtboxes (+0x1C);
+# poll = the damage pollers (+0x64 ... +0x94; needs template's DamageModule). VARIANTS: the shipped builds
+RELEASE = frozenset()             # v4's release exe: the safe set (nothing risky) until a TEST_ONLY log clears the rest
+VARIANTS = (('A_safe', frozenset()), ('B_template', frozenset(('template',))),
+            ('C_hurt', frozenset(('template', 'hurt', 'poll'))), ('D_full', FEATURES))
 VAR_GEN = 0x0F000317              # his VAR_23 (v3 diag): the last generate's result (ArticleModule 0x2710)
 VAR_LOGGED = 0x0F000302           # the clone's VAR_2 (v3 diag): its first frame logged
 HITSTOP_FN = 0x02C2678C           # (accessor, hitbox data, f1 damage, f2 multiplier, r5 side, r6 use its multiplier) -> frames
@@ -118,6 +125,22 @@ HURTBOXES = (
     (0, 0, 0, 4.0, 0, 0, 1.5, 9, 3, 0),
     (0, 0, 0, 4.0, 0, 0, 1.5, 5, 3, 0))
 WEAPON_JOINT = 0x7D0
+
+
+HURT_CALL = '''
+        cmpwi r3, 0
+        beq wi_out
+        lis r11, %(hurt_hi)d
+        addi r11, r11, %(hurt_lo)d
+        stw r11, 8(r1)
+        li r0, %(nhurt)d
+        stw r0, 0xC(r1)
+        addi r4, r1, 8
+        li r5, 0
+        lwz r12, 0(r3)
+        lwz r12, 0x4C(r12)
+        mtctr r12
+        bctrl'''
 
 
 def hurt_blob():
@@ -285,7 +308,7 @@ def motion_parts(img):
     return [img.w(mi + 4 * i) for i in range(2, 6)]
 
 
-def layout(img):
+def layout(img, feats=None):
     """what the cave writes, read from the base: the sizes / sources of the data blocks"""
     bdesc = W.descriptor_of(img, CLONE_BASE)
     descs = W.all_descriptors(img)
@@ -299,7 +322,8 @@ def layout(img):
     assert acount == 6 and [img.w(aents + 16 * i) for i in range(acount)] == [0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE]
     rows = [[img.w(aents + 16 * i + 4 * j) for j in range(4)] for i in range(acount)]
     rows += [[CLONE_KIND, 1, 0, 0], [CLONE_KIND, 1, 0, 0]]
-    mrow = [img.w(W.MODULE_TABLE + 0x70 * TEMPLATE + 4 * j) for j in range(28)]
+    feats = FEATURES if feats is None else feats
+    mrow = [img.w(W.MODULE_TABLE + 0x70 * (TEMPLATE if 'template' in feats else CLONE_BASE) + 4 * j) for j in range(28)]
     assert img.w(svt + 0x1C) == 0x02AF695C and img.w(0x02AF695C) == 0x4E800020, "bunshin's +0x1C: a blr"
     for j in (2, 6, 7, 20, 26):
         f = img.w(W.MODULE_TABLE + 0x70 * TEMPLATE + 4 * j)
@@ -310,7 +334,7 @@ def layout(img):
                 parts=motion_parts(img), rows=rows, mrow=mrow)
 
 
-def build(rpx, diag=False):
+def build(rpx, diag=False, feats=None):
     """(Out, info): every word, asserted against the base"""
     img = K.Image(rpx)
     out = Out(img)
@@ -328,7 +352,9 @@ def build(rpx, diag=False):
     assert img.w(T['st'] + 4 * k) == 0 and img.w(T['rt'] + 4 * k) == 0, 'kind 0x%X in use' % CLONE_KIND
     for nm, addr in W.NAME_TABLES:
         assert img.w(T[nm] + 4 * CLONE_KIND) == img.w(addr), 'name table %s: kind 0x%X in use' % (nm, CLONE_KIND)
-    L = layout(img)
+    feats = FEATURES if feats is None else frozenset(feats)
+    assert feats <= FEATURES, feats
+    L = layout(img, feats)
     owner_str = img.w(T['owner'] + 4 * 0xF9)
     assert img.cstr(owner_str) == 'gekkouga'
 
@@ -367,16 +393,20 @@ def build(rpx, diag=False):
             ('gk_ff', 'S4GF slot=%d flags=%d gen=%d\n'),
             ('gk_fi', 'S4GI clone set-up: hitmodule=%08X\n'),
             ('gk_fc', 'S4GC clone first frame: id=%d owner slot=%d\n'),
-            ('gk_fu', 'S4GU tag hidden: player=%d cursor=%08X\n')]
+            ('gk_fu', 'S4GU tag hidden: player=%d cursor=%08X\n'),
+            ('gk_fj', 'S4GJ clone set-up done\n'),
+            ('gk_fp', 'S4GP clone first update (its script not run yet): weapon accessor=%08X\n')]
     for nm, s in fmts:
         A[nm] = alloc((len(s) + 4) & ~3, 4) if diag else 0
     code_at = alloc(0, 4)
 
     # weapon motion entries / info / descriptor / vtable / singleton / row
-    out.blob(A['w_ents'], b''.join(struct.pack('>II', h, f) for h, f in L['ents']), 'clone motions (his body + flags)')
+    out.blob(A['w_ents'], b''.join(struct.pack('>II', h, f if 'parts' in feats else 0) for h, f in L['ents']),
+             'clone motions (his body (+ flags))')
     mi = bytearray(img.blob(L['bminfo'], W.MINFO_SIZE))
     struct.pack_into('>II', mi, 0, A['w_ents'], len(L['hashes']))
-    struct.pack_into('>4I', mi, 8, *L['parts'])       # v2: his parts (hands, face) and groups
+    if 'parts' in feats:
+        struct.pack_into('>4I', mi, 8, *L['parts'])   # v2: his parts (hands, face) and groups
     out.blob(A['w_minfo'], bytes(mi), 'clone motion info')
     d = bytearray(img.blob(L['bdesc'], L['dsize']))
     struct.pack_into('>I', d, 8, A['w_minfo'])
@@ -409,7 +439,7 @@ def build(rpx, diag=False):
              hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, whit=W_HIT_MOD, wdmg=W_DAMAGE, watk=W_ATTACK,
              wstop=W_STOP, nhurt=len(HURTBOXES), s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
-               'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf'):
+               'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -846,25 +876,13 @@ w_init: stwu r1, -0x20(r1)
         mr r4, r3
         lis r3, %(gk_fi_hi)d
         addi r3, r3, %(gk_fi_lo)d''' + osr() + '''
-        lwz r3, 0x10(r1)''') + '''
-        cmpwi r3, 0
-        beq wi_out
-        lis r11, %(hurt_hi)d
-        addi r11, r11, %(hurt_lo)d
-        stw r11, 8(r1)
-        li r0, %(nhurt)d
-        stw r0, 0xC(r1)
-        addi r4, r1, 8
-        li r5, 0
-        lwz r12, 0(r3)
-        lwz r12, 0x4C(r12)
-        mtctr r12
-        bctrl
+        lwz r3, 0x10(r1)''') + (HURT_CALL if 'hurt' in feats else '') + D('''
+        lis r3, %(gk_fj_hi)d
+        addi r3, r3, %(gk_fj_lo)d''' + osr()) + '''
 wi_out: lwz r0, 0x24(r1)
         mtlr r0
         addi r1, r1, 0x20
         blr
-
 # ---- v3: the clone hurt? (r3 the weapon): damage taken this frame (DamageModule vt +0x7C(0) > 0) -> its owner's
 # VAR_21 = HIT_BIAS2 + its id (its VAR_1): his MSC turns that clone into the log (which clone: exact)
 w_poll: stwu r1, -0x30(r1)
@@ -881,7 +899,17 @@ w_poll: stwu r1, -0x30(r1)
         lis r12, %(half_hi)d
         lfs f0, %(half_lo)d(r12)
         fcmpu cr0, f1, f0
-        bgt wp_nolog''' + var_get('r30', VAR_ID) + '''
+        bgt wp_nolog
+        lis r12, %(zero_hi)d
+        lfs f0, %(zero_lo)d(r12)
+        fcmpu cr0, f1, f0
+        bgt wp_named                    # its first update already logged
+        lis r12, %(half_hi)d
+        lfs f1, %(half_lo)d(r12)''' + var_set('r30', VAR_LOGGED) + '''
+        lis r3, %(gk_fp_hi)d
+        addi r3, r3, %(gk_fp_lo)d
+        mr r4, r31''' + osr() + '''
+wp_named:''' + var_get('r30', VAR_ID) + '''
         fctiwz f1, f1
         stfd f1, 0x18(r1)
         lwz r0, 0x1C(r1)
@@ -899,7 +927,7 @@ w_poll: stwu r1, -0x30(r1)
         addi r3, r3, %(gk_fc_lo)d
         lwz r4, 0x10(r1)
         lwz r5, 0x1C(r1)''' + osr() + '''
-wp_nolog:''') + '''
+wp_nolog:''') + (('''
         lwz r3, %(wdmg)d(r31)           # its DamageModule
         cmpwi r3, 0
         beq wp_out
@@ -937,8 +965,8 @@ wp_nolog:''') + '''
         stfd f1, 0x18(r1)
         lis r3, %(gk_fd_hi)d
         addi r3, r3, %(gk_fd_lo)d
-        lwz r5, 0x1C(r1)
         lwz r4, 0x1C(r1)''' + osr()) + '''
+''') if 'poll' in feats else '') + '''
 wp_out: lwz r30, 0x28(r1)
         lwz r31, 0x2C(r1)
         lwz r0, 0x34(r1)
@@ -1079,8 +1107,9 @@ w_dcase:
     # the singleton's vtable copy with our hit method
     vb = bytearray(img.blob(L['svt'], L['vsize']))
     struct.pack_into('>I', vb, W.HIT_METHOD, lab['w_hit'])
-    struct.pack_into('>I', vb, 0x1C, lab['w_init'])
-    for o in POLL_SLOTS:
+    if 'hurt' in feats or diag:
+        struct.pack_into('>I', vb, 0x1C, lab['w_init'])
+    for o in (POLL_SLOTS if 'poll' in feats or diag else ()):
         struct.pack_into('>I', vb, o, lab['wp_%X' % o])
     out.blob(A['w_vt'], bytes(vb), 'clone vtable (bunshin copy, +0x1C / +0x64 / +0x84 / +0x8C / +0x94 / +0xAC ours)')
 
@@ -1116,15 +1145,15 @@ w_dcase:
         out.words.pop(wa, None)
         out.put(wa, word, 'table %s 0x%X' % (nm, CLONE_KIND))
     out.put(T['dt'] + 4 * k, lab['w_dcase'], 'descriptor case 0x%X' % CLONE_KIND, 0)
-    out.put(T['bt'] + 4 * k, TEMPLATE, 'base kind 0x%X (v3: the template kind)' % CLONE_KIND, 0xFFFF)
+    out.put(T['bt'] + 4 * k, TEMPLATE if 'template' in feats else CLONE_BASE, 'base kind 0x%X' % CLONE_KIND, 0xFFFF)
     out.put(T['st'] + 4 * k, A['w_single'], 'singleton case 0x%X' % CLONE_KIND, 0)
     out.put(T['rt'] + 4 * k, (A['w_row'] - W.MODULE_TABLE) & 0xFFFFFFFF, 'own module row 0x%X' % CLONE_KIND, 0)
-    info = dict(A=A, labels=lab, T=T, layout=L, end=end, owner_str=owner_str)
+    info = dict(A=A, labels=lab, T=T, layout=L, end=end, owner_str=owner_str, feats=feats)
     return out, info
 
 
-def args(rpx, diag=False):
-    out, _info = build(rpx, diag)
+def args(rpx, diag=False, feats=None):
+    out, _info = build(rpx, diag, feats)
     return ['textregion:0x%X' % TEXT_REGION, 'grow:0x%08X' % LIMIT] + \
         ['0x%08X=0x%08X' % (a, w) for a, (w, _n) in sorted(out.words.items())]
 
@@ -1134,16 +1163,19 @@ def main():
     ap.add_argument('--rpx', required=True)
     ap.add_argument('--diag', action='store_true')
     ap.add_argument('--info', action='store_true')
+    ap.add_argument('--features', default=None, help='comma list of %s (default: %s); "" = the safe set' %
+                    (','.join(sorted(FEATURES)), ','.join(sorted(RELEASE))))
     o = ap.parse_args()
+    feats = RELEASE if o.features is None else frozenset(f for f in o.features.split(',') if f)
     if o.info:
-        out, info = build(o.rpx, o.diag)
+        out, info = build(o.rpx, o.diag, feats)
         for nm, at in sorted(info['A'].items(), key=lambda kv: kv[1]):
             print('%-10s 0x%08X' % (nm, at))
         for nm in ('g1_stub', 'hud', 's13', 's42', 's43', 'gk_entry', 'w_hit', 'w_init', 'w_poll', 'gk_dcase', 'w_dcase'):
             print('%-10s 0x%08X' % (nm, info['labels'][nm]))
         print('end        0x%08X (limit 0x%08X), %d words' % (info['end'], LIMIT, len(out.words)))
         return
-    print(' '.join(args(o.rpx, o.diag)))
+    print(' '.join(args(o.rpx, o.diag, feats)))
 
 
 if __name__ == '__main__':
