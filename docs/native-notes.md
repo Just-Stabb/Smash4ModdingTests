@@ -3883,3 +3883,9 @@ MSC on a bunshin-based kind, the 4-shape group.
   (their MotionModule calls: `0x02C5C2BC`, `0x02C5D2B4`, `0x02C5D464`, `0x02C5C4C8`), so an article's swing bones stay
   where the bind put them. HitModule's add (`0x02C415DC`): per hurtbox `0x02C108C4` (a node in collision object
   [group], 0x174 each) and `0x02C44354` (the 0x30-byte data copied to record +8).
+- **Hit logs and raw damage (Greninja burn v1)**: an attack entry's (AttackModule +0x14, 0x174 each) hit log is the list
+  at [entry +0x130] (+4 first, +8 count; a node: +0 prev, +4 next, +0x14 the other entry's +0x154, +0x18 the hit
+  object's id, +0x23 the other container's type (0 attack, 1 hurtbox, 2 shield, 3 reflector, 4 absorber, 5 search, 6
+  catch), +0x27 the hitbox id; `0x02C10F40` appends, `0x02C1118C` searches). DamageModule vt +0x74(0, f1) adds raw
+  percent (MSC DamageModule op 9, handler `0x02C2366C`). An object id: category << 28, index << 16 (`0x02BF205C`).
+  PowerPC trap met here: `addi rD, r0, x` reads 0, not r0.

@@ -1068,9 +1068,12 @@ def hitcheck_checks(e, info, diag):
 def burn_checks(e, info, diag):
     """burn v1 (feature burn): his water moves' hits add burn instances to their victims; his ticks"""
     lab, A, F = info['labels'], info['A'], info['feats']
-    check('burn: every move\'s unshielded instance totals at least %s %% (the user\'s floor): %s' % (
-        C.BURN_MIN_TOTAL, ', '.join('%d %.2f' % (m[0], C.burn_total(m)) for m in C.BURN_MOVES)),
-          [m[0] for m in C.BURN_MOVES if C.burn_total(m) < C.BURN_MIN_TOTAL - 1e-6], [])
+    check('burn: every move\'s instance, unshielded and shielded, totals at least %s %% (the user\'s floor): %s' % (
+        C.BURN_MIN_TOTAL, ', '.join('%d %.2f / %.2f' % (m[0], C.burn_total(m), C.burn_total(m, True)) for m in C.BURN_MOVES)),
+          [(m[0], sh) for m in C.BURN_MOVES for sh in (False, True) if C.burn_total(m, sh) < C.BURN_MIN_TOTAL - 1e-4], [])
+    check('burn: the shield clamp only where 50 % / 20 % falls under the floor; above it the rule exact',
+          [m[0] for m in C.BURN_MOVES if (C.burn_shield_damage(m) != m[1] * C.BURN_SHIELD_DAMAGE)
+           != (m[1] * C.BURN_SHIELD_DAMAGE * (C.burn_shield_frames(m) // m[2]) < C.BURN_MIN_TOTAL)], [])
     if 'burn' not in F:
         check('burn: without "burn": no burn code', 'burn_him' in lab, False)
         return
@@ -1131,7 +1134,7 @@ def burn_checks(e, info, diag):
             a = A['btab'] + (v * C.BURN_CAP + k) * 16
             fr, tk, ow = e.w(a), e.w(a + 4), e.w(a + 8)
             if fr:
-                out.append((fr, tk >> 16, tk & 0xFFFF, ow, round(d2f(e.w(a + 12)), 4)))
+                out.append((fr, tk >> 16, tk & 0xFFFF, ow, round(struct.unpack('>f', struct.pack('>I', e.w(a + 12)))[0], 4)))
         return out
 
     def frame(fk, slot0):
@@ -1153,15 +1156,16 @@ def burn_checks(e, info, diag):
     check('burn: the same log node: no second instance', len(inst(4)), 1)
     log_hit(logs[1], 4, 2)                   # a shield hit
     frame(gk, 2)
-    check('burn: a shielded hit: half the frames (120), 20 % of the damage (0.08), its own timer',
-          inst(4), [(237, 3, 6, 2, 0.4), (119, 5, 6, 2, 0.08)])
+    sd = round(C.burn_shield_damage(C.BURN_MOVES[0]), 4)
+    check('burn: a shielded hit: half the frames (120), 20 %% of the damage raised to the 3 %% total (%s a tick), its own '
+          'timer' % sd, inst(4), [(237, 3, 6, 2, 0.4), (119, 5, 6, 2, sd)])
     got = []
     for _ in range(3):
         got.append(frame(gk, 2))
-    check('burn: ticks: the first at its 6th frame (0.4 %), the shielded one 2 frames later (0.08 %), each its own',
-          got, [[], [(vic['dm'], 0, 0.4)], []])
+    check('burn: ticks: the first at its 6th frame (0.4 %), the shielded one 2 frames later, each its own',
+          got, [[], [], [(vic['dm'], 0, 0.4)]])
     got = [frame(gk, 2) for _ in range(2)]
-    check('burn: ... the second\'s tick 2 frames after the first\'s', got, [[], [(vic['dm'], 0, 0.08)]])
+    check('burn: ... the second\'s tick 2 frames after the first\'s', got, [[], [(vic['dm'], 0, sd)]])
     # the other moves; outside them nothing
     e.setw(gk['mm'] + C.MM_KIND, 0)
     log_hit(logs[0], 4, 1)

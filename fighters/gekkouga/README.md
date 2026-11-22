@@ -747,3 +747,29 @@ edge (intended).
   (bound), 0 / 1 (first step). The bind needs the motion's model link mode != 8.
 - **His MSC**: `gk_gone` reports 400 + id when the clone was falling on its own (past the blast zone), else 100 + id.
 - Diag: S4GX every 60 frames for the clone's whole life. The cave limit is 0x04BF4000 (was 0x04BEE000).
+
+## Burn v1 (`greninja_burn_v1.zip`, over clones v13; exe_v46z_gkb1)
+
+The user's burn mechanic (mechanics only: the fire visuals wait for the fire flipbooks; the smashes' fire trail is
+designed for v2 with them). Feature `burn` (in `RELEASE`), `tools/gekkouga_clone_cave.py` `burn_him` / `w_burn` /
+`burn_scan` / `burn_add` / `burn_tick`:
+- **Hits**: each new node of a hit log of his (or his clone's) AttackModule while he (it) plays a burning motion
+  (MotionModule accessor +0x44, +0x38 the motion kind = his motion.mtable index: attacknairn 104, attackairf 105,
+  attacks4 95, attackhi4 99, attacklw4 101) adds one instance to the victim. A hit log: [AttackModule entry +0x130]
+  (+4 first node, +8 count; a node +4 next, +0x18 the hit object's id, +0x23 the hit container's type: 1 hurtbox, 2
+  shield). Processed counts per attacker context (his slot x 3 + 0 / 1 / 2) and entry; outside the moves the counts
+  follow the logs (nothing burns).
+- **Instances**: 8 victims x `BURN_CAP` (32) x 16 bytes {frames, tick << 16 | interval, owner slot, damage}; each
+  Greninja's slot 13 ticks only his own (their own timings), raw percent through the victim's DamageModule vt +0x74(0,
+  f1) (MSC DamageModule(9, %)'s op: no hit, so invincibility / intangibility don't matter). A victim not live: its
+  instances end.
+- **Values** (`BURN_MOVES`; damage a tick, interval, duration; total): smashes 0.4 % / 6 f / 240 f = 16 %, forward
+  air 0.3 % / 10 f / 180 f = 5.4 %, neutral air 0.25 % / 15 f / 180 f = 3 %. Shielded: half the frames, 20 % of the
+  damage, raised so the total is at least `BURN_MIN_TOTAL` 3 % (`burn_shield_damage`: all five clamp to 3 %). The
+  module asserts every instance (shielded or not) totals at least 3 %; the cave test checks it and that the clamp
+  only applies where the rule falls short.
+- Diag `S4BA` (an instance added) and `S4BT` (each victim's damage from him in the last 60 frames, his stacks on it).
+- Unicorn (`burn_checks`): a hit, no double count, a shielded hit, independent timers, Wait1 / old hits ignored, a
+  restarted log (multi-hit), reflector / weapon / out-of-range records ignored, the cap, another Greninja's timing,
+  16 % over 240 frames in 40 ticks, a gone victim, a clone's hit for its owner.
+- Not verified in game: that a shielded hit is logged in the attacker's hit log with type 2.

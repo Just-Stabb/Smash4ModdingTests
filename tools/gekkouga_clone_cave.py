@@ -137,7 +137,9 @@ HM_OBJS = 0x18                    # +8 the collision container (+0xC its objects
 # burn v1: the moves that burn (his motion.mtable indices: attackairn 104, attackairf 105, attacks4 95, attackhi4 99,
 # attacklw4 101), each hit one instance: (motion kind, damage a tick, interval (frames), duration (frames)). A shielded
 # hit: half the frames, BURN_SHIELD_DAMAGE x the damage. Totals: damage x (duration // interval) ticks. The user's
-# rule: no instance does less than BURN_MIN_TOTAL (3 %) over time unshielded (a shielded one may: 50 % / 20 %)
+# rule: no instance, shielded or not, does less than BURN_MIN_TOTAL (3 %) over time: a shielded one whose 50 % / 20 %
+# total would fall under it gets its damage a tick raised so its total is exactly 3 % (its halved duration kept);
+# above the floor the 50 % / 20 % rule is exact (burn_shield_damage: the table's fifth word, used as it is)
 BURN_MOVES = (
     (95, 0.4, 6, 240),            # forward smash: 0.4 % every 6 frames for 4 s = 16 %
     (99, 0.4, 6, 240),            # up smash: 16 %
@@ -145,19 +147,31 @@ BURN_MOVES = (
     (105, 0.3, 10, 180),          # forward air: 0.3 % every 10 frames for 3 s = 5.4 %
     (104, 0.25, 15, 180),         # neutral air (multi-hit: one each hit): 0.25 % every 15 frames for 3 s = 3 %
 )
-BURN_MIN_TOTAL = 3.0              # the user's floor for one unshielded instance
+BURN_MIN_TOTAL = 3.0              # the user's floor for one instance, shielded or not
+BURN_SHIELD_DAMAGE = 0.2          # a shielded hit: 20 % of the damage a tick, half the duration
+
+
+def burn_shield_frames(row):
+    return max(1, row[3] // 2)
+
+
+def burn_shield_damage(row):
+    """a shielded instance's damage a tick: 20 %, raised so its total is at least BURN_MIN_TOTAL (the clamp)"""
+    _k, dmg, interval, _frames = row
+    ticks = max(1, burn_shield_frames(row) // interval)
+    return max(dmg * BURN_SHIELD_DAMAGE, BURN_MIN_TOTAL / ticks)
 
 
 def burn_total(row, shielded=False):
     """one instance's total percent: (damage a tick) x (ticks)"""
     _k, dmg, interval, frames = row
     if shielded:
-        dmg, frames = dmg * BURN_SHIELD_DAMAGE, max(1, frames // 2)
+        dmg, frames = burn_shield_damage(row), burn_shield_frames(row)
     return dmg * (frames // interval)
 
 
-assert all(burn_total(m) >= BURN_MIN_TOTAL - 1e-6 for m in BURN_MOVES), 'a burn under %s %%' % BURN_MIN_TOTAL
-BURN_SHIELD_DAMAGE = 0.2          # a shielded hit: 20 % of the damage a tick, half the duration
+assert all(burn_total(m, sh) >= BURN_MIN_TOTAL - 1e-4 for m in BURN_MOVES for sh in (False, True)), \
+    'a burn under %s %%' % BURN_MIN_TOTAL
 BURN_CAP = 32                     # instances a victim holds at most (more are dropped)
 BURN_ENTS = 16                    # attack entries scanned (hitbox ids 0-15)
 BURN_CONTEXTS = 8 * 3             # his slot x 3 + 0 him / 1 / 2 a clone
@@ -592,7 +606,7 @@ def build(rpx, diag=False, feats=None):
     burn = 'burn' in feats
     A['btab'] = alloc(SLOTS * BURN_CAP * 16) if burn else 0      # burn v1: the victims' instances
     A['bproc'] = alloc(BURN_CONTEXTS * BURN_ENTS) if burn else 0  # the hit logs' processed counts
-    A['bmoves'] = alloc(16 * len(BURN_MOVES)) if burn else 0
+    A['bmoves'] = alloc(20 * len(BURN_MOVES)) if burn else 0
     A['bconst'] = alloc(8) if burn else 0                        # 0.2 (shield), 1000.0
     A['bsum'] = alloc(SLOTS * SLOTS * 4) if burn and diag else 0  # diag: damage per owner x victim this second
     A['bclock'] = alloc(4 * SLOTS) if burn and diag else 0
@@ -671,7 +685,8 @@ def build(rpx, diag=False, feats=None):
     if 'burn' in feats:
         out.blob(A['btab'], bytes(SLOTS * BURN_CAP * 16), 'burn instances')
         out.blob(A['bproc'], bytes(BURN_CONTEXTS * BURN_ENTS + (-BURN_CONTEXTS * BURN_ENTS) % 4), 'burn processed counts')
-        out.blob(A['bmoves'], b''.join(struct.pack('>IfII', *m) for m in BURN_MOVES), 'burn moves')
+        out.blob(A['bmoves'], b''.join(struct.pack('>IfIIf', *(m + (burn_shield_damage(m),))) for m in BURN_MOVES),
+                 'burn moves (kind, damage, interval, frames, shielded damage)')
         out.blob(A['bconst'], struct.pack('>2f', BURN_SHIELD_DAMAGE, 1000.0), 'burn constants')
         if diag:
             out.blob(A['bsum'], bytes(SLOTS * SLOTS * 4), 'burn sums')
@@ -1970,7 +1985,7 @@ bs_find:
         lwz r9, 0(r11)
         cmpw r9, r0
         beq bs_found
-        addi r11, r11, 16
+        addi r11, r11, 20
         addi r10, r10, -1
         cmpwi r10, 0
         bne bs_find
@@ -2091,9 +2106,7 @@ ba_put: lwz r8, 12(r4)                  # the duration
         cmpwi r11, 0
         beq ba_full
         srwi r8, r8, 1                  # shielded: half the frames
-        lis r9, %(bshield_hi)d
-        lfs f0, %(bshield_lo)d(r9)
-        fmuls f1, f1, f0                # 20 %% of the damage
+        lfs f1, 16(r4)                  # its damage: 20 %%, raised to the 3 %% total floor (burn_shield_damage)
         cmpwi r8, 0
         bne ba_full
         li r8, 1
@@ -2143,14 +2156,14 @@ bt_vic: cmpwi r30, %(slots)d
         add r29, r29, r0
         li r28, %(bcap)d
         li r27, 0                       # its damage module (0: not read yet)
-bt_ins: lwz r0, 0(r29)
-        cmpwi r0, 0
+bt_ins: lwz r9, 0(r29)
+        cmpwi r9, 0
         beq bt_nins
         lwz r12, 8(r29)
         cmpw r12, r31
         bne bt_nins                     # another Greninja's: his own timing
-        addi r0, r0, -1
-        stw r0, 0(r29)
+        addi r9, r9, -1                 # (not r0: addi from r0 reads 0)
+        stw r9, 0(r29)
         lhz r11, 4(r29)
         addi r11, r11, -1
         sth r11, 4(r29)
