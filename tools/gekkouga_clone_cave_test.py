@@ -375,9 +375,8 @@ def weapon_checks(e, img, info, diag=False):
     e.setw(hm + C.HM_GROUP, hgrp)
     hrecs = e.alloc(0x40 * 8, b'\0')
     e.mu.mem_write(hrecs, struct.pack('>4I', 0x11, 0x22, 0x33, 0x44))
-    hrh = e.alloc(8, b'\0')
-    e.setw(hrh + 4, hrecs)
-    e.setw(hm + C.HM_RECS, hrh)
+    e.setw(hm + 0x44, 0x14)                                  # v10: as the game's: +0x44 the capacity (v9 read it as
+    e.setw(hm + C.HM_RECS, hrecs)                            # the pointer: the user's C_hurt crash), +0x48 the records
     e.setw(hm + C.HM_OBJS, 8)
     e.setw(cacc + C.W_HIT_MOD, hm)
     e.calls = []
@@ -455,6 +454,14 @@ def weapon_checks(e, img, info, diag=False):
         check('v9 diag: S4GO (id 2, its hurtboxes 8, 8 objects, the first record\'s words; none without a HitModule)',
               [x[:8] for x in e.osr_full if x[0] == A['gk_fo']],
               [(A['gk_fo'], 2, 8, 8, 0x11, 0x22, 0x33, 0x44)] if 'hurt' in F else [])
+        if 'hurt' in F:
+            e.setw(hm + C.HM_RECS, 0x14)
+            e.calls, e.osr_full = [], []
+            e.call(lab['w_ddiag'], cacc, 2)
+            check('v10 diag: a records word outside the data range (v9 dereferenced 0x14: the user\'s C_hurt crash, '
+                  'IP 0x04BED250): S4GO with zero words, no read through it',
+                  [x[:8] for x in e.osr_full if x[0] == A['gk_fo']], [(A['gk_fo'], 2, 8, 8, 0, 0, 0, 0)])
+            e.setw(hm + C.HM_RECS, hrecs)
         for o in (C.W_VIS, C.W_MODEL, C.W_POSTURE, C.W_LINK):
             e.setw(cacc + o, 0)
         e.calls, e.osr_full = [], []
@@ -727,6 +734,51 @@ def s43_checks(e, info):
           (0x700F0000 - 0x68, 0x71, fk['f'], msg, True, 0x02000000))
 
 
+def plyc_checks(e, info, diag):
+    """v10: the name tag at the player-cursor HUD's per-player call (PLYC_HOOK -> plyc -> PLYC_FN)"""
+    lab, A = info['labels'], info['A']
+    hide, saved = A['gk_hide'], A['gk_plyr']
+    tw = [e.w(C.PLYC_TRAMP + 4 * i) for i in range(4)]
+    check('v10: the per-player call of the cursor HUD update goes to plyc (through its trampoline)',
+          (K.branch_target(C.PLYC_HOOK, e.w(C.PLYC_HOOK)), ((tw[0] & 0xFFFF) << 16) | (tw[1] & 0xFFFF), tw[2:]),
+          (C.PLYC_TRAMP, lab['plyc'], [0x7D8903A6, 0x4E800420]))
+    hud = e.alloc(8 * C.PLYC_BLK + 0x100, b'\0')
+    for i in range(8):
+        e.setw(hide + 4 * i, 0)
+        e.setw(saved + 4 * i, 0)
+        e.mu.mem_write(hud + i * C.PLYC_BLK + C.PLYC_SHOW, b'\x01')
+        e.mu.mem_write(hud + i * C.PLYC_BLK + C.PLYC_ID, struct.pack('>h', i))
+    e.stub(C.PLYC_FN, lambda e_: e_.calls.append(('plyc_fn', e_.r(3), e_.r(4),
+                                                    e_.mu.mem_read(e_.r(3) + e_.r(4) * C.PLYC_BLK + C.PLYC_SHOW, 1)[0])))
+    show = lambda i: e.mu.mem_read(hud + i * C.PLYC_BLK + C.PLYC_SHOW, 1)[0]
+
+    def call(i):
+        e.calls, e.osr_full = [], []
+        e.call(lab['plyc'], hud, i)
+        return [c for c in e.calls if c[0] == 'plyc_fn']
+    check('v10: no hide counter: the game\'s per-player update as it is (show byte 1)', call(2), [('plyc_fn', hud, 2, 1)])
+    e.setw(hide + 4 * 2, 2)
+    got = call(2)
+    logs = [x[:6] for x in e.osr_full]
+    check('v10: his counter on: the show byte 0 before the game reads it, the counter counted down, the byte\'s value '
+          'kept (+1)', (got, e.w(hide + 8), e.w(saved + 8)), ([('plyc_fn', hud, 2, 0)], 1, 2))
+    if diag:
+        check('v10 diag: S4GU once at the hide (hud, player 2, id 2, show 1)', logs,
+              [(A['gk_fu'], hud, 2, 2, 1, 0)])
+    e.mu.mem_write(hud + 2 * C.PLYC_BLK + C.PLYC_SHOW, b'\x01')   # the game set it again
+    got = call(2)
+    check('v10: ... the next frame: 0 again, no second log', (got, e.osr_full), ([('plyc_fn', hud, 2, 0)], []))
+    got = call(2)
+    check('v10: the counter run out: the saved byte (1) back once, then left alone',
+          (got, e.w(saved + 8), call(2)), ([('plyc_fn', hud, 2, 1)], 0, [('plyc_fn', hud, 2, 1)]))
+    e.setw(hide + 4 * 5, 3)
+    call(5)
+    check('v10: another player\'s counter: only that block', [show(i) for i in range(8)], [1, 1, 1, 1, 1, 0, 1, 1])
+    e.setw(hide + 4 * 5, 0)
+    call(5)
+    check('v10: player 8+ (none): straight through', [c[:3] for c in call(9)], [('plyc_fn', hud, 9)])
+
+
 def hud_checks(e, info):
     lab, A = info['labels'], info['A']
     hide = A['gk_hide']
@@ -900,6 +952,7 @@ def main():
     s42_checks(e, info)
     s43_checks(e, info)
     hud_checks(e, info)
+    plyc_checks(e, info, diag)
     panel_checks(e, info, diag)
     print('%d checks, %d failures' % (checks, fails))
     sys.exit(1 if fails else 0)

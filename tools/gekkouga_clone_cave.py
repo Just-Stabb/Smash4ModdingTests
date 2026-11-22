@@ -126,7 +126,8 @@ HM_CLEAR = 0x3C                   # v9: HitModule (vtable 0x10107774) vt +0x3C: 
 HM_GROUPS = 0x3C                  # +0x3C its hurt groups (setup vt +0x14 0x02C42570: params +0x18; weapons 1: the generic
 HM_GROUP = 0x40                   # params 0x032107B4), +0x40 the groups (0x38 each: +4 / +6 its records' start / count)
 HM_COUNT = 0x4C                   # +0x4C the hurtboxes added (vt +0x4C adds)
-HM_RECS = 0x44                    # +0x44 {?, the records (0x40 each)}
+HM_RECS = 0x48                    # +0x44 {capacity (params +0xAC: 0x14), +0x48 the records (0x40 each)}: v9 read
+                                  # [+0x44] as a pointer (0x14) and C_hurt's S4GO crashed (the user's v9.1 log)
 HM_OBJS = 0x18                    # +8 the collision container (+0xC its objects (0x174 each), +0x10 their count)
 W_POSTURE = 0x18                  # -> PostureModule (+0x10 / +0x14 / +0x18 x y z, +0x5C the scale)
 FLX_INTERN = 0x032CB1B8           # v7: (atom pool [0x102FCAA4] + 0x24, char *, length) -> atom (docs: "Damage panel")
@@ -289,11 +290,19 @@ G1_HOOK = 0x02EED92C              # his slot 0's `bl 0x02C6F5C0` (the group init
 G1_FN = 0x02C6F5C0
 HUD_HOOK = 0x028E40B4             # the HUD update's `bl 0x03091E34` (r3 the cursor, r29 = 8 - player)
 HUD_FN = 0x03091E34
+PLYC_HOOK = 0x028E4020            # v10: the player-cursor HUD update's per-player call (bl PLYC_FN, r3 the HUD, r4 player)
+PLYC_TRAMP = 0x037EE570           # 4 words (zero in exe_v46z_ui10, after ts_scene_sites_cave.py's 0x037EE550-0x037EE570):
+                                  # the cave is out of a bl's reach from PLYC_HOOK
+PLYC_FN = 0x028E3E18              # its per-player fade: shown only while the block's +0x2B75 byte is set
+PLYC_BLK = 0x2B00                 # a player's block (the HUD + player x 0x2B00; its +0xC0 part: +0 the player id)
+PLYC_SHOW = 0x2B75                # the show byte (0: the cursor fades out)
+PLYC_ALPHA = 0xC0 + 0x2AB8        # its alpha now (float)
+PLYC_ID = 0xC0                    # its player id (lha; -1 none)
 DESC_TABLE = 0x04BAA208           # kind_expand.py's fighter descriptor cases (a pointer each)
 GK_DESC = 0x10378FC8              # his fighter descriptor (0x38 bytes: +4 motion info, +8 article list)
 GK_DESC_CASE = 0x02E4362C         # its case (bl getter; epilogue)
 ORIGINAL = {SLOT13: 0x9421FF90, SLOT42: 0x9421FF38, SLOT43: 0x9421FF98, G1_HOOK: 0x4BD81C95,
-            HUD_HOOK: 0x487ADD81, DESC_TABLE + 4 * GK_KIND: GK_DESC_CASE}
+            HUD_HOOK: 0x487ADD81, DESC_TABLE + 4 * GK_KIND: GK_DESC_CASE, 0x028E4020: 0x4BFFFDF9}
 
 # game functions / data (none is an import)
 HANDLE = 0x02BF2108               # (manager [0x102F6C30], &handle, object id, 0)
@@ -517,6 +526,7 @@ def build(rpx, diag=False, feats=None):
     assert A['gk_slow'] == A['gk_hide'] + 0x20
     assert not diag or A['gk_lastf'] == A['gk_slow'] + 0x20
     A['ctf'] = alloc(12 * 4, 4)         # v6: the gauge's colour per mode
+    A['gk_plyr'] = alloc(4 * SLOTS)     # v10: per player, the cursor show byte we cleared + 1 (0: none)
     A['gk_tags'] = alloc(4 * SLOTS)     # v7: the tag messages' countdown per slot (0: shown)
     A['gk_names'] = alloc(8 * len(GAUGE_NAMES), 4)    # v7: the round gauge's clip names {char *, length}
     A['gk_namestr'] = alloc(sum(len(n) + 1 for n in GAUGE_NAMES) + 4, 4)
@@ -534,7 +544,7 @@ def build(rpx, diag=False, feats=None):
             ('gk_ff', 'S4GF slot=%d flags=%d gen=%d\n'),
             ('gk_fi', 'S4GI clone set-up: hitmodule=%08X\n'),
             ('gk_fc', 'S4GC clone first frame: id=%d owner slot=%d\n'),
-            ('gk_fu', 'S4GU tag hidden: player=%d cursor=%08X\n'),
+            ('gk_fu', 'S4GU tag hook: hud=%08X player=%d id=%d show byte %d -> 0, alpha %08X\n'),
             ('gk_fj', 'S4GJ clone set-up done\n'),
             ('gk_fp', 'S4GP clone first update (its script not run yet): weapon accessor=%08X\n'),
             ('gk_fv', 'S4GV HUD cursor update: r29=%d cursor=%08X\n'),
@@ -581,6 +591,7 @@ def build(rpx, diag=False, feats=None):
     out.blob(A['hurt'], hurt_blob(), 'clone hurtboxes (his vl group 5, article joints)')
     out.blob(A['ctf'], b''.join(struct.pack('>4B4h', *c) for c in GAUGE_COLOURS), 'gauge colours')
     out.blob(A['gk_tags'], bytes(4 * SLOTS), 'tag message countdowns')
+    out.blob(A['gk_plyr'], bytes(4 * SLOTS), 'cursor show bytes saved')
     strs, ptrs, at = b'', [], A['gk_namestr']
     for n in GAUGE_NAMES:
         ptrs.append((at + len(strs), len(n)))
@@ -602,11 +613,11 @@ def build(rpx, diag=False, feats=None):
              slow=FLAG_SLOW, clones=FLAG_CLONES, life=TAG_LIFE, sslot=SLOW_SLOT, srate=SLOW_RATE, sframes=SLOW_FRAMES,
              hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, whit=W_HIT_MOD, wdmg=W_DAMAGE, watk=W_ATTACK,
              wstop=W_STOP, wcol=W_COLOUR, wmodel=W_MODEL, wlink=W_LINK, wvis=W_VIS, wpost=W_POSTURE,
-             cclear=COLOUR_CLEAR, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
+             cclear=COLOUR_CLEAR, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
              hm_objs=HM_OBJS, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -1505,12 +1516,13 @@ wd_log2:
         cmpwi r11, 0
         beq wd_hlog
         lha r0, 4(r11)
-        lwz r11, %(hm_recs)d(r12)
-        cmpwi r11, 0
-        beq wd_hlog
-        lwz r11, 4(r11)
-        cmpwi r11, 0
-        beq wd_hlog
+        lwz r11, %(hm_recs)d(r12)       # the records (checked to be in the data range: a diag never faults)
+        lis r3, 0x1000
+        cmplw r11, r3
+        blt wd_hlog
+        lis r3, 0x8000                  # (MEM2, with the Extended Memory pack up to 0x80000000)
+        cmplw r11, r3
+        bge wd_hlog
         slwi r0, r0, 6
         add r11, r11, r0
         lwz r7, 0(r11)
@@ -1824,6 +1836,62 @@ gp_done:
         addi r1, r1, 0x50
         blr
 
+# ---- v10: the name tag, at the player-cursor HUD's per-player update (PLYC_HOOK: its `bl 0x028E3E18(hud, player)`,
+# the 8-player loop of the HUD update 0x028E3FDC's caller): that function shows the cursor only when the player block's
+# byte +0x2B75 (PLYC_SHOW, hud + player x 0x2B00) is set (else it fades it out: +0x2AB8 alpha). While s13 keeps the
+# player's hide counter up (his tag bit), the byte is 0 before every call; when it runs out, its saved value goes back
+plyc:   cmplwi r4, %(slots)d
+        bge plyc_go
+        slwi r12, r4, 2
+        lis r11, %(gk_hide_hi)d
+        addi r11, r11, %(gk_hide_lo)d
+        lwzx r10, r11, r12
+        mulli r9, r4, %(plyc_blk)d
+        add r9, r9, r3                  # r9 = the player's block
+        lis r8, %(gk_plyr_hi)d
+        addi r8, r8, %(gk_plyr_lo)d
+        lwzx r7, r8, r12                # its saved flag + 1 (0: not hidden by us)
+        cmpwi r10, 0
+        beq plyc_back
+        addi r10, r10, -1
+        stwx r10, r11, r12
+        cmpwi r7, 0
+        bne plyc_hide
+        lbz r7, %(plyc_show)d(r9)
+        addi r7, r7, 1
+        stwx r7, r8, r12''' + D('''
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stw r3, 0x8(r1)
+        stw r4, 0xC(r1)
+        stw r9, 0x10(r1)
+        mr r5, r4
+        lha r6, %(plyc_id)d(r9)
+        addi r7, r7, -1
+        lwz r8, %(plyc_alpha)d(r9)
+        mr r4, r3
+        lis r3, %(gk_fu_hi)d
+        addi r3, r3, %(gk_fu_lo)d''' + osr() + '''
+        lwz r3, 0x8(r1)
+        lwz r4, 0xC(r1)
+        lwz r9, 0x10(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40''') + '''
+plyc_hide:
+        li r0, 0
+        stb r0, %(plyc_show)d(r9)
+        b plyc_go
+plyc_back:
+        cmpwi r7, 0
+        beq plyc_go
+        addi r7, r7, -1                 # the saved flag back, once
+        stb r7, %(plyc_show)d(r9)
+        li r0, 0
+        stwx r0, r8, r12
+plyc_go:''' + tail(PLYC_FN) + '''
+
 # ---- the fighter descriptor switch's case for him: his descriptor copy (+8 the new article list)
 gk_dcase:
         lis r3, %(gk_desc_hi)d
@@ -1865,6 +1933,11 @@ w_dcase:
     out.put(SLOT42, asm1(SLOT42, 'b 0x%X' % lab['s42']), 'his slot 42', ORIGINAL[SLOT42])
     out.put(SLOT43, asm1(SLOT43, 'b 0x%X' % lab['s43']), 'his slot 43', ORIGINAL[SLOT43])
     out.put(HUD_HOOK, asm1(HUD_HOOK, 'bl 0x%X' % TRAMP), 'the HUD cursor update', ORIGINAL[HUD_HOOK])
+    out.put(PLYC_HOOK, asm1(PLYC_HOOK, 'bl 0x%X' % PLYC_TRAMP), 'the player cursor update (v10)', ORIGINAL[PLYC_HOOK])
+    t = Asm(PLYC_TRAMP)
+    t.asm(tail(lab['plyc']))
+    for i, w in enumerate(t.words()):
+        out.put(PLYC_TRAMP + 4 * i, w, 'player cursor trampoline', 0)
     t = Asm(TRAMP)
     t.asm(tail(lab['hud']))
     for i, w in enumerate(t.words()):

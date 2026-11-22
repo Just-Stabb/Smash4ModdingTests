@@ -338,7 +338,11 @@ PART_FALLBACK = 'A00Wait1.omo'
 # the model.nud's bone indices: every vertex on a bone main.pac doesn't key (the parts' bones, the swing and helper
 # bones) is moved to its nearest ancestor main.pac keys (CLONE_POSED = 'main'), so nothing hangs on a bone the article
 # never poses (a rigid tongue, fingers and jaw in their rest pose). The merged motions / empty sb are TEST_ONLY.
-CLONE_POSED = 'main'
+CLONE_POSED = 'merged'
+# v10 (the user's v9.1: it loads, the merged main.pac too; the tongue / water stay on but rigid): the merged main.pac
+# and his own model.nud again (vertices on their own bones; only helpers / the leg and water swing drops, which no
+# motion keys, rebound), and his model.sb with the tongue's entries pointed at no bone (unswing_sb: same count and size,
+# the parser skips them), so the tongue is keyed, not left in the world. 'main': v9.1's set.
 
 
 def empty_sb(sb):
@@ -427,16 +431,45 @@ def posed_bones(pac_entries):
     return {nd[1] for _nm, data in pac_entries for nd in O.Omo(data).nodes}
 
 
+def unswing_sb(sb, bones, keyed):
+    """v10: model.sb with its entries for bones the motions key (keyed: hashes) pointed at no bone: the model library's
+    swing parser (0x036B8040, version 0x10005: 0x8C-byte entries from +0xC, the bone hash first, little-endian) looks
+    each entry's bone up (0x036B0318) and skips one it doesn't find (0x036B8474), and its second pass skips an entry
+    never set up (byte +4 0); the count and size stay (v9's count 0 froze the load). -> (bytes, [bone names unswung])"""
+    assert sb[:4] == b' BWS' and struct.unpack('<HH', sb[4:8]) == (5, 1), sb[:8]
+    n = struct.unpack('<I', sb[8:12])[0]
+    assert len(sb) == 12 + 0x8C * n, len(sb)
+    names = {h: nm for nm, _p, h in bones}
+    out, done = bytearray(sb), []
+    for i in range(n):
+        at = 12 + 0x8C * i
+        h = struct.unpack('<I', sb[at:at + 4])[0]
+        if h in keyed:
+            g = (~h) & 0xFFFFFFFF
+            assert g not in names and g != 0x0FFFFFFF
+            struct.pack_into('<I', out, at, g)
+            done.append(names.get(h, hex(h)))
+    return bytes(out), done
+
+
 def cmd_data(vanilla_fighter, out_fighter, test_only=None):
     """model/clone/c00-c07 (his body's, v2 with his face files), motion/clone/ (his body's main.pac: every motion the
-    clone plays; v2 his hand / part pacs). v9.1: model.nud rebound to main.pac's bones; test_only (a folder): v9's
-    merged main.pac (merged_main_pac/...) and empty model.sb files (empty_model_sb/...) under it"""
+    clone plays; v2 his hand / part pacs). v10 (CLONE_POSED 'merged', the user's v9.1: the merged main.pac loads):
+    main.pac = his motions with his parts' bones; model.sb with the keyed swing bones (the tongue) unswung; model.nud
+    rebound only for bones no motion keys (helpers, the leg / water swing drops). test_only (a folder): fallbacks
+    under it (v9.1's main.pac / model.nud, his original model.sb)"""
     import shutil
     import omo as O
     n = 0
     body = os.path.join(vanilla_fighter, 'motion', 'body')
     motions, _fell = full_motions(body, os.path.join(vanilla_fighter, 'model', 'body', 'c00', 'model.vbn'))
-    posed = posed_bones(O.pac_read(os.path.join(body, 'main.pac')) if CLONE_POSED == 'main' else motions)
+    main_posed = posed_bones(O.pac_read(os.path.join(body, 'main.pac')))
+    posed = main_posed if CLONE_POSED == 'main' else posed_bones(motions)
+
+    def to(kind, rel):
+        t = os.path.join(test_only, kind, 'fighter', 'gekkouga', rel)
+        os.makedirs(os.path.dirname(t), exist_ok=True)
+        return t
     for c in range(8):
         src = os.path.join(vanilla_fighter, 'model', 'body', 'c%02d' % c)
         dst = os.path.join(out_fighter, 'model', 'clone', 'c%02d' % c)
@@ -444,25 +477,27 @@ def cmd_data(vanilla_fighter, out_fighter, test_only=None):
         for f in CLONE_MODEL_FILES + CLONE_FACE_FILES:
             shutil.copyfile(os.path.join(src, f), os.path.join(dst, f))
             n += 1
-        nud, _moved = rebind(open(os.path.join(src, 'model.nud'), 'rb').read(),
-                             O.vbn_read(os.path.join(src, 'model.vbn')), posed)
+        bones = O.vbn_read(os.path.join(src, 'model.vbn'))
+        nud0 = open(os.path.join(src, 'model.nud'), 'rb').read()
+        sb0 = open(os.path.join(src, 'model.sb'), 'rb').read()
+        nud, _moved = rebind(nud0, bones, posed)
         open(os.path.join(dst, 'model.nud'), 'wb').write(nud)
+        if CLONE_POSED != 'main':
+            open(os.path.join(dst, 'model.sb'), 'wb').write(unswing_sb(sb0, bones, posed)[0])
         if test_only:
-            t = os.path.join(test_only, 'original_model_nud', 'fighter', 'gekkouga', 'model', 'clone', 'c%02d' % c)
-            os.makedirs(t, exist_ok=True)
-            shutil.copyfile(os.path.join(src, 'model.nud'), os.path.join(t, 'model.nud'))
-            t = os.path.join(test_only, 'empty_model_sb', 'fighter', 'gekkouga', 'model', 'clone', 'c%02d' % c)
-            os.makedirs(t, exist_ok=True)
-            open(os.path.join(t, 'model.sb'), 'wb').write(empty_sb(open(os.path.join(src, 'model.sb'), 'rb').read()))
+            rel = 'model/clone/c%02d/' % c
+            open(to('v91_rigid', rel + 'model.nud'), 'wb').write(rebind(nud0, bones, main_posed)[0])
+            open(to('v91_rigid', rel + 'model.sb'), 'wb').write(sb0)
+            open(to('original_model_sb', rel + 'model.sb'), 'wb').write(sb0)
     dst = os.path.join(out_fighter, 'motion', 'clone')
     os.makedirs(dst, exist_ok=True)
     for f in CLONE_MOTION_PACS:
         shutil.copyfile(os.path.join(vanilla_fighter, 'motion', 'body', f), os.path.join(dst, f))
         n += 1
+    if CLONE_POSED != 'main':
+        O.pac_write(os.path.join(dst, 'main.pac'), motions)
     if test_only:
-        t = os.path.join(test_only, 'merged_main_pac', 'fighter', 'gekkouga', 'motion', 'clone')
-        os.makedirs(t, exist_ok=True)
-        O.pac_write(os.path.join(t, 'main.pac'), motions)
+        shutil.copyfile(os.path.join(body, 'main.pac'), to('v91_rigid', 'motion/clone/main.pac'))
     return n
 
 
