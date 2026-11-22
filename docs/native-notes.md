@@ -3849,3 +3849,12 @@ MSC on a bunshin-based kind, the 4-shape group.
   when its VisibilityModule (acc +0xA8) +8 is set and (LinkModule +0x84 bit 7 only) the parent is; ModelModule (acc
   +0x3C) +4 the handle (+8 its instance: drawn byte +0x7DB), +8 a mode (8: no visibility changes, vt +0x164
   `0x02007728`). Bunshin's and the moon's specializer vtables differ only at +0x34.
+- **v9 (exe_v46z_gk9)**: swing bones (model.sb) are stepped only for fighters: an article's stay where first placed
+  in the world (the clone's tongue / water); the clone gets an empty model.sb (header + count 0) and full-body motions.
+  Weapon init (`0x02BCBBF0`): singleton `0x03210C30`, spec vt +0xC (default `0x0320E748` -> `0x032107B4`: the generic
+  params, HitModule's at +0x9C: 1 hurt group) and +0x15C, then the object init `0x02BF4F08` calls each module's vt
+  +0x14 setup with the params (HitModule +0x9C, DamageModule +0xC4). HitModule (vtable `0x10107774`): +8 the collision
+  container, +0x3C / +0x40 groups (0x38 each, +4 / +6 record start / count), +0x44 {?, records 0x40 each}, +0x4C the
+  hurtboxes added, +0x6F off; vt +0x1C another setup, +0x34 reset (-> +0x3C clear-all `0x02C42CE4`), +0x44 set +0x6F,
+  +0x4C add (`0x02C42D7C`), update `0x02C42C54`. The SET_CURSOR message's vtable is `0x100FCC00` (v7 / v8's
+  `0x1010CC00` was a misread); `0x02BF019C(&handle, &msg)` = `[[handle]+0x24]` vt +0x21C.

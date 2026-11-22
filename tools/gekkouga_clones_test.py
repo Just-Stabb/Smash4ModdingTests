@@ -1196,8 +1196,6 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 6:
         want_top.remove('INSTALL_TO_data')        # v7: executables only
-    if len(earlier) == 8:
-        want_top = ['INSTALL_TO_data', 'README.txt']   # v9: data only (v8's executables stay)
     check('the package\'s top level: %s (+ Sm4shCommand)' % ', '.join(want_top),
           sorted(t for t in top if not t.startswith('Sm4shCommand_v')), want_top)
     want, same1 = [], []
@@ -1289,8 +1287,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
          'data/ui/info/dmg') if len(earlier) == 6 else \
         ('greninja_clones_v7', 'exe_v46z_gk8', 'clone.mscsb', 'VisibilityModule', 'S4GM', 'S4GN', 'A_safe', 'E_bstart',
          'bunshin', 'black', 'object id') if len(earlier) == 7 else \
-        ('greninja_clones_v8', 'exe_v46z_gk8', 'main.pac', 'model.nud', 'model.sb', 'tongue', 'water', 'swing',
-         'A_safe', 'B_attack', 'C_hurt')
+        ('greninja_clones_v8', 'exe_v46z_gk9', 'main.pac', 'model.nud', 'model.sb', 'tongue', 'water', 'swing',
+         'A_attack', 'C_hurt', 'D_parts', 'name tag', '0x100FCC00', 'S4GK', 'S4GO', 'confirmed')
     check('README.txt mentions every feature (%s)' % ', '.join(words), [w for w in words if w not in readme], [])
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 

@@ -636,3 +636,27 @@ his object id 0 (the tag hides), now logged as `object id=%d`.
   posture z and +0x5C scale, LinkModule +0x84, the ModelModule pointer.
 - Package: exe_v46z_gk8 (+ diag A-E) and the clone's `clone.mscsb`. Cave tests 97 (release), 107 (A / B / D / E),
   113 (C); `gekkouga_clones_test` 202 checks with `--v1` to `--v7`.
+
+## Clones v9 (`greninja_clones_v9.zip`)
+
+Confirmed by the user in v8: the clones show (A_safe), their attacks hit (B_attack), C_hurt doesn't crash, the panel bar
+shows. Not working in v8: the tongue / water left in the world, hits on a clone (C_hurt: no damage line over ~18 DK
+hits), the name tag (the user's correction: it never hid). Release = v8's B set (`RELEASE` = attack); TEST_ONLY
+A_attack, C_hurt (attack + hurt), D_parts (attack + parts).
+- **Tongue / water** (`tools/gekkouga_build.py` `full_motions`, `rebind`, `empty_sb`): an article never steps its
+  swing bones, so with his model.sb they were placed once in the world and stayed (the user's clip: the tongue on the
+  floor under the jumping clones, the water streaks stretched back; D_parts' keyed sw1 is overridden by the swing). The
+  clone's model.sb lists no swing bones (Cloud's empty form); every main.pac motion gets his part motions' bones
+  (lhand / rhand / pt1 / pt2 / sw1; 12 thrown motions without parts take Wait1's), tracks in vbn order; the vertices
+  on bones no motion keys (HLP elbow / leg helpers, the LegB / water swing drops) move to their nearest keyed ancestor
+  (exact while the bone would sit at its bind offset). `gekkouga_clones_test.model_tests`: merged poses equal his
+  main + parts (Wait1, every bone), no vertex on an unposed bone, sb empty; they fail on v8's files.
+- **Hurtboxes**: the generic weapon params (`0x032107B4`) give every weapon 1 hurt group (params +0x9C: +0xB4 count,
+  +0xB8 groups, +0xAC 0x14); HitModule (vtable `0x10107774`) setup vt +0x14 (`0x02C42570`) starts it empty, reset vt
+  +0x34 calls clear-all vt +0x3C (`0x02C42CE4`); the clone's hurtboxes were added only at its construction (spec
+  +0x1C, the match load). v9's start (+0x34) clears and re-adds them. Diag `S4GK` (at the start: groups, count before /
+  after, group 0's records, collision objects) and `S4GO` (with each `S4GX`: count, objects, the first record).
+- **Name tag**: the SET_CURSOR message's first word is `0x100FCC00` (the handler's `lis 0x1010` / `addi -0x3400`; its
+  vtable +0x14 `0x02BE9724` returns +4 = type 6); v7 / v8 sent `0x1010CC00` (string data). The send `0x02BF019C`
+  calls `[obj+0x24]` vt +0x21C (the receiver; its table is built at run time, not traced). The cave test reads the
+  word from the handler. `S4GW` also logs gone (0 = his object found) and the handle.

@@ -138,7 +138,8 @@ GAUGE_NAMES = ('gkgauge_mc', 'gk_ticks_mc', 'gk_dots_mc', 'gk_arcs_mc', 'gk_heav
 GAUGE_SPEEDS = (0.35, -0.8, 1.5, -2.4)   # degrees a frame (tools/gekkouga_gauge_art.py LAYERS), + clockwise
 MSG_HANDLE = 0x02BF2108           # v7: the SET_CURSOR handler's message route (0x02BE7C80): (manager, &handle, id, 1)
 MSG_SEND = 0x02BF019C             # (&handle, &message)
-MSG_KIND = 0x1010CC00             # the message's first word, as the handler's
+MSG_KIND = 0x100FCC00             # the message's first word (its vtable: +0x14 0x02BE9724 -> +4, the type 6), as the
+                                  # handler's (lis 0x1010 / addi -0x3400); v7 / v8's 0x1010CC00 was string data: no hide
 TAG_RESEND = 30                   # frames between the hide messages while the tag is hidden
 PANEL_VT = 0x100871D8 + 0x3C      # v6: the damage panel's update (InfoGadgetDmg vtable +0x3C: docs/native-notes.md "Damage
                                   # panel"; its relocation moved to a dead word by trait_badge_cave.py)
@@ -540,7 +541,7 @@ def build(rpx, diag=False, feats=None):
             ('gk_fx', 'S4GX clone id=%d at x=%d y=%d\n'),
             ('gk_fb', 'S4GB panel slot=%d gauge mode=%d value=%d\n'),
             ('gk_fz', 'S4GZ clone start: init=%08X scale x100=%d\n'),
-            ('gk_fw', 'S4GW tag message: visible=%d object id=%d\n'),
+            ('gk_fw', 'S4GW tag message: visible=%d object id=%d gone=%d handle=%08X\n'),
             ('gk_fm', 'S4GM clone id=%d draw: visflag=%d visible=%d model mode=%d drawn=%d overlay=%d/%d\n'),
             ('gk_fn', 'S4GN clone id=%d z=%d scale x100=%d link mask=%08X model=%08X\n'),
             ('gk_fk', 'S4GK clone hurtboxes set: hitmodule=%08X groups=%d boxes %d -> %d group0=%d+%d objects=%d\n'),
@@ -1554,16 +1555,19 @@ gk_tag: stwu r1, -0x50(r1)
         addi r0, r1, 0x10
         stw r0, 0x20(r1)
         li r0, 0
-        stw r0, 0x24(r1)''' + D('''
+        stw r0, 0x24(r1)
         stw r5, 0x48(r1)
-        lis r3, %(gk_fw_hi)d
-        addi r3, r3, %(gk_fw_lo)d
-        mr r4, r31''' + osr() + '''
-        lwz r5, 0x48(r1)''') + '''
         lis r3, %(mgr_hi)d
         lwz r3, %(mgr_lo)d(r3)
         addi r4, r1, 0x28
-        li r6, 1''' + call(MSG_HANDLE) + '''
+        li r6, 1''' + call(MSG_HANDLE) + D('''
+        addi r3, r1, 0x28''' + call(HANDLE_GONE) + '''
+        mr r6, r3                       # v9 diag: 0 = his object found (the message reaches it)
+        lis r3, %(gk_fw_hi)d
+        addi r3, r3, %(gk_fw_lo)d
+        mr r4, r31
+        lwz r5, 0x48(r1)
+        lwz r7, 0x28(r1)''' + osr()) + '''
         addi r3, r1, 0x28
         addi r4, r1, 0x18''' + call(MSG_SEND) + '''
 gt_out: lwz r31, 0x4C(r1)

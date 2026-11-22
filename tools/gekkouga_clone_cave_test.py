@@ -505,7 +505,7 @@ def weapon_checks(e, img, info, diag=False):
               ([c[1:3] + (c[3],) for c in e.osr_seen], e.clone_vars.get(C.VAR_LOGGED)), ([(A['gk_fc'], 2, 3)], 1.0))
         poll(0x64, 0.0)
         check('v3 diag: ... not again; v8: its 4th poll (its first frame) logs its place and draw state (S4GX, S4GM, S4GN)',
-              [c[1] for c in e.osr_seen], [A['gk_fx'], A['gk_fm'], A['gk_fn']])
+              [c[1] for c in e.osr_seen], [A['gk_fx'], A['gk_fm'], A['gk_fn']] + ([A['gk_fo']] if 'hurt' in F else []))
         poll(0x64, 0.0)
         check('v8 diag: ... then nothing until its 120th poll', e.osr_seen, [])
     if 'hurt' not in F:
@@ -667,6 +667,13 @@ def s13_checks(e, info):
         e.calls = []
         e.run_to(lab['s13'], C.SLOT13 + 4, 0x51, fk['f'], 0x53)
         return [c for c in e.calls if c[0] in ('msg_handle', 'msg_send')]
+    # v9: the message's first word read from the game's own SET_CURSOR handler (0x02BE7C80: lis r11, 0x1010 at
+    # +0x48, addi r11, r11, -0x3400 at +0x58 = 0x100FCC00, the message vtable); v7 / v8 had 0x1010CC00 (string data:
+    # the user's tag never hid)
+    hw, aw = e.w(0x02BE7CC8), e.w(0x02BE7CD8)
+    game_kind = (((hw & 0xFFFF) << 16) + K.sx16(aw)) & 0xFFFFFFFF
+    check('v9: the SET_CURSOR handler\'s message vtable (lis 0x%X / addi %d: 0x%08X) is ours'
+          % (hw & 0xFFFF, K.sx16(aw), game_kind), (hw >> 26, aw >> 26, game_kind), (15, 14, C.MSG_KIND))
     want0 = [('msg_handle', 0x1234, 1), ('msg_send', C.MSG_KIND, 6, 0xA, 0)]
     check('v7: bit 1 on: the SET_CURSOR message {0xA, 0} to his object (handle (manager, id, 1), then sent)', frame(1.0), want0)
     n = [len(frame(1.0)) for _ in range(C.TAG_RESEND - 1)]
