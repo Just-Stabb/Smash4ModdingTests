@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Greninja's clones (fighters/gekkouga/README.md "Clones v1"): the native part. Prints rpx_patch.py arguments.
+"""Greninja's clones (fighters/gekkouga/README.md "Clones v1" / "Clones v2"): the native part. Prints rpx_patch.py
+arguments (v2: exe_v46z_gk2; v1's exe_v46z_gk1 was this without the v2 parts).
 
-  python3 tools/rpx_patch.py exe_v46z_ui10.rpx exe_v46z_gk1.rpx $(python3 tools/gekkouga_clone_cave.py --rpx exe_v46z_ui10.rpx)
-  python3 tools/gekkouga_clone_cave.py --rpx exe_v46z_ui10.rpx --diag      # + the TEST ONLY OSReport lines (exe_v46z_gk1_diag)
+  python3 tools/rpx_patch.py exe_v46z_ui10.rpx exe_v46z_gk2.rpx $(python3 tools/gekkouga_clone_cave.py --rpx exe_v46z_ui10.rpx)
+  python3 tools/gekkouga_clone_cave.py --rpx exe_v46z_ui10_diag.rpx --diag # + the TEST ONLY OSReport lines (exe_v46z_gk2_diag)
   python3 tools/gekkouga_clone_cave.py --rpx exe_v46z_ui10.rpx --info      # where everything went
 
 Greninja (fighter kind 0x30) runs his own native code; for him ONLY this adds (every other fighter, Kirby's Greninja copy
@@ -16,13 +17,16 @@ included, runs the game's words as before: the hooks sit in Greninja's own speci
    - the 4 name tables (owner = Greninja's own "gekkouga" string, name / folder = "clone", root = bunshin's) and the 3
      static tables (bunshin's u32 / u8 / u16 flags 0x87D: 0x40 a model, 0x10 the model in the owner's colour: c00-c07);
    - its descriptor (a copy of bunshin's) whose motion info lists EVERY body motion of his (his fighter motion table's
-     668 main-animation hashes, flags 0): the article plays motion kind K from motion/clone/main.pac (his body main.pac)
-     and runs the script its motion.mtable names for K (his body mtable);
+     668 main-animation hashes, v2 with his flags, and v2 his motion parts / groups: words 2-5 of his own motion info,
+     the hands' and parts' per-motion tables): the article plays motion kind K from motion/clone/main.pac (his body
+     main.pac; v2 + his part pacs) and runs the script its motion.mtable names for K (his body mtable);
    - its own module row: bunshin's 28 constructors with the shuriken's KineticModule (slot 0), AttackModule (2) and
      slots 5, 8, 9, 11 (the attack's companions every attacking Greninja article has): his hitboxes, copied into the
      article's game scripts, hit as his;
    - its own singleton (bunshin's vtable copied, the hit-result method +0xAC replaced): its attack connecting / being
-     shielded (result bits 0x17) never removes it (the default removes a weapon whose attack connects);
+     shielded (result bits 0x17) never removes it (the default removes a weapon whose attack connects); v2: it also
+     sets its owner's VAR_22 = 1.0 (the owner: the fighter table entry of the slot in the clone's VAR_0, which its MSC
+     writes), his MSC's signal for his hitlag;
    - the base kind (bunshin: its 11 native methods), the descriptor case, the singleton case, the own row.
    Greninja's article list becomes his 6 articles + two CLONE_KIND entries (article 6 the left clone, 7 the right one,
    one instance each, no spawner callback as bunshin's), through a copy of his fighter descriptor (+8 the new list)
@@ -50,7 +54,7 @@ included, runs the game's words as before: the hooks sit in Greninja's own speci
    Player index = the HUD's loop index = the fighter table's slot (assumed: both are the entry order).
 
 His MSC's side (fighters/gekkouga/README.md): VAR_20 = the flags (1 tag hidden, 2 burnout slow, 4 clones out), VAR_21 =
-a clone hit (0 none). Space: CAVE-LIMIT (past Supamario's 0x04BE8000-0x04BEA000; `textregion:0x2BEC000
+a clone hit (0 none), VAR_22 (v2) = a clone's hit landed (1: his hitlag). Space: CAVE-LIMIT (past Supamario's 0x04BE8000-0x04BEA000; `textregion:0x2BEC000
 grow:0x04BEC000`), TRAMP (4 words of the zero run 0x037EE4DC-0x037EE550 inside copy_custom_cave.py's never-used spawn
 reserve). Calls go through ctr (game functions only). Every hooked / written word is asserted against the base.
 Test: tools/gekkouga_clone_cave_test.py (unicorn).
@@ -116,6 +120,10 @@ SLOW_SLOT, SLOW_RATE, SLOW_FRAMES = 3, 2, 600
 # the variables his MSC and this share (docs/acmd-extra-commands.md VAR_0-VAR_23: his private ones)
 VAR_FLAGS = 0x0F000314            # VAR_20: 1 name tag hidden, 2 burnout slow, 4 clones out
 VAR_HIT = 0x0F000315              # VAR_21: HIT_BIAS + (hitting object's X - his X); 0 = none
+VAR_LAG = 0x0F000316             # VAR_22 (v2): 1 = a clone's hit landed (w_hit sets it; his MSC gives him the hitlag)
+VAR_SLOT = 0x0F000300             # the clone's VAR_0 (v2): its owner's slot (1-8), its MSC writes it every frame
+W_ACC = 0x28                      # weapon -> its module accessor (+0x20 StatusModule, +0x28 WorkModule)
+W_WORK = 0x28
 FLAG_TAG, FLAG_SLOW, FLAG_CLONES = 1, 2, 4
 HIT_BIAS = 10000.0
 TAG_LIFE = 4                      # HUD frames a refresh keeps the tag hidden
@@ -221,9 +229,20 @@ def tables(img):
 
 def motion_hashes(img):
     """his fighter motion table's main-animation hashes (the descriptor's +4 motion info: {table, count})"""
+    return [h for h, _f in motion_entries(img)]
+
+
+def motion_entries(img):
+    """his fighter motion table's entries {hash, flags} (v2: the clones keep his flags)"""
     mi = img.w(GK_DESC + 4)
     tbl, n = img.w(mi), img.w(mi + 4)
-    return [img.w(tbl + 8 * i) for i in range(n)]
+    return [(img.w(tbl + 8 * i), img.w(tbl + 8 * i + 4)) for i in range(n)]
+
+
+def motion_parts(img):
+    """his motion info's words 2-5: {parts list, count, groups list, count} (v2: the clones' hand / face parts)"""
+    mi = img.w(GK_DESC + 4)
+    return [img.w(mi + 4 * i) for i in range(2, 6)]
 
 
 def layout(img):
@@ -244,7 +263,8 @@ def layout(img):
     for s in MODULE_SLOTS:
         mrow[s] = img.w(W.MODULE_TABLE + 0x70 * MODULES_FROM + 4 * s)
     return dict(bdesc=bdesc, bminfo=img.w(bdesc + 8), dsize=dsize, svt=svt, vsize=W.vtable_size(img, svt),
-                old_hit=img.w(svt + W.HIT_METHOD), hashes=motion_hashes(img), rows=rows, mrow=mrow)
+                old_hit=img.w(svt + W.HIT_METHOD), hashes=motion_hashes(img), ents=motion_entries(img),
+                parts=motion_parts(img), rows=rows, mrow=mrow)
 
 
 def build(rpx, diag=False):
@@ -292,18 +312,20 @@ def build(rpx, diag=False):
     A['gk_hide'] = alloc(4 * SLOTS)
     A['gk_slow'] = alloc(4 * SLOTS)
     assert A['gk_slow'] == A['gk_hide'] + 0x20
-    A['consts'] = alloc(16)          # 0.0, 0.5, HIT_BIAS, FAR
+    A['consts'] = alloc(20)          # 0.0, 0.5, HIT_BIAS, FAR, 1.0
     A['gk_str'] = alloc(8)
     fmts = [('gk_ft', 'S4GT slot=%d hide=%d\n'), ('gk_fs', 'S4GS slot=%d slow=%d\n'),
-            ('gk_f42', 'S4GH clone hit dx=%d\n'), ('gk_f43', 'S4GV shield damage vetoed\n')]
+            ('gk_f42', 'S4GH clone hit dx=%d\n'), ('gk_f43', 'S4GV shield damage vetoed\n'),
+            ('gk_fl', 'S4GL clone hit landed: owner slot %d hitlag\n')]
     for nm, s in fmts:
         A[nm] = alloc((len(s) + 4) & ~3, 4) if diag else 0
     code_at = alloc(0, 4)
 
     # weapon motion entries / info / descriptor / vtable / singleton / row
-    out.blob(A['w_ents'], b''.join(struct.pack('>II', h, 0) for h in L['hashes']), 'clone motions (his body)')
+    out.blob(A['w_ents'], b''.join(struct.pack('>II', h, f) for h, f in L['ents']), 'clone motions (his body + flags)')
     mi = bytearray(img.blob(L['bminfo'], W.MINFO_SIZE))
     struct.pack_into('>II', mi, 0, A['w_ents'], len(L['hashes']))
+    struct.pack_into('>4I', mi, 8, *L['parts'])       # v2: his parts (hands, face) and groups
     out.blob(A['w_minfo'], bytes(mi), 'clone motion info')
     d = bytearray(img.blob(L['bdesc'], L['dsize']))
     struct.pack_into('>I', d, 8, A['w_minfo'])
@@ -321,7 +343,7 @@ def build(rpx, diag=False):
     out.blob(A['g1_shapes'], b''.join(struct.pack('>7fI', 0.0, SHAPE_Y[0], z, 0.0, SHAPE_Y[1], z, SHAPE_R, 0x200)
                                       for z in SHAPE_Z), 'clone shapes (joint 0, capsules)')
     out.blob(A['gk_hide'], bytes(8 * SLOTS), 'hide counters / slow states')
-    out.blob(A['consts'], struct.pack('>4f', 0.0, 0.5, HIT_BIAS, FAR), 'constants')
+    out.blob(A['consts'], struct.pack('>5f', 0.0, 0.5, HIT_BIAS, FAR, 1.0), 'constants')
     out.blob(A['gk_str'], CLONE_NAME.encode().ljust(8, b'\0'), '"clone"')
     if diag:
         for nm, s in fmts:
@@ -330,10 +352,10 @@ def build(rpx, diag=False):
 
     p = dict(acc=ACC, work=WORK, posture=POSTURE, bacc=BASE_ACC, entry=ENTRY, slots=SLOTS, tag=FLAG_TAG,
              slow=FLAG_SLOW, clones=FLAG_CLONES, life=TAG_LIFE, sslot=SLOW_SLOT, srate=SLOW_RATE, sframes=SLOW_FRAMES,
-             hitbits=HIT_BITS, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
-    for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43'):
+             hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
+    for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
-    for i, nm in enumerate(('zero', 'half', 'bias', 'far')):
+    for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
     p['ftab_hi'], p['ftab_lo'] = ha(FIGHTERS), K.slo(FIGHTERS)
     p['mgr_hi'], p['mgr_lo'] = ha(OBJ_MANAGER), K.slo(OBJ_MANAGER)
@@ -571,7 +593,54 @@ s43_orig:
 # ---- the clone article's hit-result method (its singleton vtable +0xAC): (singleton, weapon, result bits)
 w_hit:  andi. r0, r5, %(hitbits)d
         beq w_base
-        li r3, 0                        # its attack connected / was shielded: kept (not removed)
+        stwu r1, -0x30(r1)              # its attack connected / was shielded: kept (not removed), and (v2) its owner's
+        mflr r0                         # VAR_22 = 1 (his MSC gives him the hitlag); the owner's slot is the clone's VAR_0
+        stw r0, 0x34(r1)
+        stw r31, 0x2C(r1)
+        lwz r12, %(wacc)d(r4)           # the clone's module accessor
+        cmpwi r12, 0
+        beq w_done
+        lwz r31, %(wwork)d(r12)         # its WorkModule
+        cmpwi r31, 0
+        beq w_done''' + var_get('r31', VAR_SLOT) + '''
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r11, 0x1C(r1)
+        addi r11, r11, -1               # the owner's table index (slot 1-8)
+        cmplwi r11, %(slots)d
+        bge w_done
+        lis r12, %(ftab_hi)d
+        lwz r12, %(ftab_lo)d(r12)
+        cmpwi r12, 0
+        beq w_done
+        lwz r12, 0(r12)
+        cmpwi r12, 0
+        beq w_done
+        lwz r10, 8(r12)                 # the entries' count
+        cmplw r11, r10
+        bge w_done
+        lwz r12, 0(r12)
+        mulli r11, r11, %(entry)d
+        add r12, r12, r11
+        lbz r0, 0x1E(r12)               # live (>= 4)
+        cmplwi r0, 4
+        blt w_done
+        lwz r12, %(acc)d(r12)
+        cmpwi r12, 0
+        beq w_done
+        lwz r31, %(work)d(r12)          # his WorkModule
+        cmpwi r31, 0
+        beq w_done
+        lis r12, %(one_hi)d
+        lfs f1, %(one_lo)d(r12)''' + var_set('r31', VAR_LAG) + D('''
+        lis r3, %(gk_fl_hi)d
+        addi r3, r3, %(gk_fl_lo)d
+        lwz r4, 0x1C(r1)''' + osr()) + '''
+w_done: lwz r31, 0x2C(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        li r3, 0
         blr
 w_base:''' + tail(L['old_hit']) + '''
 

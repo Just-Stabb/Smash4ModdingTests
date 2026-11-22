@@ -1,10 +1,12 @@
-// Greninja's clone (weapon kind 0x1A1, his articles 6 / 7: fighters/gekkouga/README.md "Clones v1").
+// Greninja's clone (weapon kind 0x1A1, his articles 6 / 7: fighters/gekkouga/README.md "Clones v1" / "Clones v2").
 // The framework is his moon article's (vanilla moon.mscsb, decompiled): one status that does nothing. The clone itself
-// is cl_frame(), run every frame (global14): it finds him (the player slot whose SLOTn_SHARED_7 is 4747, nearest to
-// where it was made), stands at his X + its offset (his VAR_24 / VAR_25 by which clone it is: his VAR_30 when it was
-// made), faces his way and plays the motion he gives (VAR_27 / 28 / 29: his own, or Wait1 / Fall while he is on a
-// ledge, hit, ...); its scripts are his body's hitboxes (script/animcmd/weapon/clone, tools/gekkouga_build.py). Hidden
-// when he closes the channel (his VAR_31 0) or it is not alive any more; he removes it (ArticleModule 0x2712).
+// is cl_frame(), run every frame (global14): it finds him (the player slot whose SLOTn_SHARED_7 is 4747000 + flags,
+// nearest to where it was made) and which clone it is (his "being made" bit 4 / 8), stands where his MSC puts it (v2:
+// his VAR_24 / 25 or VAR_26 / 27: it falls and lands on its own there), faces his way and plays the motion he gives
+// (VAR_30 kind, VAR_28 frame, VAR_29 rate: his own, Wait1 / Fall while he is on a ledge, hit, ...; Fall while it falls
+// on its own, flags 16 / 32); its scripts are his body's hitboxes (script/animcmd/weapon/clone, tools/gekkouga_build.py).
+// Its VAR_0 = his slot (v2: the executable's clone hit method gives him its landed hits' hitlag). Hidden when he closes
+// the channel (his VAR_31 0) or it is not alive any more; he removes it (ArticleModule 0x2712).
 int global0;
 int global1;
 int global2;
@@ -642,7 +644,19 @@ float cl_abs(float v)
     return v;
 }
 
-// him: a slot whose VAR_31 is the magic, the nearest to here (he made it at his place)
+// v2: his flags (VAR_31 - 4747000), 0x1000 when slot n isn't a Greninja with clones out
+int cl_flags(int slot)
+{
+    float v;
+    v = cl_shared(slot, 7) - 4747000.0f;
+    if (v < -0.5f || v > 63.5f)
+    {
+        return 0x1000;
+    }
+    return (int)(v + 0.5f);
+}
+
+// him: a slot whose VAR_31 is the magic (4747000 + flags), the nearest to here (he made it at his place)
 int cl_find()
 {
     int s;
@@ -654,7 +668,7 @@ int cl_find()
     s = 1;
     while (s <= 8)
     {
-        if (cl_shared(s, 7) > 4746.5f && cl_shared(s, 7) < 4747.5f)
+        if (cl_flags(s) < 0x1000)
         {
             d = cl_abs(cl_slot_pos(s, 0) - PostureModuleF(0x1)) + cl_abs(cl_slot_pos(s, 1) - PostureModuleF(0x2));
             if (d < bd)
@@ -677,16 +691,31 @@ void cl_show(int on)
     }
 }
 
+// which clone this is: his "being made" bit (4 the left one, 8 the right one); none in the first frames: wait
+int cl_which(int flags)
+{
+    if (flags & 0x4)
+    {
+        return 0x1;
+    }
+    if (flags & 0x8)
+    {
+        return 0x2;
+    }
+    return 0;
+}
+
+// every frame (hitstop included): its place (his MSC's: it stands / falls / lands there), his facing, his motion
+// (Fall while it falls on its own), its owner's slot in its VAR_0 (the executable gives him its hits' hitlag)
 void cl_frame()
 {
-    int alive;
+    int flags;
     int k;
     float f;
     float r;
-    float off;
     float lr;
     cl_t += 1;
-    if (cl_slot == 0)
+    if (cl_slot == 0 || cl_id == 0)
     {
         cl_shown = 1;
         cl_motion = 0xffffffff;
@@ -696,41 +725,56 @@ void cl_frame()
             cl_show(0);
             return;
         }
-        cl_id = (int)cl_shared(cl_slot, 6);
-        if (cl_id != 0x2)
+        cl_id = cl_which(cl_flags(cl_slot));
+        if (cl_id == 0)
         {
-            cl_id = 0x1;
+            cl_slot = 0;
+            cl_show(0);
+            return;
         }
     }
-    if (cl_shared(cl_slot, 7) < 4746.5f)
+    WorkModule(0, (float)cl_slot + 0, 0x0f000300);
+    flags = cl_flags(cl_slot);
+    if (flags >= 0x1000)
     {
         cl_show(0);                       // his ability ended: he removes it
         return;
     }
-    alive = (int)cl_shared(cl_slot, 2);
-    if ((alive & cl_id) == 0)
+    if ((flags & cl_id) == 0)
     {
         cl_show(0);
         return;
     }
     if (cl_id == 0x1)
     {
-        off = cl_shared(cl_slot, 0);
+        PostureModule(0x3, cl_shared(cl_slot, 0), cl_shared(cl_slot, 1), 0);
     }
     else
     {
-        off = cl_shared(cl_slot, 1);
+        PostureModule(0x3, cl_shared(cl_slot, 2), cl_shared(cl_slot, 3), 0);
     }
-    PostureModule(0x3, cl_slot_pos(cl_slot, 0) + off, cl_slot_pos(cl_slot, 1), 0);
     lr = cl_slot_pos(cl_slot, 3);
     if (lr != 0 && PostureModuleF(0) != lr)
     {
         PostureModule(0, lr);
         PostureModule(0x2);
     }
-    k = (int)cl_shared(cl_slot, 3);
+    k = (int)cl_shared(cl_slot, 6);
     f = cl_shared(cl_slot, 4);
     r = cl_shared(cl_slot, 5);
+    if (flags & (0x10 * cl_id))
+    {
+        k = 0x24;                         // falling on its own: Fall (its own loop)
+        if (k != cl_motion)
+        {
+            MotionModule(0x1, k, 0, 1.0f);
+            cl_motion = k;
+        }
+        MotionModule(0x4, r);
+        cl_last_f = 0;
+        cl_show(1);
+        return;
+    }
     if (k != cl_motion || f + 0.5f < cl_last_f)
     {
         MotionModule(0x1, k, f, r);       // his new motion (or his restart), from his frame: its script runs from it

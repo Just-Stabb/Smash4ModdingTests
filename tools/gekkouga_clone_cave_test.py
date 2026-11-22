@@ -11,10 +11,11 @@ Checks:
 - words: the patched RPX has every word of the cave; the hooked words in BASE are the game's; no relocation on them;
   the cave space and the trampoline are free in BASE; nothing else differs between BASE and PATCHED;
 - the clone weapon kind 0x1A1: the game's weapon descriptor getter (0x0320D934) returns its descriptor (bunshin's
-  bytes, its motion info: his 668 body motions' hashes, flags 0); the singleton getter (0x03210C30) its own singleton
+  bytes, its motion info: his 668 body motions' hashes and flags, v2 his parts / groups); the singleton getter (0x03210C30) its own singleton
   whose vtable is bunshin's but +0xAC; the module set-up's row stub gives its own row (bunshin's + the shuriken's
   slots 0 / 2 / 5 / 8 / 9 / 11); the name / static tables (owner "gekkouga", name / folder "clone", bunshin's flags);
-  the hit method: result bits 0x1 / 0x2 / 0x4 / 0x10 -> 0 (kept), 0x8 -> bunshin's method;
+  the hit method: result bits 0x1 / 0x2 / 0x4 / 0x10 -> 0 (kept), 0x8 -> bunshin's method; v2: a hit / shield sets
+  the owner's VAR_22 (the slot in the clone's VAR_0; not for slot 0 / 9, a dead entry, no accessor);
 - his fighter descriptor (the fighter descriptor switch 0x02E4313C, kind 0x30): his descriptor copy, +4 his motion
   info, +8 his 6 articles + the clones (6 / 7: 0x1A1, max 1); every other kind's descriptor as before;
 - slot 0's group-1 init: the group init gets our desc (4 capsules on joint 0 at z = -28 / -14 / 14 / 28, y 3-15, r 5.5,
@@ -73,6 +74,7 @@ class Run(Emu):
     def __init__(self, path):
         super().__init__(path)
         self.calls = []
+        self.set_wm = []
         self.vars = {}
         self.gone = 0
         self.obj_x = 0.0
@@ -120,6 +122,7 @@ class Run(Emu):
     def setf_fn(self, e):
         v = round(d2f(self.mu.reg_read(UC_PPC_REG_FPR1)), 3)
         self.calls.append(('setf', self.r(4), v))
+        self.set_wm.append(self.r(3))
         self.vars[self.r(4)] = v
 
     def fighter(self, slot, x=5.0):
@@ -188,10 +191,20 @@ def weapon_checks(e, img, info):
     mi = e.w(d + 8)
     check('its motion info: his 668 motions', (mi, e.w(mi + 4)), (A['w_minfo'], 668))
     ents = e.w(mi)
-    check('the entries: his body motions\' hashes, flags 0',
-          [(e.w(ents + 8 * i), e.w(ents + 8 * i + 4)) for i in range(668)], [(h, 0) for h in L['hashes']])
-    check('the motion info\'s other words are bunshin\'s', [e.w(mi + 4 * i) for i in range(2, 8)],
-          [img.w(L['bminfo'] + 4 * i) for i in range(2, 8)])
+    check('the entries: his body motions\' hashes and flags (v2: his fighter motion table\'s entries)',
+          [(e.w(ents + 8 * i), e.w(ents + 8 * i + 4)) for i in range(668)], L['ents'])
+    his = img.w(C.GK_DESC + 4)
+    check('his motion table: 668 entries, hashes the v1 list', ([h for h, _f in L['ents']] == L['hashes'], len(L['ents'])),
+          (True, 668))
+    check('v2: its motion info\'s words 2-5 are his (parts 0x10378F70 x 6, groups 0x10378FA0 x 5)',
+          [e.w(mi + 4 * i) for i in range(2, 6)], [img.w(his + 4 * i) for i in range(2, 6)])
+    check('... his parts as read: 0x10378F70 6 0x10378FA0 5', [img.w(his + 4 * i) for i in range(2, 6)],
+          [0x10378F70, 6, 0x10378FA0, 5])
+    check('... each part a 668-word hash table (motion kind -> the part\'s animation; hands 4 / 3, parts 6 / 7 / 8)',
+          [(img.w(0x10378F70 + 8 * i + 4), img.w(0x10378F70 + 8 * (i + 1)) - img.w(0x10378F70 + 8 * i))
+           for i in range(4)], [(4, 668 * 4), (3, 668 * 4), (6, 668 * 4), (7, 668 * 4)])
+    check('its words 6 / 7 bunshin\'s (-90.0 / 90.0)', [e.w(mi + 4 * i) for i in range(6, 8)],
+          [img.w(L['bminfo'] + 4 * i) for i in range(6, 8)])
     check('bunshin\'s descriptor unchanged', e.call(W.DESC_SWITCH, 0, C.CLONE_BASE), L['bdesc'])
     s = e.call(W.SINGLETON_SWITCH, 0, C.CLONE_KIND)
     check('the singleton getter: kind 0x1A1 -> its own singleton', s, A['w_single'])
@@ -201,12 +214,51 @@ def weapon_checks(e, img, info):
     check('its +0xAC: the hit method', e.w(vt + W.HIT_METHOD), lab['w_hit'])
     hits = []
     e.stub(L['old_hit'], lambda e_: e_.rec('base_hit', 3, 4, 5))
+    # v2: a clone (weapon +0x28 its accessor, +0x28 its WorkModule: VAR_0 = its owner's slot) and its owner
+    cvt = e.alloc(0x100, b'\0')
+    cget = e.alloc(4)
+    e.setw(cvt + 0x44, cget)
+    e.clone_vars = {C.VAR_SLOT: 3.0}
+
+    def cget_fn(e_):
+        e_.calls.append(('clone_getf', e_.r(4)))
+        e_.mu.reg_write(UC_PPC_REG_FPR1, f2d(e_.clone_vars.get(e_.r(4), 0.0)))
+    e.stub(cget, cget_fn)
+    cwm = e.alloc(0x10, b'\0')
+    e.setw(cwm, cvt)
+    cacc = e.alloc(0x40, b'\0')
+    e.setw(cacc + C.W_WORK, cwm)
+    weapon = e.alloc(0x40, b'\0')
+    e.setw(weapon + C.W_ACC, cacc)
+    owner = e.fighter(2)
+    e.mu.mem_write(owner['f'] + 0x1E, b'\x04')
     for bits in (0x1, 0x2, 0x4, 0x10, 0x13, 0x8):
-        e.calls = []
-        r = e.call(lab['w_hit'], s, 0x1234, bits)
-        hits.append((bits, r if not e.calls else 'base'))
+        e.calls, e.set_wm = [], []
+        r = e.call(lab['w_hit'], s, weapon, bits)
+        hits.append((bits, r if not [c for c in e.calls if c[0] == 'base_hit'] else 'base'))
     check('the hit method: 0x1 / 0x2 / 0x4 / 0x10 kept (0), 0x8 bunshin\'s',
           hits, [(1, 0), (2, 0), (4, 0), (0x10, 0), (0x13, 0), (8, 'base')])
+
+    def landed(slot_var, live=4, bits=0x13):
+        e.clone_vars[C.VAR_SLOT] = slot_var
+        e.mu.mem_write(owner['f'] + 0x1E, bytes([live]))
+        e.calls, e.set_wm, e.vars = [], [], {}
+        for i in range(14, 32):
+            e.mu.reg_write(REGS[i], 0x5A5A0000 + i)
+        r = e.call(lab['w_hit'], s, weapon, bits)
+        return r, [c for c in e.calls if c[0] in ('clone_getf', 'setf')], e.set_wm, e.kept()
+    r = landed(3.0)
+    want = [('clone_getf', C.VAR_SLOT), ('setf', C.VAR_LAG, 1.0)]
+    check('v2: a landed hit (0x13): the clone\'s VAR_0 (slot 3) read, its owner\'s (table entry 2) VAR_22 = 1.0 '
+          'through his WorkModule, 0, the registers kept', r, (0, want, [owner['wm']], True))
+    check('v2: shielded (0x4): the same signal (his hitlag on a shield too)', landed(3.0, bits=0x4)[1], want)
+    check('v2: slot 0 (its MSC not run yet): nothing set', landed(0.0)[1], [('clone_getf', C.VAR_SLOT)])
+    check('v2: slot 9: nothing set', landed(9.0)[1], [('clone_getf', C.VAR_SLOT)])
+    check('v2: the owner\'s entry not live (+0x1E < 4): nothing set', landed(3.0, live=2)[1], [('clone_getf', C.VAR_SLOT)])
+    e.setw(weapon + C.W_ACC, 0)
+    check('v2: no accessor: nothing read, 0', landed(3.0)[:2], (0, []))
+    e.setw(weapon + C.W_ACC, cacc)
+    e.mu.mem_write(owner['f'] + 0x1E, b'\x00')
     # the module row stub (the bl at MODULE_ROW): r30 = kind -> r8 = row - MODULE_TABLE
     mr = K.branch_target(W.MODULE_ROW, img.w(W.MODULE_ROW))
     e.mu.reg_write(REGS[30], C.CLONE_KIND)

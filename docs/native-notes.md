@@ -3722,7 +3722,7 @@ exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATC
   - Secret Sensation's MSC also holds every other fighter by the 2-frame hitstop (`ui_freeze(0)`) while it asks the
     stop, a second lock that works without the frame state.
 
-## Greninja's clones (`tools/gekkouga_clone_cave.py`, exe_v46z_gk1; fighters/gekkouga/README.md "Clones v1")
+## Greninja's clones (`tools/gekkouga_clone_cave.py`, exe_v46z_gk1 / gk2; fighters/gekkouga/README.md "Clones v1" / "Clones v2")
 
 **Claimed region: `0x04BEA000`-`0x04BEC000`** (`textregion:0x2BEC000 grow:0x04BEC000`, past Supamario's
 `0x04BE8000`-`0x04BEA000`) and a 4-word trampoline at `0x037EE540` (the zero run `0x037EE4DC`-`0x037EE550`, inside
@@ -3775,3 +3775,25 @@ exe_v46z_gk1_diag). Every hooked / written word is asserted; `tools/import_call_
 Not run in game: whether the HUD's player index is the fighter slot, whether an off-screen cursor isn't drawn
 elsewhere (the draw `0x028E414C` reads the cursor's model), the article set-up with the mixed module row, the weapon
 MSC on a bunshin-based kind, the 4-shape group.
+
+- **v2 (exe_v46z_gk2 / gk2_diag on ui10 / ui10_diag; fighters/gekkouga/README.md "Clones v2")**:
+  - **A fighter's motion parts**: his motion info `0x1037C470` = {main `0x1037C4CC`, 668, parts `0x10378F70`, 6,
+    groups `0x10378FA0`, 5, 0, 0}; a part entry {table, part id}: 668 words each (motion kind -> the part's animation
+    hash): `0x10379034` Lhand 4, `0x10379AA4` Rhand 3, `0x1037A514` 6, `0x1037AF84` 7, `0x1037B9F4` 8 (Gekkougapt1 /
+    pt2 / sw1), {0, 1}; groups {`0x10379000`, 5}, {`0x10379014`, 5}, {`0x10378F68`, 1}, {`0x10379028`, 3},
+    {`0x10378F6C`, 1}. A weapon's motion info has the same layout with words 2-5 zero in every vanilla weapon (kinds
+    0-0x184 scanned) and -90.0 / 90.0 at words 6 / 7. Both set-ups store the motion info pointer at the init block's
+    `+0x58` (fighter `0x02E5412C`, from the fighter descriptor `+4`; article `0x02BCBB30`, from the weapon descriptor
+    `+8`). The clone's motion info copy now has his words 2-5 and his entries' flags (v1: bunshin's zeros / flags 0).
+    Not confirmed: that the article's MotionModule plays parts (no vanilla weapon has any) and that its resource load
+    takes motion/clone's extra pacs; the exe has no part pac names (only `material_anime_*.pac`, `0x10196270`-), so the
+    motion folder's .pac files are likely listed, not named.
+  - **A weapon's WorkModule**: weapon `+0x28` -> its module accessor (`+0x20` StatusModule, `+0x28` WorkModule), the
+    same accessor layout as a fighter's. The clone's hit method (singleton vtable `+0xAC`, bits 0x17) reads the clone's
+    VAR_0 (its owner's slot, written by its MSC) and sets the owner's VAR_22 (`0x0F000316`) = 1.0 through the fighter
+    table (`[[0x1035184C]]` `+0` entries x 0x76B0, `+8` count; entry `+0x1E` >= 4 live; `[entry + 0x28] + 0x726C` the
+    WorkModule); his MSC turns it into `StopModule(2, n)` (the victims' hitstop). Diag `S4GL`.
+  - Cave: `0x04BEA000`-`0x04BEBE20` (diag `0x04BEBF98`) of `0x04BEC000`; the trampoline as v1.
+  - Tests: `gekkouga_clone_cave_test.py` 66 / 0 on both (the minfo words / flags / part tables, the hit signal: hit,
+    shield, slot 0 / 9, a dead entry, no accessor, the registers kept); `supamario_ui_cave_test.py` (outline5 -> gk2)
+    422 / 0; import_call_check 0.

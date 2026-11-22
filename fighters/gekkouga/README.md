@@ -316,12 +316,103 @@ Smash; their effect scripts (25) with EFFECT / follow / flip / Sword_Glow only; 
 ### What is approximate / untested (nothing has run in game)
 
 - The clones don't have their own physics: a fixed offset from him (off a ledge they float; launched, they go with
-  him). They mirror his motions, not his inputs.
+  him). They mirror his motions, not his inputs. (v2: they fall: "Clones v2".)
 - Clone "hurtboxes" are capsules on his shield, not the article's: a hit is given to the nearest clone by the hitting
   object's position; a hit touching a clone and him meets the shape first (the clone takes it); the common shield
   spark shows. The cave-built group replaces his counter shape (his 5-shape pool: the guard's + 4).
-- An article's hit doesn't give him hitlag; a clone in its hitlag catches back up with his frame.
-- No hand / face part animations on the clones (only main.pac); no sound; no smash-charge effects on them.
+- An article's hit doesn't give him hitlag; a clone in its hitlag catches back up with his frame. (v2: it does.)
+- No hand / face part animations on the clones (only main.pac); no sound; no smash-charge effects on them. (v2: hands
+  and face.)
 - The name tag: the HUD cursor of his player number moved off screen (FAR = -100000) after the HUD placed it: assumes
   the HUD's player order is the fighter table's.
 - The base kind's native code (bunshin) runs for the clone; its singleton's other methods are bunshin's.
+
+## Clones v2 (`greninja_clones_v2.zip`)
+
+The user's v2 request (v1 not yet tested in game): the clones get his face and hand animation, a clone's landed hit
+puts him in hitlag, and the clones fall instead of floating. The package is an update over v1: only the files that
+differ from it (both MSCs, 5 motion pacs, 4 face files x 8 colours) and README.txt, with exe_v46z_gk2 (+ diag).
+Tests: `tools/gekkouga_clones_test.py ... --v1=greninja_clones_v1.zip` (147 checks), `tools/gekkouga_clone_cave_test.py`
+(66 unicorn checks on gk2 and gk2_diag), `tools/supamario_ui_cave_test.py` (outline5 -> gk2) 422 / 0,
+`tools/import_call_check.py` 0 on both. No script or motion slot changed: Sm4shCommand stays v1.7.26.
+
+```sh
+python3 tools/rpx_patch.py exe_v46z_ui10.rpx exe_v46z_gk2.rpx $(python3 tools/gekkouga_clone_cave.py --rpx exe_v46z_ui10.rpx)
+python3 tools/rpx_patch.py exe_v46z_ui10_diag.rpx exe_v46z_gk2_diag.rpx \
+    $(python3 tools/gekkouga_clone_cave.py --rpx exe_v46z_ui10_diag.rpx --diag)
+```
+
+### Face and hands
+
+- The clone weapon's motion info (exe) now carries his: its words 2-5 = his fighter motion info's (`0x1037C470`: the
+  parts list `0x10378F70` x 6, the groups `0x10378FA0` x 5) and its 668 entries keep his flags (v1: 0). A part entry
+  is {a 668-word table: motion kind -> that part's animation hash, the part id}: Lhand 4, Rhand 3, Gekkougapt1 6,
+  Gekkougapt2 7, Gekkougasw1 8 (and one with no table). The clone plays motion K with his main.pac, so the part
+  tables line up with its motion kinds.
+- `motion/clone/` gets his body's lhand / rhand / gekkougapt1 / gekkougapt2 / gekkougasw1.pac (`CLONE_MOTION_PACS`);
+  `model/clone/cXX/` his body cXX's material_anime_eye / eyelid / face.pac (the per-motion eye, eyelid, mouth material
+  animations; the eyelid's are mesh visibility by mesh name) and model.moi (`CLONE_FACE_FILES`). Not model.sbwl /
+  model.ik (bunshin's file set has neither).
+- His expression scripts hold no face changes (SLOPE, rumble, visibility, SET_CURSOR, item / article visibility): not
+  copied; the face is the material animations per motion.
+- Approximate: no vanilla weapon has motion parts (every weapon descriptor's motion info has words 2-5 zero), so
+  whether the article's MotionModule plays them, and whether the article's resource load takes the extra pacs, is
+  untested. The fighter's set-up and the article's both pass the motion info through the init block's `+0x58`
+  (`0x02E5412C` / `0x02BCBB30`), which suggests the same consumer.
+
+### Hitlag from a clone's hit
+
+- Exe: the clone's hit method (its singleton vtable `+0xAC`), for result bits 0x17 (a hit 0x13, a shield 0x4) still
+  returns 0 (kept) and now first reads the clone's VAR_0 (its owner's slot, 1-8: the clone MSC writes it every frame)
+  through the clone's WorkModule (weapon `+0x28` the accessor, `+0x28` its WorkModule, get_float vt `+0x44`), finds
+  that fighter table entry (`[[0x1035184C]]`: count `+8`, entries `+0` x 0x76B0, live `+0x1E` >= 4) and sets its
+  VAR_22 (`0x0F000316`) = 1.0 (his WorkModule: `[entry + 0x28] + 0x726C`, set_float vt `+0x4C`). Diag: `S4GL clone
+  hit landed: owner slot N hitlag`.
+- MSC (`gk_clone_hitlag`, every frame of the ability, first): VAR_22 set -> cleared; not already in hitlag
+  (`StopModule(1)`) -> `StopModule(2, n)`, n = the biggest "hitstop of the last hit taken" (`0x0F000044 + 8 x target`)
+  among the fighters in hitstop now (`0x0F000043 + 8 x target`, targets 3-10 = slots 1-8; docs/position-variables.md),
+  at least `gk_hitlag_min()` = **4**. Already in hitlag (his own hit, or the other clone's on the same frame): nothing
+  more (no stacking).
+- The freeze: the channel's rate is 0 while he is in hitlag (`StopModule(1)`), the clones' fall too.
+- Approximate: the length is read the frame after the hit (the victim's hitstop of that hit, as he'd have had); on a
+  shield or a non-fighter it is the minimum unless a fighter is in hitstop then.
+
+### The clones' fall (`gk_physics`)
+
+- His MSC owns each clone's place: `gk_lx / gk_ly / gk_lvy` (left-spawned), `gk_rx / gk_ry / gk_rvy`, frames falling
+  on its own `gk_lfall / gk_rfall`. X = his X + its offset (unless he is detached). Y:
+  - he is in the air by his own doing (situation 2, not detached, not on a ledge): it copies his vertical movement
+    (dy = his Y - his last Y: a jump with him, from its own height);
+  - else gravity **0.18** / max fall **1.85** (his `fighter_param` 0x03000018 / 0x03000019,
+    reference/fighter_param_attributes.csv);
+  - moving down it lands on the first floor of the segment (x, from) -> (x, y + dy - 0.5) (standing last frame: down
+    to y + dy - `gk_snap()` **3**, slopes): the stage line test the exe has had since exe_v46w (`Line_Test`'s MSC
+    variables `0x0F0003D0`-`3D8`, his own: Space 1 world, Floors 0 = passable platforms too; LINE_KIND 1 a floor).
+    From = y + 3 falling on its own, y - 0.05 while copying him (a platform drop isn't stopped by the platform he left).
+  - frozen while he is in hitlag.
+- **Detached** (he is launched / grabbed / thrown / down: statuses 0x3F-0x5B): X fixed too (they stay where they were)
+  and they fall; when he is out of those statuses: back in formation (his X + offset, his Y) with a smoke each.
+- **Off the stage**: falling on its own more than `gk_fall_frames()` = **100** frames -> removed with its smoke, no log
+  (the blast zone isn't read).
+- **On a ledge** (0x72-0x7A): no copy (they stand or fall).
+- The channel (his VAR_24-31, v2): 24 / 25 the left clone's X / Y, 26 / 27 the right one's, 28 his motion's frame, 29
+  its rate (0 in hitlag), 30 its kind, 31 = 4747000 + flags (1 / 2 alive, 4 / 8 being made: the first 2 frames after
+  each `ArticleModule(0x2710)`, 16 / 32 falling on its own more than 2 frames). Mirror-off statuses: Wait1, Fall
+  when he is in the air with them (copying).
+- The clone MSC: finds him (the slot whose VAR_31 is 4747000 + 0-63, nearest), which clone from the "being made" bit
+  (none yet: it waits hidden), stands at its X / Y, faces his way, plays his motion (Fall 0x24 from 0 at its own loop
+  while its fall flag is on), writes its VAR_0 = his slot.
+- **Swap**: he goes to the clone's (x, y) (`WorkModule(2, dx, 0x0F000000)` and `(2, dy, 0x0F000001)`), it to his old
+  (x, y); the other clone stays.
+- **Capsules** only for clones in formation (alive, not detached, within 3 of his Y): his shield shapes are at his
+  height; a clone on another floor or left behind can't be hit (v1's hurtbox design).
+- **The name tag**: also the vanilla cursor op `BattleObject(0xA, 0)` (ACMD SET_CURSOR's, Rebirth's `func_230`
+  shows it with 1) at the start and every 60 frames, `BattleObject(0xA, 1)` at the natural end; the exe's HUD hide stays.
+
+### What is approximate / untested (v2)
+
+- Whether the article plays motion parts / loads the part pacs and face files (above).
+- Walls and ceilings don't stop a clone; no slide on steep slopes; a clone copying his fall isn't counted as "off the
+  stage" (it goes when he is KO'd).
+- The hitlag starts a frame after the hit; its length as above.
+- Launched: they play Wait1 (Fall while falling) and come back by smoke, not by walking.

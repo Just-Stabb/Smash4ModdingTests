@@ -268,23 +268,32 @@ def cmd_acmd(user_dir, vanilla_model, out_dir):
 # ---------------------------------------------------------------- the clone's model / motion
 CLONE_MODEL_FILES = ('model.nud', 'model.nut', 'model.vbn', 'model.jtb', 'model.mta', 'model.xmb', 'model.nhb',
                      'model.sb', 'model.flp')   # bunshin's file set, from his body cNN (the costume's colours)
+CLONE_FACE_FILES = ('material_anime_eye.pac', 'material_anime_eyelid.pac', 'material_anime_face.pac', 'model.moi')
+# v2: his body cNN's face: the eye / eyelid / face material animations per motion (docs/params/fighter_files.md: the
+# eyelid's are mesh visibility by mesh name, with model.moi's per-mesh info). Not his model.sbwl / model.ik (swing
+# bone extras, leg IK: bunshin's set has neither)
+CLONE_MOTION_PACS = ('main.pac', 'lhand.pac', 'rhand.pac', 'gekkougapt1.pac', 'gekkougapt2.pac', 'gekkougasw1.pac')
+# v2: his body's motion parts too (the clone's motion info lists his parts: hands 3 / 4, parts 6 / 7 / 8)
 
 
 def cmd_data(vanilla_fighter, out_fighter):
-    """model/clone/c00-c07 (his body's), motion/clone/main.pac (his body's: every motion the clone plays)"""
+    """model/clone/c00-c07 (his body's, v2 with his face files), motion/clone/ (his body's main.pac: every motion the
+    clone plays; v2 his hand / part pacs)"""
     import shutil
     n = 0
     for c in range(8):
         src = os.path.join(vanilla_fighter, 'model', 'body', 'c%02d' % c)
         dst = os.path.join(out_fighter, 'model', 'clone', 'c%02d' % c)
         os.makedirs(dst, exist_ok=True)
-        for f in CLONE_MODEL_FILES:
+        for f in CLONE_MODEL_FILES + CLONE_FACE_FILES:
             shutil.copyfile(os.path.join(src, f), os.path.join(dst, f))
             n += 1
     dst = os.path.join(out_fighter, 'motion', 'clone')
     os.makedirs(dst, exist_ok=True)
-    shutil.copyfile(os.path.join(vanilla_fighter, 'motion', 'body', 'main.pac'), os.path.join(dst, 'main.pac'))
-    return n + 1
+    for f in CLONE_MOTION_PACS:
+        shutil.copyfile(os.path.join(vanilla_fighter, 'motion', 'body', f), os.path.join(dst, f))
+        n += 1
+    return n
 
 
 def cmd_all(vanilla_root, user_root, out):
