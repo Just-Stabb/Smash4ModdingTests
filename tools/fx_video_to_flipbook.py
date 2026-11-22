@@ -29,12 +29,14 @@ run it with `python3 -I` on downloaded footage. Needs ffmpeg (libvpx-vp9, libweb
            (pixel - (1 - alpha) x plate) / alpha, so the screen's green leaves the edges and the smoke, then
            despilled: G <= max(R, B) where opaque, sliding toward G <= mean(R, B) as much as the screen showed
            through (x --despill, default 1): a flame's edge keyed too opaque (an orange edge over green reads
-           as only part screen) would stay yellow-olive under the plain limit; neutral smoke is untouched. Alpha is then levelled: --key-lo (default: the screen's own noise,
-           its 99.5th percentile of alpha where nothing ever passes) to --key-hi (0.92) -> 0..1: soft edges kept, noise gone.
+           as only part screen) would stay yellow-olive under the plain limit; neutral smoke is untouched.
+           Alpha is then levelled: --key-lo (default: the screen's own noise, its 99.5th percentile of alpha
+           where nothing ever passes) to --key-hi (0.92) -> 0..1: soft edges kept, noise gone.
 2. Range: the visible frames (alpha mass >= --vis of the peak, default 0.02). --oneshot: kept from the first
-   visible frame to the last (no loop). Loop (default): searched inside the sustained part (alpha mass >=
-   --sustain x the steady level (5-frame mean), default 0.8; or --range A:B, source frames, B inclusive): every start a and
-   length L (L from --cells) scored by how alike the frames around the seam are (--xfade X frames before
+   visible frame to the last (no loop; --range A:B to cut one burst of several). Loop (default): searched
+   inside the sustained part (the longest run with a 5-frame mean alpha mass >= --sustain x the steady
+   level, default 0.8; or --range A:B, source frames, B inclusive): every start a and length L (L from
+   --cells) scored by how alike the frames around the seam are (--xfade X frames before
    frame a+L against the X before a, mean L1 on a small blurred copy, relative to the clip's own median
    frame-to-frame change: 1.0 = the seam looks like an ordinary frame step), longer loops slightly
    preferred (--prefer-long). The loop's last X frames (default 6) are crossfaded (premultiplied) toward
@@ -521,13 +523,16 @@ def run_job(opt):
     bw, bh = x1 - x0, y1 - y0
     # the effect running off the footage's edge (smoke trailing out of frame): fade it out toward that side
     # instead of a hard cut at the cell's edge (the ramp lies on the footage's own edge)
-    cut = {'left': bool(m[:, :2].any()), 'right': bool(m[:, -2:].any()),
-           'top': bool(m[:2].any()), 'bottom': bool(m[-2:].any())}
+    sx_ = max([abs(v[0]) for v in shifts.values()] + [0]) + 2      # tracked frames moved off the edge by this
+    sy_ = max([abs(v[1]) for v in shifts.values()] + [0]) + 2
+    cut = {'left': bool(m[:, :sx_].any()), 'right': bool(m[:, -sx_:].any()),
+           'top': bool(m[:sy_].any()), 'bottom': bool(m[-sy_:].any())}
     if opt.bottom_cut_ok:
         cut['bottom'] = False
     rx, ry = np.ones(w, np.float32), np.ones(h, np.float32)
     if opt.edge_feather > 0 and any(cut.values()):
-        fwid, fhei = max(2, int(opt.edge_feather * min(bw, w))), max(2, int(opt.edge_feather * min(bh, h)))
+        fwid = max(2, int(opt.edge_feather * min(bw, w))) + sx_
+        fhei = max(2, int(opt.edge_feather * min(bh, h))) + sy_
         ss = lambda n: (lambda t: t * t * (3 - 2 * t))(np.linspace(0, 1, n, dtype=np.float32))
         if cut['left']:
             rx[:fwid] *= ss(fwid)
