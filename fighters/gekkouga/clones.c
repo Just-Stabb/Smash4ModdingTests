@@ -103,6 +103,8 @@ int gk_beat_miss() { return 3; }          // frames without its heartbeat: the g
 int gk_beat_grace() { return 120; }       // v5: frames a clone whose heartbeat was never seen is kept anyway
 int gk_hitlag_min() { return 4; }         // a clone hit's hitlag on him when no victim's hitstop is found
 int gk_sk_req_frames() { return 5; }      // skeleton v1: the request's life (a skeleton out already: none is made)
+float gk_sk_dist() { return 36.0f; }      // skeleton v1.6: the shadow's / skeleton's fixed distance ahead of him (his
+                                          // instance float 0x35; tools/gekkouga_clone_cave.py SK_DIST, the hold's cap)
 int gk_tr_req_frames() { return 5; }      // burn v2: the trail requests' life (6 trails out already: none is made)
 
 float gk_abs(float v)
@@ -1538,6 +1540,7 @@ void gk_reset()
 void gk_ss_tick()
 {
     WorkModule(0x9, 0x10000085);
+    gk_ss_shadow();
     if (WorkModule(0x6, 0x10000085) >= WorkModule(0x6, 0x16000006))
     {
         WorkModule(0x9, 0x11000002);
@@ -1553,6 +1556,32 @@ void gk_ss_tick()
                 func_16(0xe, 0);          // Fall
             }
         }
+    }
+}
+
+// skeleton v1.6 (the user: "always spawns from this distance, regardless of if the button is held"): the shadow's
+// distance ahead of him (instance float 0x35: the executable's slot 13 places the shadow, 0x31 / 0x32, from it every
+// frame of the hold and of SpecialS) goes on from where the hold left it (2 + 1.2 a frame, capped at gk_sk_dist() by the
+// executable: feature skdist) to gk_sk_dist() evenly by SpecialS frame 0x16000006 + 0x16000007 - 2 (20 with his params:
+// the skeleton is made at 21 from the shadow's place, 0x31 / 0x32); so a tap and a hold both end there
+void gk_ss_shadow()
+{
+    float d;
+    int left;
+    d = WorkModuleF(0, 0x35);
+    if (d < gk_sk_dist())
+    {
+        left = WorkModule(0x6, 0x16000006) + WorkModule(0x6, 0x16000007) - 0x2 - WorkModule(0x6, 0x10000085);
+        if (left < 0x1)
+        {
+            left = 0x1;
+        }
+        d = d + (gk_sk_dist() - d) / (float)left;
+        if (d > gk_sk_dist())
+        {
+            d = gk_sk_dist();
+        }
+        WorkModule(0, d + 0, 0x35);
     }
 }
 
