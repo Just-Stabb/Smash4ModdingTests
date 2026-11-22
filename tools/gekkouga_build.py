@@ -119,7 +119,10 @@ def compile_msc(src, out):
 
 # ---------------------------------------------------------------- ACMD
 SMASH_SCRIPTS = ('attacks4', 'attacks4hi', 'attacks4lw', 'attackhi4', 'attacklw4')
-GROW = 1.5                 # clones.c gk_smash_grow(): every smash is a full charge, so its hitboxes / effects are x1.5
+GROW = 1.5                 # clones.c gk_smash_grow(): every smash is a full charge, so its hitboxes are x1.5
+EFFECT_GROW = 5.0          # v3 (the user): its effects x5 (clones.c gk_smash_fx_max()); its trails' (Sword_Glow) points too
+HOLD_SCRIPTS = ('attacks4hold', 'attackhi4hold', 'attacklw4hold')   # v3: their effects at size 0 (his MSC draws them, gk_sm_fx)
+HOLD_EFFECTS = ('External_Graphic', 'Graphic_Effect', 'Graphic_Effect2')
 CHARGE_DAMAGE = 1.4        # Smash 4's full smash charge (the attack's 0x1000000 ratio 1.0): x1.4 damage. The clones'
                            # copies of his smash hitboxes get it in the script (an article's attack has no charge ratio)
 HITBOXES = ('Hitbox', 'Special_Hitbox', 'Extended_Hitbox', 'Extended_Special_Hitbox')
@@ -180,7 +183,8 @@ def spans(cmds):
 
 
 def scale_smash(game, effect):
-    """his smash scripts: hitbox sizes x GROW (game), effect sizes x GROW (effect)"""
+    """his smash scripts: hitbox sizes x GROW (game), effect sizes x EFFECT_GROW (effect; a trail's two points too:
+    its length); v3: the hold scripts' effects at size 0 (his MSC draws them by the charge)"""
     n = 0
     for name in SMASH_SCRIPTS:
         for f in (game, effect):
@@ -191,8 +195,18 @@ def scale_smash(game, effect):
                 syn = c.info['syntax']
                 if 'Size' in syn and (c.name in HITBOXES or f is effect):
                     k = syn.index('Size')
-                    c.params[k] = round(float(c.params[k]) * GROW, 4)
+                    c.params[k] = round(float(c.params[k]) * (GROW if f is game else EFFECT_GROW), 4)
                     n += 1
+                if f is effect and c.name == 'Sword_Glow':
+                    for nm in ('X1', 'Y1', 'Z1', 'X2', 'Y2', 'Z2'):
+                        k = syn.index(nm)
+                        c.params[k] = round(float(c.params[k]) * EFFECT_GROW, 6)
+    for name in HOLD_SCRIPTS:
+        s = effect.script(name)
+        for c in s or []:
+            if c.name in HOLD_EFFECTS:
+                c.params[c.info['syntax'].index('Size')] = 0.0
+                n += 1
     return n
 
 

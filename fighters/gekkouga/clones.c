@@ -30,9 +30,8 @@ int gk_seq;            // frames since the ability started (the clones are made 
 int gk_swap_cd;        // frames before another swap
 int gk_pips;           // charge pips shown over his head
 int gk_fx_t;           // frames to the next "ready" sparkle
-int gk_s4;             // smash charges kept (frames, 0 - gk_smash_full()): forward
-int gk_hi4;            // up
-int gk_lw4;            // down
+int gk_smash;          // v3: the smash charge kept (frames, 0 - gk_smash_full()), one for all three smashes
+int gk_hold_first;     // v3: the hold's first tick (its effects made at once)
 int gk_chain;          // the smashes used in this chain: 1 forward, 2 up, 4 down (0 no chain)
 int gk_chain_req;      // the smash a chain cancel asked for (its start status reads it)
 int gk_sm_auto;        // this smash releases on its own: 1 a full stored charge, 2 a chain
@@ -63,8 +62,9 @@ int gk_burnout_frames() { return 480; }   // 8 seconds
 float gk_gap() { return 14.0f; }          // the clones' spacing (tools/gekkouga_clone_cave.py GAP)
 int gk_lw_hold_frame() { return 14; }     // the stance's frame held while charging (its counter window 8 - 30)
 int gk_pip_count() { return 10; }         // the charge bar: one pip a 30 frames
-int gk_smash_full() { return 60; }        // a smash's full charge (Smash 4's hold)
-float gk_smash_grow() { return 1.5f; }    // the smashes' hitbox / effect size at full charge (ACMD: gekkouga_build.py)
+int gk_smash_full() { return 120; }       // v3: the full smash charge (the user; Smash 4's own hold is 60)
+float gk_smash_grow() { return 1.5f; }    // the smashes' hitbox size at full charge (ACMD: gekkouga_build.py HIT_GROW)
+float gk_smash_fx_max() { return 5.0f; }  // v3: their effects' size at full charge (ACMD EFFECT_GROW; the hold: gk_sm_fx)
 int gk_magic() { return 4747; }
 float gk_gravity() { return 0.18f; }      // his gravity (fighter_param 0x03000018: reference/fighter_param_attributes.csv)
 float gk_max_fall() { return 1.85f; }     // his max fall speed (0x03000019)
@@ -109,9 +109,7 @@ void gekkouga_frame()
     if (st == 0x14f)
     {
         gk_lw_charge = 0;                 // the match's start (Entry): every kept charge from 0
-        gk_s4 = 0;
-        gk_hi4 = 0;
-        gk_lw4 = 0;
+        gk_smash = 0;
     }
     gk_input();
     if (gk_ability > 0)
@@ -983,32 +981,55 @@ void gk_lw_exit()
 }
 
 // ---- smash attacks: t = 1 forward, 2 up, 4 down
+// v3: one charge for all three smashes (the user): t is ignored
 int gk_sm_get(int t)
 {
-    if (t == 0x1)
-    {
-        return gk_s4;
-    }
-    if (t == 0x2)
-    {
-        return gk_hi4;
-    }
-    return gk_lw4;
+    return gk_smash;
 }
 
 void gk_sm_set(int t, int v)
 {
-    if (t == 0x1)
+    gk_smash = v;
+}
+
+// v3: the charge's effect size: 1 at 0 to gk_smash_fx_max() at full, linear
+float gk_sm_size(int v)
+{
+    return 1.0f + (gk_smash_fx_max() - 1.0f) * (float)v / (float)gk_smash_full();
+}
+
+// v3: the hold's effects (its effect scripts' own at size 0, gekkouga_build.py): at the charge's size, so a resumed
+// hold starts at the kept size. Every 5 frames the charge sparkle (0x1000019) and flash (0x1000010, at the sword
+// (forward) / over him (up) / at his feet (down)); every 10 frames his water sword (0x3300007, both hands for up /
+// down) made again at the new size (a live effect can't be resized).
+void gk_sm_fx(int t, int v, int first)
+{
+    float sz;
+    sz = gk_sm_size(v);
+    if (first || v % 5 == 0)
     {
-        gk_s4 = v;
+        EffectModule(0x2710, 0x1000019, 0, -2.0f, 0, 0, 0, 0, 0, sz, 0, 0, 0, 0, 0, 0, 0);
+        if (t == 0x1)
+        {
+            EffectModule(0x2712, 0x1000010, 25, 0, -5.5f, 0, 0, 0, 0, sz, 0);
+        }
+        else if (t == 0x2)
+        {
+            EffectModule(0x2710, 0x1000010, 0, 0, 18.0f, 0, 0, 0, 0, sz, 0, 0, 0, 0, 0, 0, 0);
+        }
+        else
+        {
+            EffectModule(0x2710, 0x1000010, 0, 0, 3.0f, 0, 0, 0, 0, sz, 0, 0, 0, 0, 0, 0, 0);
+        }
     }
-    else if (t == 0x2)
+    if (first || v % 10 == 0)
     {
-        gk_hi4 = v;
-    }
-    else
-    {
-        gk_lw4 = v;
+        EffectModule(0x2723, 0x3300007, 0x1, 0x1);
+        EffectModule(0x2712, 0x3300007, 25, -0.00001f, 0, 0, 180.0f, -90.0f, 0, sz, 0x1);
+        if (t != 0x1)
+        {
+            EffectModule(0x2712, 0x3300007, 24, -0.00001f, 0, 0, 180.0f, -90.0f, 0, sz, 0x1);
+        }
     }
 }
 
@@ -1117,6 +1138,7 @@ int gk_sm_start_loop(int t)
     }
     if (ControlModule(0x2712, 0))
     {
+        gk_hold_first = 0x1;              // the hold's effects start at the kept charge's size
         func_16(gk_sm_hold_status(t), 0x1);
         return 0x1;
     }
@@ -1148,7 +1170,10 @@ void gk_sm_hold_tick()
     {
         return;
     }
-    v = gk_sm_get(t) + 1;
+    v = gk_sm_get(t);
+    gk_sm_fx(t, v, gk_hold_first);
+    gk_hold_first = 0;
+    v = v + 1;
     if (v > gk_smash_full())
     {
         v = gk_smash_full();
