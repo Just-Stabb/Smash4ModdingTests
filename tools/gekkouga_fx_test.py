@@ -175,6 +175,110 @@ def ring_checks(p, si, name, spec, kirby, ksh):
           (r0[0], r0[1], r0[2], r0[3], 8.0 <= r10[2] <= 10.0, r10[3] < 0.01, rad(r['life'] + 2)[0]),
           (r['n'], 0.0, r['r0'], 0.0, True, True, 0))
 
+def eft_timing(p, em, frames, u=0.5):
+    """eft's own emission timing for one emitter (cross_f, skeleton v1.3: 0x04A64F00 - 0x04A65378, the count in the
+    volume functions 0x04A4B2C4 ...): {frame: [ages of its live particles]}. Its clock t = frames since the effect was
+    made (the set's +0x2AC is 0); emits while emit_start (0x44C) <= t, and with one_time while t <= end_frame (the
+    previous frame's t under it: 0x04A65040), the first at once, then every interval + 1 frames; each emission's count
+    accumulates rate x (1 - u x 0x448 / 100) (u: the LCG's draw), t 0 always one; the buffer holds one_time ? ((end -
+    emit_start) / (interval + 1) + 1) x rate : (life / (interval + 1)) x rate + rate (0x04A5BE94); a particle lives its
+    life frames (ages 0 ... life - 1)"""
+    f = lambda n: p.field(em, n)                      # noqa: E731
+    one, es, end, iv, life = f('one_time'), f('emit_start'), f('end_frame'), f('emit_interval'), f('ptcl_life')
+    rate, pct = f('emit_rate'), f('emit_rate_random')
+    cap = int(((end - es) // (iv + 1) + 1) * rate) if one else int((life // (iv + 1)) * rate + rate)
+    alive, acc, nxt, out = [], 0.0, None, {}
+    for t in range(max(frames) + 1):
+        alive = [b for b in alive if t - b < life]
+        if t >= es and (not one or t <= end) and (nxt is None or t >= nxt):
+            acc += rate * (1.0 - u * pct / 100.0)
+            if t == 0 and acc < 1.0:
+                acc = 1.0
+            n = int(acc)
+            acc -= n
+            for _ in range(n):
+                if len(alive) < cap:
+                    alive.append(t)
+            nxt = t + iv + 1
+        out[t] = [t - b for b in alive]
+    return {t: out[t] for t in frames}
+
+
+def set_visible(p, si, frames, u=0.5):
+    """frames on which the set draws nothing (no live particle on any emitter)"""
+    per = [eft_timing(p, x['data'], frames, u) for x in p.sets[si]['emitters']]
+    return [t for t in frames if not any(pe[t] for pe in per)]
+
+
+def timing_checks(p, sets, names):
+    """skeleton v1.3 (the user: the skeleton "blinks out and back in", "have the fire effects be visible the entire time"):
+    every looping set, as eft times it, draws something on every frame of 600 (its runs hand over: the next born on the
+    last frame of the one before); the v1.2 - aerial chain v1 placement (a run's birth in 0x448) left gaps"""
+    loops = [n for n, sp in sets if (sp.get('layers') or sp.get('blade') or
+                                     (sp.get('atlas') and G.sidecar(sp['atlas'])['playback'] == 'loop'))]
+    frames = list(range(600))
+    gaps = {n: set_visible(p, 20 + names.index(n), frames) for n in loops}
+    check('every looping set (%s) draws on every one of 600 frames (eft\'s timing)' % ', '.join(loops),
+          {n: g[:5] for n, g in gaps.items() if g}, {})
+    si = 20 + names.index('PtcGekkougaSkeletonR')
+    ems = [bytearray(x['data']) for x in p.sets[si]['emitters']]
+    for em in ems:                                     # the old placement: its birth in 0x448, emit start 0
+        st = p.field(em, 'emit_start')
+        p.set_field(em, 'emit_rate_random', st)
+        p.set_field(em, 'emit_start', 0)
+    per = [eft_timing(p, em, frames) for em in ems]
+    old_gap = [t for t in frames if not any(pe[t] for pe in per)]
+    both = [t for t in frames if all(pe[t] for pe in per)]
+    check('the v1.2 placement in the same model: both runs from frame 0 (two cells drawn at once, frames 0 - 54), nothing '
+          'from frame 57 to 109 (the user\'s clip: the skeleton seen ~58 frames, gone ~48, back)',
+          (both[:1], both[-1:], old_gap[:1], old_gap[-1:] if old_gap and old_gap[-1] < 110 else [x for x in old_gap if x < 110][-1:]),
+          ([0], [both[-1]] if both else [], [57], [109]))
+    for n in loops:
+        si = 20 + names.index(n)
+        lives = [p.field(x['data'], 'ptcl_life') for x in p.sets[si]['emitters']]
+        per = [eft_timing(p, x['data'], frames) for x in p.sets[si]['emitters']]
+        dup = [t for t in frames if sum(len(pe[t]) for pe in per) > (len(per) if n in ('PtcGekkougaFireBlade',) or
+                                                                       dict(sets)[n].get('layers') else 2)]
+        if dup:
+            check('%s: never more particles than its hand-overs allow' % n, dup[:5], [])
+
+
+def tier_blade_checks(p, sets, names):
+    """skeleton v1.3: the burn tiers' fires (the exe's BFX_TIER_IDS) and forward air's blade flames"""
+    import gekkouga_clone_cave as C
+    import gekkouga_build as GB
+    ids = G.ids_of(sets)
+    check('burn tiers: the exe\'s ids per tier 1 - 4 = FireBody1, FireBody (burn v2\'s), FireBody3, FireBody4',
+          list(C.BFX_TIER_IDS[1:]), [ids[n] for n in ('PtcGekkougaFireBody1', 'PtcGekkougaFireBody', 'PtcGekkougaFireBody3',
+                                                      'PtcGekkougaFireBody4')])
+    hs = []
+    for n in ('PtcGekkougaFireBody1', 'PtcGekkougaFireBody', 'PtcGekkougaFireBody3', 'PtcGekkougaFireBody4'):
+        si = 20 + names.index(n)
+        hs.append(max(round(p.field(x['data'], 'scale')[1], 1) for x in p.sets[si]['emitters']))
+    check('burn tiers: each tier\'s fire taller than the one before (quad heights %s)' % hs, hs == sorted(hs) and len(set(hs)) == 4, True)
+    si = 20 + names.index('PtcGekkougaFireBody4')
+    ems = [x['data'] for x in p.sets[si]['emitters']]
+    check('burn tier 4: two fires layered (fire_ground_10 and fire_small_5: 2 runs each), brighter (colour scale %s)' % G.FIRE_TIER4[0][2],
+          (len(ems), sorted({round(p.field(x, 'color_scale'), 2) for x in ems})), (4, [G.FIRE_TIER4[0][2]]))
+    for n in ('PtcGekkougaFireBody1', 'PtcGekkougaFireBody3', 'PtcGekkougaFireBody4'):
+        si = 20 + names.index(n)
+        fades = {round(struct.unpack('>f', bytes(x['data'][0x82C:0x830]))[0], 4) for x in p.sets[si]['emitters']}
+        check('%s: fades over %d frames when the burns end (0x2723 (id, 0, 0))' % (n, G.FIRE_FADE), fades, {round(1.0 / G.FIRE_FADE, 4)})
+    check('forward air\'s blade flames: the id gekkouga_build uses (FIRE_BLADE)', GB.FIRE_BLADE, ids['PtcGekkougaFireBlade'])
+    si = 20 + names.index('PtcGekkougaFireBlade')
+    fl = G.blade_flames()
+    ems = [x['data'] for x in p.sets[si]['emitters']]
+    feet = [round(-(p.field(e_, 'emitter_translation')[1] - (G.feet_cell_v(f_['atlas']) - 0.5) * p.field(e_, 'scale')[1]), 2)
+            for e_, f_ in zip(ems, fl)]
+    check('blade: %d flames, the clips in turn, their bases along the blade (%s down the joint), %.1fx the tip flame\'s '
+          'clips\' ring heights, looping for ever (ended with the sword), at once when ended' % (
+              len(fl), feet, G.FIRE_BLADE['size']),
+          (len(ems), [f_['atlas'] for f_ in fl] == [G.RING_ASSETS[i % len(G.RING_ASSETS)][0] for i in range(len(fl))],
+           feet == [round(f_['y'], 2) for f_ in fl], {p.field(e_, 'ptcl_life') for e_ in ems},
+           {round(struct.unpack('>f', bytes(e_[0x82C:0x830]))[0], 2) for e_ in ems}),
+          (G.FIRE_BLADE['n'], True, True, {G.FOREVER}, {1.0}))
+
+
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--')]
     if len(a) != 4:
@@ -208,6 +312,8 @@ def main():
         if spec.get('ring'):
             ring_checks(p, si, name, spec, kirby, ksh)
             continue
+        if spec.get('layers') or spec.get('blade'):
+            continue                               # (timing_checks / tier_checks)
         d = G.sidecar(spec['atlas'])
         plan = G.flip_plan(d['frames'], d['frames_per_cell_at_60fps'], d['playback'] == 'loop')
         ems = [x['data'] for x in p.sets[si]['emitters']]
@@ -220,15 +326,15 @@ def main():
                          bool(struct.unpack_from('>I', em, 4)[0] & 0x00800000), p.field(em, 'particle_type'),
                          struct.unpack_from('>I', em, 0x310)[0], p.field(em, 'blend_type'),
                          (t['size'], t['native_format'], t['comp_sel'], t['sampler'], t['mip_levels']),
-                         p.field(em, 'ptcl_life'), p.field(em, 'start_frame'),
+                         p.field(em, 'ptcl_life'), (p.field(em, 'emit_start'), p.field(em, 'emit_rate_random')),
                          [round(x, 3) for x in p.field(em, 'scale')], p.field(em, 'scale_random'),
                          p.field(em, 'figure_velocity'), p.field(em, 'gravity'), p.field(em, 'rotation_velocity'),
                          p.field(em, 'alpha_init'), p.field(em, 'volume_type')))
         want = [(True, False, 0, 0, spec['blend'], (d['atlas_size'], 7, 0x00010203, 0x22000100, 1), run['life'],
-                 run['start'], [round(x, 3) for x in spec['size']], [0.0, 0.0], 0.0, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
+                 (run['start'], 0), [round(x, 3) for x in spec['size']], [0.0, 0.0], 0.0, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0],
                  1.0, 0) for run in plan]
         check('%s: %d emitter(s) (%d cells, %s): Kirby\'s stone shader, CPU, billboard, follow 0, blend %d, BC3 %s RGBA '
-              'clamped, life / start %s, size %.2f x %.2f, still' %
+              'clamped, life / emit start (0x44C; 0x448, the count\'s random, 0) %s, size %.2f x %.2f, still' %
               (name, len(plan), d['frames'], d['playback'], spec['blend'], d['atlas_size'],
                [(r['life'], r['start']) for r in plan], spec['size'][0], spec['size'][1]), rows, want)
         n, k = d['frames'], d['frames_per_cell_at_60fps']
@@ -285,6 +391,9 @@ def main():
         check('PtcGekkougaFireTip: centred on the call (the sword\'s tip), additive, %.0f tall at size 1' % G.FIRE_TIP_H,
               (p.field(p.sets[si]['emitters'][0]['data'], 'emitter_translation'), dict(sets)['PtcGekkougaFireTip']['blend']),
               ([0.0, 0.0, 0.0], 1))
+    timing_checks(p, sets, names)
+    if burn2:
+        tier_blade_checks(p, sets, names)
     r = p.decode_texture(p.sets[20]['emitters'][0]['data'], 0).astype(np.float32)
     lft = p.decode_texture(p.sets[21]['emitters'][0]['data'], 0).astype(np.float32)
     dif = np.abs(G.mirror_cells(r, 6, 10) - lft).mean()

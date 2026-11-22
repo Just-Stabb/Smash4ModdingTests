@@ -1733,8 +1733,16 @@ def script_tests(out, user):
         check('burn v2: a flame (0x%X) at each water sword\'s tip (its hand joint, Y -11 x its size: -55 in the smashes), '
               'ended with the sword' % GB.FIRE_TIP, tips,
               [('AttackS4', [(25, -55.0, 0.0, 2.0)], 1), ('AttackHi4', [(25, -55.0, 0.0, 2.0), (24, -55.0, 0.0, 2.0)], 1),
-               ('AttackLw4', [(25, -55.0, 0.0, 2.0), (24, -55.0, 0.0, 2.0)], 1), ('AttackAirF', [(25, -11.0, 0.0, 0.7)], 1),
+               ('AttackLw4', [(25, -55.0, 0.0, 2.0), (24, -55.0, 0.0, 2.0)], 1), ('AttackAirF', [], 0),
                ('AttackAirN', [], 0)])
+        blade = [(int(c.params[1]), round(float(c.params[2]), 2), round(float(c.params[3]), 2), round(float(c.params[8]), 2))
+                 for c in pe.script('AttackAirF') if c.name == 'External_Graphic' and int(c.params[0]) == GB.FIRE_BLADE]
+        check('skeleton v1.3 package: forward air\'s flames along its water sword (0x%X, burn v2\'s tip flame gone): at the '
+              'sword\'s joint (25) and size (1), made and ended with it' % GB.FIRE_BLADE,
+              (blade, [c.name for c in pe.script('AttackAirF') if c.params and isinstance(c.params[0], int) and
+                       int(c.params[0]) in (GB.FIRE_BLADE, GB.SWORD)]),
+              ([(25, 0.0, 0.0, 1.0)], ['External_Graphic', 'External_Graphic', 'Terminate_Graphic_Effect',
+                                       'Terminate_Graphic_Effect']))
         check('burn v2: ... and his effect scripts otherwise unchanged (the flames taken out again: the True blocks\' '
               'offsets back)', GB.strip_fire_tips(pe), 11)
     smash = {zlib.crc32(n.encode()) for n in GB.SMASH_SCRIPTS}

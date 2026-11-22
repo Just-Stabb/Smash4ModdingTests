@@ -306,7 +306,12 @@ FIRE_TIPS = True                  # (False: skeleton v1.2's scripts, without the
 FIRE_TIP = 0x330001B
 SWORD = 0x3300007
 SWORD_LEN = 11.0                  # the sword at size 1 (forward air's trail: Y2 -11; the smashes' -55 at x5)
-FIRE_TIP_SIZE = {'AttackS4': 2.0, 'AttackHi4': 2.0, 'AttackLw4': 2.0, 'AttackAirF': 0.7}
+FIRE_TIP_SIZE = {'AttackS4': 2.0, 'AttackHi4': 2.0, 'AttackLw4': 2.0}   # (burn v2 - aerial chain v1: AttackAirF 0.7 too)
+FIRE_BLADE = 0x3300022            # skeleton v1.3 package (the user: "make forward air have more fire along the edges of the
+                                  # water blade and make the fire larger"): his bank's PtcGekkougaFireBlade, flames along
+                                  # the sword (tools/gekkouga_fx.py FIRE_BLADE), called at the sword's own joint and size
+                                  # in place of forward air's tip flame, ended with the sword
+FIRE_BLADE_SCRIPTS = ('AttackAirF',)
 NAIR_BURST = 0x330000B
 FIRE_NAIR_Z = 10.0                # (burn v2 - v2.1: a flame each side, Z +- 10, ended at 24)
 FIRE_NAIR_Y = 8.5
@@ -382,6 +387,23 @@ def add_fire_tips(effect):
                 i += 2
                 continue
             i += 1
+    for name in FIRE_BLADE_SCRIPTS:
+        s = effect.script(name)
+        i = 0
+        while i < len(s):
+            c = s[i]
+            syn = c.info['syntax']
+            if c.name == 'External_Graphic' and int(c.params[0]) == SWORD:
+                insert_cmds(s, i, [ext_graphic(FIRE_BLADE, int(c.params[syn.index('Bone')]), 0.0, 0.0, 0.0,
+                                               float(c.params[syn.index('Size')]))])
+                i += 2
+                n += 1
+                continue
+            if c.name == 'Terminate_Graphic_Effect' and int(c.params[0]) == SWORD:
+                insert_cmds(s, i, [terminate_gfx(FIRE_BLADE)])
+                i += 2
+                continue
+            i += 1
     s = effect.script('AttackAirN')
     i = [k for k, c in enumerate(s) if c.name == 'External_Graphic' and int(c.params[0]) == NAIR_BURST][0]
     b = s[i]
@@ -414,7 +436,7 @@ def strip_fire_tips(effect):
         while i < len(cmds):
             c = cmds[i]
             if c.name in ('External_Graphic', 'Terminate_Graphic_Effect', 'EFFECT_FOLLOW_FLIP') and \
-                    int(c.params[0]) in (FIRE_TIP, FIRE_RING):
+                    int(c.params[0]) in (FIRE_TIP, FIRE_RING, FIRE_BLADE):
                 if c.name == 'Terminate_Graphic_Effect' and i and cmds[i - 1].name == 'FRAME' and \
                         float(cmds[i - 1].params[0]) == FIRE_NAIR_END and i + 1 < len(cmds) and \
                         cmds[i + 1].name == 'Script_End':          # neutral air's own FRAME (not a sword's at 24)
