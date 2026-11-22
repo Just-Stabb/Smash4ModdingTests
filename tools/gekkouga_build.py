@@ -346,7 +346,10 @@ CLONE_POSED = 'merged'
 # v11 (the user's v10: the unswung model.sb made the tongue vanish): the release is v9.1's visible set with the merged
 # motions (the tongue / jaw / fingers' vertices on main.pac's bones, his own model.sb); TEST_ONLY_DATA/sway is his own
 # model.nud + model.sb for the E_sway exe (the clones' swing stepped natively)
-CLONE_RELEASE = 'rigid'
+CLONE_RELEASE = 'own'
+# v15 (the user's v14 E_sway: "the clones have their own swing physics": the clone's model / motion object, MotionModule
+# +0x10, has a swing system; the exe steps it): the release is his own model.nud (the tongue / water on their swing
+# bones) with his own model.sb; 'rigid' (v11 - v14's: the vertices on main.pac's bones) is TEST_ONLY_DATA/rigid
 # v10 (the user's v9.1: it loads, the merged main.pac too; the tongue / water stay on but rigid): the merged main.pac
 # and his own model.nud again (vertices on their own bones; only helpers / the leg and water swing drops, which no
 # motion keys, rebound), and his model.sb with the tongue's entries pointed at no bone (unswing_sb: same count and size,
@@ -485,12 +488,13 @@ def cmd_data(vanilla_fighter, out_fighter, test_only=None):
             n += 1
         bones = O.vbn_read(os.path.join(src, 'model.vbn'))
         nud0 = open(os.path.join(src, 'model.nud'), 'rb').read()
-        open(os.path.join(dst, 'model.nud'), 'wb').write(rebind(nud0, bones, main_posed)[0])
+        rigid = rebind(nud0, bones, main_posed)[0]
+        open(os.path.join(dst, 'model.nud'), 'wb').write(nud0 if CLONE_RELEASE == 'own' else rigid)
         if test_only:
             rel = 'model/clone/c%02d/' % c
             shutil.copyfile(os.path.join(src, 'model.nud'), to('sway', rel + 'model.nud'))
             shutil.copyfile(os.path.join(src, 'model.sb'), to('sway', rel + 'model.sb'))
-            shutil.copyfile(os.path.join(dst, 'model.nud'), to('rigid', rel + 'model.nud'))   # v14: the release's (back)
+            open(to('rigid', rel + 'model.nud'), 'wb').write(rigid)   # v14 / v15: the rigid tongue (the fallback)
     dst = os.path.join(out_fighter, 'motion', 'clone')
     os.makedirs(dst, exist_ok=True)
     for f in CLONE_MOTION_PACS:

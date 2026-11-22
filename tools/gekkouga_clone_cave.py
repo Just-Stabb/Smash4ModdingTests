@@ -288,12 +288,12 @@ SK_VAR_DIAGT, SK_VAR_REMADE = 0x0F00030B, 0x0F00030C   # v1.1: diag frames to th
 SK_REMAKE = 3                     # v1.1: its grounds made again at most this many times a life (then 4: lost)
 # his VARs (his MSC writes them at the release): 15 a skeleton asked for (1), 16 / 17 the shadow's X / Y, 18 its way
 GK_VAR_SKREQ, GK_VAR_SKX, GK_VAR_SKY, GK_VAR_SKDIR = 0x0F00030F, 0x0F000310, 0x0F000311, 0x0F000312
-RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'pose'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
-# skeleton v1: + the Running Skeleton; clones v14: + pose (his tongue / water pose onto the clones: the release candidate,
-# harmless on the rigid-tongue data)
-VARIANTS = (('A_release', RELEASE), ('E_sway', (RELEASE - {'pose'}) | {'sway'}))
-# v14: A_release (with the pose copy, diag S4TP) and E_sway (v13's swing bind, fixed: the +0x10 object; without the pose
-# copy, so the bind is seen alone); v13's D_parts dropped   # v13: each on the release's set (v3 - v12's hurtbox route, C_hurt, dropped:
+RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+# skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
+# swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose)
+VARIANTS = (('A_release', RELEASE), ('G_pose', (RELEASE - {'sway'}) | {'pose'}))
+# v15: A_release (the release: the native swing, diag) and G_pose (v14's pose copy instead of the swing, in case); v14:
+# A_release (attack hitcheck burn skeleton pose) and E_sway (attack hitcheck burn skeleton sway); v13's D_parts dropped   # v13: each on the release's set (v3 - v12's hurtbox route, C_hurt, dropped:
                                   # it never met an attack)
 
 
