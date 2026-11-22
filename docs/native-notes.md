@@ -3876,3 +3876,10 @@ MSC on a bunshin-based kind, the 4-shape group.
   list (and why the clone's never stepped) is not found. Ghirahim's assist model (the user's files) has the empty
   12-byte model.sb (count 0), no SWG / HLP bones, his cape keyed in main.pac: no swing there; and a count-0 model.sb
   loads on a non-fighter model without SWG bones.
+- **Swing step (v11)**: what steps a model's swing is MotionModule's swing update `0x02C67064(mm)`: a fighter's frame
+  calls it (`0x02E3543C`; also the MotionModule phase function `0x02010418` phase 1); it needs mm +0x38 and the motion
+  object mm +0x14, sets the rate (`0x03318A10`: swing +0x90) and runs `0x03314FB8` (mode [[obj+4]+4] != 8, swing
+  [obj+0x20]: the first call `0x036B715C` and +0xF1 = 1, then `0x036B726C` each frame). Weapon templates never call it
+  (their MotionModule calls: `0x02C5C2BC`, `0x02C5D2B4`, `0x02C5D464`, `0x02C5C4C8`), so an article's swing bones stay
+  where the bind put them. HitModule's add (`0x02C415DC`): per hurtbox `0x02C108C4` (a node in collision object
+  [group], 0x174 each) and `0x02C44354` (the 0x30-byte data copied to record +8).

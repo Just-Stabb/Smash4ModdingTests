@@ -339,6 +339,10 @@ PART_FALLBACK = 'A00Wait1.omo'
 # bones) is moved to its nearest ancestor main.pac keys (CLONE_POSED = 'main'), so nothing hangs on a bone the article
 # never poses (a rigid tongue, fingers and jaw in their rest pose). The merged motions / empty sb are TEST_ONLY.
 CLONE_POSED = 'merged'
+# v11 (the user's v10: the unswung model.sb made the tongue vanish): the release is v9.1's visible set with the merged
+# motions (the tongue / jaw / fingers' vertices on main.pac's bones, his own model.sb); TEST_ONLY_DATA/sway is his own
+# model.nud + model.sb for the E_sway exe (the clones' swing stepped natively)
+CLONE_RELEASE = 'rigid'
 # v10 (the user's v9.1: it loads, the merged main.pac too; the tongue / water stay on but rigid): the merged main.pac
 # and his own model.nud again (vertices on their own bones; only helpers / the leg and water swing drops, which no
 # motion keys, rebound), and his model.sb with the tongue's entries pointed at no bone (unswing_sb: same count and size,
@@ -453,18 +457,16 @@ def unswing_sb(sb, bones, keyed):
 
 
 def cmd_data(vanilla_fighter, out_fighter, test_only=None):
-    """model/clone/c00-c07 (his body's, v2 with his face files), motion/clone/ (his body's main.pac: every motion the
-    clone plays; v2 his hand / part pacs). v10 (CLONE_POSED 'merged', the user's v9.1: the merged main.pac loads):
-    main.pac = his motions with his parts' bones; model.sb with the keyed swing bones (the tongue) unswung; model.nud
-    rebound only for bones no motion keys (helpers, the leg / water swing drops). test_only (a folder): fallbacks
-    under it (v9.1's main.pac / model.nud, his original model.sb)"""
+    """model/clone/c00-c07 (his body's, v2 with his face files), motion/clone/ (main.pac + his part pacs). v11
+    (CLONE_RELEASE 'rigid'): main.pac = his motions with his parts' bones (merged), model.sb his own, model.nud with every
+    vertex on a bone main.pac keys (v9.1's: the tongue / water visible and on the clone, rigid). test_only (a folder):
+    sway/ = his own model.nud + model.sb (the tongue / water on their swing bones, for the E_sway exe)"""
     import shutil
     import omo as O
     n = 0
     body = os.path.join(vanilla_fighter, 'motion', 'body')
     motions, _fell = full_motions(body, os.path.join(vanilla_fighter, 'model', 'body', 'c00', 'model.vbn'))
     main_posed = posed_bones(O.pac_read(os.path.join(body, 'main.pac')))
-    posed = main_posed if CLONE_POSED == 'main' else posed_bones(motions)
 
     def to(kind, rel):
         t = os.path.join(test_only, kind, 'fighter', 'gekkouga', rel)
@@ -479,25 +481,17 @@ def cmd_data(vanilla_fighter, out_fighter, test_only=None):
             n += 1
         bones = O.vbn_read(os.path.join(src, 'model.vbn'))
         nud0 = open(os.path.join(src, 'model.nud'), 'rb').read()
-        sb0 = open(os.path.join(src, 'model.sb'), 'rb').read()
-        nud, _moved = rebind(nud0, bones, posed)
-        open(os.path.join(dst, 'model.nud'), 'wb').write(nud)
-        if CLONE_POSED != 'main':
-            open(os.path.join(dst, 'model.sb'), 'wb').write(unswing_sb(sb0, bones, posed)[0])
+        open(os.path.join(dst, 'model.nud'), 'wb').write(rebind(nud0, bones, main_posed)[0])
         if test_only:
             rel = 'model/clone/c%02d/' % c
-            open(to('v91_rigid', rel + 'model.nud'), 'wb').write(rebind(nud0, bones, main_posed)[0])
-            open(to('v91_rigid', rel + 'model.sb'), 'wb').write(sb0)
-            open(to('original_model_sb', rel + 'model.sb'), 'wb').write(sb0)
+            shutil.copyfile(os.path.join(src, 'model.nud'), to('sway', rel + 'model.nud'))
+            shutil.copyfile(os.path.join(src, 'model.sb'), to('sway', rel + 'model.sb'))
     dst = os.path.join(out_fighter, 'motion', 'clone')
     os.makedirs(dst, exist_ok=True)
     for f in CLONE_MOTION_PACS:
         shutil.copyfile(os.path.join(vanilla_fighter, 'motion', 'body', f), os.path.join(dst, f))
         n += 1
-    if CLONE_POSED != 'main':
-        O.pac_write(os.path.join(dst, 'main.pac'), motions)
-    if test_only:
-        shutil.copyfile(os.path.join(body, 'main.pac'), to('v91_rigid', 'motion/clone/main.pac'))
+    O.pac_write(os.path.join(dst, 'main.pac'), motions)
     return n
 
 

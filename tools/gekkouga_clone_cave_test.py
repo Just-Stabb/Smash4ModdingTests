@@ -409,7 +409,7 @@ def weapon_checks(e, img, info, diag=False):
     e.call(lab['w_start'], s, weapon, init)
     want = ([('bunshin_start', s, weapon, init), ('colour_off', cb, 0)] if 'bstart' in F else []) + \
         ([('hurt_clear', hm), ('hurt', hm, A['hurt'], 8, 0)] if 'hurt' in F else []) + \
-        ([('osr', A['gk_fk'], hm, 1)] if diag and 'hurt' in F else []) + \
+        ([('osr', A['gk_fk'], hm, 1), ('osr', A['gk_fy'], 0, 0)] if diag and 'hurt' in F else []) + \
         ([('osr', A['gk_fz'], init, 276)] if diag else [])
     if 'hurt' in F:
         check('v9 "hurt": the start (each time a clone is made) clears its hurtboxes and adds his 8 again: 8 after, '

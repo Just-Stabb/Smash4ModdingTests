@@ -1107,84 +1107,41 @@ def sb_parse(sb, bones):
 
 
 def model_tests(out, earlier):
-    """v10: the clone's model / motions. The release: the merged main.pac (v9's, which the user loaded in v9.1), his own
-    model.nud with only the helper / leg and water swing drops' vertices rebound, his model.sb with the tongue's entries
-    pointed at no bone (count and size kept: v9's count 0 froze the load). TEST_ONLY_DATA: v9.1's set (v91_rigid),
-    his original model.sb"""
+    """v11: the clone's model / motions. The release: the merged main.pac (v10's), v9.1's model.nud (every vertex on a
+    bone main.pac keys: the tongue visible, on the clone, rigid) and his own model.sb (v10's unswung one made the tongue
+    vanish); TEST_ONLY_DATA/sway: his own model.nud + model.sb, for the E_sway exe"""
     import omo as O
-    if len(earlier) < 10:
+    if len(earlier) < 11:
         return
     v8 = Installed(earlier[:8])
     v91 = zipfile.ZipFile(earlier[9])
+    v10 = zipfile.ZipFile(earlier[10])
     oc = 'fighter/gekkouga/motion/clone/'
     mot = os.path.join(out, oc)
     mdl = os.path.join(out, 'fighter', 'gekkouga', 'model', 'clone')
     td_root = os.path.join(out, 'TEST_ONLY_DATA')
-    rel_pac = open(os.path.join(mot, 'main.pac'), 'rb').read()
-    check("v10: the release's main.pac is v9.1's TEST_ONLY merged one (the user loaded it), byte for byte",
-          rel_pac == v91.read('TEST_ONLY_DATA/merged_main_pac/' + oc + 'main.pac'), True)
-    with tempfile.TemporaryDirectory() as td:
-        vp = os.path.join(td, 'main.pac')
-        open(vp, 'wb').write(v8.read('INSTALL_TO_data/' + oc + 'main.pac'))
-        van = dict(O.pac_read(vp))
-    main = O.pac_read(os.path.join(mot, 'main.pac'))
-    posed = GB.posed_bones(main)
-    swung = {'HLP_LElbowJb', 'HLP_LLegA1N', 'HLP_RElbowJb', 'HLP_RLegA1N',
-             'SWG_LLegB_01__swing', 'SWG_Lwater01__swing', 'SWG_RLegB_01__swing', 'SWG_Rwater01__swing'}
-    bad, sbs, rigid = [], [], []
+    check("v11: the release's main.pac is v10's (merged; loaded in v9.1 and v10)",
+          open(os.path.join(mot, 'main.pac'), 'rb').read() == v10.read('INSTALL_TO_data/' + oc + 'main.pac'), True)
+    bad = []
     for c in range(8):
-        cd = os.path.join(mdl, 'c%02d' % c)
         rel = 'fighter/gekkouga/model/clone/c%02d/' % c
+        cd = os.path.join(mdl, 'c%02d' % c)
         b = O.vbn_read(os.path.join(cd, 'model.vbn'))
         nud = open(os.path.join(cd, 'model.nud'), 'rb').read()
-        prev = v8.read('INSTALL_TO_data/' + rel + 'model.nud')
-        again, moved = GB.rebind(prev, b, posed)
-        if again != nud or set(moved) != swung or len(prev) != len(nud):
-            bad.append(('rebind', c, sorted(moved)))
-        if GB.rebind(nud, b, posed)[1]:
-            bad.append(('unposed', c))
-        sb0 = v8.read('INSTALL_TO_data/' + rel + 'model.sb')
         sb = open(os.path.join(cd, 'model.sb'), 'rb').read()
-        n0, f0, m0 = sb_parse(sb0, b)
-        n1, f1, m1 = sb_parse(sb, b)
-        diff = [i for i in range(len(sb0)) if sb0[i] != sb[i]] if len(sb0) == len(sb) else None
-        if (n1, len(sb)) != (n0, len(sb0)) or sorted(f1) != sorted(set(f0) - {'SWG_CMant%d__swing' % i for i in range(9)}) \
-                or len(m1) != 9 or m0 or diff is None or len(diff) != 36:
-            sbs.append((c, n1, f1, len(m1)))
-        for f in ('model.nud', 'model.sb'):
-            if open(os.path.join(td_root, 'v91_rigid', rel + f), 'rb').read() != v91.read('INSTALL_TO_data/' + rel + f):
-                rigid.append((c, f))
-        if open(os.path.join(td_root, 'original_model_sb', rel + 'model.sb'), 'rb').read() != sb0:
-            rigid.append((c, 'original sb'))
-    check('v10: c00-c07 model.nud: his own, only the vertices on the 8 bones no motion keys (helpers, leg / water swing '
-          'drops) rebound; the tongue (SWG_CMant0-8) on its own keyed bones', bad, [])
-    check('v10: c00-c07 model.sb: parses as the loader does (13 entries, 0x10005, 12 + 13 x 0x8C bytes); the 9 tongue '
-          'entries (36 bytes) point at no bone (skipped), the legs / water 4 still found', sbs, [])
-    check('v10: TEST_ONLY_DATA/v91_rigid = v9.1\'s release model.nud / model.sb (main.pac below); original_model_sb = '
-          'his own', rigid, [])
-    check('v10: TEST_ONLY_DATA/v91_rigid main.pac = v8 / v9.1\'s (his own)',
-          open(os.path.join(td_root, 'v91_rigid', oc, 'main.pac'), 'rb').read() == v91.read('INSTALL_TO_data/' + oc + 'main.pac'),
-          True)
-    parts = {tok: dict(O.pac_read(os.path.join(mot, f))) for f, tok in GB.CLONE_PARTS}
-    bones = O.vbn_read(os.path.join(mdl, 'c00', 'model.vbn'))
-    wait = 'FitGekkougaBodyMainA00Wait1.omo'
-    o = O.Omo(dict(main)[wait])
-    fighter = O.Omo(van[wait])
-    for tok, d in parts.items():
-        for pnode in O.Omo(d[wait.replace('Main', tok, 1)]).nodes:
-            if fighter.node(pnode[1]) is None:
-                fighter.nodes.append(pnode)
-    worst = 0.0
-    moved = set()
-    for fr in range(0, o.frames, 7):
-        a, b2 = O.world(o, bones, fr), O.world(fighter, bones, fr)
-        a0 = O.world(o, bones, 0)
-        for nm in a:
-            worst = max(worst, max(abs(a[nm][i][3] - b2[nm][i][3]) for i in range(3)))
-            if nm.startswith('SWG_CMant') and max(abs(a[nm][i][3] - a0[nm][i][3]) for i in range(3)) > 0.01:
-                moved.add(nm)
-    check("v10: Wait1: every bone where his motion + parts put it (max error %.5f); the tongue keyed: %d of its 9 bones "
-          "move during Wait1" % (worst, len(moved)), (worst < 1e-3, len(moved) > 0), (True, True))
+        if nud != v91.read('INSTALL_TO_data/' + rel + 'model.nud'):
+            bad.append(('nud not v9.1', c))
+        if sb != v8.read('INSTALL_TO_data/' + rel + 'model.sb'):
+            bad.append(('sb not his', c))
+        n, found, missed = sb_parse(sb, b)
+        if n != 13 or missed:
+            bad.append(('sb parse', c, n, missed))
+        if open(os.path.join(td_root, 'sway', rel + 'model.nud'), 'rb').read() != v8.read('INSTALL_TO_data/' + rel + 'model.nud'):
+            bad.append(('sway nud', c))
+        if open(os.path.join(td_root, 'sway', rel + 'model.sb'), 'rb').read() != sb:
+            bad.append(('sway sb', c))
+    check('v11: c00-c07: model.nud = v9.1\'s (visible, rigid tongue), model.sb = his own (13 entries, all found); '
+          'TEST_ONLY_DATA/sway = his own model.nud + model.sb', bad, [])
 
 
 def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
@@ -1205,6 +1162,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA']   # v9.1: data only (v9's exes stay)
     if len(earlier) == 10:
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
+    if len(earlier) == 11:   # v11: the release exe is v10's (not shipped)
+        want_top = ['INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     check('the package\'s top level: %s (+ Sm4shCommand)' % ', '.join(want_top),
           sorted(t for t in top if not t.startswith('Sm4shCommand_v')), want_top)
     want, same1 = [], []
@@ -1230,6 +1189,15 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
                 ['fighter/gekkouga/model/clone/c%02d/%s' % (c, f) for c in range(8) for f in GB.CLONE_FACE_FILES]
         check('v2: both MSCs, his 5 motion part pacs, the face / rest-of-model files in all 8 colours (%d)' % len(v2new),
               [m for m in v2new if 'INSTALL_TO_data/' + m not in names], [])
+    if z1 and len(earlier) == 11:
+        check("v11: INSTALL_TO_data: c00-c07 model.nud (v9.1's) / model.sb (his own)",
+              sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              sorted('fighter/gekkouga/model/clone/c%02d/%s' % (c, f) for c in range(8) for f in ('model.nud', 'model.sb')))
+        tdo = sorted(n for n in names if n.startswith('TEST_ONLY_DATA/') and not n.endswith('/'))
+        want_td = sorted('TEST_ONLY_DATA/sway/fighter/gekkouga/model/clone/c%02d/%s' % (c, f) for c in range(8)
+                         for f in ('model.nud', 'model.sb'))
+        check('v11: TEST_ONLY_DATA: sway (his own model.nud / model.sb)', tdo, want_td)
+        check('v11: ... each as built', [n for n in want_td if z.read(n) != open(os.path.join(out, n), 'rb').read()], [])
     if z1 and len(earlier) == 10:
         check("v10: INSTALL_TO_data: the merged main.pac, c00-c07 model.nud (own bones) / model.sb (tongue unswung)",
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
@@ -1325,7 +1293,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v9', 'freeze', 'model.sb', 'main.pac', 'model.nud', 'TEST_ONLY_DATA', 'merged_main_pac',
          'empty_model_sb', 'original_model_nud', 'exe_v46z_gk9', 'confirmed') if len(earlier) == 9 else         ('greninja_clones_v9_1', 'exe_v46z_gk10', 'tongue', 'model.sb', 'main.pac', 'model.nud', 'TEST_ONLY_DATA',
          'v91_rigid', 'original_model_sb', 'A_attack', 'C_hurt', 'D_parts', 'name tag', '0x2B75', 'S4GU', 'S4GO',
-         'sway', 'confirmed')
+         'sway', 'confirmed') if len(earlier) == 10 else         ('greninja_clones_v10', 'exe_v46z_gk11', 'tongue', 'model.sb', 'model.nud', 'TEST_ONLY_DATA', 'E_sway', 'sway',
+         'S4GQ', 'S4GY', 'S4GO', 'C_hurt', 'name tag', 'confirmed')
     check('README.txt mentions every feature (%s)' % ', '.join(words), [w for w in words if w not in readme], [])
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
@@ -1376,7 +1345,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
 
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
-    earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
+    earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
     base_diag = a[4] if len(a) > 4 else None

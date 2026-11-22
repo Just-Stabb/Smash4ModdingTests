@@ -129,6 +129,7 @@ HM_GROUP = 0x40                   # params 0x032107B4), +0x40 the groups (0x38 e
 HM_COUNT = 0x4C                   # +0x4C the hurtboxes added (vt +0x4C adds)
 HM_RECS = 0x48                    # +0x44 {capacity (params +0xAC: 0x14), +0x48 the records (0x40 each)}: v9 read
                                   # [+0x44] as a pointer (0x14) and C_hurt's S4GO crashed (the user's v9.1 log)
+HM_OBJARR = 0x14                  # v11: +8 +0xC the container's objects (0x174 each)
 HM_OBJS = 0x18                    # +8 the collision container (+0xC its objects (0x174 each), +0x10 their count)
 SWING_UPDATE = 0x02C67064        # v11: MotionModule's swing update (mm): a fighter's frame calls it (0x02E3543C)
 W_MOTION = 0x44                   # the accessor's MotionModule (+0x14 its motion object (+0x20 the swing system, +0xF1
@@ -563,6 +564,7 @@ def build(rpx, diag=False, feats=None):
             ('gk_fm', 'S4GM clone id=%d draw: visflag=%d visible=%d model mode=%d drawn=%d overlay=%d/%d\n'),
             ('gk_fn', 'S4GN clone id=%d z=%d scale x100=%d link mask=%08X model=%08X\n'),
             ('gk_fq', 'S4GQ clone id=%d swing: motionmodule=%08X need=%08X motion=%08X swing=%08X flags=%08X set up=%d\n'),
+            ('gk_fy', 'S4GY clone hurt object 0: %08X %08X %08X %08X %08X %08X\n'),
             ('gk_fk', 'S4GK clone hurtboxes set: hitmodule=%08X groups=%d boxes %d -> %d group0=%d+%d objects=%d\n'),
             ('gk_fo', 'S4GO clone id=%d hurt: boxes=%d objects=%d first record %08X %08X %08X %08X\n')]
     for nm, s in fmts:
@@ -623,10 +625,10 @@ def build(rpx, diag=False, feats=None):
              hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, whit=W_HIT_MOD, wdmg=W_DAMAGE, watk=W_ATTACK,
              wstop=W_STOP, wcol=W_COLOUR, wmodel=W_MODEL, wlink=W_LINK, wvis=W_VIS, wpost=W_POSTURE,
              cclear=COLOUR_CLEAR, wmotion=W_MOTION, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
-             hm_objs=HM_OBJS, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
+             hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fq', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -1428,7 +1430,30 @@ ws_diag:''' + (('''
         beq wsk_g
         lha r8, 4(r12)
         lha r9, 6(r12)
-wsk_g:  lwz r10, %(hm_objs)d(r11)''' + osr()) + '''
+wsk_g:  lwz r10, %(hm_objs)d(r11)''' + osr() + '''
+        lwz r11, 0x14(r1)               # v11: S4GY its collision object 0's first words (the container +0xC)
+        lwz r11, %(hm_objarr)d(r11)
+        li r4, 0
+        li r5, 0
+        li r6, 0
+        li r7, 0
+        li r8, 0
+        li r9, 0
+        lis r0, 0x1000
+        cmplw r11, r0
+        blt wsy_log
+        lis r0, 0x8000
+        cmplw r11, r0
+        bge wsy_log
+        lwz r4, 0(r11)
+        lwz r5, 4(r11)
+        lwz r6, 8(r11)
+        lwz r7, 0xC(r11)
+        lwz r8, 0x10(r11)
+        lwz r9, 0x14(r11)
+wsy_log:
+        lis r3, %(gk_fy_hi)d
+        addi r3, r3, %(gk_fy_lo)d''' + osr()) + '''
 ws_hurtdone:''') if 'hurt' in feats else '') + D('''
 
         lwz r5, 0x10(r1)

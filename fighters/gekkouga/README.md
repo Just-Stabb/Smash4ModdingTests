@@ -695,3 +695,18 @@ clones but rigid; C_hurt crashed (IP 0x04BED250); the tag never hid, also with v
   motion / model bind), and `0x03318A20`-style wrappers act on `[obj+0x20]` (the swing system); the step and what gates
   it for articles are not found yet. Copying his post-swing tongue pose onto the clones would use MotionModule
   set_node_rotate (`0x02C64188`) per bone; his post-swing local rotations' location is not found yet either.
+
+## Clones v11 (`greninja_clones_v11.zip`)
+
+The user's v10: loads, the name tag hides (plyc confirmed; kept), the tongue invisible (the unswung model.sb), clones
+not hit (C_hurt log: S4GK 8 boxes / 1 object, S4GO's record = our hurtbox data copied at record +8 by `0x02C44354`).
+- **Release data** (`CLONE_RELEASE = 'rigid'`): the merged main.pac, v9.1's model.nud (every vertex on a main.pac
+  bone: visible, rigid tongue), his own model.sb. The release exe is v10's byte for byte (not shipped).
+- **Sway** (feature `sway`, TEST_ONLY E_sway + TEST_ONLY_DATA/sway = his own nud / sb): a fighter's frame calls its
+  MotionModule's swing update `0x02C67064` (from `0x02E3543C`; it needs MotionModule +0x38 / +0x14, reads posture,
+  model, motion, stop, +0x60 and slow modules, sets the rate `0x03318A10`, then the motion object's swing
+  `0x03314FB8`: set-up `0x036B715C` once (+0xF1), step `0x036B726C`); the weapons' templates call only the motion
+  updates (`0x02C5C2BC`, `0x02C5D2B4`, `0x02C5D464`, `0x02C5C4C8`), never it: the v8 stuck tongue. `w_sway` calls it
+  once a frame from the +0x94 phase when every module is there. Diag `S4GQ` (every build's draw diag): MotionModule,
+  +0x38, motion object, swing system, its +0xB4 flags, +0xF1.
+- **C_hurt**: `S4GY` logs the hurtboxes' collision object 0's first words at each start.
