@@ -595,7 +595,8 @@ def fighter_desc_checks(e, img, info):
     van = img.w(C.GK_DESC + 8)
     vrows = [[img.w(img.w(van) + 16 * i + 4 * j) for j in range(4)] for i in range(6)]
     check('his articles 0-5 as before, 6 / 7 the clones (0x1A1, max 1, no spawner)', rows,
-          vrows + [[C.CLONE_KIND, 1, 0, 0], [C.CLONE_KIND, 1, 0, 0]])
+          vrows + [[C.CLONE_KIND, 1, 0, 0], [C.CLONE_KIND, 1, 0, 0]] +
+          ([[C.SK_KIND, 1, 0, 0]] if 'skeleton' in info['feats'] else []))
     others = []
     for k in (0x3, 0x10, 0x2F, 0x31, 0x41, 0x47):
         try:
@@ -1333,6 +1334,344 @@ def clear_checks(e, info, diag):
             e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
 
 
+def skeleton_checks(e, info, diag):
+    """skeleton v1 (feature skeleton): the Running Skeleton's kind, claim, collision (the hydrant's GroundModule route),
+    HP hit check (damage once per attack, his own skipped), explosion burn (the strongest row)"""
+    lab, A, F, img = info['labels'], info['A'], info['feats'], info['img']
+    rows = {m[0]: m for m in C.BURN_MOVES}
+    if 'skeleton' in F:
+        sk_row = rows[C.SK_BURN_KEY]
+        tot = {k: C.burn_total(m) for k, m in rows.items()}
+        check('skeleton: its burn row is the strongest (%.1f %% unshielded, the next %.1f %%)' % (
+            tot[C.SK_BURN_KEY], max(v for k, v in tot.items() if k != C.SK_BURN_KEY)),
+              max(tot, key=tot.get), C.SK_BURN_KEY)
+        check('skeleton: its burn 0.6 %% every 6 frames for 360 = 36 %%; shielded 50 %% / %d %% = 0.21 %% x 30 = 6.3 %% '
+              '(over the 3 %% floor: no clamp)' % round(100 * C.BURN_SHIELD_DAMAGE),
+              (round(C.burn_total(sk_row), 3), round(C.burn_shield_damage(sk_row), 4), round(C.burn_total(sk_row, True), 3)),
+              (36.0, 0.21, 6.3))
+    if 'skeleton' not in F:
+        check('skeleton: without "skeleton": no skeleton code', 'sk_frame' in lab, False)
+        return
+    T = info['T']
+    k = C.SK_KIND - W.OLD_N
+    check('skeleton tables: name / folder "skeleton", owner "gekkouga"',
+          [e.cstr(e.w(T[nm] + 4 * C.SK_KIND)) for nm in ('owner', 'name', 'folder')], ['gekkouga', 'skeleton', 'skeleton'])
+    check('skeleton tables: base kind Mario\'s pump (its template: the AttackModule\'s update), its own singleton / row',
+          (e.w(T['bt'] + 4 * k), e.w(T['st'] + 4 * k), e.w(T['rt'] + 4 * k) + W.MODULE_TABLE & 0xFFFFFFFF),
+          (C.ATTACK_BASE, A['sk_single'], A['sk_row']))
+    u16 = e.mu.mem_read(T['u16'] + 2 * C.SK_KIND, 2)
+    bun = img.h(W.STATIC_TABLES[2][1] + 2 * C.CLONE_BASE)
+    check('skeleton tables: u16 flags bunshin\'s without the Final Smash categories and the owner\'s colour (c00 only)',
+          struct.unpack('>H', bytes(u16))[0], bun & ~(C.CATEGORY_BITS | 0x10))
+    row = [e.w(A['sk_row'] + 4 * j) for j in range(28)]
+    check('skeleton row: slot 5 (its GroundModule) the hydrant\'s constructor (grounds from an .lvd); Attack (2) and the MSC '
+          'agent (8) there', (row[5], row[2] == e.w(W.MODULE_TABLE + 0x70 * C.ATTACK_BASE + 8), row[8] != 0),
+          (C.SK_GM_CTOR, True, True))
+    e.call(e.w(T['dt'] + 4 * k))
+    d = e.r(3)
+    mi = e.w(d + 8)
+    bd = W.descriptor_of(img, C.CLONE_BASE)
+    check('skeleton descriptor: a bunshin copy (+0x1C as bunshin\'s, as the clone\'s), 3 motions (the hydrant\'s hash)',
+          (d, e.w(d + 0x1C), e.w(mi + 4), [e.w(e.w(mi) + 8 * i) for i in range(3)]),
+          (A['sk_desc'], img.w(bd + 0x1C), 3, [C.SK_MOTION] * 3))
+    vt = A['sk_vt']
+    check('skeleton singleton: +0x34 sk_start, +0x94 sk_94, +0xAC sk_hit, the rest the moon\'s',
+          (e.w(A['sk_single']), e.w(vt + 0x34), e.w(vt + 0x94), e.w(vt + W.HIT_METHOD)),
+          (vt, lab['sk_start'], lab['sk_94'], lab['sk_hit']))
+    lst = e.w(A['gk_desc'] + 8)
+    check('his article list: 9 entries, article 8 the skeleton (one at a time)',
+          (e.w(lst + 4), [e.w(e.w(lst) + 16 * 8 + 4 * j) for j in range(4)]), (9, [C.SK_KIND, 1, 0, 0]))
+    # ---- the game's side, stubbed
+    calls = []
+    st = dict(file=1, ground=1)
+    mgr = e.alloc(0x40, b'\0')
+    e.setw(C.RES_MGR, mgr)
+    e.setw(mgr + 0x30, 0xABC0)
+    gm = e.alloc(0x200, b'\0')
+    e.setw(gm, C.SK_GM_VT)
+    ground = e.alloc(0x200, b'\0')
+
+    def res_get(e_):
+        calls.append(('res_get', e_.r(3), e_.r(5), e_.r(6), e_.r(7)))
+        e_.setw(e_.r(4), 0x1111)
+
+    def res_find(e_):
+        calls.append(('res_find', e_.w(e_.r(3)), e_.cstr(e_.r(5)), e_.r(6)))
+        e_.setw(e_.r(4), 0x2222 if st['file'] else 0)
+
+    def gc_make(e_):
+        calls.append(('make', e_.r(3), e_.r(4), e_.r(5), e_.r(6)))
+        if st['ground']:
+            e_.setw(e_.r(3) + 0xF0, ground)
+
+    def vert(name):
+        return lambda e_: calls.append((name, e_.r(3), e_.r(4)) + tuple(round(x, 3) for x in struct.unpack(
+            '>2f', bytes(e_.mu.mem_read(e_.r(5), 8)))))
+
+    def gc_free(e_):
+        calls.append(('col_free', e_.r(3)))
+        e_.setw(e_.r(3) + 0xF0, 0)
+    e.stub(C.RES_GET, res_get)
+    e.stub(C.RES_FIND, res_find)
+    e.stub(C.RES_ASSIGN, lambda e_: calls.append(('assign', e_.r(3), e_.w(e_.r(4)))))
+    e.stub(C.RES_FREE, lambda e_: calls.append(('res_free', e_.r(4))))
+    e.stub(C.GC_MAKE, gc_make)
+    e.stub(C.GC_ON, lambda e_: calls.append(('on', e_.r(3), e_.r(4))))
+    e.stub(C.GC_SETV, vert('setv'))
+    e.stub(C.GC_MOVEV, vert('movev'))
+    e.stub(C.GC_COMMIT, lambda e_: calls.append(('commit', e_.r(3))))
+    e.stub(C.GC_FREE, gc_free)
+    # the skeleton: its WorkModule (sv), place (50, 10), GroundModule, AttackModule (its explosion's logs), motion
+    sv = {}
+    svt = e.alloc(0x100, b'\0')
+    g, s_ = e.alloc(4), e.alloc(4)
+    e.setw(svt + 0x44, g)
+    e.setw(svt + 0x4C, s_)
+    e.stub(g, lambda e_: e_.mu.reg_write(UC_PPC_REG_FPR1, f2d(sv.get(e_.r(4), 0.0))))
+
+    def sset(e_):
+        sv[e_.r(4)] = round(d2f(e_.mu.reg_read(UC_PPC_REG_FPR1)), 3)
+    e.stub(s_, sset)
+    swm = e.alloc(0x10, b'\0')
+    e.setw(swm, svt)
+    sacc = e.alloc(0x100, b'\0')
+    e.setw(sacc + C.W_WORK, swm)
+    post = e.alloc(0x40, b'\0')
+    e.mu.mem_write(post + 0x10, struct.pack('>2f', 50.0, 10.0))
+    e.setw(sacc + C.W_POSTURE, post)
+    e.setw(sacc + 0x2C, gm)
+    smm = e.alloc(0x60, b'\0')
+    e.setw(sacc + C.W_MOTION, smm)
+    sam = e.alloc(0x60, b'\0')
+    sents = e.alloc(C.ENT_SIZE, b'\0')
+    slog = e.alloc(0x10, b'\0')
+    e.setw(slog + 4, slog)
+    e.setw(sents + C.ENT_LOG, slog)
+    e.setw(sam + C.AM_ENTS, sents)
+    e.setw(sam + C.AM_COUNT, 1)
+    e.setw(sacc + C.W_ATTACK, sam)
+    weapon = e.alloc(0x40, b'\0')
+    e.setw(weapon + C.W_ACC, sacc)
+    for i in range(8):
+        e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
+    for kk in range(C.SLOTS * C.BURN_CAP):
+        e.setw(A['btab'] + 16 * kk, 0)
+
+    def frame():
+        del calls[:]
+        e.calls, e.osr_full = [], []
+        e.call(lab['sk_frame'], weapon)
+        return list(calls)
+
+    def logs(fmt):
+        return [x[1:8] for x in e.osr_full if x[0] == A[fmt]] if diag else []
+    # its start
+    sv.update({0x0F000300 + v: 9.0 for v in range(11)})
+    del calls[:]
+    e.call(lab['sk_start'], 0, weapon, 0)
+    check('skeleton start: a last life\'s grounds removed (its GroundModule: the hydrant\'s class), VARs 0-10 = 0',
+          (calls, [sv[0x0F000300 + v] for v in range(11)]), ([('col_free', gm)], [0.0] * 11))
+    # the claim: him (slot 3, Greninja) asked for one at (40, 12), facing left
+    me = e.fighter(2)
+    e.mu.mem_write(me['f'] + 0x1E, b'\x04')
+    team = e.alloc(0x10, b'\0')
+    e.setw(e.w(me['f'] + C.BASE_ACC) + C.TEAM_MOD, team)
+    other = e.fighter(1)
+    e.setw(other['f'] + 4, 0x1)                          # slot 2: Mario, its VAR_15 on (not a Greninja)
+    e.mu.mem_write(other['f'] + 0x1E, b'\x04')
+    e.vars = {C.GK_VAR_SKREQ: 1.0, C.GK_VAR_SKX: 40.0, C.GK_VAR_SKY: 12.0, C.GK_VAR_SKDIR: -1.0}
+    c0 = frame()
+    check('skeleton claim: its owner the Greninja that asked (slot 3; slot 2 is no Greninja): VAR_0 3, its start '
+          '(40, 12), way -1; his VAR_15 cleared',
+          ([sv[C.SK_VAR_SLOT], sv[C.SK_VAR_X], sv[C.SK_VAR_Y], sv[C.SK_VAR_DIR]], e.vars[C.GK_VAR_SKREQ]),
+          ([3.0, 40.0, 12.0, -1.0], 0.0))
+    check('skeleton claim: phase 0 (its MSC not started): no collision yet', [c for c in c0 if c[0] != 'res_free'], [])
+    if diag:
+        check('skeleton diag: S4SS (slot 3, 40, 12, -1)', [x[:4] for x in logs('gk_fss')], [(3, 40, 12, 0xFFFFFFFF)])
+    e.vars = {}
+    # running: the grounds made from skeleton.lvd and placed at it
+    sv[C.SK_VAR_PHASE] = 1.0
+    c1 = frame()
+    W_, B_, H_ = C.SK_W, C.SK_B, C.SK_H
+    want_v = [(gm, i, 50.0 + vx, 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS)]
+    check('skeleton collision: as the hydrant\'s set-up: its kind\'s bundle (manager +0x30, kind 0x1A2, 0, 0), '
+          '"skeleton.lvd" in it, GroundModule +0xEC = the file, the grounds made (gm, 1, 0, 0), its 4 vertices placed at '
+          'it (x +- 6, y + 2 / + 28), the lines recomputed, on (gm, 0), both handles released',
+          c1, [('res_get', 0xABC0, C.SK_KIND, 0, 0), ('res_find', 0x1111, 'skeleton.lvd', 1), ('assign', gm + 0xEC, 0x2222),
+               ('make', gm, 1, 0, 0)] + [('setv',) + v for v in want_v] +
+              [('commit', gm), ('on', gm, 0), ('res_free', 2), ('res_free', 2)])
+    check('skeleton collision: VAR_6 = 1 (made)', sv[C.SK_VAR_COL], 1.0)
+    if diag:
+        check('skeleton diag: S4SC state 1, its first ground', [x[:2] for x in logs('gk_fsc')], [(1, ground)])
+    e.mu.mem_write(post + 0x10, struct.pack('>2f', 50.7, 10.0))
+    c2 = frame()
+    check('skeleton collision: it moved 0.7: its vertices moved (riders carried: the move call), the lines recomputed',
+          c2, [('movev', gm, i, round(50.7 + vx, 3), 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS)] + [('commit', gm)])
+    e.setw(ground + 0x160, 0xFFFF0000)
+    check('skeleton collision: its ground gone (id -1): nothing moved', frame(), [])
+    e.setw(ground + 0x160, 0)
+    e.mu.mem_write(post + 0x10, struct.pack('>2f', 50.0, 10.0))
+    frame()
+    # ---- hits: attackers over its box (x 44 - 56, y 10 - 38)
+    stopvt = e.alloc(0x100, b'\0')
+    stopfn = e.alloc(4)
+    e.setw(stopvt + 0x8C, stopfn)
+    e.stub(stopfn, lambda e_: e_.rec('sk_stop', 3, 4, 5))
+
+    def attacker(slot0, tid, boxes, dmg=(9.0, 10.0)):
+        fk = e.fighter(slot0)
+        e.mu.mem_write(fk['f'] + 0x1E, b'\x04')
+        acc = e.w(fk['f'] + C.BASE_ACC)
+        t = e.alloc(0x10, b'\0')
+        e.setw(t + 8, tid & 0xFFFFFFFF)
+        e.setw(acc + C.TEAM_MOD, t)
+        am = e.alloc(0x60, b'\0')
+        data = e.alloc(C.SLOT_SIZE * len(boxes), b'\0')
+        ents = e.alloc(C.ENT_SIZE * len(boxes), b'\0')
+        nodes = []
+        for kk, (on, box) in enumerate(boxes):
+            e.mu.mem_write(data + C.SLOT_SIZE * kk + C.SLOT_DMG, struct.pack('>f', dmg[kk]))
+            en = ents + C.ENT_SIZE * kk
+            e.setw(en, 0)
+            e.setw(en + 4, 1)
+            n = e.alloc(0x60, b'\0')
+            e.mu.mem_write(n + C.NODE_ON, bytes([on]))
+            e.mu.mem_write(n + C.NODE_MIN_X, struct.pack('>4f', *box))
+            e.setw(en + C.ENT_NODES, n)
+            nodes.append(n)
+        e.setw(am + C.AM_DATA, data)
+        e.setw(am + C.AM_ENTS, ents)
+        e.setw(am + C.AM_COUNT, len(boxes))
+        e.setw(acc + C.W_ATTACK, am)
+        stop = e.alloc(0x10, b'\0')
+        e.setw(stop, stopvt)
+        e.setw(acc + C.W_STOP, stop)
+        p = e.alloc(0x40, b'\0')
+        e.mu.mem_write(p + 0x10, struct.pack('>2f', 60.0, 12.0))
+        e.setw(acc + C.W_POSTURE, p)
+        return dict(acc=acc, nodes=nodes, data=data, stop=stop, f=fk['f'])
+    near = (54.0, 20.0, 60.0, 25.0)
+    far = (200.0, 0.0, 210.0, 5.0)
+    e.mu.mem_write(other['f'] + 0x1E, b'\x00')
+    e.setw(team + 8, 0)
+    a = attacker(4, 1, [(1, near), (1, far)])            # slot 5, another team: entry 0 over it (9 %), entry 1 away
+    e.hs_ret = 5
+    frame()
+    check('skeleton hit: slot 5\'s entry 0 over it: VAR_4 9 (its damage), VAR_9 1 hit, the place (its X 60 kept in the '
+          'box: 56, its Y 12 + 8 = 20)', [sv.get(v) for v in (C.SK_VAR_DMG, C.SK_VAR_HITS, C.SK_VAR_HX, C.SK_VAR_HY)],
+          [9.0, 1.0, 56.0, 20.0])
+    check('skeleton hit: the attacker\'s hitlag (HITSTOP_FN on that hitbox, 5 frames on its StopModule)',
+          ([c[1:3] for c in e.calls if c[0] == 'hitstop'], [c for c in e.calls if c[0] == 'sk_stop']),
+          ([(a['acc'], a['data'])], [('sk_stop', a['stop'], 5, 1)]))
+    if diag:
+        check('skeleton diag: S4SH (owner 3, attacker 0x05, hitbox 0, 90, HP left 160, at 56, 20)', logs('gk_fsh'),
+              [(3, 5, 0, 90, 160, 56, 20)])
+    for _ in range(3):
+        frame()
+    check('skeleton hit: the same attack (its hitbox still on) 3 more frames: no more damage', sv[C.SK_VAR_DMG], 9.0)
+    e.mu.mem_write(a['nodes'][0] + C.NODE_ON, b'\x00')
+    frame()
+    e.mu.mem_write(a['nodes'][0] + C.NODE_ON, b'\x01')
+    frame()
+    check('skeleton hit: its hitbox off a frame, then a new one: hit again (18)', sv[C.SK_VAR_DMG], 18.0)
+    e.mu.mem_write(a['nodes'][0] + C.NODE_ON, b'\x00')
+    frame()
+    e.mu.mem_write(a['nodes'][0] + C.NODE_ON, b'\x01')
+    e.mu.mem_write(a['nodes'][1] + C.NODE_MIN_X, struct.pack('>4f', *near))
+    frame()
+    check('skeleton hit: two of its hitboxes over it at once (9 / 10): one hit, the lowest id\'s (27)',
+          (sv[C.SK_VAR_DMG], sv[C.SK_VAR_HITS]), (27.0, 3.0))
+    frame()
+    check('skeleton hit: ... and neither again while they stay on', sv[C.SK_VAR_DMG], 27.0)
+    for n in a['nodes']:
+        e.mu.mem_write(n + C.NODE_ON, b'\x00')
+    frame()
+    # his own: his body, his team's weapons
+    mine = attacker(6, 0, [(1, near)])
+    frame()
+    check('skeleton hit: a fighter of his team (team 0): nothing', sv[C.SK_VAR_DMG], 27.0)
+    e.mu.mem_write(mine['f'] + 0x1E, b'\x00')
+    macc = e.w(me['f'] + C.BASE_ACC)
+    am = e.alloc(0x60, b'\0')
+    ents = e.alloc(C.ENT_SIZE, b'\0')
+    n = e.alloc(0x60, b'\0')
+    e.mu.mem_write(n + C.NODE_ON, b'\x01')
+    e.mu.mem_write(n + C.NODE_MIN_X, struct.pack('>4f', *near))
+    e.setw(ents + 4, 1)
+    e.setw(ents + C.ENT_NODES, n)
+    e.setw(am + C.AM_ENTS, ents)
+    e.setw(am + C.AM_COUNT, 1)
+    e.setw(macc + C.W_ATTACK, am)
+    e.setw(team + 8, 0xFFFFFFFF)
+    frame()
+    check('skeleton hit: its owner\'s own attack (him, FFA team -1): nothing', sv[C.SK_VAR_DMG], 27.0)
+    e.setw(macc + C.W_ATTACK, 0)
+    e.setw(team + 8, 0)
+    # exploded: the grounds removed once, no more hits
+    a2 = attacker(4, 1, [(1, near)])
+    sv[C.SK_VAR_PHASE] = 2.0
+    c3 = frame()
+    check('skeleton exploded (phase 2): its grounds removed (anyone on it falls), VAR_6 2; no hit counted',
+          ([c for c in c3 if c[0] == 'col_free'], sv[C.SK_VAR_COL], sv[C.SK_VAR_DMG]), ([('col_free', gm)], 2.0, 27.0))
+    if diag:
+        check('skeleton diag: S4SF (owner 3); S4SX phase 2 (damage 270)', (logs('gk_fsf')[:1] and [logs('gk_fsf')[0][:1]],
+              [x[:3] for x in logs('gk_fsx')]), ([(3,)], [(3, 2, 270)]))
+    check('skeleton exploded: not removed again', [c for c in frame() if c[0] == 'col_free'], [])
+    e.mu.mem_write(a2['f'] + 0x1E, b'\x00')
+    # its explosion's hits: the skeleton row's burn for its owner (slot 3)
+    vic = 5
+
+    def log_hit(victim0, typ=1):
+        nn = e.alloc(0x30, b'\0')
+        e.setw(nn + C.NODE_OBJ, (victim0 << 16) | 0x11)
+        e.mu.mem_write(nn + C.NODE_TYPE, bytes([typ]))
+        last = slog
+        while e.w(last + 4) != slog:
+            last = e.w(last + 4)
+        e.setw(nn + 4, slog)
+        e.setw(last + 4, nn)
+        e.setw(slog + 8, e.w(slog + 8) + 1)
+    log_hit(vic, 1)
+    log_hit(vic - 1, 2)
+    frame()
+
+    def inst(v):
+        out = []
+        for kk in range(C.BURN_CAP):
+            at = A['btab'] + (v * C.BURN_CAP + kk) * 16
+            if e.w(at):
+                out.append((e.w(at), e.w(at + 4) & 0xFFFF, e.w(at + 8),
+                            round(struct.unpack('>f', struct.pack('>I', e.w(at + 12)))[0], 4)))
+        return out
+    check('skeleton burn: its explosion hit slot 6: 0.6 %% every 6 frames for 360 (owner slot 3); shielded by slot 5: '
+          '180 frames of 0.21 %%', (inst(vic), inst(vic - 1)), ([(360, 6, 2, 0.6)], [(180, 6, 2, 0.21)]))
+    frame()
+    check('skeleton burn: the same hits not again', (len(inst(vic)), len(inst(vic - 1))), (1, 1))
+    for kk in range(C.SLOTS * C.BURN_CAP):
+        e.setw(A['btab'] + 16 * kk, 0)
+    # a missing .lvd: no collision, failed (3); the handles still released
+    st['file'] = 0
+    e.setw(gm + 0xF0, 0)
+    sv.update({C.SK_VAR_PHASE: 1.0, C.SK_VAR_COL: 0.0})
+    c4 = frame()
+    check('skeleton collision: no skeleton.lvd: nothing made, VAR_6 3 (failed: not tried again), both handles released',
+          ([c[0] for c in c4], sv[C.SK_VAR_COL]), (['res_get', 'res_find', 'res_free', 'res_free'], 3.0))
+    check('skeleton collision: failed: not tried again', [c[0] for c in frame()], [])
+    st['file'] = 1
+    e.setw(gm, 0x10000000)
+    sv[C.SK_VAR_COL] = 0.0
+    c5 = frame()
+    check('skeleton collision: its GroundModule not the hydrant\'s class: nothing called, failed (3)',
+          ([c[0] for c in c5], sv[C.SK_VAR_COL]), ([], 3.0))
+    e.setw(gm, C.SK_GM_VT)
+    # unowned: nothing
+    sv.clear()
+    check('skeleton: nobody asked for it: no owner, nothing', (frame(), sv.get(C.SK_VAR_SLOT, 0.0)), ([], 0.0))
+    for i in range(8):
+        e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
+    e.hs_ret = 7
+
+
 def hud_checks(e, info):
     lab, A = info['labels'], info['A']
     hide = A['gk_hide']
@@ -1504,6 +1843,8 @@ def main():
     hitcheck_checks(e, info, diag)
     burn_checks(e, info, diag)
     clear_checks(e, info, diag)
+    info['img'] = img
+    skeleton_checks(e, info, diag)
     fighter_desc_checks(e, img, info)
     g1_checks(e, info)
     s13_checks(e, info)

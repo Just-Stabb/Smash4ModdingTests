@@ -249,6 +249,7 @@ DAMAGE_SLOT = 20
 SK_KIND = 0x1A2
 SK_NAME = 'skeleton'
 SK_ARTICLE = 8                    # his list: 6 articles, the clones 6 / 7, the skeleton 8
+SK_MOTION = 0xB16D0064            # the hydrant's motion (its motion info's hash; motion/skeleton/main.pac is its own)
 SK_LVD = 'skeleton.lvd'           # its collision: model/skeleton/c00/skeleton.lvd (tools/gekkouga_build.py skeleton_lvd)
 HYDRANT = 0x12D                   # Pac-Man's fire hydrant: a weapon fighters stand on and are blocked by. Its module row
                                   # slot 5 (accessor +0x2C, the GroundModule) is its own class (ctor 0x02B387FC, vtable
@@ -449,6 +450,7 @@ BASE_ACC = 0xC                    # entry -> the module accessor ([+0xB8] SlowMo
 SLOW_SLOT, SLOW_RATE, SLOW_FRAMES = 3, 2, 600
 
 # the variables his MSC and this share (docs/acmd-extra-commands.md VAR_0-VAR_23: his private ones)
+VAR_GEN_CLR = 0x0F00030E          # skeleton v1: his VAR_14 = the clear-all chain's count & 7 (his MSC resets on a change)
 VAR_FLAGS = 0x0F000314            # VAR_20: 1 name tag hidden, 2 burnout slow, 4 clones out
 VAR_HIT = 0x0F000315              # VAR_21: HIT_BIAS + (hitting object's X - his X); 0 = none
 VAR_LAG = 0x0F000316             # VAR_22 (v2): 1 = a clone's hit landed (w_hit sets it; his MSC gives him the hitlag)
@@ -518,6 +520,769 @@ def osr():
         mtctr r12
         .word 0x4CC63182
         bctrl''' % (OSREPORT_VENEER >> 16, OSREPORT_VENEER & 0xFFFF)
+
+
+def vint(wm, vid, reg):
+    """an int from a variable: var_get then fctiwz into reg"""
+    return var_get(wm, vid) + '''
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz %s, 0x1C(r1)''' % reg
+
+
+def vnum(wm, vid, reg):
+    """a variable = the int in reg (0-9: sk_nums)"""
+    return '''
+        lis r12, %%(sk_nums_hi)d
+        addi r12, r12, %%(sk_nums_lo)d
+        slwi r0, %s, 2
+        lfsx f1, r12, r0''' % reg + var_set(wm, vid)
+
+
+def sk_source(D, old_hit, orig94):
+    """skeleton v1: the Running Skeleton's native part (fighters/gekkouga/README.md "Skeleton v1")"""
+    zero = '''
+        lis r12, %(zero_hi)d
+        lfs f1, %(zero_lo)d(r12)'''
+    return r'''
+# ==== skeleton v1: the Running Skeleton (weapon kind SK_KIND, his article 8; its MSC fighters/gekkouga/weapons/
+# skeleton.c). Its specializer is a copy of the moon's with +0x34 sk_start, +0x94 sk_94, +0xAC sk_hit. Its VARs: 0 its
+# owner's slot (1-8, the claim), 1 / 2 / 3 where it starts and its way (copied from his VAR_16-18), 4 the damage taken,
+# 5 its phase (its MSC: 1 running, 2 exploded, 3 smoked), 6 its collision (0 none, 1 made, 2 removed, 3 failed), 7 / 8
+# the last hit's place, 9 the hits counted, 10 (diag) the phase logged
+sk_hit: andi. r0, r5, %(hitbits)d       # its explosion connecting / shielded: not removed (its MSC removes it)
+        beq skh_base
+        li r3, 0
+        blr
+skh_base:''' + tail(old_hit) + '''
+
+# its start (+0x34, (singleton, weapon, init)): a grounds of a last life removed, its VARs 0
+sk_start:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stw r31, 0x2C(r1)
+        stw r30, 0x28(r1)
+        lwz r31, %(wacc)d(r4)
+        cmpwi r31, 0
+        beq sks_out
+        mr r3, r31
+        bl sk_col_free
+        lwz r30, %(wwork)d(r31)
+        cmpwi r30, 0
+        beq sks_out''' + ''.join(zero + var_set('r30', 0x0F000300 + v) for v in range(11)) + '''
+sks_out:
+        lwz r30, 0x28(r1)
+        lwz r31, 0x2C(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+
+# +0x94 (spec, weapon, ...): sk_frame, then the moon's method with the same arguments
+sk_94:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stw r3, 0x08(r1)
+        stw r4, 0x0C(r1)
+        stw r5, 0x10(r1)
+        stw r6, 0x14(r1)
+        stw r7, 0x18(r1)
+        stw r8, 0x1C(r1)
+        stw r9, 0x20(r1)
+        stw r10, 0x24(r1)
+        mr r3, r4
+        bl sk_frame
+        lwz r3, 0x08(r1)
+        lwz r4, 0x0C(r1)
+        lwz r5, 0x10(r1)
+        lwz r6, 0x14(r1)
+        lwz r7, 0x18(r1)
+        lwz r8, 0x1C(r1)
+        lwz r9, 0x20(r1)
+        lwz r10, 0x24(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40''' + tail(orig94) + '''
+
+# (r3 the weapon): its frame
+sk_frame:
+        stwu r1, -0x90(r1)
+        mflr r0
+        stw r0, 0x94(r1)
+        stmw r20, 0x40(r1)
+        lwz r31, %(wacc)d(r3)
+        cmpwi r31, 0
+        beq skf_out
+        lwz r30, %(wwork)d(r31)
+        cmpwi r30, 0
+        beq skf_out''' + vint('r30', 0x0F000300, 'r29') + '''
+        cmpwi r29, 0
+        bne skf_owned
+        bl sk_claim                     # whose it is (his VAR_15 asked for it): its VAR_0 - 3 filled
+        mr. r29, r3
+        beq skf_out
+skf_owned:
+        addi r12, r29, -1
+        cmplwi r12, %(slots)d
+        bge skf_out''' + vint('r30', 0x0F000305, 'r28') + vint('r30', 0x0F000306, 'r27') + D('''
+        bl sk_logphase''') + '''
+        cmpwi r28, 1
+        bne skf_notrun
+        cmpwi r27, 0
+        bne skf_have
+        bl sk_col_make                  # its first running frame: the grounds made and placed
+        mr r27, r3
+        b skf_hits
+skf_have:
+        cmpwi r27, 1
+        bne skf_hits
+        mr r3, r31
+        li r4, 0
+        bl sk_col_place                 # moved with it (riders carried)
+skf_hits:
+        bl sk_hits
+        b skf_burn
+skf_notrun:
+        cmpwi r28, 2
+        blt skf_burn
+        cmpwi r27, 1
+        bne skf_burn
+        mr r3, r31                      # exploded / smoked: the grounds removed (anyone on it falls)
+        bl sk_col_free
+        li r27, 2''' + vnum('r30', 0x0F000306, 'r27') + D('''
+        lis r3, %(gk_fsf_hi)d
+        addi r3, r3, %(gk_fsf_lo)d
+        mr r4, r29''' + osr()) + '''
+skf_burn:
+        mr r3, r31                      # its explosion's hits: the skeleton row's burn on each (burn_scan)
+        addi r4, r29, -1
+        slwi r5, r4, 2
+        addi r5, r5, 3
+        lis r6, %(sk_row_hi)d
+        addi r6, r6, %(sk_row_lo)d
+        bl burn_scan
+skf_out:
+        lmw r20, 0x40(r1)
+        lwz r0, 0x94(r1)
+        mtlr r0
+        addi r1, r1, 0x90
+        blr
+''' + D('''
+# diag: its phase when it changes (VAR_10): S4SX owner, phase, damage x10, place
+sk_logphase:
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)''' + vint('r30', 0x0F00030A, 'r12') + '''
+        cmpw r12, r28
+        beq skl_out''' + vnum('r30', 0x0F00030A, 'r28') + var_get('r30', 0x0F000304) + '''
+        lis r12, %(sk_k4_hi)d
+        lfs f0, %(sk_k4_lo)d(r12)
+        fmuls f1, f1, f0
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r6, 0x1C(r1)
+        li r7, 0
+        li r8, 0
+        lwz r12, %(wpost)d(r31)
+        cmpwi r12, 0
+        beq skl_log
+        lfs f1, 0x10(r12)
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r7, 0x1C(r1)
+        lfs f1, 0x14(r12)
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r8, 0x1C(r1)
+skl_log:
+        mr r4, r29
+        mr r5, r28
+        lis r3, %(gk_fsx_hi)d
+        addi r3, r3, %(gk_fsx_lo)d''' + osr() + '''
+skl_out:
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+''') + '''
+# (r30 its WorkModule) -> r3 its owner's slot (1-8) or 0: the first live Greninja whose VAR_15 (a skeleton asked for)
+# is on: it is cleared, his VAR_16 / 17 / 18 copied to its VAR_1 / 2 / 3, its VAR_0 = his slot
+sk_claim:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r26, 0x20(r1)
+        li r29, 1
+skc_slot:
+        cmpwi r29, %(slots)d
+        bgt skc_none
+        mr r3, r29
+        bl gk_entry
+        mr. r28, r3
+        beq skc_next
+        lwz r0, 4(r28)
+        cmpwi r0, %(gkind)d
+        bne skc_next
+        lwz r12, %(acc)d(r28)
+        cmpwi r12, 0
+        beq skc_next
+        lwz r27, %(work)d(r12)
+        cmpwi r27, 0
+        beq skc_next''' + var_get('r27', GK_VAR_SKREQ) + '''
+        lis r12, %(half_hi)d
+        lfs f0, %(half_lo)d(r12)
+        fcmpu cr0, f1, f0
+        ble skc_next''' + zero + var_set('r27', GK_VAR_SKREQ) + var_get('r27', GK_VAR_SKX) + var_set('r30', SK_VAR_X) + \
+        var_get('r27', GK_VAR_SKY) + var_set('r30', SK_VAR_Y) + var_get('r27', GK_VAR_SKDIR) + var_set('r30', SK_VAR_DIR) + \
+        vnum('r30', SK_VAR_SLOT, 'r29') + D(vint('r30', SK_VAR_X, 'r5') + '''
+        stw r5, 0x10(r1)''' + vint('r30', SK_VAR_Y, 'r6') + '''
+        stw r6, 0x14(r1)''' + vint('r30', SK_VAR_DIR, 'r7') + '''
+        lwz r5, 0x10(r1)
+        lwz r6, 0x14(r1)
+        mr r4, r29
+        lis r3, %(gk_fss_hi)d
+        addi r3, r3, %(gk_fss_lo)d''' + osr()) + '''
+        mr r3, r29
+        b skc_out
+skc_next:
+        addi r29, r29, 1
+        b skc_slot
+skc_none:
+        li r3, 0
+skc_out:
+        lmw r26, 0x20(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+
+# (r3 an accessor) -> r3 its GroundModule when it is the hydrant's class, else 0 (a leaf)
+sk_gm:  lwz r3, %(wground)d(r3)
+        lis r0, 0x1000
+        cmplw r3, r0
+        blt skg_no
+        lis r0, 0x8000
+        cmplw r3, r0
+        bge skg_no
+        lwz r0, 0(r3)
+        lis r12, %(gm_vt_hi)d
+        ori r12, r12, %(gm_vt_lo)d
+        cmplw r0, r12
+        beqlr
+skg_no: li r3, 0
+        blr
+
+# (r3 an accessor): its grounds removed (the GroundModule's own removal; nothing made: nothing)
+sk_col_free:
+        mflr r0
+        stw r0, 4(r1)
+        stwu r1, -0x10(r1)
+        bl sk_gm
+        cmpwi r3, 0
+        beq skcf_out''' + call(GC_FREE) + '''
+skcf_out:
+        addi r1, r1, 0x10
+        lwz r0, 4(r1)
+        mtlr r0
+        blr
+
+# (r31 its accessor, r30 its WorkModule) -> r3 its collision state (1 made, 3 failed), its VAR_6: as the hydrant's
+# specializer +0x3C (0x02B345A0): its kind's file bundle, SK_LVD in it, the GroundModule's +0xEC, its grounds made, placed
+# at it, on; the two stack handles released
+sk_col_make:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r28, 0x30(r1)
+        li r28, 3
+        mr r3, r31
+        bl sk_gm
+        mr. r29, r3
+        beq skm_done
+        lis r12, %(resmgr_hi)d
+        lwz r12, %(resmgr_lo)d(r12)
+        cmpwi r12, 0
+        beq skm_done
+        li r0, 0
+        stw r0, 0x10(r1)
+        stw r0, 0x14(r1)
+        lwz r3, 0x30(r12)
+        addi r4, r1, 0x10
+        li r5, %(sk_kind)d
+        li r6, 0
+        li r7, 0''' + call(RES_GET) + '''
+        addi r3, r1, 0x10
+        addi r4, r1, 0x14
+        lis r5, %(sk_lvd_hi)d
+        addi r5, r5, %(sk_lvd_lo)d
+        li r6, 1''' + call(RES_FIND) + '''
+        lwz r0, 0x14(r1)
+        cmpwi r0, 0
+        beq skm_free
+        addi r3, r29, 0xEC
+        addi r4, r1, 0x14''' + call(RES_ASSIGN) + '''
+        mr r3, r29
+        li r4, 1
+        li r5, 0
+        li r6, 0''' + call(GC_MAKE) + '''
+        lwz r0, 0xF0(r29)
+        cmpwi r0, 0
+        beq skm_free
+        mr r3, r31
+        li r4, 1
+        bl sk_col_place
+        mr r3, r29
+        li r4, 0''' + call(GC_ON) + '''
+        li r28, 1
+skm_free:
+        addi r3, r1, 0x14
+        li r4, 2''' + call(RES_FREE) + '''
+        addi r3, r1, 0x10
+        li r4, 2''' + call(RES_FREE) + '''
+skm_done:''' + vnum('r30', SK_VAR_COL, 'r28') + D('''
+        li r5, 0
+        cmpwi r29, 0
+        beq skm_log
+        lwz r5, 0xF0(r29)
+skm_log:
+        mr r4, r28
+        lis r3, %(gk_fsc_hi)d
+        addi r3, r3, %(gk_fsc_lo)d''' + osr()) + '''
+        mr r3, r28
+        lmw r28, 0x30(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+
+# (r3 its accessor, r4 1 placed / 0 moved): its collision's vertices at its place + SK_VERTS, the lines recomputed
+sk_col_place:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r27, 0x2C(r1)
+        mr r31, r3
+        mr r30, r4
+        bl sk_gm
+        mr. r29, r3
+        beq skp_out
+        lwz r12, 0xF0(r29)              # its first ground still there (+0x160 its id, -1 none)
+        cmpwi r12, 0
+        beq skp_out
+        lhz r0, 0x160(r12)
+        cmplwi r0, 0xFFFF
+        beq skp_out
+        lwz r12, %(wpost)d(r31)
+        cmpwi r12, 0
+        beq skp_out
+        lfs f0, 0x10(r12)
+        stfs f0, 0x20(r1)
+        lfs f0, 0x14(r12)
+        stfs f0, 0x24(r1)
+        li r28, 0
+        lis r27, %(sk_verts_hi)d
+        addi r27, r27, %(sk_verts_lo)d
+skp_v:  lfs f0, 0(r27)
+        lfs f1, 0x20(r1)
+        fadds f0, f0, f1
+        stfs f0, 0x10(r1)
+        lfs f0, 4(r27)
+        lfs f1, 0x24(r1)
+        fadds f0, f0, f1
+        stfs f0, 0x14(r1)
+        mr r3, r29
+        mr r4, r28
+        addi r5, r1, 0x10
+        cmpwi r30, 0
+        beq skp_mv''' + call(GC_SETV) + '''
+        b skp_n
+skp_mv:''' + call(GC_MOVEV) + '''
+skp_n:  addi r27, r27, 8
+        addi r28, r28, 1
+        cmpwi r28, %(sk_nv)d
+        blt skp_v
+        mr r3, r29''' + call(GC_COMMIT) + '''
+skp_out:
+        lmw r27, 0x2C(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+
+# (r31 its accessor, r30 its WorkModule, r29 its owner's slot): the opponents' attacks on it (the clone hit check's
+# objects: fighters, weapons, items; his team skipped). Per attacker: its entries with an on node (sk_box: r4) and those
+# over its box (r3); a hit when one over it isn't latched: the lowest such entry's damage (AttackModule +0x40 + id x
+# 0x84, +0x18) added to its VAR_4 (HP = SK_HP - it), VAR_9 + 1, VAR_7 / 8 the place (the attacker's X / Y + 8 kept in
+# its box), the attacker's hitlag (as the clones'), then every entry on now latched: an attack hits it once, until that
+# entry goes off (a new attack). SK_LATCH attackers per skeleton (its owner's slot)
+sk_hits:
+        stwu r1, -0xA0(r1)
+        mflr r0
+        stw r0, 0xA4(r1)
+        stmw r14, 0x58(r1)
+        mr r19, r29
+        mr r18, r30
+        mr r17, r31
+        lwz r12, %(wpost)d(r17)
+        cmpwi r12, 0
+        beq skh_out
+        lis r8, %(sk_box_hi)d
+        addi r8, r8, %(sk_box_lo)d
+        lfs f2, 0x10(r12)
+        lfs f3, 0(r8)
+        fsubs f4, f2, f3
+        stfs f4, 0xC(r8)                # left
+        fadds f4, f2, f3
+        stfs f4, 0x10(r8)               # right
+        lfs f2, 0x14(r12)
+        lfs f3, 4(r8)
+        fadds f4, f2, f3
+        stfs f4, 0x14(r8)               # bottom
+        lfs f3, 8(r8)
+        fadds f4, f2, f3
+        stfs f4, 0x18(r8)               # top
+        addi r12, r19, -1
+        mulli r12, r12, %(sk_lat8)d
+        lis r16, %(sk_latch_hi)d
+        addi r16, r16, %(sk_latch_lo)d
+        add r16, r16, r12               # its latches
+        li r15, 0
+skh_ref:                                # every latched attacker: entries no longer on let go
+        slwi r12, r15, 3
+        add r14, r16, r12
+        lwz r3, 0(r14)
+        cmpwi r3, 0
+        beq skh_rn
+        bl sk_box
+        lwz r0, 4(r14)
+        and r0, r0, r4
+        stw r0, 4(r14)
+        cmpwi r0, 0
+        bne skh_rn
+        stw r0, 0(r14)
+skh_rn: addi r15, r15, 1
+        cmpwi r15, %(sk_lat)d
+        blt skh_ref
+        mr r3, r19
+        bl gk_entry
+        mr. r27, r3                     # his entry
+        beq skh_out
+        li r26, -2
+        lwz r12, %(bacc)d(r27)
+        cmpwi r12, 0
+        beq skh_cats
+        lwz r12, %(team)d(r12)
+        cmpwi r12, 0
+        beq skh_cats
+        lwz r26, 8(r12)
+skh_cats:
+        li r25, 0
+skh_cat:
+        lis r12, %(ftab_hi)d
+        lwz r12, %(ftab_lo)d(r12)
+        cmpwi r12, 0
+        beq skh_out
+        slwi r0, r25, 2
+        lwzx r12, r12, r0
+        lis r0, 0x1000
+        cmplw r12, r0
+        blt skh_ncat
+        lis r0, 0x8000
+        cmplw r12, r0
+        bge skh_ncat
+        lwz r23, 0(r12)
+        lwz r22, 8(r12)
+        cmplwi r22, %(obj_max)d
+        ble skh_cnt
+        li r22, %(obj_max)d
+skh_cnt:
+        li r21, 0
+        lis r12, %(hcsize_hi)d
+        addi r12, r12, %(hcsize_lo)d
+        slwi r0, r25, 2
+        lwzx r20, r12, r0
+skh_obj:
+        cmpw r21, r22
+        bge skh_ncat
+        mullw r12, r21, r20
+        add r24, r23, r12
+        addi r21, r21, 1
+        cmpwi r25, 0
+        bne skh_notme
+        cmpw r24, r27
+        beq skh_obj                     # him
+skh_notme:
+        lbz r0, 0x1E(r24)
+        cmplwi r0, 4
+        blt skh_obj
+        lwz r24, %(bacc)d(r24)
+        lis r0, 0x1000
+        cmplw r24, r0
+        blt skh_obj
+        lis r0, 0x8000
+        cmplw r24, r0
+        bge skh_obj
+        cmpw r24, r17
+        beq skh_obj                     # itself
+        lwz r12, %(team)d(r24)
+        cmpwi r12, 0
+        beq skh_test
+        lwz r12, 8(r12)
+        cmpw r12, r26
+        bne skh_test
+        cmpwi r25, 0
+        bne skh_obj                     # a weapon / item of his team (his own, his clones', the explosion)
+        cmpwi r12, -1
+        bne skh_obj                     # a fighter of his team
+skh_test:
+        mr r3, r24
+        bl sk_box
+        mr. r15, r3                     # entries over it
+        beq skh_obj
+        mr r14, r4                      # entries on
+        li r3, 0                        # its latch (r3) and the entries latched (r4)
+        li r4, 0
+        li r5, %(sk_lat)d
+        mr r6, r16
+skh_lf: lwz r0, 0(r6)
+        cmpw r0, r24
+        bne skh_lfn
+        mr r3, r6
+        lwz r4, 4(r6)
+        b skh_lfd
+skh_lfn:
+        addi r6, r6, 8
+        addi r5, r5, -1
+        cmpwi r5, 0
+        bne skh_lf
+skh_lfd:
+        andc r0, r15, r4
+        cmpwi r0, 0
+        beq skh_obj                     # this attack hit it already
+        li r12, 0                       # the hitbox: the lowest new entry
+skh_lo: srw r11, r0, r12
+        andi. r11, r11, 1
+        bne skh_lod
+        addi r12, r12, 1
+        cmpwi r12, 31
+        blt skh_lo
+skh_lod:
+        stw r12, 0x20(r1)
+        cmpwi r3, 0
+        bne skh_put
+        li r5, %(sk_lat)d               # a free latch (none: the first one's)
+        mr r6, r16
+        mr r3, r16
+skh_ff: lwz r0, 0(r6)
+        cmpwi r0, 0
+        bne skh_ffn
+        mr r3, r6
+        b skh_put
+skh_ffn:
+        addi r6, r6, 8
+        addi r5, r5, -1
+        cmpwi r5, 0
+        bne skh_ff
+        li r4, 0
+skh_put:
+        or r4, r4, r14
+        stw r24, 0(r3)
+        stw r4, 4(r3)
+        lwz r12, %(watk)d(r24)          # the damage
+        lwz r12, %(am_data)d(r12)
+        lis r0, 0x1000
+        cmplw r12, r0
+        blt skh_obj
+        lwz r0, 0x20(r1)
+        mulli r0, r0, %(slot_size)d
+        add r4, r12, r0
+        stw r4, 0x24(r1)                # its data
+        lfs f1, %(slot_dmg)d(r4)
+        stfs f1, 0x28(r1)''' + var_get('r18', SK_VAR_DMG) + '''
+        lfs f0, 0x28(r1)
+        fadds f1, f1, f0''' + var_set('r18', SK_VAR_DMG) + var_get('r18', SK_VAR_HITS) + '''
+        lis r12, %(one_hi)d
+        lfs f0, %(one_lo)d(r12)
+        fadds f1, f1, f0''' + var_set('r18', SK_VAR_HITS) + '''
+        lis r8, %(sk_box_hi)d
+        addi r8, r8, %(sk_box_lo)d
+        lwz r12, %(wpost)d(r24)         # the place: the attacker's, in its box
+        lfs f1, 0xC(r8)
+        lfs f2, 0x14(r8)
+        cmpwi r12, 0
+        beq skh_pl
+        lfs f1, 0x10(r12)
+        lfs f2, 0x14(r12)
+        lis r11, %(sk_k8_hi)d
+        lfs f0, %(sk_k8_lo)d(r11)
+        fadds f2, f2, f0
+skh_pl: lfs f0, 0xC(r8)
+        fcmpu cr0, f1, f0
+        bge skh_p1
+        fmr f1, f0
+skh_p1: lfs f0, 0x10(r8)
+        fcmpu cr0, f1, f0
+        ble skh_p2
+        fmr f1, f0
+skh_p2: lfs f0, 0x14(r8)
+        fcmpu cr0, f2, f0
+        bge skh_p3
+        fmr f2, f0
+skh_p3: lfs f0, 0x18(r8)
+        fcmpu cr0, f2, f0
+        ble skh_p4
+        fmr f2, f0
+skh_p4: stfs f2, 0x2C(r1)
+        stfs f1, 0x30(r1)''' + var_set('r18', SK_VAR_HX) + '''
+        lfs f1, 0x2C(r1)''' + var_set('r18', SK_VAR_HY) + '''
+        lwz r4, 0x24(r1)                # the attacker's hitlag (as a clone hit)
+        lfs f1, %(slot_dmg)d(r4)
+        lis r12, %(hmul_hi)d
+        lfs f2, %(hmul_lo)d(r12)
+        mr r3, r24
+        li r5, 1
+        li r6, 1''' + call(HITSTOP_FN) + '''
+        mr. r4, r3
+        ble skh_log
+        lwz r3, %(wstop)d(r24)
+        cmpwi r3, 0
+        beq skh_log
+        li r5, 1
+        lwz r12, 0(r3)
+        lwz r12, 0x8C(r12)
+        mtctr r12
+        bctrl
+skh_log:''' + D('''
+        lis r12, %(sk_k4_hi)d
+        lfs f0, %(sk_k4_lo)d(r12)
+        lfs f1, 0x28(r1)
+        fmuls f1, f1, f0
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r0, 0x1C(r1)
+        stw r0, 0x34(r1)''' + var_get('r18', SK_VAR_DMG) + '''
+        lis r12, %(sk_k_hi)d
+        lfs f0, %(sk_k_lo)d(r12)
+        fsubs f1, f0, f1
+        lis r12, %(sk_k4_hi)d
+        lfs f0, %(sk_k4_lo)d(r12)
+        fmuls f1, f1, f0
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r0, 0x1C(r1)
+        stw r0, 0x38(r1)
+        lfs f1, 0x30(r1)
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r9, 0x1C(r1)
+        lfs f1, 0x2C(r1)
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r10, 0x1C(r1)
+        mr r4, r19
+        slwi r5, r25, 4
+        add r5, r5, r21
+        lwz r6, 0x20(r1)
+        lwz r7, 0x34(r1)
+        lwz r8, 0x38(r1)
+        lis r3, %(gk_fsh_hi)d
+        addi r3, r3, %(gk_fsh_lo)d''' + osr()) + '''
+        b skh_obj
+skh_ncat:
+        addi r25, r25, 1
+        cmpwi r25, 2
+        blt skh_cat
+        bne skh_out
+        li r25, 4
+        b skh_cat
+skh_out:
+        lmw r14, 0x58(r1)
+        lwz r0, 0xA4(r1)
+        mtlr r0
+        addi r1, r1, 0xA0
+        blr
+
+# (r3 an attacker's accessor) -> r3 its entries (hitbox ids, bits) with an on node over the skeleton's box (sk_box +0xC
+# left, +0x10 right, +0x14 bottom, +0x18 top), r4 its entries with an on node (a leaf)
+sk_box: mr r11, r3
+        li r3, 0
+        li r4, 0
+        lwz r12, %(watk)d(r11)
+        lis r0, 0x1000
+        cmplw r12, r0
+        bltlr
+        lis r0, 0x8000
+        cmplw r12, r0
+        bgelr
+        lwz r7, %(am_ents)d(r12)
+        lwz r6, %(am_count)d(r12)
+        lis r0, 0x1000
+        cmplw r7, r0
+        bltlr
+        lis r0, 0x8000
+        cmplw r7, r0
+        bgelr
+        cmplwi r6, %(am_max)d
+        bgtlr
+        lis r8, %(sk_box_hi)d
+        addi r8, r8, %(sk_box_lo)d
+        li r5, 0
+sb_ent: cmpw r5, r6
+        bgelr
+        mulli r12, r5, %(ent_size)d
+        add r12, r12, r7
+        lwz r11, 0(r12)
+        lwz r10, 4(r12)
+        cmplwi r11, %(node_max)d
+        bgt sb_next
+        cmplwi r10, %(node_max)d
+        bgt sb_next
+        slwi r11, r11, 2
+        add r11, r11, r12
+        addi r11, r11, %(ent_nodes)d
+        li r12, 1
+        slw r12, r12, r5                # this entry's bit
+sb_node:
+        cmpwi r10, 0
+        ble sb_next
+        lwz r9, 0(r11)
+        addi r11, r11, 4
+        addi r10, r10, -1
+        lis r0, 0x1000
+        cmplw r9, r0
+        blt sb_node
+        lis r0, 0x8000
+        cmplw r9, r0
+        bge sb_node
+        lbz r0, %(node_on)d(r9)
+        cmpwi r0, 0
+        beq sb_node
+        or r4, r4, r12
+        lfs f0, %(node_max_x)d(r9)
+        lfs f1, 0xC(r8)
+        fcmpu cr0, f0, f1
+        blt sb_node
+        lfs f0, %(node_min_x)d(r9)
+        lfs f1, 0x10(r8)
+        fcmpu cr0, f0, f1
+        bgt sb_node
+        lfs f0, %(node_max_y)d(r9)
+        lfs f1, 0x14(r8)
+        fcmpu cr0, f0, f1
+        blt sb_node
+        lfs f0, %(node_min_y)d(r9)
+        lfs f1, 0x18(r8)
+        fcmpu cr0, f0, f1
+        bgt sb_node
+        or r3, r3, r12
+        b sb_node
+sb_next:
+        addi r5, r5, 1
+        b sb_ent
+
+'''
 
 
 class Out:
@@ -826,15 +1591,21 @@ def build(rpx, diag=False, feats=None):
              dm_add=DM_ADD, fstatus=F_STATUS, st_kind=ST_KIND, st_dead=ST_DEAD, st_dead_n=ST_DEAD_N, ent_log=ENT_LOG, node_obj=NODE_OBJ, node_type=NODE_TYPE, mm_kind=MM_KIND, am_ents=AM_ENTS, am_count=AM_COUNT, am_max=AM_MAX, ent_size=ENT_SIZE,
              ent_nodes=ENT_NODES, node_max=NODE_MAX, node_on=NODE_ON, node_min_x=NODE_MIN_X, node_min_y=NODE_MIN_Y,
              node_max_x=NODE_MAX_X, node_max_y=NODE_MAX_Y, team=TEAM_MOD,
-             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, sk_kind=SK_KIND, sk_lat=SK_LATCH, sk_lat8=SK_LATCH * 8, sk_nv=len(SK_VERTS), gm_vt_hi=SK_GM_VT >> 16, gm_vt_lo=SK_GM_VT & 0xFFFF, wground=0x2C, nbtab=SLOTS * BURN_CAP * 4, nbproc=(BURN_CONTEXTS * BURN_ENTS + 3) // 4, clear_back=CLEAR_BACK, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
+             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, nlatch=SLOTS * SK_LATCH * 2, sk_kind=SK_KIND, sk_lat=SK_LATCH, sk_lat8=SK_LATCH * 8, sk_nv=len(SK_VERTS), gm_vt_hi=SK_GM_VT >> 16, gm_vt_lo=SK_GM_VT & 0xFFFF, wground=0x2C, nbtab=SLOTS * BURN_CAP * 4, nbproc=(BURN_CONTEXTS * BURN_ENTS + 3) // 4, clear_back=CLEAR_BACK, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
              hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbr', 'gk_clr', 'gk_fss', 'gk_fsc', 'gk_fsf', 'gk_fsh', 'gk_fsx', 'sk_lvd', 'sk_verts', 'sk_box', 'sk_nums', 'sk_k', 'sk_latch', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbr', 'gk_clr', 'sk_desc', 'gk_fss', 'gk_fsc', 'gk_fsf', 'gk_fsh', 'gk_fsx', 'sk_lvd', 'sk_verts', 'sk_box', 'sk_nums', 'sk_k', 'sk_latch', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
     p['ftab_hi'], p['ftab_lo'] = ha(FIGHTERS), K.slo(FIGHTERS)
+    if skel:
+        p['sk_k4_hi'], p['sk_k4_lo'] = ha(A['sk_k'] + 4), K.slo(A['sk_k'] + 4)
+        p['sk_k8_hi'], p['sk_k8_lo'] = ha(A['sk_k'] + 8), K.slo(A['sk_k'] + 8)
+        p['resmgr_hi'], p['resmgr_lo'] = ha(RES_MGR), K.slo(RES_MGR)
+        ski = [m[0] for m in BURN_MOVES].index(SK_BURN_KEY)
+        p['sk_row_hi'], p['sk_row_lo'] = ha(A['bmoves'] + 20 * ski), K.slo(A['bmoves'] + 20 * ski)
     p['bshield_hi'], p['bshield_lo'] = ha(A['bconst']), K.slo(A['bconst'])
     p['thousand_hi'], p['thousand_lo'] = ha(A['bconst'] + 4), K.slo(A['bconst'] + 4)
     p['fm_hi'], p['fm_lo'] = ha(FIGHTER_MANAGER), K.slo(FIGHTER_MANAGER)
@@ -977,7 +1748,10 @@ s13_noclr:''') + (('''
         mr r4, r27
         bl burn_him''') if 'burn' in feats else '') + '''
         lwz r29, %(acc)d(r31)
-        lwz r28, %(work)d(r29)''' + var_get('r28', VAR_FLAGS) + '''
+        lwz r28, %(work)d(r29)''' + (('''
+        lis r12, %(gk_clr_hi)d
+        lwz r12, %(gk_clr_lo)d(r12)
+        andi. r11, r12, 7''' + vnum('r28', VAR_GEN_CLR, 'r11')) if skel else '') + var_get('r28', VAR_FLAGS) + '''
         fctiwz f1, f1
         stfd f1, 0x18(r1)
         lwz r26, 0x1C(r1)               # the flags''' + D('''
@@ -3072,9 +3846,18 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
+''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94]) if skel else '') + '''
 # ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
 gk_clear:
         li r0, 0''' + (('''
+        lis r12, %(sk_latch_hi)d
+        addi r12, r12, %(sk_latch_lo)d
+        li r11, %(nlatch)d
+gc_lat: stw r0, 0(r12)                  # skeleton v1: its attackers latched
+        addi r12, r12, 4
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne gc_lat''') if skel else '') + (('''
         lis r12, %(btab_hi)d
         addi r12, r12, %(btab_lo)d
         li r11, %(nbtab)d
@@ -3130,7 +3913,11 @@ w_dcase:
         lis r3, %(w_desc_hi)d
         addi r3, r3, %(w_desc_lo)d
         blr
-'''
+''' + ('''sk_dcase:
+        lis r3, %(sk_desc_hi)d
+        addi r3, r3, %(sk_desc_lo)d
+        blr
+''' if skel else '')
     a = Asm(code_at)
     a.asm(src % p)
     words = a.words()
@@ -3149,6 +3936,12 @@ w_dcase:
     for o in (POLL_SLOTS if 'hurt' in feats or diag else (0x94,) if feats & {'sway', 'hitcheck', 'burn'} else ()):
         struct.pack_into('>I', vb, o, lab['wp_%X' % o])
     out.blob(A['w_vt'], bytes(vb), 'clone vtable (bunshin copy, +0x1C / +0x64 / +0x84 / +0x8C / +0x94 / +0xAC ours)')
+    if skel:
+        vs = bytearray(img.blob(L['svt'], L['vsize']))
+        struct.pack_into('>I', vs, W.HIT_METHOD, lab['sk_hit'])
+        struct.pack_into('>I', vs, 0x34, lab['sk_start'])
+        struct.pack_into('>I', vs, 0x94, lab['sk_94'])
+        out.blob(A['sk_vt'], bytes(vs), 'skeleton vtable (the moon\'s, +0x34 / +0x94 / +0xAC ours)')
 
     # ---- hooks in place (each asserted)
     def asm1(at, text):
@@ -3173,28 +3966,35 @@ w_dcase:
     out.put(ct, asm1(ct, 'b 0x%X' % lab['gk_clear']), 'the clear-all chain -> gk_clear (burn v1.2)', img.w(ct))
     assert PANEL_VT not in img.relocs(), 'the panel update word has a relocation'
     out.put(PANEL_VT, lab['gk_panel'], 'the damage panel update: the gauge (then the trait badge / the game)', PANEL_PREV)
-    # ---- the weapon cave's tables, kind 0x1A1
-    for nm, addr in W.NAME_TABLES:
-        v = {'owner': owner_str, 'name': A['gk_str'], 'folder': A['gk_str']}.get(nm, img.w(addr + 4 * CLONE_BASE))
-        out.put(T[nm] + 4 * CLONE_KIND, v, 'table %s 0x%X' % (nm, CLONE_KIND), img.w(addr))
-    for nm, addr, es, invalid in W.STATIC_TABLES:
-        rd = {1: img.b, 2: img.h, 4: img.w}[es]
-        v = rd(addr + es * CLONE_BASE)
-        if es == 2:
-            v &= ~CATEGORY_BITS             # v3: loaded with him (bunshin's 0x1: only with his Final Smash)
-        at = T[nm] + es * CLONE_KIND
-        assert rd(at) == invalid, 'table %s: kind 0x%X in use' % (nm, CLONE_KIND)
-        wa = at & ~3
-        word = out.words[wa][0] if wa in out.words else img.w(wa)
-        sh = 8 * (4 - es - (at - wa))
-        mask = ((1 << (8 * es)) - 1) << sh
-        word = (word & ~mask) | (v << sh)
-        out.words.pop(wa, None)
-        out.put(wa, word, 'table %s 0x%X' % (nm, CLONE_KIND))
-    out.put(T['dt'] + 4 * k, lab['w_dcase'], 'descriptor case 0x%X' % CLONE_KIND, 0)
-    out.put(T['bt'] + 4 * k, base_of(feats), 'base kind 0x%X' % CLONE_KIND, 0xFFFF)
-    out.put(T['st'] + 4 * k, A['w_single'], 'singleton case 0x%X' % CLONE_KIND, 0)
-    out.put(T['rt'] + 4 * k, (A['w_row'] - W.MODULE_TABLE) & 0xFFFFFFFF, 'own module row 0x%X' % CLONE_KIND, 0)
+    # ---- the weapon cave's tables, kind 0x1A1 (and skeleton v1's 0x1A2)
+    def register(kind, nstr, u16_clear, dcase, base, single, row):
+        kk = kind - W.OLD_N
+        for nm, addr in W.NAME_TABLES:
+            v = {'owner': owner_str, 'name': nstr, 'folder': nstr}.get(nm, img.w(addr + 4 * CLONE_BASE))
+            out.put(T[nm] + 4 * kind, v, 'table %s 0x%X' % (nm, kind), img.w(addr))
+        for nm, addr, es, invalid in W.STATIC_TABLES:
+            rd = {1: img.b, 2: img.h, 4: img.w}[es]
+            v = rd(addr + es * CLONE_BASE)
+            if es == 2:
+                v &= ~u16_clear
+            at = T[nm] + es * kind
+            assert rd(at) == invalid, 'table %s: kind 0x%X in use' % (nm, kind)
+            wa = at & ~3
+            word = out.words[wa][0] if wa in out.words else img.w(wa)
+            sh = 8 * (4 - es - (at - wa))
+            mask = ((1 << (8 * es)) - 1) << sh
+            word = (word & ~mask) | (v << sh)
+            out.words.pop(wa, None)
+            out.put(wa, word, 'table %s 0x%X' % (nm, kind))
+        out.put(T['dt'] + 4 * kk, dcase, 'descriptor case 0x%X' % kind, 0)
+        out.put(T['bt'] + 4 * kk, base, 'base kind 0x%X' % kind, 0xFFFF)
+        out.put(T['st'] + 4 * kk, single, 'singleton case 0x%X' % kind, 0)
+        out.put(T['rt'] + 4 * kk, (row - W.MODULE_TABLE) & 0xFFFFFFFF, 'own module row 0x%X' % kind, 0)
+    # v3: loaded with him (bunshin's 0x1: only with his Final Smash)
+    register(CLONE_KIND, A['gk_str'], CATEGORY_BITS, lab['w_dcase'], base_of(feats), A['w_single'], A['w_row'])
+    if skel:
+        # skeleton v1: loaded with him, its model c00 only (no 0x10: the owner's colour); pump's template (attack)
+        register(SK_KIND, A['sk_str'], CATEGORY_BITS | 0x10, lab['sk_dcase'], ATTACK_BASE, A['sk_single'], A['sk_row'])
     info = dict(A=A, labels=lab, T=T, layout=L, end=end, owner_str=owner_str, feats=feats, diag=diag, clear_at=ct)
     return out, info
 
