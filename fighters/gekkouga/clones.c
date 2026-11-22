@@ -62,6 +62,10 @@ int gk_gen;            // skeleton v1: the executable's clear-all count (his VAR
 int gk_gen_seen;       // ... 1 once read: a change is a training reset / restart (the state below starts over)
 int gk_sk_req_t;       // skeleton v1: frames his skeleton request (VAR_15) stays up for the executable's claim
 int gk_tr_done;        // burn v2: the attack status whose fire trail was asked for (0: none yet)
+int gk_ac_used;        // aerial chain v1: the aerials used in this chain (bit 1 << kind: 1 neutral ... 5 down)
+int gk_ac_kind;        // the aerial now (1 - 5; 0 none)
+int gk_ac_hit;         // frames since this aerial hit an opponent (0: not yet)
+int gk_ac_req;         // 1: the next aerial start is a chain's (the chain kept)
 int gk_tr_req_t;       // burn v2: frames his trail requests (VAR_0 - VAR_11) stay up for the executable's claims
 
 int gk_lw_full() { return 300; }          // 5 seconds held (the user)
@@ -133,6 +137,10 @@ void gekkouga_frame()
     {
         gk_tr_done = 0;                   // burn v2: out of that attack: the next one asks again
     }
+    if (st != 0x34)
+    {
+        gk_ac_end();                      // aerial chain v1: anything but an aerial (landing, a special, an air dodge,
+    }                                     // being hit, a ledge grab, a jump) ends the chain
     if (st == 0xb1 || st == 0xb2 || st == 0x14f)
     {
         if (gk_ability > 0 || gk_alive != 0)
@@ -183,6 +191,7 @@ void gekkouga_frame()
         flags = flags | 0x8;              // v3 diag: the ability ready (the TEST_ONLY exe logs flag changes: S4GF)
     }
     flags = flags | gk_alive * 16;        // v3 diag: 16 / 32 the clones out
+    flags = flags | gk_ac_diag();         // aerial chain v1 diag (256 up: the exe's S4GF line logs a change)
     if (gk_ability > 0)
     {
         flags = flags | gk_gen_req;       // v4 diag: 64 / 128 a clone about to be made (next frame)
@@ -740,6 +749,7 @@ void gk_clone_hitlag()
         return;
     }
     WorkModule(0, 0 + 0, 0x0f000316);
+    gk_ac_clone_hit();                    // aerial chain v1: a clone's copy of his aerial landed: it hit
     if (StopModule(0x1))
     {
         return;
@@ -1123,28 +1133,30 @@ float gk_sm_size(int v)
     return 1.0f + (gk_smash_fx_max() - 1.0f) * (float)v / (float)gk_smash_full();
 }
 
-// v3: the hold's effects (its effect scripts' own at size 0, gekkouga_build.py): at the charge's size, so a resumed
-// hold starts at the kept size. Every 5 frames the charge sparkle (0x1000019) and flash (0x1000010, at the sword
-// (forward) / over him (up) / at his feet (down)); every 10 frames his water sword (0x3300007, both hands for up /
-// down) made again at the new size (a live effect can't be resized).
+// v3: the hold's effects (its effect scripts' own at size 0, gekkouga_build.py). Every 5 frames the charge's dust
+// (0x1000019, PtcCommonRunSmoke) and sparkle (0x1000010, PtcCommonSmashFlashS: at the sword (forward) / over him (up) /
+// at his feet (down)): aerial chain v1 package (the user: "smash attacks charging not use giant effects for the dust or
+// sparkle"): at their vanilla size 1 (v3 - burn v2.3: x the charge's size, 1 - 5); every 10 frames his water sword
+// (0x3300007, both hands for up / down) made again at the charge's size (still growing: a live effect can't be resized).
+float gk_sm_dust_size() { return 1.0f; }
 void gk_sm_fx(int t, int v, int first)
 {
     float sz;
     sz = gk_sm_size(v);
     if (first || v % 5 == 0)
     {
-        EffectModule(0x2710, 0x1000019, 0, -2.0f, 0, 0, 0, 0, 0, sz, 0, 0, 0, 0, 0, 0, 0);
+        EffectModule(0x2710, 0x1000019, 0, -2.0f, 0, 0, 0, 0, 0, gk_sm_dust_size(), 0, 0, 0, 0, 0, 0, 0);
         if (t == 0x1)
         {
-            EffectModule(0x2712, 0x1000010, 25, 0, -5.5f, 0, 0, 0, 0, sz, 0);
+            EffectModule(0x2712, 0x1000010, 25, 0, -5.5f, 0, 0, 0, 0, gk_sm_dust_size(), 0);
         }
         else if (t == 0x2)
         {
-            EffectModule(0x2710, 0x1000010, 0, 0, 18.0f, 0, 0, 0, 0, sz, 0, 0, 0, 0, 0, 0, 0);
+            EffectModule(0x2710, 0x1000010, 0, 0, 18.0f, 0, 0, 0, 0, gk_sm_dust_size(), 0, 0, 0, 0, 0, 0, 0);
         }
         else
         {
-            EffectModule(0x2710, 0x1000010, 0, 0, 3.0f, 0, 0, 0, 0, sz, 0, 0, 0, 0, 0, 0, 0);
+            EffectModule(0x2710, 0x1000010, 0, 0, 3.0f, 0, 0, 0, 0, gk_sm_dust_size(), 0, 0, 0, 0, 0, 0, 0);
         }
     }
     if (first || v % 10 == 0)
@@ -1390,6 +1402,7 @@ void gk_reset()
     gk_tr_req_t = 0;
     gk_tr_done = 0;
     gk_tr_clear();
+    gk_ac_end();
 }
 
 // ---- skeleton v1: Shadow Sneak (SpecialS 0x153) without the vanish and the teleport: its per-frame (global16, in
@@ -1505,4 +1518,102 @@ void gk_trail_tick(int cur)
         gk_tr_ask(k, type, gk_cx(0x2), gk_cy(0x2));
     }
     gk_tr_req_t = gk_tr_req_frames();
+}
+
+// ---- aerial chain v1 (fighters/gekkouga/README.md "Aerial chain v1"; the user: "make Greninja's aerials chain like his
+// smash attacks do, but only if it hits an opponent"). An aerial (AttackAir 0x34: neutral / forward / back / up / down,
+// kind 1 - 5 = its motion 0x68 - 0x6C) that hits an opponent (its attack's hurtbox hits since it started: AttackModule
+// 0x2727 kind 2; a shield doesn't count; a clone's copy of it landing counts: the exe's VAR_22, which can't tell a shield)
+// can be cancelled, from the frame after the hit (not in hitlag) to its end, into a different aerial: an attack input
+// (the stick or the C-stick: the game's own air attack kind, ControlModule 0x10) of one not used yet in this chain
+// re-enters 0x34 (that aerial, picked by func_311 as any aerial). Each aerial once a chain; the chain ends on anything but
+// an aerial (landing, a special, an air dodge, being hit, a ledge grab, a jump) or after all five. Landing lag, fast fall,
+// drift: the game's. Smash chains unaffected.
+int gk_ac_hit_kinds() { return 0x2; }        // AttackModule 0x2727's kinds: 2 a hurtbox (4 a shield: not counted)
+
+void gk_ac_end()
+{
+    gk_ac_used = 0;
+    gk_ac_kind = 0;
+    gk_ac_hit = 0;
+    gk_ac_req = 0;
+}
+
+// the aerial's start (func_2382, after func_314 picked its motion into 0x11000002)
+void gk_ac_start()
+{
+    int k;
+    k = WorkModule(0x6, 0x11000002) - 0x67;
+    if (k < 0x1 || k > 0x5)
+    {
+        k = 0;
+    }
+    if (gk_ac_req == 0)
+    {
+        gk_ac_used = 0;                   // not a chain's: a new chain
+    }
+    gk_ac_req = 0;
+    gk_ac_kind = k;
+    if (k != 0)
+    {
+        gk_ac_used = gk_ac_used | (1 << k);
+    }
+    gk_ac_hit = 0;
+    AttackModule(0x2724);                 // its "hit since it started" from 0
+}
+
+// a clone's copy of his aerial landed (the exe's VAR_22: gk_clone_hitlag)
+void gk_ac_clone_hit()
+{
+    if (global4 == 0x34 && gk_ac_hit == 0)
+    {
+        gk_ac_hit = 0x1;
+    }
+}
+
+// the aerial's loop (func_2383, every frame): 1 = cancelled into the next aerial
+int gk_ac_try()
+{
+    int k;
+    if (gk_ac_hit > 0)
+    {
+        gk_ac_hit += 1;
+    }
+    else if (AttackModule(0x2727, gk_ac_hit_kinds()))
+    {
+        gk_ac_hit = 0x1;                  // hit: the window opens the next frame
+    }
+    if (gk_ac_hit < 0x2 || StopModule(0x1) || global18 != 0x2)
+    {
+        return 0;
+    }
+    if ((global24 & 0x1) == 0)
+    {
+        return 0;
+    }
+    k = ControlModule(0x10);
+    if (k < 0x1 || k > 0x5 || (gk_ac_used & (1 << k)) != 0)
+    {
+        return 0;                         // used in this chain already (or none)
+    }
+    gk_ac_req = 0x1;
+    func_16(0x34, 0x1);
+    return 0x1;
+}
+
+// diag: VAR_20's bits from 256 (the exe's S4GF logs a change): 256 x the aerial now (0 - 5), 2048 hit seen, 4096 the window
+// open, 8192 x the chain's used bits (1 << kind: 2 neutral ... 32 down, so 16384 - 524288)
+int gk_ac_diag()
+{
+    int d;
+    d = gk_ac_kind * 256;
+    if (gk_ac_hit > 0)
+    {
+        d = d | 2048;
+    }
+    if (gk_ac_hit >= 0x2)
+    {
+        d = d | 4096;
+    }
+    return d + gk_ac_used * 8192;
 }

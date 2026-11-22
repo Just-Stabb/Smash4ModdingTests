@@ -67,6 +67,12 @@ MSC_EDITS = [
      '        gk_sm_hold_tick();\n    }\n    global16 = gk_sm_hold_tick; // Greninja mod: the kept charge (clones.c)'),
     ('func_305', '        func_283();\n    }\n    global16 = func_283;',
      '        gk_sm_hold_tick();\n    }\n    global16 = gk_sm_hold_tick; // Greninja mod: the kept charge (clones.c)'),
+    # aerial chain v1: the aerial status (AttackAir 0x34): its start notes the aerial (after func_314 picks its motion),
+    # its loop tries a chain cancel first (after func_56's own interrupts)
+    ('func_2382', '    func_314();\n', '    func_314();\n    gk_ac_start(); // Greninja mod: aerial chains (clones.c)\n'),
+    ('func_2383', '    if (func_56())\n    {\n        return 0x1;\n    }\n',
+     '    if (func_56())\n    {\n        return 0x1;\n    }\n    if (gk_ac_try()) // Greninja mod: aerial chains (clones.c)\n'
+     '    {\n        return 0x1;\n    }\n'),
 ]
 # whole loop bodies replaced: (function, new body)
 MSC_BODIES = {
