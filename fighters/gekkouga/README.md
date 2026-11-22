@@ -754,7 +754,7 @@ The user's burn mechanic (mechanics only: the fire visuals wait for the fire fli
 designed for v2 with them). Feature `burn` (in `RELEASE`), `tools/gekkouga_clone_cave.py` `burn_him` / `w_burn` /
 `burn_scan` / `burn_add` / `burn_tick`:
 - **Hits**: each new node of a hit log of his (or his clone's) AttackModule while he (it) plays a burning motion
-  (MotionModule accessor +0x44, +0x38 the motion kind = his motion.mtable index: attacknairn 104, attackairf 105,
+  (MotionModule accessor +0x44, +0x38 the motion kind = his motion.mtable index: attackairn 104, attackairf 105,
   attacks4 95, attackhi4 99, attacklw4 101) adds one instance to the victim. A hit log: [AttackModule entry +0x130]
   (+4 first node, +8 count; a node +4 next, +0x18 the hit object's id, +0x23 the hit container's type: 1 hurtbox, 2
   shield). Processed counts per attacker context (his slot x 3 + 0 / 1 / 2) and entry; outside the moves the counts
