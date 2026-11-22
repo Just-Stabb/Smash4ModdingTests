@@ -1595,8 +1595,9 @@ def skeleton_tests(mscsb, src):
     check('skeleton explosion: the next frame (its scale back to 1) the explode motion (1: its hitbox), its body hidden',
           ([x for x in g.log if x[0] == 'motion'], [x for x in g.log if x[0] == 'visible']), ([('motion', 1, 0.0, 1.0)], [('visible', 0)]))
     x0 = g.x
-    run(m, 38)
-    check('skeleton explosion: it stays put; removed 40 frames after (BattleObject 9)',
+    run(m, m('sk_boom_frames') - 2)
+    check('skeleton explosion: it stays put; removed %d frames after (BattleObject 9; v1.5: 40 -> 120, its sound\'s '
+          'length)' % m('sk_boom_frames'),
           (g.x == x0, [x for x in g.log if x[0] == 'remove']), (True, []))
     run(m, 1)
     check('skeleton explosion: ... removed', [x for x in g.log if x[0] == 'remove'], [('remove',)])
@@ -1628,8 +1629,9 @@ def skeleton_tests(mscsb, src):
            [x[:3] for x in g.log if x[0] == 'effect' and x[1] == 0x2723], [x for x in g.log if x[0] == 'motion']),
           (3.0, [('effect', 3, 0x3300018, 50.0, 20.0), ('effect', 3, 0x1000021, round(x0, 3), round(y0 + 14.0, 3))],
            [('effect', 0x2723, 0x3300016), ('effect', 0x2723, 0x3300017)], [('motion', 2, 0.0, 1.0)]))
-    run(m, 2)
-    check('skeleton smoke: removed 3 frames after', [x for x in g.log if x[0] == 'remove'], [])
+    run(m, m('sk_smoke_frames') - 1)
+    check('skeleton smoke: removed %d frames after (v1.5: 3 -> 36, its death sound\'s length)' % m('sk_smoke_frames'),
+          [x for x in g.log if x[0] == 'remove'], [])
     run(m, 1)
     check('skeleton smoke: ... removed', [x for x in g.log if x[0] == 'remove'], [('remove',)])
     run(m, 200)
@@ -1643,6 +1645,89 @@ def skeleton_tests(mscsb, src):
     run(m, 3)
     check('skeleton in hitlag: it doesn\'t move', g.x, x0)
 
+
+def skeleton_sound_tests(mscsb, src, out=None):
+    """skeleton v1.5's sounds (its MSC): a random one of the two spawn sounds at its start; while it runs its voices, one
+    of two at random, the first 10 - 40 frames in, each next from 30 before the last one's end to 60 after; at its end
+    (explosion / 0 HP) its voices stopped, then the explosion's / death's sound; the ids its bank / table give them"""
+    import gekkouga_sound as GS
+    picks = []
+
+    def make(seq):
+        m = MSC(mscsb, src)
+        g = m.game
+        it = iter(seq)
+
+        def sysf(sid, a, old=g.sys):
+            if sid == 0x9:                         # randi(lo, hi): the scripted picks (lo + n, under hi)
+                v = next(it, 0)
+                picks.append((a[0], a[1], v))
+                return a[0] + min(v, a[1] - a[0] - 1)
+            if sid == 0x1E:
+                g.log.append(('snd', a[0], a[1]))
+                return 0
+            if sid == 0x21 and a[0] == 0x9:
+                g.log.append(('remove',))
+                return 0
+            return old(sid, a)
+        g.sys = sysf
+        g.vars.update({0x0F000300: 3.0, 0x0F000301: 40.0, 0x0F000302: 10.0, 0x0F000303: 1.0})
+        return m, g
+    ids = {n: m_ for n, m_ in (('spawn1', 'sk_snd_spawn1'), ('spawn2', 'sk_snd_spawn2'), ('voice1', 'sk_snd_voice1'),
+                                ('voice2', 'sk_snd_voice2'), ('death', 'sk_snd_death'), ('boom', 'sk_snd_boom'))}
+    m, g = make([1, 5, 0, 0, 1, 90])               # spawn: the 2nd; first voice in 10 + 5; voice1, gap -30 + 0; voice2 ...
+    sid = {k: m(v) & 0xFFFFFFFF for k, v in ids.items()}
+    if out:
+        exp = {k: (0x0768 << 16) | (91 + i) for i, k in enumerate(('spawn1', 'spawn2', 'voice1', 'voice2', 'death', 'boom'))}
+        check('skeleton v1.5 sounds: the MSC\'s ids are the bank / table\'s (row 0x768, labels 91 - 96: '
+              'tools/gekkouga_sound.py SOUNDS in order)', sid, exp)
+    plays = []
+    for t in range(160):
+        g.log = []
+        m('sk_frame')
+        plays += [(t, x[2]) for x in g.log if x[0] == 'snd' and x[1] == 0x2710]
+    inv = {v: k for k, v in sid.items()}
+    seq = [(t, inv.get(i & 0xFFFFFFFF)) for t, i in plays]
+    l1, l2 = m('sk_vc_len1'), m('sk_vc_len2')
+    check('skeleton v1.5 sounds: its start plays the picked spawn sound (randi 0 / 2 -> the 2nd); its first voice the '
+          '15th frame (10 + 5, its start frame the 1st), voice1, the next %d after (its %d frames - 30), voice2' % (l1 - 30, l1),
+          seq[:3], [(0, 'spawn2'), (14, 'voice1'), (14 + l1 - 30, 'voice2')])
+    m2, g2 = make([0, 30, 1, 90] + [0, 0] * 20)
+    sid2 = {k: m2(v) & 0xFFFFFFFF for k, v in ids.items()}
+    inv2 = {v: k for k, v in sid2.items()}
+    plays, stops = [], []
+    for t in range(180):
+        g2.log = []
+        m2('sk_frame')
+        plays += [(t, inv2.get(x[2] & 0xFFFFFFFF)) for x in g2.log if x[0] == 'snd' and x[1] == 0x2710]
+        stops += [(t, inv2.get(x[2] & 0xFFFFFFFF)) for x in g2.log if x[0] == 'snd' and x[1] == 0x2714]
+    vt = [t for t, k in plays if k in ('voice1', 'voice2')]
+    check('skeleton v1.5 sounds: the 1st spawn sound on a 0 pick; the first voice the 40th frame (10 + 30); then voice2 (a 1 pick) '
+          'and the next %d + 60 after it (the latest a gap allows); explosion at 180: the voices stopped then the '
+          'explosion\'s sound' % l2,
+          (plays[0], vt[:2], vt[1] - vt[0] if len(vt) > 1 else None, stops, plays[-1]),
+          ((0, 'spawn1'), [39, 39 + l2 + 60] if 39 + l2 + 60 < 180 else [39], (l2 + 60) if 39 + l2 + 60 < 180 else None,
+           [(179, 'voice1'), (179, 'voice2')], (179, 'boom')))
+    # 0 HP: the voices stopped, the death sound; nothing after it
+    m3, g3 = make([0, 0] + [0] * 40)
+    sid3 = {k: m3(v) & 0xFFFFFFFF for k, v in ids.items()}
+    inv3 = {v: k for k, v in sid3.items()}
+    for _ in range(20):
+        m3('sk_frame')
+    g3.vars[0x0F000304] = 30.0                    # its VAR_4: 30 damage (25 HP)
+    g3.log = []
+    m3('sk_frame')
+    end = [(x[1], inv3.get(x[2] & 0xFFFFFFFF)) for x in g3.log if x[0] == 'snd']
+    g3.log = []
+    for _ in range(m3('sk_smoke_frames') + 5):
+        m3('sk_frame')
+    check('skeleton v1.5 sounds: at 0 HP its voices stopped (0x2714 both), the death sound; no voice after it; removed %d '
+          'frames later (its sound played out)' % m3('sk_smoke_frames'),
+          (end, [x for x in g3.log if x[0] == 'snd'], [x for x in g3.log if x[0] == 'remove'][:1]),
+          ([(0x2714, 'voice1'), (0x2714, 'voice2'), (0x2710, 'death')], [], [('remove',)]))
+    gaps = (m('sk_vc_gap'), m('sk_vc_gap') + m('sk_vc_gap_rand') - 1, m('sk_vc_first'), m('sk_vc_first') + m('sk_vc_first_rand') - 1)
+    check('skeleton v1.5 sounds: the gap to the next voice -30 ... +60 frames after the last one\'s end (overlap at most 0.5 s), '
+          'the first voice 10 - 40 frames in', gaps, (-30, 60, 10, 40))
 
 def skeleton_data_tests(out):
     """skeleton v1: its built files: the explosion's hitbox, the scripts' names, its collision, its carrier"""
@@ -1658,19 +1743,21 @@ def skeleton_data_tests(out):
     boom = [c for c in game.script('SkeletonExplode') if c.name in ('Special_Hitbox', 'Extra_Special_Hitbox')]
     syn = boom[0].info['syntax'] if boom else []
     hb = dict(zip(syn, boom[0].params)) if boom else {}
-    check('skeleton explosion: one hitbox, 15 %, 50 degrees, KBG 50 / BKB 40, size 22 at its middle (bone 0, Y 14), flame, '
-          'launched from its middle (FacingRestrict 5), then off after 4 frames',
-          (len(boom), [round(hb.get(k, -1), 3) for k in ('Damage', 'Angle', 'KBG', 'BKB', 'Size', 'Y', 'Effect', 'FacingRestrict', 'Bone')],
+    check('skeleton explosion: one hitbox, 15 %, 50 degrees, KBG 50 / BKB 40, size 27 at its middle (bone 0, Y 14; v1 - v1.4: '
+          '22), flame, launched from its middle (FacingRestrict 5), then off after 4 frames; v1.5: shield damage +40 (55 '
+          'against a fresh shield\'s 50: it breaks)',
+          (len(boom), [round(hb.get(k, -1), 3) for k in ('Damage', 'Angle', 'KBG', 'BKB', 'Size', 'Y', 'Effect', 'FacingRestrict', 'Bone',
+                                                          'ShieldDamage')],
            [c.name for c in game.script('SkeletonExplode')][1:3]),
-          (1, [15.0, 50, 50, 40, 22.0, 14.0, 5, 5, 0], ['WAIT', 'Remove_All_Hitboxes']))
+          (1, [15.0, 50, 50, 40, 27.0, 14.0, 5, 5, 0, 40], ['WAIT', 'Remove_All_Hitboxes']))
     p = 145.0
     kb = ((p / 10 + p * 15 / 20) * 200 / 200 * 1.4 + 18) * 0.5 + 40
     check('skeleton explosion: Smash 4\'s knockback on Mario (weight 100) at 130 %% (+ 15): %.1f (a mid-stage KO ~130-140)' % kb,
           130 <= kb <= 140, True)
     check('skeleton v1.5: the explosion\'s hitstun x %g (Extra_Special_Hitbox HitstunMul; the other extras 0: unchanged)' %
-          GB.SK_BOOM_HITSTUN, (boom[0].name if boom else None, hb.get('HitstunMul'),
+          GB.SK_BOOM_HITSTUN, (boom[0].name if boom else None, round(hb.get('HitstunMul', 0), 4),
                                [hb.get(k) for k in ('HitstopMul', 'HitstopFrames', 'SelfHitstopMul', 'SelfHitstopFrames', 'DIMul')]),
-          ('Extra_Special_Hitbox', GB.SK_BOOM_HITSTUN, [0.0, 0, 0.0, 0, 0.0]))
+          ('Extra_Special_Hitbox', round(GB.SK_BOOM_HITSTUN, 4), [0.0, 0, 0.0, 0, 0.0]))
     run = game.script('SkeletonRun')
     fr, on, t = 0.0, [], {}
     for c in run:
@@ -2156,7 +2243,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     same = [w for w in want if z.read(w) != open(os.path.join(out, w[len('INSTALL_TO_data/'):]), 'rb').read()]
     check('... byte for byte', same, [])
     if z1:
-        again = {'INSTALL_TO_data/fighter/gekkouga/model/skeleton/c00/skeleton.lvd'} if len(earlier) == 29 else set()   # skeleton v1.4: the box skeleton.lvd again on purpose (it
+        again = {'INSTALL_TO_data/fighter/gekkouga/model/skeleton/c00/skeleton.lvd'} if len(earlier) == 29 else \
+            {'INSTALL_TO_data/sound/config/soundlabeltable.bin'} if len(earlier) == 30 else set()   # skeleton v1.4: the box skeleton.lvd again on purpose (it
         # replaces skeleton v1.1's TEST_ONLY floor-only one the user had installed)
         check('update: none of the installed unchanged files again (%d unchanged)%s' % (len(same1), ', but skeleton.lvd' if again
               else ''), [w for w in same1 if w in names and w not in again], [])
@@ -2226,13 +2314,35 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
               ['fighter/gekkouga/script/msc/clone/clone.mscsb', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
     if z1 and len(earlier) == 30:
-        check('skeleton v1.5: INSTALL_TO_data: his effect bank (the skeleton\'s body shifted onto its place), the body-sized '
-              'skeleton.lvd, the skeleton\'s game.bin (its contact hitbox, the explosion\'s hitstun), the clone\'s game / '
-              'effect.bin (joint 25 on the right hand: confirmed in game)',
+        check('skeleton v1.5: INSTALL_TO_data: his effect bank (the skeleton\'s body shifted onto its place, the explosion '
+              'x 1.23), the body-sized skeleton.lvd, the skeleton\'s game.bin (its contact hitbox, the explosion\'s hitstun / '
+              'size / shield damage) and MSC (its sounds), the clone\'s game / effect.bin (joint 25 on the right hand: '
+              'confirmed in game), his se bank (+ 6 sounds) and the soundlabeltable (his row + 6 labels)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
               ['fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.ptcl', 'fighter/gekkouga/model/skeleton/c00/skeleton.lvd',
                'fighter/gekkouga/script/animcmd/weapon/clone/effect.bin', 'fighter/gekkouga/script/animcmd/weapon/clone/game.bin',
-               'fighter/gekkouga/script/animcmd/weapon/skeleton/game.bin'])
+               'fighter/gekkouga/script/animcmd/weapon/skeleton/game.bin', 'fighter/gekkouga/script/msc/skeleton/skeleton.mscsb',
+               'fighter/gekkouga/sound/snd_se_Gekkouga.nus3bank', 'sound/config/soundlabeltable.bin'])
+        import fighter_own_bank as FB
+        import minecraft_sound as MS
+        import gekkouga_sound as GS
+        bank = z.read('INSTALL_TO_data/fighter/gekkouga/sound/snd_se_Gekkouga.nus3bank')
+        _s, tones = MS.tones_of(bank)
+        new = [MS.parse_entry(e) for e in tones[-len(GS.SOUNDS):]]
+        frames = [round(struct.unpack('<I', r[-0x18:-0x14])[0] * 60 / 48000) for _h, _n, r in new]
+        t_new = FB.Table(z.read('INSTALL_TO_data/sound/config/soundlabeltable.bin'))
+        t_old = FB.Table(open(os.path.join(out, 'TEST_ONLY_STB_BASE'), 'rb').read()) if os.path.exists(
+            os.path.join(out, 'TEST_ONLY_STB_BASE')) else None
+        row = t_new.row_of(2058)
+        others = None if t_old is None else [i for i in range(len(t_old.rows)) if i != row and
+                                             t_old.tones(i) != t_new.tones(i)]
+        check('skeleton v1.5 sounds: his bank (BINF snd_se_Gekkouga 2058, kept) + 6 one-shots snd_se_Gekkouga_<label> '
+              '(%s); his row 0x768 = his 91 labels + their tones (labels 91 - 96); no other row changed; the voices\' '
+              'lengths the MSC\'s (80 / 231 frames)' % ', '.join(l for l, _f, _v in GS.SOUNDS),
+              (FB.binf(bank), len(tones), [n for _h, n, _r in new], row, t_new.tones(row)[91:], others,
+               frames[2:4]),
+              (('snd_se_Gekkouga', 2058), 110, ['snd_se_Gekkouga_' + l for l, _f, _v in GS.SOUNDS], 0x768,
+               list(range(104, 110)), [] if t_old is not None else None, [80, 231]))
     if z1 and len(earlier) == 29:
         check('skeleton v1.4: INSTALL_TO_data: the box skeleton.lvd (walls + top), the clone\'s main.pac (no TransN movement), '
               'the trail\'s game.bin (up smash\'s hitboxes on its flames), his MSC (the clone diag)',
@@ -2443,7 +2553,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
          'unconfirmed', 'exe_v46z_gkb6') if len(earlier) == 28 else \
         ('greninja_firetrail_fix_v1', 'skeleton.lvd', 'floor-only', 'walls', 'S4SV', 'A_release', 'TransN', 'snap', 'S4GF',
          'gen=', 'up smash', 'unconfirmed', 'exe_v46z_gkb6') if len(earlier) == 29 else \
-        ('greninja_skeleton_v1_4', 'exe_v46z_gkb7', 'body', '3.5', '24', 'contact', '70', '3.5 %', 'every 3 frames',
+        ('greninja_skeleton_v1_4', 'exe_v46z_gkb7', 'body', '3.5', '24', 'contact', '70', '3.5%', 'every 3 frames', 'spawn', 'death', 'explosion', 'soundlabeltable', 'nus3bank', '27', 'shield damage',
          'shield', '1.6', 'hitstun', 'right hand', 'skeleton_box.png', 'unconfirmed', 'A_release') if len(earlier) == 30 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',

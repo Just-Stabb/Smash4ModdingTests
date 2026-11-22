@@ -50,7 +50,7 @@ FOREVER = 0x7FFFFFFF
 SK_BODY_H = 28.0                   # the body (feet to head) this tall: the collision box's height (12 x 28)
 SK_BODY_TOP_V = 0.141              # the body's top / bottom in a cell (alpha >= 0.5, median over the 55 cells of
 SK_BODY_BOTTOM_V = 0.907           # skeleton_run_atlas.png; the sidecar's anchor: feet at 0.933 of the frame)
-SK_BOOM_DIAMETER = 44.0            # the explosion's widest (its smoke column, cells 24 - 32: u 0.08 - 0.93) = the
+SK_BOOM_DIAMETER = 54.0            # (skeleton v1.5: 44 -> 54, x 1.23 as its hitbox 22 -> 27) the explosion's widest (its smoke column, cells 24 - 32: u 0.08 - 0.93) = the
 SK_BOOM_WIDEST_U = 0.84            # hitbox's 22 radius x 2
 SK_BOOM_BASE_V = 0.895             # its base (alpha >= 0.5's lowest row, every cell): on the ground
 SK_HIT_W = 18.0                    # a hit's sparks: the quad 18 units across (centred on the hit)

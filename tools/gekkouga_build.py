@@ -793,7 +793,11 @@ SK_CARRIER = ('model.nud', 'model.nut', 'model.vbn', 'model.jtb', 'model.mta', '
 # its explosion (motion 1, frames 1 - 4): 15 %, 50 degrees, KBG 50 / BKB 40 (Smash 4's formula on Mario, weight 100:
 # 130 % + 15 -> ((14.5 + 108.75) x 1.4 + 18) x 0.5 + 40 = 135 knockback, about a mid-stage KO; 0 % -> 58), flame,
 # launched away from its middle (FacingRestrict 5), as the hydrant's hitboxes (bone 0, type 9, indirect)
-SK_BOOM = dict(Damage=15.0, Angle=50, KBG=50, FKB=0, BKB=40, Size=22.0, Y=14.0, Effect=5, SFXLevel=2, SFXType=0xB)
+SK_BOOM = dict(Damage=15.0, Angle=50, KBG=50, FKB=0, BKB=40, Size=27.0, Y=14.0, Effect=5, SFXLevel=2, SFXType=0xB,
+               ShieldDamage=40)   # skeleton v1.5 (the user: "make the explosion effect and hitbox slightly bigger and do a lot
+                                  # of shield damage"): size 22 -> 27 (x 1.23, its effect 44 -> 54 wide: tools/gekkouga_fx.py
+                                  # SK_BOOM_DIAMETER); shield damage +40 on its 15 %: 55 against a fresh shield's 50 HP
+                                  # (Smash 4: the hitbox's damage + its shield damage): a full shield breaks
 SK_BOOM_FRAMES = 4
 SK_BOOM_HITSTUN = 1.6             # skeleton v1.5 (the user: "make the explosion have 1.6x hitstun"): Extra_Special_Hitbox's
                                   # HitstunMul (the ACMD extension's extras, tools/acmd_ext_cave.py: works in articles' scripts)

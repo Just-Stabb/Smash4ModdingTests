@@ -85,7 +85,10 @@ def build_bank(data, name, bank_id, sounds):
     _s, tones = ms.tones_of(data)
     template = None
     for e in tones:
-        head, nm, rest = ms.parse_entry(e)
+        try:
+            head, nm, rest = ms.parse_entry(e)
+        except (IndexError, AssertionError):
+            continue                     # an empty / unnamed entry (Greninja's bank has 14)
         if nm.endswith(TEMPLATE_TONE):
             template = (head, rest)
     assert template, 'no %s tone to copy' % TEMPLATE_TONE

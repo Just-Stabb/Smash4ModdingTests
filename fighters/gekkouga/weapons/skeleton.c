@@ -618,6 +618,7 @@ void func_48()
 // the Running Skeleton
 // ===================================================================
 int sk_on;             // 1 once started (its owner known)
+int sk_vc_t;           // skeleton v1.5: frames to its next voice
 int sk_wait;           // frames waited for its owner (the executable's claim)
 int sk_t;              // frames running
 int sk_phase;          // 1 running, 2 exploded, 3 smoked
@@ -640,8 +641,10 @@ float sk_snap() { return 3.0f; }          // standing: the floor under its next 
 float sk_wall_y() { return 5.0f; }        // the wall test's height
 float sk_wall_ahead() { return 2.0f; }    // ... and how far past its step (inside its own walls: x +- 6)
 float sk_mid() { return 14.0f; }          // its middle (28 tall): its explosion / smoke there
-int sk_boom_frames() { return 40; }       // the explosion: removed after this (its hitbox: the game script's frames 1 - 4)
-int sk_smoke_frames() { return 3; }       // the smoke: removed after this (no hitbox)
+int sk_boom_frames() { return 120; }      // the explosion: removed after this (its hitbox: the game script's frames 1 - 4;
+                                          // skeleton v1.5: 40 -> 120, its explosion sound's 114 frames: kept hidden so
+                                          // the sound isn't cut with it)
+int sk_smoke_frames() { return 36; }      // the smoke: removed after this (no hitbox; v1.5: 3 -> 36, its death sound's 34)
 int sk_wait_max() { return 30; }          // never claimed (nobody asked): removed
 
 // effects (skeleton v1.2: his bank's flipbooks, the user's footage: tools/gekkouga_fx.py, his gekkouga.010d0000.ptcl
@@ -749,6 +752,7 @@ void sk_start()
     sk_set(5, 1.0f);
     MotionModule(0x1, 0, 0, 1.0f);        // run (motion 0)
     sk_body_on();
+    sk_snd_spawn();
 }
 
 // a step: straight on (a wall stops it, it keeps running in place), standing it follows the floor, off a ledge it
@@ -795,6 +799,7 @@ void sk_explode()
     sk_end_t = 0;
     sk_set(5, 2.0f);                      // the executable: its collision removed, its explosion's hits burn
     sk_body_off();
+    sk_snd_end(sk_snd_boom());
     sk_fx_at(sk_fx_boom(), sk_x, sk_y + sk_boom_y(), sk_fx_boom_size());
     // its explode motion (its hitbox) the next frame: the executable has put its scale back to 1 by then
 }
@@ -805,6 +810,7 @@ void sk_smoke()
     sk_end_t = 0;
     sk_set(5, 3.0f);
     sk_body_off();
+    sk_snd_end(sk_snd_death());
     MotionModule(0x1, 0x2, 0, 1.0f);      // smoke (motion 2: no hitbox)
     sk_fx_at(sk_fx_smoke(), sk_x, sk_y + sk_mid(), sk_fx_smoke_size());
 }
@@ -847,6 +853,7 @@ void sk_frame()
         return;
     }
     sk_t += 1;
+    sk_snd_voice();
     h = (int)(sk_var(9) + 0.5f);
     if (h != sk_hits)
     {
@@ -868,4 +875,62 @@ void sk_frame()
         sk_move();
     }
     PostureModule(0x3, sk_x, sk_y, 0);
+}
+
+// ---- skeleton v1.5 sounds (the user's clips in his se bank: tools/gekkouga_sound.py; ids row 0x768, labels 91 - 96).
+// Spawn: one of two at random. While it runs: its voices, one of two at random, the first 10 - 40 frames in, then each
+// next one from 30 frames before the last one's end to 60 after (they may overlap a little). Its end (explosion / 0 HP):
+// its voices stopped (SoundModule 0x2714: both ids), then the explosion's / death's sound; it stays (hidden) until that
+// has played (sk_boom_frames / sk_smoke_frames). Its own SoundModule (accessor +0xA4): from where it is.
+int sk_snd_spawn1() { return 0x768005b; }  // spawn_ding
+int sk_snd_spawn2() { return 0x768005c; }  // spawn_running
+int sk_snd_voice1() { return 0x768005d; }  // idle_rahhh (80 frames)
+int sk_snd_voice2() { return 0x768005e; }  // idle_voice2 (231 frames)
+int sk_snd_death() { return 0x768005f; }   // death_drybones (34 frames)
+int sk_snd_boom() { return 0x7680060; }    // explode_deltarune (114 frames)
+int sk_vc_len1() { return 80; }
+int sk_vc_len2() { return 231; }
+int sk_vc_first() { return 10; }           // the first voice: 10 + 0 - 30 frames after it starts
+int sk_vc_first_rand() { return 31; }
+int sk_vc_gap() { return -30; }            // the next: the last one's length - 30 + 0 - 90 (to 60 after its end)
+int sk_vc_gap_rand() { return 91; }
+
+void sk_snd_spawn()
+{
+    if (randi(0, 2) == 0)
+    {
+        SoundModule(0x2710, sk_snd_spawn1());
+    }
+    else
+    {
+        SoundModule(0x2710, sk_snd_spawn2());
+    }
+    sk_vc_t = sk_vc_first() + randi(0, sk_vc_first_rand());
+}
+
+void sk_snd_voice()
+{
+    sk_vc_t -= 1;
+    if (sk_vc_t > 0)
+    {
+        return;
+    }
+    if (randi(0, 2) == 0)
+    {
+        SoundModule(0x2710, sk_snd_voice1());
+        sk_vc_t = sk_vc_len1();
+    }
+    else
+    {
+        SoundModule(0x2710, sk_snd_voice2());
+        sk_vc_t = sk_vc_len2();
+    }
+    sk_vc_t = sk_vc_t + sk_vc_gap() + randi(0, sk_vc_gap_rand());
+}
+
+void sk_snd_end(int id)
+{
+    SoundModule(0x2714, sk_snd_voice1());
+    SoundModule(0x2714, sk_snd_voice2());
+    SoundModule(0x2710, id);
 }

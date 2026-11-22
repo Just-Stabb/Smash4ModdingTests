@@ -122,8 +122,10 @@ class VM:
                 st.append((loc if p[0] == 0 else self.g).get(p[1], 0))
             elif op in (0xE, 0xF, 0x10, 0x11, 0x12, 0x16, 0x17, 0x19, 0x1A, 0x1B):
                 b, a = s32(st.pop()), s32(st.pop())
-                r = {0xE: a + b, 0xF: a - b, 0x10: a * b, 0x11: int(a / b) if b else 0, 0x12: a % b if b else 0,
-                     0x16: a & b, 0x17: a | b, 0x19: a ^ b, 0x1A: a << b, 0x1B: a >> b}[op]
+                r = {0xE: lambda: a + b, 0xF: lambda: a - b, 0x10: lambda: a * b,
+                     0x11: lambda: int(a / b) if b else 0, 0x12: lambda: a % b if b else 0, 0x16: lambda: a & b,
+                     0x17: lambda: a | b, 0x19: lambda: a ^ b, 0x1A: lambda: a << b,
+                     0x1B: lambda: a >> b}[op]()    # (lazy: a negative operand no longer trips the shifts)
                 if push:
                     st.append(r & 0xFFFFFFFF)
             elif op in (0x13, 0x18, 0x2B):
