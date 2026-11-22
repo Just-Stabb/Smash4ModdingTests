@@ -27,6 +27,7 @@ Facing: a billboard is not turned by its emitter, so the skeleton has two sets, 
 (each cell mirrored in place); its MSC picks one by its way.
 """
 import json
+import math
 import os
 import struct
 import sys
@@ -59,6 +60,11 @@ FIRE_BODY_H = 30.0                 # on a burning fighter (fire_small_4): its ba
 FIRE_TIP_H = 15.0                  # at the outer ends of his water (fire_torch_012): centred on the call (x the call's size:
                                    # ~7 of flame at 1)
 FIRE_TRAIL_H = 22.0                # the smashes' trails (fire_ground_10): its base on the call's point, ~14.5 of flame
+FIRE_RING_H = 6.5                  # burn v2.2: neutral air's ring of flames (fire_small_4's first 31 cells), at size 1
+FIRE_RING = dict(n=15, groups=3, r0=5.0, v=0.9, air=0.8, life=14)   # its circle: radius 5 + 0.9 a frame x 0.8 a frame: ~9 at
+                                   # frame 10 (x the call's 1.45: 7 -> 13, the water burst's bright edge in fx_render's
+                                   # render: its rings / splash puffs; its faint mist reaches ~21), the flames gone by 14
+                                   # (the burst by ~13). v2.2 preview 1 (r0 6, v 1.6, 9 tall) wrapped far outside it
 FIRE_FADE = 15                     # frames the body / trail fires take to go when ended with a fade (0x2723 (0, 0))
 
 
@@ -76,7 +82,10 @@ def _fire_sets():
     trail = dict(atlas='fire_ground_10', blend=1, size=(FIRE_TRAIL_H * cell_aspect('fire_ground_10'), FIRE_TRAIL_H),
                  fade=FIRE_FADE)
     trail['offset'] = (0.0, (feet_cell_v('fire_ground_10') - 0.5) * FIRE_TRAIL_H)
-    return [('PtcGekkougaFireBody', body), ('PtcGekkougaFireTip', tip), ('PtcGekkougaFireTrail', trail)]
+    ring = dict(atlas='fire_small_4', blend=1, size=(FIRE_RING_H * cell_aspect('fire_small_4'), FIRE_RING_H),
+                offset=(0.0, 0.0), ring=FIRE_RING)
+    return [('PtcGekkougaFireBody', body), ('PtcGekkougaFireTip', tip), ('PtcGekkougaFireTrail', trail),
+            ('PtcGekkougaFireRing', ring)]
 
 
 def all_sets(burn2=True):
@@ -173,6 +182,33 @@ def flip_plan(n, k, loop):
     return out
 
 
+def ring_fields(p, em, ring, group):
+    """burn v2.2: a ring of flames in the call's YZ plane (the camera's plane at a side-on call: the burst's
+    billboards' circle): ring['n'] / ring['groups'] particles at once on an even circle (volume 2: XZ, turned Z +90; each
+    group's turned on by 1 / n of a turn: together n evenly round) of radius r0, flying
+    out (all-direction speed v, air resistance air) as the burst's edge grows, fading in quickly, held, fading out over
+    the last 55 % of their life, a little bigger after 30 %"""
+    f = p.set_field
+    f(em, 'volume_type', 2)
+    f(em, 'volume_radius', [ring['r0'], 0.0, ring['r0']])
+    f(em, 'volume_sweep_start', 2 * math.pi * group / ring['n'])
+    f(em, 'volume_sweep_param', 2 * math.pi)
+    f(em, 'emit_rate', float(ring['n'] // ring['groups']))
+    f(em, 'figure_velocity', ring['v'])
+    f(em, 'air_resistance', ring['air'])
+    f(em, 'alpha_init', 0.6)
+    f(em, 'alpha_diff21', 0.4)
+    f(em, 'alpha_diff32', -1.0)
+    f(em, 'alpha_section1', 0.12)
+    f(em, 'alpha_section2', 0.45)
+    f(em, 'scale_init_ratio', [0.6, 0.6])
+    f(em, 'scale_diff21', [0.4, 0.4])
+    f(em, 'scale_diff32', [0.0, 0.0])
+    f(em, 'scale_sections', [30, 100])
+    p.set_emitter_srt(em, rotation=(0.0, 0.0, math.pi / 2))
+    struct.pack_into('>f', em, 0x82C, 0.0)        # a one-shot: ended (the move's end), its flames play out
+
+
 def flip_emitters(p, tmpl, name, spec):
     """the emitters of one flipbook billboard (module docstring; flip_plan) from the template bytes"""
     import vfxb_to_ptcl as VP
@@ -184,7 +220,14 @@ def flip_emitters(p, tmpl, name, spec):
     if spec.get('mirror'):
         img = mirror_cells(img, nx, ny)
     out = []
-    for j, run in enumerate(flip_plan(n, k, loop)):
+    plan = flip_plan(n, k, loop)
+    ring = spec.get('ring')
+    if ring:                                       # burn v2.2: ring['groups'] emitters of the flipbook's first cells,
+        n = min(n, TABLE - 1)                      # each its table started a third further on (out of step: eft's
+        g = ring['groups']                         # random start, 0x4D9, is one UV shift per emitter, 0x04A54A88)
+        plan = [dict(first=0, cells=n, table=[(c + j * n // g) % n for c in range(n)], start=0, life=ring['life'],
+                     period=0, group=j) for j in range(g)]
+    for j, run in enumerate(plan):
         em = bytearray(tmpl)
         struct.pack_into('>I', em, 0x38, p.add_name(name if j == 0 else '%s_%d' % (name, j + 1)))
         sampler = struct.unpack_from('>I', em, P.TEXRES + 0x0C)[0]
@@ -237,6 +280,8 @@ def flip_emitters(p, tmpl, name, spec):
         t = run['table']
         VP.set_flipbook(em, MODE, {'uv_div': [nx, ny]},
                         {'num': len(t), 'num_random': 1, 'table': t + [0] * (TABLE - len(t)), 'frequency': k})
+        if ring:
+            ring_fields(p, em, ring, run['group'])
         VP.set_uv_anim(em, None)
         VP.set_inv_rand(em, 0, (False, False))
         out.append(em)

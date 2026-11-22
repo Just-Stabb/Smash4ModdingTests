@@ -1020,3 +1020,24 @@ Neutral air's and the trail's unshielded 3 % could now go lower (the user's call
 per feature set; every row >= 1 %, the clamp only where 35 % / 50 % falls under it, the shielded totals above);
 `gekkouga_clones_test ... --vb2` 262 / 0; supamario_ui_cave_test 0; import_call_check 0; gks2 / gkb4 / gkb5 rebuild byte
 for byte.
+
+## Burn v2.2 (`greninja_burn_v2_2.zip`, over burn v2.1; data only, exe_v46z_gkb5)
+
+The user, after the neutral air preview (`tools/gekkouga_nair_preview.py`: his model posed in AttackAirN, fx_render's
+effects): "Can you wrap neutral air's water edges in fire?". Burn v2's two side flames (0x330001B at Z +- 10) are
+replaced by **PtcGekkougaFireRing** (0x330001D, efc entry 0x1D, `gekkouga_fx.FIRE_RING`), made with the water burst on
+its call (`gekkouga_build.FIRE_RING`: External_Graphic at joint 0, Y 8.5, size 1.45, right after the burst's; played out,
+no Terminate; the clone's copy too):
+- 3 emitters x 5 flames (fire_small_4's first 31 cells, additive, 6.5 tall quads at size 1), each emission on an even
+  circle (volume 2, XZ turned Z +90 into the YZ plane: the burst's billboards face the camera, side-on), radius 5, the
+  groups' circles a 15th of a turn apart (15 evenly round), flying out at 0.9 a frame with air resistance 0.8 (~9 by frame
+  10: x 1.45 = 13, the burst's bright edge in fx_render's render; its faint mist reaches ~21), alpha 0.6 -> 1 by 12 %, held
+  to 45 %, out by the end of their 14 frames, scale 0.6 -> 1 by 30 %, fade rate 0 (played out).
+- Out of step: each group's table starts 10 cells further on. eft's random start (0x4D9) is no help: its code
+  (`0x04A54A88`) picks one random cell per emitter and shifts the emitter's UV by it (all its particles alike; outside our
+  table's cells it would leave the atlas), so the flipbook tables do it.
+- A first try (radius 6, 1.6 a frame, 9 tall) wrapped far outside the burst in the preview; tuned against it.
+- Tests: `gekkouga_fx_test` 32 / 0 (`ring_checks`: the 3 emitters' fields, 15 flames evenly round in the YZ plane at one
+  radius, 5 -> ~9 by frame 10, gone after 14, the groups' cells 10 apart advancing every 2 frames); `gekkouga_clones_test
+  ... --vb21` 260 / 0 (the ring on the burst's call, v2's side flames gone, the scripts otherwise unchanged; the installed
+  gkb5 rebuilt from the script). Preview `$S/gk_preview/nair_v2.png` / `.gif`. Not confirmed in game.

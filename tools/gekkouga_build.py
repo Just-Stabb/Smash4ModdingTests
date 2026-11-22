@@ -302,10 +302,14 @@ SWORD = 0x3300007
 SWORD_LEN = 11.0                  # the sword at size 1 (forward air's trail: Y2 -11; the smashes' -55 at x5)
 FIRE_TIP_SIZE = {'AttackS4': 2.0, 'AttackHi4': 2.0, 'AttackLw4': 2.0, 'AttackAirF': 0.7}
 NAIR_BURST = 0x330000B
-FIRE_NAIR_Z = 10.0
+FIRE_NAIR_Z = 10.0                # (burn v2 - v2.1: a flame each side, Z +- 10, ended at 24)
 FIRE_NAIR_Y = 8.5
 FIRE_NAIR_SIZE = 1.0
 FIRE_NAIR_END = 24
+FIRE_RING = 0x330001D             # burn v2.2 (the user: "wrap neutral air's water edges in fire"): his bank's
+                                  # PtcGekkougaFireRing, a ring of 14 flames round the water burst's edge, growing with it
+                                  # (tools/gekkouga_fx.py FIRE_RING), made with the burst: the burst's call (joint 0, Y 8.5,
+                                  # size 1.45), played out (no Terminate: one-shot flames)
 
 
 def insert_cmds(cmds, i, new):
@@ -362,10 +366,11 @@ def add_fire_tips(effect):
             i += 1
     s = effect.script('AttackAirN')
     i = [k for k, c in enumerate(s) if c.name == 'External_Graphic' and int(c.params[0]) == NAIR_BURST][0]
-    insert_cmds(s, i + 1, [ext_graphic(FIRE_TIP, 0, 0.0, FIRE_NAIR_Y, z, FIRE_NAIR_SIZE) for z in (FIRE_NAIR_Z, -FIRE_NAIR_Z)])
-    end = [k for k, c in enumerate(s) if c.name == 'Script_End'][-1]
-    insert_cmds(s, end, [acmd.Command(by['FRAME'], [float(FIRE_NAIR_END)]), terminate_gfx(FIRE_TIP)])
-    return n + 2
+    b = s[i]
+    syn = b.info['syntax']
+    insert_cmds(s, i + 1, [ext_graphic(FIRE_RING, int(b.params[syn.index('Bone')]), 0.0, float(b.params[syn.index('Y')]),
+                                       float(b.params[syn.index('Z')]), float(b.params[syn.index('Size')]))])
+    return n + 1
 
 
 def remove_cmd(cmds, i):
@@ -389,7 +394,7 @@ def strip_fire_tips(effect):
         i = 0
         while i < len(cmds):
             c = cmds[i]
-            if c.name in ('External_Graphic', 'Terminate_Graphic_Effect') and int(c.params[0]) == FIRE_TIP:
+            if c.name in ('External_Graphic', 'Terminate_Graphic_Effect') and int(c.params[0]) in (FIRE_TIP, FIRE_RING):
                 if c.name == 'Terminate_Graphic_Effect' and i and cmds[i - 1].name == 'FRAME' and \
                         float(cmds[i - 1].params[0]) == FIRE_NAIR_END and i + 1 < len(cmds) and \
                         cmds[i + 1].name == 'Script_End':          # neutral air's own FRAME (not a sword's at 24)

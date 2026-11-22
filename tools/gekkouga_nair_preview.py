@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Greninja's neutral air as it looks with burn v2 (fighters/gekkouga/README.md "Burn v2"): his model posed in
 AttackAirN with his effect script's effects drawn by tools/fx_render.py (the game's own vertex / pixel programs on
-eft's uniform blocks: the water burst 0x330000B and the two new flames 0x330001B), a contact sheet and a GIF.
+eft's uniform blocks: the water burst 0x330000B and burn v2's fire: v2 / v2.1 two flames 0x330001B, v2.2 the ring of
+flames 0x330001D), a contact sheet and a GIF (--name: the files' name).
 
   python3 -I tools/gekkouga_nair_preview.py VANILLA_FIGHTER BUILT_FIGHTER OUT_DIR [--frames 9,11,13,16,20,24]
 
@@ -184,6 +185,7 @@ def main():
     ap.add_argument('built')
     ap.add_argument('out')
     ap.add_argument('--frames', default='9,11,13,15,18,22')
+    ap.add_argument('--name', default='nair')
     a = ap.parse_args()
     from PIL import Image, ImageDraw
     frames = [int(x) for x in a.frames.split(',')]
@@ -217,12 +219,12 @@ def main():
     sheet = Image.new('RGB', (w * len(tiles) + 4 * (len(tiles) - 1), h + 22), (18, 18, 22))
     for i, t in enumerate(tiles):
         sheet.paste(t, (i * (w + 4), 22))
-    ImageDraw.Draw(sheet).text((6, 5), 'Greninja neutral air (burn v2): water burst 0x330000B + flames 0x330001B (Z +- 10, '
-                               'Y 8.5) from frame 11, ended at 24; offline render (see notes)', fill=(220, 220, 220))
-    sheet.save(os.path.join(a.out, 'nair.png'))
+    ImageDraw.Draw(sheet).text((6, 5), 'Greninja neutral air: ' + ', '.join('0x%X at frame %d' % (int(c[1]), c[0]) for c in calls)
+                               + '; offline render (see notes)', fill=(220, 220, 220))
+    sheet.save(os.path.join(a.out, a.name + '.png'))
     gif = [Image.fromarray(canv[fr].image()).convert('P', palette=Image.ADAPTIVE) for fr in gif_frames]
-    gif[0].save(os.path.join(a.out, 'nair.gif'), save_all=True, append_images=gif[1:], duration=50, loop=0)
-    print(os.path.join(a.out, 'nair.png'))
+    gif[0].save(os.path.join(a.out, a.name + '.gif'), save_all=True, append_images=gif[1:], duration=50, loop=0)
+    print(os.path.join(a.out, a.name + '.png'))
 
 
 if __name__ == '__main__':
