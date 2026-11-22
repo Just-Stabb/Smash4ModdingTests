@@ -763,7 +763,7 @@ designed for v2 with them). Feature `burn` (in `RELEASE`), `tools/gekkouga_clone
   Greninja's slot 13 ticks only his own (their own timings), raw percent through the victim's DamageModule vt +0x74(0,
   f1) (MSC DamageModule(9, %)'s op: no hit, so invincibility / intangibility don't matter). A victim not live: its
   instances end.
-- **Values** (`BURN_MOVES`; damage a tick, interval, duration; total): smashes 0.4 % / 6 f / 240 f = 16 %, forward
+- **Values** (`BURN_MOVES`; damage a tick, interval, duration; total; burn v2.1: the floor 1 %, see "Burn v2.1"): smashes 0.4 % / 6 f / 240 f = 16 %, forward
   air 0.3 % / 10 f / 180 f = 5.4 %, neutral air 0.25 % / 15 f / 180 f = 3 %. Shielded: half the frames, 20 % of the
   damage, raised so the total is at least `BURN_MIN_TOTAL` 3 % (`burn_shield_damage`: all five clamp to 3 %). The
   module asserts every instance (shielded or not) totals at least 3 %; the cave test checks it and that the clamp
@@ -1001,3 +1001,22 @@ Feature `burn2` (in `RELEASE`; skeleton v1.2's exe is `RELEASE - burn2`), `tools
   run out, its hits' burns plain and shielded); `gekkouga_fx_test` 29 / 0; `gekkouga_clones_test ... --vs12` 262 / 0
   (`trail_side_tests`, `firetrail_tests`, `trail_data_tests`, the tips, the package); supamario_ui_cave_test 0;
   import_call_check 0; byte-for-byte rebuilds. Not confirmed in game: everything here.
+
+## Burn v2.1 (`greninja_burn_v2_1.zip`, over burn v2; exe_v46z_gkb5)
+
+The user: "Change the minimum burn damage to 1%". Feature `floor1` (in `RELEASE`; burn v2's exe_v46z_gkb4 is `RELEASE -
+floor1`, skeleton v1.2's `RELEASE - burn2 - floor1`): `burn_floor(feats)` 1 % (`BURN_MIN_TOTAL`; 3 % `BURN_MIN_TOTAL_OLD`
+without it), the shielded damage a tick in the moves table (`burn_shield_damage(row, floor)`). Unshielded rows unchanged.
+
+| Row | Unshielded | Shielded (35 % a tick, half the frames) v2 -> v2.1 |
+|---|---|---|
+| smashes (95 / 99 / 101) | 0.4 % / 6 f / 240 f = 16 % | 3 % (0.15 x 20) -> 2.8 % (0.14 x 20, unclamped) |
+| forward air (105) | 0.3 % / 10 f / 180 f = 5.4 % | 3 % -> 1 % (0.945 % raised: 0.111 x 9) |
+| neutral air (104) | 0.25 % / 15 f / 180 f = 3 % | 3 % -> 1 % (0.525 % raised: 0.167 x 6) |
+| skeleton explosion (0x101A2) | 0.6 % / 6 f / 360 f = 36 % | 6.3 % (0.21 x 30) |
+| fire trail (0x101A3) | 0.25 % / 15 f / 180 f = 3 % | 3 % -> 1 % (0.525 % raised: 0.167 x 6) |
+
+Neutral air's and the trail's unshielded 3 % could now go lower (the user's call). Tests: cave 229 / 258 / 253 (the floor
+per feature set; every row >= 1 %, the clamp only where 35 % / 50 % falls under it, the shielded totals above);
+`gekkouga_clones_test ... --vb2` 262 / 0; supamario_ui_cave_test 0; import_call_check 0; gks2 / gkb4 / gkb5 rebuild byte
+for byte.

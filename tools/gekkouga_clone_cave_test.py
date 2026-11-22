@@ -1091,12 +1091,22 @@ def hitcheck_checks(e, info, diag):
 def burn_checks(e, info, diag):
     """burn v1 (feature burn): his water moves' hits add burn instances to their victims; his ticks"""
     lab, A, F = info['labels'], info['A'], info['feats']
-    check('burn: every move\'s instance, unshielded and shielded, totals at least %s %% (the user\'s floor): %s' % (
-        C.BURN_MIN_TOTAL, ', '.join('%d %.2f / %.2f' % (m[0], C.burn_total(m), C.burn_total(m, True)) for m in C.BURN_MOVES)),
-          [(m[0], sh) for m in C.BURN_MOVES for sh in (False, True) if C.burn_total(m, sh) < C.BURN_MIN_TOTAL - 1e-4], [])
+    fl = C.burn_floor(F)
+    rows_all = C.burn_moves(F)
+    check('burn: every move\'s instance, unshielded and shielded, totals at least %s %% (the user\'s floor%s): %s' % (
+        fl, ', burn v2.1' if 'floor1' in F else '', ', '.join('%d %.2f / %.3f' % (m[0], C.burn_total(m), C.burn_total(m, True, fl))
+                                                          for m in rows_all)),
+          [(m[0], sh) for m in rows_all for sh in (False, True) if C.burn_total(m, sh, fl) < fl - 1e-4], [])
     check('burn: the shield clamp only where 50 %% / %d %% falls under the floor; above it the rule exact' % round(100 * C.BURN_SHIELD_DAMAGE),
-          [m[0] for m in C.BURN_MOVES if (C.burn_shield_damage(m) != m[1] * C.BURN_SHIELD_DAMAGE)
-           != (m[1] * C.BURN_SHIELD_DAMAGE * (C.burn_shield_frames(m) // m[2]) < C.BURN_MIN_TOTAL)], [])
+          [m[0] for m in rows_all if (C.burn_shield_damage(m, fl) != m[1] * C.BURN_SHIELD_DAMAGE)
+           != (m[1] * C.BURN_SHIELD_DAMAGE * (C.burn_shield_frames(m) // m[2]) < fl)], [])
+    if 'floor1' in F:
+        check('burn v2.1: shielded totals (35 %% a tick, half the frames, 1 %% floor): smashes 2.8 unclamped, forward air '
+              '0.945 -> 1, neutral air 0.525 -> 1, skeleton 6.3, trail 0.525 -> 1',
+              [(m[0], round(C.burn_total(m, True, fl), 4), m[1] * C.BURN_SHIELD_DAMAGE * (C.burn_shield_frames(m) // m[2]) < fl)
+               for m in rows_all],
+              [(95, 2.8, False), (99, 2.8, False), (101, 2.8, False), (105, 1.0, True), (104, 1.0, True),
+               (C.SK_BURN_KEY, 6.3, False)] + ([(C.TR_BURN_KEY, 1.0, True)] if 'burn2' in F else []))
     if 'burn' not in F:
         check('burn: without "burn": no burn code', 'burn_him' in lab, False)
         return
@@ -1179,9 +1189,10 @@ def burn_checks(e, info, diag):
     check('burn: the same log node: no second instance', len(inst(4)), 1)
     log_hit(logs[1], 4, 2)                   # a shield hit
     frame(gk, 2)
-    sd = round(C.burn_shield_damage(C.BURN_MOVES[0]), 4)
-    check('burn: a shielded hit: half the frames (120), %d %%%% of the damage raised to the 3 %%%% total (%s a tick), its own '
-          'timer' % (round(100 * C.BURN_SHIELD_DAMAGE), sd), inst(4), [(237, 3, 6, 2, 0.4), (119, 5, 6, 2, sd)])
+    sd = round(C.burn_shield_damage(C.BURN_MOVES[0], C.burn_floor(F)), 4)
+    check('burn: a shielded hit: half the frames (120), %d %%%% of the damage (raised to the %g %%%% total floor if under it: '
+          '%s a tick), its own timer' % (round(100 * C.BURN_SHIELD_DAMAGE), C.burn_floor(F), sd), inst(4),
+          [(237, 3, 6, 2, 0.4), (119, 5, 6, 2, sd)])
     got = []
     for _ in range(3):
         got.append(frame(gk, 2))
@@ -1374,7 +1385,8 @@ def skeleton_checks(e, info, diag):
               max(tot, key=tot.get), C.SK_BURN_KEY)
         check('skeleton: its burn 0.6 %% every 6 frames for 360 = 36 %%; shielded 50 %% / %d %% = 0.21 %% x 30 = 6.3 %% '
               '(over the 3 %% floor: no clamp)' % round(100 * C.BURN_SHIELD_DAMAGE),
-              (round(C.burn_total(sk_row), 3), round(C.burn_shield_damage(sk_row), 4), round(C.burn_total(sk_row, True), 3)),
+              (round(C.burn_total(sk_row), 3), round(C.burn_shield_damage(sk_row, C.burn_floor(F)), 4),
+               round(C.burn_total(sk_row, True, C.burn_floor(F)), 3)),
               (36.0, 0.21, 6.3))
     if 'skeleton' not in F:
         check('skeleton: without "skeleton": no skeleton code', 'sk_frame' in lab, False)
@@ -2057,9 +2069,10 @@ def burn2_checks(e, info, diag):
     (kind TR_KIND: its tables, tr_claim from his requests, its contexts, its hits' burns with the trail row)"""
     lab, A, F, img = info['labels'], info['A'], info['feats'], info['img']
     tr = C.TR_ROW
+    fl = C.burn_floor(F)
     check('burn v2: the trail row 0.25 %% every 15 frames for 180 = %.2f %%; shielded half the frames, raised to the floor: '
-          '%.2f %% a tick x 6 = %.2f %%' % (C.burn_total(tr), C.burn_shield_damage(tr), C.burn_total(tr, True)),
-          (round(C.burn_total(tr), 4), round(C.burn_total(tr, True), 4)), (3.0, 3.0))
+          '%.3f %% a tick x 6 = %.2f %%' % (C.burn_total(tr), C.burn_shield_damage(tr, fl), C.burn_total(tr, True, fl)),
+          (round(C.burn_total(tr), 4), round(C.burn_total(tr, True, fl), 4)), (3.0, fl))
     if 'burn2' not in F:
         check('burn v2: without "burn2": no trail / fire code', ('tr_frame' in lab, 'bfx_vic' in lab), (False, False))
         return
@@ -2276,8 +2289,9 @@ def burn2_checks(e, info, diag):
     e.setw(n + 4, n2)
     e.setw(ta['log'] + 8, 2)
     tframe(ta)
-    check('trail hit: its re-hit on a shield: 90 frames, 0.5 %% a tick (35 %% raised to the 3 %% floor)', insts(4)[1:],
-          [(90, 15, 2, 0.5)])
+    tsd = round(C.burn_shield_damage(C.TR_ROW, C.burn_floor(F)), 4)
+    check('trail hit: its re-hit on a shield: 90 frames, %s %% a tick (35 %% raised to the %g %% floor)' % (tsd, C.burn_floor(F)),
+          insts(4)[1:], [(90, 15, 2, tsd)])
     # contexts run out
     for i in range(C.SLOTS * C.TR_CTX):
         e.setw(A['tr_ttl'] + 4 * i, 0)
