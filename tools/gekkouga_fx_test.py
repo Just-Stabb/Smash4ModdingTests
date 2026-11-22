@@ -243,6 +243,41 @@ def timing_checks(p, sets, names):
             check('%s: never more particles than its hand-overs allow' % n, dup[:5], [])
 
 
+def base_step(img, d):
+    """the median, over the cells, of the biggest alpha drop between two rows at the flame's base (its lowest row with
+    alpha over 8 and the 8 rows above it)"""
+    nx, ny = d['columns'], d['rows']
+    h, w = img.shape[:2]
+    out = []
+    for k in range(d['frames']):
+        i, j = k % nx, k // nx
+        a = img[int(round(j * h / ny)):int(round((j + 1) * h / ny)), int(round(i * w / nx)):int(round((i + 1) * w / nx)),
+                3].astype(float)
+        m = a.max(1)
+        rows = np.nonzero(m > 8)[0]
+        if not len(rows):
+            continue
+        b = rows[-1]
+        out.append(max(m[r] - m[r + 1] for r in range(max(0, b - 8), min(len(m) - 1, b + 2))))
+    return float(np.median(out))
+
+
+def soft_checks(p, sets, names):
+    """fire trail fix v1 (the user: the trail flames' "hard, flat, cut-off bottom edge"): the fire sets' textures (as
+    built: BC3 decoded) have soft bases (G.soften_bottom): the base's biggest row-to-row alpha drop, median over the
+    cells, under 30 of 255 (the footage's own: 80 - 130; fire_torch_012's wisps 23 already)"""
+    got, raw = {}, {}
+    for n in ('PtcGekkougaFireBody', 'PtcGekkougaFireTip', 'PtcGekkougaFireTrail', 'PtcGekkougaFireBody1',
+              'PtcGekkougaFireBody3'):
+        sp = dict(sets)[n]
+        d = G.sidecar(sp['atlas'])
+        em = p.sets[20 + names.index(n)]['emitters'][0]['data']
+        got[n] = round(base_step(p.decode_texture(em, 0), d), 1)
+        raw[n] = round(base_step(G.atlas(sp['atlas']), d), 1)
+    check('fire trail fix v1: the fires\' flame bases soft (base alpha step, median, as built: %s; the footage\'s own %s)' %
+          (got, raw), {n: v for n, v in got.items() if v >= 30}, {})
+
+
 def tier_blade_checks(p, sets, names):
     """skeleton v1.3: the burn tiers' fires (the exe's BFX_TIER_IDS) and forward air's blade flames"""
     import gekkouga_clone_cave as C
@@ -394,6 +429,7 @@ def main():
     timing_checks(p, sets, names)
     if burn2:
         tier_blade_checks(p, sets, names)
+        soft_checks(p, sets, names)
     r = p.decode_texture(p.sets[20]['emitters'][0]['data'], 0).astype(np.float32)
     lft = p.decode_texture(p.sets[21]['emitters'][0]['data'], 0).astype(np.float32)
     dif = np.abs(G.mirror_cells(r, 6, 10) - lft).mean()

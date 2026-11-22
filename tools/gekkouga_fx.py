@@ -205,6 +205,33 @@ def feet_cell_v(name):
     return ((ch - fh) // 2 + d['anchor']['body_bottom_v'] * fh) / ch
 
 
+FIRE_SOFT_BOTTOM = 0.16            # fire trail fix v1 (the user: the flames' "hard, flat, cut-off bottom edge"): every fire
+                                   # cell's base softened: alpha (and colour: additive) ramped from 0 at its lowest lit row
+                                   # to full this fraction of the frame's height above it
+
+
+def soften_bottom(img, d, frac=FIRE_SOFT_BOTTOM, lit=24):
+    """each cell's flame base faded: from its lowest row with alpha over lit, a linear ramp over frac x the frame's height
+    (the atlases' frames are clear at their edges: the hard edge is the flame's own flat base, opaque to its last row)"""
+    out = img.astype(np.float32).copy()
+    nx, ny = d['columns'], d['rows']
+    h, w = img.shape[:2]
+    n = int(round(frac * d['frame_size_in_cell'][1]))
+    for k in range(d['frames']):
+        i, j = k % nx, k // nx
+        y0, y1 = int(round(j * h / ny)), int(round((j + 1) * h / ny))
+        x0, x1 = int(round(i * w / nx)), int(round((i + 1) * w / nx))
+        a = out[y0:y1, x0:x1, 3]
+        rows = np.nonzero(a.max(1) > lit)[0]
+        if not len(rows):
+            continue
+        b = rows[-1]
+        for r in range(max(0, b - n), y1 - y0):
+            f = min(1.0, max(0.0, (b + 1 - r) / float(n + 1)))
+            out[y0 + r, x0:x1] *= f
+    return np.clip(np.round(out), 0, 255).astype(np.uint8)
+
+
 def mirror_cells(img, nx, ny):
     """each cell mirrored left-right in place (cells on i x W / nx, rounded to whole pixels: the frames are centred
     with a clear margin, so a pixel's rounding moves nothing out of its cell)"""
@@ -357,6 +384,8 @@ def flip_emitters(p, tmpl, name, spec):
     assert img.shape[:2] == tuple(d['atlas_size'][::-1])
     if spec.get('mirror'):
         img = mirror_cells(img, nx, ny)
+    if spec['blend'] == 1:                          # the fires (fire trail fix v1): their bases soft
+        img = soften_bottom(img, d)
     out = []
     plan = flip_plan(n, k, loop)
     ring = spec.get('ring')

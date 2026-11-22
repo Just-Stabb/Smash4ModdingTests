@@ -636,8 +636,12 @@ float tr_var(int n)
     return WorkModuleF(0, 0x0f000300 + n);
 }
 
-// the flames along the smash's path (units from its place, x along its way): forward smash 5 on the ground ahead (10 -
-// 42), up smash a column of 4 over it (0 - 42: each ~14.5 tall), down smash 4 each side (10 - 37)
+// the flames along the smash's path (units from its place along its way): forward smash 5 on the ground ahead (10 - 42),
+// down smash 4 each side (10 - 37); fire trail fix v1 (the user: "the lingering fire trails ... seem to be in the wrong
+// axis"): up smash 2 each side under it (6, 14: where its geyser rises; v1 - burn v2.3 a column of 4 over it, an
+// interpretation of the report). The offsets go on joint 0's local Z: its model is turned by its way (PostureModule 0 /
+// 2, as a fighter's: +Z forward), so local X is depth (burn v2 - clone fixes v1 put them on X x the way: the flames
+// receded into the screen) and no x the way is needed
 int tr_fx_count()
 {
     if (tr_type == 0x1)
@@ -649,6 +653,20 @@ int tr_fx_count()
         return 4;
     }
     return 8;
+}
+
+// fire trail fix v1: forward along its way (joint 0's local Z)
+float tr_fx_dz(int k)
+{
+    if (tr_type == 0x2)
+    {
+        if (k % 2 == 0)
+        {
+            return 6.0f + 8.0f * (float)(k / 2);
+        }
+        return -6.0f - 8.0f * (float)(k / 2);
+    }
+    return tr_fx_dx(k);
 }
 
 float tr_fx_dx(int k)
@@ -670,11 +688,7 @@ float tr_fx_dx(int k)
 
 float tr_fx_dy(int k)
 {
-    if (tr_type == 0x2)
-    {
-        return 14.0f * (float)k;
-    }
-    return 0;
+    return 0;                             // (burn v2 - clone fixes v1: up smash 14 x k, a column)
 }
 
 // its start: the place / smash / way the executable copied from him
@@ -722,8 +736,8 @@ void tr_frame()
     }
     if (tr_fx_n < tr_fx_count())          // a flame a frame (their flipbooks out of step)
     {
-        dx = tr_fx_dx(tr_fx_n) * tr_dir;
-        EffectModule(0x2717, tr_fx(), 0, dx, tr_fx_dy(tr_fx_n), 0, 0, 0, 0, tr_fx_size(), 0);
+        dx = tr_fx_dz(tr_fx_n);
+        EffectModule(0x2717, tr_fx(), 0, 0, tr_fx_dy(tr_fx_n), dx, 0, 0, 0, tr_fx_size(), 0);
         tr_fx_n += 1;
     }
     tr_t += 1;

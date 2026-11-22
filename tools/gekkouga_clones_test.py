@@ -1703,7 +1703,7 @@ def firetrail_tests(mscsb, src):
                 g.log.append(('remove',))
                 return 0
             if sid == 0x1C:
-                g.log.append(('fx', a[0]) + tuple(a[1:3]) + tuple(round(fv(x), 2) for x in a[3:5]) if a[0] == 0x2717
+                g.log.append(('fx', a[0]) + tuple(a[1:3]) + tuple(round(fv(x), 2) for x in a[3:6]) if a[0] == 0x2717
                              else ('fx',) + tuple(a))
                 return 0
             return old(sid, a)
@@ -1721,16 +1721,17 @@ def firetrail_tests(mscsb, src):
     m, g = make()
     g.vars.update({0x0F000300: 3.0, 0x0F000301: 1.0, 0x0F000302: 40.0, 0x0F000303: 10.0, 0x0F000304: -1.0})
     run(m, 1)
-    check('trail start (forward smash at (40, 10), way -1): facing -1, there, its effects unhooked from its hidden model '
-          '(0x26 (0), 0x1C (1)), motion 0 held (rate 0: its hitboxes), the first flame 10 ahead (x -10)',
+    check('trail start (forward smash at (40, 10), way -1): facing -1 (its model turned: PostureModule 0, 2), there, its '
+          'effects unhooked from its hidden model (0x26 (0), 0x1C (1)), motion 0 held (rate 0: its hitboxes), the first flame '
+          '10 ahead (fire trail fix v1: on joint 0\'s local Z, forward in its turned frame: X 0, Y 0, Z 10)',
           ([x for x in g.log if x[0] in ('lr', 'motion')], g.posture_sets[:1], [x for x in g.log if x[0] == 'fx'],
            [x for x in g.log if x[0] == 'visible' and x[1] != 0]),
           ([('lr', -1.0), ('motion', 0, 0.0, 0.0)], [(40.0, 10.0)],
-           [('fx', 0x26, 0), ('fx', 0x1C, 1), ('fx', 0x2717, 0x330001C, 0, -10.0, 0.0)], []))
+           [('fx', 0x26, 0), ('fx', 0x1C, 1), ('fx', 0x2717, 0x330001C, 0, 0.0, 0.0, 10.0)], []))
     g.log = []
     run(m, 5)
-    check('trail: a flame a frame along its way (x -18 ... -42 on the ground), five in all',
-          [x[4:6] for x in g.log if x[0] == 'fx'], [(-18.0, 0.0), (-26.0, 0.0), (-34.0, 0.0), (-42.0, 0.0)])
+    check('trail: a flame a frame along its way (local Z 18 ... 42, X / Y 0: on the ground ahead), five in all',
+          [x[4:7] for x in g.log if x[0] == 'fx'], [(0.0, 0.0, 18.0), (0.0, 0.0, 26.0), (0.0, 0.0, 34.0), (0.0, 0.0, 42.0)])
     g.log = []
     run(m, 158)
     check('trail: frames 7 - 164: nothing more; it stays put', ([x for x in g.log if x[0] in ('fx', 'remove')], g.posture_sets[-1]),
@@ -1745,16 +1746,20 @@ def firetrail_tests(mscsb, src):
     run(m, 1)
     check('trail: frame 180 (3 s): its fire ended, removed', [x for x in g.log if x[0] in ('fx', 'remove')],
           [('fx', 0x2723, 0x330001C, 1, 1), ('remove',)])
-    for typ, want in ((2, [(0.0, 0.0), (0.0, 14.0), (0.0, 28.0), (0.0, 42.0)]),
-                      (3, [(10.0, 0.0), (-10.0, 0.0), (19.0, 0.0), (-19.0, 0.0), (28.0, 0.0), (-28.0, 0.0), (37.0, 0.0),
-                           (-37.0, 0.0)])):
+    for typ, way, want in [(t, w, ws) for t, ws in (
+            (1, [10.0, 18.0, 26.0, 34.0, 42.0]),
+            (2, [6.0, -6.0, 14.0, -14.0]),
+            (3, [10.0, -10.0, 19.0, -19.0, 28.0, -28.0, 37.0, -37.0])) for w in (1.0, -1.0)]:
         m, g = make()
-        g.vars.update({0x0F000300: 3.0, 0x0F000301: float(typ), 0x0F000302: 0.0, 0x0F000303: 0.0, 0x0F000304: 1.0})
+        g.vars.update({0x0F000300: 3.0, 0x0F000301: float(typ), 0x0F000302: 0.0, 0x0F000303: 0.0, 0x0F000304: way})
         run(m, 12)
-        check('trail: %s smash: motion %d, its flames %s' % ('up' if typ == 2 else 'down', typ - 1,
-                                                              'a column over it' if typ == 2 else 'each side alternately'),
-              ([x[1] for x in g.log if x[0] == 'motion'], [x[4:6] for x in g.log if x[0] == 'fx' and x[1] == 0x2717]),
-              ([typ - 1], want))
+        check('fire trail fix v1: %s smash facing %s: motion %d, its flames on the ground (Y 0) along its way (local Z: '
+              'X 0, never into the screen) %s; its model turned by its way (the same Z either way)' % (
+                  ('forward', 'up', 'down')[typ - 1], 'right' if way > 0 else 'left', typ - 1,
+                  'ahead' if typ == 1 else 'each side alternately (up smash: under its geyser, 6 / 14: an interpretation)'),
+              ([x[1] for x in g.log if x[0] == 'motion'], [x for x in g.log if x[0] == 'lr'][:1],
+               [x[4:7] for x in g.log if x[0] == 'fx' and x[1] == 0x2717]),
+              ([typ - 1], [('lr', way)], [(0.0, 0.0, z) for z in want]))
 
 
 def trail_data_tests(out):
