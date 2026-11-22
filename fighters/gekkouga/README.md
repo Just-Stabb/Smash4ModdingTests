@@ -1200,3 +1200,21 @@ Graphic_Effect5, the grabs (Catch / CatchDash / CatchTurn / CatchWait: no hitbox
 - Tests: `gekkouga_clones_test.clone_fx_tests` (hold -> up smash -> restart -> jump -> its own fall: 0x2D before each new
   move only; up air / grabs / down air / forward / back air / up smash request his effects; all 100 scripts his requests
   in his order); the v4 smash-size check now compares with his. Not confirmed in game.
+
+## Fire trail fix v1 (`greninja_firetrail_fix_v1.zip`, over clone fixes v1; data only, exe_v46z_gkb6)
+
+The user (burn v2+ in game): "the lingering fire trails left by smash attacks seem to be in the wrong axis" (down smash:
+a diagonal line receding into the screen; up smash: a column of flames, each with a hard flat bottom).
+- **The axis** (`weapons/firetrail.c` `tr_fx_dz`): the flames were requested on joint 0 (0x2717) with their offset on
+  local X x its way. The trail turns its model by its way (`PostureModule(0, way)`, `(2)`: as the clones, a fighter's
+  frame, +Z forward), so local X is depth. Now the offset is local Z (no x the way: the turn mirrors it): forward smash
+  10 - 42 ahead, down smash +- 10 - 37, **up smash +- 6 / 14 on the ground under it** (where its geyser rises; v1 - clone
+  fixes v1: a column of 4 over it at Y 0 - 42; an interpretation, the coordinator asked the user). Preview
+  `$S/gk_preview/trails.png` (`tools/gekkouga_trail_preview.py`).
+- **Hard bottoms** (`tools/gekkouga_fx.py` `soften_bottom`, `FIRE_SOFT_BOTTOM` 0.16): the atlases' frames are clear at
+  their edges; the hard edge is the flame's own base, opaque to its last row. Every fire flipbook (additive sets: the
+  trail, the tiers, the tips, forward air's blade, the n-air ring) is faded linearly from its lowest lit row over 16 %
+  of the frame's height, per cell (colour too: additive).
+- Tests: `gekkouga_clones_test ... --vcf` 313 / 0; `firetrail_tests` (each smash facing right and left: the flames' X 0, Y 0, local Z along
+  the way; the facing turn); `gekkouga_fx_test.soft_checks` (the bases' biggest row-to-row alpha drop, as built: 11 - 22
+  of 255 against the footage's 80 - 130; fire_torch_012's wisps 23 already). Not confirmed in game.

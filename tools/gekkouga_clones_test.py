@@ -2117,8 +2117,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     if z1 and len(earlier) == 28:
         check('fire trail fix v1: INSTALL_TO_data: the trail\'s MSC (its flames along X) and his effect bank (the fires\' soft '
               'bases)', sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
-              ['fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.efc', 'fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.ptcl',
-               'fighter/gekkouga/script/msc/firetrail/firetrail.mscsb'])
+              ['fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.ptcl', 'fighter/gekkouga/script/msc/firetrail/firetrail.mscsb'])
     if z1 and len(earlier) == 27:
         check('clone fixes v1: INSTALL_TO_data: the clone\'s MSC (its effects ended on a new move) and effect.bin (every '
               'motion\'s effect requests)',
