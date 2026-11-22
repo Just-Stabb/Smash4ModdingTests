@@ -916,3 +916,44 @@ v13 read +0x14). So:
   and the skeleton has no slot 17 module: a lead if the comparison shows nothing.
 - Tests: cave 197 / 224 / 219 (release / A_release / G_pose); `gekkouga_clones_test ... --v14` 236 / 0;
   supamario_ui_cave_test 0; import_call_check 0; byte-for-byte rebuilds.
+
+## Skeleton v1.2 (`greninja_skeleton_v1_2.zip`, over clones v15; exe_v46z_gks2)
+
+**The collision** (the user's log_v15_hydrant, A_release's S4CD - S4CH lines: Pac-Man's hydrant's ground +0x68 / +0x6C
+-1, +0x72 1, handle +0x163 1, GroundModule +0xFB 1; the skeleton's all 0). `0x02AC2EF0(gm, 0)`, which v1 - v1.1 called
+after making the grounds as the hydrant's set-up does, turns them OFF: the hydrant makes its ground off and its status
+hook turns it on when it lands (`(gm, 1)`, `0x02B3746C`), which then happens in the per-frame `0x02AC2E54` (+0x163 1,
+masks -1, `0x02D5D6E0`). v1.2 (`tools/gekkouga_clone_cave.py` `sk_col_make` / `sk_col_place`): `GC_ON (gm, 1)` and
+`GC_ENABLE` (`0x02AC2E54`) right after making them, `GC_ENABLE` again after each move (a no-op once on). The hydrant's
+handle callbacks only set its own WorkModule flag 0x10000010 on contact: not used (docs/native-notes.md "Article grounds
+are made OFF"). The diag build keeps the comparison lines. `SK_SCALE` 2.0 -> 1.0 (the carrier no longer shows).
+
+**The look** (`tools/gekkouga_fx.py`, `gekkouga_build.py effects`: his vanilla bank + the user's flipbooks
+`greninja_fire_effects_v1` = $S/fire_out/pkg, made by `tools/fx_video_to_flipbook.py`): four sets appended to
+gekkouga.010d0000.ptcl / .efc (entries 0x16 - 0x19, flags 0x100; his 20 sets / 22 entries unchanged):
+
+| Id | Set | Flipbook | Size / place | Blend |
+|---|---|---|---|---|
+| 0x3300016 / 0x3300017 | PtcGekkougaSkeletonR / L | skeleton_run, 55 cells 6 x 10 on 2048², 30 fps, loop (L: each cell mirrored) | 60.9 x 36.6: the body (alpha >= 0.5 rows 0.141 - 0.907 of a cell) 28 tall, its feet (sidecar anchor 0.933 of the frame = 0.9125 of the cell) on the call's point | normal |
+| 0x3300018 | PtcGekkougaSkeletonHit | impact_sparks, 24 cells, 30 fps, one-shot | 18 x 18, centred | normal |
+| 0x3300019 | PtcGekkougaSkeletonBoom | explosion_simple_24, 40 cells, 15 fps, one-shot (2.7 s) | 52.4 x 61.1: 44 wide at its widest (u 0.08 - 0.93 = the hitbox's 22 x 2), its base (v 0.895) on the call's point | normal |
+
+- Every emitter is a copy of Kirby's `PtcKirbyStoneEnd/stone` (its shader imported once): the only kind among the 7128
+  vanilla emitters that is a CPU particle (follow type 0 keeps it on a following call's live matrix), a camera billboard,
+  a flipbook program, colour combiner 1 (alpha from the texture's alpha), one BC3 RGBA texture, unlit, normal blend.
+  One particle per call, still, white, alpha 1; the texture the atlas as BC3 (one mip, clamped).
+- **32 cells at most per emitter** (docs/ptcl-format.md 0x4E0, docs/native-notes.md "eft flipbooks hold 32 cells"):
+  longer flipbooks are runs of up to 31 cells on emitters born in turn (`flip_plan`): the skeleton 28 + 27 cells
+  (start 0 / 56, born again every 110 frames, life 57 / 55), the explosion 20 + 20 (start 0 / 80, life 81 / 80); a run is
+  held on its last cell one extra frame (its table's last entry twice, mode 4 wraps) so the hand-over frame shows both
+  adjacent cells. Loops: fade 1.0 (ended: gone at once); one-shots fade 0 (a fade doesn't cut them).
+- **Its MSC** (`weapons/skeleton.c`): the carrier hidden (`sk_show_model` 0); at the start `EffectModule(0x26, 0)` and
+  `(0x1C, 1)` (a hidden model hides its following effects: docs/native-notes.md "Effects follow the model's visibility")
+  then `EffectModule(0x2717, R or L by its way, joint 0, ..., 1.0)`; explosion / smoke end both (`0x2723`); the hit spark
+  at the hit (op 3), the explosion at its feet (op 3, size 1), the smoke still the common puff.
+- Tests: `tools/gekkouga_fx_test.py` 19 / 0 (vanilla sets / entries unchanged, the ids in skeleton.c, each emitter's
+  fields, every frame of two loops / each one-shot's life drawn by Kirby's program in `tools/latte_exec.py` on the CB2 the
+  game's code fills: the right cell, hand-overs, nothing after a one-shot; the feet at the call's point and 28 tall, the
+  explosion's 44, the mirror); `gekkouga_clone_cave_test` 201 / 228 / 223 (release / A_release / G_pose; `col_on_checks`:
+  the game's GC_ON / GC_ENABLE / 0x02D5D6E0 leave the hydrant's words); `gekkouga_clones_test ... --v15` 236 / 0;
+  supamario_ui_cave_test 0 (release); import_call_check 0; byte-for-byte rebuilds. Not confirmed in game: everything here.

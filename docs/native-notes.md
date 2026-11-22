@@ -3906,7 +3906,7 @@ MSC on a bunshin-based kind, the 4-shape group.
   two stage grounds (`0x02D49F2C` in the ground manager `[0x102F7DB4]`, handles at +0xF0 / +0xF4, +0x160 their id) from
   the .lvd at gm +0xEC (the hydrant's specializer +0x3C `0x02B34508`: `0x030C40A8([0x102F9028] +0x30, &bundle, kind, 0,
   0)`, `0x032D7140(&bundle, &file, "firehydrant.lvd", 1)`, `0x032D69B8(gm + 0xEC, &file)`, then `0x02AC2EF0(gm, 0)`
-  switches them on (+0xFB 0) and `0x032D4200(&handle, 2)` releases each stack handle). Vertices: `0x02AC30C0(gm, i,
+  (switches them OFF: see "Skeleton collision" below) and `0x032D4200(&handle, 2)` releases each stack handle). Vertices: `0x02AC30C0(gm, i,
   &xy)` placed (`0x02D5D5F0`: current = last), `0x02AC312C` moved (`0x02D5D668`: last = current, so riders are carried),
   `0x02AC3204(gm)` recomputes the lines; the hydrant's update puts each on a model joint (`0x02B38950`, table gm +0xFC).
   `0x02AC29D8(gm)` releases them (its vt +0x2C / +0x4C). The hydrant's .lvd is one floor line (x +- 4.23 at y 14.09),
@@ -3920,7 +3920,20 @@ MSC on a bunshin-based kind, the 4-shape group.
   steps [mm+0x14] (`0x03314FB8`); on a weapon +0x14 is no such object (its +4 was 6: v13's E_sway crash at
   `[[+0x14]+4]+4`). Clones v14 copies his swing bones' world matrices (from +0x14 when it has the layout, else +0x10)
   onto each clone's +0x10 ones every frame phase.
-- **Skeleton collision, not working yet (skeleton v1)**: the hydrant route makes the grounds (`S4SC state=1`, handle
+- **Article grounds are made OFF; on is a second call (Greninja skeleton v1.2, the user's log_v15_hydrant)**:
+  `0x02AC2EF0(gm, on)` stores `on` at gm +0xFB; 0 turns each ground off (handle +0x163 0, +0x167 -> +0x16C, ground +0x68 /
+  +0x6C (its collision masks) 0, `0x02D5D870(ground, 1)`: +0x72 0) and the GroundModule +0x18 object's own handle (+0x234);
+  1 turns only that +0x234 handle on. The grounds themselves go on in `0x02AC2E54(gm)` (the object updates call it every
+  frame: `0x02BCAEF8`, `0x02BCAF8C`, `0x02BCB020`): with +0xFB set, each handle whose +0x163 is 0 gets +0x163 1, its ground
+  +0x68 / +0x6C -1 and `0x02D5D6E0(ground, 0, 1)` (+0x72 / +0x73 / +0x76 - +0x78 1, each vertex's last place = its place).
+  The hydrant makes its grounds off (`0x02B34618`) and its status hook (`0x02B373C0`: status 1) calls `(gm, 1)` when it
+  lands (2 / 4-6: `(gm, 0)`). The skeleton v1 - v1.1 stopped after the first call: grounds made, moved, never on (log:
+  ground +0x68 0, +0x72 0, +0xFB 0, +0x163 0 against the hydrant's -1 / 1 / 1 / 1). v1.2 calls `(gm, 1)` and
+  `0x02AC2E54` after making them (`gekkouga_clone_cave_test.col_on_checks` runs the game's three functions on a fake
+  GroundModule: the hydrant's words). The hydrant's handle callbacks (+0x44 on, +0x48 `0x02B34424`, +0x4C its accessor;
+  +0xA4 / +0xA8 `0x02B34470` / +0xAC) only set its WorkModule flag `0x10000010` when a contact record (type 0 / 2, object
+  id not 0x50000000, +0x2C set) comes in (and clear it, +0xA8, when the flag was on): its own logic, not the collision.
+- **Skeleton collision before v1.2 (skeleton v1)**: the hydrant route makes the grounds (`S4SC state=1`, handle
   0x13378650 in the user's log) but fighters neither stand on nor bump into them. Unverified: whether a lifecycle call
   (GroundModule vt +0x24 re-init `0x02AC29A4`, which zeroes +0xF0 without releasing; vt +0x4C `0x02AC2B50` / +0x2C
   `0x02AC2B1C`, which release) runs on the article after the make; the ground manager's layer pick (`[0x102F7DB4]
@@ -3932,5 +3945,16 @@ MSC on a bunshin-based kind, the 4-shape group.
   26 +0xC4, 27 +0x78. Slot 17 (+0x8C, ctor `0x02C4D2B8`, vtable `0x10108224`) is on the hydrant, Villager's tree /
   bowling ball, Wario's bike, Pikmin, Tico, Zelda's phantom, Rush coil; the hydrant's +0x3C calls its vt +0x3C(5),
   +0x74 / +0xC4 (Pac-Man's vl +0x4C0 / +0x4C4), +0x54(1) before making its grounds.
+- **eft flipbooks hold 32 cells (Greninja skeleton v1.2)**: every vanilla flipbook vertex program reads the cell from the
+  pattern table (CB2 ptnAnm0's vec4 17-24, 32 entries, filled from emitter 0x4E0 by `0x04A5A858` whatever 0x4D5 says);
+  no vanilla emitter has more than 32 cells (7128 checked). Run in `tools/latte_exec.py` (Kirby's PtcKirbyStoneEnd/stone
+  program, CB2 from `tools/eft_static.py`): mode 4 (uboFlag 0x8) shows table[(age / frames a cell) mod count] (it wraps:
+  not a clamp), mode 1 spreads the count over the life, mode 2 starts the loop elsewhere. `tools/gekkouga_fx.py` plays a
+  longer flipbook as runs of up to 31 cells on emitters born in turn (start frame = the cells before x frames a cell,
+  the period n x k), each run held on its last cell one extra frame (its table's last entry repeated) so a late birth
+  leaves no gap.
+- **Following effects of a hidden article**: the skeleton's carrier model is hidden (VisibilityModule 0x2710 0), which
+  hides its following effects ("Effects follow the model's visibility"); its MSC clears the sync (`EffectModule(0x26, 0)`)
+  and shows them again (`EffectModule(0x1C, 1)`) before its following body effect (`EffectModule(0x2717, ...)`).
 - **Clone swing (clones v15, confirmed in game)**: stepping the clone's MotionModule +0x10 object's own swing system
   (`0x03318A10` rate, `0x03314FB8` step) each frame swings its tongue / water with his own model.sb: no bind needed.

@@ -284,8 +284,10 @@ SK_W, SK_B, SK_H = 6.0, 2.0, 28.0   # its collision: x +- 6, a wall each side fr
                                   # at y + 28 (about 1.75 x a fighter's height: Greninja's ~16)
 SK_VERTS = ((-SK_W, SK_B), (-SK_W, SK_H), (SK_W, SK_H), (SK_W, SK_B))   # the .lvd's vertices (left wall, top, right wall)
 SK_HP = 25.0
-SK_SCALE = 2.0                    # the carrier model's scale while it runs (its stand-in body: the hydrant's top at 14.09
-                                  # x 2 = the collision's top); 1.0 from its explosion / smoke on (its hitbox unscaled)
+SK_SCALE = 1.0                    # its scale while it runs; 1.0 from its explosion / smoke on (its hitbox unscaled). v1 -
+                                  # v1.1: 2.0 (the carrier model, the hydrant, was its stand-in body: its top at 14.09 x 2);
+                                  # v1.2: the carrier is hidden and the body is a flipbook following its joint 0, which
+                                  # would grow with the object's scale
 PM_SCALE = 0xE4                   # PostureModule (accessor +0x18) vt +0xE4(f1): the object's scale (the moon's start)
 SK_LATCH = 16                     # attackers remembered per skeleton (one per owner slot): {accessor, entries latched}
 # its VARs (its MSC reads / writes them; the executable fills 0-4, 6-9)

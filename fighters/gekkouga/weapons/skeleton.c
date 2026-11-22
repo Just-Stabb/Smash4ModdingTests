@@ -7,8 +7,8 @@
 // runs it: from the start it runs straight on at sk_speed() (stopped by walls, off ledges it falls with his gravity),
 // at 0 HP it goes in a puff of smoke (no hitbox), at sk_fuse() frames it explodes (motion 1: its game script's hitbox).
 // Its phase in VAR_5 (1 running, 2 exploded, 3 smoked) for the executable. Its model (Pac-Man's hydrant's, a carrier for
-// its joints and its collision file) is its stand-in body while it runs (x 2: sk_show_model()), until the skeleton's
-// flipbook effect (sk_fx_body()) is in his effect bank.
+// its joints and its collision file) is hidden; v1.2: its body is the skeleton flipbook in his effect bank, following it
+// (sk_fx_body(): v1 / v1.1 showed the carrier x 2 as a stand-in).
 int global0;
 int global1;
 int global2;
@@ -644,16 +644,28 @@ int sk_boom_frames() { return 40; }       // the explosion: removed after this (
 int sk_smoke_frames() { return 3; }       // the smoke: removed after this (no hitbox)
 int sk_wait_max() { return 30; }          // never claimed (nobody asked): removed
 
-// effects (skeleton v1; placeholders until its flipbooks: sk_fx_* return the ids)
-int sk_fx_spark() { return 0x1000025; }   // a hit: the common glancing-blow spark
-int sk_fx_boom() { return 0x1000017; }    // the explosion: the common bomb explosion
+// effects (skeleton v1.2: his bank's flipbooks, the user's footage: tools/gekkouga_fx.py, his gekkouga.010d0000.ptcl
+// sets PtcGekkougaSkeleton*; v1's were common placeholders)
+int sk_fx_spark() { return 0x3300018; }   // a hit: impact_sparks (18 units across, at the hit)
+int sk_fx_boom() { return 0x3300019; }    // the explosion: explosion_simple_24 (44 wide at its widest: the hitbox's 22
+                                          // radius x 2; its base on the call's point)
 int sk_fx_smoke() { return 0x1000021; }   // 0 HP: the common smoke puff (an item's)
-int sk_fx_body() { return 0; }            // the skeleton itself (0: none)
-int sk_show_model() { return 1; }         // its stand-in body: the carrier model shown while it runs (the executable
-                                          // scales it x 2: its top on the collision's floor); 0 once sk_fx_body() is it
-float sk_fx_boom_size() { return 2.2f; }
+int sk_fx_body_r() { return 0x3300016; }  // the skeleton itself: skeleton_run (28 tall, its feet on the call's point),
+int sk_fx_body_l() { return 0x3300017; }  // following it; as shot (facing right) / each cell mirrored (left)
+int sk_show_model() { return 0; }         // the carrier model (Pac-Man's hydrant: its joints and files) hidden
+float sk_fx_boom_size() { return 1.0f; }
 float sk_fx_smoke_size() { return 3.0f; }
-float sk_fx_spark_size() { return 1.6f; }
+float sk_fx_spark_size() { return 1.0f; }
+float sk_boom_y() { return 0.0f; }        // the explosion's call: at its feet (the footage's base on the ground)
+
+int sk_fx_body()
+{
+    if (sk_dir < 0)
+    {
+        return sk_fx_body_l();
+    }
+    return sk_fx_body_r();
+}
 
 float sk_var(int n)
 {
@@ -692,20 +704,22 @@ void sk_fx_at(int id, float x, float y, float size)
     }
 }
 
+// the body: following its joint 0 (op 0x2717, the following form: Supamario's auras), ended by 0x2723 (its emitters'
+// fade 1.0: gone at once)
+// Its effects no longer follow its model's visibility (the carrier is hidden; docs/native-notes.md "Effects follow the
+// model's visibility": EffectModule 0x26 (0) clears the sync, 0x1C (1) shows its effects again: a following request
+// made while they are hidden would be hidden at once)
 void sk_body_on()
 {
-    if (sk_fx_body() != 0)
-    {
-        EffectModule(0x2710, sk_fx_body(), 0, 0, 0, 0, 0, 0, 0, 1.0f, 0, 0, 0, 0, 0, 0, 0);
-    }
+    EffectModule(0x26, 0);
+    EffectModule(0x1C, 0x1);
+    EffectModule(0x2717, sk_fx_body(), 0, 0, 0, 0, 0, 0, 0, 1.0f, 0);
 }
 
 void sk_body_off()
 {
-    if (sk_fx_body() != 0)
-    {
-        EffectModule(0x2723, sk_fx_body(), 0x1, 0x1);
-    }
+    EffectModule(0x2723, sk_fx_body_r(), 0x1, 0x1);
+    EffectModule(0x2723, sk_fx_body_l(), 0x1, 0x1);
 }
 
 // its start: the place / way the executable copied from him (the shadow's place, his facing)
@@ -781,7 +795,7 @@ void sk_explode()
     sk_end_t = 0;
     sk_set(5, 2.0f);                      // the executable: its collision removed, its explosion's hits burn
     sk_body_off();
-    sk_fx_at(sk_fx_boom(), sk_x, sk_y + sk_mid(), sk_fx_boom_size());
+    sk_fx_at(sk_fx_boom(), sk_x, sk_y + sk_boom_y(), sk_fx_boom_size());
     // its explode motion (its hitbox) the next frame: the executable has put its scale back to 1 by then
 }
 

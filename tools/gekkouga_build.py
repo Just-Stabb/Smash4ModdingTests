@@ -8,6 +8,9 @@
                                                                 gekkouga/script/animcmd) -> OUT/fighter/gekkouga/...
   python3 tools/gekkouga_build.py skeleton PACMAN_FIGHTER_DIR OUT_FIGHTER [TEST_ONLY_DIR]   skeleton v1: its files
                                                                 (vanilla fighter/pacman: its hydrant's model / motion)
+  python3 tools/gekkouga_build.py effects VANILLA_EFFECT_DIR KIRBY_PTCL FX_PKG OUT_FIGHTER   skeleton v1.2 on: his
+                                                                effect bank + the flipbooks (tools/gekkouga_fx.py) ->
+                                                                OUT_FIGHTER/effect/gekkouga/gekkouga.010d0000.ptcl / .efc
 
 VANILLA.c: the decompiled vanilla MSC with its labels (git show 0932c7b:fighters/gekkouga/gekkouga.c); the result is
 fighters/gekkouga/gekkouga.c. The MSC step runs tools/universal_mechanics.py on it (roll-off 2.2 / 1.0, Hero's
@@ -638,6 +641,10 @@ if __name__ == '__main__':
         print(cmd_data(a[1], a[2]))
     elif len(a) == 4 and a[0] == 'all':
         print(cmd_all(a[1], a[2], a[3]))
+    elif len(a) == 5 and a[0] == 'effects':
+        import gekkouga_fx
+        for k, v in gekkouga_fx.build(a[1], a[2], a[3], os.path.join(a[4], 'effect', 'gekkouga')).items():
+            print('0x%08X %s' % (v, k))
     elif len(a) in (3, 4) and a[0] == 'skeleton':
         print(cmd_skeleton(a[1], a[2], a[3] if len(a) > 3 else None))
     else:

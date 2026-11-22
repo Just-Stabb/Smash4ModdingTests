@@ -1105,10 +1105,13 @@ def skeleton_tests(mscsb, src):
           'motion (0), its phase 1 (VAR_5); the carrier model hidden',
           ([x for x in g.log if x[0] in ('lr', 'motion')], g.vars.get(0x0F000305), [x for x in g.log if x[0] == 'visible']),
           ([('lr', -1.0), ('motion', 0, 0.0, 1.0)], 1.0, [('visible', 0)]))
+    check('skeleton v1.2: its effects unhooked from its (hidden) model\'s visibility (EffectModule 0x26 (0), 0x1C (1)), then '
+          'its body the flipbook following it (op 0x2717: PtcGekkougaSkeletonL 0x3300017 for way -1, joint 0, no offset)',
+          [x[:3] for x in g.log if x[0] == 'effect'], [('effect', 0x26, 0), ('effect', 0x1C, 1), ('effect', 0x2717, 0x3300017)])
     g.log = []
     run(m, 1)
-    check('skeleton: running, its stand-in body (the carrier model, x 2 by the executable) shown',
-          [x for x in g.log if x[0] == 'visible'], [('visible', 1)])
+    check('skeleton v1.2: running, the carrier model (the hydrant) stays hidden (v1 / v1.1: shown x 2 as its stand-in body)',
+          [x for x in g.log if x[0] == 'visible' and x[1] != 0], [])
     check('skeleton run: 2 steps 0.7 left (38.6, 10)', (g.x, g.y), (38.6, 10.0))
     run(m, 8)
     check('skeleton run: 10 frames: 7 units (33, 10), straight on', (round(g.x, 2), g.y), (33.0, 10.0))
@@ -1121,6 +1124,8 @@ def skeleton_tests(mscsb, src):
     m, g = make(floors=[(-1000.0, 100.0, 10.0), (100.0, 1000.0, -20.0)])
     claim(g, 95.0, 10.0, 1.0)
     run(m, 8)
+    check('skeleton v1.2: way +1: the body as shot (PtcGekkougaSkeletonR 0x3300016), once',
+          [x[:3] for x in g.log if x[0] == 'effect' and x[1] == 0x2717], [('effect', 0x2717, 0x3300016)])
     check('skeleton ledge: it doesn\'t stop at the ledge (x 95 -> 100.6), off it it falls', (round(g.x, 1), g.y < 10.0), (100.6, True))
     ys = []
     for _ in range(30):
@@ -1137,10 +1142,12 @@ def skeleton_tests(mscsb, src):
           (1.0, ('motion', 0, 0.0, 1.0)))
     g.log = []
     run(m, 1)
-    check('skeleton explosion at 180: phase 2 (VAR_5: its collision removed, its scale 1, its hits burn), the explosion '
-          'effect at its middle (x, y + 14)',
-          (g.vars.get(0x0F000305), [x for x in g.log if x[0] == 'motion'], [x[:5] for x in g.log if x[0] == 'effect']),
-          (2.0, [], [('effect', 3, 0x1000017, round(40.0 - 0.7 * 179, 3), 24.0)]))
+    check('skeleton explosion at 180: phase 2 (VAR_5: its collision removed, its hits burn), its body ended (both facings\' '
+          'sets, 0x2723), v1.2: the explosion flipbook (0x3300019) at its feet (x, y: its base on the ground)',
+          (g.vars.get(0x0F000305), [x for x in g.log if x[0] == 'motion'], [x[:3] for x in g.log if x[0] == 'effect' and x[1] == 0x2723],
+           [x[:5] for x in g.log if x[0] == 'effect' and x[1] != 0x2723]),
+          (2.0, [], [('effect', 0x2723, 0x3300016), ('effect', 0x2723, 0x3300017)],
+           [('effect', 3, 0x3300019, round(40.0 - 0.7 * 179, 3), 10.0)]))
     g.log = []
     run(m, 1)
     check('skeleton explosion: the next frame (its scale back to 1) the explode motion (1: its hitbox), its body hidden',
@@ -1164,8 +1171,9 @@ def skeleton_tests(mscsb, src):
     g.vars.update({0x0F000309: 1.0, 0x0F000307: 50.0, 0x0F000308: 20.0, 0x0F000304: 9.0})
     g.log = []
     run(m, 1)
-    check('skeleton hit (the executable: VAR_9 1, at VAR_7 / 8): the spark there; 9 of 25: still running',
-          ([x[:5] for x in g.log if x[0] == 'effect'], g.vars.get(0x0F000305)), ([('effect', 3, 0x1000025, 50.0, 20.0)], 1.0))
+    check('skeleton hit (the executable: VAR_9 1, at VAR_7 / 8): v1.2: the impact sparks flipbook (0x3300018) there; 9 of 25: '
+          'still running',
+          ([x[:5] for x in g.log if x[0] == 'effect'], g.vars.get(0x0F000305)), ([('effect', 3, 0x3300018, 50.0, 20.0)], 1.0))
     g.log = []
     run(m, 1)
     check('skeleton hit: no new hit: no spark', [x for x in g.log if x[0] == 'effect'], [])
@@ -1174,9 +1182,10 @@ def skeleton_tests(mscsb, src):
     x0, y0 = g.x, g.y
     run(m, 1)
     check('skeleton at 0 HP (25 damage): smoked: phase 3, the smoke at its middle, motion 2 (no hitbox), no explosion',
-          (g.vars.get(0x0F000305), [x[:5] for x in g.log if x[0] == 'effect'], [x for x in g.log if x[0] == 'motion']),
-          (3.0, [('effect', 3, 0x1000025, 50.0, 20.0), ('effect', 3, 0x1000021, round(x0, 3), round(y0 + 14.0, 3))],
-           [('motion', 2, 0.0, 1.0)]))
+          (g.vars.get(0x0F000305), [x[:5] for x in g.log if x[0] == 'effect' and x[1] != 0x2723],
+           [x[:3] for x in g.log if x[0] == 'effect' and x[1] == 0x2723], [x for x in g.log if x[0] == 'motion']),
+          (3.0, [('effect', 3, 0x3300018, 50.0, 20.0), ('effect', 3, 0x1000021, round(x0, 3), round(y0 + 14.0, 3))],
+           [('effect', 0x2723, 0x3300016), ('effect', 0x2723, 0x3300017)], [('motion', 2, 0.0, 1.0)]))
     run(m, 2)
     check('skeleton smoke: removed 3 frames after', [x for x in g.log if x[0] == 'remove'], [])
     run(m, 1)
@@ -1414,6 +1423,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 19:   # v15: the release exe and data, test exes and data
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
+    if len(earlier) == 20:   # skeleton v1.2: the exes, his effect bank and the skeleton's MSC
+        want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 18:   # v14: exes and test data only
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 12:   # v12: TEST_ONLY exes only (the release and the data are v11's)
@@ -1436,7 +1447,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('update: none of the installed unchanged files again (%d unchanged)' % len(same1), [w for w in same1 if w in names], [])
         check('update: nothing in INSTALL_TO_data but the built files',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want), [])
-        if len(earlier) in (18, 19):
+        if len(earlier) in (18, 19, 20):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 17:
             check('skeleton v1: Sm4shCommand v1.7.27 (its three script names in ModAnimNames.txt)',
@@ -1474,6 +1485,11 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('v15: ... each as built and rigid = v14\'s', ([n for n in want_td if z.read(n) != open(os.path.join(out, n), 'rb').read()],
               [c for c in range(8) if z.read('TEST_ONLY_DATA/rigid/fighter/gekkouga/model/clone/c%02d/model.nud' % c) !=
                z1.read('TEST_ONLY_DATA/rigid/fighter/gekkouga/model/clone/c%02d/model.nud' % c)]), ([], []))
+    if z1 and len(earlier) == 20:
+        check('skeleton v1.2: INSTALL_TO_data: his effect bank (.ptcl / .efc: the flipbooks) and the skeleton\'s MSC',
+              sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              ['fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.efc', 'fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.ptcl',
+               'fighter/gekkouga/script/msc/skeleton/skeleton.mscsb'])
     if z1 and len(earlier) == 18:
         check('v14: no INSTALL_TO_data (the rigid-tongue release data stays)',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')), [])
@@ -1563,7 +1579,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     with tempfile.TemporaryDirectory() as td:
         import gekkouga_clone_cave as C
         for i, (member, b, dg, feats) in enumerate(exe_members(base, base_diag, len(earlier) >= 3, len(earlier) == 17,
-                                                               len(earlier) == 18, len(earlier) == 19)):
+                                                               len(earlier) == 18, len(earlier) >= 19)):
             if not b:
                 continue
             p = os.path.join(td, '%d.rpx' % i)
@@ -1602,7 +1618,9 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18, 19) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18, 19, 20) else \
+        ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
+         'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -1655,7 +1673,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
     z = zipfile.ZipFile(pkg)
     with tempfile.TemporaryDirectory() as td:
         for member, b, dg, feats in exe_members(base, base_diag, v4, len(earlier) == 17, len(earlier) == 18,
-                                                len(earlier) == 19):
+                                                len(earlier) >= 19):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')
@@ -1677,7 +1695,8 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
+                                               'b11', 'b12', 's1', '14', '15', 's12') for x in sys.argv[1:]
+               if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
     base_diag = a[4] if len(a) > 4 else None
