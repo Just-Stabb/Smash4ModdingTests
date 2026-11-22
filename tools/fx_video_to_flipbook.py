@@ -62,7 +62,6 @@ import json
 import math
 import os
 import subprocess
-import sys
 from fractions import Fraction
 
 import numpy as np
@@ -385,10 +384,17 @@ def run_job(opt):
             tail = mass[first + (last - first) // 2: last + 1]
             steady = float(np.median(tail))
             ok = box(mass[:, None], 2, axes=(0,))[:, 0] >= opt.sustain * steady
-            lo = last
-            while lo - 1 >= first and ok[lo - 1]:
-                lo -= 1
-            hi = last
+            runs, t = [], first                      # the longest sustained run (the latest on a tie)
+            while t <= last:
+                if ok[t]:
+                    u = t
+                    while u + 1 <= last and ok[u + 1]:
+                        u += 1
+                    runs.append((u - t, t, u))
+                    t = u + 1
+                else:
+                    t += 1
+            _n, lo, hi = max(runs) if runs else (0, first, last)
         step = float(fps) * K / 60
         Lmin = max(X + 2, math.ceil(cmin * step - 1e-6))
         Lmax = min(int(cmax * step + 1e-6), hi - lo - X)
@@ -572,10 +578,11 @@ def write_previews(od, name, cells, K, loop):
 def write_qa(qa, name, atlas8, cells, nx, loop):
     H, W = atlas8.shape[:2]
     grey = np.full((H, W, 3), 128, np.uint8)
-    sheet = np.concatenate([over(atlas8, checker(W, H, 16)), over(atlas8, grey)], 1)
+    add = np.clip(atlas8[..., :3] * (atlas8[..., 3:4] / 255.0) + 64, 0, 255).astype(np.uint8)
+    sheet = np.concatenate([over(atlas8, checker(W, H, 16)), over(atlas8, grey), add], 1)   # normal x2, additive
     Image.fromarray(sheet).save(os.path.join(qa, f'{name}_atlas_qa.png'))
     if loop and len(cells) >= 8:
-        seq = cells[-4:] + cells[:4]
+        seq = cells[-4:] + cells[:4]                 # the loop's last four cells, then its first four
         h = max(c.shape[0] for c in seq)
         strip = np.concatenate([over(c, np.full((h, c.shape[1], 3), 128, np.uint8)) for c in seq], 1)
         Image.fromarray(strip).save(os.path.join(qa, f'{name}_seam_qa.png'))
