@@ -153,7 +153,14 @@ CHARGE_DAMAGE = 1.4        # Smash 4's full smash charge (the attack's 0x1000000
 HITBOXES = ('Hitbox', 'Special_Hitbox', 'Extended_Hitbox', 'Extended_Special_Hitbox')
 CLONE_GAME = set(HITBOXES) | {'FRAME', 'WAIT', 'Remove_All_Hitboxes', 'Remove_Hitbox', 'Move_Hitbox', 'Script_End'}
 CLONE_EFFECT = {'FRAME', 'WAIT', 'Script_End', 'Graphic_Effect2', 'External_Graphic', 'EFFECT_FLIP', 'EFFECT_FOLLOW_FLIP',
-                'Terminate_Graphic_Effect', 'Sword_Glow', 'Terminate_Sword_Glow'}
+                'Terminate_Graphic_Effect', 'Sword_Glow', 'Terminate_Sword_Glow',
+                # clone fixes v1 (the user: "Up air's twist doesn't appear", "grab's effect doesn't appear"): every effect
+                # request his scripts use (up air's twist is Graphic_Effect5), their rate / colour
+                'Graphic_Effect', 'Graphic_Effect3', 'Graphic_Effect4', 'Graphic_Effect5', 'External_Graphic_Effect2',
+                'LANDING_EFFECT_FLIP', 'EFFECT_COLOR', 'LAST_EFFECT_SET_RATE'}
+CLONE_EFFECT_SKIP = {'CALL', 'JUMP', 'Set_Loop', 'Goto', 'Loop_Rest', 'WAIT_LOOP_CLR'}   # clone fixes v1: a motion's
+                                           # effect script copied (its conditions' True branches: flatten) unless it
+                                           # calls / jumps / loops
 FLOW = {'Set_Loop', 'Goto', 'Float_Var_Compare', 'True', 'Else', 'False', 'IS_FLAG', 'CALL', 'JUMP', 'EXECUTE',
         'Loop_Rest', 'Float_Compare', 'WAIT_LOOP_CLR'}
 NO_CLONE = {'IS_FLAG', 'CALL', 'JUMP'}     # scripts using these (his counter's attacks, ...) aren't copied
@@ -269,6 +276,9 @@ def clone_scripts(game, effect, mtable_hashes, bmap):
     for crc in sorted(set(mtable_hashes) - final):
         s = game.scripts.get(crc)
         if not s or not any(c.name in HITBOXES for c in s) or any(c.name in NO_CLONE for c in s):
+            eo = clone_effect(effect.scripts.get(crc), bmap)      # clone fixes v1: no hitbox (a grab, a throw, ...):
+            if eo:                                                # its effects anyway
+                e_out[crc] = eo
             continue
         inside = spans(s)
         out = []
@@ -286,23 +296,34 @@ def clone_scripts(game, effect, mtable_hashes, bmap):
                     c2.params[k] = round(float(c2.params[k]) * CHARGE_DAMAGE, 4)
             out.append(c2)
         g_out[crc] = out
-        e = effect.scripts.get(crc)
-        if e and crc in smash:
-            e = flatten(e)                # v4: his smashes' effects too (their conditions: the True branches)
-        if e and not any(c.name in FLOW for c in e):
-            eo = []
-            for c in e:
-                if c.name not in CLONE_EFFECT:
-                    continue
-                c2 = acmd.Command(c.ident, list(c.params))
-                for nm in ('Bone', 'Bone1', 'Bone2', 'Bone3'):
-                    if nm in c2.info['syntax']:
-                        k = param(c2, nm)
-                        c2.params[k] = bmap(int(c2.params[k]))
-                eo.append(c2)
-            if any(c.name not in ('FRAME', 'WAIT', 'Script_End') for c in eo):
-                e_out[crc] = eo
+        eo = clone_effect(effect.scripts.get(crc), bmap)
+        if eo:
+            e_out[crc] = eo
     return g_out, e_out
+
+
+def clone_effect(e, bmap):
+    """one motion's effect script for the clone: its conditions' True branches (v4: the smashes'; clone fixes v1: every
+    script's), CLONE_EFFECT's commands with their joints remapped; None when it calls / jumps / loops or has no effect"""
+    import acmd
+    if not e or any(c.name in CLONE_EFFECT_SKIP for c in e):
+        return None
+    eo = []
+    for c in flatten(e):
+        if c.name not in CLONE_EFFECT:
+            continue
+        c2 = acmd.Command(c.ident, list(c.params))
+        try:
+            for nm in ('Bone', 'Bone1', 'Bone2', 'Bone3'):
+                if nm in c2.info['syntax']:
+                    k = param(c2, nm)
+                    c2.params[k] = bmap(int(c2.params[k]))
+        except (IndexError, AssertionError):
+            continue                      # a joint past his model.jtb's tables: left out (none of the attacks')
+        eo.append(c2)
+    if any(c.name not in ('FRAME', 'WAIT', 'Script_End') for c in eo):
+        return eo
+    return None
 
 
 # burn v2: fire at the outer ends of his water (his bank's PtcGekkougaFireTip, fire_torch_012: a looping billboard flame

@@ -805,6 +805,7 @@ void cl_frame()
         k = 0x24;                         // falling on its own: Fall (its own loop)
         if (k != cl_motion)
         {
+            cl_move_end(k);
             MotionModule(0x1, k, 0, 1.0f);
             cl_motion = k;
         }
@@ -815,6 +816,7 @@ void cl_frame()
     }
     if (k != cl_motion || f + 0.5f < cl_last_f)
     {
+        cl_move_end(k);
         MotionModule(0x1, k, f, r);       // his new motion (or his restart), from his frame: its script runs from it
         cl_motion = k;
     }
@@ -880,4 +882,18 @@ float cl_hist(int i, float v0, float v1, float v2)
         return v2;
     }
     return v0;
+}
+
+// ---- clone fixes v1 (the user: "down air's effects stay on clones indefinitely", "smash attacks charging effects never
+// clear for the clones"): a fighter's following effects end with its moves (his scripts' Terminates, his status ends);
+// the clone's one status never ends and a script left early (his move cancelled, landed, chained) never reaches its
+// Terminates. So on a new motion kind (not a restart of the same one) every following effect of the clone is ended
+// with a fade (EffectModule int op 0x2D (0): vt +0xD4, docs/native-notes.md): its last move's sword / water / streaks.
+// World effects (Graphic_Effect: one-shots at a place) play out as on him.
+void cl_move_end(int k)
+{
+    if (cl_motion != 0xffffffff && k != cl_motion)
+    {
+        EffectModule(0x2d, 0);
+    }
 }

@@ -1309,6 +1309,85 @@ def clone_delay_tests(mscsb, src):
     check('not alive (its bit gone): hidden, its history dropped (alive again: his motion now)',
           [x[1] for x in feed(0x32, 0.0) if x[0] == 'motion'], [0x32])
 
+def clone_fx_tests(mscsb, src, out):
+    """clone fixes v1: the clone ends its following effects (EffectModule 0x2D (0): a fade) on a new motion kind, not on a
+    restart; its effect.bin has every motion's effects his has (conditions' True branches), up air's twist and the grabs'"""
+    m = stub_fn(MSC(mscsb, src), 'cl_delay', 0)
+    g = m.game
+    sh, pos = {}, {}
+
+    def sysf(sid, a, old=g.sys):
+        if sid == 0x17 and a[0] == 0:
+            if a[1] in sh:
+                return f2i(sh[a[1]])
+            if a[1] in pos:
+                return f2i(pos[a[1]])
+        if sid == 0x12 and a[0] == 0x1:
+            g.log.append(('motion', a[1]))
+            return 0
+        if sid == 0x1C:
+            g.log.append(('fx', a[0]) + tuple(a[1:2]))
+            return 0
+        return old(sid, a)
+    g.sys = sysf
+    base = 0x0F000340 + 8
+    sh[base + 0], sh[base + 2] = 86.0, 114.0
+    g.x, g.y = 98.0, 0.0
+
+    def feed(kind, frame, flags=3):
+        sh[base + 4] = kind * 1024 + frame
+        sh[base + 5] = 1.0
+        sh[base + 7] = 4747000.0 + flags
+        pos[0x0F000020 + 4 + 3] = 1.0
+        g.log = []
+        m('cl_frame')
+        return [x for x in g.log if x[0] in ('motion', 'fx')]
+    feed(0x62, 0.0, 3 + 8)                         # made during his up smash hold (0x62)
+    seq = []
+    for k, f in ((0x62, 1.0), (0x62, 2.0), (0x63, 0.0), (0x63, 1.0), (0x63, 0.0), (0x1B, 0.0), (0x1B, 1.0)):
+        seq.append(feed(k, f))
+    check('clone fixes v1: the clone in his smash hold (0x62), then his up smash (0x63), its restart, a jump (0x1B): its '
+          'following effects ended (EffectModule 0x2D (0): a fade) before each new move, not on a restart or within a move',
+          seq, [[], [], [('fx', 0x2D, 0), ('motion', 0x63)], [], [('motion', 0x63)], [('fx', 0x2D, 0), ('motion', 0x1B)], []])
+    g.log = []
+    feed(0x1B, 2.0, 3 + 0x20)
+    check('clone fixes v1: ... falling on its own (Fall): ended too', [x for x in g.log if x[0] in ('motion', 'fx')],
+          [('fx', 0x2D, 0), ('motion', 0x24)])
+    # its effect.bin
+    O = os.path.join(out, 'fighter', 'gekkouga', 'script', 'animcmd')
+    pe = acmd.ACMDFile.load(os.path.join(O, 'body', 'effect.bin'))
+    ce = acmd.ACMDFile.load(os.path.join(O, 'weapon', 'clone', 'effect.bin'))
+    req = lambda cmds: [(c.name, int(c.params[0])) for c in cmds if c.name in GB.CLONE_EFFECT and   # noqa: E731
+                        c.name not in ('FRAME', 'WAIT', 'Script_End')]
+    names = ('attackairhi', 'catch', 'catchdash', 'catchturn', 'attackairlw', 'attackairf', 'attackairb', 'attackhi4')
+    got = {n: req(ce.scripts.get(zlib.crc32(n.encode()), [])) for n in names}
+    want = {n: req(GB.flatten(pe.scripts[zlib.crc32(n.encode())])) for n in names}
+    check('clone fixes v1: the clone\'s effect scripts request his effects (up air\'s twist Graphic_Effect5 0x1000023, the '
+          'grabs\' 0x3300015, his conditions\' True branches): %s' % ', '.join(names), got, want)
+    mdl = os.path.join(out, 'fighter', 'gekkouga', 'model', 'clone', 'c00')
+    bm = GB.bone_map(open(os.path.join(mdl, 'model.jtb'), 'rb').read(), os.path.join(mdl, 'model.vbn'))
+
+    def mappable(c):
+        try:
+            for nm in ('Bone', 'Bone1', 'Bone2', 'Bone3'):
+                if nm in c.info['syntax']:
+                    bm(int(c.params[c.info['syntax'].index(nm)]))
+            return True
+        except (IndexError, AssertionError):
+            return False
+    bad = []
+    for crc, cmds in ce.scripts.items():
+        if crc not in pe.scripts:
+            bad.append((hex(crc), 'not his'))
+            continue
+        if req(cmds) != req([c for c in GB.flatten(pe.scripts[crc]) if mappable(c)]):
+            bad.append(hex(crc))
+    check('clone fixes v1: every clone effect script (%d) requests his own effects in his order (the joints remapped; '
+          'a request on a joint past his model.jtb tables left out)' %
+          len(ce.scripts), bad, [])
+    check('clone fixes v1: at least the motions his scripts give effects without loops / calls (%d)' % len(ce.scripts),
+          len(ce.scripts) >= 90, True)
+
 def skeleton_side_tests(mscsb, src):
     """skeleton v1: his side special (SpecialS 0x153's per-frame: gk_ss_tick, in place of func_2291), the request's
     lapse, the reset on the executable's clear-all count (his VAR_14)"""
@@ -1825,8 +1904,14 @@ def script_tests(out, user):
         for c in ce.scripts.get(zlib.crc32(nm.encode()), []):
             if 'Size' in c.info['syntax'] and c.name != 'Sword_Glow' and int(c.params[0]) != GB.FIRE_TIP:
                 sizes.append(float(c.params[c.info['syntax'].index('Size')]))
-    check('v4: the clone has his smash effects too (their True branches), at his sizes (5x: water sword / flash 5.0)',
-          (len(sizes) >= 8, all(abs(x - 5.0) < 1e-3 for x in sizes)), (True, True))
+    his = []
+    for nm in GB.SMASH_SCRIPTS:
+        for c in GB.flatten(pe.scripts.get(zlib.crc32(nm.encode()), [])):
+            if c.name in GB.CLONE_EFFECT and 'Size' in c.info['syntax'] and c.name != 'Sword_Glow' and \
+                    int(c.params[0]) != GB.FIRE_TIP:
+                his.append(float(c.params[c.info['syntax'].index('Size')]))
+    check('v4: the clone has his smash effects too (their True branches), at his sizes (x5: the water sword / flash 5.0; '
+          'clone fixes v1: every effect request of them)', (len(sizes) >= 8, sizes == his, 5.0 in sizes), (True, True, True))
     sw = [c for nm in GB.SMASH_SCRIPTS for c in ce.scripts.get(zlib.crc32(nm.encode()), []) if c.name == 'Sword_Glow']
     check('v4: ... its trails 5x long (Y2 -55) on its sword joints (0x7D0 + 24 / 25)',
           sorted({(int(c.params[c.info['syntax'].index('Bone2')]), round(float(c.params[c.info['syntax'].index('Y2')]), 2))
@@ -1936,7 +2021,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (20, 21, 26):   # skeleton v1.2 / burn v2 / skeleton v1.3: the exes, the data, test exes
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
-    if len(earlier) in (23, 24, 25):   # burn v2.2 / v2.3 / aerial chain v1: data only
+    if len(earlier) in (23, 24, 25, 27):   # burn v2.2 / v2.3 / aerial chain v1 / clone fixes v1: data only
         want_top = ['INSTALL_TO_data', 'README.txt']
     if len(earlier) == 22:   # burn v2.1: the exes only (the floor is the exe's)
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
@@ -1962,7 +2047,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('update: none of the installed unchanged files again (%d unchanged)' % len(same1), [w for w in same1 if w in names], [])
         check('update: nothing in INSTALL_TO_data but the built files',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want), [])
-        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26):
+        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 21:
             check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
@@ -2024,6 +2109,11 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               'places delayed) and the clone\'s MSC (its playback delayed)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
               ['fighter/gekkouga/script/msc/clone/clone.mscsb', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
+    if z1 and len(earlier) == 27:
+        check('clone fixes v1: INSTALL_TO_data: the clone\'s MSC (its effects ended on a new move) and effect.bin (every '
+              'motion\'s effect requests)',
+              sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              ['fighter/gekkouga/script/animcmd/weapon/clone/effect.bin', 'fighter/gekkouga/script/msc/clone/clone.mscsb'])
     if z1 and len(earlier) == 26:
         check('skeleton v1.3: INSTALL_TO_data: his effect bank (the runs born on time, the burn tiers\' fires, forward air\'s '
               'blade flames), his body game.bin (the rolls\' roll-off speed) and effect.bin (forward air), the clone\'s '
@@ -2178,7 +2268,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18, 19, 20, 21, 22, 23, 24, 25, 26) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -2195,6 +2285,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
          'sword', '1 frame', '2 frames', 'hitlag', 'swap', 'S4GF', 'unconfirmed', 'exe_v46z_gkb5') if len(earlier) == 25 else \
         ('greninja_aerialchain_v1', 'exe_v46z_gkb6', 'blink', 'collision', 'tier', 'stack', 'forward air', 'blade', 'roll',
          '2.5', '1.24', 'A_release', 'G_pose', 'S4SD', 'unconfirmed', 'burn_tiers.png', 'fair.png') if len(earlier) == 26 else \
+        ('greninja_skeleton_v1_3', 'up air', 'grab', 'down air', 'smash', 'charge', 'shuriken', 'forward air', 'back air',
+         'walk', 'unconfirmed', 'exe_v46z_gkb6') if len(earlier) == 27 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -2273,7 +2365,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
@@ -2285,6 +2377,7 @@ def main():
     aerial_chain_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
     delay_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
     clone_delay_tests(os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC)
+    clone_fx_tests(os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC, out)
     if os.path.exists(os.path.join(msc, 'skeleton', 'skeleton.mscsb')):
         skeleton_side_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
         skeleton_tests(os.path.join(msc, 'skeleton', 'skeleton.mscsb'), GB.SKELETON_MSC)

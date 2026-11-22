@@ -1172,3 +1172,31 @@ multiplier" ("if the roll script is already in place, uncap his roll speed").
   and the exe on 10 cases, swaps only on a tier change, the fade; the GroundModule update before the vertices);
   `gekkouga_fx_test` 51 / 0; `rolloff_hold_test` gekkouga ok; `gekkouga_clones_test ... --vac` 307 / 0;
   supamario_ui_cave_test 0; import_call_check 0. Not confirmed in game: everything here.
+
+## Clone fixes v1 (`greninja_clonefix_v1.zip`, over skeleton v1.3; data only, exe_v46z_gkb6)
+
+The user (screenshots `$S/gk_in/clone_fx/`): "the clones don't copy effects like neutral special's shuriken, forward air's
+water sword doesn't move, Up air's twist doesn't appear, down air's effects stay on clones indefinitely, grab's effect
+doesn't appear. Back air is missing it's blue inner trail", "Smash attack charging effects never clear for the clones".
+The audit (his body effect.bin against the clone's): 28 clone effect scripts, only for motions with hitboxes and only
+Graphic_Effect2 / External_Graphic / EFFECT_FLIP / EFFECT_FOLLOW_FLIP / Terminate / Sword_Glow; up air's twist is
+Graphic_Effect5, the grabs (Catch / CatchDash / CatchTurn / CatchWait: no hitbox) never copied.
+- **Effect scripts** (`gekkouga_build.py` `clone_effect`, `CLONE_EFFECT`, `CLONE_EFFECT_SKIP`): every motion's effect
+  script (not his Final Smash's), its conditions' True branches (`flatten`, as v4's smashes), every effect request kind
+  his scripts use (+ Graphic_Effect / 3 / 4 / 5, External_Graphic_Effect2, LANDING_EFFECT_FLIP, EFFECT_COLOR,
+  LAST_EFFECT_SET_RATE), joints remapped; skipped: scripts that call / jump / loop (Run / Walk dust, Attack100,
+  SpecialNHold, ...); a request on a joint past his model.jtb tables (an appeal's joint 26) left out. 100 scripts.
+- **Stuck effects** (`weapons/clone.c` `cl_move_end`): a fighter's following effects end with his move; the clone's one
+  status never ends and a script left early never reaches its Terminates (down air's streaks, the smashes' x5 water
+  swords when he cancels / chains / jumps). On a new motion kind (not a restart) the clone ends every following effect
+  with a fade: `EffectModule(0x2D, 0)` (vt +0xD4 `0x02C2BD44`: the object's following effects, `0x0334F308(record, 0,
+  0)`; docs/native-notes.md). World requests (Graphic_Effect: puffs, sparks) play out.
+- **Not fixed**: neutral special's shuriken (an article; a clone can't generate one: it needs exe code generating his
+  shuriken at the clone's place, not done); forward air's sword on the clones (joint 25 = model.jtb table 0's ThrowN,
+  still at his origin in AttackAirF's data, on him too: why it swings on him is not found); back air's inner trail (the
+  clone's script is his exactly: likely a fighter-only effect colour, not found); "clones ... clip back to a set position
+  constantly" on the ground (`$S/gk_in/clone_move/a.mp4`): not reproduced in the MSC test (walking at 2 a frame they
+  follow his X 1 / 2 frames late, no jumps).
+- Tests: `gekkouga_clones_test.clone_fx_tests` (hold -> up smash -> restart -> jump -> its own fall: 0x2D before each new
+  move only; up air / grabs / down air / forward / back air / up smash request his effects; all 100 scripts his requests
+  in his order); the v4 smash-size check now compares with his. Not confirmed in game.
