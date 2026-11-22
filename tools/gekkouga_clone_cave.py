@@ -77,7 +77,8 @@ import weapon_expand_append as WA  # noqa: E402
 from ppcasm import Asm, ha  # noqa: E402
 
 CAVE = 0x04BEA000
-LIMIT = 0x04BEE000                # v3: 8 KB more (zero in exe_v46z_ui10: past its text)
+LIMIT = 0x04BF4000                # v3: 8 KB more (zero in exe_v46z_ui10: past its text); v13: 24 KB (the hit check's
+                                  # projectiles / items and the swing bind filled v12's)
 TEXT_REGION = LIMIT - 0x02000000
 TRAMP = 0x037EE540                # 4 words (zero in exe_v46z_ui10)
 
@@ -137,6 +138,10 @@ AM_ENTS, AM_COUNT, AM_MAX = 0x14, 0x18, 32         # AttackModule +8 container: 
 ENT_SIZE, ENT_NODES, NODE_MAX = 0x174, 0x18, 64    # an entry: +0 first node, +4 count, +0x18 node pointers (cap)
 NODE_ON, NODE_MIN_X, NODE_MIN_Y, NODE_MAX_X, NODE_MAX_Y = 0x3C, 0x18, 0x1C, 0x20, 0x24   # a node: on, its x / y box
 TEAM_MOD = 0x6C                   # the accessor's TeamModule (+8 the team id)
+HC_OBJ_SIZES = (0x76B0, 0x1E20, 0, 0, 0x3B88)   # v13: the object tables' entry sizes (categories 0 fighters, 1 weapons,
+                                  # 4 items: 0x02BF4A88 / 0x02BF4B24 / 0x02BF4CF8)
+HC_OBJ_MAX = 128                  # objects a category tested at most
+AM_DATA, SLOT_SIZE, SLOT_DMG = 0x40, 0x84, 0x18   # AttackModule +0x40 its hitboxes' data (0x84 each, +0x18 damage)
 HC_BOX = (6.0, 0.0, 18.0)         # the clone's box: x +- 6, y + 0 to y + 18 (his body: his shield-route capsules y 3 -
                                   # 15, radius 5.5)
 SWING_RATE = 0x03318A10           # v12: (motion object, f1 rate): its swing's +0x90
@@ -548,7 +553,8 @@ def build(rpx, diag=False, feats=None):
     assert A['gk_slow'] == A['gk_hide'] + 0x20
     assert not diag or A['gk_lastf'] == A['gk_slow'] + 0x20
     A['ctf'] = alloc(12 * 4, 4)         # v6: the gauge's colour per mode
-    A['hcbox'] = alloc(12) if 'hitcheck' in feats else 0   # v12: the hit check's box
+    A['hcbox'] = alloc(0x1C) if 'hitcheck' in feats else 0   # v12: the hit check's box (+0xC: this frame's edges)
+    A['hcsize'] = alloc(4 * len(HC_OBJ_SIZES)) if 'hitcheck' in feats else 0
     A['gk_plyr'] = alloc(4 * SLOTS)     # v10: per player, the cursor show byte we cleared + 1 (0: none)
     A['gk_tags'] = alloc(4 * SLOTS)     # v7: the tag messages' countdown per slot (0: shown)
     A['gk_names'] = alloc(8 * len(GAUGE_NAMES), 4)    # v7: the round gauge's clip names {char *, length}
@@ -577,7 +583,7 @@ def build(rpx, diag=False, feats=None):
             ('gk_fw', 'S4GW tag message: visible=%d object id=%d gone=%d handle=%08X\n'),
             ('gk_fm', 'S4GM clone id=%d draw: visflag=%d visible=%d model mode=%d drawn=%d overlay=%d/%d\n'),
             ('gk_fn', 'S4GN clone id=%d z=%d scale x100=%d link mask=%08X model=%08X\n'),
-            ('gk_fh', 'S4GH hit check: attacker slot=%d hitbox=%d clone id=%d at x=%d y=%d\n'),
+            ('gk_fh', 'S4GH hit check: attacker=%X (category x 16 + index) hitbox=%d clone id=%d hitlag=%d at x=%d y=%d\n'),
             ('gk_fr', 'S4GR clone swing step %d (0 before, 1 after): motion=%08X swing=%08X set up=%d flags=%08X\n'),
             ('gk_fq', 'S4GQ clone id=%d swing: motionmodule=%08X need=%08X motion=%08X swing=%08X flags=%08X set up=%d\n'),
             ('gk_fy', 'S4GY clone hurt object 0: %08X %08X %08X %08X %08X %08X\n'),
@@ -620,7 +626,8 @@ def build(rpx, diag=False, feats=None):
     out.blob(A['gk_tags'], bytes(4 * SLOTS), 'tag message countdowns')
     out.blob(A['gk_plyr'], bytes(4 * SLOTS), 'cursor show bytes saved')
     if 'hitcheck' in feats:
-        out.blob(A['hcbox'], struct.pack('>3f', *HC_BOX), 'hit check box')
+        out.blob(A['hcbox'], struct.pack('>7f', *(HC_BOX + (0.0,) * 4)), 'hit check box')
+        out.blob(A['hcsize'], struct.pack('>%dI' % len(HC_OBJ_SIZES), *HC_OBJ_SIZES), 'hit check object sizes')
     strs, ptrs, at = b'', [], A['gk_namestr']
     for n in GAUGE_NAMES:
         ptrs.append((at + len(strs), len(n)))
@@ -644,11 +651,12 @@ def build(rpx, diag=False, feats=None):
              wstop=W_STOP, wcol=W_COLOUR, wmodel=W_MODEL, wlink=W_LINK, wvis=W_VIS, wpost=W_POSTURE,
              cclear=COLOUR_CLEAR, am_ents=AM_ENTS, am_count=AM_COUNT, am_max=AM_MAX, ent_size=ENT_SIZE,
              ent_nodes=ENT_NODES, node_max=NODE_MAX, node_on=NODE_ON, node_min_x=NODE_MIN_X, node_min_y=NODE_MIN_Y,
-             node_max_x=NODE_MAX_X, node_max_y=NODE_MAX_Y, team=TEAM_MOD, wmotion=W_MOTION, mo_swing=MO_SWING, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
+             node_max_x=NODE_MAX_X, node_max_y=NODE_MAX_Y, team=TEAM_MOD,
+             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
              hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -1438,14 +1446,17 @@ wsl_go: lis r3, %(gk_fr_hi)d
         blr''') + '''
 
 ''') if 'sway' in feats else '') + '''
-''' + ((r'''# ---- v12 hitcheck (F_hitcheck): the clone hit from Greninja's side. The native hurtboxes (v3 - v11) never met an
-# attack; this tests every other live fighter's active attack nodes against the clone's box at its place, once a frame
-# (the +0x94 phase): AttackModule (accessor +0x50) +8 its collision container: +0xC the entries (0x174, one per hitbox
-# id), +0x10 their count; an entry's nodes: +0 first index, +4 count, +0x18 the node pointers; a node: +0x3C on, its
-# x / y bounding box +0x18 / +0x1C (min) +0x20 / +0x24 (max) (the game's pair pass 0x02C0F6F0 tests the same boxes
-# first). Same team (TeamModule accessor +0x6C, team id +8) skipped. A hit: his VAR_21 = HIT_BIAS2 + its id (his MSC
-# removes that clone: smoke and the log, as the hurt route), the clone's VAR_4 latched (once per clone life: w_start
-# clears it); diag S4GH (attacker slot, hitbox, clone id, place)
+''' + ((r'''# ---- v12 / v13 hitcheck: the clone hit from Greninja's side (the native hurtboxes never met an attack; v12's
+# F_hitcheck worked in the user's game). Once a frame (the +0x94 phase) every live battle object's active attack nodes
+# against the clone's box at its place: the fighters (holder [0x1035184C] +0, 0x76B0 each), v13 the weapons (+4,
+# 0x1E20) and the items (+0x10, 0x3B88); an object: +0x1E live (>= 4, as 0x02BF2108), +0xC its module accessor.
+# AttackModule (accessor +0x50) +8 its collision container: +0xC the entries (0x174, one per hitbox id), +0x10 their
+# count; an entry's nodes: +0 first index, +4 count, +0x18 the node pointers; a node: +0x3C on, its x / y box +0x18 /
+# +0x1C (min) +0x20 / +0x24 (max) (the boxes the game's pair pass 0x02C0F6F0 tests first). His team (TeamModule +0x6C,
+# team id +8) skipped (a fighter's team -1 never matches; a weapon's / item's equal to his always skipped: his own
+# shuriken). A hit: his VAR_21 = HIT_BIAS2 + its id (his MSC: smoke and the log), the clone's VAR_4 latched (w_start
+# clears it), v13 the attacker's hitlag (HITSTOP_FN on that hitbox's data and damage, its StopModule vt +0x8C(frames,
+# 1), as the clone's own hit method gives him). Diag S4GH (attacker: category x 16 + index, hitbox, clone id, place)
 w_hitchk:
         stwu r1, -0x70(r1)
         mflr r0
@@ -1471,13 +1482,28 @@ w_hitchk:
         fctiwz f1, f1
         stfd f1, 0x18(r1)
         lwz r28, 0x1C(r1)               # its owner's slot (1 - 8)
-        lwz r12, %(wpost)d(r31)         # its place
+        lwz r12, %(wpost)d(r31)         # its place: the box
         cmpwi r12, 0
         beq hc_out
-        lfs f0, 0x10(r12)
-        stfs f0, 0x20(r1)
-        lfs f0, 0x14(r12)
-        stfs f0, 0x24(r1)
+        lis r8, %(hcbox_hi)d
+        addi r8, r8, %(hcbox_lo)d
+        lfs f2, 0x10(r12)
+        lfs f3, 0(r8)
+        fsubs f4, f2, f3
+        stfs f4, 0xC(r8)                # left
+        fadds f4, f2, f3
+        stfs f4, 0x10(r8)               # right
+        lfs f2, 0x14(r12)
+        lfs f3, 4(r8)
+        fadds f4, f2, f3
+        stfs f4, 0x14(r8)               # bottom
+        lfs f3, 8(r8)
+        fadds f4, f2, f3
+        stfs f4, 0x18(r8)               # top
+        lfs f2, 0x10(r12)
+        stfs f2, 0x20(r1)
+        lfs f2, 0x14(r12)
+        stfs f2, 0x24(r1)
         mr r3, r28
         bl gk_entry
         mr. r27, r3                     # his entry
@@ -1485,135 +1511,212 @@ w_hitchk:
         li r26, -2                      # his team (-2: none read)
         lwz r12, %(bacc)d(r27)
         cmpwi r12, 0
-        beq hc_team
+        beq hc_cats
         lwz r12, %(team)d(r12)
         cmpwi r12, 0
-        beq hc_team
+        beq hc_cats
         lwz r26, 8(r12)
-hc_team:
-        li r25, 0                       # the other slots (0-based)
-hc_slot:
-        addi r25, r25, 1
-        cmpwi r25, %(slots)d
-        bgt hc_out
-        cmpw r25, r28
-        beq hc_slot
-        mr r3, r25
-        bl gk_entry
-        cmpwi r3, 0
-        beq hc_slot
-        lwz r24, %(bacc)d(r3)           # its accessor
-        cmpwi r24, 0
-        beq hc_slot
+hc_cats:
+        li r25, 0                       # the category (0 fighters, 1 weapons, 4 items)
+hc_cat: lis r12, %(ftab_hi)d
+        lwz r12, %(ftab_lo)d(r12)
+        cmpwi r12, 0
+        beq hc_out
+        slwi r0, r25, 2
+        lwzx r12, r12, r0               # the category's table
+        lis r0, 0x1000
+        cmplw r12, r0
+        blt hc_ncat
+        lis r0, 0x8000
+        cmplw r12, r0
+        bge hc_ncat
+        lwz r23, 0(r12)                 # its objects
+        lwz r22, 8(r12)                 # their count
+        cmplwi r22, %(obj_max)d
+        ble hc_cnt
+        li r22, %(obj_max)d
+hc_cnt: li r21, 0
+        lis r12, %(hcsize_hi)d
+        addi r12, r12, %(hcsize_lo)d
+        slwi r0, r25, 2
+        lwzx r20, r12, r0               # its object size
+hc_obj: cmpw r21, r22
+        bge hc_ncat
+        mullw r12, r21, r20
+        add r24, r23, r12               # the object
+        addi r21, r21, 1
+        cmpwi r25, 0
+        bne hc_notme
+        cmpw r24, r27
+        beq hc_obj                      # him
+hc_notme:
+        lbz r0, 0x1E(r24)
+        cmplwi r0, 4
+        blt hc_obj
+        lwz r24, %(bacc)d(r24)          # its accessor
+        lis r0, 0x1000
+        cmplw r24, r0
+        blt hc_obj
+        lis r0, 0x8000
+        cmplw r24, r0
+        bge hc_obj
         lwz r12, %(team)d(r24)
         cmpwi r12, 0
-        beq hc_noteam
+        beq hc_test
         lwz r12, 8(r12)
-        cmpwi r12, -1
-        beq hc_noteam
         cmpw r12, r26
-        beq hc_slot                     # his team
-hc_noteam:
-        lwz r12, %(watk)d(r24)          # its AttackModule
-        cmpwi r12, 0
-        beq hc_slot
-        lwz r23, %(am_ents)d(r12)       # the entries
-        lwz r22, %(am_count)d(r12)
-        lis r0, 0x1000
-        cmplw r23, r0
-        blt hc_slot
-        lis r0, 0x8000
-        cmplw r23, r0
-        bge hc_slot
-        cmplwi r22, %(am_max)d
-        bgt hc_slot
-        li r21, 0                       # the entry
-hc_ent: cmpw r21, r22
-        bge hc_slot
-        mulli r12, r21, %(ent_size)d
-        add r12, r12, r23
-        lwz r11, 0(r12)                 # its first node index
-        lwz r10, 4(r12)                 # its node count
-        cmplwi r11, %(node_max)d
-        bgt hc_next
-        cmplwi r10, %(node_max)d
-        bgt hc_next
-        slwi r11, r11, 2
-        add r11, r11, r12
-        addi r11, r11, %(ent_nodes)d    # its first node pointer
-        li r20, 0
-hc_node:
-        cmpw r20, r10
-        bge hc_next
-        slwi r9, r20, 2
-        lwzx r9, r11, r9
-        addi r20, r20, 1
-        lis r0, 0x1000
-        cmplw r9, r0
-        blt hc_node
-        lis r0, 0x8000
-        cmplw r9, r0
-        bge hc_node
-        lbz r0, %(node_on)d(r9)
-        cmpwi r0, 0
-        beq hc_node
-        lis r8, %(hcbox_hi)d
-        addi r8, r8, %(hcbox_lo)d
-        lfs f2, 0x20(r1)                # x
-        lfs f3, 0(r8)                   # half width
-        fsubs f4, f2, f3
-        lfs f0, %(node_max_x)d(r9)
-        fcmpu cr0, f0, f4
-        blt hc_node                     # its right edge left of the box
-        fadds f4, f2, f3
-        lfs f0, %(node_min_x)d(r9)
-        fcmpu cr0, f0, f4
-        bgt hc_node
-        lfs f2, 0x24(r1)                # y
-        lfs f3, 4(r8)                   # bottom offset
-        fadds f4, f2, f3
-        lfs f0, %(node_max_y)d(r9)
-        fcmpu cr0, f0, f4
-        blt hc_node
-        lfs f3, 8(r8)                   # top offset
-        fadds f4, f2, f3
-        lfs f0, %(node_min_y)d(r9)
-        fcmpu cr0, f0, f4
-        bgt hc_node
+        bne hc_test
+        cmpwi r25, 0
+        bne hc_obj                      # a weapon / item of his team: skipped
+        cmpwi r12, -1
+        bne hc_obj                      # a fighter of his team
+hc_test:
+        mr r3, r24
+        bl hc_box
+        cmpwi r3, 0
+        blt hc_obj
         b hc_hit
-hc_next:
-        addi r21, r21, 1
-        b hc_ent
-hc_hit: lis r12, %(one_hi)d
+hc_ncat:
+        addi r25, r25, 1
+        cmpwi r25, 2
+        blt hc_cat
+        bne hc_last
+        li r25, 4                       # (categories 2 / 3: not attack objects)
+        b hc_cat
+hc_last:
+        b hc_out
+hc_hit: mr r23, r3                      # the hitbox (entry index)
+        lis r12, %(one_hi)d
         lfs f1, %(one_lo)d(r12)''' + var_set('r30', VAR_LATCH) + '''
         lwz r12, %(acc)d(r27)           # his WorkModule: VAR_21 = HIT_BIAS2 + the id
         cmpwi r12, 0
-        beq hc_out
+        beq hc_lag
         lwz r20, %(work)d(r12)
         cmpwi r20, 0
-        beq hc_out
-        lfs f1, 0x28(r1)                # the id (float)
+        beq hc_lag
+        lfs f1, 0x28(r1)
         lis r12, %(bias2_hi)d
         lfs f0, %(bias2_lo)d(r12)
-        fadds f1, f1, f0''' + var_set('r20', VAR_HIT) + D('''
+        fadds f1, f1, f0''' + var_set('r20', VAR_HIT) + '''
+hc_lag: li r22, 0                       # the attacker's hitlag: HITSTOP_FN(accessor, its data, damage, mul, 1, 1)
+        lwz r12, %(watk)d(r24)
+        lwz r12, %(am_data)d(r12)
+        lis r0, 0x1000
+        cmplw r12, r0
+        blt hc_log
+        mulli r0, r23, %(slot_size)d
+        add r4, r12, r0
+        lfs f1, %(slot_dmg)d(r4)
+        lis r12, %(hmul_hi)d
+        lfs f2, %(hmul_lo)d(r12)
+        mr r3, r24
+        li r5, 1
+        li r6, 1''' + call(HITSTOP_FN) + '''
+        mr. r22, r3
+        ble hc_log
+        lwz r3, %(wstop)d(r24)          # its StopModule
+        cmpwi r3, 0
+        beq hc_log
+        mr r4, r22
+        li r5, 1
+        lwz r12, 0(r3)
+        lwz r12, 0x8C(r12)
+        mtctr r12
+        bctrl
+hc_log:''' + D('''
         lfs f1, 0x20(r1)
         fctiwz f1, f1
         stfd f1, 0x18(r1)
-        lwz r7, 0x1C(r1)
+        lwz r8, 0x1C(r1)
         lfs f1, 0x24(r1)
         fctiwz f1, f1
         stfd f1, 0x18(r1)
-        lwz r8, 0x1C(r1)
+        lwz r9, 0x1C(r1)
+        slwi r4, r25, 4
+        add r4, r4, r21                 # category x 16 + its index (+1)
+        mr r5, r23
+        mr r6, r29
+        mr r7, r22
         lis r3, %(gk_fh_hi)d
-        addi r3, r3, %(gk_fh_lo)d
-        mr r4, r25
-        mr r5, r21
-        mr r6, r29''' + osr()) + '''
+        addi r3, r3, %(gk_fh_lo)d''' + osr()) + '''
 hc_out: lmw r20, 0x40(r1)
         lwz r0, 0x74(r1)
         mtlr r0
         addi r1, r1, 0x70
         blr
+
+# (r3 an attacker's accessor) -> r3 the first entry (hitbox) with an on node over the clone's box (hcbox +0xC left,
+# +0x10 right, +0x14 bottom, +0x18 top), or -1
+hc_box: lwz r12, %(watk)d(r3)           # its AttackModule
+        li r3, -1
+        lis r0, 0x1000
+        cmplw r12, r0
+        bltlr
+        lis r0, 0x8000
+        cmplw r12, r0
+        bgelr
+        lwz r7, %(am_ents)d(r12)        # the entries
+        lwz r6, %(am_count)d(r12)
+        lis r0, 0x1000
+        cmplw r7, r0
+        bltlr
+        lis r0, 0x8000
+        cmplw r7, r0
+        bgelr
+        cmplwi r6, %(am_max)d
+        bgtlr
+        lis r8, %(hcbox_hi)d
+        addi r8, r8, %(hcbox_lo)d
+        li r5, 0                        # the entry
+hb_ent: cmpw r5, r6
+        bgelr
+        mulli r12, r5, %(ent_size)d
+        add r12, r12, r7
+        lwz r11, 0(r12)                 # its first node index
+        lwz r10, 4(r12)                 # its node count
+        cmplwi r11, %(node_max)d
+        bgt hb_next
+        cmplwi r10, %(node_max)d
+        bgt hb_next
+        slwi r11, r11, 2
+        add r11, r11, r12
+        addi r11, r11, %(ent_nodes)d    # its first node pointer
+hb_node:
+        cmpwi r10, 0
+        ble hb_next
+        lwz r9, 0(r11)
+        addi r11, r11, 4
+        addi r10, r10, -1
+        lis r0, 0x1000
+        cmplw r9, r0
+        blt hb_node
+        lis r0, 0x8000
+        cmplw r9, r0
+        bge hb_node
+        lbz r0, %(node_on)d(r9)
+        cmpwi r0, 0
+        beq hb_node
+        lfs f0, %(node_max_x)d(r9)
+        lfs f1, 0xC(r8)
+        fcmpu cr0, f0, f1
+        blt hb_node
+        lfs f0, %(node_min_x)d(r9)
+        lfs f1, 0x10(r8)
+        fcmpu cr0, f0, f1
+        bgt hb_node
+        lfs f0, %(node_max_y)d(r9)
+        lfs f1, 0x14(r8)
+        fcmpu cr0, f0, f1
+        blt hb_node
+        lfs f0, %(node_min_y)d(r9)
+        lfs f1, 0x18(r8)
+        fcmpu cr0, f0, f1
+        bgt hb_node
+        mr r3, r5
+        blr
+hb_next:
+        addi r5, r5, 1
+        b hb_ent
 
 ''') if 'hitcheck' in feats else '') + '''
 # ---- the clone's start (its specializer +0x34, (singleton, weapon, init)). v7: nothing (the moon's sets the model
