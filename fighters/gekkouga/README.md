@@ -586,3 +586,18 @@ the other "poofed instantly", and both were dropped by the heartbeat (102 at the
   with `0x032CDF80` (as is / blue / grey), hidden for mode 0. Diag `S4GB slot mode value` on every tenth. Tested in
   unicorn (`gekkouga_clone_cave_test.py` panel checks: the hook, the calls per mode, the colours, Little Mac's and empty
   slots untouched); the art is Little Mac's meter (its full frame reads "KO").
+
+## Clones v7 (`greninja_clones_v7.zip`)
+
+The user's v6 A_safe log: ids 1 / 2, both clones alive for the 12 s and placed right (`S4GX`), the gauge values right
+(`S4GB`), no `S4GV` at all; on screen: no clones, no gauge, the tag shown. Executables only:
+- **Invisible clones**: the moon's specializer +0x34 (`0x02AF6B2C`) sets the model scale from the start's init block
+  +0x68 ([acc+0x18] vt +0xE4), which the Final Smash fills and our generate leaves 0. The clone's +0x34 is now ours
+  (`w_start`): nothing (diag `S4GZ` logs the init's scale x100).
+- **No gauge**: the panel's colour transform multipliers are 0-100 (as its alpha, "Panel alpha"); v6's 0xFF alpha hid
+  the meter. `GAUGE_COLOURS` now 0-100 (as is / blue / grey).
+- **The name tag**: the HUD hook (`0x028E40B4`) never ran in game: that bl is skipped unless the cursor's
+  `0x03091830` says so. The tag now goes through the game's own SET_CURSOR route (the ACMD handler `0x02BE7C80`): slot 13
+  sends his object (`[accessor + 0]`) the message {0xA, visible} (`0x02BF2108` (manager, &handle, id, 1), `0x02BF019C`
+  (&handle, &{`0x1010CC00`, 6, &{&{0xA, v}, 2}, 0})) when the tag bit comes on and every 30 frames after (`gk_tags`),
+  {0xA, 1} once when it goes. Diag `S4GW`.

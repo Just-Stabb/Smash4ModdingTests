@@ -1091,10 +1091,11 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     newest = os.path.basename(earlier[-1]).replace('.zip', '') if earlier else None
     top = {n.split('/')[0] for n in names}
     exe_too = True
-    check('the package\'s top level: README.txt, INSTALL_TO_data%s (+ Sm4shCommand)' % (', INSTALL_TO_code, TEST_ONLY_INSTALL_TO_code'
-                                                                                      if exe_too else ' (v4: the exe is v3\'s)'),
-          sorted(t for t in top if not t.startswith('Sm4shCommand_v')),
-          ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code'] if exe_too else ['INSTALL_TO_data', 'README.txt'])
+    want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
+    if len(earlier) == 6:
+        want_top.remove('INSTALL_TO_data')        # v7: executables only
+    check('the package\'s top level: %s (+ Sm4shCommand)' % ', '.join(want_top),
+          sorted(t for t in top if not t.startswith('Sm4shCommand_v')), want_top)
     want, same1 = [], []
     for root, _ds, fs in os.walk(os.path.join(out, 'fighter')):
         for f in fs:
@@ -1118,6 +1119,9 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
                 ['fighter/gekkouga/model/clone/c%02d/%s' % (c, f) for c in range(8) for f in GB.CLONE_FACE_FILES]
         check('v2: both MSCs, his 5 motion part pacs, the face / rest-of-model files in all 8 colours (%d)' % len(v2new),
               [m for m in v2new if 'INSTALL_TO_data/' + m not in names], [])
+    if z1 and len(earlier) == 6:
+        check('v7: no INSTALL_TO_data (no data file changed: the fixes are the executable\'s)',
+              sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')), [])
     if z1 and len(earlier) == 5:
         check('v6: INSTALL_TO_data: his MSC only (the "being made" bit for the last-made clone only)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
@@ -1163,7 +1167,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v4', 'exe_v46z_gk5', 'A_safe', 'B_attack', 'C_hurt', 'D_parts', 'S4GV', 'gen=', 'heartbeat',
          'moon', 'pump') if len(earlier) == 4 else \
         ('greninja_clones_v5', 'exe_v46z_gk6', 'black', 'id=1', 'S4GX', 'A_safe', 'B_attack', 'C_hurt', 'D_parts',
-         'damage panel', 'Little Mac', 'S4GB', 'grey')
+         'damage panel', 'Little Mac', 'S4GB', 'grey') if len(earlier) == 5 else \
+        ('greninja_clones_v6', 'exe_v46z_gk7', 'scale', 'S4GZ', 'S4GW', 'name tag', '0-100', 'A_safe', 'B_attack')
     check('README.txt mentions every feature (%s)' % ', '.join(words), [w for w in words if w not in readme], [])
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
@@ -1209,7 +1214,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False):
 
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
-    earlier = [x[5:] for k in ('1', '2', '3', '4', '5') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
+    earlier = [x[5:] for k in ('1', '2', '3', '4', '5', '6') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
     base_diag = a[4] if len(a) > 4 else None

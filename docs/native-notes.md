@@ -3836,3 +3836,8 @@ MSC on a bunshin-based kind, the 4-shape group.
     meter: `0x032CDFFC(ko_mc, visible)`, `0x02663C54(P, slot, v)` (stores v at slot +0x3C, picks the label from a table
     `[[0x102FCE14] + 0x20 + 4 x ((v - 1) / 10 + 1)]`, `+0x20` for 0, `+0x104` for 100; skips the goto when the slot's
     +0x1C8 already holds it), `0x032CDF80(ko_mc, &colour)`.
+- **v7 (exe_v46z_gk7)**: the moon's +0x34 sets the model scale from the init block's +0x68 (0 for an MSC generate: the
+  clones were drawn at scale 0); the clone's +0x34 is a no-op now. The damage panel's colour transform multipliers are
+  0-100 (0xFF hides a clip). The battle HUD's cursor update only calls `0x03091E34` for a cursor `0x03091830` accepts:
+  never for the user, so the name tag goes through the SET_CURSOR message ({0xA, visible} to the fighter's object id,
+  `0x02BF2108` / `0x02BF019C` as `0x02BE7C80` sends it) from slot 13.

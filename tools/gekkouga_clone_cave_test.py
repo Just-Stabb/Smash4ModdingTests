@@ -212,17 +212,18 @@ def weapon_checks(e, img, info, diag=False):
     s = e.call(W.SINGLETON_SWITCH, 0, C.CLONE_KIND)
     check('the singleton getter: kind 0x1A1 -> its own singleton', s, A['w_single'])
     vt = e.w(s)
-    VT_OURS = (W.HIT_METHOD,) + ((0x1C,) if 'hurt' in F or diag else ()) + (C.POLL_SLOTS if 'hurt' in F or diag else ())
+    VT_OURS = (W.HIT_METHOD, 0x34) + ((0x1C,) if 'hurt' in F or diag else ()) + (C.POLL_SLOTS if 'hurt' in F or diag else ())
     check('its vtable: bunshin\'s but +0x1C / +0x64 / +0x84 / +0x8C / +0x94 / +0xAC (v3)',
           [e.w(vt + o) for o in range(0, L['vsize'], 4) if o not in VT_OURS],
           [img.w(L['svt'] + o) for o in range(0, L['vsize'], 4) if o not in VT_OURS])
     check('its +0xAC: the hit method, +0x1C the set-up, the 4 phases\' pollers (v4: by the build\'s features)',
           [e.w(vt + o) for o in VT_OURS],
-          [lab['w_hit']] + ([lab['w_init']] if 0x1C in VT_OURS else []) + [lab['wp_%X' % o] for o in VT_OURS[2:]
-                                                                            if o in C.POLL_SLOTS])
-    check('v6: its specializer is the moon\'s copy: +0x34 the moon\'s (sets the model scale), not bunshin\'s 0x02AF6738 (paints '
-          'it black: the user\'s v5 "completely black" clone)', (e.w(vt + 0x34), e.w(vt + 0x34) != 0x02AF6738),
-          (img.w(W.singleton_of(img, C.VT_BASE)[1] + 0x34), True))
+          [lab['w_hit'], lab['w_start']] + ([lab['w_init']] if 0x1C in VT_OURS else []) +
+          [lab['wp_%X' % o] for o in VT_OURS if o in C.POLL_SLOTS])
+    check('v6 / v7: its specializer is the moon\'s copy, its +0x34 ours: neither bunshin\'s 0x02AF6738 (black) nor the moon\'s '
+          '(the init\'s scale: the user\'s v6 invisible clones)', (e.w(vt + 0x34) != 0x02AF6738,
+                                                                  e.w(vt + 0x34) != img.w(W.singleton_of(img, C.VT_BASE)[1] + 0x34)),
+          (True, True))
     hits = []
     e.stub(L['old_hit'], lambda e_: e_.rec('base_hit', 3, 4, 5))
     # a clone: weapon +0x28 its accessor: +0x28 WorkModule (VAR_0 its owner's slot, VAR_1 its id), +0x50 AttackModule
@@ -364,6 +365,13 @@ def weapon_checks(e, img, info, diag=False):
           bytes(e.mu.mem_read(A['hurt'], 0x30 * 8)) == C.hurt_blob() and
           [struct.unpack_from('>I', C.hurt_blob(), 0x30 * i + 0x1C)[0] for i in range(8)] ==
           [0x7D0 + j for j in (12, 19, 22, 16, 8, 4, 9, 5)], True)
+    check('v7: its +0x34 (the start) is ours: no scale / colour / link call', e.w(vt + 0x34), lab['w_start'])
+    init = e.alloc(0x80, b'\0')
+    e.mu.mem_write(init + 0x68, struct.pack('>f', 0.0))
+    e.calls = []
+    e.call(lab['w_start'], s, weapon, init)
+    check('v7: ... it calls nothing' + (' but the S4GZ log (init, scale x100 0)' if diag else ''),
+          [c[:3] for c in e.calls], [('osr', A['gk_fz'], init)] if diag else [])
     # ---- v3: the pollers: the damage this frame -> his VAR_21 = 20000 + its id; then bunshin's method
     dmvt = e.alloc(0x100, b'\0')
     dmget = e.alloc(4)
@@ -552,6 +560,24 @@ def s13_checks(e, info):
     e.vars = {flags: 7.0}
     e.run_to(lab['s13'], C.SLOT13 + 4, 0x51, fk7['f'], 0x53)
     check('slot 7: its counter', e.w(hide + 28), 4)
+    # v7: the tag message (the SET_CURSOR route) while bit 1 is on: at once, then every TAG_RESEND frames; visible 1 at the end
+    tags = info['A']['gk_tags']
+    for i in range(8):
+        e.setw(tags + 4 * i, 0)
+    e.setw(e.w(fk['f'] + C.BASE_ACC), 0x1234)               # his object id at [accessor + 0]
+
+    def frame(f):
+        e.vars = {flags: f}
+        e.calls = []
+        e.run_to(lab['s13'], C.SLOT13 + 4, 0x51, fk['f'], 0x53)
+        return [c for c in e.calls if c[0] in ('msg_handle', 'msg_send')]
+    want0 = [('msg_handle', 0x1234, 1), ('msg_send', C.MSG_KIND, 6, 0xA, 0)]
+    check('v7: bit 1 on: the SET_CURSOR message {0xA, 0} to his object (handle (manager, id, 1), then sent)', frame(1.0), want0)
+    n = [len(frame(1.0)) for _ in range(C.TAG_RESEND - 1)]
+    check('v7: ... not again for %d frames' % (C.TAG_RESEND - 1), sum(n), 0)
+    check('v7: ... then again', frame(1.0), want0)
+    check('v7: bit 1 off: {0xA, 1} once (the tag back)', (frame(0.0), frame(0.0)),
+          ([('msg_handle', 0x1234, 1), ('msg_send', C.MSG_KIND, 6, 0xA, 1)], []))
 
 
 def s42_checks(e, info):
@@ -708,6 +734,13 @@ def main():
     e = Run(patched)
     if diag:
         e.stub(C.OSREPORT_VENEER, lambda e_: e_.rec('osr', 3, 4, 5))
+    e.stub(C.MSG_HANDLE, lambda e_: e_.calls.append(('msg_handle', e_.r(5), e_.r(6))))
+
+    def msg_send(e_):
+        m = e_.r(4)
+        inner = e_.w(e_.w(m + 8))
+        e_.calls.append(('msg_send', e_.w(m), e_.w(m + 4), e_.w(inner), e_.w(inner + 4)))
+    e.stub(C.MSG_SEND, msg_send)
     weapon_checks(e, img, info, diag)
     fighter_desc_checks(e, img, info)
     g1_checks(e, info)

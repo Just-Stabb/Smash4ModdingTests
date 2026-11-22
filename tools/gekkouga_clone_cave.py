@@ -111,6 +111,10 @@ SAFE_BASE = 0xFC                  # v5: moon (his Final Smash's moon). v4's safe
 ATTACK_BASE = 0x2                 # Mario's pump
 HURT_BASE = 0x168                 # mewtwom (Mewtwo's Final Smash form)
 MSC_SLOT = 8
+MSG_HANDLE = 0x02BF2108           # v7: the SET_CURSOR handler's message route (0x02BE7C80): (manager, &handle, id, 1)
+MSG_SEND = 0x02BF019C             # (&handle, &message)
+MSG_KIND = 0x1010CC00             # the message's first word, as the handler's
+TAG_RESEND = 30                   # frames between the hide messages while the tag is hidden
 PANEL_VT = 0x100871D8 + 0x3C      # v6: the damage panel's update (InfoGadgetDmg vtable +0x3C: docs/native-notes.md "Damage
                                   # panel"; its relocation moved to a dead word by trait_badge_cave.py)
 PANEL_PREV = 0x04B84000           # what it points at in exe_v46z_ui10: the trait badge cave (it calls the game's 0x02661808)
@@ -120,8 +124,10 @@ PANEL_COLOUR = 0x032CDF80         # (clip, &{u8 mul A R G B, s16 add A R G B})
 FIGHTER_MANAGER = 0x102F7024
 PANEL_SLOT = 0x30C0
 VAR_GAUGE = 0x0F000313            # his VAR_19 (v6): mode x 1000 + 0-100 (1 charge, 2 the ability left, 3 the burnout left)
-GAUGE_COLOURS = ((0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0), (0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0),
-                 (0xFF, 0x50, 0xB0, 0xFF, 0, 0, 0x10, 0x30), (0xFF, 0x70, 0x70, 0x70, 0, 0x30, 0x30, 0x30))
+GAUGE_COLOURS = ((100, 100, 100, 100, 0, 0, 0, 0), (100, 100, 100, 100, 0, 0, 0, 0),
+                 (100, 35, 70, 100, 0, 0, 0, 0), (100, 45, 45, 45, 0, 0, 0, 0))
+# v7: the panel's colour multipliers are 0-100 (docs/native-notes.md "Panel alpha": 255 hid Hero's menu): v6's 0xFF
+# alpha hid the meter (the user's "no bar shows")
 VT_BASE = 0xFC                    # v6: the clone's specializer (its singleton's vtable) is a copy of the moon's, not
                                   # bunshin's: bunshin's +0x34 (0x02AF6738, at its start) paints the model black (its
                                   # [acc+0x38] vt +0x4C colour (0, 0, 0, 255): the Final Smash's shadow clones) and links
@@ -478,8 +484,9 @@ def build(rpx, diag=False, feats=None):
     assert A['gk_slow'] == A['gk_hide'] + 0x20
     assert not diag or A['gk_lastf'] == A['gk_slow'] + 0x20
     A['ctf'] = alloc(12 * 4, 4)         # v6: the gauge's colour per mode
+    A['gk_tags'] = alloc(4 * SLOTS)     # v7: the tag messages' countdown per slot (0: shown)
     A['gk_gaugelog'] = alloc(4 * SLOTS) if diag else 0
-    A['consts'] = alloc(28)          # 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, the hitstop multiplier
+    A['consts'] = alloc(32)          # 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, the hitstop multiplier, 100.0
     A['hurt'] = alloc(0x30 * len(HURTBOXES))
     A['gk_str'] = alloc(8)
     fmts = [('gk_ft', 'S4GT slot=%d hide=%d\n'), ('gk_fs', 'S4GS slot=%d slow=%d\n'),
@@ -494,7 +501,9 @@ def build(rpx, diag=False, feats=None):
             ('gk_fp', 'S4GP clone first update (its script not run yet): weapon accessor=%08X\n'),
             ('gk_fv', 'S4GV HUD cursor update: r29=%d cursor=%08X\n'),
             ('gk_fx', 'S4GX clone id=%d at x=%d y=%d\n'),
-            ('gk_fb', 'S4GB panel slot=%d gauge mode=%d value=%d\n')]
+            ('gk_fb', 'S4GB panel slot=%d gauge mode=%d value=%d\n'),
+            ('gk_fz', 'S4GZ clone start: init=%08X scale x100=%d\n'),
+            ('gk_fw', 'S4GW tag message: visible=%d object=%08X\n')]
     for nm, s in fmts:
         A[nm] = alloc((len(s) + 4) & ~3, 4) if diag else 0
     code_at = alloc(0, 4)
@@ -526,9 +535,10 @@ def build(rpx, diag=False, feats=None):
     if diag:
         out.blob(A['gk_lastf'], bytes(8 * SLOTS), 'diag: flags logged / tag hide logged')
         out.blob(A['gk_seen'], bytes(4 * 16), 'diag: HUD calls seen')
-    out.blob(A['consts'], struct.pack('>6fI', 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, img.w(HITSTOP_MUL)), 'constants')
+    out.blob(A['consts'], struct.pack('>6fIf', 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, img.w(HITSTOP_MUL), 100.0), 'constants')
     out.blob(A['hurt'], hurt_blob(), 'clone hurtboxes (his vl group 5, article joints)')
     out.blob(A['ctf'], b''.join(struct.pack('>4B4h', *c) for c in GAUGE_COLOURS), 'gauge colours')
+    out.blob(A['gk_tags'], bytes(4 * SLOTS), 'tag message countdowns')
     if diag:
         out.blob(A['gk_gaugelog'], struct.pack('>8i', *([-1] * SLOTS)), 'diag: gauge logged')
     out.blob(A['gk_str'], CLONE_NAME.encode().ljust(8, b'\0'), '"clone"')
@@ -540,15 +550,16 @@ def build(rpx, diag=False, feats=None):
     p = dict(acc=ACC, work=WORK, posture=POSTURE, bacc=BASE_ACC, entry=ENTRY, slots=SLOTS, tag=FLAG_TAG,
              slow=FLAG_SLOW, clones=FLAG_CLONES, life=TAG_LIFE, sslot=SLOW_SLOT, srate=SLOW_RATE, sframes=SLOW_FRAMES,
              hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, whit=W_HIT_MOD, wdmg=W_DAMAGE, watk=W_ATTACK,
-             wstop=W_STOP, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
+             wstop=W_STOP, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_tags'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
-    for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul')):
+    for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
     p['ftab_hi'], p['ftab_lo'] = ha(FIGHTERS), K.slo(FIGHTERS)
     p['fm_hi'], p['fm_lo'] = ha(FIGHTER_MANAGER), K.slo(FIGHTER_MANAGER)
+    p['msgk_hi'], p['msgk_lo'] = ha(MSG_KIND), K.slo(MSG_KIND)
     p['mgr_hi'], p['mgr_lo'] = ha(OBJ_MANAGER), K.slo(OBJ_MANAGER)
     D = (lambda s: s) if diag else (lambda s: '')
 
@@ -695,6 +706,33 @@ s13_keep:''' + var_get('r28', VAR_GEN) + '''
         mr r5, r26
         lwz r6, 0x24(r1)''' + osr() + '''
 s13_nof:''') + '''
+        lis r25, %(gk_tags_hi)d
+        addi r25, r25, %(gk_tags_lo)d
+        slwi r12, r27, 2
+        lwzx r10, r25, r12
+        andi. r0, r26, %(tag)d
+        beq s13_tagoff
+        addi r10, r10, -1
+        cmpwi r10, 0
+        bgt s13_tagkeep
+        li r10, %(tagresend)d
+        stwx r10, r25, r12
+        mr r3, r31
+        li r4, 0
+        bl gk_tag
+        b s13_tagdone
+s13_tagkeep:
+        stwx r10, r25, r12
+        b s13_tagdone
+s13_tagoff:
+        cmpwi r10, 0
+        beq s13_tagdone
+        li r0, 0
+        stwx r0, r25, r12
+        mr r3, r31
+        li r4, 1
+        bl gk_tag
+s13_tagdone:
         lis r25, %(gk_hide_hi)d
         addi r25, r25, %(gk_hide_lo)d
         slwi r12, r27, 2
@@ -1222,6 +1260,74 @@ wp_94:
         mtlr r0
         addi r1, r1, 0x40''' + tail(L['vt_orig'][0x94]) + '''
 
+# ---- v7: the clone's start (its specializer +0x34, (singleton, weapon, init)): nothing (the moon's sets the model scale
+# from the init's +0x68; bunshin's paints it black and links it to its owner); diag: the init's scale
+w_start:''' + D('''
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        li r6, -1
+        cmpwi r5, 0
+        beq ws_log
+        lfs f1, 0x68(r5)
+        lis r12, %(hundred_hi)d
+        lfs f0, %(hundred_lo)d(r12)
+        fmuls f1, f1, f0
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r6, 0x1C(r1)
+ws_log: mr r5, r6
+        lis r3, %(gk_fz_hi)d
+        addi r3, r3, %(gk_fz_lo)d''' + osr() + '''
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30''') + '''
+        blr
+
+# ---- v7: the name tag: the SET_CURSOR message (as the ACMD command's handler 0x02BE7C80: {0xA, visible} to the
+# fighter's object id ([accessor + 0]) through the object messages 0x02BF2108 / 0x02BF019C); (r3 his entry, r4 visible)
+gk_tag: stwu r1, -0x50(r1)
+        mflr r0
+        stw r0, 0x54(r1)
+        stw r31, 0x4C(r1)
+        mr r31, r4
+        lwz r12, %(bacc)d(r3)
+        cmpwi r12, 0
+        beq gt_out
+        lwz r5, 0(r12)                  # his object id
+        li r11, 0xA
+        stw r11, 8(r1)
+        stw r31, 0xC(r1)
+        addi r0, r1, 8
+        stw r0, 0x10(r1)
+        li r11, 2
+        stw r11, 0x14(r1)
+        lis r11, %(msgk_hi)d
+        addi r11, r11, %(msgk_lo)d
+        stw r11, 0x18(r1)
+        li r0, 6
+        stw r0, 0x1C(r1)
+        addi r0, r1, 0x10
+        stw r0, 0x20(r1)
+        li r0, 0
+        stw r0, 0x24(r1)''' + D('''
+        stw r5, 0x48(r1)
+        lis r3, %(gk_fw_hi)d
+        addi r3, r3, %(gk_fw_lo)d
+        mr r4, r31''' + osr() + '''
+        lwz r5, 0x48(r1)''') + '''
+        lis r3, %(mgr_hi)d
+        lwz r3, %(mgr_lo)d(r3)
+        addi r4, r1, 0x28
+        li r6, 1''' + call(MSG_HANDLE) + '''
+        addi r3, r1, 0x28
+        addi r4, r1, 0x18''' + call(MSG_SEND) + '''
+gt_out: lwz r31, 0x4C(r1)
+        lwz r0, 0x54(r1)
+        mtlr r0
+        addi r1, r1, 0x50
+        blr
+
 # ---- v6: the charge / ability / burnout gauge on his damage panel: the panel's update (its vtable +0x3C, the trait
 # badge cave's hook before us) then, for each panel slot of a Greninja, his VAR_19 (mode x 1000 + 0-100) on Little
 # Mac's KO meter (ko_mc, the slot's +0x18C): shown and set (0x02663C54: 0 empty, 1-99 ten steps, 100 "KO" blinking:
@@ -1363,6 +1469,8 @@ w_dcase:
     struct.pack_into('>I', vb, W.HIT_METHOD, lab['w_hit'])
     if 'hurt' in feats or diag:
         struct.pack_into('>I', vb, 0x1C, lab['w_init'])
+    struct.pack_into('>I', vb, 0x34, lab['w_start'])  # v7: not the moon's start (it sets the model scale from the init's
+                                                      # +0x68: the generate's, 0 for ours: the user's v6 invisible clones)
     for o in (POLL_SLOTS if 'hurt' in feats or diag else ()):
         struct.pack_into('>I', vb, o, lab['wp_%X' % o])
     out.blob(A['w_vt'], bytes(vb), 'clone vtable (bunshin copy, +0x1C / +0x64 / +0x84 / +0x8C / +0x94 / +0xAC ours)')
