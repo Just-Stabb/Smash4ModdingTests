@@ -29,11 +29,7 @@ float gk_off_l;        // the left-spawned clone's X offset from him (world)
 float gk_off_r;        // the right-spawned clone's
 int gk_seq;            // frames since the ability started (the clones are made at 0 and 3)
 int gk_swap_cd;        // frames before another swap
-int gk_pips;           // charge pips shown over his head
-int gk_fx_t;           // frames to the next "ready" sparkle
 int gk_smash;          // v3: the smash charge kept (frames, 0 - gk_smash_full()), one for all three smashes
-int gk_hold_first;     // v3: the hold's first tick (its effects made at once)
-int gk_gen_req;        // v4 diag: 0x40 / 0x80 the left / right clone made next frame
 int gk_seen;           // v5: 1 / 2 the clone's heartbeat seen (its script runs and found him)
 int gk_last_made;      // v6: the clone made last (only its "being made" bit is on)
 int gk_chain;          // the smashes used in this chain: 1 forward, 2 up, 4 down (0 no chain)
@@ -52,9 +48,6 @@ float gk_hx2;          // of his unfrozen frames back ...
 float gk_hy2;          // ... his Y 2 / 3 back ...
 float gk_hy3;
 int gk_hcopy;          // ... "copying his vertical movement" then (bit 1: 1 back, 2: 2 back) ...
-int gk_cl_why;         // clone fixes v2 diag: what overrode the clones' places since the last line (1 / 2 a wall held the
-                       // left / right one, 4 their history started over, 8 back in formation, 16 / 32 falling on its own)
-int gk_cl_t;           // ... frames to the next line (every 10 while he is on the ground with clones out)
 int gk_hn;             // ... and how many of those each clone may use: the left's (0 - 3) + 4 x the right's (from 0 when
                        // it is made, at a swap, back in formation)
 float gk_floor_y;      // gk_floor()'s answer
@@ -65,9 +58,6 @@ int gk_rmiss;
 int gk_lage;           // ... and frames since it was made
 int gk_rage;
 int gk_det;            // he was launched / held last frame (the clones detached)
-int gk_spawn_bits;     // the channel's "being made" bit (4 left, 8 right) ...
-int gk_spawn_t;        // ... for this many more frames
-int gk_cursor_t;       // frames to the next name tag hide
 int gk_lfall;          // frames each clone has fallen on its own (0 standing / copying him)
 int gk_rfall;
 int gk_gen;            // skeleton v1: the executable's clear-all count (his VAR_14) last seen ...
@@ -183,6 +173,10 @@ void gekkouga_frame()
         gk_lw_charge = 0;                 // the match's start (Entry): every kept charge from 0
         gk_smash = 0;
     }
+    if (st != 0x161 && (StatusModule(0x1) == 0 || gk_on_ledge(st)))
+    {
+        gk_svi(9, 0);                     // aligned kick v1: once an airtime (landed, or on a ledge)
+    }
     gk_input();
     if (gk_ability > 0)
     {
@@ -220,7 +214,7 @@ void gekkouga_frame()
     flags = flags | gk_cl_diag();         // clone fixes v2 diag (1048576 toggled: an S4GF line with VAR_23)
     if (gk_ability > 0)
     {
-        flags = flags | gk_gen_req;       // v4 diag: 64 / 128 a clone about to be made (next frame)
+        flags = flags | gk_vi(4);         // v4 diag: 64 / 128 a clone about to be made (next frame; gk_gen_req)
     }
     WorkModule(0, (float)flags + 0, 0x0f000314);
     gk_gauge();
@@ -243,18 +237,26 @@ void gk_input()
     {
         return;                           // special not pressed this frame
     }
+    if (gk_ability > 0 && gk_rg_try())
+    {
+        return;                           // aligned kick v1: shield + special while split: the regroup
+    }
     sy = ControlModuleF(0x1);
     if (sy > -0.3f)
     {
         return;                           // not a down special (neutral / side / up specials as normal)
     }
+    sx = ControlModuleF(0);
+    if (gk_ability > 0 && gk_abs(sx) <= 0.25f)
+    {
+        return;                           // aligned kick v1: no left / right: the game's down special input goes on
+    }                                     // (func_43 / func_58 ... -> gk_lw_press -> gk_ak_try, when he can act)
     WorkModule(0, 32.0f + 0, 0x0f0003c9); // Buffer_Clear (specials) for this fighter: no down special status
     global24 = global24 - (global24 & 0xf000); // nor this frame's special bits (the status loop reads them after this hook)
     if (gk_ability <= 0)
     {
         return;                           // burnout: down special disabled
     }
-    sx = ControlModuleF(0);
     if (gk_swap_cd > 0)
     {
         return;
@@ -279,7 +281,7 @@ void gk_swap(int id)
     float oy;
     float cx;
     float cy;
-    if ((gk_alive & id) == 0 || gk_det)
+    if ((gk_alive & id) == 0 || (gk_det && gk_vi(8) == 0))
     {
         return;
     }
@@ -287,6 +289,11 @@ void gk_swap(int id)
     oy = PostureModuleF(0x2);
     cx = gk_cx(id);
     cy = gk_cy(id);
+    if (gk_vi(8) != 0)
+    {
+        gk_swap_free(id, ox, oy, cx, cy); // aligned kick v1: free clones: places and momentum exchanged
+        return;
+    }
     o = cx - ox;                          // his move (its offset, or less when a wall held it)
     if (id == 0x1)
     {
@@ -303,7 +310,7 @@ void gk_swap(int id)
     gk_set_c(id, ox, oy, 0);
     gk_set_fall_t(id, 0);
     gk_last_oy = cy;
-    gk_cl_why = gk_cl_why | 0x4;
+    gk_cl_why_or(0x4);
     gk_hn = 0;                            // clone delay: his old places mean nothing now (both offsets changed): the
     gk_swap_cd = 10;                      // clones go on from his new place (held for their delay, then delayed)
 }
@@ -311,7 +318,11 @@ void gk_swap(int id)
 // ---- the input sites' down special (func_43, func_58, func_675, func_1999): 1 = entered the stance
 int gk_lw_press()
 {
-    if (gk_ability > 0 || gk_burnout > 0)
+    if (gk_ability > 0)
+    {
+        return gk_ak_try();               // aligned kick v1 (down special with no left / right during the ability)
+    }
+    if (gk_burnout > 0)
     {
         return 0;
     }
@@ -332,28 +343,32 @@ void gk_activate()
     gk_off_l = -gk_gap();
     gk_off_r = gk_gap();
     gk_seq = 0;
-    gk_fx_t = 0;
+    gk_svi(0, 0);                         // (gk_fx_t)
     gk_det = 0;
     gk_last_oy = PostureModuleF(0x2);
     gk_hn = 0;
     gk_hcopy = 0;
-    gk_cursor_t = 0;
+    gk_svi(1, 0);                         // (gk_cursor_t)
+    gk_svi(8, 0);                         // aligned kick v1: formation, the kick not used
+    gk_svi(9, 0);
     EffectModule(0x2723, 0x10000bd, 0x1, 0x1);
 }
 
 void gk_ability_update()
 {
+    int t;
     // v4: each clone is requested a frame before it is made (flags bit 64 / 128: the TEST_ONLY exe logs the request
     // before the generate runs, and its result the frame after)
-    gk_gen_req = 0;
+    t = 0;                                // (gk_gen_req)
     if (gk_seq == 0)
     {
-        gk_gen_req = 0x40;
+        t = 0x40;
     }
     if (gk_seq == 3)
     {
-        gk_gen_req = 0x80;
+        t = 0x80;
     }
+    gk_svi(4, t);
     if (gk_seq == 1)
     {
         gk_spawn(0x1);
@@ -363,22 +378,26 @@ void gk_ability_update()
         gk_spawn(0x2);
     }
     gk_seq += 1;
-    if (gk_spawn_t > 0)
-    {
-        gk_spawn_t -= 1;
-    }
     gk_clone_hitlag();
     gk_check_hit();
     gk_heartbeat();
-    gk_physics();
+    if (gk_vi(8) != 0)
+    {
+        gk_free_frame();                  // aligned kick v1: kicking / split / regrouping: their own movement
+    }
+    else
+    {
+        gk_physics();
+    }
     gk_channel();
     gk_shapes_update();
-    if (gk_cursor_t <= 0)
+    t = gk_vi(1);                         // (gk_cursor_t)
+    if (t <= 0)
     {
         BattleObject(0xa, 0);             // his player cursor (name tag) hidden: SET_CURSOR(0)'s op (Rebirth shows it with 1)
-        gk_cursor_t = 60;
+        t = 60;
     }
-    gk_cursor_t -= 1;
+    gk_svi(1, t - 1);
     gk_ability -= 1;
     if (gk_ability <= 0)
     {
@@ -395,8 +414,6 @@ void gk_spawn(int id)
     gk_set_c(id, PostureModuleF(0x1) + off, PostureModuleF(0x2), 0);
     gk_set_fall_t(id, 0);
     gk_set_hn(id, 0);                     // clone delay: no history yet: his place now, held for its delay
-    gk_spawn_bits = 0x4 * id;
-    gk_spawn_t = 3;
     if (id == 0x1)
     {
         r = ArticleModule(0x2710, 0x6);
@@ -589,7 +606,7 @@ void gk_clone_phys(int id, float ox, float oy, float lastoy, int copy, int froze
     {
         if (gk_line(x, y + gk_wall_y(), nx, y + gk_wall_y()) == 0x2)
         {
-            gk_cl_why = gk_cl_why | id;   // clone fixes v2 diag: a wall held it (1 the left clone, 2 the right)
+            gk_cl_why_or(id);             // clone fixes v2 diag: a wall held it (1 the left clone, 2 the right)
             if (nx > x)
             {
                 nx = gk_hit_x - gk_wall_gap();
@@ -698,7 +715,7 @@ void gk_physics()
     {
         gk_det = 0;                       // back from a launch: the clones back in formation (smoke)
         gk_hn = 0;                        // (clone delay: from his place now)
-        gk_cl_why = gk_cl_why | 0xc;
+        gk_cl_why_or(0xc);
         if (gk_alive & 0x1)
         {
             gk_set_c(0x1, ox + gk_off_l, oy, 0);
@@ -871,6 +888,14 @@ void gk_channel()
     WorkModule(0, gk_ly + 0, 0x0f000319);
     WorkModule(0, gk_rx + 0, 0x0f00031a);
     WorkModule(0, gk_ry + 0, 0x0f00031b);
+    if (gk_vi(8) != 0)
+    {
+        flags = flags | 0x80;             // aligned kick v1: free: VAR_28 / VAR_29 each clone's own motion (gk_fpack)
+        WorkModule(0, (float)gk_fpack(0x1) + 0, 0x0f00031c);
+        WorkModule(0, (float)gk_fpack(0x2) + 0, 0x0f00031d);
+        WorkModule(0, 4747000.0f + (float)flags, 0x0f00031f);
+        return;
+    }
     WorkModule(0, (float)(k * 1024) + f, 0x0f00031c);
     WorkModule(0, r + 0, 0x0f00031d);
     WorkModule(0, 4747000.0f + (float)flags, 0x0f00031f);
@@ -1069,6 +1094,7 @@ void gk_end_ability(int burn)
     }
     gk_alive = 0;
     gk_ability = 0;
+    gk_svi(8, 0);                         // aligned kick v1: the clones' mode
     gk_shapes_update();
     WorkModule(0, 0 + 0, 0x0f00031f);
     if (burn)
@@ -1116,22 +1142,23 @@ void gk_overlay_off()
 // ---- charged and waiting: a small sparkle over his head every 45 frames
 void gk_ready_fx()
 {
+    int t;
     if (gk_lw_charge < gk_lw_full())
     {
         return;
     }
-    if (gk_fx_t > 0)
+    t = gk_vi(0);                         // (gk_fx_t)
+    if (t > 0)
     {
-        gk_fx_t -= 1;
+        gk_svi(0, t - 1);
         return;
     }
-    gk_fx_t = 45;                         // v6: no sparkle over his head (the panel's gauge blinks "KO" when ready)
+    gk_svi(0, 45);                         // v6: no sparkle over his head (the panel's gauge blinks "KO" when ready)
 }
 
 // ---- the charge stance (SpecialLw 0x155, his old counter: no counter shape now)
 void gk_lw_main()
 {
-    gk_pips = 0;
     gk_bar();
     if (!StopModule(0x1))
     {
@@ -1143,6 +1170,7 @@ void gk_lw_main()
 // per frame of the stance (not in hitlag): the charge, its bar, the stance's afterimages again
 void gk_lw_tick()
 {
+    int t;
     if (gk_lw_charge < gk_lw_full())
     {
         gk_lw_charge += 1;
@@ -1150,10 +1178,11 @@ void gk_lw_tick()
     gk_bar();
     if (MotionModuleF(0x1) >= (float)gk_lw_hold_frame())
     {
-        gk_fx_t += 1;
-        if (gk_fx_t >= 20)
+        t = gk_vi(0) + 1;                 // (gk_fx_t)
+        gk_svi(0, t);
+        if (t >= 20)
         {
-            gk_fx_t = 0;
+            gk_svi(0, 0);
             EffectModule(0x2710, 0x3300009, 0, 0, 11.0f, 5.0f, 0, 0, 0, 1.0f, 0, 0, 0, 0, 0, 0, 0);
         }
     }
@@ -1210,11 +1239,9 @@ int gk_lw_loop()
         func_23(0x289);
         func_2341(0);
         GroundModule(0x2710, 0x5);
-        gk_pips = 0;                      // the motion change ended the pips (terminate): drawn again
     }
     else if (global19 == 0x2 && global18 == 0)
     {
-        gk_pips = 0;
         func_23(0x271);
         func_2341(0);
         KineticModule(0x11, 0x1, 0);
@@ -1416,7 +1443,7 @@ int gk_sm_start_loop(int t)
     }
     if (ControlModule(0x2712, 0))
     {
-        gk_hold_first = 0x1;              // the hold's effects start at the kept charge's size
+        gk_svi(5, 0x1);                   // the hold's effects start at the kept charge's size (gk_hold_first)
         func_16(gk_sm_hold_status(t), 0x1);
         return 0x1;
     }
@@ -1442,6 +1469,7 @@ void gk_sm_hold_tick()
 {
     int t;
     int v;
+    int first;
     WorkModule(0xa, 0x11000005);
     t = gk_sm_type(global4);
     if (t == 0)
@@ -1449,8 +1477,9 @@ void gk_sm_hold_tick()
         return;
     }
     v = gk_sm_get(t);
-    gk_sm_fx(t, v, gk_hold_first);
-    gk_hold_first = 0;
+    first = gk_vi(5);                     // (gk_hold_first)
+    gk_sm_fx(t, v, first);
+    gk_svi(5, 0);
     v = v + 1;
     if (v > gk_smash_full())
     {
@@ -1683,13 +1712,13 @@ void gk_tr_clear()
     WorkModule(0, 0 + 0, 0x0f000308);
 }
 
-void gk_tr_ask(int k, int type, float x, float y)
+void gk_tr_ask(int k, int type, float x, float y, float lr)
 {
     int r;
     WorkModule(0, (float)type + 0, 0x0f000300 + k * 4);
     WorkModule(0, x + 0, 0x0f000301 + k * 4);
     WorkModule(0, y + 0, 0x0f000302 + k * 4);
-    WorkModule(0, PostureModuleF(0) + 0, 0x0f000303 + k * 4);
+    WorkModule(0, lr + 0, 0x0f000303 + k * 4);
     r = ArticleModule(0x2710, 0x9);
 }
 
@@ -1707,16 +1736,21 @@ void gk_trail_tick(int cur)
     }
     gk_tr_done = global4;
     type = gk_tr_type(cur);
-    gk_tr_ask(0, type, PostureModuleF(0x1), PostureModuleF(0x2));
+    gk_tr_ask(0, type, PostureModuleF(0x1), PostureModuleF(0x2), PostureModuleF(0));
+    gk_tr_req_t = gk_tr_req_frames();
+    if (gk_vi(8) != 0)
+    {
+        return;                           // aligned kick v1: free clones make their own smashes' trails (gk_fatk)
+    }
     k = 0x1;
     if ((gk_alive & 0x1) && gk_lfall == 0)
     {
-        gk_tr_ask(k, type, gk_cx(0x1), gk_cy(0x1));
+        gk_tr_ask(k, type, gk_cx(0x1), gk_cy(0x1), PostureModuleF(0));
         k += 1;
     }
     if ((gk_alive & 0x2) && gk_rfall == 0)
     {
-        gk_tr_ask(k, type, gk_cx(0x2), gk_cy(0x2));
+        gk_tr_ask(k, type, gk_cx(0x2), gk_cy(0x2), PostureModuleF(0));
     }
     gk_tr_req_t = gk_tr_req_frames();
 }
@@ -1968,29 +2002,1567 @@ int gk_cl_err(int id)
 
 int gk_cl_diag()
 {
+    int t;
     if (gk_ability <= 0 || gk_alive == 0)
     {
-        gk_cl_t = 0;
-        gk_cl_why = 0;
+        gk_svi(3, 0);                     // (gk_cl_t)
+        gk_svi(2, 0);                     // (gk_cl_why)
         return 0;
     }
     if (StatusModule(0x1) != 0)
     {
-        return ((gk_cl_t / 10) & 0x1) * 1048576;   // in the air: no line, the bit as it was
+        return ((gk_vi(3) / 10) & 0x1) * 1048576;   // in the air: no line, the bit as it was
     }
     if (gk_lfall > 2)
     {
-        gk_cl_why = gk_cl_why | 0x10;
+        gk_cl_why_or(0x10);
     }
     if (gk_rfall > 2)
     {
-        gk_cl_why = gk_cl_why | 0x20;
+        gk_cl_why_or(0x20);
     }
-    gk_cl_t += 1;
-    if (gk_cl_t % 10 == 0)
+    t = gk_vi(3) + 1;                     // (gk_cl_t)
+    gk_svi(3, t);
+    if (t % 10 == 0)
     {
-        WorkModule(0, (float)(gk_cl_why * 10000 + gk_cl_err(0x1) * 100 + gk_cl_err(0x2)) + 0, 0x0f000317);
-        gk_cl_why = 0;
+        WorkModule(0, (float)(gk_vi(2) * 10000 + gk_cl_err(0x1) * 100 + gk_cl_err(0x2)) + 0, 0x0f000317);
+        gk_svi(2, 0);                     // (gk_cl_why)
     }
-    return ((gk_cl_t / 10) & 0x1) * 1048576;
+    return ((t / 10) & 0x1) * 1048576;
+}
+
+// ===================================================================
+// New_Var slots (aligned kick v1: his MSC had 127 of 128 globals). Each fighter has 64 slot variables of its own
+// (0x0F000380 + i, docs/acmd-extra-commands.md "New_Var": floats, whole numbers exact, read 0 until written, cleared
+// with his VAR_n at a KO); his MSC keeps state there instead of in globals (fighters/gekkouga/README.md "Aligned kick
+// v1", the slot table). 0 - 15 his own: 0 gk_fx_t, 1 gk_cursor_t, 2 gk_cl_why, 3 gk_cl_t, 4 gk_gen_req, 5 gk_hold_first
+// (moved out of the globals), 8 the clones' mode (0 formation, 1 the aligned kick, 2 split, 3 regrouping), 9 the kick
+// used this airtime, 10 the kick's clock, 11 its variant (1 tapped, 2 held), 12 the regroup's clock; 16 x b + k body b's
+// (1 the left-spawned clone, 2 the right-spawned one, 3 him): k 0 action, 1 frames in it, 2 motion kind, 3 its start
+// frame, 4 the command's seq, 5 facing, 6 X speed, 7 Y speed (his; the clones' are gk_lvy / gk_rvy), 8 flight frames
+// left, 9 air jumps used, 10 smash charge, 11 smash chain, 12 tilted (the kick), 13 aux (smash type + 8 x auto / the
+// aerial / the landing lag), 14 / 15 the regroup's start X / Y
+// ===================================================================
+int gk_vi(int i)
+{
+    return (int)WorkModuleF(0, 0x0f000380 + i);
+}
+
+void gk_svi(int i, int v)
+{
+    WorkModule(0, (float)v + 0, 0x0f000380 + i);
+}
+
+float gk_bv(int b, int k)
+{
+    return WorkModuleF(0, 0x0f000380 + 16 * b + k);
+}
+
+int gk_bvi(int b, int k)
+{
+    return (int)WorkModuleF(0, 0x0f000380 + 16 * b + k);
+}
+
+void gk_bs(int b, int k, float v)
+{
+    WorkModule(0, v + 0, 0x0f000380 + 16 * b + k);
+}
+
+void gk_bsi(int b, int k, int v)
+{
+    WorkModule(0, (float)v + 0, 0x0f000380 + 16 * b + k);
+}
+
+void gk_cl_why_or(int bits)
+{
+    int w;
+    w = gk_vi(2);
+    gk_svi(2, w | bits);
+}
+
+// ===================================================================
+// Aligned kick v1 (fighters/gekkouga/README.md "Aligned kick v1"; the user's sketch: an arrowhead). During the ability,
+// down special with no left / right (stick down, |X| <= 0.25) while he can act starts it (gk_lw_press -> gk_ak_try: once
+// an airtime): his SpecialLwAttack slot (0x161, unused since clones v1: no counter) is ours: the counter's up-diagonal kick
+// (his game script's 0x2100001C hitboxes: 13 %, 60 degrees) on him and on both clones at once (their 1 / 2-frame delays
+// skipped). The startup: gk_ak_startup() frames (the motion's 5 to its kick, slowed to 5/8: a tap is easier to tell from a
+// hold), all three still. At the kick: special still held -> HELD, else TAPPED; he flies straight up gk_ak_rise() in
+// gk_ak_flight() frames; each clone flies up toward the centre line (53 degrees, the sketch) gk_ak_far() along its
+// diagonal (tapped: they cross above him and end beyond) or gk_ak_near() (held: they end next to him at the spawn spacing,
+// on the other side); his peak is well above theirs. Then a quarter of the speed is carried, gravity; he ends in Fall (not
+// a free fall), the clones are SPLIT. Swaps any time (gk_swap_free): place and momentum (a flight's rest) exchanged.
+// ===================================================================
+int gk_ak_startup() { return 8; }         // game frames to the kick (the motion's frame 5: its hitboxes, his and theirs)
+int gk_ak_kick_mf() { return 5; }         // the motion's kick frame (speciallwattack / specialairlwattack: FRAME 5)
+float gk_ak_rate0() { return 0.625f; }    // the startup's rate (5 motion frames in 8)
+int gk_ak_flight() { return 15; }         // frames of flight (the kick's hitboxes: motion frames 5 - 20)
+int gk_ak_len() { return 23; }            // the move: startup + flight (the motion's 20 frames)
+float gk_ak_rise() { return 78.0f; }      // his rise (straight up)
+float gk_ak_far() { return 64.0f; }       // a clone's flight along its diagonal, tapped
+float gk_ak_near() { return 46.5f; }      // ... held: 28 across (from -14 to +14) at 53 degrees
+float gk_ak_cos() { return 0.6018f; }     // the diagonal: 53 degrees over the horizontal (the sketch's arrows: 52 / 54)
+float gk_ak_sin() { return 0.7986f; }
+float gk_ak_keep() { return 0.25f; }      // the speed carried past a flight's end
+float gk_ak_tilt() { return 270.0f; }     // his kick turned straight up (FighterUtil 6: the counter's rush direction, up)
+
+int gk_ak_try()
+{
+    int m;
+    if (gk_vi(9) != 0)
+    {
+        return 0;                         // once an airtime
+    }
+    m = gk_vi(8);
+    if (m == 0x1 || m == 0x3)
+    {
+        return 0;                         // a kick's flight / the regroup still running
+    }
+    func_16(0x161, 0x1);
+    return 0x1;
+}
+
+// his status 0x161's pre (func_2351's body): in the air (as Hydro Pump's jet, func_2307), its kinetic type kept
+int gk_ak_pre()
+{
+    StatusModule(0x5, 0x2, 0x32, 0x5, 0x2, 0x1, 0xffffe000, 0xfffffffc, 0xffffffc0, 0);
+    StatusModule(0x2713, 0, 0x1, 0, 0, 0, 0x432, 0x2000000, 0x400, 0);
+    return 0;
+}
+
+// its init (func_2358's body): his speeds are ours (gk_ak_tick), no limits
+void gk_ak_init()
+{
+    WorkModule(0x2710, 0x2100001c);
+    KineticModule(0x14, 0x3, 100.0f, 0);
+    KineticModule(0x11, 0x3, 0, 0);
+    KineticModule(0xb, 0x3);
+    KineticModule(0x14, 0x1, 100.0f);
+    KineticModule(0x11, 0x1, 0);
+    KineticModule(0xb, 0x1);
+}
+
+// its main (func_2352's body)
+void gk_ak_main()
+{
+    float r;
+    WorkModule(0x2711, 0x21000018);       // his effect / sound scripts' False branches: the kick's effects and sound
+    WorkModule(0x2711, 0x21000019);
+    WorkModule(0x2711, 0x2100001a);
+    WorkModule(0x2711, 0x2100001b);
+    WorkModule(0x2711, 0x2100001d);
+    WorkModule(0x2711, 0x2100001e);
+    WorkModule(0x2711, 0x2100001f);
+    WorkModule(0x2710, 0x2100001c);       // the up-diagonal kick's hitboxes (his game script's 0x2100001C branch)
+    r = gk_ak_rate0();
+    func_22(0x28d, 0, r);
+    MotionModule(0x4, r);
+    GroundModule(0x2710, 0x5);
+    FighterUtil(0x6, 270.0f);
+    WorkModule(0, 270.0f + 0, 0x100000b);
+    gk_ak_begin();
+    global16 = gk_ak_tick;
+    func_78(gk_ak_loop);
+}
+
+// its exec (func_2359's body): his rotation every frame (the counter's)
+void gk_ak_exec()
+{
+    FighterUtil(0x6, WorkModuleF(0, 0x100000b));
+}
+
+// its end (func_2355's body)
+void gk_ak_end()
+{
+    VisibilityModule(0x2710, 0x1);
+    FighterUtil(0x6, 0);
+}
+
+// the move starts: the clones' mode 1 (free, kicking), its clock 0; his path still; each clone faces the centre line
+void gk_ak_begin()
+{
+    float ox;
+    int c;
+    gk_svi(8, 0x1);
+    gk_svi(9, 0x1);
+    gk_svi(10, 0);
+    gk_svi(11, 0);
+    gk_bsi(3, 0x1, 0);
+    gk_bs(3, 6, 0);
+    gk_bs(3, 7, 0);
+    gk_bsi(3, 8, 0);
+    ox = PostureModuleF(0x1);
+    c = 0x1;
+    while (c <= 0x2)
+    {
+        if (gk_alive & c)
+        {
+            gk_ak_clone_begin(c, ox);
+        }
+        c += 1;
+    }
+}
+
+void gk_ak_clone_begin(int c, float ox)
+{
+    float x;
+    float y;
+    float lr;
+    x = gk_cx(c);
+    y = gk_cy(c);
+    lr = 1.0f;
+    if (x > ox)
+    {
+        lr = -1.0f;
+    }
+    gk_bs(c, 5, lr);
+    gk_bsi(c, 0, 12);                     // kicking
+    gk_bsi(c, 12, 0x1);                   // tilted along its flight
+    gk_bs(c, 6, 0);
+    gk_bsi(c, 8, 0);
+    gk_bsi(c, 9, 0);
+    gk_bsi(c, 11, 0);
+    gk_set_c(c, x, y, 0);
+    gk_set_fall_t(c, 0);
+    gk_fcmd(c, 0x28d, 0);
+}
+
+// the kick frame (the clock at gk_ak_startup()): the variant, the three flights
+void gk_ak_launch()
+{
+    int held;
+    int c;
+    int f;
+    float d;
+    float ox;
+    float v;
+    float lr;
+    held = ControlModule(0x2712, 0x1);
+    d = gk_ak_far();
+    if (held)
+    {
+        d = gk_ak_near();
+    }
+    gk_svi(11, held + 1);
+    f = gk_ak_flight();
+    v = gk_ak_rise() / (float)f;
+    gk_bs(3, 6, 0);
+    gk_bs(3, 7, v);
+    gk_bsi(3, 8, f);
+    ox = PostureModuleF(0x1);
+    c = 0x1;
+    while (c <= 0x2)
+    {
+        if ((gk_alive & c) && gk_bvi(c, 0) == 12)
+        {
+            lr = 1.0f;
+            if (gk_cx(c) > ox)
+            {
+                lr = -1.0f;
+            }
+            gk_bs(c, 5, lr);
+            gk_bs(c, 6, lr * d * gk_ak_cos() / (float)f);
+            v = d * gk_ak_sin() / (float)f;
+            gk_set_vy(c, v);
+            gk_bsi(c, 8, f);
+        }
+        c += 1;
+    }
+}
+
+// his status's per-frame (not in hitlag; gekkouga_frame runs first in the frame): the startup still, then his path
+// (his own or a clone's, swapped), then gravity
+void gk_ak_tick()
+{
+    int t;
+    int ft;
+    float vx;
+    float vy;
+    t = gk_bvi(3, 0x1) + 1;
+    gk_bsi(3, 0x1, t);
+    vx = 0;
+    vy = 0;
+    if (t == gk_ak_startup())
+    {
+        MotionModule(0x4, 1.0f);
+    }
+    if (t >= gk_ak_startup())
+    {
+        ft = gk_bvi(3, 8);
+        vx = gk_bv(3, 6);
+        vy = gk_bv(3, 7);
+        if (ft > 0)
+        {
+            ft -= 1;
+            gk_bsi(3, 8, ft);
+            if (ft == 0)
+            {
+                gk_bs(3, 6, vx * gk_ak_keep());
+                gk_bs(3, 7, vy * gk_ak_keep());
+            }
+        }
+        else
+        {
+            vy = vy - gk_gravity();
+            if (vy < -gk_max_fall())
+            {
+                vy = -gk_max_fall();
+            }
+            vx = vx * 0.95f;
+            gk_bs(3, 6, vx);
+            gk_bs(3, 7, vy);
+        }
+    }
+    KineticModule(0x11, 0x3, vx, 0);
+    KineticModule(0x11, 0x1, vy);
+}
+
+// his status's loop: a landing after the lift-off (a normal landing), the move's end: Fall (not a free fall) / Wait
+int gk_ak_loop()
+{
+    int t;
+    t = gk_bvi(3, 0x1);
+    if (t > gk_ak_startup() + 0x1 && global18 == 0)
+    {
+        func_16(0x17, 0);
+        return 0x1;
+    }
+    if (t >= gk_ak_len())
+    {
+        if (global18 == 0)
+        {
+            func_16(0, 0);
+        }
+        else
+        {
+            func_16(0xe, 0);
+        }
+        return 0x1;
+    }
+    return 0;
+}
+
+// a clone's frame of the kick: still in the startup (its motion paused frame by frame: gk_fpack), then its flight (walls
+// and ceilings stop it), then a quarter of its speed carried: split, in the air
+void gk_kick_step(int c)
+{
+    int ft;
+    float x;
+    float y;
+    float vx;
+    float vy;
+    float nx;
+    float ny;
+    if (gk_vi(10) < gk_ak_startup() && gk_vi(8) == 0x1)
+    {
+        return;
+    }
+    ft = gk_bvi(c, 8);
+    x = gk_cx(c);
+    y = gk_cy(c);
+    vx = gk_bv(c, 6);
+    vy = gk_cvy(c);
+    nx = gk_fwall(x, y, vx);
+    ny = y + vy;
+    if (vy > 0.01f)
+    {
+        if (gk_line(nx, y + gk_head(), nx, ny + gk_head()) == 0x3)
+        {
+            ny = gk_hit_y - gk_head();    // a ceiling: the flight ends
+            ft = 0x1;
+        }
+    }
+    else if (gk_floor(nx, y + 0.5f, ny - 0.5f))
+    {
+        ny = gk_floor_y;                  // (a flight going down: a swap gave it his) a floor ends it
+        ft = 0x1;
+    }
+    gk_set_c(c, nx, ny, vy);
+    ft -= 1;
+    gk_bsi(c, 8, ft);
+    if (ft <= 0)
+    {
+        gk_bs(c, 6, vx * gk_ak_keep());
+        vy = vy * gk_ak_keep();
+        gk_set_vy(c, vy);
+        gk_bsi(c, 0, 10);                 // split: in the air, its own inputs (his)
+        gk_bsi(c, 12, 0);                 // upright
+    }
+}
+
+// ===================================================================
+// Split clones (the user: "Clones should mirror inputs. They should not regroup when landing. If shield + special is
+// pressed, Greninja should do a quick, short animation and the clones should slowly move back to him"). After the aligned
+// kick each clone runs its own actions from his controller (his stick, the game's command bits global24 (CAT1), attack
+// held) in its own situation, with its own physics (his walk / dash / run / air / jump / gravity values, the stage line
+// tests): on the ground wait / walk / dash / run, jab 1 - 3, tilts, dash attack, smashes (their start, hold, charge, auto
+// release and chains, his rules: a charge of its own), jumps (squat, full hop / short hop); in the air aerials (forward /
+// back by its own facing), its double jump, drift, fast fall; landings (an aerial's landing lag his). No ledges, no
+// specials, no grabs, no shields. Its motion is commanded through the channel (gk_fpack: VAR_28 / VAR_29); its scripts
+// are his (hitboxes, effects): its hits count as his. They don't regroup on landing; shield + special does (gk_rg_*).
+// ===================================================================
+float gk_walk_max() { return 1.43f; }     // his fighter_param: 0x03000003 walk max
+float gk_dash_v() { return 1.6f; }        // 0x03000008 dash initial speed
+float gk_run_max() { return 2.08f; }      // 0x0300000B run max
+float gk_friction() { return 0.045f; }    // 0x03000007 ground friction
+int gk_squat_frames() { return 4; }       // 0x1300000C jump startup frames
+float gk_jump_vy() { return 4.07f; }      // 0x03000011 jump height 46 at his gravity 0.18: sqrt(2 x 0.18 x 46)
+float gk_hop_vy() { return 2.82f; }       // 0x03000012 hop height 22.1
+float gk_ajump_vy() { return 4.07f; }     // 0x03000013 air jump height 46
+float gk_air_max() { return 1.18f; }      // 0x03000016 air speed max
+float gk_air_acc() { return 0.08f; }      // 0x03000014 + 0x03000015 air acceleration (0.07 + 0.01)
+float gk_air_fric() { return 0.015f; }    // 0x03000017 air friction
+float gk_fastfall() { return 2.96f; }     // 0x0300001B fast fall speed
+int gk_dash_frames() { return 10; }       // its dash before the run
+int gk_land_frames() { return 4; }        // a plain landing
+
+// the frame an action can end (the clone's motion): his vl group 1 byte 2 (the cancel frame) when it has one, else the
+// motion's length (vanilla fighter_param_vl_gekkouga.bin, his motion/body/main.pac)
+int gk_mlen(int k)
+{
+    if (k == 0x50 || k == 0x51)
+    {
+        return 22;                        // jab 1 / 2
+    }
+    if (k == 0x52)
+    {
+        return 36;
+    }
+    if (k == 0x56 || k == 0x5c)
+    {
+        return 33;                        // dash attack, up tilt
+    }
+    if (k == 0x58)
+    {
+        return 39;                        // forward tilt
+    }
+    if (k == 0x5d)
+    {
+        return 27;                        // down tilt
+    }
+    if (k == 0x5f)
+    {
+        return 50;                        // forward smash
+    }
+    if (k == 0x63)
+    {
+        return 52;                        // up smash
+    }
+    if (k == 0x65)
+    {
+        return 55;                        // down smash
+    }
+    if (k == 0x68)
+    {
+        return 65;                        // neutral air
+    }
+    if (k == 0x69)
+    {
+        return 55;                        // forward air
+    }
+    if (k == 0x6a)
+    {
+        return 46;                        // back air
+    }
+    if (k == 0x6b)
+    {
+        return 42;                        // up air
+    }
+    if (k == 0x6c)
+    {
+        return 57;                        // down air
+    }
+    if (k == 0x19)
+    {
+        return 40;                        // JumpF (motion length)
+    }
+    if (k == 0x1b)
+    {
+        return 43;                        // JumpAerialF
+    }
+    if (k == 0x28d || k == 0x279)
+    {
+        return 20;                        // the kick
+    }
+    return 0;
+}
+
+// an aerial's landing lag (his fighter_param 0x0300001C - 0x03000020)
+int gk_alag(int k)
+{
+    if (k == 0x1)
+    {
+        return 12;
+    }
+    if (k == 0x3)
+    {
+        return 13;
+    }
+    if (k == 0x5)
+    {
+        return 32;
+    }
+    return 15;
+}
+
+int gk_sm_hold_mf(int t)
+{
+    if (t == 0x1)
+    {
+        return 8;                         // the scripts' hold flag 0x2100001B (attacks4 8, attackhi4 9, attacklw4 5)
+    }
+    if (t == 0x2)
+    {
+        return 9;
+    }
+    return 5;
+}
+
+int gk_sm_start_kind(int t)
+{
+    if (t == 0x1)
+    {
+        return 0x5f;
+    }
+    if (t == 0x2)
+    {
+        return 0x63;
+    }
+    return 0x65;
+}
+
+int gk_sm_hold_kind(int t)
+{
+    if (t == 0x1)
+    {
+        return 0x62;
+    }
+    if (t == 0x2)
+    {
+        return 0x64;
+    }
+    return 0x67;
+}
+
+void gk_set_vy(int c, float vy)
+{
+    if (c == 0x1)
+    {
+        gk_lvy = vy;
+    }
+    else
+    {
+        gk_rvy = vy;
+    }
+}
+
+// a new motion for clone c: kind from frame f0 (the clone restarts it on a new seq)
+void gk_fcmd(int c, int kind, int f0)
+{
+    int s;
+    s = 0x1 - gk_bvi(c, 4);
+    gk_bsi(c, 4, s);
+    gk_bsi(c, 2, kind);
+    gk_bsi(c, 3, f0);
+    gk_bsi(c, 0x1, 0);
+}
+
+// its command in the channel: kind + 1024 x start frame + 2^20 facing left + 2^21 tilted + 2^22 paused + 2^23 seq
+// (under 2^24: exact in the float); the kick's startup: paused at the clock's frame of the motion (5 in 8)
+int gk_fpack(int c)
+{
+    int v;
+    int f0;
+    v = gk_bvi(c, 2);
+    f0 = gk_bvi(c, 3);
+    if (gk_bvi(c, 0) == 12 && gk_vi(8) == 0x1 && gk_vi(10) < gk_ak_startup())
+    {
+        f0 = gk_vi(10) * gk_ak_kick_mf() / gk_ak_startup();
+        v = v + 4194304;
+    }
+    v = v + f0 * 1024;
+    if (gk_bv(c, 5) < 0)
+    {
+        v = v + 1048576;
+    }
+    if (gk_bvi(c, 12))
+    {
+        v = v + 2097152;
+    }
+    if (gk_bvi(c, 4))
+    {
+        v = v + 8388608;
+    }
+    return v;
+}
+
+// back to formation (the regroup's end, or a kick cut before its kick): copying him again from the offsets they have
+void gk_free_end()
+{
+    float ox;
+    float oy;
+    ox = PostureModuleF(0x1);
+    oy = PostureModuleF(0x2);
+    gk_svi(8, 0);
+    gk_off_l = gk_lx - ox;
+    gk_off_r = gk_rx - ox;
+    gk_lfall = 0;
+    gk_rfall = 0;
+    gk_lvy = 0;
+    gk_rvy = 0;
+    gk_hn = 0;
+    gk_hcopy = 0;
+    gk_last_oy = oy;
+    gk_det = gk_detached(global4);
+    gk_bsi(0x1, 0, 0);
+    gk_bsi(0x2, 0, 0);
+    gk_bsi(0x1, 12, 0);
+    gk_bsi(0x2, 12, 0);
+}
+
+// every frame of the ability while the clones are free (mode 1 - 3; gk_physics in formation)
+void gk_free_frame()
+{
+    int m;
+    int t;
+    int cmd;
+    int held;
+    float sx;
+    float sy;
+    float hlr;
+    if (StopModule(0x1))
+    {
+        return;                           // his hitlag: they freeze with him
+    }
+    m = gk_vi(8);
+    if (m == 0x1)
+    {
+        t = gk_vi(10) + 1;
+        gk_svi(10, t);
+        if (t <= gk_ak_startup() && global4 != 0x161)
+        {
+            gk_free_end();                // his kick cut before the kick: nothing flew, back in formation
+            return;
+        }
+        if (t == gk_ak_startup())
+        {
+            gk_ak_launch();
+        }
+    }
+    if (m == 0x3)
+    {
+        t = gk_vi(12) + 1;
+        gk_svi(12, t);
+    }
+    sx = ControlModuleF(0);
+    sy = ControlModuleF(0x1);
+    cmd = global24;
+    held = ControlModule(0x2712, 0);
+    if (gk_mirror_off(global4) || global4 == 0x160)
+    {
+        sx = 0;                           // he is hit / on a ledge / calling them: no input for them
+        sy = 0;
+        cmd = 0;
+        held = 0;
+    }
+    hlr = PostureModuleF(0);
+    if (gk_alive & 0x1)
+    {
+        gk_fc(0x1, sx, sy, cmd, held, hlr);
+    }
+    if (gk_alive & 0x2)
+    {
+        gk_fc(0x2, sx, sy, cmd, held, hlr);
+    }
+    if (m == 0x1 && !gk_kicking(0x1) && !gk_kicking(0x2) && gk_vi(10) >= gk_ak_startup())
+    {
+        gk_svi(8, 0x2);                   // both flights over: split
+    }
+    if (m == 0x3 && gk_vi(12) >= gk_rg_frames())
+    {
+        gk_free_end();                    // regrouped: formation again
+    }
+}
+
+int gk_kicking(int c)
+{
+    if ((gk_alive & c) && gk_bvi(c, 0) == 12)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// one clone's frame (free): its action from his inputs, then its movement
+void gk_fc(int c, float sx, float sy, int cmd, int held, float hlr)
+{
+    int a;
+    int t;
+    t = gk_bvi(c, 0x1) + 1;
+    gk_bsi(c, 0x1, t);
+    a = gk_bvi(c, 0);
+    if (a == 12)
+    {
+        gk_kick_step(c);
+        return;
+    }
+    if (a == 13)
+    {
+        gk_rg_step(c);
+        return;
+    }
+    if (a < 10)
+    {
+        gk_fg(c, sx, cmd, held, sy);
+    }
+    else
+    {
+        gk_fa(c, sx, cmd, hlr);
+    }
+    gk_fmove(c, sy);
+}
+
+void gk_face(int c, float sx)
+{
+    if (sx > 0.2f)
+    {
+        gk_bs(c, 5, 1.0f);
+    }
+    else if (sx < -0.2f)
+    {
+        gk_bs(c, 5, -1.0f);
+    }
+}
+
+void gk_idle(int c)
+{
+    gk_bsi(c, 0, 0);
+    gk_bsi(c, 11, 0);
+    gk_fcmd(c, 0, 0);
+}
+
+float gk_toward(float v, float to, float step)
+{
+    if (v > to + step)
+    {
+        return v - step;
+    }
+    if (v < to - step)
+    {
+        return v + step;
+    }
+    return to;
+}
+
+// ---- on the ground: 0 wait / walk / run, 1 jump squat, 2 an attack, 3 a smash's start, 4 its hold, 5 a landing
+void gk_fg(int c, float sx, int cmd, int held, float sy)
+{
+    int a;
+    int t;
+    float vx;
+    a = gk_bvi(c, 0);
+    t = gk_bvi(c, 0x1);
+    if (a != 0)
+    {
+        vx = gk_bv(c, 6);
+        vx = gk_toward(vx, 0, 0.045f);    // his ground friction
+        gk_bs(c, 6, vx);
+    }
+    if (a == 0x1)
+    {
+        if (t >= gk_squat_frames())
+        {
+            gk_jump(c, sx, sy);
+        }
+        return;
+    }
+    if (a == 0x5)
+    {
+        if (t >= gk_bvi(c, 13))
+        {
+            gk_idle(c);
+        }
+        return;
+    }
+    if (a == 0x2)
+    {
+        gk_fatk(c, cmd, sx);
+        return;
+    }
+    if (a == 0x3)
+    {
+        gk_fsms(c, held);
+        return;
+    }
+    if (a == 0x4)
+    {
+        gk_fsmh(c, held);
+        return;
+    }
+    if (cmd & 0x300000)
+    {
+        gk_bsi(c, 0, 0x1);                // jump (button or stick): the squat
+        gk_fcmd(c, 0x18, 0);
+        return;
+    }
+    if (gk_fg_attack(c, sx, cmd))
+    {
+        return;
+    }
+    gk_fwalk(c, sx);
+}
+
+void gk_jump(int c, float sx, float sy)
+{
+    float vy;
+    float vx;
+    vy = gk_hop_vy();
+    if (ControlModule(0x2712, 0x2) || sy > 0.5f)
+    {
+        vy = gk_jump_vy();                // jump still held at the squat's end: a full jump
+    }
+    vx = gk_bv(c, 6) * 0.8f + sx * 0.95f; // his ground-to-air x 0.8, + 0.95 by the stick, at most 1.3
+    if (vx > 1.3f)
+    {
+        vx = 1.3f;
+    }
+    if (vx < -1.3f)
+    {
+        vx = -1.3f;
+    }
+    gk_bs(c, 6, vx);
+    gk_set_vy(c, vy);
+    gk_set_fall_t(c, 0x1);
+    gk_bsi(c, 0, 10);
+    gk_fcmd(c, 0x19, 0);                  // JumpF
+}
+
+// an attack from his command bits: smash (0x10 forward, 0x20 up, 0x40 down) > tilt (0x2 / 0x4 / 0x8) > jab / dash attack
+int gk_fg_attack(int c, float sx, int cmd)
+{
+    int t;
+    int k;
+    float vx;
+    t = 0;
+    if (cmd & 0x10)
+    {
+        t = 0x1;
+    }
+    else if (cmd & 0x20)
+    {
+        t = 0x2;
+    }
+    else if (cmd & 0x40)
+    {
+        t = 0x4;
+    }
+    if (t != 0)
+    {
+        if (t == 0x1)
+        {
+            gk_face(c, sx);
+        }
+        gk_bsi(c, 11, 0);                 // a new chain
+        k = 0;
+        if (gk_bvi(c, 10) >= gk_smash_full())
+        {
+            k = 0x1;                      // a stored full charge: it releases on its own
+        }
+        gk_fsm_begin(c, t, k);
+        return 0x1;
+    }
+    k = 0;
+    if (cmd & 0x4)
+    {
+        k = 0x5c;
+    }
+    else if (cmd & 0x8)
+    {
+        k = 0x5d;
+    }
+    else if (cmd & 0x2)
+    {
+        k = 0x58;
+        gk_face(c, sx);
+    }
+    else if (cmd & 0x1)
+    {
+        k = 0x50;
+        vx = gk_bv(c, 6);
+        if (gk_abs(vx) > gk_walk_max())
+        {
+            k = 0x56;                     // running: dash attack
+        }
+    }
+    if (k == 0)
+    {
+        return 0;
+    }
+    gk_bsi(c, 0, 0x2);
+    gk_bsi(c, 13, 0);
+    gk_fcmd(c, k, 0);
+    return 0x1;
+}
+
+void gk_fsm_begin(int c, int t, int au)
+{
+    int k;
+    gk_bsi(c, 0, 0x3);
+    gk_bsi(c, 13, t + 8 * au);
+    k = gk_sm_start_kind(t);
+    gk_fcmd(c, k, 0);
+}
+
+// an attack's frames: jab 1 -> 2 -> 3 on a new attack press, a smash's chain (from its last hitbox's end), its end
+void gk_fatk(int c, int cmd, float sx)
+{
+    int k;
+    int t;
+    int f;
+    int st;
+    float x;
+    float y;
+    float lr;
+    k = gk_bvi(c, 2);
+    t = gk_bvi(c, 0x1);
+    f = gk_bvi(c, 3) + t;
+    st = gk_bvi(c, 13);
+    if ((k == 0x50 || k == 0x51) && t >= 6 && (cmd & 0x7f) == 0x1)
+    {
+        gk_fcmd(c, k + 0x1, 0);
+        return;
+    }
+    if (st != 0)
+    {
+        if (f == gk_tr_frame(st))
+        {
+            x = gk_cx(c);                 // burn v2: its fire trail at its smash's main hit
+            y = gk_cy(c);
+            lr = gk_bv(c, 5);
+            k = gk_tr_type(st);
+            gk_tr_ask(c, k, x, y, lr);
+            gk_tr_req_t = gk_tr_req_frames();
+            k = gk_bvi(c, 2);
+        }
+        if (f >= gk_sm_window(st) && gk_fchain(c, cmd, sx))
+        {
+            return;
+        }
+    }
+    if (f >= gk_mlen(k))
+    {
+        gk_idle(c);
+    }
+}
+
+int gk_fchain(int c, int cmd, float sx)
+{
+    int t;
+    int used;
+    t = 0;
+    if (cmd & 0x10)
+    {
+        t = 0x1;
+    }
+    else if (cmd & 0x20)
+    {
+        t = 0x2;
+    }
+    else if (cmd & 0x40)
+    {
+        t = 0x4;
+    }
+    used = gk_bvi(c, 11);
+    if (t == 0 || (used & t) != 0)
+    {
+        return 0;
+    }
+    if (t == 0x1)
+    {
+        gk_face(c, sx);
+    }
+    gk_fsm_begin(c, t, 0x2);
+    return 0x1;
+}
+
+// a smash's start: at its hold frame an automatic one (a full stored charge: used; a chain) releases, a held one holds,
+// a released one is no attack (his rules: gk_sm_start_loop)
+void gk_fsms(int c, int held)
+{
+    int aux;
+    int t;
+    int au;
+    int k;
+    int f;
+    aux = gk_bvi(c, 13);
+    t = aux % 8;
+    au = aux / 8;
+    f = gk_sm_hold_mf(t);
+    if (gk_bvi(c, 0x1) < f)
+    {
+        return;
+    }
+    if (au != 0)
+    {
+        if (au == 0x1)
+        {
+            gk_bsi(c, 10, 0);
+        }
+        k = gk_bvi(c, 11);
+        gk_bsi(c, 11, k | t);
+        gk_bsi(c, 0, 0x2);
+        gk_bsi(c, 13, t);
+        k = gk_sm_start_kind(t);
+        gk_fcmd(c, k, f);
+        return;
+    }
+    if (held)
+    {
+        gk_bsi(c, 0, 0x4);
+        k = gk_sm_hold_kind(t);
+        gk_fcmd(c, k, 0);
+        return;
+    }
+    gk_idle(c);
+}
+
+// the hold: its charge grows (its own, up to gk_smash_full()); full -> ready (no attack: the next releases at once),
+// released -> kept (no attack)
+void gk_fsmh(int c, int held)
+{
+    int v;
+    v = gk_bvi(c, 10) + 1;
+    if (v > gk_smash_full())
+    {
+        v = gk_smash_full();
+    }
+    gk_bsi(c, 10, v);
+    if (v >= gk_smash_full() || !held)
+    {
+        gk_idle(c);
+    }
+}
+
+void gk_fwalk(int c, float sx)
+{
+    float ax;
+    float vx;
+    float lr;
+    int k;
+    int want;
+    ax = gk_abs(sx);
+    k = gk_bvi(c, 2);
+    vx = gk_bv(c, 6);
+    want = 0;
+    if (ax < 0.2f)
+    {
+        vx = gk_toward(vx, 0, 0.045f);
+    }
+    else
+    {
+        lr = 1.0f;
+        if (sx < 0)
+        {
+            lr = -1.0f;
+        }
+        gk_bs(c, 5, lr);
+        if (ax < 0.75f)
+        {
+            want = 0xb;                   // WalkMiddle
+            vx = gk_walk_max() * ax / 0.75f * lr;
+        }
+        else
+        {
+            want = 0x12;                  // Run, after its dash
+            if (k != 0x11 && k != 0x12)
+            {
+                want = 0x11;
+            }
+            else if (k == 0x11 && gk_bvi(c, 0x1) < gk_dash_frames())
+            {
+                want = 0x11;
+            }
+            vx = gk_run_max() * lr;
+            if (want == 0x11)
+            {
+                vx = gk_dash_v() * lr;
+            }
+        }
+    }
+    gk_bs(c, 6, vx);
+    if (want != k)
+    {
+        gk_fcmd(c, want, 0);
+    }
+}
+
+// ---- in the air: 10 jump / fall, 11 an aerial
+void gk_fa(int c, float sx, int cmd, float hlr)
+{
+    int a;
+    int t;
+    int k;
+    float vx;
+    a = gk_bvi(c, 0);
+    t = gk_bvi(c, 0x1);
+    k = gk_bvi(c, 2);
+    if (a == 11)
+    {
+        if (t >= gk_mlen(k))
+        {
+            gk_bsi(c, 0, 10);
+            gk_fcmd(c, 0x24, 0);
+        }
+        gk_fdrift(c, sx);
+        return;
+    }
+    if ((cmd & 0x300000) && gk_bvi(c, 9) == 0)
+    {
+        gk_bsi(c, 9, 0x1);                // its double jump
+        gk_set_vy(c, gk_ajump_vy());
+        vx = sx * 0.9f;
+        gk_bs(c, 6, vx);
+        gk_fcmd(c, 0x1b, 0);              // JumpAerialF
+        return;
+    }
+    k = gk_aerial(c, cmd, hlr);
+    if (k != 0)
+    {
+        gk_bsi(c, 0, 11);
+        gk_bsi(c, 13, k);
+        gk_fcmd(c, 0x67 + k, 0);          // AttackAirN / F / B / Hi / Lw (0x68 - 0x6C)
+        gk_fdrift(c, sx);
+        return;
+    }
+    k = gk_bvi(c, 2);
+    if (k != 0x24 && t >= gk_mlen(k))
+    {
+        gk_fcmd(c, 0x24, 0);              // its jump's / the kick's motion over: Fall
+    }
+    gk_fdrift(c, sx);
+}
+
+// the aerial his command asks for (1 neutral, 2 forward, 3 back, 4 up, 5 down), forward / back by its facing
+int gk_aerial(int c, int cmd, float hlr)
+{
+    int k;
+    float lr;
+    if ((cmd & 0xf81) == 0)
+    {
+        return 0;
+    }
+    k = 0x1;
+    if (cmd & 0x400)
+    {
+        k = 0x4;
+    }
+    else if (cmd & 0x800)
+    {
+        k = 0x5;
+    }
+    else if (cmd & 0x100)
+    {
+        k = 0x2;
+    }
+    else if (cmd & 0x200)
+    {
+        k = 0x3;
+    }
+    else if ((cmd & 0x80) == 0)
+    {
+        k = ControlModule(0x10);          // only the attack bit: the game's air attack kind (as gk_ac_try)
+        if (k < 0x1 || k > 0x5)
+        {
+            k = 0x1;
+        }
+    }
+    if (k == 0x2 || k == 0x3)
+    {
+        lr = gk_bv(c, 5);
+        if (lr * hlr < 0)
+        {
+            k = 0x5 - k;                  // his forward is its back
+        }
+    }
+    return k;
+}
+
+void gk_fdrift(int c, float sx)
+{
+    float vx;
+    vx = gk_bv(c, 6);
+    if (gk_abs(sx) < 0.2f)
+    {
+        vx = gk_toward(vx, 0, 0.015f);
+    }
+    else
+    {
+        vx = gk_toward(vx, sx * gk_air_max(), 0.08f);
+    }
+    gk_bs(c, 6, vx);
+}
+
+// a wall between x and x + vx at its knees stops it there (gk_clone_phys's test); the X it gets to
+float gk_fwall(float x, float y, float vx)
+{
+    float nx;
+    nx = x + vx;
+    if (gk_abs(vx) < 0.01f)
+    {
+        return x;
+    }
+    if (gk_line(x, y + gk_wall_y(), nx, y + gk_wall_y()) == 0x2)
+    {
+        if (vx > 0)
+        {
+            return gk_hit_x - gk_wall_gap();
+        }
+        return gk_hit_x + gk_wall_gap();
+    }
+    return nx;
+}
+
+// its movement: on the ground along the floor (off a ledge it falls); in the air gravity, fast fall, ceilings, landing
+void gk_fmove(int c, float sy)
+{
+    float x;
+    float y;
+    float vx;
+    float vy;
+    float nx;
+    float ny;
+    float reach;
+    float d;
+    int a;
+    int t;
+    a = gk_bvi(c, 0);
+    x = gk_cx(c);
+    y = gk_cy(c);
+    vy = gk_cvy(c);
+    vx = gk_bv(c, 6);
+    t = gk_fall_t(c);
+    nx = gk_fwall(x, y, vx);
+    d = nx - x - vx;
+    if (gk_abs(d) > 0.01f)
+    {
+        gk_bs(c, 6, 0);                   // a wall
+    }
+    if (a < 10)
+    {
+        d = nx - x;
+        reach = gk_snap() + gk_slope() * gk_abs(d);
+        if (gk_floor(nx, y + reach, y - reach))
+        {
+            gk_set_c(c, nx, gk_floor_y, 0);
+            gk_set_fall_t(c, 0);
+            return;
+        }
+        gk_set_c(c, nx, y, 0);            // off a ledge: it falls
+        gk_set_fall_t(c, 0x1);
+        gk_bsi(c, 0, 10);
+        gk_fcmd(c, 0x24, 0);
+        return;
+    }
+    vy = vy - gk_gravity();
+    if (vy < -gk_max_fall())
+    {
+        vy = -gk_max_fall();
+    }
+    if (sy < -0.66f && vy < 0)
+    {
+        vy = -gk_fastfall();
+    }
+    ny = y + vy;
+    if (vy > 0.01f)
+    {
+        if (gk_line(nx, y + gk_head(), nx, ny + gk_head()) == 0x3)
+        {
+            ny = gk_hit_y - gk_head();
+            vy = 0;
+        }
+    }
+    else if (gk_floor(nx, y + 0.5f, ny - 0.5f))
+    {
+        gk_set_c(c, nx, gk_floor_y, 0);
+        gk_set_fall_t(c, 0);
+        gk_fland(c);
+        return;
+    }
+    gk_set_c(c, nx, ny, vy);
+    t += 1;
+    gk_set_fall_t(c, t);
+    if (t > gk_fall_frames())
+    {
+        gk_kill(c, 0);                    // fallback: fallen far off the stage
+        gk_why(400, c);
+    }
+}
+
+void gk_fland(int c)
+{
+    int k;
+    gk_bsi(c, 9, 0);
+    if (gk_bvi(c, 0) == 11)
+    {
+        k = gk_bvi(c, 13);
+        gk_bsi(c, 0, 0x5);
+        gk_bsi(c, 13, gk_alag(k));
+        gk_fcmd(c, 0x6c + k, 0);          // LandingAirN / F / B / Hi / Lw (0x6D - 0x71), his landing lag
+        return;
+    }
+    gk_bsi(c, 0, 0x5);
+    gk_bsi(c, 13, gk_land_frames());
+    gk_fcmd(c, 0x3a, 0);                  // LandingLight
+}
+
+// ---- the regroup (the user: shield + special: "Greninja should do a quick, short animation and the clones should slowly
+// move back to him"): while split, special pressed with shield held, when he can act (standing, moving, in the air,
+// shielding): the press is eaten (no special) and his SpecialLwHit slot (0x160, unused: no counter) plays the start of his
+// counter stance (speciallw / specialairlw, frames 0 - 7.6: before its intangible window 8 - 19, at 0.4: gk_rg_anim()
+// frames), the stance's own slow fall; the clones walk (same floor) / float back to their formation places (his X -/+ 14,
+// his Y) over gk_rg_frames() (eased: slow start and end; not through walls' tests: they float), then formation
+int gk_rg_frames() { return 75; }         // 1.25 s
+int gk_rg_anim() { return 19; }
+float gk_rg_rate() { return 0.4f; }
+
+int gk_rg_ok(int st)
+{
+    if (st == 0x10)
+    {
+        return 0;                         // helpless
+    }
+    if (st <= 0x15)
+    {
+        return 0x1;                       // wait, walk, dash, run, turns, squat, jumps, fall
+    }
+    if (st >= 0x1b && st <= 0x1d)
+    {
+        return 0x1;                       // shielding
+    }
+    return 0;
+}
+
+int gk_rg_try()
+{
+    if (gk_vi(8) != 0x2)
+    {
+        return 0;
+    }
+    if (ControlModule(0x2712, 0x3) == 0)
+    {
+        return 0;
+    }
+    if (!gk_rg_ok(global4))
+    {
+        return 0;
+    }
+    WorkModule(0, 32.0f + 0, 0x0f0003c9); // Buffer_Clear (specials): no special status
+    global24 = global24 - (global24 & 0xf000);
+    func_16(0x160, 0x1);
+    return 0x1;
+}
+
+// his status 0x160's main (func_2346's body)
+void gk_rg_main()
+{
+    float r;
+    r = gk_rg_rate();
+    if (global18 == 0)
+    {
+        func_22(0x271, 0, r);
+    }
+    else
+    {
+        func_22(0x289, 0, r);
+    }
+    MotionModule(0x4, r);
+    gk_rg_begin();
+    func_78(gk_rg_loop);
+}
+
+// its loop (func_2347's body)
+int gk_rg_loop()
+{
+    if (global9 >= (float)gk_rg_anim())
+    {
+        if (global18 == 0)
+        {
+            func_16(0, 0);
+        }
+        else
+        {
+            func_16(0xe, 0);
+        }
+        return 0x1;
+    }
+    if (global19 == 0 && global18 == 0x2)
+    {
+        func_23(0x289);
+        MotionModule(0x4, gk_rg_rate());
+    }
+    else if (global19 == 0x2 && global18 == 0)
+    {
+        func_23(0x271);
+        MotionModule(0x4, gk_rg_rate());
+    }
+    return 0;
+}
+
+void gk_rg_begin()
+{
+    int c;
+    float x;
+    float y;
+    if (gk_vi(8) != 0x2)
+    {
+        return;
+    }
+    gk_svi(8, 0x3);
+    gk_svi(12, 0);
+    c = 0x1;
+    while (c <= 0x2)
+    {
+        if (gk_alive & c)
+        {
+            x = gk_cx(c);
+            y = gk_cy(c);
+            gk_bs(c, 14, x);
+            gk_bs(c, 15, y);
+            gk_bsi(c, 0, 13);
+            gk_bsi(c, 12, 0);
+            gk_bs(c, 6, 0);
+            gk_set_vy(c, 0);
+            gk_fcmd(c, 0x24, 0);
+        }
+        c += 1;
+    }
+}
+
+float gk_form_off(int c)
+{
+    if (c == 0x1)
+    {
+        return -gk_gap();
+    }
+    return gk_gap();
+}
+
+// a clone's regroup frame: eased (smoothstep) from where it was to its formation place now
+void gk_rg_step(int c)
+{
+    float u;
+    float s;
+    float tx;
+    float ty;
+    float x0;
+    float y0;
+    float x;
+    float y;
+    float d;
+    int k;
+    u = (float)gk_vi(12) / (float)gk_rg_frames();
+    if (u > 1.0f)
+    {
+        u = 1.0f;
+    }
+    s = u * u * (3.0f - 2.0f * u);
+    d = gk_form_off(c);
+    tx = PostureModuleF(0x1) + d;
+    ty = PostureModuleF(0x2);
+    x0 = gk_bv(c, 14);
+    y0 = gk_bv(c, 15);
+    x = x0 + (tx - x0) * s;
+    y = y0 + (ty - y0) * s;
+    if (tx > x0 + 0.5f)
+    {
+        gk_bs(c, 5, 1.0f);
+    }
+    else if (tx < x0 - 0.5f)
+    {
+        gk_bs(c, 5, -1.0f);
+    }
+    k = 0x24;                             // floating back (Fall)
+    d = ty - y0;
+    if (gk_abs(d) < 3.0f && gk_fall_t(c) == 0)
+    {
+        k = 0xb;                          // walking back on his floor (WalkMiddle)
+    }
+    if (u >= 1.0f)
+    {
+        k = 0;
+    }
+    if (k != gk_bvi(c, 2))
+    {
+        gk_fcmd(c, k, 0);
+    }
+    gk_set_c(c, x, y, 0);
+}
+
+// ---- swaps while free (the user: "he can swap with a clone at any point during the move (and after), taking its
+// position and momentum"): places exchanged, and the speeds: a flight's rest (its speed and frames) go with it; in his
+// kick status his path is ours (gk_ak_tick), else his speed is set (the vertical on his gravity energy, the horizontal
+// on his stop energy: approximate); the clone gets his (his kick path, or his speed now: SPEED_X / SPEED_Y)
+void gk_swap_free(int id, float ox, float oy, float cx, float cy)
+{
+    float hvx;
+    float hvy;
+    float cvx;
+    float cvy;
+    int hft;
+    int cft;
+    int a;
+    hft = 0;
+    if (global4 == 0x161)
+    {
+        hvx = gk_bv(3, 6);
+        hvy = gk_bv(3, 7);
+        hft = gk_bvi(3, 8);
+    }
+    else
+    {
+        hvx = WorkModuleF(0, 0x0f000332);
+        hvy = WorkModuleF(0, 0x0f000333);
+    }
+    cvx = gk_bv(id, 6);
+    cvy = gk_cvy(id);
+    cft = gk_bvi(id, 8);
+    a = gk_bvi(id, 0);
+    if (a != 12)
+    {
+        cft = 0;
+    }
+    WorkModule(0x2, cx - ox + 0, 0x0f000000);
+    WorkModule(0x2, cy - oy + 0, 0x0f000001);
+    if (global4 == 0x161)
+    {
+        gk_bs(3, 6, cvx);
+        gk_bs(3, 7, cvy);
+        gk_bsi(3, 8, cft);
+    }
+    else
+    {
+        KineticModule(0x11, 0x1, cvy);
+        KineticModule(0x11, 0x3, cvx, 0);
+        KineticModule(0xb, 0x3);
+    }
+    gk_set_c(id, ox, oy, hvy);
+    gk_bs(id, 6, hvx);
+    gk_bsi(id, 8, hft);
+    if (hft > 0)
+    {
+        gk_bsi(id, 0, 12);                // it flies his path's rest
+        gk_bsi(id, 12, 0x1);
+    }
+    else if (a == 12 || StatusModule(0x1) == 0x2)
+    {
+        gk_bsi(id, 0, 10);
+        gk_bsi(id, 12, 0);
+        gk_set_fall_t(id, 0x1);
+        gk_fcmd(id, 0x24, 0);
+    }
+    else
+    {
+        gk_set_fall_t(id, 0);
+        gk_idle(id);
+    }
+    gk_swap_cd = 10;
 }

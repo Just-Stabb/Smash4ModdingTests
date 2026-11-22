@@ -632,6 +632,9 @@ float cl_hl0;          // ... his facing ...
 float cl_hl1;
 float cl_hl2;
 int cl_hn;             // ... and how many are kept (0 - 3)
+int cl_free_on;        // aligned kick v1: his channel's free mode (flags 128) seen last frame
+int cl_free_seen;      // ... the command applied last: its kind x 2 + its seq (-1 none)
+int cl_tilt;           // ... its tilt now (1: turned along the kick's flight; -1 to set again)
 
 int cl_magic() { return 4747; }
 
@@ -657,12 +660,12 @@ float cl_abs(float v)
 }
 
 // v2: his flags (VAR_31 - 4747000), 0x1000 when slot n isn't a Greninja with clones out (clone delay: up to 127: 64 he
-// is frozen)
+// is frozen; aligned kick v1: up to 255: 128 the clones are free)
 int cl_flags(int slot)
 {
     float v;
     v = cl_shared(slot, 7) - 4747000.0f;
-    if (v < -0.5f || v > 127.5f)
+    if (v < -0.5f || v > 255.5f)
     {
         return 0x1000;
     }
@@ -781,6 +784,19 @@ void cl_frame()
         PostureModule(0x3, cl_shared(cl_slot, 2), cl_shared(cl_slot, 3), 0);
     }
     cl_beat();
+    if (flags & 0x80)
+    {
+        cl_free(flags);                   // aligned kick v1: its own motion (the kick, split, the regroup)
+        return;
+    }
+    if (cl_free_on)
+    {
+        cl_free_on = 0;                   // back in formation: upright, his motion from now (no history)
+        PostureModule(0x4, 0, 0, 0);
+        cl_tilt = 0;
+        cl_motion = 0xffffffff;
+        cl_hn = 0;
+    }
     if ((flags & 0x40) == 0 || cl_hn == 0)
     {
         cl_push(cl_shared(cl_slot, 4), cl_shared(cl_slot, 5), cl_slot_pos(cl_slot, 3));
@@ -896,4 +912,82 @@ void cl_move_end(int k)
     {
         EffectModule(0x2d, 0);
     }
+}
+
+// ---- aligned kick v1 (fighters/gekkouga/README.md "Aligned kick v1"): while his flags have 128 the clone is free: his MSC
+// moves it (its X / Y as before) and commands its motion in VAR_28 (the left-spawned clone) / VAR_29 (the right-spawned
+// one): kind + 1024 x start frame + 2^20 facing left + 2^21 tilted + 2^22 paused + 2^23 seq. A new kind or seq: that
+// motion from the start frame (its scripts from there); else it plays on (rate 1; 0 while he is frozen, flags 64);
+// paused: held on the start frame (the kick's startup, stepped by him). Tilted: turned back cl_tilt_deg() about its X
+// (relative to its facing: +X tilts it forward), its kick along its flight up toward the centre line.
+float cl_tilt_deg() { return -53.0f; }
+
+void cl_free(int flags)
+{
+    int v;
+    int kind;
+    int f0;
+    int tilt;
+    int paused;
+    int seq;
+    float lr;
+    float r;
+    if (cl_free_on == 0)
+    {
+        cl_free_on = 0x1;
+        cl_free_seen = 0xffffffff;
+        cl_tilt = 0xffffffff;
+    }
+    v = (int)(cl_shared(cl_slot, 3 + cl_id) + 0.5f);
+    kind = v % 1024;
+    f0 = (v / 1024) % 1024;
+    lr = 1.0f;
+    if ((v / 1048576) % 2)
+    {
+        lr = -1.0f;
+    }
+    tilt = (v / 2097152) % 2;
+    paused = (v / 4194304) % 2;
+    seq = (v / 8388608) % 2;
+    if (PostureModuleF(0) != lr)
+    {
+        PostureModule(0, lr);
+        PostureModule(0x2);
+        cl_tilt = 0xffffffff;             // turned: its tilt set again
+    }
+    if (tilt != cl_tilt)
+    {
+        if (tilt)
+        {
+            PostureModule(0x4, cl_tilt_deg(), 0, 0);
+        }
+        else
+        {
+            PostureModule(0x4, 0, 0, 0);
+        }
+        cl_tilt = tilt;
+    }
+    r = 1.0f;
+    if ((flags & 0x40) || paused)
+    {
+        r = 0;
+    }
+    if (kind != cl_motion || kind * 2 + seq != cl_free_seen)
+    {
+        cl_move_end(kind);
+        MotionModule(0x1, kind, (float)f0, r);
+        cl_motion = kind;
+        cl_free_seen = kind * 2 + seq;
+    }
+    else
+    {
+        MotionModule(0x4, r);
+        if (paused && cl_abs((float)f0 - MotionModuleF(0x1)) > 0.5f)
+        {
+            MotionModule(0x2713, (float)f0);
+        }
+    }
+    cl_hn = 0;
+    cl_last_f = 0;
+    cl_show(1);
 }

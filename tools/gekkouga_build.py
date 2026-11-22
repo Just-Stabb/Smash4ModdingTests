@@ -93,6 +93,16 @@ MSC_BODIES = {
     'func_306': ('int', 'return gk_sm_hold_loop(0x4); // Greninja mod (clones.c)'),
     # skeleton v1: Shadow Sneak's per-frame: no vanish / teleport, the Running Skeleton at the shadow (clones.c)
     'func_2291': ('void', 'gk_ss_tick(); // Greninja mod: skeleton v1 (clones.c)'),
+    # aligned kick v1: SpecialLwAttack 0x161 (unused since clones v1: no counter) is the aligned kick (clones.c gk_ak_*)
+    'func_2351': ('int', 'return gk_ak_pre(); // Greninja mod: aligned kick v1 (clones.c)'),
+    'func_2352': ('void', 'gk_ak_main(); // Greninja mod: aligned kick v1 (clones.c)'),
+    'func_2358': ('void', 'gk_ak_init(); // Greninja mod: aligned kick v1 (clones.c)'),
+    'func_2359': ('void', 'gk_ak_exec(); // Greninja mod: aligned kick v1 (clones.c)'),
+    'func_2355': ('void', 'gk_ak_end(); // Greninja mod: aligned kick v1 (clones.c)'),
+    # ... and SpecialLwHit 0x160 (unused) the split clones' regroup call: the start of his stance (clones.c gk_rg_*)
+    'func_2346': ('void', 'gk_rg_main(); // Greninja mod: aligned kick v1, the regroup (clones.c)'),
+    'func_2347': ('int', 'return gk_rg_loop(); // Greninja mod: aligned kick v1, the regroup (clones.c)'),
+    'func_2349': ('void', 'func_2340(); // Greninja mod: the regroup: the stance\'s physics (clones.c)'),
 }
 # attack loops: a chain cancel first
 MSC_CHAIN = {'func_293': 0x1, 'func_302': 0x2, 'func_309': 0x4}
@@ -328,7 +338,63 @@ def clone_scripts(game, effect, mtable_hashes, bmap, joint25=None):
         eo = clone_effect(effect.scripts.get(crc), bmap, joint25)
         if eo:
             e_out[crc] = eo
+    for crc, (gs, es) in clone_kick(game, effect, bmap).items():
+        if crc in mtable_hashes:
+            g_out[crc] = gs
+            e_out[crc] = es
     return g_out, e_out
+
+
+KICK_SCRIPTS = ('speciallwattack', 'specialairlwattack')   # aligned kick v1: the counter's kick (motions 0x279 / 0x28D)
+KICK_FLAG = 0x2100001C            # ... its up-diagonal branch (13 %, 60 degrees; clones.c gk_ak_main sets it on him)
+KICK_FX_FLAGS = (0x21000018, 0x21000019)   # his effect script's branches the kick plays (False: the flags are off)
+
+
+def kick_branch(s, flag):
+    """the Hitbox commands of `IS_FLAG(flag)`'s True branch in his counter kick's game script"""
+    i = next(i for i, c in enumerate(s) if c.name == 'IS_FLAG' and int(c.params[0]) == flag)
+    assert s[i + 1].name == 'True'
+    out = []
+    for c in s[i + 2:]:
+        if c.name not in HITBOXES:
+            break
+        out.append(c)
+    assert out
+    return out
+
+
+def clone_kick(game, effect, bmap):
+    """aligned kick v1: the clone's counter kick (its game scripts skip IS_FLAG scripts): his first FRAME (the kick at 5),
+    the up-diagonal branch's hitboxes (bones as the article's), his last FRAME / Remove_All_Hitboxes; its effects: his
+    effect script's commands under the False branches it plays (his flags 0x21000018 / 19 off); {crc: (game, effect)}"""
+    import acmd
+    s = game.scripts[acmd.crc(KICK_SCRIPTS[0])]
+    frames = [c for c in s if c.name == 'FRAME']
+    g = [acmd.Command(frames[0].ident, list(frames[0].params))]
+    for c in kick_branch(s, KICK_FLAG):
+        c2 = acmd.Command(c.ident, list(c.params))
+        k = param(c2, 'Bone')
+        c2.params[k] = bmap(int(c2.params[k]))
+        g.append(c2)
+    g.append(acmd.Command(frames[-1].ident, list(frames[-1].params)))
+    rm = [c for c in s if c.name == 'Remove_All_Hitboxes']
+    g.append(acmd.Command(rm[-1].ident, []))
+    g.append(acmd.Command(s[-1].ident, []))
+    assert s[-1].name == 'Script_End'
+    e = []
+    for c in effect.scripts[acmd.crc(KICK_SCRIPTS[0])]:
+        if c.name in ('IS_FLAG', 'False', 'ON_FLAG', 'True', 'Else'):
+            continue
+        c2 = acmd.Command(c.ident, list(c.params))
+        if c.name not in ('FRAME', 'WAIT'):
+            assert c.name in CLONE_EFFECT, c.name
+            for nm in ('Bone', 'Bone1', 'Bone2', 'Bone3'):
+                if nm in c2.info['syntax']:
+                    k = param(c2, nm)
+                    c2.params[k] = bmap(int(c2.params[k]))
+        e.append(c2)
+    assert e[-1].name == 'Script_End'
+    return {acmd.crc(n): (g, e) for n in KICK_SCRIPTS}
 
 
 def clone_effect(e, bmap, joint25=None):
