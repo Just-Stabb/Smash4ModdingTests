@@ -1003,6 +1003,188 @@ def clone_tests(mscsb, src):
     check('v8: ... once (no VisibilityModule call while nothing changes)', [x for x in g.log if x[0] == 'visible'], [])
 
 
+def skeleton_side_tests(mscsb, src):
+    """skeleton v1: his side special (SpecialS 0x153's per-frame: gk_ss_tick, in place of func_2291), the request's
+    lapse, the reset on the executable's clear-all count (his VAR_14)"""
+    m = fresh(mscsb, src)
+    g = m.game
+    g.ints.update({0x16000006: 12, 0x16000007: 10, 0x10000085: 0, 0x11000002: 0})
+    g.vars.update({0x31: 80.0, 0x32: 12.5})
+    g.lr = -1.0
+    g.situation = 0
+    seen = []
+    for f in range(1, 23):
+        g.log, g.status_req = [], []
+        m('func_2291')
+        if g.log or g.status_req or g.vars.get(0x0F00030F):
+            seen.append(f)
+            if f == 21:
+                got = (list(g.log), list(g.status_req))
+    check('skeleton v1: Shadow Sneak: nothing for the start-up (12) and the shadow\'s time (10): no vanish (no '
+          'VisibilityModule / HitModule), no teleport; at frame 21 (where vanilla\'s func_2291 teleports him) the skeleton',
+          seen[:1], [21])
+    check('skeleton v1: ... his VAR_15 = 1 (asked), VAR_16 / 17 = the shadow\'s place (80, 12.5), VAR_18 his facing (-1)',
+          [g.vars.get(v) for v in (0x0F00030F, 0x0F000310, 0x0F000311, 0x0F000312)], [1.0, 80.0, 12.5, -1.0])
+    check('skeleton v1: ... article 8 made (ArticleModule 0x2710), then he ends the move in place: Wait (on the ground)',
+          ([x for x in got[0] if x[0] == 'article'], got[1], g.posture_sets), ([('article', 0x2710, 8)], [(0, 0)], []))
+    g.ints.update({0x10000085: 0, 0x11000002: 0})
+    g.situation = 2
+    m.vm.g[18] = 2
+    for _ in range(21):
+        g.status_req = []
+        m('func_2291')
+    check('skeleton v1: in the air: Fall (0xE) at the end', g.status_req, [(0xE, 0)])
+    # the request lapses after 5 frames (one out already: none was made, the executable never claims it)
+    g.situation = 0
+    m.vm.g[18] = 0
+    g.vars[0x0F00030E] = 0.0
+    frames(m, 4)
+    a = g.vars.get(0x0F00030F)
+    frames(m, 1)
+    check('skeleton v1: the request stays 5 frames for the executable\'s claim, then lapses (VAR_15 0)',
+          (a, g.vars.get(0x0F00030F)), (1.0, 0.0))
+    # a reset of the battle: his VAR_14 (the clear-all count & 7) changes
+    m.setg('gk_smash', 60)
+    m.setg('gk_lw_charge', 200)
+    frames(m, 1)
+    check('skeleton v1: VAR_14 unchanged: his charges kept', (m.g('gk_smash'), m.g('gk_lw_charge')), (60, 200))
+    g.vars[0x0F00030E] = 1.0
+    frames(m, 1)
+    check('skeleton v1: VAR_14 changed (a training reset / restart): the smash store and the down special charge 0',
+          (m.g('gk_smash'), m.g('gk_lw_charge')), (0, 0))
+    m2 = fresh(mscsb, src)
+    m2.game.vars[0x0F00030E] = 5.0
+    m2.setg('gk_smash', 60)
+    frames(m2, 1)
+    check('skeleton v1: the first count he sees is only stored (not a reset)', (m2.g('gk_smash'), m2.g('gk_gen')), (60, 5))
+    m2.game.vars[0x0F00030E] = 0.0
+    frames(m2, 1)
+    check('skeleton v1: ... a change back to 0 is a reset too', m2.g('gk_smash'), 0)
+
+
+def skeleton_tests(mscsb, src):
+    """skeleton v1: the Running Skeleton's MSC (skeleton.mscsb)"""
+
+    def make(floors=((-1000.0, 1000.0, 10.0),), walls=()):
+        m = MSC(mscsb, src)
+        g = m.game
+        g.floors = list(floors)
+        g.walls = list(walls)
+        g.x, g.y = 0.0, 0.0
+
+        def sysf(sid, a, old=g.sys):
+            if sid == 0x12 and a[0] == 0x1:
+                g.log.append(('motion', a[1], fv(a[2]), fv(a[3])))
+                return 0
+            if sid == 0x14 and a[0] == 0:
+                g.log.append(('lr', fv(a[1])))
+                g.lr = fv(a[1])
+                return 0
+            if sid == 0x21 and a[0] == 0x9:
+                g.log.append(('remove',))
+                return 0
+            return old(sid, a)
+        g.sys = sysf
+        return m, g
+
+    def claim(g, x=40.0, y=10.0, d=-1.0):
+        g.vars.update({0x0F000300: 3.0, 0x0F000301: x, 0x0F000302: y, 0x0F000303: d})
+
+    def run(m, n):
+        for _ in range(n):
+            m('sk_frame')
+    m, g = make()
+    run(m, 30)
+    check('skeleton: nobody claimed it: it waits (hidden, nothing else) ...', [x for x in g.log if x[0] != 'visible'], [])
+    run(m, 1)
+    check('skeleton: ... and after 30 frames it removes itself (BattleObject 9)', [x for x in g.log if x[0] == 'remove'], [('remove',)])
+    m, g = make()
+    claim(g)
+    run(m, 1)
+    check('skeleton start: at its VAR_1 / 2 (40, 10: on the floor), facing its VAR_3 (-1, the model turned), the run '
+          'motion (0), its phase 1 (VAR_5); the carrier model hidden',
+          ([x for x in g.log if x[0] in ('lr', 'motion')], g.vars.get(0x0F000305), ('visible', 0) in g.log),
+          ([('lr', -1.0), ('motion', 0, 0.0, 1.0)], 1.0, True))
+    check('skeleton run: its first step 0.7 left (39.3, 10)', (g.x, g.y), (39.3, 10.0))
+    run(m, 9)
+    check('skeleton run: 10 frames: 7 units (33, 10), straight on', (round(g.x, 2), g.y), (33.0, 10.0))
+    m, g = make(walls=[(30.0, 0.0, 50.0)])
+    claim(g)
+    run(m, 30)
+    check('skeleton run: a wall (x 30) stops it short (its test reaches 2 past its step), it stays there running',
+          (round(g.x, 1), g.y), (32.3, 10.0))
+    # off a ledge: running right from 95 on a floor that ends at 100, a lower floor at -20 from 100 on
+    m, g = make(floors=[(-1000.0, 100.0, 10.0), (100.0, 1000.0, -20.0)])
+    claim(g, 95.0, 10.0, 1.0)
+    run(m, 8)
+    check('skeleton ledge: it doesn\'t stop at the ledge (x 95 -> 100.6), off it it falls', (round(g.x, 1), g.y < 10.0), (100.6, True))
+    ys = []
+    for _ in range(30):
+        run(m, 1)
+        ys.append(g.y)
+    dys = [round(b - a, 3) for a, b in zip([g.posture_sets[-31][1]] + ys, ys)]
+    check('skeleton fall: his gravity 0.18 a frame up to his max fall 1.85, then lands on the floor below (-20)',
+          (dys[:3], min(dys), ys[-1]), ([-0.36, -0.54, -0.72], -1.85, -20.0))
+    # the explosion at 180 frames
+    m, g = make()
+    claim(g)
+    run(m, 179)
+    check('skeleton: 179 frames: still running (phase 1, no explosion)', (g.vars.get(0x0F000305), [x for x in g.log if x[0] == 'motion'][-1]),
+          (1.0, ('motion', 0, 0.0, 1.0)))
+    g.log = []
+    run(m, 1)
+    check('skeleton explosion at 180: phase 2 (VAR_5: its collision removed, its hits burn), the explode motion (1: its '
+          'hitbox), the explosion effect at its middle (x, y + 14)',
+          (g.vars.get(0x0F000305), [x for x in g.log if x[0] == 'motion'], [x[:5] for x in g.log if x[0] == 'effect']),
+          (2.0, [('motion', 1, 0.0, 1.0)], [('effect', 3, 0x1000017, round(40.0 - 0.7 * 179, 3), 24.0)]))
+    x0 = g.x
+    run(m, 39)
+    check('skeleton explosion: it stays put; removed 40 frames after (BattleObject 9)',
+          (g.x == x0, [x for x in g.log if x[0] == 'remove']), (True, []))
+    run(m, 1)
+    check('skeleton explosion: ... removed', [x for x in g.log if x[0] == 'remove'], [('remove',)])
+    # mid-air: off a ledge, exploding in the air
+    m, g = make(floors=[(-1000.0, 50.0, 10.0)])
+    claim(g, 45.0, 10.0, 1.0)
+    run(m, 180)
+    check('skeleton explosion in the air (it ran off at 50 and fell): still at 180, where it is', (g.vars.get(0x0F000305), g.y < 0),
+          (2.0, True))
+    # hits / HP
+    m, g = make()
+    claim(g)
+    run(m, 5)
+    g.vars.update({0x0F000309: 1.0, 0x0F000307: 50.0, 0x0F000308: 20.0, 0x0F000304: 9.0})
+    g.log = []
+    run(m, 1)
+    check('skeleton hit (the executable: VAR_9 1, at VAR_7 / 8): the spark there; 9 of 25: still running',
+          ([x[:5] for x in g.log if x[0] == 'effect'], g.vars.get(0x0F000305)), ([('effect', 3, 0x1000025, 50.0, 20.0)], 1.0))
+    g.log = []
+    run(m, 1)
+    check('skeleton hit: no new hit: no spark', [x for x in g.log if x[0] == 'effect'], [])
+    g.vars.update({0x0F000309: 3.0, 0x0F000304: 25.0})
+    g.log = []
+    x0, y0 = g.x, g.y
+    run(m, 1)
+    check('skeleton at 0 HP (25 damage): smoked: phase 3, the smoke at its middle, motion 2 (no hitbox), no explosion',
+          (g.vars.get(0x0F000305), [x[:5] for x in g.log if x[0] == 'effect'], [x for x in g.log if x[0] == 'motion']),
+          (3.0, [('effect', 3, 0x1000025, 50.0, 20.0), ('effect', 3, 0x1000021, round(x0, 3), round(y0 + 14.0, 3))],
+           [('motion', 2, 0.0, 1.0)]))
+    run(m, 2)
+    check('skeleton smoke: removed 3 frames after', [x for x in g.log if x[0] == 'remove'], [])
+    run(m, 1)
+    check('skeleton smoke: ... removed', [x for x in g.log if x[0] == 'remove'], [('remove',)])
+    run(m, 200)
+    check('skeleton smoke: never explodes after', [x for x in g.log if x[0] == 'motion' and x[1] == 1], [])
+    # hitlag: it doesn't move
+    m, g = make()
+    claim(g)
+    run(m, 1)
+    x0 = g.x
+    g.hitlag = 3
+    run(m, 3)
+    check('skeleton in hitlag: it doesn\'t move', g.x, x0)
+
+
 def script_tests(out, user):
     O = os.path.join(out, 'fighter', 'gekkouga', 'script', 'animcmd')
     ug = acmd.ACMDFile.load(os.path.join(user, 'body', 'game.bin'))

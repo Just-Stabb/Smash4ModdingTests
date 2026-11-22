@@ -6,6 +6,8 @@
   python3 tools/gekkouga_build.py data VANILLA_FIGHTER_DIR OUT  the clone's model (c00-c07) / motion folders
   python3 tools/gekkouga_build.py all VANILLA_ROOT USER_ROOT OUT (VANILLA_ROOT/fighter/gekkouga, USER_ROOT/fighter/
                                                                 gekkouga/script/animcmd) -> OUT/fighter/gekkouga/...
+  python3 tools/gekkouga_build.py skeleton PACMAN_FIGHTER_DIR OUT_FIGHTER   skeleton v1: the Running Skeleton's files
+                                                                (vanilla fighter/pacman: its hydrant's model / motion)
 
 VANILLA.c: the decompiled vanilla MSC with its labels (git show 0932c7b:fighters/gekkouga/gekkouga.c); the result is
 fighters/gekkouga/gekkouga.c. The MSC step runs tools/universal_mechanics.py on it (roll-off 2.2 / 1.0, Hero's
@@ -70,6 +72,8 @@ MSC_BODIES = {
     'func_289': ('int', 'return gk_sm_hold_loop(0x1); // Greninja mod (clones.c)'),
     'func_299': ('int', 'return gk_sm_hold_loop(0x2); // Greninja mod (clones.c)'),
     'func_306': ('int', 'return gk_sm_hold_loop(0x4); // Greninja mod (clones.c)'),
+    # skeleton v1: Shadow Sneak's per-frame: no vanish / teleport, the Running Skeleton at the shadow (clones.c)
+    'func_2291': ('void', 'gk_ss_tick(); // Greninja mod: skeleton v1 (clones.c)'),
 }
 # attack loops: a chain cancel first
 MSC_CHAIN = {'func_293': 0x1, 'func_302': 0x2, 'func_309': 0x4}
@@ -513,6 +517,95 @@ def cmd_all(vanilla_root, user_root, out):
     return info
 
 
+# ---------------------------------------------------------------- skeleton v1: the Running Skeleton (article 8)
+SKELETON_MSC = os.path.join(ROOT, 'fighters', 'gekkouga', 'weapons', 'skeleton.c')
+SK_SCRIPTS = ('SkeletonRun', 'SkeletonExplode', 'SkeletonSmoke')   # its motion kinds 0 / 1 / 2 (motion.mtable)
+SK_CARRIER = ('model.nud', 'model.nut', 'model.vbn', 'model.jtb', 'model.mta', 'model.xmb', 'model.nhb', 'model.sb',
+              'model.flp')                # Pac-Man's hydrant's model (fighter/pacman/model/firehydrant/c00): its
+                                          # joints and file set carry the article (hidden: the skeleton is an effect)
+# its explosion (motion 1, frames 1 - 4): 15 %, 50 degrees, KBG 50 / BKB 40 (Smash 4's formula on Mario, weight 100:
+# 130 % + 15 -> ((14.5 + 108.75) x 1.4 + 18) x 0.5 + 40 = 135 knockback, about a mid-stage KO; 0 % -> 58), flame,
+# launched away from its middle (FacingRestrict 5), as the hydrant's hitboxes (bone 0, type 9, indirect)
+SK_BOOM = dict(Damage=15.0, Angle=50, KBG=50, FKB=0, BKB=40, Size=22.0, Y=14.0, Effect=5, SFXLevel=2, SFXType=0xB)
+SK_BOOM_FRAMES = 4
+
+
+def sk_boom_hitbox():
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    ident = by['Special_Hitbox']
+    syn = acmd.INFO[ident]['syntax']
+    d = dict(ID=0, Part=0, Bone=0, Damage=0, Angle=0, KBG=0, FKB=0, BKB=0, Size=5, X=0, Y=0, Z=0, Effect=0, Trip=0,
+             Hitlag=1.0, SDI=1.0, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=0, SFXType=0, Type=9, HitBits=0x3F,
+             Unk41=0, CollisionPart=0xF, NoScale=0, Shieldable=1, Reflectable=0, Absorbable=0, Rehit=0, IgnoreInvuln=0,
+             HitAllStates=0, FacingRestrict=5, NoGrabRelease=0, TeamDamage=0, DisableHitlag=0, NoGFX=0, Flinchless=0,
+             Shape=0)
+    d['Ground/Air'] = 3
+    d['Direct/Indirect'] = 0
+    d.update(SK_BOOM)
+    return acmd.Command(ident, [d[n] for n in syn])
+
+
+def sk_scripts():
+    """{crc: [Command]}: game (the explosion's hitbox), effect / sound empty"""
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    end = acmd.Command(by['Script_End'], [])
+    boom = [sk_boom_hitbox(), acmd.Command(by['WAIT'], [float(SK_BOOM_FRAMES)]),
+            acmd.Command(by['Remove_All_Hitboxes'], []), end]
+    game = {acmd.crc(n): [acmd.Command(by['Script_End'], [])] for n in SK_SCRIPTS}
+    game[acmd.crc('SkeletonExplode')] = boom
+    return game
+
+
+def sk_empty():
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    return {acmd.crc(n): [acmd.Command(by['Script_End'], [])] for n in SK_SCRIPTS}
+
+
+def skeleton_lvd(hydrant_lvd):
+    """its collision: the hydrant's .lvd (one collision, its flags / names kept) with the skeleton's lines: a wall each
+    side and a floor on top (tools/gekkouga_clone_cave.py SK_VERTS: the executable moves these 4 vertices onto it)"""
+    import lvd
+    import gekkouga_clone_cave as C
+    lv = lvd.LVD(hydrant_lvd)
+    assert len(lv.collisions) == 1, 'the hydrant has one collision'
+    c = lv.collisions[0]
+    c.name, c.subname = 'COL_Skeleton', 'Skeleton'
+    c.verts = [list(map(float, v)) for v in C.SK_VERTS]
+    c.normals = [[-1.0, 0.0], [0.0, 1.0], [1.0, 0.0]]          # left wall, top (a floor), right wall: out of the solid
+    c.mats = [bytearray(c.mats[0]) for _ in range(3)]
+    c.cliffs = []
+    return lv.write()
+
+
+def cmd_skeleton(pacman_fighter, out_fighter):
+    """the Running Skeleton's files: model/skeleton/c00 (the hydrant's model + skeleton.lvd), motion/skeleton/main.pac
+    (the hydrant's: its motion info's hash), script/animcmd/weapon/skeleton, script/msc/skeleton/skeleton.mscsb"""
+    import shutil
+    import acmd
+    src = os.path.join(pacman_fighter, 'model', 'firehydrant', 'c00')
+    dst = os.path.join(out_fighter, 'model', 'skeleton', 'c00')
+    os.makedirs(dst, exist_ok=True)
+    for f in SK_CARRIER:
+        shutil.copyfile(os.path.join(src, f), os.path.join(dst, f))
+    open(os.path.join(dst, 'skeleton.lvd'), 'wb').write(skeleton_lvd(os.path.join(src, 'firehydrant.lvd')))
+    md = os.path.join(out_fighter, 'motion', 'skeleton')
+    os.makedirs(md, exist_ok=True)
+    shutil.copyfile(os.path.join(pacman_fighter, 'motion', 'firehydrant', 'main.pac'), os.path.join(md, 'main.pac'))
+    ow = os.path.join(out_fighter, 'script', 'animcmd', 'weapon', 'skeleton')
+    os.makedirs(ow, exist_ok=True)
+    acmd.ACMDFile(sk_scripts()).save(os.path.join(ow, 'game.bin'))
+    acmd.ACMDFile(sk_empty()).save(os.path.join(ow, 'effect.bin'))
+    acmd.ACMDFile(sk_empty()).save(os.path.join(ow, 'sound.bin'))
+    open(os.path.join(ow, 'motion.mtable'), 'wb').write(b''.join(struct.pack('>I', acmd.crc(n)) for n in SK_SCRIPTS))
+    ms = os.path.join(out_fighter, 'script', 'msc', 'skeleton')
+    os.makedirs(ms, exist_ok=True)
+    compile_msc(SKELETON_MSC, os.path.join(ms, 'skeleton.mscsb'))
+    return len(SK_CARRIER) + 6
+
+
 if __name__ == '__main__':
     a = sys.argv[1:]
     if len(a) == 3 and a[0] == 'msc':
@@ -523,5 +616,7 @@ if __name__ == '__main__':
         print(cmd_data(a[1], a[2]))
     elif len(a) == 4 and a[0] == 'all':
         print(cmd_all(a[1], a[2], a[3]))
+    elif len(a) == 3 and a[0] == 'skeleton':
+        print(cmd_skeleton(a[1], a[2]))
     else:
         sys.exit(__doc__)

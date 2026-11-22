@@ -58,6 +58,9 @@ int gk_spawn_t;        // ... for this many more frames
 int gk_cursor_t;       // frames to the next name tag hide
 int gk_lfall;          // frames each clone has fallen on its own (0 standing / copying him)
 int gk_rfall;
+int gk_gen;            // skeleton v1: the executable's clear-all count (his VAR_14) last seen ...
+int gk_gen_seen;       // ... 1 once read: a change is a training reset / restart (the state below starts over)
+int gk_sk_req_t;       // skeleton v1: frames his skeleton request (VAR_15) stays up for the executable's claim
 
 int gk_lw_full() { return 300; }          // 5 seconds held (the user)
 int gk_ability_frames() { return 720; }   // 12 seconds
@@ -82,6 +85,7 @@ float gk_head() { return 15.0f; }         // its height (the ceiling test)
 int gk_beat_miss() { return 3; }          // frames without its heartbeat: the game removed it (the blast zone)
 int gk_beat_grace() { return 120; }       // v5: frames a clone whose heartbeat was never seen is kept anyway
 int gk_hitlag_min() { return 4; }         // a clone hit's hitlag on him when no victim's hitstop is found
+int gk_sk_req_frames() { return 5; }      // skeleton v1: the request's life (a skeleton out already: none is made)
 
 float gk_abs(float v)
 {
@@ -97,7 +101,23 @@ void gekkouga_frame()
 {
     int st;
     int flags;
+    int gen;
     st = global4;
+    gen = (int)(WorkModuleF(0, 0x0f00030e) + 0.5f);   // skeleton v1: the executable's clear-all count & 7 (VAR_14)
+    if (gk_gen_seen && gen != gk_gen)
+    {
+        gk_reset();                       // a training reset / restart / new match: his state starts over
+    }
+    gk_gen = gen;
+    gk_gen_seen = 0x1;
+    if (gk_sk_req_t > 0)
+    {
+        gk_sk_req_t -= 1;
+        if (gk_sk_req_t == 0)
+        {
+            WorkModule(0, 0 + 0, 0x0f00030f);   // not claimed: no skeleton was made (one is out already)
+        }
+    }
     if (st == 0xb1 || st == 0xb2 || st == 0x14f)
     {
         if (gk_ability > 0 || gk_alive != 0)
@@ -1330,4 +1350,65 @@ int gk_chain_try(int cur)
     }
     func_16(gk_sm_start_status(t), 0x1);
     return 0x1;
+}
+
+// ---- skeleton v1: a reset of the battle (the executable's clear-all count changed: training reset, restart): the
+// ability / burnout ended, the chain, the kept charges 0 (as at the match's start)
+void gk_reset()
+{
+    if (gk_ability > 0 || gk_alive != 0)
+    {
+        gk_end_ability(0);
+        BattleObject(0xa, 0x1);           // the name tag back
+    }
+    if (gk_burnout > 0)
+    {
+        gk_burnout = 0;
+        gk_overlay_off();
+    }
+    gk_chain = 0;
+    gk_lw_charge = 0;
+    gk_smash = 0;
+    gk_sk_req_t = 0;
+    WorkModule(0, 0 + 0, 0x0f00030f);
+}
+
+// ---- skeleton v1: Shadow Sneak (SpecialS 0x153) without the vanish and the teleport: its per-frame (global16, in
+// place of func_2291): the start-up (0x16000006 frames) and the shadow's time (0x16000007) as vanilla, but he stays
+// where he is, seen and hittable; where he'd have reappeared (the shadow's place: his instance floats 0x31 / 0x32) the
+// Running Skeleton is made, and he ends the move (Wait / Fall)
+void gk_ss_tick()
+{
+    WorkModule(0x9, 0x10000085);
+    if (WorkModule(0x6, 0x10000085) >= WorkModule(0x6, 0x16000006))
+    {
+        WorkModule(0x9, 0x11000002);
+        if (WorkModule(0x6, 0x11000002) >= WorkModule(0x6, 0x16000007))
+        {
+            gk_sk_spawn(WorkModuleF(0, 0x31), WorkModuleF(0, 0x32));
+            if (global18 == 0)
+            {
+                func_16(0, 0);            // Wait
+            }
+            else
+            {
+                func_16(0xe, 0);          // Fall
+            }
+        }
+    }
+}
+
+// the request (his VAR_15 = 1, VAR_16 / 17 the place, VAR_18 his facing: the executable copies them into the new
+// skeleton as it claims it) and the skeleton made (article 8, one at a time: with one out, nothing is made and the
+// request lapses)
+void gk_sk_spawn(float x, float y)
+{
+    int r;
+    WorkModule(0, 1.0f + 0, 0x0f00030f);
+    WorkModule(0, x + 0, 0x0f000310);
+    WorkModule(0, y + 0, 0x0f000311);
+    WorkModule(0, PostureModuleF(0) + 0, 0x0f000312);
+    gk_sk_req_t = gk_sk_req_frames();
+    r = ArticleModule(0x2710, 0x8);
+    WorkModule(0, (float)r + 0, 0x0f000317);   // diag: the generate's result (the TEST_ONLY exe logs it: S4GF gen=)
 }
