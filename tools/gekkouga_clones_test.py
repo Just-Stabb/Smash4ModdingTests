@@ -43,6 +43,7 @@ import rolloff_hold_test as R  # noqa: E402
 import msc_stack_check  # noqa: E402
 import acmd  # noqa: E402
 import gekkouga_build as GB  # noqa: E402
+import gekkouga_clone_cave as CC  # noqa: E402
 
 fails = 0
 checks = 0
@@ -1504,6 +1505,90 @@ def skeleton_side_tests(mscsb, src):
     check('skeleton v1: ... a change back to 0 is a reset too', m2.g('gk_smash'), 0)
 
 
+def skeleton_v16_tests(mscsb, src):
+    """skeleton v1.6: the shadow's fixed distance (gk_ss_shadow: his instance float 0x35 to gk_sk_dist() by SpecialS
+    frame 20, the skeleton at 21) and no side special while a skeleton of his runs (gk_ss_allowed in func_2379)"""
+    D = 36.0
+    for start, what in ((9.2, 'a tap (2 + 6 x 1.2)'), (2.0, 'the hold\'s first frame'), (30.8, 'a hold cut short'),
+                        (36.0, 'a full hold (the executable\'s cap)')):
+        m = fresh(mscsb, src)
+        g = m.game
+        g.ints.update({0x16000006: 12, 0x16000007: 10, 0x10000085: 0, 0x11000002: 0})
+        g.vars.update({0x31: 80.0, 0x32: 12.5, 0x35: start})
+        g.situation = 0
+        ds, spawn = [], None
+        for f in range(1, 22):
+            g.log = []
+            m('func_2291')
+            ds.append(round(g.vars[0x35], 3))
+            if g.vars.get(0x0F00030F) and spawn is None:
+                spawn = f
+        steps = [round(b - a, 3) for a, b in zip([start] + ds, ds)]
+        check('skeleton v1.6: %s (0x35 = %.1f): the shadow goes on evenly to %.0f by SpecialS frame 20, stays, never past; '
+              'the skeleton at 21 (from the shadow\'s place 0x31 / 0x32)' % (what, start, D),
+              (ds[19], ds[20], max(ds) <= D, all(x >= -1e-3 for x in steps), max(steps) - min(steps[:20]) < 1e-2 or start == D,
+               spawn), (D, D, True, True, True, 21))
+    check('skeleton v1.6: gk_sk_dist() 36 = tools/gekkouga_clone_cave.py SK_DIST (the hold\'s cap in the executable)',
+          (round(i2f(fresh(mscsb, src)('gk_sk_dist') & 0xFFFFFFFF), 3), CC.SK_DIST), (36.0, 36.0))
+
+    def press_side(m, st):
+        g = m.game
+        g.flags.discard(0x2000007C)
+        m.vm.g[24] = 0x2000                   # global24: side special pressed
+        m.vm.g[4] = st
+        m('func_2379')
+        m.vm.g[24] = 0
+        return 0x2000007C in g.flags
+    for sit, st, where in ((0, 0, 'on the ground (Wait)'), (2, 0x1A, 'in the air (Fall)')):
+        m = fresh(mscsb, src)
+        g = m.game
+        g.situation = sit
+        g.beat = 0
+        frames(m, 2, st)
+        free = press_side(m, st)
+        g.vars[0x0F00031E] = 4.0              # a skeleton runs: bit 4 in his VAR_30
+        m.vm.g[4] = st
+        m('gekkouga_frame')
+        alive1 = press_side(m, st)
+        blocked = []
+        for _ in range(100):
+            g.vars[0x0F00031E] = 4.0
+            m('gekkouga_frame')
+            blocked.append(press_side(m, st))
+        g.vars[0x0F00031E] = 0.0             # exploded: no heartbeat
+        m('gekkouga_frame')
+        one = press_side(m, st)
+        g.vars[0x0F00031E] = 0.0
+        m('gekkouga_frame')
+        two = press_side(m, st)
+        g.vars[0x0F00031E] = 0.0
+        m('gekkouga_frame')
+        three = press_side(m, st)
+        check('skeleton v1.6 %s: side special starts (0x2000007C) with no skeleton; blocked from its first heartbeat '
+              'and while it runs (100 frames); free again 2 frames after its last (gk_sk_beat_miss)' % where,
+              (free, alive1, any(blocked), one, two, three), (True, False, False, False, True, True))
+    # the request in flight (made, not yet claimed): blocked too; other specials untouched
+    m = fresh(mscsb, src)
+    g = m.game
+    g.beat = 0
+    m.setg('gk_sk_req_t', 3)
+    check('skeleton v1.6: a skeleton asked for and not claimed yet (gk_sk_req_t): side special blocked',
+          press_side(m, 0), False)
+    m = fresh(mscsb, src)
+    g = m.game
+    g.vars[0x0F00031E] = 4.0
+    m('gekkouga_frame')
+    m.vm.g[24] = 0x4000                       # up special pressed while a skeleton runs
+    g.flags.discard(0x2000007C)
+    m('func_2379')
+    m.vm.g[24] = 0
+    body = open(src).read()
+    a, b, c = GB.func_span(body, 'func_2379')
+    check('skeleton v1.6: up special pressed while a skeleton runs: no side special hold; func_2379\'s only change is its '
+          'side special condition (the other specials\' lines as before)',
+          (0x2000007C in g.flags, body[a:c].count('gk_'), 'global24 & 0x2000 && gk_ss_allowed()' in body[a:c]), (False, 1, True))
+
+
 def skeleton_tests(mscsb, src):
     """skeleton v1: the Running Skeleton's MSC (skeleton.mscsb)"""
 
@@ -1579,7 +1664,13 @@ def skeleton_tests(mscsb, src):
     # the explosion at 180 frames
     m, g = make()
     claim(g)
-    run(m, 179)
+    beats = []
+    for _ in range(179):
+        g.vars[0x0F000356] = 1.0                      # his slot 3's VAR_30: a clone's bit; he clears it every frame
+        run(m, 1)
+        beats.append(g.vars.get(0x0F000356))
+    check('skeleton v1.6: running, its heartbeat: bit 4 added to its owner\'s (slot 3) VAR_30 (SLOTn_SHARED_6) every frame, '
+          'the clones\' bits kept', set(beats), {5.0})
     check('skeleton: 179 frames: still running (phase 1, no explosion)', (g.vars.get(0x0F000305), [x for x in g.log if x[0] == 'motion'][-1]),
           (1.0, ('motion', 0, 0.0, 1.0)))
     g.log = []
@@ -1594,8 +1685,12 @@ def skeleton_tests(mscsb, src):
     run(m, 1)
     check('skeleton explosion: the next frame (its scale back to 1) the explode motion (1: its hitbox), its body hidden',
           ([x for x in g.log if x[0] == 'motion'], [x for x in g.log if x[0] == 'visible']), ([('motion', 1, 0.0, 1.0)], [('visible', 0)]))
+    g.vars[0x0F000356] = 0.0
+    run(m, 3)
+    check('skeleton v1.6: exploded (phase 2): no heartbeat (his side special is free again; not at its removal, '
+          'sk_boom_frames later)', g.vars.get(0x0F000356), 0.0)
     x0 = g.x
-    run(m, m('sk_boom_frames') - 2)
+    run(m, m('sk_boom_frames') - 5)
     check('skeleton explosion: it stays put; removed %d frames after (BattleObject 9; v1.5: 40 -> 120, its sound\'s '
           'length)' % m('sk_boom_frames'),
           (g.x == x0, [x for x in g.log if x[0] == 'remove']), (True, []))
@@ -2216,7 +2311,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 19:   # v15: the release exe and data, test exes and data
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
-    if len(earlier) in (20, 21, 26, 30):   # skeleton v1.2 / burn v2 / skeleton v1.3 / v1.5: the exes, the data, test exes
+    if len(earlier) in (20, 21, 26, 30, 31):   # skeleton v1.2 / burn v2 / skeleton v1.3 / v1.5 / v1.6: the exes, the data, test exes
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (23, 24, 25, 27, 28):   # burn v2.2 / v2.3 / aerial chain v1 / clone fixes v1 / trail fix: data only
         want_top = ['INSTALL_TO_data', 'README.txt']
@@ -2251,7 +2346,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('update: nothing in INSTALL_TO_data but the built files',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want and
                      n not in again), [])
-        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30):
+        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 21:
             check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
@@ -2313,6 +2408,13 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               'places delayed) and the clone\'s MSC (its playback delayed)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
               ['fighter/gekkouga/script/msc/clone/clone.mscsb', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
+    if z1 and len(earlier) == 31:
+        check('skeleton v1.6: INSTALL_TO_data: his MSC (the shadow carried on to 36, no side special while a skeleton runs) '
+              'and the skeleton\'s MSC (its heartbeat); TEST_ONLY: A_release only (no G_pose: the user)',
+              (sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+               sorted({n.split('/')[1] for n in names if n.startswith('TEST_ONLY_INSTALL_TO_code/') and n.count('/') > 1})),
+              (['fighter/gekkouga/script/msc/gekkouga.mscsb', 'fighter/gekkouga/script/msc/skeleton/skeleton.mscsb'],
+               ['A_release']))
     if z1 and len(earlier) == 30:
         check('skeleton v1.5: INSTALL_TO_data: his effect bank (the skeleton\'s body shifted onto its place, the explosion '
               'x 1.23), the body-sized skeleton.lvd, the skeleton\'s game.bin (its contact hitbox, the explosion\'s hitstun / '
@@ -2491,7 +2593,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         for i, (member, b, dg, feats) in enumerate(exe_members(base, base_diag, len(earlier) >= 3, len(earlier) == 17,
                                                                len(earlier) == 18, len(earlier) >= 19, len(earlier) in (19, 20),
                                                                len(earlier) == 21, len(earlier) in (22, 23, 24, 25),
-                                                               len(earlier) in (26, 27, 28, 29))):
+                                                               len(earlier) in (26, 27, 28, 29), len(earlier) == 30)):
             if not b:
                 continue
             p = os.path.join(td, '%d.rpx' % i)
@@ -2530,7 +2632,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 31)) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 32)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -2555,6 +2657,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
          'gen=', 'up smash', 'unconfirmed', 'exe_v46z_gkb6') if len(earlier) == 29 else \
         ('greninja_skeleton_v1_4', 'exe_v46z_gkb7', 'body', '3.5', '24', 'contact', '70', '3.5%', 'every 3 frames', 'spawn', 'death', 'explosion', 'soundlabeltable', 'nus3bank', '27', 'shield damage',
          'shield', '1.6', 'hitstun', 'right hand', 'skeleton_box.png', 'unconfirmed', 'A_release') if len(earlier) == 30 else \
+        ('greninja_skeleton_v1_5', 'exe_v46z_gkb8', '36', 'shadow', 'tap', 'hold', '9.2', 'alive', 'explo', 'side special',
+         'air', 'A_release', 'G_pose', 'unconfirmed') if len(earlier) == 31 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -2566,7 +2670,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
 
-def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=False, b2=False, gkb5=False, gkb6=False):
+def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=False, b2=False, gkb5=False, gkb6=False,
+                gkb7=False):
     """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant; skeleton v1 the
     release and TEST_ONLY A_release (as the burn packages)"""
     import gekkouga_clone_cave as C
@@ -2582,8 +2687,11 @@ def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=
         drop = {'burn2', 'floor1'} if sk12 else {'floor1'} if b2 else set()
         drop |= {'tiers', 'gmupd'} if sk12 or b2 or gkb5 else set()   # (skeleton v1.3's exe_v46z_gkb6 adds them)
         drop |= {'skbody', 'sktouch'} if sk12 or b2 or gkb5 or gkb6 else set()   # (skeleton v1.5's gkb7)
+        drop |= {'skdist'} if sk12 or b2 or gkb5 or gkb6 or gkb7 else set()      # (skeleton v1.6's gkb8)
+        variants = C.VARIANTS if not (sk12 or b2 or gkb5 or gkb6 or gkb7) else \
+            C.VARIANTS + (('G_pose', (C.RELEASE - {'sway'}) | {'pose'}),)       # (up to v1.5: + G_pose)
         return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE - drop)] + \
-            [('TEST_ONLY_INSTALL_TO_code/%s/cross_f.rpx' % n, base_diag, True, f - drop) for n, f in C.VARIANTS]
+            [('TEST_ONLY_INSTALL_TO_code/%s/cross_f.rpx' % n, base_diag, True, f - drop) for n, f in variants]
     if not v4:
         return [('INSTALL_TO_code/cross_f.rpx', base, False, C.FEATURES), ('TEST_ONLY_INSTALL_TO_code/cross_f.rpx', base_diag, True, C.FEATURES)]
     return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE)] + \
@@ -2612,7 +2720,8 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
     with tempfile.TemporaryDirectory() as td:
         for member, b, dg, feats in exe_members(base, base_diag, v4, len(earlier) == 17, len(earlier) == 18,
                                                 len(earlier) >= 19, len(earlier) in (19, 20), len(earlier) == 21,
-                                                len(earlier) in (22, 23, 24, 25), len(earlier) in (26, 27, 28, 29)):
+                                                len(earlier) in (22, 23, 24, 25), len(earlier) in (26, 27, 28, 29),
+                                                len(earlier) == 30):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')
@@ -2634,7 +2743,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
@@ -2650,6 +2759,7 @@ def main():
     ground_move_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'), out)
     if os.path.exists(os.path.join(msc, 'skeleton', 'skeleton.mscsb')):
         skeleton_side_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
+        skeleton_v16_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
         skeleton_tests(os.path.join(msc, 'skeleton', 'skeleton.mscsb'), GB.SKELETON_MSC)
         skeleton_data_tests(out)
     if os.path.exists(os.path.join(msc, 'firetrail', 'firetrail.mscsb')):

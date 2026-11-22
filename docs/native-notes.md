@@ -3987,3 +3987,18 @@ MSC on a bunshin-based kind, the 4-shape group.
   meant to run once at the change, the script never looping (unconfirmed in game).
 - **Clone swing (clones v15, confirmed in game)**: stepping the clone's MotionModule +0x10 object's own swing system
   (`0x03318A10` rate, `0x03314FB8` step) each frame swings its tongue / water with his own model.sb: no bind needed.
+- **Greninja's side special shadow (skeleton v1.6, read from exe_v46z_ui10; fighters/gekkouga/README.md "Skeleton
+  v1.6")**: the hold is not a status. His MSC's side special hook (`func_2379`, run before the common ground / air
+  action checks) on the press sets flag `0x2000007C`, instance floats `0x30` = vl `0x0600000D` (90, frames), `0x35` =
+  `0x06000009` (2, the shadow's distance ahead), `0x36` = his way (x -1 with the stick back), and turns the vanilla
+  side special transition (`0x1E000063`) off every frame. His slot 13 (`0x02EEE734`, vtable `0x101347B4` +0x74), with
+  the flag on: `0x35` += `0x0600000B` (1.2) x 1 / `[[acc + 0x7304] + 0x1C]` x `[[0x102F6C04] + 4]` (the frame rate),
+  capped at `0x0600000C` (70) (`0x02EEEB84` - `0x02EEEC08`: the cap read three times as `+0x30` of his float params,
+  `[[WorkModule + 8] + 0x18] + 4`; his instance floats are `[[[WorkModule + 8] + 0] + 4]`, `0x35` at `+0xD4`); `0x30` -=
+  the same rate; held (`[[acc + 0x7268] + 0xA0] + 0x3C` & `[0x10000674]` = 2) or within `0x16000000` (5) frames of the
+  press (`0x30 > 90 - 5`) or flag `0x20000084`: on; else (released, or `0x30` <= 0) flags `0x20000046` / `0x2000007C`
+  off and status `0x153` (vt `+0x16C`), the advance still run that frame (a tap: 6 advances, 9.2). Then, with the flag
+  or in status `0x153`, `0x02EEDA74` puts the shadow (`0x31` / `0x32`, at `+0xC4` / `+0xC8`) at his place +
+  `0x35` x `0x36` on the ground (line tests: it stops at a ledge). So in `0x153` the shadow follows him at a fixed
+  distance; nothing else moves `0x35`. Feature `skdist` replaces the three cap loads with a cave constant
+  (`SK_DIST_PATCH`, 6 words: `lwz rX, 4(r10)` / `lfs fY, 0x30(rX)` -> `lis` / `lfs` of SK_DIST).

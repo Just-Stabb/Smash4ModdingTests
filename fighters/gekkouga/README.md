@@ -1285,3 +1285,38 @@ the explosion effect and hitbox slightly bigger and do a lot of shield damage"; 
   the table's, spawn pick, voice timing / overlap bounds, stops and the death / explosion sounds, removal after them; the
   contact script's frames and fields; the explosion's HitstunMul / size / shield damage; the package's bank / table);
   supamario_ui_cave_test 0; import_call_check 0. Not confirmed in game: everything but the clone sword's hand.
+
+## Skeleton v1.6 (`greninja_skeleton_v1_6.zip`, over v1.5; exe_v46z_gkb8)
+
+The user: "please make it so that the Skeleton always spawns from this distance, regardless of if the button is held.
+Make sure the shadow matches" (`$S/gk_in/clone_fx/skeleton_spawn_distance.png`), then "Can you also disable side special
+from being used while a Skeleton is alive", and "Please stop packaging G_pose".
+- **The shadow (read from the exe)**: docs/native-notes.md "Greninja's side special shadow": the hold starts in his
+  MSC (`func_2379`: flag 0x2000007C, 0x35 = 2), his slot 13 moves the shadow 1.2 a frame up to the vl max 70 while
+  held (at least 5 frames), then status 0x153 with the shadow frozen at his place + 0x35 (a tap: 9.2). v1 - v1.5 made
+  the skeleton there.
+- **The distance**: 36 (`gk_sk_dist()` = `gekkouga_clone_cave.py SK_DIST`): the screenshot, his middle to the skeleton's
+  spine 590 - 610 px at 16.2 px a unit (the skeleton's bones 26.6 tall = 430 px, 3x): 36.5 - 37.7; also the vanilla
+  speed kept through the whole move, 2 + 1.2 x (6 + 22) = 35.6.
+- **Exe feature `skdist`** (`SK_DIST_PATCH`, in RELEASE): the hold's cap is SK_DIST in place of 0x0600000C (no vl file
+  shipped): held, the shadow stops at 36. **MSC** (`clones.c gk_ss_shadow`, called from `gk_ss_tick`): in SpecialS, a
+  shorter shadow (a tap, a hold let go early) goes on evenly to 36 by SpecialS frame 20 (`0x16000006 + 0x16000007 -
+  2`); the skeleton is made at 21 from 0x31 / 0x32 as before, so it is always on the shadow. **The hold kept**: it
+  still delays the release (to vanilla's 90 frames) for timing, the distance doesn't change (the README asks the user
+  whether the hold should do nothing instead).
+- **No side special while a skeleton runs**: `weapons/skeleton.c sk_beat`: while running (phase 1) bit 4 in its owner's
+  VAR_30 (SLOTn_SHARED_6, the clones' heartbeat word) every frame; `clones.c gk_sk_heartbeat` (every frame in
+  `gekkouga_frame`, before the clones' `gk_heartbeat` clears the word) takes it out and keeps `gk_sk_live` 2 frames;
+  `gk_ss_allowed()` (0 with `gk_sk_live` or `gk_sk_req_t`, the request in flight) gates `func_2379`'s press (MSC_EDITS:
+  the hold's start is the only way in: the vanilla side special transition is off every frame there). "Alive" ends at
+  the explosion / smoke (not at the removal after its sound, up to 2 s): the coordinator's suggestion. Clone articles
+  (later) owned by him write the same bit.
+- **G_pose dropped** (`VARIANTS` = A_release only); the `pose` feature code stays (the exes up to v1.5 rebuild with it;
+  `gekkouga_clones_test.exe_members` adds G_pose back for those packages).
+- Tests: cave 242 / 272 (release / A_release; `skdist_checks`: the game's own advance words in unicorn: 2 -> 3.2, 9.2 ->
+  10.4, 34 -> 35.2, 35.5 -> 36, 36 stays; gkb7 = RELEASE - skdist byte for byte, 241); `gekkouga_clones_test ... --vs15`
+  329 / 0 (`skeleton_v16_tests`: a tap / the first frame / a cut hold / a full hold all end at 36 by frame 20, even
+  steps, never past, the skeleton at 21; side special blocked from the first heartbeat, through 100 frames, free 2 frames
+  after, ground and air; the request in flight blocks; func_2379's only change; `skeleton_tests`: the heartbeat while
+  running (the clones' bits kept), none after the explosion); supamario_ui_cave_test 0; import_call_check 0. Not
+  confirmed in game: everything here.

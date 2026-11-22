@@ -2409,6 +2409,49 @@ def burn2_trail_checks(e, info, diag, gk):
     e.vars = {}
 
 
+def skdist_checks(e, info):
+    """skeleton v1.6 (feature skdist): his slot 13's side special hold advance (the game's own words 0x02EEEB84 -
+    0x02EEEC08, run in unicorn): the shadow's distance (instance float 0x35) + 0x0600000B (1.2) a frame, capped at
+    C.SK_DIST (36) instead of his vl max distance 0x0600000C (70)"""
+    from unicorn.ppc_const import UC_PPC_REG_FPR31
+    if 'skdist' not in info['feats']:
+        check('skdist off: his slot 13\'s cap loads are the game\'s (+0x30 of his float params)',
+              [e.w(a) for a, _o, _t, _n in C.SK_DIST_PATCH], [o for _a, o, _t, _n in C.SK_DIST_PATCH])
+        return
+    fl = e.alloc(0x200, b'\0')                       # his instance floats
+    fp = e.alloc(0x40, b'\0')                        # his float params (category 6): +0x2C speed, +0x30 max
+    e.mu.mem_write(fp + 0x2C, struct.pack('>2f', 1.2, 70.0))
+    cat0 = e.alloc(0x10, b'\0')
+    e.setw(cat0 + 4, fl)
+    par = e.alloc(0x10, b'\0')
+    e.setw(par + 4, fp)
+    wm8 = e.alloc(0x20, b'\0')
+    e.setw(wm8, cat0)
+    e.setw(wm8 + 0x18, par)
+    acc = e.alloc(0x7400, b'\0')
+    rate = e.alloc(0x20, b'\0')
+    e.setw(rate + 0x1C, 1)
+    e.setw(acc + 0x7304, rate)
+    gs = e.alloc(8, b'\0')
+    e.mu.mem_write(gs + 4, struct.pack('>f', 1.0))
+    e.setw(0x102F6C04, gs)
+    st = e.alloc(0x60, b'\0')
+    e.setw(st + 0x48, 0x153)
+    got = []
+    for d in (2.0, 9.2, 34.0, 35.5, 36.0, 50.0):
+        e.mu.mem_write(fl + 0xD4, struct.pack('>f', d))
+        for r, v in ((7, wm8), (8, cat0), (26, acc), (30, st), (27, st)):
+            e.mu.reg_write(REGS[r], v)
+        e.mu.reg_write(UC_PPC_REG_FPR31, f2d(1.0))
+        e.call(0x02EEEB84, until=0x02EEEC0C)
+        got.append(round(struct.unpack('>f', bytes(e.mu.mem_read(fl + 0xD4, 4)))[0], 3))
+    check('skeleton v1.6 (skdist): the hold\'s advance from 2 / 9.2 / 34 / 35.5 / 36 / 50: + 1.2 a frame, capped at '
+          'SK_DIST %.0f (the vl max 70 no longer read); at or past it unchanged' % C.SK_DIST, got,
+          [3.2, 10.4, 35.2, 36.0, 36.0, 50.0])
+    check('skeleton v1.6 (skdist): its cap in the cave = SK_DIST', round(struct.unpack('>f', bytes(e.mu.mem_read(
+        info['A']['sk_dist'], 4)))[0], 3), C.SK_DIST)
+
+
 def col_on_checks(patched):
     """skeleton v1.2: the game's own GC_ON / GC_ENABLE (0x02AC2EF0 / 0x02AC2E54) and the ground's enable 0x02D5D6E0 run
     unstubbed on a fake GroundModule / handle / ground: the words they leave are the hydrant's in the user's log
@@ -2490,6 +2533,7 @@ def main():
     if 'skeleton' in feats:
         col_on_checks(patched)
     pose_checks(e, info, diag)
+    skdist_checks(e, info)
     fighter_desc_checks(e, img, info)
     g1_checks(e, info)
     s13_checks(e, info)

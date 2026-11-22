@@ -98,7 +98,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
-                      'tiers', 'gmupd', 'skbody', 'sktouch'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -115,6 +115,8 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', '
 #   tiers   skeleton v1.3 / burn tiers (needs burn2): the burning fighters' fire picked by tier (BFX_TIERS: their burns'
 #           count, remaining damage, strongest rate), a different effect each (BFX_TIER_IDS) in place of one scaled
 #   skbody  skeleton v1.5: its collision vertices and HP hit box fit to its body (SK_BODY) instead of its flames
+#   skdist  skeleton v1.6: his side special's shadow stops at SK_DIST ahead of him (his slot 13's hold advance capped
+#           there in place of the vl max distance 0x0600000C): SK_DIST_PATCH
 #   sktouch skeleton v1.5 (needs burn2): its running contact hits burn with SK_TOUCH_ROW (its explosion's: the skeleton row)
 #   gmupd   skeleton v1.3 (needs skeleton): its GroundModule's own frame update (GC_FRAME) every moved frame, as the
 #           hydrant's update template runs it (the collision attempt: Mario's pump's template never updates +0x2C)
@@ -410,14 +412,18 @@ TR_VAR_SLOT, TR_VAR_TYPE, TR_VAR_X, TR_VAR_Y, TR_VAR_DIR, TR_VAR_CTX = (0x0F0003
 assert all(burn_total(m, sh, f) >= f - 1e-4 for m in BURN_MOVES + (TR_ROW, SK_TOUCH_ROW) for sh in (False, True)
            for f in (BURN_MIN_TOTAL, BURN_MIN_TOTAL_OLD)), 'a burn under the floor'
 RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1', 'tiers', 'gmupd', 'skbody',
-                     'sktouch'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+                     'sktouch', 'skdist'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
 # swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose); burn v2:
 # + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2 - floor1); burn
 # v2.1: + floor1 (the burn floor 1 %, the user; burn v2's exe_v46z_gkb4 is RELEASE - floor1); skeleton v1.3: + tiers,
 # gmupd (exe_v46z_gkb6; burn v2.1 - aerial chain v1's exe_v46z_gkb5 is RELEASE - tiers - gmupd - skbody); skeleton v1.5:
-# + skbody, sktouch (exe_v46z_gkb7; v1.3 / v1.4's gkb6 is RELEASE - skbody - sktouch)
-VARIANTS = (('A_release', RELEASE), ('G_pose', (RELEASE - {'sway'}) | {'pose'}))
+# + skbody, sktouch (exe_v46z_gkb7; v1.3 / v1.4's gkb6 is RELEASE - skbody - sktouch); skeleton v1.6: + skdist
+# (exe_v46z_gkb8; gkb7 is RELEASE - skdist)
+VARIANTS = (('A_release', RELEASE),)
+# skeleton v1.6 (the user: "Please stop packaging G_pose. It has no use anymore."): A_release only. The pose feature
+# stays (the exes shipped with it up to v1.5 still rebuild from this script); v1.5 and before: + ('G_pose', (RELEASE -
+# {'sway'}) | {'pose'})
 # v15: A_release (the release: the native swing, diag) and G_pose (v14's pose copy instead of the swing, in case); v14:
 # A_release (attack hitcheck burn skeleton pose) and E_sway (attack hitcheck burn skeleton sway); v13's D_parts dropped   # v13: each on the release's set (v3 - v12's hurtbox route, C_hurt, dropped:
                                   # it never met an attack)
@@ -557,6 +563,24 @@ PLYC_ID = 0xC0                    # its player id (lha; -1 none)
 DESC_TABLE = 0x04BAA208           # kind_expand.py's fighter descriptor cases (a pointer each)
 GK_DESC = 0x10378FC8              # his fighter descriptor (0x38 bytes: +4 motion info, +8 article list)
 GK_DESC_CASE = 0x02E4362C         # its case (bl getter; epilogue)
+# skeleton v1.6 (feature skdist; the user: "make it so that the Skeleton always spawns from this distance, regardless of if
+# the button is held. Make sure the shadow matches"): his side special's shadow. His MSC (func_2379) starts the hold:
+# flag 0x2000007C, instance floats 0x30 = 0x0600000D (90 frames), 0x35 = 0x06000009 (2: the shadow's distance ahead),
+# 0x36 his way. His slot 13 (0x02EEE734) every frame of the hold: 0x35 += 0x0600000B (1.2) x the frame rate, capped at
+# 0x0600000C (70) (0x02EEEB84 - 0x02EEEC08: three loads of +0x30 of his float params), 0x30 - 1; after 0x16000000 (5)
+# frames, released or 0x30 <= 0 -> 0x2000007C off, status 0x153; then 0x02EEDA74 (with the flag or in 0x153) puts the
+# shadow (0x31 / 0x32) at his place + 0x35 x 0x36 on the ground (docs/native-notes.md "Greninja's side special shadow").
+# skdist: those three loads read SK_DIST (the cave) instead: the hold stops the shadow there; his MSC (clones.c
+# gk_ss_shadow) carries a shorter one (a tap: 2 + 6 x 1.2 = 9.2) on to it during SpecialS. SK_DIST: the user's screenshot
+# (gk_in/clone_fx/skeleton_spawn_distance.png: his centre to the skeleton's spine ~36.5 - 37.7 at the skeleton's 26.6 height)
+# and the vanilla speed over the hold + SpecialS (2 + 1.2 x (6 + 22) = 35.6)
+SK_DIST = 36.0
+SK_DIST_PATCH = ((0x02EEEB8C, 0x80AA0004, 'lis r5, %(hi)d', 'his shadow hold: the cap\'s address (was lwz r5, 4(r10))'),
+                 (0x02EEEB98, 0xC0050030, 'lfs f0, %(lo)d(r5)', 'his shadow hold: dist >= the cap? (was +0x30: 0x0600000C)'),
+                 (0x02EEEBE8, 0x816A0004, 'lis r11, %(hi)d', 'his shadow hold: the cap\'s address (was lwz r11, 4(r10))'),
+                 (0x02EEEBF0, 0xC18B0030, 'lfs f12, %(lo)d(r11)', 'his shadow hold: past the cap?'),
+                 (0x02EEEC00, 0x808A0004, 'lis r4, %(hi)d', 'his shadow hold: the cap\'s address (was lwz r4, 4(r10))'),
+                 (0x02EEEC04, 0xC0E40030, 'lfs f7, %(lo)d(r4)', 'his shadow hold: = the cap'))
 ORIGINAL = {SLOT13: 0x9421FF90, SLOT42: 0x9421FF38, SLOT43: 0x9421FF98, G1_HOOK: 0x4BD81C95,
             HUD_HOOK: 0x487ADD81, DESC_TABLE + 4 * GK_KIND: GK_DESC_CASE, 0x028E4020: 0x4BFFFDF9}
 
@@ -2782,6 +2806,7 @@ def build(rpx, diag=False, feats=None):
                             'context=%d\n')]
     for nm, s in fmts:
         A[nm] = alloc((len(s) + 4) & ~3, 4) if diag else 0
+    A['sk_dist'] = alloc(4, 4) if 'skdist' in feats else 0   # skeleton v1.6: SK_DIST (its hold's cap)
     code_at = alloc(0, 4)
 
     # weapon motion entries / info / descriptor / vtable / singleton / row
@@ -5333,6 +5358,10 @@ w_dcase:
     # ---- hooks in place (each asserted)
     def asm1(at, text):
         return K.one(at, text)
+    if 'skdist' in feats:
+        out.blob(A['sk_dist'], struct.pack('>f', SK_DIST), 'his side special shadow\'s cap (SK_DIST)')
+        for at, orig, text, note in SK_DIST_PATCH:
+            out.put(at, asm1(at, text % dict(hi=ha(A['sk_dist']), lo=K.slo(A['sk_dist']))), note, orig)
     out.put(G1_HOOK, asm1(G1_HOOK, 'bl 0x%X' % lab['g1_stub']), 'his group-1 init: our desc', ORIGINAL[G1_HOOK])
     out.put(SLOT13, asm1(SLOT13, 'b 0x%X' % lab['s13']), 'his slot 13', ORIGINAL[SLOT13])
     out.put(SLOT42, asm1(SLOT42, 'b 0x%X' % lab['s42']), 'his slot 42', ORIGINAL[SLOT42])

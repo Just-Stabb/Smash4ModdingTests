@@ -815,6 +815,24 @@ void sk_smoke()
     sk_fx_at(sk_fx_smoke(), sk_x, sk_y + sk_mid(), sk_fx_smoke_size());
 }
 
+// skeleton v1.6 (the user: "disable side special from being used while a Skeleton is alive"): while it runs (until it
+// explodes or goes in smoke at 0 HP) bit 4 in its owner's VAR_30 (SLOTn_SHARED_6, the clones' heartbeat: bits 1 / 2)
+// every frame; he clears it every frame (clones.c gk_heartbeat) and blocks his side special while it comes
+void sk_beat()
+{
+    int slot;
+    int beat;
+    slot = (int)(sk_var(0) + 0.5f);
+    if (slot >= 0x1 && slot <= 0x8)
+    {
+        beat = (int)(WorkModuleF(0, 0x0f000340 + 8 * (slot - 1) + 6) + 0.5f);
+        if ((beat & 0x4) == 0)
+        {
+            WorkModule(0, (float)(beat + 0x4) + 0, 0x0f000340 + 8 * (slot - 1) + 6);
+        }
+    }
+}
+
 void sk_frame()
 {
     int h;
@@ -853,6 +871,7 @@ void sk_frame()
         return;
     }
     sk_t += 1;
+    sk_beat();
     sk_snd_voice();
     h = (int)(sk_var(9) + 0.5f);
     if (h != sk_hits)

@@ -39294,7 +39294,7 @@ int func_2379()
     }
     if (!(WorkModule(0x10, 0x2000007c) || WorkModule(0x10, 0x20000084)))
     {
-        if (global24 & 0x2000)
+        if (global24 & 0x2000 && gk_ss_allowed()) // Greninja mod: not while a skeleton runs (clones.c)
         {
             WorkModule(0x2710, 0x2000007c);
             WorkModule(0x2711, 0x2000007e);
@@ -40071,6 +40071,7 @@ void rolloff_hold_update()
 int gk_lw_charge;      // the down special's charge: frames held (0 - gk_lw_full()); kept between presses / stocks
 int gk_ability;        // the ability: frames left
 int gk_burnout;        // the burnout: frames left
+int gk_sk_live;        // skeleton v1.6: frames a skeleton of his still counts as running (its heartbeat: bit 4 of VAR_30)
 int gk_alive;          // clones out: 1 the left-spawned one (article 6), 2 the right-spawned one (article 7)
 float gk_off_l;        // the left-spawned clone's X offset from him (world)
 float gk_off_r;        // the right-spawned clone's
@@ -40151,6 +40152,7 @@ int gk_beat_miss() { return 3; }          // frames without its heartbeat: the g
 int gk_beat_grace() { return 120; }       // v5: frames a clone whose heartbeat was never seen is kept anyway
 int gk_hitlag_min() { return 4; }         // a clone hit's hitlag on him when no victim's hitstop is found
 int gk_sk_req_frames() { return 5; }      // skeleton v1: the request's life (a skeleton out already: none is made)
+int gk_sk_beat_miss() { return 2; }       // skeleton v1.6: frames without its heartbeat before it counts as gone
 float gk_sk_dist() { return 36.0f; }      // skeleton v1.6: the shadow's / skeleton's fixed distance ahead of him (his
                                           // instance float 0x35; tools/gekkouga_clone_cave.py SK_DIST, the hold's cap)
 int gk_tr_req_frames() { return 5; }      // burn v2: the trail requests' life (6 trails out already: none is made)
@@ -40178,6 +40180,7 @@ void gekkouga_frame()
     }
     gk_gen = gen;
     gk_gen_seen = 0x1;
+    gk_sk_heartbeat();
     if (gk_sk_req_t > 0)
     {
         gk_sk_req_t -= 1;
@@ -41574,6 +41577,7 @@ void gk_reset()
     gk_lw_charge = 0;
     gk_smash = 0;
     gk_sk_req_t = 0;
+    gk_sk_live = 0;
     WorkModule(0, 0 + 0, 0x0f00030f);
     gk_tr_req_t = 0;
     gk_tr_done = 0;
@@ -41610,8 +41614,8 @@ void gk_ss_tick()
 // skeleton v1.6 (the user: "always spawns from this distance, regardless of if the button is held"): the shadow's
 // distance ahead of him (instance float 0x35: the executable's slot 13 places the shadow, 0x31 / 0x32, from it every
 // frame of the hold and of SpecialS) goes on from where the hold left it (2 + 1.2 a frame, capped at gk_sk_dist() by the
-// executable: feature skdist) to gk_sk_dist() by the frame before the skeleton is made (SpecialS frame
-// 0x16000006 + 0x16000007 - 1 = 21 with his params), evenly; so a tap and a hold both end there
+// executable: feature skdist) to gk_sk_dist() evenly by SpecialS frame 0x16000006 + 0x16000007 - 2 (20 with his params:
+// the skeleton is made at 21 from the shadow's place, 0x31 / 0x32); so a tap and a hold both end there
 void gk_ss_shadow()
 {
     float d;
@@ -41619,7 +41623,7 @@ void gk_ss_shadow()
     d = WorkModuleF(0, 0x35);
     if (d < gk_sk_dist())
     {
-        left = WorkModule(0x6, 0x16000006) + WorkModule(0x6, 0x16000007) - 0x2 - WorkModule(0x6, 0x10000085);
+        left = WorkModule(0x6, 0x16000006) + WorkModule(0x6, 0x16000007) - 0x1 - WorkModule(0x6, 0x10000085);
         if (left < 0x1)
         {
             left = 0x1;
@@ -41631,6 +41635,37 @@ void gk_ss_shadow()
         }
         WorkModule(0, d + 0, 0x35);
     }
+}
+
+// skeleton v1.6: his running skeletons' heartbeat (weapons/skeleton.c sk_beat: bit 4 of his VAR_30, every frame) taken
+// out of VAR_30 every frame (before the clones' heartbeat, gk_heartbeat, reads the rest); seen: a skeleton runs for
+// gk_sk_beat_miss() more frames
+void gk_sk_heartbeat()
+{
+    int beat;
+    beat = (int)(WorkModuleF(0, 0x0f00031e) + 0.5f);
+    if (beat & 0x4)
+    {
+        WorkModule(0, (float)(beat - 0x4) + 0, 0x0f00031e);
+        gk_sk_live = gk_sk_beat_miss();
+    }
+    else if (gk_sk_live > 0)
+    {
+        gk_sk_live -= 1;
+    }
+}
+
+// skeleton v1.6 (the user: "disable side special from being used while a Skeleton is alive"): his side special's input
+// (func_2379, the hold's start: the only way in, the vanilla side special transition is off every frame there) does
+// nothing while a skeleton of his runs (its heartbeat, gk_sk_live) or one is asked for and not claimed yet (gk_sk_req_t);
+// on the ground and in the air. "Alive" ends at its explosion / its smoke at 0 HP, not at its removal (its sound's end)
+int gk_ss_allowed()
+{
+    if (gk_sk_live > 0 || gk_sk_req_t > 0)
+    {
+        return 0;
+    }
+    return 0x1;
 }
 
 // the request (his VAR_15 = 1, VAR_16 / 17 the place, VAR_18 his facing: the executable copies them into the new

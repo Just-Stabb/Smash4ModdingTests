@@ -52,6 +52,10 @@ MSC_EDITS = [
     ('func_1999', 'func_16(0x155, 0x1);\n                    return;',
      'if (gk_lw_press()) // Greninja mod: charge stance / ability (clones.c)\n                    {\n'
      '                        return;\n                    }'),
+    # skeleton v1.6: no side special while a skeleton of his runs (its input: the hold's start, func_2379)
+    ('func_2379', '        if (global24 & 0x2000)\n        {\n            WorkModule(0x2710, 0x2000007c);',
+     '        if (global24 & 0x2000 && gk_ss_allowed()) // Greninja mod: not while a skeleton runs (clones.c)\n'
+     '        {\n            WorkModule(0x2710, 0x2000007c);'),
     # SpecialLw 0x155: the charge stance (no counter)
     ('func_2336', '    func_78(func_2337);', '    gk_lw_main(); // Greninja mod: the charge (clones.c)\n    func_78(gk_lw_loop);'),
     ('func_2338', '    VisibilityModule(0x2710, 0x1);',
