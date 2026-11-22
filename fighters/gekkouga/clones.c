@@ -44,7 +44,15 @@ float gk_lvy;
 float gk_rx;
 float gk_ry;
 float gk_rvy;
-float gk_last_oy;      // his Y last frame (the clones copy his vertical movement in the air)
+float gk_last_oy;      // his Y last frame (the clones copy his vertical movement in the air); clone delay: 1 of his
+                       // (unfrozen) frames back
+float gk_hx1;          // clone delay (the user: "the left clone ... 1 frame delay and the right clone ... 2"): his X 1 / 2
+float gk_hx2;          // of his unfrozen frames back ...
+float gk_hy2;          // ... his Y 2 / 3 back ...
+float gk_hy3;
+int gk_hcopy;          // ... "copying his vertical movement" then (bit 1: 1 back, 2: 2 back) ...
+int gk_hn;             // ... and how many of those each clone may use: the left's (0 - 3) + 4 x the right's (from 0 when
+                       // it is made, at a swap, back in formation)
 float gk_floor_y;      // gk_floor()'s answer
 float gk_hit_x;        // gk_line()'s point
 float gk_hit_y;
@@ -277,7 +285,8 @@ void gk_swap(int id)
     gk_set_c(id, ox, oy, 0);
     gk_set_fall_t(id, 0);
     gk_last_oy = cy;
-    gk_swap_cd = 10;
+    gk_hn = 0;                            // clone delay: his old places mean nothing now (both offsets changed): the
+    gk_swap_cd = 10;                      // clones go on from his new place (held for their delay, then delayed)
 }
 
 // ---- the input sites' down special (func_43, func_58, func_675, func_1999): 1 = entered the stance
@@ -307,6 +316,8 @@ void gk_activate()
     gk_fx_t = 0;
     gk_det = 0;
     gk_last_oy = PostureModuleF(0x2);
+    gk_hn = 0;
+    gk_hcopy = 0;
     gk_cursor_t = 0;
     EffectModule(0x2723, 0x10000bd, 0x1, 0x1);
 }
@@ -364,6 +375,7 @@ void gk_spawn(int id)
     off = gk_off(id);
     gk_set_c(id, PostureModuleF(0x1) + off, PostureModuleF(0x2), 0);
     gk_set_fall_t(id, 0);
+    gk_set_hn(id, 0);                     // clone delay: no history yet: his place now, held for its delay
     gk_spawn_bits = 0x4 * id;
     gk_spawn_t = 3;
     if (id == 0x1)
@@ -525,7 +537,7 @@ int gk_floor(float x, float y0, float y1)
 //    the floor under its new X, up or down as far as the steepest floor can go for that step (slopes, steps).
 // Frozen while he is in hitlag. Gone when the game removes it (the blast zone: gk_heartbeat) or, as a fallback, after
 // gk_fall_frames() falling on its own.
-void gk_clone_phys(int id, float ox, float oy, int copy, int frozen)
+void gk_clone_phys(int id, float ox, float oy, float lastoy, int copy, int frozen)
 {
     float x;
     float y;
@@ -576,11 +588,11 @@ void gk_clone_phys(int id, float ox, float oy, int copy, int frozen)
     x = nx;
     if (copy)
     {
-        dy = oy - gk_last_oy;
+        dy = oy - lastoy;
         vy = dy;
         t = 0;
         from = y + 0.5f;                  // its floor stops it (it landed while he still comes down) ...
-        if (gk_abs(y - gk_last_oy) < 0.1f)
+        if (gk_abs(y - lastoy) < 0.1f)
         {
             from = y - 0.05f;             // ... unless it is level with him: the floor he left (a platform drop)
         }
@@ -665,6 +677,7 @@ void gk_physics()
     if (gk_det && !det)
     {
         gk_det = 0;                       // back from a launch: the clones back in formation (smoke)
+        gk_hn = 0;                        // (clone delay: from his place now)
         if (gk_alive & 0x1)
         {
             gk_set_c(0x1, ox + gk_off_l, oy, 0);
@@ -684,14 +697,116 @@ void gk_physics()
     {
         copy = 0x1;
     }
-    gk_clone_phys(0x1, ox, oy, copy, frozen);
-    gk_clone_phys(0x2, ox, oy, copy, frozen);
+    if (frozen)
+    {
+        return;                           // his hitlag: the clones freeze with him (no history kept: they stay in step)
+    }
+    gk_delayed(0x1, ox, oy, copy);
+    gk_delayed(0x2, ox, oy, copy);
+    gk_hy3 = gk_hy2;                      // clone delay: this frame into the history
+    gk_hy2 = gk_last_oy;
     gk_last_oy = oy;
+    gk_hx2 = gk_hx1;
+    gk_hx1 = ox;
+    gk_hcopy = (gk_hcopy * 2 + copy) & 0x3;
+    gk_set_hn(0x1, gk_get_hn(0x1) + 1);
+    gk_set_hn(0x2, gk_get_hn(0x2) + 1);
+}
+
+// ---- clone delay (fighters/gekkouga/README.md "Clone delay"): each clone replays him gk_delay(id) of his frames late
+// (the left-spawned 1, the right-spawned 2): its place here (his X, and his vertical movement while it copies it) and
+// its motion / frame / rate / facing in its own MSC (weapons/clone.c: the channel's history). Its own physics (walls,
+// floors, its fall) run on the frame. Frozen frames (his hitlag) are no frames: no history is kept, they freeze.
+int gk_delay(int id) { return id; }        // 1 the left-spawned clone, 2 the right-spawned one
+
+int gk_get_hn(int id)
+{
+    if (id == 0x1)
+    {
+        return gk_hn & 0x3;
+    }
+    return (gk_hn / 4) & 0x3;
+}
+
+void gk_set_hn(int id, int n)
+{
+    if (n > 0x3)
+    {
+        n = 0x3;
+    }
+    if (id == 0x1)
+    {
+        gk_hn = (gk_hn & 0xc) + n;
+    }
+    else
+    {
+        gk_hn = (gk_hn & 0x3) + n * 4;
+    }
+}
+
+float gk_hist_x(int i, float ox)
+{
+    if (i == 0x1)
+    {
+        return gk_hx1;
+    }
+    if (i == 0x2)
+    {
+        return gk_hx2;
+    }
+    return ox;
+}
+
+float gk_hist_y(int i, float oy)
+{
+    if (i == 0x1)
+    {
+        return gk_last_oy;
+    }
+    if (i == 0x2)
+    {
+        return gk_hy2;
+    }
+    if (i == 0x3)
+    {
+        return gk_hy3;
+    }
+    return oy;
+}
+
+int gk_hist_copy(int i, int copy)
+{
+    if (i == 0)
+    {
+        return copy;
+    }
+    return (gk_hcopy / i) & 0x1;
+}
+
+// one clone's frame from his state gk_delay(id) frames back (fewer while its history fills: his place now at first)
+void gk_delayed(int id, float ox, float oy, int copy)
+{
+    int n;
+    int i;
+    float lastoy;
+    n = gk_get_hn(id);
+    i = gk_delay(id);
+    if (i > n)
+    {
+        i = n;
+    }
+    lastoy = gk_hist_y(i, oy);            // no frame before it in its history: no vertical movement
+    if (i + 1 <= n)
+    {
+        lastoy = gk_hist_y(i + 1, oy);
+    }
+    gk_clone_phys(id, gk_hist_x(i, ox), gk_hist_y(i, oy), lastoy, gk_hist_copy(i, copy), 0);
 }
 
 // the channel his clones read (his VAR_24 - VAR_31, SLOTn_SHARED_0 - 7): their places, his motion (v3: its kind x 1024
 // + its frame in VAR_28), its rate (0 while he is in hitlag: they freeze with him), VAR_30 their heartbeat (theirs to
-// write: gk_heartbeat), 4747000 + flags (1 / 2 alive, 4 / 8 being made, 16 / 32 falling on its own: it plays Fall)
+// write: gk_heartbeat), 4747000 + flags (1 / 2 alive, 4 / 8 being made, 16 / 32 falling on its own: it plays Fall;
+// clone delay: 64 he is frozen: their delayed playback pauses)
 void gk_channel()
 {
     int k;
@@ -726,6 +841,10 @@ void gk_channel()
     if (gk_rfall > 2)
     {
         flags = flags | 0x20;
+    }
+    if (StopModule(0x1))
+    {
+        flags = flags | 0x40;             // clone delay: he is frozen (hitlag): their playback pauses (no history kept)
     }
     WorkModule(0, gk_lx + 0, 0x0f000318);
     WorkModule(0, gk_ly + 0, 0x0f000319);
@@ -1592,9 +1711,13 @@ int gk_ac_try()
         return 0;
     }
     k = ControlModule(0x10);
-    if (k < 0x1 || k > 0x5 || (gk_ac_used & (1 << k)) != 0)
+    if (k < 0x1 || k > 0x5)
     {
-        return 0;                         // used in this chain already (or none)
+        k = 0x1;                          // func_311 plays a neutral air for any other answer
+    }
+    if ((gk_ac_used & (1 << k)) != 0)
+    {
+        return 0;                         // used in this chain already
     }
     gk_ac_req = 0x1;
     func_16(0x34, 0x1);

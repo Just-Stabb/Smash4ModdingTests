@@ -88,6 +88,8 @@ class Game:
         self.ceilings = []         # (x0, x1, y)
         self.beat = 3              # v3: the clones' heartbeat bits their MSCs write into his VAR_30 each frame
         self.line_tests = 0
+        self.air_kind = 0          # aerial chain v1: ControlModule(0x10): the air attack the input asks for (1 n - 5 d)
+        self.atk_hit = 0           # AttackModule(0x2727, kinds): what his attack hit since it started (2 hurtbox, 4 shield)
 
     def line_test(self):
         """the Line_Test variables: a vertical segment (X0, Y0) -> (X0, Y1) meets the nearest floor (going down) or
@@ -151,6 +153,8 @@ class Game:
                 return f2i(10.0)
             return f2i(self.vars.get(a[1], 0.0))
         if sid == 0xE:                                        # ControlModule
+            if a[0] == 0x10:
+                return self.air_kind
             if a[0] == 0x2710:
                 return int(a[1] in self.press)
             if a[0] == 0x2712:
@@ -215,6 +219,13 @@ class Game:
         if sid == 0x39:
             self.log.append(('visible', a[1]))
             return 0
+        if sid == 0x2E:                                       # AttackModule
+            if a[0] == 0x2727:
+                return int(self.atk_hit & a[1] != 0)
+            if a[0] == 0x2724:
+                self.log.append(('atk_clear',))
+                self.atk_hit = 0
+            return 0
         return 0
 
 
@@ -257,6 +268,21 @@ def fresh(mscsb, src):
     m.vm.g[11] = m.addr['func_17']          # func_16 -> func_17 -> StatusModule(3, status, keep)
     m.vm.g[14] = 0
     return m
+
+
+def stub_fn(m, name, value):
+    """one of the MSC's functions answering `value` (e.g. the clone delay's gk_delay / cl_delay at 0: the tests written
+    before it, of the physics / playback it delays)"""
+    orig, tgt = m.vm.call, m.fn[name]
+
+    def call(script, args=()):
+        return value if script is tgt else orig(script, args)
+    m.vm.call = call
+    return m
+
+
+def fresh_nodelay(mscsb, src):
+    return stub_fn(fresh(mscsb, src), 'gk_delay', 0)
 
 
 def frames(m, n, st=0):
@@ -584,7 +610,8 @@ def msc_tests(mscsb, src):
     check('v3: the resumed hold\'s first frame: its effects at once: sparkle, flash (over his feet), the sword killed and '
           'made again on both hands (25, 24)', [(x[1], x[2]) for x in fx],
           [(0x2710, 0x1000019), (0x2710, 0x1000010), (0x2723, 0x3300007), (0x2712, 0x3300007), (0x2712, 0x3300007)])
-    check('... all at the kept charge\'s size: 1 + 4 x 50 / 120 = 2.667', [x[4] for x in g4.log if x[0] == 'fxsize'], [2.667] * 4)
+    check('... the sword at the kept charge\'s size: 1 + 4 x 50 / 120 = 2.667 (aerial chain v1 package: the dust and sparkle '
+          'at their vanilla 1)', [x[4] for x in g4.log if x[0] == 'fxsize'], [1.0, 1.0, 2.667, 2.667])
     g4.log = []
     for _ in range(69):
         m4('gk_sm_hold_tick')
@@ -610,7 +637,9 @@ def msc_tests(mscsb, src):
 
 def physics_tests(mscsb, src):
     """v2: the clones' own fall (ledge, a lower floor, max fall speed), a jump with him, a platform drop, a launch, the
-    fall off the stage; his hitlag from their hits; the freeze in hitlag"""
+    fall off the stage; his hitlag from their hits; the freeze in hitlag (the physics at delay 0: gk_delay stubbed; the
+    clone delay's own tests: delay_tests)"""
+    fresh = fresh_nodelay
     def start(x=0.0, y=10.0, floors=None):
         m = fresh(mscsb, src)
         g = m.game
@@ -872,7 +901,7 @@ def physics_tests(mscsb, src):
 
 
 def clone_tests(mscsb, src):
-    m = MSC(mscsb, src)
+    m = stub_fn(MSC(mscsb, src), 'cl_delay', 0)     # the playback at delay 0 (the delay: clone_delay_tests)
     g = m.game
     sh = {}
 
@@ -980,7 +1009,7 @@ def clone_tests(mscsb, src):
     m2('cl_frame')
     check('nobody with the magic: not found, hidden', m2.g('cl_slot'), 0)
     # v2: made before his channel says which (no "being made" bit yet): it waits (hidden), then takes it
-    m3 = MSC(mscsb, src)
+    m3 = stub_fn(MSC(mscsb, src), 'cl_delay', 0)
     g3 = m3.game
     sh.clear()
     shared(2, 7, 4747000.0 + 1)
@@ -1002,6 +1031,283 @@ def clone_tests(mscsb, src):
         m3('cl_frame')
     check('v8: ... once (no VisibilityModule call while nothing changes)', [x for x in g.log if x[0] == 'visible'], [])
 
+
+def aerial_chain_tests(mscsb, src):
+    """aerial chain v1 (README "Aerial chain v1"): an aerial that hits an opponent (AttackModule 0x2727 kind 2; a shield
+    doesn't count; a clone's hit does) can be cancelled from the frame after the hit into a different aerial (the game's
+    air attack input, ControlModule 0x10); each once a chain; anything but an aerial (landing) ends it; then the smash
+    charge's dust / sparkle at size 1 at every charge level"""
+    m = fresh(mscsb, src)
+    g = m.game
+    body = open(src).read()
+    f82 = body[body.index('void func_2382()'):body.index('void func_2384()')]
+    check('aerial chain: the aerial status (0x34) start notes the aerial after func_314 picked its motion; its loop tries '
+          'a chain first after func_56\'s own interrupts', (f82.index('func_314();') < f82.index('gk_ac_start();'),
+          f82.index('if (func_56())') < f82.index('if (gk_ac_try())') < f82.index('StopModule(0x1) == 0')), (True, True))
+    names = {0x68: 1, 0x69: 2, 0x6A: 3, 0x6B: 4, 0x6C: 5}
+
+    def start(motion):
+        m.vm.g[4] = 0x34
+        g.ints[0x11000002] = motion
+        g.log = []
+        m('gk_ac_start')
+
+    def tick(hit=0, kind=0, cmd=0x1, air=2):
+        """one frame of the aerial's loop: what its attack hit so far, the input's air attack"""
+        g.atk_hit = hit
+        g.air_kind = kind
+        m.vm.g[18] = air
+        m.vm.g[24] = cmd
+        g.status_req = []
+        return m('gk_ac_try'), list(g.status_req)
+
+    start(0x69)
+    check('a forward air starts a chain: used {forward} (bit 1 << 2), kind 2, its hits since it started cleared',
+          (m.g('gk_ac_used'), m.g('gk_ac_kind'), m.g('gk_ac_hit'), [x for x in g.log if x[0] == 'atk_clear']), (4, 2, 0, [('atk_clear',)]))
+    check('a whiff: an aerial input (neutral) does nothing, 5 frames', [tick(0, 1) for _ in range(5)], [(0, [])] * 5)
+    check('shielded (kind 4 only): no window', [tick(4, 1) for _ in range(3)], [(0, [])] * 3)
+    check('the hit (kind 2) on this frame: no cancel yet (from the next frame)', (tick(2, 1), m.g('gk_ac_hit')), ((0, []), 1))
+    g.hitlag = 3
+    check('... the next frame in hitlag: still none', tick(2, 1), (0, []))
+    g.hitlag = 0
+    check('... out of hitlag, the same aerial again (forward, used): refused', tick(2, 2), (0, []))
+    check('... no attack input (command bit 1 off): none', tick(2, 1, cmd=0), (0, []))
+    check('... on the ground (situation 0): none', tick(2, 1, air=0), (0, []))
+    check('... a neutral air: cancelled into the aerial status again (0x34) as a chain', (tick(2, 1), m.g('gk_ac_req')), ((1, [(0x34, 1)]), 1))
+    start(0x68)
+    check('the neutral air\'s start: the chain kept (used forward + neutral: 4 + 2), its hit from 0', (m.g('gk_ac_used'), m.g('gk_ac_kind'),
+          m.g('gk_ac_hit'), m.g('gk_ac_req')), (6, 1, 0, 0))
+    check('... no hit yet: no chain (even with the input)', tick(0, 3), (0, []))
+    tick(2, 0)
+    check('... hit: forward / neutral (and 0: func_311\'s neutral) refused, back accepted', (tick(2, 2), tick(2, 1), tick(2, 0), tick(2, 3)),
+          ((0, []), (0, []), (0, []), (1, [(0x34, 1)])))
+    start(0x6A)
+    tick(2, 0)
+    tick(2, 4)
+    start(0x6B)
+    tick(2, 0)
+    tick(2, 5)
+    start(0x6C)
+    check('forward, neutral, back, up, down: all five in the chain (2 + 4 + 8 + 16 + 32)', m.g('gk_ac_used'), 62)
+    tick(2, 0)
+    check('... the down air hits: no aerial left (every input refused)', [tick(2, k) for k in range(0, 6)], [(0, [])] * 6)
+    g.ints[0x11000002] = 0x6C
+    m.setg('gk_ac_hit', 2)
+    m.vm.g[4] = 0x34
+    m.game.vars[0x0F00031E] = 0.0
+    m('gekkouga_frame')
+    d = int(g.vars.get(0x0F000314, 0.0))
+    check('diag (his VAR_20 from 256): the aerial (5 x 256), hit seen (2048), window open (4096), used 62 x 8192',
+          (d >> 8 & 7, d >> 11 & 1, d >> 12 & 1, d >> 13), (5, 1, 1, 62))
+    frames(m, 1, st=0x17)
+    check('landing (any status but 0x34): the chain ends', (m.g('gk_ac_used'), m.g('gk_ac_kind'), m.g('gk_ac_hit'), m.g('gk_ac_req')), (0, 0, 0, 0))
+    start(0x6C)
+    check('... the next aerial (down) a new chain: only itself used', m.g('gk_ac_used'), 32)
+    tick(2, 0)
+    m.setg('gk_ac_req', 1)
+    frames(m, 1, st=0x1B)
+    start(0x6B)
+    check('a jump (not an aerial) ends it too, even with a chain cancel asked: the next aerial a new chain', m.g('gk_ac_used'), 16)
+    # a clone's copy of the aerial landing (the exe's VAR_22) opens the window too
+    start(0x6A)
+    tick(0, 0)
+    g.vars[0x0F000316] = 1.0
+    m('gk_clone_hitlag')
+    check('a clone\'s hit (his VAR_22) during his aerial: hit seen, VAR_22 cleared', (m.g('gk_ac_hit'), g.vars.get(0x0F000316)), (1, 0.0))
+    g.hitlag = 0
+    check('... the next frame: a chain (neutral)', tick(0, 1), (1, [(0x34, 1)]))
+    m.vm.g[4] = 0x2C
+    m.setg('gk_ac_hit', 0)
+    g.vars[0x0F000316] = 1.0
+    m('gk_clone_hitlag')
+    check('... a clone\'s hit while he is not in an aerial: nothing', m.g('gk_ac_hit'), 0)
+    check('the hit kinds read: 2 (a hurtbox; 4 a shield not counted)', m('gk_ac_hit_kinds'), 2)
+    # ---- the smash charge's dust / sparkle at size 1 at every charge level; the water sword still the charge's size
+    bad = []
+    for t in (0x1, 0x2, 0x4):
+        for v in range(0, 121, 10):
+            g.log = []
+            m('gk_sm_fx', t, v, 1)
+            sz = [(x[2], x[4]) for x in g.log if x[0] == 'fxsize']
+            want_sw = round(i2f(m('gk_sm_size', v) & 0xFFFFFFFF), 3)
+            ds = [z for i_, z in sz if i_ in (0x1000019, 0x1000010)]
+            sw = [z for i_, z in sz if i_ == 0x3300007]
+            if ds != [1.0, 1.0] or not sw or any(z != want_sw for z in sw):
+                bad.append((t, v, sz))
+    check('smash charge (forward / up / down, charge 0 - 120 every 10): the dust (0x1000019) and sparkle (0x1000010) at '
+          'size 1, the water sword at the charge\'s (1 - 5)', bad, [])
+
+
+def delay_tests(mscsb, src):
+    """clone delay (README "Clone delay"): his side: each clone's place follows his X / vertical movement from gk_delay(id)
+    of his frames back (left 1, right 2); its first frames his place now (held); a swap / a return to formation starts the
+    history over; his hitlag frames are no frames"""
+    def start(x=0.0, y=10.0, floors=None):
+        m = fresh(mscsb, src)
+        g = m.game
+        g.x, g.y = x, y
+        if floors is not None:
+            g.floors = floors
+        m.setg('gk_lw_charge', 300)
+        m('gk_lw_press')
+        return m, g
+    m, g = start()
+    check('clone delay: the left clone 1 frame, the right one 2', (m('gk_delay', 1), m('gk_delay', 2)), (1, 2))
+    seen = []
+    for t in range(12):
+        g.x = 2.0 * t
+        frames(m, 1)
+        seen.append((g.x, m.gf('gk_lx') + 14.0 if m.g('gk_alive') & 1 else None, m.gf('gk_rx') - 14.0 if m.g('gk_alive') & 2 else None))
+    check('he walks 2 a frame from the start (the clones made on its 2nd / 5th frame): each clone\'s X - its offset: made at '
+          'his X then, held for its delay, then his X 1 (left) / 2 (right) frames back',
+          seen, [(0.0, None, None), (2.0, 2.0, None), (4.0, 2.0, None), (6.0, 4.0, None), (8.0, 6.0, 8.0), (10.0, 8.0, 8.0),
+                 (12.0, 10.0, 8.0), (14.0, 12.0, 10.0), (16.0, 14.0, 12.0), (18.0, 16.0, 14.0), (20.0, 18.0, 16.0),
+                 (22.0, 20.0, 18.0)])
+    # his jump: the clones copy his vertical movement 1 / 2 frames late
+    m, g = start()
+    frames(m, 10)
+    g.situation = 2
+    ys = []
+    for y in (14.0, 17.0, 19.0, 15.0, 10.0, 10.0, 10.0):
+        g.y = y
+        frames(m, 1, st=0x1B)
+        ys.append((m.gf('gk_ly'), m.gf('gk_ry')))
+    check('he jumps (14, 17, 19, 15, 10): the left clone 1 frame late, the right one 2',
+          ys, [(10.0, 10.0), (14.0, 10.0), (17.0, 14.0), (19.0, 17.0), (15.0, 19.0), (10.0, 15.0), (10.0, 10.0)])
+    g.situation = 0
+    # his hitlag: no history: they freeze and go on in step
+    m, g = start()
+    frames(m, 10)
+    for t in range(3):
+        g.x = 2.0 * (t + 1)
+        frames(m, 1)
+    g.hitlag = 5
+    for _ in range(3):
+        frames(m, 1)
+    fr = (m.gf('gk_lx') + 14.0, m.gf('gk_rx') - 14.0)
+    fl = int(g.vars.get(0x0F00031F) - 4747000.0)
+    g.hitlag = 0
+    out = []
+    for t in range(3):
+        g.x = 8.0 + 2.0 * t
+        frames(m, 1)
+        out.append((m.gf('gk_lx') + 14.0, m.gf('gk_rx') - 14.0))
+    check('he walks 2, 4, 6, then 3 frames of hitlag: the clones stay at 4 / 2 (frozen); then 8, 10, 12: 6 / 4, 8 / 6, '
+          '10 / 8 (his frozen frames skipped)', (fr, out), ((4.0, 2.0), [(6.0, 4.0), (8.0, 6.0), (10.0, 8.0)]))
+    check('... the channel\'s flag 64 while he was frozen (their playback pauses), off after',
+          (fl & 0x40, int(g.vars.get(0x0F00031F) - 4747000.0) & 0x40), (0x40, 0))
+    # a swap: the history starts over (his old places would put the clones off by the swap's move)
+    m, g = start()
+    frames(m, 10)
+    for t in range(4):
+        g.x = 2.0 * (t + 1)
+        frames(m, 1)
+    lx0 = m.gf('gk_lx')
+    g.press, g.stick = {1}, (0.8, -0.8)
+    m('gekkouga_frame')
+    sw = (g.x, m.gf('gk_rx'), m.gf('gk_lx'), m.g('gk_hn'))
+    check('swap with the right clone (at 4 + 14 = 18: 2 frames late) while he is at 8: him to 18, it to his place (8), '
+          'the left one at his place + its offset (8 - 14: the history started over, his place now), 1 frame of history each',
+          sw, (18.0, 8.0, -6.0, 1 + 4))
+    check('... (the left one was at %g: 6 - 14)' % lx0, lx0, -8.0)
+    out = []
+    for t in range(3):
+        g.x = 18.0 + 2.0 * (t + 1)
+        frames(m, 1)
+        out.append((m.gf('gk_lx'), m.gf('gk_rx')))
+    check('... he walks on (20, 22, 24): the left one (offset -24) 1 frame late from 18, the right one (offset -10) held at '
+          '8 for 2 frames, then 2 late', out, [(-6.0, 8.0), (-4.0, 8.0), (-2.0, 10.0)])
+    # back in formation after a launch: the history starts over (his place now)
+    m, g = start(0.0, 10.0, [(-30.0, 30.0, 10.0)])
+    frames(m, 10)
+    g.situation = 2
+    for i in range(3):
+        g.x, g.y = 10.0 * (i + 1), 10.0 + 6.0 * (i + 1)
+        frames(m, 1, st=0x46)
+    g.x, g.y, g.situation = 60.0, 10.0, 0
+    g.floors = [(-1000.0, 1000.0, 10.0)]
+    frames(m, 1, st=0)
+    check('back in formation after a launch (60): at his place now (46 / 74), not his launch\'s places',
+          (m.gf('gk_lx'), m.gf('gk_rx'), m.g('gk_hn')), (46.0, 74.0, 1 + 4))
+
+def clone_delay_tests(mscsb, src):
+    """clone delay, the clone's side (weapons/clone.c): it plays his channel's motion / frame / rate / facing from
+    cl_delay() of his frames back (left 1, right 2); at first his state now, held while its history fills; his frozen
+    frames (flag 64) kept out of it, its rate 0 then"""
+    def make(cid):
+        m = MSC(mscsb, src)
+        g = m.game
+        sh, pos = {}, {}
+
+        def sysf(sid, a, old=g.sys):
+            if sid == 0x17 and a[0] == 0:
+                if a[1] in sh:
+                    return f2i(sh[a[1]])
+                if a[1] in pos:
+                    return f2i(pos[a[1]])
+            if sid == 0x12 and a[0] == 0x1:
+                g.log.append(('motion', a[1], fv(a[2]), fv(a[3])))
+                return 0
+            if sid == 0x12 and a[0] == 0x2713:
+                g.log.append(('setframe', fv(a[1])))
+                return 0
+            if sid == 0x14 and a[0] == 0:
+                g.log.append(('lr', fv(a[1])))
+                g.lr = fv(a[1])
+                return 0
+            return old(sid, a)
+        g.sys = sysf
+        base = 0x0F000340 + 8
+
+        def feed(kind, frame=0.0, rate=1.0, lr=1.0, flags=3):
+            sh[base + 4] = kind * 1024 + frame
+            sh[base + 5] = rate
+            sh[base + 7] = 4747000.0 + flags
+            pos[0x0F000020 + 4] = 100.0
+            pos[0x0F000020 + 4 + 3] = lr
+            g.log = []
+            m('cl_frame')
+            return [x for x in g.log if x[0] in ('motion', 'rate', 'lr')]
+        sh[base + 0], sh[base + 2] = 86.0, 114.0
+        g.x, g.y, g.lr = 98.0, 0.0, 1.0
+        feed(0x10, flags=3 + 4 * cid)                 # found, its id from the "being made" bit
+        return m, g, feed
+
+    m, g, feed = make(1)
+    check('clone delay: cl_delay = its id (the left clone 1, the right one 2)', (m.g('cl_id'), m('cl_delay')), (1, 1))
+    m, g, feed = make(2)
+    check('... (the right one: 2)', (m.g('cl_id'), m('cl_delay')), (2, 2))
+    for cid in (1, 2):
+        m, g, feed = make(cid)
+        played = [0x10]                               # its first frame: his motion now
+        for k in (0x11, 0x12, 0x13, 0x14, 0x15):
+            played.append(([x[1] for x in feed(k) if x[0] == 'motion'] or ['-'])[0])
+        want = [0x10, '-', 0x11, 0x12, 0x13, 0x14] if cid == 1 else [0x10, '-', '-', 0x11, 0x12, 0x13]
+        check('the %s clone: his motions 0x10 (its first frame: now), 0x11 ... 0x15 one a frame: it plays %s (- none new: '
+              'held while its history fills), then %d frame%s late' % ('left' if cid == 1 else 'right', ' '.join(
+                  x if x == '-' else '0x%X' % x for x in want), cid, 's' if cid > 1 else ''), played, want)
+    m, g, feed = make(2)
+    for f in (1.0, 2.0, 3.0):
+        feed(0x10, f, 1.0)
+    got = []
+    for f, lr in ((4.0, -1.0), (5.0, -1.0), (6.0, -1.0)):
+        got.append([x for x in feed(0x10, f, 1.0, lr) if x[0] in ('lr',)])
+    check('the right clone: his facing (turned at his frame 4) 2 frames late', got, [[], [], [('lr', -1.0)]])
+    # his frozen frames: no history, rate 0
+    m, g, feed = make(1)
+    feed(0x20, 0.0)
+    feed(0x20, 1.0)
+    fz = [feed(0x21, 0.0, 0.0, flags=3 + 64) for _ in range(3)]
+    check('he is frozen (flag 64; his rate 0, a new motion that frame): the left clone pauses where it is (rate 0, '
+          'still 0x20), nothing kept', fz, [[('rate', 0.0)]] * 3)
+    out = [feed(0x22, 0.0) for _ in range(2)]
+    check('... unfrozen (0x22): his frozen frame never played: 0x20 at rate 1, then 0x22',
+          out, [[('rate', 1.0)], [('motion', 0x22, 0.0, 1.0)]])
+    m, g, feed = make(2)
+    feed(0x30, 0.0)
+    feed(0x31, 0.0, flags=1)
+    check('not alive (its bit gone): hidden, its history dropped (alive again: his motion now)',
+          [x[1] for x in feed(0x32, 0.0) if x[0] == 'motion'], [0x32])
 
 def skeleton_side_tests(mscsb, src):
     """skeleton v1: his side special (SpecialS 0x153's per-frame: gk_ss_tick, in place of func_2291), the request's
@@ -1608,7 +1914,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (20, 21):   # skeleton v1.2 / burn v2: the exes, the data, test exes (burn v2: + Sm4shCommand)
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
-    if len(earlier) in (23, 24):   # burn v2.2 / v2.3: data only (neutral air's ring of flames)
+    if len(earlier) in (23, 24, 25):   # burn v2.2 / v2.3 / aerial chain v1: data only
         want_top = ['INSTALL_TO_data', 'README.txt']
     if len(earlier) == 22:   # burn v2.1: the exes only (the floor is the exe's)
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
@@ -1634,7 +1940,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('update: none of the installed unchanged files again (%d unchanged)' % len(same1), [w for w in same1 if w in names], [])
         check('update: nothing in INSTALL_TO_data but the built files',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want), [])
-        if len(earlier) in (18, 19, 20, 22, 23, 24):
+        if len(earlier) in (18, 19, 20, 22, 23, 24, 25):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 21:
             check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
@@ -1691,6 +1997,11 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
                       'fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.ptcl',
                       'fighter/gekkouga/script/animcmd/body/effect.bin',
                       'fighter/gekkouga/script/animcmd/weapon/clone/effect.bin']))
+    if z1 and len(earlier) == 25:
+        check('aerial chain v1: INSTALL_TO_data: his MSC (the aerial chain, the charge\'s dust / sparkle at size 1, the clones\' '
+              'places delayed) and the clone\'s MSC (its playback delayed)',
+              sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              ['fighter/gekkouga/script/msc/clone/clone.mscsb', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
     if z1 and len(earlier) == 22:
         check('burn v2.1: no INSTALL_TO_data (the 1 %% floor is the exe\'s shielded damage table)',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')), [])
@@ -1835,7 +2146,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18, 19, 20, 21, 22, 23, 24) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18, 19, 20, 21, 22, 23, 24, 25) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -1848,6 +2159,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_burn_v2_2', 'neutral air', 'ring', '15', 'outward', 'fire_small_4', 'fire_small_5', 'fire_torch_012',
          'fire_torch_026', 'fire_ground_10', 'facing left', 'jitter', 'clone', 'preview', 'unconfirmed', 'exe_v46z_gkb5') \
         if len(earlier) == 24 else \
+        ('greninja_burn_v2_3', 'aerial', 'chain', 'hit', 'shield', 'once', 'land', 'clone', 'dust', 'sparkle', 'size 1',
+         'sword', '1 frame', '2 frames', 'hitlag', 'swap', 'S4GF', 'unconfirmed', 'exe_v46z_gkb5') if len(earlier) == 25 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -1924,7 +2237,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
@@ -1933,6 +2246,9 @@ def main():
     msc_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
     physics_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
     clone_tests(os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC)
+    aerial_chain_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
+    delay_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
+    clone_delay_tests(os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC)
     if os.path.exists(os.path.join(msc, 'skeleton', 'skeleton.mscsb')):
         skeleton_side_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
         skeleton_tests(os.path.join(msc, 'skeleton', 'skeleton.mscsb'), GB.SKELETON_MSC)

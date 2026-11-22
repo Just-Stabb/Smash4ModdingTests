@@ -622,6 +622,16 @@ int cl_shown;          // v8: the visibility it last set + 1 (0: never set, so t
                        // kept 1 / 0 and reset it to 1 ("shown") whenever it looked for him again: a clone that
                        // waited a frame for its id (hidden) was then never shown again: the invisible clones
 int cl_t;              // frames alive
+float cl_hk0;          // clone delay: his channel's motion (VAR_28: kind x 1024 + frame) now, 1 and 2 of his unfrozen
+float cl_hk1;          // frames back ...
+float cl_hk2;
+float cl_hr0;          // ... its rate (VAR_29) ...
+float cl_hr1;
+float cl_hr2;
+float cl_hl0;          // ... his facing ...
+float cl_hl1;
+float cl_hl2;
+int cl_hn;             // ... and how many are kept (0 - 3)
 
 int cl_magic() { return 4747; }
 
@@ -646,12 +656,13 @@ float cl_abs(float v)
     return v;
 }
 
-// v2: his flags (VAR_31 - 4747000), 0x1000 when slot n isn't a Greninja with clones out
+// v2: his flags (VAR_31 - 4747000), 0x1000 when slot n isn't a Greninja with clones out (clone delay: up to 127: 64 he
+// is frozen)
 int cl_flags(int slot)
 {
     float v;
     v = cl_shared(slot, 7) - 4747000.0f;
-    if (v < -0.5f || v > 63.5f)
+    if (v < -0.5f || v > 127.5f)
     {
         return 0x1000;
     }
@@ -732,6 +743,7 @@ void cl_frame()
     if (cl_slot == 0 || cl_id == 0)
     {
         cl_motion = 0xffffffff;
+        cl_hn = 0;
         cl_slot = cl_find();
         if (cl_slot == 0)
         {
@@ -756,6 +768,7 @@ void cl_frame()
     }
     if ((flags & cl_id) == 0)
     {
+        cl_hn = 0;
         cl_show(0);
         return;
     }
@@ -768,16 +781,25 @@ void cl_frame()
         PostureModule(0x3, cl_shared(cl_slot, 2), cl_shared(cl_slot, 3), 0);
     }
     cl_beat();
-    lr = cl_slot_pos(cl_slot, 3);
+    if ((flags & 0x40) == 0 || cl_hn == 0)
+    {
+        cl_push(cl_shared(cl_slot, 4), cl_shared(cl_slot, 5), cl_slot_pos(cl_slot, 3));
+    }
+    k = cl_pick();                        // clone delay: his state cl_delay() frames back
+    lr = cl_hist(k, cl_hl0, cl_hl1, cl_hl2);
     if (lr != 0 && PostureModuleF(0) != lr)
     {
         PostureModule(0, lr);
         PostureModule(0x2);
     }
-    f = cl_shared(cl_slot, 4);
+    f = cl_hist(k, cl_hk0, cl_hk1, cl_hk2);
+    r = cl_hist(k, cl_hr0, cl_hr1, cl_hr2);
+    if (flags & 0x40)
+    {
+        r = 0;                            // he is frozen (hitlag): so is its playback, where it is
+    }
     k = (int)(f / 1024.0f);               // v3: his VAR_28 = kind x 1024 + frame
     f = f - (float)(k * 1024);
-    r = cl_shared(cl_slot, 5);
     if (flags & (0x10 * cl_id))
     {
         k = 0x24;                         // falling on its own: Fall (its own loop)
@@ -806,4 +828,56 @@ void cl_frame()
     }
     cl_last_f = f;
     cl_show(1);
+}
+
+// ---- clone delay (fighters/gekkouga/README.md "Clone delay"; the user: "the left clone should have a 1 frame delay and
+// the right clone should have a 2 frame delay"): it plays his motion, frame, rate and facing as his channel gave them
+// cl_delay() of his frames before (its place: his MSC's, delayed there the same way); fewer while its history fills
+// (at first: now, then held). His frozen frames (hitlag, flag 64) are no frames: nothing kept, its playback paused.
+int cl_delay() { return cl_id; }          // 1 the left-spawned clone, 2 the right-spawned one
+
+void cl_push(float kf, float r, float lr)
+{
+    cl_hk2 = cl_hk1;
+    cl_hk1 = cl_hk0;
+    cl_hk0 = kf;
+    cl_hr2 = cl_hr1;
+    cl_hr1 = cl_hr0;
+    cl_hr0 = r;
+    cl_hl2 = cl_hl1;
+    cl_hl1 = cl_hl0;
+    cl_hl0 = lr;
+    if (cl_hn < 0x3)
+    {
+        cl_hn += 1;
+    }
+}
+
+// the history entry to play: cl_delay() back, or the oldest kept while it fills
+int cl_pick()
+{
+    int i;
+    i = cl_delay();
+    if (i > cl_hn - 1)
+    {
+        i = cl_hn - 1;
+    }
+    if (i < 0)
+    {
+        i = 0;
+    }
+    return i;
+}
+
+float cl_hist(int i, float v0, float v1, float v2)
+{
+    if (i == 0x1)
+    {
+        return v1;
+    }
+    if (i == 0x2)
+    {
+        return v2;
+    }
+    return v0;
 }

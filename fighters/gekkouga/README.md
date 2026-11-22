@@ -1062,3 +1062,63 @@ His bank: two more clips (fire_small_5, fire_torch_026: +2 MB, 17.4 MB). Tests: 
 for both sets: each flame's fields, neighbours differ, every tip out from the centre as seen within the jitter, the ring's
 growth in fx_render); `gekkouga_clones_test ... --vb22` 260 / 0. Preview `$S/gk_preview/nair_v3.png` / `.gif` (facing
 right). Not confirmed in game.
+
+## Aerial chain v1 (`greninja_aerialchain_v1.zip`, over burn v2.3; data only, exe_v46z_gkb5)
+
+Three requests in one package, all MSC (his `gekkouga.mscsb` and the clone's `clone.mscsb`); the exe stays gkb5.
+
+### Aerial chain
+
+The user: "Can you make Greninja's aerials chain like his smash attacks do, but only if it hits an opponent".
+`clones.c` `gk_ac_*`, hooked into the aerial status (AttackAir `0x34`) by `tools/gekkouga_build.py` `MSC_EDITS`:
+- `func_2382` (its start), after `func_314` picked the motion into `0x11000002`: `gk_ac_start` notes the aerial (kind
+  1 neutral - 5 down = motion `0x68` - `0x6C` - `0x67`), starts a new chain unless this start is a chain's (`gk_ac_req`),
+  adds it to the chain's used set, and clears its attack's "hit since it started" (`AttackModule(0x2724)`).
+- `func_2383` (its loop), after `func_56`'s own interrupts: `gk_ac_try`. A hit is the attack's hit since it started on a
+  hurtbox (`AttackModule(0x2727, 2)`; native-notes: `+0xC8`; kind 4, a shield, is not counted) or a clone's copy of
+  the aerial landing (the exe's VAR_22, read by `gk_clone_hitlag` -> `gk_ac_clone_hit`; the exe sets it for a clone's
+  shielded hit too: it can't tell). The window opens the frame after the hit (not while he is in hitlag) and stays open
+  to the move's end. In it, in the air, with the attack command (`global24 & 1`, as vanilla `func_63`'s aerial entry)
+  the game's air attack kind (`ControlModule(0x10)`: stick + attack or the C-stick; anything but 1 - 5 is neutral, as
+  `func_311`) not used yet in this chain re-enters `0x34` (`func_16(0x34, 1)`: the same status again, as the jab's
+  re-entry; `func_311` picks that aerial's motion, facing as vanilla, so a back air is still a back air).
+- Each aerial once a chain; `gekkouga_frame` ends the chain on any status but `0x34` (landing, a special, an air dodge,
+  a jump, being hit, a ledge grab); after all five nothing more is accepted. Landing lag, fast fall and drift are the
+  game's (nothing touched). Smash chains (`gk_chain_try`) are separate and unchanged.
+- Diag (no exe change): his VAR_20 flags from bit 256 (the TEST_ONLY exe's `S4GF` line logs every change): 256 x the
+  aerial (1 - 5), 2048 hit seen, 4096 window open, 8192 x the chain's used bits (2 neutral, 4 forward, 8 back, 16 up,
+  32 down).
+
+### Smash charge effects
+
+The user: "Also make Smash attacks charging not use giant effects for the dust or sparkle". `gk_sm_fx` (the hold's
+effects every 5 frames): the dust (`0x1000019` PtcCommonRunSmoke) and sparkle (`0x1000010` PtcCommonSmashFlashS) at
+`gk_sm_dust_size()` = 1, their vanilla hold scripts' size, at every charge level. Left as it was (and asked about): his
+water sword (`0x3300007`), remade every 10 frames of the hold at the charge's size (1 at 0 to 5 at full: it grows as
+the hitbox does); the release's effects (ACMD `EFFECT_GROW`) stay x5 at full.
+
+### Clone delay
+
+The user: "Can you give each clone a frame delay? The left clone should have a 1 frame delay and the right clone should
+have a 2 frame delay". Each clone replays his state `gk_delay(id)` / `cl_delay()` of his frames late (the left-spawned
+clone 1, the right-spawned one 2):
+- His side (`gk_physics` -> `gk_delayed`): the copied inputs of its physics, his X and (while it copies it) his vertical
+  movement and the "copying" decision, from a history of his last 3 frames (`gk_hx1` / `gk_hx2`, `gk_last_oy` /
+  `gk_hy2` / `gk_hy3`, `gk_hcopy`); its own physics (walls, floors, ceilings, its own fall, the detach on a launch) run
+  on the frame.
+- The clone's side (`cl_frame`, `cl_push` / `cl_pick`): his channel's motion kind and frame (VAR_28), rate (VAR_29) and
+  facing, its own 3-entry history; its hitboxes and effects follow its motion frame, so they come out 1 / 2 frames late.
+- First frames: no history yet: his state now, held while it fills (a clone made: its count from 0, `gk_set_hn`).
+- His hitlag: no history kept on his frozen frames (his side: `gk_physics` returns; the clone's: the channel's new
+  flag 64, its rate 0 where it is), so they freeze and go on in step.
+- A swap (and a return to formation after a launch) starts his side's history over (his old places, with the swap's
+  new offsets, would put the clones off by the swap's move): they go on from his place now, held for their delay; the
+  clone's motion history is kept (the swap changes no motion).
+- Not delayed: the native swing (each clone's own, release `sway`); `G_pose`'s TEST_ONLY bone copy is his current pose.
+
+Tests (`gekkouga_clones_test`): `aerial_chain_tests` (hit opens the window the frame after, whiff / shield / hitlag /
+ground / no input don't, repeats refused, all five, landing and a jump end it, a clone's hit counts, the diag bits, the
+charge's dust / sparkle 1 and sword sizes at 0 - 120 for all three smashes), `delay_tests` (his side: walk, jump,
+hitlag, swap, back in formation) and `clone_delay_tests` (the clone: 1 / 2 frames late, first frames, facing, frozen,
+history dropped when not alive); the physics / playback tests written before the delay run with it stubbed to 0.
+Not confirmed in game.
