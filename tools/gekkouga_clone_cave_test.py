@@ -1275,6 +1275,64 @@ def burn_checks(e, info, diag):
         e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
 
 
+def clear_checks(e, info, diag):
+    """burn v1.2: the per-match state is emptied by the game's clear-all chain (match start / end, training reset,
+    restart): gk_clear, reached from the chain's last `b`, ends with `b CLEAR_BACK` keeping r3 / r10"""
+    lab, A, F = info['labels'], info['A'], info['feats']
+    from kind_expand_test import REGS as RG
+    ct = info['clear_at']
+    w = e.w(ct)
+    tgt = ct + ((w & 0x3FFFFFC) ^ 0x2000000) - 0x2000000
+    check('burn v1.2: the clear-all chain\'s last b (0x%08X) goes to gk_clear' % ct, tgt, lab['gk_clear'])
+    burn = 'burn' in F
+    if burn:
+        for k in range(0, C.SLOTS * C.BURN_CAP * 16, 16):
+            e.setw(A['btab'] + k, 100)          # a "previous match": every list full
+            e.setw(A['btab'] + k + 4, (3 << 16) | 6)
+            e.setw(A['btab'] + k + 8, k // 16 % 8)
+        e.mu.mem_write(A['bproc'], b'\x07' * (C.BURN_CONTEXTS * C.BURN_ENTS))
+    for i in range(16):
+        e.setw(A['gk_hide'] + 4 * i, 3)
+    for i in range(C.SLOTS):
+        e.setw(A['gk_tags'] + 4 * i, 9)
+        e.setw(A['gk_plyr'] + 4 * i, 2)
+    n0 = e.w(A['gk_clr'])
+    e.mu.reg_write(RG[10], 0x10)
+    e.call(lab['gk_clear'], 0x12345678, until=C.CLEAR_BACK)
+    check('burn v1.2: gk_clear back at CLEAR_BACK with r3 / r10 kept', (e.r(3), e.r(10)), (0x12345678, 0x10))
+    if burn:
+        check('burn v1.2: every burn of the last match gone, the processed counts 0',
+              (any(e.w(A['btab'] + k) for k in range(0, C.SLOTS * C.BURN_CAP * 16, 4)),
+               bytes(e.mu.mem_read(A['bproc'], C.BURN_CONTEXTS * C.BURN_ENTS)).strip(b'\0')), (False, b''))
+    check('burn v1.2: the tag hide counters / slow states / tag countdowns 0, the cursor bytes kept for their restore',
+          ([e.w(A['gk_hide'] + 4 * i) for i in range(16)], [e.w(A['gk_tags'] + 4 * i) for i in range(C.SLOTS)],
+           [e.w(A['gk_plyr'] + 4 * i) for i in range(C.SLOTS)]), ([0] * 16, [0] * C.SLOTS, [2] * C.SLOTS))
+    check('burn v1.2: the clear counted (diag S4BR)', e.w(A['gk_clr']), n0 + 1)
+    if burn:
+        # the next match: a Greninja and a victim live again, nothing ticks
+        dm_calls = []
+        dmvt = e.alloc(0x100, b'\0')
+        dmadd = e.alloc(4)
+        e.setw(dmvt + C.DM_ADD, dmadd)
+        e.stub(dmadd, lambda e_: dm_calls.append(e_.r(3)))
+        gk = e.fighter(1)
+        e.mu.mem_write(gk['f'] + 0x1E, b'\x04')
+        vic = e.fighter(3)
+        e.mu.mem_write(vic['f'] + 0x1E, b'\x04')
+        acc = e.w(vic['f'] + C.BASE_ACC)
+        dm = e.alloc(0x10, b'\0')
+        e.setw(dm, dmvt)
+        e.setw(acc + C.W_DAMAGE, dm)
+        gacc = e.w(gk['f'] + C.BASE_ACC)
+        mm = e.alloc(0x60, b'\0')
+        e.setw(gacc + C.W_MOTION, mm)
+        for _ in range(12):
+            e.call(lab['burn_him'], gk['f'], 1)
+        check('burn v1.2: the next match: 12 frames of his, no burn ticks on anyone', dm_calls, [])
+        for i in range(8):
+            e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
+
+
 def hud_checks(e, info):
     lab, A = info['labels'], info['A']
     hide = A['gk_hide']
@@ -1445,6 +1503,7 @@ def main():
     sway_checks(e, info)
     hitcheck_checks(e, info, diag)
     burn_checks(e, info, diag)
+    clear_checks(e, info, diag)
     fighter_desc_checks(e, img, info)
     g1_checks(e, info)
     s13_checks(e, info)

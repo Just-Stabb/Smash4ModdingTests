@@ -3894,3 +3894,9 @@ MSC on a bunshin-based kind, the 4-shape group.
   path), Rebirth `0xB2` (the respawn platform). `burn_tick` reads it once a frame for every victim that holds a burn
   and empties that victim's whole list (every owner's) in either status, or when the fighter isn't live (`+0x1E < 4`).
   Diag `S4BK victim status owner`. Not seen in game yet: that star / screen KOs pass through `0xB1` too.
+- **Per-match state (Greninja burn v1.2)**: the burn lists, processed counts, tag hide counters, slow states and tag
+  message countdowns are emptied by `gk_clear`, the last link of the game's clear-all chain (`0x02FB3498` -> tsu_clear
+  -> ... -> `b 0x02FB349C`; `outline_cave.clear_tail` finds the end; a leaf keeping r3 / r10 / LR), which the battle
+  set-up (`0x029104D0`) and the battle sequences' start / restart / end virtuals run: match start / end or quit,
+  rematch, training reset. The user's burn v1.1: burns went on into the next match after quitting early. The cursor's
+  saved show byte is kept (its restore runs once the hide counter is 0). Diag `S4BR clear# slot`.

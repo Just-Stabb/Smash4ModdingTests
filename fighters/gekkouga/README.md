@@ -786,3 +786,14 @@ The user's burn v1 test: burns work and stack, but kept ticking after a KO; shie
 - Unicorn (`burn_checks`): status 0 / 0xB0 / 0xB3 keep ticking; 0xB1 / 0xB2 with two owners' burns: empty at once, no
   tick after; diag S4BK once. `gekkouga_clone_cave_test` 143 (release) / 161 (diag) checks, 0 failures;
   `supamario_ui_cave_test` 0 failures; `import_call_check` 0 on both; both exes rebuild byte for byte.
+
+## Burn v1.2 (`greninja_burn_v1_2.zip`, over burn v1.1; exe_v46z_gkb3)
+
+The user: burns carried into the next match after quitting early. `gk_clear` joins the game's clear-all chain (its
+last `b 0x02FB349C`, found by `outline_cave.clear_tail`; run at match start / end or quit, rematch / restart, training
+reset) and empties the burn lists and processed counts, the tag hide counters, the slow states and the tag message
+countdowns (the cursor's saved byte is kept for its restore). Diag `S4BR` once per Greninja slot after each clear.
+Unicorn (`clear_checks`): the chain's last b -> gk_clear, back at `0x02FB349C` with r3 / r10 kept, every list empty,
+the next match's 12 frames tick nothing. Cave tests 149 (release) / 167 (diag), 0 failures; supamario_ui_cave_test 0;
+import_call_check 0; both rebuild byte for byte. Not covered: his MSC's own state (clones, smash store, gauge) on a
+training reset (it resets at Entry / KO).

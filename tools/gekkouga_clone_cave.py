@@ -72,6 +72,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import kind_expand as K  # noqa: E402
+import outline_cave as OL  # noqa: E402
 import weapon_expand as W  # noqa: E402
 import weapon_expand_append as WA  # noqa: E402
 from ppcasm import Asm, ha  # noqa: E402
@@ -382,6 +383,13 @@ GK_DESC_CASE = 0x02E4362C         # its case (bl getter; epilogue)
 ORIGINAL = {SLOT13: 0x9421FF90, SLOT42: 0x9421FF38, SLOT43: 0x9421FF98, G1_HOOK: 0x4BD81C95,
             HUD_HOOK: 0x487ADD81, DESC_TABLE + 4 * GK_KIND: GK_DESC_CASE, 0x028E4020: 0x4BFFFDF9}
 
+# burn v1.2: the game's clear-all chain (the slow manager's "clear every request" 0x02FB3498, which the battle set-up
+# and the battle sequences' start / restart / end run: match start, match end or quit, rematch, training reset); each
+# cave's clear ends with a `b` to the next, the last to CLEAR_BACK (r3 / r10 / LR kept). gk_clear joins at its end
+# (OL.clear_tail) and empties the per-match state: every burn, the processed counts, the name tag hide counters, the
+# slow states, the tag message countdowns (the user's burn v1.1 test: burns went on into the next match)
+CLEAR_BACK = OL.CLEAR_BACK
+
 # game functions / data (none is an import)
 HANDLE = 0x02BF2108               # (manager [0x102F6C30], &handle, object id, 0)
 HANDLE_GONE = 0x02BEF50C          # (&handle) -> 0 while the object exists
@@ -613,6 +621,7 @@ def build(rpx, diag=False, feats=None):
     A['bconst'] = alloc(8) if burn else 0                        # 0.2 (shield), 1000.0
     A['bsum'] = alloc(SLOTS * SLOTS * 4) if burn and diag else 0  # diag: damage per owner x victim this second
     A['bclock'] = alloc(4 * SLOTS) if burn and diag else 0
+    A['gk_clr'] = alloc(4 + 4 * SLOTS)  # burn v1.2: the clears seen (+0), per slot the count its diag last logged
     A['gk_plyr'] = alloc(4 * SLOTS)     # v10: per player, the cursor show byte we cleared + 1 (0: none)
     A['gk_tags'] = alloc(4 * SLOTS)     # v7: the tag messages' countdown per slot (0: shown)
     A['gk_names'] = alloc(8 * len(GAUGE_NAMES), 4)    # v7: the round gauge's clip names {char *, length}
@@ -642,6 +651,7 @@ def build(rpx, diag=False, feats=None):
             ('gk_fm', 'S4GM clone id=%d draw: visflag=%d visible=%d model mode=%d drawn=%d overlay=%d/%d\n'),
             ('gk_fn', 'S4GN clone id=%d z=%d scale x100=%d link mask=%08X model=%08X\n'),
             ('gk_fba', 'S4BA burn added: victim slot=%d move=%d shielded=%d damage x1000=%d interval=%d frames=%d\n'),
+            ('gk_fbr', 'S4BR match state cleared (match start / end, training reset, restart): clear #%d, seen by slot=%d\n'),
             ('gk_fbt', 'S4BT burn ticks: owner slot=%d victim slot=%d stacks=%d damage x1000 this second=%d\n'),
             ('gk_fbk', 'S4BK burns cleared: victim slot=%d status=%X (KO: Dead / Rebirth; -1 gone) seen by owner slot=%d\n'),
             ('gk_fh', 'S4GH hit check: attacker=%X (category x 16 + index) hitbox=%d clone id=%d hitlag=%d at x=%d y=%d\n'),
@@ -686,6 +696,7 @@ def build(rpx, diag=False, feats=None):
     out.blob(A['ctf'], b''.join(struct.pack('>4B4h', *c) for c in GAUGE_COLOURS), 'gauge colours')
     out.blob(A['gk_tags'], bytes(4 * SLOTS), 'tag message countdowns')
     out.blob(A['gk_plyr'], bytes(4 * SLOTS), 'cursor show bytes saved')
+    out.blob(A['gk_clr'], bytes(4 + 4 * SLOTS), 'clears seen (burn v1.2)')
     if 'burn' in feats:
         out.blob(A['btab'], bytes(SLOTS * BURN_CAP * 16), 'burn instances')
         out.blob(A['bproc'], bytes(BURN_CONTEXTS * BURN_ENTS + (-BURN_CONTEXTS * BURN_ENTS) % 4), 'burn processed counts')
@@ -723,11 +734,11 @@ def build(rpx, diag=False, feats=None):
              dm_add=DM_ADD, fstatus=F_STATUS, st_kind=ST_KIND, st_dead=ST_DEAD, st_dead_n=ST_DEAD_N, ent_log=ENT_LOG, node_obj=NODE_OBJ, node_type=NODE_TYPE, mm_kind=MM_KIND, am_ents=AM_ENTS, am_count=AM_COUNT, am_max=AM_MAX, ent_size=ENT_SIZE,
              ent_nodes=ENT_NODES, node_max=NODE_MAX, node_on=NODE_ON, node_min_x=NODE_MIN_X, node_min_y=NODE_MIN_Y,
              node_max_x=NODE_MAX_X, node_max_y=NODE_MAX_Y, team=TEAM_MOD,
-             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
+             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, nbtab=SLOTS * BURN_CAP * 4, nbproc=(BURN_CONTEXTS * BURN_ENTS + 3) // 4, clear_back=CLEAR_BACK, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
              hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbr', 'gk_clr', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -856,7 +867,20 @@ s13:    stwu r1, -0x50(r1)
         bge s13_out
         mullw r10, r27, r10
         cmpw r10, r11
-        bne s13_out''' + (('''
+        bne s13_out''' + D('''
+        lis r25, %(gk_clr_hi)d
+        addi r25, r25, %(gk_clr_lo)d
+        lwz r4, 0(r25)                  # burn v1.2 diag: a clear since this slot last logged one
+        slwi r12, r27, 2
+        addi r12, r12, 4
+        lwzx r0, r25, r12
+        cmpw r0, r4
+        beq s13_noclr
+        stwx r4, r25, r12
+        mr r5, r27
+        lis r3, %(gk_fbr_hi)d
+        addi r3, r3, %(gk_fbr_lo)d''' + osr() + '''
+s13_noclr:''') + (('''
         mr r3, r31                      # burn v1: his hits and his burns' ticks
         mr r4, r27
         bl burn_him''') if 'burn' in feats else '') + '''
@@ -2952,6 +2976,51 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
+# ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
+gk_clear:
+        li r0, 0''' + (('''
+        lis r12, %(btab_hi)d
+        addi r12, r12, %(btab_lo)d
+        li r11, %(nbtab)d
+gc_btab:
+        stw r0, 0(r12)                  # every burn
+        addi r12, r12, 4
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne gc_btab
+        lis r12, %(bproc_hi)d
+        addi r12, r12, %(bproc_lo)d
+        li r11, %(nbproc)d
+gc_bproc:
+        stw r0, 0(r12)                  # the hit logs' processed counts
+        addi r12, r12, 4
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne gc_bproc''') if 'burn' in feats else '') + '''
+        lis r12, %(gk_hide_hi)d
+        addi r12, r12, %(gk_hide_lo)d
+        li r11, 16
+gc_hide:
+        stw r0, 0(r12)                  # the tag hide counters, the slow states (the cursor's saved byte is kept: its
+        addi r12, r12, 4                # restore runs once the counter is 0)
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne gc_hide
+        lis r12, %(gk_tags_hi)d
+        addi r12, r12, %(gk_tags_lo)d
+        li r11, %(slots)d
+gc_tags:
+        stw r0, 0(r12)
+        addi r12, r12, 4
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne gc_tags
+        lis r12, %(gk_clr_hi)d
+        lwz r11, %(gk_clr_lo)d(r12)
+        addi r11, r11, 1
+        stw r11, %(gk_clr_lo)d(r12)
+        b 0x%(clear_back)08X
+
 # ---- the fighter descriptor switch's case for him: his descriptor copy (+8 the new article list)
 gk_dcase:
         lis r3, %(gk_desc_hi)d
@@ -3003,6 +3072,9 @@ w_dcase:
     for i, w in enumerate(t.words()):
         out.put(TRAMP + 4 * i, w, 'HUD trampoline', 0)
     out.put(DESC_TABLE + 4 * GK_KIND, lab['gk_dcase'], 'his fighter descriptor case', GK_DESC_CASE)
+    ct = OL.clear_tail(img.w)                         # burn v1.2: the clear-all chain's last `b CLEAR_BACK` -> gk_clear
+    assert not CAVE <= ct < LIMIT, 'clear chain already through this cave'
+    out.put(ct, asm1(ct, 'b 0x%X' % lab['gk_clear']), 'the clear-all chain -> gk_clear (burn v1.2)', img.w(ct))
     assert PANEL_VT not in img.relocs(), 'the panel update word has a relocation'
     out.put(PANEL_VT, lab['gk_panel'], 'the damage panel update: the gauge (then the trait badge / the game)', PANEL_PREV)
     # ---- the weapon cave's tables, kind 0x1A1
@@ -3027,7 +3099,7 @@ w_dcase:
     out.put(T['bt'] + 4 * k, base_of(feats), 'base kind 0x%X' % CLONE_KIND, 0xFFFF)
     out.put(T['st'] + 4 * k, A['w_single'], 'singleton case 0x%X' % CLONE_KIND, 0)
     out.put(T['rt'] + 4 * k, (A['w_row'] - W.MODULE_TABLE) & 0xFFFFFFFF, 'own module row 0x%X' % CLONE_KIND, 0)
-    info = dict(A=A, labels=lab, T=T, layout=L, end=end, owner_str=owner_str, feats=feats, diag=diag)
+    info = dict(A=A, labels=lab, T=T, layout=L, end=end, owner_str=owner_str, feats=feats, diag=diag, clear_at=ct)
     return out, info
 
 
