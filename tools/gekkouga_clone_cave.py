@@ -98,7 +98,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
-                      'tiers', 'gmupd'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'tiers', 'gmupd', 'skbody'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -114,6 +114,7 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', '
 #   burn2   burn v2 (needs skeleton): fire on burning fighters (bfx_vic) and the smashes' fire trails (kind TR_KIND)
 #   tiers   skeleton v1.3 / burn tiers (needs burn2): the burning fighters' fire picked by tier (BFX_TIERS: their burns'
 #           count, remaining damage, strongest rate), a different effect each (BFX_TIER_IDS) in place of one scaled
+#   skbody  skeleton v1.5: its collision vertices and HP hit box fit to its body (SK_BODY) instead of its flames
 #   gmupd   skeleton v1.3 (needs skeleton): its GroundModule's own frame update (GC_FRAME) every moved frame, as the
 #           hydrant's update template runs it (the collision attempt: Mario's pump's template never updates +0x2C)
 #   hitcheck v12: the clone hit from his side (w_hitchk: other fighters' attack boxes against the clone's box)
@@ -311,6 +312,23 @@ GC_FRAME = 0x02C34258             # skeleton v1.3 (gmupd): (gm) the GroundModule
 SK_W, SK_B, SK_H = 6.0, 2.0, 28.0   # its collision: x +- 6, a wall each side from y + 2 up to the top, a floor on top
                                   # at y + 28 (about 1.75 x a fighter's height: Greninja's ~16)
 SK_VERTS = ((-SK_W, SK_B), (-SK_W, SK_H), (SK_W, SK_H), (SK_W, SK_B))   # the .lvd's vertices (left wall, top, right wall)
+# skeleton v1.5 (feature skbody; the user: "make the skeleton's collision box closer to the skeleton's body rather than
+# its outer flames"): measured on skeleton_run's 55 cells as drawn (5.60 px a unit, its feet on the call): the bones (red
+# over the yellow flame) reach the skull top at 26.6 (median; 24.6 - 27.5), the ribcage spans -2.3 / +2.7 round the spine,
+# which is 2.2 ahead of the picture's centre (the billboards now shifted back by it: tools/gekkouga_fx.py SK_SPINE_X). The
+# box: x +- 3.5 (the ribcage and a unit of its flame), the top at 24 (between its shoulders and its skull top: standing on
+# its head), the wall from 2 as before; the HP hit box the same (x +- 3.5, y 0 - 24)
+SK_BODY = (3.5, 2.0, 24.0)
+
+
+def sk_dims(feats):
+    """(half width, the walls' bottom, the top) of the skeleton's box: v1.5's body box with skbody, else v1 - v1.4's"""
+    return SK_BODY if 'skbody' in feats else (SK_W, SK_B, SK_H)
+
+
+def sk_verts(feats):
+    w, b, h = sk_dims(feats)
+    return ((-w, b), (-w, h), (w, h), (w, b))
 SK_HP = 25.0
 SK_SCALE = 1.0                    # its scale while it runs; 1.0 from its explosion / smoke on (its hitbox unscaled). v1 -
                                   # v1.1: 2.0 (the carrier model, the hydrant, was its stand-in body: its top at 14.09 x 2);
@@ -383,12 +401,13 @@ GK_VAR_TR = 0x0F000300            # his VAR_0 + 4 k: request k's type, + 1 x, + 
 TR_VAR_SLOT, TR_VAR_TYPE, TR_VAR_X, TR_VAR_Y, TR_VAR_DIR, TR_VAR_CTX = (0x0F000300 + i for i in range(6))
 assert all(burn_total(m, sh, f) >= f - 1e-4 for m in BURN_MOVES + (TR_ROW,) for sh in (False, True)
            for f in (BURN_MIN_TOTAL, BURN_MIN_TOTAL_OLD)), 'a burn under the floor'
-RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1', 'tiers', 'gmupd'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1', 'tiers', 'gmupd', 'skbody'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
 # swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose); burn v2:
 # + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2 - floor1); burn
 # v2.1: + floor1 (the burn floor 1 %, the user; burn v2's exe_v46z_gkb4 is RELEASE - floor1); skeleton v1.3: + tiers,
-# gmupd (exe_v46z_gkb6; burn v2.1 - aerial chain v1's exe_v46z_gkb5 is RELEASE - tiers - gmupd)
+# gmupd (exe_v46z_gkb6; burn v2.1 - aerial chain v1's exe_v46z_gkb5 is RELEASE - tiers - gmupd - skbody); skeleton v1.5:
+# + skbody (exe_v46z_gkb7; v1.3 / v1.4's gkb6 is RELEASE - skbody)
 VARIANTS = (('A_release', RELEASE), ('G_pose', (RELEASE - {'sway'}) | {'pose'}))
 # v15: A_release (the release: the native swing, diag) and G_pose (v14's pose copy instead of the swing, in case); v14:
 # A_release (attack hitcheck burn skeleton pose) and E_sway (attack hitcheck burn skeleton sway); v13's D_parts dropped   # v13: each on the release's set (v3 - v12's hurtbox route, C_hurt, dropped:
@@ -2781,8 +2800,8 @@ def build(rpx, diag=False, feats=None):
         out.blob(A['sk_row'], b''.join(struct.pack('>I', w) for w in L['skrow']), 'skeleton module row')
         out.blob(A['sk_str'], SK_NAME.encode().ljust(12, b'\0'), '"skeleton"')
         out.blob(A['sk_lvd'], SK_LVD.encode().ljust(16, b'\0'), '"skeleton.lvd"')
-        out.blob(A['sk_verts'], b''.join(struct.pack('>2f', *v) for v in SK_VERTS), 'skeleton collision vertices')
-        out.blob(A['sk_box'], struct.pack('>7f', SK_W, 0.0, SK_H, 0, 0, 0, 0), 'skeleton hit box')
+        out.blob(A['sk_verts'], b''.join(struct.pack('>2f', *v) for v in sk_verts(feats)), 'skeleton collision vertices')
+        out.blob(A['sk_box'], struct.pack('>7f', sk_dims(feats)[0], 0.0, sk_dims(feats)[2], 0, 0, 0, 0), 'skeleton hit box')
         out.blob(A['sk_nums'], struct.pack('>10f', *range(10)), 'skeleton 0-9')
         out.blob(A['sk_k'], struct.pack('>5f', SK_HP, 10.0, 8.0, 0.5, SK_SCALE), 'skeleton constants')
         out.blob(A['sk_latch'], bytes(SLOTS * SK_LATCH * 8), 'skeleton attackers latched')

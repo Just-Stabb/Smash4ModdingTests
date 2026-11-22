@@ -1554,7 +1554,7 @@ def skeleton_checks(e, info, diag):
     sv[C.SK_VAR_PHASE] = 1.0
     c1 = frame()
     W_, B_, H_ = C.SK_W, C.SK_B, C.SK_H
-    want_v = [(gm, i, 50.0 + vx, 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS)]
+    want_v = [(gm, i, 50.0 + vx, 10.0 + vy) for i, (vx, vy) in enumerate(C.sk_verts(F))]
     check('skeleton collision: as the hydrant\'s set-up: its kind\'s bundle (manager +0x30, kind 0x1A2, 0, 0), '
           '"skeleton.lvd" in it, GroundModule +0xEC = the file, the grounds made (gm, 1, 0, 0), its 4 vertices placed at '
           'it (x +- 6, y + 2 / + 28), the lines recomputed, on (v1.2: (gm, 1), then the grounds turned on), both handles '
@@ -1572,10 +1572,10 @@ def skeleton_checks(e, info, diag):
     check('skeleton collision: it moved 0.7: %sits vertices moved (riders carried: the move call), the lines recomputed, '
           'kept on (v1.2)' % ('v1.3: its GroundModule\'s frame update (GC_FRAME, as the hydrant\'s 0x02B38AD0) first, then '
                               if gmf else ''),
-          c2, gmf + [('movev', gm, i, round(50.7 + vx, 3), 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS)] +
+          c2, gmf + [('movev', gm, i, round(50.7 + vx, 3), 10.0 + vy) for i, (vx, vy) in enumerate(C.sk_verts(F))] +
           [('commit', gm), ('enable', gm)])
     if diag:
-        want4 = [int(round(10 * v)) for vx, vy in C.SK_VERTS for v in (50.7 + vx, 10.0 + vy)]
+        want4 = [int(round(10 * v)) for vx, vy in C.sk_verts(F) for v in (50.7 + vx, 10.0 + vy)]
         got4 = [x[2:6] for x in logs('gk_fsd')][-1:] + [x[3:7] for x in logs('gk_fsv')][-1:]
         check('skeleton v1.4 diag: S4SD v0 / v1 and S4SV its place (507, 100) and v2 / v3 (x10): all 4 vertices as moved '
               '(the walls\' ends too)', ([list(g_) for g_ in got4], [x[1:3] for x in logs('gk_fsv')][-1:]),
@@ -1602,7 +1602,7 @@ def skeleton_checks(e, info, diag):
     e.setw(gobj + 0x34, 2)
     e.mu.mem_write(post + 0x10, struct.pack('>2f', 50.0, 10.0))
     check('skeleton v1.1: a floor-only skeleton.lvd (2 vertices, as the hydrant\'s): only its top line moved (x +- 6, y + 28)',
-          frame(), gmf + [('movev', gm, i, 50.0 + vx, 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS[1:3])] +
+          frame(), gmf + [('movev', gm, i, 50.0 + vx, 10.0 + vy) for i, (vx, vy) in enumerate(C.sk_verts(F)[1:3])] +
           [('commit', gm), ('enable', gm)])
     e.setw(gobj + 0x34, 4)
     frame()

@@ -839,7 +839,7 @@ def skeleton_lvd(hydrant_lvd):
     assert len(lv.collisions) == 1, 'the hydrant has one collision'
     c = lv.collisions[0]
     c.name, c.subname = 'COL_Skeleton', 'Skeleton'
-    c.verts = [list(map(float, v)) for v in C.SK_VERTS]
+    c.verts = [list(map(float, v)) for v in C.sk_verts(C.RELEASE)]   # (skeleton v1.5: its body's box)
     c.normals = [[-1.0, 0.0], [0.0, 1.0], [1.0, 0.0]]          # left wall, top (a floor), right wall: out of the solid
     c.mats = [bytearray(c.mats[0]) for _ in range(3)]
     c.cliffs = []
@@ -855,7 +855,7 @@ def skeleton_lvd_floor(hydrant_lvd):
     lv = lvd.LVD(hydrant_lvd)
     c = lv.collisions[0]
     assert len(c.verts) == 2
-    c.verts = [list(map(float, v)) for v in C.SK_VERTS[1:3]]
+    c.verts = [list(map(float, v)) for v in C.sk_verts(C.RELEASE)[1:3]]
     return lv.write()
 
 

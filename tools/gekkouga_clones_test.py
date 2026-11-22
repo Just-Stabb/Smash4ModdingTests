@@ -1672,10 +1672,10 @@ def skeleton_data_tests(out):
           (['Script_End'], ['Script_End']))
     lv = lvd.LVD(os.path.join(fg, 'model', 'skeleton', 'c00', 'skeleton.lvd'))
     c = lv.collisions[0]
-    check('skeleton.lvd: one collision, the 4 vertices the executable moves (x +- 6, y 2 / 28), a wall each side and a '
+    check('skeleton.lvd: one collision, the 4 vertices the executable moves (v1.5: x +- 3.5, y 2 / 24: its body), a wall each side and a '
           'floor on top (normals out), the hydrant\'s flags',
           (len(lv.collisions), [tuple(round(x, 2) for x in v) for v in c.verts], [tuple(n) for n in c.normals], c.flags),
-          (1, [tuple(v) for v in C.SK_VERTS], [(-1.0, 0.0), (0.0, 1.0), (1.0, 0.0)], [0, 1, 0, 0]))
+          (1, [tuple(v) for v in C.sk_verts(C.RELEASE)], [(-1.0, 0.0), (0.0, 1.0), (1.0, 0.0)], [0, 1, 0, 0]))
     check('skeleton: its main.pac and carrier model files are present (Pac-Man\'s hydrant\'s)',
           [f for f in GB.SK_CARRIER if not os.path.exists(os.path.join(fg, 'model', 'skeleton', 'c00', f))] +
           [f for f in ('main.pac',) if not os.path.exists(os.path.join(fg, 'motion', 'skeleton', f))], [])
