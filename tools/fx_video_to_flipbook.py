@@ -4,7 +4,7 @@ for an eft .ptcl emitter (docs/ptcl-format.md: slot 0 flipbook 0x4D5-0x50C), wit
 
   python3 -I tools/fx_video_to_flipbook.py CLIP OUT_DIR --name NAME --matte luma|alpha|chroma
           [--oneshot] [--range A:B] [--cells MIN:MAX] [--fpc K] [--max-side 1024] [--max-area 1048576] ...
-  python3 -I tools/fx_video_to_flipbook.py --batch jobs.json [--only NAME,...]
+  python3 -I tools/fx_video_to_flipbook.py --batch jobs.json [--only NAME,...] [--overview sheet.png]
 
 jobs.json: {"out": DIR, "jobs": [{"input": PATH, "name": NAME, "matte": ..., <any option below, "-" -> "_">}]}.
 Each job writes OUT/NAME/: NAME_atlas.png, NAME.json (sidecar), NAME.webp (animated, alpha),
@@ -26,7 +26,7 @@ run it with `python3 -I` on downloaded footage. Needs ffmpeg (libvpx-vp9, libweb
            smoke keeps the fraction of the screen it lets through (smoke stays smoke). The colour is unmixed
            (pixel - (1 - alpha) x plate) / alpha, so the screen's green leaves the edges and the smoke, then
            despilled (G <= max(R, B)). Alpha is then levelled: --key-lo (default: the screen's own noise,
-           its 99.5th percentile of alpha) to --key-hi (0.92) -> 0..1: soft edges kept, noise gone.
+           its 99.5th percentile of alpha where nothing ever passes) to --key-hi (0.92) -> 0..1: soft edges kept, noise gone.
 2. Range: the visible frames (alpha mass >= --vis of the peak, default 0.02). --oneshot: kept from the first
    visible frame to the last (no loop). Loop (default): searched inside the sustained part (alpha mass >=
    --sustain x the steady level (5-frame mean), default 0.8; or --range A:B, source frames, B inclusive): every start a and
@@ -39,12 +39,15 @@ run it with `python3 -I` on downloaded footage. Needs ffmpeg (libvpx-vp9, libweb
 3. --track (x, xy): runners crossing the frame are shifted so the opaque body's centroid (alpha >= 0.6) stays
    at its mean over the loop (smoothed over 5 frames); reported as drift when not used.
 4. Crop: the union of every kept frame's alpha (box-filtered 5 px, > --crop-thr, default 0.03) plus --margin
-   (default 3 % of the larger side, at least 4 px).
+   (default 3 % of the larger side, at least 4 px). Where the effect runs off the footage (smoke trailing out
+   of frame) that side fades out over --edge-feather (8 % of the crop, smoothstep) instead of ending in
+   a hard line (--bottom-cut-ok: not the bottom, for fire standing on it); the sidecar lists them.
 5. Cells and timing: the game runs at 60; eft plays a cell every K frames (0x504 frames a cell, integer).
    K defaults to the slowest that does not drop below the source's rate (30 fps -> 2: 30 fps; 24 -> 3: 20 fps);
    --fpc K forces it. A loop of L source frames becomes N = round(L x 60 / (fps x K)) cells (sampled by
    nearest frame; 30 / 29.97 fps sources at K = 2: every frame, N = L); a one-shot gets ceil(kept x 60 /
-   (fps x K)) cells, K raised (preferring a whole source-frame step) until N <= --cells max.
+   (fps x K)) cells, K raised until N <= --cells max (one more when that turns an uneven step such as
+   1.5 source frames a cell into a whole one: 30 fps at K = 3 -> 4).
 6. Atlas: power-of-two W x H (<= --max-side, W x H <= --max-area), a grid of nx x ny >= N cells (one partial
    row at most), chosen for the largest frame (never above the source's own resolution), then the
    smallest texture. Each frame is box-filtered (premultiplied) into its cell, centred, 2 px clear of the
@@ -62,6 +65,7 @@ import json
 import math
 import os
 import subprocess
+import warnings
 from fractions import Fraction
 
 import numpy as np
@@ -149,7 +153,9 @@ class Matte:
         typical = np.percentile(d, 90)
         scr = d >= 0.6 * typical
         vals = np.where(scr[..., None], sub, np.nan)
-        plate = np.nanmedian(vals, axis=0)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', RuntimeWarning)      # pixels never screen: filled below
+            plate = np.nanmedian(vals, axis=0)
         valid = np.isfinite(plate[..., 0])
         glob = np.median(sub[scr], axis=0)
         plate = np.where(valid[..., None], plate, 0).astype(np.float32)
@@ -197,21 +203,18 @@ class Matte:
         return np.concatenate([col * a[..., None], a[..., None]], -1)
 
     def calibrate(self, small_frames):
-        """--key-lo by default: the 99.5th percentile of the raw alpha over the screen's own pixels"""
+        """--key-lo by default: the screen's own noise, the 99.5th percentile of the raw alpha over the pixels
+        the subject and its faintest smoke never reach (raw alpha < 0.1 in every sampled frame)"""
         if self.kind != 'chroma':
             return
         if self.o.key_lo is not None:
             self.lo = self.o.key_lo
             return
         idx = np.linspace(0, len(small_frames) - 1, min(24, len(small_frames))).round().astype(int)
-        vals = []
-        for i in idx:
-            rgb = small_frames[i][..., :3]
-            a = self.chroma(rgb, levels=False)
-            scr = self._diff(rgb) >= 0.6 * np.maximum(self._diff(self.plate_for(rgb.shape)), 1e-3)
-            vals.append(a[scr])
-        v = np.concatenate(vals)
-        self.lo = float(np.clip(np.percentile(v, 99.5) if v.size else 0.05, 0.02, 0.2))
+        A = np.stack([self.chroma(small_frames[i][..., :3], levels=False) for i in idx])
+        never = A.max(0) < 0.1
+        v = A[:, never]
+        self.lo = float(np.clip(np.percentile(v, 99.5) if v.size else 0.05, 0.01, 0.2))
 
     # all ----------------------------------------------------------------------------------------------
     def __call__(self, frame):
@@ -344,7 +347,6 @@ def run_job(opt):
     alpha_in = opt.matte == 'alpha'
     frames = decode(opt.input, info, w, h, alpha_in)
     T = len(frames)
-    log = {'decoded': [w, h, T]}
     matte = Matte(opt, frames)
     f = max(1, round(max(w, h) / 160))
     small_raw = shrink(frames, f) / 255.0
@@ -372,8 +374,10 @@ def run_job(opt):
                 cands.append((k, step, n))
         if not cands:
             raise SystemExit(f'{opt.name}: {kept} frames do not fit {cmax} cells')
-        whole = [c for c in cands if abs(c[1] - round(c[1])) < 0.02 and c[0] <= 2 * K]
-        k, step, n = (whole or cands)[0] if not opt.fpc else cands[0]
+        k, step, n = cands[0]                        # the fastest that fits; a whole frame step one K
+        nxt = [c for c in cands if c[0] == k + 1 and abs(c[1] - round(c[1])) < 0.02]   # slower if
+        if not opt.fpc and step > 1.01 and abs(step - round(step)) > 0.02 and nxt:      # it ends a
+            k, step, n = nxt[0]                                                         # judder
         K = k
         src_idx = [min(hi, lo + int(round(i * step))) for i in range(n)]
         seq_src = list(range(lo, hi + 1))
@@ -472,13 +476,33 @@ def run_job(opt):
     mg = max(4, int(round(opt.margin * max(x1 - x0, y1 - y0))))
     x0, y0, x1, y1 = max(0, x0 - mg), max(0, y0 - mg), min(w, x1 + mg), min(h, y1 + mg)
     bw, bh = x1 - x0, y1 - y0
+    # the effect running off the footage's edge (smoke trailing out of frame): fade it out toward that side
+    # instead of a hard cut at the cell's edge
+    cut = {'left': bool(m[:, :2].any()), 'right': bool(m[:, -2:].any()),
+           'top': bool(m[:2].any()), 'bottom': bool(m[-2:].any())}
+    if opt.bottom_cut_ok:
+        cut['bottom'] = False
+    ramp = np.ones((bh, bw), np.float32)
+    if opt.edge_feather > 0 and any(cut.values()):
+        fwid, fhei = max(2, int(opt.edge_feather * bw)), max(2, int(opt.edge_feather * bh))
+        rx, ry = np.ones(bw, np.float32), np.ones(bh, np.float32)
+        ss = lambda n: (lambda t: t * t * (3 - 2 * t))(np.linspace(0, 1, n, dtype=np.float32))
+        if cut['left']:
+            rx[:fwid] *= ss(fwid)
+        if cut['right']:
+            rx[-fwid:] *= ss(fwid)[::-1]
+        if cut['top']:
+            ry[:fhei] *= ss(fhei)
+        if cut['bottom']:
+            ry[-fhei:] *= ss(fhei)[::-1]
+        ramp = ry[:, None] * rx[None, :]
     W, H, nx, ny, s = pick_layout(n, bw, bh, native, opt)
     fw, fh = max(1, int(round(bw * s))), max(1, int(round(bh * s)))
     atlas = np.zeros((H, W, 4), np.float32)
     cells = []
     cw, ch = W / nx, H / ny
     for c, o in enumerate(outs):
-        r = resize_prem(o[y0:y1, x0:x1].astype(np.float32), fw, fh)
+        r = resize_prem(o[y0:y1, x0:x1].astype(np.float32) * ramp[..., None], fw, fh)
         cx, cy = c % nx, c // nx
         px, py = int(math.floor(cx * cw + (cw - fw) / 2)), int(math.floor(cy * ch + (ch - fh) / 2))
         atlas[py:py + fh, px:px + fw] = r
@@ -521,6 +545,7 @@ def run_job(opt):
                   **({'premultiplied_source': opt.premultiplied} if opt.matte == 'alpha' else {}),
                   **({'key': opt.key, 'key_lo': round(matte.lo, 4), 'key_hi': opt.key_hi,
                       'screen_rgb': [round(float(v), 3) for v in matte.screen_rgb]} if opt.matte == 'chroma' else {})},
+        'edges_faded': [k for k, v in cut.items() if v and opt.edge_feather > 0],
         'subject_drift': drift, 'tracked': opt.track or None,
         'vram_bytes': {'rgba8': W * H * 4, 'bc3': W * H},
         'ptcl': {'flipbook_mode_0x500': 2 if loop else 4, 'cells_across_0x4D7': nx, 'cells_down_0x4D8': ny,
@@ -588,6 +613,55 @@ def write_qa(qa, name, atlas8, cells, nx, loop):
         Image.fromarray(strip).save(os.path.join(qa, f'{name}_seam_qa.png'))
 
 
+def cell_frames(atlas8, side):
+    """the frames back out of an atlas, by its sidecar"""
+    W, H = side['atlas_size']
+    nx, ny = side['columns'], side['rows']
+    fw, fh = side['frame_size_in_cell']
+    cw, ch = W / nx, H / ny
+    out = []
+    for c in range(side['frames']):
+        px = int(math.floor((c % nx) * cw + (cw - fw) / 2))
+        py = int(math.floor((c // nx) * ch + (ch - fh) / 2))
+        out.append(atlas8[py:py + fh, px:px + fw])
+    return out
+
+
+def overview(out_dir, sides, path, per=5, tile=180):
+    """one row per effect: `per` frames spread over it, over a checker, with its stats"""
+    label_w = 300
+    rows = []
+    for side in sides:
+        atlas8 = np.asarray(Image.open(os.path.join(out_dir, side['name'], side['files']['atlas'])).convert('RGBA'))
+        fr = cell_frames(atlas8, side)
+        pick = np.linspace(0, len(fr) - 1, per).round().astype(int)
+        row = Image.new('RGB', (label_w + per * (tile + 8), tile + 8), (32, 32, 32))
+        d = ImageDraw.Draw(row)
+        txt = [side['name'], f"{side['playback']}, {side['frames']} frames @ {side['fps']:g} fps",
+               f"{side['columns']}x{side['rows']} on {side['atlas_size'][0]}x{side['atlas_size'][1]}",
+               f"cell {side['frame_size_in_cell'][0]}x{side['frame_size_in_cell'][1]}, {side['matte']['kind']} matte",
+               f"src frames {side['kept_range']['first_frame']}-{side['kept_range']['last_frame']}"
+               + (f", seam {side['loop']['seam_cost_vs_median_frame_step']}" if side['loop'] else '')]
+        for i, t in enumerate(txt):
+            d.text((8, 8 + 16 * i), t, fill=(230, 230, 230) if i else (255, 200, 90))
+        for j, k in enumerate(pick):
+            f = fr[k]
+            sc = min(tile / f.shape[1], tile / f.shape[0])
+            im = Image.fromarray(f, 'RGBA').resize((max(1, int(f.shape[1] * sc)), max(1, int(f.shape[0] * sc))),
+                                                  Image.Resampling.LANCZOS)
+            bg = Image.fromarray(checker(tile, tile, 10))
+            bg.paste(im, ((tile - im.width) // 2, (tile - im.height) // 2), im)
+            row.paste(bg, (label_w + j * (tile + 8), 4))
+            d.text((label_w + j * (tile + 8) + 4, 6), f'#{k}', fill=(255, 255, 255))
+        rows.append(row)
+    sheet = Image.new('RGB', (rows[0].width, sum(r.height for r in rows)), (32, 32, 32))
+    y = 0
+    for r in rows:
+        sheet.paste(r, (0, y))
+        y += r.height
+    sheet.save(path)
+
+
 # ------------------------------------------------------------------------------------------------ cli
 def parser():
     ap = argparse.ArgumentParser(description=__doc__.split('\n')[0])
@@ -595,6 +669,7 @@ def parser():
     ap.add_argument('out', nargs='?')
     ap.add_argument('--batch')
     ap.add_argument('--only')
+    ap.add_argument('--overview', help='with --batch: a contact sheet of every job (PNG path)')
     ap.add_argument('--name')
     ap.add_argument('--matte', choices=('luma', 'alpha', 'chroma'), default='luma')
     ap.add_argument('--oneshot', action='store_true')
@@ -608,6 +683,9 @@ def parser():
     ap.add_argument('--track', choices=('x', 'y', 'xy'))
     ap.add_argument('--crop-thr', type=float, default=0.03)
     ap.add_argument('--margin', type=float, default=0.03)
+    ap.add_argument('--edge-feather', type=float, default=0.08,
+                    help='fade width (of the crop) on sides where the effect runs off the footage')
+    ap.add_argument('--bottom-cut-ok', action='store_true', help='no fade at the bottom (fire standing on it)')
     ap.add_argument('--max-side', type=int, default=1024)
     ap.add_argument('--max-area', type=int, default=1024 * 1024)
     ap.add_argument('--decode-max', type=int, default=1280, help='working resolution (longer side)')
@@ -645,6 +723,12 @@ def main(argv=None):
                 else:
                     argl += [flag, str(v)]
             results.append(run_job(ap.parse_args(argl)))
+        if args.overview:
+            sides = []
+            for job in spec['jobs']:
+                with open(os.path.join(spec['out'], job['name'], job['name'] + '.json')) as fh:
+                    sides.append(json.load(fh))
+            overview(spec['out'], sides, args.overview)
         return results
     if not (args.input and args.out and args.name):
         ap.error('CLIP OUT_DIR --name NAME (or --batch jobs.json)')
