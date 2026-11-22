@@ -221,7 +221,7 @@ def weapon_checks(e, img, info, diag=False):
     check('the singleton getter: kind 0x1A1 -> its own singleton', s, A['w_single'])
     vt = e.w(s)
     VT_OURS = (W.HIT_METHOD, 0x34) + ((0x1C,) if 'hurt' in F or diag else ()) + (
-        C.POLL_SLOTS if 'hurt' in F or diag else (0x94,) if F & {'sway', 'hitcheck'} else ())
+        C.POLL_SLOTS if 'hurt' in F or diag else (0x94,) if F & {'sway', 'hitcheck', 'burn'} else ())
     check('its vtable: bunshin\'s but +0x1C / +0x64 / +0x84 / +0x8C / +0x94 / +0xAC (v3)',
           [e.w(vt + o) for o in range(0, L['vsize'], 4) if o not in VT_OURS],
           [img.w(L['svt'] + o) for o in range(0, L['vsize'], 4) if o not in VT_OURS])
@@ -1065,6 +1065,179 @@ def hitcheck_checks(e, info, diag):
         e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
 
 
+def burn_checks(e, info, diag):
+    """burn v1 (feature burn): his water moves' hits add burn instances to their victims; his ticks"""
+    lab, A, F = info['labels'], info['A'], info['feats']
+    if 'burn' not in F:
+        check('burn: without "burn": no burn code', 'burn_him' in lab, False)
+        return
+    dm_calls = []
+    dmvt = e.alloc(0x100, b'\0')
+    dmadd = e.alloc(4)
+    e.setw(dmvt + C.DM_ADD, dmadd)
+    e.stub(dmadd, lambda e_: dm_calls.append((e_.r(3), e_.r(4), round(d2f(e_.mu.reg_read(UC_PPC_REG_FPR1)), 4))))
+    for i in range(8):
+        e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
+
+    def fighter(slot0, kind=0):
+        fk = e.fighter(slot0)
+        e.mu.mem_write(fk['f'] + 0x1E, b'\x04')
+        acc = e.w(fk['f'] + C.BASE_ACC)
+        mm = e.alloc(0x60, b'\0')
+        e.setw(mm + C.MM_KIND, kind)
+        e.setw(acc + C.W_MOTION, mm)
+        dm = e.alloc(0x10, b'\0')
+        e.setw(dm, dmvt)
+        e.setw(acc + C.W_DAMAGE, dm)
+        fk.update(acc=acc, mm=mm, dm=dm)
+        return fk
+
+    def attack(acc, n_ents=2):
+        am = e.alloc(0x60, b'\0')
+        ents = e.alloc(C.ENT_SIZE * n_ents, b'\0')
+        logs = []
+        for k in range(n_ents):
+            hdr = e.alloc(0x10, b'\0')
+            e.setw(hdr + 4, hdr)
+            e.setw(ents + C.ENT_SIZE * k + C.ENT_LOG, hdr)
+            logs.append(hdr)
+        e.setw(am + C.AM_ENTS, ents)
+        e.setw(am + C.AM_COUNT, n_ents)
+        e.setw(acc + C.W_ATTACK, am)
+        return logs
+
+    def log_hit(hdr, victim0, typ=1, cat=0):
+        n = e.alloc(0x30, b'\0')
+        e.setw(n + C.NODE_OBJ, (cat << 28) | (victim0 << 16) | 0x11)
+        e.mu.mem_write(n + C.NODE_TYPE, bytes([typ]))
+        last = hdr
+        while e.w(last + 4) != hdr:
+            last = e.w(last + 4)
+        e.setw(n + 4, hdr)
+        e.setw(last + 4, n)
+        e.setw(hdr + 8, e.w(hdr + 8) + 1)
+        return n
+
+    def clear_log(hdr):
+        e.setw(hdr + 4, hdr)
+        e.setw(hdr + 8, 0)
+
+    def inst(v):
+        out = []
+        for k in range(C.BURN_CAP):
+            a = A['btab'] + (v * C.BURN_CAP + k) * 16
+            fr, tk, ow = e.w(a), e.w(a + 4), e.w(a + 8)
+            if fr:
+                out.append((fr, tk >> 16, tk & 0xFFFF, ow, round(d2f(e.w(a + 12)), 4)))
+        return out
+
+    def frame(fk, slot0):
+        e.calls, e.osr_full = [], []
+        del dm_calls[:]
+        e.call(lab['burn_him'], fk['f'], slot0)
+        return list(dm_calls)
+    gk = fighter(2, 95)                     # him: slot 3, forward smash
+    vic = fighter(4)                         # the victim: slot 5
+    logs = attack(gk['acc'])
+    log_hit(logs[1], 4, 1)
+    frame(gk, 2)
+    check('burn: his forward smash hits slot 5: one instance (240 frames - 1 ticked, its tick 6 - 1, interval 6, owner '
+          '3, 0.4 %)', inst(4), [(239, 5, 6, 2, 0.4)])
+    if diag:
+        check('burn diag: S4BA (victim 4, move 95, not shielded, 400, interval 6, 240 frames)',
+              [x[:7] for x in e.osr_full if x[0] == A['gk_fba']], [(A['gk_fba'], 4, 95, 0, 400, 6, 240)])
+    frame(gk, 2)
+    check('burn: the same log node: no second instance', len(inst(4)), 1)
+    log_hit(logs[1], 4, 2)                   # a shield hit
+    frame(gk, 2)
+    check('burn: a shielded hit: half the frames (120), 20 % of the damage (0.08), its own timer',
+          inst(4), [(237, 3, 6, 2, 0.4), (119, 5, 6, 2, 0.08)])
+    got = []
+    for _ in range(3):
+        got.append(frame(gk, 2))
+    check('burn: ticks: the first at its 6th frame (0.4 %), the shielded one 2 frames later (0.08 %), each its own',
+          got, [[], [(vic['dm'], 0, 0.4)], []])
+    got = [frame(gk, 2) for _ in range(2)]
+    check('burn: ... the second\'s tick 2 frames after the first\'s', got, [[], [(vic['dm'], 0, 0.08)]])
+    # the other moves; outside them nothing
+    e.setw(gk['mm'] + C.MM_KIND, 0)
+    log_hit(logs[0], 4, 1)
+    frame(gk, 2)
+    check('burn: Wait1 (not a burning move): its hit adds nothing (the log followed)', len(inst(4)), 2)
+    e.setw(gk['mm'] + C.MM_KIND, 104)
+    frame(gk, 2)
+    check('burn: then neutral air: that old hit still nothing', len(inst(4)), 2)
+    log_hit(logs[0], 4, 1)
+    frame(gk, 2)
+    check('burn: neutral air\'s new hit: 0.1 % every 15 frames for 120', inst(4)[-1], (119, 14, 15, 2, 0.1))
+    clear_log(logs[0])
+    log_hit(logs[0], 4, 1)
+    frame(gk, 2)
+    check('burn: the log restarted (a multi-hit\'s next hit): a new instance, stacked (4)', len(inst(4)), 4)
+    log_hit(logs[0], 4, 3)
+    log_hit(logs[0], 5, 1, cat=1)
+    log_hit(logs[0], 9, 1)
+    frame(gk, 2)
+    check('burn: a reflector record, a weapon, a slot past 8: nothing', len(inst(4)), 4)
+    # the cap
+    for _ in range(40):
+        log_hit(logs[0], 4, 1)
+    frame(gk, 2)
+    check('burn: 40 more hits: capped at %d' % C.BURN_CAP, len(inst(4)), C.BURN_CAP)
+    # another Greninja's instances: not his ticks
+    gk2 = fighter(6, 101)
+    logs2 = attack(gk2['acc'], 1)
+    log_hit(logs2[0], 5, 1)
+    vic2 = fighter(5)
+    for k in range(C.BURN_CAP):
+        e.setw(A['btab'] + (4 * C.BURN_CAP + k) * 16, 0)
+    frame(gk2, 6)
+    check('burn: another Greninja (slot 7) hits slot 6: his instance (owner 6)', inst(5), [(239, 5, 6, 6, 0.4)])
+    for _ in range(10):
+        frame(gk, 2)
+    check('burn: ... slot 3\'s frames don\'t tick it', inst(5), [(239, 5, 6, 6, 0.4)])
+    # the whole duration: 40 ticks of 0.4, then gone
+    total = 0.0
+    n = 0
+    for _ in range(239):
+        for c in frame(gk2, 6):
+            total += c[2]
+            n += 1
+    check('burn: forward smash over its 240 frames: 40 ticks, 16 %%, then gone (%.2f)' % total,
+          (n, round(total, 3), inst(5)), (40, 16.0, []))
+    # a victim gone: its instances end
+    log_hit(logs2[0], 5, 1)
+    frame(gk2, 6)
+    e.mu.mem_write(vic2['f'] + 0x1E, b'\x00')
+    for _ in range(6):
+        frame(gk2, 6)
+    check('burn: its victim no longer live: its burns end at the next tick', inst(5), [])
+    # a clone's hits count for its owner
+    for k in range(C.BURN_CAP * 8):
+        e.setw(A['btab'] + k * 16, 0)
+    e.mu.mem_write(vic2['f'] + 0x1E, b'\x04')
+    cv = {C.VAR_SLOT: 3.0, C.VAR_ID: 2.0}
+    vt = e.alloc(0x100, b'\0')
+    g = e.alloc(4)
+    e.setw(vt + 0x44, g)
+    e.stub(g, lambda e_: e_.mu.reg_write(UC_PPC_REG_FPR1, f2d(cv.get(e_.r(4), 0.0))))
+    wm = e.alloc(0x10, b'\0')
+    e.setw(wm, vt)
+    cacc = e.alloc(0x100, b'\0')
+    e.setw(cacc + C.W_WORK, wm)
+    cmm = e.alloc(0x60, b'\0')
+    e.setw(cmm + C.MM_KIND, 99)
+    e.setw(cacc + C.W_MOTION, cmm)
+    clog = attack(cacc, 1)
+    weapon = e.alloc(0x40, b'\0')
+    e.setw(weapon + C.W_ACC, cacc)
+    log_hit(clog[0], 5, 1)
+    e.call(lab['w_burn'], weapon)
+    check('burn: a clone\'s up smash hits slot 6: an instance owned by its owner (slot 3)', inst(5), [(240, 6, 6, 2, 0.4)])
+    for i in range(8):
+        e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
+
+
 def hud_checks(e, info):
     lab, A = info['labels'], info['A']
     hide = A['gk_hide']
@@ -1234,6 +1407,7 @@ def main():
     weapon_checks(e, img, info, diag)
     sway_checks(e, info)
     hitcheck_checks(e, info, diag)
+    burn_checks(e, info, diag)
     fighter_desc_checks(e, img, info)
     g1_checks(e, info)
     s13_checks(e, info)

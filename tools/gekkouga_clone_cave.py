@@ -96,7 +96,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # none: 2, loaded with the fighter. Bunshin's 0x87D has 0x1 (4: the Final Smash load,
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
-FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -105,6 +105,7 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck')) 
 #   hurt    base kind mewtwom (HURT_BASE: + Kinetic / Hit / Ground updates) and its row + lizardonm's DamageModule (slot
 #           20); the hurtboxes (+0x1C) and the damage pollers (+0x64 ... +0x94)
 #   parts   his motion parts and flags on the clone (v2's hands / face)
+#   burn    burn v1: his water moves burn whoever they hit (burn_scan / burn_add / burn_tick, BURN_MOVES)
 #   hitcheck v12: the clone hit from his side (w_hitchk: other fighters' attack boxes against the clone's box)
 #   sway    v11: the clone's swing step every frame (w_sway: his MotionModule's swing update, as his frame calls it)
 #   bstart  v8: the clone's start (specializer +0x34) runs bunshin's own (0x02AF6738: black overlay, LinkModule link 3
@@ -133,6 +134,22 @@ HM_RECS = 0x48                    # +0x44 {capacity (params +0xAC: 0x14), +0x48 
                                   # [+0x44] as a pointer (0x14) and C_hurt's S4GO crashed (the user's v9.1 log)
 HM_OBJARR = 0x14                  # v11: +8 +0xC the container's objects (0x174 each)
 HM_OBJS = 0x18                    # +8 the collision container (+0xC its objects (0x174 each), +0x10 their count)
+# burn v1: the moves that burn (his motion.mtable indices: attackairn 104, attackairf 105, attacks4 95, attackhi4 99,
+# attacklw4 101), each hit one instance: (motion kind, damage a tick, interval (frames), duration (frames)). A shielded
+# hit: half the frames, BURN_SHIELD_DAMAGE x the damage. Totals: damage x duration / interval
+BURN_MOVES = (
+    (95, 0.4, 6, 240),            # forward smash: 0.4 % every 6 frames for 4 s = 16 %
+    (99, 0.4, 6, 240),            # up smash: 16 %
+    (101, 0.4, 6, 240),           # down smash: 16 % (each side that hits)
+    (105, 0.25, 10, 180),         # forward air: 0.25 % every 10 frames for 3 s = 4.5 %
+    (104, 0.1, 15, 120),          # neutral air (multi-hit: one each hit): 0.1 % every 15 frames for 2 s = 0.8 %
+)
+BURN_SHIELD_DAMAGE = 0.2          # a shielded hit: 20 % of the damage a tick, half the duration
+BURN_CAP = 32                     # instances a victim holds at most (more are dropped)
+BURN_ENTS = 16                    # attack entries scanned (hitbox ids 0-15)
+BURN_CONTEXTS = 8 * 3             # his slot x 3 + 0 him / 1 / 2 a clone
+DM_ADD = 0x74                     # DamageModule vt +0x74(0, f1): add percent (MSC DamageModule(9, %)'s op)
+ENT_LOG, NODE_OBJ, NODE_TYPE, MM_KIND = 0x130, 0x18, 0x23, 0x38
 VAR_LATCH = 0x0F000304            # v12: the clone's VAR_4: its hit reported (w_hitchk; w_start clears it)
 AM_ENTS, AM_COUNT, AM_MAX = 0x14, 0x18, 32         # AttackModule +8 container: +0xC entries, +0x10 count (cap)
 ENT_SIZE, ENT_NODES, NODE_MAX = 0x174, 0x18, 64    # an entry: +0 first node, +4 count, +0x18 node pointers (cap)
@@ -192,7 +209,7 @@ VT_BASE = 0xFC                    # v6: the clone's specializer (its singleton's
                                   # it to its owner; the moon's +0x34 only sets the model scale (the user's v5 "completely
                                   # black" clone)
 DAMAGE_SLOT = 20
-RELEASE = frozenset(('attack', 'hitcheck'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack
+RELEASE = frozenset(('attack', 'hitcheck', 'burn'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack
 VARIANTS = (('A_release', RELEASE), ('D_parts', RELEASE | {'parts'}),
             ('E_sway', RELEASE | {'sway'}))   # v13: each on the release's set (v3 - v12's hurtbox route, C_hurt, dropped:
                                   # it never met an attack)
@@ -559,6 +576,13 @@ def build(rpx, diag=False, feats=None):
     A['ctf'] = alloc(12 * 4, 4)         # v6: the gauge's colour per mode
     A['hcbox'] = alloc(0x1C) if 'hitcheck' in feats else 0   # v12: the hit check's box (+0xC: this frame's edges)
     A['hcsize'] = alloc(4 * len(HC_OBJ_SIZES)) if 'hitcheck' in feats else 0
+    burn = 'burn' in feats
+    A['btab'] = alloc(SLOTS * BURN_CAP * 16) if burn else 0      # burn v1: the victims' instances
+    A['bproc'] = alloc(BURN_CONTEXTS * BURN_ENTS) if burn else 0  # the hit logs' processed counts
+    A['bmoves'] = alloc(16 * len(BURN_MOVES)) if burn else 0
+    A['bconst'] = alloc(8) if burn else 0                        # 0.2 (shield), 1000.0
+    A['bsum'] = alloc(SLOTS * SLOTS * 4) if burn and diag else 0  # diag: damage per owner x victim this second
+    A['bclock'] = alloc(4 * SLOTS) if burn and diag else 0
     A['gk_plyr'] = alloc(4 * SLOTS)     # v10: per player, the cursor show byte we cleared + 1 (0: none)
     A['gk_tags'] = alloc(4 * SLOTS)     # v7: the tag messages' countdown per slot (0: shown)
     A['gk_names'] = alloc(8 * len(GAUGE_NAMES), 4)    # v7: the round gauge's clip names {char *, length}
@@ -587,6 +611,8 @@ def build(rpx, diag=False, feats=None):
             ('gk_fw', 'S4GW tag message: visible=%d object id=%d gone=%d handle=%08X\n'),
             ('gk_fm', 'S4GM clone id=%d draw: visflag=%d visible=%d model mode=%d drawn=%d overlay=%d/%d\n'),
             ('gk_fn', 'S4GN clone id=%d z=%d scale x100=%d link mask=%08X model=%08X\n'),
+            ('gk_fba', 'S4BA burn added: victim slot=%d move=%d shielded=%d damage x1000=%d interval=%d frames=%d\n'),
+            ('gk_fbt', 'S4BT burn ticks: owner slot=%d victim slot=%d stacks=%d damage x1000 this second=%d\n'),
             ('gk_fh', 'S4GH hit check: attacker=%X (category x 16 + index) hitbox=%d clone id=%d hitlag=%d at x=%d y=%d\n'),
             ('gk_fr', 'S4GR clone swing stage %d: %08X %08X %X %08X (0 / 1 before / after its first step: motion, swing, set up, flags; 2 bind sources: sb, nhb, own; 3 bound: motion, swing)\n'),
             ('gk_fq', 'S4GQ clone id=%d swing: motionmodule=%08X need=%08X motion=%08X swing=%08X flags=%08X set up=%d\n'),
@@ -629,6 +655,14 @@ def build(rpx, diag=False, feats=None):
     out.blob(A['ctf'], b''.join(struct.pack('>4B4h', *c) for c in GAUGE_COLOURS), 'gauge colours')
     out.blob(A['gk_tags'], bytes(4 * SLOTS), 'tag message countdowns')
     out.blob(A['gk_plyr'], bytes(4 * SLOTS), 'cursor show bytes saved')
+    if 'burn' in feats:
+        out.blob(A['btab'], bytes(SLOTS * BURN_CAP * 16), 'burn instances')
+        out.blob(A['bproc'], bytes(BURN_CONTEXTS * BURN_ENTS + (-BURN_CONTEXTS * BURN_ENTS) % 4), 'burn processed counts')
+        out.blob(A['bmoves'], b''.join(struct.pack('>IfII', *m) for m in BURN_MOVES), 'burn moves')
+        out.blob(A['bconst'], struct.pack('>2f', BURN_SHIELD_DAMAGE, 1000.0), 'burn constants')
+        if diag:
+            out.blob(A['bsum'], bytes(SLOTS * SLOTS * 4), 'burn sums')
+            out.blob(A['bclock'], bytes(4 * SLOTS), 'burn clocks')
     if 'hitcheck' in feats:
         out.blob(A['hcbox'], struct.pack('>7f', *(HC_BOX + (0.0,) * 4)), 'hit check box')
         out.blob(A['hcsize'], struct.pack('>%dI' % len(HC_OBJ_SIZES), *HC_OBJ_SIZES), 'hit check object sizes')
@@ -653,18 +687,21 @@ def build(rpx, diag=False, feats=None):
              slow=FLAG_SLOW, clones=FLAG_CLONES, life=TAG_LIFE, sslot=SLOW_SLOT, srate=SLOW_RATE, sframes=SLOW_FRAMES,
              hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, whit=W_HIT_MOD, wdmg=W_DAMAGE, watk=W_ATTACK,
              wstop=W_STOP, wcol=W_COLOUR, wmodel=W_MODEL, wlink=W_LINK, wvis=W_VIS, wpost=W_POSTURE,
-             cclear=COLOUR_CLEAR, am_ents=AM_ENTS, am_count=AM_COUNT, am_max=AM_MAX, ent_size=ENT_SIZE,
+             cclear=COLOUR_CLEAR, nmoves=len(BURN_MOVES), bcap=BURN_CAP, bcap16=BURN_CAP * 16, bents=BURN_ENTS,
+             dm_add=DM_ADD, ent_log=ENT_LOG, node_obj=NODE_OBJ, node_type=NODE_TYPE, mm_kind=MM_KIND, am_ents=AM_ENTS, am_count=AM_COUNT, am_max=AM_MAX, ent_size=ENT_SIZE,
              ent_nodes=ENT_NODES, node_max=NODE_MAX, node_on=NODE_ON, node_min_x=NODE_MIN_X, node_min_y=NODE_MIN_Y,
              node_max_x=NODE_MAX_X, node_max_y=NODE_MAX_Y, team=TEAM_MOD,
              obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
              hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
     p['ftab_hi'], p['ftab_lo'] = ha(FIGHTERS), K.slo(FIGHTERS)
+    p['bshield_hi'], p['bshield_lo'] = ha(A['bconst']), K.slo(A['bconst'])
+    p['thousand_hi'], p['thousand_lo'] = ha(A['bconst'] + 4), K.slo(A['bconst'] + 4)
     p['fm_hi'], p['fm_lo'] = ha(FIGHTER_MANAGER), K.slo(FIGHTER_MANAGER)
     p['msgk_hi'], p['msgk_lo'] = ha(MSG_KIND), K.slo(MSG_KIND)
     p['apool_hi'], p['apool_lo'] = ha(FLX_ATOM_POOL), K.slo(FLX_ATOM_POOL)
@@ -787,7 +824,10 @@ s13:    stwu r1, -0x50(r1)
         bge s13_out
         mullw r10, r27, r10
         cmpw r10, r11
-        bne s13_out
+        bne s13_out''' + (('''
+        mr r3, r31                      # burn v1: his hits and his burns' ticks
+        mr r4, r27
+        bl burn_him''') if 'burn' in feats else '') + '''
         lwz r29, %(acc)d(r31)
         lwz r28, %(work)d(r29)''' + var_get('r28', VAR_FLAGS) + '''
         fctiwz f1, f1
@@ -1359,6 +1399,8 @@ wp_94:
         lwz r3, 0x0C(r1)
         bl w_sway''') if 'sway' in feats else '') + (('''
         lwz r3, 0x0C(r1)
+        bl w_burn''') if 'burn' in feats else '') + (('''
+        lwz r3, 0x0C(r1)
         bl w_hitchk''') if 'hitcheck' in feats else '') + '''
         lwz r3, 0x08(r1)
         lwz r4, 0x0C(r1)
@@ -1826,6 +1868,386 @@ hb_next:
         b hb_ent
 
 ''') if 'hitcheck' in feats else '') + '''
+''' + ((r'''# ---- burn v1 (feature burn): his water moves (BURN_MOVES: forward / neutral air, the three smashes) burn whoever
+# they hit. Each new hit-log node of his AttackModule (and his clones') while he (it) plays one of those motions (his
+# MotionModule accessor +0x44, +0x38 the motion kind = the motion.mtable index) adds one instance to the victim's
+# list: the hit log of an attack entry (0x174 each, AttackModule +0x14 / +0x18) is the list at [entry +0x130] (+4 the
+# first node, +8 the count; a node +4 next, +0x18 the hit object's id, +0x23 the hit container's type: 1 a hurtbox,
+# 2 a shield (half the frames, 20 %% of the damage); 0x02C10F40 appends, 0x02C1118C reads); processed counts per
+# attacker context (his slot x 3 + 0 him / 1 / 2 a clone) and entry; outside the moves the counts follow the logs.
+# The lists: BURN_VICTIMS x BURN_CAP instances of 16 bytes {frames left, tick left << 16 | interval, owner slot,
+# damage}; each Greninja ticks only his own (their timing their own: his slot 13 once a frame), raw percent through
+# the victim's DamageModule vt +0x74(0, f1) (MSC DamageModule(9, %%)'s op: no hit, no knockback, no hitstun: invincible
+# or intangible doesn't matter). Diag S4BA (an instance added), S4BT (each victim's ticks from him, every 60 frames)
+burn_him:                               # (r3 his entry, r4 his slot 0-7): his hits, then his burns' ticks
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r31, 0x1C(r1)
+        mr r31, r4
+        lwz r3, %(bacc)d(r3)
+        mulli r5, r4, 3
+        bl burn_scan
+        mr r3, r31
+        bl burn_tick
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+w_burn:                                 # (r3 the clone weapon): its hits, for its owner
+        stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stw r31, 0x2C(r1)
+        stw r30, 0x28(r1)
+        lwz r31, %(wacc)d(r3)
+        cmpwi r31, 0
+        beq wbn_out
+        lwz r30, %(wwork)d(r31)
+        cmpwi r30, 0
+        beq wbn_out''' + var_get('r30', VAR_SLOT) + '''
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r0, 0x1C(r1)
+        stw r0, 0x10(r1)''' + var_get('r30', VAR_ID) + '''
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r5, 0x1C(r1)                # its id 1 / 2
+        lwz r4, 0x10(r1)
+        addi r4, r4, -1                 # its owner's slot 0-7
+        cmplwi r4, %(slots)d
+        bge wbn_out
+        addi r0, r5, -1
+        cmplwi r0, 1
+        bgt wbn_out
+        mulli r6, r4, 3
+        add r5, r5, r6                  # its context
+        mr r3, r31
+        bl burn_scan
+wbn_out:
+        lwz r30, 0x28(r1)
+        lwz r31, 0x2C(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+
+burn_scan:                              # (r3 an attacker's accessor, r4 the owner's slot, r5 its context)
+        stwu r1, -0x50(r1)
+        mflr r0
+        stw r0, 0x54(r1)
+        stmw r22, 0x28(r1)
+        mr r31, r4
+        mr r30, r5
+        cmpwi r3, 0
+        beq bs_out
+        lwz r12, %(wmotion)d(r3)
+        lwz r29, %(watk)d(r3)           # its AttackModule
+        cmpwi r29, 0
+        beq bs_out
+        li r28, 0                       # the move row (0: none)
+        cmpwi r12, 0
+        beq bs_rows
+        lwz r0, %(mm_kind)d(r12)        # its motion kind
+        lis r11, %(bmoves_hi)d
+        addi r11, r11, %(bmoves_lo)d
+        li r10, %(nmoves)d
+bs_find:
+        lwz r9, 0(r11)
+        cmpw r9, r0
+        beq bs_found
+        addi r11, r11, 16
+        addi r10, r10, -1
+        cmpwi r10, 0
+        bne bs_find
+        b bs_rows
+bs_found:
+        mr r28, r11
+bs_rows:
+        lwz r27, %(am_ents)d(r29)
+        lwz r26, %(am_count)d(r29)
+        lis r0, 0x1000
+        cmplw r27, r0
+        blt bs_out
+        lis r0, 0x8000
+        cmplw r27, r0
+        bge bs_out
+        cmplwi r26, %(bents)d
+        ble bs_cnt
+        li r26, %(bents)d
+bs_cnt: lis r25, %(bproc_hi)d
+        addi r25, r25, %(bproc_lo)d
+        mulli r0, r30, %(bents)d
+        add r25, r25, r0                # its processed counts
+        li r24, 0                       # the entry
+bs_ent: cmpw r24, r26
+        bge bs_out
+        mulli r12, r24, %(ent_size)d
+        add r12, r12, r27
+        lwz r23, %(ent_log)d(r12)       # its hit log
+        lis r0, 0x1000
+        cmplw r23, r0
+        blt bs_next
+        lis r0, 0x8000
+        cmplw r23, r0
+        bge bs_next
+        lwz r22, 8(r23)                 # its count
+        lbzx r0, r25, r24               # processed
+        cmpwi r28, 0
+        beq bs_sync
+        cmplw r22, r0
+        bge bs_more
+        li r0, 0                        # (a new attack: the log restarted)
+bs_more:
+        cmplw r22, r0
+        ble bs_sync
+        mr r10, r0                      # the first new one
+        lwz r9, 4(r23)                  # the first node
+        li r8, 0
+bs_node:
+        cmplw r9, r23
+        beq bs_sync
+        cmplwi r8, 64
+        bge bs_sync
+        cmplw r8, r10
+        blt bs_skip
+        stw r8, 0x10(r1)
+        stw r9, 0x14(r1)
+        stw r10, 0x18(r1)
+        mr r3, r9
+        mr r4, r28
+        mr r5, r31
+        bl burn_add
+        lwz r8, 0x10(r1)
+        lwz r9, 0x14(r1)
+        lwz r10, 0x18(r1)
+bs_skip:
+        addi r8, r8, 1
+        lwz r9, 4(r9)
+        lis r0, 0x1000
+        cmplw r9, r0
+        blt bs_sync
+        b bs_node
+bs_sync:
+        cmplwi r22, 255
+        ble bs_st
+        li r22, 255
+bs_st:  stbx r22, r25, r24
+bs_next:
+        addi r24, r24, 1
+        b bs_ent
+bs_out: lmw r22, 0x28(r1)
+        lwz r0, 0x54(r1)
+        mtlr r0
+        addi r1, r1, 0x50
+        blr
+
+burn_add:                               # (r3 a hit-log node, r4 the move's row, r5 the owner's slot)
+        lbz r0, %(node_type)d(r3)
+        li r11, 0                       # 0 full, 1 shield
+        cmpwi r0, 1
+        beq ba_kind
+        cmpwi r0, 2
+        bnelr
+        li r11, 1
+ba_kind:
+        lwz r12, %(node_obj)d(r3)       # the hit object's id
+        srwi r0, r12, 28
+        cmpwi r0, 0
+        bnelr                           # not a fighter
+        rlwinm r12, r12, 16, 20, 31     # its index
+        cmplwi r12, %(slots)d
+        bgelr
+        lis r10, %(btab_hi)d
+        addi r10, r10, %(btab_lo)d
+        mulli r0, r12, %(bcap16)d
+        add r10, r10, r0                # its list
+        li r9, %(bcap)d
+ba_free:
+        lwz r0, 0(r10)
+        cmpwi r0, 0
+        beq ba_put
+        addi r10, r10, 16
+        addi r9, r9, -1
+        cmpwi r9, 0
+        bne ba_free
+        blr                             # full (BURN_CAP)
+ba_put: lwz r8, 12(r4)                  # the duration
+        lfs f1, 4(r4)                   # the damage a tick
+        cmpwi r11, 0
+        beq ba_full
+        srwi r8, r8, 1                  # shielded: half the frames
+        lis r9, %(bshield_hi)d
+        lfs f0, %(bshield_lo)d(r9)
+        fmuls f1, f1, f0                # 20 %% of the damage
+        cmpwi r8, 0
+        bne ba_full
+        li r8, 1
+ba_full:
+        lwz r9, 8(r4)                   # the interval
+        stw r8, 0(r10)
+        slwi r0, r9, 16
+        or r0, r0, r9
+        stw r0, 4(r10)
+        stw r5, 8(r10)
+        stfs f1, 12(r10)''' + D('''
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        lwz r5, 0(r4)                   # the move (its motion kind)
+        mr r4, r12                      # the victim's slot
+        mr r6, r11
+        fmr f2, f1
+        lis r7, %(thousand_hi)d
+        lfs f0, %(thousand_lo)d(r7)
+        fmuls f2, f2, f0
+        fctiwz f2, f2
+        stfd f2, 0x10(r1)
+        lwz r7, 0x14(r1)
+        lwz r8, 4(r10)
+        clrlwi r8, r8, 16
+        lwz r9, 0(r10)
+        lis r3, %(gk_fba_hi)d
+        addi r3, r3, %(gk_fba_lo)d''' + osr() + '''
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20''') + '''
+        blr
+
+burn_tick:                              # (r3 his slot 0-7): his burns tick, on every victim
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r24, 0x20(r1)
+        mr r31, r3
+        li r30, 0                       # the victim
+bt_vic: cmpwi r30, %(slots)d
+        bge bt_done
+        lis r29, %(btab_hi)d
+        addi r29, r29, %(btab_lo)d
+        mulli r0, r30, %(bcap16)d
+        add r29, r29, r0
+        li r28, %(bcap)d
+        li r27, 0                       # its damage module (0: not read yet)
+bt_ins: lwz r0, 0(r29)
+        cmpwi r0, 0
+        beq bt_nins
+        lwz r12, 8(r29)
+        cmpw r12, r31
+        bne bt_nins                     # another Greninja's: his own timing
+        addi r0, r0, -1
+        stw r0, 0(r29)
+        lhz r11, 4(r29)
+        addi r11, r11, -1
+        sth r11, 4(r29)
+        cmpwi r11, 0
+        bne bt_nins
+        lhz r11, 6(r29)
+        sth r11, 4(r29)                 # the next tick
+        cmpwi r27, 0
+        bne bt_dm
+        addi r3, r30, 1
+        bl gk_entry
+        cmpwi r3, 0
+        beq bt_gone
+        lwz r12, %(bacc)d(r3)
+        cmpwi r12, 0
+        beq bt_gone
+        lwz r27, %(wdmg)d(r12)          # its DamageModule
+        cmpwi r27, 0
+        beq bt_gone
+bt_dm:  mr r3, r27
+        li r4, 0
+        lfs f1, 12(r29)
+        lwz r12, 0(r3)
+        lwz r12, %(dm_add)d(r12)
+        mtctr r12
+        bctrl''' + D('''
+        lis r12, %(bsum_hi)d
+        addi r12, r12, %(bsum_lo)d
+        slwi r0, r31, 5
+        add r12, r12, r0
+        slwi r0, r30, 2
+        add r12, r12, r0
+        lfs f0, 0(r12)
+        lfs f1, 12(r29)
+        fadds f0, f0, f1
+        stfs f0, 0(r12)''') + '''
+        b bt_nins
+bt_gone:
+        li r0, 0                        # no such fighter now: its burns end
+        stw r0, 0(r29)
+bt_nins:
+        addi r29, r29, 16
+        addi r28, r28, -1
+        cmpwi r28, 0
+        bne bt_ins
+        addi r30, r30, 1
+        b bt_vic
+bt_done:''' + D('''
+        lis r29, %(bsum_hi)d
+        addi r29, r29, %(bsum_lo)d
+        slwi r0, r31, 5
+        add r29, r29, r0                # his sums
+        lis r12, %(bclock_hi)d
+        addi r12, r12, %(bclock_lo)d
+        slwi r0, r31, 2
+        lwzx r11, r12, r0
+        addi r11, r11, 1
+        stwx r11, r12, r0
+        cmpwi r11, 60
+        blt bt_out
+        li r11, 0
+        stwx r11, r12, r0
+        li r30, 0
+bt_log: cmpwi r30, %(slots)d
+        bge bt_out
+        slwi r0, r30, 2
+        lfsx f1, r29, r0
+        lis r12, %(zero_hi)d
+        lfs f0, %(zero_lo)d(r12)
+        fcmpu cr0, f1, f0
+        beq bt_lnext
+        stfsx f0, r29, r0
+        lis r12, %(thousand_hi)d
+        lfs f0, %(thousand_lo)d(r12)
+        fmuls f1, f1, f0
+        fctiwz f1, f1
+        stfd f1, 0x10(r1)
+        lis r12, %(btab_hi)d
+        addi r12, r12, %(btab_lo)d
+        mulli r0, r30, %(bcap16)d
+        add r12, r12, r0
+        li r10, %(bcap)d
+        li r6, 0                        # his stacks on it
+bt_cnt: lwz r0, 0(r12)
+        cmpwi r0, 0
+        beq bt_cn
+        lwz r0, 8(r12)
+        cmpw r0, r31
+        bne bt_cn
+        addi r6, r6, 1
+bt_cn:  addi r12, r12, 16
+        addi r10, r10, -1
+        cmpwi r10, 0
+        bne bt_cnt
+        lis r3, %(gk_fbt_hi)d
+        addi r3, r3, %(gk_fbt_lo)d
+        mr r4, r31
+        mr r5, r30
+        lwz r7, 0x14(r1)''' + osr() + '''
+bt_lnext:
+        addi r30, r30, 1
+        b bt_log
+bt_out:''') + '''
+        lmw r24, 0x20(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+
+''') if 'burn' in feats else '') + '''
 # ---- the clone's start (its specializer +0x34, (singleton, weapon, init)). v7: nothing (the moon's sets the model
 # scale from the init's +0x68; bunshin's paints it black). v8 bstart: bunshin's own, then its black overlay cleared
 # (ColorBlendModule slot 0 off). Diag: the init's scale (S4GZ)
@@ -2497,7 +2919,7 @@ w_dcase:
         struct.pack_into('>I', vb, 0x1C, lab['w_init'])
     struct.pack_into('>I', vb, 0x34, lab['w_start'])  # v7: not the moon's start (it sets the model scale from the init's
                                                       # +0x68: the generate's, 0 for ours: the user's v6 invisible clones)
-    for o in (POLL_SLOTS if 'hurt' in feats or diag else (0x94,) if feats & {'sway', 'hitcheck'} else ()):
+    for o in (POLL_SLOTS if 'hurt' in feats or diag else (0x94,) if feats & {'sway', 'hitcheck', 'burn'} else ()):
         struct.pack_into('>I', vb, o, lab['wp_%X' % o])
     out.blob(A['w_vt'], bytes(vb), 'clone vtable (bunshin copy, +0x1C / +0x64 / +0x84 / +0x8C / +0x94 / +0xAC ours)')
 
