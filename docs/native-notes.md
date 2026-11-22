@@ -4002,3 +4002,9 @@ MSC on a bunshin-based kind, the 4-shape group.
   `0x35` x `0x36` on the ground (line tests: it stops at a ledge). So in `0x153` the shadow follows him at a fixed
   distance; nothing else moves `0x35`. Feature `skdist` replaces the three cap loads with a cave constant
   (`SK_DIST_PATCH`, 6 words: `lwz rX, 4(r10)` / `lfs fY, 0x30(rX)` -> `lis` / `lfs` of SK_DIST).
+- **ColorBlendModule's two overlay slots (burn tint v1)**: vt +0x4C(&rgba, slot, flag) (`0x02C1A12C`, returns when +0xD9
+  is 0) writes slot n's colour at +0x18 + 0x4C n (scaled by +0x34 - +0x3C into +8 - +0xC) and its on byte +0x50 + 0x4C n;
+  vt +0x44(slot) clears the on bytes; vt +0xAC (`0x02C1A288`) picks the slot shown: 1 when its on byte (+0x9C) is set and
+  slot 0 is off or slot 1's priority (+0x98) is higher than slot 0's (+0x4C); vt +0xCC / +0xC4 read / write the slot
+  Color_Overlay writes to (+0xD5); `0x02C1A2C8` resets slot 1 (priority 0x32). Outline_Shell's table in exe_v46z_ui10:
+  os_tab `0x04BE5F5C`, os_g `0x04BE5D10` (+0 entries in use: os_frame skips everything at 0), os_count `0x04BE5388`.

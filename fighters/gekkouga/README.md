@@ -1342,3 +1342,35 @@ once per chain (their choices). Modelled on the aerial chain (`clones.c gk_tc_*`
 - Tests: `gekkouga_clones_test ... --vs16` 358 / 0 (`tilt_chain_tests`: the hooks' places, a whiff / shield / hitlag /
   smash input / air refused, jab -> forward -> up -> down, repeats refused, all three, the diag, the ends (walk, jump,
   shield, hit, special, smash, aerial, rapid jab), the rapid jab without a chain, a clone's hit). Not confirmed in game.
+
+## Burn tint v1 (`greninja_burn_tint_v1.zip`, over tilt chain v1; exe_v46z_gkb9)
+
+The user: "based on burn amount and strength, please tint the opponent into an orange more with a feint red outline", then
+"The higher strength levels should turn into a hot red". Exe feature `btint` (in RELEASE; `gekkouga_clone_cave.py`
+`BTINT_*`, `bti_vic` / `bti_shell` / `bti_unshell`, called after `bfx_vic` in burn_tick):
+- **Level**: the fire's tier (`bfx_lvl`, BFX_TIERS: count / remaining damage / strongest rate), stepped once a frame by
+  the first live Greninja's burn_tick (later ones skip it).
+- **Colour table** (overlay rgb, alpha; outline rgb, alpha, width px of 1280 x 720):
+
+  | tier | overlay | alpha | outline | alpha | width |
+  | --- | --- | --- | --- | --- | --- |
+  | 1 | light orange 1.0 / 0.60 / 0.20 | 0.18 | red 1.0 / 0.12 / 0.06 | 0.28 | 1.5 |
+  | 2 | orange 1.0 / 0.47 / 0.14 | 0.26 | 1.0 / 0.10 / 0.05 | 0.34 | 1.75 |
+  | 3 | red-orange 1.0 / 0.35 / 0.10 | 0.34 | 1.0 / 0.08 / 0.04 | 0.40 | 2.0 |
+  | 4 | hot red 1.2 / 0.15 / 0.05 (red over 1: heat) | 0.42 | 1.0 / 0.06 / 0.03 | 0.48 | 2.5 |
+
+- **Overlay**: the victim's ColorBlendModule (accessor +0x38) vt +0x4C(&rgba 0-1, slot 1, 0) every frame while it burns
+  (drawn lit x (1 - a) + rgb x a); slot 1 shows only when slot 0 is off or lower in priority (vt +0xAC), so the game's own
+  flashes (slot 0) win; vt +0x44(1) clears it.
+- **Outline**: an entry of `outline_shell_cave.py`'s table in the base exe (os_tab `0x04BE5F5C`, 16 x 0x50; os_count
+  `0x04BE5388` asserted) held (phase 2, no frames, blend 0); only when the victim has no entry (an ACMD Outline_Shell's:
+  Supamario's Ultra Instinct glow stays); ours dropped if a command changes it (its width no longer ours) and never
+  freed then; os_frame drops it itself on a KO / model change.
+- **Clears**: the burns end -> both fade over BTINT_FADE 15 frames (the fire's fade), then the slot cleared and the entry
+  freed; Dead / Rebirth -> off at once; gk_clear (match / training reset) -> tier 0, fade -1: off the next frame.
+- Preview `$S/gk_preview/burn_tint.png` (`tools/gekkouga_tint_preview.py`: his textured model, the overlay formula and a
+  dilated band; the outline's width approximate).
+- Tests: cave 259 / 289 (`btint_checks`: the table, tiers 1 / 2 / 4 overlay + entry, every frame, the 15-frame fade on
+  the same entry then off (count 0), a command's entry left alone, a taken-over entry not written / not freed, KO at
+  once, the reset, an earlier Greninja's burn_tick doing it; gk_clear's state; gkb8 = RELEASE - btint byte for byte);
+  supamario_ui_cave_test 0; import_call_check 0. Not confirmed in game: everything here.
