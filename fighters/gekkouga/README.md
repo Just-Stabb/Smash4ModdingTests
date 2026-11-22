@@ -545,3 +545,21 @@ biggest is 30 (6 x 5), his largest vanilla hitbox's size (his Final Smash). The 
 now his smash effects too (`flatten`: their conditions' True branches; v3's clones had none). Tests:
 `gekkouga_clones_test.py ... --v1 --v2 --v3`, `gekkouga_clone_cave_test.py --features=...` on every exe in the package,
 `supamario_ui_cave_test.py` on gk4, `import_call_check` 0 on all five.
+
+## Clones v5 (`greninja_clones_v5.zip`)
+
+The user's v4 logs: A_safe made both clones and the game updated them (`S4GP`), but the clone MSC never ran (no `S4GC`),
+and his heartbeat dropped each ~8 frames later; B_template (lizardonm) crashed inside the generate (`flags=65`, then
+nothing). Why A's MSC never ran: the MSC agent is weapon row slot 8 (accessor +0x1C, constructor `0x02BCC820`):
+shuriken / water / moon have it, bunshin / tatami / monsterball (no MSC files) don't, and bunshin's per-frame template
+doesn't update +0x1C; moon's is bunshin's plus that update. v5's feature sets (`tools/gekkouga_clone_cave.py`
+`FEATURES`, `VARIANTS`):
+- safe (release exe_v46z_gk5, TEST_ONLY A_safe): base kind moon (0xFC), bunshin's row + moon's MSC agent;
+- attack (B_attack): base Mario's pump (0x2: bunshin's template + the agent + the AttackModule's update; u16 0x87C like
+  the clone), bunshin's row + the pump's Attack / +0x2C / agent;
+- hurt (C_hurt): base mewtwom (0x168), its row + lizardonm's DamageModule (slot 20), hurtboxes and damage pollers;
+- parts (D_parts): v2's motion parts on the safe set.
+lizardonm is out (the v4 crash). His MSC: a clone never heard from is kept 120 frames (`gk_beat_grace()`) before the
+heartbeat drops it (v4: 6 + 3), its "being made" bit stays until its heartbeat is first seen, and VAR_23 holds the
+removal reason (`gk_why`: 100 heartbeat, 200 hit, 300 end / KO, 400 fall, + the clone's id), logged by `S4GF gen=`.
+Diag `S4GV r29 cursor`: every HUD cursor call's index once (the tag: v4 had no `S4GU`).

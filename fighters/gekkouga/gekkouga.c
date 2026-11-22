@@ -40104,6 +40104,7 @@ int gk_fx_t;           // frames to the next "ready" sparkle
 int gk_smash;          // v3: the smash charge kept (frames, 0 - gk_smash_full()), one for all three smashes
 int gk_hold_first;     // v3: the hold's first tick (its effects made at once)
 int gk_gen_req;        // v4 diag: 0x40 / 0x80 the left / right clone made next frame
+int gk_seen;           // v5: 1 / 2 the clone's heartbeat seen (its script runs and found him)
 int gk_chain;          // the smashes used in this chain: 1 forward, 2 up, 4 down (0 no chain)
 int gk_chain_req;      // the smash a chain cancel asked for (its start status reads it)
 int gk_sm_auto;        // this smash releases on its own: 1 a full stored charge, 2 a chain
@@ -40149,6 +40150,7 @@ float gk_wall_y() { return 5.0f; }        // the wall test's height above its fe
 float gk_wall_gap() { return 3.0f; }      // how far it stays from a wall
 float gk_head() { return 15.0f; }         // its height (the ceiling test)
 int gk_beat_miss() { return 3; }          // frames without its heartbeat: the game removed it (the blast zone)
+int gk_beat_grace() { return 120; }       // v5: frames a clone whose heartbeat was never seen is kept anyway
 int gk_hitlag_min() { return 4; }         // a clone hit's hitlag on him when no victim's hitstop is found
 
 float gk_abs(float v)
@@ -40399,6 +40401,7 @@ void gk_spawn(int id)
     }
     WorkModule(0, (float)r + 0, 0x0f000317);   // v3 diag: the generate's result (the TEST_ONLY exe logs it: S4GF gen=)
     gk_alive = gk_alive | id;
+    gk_seen = gk_seen & (0x3 - id);
     if (id == 0x1)
     {
         gk_lage = 0;
@@ -40647,6 +40650,7 @@ void gk_clone_phys(int id, float ox, float oy, int copy, int frozen)
     if (t > gk_fall_frames())
     {
         gk_kill(id, 0);                   // fallback: fallen far off the stage
+        gk_why(400, id);
     }
 }
 
@@ -40736,10 +40740,7 @@ void gk_channel()
         r = 0;
     }
     flags = gk_alive;
-    if (gk_spawn_t > 0)
-    {
-        flags = flags | gk_spawn_bits;
-    }
+    flags = flags | (gk_alive & (0x3 - gk_seen)) * 4;   // v5: "being made" until its heartbeat is first seen
     if (gk_lfall > 2)
     {
         flags = flags | 0x10;
@@ -40815,11 +40816,13 @@ void gk_check_hit()
     if (id == 0x1 || id == 0x2)
     {
         gk_kill(id, 0x1);
+        gk_why(200, id);
     }
 }
 
 // v3: each clone's MSC adds its bit (1 / 2) to his VAR_30 every frame; the game removes a weapon past the stage's blast
-// zone without its MSC: a clone whose bit stays off gk_beat_miss() frames is gone (no log, no removal call needed)
+// zone without its MSC: a clone whose bit stays off gk_beat_miss() frames is gone (no log, no removal call needed).
+// v5: only once its heartbeat has been seen (its script runs and found him); never seen: gk_beat_grace() frames first
 void gk_heartbeat()
 {
     int beat;
@@ -40827,7 +40830,15 @@ void gk_heartbeat()
     WorkModule(0, 0 + 0, 0x0f00031e);
     gk_lage += 1;
     gk_rage += 1;
-    if ((gk_alive & 0x1) && gk_lage > 6)
+    if (beat & 0x1)
+    {
+        gk_seen = gk_seen | 0x1;
+    }
+    if (beat & 0x2)
+    {
+        gk_seen = gk_seen | 0x2;
+    }
+    if ((gk_alive & 0x1) && ((gk_seen & 0x1) || gk_lage > gk_beat_grace()))
     {
         if (beat & 0x1)
         {
@@ -40842,7 +40853,7 @@ void gk_heartbeat()
             }
         }
     }
-    if ((gk_alive & 0x2) && gk_rage > 6)
+    if ((gk_alive & 0x2) && ((gk_seen & 0x2) || gk_rage > gk_beat_grace()))
     {
         if (beat & 0x2)
         {
@@ -40859,10 +40870,19 @@ void gk_heartbeat()
     }
 }
 
+// v5 diag: why a clone went (his VAR_23, logged by the TEST_ONLY exe as "gen="): 100 + id heartbeat lost (the game
+// removed it, or its script never ran), 200 + id hit, 300 + id the ability's end / a KO, 400 + id the fall fallback;
+// 1 = the last generate's answer otherwise
+void gk_why(int code, int id)
+{
+    WorkModule(0, (float)(code + id) + 0, 0x0f000317);
+}
+
 // a clone the game already removed: off the books (its smoke where it was last, as a kill without a log)
 void gk_gone(int id)
 {
     gk_kill(id, 0);
+    gk_why(100, id);
 }
 
 // a clone gone: removed, its smoke, and (hit) the Substitution log (rare: the doll) where it stood
@@ -40910,10 +40930,12 @@ void gk_end_ability(int burn)
     if (gk_alive & 0x1)
     {
         gk_kill(0x1, 0);
+        gk_why(300, 0x1);
     }
     if (gk_alive & 0x2)
     {
         gk_kill(0x2, 0);
+        gk_why(300, 0x2);
     }
     gk_alive = 0;
     gk_ability = 0;

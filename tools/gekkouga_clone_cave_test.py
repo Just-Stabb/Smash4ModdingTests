@@ -212,7 +212,7 @@ def weapon_checks(e, img, info, diag=False):
     s = e.call(W.SINGLETON_SWITCH, 0, C.CLONE_KIND)
     check('the singleton getter: kind 0x1A1 -> its own singleton', s, A['w_single'])
     vt = e.w(s)
-    VT_OURS = (W.HIT_METHOD,) + ((0x1C,) if 'hurt' in F or diag else ()) + (C.POLL_SLOTS if 'poll' in F or diag else ())
+    VT_OURS = (W.HIT_METHOD,) + ((0x1C,) if 'hurt' in F or diag else ()) + (C.POLL_SLOTS if 'hurt' in F or diag else ())
     check('its vtable: bunshin\'s but +0x1C / +0x64 / +0x84 / +0x8C / +0x94 / +0xAC (v3)',
           [e.w(vt + o) for o in range(0, L['vsize'], 4) if o not in VT_OURS],
           [img.w(L['svt'] + o) for o in range(0, L['vsize'], 4) if o not in VT_OURS])
@@ -401,7 +401,7 @@ def weapon_checks(e, img, info, diag=False):
               ([c[1:3] + (c[3],) for c in e.osr_seen], e.clone_vars.get(C.VAR_LOGGED)), ([(A['gk_fc'], 2, 3)], 1.0))
         poll(0x64, 0.0)
         check('v3 diag: ... not again', e.osr_seen, [])
-    if 'poll' not in F:
+    if 'hurt' not in F:
         if diag:
             check('v4 without "poll": the pollers never read the DamageModule, bunshin\'s methods still run',
                   poll(0x64, 3.5)[0], [('orig64', s, weapon, 0x55, 0x66)])
@@ -425,16 +425,25 @@ def weapon_checks(e, img, info, diag=False):
     e.call(mr)
     row = (e.r(8) + W.MODULE_TABLE) & 0xFFFFFFFF
     check('the module set-up: kind 0x1A1 -> its own row', row, A['w_row'])
-    tk = C.TEMPLATE if 'template' in F else C.CLONE_BASE
-    want = [img.w(W.MODULE_TABLE + 0x70 * tk + 4 * j) for j in range(28)]
-    check('v3: its row: the template kind\'s (lizardonm, 0x15C: bunshin\'s modules + Kinetic, Attack, Hit, Damage)',
+    tk = C.base_of(F)
+    want = C.row_of(img, F)
+    dummy = lambda f: img.w(f) == 0x38600000 and img.w(f + 4) == 0x4E800020
+    check('v5: the row has the MSC agent (slot 8, moon\'s / the pump\'s constructor %08X) and the base kind\'s template updates '
+          'it (+0x1C)' % want[C.MSC_SLOT], (not dummy(want[C.MSC_SLOT]), want[C.MSC_SLOT] == img.w(W.MODULE_TABLE + 0x70 * 0xFC + 4 * 8)),
+          (True, True))
+    check('v5: attack: the AttackModule (slot 2); hurt: Hit (6) and Damage (20); safe: neither',
+          (not dummy(want[2]), not dummy(want[6]), not dummy(want[20])),
+          ('attack' in F or 'hurt' in F, 'hurt' in F, 'hurt' in F))
+    check('v3 / v5: its row: the feature set\'s (safe: bunshin + moon\'s MSC agent; attack: + the pump\'s; hurt: mewtwom\'s + Damage)',
           [e.w(row + 4 * j) for j in range(28)], want)
     T_ = info['T']
-    check('v3: its base kind (the weapon switches\' templates): 0x15C (v4 without "template": bunshin 0xFE)',
+    check('v5: its base kind (the weapon switches\' templates): moon 0xFC / the pump 0x2 / mewtwom 0x168',
           e.w(T_['bt'] + 4 * (C.CLONE_KIND - W.OLD_N)), tk)
     nt = dict(W.NAME_TABLES)
-    check('... 0x15C is lizardon\'s lizardonm', (img.cstr(img.w(nt['owner'] + 4 * C.TEMPLATE)),
-                                                 img.cstr(img.w(nt['name'] + 4 * C.TEMPLATE))), C.TEMPLATE_NAME)
+    check('v5: the base kinds are his moon, Mario\'s pump, Mewtwo\'s mewtwom (the u16 flags: model, no category bits for '
+          'moon\'s / pump\'s 0x871 / 0x87C)', [(img.cstr(img.w(nt['owner'] + 4 * k)), img.cstr(img.w(nt['name'] + 4 * k)))
+                                             for k in (C.SAFE_BASE, C.ATTACK_BASE, C.HURT_BASE)],
+          [('gekkouga', 'moon'), ('mario', 'pump'), ('mewtwo', 'mewtwom')])
     e.mu.reg_write(REGS[30], CLONE_OTHER)
     e.call(mr)
     check('the module set-up: bunshin\'s own row as before', e.r(8), 0x70 * CLONE_OTHER)

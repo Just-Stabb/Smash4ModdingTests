@@ -3822,3 +3822,8 @@ MSC on a bunshin-based kind, the 4-shape group.
   (`--features`: template / parts / hurt / poll); the release is the safe set (bunshin's row and routine, no parts, no
   hurtboxes, no pollers). The `GX2RSetAttributeBuffer` burst at the match start is in an older Supamario-test log too: not
   the clones'.
+- **v5 (exe_v46z_gk5; README "Clones v5")**: **a weapon's MSC agent is module row slot 8** (accessor +0x1C, constructor
+  `0x02BCC820`): the articles with MSC files have it (shuriken, water, moon), bunshin / tatami / monsterball don't; the
+  update templates update +0x1C only for kinds that have it (moon's = bunshin's + +0x1C). v4's safe clone (bunshin's row)
+  was made and updated but its MSC never ran. Mario's pump (0x2) is bunshin's set + Attack (slot 2) + slot 5 + the agent,
+  its template bunshin's + +0x1C + +0x50. The v4 B build (lizardonm's routine / row) crashed inside the generate.

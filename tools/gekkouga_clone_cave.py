@@ -95,19 +95,48 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # none: 2, loaded with the fighter. Bunshin's 0x87D has 0x1 (4: the Final Smash load,
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
-FEATURES = frozenset(('template', 'parts', 'hurt', 'poll'))   # v4: each risky part (the v3 in-game crash at a clone's
-# spawn), built in or not: template = lizardonm's per-frame routine / module row (else bunshin's own, exactly: no attack,
-# no hurtbox); parts = his motion parts and flags on the clone (else bunshin's: none); hurt = its hurtboxes (+0x1C);
-# poll = the damage pollers (+0x64 ... +0x94; needs template's DamageModule). VARIANTS: the shipped builds
-SAFE_BASE = 0xFC                  # v5: moon (his Final Smash's moon): the safe build's base kind (its per-frame template =
-                                  # bunshin's + the +0x1C module's update) and its MSC agent; v4's safe build (bunshin's
-                                  # row and template) never ran the clone's MSC (the user's v4 A log: no S4GC): bunshin
-                                  # has no MSC module (row slot 8, accessor +0x1C: shuriken / water / moon have it,
-                                  # bunshin / tatami / monsterball don't), its template no +0x1C update
+FEATURES = frozenset(('attack', 'hurt', 'parts'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+# at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
+#   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
+#           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
+#   attack  base kind Mario's pump (ATTACK_BASE: bunshin's template + the MSC agent + the AttackModule's update; its row
+#           is bunshin's + Attack / +0x2C / the MSC agent, u16 flags 0x87C like the clone's): the clones' hitboxes work
+#   hurt    base kind mewtwom (HURT_BASE: + Kinetic / Hit / Ground updates) and its row + lizardonm's DamageModule (slot
+#           20); the hurtboxes (+0x1C) and the damage pollers (+0x64 ... +0x94)
+#   parts   his motion parts and flags on the clone (v2's hands / face)
+SAFE_BASE = 0xFC                  # v5: moon (his Final Smash's moon). v4's safe build (bunshin's row and template) never
+                                  # ran the clone's MSC (the user's v4 A log: no S4GC): bunshin has no MSC agent (row slot
+                                  # 8, accessor +0x1C: shuriken / water / moon have it, bunshin / tatami / monsterball
+                                  # don't), and its template no +0x1C update
+ATTACK_BASE = 0x2                 # Mario's pump
+HURT_BASE = 0x168                 # mewtwom (Mewtwo's Final Smash form)
 MSC_SLOT = 8
-RELEASE = frozenset()             # v4's release exe: the safe set (nothing risky) until a TEST_ONLY log clears the rest
-VARIANTS = (('A_safe', frozenset()), ('B_template', frozenset(('template',))),
-            ('C_hurt', frozenset(('template', 'hurt', 'poll'))), ('D_full', FEATURES))
+DAMAGE_SLOT = 20
+RELEASE = frozenset()             # the release exe: the safe set (nothing risky) until a TEST_ONLY log clears the rest
+VARIANTS = (('A_safe', frozenset()), ('B_attack', frozenset(('attack',))), ('C_hurt', frozenset(('hurt',))),
+            ('D_parts', frozenset(('parts',))))
+
+
+def base_of(feats):
+    return HURT_BASE if 'hurt' in feats else ATTACK_BASE if 'attack' in feats else SAFE_BASE
+
+
+def row_of(img, feats):
+    """the clone's module row for a feature set"""
+    rw = lambda k: [img.w(W.MODULE_TABLE + 0x70 * k + 4 * j) for j in range(28)]
+    dummy = lambda f: img.w(f) == 0x38600000 and img.w(f + 4) == 0x4E800020
+    if 'hurt' in feats:
+        r = rw(HURT_BASE)
+        r[DAMAGE_SLOT] = rw(TEMPLATE)[DAMAGE_SLOT]
+        return r
+    r = rw(CLONE_BASE)
+    donor = rw(ATTACK_BASE if 'attack' in feats else SAFE_BASE)
+    for j in range(28):
+        if dummy(r[j]) and not dummy(donor[j]):
+            r[j] = donor[j]
+    return r
+
+
 VAR_GEN = 0x0F000317              # his VAR_23 (v3 diag): the last generate's result (ArticleModule 0x2710)
 VAR_LOGGED = 0x0F000302           # the clone's VAR_2 (v3 diag): its first frame logged
 HITSTOP_FN = 0x02C2678C           # (accessor, hitbox data, f1 damage, f2 multiplier, r5 side, r6 use its multiplier) -> frames
@@ -329,9 +358,7 @@ def layout(img, feats=None):
     rows = [[img.w(aents + 16 * i + 4 * j) for j in range(4)] for i in range(acount)]
     rows += [[CLONE_KIND, 1, 0, 0], [CLONE_KIND, 1, 0, 0]]
     feats = FEATURES if feats is None else feats
-    mrow = [img.w(W.MODULE_TABLE + 0x70 * (TEMPLATE if 'template' in feats else CLONE_BASE) + 4 * j) for j in range(28)]
-    if 'template' not in feats:
-        mrow[MSC_SLOT] = img.w(W.MODULE_TABLE + 0x70 * SAFE_BASE + 4 * MSC_SLOT)   # v5: the MSC agent (moon's)
+    mrow = row_of(img, feats)
     assert img.w(svt + 0x1C) == 0x02AF695C and img.w(0x02AF695C) == 0x4E800020, "bunshin's +0x1C: a blr"
     for j in (2, 6, 7, 20, 26):
         f = img.w(W.MODULE_TABLE + 0x70 * TEMPLATE + 4 * j)
@@ -1012,7 +1039,7 @@ wp_nolog:''') + (('''
         lis r3, %(gk_fd_hi)d
         addi r3, r3, %(gk_fd_lo)d
         lwz r4, 0x1C(r1)''' + osr()) + '''
-''') if 'poll' in feats else '') + '''
+''') if 'hurt' in feats else '') + '''
 wp_out: lwz r30, 0x28(r1)
         lwz r31, 0x2C(r1)
         lwz r0, 0x34(r1)
@@ -1155,7 +1182,7 @@ w_dcase:
     struct.pack_into('>I', vb, W.HIT_METHOD, lab['w_hit'])
     if 'hurt' in feats or diag:
         struct.pack_into('>I', vb, 0x1C, lab['w_init'])
-    for o in (POLL_SLOTS if 'poll' in feats or diag else ()):
+    for o in (POLL_SLOTS if 'hurt' in feats or diag else ()):
         struct.pack_into('>I', vb, o, lab['wp_%X' % o])
     out.blob(A['w_vt'], bytes(vb), 'clone vtable (bunshin copy, +0x1C / +0x64 / +0x84 / +0x8C / +0x94 / +0xAC ours)')
 
@@ -1191,7 +1218,7 @@ w_dcase:
         out.words.pop(wa, None)
         out.put(wa, word, 'table %s 0x%X' % (nm, CLONE_KIND))
     out.put(T['dt'] + 4 * k, lab['w_dcase'], 'descriptor case 0x%X' % CLONE_KIND, 0)
-    out.put(T['bt'] + 4 * k, TEMPLATE if 'template' in feats else SAFE_BASE, 'base kind 0x%X' % CLONE_KIND, 0xFFFF)
+    out.put(T['bt'] + 4 * k, base_of(feats), 'base kind 0x%X' % CLONE_KIND, 0xFFFF)
     out.put(T['st'] + 4 * k, A['w_single'], 'singleton case 0x%X' % CLONE_KIND, 0)
     out.put(T['rt'] + 4 * k, (A['w_row'] - W.MODULE_TABLE) & 0xFFFFFFFF, 'own module row 0x%X' % CLONE_KIND, 0)
     info = dict(A=A, labels=lab, T=T, layout=L, end=end, owner_str=owner_str, feats=feats)
