@@ -618,7 +618,9 @@ int cl_slot;           // his player slot (1 - 8), 0 not found yet
 int cl_id;             // 1 the left-spawned clone (his article 6), 2 the right-spawned one (7)
 int cl_motion;         // the motion playing (-1 none yet)
 float cl_last_f;       // his motion frame last frame
-int cl_shown;          // visible
+int cl_shown;          // v8: the visibility it last set + 1 (0: never set, so the next cl_show sets it). v1 - v7
+                       // kept 1 / 0 and reset it to 1 ("shown") whenever it looked for him again: a clone that
+                       // waited a frame for its id (hidden) was then never shown again: the invisible clones
 int cl_t;              // frames alive
 
 int cl_magic() { return 4747; }
@@ -684,10 +686,10 @@ int cl_find()
 
 void cl_show(int on)
 {
-    if (on != cl_shown)
+    if (on + 1 != cl_shown)
     {
         VisibilityModule(0x2710, on);
-        cl_shown = on;
+        cl_shown = on + 1;
     }
 }
 
@@ -729,7 +731,6 @@ void cl_frame()
     cl_t += 1;
     if (cl_slot == 0 || cl_id == 0)
     {
-        cl_shown = 1;
         cl_motion = 0xffffffff;
         cl_slot = cl_find();
         if (cl_slot == 0)

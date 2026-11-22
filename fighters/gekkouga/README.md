@@ -612,3 +612,27 @@ The user's v6 A_safe log: ids 1 / 2, both clones alive for the 12 s and placed r
   fill on frame 1 + value / 10 and stopped; else the KO meter route. Not built into the package: it needs the user's
   current `data/ui/info/dmg` (the trait badge / Hero's menu in it). Tested in unicorn (the driver); the builder is
   untested until those files arrive.
+
+## Clones v8 (`greninja_clones_v8.zip`)
+
+The user's v7 A_safe log: the panel bar shows and the name tag hides, but no clones; `S4GZ` gave the start's scale 2.76
+(the v6 / v7 "scale 0" reading was wrong), the clones lived 12 s with their ids and places. `S4GW object=00000000` is
+his object id 0 (the tag hides), now logged as `object id=%d`.
+- **The cause, in the clone's MSC** (`weapons/clone.c`): `cl_show` kept the visibility it set (1 / 0), and `cl_frame`
+  reset it to 1 each time it looked for him again, without a call. A clone that waited a frame for its id
+  (`VisibilityModule(0x2710, 0)`) was never shown again. In v5 the right clone took the left's lingering "being made"
+  bit, never waited and was drawn (black: bunshin's start); in v6 / v7 the bit comes the frame after the generate, so
+  both waited. Now `cl_shown` = the value last set + 1 (0 never set); the test checks wait (hidden), id (shown), then
+  no more calls, and fails on the v7 script.
+- **Bunshin's start** (`0x02AF6738`, read in full): ColorBlendModule (accessor +0x38) vt +0x4C(&(0, 0, 0, 255), slot 0,
+  0); LinkModule (+0x68) set_attribute vt +0x3BC(link 3, 0, 1) and (3, 0xD, 1); EffectModule (+0xA0) vt +0xB4(0x20000,
+  0), vt +0xA4(0x1000047, 0x20000). None of these shows the model: a weapon is drawn by its VisibilityModule (+0xA8)
+  +8 AND, only with a link attribute 7, the parent's (`0x02C77004` / `0x02C560C8`). The v5 clone's fade was the
+  heartbeat removal (the id clash). The specializer vtables of bunshin and the moon differ only at +0x34.
+- New TEST_ONLY variant **E_bstart** (feature `bstart`): the start runs bunshin's, then ColorBlendModule vt +0x44(0)
+  (slot 0 off, as Terminate_Overlays' handler `0x02BE37B8`). The release and A-D keep v7's empty start.
+- Diag `S4GM` / `S4GN` (`w_ddiag`, on the clone's first frame (its 4th poll) and with each `S4GX`): VisibilityModule +8
+  and is_visible, ModelModule (+0x3C) +8 mode and its instance's +0x7DB, ColorBlendModule +0x50 (slot 0) / +0xD9; the
+  posture z and +0x5C scale, LinkModule +0x84, the ModelModule pointer.
+- Package: exe_v46z_gk8 (+ diag A-E) and the clone's `clone.mscsb`. Cave tests 97 (release), 107 (A / B / D / E),
+  113 (C); `gekkouga_clones_test` 202 checks with `--v1` to `--v7`.

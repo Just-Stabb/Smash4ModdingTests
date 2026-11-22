@@ -972,11 +972,20 @@ def clone_tests(mscsb, src):
     shared(2, 0, 86.0)
     g3.sys = lambda sid, a, f=sysf: f(sid, a)
     m3.game.sys = g.sys
+    g.log = []
     m3('cl_frame')
     check('v2: no "being made" bit: no id yet (waits)', (m3.g('cl_slot'), m3.g('cl_id')), (0, 0))
+    check('v8: ... hidden while it waits', [x for x in g.log if x[0] == 'visible'], [('visible', 0)])
     shared(2, 7, 4747000.0 + 1 + 4)
+    g.log = []
     m3('cl_frame')
     check('v2: ... the left bit (4): the left one, at VAR_24 / 25', (m3.g('cl_slot'), m3.g('cl_id'), g.x), (2, 1, 86.0))
+    check('v8: ... and shown again (v1 - v7 never showed a clone that had waited: the invisible clones)',
+          [x for x in g.log if x[0] == 'visible'], [('visible', 1)])
+    g.log = []
+    for _ in range(3):
+        m3('cl_frame')
+    check('v8: ... once (no VisibilityModule call while nothing changes)', [x for x in g.log if x[0] == 'visible'], [])
 
 
 def script_tests(out, user):
@@ -1119,6 +1128,10 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
                 ['fighter/gekkouga/model/clone/c%02d/%s' % (c, f) for c in range(8) for f in GB.CLONE_FACE_FILES]
         check('v2: both MSCs, his 5 motion part pacs, the face / rest-of-model files in all 8 colours (%d)' % len(v2new),
               [m for m in v2new if 'INSTALL_TO_data/' + m not in names], [])
+    if z1 and len(earlier) == 7:
+        check('v8: INSTALL_TO_data: the clone\'s MSC only (its visibility: shown again after waiting for its id)',
+              sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              ['fighter/gekkouga/script/msc/clone/clone.mscsb'])
     if z1 and len(earlier) == 6:
         check('v7: no INSTALL_TO_data (no data file changed: the fixes are the executable\'s)',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')), [])
@@ -1169,7 +1182,9 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v5', 'exe_v46z_gk6', 'black', 'id=1', 'S4GX', 'A_safe', 'B_attack', 'C_hurt', 'D_parts',
          'damage panel', 'Little Mac', 'S4GB', 'grey') if len(earlier) == 5 else \
         ('greninja_clones_v6', 'exe_v46z_gk7', 'scale', 'S4GZ', 'S4GW', 'name tag', '0-100', 'A_safe', 'B_attack', 'round',
-         'data/ui/info/dmg')
+         'data/ui/info/dmg') if len(earlier) == 6 else \
+        ('greninja_clones_v7', 'exe_v46z_gk8', 'clone.mscsb', 'VisibilityModule', 'S4GM', 'S4GN', 'A_safe', 'E_bstart',
+         'bunshin', 'black', 'object id')
     check('README.txt mentions every feature (%s)' % ', '.join(words), [w for w in words if w not in readme], [])
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
@@ -1215,7 +1230,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False):
 
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
-    earlier = [x[5:] for k in ('1', '2', '3', '4', '5', '6') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
+    earlier = [x[5:] for k in ('1', '2', '3', '4', '5', '6', '7') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
     base_diag = a[4] if len(a) > 4 else None

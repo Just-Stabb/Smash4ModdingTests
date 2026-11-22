@@ -54,6 +54,14 @@ def check(what, got, want):
     return ok
 
 
+M1 = 0xFFFFFFFF
+
+
+def ddiag_rows(e, A):
+    """v8: the S4GM (7 values) / S4GN (5) logs"""
+    return [x[:8] if x[0] == A['gk_fm'] else x[:6] for x in e.osr_full if x[0] in (A['gk_fm'], A['gk_fn'])]
+
+
 def f2d(v):
     return struct.unpack('>Q', struct.pack('>d', v))[0]
 
@@ -365,13 +373,66 @@ def weapon_checks(e, img, info, diag=False):
           bytes(e.mu.mem_read(A['hurt'], 0x30 * 8)) == C.hurt_blob() and
           [struct.unpack_from('>I', C.hurt_blob(), 0x30 * i + 0x1C)[0] for i in range(8)] ==
           [0x7D0 + j for j in (12, 19, 22, 16, 8, 4, 9, 5)], True)
-    check('v7: its +0x34 (the start) is ours: no scale / colour / link call', e.w(vt + 0x34), lab['w_start'])
+    check('v7: its +0x34 (the start) is ours', e.w(vt + 0x34), lab['w_start'])
     init = e.alloc(0x80, b'\0')
-    e.mu.mem_write(init + 0x68, struct.pack('>f', 0.0))
+    e.mu.mem_write(init + 0x68, struct.pack('>f', 2.76))
+    # v8: its ColorBlendModule (accessor +0x38): vt +0x44 (slot off)
+    cbvt = e.alloc(0x100, b'\0')
+    cboff = e.alloc(4)
+    e.setw(cbvt + C.COLOUR_CLEAR, cboff)
+    e.stub(cboff, lambda e_: e_.rec('colour_off', 3, 4))
+    cb = e.alloc(0x100, b'\0')
+    e.setw(cb, cbvt)
+    e.setw(cacc + C.W_COLOUR, cb)
+    e.stub(C.BUNSHIN_START, lambda e_: e_.rec('bunshin_start', 3, 4, 5))
     e.calls = []
     e.call(lab['w_start'], s, weapon, init)
-    check('v7: ... it calls nothing' + (' but the S4GZ log (init, scale x100 0)' if diag else ''),
-          [c[:3] for c in e.calls], [('osr', A['gk_fz'], init)] if diag else [])
+    want = ([('bunshin_start', s, weapon, init), ('colour_off', cb, 0)] if 'bstart' in F else []) + \
+        ([('osr', A['gk_fz'], init, 276)] if diag else [])
+    check('v8: ... ' + ('"bstart": bunshin\'s start (as it is), then its black off (ColorBlendModule vt +0x44(0))'
+                        if 'bstart' in F else 'it calls nothing (v7)') + (', the S4GZ log (init, scale x100 276)' if diag else ''),
+          [c[:4] if c[0] == 'osr' else c for c in e.calls], want)
+    if diag:
+        # v8 diag: the draw state (S4GM / S4GN)
+        visvt = e.alloc(0x100, b'\0')
+        isvis = e.alloc(4)
+        e.setw(visvt + 0xA4, isvis)
+        e.stub(isvis, lambda e_: (e_.rec('is_visible', 3), 0x101)[1])
+        vis = e.alloc(0x20, b'\0')
+        e.setw(vis, visvt)
+        e.mu.mem_write(vis + 8, b'\x00')
+        e.setw(cacc + C.W_VIS, vis)
+        mm = e.alloc(0x20, b'\0')
+        mi = e.alloc(0x800, b'\0')
+        e.setw(mm + 8, 3)
+        e.setw(mm + 0xC, mi)
+        e.mu.mem_write(mi + 0x7DB, b'\x01')
+        e.setw(cacc + C.W_MODEL, mm)
+        e.mu.mem_write(cb + 0x50, b'\x01')
+        e.mu.mem_write(cb + 0xD9, b'\x01')
+        post = e.alloc(0x80, b'\0')
+        e.mu.mem_write(post + 0x18, struct.pack('>f', -12.0))
+        e.mu.mem_write(post + 0x5C, struct.pack('>f', 1.25))
+        e.setw(cacc + C.W_POSTURE, post)
+        lm = e.alloc(0x100, b'\0')
+        e.setw(lm + 0x84, 0x80)
+        e.setw(cacc + C.W_LINK, lm)
+        e.calls, e.osr_full = [], []
+        e.call(lab['w_ddiag'], cacc, 2)
+        check('v8 diag: w_ddiag: S4GM (id 2, VisibilityModule +8 0, is_visible 1 (its byte), model mode 3, drawn 1, '
+              'overlay slot 0 on / enabled) and S4GN (z -12, scale x100 125, link mask 0x80, the ModelModule)',
+              ([c for c in e.calls if c[0] == 'is_visible'], ddiag_rows(e, A)),
+              ([('is_visible', vis)], [(A['gk_fm'], 2, 0, 1, 3, 1, 1, 1), (A['gk_fn'], 2, -12 & 0xFFFFFFFF, 125, 0x80, mm)]))
+        for o in (C.W_VIS, C.W_MODEL, C.W_POSTURE, C.W_LINK):
+            e.setw(cacc + o, 0)
+        e.calls, e.osr_full = [], []
+        e.call(lab['w_ddiag'], cacc, 1)
+        check('v8 diag: ... modules missing: -1 for each (nothing read through them)',
+              ddiag_rows(e, A), [(A['gk_fm'], 1, M1, M1, M1, M1, 1, 1), (A['gk_fn'], 1, M1, M1, M1, 0)])
+        e.setw(cacc + C.W_POSTURE, post)
+        e.setw(cacc + C.W_VIS, vis)
+        e.setw(cacc + C.W_MODEL, mm)
+        e.setw(cacc + C.W_LINK, lm)
     # ---- v3: the pollers: the damage this frame -> his VAR_21 = 20000 + its id; then bunshin's method
     dmvt = e.alloc(0x100, b'\0')
     dmget = e.alloc(4)
@@ -411,7 +472,10 @@ def weapon_checks(e, img, info, diag=False):
         check('v3 diag: named: S4GC (id 2, owner slot 3) once, its VAR_2 1',
               ([c[1:3] + (c[3],) for c in e.osr_seen], e.clone_vars.get(C.VAR_LOGGED)), ([(A['gk_fc'], 2, 3)], 1.0))
         poll(0x64, 0.0)
-        check('v3 diag: ... not again', e.osr_seen, [])
+        check('v3 diag: ... not again; v8: its 4th poll (its first frame) logs its place and draw state (S4GX, S4GM, S4GN)',
+              [c[1] for c in e.osr_seen], [A['gk_fx'], A['gk_fm'], A['gk_fn']])
+        poll(0x64, 0.0)
+        check('v8 diag: ... then nothing until its 120th poll', e.osr_seen, [])
     if 'hurt' not in F:
         if diag:
             check('v4 without "poll": the pollers never read the DamageModule, bunshin\'s methods still run',
@@ -780,7 +844,9 @@ def main():
     img = K.Image(base)
     e = Run(patched)
     if diag:
-        e.stub(C.OSREPORT_VENEER, lambda e_: e_.rec('osr', 3, 4, 5))
+        e.osr_full = []
+        e.stub(C.OSREPORT_VENEER, lambda e_: (e_.rec('osr', 3, 4, 5, 6),
+                                               e_.osr_full.append(tuple(e_.r(i) for i in range(3, 11))))[1])
     e.stub(C.MSG_HANDLE, lambda e_: e_.calls.append(('msg_handle', e_.r(5), e_.r(6))))
 
     def msg_send(e_):

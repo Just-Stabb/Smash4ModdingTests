@@ -3841,3 +3841,11 @@ MSC on a bunshin-based kind, the 4-shape group.
   0-100 (0xFF hides a clip). The battle HUD's cursor update only calls `0x03091E34` for a cursor `0x03091830` accepts:
   never for the user, so the name tag goes through the SET_CURSOR message ({0xA, visible} to the fighter's object id,
   `0x02BF2108` / `0x02BF019C` as `0x02BE7C80` sends it) from slot 13.
+- **v8 (exe_v46z_gk8)**: the invisible clones were the clone MSC's (`cl_show` reset to "shown" without a call after a
+  wait for its id; fighters/gekkouga/README.md "Clones v8"), not the start: the moon's init +0x68 is 2.76. Bunshin's
+  +0x34 in full: ColorBlendModule (acc +0x38, vtable 0x10104618) vt +0x4C(&rgba, slot, flag) (returns when +0xD9 is 0;
+  slot n on at +0x50 + 0x4C n) and vt +0x44(slot) off (Terminate_Overlays' handler `0x02BE37B8` clears slot [+0xD5]),
+  LinkModule (acc +0x68) vt +0x3BC set_attribute(link 3, 0 / 0xD, 1), EffectModule vt +0xB4 / +0xA4. A weapon is drawn
+  when its VisibilityModule (acc +0xA8) +8 is set and (LinkModule +0x84 bit 7 only) the parent is; ModelModule (acc
+  +0x3C) +4 the handle (+8 its instance: drawn byte +0x7DB), +8 a mode (8: no visibility changes, vt +0x164
+  `0x02007728`). Bunshin's and the moon's specializer vtables differ only at +0x34.

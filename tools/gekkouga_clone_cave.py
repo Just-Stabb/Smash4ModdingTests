@@ -95,7 +95,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # none: 2, loaded with the fighter. Bunshin's 0x87D has 0x1 (4: the Final Smash load,
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
-FEATURES = frozenset(('attack', 'hurt', 'parts'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -104,6 +104,9 @@ FEATURES = frozenset(('attack', 'hurt', 'parts'))   # v5: each risky part, built
 #   hurt    base kind mewtwom (HURT_BASE: + Kinetic / Hit / Ground updates) and its row + lizardonm's DamageModule (slot
 #           20); the hurtboxes (+0x1C) and the damage pollers (+0x64 ... +0x94)
 #   parts   his motion parts and flags on the clone (v2's hands / face)
+#   bstart  v8: the clone's start (specializer +0x34) runs bunshin's own (0x02AF6738: black overlay, LinkModule link 3
+#           attributes 0 / 0xD, EffectModule +0xB4 / +0xA4), then clears the black (ColorBlendModule vt +0x44(0), as
+#           Terminate_Overlays' handler 0x02BE37B8 does); without it the start does nothing (v7)
 SAFE_BASE = 0xFC                  # v5: moon (his Final Smash's moon). v4's safe build (bunshin's row and template) never
                                   # ran the clone's MSC (the user's v4 A log: no S4GC): bunshin has no MSC agent (row slot
                                   # 8, accessor +0x1C: shuriken / water / moon have it, bunshin / tatami / monsterball
@@ -111,6 +114,14 @@ SAFE_BASE = 0xFC                  # v5: moon (his Final Smash's moon). v4's safe
 ATTACK_BASE = 0x2                 # Mario's pump
 HURT_BASE = 0x168                 # mewtwom (Mewtwo's Final Smash form)
 MSC_SLOT = 8
+BUNSHIN_START = 0x02AF6738        # v8 (bstart): bunshin's specializer +0x34 (singleton, weapon, init)
+COLOUR_CLEAR = 0x44               # ColorBlendModule (accessor +0x38, vtable 0x10104618) vt +0x44(slot): slot off
+W_COLOUR = 0x38                   # weapon accessor -> ColorBlendModule (+0x50 + 0x4C n: slot n on, +0xD9 enabled)
+W_MODEL = 0x3C                    # -> ModelModule (+4 the handle: +8 a mode, +0xC the instance: +0x7DB drawn)
+W_LINK = 0x68                     # -> LinkModule (+0x84 the mask: bit 7 a link with attribute 7 (parent's visibility))
+W_VIS = 0xA8                      # -> VisibilityModule (+8 its own flag (MSC VisibilityModule(0x2710, v)), vt +0xA4
+                                  # is_visible 0x02C77004: +8 and, through the LinkModule, the parent's)
+W_POSTURE = 0x18                  # -> PostureModule (+0x10 / +0x14 / +0x18 x y z, +0x5C the scale)
 FLX_INTERN = 0x032CB1B8           # v7: (atom pool [0x102FCAA4] + 0x24, char *, length) -> atom (docs: "Damage panel")
 FLX_ATOM_POOL = 0x102FCAA4
 FLX_FIND = 0x032CCAA0             # (clip, &atom) -> the child clip
@@ -143,7 +154,7 @@ VT_BASE = 0xFC                    # v6: the clone's specializer (its singleton's
 DAMAGE_SLOT = 20
 RELEASE = frozenset()             # the release exe: the safe set (nothing risky) until a TEST_ONLY log clears the rest
 VARIANTS = (('A_safe', frozenset()), ('B_attack', frozenset(('attack',))), ('C_hurt', frozenset(('hurt',))),
-            ('D_parts', frozenset(('parts',))))
+            ('D_parts', frozenset(('parts',))), ('E_bstart', frozenset(('bstart',))))
 
 
 def base_of(feats):
@@ -192,7 +203,8 @@ WEAPON_JOINT = 0x7D0
 
 
 def pos_diag():
-    """diag: a clone's place every 30 frames (120 poll calls: 4 phases) for its first 8 logs (S4GX)"""
+    """diag: a clone's place every 30 frames (120 poll calls: 4 phases) for its first 8 logs (S4GX); v8: also on its
+    first frame (the 4th poll), each with its draw state (S4GM / S4GN, w_ddiag)"""
     return '''
         lwz r30, %(wwork)d(r31)
         cmpwi r30, 0
@@ -207,11 +219,14 @@ def pos_diag():
         lwz r0, 0x1C(r1)
         cmpwi r0, 960
         bgt wp_nopos
+        cmpwi r0, 4
+        beq wp_dopos
         li r12, 120
         divwu r11, r0, r12
         mullw r11, r11, r12
         cmpw r11, r0
         bne wp_nopos
+wp_dopos:
         lwz r12, 0x18(r31)              # its PostureModule: +0x10 x, +0x14 y
         cmpwi r12, 0
         beq wp_nopos
@@ -232,6 +247,9 @@ def pos_diag():
         lwz r4, 0x1C(r1)
         lwz r5, 0x10(r1)
         lwz r6, 0x14(r1)''' + osr() + '''
+        mr r3, r31
+        lwz r4, 0x1C(r1)
+        bl w_ddiag
 wp_nopos:'''
 HURT_CALL = '''
         cmpwi r3, 0
@@ -515,7 +533,9 @@ def build(rpx, diag=False, feats=None):
             ('gk_fx', 'S4GX clone id=%d at x=%d y=%d\n'),
             ('gk_fb', 'S4GB panel slot=%d gauge mode=%d value=%d\n'),
             ('gk_fz', 'S4GZ clone start: init=%08X scale x100=%d\n'),
-            ('gk_fw', 'S4GW tag message: visible=%d object=%08X\n')]
+            ('gk_fw', 'S4GW tag message: visible=%d object id=%d\n'),
+            ('gk_fm', 'S4GM clone id=%d draw: visflag=%d visible=%d model mode=%d drawn=%d overlay=%d/%d\n'),
+            ('gk_fn', 'S4GN clone id=%d z=%d scale x100=%d link mask=%08X model=%08X\n')]
     for nm, s in fmts:
         A[nm] = alloc((len(s) + 4) & ~3, 4) if diag else 0
     code_at = alloc(0, 4)
@@ -571,10 +591,11 @@ def build(rpx, diag=False, feats=None):
     p = dict(acc=ACC, work=WORK, posture=POSTURE, bacc=BASE_ACC, entry=ENTRY, slots=SLOTS, tag=FLAG_TAG,
              slow=FLAG_SLOW, clones=FLAG_CLONES, life=TAG_LIFE, sslot=SLOW_SLOT, srate=SLOW_RATE, sframes=SLOW_FRAMES,
              hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, whit=W_HIT_MOD, wdmg=W_DAMAGE, watk=W_ATTACK,
-             wstop=W_STOP, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
+             wstop=W_STOP, wcol=W_COLOUR, wmodel=W_MODEL, wlink=W_LINK, wvis=W_VIS, wpost=W_POSTURE,
+             cclear=COLOUR_CLEAR, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_tags', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_tags', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -1282,12 +1303,30 @@ wp_94:
         mtlr r0
         addi r1, r1, 0x40''' + tail(L['vt_orig'][0x94]) + '''
 
-# ---- v7: the clone's start (its specializer +0x34, (singleton, weapon, init)): nothing (the moon's sets the model scale
-# from the init's +0x68; bunshin's paints it black and links it to its owner); diag: the init's scale
-w_start:''' + D('''
+# ---- the clone's start (its specializer +0x34, (singleton, weapon, init)). v7: nothing (the moon's sets the model
+# scale from the init's +0x68; bunshin's paints it black). v8 bstart: bunshin's own, then its black overlay cleared
+# (ColorBlendModule slot 0 off). Diag: the init's scale (S4GZ)
+w_start:
         stwu r1, -0x30(r1)
         mflr r0
         stw r0, 0x34(r1)
+        stw r31, 0x2C(r1)
+        mr r31, r4
+        stw r5, 0x10(r1)''' + (('''
+        bl ws_bunshin
+        lwz r12, %(wacc)d(r31)
+        cmpwi r12, 0
+        beq ws_diag
+        lwz r3, %(wcol)d(r12)           # its ColorBlendModule: slot 0 (bunshin's black) off
+        cmpwi r3, 0
+        beq ws_diag
+        li r4, 0
+        lwz r12, 0(r3)
+        lwz r12, %(cclear)d(r12)
+        mtctr r12
+        bctrl''') if 'bstart' in feats else '') + '''
+ws_diag:''' + D('''
+        lwz r5, 0x10(r1)
         li r6, -1
         cmpwi r5, 0
         beq ws_log
@@ -1301,12 +1340,112 @@ w_start:''' + D('''
 ws_log: mr r4, r5
         mr r5, r6
         lis r3, %(gk_fz_hi)d
-        addi r3, r3, %(gk_fz_lo)d''' + osr() + '''
+        addi r3, r3, %(gk_fz_lo)d''' + osr()) + '''
+        lwz r31, 0x2C(r1)
         lwz r0, 0x34(r1)
         mtlr r0
-        addi r1, r1, 0x30''') + '''
-        blr
+        addi r1, r1, 0x30
+        blr''' + (('''
+ws_bunshin:''' + tail(BUNSHIN_START)) if 'bstart' in feats else '') + '''
 
+# ---- v8 diag: a clone's draw state (r3 its accessor, r4 its id): S4GM VisibilityModule +8 / is_visible, the
+# ModelModule's mode / its instance's drawn byte, ColorBlendModule slot 0 / enabled; S4GN z, scale, LinkModule mask
+''' + D('''w_ddiag:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stw r31, 0x3C(r1)
+        stw r30, 0x38(r1)
+        mr r31, r3
+        stw r4, 0x10(r1)
+        li r0, -1
+        stw r0, 0x14(r1)
+        stw r0, 0x18(r1)
+        stw r0, 0x1C(r1)
+        stw r0, 0x20(r1)
+        stw r0, 0x24(r1)
+        stw r0, 0x28(r1)
+        lwz r30, %(wvis)d(r31)
+        cmpwi r30, 0
+        beq wd_model
+        lbz r0, 8(r30)
+        stw r0, 0x14(r1)
+        mr r3, r30
+        lwz r12, 0(r3)
+        lwz r12, 0xA4(r12)
+        mtctr r12
+        bctrl
+        clrlwi r3, r3, 24
+        stw r3, 0x18(r1)
+wd_model:
+        lwz r12, %(wmodel)d(r31)
+        cmpwi r12, 0
+        beq wd_colour
+        lwz r0, 8(r12)
+        stw r0, 0x1C(r1)
+        lwz r11, 0xC(r12)
+        cmpwi r11, 0
+        beq wd_colour
+        lbz r0, 0x7DB(r11)
+        stw r0, 0x20(r1)
+wd_colour:
+        lwz r12, %(wcol)d(r31)
+        cmpwi r12, 0
+        beq wd_log
+        lbz r0, 0x50(r12)
+        stw r0, 0x24(r1)
+        lbz r0, 0xD9(r12)
+        stw r0, 0x28(r1)
+wd_log: lis r3, %(gk_fm_hi)d
+        addi r3, r3, %(gk_fm_lo)d
+        lwz r4, 0x10(r1)
+        lwz r5, 0x14(r1)
+        lwz r6, 0x18(r1)
+        lwz r7, 0x1C(r1)
+        lwz r8, 0x20(r1)
+        lwz r9, 0x24(r1)
+        lwz r10, 0x28(r1)''' + osr() + '''
+        li r0, -1
+        stw r0, 0x14(r1)
+        stw r0, 0x18(r1)
+        stw r0, 0x1C(r1)
+        lwz r12, %(wpost)d(r31)
+        cmpwi r12, 0
+        beq wd_link
+        lfs f1, 0x18(r12)
+        fctiwz f1, f1
+        stfd f1, 0x30(r1)
+        lwz r0, 0x34(r1)
+        stw r0, 0x14(r1)
+        lfs f1, 0x5C(r12)
+        lis r11, %(hundred_hi)d
+        lfs f0, %(hundred_lo)d(r11)
+        fmuls f1, f1, f0
+        fctiwz f1, f1
+        stfd f1, 0x30(r1)
+        lwz r0, 0x34(r1)
+        stw r0, 0x18(r1)
+wd_link:
+        lwz r12, %(wlink)d(r31)
+        cmpwi r12, 0
+        beq wd_log2
+        lwz r0, 0x84(r12)
+        stw r0, 0x1C(r1)
+wd_log2:
+        lis r3, %(gk_fn_hi)d
+        addi r3, r3, %(gk_fn_lo)d
+        lwz r4, 0x10(r1)
+        lwz r5, 0x14(r1)
+        lwz r6, 0x18(r1)
+        lwz r7, 0x1C(r1)
+        lwz r8, %(wmodel)d(r31)''' + osr() + '''
+        lwz r30, 0x38(r1)
+        lwz r31, 0x3C(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+''') + '''
 # ---- v7: the name tag: the SET_CURSOR message (as the ACMD command's handler 0x02BE7C80: {0xA, visible} to the
 # fighter's object id ([accessor + 0]) through the object messages 0x02BF2108 / 0x02BF019C); (r3 his entry, r4 visible)
 gk_tag: stwu r1, -0x50(r1)
