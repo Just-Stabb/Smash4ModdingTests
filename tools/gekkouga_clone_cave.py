@@ -97,7 +97,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # none: 2, loaded with the fighter. Bunshin's 0x87D has 0x1 (4: the Final Smash load,
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
-FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -109,6 +109,7 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', '
 #   burn    burn v1: his water moves burn whoever they hit (burn_scan / burn_add / burn_tick, BURN_MOVES)
 #   pose    clones v14: his tongue / water swing bones' world matrices copied onto the clones (w_pose, every phase)
 #   skeleton skeleton v1: the Running Skeleton article (needs burn): its kind, claim, collision, HP hit check, burn
+#   floor1  burn v2.1: the per-burn floor 1 % (shielded or not; 3 % without: the shielded rows' damage a tick)
 #   burn2   burn v2 (needs skeleton): fire on burning fighters (bfx_vic) and the smashes' fire trails (kind TR_KIND)
 #   hitcheck v12: the clone hit from his side (w_hitchk: other fighters' attack boxes against the clone's box)
 #   sway    v11: the clone's swing step every frame (w_sway: his MotionModule's swing update, as his frame calls it)
@@ -154,7 +155,12 @@ BURN_MOVES = (
                                   # row): 0.6 % every 6 frames for 6 s = 36 %, the strongest (shielded 0.21 % x 30 = 6.3 %)
 )
 SK_BURN_KEY = 0x101A2
-BURN_MIN_TOTAL = 3.0              # the user's floor for one instance, shielded or not
+BURN_MIN_TOTAL = 1.0              # the user's floor for one instance, shielded or not (burn v2.1, feature floor1; 3 % up
+BURN_MIN_TOTAL_OLD = 3.0          # to burn v2: the exes built without floor1)
+
+
+def burn_floor(feats):
+    return BURN_MIN_TOTAL if 'floor1' in feats else BURN_MIN_TOTAL_OLD
 BURN_SHIELD_DAMAGE = 0.35         # a shielded hit: 35 % of the damage a tick (burn v1.1; v1 20 %), half the duration
 
 
@@ -162,18 +168,18 @@ def burn_shield_frames(row):
     return max(1, row[3] // 2)
 
 
-def burn_shield_damage(row):
-    """a shielded instance's damage a tick: 35 % (v1.1), raised so its total is at least BURN_MIN_TOTAL (the clamp)"""
+def burn_shield_damage(row, floor=BURN_MIN_TOTAL):
+    """a shielded instance's damage a tick: 35 % (v1.1), raised so its total is at least the floor (the clamp)"""
     _k, dmg, interval, _frames = row
     ticks = max(1, burn_shield_frames(row) // interval)
-    return max(dmg * BURN_SHIELD_DAMAGE, BURN_MIN_TOTAL / ticks)
+    return max(dmg * BURN_SHIELD_DAMAGE, floor / ticks)
 
 
-def burn_total(row, shielded=False):
+def burn_total(row, shielded=False, floor=BURN_MIN_TOTAL):
     """one instance's total percent: (damage a tick) x (ticks)"""
     _k, dmg, interval, frames = row
     if shielded:
-        dmg, frames = burn_shield_damage(row), burn_shield_frames(row)
+        dmg, frames = burn_shield_damage(row, floor), burn_shield_frames(row)
     return dmg * (frames // interval)
 
 
@@ -335,15 +341,17 @@ TR_CTX = TR_MAX
 TR_TTL = 3
 TR_REQS = 3
 TR_BURN_KEY = 0x101A3
-TR_ROW = (TR_BURN_KEY, 0.25, 15, 180)   # 0.25 % every 15 frames for 3 s = 3 % (the user); shielded 0.5 % x 6 = 3 %
+TR_ROW = (TR_BURN_KEY, 0.25, 15, 180)   # 0.25 % every 15 frames for 3 s = 3 % (the user); shielded 0.167 % x 6 = 1 % (v2:
+                                        # 0.5 % x 6 = 3 % under the 3 % floor)
 GK_VAR_TR = 0x0F000300            # his VAR_0 + 4 k: request k's type, + 1 x, + 2 y, + 3 way
 TR_VAR_SLOT, TR_VAR_TYPE, TR_VAR_X, TR_VAR_Y, TR_VAR_DIR, TR_VAR_CTX = (0x0F000300 + i for i in range(6))
-assert all(burn_total(m, sh) >= BURN_MIN_TOTAL - 1e-4 for m in BURN_MOVES + (TR_ROW,) for sh in (False, True)), \
-    'a burn under %s %%' % BURN_MIN_TOTAL
-RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+assert all(burn_total(m, sh, f) >= f - 1e-4 for m in BURN_MOVES + (TR_ROW,) for sh in (False, True)
+           for f in (BURN_MIN_TOTAL, BURN_MIN_TOTAL_OLD)), 'a burn under the floor'
+RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
 # swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose); burn v2:
-# + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2)
+# + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2 - floor1); burn
+# v2.1: + floor1 (the burn floor 1 %, the user; burn v2's exe_v46z_gkb4 is RELEASE - floor1)
 VARIANTS = (('A_release', RELEASE), ('G_pose', (RELEASE - {'sway'}) | {'pose'}))
 # v15: A_release (the release: the native swing, diag) and G_pose (v14's pose copy instead of the swing, in case); v14:
 # A_release (attack hitcheck burn skeleton pose) and E_sway (attack hitcheck burn skeleton sway); v13's D_parts dropped   # v13: each on the release's set (v3 - v12's hurtbox route, C_hurt, dropped:
@@ -2655,7 +2663,8 @@ def build(rpx, diag=False, feats=None):
         out.blob(A['btab'], bytes(SLOTS * BURN_CAP * 16), 'burn instances')
         nbp = burn_contexts(feats) * BURN_ENTS
         out.blob(A['bproc'], bytes(nbp + (-nbp) % 4), 'burn processed counts')
-        out.blob(A['bmoves'], b''.join(struct.pack('>IfIIf', *(m + (burn_shield_damage(m),))) for m in burn_moves(feats)),
+        out.blob(A['bmoves'], b''.join(struct.pack('>IfIIf', *(m + (burn_shield_damage(m, burn_floor(feats)),)))
+                                       for m in burn_moves(feats)),
                  'burn moves (kind, damage, interval, frames, shielded damage)')
         out.blob(A['bconst'], struct.pack('>2f', BURN_SHIELD_DAMAGE, 1000.0), 'burn constants')
         if diag:
@@ -4153,7 +4162,7 @@ ba_put: lwz r8, 12(r4)                  # the duration
         cmpwi r11, 0
         beq ba_full
         srwi r8, r8, 1                  # shielded: half the frames
-        lfs f1, 16(r4)                  # its damage: 35 %%, raised to the 3 %% total floor (burn_shield_damage)
+        lfs f1, 16(r4)                  # its damage: 35 %%, raised to the total floor (burn_shield_damage: 1 %%, 3 %% before)
         cmpwi r8, 0
         bne ba_full
         li r8, 1
