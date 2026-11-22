@@ -3868,3 +3868,11 @@ MSC on a bunshin-based kind, the 4-shape group.
   `0x028E3E18(hud, i)` (called at `0x028E4020`) shows a marker only while `hud + i x 0x2B00 + 0x2B75` is set (else
   fades `+0x2B78`); fixed in `gekkouga_clone_cave.py` `plyc`. The swing parser is called from the motion bind
   (`0x0330E030`).
+- **Swing (v11 research, nothing built)**: the motion bind (`0x0330DFE8`) makes a swing system at motion object +0x20
+  (`0x03327448`) when the model resource has a model.sb (+0x6FC) or model.nhb (+0x700), parses them (`0x036B8040`,
+  `0x036B736C`). A manager (vtable `0x10193260`, two-word entries; data words filled by relocations, so search the
+  RELA sections, not the raw data) steps it: its method `0x03320638` walks the list at [mgr+8] (node +0x10 the motion
+  object, its +0x20 the swing system) and skips a system whose +0xB4 has bit 0x2. How a motion object gets onto that
+  list (and why the clone's never stepped) is not found. Ghirahim's assist model (the user's files) has the empty
+  12-byte model.sb (count 0), no SWG / HLP bones, his cape keyed in main.pac: no swing there; and a count-0 model.sb
+  loads on a non-fighter model without SWG bones.
