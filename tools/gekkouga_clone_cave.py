@@ -99,6 +99,12 @@ FEATURES = frozenset(('template', 'parts', 'hurt', 'poll'))   # v4: each risky p
 # spawn), built in or not: template = lizardonm's per-frame routine / module row (else bunshin's own, exactly: no attack,
 # no hurtbox); parts = his motion parts and flags on the clone (else bunshin's: none); hurt = its hurtboxes (+0x1C);
 # poll = the damage pollers (+0x64 ... +0x94; needs template's DamageModule). VARIANTS: the shipped builds
+SAFE_BASE = 0xFC                  # v5: moon (his Final Smash's moon): the safe build's base kind (its per-frame template =
+                                  # bunshin's + the +0x1C module's update) and its MSC agent; v4's safe build (bunshin's
+                                  # row and template) never ran the clone's MSC (the user's v4 A log: no S4GC): bunshin
+                                  # has no MSC module (row slot 8, accessor +0x1C: shuriken / water / moon have it,
+                                  # bunshin / tatami / monsterball don't), its template no +0x1C update
+MSC_SLOT = 8
 RELEASE = frozenset()             # v4's release exe: the safe set (nothing risky) until a TEST_ONLY log clears the rest
 VARIANTS = (('A_safe', frozenset()), ('B_template', frozenset(('template',))),
             ('C_hurt', frozenset(('template', 'hurt', 'poll'))), ('D_full', FEATURES))
@@ -324,6 +330,8 @@ def layout(img, feats=None):
     rows += [[CLONE_KIND, 1, 0, 0], [CLONE_KIND, 1, 0, 0]]
     feats = FEATURES if feats is None else feats
     mrow = [img.w(W.MODULE_TABLE + 0x70 * (TEMPLATE if 'template' in feats else CLONE_BASE) + 4 * j) for j in range(28)]
+    if 'template' not in feats:
+        mrow[MSC_SLOT] = img.w(W.MODULE_TABLE + 0x70 * SAFE_BASE + 4 * MSC_SLOT)   # v5: the MSC agent (moon's)
     assert img.w(svt + 0x1C) == 0x02AF695C and img.w(0x02AF695C) == 0x4E800020, "bunshin's +0x1C: a blr"
     for j in (2, 6, 7, 20, 26):
         f = img.w(W.MODULE_TABLE + 0x70 * TEMPLATE + 4 * j)
@@ -381,6 +389,7 @@ def build(rpx, diag=False, feats=None):
     A['gk_hide'] = alloc(4 * SLOTS)
     A['gk_slow'] = alloc(4 * SLOTS)
     A['gk_lastf'] = alloc(8 * SLOTS) if diag else 0   # diag: the flags last logged / the tag-hide logged, per slot
+    A['gk_seen'] = alloc(4 * 16) if diag else 0       # diag: the HUD calls seen, by r29
     assert A['gk_slow'] == A['gk_hide'] + 0x20
     assert not diag or A['gk_lastf'] == A['gk_slow'] + 0x20
     A['consts'] = alloc(28)          # 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, the hitstop multiplier
@@ -395,7 +404,8 @@ def build(rpx, diag=False, feats=None):
             ('gk_fc', 'S4GC clone first frame: id=%d owner slot=%d\n'),
             ('gk_fu', 'S4GU tag hidden: player=%d cursor=%08X\n'),
             ('gk_fj', 'S4GJ clone set-up done\n'),
-            ('gk_fp', 'S4GP clone first update (its script not run yet): weapon accessor=%08X\n')]
+            ('gk_fp', 'S4GP clone first update (its script not run yet): weapon accessor=%08X\n'),
+            ('gk_fv', 'S4GV HUD cursor update: r29=%d cursor=%08X\n')]
     for nm, s in fmts:
         A[nm] = alloc((len(s) + 4) & ~3, 4) if diag else 0
     code_at = alloc(0, 4)
@@ -426,6 +436,7 @@ def build(rpx, diag=False, feats=None):
     out.blob(A['gk_hide'], bytes(8 * SLOTS), 'hide counters / slow states')
     if diag:
         out.blob(A['gk_lastf'], bytes(8 * SLOTS), 'diag: flags logged / tag hide logged')
+        out.blob(A['gk_seen'], bytes(4 * 16), 'diag: HUD calls seen')
     out.blob(A['consts'], struct.pack('>6fI', 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, img.w(HITSTOP_MUL)), 'constants')
     out.blob(A['hurt'], hurt_blob(), 'clone hurtboxes (his vl group 5, article joints)')
     out.blob(A['gk_str'], CLONE_NAME.encode().ljust(8, b'\0'), '"clone"')
@@ -439,7 +450,7 @@ def build(rpx, diag=False, feats=None):
              hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, whit=W_HIT_MOD, wdmg=W_DAMAGE, watk=W_ATTACK,
              wstop=W_STOP, nhurt=len(HURTBOXES), s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
-               'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp'):
+               'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -454,7 +465,42 @@ g1_stub:
         addi r7, r7, %(g1_desc_lo)d''' + tail(G1_FN) + '''
 
 # ---- the HUD's cursor update (HUD_HOOK -> TRAMP -> here; r3 the cursor, r29 = 8 - player, LR back into the HUD)
-hud:    li r12, 8
+hud:''' + D('''
+        lis r11, %(gk_seen_hi)d
+        addi r11, r11, %(gk_seen_lo)d
+        andi. r10, r29, 15
+        slwi r10, r10, 2
+        lwzx r0, r11, r10
+        cmpwi r0, 0
+        bne hud_s
+        li r0, 1
+        stwx r0, r11, r10
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stw r3, 0x8(r1)
+        stw r4, 0xC(r1)
+        stw r5, 0x10(r1)
+        stw r6, 0x14(r1)
+        stw r7, 0x18(r1)
+        stw r8, 0x1C(r1)
+        stw r9, 0x20(r1)
+        mr r5, r3
+        mr r4, r29
+        lis r3, %(gk_fv_hi)d
+        addi r3, r3, %(gk_fv_lo)d''' + osr() + '''
+        lwz r3, 0x8(r1)
+        lwz r4, 0xC(r1)
+        lwz r5, 0x10(r1)
+        lwz r6, 0x14(r1)
+        lwz r7, 0x18(r1)
+        lwz r8, 0x1C(r1)
+        lwz r9, 0x20(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+hud_s:''') + '''
+        li r12, 8
         subf r12, r29, r12              # the player (r12 = 8 - r29)
         cmplwi r12, %(slots)d
         bge hud_go
@@ -1145,7 +1191,7 @@ w_dcase:
         out.words.pop(wa, None)
         out.put(wa, word, 'table %s 0x%X' % (nm, CLONE_KIND))
     out.put(T['dt'] + 4 * k, lab['w_dcase'], 'descriptor case 0x%X' % CLONE_KIND, 0)
-    out.put(T['bt'] + 4 * k, TEMPLATE if 'template' in feats else CLONE_BASE, 'base kind 0x%X' % CLONE_KIND, 0xFFFF)
+    out.put(T['bt'] + 4 * k, TEMPLATE if 'template' in feats else SAFE_BASE, 'base kind 0x%X' % CLONE_KIND, 0xFFFF)
     out.put(T['st'] + 4 * k, A['w_single'], 'singleton case 0x%X' % CLONE_KIND, 0)
     out.put(T['rt'] + 4 * k, (A['w_row'] - W.MODULE_TABLE) & 0xFFFFFFFF, 'own module row 0x%X' % CLONE_KIND, 0)
     info = dict(A=A, labels=lab, T=T, layout=L, end=end, owner_str=owner_str, feats=feats)
