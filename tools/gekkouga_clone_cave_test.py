@@ -637,6 +637,9 @@ def s13_checks(e, info):
     sp = 0x700F0000
     e.run_to(lab['s13'], C.SLOT13 + 4, 0x51, fk['f'], 0x53)
     check('slot 13, bit 1: his slot\'s (3) hide counter = 4', [e.w(hide + 4 * i) for i in range(8)], [0, 0, 0, 4, 0, 0, 0, 0])
+    if 'skeleton' in info['feats']:
+        check('skeleton v1: slot 13 writes his VAR_14 = the clear-all count & 7 (his MSC resets on a change: a training '
+              'reset)', e.vars.get(C.VAR_GEN_CLR), float(e.w(info['A']['gk_clr']) & 7))
     check('slot 13: on to his own code (stwu replayed, r3 / r4 / r5 kept, the non-volatiles kept)',
           (e.mu.reg_read(UC_PPC_REG_1), e.r(3), e.r(4), e.r(5), e.kept()), (0x700F0000 - 0x70, 0x51, fk['f'], 0x53, True))
     check('no slow without bit 2', [c for c in e.calls if c[0].startswith('slow')], [])
