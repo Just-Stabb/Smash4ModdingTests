@@ -1337,6 +1337,11 @@ def clear_checks(e, info, diag):
     e.mu.reg_write(RG[10], 0x10)
     e.call(lab['gk_clear'], 0x12345678, until=C.CLEAR_BACK)
     check('burn v1.2: gk_clear back at CLEAR_BACK with r3 / r10 kept', (e.r(3), e.r(10)), (0x12345678, 0x10))
+    if 'btint' in F:
+        check('burn tint v1: gk_clear: every victim\'s tint state tier 0, fade -1 (off the next frame)',
+              [(e.w(A['bti_st'] + 16 * i), e.w(A['bti_st'] + 16 * i + 4)) for i in range(C.SLOTS)], [(0, 0xFFFFFFFF)] * C.SLOTS)
+        for i in range(C.SLOTS):
+            e.setw(A['bti_st'] + 16 * i + 4, 0)
     if burn:
         check('burn v1.2: every burn of the last match gone, the processed counts 0',
               (any(e.w(A['btab'] + k) for k in range(0, C.SLOTS * C.BURN_CAP * 16, 4)),
@@ -2161,6 +2166,8 @@ def burn2_checks(e, info, diag):
         return list(calls)
     if 'tiers' in F:
         tier_checks(e, A, put, frame, vem)
+        if 'btint' in F:
+            btint_checks(e, info, put, frame, vic)
     else:
         bfx_level_checks(e, A, put, frame, vem, gk)
     if diag:
@@ -2228,6 +2235,139 @@ def tier_checks(e, A, put, frame, vem):
     put(0)
     check('burn tiers: no burn left: the fire ended with a fade (0x2723 (id, 0, 0): its 15 frames), nothing put on',
           frame(), [end(1, 0)])
+
+
+def btint_checks(e, info, put, frame, vic):
+    """burn tint v1 (feature btint): the burning victim's overlay (ColorBlendModule slot BTINT_SLOT) and its outline (an
+    Outline_Shell table entry) by its fire's tier, the fade, the KO, a reset, a command's outline left alone"""
+    lab, A = info['labels'], info['A']
+    rows = {m[0]: m for m in C.BURN_MOVES}
+    nair, fair, sk = rows[104], rows[105], rows[C.SK_BURN_KEY]
+    inst = lambda r: (r[3], r[2], r[1])                                 # noqa: E731
+    vacc = e.w(vic['f'] + C.BASE_ACC)
+    cvt = e.alloc(0x100, b'\0')
+    cset, cclr = e.alloc(4), e.alloc(4)
+    e.setw(cvt + 0x4C, cset)
+    e.setw(cvt + C.COLOUR_CLEAR, cclr)
+    cbm = e.alloc(0x100, b'\0')
+    e.setw(cbm, cvt)
+    e.setw(vacc + C.W_COLOUR, cbm)
+    calls = []
+    rd = lambda a, n: [round(x, 4) for x in struct.unpack('>%df' % n, bytes(e.mu.mem_read(a, 4 * n)))]   # noqa: E731
+    e.stub(cset, lambda e_: calls.append(('set', tuple(rd(e_.r(4), 4)), e_.r(5), e_.r(6))))
+    e.stub(cclr, lambda e_: calls.append(('clear', e_.r(4))))
+    mm = e.alloc(0x40, b'\0')
+    inst_obj = e.alloc(0x100, b'\0')
+    e.setw(mm + 0xC, inst_obj)
+    e.setw(vacc + 0x3C, mm)
+    stm = e.alloc(0x60, b'\0')
+    e.setw(vacc + C.F_STATUS, stm)
+    os_g = 0x04BE5D10
+
+    def ent():
+        for i in range(C.OS_N):
+            a = C.OS_TAB + C.OS_ENT * i
+            if e.w(a) == vacc:
+                return a
+        return None
+
+    def shell():
+        a = ent()
+        if a is None:
+            return None
+        return (e.w(a + 4) == inst_obj, e.w(a + 8), tuple(rd(a + 0x1C, 3)), rd(a + 0x28, 1)[0], rd(a + 0x2C, 1)[0], e.w(os_g))
+
+    def want_shell(tier, fade=C.BTINT_FADE):
+        _t, sh = C.btint_ref(tier, fade)
+        return (True, 2, tuple(round(x, 4) for x in sh[:3]), round(sh[3], 4), round(sh[4], 4), 1)
+
+    def want_set(tier, fade=C.BTINT_FADE):
+        t, _sh = C.btint_ref(tier, fade)
+        return ('set', tuple(round(x, 4) for x in t), C.BTINT_SLOT, 0)
+
+    def step(ins=None):
+        if ins is not None:
+            put(ins)
+        del calls[:]
+        frame()
+        return list(calls)
+    for i in range(C.OS_N * C.OS_ENT // 4):
+        e.setw(C.OS_TAB + 4 * i, 0)
+    e.setw(os_g, 0)
+    for _ in range(C.BTINT_FADE + 2):
+        step(0)
+    check('burn tint: the colour table (the user: orange -> hot red, a faint red outline growing a little): tiers 1 - 4',
+          [C.btint_ref(t, C.BTINT_FADE) for t in (1, 2, 3, 4)],
+          [(C.BTINT_TINT[t], C.BTINT_SHELL[t]) for t in (1, 2, 3, 4)])
+    check('burn tint: no burn: no overlay, no outline', (step(0), shell()), ([], None))
+    for tier, ins, what in ((1, [inst(nair)], 'a neutral air burn'), (2, [inst(fair)], 'a forward air burn'),
+                            (4, [inst(sk)], 'the explosion burn')):
+        got = step(ins)
+        check('burn tint: %s (tier %d): its overlay in slot %d (%s), its outline entry (held, faint red, alpha %.2f, '
+              'width %.2f px; the table\'s count 1)' % (what, tier, C.BTINT_SLOT, C.BTINT_TINT[tier], C.BTINT_SHELL[tier][3],
+                                                       C.BTINT_SHELL[tier][4]),
+              (got, shell()), ([want_set(tier)], want_shell(tier)))
+    check('burn tint: ... every frame while it burns (the game\'s own overlays may clear the slot)', step(), [want_set(4)])
+    a0 = ent()
+    fades = []
+    for f in range(C.BTINT_FADE - 1, 0, -1):
+        got = step(0)
+        fades.append((got == [want_set(4, f)], shell() == want_shell(4, f)))
+    check('burn tint: the burns end: overlay and outline fade over %d frames (the fire\'s fade), same entry' % C.BTINT_FADE,
+          (fades, ent() == a0), ([(True, True)] * (C.BTINT_FADE - 1), True))
+    check('burn tint: ... then off: the slot cleared (vt +0x%X(%d)), the outline entry freed (count 0)' % (C.COLOUR_CLEAR,
+          C.BTINT_SLOT), (step(0), ent(), e.w(os_g)), ([('clear', C.BTINT_SLOT)], None, 0))
+    check('burn tint: ... and nothing after', step(0), [])
+    # a command's outline (Supamario's Ultra Instinct glow): left alone, the tint still shown
+    cmd = C.OS_TAB + C.OS_ENT * 5
+    e.setw(cmd, vacc)
+    e.setw(cmd + 4, inst_obj)
+    e.setw(cmd + 8, 2)
+    e.mu.mem_write(cmd + 0x1C, struct.pack('>5f', 0.8, 0.9, 1.0, 1.0, 4.0))
+    e.setw(os_g, 1)
+    got = step([inst(nair)])
+    check('burn tint: an outline a command put on it (another entry of its accessor): left as it is; its overlay still on',
+          (got, rd(cmd + 0x1C, 5), e.w(os_g)), ([want_set(1)], [0.8, 0.9, 1.0, 1.0, 4.0], 1))
+    e.setw(cmd, 0)
+    e.setw(cmd + 8, 0)
+    e.setw(os_g, 0)
+    step()
+    a1 = ent()
+    e.mu.mem_write(a1 + 0x2C, struct.pack('>f', 6.0))          # a command took our entry over (its width)
+    step()
+    check('burn tint: our entry taken over by a command (its width changed): no longer written, nor freed at the end',
+          (rd(a1 + 0x2C, 1), e.w(A['bti_st'] + 16 * 4 + 8)), ([6.0], 0))
+    for _ in range(C.BTINT_FADE + 1):
+        step(0)
+    check('burn tint: ... its end: the overlay cleared, that entry kept (a command\'s)', ent() == a1, True)
+    e.setw(a1, 0)
+    e.setw(a1 + 8, 0)
+    # a KO: off at once
+    step([inst(sk)])
+    e.setw(stm + C.ST_KIND, C.ST_DEAD)
+    got = step()
+    check('burn tint: KO\'d (Dead): off at once (its burns cleared, the slot cleared, the entry freed)',
+          (got, ent()), ([('clear', C.BTINT_SLOT)], None))
+    check('burn tint: ... dead the next frame: nothing again', step(), [])
+    e.setw(stm + C.ST_KIND, 0)
+    # a reset (gk_clear: tier 0, fade -1): off the next frame
+    step([inst(nair)])
+    e.setw(A['bti_st'] + 16 * 4, 0)
+    e.setw(A['bti_st'] + 16 * 4 + 4, 0xFFFFFFFF)
+    got = step(0)
+    check('burn tint: after a match / training reset (gk_clear: tier 0, fade -1): off the next frame, no fade',
+          (got, ent()), ([('clear', C.BTINT_SLOT)], None))
+    # only the first live Greninja steps it
+    e.setw(A['bti_st'] + 16 * 4 + 4, 0)
+    put([inst(nair)])
+    gk0 = e.fighter(0)
+    e.mu.mem_write(gk0['f'] + 0x1E, b'\x04')
+    del calls[:]
+    frame()
+    check('burn tint: a Greninja in an earlier slot (0): slot 2\'s burn_tick leaves the tint to his', calls, [])
+    e.mu.mem_write(gk0['f'] + 0x1E, b'\x00')
+    for _ in range(C.BTINT_FADE + 2):
+        step(0)
 
 
 def bfx_level_checks(e, A, put, frame, vem, gk):

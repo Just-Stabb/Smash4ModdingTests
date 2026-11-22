@@ -98,7 +98,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
-                      'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -115,6 +115,8 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', '
 #   tiers   skeleton v1.3 / burn tiers (needs burn2): the burning fighters' fire picked by tier (BFX_TIERS: their burns'
 #           count, remaining damage, strongest rate), a different effect each (BFX_TIER_IDS) in place of one scaled
 #   skbody  skeleton v1.5: its collision vertices and HP hit box fit to its body (SK_BODY) instead of its flames
+#   btint   burn tint v1 (needs tiers): burning fighters tinted orange -> hot red and outlined faint red by their fire's
+#           tier (BTINT_TINT / BTINT_SHELL: ColorBlendModule slot BTINT_SLOT, an Outline_Shell entry), faded with the fire
 #   skdist  skeleton v1.6: his side special's shadow stops at SK_DIST ahead of him (his slot 13's hold advance capped
 #           there in place of the vl max distance 0x0600000C): SK_DIST_PATCH
 #   sktouch skeleton v1.5 (needs burn2): its running contact hits burn with SK_TOUCH_ROW (its explosion's: the skeleton row)
@@ -378,6 +380,326 @@ BFX_TIER_IDS = (0, 0x0330001F, 0x0330001A, 0x03300020, 0x03300021)   # tier -> h
                                   # PtcGekkougaFireBody1 / FireBody (burn v2's, tier 2) / FireBody3 / FireBody4)
 
 
+# burn tint v1 (feature btint; the user: "based on burn amount and strength, please tint the opponent into an orange more
+# with a feint red outline", then "The higher strength levels should turn into a hot red"): each frame, per victim (the
+# first live Greninja's burn_tick only: one step a frame), from its fire's tier (bfx_lvl: BFX_TIERS) -
+# (1) a colour overlay in its ColorBlendModule's priority slot BTINT_SLOT (vt +0x4C(&rgba 0-1, slot, 0); the game shows
+#     slot 1 when slot 0 is off or of a lower priority (vt +0xAC): the game's own overlays, in slot 0, win), drawn as
+#     lit x (1 - a) + rgb x a; tier 4 a little over 1 in red (heat, not a dark red);
+# (2) a thin faint red Outline_Shell (tools/outline_shell_cave.py's table in the base exe: an entry of its own when the
+#     victim has none; one an ACMD Outline_Shell made or took over (Supamario's Ultra Instinct glow) is left alone);
+# both at full while it burns, faded over BTINT_FADE frames (the fire's 15-frame fade) when the burns end, off at once on
+# a KO (Dead / Rebirth) and at a match / training reset (gk_clear: off the next frame)
+BTINT_SLOT = 1
+BTINT_FADE = 15
+BTINT_TINT = {                    # tier: (r, g, b, alpha) of the overlay
+    1: (1.0, 0.6, 0.2, 0.18),     # light orange
+    2: (1.0, 0.47, 0.14, 0.26),   # orange
+    3: (1.0, 0.35, 0.1, 0.34),    # red-orange
+    4: (1.2, 0.15, 0.05, 0.42),   # hot red (red over 1: brighter)
+}
+BTINT_SHELL = {                   # tier: (r, g, b, alpha, width in pixels of 1280 x 720) of the outline
+    1: (1.0, 0.12, 0.06, 0.28, 1.5),
+    2: (1.0, 0.1, 0.05, 0.34, 1.75),
+    3: (1.0, 0.08, 0.04, 0.40, 2.0),
+    4: (1.0, 0.06, 0.03, 0.48, 2.5),
+}
+BTINT_ROW = 36                    # bytes a tier: the tint's 4 floats, the outline's 5
+OS_TAB, OS_N, OS_ENT = 0x04BE5F5C, 16, 0x50   # the Outline_Shell table in exe_v46z_ui10 (outline_shell_cave.py os_tab:
+OS_COUNT = 0x04BE5388             # entry +0 accessor, +4 model instance, +8 phase (2 held), +0xC w, +0x10 / +0x14 rates,
+OS_COUNT_WORDS = (0x3D8004BE, 0x398C5F5C, 0x39600010, 0x39200000)   # +0x18 frames, +0x1C rgb, +0x28 alpha, +0x2C width,
+                                  # +0x30 blend, +0x38 flash, +0x3C frames since, +0x40 weight drawn); os_count (its
+                                  # words asserted) recounts the entries in use (os_g +0), which its frame needs
+
+
+def btint_k():
+    """bti_k's bytes: +0 1 / BTINT_FADE, +4 0.0, +8 1.0, +0xC 0, +0x10 the int -> float magic (8-aligned), +0x18 the
+    tiers' rows (tier 0 zero)"""
+    rows = b''.join(struct.pack('>9f', *(BTINT_TINT[t] + BTINT_SHELL[t])) if t else bytes(BTINT_ROW) for t in range(5))
+    return struct.pack('>3fI', 1.0 / BTINT_FADE, 0.0, 1.0, 0) + struct.pack('>II', 0x43300000, 0x80000000) + rows
+
+
+def btint_ref(tier, fade):
+    """(Python reference) the overlay (r, g, b, a) and the outline (r, g, b, a, width) for a tier at fade frames left of
+    BTINT_FADE (full while it burns)"""
+    w = fade / float(BTINT_FADE)
+    t, sh = BTINT_TINT[tier], BTINT_SHELL[tier]
+    return t[:3] + (t[3] * w,), sh[:3] + (sh[3] * w, sh[4])
+
+
+def btint_src(D):
+    return r'''
+# ==== burn tint v1: (r3 a victim 0-7, r4 his slot) its tint / outline from its fire's tier (bfx_lvl). Only the first live
+# Greninja's burn_tick steps it (one step a frame). State per victim (bti_st, 16 bytes): +0 the tier shown (0 none), +4 fade
+# frames left (-1: an off asked by gk_clear), +8 its outline entry (ours), +0xC that entry's width as we wrote it
+bti_vic:
+        stwu r1, -0x60(r1)
+        mflr r0
+        stw r0, 0x64(r1)
+        stmw r24, 0x40(r1)
+        stfd f31, 0x38(r1)
+        mr r31, r3
+        mr r30, r4
+        li r29, 0
+btv_g:  cmpw r29, r30
+        bge btv_me
+        addi r3, r29, 1
+        bl gk_entry
+        cmpwi r3, 0
+        beq btv_gn
+        lwz r0, 4(r3)
+        cmpwi r0, %(gkind)d
+        beq btv_out                     # an earlier Greninja's burn_tick does it
+btv_gn: addi r29, r29, 1
+        b btv_g
+btv_me: lis r28, %(bti_st_hi)d
+        addi r28, r28, %(bti_st_lo)d
+        slwi r0, r31, 4
+        add r28, r28, r0
+        lis r25, %(bti_k_hi)d
+        addi r25, r25, %(bti_k_lo)d
+        lis r12, %(bfx_lvl_hi)d
+        addi r12, r12, %(bfx_lvl_lo)d
+        slwi r0, r31, 2
+        lwzx r27, r12, r0               # its fire's tier now (0 none)
+        addi r3, r31, 1
+        bl gk_entry
+        cmpwi r3, 0
+        beq btv_gone
+        lwz r26, %(bacc)d(r3)
+        lis r0, 0x1000
+        cmplw r26, r0
+        blt btv_gone
+        lis r0, 0x8000
+        cmplw r26, r0
+        bge btv_gone
+        lwz r11, %(fstatus)d(r26)
+        lis r0, 0x1000
+        cmplw r11, r0
+        blt btv_live
+        lis r0, 0x8000
+        cmplw r11, r0
+        bge btv_live
+        lwz r10, %(st_kind)d(r11)
+        addi r10, r10, -%(st_dead)d
+        cmplwi r10, %(st_dead_n)d
+        bge btv_live
+        lwz r0, 0(r28)                  # KO'd (Dead / Rebirth): off at once (once)
+        cmpwi r0, 0
+        bne btv_off
+        lwz r0, 4(r28)
+        cmpwi r0, 0
+        bne btv_off
+        b btv_out
+btv_live:
+        cmpwi r27, 0
+        beq btv_fade
+        stw r27, 0(r28)
+        li r0, %(bti_fade)d
+        stw r0, 4(r28)
+        b btv_on
+btv_fade:
+        lwz r27, 0(r28)
+        lwz r9, 4(r28)
+        cmpwi r27, 0
+        bne btv_step
+        cmpwi r9, -1                    # an off asked (a reset)
+        beq btv_off
+        b btv_out
+btv_step:
+        addi r9, r9, -1
+        stw r9, 4(r28)
+        cmpwi r9, 0
+        ble btv_off
+btv_on: lwz r9, 4(r28)                  # f31: the fade's weight (frames left / BTINT_FADE)
+        xoris r9, r9, 0x8000
+        stw r9, 0x14(r1)
+        lis r0, 0x4330
+        stw r0, 0x10(r1)
+        lfd f1, 0x10(r1)
+        lfd f2, 0x10(r25)
+        fsub f1, f1, f2
+        frsp f1, f1
+        lfs f0, 0(r25)
+        fmuls f31, f1, f0
+        mulli r0, r27, %(bti_row)d
+        addi r24, r25, 0x18
+        add r24, r24, r0                # its tier's row
+        lfs f0, 0(r24)
+        stfs f0, 0x18(r1)
+        lfs f0, 4(r24)
+        stfs f0, 0x1C(r1)
+        lfs f0, 8(r24)
+        stfs f0, 0x20(r1)
+        lfs f0, 12(r24)
+        fmuls f0, f0, f31
+        stfs f0, 0x24(r1)
+        lwz r3, %(wcol)d(r26)           # its ColorBlendModule: the overlay in slot BTINT_SLOT
+        lis r0, 0x1000
+        cmplw r3, r0
+        blt btv_sh
+        lis r0, 0x8000
+        cmplw r3, r0
+        bge btv_sh
+        addi r4, r1, 0x18
+        li r5, %(bti_slot)d
+        li r6, 0
+        lwz r12, 0(r3)
+        lwz r12, 0x4C(r12)
+        mtctr r12
+        bctrl
+btv_sh: mr r3, r26
+        mr r4, r28
+        addi r5, r24, 16
+        bl bti_shell
+        b btv_out
+btv_off:
+        li r0, 0
+        stw r0, 0(r28)
+        stw r0, 4(r28)
+        lwz r3, %(wcol)d(r26)
+        lis r0, 0x1000
+        cmplw r3, r0
+        blt btv_uns
+        lis r0, 0x8000
+        cmplw r3, r0
+        bge btv_uns
+        li r4, %(bti_slot)d
+        lwz r12, 0(r3)
+        lwz r12, %(cclear)d(r12)
+        mtctr r12
+        bctrl
+btv_uns:
+        mr r3, r26
+        mr r4, r28
+        bl bti_unshell
+        b btv_out
+btv_gone:
+        li r0, 0                        # no such fighter: nothing to clear
+        stw r0, 0(r28)
+        stw r0, 4(r28)
+        stw r0, 8(r28)
+btv_out:
+        lfd f31, 0x38(r1)
+        lmw r24, 0x40(r1)
+        lwz r0, 0x64(r1)
+        mtlr r0
+        addi r1, r1, 0x60
+        blr
+
+# (r3 its accessor, r4 its state, r5 its tier's outline row (r, g, b, alpha, width), f31 the fade): its Outline_Shell
+# entry: the one we made (unchanged since: its width ours), else a free one when it has none; one of a command's
+# (another entry of its accessor, or ours taken over) is left alone
+bti_shell:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r27, 0x2C(r1)
+        mr r31, r3
+        mr r30, r4
+        mr r29, r5''' + OL.mi_of('r31', 'r28', 'bts_out') + r'''
+        lis r12, %(os_tab_hi)d
+        addi r12, r12, %(os_tab_lo)d
+        li r11, %(os_n)d
+        li r27, 0
+bts_l:  lwz r0, 0(r12)
+        cmplw r0, r31
+        beq bts_have
+        cmpwi r27, 0
+        bne bts_n
+        cmpwi r0, 0
+        bne bts_n
+        mr r27, r12
+bts_n:  addi r12, r12, %(os_ent)d
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne bts_l
+        cmpwi r27, 0                    # none of its own: a free one (none free: no outline)
+        beq bts_lost
+        mr r12, r27
+        stw r31, 0(r12)
+        stw r28, 4(r12)
+        li r0, 2                        # held (no fades of its own, no frame count)
+        stw r0, 8(r12)
+        lis r11, %(bti_k_hi)d
+        addi r11, r11, %(bti_k_lo)d
+        lfs f0, 8(r11)                  # 1.0
+        stfs f0, 0xC(r12)
+        stfs f0, 0x40(r12)
+        li r0, 0
+        stw r0, 0x10(r12)
+        stw r0, 0x14(r12)
+        stw r0, 0x18(r12)
+        stw r0, 0x30(r12)               # blend 0: over what is behind
+        stw r0, 0x38(r12)
+        stw r0, 0x3C(r12)
+        b bts_set
+bts_have:
+        lwz r0, 8(r30)
+        cmplw r0, r12
+        bne bts_lost                    # a command's entry: left alone
+        lwz r0, 0xC(r30)
+        lwz r9, 0x2C(r12)
+        cmplw r0, r9
+        bne bts_lost                    # ours, but a command changed it since: theirs now
+        lwz r0, 4(r12)
+        cmplw r0, r28
+        bne bts_lost
+bts_set:
+        lfs f0, 0(r29)
+        stfs f0, 0x1C(r12)
+        lfs f0, 4(r29)
+        stfs f0, 0x20(r12)
+        lfs f0, 8(r29)
+        stfs f0, 0x24(r12)
+        lfs f0, 12(r29)
+        fmuls f0, f0, f31
+        stfs f0, 0x28(r12)
+        lwz r0, 16(r29)
+        stw r0, 0x2C(r12)
+        stw r12, 8(r30)
+        stw r0, 0xC(r30)
+        bl 0x%(os_count)08X
+        b bts_out
+bts_lost:
+        li r0, 0
+        stw r0, 8(r30)
+bts_out:
+        lmw r27, 0x2C(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+
+# (r3 its accessor, r4 its state): our outline entry freed (if still ours)
+bti_unshell:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        lwz r12, 8(r4)
+        li r0, 0
+        stw r0, 8(r4)
+        cmpwi r12, 0
+        beq btu_out
+        lwz r0, 0(r12)
+        cmplw r0, r3
+        bne btu_out
+        lwz r0, 0xC(r4)
+        lwz r9, 0x2C(r12)
+        cmplw r0, r9
+        bne btu_out
+        li r0, 0
+        stw r0, 0(r12)
+        stw r0, 8(r12)
+        bl 0x%(os_count)08X
+btu_out:
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+'''
+
+
 def bfx_tier(instances):
     """the tier of a victim's burns: instances [(frames left, interval, damage a tick)] (the exe's bfx_vic)"""
     live = [(f, iv, d) for f, iv, d in instances if f]
@@ -412,14 +734,14 @@ TR_VAR_SLOT, TR_VAR_TYPE, TR_VAR_X, TR_VAR_Y, TR_VAR_DIR, TR_VAR_CTX = (0x0F0003
 assert all(burn_total(m, sh, f) >= f - 1e-4 for m in BURN_MOVES + (TR_ROW, SK_TOUCH_ROW) for sh in (False, True)
            for f in (BURN_MIN_TOTAL, BURN_MIN_TOTAL_OLD)), 'a burn under the floor'
 RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1', 'tiers', 'gmupd', 'skbody',
-                     'sktouch', 'skdist'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+                     'sktouch', 'skdist', 'btint'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
 # swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose); burn v2:
 # + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2 - floor1); burn
 # v2.1: + floor1 (the burn floor 1 %, the user; burn v2's exe_v46z_gkb4 is RELEASE - floor1); skeleton v1.3: + tiers,
 # gmupd (exe_v46z_gkb6; burn v2.1 - aerial chain v1's exe_v46z_gkb5 is RELEASE - tiers - gmupd - skbody); skeleton v1.5:
 # + skbody, sktouch (exe_v46z_gkb7; v1.3 / v1.4's gkb6 is RELEASE - skbody - sktouch); skeleton v1.6: + skdist
-# (exe_v46z_gkb8; gkb7 is RELEASE - skdist)
+# (exe_v46z_gkb8; gkb7 is RELEASE - skdist); burn tint v1: + btint (exe_v46z_gkb9; gkb8 is RELEASE - btint)
 VARIANTS = (('A_release', RELEASE),)
 # skeleton v1.6 (the user: "Please stop packaging G_pose. It has no use anymore."): A_release only. The pose feature
 # stays (the exes shipped with it up to v1.5 still rebuild from this script); v1.5 and before: + ('G_pose', (RELEASE -
@@ -2807,6 +3129,10 @@ def build(rpx, diag=False, feats=None):
     for nm, s in fmts:
         A[nm] = alloc((len(s) + 4) & ~3, 4) if diag else 0
     A['sk_dist'] = alloc(4, 4) if 'skdist' in feats else 0   # skeleton v1.6: SK_DIST (its hold's cap)
+    btint = 'btint' in feats
+    assert not btint or 'tiers' in feats, 'btint needs tiers'
+    A['bti_k'] = alloc(len(btint_k()), 8) if btint else 0      # burn tint v1: its constants, the tiers' rows
+    A['bti_st'] = alloc(16 * SLOTS, 4) if btint else 0         # ... per victim: tier, fade, outline entry, its width
     code_at = alloc(0, 4)
 
     # weapon motion entries / info / descriptor / vtable / singleton / row
@@ -2965,6 +3291,11 @@ def build(rpx, diag=False, feats=None):
                  bfx_id_lo=BFX_ID & 0xFFFF, tr_ctx=TR_CTX, tr_ctx4=4 * TR_CTX, tr_ttlv=TR_TTL, tr_ctx0=TR_CTX0,
                  tr_reqs=TR_REQS, gk_var_tr_hi=GK_VAR_TR >> 16, gk_var_tr_lo=GK_VAR_TR & 0xFFFF,
                  tr_var_type_hi=TR_VAR_TYPE >> 16, tr_var_type_lo=TR_VAR_TYPE & 0xFFFF, nbfx=SLOTS + SLOTS * TR_CTX)
+    if 'btint' in feats:
+        for nm in ('bti_k', 'bti_st'):
+            p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
+        p.update(bti_fade=BTINT_FADE, bti_row=BTINT_ROW, bti_slot=BTINT_SLOT, os_tab_hi=ha(OS_TAB), os_tab_lo=K.slo(OS_TAB),
+                 os_n=OS_N, os_ent=OS_ENT, os_count=OS_COUNT)
     p['bshield_hi'], p['bshield_lo'] = ha(A['bconst']), K.slo(A['bconst'])
     p['thousand_hi'], p['thousand_lo'] = ha(A['bconst'] + 4), K.slo(A['bconst'] + 4)
     p['fm_hi'], p['fm_lo'] = ha(FIGHTER_MANAGER), K.slo(FIGHTER_MANAGER)
@@ -4536,7 +4867,10 @@ bt_nins:
         bne bt_ins
 bt_next:''' + ('''
         mr r3, r30
-        bl bfx_vic                      # burn v2: its fire as its burns''' if 'burn2' in feats else '') + '''
+        bl bfx_vic                      # burn v2: its fire as its burns''' if 'burn2' in feats else '') + ('''
+        mr r3, r30
+        mr r4, r31
+        bl bti_vic                      # burn tint v1: its tint / outline''' if 'btint' in feats else '') + '''
         addi r30, r30, 1
         b bt_vic
 bt_done:''' + D('''
@@ -5244,7 +5578,7 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
-''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats) if 'burn2' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
+''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
 # ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
 gk_clear:
         li r0, 0''' + (('''
@@ -5281,7 +5615,17 @@ gc_bfx: stw r0, 0(r12)                  # burn v2: the fires shown, the trails' 
         addi r12, r12, 4
         addi r11, r11, -1
         cmpwi r11, 0
-        bne gc_bfx''') if 'burn2' in feats else '') + '''
+        bne gc_bfx''') if 'burn2' in feats else '') + (('''
+        lis r12, %(bti_st_hi)d
+        addi r12, r12, %(bti_st_lo)d
+        li r11, %(slots)d
+        li r9, -1                       # (r10 kept: the chain's)
+gc_bti: stw r0, 0(r12)                  # burn tint v1: each victim's tint / outline off the next frame (tier 0, fade -1)
+        stw r9, 4(r12)
+        addi r12, r12, 16
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne gc_bti''') if 'btint' in feats else '') + '''
         lis r12, %(gk_hide_hi)d
         addi r12, r12, %(gk_hide_lo)d
         li r11, 16
@@ -5358,6 +5702,12 @@ w_dcase:
     # ---- hooks in place (each asserted)
     def asm1(at, text):
         return K.one(at, text)
+    if btint:
+        out.blob(A['bti_k'], btint_k(), 'burn tint constants / tiers (BTINT_TINT, BTINT_SHELL)')
+        out.blob(A['bti_st'], bytes(16 * SLOTS), 'burn tint per victim')
+        for i, w in enumerate(OS_COUNT_WORDS):
+            assert img.w(OS_COUNT + 4 * i) == w, 'os_count at 0x%08X' % OS_COUNT
+        assert all(img.w(OS_TAB + 4 * i) == 0 for i in range(OS_N * OS_ENT // 4)), 'os_tab'
     if 'skdist' in feats:
         out.blob(A['sk_dist'], struct.pack('>f', SK_DIST), 'his side special shadow\'s cap (SK_DIST)')
         for at, orig, text, note in SK_DIST_PATCH:
