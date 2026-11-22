@@ -1068,6 +1068,9 @@ def hitcheck_checks(e, info, diag):
 def burn_checks(e, info, diag):
     """burn v1 (feature burn): his water moves' hits add burn instances to their victims; his ticks"""
     lab, A, F = info['labels'], info['A'], info['feats']
+    check('burn: every move\'s unshielded instance totals at least %s %% (the user\'s floor): %s' % (
+        C.BURN_MIN_TOTAL, ', '.join('%d %.2f' % (m[0], C.burn_total(m)) for m in C.BURN_MOVES)),
+          [m[0] for m in C.BURN_MOVES if C.burn_total(m) < C.BURN_MIN_TOTAL - 1e-6], [])
     if 'burn' not in F:
         check('burn: without "burn": no burn code', 'burn_him' in lab, False)
         return
@@ -1169,7 +1172,7 @@ def burn_checks(e, info, diag):
     check('burn: then neutral air: that old hit still nothing', len(inst(4)), 2)
     log_hit(logs[0], 4, 1)
     frame(gk, 2)
-    check('burn: neutral air\'s new hit: 0.1 % every 15 frames for 120', inst(4)[-1], (119, 14, 15, 2, 0.1))
+    check('burn: neutral air\'s new hit: 0.25 % every 15 frames for 180', inst(4)[-1], (179, 14, 15, 2, 0.25))
     clear_log(logs[0])
     log_hit(logs[0], 4, 1)
     frame(gk, 2)

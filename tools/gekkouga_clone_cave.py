@@ -136,14 +136,27 @@ HM_OBJARR = 0x14                  # v11: +8 +0xC the container's objects (0x174 
 HM_OBJS = 0x18                    # +8 the collision container (+0xC its objects (0x174 each), +0x10 their count)
 # burn v1: the moves that burn (his motion.mtable indices: attackairn 104, attackairf 105, attacks4 95, attackhi4 99,
 # attacklw4 101), each hit one instance: (motion kind, damage a tick, interval (frames), duration (frames)). A shielded
-# hit: half the frames, BURN_SHIELD_DAMAGE x the damage. Totals: damage x duration / interval
+# hit: half the frames, BURN_SHIELD_DAMAGE x the damage. Totals: damage x (duration // interval) ticks. The user's
+# rule: no instance does less than BURN_MIN_TOTAL (3 %) over time unshielded (a shielded one may: 50 % / 20 %)
 BURN_MOVES = (
     (95, 0.4, 6, 240),            # forward smash: 0.4 % every 6 frames for 4 s = 16 %
     (99, 0.4, 6, 240),            # up smash: 16 %
     (101, 0.4, 6, 240),           # down smash: 16 % (each side that hits)
-    (105, 0.25, 10, 180),         # forward air: 0.25 % every 10 frames for 3 s = 4.5 %
-    (104, 0.1, 15, 120),          # neutral air (multi-hit: one each hit): 0.1 % every 15 frames for 2 s = 0.8 %
+    (105, 0.3, 10, 180),          # forward air: 0.3 % every 10 frames for 3 s = 5.4 %
+    (104, 0.25, 15, 180),         # neutral air (multi-hit: one each hit): 0.25 % every 15 frames for 3 s = 3 %
 )
+BURN_MIN_TOTAL = 3.0              # the user's floor for one unshielded instance
+
+
+def burn_total(row, shielded=False):
+    """one instance's total percent: (damage a tick) x (ticks)"""
+    _k, dmg, interval, frames = row
+    if shielded:
+        dmg, frames = dmg * BURN_SHIELD_DAMAGE, max(1, frames // 2)
+    return dmg * (frames // interval)
+
+
+assert all(burn_total(m) >= BURN_MIN_TOTAL - 1e-6 for m in BURN_MOVES), 'a burn under %s %%' % BURN_MIN_TOTAL
 BURN_SHIELD_DAMAGE = 0.2          # a shielded hit: 20 % of the damage a tick, half the duration
 BURN_CAP = 32                     # instances a victim holds at most (more are dropped)
 BURN_ENTS = 16                    # attack entries scanned (hitbox ids 0-15)
