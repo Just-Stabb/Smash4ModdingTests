@@ -1071,7 +1071,7 @@ def burn_checks(e, info, diag):
     check('burn: every move\'s instance, unshielded and shielded, totals at least %s %% (the user\'s floor): %s' % (
         C.BURN_MIN_TOTAL, ', '.join('%d %.2f / %.2f' % (m[0], C.burn_total(m), C.burn_total(m, True)) for m in C.BURN_MOVES)),
           [(m[0], sh) for m in C.BURN_MOVES for sh in (False, True) if C.burn_total(m, sh) < C.BURN_MIN_TOTAL - 1e-4], [])
-    check('burn: the shield clamp only where 50 % / 20 % falls under the floor; above it the rule exact',
+    check('burn: the shield clamp only where 50 %% / %d %% falls under the floor; above it the rule exact' % round(100 * C.BURN_SHIELD_DAMAGE),
           [m[0] for m in C.BURN_MOVES if (C.burn_shield_damage(m) != m[1] * C.BURN_SHIELD_DAMAGE)
            != (m[1] * C.BURN_SHIELD_DAMAGE * (C.burn_shield_frames(m) // m[2]) < C.BURN_MIN_TOTAL)], [])
     if 'burn' not in F:
@@ -1157,8 +1157,8 @@ def burn_checks(e, info, diag):
     log_hit(logs[1], 4, 2)                   # a shield hit
     frame(gk, 2)
     sd = round(C.burn_shield_damage(C.BURN_MOVES[0]), 4)
-    check('burn: a shielded hit: half the frames (120), 20 %% of the damage raised to the 3 %% total (%s a tick), its own '
-          'timer' % sd, inst(4), [(237, 3, 6, 2, 0.4), (119, 5, 6, 2, sd)])
+    check('burn: a shielded hit: half the frames (120), %d %%%% of the damage raised to the 3 %%%% total (%s a tick), its own '
+          'timer' % (round(100 * C.BURN_SHIELD_DAMAGE), sd), inst(4), [(237, 3, 6, 2, 0.4), (119, 5, 6, 2, sd)])
     got = []
     for _ in range(3):
         got.append(frame(gk, 2))
@@ -1218,7 +1218,37 @@ def burn_checks(e, info, diag):
     e.mu.mem_write(vic2['f'] + 0x1E, b'\x00')
     for _ in range(6):
         frame(gk2, 6)
-    check('burn: its victim no longer live: its burns end at the next tick', inst(5), [])
+    check('burn: its victim no longer live: its burns end', inst(5), [])
+    # burn v1.1: a KO (Dead 0xB1 / Rebirth 0xB2) ends every burn on the victim, anyone's, at once; no tick after it
+    e.mu.mem_write(vic2['f'] + 0x1E, b'\x04')
+    sm = e.alloc(0x60, b'\0')
+    e.setw(e.w(vic2['f'] + C.BASE_ACC) + C.F_STATUS, sm)
+    for st, ko in ((0x0, False), (0xB0, False), (0xB1, True), (0xB2, True), (0xB3, False)):
+        e.setw(sm + C.ST_KIND, 0)
+        log_hit(logs2[0], 5, 1)
+        frame(gk2, 6)
+        e.setw(A['btab'] + (5 * C.BURN_CAP + 7) * 16, 50)        # another Greninja's instance too (owner 2)
+        e.setw(A['btab'] + (5 * C.BURN_CAP + 7) * 16 + 4, (1 << 16) | 6)
+        e.setw(A['btab'] + (5 * C.BURN_CAP + 7) * 16 + 8, 2)
+        before = len(inst(5))
+        e.setw(sm + C.ST_KIND, st)
+        got, seen = [], []
+        for _ in range(12):
+            got.append(frame(gk2, 6))
+            seen += [x for x in getattr(e, 'osr_full', []) if diag and x[0] == A['gk_fbk']]
+        if ko:
+            check('burn v1.1: victim KO\'d (status 0x%X) with %d burns: the list empty at once, no tick after' % (st, before),
+                  (before >= 2, inst(5), got), (True, [], [[]] * 12))
+            if diag:
+                check('burn v1.1 diag: S4BK (victim 5, status 0x%X, seen by slot 6) once' % st,
+                      [x[1:4] for x in seen], [(5, st, 6)])
+        else:
+            check('burn v1.1: status 0x%X (not a KO): its burns stay and tick' % st,
+                  (len(inst(5)) > 0, sum(len(g) for g in got) > 0), (True, True))
+        for k in range(C.BURN_CAP):
+            e.setw(A['btab'] + (5 * C.BURN_CAP + k) * 16, 0)
+    e.setw(sm + C.ST_KIND, 0)
+    e.mu.mem_write(vic2['f'] + 0x1E, b'\x00')
     # a clone's hits count for its owner
     for k in range(C.BURN_CAP * 8):
         e.setw(A['btab'] + k * 16, 0)

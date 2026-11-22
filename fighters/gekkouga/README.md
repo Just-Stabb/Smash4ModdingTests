@@ -773,3 +773,16 @@ designed for v2 with them). Feature `burn` (in `RELEASE`), `tools/gekkouga_clone
   restarted log (multi-hit), reflector / weapon / out-of-range records ignored, the cap, another Greninja's timing,
   16 % over 240 frames in 40 ticks, a gone victim, a clone's hit for its owner.
 - Not verified in game: that a shielded hit is logged in the attacker's hit log with type 2.
+
+## Burn v1.1 (`greninja_burn_v1_1.zip`, over burn v1; exe_v46z_gkb2)
+
+The user's burn v1 test: burns work and stack, but kept ticking after a KO; shield factor 20 % -> 35 %.
+- **KO clear** (`burn_tick`): each frame, for every victim holding a burn (anyone's), its status kind (accessor
+  `+0x20` StatusModule, `+0x48`): Dead `0xB1` / Rebirth `0xB2`, or the fighter not live -> its whole list emptied (every
+  Greninja's instances) before any tick. Diag `S4BK victim status owner`. A hit on the respawn platform burns nothing.
+- **Shield** `BURN_SHIELD_DAMAGE` 0.35 (50 % duration, the 3 % floor kept). Today's rows all still clamp (50 % / 35 %
+  gives 2.8 % for the smashes, 0.945 % forward air, 0.525 % neutral air): shielded 0.15 % / 6 f / 120 f, 0.333 % /
+  10 f / 90 f, 0.5 % / 15 f / 90 f = 3 % each, as in v1.
+- Unicorn (`burn_checks`): status 0 / 0xB0 / 0xB3 keep ticking; 0xB1 / 0xB2 with two owners' burns: empty at once, no
+  tick after; diag S4BK once. `gekkouga_clone_cave_test` 143 (release) / 161 (diag) checks, 0 failures;
+  `supamario_ui_cave_test` 0 failures; `import_call_check` 0 on both; both exes rebuild byte for byte.

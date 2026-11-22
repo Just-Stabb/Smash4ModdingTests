@@ -3889,3 +3889,8 @@ MSC on a bunshin-based kind, the 4-shape group.
   catch), +0x27 the hitbox id; `0x02C10F40` appends, `0x02C1118C` searches). DamageModule vt +0x74(0, f1) adds raw
   percent (MSC DamageModule op 9, handler `0x02C2366C`). An object id: category << 28, index << 16 (`0x02BF205C`).
   PowerPC trap met here: `addi rD, r0, x` reads 0, not r0.
+- **A fighter's KO from native code (Greninja burn v1.1)**: the module accessor (entry `+0xC`) `+0x20` is the
+  StatusModule (fighters' vtable `0x1012D42C`), its `+0x48` the status kind: Dead `0xB1` (every KO; the game's KO
+  path), Rebirth `0xB2` (the respawn platform). `burn_tick` reads it once a frame for every victim that holds a burn
+  and empties that victim's whole list (every owner's) in either status, or when the fighter isn't live (`+0x1E < 4`).
+  Diag `S4BK victim status owner`. Not seen in game yet: that star / screen KOs pass through `0xB1` too.
