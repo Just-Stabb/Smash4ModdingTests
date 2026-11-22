@@ -407,7 +407,8 @@ def weapon_checks(e, img, info, diag=False):
     e.calls = []
     e.setw(hm + C.HM_COUNT, 8)
     e.call(lab['w_start'], s, weapon, init)
-    want = ([('bunshin_start', s, weapon, init), ('colour_off', cb, 0)] if 'bstart' in F else []) + \
+    want = ([('clone_setf', C.VAR_LATCH, 0.0)] if 'hitcheck' in F else []) + \
+        ([('bunshin_start', s, weapon, init), ('colour_off', cb, 0)] if 'bstart' in F else []) + \
         ([('hurt_clear', hm), ('hurt', hm, A['hurt'], 8, 0)] if 'hurt' in F else []) + \
         ([('osr', A['gk_fk'], hm, 1), ('osr', A['gk_fy'], 0, 0)] if diag and 'hurt' in F else []) + \
         ([('osr', A['gk_fz'], init, 276)] if diag else [])
@@ -825,6 +826,117 @@ def sway_checks(e, info):
           (calls, [c for c in e.calls if c[0].startswith('orig')]), ([('swing', mm)], [('orig94', 0x51, weapon, 0x55, 0x66)]))
 
 
+def hitcheck_checks(e, info, diag):
+    """v12: the clone hit from his side (feature hitcheck): w_hitchk against fake fighters' attack nodes"""
+    lab, A, F = info['labels'], info['A'], info['feats']
+    if 'hitcheck' not in F:
+        check('v12: without "hitcheck": no hit check code', 'w_hitchk' in lab, False)
+        return
+    # the clone: its WorkModule (VAR_0 slot 3, VAR_1 id 2, VAR_4 latch), its place (50, 10)
+    cv = {C.VAR_SLOT: 3.0, C.VAR_ID: 2.0, C.VAR_LATCH: 0.0}
+    vt = e.alloc(0x100, b'\0')
+    g, st = e.alloc(4), e.alloc(4)
+    e.setw(vt + 0x44, g)
+    e.setw(vt + 0x4C, st)
+    e.stub(g, lambda e_: e_.mu.reg_write(UC_PPC_REG_FPR1, f2d(cv.get(e_.r(4), 0.0))))
+
+    def cset(e_):
+        v = round(d2f(e_.mu.reg_read(UC_PPC_REG_FPR1)), 3)
+        cv[e_.r(4)] = v
+        e_.calls.append(('clone_set', e_.r(4), v))
+    e.stub(st, cset)
+    wm = e.alloc(0x10, b'\0')
+    e.setw(wm, vt)
+    cacc = e.alloc(0x100, b'\0')
+    e.setw(cacc + C.W_WORK, wm)
+    post = e.alloc(0x40, b'\0')
+    e.mu.mem_write(post + 0x10, struct.pack('>2f', 50.0, 10.0))
+    e.setw(cacc + C.W_POSTURE, post)
+    weapon = e.alloc(0x40, b'\0')
+    e.setw(weapon + C.W_ACC, cacc)
+
+    def team(acc, tid):
+        t = e.alloc(0x10, b'\0')
+        e.setw(t + 8, tid & 0xFFFFFFFF)
+        e.setw(acc + C.TEAM_MOD, t)
+
+    def nodes_entry(ent, first, boxes):
+        e.setw(ent, first)
+        e.setw(ent + 4, len(boxes))
+        out = []
+        for i, (on, box) in enumerate(boxes):
+            n = e.alloc(0x60, b'\0')
+            e.mu.mem_write(n + C.NODE_ON, bytes([on]))
+            e.mu.mem_write(n + C.NODE_MIN_X, struct.pack('>4f', *box))
+            e.setw(ent + C.ENT_NODES + 4 * (first + i), n)
+            out.append(n)
+        return out
+
+    def attacker(slot0, tid, entries):
+        fk = e.fighter(slot0)
+        e.mu.mem_write(fk['f'] + 0x1E, b'\x04')
+        acc = e.r(3) if False else e.w(fk['f'] + C.BASE_ACC)
+        team(acc, tid)
+        am = e.alloc(0x40, b'\0')
+        ents = e.alloc(C.ENT_SIZE * len(entries), b'\0')
+        e.setw(am + C.AM_ENTS, ents)
+        e.setw(am + C.AM_COUNT, len(entries))
+        nodes = [nodes_entry(ents + C.ENT_SIZE * k, first, boxes) for k, (first, boxes) in enumerate(entries)]
+        e.setw(acc + C.W_ATTACK, am)
+        return fk, nodes
+    for i in range(8):
+        e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
+    me = e.fighter(2)                                     # his entry: slot 3
+    e.mu.mem_write(me['f'] + 0x1E, b'\x04')
+    team(e.w(me['f'] + C.BASE_ACC), 0)
+    far = (200.0, 0.0, 210.0, 5.0)
+    near = (54.0, 20.0, 60.0, 25.0)                       # its left edge inside x 44 - 56, y 10 - 28
+    _a, an = attacker(4, 1, [(0, [(0, near)]), (2, [(1, far), (1, near)])])   # slot 5: entry 0 off, entry 1 node 2 on
+    _t, tn = attacker(5, 0, [(0, [(1, near)])])          # slot 6: his team
+    e.vars = {}
+
+    def run():
+        e.calls, e.osr_full = [], []
+        e.call(lab['w_hitchk'], weapon)
+        return ([c for c in e.calls if c[0] in ('setf', 'clone_set')],
+                [x[:6] for x in e.osr_full if x[0] == A['gk_fh']])
+    sets, logs = run()
+    check('v12 hitcheck: slot 5\'s entry 1 (its second node on and over the clone\'s box): his VAR_21 = 20000 + its id '
+          '2, the clone\'s latch 1; not his teammate (slot 6), not entry 0 (off)',
+          sets, [('clone_set', C.VAR_LATCH, 1.0), ('setf', C.VAR_HIT, C.HIT_BIAS2 + 2)])
+    if diag:
+        check('v12 hitcheck diag: S4GH (attacker slot 5, hitbox 1, clone 2, at 50, 10)', logs, [(A['gk_fh'], 5, 1, 2, 50, 10)])
+    check('v12 hitcheck: latched: no second report', run()[0], [])
+    cv[C.VAR_LATCH] = 0.0
+    e.mu.mem_write(an[1][1] + C.NODE_ON, b'\x00')
+    check('v12 hitcheck: the node off: nothing', run()[0], [])
+    e.mu.mem_write(an[1][1] + C.NODE_ON, b'\x01')
+    for box, what in (((57.0, 12.0, 70.0, 20.0), 'right of it'), ((40.0, 29.0, 60.0, 40.0), 'above it'),
+                      ((40.0, -5.0, 60.0, 9.0), 'below it')):
+        e.mu.mem_write(an[1][1] + C.NODE_MIN_X, struct.pack('>4f', *box))
+        check('v12 hitcheck: a node %s: nothing' % what, run()[0], [])
+    e.mu.mem_write(an[1][1] + C.NODE_MIN_X, struct.pack('>4f', 30.0, 0.0, 45.0, 11.0))
+    check('v12 hitcheck: a node touching its lower left corner: hit', run()[0],
+          [('clone_set', C.VAR_LATCH, 1.0), ('setf', C.VAR_HIT, C.HIT_BIAS2 + 2)])
+    cv[C.VAR_LATCH] = 0.0
+    team(e.w(me['f'] + C.BASE_ACC), 1)
+    e.mu.mem_write(tn[0][0] + C.NODE_ON, b'\x00')        # (slot 6, team 0, is an opponent now: its node off)
+    check('v12 hitcheck: slot 5 on his team now: nothing (the same team skipped)', run()[0], [])
+    e.mu.mem_write(tn[0][0] + C.NODE_ON, b'\x01')
+    cv[C.VAR_LATCH] = 0.0
+    sets, logs = run()
+    check('v12 hitcheck: ... and slot 6 (team 0) an opponent now: its node hits',
+          (sets, [x[1] for x in logs] if diag else [6]), ([('clone_set', C.VAR_LATCH, 1.0), ('setf', C.VAR_HIT, C.HIT_BIAS2 + 2)], [6]))
+    cv[C.VAR_LATCH] = 0.0
+    team(e.w(me['f'] + C.BASE_ACC), 0)
+    cv[C.VAR_SLOT] = 5.0
+    e.mu.mem_write(tn[0][0] + C.NODE_ON, b'\x00')
+    check('v12 hitcheck: the clone owned by slot 5 (its node on it): its owner\'s own attack skipped', run()[0], [])
+    cv[C.VAR_SLOT] = 3.0
+    for i in range(8):
+        e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
+
+
 def hud_checks(e, info):
     lab, A = info['labels'], info['A']
     hide = A['gk_hide']
@@ -993,6 +1105,7 @@ def main():
     e.stub(C.MSG_SEND, msg_send)
     weapon_checks(e, img, info, diag)
     sway_checks(e, info)
+    hitcheck_checks(e, info, diag)
     fighter_desc_checks(e, img, info)
     g1_checks(e, info)
     s13_checks(e, info)

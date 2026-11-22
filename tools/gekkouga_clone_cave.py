@@ -95,7 +95,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # none: 2, loaded with the fighter. Bunshin's 0x87D has 0x1 (4: the Final Smash load,
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
-FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -104,6 +104,7 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway'))   # v5: each
 #   hurt    base kind mewtwom (HURT_BASE: + Kinetic / Hit / Ground updates) and its row + lizardonm's DamageModule (slot
 #           20); the hurtboxes (+0x1C) and the damage pollers (+0x64 ... +0x94)
 #   parts   his motion parts and flags on the clone (v2's hands / face)
+#   hitcheck v12: the clone hit from his side (w_hitchk: other fighters' attack boxes against the clone's box)
 #   sway    v11: the clone's swing step every frame (w_sway: his MotionModule's swing update, as his frame calls it)
 #   bstart  v8: the clone's start (specializer +0x34) runs bunshin's own (0x02AF6738: black overlay, LinkModule link 3
 #           attributes 0 / 0xD, EffectModule +0xB4 / +0xA4), then clears the black (ColorBlendModule vt +0x44(0), as
@@ -131,6 +132,13 @@ HM_RECS = 0x48                    # +0x44 {capacity (params +0xAC: 0x14), +0x48 
                                   # [+0x44] as a pointer (0x14) and C_hurt's S4GO crashed (the user's v9.1 log)
 HM_OBJARR = 0x14                  # v11: +8 +0xC the container's objects (0x174 each)
 HM_OBJS = 0x18                    # +8 the collision container (+0xC its objects (0x174 each), +0x10 their count)
+VAR_LATCH = 0x0F000304            # v12: the clone's VAR_4: its hit reported (w_hitchk; w_start clears it)
+AM_ENTS, AM_COUNT, AM_MAX = 0x14, 0x18, 32         # AttackModule +8 container: +0xC entries, +0x10 count (cap)
+ENT_SIZE, ENT_NODES, NODE_MAX = 0x174, 0x18, 64    # an entry: +0 first node, +4 count, +0x18 node pointers (cap)
+NODE_ON, NODE_MIN_X, NODE_MIN_Y, NODE_MAX_X, NODE_MAX_Y = 0x3C, 0x18, 0x1C, 0x20, 0x24   # a node: on, its x / y box
+TEAM_MOD = 0x6C                   # the accessor's TeamModule (+8 the team id)
+HC_BOX = (6.0, 0.0, 18.0)         # the clone's box: x +- 6, y + 0 to y + 18 (his body: his shield-route capsules y 3 -
+                                  # 15, radius 5.5)
 SWING_UPDATE = 0x02C67064        # v11: MotionModule's swing update (mm): a fighter's frame calls it (0x02E3543C)
 W_MOTION = 0x44                   # the accessor's MotionModule (+0x14 its motion object (+0x20 the swing system, +0xF1
 MM_MOTION = 0x14                  # set up), +0x38 what the swing update needs)
@@ -171,7 +179,8 @@ VT_BASE = 0xFC                    # v6: the clone's specializer (its singleton's
 DAMAGE_SLOT = 20
 RELEASE = frozenset(('attack',))  # v9: the user's v8 B_attack (the clones' attacks hit, nothing broke): the release's set
 VARIANTS = (('A_attack', frozenset(('attack',))), ('C_hurt', frozenset(('attack', 'hurt'))),
-            ('D_parts', frozenset(('attack', 'parts'))), ('E_sway', frozenset(('attack', 'sway'))))   # v9: each on the
+            ('D_parts', frozenset(('attack', 'parts'))), ('E_sway', frozenset(('attack', 'sway'))),
+            ('F_hitcheck', frozenset(('attack', 'hitcheck'))))   # v9: each on the
                                   # release's set; v11 E_sway: + the clones' swing step
 
 
@@ -535,6 +544,7 @@ def build(rpx, diag=False, feats=None):
     assert A['gk_slow'] == A['gk_hide'] + 0x20
     assert not diag or A['gk_lastf'] == A['gk_slow'] + 0x20
     A['ctf'] = alloc(12 * 4, 4)         # v6: the gauge's colour per mode
+    A['hcbox'] = alloc(12) if 'hitcheck' in feats else 0   # v12: the hit check's box
     A['gk_plyr'] = alloc(4 * SLOTS)     # v10: per player, the cursor show byte we cleared + 1 (0: none)
     A['gk_tags'] = alloc(4 * SLOTS)     # v7: the tag messages' countdown per slot (0: shown)
     A['gk_names'] = alloc(8 * len(GAUGE_NAMES), 4)    # v7: the round gauge's clip names {char *, length}
@@ -563,6 +573,7 @@ def build(rpx, diag=False, feats=None):
             ('gk_fw', 'S4GW tag message: visible=%d object id=%d gone=%d handle=%08X\n'),
             ('gk_fm', 'S4GM clone id=%d draw: visflag=%d visible=%d model mode=%d drawn=%d overlay=%d/%d\n'),
             ('gk_fn', 'S4GN clone id=%d z=%d scale x100=%d link mask=%08X model=%08X\n'),
+            ('gk_fh', 'S4GH hit check: attacker slot=%d hitbox=%d clone id=%d at x=%d y=%d\n'),
             ('gk_fq', 'S4GQ clone id=%d swing: motionmodule=%08X need=%08X motion=%08X swing=%08X flags=%08X set up=%d\n'),
             ('gk_fy', 'S4GY clone hurt object 0: %08X %08X %08X %08X %08X %08X\n'),
             ('gk_fk', 'S4GK clone hurtboxes set: hitmodule=%08X groups=%d boxes %d -> %d group0=%d+%d objects=%d\n'),
@@ -603,6 +614,8 @@ def build(rpx, diag=False, feats=None):
     out.blob(A['ctf'], b''.join(struct.pack('>4B4h', *c) for c in GAUGE_COLOURS), 'gauge colours')
     out.blob(A['gk_tags'], bytes(4 * SLOTS), 'tag message countdowns')
     out.blob(A['gk_plyr'], bytes(4 * SLOTS), 'cursor show bytes saved')
+    if 'hitcheck' in feats:
+        out.blob(A['hcbox'], struct.pack('>3f', *HC_BOX), 'hit check box')
     strs, ptrs, at = b'', [], A['gk_namestr']
     for n in GAUGE_NAMES:
         ptrs.append((at + len(strs), len(n)))
@@ -624,11 +637,13 @@ def build(rpx, diag=False, feats=None):
              slow=FLAG_SLOW, clones=FLAG_CLONES, life=TAG_LIFE, sslot=SLOW_SLOT, srate=SLOW_RATE, sframes=SLOW_FRAMES,
              hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, whit=W_HIT_MOD, wdmg=W_DAMAGE, watk=W_ATTACK,
              wstop=W_STOP, wcol=W_COLOUR, wmodel=W_MODEL, wlink=W_LINK, wvis=W_VIS, wpost=W_POSTURE,
-             cclear=COLOUR_CLEAR, wmotion=W_MOTION, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
+             cclear=COLOUR_CLEAR, am_ents=AM_ENTS, am_count=AM_COUNT, am_max=AM_MAX, ent_size=ENT_SIZE,
+             ent_nodes=ENT_NODES, node_max=NODE_MAX, node_on=NODE_ON, node_min_x=NODE_MIN_X, node_min_y=NODE_MIN_Y,
+             node_max_x=NODE_MAX_X, node_max_y=NODE_MAX_Y, team=TEAM_MOD, wmotion=W_MOTION, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
              hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -1323,7 +1338,11 @@ wp_94:
         stw r9, 0x20(r1)
         stw r10, 0x24(r1)
         mr r3, r4
-        bl w_poll
+        bl w_poll''' + (('''
+        lwz r3, 0x0C(r1)
+        bl w_sway''') if 'sway' in feats else '') + (('''
+        lwz r3, 0x0C(r1)
+        bl w_hitchk''') if 'hitcheck' in feats else '') + '''
         lwz r3, 0x08(r1)
         lwz r4, 0x0C(r1)
         lwz r5, 0x10(r1)
@@ -1331,11 +1350,7 @@ wp_94:
         lwz r7, 0x18(r1)
         lwz r8, 0x1C(r1)
         lwz r9, 0x20(r1)
-        lwz r10, 0x24(r1)''' + (('''
-        lwz r3, 0x0C(r1)
-        bl w_sway
-        lwz r3, 0x08(r1)
-        lwz r4, 0x0C(r1)''') if 'sway' in feats else '') + '''
+        lwz r10, 0x24(r1)
         lwz r0, 0x44(r1)
         mtlr r0
         addi r1, r1, 0x40''' + tail(L['vt_orig'][0x94]) + '''
@@ -1368,6 +1383,184 @@ wsw_out:
         blr
 
 ''') if 'sway' in feats else '') + '''
+''' + ((r'''# ---- v12 hitcheck (F_hitcheck): the clone hit from Greninja's side. The native hurtboxes (v3 - v11) never met an
+# attack; this tests every other live fighter's active attack nodes against the clone's box at its place, once a frame
+# (the +0x94 phase): AttackModule (accessor +0x50) +8 its collision container: +0xC the entries (0x174, one per hitbox
+# id), +0x10 their count; an entry's nodes: +0 first index, +4 count, +0x18 the node pointers; a node: +0x3C on, its
+# x / y bounding box +0x18 / +0x1C (min) +0x20 / +0x24 (max) (the game's pair pass 0x02C0F6F0 tests the same boxes
+# first). Same team (TeamModule accessor +0x6C, team id +8) skipped. A hit: his VAR_21 = HIT_BIAS2 + its id (his MSC
+# removes that clone: smoke and the log, as the hurt route), the clone's VAR_4 latched (once per clone life: w_start
+# clears it); diag S4GH (attacker slot, hitbox, clone id, place)
+w_hitchk:
+        stwu r1, -0x70(r1)
+        mflr r0
+        stw r0, 0x74(r1)
+        stmw r20, 0x40(r1)
+        lwz r31, %(wacc)d(r3)
+        cmpwi r31, 0
+        beq hc_out
+        lwz r30, %(wwork)d(r31)
+        cmpwi r30, 0
+        beq hc_out''' + var_get('r30', VAR_LATCH) + '''
+        lis r12, %(half_hi)d
+        lfs f0, %(half_lo)d(r12)
+        fcmpu cr0, f1, f0
+        bgt hc_out''' + var_get('r30', VAR_ID) + '''
+        stfs f1, 0x28(r1)
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r29, 0x1C(r1)               # its id (1 / 2)
+        addi r0, r29, -1
+        cmplwi r0, 1
+        bgt hc_out''' + var_get('r30', VAR_SLOT) + '''
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r28, 0x1C(r1)               # its owner's slot (1 - 8)
+        lwz r12, %(wpost)d(r31)         # its place
+        cmpwi r12, 0
+        beq hc_out
+        lfs f0, 0x10(r12)
+        stfs f0, 0x20(r1)
+        lfs f0, 0x14(r12)
+        stfs f0, 0x24(r1)
+        mr r3, r28
+        bl gk_entry
+        mr. r27, r3                     # his entry
+        beq hc_out
+        li r26, -2                      # his team (-2: none read)
+        lwz r12, %(bacc)d(r27)
+        cmpwi r12, 0
+        beq hc_team
+        lwz r12, %(team)d(r12)
+        cmpwi r12, 0
+        beq hc_team
+        lwz r26, 8(r12)
+hc_team:
+        li r25, 0                       # the other slots (0-based)
+hc_slot:
+        addi r25, r25, 1
+        cmpwi r25, %(slots)d
+        bgt hc_out
+        cmpw r25, r28
+        beq hc_slot
+        mr r3, r25
+        bl gk_entry
+        cmpwi r3, 0
+        beq hc_slot
+        lwz r24, %(bacc)d(r3)           # its accessor
+        cmpwi r24, 0
+        beq hc_slot
+        lwz r12, %(team)d(r24)
+        cmpwi r12, 0
+        beq hc_noteam
+        lwz r12, 8(r12)
+        cmpwi r12, -1
+        beq hc_noteam
+        cmpw r12, r26
+        beq hc_slot                     # his team
+hc_noteam:
+        lwz r12, %(watk)d(r24)          # its AttackModule
+        cmpwi r12, 0
+        beq hc_slot
+        lwz r23, %(am_ents)d(r12)       # the entries
+        lwz r22, %(am_count)d(r12)
+        lis r0, 0x1000
+        cmplw r23, r0
+        blt hc_slot
+        lis r0, 0x8000
+        cmplw r23, r0
+        bge hc_slot
+        cmplwi r22, %(am_max)d
+        bgt hc_slot
+        li r21, 0                       # the entry
+hc_ent: cmpw r21, r22
+        bge hc_slot
+        mulli r12, r21, %(ent_size)d
+        add r12, r12, r23
+        lwz r11, 0(r12)                 # its first node index
+        lwz r10, 4(r12)                 # its node count
+        cmplwi r11, %(node_max)d
+        bgt hc_next
+        cmplwi r10, %(node_max)d
+        bgt hc_next
+        slwi r11, r11, 2
+        add r11, r11, r12
+        addi r11, r11, %(ent_nodes)d    # its first node pointer
+        li r20, 0
+hc_node:
+        cmpw r20, r10
+        bge hc_next
+        slwi r9, r20, 2
+        lwzx r9, r11, r9
+        addi r20, r20, 1
+        lis r0, 0x1000
+        cmplw r9, r0
+        blt hc_node
+        lis r0, 0x8000
+        cmplw r9, r0
+        bge hc_node
+        lbz r0, %(node_on)d(r9)
+        cmpwi r0, 0
+        beq hc_node
+        lis r8, %(hcbox_hi)d
+        addi r8, r8, %(hcbox_lo)d
+        lfs f2, 0x20(r1)                # x
+        lfs f3, 0(r8)                   # half width
+        fsubs f4, f2, f3
+        lfs f0, %(node_max_x)d(r9)
+        fcmpu cr0, f0, f4
+        blt hc_node                     # its right edge left of the box
+        fadds f4, f2, f3
+        lfs f0, %(node_min_x)d(r9)
+        fcmpu cr0, f0, f4
+        bgt hc_node
+        lfs f2, 0x24(r1)                # y
+        lfs f3, 4(r8)                   # bottom offset
+        fadds f4, f2, f3
+        lfs f0, %(node_max_y)d(r9)
+        fcmpu cr0, f0, f4
+        blt hc_node
+        lfs f3, 8(r8)                   # top offset
+        fadds f4, f2, f3
+        lfs f0, %(node_min_y)d(r9)
+        fcmpu cr0, f0, f4
+        bgt hc_node
+        b hc_hit
+hc_next:
+        addi r21, r21, 1
+        b hc_ent
+hc_hit: lis r12, %(one_hi)d
+        lfs f1, %(one_lo)d(r12)''' + var_set('r30', VAR_LATCH) + '''
+        lwz r12, %(acc)d(r27)           # his WorkModule: VAR_21 = HIT_BIAS2 + the id
+        cmpwi r12, 0
+        beq hc_out
+        lwz r20, %(work)d(r12)
+        cmpwi r20, 0
+        beq hc_out
+        lfs f1, 0x28(r1)                # the id (float)
+        lis r12, %(bias2_hi)d
+        lfs f0, %(bias2_lo)d(r12)
+        fadds f1, f1, f0''' + var_set('r20', VAR_HIT) + D('''
+        lfs f1, 0x20(r1)
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r7, 0x1C(r1)
+        lfs f1, 0x24(r1)
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r8, 0x1C(r1)
+        lis r3, %(gk_fh_hi)d
+        addi r3, r3, %(gk_fh_lo)d
+        mr r4, r25
+        mr r5, r21
+        mr r6, r29''' + osr()) + '''
+hc_out: lmw r20, 0x40(r1)
+        lwz r0, 0x74(r1)
+        mtlr r0
+        addi r1, r1, 0x70
+        blr
+
+''') if 'hitcheck' in feats else '') + '''
 # ---- the clone's start (its specializer +0x34, (singleton, weapon, init)). v7: nothing (the moon's sets the model
 # scale from the init's +0x68; bunshin's paints it black). v8 bstart: bunshin's own, then its black overlay cleared
 # (ColorBlendModule slot 0 off). Diag: the init's scale (S4GZ)
@@ -1378,6 +1571,15 @@ w_start:
         stw r31, 0x2C(r1)
         mr r31, r4
         stw r5, 0x10(r1)''' + (('''
+        lwz r12, %(wacc)d(r31)          # v12 hitcheck: a new clone life: its hit latch off
+        cmpwi r12, 0
+        beq ws_latched
+        lwz r12, %(wwork)d(r12)
+        cmpwi r12, 0
+        beq ws_latched
+        lis r11, %(zero_hi)d
+        lfs f1, %(zero_lo)d(r11)''' + var_set('r12', VAR_LATCH) + '''
+ws_latched:''') if 'hitcheck' in feats else '') + (('''
         bl ws_bunshin
         lwz r12, %(wacc)d(r31)
         cmpwi r12, 0
@@ -2017,7 +2219,7 @@ w_dcase:
         struct.pack_into('>I', vb, 0x1C, lab['w_init'])
     struct.pack_into('>I', vb, 0x34, lab['w_start'])  # v7: not the moon's start (it sets the model scale from the init's
                                                       # +0x68: the generate's, 0 for ours: the user's v6 invisible clones)
-    for o in (POLL_SLOTS if 'hurt' in feats or diag else (0x94,) if 'sway' in feats else ()):
+    for o in (POLL_SLOTS if 'hurt' in feats or diag else (0x94,) if feats & {'sway', 'hitcheck'} else ()):
         struct.pack_into('>I', vb, o, lab['wp_%X' % o])
     out.blob(A['w_vt'], bytes(vb), 'clone vtable (bunshin copy, +0x1C / +0x64 / +0x84 / +0x8C / +0x94 / +0xAC ours)')
 
