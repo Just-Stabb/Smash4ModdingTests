@@ -1316,6 +1316,65 @@ skd_l1: lhz r11, 0x160(r28)
         lwz r10, 8(r1)
         lis r3, %(gk_fsd_hi)d
         addi r3, r3, %(gk_fsd_lo)d''' + osr() + '''
+        li r5, 0                        # skeleton v1.4: S4SV its place and vertices 2 / 3 (x10: the walls' ends)
+        li r6, 0
+        li r7, 0
+        li r8, 0
+        li r9, 0
+        li r10, 0
+        lis r11, %(sk_k4_hi)d
+        lfs f13, %(sk_k4_lo)d(r11)
+        lwz r12, %(wpost)d(r31)
+        cmpwi r12, 0
+        beq skv_p
+        lfs f1, 0x10(r12)
+        fmuls f1, f1, f13
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r5, 0x1C(r1)
+        lfs f1, 0x14(r12)
+        fmuls f1, f1, f13
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r6, 0x1C(r1)
+skv_p:  lwz r12, 0x3C(r27)
+        lis r0, 0x1000
+        cmplw r12, r0
+        blt skv_log
+        lwz r12, 4(r12)
+        cmplw r12, r0
+        blt skv_log
+        lwz r12, 4(r12)                 # vertex 2
+        cmplw r12, r0
+        blt skv_log
+        lfs f1, 8(r12)
+        fmuls f1, f1, f13
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r7, 0x1C(r1)
+        lfs f1, 0xC(r12)
+        fmuls f1, f1, f13
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r8, 0x1C(r1)
+        lwz r12, 4(r12)                 # vertex 3
+        lis r0, 0x1000
+        cmplw r12, r0
+        blt skv_log
+        lfs f1, 8(r12)
+        fmuls f1, f1, f13
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r9, 0x1C(r1)
+        lfs f1, 0xC(r12)
+        fmuls f1, f1, f13
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r10, 0x1C(r1)
+skv_log:
+        mr r4, r27
+        lis r3, %(gk_fsv_hi)d
+        addi r3, r3, %(gk_fsv_lo)d''' + osr() + '''
         lis r12, %(gmgr_hi)d
         lwz r12, %(gmgr_lo)d(r12)
         li r4, -1
@@ -2670,6 +2729,7 @@ def build(rpx, diag=False, feats=None):
             ('gk_fch', CD_LINES[4][1]),
             ('gk_fsg', 'S4SG skeleton collision: owner slot=%d its grounds were gone: made again (#%d)\n'),
             ('gk_fsd', 'S4SD skeleton collision: ground=%08X lines=%d v0 x10=%d,%d v1 x10=%d,%d handle +0x160 / +0x163 %08X\n'),
+            ('gk_fsv', 'S4SV skeleton collision: ground=%08X at x10=%d,%d v2 x10=%d,%d v3 x10=%d,%d\n'),
             ('gk_fse', 'S4SE skeleton collision: manager +0x19C=%d groundmodule +0x18=%08X its +0x248=%08X ground +0x68=%08X +0x7C/+0x82 %08X at x10=%d,%d\n'),
             ('gk_fsf', 'S4SF skeleton collision removed: owner slot=%d\n'),
             ('gk_fsh', 'S4SH skeleton hit: owner slot=%d attacker=%X hitbox=%d damage x10=%d HP left x10=%d at x=%d y=%d\n'),
@@ -2815,7 +2875,7 @@ def build(rpx, diag=False, feats=None):
              hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbr', 'gk_clr', 'pose_tab', 'pose_last', 'gk_ftp', 'sk_desc', 'gk_fcd', 'gk_fce', 'gk_fcf', 'gk_fcg', 'gk_fch', 'hyd_t', 'gk_fsg', 'gk_fsd', 'gk_fse', 'gk_fss', 'gk_fsc', 'gk_fsf', 'gk_fsh', 'gk_fsx', 'sk_lvd', 'sk_verts', 'sk_box', 'sk_nums', 'sk_k', 'sk_latch', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbr', 'gk_clr', 'pose_tab', 'pose_last', 'gk_ftp', 'sk_desc', 'gk_fcd', 'gk_fce', 'gk_fcf', 'gk_fcg', 'gk_fch', 'hyd_t', 'gk_fsg', 'gk_fsd', 'gk_fsv', 'gk_fse', 'gk_fss', 'gk_fsc', 'gk_fsf', 'gk_fsh', 'gk_fsx', 'sk_lvd', 'sk_verts', 'sk_box', 'sk_nums', 'sk_k', 'sk_latch', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)

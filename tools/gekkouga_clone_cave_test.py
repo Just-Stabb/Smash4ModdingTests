@@ -1432,6 +1432,10 @@ def skeleton_checks(e, info, diag):
     gobj = e.alloc(0x100, b'\0')
     e.setw(ground, gobj)
     e.setw(gobj + 0x34, 4)
+    vnodes = [e.alloc(0x20, b'\0') for _ in range(4)]   # skeleton v1.4: its vertex list (+0x3C: +4 next, +8 / +0xC x / y)
+    e.setw(gobj + 0x3C, vnodes[0])
+    for a_, b_ in zip(vnodes, vnodes[1:]):
+        e.setw(a_ + 4, b_)
 
     def res_get(e_):
         calls.append(('res_get', e_.r(3), e_.r(5), e_.r(6), e_.r(7)))
@@ -1447,8 +1451,12 @@ def skeleton_checks(e, info, diag):
             e_.setw(e_.r(3) + 0xF0, ground)
 
     def vert(name):
-        return lambda e_: calls.append((name, e_.r(3), e_.r(4)) + tuple(round(x, 3) for x in struct.unpack(
-            '>2f', bytes(e_.mu.mem_read(e_.r(5), 8)))))
+        def f(e_):
+            xy = bytes(e_.mu.mem_read(e_.r(5), 8))
+            if e_.r(4) < len(vnodes):
+                e_.mu.mem_write(vnodes[e_.r(4)] + 8, xy)        # the game's: the vertex placed / moved
+            calls.append((name, e_.r(3), e_.r(4)) + tuple(round(x, 3) for x in struct.unpack('>2f', xy)))
+        return f
 
     def gc_free(e_):
         calls.append(('col_free', e_.r(3)))
@@ -1566,6 +1574,12 @@ def skeleton_checks(e, info, diag):
                               if gmf else ''),
           c2, gmf + [('movev', gm, i, round(50.7 + vx, 3), 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS)] +
           [('commit', gm), ('enable', gm)])
+    if diag:
+        want4 = [int(round(10 * v)) for vx, vy in C.SK_VERTS for v in (50.7 + vx, 10.0 + vy)]
+        got4 = [x[2:6] for x in logs('gk_fsd')][-1:] + [x[3:7] for x in logs('gk_fsv')][-1:]
+        check('skeleton v1.4 diag: S4SD v0 / v1 and S4SV its place (507, 100) and v2 / v3 (x10): all 4 vertices as moved '
+              '(the walls\' ends too)', ([list(g_) for g_ in got4], [x[1:3] for x in logs('gk_fsv')][-1:]),
+              ([want4[:4], want4[4:]], [(507, 100)]))
     e.setw(ground + 0x160, 0xFFFF0000)
     check('skeleton v1.1: its ground gone (id -1: something removed it): nothing moved; made again next frame (VAR_6 0, '
           'VAR_12 1)', (frame(), sv[C.SK_VAR_COL], sv[C.SK_VAR_REMADE]), ([], 0.0, 1.0))
