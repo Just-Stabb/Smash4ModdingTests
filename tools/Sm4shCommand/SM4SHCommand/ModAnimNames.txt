@@ -613,3 +613,10 @@ speciallw_c2 -> clone/FitGekkougaBodyMainD03SpecialLw.omo
 SkeletonRun -> skeleton/FitPacmanFirehydrantMainD03SpecialLw.omo
 SkeletonExplode -> skeleton/FitPacmanFirehydrantMainD03SpecialLw.omo
 SkeletonSmoke -> skeleton/FitPacmanFirehydrantMainD03SpecialLw.omo
+// Burn v2 (fighters/gekkouga/README.md "Burn v2"): the smashes' fire trail article (weapon kind 0x1A3, folder
+// "firetrail": script/animcmd/weapon/firetrail), its motion kinds 0 / 1 / 2 (motion.mtable): the forward / up / down
+// smash's trail, each its hitboxes along the smash's path (no knockback, re-hit every 35 frames). Each plays its
+// carrier's (Pac-Man's hydrant's) animation from its own motion/firetrail/main.pac (held at its first frame in game).
+FireTrailS4 -> firetrail/FitPacmanFirehydrantMainD03SpecialLw.omo
+FireTrailHi4 -> firetrail/FitPacmanFirehydrantMainD03SpecialLw.omo
+FireTrailLw4 -> firetrail/FitPacmanFirehydrantMainD03SpecialLw.omo

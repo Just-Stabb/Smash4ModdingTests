@@ -1242,12 +1242,187 @@ def skeleton_data_tests(out):
           [n for n in GB.SK_SCRIPTS if '\n%s -> skeleton/' % n not in names], [])
 
 
+def trail_side_tests(mscsb, src):
+    """burn v2: his smashes ask for their fire trails at the main hit (gk_trail_tick, from gk_chain_try every frame of
+    the attack statuses): his place and each standing clone's, the requests' lapse"""
+    m = fresh(mscsb, src)
+    g = m.game
+    g.situation = 0
+    m.vm.g[18] = 0
+    m.vm.g[4] = 0x2D
+    g.x, g.y, g.lr = 30.0, 10.0, -1.0
+    arts = lambda: [x for x in g.log if x[0] == 'article']    # noqa: E731
+    got = []
+    for fr in (11, 12):
+        g.frame, g.log = float(fr), []
+        m('gk_chain_try', 1)
+        got.append(arts())
+    check('burn v2: forward smash frames 11 / 12: no trail yet (its hit at 13)', got, [[], []])
+    g.frame, g.log = 13.0, []
+    m('gk_chain_try', 1)
+    check('burn v2: frame 13: his request 0 (VAR_0 type 1, VAR_1 / 2 his place, VAR_3 his facing) and article 9 made',
+          ([g.vars.get(0x0F000300 + i) for i in range(4)], arts()), ([1.0, 30.0, 10.0, -1.0], [('article', 0x2710, 9)]))
+    g.frame, g.log = 14.0, []
+    m('gk_chain_try', 1)
+    check('burn v2: frame 14: not again', arts(), [])
+    frames(m, 4, 0x2D)
+    check('burn v2: the request kept 5 frames for the executable\'s claims ...', g.vars.get(0x0F000300), 1.0)
+    frames(m, 1, 0x2D)
+    check('burn v2: ... then lapses (not claimed: six trails out already)', g.vars.get(0x0F000300), 0.0)
+    # the clones: down smash with both out, the right one falling on its own (no trail for it)
+    frames(m, 1, 0)
+    m.setg('gk_alive', 3)
+    m.setgf('gk_lx', 16.0)
+    m.setgf('gk_ly', 10.0)
+    m.setgf('gk_rx', 44.0)
+    m.setgf('gk_ry', 10.0)
+    m.vm.g[4] = 0x30
+    g.frame, g.log = 16.0, []
+    m('gk_chain_try', 4)
+    check('burn v2: down smash (type 3) at 16 with both clones out: his request and the left clone\'s (16, 10), the right '
+          'one\'s (44, 10): three, three trails made',
+          ([g.vars.get(0x0F000300 + i) for i in range(12)], arts()),
+          ([3.0, 30.0, 10.0, -1.0, 3.0, 16.0, 10.0, -1.0, 3.0, 44.0, 10.0, -1.0], [('article', 0x2710, 9)] * 3))
+    frames(m, 1, 0)
+    for i in range(12):
+        g.vars[0x0F000300 + i] = 0.0
+    m.setg('gk_rfall', 5)
+    m.vm.g[4] = 0x33
+    g.frame, g.log = 18.0, []
+    m('gk_chain_try', 2)
+    check('burn v2: up smash (type 2) at 18, the right clone falling on its own: his and the left clone\'s only',
+          ([g.vars.get(0x0F000300 + i) for i in (0, 4, 8)], len(arts())), ([2.0, 2.0, 0.0], 2))
+    frames(m, 1, 0)
+    m.vm.g[18] = 2
+    m.vm.g[4] = 0x2D
+    g.frame, g.log = 13.0, []
+    m('gk_chain_try', 1)
+    check('burn v2: in the air: no trail', arts(), [])
+
+
+def firetrail_tests(mscsb, src):
+    """burn v2: the fire trail's MSC (firetrail.mscsb)"""
+
+    def make():
+        m = MSC(mscsb, src)
+        g = m.game
+
+        def sysf(sid, a, old=g.sys):
+            if sid == 0x12 and a[0] == 0x1:
+                g.log.append(('motion', a[1], fv(a[2]), fv(a[3])))
+                return 0
+            if sid == 0x14 and a[0] == 0:
+                g.log.append(('lr', fv(a[1])))
+                return 0
+            if sid == 0x21 and a[0] == 0x9:
+                g.log.append(('remove',))
+                return 0
+            if sid == 0x1C:
+                g.log.append(('fx', a[0]) + tuple(a[1:3]) + tuple(round(fv(x), 2) for x in a[3:5]) if a[0] == 0x2717
+                             else ('fx',) + tuple(a))
+                return 0
+            return old(sid, a)
+        g.sys = sysf
+        return m, g
+
+    def run(m, n):
+        for _ in range(n):
+            m('tr_frame')
+    m, g = make()
+    run(m, 30)
+    check('trail: nobody claimed it: it waits (hidden) ...', [x for x in g.log if x[0] not in ('visible',)], [])
+    run(m, 1)
+    check('trail: ... and after 30 frames it removes itself', [x for x in g.log if x[0] == 'remove'], [('remove',)])
+    m, g = make()
+    g.vars.update({0x0F000300: 3.0, 0x0F000301: 1.0, 0x0F000302: 40.0, 0x0F000303: 10.0, 0x0F000304: -1.0})
+    run(m, 1)
+    check('trail start (forward smash at (40, 10), way -1): facing -1, there, its effects unhooked from its hidden model '
+          '(0x26 (0), 0x1C (1)), motion 0 held (rate 0: its hitboxes), the first flame 10 ahead (x -10)',
+          ([x for x in g.log if x[0] in ('lr', 'motion')], g.posture_sets[:1], [x for x in g.log if x[0] == 'fx'],
+           [x for x in g.log if x[0] == 'visible' and x[1] != 0]),
+          ([('lr', -1.0), ('motion', 0, 0.0, 0.0)], [(40.0, 10.0)],
+           [('fx', 0x26, 0), ('fx', 0x1C, 1), ('fx', 0x2717, 0x330001C, 0, -10.0, 0.0)], []))
+    g.log = []
+    run(m, 5)
+    check('trail: a flame a frame along its way (x -18 ... -42 on the ground), five in all',
+          [x[4:6] for x in g.log if x[0] == 'fx'], [(-18.0, 0.0), (-26.0, 0.0), (-34.0, 0.0), (-42.0, 0.0)])
+    g.log = []
+    run(m, 158)
+    check('trail: frames 7 - 164: nothing more; it stays put', ([x for x in g.log if x[0] in ('fx', 'remove')], g.posture_sets[-1]),
+          ([], (40.0, 10.0)))
+    g.log = []
+    run(m, 1)
+    check('trail: frame 165: its fire fades (0x2723 (id, 0, 0): its set\'s 15-frame fade)', [x for x in g.log if x[0] == 'fx'],
+          [('fx', 0x2723, 0x330001C, 0, 0)])
+    g.log = []
+    run(m, 14)
+    check('trail: ... still there until 179', [x for x in g.log if x[0] in ('fx', 'remove')], [])
+    run(m, 1)
+    check('trail: frame 180 (3 s): its fire ended, removed', [x for x in g.log if x[0] in ('fx', 'remove')],
+          [('fx', 0x2723, 0x330001C, 1, 1), ('remove',)])
+    for typ, want in ((2, [(0.0, 0.0), (0.0, 14.0), (0.0, 28.0), (0.0, 42.0)]),
+                      (3, [(10.0, 0.0), (-10.0, 0.0), (19.0, 0.0), (-19.0, 0.0), (28.0, 0.0), (-28.0, 0.0), (37.0, 0.0),
+                           (-37.0, 0.0)])):
+        m, g = make()
+        g.vars.update({0x0F000300: 3.0, 0x0F000301: float(typ), 0x0F000302: 0.0, 0x0F000303: 0.0, 0x0F000304: 1.0})
+        run(m, 12)
+        check('trail: %s smash: motion %d, its flames %s' % ('up' if typ == 2 else 'down', typ - 1,
+                                                              'a column over it' if typ == 2 else 'each side alternately'),
+              ([x[1] for x in g.log if x[0] == 'motion'], [x[4:6] for x in g.log if x[0] == 'fx' and x[1] == 0x2717]),
+              ([typ - 1], want))
+
+
+def trail_data_tests(out):
+    """burn v2: the fire trail's built files"""
+    fg = os.path.join(out, 'fighter', 'gekkouga')
+    ow = os.path.join(fg, 'script', 'animcmd', 'weapon', 'firetrail')
+    mt = open(os.path.join(ow, 'motion.mtable'), 'rb').read()
+    check('trail scripts: motion.mtable = FireTrailS4 / FireTrailHi4 / FireTrailLw4 (its motion kinds 0 / 1 / 2)',
+          list(struct.unpack('>3I', mt)), [acmd.crc(n) for n in GB.TR_SCRIPTS])
+    game = acmd.ACMDFile.load(os.path.join(ow, 'game.bin'))
+    rows = []
+    for n in GB.TR_SCRIPTS:
+        sc = game.script(n)
+        hb = [dict(zip(c.info['syntax'], c.params)) for c in sc if c.name == 'Special_Hitbox']
+        rows.append((n, [(h['ID'], h['Bone'], round(h['Z'], 2), round(h['Y'], 2), round(h['Size'], 2)) for h in hb],
+                     sorted({(round(h['Damage'], 2), h['KBG'], h['FKB'], h['BKB'], h['Rehit'], h['DisableHitlag'], h['NoGFX'],
+                              h['Flinchless'], round(h['Hitlag'], 2), h['Ground/Air'], h['Shieldable']) for h in hb}),
+                     [c.name for c in sc][-1]))
+    check('trail hitboxes (bone 0, from frame 0, never removed): along each smash\'s path, 0.1 %, no knockback (KBG / FKB / '
+          'BKB 0), re-hit every 35 frames, no hitlag, no hit effect, no flinch, ground and air, shieldable', rows,
+          [(n, [(i, 0, z, y, sz) for i, (z, y, sz) in enumerate(GB.TR_BOXES[n])],
+            [(0.1, 0, 0, 0, 35, 1, 1, 1, 0.0, 3, 1)], 'Script_End') for n in GB.TR_SCRIPTS])
+    check('trail scripts: effect / sound empty (its MSC makes the fire)',
+          [[c.name for c in acmd.ACMDFile.load(os.path.join(ow, f)).script(n)] for f in ('effect.bin', 'sound.bin')
+           for n in GB.TR_SCRIPTS], [['Script_End']] * 6)
+    check('trail: its main.pac and carrier model files are present (Pac-Man\'s hydrant\'s), its MSC',
+          [f for f in GB.SK_CARRIER if not os.path.exists(os.path.join(fg, 'model', 'firetrail', 'c00', f))] +
+          [f for f in (os.path.join('motion', 'firetrail', 'main.pac'), os.path.join('script', 'msc', 'firetrail', 'firetrail.mscsb'))
+           if not os.path.exists(os.path.join(fg, f))], [])
+    names = open(os.path.join(HERE, 'Sm4shCommand', 'SM4SHCommand', 'ModAnimNames.txt')).read()
+    check('trail: its script names in ModAnimNames.txt (with -> lines for the Hitbox Viewer)',
+          [n for n in GB.TR_SCRIPTS if '\n%s -> firetrail/' % n not in names], [])
+
+
 def script_tests(out, user):
     O = os.path.join(out, 'fighter', 'gekkouga', 'script', 'animcmd')
     ug = acmd.ACMDFile.load(os.path.join(user, 'body', 'game.bin'))
     ue = acmd.ACMDFile.load(os.path.join(user, 'body', 'effect.bin'))
     pg = acmd.ACMDFile.load(os.path.join(O, 'body', 'game.bin'))
     pe = acmd.ACMDFile.load(os.path.join(O, 'body', 'effect.bin'))
+    tips = [(nm, [(int(c.params[1]), round(float(c.params[3]), 2), round(float(c.params[4]), 2), round(float(c.params[8]), 2))
+                  for c in pe.script(nm) if c.name == 'External_Graphic' and int(c.params[0]) == GB.FIRE_TIP],
+             len([c for c in pe.script(nm) if c.name == 'Terminate_Graphic_Effect' and int(c.params[0]) == GB.FIRE_TIP]))
+            for nm in ('AttackS4', 'AttackHi4', 'AttackLw4', 'AttackAirF', 'AttackAirN')]
+    if GB.FIRE_TIPS:
+        check('burn v2: a flame (0x%X) at each water sword\'s tip (its hand joint, Y -11 x its size: -55 in the smashes), '
+              'ended with the sword; neutral air\'s water burst a flame each side (Z +- %g at Y %g), ended at %d' % (
+                  GB.FIRE_TIP, GB.FIRE_NAIR_Z, GB.FIRE_NAIR_Y, GB.FIRE_NAIR_END), tips,
+              [('AttackS4', [(25, -55.0, 0.0, 2.0)], 1), ('AttackHi4', [(25, -55.0, 0.0, 2.0), (24, -55.0, 0.0, 2.0)], 1),
+               ('AttackLw4', [(25, -55.0, 0.0, 2.0), (24, -55.0, 0.0, 2.0)], 1), ('AttackAirF', [(25, -11.0, 0.0, 0.7)], 1),
+               ('AttackAirN', [(0, 8.5, 10.0, 1.0), (0, 8.5, -10.0, 1.0)], 1)])
+        check('burn v2: ... and his effect scripts otherwise unchanged (the flames taken out again: the True blocks\' '
+              'offsets back)', GB.strip_fire_tips(pe), 13)
     smash = {zlib.crc32(n.encode()) for n in GB.SMASH_SCRIPTS}
     hold = {zlib.crc32(n.encode()) for n in GB.HOLD_SCRIPTS}
     bad, n, got = [], 0, {}
@@ -1312,7 +1487,7 @@ def script_tests(out, user):
     sizes = []
     for nm in GB.SMASH_SCRIPTS:
         for c in ce.scripts.get(zlib.crc32(nm.encode()), []):
-            if 'Size' in c.info['syntax'] and c.name != 'Sword_Glow':
+            if 'Size' in c.info['syntax'] and c.name != 'Sword_Glow' and int(c.params[0]) != GB.FIRE_TIP:
                 sizes.append(float(c.params[c.info['syntax'].index('Size')]))
     check('v4: the clone has his smash effects too (their True branches), at his sizes (5x: water sword / flash 5.0)',
           (len(sizes) >= 8, all(abs(x - 5.0) < 1e-3 for x in sizes)), (True, True))
@@ -1423,7 +1598,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 19:   # v15: the release exe and data, test exes and data
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
-    if len(earlier) == 20:   # skeleton v1.2: the exes, his effect bank and the skeleton's MSC
+    if len(earlier) in (20, 21):   # skeleton v1.2 / burn v2: the exes, the data, test exes (burn v2: + Sm4shCommand)
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 18:   # v14: exes and test data only
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
@@ -1449,6 +1624,12 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want), [])
         if len(earlier) in (18, 19, 20):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
+        elif len(earlier) == 21:
+            check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
+                  ([t for t in top if t.startswith('Sm4shCommand_v')],
+                   z.read('Sm4shCommand_v1.7.28/ModAnimNames.txt') == open(os.path.join(HERE, 'Sm4shCommand', 'SM4SHCommand',
+                                                                                         'ModAnimNames.txt'), 'rb').read()),
+                  (['Sm4shCommand_v1.7.28'], True))
         elif len(earlier) == 17:
             check('skeleton v1: Sm4shCommand v1.7.27 (its three script names in ModAnimNames.txt)',
                   ([t for t in top if t.startswith('Sm4shCommand_v')],
@@ -1490,6 +1671,18 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
               ['fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.efc', 'fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.ptcl',
                'fighter/gekkouga/script/msc/skeleton/skeleton.mscsb'])
+    if z1 and len(earlier) == 21:
+        check('burn v2: INSTALL_TO_data: his MSC, his body and the clone\'s effect.bin (the flames at his water\'s ends), his '
+              'effect bank (the fire sets), the fire trail\'s files (model / motion / scripts / MSC)',
+              sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              sorted(['fighter/gekkouga/script/msc/gekkouga.mscsb', 'fighter/gekkouga/script/animcmd/body/effect.bin',
+                      'fighter/gekkouga/script/animcmd/weapon/clone/effect.bin',
+                      'fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.efc',
+                      'fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.ptcl',
+                      'fighter/gekkouga/script/msc/firetrail/firetrail.mscsb', 'fighter/gekkouga/motion/firetrail/main.pac'] +
+                     ['fighter/gekkouga/script/animcmd/weapon/firetrail/%s' % f for f in ('game.bin', 'effect.bin', 'sound.bin',
+                                                                                          'motion.mtable')] +
+                     ['fighter/gekkouga/model/firetrail/c00/%s' % f for f in GB.SK_CARRIER]))
     if z1 and len(earlier) == 18:
         check('v14: no INSTALL_TO_data (the rigid-tongue release data stays)',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')), [])
@@ -1579,7 +1772,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     with tempfile.TemporaryDirectory() as td:
         import gekkouga_clone_cave as C
         for i, (member, b, dg, feats) in enumerate(exe_members(base, base_diag, len(earlier) >= 3, len(earlier) == 17,
-                                                               len(earlier) == 18, len(earlier) >= 19)):
+                                                               len(earlier) == 18, len(earlier) >= 19, len(earlier) in (19, 20))):
             if not b:
                 continue
             p = os.path.join(td, '%d.rpx' % i)
@@ -1618,9 +1811,12 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18, 19, 20) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18, 19, 20, 21) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
+        ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
+         'sword', 'neutral air', 'up smash', 'clone', 'S4BF', 'S4TR', 'Sm4shCommand_v1.7.28', 'A_release', 'G_pose',
+         'unconfirmed', 'knockback') if len(earlier) == 21 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -1632,7 +1828,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
 
-def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False):
+def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=False):
     """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant; skeleton v1 the
     release and TEST_ONLY A_release (as the burn packages)"""
     import gekkouga_clone_cave as C
@@ -1644,9 +1840,10 @@ def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False):
         return [('INSTALL_TO_code/cross_f.rpx', base, False, sk1 | {'pose'}),
                 ('TEST_ONLY_INSTALL_TO_code/A_release/cross_f.rpx', base_diag, True, sk1 | {'pose'}),
                 ('TEST_ONLY_INSTALL_TO_code/E_sway/cross_f.rpx', base_diag, True, sk1 | {'sway'})]
-    if v15:
-        return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE)] + \
-            [('TEST_ONLY_INSTALL_TO_code/%s/cross_f.rpx' % n, base_diag, True, f) for n, f in C.VARIANTS]
+    if v15:     # (v15 and skeleton v1.2 (sk12): RELEASE without burn v2's burn2; burn v2 on: RELEASE)
+        drop = {'burn2'} if sk12 else set()
+        return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE - drop)] + \
+            [('TEST_ONLY_INSTALL_TO_code/%s/cross_f.rpx' % n, base_diag, True, f - drop) for n, f in C.VARIANTS]
     if not v4:
         return [('INSTALL_TO_code/cross_f.rpx', base, False, C.FEATURES), ('TEST_ONLY_INSTALL_TO_code/cross_f.rpx', base_diag, True, C.FEATURES)]
     return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE)] + \
@@ -1662,7 +1859,8 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
     msc = os.path.join(out, 'fighter', 'gekkouga', 'script', 'msc')
     for f, src in ((os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c')),
                    (os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC),
-                   (os.path.join(msc, 'skeleton', 'skeleton.mscsb'), GB.SKELETON_MSC)):
+                   (os.path.join(msc, 'skeleton', 'skeleton.mscsb'), GB.SKELETON_MSC),
+                   (os.path.join(msc, 'firetrail', 'firetrail.mscsb'), GB.TRAIL_MSC)):
         if not os.path.exists(f):
             continue
         r = subprocess.run([sys.executable, os.path.join(HERE, 'msc_stack_check.py'), f, src], capture_output=True, text=True)
@@ -1673,7 +1871,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
     z = zipfile.ZipFile(pkg)
     with tempfile.TemporaryDirectory() as td:
         for member, b, dg, feats in exe_members(base, base_diag, v4, len(earlier) == 17, len(earlier) == 18,
-                                                len(earlier) >= 19):
+                                                len(earlier) >= 19, len(earlier) in (19, 20)):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')
@@ -1708,6 +1906,10 @@ def main():
         skeleton_side_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
         skeleton_tests(os.path.join(msc, 'skeleton', 'skeleton.mscsb'), GB.SKELETON_MSC)
         skeleton_data_tests(out)
+    if os.path.exists(os.path.join(msc, 'firetrail', 'firetrail.mscsb')):
+        trail_side_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
+        firetrail_tests(os.path.join(msc, 'firetrail', 'firetrail.mscsb'), GB.TRAIL_MSC)
+        trail_data_tests(out)
     script_tests(out, user)
     package_tests(out, pkg, base, base_diag, v1, earlier)
     model_tests(out, earlier)

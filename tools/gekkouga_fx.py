@@ -55,9 +55,10 @@ SK_BOOM_BASE_V = 0.895             # its base (alpha >= 0.5's lowest row, every 
 SK_HIT_W = 18.0                    # a hit's sparks: the quad 18 units across (centred on the hit)
 
 # ---- burn v2: fire (the luma-matted footage, additive: fire on black). Heights of the quad; widths from the cell's shape
-FIRE_BODY_H = 22.0                 # on a burning fighter (fire_small_4): its base on his feet (TransN), ~16 of flame
-FIRE_TIP_H = 10.0                  # at the outer ends of his water (fire_torch_012): centred on the call (x the call's size)
-FIRE_TRAIL_H = 22.0                # the smashes' trails (fire_ground_10): its base on the call's point
+FIRE_BODY_H = 30.0                 # on a burning fighter (fire_small_4): its base on his feet (TransN), ~16 of flame, ~21 wide
+FIRE_TIP_H = 15.0                  # at the outer ends of his water (fire_torch_012): centred on the call (x the call's size:
+                                   # ~7 of flame at 1)
+FIRE_TRAIL_H = 22.0                # the smashes' trails (fire_ground_10): its base on the call's point, ~14.5 of flame
 FIRE_FADE = 15                     # frames the body / trail fires take to go when ended with a fade (0x2723 (0, 0))
 
 

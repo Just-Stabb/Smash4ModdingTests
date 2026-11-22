@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Tests for tools/gekkouga_fx.py (Greninja's flipbook effects, fighters/gekkouga/README.md "Skeleton v1.2" on).
 
-  python3 -I tools/gekkouga_fx_test.py VANILLA_EFFECT_DIR KIRBY_PTCL FX_PKG BUILT_EFFECT_DIR
+  python3 -I tools/gekkouga_fx_test.py VANILLA_EFFECT_DIR KIRBY_PTCL FX_PKG BUILT_EFFECT_DIR [--skeleton-only]
+
+--skeleton-only: skeleton v1.2's bank (its four sets); else burn v2's too (the fire on burning fighters, at his water's
+ends and in the smashes' trails: their ids in the executable / build / trail MSC, their bases).
 
 BUILT_EFFECT_DIR: gekkouga_fx.build's output (the package's fighter/gekkouga/effect/gekkouga). Checks:
 - his 20 vanilla sets and 22 vanilla .efc entries unchanged; the new entries (flags 0x100) name the new sets in order,
@@ -110,12 +113,13 @@ def cells_shown(p, si, frames):
 
 
 def main():
-    a = sys.argv[1:]
+    a = [x for x in sys.argv[1:] if not x.startswith('--')]
     if len(a) != 4:
         sys.exit(__doc__)
     van_dir, kirby_path, fx_pkg, built = a
     G.FX_PKG = fx_pkg
-    sets = G._sk_sets()
+    burn2 = '--skeleton-only' not in sys.argv
+    sets = G.all_sets(burn2)
     v = P.Ptcl(open(os.path.join(van_dir, 'gekkouga.010d0000.ptcl'), 'rb').read())
     ve = EFC.Efc(open(os.path.join(van_dir, 'gekkouga.010d0000.efc'), 'rb').read())
     p = P.Ptcl(open(os.path.join(built, 'gekkouga.010d0000.ptcl'), 'rb').read())
@@ -133,7 +137,7 @@ def main():
     used = {m.group(1): int(m.group(2), 16) for m in re.finditer(r'int (sk_fx_\w+)\(\) \{ return (0x[0-9a-f]+); \}', src)}
     check('skeleton.c\'s ids: body right / left, hit, explosion',
           [used.get(n) for n in ('sk_fx_body_r', 'sk_fx_body_l', 'sk_fx_spark', 'sk_fx_boom')],
-          [ids[n] for n in names])
+          [ids[n] for n in names[:4]])
     ksi = kirby.find_set(G.TEMPLATE[0])
     ksh = kirby.field(kirby.sets[ksi]['emitters'][G.TEMPLATE[1]]['data'], 'shader_index')
     for i, (name, spec) in enumerate(sets):
@@ -192,6 +196,27 @@ def main():
           (boom['size'][0] * G.SK_BOOM_WIDEST_U),
           (round(tb[1] + boom['size'][1] / 2 - G.SK_BOOM_BASE_V * boom['size'][1], 3), round(boom['size'][0] * G.SK_BOOM_WIDEST_U, 2)),
           (0.0, G.SK_BOOM_DIAMETER))
+    if burn2:
+        import gekkouga_clone_cave as C
+        import gekkouga_build as GB
+        tsrc = open(os.path.join(ROOT, 'fighters', 'gekkouga', 'weapons', 'firetrail.c')).read()
+        m = re.search(r'int tr_fx\(\) \{ return (0x[0-9a-f]+); \}', tsrc)
+        check('burn v2 ids: the fire on burning fighters (the exe\'s BFX_ID), at his water\'s ends (gekkouga_build FIRE_TIP), '
+              'the trails (firetrail.c tr_fx)', [C.BFX_ID, GB.FIRE_TIP, int(m.group(1), 16) if m else None],
+              [ids['PtcGekkougaFireBody'], ids['PtcGekkougaFireTip'], ids['PtcGekkougaFireTrail']])
+        for nm, base in (('PtcGekkougaFireBody', 'fire_small_4'), ('PtcGekkougaFireTrail', 'fire_ground_10')):
+            spec = dict(sets)[nm]
+            si = 20 + names.index(nm)
+            t = p.field(p.sets[si]['emitters'][0]['data'], 'emitter_translation')
+            h = spec['size'][1]
+            check('%s: the flame\'s base (%s\'s anchor) on the call\'s point, %.0f units tall, additive, fade 1 / %d' % (
+                nm, base, h, G.FIRE_FADE), (round(t[1] + h / 2 - G.feet_cell_v(base) * h, 3), spec['blend'],
+                round(struct.unpack('>f', bytes(p.sets[si]['emitters'][0]['data'][0x82C:0x830]))[0], 4)),
+                  (0.0, 1, round(1.0 / G.FIRE_FADE, 4)))
+        si = 20 + names.index('PtcGekkougaFireTip')
+        check('PtcGekkougaFireTip: centred on the call (the sword\'s tip), additive, %.0f tall at size 1' % G.FIRE_TIP_H,
+              (p.field(p.sets[si]['emitters'][0]['data'], 'emitter_translation'), dict(sets)['PtcGekkougaFireTip']['blend']),
+              ([0.0, 0.0, 0.0], 1))
     r = p.decode_texture(p.sets[20]['emitters'][0]['data'], 0).astype(np.float32)
     lft = p.decode_texture(p.sets[21]['emitters'][0]['data'], 0).astype(np.float32)
     dif = np.abs(G.mirror_cells(r, 6, 10) - lft).mean()

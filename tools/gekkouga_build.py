@@ -8,6 +8,7 @@
                                                                 gekkouga/script/animcmd) -> OUT/fighter/gekkouga/...
   python3 tools/gekkouga_build.py skeleton PACMAN_FIGHTER_DIR OUT_FIGHTER [TEST_ONLY_DIR]   skeleton v1: its files
                                                                 (vanilla fighter/pacman: its hydrant's model / motion)
+  python3 tools/gekkouga_build.py trail PACMAN_FIGHTER_DIR OUT_FIGHTER      burn v2: the fire trail's files
   python3 tools/gekkouga_build.py effects VANILLA_EFFECT_DIR KIRBY_PTCL FX_PKG OUT_FIGHTER   skeleton v1.2 on: his
                                                                 effect bank + the flipbooks (tools/gekkouga_fx.py) ->
                                                                 OUT_FIGHTER/effect/gekkouga/gekkouga.010d0000.ptcl / .efc
@@ -289,6 +290,118 @@ def clone_scripts(game, effect, mtable_hashes, bmap):
     return g_out, e_out
 
 
+# burn v2: fire at the outer ends of his water (his bank's PtcGekkougaFireTip, fire_torch_012: a looping billboard flame
+# centred on the call). The water sword (0x3300007, External_Graphic on a hand: 24 / 25) ends where its trail's second
+# point is (Sword_Glow Y2: -11 x its size: -55 in the smashes at x5, -11 in forward air): a flame there on each sword,
+# made with it, ended with it (the sword's Terminate_Graphic_Effect). Neutral air's water burst (0x330000B at joint 0,
+# Y 8.5): a flame each side (Z +- FIRE_NAIR_Z), ended at frame FIRE_NAIR_END. Up smash's water is the two hand swords
+# (the EffGekkougaAttackHi model 0x3300011 is up tilt's, not up smash's: his effect.bin)
+FIRE_TIPS = True                  # (False: skeleton v1.2's scripts, without them)
+FIRE_TIP = 0x330001B
+SWORD = 0x3300007
+SWORD_LEN = 11.0                  # the sword at size 1 (forward air's trail: Y2 -11; the smashes' -55 at x5)
+FIRE_TIP_SIZE = {'AttackS4': 2.0, 'AttackHi4': 2.0, 'AttackLw4': 2.0, 'AttackAirF': 0.7}
+NAIR_BURST = 0x330000B
+FIRE_NAIR_Z = 10.0
+FIRE_NAIR_Y = 8.5
+FIRE_NAIR_SIZE = 1.0
+FIRE_NAIR_END = 24
+
+
+def insert_cmds(cmds, i, new):
+    """new commands before cmds[i], inside every True / Else / False block that holds cmds[i] (their Offset words grow)"""
+    pos, at = [], 0
+    for c in cmds:
+        pos.append(at)
+        at += 1 + len(c.params)
+    q = pos[i] if i < len(cmds) else at
+    words = sum(1 + len(c.params) for c in new)
+    for j, c in enumerate(cmds):
+        if c.name in ('True', 'Else', 'False') and pos[j] < q < pos[j] + int(c.params[0]):
+            c.params[0] = int(c.params[0]) + words
+    cmds[i:i] = new
+
+
+def ext_graphic(gfx, bone, x, y, z, size, terminate=1):
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    ident = by['External_Graphic']
+    vals = dict(Graphic=gfx, Bone=bone, X=x, Y=y, Z=z, XRot=0.0, YRot=0.0, ZRot=0.0, Size=size, Terminate=terminate)
+    return acmd.Command(ident, [vals[n] for n in acmd.INFO[ident]['syntax']])
+
+
+def terminate_gfx(gfx):
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    ident = by['Terminate_Graphic_Effect']
+    vals = dict(Graphic=gfx, KillParticles=0, KillImmediately=0)
+    return acmd.Command(ident, [vals[n] for n in acmd.INFO[ident]['syntax']])
+
+
+def add_fire_tips(effect):
+    """burn v2: the flames at his water's ends (after scale_smash: the sizes / offsets are the scaled ones)"""
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    n = 0
+    for name, size in FIRE_TIP_SIZE.items():
+        s = effect.script(name)
+        i = 0
+        while i < len(s):
+            c = s[i]
+            syn = c.info['syntax']
+            if c.name == 'External_Graphic' and int(c.params[0]) == SWORD:
+                y = -SWORD_LEN * float(c.params[syn.index('Size')])
+                insert_cmds(s, i, [ext_graphic(FIRE_TIP, int(c.params[syn.index('Bone')]), 0.0, y, 0.0, size)])
+                i += 2
+                n += 1
+                continue
+            if c.name == 'Terminate_Graphic_Effect' and int(c.params[0]) == SWORD:
+                insert_cmds(s, i, [terminate_gfx(FIRE_TIP)])
+                i += 2
+                continue
+            i += 1
+    s = effect.script('AttackAirN')
+    i = [k for k, c in enumerate(s) if c.name == 'External_Graphic' and int(c.params[0]) == NAIR_BURST][0]
+    insert_cmds(s, i + 1, [ext_graphic(FIRE_TIP, 0, 0.0, FIRE_NAIR_Y, z, FIRE_NAIR_SIZE) for z in (FIRE_NAIR_Z, -FIRE_NAIR_Z)])
+    end = [k for k, c in enumerate(s) if c.name == 'Script_End'][-1]
+    insert_cmds(s, end, [acmd.Command(by['FRAME'], [float(FIRE_NAIR_END)]), terminate_gfx(FIRE_TIP)])
+    return n + 2
+
+
+def remove_cmd(cmds, i):
+    """cmds[i] removed (insert_cmds undone: the True / Else / False blocks holding it shrink)"""
+    pos, at = [], 0
+    for c in cmds:
+        pos.append(at)
+        at += 1 + len(c.params)
+    words = 1 + len(cmds[i].params)
+    for j, c in enumerate(cmds):
+        if c.name in ('True', 'Else', 'False') and pos[j] < pos[i] < pos[j] + int(c.params[0]):
+            c.params[0] = int(c.params[0]) - words
+    del cmds[i]
+
+
+def strip_fire_tips(effect):
+    """add_fire_tips undone (tests: the rest of his scripts as before): its commands, and neutral air's FRAME before
+    its Terminate"""
+    n = 0
+    for crc, cmds in effect.scripts.items():
+        i = 0
+        while i < len(cmds):
+            c = cmds[i]
+            if c.name in ('External_Graphic', 'Terminate_Graphic_Effect') and int(c.params[0]) == FIRE_TIP:
+                if c.name == 'Terminate_Graphic_Effect' and i and cmds[i - 1].name == 'FRAME' and \
+                        float(cmds[i - 1].params[0]) == FIRE_NAIR_END and i + 1 < len(cmds) and \
+                        cmds[i + 1].name == 'Script_End':          # neutral air's own FRAME (not a sword's at 24)
+                    remove_cmd(cmds, i - 1)
+                    i -= 1
+                remove_cmd(cmds, i)
+                n += 1
+                continue
+            i += 1
+    return n
+
+
 def cmd_acmd(user_dir, vanilla_model, out_dir):
     """user_dir: his script/animcmd (body/ game, effect, sound, expression, motion.mtable); vanilla_model: his
     model/body/c00 (model.jtb / model.vbn for the clone's joints); out_dir: script/animcmd of the package"""
@@ -297,6 +410,7 @@ def cmd_acmd(user_dir, vanilla_model, out_dir):
     game = acmd.ACMDFile.load(os.path.join(body, 'game.bin'))
     effect = acmd.ACMDFile.load(os.path.join(body, 'effect.bin'))
     n = scale_smash(game, effect)
+    tips = add_fire_tips(effect) if FIRE_TIPS else 0
     ob = os.path.join(out_dir, 'body')
     os.makedirs(ob, exist_ok=True)
     game.save(os.path.join(ob, 'game.bin'))
@@ -311,7 +425,7 @@ def cmd_acmd(user_dir, vanilla_model, out_dir):
     acmd.ACMDFile(e).save(os.path.join(ow, 'effect.bin'))
     acmd.ACMDFile({}).save(os.path.join(ow, 'sound.bin'))
     open(os.path.join(ow, 'motion.mtable'), 'wb').write(mt)
-    return dict(scaled=n, game=len(g), effect=len(e), motions=len(hashes))
+    return dict(scaled=n, tips=tips, game=len(g), effect=len(e), motions=len(hashes))
 
 
 # ---------------------------------------------------------------- the clone's model / motion
@@ -631,6 +745,75 @@ def cmd_skeleton(pacman_fighter, out_fighter, test_only=None):
     return len(SK_CARRIER) + 6
 
 
+
+# ---------------------------------------------------------------- burn v2: the smashes' fire trails (article 9)
+TRAIL_MSC = os.path.join(ROOT, 'fighters', 'gekkouga', 'weapons', 'firetrail.c')
+TR_SCRIPTS = ('FireTrailS4', 'FireTrailHi4', 'FireTrailLw4')   # its motion kinds 0 / 1 / 2 (forward / up / down smash)
+# its hitboxes (bone 0, held from the motion's first frame): along each smash's path, where its fire is (firetrail.c
+# tr_fx_*): (Z forward along its way, Y up, size). No knockback (KBG / FKB / BKB 0), no hitlag, no flinch, no hit effect,
+# 0.1 % (a hit to log: the burn is the exe's trail row, 0.25 % every 15 frames for 3 s = 3 %), re-hit every TR_REHIT
+TR_BOXES = {'FireTrailS4': ((14.0, 5.0, 7.0), (26.0, 5.0, 7.0), (38.0, 5.0, 7.0)),
+            'FireTrailHi4': ((0.0, 8.0, 9.0), (0.0, 22.0, 9.0), (0.0, 36.0, 9.0), (0.0, 50.0, 9.0)),
+            'FireTrailLw4': ((14.0, 5.0, 8.0), (30.0, 5.0, 8.0), (-14.0, 5.0, 8.0), (-30.0, 5.0, 8.0))}
+TR_REHIT = 35
+TR_HIT = dict(Damage=0.1, Angle=361, KBG=0, FKB=0, BKB=0, Effect=5, Hitlag=0.0, SDI=0.0, Clang=0, Rebound=0,
+              ShieldDamage=0, SFXLevel=0, SFXType=0, Rehit=TR_REHIT, DisableHitlag=1, NoGFX=1, Flinchless=1)
+
+
+def tr_hitbox(i, z, y, size):
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    ident = by['Special_Hitbox']
+    syn = acmd.INFO[ident]['syntax']
+    d = dict(ID=i, Part=0, Bone=0, Damage=0, Angle=0, KBG=0, FKB=0, BKB=0, Size=size, X=0, Y=y, Z=z, Effect=0, Trip=0,
+             Hitlag=1.0, SDI=1.0, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=0, SFXType=0, Type=9, HitBits=0x3F,
+             Unk41=0, CollisionPart=0xF, NoScale=0, Shieldable=1, Reflectable=0, Absorbable=0, Rehit=0, IgnoreInvuln=0,
+             HitAllStates=0, FacingRestrict=0, NoGrabRelease=0, TeamDamage=0, DisableHitlag=0, NoGFX=0, Flinchless=0,
+             Shape=0)
+    d['Ground/Air'] = 3
+    d['Direct/Indirect'] = 0
+    d.update(TR_HIT)
+    return acmd.Command(ident, [d[n] for n in syn])
+
+
+def tr_scripts():
+    """{crc: [Command]}: each smash's hitboxes at once (its MSC holds the motion at frame 0), then the end"""
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    return {acmd.crc(n): [tr_hitbox(i, *b) for i, b in enumerate(TR_BOXES[n])] + [acmd.Command(by['Script_End'], [])]
+            for n in TR_SCRIPTS}
+
+
+def tr_empty():
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    return {acmd.crc(n): [acmd.Command(by['Script_End'], [])] for n in TR_SCRIPTS}
+
+
+def cmd_trail(pacman_fighter, out_fighter):
+    """the fire trail's files: model/firetrail/c00 (the hydrant's model: a hidden carrier), motion/firetrail/main.pac
+    (the hydrant's), script/animcmd/weapon/firetrail, script/msc/firetrail/firetrail.mscsb"""
+    import shutil
+    import acmd
+    src = os.path.join(pacman_fighter, 'model', 'firehydrant', 'c00')
+    dst = os.path.join(out_fighter, 'model', 'firetrail', 'c00')
+    os.makedirs(dst, exist_ok=True)
+    for f in SK_CARRIER:
+        shutil.copyfile(os.path.join(src, f), os.path.join(dst, f))
+    md = os.path.join(out_fighter, 'motion', 'firetrail')
+    os.makedirs(md, exist_ok=True)
+    shutil.copyfile(os.path.join(pacman_fighter, 'motion', 'firehydrant', 'main.pac'), os.path.join(md, 'main.pac'))
+    ow = os.path.join(out_fighter, 'script', 'animcmd', 'weapon', 'firetrail')
+    os.makedirs(ow, exist_ok=True)
+    acmd.ACMDFile(tr_scripts()).save(os.path.join(ow, 'game.bin'))
+    acmd.ACMDFile(tr_empty()).save(os.path.join(ow, 'effect.bin'))
+    acmd.ACMDFile(tr_empty()).save(os.path.join(ow, 'sound.bin'))
+    open(os.path.join(ow, 'motion.mtable'), 'wb').write(b''.join(struct.pack('>I', acmd.crc(n)) for n in TR_SCRIPTS))
+    ms = os.path.join(out_fighter, 'script', 'msc', 'firetrail')
+    os.makedirs(ms, exist_ok=True)
+    compile_msc(TRAIL_MSC, os.path.join(ms, 'firetrail.mscsb'))
+    return len(SK_CARRIER) + 6
+
 if __name__ == '__main__':
     a = sys.argv[1:]
     if len(a) == 3 and a[0] == 'msc':
@@ -646,6 +829,8 @@ if __name__ == '__main__':
         for k, v in gekkouga_fx.build(a[1], a[2], a[3], os.path.join(a[4], 'effect', 'gekkouga'),
                                       burn2=a[5:] != ['--skeleton-only']).items():
             print('0x%08X %s' % (v, k))
+    elif len(a) == 3 and a[0] == 'trail':
+        print(cmd_trail(a[1], a[2]))
     elif len(a) in (3, 4) and a[0] == 'skeleton':
         print(cmd_skeleton(a[1], a[2], a[3] if len(a) > 3 else None))
     else:

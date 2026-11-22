@@ -3956,5 +3956,12 @@ MSC on a bunshin-based kind, the 4-shape group.
 - **Following effects of a hidden article**: the skeleton's carrier model is hidden (VisibilityModule 0x2710 0), which
   hides its following effects ("Effects follow the model's visibility"); its MSC clears the sync (`EffectModule(0x26, 0)`)
   and shows them again (`EffectModule(0x1C, 1)`) before its following body effect (`EffectModule(0x2717, ...)`).
+- **Effects on another object from native code (Greninja burn v2)**: any object's EffectModule (accessor +0xA0) takes
+  MSC requests at vt +0x2EC (module, &{u32 *args, count}): the words of `EffectModule(op, ...)` (ints, floats as their
+  bits), as ACMD's Terminate handler builds them (`0x02BE25AC`). `bfx_vic` puts the burn fire on a victim with `0x2717`
+  (id, joint 0, x, y, z, rx, ry, rz, size, 0: following, position only) and ends it with `0x2723` (id, 1, 1) / (0, 0).
+- **A weapon held at its motion's first frame (Greninja burn v2's fire trail)**: `MotionModule(0x1, kind, 0, 0)` (rate 0,
+  as vanilla's `MotionModule(0x1, 0, 0, 0, 0)`); its game script's commands before any timer (the trail's hitboxes) are
+  meant to run once at the change, the script never looping (unconfirmed in game).
 - **Clone swing (clones v15, confirmed in game)**: stepping the clone's MotionModule +0x10 object's own swing system
   (`0x03318A10` rate, `0x03314FB8` step) each frame swings its tongue / water with his own model.sb: no bind needed.

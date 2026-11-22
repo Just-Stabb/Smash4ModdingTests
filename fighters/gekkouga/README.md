@@ -957,3 +957,47 @@ gekkouga.010d0000.ptcl / .efc (entries 0x16 - 0x19, flags 0x100; his 20 sets / 2
   explosion's 44, the mirror); `gekkouga_clone_cave_test` 201 / 228 / 223 (release / A_release / G_pose; `col_on_checks`:
   the game's GC_ON / GC_ENABLE / 0x02D5D6E0 leave the hydrant's words); `gekkouga_clones_test ... --v15` 236 / 0;
   supamario_ui_cave_test 0 (release); import_call_check 0; byte-for-byte rebuilds. Not confirmed in game: everything here.
+
+## Burn v2 (`greninja_burn_v2.zip`, over skeleton v1.2; exe_v46z_gkb4, Sm4shCommand v1.7.28)
+
+Feature `burn2` (in `RELEASE`; skeleton v1.2's exe is `RELEASE - burn2`), `tools/gekkouga_clone_cave.py` `burn2_src`.
+
+- **Fire on burning fighters** (`bfx_vic`, from `burn_tick`'s `bt_next`: every Greninja's pass, each victim): the level
+  (the victim's burn instances, anyone's, at most `BFX_LEVELS` 5) against the one shown (`bfx_lvl`, shared: the second
+  Greninja in a frame finds it shown); a change calls the victim's EffectModule MSC handler (accessor +0xA0, vt +0x2EC:
+  the call ACMD's Terminate makes, `{args, count}`): `0x2723 (BFX_ID, 1, 1)` (another level) / `(0, 0)` (none: a fade),
+  then `0x2717 (BFX_ID, joint 0, 0 x 6, size, 0)` (following, position only), size 1 + 0.15 x (level - 1) (1.0 - 1.6).
+  `BFX_ID` 0x330001A (PtcGekkougaFireBody). gk_clear empties the levels. Diag `S4BF victim level old -> new`.
+- **Fire at his water's ends** (`gekkouga_build.add_fire_tips`, after `scale_smash`; the clone's scripts copy them):
+  External_Graphic 0x330001B (PtcGekkougaFireTip) on each water sword's hand joint at Y = -11 x the sword's size (its
+  Sword_Glow's second point: -55 in the smashes, -11 in forward air), size 2.0 (smashes) / 0.7 (forward air), put just
+  before the sword's command (inside its IS_FLAG block: the True offsets grow, `insert_cmds`), ended just before its
+  Terminate; neutral air: two at joint 0 (Y 8.5, Z +- 10), size 1, FRAME 24 + Terminate. Up smash's water is its two
+  swords (0x3300011, EffGekkougaAttackHi, is up tilt's model). `strip_fire_tips` undoes it (tests).
+- **Fire trails**: his MSC (`clones.c` `gk_trail_tick`, from `gk_chain_try` each frame of the attack statuses, on the
+  ground) at the smash's main hit (forward 13, up 18, down 16) writes request k = his VAR_4k (type 1 / 2 / 3), +1 / +2 the
+  place, +3 his facing: his and each clone's not falling on its own (`gk_cx` / `gk_cy`), `ArticleModule(0x2710, 9)` each;
+  the requests lapse after 5 frames (`gk_tr_clear`). The article: weapon kind `TR_KIND` 0x1A3 "firetrail" (article 9,
+  `TR_MAX` 6 at once; registered as the skeleton: bunshin descriptor copy with 3 motions of the hydrant's hash, pump's
+  template, the clone's row, the moon's vtable with the skeleton's +0x34 / +0xAC and +0x94 `tr_94`). `tr_frame`: the claim
+  (`tr_claim`: the first live Greninja with a request -> its VAR_0 his slot, VAR_1-4 the request, VAR_5 a free context of
+  his: `tr_ttl` 0, kept `TR_TTL` 3 frames by each of its frames, counted down by his `burn_him`; its processed counts
+  cleared; none free: 0, no burns), then `burn_scan` with the trail row and context `TR_CTX0` (32) + slot x 6 + n. Its
+  MSC (`weapons/firetrail.c`): placed, facing his way, motion type - 1 held at rate 0 (its game script's hitboxes at
+  frame 0), its effects unhooked from its hidden model (0x26 / 0x1C), a flame (0x330001C, PtcGekkougaFireTrail) a frame:
+  forward 5 at x 10 - 42, up a column of 4 at y 0 - 42, down 4 each side at 10 - 37; at 165 the fire fades (0x2723 (0,
+  0), its set's 1/15), at 180 ended and removed. Its hitboxes (`gekkouga_build.TR_BOXES`, Special_Hitbox on bone 0):
+  forward Z 14 / 26 / 38 (size 7, Y 5), up Y 8 / 22 / 36 / 50 (size 9), down Z +- 14 / +- 30 (size 8, Y 5); 0.1 %,
+  angle 361, KBG / FKB / BKB 0, Hitlag 0, DisableHitlag, NoGFX, Flinchless, re-hit 35, ground and air, shieldable.
+  Burn row `TR_ROW` (0x101A3) 0.25 % / 15 f / 180 f = 3 %; shielded 0.5 % x 6 = 3 % (raised to the floor).
+- **His bank** (`tools/gekkouga_fx.py`, entries 0x1A - 0x1C after skeleton v1.2's): PtcGekkougaFireBody (fire_small_4,
+  30 tall: ~16 of flame, ~21 wide, its base at the call, fade 15), PtcGekkougaFireTip (fire_torch_012, 15 tall, centred,
+  ~7 of flame at size 1), PtcGekkougaFireTrail (fire_ground_10, 22 tall: ~14.5 of flame, base at the call, fade 15); all
+  additive, 2 emitters each (39 - 46 cells). His .ptcl 15.2 MB.
+- Sm4shCommand v1.7.28: `FireTrailS4` / `FireTrailHi4` / `FireTrailLw4` in ModAnimNames.txt (-> the carrier's
+  animation). `new_var_test` 290 / 1 (the known effect.bin else-if count), `hitbox_var_test` 248 / 0.
+- Tests: `gekkouga_clone_cave_test` 228 / 257 / 252 (release / A_release / G_pose; `burn2_checks`: the row, the fire's
+  calls level by level, shared between Greninjas, a victim gone; the trail's tables, claims, contexts kept / freed /
+  run out, its hits' burns plain and shielded); `gekkouga_fx_test` 29 / 0; `gekkouga_clones_test ... --vs12` 262 / 0
+  (`trail_side_tests`, `firetrail_tests`, `trail_data_tests`, the tips, the package); supamario_ui_cave_test 0;
+  import_call_check 0; byte-for-byte rebuilds. Not confirmed in game: everything here.

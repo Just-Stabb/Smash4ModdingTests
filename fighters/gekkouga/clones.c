@@ -61,6 +61,8 @@ int gk_rfall;
 int gk_gen;            // skeleton v1: the executable's clear-all count (his VAR_14) last seen ...
 int gk_gen_seen;       // ... 1 once read: a change is a training reset / restart (the state below starts over)
 int gk_sk_req_t;       // skeleton v1: frames his skeleton request (VAR_15) stays up for the executable's claim
+int gk_tr_done;        // burn v2: the attack status whose fire trail was asked for (0: none yet)
+int gk_tr_req_t;       // burn v2: frames his trail requests (VAR_0 - VAR_11) stay up for the executable's claims
 
 int gk_lw_full() { return 300; }          // 5 seconds held (the user)
 int gk_ability_frames() { return 720; }   // 12 seconds
@@ -86,6 +88,7 @@ int gk_beat_miss() { return 3; }          // frames without its heartbeat: the g
 int gk_beat_grace() { return 120; }       // v5: frames a clone whose heartbeat was never seen is kept anyway
 int gk_hitlag_min() { return 4; }         // a clone hit's hitlag on him when no victim's hitstop is found
 int gk_sk_req_frames() { return 5; }      // skeleton v1: the request's life (a skeleton out already: none is made)
+int gk_tr_req_frames() { return 5; }      // burn v2: the trail requests' life (6 trails out already: none is made)
 
 float gk_abs(float v)
 {
@@ -117,6 +120,18 @@ void gekkouga_frame()
         {
             WorkModule(0, 0 + 0, 0x0f00030f);   // not claimed: no skeleton was made (one is out already)
         }
+    }
+    if (gk_tr_req_t > 0)
+    {
+        gk_tr_req_t -= 1;
+        if (gk_tr_req_t == 0)
+        {
+            gk_tr_clear();                // burn v2: not claimed (6 trails out already)
+        }
+    }
+    if (st != gk_tr_done)
+    {
+        gk_tr_done = 0;                   // burn v2: out of that attack: the next one asks again
     }
     if (st == 0xb1 || st == 0xb2 || st == 0x14f)
     {
@@ -1317,6 +1332,7 @@ int gk_sm_hold_loop(int t)
 int gk_chain_try(int cur)
 {
     int t;
+    gk_trail_tick(cur);                   // burn v2: its fire trail at the smash's hit
     if (gk_sm_type(global4) != cur || global18 != 0)
     {
         return 0;
@@ -1371,6 +1387,9 @@ void gk_reset()
     gk_smash = 0;
     gk_sk_req_t = 0;
     WorkModule(0, 0 + 0, 0x0f00030f);
+    gk_tr_req_t = 0;
+    gk_tr_done = 0;
+    gk_tr_clear();
 }
 
 // ---- skeleton v1: Shadow Sneak (SpecialS 0x153) without the vanish and the teleport: its per-frame (global16, in
@@ -1411,4 +1430,79 @@ void gk_sk_spawn(float x, float y)
     gk_sk_req_t = gk_sk_req_frames();
     r = ArticleModule(0x2710, 0x8);
     WorkModule(0, (float)r + 0, 0x0f000317);   // diag: the generate's result (the TEST_ONLY exe logs it: S4GF gen=)
+}
+
+// ---- burn v2: the smashes' fire trails (fighters/gekkouga/README.md "Burn v2"). At each smash's main hit (attacks4 13,
+// attackhi4 18, attacklw4 16: its game script) a fire trail (article 9, weapon kind 0x1A3: weapons/firetrail.c) at his
+// place, and one at each clone's (they play his smash with him): request k in his VAR_4k (type: 1 forward, 2 up, 3 down),
+// VAR_4k+1 / +2 the place, VAR_4k+3 his facing; the executable copies one into each new trail as it claims it
+int gk_tr_frame(int t)
+{
+    if (t == 0x1)
+    {
+        return 13;
+    }
+    if (t == 0x2)
+    {
+        return 18;
+    }
+    return 16;
+}
+
+int gk_tr_type(int t)
+{
+    if (t == 0x1)
+    {
+        return 0x1;
+    }
+    if (t == 0x2)
+    {
+        return 0x2;
+    }
+    return 0x3;
+}
+
+void gk_tr_clear()
+{
+    WorkModule(0, 0 + 0, 0x0f000300);
+    WorkModule(0, 0 + 0, 0x0f000304);
+    WorkModule(0, 0 + 0, 0x0f000308);
+}
+
+void gk_tr_ask(int k, int type, float x, float y)
+{
+    int r;
+    WorkModule(0, (float)type + 0, 0x0f000300 + k * 4);
+    WorkModule(0, x + 0, 0x0f000301 + k * 4);
+    WorkModule(0, y + 0, 0x0f000302 + k * 4);
+    WorkModule(0, PostureModuleF(0) + 0, 0x0f000303 + k * 4);
+    r = ArticleModule(0x2710, 0x9);
+}
+
+void gk_trail_tick(int cur)
+{
+    int k;
+    int type;
+    if (gk_tr_done == global4 || global18 != 0)
+    {
+        return;
+    }
+    if (MotionModuleF(0x1) < (float)gk_tr_frame(cur))
+    {
+        return;
+    }
+    gk_tr_done = global4;
+    type = gk_tr_type(cur);
+    gk_tr_ask(0, type, PostureModuleF(0x1), PostureModuleF(0x2));
+    k = 0x1;
+    if ((gk_alive & 0x1) && gk_lfall == 0)
+    {
+        gk_tr_ask(k, type, gk_cx(0x1), gk_cy(0x1));
+        k += 1;
+    }
+    if ((gk_alive & 0x2) && gk_rfall == 0)
+    {
+        gk_tr_ask(k, type, gk_cx(0x2), gk_cy(0x2));
+    }
+    gk_tr_req_t = gk_tr_req_frames();
 }
