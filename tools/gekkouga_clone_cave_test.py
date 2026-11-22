@@ -816,7 +816,10 @@ def sway_checks(e, info):
     mm = e.alloc(0x60, b'\0')
     e.setw(acc + C.W_MOTION, mm)
     motion = e.alloc(0x200, b'\0')
-    e.setw(mm + C.MM_MOTION, motion)
+    e.setw(mm + C.MM_MODEL, motion)                     # v14: its model / motion object is MotionModule +0x10
+    odd = e.alloc(0x40, b'\0')                         # +0x14 on a weapon: no such object (its +4 is 6: the user's
+    e.setw(odd + 4, 6)                                   # v13 E_sway crash read 6's +4)
+    e.setw(mm + C.MM_MOTION, odd)
     link = e.alloc(0x10, b'\0')
     e.setw(link + 4, 3)                                  # its model link's mode (8: none)
     e.setw(motion + 4, link)
@@ -877,6 +880,19 @@ def sway_checks(e, info):
     e.setw(acc + C.W_MOTION, 0)
     check('v12 sway: no MotionModule: nothing', run(), [])
     e.setw(acc + C.W_MOTION, mm)
+    e.setw(mm + C.MM_MODEL, 0)
+    cv[C.VAR_BIND] = 0.0
+    check('v14 sway: the user\'s v13 crash layout (+0x10 none, +0x14 an object whose +4 is 6): nothing read through it, '
+          'nothing called', (run(), e.w(odd + C.MO_SWING)), ([], 0))
+    for bad, what in ((0x7, '+4 not a pointer'), (0x9000000, '+4 a low address')):
+        e.setw(mm + C.MM_MODEL, motion)
+        e.setw(motion + 4, bad)
+        check('v14 sway: its object\'s %s: nothing' % what, run(), [])
+    e.setw(motion + 4, link)
+    sk1c = e.w(motion + 0x1C)
+    e.setw(motion + 0x1C, 0x20)
+    check('v14 sway: its evaluator (+0x1C) not a pointer: nothing', run(), [])
+    e.setw(motion + 0x1C, sk1c)
     e.setw(motion + C.MO_SWING, sw)
     vtab = info['A']['w_vt']
     del calls[:]
@@ -1780,8 +1796,32 @@ def pose_checks(e, info, diag):
         check('v14 pose: %s: the clone untouched' % what,
               max(float(np.abs(read(carr, i) - Cm[i]).max()) for i in range(C.POSE_MIN)), 0.0)
         undo()
+    # his MotionModule +0x14 (the object a fighter's swing update steps) is preferred when it is one; the clone's +0x14
+    # (a weapon's: no such object, its +4 6) is never read through
+    hacc = e.w(him['f'] + C.BASE_ACC)
+    hmm = e.w(hacc + C.W_MOTION)
+    H2 = [rigid(1.0).astype(np.float32).astype(float) for _ in range(C.POSE_MIN)]
+    tmp = e.alloc(0x40, b'\0')
+    e.setw(tmp + C.W_MOTION, e.alloc(0x60, b'\0'))
+    arr2 = model(tmp, H2)
+    e.setw(hmm + C.MM_MOTION, e.w(e.w(tmp + C.W_MOTION) + C.MM_MODEL))
+    odd = e.alloc(0x40, b'\0')
+    e.setw(odd + 4, 6)
+    e.setw(e.w(cacc + C.W_MOTION) + C.MM_MOTION, odd)
+    for i, m in enumerate(Cm):
+        e.mu.mem_write(carr + 0x30 * i, struct.pack('>12f', *m.reshape(-1)))
+    e.call(lab['w_pose'], weapon, 8)
+    want2 = {b: (h4(Cm[a]) @ np.linalg.inv(h4(H2[a])) @ h4(H2[b]))[:3] for b, a in C.POSE_BONES}
+    err = max(float(np.abs(read(carr, b) - want2[b]).max()) for b, _a in C.POSE_BONES)
+    check('v14 pose: his +0x14 object (the swung one) used when it is one; the clone\'s odd +0x14 ignored (max error %.2g)'
+          % err, err < 2e-3, True)
+    e.setw(hmm + C.MM_MOTION, 0)
     if diag:
         cv[C.VAR_POSELOG] = 0.0
+        for r in range(2):
+            e.setw(A['pose_last'] + 0x14 * r + 0x10, 0)
+        for i, m in enumerate(Cm):
+            e.mu.mem_write(carr + 0x30 * i, struct.pack('>12f', *m.reshape(-1)))
         e.osr_full = []
         e.call(lab['w_pose'], weapon, 1)          # +0x64: the clone's pose (Cm, restored above) differs from our write
         e.call(lab['w_pose'], weapon, 8)          # +0x94: it is ours (no change): logs

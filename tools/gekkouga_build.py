@@ -490,6 +490,7 @@ def cmd_data(vanilla_fighter, out_fighter, test_only=None):
             rel = 'model/clone/c%02d/' % c
             shutil.copyfile(os.path.join(src, 'model.nud'), to('sway', rel + 'model.nud'))
             shutil.copyfile(os.path.join(src, 'model.sb'), to('sway', rel + 'model.sb'))
+            shutil.copyfile(os.path.join(dst, 'model.nud'), to('rigid', rel + 'model.nud'))   # v14: the release's (back)
     dst = os.path.join(out_fighter, 'motion', 'clone')
     os.makedirs(dst, exist_ok=True)
     for f in CLONE_MOTION_PACS:

@@ -1409,6 +1409,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 11:   # v11: the release exe is v10's (not shipped)
         want_top = ['INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
+    if len(earlier) == 18:   # v14: exes and test data only
+        want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 12:   # v12: TEST_ONLY exes only (the release and the data are v11's)
         want_top = ['README.txt', 'TEST_ONLY_INSTALL_TO_code']
     check('the package\'s top level: %s (+ Sm4shCommand)' % ', '.join(want_top),
@@ -1429,7 +1431,9 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('update: none of the installed unchanged files again (%d unchanged)' % len(same1), [w for w in same1 if w in names], [])
         check('update: nothing in INSTALL_TO_data but the built files',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want), [])
-        if len(earlier) == 17:
+        if len(earlier) == 18:
+            check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
+        elif len(earlier) == 17:
             check('skeleton v1: Sm4shCommand v1.7.27 (its three script names in ModAnimNames.txt)',
                   ([t for t in top if t.startswith('Sm4shCommand_v')],
                    z.read('Sm4shCommand_v1.7.27/ModAnimNames.txt') == open(os.path.join(HERE, 'Sm4shCommand', 'SM4SHCommand',
@@ -1451,6 +1455,19 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
                      ['fighter/gekkouga/script/animcmd/weapon/skeleton/%s' % f for f in ('game.bin', 'effect.bin', 'sound.bin',
                                                                                          'motion.mtable')] +
                      ['fighter/gekkouga/model/skeleton/c00/%s' % f for f in GB.SK_CARRIER]))
+    if z1 and len(earlier) == 18:
+        check('v14: no INSTALL_TO_data (the rigid-tongue release data stays)',
+              sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')), [])
+        tdo = sorted(n for n in names if n.startswith('TEST_ONLY_DATA/') and not n.endswith('/'))
+        want_td = sorted(['TEST_ONLY_DATA/sway/fighter/gekkouga/model/clone/c%02d/%s' % (c, f) for c in range(8)
+                          for f in ('model.nud', 'model.sb')] +
+                         ['TEST_ONLY_DATA/rigid/fighter/gekkouga/model/clone/c%02d/model.nud' % c for c in range(8)])
+        check('v14: TEST_ONLY_DATA: sway (his own model.nud / model.sb: the tongue on its own bones) and rigid (the release\'s '
+              'model.nud back)', tdo, want_td)
+        check('v14: ... each as built', [n for n in want_td if z.read(n) != open(os.path.join(out, n), 'rb').read()], [])
+        check('v14: rigid = the installed release model.nud',
+              [c for c in range(8) if z.read('TEST_ONLY_DATA/rigid/fighter/gekkouga/model/clone/c%02d/model.nud' % c) !=
+               z1.read('INSTALL_TO_data/fighter/gekkouga/model/clone/c%02d/model.nud' % c)], [])
     if z1 and len(earlier) == 13:
         check('v13: INSTALL_TO_data: his MSC only (a fallen clone\'s heartbeat loss reported 401 / 402)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
@@ -1525,7 +1542,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     check('the files the mod needs (with the earlier packages under it)', [m for m in must if 'INSTALL_TO_data/' + m not in names | names1], [])
     with tempfile.TemporaryDirectory() as td:
         import gekkouga_clone_cave as C
-        for i, (member, b, dg, feats) in enumerate(exe_members(base, base_diag, len(earlier) >= 3, len(earlier) == 17)):
+        for i, (member, b, dg, feats) in enumerate(exe_members(base, base_diag, len(earlier) >= 3, len(earlier) == 17,
+                                                               len(earlier) == 18)):
             if not b:
                 continue
             p = os.path.join(td, '%d.rpx' % i)
@@ -1564,20 +1582,26 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) != 17 else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18) else \
+        ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
+         'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed') if len(earlier) == 18 else \
         ('greninja_burn_v1_2', 'exe_v46z_gks1', 'Running Skeleton', '25', '180', '0.7', 'ledge', 'smoke', 'explo', '36',
          '6.3', 'S4SS', 'S4SH', 'S4SX', 'S4SC', 'S4SF', 'hydrant', 'placeholder', 'Sm4shCommand_v1.7.27', 'unconfirmed')
     check('README.txt mentions every feature (%s)' % ', '.join(words), [w for w in words if w not in readme], [])
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
 
-def exe_members(base, base_diag, v4, skeleton=False):
+def exe_members(base, base_diag, v4, skeleton=False, v14=False):
     """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant; skeleton v1 the
     release and TEST_ONLY A_release (as the burn packages)"""
     import gekkouga_clone_cave as C
     if skeleton:
-        return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE),
-                ('TEST_ONLY_INSTALL_TO_code/A_release/cross_f.rpx', base_diag, True, C.RELEASE)]
+        f = C.RELEASE - {'pose'}
+        return [('INSTALL_TO_code/cross_f.rpx', base, False, f),
+                ('TEST_ONLY_INSTALL_TO_code/A_release/cross_f.rpx', base_diag, True, f)]
+    if v14:
+        return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE)] + \
+            [('TEST_ONLY_INSTALL_TO_code/%s/cross_f.rpx' % n, base_diag, True, f) for n, f in C.VARIANTS]
     if not v4:
         return [('INSTALL_TO_code/cross_f.rpx', base, False, C.FEATURES), ('TEST_ONLY_INSTALL_TO_code/cross_f.rpx', base_diag, True, C.FEATURES)]
     return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE)] + \
@@ -1603,7 +1627,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
               (lines[-2].startswith('0 of') if len(lines) > 1 else False, bool(m) and int(m.group(1)) <= 128), (True, True))
     z = zipfile.ZipFile(pkg)
     with tempfile.TemporaryDirectory() as td:
-        for member, b, dg, feats in exe_members(base, base_diag, v4, len(earlier) == 17):
+        for member, b, dg, feats in exe_members(base, base_diag, v4, len(earlier) == 17, len(earlier) == 18):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')
@@ -1625,7 +1649,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
+                                               'b11', 'b12', 's1') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
     base_diag = a[4] if len(a) > 4 else None

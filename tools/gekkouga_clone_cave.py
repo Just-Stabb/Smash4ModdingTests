@@ -285,10 +285,12 @@ SK_VAR_DMG, SK_VAR_PHASE, SK_VAR_COL = 0x0F000304, 0x0F000305, 0x0F000306
 SK_VAR_HX, SK_VAR_HY, SK_VAR_HITS, SK_VAR_LOGP = 0x0F000307, 0x0F000308, 0x0F000309, 0x0F00030A
 # his VARs (his MSC writes them at the release): 15 a skeleton asked for (1), 16 / 17 the shadow's X / Y, 18 its way
 GK_VAR_SKREQ, GK_VAR_SKX, GK_VAR_SKY, GK_VAR_SKDIR = 0x0F00030F, 0x0F000310, 0x0F000311, 0x0F000312
-RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
-# skeleton v1: + the Running Skeleton
-VARIANTS = (('A_release', RELEASE), ('D_parts', RELEASE | {'parts'}),
-            ('E_sway', RELEASE | {'sway'}), ('G_pose', RELEASE | {'pose'}))   # v13: each on the release's set (v3 - v12's hurtbox route, C_hurt, dropped:
+RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'pose'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+# skeleton v1: + the Running Skeleton; clones v14: + pose (his tongue / water pose onto the clones: the release candidate,
+# harmless on the rigid-tongue data)
+VARIANTS = (('A_release', RELEASE), ('E_sway', (RELEASE - {'pose'}) | {'sway'}))
+# v14: A_release (with the pose copy, diag S4TP) and E_sway (v13's swing bind, fixed: the +0x10 object; without the pose
+# copy, so the bind is seen alone); v13's D_parts dropped   # v13: each on the release's set (v3 - v12's hurtbox route, C_hurt, dropped:
                                   # it never met an attack)
 
 
@@ -1391,6 +1393,38 @@ mi_ok:  lfs f13, 4(r5)                  # 1.0
     return s
 
 
+MO_OK = '''
+# v14: (r3) -> r3 itself when it is a model / motion object (the layout 0x0330DE2C / 0x03314FB8 read: +4 a pointer whose
+# +4 is the mode (8: none), +0x1C the evaluator), else 0 (a leaf). A weapon's MotionModule +0x14 is no such object
+# (its +4 was 6: the user's v13 E_sway crash)
+mo_ok:  lis r0, 0x1000
+        cmplw r3, r0
+        blt mok_no
+        lis r0, 0x8000
+        cmplw r3, r0
+        bge mok_no
+        lwz r12, 4(r3)
+        lis r0, 0x1000
+        cmplw r12, r0
+        blt mok_no
+        lis r0, 0x8000
+        cmplw r12, r0
+        bge mok_no
+        lwz r0, 4(r12)
+        cmpwi r0, 8
+        beq mok_no
+        lwz r12, 0x1C(r3)
+        lis r0, 0x1000
+        cmplw r12, r0
+        blt mok_no
+        lis r0, 0x8000
+        cmplw r12, r0
+        bltlr
+mok_no: li r3, 0
+        blr
+'''
+
+
 def pose_src(D):
     """w_pose (r3 the clone weapon, r4 the phase bit): his swing bones' pose onto the clone"""
     return r'''
@@ -1412,10 +1446,12 @@ w_pose: stwu r1, -0xD0(r1)
         mr. r29, r3                     # his entry
         beq wpo_out
         lwz r3, %(bacc)d(r29)
+        li r4, 1
         bl wpo_model
         mr. r28, r3                     # his world matrices
         beq wpo_out
         mr r3, r31
+        li r4, 0
         bl wpo_model
         mr. r27, r3                     # the clone's
         beq wpo_out''' + D('''
@@ -1461,36 +1497,35 @@ wpo_out:
         addi r1, r1, 0xD0
         blr
 
-# (r3 an accessor) -> r3 its model's bone world matrices (MotionModule +0x10, +0xC) when it has at least POSE_MIN bones,
-# else 0
+# (r3 an accessor, r4 1: his: his MotionModule +0x14 first (the object a fighter's swing update steps), else +0x10)
+# -> r3 its model's bone world matrices (+0xC: 0x30 each) when it has at least POSE_MIN bones, else 0
 wpo_model:
         mflr r0
         stw r0, 4(r1)
         stwu r1, -0x10(r1)
         stw r31, 0xC(r1)
+        stw r30, 8(r1)
         li r31, 0
         cmpwi r3, 0
         beq wpm_out
-        lwz r12, %(wmotion)d(r3)        # its MotionModule
+        lwz r30, %(wmotion)d(r3)        # its MotionModule
         lis r0, 0x1000
-        cmplw r12, r0
+        cmplw r30, r0
         blt wpm_out
         lis r0, 0x8000
-        cmplw r12, r0
+        cmplw r30, r0
         bge wpm_out
-        lwz r31, %(mm_model)d(r12)      # its model / motion object
-        lis r0, 0x1000
-        cmplw r31, r0
-        blt wpm_no
-        lis r0, 0x8000
-        cmplw r31, r0
-        bge wpm_no
-        lwz r12, 4(r31)                 # (the count's own checks: [[+4] +4] 8 has none)
-        cmpwi r12, 0
-        beq wpm_no
-        lwz r12, 0x1C(r31)
-        cmpwi r12, 0
-        beq wpm_no
+        cmpwi r4, 0
+        beq wpm_10
+        lwz r3, %(mm_motion)d(r30)
+        bl mo_ok
+        mr. r31, r3
+        bne wpm_have
+wpm_10: lwz r3, %(mm_model)d(r30)
+        bl mo_ok
+        mr. r31, r3
+        beq wpm_out
+wpm_have:
         mr r3, r31''' + call(MDL_COUNT) + '''
         cmplwi r3, %(pose_min)d
         blt wpm_no
@@ -1504,6 +1539,7 @@ wpo_model:
 wpm_no: li r31, 0
 wpm_out:
         mr r3, r31
+        lwz r30, 8(r1)
         lwz r31, 0xC(r1)
         addi r1, r1, 0x10
         lwz r0, 4(r1)
@@ -1839,7 +1875,7 @@ def build(rpx, diag=False, feats=None):
             ('gk_fbk', 'S4BK burns cleared: victim slot=%d status=%X (KO: Dead / Rebirth; -1 gone) seen by owner slot=%d\n'),
             ('gk_fh', 'S4GH hit check: attacker=%X (category x 16 + index) hitbox=%d clone id=%d hitlag=%d at x=%d y=%d\n'),
             ('gk_fr', 'S4GR clone swing stage %d: %08X %08X %X %08X (0 / 1 before / after its first step: motion, swing, set up, flags; 2 bind sources: sb, nhb, own; 3 bound: motion, swing)\n'),
-            ('gk_fq', 'S4GQ clone id=%d swing: motionmodule=%08X need=%08X motion=%08X swing=%08X flags=%08X set up=%d\n'),
+            ('gk_fq', 'S4GQ clone id=%d swing: motionmodule=%08X its +0x14=%08X model/motion (+0x10)=%08X swing=%08X flags=%08X set up=%d\n'),
             ('gk_fy', 'S4GY clone hurt object 0: %08X %08X %08X %08X %08X %08X\n'),
             ('gk_fk', 'S4GK clone hurtboxes set: hitmodule=%08X groups=%d boxes %d -> %d group0=%d+%d objects=%d\n'),
             ('gk_fo', 'S4GO clone id=%d hurt: boxes=%d objects=%d first record %08X %08X %08X %08X\n')]
@@ -2726,13 +2762,10 @@ w_sway: stwu r1, -0x40(r1)
         lwz r11, %(wmotion)d(r29)       # its MotionModule
         cmpwi r11, 0
         beq wsw_out
-        lwz r31, %(mm_motion)d(r11)     # its motion object
-        lis r0, 0x1000
-        cmplw r31, r0
-        blt wsw_out
-        lis r0, 0x8000
-        cmplw r31, r0
-        bge wsw_out
+        lwz r3, %(mm_model)d(r11)       # v14: its model / motion object (+0x10: v11 - v13 read +0x14, which on a weapon
+        bl mo_ok                        # is no such object: its +4 is 6, the user's v13 E_sway crash at its +4's +4)
+        mr. r31, r3
+        beq wsw_out
         lwz r11, %(mo_swing)d(r31)      # its swing system
         cmpwi r11, 0
         bne wsw_have
@@ -2822,6 +2855,20 @@ wb_have:''' + D('''
         beq wb_out''' + call(SWING_NEW) + '''
         mr. r26, r3
         beq wb_out
+        lwz r4, 0x18(r31)               # v14: its +0x18 and [[+0x18]] checked before the bind uses them
+        lis r0, 0x1000
+        cmplw r4, r0
+        blt wb_out
+        lis r0, 0x8000
+        cmplw r4, r0
+        bge wb_out
+        lwz r10, 0(r4)
+        lis r0, 0x1000
+        cmplw r10, r0
+        blt wb_out
+        lis r0, 0x8000
+        cmplw r10, r0
+        bge wb_out
         stw r26, %(mo_swing)d(r31)
         lwz r4, 0x18(r31)
         lwz r10, 0(r4)
@@ -3803,8 +3850,8 @@ wd_log2:
         lwz r5, %(wmotion)d(r31)
         cmpwi r5, 0
         beq wd_qlog
-        lwz r6, %(mm_swing)d(r5)
-        lwz r7, %(mm_motion)d(r5)
+        lwz r6, %(mm_motion)d(r5)       # v14: its +0x14 (v11 - v13 its +0x38)
+        lwz r7, %(mm_model)d(r5)        # v14: the model / motion object (+0x10; v11 - v13 +0x14)
         lis r0, 0x1000
         cmplw r7, r0
         blt wd_qlog
@@ -4213,7 +4260,7 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
-''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94]) if skel else '') + (pose_src(D) if pose else '') + '''
+''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94]) if skel else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
 # ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
 gk_clear:
         li r0, 0''' + (('''
