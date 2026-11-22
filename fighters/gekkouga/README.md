@@ -1320,3 +1320,25 @@ from being used while a Skeleton is alive", and "Please stop packaging G_pose".
   after, ground and air; the request in flight blocks; func_2379's only change; `skeleton_tests`: the heartbeat while
   running (the clones' bits kept), none after the explosion); supamario_ui_cave_test 0; import_call_check 0. Not
   confirmed in game: everything here.
+
+## Tilt chain v1 (`greninja_tilt_chain_v1.zip`, over skeleton v1.6; data only, exe_v46z_gkb8)
+
+The user: "please make jab chain into tilts (except rapid jab) and have tilts chain into tilts"; on hit only, each tilt
+once per chain (their choices). Modelled on the aerial chain (`clones.c gk_tc_*`):
+- `gk_tc_start(k)` in the status mains (MSC_EDITS: jab Attack 0x25 `func_263` k 4, AttackS3 0x28 `func_275` 1,
+  AttackHi3 0x29 `func_278` 2, AttackLw3 0x2A `func_281` 3): a new chain unless a chain cancel asked for it (`gk_tc_req`);
+  a tilt marks itself used (2 / 4 / 8), a jab doesn't; AttackModule 0x2724 (its hits from 0). Jab 1 - 3 re-enter 0x25;
+  the rapid jab is Attack100 0x26 (`func_336`), not hooked.
+- `gk_tc_try()` first in their loops (`MSC_TILT_CHAIN`: `func_270` / `277` / `279` / `282`, before the IASA check):
+  AttackModule 0x2727 kind 2 (a hurtbox; a shield doesn't count) opens the window the frame after, not in hitlag, on the
+  ground (situation 0); the game's tilt bits (global24 0x4 up, 0x8 down, 0x2 forward: func_43's order) with no smash bit
+  (0x70: left to the game) -> `func_16(0x27 + k, 1)` for a tilt not used yet.
+- Ends (`gk_tc_end`) in `gekkouga_frame` on any status but 0x25 / 0x28 / 0x29 / 0x2A, and on `gk_reset`.
+- Clones: a clone's landed copy (the exe's VAR_22, `gk_clone_hitlag`) counts as a hit (`gk_tc_clone_hit`), shield or not
+  (VAR_22 can't tell).
+- Diag: in a jab / tilt VAR_20 gets 2097152 + the aerial chain's fields for the tilt chain (256 x the move: 1 / 2 / 3
+  tilts, 4 jab; 2048 hit; 4096 window; 8192 x the used bits): under 2^24, so VAR_20's low flag bits stay exact in the
+  float.
+- Tests: `gekkouga_clones_test ... --vs16` 358 / 0 (`tilt_chain_tests`: the hooks' places, a whiff / shield / hitlag /
+  smash input / air refused, jab -> forward -> up -> down, repeats refused, all three, the diag, the ends (walk, jump,
+  shield, hit, special, smash, aerial, rapid jab), the rapid jab without a chain, a clone's hit). Not confirmed in game.

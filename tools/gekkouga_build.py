@@ -56,6 +56,11 @@ MSC_EDITS = [
     ('func_2379', '        if (global24 & 0x2000)\n        {\n            WorkModule(0x2710, 0x2000007c);',
      '        if (global24 & 0x2000 && gk_ss_allowed()) // Greninja mod: not while a skeleton runs (clones.c)\n'
      '        {\n            WorkModule(0x2710, 0x2000007c);'),
+    # tilt chain v1: the jab's / tilts' starts (their status mains, before the loop is set)
+    ('func_263', '    func_78(func_270);', '    gk_tc_start(0x4); // Greninja mod: tilt chain (clones.c)\n    func_78(func_270);'),
+    ('func_275', '    func_78(func_277);', '    gk_tc_start(0x1); // Greninja mod: tilt chain (clones.c)\n    func_78(func_277);'),
+    ('func_278', '    func_78(func_279);', '    gk_tc_start(0x2); // Greninja mod: tilt chain (clones.c)\n    func_78(func_279);'),
+    ('func_281', '    func_78(func_282);', '    gk_tc_start(0x3); // Greninja mod: tilt chain (clones.c)\n    func_78(func_282);'),
     # SpecialLw 0x155: the charge stance (no counter)
     ('func_2336', '    func_78(func_2337);', '    gk_lw_main(); // Greninja mod: the charge (clones.c)\n    func_78(gk_lw_loop);'),
     ('func_2338', '    VisibilityModule(0x2710, 0x1);',
@@ -91,6 +96,8 @@ MSC_BODIES = {
 }
 # attack loops: a chain cancel first
 MSC_CHAIN = {'func_293': 0x1, 'func_302': 0x2, 'func_309': 0x4}
+# tilt chain v1: the jab's / tilts' loops (Attack 0x25, AttackS3 0x28, AttackHi3 0x29, AttackLw3 0x2A): a tilt chain first
+MSC_TILT_CHAIN = ('func_270', 'func_277', 'func_279', 'func_282')
 
 
 def func_span(src, name):
@@ -117,6 +124,12 @@ def patch_msc(src):
         ret = 'return 0x1;' if src[a:b].startswith('int') else 'return;'
         src = src[:b] + '\n    if (gk_chain_try(0x%X)) // Greninja mod: smash chains (clones.c)\n    {\n        %s\n    }' % (
             t, ret) + src[b:]
+    for fn in MSC_TILT_CHAIN:
+        a, b, c = func_span(src, fn)
+        ret = 'return 0x1;' if src[a:b].startswith('int') else 'return;'
+        decl = re.match(r'\n(    (?:int|float) \w+;\n)*', src[b:])
+        at = b + decl.end()
+        src = src[:at] + '    if (gk_tc_try()) // Greninja mod: tilt chain (clones.c)\n    {\n        %s\n    }\n' % ret + src[at:]
     return src + '\n' + open(CLONES_C).read()
 
 

@@ -1033,6 +1033,110 @@ def clone_tests(mscsb, src):
     check('v8: ... once (no VisibilityModule call while nothing changes)', [x for x in g.log if x[0] == 'visible'], [])
 
 
+def tilt_chain_tests(mscsb, src):
+    """tilt chain v1 (README "Tilt chain v1"): a jab (0x25) or a tilt (0x28 / 0x29 / 0x2A) that hits an opponent
+    (AttackModule 0x2727 kind 2; a shield doesn't count; a clone's hit does) can be cancelled from the frame after the hit,
+    on the ground, into a tilt not used in this chain (the game's tilt input; a smash input left to the game); the rapid
+    jab (0x26) not part of it; anything but a jab / tilt ends it"""
+    m = fresh(mscsb, src)
+    g = m.game
+    body = open(src).read()
+    spans = {}
+    for fn in ('func_263', 'func_275', 'func_278', 'func_281', 'func_270', 'func_277', 'func_279', 'func_282', 'func_336'):
+        a, b, c = GB.func_span(body, fn)
+        spans[fn] = body[a:c]
+    check('tilt chain: the jab / forward / up / down tilt mains start it (4 / 1 / 2 / 3) before their loops are set',
+          [spans[f].count('gk_tc_start(0x%X);' % k) == 1 and spans[f].index('gk_tc_start') < spans[f].index('func_78(')
+           for f, k in (('func_263', 4), ('func_275', 1), ('func_278', 2), ('func_281', 3))], [True] * 4)
+    check('tilt chain: their loops try it first; the rapid jab (Attack100 0x26, func_336) has none',
+          ([spans[f].index('gk_tc_try()') < spans[f].index('CancelModule(0x2713)') for f in ('func_270', 'func_277', 'func_279',
+                                                                                              'func_282')],
+           'gk_tc' in spans['func_336']), ([True] * 4, False))
+
+    def start(st, k):
+        m.vm.g[4] = st
+        g.log = []
+        m('gk_tc_start', k)
+
+    def tick(hit=0, cmd=0, air=0):
+        g.atk_hit = hit
+        m.vm.g[18] = air
+        m.vm.g[24] = cmd
+        g.status_req = []
+        return m('gk_tc_try'), list(g.status_req)
+
+    start(0x25, 4)
+    check('a jab starts a chain: nothing used (a jab isn\'t a tilt use), kind 4, its hits since it started cleared',
+          (m.g('gk_tc_used'), m.g('gk_tc_kind'), m.g('gk_tc_hit'), [x for x in g.log if x[0] == 'atk_clear']),
+          (0, 4, 0, [('atk_clear',)]))
+    check('a whiff: a tilt input (forward) does nothing, 5 frames', [tick(0, 0x2) for _ in range(5)], [(0, [])] * 5)
+    check('shielded (kind 4 only): no window', [tick(4, 0x2) for _ in range(3)], [(0, [])] * 3)
+    check('the hit (kind 2) on this frame: no cancel yet (from the next frame)', (tick(2, 0x2), m.g('gk_tc_hit')), ((0, []), 1))
+    g.hitlag = 3
+    check('... the next frame in hitlag: still none', tick(2, 0x2), (0, []))
+    g.hitlag = 0
+    check('... a smash input (forward smash 0x10 with the tilt bit): left to the game', tick(2, 0x12), (0, []))
+    check('... no tilt input (jab 0x1): none', tick(2, 0x1), (0, []))
+    check('... in the air (situation 2): none', tick(2, 0x2, air=2), (0, []))
+    check('... a forward tilt: AttackS3 (0x28) as a chain', (tick(2, 0x2), m.g('gk_tc_req')), ((1, [(0x28, 1)]), 1))
+    start(0x28, 1)
+    check('the forward tilt\'s start: the chain kept (used forward: 2), kind 1, its hit from 0',
+          (m.g('gk_tc_used'), m.g('gk_tc_kind'), m.g('gk_tc_hit'), m.g('gk_tc_req')), (2, 1, 0, 0))
+    check('... no hit yet: no chain (even with the input)', tick(0, 0x4), (0, []))
+    tick(2, 0)
+    check('... hit: forward again refused; up + forward bits: up first (as func_43); down accepted',
+          (tick(2, 0x2), tick(2, 0x6)), ((0, []), (1, [(0x29, 1)])))
+    start(0x29, 2)
+    tick(2, 0)
+    check('the up tilt hits: forward / up refused, down: AttackLw3 (0x2A)', (tick(2, 0x2), tick(2, 0x4), tick(2, 0x8)),
+          ((0, []), (0, []), (1, [(0x2A, 1)])))
+    start(0x2A, 3)
+    check('forward, up, down: all three in the chain (2 + 4 + 8)', m.g('gk_tc_used'), 14)
+    tick(2, 0)
+    check('... the down tilt hits: no tilt left', [tick(2, c) for c in (0x2, 0x4, 0x8)], [(0, [])] * 3)
+    m.setg('gk_tc_hit', 2)
+    m.vm.g[4] = 0x2A
+    m.game.vars[0x0F00031E] = 0.0
+    m('gekkouga_frame')
+    d = int(g.vars.get(0x0F000314, 0.0))
+    check('diag (his VAR_20): 2097152 on, the move (3 x 256), hit seen (2048), window open (4096), used 14 x 8192; under '
+          '2^24 (VAR_20 is a float: its low flag bits stay exact)',
+          (d >> 21 & 1, d >> 8 & 7, d >> 11 & 1, d >> 12 & 1, d >> 13 & 0xFF, d < 1 << 24), (1, 3, 1, 1, 14, True))
+    frames(m, 1, st=0x1)
+    check('walking (any status but a jab / tilt): the chain ends', (m.g('gk_tc_used'), m.g('gk_tc_kind'), m.g('gk_tc_hit'),
+                                                                   m.g('gk_tc_req')), (0, 0, 0, 0))
+    start(0x2A, 3)
+    check('... the next tilt (down) a new chain: only itself used', m.g('gk_tc_used'), 8)
+    for st, what in ((0x1B, 'a jump'), (0x1D, 'a shield'), (0x4A, 'being hit'), (0x153, 'a special'), (0x2B, 'a smash'),
+                     (0x34, 'an aerial'), (0x26, 'the rapid jab')):
+        start(0x28, 1)
+        tick(2, 0)
+        m.setg('gk_tc_req', 1)
+        frames(m, 1, st=st)
+        start(0x29, 2)
+        check('%s (0x%X) ends it, even with a chain cancel asked: the next tilt a new chain' % (what, st), m.g('gk_tc_used'), 4)
+    m2 = fresh(mscsb, src)
+    m2.vm.g[4] = 0x26
+    m2.game.atk_hit = 2
+    m2.game.status_req = []
+    m2.vm.g[24] = 0x2
+    check('the rapid jab (0x26): no chain kind set, its try does nothing', (m2('gk_tc_try'), m2.game.status_req), (0, []))
+    # a clone's copy of the move landing (the exe's VAR_22) opens the window too
+    start(0x28, 1)
+    tick(0, 0)
+    g.vars[0x0F000316] = 1.0
+    m('gk_clone_hitlag')
+    check('a clone\'s hit (his VAR_22) during his forward tilt: hit seen, VAR_22 cleared', (m.g('gk_tc_hit'),
+          g.vars.get(0x0F000316)), (1, 0.0))
+    g.hitlag = 0
+    check('... the next frame: a chain (up tilt)', tick(0, 0x4), (1, [(0x29, 1)]))
+    m.vm.g[4] = 0x1
+    m.setg('gk_tc_hit', 0)
+    g.vars[0x0F000316] = 1.0
+    m('gk_clone_hitlag')
+    check('... a clone\'s hit while he walks: nothing', m.g('gk_tc_hit'), 0)
+
+
 def aerial_chain_tests(mscsb, src):
     """aerial chain v1 (README "Aerial chain v1"): an aerial that hits an opponent (AttackModule 0x2727 kind 2; a shield
     doesn't count; a clone's hit does) can be cancelled from the frame after the hit into a different aerial (the game's
@@ -2313,7 +2417,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (20, 21, 26, 30, 31):   # skeleton v1.2 / burn v2 / skeleton v1.3 / v1.5 / v1.6: the exes, the data, test exes
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
-    if len(earlier) in (23, 24, 25, 27, 28):   # burn v2.2 / v2.3 / aerial chain v1 / clone fixes v1 / trail fix: data only
+    if len(earlier) in (23, 24, 25, 27, 28, 32):   # burn v2.2 / v2.3 / aerial chain v1 / clone fixes v1 / trail fix / tilt
+        # chain v1: data only
         want_top = ['INSTALL_TO_data', 'README.txt']
     if len(earlier) == 29:   # skeleton v1.4: data, the clone joint test data and the TEST_ONLY exes (S4SV); the release
         want_top = ['INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']   # exe is v1.3's
@@ -2346,7 +2451,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('update: nothing in INSTALL_TO_data but the built files',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want and
                      n not in again), [])
-        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31):
+        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 21:
             check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
@@ -2408,6 +2513,10 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               'places delayed) and the clone\'s MSC (its playback delayed)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
               ['fighter/gekkouga/script/msc/clone/clone.mscsb', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
+    if z1 and len(earlier) == 32:
+        check('tilt chain v1: INSTALL_TO_data: his MSC only (the exe is skeleton v1.6\'s)',
+              sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              ['fighter/gekkouga/script/msc/gekkouga.mscsb'])
     if z1 and len(earlier) == 31:
         check('skeleton v1.6: INSTALL_TO_data: his MSC (the shadow carried on to 36, no side special while a skeleton runs) '
               'and the skeleton\'s MSC (its heartbeat); TEST_ONLY: A_release only (no G_pose: the user)',
@@ -2632,7 +2741,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 32)) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 33)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -2659,6 +2768,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
          'shield', '1.6', 'hitstun', 'right hand', 'skeleton_box.png', 'unconfirmed', 'A_release') if len(earlier) == 30 else \
         ('greninja_skeleton_v1_5', 'exe_v46z_gkb8', '36', 'shadow', 'tap', 'hold', '9.2', 'alive', 'explo', 'side special',
          'air', 'A_release', 'G_pose', 'unconfirmed') if len(earlier) == 31 else \
+        ('greninja_skeleton_v1_6', 'jab', 'tilt', 'rapid', 'hit', 'shield', 'once', 'clone', 'smash', 'S4GF', '2097152',
+         'unconfirmed', 'exe_v46z_gkb8') if len(earlier) == 32 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -2743,7 +2854,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
@@ -2753,6 +2864,7 @@ def main():
     physics_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
     clone_tests(os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC)
     aerial_chain_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
+    tilt_chain_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
     delay_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
     clone_delay_tests(os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC)
     clone_fx_tests(os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC, out)

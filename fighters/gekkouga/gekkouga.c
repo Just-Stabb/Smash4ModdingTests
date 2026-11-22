@@ -6445,6 +6445,7 @@ void func_263()
         }
         global16 = func_267;
     }
+    gk_tc_start(0x4); // Greninja mod: tilt chain (clones.c)
     func_78(func_270);
 }
 
@@ -6623,6 +6624,10 @@ void func_269()
 void func_270()
 {
     int var0;
+    if (gk_tc_try()) // Greninja mod: tilt chain (clones.c)
+    {
+        return;
+    }
     func_264();
     if (CancelModule(0x2713) == 0x1 && func_39() != 0)
     {
@@ -6797,6 +6802,7 @@ void func_275()
     global16 = func_274;
     func_33();
     KineticModule(0x13, 0, PostureModuleF(0));
+    gk_tc_start(0x1); // Greninja mod: tilt chain (clones.c)
     func_78(func_277);
 }
 
@@ -6845,6 +6851,10 @@ void func_276()
 
 void func_277()
 {
+    if (gk_tc_try()) // Greninja mod: tilt chain (clones.c)
+    {
+        return;
+    }
     if (CancelModule(0x2713) == 0x1 && func_39() != 0)
     {
         return;
@@ -6873,11 +6883,16 @@ void func_278()
         func_274();
     }
     global16 = func_274;
+    gk_tc_start(0x2); // Greninja mod: tilt chain (clones.c)
     func_78(func_279);
 }
 
 void func_279()
 {
+    if (gk_tc_try()) // Greninja mod: tilt chain (clones.c)
+    {
+        return;
+    }
     if (CancelModule(0x2713) == 0x1 && func_39() != 0)
     {
         return;
@@ -6916,11 +6931,16 @@ void func_281()
         func_274();
     }
     global16 = func_274;
+    gk_tc_start(0x3); // Greninja mod: tilt chain (clones.c)
     func_78(func_282);
 }
 
 int func_282()
 {
+    if (gk_tc_try()) // Greninja mod: tilt chain (clones.c)
+    {
+        return 0x1;
+    }
     if (CancelModule(0x2713) == 0x1 && func_39() != 0)
     {
         return 0x1;
@@ -40126,6 +40146,10 @@ int gk_ac_used;        // aerial chain v1: the aerials used in this chain (bit 1
 int gk_ac_kind;        // the aerial now (1 - 5; 0 none)
 int gk_ac_hit;         // frames since this aerial hit an opponent (0: not yet)
 int gk_ac_req;         // 1: the next aerial start is a chain's (the chain kept)
+int gk_tc_used;        // tilt chain v1: the tilts used in this chain (bit 1 << kind: 2 forward, 4 up, 8 down)
+int gk_tc_kind;        // the move now: 0 none, 1 forward / 2 up / 3 down tilt, 4 a jab (1 - 3)
+int gk_tc_hit;         // frames since this move hit an opponent (0: not yet)
+int gk_tc_req;         // 1: the next tilt start is a chain's (the chain kept)
 int gk_tr_req_t;       // burn v2: frames his trail requests (VAR_0 - VAR_11) stay up for the executable's claims
 
 int gk_lw_full() { return 300; }          // 5 seconds held (the user)
@@ -40201,6 +40225,10 @@ void gekkouga_frame()
     {
         gk_tr_done = 0;                   // burn v2: out of that attack: the next one asks again
     }
+    if (st != 0x25 && st != 0x28 && st != 0x29 && st != 0x2a)
+    {
+        gk_tc_end();                      // tilt chain v1: anything but a jab (1 - 3) or a tilt ends the chain
+    }
     if (st != 0x34)
     {
         gk_ac_end();                      // aerial chain v1: anything but an aerial (landing, a special, an air dodge,
@@ -40256,6 +40284,7 @@ void gekkouga_frame()
     }
     flags = flags | gk_alive * 16;        // v3 diag: 16 / 32 the clones out
     flags = flags | gk_ac_diag();         // aerial chain v1 diag (256 up: the exe's S4GF line logs a change)
+    flags = flags | gk_tc_diag();         // tilt chain v1 diag (2097152 + the same fields, in a jab / tilt)
     flags = flags | gk_cl_diag();         // clone fixes v2 diag (1048576 toggled: an S4GF line with VAR_23)
     if (gk_ability > 0)
     {
@@ -40929,6 +40958,7 @@ void gk_clone_hitlag()
     }
     WorkModule(0, 0 + 0, 0x0f000316);
     gk_ac_clone_hit();                    // aerial chain v1: a clone's copy of his aerial landed: it hit
+    gk_tc_clone_hit();                    // tilt chain v1: ... of his jab / tilt
     if (StopModule(0x1))
     {
         return;
@@ -41583,6 +41613,7 @@ void gk_reset()
     gk_tr_done = 0;
     gk_tr_clear();
     gk_ac_end();
+    gk_tc_end();
 }
 
 // ---- skeleton v1: Shadow Sneak (SpecialS 0x153) without the vanish and the teleport: its per-frame (global16, in
@@ -41858,6 +41889,122 @@ int gk_ac_diag()
         d = d | 4096;
     }
     return d + gk_ac_used * 8192;
+}
+
+// ---- tilt chain v1 (fighters/gekkouga/README.md "Tilt chain v1"; the user: "please make jab chain into tilts (except
+// rapid jab) and have tilts chain into tilts"; on hit only, each tilt once a chain). A jab (Attack 0x25: jab 1 - 3; not
+// the rapid jab, Attack100 0x26, nor its finisher) or a tilt (AttackS3 0x28 / AttackHi3 0x29 / AttackLw3 0x2A) that hits
+// an opponent (AttackModule 0x2727 kind 2, as the aerial chain; a shield doesn't count; a clone's copy landing does: the
+// exe's VAR_22) can be cancelled, from the frame after the hit (not in hitlag) to its end, on the ground, into a tilt not
+// used yet in this chain: the game's tilt input (global24 0x2 forward / 0x4 up / 0x8 down, checked up / down / forward as
+// func_43 does; a smash input, 0x10 / 0x20 / 0x40, is left to the game). Each tilt once a chain; a jab starting it isn't a
+// use. The chain ends on anything but a jab or a tilt (moving, jumping, shielding, being hit, specials, smashes, aerials)
+// or after all three. Smash / aerial chains unaffected.
+void gk_tc_end()
+{
+    gk_tc_used = 0;
+    gk_tc_kind = 0;
+    gk_tc_hit = 0;
+    gk_tc_req = 0;
+}
+
+// the move's start (its status main: k 1 forward / 2 up / 3 down tilt, 4 a jab)
+void gk_tc_start(int k)
+{
+    if (gk_tc_req == 0)
+    {
+        gk_tc_used = 0;                   // not a chain's: a new chain
+    }
+    gk_tc_req = 0;
+    gk_tc_kind = k;
+    if (k >= 0x1 && k <= 0x3)
+    {
+        gk_tc_used = gk_tc_used | (1 << k);
+    }
+    gk_tc_hit = 0;
+    AttackModule(0x2724);                 // its "hit since it started" from 0
+}
+
+// a clone's copy of his jab / tilt landed (the exe's VAR_22: gk_clone_hitlag)
+void gk_tc_clone_hit()
+{
+    if ((global4 == 0x25 || global4 == 0x28 || global4 == 0x29 || global4 == 0x2a) && gk_tc_kind != 0 && gk_tc_hit == 0)
+    {
+        gk_tc_hit = 0x1;
+    }
+}
+
+// the tilt for this frame's input (0 none; a smash input: none, the game's)
+int gk_tc_input()
+{
+    if ((global24 & 0x70) != 0)
+    {
+        return 0;
+    }
+    if (global24 & 0x4)
+    {
+        return 0x2;
+    }
+    if (global24 & 0x8)
+    {
+        return 0x3;
+    }
+    if (global24 & 0x2)
+    {
+        return 0x1;
+    }
+    return 0;
+}
+
+// the move's loop (every frame, first): 1 = cancelled into the next tilt
+int gk_tc_try()
+{
+    int k;
+    if (gk_tc_kind == 0)
+    {
+        return 0;
+    }
+    if (gk_tc_hit > 0)
+    {
+        gk_tc_hit += 1;
+    }
+    else if (AttackModule(0x2727, gk_ac_hit_kinds()))
+    {
+        gk_tc_hit = 0x1;                  // hit: the window opens the next frame
+    }
+    if (gk_tc_hit < 0x2 || StopModule(0x1) || global18 != 0)
+    {
+        return 0;
+    }
+    k = gk_tc_input();
+    if (k == 0 || (gk_tc_used & (1 << k)) != 0)
+    {
+        return 0;                         // no tilt input, or that tilt used in this chain already
+    }
+    gk_tc_req = 0x1;
+    func_16(0x27 + k, 0x1);               // 0x28 forward / 0x29 up / 0x2A down tilt
+    return 0x1;
+}
+
+// diag: in a jab / tilt, VAR_20's aerial chain fields hold the tilt chain's, with 2097152 on: 256 x the move (1 forward,
+// 2 up, 3 down tilt, 4 jab), 2048 hit seen, 4096 the window open, 8192 x the used bits (2 / 4 / 8)
+int gk_tc_diag()
+{
+    int d;
+    if (gk_tc_kind == 0)
+    {
+        return 0;
+    }
+    d = 2097152 + gk_tc_kind * 256 + gk_tc_used * 8192;
+    if (gk_tc_hit > 0)
+    {
+        d = d | 2048;
+    }
+    if (gk_tc_hit >= 0x2)
+    {
+        d = d | 4096;
+    }
+    return d;
 }
 
 // ---- clone fixes v2 diag (the user: the clones "follow grounded movement incorrectly"): every 10 frames while he is on
