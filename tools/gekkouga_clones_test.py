@@ -281,9 +281,10 @@ def msc_tests(mscsb, src):
     for _ in range(99):
         m('gk_lw_tick')
     check('100 frames held: charge 100', m.g('gk_lw_charge'), 100)
-    pips = [x for x in g.log if x[0] == 'effect' and x[1] == 0x2712]
-    check('the bar: 3 pips lit (one a 30 frames), the pip effect 0x1000047 over his head',
-          [(x[2], x[5]) for x in pips], [(0x1000047, 25.0)] * 3)
+    pips = [x for x in g.log if x[0] == 'effect' and x[2] == 0x1000047]
+    check('v6: no pips over his head any more (the gauge is on his damage panel)', pips, [])
+    m('gekkouga_frame')
+    check('v6: the panel gauge (his VAR_19): charge mode 1, 100 / 300 frames -> 1000 + 33', g.vars.get(0x0F000313), 1033.0)
     g.held = {1}
     g.frame = 20.0
     r = m('gk_lw_loop')
@@ -325,6 +326,7 @@ def msc_tests(mscsb, src):
     check('frame 1: the left clone (article 6) made, VAR_31 = 4747000 + alive 1 + being made (left) 4, its smoke at X - 14',
           (arts, g.vars.get(0x0F00031F), [x[3] for x in g.log if x[0] == 'effect' and x[2] == 0x3300006]),
           ([('article', 0x2710, 6)], 4747005.0, [36.0]))
+    check('v6: the gauge in the ability: mode 2, 719 / 720 left -> 99', g.vars.get(0x0F000313), 2099.0)
     check('v2: the ability hides his name tag (the cursor op BattleObject(0xA, 0))', [x for x in g.log if x[0] == 'cursor'],
           [('cursor', 0)])
     frames(m, 3)
@@ -418,6 +420,7 @@ def msc_tests(mscsb, src):
     g.log = []
     frames(m, left)
     check('the ability ran 720 frames in all, then the burnout 480', (m.g('gk_ability'), m.g('gk_burnout')), (0, 480))
+    check('v6: the gauge in the burnout: mode 3, 480 / 480 left -> 99 (100 is only the charge\'s "ready")', g.vars.get(0x0F000313), 3099.0)
     check('its end: the channel closed (magic 0), flags 2 (slow)', (g.vars.get(0x0F00031F), g.vars.get(0x0F000314)), (0.0, 2.0))
     cur = [x for x in g.log if x[0] == 'cursor']
     check('v2: the name tag hidden again every 60 frames during it, shown at its end (BattleObject(0xA, 1))',
@@ -1159,7 +1162,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
          'B_template', 'C_hurt', 'D_full', 'S4GP', 'GX2R', 'crash') if len(earlier) == 3 else \
         ('greninja_clones_v4', 'exe_v46z_gk5', 'A_safe', 'B_attack', 'C_hurt', 'D_parts', 'S4GV', 'gen=', 'heartbeat',
          'moon', 'pump') if len(earlier) == 4 else \
-        ('greninja_clones_v5', 'exe_v46z_gk6', 'black', 'id=1', 'S4GX', 'A_safe', 'B_attack', 'C_hurt', 'D_parts')
+        ('greninja_clones_v5', 'exe_v46z_gk6', 'black', 'id=1', 'S4GX', 'A_safe', 'B_attack', 'C_hurt', 'D_parts',
+         'damage panel', 'Little Mac', 'S4GB', 'grey')
     check('README.txt mentions every feature (%s)' % ', '.join(words), [w for w in words if w not in readme], [])
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 

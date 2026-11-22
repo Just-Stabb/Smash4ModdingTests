@@ -153,6 +153,7 @@ void gekkouga_frame()
         flags = flags | gk_gen_req;       // v4 diag: 64 / 128 a clone about to be made (next frame)
     }
     WorkModule(0, (float)flags + 0, 0x0f000314);
+    gk_gauge();
 }
 
 // ---- down special presses while the ability / burnout runs: swaps, or nothing (no status)
@@ -928,8 +929,7 @@ void gk_ready_fx()
         gk_fx_t -= 1;
         return;
     }
-    gk_fx_t = 45;
-    EffectModule(0x2710, 0x10000bd, 0, 0, 22.0f, 0, 0, 0, 0, 0.8f, 0, 0, 0, 0, 0, 0, 0);
+    gk_fx_t = 45;                         // v6: no sparkle over his head (the panel's gauge blinks "KO" when ready)
 }
 
 // ---- the charge stance (SpecialLw 0x155, his old counter: no counter shape now)
@@ -966,15 +966,45 @@ void gk_lw_tick()
 // the charge bar: pips (0x1000047) in a row over his head, one lit every gk_lw_full() / gk_pip_count() frames
 void gk_bar()
 {
-    int lit;
-    float lr;
-    lit = gk_lw_charge * gk_pip_count() / gk_lw_full();
-    lr = PostureModuleF(0);
-    while (gk_pips < lit)
+    // v6 (the user): no pips over his head any more: the gauge is on his damage panel (gk_gauge, the executable)
+}
+
+// v6: the damage panel gauge (his VAR_19, the executable shows it on Little Mac's KO meter in his panel): mode x 1000 +
+// 0-100. 1: the charge (100 = ready, the meter's blinking "KO" frame), 2: the ability's time left, 3: the burnout's
+// time left (grey); 0 nothing (hidden)
+void gk_gauge()
+{
+    int g;
+    g = 0;
+    if (gk_burnout > 0)
     {
-        EffectModule(0x2712, 0x1000047, 0, 0, 25.0f, ((float)gk_pips - 4.5f) * 2.2f * lr, 0, 0, 0, 0.35f, 0x1);
-        gk_pips += 1;
+        g = 3000 + gk_pct(gk_burnout, gk_burnout_frames());
     }
+    else if (gk_ability > 0)
+    {
+        g = 2000 + gk_pct(gk_ability, gk_ability_frames());
+    }
+    else if (gk_lw_charge > 0)
+    {
+        g = 1000 + gk_lw_charge * 100 / gk_lw_full();
+    }
+    WorkModule(0, (float)g + 0, 0x0f000313);
+}
+
+// time left as 1 - 99 (100 is the meter's "full / ready" frame: only the charge's)
+int gk_pct(int left, int all)
+{
+    int v;
+    v = left * 100 / all;
+    if (v < 1)
+    {
+        v = 1;
+    }
+    if (v > 99)
+    {
+        v = 99;
+    }
+    return v;
 }
 
 int gk_lw_loop()

@@ -576,3 +576,13 @@ the other "poofed instantly", and both were dropped by the heartbeat (102 at the
   colour (0, 0, 0, 255) through [acc+0x38] vt +0x4C (the Final Smash's shadow clones) and links it to its owner
   ([acc+0x68] vt +0x3BC). Now a copy of the moon's (`VT_BASE` 0xFC), whose +0x34 only sets the model scale.
 - Diag `S4GX clone id at x y`: each clone's posture every 30 frames, its first 8 logs.
+- **The charge gauge on his damage panel** (the user): the pips over his head and the ready sparkle are gone (the star
+  flash at full stays). His MSC writes VAR_19 = mode x 1000 + 0-100 (`gk_gauge`: 1 the charge, 100 = ready; 2 the
+  ability's time left; 3 the burnout's; 0 none). The exe hooks the damage panel's update (InfoGadgetDmg vtable +0x3C,
+  `0x100871D8 + 0x3C`, which points at the trait badge cave: we call it first) and for each panel slot whose starting
+  kind and current fighter are Greninja (the trait badge's slot -> fighter route: `[0x102F7024]` entry -> object ->
+  accessor -> WorkModule) shows Little Mac's KO meter (`ko_mc`, the slot's +0x18C) and sets it with the game's
+  `0x02663C54(panel, slot, 0-100)` (num_0 / num_1-10 / ko blinking; it no-ops on an unchanged label), coloured per mode
+  with `0x032CDF80` (as is / blue / grey), hidden for mode 0. Diag `S4GB slot mode value` on every tenth. Tested in
+  unicorn (`gekkouga_clone_cave_test.py` panel checks: the hook, the calls per mode, the colours, Little Mac's and empty
+  slots untouched); the art is Little Mac's meter (its full frame reads "KO").

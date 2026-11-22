@@ -111,6 +111,17 @@ SAFE_BASE = 0xFC                  # v5: moon (his Final Smash's moon). v4's safe
 ATTACK_BASE = 0x2                 # Mario's pump
 HURT_BASE = 0x168                 # mewtwom (Mewtwo's Final Smash form)
 MSC_SLOT = 8
+PANEL_VT = 0x100871D8 + 0x3C      # v6: the damage panel's update (InfoGadgetDmg vtable +0x3C: docs/native-notes.md "Damage
+                                  # panel"; its relocation moved to a dead word by trait_badge_cave.py)
+PANEL_PREV = 0x04B84000           # what it points at in exe_v46z_ui10: the trait badge cave (it calls the game's 0x02661808)
+PANEL_KO_SET = 0x02663C54         # (panel, slot, 0-100): Little Mac's KO meter value (labels num_0 - num_10, ko)
+PANEL_VISIBLE = 0x032CDFFC        # (clip, visible)
+PANEL_COLOUR = 0x032CDF80         # (clip, &{u8 mul A R G B, s16 add A R G B})
+FIGHTER_MANAGER = 0x102F7024
+PANEL_SLOT = 0x30C0
+VAR_GAUGE = 0x0F000313            # his VAR_19 (v6): mode x 1000 + 0-100 (1 charge, 2 the ability left, 3 the burnout left)
+GAUGE_COLOURS = ((0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0), (0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0),
+                 (0xFF, 0x50, 0xB0, 0xFF, 0, 0, 0x10, 0x30), (0xFF, 0x70, 0x70, 0x70, 0, 0x30, 0x30, 0x30))
 VT_BASE = 0xFC                    # v6: the clone's specializer (its singleton's vtable) is a copy of the moon's, not
                                   # bunshin's: bunshin's +0x34 (0x02AF6738, at its start) paints the model black (its
                                   # [acc+0x38] vt +0x4C colour (0, 0, 0, 255): the Final Smash's shadow clones) and links
@@ -466,6 +477,8 @@ def build(rpx, diag=False, feats=None):
     A['gk_seen'] = alloc(4 * 16) if diag else 0       # diag: the HUD calls seen, by r29
     assert A['gk_slow'] == A['gk_hide'] + 0x20
     assert not diag or A['gk_lastf'] == A['gk_slow'] + 0x20
+    A['ctf'] = alloc(12 * 4, 4)         # v6: the gauge's colour per mode
+    A['gk_gaugelog'] = alloc(4 * SLOTS) if diag else 0
     A['consts'] = alloc(28)          # 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, the hitstop multiplier
     A['hurt'] = alloc(0x30 * len(HURTBOXES))
     A['gk_str'] = alloc(8)
@@ -480,7 +493,8 @@ def build(rpx, diag=False, feats=None):
             ('gk_fj', 'S4GJ clone set-up done\n'),
             ('gk_fp', 'S4GP clone first update (its script not run yet): weapon accessor=%08X\n'),
             ('gk_fv', 'S4GV HUD cursor update: r29=%d cursor=%08X\n'),
-            ('gk_fx', 'S4GX clone id=%d at x=%d y=%d\n')]
+            ('gk_fx', 'S4GX clone id=%d at x=%d y=%d\n'),
+            ('gk_fb', 'S4GB panel slot=%d gauge mode=%d value=%d\n')]
     for nm, s in fmts:
         A[nm] = alloc((len(s) + 4) & ~3, 4) if diag else 0
     code_at = alloc(0, 4)
@@ -514,6 +528,9 @@ def build(rpx, diag=False, feats=None):
         out.blob(A['gk_seen'], bytes(4 * 16), 'diag: HUD calls seen')
     out.blob(A['consts'], struct.pack('>6fI', 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, img.w(HITSTOP_MUL)), 'constants')
     out.blob(A['hurt'], hurt_blob(), 'clone hurtboxes (his vl group 5, article joints)')
+    out.blob(A['ctf'], b''.join(struct.pack('>4B4h', *c) for c in GAUGE_COLOURS), 'gauge colours')
+    if diag:
+        out.blob(A['gk_gaugelog'], struct.pack('>8i', *([-1] * SLOTS)), 'diag: gauge logged')
     out.blob(A['gk_str'], CLONE_NAME.encode().ljust(8, b'\0'), '"clone"')
     if diag:
         for nm, s in fmts:
@@ -523,13 +540,15 @@ def build(rpx, diag=False, feats=None):
     p = dict(acc=ACC, work=WORK, posture=POSTURE, bacc=BASE_ACC, entry=ENTRY, slots=SLOTS, tag=FLAG_TAG,
              slow=FLAG_SLOW, clones=FLAG_CLONES, life=TAG_LIFE, sslot=SLOW_SLOT, srate=SLOW_RATE, sframes=SLOW_FRAMES,
              hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, whit=W_HIT_MOD, wdmg=W_DAMAGE, watk=W_ATTACK,
-             wstop=W_STOP, nhurt=len(HURTBOXES), s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
+             wstop=W_STOP, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
-               'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx'):
+               'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
+               'gk_gaugelog'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
     p['ftab_hi'], p['ftab_lo'] = ha(FIGHTERS), K.slo(FIGHTERS)
+    p['fm_hi'], p['fm_lo'] = ha(FIGHTER_MANAGER), K.slo(FIGHTER_MANAGER)
     p['mgr_hi'], p['mgr_lo'] = ha(OBJ_MANAGER), K.slo(OBJ_MANAGER)
     D = (lambda s: s) if diag else (lambda s: '')
 
@@ -1203,6 +1222,120 @@ wp_94:
         mtlr r0
         addi r1, r1, 0x40''' + tail(L['vt_orig'][0x94]) + '''
 
+# ---- v6: the charge / ability / burnout gauge on his damage panel: the panel's update (its vtable +0x3C, the trait
+# badge cave's hook before us) then, for each panel slot of a Greninja, his VAR_19 (mode x 1000 + 0-100) on Little
+# Mac's KO meter (ko_mc, the slot's +0x18C): shown and set (0x02663C54: 0 empty, 1-99 ten steps, 100 "KO" blinking:
+# ready) with a colour per mode (1 charge: as is, 2 the ability draining: blue, 3 the burnout draining: grey); mode 0:
+# hidden
+gk_panel:
+        stwu r1, -0x50(r1)
+        mflr r0
+        stw r0, 0x54(r1)
+        stmw r25, 0x30(r1)
+        mr r31, r3''' + call(PANEL_PREV) + '''
+        stw r3, 0x10(r1)
+        li r26, 0
+gp_slot:
+        cmpwi r26, %(slots)d
+        bge gp_done
+        mulli r30, r26, %(pslot)d
+        add r30, r30, r31
+        addi r30, r30, 0xC0             # the panel slot
+        lha r0, 8(r30)
+        cmpwi r0, 2
+        beq gp_next                     # empty
+        lbz r0, 0xA(r30)
+        extsb r0, r0
+        cmpwi r0, %(gkind)d
+        bne gp_next
+        lwz r29, 0x18C(r30)             # ko_mc
+        cmpwi r29, 0
+        beq gp_next
+        lha r5, 0(r30)                  # its fighter: the manager's entry, the current object (the trait badge's way)
+        cmpwi r5, 0
+        blt gp_next
+        lis r12, %(fm_hi)d
+        lwz r12, %(fm_lo)d(r12)
+        cmpwi r12, 0
+        beq gp_next
+        lwz r0, 0x18(r12)
+        cmplw r5, r0
+        bge gp_next
+        slwi r5, r5, 2
+        add r12, r12, r5
+        lwz r12, 0x24(r12)
+        cmpwi r12, 0
+        beq gp_next
+        lbz r5, 0x14E9(r12)
+        lwz r0, 0xDB4(r12)
+        cmplw r5, r0
+        bge gp_next
+        slwi r5, r5, 2
+        add r12, r12, r5
+        lwz r12, 0xDC0(r12)
+        cmpwi r12, 0
+        beq gp_next
+        lwz r0, 4(r12)
+        cmpwi r0, %(gkind)d
+        bne gp_next
+        lwz r12, 0xC(r12)
+        cmpwi r12, 0
+        beq gp_next
+        lwz r28, 0x28(r12)              # his WorkModule
+        cmpwi r28, 0
+        beq gp_next''' + var_get('r28', VAR_GAUGE) + '''
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r27, 0x1C(r1)               # mode x 1000 + value
+        li r0, 1000
+        divwu r25, r27, r0              # the mode
+        mullw r10, r25, r0
+        subf r28, r10, r27              # the value
+        cmplwi r25, 3
+        ble gp_ok
+        li r25, 0
+gp_ok:  cmpwi r25, 0
+        bne gp_show
+        mr r3, r29
+        li r4, 0''' + call(PANEL_VISIBLE) + '''
+        b gp_log
+gp_show:
+        mr r3, r29
+        li r4, 1''' + call(PANEL_VISIBLE) + '''
+        mr r3, r31
+        mr r4, r26
+        mr r5, r28''' + call(PANEL_KO_SET) + '''
+        mr r3, r29
+        lis r4, %(ctf_hi)d
+        addi r4, r4, %(ctf_lo)d
+        mulli r0, r25, 12
+        add r4, r4, r0''' + call(PANEL_COLOUR) + '''
+gp_log:''' + D('''
+        lis r11, %(gk_gaugelog_hi)d
+        addi r11, r11, %(gk_gaugelog_lo)d
+        slwi r12, r26, 2
+        li r0, 10
+        divwu r10, r27, r0
+        lwzx r0, r11, r12
+        cmpw r0, r10
+        beq gp_next
+        stwx r10, r11, r12
+        lis r3, %(gk_fb_hi)d
+        addi r3, r3, %(gk_fb_lo)d
+        mr r4, r26
+        mr r5, r25
+        mr r6, r28''' + osr()) + '''
+gp_next:
+        addi r26, r26, 1
+        b gp_slot
+gp_done:
+        lwz r3, 0x10(r1)
+        lmw r25, 0x30(r1)
+        lwz r0, 0x54(r1)
+        mtlr r0
+        addi r1, r1, 0x50
+        blr
+
 # ---- the fighter descriptor switch's case for him: his descriptor copy (+8 the new article list)
 gk_dcase:
         lis r3, %(gk_desc_hi)d
@@ -1247,6 +1380,8 @@ w_dcase:
     for i, w in enumerate(t.words()):
         out.put(TRAMP + 4 * i, w, 'HUD trampoline', 0)
     out.put(DESC_TABLE + 4 * GK_KIND, lab['gk_dcase'], 'his fighter descriptor case', GK_DESC_CASE)
+    assert PANEL_VT not in img.relocs(), 'the panel update word has a relocation'
+    out.put(PANEL_VT, lab['gk_panel'], 'the damage panel update: the gauge (then the trait badge / the game)', PANEL_PREV)
     # ---- the weapon cave's tables, kind 0x1A1
     for nm, addr in W.NAME_TABLES:
         v = {'owner': owner_str, 'name': A['gk_str'], 'folder': A['gk_str']}.get(nm, img.w(addr + 4 * CLONE_BASE))
@@ -1292,7 +1427,8 @@ def main():
         out, info = build(o.rpx, o.diag, feats)
         for nm, at in sorted(info['A'].items(), key=lambda kv: kv[1]):
             print('%-10s 0x%08X' % (nm, at))
-        for nm in ('g1_stub', 'hud', 's13', 's42', 's43', 'gk_entry', 'w_hit', 'w_init', 'w_poll', 'gk_dcase', 'w_dcase'):
+        for nm in ('g1_stub', 'hud', 's13', 's42', 's43', 'gk_entry', 'w_hit', 'w_init', 'w_poll', 'gk_panel', 'gk_dcase',
+                   'w_dcase'):
             print('%-10s 0x%08X' % (nm, info['labels'][nm]))
         print('end        0x%08X (limit 0x%08X), %d words' % (info['end'], LIMIT, len(out.words)))
         return

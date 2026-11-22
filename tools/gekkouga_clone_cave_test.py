@@ -627,6 +627,75 @@ def hud_checks(e, info):
     check('the HUD hook: bl to the trampoline', K.branch_target(C.HUD_HOOK, img.w(C.HUD_HOOK)), C.TRAMP)
 
 
+def panel_checks(e, info, diag):
+    """v6: the damage panel gauge: the update hook (after the trait badge's / the game's update), per Greninja slot his
+    VAR_19 on Little Mac's KO meter"""
+    lab, A = info['labels'], info['A']
+    P = e.alloc(0xC0 + 8 * C.PANEL_SLOT + 0x100, b'\0')
+    slot = lambda i: P + 0xC0 + i * C.PANEL_SLOT
+    for i in range(8):
+        e.mu.mem_write(slot(i) + 8, struct.pack('>h', 2))          # empty
+    fm = e.alloc(0x80, b'\0')
+    e.setw(fm + 0x18, 4)
+    e.setw(C.FIGHTER_MANAGER, fm)
+    gk = e.fighter(None)                                          # his accessor's WorkModule (the variables)
+    gacc = e.alloc(0x40, b'\0')
+    gwm = gk['wm']
+    e.setw(gacc + 0x28, gwm)
+
+    def fighter_obj(entry, kind, acc):
+        fe = e.alloc(0x2000, b'\0')
+        e.setw(fm + 0x24 + 4 * entry, fe)
+        e.mu.mem_write(fe + 0x14E9, b'\x00')
+        e.setw(fe + 0xDB4, 1)
+        obj = e.alloc(0x20, b'\0')
+        e.setw(fe + 0xDC0, obj)
+        e.setw(obj + 4, kind)
+        e.setw(obj + 0xC, acc)
+    fighter_obj(0, C.GK_KIND, gacc)
+    macc = e.alloc(0x40, b'\0')
+    fighter_obj(1, 0x29, macc)
+    ko = e.alloc(0x20, b'\0')
+    ko2 = e.alloc(0x20, b'\0')
+    for i, entry, kind, k in ((0, 0, C.GK_KIND, ko), (2, 1, 0x29, ko2)):
+        e.mu.mem_write(slot(i), struct.pack('>h', entry))
+        e.mu.mem_write(slot(i) + 8, struct.pack('>h', 0))
+        e.mu.mem_write(slot(i) + 0xA, bytes([kind]))
+        e.setw(slot(i) + 0x18C, k)
+    e.stub(C.PANEL_PREV, lambda e_: (e_.rec('prev', 3), 0x77)[1])
+    e.stub(C.PANEL_VISIBLE, lambda e_: e_.rec('visible', 3, 4))
+    e.stub(C.PANEL_KO_SET, lambda e_: e_.rec('ko_set', 3, 4, 5))
+    e.stub(C.PANEL_COLOUR, lambda e_: e_.rec('colour', 3, 4))
+
+    def run(g):
+        e.vars = {C.VAR_GAUGE: float(g)}
+        e.calls = []
+        for i in range(14, 32):
+            e.mu.reg_write(REGS[i], 0x5A5A0000 + i)
+        r = e.call(lab['gk_panel'], P)
+        return r, [c for c in e.calls if c[0] in ('prev', 'visible', 'ko_set', 'colour')], e.kept()
+    check('v6 panel hook: the vtable +0x3C word is ours (it was the trait badge cave)', e.w(C.PANEL_VT), lab['gk_panel'])
+    check('v6 panel: charge 1033 -> the previous update (its r3 kept), his slot\'s KO meter shown, 33, mode 1\'s colour; '
+          'Little Mac\'s slot and the empty ones untouched; the registers kept', run(1033),
+          (0x77, [('prev', P), ('visible', ko, 1), ('ko_set', P, 0, 33), ('colour', ko, A['ctf'] + 12)], True))
+    check('v6 panel: ready 1100 -> 100 (the meter\'s blinking frame)', run(1100)[1][2], ('ko_set', P, 0, 100))
+    check('v6 panel: the ability 2050 -> 50, blue (mode 2)', run(2050)[1][2:], [('ko_set', P, 0, 50), ('colour', ko, A['ctf'] + 24)])
+    check('v6 panel: the burnout 3020 -> 20, grey (mode 3)', run(3020)[1][2:], [('ko_set', P, 0, 20), ('colour', ko, A['ctf'] + 36)])
+    check('v6 panel: nothing (0) -> the meter hidden', run(0)[1], [('prev', P), ('visible', ko, 0)])
+    check('v6 panel: a bad mode (7000) -> hidden', run(7000)[1][1:], [('visible', ko, 0)])
+    check('v6 gauge colours: as is / blue / grey', bytes(e.mu.mem_read(A['ctf'], 48)),
+          b''.join(struct.pack('>4B4h', *c) for c in C.GAUGE_COLOURS))
+    if diag:
+        e.calls = []
+        run(1033)
+        n1 = len([c for c in e.calls if c[0] == 'osr'])
+        run(1034)
+        n2 = len([c for c in e.calls if c[0] == 'osr'])
+        run(1043)
+        n3 = len([c for c in e.calls if c[0] == 'osr'])
+        check('v6 diag: S4GB logged when the gauge changes by a tenth (1034 no, 1043 yes)', (n2, n3), (0, 1))
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     diag = '--diag' in sys.argv
@@ -646,6 +715,7 @@ def main():
     s42_checks(e, info)
     s43_checks(e, info)
     hud_checks(e, info)
+    panel_checks(e, info, diag)
     print('%d checks, %d failures' % (checks, fails))
     sys.exit(1 if fails else 0)
 

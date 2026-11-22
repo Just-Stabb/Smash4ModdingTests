@@ -3831,3 +3831,8 @@ MSC on a bunshin-based kind, the 4-shape group.
   +0x38] vt +0x4C with (0, 0, 0, 255) from `0x100DDFC4` / `0x100DDFC8`) and calls [acc+0x68] vt +0x3BC(3, 0, 1) / (3, 0xD, 1)
   and [acc+0xA0] vt +0xB4 / +0xA4 (0x1000047); the moon's +0x34 (`0x02AF6B2C`) only [acc+0x18] vt +0xE4(init +0x68: the
   scale). The clone's specializer is now the moon's copy.
+  - **The damage panel gauge**: the panel update's vtable word (`0x10087214`, no relocation: trait_badge_cave.py moved it)
+    -> our hook, which calls what was there (the trait badge cave `0x04B84000`), then per Greninja slot Little Mac's KO
+    meter: `0x032CDFFC(ko_mc, visible)`, `0x02663C54(P, slot, v)` (stores v at slot +0x3C, picks the label from a table
+    `[[0x102FCE14] + 0x20 + 4 x ((v - 1) / 10 + 1)]`, `+0x20` for 0, `+0x104` for 100; skips the goto when the slot's
+    +0x1C8 already holds it), `0x032CDF80(ko_mc, &colour)`.
