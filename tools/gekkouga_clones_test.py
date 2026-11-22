@@ -84,17 +84,36 @@ class Game:
         self.posture_sets = []
         self.hitlag = 0            # StopModule(1)
         self.floors = [(-1000.0, 1000.0, 10.0)]   # the stage's floors (x0, x1, y): his line test (LINE_* variables)
+        self.walls = []            # (x, y0, y1)
+        self.ceilings = []         # (x0, x1, y)
+        self.beat = 3              # v3: the clones' heartbeat bits their MSCs write into his VAR_30 each frame
         self.line_tests = 0
 
     def line_test(self):
-        """the Line_Test variables: a vertical segment (X0, Y0) -> (X0, Y1) down, the highest floor it meets"""
+        """the Line_Test variables: a vertical segment (X0, Y0) -> (X0, Y1) meets the nearest floor (going down) or
+        ceiling (going up); a horizontal one (Y0 = Y1) the nearest wall"""
         self.line_tests += 1
-        x, y0, y1 = (self.vars.get(0x0F0003D0 + i, 0.0) for i in (0, 1, 3))
-        hit = [fy for x0, x1, fy in self.floors if x0 <= x <= x1 and y1 <= fy <= y0]
-        if hit:
-            self.vars[0x0F0003D4], self.vars[0x0F0003D7], self.vars[0x0F0003D8] = 1.0, max(hit), 1.0
+        x, y0, x1_, y1 = (self.vars.get(0x0F0003D0 + i, 0.0) for i in (0, 1, 2, 3))
+        V = self.vars
+        hit = None
+        if abs(x1_ - x) < 1e-6:
+            if y1 <= y0:
+                fl = [fy for a, b, fy in self.floors if a <= x <= b and y1 <= fy <= y0]
+                if fl:
+                    hit = (x, max(fl), 1.0)
+            else:
+                cl = [cy for a, b, cy in self.ceilings if a <= x <= b and y0 <= cy <= y1]
+                if cl:
+                    hit = (x, min(cl), 3.0)
         else:
-            self.vars[0x0F0003D4], self.vars[0x0F0003D7], self.vars[0x0F0003D8] = 0.0, y1, 0.0
+            lo, hi = min(x, x1_), max(x, x1_)
+            wl = [wx for wx, a, b in self.walls if lo <= wx <= hi and a <= y0 <= b]
+            if wl:
+                hit = (min(wl, key=lambda w: abs(w - x)), y0, 2.0)
+        if hit:
+            V[0x0F0003D4], V[0x0F0003D6], V[0x0F0003D7], V[0x0F0003D8] = 1.0, hit[0], hit[1], hit[2]
+        else:
+            V[0x0F0003D4], V[0x0F0003D6], V[0x0F0003D7], V[0x0F0003D8] = 0.0, x1_, y1, 0.0
 
     def sys(self, sid, a):
         if sid == 0x16:                                       # WorkModule
@@ -242,6 +261,7 @@ def frames(m, n, st=0):
     m.vm.g[4] = st
     for _ in range(n):
         m.game.press = set()
+        m.game.vars[0x0F00031E] = float(m.g('gk_alive') & m.game.beat)   # the clones' MSCs: their heartbeat bits
         m('gekkouga_frame')
 
 
@@ -307,24 +327,27 @@ def msc_tests(mscsb, src):
     check('frame 3: the right clone (article 7), VAR_31 = 4747000 + 3 + being made (right) 8, its smoke at X + 14',
           (arts[-1], g.vars.get(0x0F00031F), [x[3] for x in g.log if x[0] == 'effect' and x[2] == 0x3300006][-1]),
           (('article', 0x2710, 7), 4747011.0, 64.0))
-    check('flags: tag hidden + clones out (5)', g.vars.get(0x0F000314), 5.0)
+    check('flags: tag hidden (1)', g.vars.get(0x0F000314), 1.0)
     g.motion, g.frame, g.rate = 0x5F, 7.0, 1.0
     frames(m, 2)
-    check('v2 channel: left clone X / Y 36 / 10, right 64 / 10, frame 7, rate 1, motion 0x5F, 4747000 + alive 3',
-          [g.vars.get(0x0F000318 + i) for i in range(8)], [36.0, 10.0, 64.0, 10.0, 7.0, 1.0, 95.0, 4747003.0])
-    check('the capsules: shapes 1 (-14) and 2 (+14) on, 0 / 3 off', g.shapes, {0: 0, 1: 1, 2: 1, 3: 0})
+    check('v3 channel: left clone X / Y 36 / 10, right 64 / 10, motion 0x5F x 1024 + frame 7, rate 1, the heartbeat '
+          'cleared (0), 4747000 + alive 3', [g.vars.get(0x0F000318 + i) for i in range(8)],
+          [36.0, 10.0, 64.0, 10.0, 95.0 * 1024 + 7.0, 1.0, 0.0, 4747003.0])
+    check('v3: no shield capsules (the clones have their own hurtboxes): shapes 0-3 off', g.shapes, {0: 0, 1: 0, 2: 0, 3: 0})
+    check('v3: flags tag hidden only (1: bit 4 "clones out" no longer set: his shield shapes never report)',
+          g.vars.get(0x0F000314), 1.0)
     g.lr = -1.0
     frames(m, 1)
-    check('facing left: the same clones are at z +14 / -14 (shapes 2 / 1)', g.shapes, {0: 0, 1: 1, 2: 1, 3: 0})
+    check('facing left: still no capsules', g.shapes, {0: 0, 1: 0, 2: 0, 3: 0})
     g.lr = 1.0
     m.vm.g[4] = 0x74
     m('gekkouga_frame')
-    check('on a ledge (0x74, CliffWait): the clones play Wait1 / Fall', g.vars.get(0x0F00031E), 0.0)
+    check('on a ledge (0x74, CliffWait): the clones play Wait1 / Fall', g.vars.get(0x0F00031C) // 1024, 0.0)
     g.situation = 2
     m.vm.g[4] = 0x46
     m('gekkouga_frame')
     check('v2: hit in the air (0x46): standing clones Wait1 (they stay where they are; a falling one plays Fall)',
-          g.vars.get(0x0F00031E), 0.0)
+          g.vars.get(0x0F00031C) // 1024, 0.0)
     g.situation = 0
     frames(m, 1)
     # ---- swaps
@@ -357,17 +380,20 @@ def msc_tests(mscsb, src):
     m.vm.g[24] = 0x4000
     m('gekkouga_frame')
     check('up special during the ability: left alone', m.vm.g[24] & 0x4000, 0x4000)
-    # ---- a clone hit: the nearest (dx -12 -> the left one at -14)
+    # ---- v3: a clone's own hurtbox hit (the executable: VAR_21 = 20000 + its id): exactly that clone
     frames(m, 1)
     g.log = []
-    g.posture_sets = []
     g.vars[0x0F000315] = 10000.0 - 12.0
+    frames(m, 1)
+    check('v1 / v2\'s shield-capsule report (10000 + dx): ignored now, cleared', (m.g('gk_alive'), g.vars.get(0x0F000315)), (3, 0.0))
+    g.log = []
+    g.posture_sets = []
+    g.vars[0x0F000315] = 20000.0 + 1.0
     xh, g.rand = g.x, 0.5
     frames(m, 1)
-    check('a hit at dx -12: the left clone (-14) gone (article 6 removed), its smoke, the log (0x3F7) at its place, him back',
+    check('v3: a hit on the left clone\'s hurtbox (20001): it is gone (article 6 removed), its smoke, the log (0x3F7) at its place, him back',
           ([x for x in g.log if x[0] in ('article', 'battleobject')], g.posture_sets, g.x, m.g('gk_alive'), g.vars.get(0x0F000315)),
           ([('article', 0x2712, 6), ('battleobject', 0x3F7, xh - 14.0, 10.0)], [(xh - 14.0, 10.0), (xh, 10.0)], xh, 2, 0.0))
-    check('the capsules: only the right clone\'s (-28: shape 0)', g.shapes, {0: 1, 1: 0, 2: 0, 3: 0})
     check('the channel: alive 2', g.vars.get(0x0F00031F), 4747002.0)
     g.press, g.stick = {1}, (-0.8, -0.8)
     xs = g.x
@@ -377,7 +403,7 @@ def msc_tests(mscsb, src):
     check('swap with the dead left clone: nothing', g.x, xs)
     g.log = []
     g.rand = 0.05
-    g.vars[0x0F000315] = 10000.0 + 5.0
+    g.vars[0x0F000315] = 20000.0 + 2.0
     frames(m, 1)
     check('a hit with the right clone the only one: it (0x2712 7), the rare doll (0x3F8: rand 0.05 <= 10%)',
           [x[:3] for x in g.log if x[0] in ('article', 'battleobject')], [('article', 0x2712, 7), ('battleobject', 0x3F8, xs - 28.0)])
@@ -551,10 +577,10 @@ def physics_tests(mscsb, src):
 
     def flags(g):
         return int(g.vars.get(0x0F00031F, 0.0) - 4747000.0)
-    check('v2 constants: gravity 0.18, max fall 1.85 (his fighter_param), fall-off 100 frames, snap 3, hitlag min 4',
+    check('v3 constants: gravity 0.18, max fall 1.85 (his fighter_param), fall-off fallback 300 frames, snap 2, hitlag min 4',
           (round(i2f(fresh(mscsb, src)('gk_gravity') & 0xFFFFFFFF), 3), round(i2f(fresh(mscsb, src)('gk_max_fall') & 0xFFFFFFFF), 3),
            fresh(mscsb, src)('gk_fall_frames'), round(i2f(fresh(mscsb, src)('gk_snap') & 0xFFFFFFFF), 3),
-           fresh(mscsb, src)('gk_hitlag_min')), (0.18, 1.85, 100, 3.0, 4))
+           fresh(mscsb, src)('gk_hitlag_min')), (0.18, 1.85, 300, 2.0, 4))
     # ---- a ledge: the stage ends at x 20 (a lower floor at -20 from 20 to 100)
     m, g = start(10.0, 10.0, [(-60.0, 20.0, 10.0), (20.0, 100.0, -20.0)])
     check('made: left at (-4, 10), right at (24, 10) (both on the floor: the right one at the edge\'s far side, its '
@@ -566,7 +592,6 @@ def physics_tests(mscsb, src):
     check('off the ledge: the right clone falls with his gravity (10 frames: 10 - 0.18 x 55 = 0.1), the left one stays on '
           'the floor', (m.gf('gk_ly'), round(m.gf('gk_ry'), 2)), (10.0, 0.1))
     check('... it plays Fall (flags 16 / 32: right 32), alive 3', flags(g) & 0x3F, 0x23)
-    check('... only the left clone\'s capsule (the right one is out of formation)', g.shapes, {0: 0, 1: 1, 2: 0, 3: 0})
     vmin = 0.0
     for _ in range(40):
         frames(m, 1)
@@ -617,27 +642,99 @@ def physics_tests(mscsb, src):
         g.x, g.y = 10.0 * (i + 1), 10.0 + 6.0 * (i + 1)
         frames(m, 1, st=0x46)
     check('he is launched (x 50, y 40): the clones stay where they were, on the floor (-14 / 14, 10)', cl(m), (-14.0, 10.0, 14.0, 10.0))
-    check('... no capsules, standing: Wait1', (g.shapes, g.vars.get(0x0F00031E)), ({0: 0, 1: 0, 2: 0, 3: 0}, 0.0))
+    check('... standing: Wait1', g.vars.get(0x0F00031C) // 1024, 0.0)
     g.x, g.y, g.situation = 60.0, 10.0, 0
     g.floors = [(-1000.0, 1000.0, 10.0)]
     g.log = []
     frames(m, 1, st=0)
     check('he is back (60, 10): the clones back in formation (46 / 74), a smoke each',
           (cl(m), len([x for x in g.log if x[0] == 'effect' and x[2] == 0x3300006])), ((46.0, 10.0, 74.0, 10.0), 2))
-    check('... the capsules back on', g.shapes, {0: 0, 1: 1, 2: 1, 3: 0})
-    # ---- off the stage: no floor under them: falling on their own 100 frames -> gone in smoke, no log
+    # ---- v3: the blast zone: the game removes a weapon past it without its MSC; its heartbeat stops
     m, g = start(0.0, 10.0, [])
     g.log = []
-    frames(m, 94)
-    check('nothing under them: the left clone 100 frames falling (made 6 frames before): still there', m.g('gk_alive'), 3)
+    frames(m, 4)
+    g.beat = 2                                # the left clone's MSC no longer runs (removed by the game)
+    frames(m, 2)
+    check('v3 blast zone: the left clone\'s heartbeat (his VAR_30 bit 1) missing 2 frames: still counted', m.g('gk_alive'), 3)
     frames(m, 1)
-    check('its 101st: the left one gone (article 6 removed), its smoke, no Substitution log',
+    check('... 3 frames: gone (no log), the right one (its heartbeat on) stays',
+          ([x[:3] for x in g.log if x[0] in ('article', 'battleobject')], m.g('gk_alive')), ([('article', 0x2712, 6)], 2))
+    m, g = start(0.0, 10.0, [])
+    g.beat = 0
+    frames(m, 1)
+    check('v3: just made (6 frames of grace: its MSC finds him first): no heartbeat yet is fine', m.g('gk_alive'), 3)
+    g.beat = 3
+    # ---- the fallback: falling on their own 300 frames (no blast zone removal seen) -> gone in smoke, no log
+    m, g = start(0.0, 10.0, [])
+    g.log = []
+    frames(m, 294)
+    check('v3 fallback: nothing under them, the left clone 300 frames falling: still there', m.g('gk_alive'), 3)
+    frames(m, 1)
+    check('its 301st: the left one gone (article 6 removed), its smoke, no Substitution log',
           ([x for x in g.log if x[0] in ('article', 'battleobject')], len([x for x in g.log if x[0] == 'effect' and x[2] == 0x3300006]),
            m.g('gk_alive')), ([('article', 0x2712, 6)], 1, 2))
     frames(m, 3)
     check('the right one (made 3 frames later) 3 frames later; the ability goes on',
           ([x for x in g.log if x[0] in ('article', 'battleobject')][-1], m.g('gk_alive'), m.g('gk_ability') > 0),
           (('article', 0x2712, 7), 0, True))
+    # ---- v3: walls: a clone stops against one (its offset gives way), and goes back to its offset when free
+    m, g = start(0.0, 10.0, [(-1000.0, 1000.0, 10.0)])
+    g.walls = [(20.0, 0.0, 40.0)]
+    for x in (2.0, 4.0, 6.0, 8.0, 10.0):
+        g.x = x
+        frames(m, 1)
+    check('v3 wall at x 20: he walks to 10, the right clone (offset 14) stops against it (20 - 3), the left one follows (-4)',
+          (m.gf('gk_rx'), m.gf('gk_lx'), m.gf('gk_off_r')), (17.0, -4.0, 14.0))
+    g.x = -2.0
+    frames(m, 1)
+    check('... he walks back (-2): the right clone at its offset again (12)', m.gf('gk_rx'), 12.0)
+    g.x = 10.0
+    for _ in range(2):
+        frames(m, 1)
+    x0 = g.x
+    g.press, g.stick = {1}, (0.8, -0.8)
+    m('gekkouga_frame')
+    check('v3 swap with the right clone held by the wall (17): him to 17, it to his place (10), the left one stays (-4)',
+          (g.x, m.gf('gk_rx'), m.gf('gk_lx'), m.gf('gk_off_r'), m.gf('gk_off_l')), (17.0, 10.0, -4.0, -7.0, -21.0))
+    m, g = start(0.0, 10.0, [(-1000.0, 1000.0, 10.0)])
+    g.walls = [(-20.0, 0.0, 40.0)]
+    g.x = -10.0
+    frames(m, 1)
+    check('v3: a wall on the left (-20): the left clone held at -17', m.gf('gk_lx'), -17.0)
+    g.walls = [(30.0, 30.0, 60.0)]
+    g.x = 20.0
+    frames(m, 1)
+    check('v3: a wall above its test height (30 - 60) doesn\'t stop it (34)', m.gf('gk_rx'), 34.0)
+    # ---- v3: ceilings: a clone jumping with him stops under one
+    m, g = start(0.0, 10.0, [(-1000.0, 1000.0, 10.0)])
+    g.ceilings = [(10.0, 20.0, 35.0)]
+    g.situation = 2
+    for y in (15.0, 20.0, 25.0, 30.0):
+        g.y = y
+        frames(m, 1, st=0x1B)
+    check('v3 ceiling at 35 over the right clone (x 14): he rises to 30, it stops at 35 - 15 = 20; the left one rises with him',
+          (m.gf('gk_ry'), m.gf('gk_ly')), (20.0, 30.0))
+    for y in (27.0, 22.0, 15.0, 10.0):
+        g.y = y
+        frames(m, 1, st=0x1B)
+    g.situation = 0
+    frames(m, 6)
+    check('... both come back down to the floor (10)', (m.gf('gk_ry'), m.gf('gk_ly')), (10.0, 10.0))
+    # ---- v3: slopes / steps: standing, it follows the floor under its new X, up or down
+    m, g = start(0.0, 10.0, [(-1000.0, 15.0, 10.0), (15.0, 1000.0, 14.0)])
+    frames(m, 1)
+    check('v3: the right clone at x 14 on the floor 10', m.gf('gk_ry'), 10.0)
+    g.x = 4.0
+    frames(m, 1)
+    check('v3: a step up of 4 (x 18 on the floor 14; reach 2 + 1.4 x 4 = 7.6): it steps up', m.gf('gk_ry'), 14.0)
+    g.x = 0.0
+    frames(m, 1)
+    check('v3: and down again (no fall)', (m.gf('gk_ry'), m.g('gk_rfall')), (10.0, 0))
+    m, g = start(0.0, 10.0, [(-1000.0, 15.0, 10.0), (15.0, 1000.0, 40.0)])
+    g.walls = [(15.0, 10.0, 40.0)]
+    g.x = 4.0
+    frames(m, 1)
+    check('v3: a cliff face (a wall, 30 high) is not a step: it stays against it on its floor', (m.gf('gk_rx'), m.gf('gk_ry')), (12.0, 10.0))
     # ---- a clone's hit lands: his hitlag (the biggest victim's), once; the freeze
     m, g = start(0.0, 10.0, [(-10.0, 10.0, 10.0)])
     g.vars[0x0F000043 + 8 * 4] = 1.0          # slot 2 in hitstop, 9 frames
@@ -672,10 +769,11 @@ def physics_tests(mscsb, src):
     m.setgf('gk_ry', -20.0)
     m.setgf('gk_ly', -20.0)
     alive = m.g('gk_alive')
-    g.vars[0x0F000315] = 10000.0 + 14.0
+    g.vars[0x0F000315] = 20000.0 + 2.0
+    g.log = []
     frames(m, 1)
-    check('a hit at a clone place while both clones fell (out of formation: their capsules off): nobody',
-          (m.g('gk_alive'), g.shapes), (alive, {0: 0, 1: 0, 2: 0, 3: 0}))
+    check('v3: a hit on the right clone 30 below him (its own hurtbox, anywhere): it is gone, the log at its place',
+          (m.g('gk_alive'), [x[:4] for x in g.log if x[0] == 'battleobject']), (alive & 1, [('battleobject', 0x3F7, m.gf('gk_rx'), -20.0)]))
     # ---- a swap to a clone below him: he goes to its X and Y
     m, g = start(0.0, 10.0, [(-30.0, 10.0, 10.0), (10.0, 60.0, -10.0)])
     frames(m, 20)
@@ -728,8 +826,8 @@ def clone_tests(mscsb, src):
     shared(2, 1, 0.0)
     shared(2, 2, 114.0)
     shared(2, 3, -6.5)
-    shared(2, 6, float(0x5F))
-    shared(2, 4, 5.0)
+    shared(2, 6, 0.0)
+    shared(2, 4, 97280 + 5.0)
     shared(2, 5, 1.0)
     g.x, g.y, g.lr = 98.0, 0.0, 1.0
     m('cl_frame')
@@ -737,16 +835,18 @@ def clone_tests(mscsb, src):
           (m.g('cl_slot'), m.g('cl_id')), (2, 2))
     check('v2: its place his MSC\'s (VAR_26 / 27: 114, -6.5: it stands / falls there)', (g.x, g.y), (114.0, -6.5))
     check('v2: its VAR_0 = his slot (the executable\'s hit method gives him its hits\' hitlag)', g.vars.get(0x0F000300), 2.0)
+    check('v3: its VAR_1 = which clone (2: the executable reports its hurtbox\'s hits with it)', g.vars.get(0x0F000301), 2.0)
+    check('v3: its heartbeat: bit 2 written into his VAR_30 (SLOT2_SHARED_6)', g.vars.get(0x0F000340 + 8 + 6), 2.0)
     check('faces his way (-1, then the model turned)', [x for x in g.log if x[0] in ('lr', 'posture')][-2:], [('lr', -1.0), ('posture', 2)])
-    check('his motion 0x5F (VAR_30) from his frame 5 at his rate', [x for x in g.log if x[0] == 'motion'], [('motion', 0x5F, 5.0, 1.0)])
+    check('his motion 0x5F (VAR_28 = kind x 1024 + frame) from his frame 5 at his rate', [x for x in g.log if x[0] == 'motion'], [('motion', 0x5F, 5.0, 1.0)])
     g.log = []
-    shared(2, 4, 6.0)
+    shared(2, 4, 97280 + 6.0)
     shared(2, 7, 4747000.0 + 3)
     g.frame = 6.0
     m('cl_frame')
     check('the next frame: the same motion, his rate (no restart); the bit gone, it is still the right one',
           ([x for x in g.log if x[0] == 'motion'], [x for x in g.log if x[0] == 'rate'], m.g('cl_id')), ([], [('rate', 1.0)], 2))
-    shared(2, 4, 9.0)
+    shared(2, 4, 97280 + 9.0)
     g.frame = 6.5
     g.log = []
     m('cl_frame')
@@ -756,7 +856,7 @@ def clone_tests(mscsb, src):
     m('cl_frame')
     check('v2: his hitlag (rate 0): it freezes', [x for x in g.log if x[0] == 'rate'], [('rate', 0.0)])
     shared(2, 5, 1.0)
-    shared(2, 4, 0.0)
+    shared(2, 4, 97280 + 0.0)
     g.log = []
     m('cl_frame')
     check('his frame went back (a restart): the motion again from his frame', [x for x in g.log if x[0] == 'motion'], [('motion', 0x5F, 0.0, 1.0)])
@@ -772,7 +872,7 @@ def clone_tests(mscsb, src):
     g.log = []
     m('cl_frame')
     check('... the other clone\'s fall flag (16): not this one, his motion again', [x for x in g.log if x[0] == 'motion'], [('motion', 0x5F, 0.0, 1.0)])
-    shared(2, 6, 0.0)
+    shared(2, 4, 0.0)
     g.log = []
     m('cl_frame')
     check('a new motion (Wait1)', [x for x in g.log if x[0] == 'motion'], [('motion', 0, 0.0, 1.0)])
@@ -859,12 +959,31 @@ def script_tests(out, user):
     check('the clone\'s motion.mtable is his (668 motions)', (mt1 == mt0, len(mt1) // 4), (True, 668))
 
 
-def package_tests(out, pkg, base, base_diag, v1=None):
-    """the package; with v1 (greninja_clones_v1.zip) the package is an update over it: only the files that differ"""
+class Installed:
+    """the earlier packages installed in order (a later one's file replaces an earlier one's)"""
+
+    def __init__(self, paths):
+        self.zs = [zipfile.ZipFile(p) for p in paths]
+
+    def namelist(self):
+        return sorted(set(n for z in self.zs for n in z.namelist()))
+
+    def read(self, n):
+        for z in reversed(self.zs):
+            if n in z.namelist():
+                return z.read(n)
+        raise KeyError(n)
+
+
+def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
+    """the package; with earlier packages (v1, v2: --v1 / --v2) it is an update over them: only the files that differ
+    from what they install"""
     z = zipfile.ZipFile(pkg)
     names = set(z.namelist())
-    z1 = zipfile.ZipFile(v1) if v1 else None
+    earlier = list(earlier) or ([v1] if v1 else [])
+    z1 = Installed(earlier) if earlier else None
     names1 = set(z1.namelist()) if z1 else set()
+    newest = os.path.basename(earlier[-1]).replace('.zip', '') if earlier else None
     top = {n.split('/')[0] for n in names}
     check('the package\'s top level: README.txt, INSTALL_TO_data, INSTALL_TO_code, TEST_ONLY_INSTALL_TO_code (+ Sm4shCommand)',
           sorted(t for t in top if not t.startswith('Sm4shCommand_v')),
@@ -882,20 +1001,25 @@ def package_tests(out, pkg, base, base_diag, v1=None):
     same = [w for w in want if z.read(w) != open(os.path.join(out, w[len('INSTALL_TO_data/'):]), 'rb').read()]
     check('... byte for byte', same, [])
     if z1:
-        check('v2 update: none of v1\'s unchanged files again (%d unchanged)' % len(same1), [w for w in same1 if w in names], [])
-        check('v2 update: nothing in INSTALL_TO_data but the built files',
+        check('update: none of the installed unchanged files again (%d unchanged)' % len(same1), [w for w in same1 if w in names], [])
+        check('update: nothing in INSTALL_TO_data but the built files',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want), [])
-        check('v2 update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
+        check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
+    if z1 and len(earlier) == 1:
         v2new = ['fighter/gekkouga/script/msc/gekkouga.mscsb', 'fighter/gekkouga/script/msc/clone/clone.mscsb'] + \
                 ['fighter/gekkouga/motion/clone/%s' % f for f in GB.CLONE_MOTION_PACS if f != 'main.pac'] + \
                 ['fighter/gekkouga/model/clone/c%02d/%s' % (c, f) for c in range(8) for f in GB.CLONE_FACE_FILES]
         check('v2: both MSCs, his 5 motion part pacs, the face / rest-of-model files in all 8 colours (%d)' % len(v2new),
               [m for m in v2new if 'INSTALL_TO_data/' + m not in names], [])
+    if z1 and len(earlier) == 2:
+        check('v3: INSTALL_TO_data is both MSCs (the data files are v1 / v2\'s)',
+              sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              ['fighter/gekkouga/script/msc/clone/clone.mscsb', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
     must = ['fighter/gekkouga/script/msc/gekkouga.mscsb', 'fighter/gekkouga/script/msc/clone/clone.mscsb',
             'fighter/gekkouga/script/animcmd/body/game.bin', 'fighter/gekkouga/script/animcmd/weapon/clone/game.bin',
             'fighter/gekkouga/motion/clone/main.pac', 'fighter/kirby/script/msc/kirby.mscsb'] + \
            ['fighter/gekkouga/model/clone/c%02d/%s' % (c, f) for c in range(8) for f in GB.CLONE_MODEL_FILES]
-    check('the files the mod needs (with v1 under it)', [m for m in must if 'INSTALL_TO_data/' + m not in names | names1], [])
+    check('the files the mod needs (with the earlier packages under it)', [m for m in must if 'INSTALL_TO_data/' + m not in names | names1], [])
     with tempfile.TemporaryDirectory() as td:
         for nm, b in (('gk', base), ('gkd', base_diag)):
             if not b:
@@ -907,15 +1031,21 @@ def package_tests(out, pkg, base, base_diag, v1=None):
             member = ('INSTALL_TO_code' if nm == 'gk' else 'TEST_ONLY_INSTALL_TO_code') + '/cross_f.rpx'
             check('%s is the cave on its base, rebuilt from the script' % member, z.read(member) == open(p, 'rb').read(), True)
             if z1:
-                check('%s differs from v1\'s' % member, z.read(member) != z1.read(member), True)
+                check('%s differs from %s\'s' % (member, newest), z.read(member) != z1.read(member), True)
     readme = z.read('README.txt').decode('utf8', 'replace')
     words = ('300', '720', '480', 'swap', 'chain', 'Technical') if not z1 else \
-        ('greninja_clones_v1', 'hitlag', 'fall', 'face', 'hand', 'exe_v46z_gk2', 'swap', 'blast')
+        ('greninja_clones_v1', 'hitlag', 'fall', 'face', 'hand', 'exe_v46z_gk2', 'swap', 'blast') if len(earlier) == 1 else \
+        ('greninja_clones_v2', 'hurtbox', 'wall', 'ceiling', 'slope', 'blast zone', 'hitlag', 'exe_v46z_gk3', 'swap')
     check('README.txt mentions every feature (%s)' % ', '.join(words), [w for w in words if w not in readme], [])
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
 
 def tool_tests(out, base, base_diag, pkg):
+    import gekkouga_clone_cave as C
+    mdl = os.path.join(out, 'fighter', 'gekkouga', 'model', 'clone', 'c00')
+    bm = GB.bone_map(open(os.path.join(mdl, 'model.jtb'), 'rb').read(), os.path.join(mdl, 'model.vbn'))
+    check('v3: the clone hurtboxes\' bones are his hurtbox joints as the article\'s (gekkouga_build.bone_map, model.jtb)',
+          [C.WEAPON_JOINT + h[7] for h in C.HURTBOXES], [bm(h[7]) for h in C.HURTBOXES])
     msc = os.path.join(out, 'fighter', 'gekkouga', 'script', 'msc')
     for f, src in ((os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c')),
                    (os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC)):
@@ -941,9 +1071,9 @@ def tool_tests(out, base, base_diag, pkg):
 
 
 def main():
-    a = [x for x in sys.argv[1:] if not x.startswith('--v1=')]
-    v1 = [x[5:] for x in sys.argv[1:] if x.startswith('--v1=')]
-    v1 = v1[0] if v1 else None
+    a = [x for x in sys.argv[1:] if not x.startswith('--v')]
+    earlier = [x[5:] for x in sys.argv[1:] if x.startswith('--v1=')] + [x[5:] for x in sys.argv[1:] if x.startswith('--v2=')]
+    v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
     base_diag = a[4] if len(a) > 4 else None
     msc = os.path.join(out, 'fighter', 'gekkouga', 'script', 'msc')
@@ -951,7 +1081,7 @@ def main():
     physics_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
     clone_tests(os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC)
     script_tests(out, user)
-    package_tests(out, pkg, base, base_diag, v1)
+    package_tests(out, pkg, base, base_diag, v1, earlier)
     tool_tests(out, base, base_diag, pkg)
     kirby = open(os.path.join(ROOT, 'fighters', 'kirby', 'kirby.c')).read()
     check('Kirby\'s copy of Greninja (0x30): Technical', 'if (kind == 0x30) { return trait_technical(); } // Greninja' in kirby, True)

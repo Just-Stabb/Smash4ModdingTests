@@ -72,7 +72,7 @@ import weapon_expand_append as WA  # noqa: E402
 from ppcasm import Asm, ha  # noqa: E402
 
 CAVE = 0x04BEA000
-LIMIT = 0x04BEC000
+LIMIT = 0x04BEE000                # v3: 8 KB more (zero in exe_v46z_ui10: past its text)
 TEXT_REGION = LIMIT - 0x02000000
 TRAMP = 0x037EE540                # 4 words (zero in exe_v46z_ui10)
 
@@ -80,8 +80,37 @@ GK_KIND = 0x30                    # Greninja (fighter_param_attributes.csv CharI
 CLONE_KIND = 0x1A1
 CLONE_NAME = 'clone'
 CLONE_BASE = 0xFE                 # bunshin (his Final Smash's clone)
-MODULES_FROM = 0xF9               # shuriken
+MODULES_FROM = 0xF9               # shuriken (v1 / v2's module row: bunshin's + these slots; v3: TEMPLATE's row)
 MODULE_SLOTS = (0, 2, 5, 8, 9, 11)
+TEMPLATE = 0x15C                  # v3: lizardonm (Charizard's Final Smash form): the clone's base kind for the weapon
+                                  # switches (their per-kind module update templates) and its whole module row: bunshin's
+                                  # modules + Kinetic, Attack, Hit, Damage, whose updates bunshin's template never runs
+TEMPLATE_NAME = ('lizardon', 'lizardonm')
+HITSTOP_FN = 0x02C2678C           # (accessor, hitbox data, f1 damage, f2 multiplier, r5 side, r6 use its multiplier) -> frames
+HITSTOP_MUL = 0x10105DCC          # the attacker handler's f1 for it (0x02C2643C: lfs f1, 0x5DCC(0x1010))
+W_HIT_MOD = 0x58                  # weapon accessor -> HitModule (vt +0x4C: hurtboxes from {data, count}, 0)
+W_DAMAGE = 0x54                   # -> DamageModule (vt +0x7C(0): the damage taken this frame, f1)
+W_ATTACK = 0x50                   # -> AttackModule (+0x14 record arrays (0x174 each, +0x18 count), +0x40 slots 0x84)
+W_STOP = 0x48                     # (a fighter's accessor too) -> StopModule (vt +0x8C(frames, 1): hitstop)
+POLL_SLOTS = (0x64, 0x84, 0x8C, 0x94)   # specializer methods every frame phase calls (spec, weapon): the damage poll
+VAR_ID = 0x0F000301               # the clone's VAR_1 (v3): which clone it is (1 / 2), its MSC writes it
+HIT_BIAS2 = 20000.0               # v3: his VAR_21 = HIT_BIAS2 + the clone's id when a clone's hurtbox is hit
+# v3: the clone's hurtboxes: his own (fighter_param_vl_gekkouga group 5, vanilla), bones as the article's joints
+# (0x7D0 + his model.jtb table-0 entry); {x1 y1 z1 x2 y2 z2 radius, bone, part, height, 0, pool 2}
+HURTBOXES = (
+    (0.3, 0, 0, 2.2, 0, 0, 3.2, 12, 0, 1),
+    (0.7, 1.4, 0, 1.5, -1.9, 0, 2.5, 19, 0, 2),
+    (-0.3, 0, 0, 3.3, 0, 0, 1.2, 22, 1, 1),
+    (-0.3, 0, 0, 3.3, 0, 0, 1.2, 16, 1, 1),
+    (1.7, 0, 0, 3.3, 0, 0, 2.0, 8, 3, 0),
+    (1.7, 0, 0, 3.3, 0, 0, 2.0, 4, 3, 0),
+    (0, 0, 0, 4.0, 0, 0, 1.5, 9, 3, 0),
+    (0, 0, 0, 4.0, 0, 0, 1.5, 5, 3, 0))
+WEAPON_JOINT = 0x7D0
+
+
+def hurt_blob():
+    return b''.join(struct.pack('>7f5I', *h[:7], WEAPON_JOINT + h[7], h[8], h[9], 0, 2) for h in HURTBOXES)
 ART_L, ART_R = 6, 7               # the clones' article ids (his list: shuriken water tatami moon monsterball bunshin)
 HIT_BITS = 0x17                   # attack-result bits that never remove a clone (0x13 hit, 0x4 shield)
 
@@ -259,10 +288,13 @@ def layout(img):
     assert acount == 6 and [img.w(aents + 16 * i) for i in range(acount)] == [0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE]
     rows = [[img.w(aents + 16 * i + 4 * j) for j in range(4)] for i in range(acount)]
     rows += [[CLONE_KIND, 1, 0, 0], [CLONE_KIND, 1, 0, 0]]
-    mrow = [img.w(W.MODULE_TABLE + 0x70 * CLONE_BASE + 4 * j) for j in range(28)]
-    for s in MODULE_SLOTS:
-        mrow[s] = img.w(W.MODULE_TABLE + 0x70 * MODULES_FROM + 4 * s)
+    mrow = [img.w(W.MODULE_TABLE + 0x70 * TEMPLATE + 4 * j) for j in range(28)]
+    assert img.w(svt + 0x1C) == 0x02AF695C and img.w(0x02AF695C) == 0x4E800020, "bunshin's +0x1C: a blr"
+    for j in (2, 6, 7, 20, 26):
+        f = img.w(W.MODULE_TABLE + 0x70 * TEMPLATE + 4 * j)
+        assert not (img.w(f) == 0x38600000 and img.w(f + 4) == 0x4E800020), 'template row slot %d empty' % j
     return dict(bdesc=bdesc, bminfo=img.w(bdesc + 8), dsize=dsize, svt=svt, vsize=W.vtable_size(img, svt),
+                vt_orig={o: img.w(svt + o) for o in POLL_SLOTS + (0x1C,)},
                 old_hit=img.w(svt + W.HIT_METHOD), hashes=motion_hashes(img), ents=motion_entries(img),
                 parts=motion_parts(img), rows=rows, mrow=mrow)
 
@@ -312,11 +344,13 @@ def build(rpx, diag=False):
     A['gk_hide'] = alloc(4 * SLOTS)
     A['gk_slow'] = alloc(4 * SLOTS)
     assert A['gk_slow'] == A['gk_hide'] + 0x20
-    A['consts'] = alloc(20)          # 0.0, 0.5, HIT_BIAS, FAR, 1.0
+    A['consts'] = alloc(28)          # 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, the hitstop multiplier
+    A['hurt'] = alloc(0x30 * len(HURTBOXES))
     A['gk_str'] = alloc(8)
     fmts = [('gk_ft', 'S4GT slot=%d hide=%d\n'), ('gk_fs', 'S4GS slot=%d slow=%d\n'),
             ('gk_f42', 'S4GH clone hit dx=%d\n'), ('gk_f43', 'S4GV shield damage vetoed\n'),
-            ('gk_fl', 'S4GL clone hit landed: owner slot %d hitlag\n')]
+            ('gk_fl', 'S4GL clone hit landed: owner slot %d hitlag %d\n'),
+            ('gk_fd', 'S4GD clone %d hurt\n')]
     for nm, s in fmts:
         A[nm] = alloc((len(s) + 4) & ~3, 4) if diag else 0
     code_at = alloc(0, 4)
@@ -343,7 +377,8 @@ def build(rpx, diag=False):
     out.blob(A['g1_shapes'], b''.join(struct.pack('>7fI', 0.0, SHAPE_Y[0], z, 0.0, SHAPE_Y[1], z, SHAPE_R, 0x200)
                                       for z in SHAPE_Z), 'clone shapes (joint 0, capsules)')
     out.blob(A['gk_hide'], bytes(8 * SLOTS), 'hide counters / slow states')
-    out.blob(A['consts'], struct.pack('>5f', 0.0, 0.5, HIT_BIAS, FAR, 1.0), 'constants')
+    out.blob(A['consts'], struct.pack('>6fI', 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, img.w(HITSTOP_MUL)), 'constants')
+    out.blob(A['hurt'], hurt_blob(), 'clone hurtboxes (his vl group 5, article joints)')
     out.blob(A['gk_str'], CLONE_NAME.encode().ljust(8, b'\0'), '"clone"')
     if diag:
         for nm, s in fmts:
@@ -352,10 +387,11 @@ def build(rpx, diag=False):
 
     p = dict(acc=ACC, work=WORK, posture=POSTURE, bacc=BASE_ACC, entry=ENTRY, slots=SLOTS, tag=FLAG_TAG,
              slow=FLAG_SLOW, clones=FLAG_CLONES, life=TAG_LIFE, sslot=SLOW_SLOT, srate=SLOW_RATE, sframes=SLOW_FRAMES,
-             hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
-    for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl'):
+             hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, whit=W_HIT_MOD, wdmg=W_DAMAGE, watk=W_ATTACK,
+             wstop=W_STOP, nhurt=len(HURTBOXES), s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
+    for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
-    for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one')):
+    for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
     p['ftab_hi'], p['ftab_lo'] = ha(FIGHTERS), K.slo(FIGHTERS)
     p['mgr_hi'], p['mgr_lo'] = ha(OBJ_MANAGER), K.slo(OBJ_MANAGER)
@@ -590,59 +626,330 @@ s43_orig:
         stwu r1, -0x68(r1)              # his slot 43's first word
         b %(s43b)d
 
-# ---- the clone article's hit-result method (its singleton vtable +0xAC): (singleton, weapon, result bits)
-w_hit:  andi. r0, r5, %(hitbits)d
-        beq w_base
-        stwu r1, -0x30(r1)              # its attack connected / was shielded: kept (not removed), and (v2) its owner's
-        mflr r0                         # VAR_22 = 1 (his MSC gives him the hitlag); the owner's slot is the clone's VAR_0
-        stw r0, 0x34(r1)
-        stw r31, 0x2C(r1)
-        lwz r12, %(wacc)d(r4)           # the clone's module accessor
-        cmpwi r12, 0
-        beq w_done
-        lwz r31, %(wwork)d(r12)         # its WorkModule
-        cmpwi r31, 0
-        beq w_done''' + var_get('r31', VAR_SLOT) + '''
-        fctiwz f1, f1
-        stfd f1, 0x18(r1)
-        lwz r11, 0x1C(r1)
-        addi r11, r11, -1               # the owner's table index (slot 1-8)
+# ---- an owner's fighter table entry from his slot (r3, 1-8) -> r3 (0: none / not live); leaf
+gk_entry:
+        addi r11, r3, -1
         cmplwi r11, %(slots)d
-        bge w_done
+        bge ge_none
         lis r12, %(ftab_hi)d
         lwz r12, %(ftab_lo)d(r12)
         cmpwi r12, 0
-        beq w_done
+        beq ge_none
         lwz r12, 0(r12)
         cmpwi r12, 0
-        beq w_done
+        beq ge_none
         lwz r10, 8(r12)                 # the entries' count
         cmplw r11, r10
-        bge w_done
+        bge ge_none
         lwz r12, 0(r12)
         mulli r11, r11, %(entry)d
-        add r12, r12, r11
-        lbz r0, 0x1E(r12)               # live (>= 4)
+        add r3, r12, r11
+        lbz r0, 0x1E(r3)                # live (>= 4)
         cmplwi r0, 4
-        blt w_done
-        lwz r12, %(acc)d(r12)
-        cmpwi r12, 0
-        beq w_done
-        lwz r31, %(work)d(r12)          # his WorkModule
+        blt ge_none
+        blr
+ge_none:
+        li r3, 0
+        blr
+
+# ---- the clone article's hit-result method (its singleton vtable +0xAC): (singleton, weapon, result bits)
+# bits 0x17 (a hit / a shield): kept (0, not removed), and (v3) its owner gets the hitlag at once: the game's hitstop
+# (HITSTOP_FN, the attacker side, with the hitbox's own multiplier) for the clone's hitbox with the biggest damage
+# among those with hit records, on his StopModule (vt +0x8C(frames, 1): the longer of it and what he has); his
+# VAR_22 = 1.0 (his MSC: a fallback if he still isn't in hitlag)
+w_hit:  andi. r0, r5, %(hitbits)d
+        beq w_base
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r27, 0x2C(r1)
+        lwz r31, %(wacc)d(r4)           # the clone's module accessor
         cmpwi r31, 0
         beq w_done
-        lis r12, %(one_hi)d
-        lfs f1, %(one_lo)d(r12)''' + var_set('r31', VAR_LAG) + D('''
+        lwz r30, %(wwork)d(r31)         # its WorkModule
+        cmpwi r30, 0
+        beq w_done''' + var_get('r30', VAR_SLOT) + '''
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r3, 0x1C(r1)                # its owner's slot (its VAR_0)
+        bl gk_entry
+        cmpwi r3, 0
+        beq w_done
+        mr r29, r3                      # his table entry
+        li r27, 0                       # the hitbox data
+        lis r12, %(zero_hi)d
+        lfs f0, %(zero_lo)d(r12)
+        stfs f0, 0x20(r1)               # its damage
+        lwz r28, %(watk)d(r31)          # the clone's AttackModule
+        cmpwi r28, 0
+        beq w_lag
+        lwz r9, 0x18(r28)               # record arrays (one a hitbox), at most 8
+        cmplwi r9, 8
+        ble w_cnt
+        li r9, 8
+w_cnt:  lwz r10, 0x14(r28)
+        cmpwi r10, 0
+        beq w_lag
+w_h:    cmpwi r9, 0
+        beq w_lag
+        addi r11, r10, 0x124            # the list's sentinel
+        lwz r12, 0x128(r10)             # its first node
+        li r8, 32
+w_n:    cmpw r12, r11
+        beq w_next
+        cmpwi r12, 0
+        beq w_next
+        lbz r7, 0x27(r12)               # the node's hitbox id
+        mulli r7, r7, 0x84
+        lwz r6, 0x40(r28)
+        add r6, r6, r7                  # its attack data (+0x18 damage)
+        lfs f0, 0x18(r6)
+        lfs f13, 0x20(r1)
+        fcmpu cr0, f0, f13
+        ble w_skip
+        stfs f0, 0x20(r1)
+        mr r27, r6
+w_skip: lwz r12, 4(r12)
+        addi r8, r8, -1
+        cmpwi r8, 0
+        bne w_n
+w_next: addi r10, r10, 0x174
+        addi r9, r9, -1
+        b w_h
+w_lag:  cmpwi r27, 0
+        beq w_mark
+        lwz r28, %(bacc)d(r29)          # his module accessor
+        cmpwi r28, 0
+        beq w_mark
+        mr r3, r28
+        mr r4, r27
+        lfs f1, 0x20(r1)
+        lis r12, %(hmul_hi)d
+        lfs f2, %(hmul_lo)d(r12)
+        li r5, 1                        # the attacker's side
+        li r6, 1''' + call(HITSTOP_FN) + '''
+        mr r27, r3
+        cmpwi r27, 0
+        ble w_mark
+        lwz r3, %(wstop)d(r28)          # his StopModule
+        cmpwi r3, 0
+        beq w_mark
+        mr r4, r27
+        li r5, 1
+        lwz r12, 0(r3)
+        lwz r12, 0x8C(r12)
+        mtctr r12
+        bctrl''' + D(''' 
         lis r3, %(gk_fl_hi)d
         addi r3, r3, %(gk_fl_lo)d
-        lwz r4, 0x1C(r1)''' + osr()) + '''
-w_done: lwz r31, 0x2C(r1)
-        lwz r0, 0x34(r1)
+        lwz r4, 0x1C(r1)
+        mr r5, r27''' + osr()) + '''
+w_mark: lwz r12, %(acc)d(r29)
+        cmpwi r12, 0
+        beq w_done
+        lwz r30, %(work)d(r12)          # his WorkModule
+        cmpwi r30, 0
+        beq w_done
+        lis r12, %(one_hi)d
+        lfs f1, %(one_lo)d(r12)''' + var_set('r30', VAR_LAG) + '''
+w_done: lmw r27, 0x2C(r1)
+        lwz r0, 0x44(r1)
         mtlr r0
-        addi r1, r1, 0x30
+        addi r1, r1, 0x40
         li r3, 0
         blr
 w_base:''' + tail(L['old_hit']) + '''
+
+# ---- v3: the clone's set-up (its singleton vtable +0x1C, (singleton, weapon); bunshin's is a blr): his hurtboxes on
+# its HitModule (vt +0x4C(&{data, count}, 0), the can's call)
+w_init: stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        lwz r12, %(wacc)d(r4)
+        cmpwi r12, 0
+        beq wi_out
+        lwz r3, %(whit)d(r12)           # its HitModule
+        cmpwi r3, 0
+        beq wi_out
+        lis r11, %(hurt_hi)d
+        addi r11, r11, %(hurt_lo)d
+        stw r11, 8(r1)
+        li r0, %(nhurt)d
+        stw r0, 0xC(r1)
+        addi r4, r1, 8
+        li r5, 0
+        lwz r12, 0(r3)
+        lwz r12, 0x4C(r12)
+        mtctr r12
+        bctrl
+wi_out: lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+# ---- v3: the clone hurt? (r3 the weapon): damage taken this frame (DamageModule vt +0x7C(0) > 0) -> its owner's
+# VAR_21 = HIT_BIAS2 + its id (its VAR_1): his MSC turns that clone into the log (which clone: exact)
+w_poll: stwu r1, -0x30(r1)
+        mflr r0
+        stw r0, 0x34(r1)
+        stw r31, 0x2C(r1)
+        stw r30, 0x28(r1)
+        lwz r31, %(wacc)d(r3)
+        cmpwi r31, 0
+        beq wp_out
+        lwz r3, %(wdmg)d(r31)           # its DamageModule
+        cmpwi r3, 0
+        beq wp_out
+        li r4, 0
+        lwz r12, 0(r3)
+        lwz r12, 0x7C(r12)
+        mtctr r12
+        bctrl
+        lis r12, %(zero_hi)d
+        lfs f0, %(zero_lo)d(r12)
+        fcmpu cr0, f1, f0
+        ble wp_out
+        lwz r30, %(wwork)d(r31)
+        cmpwi r30, 0
+        beq wp_out''' + var_get('r30', VAR_ID) + '''
+        stfs f1, 0x20(r1)               # its id''' + var_get('r30', VAR_SLOT) + '''
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r3, 0x1C(r1)
+        bl gk_entry
+        cmpwi r3, 0
+        beq wp_out
+        lwz r12, %(acc)d(r3)
+        cmpwi r12, 0
+        beq wp_out
+        lwz r30, %(work)d(r12)          # his WorkModule
+        cmpwi r30, 0
+        beq wp_out
+        lfs f1, 0x20(r1)
+        lis r12, %(bias2_hi)d
+        lfs f0, %(bias2_lo)d(r12)
+        fadds f1, f1, f0''' + var_set('r30', VAR_HIT) + D('''
+        lfs f1, 0x20(r1)
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lis r3, %(gk_fd_hi)d
+        addi r3, r3, %(gk_fd_lo)d
+        lwz r5, 0x1C(r1)
+        lwz r4, 0x1C(r1)''' + osr()) + '''
+wp_out: lwz r30, 0x28(r1)
+        lwz r31, 0x2C(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr
+
+# the specializer's +0x64 (spec, weapon, ...): the damage poll, then bunshin's method with the same arguments
+wp_64:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stw r3, 0x08(r1)
+        stw r4, 0x0C(r1)
+        stw r5, 0x10(r1)
+        stw r6, 0x14(r1)
+        stw r7, 0x18(r1)
+        stw r8, 0x1C(r1)
+        stw r9, 0x20(r1)
+        stw r10, 0x24(r1)
+        mr r3, r4
+        bl w_poll
+        lwz r3, 0x08(r1)
+        lwz r4, 0x0C(r1)
+        lwz r5, 0x10(r1)
+        lwz r6, 0x14(r1)
+        lwz r7, 0x18(r1)
+        lwz r8, 0x1C(r1)
+        lwz r9, 0x20(r1)
+        lwz r10, 0x24(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40''' + tail(L['vt_orig'][0x64]) + '''
+
+# the specializer's +0x84 (spec, weapon, ...): the damage poll, then bunshin's method with the same arguments
+wp_84:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stw r3, 0x08(r1)
+        stw r4, 0x0C(r1)
+        stw r5, 0x10(r1)
+        stw r6, 0x14(r1)
+        stw r7, 0x18(r1)
+        stw r8, 0x1C(r1)
+        stw r9, 0x20(r1)
+        stw r10, 0x24(r1)
+        mr r3, r4
+        bl w_poll
+        lwz r3, 0x08(r1)
+        lwz r4, 0x0C(r1)
+        lwz r5, 0x10(r1)
+        lwz r6, 0x14(r1)
+        lwz r7, 0x18(r1)
+        lwz r8, 0x1C(r1)
+        lwz r9, 0x20(r1)
+        lwz r10, 0x24(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40''' + tail(L['vt_orig'][0x84]) + '''
+
+# the specializer's +0x8C (spec, weapon, ...): the damage poll, then bunshin's method with the same arguments
+wp_8C:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stw r3, 0x08(r1)
+        stw r4, 0x0C(r1)
+        stw r5, 0x10(r1)
+        stw r6, 0x14(r1)
+        stw r7, 0x18(r1)
+        stw r8, 0x1C(r1)
+        stw r9, 0x20(r1)
+        stw r10, 0x24(r1)
+        mr r3, r4
+        bl w_poll
+        lwz r3, 0x08(r1)
+        lwz r4, 0x0C(r1)
+        lwz r5, 0x10(r1)
+        lwz r6, 0x14(r1)
+        lwz r7, 0x18(r1)
+        lwz r8, 0x1C(r1)
+        lwz r9, 0x20(r1)
+        lwz r10, 0x24(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40''' + tail(L['vt_orig'][0x8C]) + '''
+
+# the specializer's +0x94 (spec, weapon, ...): the damage poll, then bunshin's method with the same arguments
+wp_94:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stw r3, 0x08(r1)
+        stw r4, 0x0C(r1)
+        stw r5, 0x10(r1)
+        stw r6, 0x14(r1)
+        stw r7, 0x18(r1)
+        stw r8, 0x1C(r1)
+        stw r9, 0x20(r1)
+        stw r10, 0x24(r1)
+        mr r3, r4
+        bl w_poll
+        lwz r3, 0x08(r1)
+        lwz r4, 0x0C(r1)
+        lwz r5, 0x10(r1)
+        lwz r6, 0x14(r1)
+        lwz r7, 0x18(r1)
+        lwz r8, 0x1C(r1)
+        lwz r9, 0x20(r1)
+        lwz r10, 0x24(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40''' + tail(L['vt_orig'][0x94]) + '''
 
 # ---- the fighter descriptor switch's case for him: his descriptor copy (+8 the new article list)
 gk_dcase:
@@ -669,7 +976,10 @@ w_dcase:
     # the singleton's vtable copy with our hit method
     vb = bytearray(img.blob(L['svt'], L['vsize']))
     struct.pack_into('>I', vb, W.HIT_METHOD, lab['w_hit'])
-    out.blob(A['w_vt'], bytes(vb), 'clone vtable (bunshin copy, +0xAC ours)')
+    struct.pack_into('>I', vb, 0x1C, lab['w_init'])
+    for o in POLL_SLOTS:
+        struct.pack_into('>I', vb, o, lab['wp_%X' % o])
+    out.blob(A['w_vt'], bytes(vb), 'clone vtable (bunshin copy, +0x1C / +0x64 / +0x84 / +0x8C / +0x94 / +0xAC ours)')
 
     # ---- hooks in place (each asserted)
     def asm1(at, text):
@@ -701,7 +1011,7 @@ w_dcase:
         out.words.pop(wa, None)
         out.put(wa, word, 'table %s 0x%X' % (nm, CLONE_KIND))
     out.put(T['dt'] + 4 * k, lab['w_dcase'], 'descriptor case 0x%X' % CLONE_KIND, 0)
-    out.put(T['bt'] + 4 * k, CLONE_BASE, 'base kind 0x%X' % CLONE_KIND, 0xFFFF)
+    out.put(T['bt'] + 4 * k, TEMPLATE, 'base kind 0x%X (v3: the template kind)' % CLONE_KIND, 0xFFFF)
     out.put(T['st'] + 4 * k, A['w_single'], 'singleton case 0x%X' % CLONE_KIND, 0)
     out.put(T['rt'] + 4 * k, (A['w_row'] - W.MODULE_TABLE) & 0xFFFFFFFF, 'own module row 0x%X' % CLONE_KIND, 0)
     info = dict(A=A, labels=lab, T=T, layout=L, end=end, owner_str=owner_str)
@@ -724,7 +1034,7 @@ def main():
         out, info = build(o.rpx, o.diag)
         for nm, at in sorted(info['A'].items(), key=lambda kv: kv[1]):
             print('%-10s 0x%08X' % (nm, at))
-        for nm in ('g1_stub', 'hud', 's13', 's42', 's43', 'w_hit', 'gk_dcase', 'w_dcase'):
+        for nm in ('g1_stub', 'hud', 's13', 's42', 's43', 'gk_entry', 'w_hit', 'w_init', 'w_poll', 'gk_dcase', 'w_dcase'):
             print('%-10s 0x%08X' % (nm, info['labels'][nm]))
         print('end        0x%08X (limit 0x%08X), %d words' % (info['end'], LIMIT, len(out.words)))
         return

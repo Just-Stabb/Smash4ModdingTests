@@ -40071,7 +40071,7 @@ void rolloff_hold_update()
 
 
 // ===================================================================
-// Greninja's clones and smash charges (fighters/gekkouga/README.md "Clones v1" / "Clones v2")
+// Greninja's clones and smash charges (fighters/gekkouga/README.md "Clones v1" - "Clones v3")
 //
 // Down special: held, it charges (the Substitution stance, no counter); 300 frames held in all (kept between
 // presses and stocks) make it ready, and the next down special starts the ABILITY (720 frames): two clones
@@ -40085,7 +40085,9 @@ void rolloff_hold_update()
 // The executable reads VAR_20 (flags: 1 tag hidden, 2 burnout slow, 4 clones out) and writes VAR_21 (a clone
 // hit: 10000 + the hitting object's X - his X) and VAR_22 (v2: a clone's hit landed: his hitlag). His clones read his
 // VAR_24 - VAR_31 (SLOTn_SHARED_0 - 7), v2: 24 / 25 the left clone's X / Y, 26 / 27 the right one's, 28 his motion's
-// frame, 29 its rate (0 in hitlag), 30 its kind, 31 = 4747000 + flags (1 / 2 alive, 4 / 8 being made, 16 / 32 falling).
+// kind x 1024 + frame (v3), 29 its rate (0 in hitlag), 30 the clones' heartbeat (v3: they write it), 31 = 4747000 +
+// flags (1 / 2 alive, 4 / 8 being made, 16 / 32 falling). v3: the clones' own hurtboxes (VAR_21 = 20000 + the hit
+// clone's id), walls / ceilings / slopes for their places, his hitlag set by the executable at the hit.
 // v2: the clones' places are his MSC's (their own fall with his gravity, his GroundModule's line test for the floor:
 // gk_physics); a clone's landed hit gives him its hitlag (gk_clone_hitlag); the clones play his hand / face parts.
 // ===================================================================
@@ -40113,6 +40115,12 @@ float gk_ry;
 float gk_rvy;
 float gk_last_oy;      // his Y last frame (the clones copy his vertical movement in the air)
 float gk_floor_y;      // gk_floor()'s answer
+float gk_hit_x;        // gk_line()'s point
+float gk_hit_y;
+int gk_lmiss;          // v3: frames each clone's heartbeat (his VAR_30, its MSC) has been missing ...
+int gk_rmiss;
+int gk_lage;           // ... and frames since it was made
+int gk_rage;
 int gk_det;            // he was launched / held last frame (the clones detached)
 int gk_spawn_bits;     // the channel's "being made" bit (4 left, 8 right) ...
 int gk_spawn_t;        // ... for this many more frames
@@ -40131,8 +40139,14 @@ float gk_smash_grow() { return 1.5f; }    // the smashes' hitbox / effect size a
 int gk_magic() { return 4747; }
 float gk_gravity() { return 0.18f; }      // his gravity (fighter_param 0x03000018: reference/fighter_param_attributes.csv)
 float gk_max_fall() { return 1.85f; }     // his max fall speed (0x03000019)
-int gk_fall_frames() { return 100; }      // a clone falling on its own this long is gone (smoke, no log): off the stage
-float gk_snap() { return 3.0f; }          // a standing clone keeps to a floor this far down (slopes)
+int gk_fall_frames() { return 300; }      // v3 fallback: a clone falling on its own this long is gone (the game's own
+                                          // blast zone removal comes first: gk_heartbeat)
+float gk_snap() { return 2.0f; }          // a standing clone keeps to a floor this far up / down, plus ...
+float gk_slope() { return 1.4f; }         // ... this x its step (floors are lines with normal Y >= 0.6: at most 1.33)
+float gk_wall_y() { return 5.0f; }        // the wall test's height above its feet
+float gk_wall_gap() { return 3.0f; }      // how far it stays from a wall
+float gk_head() { return 15.0f; }         // its height (the ceiling test)
+int gk_beat_miss() { return 3; }          // frames without its heartbeat: the game removed it (the blast zone)
 int gk_hitlag_min() { return 4; }         // a clone hit's hitlag on him when no victim's hitstop is found
 
 float gk_abs(float v)
@@ -40192,10 +40206,7 @@ void gekkouga_frame()
     {
         flags = flags | 0x1;              // name tag hidden
     }
-    if (gk_alive != 0 && gk_ability > 0)
-    {
-        flags = flags | 0x4;              // clones out: their shapes report hits
-    }
+    // v3: bit 4 (clones out: his shield shapes report hits) no longer set: the clones have their own hurtboxes
     if (gk_burnout > 0)
     {
         flags = flags | 0x2;              // the burnout's slow
@@ -40264,15 +40275,14 @@ void gk_swap(int id)
     oy = PostureModuleF(0x2);
     cx = gk_cx(id);
     cy = gk_cy(id);
+    o = cx - ox;                          // his move (its offset, or less when a wall held it)
     if (id == 0x1)
     {
-        o = gk_off_l;
         gk_off_l = -o;
         gk_off_r = gk_off_r - o;
     }
     else
     {
-        o = gk_off_r;
         gk_off_r = -o;
         gk_off_l = gk_off_l - o;
     }
@@ -40332,6 +40342,7 @@ void gk_ability_update()
     }
     gk_clone_hitlag();
     gk_check_hit();
+    gk_heartbeat();
     gk_physics();
     gk_channel();
     gk_shapes_update();
@@ -40366,6 +40377,16 @@ void gk_spawn(int id)
         ArticleModule(0x2710, 0x7);
     }
     gk_alive = gk_alive | id;
+    if (id == 0x1)
+    {
+        gk_lage = 0;
+        gk_lmiss = 0;
+    }
+    else
+    {
+        gk_rage = 0;
+        gk_rmiss = 0;
+    }
     gk_puff_at(gk_cx(id), gk_cy(id));
 }
 
@@ -40465,45 +40486,44 @@ void gk_set_c(int id, float x, float y, float vy)
     }
 }
 
-// a clone in its formation place (with him, his height): only then its capsule is on (his shield shapes are his)
-int gk_in_formation(int id)
+// the stage line test of his own GroundModule (Line_Test's MSC variables, world space, passable platforms too) from
+// (x0, y0) to (x1, y1): the kind of the first line met (0 none, 1 floor, 2 wall, 3 ceiling), gk_hit_x / gk_hit_y there
+int gk_line(float x0, float y0, float x1, float y1)
 {
-    if ((gk_alive & id) == 0 || gk_det)
-    {
-        return 0;
-    }
-    if (gk_abs(gk_cy(id) - PostureModuleF(0x2)) > 3.0f)
-    {
-        return 0;
-    }
-    return 0x1;
-}
-
-// the first floor (a line with normal Y >= 0.6, passable platforms included) from (x, y0) down to (x, y1): the stage
-// line test of his own GroundModule (Line_Test's MSC variables, world space); 1 = found, gk_floor_y its height
-int gk_floor(float x, float y0, float y1)
-{
-    WorkModule(0, x + 0, 0x0f0003d0);
+    WorkModule(0, x0 + 0, 0x0f0003d0);
     WorkModule(0, y0 + 0, 0x0f0003d1);
-    WorkModule(0, x + 0, 0x0f0003d2);
+    WorkModule(0, x1 + 0, 0x0f0003d2);
     WorkModule(0, y1 + 0, 0x0f0003d3);
     WorkModule(0, 1.0f + 0, 0x0f0003d4);
     if (WorkModuleF(0, 0x0f0003d4) < 0.5f)
     {
         return 0;
     }
-    if (WorkModuleF(0, 0x0f0003d8) < 0.5f || WorkModuleF(0, 0x0f0003d8) > 1.5f)
+    gk_hit_x = WorkModuleF(0, 0x0f0003d6);
+    gk_hit_y = WorkModuleF(0, 0x0f0003d7);
+    return (int)(WorkModuleF(0, 0x0f0003d8) + 0.5f);
+}
+
+// the first floor (a line with normal Y >= 0.6, passable platforms included) from (x, y0) down to (x, y1): 1 = found,
+// gk_floor_y its height
+int gk_floor(float x, float y0, float y1)
+{
+    if (gk_line(x, y0, x, y1) != 0x1)
     {
         return 0;
     }
-    gk_floor_y = WorkModuleF(0, 0x0f0003d7);
+    gk_floor_y = gk_hit_y;
     return 0x1;
 }
 
-// one clone's frame: X with him (his X + its offset) unless he is detached; Y its own: while he is in the air by his
-// own doing (a jump, a fall, a special) it copies his vertical movement (a jump with him), else it falls with his
-// gravity / max fall speed and lands on the first floor under it (platforms too). Standing, it keeps to the floor
-// within gk_snap() (slopes). Frozen while he is in hitlag. Falling on its own too long: gone in smoke (no log).
+// one clone's frame (v3):
+// X: with him (his X + its offset) unless he is detached; a wall (a stage line too steep for a floor) between where it
+//    is and there stops it against the wall (its offset gives way; free again, it goes back to its offset).
+// Y: while he is in the air by his own doing it copies his vertical movement, else it falls with his gravity / max fall
+//    speed; going up, a ceiling stops it; going down it lands on the first floor (platforms too). Standing, it follows
+//    the floor under its new X, up or down as far as the steepest floor can go for that step (slopes, steps).
+// Frozen while he is in hitlag. Gone when the game removes it (the blast zone: gk_heartbeat) or, as a fallback, after
+// gk_fall_frames() falling on its own.
 void gk_clone_phys(int id, float ox, float oy, int copy, int frozen)
 {
     float x;
@@ -40511,8 +40531,10 @@ void gk_clone_phys(int id, float ox, float oy, int copy, int frozen)
     float vy;
     float dy;
     float ny;
+    float nx;
     float from;
     float to;
+    float reach;
     int t;
     if ((gk_alive & id) == 0)
     {
@@ -40522,53 +40544,87 @@ void gk_clone_phys(int id, float ox, float oy, int copy, int frozen)
     y = gk_cy(id);
     vy = gk_cvy(id);
     t = gk_fall_t(id);
+    if (frozen)
+    {
+        return;
+    }
+    nx = x;
     if (!gk_det)
     {
-        x = ox + gk_off(id);
+        nx = ox + gk_off(id);
     }
-    if (!frozen)
+    if (gk_abs(nx - x) > 0.01f)
     {
-        if (copy)
+        if (gk_line(x, y + gk_wall_y(), nx, y + gk_wall_y()) == 0x2)
         {
-            dy = oy - gk_last_oy;
-            vy = dy;
-            t = 0;
-            from = y - 0.05f;             // not the floor he just left (a platform drop)
-            to = y + dy - 0.5f;
-        }
-        else
-        {
-            vy = vy - gk_gravity();
-            if (vy < -gk_max_fall())
+            if (nx > x)
             {
-                vy = -gk_max_fall();
+                nx = gk_hit_x - gk_wall_gap();
             }
-            dy = vy;
-            from = y + 3.0f;
-            to = y + dy - 0.5f;
-            if (t == 0)
+            else
             {
-                to = y + dy - gk_snap();  // it stood last frame: keep to the floor (down a slope)
+                nx = gk_hit_x + gk_wall_gap();
             }
-            t += 1;
-        }
-        ny = y + dy;
-        if (dy < 0.01f)
-        {
-            if (gk_floor(x, from, to))
+            if (gk_abs(nx - x) > gk_abs(ox + gk_off(id) - x))
             {
-                ny = gk_floor_y;
-                vy = 0;
-                t = 0;
+                nx = x;
             }
         }
-        y = ny;
     }
-    gk_set_c(id, x, y, vy);
+    reach = gk_snap() + gk_slope() * gk_abs(nx - x);
+    x = nx;
+    if (copy)
+    {
+        dy = oy - gk_last_oy;
+        vy = dy;
+        t = 0;
+        from = y + 0.5f;                  // its floor stops it (it landed while he still comes down) ...
+        if (gk_abs(y - gk_last_oy) < 0.1f)
+        {
+            from = y - 0.05f;             // ... unless it is level with him: the floor he left (a platform drop)
+        }
+        to = y + dy - 0.5f;
+    }
+    else
+    {
+        vy = vy - gk_gravity();
+        if (vy < -gk_max_fall())
+        {
+            vy = -gk_max_fall();
+        }
+        dy = vy;
+        from = y + 0.5f;
+        to = y + dy - 0.5f;
+        if (t == 0)
+        {
+            from = y + reach;             // it stood last frame: the floor under its new X, a slope up or down
+            to = y + dy - reach;
+        }
+        t += 1;
+    }
+    ny = y + dy;
+    if (dy > 0.01f)
+    {
+        if (gk_line(x, y + gk_head(), x, ny + gk_head()) == 0x3)
+        {
+            ny = gk_hit_y - gk_head();    // a ceiling: no higher
+            vy = 0;
+        }
+    }
+    else
+    {
+        if (gk_floor(x, from, to))
+        {
+            ny = gk_floor_y;
+            vy = 0;
+            t = 0;
+        }
+    }
+    gk_set_c(id, x, ny, vy);
     gk_set_fall_t(id, t);
     if (t > gk_fall_frames())
     {
-        gk_kill(id, 0);                   // fallen off the stage: gone in smoke (no log)
+        gk_kill(id, 0);                   // fallback: fallen far off the stage
     }
 }
 
@@ -40631,9 +40687,9 @@ void gk_physics()
     gk_last_oy = oy;
 }
 
-// the channel his clones read (his VAR_24 - VAR_31, SLOTn_SHARED_0 - 7): their places, his motion's frame, rate (0
-// while he is in hitlag: they freeze with him) and kind, 4747000 + flags (1 / 2 alive, 4 / 8 being made, 16 / 32
-// falling on its own: it plays Fall)
+// the channel his clones read (his VAR_24 - VAR_31, SLOTn_SHARED_0 - 7): their places, his motion (v3: its kind x 1024
+// + its frame in VAR_28), its rate (0 while he is in hitlag: they freeze with him), VAR_30 their heartbeat (theirs to
+// write: gk_heartbeat), 4747000 + flags (1 / 2 alive, 4 / 8 being made, 16 / 32 falling on its own: it plays Fall)
 void gk_channel()
 {
     int k;
@@ -40674,9 +40730,8 @@ void gk_channel()
     WorkModule(0, gk_ly + 0, 0x0f000319);
     WorkModule(0, gk_rx + 0, 0x0f00031a);
     WorkModule(0, gk_ry + 0, 0x0f00031b);
-    WorkModule(0, f + 0, 0x0f00031c);
+    WorkModule(0, (float)(k * 1024) + f, 0x0f00031c);
     WorkModule(0, r + 0, 0x0f00031d);
-    WorkModule(0, (float)k + 0, 0x0f00031e);
     WorkModule(0, 4747000.0f + (float)flags, 0x0f00031f);
 }
 
@@ -40718,7 +40773,8 @@ void gk_clone_hitlag()
     StopModule(0x2, (int)n);
 }
 
-// a hit on a clone's capsule (the executable's slot 42: VAR_21 = 10000 + dx): the nearest clone in formation
+// v3: a clone's own hurtbox was hit (the executable: his VAR_21 = 20000 + its id, from the clone's damage this frame):
+// exactly that clone turns into the log. (v1 / v2's 10000 + dx shield-capsule report: no longer made, ignored.)
 void gk_check_hit()
 {
     float h;
@@ -40729,36 +40785,62 @@ void gk_check_hit()
         return;
     }
     WorkModule(0, 0 + 0, 0x0f000315);
-    id = gk_nearest(h - 10000.0f);
-    if (id)
+    if (h < 15000.0f)
+    {
+        return;
+    }
+    id = (int)(h - 20000.0f + 0.5f);
+    if (id == 0x1 || id == 0x2)
     {
         gk_kill(id, 0x1);
     }
 }
 
-int gk_nearest(float dx)
+// v3: each clone's MSC adds its bit (1 / 2) to his VAR_30 every frame; the game removes a weapon past the stage's blast
+// zone without its MSC: a clone whose bit stays off gk_beat_miss() frames is gone (no log, no removal call needed)
+void gk_heartbeat()
 {
-    float dl;
-    float dr;
-    dl = 100000.0f;
-    dr = 100000.0f;
-    if (gk_in_formation(0x1))
+    int beat;
+    beat = (int)(WorkModuleF(0, 0x0f00031e) + 0.5f);
+    WorkModule(0, 0 + 0, 0x0f00031e);
+    gk_lage += 1;
+    gk_rage += 1;
+    if ((gk_alive & 0x1) && gk_lage > 6)
     {
-        dl = gk_abs(gk_off_l - dx);
+        if (beat & 0x1)
+        {
+            gk_lmiss = 0;
+        }
+        else
+        {
+            gk_lmiss += 1;
+            if (gk_lmiss >= gk_beat_miss())
+            {
+                gk_gone(0x1);
+            }
+        }
     }
-    if (gk_in_formation(0x2))
+    if ((gk_alive & 0x2) && gk_rage > 6)
     {
-        dr = gk_abs(gk_off_r - dx);
+        if (beat & 0x2)
+        {
+            gk_rmiss = 0;
+        }
+        else
+        {
+            gk_rmiss += 1;
+            if (gk_rmiss >= gk_beat_miss())
+            {
+                gk_gone(0x2);
+            }
+        }
     }
-    if (dl > 99999.0f && dr > 99999.0f)
-    {
-        return 0;
-    }
-    if (dl <= dr)
-    {
-        return 0x1;
-    }
-    return 0x2;
+}
+
+// a clone the game already removed: off the books (its smoke where it was last, as a kill without a log)
+void gk_gone(int id)
+{
+    gk_kill(id, 0);
 }
 
 // a clone gone: removed, its smoke, and (hit) the Substitution log (rare: the doll) where it stood
@@ -40822,43 +40904,11 @@ void gk_end_ability(int burn)
     }
 }
 
-// the clone capsules (his shield group 1: shapes at -2 gap, -gap, +gap, +2 gap along his facing): a clone in formation
-int gk_shape_of(float z)
-{
-    if (z < -1.5f * gk_gap())
-    {
-        return 0x1;
-    }
-    if (z < 0)
-    {
-        return 0x2;
-    }
-    if (z < 1.5f * gk_gap())
-    {
-        return 0x4;
-    }
-    return 0x8;
-}
-
+// v1 / v2's clone capsules (his shield group 1, the executable's 4 shapes): v3 keeps them off (the clones have their
+// own hurtboxes; his counter shape group stays built but never switched on)
 int gk_shapes_want()
 {
-    int want;
-    float lr;
-    want = 0;
-    if (gk_ability <= 0)
-    {
-        return 0;
-    }
-    lr = PostureModuleF(0);
-    if (gk_in_formation(0x1))
-    {
-        want = want | gk_shape_of(gk_off_l * lr);
-    }
-    if (gk_in_formation(0x2))
-    {
-        want = want | gk_shape_of(gk_off_r * lr);
-    }
-    return want;
+    return 0;
 }
 
 void gk_shapes_update()

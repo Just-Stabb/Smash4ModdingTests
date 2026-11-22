@@ -1,10 +1,10 @@
-// Greninja's clone (weapon kind 0x1A1, his articles 6 / 7: fighters/gekkouga/README.md "Clones v1" / "Clones v2").
+// Greninja's clone (weapon kind 0x1A1, his articles 6 / 7: fighters/gekkouga/README.md "Clones v1" - "Clones v3").
 // The framework is his moon article's (vanilla moon.mscsb, decompiled): one status that does nothing. The clone itself
 // is cl_frame(), run every frame (global14): it finds him (the player slot whose SLOTn_SHARED_7 is 4747000 + flags,
 // nearest to where it was made) and which clone it is (his "being made" bit 4 / 8), stands where his MSC puts it (v2:
 // his VAR_24 / 25 or VAR_26 / 27: it falls and lands on its own there), faces his way and plays the motion he gives
-// (VAR_30 kind, VAR_28 frame, VAR_29 rate: his own, Wait1 / Fall while he is on a ledge, hit, ...; Fall while it falls
-// on its own, flags 16 / 32); its scripts are his body's hitboxes (script/animcmd/weapon/clone, tools/gekkouga_build.py).
+// (VAR_28 kind x 1024 + frame (v3), VAR_29 rate: his own, Wait1 / Fall while he is on a ledge, hit, ...; Fall while it
+// falls on its own, flags 16 / 32); v3: its VAR_1 = which clone, its bit in his VAR_30 every frame (the heartbeat); its scripts are his body's hitboxes (script/animcmd/weapon/clone, tools/gekkouga_build.py).
 // Its VAR_0 = his slot (v2: the executable's clone hit method gives him its landed hits' hitlag). Hidden when he closes
 // the channel (his VAR_31 0) or it is not alive any more; he removes it (ArticleModule 0x2712).
 int global0;
@@ -707,6 +707,18 @@ int cl_which(int flags)
 
 // every frame (hitstop included): its place (his MSC's: it stands / falls / lands there), his facing, his motion
 // (Fall while it falls on its own), its owner's slot in its VAR_0 (the executable gives him its hits' hitlag)
+// v3: its heartbeat: its bit (1 / 2) in his VAR_30 (SLOTn_SHARED_6) every frame; he clears it every frame, and a
+// clone whose bit stays off is one the game removed (past the blast zone)
+void cl_beat()
+{
+    int beat;
+    beat = (int)(cl_shared(cl_slot, 6) + 0.5f);
+    if ((beat & cl_id) == 0)
+    {
+        WorkModule(0, (float)(beat + cl_id) + 0, 0x0f000340 + 8 * (cl_slot - 1) + 6);
+    }
+}
+
 void cl_frame()
 {
     int flags;
@@ -734,6 +746,7 @@ void cl_frame()
         }
     }
     WorkModule(0, (float)cl_slot + 0, 0x0f000300);
+    WorkModule(0, (float)cl_id + 0, 0x0f000301);   // v3: which clone (the executable reports its hurtbox's hits with it)
     flags = cl_flags(cl_slot);
     if (flags >= 0x1000)
     {
@@ -753,14 +766,16 @@ void cl_frame()
     {
         PostureModule(0x3, cl_shared(cl_slot, 2), cl_shared(cl_slot, 3), 0);
     }
+    cl_beat();
     lr = cl_slot_pos(cl_slot, 3);
     if (lr != 0 && PostureModuleF(0) != lr)
     {
         PostureModule(0, lr);
         PostureModule(0x2);
     }
-    k = (int)cl_shared(cl_slot, 6);
     f = cl_shared(cl_slot, 4);
+    k = (int)(f / 1024.0f);               // v3: his VAR_28 = kind x 1024 + frame
+    f = f - (float)(k * 1024);
     r = cl_shared(cl_slot, 5);
     if (flags & (0x10 * cl_id))
     {

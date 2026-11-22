@@ -39,7 +39,7 @@ import gekkouga_clone_cave as C  # noqa: E402
 import kind_expand as K  # noqa: E402
 import weapon_expand as W  # noqa: E402
 from kind_expand_test import Emu, REGS  # noqa: E402
-from unicorn.ppc_const import UC_PPC_REG_1, UC_PPC_REG_MSR, UC_PPC_REG_FPR1, UC_PPC_REG_LR  # noqa: E402
+from unicorn.ppc_const import UC_PPC_REG_1, UC_PPC_REG_MSR, UC_PPC_REG_FPR1, UC_PPC_REG_FPR2, UC_PPC_REG_LR  # noqa: E402
 
 fails = 0
 checks = 0
@@ -209,16 +209,21 @@ def weapon_checks(e, img, info):
     s = e.call(W.SINGLETON_SWITCH, 0, C.CLONE_KIND)
     check('the singleton getter: kind 0x1A1 -> its own singleton', s, A['w_single'])
     vt = e.w(s)
-    check('its vtable: bunshin\'s but +0xAC', [e.w(vt + o) for o in range(0, L['vsize'], 4) if o != W.HIT_METHOD],
-          [img.w(L['svt'] + o) for o in range(0, L['vsize'], 4) if o != W.HIT_METHOD])
-    check('its +0xAC: the hit method', e.w(vt + W.HIT_METHOD), lab['w_hit'])
+    VT_OURS = (0x1C, W.HIT_METHOD) + C.POLL_SLOTS
+    check('its vtable: bunshin\'s but +0x1C / +0x64 / +0x84 / +0x8C / +0x94 / +0xAC (v3)',
+          [e.w(vt + o) for o in range(0, L['vsize'], 4) if o not in VT_OURS],
+          [img.w(L['svt'] + o) for o in range(0, L['vsize'], 4) if o not in VT_OURS])
+    check('its +0xAC: the hit method, +0x1C the set-up, the 4 phases\' pollers',
+          [e.w(vt + o) for o in (W.HIT_METHOD, 0x1C) + C.POLL_SLOTS],
+          [lab['w_hit'], lab['w_init']] + [lab['wp_%X' % o] for o in C.POLL_SLOTS])
     hits = []
     e.stub(L['old_hit'], lambda e_: e_.rec('base_hit', 3, 4, 5))
-    # v2: a clone (weapon +0x28 its accessor, +0x28 its WorkModule: VAR_0 = its owner's slot) and its owner
+    # a clone: weapon +0x28 its accessor: +0x28 WorkModule (VAR_0 its owner's slot, VAR_1 its id), +0x50 AttackModule
+    # (hit records), +0x54 DamageModule (vt +0x7C damage this frame), +0x58 HitModule (vt +0x4C hurtboxes)
     cvt = e.alloc(0x100, b'\0')
     cget = e.alloc(4)
     e.setw(cvt + 0x44, cget)
-    e.clone_vars = {C.VAR_SLOT: 3.0}
+    e.clone_vars = {C.VAR_SLOT: 3.0, C.VAR_ID: 2.0}
 
     def cget_fn(e_):
         e_.calls.append(('clone_getf', e_.r(4)))
@@ -226,11 +231,60 @@ def weapon_checks(e, img, info):
     e.stub(cget, cget_fn)
     cwm = e.alloc(0x10, b'\0')
     e.setw(cwm, cvt)
-    cacc = e.alloc(0x40, b'\0')
+    cacc = e.alloc(0x100, b'\0')
     e.setw(cacc + C.W_WORK, cwm)
     weapon = e.alloc(0x40, b'\0')
     e.setw(weapon + C.W_ACC, cacc)
+    # its AttackModule: 3 record arrays (hitboxes 0-2), slots of 0x84 (+0x18 damage)
+    am = e.alloc(0x60, b'\0')
+    arr = e.alloc(0x174 * 3, b'\0')
+    slots = e.alloc(0x84 * 3, b'\0')
+    e.setw(am + 0x14, arr)
+    e.setw(am + 0x18, 3)
+    e.setw(am + 0x40, slots)
+    for i, dmg in enumerate((8.0, 5.0, 13.0)):
+        e.mu.mem_write(slots + 0x84 * i + 0x18, struct.pack('>f', dmg))
+    nodes = e.alloc(0x40 * 4, b'\0')
+
+    def records(spec):
+        """spec: {hitbox: [ids of its nodes]}; empty lists point at their sentinel"""
+        k = 0
+        for h in range(3):
+            base = arr + 0x174 * h
+            prev = base + 0x124
+            ids = spec.get(h, [])
+            e.setw(base + 0x128, base + 0x124)
+            first = None
+            for j, hid in enumerate(ids):
+                n = nodes + 0x40 * k
+                k += 1
+                e.mu.mem_write(n + 0x27, bytes([hid]))
+                e.setw(n + 4, base + 0x124)
+                if first is None:
+                    first = n
+                else:
+                    e.setw(prev + 4, n)
+                prev = n
+            if first is not None:
+                e.setw(base + 0x128, first)
+    records({})
+    e.setw(cacc + C.W_ATTACK, am)
+    e.hs_ret = 7
+
+    def hs_fn(e_):
+        e_.calls.append(('hitstop', e_.r(3), e_.r(4), round(d2f(e_.mu.reg_read(UC_PPC_REG_FPR1)), 3),
+                         round(d2f(e_.mu.reg_read(UC_PPC_REG_FPR2)), 3), e_.r(5), e_.r(6)))
+        return e_.hs_ret
+    e.stub(C.HITSTOP_FN, hs_fn)
     owner = e.fighter(2)
+    oacc = e.w(owner['f'] + C.BASE_ACC)
+    smvt = e.alloc(0x100, b'\0')
+    smset = e.alloc(4)
+    e.setw(smvt + 0x8C, smset)
+    e.stub(smset, lambda e_: e_.rec('stop', 4, 5))
+    sm = e.alloc(0x20, b'\0')
+    e.setw(sm, smvt)
+    e.setw(oacc + C.W_STOP, sm)
     e.mu.mem_write(owner['f'] + 0x1E, b'\x04')
     for bits in (0x1, 0x2, 0x4, 0x10, 0x13, 0x8):
         e.calls, e.set_wm = [], []
@@ -239,25 +293,91 @@ def weapon_checks(e, img, info):
     check('the hit method: 0x1 / 0x2 / 0x4 / 0x10 kept (0), 0x8 bunshin\'s',
           hits, [(1, 0), (2, 0), (4, 0), (0x10, 0), (0x13, 0), (8, 'base')])
 
-    def landed(slot_var, live=4, bits=0x13):
+    def landed(slot_var, live=4, bits=0x13, spec=None):
         e.clone_vars[C.VAR_SLOT] = slot_var
+        records(spec or {})
         e.mu.mem_write(owner['f'] + 0x1E, bytes([live]))
         e.calls, e.set_wm, e.vars = [], [], {}
         for i in range(14, 32):
             e.mu.reg_write(REGS[i], 0x5A5A0000 + i)
         r = e.call(lab['w_hit'], s, weapon, bits)
-        return r, [c for c in e.calls if c[0] in ('clone_getf', 'setf')], e.set_wm, e.kept()
-    r = landed(3.0)
-    want = [('clone_getf', C.VAR_SLOT), ('setf', C.VAR_LAG, 1.0)]
-    check('v2: a landed hit (0x13): the clone\'s VAR_0 (slot 3) read, its owner\'s (table entry 2) VAR_22 = 1.0 '
-          'through his WorkModule, 0, the registers kept', r, (0, want, [owner['wm']], True))
-    check('v2: shielded (0x4): the same signal (his hitlag on a shield too)', landed(3.0, bits=0x4)[1], want)
-    check('v2: slot 0 (its MSC not run yet): nothing set', landed(0.0)[1], [('clone_getf', C.VAR_SLOT)])
-    check('v2: slot 9: nothing set', landed(9.0)[1], [('clone_getf', C.VAR_SLOT)])
-    check('v2: the owner\'s entry not live (+0x1E < 4): nothing set', landed(3.0, live=2)[1], [('clone_getf', C.VAR_SLOT)])
+        return r, [c for c in e.calls if c[0] in ('clone_getf', 'setf', 'hitstop', 'stop')], e.set_wm, e.kept()
+    two = {0: [0], 1: [], 2: [2, 2]}
+    r = landed(3.0, spec=two)
+    want = [('clone_getf', C.VAR_SLOT), ('hitstop', oacc, slots + 0x84 * 2, 13.0, 1.0, 1, 1), ('stop', 7, 1),
+            ('setf', C.VAR_LAG, 1.0)]
+    check('v3: a landed hit (0x13): the clone\'s VAR_0 (slot 3); its hitbox with the most damage among those with hit '
+          'records (id 2, 13%%); the game\'s hitstop for it on HIS accessor (attacker side 1, its own multiplier, x1.0); '
+          'his StopModule vt +0x8C(7, 1); VAR_22 = 1.0 through his WorkModule; 0; the registers kept',
+          r, (0, want, [owner['wm']], True))
+    check('v3: shielded (0x4): the same', landed(3.0, bits=0x4, spec=two)[1], want)
+    e.hs_ret = 0
+    check('v3: the game\'s hitstop 0 (a no-hitlag hitbox): no stop, VAR_22 still set', landed(3.0, spec=two)[1],
+          [want[0], want[1], want[3]])
+    e.hs_ret = 7
+    check('v3: no hit records: no hitstop call, VAR_22 set (his MSC\'s fallback)', landed(3.0)[1], [want[0], want[3]])
+    check('v3: only hitbox 0\'s record: its data (8%%)', landed(3.0, spec={0: [0]})[1][1],
+          ('hitstop', oacc, slots, 8.0, 1.0, 1, 1))
+    check('v2: slot 0 (its MSC not run yet): nothing set', landed(0.0, spec=two)[1], [('clone_getf', C.VAR_SLOT)])
+    check('v2: slot 9: nothing set', landed(9.0, spec=two)[1], [('clone_getf', C.VAR_SLOT)])
+    check('v2: the owner\'s entry not live (+0x1E < 4): nothing set', landed(3.0, live=2, spec=two)[1],
+          [('clone_getf', C.VAR_SLOT)])
     e.setw(weapon + C.W_ACC, 0)
     check('v2: no accessor: nothing read, 0', landed(3.0)[:2], (0, []))
     e.setw(weapon + C.W_ACC, cacc)
+    # ---- v3: the set-up: his hurtboxes on its HitModule
+    hmvt = e.alloc(0x100, b'\0')
+    hmset = e.alloc(4)
+    e.setw(hmvt + 0x4C, hmset)
+
+    def hm_fn(e_):
+        d = e_.r(4)
+        e_.calls.append(('hurt', e_.r(3), e_.w(d), e_.w(d + 4), e_.r(5)))
+    e.stub(hmset, hm_fn)
+    hm = e.alloc(0x20, b'\0')
+    e.setw(hm, hmvt)
+    e.setw(cacc + C.W_HIT_MOD, hm)
+    e.calls = []
+    e.call(lab['w_init'], s, weapon)
+    check('v3 set-up (+0x1C): HitModule vt +0x4C(&{his 8 hurtboxes, 8}, 0)', e.calls, [('hurt', hm, A['hurt'], 8, 0)])
+    check('... the hurtbox data: his vl group 5 entries, bones 0x7D0 + his joint, pool 2',
+          bytes(e.mu.mem_read(A['hurt'], 0x30 * 8)) == C.hurt_blob() and
+          [struct.unpack_from('>I', C.hurt_blob(), 0x30 * i + 0x1C)[0] for i in range(8)] ==
+          [0x7D0 + j for j in (12, 19, 22, 16, 8, 4, 9, 5)], True)
+    # ---- v3: the pollers: the damage this frame -> his VAR_21 = 20000 + its id; then bunshin's method
+    dmvt = e.alloc(0x100, b'\0')
+    dmget = e.alloc(4)
+    e.setw(dmvt + 0x7C, dmget)
+    e.dmg = 0.0
+
+    def dm_fn(e_):
+        e_.calls.append(('dmg', e_.r(4)))
+        e_.mu.reg_write(UC_PPC_REG_FPR1, f2d(e_.dmg))
+    e.stub(dmget, dm_fn)
+    dm = e.alloc(0x20, b'\0')
+    e.setw(dm, dmvt)
+    e.setw(cacc + C.W_DAMAGE, dm)
+    for o in C.POLL_SLOTS:
+        e.stub(L['vt_orig'][o], lambda e_, o=o: e_.rec('orig%X' % o, 3, 4, 5, 6))
+
+    def poll(o, dmg):
+        e.dmg = dmg
+        e.calls, e.set_wm, e.vars = [], [], {}
+        for i in range(14, 32):
+            e.mu.reg_write(REGS[i], 0x5A5A0000 + i)
+        e.call(lab['wp_%X' % o], s, weapon, 0x55, 0x66)
+        return [c for c in e.calls if c[0] in ('dmg', 'setf') or c[0].startswith('orig')], e.set_wm, e.kept()
+    e.mu.mem_write(owner['f'] + 0x1E, b'\x04')
+    e.clone_vars[C.VAR_SLOT] = 3.0
+    for o in C.POLL_SLOTS:
+        check('v3 poller +0x%X, no damage: nothing set, bunshin\'s method with the same arguments' % o, poll(o, 0.0),
+              ([('dmg', 0), ('orig%X' % o, s, weapon, 0x55, 0x66)], [], True))
+    check('v3 poller +0x64, 3.5 damage this frame: his VAR_21 = 20000 + its id (2) through his WorkModule, then bunshin\'s',
+          poll(0x64, 3.5), ([('dmg', 0), ('setf', C.VAR_HIT, 20002.0), ('orig64', s, weapon, 0x55, 0x66)], [owner['wm']], True))
+    e.clone_vars[C.VAR_ID] = 1.0
+    check('v3 poller +0x8C, the left clone (id 1)', poll(0x8C, 1.0)[0][1], ('setf', C.VAR_HIT, 20001.0))
+    e.clone_vars[C.VAR_SLOT] = 0.0
+    check('v3 poller: slot 0: nothing set', poll(0x94, 2.0)[0], [('dmg', 0), ('orig94', s, weapon, 0x55, 0x66)])
     e.mu.mem_write(owner['f'] + 0x1E, b'\x00')
     # the module row stub (the bl at MODULE_ROW): r30 = kind -> r8 = row - MODULE_TABLE
     mr = K.branch_target(W.MODULE_ROW, img.w(W.MODULE_ROW))
@@ -265,10 +385,14 @@ def weapon_checks(e, img, info):
     e.call(mr)
     row = (e.r(8) + W.MODULE_TABLE) & 0xFFFFFFFF
     check('the module set-up: kind 0x1A1 -> its own row', row, A['w_row'])
-    want = [img.w(W.MODULE_TABLE + 0x70 * C.CLONE_BASE + 4 * j) for j in range(28)]
-    for sl in C.MODULE_SLOTS:
-        want[sl] = img.w(W.MODULE_TABLE + 0x70 * C.MODULES_FROM + 4 * sl)
-    check('its row: bunshin\'s + the shuriken\'s slots 0 2 5 8 9 11', [e.w(row + 4 * j) for j in range(28)], want)
+    want = [img.w(W.MODULE_TABLE + 0x70 * C.TEMPLATE + 4 * j) for j in range(28)]
+    check('v3: its row: the template kind\'s (lizardonm, 0x15C: bunshin\'s modules + Kinetic, Attack, Hit, Damage)',
+          [e.w(row + 4 * j) for j in range(28)], want)
+    T_ = info['T']
+    check('v3: its base kind (the weapon switches\' templates): 0x15C', e.w(T_['bt'] + 4 * (C.CLONE_KIND - W.OLD_N)), C.TEMPLATE)
+    nt = dict(W.NAME_TABLES)
+    check('... 0x15C is lizardon\'s lizardonm', (img.cstr(img.w(nt['owner'] + 4 * C.TEMPLATE)),
+                                                 img.cstr(img.w(nt['name'] + 4 * C.TEMPLATE))), C.TEMPLATE_NAME)
     e.mu.reg_write(REGS[30], CLONE_OTHER)
     e.call(mr)
     check('the module set-up: bunshin\'s own row as before', e.r(8), 0x70 * CLONE_OTHER)
