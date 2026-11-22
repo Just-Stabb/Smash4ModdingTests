@@ -266,7 +266,15 @@ RES_FIND = 0x032D7140             # (&bundle, &file, name, 1): a file of it by n
 RES_ASSIGN = 0x032D69B8           # (&handle, &file): GroundModule +0xEC = the .lvd
 RES_FREE = 0x032D4200             # (&handle, 2): a stack handle's release
 GC_MAKE = 0x02AC2B84              # (gm, 1, 0, 0): the grounds from the .lvd (+0xF0 / +0xF4, at most 2 collisions)
-GC_ON = 0x02AC2EF0                # (gm, 0): on (the hydrant's call after making them)
+GC_ON = 0x02AC2EF0                # (gm, on): +0xFB = on. 0 OFF: every ground's handle off (+0x163 0, the ground's
+                                  # +0x68 / +0x6C masks 0, 0x02D5D870: its +0x72 0); the hydrant makes its grounds off
+                                  # (0x02B34618) and turns them on in its status 1 (0x02B3746C: (gm, 1)). Skeleton v1 -
+                                  # v1.1 called (gm, 0): their grounds were never on (the user: no collision; the v1.2
+                                  # hydrant log: its ground +0x68 / +0x6C -1, +0x72 1, handle +0x163 1, gm +0xFB 1; ours 0)
+GC_ENABLE = 0x02AC2E54            # (gm): skeleton v1.2: with +0xFB on, each ground whose handle's +0x163 is 0 turned on
+                                  # (+0x163 1, the ground's +0x68 / +0x6C = -1: collides with everything, 0x02D5D6E0(
+                                  # ground, 0, 1): +0x72 / +0x73 / +0x76 - +0x78 1, its vertices' last places); the game's
+                                  # per-frame object updates (0x02BCAEF8 ...) call it for the hydrant; we call it too
 GC_SETV = 0x02AC30C0              # (gm, vertex, &(x, y)): a vertex placed (its last position too: no carry)
 GC_MOVEV = 0x02AC312C             # (gm, vertex, &(x, y)): a vertex moved (last = where it was: riders carried)
 GC_COMMIT = 0x02AC3204            # (gm): the grounds' lines recomputed after the vertex moves
@@ -999,7 +1007,8 @@ sk_col_make:
         li r4, 1
         bl sk_col_place
         mr r3, r29
-        li r4, 0''' + call(GC_ON) + '''
+        li r4, 1''' + call(GC_ON) + '''
+        mr r3, r29''' + call(GC_ENABLE) + '''
         li r28, 1
 skm_free:
         addi r3, r1, 0x14
@@ -1088,6 +1097,10 @@ skp_n:  addi r27, r27, 8
         cmpw r28, r25
         blt skp_v
         mr r3, r29''' + call(GC_COMMIT) + '''
+        cmpwi r30, 0                    # v1.2: moved: kept on (a no-op once on; sk_col_make turns them on after placing)
+        bne skp_one
+        mr r3, r29''' + call(GC_ENABLE) + '''
+skp_one:
         li r26, 1
 skp_out:
         mr r3, r26
@@ -2022,7 +2035,7 @@ def layout(img, feats=None):
         assert img.w(W.MODULE_TABLE + 0x70 * HYDRANT + 4 * 5) == SK_GM_CTOR, "the hydrant's GroundModule constructor"
         skrow[5] = SK_GM_CTOR                           # its GroundModule: the hydrant's (grounds from an .lvd)
         assert img.w(SK_GM_CTOR + 8) >> 26 == 18 and K.branch_target(SK_GM_CTOR + 8, img.w(SK_GM_CTOR + 8)) == 0x02B387FC
-        for f, want in ((GC_MAKE, 0x9421F640), (GC_ON, 0x9421FFE0), (GC_SETV, 0x7C6C1B78), (GC_MOVEV, 0x7C6C1B78),
+        for f, want in ((GC_MAKE, 0x9421F640), (GC_ON, 0x9421FFE0), (GC_ENABLE, 0x9421FFE0), (GC_SETV, 0x7C6C1B78), (GC_MOVEV, 0x7C6C1B78),
                         (GC_COMMIT, 0x7C0802A6), (GC_FREE, 0x9421FFD0)):
             assert img.w(f) == want, 'collision function 0x%08X: 0x%08X' % (f, img.w(f))
     return dict(skrow=skrow, bdesc=bdesc, bminfo=img.w(bdesc + 8), dsize=dsize, svt=svt, vsize=W.vtable_size(img, svt),

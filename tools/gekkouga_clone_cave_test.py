@@ -1439,6 +1439,7 @@ def skeleton_checks(e, info, diag):
     e.stub(C.RES_FREE, lambda e_: calls.append(('res_free', e_.r(4))))
     e.stub(C.GC_MAKE, gc_make)
     e.stub(C.GC_ON, lambda e_: calls.append(('on', e_.r(3), e_.r(4))))
+    e.stub(C.GC_ENABLE, lambda e_: calls.append(('enable', e_.r(3))))
     e.stub(C.GC_SETV, vert('setv'))
     e.stub(C.GC_MOVEV, vert('movev'))
     e.stub(C.GC_COMMIT, lambda e_: calls.append(('commit', e_.r(3))))
@@ -1526,10 +1527,11 @@ def skeleton_checks(e, info, diag):
     want_v = [(gm, i, 50.0 + vx, 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS)]
     check('skeleton collision: as the hydrant\'s set-up: its kind\'s bundle (manager +0x30, kind 0x1A2, 0, 0), '
           '"skeleton.lvd" in it, GroundModule +0xEC = the file, the grounds made (gm, 1, 0, 0), its 4 vertices placed at '
-          'it (x +- 6, y + 2 / + 28), the lines recomputed, on (gm, 0), both handles released',
+          'it (x +- 6, y + 2 / + 28), the lines recomputed, on (v1.2: (gm, 1), then the grounds turned on), both handles '
+          'released',
           c1, [('res_get', 0xABC0, C.SK_KIND, 0, 0), ('res_find', 0x1111, 'skeleton.lvd', 1), ('assign', gm + 0xEC, 0x2222),
                ('make', gm, 1, 0, 0)] + [('setv',) + v for v in want_v] +
-              [('commit', gm), ('on', gm, 0), ('res_free', 2), ('res_free', 2)])
+              [('commit', gm), ('on', gm, 1), ('enable', gm), ('res_free', 2), ('res_free', 2)])
     check('skeleton collision: VAR_6 = 1 (made)', sv[C.SK_VAR_COL], 1.0)
     check('skeleton: running, its stand-in body x %g (PostureModule vt +0xE4)' % C.SK_SCALE, scales, [('scale', post, C.SK_SCALE)])
     if diag:
@@ -1537,8 +1539,10 @@ def skeleton_checks(e, info, diag):
               [x[:5] for x in logs('gk_fsc')], [(1, ground, 0x1111, 0x2222, gm)])
     e.mu.mem_write(post + 0x10, struct.pack('>2f', 50.7, 10.0))
     c2 = frame()
-    check('skeleton collision: it moved 0.7: its vertices moved (riders carried: the move call), the lines recomputed',
-          c2, [('movev', gm, i, round(50.7 + vx, 3), 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS)] + [('commit', gm)])
+    check('skeleton collision: it moved 0.7: its vertices moved (riders carried: the move call), the lines recomputed, '
+          'kept on (v1.2)',
+          c2, [('movev', gm, i, round(50.7 + vx, 3), 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS)] +
+          [('commit', gm), ('enable', gm)])
     e.setw(ground + 0x160, 0xFFFF0000)
     check('skeleton v1.1: its ground gone (id -1: something removed it): nothing moved; made again next frame (VAR_6 0, '
           'VAR_12 1)', (frame(), sv[C.SK_VAR_COL], sv[C.SK_VAR_REMADE]), ([], 0.0, 1.0))
@@ -1561,7 +1565,8 @@ def skeleton_checks(e, info, diag):
     e.setw(gobj + 0x34, 2)
     e.mu.mem_write(post + 0x10, struct.pack('>2f', 50.0, 10.0))
     check('skeleton v1.1: a floor-only skeleton.lvd (2 vertices, as the hydrant\'s): only its top line moved (x +- 6, y + 28)',
-          frame(), [('movev', gm, i, 50.0 + vx, 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS[1:3])] + [('commit', gm)])
+          frame(), [('movev', gm, i, 50.0 + vx, 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS[1:3])] +
+          [('commit', gm), ('enable', gm)])
     e.setw(gobj + 0x34, 4)
     frame()
     # ---- hits: attackers over its box (x 44 - 56, y 10 - 38)
@@ -2039,6 +2044,55 @@ def panel_checks(e, info, diag):
         check('v6 diag: S4GB logged when the gauge changes by a tenth (1034 no, 1043 yes)', (n2, n3), (0, 1))
 
 
+def col_on_checks(patched):
+    """skeleton v1.2: the game's own GC_ON / GC_ENABLE (0x02AC2EF0 / 0x02AC2E54) and the ground's enable 0x02D5D6E0 run
+    unstubbed on a fake GroundModule / handle / ground: the words they leave are the hydrant's in the user's log
+    (log_v15_hydrant: S4CE tag=2 ground +0x68 / +0x6C FFFFFFFF, +0x70 00320100 (+0x72 1); S4CG +0xF8 01000001 (+0xFB 1);
+    S4CH handle +0x160 001E0101 (+0x163 1)), where v1.1's (gm, 0) left the skeleton's at 0 (tag=1)"""
+    e = Run(patched)
+
+    def fake():
+        gm = e.alloc(0x200, b'\0')
+        e.setw(gm, C.SK_GM_VT)
+        obj = e.alloc(0x300, b'\0')                    # its +0x18 object (+0x234 no handle of its own)
+        e.setw(gm + 0x18, obj)
+        e.mu.mem_write(gm + 0xF8, b'\x01\x00\x00\x00')
+        h = e.alloc(0x200, b'\0')
+        e.setw(gm + 0xF0, h)
+        e.setw(h + 0x160, 0x001F0100)
+        g = e.alloc(0x100, b'\0')
+        e.setw(h, g)
+        e.setw(g + 0x70, 0x00330000)
+        e.setw(g + 0x74, 0x01000100)                    # +0x74 1: the first vertex loop (0x10551DD8's offsets)
+        vs = [e.alloc(0x40, b'\0') for _ in range(2)]
+        for i, v in enumerate(vs):
+            e.setw(v + 4, vs[(i + 1) % 2])
+            e.mu.mem_write(v + 8, struct.pack('>2f', -46.2 + 12 * i, 28.0))
+        e.setw(g + 0x34, 2)
+        e.setw(g + 0x3C, vs[0])
+        return gm, h, g
+
+    def words(gm, h, g):
+        return ('%08X' % e.w(g + 0x68), '%08X' % e.w(g + 0x6C), e.mu.mem_read(g + 0x72, 1)[0],
+                e.mu.mem_read(gm + 0xFB, 1)[0], e.mu.mem_read(h + 0x163, 1)[0])
+    gm, h, g = fake()
+    e.call(C.GC_ENABLE, gm)
+    check('skeleton v1.2 (the game\'s code): GC_ENABLE with +0xFB 0 (v1.1: GC_ON (gm, 0)) leaves the ground off, as the '
+          'user\'s log showed for the skeleton (+0x68 / +0x6C 0, +0x72 0, +0xFB 0, +0x163 0)',
+          words(gm, h, g), ('00000000', '00000000', 0, 0, 0))
+    e.call(C.GC_ON, gm, 1)
+    e.call(C.GC_ENABLE, gm)
+    got = words(gm, h, g)
+    check('skeleton v1.2 (the game\'s code): GC_ON (gm, 1) then GC_ENABLE: the hydrant\'s logged words (ground +0x68 / '
+          '+0x6C FFFFFFFF, +0x72 1, gm +0xFB 1, handle +0x163 1)', got, ('FFFFFFFF', 'FFFFFFFF', 1, 1, 1))
+    check('skeleton v1.2: ... its vertices\' last places set (+0x32 1)',
+          [e.mu.mem_read(e.w(g + 0x3C) + 0x32, 1)[0], e.mu.mem_read(e.w(e.w(g + 0x3C) + 4) + 0x32, 1)[0]], [1, 1])
+    e.setw(g + 0x68, 0x12345678)
+    e.call(C.GC_ENABLE, gm)
+    check('skeleton v1.2: GC_ENABLE again (every moved frame): nothing rewritten once on (+0x163 1)',
+          '%08X' % e.w(g + 0x68), '12345678')
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     diag = '--diag' in sys.argv
@@ -2067,6 +2121,8 @@ def main():
     clear_checks(e, info, diag)
     info['img'] = img
     skeleton_checks(e, info, diag)
+    if 'skeleton' in feats:
+        col_on_checks(patched)
     pose_checks(e, info, diag)
     fighter_desc_checks(e, img, info)
     g1_checks(e, info)
