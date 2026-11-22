@@ -318,11 +318,101 @@ CLONE_MOTION_PACS = ('main.pac', 'lhand.pac', 'rhand.pac', 'gekkougapt1.pac', 'g
 # v2: his body's motion parts too (the clone's motion info lists his parts: hands 3 / 4, parts 6 / 7 / 8)
 
 
+# v9: the clone's motions are full-body, as bunshin's (its one motion animates every bone but the swing ones). A weapon
+# plays only its main.pac motion: a bone none of it animates is never posed and its vertices draw at the stage's origin
+# (the user's v8: "their tongues and parts of their model are attached to the origin of the stage"). Each main.pac
+# motion gets his part motions' bones (same motion, the part's name in place of "Main"; resampled to main's frames, or
+# the part's Wait1 when it has none), and the vertices on bones no motion animates (his helper / extra swing bones,
+# posed only by his own fighter modules) move to their nearest animated ancestor: the same place the bone takes at its
+# bind offset from that ancestor.
+CLONE_PARTS = (('lhand.pac', 'Lhand'), ('rhand.pac', 'Rhand'), ('gekkougapt1.pac', 'Gekkougapt1'),
+               ('gekkougapt2.pac', 'Gekkougapt2'), ('gekkougasw1.pac', 'Gekkougasw1'))
+PART_FALLBACK = 'A00Wait1.omo'
+
+
+def full_motions(body_motion_dir, vbn_path):
+    """his main.pac with every part's bones in each motion, the tracks in the model's bone order (vanilla's:
+    tools/omo_sort.py): ([(name, omo bytes)], {main name: [parts from Wait1]})"""
+    import omo as O
+    order = {h: i for i, (_n, _p, h) in enumerate(O.vbn_read(vbn_path))}
+    main = O.pac_read(os.path.join(body_motion_dir, 'main.pac'))
+    parts = []
+    for f, tok in CLONE_PARTS:
+        d = dict(O.pac_read(os.path.join(body_motion_dir, f)))
+        fb = [n for n in d if n.endswith(PART_FALLBACK)]
+        assert len(fb) == 1, (f, fb)
+        parts.append((tok, d, d[fb[0]]))
+    out, fell = [], {}
+    for name, data in main:
+        m = O.Omo(data)
+        have = {n[1] for n in m.nodes}
+        for tok, d, fb in parts:
+            pn = name.replace('Main', tok, 1)
+            src = d.get(pn)
+            if src is None:
+                src = fb
+                fell.setdefault(name, []).append(tok)
+            po = O.Omo(src)
+            for f_, h, c, keys in po.nodes:
+                if h in have:
+                    continue
+                if m.frames:
+                    idx = [min(len(keys) - 1, int(round(fr * (len(keys) - 1) / max(m.frames - 1, 1))))
+                           for fr in range(m.frames)] if len(keys) != m.frames else list(range(m.frames))
+                    m.nodes.append([f_, h, c, [keys[i] for i in idx]])
+                else:
+                    m.nodes.append([f_, h, c, []])
+                have.add(h)
+        m.nodes.sort(key=lambda nd: order.get(nd[1], len(order)))
+        out.append((name, m.encode()))
+    return out, fell
+
+
+def rebind(nud, bones, posed):
+    """a model.nud whose rigged vertices on bones not in posed (hashes) are on their nearest posed ancestor instead
+    (bones: omo.vbn_read): (bytes, {bone name: the ancestor's})"""
+    d = bytearray(nud)
+    assert d[:4] == b'NDP3'
+    _, _v, nmesh, _bs, _be, pstart, psize, vsize, vasize = struct.unpack('>IHhhhiiii', bytes(d[4:0x20]))
+    poly_base = 0x30 + pstart
+    va_base = poly_base + psize + vsize
+    target = {}
+    for i, (name, parent, h) in enumerate(bones):
+        j = i
+        while j >= 0 and bones[j][2] not in posed:
+            j = bones[j][1] if 0 <= bones[j][1] < len(bones) else -1
+        target[i] = j
+    moved = {}
+    for i in range(nmesh):
+        o = 0x30 + i * 0x30
+        npoly, obj = struct.unpack('>hi', bytes(d[o + 42:o + 48]))
+        for j in range(npoly):
+            q = obj + j * 0x30
+            _po, _vo, vaoff, nv, vs, _us = struct.unpack('>iiiHBB', bytes(d[q:q + 16]))
+            if vs >> 4 == 0:
+                continue
+            assert vs >> 4 == 4, 'bone type %d' % (vs >> 4)
+            st = 12 + {0: 4, 1: 20, 3: 52, 6: 8, 7: 24}[vs & 0xF] + 8
+            for k in range(nv):
+                at = va_base + vaoff + k * st + st - 8
+                for b in range(4):
+                    bi, w = d[at + b], d[at + 4 + b]
+                    if w and target.get(bi, bi) != bi:
+                        assert target[bi] >= 0, bones[bi][0]
+                        moved[bones[bi][0]] = bones[target[bi]][0]
+                        d[at + b] = target[bi]
+    return bytes(d), moved
+
+
 def cmd_data(vanilla_fighter, out_fighter):
     """model/clone/c00-c07 (his body's, v2 with his face files), motion/clone/ (his body's main.pac: every motion the
     clone plays; v2 his hand / part pacs)"""
     import shutil
+    import omo as O
     n = 0
+    motions, _fell = full_motions(os.path.join(vanilla_fighter, 'motion', 'body'),
+                                  os.path.join(vanilla_fighter, 'model', 'body', 'c00', 'model.vbn'))
+    posed = {nd[1] for _nm, data in motions for nd in O.Omo(data).nodes}
     for c in range(8):
         src = os.path.join(vanilla_fighter, 'model', 'body', 'c%02d' % c)
         dst = os.path.join(out_fighter, 'model', 'clone', 'c%02d' % c)
@@ -330,11 +420,15 @@ def cmd_data(vanilla_fighter, out_fighter):
         for f in CLONE_MODEL_FILES + CLONE_FACE_FILES:
             shutil.copyfile(os.path.join(src, f), os.path.join(dst, f))
             n += 1
+        nud, _moved = rebind(open(os.path.join(src, 'model.nud'), 'rb').read(),
+                             O.vbn_read(os.path.join(src, 'model.vbn')), posed)
+        open(os.path.join(dst, 'model.nud'), 'wb').write(nud)
     dst = os.path.join(out_fighter, 'motion', 'clone')
     os.makedirs(dst, exist_ok=True)
     for f in CLONE_MOTION_PACS:
         shutil.copyfile(os.path.join(vanilla_fighter, 'motion', 'body', f), os.path.join(dst, f))
         n += 1
+    O.pac_write(os.path.join(dst, 'main.pac'), motions)
     return n
 
 
