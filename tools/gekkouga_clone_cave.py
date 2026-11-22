@@ -96,7 +96,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # none: 2, loaded with the fighter. Bunshin's 0x87D has 0x1 (4: the Final Smash load,
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
-FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -106,6 +106,7 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', '
 #           20); the hurtboxes (+0x1C) and the damage pollers (+0x64 ... +0x94)
 #   parts   his motion parts and flags on the clone (v2's hands / face)
 #   burn    burn v1: his water moves burn whoever they hit (burn_scan / burn_add / burn_tick, BURN_MOVES)
+#   skeleton skeleton v1: the Running Skeleton article (needs burn): its kind, claim, collision, HP hit check, burn
 #   hitcheck v12: the clone hit from his side (w_hitchk: other fighters' attack boxes against the clone's box)
 #   sway    v11: the clone's swing step every frame (w_sway: his MotionModule's swing update, as his frame calls it)
 #   bstart  v8: the clone's start (specializer +0x34) runs bunshin's own (0x02AF6738: black overlay, LinkModule link 3
@@ -146,7 +147,10 @@ BURN_MOVES = (
     (101, 0.4, 6, 240),           # down smash: 16 % (each side that hits)
     (105, 0.3, 10, 180),          # forward air: 0.3 % every 10 frames for 3 s = 5.4 %
     (104, 0.25, 15, 180),         # neutral air (multi-hit: one each hit): 0.25 % every 15 frames for 3 s = 3 %
+    (0x101A2, 0.6, 6, 360),       # skeleton v1: the Running Skeleton's explosion (key: no motion kind, its scan passes the
+                                  # row): 0.6 % every 6 frames for 6 s = 36 %, the strongest (shielded 0.21 % x 30 = 6.3 %)
 )
+SK_BURN_KEY = 0x101A2
 BURN_MIN_TOTAL = 3.0              # the user's floor for one instance, shielded or not
 BURN_SHIELD_DAMAGE = 0.35         # a shielded hit: 35 % of the damage a tick (burn v1.1; v1 20 %), half the duration
 
@@ -174,7 +178,7 @@ assert all(burn_total(m, sh) >= BURN_MIN_TOTAL - 1e-4 for m in BURN_MOVES for sh
     'a burn under %s %%' % BURN_MIN_TOTAL
 BURN_CAP = 32                     # instances a victim holds at most (more are dropped)
 BURN_ENTS = 16                    # attack entries scanned (hitbox ids 0-15)
-BURN_CONTEXTS = 8 * 3             # his slot x 3 + 0 him / 1 / 2 a clone
+BURN_CONTEXTS = 8 * 4             # his slot x 4 + 0 him / 1 / 2 a clone / 3 his skeleton (skeleton v1; burn v1: x 3)
 DM_ADD = 0x74                     # DamageModule vt +0x74(0, f1): add percent (MSC DamageModule(9, %)'s op)
 F_STATUS, ST_KIND = 0x20, 0x48     # burn v1.1: a fighter's accessor -> StatusModule (vtable 0x1012D42C), +0x48 its status kind
 ST_DEAD, ST_DEAD_N = 0xB1, 2      # Dead 0xB1 (every KO), Rebirth 0xB2 (the respawn platform): a victim in them loses
@@ -239,7 +243,44 @@ VT_BASE = 0xFC                    # v6: the clone's specializer (its singleton's
                                   # it to its owner; the moon's +0x34 only sets the model scale (the user's v5 "completely
                                   # black" clone)
 DAMAGE_SLOT = 20
-RELEASE = frozenset(('attack', 'hitcheck', 'burn'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack
+# ---- skeleton v1 (feature skeleton): Greninja's side special leaves a Running Skeleton (fighters/gekkouga/README.md
+# "Skeleton v1"): a new weapon kind SK_KIND (article SK_ARTICLE), its MSC fighters/gekkouga/weapons/skeleton.c
+SK_KIND = 0x1A2
+SK_NAME = 'skeleton'
+SK_ARTICLE = 8                    # his list: 6 articles, the clones 6 / 7, the skeleton 8
+SK_LVD = 'skeleton.lvd'           # its collision: model/skeleton/c00/skeleton.lvd (tools/gekkouga_build.py skeleton_lvd)
+HYDRANT = 0x12D                   # Pac-Man's fire hydrant: a weapon fighters stand on and are blocked by. Its module row
+                                  # slot 5 (accessor +0x2C, the GroundModule) is its own class (ctor 0x02B387FC, vtable
+                                  # SK_GM_VT): a GroundModule that makes stage grounds from an .lvd in the article's files
+                                  # (0x02AC2B84) and moves their vertices (0x02AC30C0 / 0x02AC312C, commit 0x02AC3204); the
+                                  # hydrant's specializer +0x3C (0x02B34508) loads "firehydrant.lvd" and makes them; Fox /
+                                  # Falco's Landmaster use the same class (landmaster.lvd)
+SK_GM_CTOR = 0x02BCC7FC           # its row slot 5 constructor (the hydrant's)
+SK_GM_VT = 0x100ED868             # the hydrant GroundModule's vtable (the ctor's last store)
+RES_MGR = 0x102F9028              # [RES_MGR] + 0x30: the resource manager (the hydrant's 0x02B3459C)
+RES_GET = 0x030C40A8              # (manager, &bundle, weapon kind, 0, 0): the kind's file bundle
+RES_FIND = 0x032D7140             # (&bundle, &file, name, 1): a file of it by name
+RES_ASSIGN = 0x032D69B8           # (&handle, &file): GroundModule +0xEC = the .lvd
+RES_FREE = 0x032D4200             # (&handle, 2): a stack handle's release
+GC_MAKE = 0x02AC2B84              # (gm, 1, 0, 0): the grounds from the .lvd (+0xF0 / +0xF4, at most 2 collisions)
+GC_ON = 0x02AC2EF0                # (gm, 0): on (the hydrant's call after making them)
+GC_SETV = 0x02AC30C0              # (gm, vertex, &(x, y)): a vertex placed (its last position too: no carry)
+GC_MOVEV = 0x02AC312C             # (gm, vertex, &(x, y)): a vertex moved (last = where it was: riders carried)
+GC_COMMIT = 0x02AC3204            # (gm): the grounds' lines recomputed after the vertex moves
+GC_FREE = 0x02AC29D8              # (gm): the grounds removed (the GroundModule's own end, vt +0x2C / +0x4C, does this)
+SK_W, SK_B, SK_H = 6.0, 2.0, 28.0   # its collision: x +- 6, a wall each side from y + 2 up to the top, a floor on top
+                                  # at y + 28 (about 1.75 x a fighter's height: Greninja's ~16)
+SK_VERTS = ((-SK_W, SK_B), (-SK_W, SK_H), (SK_W, SK_H), (SK_W, SK_B))   # the .lvd's vertices (left wall, top, right wall)
+SK_HP = 25.0
+SK_LATCH = 16                     # attackers remembered per skeleton (one per owner slot): {accessor, entries latched}
+# its VARs (its MSC reads / writes them; the executable fills 0-4, 6-9)
+SK_VAR_SLOT, SK_VAR_X, SK_VAR_Y, SK_VAR_DIR = 0x0F000300, 0x0F000301, 0x0F000302, 0x0F000303
+SK_VAR_DMG, SK_VAR_PHASE, SK_VAR_COL = 0x0F000304, 0x0F000305, 0x0F000306
+SK_VAR_HX, SK_VAR_HY, SK_VAR_HITS, SK_VAR_LOGP = 0x0F000307, 0x0F000308, 0x0F000309, 0x0F00030A
+# his VARs (his MSC writes them at the release): 15 a skeleton asked for (1), 16 / 17 the shadow's X / Y, 18 its way
+GK_VAR_SKREQ, GK_VAR_SKX, GK_VAR_SKY, GK_VAR_SKDIR = 0x0F00030F, 0x0F000310, 0x0F000311, 0x0F000312
+RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+# skeleton v1: + the Running Skeleton
 VARIANTS = (('A_release', RELEASE), ('D_parts', RELEASE | {'parts'}),
             ('E_sway', RELEASE | {'sway'}))   # v13: each on the release's set (v3 - v12's hurtbox route, C_hurt, dropped:
                                   # it never met an attack)
@@ -1918,7 +1959,8 @@ burn_him:                               # (r3 his entry, r4 his slot 0-7): his h
         stw r31, 0x1C(r1)
         mr r31, r4
         lwz r3, %(bacc)d(r3)
-        mulli r5, r4, 3
+        slwi r5, r4, 2                  # his context: slot x 4 (skeleton v1: x 4, 3 the skeleton's)
+        li r6, 0
         bl burn_scan
         mr r3, r31
         bl burn_tick
@@ -1953,8 +1995,9 @@ w_burn:                                 # (r3 the clone weapon): its hits, for i
         addi r0, r5, -1
         cmplwi r0, 1
         bgt wbn_out
-        mulli r6, r4, 3
+        slwi r6, r4, 2
         add r5, r5, r6                  # its context
+        li r6, 0
         mr r3, r31
         bl burn_scan
 wbn_out:
@@ -1965,7 +2008,8 @@ wbn_out:
         addi r1, r1, 0x30
         blr
 
-burn_scan:                              # (r3 an attacker's accessor, r4 the owner's slot, r5 its context)
+burn_scan:                              # (r3 an attacker's accessor, r4 the owner's slot, r5 its context, r6 a row or 0:
+                                        # the attacker's motion kind's; skeleton v1: its explosion row for every hit)
         stwu r1, -0x50(r1)
         mflr r0
         stw r0, 0x54(r1)
@@ -1978,7 +2022,8 @@ burn_scan:                              # (r3 an attacker's accessor, r4 the own
         lwz r29, %(watk)d(r3)           # its AttackModule
         cmpwi r29, 0
         beq bs_out
-        li r28, 0                       # the move row (0: none)
+        mr. r28, r6                     # the move row (0: none / by the motion kind)
+        bne bs_rows
         cmpwi r12, 0
         beq bs_rows
         lwz r0, %(mm_kind)d(r12)        # its motion kind
