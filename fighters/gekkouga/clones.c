@@ -539,9 +539,11 @@ int gk_lw_loop()
         func_23(0x289);
         func_2341(0);
         GroundModule(0x2710, 0x5);
+        gk_pips = 0;                      // the motion change ended the pips (terminate): drawn again
     }
     else if (global19 == 0x2 && global18 == 0)
     {
+        gk_pips = 0;
         func_23(0x271);
         func_2341(0);
         KineticModule(0x11, 0x1, 0);
