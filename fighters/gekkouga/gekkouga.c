@@ -40099,6 +40099,9 @@ float gk_hx2;          // of his unfrozen frames back ...
 float gk_hy2;          // ... his Y 2 / 3 back ...
 float gk_hy3;
 int gk_hcopy;          // ... "copying his vertical movement" then (bit 1: 1 back, 2: 2 back) ...
+int gk_cl_why;         // clone fixes v2 diag: what overrode the clones' places since the last line (1 / 2 a wall held the
+                       // left / right one, 4 their history started over, 8 back in formation, 16 / 32 falling on its own)
+int gk_cl_t;           // ... frames to the next line (every 10 while he is on the ground with clones out)
 int gk_hn;             // ... and how many of those each clone may use: the left's (0 - 3) + 4 x the right's (from 0 when
                        // it is made, at a swap, back in formation)
 float gk_floor_y;      // gk_floor()'s answer
@@ -40248,6 +40251,7 @@ void gekkouga_frame()
     }
     flags = flags | gk_alive * 16;        // v3 diag: 16 / 32 the clones out
     flags = flags | gk_ac_diag();         // aerial chain v1 diag (256 up: the exe's S4GF line logs a change)
+    flags = flags | gk_cl_diag();         // clone fixes v2 diag (1048576 toggled: an S4GF line with VAR_23)
     if (gk_ability > 0)
     {
         flags = flags | gk_gen_req;       // v4 diag: 64 / 128 a clone about to be made (next frame)
@@ -40333,6 +40337,7 @@ void gk_swap(int id)
     gk_set_c(id, ox, oy, 0);
     gk_set_fall_t(id, 0);
     gk_last_oy = cy;
+    gk_cl_why = gk_cl_why | 0x4;
     gk_hn = 0;                            // clone delay: his old places mean nothing now (both offsets changed): the
     gk_swap_cd = 10;                      // clones go on from his new place (held for their delay, then delayed)
 }
@@ -40618,6 +40623,7 @@ void gk_clone_phys(int id, float ox, float oy, float lastoy, int copy, int froze
     {
         if (gk_line(x, y + gk_wall_y(), nx, y + gk_wall_y()) == 0x2)
         {
+            gk_cl_why = gk_cl_why | id;   // clone fixes v2 diag: a wall held it (1 the left clone, 2 the right)
             if (nx > x)
             {
                 nx = gk_hit_x - gk_wall_gap();
@@ -40726,6 +40732,7 @@ void gk_physics()
     {
         gk_det = 0;                       // back from a launch: the clones back in formation (smoke)
         gk_hn = 0;                        // (clone delay: from his place now)
+        gk_cl_why = gk_cl_why | 0xc;
         if (gk_alive & 0x1)
         {
             gk_set_c(0x1, ox + gk_off_l, oy, 0);
@@ -41787,4 +41794,54 @@ int gk_ac_diag()
         d = d | 4096;
     }
     return d + gk_ac_used * 8192;
+}
+
+// ---- clone fixes v2 diag (the user: the clones "follow grounded movement incorrectly"): every 10 frames while he is on
+// the ground with clones out, his VAR_23 = the reasons x 10000 + (the left clone's X - its target + 50) x 100 + (the
+// right one's + 50) (target: his X + its offset; each rounded, clamped to +- 49; a missing clone 99), and flags bit
+// 1048576 toggled, so the TEST_ONLY exe's S4GF line logs it (gen=); the reasons (gk_cl_why) then start over
+int gk_cl_err(int id)
+{
+    float d;
+    if ((gk_alive & id) == 0)
+    {
+        return 99;
+    }
+    d = gk_cx(id) - PostureModuleF(0x1) - gk_off(id);
+    if (d > 49.0f)
+    {
+        d = 49.0f;
+    }
+    if (d < -49.0f)
+    {
+        d = -49.0f;
+    }
+    if (d < 0)
+    {
+        return 50 - (int)(0.5f - d);
+    }
+    return 50 + (int)(d + 0.5f);
+}
+
+int gk_cl_diag()
+{
+    if (gk_ability <= 0 || gk_alive == 0 || StatusModule(0x1) != 0)
+    {
+        return (gk_cl_t & 0x1) * 1048576;
+    }
+    if (gk_lfall > 2)
+    {
+        gk_cl_why = gk_cl_why | 0x10;
+    }
+    if (gk_rfall > 2)
+    {
+        gk_cl_why = gk_cl_why | 0x20;
+    }
+    gk_cl_t += 1;
+    if (gk_cl_t % 10 == 0)
+    {
+        WorkModule(0, (float)(gk_cl_why * 10000 + gk_cl_err(0x1) * 100 + gk_cl_err(0x2)) + 0, 0x0f000317);
+        gk_cl_why = 0;
+    }
+    return ((gk_cl_t / 10) & 0x1) * 1048576;
 }

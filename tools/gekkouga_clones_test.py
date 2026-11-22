@@ -1388,6 +1388,63 @@ def clone_fx_tests(mscsb, src, out):
     check('clone fixes v1: at least the motions his scripts give effects without loops / calls (%d)' % len(ce.scripts),
           len(ce.scripts) >= 90, True)
 
+def ground_move_tests(mscsb, src, out):
+    """clone fixes v2 (the user: the clones "follow grounded movement incorrectly", "clip back to a set position
+    constantly"): his walk / dash / run / turnaround / dash-turn / skid at his own speeds (fighter_param: walk 1.43, dash
+    1.6, run 2.08): each clone at his X 1 / 2 frames back + its offset (world: the left one always left), never a jump
+    over 1.5x his top speed; the cause was the clone's motions' TransN movement (its model ran ahead and snapped back):
+    the clone's main.pac has none; the diag line"""
+    import omo as O
+    m = fresh(mscsb, src)
+    g = m.game
+    g.x, g.y = 0.0, 10.0
+    m.setg('gk_lw_charge', 300)
+    m('gk_lw_press')
+    frames(m, 10)
+    xs, lr = [], []
+    v, x = 0.0, 0.0
+    plan = ([1.43] * 20 + [1.6] * 10 + [2.08] * 30 + [1.2, 0.6, 0.0, -0.6, -1.2] + [-1.6] * 8 + [-2.08] * 20 +
+            [-1.5, -1.0, -0.5, 0.0] + [1.6] * 5 + [-1.6] * 5 + [2.08] * 10 + [1.4, 0.8, 0.3, 0.0])   # walk, dash, run,
+    for v in plan:                        # turnaround, run back, skid, dash-turn twice, run, skid
+        x += v
+        g.x = round(x, 3)
+        g.lr = 1.0 if v >= 0 else -1.0
+        frames(m, 1)
+        xs.append((g.x, m.gf('gk_lx'), m.gf('gk_rx')))
+    hist = [p[0] for p in xs]
+    bad = []
+    for t in range(3, len(xs)):
+        want = (round(hist[t - 1] - 14.0, 2), round(hist[t - 2] + 14.0, 2))
+        got = (round(xs[t][1], 2), round(xs[t][2], 2))
+        if abs(got[0] - want[0]) > 0.01 or abs(got[1] - want[1]) > 0.01:
+            bad.append((t, got, want))
+    jumps = [t for t in range(1, len(xs)) if max(abs(xs[t][1] - xs[t - 1][1]), abs(xs[t][2] - xs[t - 1][2])) > 1.5 * 2.08]
+    check('clone fixes v2: walk, dash, run, turnaround, run back, skid, two dash-turns, run, skid (%d frames, his speeds): '
+          'the left clone at his X 1 frame back - 14, the right one 2 back + 14 (world sides: his facing changes nothing), '
+          'no jump over 1.5 x 2.08' % len(plan), (bad[:3], jumps[:3]), ([], []))
+    check('clone fixes v2 diag: every 10 grounded frames his VAR_23 = reasons x 10000 + (left X - target + 50) x 100 + (right '
+          '+ 50) (here: no override; the left 1 frame late, the right 2), flags bit 1048576 toggling',
+          (int(g.vars.get(0x0F000317)) // 10000, int(g.vars.get(0x0F000314)) >> 20 in (0, 1)), (0, True))
+    # the clone's motions: no TransN sideways movement
+    d = dict(O.pac_read(os.path.join(out, 'fighter', 'gekkouga', 'motion', 'clone', 'main.pac')))
+    mdl = os.path.join(out, 'fighter', 'gekkouga', 'model', 'clone', 'c00')
+    bones = O.vbn_read(os.path.join(mdl, 'model.vbn'))
+    h = bones[0][2]
+    moving = []
+    for name, data in d.items():
+        o = O.Omo(data)
+        for fr in range(o.frames):
+            s_ = o.sample(h, fr)
+            if s_ and (abs(s_[0][0]) > 1e-3 or abs(s_[0][2]) > 1e-3):
+                moving.append(name)
+                break
+    walk = O.Omo(d['FitGekkougaBodyMainA01WalkMiddle.omo'])
+    check('clone fixes v2: the clone\'s %d motions: TransN never moves sideways (his WalkMiddle / Run / AttackDash carry '
+          'it 22 / 33 / 25.5: the clone\'s model ran ahead of its place and snapped back each loop); WalkMiddle\'s TransN '
+          'still, its other bones moving' % len(d),
+          (moving[:3], [round(c, 2) for c in walk.sample(h, 25)[0]],
+           walk.sample(bones[2][2], 0) != walk.sample(bones[2][2], 25)), ([], [0.0, 0.0, 0.0], True))
+
 def skeleton_side_tests(mscsb, src):
     """skeleton v1: his side special (SpecialS 0x153's per-frame: gk_ss_tick, in place of func_2291), the request's
     lapse, the reset on the executable's clear-all count (his VAR_14)"""
@@ -2028,6 +2085,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (23, 24, 25, 27, 28):   # burn v2.2 / v2.3 / aerial chain v1 / clone fixes v1 / trail fix: data only
         want_top = ['INSTALL_TO_data', 'README.txt']
+    if len(earlier) == 29:   # skeleton v1.4: data and the TEST_ONLY exes (S4SV); the release exe is v1.3's
+        want_top = ['INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 22:   # burn v2.1: the exes only (the floor is the exe's)
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 18:   # v14: exes and test data only
@@ -2049,10 +2108,14 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     same = [w for w in want if z.read(w) != open(os.path.join(out, w[len('INSTALL_TO_data/'):]), 'rb').read()]
     check('... byte for byte', same, [])
     if z1:
-        check('update: none of the installed unchanged files again (%d unchanged)' % len(same1), [w for w in same1 if w in names], [])
+        again = {'INSTALL_TO_data/fighter/gekkouga/model/skeleton/c00/skeleton.lvd'} if len(earlier) == 29 else set()   # skeleton v1.4: the box skeleton.lvd again on purpose (it
+        # replaces skeleton v1.1's TEST_ONLY floor-only one the user had installed)
+        check('update: none of the installed unchanged files again (%d unchanged)%s' % (len(same1), ', but skeleton.lvd' if again
+              else ''), [w for w in same1 if w in names and w not in again], [])
         check('update: nothing in INSTALL_TO_data but the built files',
-              sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want), [])
-        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28):
+              sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want and
+                     n not in again), [])
+        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 21:
             check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
@@ -2114,6 +2177,19 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               'places delayed) and the clone\'s MSC (its playback delayed)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
               ['fighter/gekkouga/script/msc/clone/clone.mscsb', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
+    if z1 and len(earlier) == 29:
+        check('skeleton v1.4: INSTALL_TO_data: the box skeleton.lvd (walls + top), the clone\'s main.pac (no TransN movement), '
+              'the trail\'s game.bin (up smash\'s hitboxes on its flames), his MSC (the clone diag)',
+              sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              ['fighter/gekkouga/model/skeleton/c00/skeleton.lvd', 'fighter/gekkouga/motion/clone/main.pac',
+               'fighter/gekkouga/script/animcmd/weapon/firetrail/game.bin', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
+        import lvd as LV
+        c = LV.LVD(z.read('INSTALL_TO_data/fighter/gekkouga/model/skeleton/c00/skeleton.lvd')).collisions[0]
+        check('skeleton v1.4: skeleton.lvd: one collision, 4 vertices up the left side, across the top, down the right (x +- 6, '
+              'y 2 / 28), normals out of the solid (left wall -X, the top +Y, right wall +X: each the line\'s direction '
+              'turned counter-clockwise, as the hydrant\'s floor), no drop-through',
+              ([list(map(float, v)) for v in c.verts], [list(map(float, n)) for n in c.normals], len(c.mats)),
+              ([[-6.0, 2.0], [-6.0, 28.0], [6.0, 28.0], [6.0, 2.0]], [[-1.0, 0.0], [0.0, 1.0], [1.0, 0.0]], 3))
     if z1 and len(earlier) == 28:
         check('fire trail fix v1: INSTALL_TO_data: the trail\'s MSC (its flames along X) and his effect bank (the fires\' soft '
               'bases)', sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
@@ -2277,7 +2353,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -2298,6 +2374,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
          'walk', 'unconfirmed', 'exe_v46z_gkb6') if len(earlier) == 27 else \
         ('greninja_clonefix_v1', 'axis', 'down smash', 'up smash', 'forward smash', 'interpretation', 'bottom', 'trails.png',
          'unconfirmed', 'exe_v46z_gkb6') if len(earlier) == 28 else \
+        ('greninja_firetrail_fix_v1', 'skeleton.lvd', 'floor-only', 'walls', 'S4SV', 'A_release', 'TransN', 'snap', 'S4GF',
+         'gen=', 'up smash', 'unconfirmed', 'exe_v46z_gkb6') if len(earlier) == 29 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -2376,7 +2454,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
@@ -2389,6 +2467,7 @@ def main():
     delay_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
     clone_delay_tests(os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC)
     clone_fx_tests(os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC, out)
+    ground_move_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'), out)
     if os.path.exists(os.path.join(msc, 'skeleton', 'skeleton.mscsb')):
         skeleton_side_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
         skeleton_tests(os.path.join(msc, 'skeleton', 'skeleton.mscsb'), GB.SKELETON_MSC)

@@ -603,8 +603,28 @@ def full_motions(body_motion_dir, vbn_path):
                     m.nodes.append([f_, h, c, []])
                 have.add(h)
         m.nodes.sort(key=lambda nd: order.get(nd[1], len(order)))
+        root_still(m, O.vbn_read(vbn_path)[0][2])
         out.append((name, m.encode()))
     return out, fell
+
+
+def root_still(m, h):
+    """clone fixes v2 (the user: the clones "clip back to a set position constantly" on the ground): his walks / runs /
+    dash attack / dash grab move TransN forward (WalkMiddle 22 a loop, Run 33, AttackDash 25.5): a fighter's kinetics take
+    that as his movement, an article draws it, so the clone's model ran ahead of its place (his X + its offset, which already
+    has that movement) and snapped back at each loop. TransN's X / Z kept at 0 on every frame (Y and its rotation as they
+    were); a motion whose TransN doesn't move sideways is left as it is"""
+    import omo as O
+    n = m.node(h)
+    if n is None or not m.frames or 'pos' not in O.tracks(m, h):
+        return False
+    smp = [m.sample(h, fr) for fr in range(m.frames)]
+    if all(abs(p[0]) < 1e-4 and abs(p[2]) < 1e-4 for p, _q, _s in smp):
+        return False
+    tr = O.tracks(m, h)
+    O.set_node(m, h, pos=[(0.0, p[1], 0.0) for p, _q, _s in smp], rot=[q for _p, q, _s in smp] if 'rot' in tr else None,
+               scl=[s_ for _p, _q, s_ in smp] if 'scl' in tr else None)
+    return True
 
 
 def rebind(nud, bones, posed):
@@ -843,7 +863,8 @@ TR_SCRIPTS = ('FireTrailS4', 'FireTrailHi4', 'FireTrailLw4')   # its motion kind
 # tr_fx_*): (Z forward along its way, Y up, size). No knockback (KBG / FKB / BKB 0), no hitlag, no flinch, no hit effect,
 # 0.1 % (a hit to log: the burn is the exe's trail row, 0.25 % every 15 frames for 3 s = 3 %), re-hit every TR_REHIT
 TR_BOXES = {'FireTrailS4': ((14.0, 5.0, 7.0), (26.0, 5.0, 7.0), (38.0, 5.0, 7.0)),
-            'FireTrailHi4': ((0.0, 8.0, 9.0), (0.0, 22.0, 9.0), (0.0, 36.0, 9.0), (0.0, 50.0, 9.0)),
+            'FireTrailHi4': ((6.0, 5.0, 7.0), (-6.0, 5.0, 7.0), (14.0, 5.0, 7.0), (-14.0, 5.0, 7.0)),   # skeleton v1.4: on
+                                                                       # its flames under it (v1 - fire trail fix v1: a column)
             'FireTrailLw4': ((14.0, 5.0, 8.0), (30.0, 5.0, 8.0), (-14.0, 5.0, 8.0), (-30.0, 5.0, 8.0))}
 TR_REHIT = 35
 TR_HIT = dict(Damage=0.1, Angle=361, KBG=0, FKB=0, BKB=0, Effect=5, Hitlag=0.0, SDI=0.0, Clang=0, Rebound=0,
