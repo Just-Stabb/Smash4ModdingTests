@@ -18,14 +18,18 @@ run it with `python3 -I` on downloaded footage. Needs ffmpeg (libvpx-vp9, libweb
            itself: it composites the same with normal alpha blending (eft "Normal": src x a + dst x (1 - a))
            as with additive blending that takes the source alpha (eft "Add": src x a + dst); additive is
            what the footage was shot for (bright fire glows, black adds nothing). --black: the noise floor
-           cut (default 0.02), --gain: > 1 thickens the alpha (default 1).
+           cut (default 0.02), --gain: scales colour and alpha (auto, the default: the brightest flame, the
+           99.9th percentile of the lit pixels, -> 1, capped at x 3; dim footage would otherwise never be
+           opaque anywhere; the sidecar records it).
    alpha   footage with its own alpha (ProRes 4444 ...): --premultiplied (default on; --straight if not).
    chroma  green (or --key blue) screen: a clean plate of the screen is estimated per pixel (its median
            over frames where a pixel is screen, smoothed and filled where never seen), then a colour-
            difference key: alpha = 1 - (G - max(R, B)) / (plate's G - max(R, B)). A semi-transparent dark
            smoke keeps the fraction of the screen it lets through (smoke stays smoke). The colour is unmixed
            (pixel - (1 - alpha) x plate) / alpha, so the screen's green leaves the edges and the smoke, then
-           despilled (G <= max(R, B)). Alpha is then levelled: --key-lo (default: the screen's own noise,
+           despilled: G <= max(R, B) where opaque, sliding toward G <= mean(R, B) as much as the screen showed
+           through (x --despill, default 1): a flame's edge keyed too opaque (an orange edge over green reads
+           as only part screen) would stay yellow-olive under the plain limit; neutral smoke is untouched. Alpha is then levelled: --key-lo (default: the screen's own noise,
            its 99.5th percentile of alpha where nothing ever passes) to --key-hi (0.92) -> 0..1: soft edges kept, noise gone.
 2. Range: the visible frames (alpha mass >= --vis of the peak, default 0.02). --oneshot: kept from the first
    visible frame to the last (no loop). Loop (default): searched inside the sustained part (alpha mass >=
@@ -39,9 +43,11 @@ run it with `python3 -I` on downloaded footage. Needs ffmpeg (libvpx-vp9, libweb
 3. --track (x, xy): runners crossing the frame are shifted so the opaque body's centroid (alpha >= 0.6) stays
    at its mean over the loop (smoothed over 5 frames); reported as drift when not used.
 4. Crop: the union of every kept frame's alpha (box-filtered 5 px, > --crop-thr, default 0.03) plus --margin
-   (default 3 % of the larger side, at least 4 px). Where the effect runs off the footage (smoke trailing out
-   of frame) that side fades out over --edge-feather (8 % of the crop, smoothstep) instead of ending in
-   a hard line (--bottom-cut-ok: not the bottom, for fire standing on it); the sidecar lists them.
+   (default 3 % of the larger side, at least 4 px). Where the effect runs off the footage (smoke trailing
+   out of frame) that side fades out over --edge-feather (8 % of the crop, smoothstep) instead of ending
+   in a hard line (--bottom-cut-ok: not the bottom, for fire standing on it); the sidecar lists them.
+   --fade-out N (one-shots): the last N cells fade out linearly, for footage that ends still dense (smoke
+   that never clears).
 5. Cells and timing: the game runs at 60; eft plays a cell every K frames (0x504 frames a cell, integer).
    K defaults to the slowest that does not drop below the source's rate (30 fps -> 2: 30 fps; 24 -> 3: 20 fps);
    --fpc K forces it. A loop of L source frames becomes N = round(L x 60 / (fps x K)) cells (sampled by
@@ -192,10 +198,14 @@ class Matte:
         a_raw = np.clip(1 - self._diff(rgb) / dp, 0, 1)
         prem = np.clip(rgb - (1 - a_raw[..., None]) * plate, 0, None)
         col = prem / np.maximum(a_raw[..., None], 1e-3)
-        if self.o.key == 'blue':
-            col[..., 2] = np.minimum(col[..., 2], np.maximum(col[..., 0], col[..., 1]))
-        else:
-            col[..., 1] = np.minimum(col[..., 1], np.maximum(col[..., 0], col[..., 2]))
+        # despill: the key channel limited to max(other two) where opaque, to their mean where the screen
+        # showed through (a fire's edge over the screen keyed too opaque comes out yellow-olive, not orange;
+        # neutral smoke is untouched either way)
+        k, o1, o2 = (2, 0, 1) if self.o.key == 'blue' else (1, 0, 2)
+        hi_ = np.maximum(col[..., o1], col[..., o2])
+        mean_ = 0.5 * (col[..., o1] + col[..., o2])
+        t = np.clip(1 - a_raw, 0, 1) * self.o.despill
+        col[..., k] = np.minimum(col[..., k], hi_ * (1 - t) + mean_ * t)
         col = np.clip(col, 0, 1)
         if not levels:
             return a_raw
@@ -347,6 +357,15 @@ def run_job(opt):
     alpha_in = opt.matte == 'alpha'
     frames = decode(opt.input, info, w, h, alpha_in)
     T = len(frames)
+    if opt.matte == 'luma' and opt.gain == 'auto':
+        # the brightest flame (99.9th percentile of the lit pixels' max channel) -> 1, at most x 3
+        idx = np.linspace(0, T - 1, min(16, T)).round().astype(int)
+        mc = frames[idx].max(-1).astype(np.float32) / 255
+        lit = mc[mc > opt.black + 0.05]
+        peak = (float(np.percentile(lit, 99.9)) - opt.black) / (1 - opt.black) if lit.size else 1.0
+        opt.gain = round(float(np.clip(1 / max(peak, 1e-3), 1.0, 3.0)), 3)
+    else:
+        opt.gain = float(opt.gain)
     matte = Matte(opt, frames)
     f = max(1, round(max(w, h) / 160))
     small_raw = shrink(frames, f) / 255.0
@@ -461,6 +480,8 @@ def run_job(opt):
             if j >= 0:
                 wgt = (j + 1) / X               # the last frame is frame a-1 itself
                 p = (1 - wgt) * p + wgt * full(i - loop['length_frames'])
+        elif opt.fade_out and c >= n - opt.fade_out:
+            p = p * ((n - c) / (opt.fade_out + 1))      # one-shot still dense at the footage's end
         return p
 
     outs = [out_frame(c).astype(np.float16) for c in range(n)]
@@ -543,9 +564,10 @@ def run_job(opt):
         'blend_hint': BLEND_HINT[opt.matte],
         'matte': {'kind': opt.matte, **({'black': opt.black, 'gain': opt.gain} if opt.matte == 'luma' else {}),
                   **({'premultiplied_source': opt.premultiplied} if opt.matte == 'alpha' else {}),
-                  **({'key': opt.key, 'key_lo': round(matte.lo, 4), 'key_hi': opt.key_hi,
+                  **({'key': opt.key, 'key_lo': round(matte.lo, 4), 'key_hi': opt.key_hi, 'despill': opt.despill,
                       'screen_rgb': [round(float(v), 3) for v in matte.screen_rgb]} if opt.matte == 'chroma' else {})},
         'edges_faded': [k for k, v in cut.items() if v and opt.edge_feather > 0],
+        'faded_out_last_cells': opt.fade_out if (opt.fade_out and not loop) else 0,
         'subject_drift': drift, 'tracked': opt.track or None,
         'vram_bytes': {'rgba8': W * H * 4, 'bc3': W * H},
         'ptcl': {'flipbook_mode_0x500': 2 if loop else 4, 'cells_across_0x4D7': nx, 'cells_down_0x4D8': ny,
@@ -565,7 +587,7 @@ def run_job(opt):
 
 ALPHA_MODE = {
     'luma': 'straight (unpremultiplied) RGBA; alpha = max(R, G, B) of the black-levelled footage, colour = '
-            'footage / alpha, so colour x alpha = the footage over black',
+            'footage / alpha, so colour x alpha = the footage over black (x matte.gain)',
     'alpha': 'straight (unpremultiplied) RGBA from the source\'s own (premultiplied) alpha',
     'chroma': 'straight (unpremultiplied) RGBA; colour-difference key with the screen unmixed out and despilled',
 }
@@ -690,7 +712,10 @@ def parser():
     ap.add_argument('--max-area', type=int, default=1024 * 1024)
     ap.add_argument('--decode-max', type=int, default=1280, help='working resolution (longer side)')
     ap.add_argument('--black', type=float, default=0.02)
-    ap.add_argument('--gain', type=float, default=1.0)
+    ap.add_argument('--gain', default='auto', help="luma: colour / alpha scale; 'auto': the brightest flame -> 1")
+    ap.add_argument('--fade-out', type=int, default=0, help='one-shot: fade the last N cells out (linear)')
+    ap.add_argument('--despill', type=float, default=1.0, help='chroma: 0 = G <= max(R, B) only; 1 = toward '
+                    'mean(R, B) as the screen shows through')
     ap.add_argument('--straight', dest='premultiplied', action='store_false')
     ap.add_argument('--key', choices=('green', 'blue'), default='green')
     ap.add_argument('--key-lo', type=float)
