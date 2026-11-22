@@ -97,7 +97,8 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # none: 2, loaded with the fighter. Bunshin's 0x87D has 0x1 (4: the Final Smash load,
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
-FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
+                      'tiers', 'gmupd'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -111,6 +112,10 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', '
 #   skeleton skeleton v1: the Running Skeleton article (needs burn): its kind, claim, collision, HP hit check, burn
 #   floor1  burn v2.1: the per-burn floor 1 % (shielded or not; 3 % without: the shielded rows' damage a tick)
 #   burn2   burn v2 (needs skeleton): fire on burning fighters (bfx_vic) and the smashes' fire trails (kind TR_KIND)
+#   tiers   skeleton v1.3 / burn tiers (needs burn2): the burning fighters' fire picked by tier (BFX_TIERS: their burns'
+#           count, remaining damage, strongest rate), a different effect each (BFX_TIER_IDS) in place of one scaled
+#   gmupd   skeleton v1.3 (needs skeleton): its GroundModule's own frame update (GC_FRAME) every moved frame, as the
+#           hydrant's update template runs it (the collision attempt: Mario's pump's template never updates +0x2C)
 #   hitcheck v12: the clone hit from his side (w_hitchk: other fighters' attack boxes against the clone's box)
 #   sway    v11: the clone's swing step every frame (w_sway: his MotionModule's swing update, as his frame calls it)
 #   bstart  v8: the clone's start (specializer +0x34) runs bunshin's own (0x02AF6738: black overlay, LinkModule link 3
@@ -298,6 +303,11 @@ GC_MOVEV = 0x02AC312C             # (gm, vertex, &(x, y)): a vertex moved (last 
 GC_COMMIT = 0x02AC3204            # (gm): the grounds' lines recomputed after the vertex moves
 GROUND_MGR = 0x102F7DB4          # v1.1 diag: [it] the stage's ground manager (+0x19C: its layers byte)
 GC_FREE = 0x02AC29D8              # (gm): the grounds removed (the GroundModule's own end, vt +0x2C / +0x4C, does this)
+GC_FRAME = 0x02C34258             # skeleton v1.3 (gmupd): (gm) the GroundModule's base frame update: [gm +0x14] +0x18 vt
+                                  # +0x74, its +0x18 object's 0x02D64344, vt +0x64 (0x02C35C9C), +0xE3 = 1. The hydrant's
+                                  # own update 0x02B38AD0 (its template's last phase 0x02BA98F4) runs it, then its vertices
+                                  # (0x02B38A18 -> 0x02B38950) and the commit; Mario's pump's template (the skeleton's base
+                                  # kind) never updates +0x2C
 SK_W, SK_B, SK_H = 6.0, 2.0, 28.0   # its collision: x +- 6, a wall each side from y + 2 up to the top, a floor on top
                                   # at y + 28 (about 1.75 x a fighter's height: Greninja's ~16)
 SK_VERTS = ((-SK_W, SK_B), (-SK_W, SK_H), (SK_W, SK_H), (SK_W, SK_B))   # the .lvd's vertices (left wall, top, right wall)
@@ -325,6 +335,32 @@ GK_VAR_SKREQ, GK_VAR_SKX, GK_VAR_SKY, GK_VAR_SKDIR = 0x0F00030F, 0x0F000310, 0x0
 BFX_ID = 0x0330001A
 BFX_LEVELS = 5
 BFX_STEP = 0.15
+# skeleton v1.3 package (feature tiers; the user: "different fire effects on the opponent to denote more/stronger fire
+# stacks"): the fire's tier from all its burns (anyone's): the highest tier one of whose minimums is met (instances,
+# remaining damage %, strongest rate % a second), 1 with any burn. Remaining = each instance's damage a tick x frames left /
+# interval; rate = damage a tick x 60 / interval. Rows (burn_moves): neutral air 3 % / 1 %/s, forward air 5.4 / 1.8, a
+# smash 16 / 4, the fire trail 3 / 1, the skeleton's explosion 36 / 6 (shielded: 35 %, half the frames). So one neutral
+# air: tier 1; a forward air: 2; a smash: 3; the explosion: 4; weak burns climb by count (2, 4, 6).
+BFX_TIERS = (                     # (tier, min instances, min remaining %, min %/s): checked from the top
+    (4, 6, 20.0, 6.0),
+    (3, 4, 8.0, 4.0),
+    (2, 2, 4.0, 1.8),
+)
+BFX_TIER_IDS = (0, 0x0330001F, 0x0330001A, 0x03300020, 0x03300021)   # tier -> his bank's set (tools/gekkouga_fx.py
+                                  # PtcGekkougaFireBody1 / FireBody (burn v2's, tier 2) / FireBody3 / FireBody4)
+
+
+def bfx_tier(instances):
+    """the tier of a victim's burns: instances [(frames left, interval, damage a tick)] (the exe's bfx_vic)"""
+    live = [(f, iv, d) for f, iv, d in instances if f]
+    if not live:
+        return 0
+    rem = sum(d * f / iv for f, iv, d in live if iv)
+    rate = max([d * 60.0 / iv for f, iv, d in live if iv] or [0.0])
+    for tier, n, r, ps in BFX_TIERS:
+        if len(live) >= n or rem >= r - 1e-6 or rate >= ps - 1e-6:
+            return tier
+    return 1
 EM_MSC = 0x2EC                    # EffectModule vt +0x2EC: the MSC handler (module, &{args, count}): the ACMD Terminate's call
 F_EFFECT = 0xA0                   # a fighter's (any object's) accessor -> EffectModule
 # (2) the smashes' fire trails: a stationary article (weapon kind TR_KIND, his article 9, TR_MAX at once; its MSC
@@ -347,11 +383,12 @@ GK_VAR_TR = 0x0F000300            # his VAR_0 + 4 k: request k's type, + 1 x, + 
 TR_VAR_SLOT, TR_VAR_TYPE, TR_VAR_X, TR_VAR_Y, TR_VAR_DIR, TR_VAR_CTX = (0x0F000300 + i for i in range(6))
 assert all(burn_total(m, sh, f) >= f - 1e-4 for m in BURN_MOVES + (TR_ROW,) for sh in (False, True)
            for f in (BURN_MIN_TOTAL, BURN_MIN_TOTAL_OLD)), 'a burn under the floor'
-RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1', 'tiers', 'gmupd'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
 # swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose); burn v2:
 # + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2 - floor1); burn
-# v2.1: + floor1 (the burn floor 1 %, the user; burn v2's exe_v46z_gkb4 is RELEASE - floor1)
+# v2.1: + floor1 (the burn floor 1 %, the user; burn v2's exe_v46z_gkb4 is RELEASE - floor1); skeleton v1.3: + tiers,
+# gmupd (exe_v46z_gkb6; burn v2.1 - aerial chain v1's exe_v46z_gkb5 is RELEASE - tiers - gmupd)
 VARIANTS = (('A_release', RELEASE), ('G_pose', (RELEASE - {'sway'}) | {'pose'}))
 # v15: A_release (the release: the native swing, diag) and G_pose (v14's pose copy instead of the swing, in case); v14:
 # A_release (attack hitcheck burn skeleton pose) and E_sway (attack hitcheck burn skeleton sway); v13's D_parts dropped   # v13: each on the release's set (v3 - v12's hurtbox route, C_hurt, dropped:
@@ -609,9 +646,91 @@ def vnum(wm, vid, reg):
         lfsx f1, r12, r0''' % reg + var_set(wm, vid)
 
 
-def burn2_src(D, orig94):
+def burn2_src(D, orig94, tiers=False):
     """burn v2: the burning fighters' fire (bfx_vic) and the fire trail article's native part (tr_94 / tr_frame /
-    tr_claim / tr_dcase)"""
+    tr_claim / tr_dcase); skeleton v1.3 (tiers): the fire by tier (BFX_TIERS / BFX_TIER_IDS)"""
+    count = """
+bfv_cnt:
+        lwz r0, 0(r12)
+        cmpwi r0, 0
+        beq bfv_cn
+        addi r30, r30, 1
+bfv_cn: addi r12, r12, 16
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne bfv_cnt
+        cmpwi r30, %(bfx_levels)d
+        ble bfv_lv
+        li r30, %(bfx_levels)d"""
+    # tiers: per live instance (frames left, interval, damage a tick): count, remaining += damage / interval x frames
+    # left, rate = the most damage / interval; then the tier: the first rule (4, 3, 2) one of whose minimums is met, else 1
+    tiers_count = """
+        lis r10, %(bfx_tier_hi)d
+        addi r10, r10, %(bfx_tier_lo)d  # +0 the int -> float magic, +8 0.0, +32 the rules
+        lfs f2, 8(r10)                  # remaining
+        fmr f3, f2                      # the strongest rate (a frame)
+        lfd f8, 0(r10)
+        lis r9, 0x4330
+        stw r9, 0x40(r1)
+bfv_cnt:
+        lwz r0, 0(r12)
+        cmpwi r0, 0
+        beq bfv_cn
+        addi r30, r30, 1
+        lhz r9, 6(r12)                  # its interval
+        cmpwi r9, 0
+        beq bfv_cn
+        xoris r0, r0, 0x8000
+        stw r0, 0x44(r1)
+        lfd f5, 0x40(r1)
+        fsub f5, f5, f8
+        frsp f5, f5                     # frames left
+        xoris r9, r9, 0x8000
+        stw r9, 0x44(r1)
+        lfd f6, 0x40(r1)
+        fsub f6, f6, f8
+        frsp f6, f6
+        lfs f4, 12(r12)
+        fdivs f7, f4, f6                # its damage a frame
+        fmadds f2, f7, f5, f2
+        fcmpu cr0, f7, f3
+        ble bfv_cn
+        fmr f3, f7
+bfv_cn: addi r12, r12, 16
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne bfv_cnt
+        cmpwi r30, 0
+        beq bfv_lv                      # none: 0
+        mr r9, r30
+        li r30, 1
+        addi r8, r10, 32
+        li r7, %(bfx_nrules)d
+bfv_rule:
+        lwz r0, 4(r8)                   # {tier, instances, remaining, rate a frame}
+        cmpw r9, r0
+        bge bfv_hit
+        lfs f0, 8(r8)
+        fcmpu cr0, f2, f0
+        bge bfv_hit
+        lfs f0, 12(r8)
+        fcmpu cr0, f3, f0
+        bge bfv_hit
+        addi r8, r8, 16
+        addi r7, r7, -1
+        cmpwi r7, 0
+        bne bfv_rule
+        b bfv_lv
+bfv_hit:
+        lwz r30, 0(r8)"""
+    old_id = """
+        lis r0, %(bfx_id_hi)d
+        ori r0, r0, %(bfx_id_lo)d"""
+    tier_id = lambda reg: """
+        lis r12, %(bfx_ids_hi)d
+        addi r12, r12, %(bfx_ids_lo)d
+        slwi r0, """ + reg + """, 2
+        lwzx r0, r12, r0                # the tier's effect"""
     zero = """
         lis r12, %(zero_hi)d
         lfs f1, %(zero_lo)d(r12)"""
@@ -641,19 +760,7 @@ bfx_vic:
         mulli r0, r31, %(bcap16)d
         add r12, r12, r0
         li r11, %(bcap)d
-        li r30, 0                       # its instances
-bfv_cnt:
-        lwz r0, 0(r12)
-        cmpwi r0, 0
-        beq bfv_cn
-        addi r30, r30, 1
-bfv_cn: addi r12, r12, 16
-        addi r11, r11, -1
-        cmpwi r11, 0
-        bne bfv_cnt
-        cmpwi r30, %(bfx_levels)d
-        ble bfv_lv
-        li r30, %(bfx_levels)d
+        li r30, 0                       # its instances""" + (tiers_count if tiers else count) + r"""
 bfv_lv: lis r29, %(bfx_lvl_hi)d
         addi r29, r29, %(bfx_lvl_lo)d
         slwi r0, r31, 2
@@ -679,9 +786,7 @@ bfv_lv: lis r29, %(bfx_lvl_hi)d
         cmpwi r28, 0
         beq bfv_new
         li r0, 0x2723                   # the old fire ended
-        stw r0, 0x10(r1)
-        lis r0, %(bfx_id_hi)d
-        ori r0, r0, %(bfx_id_lo)d
+        stw r0, 0x10(r1)""" + (tier_id('r28') if tiers else old_id) + r"""
         stw r0, 0x14(r1)
         li r0, 0                        # (0, 0): a fade (none now)
         cmpwi r30, 0
@@ -694,9 +799,7 @@ bfv_new:
         cmpwi r30, 0
         beq bfv_log
         li r0, 0x2717                   # the new one: following its joint 0 (position only)
-        stw r0, 0x10(r1)
-        lis r0, %(bfx_id_hi)d
-        ori r0, r0, %(bfx_id_lo)d
+        stw r0, 0x10(r1)""" + (tier_id('r30') if tiers else old_id) + r"""
         stw r0, 0x14(r1)
         li r0, 0
         stw r0, 0x18(r1)                # joint 0
@@ -709,8 +812,8 @@ bfv_new:
         stw r0, 0x38(r1)                # the last word 0
         lis r12, %(bfx_sizes_hi)d
         addi r12, r12, %(bfx_sizes_lo)d
-        slwi r0, r30, 2
-        lwzx r0, r12, r0                # its size: 1 + BFX_STEP x (level - 1)
+""" + ("""        lwz r0, 4(r12)                  # tiers: size 1.0 (each tier its own look)""" if tiers else """        slwi r0, r30, 2
+        lwzx r0, r12, r0                # its size: 1 + BFX_STEP x (level - 1)""") + r"""
         stw r0, 0x34(r1)
         li r4, 11""" + em_call + """
 bfv_log:""" + D("""
@@ -942,7 +1045,7 @@ tr_dcase:
 """
 
 
-def sk_source(D, old_hit, orig94):
+def sk_source(D, old_hit, orig94, gmupd=False):
     """skeleton v1: the Running Skeleton's native part (fighters/gekkouga/README.md "Skeleton v1")"""
     zero = '''
         lis r12, %(zero_hi)d
@@ -1454,7 +1557,11 @@ sk_col_place:
         addi r27, r27, 8                # the top's two (SK_VERTS 1 / 2)
         b skp_cnt
 skp_n4: li r25, %(sk_nv)d
-skp_cnt:
+skp_cnt:''' + ('''
+        cmpwi r30, 0                    # skeleton v1.3 (gmupd): moved: its GroundModule's own frame update first (the
+        bne skp_nofr                    # hydrant's 0x02B38AD0 order: the update, then the vertices, then the commit)
+        mr r3, r29''' + call(GC_FRAME) + '''
+skp_nofr:''' if gmupd else '') + '''
         lwz r12, %(wpost)d(r31)
         cmpwi r12, 0
         beq skp_out
@@ -2500,6 +2607,8 @@ def build(rpx, diag=False, feats=None):
     A['bfx_lvl'] = alloc(4 * SLOTS, 4) if burn2 else 0       # each victim's fire level shown
     A['tr_ttl'] = alloc(4 * SLOTS * TR_CTX, 4) if burn2 else 0   # his trails' contexts kept (frames)
     A['bfx_sizes'] = alloc(4 * (BFX_LEVELS + 1), 4) if burn2 else 0
+    A['bfx_tier'] = alloc(32 + 16 * len(BFX_TIERS), 8) if burn2 and 'tiers' in feats else 0   # skeleton v1.3: magic, 0.0,
+                                                          # the ids (+12), the rules (+32)
     assert not burn2 or A['tr_ttl'] == A['bfx_lvl'] + 4 * SLOTS
     A['gk_desc'] = alloc(0x38)
     A['g1_desc'] = alloc(12)
@@ -2636,6 +2745,10 @@ def build(rpx, diag=False, feats=None):
         out.blob(A['bfx_lvl'], bytes(4 * SLOTS + 4 * SLOTS * TR_CTX), 'burn fire levels, trail contexts')
         out.blob(A['bfx_sizes'], struct.pack('>%df' % (BFX_LEVELS + 1), 0.0, *(1.0 + BFX_STEP * i for i in range(BFX_LEVELS))),
                  'burn fire sizes')
+        if 'tiers' in feats:
+            out.blob(A['bfx_tier'], struct.pack('>II', 0x43300000, 0x80000000) + struct.pack('>f', 0.0) +
+                     struct.pack('>5I', *BFX_TIER_IDS) + b''.join(struct.pack('>2I2f', t, n, r, ps / 60.0)
+                                                              for t, n, r, ps in BFX_TIERS), 'burn fire tiers')
     out.blob(A['gk_list'], struct.pack('>II', A['gk_list'] + 8, len(L['rows'])) +
              b''.join(struct.pack('>4I', *e) for e in L['rows']), 'his article list (+ clones 6 / 7, skeleton 8)')
     gd = bytearray(img.blob(GK_DESC, 0x38))
@@ -2723,6 +2836,10 @@ def build(rpx, diag=False, feats=None):
         p['tr_row_hi'], p['tr_row_lo'] = ha(A['bmoves'] + 20 * tri), K.slo(A['bmoves'] + 20 * tri)
         for nm in ('tr_desc', 'tr_ttl', 'bfx_lvl', 'bfx_sizes', 'gk_fbf', 'gk_ftr'):
             p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
+        if 'tiers' in feats:
+            p['bfx_tier_hi'], p['bfx_tier_lo'] = ha(A['bfx_tier']), K.slo(A['bfx_tier'])
+            p['bfx_ids_hi'], p['bfx_ids_lo'] = ha(A['bfx_tier'] + 12), K.slo(A['bfx_tier'] + 12)
+            p['bfx_nrules'] = len(BFX_TIERS)
         p.update(bfx_levels=BFX_LEVELS, f_effect=F_EFFECT, em_msc=EM_MSC, bfx_id_hi=BFX_ID >> 16,
                  bfx_id_lo=BFX_ID & 0xFFFF, tr_ctx=TR_CTX, tr_ctx4=4 * TR_CTX, tr_ttlv=TR_TTL, tr_ctx0=TR_CTX0,
                  tr_reqs=TR_REQS, gk_var_tr_hi=GK_VAR_TR >> 16, gk_var_tr_lo=GK_VAR_TR & 0xFFFF,
@@ -5006,7 +5123,7 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
-''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94]) if skel else '') + (burn2_src(D, L['vt_orig'][0x94]) if 'burn2' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
+''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats) if 'burn2' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
 # ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
 gk_clear:
         li r0, 0''' + (('''

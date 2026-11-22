@@ -1464,6 +1464,8 @@ def skeleton_checks(e, info, diag):
     e.stub(C.GC_MOVEV, vert('movev'))
     e.stub(C.GC_COMMIT, lambda e_: calls.append(('commit', e_.r(3))))
     e.stub(C.GC_FREE, gc_free)
+    e.stub(C.GC_FRAME, lambda e_: calls.append(('gmframe', e_.r(3))))
+    gmf = [('gmframe', gm)] if 'gmupd' in F else []      # skeleton v1.3: its GroundModule's frame update, moved frames
     # the skeleton: its WorkModule (sv), place (50, 10), GroundModule, AttackModule (its explosion's logs), motion
     sv = {}
     svt = e.alloc(0x100, b'\0')
@@ -1559,9 +1561,10 @@ def skeleton_checks(e, info, diag):
               [x[:5] for x in logs('gk_fsc')], [(1, ground, 0x1111, 0x2222, gm)])
     e.mu.mem_write(post + 0x10, struct.pack('>2f', 50.7, 10.0))
     c2 = frame()
-    check('skeleton collision: it moved 0.7: its vertices moved (riders carried: the move call), the lines recomputed, '
-          'kept on (v1.2)',
-          c2, [('movev', gm, i, round(50.7 + vx, 3), 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS)] +
+    check('skeleton collision: it moved 0.7: %sits vertices moved (riders carried: the move call), the lines recomputed, '
+          'kept on (v1.2)' % ('v1.3: its GroundModule\'s frame update (GC_FRAME, as the hydrant\'s 0x02B38AD0) first, then '
+                              if gmf else ''),
+          c2, gmf + [('movev', gm, i, round(50.7 + vx, 3), 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS)] +
           [('commit', gm), ('enable', gm)])
     e.setw(ground + 0x160, 0xFFFF0000)
     check('skeleton v1.1: its ground gone (id -1: something removed it): nothing moved; made again next frame (VAR_6 0, '
@@ -1585,7 +1588,7 @@ def skeleton_checks(e, info, diag):
     e.setw(gobj + 0x34, 2)
     e.mu.mem_write(post + 0x10, struct.pack('>2f', 50.0, 10.0))
     check('skeleton v1.1: a floor-only skeleton.lvd (2 vertices, as the hydrant\'s): only its top line moved (x +- 6, y + 28)',
-          frame(), [('movev', gm, i, 50.0 + vx, 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS[1:3])] +
+          frame(), gmf + [('movev', gm, i, 50.0 + vx, 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS[1:3])] +
           [('commit', gm), ('enable', gm)])
     e.setw(gobj + 0x34, 4)
     frame()
@@ -2108,13 +2111,16 @@ def burn2_checks(e, info, diag):
     e.setw(vacc + C.F_EFFECT, vem)
 
     def put(n, owner=2):
+        """victim 4's instances: n of (1000 frames, every 100, no damage), or a list of (frames left, interval, damage)"""
+        ins = n if isinstance(n, list) else [(1000, 100, 0.0)] * n
         for kk in range(C.BURN_CAP):
             a = A['btab'] + (4 * C.BURN_CAP + kk) * 16
-            if kk < n:
-                e.setw(a, 1000)
-                e.setw(a + 4, (100 << 16) | 100)
+            if kk < len(ins):
+                f_, iv, dmg = ins[kk]
+                e.setw(a, f_)
+                e.setw(a + 4, (iv << 16) | iv)
                 e.setw(a + 8, owner)
-                e.setw(a + 12, 0)
+                e.mu.mem_write(a + 12, struct.pack('>f', dmg))
             else:
                 e.setw(a, 0)
 
@@ -2123,6 +2129,79 @@ def burn2_checks(e, info, diag):
         e.osr_full = []
         e.call(lab['burn_him'], (f or gk)['f'], slot0)
         return list(calls)
+    if 'tiers' in F:
+        tier_checks(e, A, put, frame, vem)
+    else:
+        bfx_level_checks(e, A, put, frame, vem, gk)
+    if diag:
+        frame()
+        put(1)
+        frame()
+        check('burn v2 diag: S4BF (victim 4, level 0 -> 1)', [x[1:4] for x in e.osr_full if x[0] == A['gk_fbf']], [(4, 0, 1)])
+        put(0)
+        frame()
+    e.mu.mem_write(vic['f'] + 0x1E, b'\x00')
+    put(2)
+    check('burn v2: a victim no longer live: its level kept, no call', (frame(), e.w(A['bfx_lvl'] + 16)), ([], 0))
+    put(0)
+    frame()
+    e.mu.mem_write(vic['f'] + 0x1E, b'\x04')
+    burn2_trail_checks(e, info, diag, gk)
+
+
+def tier_checks(e, A, put, frame, vem):
+    """skeleton v1.3 (tiers): the fire on a burning fighter by tier (C.BFX_TIERS): its burns' count, remaining damage,
+    strongest rate; a swap only when the tier changes"""
+    ids = C.BFX_TIER_IDS
+    spawn = lambda t: (vem, (0x2717, ids[t], 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0))   # noqa: E731
+    end = lambda t, k: (vem, (0x2723, ids[t], k, k))                                     # noqa: E731
+    rows = {m[0]: m for m in C.BURN_MOVES}
+
+    def inst(row, left=None):
+        _k, dmg, iv, frames = row
+        return (frames if left is None else left, iv, dmg)
+    nair, fair, smash, sk = rows[104], rows[105], rows[95], rows[C.SK_BURN_KEY]
+    cases = [('one neutral air burn (3 %, 1 %/s)', [inst(nair)], 1),
+             ('one forward air burn (5.4 %: over 4)', [inst(fair)], 2),
+             ('two neutral air burns (count 2)', [inst(nair)] * 2, 2),
+             ('one smash burn (4 %/s)', [inst(smash)], 3),
+             ('four neutral air burns (count 4)', [inst(nair)] * 4, 3),
+             ('the skeleton\'s explosion burn (6 %/s)', [inst(sk)], 4),
+             ('the explosion burn nearly out (60 frames left: 6 %, still 6 %/s)', [inst(sk, 60)], 4),
+             ('six neutral air burns (count 6)', [inst(nair)] * 6, 4),
+             ('a forward air burn nearly out (20 frames: 0.6 %, 1.8 %/s: the rate)', [inst(fair, 20)], 2),
+             ('three burns of 0.5 % every 15 frames, 90 frames left: 9 % between them, 2 %/s (remaining)',
+              [(90, 15, 0.5)] * 3, 3)]
+    check('burn tiers: the Python reference (bfx_tier) on each case',
+          [C.bfx_tier(c[1]) for c in cases], [c[2] for c in cases])
+    for what, ins, want in cases:
+        put(0)
+        frame()
+        put(ins)
+        got = frame()
+        check('burn tiers: %s: tier %d, its own effect (0x%X) put on' % (what, want, ids[want]),
+              (got, e.w(A['bfx_lvl'] + 16)), ([spawn(want)], want))
+    put(0)
+    frame()
+    put([inst(nair)])
+    frame()
+    put([inst(nair)] * 2)
+    check('burn tiers: 1 -> 2 burns: the tier-1 fire ended at once, the tier-2 one put on', frame(), [end(1, 1), spawn(2)])
+    put([inst(nair, 120)] * 2)
+    check('burn tiers: the 2 burns burning down (still tier 2): no swap', frame(), [])
+    put([inst(nair, 120)] * 2 + [inst(sk)])
+    check('burn tiers: + the explosion burn: tier 4 (2 -> 4)', frame(), [end(2, 1), spawn(4)])
+    put([inst(nair)] * 9)
+    check('burn tiers: 9 weak burns: still 4: nothing', frame(), [])
+    put([inst(nair, 30)])
+    check('burn tiers: one weak burn left: down to 1', frame(), [end(4, 1), spawn(1)])
+    put(0)
+    check('burn tiers: no burn left: the fire ended with a fade (0x2723 (id, 0, 0): its 15 frames), nothing put on',
+          frame(), [end(1, 0)])
+
+
+def bfx_level_checks(e, A, put, frame, vem, gk):
+    """burn v2 - aerial chain v1 (no tiers): one fire, scaled by the count"""
     put(1)
     c1 = frame()
     spawn = lambda sz: (vem, (0x2717, C.BFX_ID, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, sz, 0))   # noqa: E731
@@ -2147,19 +2226,10 @@ def burn2_checks(e, info, diag):
     c0 = frame()
     check('burn v2: no burn left: the fire ended with a fade (0x2723 (id, 0, 0)), nothing put on', c0,
           [(vem, (0x2723, C.BFX_ID, 0, 0))])
-    if diag:
-        frame()
-        put(1)
-        frame()
-        check('burn v2 diag: S4BF (victim 4, level 0 -> 1)', [x[1:4] for x in e.osr_full if x[0] == A['gk_fbf']], [(4, 0, 1)])
-        put(0)
-        frame()
-    e.mu.mem_write(vic['f'] + 0x1E, b'\x00')
-    put(2)
-    check('burn v2: a victim no longer live: its level kept, no call', (frame(), e.w(A['bfx_lvl'] + 16)), ([], 0))
-    put(0)
-    frame()
-    e.mu.mem_write(vic['f'] + 0x1E, b'\x04')
+
+
+def burn2_trail_checks(e, info, diag, gk):
+    lab, A, F, img = info['labels'], info['A'], info['feats'], info['img']
     # ---- (2) the fire trail article: its tables
     T = info['T']
     k = C.TR_KIND - W.OLD_N
