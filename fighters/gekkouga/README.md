@@ -672,3 +672,26 @@ is not pinned offline. v9.1 (data only, v9's exe stays): his own main.pac and mo
 only its vertex bone indices changed: every vertex on a bone main.pac doesn't key (37 bones: parts, swing, helpers) on
 its nearest keyed ancestor (`CLONE_POSED = 'main'`): rigid tongue / jaw / fingers on the clones, nothing on an unposed
 bone. TEST_ONLY_DATA: `original_model_nud` (if v9.1 still hangs), `merged_main_pac`, `empty_model_sb` (to pin v9's).
+
+## Clones v10 (`greninja_clones_v10.zip`)
+
+The user's v9.1: loads (also with the merged main.pac: v9's freeze was the empty model.sb), tongue / water on the
+clones but rigid; C_hurt crashed (IP 0x04BED250); the tag never hid, also with v9's well-formed message (gone=0).
+- **Tongue** (`CLONE_POSED = 'merged'`, `unswing_sb`): the merged main.pac (byte for byte v9.1's TEST_ONLY one), his
+  own model.nud with only the 8 bones no motion keys rebound (HLP x4, LegB / water swing drops), and his model.sb with
+  the 9 SWG_CMant entries' bone hashes inverted: the parser (`0x036B8040`) looks each entry's bone up (`0x036B0318`)
+  and skips a miss (`0x036B8474`; its second pass skips entries never set up, byte +4), so the count / size stay (13,
+  1832 bytes) and the tongue is an ordinary keyed chain (his sw1 keys), not a swing chain left in the world.
+  `gekkouga_clones_test.sb_parse` mirrors the parser. Physics sway on the clones: not done (see below).
+- **C_hurt crash**: S4GO read HitModule +0x44 (the records' capacity, 0x14) as the records pointer; it is +0x48. The
+  read is range-checked now (0x10000000-0x80000000); the unicorn test runs the game's layout and a bad word.
+- **Name tag**: the player-marker HUD (`ui/info/plycursor`, `inf_plycursor_*`; its set-up `0x028E3B90` reads the
+  resource table `0x1033B120`): its update calls `0x028E3E18(hud, player)` for each of 8 players (`0x028E4020`), which
+  shows the marker only while the player block's byte `+0x2B75` (block = hud + player x 0x2B00) is set, else fades it
+  (`+0xC0+0x2AB8` alpha, the 13 parts at `+0xC0+0x40`, 0x340 each, through `0x029003AC`). `plyc` (trampoline
+  `0x037EE570`) zeroes that byte before the call while s13's hide counter is up (his tag bit), saving it and putting it
+  back once after. Diag `S4GU` once per hide. The message route stays (harmless).
+- **Swing (for the sway)**: the swing data is bound by the motion library (`0x0330E030` calls the parser in the
+  motion / model bind), and `0x03318A20`-style wrappers act on `[obj+0x20]` (the swing system); the step and what gates
+  it for articles are not found yet. Copying his post-swing tongue pose onto the clones would use MotionModule
+  set_node_rotate (`0x02C64188`) per bone; his post-swing local rotations' location is not found yet either.

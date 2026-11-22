@@ -1239,7 +1239,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_td = sorted(['TEST_ONLY_DATA/v91_rigid/fighter/gekkouga/motion/clone/main.pac'] +
                          ['TEST_ONLY_DATA/%s/fighter/gekkouga/model/clone/c%02d/%s' % (d, c, f) for c in range(8)
                           for d, f in (('v91_rigid', 'model.nud'), ('v91_rigid', 'model.sb'), ('original_model_sb', 'model.sb'))])
-        check('v10: TEST_ONLY_DATA: v9.1's set (v91_rigid), his original model.sb', tdo, want_td)
+        check('v10: TEST_ONLY_DATA: the v9.1 set (v91_rigid), his original model.sb', tdo, want_td)
         check('v10: ... each as built', [n for n in want_td if z.read(n) != open(os.path.join(out, n), 'rb').read()], [])
     if z1 and len(earlier) == 9:
         check("v9.1: INSTALL_TO_data: his own main.pac / model.sb back (v8's), c00-c07 model.nud rebound to main.pac's bones",
@@ -1376,7 +1376,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
 
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
-    earlier = [x[5:] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
+    earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
     base_diag = a[4] if len(a) > 4 else None

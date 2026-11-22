@@ -3862,3 +3862,9 @@ MSC on a bunshin-based kind, the 4-shape group.
   or the merged 3.8 MB main.pac; not pinned). The model library's swing file parser is `0x036B8040` (`SWB ` / LE
   ` BWS` swapped by `0x036B73F4`; versions 0x10004 / 0x10005; count +8; 0x468-byte entries). Release data reverted
   to his own main.pac / model.sb; model.nud indices only (vertices on main.pac-keyed ancestors).
+- **v10 (exe_v46z_gk10)**: the empty model.sb (count 0) froze the load; a model.sb whose entries name bones the
+  skeleton lacks is parsed with those entries skipped (`0x036B0318` miss -> `0x036B8474`; the second pass checks byte
+  +4). HitModule +0x44 {capacity, +0x48 records 0x40 each}. The player-marker HUD (plycursor) update's per-player
+  `0x028E3E18(hud, i)` (called at `0x028E4020`) shows a marker only while `hud + i x 0x2B00 + 0x2B75` is set (else
+  fades `+0x2B78`); fixed in `gekkouga_clone_cave.py` `plyc`. The swing parser is called from the motion bind
+  (`0x0330E030`).
