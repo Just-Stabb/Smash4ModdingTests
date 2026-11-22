@@ -60,11 +60,19 @@ FIRE_BODY_H = 30.0                 # on a burning fighter (fire_small_4): its ba
 FIRE_TIP_H = 15.0                  # at the outer ends of his water (fire_torch_012): centred on the call (x the call's size:
                                    # ~7 of flame at 1)
 FIRE_TRAIL_H = 22.0                # the smashes' trails (fire_ground_10): its base on the call's point, ~14.5 of flame
-FIRE_RING_H = 6.5                  # burn v2.2: neutral air's ring of flames (fire_small_4's first 31 cells), at size 1
-FIRE_RING = dict(n=15, groups=3, r0=5.0, v=0.9, air=0.8, life=14)   # its circle: radius 5 + 0.9 a frame x 0.8 a frame: ~9 at
-                                   # frame 10 (x the call's 1.45: 7 -> 13, the water burst's bright edge in fx_render's
-                                   # render: its rings / splash puffs; its faint mist reaches ~21), the flames gone by 14
-                                   # (the burst by ~13). v2.2 preview 1 (r0 6, v 1.6, 9 tall) wrapped far outside it
+FIRE_RING = dict(n=15, r0=5.0, v=0.9, air=0.8, life=14, seed=7)   # burn v2.2 / v2.3: neutral air's ring of flames: n
+                                   # flames round a circle of radius r0, flying out at v a frame x air a frame (~9 by frame
+                                   # 10: x the call's 1.45, 13, the water burst's bright edge in fx_render's render; its
+                                   # faint mist reaches ~21), gone by 14 (the burst by ~13)
+# v2.3 (the user: "varying fire effects, rotations and fire direction based on Greninja's position in the circle"): one
+# emitter a flame, the assets in turn round the ring (quad height at size 1, each its own flipbook's first 31 cells),
+# each turned so its own flame's tip (ring_tip_angle: measured on its atlas) points out from the centre, +- RING_JITTER
+# degrees, sized x RING_SIZE_VAR
+RING_ASSETS = (('fire_small_4', 6.5), ('fire_torch_012', 9.0), ('fire_small_5', 6.0), ('fire_ground_10', 8.0),
+               ('fire_torch_026', 7.0))
+RING_JITTER = 12.0
+RING_POS_JITTER = 4.0              # degrees round the circle
+RING_SIZE_VAR = (0.85, 1.15)
 FIRE_FADE = 15                     # frames the body / trail fires take to go when ended with a fade (0x2723 (0, 0))
 
 
@@ -82,10 +90,10 @@ def _fire_sets():
     trail = dict(atlas='fire_ground_10', blend=1, size=(FIRE_TRAIL_H * cell_aspect('fire_ground_10'), FIRE_TRAIL_H),
                  fade=FIRE_FADE)
     trail['offset'] = (0.0, (feet_cell_v('fire_ground_10') - 0.5) * FIRE_TRAIL_H)
-    ring = dict(atlas='fire_small_4', blend=1, size=(FIRE_RING_H * cell_aspect('fire_small_4'), FIRE_RING_H),
-                offset=(0.0, 0.0), ring=FIRE_RING)
+    ring = dict(ring=FIRE_RING, left=False)
+    ring_l = dict(ring=FIRE_RING, left=True)
     return [('PtcGekkougaFireBody', body), ('PtcGekkougaFireTip', tip), ('PtcGekkougaFireTrail', trail),
-            ('PtcGekkougaFireRing', ring)]
+            ('PtcGekkougaFireRing', ring), ('PtcGekkougaFireRingL', ring_l)]
 
 
 def all_sets(burn2=True):
@@ -182,20 +190,69 @@ def flip_plan(n, k, loop):
     return out
 
 
-def ring_fields(p, em, ring, group):
-    """burn v2.2: a ring of flames in the call's YZ plane (the camera's plane at a side-on call: the burst's
-    billboards' circle): ring['n'] / ring['groups'] particles at once on an even circle (volume 2: XZ, turned Z +90; each
-    group's turned on by 1 / n of a turn: together n evenly round) of radius r0, flying
-    out (all-direction speed v, air resistance air) as the burst's edge grows, fading in quickly, held, fading out over
-    the last 55 % of their life, a little bigger after 30 %"""
+def ring_tip_angle(name):
+    """the direction its flames point in the footage (degrees, 90 = up, counter-clockwise): the median over its first
+    31 cells of base -> tip, the alpha-weighted centres of the bottom and top 35 % of each cell's alpha"""
+    d = sidecar(name)
+    img = atlas(name).astype(np.float32) / 255
+    h, w = img.shape[:2]
+    nx, ny = d['columns'], d['rows']
+    cw, ch = w / nx, h / ny
+    out = []
+    for k in range(min(d['frames'], TABLE - 1)):
+        i, j = k % nx, k // nx
+        c = img[int(round(j * ch)):int(round((j + 1) * ch)), int(round(i * cw)):int(round((i + 1) * cw)), 3]
+        tot = c.sum()
+        if tot < 1:
+            continue
+        ys, xs = np.mgrid[0:c.shape[0], 0:c.shape[1]]
+        rows = c.sum(1)
+        yb = c.shape[0] - 1 - int(np.searchsorted(np.cumsum(rows[::-1]) / tot, 0.35))
+        yt = int(np.searchsorted(np.cumsum(rows) / tot, 0.35))
+        lo, hi = c[yb:], c[:yt + 1]
+        bx, by = (lo * xs[yb:]).sum() / lo.sum(), (lo * ys[yb:]).sum() / lo.sum()
+        tx, ty = (hi * xs[:yt + 1]).sum() / hi.sum(), (hi * ys[:yt + 1]).sum() / hi.sum()
+        out.append(math.degrees(math.atan2(by - ty, tx - bx)))
+    return float(np.median(out))
+
+
+def ring_flames(left):
+    """burn v2.3: the ring's flames: [{atlas, height, phi (degrees round the circle: 0 forward along his facing, 90 up),
+    rot (the billboard's turn, degrees counter-clockwise), size, start (its table's first cell)}]. Facing left the game
+    mirrors the places (the call's matrix) but not a billboard's turn: the left set's turns are worked out from the
+    places as seen (180 - phi), its flames otherwise the same"""
+    rng = np.random.RandomState(FIRE_RING['seed'])
+    n = FIRE_RING['n']
+    tips = {a: ring_tip_angle(a) for a, _h in RING_ASSETS}
+    out = []
+    for i in range(n):
+        atl, hgt = RING_ASSETS[i % len(RING_ASSETS)]
+        phi = 360.0 * i / n + rng.uniform(-RING_POS_JITTER, RING_POS_JITTER)
+        jit = rng.uniform(-RING_JITTER, RING_JITTER)
+        size = rng.uniform(*RING_SIZE_VAR)
+        start = int(rng.randint(0, TABLE - 1))
+        seen = (180.0 - phi) if left else phi
+        out.append(dict(atlas=atl, height=hgt, phi=phi, rot=(seen - tips[atl] + jit + 180.0) % 360.0 - 180.0, size=size,
+                        start=start, tip=tips[atl], jitter=jit))
+    return out
+
+
+def ring_fields(p, em, ring, flame):
+    """burn v2.2 / v2.3: one flame of the ring: one particle at radius r0 round the call's YZ plane (the burst's
+    billboards' circle seen side-on) at its angle phi, flying out along it (directional speed v, air resistance air) as
+    the burst's edge grows, turned so its tip points out (rotation Z: a billboard's turn on screen, counter-clockwise),
+    fading in quickly, held, fading out over the last 55 % of its life, a little bigger after 30 %; played out when ended"""
     f = p.set_field
-    f(em, 'volume_type', 2)
-    f(em, 'volume_radius', [ring['r0'], 0.0, ring['r0']])
-    f(em, 'volume_sweep_start', 2 * math.pi * group / ring['n'])
-    f(em, 'volume_sweep_param', 2 * math.pi)
-    f(em, 'emit_rate', float(ring['n'] // ring['groups']))
-    f(em, 'figure_velocity', ring['v'])
+    ph = math.radians(flame['phi'])
+    dy, dz = math.sin(ph), math.cos(ph)
+    f(em, 'volume_type', 0)
+    f(em, 'volume_radius', [0.0, 0.0, 0.0])
+    f(em, 'emit_rate', 1.0)
+    f(em, 'figure_velocity', 0.0)
+    f(em, 'emit_direction', [0.0, dy, dz])
+    f(em, 'emitter_velocity', ring['v'])
     f(em, 'air_resistance', ring['air'])
+    f(em, 'rotation_init', [0.0, 0.0, math.radians(flame['rot'])])
     f(em, 'alpha_init', 0.6)
     f(em, 'alpha_diff21', 0.4)
     f(em, 'alpha_diff32', -1.0)
@@ -205,8 +262,19 @@ def ring_fields(p, em, ring, group):
     f(em, 'scale_diff21', [0.4, 0.4])
     f(em, 'scale_diff32', [0.0, 0.0])
     f(em, 'scale_sections', [30, 100])
-    p.set_emitter_srt(em, rotation=(0.0, 0.0, math.pi / 2))
-    struct.pack_into('>f', em, 0x82C, 0.0)        # a one-shot: ended (the move's end), its flames play out
+    p.set_emitter_srt(em, translation=(0.0, ring['r0'] * dy, ring['r0'] * dz))
+    struct.pack_into('>f', em, 0x82C, 0.0)
+
+
+def ring_emitters(p, tmpl, name, spec):
+    """the ring's set: one emitter a flame (ring_flames), each its asset's flipbook"""
+    out = []
+    for i, fl in enumerate(ring_flames(spec['left'])):
+        sub = dict(atlas=fl['atlas'], blend=1, size=(fl['height'] * fl['size'] * cell_aspect(fl['atlas']),
+                                                       fl['height'] * fl['size']),
+                   offset=(0.0, 0.0), ring=dict(spec['ring'], flame=fl))
+        out += flip_emitters(p, tmpl, name if i == 0 else '%s_%d' % (name, i + 1), sub)
+    return out
 
 
 def flip_emitters(p, tmpl, name, spec):
@@ -222,11 +290,10 @@ def flip_emitters(p, tmpl, name, spec):
     out = []
     plan = flip_plan(n, k, loop)
     ring = spec.get('ring')
-    if ring:                                       # burn v2.2: ring['groups'] emitters of the flipbook's first cells,
-        n = min(n, TABLE - 1)                      # each its table started a third further on (out of step: eft's
-        g = ring['groups']                         # random start, 0x4D9, is one UV shift per emitter, 0x04A54A88)
-        plan = [dict(first=0, cells=n, table=[(c + j * n // g) % n for c in range(n)], start=0, life=ring['life'],
-                     period=0, group=j) for j in range(g)]
+    if ring:                                       # burn v2.3: one flame: the flipbook's first cells from its start
+        n = min(n, TABLE - 1)                      # (out of step with the others: eft's random start, 0x4D9, is one UV
+        st = ring['flame']['start'] % n            # shift per emitter, 0x04A54A88)
+        plan = [dict(first=0, cells=n, table=[(c + st) % n for c in range(n)], start=0, life=ring['life'], period=0)]
     for j, run in enumerate(plan):
         em = bytearray(tmpl)
         struct.pack_into('>I', em, 0x38, p.add_name(name if j == 0 else '%s_%d' % (name, j + 1)))
@@ -281,7 +348,7 @@ def flip_emitters(p, tmpl, name, spec):
         VP.set_flipbook(em, MODE, {'uv_div': [nx, ny]},
                         {'num': len(t), 'num_random': 1, 'table': t + [0] * (TABLE - len(t)), 'frequency': k})
         if ring:
-            ring_fields(p, em, ring, run['group'])
+            ring_fields(p, em, ring, ring['flame'])
         VP.set_uv_anim(em, None)
         VP.set_inv_rand(em, 0, (False, False))
         out.append(em)
@@ -299,7 +366,7 @@ def build(in_dir, kirby_path, fx_pkg, out_dir, sets=None, burn2=True):
     tmpl = template(p, kirby)
     ids = {}
     for name, spec in (sets if sets is not None else all_sets(burn2)):
-        si = p.new_set(name, flip_emitters(p, tmpl, name, spec))
+        si = p.new_set(name, ring_emitters(p, tmpl, name, spec) if 'left' in spec else flip_emitters(p, tmpl, name, spec))
         ids[name] = (BANK << 16) | e.add(si + 1, None, 0x100)
     errs = p.validate()
     assert not errs, errs

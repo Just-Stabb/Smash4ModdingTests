@@ -307,9 +307,11 @@ FIRE_NAIR_Y = 8.5
 FIRE_NAIR_SIZE = 1.0
 FIRE_NAIR_END = 24
 FIRE_RING = 0x330001D             # burn v2.2 (the user: "wrap neutral air's water edges in fire"): his bank's
-                                  # PtcGekkougaFireRing, a ring of 14 flames round the water burst's edge, growing with it
+                                  # PtcGekkougaFireRing, a ring of 15 flames round the water burst's edge, growing with it
                                   # (tools/gekkouga_fx.py FIRE_RING), made with the burst: the burst's call (joint 0, Y 8.5,
-                                  # size 1.45), played out (no Terminate: one-shot flames)
+                                  # size 1.45), played out (no Terminate: one-shot flames). v2.3: each flame its own
+                                  # footage, turned out from his centre: EFFECT_FOLLOW_FLIP with the left-facing set
+FIRE_RING_L = 0x330001E           # PtcGekkougaFireRingL (the game mirrors the places facing left, not a billboard's turn)
 
 
 def insert_cmds(cmds, i, new):
@@ -331,6 +333,16 @@ def ext_graphic(gfx, bone, x, y, z, size, terminate=1):
     by = {v['name']: k for k, v in acmd.INFO.items()}
     ident = by['External_Graphic']
     vals = dict(Graphic=gfx, Bone=bone, X=x, Y=y, Z=z, XRot=0.0, YRot=0.0, ZRot=0.0, Size=size, Terminate=terminate)
+    return acmd.Command(ident, [vals[n] for n in acmd.INFO[ident]['syntax']])
+
+
+def follow_flip(right, left, bone, x, y, z, size):
+    """EFFECT_FOLLOW_FLIP (the facing's id: right / left), as vanilla's (up tilt's: Terminate 1, FlipType 1)"""
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    ident = by['EFFECT_FOLLOW_FLIP']
+    vals = dict(GFXRight=right, GFXLeft=left, Bone=bone, X=x, Y=y, Z=z, XRot=0.0, YRot=0.0, ZRot=0.0, Size=size, Terminate=1,
+                FlipType=1)
     return acmd.Command(ident, [vals[n] for n in acmd.INFO[ident]['syntax']])
 
 
@@ -368,8 +380,9 @@ def add_fire_tips(effect):
     i = [k for k, c in enumerate(s) if c.name == 'External_Graphic' and int(c.params[0]) == NAIR_BURST][0]
     b = s[i]
     syn = b.info['syntax']
-    insert_cmds(s, i + 1, [ext_graphic(FIRE_RING, int(b.params[syn.index('Bone')]), 0.0, float(b.params[syn.index('Y')]),
-                                       float(b.params[syn.index('Z')]), float(b.params[syn.index('Size')]))])
+    insert_cmds(s, i + 1, [follow_flip(FIRE_RING, FIRE_RING_L, int(b.params[syn.index('Bone')]), 0.0,
+                                       float(b.params[syn.index('Y')]), float(b.params[syn.index('Z')]),
+                                       float(b.params[syn.index('Size')]))])
     return n + 1
 
 
@@ -394,7 +407,8 @@ def strip_fire_tips(effect):
         i = 0
         while i < len(cmds):
             c = cmds[i]
-            if c.name in ('External_Graphic', 'Terminate_Graphic_Effect') and int(c.params[0]) in (FIRE_TIP, FIRE_RING):
+            if c.name in ('External_Graphic', 'Terminate_Graphic_Effect', 'EFFECT_FOLLOW_FLIP') and \
+                    int(c.params[0]) in (FIRE_TIP, FIRE_RING):
                 if c.name == 'Terminate_Graphic_Effect' and i and cmds[i - 1].name == 'FRAME' and \
                         float(cmds[i - 1].params[0]) == FIRE_NAIR_END and i + 1 < len(cmds) and \
                         cmds[i + 1].name == 'Script_End':          # neutral air's own FRAME (not a sword's at 24)

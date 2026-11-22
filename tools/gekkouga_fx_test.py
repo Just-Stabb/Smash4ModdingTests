@@ -112,36 +112,52 @@ def cells_shown(p, si, frames):
     return out
 
 
-def ring_checks(p, si, name, spec, d, kirby, ksh):
-    """burn v2.2: neutral air's ring of flames (one emitter: a circle of flames flying out with the burst's edge)"""
+def ring_checks(p, si, name, spec, kirby, ksh):
+    """burn v2.3: neutral air's ring of flames: one emitter a flame, each its own footage, at its place round the
+    circle, flying out along it, turned so its flame's tip points out from his centre"""
     import math
     import fx_render as F
     r = spec['ring']
+    fl = G.ring_flames(spec['left'])
     ems = [x['data'] for x in p.sets[si]['emitters']]
     rnd = lambda v: [round(x, 3) for x in v] if isinstance(v, (list, tuple)) else round(v, 3)   # noqa: E731
-    g, m = r['groups'], r['n'] // r['groups']
-    rows = []
-    for em in ems:
+    rows, want = [], []
+    for em, f in zip(ems, fl):
+        d = G.sidecar(f['atlas'])
+        n = min(d['frames'], G.TABLE - 1)
         sh = p.field(em, 'shader_index')
-        t = p.texres(em, 0)
+        ph = math.radians(f['phi'])
         rows.append((bytes(p.shader_binary(sh)) == bytes(kirby.shader_binary(ksh)),
                      bool(struct.unpack_from('>I', em, 4)[0] & 0x00800000), p.field(em, 'particle_type'),
-                     struct.unpack_from('>I', em, 0x310)[0], p.field(em, 'blend_type'), t['size'], p.field(em, 'volume_type'),
-                     rnd(p.field(em, 'volume_radius')), rnd(p.field(em, 'emitter_rotation')), p.field(em, 'emit_rate'),
-                     rnd(p.field(em, 'figure_velocity')), rnd(p.field(em, 'air_resistance')), p.field(em, 'ptcl_life'),
-                     (p.field(em, 'one_time'), p.field(em, 'end_frame')), em[0x4D9], struct.unpack_from('>h', em, 0x506)[0],
-                     struct.unpack_from('>f', em, 0x82C)[0], rnd(p.field(em, 'volume_sweep_start')), em[0x4E0]))
-    check('%s: %d emitters (out of step: tables started %d cells apart), Kirby\'s stone shader, CPU billboards, follow 0, '
-          'additive, BC3 %s; %d flames each at once on an even circle (volume 2) of radius %g turned into the YZ plane (Z +90),'
-          ' the groups 1 / %d of a turn apart, flying out at %g a frame (air %g), life %d, one emission, the first %d cells, '
-          'played out when ended' % (name, g, (G.TABLE - 1) // g, d['atlas_size'], m, r['r0'], r['n'], r['v'], r['air'],
-                                     r['life'], G.TABLE - 1),
-          rows, [(True, False, 0, 0, 1, d['atlas_size'], 2, [r['r0'], 0.0, r['r0']], [0.0, 0.0, round(math.pi / 2, 3)],
-                  float(m), r['v'], r['air'], r['life'], (1, 1), 1, G.TABLE - 1, 0.0, round(2 * math.pi * j / r['n'], 3),
-                  j * (G.TABLE - 1) // g) for j in range(g)])
+                     struct.unpack_from('>I', em, 0x310)[0], p.field(em, 'blend_type'), p.texres(em, 0)['size'],
+                     p.field(em, 'volume_type'), p.field(em, 'emit_rate'), (p.field(em, 'one_time'), p.field(em, 'end_frame')),
+                     p.field(em, 'ptcl_life'), rnd(p.field(em, 'emit_direction')), rnd(p.field(em, 'emitter_velocity')),
+                     rnd(p.field(em, 'figure_velocity')), rnd(p.field(em, 'air_resistance')),
+                     rnd(p.field(em, 'emitter_translation')), rnd(p.field(em, 'rotation_init')), em[0x4E0],
+                     struct.unpack_from('>h', em, 0x506)[0], em[0x4D9], struct.unpack_from('>f', em, 0x82C)[0]))
+        want.append((True, False, 0, 0, 1, d['atlas_size'], 0, 1.0, (1, 1), r['life'],
+                     rnd([0.0, math.sin(ph), math.cos(ph)]), r['v'], 0.0, r['air'],
+                     rnd([0.0, r['r0'] * math.sin(ph), r['r0'] * math.cos(ph)]), rnd([0.0, 0.0, math.radians(f['rot'])]),
+                     f['start'] % n, n, 1, 0.0))
+    check('%s: %d emitters, one a flame: Kirby\'s stone shader, CPU billboard, follow 0, additive, its own footage\'s atlas; '
+          'one particle at radius %g at its angle round the YZ plane, flying out along it at %g (air %g), life %d, its '
+          'billboard turned (rotation Z), its table from its own start cell, played out' % (
+              name, r['n'], r['r0'], r['v'], r['air'], r['life']), rows, want)
+    assets = [f['atlas'] for f in fl]
+    check('%s: neighbouring flames differ (%s in turn)' % (name, ', '.join(a for a, _h in G.RING_ASSETS)),
+          [i for i in range(len(fl)) if assets[i] == assets[(i + 1) % len(fl)]], [])
+    out = []
+    for f in fl:
+        seen = (180.0 - f['phi']) if spec['left'] else f['phi']
+        tipdir = f['tip'] + f['rot']
+        out.append(abs((tipdir - seen + 180) % 360 - 180) <= G.RING_JITTER + 1e-6)
+    check('%s: every flame\'s tip (its footage\'s own direction, measured on its atlas, + its turn, counter-clockwise on '
+          'screen) points out from his centre as seen %s, within %g degrees (the jitter)' % (
+              name, 'facing left (the places mirrored, 180 - angle)' if spec['left'] else 'facing right', G.RING_JITTER),
+          all(out), True)
     ems_r = F.s4_emitters(p, si, None)
     cm = F.call_matrix((0, 0, 0), (0, 0, 0), 1.0)
-    frames = list(range(0, r['life'] + 3))
+    frames = [0, 10, r['life'] + 2]
     pts = {fr: [] for fr in frames}
     for j, e in enumerate(ems_r):
         sim = F.simulate(e, (0, cm, 1.0, None), frames, seed=3 + j)
@@ -150,23 +166,14 @@ def ring_checks(p, si, name, spec, d, kirby, ksh):
 
     def rad(fr):
         q = pts[fr]
-        if not q:
-            return (0, None, None, None)
         rr = [math.hypot(x[1], x[2]) for x in q]
-        ang = sorted(math.degrees(math.atan2(x[1], x[2])) % 360 for x in q)
-        gaps = [round((b - a) % 360, 1) for a, b in zip(ang, ang[1:] + ang[:1])]
-        return (len(q), round(max(abs(x[0]) for x in q), 3), round(float(np.mean(rr)), 1), round(float(np.ptp(rr)), 3),
-                max(gaps) - min(gaps) < 0.5)
+        return (len(q), round(max(abs(x[0]) for x in q), 3) if q else None, round(float(np.mean(rr)), 1) if q else None,
+                round(float(np.ptp(rr)), 3) if q else None)
     r0, r10 = rad(0), rad(10)
-    check('%s: (fx_render\'s eft) %d flames evenly round (every %g degrees) in the YZ plane (X 0), all at one radius, %g at '
-          'birth growing to ~9 by frame 10 (x the call\'s 1.45: the burst\'s edge, ~13), gone after %d frames' % (
-              name, r['n'], 360 / r['n'], r['r0'], r['life']),
-          (r0[0], r0[1], r0[3], r0[2], r0[4], 8.0 <= r10[2] <= 10.0, rad(r['life'] + 2)[0]),
-          (r['n'], 0.0, 0.0, r['r0'], True, True, 0))
-    got = cells_shown(p, si, [0, 2, 4])
-    want = sorted(c for j in range(g) for c in [j * (G.TABLE - 1) // g] * m)
-    check('%s: the flames\' cells (latte_exec): the groups\' %s, each a cell further every %d frames' % (
-        name, sorted(set(want)), d['frames_per_cell_at_60fps']), (got[0], got[2]), (want, [c + 1 for c in want]))
+    check('%s: (fx_render\'s eft) %d flames in the YZ plane, %g out at birth, ~9 by frame 10 (x the call\'s 1.45: the '
+          'burst\'s edge, ~13), all at one radius, gone after %d frames' % (name, r['n'], r['r0'], r['life']),
+          (r0[0], r0[1], r0[2], r0[3], 8.0 <= r10[2] <= 10.0, r10[3] < 0.01, rad(r['life'] + 2)[0]),
+          (r['n'], 0.0, r['r0'], 0.0, True, True, 0))
 
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--')]
@@ -198,10 +205,10 @@ def main():
     ksh = kirby.field(kirby.sets[ksi]['emitters'][G.TEMPLATE[1]]['data'], 'shader_index')
     for i, (name, spec) in enumerate(sets):
         si = 20 + i
-        d = G.sidecar(spec['atlas'])
         if spec.get('ring'):
-            ring_checks(p, si, name, spec, d, kirby, ksh)
+            ring_checks(p, si, name, spec, kirby, ksh)
             continue
+        d = G.sidecar(spec['atlas'])
         plan = G.flip_plan(d['frames'], d['frames_per_cell_at_60fps'], d['playback'] == 'loop')
         ems = [x['data'] for x in p.sets[si]['emitters']]
         rows = []
@@ -262,8 +269,9 @@ def main():
         m = re.search(r'int tr_fx\(\) \{ return (0x[0-9a-f]+); \}', tsrc)
         check('burn v2 ids: the fire on burning fighters (the exe\'s BFX_ID), at his water\'s ends (gekkouga_build FIRE_TIP), '
               'the trails (firetrail.c tr_fx), v2.2: neutral air\'s ring (FIRE_RING)',
-              [C.BFX_ID, GB.FIRE_TIP, int(m.group(1), 16) if m else None, GB.FIRE_RING],
-              [ids['PtcGekkougaFireBody'], ids['PtcGekkougaFireTip'], ids['PtcGekkougaFireTrail'], ids['PtcGekkougaFireRing']])
+              [C.BFX_ID, GB.FIRE_TIP, int(m.group(1), 16) if m else None, GB.FIRE_RING, GB.FIRE_RING_L],
+              [ids['PtcGekkougaFireBody'], ids['PtcGekkougaFireTip'], ids['PtcGekkougaFireTrail'], ids['PtcGekkougaFireRing'],
+               ids['PtcGekkougaFireRingL']])
         for nm, base in (('PtcGekkougaFireBody', 'fire_small_4'), ('PtcGekkougaFireTrail', 'fire_ground_10')):
             spec = dict(sets)[nm]
             si = 20 + names.index(nm)

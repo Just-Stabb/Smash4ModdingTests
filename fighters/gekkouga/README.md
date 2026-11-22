@@ -1041,3 +1041,24 @@ no Terminate; the clone's copy too):
   radius, 5 -> ~9 by frame 10, gone after 14, the groups' cells 10 apart advancing every 2 frames); `gekkouga_clones_test
   ... --vb21` 260 / 0 (the ring on the burst's call, v2's side flames gone, the scripts otherwise unchanged; the installed
   gkb5 rebuilt from the script). Preview `$S/gk_preview/nair_v2.png` / `.gif`. Not confirmed in game.
+
+## Burn v2.3 (`greninja_burn_v2_3.zip`, over burn v2.2; data only, exe_v46z_gkb5)
+
+The user: "Can you make the ring use varying fire effects, rotations and fire direction based on Greninja's position in
+the circle". The ring (`tools/gekkouga_fx.py` `ring_flames` / `ring_fields` / `ring_emitters`) is now one emitter a flame
+(15 a set, the most a vanilla set has is 16), each:
+- its own footage, in turn round the ring (`RING_ASSETS`: fire_small_4 6.5, fire_torch_012 9, fire_small_5 6,
+  fire_ground_10 8, fire_torch_026 7 tall quads at size 1; each its first 31 cells from its own random start cell);
+- one particle at radius 5 at its angle phi round the call's YZ plane (24 degrees apart, +- 4), flying out along it
+  (emit direction (0, sin phi, cos phi), directional speed 0.9, air 0.8: ~9 by frame 10, x 1.45 = 13);
+- turned (rotation Z: a billboard's turn on screen, counter-clockwise: checked with a rotated skeleton in fx_render) by
+  phi - its footage's own tip direction (`ring_tip_angle`: base -> tip of the bottom / top 35 % of each cell's alpha,
+  median over its first 31 cells: small_4 123, torch_012 95, small_5 51, ground_10 99, torch_026 143 degrees) +- 12
+  degrees, sized x 0.85 - 1.15 (fixed by a seed);
+- facing left the game mirrors the call's places but not a billboard's turn: **PtcGekkougaFireRingL** (0x330001E, entry
+  0x1E) has the turns for the places as seen (180 - phi); neutral air plays the pair with EFFECT_FOLLOW_FLIP (right /
+  left, FlipType 1 as up tilt's) on the burst's call.
+His bank: two more clips (fire_small_5, fire_torch_026: +2 MB, 17.4 MB). Tests: `gekkouga_fx_test` 37 / 0 (`ring_checks`
+for both sets: each flame's fields, neighbours differ, every tip out from the centre as seen within the jitter, the ring's
+growth in fx_render); `gekkouga_clones_test ... --vb22` 260 / 0. Preview `$S/gk_preview/nair_v3.png` / `.gif` (facing
+right). Not confirmed in game.

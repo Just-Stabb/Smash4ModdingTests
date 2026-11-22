@@ -1415,13 +1415,15 @@ def script_tests(out, user):
              len([c for c in pe.script(nm) if c.name == 'Terminate_Graphic_Effect' and int(c.params[0]) == GB.FIRE_TIP]))
             for nm in ('AttackS4', 'AttackHi4', 'AttackLw4', 'AttackAirF', 'AttackAirN')]
     if GB.FIRE_TIPS:
-        ring = [(int(c.params[1]), round(float(c.params[3]), 2), round(float(c.params[4]), 2), round(float(c.params[8]), 2))
-                for c in pe.script('AttackAirN') if c.name == 'External_Graphic' and int(c.params[0]) == GB.FIRE_RING]
-        check('burn v2.2: neutral air\'s water burst wrapped in fire: its ring (0x%X) with it, on its call (joint 0, Y 8.5, '
-              'size 1.45), played out (no Terminate); burn v2\'s two side flames gone' % GB.FIRE_RING,
+        ring = [(int(c.params[0]), int(c.params[1]), int(c.params[2]), round(float(c.params[4]), 2),
+                 round(float(c.params[5]), 2), round(float(c.params[9]), 2)) for c in pe.script('AttackAirN')
+                if c.name == 'EFFECT_FOLLOW_FLIP' and int(c.params[0]) == GB.FIRE_RING]
+        check('burn v2.2 / v2.3: neutral air\'s water burst wrapped in fire: its ring (0x%X, facing left 0x%X: '
+              'EFFECT_FOLLOW_FLIP) with it, on its call (joint 0, Y 8.5, size 1.45), played out (no Terminate); burn v2\'s '
+              'two side flames gone' % (GB.FIRE_RING, GB.FIRE_RING_L),
               (ring, [c.name for c in pe.script('AttackAirN') if c.params and isinstance(c.params[0], int) and
                       int(c.params[0]) in (GB.FIRE_RING, GB.FIRE_TIP)]),
-              ([(0, 8.5, 0.0, 1.45)], ['External_Graphic']))
+              ([(GB.FIRE_RING, GB.FIRE_RING_L, 0, 8.5, 0.0, 1.45)], ['EFFECT_FOLLOW_FLIP']))
         check('burn v2: a flame (0x%X) at each water sword\'s tip (its hand joint, Y -11 x its size: -55 in the smashes), '
               'ended with the sword' % GB.FIRE_TIP, tips,
               [('AttackS4', [(25, -55.0, 0.0, 2.0)], 1), ('AttackHi4', [(25, -55.0, 0.0, 2.0), (24, -55.0, 0.0, 2.0)], 1),
@@ -1606,7 +1608,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (20, 21):   # skeleton v1.2 / burn v2: the exes, the data, test exes (burn v2: + Sm4shCommand)
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
-    if len(earlier) == 23:   # burn v2.2: data only (neutral air's ring of flames)
+    if len(earlier) in (23, 24):   # burn v2.2 / v2.3: data only (neutral air's ring of flames)
         want_top = ['INSTALL_TO_data', 'README.txt']
     if len(earlier) == 22:   # burn v2.1: the exes only (the floor is the exe's)
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
@@ -1632,7 +1634,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('update: none of the installed unchanged files again (%d unchanged)' % len(same1), [w for w in same1 if w in names], [])
         check('update: nothing in INSTALL_TO_data but the built files',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want), [])
-        if len(earlier) in (18, 19, 20, 22, 23):
+        if len(earlier) in (18, 19, 20, 22, 23, 24):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 21:
             check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
@@ -1681,8 +1683,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
               ['fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.efc', 'fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.ptcl',
                'fighter/gekkouga/script/msc/skeleton/skeleton.mscsb'])
-    if z1 and len(earlier) == 23:
-        check('burn v2.2: INSTALL_TO_data: his effect bank (+ the ring of flames) and his body / the clone\'s effect.bin '
+    if z1 and len(earlier) in (23, 24):
+        check('burn v2.2 / v2.3: INSTALL_TO_data: his effect bank (+ the ring of flames) and his body / the clone\'s effect.bin '
               '(neutral air\'s ring in place of v2\'s two flames)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
               sorted(['fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.efc',
@@ -1833,7 +1835,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18, 19, 20, 21, 22, 23) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18, 19, 20, 21, 22, 23, 24) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -1843,6 +1845,9 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
          'lower', 'A_release', 'G_pose', 'unconfirmed') if len(earlier) == 22 else \
         ('greninja_burn_v2_1', 'neutral air', 'ring', '15', 'flames', 'edge', '1.45', 'clone', 'preview', 'unconfirmed',
          'exe_v46z_gkb5') if len(earlier) == 23 else \
+        ('greninja_burn_v2_2', 'neutral air', 'ring', '15', 'outward', 'fire_small_4', 'fire_small_5', 'fire_torch_012',
+         'fire_torch_026', 'fire_ground_10', 'facing left', 'jitter', 'clone', 'preview', 'unconfirmed', 'exe_v46z_gkb5') \
+        if len(earlier) == 24 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -1919,7 +1924,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
