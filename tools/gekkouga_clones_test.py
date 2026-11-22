@@ -271,9 +271,9 @@ def msc_tests(mscsb, src):
     # ---- the charge: accumulation, kept, threshold
     m = fresh(mscsb, src)
     g = m.game
-    check('constants: 300 / 720 / 480 / gap 14 / smash full 120 (v3) / hitbox growth 1.5',
+    check('constants: 300 / 720 / 480 / gap 14 / smash full 120 (v3) / hitbox growth 5 (v4)',
           (m('gk_lw_full'), m('gk_ability_frames'), m('gk_burnout_frames'), round(i2f(m('gk_gap') & 0xFFFFFFFF), 3),
-           m('gk_smash_full'), round(i2f(m('gk_smash_grow') & 0xFFFFFFFF), 3)), (300, 720, 480, 14.0, 120, 1.5))
+           m('gk_smash_full'), round(i2f(m('gk_smash_grow') & 0xFFFFFFFF), 3)), (300, 720, 480, 14.0, 120, 5.0))
     r = m('gk_lw_press')
     check('down special, not charged: the stance (status 0x155)', (r, g.status_req), (1, [(0x155, 1)]))
     g.status_req = []
@@ -972,7 +972,10 @@ def script_tests(out, user):
                     nm = c0.info['syntax'][i] if i < len(c0.info['syntax']) else ''
                     k = None
                     if crc in smash and nm == 'Size' and c0.name in GB.HITBOXES and kind == 'game':
-                        k = 1.5
+                        k = 5.0
+                    elif (crc in smash and kind == 'game' and c0.name in GB.HITBOXES and nm in ('X', 'Y', 'Z', 'X2', 'Y2', 'Z2')
+                          and int(c0.params[c0.info['syntax'].index('Bone')]) in GB.SWORD_BONES):
+                        k = 5.0
                     elif crc in smash and kind == 'effect' and (nm == 'Size' or (c0.name == 'Sword_Glow' and nm in
                                                                                  ('X1', 'Y1', 'Z1', 'X2', 'Y2', 'Z2'))):
                         k = 5.0
@@ -984,9 +987,9 @@ def script_tests(out, user):
                     if (abs(float(p1) - float(p0) * k) > 1e-3) if k is not None else (p1 != p0):
                         bad.append((kind, hex(crc), c0.name, nm, p0, p1))
     check('v3: the shipped body scripts the smashes play (attacks4 / attackhi4 / attacklw4, motions 0x5F / 0x63 / 0x65): '
-          'hitbox Size x1.5 (game), every effect Size and trail point x5 (effect); their holds\' (0x62 / 0x64 / 0x67) effects '
+          'v4: hitbox Size x5 and the water-sword bones\' (24 / 25) hitbox offsets x5 (game), every effect Size and trail point x5 (effect); their holds\' (0x62 / 0x64 / 0x67) effects '
           'size 0 (his MSC draws them by the charge); nothing else of his changed',
-          (bad[:3], got.get(('game', 1.5), 0) >= 10, got.get(('effect', 5.0), 0) >= 20, got.get(('effect', 0.0), 0)),
+          (bad[:3], got.get(('game', 5.0), 0) >= 30, got.get(('effect', 5.0), 0) >= 20, got.get(('effect', 0.0), 0)),
           ([], True, True, 11))
     mt = open(os.path.join(user, 'body', 'motion.mtable'), 'rb').read()
     mth = [struct.unpack_from('>I', mt, 4 * i)[0] for i in range(len(mt) // 4)]
@@ -1014,6 +1017,18 @@ def script_tests(out, user):
         ok.append(same and not bad_cmds)
     check('the clone\'s game scripts (%d): his hitboxes (bones the article\'s joints, his smashes\' damage x1.4), only '
           'hitbox / timing commands' % len(cg.scripts), all(ok) and len(cg.scripts) >= 35, True)
+    ce = acmd.ACMDFile.load(os.path.join(O, 'weapon', 'clone', 'effect.bin'))
+    sizes = []
+    for nm in GB.SMASH_SCRIPTS:
+        for c in ce.scripts.get(zlib.crc32(nm.encode()), []):
+            if 'Size' in c.info['syntax'] and c.name != 'Sword_Glow':
+                sizes.append(float(c.params[c.info['syntax'].index('Size')]))
+    check('v4: the clone has his smash effects too (their True branches), at his sizes (5x: water sword / flash 5.0)',
+          (len(sizes) >= 8, all(abs(x - 5.0) < 1e-3 for x in sizes)), (True, True))
+    sw = [c for nm in GB.SMASH_SCRIPTS for c in ce.scripts.get(zlib.crc32(nm.encode()), []) if c.name == 'Sword_Glow']
+    check('v4: ... its trails 5x long (Y2 -55) on its sword joints (0x7D0 + 24 / 25)',
+          sorted({(int(c.params[c.info['syntax'].index('Bone2')]), round(float(c.params[c.info['syntax'].index('Y2')]), 2))
+                  for c in sw}), [(0x7D0 + 24, -55.0), (0x7D0 + 25, -55.0)])
     check('the clone has his forward smash, his jab, his up air (the loop)',
           all(zlib.crc32(n.encode()) in cg.scripts for n in ('attacks4', 'attack11', 'attackairhi')), True)
     mt0 = open(os.path.join(user, 'body', 'motion.mtable'), 'rb').read()
@@ -1047,9 +1062,11 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     names1 = set(z1.namelist()) if z1 else set()
     newest = os.path.basename(earlier[-1]).replace('.zip', '') if earlier else None
     top = {n.split('/')[0] for n in names}
-    check('the package\'s top level: README.txt, INSTALL_TO_data, INSTALL_TO_code, TEST_ONLY_INSTALL_TO_code (+ Sm4shCommand)',
+    exe_too = len(earlier) < 3             # v4: no executable change (v3's stays)
+    check('the package\'s top level: README.txt, INSTALL_TO_data%s (+ Sm4shCommand)' % (', INSTALL_TO_code, TEST_ONLY_INSTALL_TO_code'
+                                                                                      if exe_too else ' (v4: the exe is v3\'s)'),
           sorted(t for t in top if not t.startswith('Sm4shCommand_v')),
-          ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code'])
+          ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code'] if exe_too else ['INSTALL_TO_data', 'README.txt'])
     want, same1 = [], []
     for root, _ds, fs in os.walk(os.path.join(out, 'fighter')):
         for f in fs:
@@ -1073,6 +1090,11 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
                 ['fighter/gekkouga/model/clone/c%02d/%s' % (c, f) for c in range(8) for f in GB.CLONE_FACE_FILES]
         check('v2: both MSCs, his 5 motion part pacs, the face / rest-of-model files in all 8 colours (%d)' % len(v2new),
               [m for m in v2new if 'INSTALL_TO_data/' + m not in names], [])
+    if z1 and len(earlier) == 3:
+        check('v4: INSTALL_TO_data: his body game.bin (hitboxes x5), the clone\'s game / effect.bin, his MSC',
+              sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              ['fighter/gekkouga/script/animcmd/body/game.bin', 'fighter/gekkouga/script/animcmd/weapon/clone/effect.bin',
+               'fighter/gekkouga/script/animcmd/weapon/clone/game.bin', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
     if z1 and len(earlier) == 2:
         check('v3: INSTALL_TO_data is both MSCs and his body effect.bin (the smash effects x5; the rest is v1 / v2\'s)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
@@ -1092,6 +1114,10 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
             a = C.args(b, nm == 'gkd')
             subprocess.run([sys.executable, os.path.join(HERE, 'rpx_patch.py'), b, p] + a, check=True, stdout=subprocess.DEVNULL)
             member = ('INSTALL_TO_code' if nm == 'gk' else 'TEST_ONLY_INSTALL_TO_code') + '/cross_f.rpx'
+            if not exe_too:
+                check('v4: the installed %s (v3\'s) is still the cave on its base, rebuilt from the script' % member,
+                      z1.read(member) == open(p, 'rb').read(), True)
+                continue
             check('%s is the cave on its base, rebuilt from the script' % member, z.read(member) == open(p, 'rb').read(), True)
             if z1:
                 check('%s differs from %s\'s' % (member, newest), z.read(member) != z1.read(member), True)
@@ -1099,7 +1125,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     words = ('300', '720', '480', 'swap', 'chain', 'Technical') if not z1 else \
         ('greninja_clones_v1', 'hitlag', 'fall', 'face', 'hand', 'exe_v46z_gk2', 'swap', 'blast') if len(earlier) == 1 else \
         ('greninja_clones_v2', 'hurtbox', 'wall', 'ceiling', 'slope', 'blast zone', 'hitlag', 'exe_v46z_gk3', 'swap', '120',
-         '5x', 'S4GF', 'S4GC', 'S4GU', 'Final Smash')
+         '5x', 'S4GF', 'S4GC', 'S4GU', 'Final Smash') if len(earlier) == 2 else \
+        ('greninja_clones_v3', 'hitbox', '5x', 'sword', 'offset', 'clone', 'exe_v46z_gk3', 'Hitbox Viewer')
     check('README.txt mentions every feature (%s)' % ', '.join(words), [w for w in words if w not in readme], [])
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
@@ -1136,7 +1163,7 @@ def tool_tests(out, base, base_diag, pkg):
 
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
-    earlier = [x[5:] for x in sys.argv[1:] if x.startswith('--v1=')] + [x[5:] for x in sys.argv[1:] if x.startswith('--v2=')]
+    earlier = [x[5:] for k in ('1', '2', '3') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
     base_diag = a[4] if len(a) > 4 else None

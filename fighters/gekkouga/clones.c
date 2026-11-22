@@ -63,7 +63,8 @@ float gk_gap() { return 14.0f; }          // the clones' spacing (tools/gekkouga
 int gk_lw_hold_frame() { return 14; }     // the stance's frame held while charging (its counter window 8 - 30)
 int gk_pip_count() { return 10; }         // the charge bar: one pip a 30 frames
 int gk_smash_full() { return 120; }       // v3: the full smash charge (the user; Smash 4's own hold is 60)
-float gk_smash_grow() { return 1.5f; }    // the smashes' hitbox size at full charge (ACMD: gekkouga_build.py HIT_GROW)
+float gk_smash_grow() { return 5.0f; }    // v4: the smashes' hitbox size at full charge, as their effects (ACMD:
+                                          // gekkouga_build.py GROW; sword-bone hitboxes' offsets too)
 float gk_smash_fx_max() { return 5.0f; }  // v3: their effects' size at full charge (ACMD EFFECT_GROW; the hold: gk_sm_fx)
 int gk_magic() { return 4747; }
 float gk_gravity() { return 0.18f; }      // his gravity (fighter_param 0x03000018: reference/fighter_param_attributes.csv)

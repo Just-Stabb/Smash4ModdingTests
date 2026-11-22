@@ -119,7 +119,9 @@ def compile_msc(src, out):
 
 # ---------------------------------------------------------------- ACMD
 SMASH_SCRIPTS = ('attacks4', 'attacks4hi', 'attacks4lw', 'attackhi4', 'attacklw4')
-GROW = 1.5                 # clones.c gk_smash_grow(): every smash is a full charge, so its hitboxes are x1.5
+GROW = 5.0                 # v4 (the user): the hitboxes grow with the effects: every smash is a full charge, x5 (v1-v3 1.5)
+SWORD_BONES = (24, 25)     # v4: his water sword's bones: a hitbox on them also has its offset x5 (the sword effect and its
+                           # trail grow from the bone, so the hitboxes stay along the 5x sword); others (body bones) keep it
 EFFECT_GROW = 5.0          # v3 (the user): its effects x5 (clones.c gk_smash_fx_max()); its trails' (Sword_Glow) points too
 HOLD_SCRIPTS = ('attacks4hold', 'attackhi4hold', 'attacklw4hold')   # v3: their effects at size 0 (his MSC draws them, gk_sm_fx)
 HOLD_EFFECTS = ('External_Graphic', 'Graphic_Effect', 'Graphic_Effect2')
@@ -197,6 +199,11 @@ def scale_smash(game, effect):
                     k = syn.index('Size')
                     c.params[k] = round(float(c.params[k]) * (GROW if f is game else EFFECT_GROW), 4)
                     n += 1
+                if f is game and c.name in HITBOXES and int(c.params[syn.index('Bone')]) in SWORD_BONES:
+                    for nm in ('X', 'Y', 'Z', 'X2', 'Y2', 'Z2'):
+                        if nm in syn:
+                            k = syn.index(nm)
+                            c.params[k] = round(float(c.params[k]) * GROW, 4)
                 if f is effect and c.name == 'Sword_Glow':
                     for nm in ('X1', 'Y1', 'Z1', 'X2', 'Y2', 'Z2'):
                         k = syn.index(nm)
@@ -208,6 +215,25 @@ def scale_smash(game, effect):
                 c.params[c.info['syntax'].index('Size')] = 0.0
                 n += 1
     return n
+
+
+def flatten(cmds):
+    """a script with conditions as straight commands: each condition (IS_FLAG / Float_Compare / Float_Var_Compare) and
+    True / Else dropped, the Else branches' commands dropped (True / Else jump Offset words from their own header; a
+    command is 1 + its parameters words), EXECUTE dropped (the clone starts its motion at his frame)"""
+    pos, at = [], 0
+    for c in cmds:
+        pos.append(at)
+        at += 1 + len(c.params)
+    skip = set()
+    for i, c in enumerate(cmds):
+        if c.name == 'Else':
+            end = pos[i] + int(c.params[0])
+            for j in range(i + 1, len(cmds)):
+                if pos[j] < end:
+                    skip.add(j)
+    drop = {'IS_FLAG', 'Float_Compare', 'Float_Var_Compare', 'True', 'Else', 'EXECUTE'}
+    return [c for i, c in enumerate(cmds) if i not in skip and c.name not in drop]
 
 
 def clone_scripts(game, effect, mtable_hashes, bmap):
@@ -238,6 +264,8 @@ def clone_scripts(game, effect, mtable_hashes, bmap):
             out.append(c2)
         g_out[crc] = out
         e = effect.scripts.get(crc)
+        if e and crc in smash:
+            e = flatten(e)                # v4: his smashes' effects too (their conditions: the True branches)
         if e and not any(c.name in FLOW for c in e):
             eo = []
             for c in e:
