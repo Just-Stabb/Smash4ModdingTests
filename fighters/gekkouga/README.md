@@ -1218,3 +1218,34 @@ a diagonal line receding into the screen; up smash: a column of flames, each wit
 - Tests: `gekkouga_clones_test ... --vcf` 313 / 0; `firetrail_tests` (each smash facing right and left: the flames' X 0, Y 0, local Z along
   the way; the facing turn); `gekkouga_fx_test.soft_checks` (the bases' biggest row-to-row alpha drop, as built: 11 - 22
   of 255 against the footage's 80 - 130; fire_torch_012's wisps 23 already). Not confirmed in game.
+
+## Skeleton v1.4 (`greninja_skeleton_v1_4.zip`, over fire trail fix v1; release exe exe_v46z_gkb6, new TEST_ONLY diag)
+
+Also the clone fixes v2 items (one package).
+- **Skeleton walls**: the user, with v1.3: "doesn't have collision on its sides, but has collision on top" (v1.3's
+  GroundModule frame update made the top work), and "I believe the test one is there": skeleton v1.1's TEST_ONLY
+  floor-only skeleton.lvd (the top line only). v1.4 ships the box skeleton.lvd (`skeleton_lvd`: 4 vertices up the left
+  side, across the top, down the right, x +- 6 / y 2 - 28; normals out of the solid, each line's direction turned
+  counter-clockwise as the hydrant's floor line; materials the hydrant's) in INSTALL_TO_data, over the test one. No
+  Landmaster or stage .lvd is in the workspace to compare wall lines with. TEST_ONLY exes: `sk_coldiag` adds **S4SV**
+  (every 30 frames: the skeleton's place and vertices 2 / 3, x10, after S4SD's 0 / 1): `skeleton_checks` moves all 4
+  through the game's vertex list and reads them back. The release exe is unchanged (gkb6, byte for byte).
+- **The clones on the ground** (the user's two clips: they "clip back to a set position constantly", bunch and
+  separate): his walk / run / dash attack / dash grab motions carry TransN forward (WalkMiddle 22 a loop, Run 33,
+  AttackDash 25.5); a fighter's kinetics turn it into his movement, an article draws it, so each clone's model ran ahead
+  of its place (already his X + its offset) and snapped back every loop. `gekkouga_build.py root_still`: the clone's
+  main.pac keeps TransN's X / Z at 0 on every frame (Y, rotation as they were). `ground_move_tests`: walk 1.43, dash 1.6,
+  run 2.08 (his fighter_param), turnaround, run back, skid, two dash-turns: each clone exactly his X 1 / 2 frames back
+  +- 14 (world sides), no jump over 1.5 x 2.08; every clone motion's TransN still sideways. Diag (no exe change): every
+  10 frames on the ground with clones out his VAR_23 = reasons x 10000 + (left error + 50) x 100 + (right error + 50)
+  (error: the clone's X - his X - its offset, +- 49; reasons 1 / 2 wall, 4 history restart, 8 back in formation, 16 / 32
+  falling on its own), flags bit 1048576 toggled so the TEST_ONLY exe's S4GF line logs it (gen=).
+- **The clones' forward air sword** (the user: "Clones also still display trails incorrectly": the sword, its trail and
+  flames hang straight down): his joint 25 (forward air's sword and trail, the smashes' second sword, SpecialNHold's
+  shuriken) is model.jtb table 0's ThrowN, which no motion of his moves (main.pac's track constant, no part pac keys
+  it): on him something native moves it (not found); on the clone it stays still. `CLONE_JOINT_FIX` {25: LHaveN}: the
+  clone's effects and hitboxes on his joint 25 use its left hand (the smashes' two swords are 24 = RHaveN and 25; the
+  shuriken is charged on 25), TEST_ONLY_DATA clone_sword_rhave (the right hand) / clone_sword_thrown (as before) to
+  compare. Back air's inner trail is on joint 2 (HipN, animated on the clones): not this, still open.
+- **Up smash's trail hitboxes** on its flames (+- 6 / 14, Y 5; fire trail fix v1 moved the flames only).
+- Tests: cave A_release 269 / G_pose 264 / release 239; `gekkouga_clones_test ... --vft` 321 / 0. Not confirmed in game.

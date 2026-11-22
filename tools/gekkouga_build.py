@@ -174,18 +174,29 @@ def param(c, name):
     return c.info['syntax'].index(name)
 
 
-def bone_map(jtb_bytes, vbn_path):
+CLONE_JOINT_FIX = {25: 'LHaveN'}   # clone fixes v2: his joint 25 is model.jtb table 0's ThrowN, which no motion moves (his
+                                   # sword / shuriken / smash swords follow it, and sweep on him: something native moves it);
+                                   # on the clones his left hand: the smashes' two swords are 24 (RHaveN) and 25, the
+                                   # shuriken is charged on 25 (TEST_ONLY_DATA: the right hand, and ThrowN as before)
+
+
+def bone_map(jtb_bytes, vbn_path, fix=None):
     """his body joint id (table 0 below 1000, table 1 from 1000) -> the clone article's (0x7D0 + table-0 entry):
-    a bone missing from table 0 goes to its nearest ancestor that is there"""
+    a bone missing from table 0 goes to its nearest ancestor that is there; fix: {joint: bone name} taken instead
+    (CLONE_JOINT_FIX)"""
     import port_check
     import omo
     t0, t1 = port_check.jtb(jtb_bytes)
     bones = omo.vbn_read(vbn_path)
     where = {b: n for n, b in enumerate(t0)}
+    names = [n for n, _p, _h in bones]
+    fix = CLONE_JOINT_FIX if fix is None else fix
 
     def m(j):
         if j == 0:
             return 0
+        if j in fix:
+            return WEAPON_JOINT + where[names.index(fix[j])]
         b = t0[j] if j < 1000 else t1[j - 1000]
         while b not in where:
             b = bones[b][1]
@@ -266,7 +277,7 @@ def flatten(cmds):
     return [c for i, c in enumerate(cmds) if i not in skip and c.name not in drop]
 
 
-def clone_scripts(game, effect, mtable_hashes, bmap):
+def clone_scripts(game, effect, mtable_hashes, bmap, joint25=None):
     """the clone article's game / effect scripts: his body's hitbox scripts (bones remapped, his smashes' damage x
     CHARGE_DAMAGE) and their effects (EFFECT / follow / flip / trails only); {crc: [Command]} each"""
     import acmd
@@ -276,7 +287,7 @@ def clone_scripts(game, effect, mtable_hashes, bmap):
     for crc in sorted(set(mtable_hashes) - final):
         s = game.scripts.get(crc)
         if not s or not any(c.name in HITBOXES for c in s) or any(c.name in NO_CLONE for c in s):
-            eo = clone_effect(effect.scripts.get(crc), bmap)      # clone fixes v1: no hitbox (a grab, a throw, ...):
+            eo = clone_effect(effect.scripts.get(crc), bmap, joint25)   # clone fixes v1: no hitbox (a grab, a throw, ...):
             if eo:                                                # its effects anyway
                 e_out[crc] = eo
             continue
@@ -296,13 +307,13 @@ def clone_scripts(game, effect, mtable_hashes, bmap):
                     c2.params[k] = round(float(c2.params[k]) * CHARGE_DAMAGE, 4)
             out.append(c2)
         g_out[crc] = out
-        eo = clone_effect(effect.scripts.get(crc), bmap)
+        eo = clone_effect(effect.scripts.get(crc), bmap, joint25)
         if eo:
             e_out[crc] = eo
     return g_out, e_out
 
 
-def clone_effect(e, bmap):
+def clone_effect(e, bmap, joint25=None):
     """one motion's effect script for the clone: its conditions' True branches (v4: the smashes'; clone fixes v1: every
     script's), CLONE_EFFECT's commands with their joints remapped; None when it calls / jumps / loops or has no effect"""
     import acmd
@@ -317,7 +328,8 @@ def clone_effect(e, bmap):
             for nm in ('Bone', 'Bone1', 'Bone2', 'Bone3'):
                 if nm in c2.info['syntax']:
                     k = param(c2, nm)
-                    c2.params[k] = bmap(int(c2.params[k]))
+                    j = int(c2.params[k])
+                    c2.params[k] = joint25 if (joint25 is not None and j == 25) else bmap(j)
         except (IndexError, AssertionError):
             continue                      # a joint past his model.jtb's tables: left out (none of the attacks')
         eo.append(c2)
@@ -491,7 +503,15 @@ def add_rolloff(game):
         RA.add_speed(sc, -ROLLOFF_SPEED if nm == 'EscapeB' else ROLLOFF_SPEED, 5.0, 27.0, scripts=game.scripts)
 
 
-def cmd_acmd(user_dir, vanilla_model, out_dir):
+# clone fixes v2 (the user: "Clones also still display trails incorrectly": forward air's sword / trail / flames hang
+# straight down on the clones, sweep on him): his effects on joint 25 (the water sword's in forward air and the smashes)
+# are model.jtb table 0's entry 25 = ThrowN, which no motion of his moves (main.pac's track constant, no part pac has it),
+# so the clone's copy stays still; on him something native moves it (not found). TEST_ONLY_DATA/<name>: the clone's
+# effect.bin with joint 25 on one of his hands instead, for the user to pick
+CLONE_JOINT25_TESTS = (('clone_sword_rhave', 'RHaveN'), ('clone_sword_thrown', 'ThrowN'))
+
+
+def cmd_acmd(user_dir, vanilla_model, out_dir, test_only=None):
     """user_dir: his script/animcmd (body/ game, effect, sound, expression, motion.mtable); vanilla_model: his
     model/body/c00 (model.jtb / model.vbn for the clone's joints); out_dir: script/animcmd of the package"""
     import acmd
@@ -513,6 +533,19 @@ def cmd_acmd(user_dir, vanilla_model, out_dir):
     os.makedirs(ow, exist_ok=True)
     acmd.ACMDFile(g).save(os.path.join(ow, 'game.bin'))
     acmd.ACMDFile(e).save(os.path.join(ow, 'effect.bin'))
+    if test_only:
+        import omo as O
+        names = [n for n, _p, _h in O.vbn_read(os.path.join(vanilla_model, 'model.vbn'))]
+        import port_check
+        t0, _t1 = port_check.jtb(open(os.path.join(vanilla_model, 'model.jtb'), 'rb').read())
+        for tname, bone in CLONE_JOINT25_TESTS:
+            bm2 = bone_map(open(os.path.join(vanilla_model, 'model.jtb'), 'rb').read(),
+                           os.path.join(vanilla_model, 'model.vbn'), {25: bone})
+            g2, e2 = clone_scripts(game, effect, hashes, bm2)
+            td = os.path.join(test_only, tname, 'fighter', 'gekkouga', 'script', 'animcmd', 'weapon', 'clone')
+            os.makedirs(td, exist_ok=True)
+            acmd.ACMDFile(g2).save(os.path.join(td, 'game.bin'))
+            acmd.ACMDFile(e2).save(os.path.join(td, 'effect.bin'))
     acmd.ACMDFile({}).save(os.path.join(ow, 'sound.bin'))
     open(os.path.join(ow, 'motion.mtable'), 'wb').write(mt)
     return dict(scaled=n, tips=tips, game=len(g), effect=len(e), motions=len(hashes))
@@ -737,7 +770,8 @@ def cmd_all(vanilla_root, user_root, out):
     vf = os.path.join(vanilla_root, 'fighter', 'gekkouga')
     of = os.path.join(out, 'fighter', 'gekkouga')
     info = cmd_acmd(os.path.join(user_root, 'fighter', 'gekkouga', 'script', 'animcmd'),
-                    os.path.join(vf, 'model', 'body', 'c00'), os.path.join(of, 'script', 'animcmd'))
+                    os.path.join(vf, 'model', 'body', 'c00'), os.path.join(of, 'script', 'animcmd'),
+                    os.path.join(out, 'TEST_ONLY_DATA'))
     info['data_files'] = cmd_data(vf, of, os.path.join(out, 'TEST_ONLY_DATA'))   # v9.1: v9's data, to test
     msc = os.path.join(of, 'script', 'msc')
     os.makedirs(os.path.join(msc, 'clone'), exist_ok=True)

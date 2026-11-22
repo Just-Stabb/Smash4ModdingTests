@@ -1975,9 +1975,17 @@ def script_tests(out, user):
     check('v4: the clone has his smash effects too (their True branches), at his sizes (x5: the water sword / flash 5.0; '
           'clone fixes v1: every effect request of them)', (len(sizes) >= 8, sizes == his, 5.0 in sizes), (True, True, True))
     sw = [c for nm in GB.SMASH_SCRIPTS for c in ce.scripts.get(zlib.crc32(nm.encode()), []) if c.name == 'Sword_Glow']
-    check('v4: ... its trails 5x long (Y2 -55) on its sword joints (0x7D0 + 24 / 25)',
+    check('v4: ... its trails 5x long (Y2 -55) on its sword joints (0x7D0 + 24: his joint 24 RHaveN; clone fixes v2: his '
+          'joint 25, ThrowN by model.jtb, on the clone\'s LHaveN, 0x7D0 + 23)',
           sorted({(int(c.params[c.info['syntax'].index('Bone2')]), round(float(c.params[c.info['syntax'].index('Y2')]), 2))
-                  for c in sw}), [(0x7D0 + 24, -55.0), (0x7D0 + 25, -55.0)])
+                  for c in sw}), [(0x7D0 + 23, -55.0), (0x7D0 + 24, -55.0)])
+    j25 = sorted({(n, c.name, int(c.params[c.info['syntax'].index('Bone')])) for n in ('attackairf', 'attackhi4', 'specialnhold')
+                  for c in ce.scripts.get(zlib.crc32(n.encode()), []) if 'Bone' in c.info['syntax'] and
+                  c.name in ('External_Graphic', 'Graphic_Effect2')})
+    check('clone fixes v2 (the user: the clones\' forward air sword / trail hang down): his joint-25 effects (the water sword, '
+          'its flames, the smashes\' second sword) on the clone\'s left hand (0x7D0 + 23), not its still ThrowN (0x7D0 + 25); '
+          'TEST_ONLY_DATA clone_sword_rhave / clone_sword_thrown the alternatives',
+          sorted({b_ for _n, _c, b_ in j25 if b_ >= 0x7D0}), [0x7D0 + 23, 0x7D0 + 24])
     check('the clone has his forward smash, his jab, his up air (the loop)',
           all(zlib.crc32(n.encode()) in cg.scripts for n in ('attacks4', 'attack11', 'attackairhi')), True)
     mt0 = open(os.path.join(user, 'body', 'motion.mtable'), 'rb').read()
@@ -2032,8 +2040,25 @@ def model_tests(out, earlier):
     mot = os.path.join(out, oc)
     mdl = os.path.join(out, 'fighter', 'gekkouga', 'model', 'clone')
     td_root = os.path.join(out, 'TEST_ONLY_DATA')
-    check("v11: the release's main.pac is v10's (merged; loaded in v9.1 and v10)",
-          open(os.path.join(mot, 'main.pac'), 'rb').read() == v10.read('INSTALL_TO_data/' + oc + 'main.pac'), True)
+    if len(earlier) < 29:
+        check("v11: the release's main.pac is v10's (merged; loaded in v9.1 and v10)",
+              open(os.path.join(mot, 'main.pac'), 'rb').read() == v10.read('INSTALL_TO_data/' + oc + 'main.pac'), True)
+    else:
+        with tempfile.TemporaryDirectory() as td_:
+            pp = os.path.join(td_, 'main.pac')
+            open(pp, 'wb').write(v10.read('INSTALL_TO_data/' + oc + 'main.pac'))
+            old = O.pac_read(pp)
+        new = O.pac_read(os.path.join(mot, 'main.pac'))
+        h0 = O.vbn_read(os.path.join(mdl, 'c00', 'model.vbn'))[0][2]
+        bad, still = [], 0
+        for (n0, d0), (n1, d1) in zip(old, new):
+            m0 = O.Omo(d0)
+            still += GB.root_still(m0, h0)
+            if n0 != n1 or m0.encode() != d1:
+                bad.append(n0)
+        check("v11 / skeleton v1.4: the release's main.pac is v10's (merged) with TransN kept still sideways (%d motions: "
+              "clone fixes v2's root_still), every motion otherwise byte for byte" % still,
+              (len(old) == len(new), bad[:3], still > 20), (True, [], True))
     bad = []
     for c in range(8):
         rel = 'fighter/gekkouga/model/clone/c%02d/' % c
@@ -2085,8 +2110,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (23, 24, 25, 27, 28):   # burn v2.2 / v2.3 / aerial chain v1 / clone fixes v1 / trail fix: data only
         want_top = ['INSTALL_TO_data', 'README.txt']
-    if len(earlier) == 29:   # skeleton v1.4: data and the TEST_ONLY exes (S4SV); the release exe is v1.3's
-        want_top = ['INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
+    if len(earlier) == 29:   # skeleton v1.4: data, the clone joint test data and the TEST_ONLY exes (S4SV); the release
+        want_top = ['INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']   # exe is v1.3's
     if len(earlier) == 22:   # burn v2.1: the exes only (the floor is the exe's)
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 18:   # v14: exes and test data only
@@ -2182,9 +2207,19 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               'the trail\'s game.bin (up smash\'s hitboxes on its flames), his MSC (the clone diag)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
               ['fighter/gekkouga/model/skeleton/c00/skeleton.lvd', 'fighter/gekkouga/motion/clone/main.pac',
+               'fighter/gekkouga/script/animcmd/weapon/clone/effect.bin', 'fighter/gekkouga/script/animcmd/weapon/clone/game.bin',
                'fighter/gekkouga/script/animcmd/weapon/firetrail/game.bin', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
+        td = sorted(n for n in names if n.startswith('TEST_ONLY_DATA/') and not n.endswith('/'))
+        check('skeleton v1.4: TEST_ONLY_DATA: the clone\'s game / effect.bin with his joint 25 on its right hand '
+              '(clone_sword_rhave) or ThrowN as before (clone_sword_thrown), byte for byte as built',
+              [(n, z.read(n) == open(os.path.join(out, n), 'rb').read()) for n in td],
+              [('TEST_ONLY_DATA/%s/fighter/gekkouga/script/animcmd/weapon/clone/%s' % (t, f), True)
+               for t in ('clone_sword_rhave', 'clone_sword_thrown') for f in ('effect.bin', 'game.bin')])
         import lvd as LV
-        c = LV.LVD(z.read('INSTALL_TO_data/fighter/gekkouga/model/skeleton/c00/skeleton.lvd')).collisions[0]
+        with tempfile.TemporaryDirectory() as td_:
+            lp = os.path.join(td_, 'skeleton.lvd')
+            open(lp, 'wb').write(z.read('INSTALL_TO_data/fighter/gekkouga/model/skeleton/c00/skeleton.lvd'))
+            c = LV.LVD(lp).collisions[0]
         check('skeleton v1.4: skeleton.lvd: one collision, 4 vertices up the left side, across the top, down the right (x +- 6, '
               'y 2 / 28), normals out of the solid (left wall -X, the top +Y, right wall +X: each the line\'s direction '
               'turned counter-clockwise, as the hydrant\'s floor), no drop-through',

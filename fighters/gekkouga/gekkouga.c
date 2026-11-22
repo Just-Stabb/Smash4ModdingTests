@@ -41825,9 +41825,15 @@ int gk_cl_err(int id)
 
 int gk_cl_diag()
 {
-    if (gk_ability <= 0 || gk_alive == 0 || StatusModule(0x1) != 0)
+    if (gk_ability <= 0 || gk_alive == 0)
     {
-        return (gk_cl_t & 0x1) * 1048576;
+        gk_cl_t = 0;
+        gk_cl_why = 0;
+        return 0;
+    }
+    if (StatusModule(0x1) != 0)
+    {
+        return ((gk_cl_t / 10) & 0x1) * 1048576;   // in the air: no line, the bit as it was
     }
     if (gk_lfall > 2)
     {
