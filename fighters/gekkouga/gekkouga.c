@@ -40209,6 +40209,11 @@ void gekkouga_frame()
     {
         flags = flags | 0x2;              // the burnout's slow
     }
+    if (gk_lw_charge >= gk_lw_full())
+    {
+        flags = flags | 0x8;              // v3 diag: the ability ready (the TEST_ONLY exe logs flag changes: S4GF)
+    }
+    flags = flags | gk_alive * 16;        // v3 diag: 16 / 32 the clones out
     WorkModule(0, (float)flags + 0, 0x0f000314);
 }
 
@@ -40361,6 +40366,7 @@ void gk_ability_update()
 void gk_spawn(int id)
 {
     float off;
+    int r;
     off = gk_off(id);
     gk_set_c(id, PostureModuleF(0x1) + off, PostureModuleF(0x2), 0);
     gk_set_fall_t(id, 0);
@@ -40368,12 +40374,13 @@ void gk_spawn(int id)
     gk_spawn_t = 3;
     if (id == 0x1)
     {
-        ArticleModule(0x2710, 0x6);
+        r = ArticleModule(0x2710, 0x6);
     }
     else
     {
-        ArticleModule(0x2710, 0x7);
+        r = ArticleModule(0x2710, 0x7);
     }
+    WorkModule(0, (float)r + 0, 0x0f000317);   // v3 diag: the generate's result (the TEST_ONLY exe logs it: S4GF gen=)
     gk_alive = gk_alive | id;
     if (id == 0x1)
     {

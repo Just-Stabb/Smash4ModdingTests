@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
-"""Greninja's clones (fighters/gekkouga/README.md "Clones v1" / "Clones v2"): the native part. Prints rpx_patch.py
-arguments (v2: exe_v46z_gk2; v1's exe_v46z_gk1 was this without the v2 parts).
+"""Greninja's clones (fighters/gekkouga/README.md "Clones v1" - "Clones v3"): the native part. Prints rpx_patch.py
+arguments (v3: exe_v46z_gk3; v1 / v2's exe_v46z_gk1 / gk2 were this without the later parts).
 
-  python3 tools/rpx_patch.py exe_v46z_ui10.rpx exe_v46z_gk2.rpx $(python3 tools/gekkouga_clone_cave.py --rpx exe_v46z_ui10.rpx)
-  python3 tools/gekkouga_clone_cave.py --rpx exe_v46z_ui10_diag.rpx --diag # + the TEST ONLY OSReport lines (exe_v46z_gk2_diag)
+v3: the clone's u16 flags without the Final-Smash-only resource category (its files load with him); its base kind for
+the weapon switches and its module row are lizardonm's (an attacking, hittable article's per-frame template); its
+specializer +0x1C gives it his hurtboxes, +0x64 / +0x84 / +0x8C / +0x94 poll its damage (a hit -> his VAR_21 = 20000 +
+its id), +0xAC sets his hitstop at its hit. Diag: S4GF / S4GI / S4GC / S4GU along the spawn chain.
+
+  python3 tools/rpx_patch.py exe_v46z_ui10.rpx exe_v46z_gk3.rpx $(python3 tools/gekkouga_clone_cave.py --rpx exe_v46z_ui10.rpx)
+  python3 tools/gekkouga_clone_cave.py --rpx exe_v46z_ui10_diag.rpx --diag # + the TEST ONLY OSReport lines (exe_v46z_gk3_diag)
   python3 tools/gekkouga_clone_cave.py --rpx exe_v46z_ui10.rpx --info      # where everything went
 
 Greninja (fighter kind 0x30) runs his own native code; for him ONLY this adds (every other fighter, Kirby's Greninja copy
@@ -86,6 +91,12 @@ TEMPLATE = 0x15C                  # v3: lizardonm (Charizard's Final Smash form)
                                   # switches (their per-kind module update templates) and its whole module row: bunshin's
                                   # modules + Kinetic, Attack, Hit, Damage, whose updates bunshin's template never runs
 TEMPLATE_NAME = ('lizardon', 'lizardonm')
+CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource request's categories 1 / 4 / 8 (0x030C37AC);
+                                  # none: 2, loaded with the fighter. Bunshin's 0x87D has 0x1 (4: the Final Smash load,
+                                  # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
+                                  # don't appear"). v3: 0x87C
+VAR_GEN = 0x0F000317              # his VAR_23 (v3 diag): the last generate's result (ArticleModule 0x2710)
+VAR_LOGGED = 0x0F000302           # the clone's VAR_2 (v3 diag): its first frame logged
 HITSTOP_FN = 0x02C2678C           # (accessor, hitbox data, f1 damage, f2 multiplier, r5 side, r6 use its multiplier) -> frames
 HITSTOP_MUL = 0x10105DCC          # the attacker handler's f1 for it (0x02C2643C: lfs f1, 0x5DCC(0x1010))
 W_HIT_MOD = 0x58                  # weapon accessor -> HitModule (vt +0x4C: hurtboxes from {data, count}, 0)
@@ -343,14 +354,20 @@ def build(rpx, diag=False):
     A['g1_shapes'] = alloc(0x20 * len(SHAPE_Z))
     A['gk_hide'] = alloc(4 * SLOTS)
     A['gk_slow'] = alloc(4 * SLOTS)
+    A['gk_lastf'] = alloc(8 * SLOTS) if diag else 0   # diag: the flags last logged / the tag-hide logged, per slot
     assert A['gk_slow'] == A['gk_hide'] + 0x20
+    assert not diag or A['gk_lastf'] == A['gk_slow'] + 0x20
     A['consts'] = alloc(28)          # 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, the hitstop multiplier
     A['hurt'] = alloc(0x30 * len(HURTBOXES))
     A['gk_str'] = alloc(8)
     fmts = [('gk_ft', 'S4GT slot=%d hide=%d\n'), ('gk_fs', 'S4GS slot=%d slow=%d\n'),
             ('gk_f42', 'S4GH clone hit dx=%d\n'), ('gk_f43', 'S4GV shield damage vetoed\n'),
             ('gk_fl', 'S4GL clone hit landed: owner slot %d hitlag %d\n'),
-            ('gk_fd', 'S4GD clone %d hurt\n')]
+            ('gk_fd', 'S4GD clone %d hurt\n'),
+            ('gk_ff', 'S4GF slot=%d flags=%d gen=%d\n'),
+            ('gk_fi', 'S4GI clone set-up: hitmodule=%08X\n'),
+            ('gk_fc', 'S4GC clone first frame: id=%d owner slot=%d\n'),
+            ('gk_fu', 'S4GU tag hidden: player=%d cursor=%08X\n')]
     for nm, s in fmts:
         A[nm] = alloc((len(s) + 4) & ~3, 4) if diag else 0
     code_at = alloc(0, 4)
@@ -377,6 +394,8 @@ def build(rpx, diag=False):
     out.blob(A['g1_shapes'], b''.join(struct.pack('>7fI', 0.0, SHAPE_Y[0], z, 0.0, SHAPE_Y[1], z, SHAPE_R, 0x200)
                                       for z in SHAPE_Z), 'clone shapes (joint 0, capsules)')
     out.blob(A['gk_hide'], bytes(8 * SLOTS), 'hide counters / slow states')
+    if diag:
+        out.blob(A['gk_lastf'], bytes(8 * SLOTS), 'diag: flags logged / tag hide logged')
     out.blob(A['consts'], struct.pack('>6fI', 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, img.w(HITSTOP_MUL)), 'constants')
     out.blob(A['hurt'], hurt_blob(), 'clone hurtboxes (his vl group 5, article joints)')
     out.blob(A['gk_str'], CLONE_NAME.encode().ljust(8, b'\0'), '"clone"')
@@ -389,7 +408,8 @@ def build(rpx, diag=False):
              slow=FLAG_SLOW, clones=FLAG_CLONES, life=TAG_LIFE, sslot=SLOW_SLOT, srate=SLOW_RATE, sframes=SLOW_FRAMES,
              hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, whit=W_HIT_MOD, wdmg=W_DAMAGE, watk=W_ATTACK,
              wstop=W_STOP, nhurt=len(HURTBOXES), s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
-    for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt'):
+    for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
+               'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -419,7 +439,39 @@ hud:    li r12, 8
         lis r11, %(far_hi)d
         lfs f0, %(far_lo)d(r11)
         stfs f0, 8(r3)
-        stfs f0, 0xC(r3)
+        stfs f0, 0xC(r3)''' + D('''
+        lis r11, %(gk_lastf_hi)d
+        addi r11, r11, %(gk_lastf_lo)d
+        addi r11, r11, 0x20
+        lwzx r10, r11, r12
+        cmpwi r10, 0
+        bne hud_go
+        li r10, 1
+        stwx r10, r11, r12
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stw r3, 0x8(r1)
+        stw r4, 0xC(r1)
+        stw r5, 0x10(r1)
+        stw r6, 0x14(r1)
+        stw r7, 0x18(r1)
+        stw r8, 0x1C(r1)
+        stw r9, 0x20(r1)
+        mr r5, r3
+        srwi r4, r12, 2
+        lis r3, %(gk_fu_hi)d
+        addi r3, r3, %(gk_fu_lo)d''' + osr() + '''
+        lwz r3, 0x8(r1)
+        lwz r4, 0xC(r1)
+        lwz r5, 0x10(r1)
+        lwz r6, 0x14(r1)
+        lwz r7, 0x18(r1)
+        lwz r8, 0x1C(r1)
+        lwz r9, 0x20(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40''') + '''
 hud_go:''' + tail(HUD_FN) + '''
 
 # ---- slot 13: his per-frame code (r3 specializer, r4 his table entry)
@@ -451,7 +503,28 @@ s13:    stwu r1, -0x50(r1)
         lwz r28, %(work)d(r29)''' + var_get('r28', VAR_FLAGS) + '''
         fctiwz f1, f1
         stfd f1, 0x18(r1)
-        lwz r26, 0x1C(r1)               # the flags
+        lwz r26, 0x1C(r1)               # the flags''' + D('''
+        lis r25, %(gk_lastf_hi)d
+        addi r25, r25, %(gk_lastf_lo)d
+        slwi r12, r27, 2
+        lwzx r0, r25, r12
+        cmpw r0, r26
+        beq s13_nof
+        stwx r26, r25, r12
+        andi. r0, r26, %(tag)d
+        bne s13_keep
+        addi r11, r25, 0x20             # the tag gone: its hide may be logged again
+        li r0, 0
+        stwx r0, r11, r12
+s13_keep:''' + var_get('r28', VAR_GEN) + '''
+        fctiwz f1, f1
+        stfd f1, 0x20(r1)
+        lis r3, %(gk_ff_hi)d
+        addi r3, r3, %(gk_ff_lo)d
+        mr r4, r27
+        mr r5, r26
+        lwz r6, 0x24(r1)''' + osr() + '''
+s13_nof:''') + '''
         lis r25, %(gk_hide_hi)d
         addi r25, r25, %(gk_hide_lo)d
         slwi r12, r27, 2
@@ -768,7 +841,12 @@ w_init: stwu r1, -0x20(r1)
         lwz r12, %(wacc)d(r4)
         cmpwi r12, 0
         beq wi_out
-        lwz r3, %(whit)d(r12)           # its HitModule
+        lwz r3, %(whit)d(r12)           # its HitModule''' + D('''
+        stw r3, 0x10(r1)
+        mr r4, r3
+        lis r3, %(gk_fi_hi)d
+        addi r3, r3, %(gk_fi_lo)d''' + osr() + '''
+        lwz r3, 0x10(r1)''') + '''
         cmpwi r3, 0
         beq wi_out
         lis r11, %(hurt_hi)d
@@ -796,7 +874,32 @@ w_poll: stwu r1, -0x30(r1)
         stw r30, 0x28(r1)
         lwz r31, %(wacc)d(r3)
         cmpwi r31, 0
-        beq wp_out
+        beq wp_out''' + D('''
+        lwz r30, %(wwork)d(r31)
+        cmpwi r30, 0
+        beq wp_nolog''' + var_get('r30', VAR_LOGGED) + '''
+        lis r12, %(half_hi)d
+        lfs f0, %(half_lo)d(r12)
+        fcmpu cr0, f1, f0
+        bgt wp_nolog''' + var_get('r30', VAR_ID) + '''
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r0, 0x1C(r1)
+        stw r0, 0x10(r1)''' + var_get('r30', VAR_SLOT) + '''
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lis r12, %(half_hi)d
+        lfs f0, %(half_lo)d(r12)
+        lwz r0, 0x10(r1)
+        cmpwi r0, 0
+        beq wp_nolog                    # its MSC hasn't named it yet: logged on a later frame
+        lis r12, %(one_hi)d
+        lfs f1, %(one_lo)d(r12)''' + var_set('r30', VAR_LOGGED) + '''
+        lis r3, %(gk_fc_hi)d
+        addi r3, r3, %(gk_fc_lo)d
+        lwz r4, 0x10(r1)
+        lwz r5, 0x1C(r1)''' + osr() + '''
+wp_nolog:''') + '''
         lwz r3, %(wdmg)d(r31)           # its DamageModule
         cmpwi r3, 0
         beq wp_out
@@ -1001,6 +1104,8 @@ w_dcase:
     for nm, addr, es, invalid in W.STATIC_TABLES:
         rd = {1: img.b, 2: img.h, 4: img.w}[es]
         v = rd(addr + es * CLONE_BASE)
+        if es == 2:
+            v &= ~CATEGORY_BITS             # v3: loaded with him (bunshin's 0x1: only with his Final Smash)
         at = T[nm] + es * CLONE_KIND
         assert rd(at) == invalid, 'table %s: kind 0x%X in use' % (nm, CLONE_KIND)
         wa = at & ~3

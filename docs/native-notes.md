@@ -3722,7 +3722,7 @@ exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATC
   - Secret Sensation's MSC also holds every other fighter by the 2-frame hitstop (`ui_freeze(0)`) while it asks the
     stop, a second lock that works without the frame state.
 
-## Greninja's clones (`tools/gekkouga_clone_cave.py`, exe_v46z_gk1 / gk2; fighters/gekkouga/README.md "Clones v1" / "Clones v2")
+## Greninja's clones (`tools/gekkouga_clone_cave.py`, exe_v46z_gk1 - gk3; fighters/gekkouga/README.md "Clones v1" - "Clones v3")
 
 **Claimed region: `0x04BEA000`-`0x04BEC000`** (`textregion:0x2BEC000 grow:0x04BEC000`, past Supamario's
 `0x04BE8000`-`0x04BEA000`) and a 4-word trampoline at `0x037EE540` (the zero run `0x037EE4DC`-`0x037EE550`, inside
@@ -3797,3 +3797,23 @@ MSC on a bunshin-based kind, the 4-shape group.
   - Tests: `gekkouga_clone_cave_test.py` 66 / 0 on both (the minfo words / flags / part tables, the hit signal: hit,
     shield, slot 0 / 9, a dead entry, no accessor, the registers kept); `supamario_ui_cave_test.py` (outline5 -> gk2)
     422 / 0; import_call_check 0.
+
+- **v3 (exe_v46z_gk3 / gk3_diag; fighters/gekkouga/README.md "Clones v3")**:
+  - **Why the v1 / v2 clones never appeared**: weapon u16 flags 0x80 / 0x1 / 0x100 = the resource request's categories
+    1 / 4 / 8 (`0x030C37AC` walks the fighter's article list; a kind with none of them is category 2, loaded with the
+    fighter). Bunshin's 0x87D (like tatami / moon 0x871) has 0x1: loaded for the Final Smash only. The clone's copy is
+    now 0x87C.
+  - **Weapon per-kind templates**: each of the 11 weapon switches' cases is a per-kind template; the update switch
+    (`0x02B6B7A8`) case calls T (`mr r3, r31; addi r4, r31, 0xD0; bl T`) then the specializer's +0x64 (+0x84 / +0x8C /
+    +0x94 in `0x02B75A88` / `0x02B77FAC` / `0x02B7A4DC`). Bunshin's T `0x02BA821C` updates only +0x18 / +0x24 / +0x38 /
+    +0x44 / +0x8C / +0xA0 / +0xB4 / +0xB8 (no Attack `0x02C08230`, Hit `0x02C42C54`, Kinetic `0x02C4F85C`); the can's
+    `0x02BA8B40`; lizardonm's `0x02BAACCC` (bunshin's + +0x1C, +0x34, +0x50, +0x58, +0xA4). The clone's base kind (`bt`)
+    and row are now lizardonm's (0x15C).
+  - **Weapon hurtboxes**: HitModule (+0x58) vt +0x4C(&{0x30-byte vl entries, count}, 0), bones 0x7D0 + joint (the can's
+    set-up `0x02AC9F40`); damage taken this frame: DamageModule (+0x54) vt +0x7C(0) -> f1 (`0x02B215D0`).
+  - **Weapon class vtable `0x100F78F8`**: +0xD4 victim `0x02B8B384`, +0xEC attacker `0x02B91EAC` = `li r3, 0; blr` (no
+    attacker hitstop for a weapon), +0x374-+0x394 forward to the specializer's +0xAC / +0xD4 / +0xDC / +0xE4 / +0xEC.
+    The clone's hit method sets his hitstop from its AttackModule hit records with `0x02C2678C`.
+  - Not found: the stage's blast zone data (the clones use a heartbeat for the game's own removal + a fallback).
+  - Cave `0x04BEA000`-`0x04BEC400` (diag `0x04BEC8B8`), limit `0x04BEE000`. Tests: `gekkouga_clone_cave_test.py` 81 / 84
+    (release / diag), `supamario_ui_cave_test.py` (outline5 -> gk3) 0 failures, import_call_check 0.

@@ -181,7 +181,7 @@ def words_checks(base, patched, diag):
     return out, info
 
 
-def weapon_checks(e, img, info):
+def weapon_checks(e, img, info, diag=False):
     L, A, lab = info['layout'], info['A'], info['labels']
     d = e.call(W.DESC_SWITCH, 0, C.CLONE_KIND)
     check('the weapon descriptor getter: kind 0x1A1 -> its descriptor', d, A['w_desc'])
@@ -229,6 +229,14 @@ def weapon_checks(e, img, info):
         e_.calls.append(('clone_getf', e_.r(4)))
         e_.mu.reg_write(UC_PPC_REG_FPR1, f2d(e_.clone_vars.get(e_.r(4), 0.0)))
     e.stub(cget, cget_fn)
+    cset = e.alloc(4)
+    e.setw(cvt + 0x4C, cset)
+
+    def cset_fn(e_):
+        v = round(d2f(e_.mu.reg_read(UC_PPC_REG_FPR1)), 3)
+        e_.calls.append(('clone_setf', e_.r(4), v))
+        e_.clone_vars[e_.r(4)] = v
+    e.stub(cset, cset_fn)
     cwm = e.alloc(0x10, b'\0')
     e.setw(cwm, cvt)
     cacc = e.alloc(0x100, b'\0')
@@ -339,7 +347,11 @@ def weapon_checks(e, img, info):
     e.setw(cacc + C.W_HIT_MOD, hm)
     e.calls = []
     e.call(lab['w_init'], s, weapon)
-    check('v3 set-up (+0x1C): HitModule vt +0x4C(&{his 8 hurtboxes, 8}, 0)', e.calls, [('hurt', hm, A['hurt'], 8, 0)])
+    check('v3 set-up (+0x1C): HitModule vt +0x4C(&{his 8 hurtboxes, 8}, 0)', [c for c in e.calls if c[0] == 'hurt'],
+          [('hurt', hm, A['hurt'], 8, 0)])
+    if diag:
+        check('v3 diag: S4GI clone set-up logged with its HitModule', [c[1:3] for c in e.calls if c[0] == 'osr'],
+              [(A['gk_fi'], hm)])
     check('... the hurtbox data: his vl group 5 entries, bones 0x7D0 + his joint, pool 2',
           bytes(e.mu.mem_read(A['hurt'], 0x30 * 8)) == C.hurt_blob() and
           [struct.unpack_from('>I', C.hurt_blob(), 0x30 * i + 0x1C)[0] for i in range(8)] ==
@@ -366,9 +378,17 @@ def weapon_checks(e, img, info):
         for i in range(14, 32):
             e.mu.reg_write(REGS[i], 0x5A5A0000 + i)
         e.call(lab['wp_%X' % o], s, weapon, 0x55, 0x66)
+        e.osr_seen = [c for c in e.calls if c[0] == 'osr']
         return [c for c in e.calls if c[0] in ('dmg', 'setf') or c[0].startswith('orig')], e.set_wm, e.kept()
     e.mu.mem_write(owner['f'] + 0x1E, b'\x04')
     e.clone_vars[C.VAR_SLOT] = 3.0
+    e.clone_vars[C.VAR_LOGGED] = 0.0
+    poll(0x64, 0.0)
+    if diag:
+        check('v3 diag: the clone\'s first poll logs S4GC (id 2, owner slot 3) once and marks its VAR_2',
+              ([c[1:3] + (c[3],) for c in e.osr_seen], e.clone_vars.get(C.VAR_LOGGED)), ([(A['gk_fc'], 2, 3)], 1.0))
+        poll(0x64, 0.0)
+        check('v3 diag: ... not again', e.osr_seen, [])
     for o in C.POLL_SLOTS:
         check('v3 poller +0x%X, no damage: nothing set, bunshin\'s method with the same arguments' % o, poll(o, 0.0),
               ([('dmg', 0), ('orig%X' % o, s, weapon, 0x55, 0x66)], [], True))
@@ -399,12 +419,15 @@ def weapon_checks(e, img, info):
     T = info['T']
     check('owner "gekkouga", name / folder "clone"',
           [e.cstr(e.w(T[n] + 4 * C.CLONE_KIND)) for n in ('owner', 'name', 'folder')], ['gekkouga', 'clone', 'clone'])
-    check('root and static tables: bunshin\'s',
+    check('root and static tables: bunshin\'s (v3: the u16 flags without the category bits)',
           (e.w(T['root'] + 4 * C.CLONE_KIND), e.w(T['u32'] + 4 * C.CLONE_KIND),
            struct.unpack('>H', bytes(e.mu.mem_read(T['u16'] + 2 * C.CLONE_KIND, 2)))[0],
            bytes(e.mu.mem_read(T['u8'] + C.CLONE_KIND, 1))[0]),
           (img.w(W.NAME_TABLES[0][1] + 4 * C.CLONE_BASE), img.w(W.STATIC_TABLES[0][1] + 4 * C.CLONE_BASE),
-           img.h(W.STATIC_TABLES[2][1] + 2 * C.CLONE_BASE), img.b(W.STATIC_TABLES[1][1] + C.CLONE_BASE)))
+           img.h(W.STATIC_TABLES[2][1] + 2 * C.CLONE_BASE) & ~C.CATEGORY_BITS, img.b(W.STATIC_TABLES[1][1] + C.CLONE_BASE)))
+    u16 = struct.unpack('>H', bytes(e.mu.mem_read(T['u16'] + 2 * C.CLONE_KIND, 2)))[0]
+    check('v3: the clone\'s u16 flags 0x87C: no resource category bit (0x80 / 0x1 / 0x100), so its files load with him '
+          '(bunshin\'s 0x87D has 0x1: the Final Smash load, why v1 / v2\'s clones never appeared)', (hex(u16), u16 & 0x181), ('0x87c', 0))
     check('the u16 flags have a model (0x40) in the owner\'s colour (0x10)', img.h(W.STATIC_TABLES[2][1] + 2 * C.CLONE_BASE) & 0x50, 0x50)
 
 
@@ -579,7 +602,7 @@ def main():
     e = Run(patched)
     if diag:
         e.stub(C.OSREPORT_VENEER, lambda e_: e_.rec('osr', 3, 4, 5))
-    weapon_checks(e, img, info)
+    weapon_checks(e, img, info, diag)
     fighter_desc_checks(e, img, info)
     g1_checks(e, info)
     s13_checks(e, info)

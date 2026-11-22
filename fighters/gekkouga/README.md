@@ -419,9 +419,36 @@ python3 tools/rpx_patch.py exe_v46z_ui10_diag.rpx exe_v46z_gk2_diag.rpx \
 
 ## Clones v3 (`greninja_clones_v3.zip`)
 
-The user asked for v2's limits to be fixed. The package is an update over v1 + v2: both MSCs, exe_v46z_gk3 (+ diag)
-and README.txt. Tests: `tools/gekkouga_clones_test.py ... --v1=greninja_clones_v1.zip --v2=greninja_clones_v2.zip`
-(163 checks), `tools/gekkouga_clone_cave_test.py` (80 unicorn checks, gk3 and gk3_diag), `supamario_ui_cave_test.py`
+The user's v1 + v2 test ("clones don't appear"; the smash growth not visible), v2's limits, and new smash requests.
+The package is an update over v1 + v2: both MSCs, his body effect.bin, exe_v46z_gk3 (+ diag) and README.txt.
+
+### The clones never appeared (v1 / v2): the resource category
+
+The weapon u16 flags (`0x1018A970` table, the cave copy for kinds past 0x184) bits 0x80 / 0x1 / 0x100 are the
+resource request's categories 1 / 4 / 8 (`0x030C37AC`: `0x0320E6AC` / `0x0320E634` / `0x0320E6C0`; none -> 2, loaded
+with the fighter): the loader walks the fighter's article list and adds a kind's files only when the request's mask has
+its category. Bunshin's 0x87D has 0x1 (4: his Final Smash load, like his tatami 0x871 / moon 0x871), and the clone
+copied it: its model / motions were never loaded outside a Final Smash, so no clone was made (the user's log: the
+ability ran, S4GT / S4GS, nothing of the clones). v3: 0x87C (`CATEGORY_BITS` cleared). Diag (TEST_ONLY): `S4GF slot
+flags gen` on every change of his VAR_20 (MSC bits: 1 tag, 2 slow, 8 ready, 16 / 32 the clones made; gen = the last
+`ArticleModule(0x2710)` result, his VAR_23), `S4GI` the clone's set-up (+0x1C, the object made), `S4GC` its first
+frame with its id / owner slot (its MSC ran), `S4GU` the HUD's first hide of a player's tag. Not explained yet: the
+tag not hiding in the user's log (S4GT logged; S4GU will say whether the HUD part ran) and 48 `GX2RSetAttributeBuffer`
+errors ~8 s before the ability (during the charge).
+
+### Smash attacks (v3: the user)
+
+- One store (`gk_smash`) for all three smashes, full **120** frames (`gk_smash_full()`): any hold adds to it; full ->
+  the flash and Wait (no attack); the next smash of any direction releases at once and empties the store; a chain's
+  smashes release at full without it (the store untouched). The hold loop is ours (`gk_sm_hold_loop`), so the vanilla
+  60-frame hold limit doesn't apply; the release sets the hold's exit values (ratio 1.0: the game's full-charge damage).
+- Effects: his attacks4 / attackhi4 / attacklw4 effect scripts' Size x **5** and their Sword_Glow points x5 (the trail's
+  length; the user's "no size increase": v1 / v2 scaled only Size x1.5, not the trail, the main visual). Hitbox Size
+  stays x1.5. The hold scripts' (attacks4hold / attackhi4hold / attacklw4hold) effects are at size 0 and his MSC
+  (`gk_sm_fx`, from the hold tick) draws them by the charge: 1 + 4 x charge / 120 (linear): the sparkle 0x1000019 and
+  flash 0x1000010 every 5 frames, the water sword 0x3300007 killed and made again every 10 (both hands for up / down).
+  The clone's copies of the smash effects are unscaled. Tests: `tools/gekkouga_clones_test.py ... --v1=greninja_clones_v1.zip --v2=greninja_clones_v2.zip`
+(173 checks), `tools/gekkouga_clone_cave_test.py` (81 / 84 unicorn checks, gk3 / gk3_diag), `supamario_ui_cave_test.py`
 (outline5 -> gk3) 0 failures, `import_call_check` 0 on both. No script or slot changed (Sm4shCommand stays v1.7.26).
 
 ```sh

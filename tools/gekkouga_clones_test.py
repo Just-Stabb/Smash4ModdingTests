@@ -199,6 +199,8 @@ class Game:
             return 0
         if sid == 0x1C:                                       # EffectModule
             self.log.append(('effect', a[0], a[1]) + tuple(fv(x) for x in a[2:6]))
+            if a[0] in (0x2710, 0x2712) and len(a) > 9:
+                self.log.append(('fxsize', a[0], a[1], a[2], fv(a[9])))   # op, id, bone, size
             return 0
         if sid == 0x42:                                       # ColorBlendModule
             self.log.append(('colour', a[0]) + tuple(fv(x) if i < 4 and a[0] == 0x2711 else x
@@ -269,9 +271,9 @@ def msc_tests(mscsb, src):
     # ---- the charge: accumulation, kept, threshold
     m = fresh(mscsb, src)
     g = m.game
-    check('constants: 300 / 720 / 480 / gap 14 / smash full 60 / growth 1.5',
+    check('constants: 300 / 720 / 480 / gap 14 / smash full 120 (v3) / hitbox growth 1.5',
           (m('gk_lw_full'), m('gk_ability_frames'), m('gk_burnout_frames'), round(i2f(m('gk_gap') & 0xFFFFFFFF), 3),
-           m('gk_smash_full'), round(i2f(m('gk_smash_grow') & 0xFFFFFFFF), 3)), (300, 720, 480, 14.0, 60, 1.5))
+           m('gk_smash_full'), round(i2f(m('gk_smash_grow') & 0xFFFFFFFF), 3)), (300, 720, 480, 14.0, 120, 1.5))
     r = m('gk_lw_press')
     check('down special, not charged: the stance (status 0x155)', (r, g.status_req), (1, [(0x155, 1)]))
     g.status_req = []
@@ -327,15 +329,15 @@ def msc_tests(mscsb, src):
     check('frame 3: the right clone (article 7), VAR_31 = 4747000 + 3 + being made (right) 8, its smoke at X + 14',
           (arts[-1], g.vars.get(0x0F00031F), [x[3] for x in g.log if x[0] == 'effect' and x[2] == 0x3300006][-1]),
           (('article', 0x2710, 7), 4747011.0, 64.0))
-    check('flags: tag hidden (1)', g.vars.get(0x0F000314), 1.0)
+    check('flags: tag hidden (1) + v3 diag clones out (16 + 32)', g.vars.get(0x0F000314), 49.0)
     g.motion, g.frame, g.rate = 0x5F, 7.0, 1.0
     frames(m, 2)
     check('v3 channel: left clone X / Y 36 / 10, right 64 / 10, motion 0x5F x 1024 + frame 7, rate 1, the heartbeat '
           'cleared (0), 4747000 + alive 3', [g.vars.get(0x0F000318 + i) for i in range(8)],
           [36.0, 10.0, 64.0, 10.0, 95.0 * 1024 + 7.0, 1.0, 0.0, 4747003.0])
     check('v3: no shield capsules (the clones have their own hurtboxes): shapes 0-3 off', g.shapes, {0: 0, 1: 0, 2: 0, 3: 0})
-    check('v3: flags tag hidden only (1: bit 4 "clones out" no longer set: his shield shapes never report)',
-          g.vars.get(0x0F000314), 1.0)
+    check('v3: flags: bit 4 ("clones out": his shield shapes report) no longer set; 1 + 16 + 32',
+          g.vars.get(0x0F000314), 49.0)
     g.lr = -1.0
     frames(m, 1)
     check('facing left: still no capsules', g.shapes, {0: 0, 1: 0, 2: 0, 3: 0})
@@ -451,11 +453,11 @@ def msc_tests(mscsb, src):
     m2.setg('gk_lw_charge', 120)
     frames(m2, 1, st=0xB1)
     check('the charge survives a KO', m2.g('gk_lw_charge'), 120)
-    m2.setg('gk_s4', 33)
+    m2.setg('gk_smash', 33)
     frames(m2, 1, st=0xB2)
-    check('the smash charges survive a KO / respawn', (m2.g('gk_s4'), m2.g('gk_lw_charge')), (33, 120))
+    check('the smash charges survive a KO / respawn', (m2.g('gk_smash'), m2.g('gk_lw_charge')), (33, 120))
     frames(m2, 1, st=0x14F)
-    check('the match\'s start (Entry 0x14F): every charge from 0', (m2.g('gk_s4'), m2.g('gk_lw_charge')), (0, 0))
+    check('the match\'s start (Entry 0x14F): every charge from 0', (m2.g('gk_smash'), m2.g('gk_lw_charge')), (0, 0))
 
     # ---- smash attacks
     m = fresh(mscsb, src)
@@ -470,9 +472,9 @@ def msc_tests(mscsb, src):
     m.vm.g[4] = 0x2C
     for _ in range(30):
         m('gk_sm_hold_tick')
-    check('30 hold frames: forward smash charge 30 (up / down untouched)', (m.g('gk_s4'), m.g('gk_hi4'), m.g('gk_lw4')), (30, 0, 0))
+    check('30 hold frames: the (shared, v3) charge 30', m.g('gk_smash'), 30)
     g.held = set()
-    check('released before full: Wait (no attack), the charge kept', (m('gk_sm_hold_loop', 1), g.status_req, m.g('gk_s4')), (1, [(0, 0)], 30))
+    check('released before full: Wait (no attack), the charge kept', (m('gk_sm_hold_loop', 1), g.status_req, m.g('gk_smash')), (1, [(0, 0)], 30))
     g.status_req = []
     g.held = set()
     m('gk_sm_start_main', 1)
@@ -484,8 +486,11 @@ def msc_tests(mscsb, src):
     g.status_req = []
     for _ in range(40):
         m('gk_sm_hold_tick')
-    check('30 + 40 frames: capped at 60', m.g('gk_s4'), 60)
-    check('full while held: ready (flash), Wait, no attack', (m('gk_sm_hold_loop', 1), g.status_req, m.g('gk_s4')), (1, [(0, 0)], 60))
+    check('v3: 30 + 40 frames: 70 (full is 120 now): not full, still holding', (m.g('gk_smash'), m('gk_sm_hold_loop', 1), g.status_req), (70, 0, []))
+    for _ in range(60):
+        m('gk_sm_hold_tick')
+    check('70 + 60 frames: capped at 120', m.g('gk_smash'), 120)
+    check('full while held: ready (flash), Wait, no attack', (m('gk_sm_hold_loop', 1), g.status_req, m.g('gk_smash')), (1, [(0, 0)], 120))
     g.status_req = []
     m.vm.g[4] = 0x2B
     m('gk_sm_start_main', 1)
@@ -493,7 +498,7 @@ def msc_tests(mscsb, src):
     g.held = set()
     r = m('gk_sm_start_loop', 1)
     check('at the hold point, not even held: the attack (0x2D, keep), ratio 1.0, charged flag, the store used, chain = forward',
-          (r, g.status_req, g.vars.get(0x1000000), 0x21000002 in g.flags, m.g('gk_s4'), m.g('gk_chain')),
+          (r, g.status_req, g.vars.get(0x1000000), 0x21000002 in g.flags, m.g('gk_smash'), m.g('gk_chain')),
           (1, [(0x2D, 1)], 1.0, True, 0, 1))
     g.status_req = []
     m.vm.g[4] = 0x2D
@@ -509,11 +514,11 @@ def msc_tests(mscsb, src):
     m.vm.g[4] = 0x31
     m('gekkouga_frame')
     check('the chain goes on through the start status', m.g('gk_chain'), 1)
-    m.setg('gk_hi4', 25)
+    m.setg('gk_smash', 25)
     m('gk_sm_start_main', 2)
-    check('the chained up smash: automatic (2), its own store untouched', (m.g('gk_sm_auto'), m.g('gk_hi4')), (2, 25))
+    check('the chained up smash: automatic (2), the store untouched', (m.g('gk_sm_auto'), m.g('gk_smash')), (2, 25))
     r = m('gk_sm_start_loop', 2)
-    check('its release: 0x33, chain forward + up, store kept', (g.status_req, m.g('gk_chain'), m.g('gk_hi4')), ([(0x33, 1)], 3, 25))
+    check('its release: 0x33, chain forward + up, store kept', (g.status_req, m.g('gk_chain'), m.g('gk_smash')), ([(0x33, 1)], 3, 25))
     g.status_req = []
     m.vm.g[4] = 0x33
     g.frame = 21.0
@@ -549,6 +554,45 @@ def msc_tests(mscsb, src):
     m('gk_chain_try', 1)
     check('a forward smash chained the other way: turned first (PostureModule 1, 2)',
           [x for x in g.log if x[0] == 'posture'][-2:], [('posture', 1), ('posture', 2)])
+    # ---- v3: one charge for all three; the hold's effects grow with it
+    m4 = fresh(mscsb, src)
+    g4 = m4.game
+    g4.held = {0}
+    g4.flags.add(0x2100001B)
+    m4('gk_sm_start_main', 1)
+    m4('gk_sm_start_loop', 1)
+    m4.vm.g[4] = 0x2C
+    for _ in range(50):
+        m4('gk_sm_hold_tick')
+    g4.held = set()
+    m4('gk_sm_hold_loop', 1)
+    g4.held = {0}
+    m4.vm.g[4] = 0x2E
+    m4('gk_sm_start_main', 4)
+    m4('gk_sm_start_loop', 4)
+    m4.vm.g[4] = 0x2F
+    g4.log = []
+    m4('gk_sm_hold_tick')
+    fx = [x for x in g4.log if x[0] == 'effect']
+    check('v3: a forward smash held 50, then a down smash: the same store (51 after its first frame)', m4.g('gk_smash'), 51)
+    check('v3: the resumed hold\'s first frame: its effects at once: sparkle, flash (over his feet), the sword killed and '
+          'made again on both hands (25, 24)', [(x[1], x[2]) for x in fx],
+          [(0x2710, 0x1000019), (0x2710, 0x1000010), (0x2723, 0x3300007), (0x2712, 0x3300007), (0x2712, 0x3300007)])
+    check('... all at the kept charge\'s size: 1 + 4 x 50 / 120 = 2.667', [x[4] for x in g4.log if x[0] == 'fxsize'], [2.667] * 4)
+    g4.log = []
+    for _ in range(69):
+        m4('gk_sm_hold_tick')
+    sizes = [x[4] for x in g4.log if x[0] == 'fxsize' and x[2] == 0x3300007]
+    check('v3: the sword made again every 10 frames (60 - 110, both hands: 12), growing (its last: 1 + 4 x 110 / 120 = 4.667)',
+          (len(sizes), sizes[-1], sizes == sorted(sizes)), (12, 4.667, True))
+    check('v3: 120: full -> ready, Wait; the next up smash releases at once', (m4('gk_sm_hold_loop', 4), m4.g('gk_smash')), (1, 120))
+    m4('gk_sm_start_main', 2)
+    check('... automatic (1: the stored full charge)', m4.g('gk_sm_auto'), 1)
+    m4.game.status_req = []
+    m4('gk_sm_start_loop', 2)
+    check('... released (0x33): the shared store emptied (the chain carries the full charge)', (m4.game.status_req, m4.g('gk_smash')), ([(0x33, 1)], 0))
+    check('v3 effect size curve: 1 at 0, 3 at 60, 5 at 120 (linear)',
+          [round(i2f(m4('gk_sm_size', v) & 0xFFFFFFFF), 3) for v in (0, 30, 60, 120)], [1.0, 2.0, 3.0, 5.0])
     # down smash out of run: the same start status (0x2E), so the same rules
     m3 = fresh(mscsb, src)
     m3.game.held = {0}
@@ -914,7 +958,8 @@ def script_tests(out, user):
     pg = acmd.ACMDFile.load(os.path.join(O, 'body', 'game.bin'))
     pe = acmd.ACMDFile.load(os.path.join(O, 'body', 'effect.bin'))
     smash = {zlib.crc32(n.encode()) for n in GB.SMASH_SCRIPTS}
-    bad, n = [], 0
+    hold = {zlib.crc32(n.encode()) for n in GB.HOLD_SCRIPTS}
+    bad, n, got = [], 0, {}
     for f0, f1, kind in ((ug, pg, 'game'), (ue, pe, 'effect')):
         check('%s.bin: the same scripts' % kind, sorted(f0.scripts), sorted(f1.scripts))
         for crc in f0.scripts:
@@ -925,13 +970,30 @@ def script_tests(out, user):
                     continue
                 for i, (p0, p1) in enumerate(zip(c0.params, c1.params)):
                     nm = c0.info['syntax'][i] if i < len(c0.info['syntax']) else ''
-                    grow = crc in smash and nm == 'Size' and (c0.name in GB.HITBOXES or kind == 'effect')
-                    want = round(float(p0) * 1.5, 4) if grow else p0
-                    if grow:
+                    k = None
+                    if crc in smash and nm == 'Size' and c0.name in GB.HITBOXES and kind == 'game':
+                        k = 1.5
+                    elif crc in smash and kind == 'effect' and (nm == 'Size' or (c0.name == 'Sword_Glow' and nm in
+                                                                                 ('X1', 'Y1', 'Z1', 'X2', 'Y2', 'Z2'))):
+                        k = 5.0
+                    elif crc in hold and kind == 'effect' and nm == 'Size' and c0.name in GB.HOLD_EFFECTS:
+                        k = 0.0
+                    if k is not None:
                         n += 1
-                    if (abs(float(p1) - float(want)) > 1e-3) if grow else (p1 != p0):
+                        got[(kind, k)] = got.get((kind, k), 0) + 1
+                    if (abs(float(p1) - float(p0) * k) > 1e-3) if k is not None else (p1 != p0):
                         bad.append((kind, hex(crc), c0.name, nm, p0, p1))
-    check('his smash scripts: every hitbox / effect Size x1.5, nothing else of his changed', (bad[:3], n > 20), ([], True))
+    check('v3: the shipped body scripts the smashes play (attacks4 / attackhi4 / attacklw4, motions 0x5F / 0x63 / 0x65): '
+          'hitbox Size x1.5 (game), every effect Size and trail point x5 (effect); their holds\' (0x62 / 0x64 / 0x67) effects '
+          'size 0 (his MSC draws them by the charge); nothing else of his changed',
+          (bad[:3], got.get(('game', 1.5), 0) >= 10, got.get(('effect', 5.0), 0) >= 20, got.get(('effect', 0.0), 0)),
+          ([], True, True, 11))
+    mt = open(os.path.join(user, 'body', 'motion.mtable'), 'rb').read()
+    mth = [struct.unpack_from('>I', mt, 4 * i)[0] for i in range(len(mt) // 4)]
+    check('v3: those scripts are the smash motions\' (the motion table: attacks4 0x5F, attacks4hold 0x62, attackhi4 0x63, '
+          'attackhi4hold 0x64, attacklw4 0x65, attacklw4hold 0x67)',
+          [mth[k] for k in (0x5F, 0x62, 0x63, 0x64, 0x65, 0x67)],
+          [zlib.crc32(x.encode()) for x in ('attacks4', 'attacks4hold', 'attackhi4', 'attackhi4hold', 'attacklw4', 'attacklw4hold')])
     cg = acmd.ACMDFile.load(os.path.join(O, 'weapon', 'clone', 'game.bin'))
     ok = []
     for crc, s in cg.scripts.items():
@@ -1012,9 +1074,10 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('v2: both MSCs, his 5 motion part pacs, the face / rest-of-model files in all 8 colours (%d)' % len(v2new),
               [m for m in v2new if 'INSTALL_TO_data/' + m not in names], [])
     if z1 and len(earlier) == 2:
-        check('v3: INSTALL_TO_data is both MSCs (the data files are v1 / v2\'s)',
+        check('v3: INSTALL_TO_data is both MSCs and his body effect.bin (the smash effects x5; the rest is v1 / v2\'s)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
-              ['fighter/gekkouga/script/msc/clone/clone.mscsb', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
+              ['fighter/gekkouga/script/animcmd/body/effect.bin', 'fighter/gekkouga/script/msc/clone/clone.mscsb',
+               'fighter/gekkouga/script/msc/gekkouga.mscsb'])
     must = ['fighter/gekkouga/script/msc/gekkouga.mscsb', 'fighter/gekkouga/script/msc/clone/clone.mscsb',
             'fighter/gekkouga/script/animcmd/body/game.bin', 'fighter/gekkouga/script/animcmd/weapon/clone/game.bin',
             'fighter/gekkouga/motion/clone/main.pac', 'fighter/kirby/script/msc/kirby.mscsb'] + \
@@ -1035,7 +1098,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     readme = z.read('README.txt').decode('utf8', 'replace')
     words = ('300', '720', '480', 'swap', 'chain', 'Technical') if not z1 else \
         ('greninja_clones_v1', 'hitlag', 'fall', 'face', 'hand', 'exe_v46z_gk2', 'swap', 'blast') if len(earlier) == 1 else \
-        ('greninja_clones_v2', 'hurtbox', 'wall', 'ceiling', 'slope', 'blast zone', 'hitlag', 'exe_v46z_gk3', 'swap')
+        ('greninja_clones_v2', 'hurtbox', 'wall', 'ceiling', 'slope', 'blast zone', 'hitlag', 'exe_v46z_gk3', 'swap', '120',
+         '5x', 'S4GF', 'S4GC', 'S4GU', 'Final Smash')
     check('README.txt mentions every feature (%s)' % ', '.join(words), [w for w in words if w not in readme], [])
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
