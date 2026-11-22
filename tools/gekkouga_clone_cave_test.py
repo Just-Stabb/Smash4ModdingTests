@@ -512,7 +512,7 @@ def weapon_checks(e, img, info, diag=False):
               ([c[1:3] + (c[3],) for c in e.osr_seen], e.clone_vars.get(C.VAR_LOGGED)), ([(A['gk_fc'], 2, 3)], 1.0))
         poll(0x64, 0.0)
         check('v3 diag: ... not again; v8: its 4th poll (its first frame) logs its place and draw state (S4GX, S4GM, S4GN)',
-              [c[1] for c in e.osr_seen], [A['gk_fx'], A['gk_fm'], A['gk_fn']] + ([A['gk_fo']] if 'hurt' in F else []))
+              [c[1] for c in e.osr_seen], [A['gk_fx'], A['gk_fm'], A['gk_fn'], A['gk_fq']] + ([A['gk_fo']] if 'hurt' in F else []))
         poll(0x64, 0.0)
         check('v8 diag: ... then nothing until its 120th poll', e.osr_seen, [])
     if 'hurt' not in F:
@@ -779,6 +779,52 @@ def plyc_checks(e, info, diag):
     check('v10: player 8+ (none): straight through', [c[:3] for c in call(9)], [('plyc_fn', hud, 9)])
 
 
+def sway_checks(e, info):
+    """v11: the clone's swing step (feature sway): wp_94 -> w_sway -> MotionModule's swing update, guarded"""
+    lab, A, F, L = info['labels'], info['A'], info['feats'], info['layout']
+    if 'sway' not in F:
+        check('v11: without "sway": no swing step code', 'w_sway' in lab, False)
+        return
+    calls = []
+    e.stub(C.SWING_UPDATE, lambda e_: calls.append(('swing', e_.r(3))))
+    acc = e.alloc(0x100, b'\0')
+    for o in C.SWAY_MODULES:
+        e.setw(acc + o, e.alloc(0x40, b'\0'))
+    mm = e.alloc(0x60, b'\0')
+    e.setw(acc + C.W_MOTION, mm)
+    e.setw(mm + C.MM_SWING, 0x1234)
+    e.setw(mm + C.MM_MOTION, e.alloc(0x100, b'\0'))
+    weapon = e.alloc(0x40, b'\0')
+    e.setw(weapon + C.W_ACC, acc)
+
+    def run():
+        del calls[:]
+        e.call(lab['w_sway'], weapon)
+        return list(calls)
+    check('v11 sway: every module there, the MotionModule with its swing: its swing update (mm) once', run(), [('swing', mm)])
+    e.setw(mm + C.MM_SWING, 0)
+    check('v11 sway: no swing (MotionModule +0x38 0): not called', run(), [])
+    e.setw(mm + C.MM_SWING, 0x1234)
+    miss = []
+    for o in C.SWAY_MODULES:
+        keep = e.w(acc + o)
+        e.setw(acc + o, 0)
+        if run():
+            miss.append(hex(o))
+        e.setw(acc + o, keep)
+    check('v11 sway: any module the update reads missing (%s): not called' % ', '.join(hex(o) for o in C.SWAY_MODULES), miss, [])
+    e.setw(weapon + C.W_ACC, 0)
+    check('v11 sway: no accessor: not called', run(), [])
+    e.setw(weapon + C.W_ACC, acc)
+    # the +0x94 phase: the poller, the swing step, then the moon's method with the same arguments
+    vt = info['A']['w_vt']
+    del calls[:]
+    e.calls = []
+    e.call(e.w(vt + 0x94), 0x51, weapon, 0x55, 0x66)
+    check('v11 sway: the +0x94 phase (once a frame) steps the swing, then runs the moon\'s method as it was called',
+          (calls, [c for c in e.calls if c[0].startswith('orig')]), ([('swing', mm)], [('orig94', 0x51, weapon, 0x55, 0x66)]))
+
+
 def hud_checks(e, info):
     lab, A = info['labels'], info['A']
     hide = A['gk_hide']
@@ -946,6 +992,7 @@ def main():
         e_.calls.append(('msg_send', e_.w(m), e_.w(m + 4), e_.w(inner), e_.w(inner + 4)))
     e.stub(C.MSG_SEND, msg_send)
     weapon_checks(e, img, info, diag)
+    sway_checks(e, info)
     fighter_desc_checks(e, img, info)
     g1_checks(e, info)
     s13_checks(e, info)

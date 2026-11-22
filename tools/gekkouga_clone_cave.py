@@ -95,7 +95,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # none: 2, loaded with the fighter. Bunshin's 0x87D has 0x1 (4: the Final Smash load,
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
-FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -104,6 +104,7 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart'))   # v5: each risky p
 #   hurt    base kind mewtwom (HURT_BASE: + Kinetic / Hit / Ground updates) and its row + lizardonm's DamageModule (slot
 #           20); the hurtboxes (+0x1C) and the damage pollers (+0x64 ... +0x94)
 #   parts   his motion parts and flags on the clone (v2's hands / face)
+#   sway    v11: the clone's swing step every frame (w_sway: his MotionModule's swing update, as his frame calls it)
 #   bstart  v8: the clone's start (specializer +0x34) runs bunshin's own (0x02AF6738: black overlay, LinkModule link 3
 #           attributes 0 / 0xD, EffectModule +0xB4 / +0xA4), then clears the black (ColorBlendModule vt +0x44(0), as
 #           Terminate_Overlays' handler 0x02BE37B8 does); without it the start does nothing (v7)
@@ -129,6 +130,12 @@ HM_COUNT = 0x4C                   # +0x4C the hurtboxes added (vt +0x4C adds)
 HM_RECS = 0x48                    # +0x44 {capacity (params +0xAC: 0x14), +0x48 the records (0x40 each)}: v9 read
                                   # [+0x44] as a pointer (0x14) and C_hurt's S4GO crashed (the user's v9.1 log)
 HM_OBJS = 0x18                    # +8 the collision container (+0xC its objects (0x174 each), +0x10 their count)
+SWING_UPDATE = 0x02C67064        # v11: MotionModule's swing update (mm): a fighter's frame calls it (0x02E3543C)
+W_MOTION = 0x44                   # the accessor's MotionModule (+0x14 its motion object (+0x20 the swing system, +0xF1
+MM_MOTION = 0x14                  # set up), +0x38 what the swing update needs)
+MM_SWING = 0x38
+SWAY_MODULES = (0x18, 0x3C, 0x44, 0x48, 0x60, 0xB8)   # the accessor's modules the swing update reads (posture, model,
+                                  # motion, stop, +0x60 (0x02C66254), slow): all must be there
 W_POSTURE = 0x18                  # -> PostureModule (+0x10 / +0x14 / +0x18 x y z, +0x5C the scale)
 FLX_INTERN = 0x032CB1B8           # v7: (atom pool [0x102FCAA4] + 0x24, char *, length) -> atom (docs: "Damage panel")
 FLX_ATOM_POOL = 0x102FCAA4
@@ -163,7 +170,8 @@ VT_BASE = 0xFC                    # v6: the clone's specializer (its singleton's
 DAMAGE_SLOT = 20
 RELEASE = frozenset(('attack',))  # v9: the user's v8 B_attack (the clones' attacks hit, nothing broke): the release's set
 VARIANTS = (('A_attack', frozenset(('attack',))), ('C_hurt', frozenset(('attack', 'hurt'))),
-            ('D_parts', frozenset(('attack', 'parts'))))   # v9: each on the release's set
+            ('D_parts', frozenset(('attack', 'parts'))), ('E_sway', frozenset(('attack', 'sway'))))   # v9: each on the
+                                  # release's set; v11 E_sway: + the clones' swing step
 
 
 def base_of(feats):
@@ -554,6 +562,7 @@ def build(rpx, diag=False, feats=None):
             ('gk_fw', 'S4GW tag message: visible=%d object id=%d gone=%d handle=%08X\n'),
             ('gk_fm', 'S4GM clone id=%d draw: visflag=%d visible=%d model mode=%d drawn=%d overlay=%d/%d\n'),
             ('gk_fn', 'S4GN clone id=%d z=%d scale x100=%d link mask=%08X model=%08X\n'),
+            ('gk_fq', 'S4GQ clone id=%d swing: motionmodule=%08X need=%08X motion=%08X swing=%08X flags=%08X set up=%d\n'),
             ('gk_fk', 'S4GK clone hurtboxes set: hitmodule=%08X groups=%d boxes %d -> %d group0=%d+%d objects=%d\n'),
             ('gk_fo', 'S4GO clone id=%d hurt: boxes=%d objects=%d first record %08X %08X %08X %08X\n')]
     for nm, s in fmts:
@@ -613,11 +622,11 @@ def build(rpx, diag=False, feats=None):
              slow=FLAG_SLOW, clones=FLAG_CLONES, life=TAG_LIFE, sslot=SLOW_SLOT, srate=SLOW_RATE, sframes=SLOW_FRAMES,
              hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, whit=W_HIT_MOD, wdmg=W_DAMAGE, watk=W_ATTACK,
              wstop=W_STOP, wcol=W_COLOUR, wmodel=W_MODEL, wlink=W_LINK, wvis=W_VIS, wpost=W_POSTURE,
-             cclear=COLOUR_CLEAR, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
+             cclear=COLOUR_CLEAR, wmotion=W_MOTION, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
              hm_objs=HM_OBJS, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fq', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -1320,11 +1329,43 @@ wp_94:
         lwz r7, 0x18(r1)
         lwz r8, 0x1C(r1)
         lwz r9, 0x20(r1)
-        lwz r10, 0x24(r1)
+        lwz r10, 0x24(r1)''' + (('''
+        lwz r3, 0x0C(r1)
+        bl w_sway
+        lwz r3, 0x08(r1)
+        lwz r4, 0x0C(r1)''') if 'sway' in feats else '') + '''
         lwz r0, 0x44(r1)
         mtlr r0
         addi r1, r1, 0x40''' + tail(L['vt_orig'][0x94]) + '''
 
+''' + ((r'''# ---- v11 sway: the clone's swing step. A fighter's frame calls its MotionModule's swing update 0x02C67064 (from
+# 0x02E3543C: the wind, the rate from its slow / stop, then the motion object's swing step 0x03314FB8: the first call
+# sets the swing up (0x036B715C), the next ones step it (0x036B726C)); the weapons' templates never call it, so a
+# clone's swing bones stayed where they were first placed (v8). Once a frame (the specializer's +0x94 phase), when
+# every module it reads is there and its MotionModule has a swing (+0x38, +0x14)
+w_sway: stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        lwz r12, %(wacc)d(r3)
+        cmpwi r12, 0
+        beq wsw_out''' + ''.join('''
+        lwz r11, 0x%X(r12)
+        cmpwi r11, 0
+        beq wsw_out''' % o for o in SWAY_MODULES) + '''
+        lwz r3, %(wmotion)d(r12)        # its MotionModule
+        lwz r11, %(mm_swing)d(r3)
+        cmpwi r11, 0
+        beq wsw_out
+        lwz r11, %(mm_motion)d(r3)
+        cmpwi r11, 0
+        beq wsw_out''' + call(SWING_UPDATE) + '''
+wsw_out:
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+''') if 'sway' in feats else '') + '''
 # ---- the clone's start (its specializer +0x34, (singleton, weapon, init)). v7: nothing (the moon's sets the model
 # scale from the init's +0x68; bunshin's paints it black). v8 bstart: bunshin's own, then its black overlay cleared
 # (ColorBlendModule slot 0 off). Diag: the init's scale (S4GZ)
@@ -1502,7 +1543,37 @@ wd_log2:
         lwz r5, 0x14(r1)
         lwz r6, 0x18(r1)
         lwz r7, 0x1C(r1)
-        lwz r8, %(wmodel)d(r31)''' + osr() + ('''
+        lwz r8, %(wmodel)d(r31)''' + osr() + '''
+        li r5, 0                        # v11: S4GQ its swing: MotionModule, +0x38, the motion object, its swing system,
+        li r6, 0                        # the system's flags (+0xB4), set up (motion +0xF1)
+        li r7, 0
+        li r8, 0
+        li r9, -1
+        li r10, -1
+        lwz r5, %(wmotion)d(r31)
+        cmpwi r5, 0
+        beq wd_qlog
+        lwz r6, %(mm_swing)d(r5)
+        lwz r7, %(mm_motion)d(r5)
+        lis r0, 0x1000
+        cmplw r7, r0
+        blt wd_qlog
+        lis r0, 0x8000
+        cmplw r7, r0
+        bge wd_qlog
+        lbz r10, 0xF1(r7)
+        lwz r8, 0x20(r7)
+        lis r0, 0x1000
+        cmplw r8, r0
+        blt wd_qlog
+        lis r0, 0x8000
+        cmplw r8, r0
+        bge wd_qlog
+        lwz r9, 0xB4(r8)
+wd_qlog:
+        lis r3, %(gk_fq_hi)d
+        addi r3, r3, %(gk_fq_lo)d
+        lwz r4, 0x10(r1)''' + osr() + ('''
         lwz r12, %(whit)d(r31)          # v9: its HitModule: hurtboxes, collision objects, the first hurtbox's record
         cmpwi r12, 0
         beq wd_end
@@ -1921,7 +1992,7 @@ w_dcase:
         struct.pack_into('>I', vb, 0x1C, lab['w_init'])
     struct.pack_into('>I', vb, 0x34, lab['w_start'])  # v7: not the moon's start (it sets the model scale from the init's
                                                       # +0x68: the generate's, 0 for ours: the user's v6 invisible clones)
-    for o in (POLL_SLOTS if 'hurt' in feats or diag else ()):
+    for o in (POLL_SLOTS if 'hurt' in feats or diag else (0x94,) if 'sway' in feats else ()):
         struct.pack_into('>I', vb, o, lab['wp_%X' % o])
     out.blob(A['w_vt'], bytes(vb), 'clone vtable (bunshin copy, +0x1C / +0x64 / +0x84 / +0x8C / +0x94 / +0xAC ours)')
 
