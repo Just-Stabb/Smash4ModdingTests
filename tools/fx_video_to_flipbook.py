@@ -46,6 +46,9 @@ run it with `python3 -I` on downloaded footage. Needs ffmpeg (libvpx-vp9, libweb
    (default 3 % of the larger side, at least 4 px). Where the effect runs off the footage (smoke trailing
    out of frame) that side fades out over --edge-feather (8 % of the crop, smoothstep) instead of ending
    in a hard line (--bottom-cut-ok: not the bottom, for fire standing on it); the sidecar lists them.
+   --center-subject x|y|xy widens the crop (padding clear where it leaves the footage) so the opaque body's
+   mean centroid is the frame's centre: a looping character effect hung on an article / particle origin.
+   The sidecar's anchor gives the body's centroid and lowest row in the frame (0..1) either way.
    --fade-out N (one-shots): the last N cells fade out linearly, for footage that ends still dense (smoke
    that never clears).
 5. Cells and timing: the game runs at 60; eft plays a cell every K frames (0x504 frames a cell, integer).
@@ -365,7 +368,7 @@ def run_job(opt):
         peak = (float(np.percentile(lit, 99.9)) - opt.black) / (1 - opt.black) if lit.size else 1.0
         opt.gain = round(float(np.clip(1 / max(peak, 1e-3), 1.0, 3.0)), 3)
     else:
-        opt.gain = float(opt.gain)
+        opt.gain = 1.0 if opt.gain == 'auto' else float(opt.gain)
     matte = Matte(opt, frames)
     f = max(1, round(max(w, h) / 160))
     small_raw = shrink(frames, f) / 255.0
@@ -496,17 +499,35 @@ def run_job(opt):
     y0, y1, x0, x1 = ys[0], ys[-1] + 1, xs[0], xs[-1] + 1
     mg = max(4, int(round(opt.margin * max(x1 - x0, y1 - y0))))
     x0, y0, x1, y1 = max(0, x0 - mg), max(0, y0 - mg), min(w, x1 + mg), min(h, y1 + mg)
+    # the opaque body (alpha >= 0.6) over the kept frames: its mean centroid and its usual lowest row
+    bcx, bcy, bbot = [], [], []
+    for o in outs:
+        b = o[..., 3] >= 0.6
+        if b.any():
+            yy, xx = np.nonzero(b)
+            bcx.append(xx.mean())
+            bcy.append(yy.mean())
+            bbot.append(yy.max())
+    if opt.center_subject and bcx:
+        # the frame's centre on the body: an article's origin at the particle (the far side padded clear)
+        if 'x' in opt.center_subject:
+            c = float(np.mean(bcx))
+            half = max(c - x0, x1 - c)
+            x0, x1 = int(math.floor(c - half)), int(math.ceil(c + half))
+        if 'y' in opt.center_subject:
+            c = float(np.mean(bcy))
+            half = max(c - y0, y1 - c)
+            y0, y1 = int(math.floor(c - half)), int(math.ceil(c + half))
     bw, bh = x1 - x0, y1 - y0
     # the effect running off the footage's edge (smoke trailing out of frame): fade it out toward that side
-    # instead of a hard cut at the cell's edge
+    # instead of a hard cut at the cell's edge (the ramp lies on the footage's own edge)
     cut = {'left': bool(m[:, :2].any()), 'right': bool(m[:, -2:].any()),
            'top': bool(m[:2].any()), 'bottom': bool(m[-2:].any())}
     if opt.bottom_cut_ok:
         cut['bottom'] = False
-    ramp = np.ones((bh, bw), np.float32)
+    rx, ry = np.ones(w, np.float32), np.ones(h, np.float32)
     if opt.edge_feather > 0 and any(cut.values()):
-        fwid, fhei = max(2, int(opt.edge_feather * bw)), max(2, int(opt.edge_feather * bh))
-        rx, ry = np.ones(bw, np.float32), np.ones(bh, np.float32)
+        fwid, fhei = max(2, int(opt.edge_feather * min(bw, w))), max(2, int(opt.edge_feather * min(bh, h)))
         ss = lambda n: (lambda t: t * t * (3 - 2 * t))(np.linspace(0, 1, n, dtype=np.float32))
         if cut['left']:
             rx[:fwid] *= ss(fwid)
@@ -516,14 +537,29 @@ def run_job(opt):
             ry[:fhei] *= ss(fhei)
         if cut['bottom']:
             ry[-fhei:] *= ss(fhei)[::-1]
-        ramp = ry[:, None] * rx[None, :]
+    ramp = ry[:, None] * rx[None, :]
+
+    def crop(a):
+        """a[y0:y1, x0:x1], zero outside the footage"""
+        out = np.zeros((bh, bw) + a.shape[2:], np.float32)
+        sx0, sy0, sx1, sy1 = max(0, x0), max(0, y0), min(w, x1), min(h, y1)
+        out[sy0 - y0:sy1 - y0, sx0 - x0:sx1 - x0] = a[sy0:sy1, sx0:sx1]
+        return out
+
+    ramp = crop(ramp)
+    anchor = None
+    if bcx:
+        anchor = {'body_centroid_uv': [round((float(np.mean(bcx)) - x0) / bw, 4), round((float(np.mean(bcy)) - y0) / bh, 4)],
+                  'body_bottom_v': round((float(np.median(bbot)) + 1 - y0) / bh, 4),
+                  'note': 'u, v: 0..1 across the frame (frame_size_in_cell) from its top-left; body = alpha >= 0.6 '
+                          '(mean centroid over the kept frames; bottom = the median lowest body row)'}
     W, H, nx, ny, s = pick_layout(n, bw, bh, native, opt)
     fw, fh = max(1, int(round(bw * s))), max(1, int(round(bh * s)))
     atlas = np.zeros((H, W, 4), np.float32)
     cells = []
     cw, ch = W / nx, H / ny
     for c, o in enumerate(outs):
-        r = resize_prem(o[y0:y1, x0:x1].astype(np.float32) * ramp[..., None], fw, fh)
+        r = resize_prem(crop(o) * ramp[..., None], fw, fh)
         cx, cy = c % nx, c // nx
         px, py = int(math.floor(cx * cw + (cw - fw) / 2)), int(math.floor(cy * ch + (ch - fh) / 2))
         atlas[py:py + fh, px:px + fw] = r
@@ -568,7 +604,8 @@ def run_job(opt):
                       'screen_rgb': [round(float(v), 3) for v in matte.screen_rgb]} if opt.matte == 'chroma' else {})},
         'edges_faded': [k for k, v in cut.items() if v and opt.edge_feather > 0],
         'faded_out_last_cells': opt.fade_out if (opt.fade_out and not loop) else 0,
-        'subject_drift': drift, 'tracked': opt.track or None,
+        'subject_drift': drift, 'tracked': opt.track or None, 'centred_on_subject': opt.center_subject or None,
+        'anchor': anchor,
         'vram_bytes': {'rgba8': W * H * 4, 'bc3': W * H},
         'ptcl': {'flipbook_mode_0x500': 2 if loop else 4, 'cells_across_0x4D7': nx, 'cells_down_0x4D8': ny,
                  'frames_a_cell_0x504': K, 'cells_0x506': n, 'uv_scale_0x508': [1 / nx, 1 / ny],
@@ -704,6 +741,8 @@ def parser():
     ap.add_argument('--sustain', type=float, default=0.8)
     ap.add_argument('--track', choices=('x', 'y', 'xy'))
     ap.add_argument('--crop-thr', type=float, default=0.03)
+    ap.add_argument('--center-subject', choices=('x', 'y', 'xy'),
+                    help="widen the crop so the body's mean centroid is the frame's centre")
     ap.add_argument('--margin', type=float, default=0.03)
     ap.add_argument('--edge-feather', type=float, default=0.08,
                     help='fade width (of the crop) on sides where the effect runs off the footage')
