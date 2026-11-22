@@ -333,6 +333,12 @@ PART_FALLBACK = 'A00Wait1.omo'
 # the world (the user's v8 clip: the tongue on the floor under the jumping clones, the water streaks stretched back to
 # where the clones had stood; D_parts' keyed sw1 didn't help); now the tongue (SWG_CMant0-8) is an ordinary bone chain
 # keyed by his gekkougasw1 motions, and the other swing bones (no keys anywhere) are rebound to their parents.
+# v9.1: v9 (empty model.sb + the merged main.pac) froze at the match load (the user's log: nothing after boot, not even
+# the clones' set-up lines). The release goes back to his own model.sb and main.pac (v8's, loaded fine) and changes only
+# the model.nud's bone indices: every vertex on a bone main.pac doesn't key (the parts' bones, the swing and helper
+# bones) is moved to its nearest ancestor main.pac keys (CLONE_POSED = 'main'), so nothing hangs on a bone the article
+# never poses (a rigid tongue, fingers and jaw in their rest pose). The merged motions / empty sb are TEST_ONLY.
+CLONE_POSED = 'main'
 
 
 def empty_sb(sb):
@@ -415,15 +421,22 @@ def rebind(nud, bones, posed):
     return bytes(d), moved
 
 
-def cmd_data(vanilla_fighter, out_fighter):
+def posed_bones(pac_entries):
+    """the bone hashes any motion of a pac keys"""
+    import omo as O
+    return {nd[1] for _nm, data in pac_entries for nd in O.Omo(data).nodes}
+
+
+def cmd_data(vanilla_fighter, out_fighter, test_only=None):
     """model/clone/c00-c07 (his body's, v2 with his face files), motion/clone/ (his body's main.pac: every motion the
-    clone plays; v2 his hand / part pacs)"""
+    clone plays; v2 his hand / part pacs). v9.1: model.nud rebound to main.pac's bones; test_only (a folder): v9's
+    merged main.pac (merged_main_pac/...) and empty model.sb files (empty_model_sb/...) under it"""
     import shutil
     import omo as O
     n = 0
-    motions, _fell = full_motions(os.path.join(vanilla_fighter, 'motion', 'body'),
-                                  os.path.join(vanilla_fighter, 'model', 'body', 'c00', 'model.vbn'))
-    posed = {nd[1] for _nm, data in motions for nd in O.Omo(data).nodes}
+    body = os.path.join(vanilla_fighter, 'motion', 'body')
+    motions, _fell = full_motions(body, os.path.join(vanilla_fighter, 'model', 'body', 'c00', 'model.vbn'))
+    posed = posed_bones(O.pac_read(os.path.join(body, 'main.pac')) if CLONE_POSED == 'main' else motions)
     for c in range(8):
         src = os.path.join(vanilla_fighter, 'model', 'body', 'c%02d' % c)
         dst = os.path.join(out_fighter, 'model', 'clone', 'c%02d' % c)
@@ -434,13 +447,22 @@ def cmd_data(vanilla_fighter, out_fighter):
         nud, _moved = rebind(open(os.path.join(src, 'model.nud'), 'rb').read(),
                              O.vbn_read(os.path.join(src, 'model.vbn')), posed)
         open(os.path.join(dst, 'model.nud'), 'wb').write(nud)
-        open(os.path.join(dst, 'model.sb'), 'wb').write(empty_sb(open(os.path.join(src, 'model.sb'), 'rb').read()))
+        if test_only:
+            t = os.path.join(test_only, 'original_model_nud', 'fighter', 'gekkouga', 'model', 'clone', 'c%02d' % c)
+            os.makedirs(t, exist_ok=True)
+            shutil.copyfile(os.path.join(src, 'model.nud'), os.path.join(t, 'model.nud'))
+            t = os.path.join(test_only, 'empty_model_sb', 'fighter', 'gekkouga', 'model', 'clone', 'c%02d' % c)
+            os.makedirs(t, exist_ok=True)
+            open(os.path.join(t, 'model.sb'), 'wb').write(empty_sb(open(os.path.join(src, 'model.sb'), 'rb').read()))
     dst = os.path.join(out_fighter, 'motion', 'clone')
     os.makedirs(dst, exist_ok=True)
     for f in CLONE_MOTION_PACS:
         shutil.copyfile(os.path.join(vanilla_fighter, 'motion', 'body', f), os.path.join(dst, f))
         n += 1
-    O.pac_write(os.path.join(dst, 'main.pac'), motions)
+    if test_only:
+        t = os.path.join(test_only, 'merged_main_pac', 'fighter', 'gekkouga', 'motion', 'clone')
+        os.makedirs(t, exist_ok=True)
+        O.pac_write(os.path.join(t, 'main.pac'), motions)
     return n
 
 
@@ -451,7 +473,7 @@ def cmd_all(vanilla_root, user_root, out):
     of = os.path.join(out, 'fighter', 'gekkouga')
     info = cmd_acmd(os.path.join(user_root, 'fighter', 'gekkouga', 'script', 'animcmd'),
                     os.path.join(vf, 'model', 'body', 'c00'), os.path.join(of, 'script', 'animcmd'))
-    info['data_files'] = cmd_data(vf, of)
+    info['data_files'] = cmd_data(vf, of, os.path.join(out, 'TEST_ONLY_DATA'))   # v9.1: v9's data, to test
     msc = os.path.join(of, 'script', 'msc')
     os.makedirs(os.path.join(msc, 'clone'), exist_ok=True)
     compile_msc(os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'), os.path.join(msc, 'gekkouga.mscsb'))

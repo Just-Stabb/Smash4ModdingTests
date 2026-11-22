@@ -660,3 +660,15 @@ A_attack, C_hurt (attack + hurt), D_parts (attack + parts).
   vtable +0x14 `0x02BE9724` returns +4 = type 6); v7 / v8 sent `0x1010CC00` (string data). The send `0x02BF019C`
   calls `[obj+0x24]` vt +0x21C (the receiver; its table is built at run time, not traced). The cave test reads the
   word from the handler. `S4GW` also logs gone (0 = his object found) and the handle.
+
+## Clones v9.1 (`greninja_clones_v9_1.zip`)
+
+The user's v9 A_attack log: frozen while the match loaded (nothing after the boot lines, not even the clones'
+set-up `S4GI`), so before the clone objects were built: the data, not v9's exe changes (they run in the match). The two
+load-time changes were the empty model.sb (12 bytes) and the merged main.pac (3.8 MB). The swing loader (`0x036B8040`:
+magic `SWB ` after the LE swap `0x036B73F4`, version 0x10005 -> `0x036B7C40`, count at +8 -> `[+0x50]`, entries 0x468
+from `0x04AD7978`) takes count 0 (the Ultimate ports' fighters use it), but never on an article with SWG_ bones; the hang
+is not pinned offline. v9.1 (data only, v9's exe stays): his own main.pac and model.sb back (v8's), and model.nud with
+only its vertex bone indices changed: every vertex on a bone main.pac doesn't key (37 bones: parts, swing, helpers) on
+its nearest keyed ancestor (`CLONE_POSED = 'main'`): rigid tongue / jaw / fingers on the clones, nothing on an unposed
+bone. TEST_ONLY_DATA: `original_model_nud` (if v9.1 still hangs), `merged_main_pac`, `empty_model_sb` (to pin v9's).

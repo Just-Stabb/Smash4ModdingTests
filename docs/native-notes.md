@@ -3858,3 +3858,7 @@ MSC on a bunshin-based kind, the 4-shape group.
   hurtboxes added, +0x6F off; vt +0x1C another setup, +0x34 reset (-> +0x3C clear-all `0x02C42CE4`), +0x44 set +0x6F,
   +0x4C add (`0x02C42D7C`), update `0x02C42C54`. The SET_CURSOR message's vtable is `0x100FCC00` (v7 / v8's
   `0x1010CC00` was a misread); `0x02BF019C(&handle, &msg)` = `[[handle]+0x24]` vt +0x21C.
+- **v9.1**: v9's data froze the match load before any clone was built (empty model.sb on SWG_-boned article models,
+  or the merged 3.8 MB main.pac; not pinned). The model library's swing file parser is `0x036B8040` (`SWB ` / LE
+  ` BWS` swapped by `0x036B73F4`; versions 0x10004 / 0x10005; count +8; 0x468-byte entries). Release data reverted
+  to his own main.pac / model.sb; model.nud indices only (vertices on main.pac-keyed ancestors).
