@@ -131,6 +131,7 @@ FLOW = {'Set_Loop', 'Goto', 'Float_Var_Compare', 'True', 'Else', 'False', 'IS_FL
 NO_CLONE = {'IS_FLAG', 'CALL', 'JUMP'}     # scripts using these (his counter's attacks, ...) aren't copied
 FLOW_KEEP_SAFE = {'SET_FLOAT'}             # kept inside a loop / condition (position variables only: from an article
                                            # they find nobody), never anything else
+FINAL_FIRST = 0x295                        # his Final Smash's motions (0x295 - 0x29B): not copied (the clones idle then)
 WEAPON_JOINT = 0x7D0                       # an article's joint = 0x7D0 + its model.jtb table-0 entry
 
 
@@ -201,7 +202,8 @@ def clone_scripts(game, effect, mtable_hashes, bmap):
     import acmd
     smash = {zlib.crc32(n.encode()) for n in SMASH_SCRIPTS}
     g_out, e_out = {}, {}
-    for crc in sorted(set(mtable_hashes)):
+    final = {h for i, h in enumerate(mtable_hashes) if i >= FINAL_FIRST}
+    for crc in sorted(set(mtable_hashes) - final):
         s = game.scripts.get(crc)
         if not s or not any(c.name in HITBOXES for c in s) or any(c.name in NO_CLONE for c in s):
             continue

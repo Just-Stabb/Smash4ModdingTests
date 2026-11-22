@@ -564,3 +564,46 @@ WhipD02SpecialAirHiPullL48
 WhipD02SpecialAirHiPullL40
 WhipD02SpecialAirHiPullL32
 WhipD02SpecialAirHiPullL24
+
+// ---- Greninja (gekkouga)
+// Clones v1 (fighters/gekkouga/README.md): the clone article (weapon kind 0x1A1, folder "clone": script/animcmd/weapon/clone)
+// runs copies of his body's hitbox scripts (tools/gekkouga_build.py) under his own motion names, and plays his body
+// animations from its own motion/clone/main.pac (his body main.pac): a -> line each, so the Hitbox Viewer plays them.
+// No new body script or motion slot.
+Attack11 -> clone/FitGekkougaBodyMainC00Attack11.omo
+Attack12 -> clone/FitGekkougaBodyMainC00Attack12.omo
+attack13 -> clone/FitGekkougaBodyMainC00Attack13.omo
+attack100end -> clone/FitGekkougaBodyMainC00AttackEnd.omo
+AttackDash -> clone/FitGekkougaBodyMainC00AttackDash.omo
+attacks3hi -> clone/FitGekkougaBodyMainC01AttackS3Hi.omo
+attacks3 -> clone/FitGekkougaBodyMainC01AttackS3S.omo
+attacks3lw -> clone/FitGekkougaBodyMainC01AttackS3Lw.omo
+AttackHi3 -> clone/FitGekkougaBodyMainC02AttackHi3.omo
+AttackLw3 -> clone/FitGekkougaBodyMainC02AttackLw3.omo
+attacks4 -> clone/FitGekkougaBodyMainC03AttackS4S.omo
+AttackHi4 -> clone/FitGekkougaBodyMainC04AttackHi4.omo
+AttackLw4 -> clone/FitGekkougaBodyMainC04AttackLw4.omo
+AttackAirN -> clone/FitGekkougaBodyMainC05AttackAirN.omo
+AttackAirF -> clone/FitGekkougaBodyMainC05AttackAirF.omo
+AttackAirB -> clone/FitGekkougaBodyMainC05AttackAirB.omo
+AttackAirHi -> clone/FitGekkougaBodyMainC05AttackAirHi.omo
+AttackAirLw -> clone/FitGekkougaBodyMainC05AttackAirLw.omo
+CatchAttack -> clone/FitGekkougaBodyMainE00CatchAttack.omo
+DownAttackU -> clone/FitGekkougaBodyMainF03DownAttackU.omo
+DownAttackD -> clone/FitGekkougaBodyMainF04DownAttackD.omo
+CliffAttackQuick -> clone/FitGekkougaBodyMainG02CliffAttackQuick.omo
+SlipAttack -> clone/FitGekkougaBodyMainG03SlipAttack.omo
+appeallwr -> clone/FitGekkougaBodyMainJ01AppealLw.omo
+specialsattackf -> clone/FitGekkougaBodyMainD01SpecialSAttackF.omo
+specialsattackf_c2 -> clone/FitGekkougaBodyMainD01SpecialSAttackF.omo
+specialsattackf_c3 -> clone/FitGekkougaBodyMainD01SpecialSAttackF.omo
+specialsattackb -> clone/FitGekkougaBodyMainD01SpecialSAttackB.omo
+specialsattackb_c2 -> clone/FitGekkougaBodyMainD01SpecialSAttackB.omo
+specialsattackb_c3 -> clone/FitGekkougaBodyMainD01SpecialSAttackB.omo
+specialairsattackf -> clone/FitGekkougaBodyMainD01SpecialAirSAttackF.omo
+specialairsattackf_c2 -> clone/FitGekkougaBodyMainD01SpecialAirSAttackF.omo
+specialairsattackf_c3 -> clone/FitGekkougaBodyMainD01SpecialAirSAttackF.omo
+specialairsattackb -> clone/FitGekkougaBodyMainD01SpecialAirSAttackB.omo
+specialairsattackb_c2 -> clone/FitGekkougaBodyMainD01SpecialAirSAttackB.omo
+specialairsattackb_c3 -> clone/FitGekkougaBodyMainD01SpecialAirSAttackB.omo
+speciallw_c2 -> clone/FitGekkougaBodyMainD03SpecialLw.omo

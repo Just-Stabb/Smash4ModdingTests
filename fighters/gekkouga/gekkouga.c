@@ -40142,6 +40142,13 @@ void gekkouga_frame()
         }
         gk_chain = 0;
     }
+    if (st == 0x14f)
+    {
+        gk_lw_charge = 0;                 // the match's start (Entry): every kept charge from 0
+        gk_s4 = 0;
+        gk_hi4 = 0;
+        gk_lw4 = 0;
+    }
     gk_input();
     if (gk_ability > 0)
     {
@@ -40198,7 +40205,7 @@ void gk_input()
         return;                           // not a down special (neutral / side / up specials as normal)
     }
     WorkModule(0, 32.0f + 0, 0x0f0003c9); // Buffer_Clear (specials) for this fighter: no down special status
-    global24 = global24 & 0xffff0fff;     // nor this frame's (the status loop reads it after this hook)
+    global24 = global24 - (global24 & 0xf000); // nor this frame's special bits (the status loop reads them after this hook)
     if (gk_ability <= 0)
     {
         return;                           // burnout: down special disabled
@@ -40282,8 +40289,8 @@ void gk_ability_update()
         gk_spawn(0x2);
     }
     gk_seq += 1;
-    gk_channel();
     gk_check_hit();
+    gk_channel();
     gk_shapes_update();
     gk_ability -= 1;
     if (gk_ability <= 0)
