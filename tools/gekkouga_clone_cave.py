@@ -121,6 +121,13 @@ W_MODEL = 0x3C                    # -> ModelModule (+4 the handle: +8 a mode, +0
 W_LINK = 0x68                     # -> LinkModule (+0x84 the mask: bit 7 a link with attribute 7 (parent's visibility))
 W_VIS = 0xA8                      # -> VisibilityModule (+8 its own flag (MSC VisibilityModule(0x2710, v)), vt +0xA4
                                   # is_visible 0x02C77004: +8 and, through the LinkModule, the parent's)
+HM_CLEAR = 0x3C                   # v9: HitModule (vtable 0x10107774) vt +0x3C: every hurtbox off (0x02C42CE4: each group,
+                                  # +0x4C = 0, the collision container cleared); its lifecycle reset vt +0x34 calls it
+HM_GROUPS = 0x3C                  # +0x3C its hurt groups (setup vt +0x14 0x02C42570: params +0x18; weapons 1: the generic
+HM_GROUP = 0x40                   # params 0x032107B4), +0x40 the groups (0x38 each: +4 / +6 its records' start / count)
+HM_COUNT = 0x4C                   # +0x4C the hurtboxes added (vt +0x4C adds)
+HM_RECS = 0x44                    # +0x44 {?, the records (0x40 each)}
+HM_OBJS = 0x18                    # +8 the collision container (+0xC its objects (0x174 each), +0x10 their count)
 W_POSTURE = 0x18                  # -> PostureModule (+0x10 / +0x14 / +0x18 x y z, +0x5C the scale)
 FLX_INTERN = 0x032CB1B8           # v7: (atom pool [0x102FCAA4] + 0x24, char *, length) -> atom (docs: "Damage panel")
 FLX_ATOM_POOL = 0x102FCAA4
@@ -152,9 +159,9 @@ VT_BASE = 0xFC                    # v6: the clone's specializer (its singleton's
                                   # it to its owner; the moon's +0x34 only sets the model scale (the user's v5 "completely
                                   # black" clone)
 DAMAGE_SLOT = 20
-RELEASE = frozenset()             # the release exe: the safe set (nothing risky) until a TEST_ONLY log clears the rest
-VARIANTS = (('A_safe', frozenset()), ('B_attack', frozenset(('attack',))), ('C_hurt', frozenset(('hurt',))),
-            ('D_parts', frozenset(('parts',))), ('E_bstart', frozenset(('bstart',))))
+RELEASE = frozenset(('attack',))  # v9: the user's v8 B_attack (the clones' attacks hit, nothing broke): the release's set
+VARIANTS = (('A_attack', frozenset(('attack',))), ('C_hurt', frozenset(('attack', 'hurt'))),
+            ('D_parts', frozenset(('attack', 'parts'))))   # v9: each on the release's set
 
 
 def base_of(feats):
@@ -535,7 +542,9 @@ def build(rpx, diag=False, feats=None):
             ('gk_fz', 'S4GZ clone start: init=%08X scale x100=%d\n'),
             ('gk_fw', 'S4GW tag message: visible=%d object id=%d\n'),
             ('gk_fm', 'S4GM clone id=%d draw: visflag=%d visible=%d model mode=%d drawn=%d overlay=%d/%d\n'),
-            ('gk_fn', 'S4GN clone id=%d z=%d scale x100=%d link mask=%08X model=%08X\n')]
+            ('gk_fn', 'S4GN clone id=%d z=%d scale x100=%d link mask=%08X model=%08X\n'),
+            ('gk_fk', 'S4GK clone hurtboxes set: hitmodule=%08X groups=%d boxes %d -> %d group0=%d+%d objects=%d\n'),
+            ('gk_fo', 'S4GO clone id=%d hurt: boxes=%d objects=%d first record %08X %08X %08X %08X\n')]
     for nm, s in fmts:
         A[nm] = alloc((len(s) + 4) & ~3, 4) if diag else 0
     code_at = alloc(0, 4)
@@ -592,10 +601,11 @@ def build(rpx, diag=False, feats=None):
              slow=FLAG_SLOW, clones=FLAG_CLONES, life=TAG_LIFE, sslot=SLOW_SLOT, srate=SLOW_RATE, sframes=SLOW_FRAMES,
              hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, whit=W_HIT_MOD, wdmg=W_DAMAGE, watk=W_ATTACK,
              wstop=W_STOP, wcol=W_COLOUR, wmodel=W_MODEL, wlink=W_LINK, wvis=W_VIS, wpost=W_POSTURE,
-             cclear=COLOUR_CLEAR, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
+             cclear=COLOUR_CLEAR, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
+             hm_objs=HM_OBJS, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_tags', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -1325,7 +1335,49 @@ w_start:
         lwz r12, %(cclear)d(r12)
         mtctr r12
         bctrl''') if 'bstart' in feats else '') + '''
-ws_diag:''' + D('''
+ws_diag:''' + (('''
+        lwz r12, %(wacc)d(r31)          # v9 hurt: its hurtboxes (re)made at each start: cleared, then his 8 added
+        cmpwi r12, 0
+        beq ws_hurtdone
+        lwz r3, %(whit)d(r12)           # its HitModule
+        cmpwi r3, 0
+        beq ws_hurtdone
+        stw r3, 0x14(r1)
+        lwz r0, %(hm_count)d(r3)
+        stw r0, 0x28(r1)
+        lwz r12, 0(r3)
+        lwz r12, %(hm_clear)d(r12)
+        mtctr r12
+        bctrl
+        lwz r3, 0x14(r1)
+        lis r11, %(hurt_hi)d
+        addi r11, r11, %(hurt_lo)d
+        stw r11, 0x20(r1)
+        li r0, %(nhurt)d
+        stw r0, 0x24(r1)
+        addi r4, r1, 0x20
+        li r5, 0
+        lwz r12, 0(r3)
+        lwz r12, 0x4C(r12)
+        mtctr r12
+        bctrl''' + D('''
+        lwz r11, 0x14(r1)
+        lis r3, %(gk_fk_hi)d
+        addi r3, r3, %(gk_fk_lo)d
+        mr r4, r11
+        lwz r5, %(hm_groups)d(r11)
+        lwz r6, 0x28(r1)
+        lwz r7, %(hm_count)d(r11)
+        li r8, -1
+        li r9, -1
+        lwz r12, %(hm_group)d(r11)
+        cmpwi r12, 0
+        beq wsk_g
+        lha r8, 4(r12)
+        lha r9, 6(r12)
+wsk_g:  lwz r10, %(hm_objs)d(r11)''' + osr()) + '''
+ws_hurtdone:''') if 'hurt' in feats else '') + D('''
+
         lwz r5, 0x10(r1)
         li r6, -1
         cmpwi r5, 0
@@ -1438,7 +1490,37 @@ wd_log2:
         lwz r5, 0x14(r1)
         lwz r6, 0x18(r1)
         lwz r7, 0x1C(r1)
-        lwz r8, %(wmodel)d(r31)''' + osr() + '''
+        lwz r8, %(wmodel)d(r31)''' + osr() + ('''
+        lwz r12, %(whit)d(r31)          # v9: its HitModule: hurtboxes, collision objects, the first hurtbox's record
+        cmpwi r12, 0
+        beq wd_end
+        lwz r5, %(hm_count)d(r12)
+        lwz r6, %(hm_objs)d(r12)
+        li r7, 0
+        li r8, 0
+        li r9, 0
+        li r10, 0
+        lwz r11, %(hm_group)d(r12)
+        cmpwi r11, 0
+        beq wd_hlog
+        lha r0, 4(r11)
+        lwz r11, %(hm_recs)d(r12)
+        cmpwi r11, 0
+        beq wd_hlog
+        lwz r11, 4(r11)
+        cmpwi r11, 0
+        beq wd_hlog
+        slwi r0, r0, 6
+        add r11, r11, r0
+        lwz r7, 0(r11)
+        lwz r8, 4(r11)
+        lwz r9, 8(r11)
+        lwz r10, 0xC(r11)
+wd_hlog:
+        lis r3, %(gk_fo_hi)d
+        addi r3, r3, %(gk_fo_lo)d
+        lwz r4, 0x10(r1)''' + osr() if 'hurt' in feats else '') + '''
+wd_end:
         lwz r30, 0x38(r1)
         lwz r31, 0x3C(r1)
         lwz r0, 0x44(r1)

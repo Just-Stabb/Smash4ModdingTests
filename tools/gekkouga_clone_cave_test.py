@@ -357,15 +357,35 @@ def weapon_checks(e, img, info, diag=False):
     def hm_fn(e_):
         d = e_.r(4)
         e_.calls.append(('hurt', e_.r(3), e_.w(d), e_.w(d + 4), e_.r(5)))
+        e_.setw(e_.r(3) + C.HM_COUNT, e_.w(e_.r(3) + C.HM_COUNT) + e_.w(d + 4))
     e.stub(hmset, hm_fn)
-    hm = e.alloc(0x20, b'\0')
+    hmclr = e.alloc(4)
+    e.setw(hmvt + C.HM_CLEAR, hmclr)
+
+    def hm_clear(e_):
+        e_.calls.append(('hurt_clear', e_.r(3)))
+        e_.setw(e_.r(3) + C.HM_COUNT, 0)
+    e.stub(hmclr, hm_clear)
+    # v9: a HitModule as the generic weapon params make it: 1 group (records 0-7 after the set-up), 8 objects
+    hm = e.alloc(0x80, b'\0')
     e.setw(hm, hmvt)
+    hgrp = e.alloc(0x38, b'\0')
+    e.mu.mem_write(hgrp + 4, struct.pack('>hh', 0, 8))
+    e.setw(hm + C.HM_GROUPS, 1)
+    e.setw(hm + C.HM_GROUP, hgrp)
+    hrecs = e.alloc(0x40 * 8, b'\0')
+    e.mu.mem_write(hrecs, struct.pack('>4I', 0x11, 0x22, 0x33, 0x44))
+    hrh = e.alloc(8, b'\0')
+    e.setw(hrh + 4, hrecs)
+    e.setw(hm + C.HM_RECS, hrh)
+    e.setw(hm + C.HM_OBJS, 8)
     e.setw(cacc + C.W_HIT_MOD, hm)
     e.calls = []
     e.call(lab['w_init'], s, weapon)
     check('v3 set-up (+0x1C): HitModule vt +0x4C(&{his 8 hurtboxes, 8}, 0) (v4: only with "hurt")',
           [c for c in e.calls if c[0] == 'hurt'], [('hurt', hm, A['hurt'], 8, 0)] if 'hurt' in F else [])
     if diag:
+        e.osr_full = []
         osr_ = [c for c in e.calls if c[0] == 'osr']
         check('v3 / v4 diag: S4GI clone set-up logged with its HitModule (before the hurtboxes), then S4GJ done',
               ([c[1] for c in osr_], osr_[0][2]), ([A['gk_fi'], A['gk_fj']], hm))
@@ -386,11 +406,20 @@ def weapon_checks(e, img, info, diag=False):
     e.setw(cacc + C.W_COLOUR, cb)
     e.stub(C.BUNSHIN_START, lambda e_: e_.rec('bunshin_start', 3, 4, 5))
     e.calls = []
+    e.setw(hm + C.HM_COUNT, 8)
     e.call(lab['w_start'], s, weapon, init)
     want = ([('bunshin_start', s, weapon, init), ('colour_off', cb, 0)] if 'bstart' in F else []) + \
+        ([('hurt_clear', hm), ('hurt', hm, A['hurt'], 8, 0)] if 'hurt' in F else []) + \
+        ([('osr', A['gk_fk'], hm, 1)] if diag and 'hurt' in F else []) + \
         ([('osr', A['gk_fz'], init, 276)] if diag else [])
+    if 'hurt' in F:
+        check('v9 "hurt": the start (each time a clone is made) clears its hurtboxes and adds his 8 again: 8 after, '
+              'not 16 (v8\'s, made only at the set-up, were never hit)', e.w(hm + C.HM_COUNT), 8)
+        if diag:
+            check('v9 diag: S4GK (HitModule, groups 1, boxes 8 -> 8, group 0 = records 0 + 8, 8 objects)',
+                  [x[:8] for x in e.osr_full if x[0] == A['gk_fk']], [(A['gk_fk'], hm, 1, 8, 8, 0, 8, 8)])
     check('v8: ... ' + ('"bstart": bunshin\'s start (as it is), then its black off (ColorBlendModule vt +0x44(0))'
-                        if 'bstart' in F else 'it calls nothing (v7)') + (', the S4GZ log (init, scale x100 276)' if diag else ''),
+                        if 'bstart' in F else '"hurt": its hurtboxes again' if 'hurt' in F else 'it calls nothing (v7)') + (', the S4GZ log (init, scale x100 276)' if diag else ''),
           [c[:4] if c[0] == 'osr' else c for c in e.calls], want)
     if diag:
         # v8 diag: the draw state (S4GM / S4GN)
@@ -423,6 +452,9 @@ def weapon_checks(e, img, info, diag=False):
               'overlay slot 0 on / enabled) and S4GN (z -12, scale x100 125, link mask 0x80, the ModelModule)',
               ([c for c in e.calls if c[0] == 'is_visible'], ddiag_rows(e, A)),
               ([('is_visible', vis)], [(A['gk_fm'], 2, 0, 1, 3, 1, 1, 1), (A['gk_fn'], 2, -12 & 0xFFFFFFFF, 125, 0x80, mm)]))
+        check('v9 diag: S4GO (id 2, its hurtboxes 8, 8 objects, the first record\'s words; none without a HitModule)',
+              [x[:8] for x in e.osr_full if x[0] == A['gk_fo']],
+              [(A['gk_fo'], 2, 8, 8, 0x11, 0x22, 0x33, 0x44)] if 'hurt' in F else [])
         for o in (C.W_VIS, C.W_MODEL, C.W_POSTURE, C.W_LINK):
             e.setw(cacc + o, 0)
         e.calls, e.osr_full = [], []
