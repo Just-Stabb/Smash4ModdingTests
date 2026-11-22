@@ -1655,7 +1655,7 @@ def skeleton_data_tests(out):
     check('skeleton scripts: motion.mtable = SkeletonRun / SkeletonExplode / SkeletonSmoke (its motion kinds 0 / 1 / 2)',
           list(struct.unpack('>3I', mt)), [acmd.crc(n) for n in GB.SK_SCRIPTS])
     game = acmd.ACMDFile.load(os.path.join(ow, 'game.bin'))
-    boom = [c for c in game.script('SkeletonExplode') if c.name == 'Special_Hitbox']
+    boom = [c for c in game.script('SkeletonExplode') if c.name in ('Special_Hitbox', 'Extra_Special_Hitbox')]
     syn = boom[0].info['syntax'] if boom else []
     hb = dict(zip(syn, boom[0].params)) if boom else {}
     check('skeleton explosion: one hitbox, 15 %, 50 degrees, KBG 50 / BKB 40, size 22 at its middle (bone 0, Y 14), flame, '
@@ -1667,9 +1667,30 @@ def skeleton_data_tests(out):
     kb = ((p / 10 + p * 15 / 20) * 200 / 200 * 1.4 + 18) * 0.5 + 40
     check('skeleton explosion: Smash 4\'s knockback on Mario (weight 100) at 130 %% (+ 15): %.1f (a mid-stage KO ~130-140)' % kb,
           130 <= kb <= 140, True)
-    check('skeleton scripts: run / smoke without a hitbox; effect / sound empty',
-          ([c.name for c in game.script('SkeletonRun')], [c.name for c in game.script('SkeletonSmoke')]),
-          (['Script_End'], ['Script_End']))
+    check('skeleton v1.5: the explosion\'s hitstun x %g (Extra_Special_Hitbox HitstunMul; the other extras 0: unchanged)' %
+          GB.SK_BOOM_HITSTUN, (boom[0].name if boom else None, hb.get('HitstunMul'),
+                               [hb.get(k) for k in ('HitstopMul', 'HitstopFrames', 'SelfHitstopMul', 'SelfHitstopFrames', 'DIMul')]),
+          ('Extra_Special_Hitbox', GB.SK_BOOM_HITSTUN, [0.0, 0, 0.0, 0, 0.0]))
+    run = game.script('SkeletonRun')
+    fr, on, t = 0.0, [], {}
+    for c in run:
+        if c.name == 'FRAME':
+            fr = float(c.params[0])
+        elif c.name == 'Extended_Special_Hitbox':
+            on.append(fr)
+            t = dict(zip(c.info['syntax'], c.params))
+        elif c.name == 'Remove_All_Hitboxes':
+            on.append(-fr)
+    starts = [x for x in on if x >= 0]
+    check('skeleton v1.5 contact: SkeletonRun puts its body capsule (joint 0, radius 3.5, Y 3.5 - 20.5: x +- 3.5, y 0 - 24) '
+          'on at frames 0, 3, 6 ... 45 and off 2 frames later (a touch every 3 frames, as up air\'s multi-hit); no '
+          'knockback (KBG / FKB / BKB 0), no hitlag, no flinch, 0.1 %%, fire',
+          (starts[:3], len(starts), all(-on[2 * k + 1] == starts[k] + 2 for k in range(len(starts))),
+           [t.get(k) for k in ('Bone', 'Size', 'Y', 'Y2', 'KBG', 'FKB', 'BKB', 'DisableHitlag', 'Flinchless', 'Effect')],
+           round(t.get('Damage', 0), 3)),
+          ([0.0, 3.0, 6.0], 16, True, [0, 3.5, 3.5, 20.5, 0, 0, 0, 1, 1, 5], 0.1))
+    check('skeleton scripts: smoke without a hitbox; effect / sound empty', [c.name for c in game.script('SkeletonSmoke')],
+          ['Script_End'])
     lv = lvd.LVD(os.path.join(fg, 'model', 'skeleton', 'c00', 'skeleton.lvd'))
     c = lv.collisions[0]
     check('skeleton.lvd: one collision, the 4 vertices the executable moves (v1.5: x +- 3.5, y 2 / 24: its body), a wall each side and a '
@@ -2349,7 +2370,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         import gekkouga_clone_cave as C
         for i, (member, b, dg, feats) in enumerate(exe_members(base, base_diag, len(earlier) >= 3, len(earlier) == 17,
                                                                len(earlier) == 18, len(earlier) >= 19, len(earlier) in (19, 20),
-                                                               len(earlier) == 21, len(earlier) in (22, 23, 24, 25))):
+                                                               len(earlier) == 21, len(earlier) in (22, 23, 24, 25),
+                                                               len(earlier) in (26, 27, 28, 29))):
             if not b:
                 continue
             p = os.path.join(td, '%d.rpx' % i)
@@ -2422,7 +2444,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
 
-def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=False, b2=False, gkb5=False):
+def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=False, b2=False, gkb5=False, gkb6=False):
     """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant; skeleton v1 the
     release and TEST_ONLY A_release (as the burn packages)"""
     import gekkouga_clone_cave as C
@@ -2437,6 +2459,7 @@ def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=
     if v15:     # (v15 and skeleton v1.2 (sk12): RELEASE without burn v2's burn2; burn v2 on: RELEASE)
         drop = {'burn2', 'floor1'} if sk12 else {'floor1'} if b2 else set()
         drop |= {'tiers', 'gmupd'} if sk12 or b2 or gkb5 else set()   # (skeleton v1.3's exe_v46z_gkb6 adds them)
+        drop |= {'skbody', 'sktouch'} if sk12 or b2 or gkb5 or gkb6 else set()   # (skeleton v1.5's gkb7)
         return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE - drop)] + \
             [('TEST_ONLY_INSTALL_TO_code/%s/cross_f.rpx' % n, base_diag, True, f - drop) for n, f in C.VARIANTS]
     if not v4:
@@ -2467,7 +2490,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
     with tempfile.TemporaryDirectory() as td:
         for member, b, dg, feats in exe_members(base, base_diag, v4, len(earlier) == 17, len(earlier) == 18,
                                                 len(earlier) >= 19, len(earlier) in (19, 20), len(earlier) == 21,
-                                                len(earlier) in (22, 23, 24, 25)):
+                                                len(earlier) in (22, 23, 24, 25), len(earlier) in (26, 27, 28, 29)):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')

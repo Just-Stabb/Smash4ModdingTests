@@ -794,12 +794,22 @@ SK_CARRIER = ('model.nud', 'model.nut', 'model.vbn', 'model.jtb', 'model.mta', '
 # launched away from its middle (FacingRestrict 5), as the hydrant's hitboxes (bone 0, type 9, indirect)
 SK_BOOM = dict(Damage=15.0, Angle=50, KBG=50, FKB=0, BKB=40, Size=22.0, Y=14.0, Effect=5, SFXLevel=2, SFXType=0xB)
 SK_BOOM_FRAMES = 4
+SK_BOOM_HITSTUN = 1.6             # skeleton v1.5 (the user: "make the explosion have 1.6x hitstun"): Extra_Special_Hitbox's
+                                  # HitstunMul (the ACMD extension's extras, tools/acmd_ext_cave.py: works in articles' scripts)
+# skeleton v1.5's contact burn (the user: "about 4% overall but rehits quickly ... about 70% overall if it was for 1
+# second"): while it runs (SkeletonRun), its body (tools/gekkouga_clone_cave.py SK_BODY: x +- 3.5, y 0 - 24) is a capsule
+# hitbox (radius 3.5, Y 3.5 - 20.5 on joint 0) with no knockback, no hitlag, no flinch, 0.1 %, on 2 frames then off 1
+# (Remove_All_Hitboxes: its hit log restarts, as vanilla up air's multi-hit): a touch every 3 frames; each hit's burn is
+# the exe's contact row (SK_TOUCH_ROW: 3.5 %), 20 a second = 70 % (+ 2 % of the hits)
+SK_TOUCH = dict(Damage=0.1, Angle=361, KBG=0, FKB=0, BKB=0, Size=3.5, Y=3.5, Y2=20.5, Effect=5, Hitlag=0.0, SDI=0.0,
+                Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=0, SFXType=0, DisableHitlag=1, NoGFX=1, Flinchless=1)
+SK_TOUCH_ON, SK_TOUCH_PERIOD = 2, 3
 
 
 def sk_boom_hitbox():
     import acmd
     by = {v['name']: k for k, v in acmd.INFO.items()}
-    ident = by['Special_Hitbox']
+    ident = by['Extra_Special_Hitbox']   # skeleton v1.5: + its hitstun x SK_BOOM_HITSTUN (v1 - v1.4: Special_Hitbox)
     syn = acmd.INFO[ident]['syntax']
     d = dict(ID=0, Part=0, Bone=0, Damage=0, Angle=0, KBG=0, FKB=0, BKB=0, Size=5, X=0, Y=0, Z=0, Effect=0, Trip=0,
              Hitlag=1.0, SDI=1.0, Clang=0, Rebound=0, ShieldDamage=0, SFXLevel=0, SFXType=0, Type=9, HitBits=0x3F,
@@ -809,7 +819,39 @@ def sk_boom_hitbox():
     d['Ground/Air'] = 3
     d['Direct/Indirect'] = 0
     d.update(SK_BOOM)
+    d.update(HitstunMul=SK_BOOM_HITSTUN, HitstopMul=0.0, HitstopFrames=0, SelfHitstopMul=0.0, SelfHitstopFrames=0, DIMul=0.0)
     return acmd.Command(ident, [d[n] for n in syn])
+
+
+def sk_touch_hitbox():
+    """skeleton v1.5: its body's contact hitbox (SK_TOUCH)"""
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    ident = by['Extended_Special_Hitbox']
+    syn = acmd.INFO[ident]['syntax']
+    d = dict(ID=0, Part=0, Bone=0, X=0.0, Z=0.0, X2=0.0, Z2=0.0, Trip=0, Type=9, HitBits=0x3F, Unk41=0, CollisionPart=0xF,
+             NoScale=0, Shieldable=1, Reflectable=0, Absorbable=0, Rehit=0, IgnoreInvuln=0, HitAllStates=0, FacingRestrict=0,
+             NoGrabRelease=0, TeamDamage=0)
+    d['Ground/Air'] = 3
+    d['Direct/Indirect'] = 0
+    d.update(SK_TOUCH)
+    return acmd.Command(ident, [d[n] for n in syn])
+
+
+def sk_run_script(frames=None):
+    """SkeletonRun: the contact hitbox on SK_TOUCH_ON frames of every SK_TOUCH_PERIOD, through its motion (it loops: the
+    script again from 0; its 30 / 48 frames are whole periods)"""
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    frames = frames or 48
+    out = []
+    for f in range(0, frames, SK_TOUCH_PERIOD):
+        if f:
+            out.append(acmd.Command(by['FRAME'], [float(f)]))
+        out.append(sk_touch_hitbox())
+        out.append(acmd.Command(by['FRAME'], [float(f + SK_TOUCH_ON)]))
+        out.append(acmd.Command(by['Remove_All_Hitboxes'], []))
+    return out + [acmd.Command(by['Script_End'], [])]
 
 
 def sk_scripts():
@@ -821,6 +863,7 @@ def sk_scripts():
             acmd.Command(by['Remove_All_Hitboxes'], []), end]
     game = {acmd.crc(n): [acmd.Command(by['Script_End'], [])] for n in SK_SCRIPTS}
     game[acmd.crc('SkeletonExplode')] = boom
+    game[acmd.crc('SkeletonRun')] = sk_run_script()
     return game
 
 

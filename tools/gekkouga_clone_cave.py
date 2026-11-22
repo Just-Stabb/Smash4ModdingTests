@@ -98,7 +98,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
-                      'tiers', 'gmupd', 'skbody'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'tiers', 'gmupd', 'skbody', 'sktouch'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -115,6 +115,7 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', '
 #   tiers   skeleton v1.3 / burn tiers (needs burn2): the burning fighters' fire picked by tier (BFX_TIERS: their burns'
 #           count, remaining damage, strongest rate), a different effect each (BFX_TIER_IDS) in place of one scaled
 #   skbody  skeleton v1.5: its collision vertices and HP hit box fit to its body (SK_BODY) instead of its flames
+#   sktouch skeleton v1.5 (needs burn2): its running contact hits burn with SK_TOUCH_ROW (its explosion's: the skeleton row)
 #   gmupd   skeleton v1.3 (needs skeleton): its GroundModule's own frame update (GC_FRAME) every moved frame, as the
 #           hydrant's update template runs it (the collision attempt: Mario's pump's template never updates +0x2C)
 #   hitcheck v12: the clone hit from his side (w_hitchk: other fighters' attack boxes against the clone's box)
@@ -161,6 +162,13 @@ BURN_MOVES = (
                                   # row): 0.6 % every 6 frames for 6 s = 36 %, the strongest (shielded 0.21 % x 30 = 6.3 %)
 )
 SK_BURN_KEY = 0x101A2
+SK_TOUCH_KEY = 0x101A4
+SK_TOUCH_ROW = (SK_TOUCH_KEY, 0.35, 6, 60)   # skeleton v1.5 (the user: "a contact burn damage to the skeleton that does
+                                  # about 4% overall but rehits quickly ... about 70% overall if it was for 1 second"): its
+                                  # body hitbox while it runs rehits every 3 frames (gekkouga_build SK_TOUCH: on 2, off 1,
+                                  # as vanilla up air's multi-hit), each hit one instance: 0.35 % every 6 frames for 1 s =
+                                  # 3.5 %; 20 hits a second = 70 %; at most 20 instances alive (BURN_CAP 32: no plateau);
+                                  # shielded 35 % / half the frames, raised to the 1 % floor (0.2 % x 5)
 BURN_MIN_TOTAL = 1.0              # the user's floor for one instance, shielded or not (burn v2.1, feature floor1; 3 % up
 BURN_MIN_TOTAL_OLD = 3.0          # to burn v2: the exes built without floor1)
 
@@ -195,8 +203,8 @@ BURN_CONTEXTS = 8 * 4             # his slot x 4 + 0 him / 1 / 2 a clone / 3 his
 
 
 def burn_moves(feats):
-    """the burn rows: BURN_MOVES, burn v2's trail row after them"""
-    return BURN_MOVES + ((TR_ROW,) if 'burn2' in feats else ())
+    """the burn rows: BURN_MOVES, burn v2's trail row after them, skeleton v1.5's contact row after that"""
+    return BURN_MOVES + ((TR_ROW,) if 'burn2' in feats else ()) + ((SK_TOUCH_ROW,) if 'sktouch' in feats else ())
 
 
 def burn_contexts(feats):
@@ -399,15 +407,16 @@ TR_ROW = (TR_BURN_KEY, 0.25, 15, 180)   # 0.25 % every 15 frames for 3 s = 3 % (
                                         # 0.5 % x 6 = 3 % under the 3 % floor)
 GK_VAR_TR = 0x0F000300            # his VAR_0 + 4 k: request k's type, + 1 x, + 2 y, + 3 way
 TR_VAR_SLOT, TR_VAR_TYPE, TR_VAR_X, TR_VAR_Y, TR_VAR_DIR, TR_VAR_CTX = (0x0F000300 + i for i in range(6))
-assert all(burn_total(m, sh, f) >= f - 1e-4 for m in BURN_MOVES + (TR_ROW,) for sh in (False, True)
+assert all(burn_total(m, sh, f) >= f - 1e-4 for m in BURN_MOVES + (TR_ROW, SK_TOUCH_ROW) for sh in (False, True)
            for f in (BURN_MIN_TOTAL, BURN_MIN_TOTAL_OLD)), 'a burn under the floor'
-RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1', 'tiers', 'gmupd', 'skbody'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1', 'tiers', 'gmupd', 'skbody',
+                     'sktouch'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
 # swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose); burn v2:
 # + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2 - floor1); burn
 # v2.1: + floor1 (the burn floor 1 %, the user; burn v2's exe_v46z_gkb4 is RELEASE - floor1); skeleton v1.3: + tiers,
 # gmupd (exe_v46z_gkb6; burn v2.1 - aerial chain v1's exe_v46z_gkb5 is RELEASE - tiers - gmupd - skbody); skeleton v1.5:
-# + skbody (exe_v46z_gkb7; v1.3 / v1.4's gkb6 is RELEASE - skbody)
+# + skbody, sktouch (exe_v46z_gkb7; v1.3 / v1.4's gkb6 is RELEASE - skbody - sktouch)
 VARIANTS = (('A_release', RELEASE), ('G_pose', (RELEASE - {'sway'}) | {'pose'}))
 # v15: A_release (the release: the native swing, diag) and G_pose (v14's pose copy instead of the swing, in case); v14:
 # A_release (attack hitcheck burn skeleton pose) and E_sway (attack hitcheck burn skeleton sway); v13's D_parts dropped   # v13: each on the release's set (v3 - v12's hurtbox route, C_hurt, dropped:
@@ -1064,7 +1073,7 @@ tr_dcase:
 """
 
 
-def sk_source(D, old_hit, orig94, gmupd=False):
+def sk_source(D, old_hit, orig94, gmupd=False, sktouch=False):
     """skeleton v1: the Running Skeleton's native part (fighters/gekkouga/README.md "Skeleton v1")"""
     zero = '''
         lis r12, %(zero_hi)d
@@ -1217,7 +1226,12 @@ skf_burn:
         slwi r5, r4, 2
         addi r5, r5, 3
         lis r6, %(sk_row_hi)d
-        addi r6, r6, %(sk_row_lo)d
+        addi r6, r6, %(sk_row_lo)d''' + ('''
+        cmpwi r28, 1                    # skeleton v1.5 (sktouch): running: its contact hits' row
+        bne skf_brow
+        lis r6, %(sk_trow_hi)d
+        addi r6, r6, %(sk_trow_lo)d
+skf_brow:''' if sktouch else '') + '''
         bl burn_scan
 skf_out:
         lmw r20, 0x40(r1)
@@ -2910,6 +2924,9 @@ def build(rpx, diag=False, feats=None):
         p['gmgr_hi'], p['gmgr_lo'] = ha(GROUND_MGR), K.slo(GROUND_MGR)
         ski = [m[0] for m in burn_moves(feats)].index(SK_BURN_KEY)
         p['sk_row_hi'], p['sk_row_lo'] = ha(A['bmoves'] + 20 * ski), K.slo(A['bmoves'] + 20 * ski)
+        if 'sktouch' in feats:
+            sti = [m[0] for m in burn_moves(feats)].index(SK_TOUCH_KEY)
+            p['sk_trow_hi'], p['sk_trow_lo'] = ha(A['bmoves'] + 20 * sti), K.slo(A['bmoves'] + 20 * sti)
     if 'burn2' in feats:
         tri = [m[0] for m in burn_moves(feats)].index(TR_BURN_KEY)
         p['tr_row_hi'], p['tr_row_lo'] = ha(A['bmoves'] + 20 * tri), K.slo(A['bmoves'] + 20 * tri)
@@ -5202,7 +5219,7 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
-''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats) if 'burn2' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
+''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats) if 'burn2' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
 # ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
 gk_clear:
         li r0, 0''' + (('''

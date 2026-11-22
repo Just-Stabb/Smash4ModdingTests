@@ -1644,7 +1644,7 @@ def skeleton_checks(e, info, diag):
         e.mu.mem_write(p + 0x10, struct.pack('>2f', 60.0, 12.0))
         e.setw(acc + C.W_POSTURE, p)
         return dict(acc=acc, nodes=nodes, data=data, stop=stop, f=fk['f'])
-    near = (54.0, 20.0, 60.0, 25.0)
+    near = (52.0, 20.0, 58.0, 25.0)                       # (over both boxes: v1 - v1.4's x 44 - 56, v1.5's 46.5 - 53.5)
     far = (200.0, 0.0, 210.0, 5.0)
     e.mu.mem_write(other['f'] + 0x1E, b'\x00')
     e.setw(team + 8, 0)
@@ -1652,8 +1652,9 @@ def skeleton_checks(e, info, diag):
     e.hs_ret = 5
     frame()
     check('skeleton hit: slot 5\'s entry 0 over it: VAR_4 9 (its damage), VAR_9 1 hit, the place (its X 60 kept in the '
-          'box: 56, its Y 12 + 8 = 20)', [sv.get(v) for v in (C.SK_VAR_DMG, C.SK_VAR_HITS, C.SK_VAR_HX, C.SK_VAR_HY)],
-          [9.0, 1.0, 56.0, 20.0])
+          'box: 50 + %g, its Y 12 + 8 = 20)' % C.sk_dims(F)[0], [sv.get(v) for v in (C.SK_VAR_DMG, C.SK_VAR_HITS, C.SK_VAR_HX,
+                                                                                   C.SK_VAR_HY)],
+          [9.0, 1.0, 50.0 + C.sk_dims(F)[0], 20.0])
     check('skeleton hit: the attacker\'s hitlag (HITSTOP_FN on that hitbox, 5 frames on its StopModule)',
           ([c[1:3] for c in e.calls if c[0] == 'hitstop'], [c for c in e.calls if c[0] == 'sk_stop']),
           ([(a['acc'], a['data'])], [('sk_stop', a['stop'], 5, 1)]))
@@ -2095,7 +2096,21 @@ def burn2_checks(e, info, diag):
         return
     check('burn v2: its rows: burn v1\'s and the skeleton\'s, then the trail\'s (key 0x%X)' % C.TR_BURN_KEY,
           [struct.unpack('>I', bytes(e.mu.mem_read(A['bmoves'] + 20 * i, 4)))[0] for i in range(len(C.burn_moves(F)))],
-          [m[0] for m in C.BURN_MOVES] + [C.TR_BURN_KEY])
+          [m[0] for m in C.BURN_MOVES] + [C.TR_BURN_KEY] + ([C.SK_TOUCH_KEY] if 'sktouch' in F else []))
+    if 'sktouch' in F:
+        tr_ = C.SK_TOUCH_ROW
+        fl_ = C.burn_floor(F)
+        # one second of contact: a hit every 3 frames (SK_TOUCH_PERIOD), each an instance ticking its row
+        per = 3
+        hits = list(range(0, 60, per))
+        dmg = sum(tr_[1] for h0 in hits for t in range(h0 + tr_[2], h0 + tr_[3] + 1, tr_[2]))
+        alive = max(sum(1 for h0 in hits if h0 <= t < h0 + tr_[3]) for t in range(120))
+        check('skeleton v1.5 contact burn: 0.35 %% every 6 frames for 60 = %.2f %% a touch; 1 s of contact (a touch every %d '
+              'frames: 20) = %.1f %% (the user: ~70), at most %d instances at once (cap %d); shielded: %.3f %% a tick x %d = '
+              '%.2f %% (the floor)' % (C.burn_total(tr_), per, dmg, alive, C.BURN_CAP, C.burn_shield_damage(tr_, fl_),
+                                     C.burn_shield_frames(tr_) // tr_[2], C.burn_total(tr_, True, fl_)),
+              (round(C.burn_total(tr_), 3), round(dmg, 1), alive <= C.BURN_CAP, round(C.burn_total(tr_, True, fl_), 3)),
+              (3.5, 70.0, True, fl_))
     # ---- (1) the fire on a burning fighter
     for i in range(8):
         e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
