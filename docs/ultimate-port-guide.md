@@ -281,6 +281,31 @@ Emitter animations (EA**) and eft2's rotation order (Rx Ry Rz) and world gravity
 the down smash's columns parted and the converter's two bugs showed (catalogue). Still open: the dash's
 droplets fly higher in both columns than in Ultimate's footage.
 
+## Effect banks to rebuild: effect delay fix v1
+
+Every converted bank shipped before effect delay fix v1 has its delays in 0x448 (bug catalogue: "converted effects'
+delays"; `port_check` E16 errors on it). The user's call: fix each fighter **the next time it is worked on** (not
+now), unless it is a small job. The next package for any of these fighters ships a fixed bank. Two ways:
+
+- **patch** (only the timing fields change; the converter's other changes since the bank was built stay out):
+  `python3 tools/effect_delay_patch.py SHIPPED.ptcl OUT.ptcl --prefix PtcNAME --eff ULT_EFF [EF_COMMON_EFF]` on
+  the bank as installed (the newest package that holds it), then ship OUT as `fighter/NAME/effect/NAME/NAME.010d0000.ptcl`
+  (the .efc is unchanged). `--eff` checks every patched emitter's start against its Ultimate source (always pass it
+  for an Ultimate port: a bank already converted with the fix must not be patched);
+- **rebuild**: the fighter's own effects command (below) with the fixed converter, then its usual steps after it.
+
+Then `python3 tools/port_check.py NAME <install> <new package>`: no E16. Status per fighter:
+
+| fighter | bank | status / what the next work on it does |
+|---|---|---|
+| Byleth (`master`) | byleth_v8_fix.zip (unchanged through v19) | **fixed**: `byleth_effect_delay_fix_v1.zip` (the patch, 256 emitters, all checked against ef_master.eff / ef_common.eff; E16 clean). A later rebuild (`ultimate_port.py run master effects variants`) also brings eft2's count randoms (`eft_rate`: 33 of ef_master's 597 emitters have one) |
+| Hero (`brave`) | his newest effects package (fighters/brave/README.md) | **deferred**: patch with `--prefix PtcBrave --eff ef_brave.eff ef_common.eff`, or rebuild (fighters/brave/README.md "vfxb_to_ptcl.py HERO_FX/ef_brave.eff REFLET/effect/reflet ...", then `brave_build.py --bank`). An old bank seen here (`v8/brave`): 231 converted emitters with a start in 0x448, none in 0x44C. Inputs needed: the shipped bank, ef_brave.eff, ef_common.eff (not in this checkout's sources) |
+| Sephiroth (`edge`) | his newest effects package (fighters/edge/README.md) | **deferred**: patch with `--prefix PtcEdge --eff ef_edge.eff ef_common.eff`, or rebuild with `tools/edge_fx_build.py` (fighters/edge/README.md test 60), then `edge_specials_build.py`. Inputs needed: the shipped bank, ef_edge.eff, ef_common.eff |
+| Squirtle (`pzenigame`) | his newest effects package (fighters/pzenigame/README.md) | **deferred**: patch with `--prefix PtcPzenigame --eff ef_pzenigame.eff ef_common.eff`, or rebuild (fighters/pzenigame/README.md "vfxb_to_ptcl.py ef_pzenigame.eff ...", then `pzenigame_build.py --bank`). Inputs needed: the shipped bank, ef_pzenigame.eff, ef_common.eff |
+| Supamario (XV2, not a port) | `supamario_ultrainstinct_v14.zip` (his builds stack each move's sets on the previous install's bank) | **deferred**: patch the newest bank, `--prefix PtcSupamario` (no `--eff`: XV2 sources; the fixed `xv2_to_ptcl` never writes 0x448, so the patch can't misread a fixed set), and build the next move on the patched bank. v14's bank: 345 emitters with a start in 0x448 (1 - 42 frames). fighters/supamario/README.md "Effect delay fix v1" |
+| Incineroar (`gaogaen`), Steve (`pickel`) | none converted (their effects lists aren't built yet) | nothing to fix: their first effects build uses the fixed converter |
+| Greninja (`gekkouga`) | his own build (`gekkouga_fx.py`) | fixed in skeleton v1.3 (his bank writes 0x44C itself) |
+
 ## Bug catalogue
 
 Each row: the bug, where it happened, and what now stops it. `port_check` codes in brackets.
@@ -494,6 +519,7 @@ Each row: the bug, where it happened, and what now stops it. `port_check` codes 
 | armor from Ultimate's status code set once, inside a one-frame window of the motion (Aymr's `f >= 34 && f < 35`): in game no armor showed | Byleth v1 - v17 (user: "down special doesn't have its super armor from Ultimate") | the status armor put back every frame of the window (34 - 63; the turn keeps it), off after it and at every exit (`master.c master_lw_armor`; Sephiroth's held Octaslash does the same) [S32 armor: none = ERROR, one-frame windows only = WARN] |
 | a tether ledge box widened to Ultimate's AIR_LASSO (75 ahead, 85 up) with no reach test: the base's tether (ZSS's 0xF2: her whip thrown at the ledge GroundModule found) fired at a ledge ~85 from his hand, the whip fell short and 0xF2 (which leaves only by landing or the whip arriving) held him helpless to the blast line | Byleth v18 (user: "the tether will attempt to happen out of Byleth's range instead of just whiffing up special normally"; clip 066bddbd frames 137 - 170) | the ledge caught only when its corner (GroundModuleF(1) / (2)) is within the weapon's reach of his hand (param_sword reach_length_max 70: `master.c master_hi_reach`), in the check window and at a wall; the big box only on the check frames; 0xF2 gives up after 40 frames (`master_hi_f2_main`) [S34 tether-reach: no reach test = ERROR, the base's 0xF2 main = WARN] |
 | status motions' expression scripts (guard on / off, landings, footstools, down bounds) silent: Ultimate rumbles them from its common status code (the dumps' `// TODO: expression_GuardOnRumble();`), so the translator wrote Ultimate's slope-only script over the base's and the rumble was lost | Byleth v1 - v18 (user: "Byleth's shield on/off don't cause rumble like every other character's"); every port translated with `--expressions` (the same 58 TODO-only status motions in every dump) | `ultimate_acmd.keep_base_rumble` (translate_others): a status motion's script that rumbles nowhere gets the base's rumble at its frames (else the dump helper's from `rumble_helpers`); `tools/rumble_fix.py DUMP PORT BASE --fix` on an install [S35 status-rumble] |
+| converted effects' delays written into eft's 0x448 (the emission count's random, percent thinned an emission: cross_f `0x04A4B32C`) with 0 in the real delay 0x44C (emit start, `0x04A6507C`): every delayed part of an effect started on its first frame (a sequence popping at once), its counts thinned by its start %, and from 100 on it emitted only its frame-0 particle (Byleth's full-charge flare master_bowflare2 bow1_max, start 113) | every `vfxb_to_ptcl.py` / `xv2_to_ptcl.py` bank until effect delay fix v1 (Hero, Sephiroth, Squirtle, Byleth, Supamario; found on Greninja's skeleton v1.3: flipbook runs placed by start frame all spawned at 0) | `vfxb_to_ptcl.write_timing` / `xv2_to_ptcl.write_timing`: the start in 0x44C, the end on the same clock (start + duration), 0x448 0 or eft2's own count random (`eft_rate`); shipped banks: `tools/effect_delay_patch.py` (only those fields) or a rebuild (below, "Effect banks to rebuild"); `tools/effect_delay_test.py`; **port_check E16 emit-start** (ERROR: converted sets with count randoms and no emit start at all, or a count random of 100 % or more) |
 
 ## Open
 

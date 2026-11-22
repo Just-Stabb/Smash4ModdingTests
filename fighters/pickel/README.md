@@ -1,5 +1,8 @@
 # Steve (`pickel`)
 
+> Effect delay fix v1: no converted effect bank shipped yet, nothing to fix (his first effects build uses the fixed
+> `vfxb_to_ptcl.py`).
+
 A port of Ultimate's Steve (the user's `pickel.zip`: model/body c00-c07, motions, params, AI, the
 articles' models). New fighter kind `0x44`, character id 62, UI name `Steve` (subtitle
 "Minecraft"), base Pit. Trait: **Technical** (no preference given; docs/character-traits.md,

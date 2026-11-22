@@ -1,5 +1,13 @@
 # Hero (`brave`)
 
+> **Pending: effect delay fix v1** (docs/ultimate-port-guide.md "Effect banks to rebuild"). His shipped effect bank was
+> converted before the fix: each part's start delay sits in eft's 0x448 (the emission count's random), so every
+> delayed part of an effect starts on its first frame, thinned (`port_check` E16: ERROR). The next time Hero is worked
+> on, ship a fixed bank: `python3 tools/effect_delay_patch.py BANK.ptcl OUT.ptcl --prefix PtcBrave --eff ef_brave.eff
+> ef_common.eff` on his newest shipped `brave.010d0000.ptcl` (only the timing fields change), or rebuild it (the
+> `vfxb_to_ptcl.py HERO_FX/ef_brave.eff REFLET/effect/reflet ...` command below, then `brave_build.py --bank`).
+> Inputs: that bank, Ultimate's ef_brave.eff and ef_common.eff.
+
 A port of Ultimate's Hero (the user's `brave.zip`: model/body c00-c07, motions, params, AI, the
 articles). New fighter kind `0x45`, character id 63, UI name `Hero` (subtitle "The Luminary"),
 base Robin. Trait: **Shooter** (no preference given; docs/character-traits.md,

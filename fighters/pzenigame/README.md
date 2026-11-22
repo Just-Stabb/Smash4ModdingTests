@@ -1,5 +1,13 @@
 # Squirtle (`pzenigame`)
 
+> **Pending: effect delay fix v1** (docs/ultimate-port-guide.md "Effect banks to rebuild"). His shipped effect bank was
+> converted before the fix: each part's start delay sits in eft's 0x448 (the emission count's random), so every
+> delayed part of an effect starts on its first frame, thinned (`port_check` E16: ERROR). The next time Squirtle is
+> worked on, ship a fixed bank: `python3 tools/effect_delay_patch.py BANK.ptcl OUT.ptcl --prefix PtcPzenigame --eff
+> ef_pzenigame.eff ef_common.eff` on his newest shipped `pzenigame.010d0000.ptcl` (only the timing fields change), or
+> rebuild it (the `vfxb_to_ptcl.py ef_pzenigame.eff ...` command below, then `pzenigame_build.py --bank`). Inputs:
+> that bank, Ultimate's ef_pzenigame.eff and ef_common.eff.
+
 A port of Ultimate's Squirtle (the user's `pokemon-trainer-SSBU` zip, folder `pzenigame`:
 model/body c00-c07, the `water` / `waterfall` article models, motion/body/c00, `vl.prc`,
 `expression_vl.prc`, AI). New fighter kind `0x46`, character id 64, UI name `Squirtle` (subtitle

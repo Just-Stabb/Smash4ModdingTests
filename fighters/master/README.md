@@ -1,5 +1,12 @@
 # Byleth (`master`)
 
+> **Effect delay fix v1** (docs/ultimate-port-guide.md "Effect banks to rebuild"): his bank (byleth_v8_fix, unchanged
+> through v19) had every part's start delay in eft's 0x448 (the emission count's random): delayed parts started at
+> once, thinned, and Failnaught's full-charge flare (start 113) emitted one frame. `byleth_effect_delay_fix_v1.zip`
+> (scratchpad) ships it patched (`tools/effect_delay_patch.py --prefix PtcMaster --eff ef_master.eff ef_common.eff`:
+> 256 emitters, each checked against its source; only 0x448 / 0x44C / 0x450 change; `port_check` E16 clean). Not in
+> it: eft2's count randoms (`vfxb_to_ptcl.eft_rate`), which the next effects rebuild brings. Unconfirmed in game.
+
 A port of Ultimate's Byleth (internal name `master`) to Smash 4, on **Zero Suit Samus's base** (`szerosuit`, kind
 0x19). New fighter kind **`0x47`**, character id **65**, UI name `Byleth` (subtitle "A Heroic Legacy": Ultimate's own
 string for him, `msg_menu.msbt` `mnu_standard_sub_master`; Ultimate has no other per-fighter subtitle), texture-id block `0x40C70000` (`reference/port_bases.json` `_texture_ids`). Trait: **Strike** (the user's

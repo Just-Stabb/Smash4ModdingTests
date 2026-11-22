@@ -1,5 +1,8 @@
 # Incineroar (`gaogaen`)
 
+> Effect delay fix v1: no converted effect bank shipped yet, nothing to fix (his first effects build uses the fixed
+> `vfxb_to_ptcl.py`).
+
 A port of Ultimate's Incineroar (the user's `gaogaen.zip`: model/body c00-c07, the articles'
 models (championbelt, monsterball, rope, rope2), motions, params, AI). New fighter kind `0x43`,
 character id 61, UI name `Incineroar` (subtitle "Heel Pokémon"), base Bowser. Trait:

@@ -3953,6 +3953,9 @@ MSC on a bunshin-based kind, the 4-shape group.
   `0x04A65378`). Skeleton v1.2 - aerial chain v1 put a flipbook's second run's start in +0x448: it was born at 0 with
   the first (two cells drawn at once), its re-births thinned, and nothing drawn from the first run's end to the next
   period (57 - 109 for the skeleton: the clip's ~1 s seen, ~0.8 s gone). `tools/gekkouga_fx_test.py eft_timing` models it.
+  Effect delay fix v1: `vfxb_to_ptcl.py` / `xv2_to_ptcl.py` (`write_timing`) put their starts in +0x44C and the end at
+  start + duration; eft2's count random goes to +0x448 as the same range (`eft_rate`); the banks built before:
+  `tools/effect_delay_patch.py`, `port_check` E16 (docs/ultimate-port-guide.md "Effect banks to rebuild").
 - **The hydrant's GroundModule frame update (skeleton v1.3)**: the weapon update switch (`0x02B6B7A8`, case = 0x02B6B7C4 +
   4 x base kind) runs a per-kind template; the hydrant's (0x12D: `0x02BA993C`) ends with `0x02BA98F4`: `0x02B38AD0([acc
   +0x2C])` = `0x02C34258` (the GroundModule's base frame update: [gm+0x14]+0x18 vt +0x74, its +0x18 object's

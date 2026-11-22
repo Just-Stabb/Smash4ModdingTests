@@ -37,8 +37,9 @@ Mapping (eft2 v22 -> eft 0x42), per emitter, from a template emitter, as tools/x
   dissolve (custom shader 8, dissolve_of: the threshold in a colour track, the mask in texture 0);
 - meshes: the particle's 3D scale baked into the mesh, the emitter's scale 1 (x the animation);
 - scale: the particle scale x the scale keys (3-key fit), random % -> fraction;
-- life (+ random % -> frames; infinite -> 0x7FFFFFFF, emitted once), emission (start, duration when one-time, else
-  forever, interval, rate), velocity (all-direction -> figure velocity, designated direction x
+- life (+ random % -> frames; infinite -> 0x7FFFFFFF, emitted once), emission (start -> eft's emit start 0x44C,
+  end = start + duration when one-time, else forever, interval, rate; the count random % -> eft's 0x448 with the
+  rate raised to its top: eft_rate), velocity (all-direction -> figure velocity, designated direction x
   scale -> emitter velocity / direction, diffusion angle, random %), gravity (scale x direction),
   air resistance, volume (same 0-14 shape list; radius x form scale), rotation (init / random /
   add, radians), the emitter transform (translate / rotate / scale); the fade when turned off
@@ -2421,14 +2422,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         # buffer from life x rate / interval, unbounded for an endless emitter)
         one, ems = True, dict(ems, duration=1)
         notes.append('infinite life: emitted once')
-    p.set_field(em, 'start_frame', int(ems['start']))
-    p.set_field(em, 'end_frame', max(1, int(ems['duration'])) if one else FOREVER)
-    p.set_field(em, 'one_time', 1 if one else 0)
-    p.set_field(em, 'emit_start', 0)
-    p.set_field(em, 'emit_interval', int(ems['interval']))
-    # the same random gap in both (eft2 main.bin 0x88750, eft cross_f 0x04A65350: + (rand x it) >> 32)
-    p.set_field(em, 'emit_interval_random', max(0, int(ems['interval_random'])))
-    p.set_field(em, 'emit_rate', float(max(ems['rate'], 0.01)) * (line[0] if line is not None else 1))
+    write_timing(p, em, ems, one, float(max(ems['rate'], 0.01)) * (line[0] if line is not None else 1))
     life = FOREVER if pt['infinite_life'] else max(1, int(pt['life']))
     life_rand = 0
     if life != FOREVER and pt['life_random'] > 0:
@@ -2480,6 +2474,7 @@ def convert_emitter(p, e, names, images, notes, templates, prims, prim_index, as
         anims = [a for a in anims if a['target'] != 0]
         p.set_field(em, 'emit_interval', 0)
         p.set_field(em, 'emit_rate', float(max(1, max(n for _f, n in dist))))
+        p.set_field(em, 'emit_rate_random', 0)       # (the counts are the path's: no random on them)
         anims.append({'target': 0, 'loop': 0, 'keys': [(float(f), float(n)) for f, n in dist]})
         notes.append('distance emission (unit %g): %d particles over its path, as rate keys' % (
             e['emission']['dist_unit'], sum(n for _f, n in dist)))
@@ -2629,6 +2624,42 @@ def universal_shader(p, em, e, vfxb_bytes, images, prims, prim_index, notes):
         ' sRGB' if any(e['sampler'][s_]['texture_id'] in SRGB_TEXTURES for s_ in info['samplers']) else '',
         encode, ', premultiplied' if premult else '') + (', soft-particle depth fade (t13)' if info['depth'] else ''))
     return True
+
+
+def eft_timing(ems):
+    """(eft emit start 0x44C, eft2 count random as a fraction) of eft2 emission ems. eft2 waits `start` frames
+    after the effect is made, then emits for `duration` frames (one-time); eft's emitter waits until its frame
+    (t: 0 at the set's creation, cross_f 0x04A64F00) reaches 0x44C (0x04A6507C) and, one-time, emits until t passes
+    0x450 on the same clock (0x04A64F70): the start goes to 0x44C, the end to start + duration"""
+    return max(0, int(ems['start'])), max(0, int(ems.get('rate_random', 0))) / 100
+
+
+def write_timing(p, em, ems, one, rate):
+    """eft2 emission ems as emitter em's timing: the delay in eft's emit start (0x44C), the end frame on the same
+    clock (start + duration, one-time; else 0x7FFFFFFF), interval and its random, rate (eft2's rate x what the
+    conversion multiplied it by) and the count random (0x448, eft_rate). 0x448 is the count's random, not a start
+    (Greninja skeleton v1.3): until effect delay fix v1 the start went there with 0 in 0x44C, so every delayed
+    emitter began with the effect (sequences popping at once) and its counts were thinned by start %"""
+    start, rate_random = eft_timing(ems)
+    p.set_field(em, 'emit_start', start)
+    p.set_field(em, 'end_frame', start + max(1, int(ems['duration'])) if one else FOREVER)
+    p.set_field(em, 'one_time', 1 if one else 0)
+    p.set_field(em, 'emit_interval', int(ems['interval']))
+    # the same random gap in both (eft2 main.bin 0x88750, eft cross_f 0x04A65350: + (rand x it) >> 32)
+    p.set_field(em, 'emit_interval_random', max(0, int(ems['interval_random'])))
+    rate, rate_random = eft_rate(rate, rate_random)
+    p.set_field(em, 'emit_rate', rate)
+    p.set_field(em, 'emit_rate_random', rate_random)
+
+
+def eft_rate(rate, rate_random):
+    """(eft rate 0x444, eft count random 0x448 in percent) for eft2's rate and its count random (a fraction).
+    eft2 adds rate x it x U(0, 1) particles an emission (main.bin 0x8D408: rate .. rate (1 + it)); eft takes
+    rate x (1 - U(0, 1) x 0x448 / 100) (cross_f 0x04A4B32C: rate' (1 - r') .. rate'): the same range with
+    rate' = rate (1 + it), r' = 100 it / (1 + it). 0 without one (0x448 is never a start frame)"""
+    if rate_random <= 0:
+        return float(rate), 0
+    return float(rate * (1 + rate_random)), int(round(100 * rate_random / (1 + rate_random)))
 
 
 def dist_emission(e):

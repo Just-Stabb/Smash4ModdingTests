@@ -1640,7 +1640,9 @@ def check_body_effect_leaks(inst, name, rec, rep):
             end_, life = pt.field(d, 'end_frame'), pt.field(d, 'ptcl_life')
             if end_ >= 0x7FFFFFFF or life >= 0x7FFFFFFF:
                 return 1 << 30
-            best = max(best, pt.field(d, 'start_frame') + end_ + life)
+            # (the end frame is on the emit start's clock, 0x04A64F70: emission + life from the set's creation;
+            # 0x448 is the count's random, not a start: effect delay fix v1)
+            best = max(best, max(end_, pt.field(d, 'emit_start')) + life)
         return best
     msc = os.path.join(ROOT, 'fighters', name, name + '.c')
     killed = set()
@@ -2943,6 +2945,57 @@ def check_effects(inst, name, rep):
                     'while it stands still: %s' % (len(follow), ', '.join(follow[:8])))
 
 
+def emit_start_findings(p, own):
+    """E16 (effect delay fix v1): ([converted emitters with a count random of 100 % or more], [converted emitters with
+    a count random but no emit start], converted emitters with an emit start) for ptcl p; own: the converted sets'
+    name prefix. eft's 0x448 is the emission count's random (each emission rate x (1 - U x it / 100), cross_f
+    0x04A4B32C), the delay 0x44C (0x04A6507C): vfxb_to_ptcl / xv2_to_ptcl wrote eft2's / XV2's start frames into 0x448
+    and 0 into 0x44C until the fix (Greninja skeleton v1.3 found it in game): a bank built so has no converted emit
+    start at all (about 38 % of Ultimate's emitters have a delay: ef_master, ef_common) and a count random on every
+    delayed emitter"""
+    over, no_start, started = [], [], 0
+    for si in range(len(p.sets)):
+        if not p.set_name(si).startswith(own):
+            continue
+        for x in p.sets[si]['emitters']:
+            d = x['data']
+            if d is None:
+                continue
+            label = '%s/%s' % (p.set_name(si), p.emitter_name(d))
+            r, st = p.field(d, 'emit_rate_random'), p.field(d, 'emit_start')
+            if r >= 100 or r < 0:
+                over.append('%s (%d)' % (label, r))
+            elif r > 0 and st == 0:
+                no_start.append('%s (%d)' % (label, r))
+            started += st > 0
+    return over, no_start, started
+
+
+def check_emit_start(inst, name, rep):
+    """E16 emit-start: the port's converted effects built with their delays in eft's 0x448 (the emission count's
+    random) instead of 0x44C (the emit start): every delayed emitter starts with the effect (a sequence pops at
+    once) and its counts are thinned by its start % (from 100 on, it emits only the first frame's one). ERROR when
+    the converted sets have count randoms and not one emit start (a bank built before effect delay fix v1:
+    reconvert with vfxb_to_ptcl.py), or a count random of 100 % or more (no emission left). A count random on an
+    undelayed emitter is eft2's own (vfxb_to_ptcl.eft_rate) once the bank has emit starts: not flagged"""
+    import ptcl
+    own = 'Ptc' + name[:1].upper() + name[1:]
+    for path in inst.glob(r'fighter/%s/effect/[^/]+/[^/]+\.ptcl' % re.escape(name)):
+        try:
+            p = ptcl.Ptcl(inst.get(path))
+        except Exception:                     # noqa: BLE001
+            continue
+        over, no_start, started = emit_start_findings(p, own)
+        if over:
+            rep.add('ERROR', 'E16 emit-start', '%s: %d converted emitters with an emission count random (0x448) of '
+                    '100 %% or more (a start frame written there): they emit nothing after their first frame; '
+                    'reconvert with vfxb_to_ptcl.py: %s' % (path, len(over), ', '.join(over[:8])))
+        if no_start and not started:
+            rep.add('ERROR', 'E16 emit-start', '%s: converted with the delays in 0x448 (the count random) and none in '
+                    '0x44C (emit start; effect delay fix v1): every delayed emitter starts at once, thinned; reconvert '
+                    'with the fixed vfxb_to_ptcl.py (%d emitters: %s)' % (path, len(no_start), ', '.join(no_start[:8])))
+
+
 def check_vec_targets(src, name, ult, rep):
     """S10: every move whose Ultimate game script carries the hit fighter to a point (angle 368 +
     AttackModule::set_vec_target_pos) has its MSC pull. Smash 4 has no such hitbox field (366 / 367 only take the victim
@@ -4000,6 +4053,7 @@ def main():
     check_sound_ids(inst, a.name, rep)
     check_sound_bank_ids(inst, a.name, kind, vanilla, rep)
     check_effects(inst, a.name, rep)
+    check_emit_start(inst, a.name, rep)
     check_effect_heap(inst, a.name, rep)
     check_cave_hooks(inst, rep)
     check_effect_scripts(src, base['ult'], rep)

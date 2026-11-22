@@ -1,5 +1,13 @@
 # Sephiroth (`edge`)
 
+> **Pending: effect delay fix v1** (docs/ultimate-port-guide.md "Effect banks to rebuild"). His shipped effect bank was
+> converted before the fix: each part's start delay sits in eft's 0x448 (the emission count's random), so every
+> delayed part of an effect starts on its first frame, thinned (`port_check` E16: ERROR). The next time Sephiroth is
+> worked on, ship a fixed bank: `python3 tools/effect_delay_patch.py BANK.ptcl OUT.ptcl --prefix PtcEdge --eff
+> ef_edge.eff ef_common.eff` on his newest shipped `edge.010d0000.ptcl` (only the timing fields change), or rebuild it
+> with `tools/edge_fx_build.py` (test 60's command), then `edge_specials_build.py`. Inputs: that bank, Ultimate's
+> ef_edge.eff and ef_common.eff.
+
 A port of Ultimate's Sephiroth (the user's files: `edge.zip` in their Drive: `model/body/c00-c07`,
 `motion/body` 367 nuanmb, `param/vl.prc`, AI params). New fighter kind `0x42`, character id 60,
 UI name `Sephiroth`, base Zelda (`tools/extra_kinds.json`; docs/kind-expansion.md). Trait:

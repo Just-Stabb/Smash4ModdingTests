@@ -1,5 +1,15 @@
 # Supamario MSC
 
+> **Pending: effect delay fix v1** (docs/ultimate-port-guide.md "Effect banks to rebuild"). His XV2 effects were
+> converted by `xv2_to_ptcl.py` before the fix: each node's start delay sits in eft's 0x448 (the emission count's
+> random), so every delayed part starts on the effect's first frame, thinned (`supamario_ultrainstinct_v14.zip`'s bank:
+> 345 emitters, delays 1 - 42 frames). His builds stack each move's sets on the previous install's bank, so a rebuild
+> of one move doesn't fix the others: the next time he is worked on, patch the newest bank first,
+> `python3 tools/effect_delay_patch.py supamario.010d0000.ptcl OUT.ptcl --prefix PtcSupamario` (no `--eff`: the fixed
+> `xv2_to_ptcl` never writes 0x448, so no set built since can be misread), build the next move on OUT and ship it.
+> Check in game that the auras / hit effects tuned on the old timing (Ultra Instinct, Time Skip, God Fist) still read
+> as intended now that their parts come in order.
+
 `supamario.c`: Supamario's decompiled MSC (first commit: the v5 package's `supamario.mscsb` as
 decompiled; a copy of Mario's, without the universal mechanics until `supamario_universal_v1` below). Built by
 `tools/supamario_kame_build.py`, which replaces the `KAME_*` names and the Super God Fist's `GF_*` (`--msc-only OUT.mscsb`: only this file, without

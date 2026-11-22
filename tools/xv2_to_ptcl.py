@@ -336,6 +336,24 @@ def schedule(times, loops):
     return start, end, max(0, gap - 1), rate
 
 
+def write_timing(p, em, start, end, interval, rate):
+    """schedule()'s (start, end, interval, rate) as emitter em's timing. eft: the emitter's first emission is
+    emit_start (0x44C) frames after the set is made (0x04A6507C); with one_time it emits until that same clock passes
+    end_frame (0x04A64F70: not a duration after the start), else until it is killed; the particle buffer is sized
+    from end - emit start for one_time emitters (0x04A5BEA8), so a one_time emitter must have a finite end (all 7982
+    vanilla emitters: one_time <=> finite end; test 4 crashed with template one_time flags left on looping
+    emitters). 0x448 is the count's random (percent thinned an emission), not a start frame: XV2 has no count random,
+    so 0 (until effect delay fix v1 the start went there: every delayed node began at once, its counts thinned by
+    start %)"""
+    start = max(0, int(start))
+    p.set_field(em, 'emit_rate_random', 0)
+    p.set_field(em, 'emit_start', start)
+    p.set_field(em, 'end_frame', FOREVER if end == FOREVER else start + max(1, int(end - start)))
+    p.set_field(em, 'one_time', 0 if end == FOREVER else 1)
+    p.set_field(em, 'emit_interval', int(interval))
+    p.set_field(em, 'emit_rate', float(rate))
+
+
 def convert_emission(p, pkg, images, chain, unit, name, spawn_times):
     node = chain[-1]
     kind = emission_kind(node)
@@ -440,17 +458,7 @@ def convert_emission(p, pkg, images, chain, unit, name, spawn_times):
     # ---- timing
     loops = any('Loop' in n['NodeFlags_names'] for n in chain)
     start, end, interval, rate = schedule(spawn_times.get(id(node), []), loops)
-    # eft: the emitter starts start_frame after the set; it emits while (frames since its start)
-    # is below end_frame (a duration, 0x04A64F70) when one_time is set, else until it is killed;
-    # the particle buffer is sized from the duration for one_time emitters (0x04A5BEA8), so a
-    # one_time emitter must have a finite end (all 7982 vanilla emitters: one_time <=> finite end;
-    # test 4 crashed with template one_time flags left on looping emitters)
-    p.set_field(em, 'start_frame', int(start))
-    p.set_field(em, 'end_frame', FOREVER if end == FOREVER else max(1, int(end - start)))
-    p.set_field(em, 'one_time', 0 if end == FOREVER else 1)
-    p.set_field(em, 'emit_start', 0)
-    p.set_field(em, 'emit_interval', int(interval))
-    p.set_field(em, 'emit_rate', float(rate))
+    write_timing(p, em, start, end, interval, rate)
     p.set_field(em, 'ptcl_life', max(1, int(node['Lifetime']) + cone_extra))
     p.set_field(em, 'ptcl_life_random', int(node['Lifetime_Variance']))
 
@@ -645,8 +653,7 @@ def main():
             d = q.sets[si]['emitters'][[c[1] for c in chunk].index(en)]['data']
             print('   %-22s pt%d bl%d life %3d frames %d..%s every %d x%.3g  scale %s  %s' % (
                 en, q.field(d, 'particle_type'), q.field(d, 'blend_type'), q.field(d, 'ptcl_life'),
-                q.field(d, 'start_frame'), 'inf' if q.field(d, 'end_frame') == FOREVER
-                else q.field(d, 'start_frame') + q.field(d, 'end_frame'),
+                q.field(d, 'emit_start'), 'inf' if q.field(d, 'end_frame') == FOREVER else q.field(d, 'end_frame'),
                 q.field(d, 'emit_interval'), q.field(d, 'emit_rate'),
                 '%.2gx%.2g' % tuple(q.field(d, 'scale')), '; '.join(sorted(set(notes)))))
     for line in log:
