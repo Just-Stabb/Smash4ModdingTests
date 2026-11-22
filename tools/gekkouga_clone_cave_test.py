@@ -1106,7 +1106,8 @@ def burn_checks(e, info, diag):
               [(m[0], round(C.burn_total(m, True, fl), 4), m[1] * C.BURN_SHIELD_DAMAGE * (C.burn_shield_frames(m) // m[2]) < fl)
                for m in rows_all],
               [(95, 2.8, False), (99, 2.8, False), (101, 2.8, False), (105, 1.0, True), (104, 1.0, True),
-               (C.SK_BURN_KEY, 6.3, False)] + ([(C.TR_BURN_KEY, 1.0, True)] if 'burn2' in F else []))
+               (C.SK_BURN_KEY, 6.3, False)] + ([(C.TR_BURN_KEY, 1.0, True)] if 'burn2' in F else []) +
+              ([(C.SK_TOUCH_KEY, 1.0, True)] if 'sktouch' in F else []))
     if 'burn' not in F:
         check('burn: without "burn": no burn code', 'burn_him' in lab, False)
         return
@@ -1659,8 +1660,8 @@ def skeleton_checks(e, info, diag):
           ([c[1:3] for c in e.calls if c[0] == 'hitstop'], [c for c in e.calls if c[0] == 'sk_stop']),
           ([(a['acc'], a['data'])], [('sk_stop', a['stop'], 5, 1)]))
     if diag:
-        check('skeleton diag: S4SH (owner 3, attacker 0x05, hitbox 0, 90, HP left 160, at 56, 20)', logs('gk_fsh'),
-              [(3, 5, 0, 90, 160, 56, 20)])
+        check('skeleton diag: S4SH (owner 3, attacker 0x05, hitbox 0, 90, HP left 160, at 50 + %g, 20)' % C.sk_dims(F)[0],
+              logs('gk_fsh'), [(3, 5, 0, 90, 160, int(50 + C.sk_dims(F)[0]), 20)])
     for _ in range(3):
         frame()
     check('skeleton hit: the same attack (its hitbox still on) 3 more frames: no more damage', sv[C.SK_VAR_DMG], 9.0)

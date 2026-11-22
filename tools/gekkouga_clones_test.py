@@ -1996,17 +1996,19 @@ def script_tests(out, user):
     check('v4: the clone has his smash effects too (their True branches), at his sizes (x5: the water sword / flash 5.0; '
           'clone fixes v1: every effect request of them)', (len(sizes) >= 8, sizes == his, 5.0 in sizes), (True, True, True))
     sw = [c for nm in GB.SMASH_SCRIPTS for c in ce.scripts.get(zlib.crc32(nm.encode()), []) if c.name == 'Sword_Glow']
+    lh = 23 if GB.CLONE_JOINT_FIX.get(25) == 'LHaveN' else 24
     check('v4: ... its trails 5x long (Y2 -55) on its sword joints (0x7D0 + 24: his joint 24 RHaveN; clone fixes v2: his '
-          'joint 25, ThrowN by model.jtb, on the clone\'s LHaveN, 0x7D0 + 23)',
+          'joint 25, ThrowN by model.jtb, on the clone\'s %s, 0x7D0 + %d; v1.5: the right hand, confirmed in game)' % (
+              GB.CLONE_JOINT_FIX.get(25), lh),
           sorted({(int(c.params[c.info['syntax'].index('Bone2')]), round(float(c.params[c.info['syntax'].index('Y2')]), 2))
-                  for c in sw}), [(0x7D0 + 23, -55.0), (0x7D0 + 24, -55.0)])
+                  for c in sw}), sorted({(0x7D0 + lh, -55.0), (0x7D0 + 24, -55.0)}))
     j25 = sorted({(n, c.name, int(c.params[c.info['syntax'].index('Bone')])) for n in ('attackairf', 'attackhi4', 'specialnhold')
                   for c in ce.scripts.get(zlib.crc32(n.encode()), []) if 'Bone' in c.info['syntax'] and
                   c.name in ('External_Graphic', 'Graphic_Effect2')})
     check('clone fixes v2 (the user: the clones\' forward air sword / trail hang down): his joint-25 effects (the water sword, '
-          'its flames, the smashes\' second sword) on the clone\'s left hand (0x7D0 + 23), not its still ThrowN (0x7D0 + 25); '
-          'TEST_ONLY_DATA clone_sword_rhave / clone_sword_thrown the alternatives',
-          sorted({b_ for _n, _c, b_ in j25 if b_ >= 0x7D0}), [0x7D0 + 23, 0x7D0 + 24])
+          'its flames, the smashes\' second sword) on the clone\'s %s (0x7D0 + %d), not its still ThrowN (0x7D0 + 25)%s' % (
+              GB.CLONE_JOINT_FIX.get(25), lh, ' (v1.5: the right hand, the user: "HaveR fixed the sword")' if lh == 24 else ''),
+          sorted({b_ for _n, _c, b_ in j25 if b_ >= 0x7D0}), sorted({0x7D0 + lh, 0x7D0 + 24}))
     check('the clone has his forward smash, his jab, his up air (the loop)',
           all(zlib.crc32(n.encode()) in cg.scripts for n in ('attacks4', 'attack11', 'attackairhi')), True)
     mt0 = open(os.path.join(user, 'body', 'motion.mtable'), 'rb').read()

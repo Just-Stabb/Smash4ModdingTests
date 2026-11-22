@@ -174,10 +174,11 @@ def param(c, name):
     return c.info['syntax'].index(name)
 
 
-CLONE_JOINT_FIX = {25: 'LHaveN'}   # clone fixes v2: his joint 25 is model.jtb table 0's ThrowN, which no motion moves (his
+CLONE_JOINT_FIX = {25: 'RHaveN'}   # clone fixes v2: his joint 25 is model.jtb table 0's ThrowN, which no motion moves (his
                                    # sword / shuriken / smash swords follow it, and sweep on him: something native moves it);
-                                   # on the clones his left hand: the smashes' two swords are 24 (RHaveN) and 25, the
-                                   # shuriken is charged on 25 (TEST_ONLY_DATA: the right hand, and ThrowN as before)
+                                   # on the clones his right hand. Skeleton v1.4 shipped the left hand with TEST_ONLY_DATA
+                                   # clone_sword_rhave / clone_sword_thrown; confirmed in game (the user: "HaveR fixed the
+                                   # sword"): the right hand, released in skeleton v1.5
 
 
 def bone_map(jtb_bytes, vbn_path, fix=None):
@@ -508,7 +509,7 @@ def add_rolloff(game):
 # are model.jtb table 0's entry 25 = ThrowN, which no motion of his moves (main.pac's track constant, no part pac has it),
 # so the clone's copy stays still; on him something native moves it (not found). TEST_ONLY_DATA/<name>: the clone's
 # effect.bin with joint 25 on one of his hands instead, for the user to pick
-CLONE_JOINT25_TESTS = (('clone_sword_rhave', 'RHaveN'), ('clone_sword_thrown', 'ThrowN'))
+CLONE_JOINT25_TESTS = ()          # (skeleton v1.4: clone_sword_rhave / clone_sword_thrown; settled: none)
 
 
 def cmd_acmd(user_dir, vanilla_model, out_dir, test_only=None):

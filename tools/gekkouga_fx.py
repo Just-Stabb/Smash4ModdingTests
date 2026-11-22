@@ -55,8 +55,10 @@ SK_BOOM_WIDEST_U = 0.84            # hitbox's 22 radius x 2
 SK_BOOM_BASE_V = 0.895             # its base (alpha >= 0.5's lowest row, every cell): on the ground
 SK_HIT_W = 18.0                    # a hit's sparks: the quad 18 units across (centred on the hit)
 SK_SPINE_X = 2.2                   # skeleton v1.5: its spine (the bones' median, over the 55 cells) this far ahead of the
-                                   # picture's centre: the billboard is shifted back by it so the body sits on the article
-                                   # (its box, tools/gekkouga_clone_cave.py SK_BODY, centred on it); the left set the other way
+                                   # picture's centre (along its way): the billboard is shifted back by it so the body sits on
+                                   # the article (its box, tools/gekkouga_clone_cave.py SK_BODY, centred on it). The skeleton
+                                   # turns its model by its way (PostureModule 0 / 2): joint 0's local +Z is ahead, so both
+                                   # sets (right, and left mirrored) move along local Z by -SK_SPINE_X
 
 # ---- burn v2: fire (the luma-matted footage, additive: fire on black). Heights of the quad; widths from the cell's shape
 FIRE_BODY_H = 30.0                 # on a burning fighter (fire_small_4): its base on his feet (TransN), ~16 of flame, ~21 wide
@@ -183,8 +185,8 @@ def _sk_sets():
     boom = dict(atlas='explosion_simple_24', blend=0, size=(bw, bw * (1024 / 6) / (1024 / 7)))
     boom['offset'] = (0.0, (SK_BOOM_BASE_V - 0.5) * boom['size'][1])
     hit = dict(atlas='impact_sparks', blend=0, size=(SK_HIT_W, SK_HIT_W), offset=(0.0, 0.0))
-    return [('PtcGekkougaSkeletonR', dict(body, mirror=False, offset=(-SK_SPINE_X, body['offset'][1]))),
-            ('PtcGekkougaSkeletonL', dict(body, mirror=True, offset=(SK_SPINE_X, body['offset'][1]))),
+    return [('PtcGekkougaSkeletonR', dict(body, mirror=False, offset_z=-SK_SPINE_X)),
+            ('PtcGekkougaSkeletonL', dict(body, mirror=True, offset_z=-SK_SPINE_X)),
             ('PtcGekkougaSkeletonHit', hit),
             ('PtcGekkougaSkeletonBoom', boom)]
 
@@ -460,7 +462,7 @@ def flip_emitters(p, tmpl, name, spec):
             p.set_emitter_srt(em, translation=(BLADE_EDGE[0], -fl['y'] + (feet_cell_v(fl['atlas']) - 0.5) * spec['size'][1],
                                                BLADE_EDGE[1]))
         else:
-            p.set_emitter_srt(em, translation=(spec['offset'][0], spec['offset'][1], 0.0))
+            p.set_emitter_srt(em, translation=(spec['offset'][0], spec['offset'][1], spec.get('offset_z', 0.0)))
         t = run['table']
         VP.set_flipbook(em, MODE, {'uv_div': [nx, ny]},
                         {'num': len(t), 'num_random': 1, 'table': t + [0] * (TABLE - len(t)), 'frequency': k})
