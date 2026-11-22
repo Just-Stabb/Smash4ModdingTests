@@ -1408,7 +1408,10 @@ def skeleton_checks(e, info, diag):
     e.setw(mgr + 0x30, 0xABC0)
     gm = e.alloc(0x200, b'\0')
     e.setw(gm, C.SK_GM_VT)
-    ground = e.alloc(0x200, b'\0')
+    ground = e.alloc(0x200, b'\0')                   # its handle: +0 the ground (+0x34 its vertex count), +0x160 id
+    gobj = e.alloc(0x100, b'\0')
+    e.setw(ground, gobj)
+    e.setw(gobj + 0x34, 4)
 
     def res_get(e_):
         calls.append(('res_get', e_.r(3), e_.r(5), e_.r(6), e_.r(7)))
@@ -1493,11 +1496,11 @@ def skeleton_checks(e, info, diag):
     def logs(fmt):
         return [x[1:8] for x in e.osr_full if x[0] == A[fmt]] if diag else []
     # its start
-    sv.update({0x0F000300 + v: 9.0 for v in range(11)})
+    sv.update({0x0F000300 + v: 9.0 for v in range(13)})
     del calls[:]
     e.call(lab['sk_start'], 0, weapon, 0)
-    check('skeleton start: a last life\'s grounds removed (its GroundModule: the hydrant\'s class), VARs 0-10 = 0',
-          (calls, [sv[0x0F000300 + v] for v in range(11)]), ([('col_free', gm)], [0.0] * 11))
+    check('skeleton start: a last life\'s grounds removed (its GroundModule: the hydrant\'s class), VARs 0-12 = 0',
+          (calls, [sv[0x0F000300 + v] for v in range(13)]), ([('col_free', gm)], [0.0] * 13))
     # the claim: him (slot 3, Greninja) asked for one at (40, 12), facing left
     me = e.fighter(2)
     e.mu.mem_write(me['f'] + 0x1E, b'\x04')
@@ -1530,15 +1533,36 @@ def skeleton_checks(e, info, diag):
     check('skeleton collision: VAR_6 = 1 (made)', sv[C.SK_VAR_COL], 1.0)
     check('skeleton: running, its stand-in body x %g (PostureModule vt +0xE4)' % C.SK_SCALE, scales, [('scale', post, C.SK_SCALE)])
     if diag:
-        check('skeleton diag: S4SC state 1, its first ground', [x[:2] for x in logs('gk_fsc')], [(1, ground)])
+        check('skeleton diag: S4SC state 1, its first ground, the bundle / lvd handles found, its GroundModule',
+              [x[:5] for x in logs('gk_fsc')], [(1, ground, 0x1111, 0x2222, gm)])
     e.mu.mem_write(post + 0x10, struct.pack('>2f', 50.7, 10.0))
     c2 = frame()
     check('skeleton collision: it moved 0.7: its vertices moved (riders carried: the move call), the lines recomputed',
           c2, [('movev', gm, i, round(50.7 + vx, 3), 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS)] + [('commit', gm)])
     e.setw(ground + 0x160, 0xFFFF0000)
-    check('skeleton collision: its ground gone (id -1): nothing moved', frame(), [])
+    check('skeleton v1.1: its ground gone (id -1: something removed it): nothing moved; made again next frame (VAR_6 0, '
+          'VAR_12 1)', (frame(), sv[C.SK_VAR_COL], sv[C.SK_VAR_REMADE]), ([], 0.0, 1.0))
+    if diag:
+        check('skeleton v1.1 diag: S4SG (owner 3, #1)', [x[:2] for x in logs('gk_fsg')], [(3, 1)])
     e.setw(ground + 0x160, 0)
     e.mu.mem_write(post + 0x10, struct.pack('>2f', 50.0, 10.0))
+    check('skeleton v1.1: ... made again at it', [c[0] for c in frame()][:4], ['res_get', 'res_find', 'assign', 'make'])
+    for k in range(C.SK_REMAKE - 1):
+        e.setw(ground + 0x160, 0xFFFF0000)
+        frame()
+        e.setw(ground + 0x160, 0)
+        frame()
+    e.setw(ground + 0x160, 0xFFFF0000)
+    frame()
+    check('skeleton v1.1: gone a %d%s time: lost for good (VAR_6 4: not made again)' % (C.SK_REMAKE + 1, 'th'),
+          (sv[C.SK_VAR_COL], [c[0] for c in frame()]), (4.0, []))
+    e.setw(ground + 0x160, 0)
+    sv.update({C.SK_VAR_COL: 1.0, C.SK_VAR_REMADE: 0.0})
+    e.setw(gobj + 0x34, 2)
+    e.mu.mem_write(post + 0x10, struct.pack('>2f', 50.0, 10.0))
+    check('skeleton v1.1: a floor-only skeleton.lvd (2 vertices, as the hydrant\'s): only its top line moved (x +- 6, y + 28)',
+          frame(), [('movev', gm, i, 50.0 + vx, 10.0 + vy) for i, (vx, vy) in enumerate(C.SK_VERTS[1:3])] + [('commit', gm)])
+    e.setw(gobj + 0x34, 4)
     frame()
     # ---- hits: attackers over its box (x 44 - 56, y 10 - 38)
     stopvt = e.alloc(0x100, b'\0')

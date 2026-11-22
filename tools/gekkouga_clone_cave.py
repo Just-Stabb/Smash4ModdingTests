@@ -270,6 +270,7 @@ GC_ON = 0x02AC2EF0                # (gm, 0): on (the hydrant's call after making
 GC_SETV = 0x02AC30C0              # (gm, vertex, &(x, y)): a vertex placed (its last position too: no carry)
 GC_MOVEV = 0x02AC312C             # (gm, vertex, &(x, y)): a vertex moved (last = where it was: riders carried)
 GC_COMMIT = 0x02AC3204            # (gm): the grounds' lines recomputed after the vertex moves
+GROUND_MGR = 0x102F7DB4          # v1.1 diag: [it] the stage's ground manager (+0x19C: its layers byte)
 GC_FREE = 0x02AC29D8              # (gm): the grounds removed (the GroundModule's own end, vt +0x2C / +0x4C, does this)
 SK_W, SK_B, SK_H = 6.0, 2.0, 28.0   # its collision: x +- 6, a wall each side from y + 2 up to the top, a floor on top
                                   # at y + 28 (about 1.75 x a fighter's height: Greninja's ~16)
@@ -283,6 +284,8 @@ SK_LATCH = 16                     # attackers remembered per skeleton (one per o
 SK_VAR_SLOT, SK_VAR_X, SK_VAR_Y, SK_VAR_DIR = 0x0F000300, 0x0F000301, 0x0F000302, 0x0F000303
 SK_VAR_DMG, SK_VAR_PHASE, SK_VAR_COL = 0x0F000304, 0x0F000305, 0x0F000306
 SK_VAR_HX, SK_VAR_HY, SK_VAR_HITS, SK_VAR_LOGP = 0x0F000307, 0x0F000308, 0x0F000309, 0x0F00030A
+SK_VAR_DIAGT, SK_VAR_REMADE = 0x0F00030B, 0x0F00030C   # v1.1: diag frames to the next S4SD; its grounds made again
+SK_REMAKE = 3                     # v1.1: its grounds made again at most this many times a life (then 4: lost)
 # his VARs (his MSC writes them at the release): 15 a skeleton asked for (1), 16 / 17 the shadow's X / Y, 18 its way
 GK_VAR_SKREQ, GK_VAR_SKX, GK_VAR_SKY, GK_VAR_SKDIR = 0x0F00030F, 0x0F000310, 0x0F000311, 0x0F000312
 RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'pose'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
@@ -576,7 +579,7 @@ sk_start:
         bl sk_col_free
         lwz r30, %(wwork)d(r31)
         cmpwi r30, 0
-        beq sks_out''' + ''.join(zero + var_set('r30', 0x0F000300 + v) for v in range(11)) + '''
+        beq sks_out''' + ''.join(zero + var_set('r30', 0x0F000300 + v) for v in range(13)) + '''
 sks_out:
         lwz r30, 0x28(r1)
         lwz r31, 0x2C(r1)
@@ -662,6 +665,22 @@ skf_have:
         mr r3, r31
         li r4, 0
         bl sk_col_place                 # moved with it (riders carried)
+        cmpwi r3, 0
+        bne skf_moved''' + vint('r30', SK_VAR_REMADE, 'r26') + '''
+        cmpwi r26, %(sk_remake)d        # skeleton v1.1: its ground gone (something removed it): made again next frame
+        bge skf_lost
+        addi r26, r26, 1''' + vnum('r30', SK_VAR_REMADE, 'r26') + '''
+        li r27, 0''' + vnum('r30', SK_VAR_COL, 'r27') + D('''
+        lis r3, %(gk_fsg_hi)d
+        addi r3, r3, %(gk_fsg_lo)d
+        mr r4, r29
+        mr r5, r26''' + osr()) + '''
+        b skf_hits
+skf_lost:
+        li r27, 4                       # lost for good (4)''' + vnum('r30', SK_VAR_COL, 'r27') + '''
+        b skf_hits
+skf_moved:''' + D('''
+        bl sk_coldiag''') + '''
 skf_hits:
         bl sk_hits
         b skf_burn
@@ -728,6 +747,120 @@ skl_out:
         addi r1, r1, 0x30
         blr
 ''') + '''
+''' + D(r'''
+# diag (v1.1): its collision every 30 frames: S4SD the ground, its line count, the first two vertices (x10), the handle's
+# id / flags; S4SE the ground manager's +0x19C (layers), the GroundModule's +0x18 object (+0x248, +0x234), the ground's
+# +0x68 / +0x7C words, its place (x10)
+sk_coldiag:
+        stwu r1, -0x50(r1)
+        mflr r0
+        stw r0, 0x54(r1)
+        stmw r27, 0x3C(r1)''' + vint('r30', SK_VAR_DIAGT, 'r27') + '''
+        addi r27, r27, -1
+        cmpwi r27, 0
+        bgt skd_keep
+        li r27, 30''' + vnum('r30', SK_VAR_DIAGT, 'r27') + '''
+        mr r3, r31
+        bl sk_gm
+        mr. r29, r3
+        beq skd_out
+        lwz r28, 0xF0(r29)              # its handle
+        cmpwi r28, 0
+        beq skd_out
+        lwz r27, 0(r28)                 # its ground
+        lis r0, 0x1000
+        cmplw r27, r0
+        blt skd_out
+        lwz r12, 0x3C(r27)              # its vertices: +8 / +0xC now, +4 the next
+        li r7, 0
+        li r8, 0
+        li r9, 0
+        li r10, 0
+        lis r0, 0x1000
+        cmplw r12, r0
+        blt skd_l1
+        lis r11, %(sk_k4_hi)d
+        lfs f13, %(sk_k4_lo)d(r11)
+        lfs f1, 8(r12)
+        fmuls f1, f1, f13
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r7, 0x1C(r1)
+        lfs f1, 0xC(r12)
+        fmuls f1, f1, f13
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r8, 0x1C(r1)
+        lwz r12, 4(r12)
+        lis r0, 0x1000
+        cmplw r12, r0
+        blt skd_l1
+        lfs f1, 8(r12)
+        fmuls f1, f1, f13
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r9, 0x1C(r1)
+        lfs f1, 0xC(r12)
+        fmuls f1, f1, f13
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r10, 0x1C(r1)
+skd_l1: lhz r11, 0x160(r28)
+        slwi r11, r11, 16
+        lbz r0, 0x163(r28)
+        or r11, r11, r0
+        stw r11, 8(r1)
+        mr r4, r27
+        lwz r5, 0x34(r27)
+        mr r6, r7
+        mr r7, r8
+        mr r8, r9
+        mr r9, r10
+        lwz r10, 8(r1)
+        lis r3, %(gk_fsd_hi)d
+        addi r3, r3, %(gk_fsd_lo)d''' + osr() + '''
+        lis r12, %(gmgr_hi)d
+        lwz r12, %(gmgr_lo)d(r12)
+        li r4, -1
+        cmpwi r12, 0
+        beq skd_m
+        lbz r4, 0x19C(r12)
+skd_m:  lwz r5, 0x18(r29)
+        li r6, 0
+        li r7, 0
+        lis r0, 0x1000
+        cmplw r5, r0
+        blt skd_g
+        lwz r6, 0x248(r5)
+        lwz r7, 0x234(r5)
+skd_g:  lwz r8, 0x68(r27)
+        lhz r9, 0x7C(r27)
+        slwi r9, r9, 16
+        lbz r0, 0x82(r27)
+        or r9, r9, r0
+        lwz r12, %(wpost)d(r31)
+        li r10, 0
+        li r11, 0
+        cmpwi r12, 0
+        beq skd_lg
+        lis r11, %(sk_k4_hi)d
+        lfs f13, %(sk_k4_lo)d(r11)
+        lfs f1, 0x10(r12)
+        fmuls f1, f1, f13
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r10, 0x1C(r1)
+skd_lg: lis r3, %(gk_fse_hi)d
+        addi r3, r3, %(gk_fse_lo)d''' + osr() + '''
+        b skd_out
+skd_keep:''' + vnum('r30', SK_VAR_DIAGT, 'r27') + '''
+skd_out:
+        lmw r27, 0x3C(r1)
+        lwz r0, 0x54(r1)
+        mtlr r0
+        addi r1, r1, 0x50
+        blr
+''') + r'''
 # (r30 its WorkModule) -> r3 its owner's slot (1-8) or 0: the first live Greninja whose VAR_15 (a skeleton asked for)
 # is on: it is cleared, his VAR_16 / 17 / 18 copied to its VAR_1 / 2 / 3, its VAR_0 = his slot
 sk_claim:
@@ -829,6 +962,8 @@ sk_col_make:
         li r0, 0
         stw r0, 0x10(r1)
         stw r0, 0x14(r1)
+        stw r0, 0x20(r1)
+        stw r0, 0x24(r1)
         lwz r3, 0x30(r12)
         addi r4, r1, 0x10
         li r5, %(sk_kind)d
@@ -839,7 +974,10 @@ sk_col_make:
         lis r5, %(sk_lvd_hi)d
         addi r5, r5, %(sk_lvd_lo)d
         li r6, 1''' + call(RES_FIND) + '''
+        lwz r0, 0x10(r1)
+        stw r0, 0x20(r1)
         lwz r0, 0x14(r1)
+        stw r0, 0x24(r1)
         cmpwi r0, 0
         beq skm_free
         addi r3, r29, 0xEC
@@ -864,11 +1002,16 @@ skm_free:
         li r4, 2''' + call(RES_FREE) + '''
 skm_done:''' + vnum('r30', SK_VAR_COL, 'r28') + D('''
         li r5, 0
+        li r9, 0
         cmpwi r29, 0
         beq skm_log
         lwz r5, 0xF0(r29)
+        lwz r9, 0xF8(r29)               # its bytes +0xF8 - +0xFB (made / ? / ? / off)
 skm_log:
         mr r4, r28
+        lwz r6, 0x20(r1)                # the bundle / file handles as found
+        lwz r7, 0x24(r1)
+        mr r8, r29
         lis r3, %(gk_fsc_hi)d
         addi r3, r3, %(gk_fsc_lo)d''' + osr()) + '''
         mr r3, r28
@@ -883,9 +1026,10 @@ sk_col_place:
         stwu r1, -0x40(r1)
         mflr r0
         stw r0, 0x44(r1)
-        stmw r27, 0x2C(r1)
+        stmw r25, 0x24(r1)
         mr r31, r3
         mr r30, r4
+        li r26, 0                       # (v1.1: 1 = moved)
         bl sk_gm
         mr. r29, r3
         beq skp_out
@@ -895,22 +1039,35 @@ sk_col_place:
         lhz r0, 0x160(r12)
         cmplwi r0, 0xFFFF
         beq skp_out
+        lwz r12, 0(r12)                 # v1.1: its ground's vertex count: 4 (walls + top) or 2 (a top line only:
+        lis r0, 0x1000                  # TEST_ONLY_DATA's floor-only skeleton.lvd, as the hydrant's)
+        cmplw r12, r0
+        blt skp_out
+        lwz r25, 0x34(r12)
+        lis r27, %(sk_verts_hi)d
+        addi r27, r27, %(sk_verts_lo)d
+        cmpwi r25, %(sk_nv)d
+        bge skp_n4
+        cmpwi r25, 2
+        bne skp_out
+        addi r27, r27, 8                # the top's two (SK_VERTS 1 / 2)
+        b skp_cnt
+skp_n4: li r25, %(sk_nv)d
+skp_cnt:
         lwz r12, %(wpost)d(r31)
         cmpwi r12, 0
         beq skp_out
         lfs f0, 0x10(r12)
-        stfs f0, 0x20(r1)
+        stfs f0, 0x18(r1)
         lfs f0, 0x14(r12)
-        stfs f0, 0x24(r1)
+        stfs f0, 0x1C(r1)
         li r28, 0
-        lis r27, %(sk_verts_hi)d
-        addi r27, r27, %(sk_verts_lo)d
 skp_v:  lfs f0, 0(r27)
-        lfs f1, 0x20(r1)
+        lfs f1, 0x18(r1)
         fadds f0, f0, f1
         stfs f0, 0x10(r1)
         lfs f0, 4(r27)
-        lfs f1, 0x24(r1)
+        lfs f1, 0x1C(r1)
         fadds f0, f0, f1
         stfs f0, 0x14(r1)
         mr r3, r29
@@ -922,11 +1079,13 @@ skp_v:  lfs f0, 0(r27)
 skp_mv:''' + call(GC_MOVEV) + '''
 skp_n:  addi r27, r27, 8
         addi r28, r28, 1
-        cmpwi r28, %(sk_nv)d
+        cmpw r28, r25
         blt skp_v
         mr r3, r29''' + call(GC_COMMIT) + '''
+        li r26, 1
 skp_out:
-        lmw r27, 0x2C(r1)
+        mr r3, r26
+        lmw r25, 0x24(r1)
         lwz r0, 0x44(r1)
         mtlr r0
         addi r1, r1, 0x40
@@ -1866,7 +2025,10 @@ def build(rpx, diag=False, feats=None):
             ('gk_fba', 'S4BA burn added: victim slot=%d move=%d shielded=%d damage x1000=%d interval=%d frames=%d\n'),
             ('gk_ftp', 'S4TP clone tongue (bone %d): him x100 %%d %%d %%d clone x100 %%d %%d %%d phases that found it changed=%%X\n' % POSE_LOG_BONE),
             ('gk_fss', 'S4SS skeleton spawned: owner slot=%d at x=%d y=%d way=%d\n'),
-            ('gk_fsc', 'S4SC skeleton collision: state=%d (1 made, 3 failed) grounds=%08X\n'),
+            ('gk_fsc', 'S4SC skeleton collision: state=%d (1 made, 3 failed) grounds=%08X bundle=%08X lvd=%08X groundmodule=%08X bytes F8-FB=%08X\n'),
+            ('gk_fsg', 'S4SG skeleton collision: owner slot=%d its grounds were gone: made again (#%d)\n'),
+            ('gk_fsd', 'S4SD skeleton collision: ground=%08X lines=%d v0 x10=%d,%d v1 x10=%d,%d handle +0x160 / +0x163 %08X\n'),
+            ('gk_fse', 'S4SE skeleton collision: manager +0x19C=%d groundmodule +0x18=%08X its +0x248=%08X +0x234=%08X ground +0x68=%08X +0x7C/+0x82 %08X at x10=%d,%d\n'),
             ('gk_fsf', 'S4SF skeleton collision removed: owner slot=%d\n'),
             ('gk_fsh', 'S4SH skeleton hit: owner slot=%d attacker=%X hitbox=%d damage x10=%d HP left x10=%d at x=%d y=%d\n'),
             ('gk_fsx', 'S4SX skeleton owner slot=%d phase=%d (1 running, 2 exploded, 3 smoked at 0 HP) damage taken x10=%d at x=%d y=%d\n'),
@@ -1978,11 +2140,11 @@ def build(rpx, diag=False, feats=None):
              dm_add=DM_ADD, fstatus=F_STATUS, st_kind=ST_KIND, st_dead=ST_DEAD, st_dead_n=ST_DEAD_N, ent_log=ENT_LOG, node_obj=NODE_OBJ, node_type=NODE_TYPE, mm_kind=MM_KIND, am_ents=AM_ENTS, am_count=AM_COUNT, am_max=AM_MAX, ent_size=ENT_SIZE,
              ent_nodes=ENT_NODES, node_max=NODE_MAX, node_on=NODE_ON, node_min_x=NODE_MIN_X, node_min_y=NODE_MIN_Y,
              node_max_x=NODE_MAX_X, node_max_y=NODE_MAX_Y, team=TEAM_MOD,
-             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, pm_scale=PM_SCALE, npose=len(POSE_BONES), pose_min=POSE_MIN, mdl_mtx=MDL_MTX, mm_model=MM_MODEL, log_off=POSE_LOG_BONE * 0x30 + 0xC, nlatch=SLOTS * SK_LATCH * 2, sk_kind=SK_KIND, sk_lat=SK_LATCH, sk_lat8=SK_LATCH * 8, sk_nv=len(SK_VERTS), gm_vt_hi=SK_GM_VT >> 16, gm_vt_lo=SK_GM_VT & 0xFFFF, wground=0x2C, nbtab=SLOTS * BURN_CAP * 4, nbproc=(BURN_CONTEXTS * BURN_ENTS + 3) // 4, clear_back=CLEAR_BACK, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
+             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, pm_scale=PM_SCALE, sk_remake=SK_REMAKE, npose=len(POSE_BONES), pose_min=POSE_MIN, mdl_mtx=MDL_MTX, mm_model=MM_MODEL, log_off=POSE_LOG_BONE * 0x30 + 0xC, nlatch=SLOTS * SK_LATCH * 2, sk_kind=SK_KIND, sk_lat=SK_LATCH, sk_lat8=SK_LATCH * 8, sk_nv=len(SK_VERTS), gm_vt_hi=SK_GM_VT >> 16, gm_vt_lo=SK_GM_VT & 0xFFFF, wground=0x2C, nbtab=SLOTS * BURN_CAP * 4, nbproc=(BURN_CONTEXTS * BURN_ENTS + 3) // 4, clear_back=CLEAR_BACK, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
              hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbr', 'gk_clr', 'pose_tab', 'pose_last', 'gk_ftp', 'sk_desc', 'gk_fss', 'gk_fsc', 'gk_fsf', 'gk_fsh', 'gk_fsx', 'sk_lvd', 'sk_verts', 'sk_box', 'sk_nums', 'sk_k', 'sk_latch', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbr', 'gk_clr', 'pose_tab', 'pose_last', 'gk_ftp', 'sk_desc', 'gk_fsg', 'gk_fsd', 'gk_fse', 'gk_fss', 'gk_fsc', 'gk_fsf', 'gk_fsh', 'gk_fsx', 'sk_lvd', 'sk_verts', 'sk_box', 'sk_nums', 'sk_k', 'sk_latch', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -1995,6 +2157,7 @@ def build(rpx, diag=False, feats=None):
         p['sk_k8_hi'], p['sk_k8_lo'] = ha(A['sk_k'] + 8), K.slo(A['sk_k'] + 8)
         p['sk_k16_hi'], p['sk_k16_lo'] = ha(A['sk_k'] + 16), K.slo(A['sk_k'] + 16)
         p['resmgr_hi'], p['resmgr_lo'] = ha(RES_MGR), K.slo(RES_MGR)
+        p['gmgr_hi'], p['gmgr_lo'] = ha(GROUND_MGR), K.slo(GROUND_MGR)
         ski = [m[0] for m in BURN_MOVES].index(SK_BURN_KEY)
         p['sk_row_hi'], p['sk_row_lo'] = ha(A['bmoves'] + 20 * ski), K.slo(A['bmoves'] + 20 * ski)
     p['bshield_hi'], p['bshield_lo'] = ha(A['bconst']), K.slo(A['bconst'])

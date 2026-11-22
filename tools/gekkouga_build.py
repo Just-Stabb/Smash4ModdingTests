@@ -6,7 +6,7 @@
   python3 tools/gekkouga_build.py data VANILLA_FIGHTER_DIR OUT  the clone's model (c00-c07) / motion folders
   python3 tools/gekkouga_build.py all VANILLA_ROOT USER_ROOT OUT (VANILLA_ROOT/fighter/gekkouga, USER_ROOT/fighter/
                                                                 gekkouga/script/animcmd) -> OUT/fighter/gekkouga/...
-  python3 tools/gekkouga_build.py skeleton PACMAN_FIGHTER_DIR OUT_FIGHTER   skeleton v1: the Running Skeleton's files
+  python3 tools/gekkouga_build.py skeleton PACMAN_FIGHTER_DIR OUT_FIGHTER [TEST_ONLY_DIR]   skeleton v1: its files
                                                                 (vanilla fighter/pacman: its hydrant's model / motion)
 
 VANILLA.c: the decompiled vanilla MSC with its labels (git show 0932c7b:fighters/gekkouga/gekkouga.c); the result is
@@ -581,7 +581,20 @@ def skeleton_lvd(hydrant_lvd):
     return lv.write()
 
 
-def cmd_skeleton(pacman_fighter, out_fighter):
+def skeleton_lvd_floor(hydrant_lvd):
+    """skeleton v1.1 (TEST_ONLY_DATA/skeleton_floor_only): the hydrant's .lvd as it is (one floor line, its 2 vertices,
+    normal, material, flags) with only the line moved to the skeleton's top (SK_VERTS 1 / 2: x +- 6, y 28); the exe moves
+    a 2-vertex ground's two onto those"""
+    import lvd
+    import gekkouga_clone_cave as C
+    lv = lvd.LVD(hydrant_lvd)
+    c = lv.collisions[0]
+    assert len(c.verts) == 2
+    c.verts = [list(map(float, v)) for v in C.SK_VERTS[1:3]]
+    return lv.write()
+
+
+def cmd_skeleton(pacman_fighter, out_fighter, test_only=None):
     """the Running Skeleton's files: model/skeleton/c00 (the hydrant's model + skeleton.lvd), motion/skeleton/main.pac
     (the hydrant's: its motion info's hash), script/animcmd/weapon/skeleton, script/msc/skeleton/skeleton.mscsb"""
     import shutil
@@ -592,6 +605,10 @@ def cmd_skeleton(pacman_fighter, out_fighter):
     for f in SK_CARRIER:
         shutil.copyfile(os.path.join(src, f), os.path.join(dst, f))
     open(os.path.join(dst, 'skeleton.lvd'), 'wb').write(skeleton_lvd(os.path.join(src, 'firehydrant.lvd')))
+    if test_only:
+        t = os.path.join(test_only, 'skeleton_floor_only', 'fighter', 'gekkouga', 'model', 'skeleton', 'c00')
+        os.makedirs(t, exist_ok=True)
+        open(os.path.join(t, 'skeleton.lvd'), 'wb').write(skeleton_lvd_floor(os.path.join(src, 'firehydrant.lvd')))
     md = os.path.join(out_fighter, 'motion', 'skeleton')
     os.makedirs(md, exist_ok=True)
     shutil.copyfile(os.path.join(pacman_fighter, 'motion', 'firehydrant', 'main.pac'), os.path.join(md, 'main.pac'))
@@ -617,7 +634,7 @@ if __name__ == '__main__':
         print(cmd_data(a[1], a[2]))
     elif len(a) == 4 and a[0] == 'all':
         print(cmd_all(a[1], a[2], a[3]))
-    elif len(a) == 3 and a[0] == 'skeleton':
-        print(cmd_skeleton(a[1], a[2]))
+    elif len(a) in (3, 4) and a[0] == 'skeleton':
+        print(cmd_skeleton(a[1], a[2], a[3] if len(a) > 3 else None))
     else:
         sys.exit(__doc__)

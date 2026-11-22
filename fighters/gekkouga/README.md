@@ -863,3 +863,31 @@ and at 0 HP goes in a puff of smoke with no hitbox. Later: it doesn't stop at le
   known effect.bin else-if count) and 248 / 0.
 - Not confirmed in game: the collision on a new article, riders and pushed fighters, FFA projectiles' team check, the
   knockback, the carrier's look.
+
+## Clones v14 (`greninja_clones_v14.zip`, over skeleton v1; exe_v46z_gk14) and Skeleton v1.1
+
+The user: fix the clones' tongue and water (swing bones the game steps only for fighters). Two routes, plus the user's
+skeleton v1 report ("no collision": its log shows `S4SC state=1` every spawn).
+- **Pose copy (feature `pose`, now in `RELEASE`)**: `w_pose` in each of the clone's four frame phases (+0x64 / +0x84 /
+  +0x8C / +0x94, the vtable's pollers): for each of his 13 swing bones (`POSE_BONES`: SWG_CMant0-8 60-68 on anchor 39,
+  SWG_LLegB_01 / Lwater01 / RLegB_01 / Rwater01 69-72 on 3 / 15 / 7 / 19), the clone's world matrix = C_a x inverse(H_a)
+  x H_b (`m34_inv` uniform-scale rigid inverse, `m34_mul` 3x4 [R | t] rows). His matrices: his MotionModule +0x14's
+  object (the one a fighter's swing update steps) when it has the layout (`mo_ok`), else +0x10; the clone's: its +0x10
+  (+0xC the world matrices, 0x30 each, as get_world_matrix `0x02C64588` -> `0x033179C8`; at least `POSE_MIN` 73 bones,
+  `0x0330DE2C`). Harmless on the installed rigid-tongue data; seen with TEST_ONLY_DATA/sway (his own nud / sb). Diag
+  `S4TP` (bone 64 on him / the clone x100, the phases that found the clone's own pose since our write).
+- **E_sway (TEST_ONLY)**: v13's bind crashed in game at its first clone frame (log_v13_E_crash: IP 0x04BED1F4 reading
+  [[mm+0x14]+4]+4 with [mm+0x14]+4 = 6): a weapon's MotionModule +0x14 is not the model / motion object. v14 binds /
+  steps [mm+0x10] after `mo_ok` (+4 a pointer whose +4 is the mode, not 8; +0x1C a pointer) and checks [+0x18] / its
+  first word before the bind; S4GQ logs +0x14 and +0x10. E_sway is `RELEASE - pose + sway`.
+- **Skeleton v1.1**: its ground gone (handle +0x160 -1, or none) while it runs -> made again (`SK_REMAKE` 3 a life, then
+  VAR_6 4: lost; diag `S4SG`); a 2-vertex ground (TEST_ONLY_DATA/skeleton_floor_only: the hydrant's .lvd with only its
+  line moved to x +- 6, y + 28) has its top line moved; diag `S4SC` adds the bundle / lvd handles, its GroundModule and
+  its bytes +0xF8-+0xFB, `S4SD` / `S4SE` every 30 frames (the ground, its line count, the first two vertices, the
+  handle's id / flags; the ground manager's +0x19C, the GroundModule's +0x18 object's +0x248 / +0x234, the ground's
+  +0x68 / +0x7C / +0x82). Why fighters ignore the made grounds is not found yet.
+- TEST_ONLY_DATA: sway (his model.nud / model.sb, c00-c07), rigid (the release's model.nud back), skeleton_floor_only.
+- Tests: cave 192 / 216 / 221 (release / A_release / E_sway; `pose_checks`: the 13 bones against numpy, the rest
+  untouched, the tongue relative to its anchor, his +0x14 preferred, the clone's odd +0x14 ignored, no owner / short
+  skeleton; `sway_checks`: the v13 crash layout, bad +4 / +0x1C; skeleton v1.1's remake / lost / floor-only);
+  `gekkouga_clones_test ... --vs1` 237 / 0; supamario_ui_cave_test 0; import_call_check 0; byte-for-byte rebuilds.

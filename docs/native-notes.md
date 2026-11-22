@@ -3913,3 +3913,16 @@ MSC on a bunshin-based kind, the 4-shape group.
   flags [0, 1, 0, 0]. Slot 5 is the GroundModule slot for every weapon (Mario's pump's 0x10-byte one `0x100F87C4` is a
   minimal GroundModule). Programmatic grounds without an .lvd: `0x02D49F2C(mgr, -1, verts, n, ...)` (stage / mode code,
   e.g. the Home-Run barrier `0x02A8E9C0`). PostureModule vt +0xE4(f1) sets an object's scale (the moon's start).
+- **A weapon's MotionModule (Greninja clones v14)**: +0x10 is the model / motion object on fighters and weapons alike (+4
+  a pointer whose +4 is the mode, 8 = none; +0x1C the evaluator, vt +0x94 the bone count (`0x0330DE2C`); +0xC the bones'
+  world matrices, 3x4 rows [R | t], 0x30 each: MotionModule get_world_matrix `0x02C64588(mm, node, 0, 1)` -> node to
+  bone through [mm+0x20] ([mm+0x24], [[mm+0x14]+0xC] its jtb), `0x033179C8([mm+0x10], bone)`). A fighter's swing update
+  steps [mm+0x14] (`0x03314FB8`); on a weapon +0x14 is no such object (its +4 was 6: v13's E_sway crash at
+  `[[+0x14]+4]+4`). Clones v14 copies his swing bones' world matrices (from +0x14 when it has the layout, else +0x10)
+  onto each clone's +0x10 ones every frame phase.
+- **Skeleton collision, not working yet (skeleton v1)**: the hydrant route makes the grounds (`S4SC state=1`, handle
+  0x13378650 in the user's log) but fighters neither stand on nor bump into them. Unverified: whether a lifecycle call
+  (GroundModule vt +0x24 re-init `0x02AC29A4`, which zeroes +0xF0 without releasing; vt +0x4C `0x02AC2B50` / +0x2C
+  `0x02AC2B1C`, which release) runs on the article after the make; the ground manager's layer pick (`[0x102F7DB4]
+  +0x19C`, the GroundModule +0x18 object's +0x244 bits); the hydrant's per-ground callbacks (+0x44 / +0x48 / +0x4C and
+  +0xA4 / +0xA8 / +0xAC on the handle, set by its +0x3C) which ours doesn't set. v1.1 diag S4SD / S4SE logs them.

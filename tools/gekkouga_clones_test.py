@@ -1461,7 +1461,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         tdo = sorted(n for n in names if n.startswith('TEST_ONLY_DATA/') and not n.endswith('/'))
         want_td = sorted(['TEST_ONLY_DATA/sway/fighter/gekkouga/model/clone/c%02d/%s' % (c, f) for c in range(8)
                           for f in ('model.nud', 'model.sb')] +
-                         ['TEST_ONLY_DATA/rigid/fighter/gekkouga/model/clone/c%02d/model.nud' % c for c in range(8)])
+                         ['TEST_ONLY_DATA/rigid/fighter/gekkouga/model/clone/c%02d/model.nud' % c for c in range(8)] +
+                         ['TEST_ONLY_DATA/skeleton_floor_only/fighter/gekkouga/model/skeleton/c00/skeleton.lvd'])
         check('v14: TEST_ONLY_DATA: sway (his own model.nud / model.sb: the tongue on its own bones) and rigid (the release\'s '
               'model.nud back)', tdo, want_td)
         check('v14: ... each as built', [n for n in want_td if z.read(n) != open(os.path.join(out, n), 'rb').read()], [])
@@ -1584,7 +1585,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
          'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18) else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
-         'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed') if len(earlier) == 18 else \
+         'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
+         'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
         ('greninja_burn_v1_2', 'exe_v46z_gks1', 'Running Skeleton', '25', '180', '0.7', 'ledge', 'smoke', 'explo', '36',
          '6.3', 'S4SS', 'S4SH', 'S4SX', 'S4SC', 'S4SF', 'hydrant', 'placeholder', 'Sm4shCommand_v1.7.27', 'unconfirmed')
     check('README.txt mentions every feature (%s)' % ', '.join(words), [w for w in words if w not in readme], [])
