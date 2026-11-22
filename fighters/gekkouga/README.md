@@ -797,3 +797,69 @@ Unicorn (`clear_checks`): the chain's last b -> gk_clear, back at `0x02FB349C` w
 the next match's 12 frames tick nothing. Cave tests 149 (release) / 167 (diag), 0 failures; supamario_ui_cave_test 0;
 import_call_check 0; both rebuild byte for byte. Not covered: his MSC's own state (clones, smash store, gauge) on a
 training reset (it resets at Entry / KO).
+
+## Skeleton v1 (`greninja_skeleton_v1.zip`, over burn v1.2; exe_v46z_gks1, Sm4shCommand v1.7.27)
+
+The user: side special (Shadow Sneak) no longer teleports him; a Running Skeleton (25 HP) appears at the shadow, runs
+slowly in a straight line, is large and solid (a wall, standable), explodes after 3 s with an extremely strong burn,
+and at 0 HP goes in a puff of smoke with no hitbox. Later: it doesn't stop at ledges (it falls).
+
+- **His side (clones.c, `gk_ss_tick` in place of `func_2291`, `tools/gekkouga_build.py` `MSC_BODIES`)**: the start-up
+  (`0x16000006`) and the shadow's time (`0x16000007`) as vanilla, no vanish (no Visibility / Hit / AreaModule calls), no
+  teleport; at the frame vanilla teleports him (21 with the vanilla params) `gk_sk_spawn(0x31, 0x32)` (the shadow's
+  place: his instance floats): his VAR_15 = 1, VAR_16 / 17 the place, VAR_18 his facing, `ArticleModule(0x2710, 8)`;
+  then Wait / Fall. The request lapses after 5 frames (one skeleton at a time: with one out, nothing is made).
+  VAR_14 (written by the exe: the clear-all count & 7) changing resets his ability / burnout / charges (`gk_reset`: a
+  training reset; burn v1.2's audit).
+- **The article** (weapon kind 0x1A2, article 8, folder `skeleton`; `tools/gekkouga_clone_cave.py` feature `skeleton`,
+  in `RELEASE`): a bunshin descriptor copy with 3 motions (the hydrant's motion hash `0xB16D0064`), u16 flags bunshin's
+  without the Final Smash categories and the owner's colour (c00 only), base kind Mario's pump (its template updates the
+  AttackModule), the clone's module row with slot 5 (the GroundModule) the hydrant's (`0x02BCC7FC`), its own singleton
+  (the moon's vtable: +0x34 `sk_start`, +0x94 `sk_94`, +0xAC `sk_hit`: its explosion connecting doesn't remove it).
+  Files (`gekkouga_build.py skeleton PACMAN_FIGHTER OUT_FIGHTER`): model/skeleton/c00 = Pac-Man's hydrant's model (a
+  carrier) + `skeleton.lvd`; motion/skeleton/main.pac = the hydrant's; scripts `SkeletonRun` / `SkeletonExplode` /
+  `SkeletonSmoke` (motion kinds 0 / 1 / 2); `weapons/skeleton.c` its MSC.
+- **The exe's part (`sk_frame`, +0x94 every frame)**: the claim (its VAR_0 0: the first live Greninja whose VAR_15 is on;
+  his 16-18 copied to its VAR_1-3, its VAR_0 = his slot, his VAR_15 cleared); running (its VAR_5 1): the collision made
+  once (below), moved with it every frame, the hit check (below); exploded / smoked (VAR_5 2 / 3): the collision removed;
+  its scale 2.0 while running (the stand-in body), 1.0 after; its explosion's hits scanned by `burn_scan` with the
+  skeleton row (context slot x 4 + 3; burn v1's contexts became x 4).
+- **Collision (the hydrant's route)**: Pac-Man's hydrant (weapon 0x12D) and Fox / Falco's Landmaster have a GroundModule
+  class (`0x02AC2948` init; vtable `0x100D3178`, the hydrant's subclass `0x100ED868`) that makes stage grounds from an
+  .lvd in the article's files: its specializer +0x3C (`0x02B34508`) does `0x030C40A8([0x102F9028] +0x30, &bundle, kind,
+  0, 0)`, `0x032D7140(&bundle, &file, "firehydrant.lvd", 1)`, `0x032D69B8(gm +0xEC, &file)`, `0x02AC2B84(gm, 1, 0, 0)`
+  (the grounds, +0xF0 / +0xF4, via `0x02D49F2C`), `0x02AC2EF0(gm, 0)` (on), `0x032D4200(&handle, 2)` x 2; its update
+  puts each vertex on a joint (`0x02B38950`: `0x02AC30C0` place / `0x02AC312C` move, then `0x02AC3204` the lines). The
+  skeleton does the same with its own kind and `skeleton.lvd` (4 vertices: x +- 6, y + 2 / + 28: a wall each side, a
+  floor on top) and moves the vertices itself from its posture (move: riders carried); `0x02AC29D8` removes them (the
+  GroundModule's own end calls it too). The user's Gogoat lead: no .lvd and none of these functions for it (the ground
+  makers `0x02D49F2C` are stage / mode code, e.g. the Home-Run barrier `0x02A8E9C0`); in Smash 4 Gogoat carries its
+  summoner (a ride), not a standable top.
+- **HP (`sk_hits`)**: the clone hit check's objects (fighters, weapons, items; his team skipped, his body, itself), per
+  attacker the entries on (`sk_box` r4) and over its box (x +- 6, y to y + 28; r3); a hit when an entry over it isn't
+  latched: the lowest one's damage added to its VAR_4, VAR_9 + 1, VAR_7 / 8 the place (the attacker's X / Y + 8 kept in
+  its box), the attacker's hitlag; then every entry on is latched until it goes off (once per attack). 16 attackers per
+  skeleton.
+- **Its MSC (`sk_frame`)**: waits for the claim (30 frames, then removed); starts at VAR_1 / 2 (snapped to a floor),
+  facing VAR_3; runs 0.7 a frame (a wall at foot + 5 within its step + 2 stops it), standing it follows the floor (3 up /
+  down), off a ledge it falls (0.18 / 1.85, his) and lands; frozen in hitlag; a new hit (VAR_9) the spark at VAR_7 / 8;
+  VAR_4 >= 25 the smoke (phase 3, removed 3 frames later); 180 frames the explosion effect (phase 2), its explode motion
+  the next frame (its scale back to 1), removed 40 frames later. Past the blast zone the game removes it.
+- **Values**: speed 0.7, HP 25, fuse 180, gravity 0.18 / max fall 1.85, box 12 x 28; explosion (`SK_BOOM`) 15 %, 50
+  degrees, KBG 50, BKB 40, size 22 at bone 0 Y 14, flame, FacingRestrict 5 (from its middle), 4 frames (Smash 4's
+  formula: 135 knockback on Mario at 130 %); burn row `0x101A2` 0.6 % / 6 f / 360 f = 36 % (the strongest), shielded
+  0.21 % x 30 = 6.3 %.
+- **Visuals (placeholder)**: the flipbooks (`$S/greninja_fire_effects_v1.zip`) belong in his effect bank
+  (effect/fighter/gekkouga/ef_gekkouga.eff), which isn't in the workspace; v1 shows the carrier (the hydrant) x 2 as its
+  body (`sk_show_model()`), the common spark 0x1000025, bomb explosion 0x1000017, item smoke 0x1000021 (`sk_fx_*`).
+- Diag: S4SS spawned, S4SC collision (1 made / 3 failed), S4SH hit, S4SX phase, S4SF collision removed; S4BA its burns
+  (move 65954).
+- Tests: `gekkouga_clone_cave_test.py` 183 / 205 (release / diag; `skeleton_checks`: the tables / row / descriptor /
+  singleton / list, the claim, the collision calls (made, moved, gone, a missing .lvd, a wrong GroundModule), hits once
+  per attack, the lowest of two, his team / himself skipped, the explosion's removal and burns, the strongest row, the
+  scale); `gekkouga_clones_test.py ... --v1 ... --v13 --vb1 --vb11 --vb12` 230 / 0 (`skeleton_side_tests`,
+  `skeleton_tests`, `skeleton_data_tests`, the package); msc_stack_check 0 (skeleton.mscsb 35 globals);
+  import_call_check 0; supamario_ui_cave_test 0; both exes rebuild byte for byte; Sm4shCommand v1.7.27 290 / 1 (the
+  known effect.bin else-if count) and 248 / 0.
+- Not confirmed in game: the collision on a new article, riders and pushed fighters, FFA projectiles' team check, the
+  knockback, the carrier's look.

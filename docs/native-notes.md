@@ -3900,3 +3900,16 @@ MSC on a bunshin-based kind, the 4-shape group.
   set-up (`0x029104D0`) and the battle sequences' start / restart / end virtuals run: match start / end or quit,
   rematch, training reset. The user's burn v1.1: burns went on into the next match after quitting early. The cursor's
   saved show byte is kept (its restore runs once the hide counter is 0). Diag `S4BR clear# slot`.
+- **Article collision from an .lvd (Greninja skeleton v1)**: Pac-Man's hydrant (weapon 0x12D) and Fox / Falco's Landmaster
+  (0x102 / 0x13E) carry a GroundModule class (module row slot 5: the hydrant's ctor `0x02BCC7FC` -> `0x02B387FC`,
+  0x100 bytes, vtables `0x100D3178` (base, init `0x02AC2948`) / `0x100ED868`) whose `0x02AC2B84(gm, 1, 0, 0)` makes up to
+  two stage grounds (`0x02D49F2C` in the ground manager `[0x102F7DB4]`, handles at +0xF0 / +0xF4, +0x160 their id) from
+  the .lvd at gm +0xEC (the hydrant's specializer +0x3C `0x02B34508`: `0x030C40A8([0x102F9028] +0x30, &bundle, kind, 0,
+  0)`, `0x032D7140(&bundle, &file, "firehydrant.lvd", 1)`, `0x032D69B8(gm + 0xEC, &file)`, then `0x02AC2EF0(gm, 0)`
+  switches them on (+0xFB 0) and `0x032D4200(&handle, 2)` releases each stack handle). Vertices: `0x02AC30C0(gm, i,
+  &xy)` placed (`0x02D5D5F0`: current = last), `0x02AC312C` moved (`0x02D5D668`: last = current, so riders are carried),
+  `0x02AC3204(gm)` recomputes the lines; the hydrant's update puts each on a model joint (`0x02B38950`, table gm +0xFC).
+  `0x02AC29D8(gm)` releases them (its vt +0x2C / +0x4C). The hydrant's .lvd is one floor line (x +- 4.23 at y 14.09),
+  flags [0, 1, 0, 0]. Slot 5 is the GroundModule slot for every weapon (Mario's pump's 0x10-byte one `0x100F87C4` is a
+  minimal GroundModule). Programmatic grounds without an .lvd: `0x02D49F2C(mgr, -1, verts, n, ...)` (stage / mode code,
+  e.g. the Home-Run barrier `0x02A8E9C0`). PostureModule vt +0xE4(f1) sets an object's scale (the moon's start).

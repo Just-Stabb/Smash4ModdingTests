@@ -1193,6 +1193,46 @@ def skeleton_tests(mscsb, src):
     check('skeleton in hitlag: it doesn\'t move', g.x, x0)
 
 
+def skeleton_data_tests(out):
+    """skeleton v1: its built files: the explosion's hitbox, the scripts' names, its collision, its carrier"""
+    import acmd
+    import lvd
+    import gekkouga_clone_cave as C
+    fg = os.path.join(out, 'fighter', 'gekkouga')
+    ow = os.path.join(fg, 'script', 'animcmd', 'weapon', 'skeleton')
+    mt = open(os.path.join(ow, 'motion.mtable'), 'rb').read()
+    check('skeleton scripts: motion.mtable = SkeletonRun / SkeletonExplode / SkeletonSmoke (its motion kinds 0 / 1 / 2)',
+          list(struct.unpack('>3I', mt)), [acmd.crc(n) for n in GB.SK_SCRIPTS])
+    game = acmd.ACMDFile.load(os.path.join(ow, 'game.bin'))
+    boom = [c for c in game.script('SkeletonExplode') if c.name == 'Special_Hitbox']
+    syn = boom[0].info['syntax'] if boom else []
+    hb = dict(zip(syn, boom[0].params)) if boom else {}
+    check('skeleton explosion: one hitbox, 15 %, 50 degrees, KBG 50 / BKB 40, size 22 at its middle (bone 0, Y 14), flame, '
+          'launched from its middle (FacingRestrict 5), then off after 4 frames',
+          (len(boom), [round(hb.get(k, -1), 3) for k in ('Damage', 'Angle', 'KBG', 'BKB', 'Size', 'Y', 'Effect', 'FacingRestrict', 'Bone')],
+           [c.name for c in game.script('SkeletonExplode')][1:3]),
+          (1, [15.0, 50, 50, 40, 22.0, 14.0, 5, 5, 0], ['WAIT', 'Remove_All_Hitboxes']))
+    p = 145.0
+    kb = ((p / 10 + p * 15 / 20) * 200 / 200 * 1.4 + 18) * 0.5 + 40
+    check('skeleton explosion: Smash 4\'s knockback on Mario (weight 100) at 130 %% (+ 15): %.1f (a mid-stage KO ~130-140)' % kb,
+          130 <= kb <= 140, True)
+    check('skeleton scripts: run / smoke without a hitbox; effect / sound empty',
+          ([c.name for c in game.script('SkeletonRun')], [c.name for c in game.script('SkeletonSmoke')]),
+          (['Script_End'], ['Script_End']))
+    lv = lvd.LVD(os.path.join(fg, 'model', 'skeleton', 'c00', 'skeleton.lvd'))
+    c = lv.collisions[0]
+    check('skeleton.lvd: one collision, the 4 vertices the executable moves (x +- 6, y 2 / 28), a wall each side and a '
+          'floor on top (normals out), the hydrant\'s flags',
+          (len(lv.collisions), [tuple(round(x, 2) for x in v) for v in c.verts], [tuple(n) for n in c.normals], c.flags),
+          (1, [tuple(v) for v in C.SK_VERTS], [(-1.0, 0.0), (0.0, 1.0), (1.0, 0.0)], [0, 1, 0, 0]))
+    check('skeleton: its main.pac and carrier model files are present (Pac-Man\'s hydrant\'s)',
+          [f for f in GB.SK_CARRIER if not os.path.exists(os.path.join(fg, 'model', 'skeleton', 'c00', f))] +
+          [f for f in ('main.pac',) if not os.path.exists(os.path.join(fg, 'motion', 'skeleton', f))], [])
+    names = open(os.path.join(HERE, 'Sm4shCommand', 'SM4SHCommand', 'ModAnimNames.txt')).read()
+    check('skeleton: its script names in ModAnimNames.txt (with -> lines for the Hitbox Viewer)',
+          [n for n in GB.SK_SCRIPTS if '\n%s -> skeleton/' % n not in names], [])
+
+
 def script_tests(out, user):
     O = os.path.join(out, 'fighter', 'gekkouga', 'script', 'animcmd')
     ug = acmd.ACMDFile.load(os.path.join(user, 'body', 'game.bin'))
@@ -1389,13 +1429,28 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('update: none of the installed unchanged files again (%d unchanged)' % len(same1), [w for w in same1 if w in names], [])
         check('update: nothing in INSTALL_TO_data but the built files',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want), [])
-        check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
+        if len(earlier) == 17:
+            check('skeleton v1: Sm4shCommand v1.7.27 (its three script names in ModAnimNames.txt)',
+                  ([t for t in top if t.startswith('Sm4shCommand_v')],
+                   z.read('Sm4shCommand_v1.7.27/ModAnimNames.txt') == open(os.path.join(HERE, 'Sm4shCommand', 'SM4SHCommand',
+                                                                                         'ModAnimNames.txt'), 'rb').read()),
+                  (['Sm4shCommand_v1.7.27'], True))
+        else:
+            check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
     if z1 and len(earlier) == 1:
         v2new = ['fighter/gekkouga/script/msc/gekkouga.mscsb', 'fighter/gekkouga/script/msc/clone/clone.mscsb'] + \
                 ['fighter/gekkouga/motion/clone/%s' % f for f in GB.CLONE_MOTION_PACS if f != 'main.pac'] + \
                 ['fighter/gekkouga/model/clone/c%02d/%s' % (c, f) for c in range(8) for f in GB.CLONE_FACE_FILES]
         check('v2: both MSCs, his 5 motion part pacs, the face / rest-of-model files in all 8 colours (%d)' % len(v2new),
               [m for m in v2new if 'INSTALL_TO_data/' + m not in names], [])
+    if z1 and len(earlier) == 17:
+        check('skeleton v1: INSTALL_TO_data: his MSC, the skeleton\'s MSC, scripts, motion and model (with skeleton.lvd)',
+              sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              sorted(['fighter/gekkouga/script/msc/gekkouga.mscsb', 'fighter/gekkouga/script/msc/skeleton/skeleton.mscsb',
+                      'fighter/gekkouga/motion/skeleton/main.pac', 'fighter/gekkouga/model/skeleton/c00/skeleton.lvd'] +
+                     ['fighter/gekkouga/script/animcmd/weapon/skeleton/%s' % f for f in ('game.bin', 'effect.bin', 'sound.bin',
+                                                                                         'motion.mtable')] +
+                     ['fighter/gekkouga/model/skeleton/c00/%s' % f for f in GB.SK_CARRIER]))
     if z1 and len(earlier) == 13:
         check('v13: INSTALL_TO_data: his MSC only (a fallen clone\'s heartbeat loss reported 401 / 402)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
@@ -1470,7 +1525,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
     check('the files the mod needs (with the earlier packages under it)', [m for m in must if 'INSTALL_TO_data/' + m not in names | names1], [])
     with tempfile.TemporaryDirectory() as td:
         import gekkouga_clone_cave as C
-        for i, (member, b, dg, feats) in enumerate(exe_members(base, base_diag, len(earlier) >= 3)):
+        for i, (member, b, dg, feats) in enumerate(exe_members(base, base_diag, len(earlier) >= 3, len(earlier) == 17)):
             if not b:
                 continue
             p = os.path.join(td, '%d.rpx' % i)
@@ -1509,14 +1564,20 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway')
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) != 17 else \
+        ('greninja_burn_v1_2', 'exe_v46z_gks1', 'Running Skeleton', '25', '180', '0.7', 'ledge', 'smoke', 'explo', '36',
+         '6.3', 'S4SS', 'S4SH', 'S4SX', 'S4SC', 'S4SF', 'hydrant', 'placeholder', 'Sm4shCommand_v1.7.27', 'unconfirmed')
     check('README.txt mentions every feature (%s)' % ', '.join(words), [w for w in words if w not in readme], [])
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
 
-def exe_members(base, base_diag, v4):
-    """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant"""
+def exe_members(base, base_diag, v4, skeleton=False):
+    """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant; skeleton v1 the
+    release and TEST_ONLY A_release (as the burn packages)"""
     import gekkouga_clone_cave as C
+    if skeleton:
+        return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE),
+                ('TEST_ONLY_INSTALL_TO_code/A_release/cross_f.rpx', base_diag, True, C.RELEASE)]
     if not v4:
         return [('INSTALL_TO_code/cross_f.rpx', base, False, C.FEATURES), ('TEST_ONLY_INSTALL_TO_code/cross_f.rpx', base_diag, True, C.FEATURES)]
     return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE)] + \
@@ -1531,7 +1592,10 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
           [C.WEAPON_JOINT + h[7] for h in C.HURTBOXES], [bm(h[7]) for h in C.HURTBOXES])
     msc = os.path.join(out, 'fighter', 'gekkouga', 'script', 'msc')
     for f, src in ((os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c')),
-                   (os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC)):
+                   (os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC),
+                   (os.path.join(msc, 'skeleton', 'skeleton.mscsb'), GB.SKELETON_MSC)):
+        if not os.path.exists(f):
+            continue
         r = subprocess.run([sys.executable, os.path.join(HERE, 'msc_stack_check.py'), f, src], capture_output=True, text=True)
         lines = r.stdout.strip().splitlines()
         m = re.search(r'globals: (\d+) of 128', r.stdout)
@@ -1539,7 +1603,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
               (lines[-2].startswith('0 of') if len(lines) > 1 else False, bool(m) and int(m.group(1)) <= 128), (True, True))
     z = zipfile.ZipFile(pkg)
     with tempfile.TemporaryDirectory() as td:
-        for member, b, dg, feats in exe_members(base, base_diag, v4):
+        for member, b, dg, feats in exe_members(base, base_diag, v4, len(earlier) == 17):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')
@@ -1560,7 +1624,8 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
 
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
-    earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
+    earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
+                                               'b11', 'b12') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
     base_diag = a[4] if len(a) > 4 else None
@@ -1568,6 +1633,10 @@ def main():
     msc_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
     physics_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
     clone_tests(os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC)
+    if os.path.exists(os.path.join(msc, 'skeleton', 'skeleton.mscsb')):
+        skeleton_side_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
+        skeleton_tests(os.path.join(msc, 'skeleton', 'skeleton.mscsb'), GB.SKELETON_MSC)
+        skeleton_data_tests(out)
     script_tests(out, user)
     package_tests(out, pkg, base, base_diag, v1, earlier)
     model_tests(out, earlier)

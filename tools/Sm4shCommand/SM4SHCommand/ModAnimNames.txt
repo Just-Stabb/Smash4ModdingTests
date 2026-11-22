@@ -607,3 +607,9 @@ specialairsattackb -> clone/FitGekkougaBodyMainD01SpecialAirSAttackB.omo
 specialairsattackb_c2 -> clone/FitGekkougaBodyMainD01SpecialAirSAttackB.omo
 specialairsattackb_c3 -> clone/FitGekkougaBodyMainD01SpecialAirSAttackB.omo
 speciallw_c2 -> clone/FitGekkougaBodyMainD03SpecialLw.omo
+// Skeleton v1 (fighters/gekkouga/README.md "Skeleton v1"): the Running Skeleton article (weapon kind 0x1A2, folder
+// "skeleton": script/animcmd/weapon/skeleton), its motion kinds 0 / 1 / 2 (motion.mtable): run, explode (its explosion's
+// hitbox), smoke. Each plays its carrier's (Pac-Man's hydrant's) animation from its own motion/skeleton/main.pac.
+SkeletonRun -> skeleton/FitPacmanFirehydrantMainD03SpecialLw.omo
+SkeletonExplode -> skeleton/FitPacmanFirehydrantMainD03SpecialLw.omo
+SkeletonSmoke -> skeleton/FitPacmanFirehydrantMainD03SpecialLw.omo
