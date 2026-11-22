@@ -416,3 +416,82 @@ python3 tools/rpx_patch.py exe_v46z_ui10_diag.rpx exe_v46z_gk2_diag.rpx \
   stage" (it goes when he is KO'd).
 - The hitlag starts a frame after the hit; its length as above.
 - Launched: they play Wait1 (Fall while falling) and come back by smoke, not by walking.
+
+## Clones v3 (`greninja_clones_v3.zip`)
+
+The user asked for v2's limits to be fixed. The package is an update over v1 + v2: both MSCs, exe_v46z_gk3 (+ diag)
+and README.txt. Tests: `tools/gekkouga_clones_test.py ... --v1=greninja_clones_v1.zip --v2=greninja_clones_v2.zip`
+(163 checks), `tools/gekkouga_clone_cave_test.py` (80 unicorn checks, gk3 and gk3_diag), `supamario_ui_cave_test.py`
+(outline5 -> gk3) 0 failures, `import_call_check` 0 on both. No script or slot changed (Sm4shCommand stays v1.7.26).
+
+```sh
+python3 tools/rpx_patch.py exe_v46z_ui10.rpx exe_v46z_gk3.rpx $(python3 tools/gekkouga_clone_cave.py --rpx exe_v46z_ui10.rpx)
+```
+
+### Found: the clone article's per-frame template
+
+The weapon switches run a per-kind template (docs/native-notes.md "Greninja's clones" v3). The clone's base kind was
+bunshin, whose update template updates only its own modules (+0x18 / +0x24 / +0x38 / +0x44 / +0x8C / +0xA0 / +0xB4 /
++0xB8): never the AttackModule (`0x02C08230` on accessor +0x50) or the KineticModule v1 added to its row. v1 / v2's
+clone hitboxes therefore likely never updated. v3's base kind (the switches only) is **lizardonm (0x15C)**, Charizard's
+Final Smash form: its template updates bunshin's modules plus +0x1C, Kinetic +0x34, Attack +0x50, Hit +0x58, +0xA4
+(no GroundModule), and its module row (bunshin's slots + Kinetic, Attack, Hit 6 `0x02BCC808`, Damage 20 `0x02BCC9D0`)
+is the clone's whole row. Its templates call the specializer only through the vtable (no direct calls into
+lizardonm's own code, scanned in all 11 switches), so the clone keeps bunshin's specializer methods (its vtable copy).
+
+### (a) Hurtboxes anywhere, exact clone, independent hits
+
+- Exe: the clone's specializer +0x1C (bunshin's is a `blr`) gives its HitModule his 8 hurtboxes (his vl group 5,
+  vanilla `fighter_param_vl_gekkouga.bin`: bones 12 19 22 16 8 4 9 5 as the article's joints 0x7D0 + jtb, checked with
+  `gekkouga_build.bone_map`) through vt +0x4C(&{data, 8}, 0), the Duck Hunt can's set-up call.
+- A hit on it: the poller in the specializer's +0x64 / +0x84 / +0x8C / +0x94 (every frame phase the templates call,
+  `(spec, weapon)`) reads its DamageModule vt +0x7C(0) (the damage taken this frame, Mii Gunner's flame pillar's read)
+  and, when > 0, writes its owner's VAR_21 = 20000 + its VAR_1 (its id, its MSC writes it) through his WorkModule, then
+  runs bunshin's method with the same arguments. His MSC kills exactly that clone (log at its place).
+- His shield-capsule route is off (MSC flags bit 4 no longer set, shapes never on): no shield spark, and an attack
+  touching him and a clone hits both (separate objects, separate hit records). The exe's group-1 / slot 42 / 43 parts
+  stay (dormant).
+
+### (b) Walls and ceilings, (d) slopes
+
+`gk_clone_phys` with `gk_line` (the stage line test, Line_Test's variables: kind 1 floor, 2 wall, 3 ceiling, hit X / Y):
+- X: a horizontal test at its feet + `gk_wall_y()` **5** from where it is to its target (his X + offset); a wall stops
+  it `gk_wall_gap()` **3** short (its offset gives way); free again, it goes back. Swaps use its real place (his move
+  = its X - his X, the other clone keeps its place).
+- Up: a test from its head (+ `gk_head()` **15**) by the rise; a ceiling stops it (vy 0).
+- Standing (it stood last frame): the floor under its new X from y + reach down to y + dy - reach, reach = `gk_snap()`
+  **2** + `gk_slope()` **1.4** x its step (a floor line has normal Y >= 0.6: at most 1.33 per unit). A cliff face is a
+  wall line (kind 2), not a step. Falling: from y + 0.5. Copying his jump: its floor stops it once it lands while he is
+  still coming down; level with him (y = his last Y) the floor he left is skipped (a platform drop).
+
+### (c) The blast zone
+
+The game removes a weapon past the stage's blast zone without its MSC (seen in game for Supamario's kamehameha, a
+fireball copy). v3: each clone's MSC sets its bit (1 / 2) in his VAR_30 (SLOTn_SHARED_6) every frame; his MSC reads and
+clears it every frame (`gk_heartbeat`); a clone older than 6 frames whose bit is off **3** frames running is gone
+(`gk_gone`: no log). The channel's motion kind moved into VAR_28 (kind x 1024 + frame) to free VAR_30. Fallback: 300
+frames falling on its own. Not found: the stage's dead-range data in the Wii U executable (searched: the fighters'
+outfield / dead event `0x02E1A45C`, the weapon templates' helpers; the 3DS's `GroundUtility::check_dead_area` has no
+Wii U counterpart identified), so the MSC doesn't read the blast zone itself.
+
+### (e) / (f) Hitlag at the hit, from the damage
+
+Weapons have no attacker hitstop handler (the weapon class's vt +0xEC is `li r3, 0; blr`), so the clone's hit-result
+method (+0xAC, called when its attack connects / is shielded) does it: from the clone's AttackModule hit records (`+0x14`
+arrays of 0x174, `+0x18` count, node `+0x27` hitbox id; slots `[+0x40] + id x 0x84`, `+0x18` damage) the hitbox with the
+most damage that has records; `0x02C2678C(his accessor, its data, damage, 1.0 (the attacker handler's multiplier,
+`0x10105DCC`), side 1, its own multiplier)` = the game's attacker hitstop; his StopModule (accessor +0x48) vt
++0x8C(frames, 1) (the fighters' setter keeps the longer: no stacking). VAR_22 = 1.0 still: his MSC's fallback (the
+victims' hitstop, at least 4) only if he isn't in hitlag by then. Not applied: the attacker handler's rate (HitModule
+vt +0x17C, 1 normally) and acmd_ext's per-hitbox attacker hitlag extras.
+
+### (g) Left-behind clones
+
+Kept: they reappear next to him in smoke when he is out of the launched / grabbed statuses (walking back could take
+them through gaps and walls).
+
+### What is approximate / untested (v3)
+
+- In game: the template swap, the hurtbox set-up, the damage poll, the native removal past the blast zone for this kind.
+- The hitlag hitbox: the strongest with records during the move (usually the one that just hit).
+- One wall test height; the fallback fall timer.
