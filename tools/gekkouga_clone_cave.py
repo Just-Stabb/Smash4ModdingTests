@@ -353,11 +353,11 @@ hud:    li r12, 8
         slwi r12, r12, 2
         lis r11, %(gk_hide_hi)d
         addi r11, r11, %(gk_hide_lo)d
-        lwzx r0, r11, r12
-        cmpwi r0, 0
+        lwzx r10, r11, r12
+        cmpwi r10, 0
         beq hud_go
-        addi r0, r0, -1
-        stwx r0, r11, r12
+        addi r10, r10, -1               # (r10: addi from r0 would read 0)
+        stwx r10, r11, r12
         lis r11, %(far_hi)d
         lfs f0, %(far_lo)d(r11)
         stfs f0, 8(r3)

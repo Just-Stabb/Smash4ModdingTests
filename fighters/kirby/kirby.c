@@ -72873,6 +72873,7 @@ int kirby_copy_trait(int kind)
     if (kind == 0x36) { return trait_technical(); } // Roy
     if (kind == 0x24) { return trait_normal(); }    // Dr. Mario
     if (kind == 0x1b) { return trait_rush(); }      // Diddy Kong
+    if (kind == 0x30) { return trait_technical(); } // Greninja
     return trait_normal();                       // not listed yet
 }
 

@@ -30,6 +30,7 @@ Traits: **Rush**, **Shooter**, **Strike**, **Juggernaut**, **Normal**, **Technic
 | Roy | `0x36` | Technical |
 | Dr. Mario | `0x24` | Normal |
 | Diddy Kong | `0x1B` | Rush |
+| Greninja (`gekkouga`) | `0x30` | Technical |
 
 Kirby himself (no copy) has no trait. A copied character that isn't listed counts as Normal.
 Kind IDs: `reference/fighter_param_attributes.csv` (CharID column) or the copy kind int `0x100000A4`.
