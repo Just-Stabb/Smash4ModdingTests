@@ -54,8 +54,33 @@ SK_BOOM_WIDEST_U = 0.84            # hitbox's 22 radius x 2
 SK_BOOM_BASE_V = 0.895             # its base (alpha >= 0.5's lowest row, every cell): on the ground
 SK_HIT_W = 18.0                    # a hit's sparks: the quad 18 units across (centred on the hit)
 
-# name, sidecar folder, blend (0 normal / 1 add), mirrored, (x, y) size in units, (x, y) offset, entry
-SETS = []
+# ---- burn v2: fire (the luma-matted footage, additive: fire on black). Heights of the quad; widths from the cell's shape
+FIRE_BODY_H = 22.0                 # on a burning fighter (fire_small_4): its base on his feet (TransN), ~16 of flame
+FIRE_TIP_H = 10.0                  # at the outer ends of his water (fire_torch_012): centred on the call (x the call's size)
+FIRE_TRAIL_H = 22.0                # the smashes' trails (fire_ground_10): its base on the call's point
+FIRE_FADE = 15                     # frames the body / trail fires take to go when ended with a fade (0x2723 (0, 0))
+
+
+def cell_aspect(name):
+    d = sidecar(name)
+    return d['cell_size'][0] / d['cell_size'][1]
+
+
+def _fire_sets():
+    body = dict(atlas='fire_small_4', blend=1, size=(FIRE_BODY_H * cell_aspect('fire_small_4'), FIRE_BODY_H),
+                fade=FIRE_FADE)
+    body['offset'] = (0.0, (feet_cell_v('fire_small_4') - 0.5) * FIRE_BODY_H)
+    tip = dict(atlas='fire_torch_012', blend=1, size=(FIRE_TIP_H * cell_aspect('fire_torch_012'), FIRE_TIP_H),
+               offset=(0.0, 0.0))
+    trail = dict(atlas='fire_ground_10', blend=1, size=(FIRE_TRAIL_H * cell_aspect('fire_ground_10'), FIRE_TRAIL_H),
+                 fade=FIRE_FADE)
+    trail['offset'] = (0.0, (feet_cell_v('fire_ground_10') - 0.5) * FIRE_TRAIL_H)
+    return [('PtcGekkougaFireBody', body), ('PtcGekkougaFireTip', tip), ('PtcGekkougaFireTrail', trail)]
+
+
+def all_sets(burn2=True):
+    """every set in entry order: skeleton v1.2's, then burn v2's"""
+    return _sk_sets() + (_fire_sets() if burn2 else [])
 
 
 def _sk_sets():
@@ -204,7 +229,8 @@ def flip_emitters(p, tmpl, name, spec):
         f(em, 'color_scale', spec.get('brightness', 1.0))
         f(em, 'camera_offset', 0.0)
         struct.pack_into('>I', em, 0x310, 0)           # follow type 0: on its emitter's live matrices
-        struct.pack_into('>f', em, 0x82C, 1.0 if loop else 0.0)   # a loop goes at once when ended; a one-shot plays out
+        # a loop goes at once when ended (or fades over spec fade frames); a one-shot plays out
+        struct.pack_into('>f', em, 0x82C, (1.0 / spec['fade'] if spec.get('fade') else 1.0) if loop else 0.0)
         em[0x2F9] = 1                                  # no emission while ending
         p.set_emitter_srt(em, translation=(spec['offset'][0], spec['offset'][1], 0.0))
         t = run['table']
@@ -216,7 +242,7 @@ def flip_emitters(p, tmpl, name, spec):
     return out
 
 
-def build(in_dir, kirby_path, fx_pkg, out_dir, sets=None):
+def build(in_dir, kirby_path, fx_pkg, out_dir, sets=None, burn2=True):
     """the new .ptcl / .efc in out_dir: {set name: effect id}"""
     global FX_PKG
     FX_PKG = fx_pkg
@@ -226,7 +252,7 @@ def build(in_dir, kirby_path, fx_pkg, out_dir, sets=None):
     kirby = P.Ptcl(open(kirby_path, 'rb').read())
     tmpl = template(p, kirby)
     ids = {}
-    for name, spec in (sets if sets is not None else _sk_sets()):
+    for name, spec in (sets if sets is not None else all_sets(burn2)):
         si = p.new_set(name, flip_emitters(p, tmpl, name, spec))
         ids[name] = (BANK << 16) | e.add(si + 1, None, 0x100)
     errs = p.validate()

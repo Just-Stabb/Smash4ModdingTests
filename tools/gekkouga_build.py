@@ -641,9 +641,10 @@ if __name__ == '__main__':
         print(cmd_data(a[1], a[2]))
     elif len(a) == 4 and a[0] == 'all':
         print(cmd_all(a[1], a[2], a[3]))
-    elif len(a) == 5 and a[0] == 'effects':
-        import gekkouga_fx
-        for k, v in gekkouga_fx.build(a[1], a[2], a[3], os.path.join(a[4], 'effect', 'gekkouga')).items():
+    elif len(a) in (5, 6) and a[0] == 'effects':
+        import gekkouga_fx                   # (a 6th argument --skeleton-only: skeleton v1.2's bank, without burn v2's)
+        for k, v in gekkouga_fx.build(a[1], a[2], a[3], os.path.join(a[4], 'effect', 'gekkouga'),
+                                      burn2=a[5:] != ['--skeleton-only']).items():
             print('0x%08X %s' % (v, k))
     elif len(a) in (3, 4) and a[0] == 'skeleton':
         print(cmd_skeleton(a[1], a[2], a[3] if len(a) > 3 else None))

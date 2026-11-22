@@ -594,9 +594,12 @@ def fighter_desc_checks(e, img, info):
     rows = [[e.w(ents + 16 * i + 4 * j) for j in range(4)] for i in range(n)]
     van = img.w(C.GK_DESC + 8)
     vrows = [[img.w(img.w(van) + 16 * i + 4 * j) for j in range(4)] for i in range(6)]
-    check('his articles 0-5 as before, 6 / 7 the clones (0x1A1, max 1, no spawner)', rows,
+    check('his articles 0-5 as before, 6 / 7 the clones (0x1A1, max 1, no spawner)%s%s' % (
+          ', 8 the skeleton' if 'skeleton' in info['feats'] else '',
+          ', 9 the fire trails (burn v2: 0x1A3, %d at once)' % C.TR_MAX if 'burn2' in info['feats'] else ''), rows,
           vrows + [[C.CLONE_KIND, 1, 0, 0], [C.CLONE_KIND, 1, 0, 0]] +
-          ([[C.SK_KIND, 1, 0, 0]] if 'skeleton' in info['feats'] else []))
+          ([[C.SK_KIND, 1, 0, 0]] if 'skeleton' in info['feats'] else []) +
+          ([[C.TR_KIND, C.TR_MAX, 0, 0]] if 'burn2' in info['feats'] else []))
     others = []
     for k in (0x3, 0x10, 0x2F, 0x31, 0x41, 0x47):
         try:
@@ -1310,7 +1313,9 @@ def clear_checks(e, info, diag):
             e.setw(A['btab'] + k, 100)          # a "previous match": every list full
             e.setw(A['btab'] + k + 4, (3 << 16) | 6)
             e.setw(A['btab'] + k + 8, k // 16 % 8)
-        e.mu.mem_write(A['bproc'], b'\x07' * (C.BURN_CONTEXTS * C.BURN_ENTS))
+        e.mu.mem_write(A['bproc'], b'\x07' * (C.burn_contexts(F) * C.BURN_ENTS))
+    if 'burn2' in F:
+        e.mu.mem_write(A['bfx_lvl'], b'\x00\x00\x00\x03' * (C.SLOTS + C.SLOTS * C.TR_CTX))
     for i in range(16):
         e.setw(A['gk_hide'] + 4 * i, 3)
     for i in range(C.SLOTS):
@@ -1323,7 +1328,10 @@ def clear_checks(e, info, diag):
     if burn:
         check('burn v1.2: every burn of the last match gone, the processed counts 0',
               (any(e.w(A['btab'] + k) for k in range(0, C.SLOTS * C.BURN_CAP * 16, 4)),
-               bytes(e.mu.mem_read(A['bproc'], C.BURN_CONTEXTS * C.BURN_ENTS)).strip(b'\0')), (False, b''))
+               bytes(e.mu.mem_read(A['bproc'], C.burn_contexts(F) * C.BURN_ENTS)).strip(b'\0')), (False, b''))
+    if 'burn2' in F:
+        check('burn v2: the fires shown and the trails\' contexts 0',
+              bytes(e.mu.mem_read(A['bfx_lvl'], 4 * (C.SLOTS + C.SLOTS * C.TR_CTX))).strip(b'\0'), b'')
     check('burn v1.2: the tag hide counters / slow states / tag countdowns 0, the cursor bytes kept for their restore',
           ([e.w(A['gk_hide'] + 4 * i) for i in range(16)], [e.w(A['gk_tags'] + 4 * i) for i in range(C.SLOTS)],
            [e.w(A['gk_plyr'] + 4 * i) for i in range(C.SLOTS)]), ([0] * 16, [0] * C.SLOTS, [2] * C.SLOTS))
@@ -1398,8 +1406,8 @@ def skeleton_checks(e, info, diag):
           (e.w(A['sk_single']), e.w(vt + 0x34), e.w(vt + 0x94), e.w(vt + W.HIT_METHOD)),
           (vt, lab['sk_start'], lab['sk_94'], lab['sk_hit']))
     lst = e.w(A['gk_desc'] + 8)
-    check('his article list: 9 entries, article 8 the skeleton (one at a time)',
-          (e.w(lst + 4), [e.w(e.w(lst) + 16 * 8 + 4 * j) for j in range(4)]), (9, [C.SK_KIND, 1, 0, 0]))
+    check('his article list: %d entries, article 8 the skeleton (one at a time)' % (10 if 'burn2' in F else 9),
+          (e.w(lst + 4), [e.w(e.w(lst) + 16 * 8 + 4 * j) for j in range(4)]), (10 if 'burn2' in F else 9, [C.SK_KIND, 1, 0, 0]))
     # ---- the game's side, stubbed
     calls = []
     st = dict(file=1, ground=1)
@@ -2044,6 +2052,249 @@ def panel_checks(e, info, diag):
         check('v6 diag: S4GB logged when the gauge changes by a tenth (1034 no, 1043 yes)', (n2, n3), (0, 1))
 
 
+def burn2_checks(e, info, diag):
+    """burn v2 (feature burn2): the burning fighters' fire (bfx_vic, from his burn_tick) and the fire trail article
+    (kind TR_KIND: its tables, tr_claim from his requests, its contexts, its hits' burns with the trail row)"""
+    lab, A, F, img = info['labels'], info['A'], info['feats'], info['img']
+    tr = C.TR_ROW
+    check('burn v2: the trail row 0.25 %% every 15 frames for 180 = %.2f %%; shielded half the frames, raised to the floor: '
+          '%.2f %% a tick x 6 = %.2f %%' % (C.burn_total(tr), C.burn_shield_damage(tr), C.burn_total(tr, True)),
+          (round(C.burn_total(tr), 4), round(C.burn_total(tr, True), 4)), (3.0, 3.0))
+    if 'burn2' not in F:
+        check('burn v2: without "burn2": no trail / fire code', ('tr_frame' in lab, 'bfx_vic' in lab), (False, False))
+        return
+    check('burn v2: its rows: burn v1\'s and the skeleton\'s, then the trail\'s (key 0x%X)' % C.TR_BURN_KEY,
+          [struct.unpack('>I', bytes(e.mu.mem_read(A['bmoves'] + 20 * i, 4)))[0] for i in range(len(C.burn_moves(F)))],
+          [m[0] for m in C.BURN_MOVES] + [C.TR_BURN_KEY])
+    # ---- (1) the fire on a burning fighter
+    for i in range(8):
+        e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
+    for kk in range(C.SLOTS * C.BURN_CAP):
+        e.setw(A['btab'] + 16 * kk, 0)
+    for i in range(C.SLOTS + C.SLOTS * C.TR_CTX):
+        e.setw(A['bfx_lvl'] + 4 * i, 0)
+    calls = []
+    emvt = e.alloc(0x400, b'\0')
+    emfn = e.alloc(4)
+    e.setw(emvt + C.EM_MSC, emfn)
+
+    def em(e_):
+        ptr, n = e_.w(e_.r(4)), e_.w(e_.r(4) + 4)
+        ws = [e_.w(ptr + 4 * i) for i in range(n)]
+        if ws[0] == 0x2717:
+            ws = ws[:3] + [round(struct.unpack('>f', struct.pack('>I', w))[0], 3) for w in ws[3:10]] + ws[10:]
+        calls.append((e_.r(3), tuple(ws)))
+    e.stub(emfn, em)
+    gk = e.fighter(2)
+    e.mu.mem_write(gk['f'] + 0x1E, b'\x04')
+    vic = e.fighter(4)
+    e.mu.mem_write(vic['f'] + 0x1E, b'\x04')
+    vacc = e.w(vic['f'] + C.BASE_ACC)
+    vem = e.alloc(0x10, b'\0')
+    e.setw(vem, emvt)
+    e.setw(vacc + C.F_EFFECT, vem)
+
+    def put(n, owner=2):
+        for kk in range(C.BURN_CAP):
+            a = A['btab'] + (4 * C.BURN_CAP + kk) * 16
+            if kk < n:
+                e.setw(a, 1000)
+                e.setw(a + 4, (100 << 16) | 100)
+                e.setw(a + 8, owner)
+                e.setw(a + 12, 0)
+            else:
+                e.setw(a, 0)
+
+    def frame(slot0=2, f=None):
+        del calls[:]
+        e.osr_full = []
+        e.call(lab['burn_him'], (f or gk)['f'], slot0)
+        return list(calls)
+    put(1)
+    c1 = frame()
+    spawn = lambda sz: (vem, (0x2717, C.BFX_ID, 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, sz, 0))   # noqa: E731
+    check('burn v2: a victim with one burn: its fire put on it (its EffectModule\'s MSC handler: 0x2717 (0x%X, joint 0, '
+          'no offset, size 1.0, 0): following its joint 0)' % C.BFX_ID, (c1, e.w(A['bfx_lvl'] + 16)), ([spawn(1.0)], 1))
+    check('burn v2: ... the next frame: nothing (shown)', frame(), [])
+    put(3)
+    put(2, 6) if False else None
+    for kk in (1, 2):
+        e.setw(A['btab'] + (4 * C.BURN_CAP + kk) * 16 + 8, 6)       # two of another Greninja's (slot 7)
+    check('burn v2: 3 burns (anyone\'s): the fire ended at once (0x2723 (id, 1, 1)) and put on again at 1.3',
+          frame(), [(vem, (0x2723, C.BFX_ID, 1, 1)), spawn(1.3)])
+    put(9)
+    check('burn v2: 9 burns: level 5 (the most): 1.6', frame()[-1:], [spawn(1.6)])
+    put(12)
+    check('burn v2: 12 burns: still level 5: nothing', frame(), [])
+    gk2 = e.fighter(6)
+    e.mu.mem_write(gk2['f'] + 0x1E, b'\x04')
+    check('burn v2: another Greninja\'s burn_tick the same frame: nothing again (the level shown is shared)',
+          frame(6, gk2), [])
+    put(0)
+    c0 = frame()
+    check('burn v2: no burn left: the fire ended with a fade (0x2723 (id, 0, 0)), nothing put on', c0,
+          [(vem, (0x2723, C.BFX_ID, 0, 0))])
+    if diag:
+        frame()
+        put(1)
+        frame()
+        check('burn v2 diag: S4BF (victim 4, level 0 -> 1)', [x[1:4] for x in e.osr_full if x[0] == A['gk_fbf']], [(4, 0, 1)])
+        put(0)
+        frame()
+    e.mu.mem_write(vic['f'] + 0x1E, b'\x00')
+    put(2)
+    check('burn v2: a victim no longer live: its level kept, no call', (frame(), e.w(A['bfx_lvl'] + 16)), ([], 0))
+    put(0)
+    frame()
+    e.mu.mem_write(vic['f'] + 0x1E, b'\x04')
+    # ---- (2) the fire trail article: its tables
+    T = info['T']
+    k = C.TR_KIND - W.OLD_N
+    check('trail tables: name / folder "firetrail", owner "gekkouga"',
+          [e.cstr(e.w(T[nm] + 4 * C.TR_KIND)) for nm in ('owner', 'name', 'folder')], ['gekkouga', 'firetrail', 'firetrail'])
+    check('trail tables: base kind Mario\'s pump, its own singleton / row (the clone\'s)',
+          (e.w(T['bt'] + 4 * k), e.w(T['st'] + 4 * k), e.w(T['rt'] + 4 * k) + W.MODULE_TABLE & 0xFFFFFFFF,
+           [e.w(A['tr_row'] + 4 * j) for j in range(28)] == [e.w(A['w_row'] + 4 * j) for j in range(28)]),
+          (C.ATTACK_BASE, A['tr_single'], A['tr_row'], True))
+    u16 = e.mu.mem_read(T['u16'] + 2 * C.TR_KIND, 2)
+    bun = img.h(W.STATIC_TABLES[2][1] + 2 * C.CLONE_BASE)
+    check('trail tables: u16 flags as the skeleton\'s (c00 only, loaded with him)', struct.unpack('>H', bytes(u16))[0],
+          bun & ~(C.CATEGORY_BITS | 0x10))
+    e.call(e.w(T['dt'] + 4 * k))
+    d = e.r(3)
+    mi = e.w(d + 8)
+    check('trail descriptor: a bunshin copy, 3 motions (the hydrant\'s hash: forward / up / down)',
+          (d, e.w(mi + 4), [e.w(e.w(mi) + 8 * i) for i in range(3)]), (A['tr_desc'], 3, [C.SK_MOTION] * 3))
+    vt = A['tr_vt']
+    check('trail singleton: +0x34 the skeleton\'s start (its VARs 0), +0x94 tr_94, +0xAC the skeleton\'s hit method (not '
+          'removed by its hits)', (e.w(A['tr_single']), e.w(vt + 0x34), e.w(vt + 0x94), e.w(vt + W.HIT_METHOD)),
+          (vt, lab['sk_start'], lab['tr_94'], lab['sk_hit']))
+    lst = e.w(A['gk_desc'] + 8)
+    check('his article list: article 9 the fire trails (0x1A3, %d at once)' % C.TR_MAX,
+          [e.w(e.w(lst) + 16 * 9 + 4 * j) for j in range(4)], [C.TR_KIND, C.TR_MAX, 0, 0])
+    # ---- its claim, contexts and burns
+    sv = {}
+    svt = e.alloc(0x100, b'\0')
+    g, s_ = e.alloc(4), e.alloc(4)
+    e.setw(svt + 0x44, g)
+    e.setw(svt + 0x4C, s_)
+    cur = {}
+    e.stub(g, lambda e_: e_.mu.reg_write(UC_PPC_REG_FPR1, f2d(cur['sv'].get(e_.r(4), 0.0))))
+
+    def sset(e_):
+        cur['sv'][e_.r(4)] = round(d2f(e_.mu.reg_read(UC_PPC_REG_FPR1)), 3)
+    e.stub(s_, sset)
+
+    def trail():
+        w = e.alloc(0x40, b'\0')
+        acc = e.alloc(0x100, b'\0')
+        wm = e.alloc(0x10, b'\0')
+        e.setw(wm, svt)
+        e.setw(acc + C.W_WORK, wm)
+        am = e.alloc(0x60, b'\0')
+        ents = e.alloc(C.ENT_SIZE * 2, b'\0')
+        hdr = e.alloc(0x10, b'\0')
+        e.setw(hdr + 4, hdr)
+        e.setw(ents + C.ENT_LOG, hdr)
+        hdr2 = e.alloc(0x10, b'\0')
+        e.setw(hdr2 + 4, hdr2)
+        e.setw(ents + C.ENT_SIZE + C.ENT_LOG, hdr2)
+        e.setw(am + C.AM_ENTS, ents)
+        e.setw(am + C.AM_COUNT, 2)
+        e.setw(acc + C.W_ATTACK, am)
+        e.setw(w + C.W_ACC, acc)
+        return dict(w=w, sv={}, log=hdr)
+
+    def tframe(t):
+        cur['sv'] = t['sv']
+        e.osr_full = []
+        e.call(lab['tr_frame'], t['w'])
+
+    def tvars(t):
+        return [t['sv'].get(0x0F000300 + i, 0.0) for i in range(6)]
+
+    def ttl(slot0):
+        return [e.w(A['tr_ttl'] + 4 * (slot0 * C.TR_CTX + i)) for i in range(C.TR_CTX)]
+    V = C.GK_VAR_TR
+    e.vars = {V: 1.0, V + 1: 30.0, V + 2: 5.0, V + 3: -1.0, V + 4: 3.0, V + 5: 60.0, V + 6: 6.0, V + 7: 1.0}
+    other = e.fighter(1)
+    e.setw(other['f'] + 4, 0x1)                          # slot 2: Mario (his VARs are the same dict: not a Greninja)
+    e.mu.mem_write(other['f'] + 0x1E, b'\x04')
+    ctx0 = C.TR_CTX0 + 2 * C.TR_CTX
+    e.mu.mem_write(A['bproc'] + ctx0 * C.BURN_ENTS, b'\x07' * C.BURN_ENTS)
+    ta, tb, tc = trail(), trail(), trail()
+    tframe(ta)
+    check('trail claim: the first trail takes his request 0 (forward smash at (30, 5), way -1): VAR_0 his slot 3, VAR_1-4 '
+          'the request, VAR_5 his first context; his request 0 cleared (request 1 kept)',
+          (tvars(ta), e.vars.get(V), e.vars.get(V + 4)), ([3.0, 1.0, 30.0, 5.0, -1.0, 1.0], 0.0, 3.0))
+    check('trail claim: its context kept (%d frames) and its processed counts from 0' % C.TR_TTL,
+          (ttl(2)[:2], bytes(e.mu.mem_read(A['bproc'] + ctx0 * C.BURN_ENTS, C.BURN_ENTS))), ([3, 0], bytes(C.BURN_ENTS)))
+    if diag:
+        check('trail diag: S4TR (owner 3, type 1, x 30, y 5, context 1)',
+              [x[1:6] for x in e.osr_full if x[0] == A['gk_ftr']], [(3, 1, 30, 5, 1)])
+    tframe(tb)
+    check('trail claim: the second takes request 1 (down smash at (60, 6), way 1), his second context',
+          (tvars(tb), e.vars.get(V + 4), ttl(2)[:2]), ([3.0, 3.0, 60.0, 6.0, 1.0, 2.0], 0.0, [3, 3]))
+    tframe(tc)
+    check('trail claim: a third with no request left: unclaimed (VAR_0 0)', tvars(tc)[0], 0.0)
+    e.vars = {}
+    e.call(lab['burn_him'], gk['f'], 2)
+    e.call(lab['burn_him'], gk['f'], 2)
+    tframe(ta)
+    check('trail contexts: his frames count them down (3 -> 1), a running trail\'s frame renews its own (3)',
+          ttl(2)[:2], [3, 1])
+    e.call(lab['burn_him'], gk['f'], 2)
+    e.call(lab['burn_him'], gk['f'], 2)
+    e.call(lab['burn_him'], gk['f'], 2)
+    check('trail contexts: a trail gone (no frame of its own) frees its context', ttl(2)[:2], [0, 0])
+    # its hits
+    for kk in range(C.SLOTS * C.BURN_CAP):
+        e.setw(A['btab'] + 16 * kk, 0)
+    tframe(ta)
+    n = e.alloc(0x30, b'\0')
+    e.setw(n + C.NODE_OBJ, (4 << 16) | 0x11)
+    e.mu.mem_write(n + C.NODE_TYPE, b'\x01')
+    e.setw(n + 4, ta['log'])
+    e.setw(ta['log'] + 4, n)
+    e.setw(ta['log'] + 8, 1)
+    tframe(ta)
+
+    def insts(v):
+        out = []
+        for kk in range(C.BURN_CAP):
+            a = A['btab'] + (v * C.BURN_CAP + kk) * 16
+            if e.w(a):
+                out.append((e.w(a), e.w(a + 4) & 0xFFFF, e.w(a + 8), round(struct.unpack('>f', struct.pack('>I', e.w(a + 12)))[0], 4)))
+        return out
+    check('trail hit: a burn on the victim (slot 5) for him (owner 2): 180 frames, every 15, 0.25 %', insts(4), [(180, 15, 2, 0.25)])
+    tframe(ta)
+    check('trail hit: the same log node: no second', len(insts(4)), 1)
+    n2 = e.alloc(0x30, b'\0')
+    e.setw(n2 + C.NODE_OBJ, (4 << 16) | 0x11)
+    e.mu.mem_write(n2 + C.NODE_TYPE, b'\x02')
+    e.setw(n2 + 4, ta['log'])
+    e.setw(n + 4, n2)
+    e.setw(ta['log'] + 8, 2)
+    tframe(ta)
+    check('trail hit: its re-hit on a shield: 90 frames, 0.5 %% a tick (35 %% raised to the 3 %% floor)', insts(4)[1:],
+          [(90, 15, 2, 0.5)])
+    # contexts run out
+    for i in range(C.SLOTS * C.TR_CTX):
+        e.setw(A['tr_ttl'] + 4 * i, 0)
+    e.vars = {V: 2.0, V + 1: 0.0, V + 2: 0.0, V + 3: 1.0}
+    ts = []
+    for i in range(C.TR_CTX + 1):
+        t = trail()
+        e.vars[V] = 2.0
+        tframe(t)
+        ts.append((tvars(t)[0], tvars(t)[5]))
+    check('trail contexts: %d trails at once each its own (1 - %d); one more: claimed with none (VAR_5 0: no burns)'
+          % (C.TR_CTX, C.TR_CTX), ts, [(3.0, float(i + 1)) for i in range(C.TR_CTX)] + [(3.0, 0.0)])
+    for i in range(C.SLOTS * C.TR_CTX):
+        e.setw(A['tr_ttl'] + 4 * i, 0)
+    e.vars = {}
+
+
 def col_on_checks(patched):
     """skeleton v1.2: the game's own GC_ON / GC_ENABLE (0x02AC2EF0 / 0x02AC2E54) and the ground's enable 0x02D5D6E0 run
     unstubbed on a fake GroundModule / handle / ground: the words they leave are the hydrant's in the user's log
@@ -2121,6 +2372,7 @@ def main():
     clear_checks(e, info, diag)
     info['img'] = img
     skeleton_checks(e, info, diag)
+    burn2_checks(e, info, diag)
     if 'skeleton' in feats:
         col_on_checks(patched)
     pose_checks(e, info, diag)

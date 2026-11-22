@@ -97,7 +97,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # none: 2, loaded with the fighter. Bunshin's 0x87D has 0x1 (4: the Final Smash load,
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
-FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -109,6 +109,7 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', '
 #   burn    burn v1: his water moves burn whoever they hit (burn_scan / burn_add / burn_tick, BURN_MOVES)
 #   pose    clones v14: his tongue / water swing bones' world matrices copied onto the clones (w_pose, every phase)
 #   skeleton skeleton v1: the Running Skeleton article (needs burn): its kind, claim, collision, HP hit check, burn
+#   burn2   burn v2 (needs skeleton): fire on burning fighters (bfx_vic) and the smashes' fire trails (kind TR_KIND)
 #   hitcheck v12: the clone hit from his side (w_hitchk: other fighters' attack boxes against the clone's box)
 #   sway    v11: the clone's swing step every frame (w_sway: his MotionModule's swing update, as his frame calls it)
 #   bstart  v8: the clone's start (specializer +0x34) runs bunshin's own (0x02AF6738: black overlay, LinkModule link 3
@@ -176,11 +177,22 @@ def burn_total(row, shielded=False):
     return dmg * (frames // interval)
 
 
-assert all(burn_total(m, sh) >= BURN_MIN_TOTAL - 1e-4 for m in BURN_MOVES for sh in (False, True)), \
-    'a burn under %s %%' % BURN_MIN_TOTAL
 BURN_CAP = 32                     # instances a victim holds at most (more are dropped)
 BURN_ENTS = 16                    # attack entries scanned (hitbox ids 0-15)
 BURN_CONTEXTS = 8 * 4             # his slot x 4 + 0 him / 1 / 2 a clone / 3 his skeleton (skeleton v1; burn v1: x 3)
+
+
+def burn_moves(feats):
+    """the burn rows: BURN_MOVES, burn v2's trail row after them"""
+    return BURN_MOVES + ((TR_ROW,) if 'burn2' in feats else ())
+
+
+def burn_contexts(feats):
+    """the processed-count contexts: BURN_CONTEXTS, burn v2's trails' (TR_CTX0 on: his slot x TR_CTX) after them"""
+    return BURN_CONTEXTS + (8 * TR_CTX if 'burn2' in feats else 0)
+
+
+TR_CTX0 = BURN_CONTEXTS
 DM_ADD = 0x74                     # DamageModule vt +0x74(0, f1): add percent (MSC DamageModule(9, %)'s op)
 F_STATUS, ST_KIND = 0x20, 0x48     # burn v1.1: a fighter's accessor -> StatusModule (vtable 0x1012D42C), +0x48 its status kind
 ST_DEAD, ST_DEAD_N = 0xB1, 2      # Dead 0xB1 (every KO), Rebirth 0xB2 (the respawn platform): a victim in them loses
@@ -298,9 +310,40 @@ SK_VAR_DIAGT, SK_VAR_REMADE = 0x0F00030B, 0x0F00030C   # v1.1: diag frames to th
 SK_REMAKE = 3                     # v1.1: its grounds made again at most this many times a life (then 4: lost)
 # his VARs (his MSC writes them at the release): 15 a skeleton asked for (1), 16 / 17 the shadow's X / Y, 18 its way
 GK_VAR_SKREQ, GK_VAR_SKX, GK_VAR_SKY, GK_VAR_SKDIR = 0x0F00030F, 0x0F000310, 0x0F000311, 0x0F000312
-RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+
+# ---- burn v2 (feature burn2, fighters/gekkouga/README.md "Burn v2")
+# (1) fire on burning fighters: each frame, for each victim, the level (its burn instances, anyone's, at most BFX_LEVELS)
+# against the one shown (bfx_lvl); a change ends the old fire (its EffectModule's MSC handler, accessor +0xA0 vt +0x2EC:
+# op 0x2723 (id, 1, 1); to none: (0, 0), a fade) and puts the new one on it (op 0x2717: following its joint 0, position
+# only, size 1 + BFX_STEP x (level - 1)). BFX_ID: his bank's PtcGekkougaFireBody (tools/gekkouga_fx.py)
+BFX_ID = 0x0330001A
+BFX_LEVELS = 5
+BFX_STEP = 0.15
+EM_MSC = 0x2EC                    # EffectModule vt +0x2EC: the MSC handler (module, &{args, count}): the ACMD Terminate's call
+F_EFFECT = 0xA0                   # a fighter's (any object's) accessor -> EffectModule
+# (2) the smashes' fire trails: a stationary article (weapon kind TR_KIND, his article 9, TR_MAX at once; its MSC
+# fighters/gekkouga/weapons/firetrail.c) his MSC asks for at each smash's hit (his VAR_0-11: TR_REQS requests of type
+# (1 forward / 2 up / 3 down), x, y, way); its first frame claims one (tr_claim: the first live Greninja with a request,
+# copied to its VAR_1-4, his request cleared, VAR_0 his slot, VAR_5 a burn context of his (1 - TR_CTX, kept while it runs:
+# tr_ttl, his frames count it down)); every frame its hit logs burn with the trail row (burn_scan, context TR_CTX0 + slot x
+# TR_CTX + n). Its hitboxes are its game script's (no knockback, no hitlag / flinch, re-hit every 35 frames)
+TR_KIND = 0x1A3
+TR_NAME = 'firetrail'
+TR_ARTICLE = 9
+TR_MAX = 6
+TR_CTX = TR_MAX
+TR_TTL = 3
+TR_REQS = 3
+TR_BURN_KEY = 0x101A3
+TR_ROW = (TR_BURN_KEY, 0.25, 15, 180)   # 0.25 % every 15 frames for 3 s = 3 % (the user); shielded 0.5 % x 6 = 3 %
+GK_VAR_TR = 0x0F000300            # his VAR_0 + 4 k: request k's type, + 1 x, + 2 y, + 3 way
+TR_VAR_SLOT, TR_VAR_TYPE, TR_VAR_X, TR_VAR_Y, TR_VAR_DIR, TR_VAR_CTX = (0x0F000300 + i for i in range(6))
+assert all(burn_total(m, sh) >= BURN_MIN_TOTAL - 1e-4 for m in BURN_MOVES + (TR_ROW,) for sh in (False, True)), \
+    'a burn under %s %%' % BURN_MIN_TOTAL
+RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
-# swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose)
+# swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose); burn v2:
+# + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2)
 VARIANTS = (('A_release', RELEASE), ('G_pose', (RELEASE - {'sway'}) | {'pose'}))
 # v15: A_release (the release: the native swing, diag) and G_pose (v14's pose copy instead of the swing, in case); v14:
 # A_release (attack hitcheck burn skeleton pose) and E_sway (attack hitcheck burn skeleton sway); v13's D_parts dropped   # v13: each on the release's set (v3 - v12's hurtbox route, C_hurt, dropped:
@@ -556,6 +599,339 @@ def vnum(wm, vid, reg):
         addi r12, r12, %%(sk_nums_lo)d
         slwi r0, %s, 2
         lfsx f1, r12, r0''' % reg + var_set(wm, vid)
+
+
+def burn2_src(D, orig94):
+    """burn v2: the burning fighters' fire (bfx_vic) and the fire trail article's native part (tr_94 / tr_frame /
+    tr_claim / tr_dcase)"""
+    zero = """
+        lis r12, %(zero_hi)d
+        lfs f1, %(zero_lo)d(r12)"""
+    em_call = """
+        addi r0, r1, 0x10
+        stw r0, 8(r1)
+        stw r4, 0xC(r1)
+        mr r3, r27
+        addi r4, r1, 8
+        lwz r12, 0(r3)
+        lwz r12, %(em_msc)d(r12)
+        mtctr r12
+        bctrl"""
+    return r"""
+# ==== burn v2: (r3 a victim 0-7) its fire as its burns (anyone's): the level (its instances, at most BFX_LEVELS) against
+# the one shown (bfx_lvl); a change ends the old fire on it (EffectModule's MSC handler: 0x2723 (BFX_ID, 1, 1) for a new
+# level, (0, 0) a fade for none) and puts the new one on it (0x2717 (BFX_ID, joint 0, 0 x 6, size, 0): following its
+# joint 0, position only). Every Greninja's burn_tick passes each victim; the second one in a frame finds it shown
+bfx_vic:
+        stwu r1, -0x60(r1)
+        mflr r0
+        stw r0, 0x64(r1)
+        stmw r27, 0x4C(r1)
+        mr r31, r3
+        lis r12, %(btab_hi)d
+        addi r12, r12, %(btab_lo)d
+        mulli r0, r31, %(bcap16)d
+        add r12, r12, r0
+        li r11, %(bcap)d
+        li r30, 0                       # its instances
+bfv_cnt:
+        lwz r0, 0(r12)
+        cmpwi r0, 0
+        beq bfv_cn
+        addi r30, r30, 1
+bfv_cn: addi r12, r12, 16
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne bfv_cnt
+        cmpwi r30, %(bfx_levels)d
+        ble bfv_lv
+        li r30, %(bfx_levels)d
+bfv_lv: lis r29, %(bfx_lvl_hi)d
+        addi r29, r29, %(bfx_lvl_lo)d
+        slwi r0, r31, 2
+        add r29, r29, r0                # the level shown
+        lwz r28, 0(r29)
+        cmpw r28, r30
+        beq bfv_out
+        stw r30, 0(r29)
+        addi r3, r31, 1
+        bl gk_entry
+        cmpwi r3, 0
+        beq bfv_out
+        lwz r12, %(bacc)d(r3)
+        cmpwi r12, 0
+        beq bfv_out
+        lwz r27, %(f_effect)d(r12)      # its EffectModule
+        lis r0, 0x1000
+        cmplw r27, r0
+        blt bfv_out
+        lis r0, 0x8000
+        cmplw r27, r0
+        bge bfv_out
+        cmpwi r28, 0
+        beq bfv_new
+        li r0, 0x2723                   # the old fire ended
+        stw r0, 0x10(r1)
+        lis r0, %(bfx_id_hi)d
+        ori r0, r0, %(bfx_id_lo)d
+        stw r0, 0x14(r1)
+        li r0, 0                        # (0, 0): a fade (none now)
+        cmpwi r30, 0
+        beq bfv_k
+        li r0, 1                        # (1, 1): at once (another level)
+bfv_k:  stw r0, 0x18(r1)
+        stw r0, 0x1C(r1)
+        li r4, 4""" + em_call + """
+bfv_new:
+        cmpwi r30, 0
+        beq bfv_log
+        li r0, 0x2717                   # the new one: following its joint 0 (position only)
+        stw r0, 0x10(r1)
+        lis r0, %(bfx_id_hi)d
+        ori r0, r0, %(bfx_id_lo)d
+        stw r0, 0x14(r1)
+        li r0, 0
+        stw r0, 0x18(r1)                # joint 0
+        stw r0, 0x1C(r1)                # x, y, z, rx, ry, rz 0.0
+        stw r0, 0x20(r1)
+        stw r0, 0x24(r1)
+        stw r0, 0x28(r1)
+        stw r0, 0x2C(r1)
+        stw r0, 0x30(r1)
+        stw r0, 0x38(r1)                # the last word 0
+        lis r12, %(bfx_sizes_hi)d
+        addi r12, r12, %(bfx_sizes_lo)d
+        slwi r0, r30, 2
+        lwzx r0, r12, r0                # its size: 1 + BFX_STEP x (level - 1)
+        stw r0, 0x34(r1)
+        li r4, 11""" + em_call + """
+bfv_log:""" + D("""
+        lis r3, %(gk_fbf_hi)d
+        addi r3, r3, %(gk_fbf_lo)d
+        mr r4, r31
+        mr r5, r28
+        mr r6, r30""" + osr()) + """
+bfv_out:
+        lmw r27, 0x4C(r1)
+        lwz r0, 0x64(r1)
+        mtlr r0
+        addi r1, r1, 0x60
+        blr
+
+# ==== burn v2: the fire trail (weapon kind TR_KIND). +0x94 (spec, weapon, ...): tr_frame, then the moon's method
+tr_94:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stw r3, 0x08(r1)
+        stw r4, 0x0C(r1)
+        stw r5, 0x10(r1)
+        stw r6, 0x14(r1)
+        stw r7, 0x18(r1)
+        stw r8, 0x1C(r1)
+        stw r9, 0x20(r1)
+        stw r10, 0x24(r1)
+        mr r3, r4
+        bl tr_frame
+        lwz r3, 0x08(r1)
+        lwz r4, 0x0C(r1)
+        lwz r5, 0x10(r1)
+        lwz r6, 0x14(r1)
+        lwz r7, 0x18(r1)
+        lwz r8, 0x1C(r1)
+        lwz r9, 0x20(r1)
+        lwz r10, 0x24(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40""" + tail(orig94) + """
+
+# (r3 the weapon): claimed (its VAR_0, tr_claim), its context kept (tr_ttl) and its hits burned with the trail row
+tr_frame:
+        stwu r1, -0x60(r1)
+        mflr r0
+        stw r0, 0x64(r1)
+        stmw r26, 0x40(r1)
+        lwz r31, %(wacc)d(r3)
+        cmpwi r31, 0
+        beq trf_out
+        lwz r30, %(wwork)d(r31)
+        cmpwi r30, 0
+        beq trf_out""" + vint('r30', TR_VAR_SLOT, 'r29') + """
+        cmpwi r29, 0
+        bne trf_owned
+        bl tr_claim
+        mr. r29, r3
+        beq trf_out
+trf_owned:
+        addi r28, r29, -1               # its owner's slot 0-7
+        cmplwi r28, %(slots)d
+        bge trf_out""" + vint('r30', TR_VAR_CTX, 'r27') + """
+        addi r27, r27, -1               # its context 0 - TR_CTX-1 (none: -1)
+        cmplwi r27, %(tr_ctx)d
+        bge trf_out
+        lis r12, %(tr_ttl_hi)d
+        addi r12, r12, %(tr_ttl_lo)d
+        mulli r0, r28, %(tr_ctx4)d
+        add r12, r12, r0
+        slwi r0, r27, 2
+        li r11, %(tr_ttlv)d
+        stwx r11, r12, r0               # still running: its context kept
+        mr r3, r31
+        mr r4, r28
+        mulli r5, r28, %(tr_ctx)d
+        add r5, r5, r27
+        addi r5, r5, %(tr_ctx0)d        # its burn context
+        lis r6, %(tr_row_hi)d
+        addi r6, r6, %(tr_row_lo)d
+        bl burn_scan
+trf_out:
+        lmw r26, 0x40(r1)
+        lwz r0, 0x64(r1)
+        mtlr r0
+        addi r1, r1, 0x60
+        blr
+
+# (r30 its WorkModule) -> r3 its owner's slot (1-8) or 0: the first live Greninja with a request (his VAR_4k > 0.5, k <
+# TR_REQS): its type / x / y / way copied to its VAR_1-4, his VAR_4k cleared, its VAR_0 his slot, its VAR_5 a free
+# context of his (tr_ttl 0: kept TR_TTL frames, its processed counts cleared; none free: 0, no burns)
+tr_claim:
+        stwu r1, -0x50(r1)
+        mflr r0
+        stw r0, 0x54(r1)
+        stmw r24, 0x20(r1)
+        li r29, 1
+trc_slot:
+        cmpwi r29, %(slots)d
+        bgt trc_none
+        mr r3, r29
+        bl gk_entry
+        mr. r28, r3
+        beq trc_next
+        lwz r0, 4(r28)
+        cmpwi r0, %(gkind)d
+        bne trc_next
+        lwz r12, %(acc)d(r28)
+        cmpwi r12, 0
+        beq trc_next
+        lwz r27, %(work)d(r12)
+        cmpwi r27, 0
+        beq trc_next
+        li r26, 0                       # request k
+trc_req:
+        cmpwi r26, %(tr_reqs)d
+        bge trc_next
+        slwi r25, r26, 2
+        mr r3, r27
+        lis r4, %(gk_var_tr_hi)d
+        ori r4, r4, %(gk_var_tr_lo)d
+        add r4, r4, r25
+        lwz r12, 0(r3)
+        lwz r12, 0x44(r12)
+        mtctr r12
+        bctrl
+        lis r12, %(half_hi)d
+        lfs f0, %(half_lo)d(r12)
+        fcmpu cr0, f1, f0
+        bgt trc_found
+        addi r26, r26, 1
+        b trc_req
+trc_found:
+        li r24, 0                       # its VAR_1 + j = his VAR_4k + j (type, x, y, way)
+trc_copy:
+        mr r3, r27
+        lis r4, %(gk_var_tr_hi)d
+        ori r4, r4, %(gk_var_tr_lo)d
+        add r4, r4, r25
+        add r4, r4, r24
+        lwz r12, 0(r3)
+        lwz r12, 0x44(r12)
+        mtctr r12
+        bctrl
+        mr r3, r30
+        lis r4, %(tr_var_type_hi)d
+        ori r4, r4, %(tr_var_type_lo)d
+        add r4, r4, r24
+        lwz r12, 0(r3)
+        lwz r12, 0x4C(r12)
+        mtctr r12
+        bctrl
+        addi r24, r24, 1
+        cmpwi r24, 4
+        blt trc_copy""" + zero + """
+        mr r3, r27
+        lis r4, %(gk_var_tr_hi)d
+        ori r4, r4, %(gk_var_tr_lo)d
+        add r4, r4, r25
+        lwz r12, 0(r3)
+        lwz r12, 0x4C(r12)
+        mtctr r12
+        bctrl                           # his request taken""" + vnum('r30', TR_VAR_SLOT, 'r29') + """
+        addi r28, r29, -1
+        lis r26, %(tr_ttl_hi)d
+        addi r26, r26, %(tr_ttl_lo)d
+        mulli r0, r28, %(tr_ctx4)d
+        add r26, r26, r0                # his contexts' keep-alive counts
+        li r24, 0
+trc_ctx:
+        cmpwi r24, %(tr_ctx)d
+        bge trc_noctx
+        slwi r0, r24, 2
+        lwzx r0, r26, r0
+        cmpwi r0, 0
+        beq trc_take
+        addi r24, r24, 1
+        b trc_ctx
+trc_take:
+        slwi r0, r24, 2
+        li r11, %(tr_ttlv)d
+        stwx r11, r26, r0
+        mulli r12, r28, %(tr_ctx)d
+        add r12, r12, r24
+        addi r12, r12, %(tr_ctx0)d
+        mulli r12, r12, %(bents)d
+        lis r11, %(bproc_hi)d
+        addi r11, r11, %(bproc_lo)d
+        add r12, r12, r11               # its processed counts: from 0
+        li r0, 0
+        li r11, %(bents)d
+trc_zero:
+        stb r0, 0(r12)
+        addi r12, r12, 1
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne trc_zero
+        addi r24, r24, 1
+        b trc_setctx
+trc_noctx:
+        li r24, 0
+trc_setctx:""" + vnum('r30', TR_VAR_CTX, 'r24') + D(vint('r30', TR_VAR_TYPE, 'r5') + """
+        stw r5, 0x10(r1)""" + vint('r30', TR_VAR_X, 'r6') + """
+        stw r6, 0x14(r1)""" + vint('r30', TR_VAR_Y, 'r7') + """
+        lwz r5, 0x10(r1)
+        lwz r6, 0x14(r1)
+        mr r4, r29
+        mr r8, r24
+        lis r3, %(gk_ftr_hi)d
+        addi r3, r3, %(gk_ftr_lo)d""" + osr()) + """
+        mr r3, r29
+        b trc_out
+trc_next:
+        addi r29, r29, 1
+        b trc_slot
+trc_none:
+        li r3, 0
+trc_out:
+        lmw r24, 0x20(r1)
+        lwz r0, 0x54(r1)
+        mtlr r0
+        addi r1, r1, 0x50
+        blr
+
+tr_dcase:
+        lis r3, %(tr_desc_hi)d
+        addi r3, r3, %(tr_desc_lo)d
+        blr
+"""
 
 
 def sk_source(D, old_hit, orig94):
@@ -2025,6 +2401,9 @@ def layout(img, feats=None):
     feats = FEATURES if feats is None else feats
     if 'skeleton' in feats:
         rows += [[SK_KIND, 1, 0, 0]]                    # skeleton v1: article 8, one at a time
+    if 'burn2' in feats:
+        assert 'skeleton' in feats, 'burn2 needs skeleton'
+        rows += [[TR_KIND, TR_MAX, 0, 0]]               # burn v2: article 9, the fire trails (TR_MAX at once)
     mrow = row_of(img, feats)
     assert img.w(img.w(svt + 0x1C)) == 0x4E800020, "the specializer's +0x1C: a blr"
     for j in (2, 6, 7, 20, 26):
@@ -2102,6 +2481,18 @@ def build(rpx, diag=False, feats=None):
     A['sk_k'] = alloc(20, 4) if skel else 0                  # SK_HP, 10.0, 8.0 (the hit point's height), 0.5, SK_SCALE
     A['sk_latch'] = alloc(SLOTS * SK_LATCH * 8, 4) if skel else 0
     A['hyd_t'] = alloc(4, 4) if skel and diag else 0          # v1.2 diag: the hydrant's +0x94 calls
+    burn2 = 'burn2' in feats
+    A['tr_ents'] = alloc(8 * 3) if burn2 else 0               # burn v2: the trail's motion entries (the hydrant's motion)
+    A['tr_minfo'] = alloc(W.MINFO_SIZE) if burn2 else 0
+    A['tr_desc'] = alloc(L['dsize']) if burn2 else 0
+    A['tr_vt'] = alloc(L['vsize']) if burn2 else 0
+    A['tr_single'] = alloc(8) if burn2 else 0
+    A['tr_row'] = alloc(0x70) if burn2 else 0
+    A['tr_str'] = alloc(12) if burn2 else 0                  # "firetrail"
+    A['bfx_lvl'] = alloc(4 * SLOTS, 4) if burn2 else 0       # each victim's fire level shown
+    A['tr_ttl'] = alloc(4 * SLOTS * TR_CTX, 4) if burn2 else 0   # his trails' contexts kept (frames)
+    A['bfx_sizes'] = alloc(4 * (BFX_LEVELS + 1), 4) if burn2 else 0
+    assert not burn2 or A['tr_ttl'] == A['bfx_lvl'] + 4 * SLOTS
     A['gk_desc'] = alloc(0x38)
     A['g1_desc'] = alloc(12)
     A['g1_shapes'] = alloc(0x20 * len(SHAPE_Z))
@@ -2116,8 +2507,8 @@ def build(rpx, diag=False, feats=None):
     A['hcsize'] = alloc(4 * len(HC_OBJ_SIZES)) if 'hitcheck' in feats else 0
     burn = 'burn' in feats
     A['btab'] = alloc(SLOTS * BURN_CAP * 16) if burn else 0      # burn v1: the victims' instances
-    A['bproc'] = alloc(BURN_CONTEXTS * BURN_ENTS) if burn else 0  # the hit logs' processed counts
-    A['bmoves'] = alloc(20 * len(BURN_MOVES)) if burn else 0
+    A['bproc'] = alloc(burn_contexts(feats) * BURN_ENTS) if burn else 0  # the hit logs' processed counts
+    A['bmoves'] = alloc(20 * len(burn_moves(feats))) if burn else 0
     A['bconst'] = alloc(8) if burn else 0                        # 0.2 (shield), 1000.0
     A['bsum'] = alloc(SLOTS * SLOTS * 4) if burn and diag else 0  # diag: damage per owner x victim this second
     A['bclock'] = alloc(4 * SLOTS) if burn and diag else 0
@@ -2175,6 +2566,10 @@ def build(rpx, diag=False, feats=None):
             ('gk_fy', 'S4GY clone hurt object 0: %08X %08X %08X %08X %08X %08X\n'),
             ('gk_fk', 'S4GK clone hurtboxes set: hitmodule=%08X groups=%d boxes %d -> %d group0=%d+%d objects=%d\n'),
             ('gk_fo', 'S4GO clone id=%d hurt: boxes=%d objects=%d first record %08X %08X %08X %08X\n')]
+    if 'burn2' in feats:
+        fmts += [('gk_fbf', 'S4BF burn fire: victim slot=%d level %d -> %d (instances on it, at most 5)\n'),
+                 ('gk_ftr', 'S4TR fire trail claimed: owner slot=%d type=%d (1 forward, 2 up, 3 down) at x=%d y=%d '
+                            'context=%d\n')]
     for nm, s in fmts:
         A[nm] = alloc((len(s) + 4) & ~3, 4) if diag else 0
     code_at = alloc(0, 4)
@@ -2216,6 +2611,23 @@ def build(rpx, diag=False, feats=None):
         out.blob(A['sk_latch'], bytes(SLOTS * SK_LATCH * 8), 'skeleton attackers latched')
         if diag:
             out.blob(A['hyd_t'], bytes(4), 'hydrant diag counter')
+    if burn2:
+        out.blob(A['tr_ents'], struct.pack('>6I', SK_MOTION, 0, SK_MOTION, 0, SK_MOTION, 0),
+                 'fire trail motions (forward / up / down: the hydrant\'s animation)')
+        mi3 = bytearray(img.blob(L['bminfo'], W.MINFO_SIZE))
+        struct.pack_into('>II', mi3, 0, A['tr_ents'], 3)
+        out.blob(A['tr_minfo'], bytes(mi3), 'fire trail motion info')
+        d3 = bytearray(img.blob(L['bdesc'], L['dsize']))
+        struct.pack_into('>I', d3, 8, A['tr_minfo'])
+        if struct.unpack_from('>I', d3, 0x1C)[0] == CLONE_BASE:
+            struct.pack_into('>I', d3, 0x1C, TR_KIND)
+        out.blob(A['tr_desc'], bytes(d3), 'fire trail descriptor (bunshin copy)')
+        out.blob(A['tr_single'], struct.pack('>II', A['tr_vt'], 0), 'fire trail singleton')
+        out.blob(A['tr_row'], b''.join(struct.pack('>I', w) for w in L['mrow']), 'fire trail module row (the clone\'s)')
+        out.blob(A['tr_str'], TR_NAME.encode().ljust(12, b'\0'), '"firetrail"')
+        out.blob(A['bfx_lvl'], bytes(4 * SLOTS + 4 * SLOTS * TR_CTX), 'burn fire levels, trail contexts')
+        out.blob(A['bfx_sizes'], struct.pack('>%df' % (BFX_LEVELS + 1), 0.0, *(1.0 + BFX_STEP * i for i in range(BFX_LEVELS))),
+                 'burn fire sizes')
     out.blob(A['gk_list'], struct.pack('>II', A['gk_list'] + 8, len(L['rows'])) +
              b''.join(struct.pack('>4I', *e) for e in L['rows']), 'his article list (+ clones 6 / 7, skeleton 8)')
     gd = bytearray(img.blob(GK_DESC, 0x38))
@@ -2241,8 +2653,9 @@ def build(rpx, diag=False, feats=None):
             out.blob(A['pose_last'], bytes(2 * 0x14), 'pose diag rows')
     if 'burn' in feats:
         out.blob(A['btab'], bytes(SLOTS * BURN_CAP * 16), 'burn instances')
-        out.blob(A['bproc'], bytes(BURN_CONTEXTS * BURN_ENTS + (-BURN_CONTEXTS * BURN_ENTS) % 4), 'burn processed counts')
-        out.blob(A['bmoves'], b''.join(struct.pack('>IfIIf', *(m + (burn_shield_damage(m),))) for m in BURN_MOVES),
+        nbp = burn_contexts(feats) * BURN_ENTS
+        out.blob(A['bproc'], bytes(nbp + (-nbp) % 4), 'burn processed counts')
+        out.blob(A['bmoves'], b''.join(struct.pack('>IfIIf', *(m + (burn_shield_damage(m),))) for m in burn_moves(feats)),
                  'burn moves (kind, damage, interval, frames, shielded damage)')
         out.blob(A['bconst'], struct.pack('>2f', BURN_SHIELD_DAMAGE, 1000.0), 'burn constants')
         if diag:
@@ -2272,11 +2685,11 @@ def build(rpx, diag=False, feats=None):
              slow=FLAG_SLOW, clones=FLAG_CLONES, life=TAG_LIFE, sslot=SLOW_SLOT, srate=SLOW_RATE, sframes=SLOW_FRAMES,
              hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, whit=W_HIT_MOD, wdmg=W_DAMAGE, watk=W_ATTACK,
              wstop=W_STOP, wcol=W_COLOUR, wmodel=W_MODEL, wlink=W_LINK, wvis=W_VIS, wpost=W_POSTURE,
-             cclear=COLOUR_CLEAR, nmoves=len(BURN_MOVES), bcap=BURN_CAP, bcap16=BURN_CAP * 16, bents=BURN_ENTS,
+             cclear=COLOUR_CLEAR, nmoves=len(burn_moves(feats)), bcap=BURN_CAP, bcap16=BURN_CAP * 16, bents=BURN_ENTS,
              dm_add=DM_ADD, fstatus=F_STATUS, st_kind=ST_KIND, st_dead=ST_DEAD, st_dead_n=ST_DEAD_N, ent_log=ENT_LOG, node_obj=NODE_OBJ, node_type=NODE_TYPE, mm_kind=MM_KIND, am_ents=AM_ENTS, am_count=AM_COUNT, am_max=AM_MAX, ent_size=ENT_SIZE,
              ent_nodes=ENT_NODES, node_max=NODE_MAX, node_on=NODE_ON, node_min_x=NODE_MIN_X, node_min_y=NODE_MIN_Y,
              node_max_x=NODE_MAX_X, node_max_y=NODE_MAX_Y, team=TEAM_MOD,
-             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, pm_scale=PM_SCALE, sk_remake=SK_REMAKE, npose=len(POSE_BONES), pose_min=POSE_MIN, mdl_mtx=MDL_MTX, mm_model=MM_MODEL, log_off=POSE_LOG_BONE * 0x30 + 0xC, nlatch=SLOTS * SK_LATCH * 2, sk_kind=SK_KIND, sk_lat=SK_LATCH, sk_lat8=SK_LATCH * 8, sk_nv=len(SK_VERTS), gm_vt_hi=SK_GM_VT >> 16, gm_vt_lo=SK_GM_VT & 0xFFFF, wground=0x2C, nbtab=SLOTS * BURN_CAP * 4, nbproc=(BURN_CONTEXTS * BURN_ENTS + 3) // 4, clear_back=CLEAR_BACK, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
+             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, pm_scale=PM_SCALE, sk_remake=SK_REMAKE, npose=len(POSE_BONES), pose_min=POSE_MIN, mdl_mtx=MDL_MTX, mm_model=MM_MODEL, log_off=POSE_LOG_BONE * 0x30 + 0xC, nlatch=SLOTS * SK_LATCH * 2, sk_kind=SK_KIND, sk_lat=SK_LATCH, sk_lat8=SK_LATCH * 8, sk_nv=len(SK_VERTS), gm_vt_hi=SK_GM_VT >> 16, gm_vt_lo=SK_GM_VT & 0xFFFF, wground=0x2C, nbtab=SLOTS * BURN_CAP * 4, nbproc=(burn_contexts(feats) * BURN_ENTS + 3) // 4, clear_back=CLEAR_BACK, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
              hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
@@ -2294,8 +2707,17 @@ def build(rpx, diag=False, feats=None):
         p['sk_k16_hi'], p['sk_k16_lo'] = ha(A['sk_k'] + 16), K.slo(A['sk_k'] + 16)
         p['resmgr_hi'], p['resmgr_lo'] = ha(RES_MGR), K.slo(RES_MGR)
         p['gmgr_hi'], p['gmgr_lo'] = ha(GROUND_MGR), K.slo(GROUND_MGR)
-        ski = [m[0] for m in BURN_MOVES].index(SK_BURN_KEY)
+        ski = [m[0] for m in burn_moves(feats)].index(SK_BURN_KEY)
         p['sk_row_hi'], p['sk_row_lo'] = ha(A['bmoves'] + 20 * ski), K.slo(A['bmoves'] + 20 * ski)
+    if 'burn2' in feats:
+        tri = [m[0] for m in burn_moves(feats)].index(TR_BURN_KEY)
+        p['tr_row_hi'], p['tr_row_lo'] = ha(A['bmoves'] + 20 * tri), K.slo(A['bmoves'] + 20 * tri)
+        for nm in ('tr_desc', 'tr_ttl', 'bfx_lvl', 'bfx_sizes', 'gk_fbf', 'gk_ftr'):
+            p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
+        p.update(bfx_levels=BFX_LEVELS, f_effect=F_EFFECT, em_msc=EM_MSC, bfx_id_hi=BFX_ID >> 16,
+                 bfx_id_lo=BFX_ID & 0xFFFF, tr_ctx=TR_CTX, tr_ctx4=4 * TR_CTX, tr_ttlv=TR_TTL, tr_ctx0=TR_CTX0,
+                 tr_reqs=TR_REQS, gk_var_tr_hi=GK_VAR_TR >> 16, gk_var_tr_lo=GK_VAR_TR & 0xFFFF,
+                 tr_var_type_hi=TR_VAR_TYPE >> 16, tr_var_type_lo=TR_VAR_TYPE & 0xFFFF, nbfx=SLOTS + SLOTS * TR_CTX)
     p['bshield_hi'], p['bshield_lo'] = ha(A['bconst']), K.slo(A['bconst'])
     p['thousand_hi'], p['thousand_lo'] = ha(A['bconst'] + 4), K.slo(A['bconst'] + 4)
     p['fm_hi'], p['fm_lo'] = ha(FIGHTER_MANAGER), K.slo(FIGHTER_MANAGER)
@@ -3525,7 +3947,21 @@ burn_him:                               # (r3 his entry, r4 his slot 0-7): his h
         li r6, 0
         bl burn_scan
         mr r3, r31
-        bl burn_tick
+        bl burn_tick''' + ('''
+        lis r12, %(tr_ttl_hi)d          # burn v2: his trails' contexts: a frame less kept (each trail renews its own)
+        addi r12, r12, %(tr_ttl_lo)d
+        mulli r0, r31, %(tr_ctx4)d
+        add r12, r12, r0
+        li r11, %(tr_ctx)d
+bh_ttl: lwz r10, 0(r12)
+        cmpwi r10, 0
+        beq bh_tn
+        addi r10, r10, -1
+        stw r10, 0(r12)
+bh_tn:  addi r12, r12, 4
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne bh_ttl''' if 'burn2' in feats else '') + '''
         lwz r31, 0x1C(r1)
         lwz r0, 0x24(r1)
         mtlr r0
@@ -3851,7 +4287,9 @@ bt_nins:
         addi r28, r28, -1
         cmpwi r28, 0
         bne bt_ins
-bt_next:
+bt_next:''' + ('''
+        mr r3, r30
+        bl bfx_vic                      # burn v2: its fire as its burns''' if 'burn2' in feats else '') + '''
         addi r30, r30, 1
         b bt_vic
 bt_done:''' + D('''
@@ -4559,7 +4997,7 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
-''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94]) if skel else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
+''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94]) if skel else '') + (burn2_src(D, L['vt_orig'][0x94]) if 'burn2' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
 # ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
 gk_clear:
         li r0, 0''' + (('''
@@ -4588,7 +5026,15 @@ gc_bproc:
         addi r12, r12, 4
         addi r11, r11, -1
         cmpwi r11, 0
-        bne gc_bproc''') if 'burn' in feats else '') + '''
+        bne gc_bproc''') if 'burn' in feats else '') + (('''
+        lis r12, %(bfx_lvl_hi)d
+        addi r12, r12, %(bfx_lvl_lo)d
+        li r11, %(nbfx)d
+gc_bfx: stw r0, 0(r12)                  # burn v2: the fires shown, the trails' contexts
+        addi r12, r12, 4
+        addi r11, r11, -1
+        cmpwi r11, 0
+        bne gc_bfx''') if 'burn2' in feats else '') + '''
         lis r12, %(gk_hide_hi)d
         addi r12, r12, %(gk_hide_lo)d
         li r11, 16
@@ -4655,6 +5101,12 @@ w_dcase:
         struct.pack_into('>I', vs, 0x34, lab['sk_start'])
         struct.pack_into('>I', vs, 0x94, lab['sk_94'])
         out.blob(A['sk_vt'], bytes(vs), 'skeleton vtable (the moon\'s, +0x34 / +0x94 / +0xAC ours)')
+    if 'burn2' in feats:
+        vt3 = bytearray(img.blob(L['svt'], L['vsize']))
+        struct.pack_into('>I', vt3, W.HIT_METHOD, lab['sk_hit'])   # its hits don't remove it
+        struct.pack_into('>I', vt3, 0x34, lab['sk_start'])       # its VARs 0 (no skeleton GroundModule: no collision)
+        struct.pack_into('>I', vt3, 0x94, lab['tr_94'])
+        out.blob(A['tr_vt'], bytes(vt3), 'fire trail vtable (the moon\'s, +0x34 / +0xAC the skeleton\'s, +0x94 ours)')
 
     # ---- hooks in place (each asserted)
     def asm1(at, text):
@@ -4715,6 +5167,9 @@ w_dcase:
     if skel:
         # skeleton v1: loaded with him, its model c00 only (no 0x10: the owner's colour); pump's template (attack)
         register(SK_KIND, A['sk_str'], CATEGORY_BITS | 0x10, lab['sk_dcase'], ATTACK_BASE, A['sk_single'], A['sk_row'])
+    if 'burn2' in feats:
+        # burn v2: the fire trail, as the skeleton (loaded with him, c00 only, pump's template), the clone's row
+        register(TR_KIND, A['tr_str'], CATEGORY_BITS | 0x10, lab['tr_dcase'], ATTACK_BASE, A['tr_single'], A['tr_row'])
     info = dict(A=A, labels=lab, T=T, layout=L, end=end, owner_str=owner_str, feats=feats, diag=diag, clear_at=ct)
     return out, info
 
