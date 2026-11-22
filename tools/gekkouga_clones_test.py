@@ -1374,8 +1374,11 @@ def model_tests(out, earlier):
         b = O.vbn_read(os.path.join(cd, 'model.vbn'))
         nud = open(os.path.join(cd, 'model.nud'), 'rb').read()
         sb = open(os.path.join(cd, 'model.sb'), 'rb').read()
-        if nud != v91.read('INSTALL_TO_data/' + rel + 'model.nud'):
+        rigid = nud if GB.CLONE_RELEASE == 'rigid' else open(os.path.join(td_root, 'rigid', rel + 'model.nud'), 'rb').read()
+        if rigid != v91.read('INSTALL_TO_data/' + rel + 'model.nud'):
             bad.append(('nud not v9.1', c))
+        if GB.CLONE_RELEASE == 'own' and nud != v8.read('INSTALL_TO_data/' + rel + 'model.nud'):
+            bad.append(('v15: the release nud not his own', c))
         if sb != v8.read('INSTALL_TO_data/' + rel + 'model.sb'):
             bad.append(('sb not his', c))
         n, found, missed = sb_parse(sb, b)
@@ -1385,8 +1388,8 @@ def model_tests(out, earlier):
             bad.append(('sway nud', c))
         if open(os.path.join(td_root, 'sway', rel + 'model.sb'), 'rb').read() != sb:
             bad.append(('sway sb', c))
-    check('v11: c00-c07: model.nud = v9.1\'s (visible, rigid tongue), model.sb = his own (13 entries, all found); '
-          'TEST_ONLY_DATA/sway = his own model.nud + model.sb', bad, [])
+    check('v11 / v15: c00-c07: the rigid model.nud = v9.1\'s (v15: TEST_ONLY_DATA/rigid; the release his own: native swing), '
+          'model.sb = his own (13 entries, all found); TEST_ONLY_DATA/sway = his own model.nud + model.sb', bad, [])
 
 
 def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):

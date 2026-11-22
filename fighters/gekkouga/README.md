@@ -891,3 +891,28 @@ skeleton v1 report ("no collision": its log shows `S4SC state=1` every spawn).
   untouched, the tongue relative to its anchor, his +0x14 preferred, the clone's odd +0x14 ignored, no owner / short
   skeleton; `sway_checks`: the v13 crash layout, bad +4 / +0x1C; skeleton v1.1's remake / lost / floor-only);
   `gekkouga_clones_test ... --vs1` 237 / 0; supamario_ui_cave_test 0; import_call_check 0; byte-for-byte rebuilds.
+
+## Clones v15 (`greninja_clones_v15.zip`, over v14; exe_v46z_gk15)
+
+**Confirmed in game: native swing (v14 E_sway)** (the user: "E_sway works and the clones have their own swing physics";
+log_v14_E_sway_ok: S4GR stages 0 -> 1, no bind needed: the clone's MotionModule +0x10 object already has a swing system,
+v13 read +0x14). So:
+- `RELEASE` = attack, hitcheck, burn, skeleton, sway (v14's E_sway set; the release exe is its non-diag build, the
+  TEST_ONLY A_release its diag build plus v1.2's hydrant comparison lines). The pose copy is TEST_ONLY G_pose (v14's
+  A_release exe byte for byte).
+- Data (`gekkouga_build.py` `CLONE_RELEASE = 'own'`): the clones' c00-c07 model.nud = his own (v14's TEST_ONLY_DATA/sway;
+  model.sb his own already); `TEST_ONLY_DATA/rigid` keeps the stiff-tongue nud (v9.1's) as the fallback. `cmd_data`
+  rebuilt from the vanilla files gives exactly these (only the 8 nud files differ from v14's release).
+- Skeleton v1.2 diag (the user: no collision, the floor-only lvd too; its ground is made, active (+0x68 0), at its top and
+  moving with it): `col_dump` logs the same words of its grounds (tag 1, from `sk_coldiag`) and of Pac-Man's own hydrant
+  (tag 2: the hydrant's specializer +0x94 is a lone `blr` at `0x02B38314`, only its vtable `0x100ED3F8` uses it; the diag
+  build branches it through `HYD_TRAMP` 0x037EE530 to `hyd_diag`, every 60 calls): S4CD the handle (+0x40-+0x4C callbacks,
+  +0xA4 / +0xA8), S4CE / S4CF the ground (+0x60-+0x88), S4CG the GroundModule +0xF8 and its +0x18 object (+0x230 / +0x240 /
+  +0x248), S4CH the handle's +0x160-+0x16C and the ground's +0x30 / +0x34. S4SE's arguments fixed (v1.1 passed 9: its last
+  was garbage). Found on the way: module row slot 17 is accessor +0x8C (the full slot -> accessor map: 0 +0x34, 1 +0x4C, 2
+  +0x50, 3 +0x24, 4 +0xA0, 5 +0x2C, 6 +0x58, 7 +0x44, 8 +0x1C, 9 +0x7C, 10 +0x70, 11 +0xA4, 12 +0xA8, 13 +0x38, 14 +0xB4,
+  15 +0x64, 16 +0x60, 17 +0x8C, 18 +0x30, 19 +0x40, 20 +0x54, 21 +0x90, 22 +0xAC, 23 +0xB0, 24 +0x84, 25 +0xB8, 26
+  +0xC4, 27 +0x78); the hydrant's +0x3C sets it up first (vt +0x3C(5), +0x74 / +0xC4 its vl floats +0x4C0 / +0x4C4, +0x54(1))
+  and the skeleton has no slot 17 module: a lead if the comparison shows nothing.
+- Tests: cave 197 / 224 / 219 (release / A_release / G_pose); `gekkouga_clones_test ... --v14` 236 / 0;
+  supamario_ui_cave_test 0; import_call_check 0; byte-for-byte rebuilds.

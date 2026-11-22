@@ -1717,6 +1717,41 @@ def skeleton_checks(e, info, diag):
     check('skeleton collision: its GroundModule not the hydrant\'s class: nothing called, failed (3)',
           ([c[0] for c in c5], sv[C.SK_VAR_COL]), ([], 3.0))
     e.setw(gm, C.SK_GM_VT)
+    if diag:
+        # v1.2: the hydrant's +0x94 (its lone blr) -> its trampoline -> hyd_diag: every 60 calls the S4C* lines, tag 2
+        w = e.w(C.HYD_HOOK)
+        check('skeleton v1.2 diag: the hydrant\'s +0x94 blr is a b to its trampoline', ((w >> 26) == 18,
+              C.HYD_HOOK + (((w & 0x3FFFFFC) ^ 0x2000000) - 0x2000000)), (True, C.HYD_TRAMP))
+        hgm = e.alloc(0x200, b'\0')
+        hh = e.alloc(0x200, b'\0')
+        hg = e.alloc(0x100, b'\0')
+        ho = e.alloc(0x300, b'\0')
+        e.setw(hgm + 0xF0, hh)
+        e.setw(hh, hg)
+        e.setw(hgm + 0x18, ho)
+        for off, v in ((0x44, 0x01000000), (0x48, 0x02B34424), (0xA4, 0x01000000), (0xA8, 0x02B34470)):
+            e.setw(hh + off, v)
+        e.setw(hg + 0x34, 2)
+        e.setw(hg + 0x68, 0x12345678)
+        e.setw(ho + 0x248, 0x1000040E)
+        hacc = e.alloc(0x100, b'\0')
+        e.setw(hacc + 0x2C, hgm)
+        hw = e.alloc(0x40, b'\0')
+        e.setw(hw + C.W_ACC, hacc)
+        e.setw(A['hyd_t'], 0)
+        e.osr_full = []
+        for _ in range(60):
+            e.call(C.HYD_HOOK, 0x51, hw)
+        got = {x[0]: x[1:8] for x in e.osr_full}
+        check('skeleton v1.2 diag: 60 hydrant frames: S4CD (tag 2, its handle, +0x44 / +0x48 / +0xA4 / +0xA8), S4CE (+0x68), '
+              'S4CG (its GroundModule, its +0x18 object\'s +0x248), S4CH (the ground\'s vertex count)',
+              (len(e.osr_full), got.get(A['gk_fcd']), got.get(A['gk_fce'], (0,) * 5)[:5],
+               got.get(A['gk_fcg'], (0,) * 7)[:3] + got.get(A['gk_fcg'], (0,) * 7)[6:7], got.get(A['gk_fch'], (0,) * 7)[6]),
+              (5, (2, hh, 0, 0x01000000, 0x02B34424, 0x01000000, 0x02B34470), (2, hg, 0, 0, 0x12345678),
+               (2, hgm, 0, 0x1000040E), 2))
+        e.osr_full = []
+        e.call(C.HYD_HOOK, 0x51, hw)
+        check('skeleton v1.2 diag: ... not on the 61st', e.osr_full, [])
     # unowned: nothing
     sv.clear()
     check('skeleton: nobody asked for it: no owner, nothing', (frame(), sv.get(C.SK_VAR_SLOT, 0.0)), ([], 0.0))

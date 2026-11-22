@@ -827,20 +827,18 @@ skd_l1: lhz r11, 0x160(r28)
         lbz r4, 0x19C(r12)
 skd_m:  lwz r5, 0x18(r29)
         li r6, 0
-        li r7, 0
         lis r0, 0x1000
         cmplw r5, r0
         blt skd_g
         lwz r6, 0x248(r5)
-        lwz r7, 0x234(r5)
-skd_g:  lwz r8, 0x68(r27)
-        lhz r9, 0x7C(r27)
-        slwi r9, r9, 16
+skd_g:  lwz r7, 0x68(r27)
+        lhz r8, 0x7C(r27)
+        slwi r8, r8, 16
         lbz r0, 0x82(r27)
-        or r9, r9, r0
+        or r8, r8, r0
         lwz r12, %(wpost)d(r31)
+        li r9, 0
         li r10, 0
-        li r11, 0
         cmpwi r12, 0
         beq skd_lg
         lis r11, %(sk_k4_hi)d
@@ -849,9 +847,17 @@ skd_g:  lwz r8, 0x68(r27)
         fmuls f1, f1, f13
         fctiwz f1, f1
         stfd f1, 0x18(r1)
+        lwz r9, 0x1C(r1)
+        lfs f1, 0x14(r12)
+        fmuls f1, f1, f13
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
         lwz r10, 0x1C(r1)
 skd_lg: lis r3, %(gk_fse_hi)d
         addi r3, r3, %(gk_fse_lo)d''' + osr() + '''
+        mr r3, r29
+        li r4, 1
+        bl col_dump                     # v1.2: the words compared with the hydrant's (tag 2)
         b skd_out
 skd_keep:''' + vnum('r30', SK_VAR_DIAGT, 'r27') + '''
 skd_out:
@@ -1821,6 +1827,116 @@ wpl_keep:
 ''')
 
 
+# ---- skeleton v1.2 diag: its grounds against Pac-Man's own hydrant's (the user: no collision, the floor-only lvd too).
+# col_dump logs the same words of both every 60 frames: S4CD the ground handle, S4CE / S4CF the ground, S4CG the
+# GroundModule and its +0x18 object, S4CH the handle's tail / the ground's vertex count. Tag 1 the skeleton (sk_coldiag),
+# 2 the hydrant: its specializer +0x94 is a lone `blr` (HYD_HOOK, the hydrant vtable 0x100ED3F8's only use of it) that
+# the diag build turns into `b hyd_diag`
+HYD_HOOK = 0x02B38314
+HYD_TRAMP = 0x037EE530            # 4 words (zero in exe_v46z_ui10, before TRAMP): the cave is out of a b's reach (diag only)
+CD_LINES = (('gk_fcd', 'S4CD tag=%d handle=%08X +40=%08X +44=%08X +48=%08X +A4=%08X +A8=%08X\n', 'h', (0x40, 0x44, 0x48, 0xA4, 0xA8)),
+            ('gk_fce', 'S4CE tag=%d ground=%08X +60=%08X +64=%08X +68=%08X +6C=%08X +70=%08X\n', 'g', (0x60, 0x64, 0x68, 0x6C, 0x70)),
+            ('gk_fcf', 'S4CF tag=%d +74=%08X +78=%08X +7C=%08X +80=%08X +84=%08X +88=%08X\n', 'g', (0x74, 0x78, 0x7C, 0x80, 0x84, 0x88)),
+            ('gk_fcg', 'S4CG tag=%d groundmodule=%08X +F8=%08X its +18=%08X: +230=%08X +240=%08X +248=%08X\n', 'm', (0xF8, 'o', 0x230, 0x240, 0x248)),
+            ('gk_fch', 'S4CH tag=%d handle +160=%08X +164=%08X +168=%08X +16C=%08X ground +30=%08X +34=%08X\n', 'x', (('h', 0x160), ('h', 0x164), ('h', 0x168), ('h', 0x16C), ('g', 0x30), ('g', 0x34))))
+
+
+def cd_src():
+    """col_dump (r3 a GroundModule of the hydrant's class, r4 the tag): the S4C* lines"""
+    regs = {'m': 'r31', 'h': 'r30', 'g': 'r29', 'o': 'r28'}
+    s = r'''
+col_dump:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r27, 0x2C(r1)
+        mr r31, r3
+        mr r27, r4
+        li r30, 0
+        li r29, 0
+        li r28, 0
+        lwz r12, 0xF0(r31)
+        bl cd_ok
+        mr. r30, r12
+        beq cd_o
+        lwz r12, 0(r30)
+        bl cd_ok
+        mr r29, r12
+cd_o:   lwz r12, 0x18(r31)
+        bl cd_ok
+        mr r28, r12'''
+    for nm, _f, base, offs in CD_LINES:
+        s += '\n        mr r4, r27'
+        if base == 'm':
+            s += '\n        mr r5, r31'
+            items = [(r'm', o) if o != 'o' else ('O', 0) for o in offs]
+            dst = 6
+        elif base == 'x':
+            items = list(offs)
+            dst = 5
+        else:
+            if nm == 'gk_fcf':
+                dst = 5
+            else:
+                s += '\n        mr r5, %s' % regs[base]
+                dst = 6
+            items = [(base, o) for o in offs]
+        if base == 'm':
+            items = [('m', 0xF8), ('O', 0), ('o', 0x230), ('o', 0x240), ('o', 0x248)]
+        for b, o in items:
+            r = 'r%d' % dst
+            if b == 'O':
+                s += '\n        mr %s, r28' % r
+            else:
+                s += '''
+        li %s, 0
+        cmpwi %s, 0
+        beq cd_%s_%d
+        lwz %s, 0x%X(%s)
+cd_%s_%d:''' % (r, regs[b], nm, dst, r, o, regs[b], nm, dst)
+            dst += 1
+        s += '''
+        lis r3, %%(%s_hi)d
+        addi r3, r3, %%(%s_lo)d''' % (nm, nm) + osr()
+    s += '''
+        lmw r27, 0x2C(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+cd_ok:  lis r0, 0x1000                  # r12 a pointer or 0 (a leaf)
+        cmplw r12, r0
+        blt cd_no
+        lis r0, 0x8000
+        cmplw r12, r0
+        bltlr
+cd_no:  li r12, 0
+        blr
+
+# the hydrant's +0x94 (spec, weapon): every 60 calls its grounds' S4C* lines (tag 2), then its original `blr`
+hyd_diag:
+        lis r12, %(hyd_t_hi)d
+        lwz r11, %(hyd_t_lo)d(r12)
+        addi r11, r11, 1
+        stw r11, %(hyd_t_lo)d(r12)
+        li r12, 60
+        divwu r10, r11, r12
+        mullw r10, r10, r12
+        cmpw r10, r11
+        bnelr
+        lwz r12, %(wacc)d(r4)
+        cmpwi r12, 0
+        beqlr
+        lwz r3, %(wground)d(r12)
+        lis r0, 0x1000
+        cmplw r3, r0
+        bltlr
+        li r4, 2
+        b col_dump
+'''
+    return s
+
+
 class Out:
     """the words to write: {address: (word, note)}, each address once"""
 
@@ -1970,6 +2086,7 @@ def build(rpx, diag=False, feats=None):
     A['sk_nums'] = alloc(4 * 10, 4) if skel else 0           # 0.0 - 9.0 (ints as floats)
     A['sk_k'] = alloc(20, 4) if skel else 0                  # SK_HP, 10.0, 8.0 (the hit point's height), 0.5, SK_SCALE
     A['sk_latch'] = alloc(SLOTS * SK_LATCH * 8, 4) if skel else 0
+    A['hyd_t'] = alloc(4, 4) if skel and diag else 0          # v1.2 diag: the hydrant's +0x94 calls
     A['gk_desc'] = alloc(0x38)
     A['g1_desc'] = alloc(12)
     A['g1_shapes'] = alloc(0x20 * len(SHAPE_Z))
@@ -2026,9 +2143,11 @@ def build(rpx, diag=False, feats=None):
             ('gk_ftp', 'S4TP clone tongue (bone %d): him x100 %%d %%d %%d clone x100 %%d %%d %%d phases that found it changed=%%X\n' % POSE_LOG_BONE),
             ('gk_fss', 'S4SS skeleton spawned: owner slot=%d at x=%d y=%d way=%d\n'),
             ('gk_fsc', 'S4SC skeleton collision: state=%d (1 made, 3 failed) grounds=%08X bundle=%08X lvd=%08X groundmodule=%08X bytes F8-FB=%08X\n'),
+            ('gk_fcd', CD_LINES[0][1]), ('gk_fce', CD_LINES[1][1]), ('gk_fcf', CD_LINES[2][1]), ('gk_fcg', CD_LINES[3][1]),
+            ('gk_fch', CD_LINES[4][1]),
             ('gk_fsg', 'S4SG skeleton collision: owner slot=%d its grounds were gone: made again (#%d)\n'),
             ('gk_fsd', 'S4SD skeleton collision: ground=%08X lines=%d v0 x10=%d,%d v1 x10=%d,%d handle +0x160 / +0x163 %08X\n'),
-            ('gk_fse', 'S4SE skeleton collision: manager +0x19C=%d groundmodule +0x18=%08X its +0x248=%08X +0x234=%08X ground +0x68=%08X +0x7C/+0x82 %08X at x10=%d,%d\n'),
+            ('gk_fse', 'S4SE skeleton collision: manager +0x19C=%d groundmodule +0x18=%08X its +0x248=%08X ground +0x68=%08X +0x7C/+0x82 %08X at x10=%d,%d\n'),
             ('gk_fsf', 'S4SF skeleton collision removed: owner slot=%d\n'),
             ('gk_fsh', 'S4SH skeleton hit: owner slot=%d attacker=%X hitbox=%d damage x10=%d HP left x10=%d at x=%d y=%d\n'),
             ('gk_fsx', 'S4SX skeleton owner slot=%d phase=%d (1 running, 2 exploded, 3 smoked at 0 HP) damage taken x10=%d at x=%d y=%d\n'),
@@ -2080,6 +2199,8 @@ def build(rpx, diag=False, feats=None):
         out.blob(A['sk_nums'], struct.pack('>10f', *range(10)), 'skeleton 0-9')
         out.blob(A['sk_k'], struct.pack('>5f', SK_HP, 10.0, 8.0, 0.5, SK_SCALE), 'skeleton constants')
         out.blob(A['sk_latch'], bytes(SLOTS * SK_LATCH * 8), 'skeleton attackers latched')
+        if diag:
+            out.blob(A['hyd_t'], bytes(4), 'hydrant diag counter')
     out.blob(A['gk_list'], struct.pack('>II', A['gk_list'] + 8, len(L['rows'])) +
              b''.join(struct.pack('>4I', *e) for e in L['rows']), 'his article list (+ clones 6 / 7, skeleton 8)')
     gd = bytearray(img.blob(GK_DESC, 0x38))
@@ -2144,7 +2265,7 @@ def build(rpx, diag=False, feats=None):
              hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbr', 'gk_clr', 'pose_tab', 'pose_last', 'gk_ftp', 'sk_desc', 'gk_fsg', 'gk_fsd', 'gk_fse', 'gk_fss', 'gk_fsc', 'gk_fsf', 'gk_fsh', 'gk_fsx', 'sk_lvd', 'sk_verts', 'sk_box', 'sk_nums', 'sk_k', 'sk_latch', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbr', 'gk_clr', 'pose_tab', 'pose_last', 'gk_ftp', 'sk_desc', 'gk_fcd', 'gk_fce', 'gk_fcf', 'gk_fcg', 'gk_fch', 'hyd_t', 'gk_fsg', 'gk_fsd', 'gk_fse', 'gk_fss', 'gk_fsc', 'gk_fsf', 'gk_fsh', 'gk_fsx', 'sk_lvd', 'sk_verts', 'sk_box', 'sk_nums', 'sk_k', 'sk_latch', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -4423,7 +4544,7 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
-''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94]) if skel else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
+''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94]) if skel else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
 # ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
 gk_clear:
         li r0, 0''' + (('''
@@ -4538,6 +4659,13 @@ w_dcase:
     for i, w in enumerate(t.words()):
         out.put(TRAMP + 4 * i, w, 'HUD trampoline', 0)
     out.put(DESC_TABLE + 4 * GK_KIND, lab['gk_dcase'], 'his fighter descriptor case', GK_DESC_CASE)
+    if skel and diag:                               # v1.2 diag: the hydrant's lone +0x94 blr -> hyd_diag
+        assert img.w(HYD_HOOK) == 0x4E800020 and img.w(0x100ED3F8 + 0x94) == HYD_HOOK
+        out.put(HYD_HOOK, asm1(HYD_HOOK, 'b 0x%X' % HYD_TRAMP), "the hydrant's +0x94 (diag)", 0x4E800020)
+        t = Asm(HYD_TRAMP)
+        t.asm(tail(lab['hyd_diag']))
+        for i, w in enumerate(t.words()):
+            out.put(HYD_TRAMP + 4 * i, w, 'hydrant diag trampoline', 0)
     ct = OL.clear_tail(img.w)                         # burn v1.2: the clear-all chain's last `b CLEAR_BACK` -> gk_clear
     assert not CAVE <= ct < LIMIT, 'clear chain already through this cave'
     out.put(ct, asm1(ct, 'b 0x%X' % lab['gk_clear']), 'the clear-all chain -> gk_clear (burn v1.2)', img.w(ct))

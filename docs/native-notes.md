@@ -3926,3 +3926,11 @@ MSC on a bunshin-based kind, the 4-shape group.
   `0x02AC2B1C`, which release) runs on the article after the make; the ground manager's layer pick (`[0x102F7DB4]
   +0x19C`, the GroundModule +0x18 object's +0x244 bits); the hydrant's per-ground callbacks (+0x44 / +0x48 / +0x4C and
   +0xA4 / +0xA8 / +0xAC on the handle, set by its +0x3C) which ours doesn't set. v1.1 diag S4SD / S4SE logs them.
+- **Weapon module slots -> accessor offsets** (the setters after each constructor in `0x02BCB42C`): 0 +0x34, 1 +0x4C,
+  2 +0x50, 3 +0x24, 4 +0xA0, 5 +0x2C, 6 +0x58, 7 +0x44, 8 +0x1C, 9 +0x7C, 10 +0x70, 11 +0xA4, 12 +0xA8, 13 +0x38,
+  14 +0xB4, 15 +0x64, 16 +0x60, 17 +0x8C, 18 +0x30, 19 +0x40, 20 +0x54, 21 +0x90, 22 +0xAC, 23 +0xB0, 24 +0x84, 25 +0xB8,
+  26 +0xC4, 27 +0x78. Slot 17 (+0x8C, ctor `0x02C4D2B8`, vtable `0x10108224`) is on the hydrant, Villager's tree /
+  bowling ball, Wario's bike, Pikmin, Tico, Zelda's phantom, Rush coil; the hydrant's +0x3C calls its vt +0x3C(5),
+  +0x74 / +0xC4 (Pac-Man's vl +0x4C0 / +0x4C4), +0x54(1) before making its grounds.
+- **Clone swing (clones v15, confirmed in game)**: stepping the clone's MotionModule +0x10 object's own swing system
+  (`0x03318A10` rate, `0x03314FB8` step) each frame swings its tongue / water with his own model.sb: no bind needed.
