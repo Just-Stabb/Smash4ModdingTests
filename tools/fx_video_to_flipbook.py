@@ -391,7 +391,7 @@ def run_job(opt):
         cands = []
         for k in range(K, K * 4 + 1):
             step = float(fps) * k / 60
-            n = math.ceil(kept / step)
+            n = math.ceil(kept / step - 0.01)         # 29.97 fps at K = 2: one cell a frame
             if n <= cmax:
                 cands.append((k, step, n))
         if not cands:
