@@ -220,6 +220,9 @@ def weapon_checks(e, img, info, diag=False):
           [e.w(vt + o) for o in VT_OURS],
           [lab['w_hit']] + ([lab['w_init']] if 0x1C in VT_OURS else []) + [lab['wp_%X' % o] for o in VT_OURS[2:]
                                                                             if o in C.POLL_SLOTS])
+    check('v6: its specializer is the moon\'s copy: +0x34 the moon\'s (sets the model scale), not bunshin\'s 0x02AF6738 (paints '
+          'it black: the user\'s v5 "completely black" clone)', (e.w(vt + 0x34), e.w(vt + 0x34) != 0x02AF6738),
+          (img.w(W.singleton_of(img, C.VT_BASE)[1] + 0x34), True))
     hits = []
     e.stub(L['old_hit'], lambda e_: e_.rec('base_hit', 3, 4, 5))
     # a clone: weapon +0x28 its accessor: +0x28 WorkModule (VAR_0 its owner's slot, VAR_1 its id), +0x50 AttackModule

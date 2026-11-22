@@ -719,8 +719,8 @@ def physics_tests(mscsb, src):
     m('gk_lw_press')
     frames(m, 100)
     check('v5: never-seen clones (their script not running) kept past v4\'s 9 frames (100 frames)', m.g('gk_alive'), 3)
-    check('v5: ... flagged "being made" (4 / 8) all the while (the clone scripts pick their id from it)',
-          int(g.vars.get(0x0F00031F) - 4747000) & 0xC, 0xC)
+    check('v6: ... only the clone made last (the right one: 8) flagged "being made" (v5 flagged both, and both clones '
+          'took id 1 in game)', int(g.vars.get(0x0F00031F) - 4747000) & 0xC, 0x8)
     frames(m, 30)
     check('v5: past the 120-frame grace + 3 misses: both dropped, the reason in VAR_23 (101 then 102: heartbeat)',
           (m.g('gk_alive'), g.vars.get(0x0F000317)), (0, 102.0))
@@ -1115,6 +1115,10 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
                 ['fighter/gekkouga/model/clone/c%02d/%s' % (c, f) for c in range(8) for f in GB.CLONE_FACE_FILES]
         check('v2: both MSCs, his 5 motion part pacs, the face / rest-of-model files in all 8 colours (%d)' % len(v2new),
               [m for m in v2new if 'INSTALL_TO_data/' + m not in names], [])
+    if z1 and len(earlier) == 5:
+        check('v6: INSTALL_TO_data: his MSC only (the "being made" bit for the last-made clone only)',
+              sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              ['fighter/gekkouga/script/msc/gekkouga.mscsb'])
     if z1 and len(earlier) == 4:
         check('v5: INSTALL_TO_data: his MSC only (the clones\' heartbeat grace, removal reasons, the request frame)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
@@ -1154,7 +1158,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v3', 'hitbox', '5x', 'sword', 'offset', 'clone', 'exe_v46z_gk4', 'Hitbox Viewer', 'A_safe',
          'B_template', 'C_hurt', 'D_full', 'S4GP', 'GX2R', 'crash') if len(earlier) == 3 else \
         ('greninja_clones_v4', 'exe_v46z_gk5', 'A_safe', 'B_attack', 'C_hurt', 'D_parts', 'S4GV', 'gen=', 'heartbeat',
-         'moon', 'pump')
+         'moon', 'pump') if len(earlier) == 4 else \
+        ('greninja_clones_v5', 'exe_v46z_gk6', 'black', 'id=1', 'S4GX', 'A_safe', 'B_attack', 'C_hurt', 'D_parts')
     check('README.txt mentions every feature (%s)' % ', '.join(words), [w for w in words if w not in readme], [])
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
@@ -1200,7 +1205,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False):
 
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
-    earlier = [x[5:] for k in ('1', '2', '3', '4') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
+    earlier = [x[5:] for k in ('1', '2', '3', '4', '5') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
     base_diag = a[4] if len(a) > 4 else None

@@ -40105,6 +40105,7 @@ int gk_smash;          // v3: the smash charge kept (frames, 0 - gk_smash_full()
 int gk_hold_first;     // v3: the hold's first tick (its effects made at once)
 int gk_gen_req;        // v4 diag: 0x40 / 0x80 the left / right clone made next frame
 int gk_seen;           // v5: 1 / 2 the clone's heartbeat seen (its script runs and found him)
+int gk_last_made;      // v6: the clone made last (only its "being made" bit is on)
 int gk_chain;          // the smashes used in this chain: 1 forward, 2 up, 4 down (0 no chain)
 int gk_chain_req;      // the smash a chain cancel asked for (its start status reads it)
 int gk_sm_auto;        // this smash releases on its own: 1 a full stored charge, 2 a chain
@@ -40402,6 +40403,7 @@ void gk_spawn(int id)
     WorkModule(0, (float)r + 0, 0x0f000317);   // v3 diag: the generate's result (the TEST_ONLY exe logs it: S4GF gen=)
     gk_alive = gk_alive | id;
     gk_seen = gk_seen & (0x3 - id);
+    gk_last_made = id;
     if (id == 0x1)
     {
         gk_lage = 0;
@@ -40740,7 +40742,9 @@ void gk_channel()
         r = 0;
     }
     flags = gk_alive;
-    flags = flags | (gk_alive & (0x3 - gk_seen)) * 4;   // v5: "being made" until its heartbeat is first seen
+    flags = flags | (gk_alive & gk_last_made & (0x3 - gk_seen)) * 4;   // v5 / v6: "being made" (only the clone made
+                                          // last, until its heartbeat is first seen: v5 kept the left's on while the
+                                          // right one was made, and both took id 1)
     if (gk_lfall > 2)
     {
         flags = flags | 0x10;

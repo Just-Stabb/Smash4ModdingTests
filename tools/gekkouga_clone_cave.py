@@ -111,6 +111,11 @@ SAFE_BASE = 0xFC                  # v5: moon (his Final Smash's moon). v4's safe
 ATTACK_BASE = 0x2                 # Mario's pump
 HURT_BASE = 0x168                 # mewtwom (Mewtwo's Final Smash form)
 MSC_SLOT = 8
+VT_BASE = 0xFC                    # v6: the clone's specializer (its singleton's vtable) is a copy of the moon's, not
+                                  # bunshin's: bunshin's +0x34 (0x02AF6738, at its start) paints the model black (its
+                                  # [acc+0x38] vt +0x4C colour (0, 0, 0, 255): the Final Smash's shadow clones) and links
+                                  # it to its owner; the moon's +0x34 only sets the model scale (the user's v5 "completely
+                                  # black" clone)
 DAMAGE_SLOT = 20
 RELEASE = frozenset()             # the release exe: the safe set (nothing risky) until a TEST_ONLY log clears the rest
 VARIANTS = (('A_safe', frozenset()), ('B_attack', frozenset(('attack',))), ('C_hurt', frozenset(('hurt',))),
@@ -162,6 +167,48 @@ HURTBOXES = (
 WEAPON_JOINT = 0x7D0
 
 
+def pos_diag():
+    """diag: a clone's place every 30 frames (120 poll calls: 4 phases) for its first 8 logs (S4GX)"""
+    return '''
+        lwz r30, %(wwork)d(r31)
+        cmpwi r30, 0
+        beq wp_nopos''' + var_get('r30', 0x0F000303) + '''
+        lis r12, %(one_hi)d
+        lfs f0, %(one_lo)d(r12)
+        fadds f1, f1, f0
+        stfs f1, 0x20(r1)''' + var_set('r30', 0x0F000303) + '''
+        lfs f1, 0x20(r1)
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r0, 0x1C(r1)
+        cmpwi r0, 960
+        bgt wp_nopos
+        li r12, 120
+        divwu r11, r0, r12
+        mullw r11, r11, r12
+        cmpw r11, r0
+        bne wp_nopos
+        lwz r12, 0x18(r31)              # its PostureModule: +0x10 x, +0x14 y
+        cmpwi r12, 0
+        beq wp_nopos
+        lfs f1, 0x10(r12)
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r0, 0x1C(r1)
+        stw r0, 0x10(r1)
+        lfs f1, 0x14(r12)
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r0, 0x1C(r1)
+        stw r0, 0x14(r1)''' + var_get('r30', VAR_ID) + '''
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lis r3, %(gk_fx_hi)d
+        addi r3, r3, %(gk_fx_lo)d
+        lwz r4, 0x1C(r1)
+        lwz r5, 0x10(r1)
+        lwz r6, 0x14(r1)''' + osr() + '''
+wp_nopos:'''
 HURT_CALL = '''
         cmpwi r3, 0
         beq wi_out
@@ -350,8 +397,8 @@ def layout(img, feats=None):
     nxt = [x for x in descs if x > bdesc]
     dsize = min(W.DESC_COPY_MAX, (nxt[0] - bdesc) if nxt else W.DESC_COPY_MAX)
     dsize -= dsize % 4
-    _sat, svt, svt2 = W.singleton_of(img, CLONE_BASE)
-    assert svt2 is None, 'bunshin has a vtable 2'
+    _sat, svt, svt2 = W.singleton_of(img, VT_BASE)
+    assert svt2 is None, 'moon has a vtable 2'
     alist = img.w(GK_DESC + 8)
     aents, acount = img.w(alist), img.w(alist + 4)
     assert acount == 6 and [img.w(aents + 16 * i) for i in range(acount)] == [0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE]
@@ -359,7 +406,7 @@ def layout(img, feats=None):
     rows += [[CLONE_KIND, 1, 0, 0], [CLONE_KIND, 1, 0, 0]]
     feats = FEATURES if feats is None else feats
     mrow = row_of(img, feats)
-    assert img.w(svt + 0x1C) == 0x02AF695C and img.w(0x02AF695C) == 0x4E800020, "bunshin's +0x1C: a blr"
+    assert img.w(img.w(svt + 0x1C)) == 0x4E800020, "the specializer's +0x1C: a blr"
     for j in (2, 6, 7, 20, 26):
         f = img.w(W.MODULE_TABLE + 0x70 * TEMPLATE + 4 * j)
         assert not (img.w(f) == 0x38600000 and img.w(f + 4) == 0x4E800020), 'template row slot %d empty' % j
@@ -432,7 +479,8 @@ def build(rpx, diag=False, feats=None):
             ('gk_fu', 'S4GU tag hidden: player=%d cursor=%08X\n'),
             ('gk_fj', 'S4GJ clone set-up done\n'),
             ('gk_fp', 'S4GP clone first update (its script not run yet): weapon accessor=%08X\n'),
-            ('gk_fv', 'S4GV HUD cursor update: r29=%d cursor=%08X\n')]
+            ('gk_fv', 'S4GV HUD cursor update: r29=%d cursor=%08X\n'),
+            ('gk_fx', 'S4GX clone id=%d at x=%d y=%d\n')]
     for nm, s in fmts:
         A[nm] = alloc((len(s) + 4) & ~3, 4) if diag else 0
     code_at = alloc(0, 4)
@@ -477,7 +525,7 @@ def build(rpx, diag=False, feats=None):
              hitbits=HIT_BITS, wacc=W_ACC, wwork=W_WORK, whit=W_HIT_MOD, wdmg=W_DAMAGE, watk=W_ATTACK,
              wstop=W_STOP, nhurt=len(HURTBOXES), s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
-               'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen'):
+               'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -1000,7 +1048,7 @@ wp_named:''' + var_get('r30', VAR_ID) + '''
         addi r3, r3, %(gk_fc_lo)d
         lwz r4, 0x10(r1)
         lwz r5, 0x1C(r1)''' + osr() + '''
-wp_nolog:''') + (('''
+wp_nolog:''' + pos_diag()) + (('''
         lwz r3, %(wdmg)d(r31)           # its DamageModule
         cmpwi r3, 0
         beq wp_out

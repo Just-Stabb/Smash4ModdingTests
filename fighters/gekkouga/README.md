@@ -563,3 +563,16 @@ lizardonm is out (the v4 crash). His MSC: a clone never heard from is kept 120 f
 heartbeat drops it (v4: 6 + 3), its "being made" bit stays until its heartbeat is first seen, and VAR_23 holds the
 removal reason (`gk_why`: 100 heartbeat, 200 hit, 300 end / KO, 400 fall, + the clone's id), logged by `S4GF gen=`.
 Diag `S4GV r29 cursor`: every HUD cursor call's index once (the tag: v4 had no `S4GU`).
+
+## Clones v6 (`greninja_clones_v6.zip`)
+
+The user's v5 A_safe log: the clone MSC runs now (`S4GC`), no crash; but both clones reported `id=1` (owner slot 1 is
+right: the clone counts slots from 1, `S4GF` from 0), one clone was "completely black" and vanished within a second,
+the other "poofed instantly", and both were dropped by the heartbeat (102 at the grace, 101 later).
+- **id**: his "being made" bit (VAR_31 4 / 8) is now only the last-made clone's (`gk_last_made`); v5 kept the left's on
+  until its heartbeat was seen, so the right clone, made 3 frames later, took id 1 too: both stood at the left place
+  and beat bit 1, the right one was dropped as never heard from.
+- **black**: the clone's specializer was a copy of bunshin's, whose +0x34 (`0x02AF6738`, at its start) sets the model
+  colour (0, 0, 0, 255) through [acc+0x38] vt +0x4C (the Final Smash's shadow clones) and links it to its owner
+  ([acc+0x68] vt +0x3BC). Now a copy of the moon's (`VT_BASE` 0xFC), whose +0x34 only sets the model scale.
+- Diag `S4GX clone id at x y`: each clone's posture every 30 frames, its first 8 logs.

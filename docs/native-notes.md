@@ -3827,3 +3827,7 @@ MSC on a bunshin-based kind, the 4-shape group.
   update templates update +0x1C only for kinds that have it (moon's = bunshin's + +0x1C). v4's safe clone (bunshin's row)
   was made and updated but its MSC never ran. Mario's pump (0x2) is bunshin's set + Attack (slot 2) + slot 5 + the agent,
   its template bunshin's + +0x1C + +0x50. The v4 B build (lizardonm's routine / row) crashed inside the generate.
+- **v6 (exe_v46z_gk6)**: bunshin's specializer +0x34 (`0x02AF6738`, the article's start) paints its model black ([acc
+  +0x38] vt +0x4C with (0, 0, 0, 255) from `0x100DDFC4` / `0x100DDFC8`) and calls [acc+0x68] vt +0x3BC(3, 0, 1) / (3, 0xD, 1)
+  and [acc+0xA0] vt +0xB4 / +0xA4 (0x1000047); the moon's +0x34 (`0x02AF6B2C`) only [acc+0x18] vt +0xE4(init +0x68: the
+  scale). The clone's specializer is now the moon's copy.
