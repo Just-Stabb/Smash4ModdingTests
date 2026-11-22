@@ -781,49 +781,68 @@ def plyc_checks(e, info, diag):
 
 
 def sway_checks(e, info):
-    """v11: the clone's swing step (feature sway): wp_94 -> w_sway -> MotionModule's swing update, guarded"""
-    lab, A, F, L = info['labels'], info['A'], info['feats'], info['layout']
+    """v12: the clone's swing step (feature sway): wp_94 -> w_sway -> the motion object's swing rate + step (v11's call
+    of MotionModule's whole swing update crashed in the user's E_sway)"""
+    lab, A, F = info['labels'], info['A'], info['feats']
     if 'sway' not in F:
         check('v11: without "sway": no swing step code', 'w_sway' in lab, False)
         return
     calls = []
-    e.stub(C.SWING_UPDATE, lambda e_: calls.append(('swing', e_.r(3))))
+    e.stub(C.SWING_RATE, lambda e_: calls.append(('rate', e_.r(3), round(d2f(e_.mu.reg_read(UC_PPC_REG_FPR1)), 3))))
+    e.stub(C.SWING_STEP, lambda e_: calls.append(('step', e_.r(3))))
+    e.stub(C.SWING_UPDATE, lambda e_: calls.append(('whole update', e_.r(3))))
+    cv = {}
+    vt = e.alloc(0x100, b'\0')
+    g, st = e.alloc(4), e.alloc(4)
+    e.setw(vt + 0x44, g)
+    e.setw(vt + 0x4C, st)
+    e.stub(g, lambda e_: e_.mu.reg_write(UC_PPC_REG_FPR1, f2d(cv.get(e_.r(4), 0.0))))
+    e.stub(st, lambda e_: cv.__setitem__(e_.r(4), round(d2f(e_.mu.reg_read(UC_PPC_REG_FPR1)), 3)))
+    wm = e.alloc(0x10, b'\0')
+    e.setw(wm, vt)
     acc = e.alloc(0x100, b'\0')
-    for o in C.SWAY_MODULES:
-        e.setw(acc + o, e.alloc(0x40, b'\0'))
+    e.setw(acc + C.W_WORK, wm)
     mm = e.alloc(0x60, b'\0')
     e.setw(acc + C.W_MOTION, mm)
-    e.setw(mm + C.MM_SWING, 0x1234)
-    e.setw(mm + C.MM_MOTION, e.alloc(0x100, b'\0'))
+    motion = e.alloc(0x100, b'\0')
+    sw = e.alloc(0x100, b'\0')
+    e.setw(motion + C.MO_SWING, sw)
+    e.setw(mm + C.MM_MOTION, motion)
     weapon = e.alloc(0x40, b'\0')
     e.setw(weapon + C.W_ACC, acc)
 
     def run():
         del calls[:]
+        e.osr_full = []
         e.call(lab['w_sway'], weapon)
         return list(calls)
-    check('v11 sway: every module there, the MotionModule with its swing: its swing update (mm) once', run(), [('swing', mm)])
-    e.setw(mm + C.MM_SWING, 0)
-    check('v11 sway: no swing (MotionModule +0x38 0): not called', run(), [])
-    e.setw(mm + C.MM_SWING, 0x1234)
-    miss = []
-    for o in C.SWAY_MODULES:
-        keep = e.w(acc + o)
-        e.setw(acc + o, 0)
-        if run():
-            miss.append(hex(o))
-        e.setw(acc + o, keep)
-    check('v11 sway: any module the update reads missing (%s): not called' % ', '.join(hex(o) for o in C.SWAY_MODULES), miss, [])
+    check('v12 sway: its motion object\'s swing rate (1.0) then its swing step; never MotionModule\'s whole update',
+          run(), [('rate', motion, 1.0), ('step', motion)])
+    if info.get('diag'):
+        first = [x[:6] for x in e.osr_full if x[0] == A['gk_fr']]
+        run()
+        check('v12 sway diag: S4GR before (0) and after (1) its first step (motion, swing, set up 0, flags), VAR_5 1, '
+              'then no more', (first, cv.get(C.VAR_SWAYLOG), [x for x in e.osr_full if x[0] == A['gk_fr']]),
+              ([(A['gk_fr'], 0, motion, sw, 0, 0), (A['gk_fr'], 1, motion, sw, 0, 0)], 1.0, []))
+    e.setw(motion + C.MO_SWING, 0)
+    check('v12 sway: no swing system: nothing', run(), [])
+    e.setw(motion + C.MO_SWING, sw)
+    e.setw(mm + C.MM_MOTION, 0)
+    check('v12 sway: no motion object: nothing', run(), [])
+    e.setw(mm + C.MM_MOTION, motion)
+    e.setw(acc + C.W_MOTION, 0)
+    check('v12 sway: no MotionModule: nothing', run(), [])
+    e.setw(acc + C.W_MOTION, mm)
     e.setw(weapon + C.W_ACC, 0)
-    check('v11 sway: no accessor: not called', run(), [])
+    check('v12 sway: no accessor: nothing', run(), [])
     e.setw(weapon + C.W_ACC, acc)
-    # the +0x94 phase: the poller, the swing step, then the moon's method with the same arguments
-    vt = info['A']['w_vt']
+    vtab = info['A']['w_vt']
     del calls[:]
     e.calls = []
-    e.call(e.w(vt + 0x94), 0x51, weapon, 0x55, 0x66)
-    check('v11 sway: the +0x94 phase (once a frame) steps the swing, then runs the moon\'s method as it was called',
-          (calls, [c for c in e.calls if c[0].startswith('orig')]), ([('swing', mm)], [('orig94', 0x51, weapon, 0x55, 0x66)]))
+    e.call(e.w(vtab + 0x94), 0x51, weapon, 0x55, 0x66)
+    check('v12 sway: the +0x94 phase steps the swing, then runs the moon\'s method with its arguments as called',
+          (calls, [c for c in e.calls if c[0].startswith('orig')]),
+          ([('rate', motion, 1.0), ('step', motion)], [('orig94', 0x51, weapon, 0x55, 0x66)]))
 
 
 def hitcheck_checks(e, info, diag):

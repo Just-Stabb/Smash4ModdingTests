@@ -710,3 +710,20 @@ not hit (C_hurt log: S4GK 8 boxes / 1 object, S4GO's record = our hurtbox data c
   once a frame from the +0x94 phase when every module is there. Diag `S4GQ` (every build's draw diag): MotionModule,
   +0x38, motion object, swing system, its +0xB4 flags, +0xF1.
 - **C_hurt**: `S4GY` logs the hurtboxes' collision object 0's first words at each start.
+
+## Clones v12 (`greninja_clones_v12.zip`, TEST_ONLY exes only)
+
+The user's v11 E_sway crashed at the first clone's first frame (MotionModule's whole swing update `0x02C67064` on an
+article). v12 (the release and data stay v10's / v11's):
+- **F_hitcheck** (feature `hitcheck`, `w_hitchk`, the +0x94 phase): every other live fighter's AttackModule entries
+  (container am +8: +0xC entries 0x174 each, +0x10 count; an entry: +0 first node, +4 count, +0x18 node pointers; a
+  node: +0x3C on, its x / y box +0x18 / +0x1C min, +0x20 / +0x24 max: the same boxes the game's pair pass
+  `0x02C0F6F0` tests first) against the clone's box (x +- 6, y to y + 18, `HC_BOX`); same team (TeamModule acc +0x6C,
+  +8) and his own slot skipped; a hit sets his VAR_21 = 20000 + its id (his MSC's hurt path: smoke and the log) once
+  per clone life (its VAR_4, cleared at each start). Diag `S4GH hit check: attacker slot hitbox clone id x y`. Not
+  covered: projectiles / items, the attacker's hitlag. Unicorn: hits, node off, the four sides, team, owner skipped.
+- **E_sway**: only the motion object's swing rate `0x03318A10(motion, 1.0)` and swing set-up / step `0x03314FB8`;
+  diag `S4GR` before / after its first call (VAR_5). The +0x94 wrapper now runs its calls before restoring the
+  arguments (v11's ran after: the moon's +0x94 is a `blr`, so harmless).
+- Assists: Ghirahim and Lyn both have the empty 12-byte model.sb; Lyn's Hair1N-5N are keyed in all 6 of her motions
+  (her model.nhb is the 64-byte empty form): no swing on either.

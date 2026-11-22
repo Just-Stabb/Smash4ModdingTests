@@ -1164,6 +1164,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 11:   # v11: the release exe is v10's (not shipped)
         want_top = ['INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
+    if len(earlier) == 12:   # v12: TEST_ONLY exes only (the release and the data are v11's)
+        want_top = ['README.txt', 'TEST_ONLY_INSTALL_TO_code']
     check('the package\'s top level: %s (+ Sm4shCommand)' % ', '.join(want_top),
           sorted(t for t in top if not t.startswith('Sm4shCommand_v')), want_top)
     want, same1 = [], []
@@ -1294,7 +1296,9 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
          'empty_model_sb', 'original_model_nud', 'exe_v46z_gk9', 'confirmed') if len(earlier) == 9 else         ('greninja_clones_v9_1', 'exe_v46z_gk10', 'tongue', 'model.sb', 'main.pac', 'model.nud', 'TEST_ONLY_DATA',
          'v91_rigid', 'original_model_sb', 'A_attack', 'C_hurt', 'D_parts', 'name tag', '0x2B75', 'S4GU', 'S4GO',
          'sway', 'confirmed') if len(earlier) == 10 else         ('greninja_clones_v10', 'exe_v46z_gk11', 'tongue', 'model.sb', 'model.nud', 'TEST_ONLY_DATA', 'E_sway', 'sway',
-         'S4GQ', 'S4GY', 'S4GO', 'C_hurt', 'name tag', 'confirmed')
+         'S4GQ', 'S4GY', 'S4GO', 'C_hurt', 'name tag', 'confirmed') if len(earlier) == 11 else \
+        ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
+         'Lyn', 'Ghirahim', 'confirmed')
     check('README.txt mentions every feature (%s)' % ', '.join(words), [w for w in words if w not in readme], [])
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
@@ -1345,7 +1349,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
 
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
-    earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
+    earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
     base_diag = a[4] if len(a) > 4 else None

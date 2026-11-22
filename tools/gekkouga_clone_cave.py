@@ -139,6 +139,10 @@ NODE_ON, NODE_MIN_X, NODE_MIN_Y, NODE_MAX_X, NODE_MAX_Y = 0x3C, 0x18, 0x1C, 0x20
 TEAM_MOD = 0x6C                   # the accessor's TeamModule (+8 the team id)
 HC_BOX = (6.0, 0.0, 18.0)         # the clone's box: x +- 6, y + 0 to y + 18 (his body: his shield-route capsules y 3 -
                                   # 15, radius 5.5)
+SWING_RATE = 0x03318A10           # v12: (motion object, f1 rate): its swing's +0x90
+SWING_STEP = 0x03314FB8           # (motion object): the swing set-up (first) / step
+MO_SWING = 0x20                   # the motion object's swing system
+VAR_SWAYLOG = 0x0F000305          # the clone's VAR_5 (diag): its first swing step logged
 SWING_UPDATE = 0x02C67064        # v11: MotionModule's swing update (mm): a fighter's frame calls it (0x02E3543C)
 W_MOTION = 0x44                   # the accessor's MotionModule (+0x14 its motion object (+0x20 the swing system, +0xF1
 MM_MOTION = 0x14                  # set up), +0x38 what the swing update needs)
@@ -574,6 +578,7 @@ def build(rpx, diag=False, feats=None):
             ('gk_fm', 'S4GM clone id=%d draw: visflag=%d visible=%d model mode=%d drawn=%d overlay=%d/%d\n'),
             ('gk_fn', 'S4GN clone id=%d z=%d scale x100=%d link mask=%08X model=%08X\n'),
             ('gk_fh', 'S4GH hit check: attacker slot=%d hitbox=%d clone id=%d at x=%d y=%d\n'),
+            ('gk_fr', 'S4GR clone swing step %d (0 before, 1 after): motion=%08X swing=%08X set up=%d flags=%08X\n'),
             ('gk_fq', 'S4GQ clone id=%d swing: motionmodule=%08X need=%08X motion=%08X swing=%08X flags=%08X set up=%d\n'),
             ('gk_fy', 'S4GY clone hurt object 0: %08X %08X %08X %08X %08X %08X\n'),
             ('gk_fk', 'S4GK clone hurtboxes set: hitmodule=%08X groups=%d boxes %d -> %d group0=%d+%d objects=%d\n'),
@@ -639,11 +644,11 @@ def build(rpx, diag=False, feats=None):
              wstop=W_STOP, wcol=W_COLOUR, wmodel=W_MODEL, wlink=W_LINK, wvis=W_VIS, wpost=W_POSTURE,
              cclear=COLOUR_CLEAR, am_ents=AM_ENTS, am_count=AM_COUNT, am_max=AM_MAX, ent_size=ENT_SIZE,
              ent_nodes=ENT_NODES, node_max=NODE_MAX, node_on=NODE_ON, node_min_x=NODE_MIN_X, node_min_y=NODE_MIN_Y,
-             node_max_x=NODE_MAX_X, node_max_y=NODE_MAX_Y, team=TEAM_MOD, wmotion=W_MOTION, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
+             node_max_x=NODE_MAX_X, node_max_y=NODE_MAX_Y, team=TEAM_MOD, wmotion=W_MOTION, mo_swing=MO_SWING, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
              hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
@@ -1355,32 +1360,82 @@ wp_94:
         mtlr r0
         addi r1, r1, 0x40''' + tail(L['vt_orig'][0x94]) + '''
 
-''' + ((r'''# ---- v11 sway: the clone's swing step. A fighter's frame calls its MotionModule's swing update 0x02C67064 (from
-# 0x02E3543C: the wind, the rate from its slow / stop, then the motion object's swing step 0x03314FB8: the first call
-# sets the swing up (0x036B715C), the next ones step it (0x036B726C)); the weapons' templates never call it, so a
-# clone's swing bones stayed where they were first placed (v8). Once a frame (the specializer's +0x94 phase), when
-# every module it reads is there and its MotionModule has a swing (+0x38, +0x14)
-w_sway: stwu r1, -0x20(r1)
+''' + ((r'''# ---- v11 / v12 sway: the clone's swing step. A fighter's frame calls its MotionModule's swing update 0x02C67064
+# (0x02E3543C). v11 called that for the clone and the user's E_sway crashed at the clone's first frame (it reads
+# fighter-side modules: wind, posture, stop, slow, +0x60). v12 calls only its last two steps, on the motion object
+# itself (model-library level): the rate 0x03318A10(motion, 1.0) (swing +0x90) and 0x03314FB8(motion) (mode != 8 and
+# a swing: the first call sets it up 0x036B715C (+0xF1), the next ones step it 0x036B726C). Once a frame (the +0x94
+# phase). Diag: S4GR before / after the first call (a crash in it leaves only "before")
+w_sway: stwu r1, -0x30(r1)
         mflr r0
-        stw r0, 0x24(r1)
+        stw r0, 0x34(r1)
+        stw r31, 0x2C(r1)
+        stw r30, 0x28(r1)
         lwz r12, %(wacc)d(r3)
         cmpwi r12, 0
-        beq wsw_out''' + ''.join('''
-        lwz r11, 0x%X(r12)
-        cmpwi r11, 0
-        beq wsw_out''' % o for o in SWAY_MODULES) + '''
-        lwz r3, %(wmotion)d(r12)        # its MotionModule
-        lwz r11, %(mm_swing)d(r3)
+        beq wsw_out
+        lwz r30, %(wwork)d(r12)
+        lwz r11, %(wmotion)d(r12)       # its MotionModule
         cmpwi r11, 0
         beq wsw_out
-        lwz r11, %(mm_motion)d(r3)
+        lwz r31, %(mm_motion)d(r11)     # its motion object
+        lis r0, 0x1000
+        cmplw r31, r0
+        blt wsw_out
+        lis r0, 0x8000
+        cmplw r31, r0
+        bge wsw_out
+        lwz r11, %(mo_swing)d(r31)      # its swing system
         cmpwi r11, 0
-        beq wsw_out''' + call(SWING_UPDATE) + '''
+        beq wsw_out''' + D('''
+        li r0, 0
+        stw r0, 0x10(r1)
+        cmpwi r30, 0
+        beq wsw_nolog0''' + var_get('r30', VAR_SWAYLOG) + '''
+        lis r12, %(half_hi)d
+        lfs f0, %(half_lo)d(r12)
+        fcmpu cr0, f1, f0
+        bgt wsw_nolog0
+        li r0, 1
+        stw r0, 0x10(r1)
+        li r4, 0
+        bl wsw_log
+wsw_nolog0:''') + '''
+        mr r3, r31
+        lis r12, %(one_hi)d
+        lfs f1, %(one_lo)d(r12)''' + call(SWING_RATE) + '''
+        mr r3, r31''' + call(SWING_STEP) + D('''
+        lwz r0, 0x10(r1)
+        cmpwi r0, 0
+        beq wsw_out
+        li r4, 1
+        bl wsw_log
+        lis r12, %(one_hi)d
+        lfs f1, %(one_lo)d(r12)''' + var_set('r30', VAR_SWAYLOG)) + '''
 wsw_out:
+        lwz r30, 0x28(r1)
+        lwz r31, 0x2C(r1)
+        lwz r0, 0x34(r1)
+        mtlr r0
+        addi r1, r1, 0x30
+        blr''' + D('''
+wsw_log:                                # (r4 0 before / 1 after, r31 the motion object)
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        mr r5, r31
+        lwz r6, %(mo_swing)d(r31)
+        lbz r7, 0xF1(r31)
+        li r8, -1
+        cmpwi r6, 0
+        beq wsl_go
+        lwz r8, 0xB4(r6)
+wsl_go: lis r3, %(gk_fr_hi)d
+        addi r3, r3, %(gk_fr_lo)d''' + osr() + '''
         lwz r0, 0x24(r1)
         mtlr r0
         addi r1, r1, 0x20
-        blr
+        blr''') + '''
 
 ''') if 'sway' in feats else '') + '''
 ''' + ((r'''# ---- v12 hitcheck (F_hitcheck): the clone hit from Greninja's side. The native hurtboxes (v3 - v11) never met an
@@ -2265,7 +2320,7 @@ w_dcase:
     out.put(T['bt'] + 4 * k, base_of(feats), 'base kind 0x%X' % CLONE_KIND, 0xFFFF)
     out.put(T['st'] + 4 * k, A['w_single'], 'singleton case 0x%X' % CLONE_KIND, 0)
     out.put(T['rt'] + 4 * k, (A['w_row'] - W.MODULE_TABLE) & 0xFFFFFFFF, 'own module row 0x%X' % CLONE_KIND, 0)
-    info = dict(A=A, labels=lab, T=T, layout=L, end=end, owner_str=owner_str, feats=feats)
+    info = dict(A=A, labels=lab, T=T, layout=L, end=end, owner_str=owner_str, feats=feats, diag=diag)
     return out, info
 
 
