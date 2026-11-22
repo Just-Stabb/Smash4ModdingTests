@@ -1249,3 +1249,39 @@ Also the clone fixes v2 items (one package).
   compare. Back air's inner trail is on joint 2 (HipN, animated on the clones): not this, still open.
 - **Up smash's trail hitboxes** on its flames (+- 6 / 14, Y 5; fire trail fix v1 moved the flames only).
 - Tests: cave A_release 269 / G_pose 264 / release 239; `gekkouga_clones_test ... --vft` 321 / 0. Not confirmed in game.
+
+## Skeleton v1.5 (`greninja_skeleton_v1_5.zip`, over v1.4; exe_v46z_gkb7)
+
+The user: the box "closer to the skeleton's body rather than its outer flames"; "a contact burn damage ... about 4%
+overall but rehits quickly ... about 70% overall if it was for 1 second"; "make the explosion have 1.6x hitstun"; "make
+the explosion effect and hitbox slightly bigger and do a lot of shield damage"; "HaveR fixed the sword"; its sounds.
+- **Body box** (exe feature `skbody`, `SK_BODY` / `sk_dims` / `sk_verts`): measured on skeleton_run's 55 cells as drawn
+  (5.60 px a unit): the bones (red over the flame) reach 26.6 (skull top, median), the ribcage spans -2.3 / +2.7 round the
+  spine, the spine 2.2 ahead of the picture's centre. The billboards move back 2.2 along joint 0's local Z (the skeleton
+  turns its model by its way: `gekkouga_fx.py SK_SPINE_X`, both sets); skeleton.lvd x +- 3.5, walls from 2, top 24; the
+  HP hit box the same. Preview `$S/gk_preview/skeleton_box.png` (`tools/gekkouga_skeleton_box_preview.py`).
+- **Contact burn** (exe feature `sktouch`, `SK_TOUCH_ROW` 0.35 % every 6 frames for 60 = 3.5 %; `gekkouga_build.py
+  SK_TOUCH` / `sk_run_script`): SkeletonRun puts a capsule (joint 0, radius 3.5, Y 3.5 - 20.5) on 2 frames, off 1 (vanilla
+  up air's multi-hit pattern: the hit log restarts), no knockback / hitlag / flinch, 0.1 %; the exe's `sk_frame` scans its
+  running hits with the contact row (its explosion's with the skeleton row). 1 s of contact: 20 touches = 70 % (+ 2 %),
+  at most 20 instances alive (cap 32); shielded: the 1 % floor each.
+- **Explosion**: Extra_Special_Hitbox (the ACMD extension) HitstunMul 1.6; size 22 -> 27 and its footage 44 -> 54 wide
+  (`SK_BOOM_DIAMETER`); ShieldDamage +40 (15 + 40 = 55 against a fresh shield's 50: a full break; the formula as Smash 4's
+  damage + shield damage, its multipliers not in the workspace's references).
+- **Clones' joint 25**: the right hand (`CLONE_JOINT_FIX` {25: RHaveN}), confirmed in game (v1.4's TEST_ONLY
+  clone_sword_rhave); the TEST_ONLY variants dropped.
+- **Sounds** (`tools/gekkouga_sound.py`, the `fighter_own_bank.py` route: silence trimmed under -45 dBFS, mono 48 kHz
+  IDSP one-shots at a -0.5 dBFS peak, TONE entries copied from his Special_L01): 6 tones appended to snd_se_Gekkouga
+  (BINF 2058 kept: 104 -> 110 tones) and their labels 91 - 96 to his soundlabeltable row 0x768 (ids 0x0768005B -
+  0x07680060: spawn 1 / 2, voice 1 / 2 (-3 dB), death, explosion), on the newest table in the workspace
+  ($S/v14/out/sound/config/soundlabeltable.bin, Supamario / Byleth rows; only his row changes). `weapons/skeleton.c`:
+  `sk_snd_spawn` (one of the two, `randi`), `sk_snd_voice` (the first 10 - 40 frames in, then each next at the last one's
+  length - 30 + 0 - 90 frames: up to 0.5 s overlap, up to 1 s gap), `sk_snd_end` (its voices stopped, SoundModule 0x2714
+  both, then the death's / explosion's); it stays hidden until that sound has played (`sk_boom_frames` 40 -> 120,
+  `sk_smoke_frames` 3 -> 36), so a new skeleton waits that long. `fighter_own_bank.build_bank` skips the bank's 14 empty
+  TONE entries when looking for the template; `rolloff_hold_test.VM` evaluates its binary ops lazily (a negative right
+  operand tripped the shifts).
+- Tests: cave 240 / 270 / 265; `gekkouga_fx_test` 52 / 0; `gekkouga_clones_test ... --vs14` 323 / 0 (`skeleton_sound_tests`: ids =
+  the table's, spawn pick, voice timing / overlap bounds, stops and the death / explosion sounds, removal after them; the
+  contact script's frames and fields; the explosion's HitstunMul / size / shield damage; the package's bank / table);
+  supamario_ui_cave_test 0; import_call_check 0. Not confirmed in game: everything but the clone sword's hand.
