@@ -304,15 +304,19 @@ def flip_emitters(p, tmpl, name, spec):
         f(em, 'blend_type', spec['blend'])
         f(em, 'volume_type', 0)
         f(em, 'volume_radius', [0.0, 0.0, 0.0])
-        f(em, 'start_frame', run['start'])
-        f(em, 'emit_start', 0)
+        # skeleton v1.3 (the user's "blinks out and back in"): a run's birth is its emit start (0x44C, frames after the
+        # effect is made); v1.2 - aerial chain v1 put it in 0x448, which is the emission count's random (percent), not a
+        # start: every run was born at frame 0 (on top of the first: two cells drawn at once), the later ones' re-births
+        # thinned at random, and nothing drawn from the first run's end to the next period
+        f(em, 'emit_rate_random', 0)
+        f(em, 'emit_start', run['start'])
         if run['period']:                          # born again every period frames, for ever
             f(em, 'one_time', 0)
             f(em, 'end_frame', FOREVER)
             f(em, 'emit_interval', run['period'] - 1)
-        else:                                      # once (the shadow's: one-time, end 1)
+        else:                                      # once (one-time: emission ends at its end frame, on the same clock)
             f(em, 'one_time', 1)
-            f(em, 'end_frame', 1)
+            f(em, 'end_frame', run['start'] + 1)
             f(em, 'emit_interval', 10)
         f(em, 'emit_interval_random', 0)
         f(em, 'emit_rate', 1.0)

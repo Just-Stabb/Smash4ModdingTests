@@ -1133,10 +1133,10 @@ def s4_emitters(p, set_index, program_cache=None):
         f = lambda n, d=d: p.field(d, n)    # noqa: E731
         em = Emitter()
         em.name = p.emitter_name(d)
-        em.start = f('start_frame') + f('emit_start')
+        em.start = f('emit_start')                   # (0x448 is the count's random, not a start: Greninja skeleton v1.3)
         em.interval = f('emit_interval')
         em.interval_random = max(0, f('emit_interval_random'))
-        em.duration = f('end_frame') if f('one_time') else FOREVER
+        em.duration = max(0, f('end_frame') - em.start + 1) if f('one_time') else FOREVER   # end: the same clock (0x04A64F70)
         em.rate = f('emit_rate')
         em.life = f('ptcl_life') if f('ptcl_life') != FOREVER else 600
         em.life_random_frames = max(0, f('ptcl_life_random')) if f('ptcl_life') != FOREVER else 0

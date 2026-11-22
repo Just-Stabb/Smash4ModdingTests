@@ -102,10 +102,16 @@ FIELDS = [
     (0x414, '>3f', 'emitter_rotation', 'corpus'),  # emitters agree; set_emitter_srt writes all four)
     (0x420, '>3f', 'emitter_translation', 'corpus'),
     (0x444, '>f', 'emit_rate', 'corpus'),
-    (0x448, '>i', 'start_frame', 'corpus'),       # after the set starts
-    (0x44C, '>i', 'emit_start', 'runtime'),       # first emission, frames after start_frame
-    (0x450, '>i', 'end_frame', 'runtime'),        # one_time: emission ends this many frames after
-                                                  # start_frame; 0x7FFFFFFF (never) without one_time
+    (0x448, '>i', 'emit_rate_random', 'runtime'),  # percent: each emission's count x (1 - U(0, 1) x this / 100),
+                                                  # accumulated (the volume functions, e.g. 0x04A4B32C; the first frame
+                                                  # always emits one). NOT a start frame (Greninja skeleton v1.3: read
+                                                  # as one before; vanilla: 0 on 186 of 188 emitters, 50 / 60 the rest);
+                                                  # its old name 'start_frame' still works (FIELD alias)
+    (0x44C, '>i', 'emit_start', 'runtime'),       # the first emission, frames after the emitter is made (the emission
+                                                  # test 0x04A6507C: its time - the set's +0x2AC (0) < this: none yet)
+    (0x450, '>i', 'end_frame', 'runtime'),        # one_time: no emission from this many frames after the emitter is
+                                                  # made (0x04A64F70: the same clock as emit_start, not after it);
+                                                  # 0x7FFFFFFF (never) without one_time
     (0x454, '>i', 'emit_interval', 'corpus'),
     (0x458, '>i', 'emit_interval_random', 'runtime'),   # next gap + (rand x this) >> 32 (cross_f 0x04A65350)
     (0x45C, '>f', 'figure_velocity', 'guess'),    # all-direction speed
@@ -156,6 +162,7 @@ FIELDS = [
     (0x844, '>I', 'shader_index', 'runtime'),     # into the shader table (shader-keyed fields must match it)
 ]
 FIELD = {f[2]: f for f in FIELDS}
+FIELD['start_frame'] = FIELD['emit_rate_random']   # (the old, wrong name: kept for the callers)
 # emitter key animations (0x2CC / 0x2D0 into the key-animation table): b'KEYA', u32 count, then count
 # blocks of u32 key count, interpolation (0 linear, 1 smoothstep), target, loop (the frame taken modulo the
 # last key's), 100 (1 on 9 vanilla blocks), 0 (1 on 3), block size (0x1C + 8 x keys), then the keys
