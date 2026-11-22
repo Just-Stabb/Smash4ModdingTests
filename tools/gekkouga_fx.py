@@ -74,6 +74,19 @@ RING_JITTER = 12.0
 RING_POS_JITTER = 4.0              # degrees round the circle
 RING_SIZE_VAR = (0.85, 1.15)
 FIRE_FADE = 15                     # frames the body / trail fires take to go when ended with a fade (0x2723 (0, 0))
+# skeleton v1.3 package (the user: "different fire effects on the opponent to denote more/stronger fire stacks"): the
+# burning fighter's fire by tier (tools/gekkouga_clone_cave.py BFX_TIERS picks it): 1 small wispy flames, 2 burn v2's
+# FireBody, 3 a larger fire, 4 the most intense (a big fire with a second one layered in it, brighter). Quad heights;
+# each tier's base on his feet as FireBody's
+FIRE_TIER1 = ('fire_torch_012', 22.0)
+FIRE_TIER3 = ('fire_small_5', 42.0)
+FIRE_TIER4 = (('fire_ground_10', 56.0, 1.25), ('fire_small_5', 40.0, 1.25))   # (atlas, height, brightness), drawn in turn
+# the user: "make forward air have more fire along the edges of the water blade and make the fire larger": flames along
+# the water sword (his hand joint 25's -Y, hilt 0 to its tip 11 at size 1) instead of burn v2's one at the tip, the n-air
+# ring's clips in turn, each its own start cell, upright (a billboard can't turn with the swinging blade) +- the jitter,
+# on the blade's outer edge (BLADE_EDGE along the joint's local axis); x BLADE_SIZE the tip flame's height
+FIRE_BLADE = dict(n=6, y0=2.5, y1=11.0, size=1.8, jitter=14.0, seed=11)
+BLADE_EDGE = (0.0, 0.0, 0.0)       # (x, z) off the blade's line (set from the render: the leading edge)
 
 
 def cell_aspect(name):
@@ -96,9 +109,66 @@ def _fire_sets():
             ('PtcGekkougaFireRing', ring), ('PtcGekkougaFireRingL', ring_l)]
 
 
-def all_sets(burn2=True):
-    """every set in entry order: skeleton v1.2's, then burn v2's"""
-    return _sk_sets() + (_fire_sets() if burn2 else [])
+def body_fire(atlas_, h, brightness=1.0):
+    d = dict(atlas=atlas_, blend=1, size=(h * cell_aspect(atlas_), h), fade=FIRE_FADE, brightness=brightness)
+    d['offset'] = (0.0, (feet_cell_v(atlas_) - 0.5) * h)
+    return d
+
+
+def _tier_sets():
+    """skeleton v1.3: the burn tiers' fires (1, 3, 4: tier 2 is FireBody) and forward air's blade flames"""
+    return [('PtcGekkougaFireBody1', body_fire(*FIRE_TIER1)),
+            ('PtcGekkougaFireBody3', body_fire(*FIRE_TIER3)),
+            ('PtcGekkougaFireBody4', dict(layers=[body_fire(a, h, b) for a, h, b in FIRE_TIER4])),
+            ('PtcGekkougaFireBlade', dict(blade=FIRE_BLADE))]
+
+
+def blade_flames():
+    """forward air's blade flames: [{atlas, height, y (down the joint), rot, start}]"""
+    rng = np.random.RandomState(FIRE_BLADE['seed'])
+    n = FIRE_BLADE['n']
+    out = []
+    for i in range(n):
+        atl, hgt = RING_ASSETS[i % len(RING_ASSETS)]
+        out.append(dict(atlas=atl, height=hgt * FIRE_BLADE['size'],
+                        y=FIRE_BLADE['y0'] + (FIRE_BLADE['y1'] - FIRE_BLADE['y0']) * i / (n - 1),
+                        rot=float(rng.uniform(-FIRE_BLADE['jitter'], FIRE_BLADE['jitter'])),
+                        start=int(rng.randint(0, TABLE - 1))))
+    return out
+
+
+def blade_emitters(p, tmpl, name, spec):
+    """the blade's set: one emitter a flame, its base on the blade (the joint's -Y at y, off by BLADE_EDGE), looping its
+    first 31 cells from its own start for as long as the sword lives (ended with it)"""
+    out = []
+    for i, fl in enumerate(blade_flames()):
+        h = fl['height']
+        sub = dict(atlas=fl['atlas'], blend=1, size=(h * cell_aspect(fl['atlas']), h),
+                   offset=(BLADE_EDGE[0], 0.0), blade=dict(flame=fl))
+        out += flip_emitters(p, tmpl, name if i == 0 else '%s_%d' % (name, i + 1), sub)
+    return out
+
+
+def layer_emitters(p, tmpl, name, spec):
+    out = []
+    for i, sub in enumerate(spec['layers']):
+        out += flip_emitters(p, tmpl, name if i == 0 else '%s_L%d' % (name, i + 1), sub)
+    return out
+
+
+def set_emitters(p, tmpl, name, spec):
+    if 'left' in spec:
+        return ring_emitters(p, tmpl, name, spec)
+    if 'layers' in spec:
+        return layer_emitters(p, tmpl, name, spec)
+    if 'blade' in spec:
+        return blade_emitters(p, tmpl, name, spec)
+    return flip_emitters(p, tmpl, name, spec)
+
+
+def all_sets(burn2=True, tiers=True):
+    """every set in entry order: skeleton v1.2's, then burn v2's, then skeleton v1.3's"""
+    return _sk_sets() + (_fire_sets() if burn2 else []) + (_tier_sets() if burn2 and tiers else [])
 
 
 def _sk_sets():
@@ -290,6 +360,11 @@ def flip_emitters(p, tmpl, name, spec):
     out = []
     plan = flip_plan(n, k, loop)
     ring = spec.get('ring')
+    blade = spec.get('blade')
+    if blade:                                      # skeleton v1.3: a blade flame: its first 31 cells from its start, for
+        n = min(n, TABLE - 1)                      # ever (ended with the sword)
+        st = blade['flame']['start'] % n
+        plan = [dict(first=0, cells=n, table=[(c + st) % n for c in range(n)], start=0, life=FOREVER, period=0)]
     if ring:                                       # burn v2.3: one flame: the flipbook's first cells from its start
         n = min(n, TABLE - 1)                      # (out of step with the others: eft's random start, 0x4D9, is one UV
         st = ring['flame']['start'] % n            # shift per emitter, 0x04A54A88)
@@ -347,7 +422,13 @@ def flip_emitters(p, tmpl, name, spec):
         # a loop goes at once when ended (or fades over spec fade frames); a one-shot plays out
         struct.pack_into('>f', em, 0x82C, (1.0 / spec['fade'] if spec.get('fade') else 1.0) if loop else 0.0)
         em[0x2F9] = 1                                  # no emission while ending
-        p.set_emitter_srt(em, translation=(spec['offset'][0], spec['offset'][1], 0.0))
+        if blade:                                  # its base on the blade: the quad's foot at the joint's -Y y
+            fl = blade['flame']
+            f(em, 'rotation_init', [0.0, 0.0, math.radians(fl['rot'])])
+            p.set_emitter_srt(em, translation=(BLADE_EDGE[0], -fl['y'] + (feet_cell_v(fl['atlas']) - 0.5) * spec['size'][1],
+                                               BLADE_EDGE[1]))
+        else:
+            p.set_emitter_srt(em, translation=(spec['offset'][0], spec['offset'][1], 0.0))
         t = run['table']
         VP.set_flipbook(em, MODE, {'uv_div': [nx, ny]},
                         {'num': len(t), 'num_random': 1, 'table': t + [0] * (TABLE - len(t)), 'frequency': k})
@@ -370,7 +451,7 @@ def build(in_dir, kirby_path, fx_pkg, out_dir, sets=None, burn2=True):
     tmpl = template(p, kirby)
     ids = {}
     for name, spec in (sets if sets is not None else all_sets(burn2)):
-        si = p.new_set(name, ring_emitters(p, tmpl, name, spec) if 'left' in spec else flip_emitters(p, tmpl, name, spec))
+        si = p.new_set(name, set_emitters(p, tmpl, name, spec))
         ids[name] = (BANK << 16) | e.add(si + 1, None, 0x100)
     errs = p.validate()
     assert not errs, errs
