@@ -328,6 +328,17 @@ CLONE_MOTION_PACS = ('main.pac', 'lhand.pac', 'rhand.pac', 'gekkougapt1.pac', 'g
 CLONE_PARTS = (('lhand.pac', 'Lhand'), ('rhand.pac', 'Rhand'), ('gekkougapt1.pac', 'Gekkougapt1'),
                ('gekkougapt2.pac', 'Gekkougapt2'), ('gekkougasw1.pac', 'Gekkougasw1'))
 PART_FALLBACK = 'A00Wait1.omo'
+# v9: no swing simulation on the clone: its model.sb keeps the header and lists no swing bones (as Cloud's, the empty
+# file the Ultimate ports use). An article never steps the swing bones, so they stayed where they were first placed in
+# the world (the user's v8 clip: the tongue on the floor under the jumping clones, the water streaks stretched back to
+# where the clones had stood; D_parts' keyed sw1 didn't help); now the tongue (SWG_CMant0-8) is an ordinary bone chain
+# keyed by his gekkougasw1 motions, and the other swing bones (no keys anywhere) are rebound to their parents.
+
+
+def empty_sb(sb):
+    """model.sb with no swing bones: its header (' BWS', version) and a count of 0"""
+    assert sb[:4] == b' BWS', sb[:4]
+    return sb[:8] + b'\0\0\0\0'
 
 
 def full_motions(body_motion_dir, vbn_path):
@@ -423,6 +434,7 @@ def cmd_data(vanilla_fighter, out_fighter):
         nud, _moved = rebind(open(os.path.join(src, 'model.nud'), 'rb').read(),
                              O.vbn_read(os.path.join(src, 'model.vbn')), posed)
         open(os.path.join(dst, 'model.nud'), 'wb').write(nud)
+        open(os.path.join(dst, 'model.sb'), 'wb').write(empty_sb(open(os.path.join(src, 'model.sb'), 'rb').read()))
     dst = os.path.join(out_fighter, 'motion', 'clone')
     os.makedirs(dst, exist_ok=True)
     for f in CLONE_MOTION_PACS:
