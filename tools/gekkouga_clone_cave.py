@@ -97,7 +97,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # none: 2, loaded with the fighter. Bunshin's 0x87D has 0x1 (4: the Final Smash load,
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
-FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -107,6 +107,7 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', '
 #           20); the hurtboxes (+0x1C) and the damage pollers (+0x64 ... +0x94)
 #   parts   his motion parts and flags on the clone (v2's hands / face)
 #   burn    burn v1: his water moves burn whoever they hit (burn_scan / burn_add / burn_tick, BURN_MOVES)
+#   pose    clones v14: his tongue / water swing bones' world matrices copied onto the clones (w_pose, every phase)
 #   skeleton skeleton v1: the Running Skeleton article (needs burn): its kind, claim, collision, HP hit check, burn
 #   hitcheck v12: the clone hit from his side (w_hitchk: other fighters' attack boxes against the clone's box)
 #   sway    v11: the clone's swing step every frame (w_sway: his MotionModule's swing update, as his frame calls it)
@@ -287,7 +288,7 @@ GK_VAR_SKREQ, GK_VAR_SKX, GK_VAR_SKY, GK_VAR_SKDIR = 0x0F00030F, 0x0F000310, 0x0
 RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton
 VARIANTS = (('A_release', RELEASE), ('D_parts', RELEASE | {'parts'}),
-            ('E_sway', RELEASE | {'sway'}))   # v13: each on the release's set (v3 - v12's hurtbox route, C_hurt, dropped:
+            ('E_sway', RELEASE | {'sway'}), ('G_pose', RELEASE | {'pose'}))   # v13: each on the release's set (v3 - v12's hurtbox route, C_hurt, dropped:
                                   # it never met an attack)
 
 
@@ -1303,6 +1304,328 @@ sb_next:
 '''
 
 
+# ---- clones v14 (feature pose): his tongue / water pose copied onto the clones. An article never steps its swing bones
+# (MotionModule's swing update 0x02C67064 is the fighters' only); his are stepped each frame, and his model's world
+# matrices (MotionModule +0x10 its model / motion object: +0xC the bones' 3x4 world matrices, 0x30 each, rows [R | t],
+# as MotionModule's get_world_matrix 0x02C64588 -> 0x033179C8 reads them; the count 0x0330DE2C) hold the result. Each
+# clone's bone b of POSE_BONES gets C_a x inverse(H_a) x H_b (H his, C the clone's matrices, a b's nearest non-swing
+# ancestor: the tongue follows the clone's head as his follows his), in each of the four frame phases its template runs
+# (+0x64 / +0x84 / +0x8C / +0x94: whichever come after the clone's own pose is computed keep it)
+MM_MODEL, MDL_MTX = 0x10, 0xC
+MDL_COUNT = 0x0330DE2C            # (model / motion object) -> its bone count ([+0x1C] vt +0x94; 0 in mode 8)
+POSE_BONES = tuple((b, 39) for b in range(60, 69)) + ((69, 3), (70, 15), (71, 7), (72, 19))
+# his model.vbn: SWG_CMant0-8__swing (60-68, the tongue: CMant0's parent 39), SWG_LLegB_01 / Lwater01 / RLegB_01 /
+# Rwater01__swing (69-72: the water drops, parents 3 / 15 / 7 / 19)
+POSE_MIN = 73                     # both models' bone counts at least this (his skeleton)
+POSE_LOG_BONE = 64                # diag S4TP: SWG_CMant4's place on him and on the clone
+VAR_POSELOG = 0x0F000307          # the clone's VAR_7 (diag): frames to its next S4TP
+POSE_PHASES = {0x64: 1, 0x84: 2, 0x8C: 4, 0x94: 8}
+
+
+def m34_mul_src():
+    """m34_mul (r3 out, r4 a, r5 b): out = a x b (3x4 rows [R | t], as 4x4 with (0 0 0 1)); out apart from a / b"""
+    s = '\nm34_mul:\n        li r6, 3\nmm_row: lfs f1, 0(r4)\n        lfs f2, 4(r4)\n        lfs f3, 8(r4)\n        lfs f4, 12(r4)'
+    for j in range(4):
+        s += '''
+        lfs f5, %d(r5)
+        lfs f6, %d(r5)
+        lfs f7, %d(r5)
+        fmuls f8, f1, f5
+        fmadds f8, f2, f6, f8
+        fmadds f8, f3, f7, f8''' % (4 * j, 16 + 4 * j, 32 + 4 * j)
+        if j == 3:
+            s += '\n        fadds f8, f8, f4'
+        s += '\n        stfs f8, %d(r3)' % (4 * j)
+    s += '''
+        addi r4, r4, 16
+        addi r3, r3, 16
+        addi r6, r6, -1
+        cmpwi r6, 0
+        bne mm_row
+        blr
+'''
+    return s
+
+
+def m34_inv_src():
+    """m34_inv (r3 out, r4 a, r5 &{0.0, 1.0}): a = s R | t (uniform scale): out = R^T / s | -(R^T / s) t; r3 = 0 when
+    the scale is ~0 (nothing written)"""
+    s = '''
+m34_inv:
+        lfs f1, 0(r4)
+        lfs f2, 4(r4)
+        lfs f3, 8(r4)
+        fmuls f0, f1, f1
+        fmadds f0, f2, f2, f0
+        fmadds f0, f3, f3, f0
+        lfs f12, 0(r5)                  # 0.0
+        fcmpu cr0, f0, f12
+        bgt mi_ok
+        li r3, 0
+        blr
+mi_ok:  lfs f13, 4(r5)                  # 1.0
+        fdivs f13, f13, f0              # 1 / s^2'''
+    for i in range(3):
+        for j in range(3):
+            s += '''
+        lfs f1, %d(r4)
+        fmuls f1, f1, f13
+        stfs f1, %d(r3)''' % (4 * (4 * j + i), 4 * (4 * i + j))
+    for i in range(3):
+        s += '''
+        lfs f1, %d(r3)
+        lfs f2, %d(r4)
+        fmuls f8, f1, f2
+        lfs f1, %d(r3)
+        lfs f2, %d(r4)
+        fmadds f8, f1, f2, f8
+        lfs f1, %d(r3)
+        lfs f2, %d(r4)
+        fmadds f8, f1, f2, f8
+        fsubs f8, f12, f8
+        stfs f8, %d(r3)''' % (16 * i, 12, 16 * i + 4, 28, 16 * i + 8, 44, 16 * i + 12)
+    s += '''
+        li r3, 1
+        blr
+'''
+    return s
+
+
+def pose_src(D):
+    """w_pose (r3 the clone weapon, r4 the phase bit): his swing bones' pose onto the clone"""
+    return r'''
+w_pose: stwu r1, -0xD0(r1)
+        mflr r0
+        stw r0, 0xD4(r1)
+        stmw r22, 0xA8(r1)
+        mr r22, r4
+        lwz r31, %(wacc)d(r3)
+        cmpwi r31, 0
+        beq wpo_out
+        lwz r30, %(wwork)d(r31)
+        cmpwi r30, 0
+        beq wpo_out''' + var_get('r30', VAR_SLOT) + '''
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r3, 0x1C(r1)
+        bl gk_entry
+        mr. r29, r3                     # his entry
+        beq wpo_out
+        lwz r3, %(bacc)d(r29)
+        bl wpo_model
+        mr. r28, r3                     # his world matrices
+        beq wpo_out
+        mr r3, r31
+        bl wpo_model
+        mr. r27, r3                     # the clone's
+        beq wpo_out''' + D('''
+        mr r3, r27
+        bl wpo_seen''') + '''
+        lis r26, %(pose_tab_hi)d
+        addi r26, r26, %(pose_tab_lo)d
+        li r25, %(npose)d
+wpo_b:  lwz r24, 4(r26)                 # its anchor
+        mulli r24, r24, 0x30
+        addi r3, r1, 0x20               # inverse(H_a)
+        add r4, r28, r24
+        lis r5, %(posek_hi)d
+        addi r5, r5, %(posek_lo)d
+        bl m34_inv
+        cmpwi r3, 0
+        beq wpo_n
+        addi r3, r1, 0x50               # C_a x inverse(H_a)
+        add r4, r27, r24
+        addi r5, r1, 0x20
+        bl m34_mul
+        lwz r24, 0(r26)                 # the bone
+        mulli r24, r24, 0x30
+        add r3, r27, r24                # C_b = that x H_b
+        addi r4, r1, 0x50
+        add r5, r28, r24
+        bl m34_mul
+wpo_n:  addi r26, r26, 8
+        addi r25, r25, -1
+        cmpwi r25, 0
+        bne wpo_b''' + D('''
+        mr r3, r27
+        bl wpo_mark
+        cmpwi r22, 8
+        bne wpo_out
+        mr r3, r28
+        mr r4, r27
+        bl wpo_log''') + '''
+wpo_out:
+        lmw r22, 0xA8(r1)
+        lwz r0, 0xD4(r1)
+        mtlr r0
+        addi r1, r1, 0xD0
+        blr
+
+# (r3 an accessor) -> r3 its model's bone world matrices (MotionModule +0x10, +0xC) when it has at least POSE_MIN bones,
+# else 0
+wpo_model:
+        mflr r0
+        stw r0, 4(r1)
+        stwu r1, -0x10(r1)
+        stw r31, 0xC(r1)
+        li r31, 0
+        cmpwi r3, 0
+        beq wpm_out
+        lwz r12, %(wmotion)d(r3)        # its MotionModule
+        lis r0, 0x1000
+        cmplw r12, r0
+        blt wpm_out
+        lis r0, 0x8000
+        cmplw r12, r0
+        bge wpm_out
+        lwz r31, %(mm_model)d(r12)      # its model / motion object
+        lis r0, 0x1000
+        cmplw r31, r0
+        blt wpm_no
+        lis r0, 0x8000
+        cmplw r31, r0
+        bge wpm_no
+        lwz r12, 4(r31)                 # (the count's own checks: [[+4] +4] 8 has none)
+        cmpwi r12, 0
+        beq wpm_no
+        lwz r12, 0x1C(r31)
+        cmpwi r12, 0
+        beq wpm_no
+        mr r3, r31''' + call(MDL_COUNT) + '''
+        cmplwi r3, %(pose_min)d
+        blt wpm_no
+        lwz r31, %(mdl_mtx)d(r31)
+        lis r0, 0x1000
+        cmplw r31, r0
+        blt wpm_no
+        lis r0, 0x8000
+        cmplw r31, r0
+        blt wpm_out
+wpm_no: li r31, 0
+wpm_out:
+        mr r3, r31
+        lwz r31, 0xC(r1)
+        addi r1, r1, 0x10
+        lwz r0, 4(r1)
+        mtlr r0
+        blr
+''' + m34_mul_src() + m34_inv_src() + D(r'''
+# diag: the clone's logged bone since our last write (pose_last, by its matrices' address): changed -> this phase's bit
+# in pose_seen (a phase after its own pose is computed sees no change)
+wpo_seen:                               # (r3 the clone's matrices, r22 the phase bit); r23 its table row
+        lis r23, %(pose_last_hi)d
+        addi r23, r23, %(pose_last_lo)d
+        lwz r0, 0(r23)
+        cmpw r0, r3
+        beq wps_row
+        addi r23, r23, 0x14
+        lwz r0, 0(r23)
+        cmpw r0, r3
+        beq wps_row
+        lwz r0, 0(r23)                  # a new one: the first free row (else row 2)
+        lis r12, %(pose_last_hi)d
+        lwz r0, %(pose_last_lo)d(r12)
+        cmpwi r0, 0
+        bne wps_new
+        addi r23, r23, -0x14
+wps_new:
+        stw r3, 0(r23)
+        li r0, 0
+        stw r0, 0x10(r23)
+        blr
+wps_row:
+        addi r12, r3, %(log_off)d
+        lfs f0, 0(r12)
+        lfs f1, 4(r23)
+        fcmpu cr0, f0, f1
+        bne wps_ch
+        lfs f0, 0x10(r12)
+        lfs f1, 8(r23)
+        fcmpu cr0, f0, f1
+        bne wps_ch
+        lfs f0, 0x20(r12)
+        lfs f1, 0xC(r23)
+        fcmpu cr0, f0, f1
+        beqlr
+wps_ch: lwz r0, 0x10(r23)
+        or r0, r0, r22
+        stw r0, 0x10(r23)
+        blr
+wpo_mark:                               # (r3 the clone's matrices, r23 its row): what we wrote
+        addi r12, r3, %(log_off)d
+        lfs f0, 0(r12)
+        stfs f0, 4(r23)
+        lfs f0, 0x10(r12)
+        stfs f0, 8(r23)
+        lfs f0, 0x20(r12)
+        stfs f0, 0xC(r23)
+        blr
+# (r3 his matrices, r4 the clone's): every 60 of its +0x94 phases, S4TP (the logged bone's place x100 on him and on
+# the clone, the phases that found it changed since our write), the mask cleared
+wpo_log:
+        mflr r0
+        stw r0, 4(r1)
+        stwu r1, -0x40(r1)
+        stw r3, 0x30(r1)
+        stw r4, 0x34(r1)''' + var_get('r30', VAR_POSELOG) + '''
+        lis r12, %(one_hi)d
+        lfs f0, %(one_lo)d(r12)
+        fsubs f1, f1, f0
+        stfs f1, 0x20(r1)
+        lis r12, %(zero_hi)d
+        lfs f0, %(zero_lo)d(r12)
+        fcmpu cr0, f1, f0
+        bgt wpl_keep
+        lis r12, %(sixty_hi)d
+        lfs f1, %(sixty_lo)d(r12)
+        stfs f1, 0x20(r1)
+        lis r12, %(hundred_hi)d
+        lfs f13, %(hundred_lo)d(r12)
+        lwz r3, 0x30(r1)
+        addi r3, r3, %(log_off)d
+        lwz r4, 0x34(r1)
+        addi r4, r4, %(log_off)d
+        li r5, 0
+wpl_v:  slwi r6, r5, 4
+        lfsx f1, r3, r6
+        fmuls f1, f1, f13
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r0, 0x1C(r1)
+        slwi r7, r5, 2
+        addi r7, r7, 0x8
+        stwx r0, r1, r7
+        lfsx f1, r4, r6
+        fmuls f1, f1, f13
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r0, 0x1C(r1)
+        slwi r7, r5, 2
+        addi r7, r7, 0x24
+        stwx r0, r1, r7
+        addi r5, r5, 1
+        cmpwi r5, 3
+        blt wpl_v
+        lwz r10, 0x10(r23)
+        li r0, 0
+        stw r0, 0x10(r23)
+        lwz r4, 0x8(r1)
+        lwz r5, 0xC(r1)
+        lwz r6, 0x10(r1)
+        lwz r7, 0x24(r1)
+        lwz r8, 0x28(r1)
+        lwz r9, 0x2C(r1)
+        lis r3, %(gk_ftp_hi)d
+        addi r3, r3, %(gk_ftp_lo)d''' + osr() + '''
+wpl_keep:
+        lfs f1, 0x20(r1)''' + var_set('r30', VAR_POSELOG) + '''
+        addi r1, r1, 0x40
+        lwz r0, 4(r1)
+        mtlr r0
+        blr
+''')
+
+
 class Out:
     """the words to write: {address: (word, note)}, each address once"""
 
@@ -1471,6 +1794,10 @@ def build(rpx, diag=False, feats=None):
     A['bconst'] = alloc(8) if burn else 0                        # 0.2 (shield), 1000.0
     A['bsum'] = alloc(SLOTS * SLOTS * 4) if burn and diag else 0  # diag: damage per owner x victim this second
     A['bclock'] = alloc(4 * SLOTS) if burn and diag else 0
+    pose = 'pose' in feats
+    A['pose_tab'] = alloc(8 * len(POSE_BONES), 4) if pose else 0     # clones v14: (bone, anchor) pairs
+    A['pose_k'] = alloc(12, 4) if pose else 0                        # 0.0, 1.0, 60.0
+    A['pose_last'] = alloc(2 * 0x14, 4) if pose and diag else 0      # diag: per clone {matrices, x y z written, phases}
     A['gk_clr'] = alloc(4 + 4 * SLOTS)  # burn v1.2: the clears seen (+0), per slot the count its diag last logged
     A['gk_plyr'] = alloc(4 * SLOTS)     # v10: per player, the cursor show byte we cleared + 1 (0: none)
     A['gk_tags'] = alloc(4 * SLOTS)     # v7: the tag messages' countdown per slot (0: shown)
@@ -1501,6 +1828,7 @@ def build(rpx, diag=False, feats=None):
             ('gk_fm', 'S4GM clone id=%d draw: visflag=%d visible=%d model mode=%d drawn=%d overlay=%d/%d\n'),
             ('gk_fn', 'S4GN clone id=%d z=%d scale x100=%d link mask=%08X model=%08X\n'),
             ('gk_fba', 'S4BA burn added: victim slot=%d move=%d shielded=%d damage x1000=%d interval=%d frames=%d\n'),
+            ('gk_ftp', 'S4TP clone tongue (bone %d): him x100 %%d %%d %%d clone x100 %%d %%d %%d phases that found it changed=%%X\n' % POSE_LOG_BONE),
             ('gk_fss', 'S4SS skeleton spawned: owner slot=%d at x=%d y=%d way=%d\n'),
             ('gk_fsc', 'S4SC skeleton collision: state=%d (1 made, 3 failed) grounds=%08X\n'),
             ('gk_fsf', 'S4SF skeleton collision removed: owner slot=%d\n'),
@@ -1572,6 +1900,11 @@ def build(rpx, diag=False, feats=None):
     out.blob(A['gk_tags'], bytes(4 * SLOTS), 'tag message countdowns')
     out.blob(A['gk_plyr'], bytes(4 * SLOTS), 'cursor show bytes saved')
     out.blob(A['gk_clr'], bytes(4 + 4 * SLOTS), 'clears seen (burn v1.2)')
+    if pose:
+        out.blob(A['pose_tab'], b''.join(struct.pack('>II', b, a) for b, a in POSE_BONES), 'pose bones (v14)')
+        out.blob(A['pose_k'], struct.pack('>3f', 0.0, 1.0, 60.0), 'pose constants')
+        if diag:
+            out.blob(A['pose_last'], bytes(2 * 0x14), 'pose diag rows')
     if 'burn' in feats:
         out.blob(A['btab'], bytes(SLOTS * BURN_CAP * 16), 'burn instances')
         out.blob(A['bproc'], bytes(BURN_CONTEXTS * BURN_ENTS + (-BURN_CONTEXTS * BURN_ENTS) % 4), 'burn processed counts')
@@ -1609,15 +1942,18 @@ def build(rpx, diag=False, feats=None):
              dm_add=DM_ADD, fstatus=F_STATUS, st_kind=ST_KIND, st_dead=ST_DEAD, st_dead_n=ST_DEAD_N, ent_log=ENT_LOG, node_obj=NODE_OBJ, node_type=NODE_TYPE, mm_kind=MM_KIND, am_ents=AM_ENTS, am_count=AM_COUNT, am_max=AM_MAX, ent_size=ENT_SIZE,
              ent_nodes=ENT_NODES, node_max=NODE_MAX, node_on=NODE_ON, node_min_x=NODE_MIN_X, node_min_y=NODE_MIN_Y,
              node_max_x=NODE_MAX_X, node_max_y=NODE_MAX_Y, team=TEAM_MOD,
-             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, pm_scale=PM_SCALE, nlatch=SLOTS * SK_LATCH * 2, sk_kind=SK_KIND, sk_lat=SK_LATCH, sk_lat8=SK_LATCH * 8, sk_nv=len(SK_VERTS), gm_vt_hi=SK_GM_VT >> 16, gm_vt_lo=SK_GM_VT & 0xFFFF, wground=0x2C, nbtab=SLOTS * BURN_CAP * 4, nbproc=(BURN_CONTEXTS * BURN_ENTS + 3) // 4, clear_back=CLEAR_BACK, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
+             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, pm_scale=PM_SCALE, npose=len(POSE_BONES), pose_min=POSE_MIN, mdl_mtx=MDL_MTX, mm_model=MM_MODEL, log_off=POSE_LOG_BONE * 0x30 + 0xC, nlatch=SLOTS * SK_LATCH * 2, sk_kind=SK_KIND, sk_lat=SK_LATCH, sk_lat8=SK_LATCH * 8, sk_nv=len(SK_VERTS), gm_vt_hi=SK_GM_VT >> 16, gm_vt_lo=SK_GM_VT & 0xFFFF, wground=0x2C, nbtab=SLOTS * BURN_CAP * 4, nbproc=(BURN_CONTEXTS * BURN_ENTS + 3) // 4, clear_back=CLEAR_BACK, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
              hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbr', 'gk_clr', 'sk_desc', 'gk_fss', 'gk_fsc', 'gk_fsf', 'gk_fsh', 'gk_fsx', 'sk_lvd', 'sk_verts', 'sk_box', 'sk_nums', 'sk_k', 'sk_latch', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbr', 'gk_clr', 'pose_tab', 'pose_last', 'gk_ftp', 'sk_desc', 'gk_fss', 'gk_fsc', 'gk_fsf', 'gk_fsh', 'gk_fsx', 'sk_lvd', 'sk_verts', 'sk_box', 'sk_nums', 'sk_k', 'sk_latch', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
     p['ftab_hi'], p['ftab_lo'] = ha(FIGHTERS), K.slo(FIGHTERS)
+    if pose:
+        p['posek_hi'], p['posek_lo'] = ha(A['pose_k']), K.slo(A['pose_k'])
+        p['sixty_hi'], p['sixty_lo'] = ha(A['pose_k'] + 8), K.slo(A['pose_k'] + 8)
     if skel:
         p['sk_k4_hi'], p['sk_k4_lo'] = ha(A['sk_k'] + 4), K.slo(A['sk_k'] + 4)
         p['sk_k8_hi'], p['sk_k8_lo'] = ha(A['sk_k'] + 8), K.slo(A['sk_k'] + 8)
@@ -2255,7 +2591,10 @@ wp_64:
         stw r9, 0x20(r1)
         stw r10, 0x24(r1)
         mr r3, r4
-        bl w_poll
+        bl w_poll''' + (('''
+        lwz r3, 0x0C(r1)
+        li r4, 1
+        bl w_pose''') if 'pose' in feats else '') + '''
         lwz r3, 0x08(r1)
         lwz r4, 0x0C(r1)
         lwz r5, 0x10(r1)
@@ -2282,7 +2621,10 @@ wp_84:
         stw r9, 0x20(r1)
         stw r10, 0x24(r1)
         mr r3, r4
-        bl w_poll
+        bl w_poll''' + (('''
+        lwz r3, 0x0C(r1)
+        li r4, 2
+        bl w_pose''') if 'pose' in feats else '') + '''
         lwz r3, 0x08(r1)
         lwz r4, 0x0C(r1)
         lwz r5, 0x10(r1)
@@ -2309,7 +2651,10 @@ wp_8C:
         stw r9, 0x20(r1)
         stw r10, 0x24(r1)
         mr r3, r4
-        bl w_poll
+        bl w_poll''' + (('''
+        lwz r3, 0x0C(r1)
+        li r4, 4
+        bl w_pose''') if 'pose' in feats else '') + '''
         lwz r3, 0x08(r1)
         lwz r4, 0x0C(r1)
         lwz r5, 0x10(r1)
@@ -2341,6 +2686,9 @@ wp_94:
         bl w_sway''') if 'sway' in feats else '') + (('''
         lwz r3, 0x0C(r1)
         bl w_burn''') if 'burn' in feats else '') + (('''
+        lwz r3, 0x0C(r1)
+        li r4, 8
+        bl w_pose''') if 'pose' in feats else '') + (('''
         lwz r3, 0x0C(r1)
         bl w_hitchk''') if 'hitcheck' in feats else '') + '''
         lwz r3, 0x08(r1)
@@ -3865,7 +4213,7 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
-''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94]) if skel else '') + '''
+''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94]) if skel else '') + (pose_src(D) if pose else '') + '''
 # ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
 gk_clear:
         li r0, 0''' + (('''
@@ -3952,7 +4300,7 @@ w_dcase:
         struct.pack_into('>I', vb, 0x1C, lab['w_init'])
     struct.pack_into('>I', vb, 0x34, lab['w_start'])  # v7: not the moon's start (it sets the model scale from the init's
                                                       # +0x68: the generate's, 0 for ours: the user's v6 invisible clones)
-    for o in (POLL_SLOTS if 'hurt' in feats or diag else (0x94,) if feats & {'sway', 'hitcheck', 'burn'} else ()):
+    for o in (POLL_SLOTS if feats & {'hurt', 'pose'} or diag else (0x94,) if feats & {'sway', 'hitcheck', 'burn'} else ()):
         struct.pack_into('>I', vb, o, lab['wp_%X' % o])
     out.blob(A['w_vt'], bytes(vb), 'clone vtable (bunshin copy, +0x1C / +0x64 / +0x84 / +0x8C / +0x94 / +0xAC ours)')
     if skel:

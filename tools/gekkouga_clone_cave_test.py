@@ -221,7 +221,7 @@ def weapon_checks(e, img, info, diag=False):
     check('the singleton getter: kind 0x1A1 -> its own singleton', s, A['w_single'])
     vt = e.w(s)
     VT_OURS = (W.HIT_METHOD, 0x34) + ((0x1C,) if 'hurt' in F or diag else ()) + (
-        C.POLL_SLOTS if 'hurt' in F or diag else (0x94,) if F & {'sway', 'hitcheck', 'burn'} else ())
+        C.POLL_SLOTS if F & {'hurt', 'pose'} or diag else (0x94,) if F & {'sway', 'hitcheck', 'burn'} else ())
     check('its vtable: bunshin\'s but +0x1C / +0x64 / +0x84 / +0x8C / +0x94 / +0xAC (v3)',
           [e.w(vt + o) for o in range(0, L['vsize'], 4) if o not in VT_OURS],
           [img.w(L['svt'] + o) for o in range(0, L['vsize'], 4) if o not in VT_OURS])
@@ -1685,6 +1685,116 @@ def skeleton_checks(e, info, diag):
     e.hs_ret = 7
 
 
+def pose_checks(e, info, diag):
+    """clones v14 (feature pose): his swing bones' world matrices onto the clone: C_b = C_a x inverse(H_a) x H_b"""
+    import numpy as np
+    lab, A, F = info['labels'], info['A'], info['feats']
+    if 'pose' not in F:
+        check('v14 pose: without "pose": no pose code', 'w_pose' in lab, False)
+        return
+    rng = np.random.default_rng(14)
+
+    def rigid(scale):
+        q = rng.normal(size=4)
+        q /= np.linalg.norm(q)
+        w, x, y, z = q
+        R = np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                      [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                      [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+        M = np.zeros((3, 4))
+        M[:, :3] = R * scale
+        M[:, 3] = rng.normal(size=3) * 20
+        return M
+
+    def model(acc, mats, mode=0, count=C.POSE_MIN):
+        mm = e.alloc(0x60, b'\0')
+        obj = e.alloc(0x40, b'\0')
+        e.setw(acc + C.W_MOTION, mm)
+        e.setw(mm + C.MM_MODEL, obj)
+        k = e.alloc(0x10, b'\0')
+        e.setw(k + 4, mode)
+        e.setw(obj + 4, k)
+        ev = e.alloc(0x10, b'\0')
+        e.setw(obj + 0x1C, ev)
+        e.setw(obj + 0x30, count)                 # (the stub's answer)
+        arr = e.alloc(0x30 * len(mats), b'\0')
+        for i, m in enumerate(mats):
+            e.mu.mem_write(arr + 0x30 * i, struct.pack('>12f', *m.reshape(-1)))
+        e.setw(obj + C.MDL_MTX, arr)
+        return arr
+
+    e.stub(C.MDL_COUNT, lambda e_: e_.w(e_.r(3) + 0x30))
+
+    def read(arr, i):
+        return np.array(struct.unpack('>12f', bytes(e.mu.mem_read(arr + 0x30 * i, 0x30)))).reshape(3, 4)
+
+    def h4(M):
+        out = np.eye(4)
+        out[:3, :] = M
+        return out
+    for i in range(8):
+        e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
+    him = e.fighter(2)
+    e.mu.mem_write(him['f'] + 0x1E, b'\x04')
+    H = [rigid(0.95).astype(np.float32).astype(float) for _ in range(C.POSE_MIN)]   # (as the game holds them)
+    Cm = [rigid(0.95).astype(np.float32).astype(float) for _ in range(C.POSE_MIN)]
+    harr = model(e.w(him['f'] + C.BASE_ACC), H)
+    cv = {C.VAR_SLOT: 3.0, C.VAR_ID: 1.0}
+    vt = e.alloc(0x100, b'\0')
+    g, st = e.alloc(4), e.alloc(4)
+    e.setw(vt + 0x44, g)
+    e.setw(vt + 0x4C, st)
+    e.stub(g, lambda e_: e_.mu.reg_write(UC_PPC_REG_FPR1, f2d(cv.get(e_.r(4), 0.0))))
+    e.stub(st, lambda e_: cv.__setitem__(e_.r(4), round(d2f(e_.mu.reg_read(UC_PPC_REG_FPR1)), 3)))
+    wm = e.alloc(0x10, b'\0')
+    e.setw(wm, vt)
+    cacc = e.alloc(0x100, b'\0')
+    e.setw(cacc + C.W_WORK, wm)
+    carr = model(cacc, Cm)
+    weapon = e.alloc(0x40, b'\0')
+    e.setw(weapon + C.W_ACC, cacc)
+    e.osr_full = []
+    e.call(lab['w_pose'], weapon, 8)
+    want = {b: (h4(Cm[a]) @ np.linalg.inv(h4(H[a])) @ h4(H[b]))[:3] for b, a in C.POSE_BONES}
+    err = max(float(np.abs(read(carr, b) - want[b]).max()) for b, _a in C.POSE_BONES)
+    check('v14 pose: each of his 13 swing bones (tongue SWG_CMant0-8, the 4 water drops) on the clone = C_a x inverse(H_a) '
+          'x H_b (a its nearest non-swing ancestor; uniform scale 0.95, random turns): max error %.2g' % err, err < 2e-3, True)
+    others = [i for i in range(C.POSE_MIN) if i not in want]
+    check('v14 pose: every other bone of the clone untouched',
+          max(float(np.abs(read(carr, i) - Cm[i]).max()) for i in others), 0.0)
+    # its tongue follows its head: the clone's tongue relative to its anchor is his
+    b, a = C.POSE_BONES[4]
+    rel_h = np.linalg.inv(h4(H[a])) @ h4(H[b])
+    rel_c = np.linalg.inv(h4(Cm[a])) @ h4(read(carr, b))
+    check('v14 pose: the clone\'s bone %d relative to its anchor %d is his (the tongue on its head)' % (b, a),
+          float(np.abs(rel_h - rel_c).max()) < 2e-3, True)
+    # nothing when: no owner, his model short of bones, mode 8, a zero scale anchor
+    for what, setup, undo in (
+            ('no owner (its VAR_0 0)', lambda: cv.__setitem__(C.VAR_SLOT, 0.0), lambda: cv.__setitem__(C.VAR_SLOT, 3.0)),
+            ('his model with 60 bones', lambda: e.setw(e.w(e.w(e.w(him['f'] + C.BASE_ACC) + C.W_MOTION) + C.MM_MODEL) + 0x30, 60),
+             lambda: e.setw(e.w(e.w(e.w(him['f'] + C.BASE_ACC) + C.W_MOTION) + C.MM_MODEL) + 0x30, C.POSE_MIN))):
+        for i, m in enumerate(Cm):
+            e.mu.mem_write(carr + 0x30 * i, struct.pack('>12f', *m.reshape(-1)))
+        setup()
+        e.call(lab['w_pose'], weapon, 8)
+        check('v14 pose: %s: the clone untouched' % what,
+              max(float(np.abs(read(carr, i) - Cm[i]).max()) for i in range(C.POSE_MIN)), 0.0)
+        undo()
+    if diag:
+        cv[C.VAR_POSELOG] = 0.0
+        e.osr_full = []
+        e.call(lab['w_pose'], weapon, 1)          # +0x64: the clone's pose (Cm, restored above) differs from our write
+        e.call(lab['w_pose'], weapon, 8)          # +0x94: it is ours (no change): logs
+        lg = [x for x in e.osr_full if x[0] == A['gk_ftp']]
+        hb = H[C.POSE_LOG_BONE][:, 3] * 100
+        cb = read(carr, C.POSE_LOG_BONE)[:, 3] * 100
+        s32 = lambda v: v - (1 << 32) if v & 0x80000000 else v
+        check('v14 pose diag: S4TP: bone 64\'s place on him / the clone (x100), the phases that found the clone\'s own pose '
+              '(1: +0x64 after the restore; not +0x94)',
+              (len(lg), [s32(v) for v in lg[0][1:7]] if lg else None, lg[0][7] if lg else None),
+              (1, [int(v) for v in hb] + [int(v) for v in cb], 1))
+
+
 def hud_checks(e, info):
     lab, A = info['labels'], info['A']
     hide = A['gk_hide']
@@ -1858,6 +1968,7 @@ def main():
     clear_checks(e, info, diag)
     info['img'] = img
     skeleton_checks(e, info, diag)
+    pose_checks(e, info, diag)
     fighter_desc_checks(e, img, info)
     g1_checks(e, info)
     s13_checks(e, info)
