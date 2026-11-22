@@ -190,3 +190,10 @@ entries in the 7 per-kind tables (each found by its first 0x185 entries), descri
 base-kinds entries, kind-compare stubs (bases with no copies before), the new fighter's article list and kind_expand's
 descriptor +8 (with `kind_expand_incremental.py build ... --list KIND=ADDR`), in 0x04B9C000-0x04B9D000. `test PATCHED
 EXE OLD NEW` runs weapon_expand_test.py over every kind with the layout read from the executable.
+
+## Greninja's clone (kind 0x1A1, exe_v46z_gk1)
+
+Not a new fighter's article: Greninja (vanilla kind 0x30) gets a brand-new article kind **0x1A1** ("clone", base
+bunshin 0xFE, own module row, own singleton, his 668 body motions) written into this cave's tables by
+`tools/gekkouga_clone_cave.py` (docs/native-notes.md "Greninja's clones"), and his own article list through a copy of
+his fighter descriptor. The next appended kind starts at **0x1A2** (weapon_expand_append.py asserts a kind is unused).

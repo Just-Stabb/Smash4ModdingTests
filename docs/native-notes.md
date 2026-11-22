@@ -3721,3 +3721,57 @@ exe_v46z_outline4 (the user's). Test `tools/supamario_ui_cave_test.py BASE [PATC
     moved to `ws_data + 0x10` (`+0xC` the mode). Diag: **S4UW** `on owner paused stage mode`.
   - Secret Sensation's MSC also holds every other fighter by the 2-frame hitstop (`ui_freeze(0)`) while it asks the
     stop, a second lock that works without the frame state.
+
+## Greninja's clones (`tools/gekkouga_clone_cave.py`, exe_v46z_gk1; fighters/gekkouga/README.md "Clones v1")
+
+**Claimed region: `0x04BEA000`-`0x04BEC000`** (`textregion:0x2BEC000 grow:0x04BEC000`, past Supamario's
+`0x04BE8000`-`0x04BEA000`) and a 4-word trampoline at `0x037EE540` (the zero run `0x037EE4DC`-`0x037EE550`, inside
+copy_custom_cave.py's spawn reserve, which never grew this far). Base: exe_v46z_ui10 (and its diag for
+exe_v46z_gk1_diag). Every hooked / written word is asserted; `tools/import_call_check.py` 0; `tools/gekkouga_clone_cave_test.py`
+56 checks; `tools/supamario_ui_cave_test.py` (outline5 -> gk1) 422 / 0, as on ui10.
+
+- **Greninja's kind is 0x30** in the fighter tables (his descriptor `0x10378FC8`: motion info `0x1037C470` = {main table
+  `0x1037C4CC`, 668 motions}, article list `0x10134ACC` = shuriken 0xF9 (max 3), water 0xFA (4), tatami 0xFB, moon 0xFC,
+  monsterball 0xFD, bunshin 0xFE (1 each)); specializer object `0x10554264`, vtable `0x101347B4` (slot n at +0xC + 8n:
+  slot 0 `0x02EED848`, 13 `0x02EEE734`, 42 `0x02EEFF18`, 43 `0x02EF0408`). Slot 13 is his per-frame code (Robin's
+  `0x02F635F0` is slot 13 of `0x101417F8` too). His weapons: bunshin is his Final Smash clone (a Greninja model,
+  `model/bunshin/c00`, one motion, no params: descriptor +0x18 0), u16 flags 0x87D.
+- **His counter shape**: slot 0 builds group 1 inline from his vl (`[[0x102FF448]+0x11DC]+0x138 + 0x9C x ...` +0x84
+  joint, +0x88-0x94 x / y / z / radius: a sphere), then `bl 0x02C6F5C0` at `0x02EED92C` (r7 the desc
+  {shapes, count, bytes 0 0 0 1}, r8 the group, r9 [M+0x14] the shapes used; [M+0x14] += r3 after). The cave gives
+  that call its own desc: 4 capsules on joint 0 at z -28 / -14 / 14 / 28, y 3-15, radius 5.5, joint 0, type 2 (the
+  module's 5-shape pool: the guard's 1 + these 4).
+- **The substitution log**: his op `BattleObject(0x3F7)` / `0x3F8` (handler around `0x02EF0CB4` in `0x02EF0870`) makes
+  item kind **0x89** (0x3F8: **0x8A**, the doll) through the item manager (`0x03056BFC`) at his posture's position
+  (+0x10 / +0x14 / +0x18) plus a param offset: an item, not an article.
+- **The clone weapon kind 0x1A1** (the first free after Byleth's 0x1A0): weapon_expand.py's tables in exe_v46q+'s cave
+  (descriptor cases `0x04BB4CD0`, base kinds `0x04BB4BE4`, singleton cases `0x04BB7530`, own rows `0x04BB7C9C`, the
+  name / static tables' cave copies) get its entries the way weapon_expand.py makes a brand-new article: base
+  bunshin, own module row (bunshin's + the shuriken's slots 0 2 5 8 9 11: Kinetic, Attack and the attack's
+  companions; slot 6 is the weapons' HitModule `0x02C424C0`, slot 20 their DamageModule `0x02C2031C`: not given, the
+  clones' hits are taken by his shield instead), its descriptor a copy of bunshin's with its motion info = his 668
+  main-animation hashes (flags 0), its singleton a copy with the hit-result method (+0xAC) returning 0 for bits 0x17.
+  Every weapon's AttackModule block is the generic one (vtable +0xC `0x0320E748` -> `0x032107B4`), bunshin's too.
+- **His article list**: the fighter descriptor switch (`0x02E4313C`, kind_expand.py's pointer table `0x04BAA208`, entry
+  0x30 `0x02E4362C` -> `bl 0x02EF1B78`) now returns a copy of his descriptor whose +8 is his 6 articles + two
+  {0x1A1, 1, 0, 0} (articles 6 / 7). Nothing else reads `0x10378FC8`.
+- **The battle HUD's player cursor** (`ui/info/plycursor/`, `inf_plycursor_1`-`8` / `_c` / ...): the HUD class
+  (vtable `0x100B06E8`: init `0x028E37B4` loads the cursors, update `0x028E3FE4`, draw `0x028E414C`) keeps a 0x2B00
+  struct per player from +0xC0; its +0x2AF0 (absolute +0x2BB0) is the cursor object (`0x030915EC`'s class: +8 / +0xC /
+  +0x10 its position, copied to `[obj+0x30]+0x18..` by `0x03091E34`). The update's loop (r29 8 -> 1, player = 8 - r29)
+  copies the player's +0x10 / +0x14 (its screen place) to the cursor and calls `0x03091E34` (`0x028E40B4`); the cave's
+  stub (through the trampoline: out of a branch's reach) puts a hidden player's cursor at (-100000, -100000) first.
+- **Slot 13** (his per-frame): his slot = (his table entry - the entries) / 0x76B0 ([[0x1035184C]]), VAR_20 read with
+  his WorkModule's get_float (block +0x726C, vt +0x44): bit 1 refreshes `gk_hide[slot]` = 4 (the HUD counts it down),
+  bit 2 the Timer's slow once ([entry +0xC] = the module accessor, +0xB8 SlowModule: vt +0x44 (3, 2, 600, 0,
+  0x50000000)), cleared (vt +0x6C (3)) when the bit goes. The stwu is replayed and his code goes on.
+- **Slots 42 / 43**: as supamario_ui_cave.py's (message +0x10 the record, +0x18 the object id; +0x14 the group; +8
+  the handled byte): group 1 with VAR_20 bit 4: VAR_21 = 10000 + (the object's X (handle `0x02BF2108`,
+  `0x02BEF50C`, `0x02BEF640`) - his X (posture +0x10)), his vanilla slot 42 skipped; slot 43 with VAR_21 > 0.5: 0 and
+  the handled bit. Else his own code (the stwu replayed).
+- The diag build's lines: `S4GT slot hide` (the tag counter starting), `S4GS slot slow` (on / off), `S4GH clone hit dx`,
+  `S4GV` (slot 43's veto).
+
+Not run in game: whether the HUD's player index is the fighter slot, whether an off-screen cursor isn't drawn
+elsewhere (the draw `0x028E414C` reads the cursor's model), the article set-up with the mixed module row, the weapon
+MSC on a bunshin-based kind, the 4-shape group.

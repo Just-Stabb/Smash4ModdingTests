@@ -247,6 +247,8 @@ small MSC interpreter (the modules stubbed) and compares each fighter's flag tra
 moving left, a weak stick, a roll ending on the ground; and the carried speed × the fighter's
 multiplier (Fall's main or the hook). 69 of 69 as Hero's. Not tested in game.
 
+Greninja's source (`fighters/gekkouga/gekkouga.c`, Clones v1) is vanilla + `universal_mechanics.py` + his mod (`tools/gekkouga_build.py msc`): the same functions as his `fighters_rolloff_hero_v1` MSC (msc_fingerprint 0 differ).
+
 Done: every fighter (Supamario too, `supamario_universal_v1`): default 2.2 / 1.0, Captain Falcon 2.4 / 1.0, Kirby 2.1 / 1.0
 (Overdrive 2.8 / 1.05), Luigi 1.6 / 1.1, Sonic 2.76 / 1.0, Pikachu 8 / 0.2, Hero 2.2 / 1.0 (Acceleratle
 ×2), with Hero's momentum.

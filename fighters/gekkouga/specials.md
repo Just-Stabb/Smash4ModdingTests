@@ -162,6 +162,9 @@ SpecialHi 0x154 --> SpecialHiJet 0x15D --timer / land--> SpecialHiEnd 0x15F --(2
 
 ## Down B: Substitute (0x155, 0x160–0x164)
 
+**Modded (README.md "Clones v1"):** 0x155 is now the charge stance (no counter shape: `gk_lw_loop` in `clones.c`);
+nothing enters 0x160-0x164 any more. The vanilla behaviour below is the decompiled one.
+
 ```
 SpecialLw 0x155 --hit during window--> SpecialLwHit 0x160 --> SpecialLwAttack 0x161 --> SpecialLwEnd 0x162 --> SpecialLwLanding 0x163
                                                                         |
