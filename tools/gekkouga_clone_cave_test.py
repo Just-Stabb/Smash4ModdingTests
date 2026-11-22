@@ -711,6 +711,53 @@ def panel_checks(e, info, diag):
     check('v6 panel: a bad mode (7000) -> hidden', run(7000)[1][1:], [('visible', ko, 0)])
     check('v6 gauge colours: as is / blue / grey', bytes(e.mu.mem_read(A['ctf'], 48)),
           b''.join(struct.pack('>4B4h', *c) for c in C.GAUGE_COLOURS))
+    # v7: the round gauge (gkgauge_mc in his panel's root clip: tools/gekkouga_gauge_flx.py)
+    root = e.alloc(0x100, b'\0')
+    e.setw(slot(0) + 0x5C, root)
+    clips = {n: e.alloc(0x100, b'\0') for n in C.GAUGE_NAMES}
+    atoms = {n: 0x7000 + i for i, n in enumerate(C.GAUGE_NAMES)}
+    pool = e.alloc(0x40, b'\0')
+    e.setw(C.FLX_ATOM_POOL, pool)
+
+    def intern(e_):
+        name = bytes(e_.mu.mem_read(e_.r(4), e_.r(5))).decode()
+        e_.calls.append(('intern', name, e_.r(3) == pool + 0x24))
+        return atoms.get(name, 0)
+
+    def find(e_):
+        atom = e_.w(e_.r(4))
+        parent = e_.r(3)
+        name = [n for n, a_ in atoms.items() if a_ == atom][0]
+        ok = (parent == root) if name == 'gkgauge_mc' else (parent == clips['gkgauge_mc'])
+        return clips[name] if ok else 0
+    e.stub(C.FLX_INTERN, intern)
+    e.stub(C.FLX_FIND, find)
+    e.stub(C.FLX_ROTATE, lambda e_: e_.calls.append(('rotate', e_.r(3), round(d2f(e_.mu.reg_read(UC_PPC_REG_FPR1)), 2))))
+    e.stub(C.FLX_GOTO, lambda e_: e_.calls.append(('goto', e_.r(3), e_.r(4))))
+    for i in range(32):
+        e.setw(A['gk_angles'] + 4 * i, 0)
+
+    def run2(g):
+        e.vars = {C.VAR_GAUGE: float(g)}
+        e.calls = []
+        e.call(lab['gk_panel'], P)
+        return [c for c in e.calls if c[0] in ('visible', 'ko_set', 'colour', 'rotate', 'goto')]
+    rings = [clips[n] for n in C.GAUGE_NAMES[1:5]]
+    r = run2(1035)
+    check('v7 round gauge: found in his panel -> the KO meter hidden, the gauge shown, mode 1\'s colour, each ring turned '
+          'by its speed (first frame), the fill on frame 1 + 35 / 10 (rounded: 5)',
+          r, [('visible', ko, 0), ('visible', clips['gkgauge_mc'], 1), ('colour', clips['gkgauge_mc'], A['ctf'] + 12)] +
+          [('rotate', c, round(sp % 360.0, 2)) for c, sp in zip(rings, C.GAUGE_SPEEDS)] +
+          [('goto', clips['gk_fill_mc'], 5)])
+    check('v7: ... the fill stopped there (+0x9C = 1)', struct.unpack('>H', bytes(e.mu.mem_read(clips['gk_fill_mc'] + 0x9C, 2)))[0], 1)
+    r = run2(1100)
+    check('v7: the next frame the rings turn on (2 x speed, kept in 0-360), the full charge on frame 11',
+          [c[2] for c in r if c[0] in ('rotate', 'goto')],
+          [round((2 * sp) % 360.0, 2) for sp in C.GAUGE_SPEEDS] + [11])
+    check('v7: the ability (2050): blue', [c for c in run2(2050) if c[0] == 'colour'], [('colour', clips['gkgauge_mc'], A['ctf'] + 24)])
+    check('v7: nothing (0): the gauge hidden, no ring calls', run2(0), [('visible', ko, 0), ('visible', clips['gkgauge_mc'], 0)])
+    check('v7: the names interned each frame from the atom pool', [c for c in e.calls if c[0] == 'intern'][:1], [('intern', 'gkgauge_mc', True)])
+    e.setw(slot(0) + 0x5C, 0)
     if diag:
         e.calls = []
         run(1033)

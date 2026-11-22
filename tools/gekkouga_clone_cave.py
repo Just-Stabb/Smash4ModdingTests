@@ -111,6 +111,13 @@ SAFE_BASE = 0xFC                  # v5: moon (his Final Smash's moon). v4's safe
 ATTACK_BASE = 0x2                 # Mario's pump
 HURT_BASE = 0x168                 # mewtwom (Mewtwo's Final Smash form)
 MSC_SLOT = 8
+FLX_INTERN = 0x032CB1B8           # v7: (atom pool [0x102FCAA4] + 0x24, char *, length) -> atom (docs: "Damage panel")
+FLX_ATOM_POOL = 0x102FCAA4
+FLX_FIND = 0x032CCAA0             # (clip, &atom) -> the child clip
+FLX_ROTATE = 0x032CDEDC           # (clip, f1 degrees)
+FLX_GOTO = 0x032CCC44             # (clip, frame 1-based): goto and play (then +0x9C = 1: stopped)
+GAUGE_NAMES = ('gkgauge_mc', 'gk_ticks_mc', 'gk_dots_mc', 'gk_arcs_mc', 'gk_heavy_mc', 'gk_fill_mc')
+GAUGE_SPEEDS = (0.35, -0.8, 1.5, -2.4)   # degrees a frame (tools/gekkouga_gauge_art.py LAYERS), + clockwise
 MSG_HANDLE = 0x02BF2108           # v7: the SET_CURSOR handler's message route (0x02BE7C80): (manager, &handle, id, 1)
 MSG_SEND = 0x02BF019C             # (&handle, &message)
 MSG_KIND = 0x1010CC00             # the message's first word, as the handler's
@@ -485,8 +492,13 @@ def build(rpx, diag=False, feats=None):
     assert not diag or A['gk_lastf'] == A['gk_slow'] + 0x20
     A['ctf'] = alloc(12 * 4, 4)         # v6: the gauge's colour per mode
     A['gk_tags'] = alloc(4 * SLOTS)     # v7: the tag messages' countdown per slot (0: shown)
+    A['gk_names'] = alloc(8 * len(GAUGE_NAMES), 4)    # v7: the round gauge's clip names {char *, length}
+    A['gk_namestr'] = alloc(sum(len(n) + 1 for n in GAUGE_NAMES) + 4, 4)
+    A['gk_atoms'] = alloc(4 * len(GAUGE_NAMES), 4)
+    A['gk_angles'] = alloc(16 * SLOTS, 4)             # 4 ring angles per panel slot
+    A['gk_speeds'] = alloc(16, 4)
     A['gk_gaugelog'] = alloc(4 * SLOTS) if diag else 0
-    A['consts'] = alloc(32)          # 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, the hitstop multiplier, 100.0
+    A['consts'] = alloc(36)          # 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, the hitstop multiplier, 100.0, 360.0
     A['hurt'] = alloc(0x30 * len(HURTBOXES))
     A['gk_str'] = alloc(8)
     fmts = [('gk_ft', 'S4GT slot=%d hide=%d\n'), ('gk_fs', 'S4GS slot=%d slow=%d\n'),
@@ -535,10 +547,19 @@ def build(rpx, diag=False, feats=None):
     if diag:
         out.blob(A['gk_lastf'], bytes(8 * SLOTS), 'diag: flags logged / tag hide logged')
         out.blob(A['gk_seen'], bytes(4 * 16), 'diag: HUD calls seen')
-    out.blob(A['consts'], struct.pack('>6fIf', 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, img.w(HITSTOP_MUL), 100.0), 'constants')
+    out.blob(A['consts'], struct.pack('>6fI2f', 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, img.w(HITSTOP_MUL), 100.0, 360.0), 'constants')
     out.blob(A['hurt'], hurt_blob(), 'clone hurtboxes (his vl group 5, article joints)')
     out.blob(A['ctf'], b''.join(struct.pack('>4B4h', *c) for c in GAUGE_COLOURS), 'gauge colours')
     out.blob(A['gk_tags'], bytes(4 * SLOTS), 'tag message countdowns')
+    strs, ptrs, at = b'', [], A['gk_namestr']
+    for n in GAUGE_NAMES:
+        ptrs.append((at + len(strs), len(n)))
+        strs += n.encode() + b'\0'
+    out.blob(A['gk_names'], b''.join(struct.pack('>II', a_, l_) for a_, l_ in ptrs), 'gauge names')
+    out.blob(A['gk_namestr'], strs + b'\0' * (-len(strs) % 4), 'gauge name strings')
+    out.blob(A['gk_atoms'], bytes(4 * len(GAUGE_NAMES)), 'gauge atoms')
+    out.blob(A['gk_angles'], bytes(16 * SLOTS), 'gauge ring angles')
+    out.blob(A['gk_speeds'], struct.pack('>4f', *GAUGE_SPEEDS), 'gauge ring speeds')
     if diag:
         out.blob(A['gk_gaugelog'], struct.pack('>8i', *([-1] * SLOTS)), 'diag: gauge logged')
     out.blob(A['gk_str'], CLONE_NAME.encode().ljust(8, b'\0'), '"clone"')
@@ -553,13 +574,14 @@ def build(rpx, diag=False, feats=None):
              wstop=W_STOP, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
-               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_tags'):
+               'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_tags', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
-    for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred')):
+    for i, nm in enumerate(('zero', 'half', 'bias', 'far', 'one', 'bias2', 'hmul', 'hundred', 'deg360')):
         p[nm + '_hi'], p[nm + '_lo'] = ha(A['consts'] + 4 * i), K.slo(A['consts'] + 4 * i)
     p['ftab_hi'], p['ftab_lo'] = ha(FIGHTERS), K.slo(FIGHTERS)
     p['fm_hi'], p['fm_lo'] = ha(FIGHTER_MANAGER), K.slo(FIGHTER_MANAGER)
     p['msgk_hi'], p['msgk_lo'] = ha(MSG_KIND), K.slo(MSG_KIND)
+    p['apool_hi'], p['apool_lo'] = ha(FLX_ATOM_POOL), K.slo(FLX_ATOM_POOL)
     p['mgr_hi'], p['mgr_lo'] = ha(OBJ_MANAGER), K.slo(OBJ_MANAGER)
     D = (lambda s: s) if diag else (lambda s: '')
 
@@ -1276,7 +1298,8 @@ w_start:''' + D('''
         fctiwz f1, f1
         stfd f1, 0x18(r1)
         lwz r6, 0x1C(r1)
-ws_log: mr r5, r6
+ws_log: mr r4, r5
+        mr r5, r6
         lis r3, %(gk_fz_hi)d
         addi r3, r3, %(gk_fz_lo)d''' + osr() + '''
         lwz r0, 0x34(r1)
@@ -1328,6 +1351,113 @@ gt_out: lwz r31, 0x4C(r1)
         addi r1, r1, 0x50
         blr
 
+# ---- v7: a child of a panel clip by name: (r3 parent, r4 name index into gk_names) -> r3 (0: none). The names are
+# interned every call (the trait badge's lesson: the flx runtime's name table can be rebuilt)
+gk_find:
+        stwu r1, -0x20(r1)
+        mflr r0
+        stw r0, 0x24(r1)
+        stw r31, 0x1C(r1)
+        stw r30, 0x18(r1)
+        mr r31, r3
+        mr r30, r4
+        lis r3, %(apool_hi)d
+        lwz r3, %(apool_lo)d(r3)
+        cmpwi r3, 0
+        beq gf_none
+        addi r3, r3, 0x24
+        lis r12, %(gk_names_hi)d
+        addi r12, r12, %(gk_names_lo)d
+        slwi r11, r30, 3
+        add r12, r12, r11
+        lwz r4, 0(r12)
+        lwz r5, 4(r12)''' + call(FLX_INTERN) + '''
+        cmpwi r3, 0
+        beq gf_none
+        lis r12, %(gk_atoms_hi)d
+        addi r12, r12, %(gk_atoms_lo)d
+        slwi r11, r30, 2
+        stwx r3, r12, r11
+        add r4, r12, r11
+        mr r3, r31''' + call(FLX_FIND) + '''
+        b gf_out
+gf_none:
+        li r3, 0
+gf_out: lwz r30, 0x18(r1)
+        lwz r31, 0x1C(r1)
+        lwz r0, 0x24(r1)
+        mtlr r0
+        addi r1, r1, 0x20
+        blr
+
+# ---- v7: the round gauge's moving parts: (r3 gkgauge_mc, r4 panel slot, r5 value 0-100): each ring (gk_names 1-4)
+# turned by its own speed (gk_speeds, degrees a frame) from its angle kept per slot (gk_angles), the fill (5) on the
+# value's frame (1 + value / 10, rounded) and stopped
+gk_rings:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r26, 0x28(r1)
+        mr r31, r3
+        mr r30, r5
+        slwi r29, r4, 4                 # this slot's 4 angles
+        lis r12, %(gk_angles_hi)d
+        addi r12, r12, %(gk_angles_lo)d
+        add r29, r29, r12
+        li r28, 1
+gr_ring:
+        cmpwi r28, 5
+        bge gr_fill
+        mr r3, r31
+        mr r4, r28
+        bl gk_find
+        mr. r27, r3
+        beq gr_next
+        slwi r26, r28, 2
+        addi r26, r26, -4
+        add r26, r26, r29               # its angle
+        lis r12, %(gk_speeds_hi)d
+        addi r12, r12, %(gk_speeds_lo)d
+        add r12, r12, r26
+        subf r12, r29, r12              # (speeds + 4 x (ring - 1))
+        lfs f0, 0(r12)
+        lfs f1, 0(r26)
+        fadds f1, f1, f0
+        lis r12, %(deg360_hi)d
+        lfs f13, %(deg360_lo)d(r12)
+        fcmpu cr0, f1, f13
+        blt gr_lo
+        fsubs f1, f1, f13
+gr_lo:  lis r12, %(zero_hi)d
+        lfs f0, %(zero_lo)d(r12)
+        fcmpu cr0, f1, f0
+        bge gr_set
+        fadds f1, f1, f13
+gr_set: stfs f1, 0(r26)
+        mr r3, r27''' + call(FLX_ROTATE) + '''
+gr_next:
+        addi r28, r28, 1
+        b gr_ring
+gr_fill:
+        mr r3, r31
+        li r4, 5
+        bl gk_find
+        mr. r27, r3
+        beq gr_out
+        mulli r4, r30, 10
+        addi r4, r4, 50
+        li r0, 100
+        divwu r4, r4, r0
+        addi r4, r4, 1                  # frame 1 - 11
+        mr r3, r27''' + call(FLX_GOTO) + '''
+        li r0, 1
+        sth r0, 0x9C(r27)               # stopped
+gr_out: lmw r26, 0x28(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+
 # ---- v6: the charge / ability / burnout gauge on his damage panel: the panel's update (its vtable +0x3C, the trait
 # badge cave's hook before us) then, for each panel slot of a Greninja, his VAR_19 (mode x 1000 + 0-100) on Little
 # Mac's KO meter (ko_mc, the slot's +0x18C): shown and set (0x02663C54: 0 empty, 1-99 ten steps, 100 "KO" blinking:
@@ -1337,7 +1467,7 @@ gk_panel:
         stwu r1, -0x50(r1)
         mflr r0
         stw r0, 0x54(r1)
-        stmw r25, 0x30(r1)
+        stmw r24, 0x2C(r1)
         mr r31, r3''' + call(PANEL_PREV) + '''
         stw r3, 0x10(r1)
         li r26, 0
@@ -1400,7 +1530,34 @@ gp_slot:
         cmplwi r25, 3
         ble gp_ok
         li r25, 0
-gp_ok:  cmpwi r25, 0
+gp_ok:  lwz r3, 0x5C(r30)               # v7: the round gauge (gkgauge_mc in his panel, tools/gekkouga_gauge_flx.py)?
+        cmpwi r3, 0
+        beq gp_ko
+        li r4, 0
+        bl gk_find
+        mr. r24, r3
+        beq gp_ko
+        mr r3, r29
+        li r4, 0''' + call(PANEL_VISIBLE) + '''
+        cmpwi r25, 0
+        bne gp_cshow
+        mr r3, r24
+        li r4, 0''' + call(PANEL_VISIBLE) + '''
+        b gp_log
+gp_cshow:
+        mr r3, r24
+        li r4, 1''' + call(PANEL_VISIBLE) + '''
+        mr r3, r24
+        lis r4, %(ctf_hi)d
+        addi r4, r4, %(ctf_lo)d
+        mulli r0, r25, 12
+        add r4, r4, r0''' + call(PANEL_COLOUR) + '''
+        mr r3, r24
+        mr r4, r26
+        mr r5, r28
+        bl gk_rings
+        b gp_log
+gp_ko:  cmpwi r25, 0
         bne gp_show
         mr r3, r29
         li r4, 0''' + call(PANEL_VISIBLE) + '''
@@ -1436,7 +1593,7 @@ gp_next:
         b gp_slot
 gp_done:
         lwz r3, 0x10(r1)
-        lmw r25, 0x30(r1)
+        lmw r24, 0x2C(r1)
         lwz r0, 0x54(r1)
         mtlr r0
         addi r1, r1, 0x50

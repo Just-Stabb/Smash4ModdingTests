@@ -601,3 +601,14 @@ The user's v6 A_safe log: ids 1 / 2, both clones alive for the 12 s and placed r
   sends his object (`[accessor + 0]`) the message {0xA, visible} (`0x02BF2108` (manager, &handle, id, 1), `0x02BF019C`
   (&handle, &{`0x1010CC00`, 6, &{&{0xA, v}, 2}, 0})) when the tag bit comes on and every 30 frames after (`gk_tags`),
   {0xA, 1} once when it goes. Diag `S4GW`.
+- **The round gauge** (the user's vector set, 41672): `tools/gekkouga_gauge_art.py` extracts the round elements from its
+  5250 x 3500 preview as white + alpha 256-px layers (`LAYERS`: ticks row 1 #3, dots row 1 #5, arcs row 1 #4, heavy
+  row 2 #5, each with its scale, speed (degrees a frame) and alpha; `FILL`: the open arc meter, 11 fill frames revealed
+  clockwise) and renders a preview (GIF + contact sheet). `tools/gekkouga_gauge_flx.py SRC_DMG OUT` adds the clip
+  `gkgauge_mc` (rings `gk_ticks_mc` / `gk_dots_mc` / `gk_arcs_mc` / `gk_heavy_mc`, the track, `gk_fill_mc` 11 frames) to
+  panel sprites 1-4 on a new 1024 x 1024 texture (GIDX 0x2800FE30), as `dmg_trait_badge.py` does. The exe (`gk_panel`):
+  when `gkgauge_mc` is in his slot's root clip (`gk_find`: the names interned every frame, `0x032CCAA0`), the KO meter
+  is hidden, the gauge shown and tinted per mode, each ring turned by its speed from its kept angle (`0x032CDEDC`), the
+  fill on frame 1 + value / 10 and stopped; else the KO meter route. Not built into the package: it needs the user's
+  current `data/ui/info/dmg` (the trait badge / Hero's menu in it). Tested in unicorn (the driver); the builder is
+  untested until those files arrive.

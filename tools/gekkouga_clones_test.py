@@ -1168,7 +1168,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
          'moon', 'pump') if len(earlier) == 4 else \
         ('greninja_clones_v5', 'exe_v46z_gk6', 'black', 'id=1', 'S4GX', 'A_safe', 'B_attack', 'C_hurt', 'D_parts',
          'damage panel', 'Little Mac', 'S4GB', 'grey') if len(earlier) == 5 else \
-        ('greninja_clones_v6', 'exe_v46z_gk7', 'scale', 'S4GZ', 'S4GW', 'name tag', '0-100', 'A_safe', 'B_attack')
+        ('greninja_clones_v6', 'exe_v46z_gk7', 'scale', 'S4GZ', 'S4GW', 'name tag', '0-100', 'A_safe', 'B_attack', 'round',
+         'data/ui/info/dmg')
     check('README.txt mentions every feature (%s)' % ', '.join(words), [w for w in words if w not in readme], [])
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
