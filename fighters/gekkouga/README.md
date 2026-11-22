@@ -727,3 +727,23 @@ article). v12 (the release and data stay v10's / v11's):
   arguments (v11's ran after: the moon's +0x94 is a `blr`, so harmless).
 - Assists: Ghirahim and Lyn both have the empty 12-byte model.sb; Lyn's Hair1N-5N are keyed in all 6 of her motions
   (her model.nhb is the 64-byte empty form): no swing on either.
+
+## Clones v13 (`greninja_clones_v13.zip`)
+
+The user's v12: F_hitcheck works in game (`S4GH attacker slot=2 ...` removed both clones); E_sway: no crash, the
+clones' motion has no swing system (`S4GQ swing=00000000`, so no step ran); a clone dropped as 101 had fallen off the
+edge (intended).
+- **Release** = attack + hitcheck (`RELEASE`); ladder A_release, D_parts, E_sway (C_hurt's hurtbox route dropped).
+- **Hit check v13** (`w_hitchk` / `hc_box`): every live battle object of the categories 0 (fighters, 0x76B0), 1
+  (weapons, 0x1E20) and 4 (items, 0x3B88) in the object holder `[0x1035184C]` (+4 x category: {objects, ?, count};
+  an object +0x1E live >= 4, +0xC its module accessor, as `0x02BF205C` / `0x02BF2108` read them); his team skipped (a
+  fighter's -1 never matches; a weapon / item equal to his always: his shuriken, the clones). The attacker's hitlag:
+  `HITSTOP_FN(accessor, AttackModule +0x40 + hitbox x 0x84, its damage +0x18, mul, 1, 1)` on its StopModule (+0x48)
+  vt +0x8C(frames, 1). S4GH: attacker category x 16 + index, hitbox, clone, hitlag, place.
+- **E_sway bind** (`wsw_bind`, once a life, VAR_6): the motion bind's swing tail (0x0330E000 - 0x0330E03C):
+  `0x03327448()` (a swing system), stored at motion +0x20, `0x036C60E0([mo+0x1C], [mo+0x18], swing, 9, 9,
+  [[[mo+0x18]]+8])`, `0x036B8040(swing, sb)`, `0x036B736C(swing, nhb)`; sb / nhb from its model instance (+0x6FC /
+  +0x700, `0x034205FC` copies them from the creation params' +0x10 / +0x18), else his. S4GR stages 2 (sources), 3
+  (bound), 0 / 1 (first step). The bind needs the motion's model link mode != 8.
+- **His MSC**: `gk_gone` reports 400 + id when the clone was falling on its own (past the blast zone), else 100 + id.
+- Diag: S4GX every 60 frames for the clone's whole life. The cave limit is 0x04BF4000 (was 0x04BEE000).

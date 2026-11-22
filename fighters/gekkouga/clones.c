@@ -805,17 +805,27 @@ void gk_heartbeat()
 }
 
 // v5 diag: why a clone went (his VAR_23, logged by the TEST_ONLY exe as "gen="): 100 + id heartbeat lost (the game
-// removed it, or its script never ran), 200 + id hit, 300 + id the ability's end / a KO, 400 + id the fall fallback;
+// removed it, or its script never ran), 200 + id hit, 300 + id the ability's end / a KO, 400 + id fell off (v13: also
+// a heartbeat lost while it was falling on its own: past the blast zone), or the fall fallback;
 // 1 = the last generate's answer otherwise
 void gk_why(int code, int id)
 {
     WorkModule(0, (float)(code + id) + 0, 0x0f000317);
 }
 
-// a clone the game already removed: off the books (its smoke where it was last, as a kill without a log)
+// a clone the game already removed: off the books (its smoke where it was last, as a kill without a log). v13: one
+// that was falling on its own when it stopped reporting fell off the stage (the game removed it past the blast zone):
+// 400 + id, as the fall fallback; 100 + id otherwise
 void gk_gone(int id)
 {
+    int fell;
+    fell = gk_fall_t(id) > 2;
     gk_kill(id, 0);
+    if (fell)
+    {
+        gk_why(400, id);
+        return;
+    }
     gk_why(100, id);
 }
 

@@ -749,6 +749,21 @@ def physics_tests(mscsb, src):
     check('the right one (made 3 frames later) 3 frames later; the ability goes on',
           ([x for x in g.log if x[0] in ('article', 'battleobject')][-1], m.g('gk_alive'), m.g('gk_ability') > 0),
           (('article', 0x2712, 7), 0, True))
+    # ---- v13: a clone falling on its own whose heartbeat stops (the game removed it past the blast zone: the user's
+    # v12 E_sway "fell off of the edge", logged 101): 400 + id, its smoke
+    m, g = start(0.0, 10.0, [])
+    frames(m, 10)
+    g.log = []
+    g.beat = 2
+    frames(m, 3)
+    check('v13: the left clone falling (10 frames) and its heartbeat gone 3 frames: removed with its smoke, reason 401 '
+          '(fell off), not 101', ([x[:3] for x in g.log if x[0] == 'article'], len([x for x in g.log if x[0] == 'effect'
+          and x[2] == 0x3300006]), g.vars.get(0x0F000317), m.g('gk_alive')), ([('article', 0x2712, 6)], 1, 401.0, 2))
+    m, g = start(0.0, 10.0, [(-1000.0, 1000.0, 10.0)])
+    frames(m, 10)
+    g.beat = 2
+    frames(m, 3)
+    check('v13: ... standing on the floor when its heartbeat stops: 101 as before', g.vars.get(0x0F000317), 101.0)
     # ---- v3: walls: a clone stops against one (its offset gives way), and goes back to its offset when free
     m, g = start(0.0, 10.0, [(-1000.0, 1000.0, 10.0)])
     g.walls = [(20.0, 0.0, 40.0)]
@@ -1191,6 +1206,10 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
                 ['fighter/gekkouga/model/clone/c%02d/%s' % (c, f) for c in range(8) for f in GB.CLONE_FACE_FILES]
         check('v2: both MSCs, his 5 motion part pacs, the face / rest-of-model files in all 8 colours (%d)' % len(v2new),
               [m for m in v2new if 'INSTALL_TO_data/' + m not in names], [])
+    if z1 and len(earlier) == 13:
+        check('v13: INSTALL_TO_data: his MSC only (a fallen clone\'s heartbeat loss reported 401 / 402)',
+              sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              ['fighter/gekkouga/script/msc/gekkouga.mscsb'])
     if z1 and len(earlier) == 11:
         check("v11: INSTALL_TO_data: c00-c07 model.nud (v9.1's) / model.sb (his own)",
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
@@ -1298,7 +1317,9 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
          'sway', 'confirmed') if len(earlier) == 10 else         ('greninja_clones_v10', 'exe_v46z_gk11', 'tongue', 'model.sb', 'model.nud', 'TEST_ONLY_DATA', 'E_sway', 'sway',
          'S4GQ', 'S4GY', 'S4GO', 'C_hurt', 'name tag', 'confirmed') if len(earlier) == 11 else \
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
-         'Lyn', 'Ghirahim', 'confirmed')
+         'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
+        ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway')
     check('README.txt mentions every feature (%s)' % ', '.join(words), [w for w in words if w not in readme], [])
     check('no fighter- or game-named wrapper folder', [t for t in top if t.lower() in ('gekkouga', 'greninja', 'fighter', 'data', 'smash4')], [])
 
@@ -1349,7 +1370,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
 
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
-    earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
+    earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12') for x in sys.argv[1:] if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
     base_diag = a[4] if len(a) > 4 else None

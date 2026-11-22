@@ -220,7 +220,8 @@ def weapon_checks(e, img, info, diag=False):
     s = e.call(W.SINGLETON_SWITCH, 0, C.CLONE_KIND)
     check('the singleton getter: kind 0x1A1 -> its own singleton', s, A['w_single'])
     vt = e.w(s)
-    VT_OURS = (W.HIT_METHOD, 0x34) + ((0x1C,) if 'hurt' in F or diag else ()) + (C.POLL_SLOTS if 'hurt' in F or diag else ())
+    VT_OURS = (W.HIT_METHOD, 0x34) + ((0x1C,) if 'hurt' in F or diag else ()) + (
+        C.POLL_SLOTS if 'hurt' in F or diag else (0x94,) if F & {'sway', 'hitcheck'} else ())
     check('its vtable: bunshin\'s but +0x1C / +0x64 / +0x84 / +0x8C / +0x94 / +0xAC (v3)',
           [e.w(vt + o) for o in range(0, L['vsize'], 4) if o not in VT_OURS],
           [img.w(L['svt'] + o) for o in range(0, L['vsize'], 4) if o not in VT_OURS])
@@ -408,6 +409,7 @@ def weapon_checks(e, img, info, diag=False):
     e.setw(hm + C.HM_COUNT, 8)
     e.call(lab['w_start'], s, weapon, init)
     want = ([('clone_setf', C.VAR_LATCH, 0.0)] if 'hitcheck' in F else []) + \
+        ([('clone_setf', C.VAR_BIND, 0.0), ('clone_setf', C.VAR_SWAYLOG, 0.0)] if 'sway' in F else []) + \
         ([('bunshin_start', s, weapon, init), ('colour_off', cb, 0)] if 'bstart' in F else []) + \
         ([('hurt_clear', hm), ('hurt', hm, A['hurt'], 8, 0)] if 'hurt' in F else []) + \
         ([('osr', A['gk_fk'], hm, 1), ('osr', A['gk_fy'], 0, 0)] if diag and 'hurt' in F else []) + \
@@ -781,17 +783,22 @@ def plyc_checks(e, info, diag):
 
 
 def sway_checks(e, info):
-    """v12: the clone's swing step (feature sway): wp_94 -> w_sway -> the motion object's swing rate + step (v11's call
-    of MotionModule's whole swing update crashed in the user's E_sway)"""
+    """v13: the clone's swing (feature sway): wp_94 -> w_sway: bind a swing system when its motion has none (its model
+    instance's sb / nhb, or his), then the motion object's swing rate + step"""
     lab, A, F = info['labels'], info['A'], info['feats']
     if 'sway' not in F:
         check('v11: without "sway": no swing step code', 'w_sway' in lab, False)
         return
     calls = []
+    newsw = [0]
     e.stub(C.SWING_RATE, lambda e_: calls.append(('rate', e_.r(3), round(d2f(e_.mu.reg_read(UC_PPC_REG_FPR1)), 3))))
     e.stub(C.SWING_STEP, lambda e_: calls.append(('step', e_.r(3))))
     e.stub(C.SWING_UPDATE, lambda e_: calls.append(('whole update', e_.r(3))))
-    cv = {}
+    e.stub(C.SWING_NEW, lambda e_: (calls.append(('new',)), newsw[0])[1])
+    e.stub(C.SWING_SKEL, lambda e_: calls.append(('skel',) + tuple(e_.r(i) for i in range(3, 9))))
+    e.stub(C.SWING_SB, lambda e_: calls.append(('sb', e_.r(3), e_.r(4))))
+    e.stub(C.SWING_NHB, lambda e_: calls.append(('nhb', e_.r(3), e_.r(4))))
+    cv = {C.VAR_SLOT: 3.0}
     vt = e.alloc(0x100, b'\0')
     g, st = e.alloc(4), e.alloc(4)
     e.setw(vt + 0x44, g)
@@ -804,10 +811,26 @@ def sway_checks(e, info):
     e.setw(acc + C.W_WORK, wm)
     mm = e.alloc(0x60, b'\0')
     e.setw(acc + C.W_MOTION, mm)
-    motion = e.alloc(0x100, b'\0')
-    sw = e.alloc(0x100, b'\0')
-    e.setw(motion + C.MO_SWING, sw)
+    motion = e.alloc(0x200, b'\0')
     e.setw(mm + C.MM_MOTION, motion)
+    link = e.alloc(0x10, b'\0')
+    e.setw(link + 4, 3)                                  # its model link's mode (8: none)
+    e.setw(motion + 4, link)
+    sk18 = e.alloc(0x10, b'\0')
+    sk18a = e.alloc(0x10, b'\0')
+    e.setw(sk18, sk18a)
+    e.setw(sk18a + 8, 0x77)
+    e.setw(motion + 0x18, sk18)
+    e.setw(motion + 0x1C, 0x55500000)
+
+    def model(acc_, sb, nhb):
+        mmod = e.alloc(0x20, b'\0')
+        mi = e.alloc(0x800, b'\0')
+        e.setw(mmod + 0xC, mi)
+        e.setw(mi + C.MI_SB, sb)
+        e.setw(mi + C.MI_NHB, nhb)
+        e.setw(acc_ + C.W_MODEL, mmod)
+    model(acc, 0x11110000, 0x22220000)
     weapon = e.alloc(0x40, b'\0')
     e.setw(weapon + C.W_ACC, acc)
 
@@ -816,26 +839,41 @@ def sway_checks(e, info):
         e.osr_full = []
         e.call(lab['w_sway'], weapon)
         return list(calls)
-    check('v12 sway: its motion object\'s swing rate (1.0) then its swing step; never MotionModule\'s whole update',
-          run(), [('rate', motion, 1.0), ('step', motion)])
+    sw = e.alloc(0x100, b'\0')
+    newsw[0] = sw
+    check('v13 sway: no swing system on its motion: one bound (new, the evaluator told, its sb / nhb parsed), then its '
+          'rate (1.0) and step; never MotionModule\'s whole update',
+          (run(), e.w(motion + C.MO_SWING)),
+          ([('new',), ('skel', 0x55500000, sk18, sw, 9, 9, 0x77), ('sb', sw, 0x11110000), ('nhb', sw, 0x22220000),
+            ('rate', motion, 1.0), ('step', motion)], sw))
     if info.get('diag'):
-        first = [x[:6] for x in e.osr_full if x[0] == A['gk_fr']]
-        run()
-        check('v12 sway diag: S4GR before (0) and after (1) its first step (motion, swing, set up 0, flags), VAR_5 1, '
-              'then no more', (first, cv.get(C.VAR_SWAYLOG), [x for x in e.osr_full if x[0] == A['gk_fr']]),
-              ([(A['gk_fr'], 0, motion, sw, 0, 0), (A['gk_fr'], 1, motion, sw, 0, 0)], 1.0, []))
+        check('v13 sway diag: S4GR 2 (sb, nhb, own 1), 3 (bound: motion, swing), 0 / 1 around its first step',
+              [x[:5] for x in e.osr_full if x[0] == A['gk_fr']],
+              [(A['gk_fr'], 2, 0x11110000, 0x22220000, 1), (A['gk_fr'], 3, motion, sw, 0),
+               (A['gk_fr'], 0, motion, sw, 0), (A['gk_fr'], 1, motion, sw, 0)])
+    check('v13 sway: the next frame: its rate and step only', run(), [('rate', motion, 1.0), ('step', motion)])
+    # his sb when its own model has none; tried once a life
     e.setw(motion + C.MO_SWING, 0)
-    check('v12 sway: no swing system: nothing', run(), [])
-    e.setw(motion + C.MO_SWING, sw)
-    e.setw(mm + C.MM_MOTION, 0)
-    check('v12 sway: no motion object: nothing', run(), [])
-    e.setw(mm + C.MM_MOTION, motion)
+    cv[C.VAR_BIND] = 0.0
+    model(acc, 0, 0)
+    for i in range(8):
+        e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
+    me = e.fighter(2)
+    e.mu.mem_write(me['f'] + 0x1E, b'\x04')
+    model(e.w(me['f'] + C.BASE_ACC), 0x33330000, 0)
+    newsw[0] = 0
+    got = run()
+    check('v13 sway: its own model without sb / nhb: his (slot 3) sb; the swing system not made: nothing more',
+          got, [('new',)])
+    check('v13 sway: ... not tried again this life (VAR_6)', run(), [])
+    e.setw(link + 4, 8)
+    cv[C.VAR_BIND] = 0.0
+    check('v13 sway: its model link mode 8 (none): no bind', run(), [])
+    e.setw(link + 4, 3)
     e.setw(acc + C.W_MOTION, 0)
     check('v12 sway: no MotionModule: nothing', run(), [])
     e.setw(acc + C.W_MOTION, mm)
-    e.setw(weapon + C.W_ACC, 0)
-    check('v12 sway: no accessor: nothing', run(), [])
-    e.setw(weapon + C.W_ACC, acc)
+    e.setw(motion + C.MO_SWING, sw)
     vtab = info['A']['w_vt']
     del calls[:]
     e.calls = []
@@ -843,6 +881,8 @@ def sway_checks(e, info):
     check('v12 sway: the +0x94 phase steps the swing, then runs the moon\'s method with its arguments as called',
           (calls, [c for c in e.calls if c[0].startswith('orig')]),
           ([('rate', motion, 1.0), ('step', motion)], [('orig94', 0x51, weapon, 0x55, 0x66)]))
+    for i in range(8):
+        e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
 
 
 def hitcheck_checks(e, info, diag):
@@ -891,11 +931,36 @@ def hitcheck_checks(e, info, diag):
             out.append(n)
         return out
 
+    stopvt = e.alloc(0x100, b'\0')
+    stopfn = e.alloc(4)
+    e.setw(stopvt + 0x8C, stopfn)
+    e.stub(stopfn, lambda e_: e_.rec('hc_stop', 3, 4, 5))
+
+    def attack_module(acc, tid, entries):
+        team(acc, tid)
+        am = e.alloc(0x60, b'\0')
+        data = e.alloc(C.SLOT_SIZE * max(1, len(entries)), b'\0')
+        for k in range(len(entries)):
+            e.mu.mem_write(data + C.SLOT_SIZE * k + C.SLOT_DMG, struct.pack('>f', 9.0 + k))
+        e.setw(am + C.AM_DATA, data)
+        stop = e.alloc(0x10, b'\0')
+        e.setw(stop, stopvt)
+        e.setw(acc + C.W_STOP, stop)
+        ents = e.alloc(C.ENT_SIZE * len(entries), b'\0')
+        e.setw(am + C.AM_ENTS, ents)
+        e.setw(am + C.AM_COUNT, len(entries))
+        nodes = [nodes_entry(ents + C.ENT_SIZE * k, first, boxes) for k, (first, boxes) in enumerate(entries)]
+        e.setw(acc + C.W_ATTACK, am)
+        return nodes, data, stop
+
     def attacker(slot0, tid, entries):
         fk = e.fighter(slot0)
         e.mu.mem_write(fk['f'] + 0x1E, b'\x04')
-        acc = e.r(3) if False else e.w(fk['f'] + C.BASE_ACC)
-        team(acc, tid)
+        acc = e.w(fk['f'] + C.BASE_ACC)
+        nodes, data, stop = attack_module(acc, tid, entries)
+        fk.update(acc=acc, data=data, stop=stop)
+        return fk, nodes
+    if False:
         am = e.alloc(0x40, b'\0')
         ents = e.alloc(C.ENT_SIZE * len(entries), b'\0')
         e.setw(am + C.AM_ENTS, ents)
@@ -918,13 +983,19 @@ def hitcheck_checks(e, info, diag):
         e.calls, e.osr_full = [], []
         e.call(lab['w_hitchk'], weapon)
         return ([c for c in e.calls if c[0] in ('setf', 'clone_set')],
-                [x[:6] for x in e.osr_full if x[0] == A['gk_fh']])
+                [x[:7] for x in e.osr_full if x[0] == A['gk_fh']])
+    e.hs_ret = 7
     sets, logs = run()
+    check('v13 hitcheck: the attacker\'s hitlag: HITSTOP_FN(its accessor, hitbox 1\'s data, its damage 10, mul, 1, 1) = 7 '
+          'frames on its StopModule (vt +0x8C(7, 1))',
+          ([c[:4] + c[5:] for c in e.calls if c[0] == 'hitstop'], [c for c in e.calls if c[0] == 'hc_stop']),
+          ([('hitstop', _a['acc'], _a['data'] + C.SLOT_SIZE, 10.0, 1, 1)], [('hc_stop', _a['stop'], 7, 1)]))
     check('v12 hitcheck: slot 5\'s entry 1 (its second node on and over the clone\'s box): his VAR_21 = 20000 + its id '
           '2, the clone\'s latch 1; not his teammate (slot 6), not entry 0 (off)',
           sets, [('clone_set', C.VAR_LATCH, 1.0), ('setf', C.VAR_HIT, C.HIT_BIAS2 + 2)])
     if diag:
-        check('v12 hitcheck diag: S4GH (attacker slot 5, hitbox 1, clone 2, at 50, 10)', logs, [(A['gk_fh'], 5, 1, 2, 50, 10)])
+        check('v13 hitcheck diag: S4GH (attacker 0x05: fighter slot 5, hitbox 1, clone 2, hitlag 7, at 50, 10)', logs,
+              [(A['gk_fh'], 5, 1, 2, 7, 50, 10)])
     check('v12 hitcheck: latched: no second report', run()[0], [])
     cv[C.VAR_LATCH] = 0.0
     e.mu.mem_write(an[1][1] + C.NODE_ON, b'\x00')
@@ -952,6 +1023,44 @@ def hitcheck_checks(e, info, diag):
     e.mu.mem_write(tn[0][0] + C.NODE_ON, b'\x00')
     check('v12 hitcheck: the clone owned by slot 5 (its node on it): its owner\'s own attack skipped', run()[0], [])
     cv[C.VAR_SLOT] = 3.0
+    # v13: the weapons (holder +4) and items (+0x10): an object's +0x1E live, +0xC its accessor
+    for i in range(8):
+        e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
+    e.mu.mem_write(me['f'] + 0x1E, b'\x04')
+    cv[C.VAR_LATCH] = 0.0
+    holder = e.w(C.FIGHTERS)
+
+    def table(cat, size, objs):
+        t = e.alloc(0x10, b'\0')
+        arr = e.alloc(size * len(objs) + 0x40, b'\0')
+        e.setw(t, arr)
+        e.setw(t + 8, len(objs))
+        e.setw(holder + 4 * cat, t)
+        out = []
+        for k, (live, tid, entries) in enumerate(objs):
+            o = arr + size * k
+            e.mu.mem_write(o + 0x1E, bytes([live]))
+            acc = e.alloc(0x100, b'\0')
+            e.setw(o + C.BASE_ACC, acc)
+            out.append((acc, attack_module(acc, tid, entries)))
+        return out
+    wp = table(1, C.HC_OBJ_SIZES[1], [(4, 0, [(0, [(1, near)])]), (2, 1, [(0, [(1, near)])]), (4, 1, [(0, [(1, far)])])])
+    check('v13 hitcheck: weapons: his team\'s (his shuriken, the clones), one not live, one away: nothing', run()[0], [])
+    it = table(4, C.HC_OBJ_SIZES[4], [(4, 7, [(0, [(1, near)])])])
+    sets, logs = run()
+    check('v13 hitcheck: an item (another team) over it: hit; the item\'s hitlag', (sets, [c[1] for c in e.calls if c[0] == 'hitstop']),
+          ([('clone_set', C.VAR_LATCH, 1.0), ('setf', C.VAR_HIT, C.HIT_BIAS2 + 2)], [it[0][0]]))
+    if diag:
+        check('v13 hitcheck diag: S4GH attacker 0x41 (category 4, its object 1)', [x[1] for x in logs], [0x41])
+    cv[C.VAR_LATCH] = 0.0
+    e.setw(holder + 0x10, 0)
+    e.mu.mem_write(wp[2][1][0][0][0] + C.NODE_MIN_X, struct.pack('>4f', *near))
+    sets, logs = run()
+    check('v13 hitcheck: a weapon of another team over it: hit', sets,
+          [('clone_set', C.VAR_LATCH, 1.0), ('setf', C.VAR_HIT, C.HIT_BIAS2 + 2)])
+    if diag:
+        check('v13 hitcheck diag: S4GH attacker 0x13 (category 1, its object 3)', [x[1] for x in logs], [0x13])
+    e.setw(holder + 4, 0)
     for i in range(8):
         e.mu.mem_write(e.entries + C.ENTRY * i + 0x1E, b'\x00')
 
