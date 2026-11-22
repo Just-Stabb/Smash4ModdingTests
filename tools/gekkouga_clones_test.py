@@ -2129,7 +2129,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 19:   # v15: the release exe and data, test exes and data
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
-    if len(earlier) in (20, 21, 26):   # skeleton v1.2 / burn v2 / skeleton v1.3: the exes, the data, test exes
+    if len(earlier) in (20, 21, 26, 30):   # skeleton v1.2 / burn v2 / skeleton v1.3 / v1.5: the exes, the data, test exes
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (23, 24, 25, 27, 28):   # burn v2.2 / v2.3 / aerial chain v1 / clone fixes v1 / trail fix: data only
         want_top = ['INSTALL_TO_data', 'README.txt']
@@ -2163,7 +2163,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('update: nothing in INSTALL_TO_data but the built files',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want and
                      n not in again), [])
-        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29):
+        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 21:
             check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
@@ -2225,6 +2225,14 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               'places delayed) and the clone\'s MSC (its playback delayed)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
               ['fighter/gekkouga/script/msc/clone/clone.mscsb', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
+    if z1 and len(earlier) == 30:
+        check('skeleton v1.5: INSTALL_TO_data: his effect bank (the skeleton\'s body shifted onto its place), the body-sized '
+              'skeleton.lvd, the skeleton\'s game.bin (its contact hitbox, the explosion\'s hitstun), the clone\'s game / '
+              'effect.bin (joint 25 on the right hand: confirmed in game)',
+              sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              ['fighter/gekkouga/effect/gekkouga/gekkouga.010d0000.ptcl', 'fighter/gekkouga/model/skeleton/c00/skeleton.lvd',
+               'fighter/gekkouga/script/animcmd/weapon/clone/effect.bin', 'fighter/gekkouga/script/animcmd/weapon/clone/game.bin',
+               'fighter/gekkouga/script/animcmd/weapon/skeleton/game.bin'])
     if z1 and len(earlier) == 29:
         check('skeleton v1.4: INSTALL_TO_data: the box skeleton.lvd (walls + top), the clone\'s main.pac (no TransN movement), '
               'the trail\'s game.bin (up smash\'s hitboxes on its flames), his MSC (the clone diag)',
@@ -2412,7 +2420,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in (17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 31)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -2435,6 +2443,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
          'unconfirmed', 'exe_v46z_gkb6') if len(earlier) == 28 else \
         ('greninja_firetrail_fix_v1', 'skeleton.lvd', 'floor-only', 'walls', 'S4SV', 'A_release', 'TransN', 'snap', 'S4GF',
          'gen=', 'up smash', 'unconfirmed', 'exe_v46z_gkb6') if len(earlier) == 29 else \
+        ('greninja_skeleton_v1_4', 'exe_v46z_gkb7', 'body', '3.5', '24', 'contact', '70', '3.5 %', 'every 3 frames',
+         'shield', '1.6', 'hitstun', 'right hand', 'skeleton_box.png', 'unconfirmed', 'A_release') if len(earlier) == 30 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -2514,7 +2524,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--v')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
