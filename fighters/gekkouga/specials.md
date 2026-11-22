@@ -110,6 +110,9 @@ SpecialS 0x153 --travel done--> SpecialSAttack 0x15B --anim end--> SpecialSEnd 0
   turn-around attack (`0x241`/`0x251`), and **SpecialSEnd (`func_2298`)**
   flips his facing (`PostureModule(0x2710)`) at the end.
 
+**Skeleton v1 (README "Skeleton v1"):** `func_2291` is `gk_ss_tick()` (clones.c): no vanish, no teleport; at the
+frame vanilla teleports him the Running Skeleton (article 8) is made at `(0x31, 0x32)` and he goes to Wait / Fall.
+
 **Easy edits:**
 - Change the vanish time with `0x16000007` (SpecialS params).
 - Make him stay tangible by removing the `HitModule(0x2710, 0x2)` line in
