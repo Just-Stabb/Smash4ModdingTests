@@ -1103,10 +1103,14 @@ def skeleton_tests(mscsb, src):
     run(m, 1)
     check('skeleton start: at its VAR_1 / 2 (40, 10: on the floor), facing its VAR_3 (-1, the model turned), the run '
           'motion (0), its phase 1 (VAR_5); the carrier model hidden',
-          ([x for x in g.log if x[0] in ('lr', 'motion')], g.vars.get(0x0F000305), ('visible', 0) in g.log),
-          ([('lr', -1.0), ('motion', 0, 0.0, 1.0)], 1.0, True))
-    check('skeleton run: its first step 0.7 left (39.3, 10)', (g.x, g.y), (39.3, 10.0))
-    run(m, 9)
+          ([x for x in g.log if x[0] in ('lr', 'motion')], g.vars.get(0x0F000305), [x for x in g.log if x[0] == 'visible']),
+          ([('lr', -1.0), ('motion', 0, 0.0, 1.0)], 1.0, [('visible', 0)]))
+    g.log = []
+    run(m, 1)
+    check('skeleton: running, its stand-in body (the carrier model, x 2 by the executable) shown',
+          [x for x in g.log if x[0] == 'visible'], [('visible', 1)])
+    check('skeleton run: 2 steps 0.7 left (38.6, 10)', (g.x, g.y), (38.6, 10.0))
+    run(m, 8)
     check('skeleton run: 10 frames: 7 units (33, 10), straight on', (round(g.x, 2), g.y), (33.0, 10.0))
     m, g = make(walls=[(30.0, 0.0, 50.0)])
     claim(g)
@@ -1133,12 +1137,16 @@ def skeleton_tests(mscsb, src):
           (1.0, ('motion', 0, 0.0, 1.0)))
     g.log = []
     run(m, 1)
-    check('skeleton explosion at 180: phase 2 (VAR_5: its collision removed, its hits burn), the explode motion (1: its '
-          'hitbox), the explosion effect at its middle (x, y + 14)',
+    check('skeleton explosion at 180: phase 2 (VAR_5: its collision removed, its scale 1, its hits burn), the explosion '
+          'effect at its middle (x, y + 14)',
           (g.vars.get(0x0F000305), [x for x in g.log if x[0] == 'motion'], [x[:5] for x in g.log if x[0] == 'effect']),
-          (2.0, [('motion', 1, 0.0, 1.0)], [('effect', 3, 0x1000017, round(40.0 - 0.7 * 179, 3), 24.0)]))
+          (2.0, [], [('effect', 3, 0x1000017, round(40.0 - 0.7 * 179, 3), 24.0)]))
+    g.log = []
+    run(m, 1)
+    check('skeleton explosion: the next frame (its scale back to 1) the explode motion (1: its hitbox), its body hidden',
+          ([x for x in g.log if x[0] == 'motion'], [x for x in g.log if x[0] == 'visible']), ([('motion', 1, 0.0, 1.0)], [('visible', 0)]))
     x0 = g.x
-    run(m, 39)
+    run(m, 38)
     check('skeleton explosion: it stays put; removed 40 frames after (BattleObject 9)',
           (g.x == x0, [x for x in g.log if x[0] == 'remove']), (True, []))
     run(m, 1)

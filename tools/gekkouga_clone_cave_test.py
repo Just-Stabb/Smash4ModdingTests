@@ -1439,8 +1439,13 @@ def skeleton_checks(e, info, diag):
     e.setw(swm, svt)
     sacc = e.alloc(0x100, b'\0')
     e.setw(sacc + C.W_WORK, swm)
-    post = e.alloc(0x40, b'\0')
+    post = e.alloc(0x80, b'\0')
     e.mu.mem_write(post + 0x10, struct.pack('>2f', 50.0, 10.0))
+    pvt = e.alloc(0x100, b'\0')
+    psc = e.alloc(4)
+    e.setw(pvt + C.PM_SCALE, psc)
+    e.stub(psc, lambda e_: calls.append(('scale', e_.r(3), round(d2f(e_.mu.reg_read(UC_PPC_REG_FPR1)), 3))))
+    e.setw(post, pvt)
     e.setw(sacc + C.W_POSTURE, post)
     e.setw(sacc + 0x2C, gm)
     smm = e.alloc(0x60, b'\0')
@@ -1460,11 +1465,14 @@ def skeleton_checks(e, info, diag):
     for kk in range(C.SLOTS * C.BURN_CAP):
         e.setw(A['btab'] + 16 * kk, 0)
 
+    scales = []
+
     def frame():
         del calls[:]
         e.calls, e.osr_full = [], []
         e.call(lab['sk_frame'], weapon)
-        return list(calls)
+        scales[:] = [c for c in calls if c[0] == 'scale']
+        return [c for c in calls if c[0] != 'scale']
 
     def logs(fmt):
         return [x[1:8] for x in e.osr_full if x[0] == A[fmt]] if diag else []
@@ -1504,6 +1512,7 @@ def skeleton_checks(e, info, diag):
                ('make', gm, 1, 0, 0)] + [('setv',) + v for v in want_v] +
               [('commit', gm), ('on', gm, 0), ('res_free', 2), ('res_free', 2)])
     check('skeleton collision: VAR_6 = 1 (made)', sv[C.SK_VAR_COL], 1.0)
+    check('skeleton: running, its stand-in body x %g (PostureModule vt +0xE4)' % C.SK_SCALE, scales, [('scale', post, C.SK_SCALE)])
     if diag:
         check('skeleton diag: S4SC state 1, its first ground', [x[:2] for x in logs('gk_fsc')], [(1, ground)])
     e.mu.mem_write(post + 0x10, struct.pack('>2f', 50.7, 10.0))
@@ -1619,7 +1628,8 @@ def skeleton_checks(e, info, diag):
     if diag:
         check('skeleton diag: S4SF (owner 3); S4SX phase 2 (damage 270)', (logs('gk_fsf')[:1] and [logs('gk_fsf')[0][:1]],
               [x[:3] for x in logs('gk_fsx')]), ([(3,)], [(3, 2, 270)]))
-    check('skeleton exploded: not removed again', [c for c in frame() if c[0] == 'col_free'], [])
+    check('skeleton exploded: not removed again; its scale 1 (the explosion\'s hitbox unscaled)',
+          ([c for c in frame() if c[0] == 'col_free'], scales), ([], [('scale', post, 1.0)]))
     e.mu.mem_write(a2['f'] + 0x1E, b'\x00')
     # its explosion's hits: the skeleton row's burn for its owner (slot 3)
     vic = 5

@@ -7,7 +7,8 @@
 // runs it: from the start it runs straight on at sk_speed() (stopped by walls, off ledges it falls with his gravity),
 // at 0 HP it goes in a puff of smoke (no hitbox), at sk_fuse() frames it explodes (motion 1: its game script's hitbox).
 // Its phase in VAR_5 (1 running, 2 exploded, 3 smoked) for the executable. Its model (Pac-Man's hydrant's, a carrier for
-// its joints and its collision file) is hidden: the skeleton is the effect sk_fx_body().
+// its joints and its collision file) is its stand-in body while it runs (x 2: sk_show_model()), until the skeleton's
+// flipbook effect (sk_fx_body()) is in his effect bank.
 int global0;
 int global1;
 int global2;
@@ -648,6 +649,8 @@ int sk_fx_spark() { return 0x1000025; }   // a hit: the common glancing-blow spa
 int sk_fx_boom() { return 0x1000017; }    // the explosion: the common bomb explosion
 int sk_fx_smoke() { return 0x1000021; }   // 0 HP: the common smoke puff (an item's)
 int sk_fx_body() { return 0; }            // the skeleton itself (0: none)
+int sk_show_model() { return 1; }         // its stand-in body: the carrier model shown while it runs (the executable
+                                          // scales it x 2: its top on the collision's floor); 0 once sk_fx_body() is it
 float sk_fx_boom_size() { return 2.2f; }
 float sk_fx_smoke_size() { return 3.0f; }
 float sk_fx_spark_size() { return 1.6f; }
@@ -778,8 +781,8 @@ void sk_explode()
     sk_end_t = 0;
     sk_set(5, 2.0f);                      // the executable: its collision removed, its explosion's hits burn
     sk_body_off();
-    MotionModule(0x1, 0x1, 0, 1.0f);      // explode (motion 1): its game script's hitbox
     sk_fx_at(sk_fx_boom(), sk_x, sk_y + sk_mid(), sk_fx_boom_size());
+    // its explode motion (its hitbox) the next frame: the executable has put its scale back to 1 by then
 }
 
 void sk_smoke()
@@ -795,7 +798,14 @@ void sk_smoke()
 void sk_frame()
 {
     int h;
-    VisibilityModule(0x2710, 0);          // the carrier model never shows
+    if (sk_on == 0 || sk_phase != 0x1)
+    {
+        VisibilityModule(0x2710, 0);      // the carrier model: hidden waiting, exploded, smoked
+    }
+    else
+    {
+        VisibilityModule(0x2710, sk_show_model());
+    }
     if (sk_on == 0)
     {
         if (sk_var(0) < 0.5f)
@@ -812,6 +822,10 @@ void sk_frame()
     if (sk_phase != 0x1)
     {
         sk_end_t += 1;
+        if (sk_phase == 0x2 && sk_end_t == 0x1)
+        {
+            MotionModule(0x1, 0x1, 0, 1.0f);   // explode (motion 1): its game script's hitbox
+        }
         if (sk_phase == 0x2 && sk_end_t >= sk_boom_frames() || sk_phase == 0x3 && sk_end_t >= sk_smoke_frames())
         {
             BattleObject(0x9);

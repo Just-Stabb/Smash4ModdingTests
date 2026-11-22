@@ -274,6 +274,9 @@ SK_W, SK_B, SK_H = 6.0, 2.0, 28.0   # its collision: x +- 6, a wall each side fr
                                   # at y + 28 (about 1.75 x a fighter's height: Greninja's ~16)
 SK_VERTS = ((-SK_W, SK_B), (-SK_W, SK_H), (SK_W, SK_H), (SK_W, SK_B))   # the .lvd's vertices (left wall, top, right wall)
 SK_HP = 25.0
+SK_SCALE = 2.0                    # the carrier model's scale while it runs (its stand-in body: the hydrant's top at 14.09
+                                  # x 2 = the collision's top); 1.0 from its explosion / smoke on (its hitbox unscaled)
+PM_SCALE = 0xE4                   # PostureModule (accessor +0x18) vt +0xE4(f1): the object's scale (the moon's start)
 SK_LATCH = 16                     # attackers remembered per skeleton (one per owner slot): {accessor, entries latched}
 # its VARs (its MSC reads / writes them; the executable fills 0-4, 6-9)
 SK_VAR_SLOT, SK_VAR_X, SK_VAR_Y, SK_VAR_DIR = 0x0F000300, 0x0F000301, 0x0F000302, 0x0F000303
@@ -628,6 +631,21 @@ skf_owned:
         cmplwi r12, %(slots)d
         bge skf_out''' + vint('r30', 0x0F000305, 'r28') + vint('r30', 0x0F000306, 'r27') + D('''
         bl sk_logphase''') + '''
+        lwz r3, %(wpost)d(r31)          # its scale: SK_SCALE running (the stand-in body), 1.0 else
+        cmpwi r3, 0
+        beq skf_noscale
+        lis r12, %(one_hi)d
+        lfs f1, %(one_lo)d(r12)
+        cmpwi r28, 1
+        bne skf_scale
+        lis r12, %(sk_k16_hi)d
+        lfs f1, %(sk_k16_lo)d(r12)
+skf_scale:
+        lwz r12, 0(r3)
+        lwz r12, %(pm_scale)d(r12)
+        mtctr r12
+        bctrl
+skf_noscale:
         cmpwi r28, 1
         bne skf_notrun
         cmpwi r27, 0
@@ -1432,7 +1450,7 @@ def build(rpx, diag=False, feats=None):
     A['sk_verts'] = alloc(8 * len(SK_VERTS), 4) if skel else 0
     A['sk_box'] = alloc(0x1C, 4) if skel else 0             # (W, 0, H) + this frame's left / right / bottom / top
     A['sk_nums'] = alloc(4 * 10, 4) if skel else 0           # 0.0 - 9.0 (ints as floats)
-    A['sk_k'] = alloc(16, 4) if skel else 0                  # SK_HP, 10.0, 8.0 (the hit point's height), 0.5
+    A['sk_k'] = alloc(20, 4) if skel else 0                  # SK_HP, 10.0, 8.0 (the hit point's height), 0.5, SK_SCALE
     A['sk_latch'] = alloc(SLOTS * SK_LATCH * 8, 4) if skel else 0
     A['gk_desc'] = alloc(0x38)
     A['g1_desc'] = alloc(12)
@@ -1534,7 +1552,7 @@ def build(rpx, diag=False, feats=None):
         out.blob(A['sk_verts'], b''.join(struct.pack('>2f', *v) for v in SK_VERTS), 'skeleton collision vertices')
         out.blob(A['sk_box'], struct.pack('>7f', SK_W, 0.0, SK_H, 0, 0, 0, 0), 'skeleton hit box')
         out.blob(A['sk_nums'], struct.pack('>10f', *range(10)), 'skeleton 0-9')
-        out.blob(A['sk_k'], struct.pack('>4f', SK_HP, 10.0, 8.0, 0.5), 'skeleton constants')
+        out.blob(A['sk_k'], struct.pack('>5f', SK_HP, 10.0, 8.0, 0.5, SK_SCALE), 'skeleton constants')
         out.blob(A['sk_latch'], bytes(SLOTS * SK_LATCH * 8), 'skeleton attackers latched')
     out.blob(A['gk_list'], struct.pack('>II', A['gk_list'] + 8, len(L['rows'])) +
              b''.join(struct.pack('>4I', *e) for e in L['rows']), 'his article list (+ clones 6 / 7, skeleton 8)')
@@ -1591,7 +1609,7 @@ def build(rpx, diag=False, feats=None):
              dm_add=DM_ADD, fstatus=F_STATUS, st_kind=ST_KIND, st_dead=ST_DEAD, st_dead_n=ST_DEAD_N, ent_log=ENT_LOG, node_obj=NODE_OBJ, node_type=NODE_TYPE, mm_kind=MM_KIND, am_ents=AM_ENTS, am_count=AM_COUNT, am_max=AM_MAX, ent_size=ENT_SIZE,
              ent_nodes=ENT_NODES, node_max=NODE_MAX, node_on=NODE_ON, node_min_x=NODE_MIN_X, node_min_y=NODE_MIN_Y,
              node_max_x=NODE_MAX_X, node_max_y=NODE_MAX_Y, team=TEAM_MOD,
-             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, nlatch=SLOTS * SK_LATCH * 2, sk_kind=SK_KIND, sk_lat=SK_LATCH, sk_lat8=SK_LATCH * 8, sk_nv=len(SK_VERTS), gm_vt_hi=SK_GM_VT >> 16, gm_vt_lo=SK_GM_VT & 0xFFFF, wground=0x2C, nbtab=SLOTS * BURN_CAP * 4, nbproc=(BURN_CONTEXTS * BURN_ENTS + 3) // 4, clear_back=CLEAR_BACK, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
+             obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, pm_scale=PM_SCALE, nlatch=SLOTS * SK_LATCH * 2, sk_kind=SK_KIND, sk_lat=SK_LATCH, sk_lat8=SK_LATCH * 8, sk_nv=len(SK_VERTS), gm_vt_hi=SK_GM_VT >> 16, gm_vt_lo=SK_GM_VT & 0xFFFF, wground=0x2C, nbtab=SLOTS * BURN_CAP * 4, nbproc=(BURN_CONTEXTS * BURN_ENTS + 3) // 4, clear_back=CLEAR_BACK, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
              hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
@@ -1603,6 +1621,7 @@ def build(rpx, diag=False, feats=None):
     if skel:
         p['sk_k4_hi'], p['sk_k4_lo'] = ha(A['sk_k'] + 4), K.slo(A['sk_k'] + 4)
         p['sk_k8_hi'], p['sk_k8_lo'] = ha(A['sk_k'] + 8), K.slo(A['sk_k'] + 8)
+        p['sk_k16_hi'], p['sk_k16_lo'] = ha(A['sk_k'] + 16), K.slo(A['sk_k'] + 16)
         p['resmgr_hi'], p['resmgr_lo'] = ha(RES_MGR), K.slo(RES_MGR)
         ski = [m[0] for m in BURN_MOVES].index(SK_BURN_KEY)
         p['sk_row_hi'], p['sk_row_lo'] = ha(A['bmoves'] + 20 * ski), K.slo(A['bmoves'] + 20 * ski)
