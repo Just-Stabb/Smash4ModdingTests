@@ -5113,7 +5113,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 50)) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 51)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',

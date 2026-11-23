@@ -2408,3 +2408,75 @@ byte for byte, release and diag):
 **Not confirmed in game**: everything; in particular the flx runtime rotating a clip inside the radar (as it does the
 round gauge's rings), the 60-frame wave clip's goto, the placement against the real name text / stock icons under the
 portrait (run-time pictures in the renderer), the radar over the round gauge in the 5 - 8 player / small panels.
+
+## Beetle safety / radar v2 (`greninja_beetle_safety_v1.zip`, over UI radar / waveform v1; exe_v46z_gkb20)
+
+The user: "make it so Greninja/opponents riding parabeetle can't be KO'd by riding it upwards unless they're in
+knockback"; "double the size of the parabeetle radar and move it very slightly upwards"; "if down special is held from the
+ground and there is no ground under Greninja (usually after being pushed off of a platform), it acts like how it does in
+the air"; "make the yellow tint slightly darker on an opponent who is going to be exploded from the ice". Nothing here is
+confirmed in game.
+
+**The blast zone, read from the exe** (docs/native-notes.md "The blast zone"):
+- The fighters' KO check (`0x02E1C084`, the call at `0x02E1C174`) tests its hip (ModelModule joint 3) against
+  `0x02C41068(pos, area)`: 0 past the top, 1 the bottom, 2 / 3 the sides, -1 inside. No status test on the way: a fighter
+  carried past the top line is KO'd whatever it is doing. Weapons are removed by the same check (`0x02B80C5C`).
+- The rect is the camera manager's (`0x02D29634` vt +0x10C = `0x02D2AD9C`: +0x48C + 16 x i), i the stage manager's
+  ([0x102F7020] +0x111C vt +0xA4) map of the object's area (GroundModule vt +0x614: its +0x18 object's +0x244).
+- MSC `StageData(0)` - `(3)` (sys 0x2C, `0x030B4F58` -> `0x030B314C` -> `0x02C40D38`) return that same rect: left, right,
+  top, bottom. (Sephiroth's test 133 doubted they were the blast zones: they are.)
+
+**Riding a beetle can't KO** (option (a): the beetle levels off; `weapons/parabeetle.c` `pb_keep_safe`, `pb_safe()`):
+- While anything rides it (a fighter's feet or one of its owner's clones on its line, plus the 2-frame grace), its line
+  never goes over `StageData(2)` - 50: a rise past that is held there; one ridden already over it (landed on while flying
+  free, or made under him near the top) comes down at most 0.7 a frame.
+- 50: a rider's hip is about 8 - 30 over its feet (a giant fighter), the bob 2.
+- Unridden it flies its v2 path, rising on from where it levelled (`pb_low` kept: no jump).
+- No blast zone read (`StageData(2) <= (3)`): nothing done.
+- Covers Greninja, opponents and the clones on their own beetles (each beetle checks itself). A rider who jumps or is
+  launched off near the top is under the game's own rules (knockback KOs as normal); a drop through is a fall.
+- Test lines (approximate community values; the game's own are read in game): Battlefield 200 -> held at 150, Final
+  Destination 188 -> 138, a tall stage 330 -> 280.
+
+**The radar** (`tools/gekkouga_gauge_flx.py` `ui_places(radar=2)`, `RADAR_V2`, `RADAR_RAISE`; v1 still rebuilds with
+`radar=1`):
+- 2 x v1's size about v1's centre, 4 units (x the panel's scale) up: panels 3 / 4 117.1 units (58.6), panel 1 111.3,
+  panel 2 70.3.
+- Depth as v1: over the portrait / CPU level, under the percent digits.
+- What it covers: the portrait hexagon's upper-right corner (drawn over it) and the percent digits' top-left (they are
+  drawn over it); clear of the round gauge in the 1 - 4 player panel; in panels 1 / 2 more of the round gauge's left side
+  (drawn over it).
+- Only dmg.flx changes (texlist.lst / img-00136.nut as UI v1's).
+
+**Down special off the ground** (`clones.c` `gk_lw_air`):
+- What happened: the stance is one status on the ground and in the air (0x155: motion 0x271 / 0x289). Leaving the
+  ground, the game sets the situation to the air and the loop switches as vanilla's `func_2337` does (air motion,
+  `func_2341`'s air control, the air correction). But the ground stance's main zeroes the gravity energy's acceleration
+  (`func_2336`: `KineticModule(0xf, 1, 0)`) and only the start (`func_2340`) sets the air one: held, he hung in the air.
+- Now the switch also gives him the air stance's own fall, as `func_2340` sets it in the air: the gravity energy reset, its
+  speed his downward speed if the stance was used this airtime (0x20000081) else 0, acceleration / limit -0x8000001 /
+  -0x8000002, on.
+- The charge carries on (one status); release -> Fall; landing still held -> vanilla's switch back. The clones play his
+  motion (VAR_28 = 0x289 x 1024 + frame) and stand at his height.
+
+**The ice flash** (exe feature `ice4`, `ICE_YELLOW4`, `ice_yellow()`): yellow (1.0, 0.85, 0.05) = RGB (255, 217, 13) ->
+(0.8, 0.68, 0.04) = (204, 173, 10), 80 %. Black, alpha, alternation and timing unchanged; the same outline path (ice3).
+Only the flash table's data changes; gkb19 = RELEASE - ice4 byte for byte (release and diag).
+
+**Tests**:
+- `gekkouga_clone_cave_test` 392 / 434 (release / A_release), 0 failures: `bs_checks` (the syscall table, StageData's ops,
+  the KO / removal call sites decoded; `0x02C40D38` and `0x02C41068` run on fake managers: the same rect, top / bottom /
+  inside); the ice4 table. gkb19 (RELEASE - ice4) 392 / 0.
+- `gekkouga_clones_test ... --vui=greninja_ui_radar_wave_v1.zip` 717 checks, 0 failures: `beetle_safety_tests` (three
+  stages; ridden from low / top - 120 / top - 60 / top - 35; an opponent; a clone; a frame's gap; a jump off; no blast
+  zone), `lw_air_tests` (vanilla's hang shown, the switch = `func_2340`'s air gravity, the charge kept, the flag, landing
+  back, the clones' channel), `ui_panel_tests(v2)`.
+- msc_stack_check 0 (his globals 126 <= 128, parabeetle 47); the opcode guard OK; the slot map OK (no new slots);
+  import_call_check 0 on both exes; `supamario_ui_cave_test` 0 failures.
+- Previews: `$S/gk_preview/beetle_safety.png` (`gekkouga_parabeetle_preview.py --safety`), `panel_mockup_v2.png` (over the
+  user's `radar_ingame.png`: `gekkouga_ui_art.mockup_v2`; v1's kept as `panel_mockup_v1.png`), `ice_flash_v2.png`
+  (`gekkouga_ice_preview.py --v2`).
+
+**Not confirmed in game**: everything; in particular `StageData` from the beetle's MSC (a weapon's: the same syscall and
+GroundModule route as the game's weapon removal), the 50 margin against the real KO point, the radar's size against the
+real panel, the air fall after the switch.

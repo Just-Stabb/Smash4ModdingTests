@@ -3865,7 +3865,8 @@ MSC on a bunshin-based kind, the 4-shape group.
   - **Weapon class vtable `0x100F78F8`**: +0xD4 victim `0x02B8B384`, +0xEC attacker `0x02B91EAC` = `li r3, 0; blr` (no
     attacker hitstop for a weapon), +0x374-+0x394 forward to the specializer's +0xAC / +0xD4 / +0xDC / +0xE4 / +0xEC.
     The clone's hit method sets his hitstop from its AttackModule hit records with `0x02C2678C`.
-  - Not found: the stage's blast zone data (the clones use a heartbeat for the game's own removal + a fallback).
+  - Not found then: the stage's blast zone data (the clones use a heartbeat for the game's own removal + a fallback).
+    Found later: "The blast zone" below.
   - Cave `0x04BEA000`-`0x04BEC400` (diag `0x04BEC8B8`), limit `0x04BEE000`. Tests: `gekkouga_clone_cave_test.py` 81 / 84
     (release / diag), `supamario_ui_cave_test.py` (outline5 -> gk3) 0 failures, import_call_check 0.
 - **v4 (exe_v46z_gk4 + four TEST_ONLY variants; fighters/gekkouga/README.md "Clones v4")**: the v3 exes crashed in game
@@ -4141,3 +4142,22 @@ MSC on a bunshin-based kind, the 4-shape group.
   `0x02C55FFC`, vtable entry `0x101099D4`) and how it reaches the model's FB1 blinkColor (MI +0x40 / +0x60) were not
   traced. The flash now goes through the outline caves' FB1 write (Outline_Set's tint, shown in game) and an
   Outline_Shell band instead.
+
+## The blast zone (Greninja beetle safety v1)
+
+`tools/gekkouga_clone_cave_test.py` `bs_checks` (decoded and run in unicorn on the game's code).
+- **Rect:** the camera manager (`[0x10352470]`, getter `0x02D29634`) holds the dead range: vt +0xEC sets one rect at
+  +0x44C (-> +0x47C with the stage's offset), vt +0x104(rect, i) sets +0x45C + 16 i (-> +0x48C + 16 i), vt +0x10C(i)
+  (`0x02D2AD9C`) returns +0x48C + 16 i: left, right, top, bottom. The stage sets them from its own fields (`0x03141FCC`).
+- **Area:** `0x02C40D38(GroundModule)`: the object's area (GroundModule vt +0x614: `[+0x18] +0x244`; the hydrant's
+  GroundModule's too, `0x02B38EB0`) mapped by the stage manager (`[0x102F7020]`, `[+0x111C]` vt +0xA4) -> that rect.
+- **Check:** `0x02C41068(pos, area, f1, f2)` -> `0x02C40ECC`: -1 inside, 0 past the top (+8), 1 under the bottom (+0xC),
+  2 / 3 left / right (the top's corners by f2's fraction); `[0x102F6C48] +0x35` 0 (Mario Galaxy) bends the position
+  first. Margins 0 for fighters and weapons.
+- **Fighters:** `0x02E1C084` checks its joint 3 (`[+0x7520]` vt +0xDC(3): the hip) with its own area (`0x02E1C16C`);
+  side -> the dead direction (table `0x101265A0`); no status test on the way. **Weapons:** `0x02B80C5C` (removed past
+  it, unless masked by +0x5C).
+- **MSC:** `StageData(0)` - `(3)` (sys 0x2C: `0x030B4F58` -> `0x030B314C` ops 0 - 3) = `0x02C40D38`'s rect +0 / +4 / +8 /
+  +0xC: the blast zone of the caller's area (fighter or weapon). The vanilla Dead status (`func_220`) puts the KO place
+  0.01 past the crossed line.
+
