@@ -4002,6 +4002,11 @@ MSC on a bunshin-based kind, the 4-shape group.
   `0x35` x `0x36` on the ground (line tests: it stops at a ledge). So in `0x153` the shadow follows him at a fixed
   distance; nothing else moves `0x35`. Feature `skdist` replaces the three cap loads with a cave constant
   (`SK_DIST_PATCH`, 6 words: `lwz rX, 4(r10)` / `lfs fY, 0x30(rX)` -> `lis` / `lfs` of SK_DIST).
+- **A fighter MSC's spare storage: its New_Var slots (Greninja aligned kick v1)**: `WorkModuleF(0, 0x0F000380 + i)` /
+  `WorkModule(0, v, 0x0F000380 + i)`, i 0 - 63, are the object's own 64 New_Var variables (docs/acmd-extra-commands.md):
+  floats, whole numbers exact under 2^24, 0 until written, cleared at a KO. Greninja's MSC (127 of 128 globals) keeps its
+  aligned kick / split clone state there. MSC gotcha met on the way: `(int)(x + 0.5f)` of a float past 2^23 rounds the
+  sum to even first (9437289 + 0.5 -> 9437290): read an exact whole number with `(int)x`.
 - **Hit records are freed by every new hitbox (skeleton v1.7, read from exe_v46z_ui10)**: AttackModule's set_attack
   (`0x02C08848`, every Hitbox command) frees the Part's records of the current round (`0x02C10660` on [entry +0x130] and
   +0x124) before the slot is live again, and the collision pass appends the next hit (`0x02C10F40`, from the record

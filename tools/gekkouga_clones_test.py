@@ -433,7 +433,8 @@ def msc_tests(mscsb, src):
     check('v3: a hit on the left clone\'s hurtbox (20001): it is gone (article 6 removed), its smoke, the log (0x3F7) at its place, him back',
           ([x for x in g.log if x[0] in ('article', 'battleobject')], g.posture_sets, g.x, m.g('gk_alive'), g.vars.get(0x0F000315)),
           ([('article', 0x2712, 6), ('battleobject', 0x3F7, xh - 14.0, 10.0)], [(xh - 14.0, 10.0), (xh, 10.0)], xh, 2, 0.0))
-    check('the channel: alive 2', g.vars.get(0x0F00031F), 4747002.0)
+    check('the channel: alive 2 (aligned kick v1 package: + 256 the effects epoch, flipped at his landing in formation)',
+          (int(g.vars.get(0x0F00031F)) - 4747000) & 0xFF, 2)
     g.press, g.stick = {1}, (-0.8, -0.8)
     xs = g.x
     frames(m, 10)
@@ -490,10 +491,13 @@ def msc_tests(mscsb, src):
     check('respawn (0xB2): the burnout ended', m2.g('gk_burnout'), 0)
     m2.setg('gk_lw_charge', 120)
     frames(m2, 1, st=0xB1)
-    check('the charge survives a KO', m2.g('gk_lw_charge'), 120)
+    check('aligned kick v1 package (the user: "the clone charge gauge should reset when Greninja is KO\'d"): the charge '
+          'back to 0 at a KO (v1 - burn tint v1: kept)', m2.g('gk_lw_charge'), 0)
+    m2.setg('gk_lw_charge', 120)
     m2.setg('gk_smash', 33)
     frames(m2, 1, st=0xB2)
-    check('the smash charges survive a KO / respawn', (m2.g('gk_smash'), m2.g('gk_lw_charge')), (33, 120))
+    check('the smash charge survives a KO / respawn (the down special\'s: 0 again)', (m2.g('gk_smash'), m2.g('gk_lw_charge')),
+          (33, 0))
     frames(m2, 1, st=0x14F)
     check('the match\'s start (Entry 0x14F): every charge from 0', (m2.g('gk_smash'), m2.g('gk_lw_charge')), (0, 0))
 
@@ -1145,8 +1149,10 @@ def ak_run(mscsb, src, held, swap_at=None, frames_=60):
         if swap_at is not None and t == swap_at:
             press, stick = (1,), (-0.8, -0.8)
         ak_frame(m, g, st=st, held=held and t <= 8, press=press, stick=stick)
+        m.vm.g[19], m.vm.g[18] = m.vm.g.get(18, 0), g.situation      # (the system line's situation globals)
         if st == 0x161 and m('gk_ak_loop'):
             st = g.status_req[-1][0]
+            m('gk_ak_end')
         track.append(((g.x, g.y), (m.gf('gk_lx'), m.gf('gk_ly')), (m.gf('gk_rx'), m.gf('gk_ry'))))
     return m, g, track
 
@@ -1180,7 +1186,7 @@ def aligned_kick_more_tests(mscsb, src):
     # ---- the end: Fall (not a free fall), split; their fall
     m, g, tr = ak_run(mscsb, src, False, frames_=24)
     check('the move\'s end (23 frames): Fall (0xE, not a free fall 0x10); upright again (FighterUtil 6, 0 at its end)',
-          g.status_req[-1:], [(0xE, 0)])
+          (g.status_req[-1:], g.rot[-1:]), ([(0xE, 0)], [0.0]))
     check('the clones split (mode 2) once both flights are over, in the air, upright (their tilt off)',
           (int(g.vars.get(0x0F000388)), m('gk_bvi', 1, 0), m('gk_bvi', 2, 0), ak_cmd(g, 1)[3], ak_cmd(g, 2)[3]), (2, 10, 10, 0, 0))
     # ---- the swap mid-flight: his path and the clone's exchanged
@@ -1203,6 +1209,249 @@ def aligned_kick_more_tests(mscsb, src):
     m('gekkouga_frame')
     r = m('gk_lw_press')
     check('... landed: again', (r, g.status_req), (1, [(0x161, 1)]))
+
+
+def split_tests(mscsb, src):
+    """aligned kick v1: split clones mirror his inputs, each in its own situation (README "Aligned kick v1"): aerials by
+    its own facing, landing (no regroup), ground walk / dash / run, jab, tilts, smashes (hold, charge, auto release, chain),
+    jumps; shield + special: his short call (0x160) and their slow walk / float back, then formation"""
+    m, g, tr = ak_run(mscsb, src, True, frames_=24)        # held: they end at +14 / -14 (crossed), in the air
+    check('split: after the kick, mode 2, both in the air (action 10)', (int(g.vars.get(0x0F000388)), m('gk_bvi', 1, 0),
+                                                                       m('gk_bvi', 2, 0)), (2, 10, 10))
+    g.status_req = []
+    # an aerial: his forward air command (0x100, him facing right): the left clone (now right of him, facing right as it
+    # flew) a forward air, the right one (facing left) a back air
+    ak_frame(m, g, st=0xE, cmd=0x100 | 0x1, stick=(0.8, 0.0))
+    check('split, in the air: his forward air command: the clone facing his way a forward air (0x69), the one facing '
+          'the other way a back air (0x6A), each its own (action 11)',
+          (ak_cmd(g, 1)[0], ak_cmd(g, 2)[0], m('gk_bvi', 1, 0), m('gk_bvi', 2, 0)), (0x69, 0x6A, 11, 11))
+    for _ in range(200):
+        ak_frame(m, g, st=0xE)
+        if m('gk_bvi', 1, 0) < 10 and m('gk_bvi', 2, 0) < 10:
+            break
+    check('split: they land on the floor (y 10) from their aerials: the aerials\' landing lag (forward 15 / back 13, '
+          'LandingAirF / B 0x6E / 0x6F), and stay split (no regroup on landing: mode 2)',
+          (m.gf('gk_ly'), m.gf('gk_ry'), sorted([ak_cmd(g, 1)[0], ak_cmd(g, 2)[0]]), int(g.vars.get(0x0F000388))),
+          (10.0, 10.0, [0x6E, 0x6F], 2))
+    for _ in range(16):
+        ak_frame(m, g, st=0)
+    check('split: after the landing lag: standing (Wait1, action 0)', (ak_cmd(g, 1)[0], m('gk_bvi', 1, 0)), (0, 0))
+    # ground: walk, dash -> run, jab, tilt, smash with its hold / release, the stored charge, a chain, a jump
+    x0 = m.gf('gk_lx')
+    ak_frame(m, g, st=1, stick=(0.5, 0.0))
+    check('split, ground: the stick half right: both walk right (WalkMiddle 0xB, 1.43 x 0.5 / 0.75 = 0.953 a frame, facing '
+          'right)', (ak_cmd(g, 1)[0], ak_cmd(g, 2)[0], round(m.gf('gk_lx') - x0, 3), ak_cmd(g, 2)[2]), (0xB, 0xB, 0.953, 0))
+    ak_frame(m, g, st=3, stick=(-1.0, 0.0))
+    k1 = ak_cmd(g, 1)[0]
+    for _ in range(10):
+        ak_frame(m, g, st=4, stick=(-1.0, 0.0))
+    check('split, ground: the stick full left: a dash (0x11, 1.6 a frame, facing left), then the run (0x12, 2.08)',
+          (k1, ak_cmd(g, 1)[0], ak_cmd(g, 1)[2], round(m('gk_bv', 1, 6) and fv(m('gk_bv', 1, 6)), 2)), (0x11, 0x12, 1, -2.08))
+    for _ in range(40):
+        ak_frame(m, g, st=0)
+    ak_frame(m, g, st=0x25, cmd=0x1)
+    check('split, ground: a jab press: jab 1 (Attack11 0x50) for both', (ak_cmd(g, 1)[0], ak_cmd(g, 2)[0]), (0x50, 0x50))
+    for _ in range(6):
+        ak_frame(m, g, st=0x25)
+    ak_frame(m, g, st=0x25, cmd=0x1)
+    check('... pressed again (6 frames in): jab 2 (0x51)', ak_cmd(g, 1)[0], 0x51)
+    for _ in range(40):
+        ak_frame(m, g, st=0)
+    ak_frame(m, g, st=0x29, cmd=0x4 | 0x1)
+    check('split, ground: up tilt (0x4): AttackHi3 (0x5C)', ak_cmd(g, 1)[0], 0x5C)
+    for _ in range(40):
+        ak_frame(m, g, st=0)
+    ak_frame(m, g, st=0x2B, cmd=0x10, stick=(1.0, 0.0), atk=True)
+    k_start = ak_cmd(g, 1)[0]
+    for _ in range(8):
+        ak_frame(m, g, st=0x2C, atk=True)
+    check('split, ground: a forward smash, attack held: its start (0x5F) to its hold frame (8), then the hold (0x62)',
+          (k_start, ak_cmd(g, 1)[0], m('gk_bvi', 1, 0)), (0x5F, 0x62, 4))
+    for _ in range(30):
+        ak_frame(m, g, st=0x2C, atk=True)
+    ak_frame(m, g, st=0)
+    check('... released before full (31 frames of 120): no attack, Wait1; its charge kept (31)',
+          (ak_cmd(g, 1)[0], m('gk_bvi', 1, 10)), (0, 31))
+    m('gk_bsi', 1, 10, 120)
+    ak_frame(m, g, st=0x2B, cmd=0x20)
+    for _ in range(9):
+        ak_frame(m, g, st=0x31)
+    check('split, ground: with a full stored charge an up smash (0x63) releases at its hold frame on its own: the start '
+          'motion from 9 (an attack), the charge used, the chain started (up)',
+          (ak_cmd(g, 1)[:2], m('gk_bvi', 1, 0), m('gk_bvi', 1, 10), m('gk_bvi', 1, 11)), ((0x63, 9), 2, 0, 2))
+    for _ in range(14):
+        ak_frame(m, g, st=0x33)
+    ak_frame(m, g, st=0x33, cmd=0x40)
+    check('... from its last hitbox\'s end (22) a down smash input chains (its start 0x65, auto)',
+          (ak_cmd(g, 1)[0], m('gk_bvi', 1, 13)), (0x65, 4 + 16))
+    for _ in range(80):
+        ak_frame(m, g, st=0)
+    ak_frame(m, g, st=0xA, cmd=0x200000)
+    k = ak_cmd(g, 1)[0]
+    for _ in range(5):
+        ak_frame(m, g, st=0xB)
+    check('split, ground: jump: the squat (0x18), then JumpF (0x19) rising (action 10)',
+          (k, ak_cmd(g, 1)[0], m('gk_bvi', 1, 0), m.gf('gk_ly') > 10.0), (0x18, 0x19, 10, True))
+    for _ in range(120):
+        ak_frame(m, g, st=0)
+    # the regroup: shield + special while split
+    g.status_req = []
+    g.x = 0.0
+    lx0, rx0 = m.gf('gk_lx'), m.gf('gk_rx')
+    ak_frame(m, g, st=0x1C, press=(1,), guard=True)
+    check('regroup: special pressed with shield held (Guard 0x1C): his short call (0x160), the special eaten',
+          (g.status_req, g.vars.get(0x0F0003C9)), ([(0x160, 1)], 32.0))
+    g.log = []
+    m.vm.g[4], m.vm.g[18] = 0x160, 0
+    m('gk_rg_main')
+    check('his call: the start of his stance (speciallw 0x271) at 0.4 (its frames 0 - 7.6, before its intangible 8 - 19); '
+          'the clones regrouping (mode 3)', ([x for x in g.log if x[0] == 'rate'][:1], int(g.vars.get(0x0F000388))),
+          ([('rate', 0.4)], 3))
+    xs = []
+    for t in range(75):
+        ak_frame(m, g, st=0x160 if t < 19 else 0)
+        xs.append((m.gf('gk_lx'), m.gf('gk_rx')))
+    step = max(abs(b[0] - a[0]) for a, b in zip([(lx0, rx0)] + xs, xs))
+    check('regroup: they come back slowly (75 frames, eased: the biggest step %.2f a frame; not a teleport), walking '
+          '(WalkMiddle 0xB) on his floor; then formation at -14 / +14 (mode 0)' % step,
+          (step < 1.5, abs(xs[37][0] - lx0) < abs(-14.0 - lx0), xs[-1], int(g.vars.get(0x0F000388))),
+          (True, True, (-14.0, 14.0), 0))
+    ak_frame(m, g, st=0)
+    check('regroup: formation again: VAR_28 his motion (kind x 1024 + frame), flags without 128',
+          int(g.vars.get(0x0F00031F)) - 4747000 & 0x80, 0)
+
+
+def bugfix_tests(mscsb, src):
+    """aligned kick v1 package (the user's two bugs): a swap / his landing flips the clones' effects epoch; a KO empties the
+    down special's charge (gauge 0)"""
+    m, g = ak_setup(mscsb, src)
+    ep = lambda: (int(g.vars.get(0x0F00031F)) - 4747000) // 256 % 2
+    e0 = ep()
+    g.situation = 2
+    frames(m, 1, 0x34)
+    g.situation = 0
+    frames(m, 1, 0x18)
+    e1 = ep()
+    g.press, g.stick = {1}, (-0.8, -0.8)
+    m.vm.g[4], m.vm.g[24] = 0x18, 0x8000
+    m('gekkouga_frame')
+    e2 = ep()
+    check('clone effects: his landing in formation (an aerial -> its landing) flips the effects epoch (flags 256), a swap '
+          'flips it again (each: the clones fade their following effects)', (e1 != e0, e2 != e1), (True, True))
+    m = fresh(mscsb, src)
+    g = m.game
+    m.setg('gk_lw_charge', 250)
+    frames(m, 1)
+    g0 = g.vars.get(0x0F000313)
+    frames(m, 1, 0xB1)
+    frames(m, 3, 0xB2)
+    frames(m, 1)
+    check('KO: the down special\'s charge (250 of 300: gauge mode 1, 83) back to 0 at the KO: gauge 0 (hidden) after the '
+          'respawn; the smash charge kept (as before)', (g0, m.g('gk_lw_charge'), g.vars.get(0x0F000313)),
+          (1083.0, 0, 0.0))
+
+
+def clone_free_tests(mscsb, src):
+    """aligned kick v1: the clone article in free mode (his flags 128): its own commanded motion (VAR_28 / VAR_29), facing,
+    tilt, the startup's pause, restarts by seq; back to his motion after; the effects epoch"""
+    m = MSC(mscsb, src)
+    g = m.game
+    sh = {}
+    g.calls2 = []
+
+    def sysf(sid, a, old=g.sys):
+        if sid == 0x17 and a[0] == 0 and a[1] in sh:
+            return f2i(sh[a[1]])
+        if sid == 0x17 and a[0] == 0 and 0x0F000020 <= a[1] < 0x0F000040:
+            return f2i({0x0F000024: 0.0, 0x0F000025: 0.0, 0x0F000027: 1.0}.get(a[1], 0.0))
+        if sid == 0x12 and a[0] in (0x1, 0x4, 0x2713):
+            g.calls2.append(('motion', a[0]) + ((a[1], fv(a[2]), fv(a[3])) if a[0] == 0x1 else (fv(a[1]),)))
+            return 0
+        if sid == 0x14 and a[0] in (0, 0x4):
+            g.calls2.append(('posture', a[0]) + tuple(fv(x) for x in a[1:]))
+            if a[0] == 0:
+                g.lr = fv(a[1])
+            return 0
+        if sid == 0x1C and a[0] == 0x2D:
+            g.calls2.append(('fade',))
+            return 0
+        return old(sid, a)
+    g.sys = sysf
+    base = 0x0F000348                                      # slot 2's shared VAR_24 - 31
+
+    def chan(flags, c1, c2=0):
+        sh[base + 7] = 4747000.0 + flags
+        sh[base + 4] = float(c1)
+        sh[base + 5] = float(c2)
+        sh[base + 0], sh[base + 1], sh[base + 2], sh[base + 3] = -14.0, 10.0, 14.0, 10.0
+    chan(3 + 4, 0, 1.0)
+    g.x, g.y, g.lr = -14.0, 10.0, 1.0
+    m('cl_frame')
+    check('free: the clone found him (slot 2, the left one)', (m.g('cl_slot'), m.g('cl_id')), (2, 1))
+    g.calls2 = []
+    cmd = 0x28D + 1024 * 2 + (1 << 21) + (1 << 22)        # the kick, frame 2, tilted, paused, facing right
+    chan(3 + 128, cmd)
+    m('cl_frame')
+    check('free (flags 128): its command: the kick motion 0x28D from frame 2 held (rate 0), tilted back 53 degrees (its '
+          'kick along its flight up toward the centre line)',
+          [c for c in g.calls2 if c[0] != 'fade'], [('posture', 4, -53.0, 0.0, 0.0), ('motion', 1, 0x28D, 2.0, 0.0)])
+    g.calls2 = []
+    cmd2 = 0x28D + 1024 * 3 + (1 << 21) + (1 << 22)
+    chan(3 + 128, cmd2)
+    m('cl_frame')
+    check('... paused on the startup\'s next frame: set there (0x2713), held', g.calls2, [('motion', 4, 0.0), ('motion', 0x2713, 3.0)])
+    g.calls2 = []
+    chan(3 + 128, 0x69 + (1 << 20) + (1 << 23))
+    m('cl_frame')
+    check('a new command (forward air, facing left, upright, seq 1): turned, upright, its motion from 0 at rate 1, its old '
+          'move\'s following effects faded', g.calls2,
+          [('posture', 0, -1.0), ('posture', 4, 0.0, 0.0, 0.0), ('fade',), ('motion', 1, 0x69, 0.0, 1.0)])
+    g.calls2 = []
+    chan(3 + 128, 0x69 + (1 << 20))
+    m('cl_frame')
+    check('the same kind, its seq flipped (a restart: jab 1 again, an aerial again): from its frame again',
+          g.calls2, [('motion', 1, 0x69, 0.0, 1.0)])
+    g.calls2 = []
+    chan(3 + 128 + 64, 0x69 + (1 << 20))
+    m('cl_frame')
+    check('he is frozen (flags 64): its rate 0 where it is', g.calls2, [('motion', 4, 0.0)])
+    g.calls2 = []
+    chan(3 + 256, 0x5F * 1024 + 4, 1.0)
+    m('cl_frame')
+    check('back in formation (no 128), the effects epoch flipped (256): its effects faded; upright; his motion (the channel\'s '
+          'kind x 1024 + frame) from its frame', [c for c in g.calls2 if c[0] in ('fade', 'motion') or c[1] == 4][:4],
+          [('fade',), ('posture', 4, 0.0, 0.0, 0.0), ('fade',), ('motion', 1, 0x5F, 4.0, 1.0)])
+
+
+def kick_data_tests(out, user):
+    """aligned kick v1: the clone's counter kick scripts (both motions): his up-diagonal branch's hitboxes (13 %, 60 degrees,
+    bone 4 as the article's), frames 5 - 20; its effects his False branches'; his own scripts unchanged"""
+    import acmd
+    ow = os.path.join(out, 'fighter', 'gekkouga', 'script', 'animcmd', 'weapon', 'clone')
+    cg = acmd.ACMDFile.load(os.path.join(ow, 'game.bin'))
+    ce = acmd.ACMDFile.load(os.path.join(ow, 'effect.bin'))
+    hg = acmd.ACMDFile.load(os.path.join(user, 'body', 'game.bin'))
+    mdl = os.path.join(out, 'fighter', 'gekkouga', 'model', 'clone', 'c00')
+    bm = GB.bone_map(open(os.path.join(mdl, 'model.jtb'), 'rb').read(), os.path.join(mdl, 'model.vbn'))
+    want = [dict(zip(c.info['syntax'], c.params)) for c in GB.kick_branch(hg.scripts[acmd.crc('speciallwattack')], 0x2100001C)]
+    for n in GB.KICK_SCRIPTS:
+        sc = cg.scripts.get(acmd.crc(n), [])
+        hbs = [dict(zip(c.info['syntax'], c.params)) for c in sc if c.name == 'Hitbox']
+        frames_ = [float(c.params[0]) for c in sc if c.name == 'FRAME']
+        check('aligned kick: the clone\'s %s: his up-diagonal kick (flag 0x2100001C\'s branch: %s %%, %s degrees, sizes %s), '
+              'bone 4 as the article\'s (0x%X), on at 5, off at 20' % (n, [w['Damage'] for w in want], [w['Angle'] for w in want],
+                                                                        [w['Size'] for w in want], bm(4)),
+              ([(h['Damage'], h['Angle'], h['KBG'], h['BKB'], h['Size'], h['X'], h['Bone']) for h in hbs], frames_,
+               [c.name for c in sc][-2:]),
+              ([(w['Damage'], w['Angle'], w['KBG'], w['BKB'], w['Size'], w['X'], bm(4)) for w in want], [5.0, 20.0],
+               ['Remove_All_Hitboxes', 'Script_End']))
+        ef = [c.name for c in ce.scripts.get(acmd.crc(n), [])]
+        check('aligned kick: its effects: his kick\'s (frame 2 Graphic_Effect2, frame 3 Graphic_Effect4: his flags off)',
+              ef, ['FRAME', 'Graphic_Effect2', 'FRAME', 'Graphic_Effect4', 'Script_End'])
+    bg = acmd.ACMDFile.load(os.path.join(out, 'fighter', 'gekkouga', 'script', 'animcmd', 'body', 'game.bin'))
+    check('aligned kick: his own kick scripts unchanged (the 0x2100001C branch on him: his MSC sets the flag)',
+          [acmd.fmt_script(bg.scripts[acmd.crc(n)]) == acmd.fmt_script(hg.scripts[acmd.crc(n)]) for n in GB.KICK_SCRIPTS],
+          [True, True])
 
 
 def tilt_chain_tests(mscsb, src):
@@ -2502,7 +2751,10 @@ def script_tests(out, user):
           [zlib.crc32(x.encode()) for x in ('attacks4', 'attacks4hold', 'attackhi4', 'attackhi4hold', 'attacklw4', 'attacklw4hold')])
     cg = acmd.ACMDFile.load(os.path.join(O, 'weapon', 'clone', 'game.bin'))
     ok = []
+    kick = {acmd.crc(n) for n in getattr(GB, 'KICK_SCRIPTS', ())}
     for crc, s in cg.scripts.items():
+        if crc in kick:
+            continue                      # aligned kick v1: one branch of his kick (kick_data_tests)
         o = pg.scripts[crc]
         hb0 = [c for c in o if c.name in GB.HITBOXES]
         hb1 = [c for c in s if c.name in GB.HITBOXES]
@@ -2670,6 +2922,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 33:   # burn tint v1: the exes only
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
+    if len(earlier) == 35:   # aligned kick v1: data only
+        want_top = ['INSTALL_TO_data', 'README.txt']
     if len(earlier) == 34:   # skeleton v1.7: the exes, the skeleton's data and his bank, test data
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (20, 21, 26, 30, 31):   # skeleton v1.2 / burn v2 / skeleton v1.3 / v1.5 / v1.6: the exes, the data, test exes
@@ -2708,7 +2962,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('update: nothing in INSTALL_TO_data but the built files',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want and
                      n not in again), [])
-        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34):
+        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 21:
             check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
@@ -2770,6 +3024,12 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               'places delayed) and the clone\'s MSC (its playback delayed)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
               ['fighter/gekkouga/script/msc/clone/clone.mscsb', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
+    if z1 and len(earlier) == 35:
+        check('aligned kick v1: INSTALL_TO_data: his MSC (the kick, split clones, the regroup, the effects epoch, the charge '
+              'reset at a KO), the clone\'s MSC (free mode, the epoch) and scripts (the kick); the exe is skeleton v1.7\'s',
+              sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              ['fighter/gekkouga/script/animcmd/weapon/clone/effect.bin', 'fighter/gekkouga/script/animcmd/weapon/clone/game.bin',
+               'fighter/gekkouga/script/msc/clone/clone.mscsb', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
     if z1 and len(earlier) == 34:
         check('skeleton v1.7: INSTALL_TO_data: the skeleton\'s game.bin (the explosion\'s window, the contact hitbox with '
               'rehit 3) and MSC (0.58 a frame, the explosion held / ended, its sounds noted), his effect bank (the run '
@@ -3025,7 +3285,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 35)) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 36)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -3059,6 +3319,9 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_burn_tint_v1', 'exe_v46z_gkb10', 'explosion', 'orange', '102', 'once', 'contact', 'rehit', '3', '20',
          'hit record', 'skeleton_toggle', 'SoundModule', 'null', 'S4SN', 'sound_via_greninja', '0.58', 'flipbook',
          'A_release', 'unconfirmed') if len(earlier) == 34 else \
+        ('greninja_skeleton_v1_7', 'down special', 'left', 'right', 'straight up', 'held', 'tapped', '64', '46.5', '78',
+         'swap', 'Fall', 'once', 'split', 'mirror', 'aerial', 'smash', 'jump', 'landing', 'shield', 'regroup', 'stance',
+         'effect', 'KO', 'charge', 'smash charge', 'unconfirmed') if len(earlier) == 35 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -3147,7 +3410,7 @@ def main():
     FX_PKG = next((x[5:] for x in sys.argv[1:] if x.startswith('--fx=')), None)
     a = [x for x in sys.argv[1:] if not x.startswith('--v') and not x.startswith('--fx=')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
@@ -3172,6 +3435,13 @@ def main():
         firetrail_tests(os.path.join(msc, 'firetrail', 'firetrail.mscsb'), GB.TRAIL_MSC)
         trail_data_tests(out)
     script_tests(out, user)
+    if len(earlier) >= 35:
+        aligned_kick_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
+        aligned_kick_more_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
+        split_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
+        bugfix_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
+        clone_free_tests(os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC)
+        kick_data_tests(out, user)
     package_tests(out, pkg, base, base_diag, v1, earlier)
     model_tests(out, earlier)
     tool_tests(out, base, base_diag, pkg, len(earlier) >= 3, earlier)

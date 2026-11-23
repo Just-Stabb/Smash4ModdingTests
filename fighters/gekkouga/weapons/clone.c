@@ -635,6 +635,7 @@ int cl_hn;             // ... and how many are kept (0 - 3)
 int cl_free_on;        // aligned kick v1: his channel's free mode (flags 128) seen last frame
 int cl_free_seen;      // ... the command applied last: its kind x 2 + its seq (-1 none)
 int cl_tilt;           // ... its tilt now (1: turned along the kick's flight; -1 to set again)
+int cl_fx_ep;          // ... his effects epoch (flags 256) seen last (+ 1; 0 none yet)
 
 int cl_magic() { return 4747; }
 
@@ -660,12 +661,12 @@ float cl_abs(float v)
 }
 
 // v2: his flags (VAR_31 - 4747000), 0x1000 when slot n isn't a Greninja with clones out (clone delay: up to 127: 64 he
-// is frozen; aligned kick v1: up to 255: 128 the clones are free)
+// is frozen; aligned kick v1: up to 511: 128 the clones are free, 256 the effects epoch)
 int cl_flags(int slot)
 {
     float v;
     v = cl_shared(slot, 7) - 4747000.0f;
-    if (v < -0.5f || v > 255.5f)
+    if (v < -0.5f || v > 511.5f)
     {
         return 0x1000;
     }
@@ -784,6 +785,7 @@ void cl_frame()
         PostureModule(0x3, cl_shared(cl_slot, 2), cl_shared(cl_slot, 3), 0);
     }
     cl_beat();
+    cl_fx_epoch(flags);
     if (flags & 0x80)
     {
         cl_free(flags);                   // aligned kick v1: its own motion (the kick, split, the regroup)
@@ -908,10 +910,23 @@ float cl_hist(int i, float v0, float v1, float v2)
 // World effects (Graphic_Effect: one-shots at a place) play out as on him.
 void cl_move_end(int k)
 {
-    if (cl_motion != 0xffffffff && k != cl_motion)
+    if (k != cl_motion)
+    {
+        EffectModule(0x2d, 0);            // (aligned kick v1 package: also after its motion was forgotten, cl_motion -1)
+    }
+}
+
+// aligned kick v1 package (the user: a swap at an aerial's landing left the aerial's effect on the clone): his effects epoch
+// (flags 256: flipped at every swap and at his landing in formation) changed: its following effects end with a fade
+void cl_fx_epoch(int flags)
+{
+    int ep;
+    ep = (flags / 256) % 2 + 1;
+    if (cl_fx_ep != 0 && ep != cl_fx_ep)
     {
         EffectModule(0x2d, 0);
     }
+    cl_fx_ep = ep;
 }
 
 // ---- aligned kick v1 (fighters/gekkouga/README.md "Aligned kick v1"): while his flags have 128 the clone is free: his MSC
@@ -938,7 +953,7 @@ void cl_free(int flags)
         cl_free_seen = 0xffffffff;
         cl_tilt = 0xffffffff;
     }
-    v = (int)(cl_shared(cl_slot, 3 + cl_id) + 0.5f);
+    v = (int)cl_shared(cl_slot, 3 + cl_id);   // (an exact whole number under 2^24: no + 0.5, which rounds to even past 2^23)
     kind = v % 1024;
     f0 = (v / 1024) % 1024;
     lr = 1.0f;

@@ -1415,3 +1415,84 @@ slower", "The skeleton sounds don't play. I made sure I had the correct files."
   sequence as eft plays it); `gekkouga_clones_test ... --vbt` 365 / 0 (the explosion's window against the measured orange,
   the held motion and the 0x2719 at 102, the contact's rehit, the toggle data, 0.58, the sound notes, the package);
   supamario_ui_cave_test 0; import_call_check 0. Not confirmed in game: everything here.
+
+## Aligned kick v1 (`greninja_aligned_kick_v1.zip`, over skeleton v1.7; data only, exe_v46z_gkb10)
+
+The brief: during the ability, down special with no left / right starts an aligned attack (the counter's up-diagonal
+kick on all three, the user's arrowhead sketch `$S/gk_in/clone_fx/aligned_kick_shape.png`), tapped / held variants, his
+peak above theirs, swaps any time, normal Fall, once an airtime; after it the clones are **split** (the user: "Clones
+should mirror inputs. They should not regroup when landing. If shield + special is pressed, Greninja should do a quick,
+short animation and the clones should slowly move back to him"). Plus two user bugs (a swap at an aerial's landing left
+its effect on the clone; the charge gauge should reset at a KO).
+
+**Globals freed first** (his MSC had 127 of 128): his 64 New_Var slots (`0x0F000380 + i`, his own object's: floats,
+whole numbers exact, read 0 until written, cleared at a KO) hold state now (`clones.c` `gk_vi` / `gk_svi`, `gk_bv` /
+`gk_bs` / `gk_bvi` / `gk_bsi`). Moved: `gk_fx_t` (slot 0), `gk_cursor_t` (1), `gk_cl_why` (2), `gk_cl_t` (3), `gk_gen_req`
+(4), `gk_hold_first` (5); removed (written, never read): `gk_pips`, `gk_spawn_bits`, `gk_spawn_t`. 118 of 128 now; every
+new value is a slot. Slots: 8 the clones' mode (0 formation, 1 the kick, 2 split, 3 regrouping), 9 the kick used this
+airtime, 10 the kick's clock, 11 its variant (1 tapped, 2 held), 12 the regroup's clock, 13 the effects epoch, 14 his
+situation last frame; 16 x b + k for body b (1 the left-spawned clone, 2 the right-spawned one, 3 him): k 0 action, 1
+frames in it, 2 motion kind, 3 its start frame, 4 the command's seq, 5 facing, 6 X speed, 7 Y speed (his; the clones'
+are `gk_lvy` / `gk_rvy`), 8 flight frames left, 9 air jumps, 10 smash charge, 11 smash chain, 12 tilted, 13 aux (smash
+type + 8 x auto / the aerial / the landing lag), 14 / 15 the regroup's start.
+
+**The kick** (`gk_ak_*`): `gk_input` lets a stick-down special with |X| <= 0.25 through (no buffer clear) during the
+ability, so the game's down special input (func_43 / func_58 / func_675 / func_1999, only when he can act) reaches
+`gk_lw_press` -> `gk_ak_try` (not used this airtime, no kick / regroup running) -> status 0x161 (SpecialLwAttack, unused
+since clones v1). `MSC_BODIES`: its pre (`gk_ak_pre`: situation air, Hydro Pump jet's first line), main (`gk_ak_main`: the
+kick motion 0x28D at 5/8, flag 0x2100001C (his game script's up-diagonal branch: 13 %, 60 degrees, frames 5 - 20), the
+effect / sound flags off (their False branches play), `FighterUtil(6, 270)`: turned straight up), init (`gk_ak_init`: his
+energies 1 / 3 at our speeds, no limits), exec (`gk_ak_exec`: the rotation every frame), end (`gk_ak_end`: upright).
+- Timeline: the kick's clock (gekkouga_frame, which runs before the status's global16 in a frame) 0 - 7 the startup (all
+  three still; the clones' motion paused on frame clock x 5/8, stepped by him); at 8 (`gk_ak_launch`) the variant
+  (special held -> held) and three paths: him 78 up in 15 frames (5.2 a frame), each clone toward the centre line at 53
+  degrees (the sketch's arrows: 52 / 54), 64 (tapped: they cross above him, ending 24.5 past it) or 46.5 (held: 28
+  across, ending at +14 / -14 on the other side), 15 frames; then a quarter of the speed kept and gravity (0.18, 1.85).
+  Peaks: him ~81, the clones ~53 (tapped) / ~38 (held). He ends in Fall (0xE) at 23 (a landing after the lift-off:
+  LandingLight 0x17).
+- Swaps (`gk_swap_free`): places exchanged and the momentum: a flight's rest (speed, frames) goes with the place; in 0x161
+  his path is ours; else his speed set (energy 1 vertical, energy 3 horizontal: approximate) and the clone gets his
+  SPEED_X / SPEED_Y.
+- Once an airtime (slot 9): cleared on the ground (not in 0x161) or on a ledge.
+- A kick cut before its kick frame (he was hit): the clones back in formation where they are.
+
+**The channel in free mode** (his VAR_31 flags + 128): VAR_28 / VAR_29 each clone's command (`gk_fpack`: kind + 1024 x
+start frame + 2^20 facing left + 2^21 tilted + 2^22 paused + 2^23 seq, under 2^24). The clone (`weapons/clone.c
+cl_free`): a new kind or seq -> that motion from the start frame (its scripts from there), else on at rate 1 (0 when he is
+frozen, flags 64); paused: held on the frame; tilted: `PostureModule(4, -53, 0, 0)` (relative to its facing: its kick
+along its flight); `(int)` of the float without + 0.5 (past 2^23 the + 0.5 rounds to even: a wrong kind). Back in
+formation: upright, his motion from the channel again. The clone's kick scripts (`gekkouga_build.clone_kick`: the 0x1C
+branch's hitboxes on bone 4 as the article's, frames 5 - 20; his kick's effects).
+
+**Split clones** (`gk_free_frame` -> `gk_fc`): from his stick, `global24` (CAT1), attack held; nothing while he is hit /
+on a ledge / calling them. Ground (`gk_fg`): wait / walk (0xB, 1.43 x |X| / 0.75) / dash (0x11, 1.6, 10 frames) / run
+(0x12, 2.08); jump (squat 0x18, 4 frames, then JumpF 0x19: 4.07 full / 2.82 hop by the jump still held, X x 0.8 + stick x
+0.95 up to 1.3); smash > tilt > jab / dash attack: smashes `gk_fsm_begin` / `gk_fsms` / `gk_fsmh` (his rules: the start
+to its hold frame 8 / 9 / 5, held -> the hold motion charging its own store to 120, released early / full -> Wait, a full
+store or a chain releases on its own from the hold frame), chains (`gk_fchain`: from 16 / 22 / 19, each once), jab 1 -> 2
+-> 3 (a new press from 6 frames in), tilts (forward faces the stick), the fire trail at its smash's hit; friction 0.045.
+Air (`gk_fa`): one double jump (JumpAerialF 0x1B), the aerial from the command bits (forward / back by its own facing:
+`gk_aerial`), drift (1.18 max, 0.08 accel, 0.015 friction), fast fall (2.96 with the stick down). Ends: his vl group 1
+cancel frames (`gk_mlen`: jab 22 / 22 / 36, dash attack 33, tilts 39 / 33 / 27, smashes 50 / 52 / 55, aerials 65 / 55 /
+46 / 42 / 57), else the motion's length. Movement (`gk_fmove`): walls, floors (slopes), off a ledge it falls, ceilings,
+landing (LandingAir 0x6D - 0x71 with his aerial landing lag 12 / 15 / 13 / 15 / 32, else LandingLight 4 frames); no
+regroup on landing. No ledges, specials, grabs, shields.
+
+**The regroup** (`gk_rg_*`): split, special pressed with shield held, when he can act (statuses up to 0x15 but helpless,
+or guard 0x1B - 0x1D): the press eaten and status 0x160 (SpecialLwHit's slot, unused): the stance (speciallw /
+specialairlw) at 0.4 for 19 frames (motion frames 0 - 7.6: before its vl intangible window 8 - 19), its init the stance's
+physics (`func_2340`); the clones (mode 3) eased (smoothstep) over 75 frames from where they were to his X -/+ 14 and his
+Y (walking on his floor, else floating; no wall tests), then formation (their offsets, history from now).
+
+**The user's bugs**: (1) a swap (formation or free) and his landing in formation flip the effects epoch (slot 13 ->
+flags 256); the clone (`cl_fx_epoch`) fades its following effects (`EffectModule(0x2D, 0)`) on a change; `cl_move_end` now
+fades on any new kind, also after its motion was forgotten (-1). (2) a KO (0xB1 / 0xB2) sets `gk_lw_charge` 0 (the gauge
+0, no ready blink); the smash store is still kept (the original spec).
+
+Tests (`gekkouga_clones_test ... --vs17` 410 / 0): `aligned_kick_tests` / `aligned_kick_more_tests` (the trigger standing
+and in the air, the swap still on left / right, the main's motion / rate / rotation / flag, the startup's paused commands,
+both variants' paths and his peak, the end in Fall upright, the swap mid-flight, once an airtime), `split_tests` (aerials
+by facing, landing lag, no regroup, walk / dash / run, jab 1 -> 2, up tilt, a forward smash's hold and early release, a
+stored up smash's auto release, a chain, a jump, the regroup's call / slow return / formation), `bugfix_tests`,
+`clone_free_tests` (the article's commands, pause, restart by seq, freeze, back to formation, the epoch), `kick_data_tests`;
+the earlier tests updated (the down special during the ability, the charge at a KO, the epoch bit). Not confirmed in game.

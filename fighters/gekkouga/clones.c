@@ -167,7 +167,8 @@ void gekkouga_frame()
             gk_overlay_off();
         }
         gk_chain = 0;
-    }
+        gk_lw_charge = 0;                 // aligned kick v1 package (the user: "the clone charge gauge should reset when
+    }                                     // Greninja is KO'd"): the down special's charge (and its gauge / ready blink)
     if (st == 0x14f)
     {
         gk_lw_charge = 0;                 // the match's start (Entry): every kept charge from 0
@@ -309,7 +310,8 @@ void gk_swap(int id)
     WorkModule(0x2, cy - oy + 0, 0x0f000001);
     gk_set_c(id, ox, oy, 0);
     gk_set_fall_t(id, 0);
-    gk_last_oy = cy;
+    gk_fx_flip();                         // the clones' following effects faded (the user: a swap at an aerial's landing
+    gk_last_oy = cy;                      // left its effect on the clone)
     gk_cl_why_or(0x4);
     gk_hn = 0;                            // clone delay: his old places mean nothing now (both offsets changed): the
     gk_swap_cd = 10;                      // clones go on from his new place (held for their delay, then delayed)
@@ -381,6 +383,7 @@ void gk_ability_update()
     gk_clone_hitlag();
     gk_check_hit();
     gk_heartbeat();
+    gk_land_fx();
     if (gk_vi(8) != 0)
     {
         gk_free_frame();                  // aligned kick v1: kicking / split / regrouping: their own movement
@@ -884,6 +887,7 @@ void gk_channel()
     {
         flags = flags | 0x40;             // clone delay: he is frozen (hitlag): their playback pauses (no history kept)
     }
+    flags = flags | gk_vi(13) * 256;      // aligned kick v1 package: the effects' epoch (a change: they fade theirs)
     WorkModule(0, gk_lx + 0, 0x0f000318);
     WorkModule(0, gk_ly + 0, 0x0f000319);
     WorkModule(0, gk_rx + 0, 0x0f00031a);
@@ -2037,7 +2041,8 @@ int gk_cl_diag()
 // with his VAR_n at a KO); his MSC keeps state there instead of in globals (fighters/gekkouga/README.md "Aligned kick
 // v1", the slot table). 0 - 15 his own: 0 gk_fx_t, 1 gk_cursor_t, 2 gk_cl_why, 3 gk_cl_t, 4 gk_gen_req, 5 gk_hold_first
 // (moved out of the globals), 8 the clones' mode (0 formation, 1 the aligned kick, 2 split, 3 regrouping), 9 the kick
-// used this airtime, 10 the kick's clock, 11 its variant (1 tapped, 2 held), 12 the regroup's clock; 16 x b + k body b's
+// used this airtime, 10 the kick's clock, 11 its variant (1 tapped, 2 held), 12 the regroup's clock, 13 the clones' effects
+// epoch (flags 256), 14 his situation last frame; 16 x b + k body b's
 // (1 the left-spawned clone, 2 the right-spawned one, 3 him): k 0 action, 1 frames in it, 2 motion kind, 3 its start
 // frame, 4 the command's seq, 5 facing, 6 X speed, 7 Y speed (his; the clones' are gk_lvy / gk_rvy), 8 flight frames
 // left, 9 air jumps used, 10 smash charge, 11 smash chain, 12 tilted (the kick), 13 aux (smash type + 8 x auto / the
@@ -3532,6 +3537,7 @@ void gk_swap_free(int id, float ox, float oy, float cx, float cy)
     }
     WorkModule(0x2, cx - ox + 0, 0x0f000000);
     WorkModule(0x2, cy - oy + 0, 0x0f000001);
+    gk_fx_flip();
     if (global4 == 0x161)
     {
         gk_bs(3, 6, cvx);
@@ -3565,4 +3571,24 @@ void gk_swap_free(int id, float ox, float oy, float cx, float cy)
         gk_idle(id);
     }
     gk_swap_cd = 10;
+}
+
+// ---- aligned kick v1 package (the user: "If the original swaps into a clone during an aerial while landing, the effect will
+// stay attached to the clone until it disappears"): the clones' following effects end (EffectModule 0x2D: a fade) when the
+// channel's effects epoch (flags 256, his slot 13) changes: at every swap (formation or free) and at his landing in
+// formation (his aerial's effects on them end with his; free clones end theirs at their own landing: a new motion)
+void gk_fx_flip()
+{
+    gk_svi(13, 0x1 - gk_vi(13));
+}
+
+void gk_land_fx()
+{
+    int s;
+    s = StatusModule(0x1);
+    if (gk_vi(8) == 0 && gk_vi(14) == 0x2 && s == 0)
+    {
+        gk_fx_flip();
+    }
+    gk_svi(14, s);
 }
