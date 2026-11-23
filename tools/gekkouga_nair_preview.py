@@ -5,6 +5,10 @@ eft's uniform blocks: the water burst 0x330000B and burn v2's fire: v2 / v2.1 tw
 flames 0x330001D), a contact sheet and a GIF (--name: the files' name).
 
   python3 -I tools/gekkouga_nair_preview.py VANILLA_FIGHTER BUILT_FIGHTER OUT_DIR [--frames 9,11,13,16,20,24]
+      [--view Z0,Z1,Y0,Y1] [--ppu 8] [--hitboxes]
+
+--hitboxes (neutral air ring v1): also draws the game script's AttackAirN hitboxes live at each frame (each at its
+bone's place from model.jtb table 0 and the motion, + X / Y / Z): Part 0 white, Part 1 orange, the ID beside each.
 
 VANILLA_FIGHTER: his vanilla fighter/gekkouga (model/body/c00, motion/body/main.pac); BUILT_FIGHTER: the package's
 fighter/gekkouga (effect/gekkouga, script/animcmd/body/effect.bin). Writes OUT_DIR/nair.png and nair.gif.
@@ -179,6 +183,46 @@ def effects(bdir):
     return calls, s4
 
 
+def hitbox_timeline(bdir, vdir, o, bones, want):
+    """{frame: {(id, part): (z, y, size, damage)}}: AttackAirN's hitboxes as the game script lays them out (FRAME / WAIT,
+    a hitbox command (re)sets its ID, Remove_All_Hitboxes clears them; a Float_Var_Compare's True block taken: drawn as
+    if the attack connected), each at its bone (model.jtb table 0) in the motion's frame + its X / Y / Z offset"""
+    import acmd
+    import port_check
+    mdir = os.path.join(vdir, 'model', 'body', 'c00')
+    t0, _t1 = port_check.jtb(open(os.path.join(mdir, 'model.jtb'), 'rb').read())
+    g = acmd.ACMDFile.load(os.path.join(bdir, 'script', 'animcmd', 'body', 'game.bin'))
+    events, frame = [], 0.0
+    for c in g.scripts.get(acmd.crc(MOTION.split('C05')[-1][:-4].lower()), []):
+        if c.name == 'FRAME':
+            frame = max(frame, float(c.params[0]))
+        elif c.name == 'WAIT':
+            frame += float(c.params[0])
+        elif c.name in ('Hitbox', 'Special_Hitbox', 'Extended_Hitbox', 'Extended_Special_Hitbox'):
+            v = dict(zip(c.info['syntax'], c.params))
+            events.append((frame, 'set', v))
+        elif c.name == 'Remove_All_Hitboxes':
+            events.append((frame, 'clear', None))
+    out = {}
+    for fr in want:
+        cur = {}
+        for f0, kind, v in events:
+            if f0 > fr:
+                break
+            if kind == 'clear':
+                cur = {}
+            else:
+                cur = {k: x for k, x in cur.items() if k[0] != int(v['ID'])}
+                cur[(int(v['ID']), int(v['Part']))] = v
+        w = omo.world(o, bones, min(fr, o.frames - 1))
+        out[fr] = {}
+        for k, v in cur.items():
+            m = np.array(w[bones[t0[int(v['Bone'])]][0]])
+            p = m @ np.array([float(v['X']), float(v['Y']), float(v['Z']), 1.0])
+            out[fr][k] = (p[2], p[1], float(v['Size']), float(v['Damage']))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('vanilla')
@@ -186,7 +230,11 @@ def main():
     ap.add_argument('out')
     ap.add_argument('--frames', default='9,11,13,15,18,22')
     ap.add_argument('--name', default='nair')
+    ap.add_argument('--view', default=None)
+    ap.add_argument('--ppu', type=float, default=PPU)
+    ap.add_argument('--hitboxes', action='store_true')
     a = ap.parse_args()
+    view = tuple(float(x) for x in a.view.split(',')) if a.view else VIEW
     from PIL import Image, ImageDraw
     frames = [int(x) for x in a.frames.split(',')]
     items, bones, bind = model_items(a.vanilla)
@@ -197,7 +245,7 @@ def main():
     want = sorted(set(frames) | set(gif_frames))
     canv = {}
     for fr in want:
-        c = F.Canvas(*VIEW, PPU)
+        c = F.Canvas(*view, a.ppu)
         c.rgb[:] = BG
         draw_model(c, pose(items, bones, bind, o, min(fr, o.frames - 1)))
         canv[fr] = c
@@ -210,9 +258,21 @@ def main():
                     if not F.draw_s4(canv[fr], em, sim[fr], cm @ F.emitter_matrix(em, fr - fr0), float(fr - fr0)):
                         F.draw(canv[fr], em, sim[fr], cm)
     os.makedirs(a.out, exist_ok=True)
+    live = hitbox_timeline(a.built, a.vanilla, o, bones, want) if a.hitboxes else {}
+
+    def image(fr):
+        im = Image.fromarray(canv[fr].image())
+        dr = ImageDraw.Draw(im)
+        c = canv[fr]
+        for (hid, part), (z, y, r, dmg) in sorted(live.get(fr, {}).items()):
+            col = (255, 255, 255) if part == 0 else (255, 150, 40)
+            sx, sy, sr = (z - c.x0) * c.ppu, (c.y1 - y) * c.ppu, r * c.ppu
+            dr.ellipse([sx - sr, sy - sr, sx + sr, sy + sr], outline=col, width=2)
+            dr.text((sx + 2, sy - 6), '%d' % hid, fill=col)
+        return im
     tiles = []
     for fr in frames:
-        im = Image.fromarray(canv[fr].image())
+        im = image(fr)
         ImageDraw.Draw(im).text((6, 4), 'frame %d' % fr, fill=(230, 230, 230))
         tiles.append(im)
     w, h = tiles[0].size
@@ -222,7 +282,11 @@ def main():
     ImageDraw.Draw(sheet).text((6, 5), 'Greninja neutral air: ' + ', '.join('0x%X at frame %d' % (int(c[1]), c[0]) for c in calls)
                                + '; offline render (see notes)', fill=(220, 220, 220))
     sheet.save(os.path.join(a.out, a.name + '.png'))
-    gif = [Image.fromarray(canv[fr].image()).convert('P', palette=Image.ADAPTIVE) for fr in gif_frames]
+    gif = []
+    for fr in gif_frames:
+        im = image(fr)
+        ImageDraw.Draw(im).text((6, 4), 'frame %d' % fr, fill=(230, 230, 230))
+        gif.append(im.convert('P', palette=Image.ADAPTIVE))
     gif[0].save(os.path.join(a.out, a.name + '.gif'), save_all=True, append_images=gif[1:], duration=50, loop=0)
     print(os.path.join(a.out, a.name + '.png'))
 
