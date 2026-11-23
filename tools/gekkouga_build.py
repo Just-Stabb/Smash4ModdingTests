@@ -861,6 +861,13 @@ USMASH_SPIKE = dict(Angle=300, KBG=50, FKB=0, BKB=25)
                                   # / BKB 25 (11 %, weight 100: KB 39 at 0 %, 84 at 100 %, 107 at 150 %: no tumble (80)
                                   # under about 95 %; was 44 degrees, KBG 100, BKB 30)
 USMASH_SPIKE_FRAME = 18
+# usmash spike v2 (the user: "Can you make all of the strong part of Up smash's hitbox do the spike?", "the outer hits were
+# knocking back rather than spiking"): the strong part is every hitbox his AttackHi4 sets at 18 (the only frame from 15
+# to 21 that sets one): the geyser (ID 0, Part 1, 14 %, Y 27 on joint 0, off at 19) and the four sword hits (inner 1 / 2,
+# outer 3 / 4, 11 %, off at 21): frames 18 - 20. All five now take USMASH_SPIKE (angle 300 by position, KBG 50, FKB 0,
+# BKB 25); their damage (uncharged), size, place, Part and the rest kept. Left as they are: the first weak hit (ID 0, Part
+# 0, 5 %, angle 366, 12 - 17) before it and the late capsule (Extended_Hitbox ID 1, 10 %, 40 degrees, 21) after it
+USMASH_STRONG = (18, 21)          # [set, all off): the strong part's frames 18, 19, 20
 
 
 def usmash_spike(game):
@@ -880,12 +887,28 @@ def usmash_spike(game):
     for k, c in enumerate(inner + outer):            # inner 1 (0x19), 2 (0x18); outer 3 (0x19), 4 (0x18)
         new_id[(int(c.params[param(c, 'Bone')]), k < 2)] = k + 1
         c.params[param(c, 'ID')] = k + 1
-    for c in inner:
+    strong = [c for c in usmash_strong(s) if c not in hits]
+    assert len(strong) == 1 and int(strong[0].params[param(strong[0], 'ID')]) == 0 and \
+        int(strong[0].params[param(strong[0], 'Bone')]) == 0, strong          # the geyser
+    for c in inner + outer + strong:                 # usmash spike v2: the whole strong part (v1: inner only)
         for nm, v in USMASH_SPIKE.items():
             c.params[param(c, nm)] = v
     for c in s:                                      # the reserves at 15 (unscaled offsets: inner Y 0, outer Y -4)
         if c.name == 'ATK_RESERVE' and int(c.params[0]) in (1, 2, 3, 4):
             c.params[0] = new_id[(int(c.params[param(c, 'Bone')]), abs(float(c.params[param(c, 'Y')])) < 1e-6)]
+
+
+def usmash_strong(script):
+    """usmash spike v2: the hitbox commands of AttackHi4's strong part (those set in USMASH_STRONG's frames)"""
+    at, out = 0.0, []
+    for c in script:
+        if c.name == 'FRAME':
+            at = float(c.params[0])
+        elif c.name == 'WAIT':
+            raise AssertionError('AttackHi4: a WAIT (the strong part is read on absolute FRAMEs)')
+        if c.name in HITBOXES and USMASH_STRONG[0] <= at < USMASH_STRONG[1]:
+            out.append(c)
+    return out
 
 
 def remove_cmds(cmds, keep):
