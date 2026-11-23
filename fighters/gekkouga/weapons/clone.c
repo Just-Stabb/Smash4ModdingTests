@@ -915,7 +915,12 @@ void cl_move_end(int k)
     {
         EffectModule(0x2d, 0);            // (aligned kick v1 package: also after its motion was forgotten, cl_motion -1)
     }
-}
+    AttackModule(0x2719);                 // clone articles v1 package (the user: "When using the clone kick, the clones
+}                                         // never clear the hitbox from the kick"): its one status never ends, so a
+                                          // script's hitboxes stay until its own Remove_All_Hitboxes, which a move left
+                                          // early (the kick's FRAME 20 is past its 20-frame motion's last frame 19; a
+                                          // landing, a cancel, a chain, a command) never reaches: every new motion (or a
+                                          // restart) clears them first (AttackModule 0x2719, its hit records kept)
 
 // aligned kick v1 package (the user: a swap at an aerial's landing left the aerial's effect on the clone): his effects epoch
 // (flags 256: flipped at every swap and at his landing in formation) changed: its following effects end with a fade

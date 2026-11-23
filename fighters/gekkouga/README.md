@@ -1496,3 +1496,44 @@ by facing, landing lag, no regroup, walk / dash / run, jab 1 -> 2, up tilt, a fo
 stored up smash's auto release, a chain, a jump, the regroup's call / slow return / formation), `bugfix_tests`,
 `clone_free_tests` (the article's commands, pause, restart by seq, freeze, back to formation, the epoch), `kick_data_tests`;
 the earlier tests updated (the down special during the ability, the charge at a KO, the epoch bit). Not confirmed in game.
+
+## Clone articles v1 (`greninja_clone_articles_v1.zip`, over aligned kick v1; exe_v46z_gkb11)
+
+The user: "allow clones to spawn duplicate articles, such as the skeletons, water shuriken and hydro pump (clone skeletons
+should spawn on top of each other, forming a stack of skeletons)"; plus two answers / bugs: a KO also clears the stored
+smash charge, and "When using the clone kick, the clones never clear the hitbox from the kick". Only clones in formation
+(copying his moves: alive, not falling on its own, not split / kicking / regrouping) make articles (`gk_art_clones`).
+- **Skeletons (a stack)**: `gk_sk_spawn` queues the clones' (`gk_sk_stack`: slot 15 the clones still to ask for, 6 / 7 his
+  skeleton's place); `gk_sk_queue` (every frame) asks for the next once his request was claimed (his VAR_15 back to 0 while
+  `gk_sk_req_t` runs): his VAR_15 = 1 + the level (1 the first clone's, 2 the next), its place his skeleton's X and its Y +
+  24 x the level, his facing, `ArticleModule(0x2710, 8)`; one a frame (the clones' delays); dropped if a request isn't
+  claimed in time. Exe (feature `cart`): his article list allows 3 skeletons (`SK_LEVELS`); the claim gives each its
+  level (his VAR_15 - 1 -> its VAR_20); each running skeleton writes its accessor / a frame counter / x / y into
+  `SK_SEAT[owner][level]` (let go when it explodes / smokes) and one with a level reads the one below's into its VAR_17
+  (1 there) / 18 / 19 / 21 (its counter mod 10); its HP latches a bank per level. Its MSC (`weapons/skeleton.c
+  sk_seat_step`): while the one below is there and its counter moves, it sits on its top (x, y + 24: the skeleton.lvd top
+  line), else it falls (his gravity) and runs on. Side special stays blocked while any runs (each beats).
+- **Water shurikens**: `gk_sh_copies` (MSC_EDITS: right after his `ArticleModule(0x2719, 0)` in SpecialNShot `func_2271` /
+  SpecialNMaxShot `func_2279`): per clone out, `ArticleModule(0x2710, 0)` then `(0x2719, 0)` (generated and shot as his:
+  the shot reads his charge), slot 57 the clones waiting (the channel's flags 512 / 1024, 3 frames: `gk_sh_tick`). His
+  shuriken's MSC is now ours (`weapons/shuriken.c`: vanilla shuriken.mscsb decompiled, recompiling to the same functions,
+  + `sh_frame` on global14): a shuriken in its first 2 frames with a copy waiting claims the first clone not claimed this
+  frame (claim bits 64 / 128 in his VAR_30, cleared by him each frame) and, once shot (status 2 / 4), moves once by that
+  clone's place minus his. His own (made at his hold, long before) is never a copy. Exe: 9 shurikens (`SH_MAX`).
+- **Hydro Pump's water**: not done: the water (article 1, 0xFA) is made by native code each jet (no MSC / ACMD
+  `ArticleModule(0x2710, 1)` in his files), so neither route above reaches it.
+- **The clones' hitboxes** (the user's kick bug): the clone article's one status never ends, so hitboxes set by a script
+  stayed until the script's own Remove_All_Hitboxes; the kick's is at FRAME 20 of a 20-frame motion (frames 0 - 19: never
+  reached), and any move a clone leaves early (a landing, a cancel, a chain, a split command) had the same hole.
+  `cl_move_end` (every new motion or restart, formation and free) now clears them first (`AttackModule(0x2719)`, its hit
+  records kept). His own kick ends with a status change (cleared).
+- **A KO** (the user: yes, clear the stored smash charge too): `gk_smash`, `gk_sm_auto`, `gk_chain_req`, the split
+  clones' stores (slot k 10) to 0 at 0xB1 / 0xB2, with the down special's charge (aligned kick v1). Nothing is kept
+  across stocks now (Clones v1 / v3's "kept across stocks" no longer applies).
+- Exe: exe_v46z_gkb11 = RELEASE (+ cart); the cave limit is `LIMIT_CART` 0x04BF8000 with cart (the diag build ends at
+  0x04BF48C8); gkb10 = RELEASE - cart byte for byte (its LIMIT kept).
+- Tests: cave 271 / 302 (`cart_checks`: the claim's levels, the stack table and seat VARs, the one below gone, its own
+  entry let go, the latch banks; the article list's 9 / 3 and the 64-instance cap); `gekkouga_clones_test ... --vak` 422 /
+  0 (`clone_articles_tests`: the skeleton queue (levels, places, one a frame, one clone, dropped), the shot's copies and
+  the channel bits, the KO's resets, the seat and the fall, the shurikens' claims and move, his own untouched, the clone's
+  clear on each new motion); supamario_ui_cave_test 0; import_call_check 0. Not confirmed in game.

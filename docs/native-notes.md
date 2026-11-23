@@ -4002,6 +4002,11 @@ MSC on a bunshin-based kind, the 4-shape group.
   `0x35` x `0x36` on the ground (line tests: it stops at a ledge). So in `0x153` the shadow follows him at a fixed
   distance; nothing else moves `0x35`. Feature `skdist` replaces the three cap loads with a cave constant
   (`SK_DIST_PATCH`, 6 words: `lwz rX, 4(r10)` / `lfs fY, 0x30(rX)` -> `lis` / `lfs` of SK_DIST).
+- **An article's hitboxes outlive its motion (Greninja clone articles v1)**: a fighter's hitboxes are cleared by its
+  status changes; a weapon that stays in one status (Greninja's clones: one MSC status for their whole life, playing his
+  motions) keeps a script's hitboxes until that script's own Remove_All_Hitboxes, so a motion switched early (or a script
+  whose Remove is past its motion's last frame: his counter kick's FRAME 20 in a 20-frame motion) leaves them on. Clear
+  them on every motion change (MSC `AttackModule(0x2719)`, hit records kept).
 - **A fighter MSC's spare storage: its New_Var slots (Greninja aligned kick v1)**: `WorkModuleF(0, 0x0F000380 + i)` /
   `WorkModule(0, v, 0x0F000380 + i)`, i 0 - 63, are the object's own 64 New_Var variables (docs/acmd-extra-commands.md):
   floats, whole numbers exact under 2^24, 0 until written, cleared at a KO. Greninja's MSC (127 of 128 globals) keeps its

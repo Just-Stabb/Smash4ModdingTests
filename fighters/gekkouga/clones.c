@@ -897,7 +897,7 @@ void gk_channel()
         flags = flags | 0x40;             // clone delay: he is frozen (hitlag): their playback pauses (no history kept)
     }
     flags = flags | gk_vi(13) * 256;      // aligned kick v1 package: the effects' epoch (a change: they fade theirs)
-    flags = flags | gk_vi(16) * 512;      // clone articles v1: their shuriken copies waiting for their claim (1 / 2)
+    flags = flags | gk_vi(57) * 512;      // clone articles v1: their shuriken copies waiting for their claim (1 / 2)
     WorkModule(0, gk_lx + 0, 0x0f000318);
     WorkModule(0, gk_ly + 0, 0x0f000319);
     WorkModule(0, gk_rx + 0, 0x0f00031a);
@@ -2053,7 +2053,7 @@ int gk_cl_diag()
 // v1", the slot table). 0 - 15 his own: 0 gk_fx_t, 1 gk_cursor_t, 2 gk_cl_why, 3 gk_cl_t, 4 gk_gen_req, 5 gk_hold_first
 // (moved out of the globals), 8 the clones' mode (0 formation, 1 the aligned kick, 2 split, 3 regrouping), 9 the kick
 // used this airtime, 10 the kick's clock, 11 its variant (1 tapped, 2 held), 12 the regroup's clock, 13 the clones' effects
-// epoch (flags 256), 14 his situation last frame (clone articles v1: 6 / 7, 15 - 18: there); 16 x b + k body b's
+// epoch (flags 256), 14 his situation last frame (clone articles v1: 6 / 7, 15, 57 - 59: there); 16 x b + k body b's
 // (1 the left-spawned clone, 2 the right-spawned one, 3 him): k 0 action, 1 frames in it, 2 motion kind, 3 its start
 // frame, 4 the command's seq, 5 facing, 6 X speed, 7 Y speed (his; the clones' are gk_lvy / gk_rvy), 8 flight frames
 // left, 9 air jumps used, 10 smash charge, 11 smash chain, 12 tilted (the kick), 13 aux (smash type + 8 x auto / the
@@ -3615,8 +3615,8 @@ void gk_land_fx()
 // - his water shuriken (neutral special's shot, with its charge): right after his shot, one generated and shot per clone
 //   (ArticleModule 0x2710 / 0x2719 on article 0, as his); each copy (weapons/shuriken.c) claims a clone from the channel's
 //   bits 512 / 1024 (slot 16, kept 3 frames) and its claim bits in his VAR_30 (64 / 128), and moves by that clone's offset
-// Slots: 6 / 7 his skeleton's place, 15 the clones' skeletons still to ask for (1 / 2), 16 the shuriken copies waiting
-// (1 / 2), 17 their frames left, 18 the levels asked for so far
+// Slots: 6 / 7 his skeleton's place, 15 the clones' skeletons still to ask for (1 / 2), 57 the shuriken copies waiting
+// (1 / 2), 58 their frames left, 59 the levels asked for so far (57 - 63: his body's k 9 - 15, unused)
 // ===================================================================
 int gk_art_clones()
 {
@@ -3648,7 +3648,7 @@ void gk_sk_stack(float x, float y)
     fx = x;
     fy = y;
     gk_svi(15, b);
-    gk_svi(18, 0);
+    gk_svi(59, 0);
     WorkModule(0, fx + 0, 0x0f000386);
     WorkModule(0, fy + 0, 0x0f000387);
 }
@@ -3673,8 +3673,8 @@ void gk_sk_queue()
         c = 0x2;
     }
     gk_svi(15, b - c);
-    lv = gk_vi(18) + 1;
-    gk_svi(18, lv);
+    lv = gk_vi(59) + 1;
+    gk_svi(59, lv);
     x = WorkModuleF(0, 0x0f000386);
     y = WorkModuleF(0, 0x0f000387) + 24.0f * (float)lv;
     WorkModule(0, (float)(lv + 1) + 0, 0x0f00030f);
@@ -3696,8 +3696,8 @@ void gk_sh_copies()
     {
         return;
     }
-    gk_svi(16, b);
-    gk_svi(17, 3);
+    gk_svi(57, b);
+    gk_svi(58, 3);
     if (b & 0x1)
     {
         r = ArticleModule(0x2710, 0);
@@ -3713,14 +3713,14 @@ void gk_sh_copies()
 void gk_sh_tick()
 {
     int t;
-    t = gk_vi(17);
+    t = gk_vi(58);
     if (t <= 0)
     {
         return;
     }
-    gk_svi(17, t - 1);
+    gk_svi(58, t - 1);
     if (t - 1 <= 0)
     {
-        gk_svi(16, 0);
+        gk_svi(57, 0);
     }
 }

@@ -496,8 +496,8 @@ def msc_tests(mscsb, src):
     m2.setg('gk_lw_charge', 120)
     m2.setg('gk_smash', 33)
     frames(m2, 1, st=0xB2)
-    check('the smash charge survives a KO / respawn (the down special\'s: 0 again)', (m2.g('gk_smash'), m2.g('gk_lw_charge')),
-          (33, 0))
+    check('clone articles v1 package (the user: a KO clears the stored smash charge too; v1 - aligned kick v1: kept): the '
+          'smash charge 0 after a KO / respawn, the down special\'s 0', (m2.g('gk_smash'), m2.g('gk_lw_charge')), (0, 0))
     frames(m2, 1, st=0x14F)
     check('the match\'s start (Entry 0x14F): every charge from 0', (m2.g('gk_smash'), m2.g('gk_lw_charge')), (0, 0))
 
@@ -1452,6 +1452,138 @@ def kick_data_tests(out, user):
     check('aligned kick: his own kick scripts unchanged (the 0x2100001C branch on him: his MSC sets the flag)',
           [acmd.fmt_script(bg.scripts[acmd.crc(n)]) == acmd.fmt_script(hg.scripts[acmd.crc(n)]) for n in GB.KICK_SCRIPTS],
           [True, True])
+
+
+def clone_articles_tests(mscsb, src, sk_mscsb, sh_mscsb, cl_mscsb):
+    """clone articles v1 (README "Clone articles v1"): his skeleton request then the clones' (one a frame, stacked levels),
+    their seating (skeleton.mscsb), his shot's shuriken copies (gekkouga.mscsb) and their claim / move (shuriken.mscsb),
+    the clones' hitboxes cleared on every new motion (clone.mscsb), the KO's resets (the user)"""
+    # ---- his side: the skeleton queue
+    m, g = ak_setup(mscsb, src)
+    g.log = []
+    m('gk_sk_spawn', f2i(36.0), f2i(10.0))
+    req = [(g.vars.get(0x0F00030F), g.vars.get(0x0F000311), [x for x in g.log if x[0] == 'article'])]
+    for _ in range(2):
+        g.vars[0x0F00030F] = 0.0                     # claimed (the executable clears his VAR_15)
+        g.log = []
+        frames(m, 1)
+        req.append((g.vars.get(0x0F00030F), g.vars.get(0x0F000311), [x for x in g.log if x[0] == 'article']))
+    g.vars[0x0F00030F] = 0.0
+    g.log = []
+    frames(m, 1)
+    check('clone articles: his side special\'s skeleton (VAR_15 1: level 0, at its place), then each frame after the last '
+          'was claimed the clones\' (VAR_15 2 / 3: levels 1 / 2, Y + 24 / + 48), article 8 each; then nothing',
+          req + [[x for x in g.log if x[0] == 'article']],
+          [(1.0, 10.0, [('article', 0x2710, 8)]), (2.0, 34.0, [('article', 0x2710, 8)]), (3.0, 58.0, [('article', 0x2710, 8)]), []])
+    m2, g2 = ak_setup(mscsb, src)
+    m2.setg('gk_alive', 2)
+    m2('gk_sk_spawn', f2i(36.0), f2i(10.0))
+    g2.vars[0x0F00030F] = 0.0
+    frames(m2, 1)
+    lv1 = g2.vars.get(0x0F00030F)
+    g2.vars[0x0F00030F] = 0.0
+    g2.log = []
+    frames(m2, 1)
+    check('... one clone out (the right one): its skeleton level 1, nothing more', (lv1, [x for x in g2.log if x[0] == 'article']),
+          (2.0, []))
+    m3, g3 = ak_setup(mscsb, src)
+    frames(m3, 1)
+    m3('gk_sk_spawn', f2i(36.0), f2i(10.0))
+    frames(m3, 6)
+    check('... not claimed in time (5 frames): the queue dropped', m3('gk_vi', 15), 0)
+    # ---- his side: the shuriken copies
+    m, g = ak_setup(mscsb, src)
+    g.log = []
+    m('gk_sh_copies')
+    frames(m, 1)
+    fl = (int(g.vars.get(0x0F00031F)) - 4747000) // 512 % 4
+    frames(m, 3)
+    fl2 = (int(g.vars.get(0x0F00031F)) - 4747000) // 512 % 4
+    check('clone articles: his shot: one shuriken generated and shot per clone out (article 0: 0x2710 then 0x2719, twice); the '
+          'channel\'s flags 512 + 1024 (copies waiting) for 3 frames, then cleared',
+          ([x for x in g.log if x[0] == 'article'], fl, fl2),
+          ([('article', 0x2710, 0), ('article', 0x2719, 0), ('article', 0x2710, 0), ('article', 0x2719, 0)], 3, 0))
+    # ---- the KO (the user: the stored smash charge too)
+    m, g = ak_setup(mscsb, src)
+    m.setg('gk_smash', 90)
+    m.setg('gk_chain_req', 2)
+    m('gk_bsi', 1, 10, 60)
+    frames(m, 1, 0xB1)
+    check('KO: the stored smash charge 0 (the user; until now kept across stocks), a chain asked for 0, the split clones\' '
+          'charges 0', (m.g('gk_smash'), m.g('gk_chain_req'), m('gk_bvi', 1, 10)), (0, 0, 0))
+    # ---- the skeleton's seat (skeleton.mscsb)
+    k = MSC(sk_mscsb, GB.SKELETON_MSC)
+    kg = k.game
+    kg.floors = [(-1000.0, 1000.0, 10.0)]
+    kg.vars.update({0x0F000300: 3.0, 0x0F000301: 36.0, 0x0F000302: 34.0, 0x0F000303: 1.0, 0x0F000314: 1.0})
+    places = []
+    for t in range(6):
+        kg.vars.update({0x0F000311: 1.0, 0x0F000312: 36.0 + 0.58 * t, 0x0F000313: 10.0, 0x0F000315: float(t % 10)})
+        k('sk_frame')
+        places.append((round(kg.x, 2), round(kg.y, 2)))
+    check('the stacked skeleton (level 1): sits on the one below (its x, its y + 24) while it runs',
+          places[1:], [(round(36.0 + 0.58 * t, 2), 34.0) for t in range(1, 6)])
+    ys = []
+    for t in range(6, 40):
+        kg.vars.update({0x0F000311: 1.0, 0x0F000315: 5.0})   # its counter stale: past the blast zone
+        k('sk_frame')
+        ys.append(kg.y)
+    check('... the one below stale 2 frames (gone without a word): it falls (his gravity) and lands on the floor, then runs',
+          (ys[0], ys[2] < ys[1], ys[-1]), (34.0, True, 10.0))
+    # ---- the shuriken copies (shuriken.mscsb)
+    def shur(beat, wait):
+        sm = MSC(sh_mscsb, GB.SHURIKEN_MSC)
+        sg = sm.game
+        sh = {0x0F000348 + 7: 4747003.0 + 512 * wait, 0x0F000348 + 6: float(beat), 0x0F000348 + 0: -14.0,
+              0x0F000348 + 1: 10.0, 0x0F000348 + 2: 14.0, 0x0F000348 + 3: 12.0}
+
+        def sysf(sid, a, old=sg.sys):
+            if sid == 0x17 and a[0] == 0 and a[1] in sh:
+                return f2i(sh[a[1]])
+            if sid == 0x17 and a[0] == 0 and 0x0F000024 <= a[1] <= 0x0F000027:
+                return f2i({0x0F000024: 0.0, 0x0F000025: 10.0}.get(a[1], 0.0))
+            if sid == 0x16 and a[0] == 0 and a[2] in sh:
+                sh[a[2]] = fv(a[1])
+                return 0
+            return old(sid, a)
+        sg.sys = sysf
+        sg.x, sg.y = 3.0, 18.0
+        return sm, sg, sh
+    sm, sg, sh = shur(3, 3)
+    sm.vm.g[4] = 0
+    sm('sh_frame')
+    sm2, sg2, sh2 = shur(sh[0x0F000348 + 6], 3)
+    sm2.vm.g[4] = 0
+    sm2('sh_frame')
+    sm.vm.g[4] = 2
+    sm('sh_frame')
+    p1 = (sg.x, sg.y)
+    sm('sh_frame')
+    check('a copy in its first frame claims the first clone waiting (the left one: claim bit 64 in his VAR_30), the next '
+          'copy the other (128); shot (status 2) it moves once by its clone\'s place minus his (-14 - 0, 10 - 10)',
+          (sm.g('sh_clone'), sm2.g('sh_clone'), sh2[0x0F000348 + 6], p1, (sg.x, sg.y)), (1, 2, 3.0 + 64 + 128, (-11.0, 18.0), (-11.0, 18.0)))
+    sm3, sg3, sh3 = shur(0, 0)
+    for _ in range(3):
+        sm3('sh_frame')
+    sm3.vm.g[4] = 2
+    sm3('sh_frame')
+    check('his own shuriken (no copy waiting): not a copy, not moved', (sm3.g('sh_clone'), sg3.x, sg3.y), (0, 3.0, 18.0))
+    # ---- the clone's hitboxes cleared on a new motion (the user: the kick's hitboxes never cleared)
+    c = MSC(cl_mscsb, GB.CLONE_MSC)
+    cg = c.game
+    atk = []
+
+    def sysc(sid, a, old=cg.sys):
+        if sid == 0x2E:
+            atk.append(a[0])
+        return old(sid, a)
+    cg.sys = sysc
+    c.setg('cl_motion', 0x28D)
+    c('cl_move_end', 0x24)
+    c('cl_move_end', 0x24)
+    check('the clone: every new motion (the kick -> Fall) and every restart clears its hitboxes first (AttackModule 0x2719: '
+          'its kick\'s FRAME 20 is past its 20-frame motion; a landing / cancel / command never reaches a Remove)',
+          atk, [0x2719, 0x2719])
 
 
 def tilt_chain_tests(mscsb, src):
@@ -2922,6 +3054,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 33:   # burn tint v1: the exes only
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
+    if len(earlier) == 36:   # clone articles v1: the exes and the MSCs
+        want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 35:   # aligned kick v1: data only
         want_top = ['INSTALL_TO_data', 'README.txt']
     if len(earlier) == 34:   # skeleton v1.7: the exes, the skeleton's data and his bank, test data
@@ -2962,7 +3096,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('update: nothing in INSTALL_TO_data but the built files',
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want and
                      n not in again), [])
-        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35):
+        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 21:
             check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
@@ -3024,6 +3158,15 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               'places delayed) and the clone\'s MSC (its playback delayed)',
               sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
               ['fighter/gekkouga/script/msc/clone/clone.mscsb', 'fighter/gekkouga/script/msc/gekkouga.mscsb'])
+    if z1 and len(earlier) == 36:
+        check('clone articles v1: INSTALL_TO_data: his MSC (the clones\' skeletons / shuriken copies, the KO\'s smash charge), '
+              'the clone\'s (its hitboxes cleared on a new motion), the skeleton\'s (its seat), his shuriken\'s (new: the '
+              'copies\' claim and move); TEST_ONLY: A_release',
+              (sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+               sorted({n.split('/')[1] for n in names if n.startswith('TEST_ONLY_INSTALL_TO_code/') and n.count('/') > 1})),
+              (['fighter/gekkouga/script/msc/clone/clone.mscsb', 'fighter/gekkouga/script/msc/gekkouga.mscsb',
+                'fighter/gekkouga/script/msc/shuriken/shuriken.mscsb', 'fighter/gekkouga/script/msc/skeleton/skeleton.mscsb'],
+               ['A_release']))
     if z1 and len(earlier) == 35:
         check('aligned kick v1: INSTALL_TO_data: his MSC (the kick, split clones, the regroup, the effects epoch, the charge '
               'reset at a KO), the clone\'s MSC (free mode, the epoch) and scripts (the kick); the exe is skeleton v1.7\'s',
@@ -3285,7 +3428,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 36)) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 37)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -3322,6 +3465,9 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_skeleton_v1_7', 'down special', 'left', 'right', 'straight up', 'held', 'tapped', '64', '46.5', '78',
          'swap', 'Fall', 'once', 'split', 'mirror', 'aerial', 'smash', 'jump', 'landing', 'shield', 'regroup', 'stance',
          'effect', 'KO', 'charge', 'smash charge', 'unconfirmed') if len(earlier) == 35 else \
+        ('greninja_aligned_kick_v1', 'exe_v46z_gkb11', 'skeleton', 'stack', '24', 'level', 'falls', 'shuriken', 'charge',
+         'Hydro Pump', 'native', 'side special', 'hitbox', 'kick', 'smash charge', 'KO', 'A_release', 'unconfirmed') \
+        if len(earlier) == 36 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -3334,7 +3480,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
 
 
 def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=False, b2=False, gkb5=False, gkb6=False,
-                gkb7=False, gkb8=False, gkb9=False):
+                gkb7=False, gkb8=False, gkb9=False, gkb10=False):
     """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant; skeleton v1 the
     release and TEST_ONLY A_release (as the burn packages)"""
     import gekkouga_clone_cave as C
@@ -3353,6 +3499,7 @@ def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=
         drop |= {'skdist'} if sk12 or b2 or gkb5 or gkb6 or gkb7 else set()      # (skeleton v1.6's gkb8)
         drop |= {'btint'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 else set()   # (burn tint v1's gkb9)
         drop |= {'mark', 'sksnd'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 else set()   # (skeleton v1.7's gkb10)
+        drop |= {'cart'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 or gkb10 else set()   # (clone articles v1's gkb11)
         variants = C.VARIANTS if not (sk12 or b2 or gkb5 or gkb6 or gkb7) else \
             C.VARIANTS + (('G_pose', (C.RELEASE - {'sway'}) | {'pose'}),)       # (up to v1.5: + G_pose)
         return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE - drop)] + \
@@ -3373,7 +3520,8 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
     for f, src in ((os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c')),
                    (os.path.join(msc, 'clone', 'clone.mscsb'), GB.CLONE_MSC),
                    (os.path.join(msc, 'skeleton', 'skeleton.mscsb'), GB.SKELETON_MSC),
-                   (os.path.join(msc, 'firetrail', 'firetrail.mscsb'), GB.TRAIL_MSC)):
+                   (os.path.join(msc, 'firetrail', 'firetrail.mscsb'), GB.TRAIL_MSC),
+                   (os.path.join(msc, 'shuriken', 'shuriken.mscsb'), getattr(GB, 'SHURIKEN_MSC', ''))):
         if not os.path.exists(f):
             continue
         r = subprocess.run([sys.executable, os.path.join(HERE, 'msc_stack_check.py'), f, src], capture_output=True, text=True)
@@ -3386,7 +3534,8 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
         for member, b, dg, feats in exe_members(base, base_diag, v4, len(earlier) == 17, len(earlier) == 18,
                                                 len(earlier) >= 19, len(earlier) in (19, 20), len(earlier) == 21,
                                                 len(earlier) in (22, 23, 24, 25), len(earlier) in (26, 27, 28, 29),
-                                                len(earlier) == 30, len(earlier) in (31, 32), len(earlier) == 33):
+                                                len(earlier) == 30, len(earlier) in (31, 32), len(earlier) == 33,
+                                                len(earlier) in (34, 35)):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')
@@ -3410,7 +3559,7 @@ def main():
     FX_PKG = next((x[5:] for x in sys.argv[1:] if x.startswith('--fx=')), None)
     a = [x for x in sys.argv[1:] if not x.startswith('--v') and not x.startswith('--fx=')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
@@ -3435,6 +3584,10 @@ def main():
         firetrail_tests(os.path.join(msc, 'firetrail', 'firetrail.mscsb'), GB.TRAIL_MSC)
         trail_data_tests(out)
     script_tests(out, user)
+    if len(earlier) >= 36:
+        clone_articles_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'),
+                             os.path.join(msc, 'skeleton', 'skeleton.mscsb'), os.path.join(msc, 'shuriken', 'shuriken.mscsb'),
+                             os.path.join(msc, 'clone', 'clone.mscsb'))
     if len(earlier) >= 35:
         aligned_kick_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
         aligned_kick_more_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))

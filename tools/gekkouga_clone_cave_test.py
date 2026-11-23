@@ -1761,6 +1761,8 @@ def skeleton_checks(e, info, diag):
         e.setw(A['btab'] + 16 * kk, 0)
     if 'sktouch' in F:
         mark_checks(e, info, frame, log_hit, inst, sv, slog, vic, diag, logs, sacc, row)
+    if 'cart' in F:
+        cart_checks(e, info, frame, sv, sacc, post)
     # a missing .lvd: no collision, failed (3); the handles still released
     st['file'] = 0
     e.setw(gm + 0xF0, 0)
@@ -1895,6 +1897,45 @@ def mark_checks(e, info, frame, log_hit, inst, sv, slog, vic, diag, logs, sacc, 
                   'again, then #2 (93)', (first, again, [x[:5] for x in logs('gk_fsn')]),
                   ([(3, 1, 91, 7, 0xABCD00)], [], [(3, 2, 93, 0, 0xABCD00)]))
     sv[C.SK_VAR_PHASE] = 2.0
+
+
+def cart_checks(e, info, frame, sv, sacc, post):
+    """clone articles v1 (feature cart): the claim's level (his VAR_15 - 1), the stack table, the seat VARs, the latch banks"""
+    A = info['A']
+    got = []
+    for req in (1.0, 2.0, 3.0):
+        sv.update({C.SK_VAR_SLOT: 0.0, C.SK_VAR_LEVEL: 9.0, C.SK_VAR_PHASE: 0.0})
+        e.vars = {C.GK_VAR_SKREQ: req, C.GK_VAR_SKX: 40.0, C.GK_VAR_SKY: 36.0, C.GK_VAR_SKDIR: 1.0}
+        frame()
+        got.append((sv[C.SK_VAR_SLOT], sv.get(C.SK_VAR_LEVEL), e.vars[C.GK_VAR_SKREQ]))
+    e.vars = {}
+    check('clone articles v1: the claim: his VAR_15 1 / 2 / 3 -> its level 0 (his) / 1 / 2 (his clones\', stacked), his '
+          'request cleared', got, [(3.0, 0.0, 0.0), (3.0, 1.0, 0.0), (3.0, 2.0, 0.0)])
+    seat = A['sk_seat']
+    base = seat + ((3 - 1) * C.SK_LEVELS) * 16
+    low = e.alloc(0x40, b'\0')
+    e.setw(base, low)
+    e.setw(base + 4, 17)
+    e.mu.mem_write(base + 8, struct.pack('>2f', 30.0, 10.0))
+    sv.update({C.SK_VAR_LEVEL: 1.0, C.SK_VAR_PHASE: 1.0})
+    e.mu.mem_write(post + 0x10, struct.pack('>2f', 30.0, 34.0))
+    frame()
+    me = base + 16
+    check('clone articles v1: level 1 running: its entry (its accessor, its counter 1, x / y), the one below\'s read: VAR_17 '
+          '1, VAR_18 / 19 its x / y (30, 10), VAR_21 its counter mod 10 (7)',
+          ((e.w(me), e.w(me + 4), struct.unpack('>2f', bytes(e.mu.mem_read(me + 8, 8)))),
+           [sv.get(k) for k in (C.SK_VAR_SEAT, C.SK_VAR_SEATX, C.SK_VAR_SEATY, C.SK_VAR_SEATN)]),
+          ((sacc, 1, (30.0, 34.0)), [1.0, 30.0, 10.0, 7.0]))
+    e.setw(base, 0)
+    frame()
+    check('clone articles v1: the one below gone (exploded / smoked: its entry let go): VAR_17 0 (it falls)',
+          sv.get(C.SK_VAR_SEAT), 0.0)
+    sv[C.SK_VAR_PHASE] = 2.0
+    frame()
+    check('clone articles v1: exploded: its own entry let go', e.w(me), 0)
+    check('clone articles v1: a latch bank per level (3 x the attackers of every owner)',
+          A['sk_seat'] - A['sk_latch'] >= C.SLOTS * C.SK_LATCH * 8 * C.SK_LEVELS, True)
+    sv.update({C.SK_VAR_LEVEL: 0.0, C.SK_VAR_PHASE: 2.0})
 
 
 def pose_checks(e, info, diag):
