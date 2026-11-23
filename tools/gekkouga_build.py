@@ -683,6 +683,67 @@ def add_rolloff(game):
 CLONE_JOINT25_TESTS = ()          # (skeleton v1.4: clone_sword_rhave / clone_sword_thrown; settled: none)
 
 
+# ---------------------------------------------------------------- tuning v1 (the user: "Can you make forward smash longer
+# (not bigger) so it reaches Donkey Kong ... remove the shield break effect from neutral air and make it 25% larger, also
+# remove the forward tilt teleporting code")
+FTILT_TELEPORT = 0x0F00000C       # the position variable his attacks3 set to 12 at its hit (his own script, the user's
+                                  # data): "put the opponent 12 in front of self" (docs/position-variables.md): the teleport
+NAIR_SHIELDBREAK = 0x0F0000B2     # LASTHIT_STATUS: his neutral air's second hit set the fighter it hit to 89 (0x59, shield
+                                  # break: its burst, its dizziness)
+NAIR_SCALE = 1.25                 # its hitboxes' and its burst / fire ring's size
+FSMASH_EXTRA = 30.0               # forward smash's blade this much longer (its width the same): a second water sword
+                                  # (0x3300007, the same size) from this far along the blade, its trail and its tip flame
+                                  # at the new end (55 -> 85), a hitbox further out (the first's size, at 32.5 + 30)
+FSMASH_BLADE = 55.0
+
+
+def remove_cmds(cmds, keep):
+    """cmds without those keep() refuses, every True / Else / False block that held one shorter by its words"""
+    while True:
+        pos, at = [], 0
+        for c in cmds:
+            pos.append(at)
+            at += 1 + len(c.params)
+        k = next((i for i, c in enumerate(cmds) if not keep(c)), None)
+        if k is None:
+            return
+        w = 1 + len(cmds[k].params)
+        for j, c in enumerate(cmds):
+            if c.name in ('True', 'Else', 'False') and pos[j] < pos[k] < pos[j] + int(c.params[0]):
+                c.params[0] = int(c.params[0]) - w
+        del cmds[k]
+
+
+def tune(game, effect):
+    import acmd
+    remove_cmds(game.scripts[acmd.crc('attacks3')],
+                lambda c: not (c.name == 'SET_FLOAT' and int(c.params[1]) == FTILT_TELEPORT))
+    s = game.scripts[acmd.crc('attackairn')]
+    remove_cmds(s, lambda c: not (c.name == 'SET_FLOAT' and int(c.params[1]) == NAIR_SHIELDBREAK))
+    for c in s:
+        if c.name in HITBOXES:
+            c.params[param(c, 'Size')] = round(float(c.params[param(c, 'Size')]) * NAIR_SCALE, 4)
+    for c in effect.scripts[acmd.crc('attackairn')]:
+        if 'Size' in c.info['syntax']:
+            c.params[param(c, 'Size')] = round(float(c.params[param(c, 'Size')]) * NAIR_SCALE, 4)
+    g = game.scripts[acmd.crc('attacks4')]
+    h0 = next(c for c in g if c.name in HITBOXES and int(c.params[param(c, 'ID')]) == 0)
+    h3 = acmd.Command(h0.ident, list(h0.params))
+    h3.params[param(h3, 'ID')] = 3
+    h3.params[param(h3, 'Y')] = round(float(h0.params[param(h0, 'Y')]) - FSMASH_EXTRA, 4)
+    insert_cmds(g, g.index(h0) + 1, [h3])
+    e = effect.scripts[acmd.crc('attacks4')]
+    for c in e:
+        if c.name == 'External_Graphic' and int(c.params[0]) == FIRE_TIP:
+            c.params[param(c, 'Y')] = -(FSMASH_BLADE + FSMASH_EXTRA)
+        if c.name == 'Sword_Glow':
+            c.params[param(c, 'Y2')] = -(FSMASH_BLADE + FSMASH_EXTRA)
+    k = next(i for i, c in enumerate(e) if c.name == 'External_Graphic' and int(c.params[0]) == SWORD)
+    c2 = acmd.Command(e[k].ident, list(e[k].params))
+    c2.params[param(c2, 'Y')] = -FSMASH_EXTRA
+    insert_cmds(e, k + 1, [c2])
+
+
 def cmd_acmd(user_dir, vanilla_model, out_dir, test_only=None):
     """user_dir: his script/animcmd (body/ game, effect, sound, expression, motion.mtable); vanilla_model: his
     model/body/c00 (model.jtb / model.vbn for the clone's joints); out_dir: script/animcmd of the package"""
@@ -693,6 +754,7 @@ def cmd_acmd(user_dir, vanilla_model, out_dir, test_only=None):
     n = scale_smash(game, effect)
     add_rolloff(game)
     tips = add_fire_tips(effect) if FIRE_TIPS else 0
+    tune(game, effect)
     ob = os.path.join(out_dir, 'body')
     os.makedirs(ob, exist_ok=True)
     game.save(os.path.join(ob, 'game.bin'))
@@ -1171,10 +1233,16 @@ TR_SCRIPTS = ('FireTrailS4', 'FireTrailHi4', 'FireTrailLw4')   # its motion kind
 # its hitboxes (bone 0, held from the motion's first frame): along each smash's path, where its fire is (firetrail.c
 # tr_fx_*): (Z forward along its way, Y up, size). No knockback (KBG / FKB / BKB 0), no hitlag, no flinch, no hit effect,
 # 0.1 % (a hit to log: the burn is the exe's trail row, 0.25 % every 15 frames for 3 s = 3 %), re-hit every TR_REHIT
-TR_BOXES = {'FireTrailS4': ((14.0, 5.0, 7.0), (26.0, 5.0, 7.0), (38.0, 5.0, 7.0)),
-            'FireTrailHi4': ((6.0, 5.0, 7.0), (-6.0, 5.0, 7.0), (14.0, 5.0, 7.0), (-14.0, 5.0, 7.0)),   # skeleton v1.4: on
-                                                                       # its flames under it (v1 - fire trail fix v1: a column)
-            'FireTrailLw4': ((14.0, 5.0, 8.0), (30.0, 5.0, 8.0), (-14.0, 5.0, 8.0), (-30.0, 5.0, 8.0))}
+TR_BOXES_V1 = {'FireTrailS4': ((14.0, 5.0, 7.0), (26.0, 5.0, 7.0), (38.0, 5.0, 7.0)),
+               'FireTrailHi4': ((6.0, 5.0, 7.0), (-6.0, 5.0, 7.0), (14.0, 5.0, 7.0), (-14.0, 5.0, 7.0)),   # skeleton v1.4:
+                                                                       # on its flames under it (v1 - fire trail fix v1: a column)
+               'FireTrailLw4': ((14.0, 5.0, 8.0), (30.0, 5.0, 8.0), (-14.0, 5.0, 8.0), (-30.0, 5.0, 8.0))}
+# tuning v1 (the user: "please make the trail fire more full, for each smash attack and match them better"): the denser
+# flames (firetrail.c tr_fx_*: forward 12 from 8 to 85 along the longer forward smash, down 8 each side 6 - 55 along its
+# sweep, up 4 each side 4 - 22 under its geyser) covered end to end
+TR_BOXES = {'FireTrailS4': tuple((12.0 + 12.0 * i, 5.0, 7.0) for i in range(7)),
+            'FireTrailHi4': tuple((sg * z, 5.0, 7.0) for z in (6.0, 15.0, 22.0) for sg in (1.0, -1.0)),
+            'FireTrailLw4': tuple((sg * z, 5.0, 8.0) for z in (12.0, 26.0, 40.0, 52.0) for sg in (1.0, -1.0))}
 TR_REHIT = 35
 TR_HIT = dict(Damage=0.1, Angle=361, KBG=0, FKB=0, BKB=0, Effect=5, Hitlag=0.0, SDI=0.0, Clang=0, Rebound=0,
               ShieldDamage=0, SFXLevel=0, SFXType=0, Rehit=TR_REHIT, DisableHitlag=1, NoGFX=1, Flinchless=1)

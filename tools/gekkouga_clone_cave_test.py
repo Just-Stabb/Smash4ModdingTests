@@ -2201,9 +2201,27 @@ def panel_checks(e, info, diag):
           [('goto', clips['gk_fill_mc'], 5)])
     check('v7: ... the fill stopped there (+0x9C = 1)', struct.unpack('>H', bytes(e.mu.mem_read(clips['gk_fill_mc'] + 0x9C, 2)))[0], 1)
     r = run2(1100)
-    check('v7: the next frame the rings turn on (2 x speed, kept in 0-360), the full charge on frame 11',
-          [c[2] for c in r if c[0] in ('rotate', 'goto')],
-          [round((2 * sp) % 360.0, 2) for sp in C.GAUGE_SPEEDS] + [11])
+    if 'gready' not in info['feats']:
+        check('v7: the next frame the rings turn on (2 x speed, kept in 0-360), the full charge on frame 11',
+              [c[2] for c in r if c[0] in ('rotate', 'goto')],
+              [round((2 * sp) % 360.0, 2) for sp in C.GAUGE_SPEEDS] + [11])
+    else:
+        check('tuning v1 (gready): the charge full (1100): READY: the rings turn %d times a frame (2, 3, 4 x speed), the '
+              'fill on frame 11, the pulse\'s first colour (gold)' % C.READY_SPIN,
+              ([c[2] for c in r if c[0] in ('rotate', 'goto')], [c for c in r if c[0] == 'colour']),
+              (sum(([round((n * sp) % 360.0, 2) for sp in C.GAUGE_SPEEDS] + [11] for n in (2, 3, 4)), []),
+               [('colour', clips['gkgauge_mc'], A['ctf_ready'] + 0)]))
+        cols = [[c[2] for c in run2(1100) if c[0] == 'colour'][0] for _ in range(70)]
+        steps = [(x - A['ctf_ready']) // 12 for x in cols]
+        check('... the pulse: a step every %d frames up 0 - 7 and down 7 - 0 (a cycle of 64 frames, about a second)' %
+              C.READY_STEP, (steps, max(steps), steps.count(7)),
+              ([min(q, 15 - q) for q in (((i + 2) // C.READY_STEP) % 16 for i in range(70))], 7, 2 * C.READY_STEP))
+        check('... the ready colours: gold, alpha 70 -> 98 %, lit up to white-hot', bytes(e.mu.mem_read(A['ctf_ready'], 96)),
+              b''.join(struct.pack('>4B4h', *c) for c in C.READY_COLOURS))
+        r = run2(1099)
+        check('... not full (1099): mode 1\'s cyan, the rings once, the pulse back to its start',
+              ([c for c in r if c[0] == 'colour'], len([c for c in r if c[0] == 'rotate']), e.w(A['gk_pulse'])),
+              ([('colour', clips['gkgauge_mc'], A['ctf'] + 12)], 4, 0))
     check('v7: the ability (2050): blue', [c for c in run2(2050) if c[0] == 'colour'], [('colour', clips['gkgauge_mc'], A['ctf'] + 24)])
     check('v7: nothing (0): the gauge hidden, no ring calls', run2(0), [('visible', ko, 0), ('visible', clips['gkgauge_mc'], 0)])
     check('v7: the names interned each frame from the atom pool', [c for c in e.calls if c[0] == 'intern'][:1], [('intern', 'gkgauge_mc', True)])

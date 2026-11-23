@@ -629,7 +629,10 @@ int tr_life() { return 180; }             // 3 s (the user)
 int tr_fade() { return 15; }              // its fire fades over its last frames (the set's fade 1 / 15)
 int tr_wait_max() { return 30; }          // never claimed: removed
 int tr_fx() { return 0x330001c; }         // his bank's PtcGekkougaFireTrail (fire_ground_10: its base on the point)
-float tr_fx_size() { return 1.0f; }
+// tuning v1 (the user: "please make the trail fire more full, for each smash attack and match them better"): denser,
+// overlapping flames (7 apart or less: the flame ~14 wide), their sizes varied 0.85 - 1.15 (k x 3 mod 4), their flipbooks
+// out of step (one made a frame)
+float tr_fx_size(int k) { return 0.85f + 0.1f * (float)((k * 3) % 4); }
 
 float tr_var(int n)
 {
@@ -646,13 +649,13 @@ int tr_fx_count()
 {
     if (tr_type == 0x1)
     {
-        return 5;
+        return 12;                        // forward smash: 8 - 85 ahead (its blade 85 long: tuning v1)
     }
     if (tr_type == 0x2)
     {
-        return 4;
+        return 8;                         // up smash: 4 - 22 each side under its geyser
     }
-    return 8;
+    return 16;                            // down smash: 6 - 55 each side along its sweep
 }
 
 // fire trail fix v1: forward along its way (joint 0's local Z)
@@ -662,9 +665,9 @@ float tr_fx_dz(int k)
     {
         if (k % 2 == 0)
         {
-            return 6.0f + 8.0f * (float)(k / 2);
+            return 4.0f + 6.0f * (float)(k / 2);
         }
-        return -6.0f - 8.0f * (float)(k / 2);
+        return -4.0f - 6.0f * (float)(k / 2);
     }
     return tr_fx_dx(k);
 }
@@ -673,7 +676,7 @@ float tr_fx_dx(int k)
 {
     if (tr_type == 0x1)
     {
-        return 10.0f + 8.0f * (float)k;
+        return 8.0f + 7.0f * (float)k;
     }
     if (tr_type == 0x2)
     {
@@ -681,9 +684,9 @@ float tr_fx_dx(int k)
     }
     if (k % 2 == 0)
     {
-        return 10.0f + 9.0f * (float)(k / 2);
+        return 6.0f + 7.0f * (float)(k / 2);
     }
-    return -10.0f - 9.0f * (float)(k / 2);
+    return -6.0f - 7.0f * (float)(k / 2);
 }
 
 float tr_fx_dy(int k)
@@ -737,7 +740,7 @@ void tr_frame()
     if (tr_fx_n < tr_fx_count())          // a flame a frame (their flipbooks out of step)
     {
         dx = tr_fx_dz(tr_fx_n);
-        EffectModule(0x2717, tr_fx(), 0, 0, tr_fx_dy(tr_fx_n), dx, 0, 0, 0, tr_fx_size(), 0);
+        EffectModule(0x2717, tr_fx(), 0, 0, tr_fx_dy(tr_fx_n), dx, 0, 0, 0, tr_fx_size(tr_fx_n), 0);
         tr_fx_n += 1;
     }
     tr_t += 1;

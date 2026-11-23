@@ -104,7 +104,8 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
-                      'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2',
+                      'gready'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -372,6 +373,12 @@ GAUGE_COLOURS = ((100, 100, 100, 100, 0, 0, 0, 0), (100, 100, 100, 100, 0, 0, 0,
 # round gauge v1.1 (feature gauge2; the user: the gauge showed white): the charge (mode 1) cyan; the diag's S4GB line also
 # gives the gauge clip it found (0: none: the KO meter's way)
 GAUGE_COLOURS2 = (GAUGE_COLOURS[0], (100, 25, 90, 100, 0, 0, 0, 0)) + GAUGE_COLOURS[2:]
+# tuning v1 (feature gready; the user: "please make it more clear on the UI when the clone gauge is charged"): the charge
+# full (mode 1, 100) reads READY: gold, pulsing once a second (READY_COLOURS: 8 steps up and down, 4 frames each: its alpha
+# 70 -> 98 %, its red / green / blue lit up to white-hot), its rings turning three times as fast (gk_rings 3 times a frame)
+READY_COLOURS = tuple((70 + 4 * k, 100, 85, 30, 0, 12 * k, 10 * k, 2 * k) for k in range(8))
+READY_STEP = 4                    # frames a step (16 steps a cycle: 64 frames)
+READY_SPIN = 3
 # v7: the panel's colour multipliers are 0-100 (docs/native-notes.md "Panel alpha": 255 hid Hero's menu): v6's 0xFF
 # alpha hid the meter (the user's "no bar shows")
 VT_BASE = 0xFC                    # v6: the clone's specializer (its singleton's vtable) is a copy of the moon's, not
@@ -833,7 +840,7 @@ TR_VAR_SLOT, TR_VAR_TYPE, TR_VAR_X, TR_VAR_Y, TR_VAR_DIR, TR_VAR_CTX = (0x0F0003
 assert all(burn_total(m, sh, f) >= f - 1e-4 for m in BURN_MOVES + (TR_ROW, SK_TOUCH_ROW) for sh in (False, True)
            for f in (BURN_MIN_TOTAL, BURN_MIN_TOTAL_OLD)), 'a burn under the floor'
 RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1', 'tiers', 'gmupd', 'skbody',
-                     'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+                     'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2', 'gready'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
 # swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose); burn v2:
 # + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2 - floor1); burn
@@ -3289,6 +3296,8 @@ def build(rpx, diag=False, feats=None):
     A['gk_namestr'] = alloc(sum(len(n) + 1 for n in GAUGE_NAMES) + 4, 4)
     A['gk_atoms'] = alloc(4 * len(GAUGE_NAMES), 4)
     A['gk_angles'] = alloc(16 * SLOTS, 4)             # 4 ring angles per panel slot
+    A['ctf_ready'] = alloc(12 * len(READY_COLOURS), 4) if 'gready' in feats else 0   # tuning v1: the ready pulse
+    A['gk_pulse'] = alloc(4 * SLOTS, 4) if 'gready' in feats else 0
     A['gk_speeds'] = alloc(16, 4)
     A['gk_gaugelog'] = alloc(4 * SLOTS) if diag else 0
     A['consts'] = alloc(36)          # 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, the hitstop multiplier, 100.0, 360.0
@@ -3427,6 +3436,9 @@ def build(rpx, diag=False, feats=None):
     out.blob(A['ctf'], b''.join(struct.pack('>4B4h', *c) for c in (GAUGE_COLOURS2 if 'gauge2' in feats else GAUGE_COLOURS)),
              'gauge colours')
     out.blob(A['gk_tags'], bytes(4 * SLOTS), 'tag message countdowns')
+    if 'gready' in feats:
+        out.blob(A['ctf_ready'], b''.join(struct.pack('>4B4h', *c) for c in READY_COLOURS), 'gauge: the ready pulse colours')
+        out.blob(A['gk_pulse'], bytes(4 * SLOTS), 'gauge: the ready pulse frames per slot')
     out.blob(A['gk_plyr'], bytes(4 * SLOTS), 'cursor show bytes saved')
     out.blob(A['gk_clr'], bytes(4 + 4 * SLOTS), 'clears seen (burn v1.2)')
     if pose:
@@ -3474,7 +3486,7 @@ def build(rpx, diag=False, feats=None):
              ent_nodes=ENT_NODES, node_max=NODE_MAX, node_on=NODE_ON, node_min_x=NODE_MIN_X, node_min_y=NODE_MIN_Y,
              node_max_x=NODE_MAX_X, node_max_y=NODE_MAX_Y, team=TEAM_MOD,
              obj_max=HC_OBJ_MAX, am_data=AM_DATA, slot_size=SLOT_SIZE, slot_dmg=SLOT_DMG, wmotion=W_MOTION, mo_swing=MO_SWING, mi_sb=MI_SB, mi_nhb=MI_NHB, mm_swing=MM_SWING, mm_motion=MM_MOTION, plyc_blk=PLYC_BLK, plyc_show=PLYC_SHOW, plyc_id=PLYC_ID, plyc_alpha=PLYC_ALPHA, pm_scale=PM_SCALE, sk_remake=SK_REMAKE, npose=len(POSE_BONES), pose_min=POSE_MIN, mdl_mtx=MDL_MTX, mm_model=MM_MODEL, log_off=POSE_LOG_BONE * 0x30 + 0xC, nlatch=SLOTS * SK_LATCH * 2 * (SK_LEVELS if 'cart' in feats else 1), sk_bank=SLOTS * SK_LATCH * 8, sk_kind=SK_KIND, sk_lat=SK_LATCH, sk_lat8=SK_LATCH * 8, sk_nv=len(SK_VERTS), gm_vt_hi=SK_GM_VT >> 16, gm_vt_lo=SK_GM_VT & 0xFFFF, wground=0x2C, nbtab=SLOTS * BURN_CAP * 4, nbproc=(burn_contexts(feats) * BURN_ENTS + 3) // 4, clear_back=CLEAR_BACK, hm_count=HM_COUNT, hm_clear=HM_CLEAR, hm_groups=HM_GROUPS, hm_group=HM_GROUP,
-             hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4)
+             hm_objs=HM_OBJS, hm_objarr=HM_OBJARR, hm_recs=HM_RECS, nhurt=len(HURTBOXES), gkind=GK_KIND, pslot=PANEL_SLOT, tagresend=TAG_RESEND, s13b=SLOT13 + 4, s42b=SLOT42 + 4, s43b=SLOT43 + 4, rdy_shift=READY_STEP.bit_length() - 1)
     for nm in ('g1_desc', 'gk_hide', 'gk_desc', 'w_desc', 'gk_ft', 'gk_fs', 'gk_f42', 'gk_f43', 'gk_fl', 'gk_fd', 'hurt',
                'gk_ff', 'gk_fi', 'gk_fc', 'gk_fu', 'gk_lastf', 'gk_fj', 'gk_fp', 'gk_fv', 'gk_seen', 'gk_fx', 'gk_fb', 'ctf',
                'gk_gaugelog', 'gk_fz', 'gk_fw', 'gk_fm', 'gk_fn', 'gk_fh', 'hcbox', 'hcsize', 'btab', 'bproc', 'bmoves', 'bsum', 'bclock', 'gk_fba', 'gk_fbt', 'gk_fbr', 'gk_clr', 'pose_tab', 'pose_last', 'gk_ftp', 'sk_desc', 'gk_fcd', 'gk_fce', 'gk_fcf', 'gk_fcg', 'gk_fch', 'hyd_t', 'gk_fsg', 'gk_fsd', 'gk_fsv', 'gk_fse', 'gk_fss', 'gk_fsc', 'gk_fsf', 'gk_fsh', 'gk_fsx', 'gk_fsn', 'sk_seat', 'sk_lvd', 'sk_verts', 'sk_box', 'sk_nums', 'sk_k', 'sk_latch', 'gk_fbk', 'gk_fr', 'gk_fq', 'gk_fy', 'gk_fk', 'gk_fo', 'gk_tags', 'gk_plyr', 'gk_names', 'gk_atoms', 'gk_angles', 'gk_speeds'):
@@ -3509,6 +3521,9 @@ def build(rpx, diag=False, feats=None):
                  bfx_id_lo=BFX_ID & 0xFFFF, tr_ctx=TR_CTX, tr_ctx4=4 * TR_CTX, tr_ttlv=TR_TTL, tr_ctx0=TR_CTX0,
                  tr_reqs=TR_REQS, gk_var_tr_hi=GK_VAR_TR >> 16, gk_var_tr_lo=GK_VAR_TR & 0xFFFF,
                  tr_var_type_hi=TR_VAR_TYPE >> 16, tr_var_type_lo=TR_VAR_TYPE & 0xFFFF, nbfx=SLOTS + SLOTS * TR_CTX)
+    if 'gready' in feats:
+        for nm in ('ctf_ready', 'gk_pulse'):
+            p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
     if 'btint' in feats:
         for nm in ('bti_k', 'bti_st'):
             p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
@@ -5693,11 +5708,42 @@ gp_cshow:
         lis r4, %(ctf_hi)d
         addi r4, r4, %(ctf_lo)d
         mulli r0, r25, 12
-        add r4, r4, r0''' + call(PANEL_COLOUR) + '''
+        add r4, r4, r0''' + ('''
+        lis r11, %(gk_pulse_hi)d
+        addi r11, r11, %(gk_pulse_lo)d
+        slwi r12, r26, 2
+        li r10, 0                       # tuning v1: not ready: its pulse from the start
+        cmpwi r25, 1
+        bne gp_rdy0
+        cmpwi r28, 100
+        blt gp_rdy0
+        lwzx r10, r11, r12              # ready (the charge full): the pulse's step (up 0 - 7, down 7 - 0)
+        addi r10, r10, 1
+        srwi r0, r10, %(rdy_shift)d
+        andi. r0, r0, 15
+        cmpwi r0, 8
+        blt gp_rdy1
+        li r9, 15
+        subf r0, r0, r9                 # (15 - the step)
+gp_rdy1:
+        mulli r0, r0, 12
+        lis r4, %(ctf_ready_hi)d
+        addi r4, r4, %(ctf_ready_lo)d
+        add r4, r4, r0
+gp_rdy0:
+        stwx r10, r11, r12''' if 'gready' in feats else '') + call(PANEL_COLOUR) + '''
         mr r3, r24
         mr r4, r26
         mr r5, r28
-        bl gk_rings
+        bl gk_rings''' + ('''
+        cmpwi r25, 1
+        bne gp_log
+        cmpwi r28, 100
+        blt gp_log''' + ''.join('''
+        mr r3, r24
+        mr r4, r26
+        mr r5, r28
+        bl gk_rings''' for _ in range(READY_SPIN - 1)) if 'gready' in feats else '') + '''
         b gp_log
 gp_ko:  cmpwi r25, 0
         bne gp_show
