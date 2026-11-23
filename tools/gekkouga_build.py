@@ -1043,7 +1043,7 @@ def cmd_skeleton(pacman_fighter, out_fighter, test_only=None):
 
 
 
-SND_TEST_AT = '    r = ArticleModule(0x2710, 0x8);\n'
+SND_TEST_AT = '    WorkModule(0, (float)r + 0, 0x0f000317);   // diag: the generate\'s result (the TEST_ONLY exe logs it: S4GF gen=)\n'
 SND_TEST = ('    WorkModule(0, (float)SoundModule(0x2710, 0x768005b) + 0, 0x0f000317); // skeleton v1.7 TEST_ONLY: its spawn '
             'sound from him (his SoundModule), the answer in VAR_23 (S4GF gen=)\n')
 
