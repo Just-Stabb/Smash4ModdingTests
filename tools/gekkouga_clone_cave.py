@@ -105,7 +105,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
                       'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2',
-                      'gready', 'skbot', 'shalf', 'ice'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'gready', 'skbot', 'shalf', 'ice', 'icesnd'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -908,9 +908,15 @@ btu_out:
 '''
 
 
-def ice_src(D, btint=True):
+def ice_src(D, btint=True, snd=False):
     """ice detonation v1 (feature ice): ice_hit (ICE_HOOK's branch), ice_arm, ice_vic (the countdown, from burn_tick),
-    ice_req (the blast's request), ice_gk_ok"""
+    ice_req (the blast's request), ice_gk_ok; snd (feature icesnd): ice_snd, the detonation's sound asked of a Greninja on
+    arming, stopped when the countdown is cancelled"""
+    S = (lambda t: t) if snd else (lambda t: '')
+    stop = S('''
+        mr r3, r31
+        li r4, 2
+        bl ice_snd                      # icesnd: its sound stopped''')
     chk = lambda reg, bad: '''
         lis r0, 0x1000
         cmplw %s, r0
@@ -1123,7 +1129,10 @@ ia_tint:''' + tint_off + D('''
         lwz r5, 0x1C(r1)
         lwz r6, 8(r28)
         lwz r7, 0xC(r28)
-        lwz r8, 0x4C(r1)''' + osr()) + '''
+        lwz r8, 0x4C(r1)''' + osr()) + S('''
+        mr r3, r31
+        li r4, 1
+        bl ice_snd                      # icesnd: the detonation's sound (its boom ICE_SND_LEAD frames on: the blast)''') + '''
 ia_out: lmw r24, 0x60(r1)
         lwz r0, 0x84(r1)
         mtlr r0
@@ -1163,7 +1172,7 @@ iv_me:  lis r28, %(ice_st_hi)d
         beq iv_gone
         lwz r26, %(bacc)d(r3)''' + chk('r26', 'iv_gone') + '''
         cmpwi r27, -1
-        beq iv_off                      # a reset: off
+        beq ''' + ('iv_stop' if snd else 'iv_off') + '''                      # a reset: off
         lwz r11, %(fstatus)d(r26)''' + chk('r11', 'iv_live') + '''
         lwz r25, %(st_kind)d(r11)
         addi r10, r25, -%(st_dead)d
@@ -1197,7 +1206,8 @@ iv_ko:''' + D('''
         addi r3, r3, %(gk_fic_lo)d
         mr r4, r31
         mr r5, r25
-        mr r6, r27''' + osr()) + '''
+        mr r6, r27''' + osr()) + S('''
+iv_stop:''') + stop + '''
 iv_off: li r0, 0
         stw r0, 0(r28)
         lwz r3, %(wcol)d(r26)''' + chk('r3', 'iv_out') + '''
@@ -1207,7 +1217,7 @@ iv_off: li r0, 0
         mtctr r12
         bctrl
         b iv_out
-iv_gone:
+iv_gone:''' + stop + '''
         li r0, 0                        # no such fighter: nothing to clear
         stw r0, 0(r28)
 iv_out: lmw r25, 0x30(r1)
@@ -1245,7 +1255,7 @@ ir_any: cmpwi r28, %(slots)d
         bne ir_have
         addi r28, r28, 1
         b ir_any
-ir_none:
+ir_none:''' + stop + '''
         li r28, 0                       # none: no blast
         b ir_log
 ir_have:
@@ -1342,7 +1352,91 @@ igo_out:
         mtlr r0
         addi r1, r1, 0x20
         blr
-'''
+''' + S(r'''
+# icesnd (r3 a victim 0-7, r4 1 play / 2 stop): play: a Greninja (the burns' owner if a live one, not the victim, else the
+# first such: ice_req's choice) asked to play the detonation's sound (his VAR ICE_SND_VAR = 1), recorded at the victim's
+# +0x1C (his slot 1-8; 0 none); stop: that Greninja (if still one) asked to stop it (his VAR ICE_SND_VAR + 1 = 1), the
+# record cleared. His MSC (clones.c gk_is_tick) plays / stops the label (SoundModule 0x2710 / 0x2714) and clears the VAR
+ice_snd:
+        stwu r1, -0x40(r1)
+        mflr r0
+        stw r0, 0x44(r1)
+        stmw r28, 0x30(r1)
+        mr r31, r3
+        mr r30, r4
+        lis r29, %(ice_st_hi)d
+        addi r29, r29, %(ice_st_lo)d
+        slwi r0, r31, 5
+        add r29, r29, r0                # its state
+        cmpwi r30, 1
+        bne is_stop
+        lwz r28, 0xC(r29)
+        addi r28, r28, 1                # the owner's slot 1-8
+        mr r3, r28
+        addi r4, r31, 1
+        bl ice_gk_ok
+        cmpwi r3, 0
+        bne is_have
+        li r28, 1
+is_any: cmpwi r28, %(slots)d
+        bgt is_none
+        mr r3, r28
+        addi r4, r31, 1
+        bl ice_gk_ok
+        cmpwi r3, 0
+        bne is_have
+        addi r28, r28, 1
+        b is_any
+is_none:
+        li r28, 0
+        stw r28, 0x1C(r29)              # none: no sound
+        b is_log
+is_have:
+        stw r28, 0x1C(r29)
+        li r4, 0                        # ICE_SND_VAR: play
+        b is_set
+is_stop:
+        lwz r28, 0x1C(r29)
+        cmpwi r28, 0
+        beq is_out                      # none playing
+        li r0, 0
+        stw r0, 0x1C(r29)
+        mr r3, r28
+        bl gk_entry
+        cmpwi r3, 0
+        beq is_log
+        lwz r0, 4(r3)
+        cmpwi r0, %(gkind)d
+        bne is_log
+        li r4, 1                        # ICE_SND_VAR + 1: stop
+is_set: lwz r12, %(acc)d(r3)
+        cmpwi r12, 0
+        beq is_log
+        lwz r3, %(work)d(r12)           # his WorkModule
+        cmpwi r3, 0
+        beq is_log
+        lis r12, 0x%(ice_snd_var_hi)04X
+        ori r12, r12, 0x%(ice_snd_var_lo)04X
+        add r4, r4, r12
+        lis r12, %(ice_k_hi)d
+        addi r12, r12, %(ice_k_lo)d
+        lfs f1, 20(r12)                 # 1.0
+        lwz r12, 0(r3)
+        lwz r12, 0x4C(r12)
+        mtctr r12
+        bctrl
+is_log:''' + D('''
+        lis r3, %(gk_fid_hi)d
+        addi r3, r3, %(gk_fid_lo)d
+        mr r4, r31
+        mr r5, r30
+        addi r6, r28, -1''' + osr()) + '''
+is_out: lmw r28, 0x30(r1)
+        lwz r0, 0x44(r1)
+        mtlr r0
+        addi r1, r1, 0x40
+        blr
+''')
 
 
 def bfx_tier(instances):
@@ -1433,13 +1527,25 @@ ICE_AMOUNT_MAX = 99.9             # (type 4 + b / 100 stays under 5)
 ICE_Y = 9.0                       # the blast's centre above the victim's feet
 ICE_VAR = 0x0F0003B0              # his gk_vi(48) - (51): the blast request (type, x, y, way)
 ICE_SLOTS_EXTRA = 2               # article 9's list: TR_MAX + this (room for blasts while 6 trails burn)
+# usmash spike v2 / trail dim v1 (feature icesnd; the user: "Can you make this sound time with the ice detonation's timer and
+# explosion?", "Replace what the old sound was"): on arming (ice_arm) the detonation's sound (tools/gekkouga_sound.py
+# ICE_SOUND, label 97) is asked of a Greninja (ice_snd: the blast's choice, the burns' owner first): his VAR ICE_SND_VAR = 1;
+# his MSC plays it the frame it sees it. Its boom is cut to come ICE_SND_LEAD frames after its start: the countdown's t = 1
+# is the frame after the arming hit, the blast is asked at t = 51 and lands at t = 52 - 53 (made and claimed within 1 - 2
+# frames), and the request is read by his MSC with the same delay as the blast's: the boom on the blast's frame (+- 1). A
+# cancelled countdown (a KO, a match / training reset, no Greninja left to make the blast) asks him to stop it (VAR + 1).
+# The blast plays no sound of its own any more (clones.c gk_ib_tick: the skeleton's SkBoom dropped; the skeleton keeps it)
+ICE_SND_LEAD = 52
+ICE_SND_VAR = 0x0F0003B4          # his gk_vi(52): play; gk_vi(53): stop
+ICE_SND_ID = 0x07680061           # his row 0x768, label 97 (tools/gekkouga_sound.py ICE_SOUND)
 
 
 def tr_motions(feats):
     """the fire trail article's motion kinds: forward / up / down (+ the ice blast, FireTrailIceBoom)"""
     return 4 if 'ice' in feats else 3
 ICE_ST = 32                       # bytes a victim: +0 t (0 off, -1 off asked, 1.. armed frame), +4 remaining damage, +8
-                                  # stacks, +0xC owner slot, +0x10 way, +0x14 b, +0x18 the Greninja asked (slot 0-7, -1)
+                                  # stacks, +0xC owner slot, +0x10 way, +0x14 b, +0x18 the Greninja asked (slot 0-7, -1),
+                                  # +0x1C (icesnd) the Greninja playing its sound (slot 1-8, 0 none)
 ICE_YELLOW = (1.0, 0.85, 0.05)
 ICE_BLACK = (0.02, 0.02, 0.02)
 ICE_ALPHA = 0.8
@@ -1483,7 +1589,8 @@ def ice_amount(instances):
 assert all(burn_total(m, sh, f) >= f - 1e-4 for m in BURN_MOVES + (TR_ROW, SK_TOUCH_ROW) for sh in (False, True)
            for f in (BURN_MIN_TOTAL, BURN_MIN_TOTAL_OLD)), 'a burn under the floor'
 RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1', 'tiers', 'gmupd', 'skbody',
-                     'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2', 'gready', 'skbot', 'shalf', 'ice'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+                     'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2', 'gready', 'skbot', 'shalf', 'ice',
+                     'icesnd'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
 # swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose); burn v2:
 # + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2 - floor1); burn
@@ -1492,7 +1599,7 @@ RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 
 # + skbody, sktouch (exe_v46z_gkb7; v1.3 / v1.4's gkb6 is RELEASE - skbody - sktouch); skeleton v1.6: + skdist
 # (exe_v46z_gkb8; gkb7 is RELEASE - skdist); burn tint v1: + btint (exe_v46z_gkb9; gkb8 is RELEASE - btint); smash tune v1:
 # + shalf (exe_v46z_gkb14; tuning v1's gkb13 is RELEASE - shalf); ice detonation v1: + ice (exe_v46z_gkb15; gkb14 is
-# RELEASE - ice)
+# RELEASE - ice); usmash spike v2 / trail dim v1: + icesnd (exe_v46z_gkb16; gkb15 is RELEASE - icesnd)
 VARIANTS = (('A_release', RELEASE),)
 # skeleton v1.6 (the user: "Please stop packaging G_pose. It has no use anymore."): A_release only. The pose feature
 # stays (the exes shipped with it up to v1.5 still rebuild from this script); v1.5 and before: + ('G_pose', (RELEASE -
@@ -4043,15 +4150,18 @@ def build(rpx, diag=False, feats=None):
     A['bti_st'] = alloc(16 * SLOTS, 4) if btint else 0         # ... per victim: tier, fade, outline entry, its width
     ice = 'ice' in feats
     assert not ice or btint, 'ice needs btint'
+    assert ice or 'icesnd' not in feats, 'icesnd needs ice'
     A['ice_k'] = alloc(len(ice_k()), 8) if ice else 0          # ice detonation v1: its constants
     A['ice_flash'] = alloc(16 * ICE_FRAMES, 4) if ice else 0   # ... the flash's colour per frame
     A['ice_st'] = alloc(ICE_ST * SLOTS, 4) if ice else 0       # ... per victim
     A['ice_reqofs'] = alloc(16, 4) if ice else 0               # ... tr_claim's request offsets (the blast's first)
     for nm, fs_ in (('gk_fia', 'S4IA ice armed: victim slot=%d burn amount x100=%d stacks=%d owner slot=%d way=%d\n'),
                     ('gk_fib', 'S4IB ice blast asked: victim slot=%d of Greninja slot=%d (-1 none) amount x100=%d\n'),
-                    ('gk_fic', 'S4IC ice countdown cancelled (KO): victim slot=%d status=%X at frame %d\n')):
-        A[nm] = alloc((len(fs_) + 4) & ~3, 4) if ice and diag else 0
-        if ice and diag:
+                    ('gk_fic', 'S4IC ice countdown cancelled (KO): victim slot=%d status=%X at frame %d\n'),
+                    ('gk_fid', 'S4ID ice sound: victim slot=%d cmd=%d (1 play, 2 stop) Greninja slot=%d (-1 none)\n')):
+        on = ice and diag and (nm != 'gk_fid' or 'icesnd' in feats)
+        A[nm] = alloc((len(fs_) + 4) & ~3, 4) if on else 0
+        if on:
             fmts.append((nm, fs_))
     code_at = alloc(0, 4)
 
@@ -4226,8 +4336,9 @@ def build(rpx, diag=False, feats=None):
         p.update(bti_fade=BTINT_FADE, bti_row=BTINT_ROW, bti_slot=BTINT_SLOT, os_tab_hi=ha(OS_TAB), os_tab_lo=K.slo(OS_TAB),
                  os_n=OS_N, os_ent=OS_ENT, os_count=OS_COUNT)
     if 'ice' in feats:
-        for nm in ('ice_k', 'ice_flash', 'ice_st', 'ice_reqofs', 'gk_fia', 'gk_fib', 'gk_fic'):
+        for nm in ('ice_k', 'ice_flash', 'ice_st', 'ice_reqofs', 'gk_fia', 'gk_fib', 'gk_fic', 'gk_fid'):
             p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
+        p.update(ice_snd_var_hi=ICE_SND_VAR >> 16, ice_snd_var_lo=ICE_SND_VAR & 0xFFFF)
         p.update(hit_elem=HIT_ELEMENT, ice_elem=ICE_ELEMENT, ice_back=ICE_BACK, hit_att=HIT_ATTACKER, look_hi=SH_LOOKUP >> 16,
                  look_lo=SH_LOOKUP & 0xFFFF, ice_frames=ICE_FRAMES, ice_ask=ICE_FRAMES - ICE_LEAD, ice_slot=BTINT_SLOT,
                  ice_var_hi=ICE_VAR >> 16, ice_var_lo=ICE_VAR & 0xFFFF, ice_stz=ICE_ST)
@@ -6555,7 +6666,7 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
-''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats, 'sksnd' in feats, 'cart' in feats, 'skbot' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats, 'ice' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (ice_src(D) if 'ice' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
+''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats, 'sksnd' in feats, 'cart' in feats, 'skbot' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats, 'ice' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (ice_src(D, snd='icesnd' in feats) if 'ice' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
 # ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
 gk_clear:
         li r0, 0''' + (('''

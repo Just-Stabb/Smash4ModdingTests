@@ -718,35 +718,24 @@ NAIR_LATE = 14.0                  # its late hit's size (6 %, frames 14-17; tuni
 NAIR_FX_FRAME = 11                # the burst / ring's call frame (his effect script)
 NAIR_FX_Y = 8.5                   # ... at joint 0, Y 8.5 (the ring's centre)
 NAIR_FX_SIZE = 1.8125             # ... its size (tuning v1)
-NAIR_RING_PART = 0                # the ring's boxes: Part 0, the burst's (smash tune v1; nair ring v1: Part 1, their own hit
-                                  # record): one record for the burst and the ring, so a fighter the burst hit is never touched
-                                  # by the ring (its launch kept) and the ring pushes anyone else once. set_attack (0x02C08848)
-                                  # keeps a Part's record while an ID set again is still out on it and clears it when a new ID
-                                  # is set on that Part: the ring's IDs are all set at 12 with the burst's (NAIR_RING_START),
-                                  # then only moved (docs/native-notes.md)
+# usmash spike v2 / trail dim v1 (the user: "make neutral air how it was in the previous build where the stun would get
+# intercepted by the smaller hits"): the ring back to nair ring v1 (git 08e6a1b) exactly: weak hits on their own Part 1,
+# set at 14, out to 24; smash tune v1's windbox (0 %, FKB 10, Flinchless, Part 0 with the burst, set at 12 tucked inside
+# it) undone
+NAIR_RING_PART = 1                # the ring's hitboxes: Part 1, their own hit record (the strong / late hits are Part 0):
+                                  # set_attack (0x02C08848) keeps a Part's record while an ID set again is still out on
+                                  # it, and clears it when a new ID is set on that Part (docs/native-notes.md)
 NAIR_RING_IDS = (1, 2, 3, 4, 5, 6)   # 6 capsules (a hexagon round the ring): the clone (a weapon: IDs 0-6, Parts 0-1)
                                   # plays this script too
-NAIR_RING_START = 12              # smash tune v1: set with the burst's first hit (12), tucked inside it (NAIR_RING_TUCK) until
-NAIR_RING_TUCK = 8.0              # 14: corners 8 from the ring's centre (joint 0, Y 8.5), + the capsules' 2.5: inside the
-                                  # burst's 12 round joint 3 (at Z 0.9, Y 8.5 - 8.7 at 12 - 13 in his motion: at most 11.4
-                                  # from it): whatever they touch the burst (ID 0, the lower ID: it wins a shared frame)
-                                  # touches too
-NAIR_RING_FRAMES = (14, 16, 18, 20, 22)   # out along the ring from 14, moved every 2 frames (the same IDs, still out: the
-NAIR_RING_END = 24                # record kept), gone at 24 (the ring's flames: called at 11, 14 frames, under 15 % alpha by 24)
+NAIR_RING_FRAMES = (14, 16, 18, 20, 22)   # the ring boxes set at 14 (all six at once: Part 1's record starts empty), moved
+NAIR_RING_END = 24                # out every 2 frames (the same IDs, still out: the record kept), gone at 24 (the ring's
+                                  # flames: called at 11, 14 frames, under 15 % alpha by 24)
 NAIR_RING_TIP = 4.5               # the ring's flames' lit tips past their centres (fx_render: 4.3 - 4.7 at frames 14-19)
 NAIR_RING_MIN = 2.5               # the capsules' least radius
-NAIR_RING_HIT = dict(Damage=0.0, Angle=361, KBG=100, FKB=10, BKB=0, Effect=5, Trip=0.0, Hitlag=0.0, SDI=0.0, Clang=0,
-                     Rebound=0, ShieldDamage=0, SFXLevel=0, SFXType=0, Type=0, HitBits=0x3F, Unk41=0, CollisionPart=0xF,
-                     NoScale=0, Shieldable=1, Reflectable=0, Absorbable=0, Rehit=0, IgnoreInvuln=0, HitAllStates=0,
-                     FacingRestrict=0, NoGrabRelease=0, TeamDamage=0, DisableHitlag=1, NoGFX=1, Flinchless=1)
-                                  # smash tune v1 (the user: "Please remove any knockback from the fire ring and turn it into a
-                                  # very weak windbox"): Smash 4's windbox, as F.L.U.D.D.'s water (Mario's pumpwater game.bin:
-                                  # Special_Hitbox, 0 %, KBG 100, set knockback (FKB) 50 / 58, BKB 0, Flinchless 1 (no
-                                  # reaction: a push, no hitstun / tumble), NoGFX 1): 0 %, set knockback 10 (KB ((1 + 10 / 2) x
-                                  # 1.4 + 18) x 1 = 26.4 at weight 100: about 0.8 a frame, F.L.U.D.D.'s 54.4), angle 361 by
-                                  # position (FacingRestrict 0: away from him either side), DisableHitlag 1 (no hitlag either
-                                  # side), no clank, no sound, fire (element 5), shieldable (as F.L.U.D.D.: 0 shield damage).
-                                  # Nair ring v1: 2.5 %, angle 60, KBG / BKB 25, hitlag 0.5
+NAIR_RING_HIT = dict(Damage=2.5, Angle=60, KBG=25, FKB=0, BKB=25, Effect=5, Trip=0.0, Hitlag=0.5, SDI=1.0, Clang=1,
+                     Rebound=1, ShieldDamage=0, SFXLevel=0, SFXType=8)
+                                  # weak: 2.5 %, the burst's own angle 60 (it carries on the way the burst sent them), KBG /
+                                  # BKB 25, fire (element 5, the burn sound 8, small), half hitlag, no shield damage
 
 
 def ring_radius(frame, ring=None):
@@ -767,12 +756,11 @@ def ring_stage(frame):
 
 
 def ring_boxes(frame):
-    """the 6 Extended_Special_Hitbox windbox capsules (Part 0, joint 0) of the ring at frame: hexagon edges round (0,
-    NAIR_FX_Y); at NAIR_RING_START tucked inside the burst (NAIR_RING_TUCK)"""
+    """the 6 Extended_Hitbox capsules (Part 1, joint 0) of the ring at frame: hexagon edges round (0, NAIR_FX_Y)"""
     import acmd
     by = {v['name']: k for k, v in acmd.INFO.items()}
-    ident = by['Extended_Special_Hitbox']
-    rv, sz = (NAIR_RING_TUCK, NAIR_RING_MIN) if frame == NAIR_RING_START else ring_stage(frame)
+    ident = by['Extended_Hitbox']
+    rv, sz = ring_stage(frame)
     out = []
     for k, hid in enumerate(NAIR_RING_IDS):
         a0, a1 = math.radians(60 * k), math.radians(60 * (k + 1))
@@ -785,9 +773,8 @@ def ring_boxes(frame):
 
 
 def nair_ring(game):
-    """neutral air: the strong / late hits NAIR_STRONG / NAIR_LATE, and the ring's windbox capsules (smash tune v1: Part 0,
-    set at 12 inside the burst, out along the ring from 14 to 24; nair ring v1: weak hits, Part 1, 14 - 24) on absolute
-    FRAMEs; his WAITs become FRAMEs (the same frames), the end Remove_All_Hitboxes (19) Remove_Hitbox(0)"""
+    """neutral air: the strong / late hits NAIR_STRONG / NAIR_LATE, and the ring's weak capsules (Part 1) from frame 14 to
+    24 on absolute FRAMEs; his WAITs become FRAMEs (the same frames), the end Remove_All_Hitboxes (19) Remove_Hitbox(0)"""
     import acmd
     by = {v['name']: k for k, v in acmd.INFO.items()}
     s = game.scripts[acmd.crc('attackairn')]
@@ -800,8 +787,7 @@ def nair_ring(game):
     assert int(tr.params[0]) == 2 + 1 + len(hb[2].params), 'the True block: the re-hit only'
     fr = lambda n: acmd.Command(by['FRAME'], [float(n)])
     rm = acmd.Command(by['Remove_Hitbox'], [0])
-    new = [fr(10), on, fr(12), hb[0]] + ring_boxes(NAIR_RING_START) + [fr(14), hb[1]] + ring_boxes(14) + [fr(16)] + \
-          ring_boxes(16) + \
+    new = [fr(10), on, fr(12), hb[0], fr(14), hb[1]] + ring_boxes(14) + [fr(16)] + ring_boxes(16) + \
           [fr(17), cmp_, tr, hb[2], fr(18)] + ring_boxes(18) + [fr(19), rm, fr(20)] + ring_boxes(20) + [fr(22)] + \
           ring_boxes(22) + [fr(NAIR_RING_END), acmd.Command(by['Remove_All_Hitboxes'], []), fr(40), off,
                             acmd.Command(by['Script_End'], [])]

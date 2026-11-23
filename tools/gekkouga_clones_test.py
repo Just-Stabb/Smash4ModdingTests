@@ -1683,10 +1683,10 @@ FAIR_DK = 19.9                    # DK's nearest point from his hand in the user
 
 
 def nair_fair_tests(out, user):
-    """nair / fair v1 (README "Neutral air ring v1"): neutral air's strong / late hits sized to the burst, the fire ring's
-    capsules (IDs 1-6) following FIRE_RING's flames outside them (smash tune v1: a very weak windbox, Part 0 with the burst,
-    set at 12 inside it; nair / fair v1: weak hits, Part 1, their own hit record kept from 14 to 24); forward air 10 longer
-    with a hitbox ID 2 reaching DK; the clones' copies the same"""
+    """nair / fair v1 (README "Neutral air ring v1"; usmash spike v2 / trail dim v1 put the ring back to this, the user's
+    request, undoing smash tune v1's windbox): neutral air's strong / late hits sized to the burst, the fire ring's
+    weak capsules (Part 1, IDs 1-6) following FIRE_RING's flames outside them, their own hit record kept from frame 14 to
+    24; forward air 10 longer with a hitbox ID 2 reaching DK; the clones' copies the same"""
     import math
     import acmd
     import gekkouga_fx as FX
@@ -1707,33 +1707,26 @@ def nair_fair_tests(out, user):
             fr += float(c.params[0])
         tl.append((fr, c))
     hb = [(f, c) for f, c in tl if c.name in GB.HITBOXES]
-    p0 = [(f, int(v(c, 'ID')), float(v(c, 'Damage')), round(float(v(c, 'Size')), 3)) for f, c in hb if int(v(c, 'ID')) == 0]
+    p0 = [(f, int(v(c, 'ID')), float(v(c, 'Damage')), round(float(v(c, 'Size')), 3)) for f, c in hb if int(v(c, 'Part')) == 0]
     check('nair ring v1: neutral air\'s Part 0 hits (ID 0): strong 11 %% at 12 (and the connected re-hit at 17) %.1f, late '
           '6 %% at 14 %.1f (tuning v1 %.3f / %.1f): the burst as drawn (its solid disc / its edge)' % (
               GB.NAIR_STRONG, GB.NAIR_LATE, NAIR_TUNING[0], NAIR_TUNING[1]),
           (p0, GB.NAIR_STRONG > NAIR_TUNING[0] * 1.2, GB.NAIR_LATE > NAIR_TUNING[1]),
           ([(12.0, 0, 11.0, GB.NAIR_STRONG), (14.0, 0, 6.0, GB.NAIR_LATE), (17.0, 0, 11.0, GB.NAIR_STRONG)], True, True))
-    ring = [(f, c) for f, c in hb if int(v(c, 'ID')) != 0]
+    ring = [(f, c) for f, c in hb if int(v(c, 'Part')) != 0]
     frames = sorted({f for f, _c in ring})
-    check('nair ring v1 / smash tune v1: the ring\'s windboxes: Extended_Special_Hitbox capsules, Part 0 (the burst\'s), IDs '
-          '1-6 on joint 0, set at 12 (with the strong hit) / 14 / 16 / 18 / 20 / 22 (6 each), all gone at 24 '
-          '(Remove_All_Hitboxes), the burst\'s ID 0 removed alone at 19 (Remove_Hitbox 0)',
+    check('nair ring v1: the ring\'s hitboxes: Extended_Hitbox capsules, Part 1, IDs 1-6 on joint 0, set at 14 / 16 / 18 / '
+          '20 / 22 (6 each), all gone at 24 (Remove_All_Hitboxes), the Part 0 hit removed alone at 19 (Remove_Hitbox 0)',
           ({c.name for _f, c in ring}, {int(v(c, 'Part')) for _f, c in ring}, sorted({int(v(c, 'ID')) for _f, c in ring}),
            {int(v(c, 'Bone')) for _f, c in ring}, frames, [sum(1 for f, _c in ring if f == x) for x in frames],
            [(f, c.name, list(c.params)) for f, c in tl if c.name in ('Remove_Hitbox', 'Remove_All_Hitboxes')]),
-          ({'Extended_Special_Hitbox'}, {0}, [1, 2, 3, 4, 5, 6], {0}, [12.0, 14.0, 16.0, 18.0, 20.0, 22.0], [6] * 6,
+          ({'Extended_Hitbox'}, {1}, [1, 2, 3, 4, 5, 6], {0}, [14.0, 16.0, 18.0, 20.0, 22.0], [6] * 5,
            [(19.0, 'Remove_Hitbox', [0]), (24.0, 'Remove_All_Hitboxes', [])]))
-    names = ('Damage', 'Angle', 'KBG', 'FKB', 'BKB', 'Hitlag', 'SDI', 'Clang', 'Rebound', 'ShieldDamage', 'SFXType',
-             'Shieldable', 'FacingRestrict', 'DisableHitlag', 'NoGFX', 'Flinchless', 'Effect')
-    vals = {tuple(round(float(v(c, n)), 3) for n in names) for _f, c in ring}
-    kb = ((1 + 10 / 2.0) * 200 / 200 * 1.4 + 18) * 100 / 100 + 0
-    check('smash tune v1 (the user: "Please remove any knockback from the fire ring and turn it into a very weak '
-          'windbox"): the ring a windbox as F.L.U.D.D.\'s water (0 %%, KBG 100, set knockback, BKB 0, Flinchless 1: a push, '
-          'no reaction, NoGFX 1): 0 %%, angle 361 by position (FacingRestrict 0), set knockback 10 (KB %.1f at weight 100: '
-          'about %.2f a frame, F.L.U.D.D.\'s 54.4), no hitlag (DisableHitlag 1, Hitlag 0), no clank, no shield damage, no '
-          'sound, shieldable, fire; no shield break anywhere in neutral air (no LASTHIT_STATUS)' % (kb, kb * 0.03),
-          (vals, [c for c in gn if c.name == 'SET_FLOAT']),
-          ({(0.0, 361, 100, 10, 0, 0.0, 0.0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 5)}, []))
+    vals = {(float(v(c, 'Damage')), int(v(c, 'Angle')), int(v(c, 'KBG')), int(v(c, 'FKB')), int(v(c, 'BKB')), int(v(c, 'Effect')),
+             int(v(c, 'ShieldDamage')), int(v(c, 'SFXType')), float(v(c, 'Hitlag'))) for _f, c in ring}
+    check('nair ring v1: the ring\'s hits weak: 2.5 %, angle 60 (the burst\'s), KBG 25, FKB 0, BKB 25, fire (element 5, '
+          'burn sound 8), no shield damage, half hitlag; no shield break anywhere in neutral air (no LASTHIT_STATUS)',
+          (vals, [c for c in gn if c.name == 'SET_FLOAT']), ({(2.5, 60, 25, 0, 25, 5, 0, 8, 0.5)}, []))
     # ---- the ring's geometry against FIRE_RING (its own formula here, not GB.ring_radius)
     fx = next(c for c in e.scripts[acmd.crc('attackairn')] if c.name == 'EFFECT_FOLLOW_FLIP')
     efr = 0.0
@@ -1748,7 +1741,7 @@ def nair_fair_tests(out, user):
     def flames(f):                       # the flames' centres' radius at frame f (t: frames since the call less one)
         t = max(0, f - efr - 1)
         return size * (R['r0'] + R['v'] * (1 - R['air'] ** t) / (1 - R['air']))
-    geo, bad, tuck = [], [], None
+    geo, bad = [], []
     for f in frames:
         cs = sorted((c for ff, c in ring if ff == f), key=lambda c: int(v(c, 'ID')))
         pts = [((float(v(c, 'Z')), float(v(c, 'Y')) - cy), (float(v(c, 'Z2')), float(v(c, 'Y2')) - cy)) for c in cs]
@@ -1758,9 +1751,6 @@ def nair_fair_tests(out, user):
                      for k in range(6))
         ang = sorted(round(math.degrees(math.atan2(p[0][1], p[0][0])) % 360) for p in pts)
         r, s_ = sum(rv) / len(rv), sz.pop() if len(sz) == 1 else None
-        if f == 12.0:
-            tuck = (round(r, 2), s_, closed, ang)
-            continue
         mid = r * math.cos(math.radians(30))
         tips = flames(f + 1) + GB.NAIR_RING_TIP
         inner, outer = ((r - s_) + (mid - s_)) / 2, ((r + s_) + (mid + s_)) / 2
@@ -1770,27 +1760,16 @@ def nair_fair_tests(out, user):
                 abs(outer - max(tips, (GB.NAIR_LATE + tips) / 2 + GB.NAIR_RING_MIN)) < 0.05 and abs(inner - want_in) < 0.05
                 and r - s_ >= GB.NAIR_LATE and flames(f + 1) < outer):
             bad.append((f, round(inner, 2), round(outer, 2), round(tips, 2), closed, ang))
-    check('nair ring v1: from 14 each set a closed hexagon of 6 capsules (corners at 0, 60 ... 300 degrees, one radius) '
-          'round the burst / ring\'s centre (joint 0, Y %.1f); its band from the burst boxes\' edge (%.1f, its mean inner '
-          'edge) to the ring\'s flame tips at the next frame (FIRE_RING r0 %.1f + v %.1f (1 - air %.1f^t) / (1 - air), x '
-          '%.4f, + %.1f: its mean outer edge), its corners outside the burst boxes; moving out with the flames (frame, '
-          'flames, tips, corner radius, capsule size): %s' % (cy, GB.NAIR_LATE, R['r0'], R['v'], R['air'], size,
-                                                              GB.NAIR_RING_TIP, geo),
+    check('nair ring v1: each set a closed hexagon of 6 capsules (corners at 0, 60 ... 300 degrees, one radius) round the '
+          'burst / ring\'s centre (joint 0, Y %.1f); its band from the burst boxes\' edge (%.1f, its mean inner edge) to the '
+          'ring\'s flame tips at the next frame (FIRE_RING r0 %.1f + v %.1f (1 - air %.1f^t) / (1 - air), x %.4f, + %.1f: its '
+          'mean outer edge), its corners outside the burst boxes; moving out with the flames (frame, flames, tips, corner '
+          'radius, capsule size): %s' % (cy, GB.NAIR_LATE, R['r0'], R['v'], R['air'], size, GB.NAIR_RING_TIP, geo),
           (bad, [x[3] for x in geo] == sorted(x[3] for x in geo) and geo[0][3] < geo[-1][3]), ([], True))
-    # the burst's centre at 12 / 13: joint 3 in his motion (the user's AttackAirN: Z 0.89 - 0.90, Y 8.46 - 8.67)
-    far = max(math.hypot(z - 0.9, (y + cy) - yb) for z, y in ((GB.NAIR_RING_TUCK * math.cos(math.radians(a_)),
-                                                                GB.NAIR_RING_TUCK * math.sin(math.radians(a_)))
-                                                               for a_ in range(0, 360, 60)) for yb in (8.46, 8.67))
-    check('smash tune v1: at 12 (with the burst\'s strong hit, so Part 0\'s record is cleared only then) the windboxes are '
-          'tucked inside the burst: a hexagon of corner radius %.0f, size %.1f: at most %.2f from the burst\'s centre '
-          '(joint 3) < its size %.0f, so whatever they touch the burst (ID 0: the lower ID wins a shared frame) touches too'
-          % (GB.NAIR_RING_TUCK, GB.NAIR_RING_MIN, far + GB.NAIR_RING_MIN, GB.NAIR_STRONG),
-          (tuck, far + GB.NAIR_RING_MIN < GB.NAIR_STRONG), ((GB.NAIR_RING_TUCK, GB.NAIR_RING_MIN, True,
-                                                              [0, 60, 120, 180, 240, 300]), True))
     check('nair ring v1: the ring boxes follow the effect\'s timing: the burst / ring called at %d (FIRE_RING life %d: its '
-          'flames gone by %d), out along the ring from the strong hit\'s end (14, the late hit) to 24, within the '
-          'flames\' life' % (efr, R['life'], efr + R['life']),
-          (efr == GB.NAIR_FX_FRAME, frames[1], max(f for f, c in tl if c.name == 'Remove_All_Hitboxes') <= efr + R['life'],
+          'flames gone by %d), the boxes from the strong hit\'s end (14, the late hit) to 24, within the flames\' life' % (
+              efr, R['life'], efr + R['life']),
+          (efr == GB.NAIR_FX_FRAME, frames[0], max(f for f, c in tl if c.name == 'Remove_All_Hitboxes') <= efr + R['life'],
            size == GB.NAIR_FX_SIZE, cy == GB.NAIR_FX_Y), (True, 14.0, True, True, True))
     # ---- the hit records: set_attack (0x02C08848) returns at once (the record kept) when the ID is out on the same Part,
     # and clears the Part's record when an ID not out (or moved from another Part) is set on it
@@ -1799,7 +1778,7 @@ def nair_fair_tests(out, user):
         if c.name in GB.HITBOXES:
             hid, part = int(v(c, 'ID')), int(v(c, 'Part'))
             if live.get(hid) == part:
-                keeps += 1
+                keeps += part == 1
             else:
                 clears.append((f, part, hid))
             live[hid] = part
@@ -1809,19 +1788,17 @@ def nair_fair_tests(out, user):
             live = {}
     for f, c in hb:
         shared.add((int(v(c, 'ID')), int(v(c, 'Part'))))
-    check('smash tune v1: the burst and the ring share one hit record (Part 0, IDs 0 / 1-6): Part 0\'s record is cleared only '
-          'at 12, as the strong hit and the tucked ring are set together (before anything is hit); every later set moves '
-          'IDs still out (the late hit, the re-hit, the ring\'s 30 moves: 32 sets, the record kept). So a fighter the burst '
-          'hit is never pushed by the ring (its launch kept: the user\'s worry) and the ring pushes anyone else once; the '
-          'clone\'s AttackModule (a weapon: IDs 0-6, Parts 0-1) holds them',
-          (sorted({p for _i, p in shared}), sorted({i for i, p in shared}), clears, keeps,
-           max(i for i, _p in shared) <= 6),
-          ([0], [0, 1, 2, 3, 4, 5, 6], [(12.0, 0, k) for k in range(7)], 32, True))
-    check('smash tune v1: the ring\'s touch still burns (a fire ring; neutral air\'s row, motion 104: 0.25 %% / 15 f / 180 f, '
-          'once, as its hit record): burn_scan takes every new record of the move\'s hit log (feature mark), a windbox\'s '
-          'too if the game logs it (unconfirmed in game); one record for the burst and the ring: a burst victim gets one '
-          'burn (nair ring v1 gave it two)',
-          ((104, 0.25, 15, 180) in C.BURN_MOVES, 'mark' in C.RELEASE), (True, True))
+    check('nair ring v1: the strong / late hits and the ring don\'t share a hit record: their own Parts (0 / 1) and IDs (0 / '
+          '1-6); Part 1\'s record is cleared only when the ring is first set (frame 14, before it can hit), every later set '
+          'moves IDs still out on Part 1 (24 sets: the record kept: one ring hit an opponent); the clone\'s AttackModule '
+          '(a weapon: IDs 0-6, Parts 0-1) holds them',
+          (sorted({p for _i, p in shared}), sorted({i for i, p in shared if p == 0}), sorted({i for i, p in shared if p == 1}),
+           [x for x in clears if x[1] == 1], keeps, max(i for i, _p in shared) <= 6 and max(p for _i, p in shared) <= 1),
+          ([0, 1], [0], [1, 2, 3, 4, 5, 6], [(14.0, 1, k) for k in range(1, 7)], 24, True))
+    check('nair ring v1: the ring\'s hits burn (neutral air\'s row, motion 104: 0.25 %% / 15 f / 180 f) with no exe change: '
+          'burn_scan takes every Part\'s hit log (entries 0 - %d, AttackModule +0x18 the highest Part in use + 1: 2) and the '
+          'release marks each new record (feature mark), so a Part 1 record after a Part 0 one is new' % (C.BURN_ENTS - 1),
+          ((104, 0.25, 15, 180) in C.BURN_MOVES, C.BURN_ENTS >= 2, 'mark' in C.RELEASE), (True, True, True))
     # ---- forward air
     gf = g.scripts[acmd.crc('attackairf')]
     hf = {int(v(c, 'ID')): c for c in gf if c.name in GB.HITBOXES}
@@ -1858,10 +1835,10 @@ def nair_fair_tests(out, user):
                 diff.append((nm, int(v(a_, 'ID'))))
     cef = sorted((int(c.params[0]), round(float(v(c, 'Y')), 2)) for c in ce.scripts[acmd.crc('attackairf')]
                  if c.name == 'External_Graphic')
-    check('nair ring v1 / fair reach: the clones\' copies the same (their scripts are his: neutral air\'s 39 hitbox sets, '
+    check('nair ring v1 / fair reach: the clones\' copies the same (their scripts are his: neutral air\'s 33 hitbox sets, '
           'forward air\'s 3 hitboxes, bones as the article\'s; its second sword and flames)',
           (diff, len([c for c in cg.scripts[acmd.crc('attackairn')] if c.name in GB.HITBOXES]), cef),
-          ([], 39, sorted([(GB.SWORD, 0.0), (GB.SWORD, -10.0), (GB.FIRE_BLADE, 0.0), (GB.FIRE_BLADE, -10.0)])))
+          ([], 33, sorted([(GB.SWORD, 0.0), (GB.SWORD, -10.0), (GB.FIRE_BLADE, 0.0), (GB.FIRE_BLADE, -10.0)])))
 
 
 FP_SLOT = 2                       # the fighter hit: player slot 3 (fighter table entry 2)
