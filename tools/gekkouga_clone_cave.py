@@ -104,7 +104,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # as his tatami / moon): v1 / v2's clone files were never loaded (the user's "clones
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
-                      'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -369,6 +369,9 @@ PANEL_SLOT = 0x30C0
 VAR_GAUGE = 0x0F000313            # his VAR_19 (v6): mode x 1000 + 0-100 (1 charge, 2 the ability left, 3 the burnout left)
 GAUGE_COLOURS = ((100, 100, 100, 100, 0, 0, 0, 0), (100, 100, 100, 100, 0, 0, 0, 0),
                  (100, 35, 70, 100, 0, 0, 0, 0), (100, 45, 45, 45, 0, 0, 0, 0))
+# round gauge v1.1 (feature gauge2; the user: the gauge showed white): the charge (mode 1) cyan; the diag's S4GB line also
+# gives the gauge clip it found (0: none: the KO meter's way)
+GAUGE_COLOURS2 = (GAUGE_COLOURS[0], (100, 25, 90, 100, 0, 0, 0, 0)) + GAUGE_COLOURS[2:]
 # v7: the panel's colour multipliers are 0-100 (docs/native-notes.md "Panel alpha": 255 hid Hero's menu): v6's 0xFF
 # alpha hid the meter (the user's "no bar shows")
 VT_BASE = 0xFC                    # v6: the clone's specializer (its singleton's vtable) is a copy of the moon's, not
@@ -830,7 +833,7 @@ TR_VAR_SLOT, TR_VAR_TYPE, TR_VAR_X, TR_VAR_Y, TR_VAR_DIR, TR_VAR_CTX = (0x0F0003
 assert all(burn_total(m, sh, f) >= f - 1e-4 for m in BURN_MOVES + (TR_ROW, SK_TOUCH_ROW) for sh in (False, True)
            for f in (BURN_MIN_TOTAL, BURN_MIN_TOTAL_OLD)), 'a burn under the floor'
 RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 'floor1', 'tiers', 'gmupd', 'skbody',
-                     'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
+                     'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2'))   # v13: the user's v12 F_hitcheck (clones hit, in game) + v8's B_attack;
 # skeleton v1: + the Running Skeleton; clones v15: + sway (confirmed in game: v14's E_sway, "the clones have their own
 # swing physics": their MotionModule +0x10 object's swing system stepped); v14's pose copy is TEST_ONLY (G_pose); burn v2:
 # + burn2 (the burning fighters' fire, the fire trails; skeleton v1.2's exe_v46z_gks2 is RELEASE - burn2 - floor1); burn
@@ -3303,7 +3306,8 @@ def build(rpx, diag=False, feats=None):
             ('gk_fp', 'S4GP clone first update (its script not run yet): weapon accessor=%08X\n'),
             ('gk_fv', 'S4GV HUD cursor update: r29=%d cursor=%08X\n'),
             ('gk_fx', 'S4GX clone id=%d at x=%d y=%d\n'),
-            ('gk_fb', 'S4GB panel slot=%d gauge mode=%d value=%d\n'),
+            ('gk_fb', 'S4GB panel slot=%d gauge mode=%d value=%d' + (' gauge clip=%08X' if 'gauge2' in feats else '') +
+             '\n'),
             ('gk_fz', 'S4GZ clone start: init=%08X scale x100=%d\n'),
             ('gk_fw', 'S4GW tag message: visible=%d object id=%d gone=%d handle=%08X\n'),
             ('gk_fm', 'S4GM clone id=%d draw: visflag=%d visible=%d model mode=%d drawn=%d overlay=%d/%d\n'),
@@ -3420,7 +3424,8 @@ def build(rpx, diag=False, feats=None):
         out.blob(A['gk_seen'], bytes(4 * 16), 'diag: HUD calls seen')
     out.blob(A['consts'], struct.pack('>6fI2f', 0.0, 0.5, HIT_BIAS, FAR, 1.0, HIT_BIAS2, img.w(HITSTOP_MUL), 100.0, 360.0), 'constants')
     out.blob(A['hurt'], hurt_blob(), 'clone hurtboxes (his vl group 5, article joints)')
-    out.blob(A['ctf'], b''.join(struct.pack('>4B4h', *c) for c in GAUGE_COLOURS), 'gauge colours')
+    out.blob(A['ctf'], b''.join(struct.pack('>4B4h', *c) for c in (GAUGE_COLOURS2 if 'gauge2' in feats else GAUGE_COLOURS)),
+             'gauge colours')
     out.blob(A['gk_tags'], bytes(4 * SLOTS), 'tag message countdowns')
     out.blob(A['gk_plyr'], bytes(4 * SLOTS), 'cursor show bytes saved')
     out.blob(A['gk_clr'], bytes(4 + 4 * SLOTS), 'clears seen (burn v1.2)')
@@ -5666,7 +5671,8 @@ gp_slot:
         cmplwi r25, 3
         ble gp_ok
         li r25, 0
-gp_ok:  lwz r3, 0x5C(r30)               # v7: the round gauge (gkgauge_mc in his panel, tools/gekkouga_gauge_flx.py)?
+gp_ok:''' + ('''  li r24, 0                       # (round gauge v1.1 diag: the clip, 0 none)
+       ''' if 'gauge2' in feats else '') + '''  lwz r3, 0x5C(r30)               # v7: the round gauge (gkgauge_mc in his panel, tools/gekkouga_gauge_flx.py)?
         cmpwi r3, 0
         beq gp_ko
         li r4, 0
@@ -5723,7 +5729,8 @@ gp_log:''' + D('''
         addi r3, r3, %(gk_fb_lo)d
         mr r4, r26
         mr r5, r25
-        mr r6, r28''' + osr()) + '''
+        mr r6, r28''' + ('''
+        mr r7, r24''' if 'gauge2' in feats else '') + osr()) + '''
 gp_next:
         addi r26, r26, 1
         b gp_slot

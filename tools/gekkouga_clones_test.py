@@ -1802,7 +1802,7 @@ GAUGE_SRC = None                          # round gauge v1: the user's ui/info/d
 GAUGE_JPG = None
 
 
-def gauge_tests(z):
+def gauge_tests(z, v11=False, inst=None):
     """round gauge v1 (README "Round gauge v1"): the package's ui/info/dmg rebuilt from the user's folder and the art,
     the gauge clip in panel sprites 1 - 4 with the names the executable looks for, the texture a new slot after the
     highest (135), every existing texlist entry / reference as it was, no overlap with the trait badge"""
@@ -1812,10 +1812,18 @@ def gauge_tests(z):
     import gekkouga_clone_cave as C
     import dmg_trait_badge as TB
     pre = 'INSTALL_TO_data/ui/info/dmg/'
+    zr, zn = z.read, set(z.namelist())
+
+    class _Z:                              # round gauge v1.1: the files it doesn't ship from the installed packages
+        @staticmethod
+        def read(n):
+            return zr(n) if n in zn else inst.read(n)
+    if inst is not None:
+        z = _Z()
     with tempfile.TemporaryDirectory() as td:
         art, out = os.path.join(td, 'art'), os.path.join(td, 'out')
         GA.extract(GAUGE_JPG, art)
-        info = GF.build(GAUGE_SRC, art, out)
+        info = GF.build(GAUGE_SRC, art, out, v11=v11)
         same = [n for n in ('dmg.flx', 'texlist.lst', 'img-00135.nut') if z.read(pre + n) != open(os.path.join(out, n), 'rb').read()]
     check('round gauge: the package\'s dmg.flx / texlist.lst / img-00135.nut rebuilt byte for byte from the user\'s folder '
           '(the update\'s) and 41672\'s art (tools/gekkouga_gauge_art.py extract, tools/gekkouga_gauge_flx.py)', same, [])
@@ -1845,6 +1853,27 @@ def gauge_tests(z):
     check('round gauge: every sprite / place / image of the user\'s file kept (the gauge\'s appended)',
           (len(f1.sprites) - len(f0.sprites) > 0, f1.images[:len(f0.images)] == f0.images,
            [vars(x) for x in f1.sprites[5:len(f0.sprites)]] == [vars(x) for x in f0.sprites[5:]]), (True, True, True))
+    if v11:
+        em = GF.emblem_places(f0)
+        got, bad_depth = {}, []
+        for panel in (1, 2, 3, 4):
+            k = f1.frame_key(panel, 0)
+            ps = [f1.places[pi] for pi in k.places]
+            gp = next(p_ for p_ in ps if f1.instance_name(p_) == 'gkgauge_mc')
+            mk = next(p_ for p_ in ps if f1.instance_name(p_) == 'mark_mc')
+            m = f1.transforms[gp.xform].matrix()
+            got[panel] = (round(m[4], 3), round(m[5], 3), round(m[0], 4), f1.colors[gp.color].mul[0])
+            ds = [p_.depth for p_ in ps]
+            if len(set(ds)) != len(ds) or gp.depth != mk.depth + 1 or \
+                    min(p_.depth for p_ in ps if p_.depth > mk.depth and p_ is not gp) != gp.depth + 1:
+                bad_depth.append(panel)
+        check('round gauge v1.1 (the user: "far too small ... about the size of the fighter emblem (pokeball), slightly '
+              'smaller"): centred on each panel\'s emblem (mark_mc), its cell 0.87 of the emblem (254 px x its scale); '
+              'hidden by default (alpha 0: the user: "appearing on fighters other than Greninja"; the executable shows it '
+              'on his panel)', got, {p_: (x, y, s_, 0) for p_, (x, y, s_, _d) in em.items()})
+        check('... drawn right above the emblem and under every other part of the panel (the percent, the portrait: their '
+              'depths one up), every depth in a panel its own', bad_depth, [])
+        return
     over = []
     for panel, (x, y, sc) in GF.PLACES.items():
         bx, by, bs = TB.PLACES[panel]
@@ -3331,6 +3360,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (37, 38):   # round gauge v1: the damage panel's files; clone fix v3: his MSC
         want_top = ['INSTALL_TO_data', 'README.txt']
+    if len(earlier) == 40:   # round gauge v1.1: the panel file and the exes
+        want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) == 39:   # freeze fix v1: his MSC, v3's files reverted one at a time (test)
         want_top = ['INSTALL_TO_data', 'README.txt', 'TEST_ONLY_DATA']
     if len(earlier) == 36:   # clone articles v1: the exes and the MSCs
@@ -3373,10 +3404,10 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('update: none of the installed unchanged files again (%d unchanged)%s' % (len(same1), ', but skeleton.lvd' if again
               else ''), [w for w in same1 if w in names and w not in again], [])
         check('update: nothing in INSTALL_TO_data but the built files%s' % (' (and round gauge v1\'s ui/info/dmg: gauge_tests)'
-                                                                          if len(earlier) == 37 else ''),
+                                                                          if len(earlier) in (37, 40) else ''),
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want and
-                     n not in again and not (len(earlier) == 37 and n.startswith('INSTALL_TO_data/ui/info/dmg/'))), [])
-        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39):
+                     n not in again and not (len(earlier) in (37, 40) and n.startswith('INSTALL_TO_data/ui/info/dmg/'))), [])
+        if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 21:
             check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
@@ -3445,6 +3476,15 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               ['ui/info/dmg/dmg.flx', 'ui/info/dmg/img-00135.nut', 'ui/info/dmg/texlist.lst'])
         if GAUGE_SRC and GAUGE_JPG:
             gauge_tests(z)
+    if z1 and len(earlier) == 40:
+        check('round gauge v1.1: INSTALL_TO_data: ui/info/dmg\'s dmg.flx only (texlist / img-00135 as v1); INSTALL_TO_code: '
+              'exe_v46z_gkb12 (feature gauge2: the charge cyan, the diag\'s S4GB line with the clip found); TEST_ONLY: '
+              'A_release', (sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and
+                                   not n.endswith('/')),
+                            sorted({n.split('/')[1] for n in names if n.startswith('TEST_ONLY_INSTALL_TO_code/') and n.count('/') > 1})),
+              (['ui/info/dmg/dmg.flx'], ['A_release']))
+        if GAUGE_SRC and GAUGE_JPG:
+            gauge_tests(z, v11=True, inst=z1)
     if z1 and len(earlier) == 39:
         check('freeze fix v1: INSTALL_TO_data: his MSC only (no bitXor); TEST_ONLY_DATA: each of clone fixes v3\'s files as '
               'clone articles v1 had it',
@@ -3697,7 +3737,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
                                                                len(earlier) == 18, len(earlier) >= 19, len(earlier) in (19, 20),
                                                                len(earlier) == 21, len(earlier) in (22, 23, 24, 25),
                                                                len(earlier) in (26, 27, 28, 29), len(earlier) == 30,
-                                                               len(earlier) in (31, 32))):
+                                                               len(earlier) in (31, 32), len(earlier) == 33,
+                                                               len(earlier) in (34, 35), len(earlier) in (36, 37, 38, 39))):
             if not b:
                 continue
             p = os.path.join(td, '%d.rpx' % i)
@@ -3736,7 +3777,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 40)) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 41)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -3783,6 +3824,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
          'unconfirmed') if len(earlier) == 38 else \
         ('greninja_clonefix_v3', 'froze', 'bitXor', '0x19', 'revert_1_gekkouga_msc', 'revert_2_clone_effect',
          'revert_3_clone_msc', 'revert_4_shuriken_msc', 'exe_v46z_gkb11', 'unconfirmed') if len(earlier) == 39 else \
+        ('greninja_freeze_fix_v1', 'emblem', '0.87', 'hidden', 'Greninja', 'cyan', 'exe_v46z_gkb12', 'S4GB', 'clip',
+         'preview', 'unconfirmed') if len(earlier) == 40 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -3795,7 +3838,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
 
 
 def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=False, b2=False, gkb5=False, gkb6=False,
-                gkb7=False, gkb8=False, gkb9=False, gkb10=False):
+                gkb7=False, gkb8=False, gkb9=False, gkb10=False, gkb11=False):
     """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant; skeleton v1 the
     release and TEST_ONLY A_release (as the burn packages)"""
     import gekkouga_clone_cave as C
@@ -3815,6 +3858,8 @@ def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=
         drop |= {'btint'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 else set()   # (burn tint v1's gkb9)
         drop |= {'mark', 'sksnd'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 else set()   # (skeleton v1.7's gkb10)
         drop |= {'cart'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 or gkb10 else set()   # (clone articles v1's gkb11)
+        drop |= {'gauge2'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 or gkb10 or gkb11 else set()   # (round
+        # gauge v1.1's gkb12)
         variants = C.VARIANTS if not (sk12 or b2 or gkb5 or gkb6 or gkb7) else \
             C.VARIANTS + (('G_pose', (C.RELEASE - {'sway'}) | {'pose'}),)       # (up to v1.5: + G_pose)
         return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE - drop)] + \
@@ -3850,7 +3895,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
                                                 len(earlier) >= 19, len(earlier) in (19, 20), len(earlier) == 21,
                                                 len(earlier) in (22, 23, 24, 25), len(earlier) in (26, 27, 28, 29),
                                                 len(earlier) == 30, len(earlier) in (31, 32), len(earlier) == 33,
-                                                len(earlier) in (34, 35)):
+                                                len(earlier) in (34, 35), len(earlier) in (36, 37, 38, 39)):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')
@@ -3876,7 +3921,7 @@ def main():
     GAUGE_JPG = next((x[12:] for x in sys.argv[1:] if x.startswith('--gauge-jpg=')), None)
     a = [x for x in sys.argv[1:] if not x.startswith('--v') and not x.startswith('--fx=') and not x.startswith('--gauge-')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3', 'ff') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]

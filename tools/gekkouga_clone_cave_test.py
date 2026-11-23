@@ -2157,8 +2157,10 @@ def panel_checks(e, info, diag):
     check('v6 panel: the burnout 3020 -> 20, grey (mode 3)', run(3020)[1][2:], [('ko_set', P, 0, 20), ('colour', ko, A['ctf'] + 36)])
     check('v6 panel: nothing (0) -> the meter hidden', run(0)[1], [('prev', P), ('visible', ko, 0)])
     check('v6 panel: a bad mode (7000) -> hidden', run(7000)[1][1:], [('visible', ko, 0)])
-    check('v6 gauge colours: as is / blue / grey', bytes(e.mu.mem_read(A['ctf'], 48)),
-          b''.join(struct.pack('>4B4h', *c) for c in C.GAUGE_COLOURS))
+    g2 = 'gauge2' in info['feats']
+    check('v6 gauge colours: as is / blue / grey%s' % (' (round gauge v1.1, gauge2: the charge cyan)' if g2 else ''),
+          bytes(e.mu.mem_read(A['ctf'], 48)),
+          b''.join(struct.pack('>4B4h', *c) for c in (C.GAUGE_COLOURS2 if g2 else C.GAUGE_COLOURS)))
     # v7: the round gauge (gkgauge_mc in his panel's root clip: tools/gekkouga_gauge_flx.py)
     root = e.alloc(0x100, b'\0')
     e.setw(slot(0) + 0x5C, root)

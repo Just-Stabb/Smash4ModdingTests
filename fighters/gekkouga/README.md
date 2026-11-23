@@ -1636,3 +1636,28 @@ data fine).
 - **TEST_ONLY_DATA** `revert_1` - `revert_4`: each of v3's four files as before v3 (his MSC, the clone's effect.bin,
   the clone's MSC, the shuriken's MSC), to swap one at a time if the freeze stays.
 - Not confirmed in game.
+
+## Round gauge v1.1 (`greninja_round_gauge_v1_1.zip`, over freeze fix v1; exe_v46z_gkb12)
+
+The user (v1 in game, screenshot `$S/gk_in/clone_fx/round_gauge_ingame.webp`): "far too small. It should be about the
+size of the fighter emblem (pokeball), slightly smaller. Also it's appearing on fighters other than Greninja".
+- **Size / place** (`tools/gekkouga_gauge_flx.py` `build(v11=True)`, `emblem_places`):
+  - centred on each panel sprite's `mark_mc` (the series emblem: a 254 px quad x its scale), its whole cell
+    `GAUGE_EMBLEM` 0.87 of it: panels 3 / 4 x 0.561 (144 of 165 px), 1 x 0.420, 2 x 0.453;
+  - drawn right above the emblem (depth + 1; every other part of panels 1 - 4 one depth up, `raise_above`, their places
+    theirs only), under the percent, the portrait and the rest.
+- **Greninja only:**
+  - v1's clip was visible in the shared panel layout, and only Greninja's panel was driven by the exe (`gk_panel`), so
+    every panel showed it.
+  - Now it is placed with alpha 0. The exe's colour (alpha 100) and visibility show it on his panel only, when his
+    VAR_19 has a mode.
+- **Colour** (exe feature `gauge2`, `GAUGE_COLOURS2`): the charge (mode 1) cyan (25 / 90 / 100; was "as is": white).
+  The diag's S4GB line adds `gauge clip=%08X` (0: not found, the KO meter's way).
+- Previews: `$S/gk_preview/round_gauge_v1_1_panels.png` (without / with the gauge, per layout; the emblem is a run-time
+  picture: the grey box).
+- Tests:
+  - `gauge_tests(v11)`: rebuilt byte for byte; centre / scale / alpha 0 per panel; depths;
+  - v1's flx still rebuilds byte for byte with `v11=False`;
+  - the cave test's colour check, by feature;
+  - gkb11 rebuilds byte for byte without `gauge2`.
+- Not confirmed in game.
