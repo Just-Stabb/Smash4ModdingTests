@@ -833,13 +833,29 @@ void func_75()
 // clone out, right after his own shot, and marks them waiting in his channel's flags (512 the left-spawned clone's, 1024 the
 // right-spawned one's; kept 3 frames). A shuriken in its first frames with a copy waiting claims it (the first one not yet
 // claimed this frame: claim bits 64 / 128 in his VAR_30, cleared by him every frame) and, once shot (status 2 Shot / 4
-// MaxShot), moves once by that clone's place minus his (his channel's VAR_24 / 25 or 26 / 27; his place: the position
-// variables), then flies on as shot (his facing, his charge). His own shuriken was made long before (his hold): never a copy.
+// MaxShot), moves by that clone's place minus his (his channel's VAR_24 / 25 or 26 / 27: the clone's live place, wherever
+// it stands; his place: the position variables), then flies on as shot (his facing = the clone's: copies are made only in
+// formation; his charge). His own shuriken was made long before (his hold): never a copy.
+// Clone fix v3 (the user: "articles spawned from clones spawn from the main body, rather than spawning from the clone"):
+// the copies were seen at his hand: the one move (v1) can be undone by the game placing the shot at his hand after it. Now
+// for sh_fix_frames() frames after the move each frame checks where the game left it: nearer to the path from his hand
+// (where it was set minus the offset) than to where it was set -> re-placed by the game: moved by the offset again.
+// Diag: each set reports (once a frame: VAR_30 + 256 x the report, his MSC turns it into his VAR_23 for the S4GF line,
+// clones.c gk_sh_report): the clone, first set / set again, and the copy's place minus the clone's (2s, -40 - 40).
 // ===================================================================
 int sh_t;              // frames alive
 int sh_slot;           // its owner's slot (1 - 8), 0 none
 int sh_clone;          // the clone it is a copy for (1 / 2), 0 none (his own)
-int sh_moved;          // moved by its clone's offset
+int sh_moved;          // frames since its move (0 not moved yet)
+float sh_dx;           // clone fix v3: the offset it was moved by (the clone's place minus his, at the shot)
+float sh_dy;
+float sh_lx;           // ... where it was last (set or seen)
+float sh_ly;
+int sh_rep;            // ... a report waiting (1 first set, 2 set again)
+float sh_rx;           // ... its place minus the clone's, at that set
+float sh_ry;
+
+int sh_fix_frames() { return 8; }
 
 float sh_shared(int slot, int k)
 {
@@ -919,21 +935,88 @@ void sh_claim()
     WorkModule(0, (float)(beat + 64 * c) + 0, 0x0f000340 + 8 * (sh_slot - 1) + 6);
 }
 
-void sh_frame()
+int sh_q(float v)
 {
-    float dx;
-    float dy;
-    sh_t += 1;
-    if (sh_t <= 2 && sh_clone == 0)
+    int q;
+    q = (int)(v / 2.0f + 20.5f);
+    if (v < -41.0f)
     {
-        sh_claim();
+        q = 0;
     }
-    if (sh_clone == 0 || sh_moved || (global4 != 0x2 && global4 != 0x4))
+    if (q > 40)
+    {
+        q = 40;
+    }
+    return q;
+}
+
+// the report to his MSC (one a frame: none there yet), else tried again next frame
+void sh_report()
+{
+    int beat;
+    int r;
+    beat = (int)(sh_shared(sh_slot, 6) + 0.5f);
+    if (beat >= 256)
     {
         return;
     }
-    dx = sh_shared(sh_slot, 2 * sh_clone - 2) - sh_slot_pos(sh_slot, 0);
-    dy = sh_shared(sh_slot, 2 * sh_clone - 1) - sh_slot_pos(sh_slot, 1);
-    PostureModule(0x3, PostureModuleF(0x1) + dx, PostureModuleF(0x2) + dy, PostureModuleF(0x3));
-    sh_moved = 0x1;
+    r = sh_clone + 4 * (sh_rep - 1) + 8 * (sh_q(sh_rx) + 41 * sh_q(sh_ry));
+    WorkModule(0, (float)(beat + 256 * r) + 0, 0x0f000340 + 8 * (sh_slot - 1) + 6);
+    sh_rep = 0;
+}
+
+void sh_set(float x, float y, int kind)
+{
+    PostureModule(0x3, x, y, PostureModuleF(0x3));
+    sh_lx = x;
+    sh_ly = y;
+    sh_rx = x - sh_shared(sh_slot, 2 * sh_clone - 2);
+    sh_ry = y - sh_shared(sh_slot, 2 * sh_clone - 1);
+    sh_rep = kind;
+    sh_report();
+}
+
+void sh_frame()
+{
+    float x;
+    float y;
+    float e1;
+    float e2;
+    sh_t += 1;
+    if (sh_t <= 3 && sh_clone == 0)
+    {
+        sh_claim();
+    }
+    if (sh_rep != 0)
+    {
+        sh_report();
+    }
+    if (sh_clone == 0 || (global4 != 0x2 && global4 != 0x4))
+    {
+        return;
+    }
+    x = PostureModuleF(0x1);
+    y = PostureModuleF(0x2);
+    if (sh_moved == 0)
+    {
+        sh_dx = sh_shared(sh_slot, 2 * sh_clone - 2) - sh_slot_pos(sh_slot, 0);
+        sh_dy = sh_shared(sh_slot, 2 * sh_clone - 1) - sh_slot_pos(sh_slot, 1);
+        sh_moved = 0x1;
+        sh_set(x + sh_dx, y + sh_dy, 0x1);
+        return;
+    }
+    if (sh_moved > sh_fix_frames())
+    {
+        return;
+    }
+    sh_moved += 1;
+    e1 = sh_abs(x - sh_lx) + sh_abs(y - sh_ly);
+    e2 = sh_abs(x - (sh_lx - sh_dx)) + sh_abs(y - (sh_ly - sh_dy));
+    if (e2 < e1)
+    {
+        sh_set(x + sh_dx, y + sh_dy, 0x2);   // the game put it back on his path: onto the clone's again
+        return;
+    }
+    sh_lx = x;
+    sh_ly = y;
 }

@@ -1430,17 +1430,6 @@ def clonefix_v3_tests(mscsb, src):
     m('gekkouga_frame')
     check('the swaps aren\'t locked: down special + left at frame 4 still swaps (his place to the left clone\'s)',
           (g.status_req, round(g.x - x0, 3) != 0), ([], True))
-    # ---- the early despawns: a split clone off the stage's edge fell to its end (401 / 402); now they float back
-    for x0, held in ((30.0, False), (45.0, False), (45.0, True), (0.0, False)):
-        m, g, ev, modes = cf3_kick_edge(mscsb, src, x0, held)
-        check('clone fix v3: the aligned kick %s, %d from the edge of a 120-wide stage: no clone lost in 600 frames%s' %
-              ('tapped' if not held else 'held', 60 - x0, ' (a clone over nothing: both float back, formation after)'
-               if x0 else ' (in the middle: they stay split, no regroup)'),
-              (ev, 3 in modes if x0 else 3 not in modes, modes[-1] == 0 if x0 else modes[-1] == 2),
-              ([], True, True))
-    m, g, ev, modes = cf3_kick_edge(mscsb, src, 30.0, False, n=70)
-    check('... the regroup starts once the clone is falling over nothing (mode 3 by frame 50), its reason bit 64 set',
-          (modes.index(3) < 50, (m('gk_vi', 2) & 64) or 64), (True, 64))
     # ---- reasons
     m = fresh(mscsb, src)
     g = m.game
@@ -1463,42 +1452,6 @@ def clonefix_v3_tests(mscsb, src):
     m('gk_lw_press')
     frames(m, 720)
     check('... the timer\'s end: 302 as before', (g.vars.get(0x0F000317), m.g('gk_alive')), (302.0, 0))
-
-
-def cf3_kick_edge(mscsb, src, x0, held, n=600):
-    """the aligned kick at x0 on a stage 120 wide (floor -60 - 60 at y 10), after the lockout; his fall after it on the
-    floor; (the clones lost: (frame, alive, reason), the clones' mode each frame)"""
-    m = fresh(mscsb, src)
-    g = m.game
-    g.floors = [(-60.0, 60.0, 10.0)]
-    g.x, g.y = x0, 10.0
-    m.setg('gk_lw_charge', 300)
-    m('gk_lw_press')
-    frames(m, 14)
-    g.status_req = []
-    m('gk_lw_press')
-    m.vm.g[4] = 0x161
-    m('gk_ak_main')
-    st = 0x161
-    ev, modes = [], []
-    alive0 = m.g('gk_alive')
-    for t in range(1, n):
-        ak_frame(m, g, st=st, held=held and t <= 8)
-        m.vm.g[19], m.vm.g[18] = m.vm.g.get(18, 0), g.situation
-        if st == 0x161 and m('gk_ak_loop'):
-            st = g.status_req[-1][0]
-            m('gk_ak_end')
-        if st != 0x161 and g.y > 10:
-            g.y = max(10.0, g.y - 2.0)
-        g.situation = 2 if g.y > 10.001 else 0
-        if st == 0xE and g.situation == 0:
-            st = 0
-        a = m.g('gk_alive')
-        if a != alive0:
-            ev.append((t, a, int(g.vars.get(0x0F000317, 0)) % 1000))
-            alive0 = a
-        modes.append(int(g.vars.get(0x0F000388, 0)))
-    return m, g, ev, modes
 
 
 def clone_free_tests(mscsb, src):
@@ -1718,6 +1671,45 @@ def clone_articles_tests(mscsb, src, sk_mscsb, sh_mscsb, cl_mscsb):
     sm3.vm.g[4] = 2
     sm3('sh_frame')
     check('his own shuriken (no copy waiting): not a copy, not moved', (sm3.g('sh_clone'), sg3.x, sg3.y), (0, 3.0, 18.0))
+    # ---- clone fix v3 (the user: "articles spawned from clones spawn from the main body"): the clone's live place, held
+    sm4, sg4, sh4 = shur(0, 1)
+    sh4[0x0F000348 + 0], sh4[0x0F000348 + 1] = -37.0, 25.0     # the left clone away from its formation place (-14, 10)
+    sg4.x, sg4.y = 8.0, 18.0                                   # the shot at his hand (him at 0, 10)
+    sm4.vm.g[4] = 0
+    sm4('sh_frame')
+    sm4.vm.g[4] = 2
+    sm4('sh_frame')
+    p0 = (sg4.x, sg4.y)
+    check('clone fix v3: a copy for a clone standing away from its formation place (-37, 25): set at the clone\'s live place '
+          '+ his hand\'s offset (8, 8): (-29, 33); reported (VAR_30 + 256 x (clone 1, first set, its place - the clone\'s '
+          '(8, 8) -> 24 / 24))', (p0, sh4[0x0F000348 + 6]), ((-29.0, 33.0), 64.0 + 256 * (1 + 8 * (24 + 41 * 24))))
+    sg4.x += 3.0
+    sm4('sh_frame')
+    check('... flying on its own path (3 a frame): left alone', (sg4.x, sg4.y), (-26.0, 33.0))
+    sg4.x, sg4.y = 14.0, 18.0                                  # the game put it back on his path (his hand + 2 frames)
+    sm4('sh_frame')
+    check('... the game re-placing it on his path the next frame: put back on the clone\'s (+ the same offset)',
+          (sg4.x, sg4.y), (-23.0, 33.0))
+    sh4[0x0F000348 + 6] = 64.0                                 # (his MSC took the first report)
+    sg4.x += 3.0
+    sm4('sh_frame')
+    check('... its report (set again: kind 2, its place - the clone\'s (14, 8)) the next frame (one at a time); still on '
+          'the clone\'s path', (sh4[0x0F000348 + 6], sg4.x), (64.0 + 256 * (5 + 8 * (27 + 41 * 24)), -20.0))
+    for _ in range(10):
+        sg4.x, sg4.y = 50.0, 18.0
+        sm4('sh_frame')
+    check('... only in its first %d frames after the move (then it is the game\'s)' % 8, (sg4.x, sg4.y), (50.0, 18.0))
+    m = fresh(mscsb, src)
+    g = m.game
+    g.vars[0x0F00031E] = 64.0 + 256 * (5 + 8 * (27 + 41 * 24))
+    f0 = int(g.vars.get(0x0F000314, 0)) >> 20 & 1
+    m.vm.g[4] = 0
+    m('gekkouga_frame')
+    v = int(g.vars.get(0x0F000317))
+    check('his MSC: a copy\'s report -> his VAR_23 (the S4GF line: 701 / 702 first set, 801 / 802 set again, + 1000 x its '
+          'place - the clone\'s in 2s: X/2 + 20 + 41 x (Y/2 + 20)), the report taken off VAR_30, the flags\' 1048576 bit flipped '
+          '(a line)', (v % 1000, ((v // 1000 % 41 - 20) * 2, (v // 1000 // 41 - 20) * 2), g.vars.get(0x0F00031E),
+                       int(g.vars.get(0x0F000314)) >> 20 & 1 != f0), (801, (14, 8), 64.0, True))
     # ---- the clone's hitboxes cleared on a new motion (the user: the kick's hitboxes never cleared)
     c = MSC(cl_mscsb, GB.CLONE_MSC)
     cg = c.game
@@ -3376,9 +3368,10 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         if GAUGE_SRC and GAUGE_JPG:
             gauge_tests(z)
     if z1 and len(earlier) == 38:
-        check('clone fix v3: INSTALL_TO_data: his MSC only (the activating press used up, the kick\'s 10-frame lockout); the '
-              'exe is clone articles v1\'s', sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/')
-                                                   and not n.endswith('/')), ['fighter/gekkouga/script/msc/gekkouga.mscsb'])
+        check('clone fix v3: INSTALL_TO_data: his MSC (the activating press used up, the kick\'s lockout, the removal reasons, '
+              'the copies\' reports) and his shuriken\'s (the copies held on their clone\'s place); the exe is clone articles '
+              'v1\'s', sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+              ['fighter/gekkouga/script/msc/gekkouga.mscsb', 'fighter/gekkouga/script/msc/shuriken/shuriken.mscsb'])
     if z1 and len(earlier) == 36:
         check('clone articles v1: INSTALL_TO_data: his MSC (the clones\' skeletons / shuriken copies, the KO\'s smash charge), '
               'the clone\'s (its hitboxes cleared on a new motion), the skeleton\'s (its seat), his shuriken\'s (new: the '
@@ -3649,7 +3642,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 38)) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 39)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -3692,7 +3685,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clone_articles_v1', 'round', 'gauge', 'img-00135', 'texlist', 'KO meter', 'badge', 'ring', 'fill',
          'cyan', 'blue', 'grey', 'preview', 'unconfirmed') if len(earlier) == 37 else \
         ('greninja_clone_articles_v1', 'round gauge', 'exe_v46z_gkb11', 'activates', '10 frames', 'fresh press', 'held',
-         'buffer', 'kick', 'unconfirmed') if len(earlier) == 38 else \
+         'kick', 'shuriken', 'clone\'s place', 'S4GF', 'gen=', '500', '600', '701', '801', 'unconfirmed') if len(earlier) == 38 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \

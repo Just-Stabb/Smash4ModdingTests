@@ -130,6 +130,7 @@ void gekkouga_frame()
     gk_sk_heartbeat();
     gk_sk_queue();                        // clone articles v1: the clones' skeletons, one a frame after his
     gk_sh_tick();                         // ... and their shurikens' claim bits
+    gk_sh_report();                       // clone fix v3 diag: a shuriken copy's report (before the heartbeat's clear)
     if (gk_sk_req_t > 0)
     {
         gk_sk_req_t -= 1;
@@ -224,6 +225,7 @@ void gekkouga_frame()
     flags = flags | gk_ac_diag();         // aerial chain v1 diag (256 up: the exe's S4GF line logs a change)
     flags = flags | gk_tc_diag();         // tilt chain v1 diag (2097152 + the same fields, in a jab / tilt)
     flags = flags | gk_cl_diag();         // clone fixes v2 diag (1048576 toggled: an S4GF line with VAR_23)
+    flags = flags ^ (gk_vi(62) * 1048576); // clone fix v3 diag: ... and flipped at each shuriken copy's report
     if (gk_ability > 0)
     {
         flags = flags | gk_vi(4);         // v4 diag: 64 / 128 a clone about to be made (next frame; gk_gen_req)
@@ -2111,7 +2113,7 @@ int gk_cl_diag()
 // (moved out of the globals), 8 the clones' mode (0 formation, 1 the aligned kick, 2 split, 3 regrouping), 9 the kick
 // used this airtime, 10 the kick's clock, 11 its variant (1 tapped, 2 held), 12 the regroup's clock, 13 the clones' effects
 // epoch (flags 256), 14 his situation last frame (clone articles v1: 6 / 7, 15, 57 - 59: there; clone fix v3: 60 the
-// kick armed, 61 a removal reason written this frame); 16 x b + k body b's
+// kick armed, 61 a removal reason written this frame, 62 the shuriken reports' parity); 16 x b + k body b's
 // (1 the left-spawned clone, 2 the right-spawned one, 3 him): k 0 action, 1 frames in it, 2 motion kind, 3 its start
 // frame, 4 the command's seq, 5 facing, 6 X speed, 7 Y speed (his; the clones' are gk_lvy / gk_rvy), 8 flight frames
 // left, 9 air jumps used, 10 smash charge, 11 smash chain, 12 tilted (the kick), 13 aux (smash type + 8 x auto / the
@@ -2756,41 +2758,9 @@ void gk_free_frame()
     {
         gk_svi(8, 0x2);                   // both flights over: split
     }
-    if (m == 0x2)
-    {
-        gk_void_check();                  // clone fix v3: one falling over nothing: they float back (not lost)
-    }
     if (m == 0x3 && gk_vi(12) >= gk_rg_frames())
     {
         gk_free_end();                    // regrouped: formation again
-    }
-}
-
-// clone fix v3 (the user: "clones will sometimes despawn early when using down special"): split clones (after the
-// aligned kick) can't grab ledges or recover, so a clone the kick's flight / its carried speed / his mirrored inputs took
-// past the stage's edge fell to the blast zone and was gone (reason 401 / 402: the MSC interpreter, a kick 30 from a
-// 60-wide stage's edge). Now a split clone falling (in the air, going down) with no floor under it within
-// gk_void_depth() makes both float back to him (the regroup, without his pose), back in formation after it.
-float gk_void_depth() { return 400.0f; }
-
-void gk_void_check()
-{
-    int c;
-    float y;
-    c = 0x1;
-    while (c <= 0x2)
-    {
-        if ((gk_alive & c) && gk_fall_t(c) > 0 && gk_cvy(c) < 0)
-        {
-            y = gk_cy(c);
-            if (gk_floor(gk_cx(c), y, y - gk_void_depth()) == 0)
-            {
-                gk_rg_begin();
-                gk_cl_why_or(0x40);       // (diag: the S4GF periodic line's reasons: 64 an off-stage regroup)
-                return;
-            }
-        }
-        c += 1;
     }
 }
 
@@ -3803,6 +3773,24 @@ void gk_sh_copies()
         r = ArticleModule(0x2710, 0);
         ArticleModule(0x2719, 0);
     }
+}
+
+// clone fix v3 diag: a shuriken copy's report in his VAR_30 (256 x: clone + 4 x (0 first set, 1 set again) + 8 x (its
+// place minus the clone's: X/2 + 20 + 41 x (Y/2 + 20), each 0 - 40); weapons/shuriken.c sh_report): his VAR_23 = 700 / 800
+// + the clone + 1000 x the place (the S4GF line: slot 62 flips the flags' 1048576 bit so the line is written)
+void gk_sh_report()
+{
+    int beat;
+    int r;
+    beat = (int)(WorkModuleF(0, 0x0f00031e) + 0.5f);
+    if (beat < 256)
+    {
+        return;
+    }
+    r = beat / 256;
+    WorkModule(0, (float)(beat % 256) + 0, 0x0f00031e);
+    gk_why(700 + 100 * ((r / 4) % 2) + 1000 * (r / 8), r % 4);
+    gk_svi(62, 0x1 - gk_vi(62));
 }
 
 void gk_sh_tick()
