@@ -3,7 +3,7 @@
 // Greninja's clones and smash charges (fighters/gekkouga/README.md "Clones v1" - "Clones v3")
 //
 // Down special: held, it charges (the Substitution stance, no counter); 300 frames held in all (kept between
-// presses and stocks) make it ready, and the next down special starts the ABILITY (720 frames): two clones
+// presses and stocks) make it ready, and the next down special starts the ABILITY (840 frames): two clones
 // (articles 6 / 7, weapon kind 0x1A1, fighters/gekkouga/weapons/clone.c) left and right of him that play his
 // motions and hit with his hitboxes, his name tag hidden; down special + left / right swaps him with that clone.
 // A clone hit (his counter shape's capsules at the clones, tools/gekkouga_clone_cave.py) turns into a log.
@@ -80,7 +80,8 @@ float gk_fp_v;         // ... his pursuit speed last frame
 int gk_ib_t;           // ice detonation v1: frames the executable's blast request (his gk_vi(48) - 51) has been up
 
 int gk_lw_full() { return 300; }          // 5 seconds held (the user)
-int gk_ability_frames() { return 720; }   // 12 seconds
+int gk_ability_frames() { return 840; }   // 14 seconds (usmash spike v2 / trail dim v1, the user: "increase the clone
+                                          // length to 14 seconds"; 12 s, 720, before)
 int gk_burnout_frames() { return 480; }   // 8 seconds
 float gk_gap() { return 14.0f; }          // the clones' spacing (tools/gekkouga_clone_cave.py GAP)
 int gk_lw_hold_frame() { return 14; }     // the stance's frame held while charging (its counter window 8 - 30)

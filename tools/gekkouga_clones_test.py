@@ -13,7 +13,7 @@ package's cross_f.rpx was built on (exe_v46z_ui10; its _diag for TEST_ONLY's).
 
 1. MSC logic: the compiled gekkouga.mscsb run in a small MSC interpreter (tools/rolloff_hold_test.py's VM) with the
    game's modules stubbed, function by function as the game calls them: the down special charge (accumulation, kept
-   across releases, the 300-frame threshold, the bar's pips), the ability (720 frames: the clones made at 0 / 3 with
+   across releases, the 300-frame threshold, the bar's pips), the ability (840 frames: the clones made at 0 / 3 with
    their ids, the channel, the name tag / clone flags, their removal), the burnout (480: grey every frame, the slow
    flag, the down special blocked), the swaps (offsets, his move, a dead clone, the cooldown), a clone hit (the
    nearest one, its log at its place, his place back, the capsules), a KO ending it, the smash charge store (kept,
@@ -303,9 +303,9 @@ def msc_tests(mscsb, src):
     # ---- the charge: accumulation, kept, threshold
     m = fresh(mscsb, src)
     g = m.game
-    check('constants: 300 / 720 / 480 / gap 14 / smash full 120 (v3) / hitbox growth 5 (v4)',
+    check('constants: 300 / 840 (usmash spike v2 / trail dim v1: 14 s; 720 before) / 480 / gap 14 / smash full 120 (v3) / hitbox growth 5 (v4)',
           (m('gk_lw_full'), m('gk_ability_frames'), m('gk_burnout_frames'), round(i2f(m('gk_gap') & 0xFFFFFFFF), 3),
-           m('gk_smash_full'), round(i2f(m('gk_smash_grow') & 0xFFFFFFFF), 3)), (300, 720, 480, 14.0, 120, 5.0))
+           m('gk_smash_full'), round(i2f(m('gk_smash_grow') & 0xFFFFFFFF), 3)), (300, 840, 480, 14.0, 120, 5.0))
     r = m('gk_lw_press')
     check('down special, not charged: the stance (status 0x155)', (r, g.status_req), (1, [(0x155, 1)]))
     g.status_req = []
@@ -348,7 +348,7 @@ def msc_tests(mscsb, src):
     g.log = []
     r = m('gk_lw_press')
     check('ready: the press starts the ability (no status), the charge used',
-          (r, g.status_req, m.g('gk_ability'), m.g('gk_lw_charge')), (0, [], 720, 0))
+          (r, g.status_req, m.g('gk_ability'), m.g('gk_lw_charge')), (0, [], 840, 0))
     g.held = set()                        # (clone fix v3: the activating press let go: the kick armed after the lockout)
     g.x = 50.0
     frames(m, 1)
@@ -359,7 +359,7 @@ def msc_tests(mscsb, src):
     check('frame 1: the left clone (article 6) made, VAR_31 = 4747000 + alive 1 + being made (left) 4, its smoke at X - 14',
           (arts, g.vars.get(0x0F00031F), [x[3] for x in g.log if x[0] == 'effect' and x[2] == 0x3300006]),
           ([('article', 0x2710, 6)], 4747005.0, [36.0]))
-    check('v6: the gauge in the ability: mode 2, 719 / 720 left -> 99', g.vars.get(0x0F000313), 2099.0)
+    check('v6: the gauge in the ability: mode 2, 839 / 840 left -> 99', g.vars.get(0x0F000313), 2099.0)
     check('v2: the ability hides his name tag (the cursor op BattleObject(0xA, 0))', [x for x in g.log if x[0] == 'cursor'],
           [('cursor', 0)])
     frames(m, 3)
@@ -461,7 +461,7 @@ def msc_tests(mscsb, src):
     left = m.g('gk_ability')
     g.log = []
     frames(m, left)
-    check('the ability ran 720 frames in all, then the burnout 480', (m.g('gk_ability'), m.g('gk_burnout')), (0, 480))
+    check('the ability ran 840 frames in all, then the burnout 480', (m.g('gk_ability'), m.g('gk_burnout')), (0, 480))
     check('v6: the gauge in the burnout: mode 3, 480 / 480 left -> 99 (100 is only the charge\'s "ready")', g.vars.get(0x0F000313), 3099.0)
     check('its end: the channel closed (magic 0), flags 2 (slow)', (g.vars.get(0x0F00031F), g.vars.get(0x0F000314)), (0.0, 2.0))
     cur = [x for x in g.log if x[0] == 'cursor']
@@ -2412,7 +2412,7 @@ def clonefix_v3_tests(mscsb, src):
     g = m.game
     m.setg('gk_lw_charge', 300)
     m('gk_lw_press')
-    frames(m, 720)
+    frames(m, 840)
     check('... the timer\'s end: 302 as before', (g.vars.get(0x0F000317), m.g('gk_alive')), (302.0, 0))
 
 
