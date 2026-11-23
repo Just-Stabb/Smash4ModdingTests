@@ -45,10 +45,18 @@ fails = 0
 checks = 0
 
 
-def check(what, got, want):
+def _near(a, b, tol):
+    if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):
+        return len(a) == len(b) and all(_near(x, y, tol) for x, y in zip(a, b))
+    if isinstance(a, float) or isinstance(b, float):
+        return isinstance(a, (int, float)) and isinstance(b, (int, float)) and abs(a - b) <= tol
+    return a == b
+
+
+def check(what, got, want, tol=None):
     global fails, checks
     checks += 1
-    ok = got == want
+    ok = got == want if tol is None else _near(got, want, tol)
     fails += not ok
     print('%s %s%s' % ('ok  ' if ok else 'FAIL', what, '' if ok else ': %r (want %r)' % (got, want)))
     return ok
@@ -2185,7 +2193,10 @@ def panel_checks(e, info, diag):
     def find(e_):
         atom = e_.w(e_.r(4))
         parent = e_.r(3)
-        name = [n for n, a_ in atoms.items() if a_ == atom][0]
+        known = [n for n, a_ in atoms.items() if a_ == atom]
+        if not known:
+            return None                 # (UI v1's clips: ui_checks' own stub answers)
+        name = known[0]
         ok = (parent == root) if name == 'gkgauge_mc' else (parent == clips['gkgauge_mc'])
         return clips[name] if ok else 0
     e.stub(C.FLX_INTERN, intern)
@@ -2232,7 +2243,9 @@ def panel_checks(e, info, diag):
               ([('colour', clips['gkgauge_mc'], A['ctf'] + 12)], 4, 0))
     check('v7: the ability (2050): blue', [c for c in run2(2050) if c[0] == 'colour'], [('colour', clips['gkgauge_mc'], A['ctf'] + 24)])
     check('v7: nothing (0): the gauge hidden, no ring calls', run2(0), [('visible', ko, 0), ('visible', clips['gkgauge_mc'], 0)])
-    check('v7: the names interned each frame from the atom pool', [c for c in e.calls if c[0] == 'intern'][:1], [('intern', 'gkgauge_mc', True)])
+    check('v7: the names interned each frame from the atom pool', [c for c in e.calls if c[0] == 'intern' and c[1] == 'gkgauge_mc'][:1], [('intern', 'gkgauge_mc', True)])
+    if 'gkui' in info['feats']:
+        ui_checks(e, info, diag, P, slot, root, clips, ko, ko2)
     e.setw(slot(0) + 0x5C, 0)
     if diag:
         e.calls = []
@@ -2243,6 +2256,178 @@ def panel_checks(e, info, diag):
         run(1043)
         n3 = len([c for c in e.calls if c[0] == 'osr'])
         check('v6 diag: S4GB logged when the gauge changes by a tenth (1034 no, 1043 yes)', (n2, n3), (0, 1))
+
+
+def ui_checks(e, info, diag, P, slot, root, clips, ko, ko2):
+    """UI radar / waveform v1 (feature gkui): gk_ui from gk_panel on his panel only: the radar (shown, the beetle shown /
+    hidden by the Parabeetle's cooldown, the sweep's spin per state) and the waveform (shown, its frame by the smash
+    charge, rainbow and fast at full, its colour) from his New_Var 58 (UI_VAR)"""
+    lab, A = info['labels'], info['A']
+    names = C.gauge_names(info['feats'])
+    check('UI v1: the clip names after the round gauge\'s (gk_find indices 6 - 10: the panel\'s gekkouga_gauge_flx.UI_NAMES)',
+          (names[len(C.GAUGE_NAMES):], [e.w(A['gk_names'] + 8 * i + 4) for i in range(len(names))]),
+          (C.UI_NAMES, [len(n) for n in names]))
+    check('UI v1: the constants: the sweep 3.6 / 0.9 degrees a frame (a turn in 100 / 400 frames: 1.67 s, a quarter speed '
+          'on cooldown), 360; the colours (the radar as drawn, the waveform cyan below full, as drawn at full)',
+          (struct.unpack('>3f', bytes(e.mu.mem_read(A['ui_k'], 12))), bytes(e.mu.mem_read(A['ui_col'], 36))),
+          ((C.UI_SPEED, C.UI_SPEED_CD, 360.0), b''.join(struct.pack('>4B4h', *c) for c in C.UI_COLOURS)), tol=1e-5)
+    check('UI v1: ... ready a turn per %.2f s, on cooldown per %.2f s (the user: "spin slowly")' % (
+          360 / C.UI_SPEED / 60, 360 / C.UI_SPEED_CD / 60), (round(360 / C.UI_SPEED), round(C.UI_SPEED / C.UI_SPEED_CD, 3)),
+          (100, 4.0))
+    roots = {'his': root, 'mac': e.alloc(0x100, b'\0')}
+    uclips = {(w, n): e.alloc(0x100, b'\0') for w in roots for n in C.UI_NAMES}
+    atoms = {n: 0x7000 + i for i, n in enumerate(names)}
+    for i in range(C.SLOTS):
+        e.setw(A['ui_ang'] + 4 * i, 0)
+    e.setw(slot(2) + 0x5C, roots['mac'])
+    have = {'wave': True, 'beetle': True}
+
+    def intern(e_):
+        name = bytes(e_.mu.mem_read(e_.r(4), e_.r(5))).decode()
+        return atoms.get(name, 0)
+
+    def find(e_):
+        atom, parent = e_.w(e_.r(4)), e_.r(3)
+        name = [n for n, a_ in atoms.items() if a_ == atom][0]
+        if name == 'gkgauge_mc':
+            return clips[name] if parent == root else 0
+        if name in C.GAUGE_NAMES:
+            return clips[name] if parent == clips['gkgauge_mc'] else 0
+        if name == 'gkwave_mc' and not have['wave'] or name == 'gk_rbeetle_mc' and not have['beetle']:
+            return 0
+        for w, r_ in roots.items():
+            if name in ('gkradar_mc', 'gkwave_mc') and parent == r_:
+                return uclips[(w, name)]
+            if parent == uclips[(w, 'gkradar_mc')]:
+                return uclips[(w, name)]
+        return 0
+    e.stub(C.FLX_INTERN, intern)
+    e.stub(C.FLX_FIND, find)
+    ui = {v: k[1] for k, v in uclips.items() if k[0] == 'his'}
+    mac = set(v for k, v in uclips.items() if k[0] == 'mac')
+
+    def frame(word, gauge=0):
+        e.vars = {C.VAR_GAUGE: float(gauge), C.UI_VAR: float(word)}
+        e.calls = []
+        e.osr_full = []
+        for i in range(14, 32):
+            e.mu.reg_write(REGS[i], 0x5A5A0000 + i)
+        e.call(lab['gk_panel'], P)
+        out = []
+        for c in e.calls:
+            if c[0] in ('visible', 'colour', 'rotate', 'goto') and (c[1] in ui or c[1] in mac):
+                out.append((c[0], ui.get(c[1], 'MAC:%X' % c[1])) + tuple(c[2:]))
+        return out, e.kept()
+    e.setw(A['ui_t'], 0)
+    got, kept = frame(0)
+    check('UI v1: ready, no charge (0): the radar shown in the radar colour, the beetle shown, the sweep turned 3.6 from 0; '
+          'the waveform shown on frame %d (level 0, phase 0) in the calm cyan, stopped; the registers kept; Little Mac\'s '
+          'panel (the same clips in it) untouched' % C.ui_frame(0, 1),
+          (got, kept, struct.unpack('>H', bytes(e.mu.mem_read(uclips[('his', 'gkwave_mc')] + 0x9C, 2)))[0]),
+          ([('visible', 'gkradar_mc', 1), ('colour', 'gkradar_mc', A['ui_col']), ('visible', 'gk_rbeetle_mc', 1),
+            ('rotate', 'gk_rsweep_mc', round(C.UI_SPEED, 2)), ('visible', 'gkwave_mc', 1), ('goto', 'gkwave_mc', 1),
+            ('colour', 'gkwave_mc', A['ui_col'] + 12)], True, 1))
+    check('UI v1: his New_Var 58 read (UI_VAR 0x%08X: his MSC\'s gk_ui)' % C.UI_VAR,
+          C.UI_VAR in [c[1] for c in e.calls if c[0] == 'getf'], True)
+    angs = []
+    for t in range(99):
+        got, _k = frame(30)
+        angs.append([c[2] for c in got if c[0] == 'rotate'][0])
+    check('UI v1 spin, ready: 3.6 degrees every frame, a full turn in 100 frames, kept in 0 - 360 (frames 2 - 100)',
+          angs, [round((C.UI_SPEED * (k + 2)) % 360.0, 2) for k in range(99)], tol=0.05)
+    e.setw(A['ui_ang'], 0)
+    got, _k = frame(450 * 1000 + 30)
+    check('UI v1: the Parabeetle\'s cooldown (450 left): the beetle hidden, the sweep a quarter speed (0.9)',
+          [c for c in got if c[1] in ('gk_rbeetle_mc', 'gk_rsweep_mc')],
+          [('visible', 'gk_rbeetle_mc', 0), ('rotate', 'gk_rsweep_mc', round(C.UI_SPEED_CD, 2))])
+    angs, beet = [], []
+    for left in range(449, 0, -1):
+        got, _k = frame(left * 1000 + 30)
+        angs.append([c[2] for c in got if c[0] == 'rotate'][0])
+        beet.append([c[2] for c in got if c[1] == 'gk_rbeetle_mc'][0])
+    check('UI v1 spin, cooldown: 0.9 a frame for its whole 450 frames (a turn in 400), the beetle hidden every frame',
+          (angs[::50], set(beet)), ([round((C.UI_SPEED_CD * (k + 2)) % 360.0, 2) for k in range(449)][::50], {0}), tol=0.05)
+    a0 = angs[-1]
+    got, _k = frame(30)
+    check('UI v1: the cooldown over (0): the beetle shown again, the sweep at full speed from where it was',
+          [c for c in got if c[1] in ('gk_rbeetle_mc', 'gk_rsweep_mc')],
+          [('visible', 'gk_rbeetle_mc', 1), ('rotate', 'gk_rsweep_mc', round((a0 + C.UI_SPEED) % 360.0, 2))], tol=0.05)
+    # the waveform's mapping
+    rows = []
+    for ch in (0, 19, 20, 39, 40, 59, 60, 79, 80, 99, 100, 119):
+        e.setw(A['ui_t'], 0)
+        got, _k = frame(ch)
+        rows.append([c[2] for c in got if c[0] == 'goto'][0])
+    check('UI v1 waveform: its level by the charge (charge x 6 / 120: 0 - 19 -> frames 1 - 6, ... 100 - 119 -> 31 - 36: the '
+          'amplitude grows with it), phase 0 at its first count', rows,
+          [C.ui_frame(ch, 1) for ch in (0, 19, 20, 39, 40, 59, 60, 79, 80, 99, 100, 119)])
+    check('... = tools/gekkouga_ui_art.wave_index (the frames the art draws) + 1', rows,
+          [1 + C.UI_LEVELS * C.UI_PHASES * 0 + ((ch * 6 // 120) * 6) for ch in (0, 19, 20, 39, 40, 59, 60, 79, 80, 99, 100, 119)])
+    e.setw(A['ui_t'], 0)
+    seq = []
+    for t in range(60):
+        got, _k = frame(70)
+        seq.append([c[2] for c in got if c[0] == 'goto'][0])
+    check('UI v1 waveform below full (70: level 3): gently animated: its phase a step every 8 frames (a wavelength in 48)',
+          seq, [C.ui_frame(70, t + 1) for t in range(60)])
+    check('... the frames 19 - 24 only (level 3), each held 8 frames', (sorted(set(seq)), seq[:7], seq[7:15]),
+          (list(range(19, 25)), [19] * 7, [20] * 8))
+    e.setw(A['ui_t'], 0)
+    seq, cols = [], set()
+    for t in range(50):
+        got, _k = frame(120)
+        seq.append([c[2] for c in got if c[0] == 'goto'][0])
+        cols |= {c[2] for c in got if c[0] == 'colour' and c[1] == 'gkwave_mc'}
+    check('UI v1 waveform at full (120: charged, the next smash releases): the rainbow frames 37 - 60, a new one every frame '
+          '(very quick), looping every 24; drawn in its own colours (the full colour)',
+          (seq, cols), ([37 + (t + 1) % 24 for t in range(50)], {A['ui_col'] + 24}))
+    got, _k = frame(450 * 1000 + 120)
+    check('UI v1: a full charge with the cooldown running: rainbow and the slow radar together (independent)',
+          ([c[2] for c in got if c[0] == 'rotate'] != [], [c for c in got if c[1] == 'gk_rbeetle_mc'],
+           [c[2] for c in got if c[0] == 'goto'][0] >= 37), (True, [('visible', 'gk_rbeetle_mc', 0)], True))
+    got, _k = frame(999)
+    check('UI v1: a charge word over 120 (not from his MSC) clamped to full', [c[2] for c in got if c[0] == 'goto'][0] >= 37, True)
+    got, _k = frame(-5)
+    check('UI v1: a negative word: read as 0 (ready, no charge)', [c for c in got if c[1] == 'gk_rbeetle_mc'],
+          [('visible', 'gk_rbeetle_mc', 1)])
+    # KO / reset: his MSC writes 0 (gk_pb_clear, gk_smash = 0): the panel follows the next frame
+    frame(300 * 1000 + 120)
+    e.setw(A['ui_t'], 0)
+    got, _k = frame(0)
+    check('UI v1: KO / reset (his MSC\'s word 0): the next frame the beetle back, the normal spin, the calm level-0 wave',
+          ([c for c in got if c[1] == 'gk_rbeetle_mc'], [c for c in got if c[1] == 'gkwave_mc' and c[0] != 'visible']),
+          ([('visible', 'gk_rbeetle_mc', 1)], [('goto', 'gkwave_mc', 1), ('colour', 'gkwave_mc', A['ui_col'] + 12)]))
+    # only his panel: Little Mac's slot (2) carries the same clips and is never touched
+    allc = []
+    for w in (0, 450030, 120):
+        allc += frame(w)[0]
+    check('UI v1: only on his panel: no call on Little Mac\'s panel\'s radar / waveform (they stay as laid out: alpha 0)',
+          [c for c in allc if str(c[1]).startswith('MAC')], [])
+    # a panel without the clips (an older dmg.flx): nothing, no crash; without the waveform the radar still turns
+    have['wave'] = False
+    got, kept = frame(30)
+    check('UI v1: no gkwave_mc: the radar as before, nothing on the wave', ([c[1] for c in got], kept),
+          (['gkradar_mc', 'gkradar_mc', 'gk_rbeetle_mc', 'gk_rsweep_mc'], True))
+    have['wave'], have['beetle'] = True, False
+    got, kept = frame(30)
+    check('UI v1: no gk_rbeetle_mc: the sweep and the waveform still', [c[1] for c in got],
+          ['gkradar_mc', 'gkradar_mc', 'gk_rsweep_mc', 'gkwave_mc', 'gkwave_mc', 'gkwave_mc'])
+    have['beetle'] = True
+    e.setw(slot(0) + 0x5C, 0)
+    got, kept = frame(30)
+    check('UI v1: no root clip: nothing', (got, kept), ([], True))
+    e.setw(slot(0) + 0x5C, root)
+    e.setw(slot(2) + 0x5C, 0)
+    if diag:
+        for i in range(8):
+            e.setw(A['ui_log'] + 4 * i, 0xFFFFFFFF)
+        logs = []
+        for w in (0, 0, 10, 25, 450025, 449025, 25, 120):
+            frame(w)
+            logs += [x[1:5] for x in e.osr_full if x[0] == A['gk_fui']]
+        check('UI v1 diag: S4UI (slot, cooldown, charge, wave frame) when the cooldown starts / ends or the charge passes a '
+              'sixth; not every frame', [x[:3] for x in logs],
+              [(0, 0, 0), (0, 0, 25), (0, 450, 25), (0, 0, 25), (0, 0, 120)])
 
 
 def burn2_checks(e, info, diag):

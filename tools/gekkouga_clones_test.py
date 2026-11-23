@@ -4569,7 +4569,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (37, 38):   # round gauge v1: the damage panel's files; clone fix v3: his MSC
         want_top = ['INSTALL_TO_data', 'README.txt']
-    if len(earlier) in (42, 44, 45, 46, 47, 48):   # parabeetle v2: the exes (ice3, ccol) and his / the beetle's MSC; parabeetle v1: the exes (pbeetle), data (+ Sm4shCommand); usmash spike v2 / trail dim v1: the exes (ice2, bgrav) and data; ice detonation v1: the exes, data (+ Sm4shCommand); tuning v1: the exes (the gauge's ready state, the skeleton's bottom) and data; smash
+    if len(earlier) in (42, 44, 45, 46, 47, 48, 49):   # parabeetle v2: the exes (ice3, ccol) and his / the beetle's MSC; parabeetle v1: the exes (pbeetle), data (+ Sm4shCommand); usmash spike v2 / trail dim v1: the exes (ice2, bgrav) and data; ice detonation v1: the exes, data (+ Sm4shCommand); tuning v1: the exes (the gauge's ready state, the skeleton's bottom) and data; smash
         # tune v1: the exes (the half shield damage) and data
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (41, 43):   # clone moves v1, nair / fair v1: data only
@@ -4618,9 +4618,9 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         check('update: none of the installed unchanged files again (%d unchanged)%s' % (len(same1), ', but skeleton.lvd' if again
               else ''), [w for w in same1 if w in names and w not in again], [])
         check('update: nothing in INSTALL_TO_data but the built files%s' % (' (and round gauge v1\'s ui/info/dmg: gauge_tests)'
-                                                                          if len(earlier) in (37, 40) else ''),
+                                                                          if len(earlier) in (37, 40, 49) else ''),
               sorted(n for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/') and n not in want and
-                     n not in again and not (len(earlier) in (37, 40) and n.startswith('INSTALL_TO_data/ui/info/dmg/')) and
+                     n not in again and not (len(earlier) in (37, 40, 49) and n.startswith('INSTALL_TO_data/ui/info/dmg/')) and
                      not (len(earlier) == 40 and n == 'INSTALL_TO_data/param/fighter/fighter_param_vl_gekkouga.bin') and
                      not (len(earlier) == 46 and n == 'INSTALL_TO_data/sound/config/soundlabeltable.bin')), [])
         if len(earlier) == 46:
@@ -4631,7 +4631,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
                    z.read('INSTALL_TO_data/sound/config/soundlabeltable.bin') !=
                    z1.read('INSTALL_TO_data/sound/config/soundlabeltable.bin')), (True, True))
         if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
-                            43, 48):
+                            43, 48, 49):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
         elif len(earlier) == 47:
             check('parabeetle v1: Sm4shCommand v1.7.30 (ParabeetleWait / Rise / Ridden in ModAnimNames.txt, with -> lines)',
@@ -4716,6 +4716,18 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               ['ui/info/dmg/dmg.flx', 'ui/info/dmg/img-00135.nut', 'ui/info/dmg/texlist.lst'])
         if GAUGE_SRC and GAUGE_JPG:
             gauge_tests(z)
+    if z1 and len(earlier) == 49:
+        check('UI radar / waveform v1: INSTALL_TO_data: his MSC (the panel\'s state in New_Var 58) and ui/info/dmg\'s dmg.flx, '
+              'texlist.lst and the new img-00136.nut (img-00135 and the other images as installed); INSTALL_TO_code '
+              'exe_v46z_gkb19; TEST_ONLY A_release; no Sm4shCommand (no script or slot added)',
+              (sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+               sorted({n.split('/')[1] for n in names if n.startswith('TEST_ONLY_INSTALL_TO_code/') and n.count('/') > 1})),
+              (['fighter/gekkouga/script/msc/gekkouga.mscsb', 'ui/info/dmg/dmg.flx', 'ui/info/dmg/img-00136.nut',
+                'ui/info/dmg/texlist.lst'], ['A_release']))
+        if GAUGE_SRC and GAUGE_JPG:
+            gauge_tests(z1, v11=True, inst=z1)    # the round gauge's own tests, on the files installed (still rebuilt)
+        if GAUGE_SRC and GAUGE_JPG and UI_SRC_DIR:
+            ui_panel_tests(z, z1)
     if z1 and len(earlier) == 48:
         check('parabeetle v2: INSTALL_TO_data: his MSC (the snap, the stick\'s direction, the slot map, the clone\'s costume '
               'flag) and the Parabeetle\'s MSC (the hold, the path, the wings); INSTALL_TO_code exe_v46z_gkb18; TEST_ONLY '
@@ -5091,7 +5103,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_clones_v11', 'exe_v46z_gk12', 'F_hitcheck', 'E_sway', 'S4GH', 'S4GR', 'crash', 'TEST_ONLY_DATA/sway',
          'Lyn', 'Ghirahim', 'confirmed') if len(earlier) == 12 else \
         ('greninja_clones_v12', 'exe_v46z_gk13', 'hit check', 'projectile', 'item', 'hitlag', 'A_release', 'D_parts',
-         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 49)) else \
+         'E_sway', 'S4GR', 'S4GH', '401', 'confirmed', 'TEST_ONLY_DATA/sway') if len(earlier) not in tuple(range(17, 50)) else \
         ('greninja_clones_v15', 'exe_v46z_gks2', 'collision', '0x02AC2EF0', 'S4CD', 'flipbook', '28', '44', 'mirror',
          'impact', 'explosion', 'smoke', 'A_release', 'G_pose', 'unconfirmed', '32 cells', 'hydrant') if len(earlier) == 20 else \
         ('greninja_skeleton_v1_2', 'exe_v46z_gkb4', 'fire', 'trail', '0.25', '15', '180', '3 %', '35', 'shield', 'tip',
@@ -5163,6 +5175,9 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_parabeetle_v1', 'exe_v46z_gkb18', 'costume', 'c00', 'c07', 'snap', 'Wait', 'drop', 'vertical', '0.7',
          '144', '3.5', 'neutral', 'left', 'right', 'down', 'wings', 'loop', 'slot', 'TIMER', 'Outline_Set', 'Outline_Shell',
          'S4IF', 'S4CK', 'S4BR', 'parabeetle_path.png', 'parabeetle_wings.gif', 'confirmed in game') if len(earlier) == 48 else \
+        ('greninja_parabeetle_v2', 'exe_v46z_gkb19', 'radar', 'sweep', 'beetle', 'cooldown', '450', 'quarter', '1.67',
+         'waveform', 'rainbow', '120', 'cyan', 'img-00136', 'S4UI', 'New_Var 58', 'radar_ready.gif', 'radar_cooldown.gif',
+         'waveform_charging.gif', 'waveform_full.gif', 'panel_mockup.png', 'confirmed in game') if len(earlier) == 49 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -5176,7 +5191,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
 
 def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=False, b2=False, gkb5=False, gkb6=False,
                 gkb7=False, gkb8=False, gkb9=False, gkb10=False, gkb11=False, gkb12=False, gkb13=False, gkb14=False,
-                gkb15=False, gkb16=False, gkb17=False):
+                gkb15=False, gkb16=False, gkb17=False, gkb18=False):
     """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant; skeleton v1 the
     release and TEST_ONLY A_release (as the burn packages)"""
     import gekkouga_clone_cave as C
@@ -5210,6 +5225,8 @@ def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=
             or gkb14 or gkb15 or gkb16 else set()   # (parabeetle v1's gkb17)
         drop |= {'ice3', 'ccol'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 or gkb10 or gkb11 or gkb12 or gkb13 \
             or gkb14 or gkb15 or gkb16 or gkb17 else set()   # (parabeetle v2's gkb18)
+        drop |= {'gkui'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 or gkb10 or gkb11 or gkb12 or gkb13 \
+            or gkb14 or gkb15 or gkb16 or gkb17 or gkb18 else set()   # (UI radar / waveform v1's gkb19)
         variants = C.VARIANTS if not (sk12 or b2 or gkb5 or gkb6 or gkb7) else \
             C.VARIANTS + (('G_pose', (C.RELEASE - {'sway'}) | {'pose'}),)       # (up to v1.5: + G_pose)
         return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE - drop)] + \
@@ -5248,7 +5265,8 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
                                                 len(earlier) == 30, len(earlier) in (31, 32), len(earlier) == 33,
                                                 len(earlier) in (34, 35), len(earlier) in (36, 37, 38, 39),
                                                 len(earlier) in (40, 41), len(earlier) in (42, 43), len(earlier) == 44,
-                                                len(earlier) == 45, len(earlier) == 46, len(earlier) == 47):
+                                                len(earlier) == 45, len(earlier) == 46, len(earlier) == 47,
+                                                len(earlier) == 48):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')
@@ -5651,8 +5669,11 @@ def parabeetle_v2_tests(mscsb, src, out):
     use(('TIMER', CC.ICE3_SND_VAR - 0x0F000320), 'exe: the ice sound play')
     use(('TIMER', CC.ICE3_SND_VAR + 1 - 0x0F000320), 'exe: the ice sound stop')
     use(('TIMER', CC.CC_VAR - 0x0F000320), 'exe: the clone\'s costume')
+    if hasattr(CC, 'UI_VAR'):
+        use(CC.UI_VAR - 0x0F000380, 'exe: the panel ui')     # UI radar / waveform v1: New_Var 58 (gk_ui / the exe's gk_ui)
     groups = {'ice': ('gk_ib_tick', 'gk_reset', 'gk_ice', 'gk_is_tick', 'exe: the ice'), 'body': ('body',),
-              'snap': ('gk_pb_', 'gk_physics'), 'clone costume': ('gk_spawn', 'exe: the clone'), 'diag flags': ('diag flags', 'gk_dg')}
+              'snap': ('gk_pb_', 'gk_physics'), 'clone costume': ('gk_spawn', 'exe: the clone'), 'diag flags': ('diag flags', 'gk_dg'),
+              'panel ui': ('gk_ui', 'exe: the panel')}
 
     def group(who):
         w = who.split(':', 1)[-1] if who.startswith(('vi:', 'id:')) else who
@@ -5664,7 +5685,7 @@ def parabeetle_v2_tests(mscsb, src, out):
         out_ = {}
         for slot, who in us.items():
             gs = {group(w) for w in who}
-            if len(gs) > 1 and gs & {'body', 'ice', 'snap', 'diag flags', 'clone costume'}:
+            if len(gs) > 1 and gs & {'body', 'ice', 'snap', 'diag flags', 'clone costume', 'panel ui'}:
                 out_[slot] = sorted(who)
         return out_
     clash = clashes(users)
@@ -5686,6 +5707,12 @@ def parabeetle_v2_tests(mscsb, src, out):
           ((CC.ICE3_VAR, CC.ICE3_SND_VAR), True, True, True, True, False, False))
     nv = sorted(k for k in users if isinstance(k, int))
     check('parabeetle v2 slot map: every New_Var slot in 0 - 63 (%d used)' % len(nv), (nv[0] >= 0, nv[-1] <= 63), (True, True))
+    if hasattr(CC, 'UI_VAR'):
+        check('UI radar / waveform v1 slot map: New_Var 58 (UI_VAR 0x%08X) only the panel\'s state (his MSC\'s gk_ui writes '
+              'it, the executable\'s gk_ui reads it); 57 the shuriken copies\' bits + their frames (58\'s old count moved in), '
+              'nothing else on 57' % CC.UI_VAR,
+              (sorted(users.get(58, ())), sorted({group(w) for w in users.get(57, ())}), '0x%08x' % CC.UI_VAR in c),
+              (['exe: the panel ui', 'vi:gk_ui'], ['own:gk_channel', 'own:gk_sh_copies', 'own:gk_sh_tick'], False))
     # ---- the clones' costumes: model/clone/c00 - c07 each his body's own (the game picks the owner's: the exe's ccol)
     import nut
     md = os.path.join(out, 'fighter', 'gekkouga', 'model', 'clone')
@@ -5699,6 +5726,198 @@ def parabeetle_v2_tests(mscsb, src, out):
 
 
 PB_SRC_DIR = None
+UI_SRC_DIR = None                         # UI radar / waveform v1: the user's radar.webp / parabeetle_icon.webp (--ui-src=)
+
+
+def ui_msc_tests(mscsb, src):
+    """UI radar / waveform v1 (README "UI radar / waveform v1"): his MSC's gk_ui every frame: New_Var 58 = the Parabeetle's
+    cooldown left x 1000 + the smash charge (0 - 120); a KO / reset clears both (the panel follows); the shuriken copies'
+    bits and frames packed into 57 (58 freed) with their 3-frame window as before"""
+    import gekkouga_clone_cave as C
+    NV58 = 0x0F000380 + 58
+    m = fresh(mscsb, src)
+    g = m.game
+    frames(m, 1)
+    check('UI v1 MSC: nothing charged, no cooldown: his New_Var 58 = 0 (the executable\'s UI_VAR %s)' % (
+          C.UI_VAR == NV58), (g.vars.get(NV58), C.UI_VAR), (0.0, NV58))
+    m.setg('gk_smash', 70)
+    frames(m, 1)
+    check('UI v1 MSC: the smash charge 70 -> 70', g.vars.get(NV58), 70.0)
+    m.setg('gk_pb_cd', m('gk_pb_cooldown'))
+    ws = []
+    for _ in range(3):
+        frames(m, 1)
+        ws.append(g.vars.get(NV58))
+    check('UI v1 MSC: a Parabeetle out (its 450-frame cooldown): 1000 x the frames left + the charge, counting down with it',
+          ws, [449070.0, 448070.0, 447070.0])
+    m.setg('gk_pb_cd', 1)
+    frames(m, 1)
+    check('UI v1 MSC: the cooldown over: back to the charge alone (the beetle icon back, the normal spin)', g.vars.get(NV58), 70.0)
+    m.setg('gk_smash', 120)
+    m.setg('gk_pb_cd', 200)
+    frames(m, 1)
+    check('UI v1 MSC: full (120) and a cooldown together', g.vars.get(NV58), 199120.0)
+    m.setg('gk_smash', 500)
+    m.setg('gk_pb_cd', 0)
+    frames(m, 1)
+    check('UI v1 MSC: a charge over full clamped to 120', g.vars.get(NV58), 120.0)
+    m.setg('gk_smash', 120)
+    m.setg('gk_pb_cd', 300)
+    frames(m, 1, 0xB1)
+    check('UI v1 MSC: a KO (0xB1): the charge and the cooldown 0 (as the gameplay: gk_smash = 0, gk_pb_clear), the word 0 '
+          'the same frame', (m.g('gk_smash'), m.g('gk_pb_cd'), g.vars.get(NV58)), (0, 0, 0.0))
+    m.setg('gk_smash', 90)
+    m.setg('gk_pb_cd', 300)
+    frames(m, 1)
+    g.vars[0x0F00030E] = float(int(g.vars.get(0x0F00030E, 0.0)) + 1)
+    frames(m, 1)
+    check('UI v1 MSC: a training reset / new match (the clear-all count): both 0, the word 0', (m.g('gk_smash'), m.g('gk_pb_cd'),
+          g.vars.get(NV58)), (0, 0, 0.0))
+    m.setg('gk_smash', 40)
+    frames(m, 1, 0x14F)
+    check('UI v1 MSC: the match\'s Entry (0x14F): the charge 0, the word 0', g.vars.get(NV58), 0.0)
+    # the hold grows the charge: the word follows it frame by frame
+    m = fresh(mscsb, src)
+    g = m.game
+    m.setg('gk_smash', 117)
+    ws = []
+    for _ in range(4):
+        m.vm.g[4] = 0x2C
+        m('gk_sm_hold_tick')
+        m('gk_ui')
+        ws.append(g.vars.get(NV58))
+    check('UI v1 MSC: a smash held: the word follows the charge each frame up to full (118, 119, 120, 120)', ws,
+          [118.0, 119.0, 120.0, 120.0])
+    # the shuriken copies: bits + 4 x frames in 57, their 3-frame window as before; 58 untouched
+    m = fresh(mscsb, src)
+    g = m.game
+    m('gk_svi', 57, 3 + 4 * 3)
+    seq = []
+    for _ in range(4):
+        m('gk_sh_tick')
+        seq.append(m('gk_vi', 57))
+    check('UI v1: the shuriken copies\' slot 57 (bits 3 + 4 x 3 frames): counted down 2 / 1 frames (bits kept), then 0',
+          seq, [3 + 8, 3 + 4, 0, 0])
+
+
+def ui_panel_tests(z, inst):
+    """UI radar / waveform v1: the package's ui/info/dmg rebuilt from the user's folder, the round gauge's art and the UI art
+    (tools/gekkouga_ui_art.py extract from radar.webp / parabeetle_icon.webp); the clips' names, frames, places, alpha 0,
+    depths; the texture; the art's layers (transparent outside the ring, the sweep's wedge, the beetle inside the inner
+    rings, the waveform's levels and rainbow) and its frame map = the executable's"""
+    import numpy as np
+    import flx
+    import nut
+    import gekkouga_gauge_art as GA
+    import gekkouga_gauge_flx as GF
+    import gekkouga_ui_art as UA
+    import gekkouga_clone_cave as C
+    pre = 'INSTALL_TO_data/ui/info/dmg/'
+    radar, icon = os.path.join(UI_SRC_DIR, 'radar.webp'), os.path.join(UI_SRC_DIR, 'parabeetle_icon.webp')
+    with tempfile.TemporaryDirectory() as td:
+        art, uart, out, out0 = (os.path.join(td, n) for n in ('art', 'uart', 'out', 'out0'))
+        GA.extract(GAUGE_JPG, art)
+        UA.extract(radar, icon, uart)
+        info = GF.build(GAUGE_SRC, art, out, v11=True, ui=uart)
+        GF.build(GAUGE_SRC, art, out0, v11=True)
+        same = [n for n in ('dmg.flx', 'texlist.lst', 'img-00136.nut') if z.read(pre + n) != open(os.path.join(out, n), 'rb').read()]
+        old = [n for n in ('dmg.flx', 'texlist.lst', 'img-00135.nut') if inst.read(pre + n) != open(os.path.join(out0, n), 'rb').read()]
+        img135 = open(os.path.join(out, 'img-00135.nut'), 'rb').read() == inst.read(pre + 'img-00135.nut')
+        L = UA.load(uart)
+        _d, ts = nut.load(os.path.join(out, 'img-00136.nut'))
+    check('UI v1: the package\'s dmg.flx / texlist.lst / img-00136.nut rebuilt byte for byte (the user\'s folder, the round '
+          'gauge\'s art, tools/gekkouga_ui_art.py extract, tools/gekkouga_gauge_flx.py build(ui=)); without ui= the build '
+          'is still round gauge v1.1\'s installed files; img-00135 (the gauge\'s) unchanged, not shipped', (same, old, img135),
+          ([], [], True))
+    t0 = flx.Tlst(inst.read(pre + 'texlist.lst'))
+    t1 = flx.Tlst(z.read(pre + 'texlist.lst'))
+    ui = info['ui']
+    check('UI v1: the texture a new slot (136: img-00136.nut, 1024 x 1024 BC3, GIDX 0x2800FE31), its 3 + %d cells; the '
+          'installed %d entries / %d slots as they were' % (UA.WAVE_FRAMES, len(t0.entries), len(t0.slots)),
+          (ui['texture_slot'], len(t1.slots), t1.slots[:len(t0.slots)] == t0.slots,
+           [vars(e) for e in t1.entries[:len(t0.entries)]] == [vars(e) for e in t0.entries], len(t1.entries) - len(t0.entries),
+           [(t.tex_id, t.w, t.h, t.fmt & 0x3F) for t in ts]),
+          (136, 137, True, True, 3 + UA.WAVE_FRAMES, [(0x2800FE31, 1024, 1024, 0x33)]))
+    f0 = flx.read(inst.read(pre + 'dmg.flx'))
+    f1 = flx.read(z.read(pre + 'dmg.flx'))
+    kid = sorted(f1.instance_name(f1.places[pi]) for pi in f1.frame_key(ui['radar'], 0).places)
+    check('UI v1: the clips as the executable names them (UI_NAMES): "gkradar_mc" (its "gk_rring_mc" / "gk_rbeetle_mc" / '
+          '"gk_rsweep_mc", drawn ring -> beetle -> sweep) and "gkwave_mc" (%d frames: %d levels x %d phases + %d rainbow)' %
+          (UA.WAVE_FRAMES, UA.WAVE_LEVELS, UA.WAVE_PHASES, UA.RAINBOW_FRAMES),
+          (GF.UI_NAMES == C.UI_NAMES, kid, [f1.instance_name(f1.places[pi]) for pi in reversed(f1.frame_key(ui['radar'], 0).places)],
+           f1.sprites[ui['wave']].nframes),
+          (True, sorted(C.UI_NAMES[1:4]), list(C.UI_NAMES[1:4]), C.UI_LEVELS * C.UI_PHASES + C.UI_RAINBOW))
+    check('UI v1: the art\'s frame map = the executable\'s (tools/gekkouga_ui_art.wave_index + 1 = gk_ui\'s frame for every '
+          'charge 0 - 120 and count 0 - 99); its level / phase / rainbow counts the executable\'s',
+          ([(ch, t) for ch in range(121) for t in range(100) if UA.wave_index(ch, t, C.UI_SLOW) + 1 != C.ui_frame(ch, t)],
+           (UA.WAVE_LEVELS, UA.WAVE_PHASES, UA.RAINBOW_FRAMES)), ([], (C.UI_LEVELS, C.UI_PHASES, C.UI_RAINBOW)))
+    got, bad = {}, []
+    for panel in (1, 2, 3, 4):
+        k = f1.frame_key(panel, 0)
+        ps = [f1.places[pi] for pi in k.places]
+        r = next(p_ for p_ in ps if f1.instance_name(p_) == 'gkradar_mc')
+        w = next(p_ for p_ in ps if f1.instance_name(p_) == 'gkwave_mc')
+        fb = next(p_ for p_ in ps if f1.instance_name(p_) == 'face_bg_mc')
+        rm, wm, fm = (f1.transforms[p_.xform].matrix() for p_ in (r, w, fb))
+        fs = (fm[0] ** 2 + fm[1] ** 2) ** 0.5
+        face = (fm[4] - 58 * fs, fm[4] + 58 * fs, fm[5] - 61 * fs, fm[5] + 61 * fs)
+        rr = rm[0] * 128
+        wh, ww = wm[0] * 24, wm[0] * 128
+        got[panel] = (f1.colors[r.color].mul[0], f1.colors[w.color].mul[0],
+                      rm[4] - rr >= face[1] - 0.01, rm[5] < fm[5], rm[5] + rr > face[2],
+                      abs(wm[4] - fm[4]) < 0.01, wm[5] - wh >= face[3] - 0.01, ww < face[1] - face[0],
+                      round(2 * rr / (122 * fs), 3))
+        ds = [p_.depth for p_ in ps]
+        lv = next(p_ for p_ in ps if f1.instance_name(p_) == 'lv_mc')
+        num = next(p_ for p_ in ps if f1.instance_name(p_) == 'num_mc')
+        nc = next(p_ for p_ in ps if f1.instance_name(p_) == 'name_col_mc')
+        if len(set(ds)) != len(ds) or not (lv.depth < r.depth < num.depth) or w.depth != nc.depth + 1:
+            bad.append(panel)
+    check('UI v1 places, per panel (1 - 4): hidden by default (alpha 0; the executable shows them on his panel); the radar right '
+          'of the portrait (its left edge past the hexagon\'s right side), its centre above the hexagon\'s, its bottom below '
+          'the hexagon\'s top; the waveform centred under the portrait (its top under the hexagon\'s bottom point), narrower '
+          'than it; the radar 0.48 of the hexagon\'s height across', got,
+          {p_: (0, 0, True, True, True, True, True, True, 0.48) for p_ in (1, 2, 3, 4)})
+    check('UI v1 depths: the radar over the portrait / CPU level and under the percent; the waveform right over the name; every '
+          'depth in a panel its own', bad, [])
+    check('UI v1: every sprite / image of the installed file kept (the clips appended)',
+          (f1.images[:len(f0.images)] == f0.images, [vars(x) for x in f1.sprites[5:len(f0.sprites)]] == [vars(x) for x in f0.sprites[5:]]),
+          (True, True))
+    # the art
+    n = UA.RSIZE
+    yy, xx = np.mgrid[0:n, 0:n]
+    rad = np.hypot(xx + 0.5 - n / 2, yy + 0.5 - n / 2)
+    ring, sweep, beet = (L[k][..., 3].astype(int) for k in ('ring', 'sweep', 'beetle'))
+    ang = (np.degrees(np.arctan2(xx + 0.5 - n / 2, -(yy + 0.5 - n / 2))) + 360) % 360
+    ring_r = UA.SRC_RING[1] * UA.SCALE
+    check('UI v1 radar art: transparent outside the ring (the grid, the backdrop, the numbers, the outer ticks gone: alpha 0 past '
+          'r 127), the bright ring solid (r %.1f - %.1f), between the lines see-through (r 30 - 40 off the spokes: alpha < 10 %%)'
+          % (UA.SRC_RING[0] * UA.SCALE, ring_r),
+          (int(ring[rad > 127.5].max()), int(np.median(ring[(rad > UA.SRC_RING[0] * UA.SCALE + 0.7) & (rad < ring_r - 0.7)])) >= 250,
+           int(np.percentile(ring[(rad > 30) & (rad < 40) & (np.abs(((ang + 15) % 30) - 15) > 4)], 90)) < 26), (0, True, True))
+    lead = sweep[(rad > 40) & (rad < 100) & (ang > 340)].mean()
+    mid = sweep[(rad > 40) & (rad < 100) & (ang > 260) & (ang < 280)].mean()
+    back = sweep[(rad > 40) & (rad < 100) & (ang > 100) & (ang < 170)].max()
+    check('UI v1 sweep art: its leading edge at 12 o\'clock, the trail counter-clockwise behind it fading (bright just behind '
+          'the edge, about a third at 90 degrees back, nothing past 180), inside the thin ring (it turns clockwise)',
+          (lead > 140, 0.25 < mid / lead < 0.45, int(back), int(sweep[rad > UA.SRC_THIN * UA.SCALE].max())), (True, True, 0, 0))
+    bb = rad[beet > 25]
+    check('UI v1 beetle art: centred, its farthest pixel inside the third inner ring (r %.1f; the ring %.1f), drawn at alpha <= '
+          '0.9 (blended on the screen)' % (UA.BEETLE_R * UA.SCALE, UA.SRC_INNER[2] * UA.SCALE),
+          (bb.max() <= UA.SRC_INNER[2] * UA.SCALE, int(beet.max()) <= 230, abs(np.average(xx[beet > 25]) - n / 2) < 12), (True, True, True))
+    hs = []
+    for lv in range(UA.WAVE_LEVELS):
+        a = L['wave'][lv * UA.WAVE_PHASES][..., 3]
+        rows = np.where(a.max(axis=1) > 128)[0]
+        hs.append(int(rows.max() - rows.min()))
+    white = all((im[..., :3][im[..., 3] > 20] > 240).all() for im in L['wave'][:UA.WAVE_LEVELS * UA.WAVE_PHASES])
+    hues = set()
+    for im in L['wave'][UA.WAVE_LEVELS * UA.WAVE_PHASES:]:
+        px = im[im[..., 3] > 200][:, :3].astype(int)
+        hues |= {tuple(int(v) for v in (p_ // 64)) for p_ in px}
+    check('UI v1 waveform art: its height grows with the level (the charge) %s; below full white (tinted cyan by the '
+          'executable); the rainbow frames many hues (%d colour cells)' % (hs, len(hues)),
+          (hs == sorted(hs) and hs[-1] > 3 * max(hs[0], 1), white, len(hues) >= 12), (True, True, True))
 
 
 def pb_make(mscsb, src, code=1.0, slot=3, his=(40.0, 50.0), shared=None, line_made=True, loop=False):
@@ -6183,10 +6402,12 @@ def main():
     global ICE_CLIP, PB_SRC_DIR
     ICE_CLIP = next((x[11:] for x in sys.argv[1:] if x.startswith('--ice-clip=')), None)
     PB_SRC_DIR = next((x[9:] for x in sys.argv[1:] if x.startswith('--pb-src=')), None)
+    global UI_SRC_DIR
+    UI_SRC_DIR = next((x[9:] for x in sys.argv[1:] if x.startswith('--ui-src=')), None)
     a = [x for x in sys.argv[1:] if not x.startswith('--v') and not x.startswith('--fx=') and not x.startswith('--gauge-')
-         and not x.startswith('--ice-clip=') and not x.startswith('--pb-src=')]
+         and not x.startswith('--ice-clip=') and not x.startswith('--pb-src=') and not x.startswith('--ui-src=')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3', 'ff', 'rg11', 'cm', 'tu', 'nr', 'st', 'id', 'ut', 'pb') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3', 'ff', 'rg11', 'cm', 'tu', 'nr', 'st', 'id', 'ut', 'pb', 'pb2') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
@@ -6216,6 +6437,8 @@ def main():
         parabeetle_data_tests(out)
         parabeetle_side_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
         parabeetle_tests(os.path.join(msc, 'parabeetle', 'parabeetle.mscsb'), GB.PARABEETLE_MSC)
+    if len(earlier) >= 49:
+        ui_msc_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'))
     if len(earlier) >= 48:
         parabeetle_v2_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'), out)
     if len(earlier) >= 46:

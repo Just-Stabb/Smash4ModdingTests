@@ -6,7 +6,11 @@ frame), the fill's faint track and the fill ("gk_fill_mc": 11 frames, 0 % - 100 
 on one new 1024 x 1024 texture (16 cells of 256 px). Tinted per mode by the executable (tools/gekkouga_clone_cave.py
 "gk_panel"); without this clip in the panel the executable falls back to Little Mac's KO meter.
 
-  python3 tools/gekkouga_gauge_flx.py SRC_DMG_DIR ART_DIR OUT_DIR
+  python3 tools/gekkouga_gauge_flx.py SRC_DMG_DIR ART_DIR OUT_DIR [UI_ART_DIR]
+
+UI_ART_DIR (UI radar / waveform v1): tools/gekkouga_ui_art.py extract's output: the radar ("gkradar_mc": "gk_rring_mc",
+"gk_rbeetle_mc", "gk_rsweep_mc") right of the portrait and the waveform ("gkwave_mc", 60 frames) under it, on the next
+texture slot (136, GIDX 0x2800FE31).
 
 SRC_DMG_DIR: the user's data/ui/info/dmg (dmg.flx, texlist.lst, img-*.nut: with the trait badge if it is installed);
 ART_DIR: tools/gekkouga_gauge_art.py extract's output.
@@ -22,6 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import flx  # noqa: E402
 import nut  # noqa: E402
 import gekkouga_gauge_art as A  # noqa: E402
+import gekkouga_ui_art as U  # noqa: E402
 
 CELL = 256
 SHEET = 1024
@@ -39,6 +44,94 @@ PLACES = {1: (72, -52, 0.16), 2: (38, -27, 0.12), 3: (122, -58, 0.24), 4: (122, 
 # executable shows it on a Greninja panel (gk_panel: visibility and the mode's colour, alpha 100)
 GAUGE_EMBLEM = 0.87
 EMBLEM_PX = 254
+
+
+# UI radar / waveform v1 (fighters/gekkouga/README.md "UI radar / waveform v1"; the user: "a UI element slightly to the right
+# of the Greninja's character icon ... the radar ... a parabeetle image layered into it" and "a small waveform element that
+# ... tracks smash attack charge ... under Greninja's character icon"): two clips in panel sprites 1 - 4 on one new 1024 x
+# 1024 texture (the radar's 3 layers in row 0's 256 px cells; the waveform's 60 frames in 256 x 48 cells below), placed by
+# the portrait (face_bg_mc: the hexagon, FACE_W x FACE_H x its scale), hidden (alpha 0) until the executable's gk_ui shows
+# them on a Greninja panel
+UI_TEXTURE_ID = 0x2800FE31                   # (the gauge's 0x2800FE30, the trait badge's 0x2800FE00 / 01)
+UI_NAMES = ('gkradar_mc', 'gk_rring_mc', 'gk_rbeetle_mc', 'gk_rsweep_mc', 'gkwave_mc')   # the executable's (UI_GAUGE_NAMES)
+FACE_W, FACE_H = 116.0, 122.0                # the portrait hexagon (inf_dmg_f_back) at its place's scale 1
+RADAR_FACE = 0.48                            # the radar's diameter: this x the hexagon's height (panel 3: 58.6; the round
+                                             # gauge 144, the stock icons' row 37, the percent's digits 96)
+RADAR_GAP = 2.0                              # its left edge this far right of the hexagon's right side
+RADAR_UP = 0.43                              # its centre this x the hexagon's height above the hexagon's centre: in the
+                                             # notch over the hexagon's upper-right edge, above the percent's top
+WAVE_FACE = 0.86                             # the waveform's width: this x the hexagon's width (panel 3: 99.8 x 18.7)
+WAVE_GAP = 2.0                               # its top this far under the hexagon's bottom point
+WAVE_ROW = 256                               # the waveform's cells start under the radar's row
+
+
+def ui_places(f):
+    """panel sprite -> {'radar': (x, y, scale), 'wave': (x, y, scale)} from its face_bg_mc (the hexagon)"""
+    out = {}
+    for panel in (1, 2, 3, 4):
+        k = f.frame_key(panel, 0)
+        pl = next(f.places[pi] for pi in k.places if f.instance_name(f.places[pi]) == 'face_bg_mc')
+        m = f.transforms[pl.xform].matrix()
+        fx, fy = m[4], m[5]
+        fs = (m[0] ** 2 + m[1] ** 2) ** 0.5
+        d = RADAR_FACE * FACE_H * fs
+        rx = fx + FACE_W / 2 * fs + RADAR_GAP * fs + d / 2
+        ry = fy - RADAR_UP * FACE_H * fs
+        ww = WAVE_FACE * FACE_W * fs
+        wh = ww * U.WAVE_H / U.WAVE_W
+        wy = fy + FACE_H / 2 * fs + WAVE_GAP * fs + wh / 2
+        out[panel] = {'radar': (round(rx, 3), round(ry, 3), round(d / U.RSIZE, 4)),
+                      'wave': (round(fx, 3), round(wy, 3), round(ww / U.WAVE_W, 4))}
+    return out
+
+
+def depth_of(f, panel, name):
+    k = f.frame_key(panel, 0)
+    return next(f.places[pi].depth for pi in k.places if f.instance_name(f.places[pi]) == name)
+
+
+def ui_sheet(ui):
+    """the 1024 x 1024 texture and its cells [(name, x, y, w, h)]"""
+    L = U.load(ui)
+    sheet = np.zeros((SHEET, SHEET, 4), np.uint8)
+    cells_ = []
+    for i, n in enumerate(U.LAYERS):
+        sheet[0:U.RSIZE, i * U.RSIZE:(i + 1) * U.RSIZE] = L[n]
+        cells_.append(('inf_dmg_gk_r%s' % n, i * U.RSIZE, 0, U.RSIZE, U.RSIZE))
+    per_row = SHEET // U.WAVE_W
+    for i, im in enumerate(L['wave']):
+        x, y = (i % per_row) * U.WAVE_W, WAVE_ROW + (i // per_row) * U.WAVE_H
+        assert y + U.WAVE_H <= SHEET
+        sheet[y:y + U.WAVE_H, x:x + U.WAVE_W] = im
+        cells_.append(('inf_dmg_gk_wave_%02d' % i, x, y, U.WAVE_W, U.WAVE_H))
+    return sheet, cells_
+
+
+def add_ui(f, tl, ui, preview=False):
+    """the radar and waveform clips (UI_NAMES) on a new texture slot: returns (slot, sheet, info)"""
+    slot = len(tl.slots)
+    tl.slots.append(0)
+    sheet, cells_ = ui_sheet(ui)
+    for name, x, y, w, h in cells_:
+        tl.add(name, slot, x, y, w, h, SHEET, SHEET)
+    layer = {n: f.add_sprite([[f.image_place('inf_dmg_gk_r%s' % n, U.RSIZE, U.RSIZE)]]) for n in U.LAYERS}
+    parts = [f.sprite_place(layer[n], 'gk_r%s_mc' % n, slot=i, depth=i) for i, n in enumerate(U.LAYERS)]
+    radar = f.add_sprite([parts])
+    wave = f.add_sprite([[f.image_place('inf_dmg_gk_wave_%02d' % i, U.WAVE_W, U.WAVE_H)] for i in range(U.WAVE_FRAMES)],
+                        labels={'w%02d' % i: i for i in range(U.WAVE_FRAMES)})
+    places = ui_places(f)
+    col = flx.Color((100 if preview else 0, 100, 100, 100), (0, 0, 0, 0))
+    for name, sprite, above in (('radar', radar, 'lv_mc'), ('wave', wave, 'name_col_mc')):
+        ds = {depth_of(f, panel, above) for panel in (1, 2, 3, 4)}
+        assert len(ds) == 1, ds
+        d = ds.pop()
+        raise_above(f, (1, 2, 3, 4), d)
+        for panel in (1, 2, 3, 4):
+            x, y, sc = places[panel][name]
+            pl = f.sprite_place(sprite, 'gk%s_mc' % name, flx.Transform.make(x, y, sc), color=col,
+                                slot=f.sprites[panel].nslots, depth=d + 1)
+            f.insert_place(panel, pl)
+    return slot, sheet, dict(radar=radar, layers=layer, wave=wave, places=places)
 
 
 def emblem_places(f):
@@ -89,9 +182,9 @@ def cells(art):
     return out
 
 
-def build(src, art, out, v11=True, preview=False):
+def build(src, art, out, v11=True, preview=False, ui=None):
     """v11: round gauge v1.1 (on the emblem, hidden until shown); False: v1. preview: the gauge drawn visible (alpha 100),
-    for flx_render only"""
+    for flx_render only. ui: UI radar / waveform v1's art (tools/gekkouga_ui_art.py extract): its clips on the next slot"""
     f = flx.read(open(os.path.join(src, 'dmg.flx'), 'rb').read())
     tl = flx.Tlst(open(os.path.join(src, 'texlist.lst'), 'rb').read())
     slot = len(tl.slots)
@@ -130,17 +223,23 @@ def build(src, art, out, v11=True, preview=False):
             pl = f.sprite_place(gauge, 'gkgauge_mc', flx.Transform.make(x, y, s), color=col, slot=f.sprites[panel].nslots,
                                 depth=d + 1)
             f.insert_place(panel, pl)
+    uinfo = None
+    if ui:
+        uslot, usheet, uinfo = add_ui(f, tl, ui, preview)
     os.makedirs(out, exist_ok=True)
     for fn in os.listdir(src):
         if fn.endswith('.nut'):
             shutil.copy(os.path.join(src, fn), out)
     open(os.path.join(out, 'img-%05d.nut' % slot), 'wb').write(nut.write_ntwu([(TEXTURE_ID, 0x33, sheet)]))
+    if ui:
+        open(os.path.join(out, 'img-%05d.nut' % uslot), 'wb').write(nut.write_ntwu([(UI_TEXTURE_ID, 0x33, usheet)]))
+        uinfo['texture_slot'] = uslot
     open(os.path.join(out, 'texlist.lst'), 'wb').write(tl.build())
     open(os.path.join(out, 'dmg.flx'), 'wb').write(flx.write(f))
-    return dict(gauge=gauge, rings=rings, track=track, fill=fill, texture_slot=slot)
+    return dict(gauge=gauge, rings=rings, track=track, fill=fill, texture_slot=slot, ui=uinfo)
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 4:
+    if len(sys.argv) not in (4, 5):
         sys.exit(__doc__)
-    print(build(*sys.argv[1:]))
+    print(build(*sys.argv[1:4], ui=sys.argv[4] if len(sys.argv) == 5 else None))

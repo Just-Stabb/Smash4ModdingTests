@@ -2334,3 +2334,77 @@ it flags v1's layout).
 **Not confirmed in game**: everything; in particular that the clone's model follows +0x4A set there (the cause of v1's
 wrong costume isn't proven: S4CK shows what the clone had), the snap's ground switch attaching him to an article's line,
 the flash through the outline caves on a hit victim, the clones' ride.
+
+## UI radar / waveform v1 (`greninja_ui_radar_wave_v1.zip`, over parabeetle v2; exe_v46z_gkb19)
+
+The user: "a UI element slightly to the right of the Greninja's character icon (... only leave the circle with no
+background and the spinning element ...) ... the radar spin normally with a parabeetle image layered into it ... When the
+parabeetle is on cooldown, the radar should spin slowly until the parabeetle icon is visible again"; "a small waveform
+element that animates and tracks smash attack charge. It should glow rainbow colors and move very quickly when smash
+attacks are charged and available ... under Greninja's character icon". Inputs: `$S/gk_in/pb_fix/radar.webp`,
+`parabeetle_icon.webp`. Nothing here is confirmed in game.
+
+**Art** (`tools/gekkouga_ui_art.py extract RADAR BEETLE OUT`; 256 px radar cells, 256 x 48 wave cells):
+- Radar measured on the source (centre (325.8, 325.7) by a circle fit to the bright ring; radii: bright ring 237.5 -
+  245.5, thin ring 228.5, inner rings 47 / 95 / 142.5 / 191.5, inner ticks 216 - 227, outer ticks 256 - 272).
+- **ring** (static): rebuilt at those radii / colours ((68, 255, 1) ring, (65, 205, 45) thin ring, the 12 spokes, 36 ticks,
+  4 inner rings), lines widened for the panel's size, the bright ring's glow; no grid, backdrop / map, numbers or outer
+  ticks: alpha 0 past r 127 and between the lines.
+- **sweep** (its own layer, turned by the exe): the source's wedge rebuilt: leading edge at 12 o'clock, the trail
+  counter-clockwise fading (1 - t / 180)^1.5 (the source: 1.0 / 0.61 / 0.35 / 0.15 at 10 / 50 / 90 / 130 degrees back),
+  green, alpha up to 0.72, inside the thin ring: it turns clockwise.
+- **beetle**: the icon centred, its farthest pixel at r 135 (inside the third inner ring, 142.5), 28 % toward the radar's
+  green, faint scanlines, alpha 0.9; drawn between the ring and the sweep (the sweep passes over it).
+- **waveform**: 6 amplitude levels (1.5 - 16 px) x 6 phases of a tapered 3-cycle, two-harmonic wave in white (tinted
+  cyan by the exe), then 24 rainbow frames (amplitude 17, phase 1/6 and hue 15 degrees a frame: the hue along the wave
+  flowing with it, a white-hot core, a wide rainbow glow).
+
+**Panel** (`tools/gekkouga_gauge_flx.py build(ui=ART)`, on the round gauge v1.1 build: dmg.flx, texlist.lst, new
+img-00136.nut (1024 x 1024 BC3, GIDX 0x2800FE31: row 0 the radar's 3 cells, below the 60 wave cells); img-00135 unchanged):
+- `gkradar_mc` (`gk_rring_mc`, `gk_rbeetle_mc`, `gk_rsweep_mc`) and `gkwave_mc` (60 frames) in panel sprites 1 - 4,
+  alpha 0 in the layout.
+- Placed from each panel's portrait hexagon (`face_bg_mc`, 116 x 122 x its scale; `ui_places`):
+  - radar: 0.48 of the hexagon's height across (panels 3 / 4: 58.6; the round gauge 144, the stock row 37, the digits
+    96), its left edge 2 right of the hexagon, its centre 0.43 x its height above the hexagon's centre (the notch over
+    its upper-right edge, above the percent); depth right over `lv_mc` (under the percent);
+  - waveform: 0.86 of the hexagon's width (panels 3 / 4: 99.8 x 18.7), centred under it, its top 2 under its bottom
+    point; depth right over `name_col_mc`.
+  - Panels 1 (5 - 8 players) and 2 (small): the round gauge sits right of the portrait there; the radar overlaps its left
+    edge (drawn over it).
+- Mock-up `$S/gk_preview/panel_mockup.png`: over the user's in-game screenshot (Greninja's 2-player panel: 1.8 px a unit,
+  measured on the hexagons) and the built dmg.flx rendered (panels 3 / 1 / 2).
+
+**MSC** (`clones.c` `gk_ui`, after `gk_gauge` every frame):
+- New_Var 58 = `gk_pb_cd` (0 - 450) x 1000 + `gk_smash` (clamped 0 - 120). A KO / reset / Entry clears both (as before):
+  the word is 0 the same frame.
+- Slot 58 was the shuriken copies' 3-frame count: now packed into 57 (bits + 4 x frames; `gk_sh_copies`, `gk_sh_tick`,
+  the channel's `% 4`). The slot map test knows the "panel ui" group (58: `gk_ui` and the exe only).
+- Globals still 126 / 128.
+
+**Exe** (feature `gkui`, `gk_ui` from `gk_panel` per Greninja slot; exe_v46z_gkb19 = RELEASE; gkb18 = RELEASE - gkui
+byte for byte, release and diag):
+- Clip names appended to `gk_names` (`UI_NAMES`, indices 6 - 10), found by `gk_find` in his slot's root clip.
+- Radar: shown + colour (100 %); beetle shown only with no cooldown; sweep angle kept per slot (`ui_ang`), + `UI_SPEED`
+  3.6 a frame (100 frames a turn, 1.67 s) or `UI_SPEED_CD` 0.9 on cooldown (a quarter: 6.7 s), `FLX_ROTATE` (the gauge
+  rings' way, + clockwise).
+- Waveform: its count per slot (`ui_t`); below full frame 1 + (charge x 6 / 120) x 6 + (count >> 3) mod 6 (a phase step
+  every 8 frames), colour cyan (25 / 90 / 100, the round gauge's charge); full (120): 37 + count mod 24 (a frame a
+  frame), colour as drawn; `FLX_GOTO` + stopped (the fill's way).
+- Other fighters' panels never touched (alpha 0 stays). A missing clip is skipped.
+- Diag **S4UI** (slot, cooldown, charge, wave frame) when the cooldown starts / ends or the charge passes a sixth.
+
+**Tests**:
+- `gekkouga_clone_cave_test` 386 / 428 (release / A_release), 0 failures (`ui_checks`: names, constants, ready / cooldown
+  spin over 100 / 450 frames, the beetle, the waveform's map / phases / rainbow, clamps, KO, Little Mac's panel untouched,
+  missing clips, S4UI); gkb18 still 364 / 0.
+- `gekkouga_clones_test ... --vpb2=greninja_parabeetle_v2.zip --ui-src=$S/gk_in/pb_fix` 693 checks, 0 failures: `ui_msc_tests` (the word, the
+  countdown, clamps, KO / reset / Entry, the hold, slot 57), `ui_panel_tests` (rebuilt byte for byte, the texture,
+  names, places / alpha / depths, the art, the frame map = the exe's), the round gauge's `gauge_tests(v11)` on the
+  installed files, the slot map.
+- import_call_check 0 on both exes; `supamario_ui_cave_test` 0 failures (release); msc_stack_check 0; the opcode guard OK.
+- Previews: `$S/gk_preview/radar_ready.gif`, `radar_cooldown.gif`, `waveform_charging.gif`, `waveform_full.gif`,
+  `panel_mockup.png`.
+
+**Not confirmed in game**: everything; in particular the flx runtime rotating a clip inside the radar (as it does the
+round gauge's rings), the 60-frame wave clip's goto, the placement against the real name text / stock icons under the
+portrait (run-time pictures in the renderer), the radar over the round gauge in the 5 - 8 player / small panels.

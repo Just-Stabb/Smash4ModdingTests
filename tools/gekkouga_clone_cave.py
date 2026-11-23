@@ -105,7 +105,7 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
                       'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2',
-                      'gready', 'skbot', 'shalf', 'ice', 'ice2', 'bgrav', 'pbeetle', 'ice3', 'ccol'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'gready', 'skbot', 'shalf', 'ice', 'ice2', 'bgrav', 'pbeetle', 'ice3', 'ccol', 'gkui'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -147,6 +147,9 @@ FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', '
 #   ccol    parabeetle v2: the clone article's model in its owner's costume: at the clone's model set-up (CC_HOOK) its
 #           entry (+8) and costume (+0x4A) set to the Greninja making it (his TIMER_15, CC_VAR) before the game's
 #           0x02B62F14 picks the model by them
+#   gkui    UI radar / waveform v1: his panel's radar (gkradar_mc: the sweep turned UI_SPEED degrees a frame, a quarter of
+#           that and the beetle hidden while the Parabeetle's cooldown runs) and smash-charge waveform (gkwave_mc: its
+#           frame by the charge, rainbow and a frame a frame at full) from his New_Var 58 (UI_VAR), gk_ui from gk_panel
 #   bstart  v8: the clone's start (specializer +0x34) runs bunshin's own (0x02AF6738: black overlay, LinkModule link 3
 #           attributes 0 / 0xD, EffectModule +0xB4 / +0xA4), then clears the black (ColorBlendModule vt +0x44(0), as
 #           Terminate_Overlays' handler 0x02BE37B8 does); without it the start does nothing (v7)
@@ -370,6 +373,32 @@ FLX_ROTATE = 0x032CDEDC           # (clip, f1 degrees)
 FLX_GOTO = 0x032CCC44             # (clip, frame 1-based): goto and play (then +0x9C = 1: stopped)
 GAUGE_NAMES = ('gkgauge_mc', 'gk_ticks_mc', 'gk_dots_mc', 'gk_arcs_mc', 'gk_heavy_mc', 'gk_fill_mc')
 GAUGE_SPEEDS = (0.35, -0.8, 1.5, -2.4)   # degrees a frame (tools/gekkouga_gauge_art.py LAYERS), + clockwise
+# UI radar / waveform v1 (feature gkui; fighters/gekkouga/README.md "UI radar / waveform v1"): the radar and the waveform
+# in his panel (tools/gekkouga_gauge_flx.py UI_NAMES, after GAUGE_NAMES in gk_names: indices 6 - 10), driven by gk_ui
+# from his New_Var 58 (his MSC's gk_ui: the Parabeetle's cooldown left x 1000 + the smash charge 0 - 120)
+UI_NAMES = ('gkradar_mc', 'gk_rring_mc', 'gk_rbeetle_mc', 'gk_rsweep_mc', 'gkwave_mc')
+UI_VAR = 0x0F0003BA               # his New_Var 58
+UI_SPEED = 3.6                    # the sweep: degrees a frame, + clockwise (100 frames a turn: 1.67 s)
+UI_SPEED_CD = UI_SPEED / 4        # on cooldown: a quarter (400 frames a turn: 6.7 s)
+UI_FULL = 120                     # the smash charge's full (his gk_smash_full())
+UI_LEVELS = 6                     # the waveform (tools/gekkouga_ui_art.py): amplitude levels below full (charge x 6 / 120)
+UI_PHASES = 6                     # ... phases a level, stepped every 1 << UI_SLOW frames (a wavelength in 48: gentle)
+UI_SLOW = 3
+UI_RAINBOW = 24                   # ... full: the rainbow frames, one a frame (0.4 s a loop: very quick)
+UI_COLOURS = ((100, 100, 100, 100, 0, 0, 0, 0),    # the radar as drawn (its layout alpha 0: shown on his panel only)
+              (100, 25, 90, 100, 0, 0, 0, 0),      # the waveform below full: the round gauge's charge cyan (GAUGE_COLOURS2)
+              (100, 100, 100, 100, 0, 0, 0, 0))    # full: its own rainbow colours
+
+
+def gauge_names(feats):
+    return GAUGE_NAMES + (UI_NAMES if 'gkui' in feats else ())
+
+
+def ui_frame(charge, t):
+    """gk_ui's waveform frame (1-based, FLX_GOTO's) for a charge at its frame count t (already counted this frame)"""
+    if charge >= UI_FULL:
+        return 1 + UI_LEVELS * UI_PHASES + t % UI_RAINBOW
+    return 1 + (charge * UI_LEVELS // UI_FULL) * UI_PHASES + (t >> UI_SLOW) % UI_PHASES
 MSG_HANDLE = 0x02BF2108           # v7: the SET_CURSOR handler's message route (0x02BE7C80): (manager, &handle, id, 1)
 MSG_SEND = 0x02BF019C             # (&handle, &message)
 MSG_KIND = 0x100FCC00             # the message's first word (its vtable: +0x14 0x02BE9724 -> +4, the type 6), as the
@@ -2398,6 +2427,153 @@ pb_dcase:
 '''
 
 
+def ui_src(D):
+    """UI radar / waveform v1 (feature gkui): gk_ui (r3 his WorkModule, r4 his panel slot, r5 its index), from gk_panel"""
+    return r'''
+# ==== UI radar / waveform v1 (gkui): his New_Var 58 (UI_VAR: the Parabeetle's cooldown left x 1000 + the smash charge
+# 0 - 120, his MSC's gk_ui every frame). The radar (gkradar_mc in his panel's root clip): shown (its colour: the layout
+# has alpha 0), its beetle (gk_rbeetle_mc) shown only with no cooldown, its sweep (gk_rsweep_mc) turned on from its kept
+# angle (ui_ang) by UI_SPEED, or UI_SPEED_CD while the cooldown runs. The waveform (gkwave_mc): shown, its frame count
+# (ui_t) up one; below full the frame 1 + (charge x UI_LEVELS / UI_FULL) x UI_PHASES + (count >> UI_SLOW) mod UI_PHASES
+# in the calm colour, full: 1 + UI_LEVELS x UI_PHASES + count mod UI_RAINBOW (its rainbow frames) as drawn; stopped there
+gk_ui:
+        stwu r1, -0x50(r1)
+        mflr r0
+        stw r0, 0x54(r1)
+        stmw r25, 0x34(r1)
+        mr r31, r4                      # his panel slot
+        mr r30, r5                      # its index
+        li r25, 0                       # (the wave's frame: 0 none, for the diag)''' + var_get('r3', UI_VAR) + '''
+        fctiwz f1, f1
+        stfd f1, 0x18(r1)
+        lwz r29, 0x1C(r1)
+        cmpwi r29, 0
+        bge gu_pos
+        li r29, 0
+gu_pos: li r0, 1000
+        divwu r28, r29, r0              # the cooldown left
+        mullw r10, r28, r0
+        subf r29, r10, r29              # the charge
+        cmplwi r29, %(ui_full)d
+        ble gu_c
+        li r29, %(ui_full)d
+gu_c:   lwz r3, 0x5C(r31)
+        cmpwi r3, 0
+        beq gu_out
+        li r4, %(ui_n_radar)d
+        bl gk_find
+        mr. r27, r3
+        beq gu_wave
+        li r4, 1''' + call(PANEL_VISIBLE) + '''
+        mr r3, r27
+        lis r4, %(ui_col_hi)d
+        addi r4, r4, %(ui_col_lo)d''' + call(PANEL_COLOUR) + '''
+        mr r3, r27
+        li r4, %(ui_n_beetle)d
+        bl gk_find
+        cmpwi r3, 0
+        beq gu_sweep
+        li r4, 1                        # the beetle: shown when its cooldown is over
+        cmpwi r28, 0
+        beq gu_bvis
+        li r4, 0
+gu_bvis:''' + call(PANEL_VISIBLE) + '''
+gu_sweep:
+        mr r3, r27
+        li r4, %(ui_n_sweep)d
+        bl gk_find
+        mr. r26, r3
+        beq gu_wave
+        lis r12, %(ui_k_hi)d
+        addi r12, r12, %(ui_k_lo)d
+        lfs f0, 0(r12)                  # ready
+        cmpwi r28, 0
+        beq gu_spd
+        lfs f0, 4(r12)                  # on cooldown: a quarter
+gu_spd: lfs f13, 8(r12)                 # 360
+        lis r11, %(ui_ang_hi)d
+        addi r11, r11, %(ui_ang_lo)d
+        slwi r10, r30, 2
+        add r11, r11, r10
+        lfs f1, 0(r11)
+        fadds f1, f1, f0
+        fcmpu cr0, f1, f13
+        blt gu_ang
+        fsubs f1, f1, f13
+gu_ang: stfs f1, 0(r11)
+        mr r3, r26''' + call(FLX_ROTATE) + '''
+gu_wave:
+        lwz r3, 0x5C(r31)
+        li r4, %(ui_n_wave)d
+        bl gk_find
+        mr. r27, r3
+        beq gu_out
+        li r4, 1''' + call(PANEL_VISIBLE) + '''
+        lis r11, %(ui_t_hi)d
+        addi r11, r11, %(ui_t_lo)d
+        slwi r10, r30, 2
+        lwzx r9, r11, r10
+        addi r9, r9, 1
+        stwx r9, r11, r10
+        lis r26, %(ui_col_hi)d
+        addi r26, r26, %(ui_col_lo)d
+        cmplwi r29, %(ui_full)d
+        blt gu_calm
+        li r0, %(ui_rainbow)d           # full: the rainbow frames, one a frame
+        divwu r8, r9, r0
+        mullw r8, r8, r0
+        subf r25, r8, r9
+        addi r25, r25, %(ui_rb0)d
+        addi r26, r26, 24
+        b gu_set
+gu_calm:
+        mulli r25, r29, %(ui_levels)d   # below full: the charge's level, its phase every 1 << UI_SLOW frames
+        li r0, %(ui_full)d
+        divwu r25, r25, r0
+        mulli r25, r25, %(ui_phases)d
+        srwi r8, r9, %(ui_slow)d
+        li r0, %(ui_phases)d
+        divwu r7, r8, r0
+        mullw r7, r7, r0
+        subf r8, r7, r8
+        add r25, r25, r8
+        addi r25, r25, 1
+        addi r26, r26, 12
+gu_set: mr r3, r27
+        mr r4, r25''' + call(FLX_GOTO) + '''
+        li r0, 1
+        sth r0, 0x9C(r27)               # stopped
+        mr r3, r27
+        mr r4, r26''' + call(PANEL_COLOUR) + '''
+gu_out:''' + D('''
+        li r0, 20                       # diag: S4UI when the cooldown starts / ends or the charge passes a sixth
+        divwu r9, r29, r0
+        slwi r9, r9, 1
+        cmpwi r28, 0
+        beq gu_k
+        addi r9, r9, 1
+gu_k:   lis r11, %(ui_log_hi)d
+        addi r11, r11, %(ui_log_lo)d
+        slwi r10, r30, 2
+        lwzx r0, r11, r10
+        cmpw r0, r9
+        beq gu_end
+        stwx r9, r11, r10
+        lis r3, %(gk_fui_hi)d
+        addi r3, r3, %(gk_fui_lo)d
+        mr r4, r30
+        mr r5, r28
+        mr r6, r29
+        mr r7, r25''' + osr() + '''
+gu_end:''') + '''
+        lmw r25, 0x34(r1)
+        lwz r0, 0x54(r1)
+        mtlr r0
+        addi r1, r1, 0x50
+        blr
+'''
+
+
 def pb_source(D, orig94):
     """parabeetle v1: the Parabeetle's native part (its claim and collision): PB_SRC with its calls / variable reads"""
     sub = {'@@TAIL94@@': tail(orig94),
@@ -2509,6 +2685,12 @@ RELEASE = frozenset(('attack', 'hitcheck', 'burn', 'skeleton', 'sway', 'burn2', 
 # RELEASE - pbeetle)
 RELEASE = RELEASE | {'ice3', 'ccol'}   # parabeetle v2: + ice3, ccol (exe_v46z_gkb18; gkb17 is RELEASE - ice3 - ccol)
 BUILD_TAG = 'exe_v46z_gkb18'      # parabeetle v2 (ice3): named in the diag build's S4BR line (which exe ran)
+RELEASE = RELEASE | {'gkui'}       # UI radar / waveform v1: + gkui (exe_v46z_gkb19; gkb18 is RELEASE - gkui)
+
+
+def build_tag(feats):
+    """the build named in the diag lines (UI radar / waveform v1: gkb19 with gkui; gkb18's own lines unchanged)"""
+    return 'exe_v46z_gkb19' if 'gkui' in feats else BUILD_TAG
 VARIANTS = (('A_release', RELEASE),)
 # skeleton v1.6 (the user: "Please stop packaging G_pose. It has no use anymore."): A_release only. The pose feature
 # stays (the exes shipped with it up to v1.5 still rebuild from this script); v1.5 and before: + ('G_pose', (RELEASE -
@@ -4992,9 +5174,9 @@ def build(rpx, diag=False, feats=None):
     A['gk_clr'] = alloc(4 + 4 * SLOTS)  # burn v1.2: the clears seen (+0), per slot the count its diag last logged
     A['gk_plyr'] = alloc(4 * SLOTS)     # v10: per player, the cursor show byte we cleared + 1 (0: none)
     A['gk_tags'] = alloc(4 * SLOTS)     # v7: the tag messages' countdown per slot (0: shown)
-    A['gk_names'] = alloc(8 * len(GAUGE_NAMES), 4)    # v7: the round gauge's clip names {char *, length}
-    A['gk_namestr'] = alloc(sum(len(n) + 1 for n in GAUGE_NAMES) + 4, 4)
-    A['gk_atoms'] = alloc(4 * len(GAUGE_NAMES), 4)
+    A['gk_names'] = alloc(8 * len(gauge_names(feats)), 4)    # v7: the round gauge's clip names {char *, length}
+    A['gk_namestr'] = alloc(sum(len(n) + 1 for n in gauge_names(feats)) + 4, 4)
+    A['gk_atoms'] = alloc(4 * len(gauge_names(feats)), 4)
     A['gk_angles'] = alloc(16 * SLOTS, 4)             # 4 ring angles per panel slot
     A['ctf_ready'] = alloc(12 * len(READY_COLOURS), 4) if 'gready' in feats else 0   # tuning v1: the ready pulse
     A['gk_pulse'] = alloc(4 * SLOTS, 4) if 'gready' in feats else 0
@@ -5035,7 +5217,7 @@ def build(rpx, diag=False, feats=None):
             ('gk_fsh', 'S4SH skeleton hit: owner slot=%d attacker=%X hitbox=%d damage x10=%d HP left x10=%d at x=%d y=%d\n'),
             ('gk_fsx', 'S4SX skeleton owner slot=%d phase=%d (1 running, 2 exploded, 3 smoked at 0 HP) damage taken x10=%d at x=%d y=%d\n'),
             ('gk_fbr', 'S4BR match state cleared (match start / end, training reset, restart): clear #%d, seen by slot=%d' +
-             (' [%s, TEST_ONLY diag build]\n' % BUILD_TAG if 'ice3' in feats else '\n')),
+             (' [%s, TEST_ONLY diag build]\n' % build_tag(feats) if 'ice3' in feats else '\n')),
             ('gk_fbt', 'S4BT burn ticks: owner slot=%d victim slot=%d stacks=%d damage x1000 this second=%d\n'),
             ('gk_fbk', 'S4BK burns cleared: victim slot=%d status=%X (KO: Dead / Rebirth; -1 gone) seen by owner slot=%d\n'),
             ('gk_fh', 'S4GH hit check: attacker=%X (category x 16 + index) hitbox=%d clone id=%d hitlag=%d at x=%d y=%d\n'),
@@ -5082,7 +5264,7 @@ def build(rpx, diag=False, feats=None):
                     ('gk_fic', 'S4IC ice countdown cancelled (KO): victim slot=%d status=%X at frame %d\n'),
                     ('gk_fid', 'S4ID ice sound: victim slot=%d cmd=%d (1 play, 2 stop) Greninja slot=%d (-1 none)\n'),
                     ('gk_fif', ('S4IF ice flash [%s]: victim slot=%%d frame=%%d rgb x100=%%d %%d %%d alpha x100=%%d entries=%%d '
-                                '(Outline_Set body tint x 100 + Outline_Shell band; 99 none)\n' % BUILD_TAG) if 'ice3' in feats
+                                '(Outline_Set body tint x 100 + Outline_Shell band; 99 none)\n' % build_tag(feats)) if 'ice3' in feats
                      else 'S4IF ice flash: victim slot=%d frame=%d red x100=%d slot0 on=%d slot1 on=%d prio0=%d prio1=%d\n')):
         on = ice and diag and (nm not in ('gk_fid', 'gk_fif') or 'ice2' in feats)
         A[nm] = alloc((len(fs_) + 4) & ~3, 4) if on else 0
@@ -5091,7 +5273,7 @@ def build(rpx, diag=False, feats=None):
     A['gk_fck'] = 0
     if 'ccol' in feats and diag:
         fs_ = ('S4CK clone model: owner slot=%%d entry=%%d (was %%d) costume=%%d (was %%d) found by=%%d (1 his TIMER_15, 0 the first '
-               'Greninja) [%s]\n' % BUILD_TAG)
+               'Greninja) [%s]\n' % build_tag(feats))
         A['gk_fck'] = alloc((len(fs_) + 4) & ~3, 4)
         fmts.append(('gk_fck', fs_))
     pb = 'pbeetle' in feats
@@ -5111,6 +5293,17 @@ def build(rpx, diag=False, feats=None):
         A[nm] = alloc((len(fs_) + 4) & ~3, 4) if pb and diag else 0
         if pb and diag:
             fmts.append((nm, fs_))
+    ui = 'gkui' in feats
+    A['ui_ang'] = alloc(4 * SLOTS, 4) if ui else 0           # UI radar / waveform v1: the sweep's angle per panel slot
+    A['ui_t'] = alloc(4 * SLOTS, 4) if ui else 0             # ... the waveform's frame count per panel slot
+    A['ui_k'] = alloc(12, 4) if ui else 0                    # ... UI_SPEED, UI_SPEED_CD, 360.0
+    A['ui_col'] = alloc(12 * len(UI_COLOURS), 4) if ui else 0
+    A['ui_log'] = alloc(4 * SLOTS, 4) if ui and diag else 0
+    A['gk_fui'] = 0
+    if ui and diag:
+        fs_ = ('S4UI panel slot=%%d beetle cooldown=%%d smash charge=%%d wave frame=%%d (0 no clip) [%s]\n' % build_tag(feats))
+        A['gk_fui'] = alloc((len(fs_) + 4) & ~3, 4)
+        fmts.append(('gk_fui', fs_))
     code_at = alloc(0, 4)
 
     # weapon motion entries / info / descriptor / vtable / singleton / row
@@ -5231,12 +5424,12 @@ def build(rpx, diag=False, feats=None):
         out.blob(A['hcbox'], struct.pack('>7f', *(HC_BOX + (0.0,) * 4)), 'hit check box')
         out.blob(A['hcsize'], struct.pack('>%dI' % len(HC_OBJ_SIZES), *HC_OBJ_SIZES), 'hit check object sizes')
     strs, ptrs, at = b'', [], A['gk_namestr']
-    for n in GAUGE_NAMES:
+    for n in gauge_names(feats):
         ptrs.append((at + len(strs), len(n)))
         strs += n.encode() + b'\0'
     out.blob(A['gk_names'], b''.join(struct.pack('>II', a_, l_) for a_, l_ in ptrs), 'gauge names')
     out.blob(A['gk_namestr'], strs + b'\0' * (-len(strs) % 4), 'gauge name strings')
-    out.blob(A['gk_atoms'], bytes(4 * len(GAUGE_NAMES)), 'gauge atoms')
+    out.blob(A['gk_atoms'], bytes(4 * len(gauge_names(feats))), 'gauge atoms')
     out.blob(A['gk_angles'], bytes(16 * SLOTS), 'gauge ring angles')
     out.blob(A['gk_speeds'], struct.pack('>4f', *GAUGE_SPEEDS), 'gauge ring speeds')
     if diag:
@@ -5315,6 +5508,13 @@ def build(rpx, diag=False, feats=None):
         p['gk_fck_hi'], p['gk_fck_lo'] = ha(A['gk_fck']), K.slo(A['gk_fck'])
         p.update(clone_kind=CLONE_KIND, cc_var_hi=CC_VAR >> 16, cc_var_lo=CC_VAR & 0xFFFF, cc_mgr_hi=ha(CC_RES_MGR),
                  cc_mgr_lo=K.slo(CC_RES_MGR), cc_setup_hi=CC_SETUP >> 16, cc_setup_lo=CC_SETUP & 0xFFFF)
+    if 'gkui' in feats:
+        for nm in ('ui_ang', 'ui_t', 'ui_k', 'ui_col', 'ui_log', 'gk_fui'):
+            p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
+        n0 = len(GAUGE_NAMES)
+        p.update(ui_full=UI_FULL, ui_levels=UI_LEVELS, ui_phases=UI_PHASES, ui_slow=UI_SLOW, ui_rainbow=UI_RAINBOW,
+                 ui_rb0=1 + UI_LEVELS * UI_PHASES, ui_n_radar=n0, ui_n_ring=n0 + 1, ui_n_beetle=n0 + 2, ui_n_sweep=n0 + 3,
+                 ui_n_wave=n0 + 4)
     if 'pbeetle' in feats:
         for nm in ('pb_desc', 'pb_lvd', 'pb_verts', 'gk_fpb', 'gk_fpc', 'gk_fpf'):
             p[nm + '_hi'], p[nm + '_lo'] = ha(A[nm]), K.slo(A[nm])
@@ -7485,7 +7685,11 @@ gp_slot:
         beq gp_next
         lwz r28, 0x28(r12)              # his WorkModule
         cmpwi r28, 0
-        beq gp_next''' + var_get('r28', VAR_GAUGE) + '''
+        beq gp_next''' + ('''
+        mr r3, r28                      # UI radar / waveform v1: his panel's radar and waveform (gk_ui)
+        mr r4, r30
+        mr r5, r26
+        bl gk_ui''' if 'gkui' in feats else '') + var_get('r28', VAR_GAUGE) + '''
         fctiwz f1, f1
         stfd f1, 0x18(r1)
         lwz r27, 0x1C(r1)               # mode x 1000 + value
@@ -7654,7 +7858,7 @@ plyc_back:
         stwx r0, r8, r12
 plyc_go:''' + tail(PLYC_FN) + '''
 
-''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats, 'sksnd' in feats, 'cart' in feats, 'skbot' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats, 'ice' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (ice_src(D, snd='ice2' in feats, fx='ice3' in feats) if 'ice' in feats else '') + (cc_src(D) if 'ccol' in feats else '') + (bg_src(D) if 'bgrav' in feats else '') + (pb_source(D, L['vt_orig'][0x94]) if 'pbeetle' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
+''' + (sk_source(D, L['old_hit'], L['vt_orig'][0x94], 'gmupd' in feats, 'sktouch' in feats, 'sksnd' in feats, 'cart' in feats, 'skbot' in feats) if skel else '') + (burn2_src(D, L['vt_orig'][0x94], 'tiers' in feats, 'ice' in feats) if 'burn2' in feats else '') + (btint_src(D) if 'btint' in feats else '') + (ice_src(D, snd='ice2' in feats, fx='ice3' in feats) if 'ice' in feats else '') + (cc_src(D) if 'ccol' in feats else '') + (bg_src(D) if 'bgrav' in feats else '') + (pb_source(D, L['vt_orig'][0x94]) if 'pbeetle' in feats else '') + (ui_src(D) if 'gkui' in feats else '') + (cd_src() if skel and diag else '') + (pose_src(D) if pose else '') + (MO_OK if feats & {'sway', 'pose'} else '') + '''
 # ---- burn v1.2: the clear-all chain (a leaf: r3 / r10 / LR kept, r0 r4-r9 r11 r12 free): the per-match state
 gk_clear:
         li r0, 0''' + (('''
@@ -7826,6 +8030,13 @@ w_dcase:
         for i, w in enumerate(tw):
             assert img.w(CC_TRAMP + 4 * i) == 0, 'CC_TRAMP 0x%08X' % (CC_TRAMP + 4 * i)
             out.put(CC_TRAMP + 4 * i, w, 'CC_TRAMP (lis / ori / mtctr / bctr -> cc_model)', 0)
+    if 'gkui' in feats:
+        out.blob(A['ui_ang'], bytes(4 * SLOTS), 'UI radar: the sweep angles (gkui)')
+        out.blob(A['ui_t'], bytes(4 * SLOTS), 'UI waveform: the frame counts')
+        out.blob(A['ui_k'], struct.pack('>3f', UI_SPEED, UI_SPEED_CD, 360.0), 'UI radar: speeds, 360')
+        out.blob(A['ui_col'], b''.join(struct.pack('>4B4h', *c) for c in UI_COLOURS), 'UI colours (radar, calm, full)')
+        if diag:
+            out.blob(A['ui_log'], struct.pack('>8i', *([-1] * SLOTS)), 'diag: UI state logged')
     if 'bgrav' in feats:
         out.blob(A['bg_k'], struct.pack('>3f', BG_RATE * BG_RATE, BG_RATE, 0.0), 'burnout gravity multipliers (bgrav)')
         assert BG_RATE == SLOW_RATE

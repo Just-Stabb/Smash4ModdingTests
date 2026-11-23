@@ -275,6 +275,7 @@ void gekkouga_frame()
     }
     WorkModule(0, (float)flags + 0, 0x0f000314);
     gk_gauge();
+    gk_ui();                              // UI radar / waveform v1: the panel's radar and waveform (slot 58)
 }
 
 // ---- down special presses while the ability / burnout runs: swaps, or nothing (no status)
@@ -980,7 +981,7 @@ void gk_channel()
         flags = flags | 0x40;             // clone delay: he is frozen (hitlag): their playback pauses (no history kept)
     }
     flags = flags | gk_vi(13) * 256;      // aligned kick v1 package: the effects' epoch (a change: they fade theirs)
-    flags = flags | gk_vi(57) * 512;      // clone articles v1: their shuriken copies waiting for their claim (1 / 2)
+    flags = flags | gk_vi(57) % 4 * 512;  // clone articles v1: their shuriken copies waiting for their claim (1 / 2)
     WorkModule(0, gk_lx + 0, 0x0f000318);
     WorkModule(0, gk_ly + 0, 0x0f000319);
     WorkModule(0, gk_rx + 0, 0x0f00031a);
@@ -1341,6 +1342,32 @@ void gk_gauge()
         g = 1000 + gk_lw_charge * 100 / gk_lw_full();
     }
     WorkModule(0, (float)g + 0, 0x0f000313);
+}
+
+// UI radar / waveform v1 (fighters/gekkouga/README.md "UI radar / waveform v1"): New_Var slot 58 = the Parabeetle's
+// cooldown left (gk_pb_cd, 0 - 450) x 1000 + the shared smash charge (gk_smash, 0 - 120), every frame; the executable
+// (tools/gekkouga_clone_cave.py gk_ui) turns his panel's radar (slowly while the cooldown runs, the beetle hidden) and
+// picks the waveform's frame (its amplitude by the charge; rainbow and fast at full). A KO / reset clears both (gk_pb_clear,
+// gk_smash = 0): the panel follows the next frame
+void gk_ui()
+{
+    int cd;
+    int c;
+    cd = gk_pb_cd;
+    if (cd < 0)
+    {
+        cd = 0;
+    }
+    c = gk_smash;
+    if (c < 0)
+    {
+        c = 0;
+    }
+    if (c > gk_smash_full())
+    {
+        c = gk_smash_full();
+    }
+    gk_svi(58, cd * 1000 + c);
 }
 
 // time left as 1 - 99 (100 is the meter's "full / ready" frame: only the charge's)
@@ -2447,7 +2474,9 @@ int gk_cl_diag()
 // k 1 - 8 (49 - 56); ice detonation v1 / v2's request / sound were 48 - 53 (a clash): now the request is 60 - 63 (the
 // executable's ICE3_VAR), the sound's play / stop his TIMER_13 / 14 (0x0F00032D / E); the kick armed 60 -> 23 and the
 // ledge kick 63 -> 39 (the clones' unused k 7), the clone fix v3 diag's flags 61 / 62 -> bits of 48 (gk_dg); TIMER_15
-// (0x0F00032F) the clone being made (the executable's cc_model: its costume), TIMER_12 (0x0F00032C) the Parabeetle snap
+// (0x0F00032F) the clone being made (the executable's cc_model: its costume), TIMER_12 (0x0F00032C) the Parabeetle snap.
+// UI radar / waveform v1: 57 holds the shuriken copies' bits + 4 x their frames (were 57 / 58); 58 the panel's state (gk_ui:
+// the beetle's cooldown x 1000 + the smash charge, read by the executable's gk_ui)
 // ===================================================================
 int gk_vi(int i)
 {
@@ -4428,8 +4457,7 @@ void gk_sh_copies()
     {
         return;
     }
-    gk_svi(57, b);
-    gk_svi(58, 3);
+    gk_svi(57, b + 4 * 3);                // the bits + 4 x their frames (UI radar / waveform v1: slot 58 freed)
     if (b & 0x1)
     {
         r = ArticleModule(0x2710, 0);
@@ -4460,18 +4488,25 @@ void gk_sh_report()
     gk_dg_set(0x2, 0x1 - gk_dg(0x2));
 }
 
+// slot 57: the copies' bits (1 / 2) + 4 x the frames they stay up (UI radar / waveform v1: the frames were slot 58)
 void gk_sh_tick()
 {
+    int w;
     int t;
-    t = gk_vi(58);
+    w = gk_vi(57);
+    t = w / 4;
     if (t <= 0)
     {
         return;
     }
-    gk_svi(58, t - 1);
-    if (t - 1 <= 0)
+    t = t - 1;
+    if (t <= 0)
     {
         gk_svi(57, 0);
+    }
+    else
+    {
+        gk_svi(57, w % 4 + 4 * t);
     }
 }
 
