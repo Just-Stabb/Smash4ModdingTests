@@ -1648,7 +1648,7 @@ def tuning_tests(mscsb, src, out, user, tr_mscsb):
             if not any(abs(z - bz) <= bs for bz, _by, bs in GB.TR_BOXES[nm]):
                 unc.append((nm, z))
     check('... every flame inside one of its trail\'s hitboxes (forward 7, up 6, down 8 boxes)',
-          (unc, [len(GB.TR_BOXES[n]) for n in GB.TR_SCRIPTS]), ([], [7, 6, 8]))
+          (unc, [len(GB.TR_BOXES[n]) for n in GB.TR_SCRIPTS[:3]]), ([], [7, 6, 8]))
     # ---- the ledge: they act
     m = fresh(mscsb, src)
     g_ = m.game
@@ -2139,6 +2139,201 @@ def smash_tune_tests(mscsb, src, out, user):
     check('clones and Tap Jump: the clones\' jumps all go through gk_jump_cmd (no bare command 0x300000 test left); the '
           'other settings they mirror come with his command bits (A+B smash, Stick Smash off: applied to the inputs before '
           'the game builds them)', ('cmd & 0x300000' in src_c, src_c.count('gk_jump_cmd(cmd)')), (False, 2))
+
+
+def ib_kb(damage, percent, weight=100.0, kbg=None, bkb=None):
+    """Smash 4's knockback (the community sheet's formula, no staleness / rage): the victim at `percent` before the hit"""
+    import gekkouga_build as _gb  # noqa: F401
+    kbg = 80 if kbg is None else kbg
+    bkb = 50 if bkb is None else bkb
+    p = percent + damage
+    return ((p / 10.0 + p * damage / 20.0) * 200.0 / (weight + 100.0) * 1.4 + 18.0) * kbg / 100.0 + bkb
+
+
+def ice_tests(mscsb, src, tr_mscsb, out, user):
+    """ice detonation v1 (README "Ice detonation v1"): his MSC's side (gk_ib_tick: the executable's blast request made into
+    article 9 with the explosion's sound, a retry, its lapse, a reset), the fire trail's blast mode (the hitbox's damage /
+    size by the burn amount, angle / knockback / facing / element, its explosion effect sized with it, its end; a trail
+    with no burn context gone at once), the shuriken's uncharged ice and sparkles, the explosion's ids and sizes"""
+    import gekkouga_clone_cave as C
+    V = C.ICE_VAR
+    # ---- his side
+    m = fresh(mscsb, src)
+    g = m.game
+
+    def sysf(sid, a, old=g.sys):
+        if sid == 0x1E:
+            g.log.append(('sound', a[0], a[1]))
+            return 1
+        return old(sid, a)
+    g.sys = sysf
+    frames(m, 2, 0)
+    arts = lambda: [x for x in g.log if x[0] in ('article', 'sound')]   # noqa: E731
+    g.log = []
+    frames(m, 3, 0)
+    check('ice: no blast request: no article', arts(), [])
+    g.vars[V], g.vars[V + 1], g.vars[V + 2], g.vars[V + 3] = 4.25, 30.0, 21.0, -1.0
+    got = []
+    for _ in range(8):
+        g.log = []
+        frames(m, 1, 0x2D)
+        got.append(arts())
+    check('ice: the executable\'s blast request (his gk_vi(48) = 4.25): article 9 made at once with the explosion\'s sound '
+          '(0x%X: the skeleton\'s), again 3 frames later (not claimed yet), then nothing; dropped after %d frames' %
+          (0x7680060, 6),
+          (got, g.vars.get(V)),
+          ([[('article', 0x2710, 9), ('sound', 0x2710, 0x7680060)], [], [], [('article', 0x2710, 9)], [], [], [], []], 0.0))
+    g.vars[V] = 4.5
+    g.log = []
+    frames(m, 1, 0xB1)
+    g.vars[V] = 0.0                               # the executable's claim takes it
+    frames(m, 2, 0xB1)
+    g.vars[V] = 4.1
+    g.log = []
+    frames(m, 1, 0)
+    check('ice: claimed (his request 0 again): the next request starts over (made at once, in any status: KO\'d too)', arts(),
+          [('article', 0x2710, 9), ('sound', 0x2710, 0x7680060)])
+    m('gk_reset')
+    check('ice: a reset (gk_reset): the request gone', (g.vars.get(V), m.g('gk_ib_t')), (0.0, 0))
+    check('ice: his MSC reads the request the executable writes (gk_vi(48) = 0x%08X = ICE_VAR)' % V,
+          ('WorkModuleF(0, 0x%08x)' % V in open(os.path.join(ROOT, 'fighters', 'gekkouga', 'clones.c')).read(),
+           0x0F000380 + 48), (True, V))
+    # ---- the blast (firetrail.c)
+    t = MSC(tr_mscsb, GB.TRAIL_MSC)
+
+    def make():
+        mm = MSC(tr_mscsb, GB.TRAIL_MSC)
+        gg = mm.game
+
+        def sysf2(sid, a, old=gg.sys):
+            if sid == 0x12 and a[0] == 0x1:
+                gg.log.append(('motion', a[1]))
+                return 0
+            if sid == 0x14 and a[0] == 0:
+                gg.log.append(('lr', fv(a[1])))
+                return 0
+            if sid == 0x21 and a[0] == 0x9:
+                gg.log.append(('remove',))
+                return 0
+            if sid == 0x2E:
+                gg.log.append(('attack', a[0]) + tuple(a[1:]))
+                return 0
+            if sid == 0x1C:
+                gg.log.append(('fx', a[0]) + tuple(a[1:]))
+                return 0
+            return old(sid, a)
+        gg.sys = sysf2
+        return mm, gg
+    syn = ['ID', 'Part', 'Bone', 'Damage', 'Angle', 'KBG', 'FKB', 'BKB', 'Size', 'X', 'Y', 'Z', 'Effect', 'Trip', 'Hitlag',
+           'SDI', 'Clang', 'Rebound', 'ShieldDamage', 'SFXLevel', 'SFXType', 'Ground/Air', 'Direct/Indirect', 'Type',
+           'HitBits', 'Unk41', 'CollisionPart', 'NoScale', 'Shieldable', 'Reflectable', 'Absorbable', 'Rehit',
+           'IgnoreInvuln', 'HitAllStates', 'FacingRestrict', 'NoGrabRelease', 'TeamDamage', 'DisableHitlag', 'NoGFX',
+           'Flinchless', 'X2', 'Y2', 'Z2']
+    floats = {'Damage', 'Size', 'X', 'Y', 'Z', 'Trip', 'Hitlag', 'SDI', 'X2', 'Y2', 'Z2'}
+    import acmd as _a
+    by = {v['name']: k for k, v in _a.INFO.items()}
+    check('ice: the blast\'s AttackModule 0x272C arguments are Extended_Special_Hitbox\'s, in order',
+          _a.INFO[by['Extended_Special_Hitbox']]['syntax'], syn)
+    lv = []
+    for b, way in ((5.0, 1.0), (20.0, -1.0), (60.0, 1.0)):
+        mm, gg = make()
+        gg.vars.update({0x0F000300: 3.0, 0x0F000301: 4.0 + b / 100.0, 0x0F000302: 30.0, 0x0F000303: 21.0,
+                        0x0F000304: way, 0x0F000305: 0.0})
+        mm('tr_frame')
+        hb = [x for x in gg.log if x[0] == 'attack' and x[1] == 0x272C]
+        h = dict(zip(syn, hb[0][2:])) if hb else {}
+        h = {k: round(fv(v), 3) if k in floats else v for k, v in h.items()}
+        fx = [x for x in gg.log if x[0] == 'fx' and x[1] == 0x3]
+        L = min(1.0, b / 40.0)
+        lv.append((b, L, h.get('Damage'), h.get('Size')))
+        check('ice blast, burn amount %g (level %.3f), way %+d: facing %+d (its model turned), at (30, 21), motion 3 '
+              '(FireTrailIceBoom); one hitbox %.2f %% size %.2f (5 + 13 L / 8 + 14 L), angle 60, KBG 80, BKB 50, flame, '
+              'explosion sound, forward (FacingRestrict 3), shieldable, no extra shield damage, no clank; its explosion '
+              '(0x3300023) there at size %.3f (the hitbox / 10)' % (b, L, way, way, 5 + 13 * L, 8 + 14 * L, (8 + 14 * L) / 10),
+              ([x for x in gg.log if x[0] in ('lr', 'motion')], gg.posture_sets[:1], len(hb),
+               [h.get(k) for k in ('ID', 'Part', 'Bone', 'Damage', 'Size', 'Angle', 'KBG', 'FKB', 'BKB', 'Effect', 'SFXType',
+                                   'SFXLevel', 'FacingRestrict', 'Shieldable', 'ShieldDamage', 'Clang', 'Rebound',
+                                   'Ground/Air', 'HitBits', 'Hitlag', 'X', 'Y', 'Z')],
+               [(x[2], round(fv(x[3]), 2), round(fv(x[4]), 2), round(fv(x[9]), 3)) for x in fx]),
+              ([('lr', way), ('motion', 3)], [(30.0, 21.0)], 1,
+               [0, 0, 0, round(5 + 13 * L, 3), round(8 + 14 * L, 3), 60, 80, 0, 50, 5, 0xB, 2, 3, 1, 0, 0, 0, 3, 0x3F, 1.0,
+                0.0, 0.0, 0.0],
+               [(0x3300023, 30.0, 21.0, round((8 + 14 * L) / 10, 3))]))
+        gg.log = []
+        for _ in range(4):
+            mm('tr_frame')
+        off = [x for x in gg.log if x[0] == 'attack']
+        gg.log = []
+        for _ in range(64):
+            mm('tr_frame')
+        rem1 = [x for x in gg.log if x[0] == 'remove']
+        mm('tr_frame')
+        rem2 = [x for x in gg.log if x[0] == 'remove']
+        check('ice blast (amount %g): its hitbox off at frame 5 (AttackModule 0x2719: one hit each), it stays put, gone at '
+              'frame 70' % b, (off, rem1, rem2, gg.posture_sets[-1]), ([('attack', 0x2719)], [], [('remove',)], (30.0, 21.0)))
+    check('ice blast: the scaling (amount b = remaining burn + 0.5 a stack; L = b / 40, at most 1): 5 -> L 0.125 6.6 %% / '
+          'size 9.75; 20 -> 0.5 11.5 %% / 15; 60 -> 1 18 %% / 22', [(b, round(L, 3), d, s_) for b, L, d, s_ in lv],
+          [(5.0, 0.125, 6.625, 9.75), (20.0, 0.5, 11.5, 15.0), (60.0, 1.0, 18.0, 22.0)])
+    kbs = [(d, round(ib_kb(d, p)), p) for d in (5.0, 11.5, 18.0) for p in (0, 60, 120)]
+    check('ice blast knockback (KBG 80, BKB 50; weight 100, no rage / staleness): at 0 / 60 / 120 %%: weak blast (5 %%) '
+          '%d / %d / %d, half (11.5 %%) %d / %d / %d, full (18 %%) %d / %d / %d' % tuple(k for _d, k, _p in kbs),
+          [k for _d, k, _p in kbs], [round(ib_kb(d, p)) for d in (5.0, 11.5, 18.0) for p in (0, 60, 120)])
+    mm, gg = make()
+    gg.vars.update({0x0F000300: 3.0, 0x0F000301: 1.0, 0x0F000302: 0.0, 0x0F000303: 0.0, 0x0F000304: 1.0, 0x0F000305: 0.0})
+    mm('tr_frame')
+    check('ice detonation v1: a fire trail claimed with no burn context (a 7th / 8th in article 9\'s list): gone at once, '
+          'nothing drawn (at most 6 burning trails, as before)',
+          [x for x in gg.log if x[0] in ('remove', 'fx', 'motion')], [('remove',)])
+    check('ice blast: the effect ids: the explosion 0x3300023, the shuriken\'s sparkles 0x3300024 (his bank\'s entries 0x23 / '
+          '0x24, after the burn tiers\': gekkouga_fx_test checks them against the bank)', (t('ib_fx'), GB.ICE_SPARKLE),
+          (0x3300023, 0x3300024))
+    # ---- the shuriken
+    sd = os.path.join(user, 'weapon', 'shuriken')
+    od = os.path.join(out, 'fighter', 'gekkouga', 'script', 'animcmd', 'weapon', 'shuriken')
+    vg, ve = acmd.ACMDFile.load(os.path.join(sd, 'game.bin')), acmd.ACMDFile.load(os.path.join(sd, 'effect.bin'))
+    pg, pe = acmd.ACMDFile.load(os.path.join(od, 'game.bin')), acmd.ACMDFile.load(os.path.join(od, 'effect.bin'))
+    shot = acmd.crc('Shot')
+    s = pg.scripts[shot]
+    names = [c.name for c in s]
+    check('ice: the shuriken\'s Shot: Float_Var_Compare(5, <, 0.1) (its charge float 5, the one its sound script splits at '
+          '0.5) True: IDs 0 / 1 + ATK_LERP, Else: vanilla\'s, Script_End',
+          (names, list(s[0].params[:2]), round(s[0].params[2], 3)),
+          (['Float_Var_Compare', 'True', 'Special_Hitbox', 'Special_Hitbox', 'ATK_LERP', 'Else', 'Special_Hitbox',
+            'Special_Hitbox', 'ATK_LERP', 'Script_End'], [5, 4], 0.1))
+    pos, at = [], 0
+    for c in s:
+        pos.append(at)
+        at += 1 + len(c.params)
+    check('ice: ... the True / Else jumps land on the Else branch / the end',
+          (pos[1] + s[1].params[0], pos[5] + s[5].params[0]), (pos[6], pos[9]))
+    van = vg.scripts[shot]
+    diff = []
+    for a, b_ in zip(s[2:4], van[:2]):
+        da, db = dict(zip(a.info['syntax'], a.params)), dict(zip(b_.info['syntax'], b_.params))
+        diff.append(sorted((k, db[k], da[k]) for k in da if da[k] != db[k]))
+    check('ice: the uncharged hitboxes = vanilla\'s but Effect 2 -> 4 (ice) and the hit sound 3 -> 0x1C (ice); the charged '
+          'branch is vanilla\'s exactly', (diff, [(c.name, c.params) for c in s[6:9]] == [(c.name, c.params) for c in van[:3]]),
+          ([[('Effect', 2, 4), ('SFXType', 3, 0x1C)]] * 2, True))
+    check('ice: every other shuriken script as vanilla (MaxShot 0xF744D20D, the charged max shot, included)',
+          sorted(k for k in set(vg.scripts) | set(pg.scripts) if k != shot and
+                 [(c.name, c.params) for c in vg.scripts.get(k, [])] != [(c.name, c.params) for c in pg.scripts.get(k, [])]),
+          [])
+    e_ = pe.scripts.get(shot, [])
+    eg = dict(zip(e_[2].info['syntax'], e_[2].params)) if len(e_) > 2 else {}
+    check('ice: its effect script (vanilla: empty): the same compare, True: External_Graphic PtcGekkougaIceSparkle (0x%X) '
+          'following its joint 0, size 1, for its flight (Terminate 1)' % GB.ICE_SPARKLE,
+          ([c.name for c in e_], list(e_[0].params[:2]) if e_ else None, e_[1].params[0] if len(e_) > 1 else None,
+           [eg.get(k) for k in ('Graphic', 'Bone', 'X', 'Y', 'Z', 'Size', 'Terminate')], len(ve.scripts),
+           sorted(pe.scripts) == [shot]),
+          (['Float_Var_Compare', 'True', 'External_Graphic', 'Script_End'], [5, 4], 13,
+           [GB.ICE_SPARKLE, 0, 0.0, 0.0, 0.0, 1.0, 1], 0, True))
+    kb0 = ((3.0 / 10 + 3.0 * 3.0 / 20) * 1.4 + 18) * 0.85 + 10
+    p52 = next(p for p in range(0, 300) if ((((p + 3) / 10 + (p + 3) * 3.0 / 20) * 1.4 + 18) * 0.85 + 10) > 52.5)
+    check('ice: the uncharged shot\'s knockback (3 %%, KBG 85, BKB 10, weight 100): %.1f at 0 %%, over 52.5 (a freeze, 12 x 3 = '
+          '36 frames) from %d %%: under that only the ice hit effect' % (kb0, p52), (round(kb0, 1), p52), (26.4, 88))
+    names_txt = open(os.path.join(HERE, 'Sm4shCommand', 'SM4SHCommand', 'ModAnimNames.txt')).read()
+    check('ice: FireTrailIceBoom in ModAnimNames.txt (-> its carrier\'s animation)',
+          '\nFireTrailIceBoom -> firetrail/FitPacmanFirehydrantMainD03SpecialLw.omo' in names_txt, True)
 
 
 def invuln_tests(mscsb, src, out, vanilla_vl):
@@ -3784,7 +3979,7 @@ def firetrail_tests(mscsb, src):
     run(m, 1)
     check('trail: ... and after 30 frames it removes itself', [x for x in g.log if x[0] == 'remove'], [('remove',)])
     m, g = make()
-    g.vars.update({0x0F000300: 3.0, 0x0F000301: 1.0, 0x0F000302: 40.0, 0x0F000303: 10.0, 0x0F000304: -1.0})
+    g.vars.update({0x0F000300: 3.0, 0x0F000301: 1.0, 0x0F000302: 40.0, 0x0F000303: 10.0, 0x0F000304: -1.0, 0x0F000305: 1.0})
     run(m, 1)
     check('trail start (forward smash at (40, 10), way -1): facing -1 (its model turned: PostureModule 0, 2), there, its '
           'effects unhooked from its hidden model (0x26 (0), 0x1C (1)), motion 0 held (rate 0: its hitboxes), the first flame '
@@ -3820,7 +4015,7 @@ def firetrail_tests(mscsb, src):
             (2, [(4.0 + 18.0 * (k // 2)) * (1 - 2 * (k % 2)) for k in range(4)]),
             (3, [round((6.0 + 49.0 / 3.0 * (k // 2)) * (1 - 2 * (k % 2)), 2) for k in range(8)])) for w in (1.0, -1.0)]:
         m, g = make()
-        g.vars.update({0x0F000300: 3.0, 0x0F000301: float(typ), 0x0F000302: 0.0, 0x0F000303: 0.0, 0x0F000304: way})
+        g.vars.update({0x0F000300: 3.0, 0x0F000301: float(typ), 0x0F000302: 0.0, 0x0F000303: 0.0, 0x0F000304: way, 0x0F000305: 1.0})
         run(m, 20)
         check('fire trail fix v1: %s smash facing %s: motion %d, its flames on the ground (Y 0) along its way (local Z: '
               'X 0, never into the screen) %s; its model turned by its way (the same Z either way)' % (
@@ -3836,11 +4031,12 @@ def trail_data_tests(out):
     fg = os.path.join(out, 'fighter', 'gekkouga')
     ow = os.path.join(fg, 'script', 'animcmd', 'weapon', 'firetrail')
     mt = open(os.path.join(ow, 'motion.mtable'), 'rb').read()
-    check('trail scripts: motion.mtable = FireTrailS4 / FireTrailHi4 / FireTrailLw4 (its motion kinds 0 / 1 / 2)',
-          list(struct.unpack('>3I', mt)), [acmd.crc(n) for n in GB.TR_SCRIPTS])
+    check('trail scripts: motion.mtable = FireTrailS4 / FireTrailHi4 / FireTrailLw4 (its motion kinds 0 / 1 / 2; ice '
+          'detonation v1: + FireTrailIceBoom, 3)',
+          list(struct.unpack('>%dI' % (len(mt) // 4), mt)), [acmd.crc(n) for n in GB.TR_SCRIPTS])
     game = acmd.ACMDFile.load(os.path.join(ow, 'game.bin'))
     rows = []
-    for n in GB.TR_SCRIPTS:
+    for n in GB.TR_SCRIPTS[:3]:
         sc = game.script(n)
         hb = [dict(zip(c.info['syntax'], c.params)) for c in sc if c.name == 'Special_Hitbox']
         rows.append((n, [(h['ID'], h['Bone'], round(h['Z'], 2), round(h['Y'], 2), round(h['Size'], 2)) for h in hb],
@@ -3850,10 +4046,12 @@ def trail_data_tests(out):
     check('trail hitboxes (bone 0, from frame 0, never removed): along each smash\'s path, 0.1 %, no knockback (KBG / FKB / '
           'BKB 0), re-hit every 35 frames, no hitlag, no hit effect, no flinch, ground and air, shieldable', rows,
           [(n, [(i, 0, z, y, sz) for i, (z, y, sz) in enumerate(GB.TR_BOXES[n])],
-            [(0.1, 0, 0, 0, 35, 1, 1, 1, 0.0, 3, 1)], 'Script_End') for n in GB.TR_SCRIPTS])
+            [(0.1, 0, 0, 0, 35, 1, 1, 1, 0.0, 3, 1)], 'Script_End') for n in GB.TR_SCRIPTS[:3]])
+    check('ice detonation v1: FireTrailIceBoom\'s game script empty (the blast\'s hitbox is its MSC\'s: ib_start)',
+          [c.name for c in game.script('FireTrailIceBoom')], ['Script_End'])
     check('trail scripts: effect / sound empty (its MSC makes the fire)',
           [[c.name for c in acmd.ACMDFile.load(os.path.join(ow, f)).script(n)] for f in ('effect.bin', 'sound.bin')
-           for n in GB.TR_SCRIPTS], [['Script_End']] * 6)
+           for n in GB.TR_SCRIPTS], [['Script_End']] * (2 * len(GB.TR_SCRIPTS)))
     check('trail: its main.pac and carrier model files are present (Pac-Man\'s hydrant\'s), its MSC',
           [f for f in GB.SK_CARRIER if not os.path.exists(os.path.join(fg, 'model', 'firetrail', 'c00', f))] +
           [f for f in (os.path.join('motion', 'firetrail', 'main.pac'), os.path.join('script', 'msc', 'firetrail', 'firetrail.mscsb'))
@@ -4144,7 +4342,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         want_top = ['INSTALL_TO_code', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (37, 38):   # round gauge v1: the damage panel's files; clone fix v3: his MSC
         want_top = ['INSTALL_TO_data', 'README.txt']
-    if len(earlier) in (42, 44):   # tuning v1: the exes (the gauge's ready state, the skeleton's bottom) and data; smash
+    if len(earlier) in (42, 44, 45):   # ice detonation v1: the exes, data (+ Sm4shCommand); tuning v1: the exes (the gauge's ready state, the skeleton's bottom) and data; smash
         # tune v1: the exes (the half shield damage) and data
         want_top = ['INSTALL_TO_code', 'INSTALL_TO_data', 'README.txt', 'TEST_ONLY_INSTALL_TO_code']
     if len(earlier) in (41, 43):   # clone moves v1, nair / fair v1: data only
@@ -4200,6 +4398,12 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         if len(earlier) in (18, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42,
                             43):
             check('update: no Sm4shCommand (no script or slot changed)', [t for t in top if t.startswith('Sm4shCommand_v')], [])
+        elif len(earlier) == 45:
+            check('ice detonation v1: Sm4shCommand v1.7.29 (FireTrailIceBoom in ModAnimNames.txt)',
+                  ([t for t in top if t.startswith('Sm4shCommand_v')],
+                   z.read('Sm4shCommand_v1.7.29/ModAnimNames.txt') == open(os.path.join(HERE, 'Sm4shCommand', 'SM4SHCommand',
+                                                                                         'ModAnimNames.txt'), 'rb').read()),
+                  (['Sm4shCommand_v1.7.29'], True))
         elif len(earlier) == 21:
             check('burn v2: Sm4shCommand v1.7.28 (the fire trail\'s three script names in ModAnimNames.txt)',
                   ([t for t in top if t.startswith('Sm4shCommand_v')],
@@ -4267,6 +4471,18 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
               ['ui/info/dmg/dmg.flx', 'ui/info/dmg/img-00135.nut', 'ui/info/dmg/texlist.lst'])
         if GAUGE_SRC and GAUGE_JPG:
             gauge_tests(z)
+    if z1 and len(earlier) == 45:
+        check('ice detonation v1: INSTALL_TO_data: his MSC (the blast request), his bank (the explosion, the sparkles), the '
+              'fire trail\'s MSC (the blast mode) and scripts (its 4th slot), the shuriken\'s game / effect scripts; '
+              'INSTALL_TO_code exe_v46z_gkb15; TEST_ONLY A_release',
+              (sorted(n[len('INSTALL_TO_data/'):] for n in names if n.startswith('INSTALL_TO_data/') and not n.endswith('/')),
+               sorted({n.split('/')[1] for n in names if n.startswith('TEST_ONLY_INSTALL_TO_code/') and n.count('/') > 1})),
+              (sorted('fighter/gekkouga/' + x for x in (
+                  'effect/gekkouga/gekkouga.010d0000.efc', 'effect/gekkouga/gekkouga.010d0000.ptcl',
+                  'script/animcmd/weapon/firetrail/effect.bin', 'script/animcmd/weapon/firetrail/game.bin',
+                  'script/animcmd/weapon/firetrail/motion.mtable', 'script/animcmd/weapon/firetrail/sound.bin',
+                  'script/animcmd/weapon/shuriken/effect.bin', 'script/animcmd/weapon/shuriken/game.bin',
+                  'script/msc/firetrail/firetrail.mscsb', 'script/msc/gekkouga.mscsb')), ['A_release']))
     if z1 and len(earlier) == 44:
         check('smash tune v1: INSTALL_TO_data: his MSC (the pursuit, the uncharged ratio, the clones\' Tap Jump), his and the '
               'clone\'s game scripts (up smash\'s spike, the windbox ring, the clones\' x1.0), the fire trail\'s hitboxes (the '
@@ -4569,7 +4785,8 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
                                                                len(earlier) in (26, 27, 28, 29), len(earlier) == 30,
                                                                len(earlier) in (31, 32), len(earlier) == 33,
                                                                len(earlier) in (34, 35), len(earlier) in (36, 37, 38, 39),
-                                                               len(earlier) in (40, 41))):
+                                                               len(earlier) in (40, 41), len(earlier) in (42, 43),
+                                                               len(earlier) == 44)):
             if not b:
                 continue
             p = os.path.join(td, '%d.rpx' % i)
@@ -4667,6 +4884,9 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
         ('greninja_nair_fair_v1', 'exe_v46z_gkb14', 'pursuit', 'shield', 'ledge', 'chain', '12', 'uncharged', 'burn',
          'x1.4', 'knockback', 'spike', 'angle 300', 'inner', 'lower hitbox ID', '1.19', '8.3', 'Tap Jump', 'A+B',
          'windbox', 'F.L.U.D.D.', 'no hitlag', 'fsmash_pursuit.png', 'unconfirmed') if len(earlier) == 44 else \
+        ('greninja_smash_tune_v1', 'exe_v46z_gkb15', 'ice', 'burn', '52', 'yellow', 'black', '60', 'KBG 80', 'BKB 50',
+         'smoke', '8x', 'Water Shuriken', 'uncharged', 'sparkle', 'S4IA', 'S4IB', 'S4IC', 'shield', 'ice_boom.gif',
+         'ice_flash.gif', 'ice_sparkle.gif', 'Sm4shCommand_v1.7.29', 'confirmed in game') if len(earlier) == 45 else \
         ('greninja_skeleton_v1', 'exe_v46z_gk14', 'tongue', 'water', 'A_release', 'E_sway', 'S4TP', 'S4GQ', 'S4GR',
          'TEST_ONLY_DATA/sway', 'TEST_ONLY_DATA/rigid', 'crash', '+0x10', 'unconfirmed', 'S4SD', 'S4SE', 'S4SG',
          'skeleton_floor_only', 'collision') if len(earlier) == 18 else \
@@ -4679,7 +4899,7 @@ def package_tests(out, pkg, base, base_diag, v1=None, earlier=()):
 
 
 def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=False, b2=False, gkb5=False, gkb6=False,
-                gkb7=False, gkb8=False, gkb9=False, gkb10=False, gkb11=False, gkb12=False, gkb13=False):
+                gkb7=False, gkb8=False, gkb9=False, gkb10=False, gkb11=False, gkb12=False, gkb13=False, gkb14=False):
     """(member, base, diag, features): v4+ ships the safe release exe and a TEST_ONLY exe per variant; skeleton v1 the
     release and TEST_ONLY A_release (as the burn packages)"""
     import gekkouga_clone_cave as C
@@ -4705,6 +4925,8 @@ def exe_members(base, base_diag, v4, skeleton=False, v14=False, v15=False, sk12=
             else set()   # (tuning v1's gkb13)
         drop |= {'shalf'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 or gkb10 or gkb11 or gkb12 or gkb13 \
             else set()   # (smash tune v1's gkb14)
+        drop |= {'ice'} if sk12 or b2 or gkb5 or gkb6 or gkb7 or gkb8 or gkb9 or gkb10 or gkb11 or gkb12 or gkb13 or gkb14 \
+            else set()   # (ice detonation v1's gkb15)
         variants = C.VARIANTS if not (sk12 or b2 or gkb5 or gkb6 or gkb7) else \
             C.VARIANTS + (('G_pose', (C.RELEASE - {'sway'}) | {'pose'}),)       # (up to v1.5: + G_pose)
         return [('INSTALL_TO_code/cross_f.rpx', base, False, C.RELEASE - drop)] + \
@@ -4741,7 +4963,7 @@ def tool_tests(out, base, base_diag, pkg, v4=False, earlier=()):
                                                 len(earlier) in (22, 23, 24, 25), len(earlier) in (26, 27, 28, 29),
                                                 len(earlier) == 30, len(earlier) in (31, 32), len(earlier) == 33,
                                                 len(earlier) in (34, 35), len(earlier) in (36, 37, 38, 39),
-                                                len(earlier) in (40, 41), len(earlier) in (42, 43)):
+                                                len(earlier) in (40, 41), len(earlier) in (42, 43), len(earlier) == 44):
             if not b:
                 continue
             p = os.path.join(td, 'x.rpx')
@@ -4769,7 +4991,7 @@ def main():
     GAUGE_VL = next((x[5:] for x in sys.argv[1:] if x.startswith('--vl=')), None)
     a = [x for x in sys.argv[1:] if not x.startswith('--v') and not x.startswith('--fx=') and not x.startswith('--gauge-')]
     earlier = [x[len('--v%s=' % k):] for k in ('1', '2', '3', '4', '5', '6', '7', '8', '9', '91', '10', '11', '12', '13', 'b1',
-                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3', 'ff', 'rg11', 'cm', 'tu', 'nr') for x in sys.argv[1:]
+                                               'b11', 'b12', 's1', '14', '15', 's12', 'b2', 'b21', 'b22', 'b23', 'ac', 's13', 'cf', 'ft', 's14', 's15', 's16', 'tc', 'bt', 's17', 'ak', 'ca', 'rg', 'cf3', 'ff', 'rg11', 'cm', 'tu', 'nr', 'st') for x in sys.argv[1:]
                if x.startswith('--v%s=' % k)]
     v1 = None
     out, pkg, user, base = a[0], a[1], a[2], a[3]
@@ -4795,6 +5017,9 @@ def main():
         trail_data_tests(out)
     script_tests(out, user)
     msc_ops_tests(out)
+    if len(earlier) >= 45:
+        ice_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'),
+                  os.path.join(msc, 'firetrail', 'firetrail.mscsb'), out, user)
     if len(earlier) >= 44:
         smash_tune_tests(os.path.join(msc, 'gekkouga.mscsb'), os.path.join(ROOT, 'fighters', 'gekkouga', 'gekkouga.c'), out,
                          user)

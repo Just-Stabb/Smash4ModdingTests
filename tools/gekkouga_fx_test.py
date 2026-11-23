@@ -2,6 +2,7 @@
 """Tests for tools/gekkouga_fx.py (Greninja's flipbook effects, fighters/gekkouga/README.md "Skeleton v1.2" on).
 
   python3 -I tools/gekkouga_fx_test.py VANILLA_EFFECT_DIR KIRBY_PTCL FX_PKG BUILT_EFFECT_DIR [--skeleton-only]
+      [--common=COMMON_PTCL] (ice detonation v1's sparkles: the common bank's emitter)
 
 --skeleton-only: skeleton v1.2's bank (its four sets); else burn v2's too (the fire on burning fighters, at his water's
 ends and in the smashes' trails: their ids in the executable / build / trail MSC, their bases).
@@ -316,8 +317,70 @@ def tier_blade_checks(p, sets, names):
           (G.FIRE_BLADE['n'], True, True, {G.FOREVER}, {1.0}))
 
 
+def ice_checks(p, sets, names, ids):
+    """ice detonation v1: the explosion (its ids in firetrail.c, the fireball's middle on the call's point, its fire
+    2 x ICE_BOOM_REF wide at size 1, the retimed flipbook: the smoke far faster than the fire) and the shuriken's sparkles
+    (the common bank's kirakira1 copied: its fields but the volume / size / name, its colours icy)"""
+    import gekkouga_build as GB
+    tsrc = open(os.path.join(ROOT, 'fighters', 'gekkouga', 'weapons', 'firetrail.c')).read()
+    m = re.search(r'int ib_fx\(\) \{ return (0x[0-9a-f]+); \}', tsrc)
+    m2 = re.search(r'float ib_fx_ref\(\) \{ return ([0-9.]+)f; \}', tsrc)
+    check('ice detonation v1 ids: the explosion (firetrail.c ib_fx), the shuriken\'s sparkles (gekkouga_build ICE_SPARKLE); '
+          'the call\'s size = the hitbox / ib_fx_ref = gekkouga_fx ICE_BOOM_REF',
+          (int(m.group(1), 16) if m else None, GB.ICE_SPARKLE, float(m2.group(1)) if m2 else None),
+          (ids['PtcGekkougaIceBoom'], ids['PtcGekkougaIceSparkle'], G.ICE_BOOM_REF))
+    spec = dict(sets)['PtcGekkougaIceBoom']
+    si = 20 + names.index('PtcGekkougaIceBoom')
+    em = p.sets[si]['emitters'][0]['data']
+    t = p.field(em, 'emitter_translation')
+    w, h = spec['size']
+    cu, cv = G.ICE_BOOM_CENTRE
+    check('PtcGekkougaIceBoom: one emitter, normal blend (the dark smoke darkens), the fireball\'s middle (u %.2f, v %.2f of '
+          'the cell) on the call\'s point, its fire (%.2f of the cell) %.0f wide at size 1 (the hitbox\'s radius %g x 2)' %
+          (cu, cv, G.ICE_BOOM_FIRE_U, 2 * G.ICE_BOOM_REF, G.ICE_BOOM_REF),
+          (len(p.sets[si]['emitters']), spec['blend'], round(t[0] - (0.5 - cu) * w, 3), round(t[1] - (cv - 0.5) * h, 3),
+           round(w * G.ICE_BOOM_FIRE_U, 3)), (1, 0, 0.0, 0.0, round(2 * G.ICE_BOOM_REF, 3)))
+    d = G.sidecar('ice_boom_15')
+    src = d['retime']['cell_source_frames']
+    steps = [b - a for a, b in zip(src, src[1:])]
+    fire = [s_ for a, s_ in zip(src, steps) if a < 42]
+    smoke = [s_ for a, s_ in zip(src, steps) if a >= 55]
+    check('ice_boom_15: 30 cells of 2 frames (%.1f s; the clip %.1f s): the fireball 2 source frames a cell (2x), the smoke 8 '
+          '(8x: far faster), its last 4 cells faded' % (d['duration_s'], d['source_duration_s']),
+          (d['frames'], d['frames_per_cell_at_60fps'], sorted(set(fire)), sorted(set(smoke)), d['faded_out_last_cells'],
+           d['playback']), (30, 2, [2], [8], 4, 'one-shot'))
+    si = 20 + names.index('PtcGekkougaIceSparkle')
+    em = p.sets[si]['emitters'][0]['data']
+    if G.COMMON is None:
+        check('PtcGekkougaIceSparkle: the common bank given (--common=)', False, True)
+        return
+    ci = G.COMMON.find_set(G.ICE_SPARKLE['set'])
+    src_em = [x['data'] for x in G.COMMON.sets[ci]['emitters'] if x['data'] is not None and
+              G.COMMON.emitter_name(x['data']) == G.ICE_SPARKLE['emitter']][0]
+    keys = ('ptcl_life', 'emit_rate', 'emit_interval', 'end_frame', 'one_time', 'blend_type', 'volume_type', 'particle_type',
+            'alpha_init', 'gravity', 'emitter_velocity')
+    c1 = p.color_keys(em, 1)
+    check('PtcGekkougaIceSparkle: one emitter, the common bank\'s %s / %s (its fields: life, emission for ever, additive, a '
+          'sphere volume) with its volume radius %g (the shuriken\'s hitbox) and its twinkles x %g; colour 1 icy (cyan %s '
+          'to white), colour 0 white' % (G.ICE_SPARKLE['set'], G.ICE_SPARKLE['emitter'], G.ICE_SPARKLE['radius'],
+                                         G.ICE_SPARKLE['scale'], tuple(round(x, 2) for x in c1[0][:3])),
+          (len(p.sets[si]['emitters']), p.emitter_name(em), [p.field(em, k) for k in keys], p.field(em, 'volume_radius'),
+           [round(x, 3) for x in p.field(em, 'scale')], c1[0][2] > 0.9 and c1[0][1] > 0.5 and c1[0][0] < 0.3,
+           p.color_keys(em, 0)[0][:3]),
+          (1, 'PtcGekkougaIceSparkle', [G.COMMON.field(src_em, k) for k in keys], [G.ICE_SPARKLE['radius']] * 3,
+           [round(x * G.ICE_SPARKLE['scale'], 3) for x in G.COMMON.field(src_em, 'scale')], True, (1.0, 1.0, 1.0)))
+    check('PtcGekkougaIceSparkle: its volume turned Z +90 (into the screen\'s YZ plane: round the shuriken as seen), centred',
+          ([round(x, 4) for x in p.field(em, 'emitter_rotation')], p.field(em, 'emitter_translation')),
+          ([0.0, 0.0, round(np.pi / 2, 4)], [0.0, 0.0, 0.0]))
+    check('PtcGekkougaIceSparkle: its texture the common bank\'s (decoded the same)',
+          bool(np.array_equal(p.decode_texture(em, 0), G.COMMON.decode_texture(src_em, 0))), True)
+
+
 def main():
     a = [x for x in sys.argv[1:] if not x.startswith('--')]
+    cm = next((x[9:] for x in sys.argv[1:] if x.startswith('--common=')), None)
+    if cm:
+        G.COMMON = P.Ptcl(open(cm, 'rb').read())
     if len(a) != 4:
         sys.exit(__doc__)
     van_dir, kirby_path, fx_pkg, built = a
@@ -349,8 +412,8 @@ def main():
         if spec.get('ring'):
             ring_checks(p, si, name, spec, kirby, ksh)
             continue
-        if spec.get('layers') or spec.get('blade'):
-            continue                               # (timing_checks / tier_checks)
+        if spec.get('layers') or spec.get('blade') or spec.get('import'):
+            continue                               # (timing_checks / tier_checks / ice_checks)
         d = G.sidecar(spec['atlas'])
         seq = G.flip_seq(d['frames'], spec.get('rate', 1.0))
         plan = G.flip_plan(d['frames'], d['frames_per_cell_at_60fps'], d['playback'] == 'loop', seq)
@@ -444,6 +507,8 @@ def main():
                   w0 * G.TRAIL_WIDE, G.TRAIL_WIDE, G.FIRE_TRAIL_H, G.FIRE_TRAIL_H * G.TRAIL_SECOND, G.TRAIL_WIDE),
               ([l_['atlas'] for l_ in ly], [round(x, 3) for x in sc[0][:2]], ly[1].get('mirror'), ly[1].get('rate')),
               (['fire_ground_10', 'fire_small_5'], [round(w0 * G.TRAIL_WIDE, 3), G.FIRE_TRAIL_H], True, 0.8))
+    if 'PtcGekkougaIceBoom' in names:
+        ice_checks(p, sets, names, ids)
     timing_checks(p, sets, names)
     if burn2:
         tier_blade_checks(p, sets, names)

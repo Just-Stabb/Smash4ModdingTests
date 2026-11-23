@@ -620,3 +620,7 @@ SkeletonSmoke -> skeleton/FitPacmanFirehydrantMainD03SpecialLw.omo
 FireTrailS4 -> firetrail/FitPacmanFirehydrantMainD03SpecialLw.omo
 FireTrailHi4 -> firetrail/FitPacmanFirehydrantMainD03SpecialLw.omo
 FireTrailLw4 -> firetrail/FitPacmanFirehydrantMainD03SpecialLw.omo
+// Ice detonation v1 (fighters/gekkouga/README.md "Ice detonation v1"): the fire trail article's motion kind 3, the ice
+// blast (an ice hit on a burning fighter, 52 frames later): its game script is empty (the hitbox is its MSC's, sized by
+// the burn amount); it plays the carrier's animation as the trails do.
+FireTrailIceBoom -> firetrail/FitPacmanFirehydrantMainD03SpecialLw.omo

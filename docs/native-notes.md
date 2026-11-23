@@ -1079,6 +1079,31 @@ AttackModule vt `+0x40C` = its `+0x11A` (0 from the constructor `0x02C07968`; vt
 Type (parameter 23) is attack data `+0x55` (the MSC builder's argument 24 too), read by AttackModule `0x02C093A0` (a
 per-Type power: `+0xEC` mask, `+0xE8` multiplier) and fighter code `0x02E489C4` / `0x02E4DCB8`.
 
+## The victim hit handler and the hitbox's element (Greninja ice detonation v1: `gekkouga_clone_cave.py` feature `ice`)
+
+- **Who gets it:** every battle object's vtable `+0xCC` is its hit dispatcher (`0x02C25100`; fighters `0x02E76EC8`, which
+  calls `0x02C25100` at `0x02E77128`); `0x02C25100` sends the hit info to the victim handler, vt `+0xD4` = `0x02C25318`
+  (every class: the vtables at `0x100D5768`, `0x1012BA70` fighters, `0x10130EA4`, ...), or the attacker handler vt `+0xEC`.
+  A hit on a shield goes elsewhere: the fighter shield's handler `0x02E35794` (vtables `0x10125CEC` / `0x10125DDC`;
+  smash tune v1's `shalf` hook is in it). So `0x02C25318` sees hurtbox hits only.
+- **Its registers:** the entry word is hero_buff_cave's branch (`0x02C25318` -> `0x04B9F008`); after its prologue
+  (`0x02C253A0` - `0x02C253B0`) r26 = the object, r27 = the victim's module accessor (the fighter table entry's `+0xC`),
+  r28 = the hit info, r29 / r30 its r6 / r7. `0x02C253B4` (`lwz r3, 0x20(r27)`, the StatusModule for its situation
+  call) has every volatile register free: the `ice` hook (`ICE_HOOK`, back at `0x02C253B8` after the game's word).
+- **The hit info** (0xE4 bytes, `0x02C21360`): `+0x2C` the attacker's object id (`0x02BF205C(manager, id)` -> its record:
+  `+0xC` accessor, `+0x1E` live >= 4), `+0x44` the hitbox data's 0x68-byte copy, so **`+0x87` = its Effect / element**
+  (data `+0x43`: 0 normal, 2 slash, 3 electric, 4 Freezing, 5 flame ...: reference/spreadsheets Element tab); the handler
+  itself reads it at `0x02C25420` (`lbz r31, 0x87(r28)`).
+- **ATK_LERP** (`0x02BDD520`) is AttackModule's MSC op `0x272F` (`0x02C0BEB4`) -> vt `+0x3C4` = `0x02C0D590`: it copies
+  hitbox ID1's whole 0x68-byte data into the lerp record (AttackModule `+0x70`: `+0x68` / `+0x6C` the two IDs) and turns
+  ID2 off (vt `+0x44(ID2, 0)`); the lerp itself (by the ratio) was not traced, but with ID1's data as the base the lerped
+  hitbox most likely keeps ID1's non-numeric fields (its Effect included): an element on ID1 alone would likely give
+  every charge level that element. Greninja's shuriken therefore switches its whole Shot (both IDs) by its charge
+  (`Float_Var_Compare(5, <, 0.1)`, the variable its own sound script splits at 0.5).
+- **Found on the way (not fixed):** clone articles v1's skeleton stack counter (`SK_SEAT` +4, in `sk_frame`) is bumped
+  with `lwz r0, 4(r25); addi r0, r0, 1`: `addi` from r0 reads 0, so it is always 1 and never "moves" (the stacked
+  skeleton's MSC reads it mod 10 to see the one below alive). Unconfirmed in game whether the stack falls apart.
+
 ## Buffered aerials out of ground statuses (edge-cancel bug)
 
 Base-game bug (user): an aerial buffered during landing lag that edge-cancels into Fall always came out as

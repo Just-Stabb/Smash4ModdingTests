@@ -39869,6 +39869,7 @@ int gk_fp_slot;        // smash tune v1: the fighter his forward smash hit or wa
                        // yet, -1 the pursuit over for this forward smash)
 int gk_fp_t;           // ... frames pursued (after his hitlag)
 float gk_fp_v;         // ... his pursuit speed last frame
+int gk_ib_t;           // ice detonation v1: frames the executable's blast request (his gk_vi(48) - 51) has been up
 
 int gk_lw_full() { return 300; }          // 5 seconds held (the user)
 int gk_ability_frames() { return 720; }   // 12 seconds
@@ -39898,6 +39899,9 @@ int gk_sk_beat_miss() { return 2; }       // skeleton v1.6: frames without its h
 float gk_sk_dist() { return 36.0f; }      // skeleton v1.6: the shadow's / skeleton's fixed distance ahead of him (his
                                           // instance float 0x35; tools/gekkouga_clone_cave.py SK_DIST, the hold's cap)
 int gk_tr_req_frames() { return 5; }      // burn v2: the trail requests' life (6 trails out already: none is made)
+int gk_ib_frames() { return 6; }          // ice detonation v1: the blast request's life (made again at gk_ib_retry())
+int gk_ib_retry() { return 3; }
+int gk_ib_sound() { return 0x7680060; }   // the skeleton's explosion sound (skeleton v1.5: his row 0x768, label 96)
 
 float gk_abs(float v)
 {
@@ -39924,6 +39928,7 @@ void gekkouga_frame()
     gk_gen = gen;
     gk_gen_seen = 0x1;
     gk_sk_heartbeat();
+    gk_ib_tick();                         // ice detonation v1: a blast the executable asked of him
     gk_sk_queue();                        // clone articles v1: the clones' skeletons, one a frame after his
     gk_sh_tick();                         // ... and their shurikens' claim bits
     gk_sh_report();                       // clone fix v3 diag: a shuriken copy's report (before the heartbeat's clear)
@@ -41684,6 +41689,37 @@ void gk_reset()
     gk_tr_clear();
     gk_ac_end();
     gk_tc_end();
+    gk_ib_t = 0;
+    gk_svi(48, 0);                        // ice detonation v1: no blast request
+}
+
+// ---- ice detonation v1 (fighters/gekkouga/README.md "Ice detonation v1"): an ice hit on a burning fighter clears its burns
+// and arms a blast on it (the executable: tools/gekkouga_clone_cave.py ice_arm / ice_vic); one frame before it goes off the
+// executable asks a Greninja for it (the burns' owner, else the first who can): his gk_vi(48) = type 4 + the burn amount /
+// 100, 49 / 50 the place, 51 the way. He makes a fire trail (article 9), which the executable's claim gives that request
+// first (no burn context): weapons/firetrail.c's blast mode (the hitbox, its explosion). Not claimed (no room): made once
+// more; the request dropped after gk_ib_frames(). The explosion's sound from him (his bank: the skeleton's)
+void gk_ib_tick()
+{
+    if (WorkModuleF(0, 0x0f0003b0) < 0.5f)
+    {
+        gk_ib_t = 0;
+        return;
+    }
+    if (gk_ib_t == 0 || gk_ib_t == gk_ib_retry())
+    {
+        ArticleModule(0x2710, 0x9);
+    }
+    if (gk_ib_t == 0)
+    {
+        SoundModule(0x2710, gk_ib_sound());
+    }
+    gk_ib_t += 1;
+    if (gk_ib_t > gk_ib_frames())
+    {
+        gk_svi(48, 0);                    // not claimed: dropped
+        gk_ib_t = 0;
+    }
 }
 
 // ---- skeleton v1: Shadow Sneak (SpecialS 0x153) without the vanish and the teleport: its per-frame (global16, in

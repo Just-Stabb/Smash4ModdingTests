@@ -187,6 +187,10 @@ def import_emitters(p, tmpl, name, spec):
     f = p.set_field
     f(em, 'volume_radius', [spec['radius']] * 3)
     f(em, 'scale', [x * spec['scale'] for x in p.field(em, 'scale')])
+    # its volume (type 4: a sphere in NintendoWare's order, docs/ptcl-format.md 0x340; tools/fx_render.py draws 3 / 4 as a
+    # filled circle in XZ) turned Z +90 into the YZ plane (the screen's, as the n-air ring's): round the shuriken as seen
+    # either way; centred on it (the vanilla's Y -1 dropped)
+    p.set_emitter_srt(em, rotation=(0.0, 0.0, math.pi / 2), translation=(0.0, 0.0, 0.0))
     return [em]
 
 
@@ -222,7 +226,8 @@ ICE_BOOM_FIRE_U = 0.64             # the fire's width (alpha > 0.3, cells 2 - 20
 ICE_BOOM_CENTRE = (0.38, 0.72)     # (u, v) in the cell: the fireball's middle (its alpha centroid, cells 2 - 10)
 # the sparkles: the common bank's PtcCommonIce (0x100003D, the frozen fighter's ice block) emitter kirakira1 (cyan-to-white
 # twinkles, additive, a sphere volume, emitting every 3 frames for ever, each 25 frames) copied into his bank on its own (the
-# set's ice block meshes left out), its volume the shuriken's size (its hitbox 5) and its twinkles x ICE_SPARKLE_SCALE
+# set's ice block meshes left out), its volume the shuriken's size (its hitbox 5), turned into the screen's plane, its
+# twinkles x ICE_SPARKLE['scale']
 ICE_SPARKLE = dict(set='PtcCommonIce', emitter='kirakira1', radius=5.0, scale=0.6)
 COMMON = None                      # the common bank (ptcl.Ptcl), for the sparkles
 

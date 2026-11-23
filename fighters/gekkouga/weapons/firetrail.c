@@ -624,6 +624,58 @@ int tr_fx_n;           // flames made so far
 float tr_x;            // its place, its way
 float tr_y;
 float tr_dir;
+float tr_lvl;          // ice detonation v1: the blast's level (0 - 1: its burn amount / ib_full())
+
+// ---- ice detonation v1 (fighters/gekkouga/README.md "Ice detonation v1"): the blast mode. A request of type 4 + b / 100
+// (the executable's ice_req: b = the victim's remaining burn damage + 0.5 a stack, at most 99.9) is an explosion at the
+// victim, not a trail: level L = b / ib_full() (at most 1); one hitbox (AttackModule 0x272C, made here: its damage and size
+// from L) for ib_hit_frames() frames, flame, angle 60 forward (FacingRestrict 3: the way it faces, which is the request's
+// way: away from whoever landed the ice hit), KBG / BKB ib_kbg() / ib_bkb(), shieldable (no extra shield damage), no
+// clank; its explosion (his bank's PtcGekkougaIceBoom, the sped-up flipbook) at the hitbox's centre, sized with it; gone
+// after ib_life(). It burns nothing (no burn context) and has no knockback of its own beyond the hitbox
+int ib_type() { return 4; }
+float ib_full() { return 40.0f; }         // a burn amount of 40 (two fresh smash burns and a few more stacks): the biggest
+float ib_dmg_min() { return 5.0f; }       // the damage at L 0 (a light burn: a small pop) ...
+float ib_dmg_max() { return 18.0f; }      // ... and at L 1 (a full stack of strong burns)
+float ib_size_min() { return 8.0f; }      // the hitbox's radius at L 0 ...
+float ib_size_max() { return 22.0f; }     // ... and at L 1
+int ib_angle() { return 60; }             // the user: "not straight up, but at a 60 degree angle"
+int ib_kbg() { return 80; }               // medium growth (the user)
+int ib_bkb() { return 50; }               // medium base knockback (the user)
+int ib_hit_frames() { return 5; }
+int ib_life() { return 70; }              // the explosion's 60 frames, and some
+int ib_fx() { return 0x3300023; }         // his bank's PtcGekkougaIceBoom (tools/gekkouga_fx.py ICE_BOOM_REF: fits a radius
+float ib_fx_ref() { return 10.0f; }       // of 10 at size 1)
+float ib_dmg(float l) { return ib_dmg_min() + (ib_dmg_max() - ib_dmg_min()) * l; }
+float ib_size(float l) { return ib_size_min() + (ib_size_max() - ib_size_min()) * l; }
+
+float ib_level(float t)
+{
+    float l;
+    l = (t - 4.0f) * 100.0f / ib_full();
+    if (l < 0)
+    {
+        l = 0;
+    }
+    if (l > 1.0f)
+    {
+        l = 1.0f;
+    }
+    return l;
+}
+
+void ib_start()
+{
+    float d;
+    float r;
+    tr_lvl = ib_level(tr_var(1));
+    d = ib_dmg(tr_lvl);
+    r = ib_size(tr_lvl);
+    MotionModule(0x1, 0x3, 0, 0);         // FireTrailIceBoom: no hitbox of its own (held)
+    AttackModule(0x272c, 0, 0, 0, d, ib_angle(), ib_kbg(), 0, ib_bkb(), r, 0, 0, 0, 0x5, 0, 1.0f, 1.0f, 0, 0, 0,
+        0x2, 0xb, 0x3, 0, 0, 0x3f, 0, 0xf, 0, 0x1, 0, 0, 0, 0, 0, 0x3, 0, 0, 0, 0, 0, 0, 0.01f, 0);
+    EffectModule(0x3, ib_fx(), tr_x, tr_y, 0, 0, 0, 0, r / ib_fx_ref(), 0, 0xffffffff);
+}
 
 int tr_life() { return 180; }             // 3 s (the user)
 int tr_fade() { return 15; }              // its fire fades over its last frames (the set's fade 1 / 15)
@@ -700,7 +752,11 @@ float tr_fx_dy(int k)
 void tr_start()
 {
     tr_type = (int)(tr_var(1) + 0.5f);
-    if (tr_type < 0x1 || tr_type > 0x3)
+    if (tr_var(1) > 3.5f)
+    {
+        tr_type = ib_type();              // ice detonation v1: a blast
+    }
+    else if (tr_type < 0x1 || tr_type > 0x3)
     {
         tr_type = 0x1;
     }
@@ -716,10 +772,15 @@ void tr_start()
     PostureModule(0x3, tr_x, tr_y, 0);
     EffectModule(0x26, 0);                // its fire doesn't follow its (hidden) model's visibility
     EffectModule(0x1C, 0x1);
-    MotionModule(0x1, tr_type - 0x1, 0, 0);   // its smash's hitboxes (the game script's first commands), held (rate 0)
     tr_on = 0x1;
     tr_t = 0;
     tr_fx_n = 0;
+    if (tr_type == ib_type())
+    {
+        ib_start();
+        return;
+    }
+    MotionModule(0x1, tr_type - 0x1, 0, 0);   // its smash's hitboxes (the game script's first commands), held (rate 0)
 }
 
 void tr_frame()
@@ -737,7 +798,27 @@ void tr_frame()
             }
             return;
         }
+        if (tr_var(1) < 3.5f && tr_var(5) < 0.5f)
+        {
+            BattleObject(0x9);            // ice detonation v1: a trail with no burn context (article 9 holds 2 more for
+            return;                       // blasts): gone, so at most 6 burning trails as before
+        }
         tr_start();
+    }
+    if (tr_type == ib_type())
+    {
+        tr_t += 1;
+        if (tr_t == ib_hit_frames())
+        {
+            AttackModule(0x2719);         // its hitbox off (its records kept: one hit each)
+        }
+        if (tr_t >= ib_life())
+        {
+            BattleObject(0x9);
+            return;
+        }
+        PostureModule(0x3, tr_x, tr_y, 0);
+        return;
     }
     if (tr_fx_n < tr_fx_count())          // a flame a frame (their flipbooks out of step)
     {

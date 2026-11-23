@@ -976,7 +976,77 @@ def cmd_acmd(user_dir, vanilla_model, out_dir, test_only=None):
             acmd.ACMDFile(e2).save(os.path.join(td, 'effect.bin'))
     acmd.ACMDFile({}).save(os.path.join(ow, 'sound.bin'))
     open(os.path.join(ow, 'motion.mtable'), 'wb').write(mt)
+    cmd_shuriken(user_dir, out_dir)          # ice detonation v1: the uncharged Water Shuriken's ice and sparkles
     return dict(scaled=n, tips=tips, game=len(g), effect=len(e), motions=len(hashes))
+
+
+# ---------------------------------------------------------------- ice detonation v1: the uncharged Water Shuriken
+# (the user: "make Greninja's uncharged Water Shuriken apply a weak ice effect. Also please add ice sparkles around uncharged
+# Water Shuriken"). His shuriken's Shot (motion kind 8, script "Shot": Special_Hitbox IDs 0 (3 %) / 1 (11 %) and ATK_LERP
+# 0 -> 1, the game lerping between them by the charge) is every shot short of the full charge (MaxShot, motion 0x10, is the
+# full one: unchanged). Its sound script picks its small / big sound by Float_Var_Compare(5, <, 0.5): the shuriken's float
+# 5, its charge (0 - 1). Uncharged = that float under SH_ICE_CHARGE (a tap): its game script's IDs 0 / 1 get Effect 4
+# (ice) and the ice hit sound (SFXType 0x1C, their levels kept), the rest as they are; charged (a held shot) the vanilla hitboxes.
+# Its effect script (empty in vanilla) gets the ice sparkles (his bank's PtcGekkougaIceSparkle, the common bank's frozen-
+# fighter twinkles) on its joint 0 for its flight, under the same compare. Freezing needs knockback over 52.5 (the
+# community sheet's Element tab): ID 0's KB (3 %, KBG 85, BKB 10) on a 100-weight fighter is 26 at 0 %% and reaches 52.5
+# at about 87 %; under that the hit only shows the ice effect, over it a short freeze (12 x 3 % = 36 frames). The clones'
+# shurikens are this article (clone articles v1): theirs follow. The ice element makes it a trigger for the ice detonation
+SH_SHOT = 'Shot'
+SH_ICE_CHARGE = 0.1
+SH_ICE_HIT = dict(Effect=4, SFXType=0x1C)
+ICE_SPARKLE = 0x3300024           # tools/gekkouga_fx.py PtcGekkougaIceSparkle (efc entry 0x24)
+
+
+def var_compare(var, method, value):
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    return acmd.Command(by['Float_Var_Compare'], [var, method, value])
+
+
+def block(name, words):
+    import acmd
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    return acmd.Command(by[name], [words])
+
+
+def words(cmds):
+    return sum(1 + len(c.params) for c in cmds)
+
+
+def shuriken_ice(game, effect):
+    """the shuriken's Shot: uncharged (its float 5 < SH_ICE_CHARGE) ice hitboxes and sparkles, else as vanilla. game /
+    effect: its ACMDFiles (changed in place)"""
+    import acmd
+    s = game.scripts[acmd.crc(SH_SHOT)]
+    assert [c.name for c in s] == ['Special_Hitbox', 'Special_Hitbox', 'ATK_LERP', 'Script_End'], [c.name for c in s]
+    van = [acmd.Command(c.ident, list(c.params)) for c in s[:3]]
+    ice = [acmd.Command(c.ident, list(c.params)) for c in s[:3]]
+    for c in ice[:2]:
+        for k, v in SH_ICE_HIT.items():
+            c.params[param(c, k)] = v
+    els = block('Else', 2 + words(van))
+    game.scripts[acmd.crc(SH_SHOT)] = [var_compare(5, 4, SH_ICE_CHARGE), block('True', 2 + words(ice) + 2)] + ice + \
+        [els] + van + [s[3]]
+    sp = [ext_graphic(ICE_SPARKLE, 0, 0.0, 0.0, 0.0, 1.0, 1)]
+    assert not effect.scripts.get(acmd.crc(SH_SHOT))
+    by = {v['name']: k for k, v in acmd.INFO.items()}
+    effect.scripts[acmd.crc(SH_SHOT)] = [var_compare(5, 4, SH_ICE_CHARGE), block('True', 2 + words(sp))] + sp + \
+        [acmd.Command(by['Script_End'], [])]
+    return game, effect
+
+
+def cmd_shuriken(user_dir, out_dir):
+    """his shuriken's game / effect scripts (script/animcmd/weapon/shuriken) with the uncharged ice"""
+    import acmd
+    d = os.path.join(user_dir, 'weapon', 'shuriken')
+    game = acmd.ACMDFile.load(os.path.join(d, 'game.bin'))
+    effect = acmd.ACMDFile.load(os.path.join(d, 'effect.bin'))
+    shuriken_ice(game, effect)
+    o = os.path.join(out_dir, 'weapon', 'shuriken')
+    os.makedirs(o, exist_ok=True)
+    game.save(os.path.join(o, 'game.bin'))
+    effect.save(os.path.join(o, 'effect.bin'))
 
 
 # ---------------------------------------------------------------- the clone's model / motion
@@ -1424,7 +1494,9 @@ def sound_test_msc(src):
 
 # ---------------------------------------------------------------- burn v2: the smashes' fire trails (article 9)
 TRAIL_MSC = os.path.join(ROOT, 'fighters', 'gekkouga', 'weapons', 'firetrail.c')
-TR_SCRIPTS = ('FireTrailS4', 'FireTrailHi4', 'FireTrailLw4')   # its motion kinds 0 / 1 / 2 (forward / up / down smash)
+TR_SCRIPTS = ('FireTrailS4', 'FireTrailHi4', 'FireTrailLw4', 'FireTrailIceBoom')   # its motion kinds 0 / 1 / 2 (forward /
+# up / down smash); ice detonation v1: 3, the blast (no hitbox in its script: weapons/firetrail.c ib_start makes it, its
+# damage and size from the burn amount)
 # its hitboxes (bone 0, held from the motion's first frame): along each smash's path, where its fire is (firetrail.c
 # tr_fx_*): (Z forward along its way, Y up, size). No knockback (KBG / FKB / BKB 0), no hitlag, no flinch, no hit effect,
 # 0.1 % (a hit to log: the burn is the exe's trail row, 0.25 % every 15 frames for 3 s = 3 %), re-hit every TR_REHIT
@@ -1468,7 +1540,7 @@ def tr_scripts():
     """{crc: [Command]}: each smash's hitboxes at once (its MSC holds the motion at frame 0), then the end"""
     import acmd
     by = {v['name']: k for k, v in acmd.INFO.items()}
-    return {acmd.crc(n): [tr_hitbox(i, *b) for i, b in enumerate(TR_BOXES[n])] + [acmd.Command(by['Script_End'], [])]
+    return {acmd.crc(n): [tr_hitbox(i, *b) for i, b in enumerate(TR_BOXES.get(n, ()))] + [acmd.Command(by['Script_End'], [])]
             for n in TR_SCRIPTS}
 
 

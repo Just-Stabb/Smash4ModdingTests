@@ -1957,3 +1957,88 @@ No new script, slot or ACMD command (Extended_Special_Hitbox is vanilla): ModAni
   `supamario_ui_cave_test` 0 failures; msc_stack_check 0 problems, his globals 121 <= 128; the opcode guard OK. Effects
   unchanged (no gekkouga_fx_test run needed).
 - Not confirmed in game.
+
+## Ice detonation v1 (`greninja_ice_detonation_v1.zip`, over smash tune v1; exe_v46z_gkb15, Sm4shCommand v1.7.29)
+
+The user: "make it so a burning character can be cleared of all burns with an ice element hitbox ... this explosion to
+attach to the affected opponent on a delay where they quickly shift to a flashing yellow and black for 52 frames until
+they explode ... speed up the attached effect and scale the size and damage of the explosion with how burned the opponent
+is ... medium base knockback and medium growth ... not straight up, but at a 60 degree angle", "make Greninja's uncharged
+Water Shuriken apply a weak ice effect ... add ice sparkles around uncharged Water Shuriken", then "Make sure the smoke of
+the explosion goes by much faster".
+
+**The trigger** (exe feature `ice`, `tools/gekkouga_clone_cave.py` `ice_hit` / `ice_arm`; docs/native-notes.md "The
+victim hit handler and the hitbox's element"):
+- Every hit on a hurtbox (any fighter's, their projectiles' and items' alike) goes through the victim hit handler
+  `0x02C25318`; `ICE_HOOK` (`0x02C253B4`) sends it to `ice_hit`. The hit info's `+0x87` is the hitbox's Effect (its data
+  `+0x43`): Effect 4 (Freezing, the community sheet's Element tab) on a fighter arms it when it has a burn instance.
+- Armed: every burn on it cleared (anyone's: the fire fades as when burns end, the burn tint is turned off), and recorded:
+  the remaining burn damage (each instance's damage a tick x frames left / interval), the stack count, the owner with the
+  most of it, the way to send it (+1 when the victim stands right of the attacking object, else -1).
+- **Choices:** an ice re-hit while armed is ignored; a shielded ice hit does nothing (a shield hit never reaches the
+  handler: it goes to the shield's own `0x02E35794`, as the burn rules' shield case); burns landing while armed are not
+  taken (`burn_add` skips an armed victim), so the blast can't be fed or re-armed until it has gone off.
+
+**The countdown** (`ice_vic`, from `burn_tick` per victim, the first live Greninja's only: one step a frame):
+- Frames 1 - 52: the victim's ColorBlendModule slot 1 (the burn tint's path) = `ice_flash()`: yellow (1.0, 0.85, 0.05) /
+  black (0.02, 0.02, 0.02) at alpha 0.8, 3 frames each to frame 30, then 2 each (it quickens toward the blast); frames 1 /
+  2 at alpha 0.35 / 0.6 (it shifts in quickly).
+- Frame 51 (`ICE_LEAD` 1 early): the blast asked of a Greninja (the burns' owner if live, not Dead / Rebirth and not the
+  victim; else the first such; none: no blast): his `gk_vi(48)` - `51` (`ICE_VAR` `0x0F0003B0`) = type 4 + b / 100, the
+  victim's x, its y + 9, the way. His MSC (`clones.c` `gk_ib_tick`) makes article 9 (once more 3 frames later if not
+  claimed; dropped after 6) and plays the skeleton's explosion sound (`0x07680060`). `tr_claim` scans that request first
+  and gives it no burn context.
+- Frame 53: the colour off, the victim free again (the blast lands at 52 - 53: made and claimed within 1 - 2 frames).
+- A KO (Dead / Rebirth) cancels it at once (colour off, nothing asked); a match / training reset (`gk_clear`) too.
+
+**The blast** (`weapons/firetrail.c` `ib_start`: the fire trail article's blast mode, motion kind 3 `FireTrailIceBoom`,
+an empty script; article 9's list 6 -> 8, a trail claimed with no burn context goes at once, so still 6 burning trails):
+- **Owner:** the Greninja asked (the burns' owner first). It hits the victim and anyone else in it but his team (an
+  article of his), once each (one hitbox, its records kept when it goes off).
+- **Burn amount** b = remaining burn damage + 0.5 a stack (at most 99.9); level L = min(b / 40, 1).
+- **Damage** 5 + 13 L % (5 - 18), **radius** 8 + 14 L (8 - 22), on for 5 frames at the victim's middle (y + 9).
+- **Knockback:** angle 60, KBG 80, BKB 50, FacingRestrict 3 (sent the way the article faces: away from whoever landed the
+  ice hit). Against vanilla: smash attacks are about KBG 95 - 110 / BKB 20 - 40, tilts about KBG 100 / BKB 0 - 10, so this
+  is a lower growth with a higher base (a mid launcher). Weight 100, no rage: 5 % -> 66 / 90 / 113 at 0 / 60 / 120 %;
+  11.5 % -> 73 / 118 / 164; 18 % -> 85 / 152 / 219 (about 160, a KO from mid-stage, at 68 % for the full one, 115 % half).
+- Flame, the explosion hit sound (SFXType 0xB, level 2), shieldable, no extra shield damage (Smash 4's damage x 1.19:
+  6 - 21 of a shield's 50), no clank, never negative.
+- **Effect:** his bank's PtcGekkougaIceBoom (`0x3300023`) at the hitbox's centre, size = radius / 10.
+
+**The effect** (`tools/gekkouga_fx.py` `_ice_sets`): FootageCrate Simple_Explosion_15 (green screen) made into `ice_boom_15`
+by `tools/fx_video_to_flipbook.py` (new `--retime`: piecewise speed-ups of a one-shot): `--matte chroma --oneshot --retime
+0:2,42:4,54:8 --fpc 2 --fade-out 4 --cells 16:31`: 30 cells of 2 frames, 1.0 s (the clip 3.7 s): the fireball (source 1 -
+43) at 2x, its embers (43 - 55) at 4x, **the smoke (55 - 99) at 8x**, its last 4 cells faded; one emitter, normal blend
+(the smoke darkens), the fireball's middle (u 0.38, v 0.72 of the cell) on the call's point, its fire 20 wide at size 1.
+
+**Uncharged Water Shuriken** (`gekkouga_build.py` `shuriken_ice`; script/animcmd/weapon/shuriken):
+- Its Shot (every shot short of full charge; MaxShot, the full one, unchanged) is IDs 0 (3 %) / 1 (11 %) lerped by the
+  charge. Its sound script splits small / big by `Float_Var_Compare(5, <, 0.5)`, the shuriken's float 5 (its charge, 0 -
+  1). Now `Float_Var_Compare(5, <, 0.1)` (a tap): IDs 0 / 1 with Effect 4 (ice) and the ice hit sound (SFXType 0x1C);
+  else the vanilla hitboxes.
+- Weak: freezing needs knockback over 52.5. ID 0 (3 %, KBG 85, BKB 10) gives 26 at 0 % and passes 52.5 at about 88 %
+  (weight 100): under that the hit only shows the ice effect; over it a short freeze (12 x 3 % = 36 frames).
+- Its effect script (empty in vanilla) gets, under the same compare, PtcGekkougaIceSparkle (`0x3300024`) following its
+  joint 0 for its flight: the common bank's PtcCommonIce `kirakira1` (the frozen fighter's twinkles: colour 1 cyan
+  (0, 0.72, 1) to white, additive, a sphere volume, every 3 frames, 25 frames each) copied into his bank, its volume the
+  shuriken's 5, its twinkles x 0.6. The effects build needs `--common=common.010d0000.ptcl`.
+- The clones' shurikens are this article (clone articles v1): theirs follow. An uncharged shuriken on a burning fighter
+  arms the detonation.
+
+**Exe:** exe_v46z_gkb15 = RELEASE (smash tune v1's gkb14 + `ice`); gkb14 still rebuilds byte for byte (RELEASE - ice).
+Diag (A_release): **S4IA** armed (victim, amount x100, stacks, owner, way), **S4IB** blast asked (victim, Greninja, amount
+x100), **S4IC** cancelled by a KO (victim, status, frame). Sm4shCommand v1.7.29: `FireTrailIceBoom` in ModAnimNames.txt;
+no command changed.
+
+**Previews** (`tools/gekkouga_ice_preview.py`): `$S/gk_preview/ice_boom.gif` / `.png` (the explosion at burn amounts 5 /
+20 / 60), `ice_flash.gif` / `.png` (the flashing victim, then the blast), `ice_sparkle.gif` / `.png`.
+
+**Tests:** `gekkouga_clone_cave_test` (`ice_checks`: the hook, the trigger / clearing / recording against `ice_amount`,
+not ice / not burning / armed, burns refused, the 52 flash frames and the request at 51, owner / fallback / none, a KO,
+a reset, the claim's order and no context); `gekkouga_clones_test ... --vst=greninja_smash_tune_v1.zip` (`ice_tests`:
+`gk_ib_tick`, the blast's hitbox at three levels, its end, a trail with no context, the shuriken's scripts, the knockback
+numbers); `gekkouga_fx_test --common=...` (`ice_checks`: ids, placement, the retimed flipbook, the copied sparkles).
+
+**Not confirmed in game:** everything here; in particular that the victim hit handler sees every hurtbox hit once (and
+no shield hit), that the shuriken's float 5 is its charge (only its sound script's use says so), the article's blast
+hitbox made from MSC (`AttackModule 0x272C`, as Kirby's vanilla Stone), and the common emitter's look in his bank.
