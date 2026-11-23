@@ -105,7 +105,8 @@ CATEGORY_BITS = 0x181             # u16 flags 0x80 / 0x1 / 0x100: the resource r
                                   # don't appear"). v3: 0x87C
 FEATURES = frozenset(('attack', 'hurt', 'parts', 'bstart', 'sway', 'hitcheck', 'burn', 'skeleton', 'pose', 'burn2', 'floor1',
                       'tiers', 'gmupd', 'skbody', 'sktouch', 'skdist', 'btint', 'mark', 'sksnd', 'cart', 'gauge2',
-                      'gready', 'skbot', 'shalf', 'ice', 'ice2', 'bgrav', 'pbeetle', 'ice3', 'ccol', 'gkui', 'ice4'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
+                      'gready', 'skbot', 'shalf', 'ice', 'ice2', 'bgrav', 'pbeetle', 'ice3', 'ccol', 'gkui', 'ice4',
+                      'ktrail'))   # v5: each risky part, built in or not (the v3 / v4 in-game crashes
 # at a clone's spawn: v4's B with lizardonm's routine / row crashed inside the generate). VARIANTS: the shipped builds.
 #   (none)  the safe set: base kind moon (SAFE_BASE: bunshin's per-frame template + the MSC agent's update), bunshin's
 #           row + the MSC agent (slot 8): the clone's MSC runs; no attack, no hurtbox
@@ -2696,11 +2697,16 @@ BUILD_TAG = 'exe_v46z_gkb18'      # parabeetle v2 (ice3): named in the diag buil
 RELEASE = RELEASE | {'gkui'}       # UI radar / waveform v1: + gkui (exe_v46z_gkb19; gkb18 is RELEASE - gkui)
 RELEASE = RELEASE | {'ice4'}       # beetle safety / radar v2: + ice4 (exe_v46z_gkb20: the ice flash's darker yellow; gkb19 is
                                    # RELEASE - ice4)
+RELEASE = RELEASE | {'ktrail'}     # Corrin cyan trail v1: + ktrail (exe_v46z_gkb21: tools/kamui_trail_cave.py's trail
+                                   # texture ids 272 / 273, not Greninja's: the release chain's one exe; gkb20 is
+                                   # RELEASE - ktrail)
 
 
 def build_tag(feats):
     """the build named in the diag lines (UI radar / waveform v1: gkb19 with gkui; beetle safety / radar v2: gkb20 with
     ice4; the earlier builds' own lines unchanged)"""
+    if 'ktrail' in feats:
+        return 'exe_v46z_gkb21'
     return 'exe_v46z_gkb20' if 'ice4' in feats else 'exe_v46z_gkb19' if 'gkui' in feats else BUILD_TAG
 VARIANTS = (('A_release', RELEASE),)
 # skeleton v1.6 (the user: "Please stop packaging G_pose. It has no use anymore."): A_release only. The pose feature
@@ -8134,8 +8140,24 @@ w_dcase:
     if 'pbeetle' in feats:
         # parabeetle v1: loaded with him, its model c00 only, the pump's template, the skeleton's row
         register(PB_KIND, A['pb_str'], CATEGORY_BITS | 0x10, lab['pb_dcase'], ATTACK_BASE, A['pb_single'], A['pb_row'])
+    if 'ktrail' in feats:
+        ktrail_words(rpx, img, out)
     info = dict(A=A, labels=lab, T=T, layout=L, end=end, owner_str=owner_str, feats=feats, diag=diag, clear_at=ct)
     return out, info
+
+
+def ktrail_words(rpx, img, out):
+    """Corrin cyan trail v1 (not Greninja's; here so the one release exe carries it): tools/kamui_trail_cave.py's trail
+    texture-name table (trail_table_cave.py's copy at 0x04B9B000 re-laid out with ids 272 / 273), the words that differ
+    from the base. The base already has trail_table_cave.py's copy (exe_v46q+: its lis / addi and their moved
+    relocations), so no relocation moves and no grow: are needed; asserted."""
+    import kamui_trail_cave as KT
+    import trail_table_cave as TT
+    assert (img.w(TT.LIS), img.w(TT.ADDI)) == (0x3F2004BA, 0x3B39AFFC), 'ktrail: the base has no trail table copy'
+    for a, w in sorted(KT.build(rpx).items()):
+        assert TT.CAVE <= a < TT.GROW or a in (TT.LIS, TT.ADDI), hex(a)
+        if img.w(a) != w:
+            out.put(a, w, 'ktrail: trail table 0x%08X' % a)
 
 
 def args(rpx, diag=False, feats=None):
