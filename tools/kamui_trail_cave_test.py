@@ -3,7 +3,8 @@
 
   python3 tools/kamui_trail_cave_test.py BASE.rpx WORK_DIR [--sm4shcommand RUN_DIR]
 
-BASE.rpx: an executable with tools/trail_table_cave.py's table (ids 1 - 271), e.g. exe_v46z_ui10 or a later release.
+BASE.rpx: an executable with tools/trail_table_cave.py's table (ids 1 - 271), e.g. exe_v46z_ui10, or a release that has
+  272 / 273 already (exe_v46z_gkb21+, gekkouga_clone_cave.py's ktrail): then applying it must change no byte.
 WORK_DIR: scratch space (the patched executable is written there, about 22 MB, and removed).
 --sm4shcommand RUN_DIR: a built Sm4shCommand (SM4SHCommand.exe, SALT.dll, Events.cfg, Tooltips): compiles
   tools/Sm4shCommand/trail_textures_test.cs there (TtTest.exe) and runs it.
@@ -127,25 +128,31 @@ def test_exe(base_rpx, work):
         end = max(patches)
         check('the table + strings end below 0x04B9C000 (weapon_expand_append.py\'s space)', end < T.GROW, hex(end))
         a, b = base.sections(), new.sections()
-        # (.bss has no data in the file; the CRC table changes with the code section's CRC: its word 4 x index)
-        kinds = [s[1] for s in base.secs]
-        changed = [i for i in range(len(a)) if a[i] != b[i] and kinds[i] not in (8, rpx_patch.SHT_RPL_CRCS)]
-        text = [i for i, s in enumerate(base.secs) if s[3] <= T.CAVE < s[3] + len(a[i] or b'')]
-        check('only the code section changes', changed == text, (changed, text))
-        crcs = kinds.index(rpx_patch.SHT_RPL_CRCS)
-        cw = [k for k in range(0, len(a[crcs]), 4) if a[crcs][k:k + 4] != b[crcs][k:k + 4]]
-        check('... and its CRC (the CRC table\'s only change)', cw == [4 * t for t in text], cw)
-        if changed == text and text:
-            i = text[0]
-            addr0 = base.secs[i][3]
-            x, y = np.frombuffer(a[i], np.uint8), np.frombuffer(b[i][:len(a[i])], np.uint8)
-            diff = np.nonzero(x != y)[0]
-            lo, hi = (addr0 + diff.min(), addr0 + diff.max()) if len(diff) else (0, 0)
-            check('... only bytes in [0x04B9B000, 0x04B9C000) (lis / addi unchanged)',
-                  len(b[i]) == len(a[i]) and T.CAVE <= lo and hi < T.GROW, (hex(lo), hex(hi), len(a[i]), len(b[i])))
-            old_end = T.CAVE + 4 * (T.OLD_N + len(T.NEW_TRAILS)) + sum(len(n) + 1 for n in T.NEW_TRAILS)
-            tail = x[old_end - addr0:T.GROW - addr0]
-            check('... the words it takes past the old table were zero', not tail.any())
+        w272 = base.u32(T.CAVE + 4 * 271)          # (past a 271-name table: its strings' first bytes)
+        if T.CAVE <= w272 < T.GROW and base.cstr(w272) == 'TexKamuiSwordTraceCyan':
+            # a release that has it already (exe_v46z_gkb21+: gekkouga_clone_cave.py's ktrail): nothing to add
+            check('the base has ids 272 / 273 already (gkb21+): applying it changes no byte',
+                  open(base_rpx, 'rb').read() == open(out_rpx, 'rb').read())
+        else:
+            # (.bss has no data in the file; the CRC table changes with the code section's CRC: its word 4 x index)
+            kinds = [s[1] for s in base.secs]
+            changed = [i for i in range(len(a)) if a[i] != b[i] and kinds[i] not in (8, rpx_patch.SHT_RPL_CRCS)]
+            text = [i for i, s in enumerate(base.secs) if s[3] <= T.CAVE < s[3] + len(a[i] or b'')]
+            check('only the code section changes', changed == text, (changed, text))
+            crcs = kinds.index(rpx_patch.SHT_RPL_CRCS)
+            cw = [k for k in range(0, len(a[crcs]), 4) if a[crcs][k:k + 4] != b[crcs][k:k + 4]]
+            check('... and its CRC (the CRC table\'s only change)', cw == [4 * t for t in text], cw)
+            if changed == text and text:
+                i = text[0]
+                addr0 = base.secs[i][3]
+                x, y = np.frombuffer(a[i], np.uint8), np.frombuffer(b[i][:len(a[i])], np.uint8)
+                diff = np.nonzero(x != y)[0]
+                lo, hi = (addr0 + diff.min(), addr0 + diff.max()) if len(diff) else (0, 0)
+                check('... only bytes in [0x04B9B000, 0x04B9C000) (lis / addi unchanged)',
+                      len(b[i]) == len(a[i]) and T.CAVE <= lo and hi < T.GROW, (hex(lo), hex(hi), len(a[i]), len(b[i])))
+                old_end = T.CAVE + 4 * (T.OLD_N + len(T.NEW_TRAILS)) + sum(len(n) + 1 for n in T.NEW_TRAILS)
+                tail = x[old_end - addr0:T.GROW - addr0]
+                check('... the words it takes past the old table were zero', not tail.any())
         import import_call_check
         bad = import_call_check.direct_import_calls(base_rpx, patches)
         check('import_call_check: no word is a call to an import', bad == [], bad)
@@ -177,6 +184,9 @@ def test_sm4shcommand(base_names):
     kam = tips[tips.index('[fighter kamui]'):]
     check('Tooltips/trails.txt: Corrin\'s own entries (240 / 241, 272 / 273 with the executable they need)',
           '0x000000F0 = TexKamuiSwordTrace |' in kam and 'NEW (v1.7.31)' in kam and 'kamui_trail_cave.py\'s table' in kam)
+    check('Tooltips / help: name the executable that has 272 / 273 (exe_v46z_gkb21 or later)',
+          'Needs cross_f.rpx exe_v46z_gkb21 or later' in kam and 'exe_v46z_gkb21 or later' in
+          open(os.path.join(S4C, 'SM4SHCommand', 'Events.cfg'), encoding='utf-8').read())
     cfg = open(os.path.join(S4C, 'SM4SHCommand', 'Events.cfg'), encoding='utf-8').read()
     check('Events.cfg: Sword_Glow\'s help and cyan example (make_events_cfg.py)',
           'Help: ## Texture ids (changed in v1.7.31: 272 / 273 are new)' in cfg and

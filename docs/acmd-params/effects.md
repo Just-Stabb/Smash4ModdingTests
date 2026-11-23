@@ -56,7 +56,8 @@ but the meaning inferred (or inferred from values + an Ultimate equivalent), **L
   followed by other variables, so it can't grow in place. `tools/trail_table_cave.py` copies it into the
   grown code space (`0x04B9B000`, the pointers then the strings, below `0x04B9C000`) and repoints the two
   instructions: ids 260 - 271 are the ports' (Sephiroth, Hero, Byleth). `tools/kamui_trail_cave.py` adds
-  Corrin's after them: **272 `TexKamuiSwordTraceCyan`, 273 `TexKamuiSwordTraceCyanAdd`**. The copy uses 1,400
+  Corrin's after them: **272 `TexKamuiSwordTraceCyan`, 273 `TexKamuiSwordTraceCyanAdd`** (in the release from
+  exe_v46z_gkb21: `gekkouga_clone_cave.py`'s feature `ktrail`). The copy uses 1,400
   of its 4,096 bytes: room for about 90 more names of this length before `0x04B9C000` (weapon_expand_append.py's
   space from there).
 - **The file**: the name is looked up among the loaded trail textures, which are every `.nut` in a loaded

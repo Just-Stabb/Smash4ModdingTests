@@ -17,6 +17,10 @@ out over the copy, which that build re-applies over an executable that has it). 
 added twice, so folding KAMUI_TRAILS into trail_table_cave.NEW_TRAILS later changes nothing (same ids, same bytes).
 Only words in [0x04B9B000, 0x04B9C000) and the two instructions trail_table_cave.py writes change.
 
+In the release chain: tools/gekkouga_clone_cave.py's feature ktrail (RELEASE from exe_v46z_gkb21) adds these words
+(the ones that differ from its base) to its own, so `rpx_patch.py exe_v46z_ui10.rpx OUT $(gekkouga_clone_cave.py
+--rpx exe_v46z_ui10.rpx)` gives the release with them; over that release this script changes nothing.
+
 The textures: fighter/kamui/effect/kamui/trail/<name>.nut (NTP3, 128 x 128, one mip, texture id 0, as her vanilla
 TexKamuiSwordTrace / Add), made by tools/kamui_trail_build.py. Test: tools/kamui_trail_cave_test.py.
 """

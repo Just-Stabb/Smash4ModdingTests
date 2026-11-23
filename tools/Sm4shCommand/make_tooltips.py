@@ -474,8 +474,9 @@ FIGHTER_TRAILS = [
     ("brave", 264, 269, "Hero's port (tools/trail_table_cave.py)"),
     ("master", 270, 271, "Byleth's port (tools/trail_table_cave.py)"),
     ("kamui", 272, 273, "NEW (v1.7.31): Corrin's cyan / light-blue sword trail (tools/kamui_trail_cave.py). Use "
-     "Texture1=272 (the trail), Texture2=273 (its glow), Shader=1, BlendMode=0xB. Needs the executable with "
-     "kamui_trail_cave.py's table (else the game can crash) and fighter/kamui/effect/kamui/trail/"
+     "Texture1=272 (the trail), Texture2=273 (its glow), Shader=1, BlendMode=0xB. Needs cross_f.rpx "
+     "exe_v46z_gkb21 or later (kamui_trail_cave.py's table; on gkb20 and older the game can crash) and "
+     "fighter/kamui/effect/kamui/trail/"
      "TexKamuiSwordTraceCyan.nut / TexKamuiSwordTraceCyanAdd.nut"),
 ]
 

@@ -3558,8 +3558,8 @@ _ov[_ov.index('## More'):_ov.index('## More')] = [
     '## New values in vanilla commands',
     '- Trail textures (Sm4shCommand v1.7.31, tools/kamui_trail_cave.py): Sword_Glow / Sword_Glow2 texture ids 272 '
     '(TexKamuiSwordTraceCyan) and 273 (TexKamuiSwordTraceCyanAdd), Corrin\'s cyan sword trail, after the game\'s 259 '
-    'and the ports\' 260 - 271 (Sephiroth, Hero, Byleth). See Sword_Glow (group "Trails & sword glow"); hover a '
-    'texture id in a script for its name.',
+    'and the ports\' 260 - 271 (Sephiroth, Hero, Byleth); they need cross_f.rpx exe_v46z_gkb21 or later. See '
+    'Sword_Glow (group "Trails & sword glow"); hover a texture id in a script for its name.',
     '',
 ]
 _TRAIL_IDS = [
@@ -3575,9 +3575,10 @@ _TRAIL_IDS = [
     'glow, for Corrin (tools/kamui_trail_cave.py; the textures in fighter/kamui/effect/kamui/trail/). Use them as a '
     'pair, Texture1=272, Texture2=273, with Shader=1 and BlendMode=0xB as her own trail. Sm4shCommand shows them as '
     '0x110 / 0x111 once the script is decompiled.',
-    'They need the patched cross_f.rpx with the longer table (tools/kamui_trail_cave.py, which adds them after '
-    'trail_table_cave.py\'s 271). On an executable without it, ids past its table read garbage as a name pointer: '
-    'the game can crash. Like any trail texture they only draw when the fighter\'s trail folder has the .nut (a '
+    'They need cross_f.rpx exe_v46z_gkb21 or later (released with Corrin cyan trail v1, over Greninja beetle '
+    'safety): its trail-name table has them (tools/kamui_trail_cave.py, built into the release by '
+    'gekkouga_clone_cave.py\'s ktrail). On an older executable (exe_v46z_gkb20 and before) the table stops at 271 '
+    'and a bigger id reads garbage as a name pointer: the game can crash. Like any trail texture they only draw when the fighter\'s trail folder has the .nut (a '
     'texture of another fighter in the match is found too, by name).',
     '',
     '## Adding your own trail texture',
@@ -3603,7 +3604,7 @@ VANILLA_EXAMPLES = {
     'Sword_Glow': [
         '// Corrin\'s forward tilt (AttackS3, effect script) with the new cyan trail: her own Sword_Glow (sword joint',
         '// 0x19, the blade from Y 0.1 to 14, her blade flare 0x3390001) with Texture1=272, Texture2=273 instead of',
-        '// her orange 240 / 241. Needs the executable with tools/kamui_trail_cave.py\'s table and',
+        '// her orange 240 / 241. Needs cross_f.rpx exe_v46z_gkb21 or later (tools/kamui_trail_cave.py\'s table) and',
         '// fighter/kamui/effect/kamui/trail/TexKamuiSwordTraceCyan.nut / TexKamuiSwordTraceCyanAdd.nut',
         'FRAME(Frames=7)',
         'Sword_Glow(Texture1=272, Texture2=273, BlurLength=8, Bone1=0x19, X1=0, Y1=0.1, Z1=0, Bone2=0x19, X2=0, Y2=14, '
